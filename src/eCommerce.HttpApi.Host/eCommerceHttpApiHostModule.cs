@@ -4,6 +4,7 @@ using Medallion.Threading.Redis;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using OpenIddict.Server.AspNetCore;
 using StackExchange.Redis;
 using Volo.Abp;
 using Volo.Abp.AspNetCore.Mvc;
@@ -12,18 +13,24 @@ using Volo.Abp.BackgroundWorkers;
 using Volo.Abp.Caching.StackExchangeRedis;
 using Volo.Abp.DistributedLocking;
 using Volo.Abp.Modularity;
+using Volo.Abp.OpenIddict;
 using Volo.Abp.Swashbuckle;
 
 namespace eCommerce;
 
 /// <summary>
-/// Host của ứng dụng (modular monolith).
+/// Host của ứng dụng (modular monolith, API-only).
 ///
-/// ⚠️ Đây là skeleton API-only: CHƯA có UI/auth module.
-/// Khi có mạng, thêm bằng ABP CLI (mỗi lệnh tự cấu hình DbContext + UI):
-///     abp add-module Volo.Abp.Identity          # user/role/permission
-///     abp add-module Volo.Abp.OpenIddict        # auth server của ABP 10 (thay IdentityServer)
-///     abp add-module Volo.Abp.AspNetCore.Mvc.UI.Theme.LeptonXLite   # UI login (bản Lite miễn phí)
+/// 🔐 PHASE 0 — xác thực: host này vừa là **auth server** (OpenIddict: /connect/token)
+/// vừa là **resource server** ([Authorize] trên các app service).
+///
+/// ⚠️ CHƯA có UI đăng nhập (solution không có project Web) ⇒ lấy token bằng cách gọi
+/// <c>POST /connect/token</c> với grant <c>password</c> hoặc <c>client_credentials</c>
+/// (xem README mục "Lấy token để gọi API"). UI login/Admin là việc của giai đoạn P1.
+///
+/// Muốn có UI: tạo project Web (xem docs/abp-modules-plan.md) rồi thêm
+/// <c>Volo.Account</c> + theme (<c>Volo.BasicTheme</c> hoặc <c>Volo.Abp.LeptonXTheme.Lite</c>)
+/// trỏ vào project đó — ABP CLI chỉ thêm được phần UI khi có project Web.
 /// </summary>
 [DependsOn(
     typeof(AbpAutofacModule),
@@ -32,6 +39,7 @@ namespace eCommerce;
     typeof(AbpCachingStackExchangeRedisModule),
     typeof(AbpDistributedLockingModule),
     typeof(AbpBackgroundWorkersModule),
+    typeof(AbpOpenIddictAspNetCoreModule),
     typeof(eCommerceEntityFrameworkCoreModule),
     typeof(eCommerceApplicationModule),
     typeof(ChannelHub.ChannelHubApplicationModule),
@@ -75,7 +83,7 @@ public class eCommerceHttpApiHostModule : AbpModule
             return new RedisDistributedSynchronizationProvider(connection.GetDatabase());
         });
 
-        // Cấu hình ChannelHub từ section "ChannelHub".
+        // Cấu hình ChannelHub / PaymentHub từ appsettings.json.
         Configure<ChannelHub.ChannelHubOptions>(configuration.GetSection("ChannelHub"));
         Configure<PaymentHub.Payments.PaymentHubOptions>(configuration.GetSection("PaymentHub"));
 
@@ -86,9 +94,20 @@ public class eCommerceHttpApiHostModule : AbpModule
             options.ConventionalControllers.Create(typeof(ChannelHub.ChannelHubApplicationModule).Assembly);
         });
 
-        // ⚠️ CHỈ DÙNG CHO PoC: bỏ qua xác thực để test API ngay.
-        // Thay bằng Identity + OpenIddict trước khi lên production.
-        context.Services.AddAlwaysAllowAuthorization();
+        // ⚠️ OpenIddict mặc định BẮT BUỘC HTTPS cho mọi endpoint.
+        // Development: cho phép HTTP để test bằng localhost (đặt trong appsettings.Development.json).
+        // Production: để false (mặc định) và chạy sau HTTPS.
+        var disableTransportSecurity = configuration.GetValue("AuthServer:DisableTransportSecurityRequirement", false);
+        Configure<OpenIddictServerAspNetCoreOptions>(options =>
+        {
+            options.DisableTransportSecurityRequirement = disableTransportSecurity;
+        });
+
+        // ⚠️ BẢO MẬT: KHÔNG còn AddAlwaysAllowAuthorization().
+        // Mọi API có [Authorize] giờ được bảo vệ bởi OpenIddict + permission của ABP.
+        // Ở Development, ABP tự tạo chứng chỉ ký/mã hoá dev
+        // (AbpOpenIddictAspNetCoreOptions.AddDevelopmentEncryptionAndSigningCertificate = true).
+        // ⚠️ Production BẮT BUỘC cấu hình chứng chỉ thật và tắt tuỳ chọn dev này.
 
         context.Services.AddAbpSwaggerGen(options =>
         {
@@ -96,7 +115,7 @@ public class eCommerceHttpApiHostModule : AbpModule
             {
                 Title = "eCommerce API",
                 Version = "v1",
-                Description = "Modular monolith: Commerce core + ChannelHub + PaymentHub"
+                Description = "Modular monolith: Commerce core + ChannelHub + PaymentHub (auth qua OpenIddict)"
             });
             options.DocInclusionPredicate((_, _) => true);
             options.CustomSchemaIds(type => type.FullName);
@@ -115,6 +134,10 @@ public class eCommerceHttpApiHostModule : AbpModule
 
         app.UseRouting();
         app.UseCors();
+
+        // 🔐 Bắt buộc: xác thực TRƯỚC phân quyền. OpenIddict chèn handler vào
+        // AuthenticationMiddleware nên /connect/token được xử lý ở đây.
+        app.UseAuthentication();
         app.UseAuthorization();
 
         // Lưu ý: dynamic background worker của ChannelHub được supervisor tự đăng ký lúc chạy,

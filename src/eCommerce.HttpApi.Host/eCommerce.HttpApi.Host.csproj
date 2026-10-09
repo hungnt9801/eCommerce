@@ -16,6 +16,7 @@
   <ItemGroup>
     <PackageReference Include="Volo.Abp.Autofac" />
     <PackageReference Include="Volo.Abp.AspNetCore.Mvc" />
+    <PackageReference Include="Volo.Abp.OpenIddict.AspNetCore" />
     <PackageReference Include="Volo.Abp.Swashbuckle" />
     <PackageReference Include="Volo.Abp.Caching.StackExchangeRedis" />
     <PackageReference Include="Volo.Abp.DistributedLocking" />

@@ -4,6 +4,13 @@ using Microsoft.EntityFrameworkCore;
 using Volo.Abp.Data;
 using Volo.Abp.EntityFrameworkCore;
 using Volo.Abp.EntityFrameworkCore.Modeling;
+using Volo.Abp.Identity.EntityFrameworkCore;
+using Volo.Abp.PermissionManagement.EntityFrameworkCore;
+using Volo.Abp.SettingManagement.EntityFrameworkCore;
+using Volo.Abp.FeatureManagement.EntityFrameworkCore;
+using Volo.Abp.AuditLogging.EntityFrameworkCore;
+using Volo.Abp.BackgroundJobs.EntityFrameworkCore;
+using Volo.Abp.OpenIddict.EntityFrameworkCore;
 
 namespace eCommerce.EntityFrameworkCore;
 
@@ -46,6 +53,16 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
         builder.ConfigurePaymentHub();
 
         ConfigureCommerce(builder);
+
+        // Module ABP (thêm ở Phase 0) tự cung cấp cấu hình model của mình.
+        // Mỗi hàm ConfigureXxx() đến từ package Volo.Abp.Xxx.EntityFrameworkCore tương ứng.
+        builder.ConfigureIdentity();
+        builder.ConfigurePermissionManagement();
+        builder.ConfigureSettingManagement();
+        builder.ConfigureFeatureManagement();
+        builder.ConfigureAuditLogging();
+        builder.ConfigureBackgroundJobs();
+        builder.ConfigureOpenIddict();
     }
 
     /// <summary>

@@ -12,8 +12,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Volo.Abp.Account.Application" />
     <PackageReference Include="Volo.Abp.Ddd.Application" />
     <PackageReference Include="Volo.Abp.DistributedLocking" />
+    <PackageReference Include="Volo.Abp.FeatureManagement.Application" />
+    <PackageReference Include="Volo.Abp.Identity.Application" />
+    <PackageReference Include="Volo.Abp.PermissionManagement.Application" />
+    <PackageReference Include="Volo.Abp.SettingManagement.Application" />
   </ItemGroup>
 
 </Project>

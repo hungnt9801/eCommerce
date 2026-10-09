@@ -1,5 +1,10 @@
 using Volo.Abp.Application;
+using Volo.Abp.FeatureManagement;
+using Volo.Abp.Identity;
 using Volo.Abp.Modularity;
+using Volo.Abp.PermissionManagement;
+using Volo.Abp.SettingManagement;
+using Volo.Abp.Account;
 
 namespace eCommerce;
 
@@ -12,12 +17,19 @@ namespace eCommerce;
 ///   • Volo.Abp.AutoMapper kéo theo AutoMapper 14.0.0, bản này có cảnh báo bảo mật
 ///     NU1903 (GHSA-rvv3-g6hj-g44x) trong lần restore đầu tiên.
 ///   • Nếu sau này cần map phức tạp, cân nhắc Mapperly (source generator, không reflection).
+///
+/// 📌 Phase 0: các module ABP được thêm bằng ABP CLI; attribute đã được gộp lại.
 /// </summary>
 [DependsOn(
     typeof(eCommerceDomainModule),
     typeof(eCommerceApplicationContractsModule),
-    typeof(AbpDddApplicationModule)
+    typeof(AbpDddApplicationModule),
+    typeof(AbpIdentityApplicationModule),
+    typeof(AbpPermissionManagementApplicationModule),
+    typeof(AbpFeatureManagementApplicationModule),
+    typeof(AbpSettingManagementApplicationModule)
 )]
-public class eCommerceApplicationModule : AbpModule
+[DependsOn(typeof(AbpAccountApplicationModule))]
+    public class eCommerceApplicationModule : AbpModule
 {
 }

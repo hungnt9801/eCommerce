@@ -6,7 +6,14 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Volo.Abp.AuditLogging.Domain.Shared" />
+    <PackageReference Include="Volo.Abp.BackgroundJobs.Domain.Shared" />
     <PackageReference Include="Volo.Abp.Ddd.Domain.Shared" />
+    <PackageReference Include="Volo.Abp.FeatureManagement.Domain.Shared" />
+    <PackageReference Include="Volo.Abp.Identity.Domain.Shared" />
+    <PackageReference Include="Volo.Abp.OpenIddict.Domain.Shared" />
+    <PackageReference Include="Volo.Abp.PermissionManagement.Domain.Shared" />
+    <PackageReference Include="Volo.Abp.SettingManagement.Domain.Shared" />
   </ItemGroup>
 
 </Project>

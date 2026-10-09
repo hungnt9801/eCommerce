@@ -4,7 +4,6 @@
     <!-- Cho phép ghim version của package BẮC CẦU (dùng để vá lỗ hổng của dependency gián tiếp). -->
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
-
   <!--
     ABP 10.7.0 = bản ổn định mới nhất tại thời điểm dựng khung (phát hành 06/10/2026).
     ABP 10.x chạy trên .NET 10 (global.json: SDK 10.0.400).
@@ -20,6 +19,14 @@
        xem docs/abp-modules-plan.md để biết kế hoạch, lệnh và thứ tự cụ thể.
   -->
   <ItemGroup Label="ABP framework (LGPL-3.0)">
+    <PackageVersion Include="Volo.Abp.Account.Application" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.Account.Application.Contracts" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.AuditLogging.Domain" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.AuditLogging.Domain.Shared" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.AuditLogging.EntityFrameworkCore" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.BackgroundJobs.Domain" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.BackgroundJobs.Domain.Shared" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.BackgroundJobs.EntityFrameworkCore" Version="10.7.0" />
     <PackageVersion Include="Volo.Abp.Ddd.Domain.Shared" Version="10.7.0" />
     <PackageVersion Include="Volo.Abp.Ddd.Domain" Version="10.7.0" />
     <PackageVersion Include="Volo.Abp.Ddd.Application.Contracts" Version="10.7.0" />
@@ -28,6 +35,29 @@
     <PackageVersion Include="Volo.Abp.EntityFrameworkCore.PostgreSql" Version="10.7.0" />
     <PackageVersion Include="Volo.Abp.Autofac" Version="10.7.0" />
     <PackageVersion Include="Volo.Abp.AspNetCore.Mvc" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.FeatureManagement.Application" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.FeatureManagement.Application.Contracts" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.FeatureManagement.Domain" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.FeatureManagement.Domain.Shared" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.FeatureManagement.EntityFrameworkCore" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.Identity.Application.Contracts" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.Identity.Domain.Shared" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.OpenIddict.AspNetCore" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.OpenIddict.Domain" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.OpenIddict.Domain.Shared" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.OpenIddict.EntityFrameworkCore" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.PermissionManagement.Application" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.PermissionManagement.Application.Contracts" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.PermissionManagement.Domain" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.PermissionManagement.Domain.Identity" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.PermissionManagement.Domain.OpenIddict" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.PermissionManagement.Domain.Shared" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.PermissionManagement.EntityFrameworkCore" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.SettingManagement.Application" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.SettingManagement.Application.Contracts" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.SettingManagement.Domain" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.SettingManagement.Domain.Shared" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.SettingManagement.EntityFrameworkCore" Version="10.7.0" />
     <PackageVersion Include="Volo.Abp.Swashbuckle" Version="10.7.0" />
     <!-- KHÔNG có Volo.Abp.AutoMapper: đã bỏ AutoMapper (map tay) để loại advisory GHSA-rvv3-g6hj-g44x. -->
     <PackageVersion Include="Volo.Abp.EventBus" Version="10.7.0" />
@@ -36,25 +66,21 @@
     <PackageVersion Include="Volo.Abp.Caching" Version="10.7.0" />
     <PackageVersion Include="Volo.Abp.Caching.StackExchangeRedis" Version="10.7.0" />
   </ItemGroup>
-
   <ItemGroup Label="ABP Identity (free module) - auth cơ bản để có user/role/permission">
     <PackageVersion Include="Volo.Abp.Identity.Domain" Version="10.7.0" />
     <PackageVersion Include="Volo.Abp.Identity.Application" Version="10.7.0" />
     <PackageVersion Include="Volo.Abp.Identity.EntityFrameworkCore" Version="10.7.0" />
     <PackageVersion Include="Volo.Abp.Identity.HttpApi" Version="10.7.0" />
   </ItemGroup>
-
   <ItemGroup Label="Third-party — version đã được xác nhận qua `dotnet restore` thật">
     <!-- EF Core runtime được resolve là 10.0.11; Tools/Design phải cùng dòng để tránh lệch. -->
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.11" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.11" />
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
     <PackageVersion Include="DistributedLock.Redis" Version="1.0.1" />
-
     <!-- Volo.Abp.Swashbuckle 10.7.0 yêu cầu Swashbuckle.AspNetCore >= 10.2.3
          (ghim 9.0.6 ban đầu gây lỗi NU1109 downgrade — đã sửa). -->
     <PackageVersion Include="Swashbuckle.AspNetCore" Version="10.2.3" />
-
     <!--
       VÁ LỖ HỔNG BẮC CẦU: EF Core Tools kéo `System.Security.Cryptography.Xml 9.0.0`,
       bản này có 8 advisory high severity (NU1903) ⇒ build từng có 16 warning.
@@ -63,7 +89,6 @@
     -->
     <PackageVersion Include="System.Security.Cryptography.Xml" Version="10.0.12" />
   </ItemGroup>
-
   <!--
     KHÔNG có trong skeleton này (thêm sau bằng `abp add-module` khi có mạng):
       Volo.TenantManagement   -> UI + entity quản tenant (Tenant Management MIỄN PHÍ)
