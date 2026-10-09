@@ -14,7 +14,17 @@ Khung solution cho hệ thống bán hàng **đa kênh** (website riêng + Shope
 | **Biên dịch toàn solution (15 project)** | ✅ **Thành công — 0 lỗi, 0 warning** | `dotnet build eCommerce.slnx` |
 | **Sinh migration EF Core cho PostgreSQL** | ✅ **Thành công** | `src/eCommerce.EntityFrameworkCore/Migrations/20261009070214_Initial.cs` — 10 bảng + 3 index unique có filter |
 | **Test nghiệp vụ tự động** | ✅ **20/20 pass** | `dotnet test` — xem mục 5 |
-| **Chạy end-to-end thật (DB + Redis + Host)** | ❌ **Chưa chạy** | Docker CLI có (29.6.2) nhưng **daemon chưa bật** — xem mục 4 để tự chạy |
+| **Chạy end-to-end thật (DB + Redis + Host)** | 🟡 **Một phần** | Host **khởi động được** (`Initialized all ABP modules`), Swagger 200, `/connect/token` trả lỗi OAuth chuẩn. Các luồng cần PostgreSQL/Redis **chưa chạy được** vì Docker daemon chưa bật |
+
+### 🔐 Phase 0 (xác thực) — ĐÃ THỰC THI
+
+8 module ABP đã được thêm: **Identity, PermissionManagement, SettingManagement, FeatureManagement,
+AuditLogging, BackgroundJobs, OpenIddict, Account** (+ `Volo.Abp.OpenIddict.AspNetCore` cho Host).
+`AddAlwaysAllowAuthorization()` **đã bị xoá** — API giờ đi qua OpenIddict + permission của ABP.
+
+👉 **Đọc [docs/phase-0-execution-report.md](docs/phase-0-execution-report.md)** — báo cáo ghi lại
+**6 lỗi chỉ lộ khi chạy thật** (thiếu `AbpDbContextOptions`, thiếu `DbSet` cho entity module,
+thiếu `[Authorize]` cấp class, Redis làm sập khởi động, 2 bug của ABP CLI) và cách kiểm chứng phần còn lại.
 
 > ⚠️ **Nói rõ để không hiểu nhầm:** khung này **biên dịch, sinh migration và pass test**, nhưng
 > **chưa từng chạy với database thật** trong môi trường dựng khung. Bước 4 là việc cần làm đầu tiên
@@ -147,11 +157,13 @@ dotnet test test\eCommerce.Tests\eCommerce.Tests.csproj
 - Hạ tầng: Redis cache + **Redis distributed lock** (bắt buộc khi chạy nhiều instance), Swagger, seed dữ liệu.
 
 ### ❌ Chưa có (cố ý để lại, có ghi chú trong code)
-- **Application module của ABP** (Identity, Permission/Setting/Feature Management, Audit Logging,
-  Background Jobs, OpenIddict, Account, Tenant Management) — **chưa thêm module nào**.
-  👉 **Kế hoạch đầy đủ, có lệnh và thứ tự: [docs/abp-modules-plan.md](docs/abp-modules-plan.md)**
-- **Xác thực/phân quyền**: chưa có Identity/OpenIddict ⇒ host đang dùng `AddAlwaysAllowAuthorization()`
-  **chỉ cho PoC**. Đây là **việc phải làm đầu tiên (Phase 0)**, xem tài liệu kế hoạch ở trên.
+- **UI đăng nhập & trang quản trị**: chưa có, vì solution **chưa có project Web**.
+  API đã có auth server (OpenIddict) nhưng lấy token phải gọi `/connect/token` trực tiếp.
+  👉 Kế hoạch tạo project Web: [docs/abp-modules-plan.md](docs/abp-modules-plan.md) §3.3
+- **`TenantManagement`, CMS Kit, Docs, Blogging** — chưa thêm (chưa cần ở Phase 0).
+- **Luồng cần database chưa được kiểm chứng**: cấp token thật, 401/403 của API, seeder,
+  và distributed lock per-shop khi refresh token Shopee. Cách kiểm chứng: xem
+  [docs/phase-0-execution-report.md](docs/phase-0-execution-report.md) §5.
 - **UI quản trị & storefront**: chưa có (đây là phần lớn nhất còn lại).
 - **Gọi HTTP thật tới Shopee/Lazada**: `ShopeeConnector` mới có phần ký + khung; các method đánh dấu `TODO` và ném `NotImplementedException` khi `EnableLiveCalls = true`.
 - **Webhook endpoint nhận IPN/push của sàn** và handler tạo đơn từ `ChannelOrderPulledEto`.
@@ -168,7 +180,8 @@ dotnet test test\eCommerce.Tests\eCommerce.Tests.csproj
   (GHSA-rvv3-g6hj-g44x) ⇒ đã **bỏ hẳn AutoMapper**, map tay trong `ChannelAppService`.
 - `ApplicationService.ObjectMapper` sẽ **lỗi lúc chạy nếu dùng** (vì đã bỏ AutoMapper). Dùng map tay,
   hoặc thêm object mapper an toàn (ví dụ Mapperly — source generator, không reflection).
-- Host đang dùng `AddAlwaysAllowAuthorization()` — **không được lên production** khi chưa thêm Identity/OpenIddict.
+- ✅ **Đã sửa ở Phase 0:** `AddAlwaysAllowAuthorization()` đã bị xoá — API đi qua OpenIddict + permission.
+  ⚠️ Nhưng **mọi app service mới phải có `[Authorize]` ở cấp class**, vì ABP không tự bảo vệ application service.
 
 ---
 

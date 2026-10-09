@@ -148,16 +148,25 @@ $env:PATH = "$env:PATH;$env:USERPROFILE\.dotnet\tools"
 
 dotnet tool install --global Volo.Abp.Cli --version 10.7.0   # ✅ đã xác minh chạy được
 
-abp add-module Volo.Abp.Identity
-abp add-module Volo.Abp.PermissionManagement
-abp add-module Volo.Abp.SettingManagement
-abp add-module Volo.Abp.FeatureManagement
-abp add-module Volo.Abp.AuditLogging
-abp add-module Volo.Abp.BackgroundJobs
-abp add-module Volo.Abp.OpenIddict
-abp add-module Volo.Abp.Account
-abp add-module Volo.Abp.AspNetCore.Mvc.UI.Theme.Basic   # UI tối thiểu, miễn phí
+# ✅ TÊN ĐÚNG — lấy từ `abp list-modules` (kế hoạch ban đầu ghi Volo.Abp.* là SAI)
+abp add-module Volo.Identity
+abp add-module Volo.PermissionManagement
+abp add-module Volo.SettingManagement
+abp add-module Volo.FeatureManagement
+abp add-module Volo.AuditLogging
+abp add-module Volo.BackgroundJobs
+abp add-module Volo.OpenIddict
+abp add-module Volo.Account
+abp add-module Volo.BasicTheme                 # hoặc Volo.Abp.LeptonXTheme.Lite
+
+# Package bổ sung bắt buộc cho Host (không nằm trong nhóm module nào)
+abp add-package Volo.Abp.OpenIddict.AspNetCore -p src/eCommerce.HttpApi.Host/eCommerce.HttpApi.Host.csproj
 ```
+
+> ⚠️ **ĐÃ THỰC THI XONG (09/10/2026).** Kết quả thật — bao gồm **6 lỗi chỉ lộ khi chạy**,
+> cách `abp add-module` sửa file, và những gì còn phải kiểm chứng —
+> xem **[phase-0-execution-report.md](phase-0-execution-report.md)**.
+> Đọc báo cáo đó trước khi làm Phase 1: nó ghi lại các bẫy mà tài liệu này dự đoán sai.
 
 **Sau khi thêm, phải sửa Host (bắt buộc):**
 - ❌ **Xoá** `context.Services.AddAlwaysAllowAuthorization();` trong `eCommerceHttpApiHostModule`.
@@ -244,9 +253,12 @@ Khi thêm một module (dù bằng CLI hay tay), **7 việc** này phải xong:
 |---|---|---|
 | 1 | `PackageReference` vào đúng tầng | `.Domain.Shared`, `.Domain`, `.Application.Contracts`, `.Application`, `.EntityFrameworkCore`, UI — mỗi tầng một package |
 | 2 | Thêm `typeof(AbpXxxModule)` vào `[DependsOn]` | Thường ở `eCommerceEntityFrameworkCoreModule` (tích hợp EF) và `eCommerceApplicationModule` (service) |
-| 3 | `eCommerceDbContext` implement `IXxxDbContext` | Ví dụ `IIdentityDbContext`, `ITenantManagementDbContext`, `IAuditLoggingDbContext`, `IBackgroundJobsDbContext`, `ISettingManagementDbContext` |
+| 3 | `eCommerceDbContext` implement `IXxxDbContext` | ❌ **KHÔNG CẦN** với ABP 10.7 — đã kiểm chứng bằng migration: chỉ `builder.ConfigureXxx()` là đủ tạo bảng. (Cách này đúng cho pattern ABP cũ hơn) |
 | 4 | `builder.ConfigureXxx()` trong `OnModelCreating` | Giống cách ta đã làm với `ConfigureChannelHub()` / `ConfigurePaymentHub()` |
-| 5 | `[ReplaceDbContext(typeof(IXxxDbContext))]` | **Bắt buộc** — nếu thiếu, ABP dùng DbContext mặc định của module và bảng không được tạo |
+| 5 | `[ReplaceDbContext(typeof(IXxxDbContext))]` | ❌ **KHÔNG CẦN** với ABP 10.7 — mỗi module dùng DbContext riêng, cùng database qua connection string `Default` (đã xác nhận qua log khởi động) |
+| 5b | 🔴 **`Configure<AbpDbContextOptions>(o => o.UseNpgsql())`** | **BẮT BUỘC** — thiếu dòng này mọi API chạm DB trả 500 với lỗi *"No configuration found for Microsoft.EntityFrameworkCore.DbContext"*. Chỉ lộ khi chạy, không lộ khi build |
+| 5c | 🔴 **Khai báo `DbSet<T>` cho entity của module** trên app DbContext | **BẮT BUỘC** — `AddDefaultRepositories(includeAllEntities: true)` chỉ tạo `IRepository<T>` cho entity CÓ DbSet. Thiếu ⇒ *"IRepository&lt;X, Guid&gt; has not been registered"* |
+| 5d | 🔴 **`[Authorize]` ở cấp class cho mọi app service** | ABP **không** tự bảo vệ application service. Chỉ đặt `[Authorize]` ở vài method ⇒ các method còn lại là API công khai |
 | 6 | Migration + seed | `dotnet ef migrations add …` rồi chạy `eCommerce.DbMigrator`; Identity cần seed admin, TenantManagement cần seed tenant mặc định |
 | 7 | UI theme + localization | `Volo.Abp.AspNetCore.Mvc.UI.Theme.Basic`/`LeptonXLite` cho MVC; `.Domain.Shared` tham chiếu module tương ứng để có mã lỗi/localization |
 
