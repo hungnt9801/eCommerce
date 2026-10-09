@@ -1,0 +1,26 @@
+<Solution>
+  <Folder Name="/modules/" />
+  <Folder Name="/modules/ChannelHub/">
+    <Project Path="modules/ChannelHub/ChannelHub.Application.Contracts/ChannelHub.Application.Contracts.csproj" />
+    <Project Path="modules/ChannelHub/ChannelHub.Application/ChannelHub.Application.csproj" />
+    <Project Path="modules/ChannelHub/ChannelHub.Domain/ChannelHub.Domain.csproj" />
+    <Project Path="modules/ChannelHub/ChannelHub.EntityFrameworkCore/ChannelHub.EntityFrameworkCore.csproj" />
+  </Folder>
+  <Folder Name="/modules/PaymentHub/">
+    <Project Path="modules/PaymentHub/PaymentHub.Application/PaymentHub.Application.csproj" />
+    <Project Path="modules/PaymentHub/PaymentHub.Domain/PaymentHub.Domain.csproj" />
+    <Project Path="modules/PaymentHub/PaymentHub.EntityFrameworkCore/PaymentHub.EntityFrameworkCore.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/eCommerce.Application.Contracts/eCommerce.Application.Contracts.csproj" />
+    <Project Path="src/eCommerce.Application/eCommerce.Application.csproj" />
+    <Project Path="src/eCommerce.DbMigrator/eCommerce.DbMigrator.csproj" />
+    <Project Path="src/eCommerce.Domain.Shared/eCommerce.Domain.Shared.csproj" />
+    <Project Path="src/eCommerce.Domain/eCommerce.Domain.csproj" />
+    <Project Path="src/eCommerce.EntityFrameworkCore/eCommerce.EntityFrameworkCore.csproj" />
+    <Project Path="src/eCommerce.HttpApi.Host/eCommerce.HttpApi.Host.csproj" />
+  </Folder>
+  <Folder Name="/test/">
+    <Project Path="test/eCommerce.Tests/eCommerce.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,75 @@
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <!-- Cho phép ghim version của package BẮC CẦU (dùng để vá lỗ hổng của dependency gián tiếp). -->
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+
+  <!--
+    ABP 10.7.0 = bản ổn định mới nhất tại thời điểm dựng khung (phát hành 06/10/2026).
+    ABP 10.x chạy trên .NET 10 (global.json: SDK 10.0.400).
+
+    ✅ ĐÃ KIỂM CHỨNG: `dotnet restore` và `dotnet build` chạy thành công với đúng các version dưới đây
+       (build 0 error / 0 warning; test 20/20 pass). Nâng version = sửa đúng file này
+       (central package management) hoặc chạy `abp update`.
+
+    📌 CÁC PACKAGE Ở ĐÂY LÀ "FRAMEWORK MODULE" CỦA ABP — chúng nằm trong source code ở dạng
+       NuGet package (DLL), KHÔNG phải file .cs, nên không thấy khi mở cây thư mục.
+       Ứng dụng "dùng" chúng qua [DependsOn] trong module class của từng project.
+       Các "APPLICATION MODULE" (Identity, TenantManagement, OpenIddict, Account...) CHƯA được thêm —
+       xem docs/abp-modules-plan.md để biết kế hoạch, lệnh và thứ tự cụ thể.
+  -->
+  <ItemGroup Label="ABP framework (LGPL-3.0)">
+    <PackageVersion Include="Volo.Abp.Ddd.Domain.Shared" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.Ddd.Domain" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.Ddd.Application.Contracts" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.Ddd.Application" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.EntityFrameworkCore" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.EntityFrameworkCore.PostgreSql" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.Autofac" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.AspNetCore.Mvc" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.Swashbuckle" Version="10.7.0" />
+    <!-- KHÔNG có Volo.Abp.AutoMapper: đã bỏ AutoMapper (map tay) để loại advisory GHSA-rvv3-g6hj-g44x. -->
+    <PackageVersion Include="Volo.Abp.EventBus" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.BackgroundWorkers" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.DistributedLocking" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.Caching" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.Caching.StackExchangeRedis" Version="10.7.0" />
+  </ItemGroup>
+
+  <ItemGroup Label="ABP Identity (free module) - auth cơ bản để có user/role/permission">
+    <PackageVersion Include="Volo.Abp.Identity.Domain" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.Identity.Application" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.Identity.EntityFrameworkCore" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.Identity.HttpApi" Version="10.7.0" />
+  </ItemGroup>
+
+  <ItemGroup Label="Third-party — version đã được xác nhận qua `dotnet restore` thật">
+    <!-- EF Core runtime được resolve là 10.0.11; Tools/Design phải cùng dòng để tránh lệch. -->
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.11" />
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
+    <PackageVersion Include="DistributedLock.Redis" Version="1.0.1" />
+
+    <!-- Volo.Abp.Swashbuckle 10.7.0 yêu cầu Swashbuckle.AspNetCore >= 10.2.3
+         (ghim 9.0.6 ban đầu gây lỗi NU1109 downgrade — đã sửa). -->
+    <PackageVersion Include="Swashbuckle.AspNetCore" Version="10.2.3" />
+
+    <!--
+      VÁ LỖ HỔNG BẮC CẦU: EF Core Tools kéo `System.Security.Cryptography.Xml 9.0.0`,
+      bản này có 8 advisory high severity (NU1903) ⇒ build từng có 16 warning.
+      Ghim lên 10.0.12 (bản ổn định mới nhất) ⇒ build còn 0 warning.
+      Cần CentralPackageTransitivePinningEnabled ở trên.
+    -->
+    <PackageVersion Include="System.Security.Cryptography.Xml" Version="10.0.12" />
+  </ItemGroup>
+
+  <!--
+    KHÔNG có trong skeleton này (thêm sau bằng `abp add-module` khi có mạng):
+      Volo.TenantManagement   -> UI + entity quản tenant (Tenant Management MIỄN PHÍ)
+      Volo.OpenIddict.*       -> auth server chuẩn của ABP 10 (thay IdentityServer)
+      Volo.Payment            -> PRO module (cần license Team+), chỉ có Stripe/PayPal/Iyzico/Alipay...
+      Volo.Abp.OperationRateLimiting -> PRO module (rate limit tầng nghiệp vụ)
+    Xem docs/02-abp-license-boundary.md.
+  -->
+</Project>

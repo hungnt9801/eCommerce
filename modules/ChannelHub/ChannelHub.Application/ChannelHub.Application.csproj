@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>eCommerce.ChannelHub</RootNamespace>
+    <AssemblyName>ChannelHub.Application</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ChannelHub.Domain\ChannelHub.Domain.csproj" />
+    <ProjectReference Include="..\ChannelHub.Application.Contracts\ChannelHub.Application.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Volo.Abp.Ddd.Application" />
+    <PackageReference Include="Volo.Abp.BackgroundWorkers" />
+    <PackageReference Include="Volo.Abp.DistributedLocking" />
+    <PackageReference Include="Volo.Abp.EventBus" />
+  </ItemGroup>
+
+</Project>

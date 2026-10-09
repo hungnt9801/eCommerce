@@ -1,0 +1,30 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+.vscode/
+.idea/
+
+## ABP / EF
+*.db
+*.db-shm
+*.db-wal
+Migrations/**/*.Designer.cs.bak
+
+## Runtime config (giữ appsettings.json mẫu, KHÔNG commit secret thật)
+appsettings.Production.json
+appsettings.Local.json
+**/secrets.json
+.env
+
+## Logs / build artifacts
+logs/
+*.log
+publish/
+artifacts/
+
+## OS
+.DS_Store
+Thumbs.db
