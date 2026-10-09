@@ -1,5 +1,7 @@
+using eCommerce.ChannelHub.Channels;
 using eCommerce.ChannelHub.EntityFrameworkCore;
 using eCommerce.PaymentHub.EntityFrameworkCore;
+using eCommerce.PaymentHub.Payments;
 using Microsoft.EntityFrameworkCore;
 using Volo.Abp.Data;
 using Volo.Abp.EntityFrameworkCore;
@@ -38,6 +40,19 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
     // ---- Orders ----
     public DbSet<Orders.Order> Orders { get; set; } = default!;
     public DbSet<Orders.OrderLine> OrderLines { get; set; } = default!;
+
+    // ---- ChannelHub (module) ----
+    // 🚨 VÌ SAO PHẢI KHAI BÁO DbSet Ở ĐÂY:
+    // AddDefaultRepositories(includeAllEntities: true) chỉ tạo IRepository<T> cho entity
+    // CÓ DbSet trên DbContext. Nếu chỉ gọi builder.ConfigureChannelHub() (cấu hình model)
+    // mà không khai báo DbSet thì runtime báo:
+    //   "The requested service 'IRepository<ChannelShop, Guid>' has not been registered."
+    public DbSet<Channel> Channels { get; set; } = default!;
+    public DbSet<ChannelShop> ChannelShops { get; set; } = default!;
+    public DbSet<ChannelListing> ChannelListings { get; set; } = default!;
+
+    // ---- PaymentHub (module) ----
+    public DbSet<PaymentTransaction> PaymentTransactions { get; set; } = default!;
 
     public eCommerceDbContext(DbContextOptions<eCommerceDbContext> options)
         : base(options)

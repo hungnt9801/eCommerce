@@ -17,7 +17,14 @@ namespace eCommerce.Channels;
 /// Điểm đáng chú ý về kiến trúc: app service này CHỈ biết
 /// <see cref="IChannelConnectorFactory"/> của ChannelHub — không biết Shopee/Lazada.
 /// Nhờ vậy thêm sàn mới không phải sửa file này.
+///
+/// 🔐 BẢO MẬT — BÀI HỌC KHI CHẠY THẬT:
+/// ABP KHÔNG tự bảo vệ application service. Nếu chỉ đặt [Authorize] ở một vài method thì
+/// các method còn lại (ví dụ GetShopsAsync) trở thành API CÔNG KHAI — đã quan sát được
+/// đúng như vậy khi chạy thử. Vì thế đặt <b>[Authorize] ở cấp CLASS</b> để mặc định
+/// mọi method đều yêu cầu đăng nhập; method nào cần quyền cụ thể thì ghi thêm.
 /// </summary>
+[Authorize]
 public class ChannelAppService : ApplicationService, IChannelAppService
 {
     private readonly IRepository<ChannelShop, Guid> _channelShopRepository;

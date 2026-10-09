@@ -76,10 +76,18 @@ public class eCommerceHttpApiHostModule : AbpModule
 
         // 🔒 Provider lock thật (Redis). Bắt buộc khi chạy nhiều instance:
         // nếu chỉ có lock in-process, hai instance vẫn có thể refresh token cùng lúc → mất token.
+        //
+        // ⚠️ BÀI HỌC KHI CHẠY THẬT: worker dọn token của OpenIddict resolve IDistributedLockProvider
+        // ngay lúc khởi động. Nếu Redis chưa lên, ConnectionMultiplexer.Connect() NÉM exception
+        // ⇒ cả ứng dụng không start được. Vì vậy đặt AbortOnConnectFail = false để multiplexer
+        // tiếp tục thử lại ở nền thay vì làm sập ứng dụng (đúng cả khi Redis restart lúc đang chạy).
         context.Services.AddSingleton<IDistributedLockProvider>(sp =>
         {
             var redisConfiguration = configuration["Redis:Configuration"] ?? "127.0.0.1:6379";
-            var connection = ConnectionMultiplexer.Connect(redisConfiguration);
+            var redisOptions = ConfigurationOptions.Parse(redisConfiguration);
+            redisOptions.AbortOnConnectFail = false;
+
+            var connection = ConnectionMultiplexer.Connect(redisOptions);
             return new RedisDistributedSynchronizationProvider(connection.GetDatabase());
         });
 
