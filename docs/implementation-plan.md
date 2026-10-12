@@ -491,4 +491,4 @@ Một giai đoạn **chỉ được bắt đầu code** khi:
 | Mã | Tài liệu | Trạng thái | Ghi chú |
 |---|---|---|---|
 | `XC-001` | [Money, Currency & chính sách làm tròn](features/XC-001-money-currency-lam-tron.md) | 🟡 `Draft` | 630 dòng · 7 quyết định thiết kế (ADR) · 12 BR · 6 NFR · 15 test case · **6/6 câu hỏi đã đóng** |
-| `XC-006` | [Phân loại thuế GTGT theo SKU](features/XC-006-phan-loai-thue-gtgt.md) | 🟡 `Draft` | 10 BR · 8 NFR · 20 test case · **state machine** Draft→Approved→Active · thiết kế để **kế toán tự quyết định** danh mục Phụ lục I/II, **không hard-code** · 5 khối Mermaid PASS |
+| `XC-006` | [Phân loại thuế GTGT theo SKU](features/XC-006-phan-loai-thue-gtgt.md) | 🟡 `Draft` | **11 BR** · 8 NFR · **22 test case** · state machine Draft→Approved→Active · **7/9 câu hỏi đã đóng** · đặc tả **Mẫu 01 (Phụ lục III)** từ **file gốc** (§6.3) · danh mục Phụ lục I/II là **dữ liệu** do kế toán quyết định, **không hard-code** |
