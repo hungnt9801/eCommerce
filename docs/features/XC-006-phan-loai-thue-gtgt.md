@@ -74,7 +74,7 @@ hàng chịu thuế TTĐB (trừ xăng)) — danh mục chi tiết nằm ở **P
 3. Cảnh báo hiện **ngay trên màn hình bán hàng/admin** khi SKU chưa phân loại (không đợi tới bước lập hoá đơn).
 4. Thông điệp lỗi `eCommerce:Tax:0003` phải **chỉ rõ mã SKU** và **hướng dẫn** "vào Phân loại thuế để xử lý" — không chỉ báo "không thể phát hành hoá đơn". |
 | **Exception Flow** | **E1:** chồng khung hiệu lực cho cùng SKU ⇒ `BusinessException` `eCommerce:Tax:0001`.<br>**E2:** mã SKU trong file không tồn tại ⇒ gom vào **báo cáo lỗi**, **không ghi dòng nào** (all-or-nothing theo lô).<br>**E3:** SKU chưa phân loại mà cố phát hành hoá đơn ⇒ `BusinessException` `eCommerce:Tax:0003` (chặn).<br>**E4:** không có mức thuế suất nào hiệu lực tại thời điểm lập hoá đơn ⇒ `eCommerce:Tax:0002`.<br>**E5:** file import sai định dạng/cột ⇒ `eCommerce:Tax:0004` + báo cáo cột thiếu. |
-| **Business Rules** | • **BR-XC-006-001**: Thuế suất áp dụng xác định **theo khung hiệu lực tại thời điểm lập hoá đơn**; **cấm hard-code** thuế suất trong code.<br>• **BR-XC-006-002**: Khi ghi dòng đơn/hoá đơn, **chốt** `TaxRate` + `TaxAmount` + `TaxClassificationId`; thay đổi cấu hình **không** làm đổi chứng từ cũ.<br>• **BR-XC-006-003**: Thứ tự ưu tiên **SKU → Danh mục → Mặc định tenant**; luôn ghi log đã chọn nguồn nào.<br>• **BR-XC-006-004**: SKU **chưa phân loại** ⇒ áp mức **chuẩn (không giảm)** + cờ `NeedsClassification` + **chặn phát hành hoá đơn**.<br>• **BR-XC-006-005**: Mọi thay đổi phân loại **phải audit** (ai · cũ · mới · căn cứ pháp lý · thời điểm) và **append-only**.<br>• **BR-XC-006-006**: Hoá đơn **phải ghi rõ thuế suất từng dòng**; `Σ thuế theo từng mức == tổng cộng tiền thuế` (liên kết `XC-001` BR-010).<br>• **BR-XC-006-007**: Bản ghi phân loại chỉ có hiệu lực khi `Status = Approved ∩ Active`; `Draft` **không** ảnh hưởng tính thuế.<br>• **BR-XC-006-008**: **Phải xuất được Mẫu 01 (Phụ lục III)** theo kỳ — **chỉ phần II (bán ra)** vì hệ thống không có phân hệ mua vào; tổng khớp dữ liệu hoá đơn đã phát hành.<br>• **BR-XC-006-009**: Không tồn tại 2 bản ghi phân loại **hiệu lực chồng nhau** cho cùng (SKU, tenant).<br>• **BR-XC-006-010**: Cách ly tenant: phân loại của tenant A **không** ảnh hưởng tenant B. |
+| **Business Rules** | • **BR-XC-006-001**: Thuế suất áp dụng xác định **theo khung hiệu lực tại thời điểm lập hoá đơn**; **cấm hard-code** thuế suất trong code.<br>• **BR-XC-006-002**: Khi ghi dòng đơn/hoá đơn, **chốt** `TaxRate` + `TaxAmount` + `TaxClassificationId`; thay đổi cấu hình **không** làm đổi chứng từ cũ.<br>• **BR-XC-006-003**: Thứ tự ưu tiên **SKU → Danh mục → Mặc định tenant**; luôn ghi log đã chọn nguồn nào.<br>• **BR-XC-006-004**: SKU **chưa phân loại** ⇒ áp mức **chuẩn (không giảm)** + cờ `NeedsClassification` + **chặn phát hành hoá đơn**.<br>• **BR-XC-006-005**: Mọi thay đổi phân loại **phải audit** (ai · cũ · mới · căn cứ pháp lý · thời điểm) và **append-only**.<br>• **BR-XC-006-006**: Hoá đơn **phải ghi rõ thuế suất từng dòng**; `Σ thuế theo từng mức == tổng cộng tiền thuế` (liên kết `XC-001` BR-010).<br>• **BR-XC-006-007**: Bản ghi phân loại chỉ có hiệu lực khi `Status = Approved ∩ Active`; `Draft` **không** ảnh hưởng tính thuế.<br>• **BR-XC-006-008**: **Phải xuất được Mẫu 01 (Phụ lục III)** theo kỳ — **chỉ phần II (bán ra)** vì hệ thống không có phân hệ mua vào; tổng khớp dữ liệu hoá đơn đã phát hành.<br>• **BR-XC-006-009**: Không tồn tại 2 bản ghi phân loại **hiệu lực chồng nhau** cho cùng (SKU, tenant).<br>• **BR-XC-006-010**: Cách ly tenant: phân loại của tenant A **không** ảnh hưởng tenant B.<br>• **BR-XC-006-011**: Thay đổi **khung hiệu lực của mức thuế suất** (`TaxRateSchedule`) phải **qua duyệt + audit**, và **cấm đặt hiệu lực lùi về quá khứ** (không được làm thay đổi cách tính của hoá đơn **đã phát hành**). |
 | **Non-Functional Requirement** | • **NFR-XC-006-001**: `ResolveEffectiveRate` < **2 ms** (p95, có cache).<br>• **NFR-XC-006-002**: Import **10.000 dòng** < 30 s.<br>• **NFR-XC-006-003**: Đổi cấu hình ⇒ cache làm mới < **5 s** trên mọi instance.<br>• **NFR-XC-006-004**: Test được mốc chuyển mức thuế bằng **đồng hồ giả** (`TimeProvider`) — không phụ thuộc ngày hệ thống.<br>• **NFR-XC-006-005**: Audit đủ trường để giải trình với cơ quan thuế. |
 
 ---
@@ -355,6 +355,7 @@ public sealed record TaxRateResolution(
 | `eCommerce:Tax:0004` | `400` | File import sai định dạng/thiếu cột | `File không hợp lệ: thiếu cột {columns}.` |
 | `eCommerce:Tax:0005` | `400` | Thay thế bản ghi chưa Approved | `Bản ghi thay thế phải được duyệt trước.` |
 | `eCommerce:Tax:0006` | `400` | Sửa/xoá bản ghi đã Active | `Không thể sửa bản ghi đã có hiệu lực; hãy tạo bản ghi mới.` |
+| `eCommerce:Tax:0007` | `400` | Lùi hiệu lực về quá khứ đã có chứng từ | `Không thể đặt hiệu lực lùi về quá khứ vì đã có chứng từ phát sinh.` |
 
 ### 6.3 Đặc tả **Mẫu 01 — Phụ lục III NĐ 174/2025/NĐ-CP** (đọc từ file gốc)
 
@@ -484,7 +485,7 @@ lần import thứ 2 trả về kết quả cũ kèm cờ `AlreadyImported`.
 | `eCommerce.Tax.Classification.Manage` | Kế toán | tạo/sửa Draft, import, huỷ Draft |
 | `eCommerce.Tax.Classification.Approve` | **Kế toán trưởng** | duyệt ⇒ Active |
 | `eCommerce.Tax.Classification.ExportMau01` | Kế toán trưởng | xuất Mẫu 01 Phụ lục III |
-| `eCommerce.Tax.RateSchedule.Manage` | **Host admin** | quản lý bảng mức thuế suất (thay đổi ảnh hưởng toàn hệ thống) |
+| `eCommerce.Tax.RateSchedule.Manage` | **Kế toán trưởng** *(không phải host admin — theo Q6)* | quản lý bảng mức thuế suất; **mọi thay đổi phải qua duyệt + audit** (BR-011). Vì ảnh hưởng toàn hệ thống nên quyền này cần **grant ở cấp host** |
 
 📌 **Nguyên tắc ABP (đã kiểm chứng ở Phase 0):** app service **không tự được bảo vệ** ⇒ **bắt buộc `[Authorize]` ở cấp class**
 (dự án đã từng có lỗi `GetShopsAsync` chạy được khi chưa xác thực).
@@ -584,6 +585,8 @@ phát sự kiện qua **outbox trong cùng transaction**.
 | TC-18 | Làm mới cache sau duyệt | **Integration** | duyệt bản ghi mới | instance 2 thấy trong < 5 s | NFR-003 |
 | TC-19 | Audit đầy đủ khi duyệt | **Integration** | duyệt | có ai/cũ/mới/căn cứ/khi nào | BR-005 |
 | TC-20 | Không hard-code thuế suất | Unit (reflection/grep) | quét assembly nghiệp vụ | 0 hằng số thuế suất | NFR-008 |
+| TC-21 | **Cấm lùi hiệu lực về quá khứ** | **Integration** | đặt `EffectiveTo` của `VAT8` **trước** ngày đã phát hành hoá đơn | **Từ chối** `eCommerce:Tax:0007` + **audit** | **BR-011** |
+| TC-22 | Đổi khung hiệu lực hợp lệ (gia hạn) | **Integration** | dời `EffectiveTo` 31/12/2026 → 31/12/2027 | Thành công + audit đủ; hoá đơn **cũ** không đổi | **BR-011**, BR-002 |
 
 ### 14.2 Fixture skeleton (xUnit)
 
@@ -623,7 +626,7 @@ public class TaxRateResolverTests
 
 ### 14.3 Acceptance Criteria (Definition of Done)
 
-- [ ] 20 test case pass, phủ **hết 10 BR** và **8 NFR**
+- [ ] 22 test case pass, phủ **hết 11 BR** và **8 NFR**
 - [ ] **Test TC-02 bằng đồng hồ giả** chứng minh tự chuyển 8% → 10% qua mốc 01/01/2027
 - [ ] **Ràng buộc `EXCLUDE` ở DB** chặn chồng khung (kiểm bằng test chèn trực tiếp SQL)
 - [ ] Bảng `TaxClassifications` là **append-only**: test chứng minh không có đường UPDATE/DELETE bản ghi `Active`
@@ -636,9 +639,9 @@ public class TaxRateResolverTests
 
 - [ ] Tài liệu **Approved** (Kế toán trưởng + Kiến trúc trưởng)
 - [x] **Q2** ✅ **đã chốt 12/10/2026**: SKU chưa phân loại ⇒ **CHẶN phát hành hoá đơn** (vẫn cho bán) + 4 biện pháp giảm thiểu ở §1 A3
-- [ ] Có **file Excel mẫu** chuẩn của kế toán để đối chiếu cột import
+- [x] ✅ **Mẫu Excel import 7 cột đã chốt** (Q3 — §6.4)
 - [x] ✅ **Đã có file gốc Mẫu 01 (Phụ lục III)** — đặc tả ở §6.3; còn cần kế toán xác nhận **Q8** (ngữ nghĩa cột (6) và chỉ tiêu [09])
-- [ ] Thống nhất: phân loại chủ yếu theo **SKU** hay theo **danh mục** (ảnh hưởng khối lượng nhập liệu)
+- [x] ✅ **Đã chốt (Q1): hỗ trợ cả hai, SKU ưu tiên** — không cần quyết định thêm
 
 ---
 
@@ -648,13 +651,13 @@ public class TaxRateResolverTests
 
 | # | Câu hỏi | Cần ai | Trạng thái | Ảnh hưởng |
 |---|---|---|---|---|
-| **Q1** | Kế toán muốn phân loại chủ yếu theo **SKU** hay theo **danh mục**? | Kế toán trưởng | `Open` | Quyết định khối lượng nhập liệu & thiết kế UI |
+| **Q1** | Kế toán muốn phân loại chủ yếu theo **SKU** hay theo **danh mục**? | Kế toán trưởng | ✅ **`Closed` — HỖ TRỢ CẢ HAI, SKU ƯU TIÊN** *(chốt 12/10/2026)* | Đúng như **D4**/**BR-003**: SKU thắng danh mục; dùng danh mục cho nhóm lớn để **giảm khối lượng nhập liệu**. UI cho nhập/import theo cả hai |
 | **Q2** | SKU chưa phân loại: **chặn phát hành hoá đơn** hay **chỉ cảnh báo**? | Kế toán trưởng | ✅ **`Closed` — CHẶN PHÁT HÀNH HOÁ ĐƠN** *(chốt 12/10/2026)* | Vẫn **cho bán** (không chặn bán). Giảm thiểu: khi tạo SKU mới, hệ thống **tự tạo dòng phân loại `Draft`** + đưa vào **báo cáo việc cần làm của kế toán** ⇒ kế toán xử lý **trước khi phát sinh đơn**, không phải phát hiện lúc lập hoá đơn (xem §1 A3) |
 | **Q3** | Mẫu Excel import gồm cột nào? | Kế toán | ✅ **`Closed`** — **7 cột đã chốt 12/10/2026** (xem §6.4) | Parser import bám đúng 7 cột; thay đổi sau này phải sửa tài liệu trước |
 | **Q4** | **Mẫu 01** có cột chính xác nào? | Kế toán | ✅ **`Closed`** — đã đọc **file gốc Phụ lục III**; đặc tả đầy đủ ở **§6.3** | Còn lại: xác nhận **ngữ nghĩa cột (6)** và chỉ tiêu **[09]** — xem **Q8** |
-| **Q5** | Bản ghi phân loại có cần **đính kèm** văn bản/công văn làm căn cứ? | Kế toán trưởng | `Open` | Nếu có ⇒ thêm bảng attachment |
-| **Q6** | Khi luật **gia hạn** mức 8% sau 31/12/2026: ai cập nhật, có cần duyệt không? | Kế toán trưởng | `Open` | Đề xuất: sửa `EffectiveTo` của `VAT8` **phải qua duyệt + audit** |
-| **Q7** | Có cần **báo cáo đối chiếu** giữa phân loại và doanh thu theo SKU để phát hiện phân loại sai? | Kiến trúc trưởng | `Open` | Đề xuất: có, thuộc `REP-*` |
+| **Q5** | Bản ghi phân loại có cần **đính kèm** văn bản/công văn làm căn cứ? | Kế toán trưởng | ✅ **`Closed` — CHƯA CẦN ở giai đoạn này** *(chốt 12/10/2026)* | Dùng trường **văn bản** `LegalBasisNote` (số công văn / mã HS). Nếu sau này cần tệp đính kèm ⇒ thêm bảng attachment, **không đổi mô hình dữ liệu hiện tại** |
+| **Q6** | Khi luật **gia hạn** mức 8% sau 31/12/2026: ai cập nhật, có cần duyệt không? | Kế toán trưởng | ✅ **`Closed` — KẾ TOÁN TRƯỞNG sửa, CÓ DUYỆT + AUDIT** *(chốt 12/10/2026)* | Thành **BR-011**: đổi khung hiệu lực phải **duyệt + audit**, và **cấm lùi hiệu lực về quá khứ**. Quyền đổi chuyển từ *host admin* → **kế toán trưởng** (§9). Kiểm bằng **TC-21** |
+| **Q7** | Có cần **báo cáo đối chiếu** giữa phân loại và doanh thu theo SKU để phát hiện phân loại sai? | Kiến trúc trưởng | ✅ **`Closed` — CÓ** *(chốt 12/10/2026)* | Yêu cầu được ghi nhận và **giao cho module `REP-*`** (báo cáo đối chiếu phân loại ↔ doanh thu theo SKU). **Không** thuộc phạm vi `XC-006`; tài liệu này chỉ cung cấp dữ liệu phân loại |
 | **Q8** | 🚩 Cột **(6)** của Mẫu 01: nhãn ghi *"Thuế GTGT của hàng hóa, dịch vụ bán ra **được giảm**"* nhưng công thức in trong mẫu là `(3) × [(4) − (5)]` = **(3) × 2%** ⇒ cho ra **số thuế ĐƯỢC GIẢM**, không phải số thuế ở mức 8%. Cách hiểu nào đúng? *(chi tiết + ví dụ số ở §15.1.4)* | **Kế toán trưởng** | `Open` | 🔴 Hiểu sai ⇒ **xuất Mẫu 01 sai số** ⇒ phải sửa và kê khai lại |
 | **Q9** | Mẫu 01 cần xuất **đúng định dạng file nộp được** của cơ quan thuế/HTKK, hay chỉ cần **bảng số liệu** để kế toán nhập lại? *(chi tiết ở §15.1.4)* | Kế toán trưởng | `Open` | Nếu phải đúng định dạng ⇒ cần **file mẫu chính thức**; nếu chỉ cần số liệu ⇒ tự thiết kế bảng |
 
@@ -718,4 +721,4 @@ hoặc xem chỉ tiêu **[08]** và **[09]** mà HTKK sinh ra rồi đối chi�
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.1 | 12/10/2026 | *(điền)* | Bản nháp đầu — thiết kế theo yêu cầu: **không hard-code danh mục Phụ lục I/II**, để **kế toán tự quyết định** |
-| v0.2 | 12/10/2026 | *(điền)* | ✅ **Đóng Q2**: SKU chưa phân loại ⇒ **CHẶN phát hành hoá đơn** (vẫn cho bán) + 4 biện pháp giảm thiểu vận hành. ✅ **Đóng Q4**: đã đọc **file gốc Mẫu 01** ⇒ thêm **§6.3** đặc tả đầy đủ. 🚩 **Sửa lỗi căn cứ**: Mẫu 01 nằm ở **Phụ lục III** (nguồn thứ cấp ghi "Phụ lục IV" — sai). Thêm **Q8** (ngữ nghĩa cột (6) & [09]) và **Q9** (định dạng file nộp). Ghi rõ **chỉ xuất được Phần II** vì không có phân hệ mua vào |
+| v0.3 | 12/10/2026 | *(điền)* | ✅ **Đóng Q3** (7 cột Excel import là chuẩn chính thức) · **Q1** (hỗ trợ cả SKU và danh mục, **SKU ưu tiên**) · **Q5** (chưa cần tệp đính kèm) · **Q6** (kế toán trưởng sửa khung hiệu lực, **có duyệt + audit** ⇒ thành **BR-011**) · **Q7** (báo cáo đối chiếu giao cho `REP-*`). Thêm mã lỗi `eCommerce:Tax:0007` + **TC-21/TC-22**. Viết lại **Q8/Q9** thành khối gửi được cho kế toán (§15.1.4). Quyền đổi mức thuế chuyển từ host admin → **kế toán trưởng** |
