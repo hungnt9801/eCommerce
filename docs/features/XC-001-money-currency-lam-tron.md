@@ -41,7 +41,7 @@ không sửa được về sau** (đã có tiền thật, đã xuất hoá đơn
 | **D3** | **So sánh tiền theo minor units** (`long`), **cấm so `==` trên `decimal`** | So `decimal` bằng `==` | ⚠️ Bài học: EShop so `ActualTotalPrice == OriginalPaymentAmount` ⇒ **vỡ ngay với VND/payOS** khi lệch làm tròn | API `ToMinorUnits()` là **đường so sánh chính thức**; `CompareTo` dùng minor units |
 | **D4** | Làm tròn mặc định **`MidpointRounding.AwayFromZero`** | `ToEven` (banker's) | Phổ biến trong kế toán VN; dễ giải thích với kế toán/khách hàng | Cấu hình được qua Setting, nhưng **đổi phải có audit** (xem §9) |
 | **D5** | Entity lưu **net + tax riêng**, `Gross` tính ra | Lưu **cả** incl-tax và excl-tax (kiểu nopCommerce) | nopCommerce có ~12 cột tiền nhân đôi vì lưu cả 2 chiều ⇒ dễ lệch nhau; ta lưu 1 chiều và tính | Mọi truy vấn báo cáo phải cộng `Net + Tax` khi cần gross |
-| **D6** | Mapping EF Core bằng **complex type** (`ComplexProperty`) cho tiền **bắt buộc có**; cột rời cho tiền **nullable** | Cột rời cho tất cả | Domain code sạch (`Money Total` thay vì `TotalAmount` + `TotalCurrency`) | ⚠️ Quyết định này phụ thuộc khả năng hỗ trợ **complex type nullable** của EF Core 10 — **cần xác minh** (§15 Q3) |
+| **D6** | Mapping EF Core bằng **complex type** (`ComplexProperty`) cho tiền **bắt buộc có**; **cột rời** cho tiền **nullable** | (a) cột rời cho tất cả · (b) `Owned` entity type · (c) complex type cho tất cả | Domain code sạch (`Money Total` thay vì `TotalAmount` + `TotalCurrency`); EF Core 10 **hỗ trợ `struct`/`readonly record struct`** cho complex type | ✅ **ĐÃ XÁC MINH** (xem §15 Q3): complex type nullable **có** hỗ trợ từ EF Core 10, **nhưng** có **bug #37559** (`ReloadAsync` ném lỗi khi giá trị null) chỉ được vá ở **EF Core 11** ⇒ tiền nullable **vẫn dùng cột rời** trên EF 10 |
 | **D7** | Phân bổ dùng **phương pháp phần dư lớn nhất** (largest remainder), **bảo toàn tổng tuyệt đối** | Chia đều rồi làm tròn từng phần | Chia đều + làm tròn từng phần ⇒ **mất/thừa 1–2 đồng** ⇒ hoá đơn không khớp | Có property-based test bắt buộc (§14) |
 
 ---
@@ -166,7 +166,19 @@ cho phép nhận tiền tệ khác **không phải migrate schema** khi bật đ
 | Tiền **bắt buộc có** (`Money Total`) | `ComplexProperty` ⇒ 2 cột `TotalAmount`, `TotalCurrency` |
 | Tiền **nullable** (`Money? ChannelFee`) | 2 cột nullable rời + property tiện ích trong domain |
 
-> ⚠️ **Q3 (§15)** — cần xác minh EF Core 10 có hỗ trợ **complex type nullable** không; nếu không thì cả hai trường hợp dùng cột rời.
+**Ba ràng buộc của EF Core đã xác minh** (nguồn: [EF Core — Complex Types](https://learn.microsoft.com/en-us/ef/core/modeling/complex-types), cập nhật 05/08/2026):
+
+1. ⚠️ **Complex type KHÔNG được phát hiện theo quy ước** — phải khai báo tường minh bằng
+   `[ComplexType]` trên type **hoặc** `ComplexProperty(...)` trong `OnModelCreating`. Quên ⇒ EF coi đó là
+   entity thường và sẽ sinh bảng/khoá ngoài ngoài ý muốn.
+2. ✅ **`readonly record struct` được hỗ trợ từ EF Core 10** ⇒ `Money` dạng struct dùng được làm complex type.
+3. 🚨 **Complex type nullable cần ít nhất MỘT property `required`** (EF cần cột non-nullable để phân biệt
+   "complex value = null" với "complex value có mọi property = null"). Nếu type không có property required
+   thì phải cấu hình `HasDiscriminator()`. ⇒ Đây là lý do **D6 chọn cột rời cho tiền nullable** thay vì
+   `Money?` dạng complex type, cùng với bug #37559 bên dưới.
+
+> 📌 Thú vị: tài liệu EF Core dùng **chính `Money`** làm ví dụ value object cho complex type
+> (*"For example, `Address`, `Coordinate`, `Money`. These are called value objects"*).
 
 ---
 
@@ -458,10 +470,23 @@ public class MoneyTests
 |---|---|---|---|---|
 | **Q1** | **Quy tắc làm tròn VAT theo quy định VN**: làm tròn theo **từng dòng** hay theo **tổng**? `AwayFromZero` hay `ToEven`? Có văn bản nào quy định cụ thể? | **Kế toán** (+ luật sư nếu cần) | `Open` | 🔴 Sai ⇒ **hoá đơn sai số tiền thuế** ⇒ sai nghĩa vụ thuế. Tạm dùng `AwayFromZero` + per-line |
 | **Q2** | VAT VN có **nhiều mức** (0/5/8/10%) và **giảm tạm thời theo Nghị quyết** ⇒ có cần **bảng thuế suất theo thời gian**? | Kế toán + BA | `Open` | Ảnh hưởng thiết kế `EINV-001`; **không chặn** `XC-001` |
-| **Q3** | EF Core 10 có hỗ trợ **complex type nullable** (`Money?`) không? | Dev (kiểm nhanh bằng spike) | `Open` | Nếu không: tiền nullable dùng **2 cột rời** (đã ghi ở D6) |
+| **Q3** | EF Core 10 có hỗ trợ **complex type nullable** (`Money?`) không? | Dev | ✅ **`Closed`** — xem khung dưới | — |
 | **Q4** | Có cần **bảng `Currency` trong DB** (thay registry trong code) không? | Kiến trúc trưởng | `Open` | Chỉ cần khi bật đa tiền tệ + tỷ giá; hiện **không** |
 | **Q5** | VND có luôn **0 chữ số thập phân** trong mọi ngữ cảnh nghiệp vụ (kể cả giá nhập/giá vốn)? | Kế toán | `Open` | ISO 4217 ghi VND = 0; nếu có ngoại lệ phải thêm quy tắc riêng |
 | **Q6** | Có cần hỗ trợ **phân bổ với trọng số âm** (ví dụ điều chỉnh giảm một dòng) không? | BA | `Open` | Hiện **ném lỗi**; nếu cần thì phải thiết kế lại thuật toán |
+
+#### 15.1.1 ✅ Q3 — ĐÃ GIẢI ĐÁP (có nguồn chính thức)
+
+| Câu hỏi con | Kết luận | Bằng chứng |
+|---|---|---|
+| EF Core 10 có hỗ trợ **complex type nullable** không? | ✅ **CÓ**, từ EF Core 10 | [EF Core — Complex Types](https://learn.microsoft.com/en-us/ef/core/modeling/complex-types) mục *Optional complex types*: *"Starting with EF Core 10, a complex property can be made optional by declaring it as nullable"* |
+| Ràng buộc kèm theo? | ⚠️ **Phải có ≥ 1 property `required`** trên complex type; nếu không, phải cấu hình `HasDiscriminator()` | Cùng trang: *"An optional complex type currently requires at least one required property to be defined on the complex type. This is because EF needs at least one non-nullable column to distinguish a null complex value from a complex value whose properties all happen to be null."* |
+| `readonly record struct` (dạng của `Money`) có dùng được làm complex type? | ✅ **CÓ**, từ EF Core 10 | Cùng trang, mục *Reference and value types*: *"a `struct` or `record struct`, introduced in EF Core 10"* |
+| Complex type có được phát hiện tự động? | ❌ **KHÔNG** — phải khai báo tường minh | *"Unlike most entity types, complex types are not discovered by convention."* |
+| Có dùng được `Money?` (nullable) trên **EF Core 10.0.11** — bản ta đang dùng — không? | ❌ **KHÔNG NÊN**: có bug đã biết, **chỉ vá ở EF Core 11** | [dotnet/efcore#37559](https://github.com/dotnet/efcore/issues/37559): `EntityEntry.ReloadAsync` ném `InvalidOperationException: The property 'Amount' contains null on entity ... but the property is marked as required`. Báo cáo trên **EF Core 10.0.2 + Npgsql 10.0.0**; **đã đóng 06/02/2026, milestone 11.0.0** ⇒ vá ở EF 11, **không** backport về 10.0.x |
+
+**⇒ Chốt:** giữ nguyên **D6** — tiền **bắt buộc** dùng `ComplexProperty`; tiền **nullable** (`Money?`) dùng **2 cột rời**.
+Khi nâng lên EF Core 11 có thể xem lại và dùng `Money?` cho cả hai (khi đó bỏ được ghi chú này).
 
 ### 15.2 Giả định
 
