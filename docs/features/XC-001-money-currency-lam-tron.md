@@ -60,7 +60,7 @@ không sửa được về sau** (đã có tiền thật, đã xuất hoá đơn
 | **Post-Condition(s)** | • Mọi giá trị tiền trả về **đã chuẩn hoá** về `Currency.Decimals`.<br>• Kết quả phân bổ có `Σ parts == total` **chính xác**.<br>• Không có exception nào bị nuốt: cộng/trừ khác tiền tệ ⇒ ném `BusinessException`. |
 | **Basic Flow** | 1. Module tạo tiền: `Money.Of(amount, Currency.Vnd)` → hệ thống **làm tròn** về 0 chữ số thập phân.<br>2. Module cộng/trừ: `a + b` → hệ thống kiểm tra **cùng `Currency`**, trả về `Money` đã chuẩn hoá.<br>3. Module nhân với hệ số: `total * 0.08m` (VAT 8%) → hệ thống tính bằng `decimal` độ chính xác đầy đủ rồi **làm tròn theo policy**.<br>4. Module so sánh: `a.ToMinorUnits() == b.ToMinorUnits()` → không dùng `==` trên `decimal`.<br>5. Module phân bổ: `MoneyAllocator.Allocate(total, weights)` → hệ thống trả mảng mà **tổng bằng đúng `total`**.<br>6. Module gọi NCC: `money.ToMinorUnits()` → truyền số nguyên (VND: chính số tiền; USD: ×100). |
 | **Alternative Flow** | **A1: Tiền nullable** — module có trường tiền không bắt buộc (ví dụ `ChannelFeeAmount`): dùng `Money?`; các phép toán phải kiểm tra trước (`HasValue`).<br>**A2: Đổi chính sách làm tròn** — quản trị đặt Setting ⇒ áp cho tenant đó; **chỉ áp cho tính toán MỚI**, không hồi tố dữ liệu đã ghi. |
-| **Exception Flow** | **E1:** cộng/trừ hai `Money` khác tiền tệ ⇒ `BusinessException` `eCommerce:Money:0001`.<br>**E2:** mã tiền tệ không có trong registry ⇒ `BusinessException` `eCommerce:Money:0002`.<br>**E3:** phân bổ với tổng trọng số = 0 (chia cho 0) ⇒ `BusinessException` `eCommerce:Money:0003`.<br>**E4:** tràn `decimal` khi nhân ⇒ `OverflowException` bị bọc thành `BusinessException` `eCommerce:Money:0004`. |
+| **Exception Flow** | **E1:** cộng/trừ hai `Money` khác tiền tệ ⇒ `BusinessException` `eCommerce:Money:0001`.<br>**E2:** mã tiền tệ không có trong registry ⇒ `BusinessException` `eCommerce:Money:0002`.<br>**E3:** phân bổ với tổng trọng số = 0 (chia cho 0) ⇒ `BusinessException` `eCommerce:Money:0003`.<br>**E4:** tràn `decimal` khi nhân ⇒ `OverflowException` bị bọc thành `BusinessException` `eCommerce:Money:0004`.<br>**E5:** trọng số phân bổ **âm** ⇒ `BusinessException` `eCommerce:Money:0005` (không hỗ trợ — Q6 đã đóng). |
 | **Business Rules** | • **BR-XC-001-001**: Mọi `Money` **luôn ở trạng thái đã làm tròn** theo `Currency.Decimals`.<br>• **BR-XC-001-002**: **Cấm** cộng/trừ/so sánh hai `Money` khác `Currency` ⇒ ném lỗi (không tự quy đổi).<br>• **BR-XC-001-003**: **Cấm** so sánh tiền bằng `==` trên `decimal`; so theo `ToMinorUnits()`.<br>• **BR-XC-001-004**: Làm tròn mặc định `AwayFromZero`, cấu hình theo tenant, **có audit** khi đổi.<br>• **BR-XC-001-005**: Thuế/VAT làm tròn **theo TỪNG DÒNG**; tổng đơn = **tổng các dòng đã làm tròn** (không làm tròn tổng).<br>• **BR-XC-001-006**: Phân bổ (giảm giá, phí vận chuyển, hoàn tiền từng phần) **phải bảo toàn tổng tuyệt đối**: `Σ Allocate(total, w) == total`.<br>• **BR-XC-001-007**: Khi gọi NCC, tiền truyền dưới dạng **minor units (số nguyên)**; **không** truyền `decimal`.<br>• **BR-XC-001-008**: **Không tồn tại `double`/`float`** trong bất kỳ biểu thức tiền nào (kể cả DTO, entity, adapter).<br>• **BR-XC-001-009**: `Currency` mặc định của hệ thống = `VND` (0 chữ số thập phân); đa tiền tệ **chưa hoạt động**. |
 | **Non-Functional Requirement** | • **NFR-XC-001-001**: Phân bổ 1.000 dòng < **5 ms** (p95) trên máy dev.<br>• **NFR-XC-001-002**: Property-based test 10.000 bộ ngẫu nhiên: `Σ Allocate == total` **100%**.<br>• **NFR-XC-001-003**: JSON round-trip bảo toàn giá trị (0 mất mát chữ số).<br>• **NFR-XC-001-004**: 0 lần xuất hiện `double`/`float` trong `eCommerce.Kernel` (kiểm bằng test reflection). |
 
@@ -244,6 +244,7 @@ Cấu hình làm tròn được đọc qua **ABP Settings** (xem §9).
 | `eCommerce:Money:0002` | `400` | Mã tiền tệ không có trong registry | `Mã tiền tệ '{code}' không được hỗ trợ.` |
 | `eCommerce:Money:0003` | `400` | Phân bổ với tổng trọng số = 0 | `Không thể phân bổ vì tổng trọng số bằng 0.` |
 | `eCommerce:Money:0004` | `500` | Tràn `decimal` | `Giá trị tiền vượt giới hạn cho phép.` |
+| `eCommerce:Money:0005` | `400` | Trọng số phân bổ **âm** (không hỗ trợ — Q6) | `Không hỗ trợ phân bổ với trọng số âm.` |
 
 ---
 
@@ -353,7 +354,7 @@ Quy tắc này được ghi vào `XC-002` và tài liệu của từng adapter.
 | Mã tiền tệ lạ (`"usd"` viết thường, `"XXX"`) | dữ liệu vào sai | `FromCode` chuẩn hoá HOA rồi tra registry; không có ⇒ **ném** `0002` | `400` |
 | `Money` mặc định (`default(Money)`) | quên khởi tạo | `Currency.Code` = null/`Amount` = 0 | ⚠️ **Cần phòng ngừa:** test reflection/analyzer cấm `default(Money)`; review checklist |
 | Trọng số phân bổ đều bằng 0 | dữ liệu giảm giá sai | **Ném** `0003` (không chia 0, không trả mảng 0 đồng) | `400` |
-| Trọng số âm trong phân bổ | dữ liệu sai | **Ném** `ArgumentException` — không hỗ trợ phân bổ số âm trong phiên bản này | `400` |
+| Trọng số âm trong phân bổ | dữ liệu sai | **Ném** `BusinessException` `0005` — **không hỗ trợ** phân bổ số âm (Q6 đã đóng) | `400` |
 | Làm tròn ra 0 đồng (ví dụ 0,4 đồng với VND) | chia nhỏ quá mức | Trả `Money.Zero` — **không phải lỗi** | bình thường |
 | Số tiền âm (hoàn tiền, điều chỉnh) | nghiệp vụ hợp lệ | **Cho phép**; không có ràng buộc `Amount > 0` | bình thường |
 | Phân bổ mà tổng lệch | lỗi thuật toán | **Ném `InvalidOperationException`** (lỗi lập trình, phải lộ ra CI) | `500` + log |
@@ -471,9 +472,9 @@ public class MoneyTests
 | **Q1** | **Quy tắc làm tròn VAT theo quy định VN**: làm tròn theo **từng dòng** hay theo **tổng**? `AwayFromZero` hay `ToEven`? Có văn bản nào quy định cụ thể? | **Kế toán** (+ luật sư nếu cần) | `Open` | 🔴 Sai ⇒ **hoá đơn sai số tiền thuế** ⇒ sai nghĩa vụ thuế. Tạm dùng `AwayFromZero` + per-line |
 | **Q2** | VAT VN có **nhiều mức** (0/5/8/10%) và **giảm tạm thời theo Nghị quyết** ⇒ có cần **bảng thuế suất theo thời gian**? | Kế toán + BA | `Open` | Ảnh hưởng thiết kế `EINV-001`; **không chặn** `XC-001` |
 | **Q3** | EF Core 10 có hỗ trợ **complex type nullable** (`Money?`) không? | Dev | ✅ **`Closed`** — xem khung dưới | — |
-| **Q4** | Có cần **bảng `Currency` trong DB** (thay registry trong code) không? | Kiến trúc trưởng | `Open` | Chỉ cần khi bật đa tiền tệ + tỷ giá; hiện **không** |
+| **Q4** | Có cần **bảng `Currency` trong DB** (thay registry trong code) không? | Kiến trúc trưởng | ✅ **`Closed` — KHÔNG dùng bảng** *(chốt 12/10/2026)* | Registry tiền tệ là **hằng số trong code** (`Currency.Vnd`, `Currency.Usd`); chỉ tạo bảng khi bật đa tiền tệ + tỷ giá |
 | **Q5** | VND có luôn **0 chữ số thập phân** trong mọi ngữ cảnh nghiệp vụ (kể cả giá nhập/giá vốn)? | Kế toán | `Open` | ISO 4217 ghi VND = 0; nếu có ngoại lệ phải thêm quy tắc riêng |
-| **Q6** | Có cần hỗ trợ **phân bổ với trọng số âm** (ví dụ điều chỉnh giảm một dòng) không? | BA | `Open` | Hiện **ném lỗi**; nếu cần thì phải thiết kế lại thuật toán |
+| **Q6** | Có cần hỗ trợ **phân bổ với trọng số âm** (ví dụ điều chỉnh giảm một dòng) không? | BA | ✅ **`Closed` — KHÔNG hỗ trợ ở giai đoạn này** *(chốt 12/10/2026)* | Trọng số âm ⇒ **ném `BusinessException` mã `eCommerce:Money:0005`**. Lý do: "từ chối rõ ràng" tốt hơn "hỗ trợ nửa vời" — sẽ thiết kế lại nếu có yêu cầu nghiệp vụ thật |
 
 #### 15.1.1 ✅ Q3 — ĐÃ GIẢI ĐÁP (có nguồn chính thức)
 
@@ -503,3 +504,4 @@ Khi nâng lên EF Core 11 có thể xem lại và dùng `Money?` cho cả hai (k
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.1 | 12/10/2026 | *(điền)* | Bản nháp đầu — chờ review |
+| v0.2 | 12/10/2026 | *(điền)* | **Đóng `Q3`** (EF Core 10 hỗ trợ complex type nullable + `record struct`, nhưng bug #37559 chỉ vá ở EF 11 ⇒ tiền nullable dùng cột rời) · **Đóng `Q4`** (không dùng bảng `Currency` trong DB) · **Đóng `Q6`** (không hỗ trợ trọng số âm) — thêm mã lỗi `eCommerce:Money:0005` |
