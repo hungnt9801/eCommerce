@@ -107,13 +107,13 @@ Hai việc này **không chặn** GĐ1 về mặt kỹ thuật, nhưng **phải 
 
 | Giai đoạn | Tài liệu phải **Approved** trước khi bắt đầu code giai đoạn đó | Số lượng | Danh sách |
 |---|---|:--:|---|
-| **Nền (trước GĐ1)** | `XC-001`…`XC-005` | **5** | Phụ lục A.3 |
+| **Nền (trước GĐ1)** | `XC-001`…`XC-006` | **6** | Phụ lục A.3 |
 | **GĐ0** — Pháp lý | `ADDR-001`…`003` · `EINV-001`…`003` · `SIGN-001` | **7** | Phụ lục A.3 |
 | **GĐ1** — Bán được | `CAT-001`…`003` · `PRC-001`…`002` · `INV-001`…`003` · `SAL-001`…`005` · `CUS-001` · `REC-001` · `WEB-001`…`003` | **18** | Phụ lục A.3 |
 | **GĐ2** — Vận hành VN | `PRO-001`…`002` · `SHP-001`…`004` · `REC-002`…`003` · `SAL-006` | **9** | Phụ lục A.3 |
 | **GĐ3** — Điều hành | `REP-001`…`003` · `NOT-001`…`002` · `ACC-001` | **6** | Phụ lục A.3 |
 | **GĐ4** — Tăng trưởng | `CHN-001`…`004` · `LOY-001` · `REV-001` | **6** | Phụ lục A.3 |
-| | | **51** | |
+| | | **52** | |
 
 > **Cách áp dụng thực tế:** không cần Approved cả 18 tài liệu GĐ1 trong một ngày. Nguyên tắc là
 > **mỗi feature phải Approved trước khi code feature đó** — nên có thể duyệt theo từng đợt nhỏ,
@@ -154,13 +154,13 @@ Hai việc này **không chặn** GĐ1 về mặt kỹ thuật, nhưng **phải 
 
 ### 7.0 Hạ tầng nền (làm trước, 1 tuần)
 
-> 📄 **Bắt buộc trước tiên:** 5 tài liệu nền **`XC-001`…`XC-005`** phải **Approved** (Phụ lục A.3) —
+> 📄 **Bắt buộc trước tiên:** 6 tài liệu nền **`XC-001`…`XC-006`** phải **Approved** (Phụ lục A.3) —
 > vì **mọi module GĐ1 trở đi đều phụ thuộc chúng** (Money/làm tròn, outbox/inbox, lock, phân quyền, observability).
 > Sau đó mới tạo code hạ tầng dưới đây.
 
 | # | Việc | DoD |
 |---|---|---|
-| 0 | ✍️ Viết & duyệt **`XC-001`…`XC-005`** (tài liệu, không phải code) | 5 tài liệu ở trạng thái **Approved** |
+| 0 | ✍️ Viết & duyệt **`XC-001`…`XC-006`** (tài liệu, không phải code) | 6 tài liệu ở trạng thái **Approved** |
 | 1 | Tạo `shared/eCommerce.Kernel` (Money, Currency, Address, enum, mã lỗi, lock key) | Build sạch; mọi module tham chiếu được; có unit test cho `Money` (cộng/trừ khác tiền tệ ⇒ ném lỗi; VND dùng điểm cố định 0 chữ số thập phân) |
 | 2 | Tạo `eCommerce.Web` + `Volo.Account` + theme miễn phí | Có màn hình login; vào được trang chủ admin |
 | 3 | Thêm **Outbox/Inbox** của ABP + **DLQ** | Có test chứng minh event không mất khi giả lập publish lỗi |
@@ -267,8 +267,8 @@ một khuyến mãi phức tạp (nhiều điều kiện AND/OR) tính đúng ti
 | GĐ3 | Reporting · Notifications · AccountingHub | **18 – 30** |
 | GĐ4 | Đấu sàn Shopee/Lazada · Loyalty/Reviews · SaaS hoá | **40 – 65** |
 | **Tổng (code)** | | **172 – 275 person-day** (≈ **9–14 tháng** cho 1 dev; **5–7 tháng** cho 2–3 dev) |
-| **Tài liệu thiết kế** | 51 tài liệu feature (Phụ lục A), ~0.5–2 pd/tài liệu | **+25 – 60 person-day** (~15% tổng công) |
-| **TỔNG CỘNG** | code + tài liệu | **197 – 335 person-day** (≈ **10–17 tháng** cho 1 dev) |
+| **Tài liệu thiết kế** | 52 tài liệu feature (Phụ lục A), ~0.5–2 pd/tài liệu | **+27 – 62 person-day** (~15% tổng công) |
+| **TỔNG CỘNG** | code + tài liệu | **199 – 337 person-day** (≈ **10–17 tháng** cho 1 dev) |
 
 > **Vì sao vẫn nên làm tài liệu dù tốn ~15%?** Vì tài liệu thiết kế **chặn được loại lỗi đắt nhất**:
 > 6 lỗi ở Phase 0 và các lỗi của eShop (outbox thiếu relay, guard im lặng, thiếu dedup) **đều là lỗi thiết kế** —
@@ -364,7 +364,7 @@ một khuyến mãi phức tạp (nhiều điều kiện AND/OR) tính đúng ti
 | Vị trí | `docs/features/<mã>-<slug>.md` |
 | Trạng thái | `Draft → In review → Approved → Implementing → Implemented → Changed` |
 
-## A.3 Danh sách tài liệu cần viết (51 tài liệu)
+## A.3 Danh sách tài liệu cần viết (52 tài liệu)
 
 ### Chuẩn bị (cross-cutting) — **viết TRƯỚC GĐ1**
 
@@ -375,6 +375,7 @@ một khuyến mãi phức tạp (nhiều điều kiện AND/OR) tính đúng ti
 | XC-003 | Khoá phân tán: quy ước đặt tên & phạm vi | 0.5 pd |
 | XC-004 | Xác thực, phân quyền & định nghĩa permission | 1 pd |
 | XC-005 | Observability: log có cấu trúc, `CorrelationId`, metric | 1 pd |
+| XC-006 | **Phân loại thuế GTGT theo SKU & mức thuế suất theo thời gian** (danh mục luật là **dữ liệu**, không hard-code) | 2 pd |
 
 ### GĐ0 — Pháp lý (7 tài liệu)
 
@@ -459,7 +460,7 @@ một khuyến mãi phức tạp (nhiều điều kiện AND/OR) tính đúng ti
 | Feature có state machine **hoặc** tích hợp NCC | **1.5–2 ngày** |
 | Feature có **cả** state machine **và** NCC **và** pháp lý (EINV-*, SHP-*) | **2–3 ngày** |
 
-**Tổng: ~25–60 person-day** cho 51 tài liệu (đã cộng vào §13).
+**Tổng: ~27–62 person-day** cho 52 tài liệu (đã cộng vào §13).
 
 ## A.5 Điều kiện để một giai đoạn được coi là "bắt đầu"
 
@@ -470,7 +471,7 @@ Một giai đoạn **chỉ được bắt đầu code** khi:
 ## A.6 Việc cần làm ngay khi bắt đầu
 
 1. Nhóm **review mẫu** `templates/feature-design-template.md` — đặc biệt 4 mục mới so với tài liệu gốc: state machine · sự kiện/idempotency · bất biến & đồng thời · migration.
-2. Viết **XC-001…XC-005** (5 tài liệu nền) — vì mọi module phụ thuộc chúng.
+2. Viết **XC-001…XC-006** (6 tài liệu nền) — vì mọi module phụ thuộc chúng.
 3. Viết **ADDR-001…003 + EINV-001** (GĐ0) — vì đây là nghĩa vụ pháp lý và chặn thiết kế địa chỉ/hoá đơn.
 4. Song song: gửi email hỏi NCC (§16) để có thông số thật điền vào tài liệu.
 
@@ -480,13 +481,14 @@ Một giai đoạn **chỉ được bắt đầu code** khi:
 |---|---|
 | Mẫu tài liệu | ✅ đã viết — **chờ nhóm review** |
 | Hướng dẫn + bảng sửa đổi so với tài liệu tham khảo | ✅ đã viết |
-| Danh sách 51 tài liệu | ✅ đã liệt kê (A.3) |
+| Danh sách 52 tài liệu | ✅ đã liệt kê (A.3) |
 | Script kiểm tra Mermaid | ✅ `npm --prefix tools run check:mermaid` — 7/7 khối PASS |
-| **Tài liệu thực tế** | 🟡 **1/51** — `XC-001` đã viết (**Draft**, chờ review) |
+| **Tài liệu thực tế** | 🟡 **2/52** — `XC-001` + `XC-006` đã viết (**Draft**, chờ review) |
 | `XC-002`…`XC-005` | ⬜ chưa viết — sau khi `XC-001` được duyệt |
 
 ### A.8 Tài liệu đã viết
 
 | Mã | Tài liệu | Trạng thái | Ghi chú |
 |---|---|---|---|
-| `XC-001` | [Money, Currency & chính sách làm tròn](features/XC-001-money-currency-lam-tron.md) | 🟡 `Draft` | 480 dòng · 7 quyết định thiết kế (ADR) · 9 BR · 6 NFR · 15 test case · **6 câu hỏi mở** — trong đó **Q1 (làm tròn VAT theo luật VN) cần kế toán trả lời** |
+| `XC-001` | [Money, Currency & chính sách làm tròn](features/XC-001-money-currency-lam-tron.md) | 🟡 `Draft` | 630 dòng · 7 quyết định thiết kế (ADR) · 12 BR · 6 NFR · 15 test case · **6/6 câu hỏi đã đóng** |
+| `XC-006` | [Phân loại thuế GTGT theo SKU](features/XC-006-phan-loai-thue-gtgt.md) | 🟡 `Draft` | 10 BR · 8 NFR · 20 test case · **state machine** Draft→Approved→Active · thiết kế để **kế toán tự quyết định** danh mục Phụ lục I/II, **không hard-code** · 5 khối Mermaid PASS |
