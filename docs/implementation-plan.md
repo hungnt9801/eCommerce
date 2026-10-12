@@ -481,4 +481,12 @@ Một giai đoạn **chỉ được bắt đầu code** khi:
 | Mẫu tài liệu | ✅ đã viết — **chờ nhóm review** |
 | Hướng dẫn + bảng sửa đổi so với tài liệu tham khảo | ✅ đã viết |
 | Danh sách 51 tài liệu | ✅ đã liệt kê (A.3) |
-| Tài liệu thực tế | ⬜ **chưa viết** — bắt đầu từ XC-001 |
+| Script kiểm tra Mermaid | ✅ `npm --prefix tools run check:mermaid` — 7/7 khối PASS |
+| **Tài liệu thực tế** | 🟡 **1/51** — `XC-001` đã viết (**Draft**, chờ review) |
+| `XC-002`…`XC-005` | ⬜ chưa viết — sau khi `XC-001` được duyệt |
+
+### A.8 Tài liệu đã viết
+
+| Mã | Tài liệu | Trạng thái | Ghi chú |
+|---|---|---|---|
+| `XC-001` | [Money, Currency & chính sách làm tròn](features/XC-001-money-currency-lam-tron.md) | 🟡 `Draft` | 480 dòng · 7 quyết định thiết kế (ADR) · 9 BR · 6 NFR · 15 test case · **6 câu hỏi mở** — trong đó **Q1 (làm tròn VAT theo luật VN) cần kế toán trả lời** |
