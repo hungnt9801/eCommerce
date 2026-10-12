@@ -122,6 +122,17 @@ bạn tự nhận việc merge mỗi lần ABP ra bản mới mà **không đư�
 
 ## 4. Ba cách đưa module vào source code (chọn theo mục đích)
 
+> 🚨 **CẢNH BÁO GIẤY PHÉP — đọc trước khi chọn cách B/C/D**
+> **Module ứng dụng của ABP là `LGPL-3.0-only`, KHÔNG phải MIT** (dù tài liệu ABP ghi "licensed with MIT").
+> Bằng chứng tôi đọc trực tiếp:
+> - nuspec `volo.abp.identity.domain 10.7.0` → `<license type="expression">LGPL-3.0-only</license>`
+> - `abpframework/abp/dev/common.props` → `<PackageLicenseExpression>LGPL-3.0-only</PackageLicenseExpression>`
+>   (mọi module đều import file này; `modules/<tên>/LICENSE` không tồn tại → 404)
+>
+> **Hệ quả:** dùng **NuGet package** thì an toàn cho sản phẩm đóng. Nhưng **copy source module vào sản phẩm
+> đóng** (tức `--with-source-code` / `abp get-source`) là **quyết định pháp lý, không phải kỹ thuật** —
+> phải hỏi luật sư trước. Xem `business-modules-proposal.md` §2.
+
 | Cách | Lệnh | Khi nào dùng | Hệ quả |
 |---|---|---|---|
 | **A. PackageReference** *(mặc định)* | `abp add-module Volo.Abp.Identity` | 99% trường hợp: chỉ cần dùng module | Module vẫn là DLL. Nâng cấp = `abp update`. **Không** phải merge gì. |

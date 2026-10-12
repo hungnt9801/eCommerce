@@ -28,3 +28,10 @@ artifacts/
 ## OS
 .DS_Store
 Thumbs.db
+
+## Node (chỉ dùng cho tools/check-mermaid.mjs — KHÔNG commit thư viện)
+node_modules/
+package-lock.json
+
+## Tài liệu: ảnh/export tạm
+docs/**/*.tmp.md
