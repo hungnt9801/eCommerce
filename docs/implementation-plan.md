@@ -105,6 +105,20 @@ Hai việc này **không chặn** GĐ1 về mặt kỹ thuật, nhưng **phải 
 > phải ở trạng thái **Approved** (Definition of Ready). Danh sách đầy đủ tài liệu cần viết theo từng giai đoạn:
 > **Phụ lục A**. Mẫu: `templates/feature-design-template.md`. Hướng dẫn: `design-doc-guidelines.md`.
 
+| Giai đoạn | Tài liệu phải **Approved** trước khi bắt đầu code giai đoạn đó | Số lượng | Danh sách |
+|---|---|:--:|---|
+| **Nền (trước GĐ1)** | `XC-001`…`XC-005` | **5** | Phụ lục A.3 |
+| **GĐ0** — Pháp lý | `ADDR-001`…`003` · `EINV-001`…`003` · `SIGN-001` | **7** | Phụ lục A.3 |
+| **GĐ1** — Bán được | `CAT-001`…`003` · `PRC-001`…`002` · `INV-001`…`003` · `SAL-001`…`005` · `CUS-001` · `REC-001` · `WEB-001`…`003` | **18** | Phụ lục A.3 |
+| **GĐ2** — Vận hành VN | `PRO-001`…`002` · `SHP-001`…`004` · `REC-002`…`003` · `SAL-006` | **9** | Phụ lục A.3 |
+| **GĐ3** — Điều hành | `REP-001`…`003` · `NOT-001`…`002` · `ACC-001` | **6** | Phụ lục A.3 |
+| **GĐ4** — Tăng trưởng | `CHN-001`…`004` · `LOY-001` · `REV-001` | **6** | Phụ lục A.3 |
+| | | **51** | |
+
+> **Cách áp dụng thực tế:** không cần Approved cả 18 tài liệu GĐ1 trong một ngày. Nguyên tắc là
+> **mỗi feature phải Approved trước khi code feature đó** — nên có thể duyệt theo từng đợt nhỏ,
+> miễn là **5 tài liệu nền (`XC-*`) xong trước tất cả** (mọi module đều phụ thuộc chúng).
+
 ## 6. GIAI ĐOẠN 0 — Pháp lý (AddressHub · EInvoiceHub · DigitalSigningHub)
 
 ### 6.1 AddressHub 🔴
@@ -131,7 +145,8 @@ Hai việc này **không chặn** GĐ1 về mặt kỹ thuật, nhưng **phải 
 | **Phụ thuộc** | `Sales` (nguồn dữ liệu đơn) |
 | **DoD** | (1) phát hành 1 hoá đơn thành công trên môi trường sandbox của NCC; (2) state machine có test cho mọi nhánh, kể cả `Rejected`; (3) lưu raw request/response để đối soát; (4) không hard-code endpoint của NCC nào |
 
-**Cổng kiểm soát GĐ0:** 3 module trên chạy được ở môi trường sandbox với **1 NCC hoá đơn + 1 hãng vận chuyển**.
+**Cổng kiểm soát GĐ0:** 📄 tài liệu `ADDR-001…003`, `EINV-001…003`, `SIGN-001` đã **Approved** ·
+3 module trên chạy được ở môi trường sandbox với **1 NCC hoá đơn + 1 hãng vận chuyển**.
 
 ---
 
@@ -139,8 +154,13 @@ Hai việc này **không chặn** GĐ1 về mặt kỹ thuật, nhưng **phải 
 
 ### 7.0 Hạ tầng nền (làm trước, 1 tuần)
 
+> 📄 **Bắt buộc trước tiên:** 5 tài liệu nền **`XC-001`…`XC-005`** phải **Approved** (Phụ lục A.3) —
+> vì **mọi module GĐ1 trở đi đều phụ thuộc chúng** (Money/làm tròn, outbox/inbox, lock, phân quyền, observability).
+> Sau đó mới tạo code hạ tầng dưới đây.
+
 | # | Việc | DoD |
 |---|---|---|
+| 0 | ✍️ Viết & duyệt **`XC-001`…`XC-005`** (tài liệu, không phải code) | 5 tài liệu ở trạng thái **Approved** |
 | 1 | Tạo `shared/eCommerce.Kernel` (Money, Currency, Address, enum, mã lỗi, lock key) | Build sạch; mọi module tham chiếu được; có unit test cho `Money` (cộng/trừ khác tiền tệ ⇒ ném lỗi; VND dùng điểm cố định 0 chữ số thập phân) |
 | 2 | Tạo `eCommerce.Web` + `Volo.Account` + theme miễn phí | Có màn hình login; vào được trang chủ admin |
 | 3 | Thêm **Outbox/Inbox** của ABP + **DLQ** | Có test chứng minh event không mất khi giả lập publish lỗi |
@@ -159,6 +179,7 @@ Hai việc này **không chặn** GĐ1 về mặt kỹ thuật, nhưng **phải 
 | **đối soát thanh toán** (trong `Reconciliation`) | `PaymentReconciliationRun`, `PaymentReconciliationLine`, `Discrepancy` | job định kỳ `querydr` với cổng; báo cáo lệch | `PaymentDiscrepancyFoundEto` | PaymentHub | Có job chạy định kỳ; phát hiện được ca "đã trừ tiền mà đơn chưa `Paid`" |
 
 **Cổng kiểm soát GĐ1 (Definition of Done cấp giai đoạn):**
+0. 📄 **Tài liệu GĐ1 đã Approved** (`CAT-*`, `PRC-*`, `INV-*`, `SAL-001…005`, `CUS-001`, `REC-001`, `WEB-*`) và 5 tài liệu nền `XC-*`.
 1. Một khách **đặt được đơn trên website**, thanh toán qua **1 cổng VN**, đơn chuyển đúng trạng thái.
 2. Bán **vượt tồn kho là không thể** — có test integration chứng minh (2 request đồng thời, 2 instance).
 3. **Không mất tiền**: có job đối soát phát hiện giao dịch lệch.
@@ -176,7 +197,8 @@ Hai việc này **không chặn** GĐ1 về mặt kỹ thuật, nhưng **phải 
 | **Reconciliation** (mở rộng) | `SettlementBatch`, `SettlementLine`, `CodReconciliationBatch`, `CodReconciliationLine`, `Discrepancy` | **settlement sàn** (khi đấu sàn) + **đối soát COD** | ⚠️ **COD không có API** — GHN chỉ có API *đổi* COD; bảng kê là **file Excel tải thủ công** theo **"phiên"** ⇒ phải làm **luồng import file + đối soát** |
 | **RMA** (trong `Sales`) | `OrderReturn`, `OrderReturnLine`, `Refund` | trả hàng, nhập lại kho, hoàn tiền (một phần/toàn bộ) | Có test: trả hàng ⇒ sinh ledger nhập kho + hoàn tiền đúng số |
 
-**Cổng kiểm soát GĐ2:** một đơn chạy hết vòng **đặt → giao → COD → đối soát** trên **1 hãng vận chuyển thật**;
+**Cổng kiểm soát GĐ2:** 📄 tài liệu `PRO-*`, `SHP-*`, `REC-002…003`, `SAL-006` đã **Approved** ·
+một đơn chạy hết vòng **đặt → giao → COD → đối soát** trên **1 hãng vận chuyển thật**;
 một khuyến mãi phức tạp (nhiều điều kiện AND/OR) tính đúng tiền.
 
 ---
