@@ -533,10 +533,25 @@ hướng dẫn bởi **Thông tư 91/2026/TT-BTC**. Căn cứ: **Điều 43 NĐ 
 
 🔴 **KHÔNG tìm thấy văn bản nào gia hạn quá 31/12/2026** ⇒ **BR-012**: cấm hard-code thuế suất; phải cấu hình
 theo **khoảng thời gian hiệu lực**, và chuẩn bị cơ chế **tự chuyển về 10% lúc 00:00 ngày 01/01/2027**.
-🔴 **BLOCKER chưa giải quyết:** **Phụ lục I & II NĐ 174/2025/NĐ-CP** (danh mục hàng hoá **không được giảm thuế**,
-phân loại theo mã ngành/HS) **chưa đọc được** — PDF là **bản scan không có lớp văn bản**, môi trường khảo sát
-không có công cụ OCR. ⇒ **Đây là blocker thật sự để gán thuế suất cho từng SKU** (thuộc `EINV-001`).
-Phải lấy được danh mục này qua nguồn khác hoặc OCR ngoài.
+🔴 **BLOCKER (vẫn chưa giải quyết):** **Phụ lục I & II NĐ 174/2025/NĐ-CP** (danh mục hàng hoá **không được giảm thuế**,
+phân loại theo mã ngành/HS) **chưa đọc được** — bản PDF chính thức là **scan không có lớp văn bản**, `chinhphu.vn`
+**không cung cấp DOCX** cho văn bản này, và `thuvienphapluat.vn` **chặn truy cập (HTTP 403 Cloudflare)** cả qua
+`web_fetch` lẫn `pwsh` có header trình duyệt. ⇒ **Vẫn cần bạn cung cấp file Excel/PDF có lớp text của Phụ lục I/II.**
+
+✅ **NHƯNG đã tìm được 2 thông tin pháp lý quan trọng về NĐ 174/2025** (nguồn: trang phổ biến pháp luật tỉnh Quảng Ninh,
+toàn văn NĐ 174/2025):
+
+> *"Trường hợp bán hàng hóa, cung cấp dịch vụ **áp dụng nhiều mức thuế suất khác nhau, trên hóa đơn phải ghi rõ thuế suất của từng hàng hóa, dịch vụ** theo quy định."*
+> *"Cơ sở kinh doanh thực hiện **kê khai các hàng hóa, dịch vụ được giảm thuế GTGT theo Mẫu số 01 tại Phụ lục IV**, ban hành kèm theo Nghị định 174/2025/NĐ-CP, cùng với Tờ khai thuế GTGT."*
+
+⚠️ **Hệ quả thiết kế (mới, quan trọng):**
+1. NĐ 174/2025 **không chỉ có Phụ lục I/II** mà còn **Phụ lục IV = Mẫu số 01** — mẫu **kê khai hàng hoá/dịch vụ
+   được giảm thuế**, nộp **cùng Tờ khai thuế GTGT**. ⇒ Hệ thống **phải xuất được dữ liệu Mẫu 01** (thuộc `EINV-001`/`ACC-001`).
+2. Vì phải kê khai được **danh sách hàng hoá thuộc/không thuộc nhóm giảm thuế**, **phân loại thuế theo từng SKU
+   là YÊU CẦU PHÁP LÝ**, không phải tuỳ chọn ⇒ `Catalog` phải có trường **mã ngành/HS + cờ "thuộc nhóm giảm"**, và
+   giá trị này phải **có hiệu lực theo thời gian** (khớp BR-012).
+3. Câu *"trên hóa đơn phải ghi rõ thuế suất của từng hàng hóa, dịch vụ"* **củng cố BR-010**
+   (bất biến `Σ thuế theo từng mức == tổng cộng tiền thuế`).
 
 **Q5 — VND có được ghi phần thập phân không?** (NĐ 254/2026, Phụ lục *"NỘI DUNG CỦA HÓA ĐƠN"* mục 8)
 
@@ -552,6 +567,38 @@ Phải lấy được danh mục này qua nguồn khác hoặc OCR ngoài.
 | Số chữ số thập phân cho ngoại tệ | ❌ **KHÔNG TÌM THẤY QUY ĐỊNH.** Ví dụ trong văn bản dùng 2 chữ số nhưng đó là **minh hoạ ký hiệu**, không phải quy định. Thông lệ: theo **ISO 4217** |
 | Hoá đơn ngoại tệ | Phải ghi **nguyên tệ + tên ngoại tệ + mã ISO + tỷ giá với VND**; nếu nộp thuế bằng ngoại tệ thì **không quy đổi** |
 | Dấu phân cách | Người bán **được lựa chọn** 1 trong 2 kiểu (`. ,` hoặc `, .`) — **phải thống nhất**, và đó là việc của tầng hiển thị |
+
+#### 15.1.3 ✅ ĐÃ ĐỌC TOÀN VĂN CHÍNH THỨC **TT 91/2026/TT-BTC** — xác nhận dứt điểm
+
+Nguồn: **file DOCX có chữ ký** trên **Công báo Chính phủ** (`congbao.chinhphu.vn`, văn bản 470171) — bóc được **164.296 ký tự**.
+Cấu trúc: **05 Chương, 25 Điều, 05 Phụ lục** (theo bài giới thiệu của Cục Thuế, Công văn 4831/CT-CS ngày 15/7/2026).
+
+**Đếm từ khoá trên toàn văn (chính thức):**
+
+| Từ khoá | Số lần xuất hiện |
+|---|---|
+| `chữ số thập phân` | **0** |
+| `làm tròn` | **0** |
+| `số chữ số` | **0** |
+| `đơn vị tiền tệ` | **0** |
+| `XML` | 4 |
+| `Phụ lục` | 60 |
+
+⇒ ✅ **Khẳng định dứt điểm:** cả **NĐ 254/2026** lẫn **TT 91/2026** **ĐỀU KHÔNG** quy định về **làm tròn** hay **số chữ số thập phân**.
+Kết luận ở Q1 và Q5 **đứng vững**: đây là **quyết định quản trị**, không phải yêu cầu pháp lý.
+
+**🎯 Phát hiện MỚI quan trọng cho `EINV-001` — trích nguyên văn Điều 3 TT 91/2026:**
+
+> *"1. Định dạng hóa đơn điện tử là tiêu chuẩn kỹ thuật quy định **kiểu dữ liệu, chiều dài dữ liệu của các trường thông tin** phục vụ truyền nhận, lưu trữ và hiển thị hóa đơn điện tử. Định dạng hóa đơn điện tử sử dụng **ngôn ngữ định dạng văn bản XML**…"*
+> *"2. Định dạng hóa đơn điện tử gồm **hai thành phần**: thành phần chứa **dữ liệu nghiệp vụ** hóa đơn điện tử và thành phần chứa **dữ liệu chữ ký số**. Đối với hóa đơn điện tử **có mã của cơ quan thuế** thì có thêm thành phần chứa dữ liệu liên quan đến **mã cơ quan thuế**."*
+> *"3. **Cục Thuế xây dựng** thành phần chứa dữ liệu nghiệp vụ hóa đơn điện tử và phương thức truyền nhận với cơ quan thuế. … Cục Thuế công bố thành phần chứa dữ liệu nghiệp vụ hóa đơn…"*
+
+⚠️ **Hệ quả thiết kế:** quy định **kiểu dữ liệu và chiều dài trường** (tức chỗ có thể chứa quy tắc số chữ số thập phân)
+**KHÔNG nằm trong Thông tư** mà do **Cục Thuế ban hành riêng** ("thành phần chứa dữ liệu nghiệp vụ hóa đơn điện tử" + "phương thức truyền nhận").
+
+➡️ **Việc cần làm mới (cho `EINV-001`):** tải **bản công bố thành phần dữ liệu nghiệp vụ hoá đơn điện tử của Cục Thuế**
+— **đây mới là tài liệu quy định chiều dài/kiểu trường**, chứ không phải TT 91. Cấu trúc XML gồm **3 phần**:
+dữ liệu nghiệp vụ + **chữ ký số** + (nếu có) **mã cơ quan thuế** ⇒ ảnh hưởng trực tiếp tới thiết kế `DigitalSigningHub`.
 
 > 🔎 **Đối chiếu:** nội dung **NĐ 123/2020 Điều 10 K13** (nay hết hiệu lực) **gần như giống hệt** NĐ 254/2026
 > Phụ lục mục 8 ⇒ **quy tắc kỹ thuật không đổi**, chỉ **căn cứ pháp lý** phải cập nhật.
