@@ -95,7 +95,7 @@ GĐ3  ĐIỀU HÀNH     Reporting · Notifications · AccountingHub
 GĐ4  TĂNG TRƯỞNG   Loyalty/Reviews · đấu sàn (ChannelHub connectors) · SaaS hoá
 ```
 
-**Vì sao GĐ0 (pháp lý) song song GĐ1:** NĐ 70/2025 hiệu lực **01/06/2025** — nghĩa vụ pháp lý **hiện tại**;
+**Vì sao GĐ0 (pháp lý) song song GĐ1:** hoá đơn điện tử nay điều chỉnh bởi **NĐ 254/2026/NĐ-CP** (hiệu lực **01/7/2026**, thay thế NĐ 123/2020 + NĐ 70/2025) — nghĩa vụ pháp lý **hiện tại**;
 việc bỏ cấp huyện (01/07/2025) **thay đổi mô hình dữ liệu địa chỉ** ⇒ làm sai từ đầu phải migrate lại toàn bộ đơn hàng.
 Hai việc này **không chặn** GĐ1 về mặt kỹ thuật, nhưng **phải xong trước khi phát hành** cho khách thật.
 
@@ -383,7 +383,7 @@ một khuyến mãi phức tạp (nhiều điều kiện AND/OR) tính đúng ti
 | ADDR-001 | Tra cứu đơn vị hành chính **2 cấp** (tỉnh + xã) và **3 cấp** cũ |
 | ADDR-002 | Đồng bộ **mã địa chỉ theo từng hãng vận chuyển** (dữ liệu đồng bộ, không phải master) |
 | ADDR-003 | Chuẩn hoá địa chỉ khách hàng: convert 3 cấp ↔ 2 cấp, xử lý **ca sáp nhập tỉnh** |
-| EINV-001 | Phát hành hoá đơn điện tử (NĐ 123/2020 + **NĐ 70/2025**) |
+| EINV-001 | Phát hành hoá đơn điện tử (**NĐ 254/2026/NĐ-CP** + **TT 91/2026/TT-BTC**) |
 | EINV-002 | Gửi cơ quan thuế & nhận kết quả (SOAP/XML, parse `OK:`/`ERR:`) |
 | EINV-003 | Điều chỉnh / thay thế / **huỷ** hoá đơn |
 | SIGN-001 | Quy trình **ký 2 bước thủ công** + quản lý chứng thư số |

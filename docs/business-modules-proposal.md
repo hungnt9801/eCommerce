@@ -88,7 +88,7 @@ Thiết kế theo **bounded context**, mỗi module sở hữu entity của mìn
 | **B0** | **AddressHub** | Mô hình địa chỉ **2 cấp mới** (tỉnh + xã, **bỏ huyện** từ 01/07/2025) **và** 3 cấp cũ; **bảng mã địa chỉ theo từng hãng vận chuyển** (là *dữ liệu đồng bộ*, không phải master data). 🔴 **P0 vì breaking change đang diễn ra** | 🔴 **P0** |
 | **B1** | **Payments** (đã có `PaymentHub`) | Thêm provider MoMo/payOS/ZaloPay/SePay; **module ĐỐI SOÁT thanh toán** (job `querydr` định kỳ) — **bắt buộc** vì webhook có thể mất | 🔴 P1 |
 | **B2** | **ShippingHub** | `Carrier` adapter (**GHN tốt nhất** — REST + sandbox + publish `llms.txt`; GHTK OK; 7 hãng còn lại phần lớn **không có tài liệu API**), `ShippingMethod`/`Service`, tính phí theo cân nặng/kích thước/địa chỉ, `Shipment` + mã vận đơn + webhook, **COD amount**, giao thất bại/giao lại | 🟠 P2 |
-| **B3** | **EInvoiceHub + DigitalSigningHub + Tax** | Thuế GTGT; **hoá đơn điện tử** (NĐ 123/2020 **từ 01/07/2022** + **NĐ 70/2025 từ 01/06/2025**); ⚠️ **`DigitalSigningHub` là STATE MACHINE 2 bước, không phải hàm sync** (VNPT: xin Hash → gửi hash đã ký) ⇒ với token/USB **không tự động hoá 100% được** | 🔴 **P0 (phần pháp lý)** |
+| **B3** | **EInvoiceHub + DigitalSigningHub + Tax** | Thuế GTGT; **hoá đơn điện tử** — ⚠️ căn cứ hiện hành là **NĐ 254/2026/NĐ-CP** (hiệu lực **01/7/2026**, thay thế NĐ 123/2020 + NĐ 70/2025) + **TT 91/2026/TT-BTC**; ⚠️ **`DigitalSigningHub` là STATE MACHINE 2 bước, không phải hàm sync** (VNPT: xin Hash → gửi hash đã ký) ⇒ với token/USB **không tự động hoá 100% được** | 🔴 **P0 (phần pháp lý)** |
 | **B4** | **Channel Settlement** (đối soát sàn) | Phí sàn theo đơn, tiền sàn phải trả, kỳ đối soát, chênh lệch, hoàn tiền/trả hàng của sàn | 🟠 P2 |
 | **B5** | **CodReconciliation** | ⚠️ **KHÔNG có API đối soát** — GHN chỉ có API **đổi** COD; bảng kê là **file Excel tải THỦ CÔNG**, kỳ theo **"phiên"** (`mã phiên`). Phải thiết kế luồng **import file thủ công + đối soát** | 🟠 P2 |
 | **B6** | **AccountingHub / InboundInvoiceHub** | MISA/Bravo/Fast **không công bố spec .NET**; Bravo chính thức hỗ trợ **Excel/CSV** | 🟡 P3 |
@@ -110,7 +110,7 @@ Thiết kế theo **bounded context**, mỗi module sở hữu entity của mìn
 ```
 P0 (PHÁP LÝ — phải làm cùng lúc với checkout, không phải "sau này")
    B0 AddressHub (địa chỉ 2 cấp, bỏ huyện từ 01/07/2025)
-   B3 EInvoiceHub + DigitalSigningHub (NĐ 70/2025 đã hiệu lực 01/06/2025)
+   B3 EInvoiceHub + DigitalSigningHub (NĐ 254/2026/NĐ-CP, hiệu lực 01/7/2026)
 
 P1 (bán được trên website)
    A1 Catalog → A2 Pricing → A4 Inventory → A5 Cart/Checkout → A6 Orders → A7 Customers → B1 đối soát thanh toán
@@ -126,7 +126,7 @@ P4 (tăng trưởng)
 ```
 
 **Nguyên tắc thứ tự:**
-1. **Địa chỉ + hoá đơn điện tử là P0 vì PHÁP LÝ, không vì kỹ thuật** — NĐ 70/2025 hiệu lực từ 01/06/2025,
+1. **Địa chỉ + hoá đơn điện tử là P0 vì PHÁP LÝ, không vì kỹ thuật** — NĐ 254/2026/NĐ-CP hiệu lực từ 01/7/2026 (thay thế NĐ 123/2020 + NĐ 70/2025),
    và việc bỏ cấp huyện (01/07/2025) làm **thay đổi mô hình dữ liệu địa chỉ**; làm sai từ đầu là phải migrate lại toàn bộ đơn hàng.
 2. **Inventory + Checkout + Orders phải làm cùng nhau** — oversell và sai tiền là hai lỗi không thể sửa về sau.
 3. **Pricing tách khỏi Catalog** ngay từ đầu, vì giá theo kênh/thời gian/giá sỉ sẽ phình nếu nhét vào Product.
@@ -495,10 +495,14 @@ hoặc `decimal` với **chính sách làm tròn tường minh**; và **không b
 ### 6.7 Nghiệp vụ đặc thù Việt Nam — **P0 vì lý do PHÁP LÝ, không phải P2**
 
 > 🚨 **ĐÍNH CHÍNH KẾ HOẠCH CŨ:** trong `ecommerce-multichannel-plan.md` (bản khảo sát trước), hoá đơn điện tử
-> được xếp ở **"Phase 3, mức Trung bình"**. **Sai.** Nghị định **70/2025 hiệu lực 01/06/2025** áp dụng cho
-> doanh nghiệp bán trực tiếp cho người tiêu dùng **và** hộ/cá nhân kinh doanh doanh thu **≥ 1 tỷ/năm**, qua
-> HĐĐT khởi tạo từ máy tính tiền. ⇒ Đây là **nghĩa vụ pháp lý hiện tại**, phải lên **P0 cùng lúc với checkout**.
-> (NĐ 123/2020 đã bắt buộc từ 01/07/2022.)
+> được xếp ở **"Phase 3, mức Trung bình"**. **Sai.** Hoá đơn điện tử là **nghĩa vụ pháp lý hiện tại**, phải lên
+> **P0 cùng lúc với checkout**.
+>
+> 🚨 **CẬP NHẬT CĂN CỨ PHÁP LÝ (tra ngày 12/10/2026):** văn bản điều chỉnh hoá đơn **hiện hành** là
+> **Nghị định 254/2026/NĐ-CP** (hiệu lực **01/7/2026**), hướng dẫn bởi **Thông tư 91/2026/TT-BTC**.
+> **NĐ 123/2020/NĐ-CP VÀ NĐ 70/2025/NĐ-CP ĐÃ HẾT HIỆU LỰC** kể từ 01/7/2026 (Điều 43 NĐ 254/2026).
+> ⇒ Mọi tài liệu viện dẫn NĐ 123/2020 **phải cập nhật** — đã sửa trong repo này.
+> Báo cáo tra cứu đầy đủ: `D:\Projects\Tools\WF\_research\vn-vat-rounding-legal.md`.
 
 #### 🚨 Breaking change đang diễn ra: **bỏ cấp huyện + sáp nhập tỉnh**
 
@@ -520,7 +524,7 @@ chỉ **5 gói NuGet tồn tại** cho cả 4 nhóm, **không gói nào chính t
 | Module | Ưu tiên | Cơ sở / rủi ro |
 |---|---|---|
 | **`AddressHub`** | 🔴 **P0** | Breaking change 01/07/2025 (bỏ huyện, 63→34 tỉnh). Ghép chung với `Commerce.Core` sẽ sai mô hình ⇒ **tách riêng** |
-| **`EInvoiceHub`** | 🔴 **P0** | NĐ 123/2020 (từ 01/07/2022) + **NĐ 70/2025 (từ 01/06/2025)** |
+| **`EInvoiceHub`** | 🔴 **P0** | **NĐ 254/2026/NĐ-CP** (hiệu lực 01/7/2026) + **TT 91/2026/TT-BTC** |
 | **`DigitalSigningHub`** | 🔴 **P0** | **Là STATE MACHINE, không phải hàm sync** — xem cảnh báo bên dưới |
 | **`ShippingHub`** | 🟠 P2 | **GHN tốt nhất** (REST, có sandbox, publish `llms.txt`/`llms-full.txt`); GHTK OK; **7 hãng còn lại phần lớn KHÔNG tìm thấy tài liệu API** |
 | **`CodReconciliation`** | 🟠 P2 | ⚠️ **KHÔNG có API đối soát.** GHN chỉ có API **đổi** COD; bảng kê là **file Excel tải THỦ CÔNG** trên portal, kỳ theo **"phiên"** (`mã phiên`) |
@@ -672,4 +676,4 @@ ghi vào `THIRD-PARTY-NOTICES.md` §5. Chi tiết: xem `THIRD-PARTY-NOTICES.md`.
 `_research/eshop-orderprocessor-va-lombiq-license.md`.
 
 ⚠️ **Cần sửa `ecommerce-multichannel-plan.md`** (bản khảo sát trước): hoá đơn điện tử đang bị xếp ở
-"Phase 3, mức Trung bình" — **sai**, NĐ 70/2025 đã có hiệu lực từ 01/06/2025 (xem §6.7).
+"Phase 3, mức Trung bình" — **sai**, hoá đơn điện tử là nghĩa vụ hiện tại; căn cứ hiện hành là **NĐ 254/2026/NĐ-CP** (xem §6.7).

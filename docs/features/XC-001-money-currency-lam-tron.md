@@ -39,7 +39,7 @@ không sửa được về sau** (đã có tiền thật, đã xuất hoá đơn
 | **D1** | `Money` là **`readonly record struct`** (immutable) | `class` / `record class` / `struct` | Không cấp phát heap cho phép toán tiền (được gọi rất nhiều); immutable ⇒ không sửa nhầm | Không có identity; `default(Money)` = tiền tệ rỗng ⇒ **phải luôn tạo qua `Money.Of(...)`** |
 | **D2** | Lưu **`decimal` + số chữ số thập phân của tiền tệ**, KHÔNG lưu minor units | Lưu `long` minor units (kiểu Stripe) | `decimal` đọc được trực tiếp trong DB, dễ đối soát bằng SQL; minor units `long` khó debug và phải convert mọi nơi | Mọi thao tác phải **chuẩn hoá về `Currency.Decimals`** |
 | **D3** | **So sánh tiền theo minor units** (`long`), **cấm so `==` trên `decimal`** | So `decimal` bằng `==` | ⚠️ Bài học: EShop so `ActualTotalPrice == OriginalPaymentAmount` ⇒ **vỡ ngay với VND/payOS** khi lệch làm tròn | API `ToMinorUnits()` là **đường so sánh chính thức**; `CompareTo` dùng minor units |
-| **D4** | Làm tròn mặc định **`MidpointRounding.AwayFromZero`** | `ToEven` (banker's) | Phổ biến trong kế toán VN; dễ giải thích với kế toán/khách hàng | Cấu hình được qua Setting, nhưng **đổi phải có audit** (xem §9) |
+| **D4** | Làm tròn mặc định **`MidpointRounding.AwayFromZero`** (half-up) | `ToEven` (banker's) · `Truncate` | ⚠️ **Đã tra luật: KHÔNG có quy định pháp luật trực tiếp** cho việc làm tròn thuế GTGT trên hoá đơn. Quy tắc **duy nhất có tính pháp lý** là **NĐ 174/2016/NĐ-CP khoản 6 Điều 4** (half-up) nhưng **chỉ áp cho đơn vị tiền tệ rút gọn khi lập BCTC** — không áp cho hoá đơn. Ràng buộc thật là **NĐ 254/2026/NĐ-CP Điều 4 K1**: *"Người bán chịu trách nhiệm trước pháp luật về tính chính xác của hóa đơn đã lập."* | Đây là **quyết định quản trị**, phải có **văn bản phê duyệt của kế toán trưởng**; cấu hình được qua Setting nhưng **đổi phải có audit** (§9) |
 | **D5** | Entity lưu **net + tax riêng**, `Gross` tính ra | Lưu **cả** incl-tax và excl-tax (kiểu nopCommerce) | nopCommerce có ~12 cột tiền nhân đôi vì lưu cả 2 chiều ⇒ dễ lệch nhau; ta lưu 1 chiều và tính | Mọi truy vấn báo cáo phải cộng `Net + Tax` khi cần gross |
 | **D6** | Mapping EF Core bằng **complex type** (`ComplexProperty`) cho tiền **bắt buộc có**; **cột rời** cho tiền **nullable** | (a) cột rời cho tất cả · (b) `Owned` entity type · (c) complex type cho tất cả | Domain code sạch (`Money Total` thay vì `TotalAmount` + `TotalCurrency`); EF Core 10 **hỗ trợ `struct`/`readonly record struct`** cho complex type | ✅ **ĐÃ XÁC MINH** (xem §15 Q3): complex type nullable **có** hỗ trợ từ EF Core 10, **nhưng** có **bug #37559** (`ReloadAsync` ném lỗi khi giá trị null) chỉ được vá ở **EF Core 11** ⇒ tiền nullable **vẫn dùng cột rời** trên EF 10 |
 | **D7** | Phân bổ dùng **phương pháp phần dư lớn nhất** (largest remainder), **bảo toàn tổng tuyệt đối** | Chia đều rồi làm tròn từng phần | Chia đều + làm tròn từng phần ⇒ **mất/thừa 1–2 đồng** ⇒ hoá đơn không khớp | Có property-based test bắt buộc (§14) |
@@ -61,7 +61,7 @@ không sửa được về sau** (đã có tiền thật, đã xuất hoá đơn
 | **Basic Flow** | 1. Module tạo tiền: `Money.Of(amount, Currency.Vnd)` → hệ thống **làm tròn** về 0 chữ số thập phân.<br>2. Module cộng/trừ: `a + b` → hệ thống kiểm tra **cùng `Currency`**, trả về `Money` đã chuẩn hoá.<br>3. Module nhân với hệ số: `total * 0.08m` (VAT 8%) → hệ thống tính bằng `decimal` độ chính xác đầy đủ rồi **làm tròn theo policy**.<br>4. Module so sánh: `a.ToMinorUnits() == b.ToMinorUnits()` → không dùng `==` trên `decimal`.<br>5. Module phân bổ: `MoneyAllocator.Allocate(total, weights)` → hệ thống trả mảng mà **tổng bằng đúng `total`**.<br>6. Module gọi NCC: `money.ToMinorUnits()` → truyền số nguyên (VND: chính số tiền; USD: ×100). |
 | **Alternative Flow** | **A1: Tiền nullable** — module có trường tiền không bắt buộc (ví dụ `ChannelFeeAmount`): dùng `Money?`; các phép toán phải kiểm tra trước (`HasValue`).<br>**A2: Đổi chính sách làm tròn** — quản trị đặt Setting ⇒ áp cho tenant đó; **chỉ áp cho tính toán MỚI**, không hồi tố dữ liệu đã ghi. |
 | **Exception Flow** | **E1:** cộng/trừ hai `Money` khác tiền tệ ⇒ `BusinessException` `eCommerce:Money:0001`.<br>**E2:** mã tiền tệ không có trong registry ⇒ `BusinessException` `eCommerce:Money:0002`.<br>**E3:** phân bổ với tổng trọng số = 0 (chia cho 0) ⇒ `BusinessException` `eCommerce:Money:0003`.<br>**E4:** tràn `decimal` khi nhân ⇒ `OverflowException` bị bọc thành `BusinessException` `eCommerce:Money:0004`.<br>**E5:** trọng số phân bổ **âm** ⇒ `BusinessException` `eCommerce:Money:0005` (không hỗ trợ — Q6 đã đóng). |
-| **Business Rules** | • **BR-XC-001-001**: Mọi `Money` **luôn ở trạng thái đã làm tròn** theo `Currency.Decimals`.<br>• **BR-XC-001-002**: **Cấm** cộng/trừ/so sánh hai `Money` khác `Currency` ⇒ ném lỗi (không tự quy đổi).<br>• **BR-XC-001-003**: **Cấm** so sánh tiền bằng `==` trên `decimal`; so theo `ToMinorUnits()`.<br>• **BR-XC-001-004**: Làm tròn mặc định `AwayFromZero`, cấu hình theo tenant, **có audit** khi đổi.<br>• **BR-XC-001-005**: Thuế/VAT làm tròn **theo TỪNG DÒNG**; tổng đơn = **tổng các dòng đã làm tròn** (không làm tròn tổng).<br>• **BR-XC-001-006**: Phân bổ (giảm giá, phí vận chuyển, hoàn tiền từng phần) **phải bảo toàn tổng tuyệt đối**: `Σ Allocate(total, w) == total`.<br>• **BR-XC-001-007**: Khi gọi NCC, tiền truyền dưới dạng **minor units (số nguyên)**; **không** truyền `decimal`.<br>• **BR-XC-001-008**: **Không tồn tại `double`/`float`** trong bất kỳ biểu thức tiền nào (kể cả DTO, entity, adapter).<br>• **BR-XC-001-009**: `Currency` mặc định của hệ thống = `VND` (0 chữ số thập phân); đa tiền tệ **chưa hoạt động**. |
+| **Business Rules** | • **BR-XC-001-001**: Mọi `Money` **luôn ở trạng thái đã làm tròn** theo `Currency.Decimals`.<br>• **BR-XC-001-002**: **Cấm** cộng/trừ/so sánh hai `Money` khác `Currency` ⇒ ném lỗi (không tự quy đổi).<br>• **BR-XC-001-003**: **Cấm** so sánh tiền bằng `==` trên `decimal`; so theo `ToMinorUnits()`.<br>• **BR-XC-001-004**: Làm tròn mặc định `AwayFromZero`, cấu hình theo tenant, **có audit** khi đổi.<br>• **BR-XC-001-005**: Thuế/VAT làm tròn **theo TỪNG DÒNG**; tổng đơn = **tổng các dòng đã làm tròn** (không làm tròn tổng).<br>• **BR-XC-001-006**: Phân bổ (giảm giá, phí vận chuyển, hoàn tiền từng phần) **phải bảo toàn tổng tuyệt đối**: `Σ Allocate(total, w) == total`.<br>• **BR-XC-001-007**: Khi gọi NCC, tiền truyền dưới dạng **minor units (số nguyên)**; **không** truyền `decimal`.<br>• **BR-XC-001-008**: **Không tồn tại `double`/`float`** trong bất kỳ biểu thức tiền nào (kể cả DTO, entity, adapter).<br>• **BR-XC-001-009**: `Currency` mặc định của hệ thống = `VND` (0 chữ số thập phân — **quy ước của ta**, không phải yêu cầu pháp lý); đa tiền tệ **chưa hoạt động**.<br>• **BR-XC-001-010**: **Bất biến hoá đơn #1** — `tổng cộng tiền thuế GTGT` **phải bằng** Σ `tổng số tiền thuế GTGT theo từng loại thuế suất`.<br>• **BR-XC-001-011**: **Bất biến hoá đơn #2** — `tổng tiền thanh toán` **phải bằng** `thành tiền chưa thuế` + `tổng cộng tiền thuế GTGT`.<br>• **BR-XC-001-012**: **Cấm hard-code thuế suất** — thuế suất phải cấu hình **theo khoảng thời gian hiệu lực** (mức 8% hết hạn 31/12/2026). |
 | **Non-Functional Requirement** | • **NFR-XC-001-001**: Phân bổ 1.000 dòng < **5 ms** (p95) trên máy dev.<br>• **NFR-XC-001-002**: Property-based test 10.000 bộ ngẫu nhiên: `Σ Allocate == total` **100%**.<br>• **NFR-XC-001-003**: JSON round-trip bảo toàn giá trị (0 mất mát chữ số).<br>• **NFR-XC-001-004**: 0 lần xuất hiện `double`/`float` trong `eCommerce.Kernel` (kiểm bằng test reflection). |
 
 ---
@@ -452,12 +452,16 @@ public class MoneyTests
 - [ ] `Money` không có constructor public nào bỏ qua chuẩn hoá
 - [ ] Không có API nào nhận `decimal` tiền mà không kèm `Currency`
 - [ ] Tài liệu này đã cập nhật khớp code thực tế
-- [ ] **Kế toán đã xác nhận** quy tắc làm tròn VAT (§15 Q1)
+- [ ] **Có văn bản phê duyệt của kế toán trưởng** cho quy tắc làm tròn (vì luật không quy định — §15.1.2 Q1)
+- [ ] **BR-010 & BR-011** có test: `Σ thuế theo từng mức` == `tổng cộng tiền thuế`; `tổng thanh toán` == `chưa thuế` + `tổng thuế`
+- [ ] **BR-012** có test: thuế suất đọc theo khoảng thời gian hiệu lực, không hard-code
 
 ### 14.4 Definition of Ready
 
 - [ ] Tài liệu được review & **Approved** (Kiến trúc trưởng + Kế toán)
-- [ ] **Q1** (quy tắc làm tròn VAT theo luật VN) đã có câu trả lời — nếu chưa, ghi rõ "dùng mặc định `AwayFromZero`, per-line, sẽ rà lại khi có kế toán"
+- [ ] **Q1** (làm tròn VAT) — ✅ đã tra luật: **không có quy định trực tiếp** ⇒ cần **văn bản phê duyệt của kế toán trưởng** cho quy tắc nội bộ (không được ghi là "yêu cầu pháp lý")
+- [ ] **Q2** (thuế suất) — ✅ đã tra: 0/5/**8% đến 31/12/2026**/10% ⇒ **phải** thiết kế thuế suất theo khoảng thời gian hiệu lực
+- [ ] **Q5** (VND thập phân) — ✅ đã tra: **được phép**, không quy định số chữ số ⇒ `VND = 0` là **quy ước của ta**
 - [ ] **Q3** (EF Core 10 complex type nullable) đã xác minh
 - [ ] Chốt tên namespace `eCommerce.Kernel.Monetary`
 
@@ -469,11 +473,11 @@ public class MoneyTests
 
 | # | Câu hỏi | Cần ai trả lời | Trạng thái | Ảnh hưởng nếu chưa trả lời |
 |---|---|---|---|---|
-| **Q1** | **Quy tắc làm tròn VAT theo quy định VN**: làm tròn theo **từng dòng** hay theo **tổng**? `AwayFromZero` hay `ToEven`? Có văn bản nào quy định cụ thể? | **Kế toán** (+ luật sư nếu cần) | `Open` | 🔴 Sai ⇒ **hoá đơn sai số tiền thuế** ⇒ sai nghĩa vụ thuế. Tạm dùng `AwayFromZero` + per-line |
-| **Q2** | VAT VN có **nhiều mức** (0/5/8/10%) và **giảm tạm thời theo Nghị quyết** ⇒ có cần **bảng thuế suất theo thời gian**? | Kế toán + BA | `Open` | Ảnh hưởng thiết kế `EINV-001`; **không chặn** `XC-001` |
-| **Q3** | EF Core 10 có hỗ trợ **complex type nullable** (`Money?`) không? | Dev | ✅ **`Closed`** — xem khung dưới | — |
+| **Q1** | **Quy tắc làm tròn VAT theo quy định VN**: theo **từng dòng** hay theo **tổng**? `AwayFromZero` hay `ToEven`? | **Kế toán trưởng** | ✅ **`Closed`** — *"không có quy định pháp luật trực tiếp"* ⇒ đây là **quyết định quản trị**, phải có **văn bản phê duyệt của kế toán trưởng** (xem §15.1.2) | Không được trình bày quy tắc này như "yêu cầu pháp lý" |
+| **Q2** | VAT VN có **nhiều mức** và **giảm tạm thời theo Nghị quyết** ⇒ có cần **bảng thuế suất theo thời gian**? | Kế toán + BA | ✅ **`Closed` — BẮT BUỘC cấu hình theo thời gian** (xem §15.1.2) | 🔴 Mức 8% **hết hạn 31/12/2026**, chưa có văn bản gia hạn ⇒ **cấm hard-code thuế suất** |
+| **Q3** | EF Core 10 có hỗ trợ **complex type nullable** (`Money?`) không? | Dev | ✅ **`Closed`** — xem §15.1.1 | — |
 | **Q4** | Có cần **bảng `Currency` trong DB** (thay registry trong code) không? | Kiến trúc trưởng | ✅ **`Closed` — KHÔNG dùng bảng** *(chốt 12/10/2026)* | Registry tiền tệ là **hằng số trong code** (`Currency.Vnd`, `Currency.Usd`); chỉ tạo bảng khi bật đa tiền tệ + tỷ giá |
-| **Q5** | VND có luôn **0 chữ số thập phân** trong mọi ngữ cảnh nghiệp vụ (kể cả giá nhập/giá vốn)? | Kế toán | `Open` | ISO 4217 ghi VND = 0; nếu có ngoại lệ phải thêm quy tắc riêng |
+| **Q5** | VND có luôn **0 chữ số thập phân** trong mọi ngữ cảnh nghiệp vụ? | Kế toán | ✅ **`Closed`** — *"VND **được phép** ghi phần thập phân; **không có** quy định về **số chữ số**"* (xem §15.1.2) | ⇒ `VND = 0 chữ số` là **quy ước của ta**, **không phải** yêu cầu pháp lý |
 | **Q6** | Có cần hỗ trợ **phân bổ với trọng số âm** (ví dụ điều chỉnh giảm một dòng) không? | BA | ✅ **`Closed` — KHÔNG hỗ trợ ở giai đoạn này** *(chốt 12/10/2026)* | Trọng số âm ⇒ **ném `BusinessException` mã `eCommerce:Money:0005`**. Lý do: "từ chối rõ ràng" tốt hơn "hỗ trợ nửa vời" — sẽ thiết kế lại nếu có yêu cầu nghiệp vụ thật |
 
 #### 15.1.1 ✅ Q3 — ĐÃ GIẢI ĐÁP (có nguồn chính thức)
@@ -488,6 +492,77 @@ public class MoneyTests
 
 **⇒ Chốt:** giữ nguyên **D6** — tiền **bắt buộc** dùng `ComplexProperty`; tiền **nullable** (`Money?`) dùng **2 cột rời**.
 Khi nâng lên EF Core 11 có thể xem lại và dùng `Money?` cho cả hai (khi đó bỏ được ghi chú này).
+
+#### 15.1.2 ✅ Q1 · Q2 · Q5 — ĐÃ TRA LUẬT (ngày 12/10/2026)
+
+🚨 **TRƯỚC HẾT — căn cứ pháp lý phải cập nhật:** **NĐ 123/2020/NĐ-CP và NĐ 70/2025/NĐ-CP ĐÃ HẾT HIỆU LỰC**
+từ **01/7/2026**. Văn bản điều chỉnh hoá đơn **hiện hành** là **Nghị định 254/2026/NĐ-CP** (hiệu lực 01/7/2026),
+hướng dẫn bởi **Thông tư 91/2026/TT-BTC**. Căn cứ: **Điều 43 NĐ 254/2026/NĐ-CP** —
+*"Kể từ ngày Nghị định này có hiệu lực thi hành, các Nghị định sau đây hết hiệu lực thi hành: a) Nghị định số 123/2020/NĐ-CP…; c) Nghị định số 70/2025/NĐ-CP…"*
+
+**Q1 — làm tròn thuế GTGT: ❌ KHÔNG có quy định pháp luật trực tiếp**
+
+Đã kiểm tra và **loại trừ**: **TT 219/2013/TT-BTC** (toàn văn ≈229.600 ký tự, cụm *"làm tròn"* xuất hiện **0 lần**) ·
+**TT 26/2015/TT-BTC** (*"làm tròn"* **0 lần**) · **NĐ 254/2026 Điều 10 K1 đ** và **NĐ 123/2020 Điều 10 K6** — chỉ quy định
+**phải ghi gì** (*"tổng số tiền thuế GTGT theo từng loại thuế suất"*), **không** quy định cách tính/làm tròn.
+
+| Nội dung | Kết luận |
+|---|---|
+| Quy tắc làm tròn **duy nhất có tính pháp lý** | **NĐ 174/2016/NĐ-CP, khoản 6 Điều 4**: *"Chữ số sau chữ số đơn vị tiền tệ rút gọn nếu bằng 5 trở lên thì được tăng thêm 1 đơn vị; nếu nhỏ hơn 5 thì không tính."* = **half-up ≡ `AwayFromZero`** |
+| Phạm vi áp dụng | ⚠️ **CHỈ** khi dùng **đơn vị tiền tệ rút gọn** (nghìn/triệu/tỷ) để lập BCTC tổng hợp/công khai. **KHÔNG áp dụng cho hoá đơn.** Đây là quy định **kế toán**, không phải **thuế** |
+| Ràng buộc thật sự | **NĐ 254/2026 Điều 4 K1**: *"…bảo đảm phản ánh đầy đủ, trung thực nội dung nghiệp vụ kinh tế phát sinh. **Người bán chịu trách nhiệm trước pháp luật về tính chính xác của hóa đơn đã lập.**"* |
+| Căn cứ cho việc **tách theo thuế suất** | **Luật 48/2024/QH15 Điều 9 K4**: cơ sở kinh doanh nhiều mức thuế suất *"phải khai thuế giá trị gia tăng theo từng mức thuế suất"* |
+| Thông lệ (**KHÔNG phải luật**) | Hai cách cùng tồn tại: (a) làm tròn **từng dòng** rồi cộng theo nhóm thuế suất; (b) làm tròn trên **tổng thành tiền của nhóm thuế suất**. Hai cách **có thể lệch vài đồng** |
+
+> ⚠️ **Không được trình bày quy tắc làm tròn như "yêu cầu pháp lý".** Đây là **quyết định quản trị**:
+> BR-005 (per-line + `AwayFromZero`) phải được **kế toán trưởng phê duyệt bằng văn bản** và lưu trong quy chế nội bộ.
+> Hai bất biến kiểm thử được đã được đưa vào **BR-010** và **BR-011**.
+
+**Q2 — thuế suất: 4 mức, mức 8% hết hạn 31/12/2026**
+
+| Mức | Áp dụng | Căn cứ |
+|---|---|---|
+| **0%** | Hàng hoá/dịch vụ xuất khẩu; gia công chuyển tiếp để XK | Luật 48/2024/QH15 Đ9 K1 |
+| **5%** | Nước sạch SX&sinh hoạt; dịch vụ KH&CN; nhà ở xã hội; nhóm a→n | Luật 48/2024/QH15 Đ9 K2 |
+| **8%** *(tạm thời)* | Hàng hoá/dịch vụ đang áp 10%, **TRỪ** nhóm bị loại trừ | **NQ 204/2025/QH15** + **NĐ 174/2025/NĐ-CP** |
+| **10%** | Không thuộc K1, K2 — **gồm cả nhóm bị loại trừ không được giảm** | Luật 48/2024/QH15 Đ9 K3 |
+
+**NQ 204/2025/QH15 (17/6/2025)** — trích nguyên văn:
+> *"Giảm 2% thuế suất thuế giá trị gia tăng… (còn 8%), trừ một số nhóm hàng hóa, dịch vụ sau: viễn thông, hoạt động tài chính, ngân hàng, chứng khoán, bảo hiểm, kinh doanh bất động sản, sản phẩm kim loại, sản phẩm khai khoáng (trừ than), sản phẩm hàng hóa và dịch vụ chịu thuế tiêu thụ đặc biệt (trừ xăng)."*
+> *"Nghị quyết này có hiệu lực thi hành từ ngày 1/7/2025 đến hết ngày 31/12/2026."*
+
+🔴 **KHÔNG tìm thấy văn bản nào gia hạn quá 31/12/2026** ⇒ **BR-012**: cấm hard-code thuế suất; phải cấu hình
+theo **khoảng thời gian hiệu lực**, và chuẩn bị cơ chế **tự chuyển về 10% lúc 00:00 ngày 01/01/2027**.
+🔴 **BLOCKER chưa giải quyết:** **Phụ lục I & II NĐ 174/2025/NĐ-CP** (danh mục hàng hoá **không được giảm thuế**,
+phân loại theo mã ngành/HS) **chưa đọc được** — PDF là **bản scan không có lớp văn bản**, môi trường khảo sát
+không có công cụ OCR. ⇒ **Đây là blocker thật sự để gán thuế suất cho từng SKU** (thuộc `EINV-001`).
+Phải lấy được danh mục này qua nguồn khác hoặc OCR ngoài.
+
+**Q5 — VND có được ghi phần thập phân không?** (NĐ 254/2026, Phụ lục *"NỘI DUNG CỦA HÓA ĐƠN"* mục 8)
+
+> *"b) …**nếu có ghi chữ số sau chữ số hàng đơn vị đặt dấu phẩy (,) sau chữ số hàng đơn vị**…"*
+> *"c) Đồng tiền ghi trên hóa đơn là đồng Việt Nam, ký hiệu quốc gia là "đ"."*
+> *"c.1) …phát sinh bằng ngoại tệ… **được ghi bằng ngoại tệ, đơn vị tiền tệ ghi tên ngoại tệ. Người bán đồng thời thể hiện trên hóa đơn tỷ giá ngoại tệ với đồng Việt Nam**…"*
+> *"c.2) Mã ký hiệu ngoại tệ theo tiêu chuẩn quốc tế (ví dụ: 13.800,25 USD…; 5.000,50 EUR…)"*
+
+| Câu hỏi | Kết luận |
+|---|---|
+| VND **được** ghi phần thập phân? | ✅ **ĐƯỢC PHÉP** (*"nếu có ghi chữ số sau chữ số hàng đơn vị"*). **Không** có quy định bắt buộc làm tròn VND về số nguyên |
+| Số chữ số thập phân cho VND | ❌ **KHÔNG TÌM THẤY QUY ĐỊNH.** *"0 chữ số"* là **quy ước của ta** (và thông lệ thực tế) |
+| Số chữ số thập phân cho ngoại tệ | ❌ **KHÔNG TÌM THẤY QUY ĐỊNH.** Ví dụ trong văn bản dùng 2 chữ số nhưng đó là **minh hoạ ký hiệu**, không phải quy định. Thông lệ: theo **ISO 4217** |
+| Hoá đơn ngoại tệ | Phải ghi **nguyên tệ + tên ngoại tệ + mã ISO + tỷ giá với VND**; nếu nộp thuế bằng ngoại tệ thì **không quy đổi** |
+| Dấu phân cách | Người bán **được lựa chọn** 1 trong 2 kiểu (`. ,` hoặc `, .`) — **phải thống nhất**, và đó là việc của tầng hiển thị |
+
+> 🔎 **Đối chiếu:** nội dung **NĐ 123/2020 Điều 10 K13** (nay hết hiệu lực) **gần như giống hệt** NĐ 254/2026
+> Phụ lục mục 8 ⇒ **quy tắc kỹ thuật không đổi**, chỉ **căn cứ pháp lý** phải cập nhật.
+
+**Nguồn chính:** [NQ 204/2025/QH15](https://xaydungchinhsach.chinhphu.vn/toan-van-nghi-quyet-so-204-2025-qh15-ve-giam-thue-gia-tri-gia-tang-119250628082120511.htm) ·
+[NĐ 174/2025/NĐ-CP (PDF ký)](https://datafiles.chinhphu.vn/cpp/files/vbpq/2025/7/174nd.signed.pdf) ·
+[NĐ 254/2026/NĐ-CP (PDF chính thức)](https://xdcs.cdnchinhphu.vn/446259493575335936/2026/7/13/254-ndcp-signed-hoa-don-dien-tu-1783935351029278986043.pdf) ·
+[Hỏi đáp Bộ Tài chính](https://tpcp.mof.gov.vn/hoidapcstc/home/cthoidap/160495) ·
+[EY Vietnam về NĐ 254 + TT 91](https://www.ey.com/vi_vn/technical/tax/tax-and-law-updates/nghi-dinh-254-2026-nd-cp-ve-hoa-don-dien-tu-va-chung-tu-dien-tu).
+⚠️ Toàn văn NĐ 254/2026 được đọc qua **nguồn không chính thống** (PDF chính thức là bản scan không trích được text)
+⇒ **cần luật sư đối chiếu bản có chữ ký**. Báo cáo tra cứu đầy đủ: `WF\_research\vn-vat-rounding-legal.md`.
 
 ### 15.2 Giả định
 
@@ -505,3 +580,4 @@ Khi nâng lên EF Core 11 có thể xem lại và dùng `Money?` cho cả hai (k
 |---|---|---|---|
 | v0.1 | 12/10/2026 | *(điền)* | Bản nháp đầu — chờ review |
 | v0.2 | 12/10/2026 | *(điền)* | **Đóng `Q3`** (EF Core 10 hỗ trợ complex type nullable + `record struct`, nhưng bug #37559 chỉ vá ở EF 11 ⇒ tiền nullable dùng cột rời) · **Đóng `Q4`** (không dùng bảng `Currency` trong DB) · **Đóng `Q6`** (không hỗ trợ trọng số âm) — thêm mã lỗi `eCommerce:Money:0005` |
+| v0.3 | 12/10/2026 | *(điền)* | 🚨 **Đóng `Q1` `Q2` `Q5` sau khi tra luật VN** (§15.1.2) — phát hiện **NĐ 123/2020 + NĐ 70/2025 đã hết hiệu lực từ 01/7/2026**, căn cứ hiện hành là **NĐ 254/2026/NĐ-CP**. Sửa **D4** (làm tròn là *quyết định quản trị*, không phải yêu cầu pháp lý). Thêm **BR-010/011** (2 bất biến hoá đơn) và **BR-012** (cấm hard-code thuế suất — mức 8% hết hạn 31/12/2026). Ghi nhận **blocker**: chưa đọc được **Phụ lục I/II NĐ 174/2025** |
