@@ -503,7 +503,7 @@ hướng dẫn bởi **Thông tư 91/2026/TT-BTC**. Căn cứ: **Điều 43 NĐ 
 **Q1 — làm tròn thuế GTGT: ❌ KHÔNG có quy định pháp luật trực tiếp**
 
 Đã kiểm tra và **loại trừ**: **TT 219/2013/TT-BTC** (toàn văn ≈229.600 ký tự, cụm *"làm tròn"* xuất hiện **0 lần**) ·
-**TT 26/2015/TT-BTC** (*"làm tròn"* **0 lần**) · **NĐ 254/2026 Điều 10 K1 đ** và **NĐ 123/2020 Điều 10 K6** — chỉ quy định
+**TT 26/2015/TT-BTC** (*"làm tròn"* **0 lần**) · **NĐ 254/2026 Điều 10 K1 đ** và **NĐ 123/2020 Điều 10 K6** *(nay đã hết hiệu lực)* — chỉ quy định
 **phải ghi gì** (*"tổng số tiền thuế GTGT theo từng loại thuế suất"*), **không** quy định cách tính/làm tròn.
 
 | Nội dung | Kết luận |
