@@ -9,8 +9,8 @@
   <ItemGroup>
     <ProjectReference Include="..\eCommerce.EntityFrameworkCore\eCommerce.EntityFrameworkCore.csproj" />
     <ProjectReference Include="..\eCommerce.Application\eCommerce.Application.csproj" />
-    <ProjectReference Include="..\..\modules\ChannelHub\ChannelHub.Application\ChannelHub.Application.csproj" />
-    <ProjectReference Include="..\..\modules\PaymentHub\PaymentHub.Application\PaymentHub.Application.csproj" />
+    <ProjectReference Include="..\..\modules\ChannelHub\eCommerce.ChannelHub.Application\eCommerce.ChannelHub.Application.csproj" />
+    <ProjectReference Include="..\..\modules\PaymentHub\eCommerce.PaymentHub.Application\eCommerce.PaymentHub.Application.csproj" />
   </ItemGroup>
 
   <ItemGroup>

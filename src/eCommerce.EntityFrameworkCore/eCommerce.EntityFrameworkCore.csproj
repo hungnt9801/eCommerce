@@ -7,8 +7,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\eCommerce.Domain\eCommerce.Domain.csproj" />
-    <ProjectReference Include="..\..\modules\ChannelHub\ChannelHub.EntityFrameworkCore\ChannelHub.EntityFrameworkCore.csproj" />
-    <ProjectReference Include="..\..\modules\PaymentHub\PaymentHub.EntityFrameworkCore\PaymentHub.EntityFrameworkCore.csproj" />
+    <ProjectReference Include="..\..\modules\ChannelHub\eCommerce.ChannelHub.EntityFrameworkCore\eCommerce.ChannelHub.EntityFrameworkCore.csproj" />
+    <ProjectReference Include="..\..\modules\PaymentHub\eCommerce.PaymentHub.EntityFrameworkCore\eCommerce.PaymentHub.EntityFrameworkCore.csproj" />
   </ItemGroup>
 
   <ItemGroup>

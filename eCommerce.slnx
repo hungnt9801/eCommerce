@@ -1,15 +1,15 @@
 <Solution>
   <Folder Name="/modules/" />
   <Folder Name="/modules/ChannelHub/">
-    <Project Path="modules/ChannelHub/ChannelHub.Application.Contracts/ChannelHub.Application.Contracts.csproj" />
-    <Project Path="modules/ChannelHub/ChannelHub.Application/ChannelHub.Application.csproj" />
-    <Project Path="modules/ChannelHub/ChannelHub.Domain/ChannelHub.Domain.csproj" />
-    <Project Path="modules/ChannelHub/ChannelHub.EntityFrameworkCore/ChannelHub.EntityFrameworkCore.csproj" />
+    <Project Path="modules/ChannelHub/eCommerce.ChannelHub.Application.Contracts/eCommerce.ChannelHub.Application.Contracts.csproj" />
+    <Project Path="modules/ChannelHub/eCommerce.ChannelHub.Application/eCommerce.ChannelHub.Application.csproj" />
+    <Project Path="modules/ChannelHub/eCommerce.ChannelHub.Domain/eCommerce.ChannelHub.Domain.csproj" />
+    <Project Path="modules/ChannelHub/eCommerce.ChannelHub.EntityFrameworkCore/eCommerce.ChannelHub.EntityFrameworkCore.csproj" />
   </Folder>
   <Folder Name="/modules/PaymentHub/">
-    <Project Path="modules/PaymentHub/PaymentHub.Application/PaymentHub.Application.csproj" />
-    <Project Path="modules/PaymentHub/PaymentHub.Domain/PaymentHub.Domain.csproj" />
-    <Project Path="modules/PaymentHub/PaymentHub.EntityFrameworkCore/PaymentHub.EntityFrameworkCore.csproj" />
+    <Project Path="modules/PaymentHub/eCommerce.PaymentHub.Application/eCommerce.PaymentHub.Application.csproj" />
+    <Project Path="modules/PaymentHub/eCommerce.PaymentHub.Domain/eCommerce.PaymentHub.Domain.csproj" />
+    <Project Path="modules/PaymentHub/eCommerce.PaymentHub.EntityFrameworkCore/eCommerce.PaymentHub.EntityFrameworkCore.csproj" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/eCommerce.Application.Contracts/eCommerce.Application.Contracts.csproj" />

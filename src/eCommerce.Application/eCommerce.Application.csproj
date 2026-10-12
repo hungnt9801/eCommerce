@@ -8,7 +8,7 @@
   <ItemGroup>
     <ProjectReference Include="..\eCommerce.Domain\eCommerce.Domain.csproj" />
     <ProjectReference Include="..\eCommerce.Application.Contracts\eCommerce.Application.Contracts.csproj" />
-    <ProjectReference Include="..\..\modules\ChannelHub\ChannelHub.Application.Contracts\ChannelHub.Application.Contracts.csproj" />
+    <ProjectReference Include="..\..\modules\ChannelHub\eCommerce.ChannelHub.Application.Contracts\eCommerce.ChannelHub.Application.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>

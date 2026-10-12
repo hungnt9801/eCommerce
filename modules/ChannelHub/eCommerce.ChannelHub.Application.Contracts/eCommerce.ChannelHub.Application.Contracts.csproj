@@ -2,11 +2,11 @@
 
   <PropertyGroup>
     <RootNamespace>eCommerce.ChannelHub</RootNamespace>
-    <AssemblyName>ChannelHub.Application.Contracts</AssemblyName>
+    <AssemblyName>eCommerce.ChannelHub.Application.Contracts</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\ChannelHub.Domain\ChannelHub.Domain.csproj" />
+    <ProjectReference Include="..\eCommerce.ChannelHub.Domain\eCommerce.ChannelHub.Domain.csproj" />
   </ItemGroup>
 
   <ItemGroup>

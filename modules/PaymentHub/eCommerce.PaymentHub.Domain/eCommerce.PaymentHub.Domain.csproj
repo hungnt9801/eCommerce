@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <RootNamespace>eCommerce.PaymentHub</RootNamespace>
-    <AssemblyName>PaymentHub.Domain</AssemblyName>
+    <AssemblyName>eCommerce.PaymentHub.Domain</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>

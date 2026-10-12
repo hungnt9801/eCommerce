@@ -2,11 +2,11 @@
 
   <PropertyGroup>
     <RootNamespace>eCommerce.PaymentHub</RootNamespace>
-    <AssemblyName>PaymentHub.EntityFrameworkCore</AssemblyName>
+    <AssemblyName>eCommerce.PaymentHub.EntityFrameworkCore</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\PaymentHub.Domain\PaymentHub.Domain.csproj" />
+    <ProjectReference Include="..\eCommerce.PaymentHub.Domain\eCommerce.PaymentHub.Domain.csproj" />
   </ItemGroup>
 
   <ItemGroup>

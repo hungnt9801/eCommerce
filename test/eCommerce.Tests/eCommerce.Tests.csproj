@@ -19,8 +19,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\eCommerce.Domain\eCommerce.Domain.csproj" />
-    <ProjectReference Include="..\..\modules\ChannelHub\ChannelHub.Application\ChannelHub.Application.csproj" />
-    <ProjectReference Include="..\..\modules\PaymentHub\PaymentHub.Application\PaymentHub.Application.csproj" />
+    <ProjectReference Include="..\..\modules\ChannelHub\eCommerce.ChannelHub.Application\eCommerce.ChannelHub.Application.csproj" />
+    <ProjectReference Include="..\..\modules\PaymentHub\eCommerce.PaymentHub.Application\eCommerce.PaymentHub.Application.csproj" />
   </ItemGroup>
 
   <ItemGroup>

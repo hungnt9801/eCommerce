@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <RootNamespace>eCommerce.ChannelHub</RootNamespace>
-    <AssemblyName>ChannelHub.Domain</AssemblyName>
+    <AssemblyName>eCommerce.ChannelHub.Domain</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
