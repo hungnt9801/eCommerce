@@ -24,7 +24,7 @@ hàng chịu thuế TTĐB (trừ xăng)) — danh mục chi tiết nằm ở **P
 
 | # | Ràng buộc | Nguồn |
 |---|---|---|
-| 1 | Doanh nghiệp **phải kê khai hàng hoá/dịch vụ được giảm thuế theo Mẫu số 01 tại Phụ lục IV**, nộp **cùng Tờ khai thuế GTGT** | NĐ 174/2025 (trích: *"…kê khai các hàng hóa, dịch vụ được giảm thuế GTGT theo Mẫu số 01 tại Phụ lục IV… cùng với Tờ khai thuế GTGT"*) |
+| 1 | Doanh nghiệp **phải kê khai hàng hoá/dịch vụ được giảm thuế theo Mẫu số 01 tại PHỤ LỤC III**, nộp **cùng Tờ khai thuế GTGT** | ✅ **Đã đọc file gốc** Phụ lục III (Mẫu số 01) — đặc tả đầy đủ ở **§6.3**. ⚠️ Nguồn thứ cấp (trang phổ biến pháp luật tỉnh Quảng Ninh) ghi *"Phụ lục III"* — **SAI**; bản gốc ghi **PHỤ LỤC III** |
 | 2 | Hoá đơn **phải ghi rõ thuế suất của từng hàng hoá, dịch vụ** khi áp nhiều mức thuế suất | NĐ 174/2025 |
 | 3 | Mức **8% chỉ có hiệu lực đến hết 31/12/2026**; chưa có văn bản gia hạn | NQ 204/2025/QH15 |
 
@@ -36,13 +36,13 @@ hàng chịu thuế TTĐB (trừ xăng)) — danh mục chi tiết nằm ở **P
 | **D2** | **Thuế suất áp dụng = hàm của THỜI GIAN** (khung hiệu lực), không phải hằng số | Lưu `TaxRate = 8` trên SKU | Mức 8% hết hạn **31/12/2026**; lưu hằng số ⇒ **tự động sai từ 01/01/2027** | Bảng `TaxRateSchedule` có `EffectiveFrom/To`; hệ thống tự chuyển về 10% mà **không cần sửa code** |
 | **D3** | **Chốt (snapshot) thuế suất + số thuế vào dòng đơn/hoá đơn** | Tính lại thuế mỗi lần xem đơn | Đổi cấu hình sau không được làm thay đổi đơn/hóa đơn **đã phát hành** | Thêm cột `TaxRate`, `TaxAmount`, `TaxClassificationId` trên dòng; đơn cũ bất biến |
 | **D4** | **Thứ tự ưu tiên tường minh: SKU → Danh mục → Mặc định tenant** | Chỉ theo danh mục | Cho phép ngoại lệ ở cấp SKU (ví dụ 1 mã hàng đặc thù) nhưng vẫn quản lý theo nhóm | Có test cho thứ tự; xung đột phải log rõ đã chọn cái nào |
-| **D5** | SKU **chưa phân loại** ⇒ mặc định **KHÔNG được giảm** (áp mức chuẩn) + cờ `NeedsClassification` + **chặn phát hành hoá đơn** | (a) áp 8% mặc định; (b) chặn bán | Áp 8% khi không chắc ⇒ **kê khai thiếu thuế** (rủi ro pháp lý). Áp 10% ⇒ nộp thừa (an toàn hơn). Nhưng **hoá đơn là chứng từ pháp lý** nên phải chặn cho tới khi phân loại | ⚠️ **Cần kế toán trưởng xác nhận** (§15 Q2) |
+| **D5** | SKU **chưa phân loại** ⇒ mặc định **KHÔNG được giảm** (áp mức chuẩn) + cờ `NeedsClassification` + **chặn phát hành hoá đơn** | (a) áp 8% mặc định; (b) chặn bán | Áp 8% khi không chắc ⇒ **kê khai thiếu thuế** (rủi ro pháp lý). Áp 10% ⇒ nộp thừa (an toàn hơn). Nhưng **hoá đơn là chứng từ pháp lý** nên phải chặn cho tới khi phân loại | ✅ **ĐÃ CHỐT 12/10/2026: chặn phát hành hoá đơn** (vẫn **cho bán**). Kèm **giảm thiểu tác động vận hành** ở §1 A3 |
 | **D6** | Lịch sử phân loại là **append-only, có version** | Sửa đè bản ghi | Cần **giải trình với cơ quan thuế** tại sao kỳ trước áp mức đó | Không xoá/sửa; thay đổi = bản ghi mới + `Superseded` bản cũ |
 
 **Phạm vi:**
 - ✅ Mô hình **mức thuế suất theo thời gian** + **phân loại thuế theo SKU/danh mục** + thứ tự ưu tiên.
 - ✅ **Import/Export Excel** danh mục phân loại (kế toán tự làm).
-- ✅ **Xuất Mẫu 01 Phụ lục IV** theo kỳ.
+- ✅ **Xuất Mẫu 01 (Phụ lục III)** theo kỳ — **chỉ Phần II (bán ra)**, vì hệ thống không có phân hệ mua vào (xem §6.3).
 - ✅ Snapshot thuế vào dòng đơn + bất biến "hoá đơn ghi rõ thuế suất từng dòng".
 - ✅ Audit + lịch sử phục vụ giải trình thuế.
 
@@ -66,10 +66,15 @@ hàng chịu thuế TTĐB (trừ xăng)) — danh mục chi tiết nằm ở **P
 | **Trigger** | (a) có văn bản pháp luật mới về thuế suất; (b) thêm SKU mới cần phân loại; (c) đến kỳ lập tờ khai thuế GTGT |
 | **Pre-Condition(s)** | • Tenant hiện tại (`TenantId` từ `ICurrentTenant`).<br>• SKU/danh mục đã tồn tại trong `Catalog`.<br>• `TaxRateSchedule` có bản ghi **hiệu lực tại thời điểm lập hoá đơn**.<br>• `ChannelCode` **không** tham gia quyết định thuế suất (thuế theo hàng hoá, không theo kênh bán). |
 | **Post-Condition(s)** | • Mọi dòng hoá đơn có `TaxRate` **chốt tại thời điểm lập**.<br>• Bản ghi phân loại có `Status = Approved` và **audit đầy đủ**.<br>• Xuất được **Mẫu 01** với tổng **khớp** dữ liệu hoá đơn đã phát hành trong kỳ. |
-| **Basic Flow** | 1. Kế toán mở màn hình **Phân loại thuế** → import file Excel (hoặc nhập tay) gồm: mã SKU/danh mục, mã mức thuế cơ sở, cờ **được giảm**, hiệu lực từ/đến, căn cứ pháp lý.<br>2. Hệ thống **validate**: SKU tồn tại, mã mức thuế hợp lệ, **không chồng khung hiệu lực**, không thiếu cột bắt buộc → hiện **báo cáo lỗi theo dòng**.<br>3. Kế toán bấm **Lưu nháp** ⇒ bản ghi `Draft` (chưa ảnh hưởng tính thuế).<br>4. Kế toán trưởng **Duyệt** ⇒ `Approved` → `Active`; hệ thống **xoá cache** thuế suất.<br>5. Tại checkout/đặt hàng: hệ thống gọi `ResolveEffectiveRate(sku, now)` → **chốt** `TaxRate` + `TaxAmount` vào dòng đơn.<br>6. Cuối kỳ: kế toán bấm **Xuất Mẫu 01 Phụ lục IV** ⇒ file Excel tổng hợp theo mức thuế suất. |
-| **Alternative Flow** | **A1: Sửa phân loại đã Active** — không sửa đè; tạo bản ghi mới có hiệu lực từ ngày X, bản cũ chuyển `Superseded` (kết thúc hiệu lực ngày X−1).<br>**A2: Đến hạn 31/12/2026** — không cần làm gì: hệ thống **tự** tra bảng, hết khung 8% ⇒ tự áp 10% lần tính tiếp theo.<br>**A3: SKU mới chưa phân loại** — bán được nhưng hiện **cảnh báo**; khi lập hoá đơn bị **chặn** cho tới khi phân loại. |
+| **Basic Flow** | 1. Kế toán mở màn hình **Phân loại thuế** → import file Excel (hoặc nhập tay) gồm: mã SKU/danh mục, mã mức thuế cơ sở, cờ **được giảm**, hiệu lực từ/đến, căn cứ pháp lý.<br>2. Hệ thống **validate**: SKU tồn tại, mã mức thuế hợp lệ, **không chồng khung hiệu lực**, không thiếu cột bắt buộc → hiện **báo cáo lỗi theo dòng**.<br>3. Kế toán bấm **Lưu nháp** ⇒ bản ghi `Draft` (chưa ảnh hưởng tính thuế).<br>4. Kế toán trưởng **Duyệt** ⇒ `Approved` → `Active`; hệ thống **xoá cache** thuế suất.<br>5. Tại checkout/đặt hàng: hệ thống gọi `ResolveEffectiveRate(sku, now)` → **chốt** `TaxRate` + `TaxAmount` vào dòng đơn.<br>6. Cuối kỳ: kế toán bấm **Xuất Mẫu 01 Phụ lục III** ⇒ file Excel tổng hợp theo mức thuế suất. |
+| **Alternative Flow** | **A1: Sửa phân loại đã Active** — không sửa đè; tạo bản ghi mới có hiệu lực từ ngày X, bản cũ chuyển `Superseded` (kết thúc hiệu lực ngày X−1).<br>**A2: Đến hạn 31/12/2026** — không cần làm gì: hệ thống **tự** tra bảng, hết khung 8% ⇒ tự áp 10% lần tính tiếp theo.<br>**A3: SKU mới chưa phân loại** — bán được nhưng hiện **cảnh báo**; khi lập hoá đơn bị **chặn** cho tới khi phân loại.
+**Giảm thiểu tác động vận hành (bắt buộc, vì D5 đã chốt chặn hoá đơn):**
+1. Khi tạo SKU mới, `Catalog` phát `ProductVariantCreatedEto` ⇒ hệ thống **tự tạo dòng phân loại `Draft`** với `NeedsClassification = true`.
+2. Dòng đó xuất hiện ngay trong **"Báo cáo SKU chưa phân loại"** (ưu tiên theo doanh thu) ⇒ kế toán có **danh sách việc cần làm**, không bị bất ngờ lúc lập hoá đơn.
+3. Cảnh báo hiện **ngay trên màn hình bán hàng/admin** khi SKU chưa phân loại (không đợi tới bước lập hoá đơn).
+4. Thông điệp lỗi `eCommerce:Tax:0003` phải **chỉ rõ mã SKU** và **hướng dẫn** "vào Phân loại thuế để xử lý" — không chỉ báo "không thể phát hành hoá đơn". |
 | **Exception Flow** | **E1:** chồng khung hiệu lực cho cùng SKU ⇒ `BusinessException` `eCommerce:Tax:0001`.<br>**E2:** mã SKU trong file không tồn tại ⇒ gom vào **báo cáo lỗi**, **không ghi dòng nào** (all-or-nothing theo lô).<br>**E3:** SKU chưa phân loại mà cố phát hành hoá đơn ⇒ `BusinessException` `eCommerce:Tax:0003` (chặn).<br>**E4:** không có mức thuế suất nào hiệu lực tại thời điểm lập hoá đơn ⇒ `eCommerce:Tax:0002`.<br>**E5:** file import sai định dạng/cột ⇒ `eCommerce:Tax:0004` + báo cáo cột thiếu. |
-| **Business Rules** | • **BR-XC-006-001**: Thuế suất áp dụng xác định **theo khung hiệu lực tại thời điểm lập hoá đơn**; **cấm hard-code** thuế suất trong code.<br>• **BR-XC-006-002**: Khi ghi dòng đơn/hoá đơn, **chốt** `TaxRate` + `TaxAmount` + `TaxClassificationId`; thay đổi cấu hình **không** làm đổi chứng từ cũ.<br>• **BR-XC-006-003**: Thứ tự ưu tiên **SKU → Danh mục → Mặc định tenant**; luôn ghi log đã chọn nguồn nào.<br>• **BR-XC-006-004**: SKU **chưa phân loại** ⇒ áp mức **chuẩn (không giảm)** + cờ `NeedsClassification` + **chặn phát hành hoá đơn**.<br>• **BR-XC-006-005**: Mọi thay đổi phân loại **phải audit** (ai · cũ · mới · căn cứ pháp lý · thời điểm) và **append-only**.<br>• **BR-XC-006-006**: Hoá đơn **phải ghi rõ thuế suất từng dòng**; `Σ thuế theo từng mức == tổng cộng tiền thuế` (liên kết `XC-001` BR-010).<br>• **BR-XC-006-007**: Bản ghi phân loại chỉ có hiệu lực khi `Status = Approved ∩ Active`; `Draft` **không** ảnh hưởng tính thuế.<br>• **BR-XC-006-008**: **Phải xuất được Mẫu 01 Phụ lục IV** theo kỳ, tổng khớp dữ liệu hoá đơn đã phát hành.<br>• **BR-XC-006-009**: Không tồn tại 2 bản ghi phân loại **hiệu lực chồng nhau** cho cùng (SKU, tenant).<br>• **BR-XC-006-010**: Cách ly tenant: phân loại của tenant A **không** ảnh hưởng tenant B. |
+| **Business Rules** | • **BR-XC-006-001**: Thuế suất áp dụng xác định **theo khung hiệu lực tại thời điểm lập hoá đơn**; **cấm hard-code** thuế suất trong code.<br>• **BR-XC-006-002**: Khi ghi dòng đơn/hoá đơn, **chốt** `TaxRate` + `TaxAmount` + `TaxClassificationId`; thay đổi cấu hình **không** làm đổi chứng từ cũ.<br>• **BR-XC-006-003**: Thứ tự ưu tiên **SKU → Danh mục → Mặc định tenant**; luôn ghi log đã chọn nguồn nào.<br>• **BR-XC-006-004**: SKU **chưa phân loại** ⇒ áp mức **chuẩn (không giảm)** + cờ `NeedsClassification` + **chặn phát hành hoá đơn**.<br>• **BR-XC-006-005**: Mọi thay đổi phân loại **phải audit** (ai · cũ · mới · căn cứ pháp lý · thời điểm) và **append-only**.<br>• **BR-XC-006-006**: Hoá đơn **phải ghi rõ thuế suất từng dòng**; `Σ thuế theo từng mức == tổng cộng tiền thuế` (liên kết `XC-001` BR-010).<br>• **BR-XC-006-007**: Bản ghi phân loại chỉ có hiệu lực khi `Status = Approved ∩ Active`; `Draft` **không** ảnh hưởng tính thuế.<br>• **BR-XC-006-008**: **Phải xuất được Mẫu 01 (Phụ lục III)** theo kỳ — **chỉ phần II (bán ra)** vì hệ thống không có phân hệ mua vào; tổng khớp dữ liệu hoá đơn đã phát hành.<br>• **BR-XC-006-009**: Không tồn tại 2 bản ghi phân loại **hiệu lực chồng nhau** cho cùng (SKU, tenant).<br>• **BR-XC-006-010**: Cách ly tenant: phân loại của tenant A **không** ảnh hưởng tenant B. |
 | **Non-Functional Requirement** | • **NFR-XC-006-001**: `ResolveEffectiveRate` < **2 ms** (p95, có cache).<br>• **NFR-XC-006-002**: Import **10.000 dòng** < 30 s.<br>• **NFR-XC-006-003**: Đổi cấu hình ⇒ cache làm mới < **5 s** trên mọi instance.<br>• **NFR-XC-006-004**: Test được mốc chuyển mức thuế bằng **đồng hồ giả** (`TimeProvider`) — không phụ thuộc ngày hệ thống.<br>• **NFR-XC-006-005**: Audit đủ trường để giải trình với cơ quan thuế. |
 
 ---
@@ -92,7 +97,7 @@ flowchart LR
         UC2(["«nhập/sửa phân loại theo SKU»"])
         UC3(["«duyệt phân loại»"])
         UC4(["«xem SKU chưa phân loại»"])
-        UC5(["«xuất Mẫu 01 Phụ lục IV»"])
+        UC5(["«xuất Mẫu 01 Phụ lục III»"])
         UC6(["«tính thuế suất hiệu lực»"])
         class UC1,UC2,UC3,UC4,UC5,UC6 usecase;
     end
@@ -182,7 +187,7 @@ graph LR
     classDef datastore fill:#e2e3e5,stroke:#383d41,stroke-width:2px;
 
     KT["Kế toán"]
-    CQT[("<b>Cơ quan thuế</b><br/>Mẫu 01 Phụ lục IV")]
+    CQT[("<b>Cơ quan thuế</b><br/>Mẫu 01 Phụ lục III")]
     DB[("<b>PostgreSQL</b><br/>TaxClassification · TaxRateSchedule")]
 
     class KT actor;
@@ -302,7 +307,7 @@ public interface ITaxClassificationAppService : IApplicationService
     Task<ImportResultDto> ImportAsync(ImportTaxClassificationDto input);             // Excel, all-or-nothing
     Task<IRemoteStreamContent> ExportTemplateAsync();
     Task<PagedResultDto<UnclassifiedSkuDto>> GetUnclassifiedSkusAsync(...);           // báo cáo SKU chưa phân loại
-    Task<IRemoteStreamContent> ExportMau01Async(ExportMau01Input input);             // Mẫu 01 Phụ lục IV
+    Task<IRemoteStreamContent> ExportMau01Async(ExportMau01Input input);             // Mẫu 01 Phụ lục III
 }
 
 public interface ITaxClassificationRepository : IRepository<TaxClassification, Guid>
@@ -338,7 +343,7 @@ public sealed record TaxRateResolution(
 | `POST` | `/api/tax/classifications/import` | `.Import` | import Excel (multipart) |
 | `GET` | `/api/tax/classifications/import-template` | `.Import` | tải file mẫu |
 | `GET` | `/api/tax/unclassified-skus` | `.View` | báo cáo SKU chưa phân loại |
-| `POST` | `/api/tax/mau-01/export` | `.ExportMau01` | xuất Mẫu 01 Phụ lục IV |
+| `POST` | `/api/tax/mau-01/export` | `.ExportMau01` | xuất Mẫu 01 Phụ lục III |
 
 **Mã lỗi nghiệp vụ**
 
@@ -350,6 +355,66 @@ public sealed record TaxRateResolution(
 | `eCommerce:Tax:0004` | `400` | File import sai định dạng/thiếu cột | `File không hợp lệ: thiếu cột {columns}.` |
 | `eCommerce:Tax:0005` | `400` | Thay thế bản ghi chưa Approved | `Bản ghi thay thế phải được duyệt trước.` |
 | `eCommerce:Tax:0006` | `400` | Sửa/xoá bản ghi đã Active | `Không thể sửa bản ghi đã có hiệu lực; hãy tạo bản ghi mới.` |
+
+### 6.3 Đặc tả **Mẫu 01 — Phụ lục III NĐ 174/2025/NĐ-CP** (đọc từ file gốc)
+
+Nguồn: file gốc *"PHỤ LỤC III (Kèm theo Nghị định số 174/2025/NĐ-CP ngày 30 tháng 6 năm 2025 của Chính phủ) — **Mẫu số 01**"*,
+tiêu đề: *"GIẢM THUẾ GIÁ TRỊ GIA TĂNG THEO NGHỊ QUYẾT SỐ 204/2025/QH15 (Kèm theo Tờ khai thuế GTGT — Kỳ tính thuế: Tháng…/Quý…/Lần phát sinh ngày…)"*
+
+**Phần đầu:** [01] Tên người nộp thuế · [02] Mã số thuế · [03] Tên đại lý thuế (nếu có) · [04] Mã số thuế · **Đơn vị tiền: Đồng Việt Nam**
+
+**Phần I — Hàng hoá/dịch vụ MUA VÀO trong kỳ được áp dụng mức thuế suất 8%** *(chỉ với NNT kê khai theo phương pháp khấu trừ)*
+
+| Cột | Nội dung |
+|---|---|
+| (1) | STT |
+| (2) | Tên hàng hoá, dịch vụ |
+| (3) | Giá trị hàng hoá, dịch vụ mua vào **chưa có thuế GTGT** được khấu trừ trong kỳ |
+| (4) | Thuế GTGT của hàng hoá, dịch vụ mua vào **được khấu trừ** trong kỳ |
+| **Tổng cộng** | **[05]** = tổng cột (3) · **[06]** = tổng cột (4) |
+
+**Phần II — Hàng hoá/dịch vụ BÁN RA trong kỳ** ← ⭐ **đây là phần hệ thống ta xuất được**
+
+| Cột | Nội dung | Công thức trong biểu mẫu |
+|---|---|---|
+| (1) | STT | |
+| (2) | Tên hàng hoá, dịch vụ | |
+| (3) | Giá trị hàng hoá, dịch vụ chưa có thuế GTGT / Doanh thu hàng hoá, dịch vụ chịu thuế | |
+| (4) | Thuế suất / Tỷ lệ tính thuế GTGT **theo quy định** | = `10%` |
+| (5) | Thuế suất / Tỷ lệ tính thuế GTGT **sau giảm** | **(5) = (4) × 80%** |
+| (6) | Thuế GTGT của hàng hoá, dịch vụ bán ra **được giảm** | **(6) = (3) × [(4) − (5)]** |
+| **Tổng cộng** | **[07]** · **[08]** | |
+
+**Phần III — Chênh lệch:** `[09] = [08] − [06]`
+
+⚠️ **Ba điểm kỹ thuật suy ra từ bản gốc (quan trọng cho lập trình):**
+1. **Công thức đã được quy định cứng ngay trong biểu mẫu** ⇒ phần mềm **không được tự chọn cách tính**;
+   phải tính đúng (5) và (6) theo công thức trên, và **đối chiếu [07]/[08]** với dữ liệu hoá đơn đã phát hành.
+2. **`(4) × 80% = 8%` chỉ đúng khi mức cơ sở là 10%** — khớp đúng phạm vi pháp lý của NQ 204/2025 (chỉ giảm 10% → 8%).
+   ⇒ **Cấm** dùng công thức ×80% cho mức cơ sở khác (ví dụ 5%) — sẽ ra sai (4%).
+3. **Phần I (mua vào) và Phần III nằm NGOÀI phạm vi hệ thống**: ta **không** có phân hệ mua vào/kế toán nhà cung cấp.
+   Hệ thống **chỉ xuất Phần II** (và cấp số [07], [08]); kế toán hoàn thiện Phần I & III trên phần mềm kế toán của họ.
+
+### 6.4 Đề xuất mẫu Excel **import** phân loại thuế *(cần kế toán xác nhận — Q3)*
+
+Đây là file kế toán sẽ upload để nạp phân loại (thay vì nhập tay từng SKU). Đề xuất 7 cột:
+
+| Cột | Bắt buộc | Ví dụ | Ghi chú |
+|---|:--:|---|---|
+| `MaLoaiDoiTuong` | ✗ | `SKU` / `DANHMUC` | để trống ⇒ mặc định `SKU` |
+| `MaDoiTuong` | ✓ | `SP-001` / `DM-DIEN-TU` | mã SKU hoặc mã danh mục, **phải tồn tại** trong `Catalog` |
+| `MucThueCoSo` | ✓ | `VAT10` | phải có trong `TaxRateSchedules` |
+| `DuocGiam` | ✓ | `C` / `K` | **`C`** = không thuộc Phụ lục I/II (**được** giảm); **`K`** = thuộc Phụ lục I/II (**không** được giảm) |
+| `HieuLucTu` | ✓ | `01/07/2025` | `dd/MM/yyyy` |
+| `HieuLucDen` | ✗ | `31/12/2026` | để trống = vô hạn |
+| `CanCuPhapLy` | ✗ | `Phụ lục I NĐ 174/2025 – mã ngành 4651` | phục vụ **giải trình thuế** |
+
+**Quy tắc validate:** mã đối tượng & mã mức thuế phải tồn tại · không chồng khung hiệu lực · `DuocGiam` chỉ nhận `C`/`K` ·
+**cả lô là all-or-nothing** (1 dòng sai ⇒ không ghi dòng nào) · có **dry-run** để kế toán xem trước.
+
+> ❓ **Vì sao cần kế toán xác nhận mẫu này:** đây là file họ dùng **hằng tháng**, nên **tên cột phải theo thói quen của họ**.
+> Ví dụ họ có thể muốn `Mã hàng` thay vì `MaDoiTuong`, hoặc ghi `Thuế suất` = `8` / `10` thay vì cờ `C`/`K`.
+> Nếu họ **đã có** một file Excel đang dùng để theo dõi việc giảm thuế ⇒ **gửi bản đó**, tôi khớp parser theo đúng cột của họ.
 
 ---
 
@@ -417,7 +482,7 @@ lần import thứ 2 trả về kết quả cũ kèm cờ `AlreadyImported`.
 | `eCommerce.Tax.Classification.View` | Kế toán, kế toán trưởng | xem danh sách + báo cáo SKU chưa phân loại |
 | `eCommerce.Tax.Classification.Manage` | Kế toán | tạo/sửa Draft, import, huỷ Draft |
 | `eCommerce.Tax.Classification.Approve` | **Kế toán trưởng** | duyệt ⇒ Active |
-| `eCommerce.Tax.Classification.ExportMau01` | Kế toán trưởng | xuất Mẫu 01 Phụ lục IV |
+| `eCommerce.Tax.Classification.ExportMau01` | Kế toán trưởng | xuất Mẫu 01 Phụ lục III |
 | `eCommerce.Tax.RateSchedule.Manage` | **Host admin** | quản lý bảng mức thuế suất (thay đổi ảnh hưởng toàn hệ thống) |
 
 📌 **Nguyên tắc ABP (đã kiểm chứng ở Phase 0):** app service **không tự được bảo vệ** ⇒ **bắt buộc `[Authorize]` ở cấp class**
@@ -569,9 +634,9 @@ public class TaxRateResolverTests
 ### 14.4 Definition of Ready
 
 - [ ] Tài liệu **Approved** (Kế toán trưởng + Kiến trúc trưởng)
-- [ ] **Q2** (§15) đã có câu trả lời: SKU chưa phân loại ⇒ **chặn hoá đơn** hay **chỉ cảnh báo**
+- [x] **Q2** ✅ **đã chốt 12/10/2026**: SKU chưa phân loại ⇒ **CHẶN phát hành hoá đơn** (vẫn cho bán) + 4 biện pháp giảm thiểu ở §1 A3
 - [ ] Có **file Excel mẫu** chuẩn của kế toán để đối chiếu cột import
-- [ ] Có **mẫu Mẫu 01 Phụ lục IV** thật (file) để đối chiếu cột export
+- [x] ✅ **Đã có file gốc Mẫu 01 (Phụ lục III)** — đặc tả ở §6.3; còn cần kế toán xác nhận **Q8** (ngữ nghĩa cột (6) và chỉ tiêu [09])
 - [ ] Thống nhất: phân loại chủ yếu theo **SKU** hay theo **danh mục** (ảnh hưởng khối lượng nhập liệu)
 
 ---
@@ -583,12 +648,14 @@ public class TaxRateResolverTests
 | # | Câu hỏi | Cần ai | Trạng thái | Ảnh hưởng |
 |---|---|---|---|---|
 | **Q1** | Kế toán muốn phân loại chủ yếu theo **SKU** hay theo **danh mục**? | Kế toán trưởng | `Open` | Quyết định khối lượng nhập liệu & thiết kế UI |
-| **Q2** | SKU chưa phân loại: **chặn phát hành hoá đơn** (đề xuất D5) hay **chỉ cảnh báo**? | Kế toán trưởng | `Open` | 🔴 Chặn ⇒ an toàn pháp lý nhưng có thể **dừng bán**; chỉ cảnh báo ⇒ rủi ro kê khai sai |
+| **Q2** | SKU chưa phân loại: **chặn phát hành hoá đơn** hay **chỉ cảnh báo**? | Kế toán trưởng | ✅ **`Closed` — CHẶN PHÁT HÀNH HOÁ ĐƠN** *(chốt 12/10/2026)* | Vẫn **cho bán** (không chặn bán). Giảm thiểu: khi tạo SKU mới, hệ thống **tự tạo dòng phân loại `Draft`** + đưa vào **báo cáo việc cần làm của kế toán** ⇒ kế toán xử lý **trước khi phát sinh đơn**, không phải phát hiện lúc lập hoá đơn (xem §1 A3) |
 | **Q3** | Có cần **file Excel mẫu** riêng của kế toán (cột nào, thứ tự nào)? | Kế toán | `Open` | Ảnh hưởng parser import |
-| **Q4** | **Mẫu 01 Phụ lục IV** có cột chính xác nào? | Kế toán | `Open` | Cần file mẫu thật; nếu không, xuất theo danh mục **tạm** và ghi rõ |
+| **Q4** | **Mẫu 01** có cột chính xác nào? | Kế toán | ✅ **`Closed`** — đã đọc **file gốc Phụ lục III**; đặc tả đầy đủ ở **§6.3** | Còn lại: xác nhận **ngữ nghĩa cột (6)** và chỉ tiêu **[09]** — xem **Q8** |
 | **Q5** | Bản ghi phân loại có cần **đính kèm** văn bản/công văn làm căn cứ? | Kế toán trưởng | `Open` | Nếu có ⇒ thêm bảng attachment |
 | **Q6** | Khi luật **gia hạn** mức 8% sau 31/12/2026: ai cập nhật, có cần duyệt không? | Kế toán trưởng | `Open` | Đề xuất: sửa `EffectiveTo` của `VAT8` **phải qua duyệt + audit** |
 | **Q7** | Có cần **báo cáo đối chiếu** giữa phân loại và doanh thu theo SKU để phát hiện phân loại sai? | Kiến trúc trưởng | `Open` | Đề xuất: có, thuộc `REP-*` |
+| **Q8** | 🚩 Cột **(6)** của Mẫu 01: nhãn ghi *"Thuế GTGT của hàng hóa, dịch vụ bán ra **được giảm**"* nhưng công thức là `(3) × [(4) − (5)]` = **(3) × 2%** ⇒ cho ra **số thuế ĐƯỢC GIẢM**, không phải số thuế ở mức 8%. Xác nhận cách hiểu này? Tương tự, chỉ tiêu **[09] = [08] − [06]** có đúng là *"giảm thuế đầu ra trừ thuế đầu vào được khấu trừ"*? | **Kế toán trưởng** | `Open` | 🔴 Hiểu sai ⇒ **xuất Mẫu 01 sai số** ⇒ phải sửa và kê khai lại |
+| **Q9** | Mẫu 01 có cần xuất **theo mẫu Excel đúng định dạng của cơ quan thuế** (để nộp được) hay chỉ cần bảng số liệu để kế toán nhập vào phần mềm HTKK? | Kế toán trưởng | `Open` | Nếu phải đúng định dạng file nộp ⇒ cần **file mẫu chính thức**; nếu chỉ cần số liệu ⇒ tự thiết kế bảng |
 
 ### 15.2 Giả định
 
@@ -605,3 +672,4 @@ public class TaxRateResolverTests
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.1 | 12/10/2026 | *(điền)* | Bản nháp đầu — thiết kế theo yêu cầu: **không hard-code danh mục Phụ lục I/II**, để **kế toán tự quyết định** |
+| v0.2 | 12/10/2026 | *(điền)* | ✅ **Đóng Q2**: SKU chưa phân loại ⇒ **CHẶN phát hành hoá đơn** (vẫn cho bán) + 4 biện pháp giảm thiểu vận hành. ✅ **Đóng Q4**: đã đọc **file gốc Mẫu 01** ⇒ thêm **§6.3** đặc tả đầy đủ. 🚩 **Sửa lỗi căn cứ**: Mẫu 01 nằm ở **Phụ lục III** (nguồn thứ cấp ghi "Phụ lục IV" — sai). Thêm **Q8** (ngữ nghĩa cột (6) & [09]) và **Q9** (định dạng file nộp). Ghi rõ **chỉ xuất được Phần II** vì không có phân hệ mua vào |
