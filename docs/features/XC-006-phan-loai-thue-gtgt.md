@@ -395,9 +395,9 @@ tiêu đề: *"GIẢM THUẾ GIÁ TRỊ GIA TĂNG THEO NGHỊ QUYẾT SỐ 204/2
 3. **Phần I (mua vào) và Phần III nằm NGOÀI phạm vi hệ thống**: ta **không** có phân hệ mua vào/kế toán nhà cung cấp.
    Hệ thống **chỉ xuất Phần II** (và cấp số [07], [08]); kế toán hoàn thiện Phần I & III trên phần mềm kế toán của họ.
 
-### 6.4 Đề xuất mẫu Excel **import** phân loại thuế *(cần kế toán xác nhận — Q3)*
+### 6.4 Mẫu Excel **import** phân loại thuế — ✅ ĐÃ CHỐT 12/10/2026
 
-Đây là file kế toán sẽ upload để nạp phân loại (thay vì nhập tay từng SKU). Đề xuất 7 cột:
+Đây là file kế toán upload để nạp phân loại (thay vì nhập tay từng SKU). **7 cột đã được xác nhận** — parser import bám đúng theo bảng này:
 
 | Cột | Bắt buộc | Ví dụ | Ghi chú |
 |---|:--:|---|---|
@@ -412,9 +412,10 @@ tiêu đề: *"GIẢM THUẾ GIÁ TRỊ GIA TĂNG THEO NGHỊ QUYẾT SỐ 204/2
 **Quy tắc validate:** mã đối tượng & mã mức thuế phải tồn tại · không chồng khung hiệu lực · `DuocGiam` chỉ nhận `C`/`K` ·
 **cả lô là all-or-nothing** (1 dòng sai ⇒ không ghi dòng nào) · có **dry-run** để kế toán xem trước.
 
-> ❓ **Vì sao cần kế toán xác nhận mẫu này:** đây là file họ dùng **hằng tháng**, nên **tên cột phải theo thói quen của họ**.
-> Ví dụ họ có thể muốn `Mã hàng` thay vì `MaDoiTuong`, hoặc ghi `Thuế suất` = `8` / `10` thay vì cờ `C`/`K`.
-> Nếu họ **đã có** một file Excel đang dùng để theo dõi việc giảm thuế ⇒ **gửi bản đó**, tôi khớp parser theo đúng cột của họ.
+> ✅ **Đã chốt 12/10/2026:** 7 cột trên là **chuẩn chính thức** cho import. Tên cột, thứ tự và giá trị `C`/`K` **không đổi**
+> nếu không có quyết định mới. Hệ thống cũng cung cấp **file mẫu tải về** (`GET /import-template`) đúng 7 cột này
+> kèm 1 dòng ví dụ + sheet `HuongDan` giải thích `C`/`K`.
+> 🔒 Sau khi chốt, **mọi thay đổi cột phải sửa tài liệu này trước** (quy tắc vàng: code lệch tài liệu ⇒ sửa tài liệu trước).
 
 ---
 
@@ -649,13 +650,58 @@ public class TaxRateResolverTests
 |---|---|---|---|---|
 | **Q1** | Kế toán muốn phân loại chủ yếu theo **SKU** hay theo **danh mục**? | Kế toán trưởng | `Open` | Quyết định khối lượng nhập liệu & thiết kế UI |
 | **Q2** | SKU chưa phân loại: **chặn phát hành hoá đơn** hay **chỉ cảnh báo**? | Kế toán trưởng | ✅ **`Closed` — CHẶN PHÁT HÀNH HOÁ ĐƠN** *(chốt 12/10/2026)* | Vẫn **cho bán** (không chặn bán). Giảm thiểu: khi tạo SKU mới, hệ thống **tự tạo dòng phân loại `Draft`** + đưa vào **báo cáo việc cần làm của kế toán** ⇒ kế toán xử lý **trước khi phát sinh đơn**, không phải phát hiện lúc lập hoá đơn (xem §1 A3) |
-| **Q3** | Có cần **file Excel mẫu** riêng của kế toán (cột nào, thứ tự nào)? | Kế toán | `Open` | Ảnh hưởng parser import |
+| **Q3** | Mẫu Excel import gồm cột nào? | Kế toán | ✅ **`Closed`** — **7 cột đã chốt 12/10/2026** (xem §6.4) | Parser import bám đúng 7 cột; thay đổi sau này phải sửa tài liệu trước |
 | **Q4** | **Mẫu 01** có cột chính xác nào? | Kế toán | ✅ **`Closed`** — đã đọc **file gốc Phụ lục III**; đặc tả đầy đủ ở **§6.3** | Còn lại: xác nhận **ngữ nghĩa cột (6)** và chỉ tiêu **[09]** — xem **Q8** |
 | **Q5** | Bản ghi phân loại có cần **đính kèm** văn bản/công văn làm căn cứ? | Kế toán trưởng | `Open` | Nếu có ⇒ thêm bảng attachment |
 | **Q6** | Khi luật **gia hạn** mức 8% sau 31/12/2026: ai cập nhật, có cần duyệt không? | Kế toán trưởng | `Open` | Đề xuất: sửa `EffectiveTo` của `VAT8` **phải qua duyệt + audit** |
 | **Q7** | Có cần **báo cáo đối chiếu** giữa phân loại và doanh thu theo SKU để phát hiện phân loại sai? | Kiến trúc trưởng | `Open` | Đề xuất: có, thuộc `REP-*` |
-| **Q8** | 🚩 Cột **(6)** của Mẫu 01: nhãn ghi *"Thuế GTGT của hàng hóa, dịch vụ bán ra **được giảm**"* nhưng công thức là `(3) × [(4) − (5)]` = **(3) × 2%** ⇒ cho ra **số thuế ĐƯỢC GIẢM**, không phải số thuế ở mức 8%. Xác nhận cách hiểu này? Tương tự, chỉ tiêu **[09] = [08] − [06]** có đúng là *"giảm thuế đầu ra trừ thuế đầu vào được khấu trừ"*? | **Kế toán trưởng** | `Open` | 🔴 Hiểu sai ⇒ **xuất Mẫu 01 sai số** ⇒ phải sửa và kê khai lại |
-| **Q9** | Mẫu 01 có cần xuất **theo mẫu Excel đúng định dạng của cơ quan thuế** (để nộp được) hay chỉ cần bảng số liệu để kế toán nhập vào phần mềm HTKK? | Kế toán trưởng | `Open` | Nếu phải đúng định dạng file nộp ⇒ cần **file mẫu chính thức**; nếu chỉ cần số liệu ⇒ tự thiết kế bảng |
+| **Q8** | 🚩 Cột **(6)** của Mẫu 01: nhãn ghi *"Thuế GTGT của hàng hóa, dịch vụ bán ra **được giảm**"* nhưng công thức in trong mẫu là `(3) × [(4) − (5)]` = **(3) × 2%** ⇒ cho ra **số thuế ĐƯỢC GIẢM**, không phải số thuế ở mức 8%. Cách hiểu nào đúng? *(chi tiết + ví dụ số ở §15.1.4)* | **Kế toán trưởng** | `Open` | 🔴 Hiểu sai ⇒ **xuất Mẫu 01 sai số** ⇒ phải sửa và kê khai lại |
+| **Q9** | Mẫu 01 cần xuất **đúng định dạng file nộp được** của cơ quan thuế/HTKK, hay chỉ cần **bảng số liệu** để kế toán nhập lại? *(chi tiết ở §15.1.4)* | Kế toán trưởng | `Open` | Nếu phải đúng định dạng ⇒ cần **file mẫu chính thức**; nếu chỉ cần số liệu ⇒ tự thiết kế bảng |
+
+#### 15.1.4 ❓ Q8 & Q9 — nội dung để hỏi kế toán *(copy gửi thẳng được)*
+
+**Bối cảnh:** Mẫu 01 (Phụ lục III NĐ 174/2025), **Phần II — Hàng hoá, dịch vụ bán ra trong kỳ**, có 6 cột:
+
+| Cột | Nội dung (nguyên văn trong mẫu) |
+|---|---|
+| (1) | STT |
+| (2) | Tên hàng hóa, dịch vụ |
+| (3) | Giá trị hàng hóa, dịch vụ chưa có thuế GTGT/Doanh thu hàng hóa, dịch vụ chịu thuế |
+| (4) | Thuế suất/Tỷ lệ tính thuế GTGT theo quy định |
+| (5) | Thuế suất/Tỷ lệ tính thuế GTGT sau giảm |
+| (6) | Thuế GTGT của hàng hóa, dịch vụ bán ra được giảm |
+
+Công thức **in sẵn trong biểu mẫu**: **(5) = (4) × 80%** · **(6) = (3) × [(4) − (5)]**
+
+---
+
+**❓ Q8 — Cột (6) là con số nào?**
+
+Ví dụ: doanh thu chưa thuế = **100.000.000 đồng**; (4) = 10%; (5) = 8%.
+
+| Cách hiểu | Phép tính | Cột (6) | Ý nghĩa |
+|---|---|---|---|
+| **A. Theo CÔNG THỨC in trong mẫu** | `100.000.000 × (10% − 8%)` | **2.000.000** | **số thuế ĐƯỢC GIẢM** (phần ngân sách giảm do chính sách) |
+| **B. Theo NHÃN của cột** (*"thuế GTGT của hàng bán ra"*) | `100.000.000 × 8%` | **8.000.000** | **số thuế ở mức 8%** của hàng bán ra |
+
+⚠️ **Nhãn và công thức trong biểu mẫu KHÔNG khớp nhau**, và hai cách hiểu **lệch 6.000.000 đồng cho mỗi 100 triệu doanh thu**.
+
+**Cách trả lời dễ nhất:** mở **HTKK**, nhập thử 1 dòng rồi xem phần mềm tự tính cột (6) ra **2.000.000** hay **8.000.000**;
+hoặc xem chỉ tiêu **[08]** và **[09]** mà HTKK sinh ra rồi đối chiếu ngược lại.
+
+**❓ Q8b — Phần II liệt kê những hàng nào?** Chỉ hàng hoá/dịch vụ **thuộc diện được giảm (8%)**, hay **tất cả** hàng bán ra trong kỳ?
+
+---
+
+**❓ Q9 — Cần xuất file dạng nào?**
+
+| Phương án | Nghĩa là | Cần gì thêm |
+|---|---|---|
+| **A. File nộp được luôn** | Xuất file **import vào HTKK / nộp qua eTax** là dùng được | ⚠️ Cần **file mẫu chính thức** (hoặc 1 file do HTKK xuất ra) để khớp **chính xác** định dạng cột/ô |
+| **B. Bảng số liệu** | Chỉ cần bảng đúng cột để kế toán **nhập lại** vào HTKK | Không cần gì thêm — tự thiết kế bảng Excel |
+
+💡 **Lưu ý nghiệp vụ:** nếu chọn **A**, định dạng file do **HTKK** quyết định, mà phần mềm này **đổi theo phiên bản**;
+⇒ chi phí bảo trì sẽ cao hơn. Nếu chọn **B**, rủi ro nhập tay sai thấp hơn nhưng tốn công kế toán.
 
 ### 15.2 Giả định
 
