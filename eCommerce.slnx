@@ -25,6 +25,7 @@
     <Project Path="src/eCommerce.HttpApi.Host/eCommerce.HttpApi.Host.csproj" />
   </Folder>
   <Folder Name="/test/">
+    <Project Path="test/eCommerce.IntegrationTests/eCommerce.IntegrationTests.csproj" />
     <Project Path="test/eCommerce.Tests/eCommerce.Tests.csproj" />
   </Folder>
 </Solution>
