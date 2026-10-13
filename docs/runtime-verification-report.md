@@ -113,3 +113,38 @@ if (permissions.Count == 0)
 3. **`ProjectReference` ≠ module dependency** trong ABP: cái đầu để biên dịch, cái sau mới nạp assembly vào đồ thị module để ABP quét.
 4. **Đặt log đúng chỗ**: C1/C3 chỉ tìm được sau khi cho DbMigrator ghi lỗi ra `stderr`; C8 chỉ tìm được sau khi bật `Microsoft.AspNetCore.Routing` = `Debug`.
 5. **Sửa theo giả thuyết mà chưa đo là rủi ro thật** — tôi đã 2 lần như vậy (C6b đoán do `SignInManager`, C7 đoán do trùng tên class) và cả 2 lần đều **sai**; chỉ khi đo mới ra nguyên nhân đúng.
+
+---
+
+## 7. ✅ Vá `XC-005` (observability) — đã kiểm chứng CẢ 2 CHIỀU
+
+| Hạng mục | Trước | Sau (đo được) |
+|---|---|---|
+| `CorrelationId` | ❌ chỉ là **cột RỖNG** trong bảng audit của ABP (**12/12** chỗ nằm trong `Migrations/`) | ✅ `UseCorrelationId()` ⇒ header **`X-Correlation-Id`** trả về **thật** (`aa003348cac54ee99f7d7c7114dca531`) |
+| Health check | ❌ không có | ✅ `/health-status` → **`200 · Healthy`** khi PostgreSQL sống · **`503`** khi **DỪNG** PostgreSQL ⇒ chứng minh check **thật sự** kiểm tra phụ thuộc (không phải luôn trả 200) |
+| Log | ⚠️ console text | ✅ **JSON 1 dòng** |
+
+**2 lỗi nữa chỉ lộ lúc chạy, khi vá health check (đã sửa):**
+
+1. `MapHealthChecks` là extension trên **`IEndpointRouteBuilder`**, **không phải** `IApplicationBuilder` ⇒ phải gọi qua `app.UseEndpoints(...)`.
+2. **Không được inject thẳng `AbpDbConnectionOptions`**: ABP đăng ký qua `Configure<T>` nên trong DI **chỉ có `IOptions<T>`**, mà health check dùng `ActivatorUtilities` (resolve theo **đúng kiểu tham số**) ⇒ ném `Unable to resolve service for type 'AbpDbConnectionOptions'` ⇒ `/health-status` trả **500**.
+
+---
+
+## 8. Tổng kết cuối
+
+| Hạng mục | Kết quả |
+|---|---|
+| **Lỗi thật tìm bằng chạy thật** | **14** |
+| Đã sửa + **kiểm chứng** | **14** |
+| Loại **"im lặng"** (không lỗi biên dịch, không exception, `exit 0`) | **7** |
+| Unit test | **42/42** (trước phiên: 20) |
+| Build | **0 lỗi / 0 warning** |
+| Tài liệu thiết kế nền | **6/6** (`XC-001…XC-006`) · Mermaid **30/30 PASS** |
+| Chuỗi xác thực | ✅ không token `401` · thiếu quyền `403` · có quyền `200` |
+| Distributed lock | ✅ khoá thật `ecommerce:channel:…` · **chặn được** thao tác tranh chấp (A/B) |
+| Việc còn lại | **12 metric chưa có nơi phát** (`XC-005` — chờ chọn công cụ) · backfill API `401`/`403` vào `XC-004` §15.2 |
+
+> **Bài học lớn nhất:** **14 lỗi thật, 7 lỗi hoàn toàn im lặng** — và **2 lần tôi sửa theo giả thuyết mà chưa đo thì cả 2 lần đều SAI**
+> (C6b đoán do `SignInManager`; C7 đoán do trùng tên class). Khi đo bằng công cụ đúng (`redis-cli MONITOR`,
+> log `Microsoft.AspNetCore.Routing` mức `Debug`) thì nguyên nhân thật hiện ra ngay.
