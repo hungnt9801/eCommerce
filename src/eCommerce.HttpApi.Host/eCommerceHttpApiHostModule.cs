@@ -108,7 +108,17 @@ public class eCommerceHttpApiHostModule : AbpModule
 
         Configure<Volo.Abp.DistributedLocking.AbpDistributedLockOptions>(options =>
         {
-            options.KeyPrefix = "eCommerce";
+            // 🚨 BUG ĐÃ SỬA (C12) — BẮT ĐƯỢC BẰNG `redis-cli MONITOR`, 13/10/2026:
+            //
+            // ABP ghép tiền tố với tên khoá **KHÔNG có dấu phân cách**: `KeyPrefix + name`.
+            // Trước đây để `"eCommerce"` và tên khoá của module là `channel:shopee:...`
+            // ⇒ khoá thật trong Redis là **`eCommercechannel:shopee:...`** (dính liền, chữ E hoa).
+            // Hệ quả: (1) KHÔNG khớp quy ước `ecommerce:<module>:...` của `XC-003` BR-002;
+            //          (2) rất dễ gõ sai khi vận hành/gỡ khoá treo bằng tay;
+            //          (3) hai tiền tố khác hệ thống có thể dính vào nhau.
+            // Nay dùng `"ecommerce:"` (chữ thường + CÓ dấu `:`) ⇒ khoá thật đúng quy ước:
+            //   `ecommerce:channel:shopee:SHOP-1:token-refresh`
+            options.KeyPrefix = "ecommerce:";
         });
 
         // 🔒 Provider lock thật (Redis). Bắt buộc khi chạy nhiều instance:

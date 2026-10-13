@@ -26,8 +26,8 @@ namespace eCommerce.ChannelHub.Sync;
 /// </summary>
 public class ChannelSyncSupervisorWorker : AsyncPeriodicBackgroundWorkerBase
 {
-    /// <summary>Sổ đăng ký tên worker đã tạo, để biết cần huỷ những worker nào.</summary>
-    private static readonly ConcurrentDictionary<string, DateTime> RegisteredWorkers = new();
+    /// <summary>Sổ đăng ký: tên worker → NHỊP (ms) đã đăng ký, để biết worker nào cần tạo lại khi nhịp đổi.</summary>
+    private static readonly ConcurrentDictionary<string, int> RegisteredWorkers = new();
 
     private readonly ILogger<ChannelSyncSupervisorWorker> _logger;
 
@@ -65,8 +65,25 @@ public class ChannelSyncSupervisorWorker : AsyncPeriodicBackgroundWorkerBase
 
             var shopId = shop.Id;
 
-            // AddAsync ghi đè worker cùng tên ⇒ gọi lại mỗi nhịp là idempotent,
-            // đồng thời cập nhật được nhịp mới khi admin đổi SyncIntervalSeconds.
+            // 🚨 C10 — SỬA LỖI STARVATION (ĐÃ ĐO BẰNG CHẠY THẬT, 13/10/2026):
+            //
+            // Trước đây gọi AddAsync **MỖI NHỊP** với suy nghĩ "ghi đè là idempotent". Thực tế ABP
+            // **THAY THẾ** worker (log: "Replaced existing dynamic worker") ⇒ **timer bị reset về 0**
+            // mỗi lần ⇒ nếu nhịp supervisor ≤ nhịp worker thì worker **KHÔNG BAO GIỜ chạy**.
+            //
+            // Đo thực tế: supervisor 5s + worker 10s ⇒ 8 lần replace, **0 lần worker chạy**;
+            //             supervisor 600s + worker 10s ⇒ worker chạy **ngay**.
+            // ⚠️ Với cấu hình MẶC ĐỊNH (SupervisorPeriodSeconds=60, DefaultShopSyncIntervalSeconds=300)
+            //    worker sẽ **KHÔNG BAO GIỜ** chạy ⇒ đồng bộ sàn hoàn toàn không hoạt động.
+            //
+            // Nay CHỈ đăng ký khi worker CHƯA có, hoặc NHỊP ĐÃ ĐỔI (để admin đổi SyncIntervalSeconds
+            // vẫn có hiệu lực).
+            if (RegisteredWorkers.TryGetValue(workerName, out var registeredPeriodMs)
+                && registeredPeriodMs == periodMs)
+            {
+                continue;
+            }
+
             await workerManager.AddAsync(
                 workerName,
                 new DynamicBackgroundWorkerSchedule { Period = periodMs },
@@ -85,7 +102,7 @@ public class ChannelSyncSupervisorWorker : AsyncPeriodicBackgroundWorkerBase
                     }
                 });
 
-            RegisteredWorkers[workerName] = DateTime.UtcNow;
+            RegisteredWorkers[workerName] = periodMs;
         }
 
         // Huỷ worker của shop đã ngắt kết nối / bị tắt.
