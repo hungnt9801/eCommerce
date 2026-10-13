@@ -1,6 +1,7 @@
 using eCommerce.EntityFrameworkCore;
 using Medallion.Threading;
 using Medallion.Threading.Redis;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -61,6 +62,27 @@ public class eCommerceHttpApiHostModule : AbpModule
             // Mọi thao tác ghi đi qua Unit of Work của ABP ⇒ transaction tự động ở tầng EF Core.
             options.TransactionBehavior = Volo.Abp.Uow.UnitOfWorkTransactionBehavior.Auto;
         });
+
+        // 🚨 C6b — CẤU HÌNH AUTHENTICATION MẶC ĐỊNH (thiếu ⇒ API không token trả 404 body RỖNG thay vì 401):
+        //
+        // Host vừa là auth server vừa là resource server. Phía resource server BẮT BUỘC phải có một
+        // scheme mặc định biết cách validate access token do chính OpenIddict phát ra.
+        // Trước đây KHÔNG hề gọi AddAuthentication(...) ⇒ khi [Authorize] thất bại, challenge không có
+        // scheme nào để gọi ⇒ sinh **404 body rỗng**.
+        // Đã chẩn đoán bằng log `Microsoft.AspNetCore.Routing` = Debug:
+        //   "Request matched endpoint 'eCommerce.Channels.ChannelAppService.GetShopsAsync'"
+        //   ⇒ route KHỚP, lỗi nằm ở tầng xác thực (không phải routing).
+        // Authority/Audience đọc từ appsettings (mục "AuthServer").
+        context.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+            .AddJwtBearer(options =>
+            {
+                options.Authority = configuration["AuthServer:Authority"];
+                options.Audience = configuration["AuthServer:Audience"];
+
+                // ⚠️ DEV chạy http nên phải tắt; PRODUCTION phải BẬT lại (true) — nếu không sẽ
+                // chấp nhận metadata qua kênh không mã hoá.
+                options.RequireHttpsMetadata = false;
+            });
 
         // Connection string lấy từ appsettings.json (xem ConnectionStrings:Default).
         Configure<Volo.Abp.Data.AbpDbConnectionOptions>(options =>
