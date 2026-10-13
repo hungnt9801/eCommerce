@@ -534,3 +534,37 @@ public class AuthorizationGuardTests
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.1 | 13/10/2026 | *(điền)* | Bản nháp đầu — số liệu lấy **từ code thật** (21 permission định nghĩa = 21 hằng số; 0 `[AllowAnonymous]`); phát hiện **F1** (unique index + `TenantId NULL`), **F2** (multi-tenancy chưa bật), **F3/F4** (password grant + mật khẩu seed trong tài liệu); **F5** kế thừa từ `XC-003` |
+
+---
+
+## 15.5 ✅ KẾT QUẢ KIỂM CHỨNG BẰNG CHẠY THẬT (13/10/2026)
+
+Toàn bộ nội dung tài liệu này **đã được kiểm chứng trên PostgreSQL 17.11 + Redis 7 thật**, không còn là suy luận.
+
+### Ma trận xác thực — đã đo đủ 3 trạng thái
+
+| Ca | Kết quả đo được | Ghi chú |
+|---|---|---|
+| **Không token** | **`401`** | Trước đó là `500` → `404` body rỗng (xem C6b) |
+| **Có token nhưng THIẾU quyền** | **`403`** | Đo bằng cách **thu hồi** grant `eCommerce.Channels.Manage` + xoá cache Redis, rồi gọi `POST /api/app/channel/connect` |
+| **Có token + có quyền** | **`200`** | `GET /api/app/channel/shops` → `{"totalCount":0,"items":[]}` |
+
+> 📌 Phát hiện phụ khi đo: `GET /api/app/channel/shops` **chỉ** có `[Authorize]` trần (chỉ cần đăng nhập),
+> nên nó trả `200` **kể cả khi thiếu** `eCommerce.Channels.Manage`. Muốn kiểm `403` phải gọi endpoint
+> **có** gắn permission (`POST /connect` → `Channels.Manage`, `POST /{id}/sync-now` → `Channels.Sync`).
+
+### Trạng thái các phát hiện trong §15.2
+
+| # | Trạng thái sau kiểm chứng |
+|---|---|
+| **F1** (unique index + `TenantId` NULL) | ✅ **đã sửa**: migration `NULLS NOT DISTINCT` cho **11 index**; **chứng minh trước/sau** bằng SQL thật (`INSERT 0 2` → `duplicate key … (null, …) already exists`) |
+| **F2** (multi-tenancy chưa bật; `ICurrentTenant` dùng ở 0 file) | ⬜ **vẫn còn** — đúng như dự kiến ở GĐ4; nay có thêm bằng chứng: entity đã `IMultiTenant` + `TenantId` NULL thật trong DB |
+| **F3** (`password` grant trong README) | ✅ **grant nay chạy được** và **đã lấy được token** (`expires_in=3599`). Còn lại: ghi rõ **chỉ dùng ở dev** |
+| **F4** (mật khẩu seed viết trong tài liệu) | 🟡 **một phần**: tài khoản nay đúng là **`admin@abp.io`** (đã sửa tài liệu); **vẫn cần** buộc đổi mật khẩu lần đầu (Q2) |
+| **F5** (mã lỗi trùng/khác định dạng) | ✅ **đã sửa** (B(a), 13/10/2026): `ChannelHubErrorCodes` chuẩn hoá về `eCommerce:Channel:*`; **xoá 3 mã trùng** ở `eCommerceConsts.ErrorCodes` |
+
+### Hệ quả cho Q2 (khuyến nghị)
+
+Vì `AbpUsers` chỉ có **`admin@abp.io`** do **seeder mặc định của ABP** tạo (không phải hằng số của ta),
+Q2 nên chốt theo hướng: **buộc đổi mật khẩu ở lần đăng nhập đầu** (hoặc sinh mật khẩu ngẫu nhiên khi seed
+production) — và **không** dựa vào việc "đổi hằng số là xong", vì seeder của ABP vẫn tạo tài khoản trước.
