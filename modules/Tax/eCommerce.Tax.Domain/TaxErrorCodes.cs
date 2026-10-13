@@ -43,9 +43,9 @@ public static class TaxLockKeys
     /// Ràng buộc EXCLUDE ở DB vẫn là chốt cuối, nhưng lock giúp tránh lỗi khó hiểu cho người dùng.
     /// </summary>
     public static string Classification(Guid tenantId, Guid targetId)
-        => $"ecommerce:tax:classification:{tenantId}:{targetId}";
+        => $"tax:classification:{tenantId}:{targetId}";
 
     /// <summary>Khoá khi đổi khung hiệu lực của bảng mức thuế suất (ảnh hưởng toàn hệ thống).</summary>
     public static string RateSchedule(Guid tenantId)
-        => $"ecommerce:tax:rate-schedule:{tenantId}";
+        => $"tax:rate-schedule:{tenantId}";
 }

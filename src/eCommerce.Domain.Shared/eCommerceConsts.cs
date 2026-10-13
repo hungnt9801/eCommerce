@@ -101,7 +101,7 @@ public static class eCommerceConsts
         /// Khi tách module Inventory (GĐ1) thì chuyển khoá này về module đó (quy ước D3 của XC-003).
         /// </remarks>
         public static string InventorySku(string warehouseId, string sku)
-            => $"ecommerce:inventory:{warehouseId}:{sku}";
+            => $"inventory:{warehouseId}:{sku}";
 
         // 📌 Khoá liên quan tới kênh bán (refresh token, đẩy tồn kho) do CHÍNH module ChannelHub
         // sở hữu — xem modules/ChannelHub/ChannelHub.Domain/ChannelHubConsts.cs.

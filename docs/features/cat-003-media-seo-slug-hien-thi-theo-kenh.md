@@ -1,0 +1,885 @@
+# `CAT-003` — Media, SEO slug và hiển thị theo kênh
+
+| Thuộc tính | Nội dung |
+|---|---|
+| **Mã** | `CAT-003` |
+| **Module** | **Catalog** (module **chưa tách** — entity đang ở `src/eCommerce.Domain/Entities/Catalog/`, xem §15.2 **F7**) |
+| **Giai đoạn** | **GĐ1 — Bán được trên website** (`docs/implementation-plan.md` **Phụ lục A.3**, dòng `CAT-003`) |
+| **Ưu tiên** | **Must have** — `WEB-002` **phụ thuộc** tài liệu này (xem §15.2 **F2**) |
+| **Trạng thái** | 🟡 `Draft` — chờ review |
+| **Người viết / người review** | *(điền)* / **Kiến trúc trưởng + BA Catalog + SEO** |
+| **Phiên bản / ngày** | `v0.1 — 13/10/2026` |
+| **Tài liệu liên quan** | `CAT-001` (sản phẩm & biến thể SKU — §15.2 **F5** giao slug sang đây) · `CAT-002` (cây danh mục & thuộc tính) · **`WEB-002`** (§11 giao migration index `Slug` cho `CAT-003`; Q3 hỏi `ProductSlugChangedEto` có `OldSlug` không) · `XC-001` (Money) · `XC-002` (outbox/inbox & idempotency) · `XC-003` (khoá phân tán — §5.4 tiền tố khoá) · `XC-004` (permission/tenant — **BR-009** `NULLS NOT DISTINCT`) · `XC-005` (observability — bảng đăng ký metric) · `XC-006` (phân loại thuế theo SKU) · `PRC-001` · `INV-001` · `CHN-004` · `docs/implementation-plan.md` §5 + Phụ lục A |
+
+---
+
+## 0. Tóm tắt & quyết định thiết kế
+
+**Tóm tắt:** `CAT-003` chốt **ba thứ mà `CAT-001`/`CAT-002` cố ý để lại**: (1) **media** — ảnh/video của sản phẩm,
+(2) **slug SEO** — khoá định danh công khai của sản phẩm trên URL, và (3) **hiển thị theo kênh** — cùng một sản phẩm
+được bán ở kênh này nhưng ẩn ở kênh khác **mà không nhân bản dữ liệu**.
+
+**Vì sao phải viết tài liệu này (và vì sao nó bị chặn):** `WEB-002` — tài liệu storefront — **đã** ghi rõ hai việc
+**giao hẳn** cho `CAT-003`:
+
+> *"Migration **bắt buộc kèm theo** *(thuộc `CAT-003`, WEB-002 phụ thuộc)* | Thêm unique index cho `CatProducts.Slug`:
+> `CREATE UNIQUE INDEX … ON "CatProducts" ("TenantId", "Slug") NULLS NOT DISTINCT WHERE "Slug" IS NOT NULL;`"*
+> — [`web-002-storefront-duyet-chi-tiet-san-pham.md:581`](web-002-storefront-duyet-chi-tiet-san-pham.md)
+
+và **Q3** của `WEB-002` hỏi thẳng *"ETO `ProductSlugChangedEto` có mang `OldSlug` không? Ai phát?"*.
+`CAT-001` cũng đã chuyển **F5** (`Product.Slug` không unique) sang đây:
+[`cat-001-san-pham-va-bien-the-sku.md:725`](cat-001-san-pham-va-bien-the-sku.md).
+⇒ **`CAT-003` phải trả lời cả ba câu này**, nếu không `WEB-002` không thể code.
+
+**Hiện trạng code (đã kiểm bằng `read`/`grep`, không viết theo trí nhớ):**
+
+| Thứ | Trạng thái thật trong repo |
+|---|---|
+| `Product.Slug` | ✅ **CÓ** — `string? Slug` ([`Product.cs:19`](../../src/eCommerce.Domain/Entities/Catalog/Product.cs#L19)) |
+| Unique index cho `Slug` | ❌ **KHÔNG CÓ** — chỉ `HasMaxLength(512)` ([`eCommerceDbContext.cs:106`](../../src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs#L106)); migration `NULLS NOT DISTINCT` **không** bao gồm `Slug` ([`20261013024226_Fix_NullableTenantId_UniqueIndexes.cs:39-86`](../../src/eCommerce.EntityFrameworkCore/Migrations/20261013024226_Fix_NullableTenantId_UniqueIndexes.cs#L39)) |
+| Entity media / visibility | ❌ **KHÔNG CÓ** — `grep -E "Media\|Image\|Thumbnail\|Visibility"` trên mọi `*.cs` = **0 kết quả** |
+| Hạ tầng lưu file (blob/S3/wwwroot) | ❌ **KHÔNG CÓ** — `grep -E "BlobStoring\|BlobContainer\|MinIO\|S3\|wwwroot\|StaticFile\|IBlob"` = **0 kết quả**; `Directory.Packages.props` **không** có gói BlobStoring |
+| `CatalogErrorCodes` / `CatalogLockKeys` | ❌ **KHÔNG CÓ** — `eCommerceConsts.ErrorCodes` chỉ có **2** mã (Inventory + Payment) ([`eCommerceConsts.cs:77-86`](../../src/eCommerce.Domain.Shared/eCommerceConsts.cs#L77)) |
+| Permission cho media/slug/visibility | ❌ **KHÔNG CÓ** — chỉ có `Products.Default/Create/Edit/Delete` ([`eCommerceConsts.cs:19-25`](../../src/eCommerce.Domain.Shared/eCommerceConsts.cs#L19)) |
+| `shared/eCommerce.Kernel` | ❌ **KHÔNG TỒN TẠI** — `Test-Path shared` = `False` (kế thừa `EINV-001` **F3**) |
+| `eCommerce.Web` (storefront) | ❌ **KHÔNG TỒN TẠI** — `src/` chỉ có 8 project, không có `eCommerce.Web` |
+
+**Phạm vi:**
+- ✅ Entity **`ProductMedia`** — ảnh/video của sản phẩm: thứ tự, ảnh chính, `alt` text, kích thước.
+- ✅ **Hợp đồng lưu trữ** `IMediaStorage` (metadata ở PostgreSQL, **bytes ở object storage**) + validate tệp.
+- ✅ **Sinh & chuẩn hoá slug SEO** (bỏ dấu tiếng Việt), **unique index `(TenantId, Slug) NULLS NOT DISTINCT`**.
+- ✅ **Sự kiện đổi slug kèm `OldSlug`** — trả lời **Q3** của `WEB-002`.
+- ✅ Entity **`ProductChannelVisibility`** — bật/ẩn sản phẩm **theo từng `ChannelCode`**, kèm **state machine ném lỗi**.
+- ✅ Permission mới, mã lỗi mới (dải riêng), khoá phân tán mới.
+
+**Không nằm trong phạm vi:**
+- ❌ **Xử lý ảnh** (resize, nén, WebP, CDN, `srcset`) — `WEB-002` **ADR-08** đã chốt GĐ1 chỉ dùng thẻ `img` với
+  `width`/`height`/`loading=lazy`/`alt`; resize/CDN là **nợ kỹ thuật** ghi ở `WEB-002` §15.1 Q5.
+- ❌ **Bảng chuyển hướng 301 (`WebSlugRoutes`)** và read-model `WebSeoProducts` — **thuộc `WEB-002`**
+  ([`web-002-storefront-duyet-chi-tiet-san-pham.md:333`](web-002-storefront-duyet-chi-tiet-san-pham.md)). `CAT-003`
+  **chỉ** sở hữu `Product.Slug` (giá trị hiện tại) + **phát sự kiện**; xem **ADR-06**.
+- ❌ **Cây danh mục & thuộc tính/tổ hợp** — thuộc `CAT-002`
+  (`Slug` của danh mục đã có quy ước riêng: UNIQUE `(TenantId, ParentId, Slug)`, [`cat-002…:373`](cat-002-cay-danh-muc-thuoc-tinh-bien-the.md)).
+- ❌ **Đẩy dữ liệu lên sàn** (đẩy ảnh/tiêu đề sang Shopee/Lazada) — thuộc `CHN-002`/`CHN-004` (GĐ4).
+- ❌ **Giá theo kênh** — thuộc `PRC-001`; `CAT-003` chỉ quyết định **hiện/ẩn**, **không** quyết định giá.
+- ❌ **Tồn kho theo kênh (allotment)** — thuộc `CHN-004`/`INV-003`; `ChannelListing.AllottedQuantity` đã có cột
+  ([`ChannelEntities.cs:142`](../../modules/ChannelHub/eCommerce.ChannelHub.Domain/Entities/ChannelEntities.cs#L142)).
+- ❌ **Đa ngôn ngữ / slug theo locale** — giả định 5 ở §15.3.
+- ❌ **CDN & HTTP cache header của ảnh** — thuộc hạ tầng triển khai + `WEB-002` ADR-07.
+
+### 0.1 Quyết định thiết kế (ADR ngắn)
+
+| # | Quyết định | Phương án đã cân nhắc | Lý do chọn | Hệ quả |
+|---|---|---|---|---|
+| **ADR-01** | Media là **entity riêng `ProductMedia`**, **không** phải một cột `ImageUrl` trên `Product` | (a) 1 cột `ImageUrl` · (b) bảng `ProductMedia` · (c) mảng JSON nhúng trong `ExtraProperties` | (a) không chứa được **nhiều** ảnh + thứ tự + `alt` từng ảnh ⇒ **không** đáp ứng được `WEB-002` **NFR-012** (*"100 % ảnh sản phẩm có `alt`"*); (c) JSON **không** index được và **không** unique được ⇒ không cưỡng chế được "một ảnh chính" | Cần bảng mới + `DbSet` (**bất biến #5**) + hạ tầng lưu trữ (**ADR-02**) |
+| **ADR-02** | **Metadata trong PostgreSQL, bytes trong object storage** qua abstraction `IMediaStorage`; **cấm** lưu blob trong DB | (a) `bytea` trong PostgreSQL · (b) ghi file vào đĩa của web server · (c) object storage qua abstraction | (a) phình DB + backup/restore chậm + `bytea` đi qua mọi truy vấn; (b) **không** hoạt động khi chạy **nhiều instance** (ảnh tải lên instance A **không** thấy ở instance B) — mà `implementation-plan.md` §11 mục 3 yêu cầu test **2 instance**; (c) tách được bytes khỏi DB | ⚠️ **Chưa có** gói/hạ tầng nào trong repo (§15.2 **F4**) ⇒ triển khai `FileSystemMediaStorage` cho **dev** và **bắt buộc** thay bằng object storage trước khi chạy nhiều instance. **Không** dùng được `FileSystem` ở production nhiều instance |
+| **ADR-03** | **Slug là thuộc tính của `Product`** (giữ nguyên `Product.Slug` đang có) **+ unique index `(TenantId, Slug) NULLS NOT DISTINCT WHERE "Slug" IS NOT NULL`** | (a) bảng `Slug` riêng cho mọi đối tượng · (b) giữ `Product.Slug` + thêm index · (c) để `WEB-002` tự quản toàn bộ slug | (a) tổng quát hoá sớm khi mới **một** loại đối tượng cần slug (danh mục đã có cột `Slug` riêng theo `CAT-002`) · (c) `WEB-002` **không** sở hữu `Product` ⇒ sẽ thành **hai nguồn sự thật** (đúng thứ `XC-003` **F1** cảnh báo) | ✅ Việc **`WEB-002` §11 giao cho `CAT-003`**; SQL thô (EF Core **không** mô hình hoá `NULLS NOT DISTINCT`) — cùng cách [`20261013024226_Fix_NullableTenantId_UniqueIndexes.cs`](../../src/eCommerce.EntityFrameworkCore/Migrations/20261013024226_Fix_NullableTenantId_UniqueIndexes.cs) |
+| **ADR-04** | Sinh slug **tất định** từ `Name`: bỏ dấu tiếng Việt → chữ thường → `[a-z0-9-]`; trùng thì thêm hậu tố **`-2`, `-3`…** | (a) `slug-{guid}` · (b) nhân viên tự gõ tay · (c) sinh tất định + hậu tố số | (a) URL xấu và `Guid` **không** có giá trị SEO (`WEB-002` **ADR-03** đã loại) · (b) gõ tay ⇒ sai chính tả, trùng, không nhất quán | Hàm sinh **phải** có test cho tiếng Việt có dấu (`đ`, `ư`, `ơ`, `ả`…); hậu tố số **phải** kiểm lại trong **cùng** transaction để không đua |
+| **ADR-05** | Slug **bất biến sau khi đã công khai**, **trừ khi** người dùng đổi **tường minh**; đổi ⇒ **bắt buộc** phát `ProductSlugChangedEto` có **`OldSlug`** | (a) sinh lại slug mỗi khi đổi `Name` · (b) slug bất biến tuyệt đối · (c) chỉ đổi khi người dùng yêu cầu + phát sự kiện | (a) **mọi** lần sửa tên sản phẩm sẽ **phá** URL đã được Google index và link đã chia sẻ ⇒ mất SEO; (b) không đổi được khi tên sai/đổi thương hiệu | Trả lời **Q3 của `WEB-002`**: **CÓ**, ETO mang `OldSlug` ⇒ `WEB-002` giữ được **301**. Không có `OldSlug` ⇒ **chặn** 301 (`WEB-002` **BR-005**) |
+| **ADR-06** | **Ranh giới sở hữu slug:** `CAT-003` sở hữu **`Product.Slug` + sự kiện**; `WEB-002` sở hữu **`WebSlugRoutes` + 301** | (a) một bên làm hết · (b) tách: giá trị hiện tại ở Catalog, lịch sử ở Web | (a) `CAT-003` **không** được tham chiếu project web; `WEB-002` **không** được sửa entity `Product` (bất biến #3) | Hai bảng, **một** nguồn sự thật cho **mỗi** loại dữ liệu: *"slug hiện tại là gì"* → Catalog; *"slug này từng trỏ đi đâu"* → Web |
+| **ADR-07** | Hiển thị theo kênh = entity **`ProductChannelVisibility`** theo cặp `(ProductId, ChannelCode)`; **không** nhân bản sản phẩm theo kênh | (a) mỗi kênh một bản ghi `Product` · (b) cờ `IsVisibleWeb`/`IsVisibleShopee` trên `Product` · (c) bảng quan hệ `(Product, Channel)` | (a) nhân bản dữ liệu ⇒ mọi sửa đổi phải đồng bộ **N** nơi (sai lệch âm thầm); (b) thêm một kênh = **migration** + sửa code — vi phạm mục tiêu *"thêm sàn không sửa `Sales`"* của `implementation-plan.md` §10 | Bảng mới; thêm kênh chỉ là **dữ liệu**, không phải migration |
+| **ADR-08** | **Mặc định = KẾ THỪA (hiển thị)**: **không có** bản ghi ⇒ sản phẩm **hiển thị** trên kênh (nếu `IsPublished`) | (a) phải có bản ghi cho **mọi** cặp (sản phẩm × kênh) · (b) không có bản ghi = hiển thị | (a) với 10.000 sản phẩm × 5 kênh = **50.000** dòng **rỗng** ngay khi tạo sản phẩm; thêm kênh thứ 6 ⇒ phải sinh thêm 10.000 dòng (**bùng nổ dữ liệu**) | 🔒 Bất biến: **"không có bản ghi" KHÔNG được suy diễn thành "ẩn"** (**BR-012**); UI **phải** hiển thị rõ trạng thái *"Kế thừa"* thay vì để trống |
+| **ADR-09** | `ChannelCode` là **chuỗi**, **không** FK cứng, **không** tham chiếu module `ChannelHub` | (a) FK → `ChnChannels.Id` · (b) FK → `Channel.Code` · (c) chuỗi + kiểm qua abstraction đọc | (a)/(b) tạo **phụ thuộc cứng** module→module và khoá chặt vào module khác; tiền lệ trong repo: `ChannelListing.ChannelCode` và `StockLedgerEntry.ChannelCode` đều là **chuỗi** ([`ChannelEntities.cs:123`](../../modules/ChannelHub/eCommerce.ChannelHub.Domain/Entities/ChannelEntities.cs#L123), [`StockLedger.cs:106`](../../src/eCommerce.Domain/Entities/Inventory/StockLedger.cs#L106)) | Cần một abstraction **đọc** (`IChannelDirectory`) do app cài đặt; tính đúng được bảo vệ bằng **kiểm tra tầng ứng dụng** + test (§14 TC-17), **không** bằng FK |
+| **ADR-10** | Hàm sinh khoá phân tán của module **KHÔNG** chứa tiền tố `ecommerce:` (tiền tố do `AbpDistributedLockOptions.KeyPrefix` cấp) | (a) có tiền tố trong hàm sinh khoá · (b) không có | `XC-003` **§5.4 hệ quả 2**: *"Tên khoá do module sinh **KHÔNG** chứa tiền tố — tiền tố là việc của `KeyPrefix`"*, và `KeyPrefix = "ecommerce:"` **đã** đặt ([`eCommerceHttpApiHostModule.cs:127`](../../src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs#L127)). ⚠️ Trong repo **đang có 2 quy ước** (**F8** §15.2) | `CatalogLockKeys` sinh `catalog:…`; khoá thật trong Redis là `ecommerce:catalog:…`. Kế thừa `XIN` chưa chốt của `SHP-002` Q5 |
+| **ADR-11** | Xoá media = **xoá mềm** (`FullAudited`), bytes **giữ lại**; job dọn bytes chỉ chạy khi media **không còn** tham chiếu | (a) xoá cứng cả dòng lẫn bytes ngay · (b) xoá mềm rồi job dọn | (a) URL ảnh **đã** phát ra storefront/sàn/CDN ⇒ xoá bytes ngay ⇒ **ảnh vỡ** ở nơi chưa kịp cập nhật (không sửa được, không có log); (b) có cửa sổ hoàn tác + dọn có kiểm soát | Cần cột `StorageKey` + job dọn + metric đếm bytes mồ côi; **cấm** xoá bytes trong cùng request |
+| **ADR-12** | **Mỗi sản phẩm có TỐI ĐA MỘT media `IsPrimary = true`** — cưỡng chế bằng **unique index có filter** | (a) kiểm ở tầng ứng dụng · (b) unique index `WHERE "IsPrimary"` | (a) 2 request song song (hoặc Redis chết — `XC-003` **D2**) ⇒ **2 ảnh chính** ⇒ storefront/structured data chọn ảnh **không xác định**; đúng loại lỗi im lặng `XC-003` cảnh báo | SQL thô (filter + `NULLS NOT DISTINCT`); đổi ảnh chính = **một** transaction (bỏ cờ cũ + đặt cờ mới) |
+| **ADR-13** | Validate tệp tải lên bằng **magic bytes (chữ ký tệp)**, **không** tin `Content-Type`/đuôi tệp từ client | (a) tin `Content-Type` header · (b) tin đuôi tệp · (c) đọc magic bytes | (a)/(b) đổi tên `shell.exe` → `anh.jpg` là vượt qua; tệp được phục vụ lại từ miền của ta ⇒ **stored XSS / phát tán mã độc** | Cần bảng ánh xạ magic bytes → đuôi cho phép; sai ⇒ **ném** `eCommerce:Catalog:0206`; test `TC-11` |
+
+---
+
+## 1. Use Case Specification
+
+| Thuộc tính | Nội dung |
+|---|---|
+| **Use Case ID** | `CAT-003` |
+| **Use Case Name** | Quản lý media, slug SEO và hiển thị sản phẩm theo từng kênh bán |
+| **Description** | *"Là nhân viên Catalog, tôi muốn tải ảnh lên và viết mô tả ảnh, đặt một đường dẫn SEO ổn định cho sản phẩm, và bật/ẩn sản phẩm theo từng kênh — để storefront hiển thị đúng, máy tìm kiếm lập chỉ mục đúng, và cùng một sản phẩm có thể bán ở kênh này mà không bán ở kênh khác."* |
+| **Actor(s)** | **Nhân viên Catalog** (media, slug) · **Marketing/SEO** (slug, alt text) · **Vận hành kênh** (hiển thị theo kênh) · **Khách/bot tìm kiếm** (đọc — chỉ đọc, thuộc `WEB-002`) · **Hệ thống** (`IMediaStorage`, outbox, job dọn bytes) |
+| **Priority** | **Must have** — `WEB-002` **đang bị chặn** bởi `CAT-003` (index `Slug` + `ProductSlugChangedEto.OldSlug`) |
+| **Trigger** | (a) nhân viên tải ảnh lên / đổi ảnh chính / sửa `alt`; (b) phát hành sản phẩm (sinh slug) hoặc đổi slug tường minh; (c) vận hành bật/ẩn sản phẩm trên một kênh; (d) job định kỳ dọn bytes mồ côi; (e) `ChannelHub` báo một kênh **ngừng hoạt động** *(sự kiện này **chưa có** — §15.2 **F10**)* |
+| **Pre-Condition(s)** | • **`TenantId`** hiện tại (`ICurrentTenant`) — hệ thống đang chạy **1 tenant** ⇒ `TenantId` **có thể là `NULL`** (`XC-004` §5.2 **F1**).<br>• **Mọi unique index có `TenantId` PHẢI** dùng `NULLS NOT DISTINCT` (`XC-004` **BR-009**) — nếu không, index **mất tác dụng** khi `TenantId IS NULL` (đã chứng minh bằng PostgreSQL thật, [`20261013024226…cs:14-17`](../../src/eCommerce.EntityFrameworkCore/Migrations/20261013024226_Fix_NullableTenantId_UniqueIndexes.cs#L14)).<br>• **Sản phẩm đã tồn tại** trong tenant (`Catalog.Product`, [`Product.cs:10`](../../src/eCommerce.Domain/Entities/Catalog/Product.cs#L10)) — nếu chưa có thì thuộc `CAT-001`.<br>• Permission đã được **định nghĩa** cho **mọi** chuỗi dùng trong `[Authorize]` (`XC-004` **D2/E3**: permission chưa định nghĩa ⇒ **`403` cho MỌI người**).<br>• `ChannelCode` **chỉ** có mặt ở nhóm use case *hiển thị theo kênh*; media và slug là **dùng chung mọi kênh** (`ChannelCode` **không** tham gia). |
+| **Post-Condition(s)** | • Sản phẩm đã công khai **luôn** có `Slug` **không rỗng**, khớp `^[a-z0-9]+(?:-[a-z0-9]+)*$`, **duy nhất trong tenant**.<br>• Slug **cũ** (nếu từng công khai) **đã** được thông báo cho `WEB-002` bằng ETO có **`OldSlug`** — trong **cùng** transaction với lần ghi `Slug`.<br>• Mỗi sản phẩm có **tối đa một** media `IsPrimary = true` (cưỡng chế ở DB, **ADR-12**).<br>• Mọi media của sản phẩm **đã** publish có `AltText` **không rỗng**.<br>• Không có bản ghi `ProductChannelVisibility` nào trỏ tới `ChannelCode` **không tồn tại / đã ngừng** (**BR-011**).<br>• **Ẩn** sản phẩm khỏi kênh A **không** ảnh hưởng kênh B và **không** xoá dữ liệu (**BR-014**). |
+| **Basic Flow** | 1. Nhân viên gọi `UploadMediaAsync` (permission `Products.ManageMedia`) — hệ thống kiểm `[Authorize]` **cấp class** trước.<br>2. Hệ thống kiểm **magic bytes** + kích thước + số media hiện có (ADR-13, **BR-019**, NFR-004); sai ⇒ **ném** `eCommerce:Catalog:0206`.<br>3. Hệ thống ghi bytes qua `IMediaStorage` ⇒ nhận `StorageKey`, rồi tạo `ProductMedia` (`SortOrder` = max + 1) **trong** Unit of Work.<br>4. Nếu đây là media **đầu tiên** ⇒ tự đặt `IsPrimary = true`; nếu nhân viên yêu cầu làm ảnh chính ⇒ bỏ cờ cũ + đặt cờ mới trong **một** transaction (**ADR-12**).<br>5. Nhân viên gọi `PublishProductAsync` ⇒ hệ thống kiểm **guard**: có `Slug` hợp lệ **và** có ≥ 1 media `IsPrimary` **và** mọi media có `AltText` ⇒ `IsPublished = true` (**BR-009**).<br>6. Hệ thống phát `ProductSlugChangedEto` (**có `OldSlug`**) + `ProductMediaChangedEto` vào **outbox** cùng transaction (`XC-002` **BR-001**).<br>7. Vận hành gọi `SetChannelVisibilityAsync(productId, channelCode, Shown\|Hidden)` ⇒ kiểm `ChannelCode` tồn tại & `IsActive` (qua `IChannelDirectory`) ⇒ ghi bản ghi + outbox. |
+| **Alternative Flow** | **A1: Slug đã tồn tại trong tenant** — hệ thống thêm hậu tố số (`-2`, `-3`…) **trong cùng transaction**; **không** báo lỗi cho người dùng khi đây là **sinh tự động**; **báo lỗi** `eCommerce:Catalog:0201` khi người dùng **tự gõ** slug trùng.<br>**A2: Không có bản ghi hiển thị** — sản phẩm **hiển thị** (kế thừa, **ADR-08/BR-012**); UI hiển thị nhãn *"Kế thừa"*.<br>**A3: Gỡ media** — xoá **mềm**; bytes giữ lại; job `media-cleanup` dọn sau (**ADR-11**).<br>**A4: Kênh ngừng hoạt động** — mọi bản ghi `ProductChannelVisibility` của kênh đó **không** tự xoá; job đối chiếu (hoặc `ChannelDeactivatedEto` khi có) chuyển trạng thái và **ghi log** — **chưa có** cơ chế này (**F10**).<br>**A5: Job dọn bytes mồ côi** — chạy định kỳ, `SkipIfBusy` (khoá `catalog:media-cleanup:{tenantId}`), log + metric (`XC-003` **D10**). |
+| **Exception Flow** | **E1:** `Publish` khi thiếu `Slug` **hoặc** thiếu media `IsPrimary` ⇒ `BusinessException` **`eCommerce:Catalog:0201`** (`409`).<br>**E2:** `Slug` sai định dạng (`"Áo thun!!"`, có dấu, có khoảng trắng, > 512 ký tự, rỗng sau chuẩn hoá) ⇒ **`eCommerce:Catalog:0202`** (`400`).<br>**E3:** `Publish` khi còn media **thiếu `AltText`** ⇒ **`eCommerce:Catalog:0203`** (`400`) kèm **danh sách** `MediaId` thiếu.<br>**E4:** `SortOrder` trùng trong cùng sản phẩm **hoặc** vượt trần số media ⇒ **`eCommerce:Catalog:0204`** (`409`).<br>**E5:** chuyển trạng thái hiển thị **sai** (xem §3) ⇒ **`eCommerce:Catalog:0205`** (`409`) — **tuyệt đối không im lặng** (quy ước bất di bất dịch #11).<br>**E6:** tệp tải lên sai định dạng/kích thước ⇒ **`eCommerce:Catalog:0206`** (`400`).<br>**E7:** `ChannelCode` không tồn tại hoặc `IsActive = false` ⇒ **`eCommerce:Catalog:0207`** (`409`).<br>**E8:** ẩn/gỡ media khi kênh **vẫn còn** `ChannelListing` ở trạng thái `Synced` ⇒ **`eCommerce:Catalog:0209`** (`409`) kèm danh sách kênh.<br>**E9:** không giành được khoá phân tán ⇒ theo `XC-003` **D10**: mặc định **ném** `eCommerce:Lock:0001` (`409`). |
+| **Business Rules** | • **BR-CAT-003-001**: Mọi `ProductMedia` **phải** thuộc **đúng một** `Product` **và** **cùng tenant** với sản phẩm đó; **cấm** media mồ côi hoặc khác tenant.<br>• **BR-CAT-003-002**: Mỗi sản phẩm có **tối đa một** media `IsPrimary = true`; cưỡng chế bằng **unique index có filter**, **cấm** chỉ kiểm ở tầng ứng dụng.<br>• **BR-CAT-003-003**: `Url`/`StorageKey` của media **phải** do `IMediaStorage` cấp (đường dẫn nội bộ) **hoặc** URL `https` trong allowlist; **cấm** `javascript:`, `data:`, `file:`, và **cấm** URL `http` không mã hoá.<br>• **BR-CAT-003-004**: **Mọi** media của sản phẩm **đã** `IsPublished` **phải** có `AltText` **không rỗng** (khớp `WEB-002` NFR-012); vi phạm ⇒ **`0203`** khi đổi sang publish.<br>• **BR-CAT-003-005**: `SortOrder` **phải duy nhất trong một sản phẩm** (không trùng) ⇒ tránh thứ tự hiển thị **không xác định**; vi phạm ⇒ **`0204`**.<br>• **BR-CAT-003-006**: `Slug` **phải** khớp `^[a-z0-9]+(?:-[a-z0-9]+)*$`, dài **3–512** ký tự (trần 512 khớp cột đang có — [`eCommerceDbContext.cs:106`](../../src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs#L106)); vi phạm ⇒ **`0202`**.<br>• **BR-CAT-003-007**: `Slug` **duy nhất theo tenant** khi `Slug IS NOT NULL` ⇒ unique index **`NULLS NOT DISTINCT`** + filter `"Slug" IS NOT NULL`; **cấm** chỉ kiểm ở tầng ứng dụng (**ADR-03**).<br>• **BR-CAT-003-008**: Slug **sinh tất định** từ `Name` (**ADR-04**); **cấm** hard-code slug; trùng ⇒ thêm hậu tố số **trong cùng transaction**.<br>• **BR-CAT-003-009**: Slug **bất biến sau khi công khai**; chỉ đổi khi người dùng yêu cầu **tường minh**, và đổi ⇒ **bắt buộc** phát `ProductSlugChangedEto` **có `OldSlug`** (trả lời `WEB-002` **Q3**).<br>• **BR-CAT-003-010**: `Publish` sản phẩm **bắt buộc** có `Slug` không rỗng **và** ≥ 1 media `IsPrimary = true`; **cấm** publish im lặng khi thiếu.<br>• **BR-CAT-003-011**: `ProductChannelVisibility` **chỉ** được ghi khi `ChannelCode` **tồn tại và `IsActive`** (kiểm qua `IChannelDirectory` — **ADR-09**); vi phạm ⇒ **`0207`**.<br>• **BR-CAT-003-012**: 🔒 **Không có bản ghi `ProductChannelVisibility` ⇒ sản phẩm HIỂN THỊ** (kế thừa, **ADR-08**); **cấm** suy diễn *"không có bản ghi = ẩn"* — đây là bất biến dễ vi phạm nhất khi viết truy vấn.<br>• **BR-CAT-003-013**: Chuyển trạng thái hiển thị **không có trong bảng §3** ⇒ **NÉM** `eCommerce:Catalog:0205`; **cấm** guard im lặng.<br>• **BR-CAT-003-014**: Ẩn sản phẩm khỏi kênh A **không** ảnh hưởng kênh B, **không** xoá dữ liệu, **không** đổi `IsPublished`; cách ly theo `(ProductId, ChannelCode)`.<br>• **BR-CAT-003-015**: Xoá media = **xoá mềm**; bytes **chỉ** được dọn bằng job khi media **không còn** tham chiếu (**ADR-11**); **cấm** xoá bytes trong cùng request.<br>• **BR-CAT-003-016**: Mọi thao tác ghi media/slug/visibility **phải** đi qua **Unit of Work**; outbox ghi **cùng** transaction (`XC-002` **D1**); **cấm** ghi ngoài UoW.<br>• **BR-CAT-003-017**: Tên khoá phân tán **chỉ** được sinh từ hàm trong `CatalogLockKeys`; **cấm** viết literal khoá trong code nghiệp vụ; hàm sinh khoá **KHÔNG** chứa tiền tố `ecommerce:` (**ADR-10**).<br>• **BR-CAT-003-018**: **Mọi** unique index có `TenantId` **phải** `NULLS NOT DISTINCT`; nếu một migration **do EF sinh** tạo lại index ⇒ **phải** chạy lại SQL thô (cảnh báo đã có ở [`20261013024226…cs:23-25`](../../src/eCommerce.EntityFrameworkCore/Migrations/20261013024226_Fix_NullableTenantId_UniqueIndexes.cs#L23)).<br>• **BR-CAT-003-019**: Tệp tải lên **phải** được kiểm bằng **magic bytes**; **cấm** tin `Content-Type`/đuôi tệp từ client (**ADR-13**); sai ⇒ **`0206`**.<br>• **BR-CAT-003-020**: **Cấm** để DTO công khai lộ `StorageKey` nội bộ, `InternalSku`, giá vốn, hay số tồn kho chính xác; DTO công khai **chỉ** trả URL đã ký/đã chuẩn hoá + `AltText` + thứ tự + kích thước.<br>• **BR-CAT-003-021**: Mọi tiền trong DTO của feature này (nếu có) **phải** đi qua `Money`/`Currency` (`XC-001` **BR-002/003**); **cấm** `double`/`float` và **cấm** so tiền bằng `==`.<br>• **BR-CAT-003-022**: Mọi app service của feature **phải** có `[Authorize]` ở **cấp class** với hằng số `eCommerceConsts.Permissions.*`; **cấm** magic string (`XC-004` **BR-001/BR-003**). |
+| **Non-Functional Requirement** | • **NFR-CAT-003-001**: Sinh slug thuần CPU ⇒ p95 **< 5 ms** cho 1.000 lần (máy dev).<br>• **NFR-CAT-003-002**: Tra sản phẩm theo `(TenantId, Slug)` ⇒ p95 **< 20 ms** với **10.000** sản phẩm/tenant.<br>• **NFR-CAT-003-003**: Tải media ⇒ trần **10 MB**/tệp; p95 thời gian ghi storage **< 2 s** cho tệp 5 MB.<br>• **NFR-CAT-003-004**: Trần **50** media/sản phẩm; vượt ⇒ **`0204`** (không được ghi dòng nào).<br>• **NFR-CAT-003-005**: **0** vi phạm bất biến "một ảnh chính" trên **1.000** vòng chèn/đổi ảnh chính **đồng thời**.<br>• **NFR-CAT-003-006**: **100 %** media của sản phẩm đã publish có `AltText` không rỗng (test quét).<br>• **NFR-CAT-003-007**: **0** slug trùng trong tenant, **kể cả khi `TenantId IS NULL`** (test chèn trùng — **cần PostgreSQL**).<br>• **NFR-CAT-003-008**: `Publish` ⇒ `WEB-002` nhận được ETO trong **p95 ≤ 2 s** (khớp NFR-XC-002-001).<br>• **NFR-CAT-003-009**: **0** bản ghi `ProductChannelVisibility` trỏ tới `ChannelCode` không tồn tại (test quét định kỳ).<br>• **NFR-CAT-003-010**: Cách ly tenant: tenant A **không** đọc/ghi được media/visibility của tenant B (integration 2 tenant — **cần PostgreSQL**).<br>• **NFR-CAT-003-011**: **0** `double`/`float` trong mọi DTO/entity của feature (test reflection — kế thừa `XC-001` NFR-004).<br>• **NFR-CAT-003-012**: Tỉ lệ tải media **thất bại** do lỗi lưu trữ **< 0,1 %** trên môi trường bình thường; vượt ⇒ cảnh báo. |
+
+---
+
+## 2. Sơ đồ Use Case
+
+```mermaid
+flowchart LR
+    classDef actor fill:#d4edda,stroke:#155724,stroke-width:2px;
+    classDef usecase fill:#e2f4f6,stroke:#17a2b8,stroke-width:2px;
+    classDef note fill:#fffbe6,stroke:#ffc107,stroke-width:1px,color:#5c4a00;
+
+    NV(("👤<br/>Nhân viên<br/>Catalog"))
+    MKT(("👤<br/>Marketing<br/>SEO"))
+    OPS(("👤<br/>Vận hành<br/>kênh"))
+    KH(("👤<br/>Khách và<br/>bot tìm kiếm"))
+
+    subgraph CAT["📦 CAT-003 — Media, SEO slug, hiển thị theo kênh"]
+        direction TB
+        UC1(["«tải ảnh lên và gắn vào sản phẩm»"])
+        UC2(["«đặt ảnh chính và thứ tự hiển thị»"])
+        UC3(["«viết mô tả ảnh (alt text)»"])
+        UC4(["«sinh slug SEO từ tên sản phẩm»"])
+        UC5(["«đổi slug và phát sự kiện kèm slug cũ»"])
+        UC6(["«bật hoặc ẩn sản phẩm theo từng kênh»"])
+        UC7(["«tra sản phẩm theo slug»"])
+        class UC1,UC2,UC3,UC4,UC5,UC6,UC7 usecase;
+    end
+
+    N1["<b>Hai nguyên tắc dễ vi phạm nhất:</b><br/>«slug duy nhất theo tenant»<br/>«không có bản ghi NGHĨA LÀ hiển thị»"]
+    class N1 note;
+
+    NV --- UC1
+    NV --- UC2
+    MKT --- UC3
+    MKT --- UC4
+    MKT --- UC5
+    OPS --- UC6
+    KH --- UC7
+    UC1 -. "«include»" .-> UC2
+    UC4 -. "«include»" .-> UC5
+    UC5 -. "«extend»" .-> UC7
+    UC6 -.- N1
+    UC4 -.- N1
+```
+
+> 📌 **Actor "Khách và bot tìm kiếm" chỉ ĐỌC** — việc render trang, `301`, `canonical`, JSON-LD và `sitemap.xml`
+> **thuộc `WEB-002`**. `CAT-003` chỉ **cấp dữ liệu** (slug + media + trạng thái hiển thị) và **phát sự kiện**.
+
+---
+
+## 3. Vòng đời hiển thị theo kênh (state machine)
+
+> **Vì sao đây là state machine của feature này:** `ProductChannelVisibility` là nơi **duy nhất** trong `CAT-003`
+> có **vòng đời** với các chuyển dịch **phải bị chặn**. Slug và media là **thuộc tính** (không có trạng thái riêng);
+> vòng đời *route slug công khai* đã thuộc `WEB-002` §3 (xem **ADR-06** để tránh trùng lặp hai state machine).
+
+```mermaid
+stateDiagram-v2
+    [*] --> KeThua : «chưa có bản ghi cho cặp sản phẩm và kênh»
+    KeThua --> HienThi : «tạo bản ghi tường minh và kênh đang hoạt động»
+    KeThua --> An : «tạo bản ghi ẩn và kênh đang hoạt động»
+    KeThua --> Loi : «kênh không tồn tại hoặc đã ngừng hoạt động»
+    HienThi --> An : «có lý do ẩn»
+    An --> HienThi : «sản phẩm đã publish»
+    HienThi --> NgungBan : «đã gỡ hết listing ở trạng thái đã đồng bộ»
+    An --> NgungBan : «đã gỡ hết listing ở trạng thái đã đồng bộ»
+    HienThi --> Loi : «chuyển dịch không có trong bảng»
+    An --> Loi : «sản phẩm chưa publish»
+    NgungBan --> Loi : «trạng thái hấp thụ — mọi chuyển dịch đều bị chặn»
+    Loi --> [*]
+    NgungBan --> [*]
+```
+
+**Bảng chuyển trạng thái & guard (mọi chuyển sai **phải ném lỗi**, không im lặng):**
+
+| Từ | Sang | Guard | Nếu vi phạm |
+|---|---|---|---|
+| `[*]` | `KeThua` | Không có bản ghi cho `(ProductId, ChannelCode)` — **mặc định** khi tạo sản phẩm | Không bao giờ lỗi (**ADR-08/BR-012**) |
+| `KeThua` | `HienThi` | `ChannelCode` tồn tại **và** `IsActive = true` (qua `IChannelDirectory`) | **NÉM** `eCommerce:Catalog:0207` |
+| `KeThua` | `An` | Như trên **và** có `Reason` không rỗng | **NÉM** `0207` (kênh sai) hoặc `0205` (thiếu lý do) |
+| `HienThi` | `An` | Có `Reason` không rỗng + audit | **NÉM** `0205` nếu thiếu lý do |
+| `An` | `HienThi` | `Product.IsPublished = true` | **NÉM** `0205` — **cấm** hiện sản phẩm chưa publish |
+| `HienThi`/`An` | `NgungBan` | **Không còn** `ChannelListing` ở `Status = Synced` (giá trị `2`, [`ChannelEntities.cs:166`](../../modules/ChannelHub/eCommerce.ChannelHub.Domain/Entities/ChannelEntities.cs#L166)) cho `(ProductId, ChannelCode)` | **NÉM** `0209` kèm **danh sách** listing còn lại |
+| `NgungBan` | *bất kỳ* | 🚫 **KHÔNG** có guard nào cho phép | **NÉM** `0205` — **trạng thái hấp thụ**; muốn hiển thị lại ⇒ tạo **bản ghi mới** |
+| `KeThua`/`HienThi`/`An` | `Loi` | Guard không thoả (bảng trên) | **NÉM** `0205`/`0207`/`0209` — **không** đổi dữ liệu |
+| *mọi cặp khác* | — | Không có trong bảng ⇒ **luôn ném lỗi** | `eCommerce:Catalog:0205` |
+
+> ⚠️ **Ghi rõ điều dễ hiểu sai:** `KeThua` **không phải** một trạng thái "trung gian chờ xử lý" — nó **là** trạng thái
+> **cuối cùng hợp lệ** cho đa số cặp `(sản phẩm, kênh)`. Thiết kế **cố ý** không tạo bản ghi cho mọi cặp
+> (10.000 sản phẩm × 5 kênh = 50.000 dòng rỗng — **ADR-08**). Vì vậy truy vấn hiển thị **bắt buộc** dùng
+> `LEFT JOIN` + `COALESCE(trạng thái, 'HienThi')`, **cấm** dùng `INNER JOIN` (sẽ **làm mất** sản phẩm khỏi kênh).
+
+---
+
+## 4. Sequence Diagram & luồng dữ liệu
+
+### 4.1 Phát hành sản phẩm — cấp slug, ghi media, phát sự kiện
+
+```mermaid
+sequenceDiagram
+    participant ADM as Quản trị viên
+    participant APP as Catalog AppService
+    participant SLUG as SlugService
+    participant ST as IMediaStorage
+    participant DB as PostgreSQL
+    participant OUT as AbpEventOutbox
+    participant WEB as WEB-002 projection
+
+    ADM->>APP: PublishProductAsync(productId, slugMoi tuy chon)
+    APP->>SLUG: ChuanHoaVaKiemTra(slug)
+    SLUG-->>APP: slug hop le hoac NEM 0202
+    APP->>DB: Kiem tra guard publish (slug, media chinh, alt text)
+    DB-->>APP: du dieu kien hoac NEM 0201 va 0203
+    APP->>DB: UPDATE CatProducts SET Slug, IsPublished
+    Note over DB: unique index NULLS NOT DISTINCT la hang rao cuoi
+    DB-->>APP: OK hoac unique violation
+    Note over APP: unique violation thi DB chan va app boc thanh 0201
+    APP->>OUT: ProductSlugChangedEto kem EventId va OldSlug
+    APP->>OUT: ProductMediaChangedEto kem EventId
+    APP->>DB: Commit UoW cung mot transaction voi outbox
+    OUT-->>WEB: phat ETO sau khi commit
+    WEB->>WEB: cap nhat WebSlugRoutes va WebSeoProducts
+    WEB-->>ADM: storefront tra 301 cho slug cu
+    APP->>ST: ghi bytes media (truoc khi commit metadata)
+    ST-->>APP: StorageKey
+```
+
+> ⚠️ **Thứ tự ghi bytes và commit DB là một quyết định có rủi ro** — xem **§12** nhánh
+> *"commit DB thất bại sau khi đã ghi bytes"*: hệ quả là **bytes mồ côi** (không phải mất dữ liệu).
+> Chọn hướng này **cố ý** vì hướng ngược lại (commit DB trước, ghi bytes sau) sẽ tạo **bản ghi trỏ tới ảnh
+> không tồn tại** — storefront hiển thị **ảnh vỡ**, tệ hơn nhiều so với vài MB rác dọn được bằng job.
+
+### 4.2 Luồng dữ liệu — ba nguồn vào, một nguồn sự thật mỗi loại
+
+| Luồng | Nguồn | Đích | Cơ chế | Ghi chú |
+|---|---|---|---|---|
+| Media: bytes | Trình duyệt (nhân viên) | `IMediaStorage` | `multipart/form-data` → kiểm magic bytes (**ADR-13**) | ⚠️ **Chưa có** hạ tầng lưu trữ (**F4**) |
+| Media: metadata | Trình duyệt | `CatProductMedia` | UoW + `DbSet` (bất biến #5) | Bảng **chưa có** — migration §11 |
+| Slug | Sinh tự động từ `Name` hoặc người dùng gõ | `CatProducts.Slug` | `SlugService` + unique index | Nguồn sự thật **duy nhất** cho *"slug hiện tại"* (**ADR-06**) |
+| Lịch sử slug | `ProductSlugChangedEto` | `WebSlugRoutes` (`WEB-002`) | Outbox → consumer | `CAT-003` **không** ghi bảng này (**ADR-06**) |
+| Hiển thị theo kênh | Vận hành | `CatProductChannelVisibility` | UoW + `IChannelDirectory` (**ADR-09**) | Bảng **chưa có** |
+| Ảnh cho storefront | `ProductMedia` | `WEB-002` (`WebSeoProducts`) | ETO | `WEB-002` ADR-08: chỉ `img` + `width`/`height`/`lazy`/`alt` |
+
+---
+
+## 5. Mô hình dữ liệu
+
+### 5.1 ERD (dạng bảng — chi tiết quan hệ)
+
+> 📌 **ERD Mermaid không vẽ lại ở đây:** sơ đồ ERD của `CatProducts`/`CatProductVariants` **đã có** ở
+> [`cat-001-san-pham-va-bien-the-sku.md:219`](cat-001-san-pham-va-bien-the-sku.md) §5.1. Vẽ lại sẽ tạo **hai**
+> nguồn sự thật cho cùng một mô hình. Ba bảng của `CAT-003` được mô tả bằng bảng dưới đây.
+
+| Quan hệ | Kiểu | Ghi chú |
+|---|---|---|
+| `CatProducts` 1—n `CatProductMedia` | FK cứng | `OnDelete` = **`Restrict`** — **cấm** `Cascade` (kế thừa lập luận `CAT-001` **D4/F7**) |
+| `CatProductMedia` n—1 `CatProductVariants` *(tuỳ chọn)* | FK cứng, **nullable** | `VariantId = NULL` ⇒ ảnh của **sản phẩm**; có giá trị ⇒ ảnh **riêng của biến thể** |
+| `CatProducts` 1—n `CatProductChannelVisibility` | FK cứng | `OnDelete` = **`Restrict`** |
+| `CatProductChannelVisibility` n—1 `Channel.Code` | ❌ **KHÔNG FK** | **ADR-09** — chỉ ràng buộc logic; tiền lệ: `ChannelListing.ChannelCode` ([`ChannelEntities.cs:123`](../../modules/ChannelHub/eCommerce.ChannelHub.Domain/Entities/ChannelEntities.cs#L123)) |
+| `CatProducts.Slug` → `WebSlugRoutes.Slug` | ❌ **KHÔNG FK** | Qua **ETO** (**ADR-06**); `WEB-002` sở hữu bảng đích |
+| `CatProductMedia.StorageKey` → bytes | ❌ **KHÔNG FK** | Bytes **không** nằm trong DB (**ADR-02**) |
+
+### 5.2 Bảng **MỚI** `CatProductMedia` — ⚠️ **chưa có trong code — kế hoạch GĐ1**
+
+| Cột | Kiểu | Null? | Ý nghĩa | Ghi chú |
+|---|---|---|---|---|
+| `Id` | `uuid` | ✗ | khoá chính | `FullAuditedAggregateRoot<Guid>`? → dùng `FullAuditedEntity<Guid>` vì thuộc aggregate `Product` |
+| `TenantId` | `uuid` | ✓ | tenant | `IMultiTenant`; `null` khi chạy 1 tenant |
+| `ProductId` | `uuid` | ✗ | FK → `CatProducts.Id` | **`Restrict`** |
+| `VariantId` | `uuid` | ✓ | FK → `CatProductVariants.Id` | `null` = ảnh chung của sản phẩm |
+| `Kind` | `int` | ✗ | `Image = 0` · `Video = 1` | 🚫 **Cấm** thêm loại mới mà không cập nhật bảng magic bytes (**ADR-13**) |
+| `StorageKey` | `varchar(512)` | ✗ | khoá nội bộ trong storage | 🔒 **NỘI BỘ** — **cấm** trả ra DTO công khai (**BR-020**) |
+| `Url` | `varchar(1024)` | ✗ | URL phục vụ (chuẩn hoá) | **BR-003**: chỉ `https` hoặc đường dẫn nội bộ |
+| `AltText` | `varchar(512)` | ✓ trên cột, **✗ khi publish** | mô tả ảnh | **BR-004**; `WEB-002` NFR-012 |
+| `WidthPx` / `HeightPx` | `integer` | ✓ | kích thước thật | Bắt buộc để tránh **CLS** (`WEB-002` ADR-08) |
+| `SizeBytes` | `bigint` | ✗ | dung lượng tệp | Phục vụ báo cáo + job dọn |
+| `ContentType` | `varchar(128)` | ✗ | MIME **đã xác minh từ magic bytes** | ⚠️ Không phải giá trị client gửi lên (**ADR-13**) |
+| `Sha256` | `char(64)` | ✗ | băm nội dung | Chống trùng tệp + kiểm toàn vẹn |
+| `SortOrder` | `integer` | ✗ | thứ tự hiển thị | **BR-005**: duy nhất trong một sản phẩm |
+| `IsPrimary` | `boolean` | ✗ | ảnh chính | **BR-002** — unique index **có filter** |
+| `ExtraProperties` / `ConcurrencyStamp` | `text` / `varchar(40)` | ✗ | ABP | |
+| `CreationTime` `CreatorId` `LastModificationTime` `LastModifierId` | `timestamptz`/`uuid` | ✗/✓ | audit | |
+| `IsDeleted` `DeleterId` `DeletionTime` | `boolean`/`uuid`/`timestamptz` | ✗/✓/✓ | **xoá mềm** | Bắt buộc cho **ADR-11** |
+
+**Index & ràng buộc `CatProductMedia`**
+
+| Loại | Cột / điều kiện | Mục đích |
+|---|---|---|
+| UNIQUE **`NULLS NOT DISTINCT`** | `(TenantId, ProductId, IsPrimary)` `WHERE "IsPrimary"` | **hàng rào thật** cho **BR-002** (một ảnh chính) |
+| UNIQUE **`NULLS NOT DISTINCT`** | `(TenantId, ProductId, SortOrder)` | **BR-005** — thứ tự duy nhất |
+| UNIQUE | `(TenantId, Sha256)` | **chống trùng tệp** (tải lại cùng ảnh ⇒ không tốn storage) — ⚠️ cần **chốt**: nếu muốn cho phép cùng ảnh ở 2 sản phẩm thì index phải là `(TenantId, ProductId, Sha256)`; **Q2** §15.1 |
+| INDEX | `(TenantId, ProductId, IsDeleted, SortOrder)` | truy vấn gallery của một sản phẩm |
+| INDEX | `(IsDeleted, DeletionTime)` | job dọn bytes mồ côi (**ADR-11**) |
+| CHECK | `("Kind" <> 1) OR ("WidthPx" IS NOT NULL AND "HeightPx" IS NOT NULL)` | video **phải** có kích thước để render đúng |
+
+### 5.3 Bảng **MỚI** `CatProductChannelVisibility` — ⚠️ **chưa có trong code — kế hoạch GĐ1**
+
+| Cột | Kiểu | Null? | Ý nghĩa | Ghi chú |
+|---|---|---|---|---|
+| `Id` | `uuid` | ✗ | khoá chính | `FullAuditedAggregateRoot<Guid>` |
+| `TenantId` | `uuid` | ✓ | tenant | `IMultiTenant` |
+| `ProductId` | `uuid` | ✗ | FK → `CatProducts.Id` | **`Restrict`** |
+| `ChannelCode` | `varchar(32)` | ✗ | mã kênh (`web`, `shopee`, `lazada`…) | Trần 32 khớp `OrdOrders.ChannelCode` ([`eCommerceDbContext.cs:168`](../../src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs#L168)); **BR-011** |
+| `Status` | `int` | ✗ | `HienThi = 1` · `An = 2` · `NgungBan = 3` | ⚠️ **KHÔNG** có giá trị `0` cho "kế thừa" — kế thừa = **không có dòng** (**ADR-08**) |
+| `Reason` | `varchar(512)` | ✓ | lý do ẩn/ngừng bán | **Bắt buộc** khi `Status = An` (§3) |
+| `HiddenAtUtc` | `timestamptz` | ✓ | thời điểm ẩn | Phục vụ audit + báo cáo |
+| `ExtraProperties` / `ConcurrencyStamp` | `text` / `varchar(40)` | ✗ | ABP | |
+| audit + xoá mềm | | | | `FullAuditedAggregateRoot` |
+
+**Index & ràng buộc `CatProductChannelVisibility`**
+
+| Loại | Cột / điều kiện | Mục đích |
+|---|---|---|
+| UNIQUE **`NULLS NOT DISTINCT`** | `(TenantId, ProductId, ChannelCode)` | **hàng rào thật** — một cặp chỉ có **một** trạng thái |
+| INDEX | `(TenantId, ChannelCode, Status)` | *"kênh này đang bán những gì"* (vận hành) |
+| CHECK | `("Status" <> 2) OR ("Reason" IS NOT NULL AND length("Reason") > 0)` | **BR**: ẩn **phải** có lý do (§3) |
+| CHECK | `"Status" IN (1, 2, 3)` | Chặn giá trị lạ ⇒ `0` **không** được ghi (**ADR-08**) |
+
+### 5.4 Bảng **ĐANG CÓ** `CatProducts` — phần `CAT-003` **bổ sung**
+
+Trạng thái thật: `Slug` là `varchar(512)` **nullable** ([`20261009070214_Initial.cs:22`](../../src/eCommerce.EntityFrameworkCore/Migrations/20261009070214_Initial.cs#L22)),
+EF chỉ cấu hình `HasMaxLength(512)` ([`eCommerceDbContext.cs:106`](../../src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs#L106)) — **không** unique, **không** index.
+
+| Thay đổi | Nội dung | Vì sao |
+|---|---|---|
+| INDEX **mới (SQL thô)** | `CREATE UNIQUE INDEX "IX_CatProducts_TenantId_Slug" ON "CatProducts" ("TenantId", "Slug") NULLS NOT DISTINCT WHERE "Slug" IS NOT NULL` | **BR-007** + đúng yêu cầu `WEB-002` §11 (dòng 581) |
+| Cột mới *(khuyến nghị)* | `SlugLockedAtUtc` `timestamptz` ✓ | Đánh dấu slug **đã từng công khai** ⇒ biết khi nào **phải** phát `ProductSlugChangedEto` (**BR-009**) |
+| Cột mới *(khuyến nghị)* | `SeoTitle` `varchar(70)` ✓ · `SeoDescription` `varchar(160)` ✓ | `WEB-002` §5.2.2 đã có 2 cột này ở **read-model**; nguồn sự thật **phải** ở Catalog (ngược lại admin sửa mà mất khi projection chạy lại) — ⚠️ xem **Q4** |
+
+> 🚨 **EF Core KHÔNG mô hình hoá `NULLS NOT DISTINCT`** — cảnh báo đã có sẵn trong repo:
+> [`20261013024226_Fix_NullableTenantId_UniqueIndexes.cs:20-25`](../../src/eCommerce.EntityFrameworkCore/Migrations/20261013024226_Fix_NullableTenantId_UniqueIndexes.cs#L20)
+> (*"nếu một migration do EF sinh tự động sau này tạo lại một trong các index dưới đây, thuộc tính sẽ **mất**"*)
+> và [`cat-002…:389`](cat-002-cay-danh-muc-thuoc-tinh-bien-the.md). ⇒ Index này **phải** viết bằng `migrationBuilder.Sql(...)`.
+
+### 5.5 Bố cục lưu trữ media (đề xuất — **chưa có trong code**)
+
+| Mục | Đề xuất | Ghi chú |
+|---|---|---|
+| Khoá đối tượng | `catalog/{tenantId ?? "host"}/{productId}/{sha256[0..2]}/{sha256}.{ext}` | Phân mảnh theo 2 ký tự đầu của băm ⇒ tránh thư mục có quá nhiều tệp |
+| Tên tệp | **băm nội dung** (`Sha256`) | Tên do client đặt **không** bao giờ được dùng làm đường dẫn ⇒ chống **path traversal** |
+| Phục vụ | URL công khai: `/media/catalog/{productId}/{sha256}.{ext}` | ⚠️ Việc phục vụ + cache header thuộc hạ tầng/`WEB-002` |
+| Môi trường | **dev**: `FileSystemMediaStorage` (thư mục ngoài `wwwroot`) · **production nhiều instance**: **object storage** | 🔴 **`FileSystem` KHÔNG dùng được** khi chạy ≥ 2 instance — **ADR-02** |
+
+---
+
+## 6. Hợp đồng API
+
+### 6.1 Application service (đề xuất — **chưa có trong code**)
+
+```csharp
+namespace eCommerce.Catalog;
+
+// 🚨 BẤT BIẾN #7: [Authorize] ở CẤP CLASS, tên quyền lấy từ HẰNG SỐ (XC-004 D3/D4).
+// ⚠️ CÁC HẰNG SỐ DƯỚI ĐÂY CHƯA TỒN TẠI — xem §9 và §15.2 F12.
+[Authorize(eCommerceConsts.Permissions.Products.Default)]
+public class ProductMediaAppService : eCommerceAppService, IProductMediaAppService
+{
+    /// Tải tệp lên + tạo ProductMedia. Idempotent theo IdempotencyKey (XC-002).
+    [Authorize(eCommerceConsts.Permissions.Products.ManageMedia)]
+    public Task<ProductMediaDto> UploadAsync(Guid productId, UploadMediaDto input, string idempotencyKey);
+
+    [Authorize(eCommerceConsts.Permissions.Products.ManageMedia)]
+    public Task<ProductMediaDto> SetPrimaryAsync(Guid productId, Guid mediaId);
+
+    [Authorize(eCommerceConsts.Permissions.Products.ManageMedia)]
+    public Task ReorderAsync(Guid productId, IReadOnlyList<Guid> orderedMediaIds);
+
+    [Authorize(eCommerceConsts.Permissions.Products.ManageMedia)]
+    public Task SetAltTextAsync(Guid mediaId, string altText);
+
+    /// XOÁ MỀM — bytes giữ lại, job dọn sau (ADR-11).
+    [Authorize(eCommerceConsts.Permissions.Products.ManageMedia)]
+    public Task DeleteAsync(Guid mediaId);
+}
+
+[Authorize(eCommerceConsts.Permissions.Products.Default)]
+public class ProductChannelVisibilityAppService : eCommerceAppService, IProductChannelVisibilityAppService
+{
+    [Authorize(eCommerceConsts.Permissions.Products.ManageChannelVisibility)]
+    public Task<ProductChannelVisibilityDto> SetAsync(Guid productId, string channelCode, VisibilityStatus status, string? reason);
+
+    [Authorize(eCommerceConsts.Permissions.Products.ManageChannelVisibility)]
+    public Task ResetToInheritedAsync(Guid productId, string channelCode);
+
+    /// Ma trận (sản phẩm × kênh) cho màn hình vận hành — KẾ THỪA hiển thị rõ, không để trống (ADR-08).
+    [Authorize(eCommerceConsts.Permissions.Products.View)]
+    public Task<ProductChannelMatrixDto> GetMatrixAsync(Guid productId);
+}
+
+public interface IMediaStorage
+{
+    Task<StoredMedia> PutAsync(Stream content, string sha256, string extension, CancellationToken ct);
+    Task<Stream> OpenReadAsync(string storageKey, CancellationToken ct);
+    Task DeleteAsync(string storageKey, CancellationToken ct);
+
+    /// ⚠️ CHỈ dùng cho integration test/DI — abstraction này phải cài được bằng FileSystem (dev) hoặc object storage.
+}
+
+/// Kiểm tra kênh — ADR-09: Catalog KHÔNG tham chiếu module ChannelHub.
+public interface IChannelDirectory
+{
+    Task<ChannelInfo?> FindAsync(string channelCode, CancellationToken ct);
+}
+```
+
+**Ràng buộc hợp đồng:**
+
+| # | Ràng buộc | Lý do |
+|---|---|---|
+| 1 | `UploadAsync` **bắt buộc** có `idempotencyKey` | Tải lại do timeout/retry **không** được tạo 2 media (**XC-002**) |
+| 2 | `ReorderAsync` nhận **toàn bộ** danh sách `orderedMediaIds` (không nhận "đổi chỗ 2 phần tử") | Tránh trạng thái `SortOrder` trùng khi 2 request xen kẽ (**BR-005**) |
+| 3 | `SetAsync` trả về **trạng thái sau** khi chuyển (kể cả khi là `KeThua`) | UI **phải** phân biệt *"kế thừa"* với *"hiển thị"* (**ADR-08**) |
+| 4 | Mọi DTO **không** chứa `StorageKey` | **BR-020** |
+| 5 | Mọi danh sách trả về **không** trả `double`/`float` | **BR-021**, NFR-011 |
+
+### 6.2 REST endpoint (ABP auto API controller sinh)
+
+| Method | Đường dẫn | Permission | Idempotent? | Ghi chú |
+|---|---|---|---|---|
+| `POST` | `/api/app/catalog/product-media/{productId}/upload` | `Products.ManageMedia` | ✅ theo `IdempotencyKey` | `multipart/form-data`; **BR-019** |
+| `POST` | `/api/app/catalog/product-media/{productId}/{mediaId}/primary` | `Products.ManageMedia` | ✅ tự nhiên | Bỏ cờ cũ + đặt cờ mới (**ADR-12**) |
+| `PUT` | `/api/app/catalog/product-media/{productId}/order` | `Products.ManageMedia` | ✅ tự nhiên | Nhận **toàn bộ** thứ tự |
+| `PUT` | `/api/app/catalog/product-media/{mediaId}/alt-text` | `Products.ManageMedia` | ✅ tự nhiên | |
+| `DELETE` | `/api/app/catalog/product-media/{mediaId}` | `Products.ManageMedia` | ✅ tự nhiên | **Xoá mềm** (**ADR-11**) |
+| `PUT` | `/api/app/catalog/product-channel-visibility/{productId}` | `Products.ManageChannelVisibility` | ✅ tự nhiên | Body: `{ channelCode, status, reason }` |
+| `DELETE` | `/api/app/catalog/product-channel-visibility/{productId}/{channelCode}` | `Products.ManageChannelVisibility` | ✅ tự nhiên | ⇒ quay về **kế thừa** |
+| `GET` | `/api/app/catalog/product-channel-visibility/{productId}/matrix` | `Products.View` | — | Chỉ đọc |
+| `PUT` | `/api/app/catalog/product/{id}/slug` | `Products.ManageSlug` | ✅ tự nhiên | Đổi slug **tường minh** (**BR-009**) |
+
+### 6.3 Mã lỗi nghiệp vụ — 🚨 **DẢI RIÊNG `0201`–`0212`** (xem §15.2 **F1**)
+
+| Mã | HTTP | Khi nào | Thông điệp |
+|---|---|---|---|
+| `eCommerce:Catalog:0201` | `409` | `Publish` thiếu `Slug` **hoặc** thiếu media `IsPrimary`; hoặc `Slug` người dùng gõ bị trùng | `Không thể phát hành: sản phẩm cần đường dẫn (slug) và một ảnh chính.` |
+| `eCommerce:Catalog:0202` | `400` | `Slug` sai định dạng / rỗng sau chuẩn hoá / > 512 ký tự | `Đường dẫn chỉ cho phép chữ thường, số và dấu gạch ngang (3–512 ký tự).` |
+| `eCommerce:Catalog:0203` | `400` | `Publish` khi còn media thiếu `AltText` | `Còn {soAnh} ảnh chưa có mô tả (alt) — hãy bổ sung trước khi phát hành.` |
+| `eCommerce:Catalog:0204` | `409` | `SortOrder` trùng trong sản phẩm **hoặc** vượt trần số media | `Thứ tự ảnh bị trùng hoặc vượt giới hạn {max} ảnh cho mỗi sản phẩm.` |
+| `eCommerce:Catalog:0205` | `409` | Chuyển trạng thái hiển thị sai (bảng §3) | `Không thể chuyển trạng thái hiển thị từ {tu} sang {sang}.` |
+| `eCommerce:Catalog:0206` | `400` | Tệp sai định dạng/kích thước (magic bytes không khớp) | `Tệp không hợp lệ hoặc vượt dung lượng cho phép ({maxMb} MB).` |
+| `eCommerce:Catalog:0207` | `409` | `ChannelCode` không tồn tại hoặc `IsActive = false` | `Kênh '{channelCode}' không tồn tại hoặc đã ngừng hoạt động.` |
+| `eCommerce:Catalog:0208` | `409` | Xoá media còn được tham chiếu bởi listing `Synced` *(dự phòng)* | `Ảnh đang được dùng trên kênh {channelCode}, hãy gỡ liên kết trước.` |
+| `eCommerce:Catalog:0209` | `409` | Ẩn/ngừng bán khi còn `ChannelListing` ở `Synced` | `Sản phẩm còn {soListing} liên kết đang đồng bộ trên kênh {channelCode}.` |
+| `eCommerce:Catalog:0210` | `404` | Không tìm thấy media/visibility (hoặc **khác tenant** — trả `404`, **không** `403`) | `Không tìm thấy dữ liệu.` |
+| `eCommerce:Catalog:0211` | `409` | Đặt ảnh chính khi sản phẩm **chưa có** media nào | `Sản phẩm chưa có ảnh nào để đặt làm ảnh chính.` |
+| `eCommerce:Catalog:0212` | `400` | `Name` rỗng/toàn ký tự không sinh được slug | `Không sinh được đường dẫn từ tên sản phẩm — hãy nhập đường dẫn thủ công.` |
+
+> 🚨 **CẢNH BÁO MÃ LỖI (F1 — §15.2):** `CAT-001` và `CAT-002` **đang dùng trùng** dải `eCommerce:Catalog:0001–0007`
+> với **nghĩa khác nhau** (ví dụ `0003` = *"publish không có biến thể"* ở `CAT-001` nhưng = *"vượt trần tổ hợp"*
+> ở `CAT-002` — [`cat-001…:406`](cat-001-san-pham-va-bien-the-sku.md) vs [`cat-002…:458`](cat-002-cay-danh-muc-thuoc-tinh-bien-the.md)).
+> `CAT-003` **cố ý** lấy dải **`0201+`** để **không** làm xung đột nặng thêm, và **đề xuất** gom về **một** file
+> `CatalogErrorCodes.cs` (theo khuôn [`TaxErrorCodes.cs`](../../modules/Tax/eCommerce.Tax.Domain/TaxErrorCodes.cs))
+> với **dải đã cấp phát** — xem **Q1**.
+
+---
+
+## 7. Sự kiện, tích hợp ngoài & idempotency
+
+### 7.1 Sự kiện phát ra (ETO)
+
+| ETO | Khi nào | Ai tiêu thụ | Trường | Idempotency ở consumer |
+|---|---|---|---|---|
+| **`ProductSlugChangedEto`** | Slug đổi (kể cả lần **đầu** được cấp khi publish) | `WEB-002` projection | **`EventId`**, `TenantId`, `ProductId`, **`OldSlug`** *(null nếu chưa từng công khai)*, `NewSlug`, `OccurredOnUtc` | ✅ khoá `EventId` (**F11** cảnh báo ETO hiện có **thiếu** `EventId`) |
+| `ProductMediaChangedEto` | Thêm/xoá/đổi thứ tự/đổi ảnh chính/đổi `alt` | `WEB-002`, (sau này `CHN-004`) | **`EventId`**, `TenantId`, `ProductId`, `MediaId`, `Kind`, `IsPrimary`, `SortOrder`, `AltText`, `Url`, `OccurredOnUtc` | ✅ khoá `EventId` |
+| `ProductChannelVisibilityChangedEto` | Bật/ẩn/ngừng bán theo kênh | Vận hành, `CHN-004` (GĐ4) | **`EventId`**, `TenantId`, `ProductId`, `ChannelCode`, `Status`, `OccurredOnUtc` | ✅ khoá `EventId` |
+| `ProductMediaBytesOrphanedEto` *(đề xuất)* | Job phát hiện bytes không còn dòng tham chiếu | Job dọn | `EventId`, `TenantId`, `StorageKey`, `SizeBytes`, `OccurredOnUtc` | ✅ khoá `EventId` |
+
+> 🔒 **`EventId` là BẮT BUỘC** trên mọi ETO của feature này — mâu thuẫn với hiện trạng
+> [`ChannelEvents.cs:17-30`](../../modules/ChannelHub/eCommerce.ChannelHub.Application.Contracts/Events/ChannelEvents.cs#L17)
+> (ETO của `ChannelHub` **không** có `EventId` — `WEB-002` **F9**). Feature này **không** lặp lại lỗi đó.
+
+### 7.2 Sự kiện / webhook **nhận vào**
+
+**Không áp dụng — lý do:** `CAT-003` **không** có biên vào từ bên ngoài (không webhook, không IPN).
+Mọi thao tác đều do người dùng đã xác thực gọi vào API admin.
+
+⚠️ **Nhưng có một khoảng trống đã phát hiện (F10):** khi một `Channel` bị **ngừng hoạt động** trong `ChannelHub`,
+`CAT-003` **không** có cách nào biết ⇒ bản ghi `ProductChannelVisibility` của kênh đó **tồn tại vô nghĩa** (vi phạm
+tinh thần **BR-011**). **Đề xuất:** `ChannelHub` phát `ChannelDeactivatedEto` *(chưa có trong code — xem
+[`ChannelEvents.cs`](../../modules/ChannelHub/eCommerce.ChannelHub.Application.Contracts/Events/ChannelEvents.cs),
+chỉ có **2** ETO: `ChannelOrderPulledEto` + `ChannelShopTokenRefreshedEto`)*. Trong lúc chưa có, xử lý bằng
+**job đối chiếu** (§12) + ghi log — **không** im lặng.
+
+### 7.3 ⚠️ Idempotency ở **mọi** biên vào (bất biến #9)
+
+| Biên vào | Rủi ro trùng | Cơ chế | Hàng rào DB |
+|---|---|---|---|
+| `POST …/upload` (tải media) | Timeout ⇒ client thử lại ⇒ **2** dòng media + **2** lần tốn storage | `IdempotencyKey` + bảng inbox (`XC-002`) | UNIQUE `(TenantId, Sha256)` *(hoặc `(TenantId, ProductId, Sha256)` — **Q2**)* |
+| `PUT …/slug` (đổi slug) | Thử lại ⇒ phát **2** ETO, tạo **2** bản ghi `WebSlugRoutes` | `IdempotencyKey` + `RowVersion`/`ConcurrencyStamp` | UNIQUE `(TenantId, Slug) NULLS NOT DISTINCT` |
+| `PUT …/{productId}` (visibility) | Thử lại ⇒ **idempotent tự nhiên** (ghi cùng giá trị) | — | UNIQUE `(TenantId, ProductId, ChannelCode)` |
+| `POST …/{mediaId}/primary` | Thử lại ⇒ **idempotent tự nhiên** | — | UNIQUE `(TenantId, ProductId, IsPrimary) WHERE IsPrimary` |
+| `DELETE …/{mediaId}` | Thử lại ⇒ lần 2 gặp bản ghi đã xoá mềm ⇒ trả **kết quả như lần 1** | — | Xoá mềm |
+| Job `media-cleanup` | Chạy chồng trên nhiều instance | Khoá `catalog:media-cleanup:{tenantId}` + `SkipIfBusy` (**XC-003** **D10**) | Xoá bytes là **idempotent** |
+
+> ⚠️ **Lock KHÔNG thay thế idempotency** (`XC-003` **BR-008**, §7.3): lock giảm tranh chấp **đồng thời**,
+> idempotency chặn **lặp lại**. `CAT-003` **cần CẢ HAI** vì vừa có 2 instance cùng tải ảnh, vừa có client retry.
+
+---
+
+## 8. Bất biến & xử lý đồng thời
+
+### 8.1 Bất biến
+
+| # | Bất biến | Cơ chế bảo vệ | Kiểm bằng |
+|---|---|---|---|
+| 1 | Slug **duy nhất trong tenant** kể cả khi `TenantId IS NULL` | UNIQUE **`NULLS NOT DISTINCT`** + filter `"Slug" IS NOT NULL` | TC-03 (**cần PostgreSQL**) |
+| 2 | Mỗi sản phẩm có **tối đa một** media `IsPrimary = true` | UNIQUE `(TenantId, ProductId, IsPrimary) WHERE "IsPrimary"` | TC-09 |
+| 3 | `SortOrder` **duy nhất trong một sản phẩm** | UNIQUE `(TenantId, ProductId, SortOrder)` | TC-10 |
+| 4 | Một cặp `(ProductId, ChannelCode)` chỉ có **một** trạng thái | UNIQUE `(TenantId, ProductId, ChannelCode)` | TC-15 |
+| 5 | **Không có bản ghi ⇒ hiển thị** (không bao giờ "ẩn ngầm") | Truy vấn **bắt buộc** `LEFT JOIN` + `COALESCE(..., HienThi)` (**§3**) | TC-14 |
+| 6 | Media **luôn** cùng tenant với `Product` | Kiểm tầng ứng dụng + query filter `IMultiTenant` của ABP | TC-18 (**cần PostgreSQL**) |
+| 7 | Mọi media đã publish có `AltText` không rỗng | Guard ở `Publish` (**BR-004**) | TC-08 |
+| 8 | Mọi thao tác ghi qua **UoW**; outbox cùng transaction | `IUnitOfWorkManager` + `useOutbox: true` (`XC-002` **D1**) | TC-05 |
+| 9 | Mọi unique index có `TenantId` **có hiệu lực khi `TenantId` NULL** | SQL thô `NULLS NOT DISTINCT` (**BR-018**) | TC-21 |
+| 10 | Khoá phân tán **grep được** và **không** có tiền tố đôi | `CatalogLockKeys` (**ADR-10**) + test quét mã nguồn | TC-19 |
+
+### 8.2 Xử lý đồng thời
+
+| # | Tình huống | Cơ chế | Nếu Redis chết |
+|---|---|---|---|
+| 1 | 2 nhân viên cùng đặt **ảnh chính** cho một sản phẩm | Khoá `catalog:media:{tenantId}:{productId}` + UNIQUE `IsPrimary` | UNIQUE index **chặn** ⇒ lỗi map thành `0204`/`0205` — **không** sai dữ liệu (`XC-003` **D2**) |
+| 2 | 2 request cùng **sinh slug** trùng cho 2 sản phẩm khác nhau | Khoá `catalog:slug:{tenantId}` + thêm hậu tố số **trong** transaction | UNIQUE `(TenantId, Slug)` **chặn** ⇒ map `0201` |
+| 3 | 2 người cùng **đổi slug** của **một** sản phẩm | `ConcurrencyStamp` của ABP + `UPDATE … WHERE ConcurrencyStamp = @expected`; **0 dòng** ⇒ **NÉM** | Không phụ thuộc Redis |
+| 4 | Vận hành đổi trạng thái hiển thị trong khi worker đang đẩy listing lên sàn | UNIQUE `(TenantId, ProductId, ChannelCode)` + guard `NgungBan` phải gỡ `Synced` trước (**§3**) | DB vẫn chặn trùng |
+| 5 | Job `media-cleanup` chạy trên **nhiều** instance | Khoá `catalog:media-cleanup:{tenantId}` + `SkipIfBusy` + **log + metric** | Fail-open: nhiều instance cùng chạy ⇒ xoá bytes là **idempotent** ⇒ **an toàn** |
+| 6 | 2 instance cùng tải **cùng một tệp** (cùng `Sha256`) cho cùng sản phẩm | UNIQUE `(TenantId, Sha256)` *(hoặc `(TenantId, ProductId, Sha256)` — **Q2**)* | DB chặn ⇒ lần 2 trả bản ghi **đã có** (không tốn thêm storage) |
+
+**Khoá phân tán dùng trong feature** — 🔒 **hàm sinh khoá KHÔNG chứa tiền tố** (**ADR-10**), tiền tố do
+`AbpDistributedLockOptions.KeyPrefix = "ecommerce:"` cấp
+([`eCommerceHttpApiHostModule.cs:127`](../../src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs#L127)):
+
+| Hàm sinh khoá (module) | Khoá **thật** trong Redis | Dùng cho | TTL |
+|---|---|---|---|
+| `CatalogLockKeys.Slug(tenantId)` → `catalog:slug:{tenantId}` | `ecommerce:catalog:slug:{tenantId}` | Sinh/cấp slug cho một tenant | **30 s** |
+| `CatalogLockKeys.MediaOrder(tenantId, productId)` → `catalog:media:{tenantId}:{productId}` | `ecommerce:catalog:media:{tenantId}:{productId}` | Thứ tự + ảnh chính của một sản phẩm | **60 s** |
+| `CatalogLockKeys.ChannelVisibility(tenantId, productId, channelCode)` → `catalog:visibility:{tenantId}:{productId}:{channelCode}` | `ecommerce:catalog:visibility:…` | Đổi trạng thái hiển thị | **30 s** |
+| `CatalogLockKeys.MediaCleanup(tenantId)` → `catalog:media-cleanup:{tenantId}` | `ecommerce:catalog:media-cleanup:{tenantId}` | Job dọn bytes mồ côi (**job định kỳ** ⇒ `SkipIfBusy`) | **300 s** |
+
+> ⚠️ **Cột "Khoá thật trong Redis" chỉ là SUY LUẬN từ `KeyPrefix` + cơ chế ghép đã kiểm chứng cho khoá
+> của `ChannelHub`** (`XC-003` §5.4, `redis-cli MONITOR`). **Chưa kiểm chứng** cho khoá `catalog:*` mới này
+> ⇒ khi có môi trường **phải** chạy `redis-cli MONITOR` xác nhận trước khi tin (đúng cách `XC-003` **F5** từng tìm ra lỗi).
+> Xem **Q6** và **F8**.
+
+**Idempotency key:** ✅ **CÓ** — xem §7.3 (khác `XC-003`, feature này **có** biên vào HTTP).
+
+---
+
+## 9. Phân quyền
+
+### 9.1 Hiện trạng (đã kiểm bằng code)
+
+| Hằng số | Giá trị | Đã định nghĩa? |
+|---|---|---|
+| `eCommerceConsts.Permissions.Products.Default` | `eCommerce.Products` | ✅ [`eCommerceConsts.cs:21`](../../src/eCommerce.Domain.Shared/eCommerceConsts.cs#L21) + provider [`…Provider.cs:28`](../../src/eCommerce.Application.Contracts/Permissions/eCommercePermissionDefinitionProvider.cs#L28) |
+| `Products.Create` | `eCommerce.Products.Create` | ✅ |
+| `Products.Edit` | `eCommerce.Products.Edit` | ✅ |
+| `Products.Delete` | `eCommerce.Products.Delete` | ✅ |
+| `Products.View` | `eCommerce.Products.View` | ❌ **CHƯA CÓ** (kế thừa `CAT-001` **F9**) |
+| `Products.Publish` | `eCommerce.Products.Publish` | ❌ **CHƯA CÓ** (kế thừa `CAT-001` **F9**) |
+| `Products.ManageMedia` / `ManageSlug` / `ManageChannelVisibility` | `…` | ❌ **CHƯA CÓ** — **CAT-003 đề xuất thêm** |
+
+### 9.2 Permission **đề xuất thêm** cho `CAT-003` (⚠️ **chưa có trong code — kế hoạch GĐ1**)
+
+| Permission | Dùng cho | Vì sao tách riêng |
+|---|---|---|
+| `eCommerce.Products.View` | `GET` media + matrix | 🔒 Kế thừa `CAT-001` **F9**: hiện **không** có quyền *"chỉ xem"* ⇒ muốn cho xem phải cấp `Edit` ⇒ **vượt quyền** |
+| `eCommerce.Products.Publish` | `Publish`/`Unpublish` | Publish là **hành động công khai** ra ngoài (ảnh hưởng SEO + khách) — tách khỏi `Edit` |
+| `eCommerce.Products.ManageMedia` | tải/xoá/đổi ảnh chính/thứ tự/alt | Media là **tài sản** (dung lượng, bản quyền ảnh) — không phải ai sửa sản phẩm cũng được tải ảnh |
+| `eCommerce.Products.ManageSlug` | `PUT …/slug` | 🔒 Đổi slug **phá URL đã index** ⇒ quyền **hẹp** (Marketing/SEO), **không** cấp mặc định cho mọi nhân viên |
+| `eCommerce.Products.ManageChannelVisibility` | bật/ẩn theo kênh | Ẩn sai kênh ⇒ **mất doanh thu** ở kênh đó — là quyết định **vận hành**, không phải biên tập nội dung |
+
+### 9.3 Ma trận endpoint ↔ permission (mọi app service **`[Authorize]` cấp class** — `XC-004` **D3**)
+
+| Endpoint | Permission | Ghi chú |
+|---|---|---|
+| `GET` media / matrix | `Products.View` | ⚠️ **Chưa** tồn tại ⇒ **phải** thêm trước khi code (**Q1**) |
+| `POST` upload / primary / reorder / alt / `DELETE` | `Products.ManageMedia` | |
+| `PUT` slug | `Products.ManageSlug` | |
+| `PUT`/`DELETE` visibility | `Products.ManageChannelVisibility` | |
+| `Publish`/`Unpublish` sản phẩm | `Products.Publish` | Thuộc `CAT-001` nhưng **CAT-003** phụ thuộc (guard slug/media) |
+
+> 🚨 **Bẫy đã xảy ra thật ở Phase 0** (`XC-004` §0): permission **chưa được định nghĩa** trong
+> `PermissionDefinitionProvider` ⇒ **`403` cho MỌI người, kể cả admin** — và **không có lỗi biên dịch**.
+> ⇒ 5 permission mới ở §9.2 **phải** được thêm vào
+> [`eCommercePermissionDefinitionProvider.cs`](../../src/eCommerce.Application.Contracts/Permissions/eCommercePermissionDefinitionProvider.cs)
+> **cùng pull request** với endpoint đầu tiên dùng chúng, và `XC-004` **TC-02** phải phủ chúng.
+>
+> 🔒 **Cấm** magic string: **mọi** `[Authorize]` dùng hằng số `eCommerceConsts.Permissions.*` (`XC-004` **BR-003**).
+
+**Phân tầng host / tenant:** `CAT-003` **không** có permission cấp host — media/slug/visibility đều thuộc tenant.
+
+**Cách ly tenant:** mọi entity `IMultiTenant` ⇒ query filter của ABP lọc theo tenant; tài nguyên của tenant khác
+trả **`404`** (**không** `403`) — `XC-004` **BR-008**.
+
+---
+
+## 10. UI Mockup & mapping dữ liệu
+
+### 10.1 Màn hình "Media của sản phẩm" (admin, trong trang sản phẩm)
+
+| Vùng UI | Dữ liệu | Nguồn | Quy tắc |
+|---|---|---|---|
+| Lưới ảnh (kéo–thả sắp xếp) | `Url`, `AltText`, `IsPrimary`, `SortOrder` | `GET` media | Kéo–thả ⇒ gửi **toàn bộ** thứ tự một lần (§6.1 #2) |
+| Nhãn "Ảnh chính" | `IsPrimary` | DTO | **Chỉ một** ảnh được đánh dấu; đổi ⇒ gọi `primary`, **không** tự sửa hai dòng ở client |
+| Ô "Mô tả ảnh (alt)" | `AltText` | DTO | **Bắt buộc** trước khi publish; hiển thị **đếm số ảnh còn thiếu** ⇒ khớp `0203` |
+| Vùng tải lên | — | — | Hiển thị **trần 10 MB** + định dạng cho phép **trước** khi người dùng chọn tệp |
+| Lỗi `0206` | mã lỗi | response | Hiển thị **thông điệp thân thiện** (`Tệp không hợp lệ…`), **không** hiện lỗi hệ thống |
+| Ảnh đang dùng ở kênh | `ChannelListing.Status` | `GET` listing | Hiện **cảnh báo** trước khi xoá ⇒ khớp `0208` |
+
+### 10.2 Màn hình "Hiển thị theo kênh" (admin — **ma trận sản phẩm × kênh**)
+
+| Vùng UI | Dữ liệu | Nguồn | Quy tắc |
+|---|---|---|---|
+| Ma trận kênh | `ChannelCode`, `Status` | `GET …/matrix` | 🔒 **BẮT BUỘC** hiển thị rõ nhãn **"Kế thừa (đang hiển thị)"** cho cặp **không có** bản ghi — **cấm** để ô trống (**ADR-08/BR-012**) |
+| Lý do ẩn | `Reason` | DTO | **Bắt buộc** khi chuyển sang `An` (§3) |
+| Kênh ngừng hoạt động | `Channel.IsActive` | `IChannelDirectory` | Hiển thị **mờ** + không cho chọn ⇒ khớp `0207` |
+| Nút "Ngừng bán ở kênh" | — | — | Nếu còn listing `Synced` ⇒ hiển thị **danh sách** phải gỡ trước ⇒ khớp `0209` |
+| Lỗi `0205` | mã lỗi | response | `Không thể chuyển trạng thái hiển thị…` — **không** hiển thị lỗi hệ thống |
+
+### 10.3 Màn hình "SEO của sản phẩm" (admin)
+
+| Vùng UI | Dữ liệu | Nguồn | Quy tắc |
+|---|---|---|---|
+| Ô slug | `Slug` | DTO | Hiển thị **đầy đủ URL** xem trước; cảnh báo khi **đổi slug sản phẩm đã công khai** ⇒ *"URL cũ sẽ chuyển hướng 301"* + cần quyền `Products.ManageSlug` |
+| Cảnh báo slug trùng | mã lỗi `0201`/`0202` | response | Tô đỏ **ô slug**; **không** hiện lỗi SQL |
+| Nút "Sinh lại từ tên" | `Name` | DTO | Gọi sinh slug tự động (`ADR-04`); **cảnh báo** sẽ phá URL cũ nếu sản phẩm đã công khai |
+| `SeoTitle` / `SeoDescription` | 2 cột đề xuất (§5.4) | DTO | Chỉ hiện khi **Q4** đã chốt nguồn sự thật — ⚠️ **chưa chốt** |
+
+### 10.4 Storefront (do `WEB-002` thực hiện — `CAT-003` **chỉ cấp dữ liệu**)
+
+| Vùng render | Dữ liệu `CAT-003` cung cấp | Quy tắc |
+|---|---|---|
+| Bộ sưu tập ảnh | `Url`, `WidthPx`, `HeightPx`, `IsPrimary`, `SortOrder` | `WEB-002` **ADR-08**: `img` + `width`/`height`/`loading=lazy` + `alt` |
+| Thuộc tính `alt` | `AltText` | **BR-004** + `WEB-002` **NFR-012** (*100 % ảnh có `alt`*) |
+| Ẩn theo kênh | `ProductChannelVisibility` | Kênh `web` ẩn ⇒ sản phẩm **không** xuất hiện trên storefront; **không** ảnh hưởng sàn (**BR-014**) |
+| Ảnh chính cho JSON-LD/OG | `IsPrimary = true` | **Duy nhất** nhờ **ADR-12** — nếu 2 ảnh chính thì structured data **không xác định** |
+
+> 📌 **Ghi rõ chênh lệch (kế thừa thói quen tốt của tài liệu SRS gốc):** khi một sản phẩm **thiếu** bản ghi
+> `ProductChannelVisibility`, UI admin hiển thị *"Kế thừa (đang hiển thị)"* còn bảng dữ liệu **không có dòng nào**.
+> ⇒ **Số dòng hiển thị ≠ số dòng trong DB** — đây **là thiết kế đúng** (**ADR-08**), **không** phải bug.
+> Người kiểm thử **phải** biết điều này, nếu không sẽ báo lỗi sai.
+
+---
+
+## 11. Migration & seed
+
+| Mục | Nội dung |
+|---|---|
+| Migration **chính** | `Add_Catalog_Media_Seo_ChannelVisibility` *(tên đề xuất)* — tạo `CatProductMedia` + `CatProductChannelVisibility` + index. ⚠️ **Chưa có trong code** |
+| Migration **bắt buộc kèm theo** | 🔒 **Đúng việc `WEB-002` §11 giao cho `CAT-003`**: thêm unique index cho `CatProducts.Slug` bằng **SQL thô** (EF Core **không** mô hình hoá `NULLS NOT DISTINCT` — cảnh báo ở [`20261013024226…cs:20-25`](../../src/eCommerce.EntityFrameworkCore/Migrations/20261013024226_Fix_NullableTenantId_UniqueIndexes.cs#L20)):<br>`CREATE UNIQUE INDEX "IX_CatProducts_TenantId_Slug" ON "CatProducts" ("TenantId", "Slug") NULLS NOT DISTINCT WHERE "Slug" IS NOT NULL` |
+| ⚠️ **Điều kiện tiên quyết của migration** | **Phải** dọn dữ liệu slug **trùng/rỗng** trước, nếu không migration **đổ**. Đây **đúng** là **Q1 đang `Open`** của `WEB-002` ([`web-002…:753`](web-002-storefront-duyet-chi-tiet-san-pham.md)) — **CAT-003 kế thừa và phải đóng Q1 này** (xem **Q3** §15.1) |
+| **Bắt buộc trong `DbContext`** | Thêm `DbSet<ProductMedia>` + `DbSet<ProductChannelVisibility>` vào [`eCommerceDbContext.cs`](../../src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs). 🔒 Thiếu `DbSet` ⇒ `IRepository<T>` **KHÔNG** được đăng ký ⇒ runtime ném *"The requested service 'IRepository<ProductMedia, Guid>' has not been registered"* — **lỗi đã xảy ra thật ở Phase 0** (ghi rõ ngay trong comment của chính file, [`eCommerceDbContext.cs:48-52`](../../src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs#L48)) |
+| Backfill | **CÓ**: sinh `Slug` cho mọi `CatProducts` có `Slug IS NULL` **và** `IsPublished = true`. Job **idempotent** (chạy lại không đổi kết quả, bỏ qua bản ghi đã có slug). ⚠️ **Chưa có** trong code |
+| Backfill media | **KHÔNG CẦN** — chưa có media nào tồn tại (`grep Media` = 0) ⇒ **không** có dữ liệu cũ để chuyển |
+| Backfill visibility | **KHÔNG CẦN** — **ADR-08**: không có bản ghi **chính là** trạng thái mặc định ⇒ **không** phải sinh 50.000 dòng rỗng |
+| Seed | **Không seed media.** *(Khuyến nghị)* seed **danh mục kênh tối thiểu** ở tầng `ChannelHub` (đã có `ChnChannels`) — nhưng **phải** có ít nhất kênh `web` để `BR-011` kiểm được. ⚠️ **chưa kiểm chứng** việc seed hiện có kênh `web` hay chưa (chưa chạy được `DbMigrator` trong phiên này) |
+| Ảnh hưởng dữ liệu cũ | **Không** sửa dữ liệu hiện có (không backfill phá huỷ). Thêm **cột** `SlugLockedAtUtc` + `SeoTitle`/`SeoDescription` ⇒ **nullable**, không cần giá trị mặc định |
+| Rollback | Drop 2 bảng mới + drop index `IX_CatProducts_TenantId_Slug` ⇒ **an toàn** (không mất dữ liệu nguồn `CatProducts`; chỉ mất media metadata + cấu hình kênh). ⚠️ Rollback **không** xoá bytes trong storage ⇒ phải dọn tay (**ADR-11**) |
+| Rủi ro đã biết | 🔴 Migration **sẽ đổ** nếu tồn tại slug trùng trong cùng tenant. **Chưa kiểm chứng** vì máy viết tài liệu **không** có PostgreSQL (xem **Q3**) |
+
+---
+
+## 12. Xử lý lỗi & trường hợp biên
+
+| Tình huống | Nguyên nhân | Hành vi hệ thống | Phản hồi |
+|---|---|---|---|
+| `Publish` khi `Slug` rỗng | quên nhập / sinh slug thất bại | **Ném** `eCommerce:Catalog:0201`; **không** đổi `IsPublished` | `409` |
+| `Publish` khi chưa có media `IsPrimary` | chưa tải ảnh | **Ném** `0201` | `409` |
+| Slug người dùng gõ **đã tồn tại** | trùng | **Ném** `0201` (người dùng gõ) | `409` |
+| Slug **sinh tự động** bị trùng | 2 sản phẩm cùng tên | **Tự** thêm hậu tố `-2`, `-3`… trong cùng transaction; **không** lỗi (**A1** §1) | bình thường |
+| Slug sai định dạng (`"Áo thun!!"`, có dấu, > 512) | nhập tay | **Ném** `0202` | `400` |
+| Slug rỗng **sau** chuẩn hoá (tên toàn ký tự đặc biệt) | `Name` là `!!!` | **Ném** `0212` (yêu cầu nhập tay) | `400` |
+| Còn media thiếu `AltText` khi publish | quên viết mô tả | **Ném** `0203` kèm **danh sách** `MediaId` | `400` |
+| `SortOrder` trùng | 2 request xen kẽ | UNIQUE **chặn** ⇒ map `0204` | `409` |
+| Vượt trần **50** media | tải quá nhiều | **Ném** `0204` **trước khi** ghi dòng nào | `409` |
+| Tệp là `shell.exe` đổi tên `.jpg` | tấn công / nhầm | **Magic bytes** không khớp ⇒ **Ném** `0206`; **không** ghi storage | `400` |
+| Tệp > 10 MB | ảnh gốc quá lớn | **Ném** `0206`; **không** đọc hết luồng (chặn theo `Content-Length` **trước**) | `400` |
+| Chuyển trạng thái hiển thị sai (`NgungBan → HienThi`) | lập trình/UI sai | **NÉM** `0205` (**quy ước #11** — không im lặng) | `409` |
+| Ẩn sản phẩm khi còn `ChannelListing` `Synced` | quên gỡ listing | **Ném** `0209` + **danh sách** listing còn lại | `409` |
+| `ChannelCode` không tồn tại | gõ sai / kênh chưa seed | **Ném** `0207` | `409` |
+| `ChannelCode` đã `IsActive = false` | kênh ngừng hoạt động | **Ném** `0207` — **không** ghi bản ghi mới (**BR-011**) | `409` |
+| 🔴 **Kênh bị ngừng hoạt động SAU khi đã có bản ghi** | `ChannelHub` đổi trạng thái | ⚠️ **Chưa có** cơ chế tự động (**F10**) ⇒ **job đối chiếu** định kỳ phát hiện + **log `Warning`** + metric; **không** tự xoá bản ghi | log + cảnh báo |
+| Media **khác tenant** | tấn công / lỗi lập trình | Query filter của ABP **không** thấy ⇒ trả **`404`** (**không** `403`) — `XC-004` **BR-008** | `404` |
+| **Trùng tệp** (cùng `Sha256`) tải lại | người dùng tải lại | Trả bản ghi **đã có** (**idempotent**) ⇒ **không** tốn thêm storage | bình thường |
+| Ghi bytes **thành công** nhưng commit DB **thất bại** | DB lỗi / mất kết nối | ⚠️ **Bytes mồ côi** — **không** phải mất dữ liệu; job `media-cleanup` dọn sau (**ADR-11**) + metric | log `Warning` |
+| Commit DB **thành công** mà bytes **chưa** ghi (nếu đảo thứ tự) | 🚫 **thiết kế sai** | **Cấm** — sẽ tạo bản ghi trỏ tới **ảnh không tồn tại** ⇒ storefront hiển thị **ảnh vỡ** | — |
+| Redis chết | sự cố hạ tầng | **Fail-open** (`XC-003` **E2**): chạy tiếp nhờ **ràng buộc DB** (đã có **đủ** unique index cho mọi bất biến — §8.1) | bình thường |
+| Không giành được khoá trong timeout | instance khác đang chạy | **Ném** `eCommerce:Lock:0001` (`409`) — hoặc **bỏ qua + log + metric** nếu là job định kỳ | `409` |
+| `ProductMedia` mồ côi (Product đã xoá cứng) | thao tác ngoài luồng | **Không** xảy ra nếu FK `Restrict` + xoá mềm đúng; job quét phát hiện | log + metric |
+
+**Chiến lược transaction:** phạm vi khoá phân tán **bao ngoài** Unit of Work (`await using` ở tầng app service,
+`XC-003` §12) ⇒ khoá được nhả **sau** khi transaction kết thúc. Ghi `CatProductMedia`/
+`CatProductChannelVisibility`/`CatProducts.Slug` + **outbox** trong **cùng** một transaction (`XC-002` **D1**).
+⚠️ **Ghi bytes vào storage KHÔNG nằm trong transaction** (không thể) — xem nhánh *"bytes mồ côi"* ở trên.
+
+---
+
+## 13. Phi chức năng
+
+| Mã | Yêu cầu | Ngưỡng đo được | Cách kiểm chứng |
+|---|---|---|---|
+| NFR-CAT-003-001 | Sinh slug thuần CPU | p95 **< 5 ms** / 1.000 lần | benchmark unit test |
+| NFR-CAT-003-002 | Tra sản phẩm theo `(TenantId, Slug)` | p95 **< 20 ms** với 10.000 sản phẩm/tenant | integration test + `EXPLAIN` dùng index |
+| NFR-CAT-003-003 | Tải media | trần **10 MB**/tệp; p95 ghi storage **< 2 s** cho 5 MB | integration test |
+| NFR-CAT-003-004 | Trần media/sản phẩm | **50**; vượt ⇒ `0204` và **0** dòng ghi | unit test |
+| NFR-CAT-003-005 | Bất biến "một ảnh chính" | **0** vi phạm / **1.000** vòng đồng thời | integration test (2 luồng, PostgreSQL thật) |
+| NFR-CAT-003-006 | `AltText` đầy đủ | **100 %** media của sản phẩm đã publish | test quét dữ liệu |
+| NFR-CAT-003-007 | Không trùng slug | **0** trường hợp, **kể cả `TenantId IS NULL`** | integration test (**cần PostgreSQL**, Testcontainers) |
+| NFR-CAT-003-008 | Độ trễ projection | `Publish` ⇒ ETO tới `WEB-002` **p95 ≤ 2 s** | integration test (khớp NFR-XC-002-001) |
+| NFR-CAT-003-009 | Không bản ghi kênh "mồ côi" | **0** bản ghi trỏ `ChannelCode` không tồn tại | test quét định kỳ |
+| NFR-CAT-003-010 | Cách ly tenant | tenant A **không** đọc/ghi media/visibility của B | integration test 2 tenant (**cần PostgreSQL**) |
+| NFR-CAT-003-011 | Không `double`/`float` | **0** trong mọi entity/DTO của feature | test reflection (kế thừa `XC-001` TC-11) |
+| NFR-CAT-003-012 | Tỉ lệ tải media thất bại do lỗi storage | **< 0,1 %** | metric đếm lỗi ghi storage |
+
+> ⚠️ **NỢ OBSERVABILITY (đã kiểm trong code):** 3 chỉ số mới mà feature này **cần** —
+> `catalog_media_bytes_orphaned`, `catalog_slug_conflict_total`, `catalog_channel_visibility_blocked_total` —
+> **CHƯA có** trong bảng đăng ký [`eCommerceMetrics.cs:13-53`](../../src/eCommerce.Domain.Shared/Observability/eCommerceMetrics.cs#L13).
+> 🔒 Vì `XC-005` **TC-06** đối chiếu **tên phát ra thật** với `eCommerceMetricNames.All`, phát metric **chưa đăng ký**
+> sẽ **làm đỏ CI**. ⇒ **Phải** thêm vào `eCommerceMetricNames` + tạo `Counter`/`Gauge` **trước** khi phát. Xem **Q5**.
+>
+> ⚠️ **Nhãn metric bị cấm:** `sku`, `correlationId`, `orderId` nằm trong danh sách **`Forbidden`**
+> vì **cardinality cao** ([`eCommerceMetrics.cs:81-85`](../../src/eCommerce.Domain.Shared/Observability/eCommerceMetrics.cs#L81))
+> ⇒ **cấm** gắn `productId`/`mediaId`/`slug` làm nhãn metric. Truy vết theo các giá trị đó ⇒ dùng **log** (`CorrelationId`).
+
+---
+
+## 14. Test cases & Acceptance Criteria
+
+### 14.1 Danh sách test case
+
+| ID | Mục tiêu | Loại | Input chính | Expected | Phủ |
+|---|---|---|---|---|---|
+| TC-01 | Sinh slug từ tên tiếng Việt có dấu | Unit | `"Áo Thun Đen Nam"` | `ao-thun-den-nam` | ADR-04, BR-008 |
+| TC-02 | Slug sai định dạng ⇒ **ném** | Unit | `"Áo thun!!"`, `"-abc"`, chuỗi 600 ký tự | `BusinessException` `eCommerce:Catalog:0202` | **BR-006** |
+| TC-03 | **Trùng slug bị DB chặn khi `TenantId` NULL** | **Integration** | chèn 2 `Product` cùng `Slug`, `TenantId = NULL` | DB **từ chối** (`duplicate key … (null, …)`) | **BR-007**, NFR-007 |
+| TC-04 | Sinh slug tự động khi trùng ⇒ thêm hậu tố | Unit | 2 sản phẩm cùng `Name` | slug 2 = `…-2` | ADR-04, BR-008 |
+| TC-05 | Đổi slug ⇒ **có** ETO kèm `OldSlug` **trong cùng UoW** | **Integration** | đổi `Slug` sản phẩm đã publish | `ProductSlugChangedEto` có `OldSlug` **cũ** + `EventId`; outbox có bản ghi | **BR-009**, NFR-008 |
+| TC-06 | `Publish` khi `Slug` rỗng ⇒ **ném** | Unit | `Slug = null` | `0201`; `IsPublished` **không** đổi | **BR-010** |
+| TC-07 | `Publish` khi **không có** ảnh chính ⇒ **ném** | Unit | 0 media / chỉ media `IsPrimary = false` | `0201` | **BR-010** |
+| TC-08 | `Publish` khi có media thiếu `AltText` ⇒ **ném** kèm danh sách | Unit | 3 media, 1 media `AltText = null` | `0203` + danh sách đúng 1 `MediaId` | **BR-004**, NFR-006 |
+| TC-09 | Chỉ **một** ảnh chính | **Integration** | đặt `IsPrimary = true` cho 2 media | UNIQUE **chặn** dòng thứ 2 | **BR-002**, ADR-12 |
+| TC-10 | `SortOrder` trùng ⇒ **ném** | Unit | 2 media cùng `SortOrder` | `0204` | **BR-005** |
+| TC-11 | Tệp giả định dạng ⇒ **ném** | Unit | `shell.exe` đổi tên `.jpg` (magic bytes `MZ`) | `0206`; **0** lần gọi `IMediaStorage.PutAsync` | **BR-019**, ADR-13 |
+| TC-12 | Tệp vượt 10 MB ⇒ **ném** | Unit | luồng 11 MB | `0206`; **không** đọc hết luồng | NFR-003 |
+| TC-13 | Xoá media = xoá **mềm**, bytes **giữ lại** | Unit | `DeleteAsync` | `IsDeleted = true`; `DeleteAsync` trên storage **chưa** được gọi | **BR-015**, ADR-11 |
+| TC-14 | **Không có bản ghi ⇒ HIỂN THỊ** | Unit | sản phẩm publish, **0** bản ghi visibility | truy vấn trả **hiển thị** trên mọi kênh | **BR-012**, ADR-08 |
+| TC-15 | Ẩn ở kênh `shopee` **không** ảnh hưởng kênh `web` | Unit | ẩn `shopee` | `web` **vẫn** hiển thị; `IsPublished` **không** đổi | **BR-014** |
+| TC-16 | Chuyển trạng thái **sai** ⇒ **NÉM** (`NgungBan → HienThi`) | Unit | bản ghi `NgungBan` | `0205`; trạng thái **không** đổi | **BR-013** |
+| TC-17 | `ChannelCode` không tồn tại ⇒ **ném** | Unit | `channelCode = "shopee-ao"` | `0207`; **0** dòng ghi | **BR-011**, ADR-09 |
+| TC-18 | Cách ly tenant cho media + visibility | **Integration** | tenant A đọc media của B | **không** thấy (query filter) | NFR-010 |
+| TC-19 | Hàm sinh khoá **không** chứa tiền tố `ecommerce:` | Unit (quét/reflection) | gọi cả 4 hàm `CatalogLockKeys.*` | **0** chuỗi bắt đầu bằng `ecommerce:` | **BR-017**, ADR-10 |
+| TC-20 | Mọi app service của feature có `[Authorize]` **cấp class** | Unit (reflection) | quét `*AppService` | **100 %** có `[Authorize]` | **BR-022**, `XC-004` TC-01 |
+| TC-21 | Index `Slug` là `NULLS NOT DISTINCT` + có filter | **Integration** | đọc `pg_indexes` | `indnullsnotdistinct = true`; `WHERE "Slug" IS NOT NULL` | **BR-018**, NFR-007 |
+| TC-22 | **0** `double`/`float` trong DTO/entity của feature | Unit (reflection) | duyệt type của feature | **0** xuất hiện | **BR-021**, NFR-011 |
+
+### 14.2 Fixture skeleton (xUnit) — **ba test quan trọng nhất**
+
+```csharp
+public class CatalogSlugAndVisibilityTests
+{
+    // TC-01 — tiếng Việt có dấu là ca dễ sai nhất (đ, ư, ơ, ả, ệ...).
+    [Theory]
+    [InlineData("Áo Thun Đen Nam",   "ao-thun-den-nam")]
+    [InlineData("Giày Thể Thao Nữ",  "giay-the-thao-nu")]
+    [InlineData("Túi Xách 100% Da",  "tui-xach-100-da")]
+    public void TC01_sinh_slug_tu_tieng_viet(string name, string expected)
+    {
+        Assert.Equal(expected, SlugService.ChuanHoa(name));
+    }
+
+    // TC-14 — BAT BIEN DE VI PHAM NHAT: khong co ban ghi NGHIA LA hien thi (BR-012, ADR-08).
+    [Fact]
+    public async Task TC14_khong_co_ban_ghi_thi_hien_thi()
+    {
+        var product = TaoSanPhamDaPublish();
+        // KHONG tao ban ghi ProductChannelVisibility nao
+        var trangThai = await _sut.GetStatusAsync(product.Id, "shopee");
+
+        Assert.Equal(VisibilityStatus.HienThi, trangThai);   // KHONG phai An
+    }
+
+    // TC-16 — state machine PHAI NEM LOI, khong im lang (quy uoc bat di bat dich #11).
+    [Fact]
+    public async Task TC16_trang_thai_hap_thu_thi_nem_0205()
+    {
+        var product = TaoSanPhamDaPublish();
+        await _sut.SetAsync(product.Id, "shopee", VisibilityStatus.NgungBan, reason: "ngung ban san");
+        GiaLapDaGoHetListing(product.Id, "shopee");
+
+        var ex = await Assert.ThrowsAsync<BusinessException>(() =>
+            _sut.SetAsync(product.Id, "shopee", VisibilityStatus.HienThi, reason: null));
+
+        Assert.Equal("eCommerce:Catalog:0205", ex.Code);
+    }
+}
+```
+
+### 14.3 Acceptance Criteria (Definition of Done)
+
+- [ ] **22** test case ở §14.1 pass, phủ **hết 22 BR** và **12 NFR**
+- [ ] 🚨 **`TC-03` + `TC-21` pass trên PostgreSQL thật** (Testcontainers) — chứng minh unique index `Slug` **chặn trùng khi `TenantId IS NULL`**
+- [ ] 🔒 **Migration index `Slug` đã viết bằng SQL thô** — đúng việc `WEB-002` §11 giao cho `CAT-003`
+- [ ] 🔒 **`ProductSlugChangedEto` CÓ `OldSlug` + `EventId`** — trả lời `WEB-002` **Q3** (chặn 301 nếu thiếu)
+- [ ] `DbSet<ProductMedia>` + `DbSet<ProductChannelVisibility>` **đã thêm** vào `eCommerceDbContext` (bất biến #5)
+- [ ] **5** permission mới (§9.2) **đã định nghĩa** trong `eCommercePermissionDefinitionProvider`; `XC-004` **TC-02** phủ hết
+- [ ] `CatalogErrorCodes` + `CatalogLockKeys` **đã tạo**; **0** literal khoá/mã lỗi trong code nghiệp vụ
+- [ ] **0** hàm sinh khoá chứa tiền tố `ecommerce:` (`TC-19`)
+- [ ] **3** metric mới **đã đăng ký** trong `eCommerceMetricNames` **trước** khi phát (`XC-005` TC-06 xanh)
+- [ ] **Không** có mermaid nào lỗi: `npm --prefix tools run check:mermaid` ⇒ **0 lỗi**
+- [ ] Tài liệu này cập nhật khớp code
+
+### 14.4 Definition of Ready
+
+- [x] ✅ Đã kiểm: `Product.Slug` **có** trong entity + DB nhưng **KHÔNG** unique index (`eCommerceDbContext.cs:106`)
+- [x] ✅ Đã kiểm: **0** entity media/visibility; **0** hạ tầng lưu file; **0** `CatalogErrorCodes`/`CatalogLockKeys`
+- [x] ✅ Đã kiểm: `KeyPrefix = "ecommerce:"` **đã** đặt (`eCommerceHttpApiHostModule.cs:127`)
+- [x] ✅ Đã kiểm: `shared/eCommerce.Kernel` và `eCommerce.Web` **chưa** tồn tại
+- [ ] **Chốt Q1** — dải mã lỗi Catalog (xung đột `CAT-001`/`CAT-002`) — **chặn** code
+- [ ] **Chốt Q2** — `Sha256` unique theo `(TenantId)` hay `(TenantId, ProductId)` — **chặn** migration
+- [ ] **Chốt Q3** — dữ liệu `Slug` hiện có đã trùng/rỗng chưa (✅ **kế thừa `WEB-002` Q1**) — **chặn** migration
+- [ ] **Chốt Q4** — `SeoTitle`/`SeoDescription` nguồn sự thật ở Catalog hay read-model — **chặn** §5.4
+- [ ] **Chốt Q6** — quy ước tiền tố khoá lock (`ecommerce:` trong hàm sinh khoá hay không) — **chặn** §8.2
+- [ ] **Chốt lựa chọn hạ tầng lưu trữ** cho production (object storage nào) — **chặn** ADR-02/§5.5
+- [ ] **Có môi trường PostgreSQL** để kiểm `TC-03`/`TC-09`/`TC-21`/`TC-18`
+
+---
+
+## 15. Câu hỏi mở, giả định & lịch sử thay đổi
+
+### 15.1 Câu hỏi mở
+
+| # | Câu hỏi | Cần ai | Trạng thái | Ảnh hưởng |
+|---|---|---|---|---|
+| **Q1** | 🚨 **Dải mã lỗi Catalog**: `CAT-001` (`0001–0009`) và `CAT-002` (`0001–0007`) đang **trùng dải với nghĩa khác nhau**. Gom về **một** `CatalogErrorCodes.cs` với dải đã cấp phát (đề xuất `CAT-001` = `00xx`, `CAT-002` = `01xx`, `CAT-003` = `02xx`)? | Kiến trúc trưởng | `Open` — **CAT-003 tạm dùng `0201–0212`** để không làm nặng thêm | Không gom ⇒ client/UI **không** phân biệt được `0003` là lỗi **nào**; log/đối soát mơ hồ |
+| **Q2** | Băm tệp `Sha256` unique theo **`(TenantId, Sha256)`** (một ảnh dùng cho **nhiều** sản phẩm ⇒ tiết kiệm storage, nhưng xoá phải kiểm đếm) hay theo **`(TenantId, ProductId, Sha256)`** (cách ly theo sản phẩm, tốn storage hơn)? | Kiến trúc trưởng + Vận hành | `Open` — **đề xuất `(TenantId, Sha256)` + đếm tham chiếu** | Quyết định này **thay đổi** index + logic job dọn (**ADR-11**) ⇒ **chặn** migration |
+| **Q3** | 🔒 **Dữ liệu `CatProducts.Slug` hiện có** đã **trùng** hoặc **rỗng** chưa? Thêm unique index có **đổ** không? | Dev + DBA | `Open` — **kế thừa `WEB-002` Q1** ([`web-002…:753`](web-002-storefront-duyet-chi-tiet-san-pham.md)); **CAT-003 phải đóng** | Trùng ⇒ migration **đổ**; **phải** dọn dữ liệu **trước** (§11) |
+| **Q4** | `SeoTitle`/`SeoDescription`: **nguồn sự thật** ở `CatProducts` (admin sửa) hay ở read-model `WebSeoProducts` (`WEB-002` §5.2.2)? | Kiến trúc trưởng + SEO | `Open` — **đề xuất ở `CatProducts`** (read-model là **bản chiếu**, ghi lại được) | Nếu để read-model làm nguồn sự thật ⇒ **mất dữ liệu** mỗi lần chiếu lại (**ADR-06** đúng tinh thần) |
+| **Q5** | Trần tài nguyên: **10 MB**/tệp, **50** media/sản phẩm, **3–512** ký tự slug — có phù hợp nghiệp vụ thật (thời trang, nội thất có ảnh rất nặng và rất nhiều ảnh)? | BA Catalog + Vận hành | `Open` | Quá thấp ⇒ chặn ảnh hợp lệ; quá cao ⇒ tốn storage + chậm trang |
+| **Q6** | 🚨 **Quy ước tiền tố khoá lock**: hàm sinh khoá của module **có** chứa `ecommerce:` hay **không**? Hiện repo có **2 quy ước** (§15.2 **F8**) | Kiến trúc trưởng | `Open` — **kế thừa `SHP-002` Q5**; **CAT-003 chọn KHÔNG có tiền tố** (**ADR-10**) | Chọn sai ⇒ khoá thật thành `ecommerce:ecommerce:catalog:…` ⇒ **khoá không bảo vệ gì** (đúng lỗi im lặng `XC-003` **F1/F5**) |
+| **Q7** | Hạ tầng lưu trữ media cho **production**: object storage nào (S3-compatible/MinIO/Azure Blob)? Có dùng gói **`Volo.Abp.BlobStoring`** của ABP hay tự viết `IMediaStorage`? | Kiến trúc trưởng + Vận hành | `Open` — **đề xuất tự viết `IMediaStorage`** (thay provider bằng cấu hình, không khoá vào ABP) | 🔴 **Chặn** ADR-02/§5.5; nếu chọn `FileSystem` ⇒ **không** chạy được ≥ 2 instance (vi phạm yêu cầu test 2 instance của `implementation-plan.md` §11) |
+| **Q8** | Có cần **video** sản phẩm ở GĐ1 không? (`Kind = Video`, cần transcode/streaming — khối lượng lớn) | BA Catalog | `Open` — **đề xuất KHÔNG** ở GĐ1: chỉ `Image`; vẫn giữ `Kind` trong mô hình để không phải migrate sau | Có video ⇒ thêm transcode/CDN/streaming, **vượt** phạm vi GĐ1 |
+| **Q9** | Ảnh **riêng theo biến thể** (`VariantId` khác `null`) có cần ở GĐ1 không? | BA Catalog | `Open` — **đề xuất CÓ** cột nhưng chưa làm UI (tránh migration sau) | Cần ⇒ storefront phải render lại khi chọn biến thể (`WEB-002` Q10 đang `Open`) |
+
+### 15.2 🚨 Sai lệch & khoảng trống phát hiện được
+
+| # | Vấn đề | Bằng chứng | Mức độ | Xử lý |
+|---|---|---|---|---|
+| **F1** 🆕 | 🚨 **Hai tài liệu anh em `CAT-001`/`CAT-002` đang DÙNG TRÙNG dải mã lỗi `eCommerce:Catalog:0001–0007` với NGHĨA KHÁC NHAU**: `0003` = *"publish khi không có biến thể"* (`CAT-001`) **vs** = *"vượt trần tổ hợp biến thể"* (`CAT-002`); tương tự `0001`/`0002`/`0004`… Đây **đúng dạng lỗi** *"hai nguồn sự thật cho cùng một mã"* mà `XC-003` **F1** đã cảnh báo | [`cat-001…:404-412`](cat-001-san-pham-va-bien-the-sku.md) **vs** [`cat-002…:456-462`](cat-002-cay-danh-muc-thuoc-tinh-bien-the.md) | 🔴 **Cao** (lỗi im lặng: log/UI/monitoring **không** phân biệt được) | 🔒 **CAT-003 cố ý lấy dải `0201–0212`**; **đề xuất** gom về `CatalogErrorCodes.cs` với dải đã cấp phát — **Q1** |
+| **F2** | **`Product.Slug` KHÔNG có unique index** ⇒ hai sản phẩm có thể **trùng slug** ⇒ SEO trùng lặp + `301` không xác định | [`eCommerceDbContext.cs:106`](../../src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs#L106) (chỉ `HasMaxLength(512)`); migration [`20261013024226…cs:39-86`](../../src/eCommerce.EntityFrameworkCore/Migrations/20261013024226_Fix_NullableTenantId_UniqueIndexes.cs#L39) **không** có `Slug` | 🔴 **Cao** — **chuyển từ `CAT-001` F5 + `WEB-002` F2** sang `CAT-003` | ⬜ **Chưa sửa** — **`CAT-003` SỞ HỮU** bản sửa (§11, TC-03/TC-21). `WEB-002` **đang chờ** |
+| **F3** | **Hoàn toàn CHƯA có entity media hay hiển thị theo kênh** | `grep -E "Media\|Image\|Thumbnail\|Visibility"` trên mọi `*.cs` = **0 kết quả**; `DbContext` chỉ có 2 `DbSet` Catalog ([`eCommerceDbContext.cs:36-37`](../../src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs#L36)) | 🟠 **Trung bình** (đúng kế hoạch GĐ1) | ⬜ Kế hoạch GĐ1 — §5 + §11 |
+| **F4** | 🚨 **KHÔNG có hạ tầng lưu trữ tệp nào**: 0 gói BlobStoring, 0 `wwwroot`, 0 abstraction, 0 storage | `grep -E "BlobStoring\|BlobContainer\|MinIO\|S3\|wwwroot\|StaticFile\|IBlob"` trên `*.cs` = **0**; `Directory.Packages.props` **không** có gói BlobStoring (đã đọc toàn bộ 108 dòng) | 🔴 **Cao** — **ADR-02** phụ thuộc hoàn toàn vào hạ tầng **chưa có** ⇒ **chặn** code upload | 🔴 **Q7** — phải chốt hạ tầng **trước** khi code `IMediaStorage` |
+| **F5** | **`eCommerce.Web` (storefront) CHƯA tồn tại** | `Get-ChildItem src -Directory` = 8 project, **không** có `eCommerce.Web` (khớp `structure-and-techstack.md:62` ghi *"⬅ MỚI"*) | 🟡 **Thấp** (đúng kế hoạch GĐ1) | ⬜ Không chặn `CAT-003` (chỉ cấp dữ liệu + ETO); chặn **kiểm thử end-to-end** |
+| **F6** | **`shared/eCommerce.Kernel` CHƯA tồn tại** ⇒ `Money`/`Currency`/`MoneyAllocator`/`LockKeyPrefix` (hợp đồng `XC-001` §6.1 + `XC-003` §6.1) **chưa có code** | `Test-Path shared` = `False`; `ProductVariant.Price` là `decimal` **trực tiếp** ([`Product.cs:71`](../../src/eCommerce.Domain/Entities/Catalog/Product.cs#L71)) | 🟠 **Trung bình** | ⬜ Kế thừa `EINV-001` **F3**, `CAT-002` **F2**, `NOT-002` **F7**. `CAT-003` **không** giả định có Kernel; media/slug **không** chứa tiền ⇒ **không chặn** |
+| **F7** | **Module `Catalog` CHƯA tách** — entity nằm ở `src/eCommerce.Domain/Entities/Catalog/`; chưa có `CatalogErrorCodes`/`CatalogLockKeys`; `modules/` chỉ có `ChannelHub`, `PaymentHub`, `Tax` | `Get-ChildItem modules -Directory` = 3 mục; §4 `structure-and-techstack.md:65` ghi `modules/Catalog/` là **kế hoạch** | 🟠 **Trung bình** (quy ước #3/#4) | ⬜ Kế hoạch GĐ1. `CAT-003` ghi rõ vị trí **hiện tại** thay vì giả định module đã có |
+| **F8** | 🚨 **HAI quy ước tiền tố khoá lock cùng tồn tại**: `ChannelHubConsts.LockKeys.*` → `channel:…` (**KHÔNG** tiền tố — **đúng**), nhưng `TaxLockKeys.*` → `ecommerce:tax:…` **và** `eCommerceConsts.LockKeys.InventorySku` → `ecommerce:inventory:…` (**CÓ** tiền tố) ⇒ với `KeyPrefix = "ecommerce:"`, khoá thật của Tax/Inventory thành **`ecommerce:ecommerce:…`** (**tiền tố ĐÔI**), vi phạm `XC-003` **§5.4 hệ quả 2** | [`ChannelHubConsts.cs:23,27,31`](../../modules/ChannelHub/eCommerce.ChannelHub.Domain/ChannelHubConsts.cs#L23) **vs** [`TaxErrorCodes.cs:46,50`](../../modules/Tax/eCommerce.Tax.Domain/TaxErrorCodes.cs#L46) **vs** [`eCommerceConsts.cs:104`](../../src/eCommerce.Domain.Shared/eCommerceConsts.cs#L104) **vs** [`eCommerceHttpApiHostModule.cs:127`](../../src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs#L127) | 🔴 **Cao** (lỗi im lặng — đúng loại `XC-003` **F1**: *"khoá không bảo vệ gì cả, và không có lỗi biên dịch nào"*) | ⚠️ **Chưa kiểm chứng bằng `redis-cli MONITOR`** (máy viết tài liệu **không** có Redis) — kế thừa `SHP-002` **F3**, `SAL-002` **F1**, `NOT-002` **F2**, `REP-003` **F5**. 🔒 `CAT-003` **theo đúng quy ước** (**KHÔNG** tiền tố, **ADR-10**) + test `TC-19`; **Q6** chốt toàn hệ thống |
+| **F9** | **`Product.BrandId` MỒ CÔI** — `Guid?` **không** FK, **không** có bảng `Brand` | [`Product.cs:23`](../../src/eCommerce.Domain/Entities/Catalog/Product.cs#L23); DDL [`20261009070214_Initial.cs:24`](../../src/eCommerce.EntityFrameworkCore/Migrations/20261009070214_Initial.cs#L24) | 🟡 **Thấp** cho `CAT-003` (kế thừa `CAT-001` **F1**) | ⬜ Ảnh hưởng **SEO** (thương hiệu trong structured data + `Brand` page, thuộc `CAT-002` **Q3**). `CAT-003` **không** tự tạo bảng `Brand` |
+| **F10** 🆕 | **`ChannelHub` KHÔNG phát sự kiện khi một kênh bị ngừng hoạt động** ⇒ `CAT-003` **không** biết để dọn bản ghi `ProductChannelVisibility` ⇒ *"bản ghi kênh chết"* tồn tại vô nghĩa (vi phạm **BR-011** về mặt dữ liệu lịch sử) | [`ChannelEvents.cs`](../../modules/ChannelHub/eCommerce.ChannelHub.Application.Contracts/Events/ChannelEvents.cs) chỉ có **2** ETO (`ChannelOrderPulledEto`, `ChannelShopTokenRefreshedEto`) — **không** có ETO nào về `Channel` | 🟠 **Trung bình** | ⬜ **Đề xuất** thêm `ChannelDeactivatedEto` (việc của `ChannelHub`, **không** thuộc `CAT-003`). Trong lúc chờ: **job đối chiếu** + log `Warning` (§7.2/§12) |
+| **F11** | **ETO hiện có của `ChannelHub` THIẾU `EventId`** ⇒ **không** đủ khoá idempotency ở consumer | [`ChannelEvents.cs:17-30`](../../modules/ChannelHub/eCommerce.ChannelHub.Application.Contracts/Events/ChannelEvents.cs#L17) — `ChannelOrderPulledEto` **không** có `EventId` (kế thừa `WEB-002` **F9**) | 🟠 **Trung bình** | 🔒 `CAT-003` **bắt buộc** `EventId` trên **mọi** ETO của mình (§7.1) + test `TC-05` |
+| **F12** | **Không có mã lỗi Catalog nào trong app** — `eCommerceConsts.ErrorCodes` chỉ có **2** mã (Inventory + Payment) | [`eCommerceConsts.cs:77-86`](../../src/eCommerce.Domain.Shared/eCommerceConsts.cs#L77) (kế thừa `CAT-001` **F10**) | 🟡 **Thấp** | ⬜ Thêm `CatalogErrorCodes` (dải `02xx` cho `CAT-003` — **Q1**) |
+| **F13** 🆕 | **Chưa có metric nào cho media/SEO/hiển thị theo kênh** — bảng đăng ký chỉ có **12** metric, **0** metric nghiệp vụ Catalog | [`eCommerceMetrics.cs:13-53`](../../src/eCommerce.Domain.Shared/Observability/eCommerceMetrics.cs#L13) | 🟡 **Thấp** | 🔒 **Phải** đăng ký 3 metric mới **trước** khi phát, nếu không `XC-005` **TC-06** **đỏ** (§13) |
+
+### 15.3 Giả định
+
+| # | Giả định | Nếu SAI |
+|---|---|---|
+| 1 | Hệ thống chạy **1 tenant**, `TenantId` **có thể `NULL`** | Nếu luôn có tenant ⇒ **F2/TC-03** nhẹ hơn, **nhưng** vẫn **phải** giữ `NULLS NOT DISTINCT` (`XC-004` **BR-009**) để an toàn |
+| 2 | `AbpDistributedLockOptions.KeyPrefix = "ecommerce:"` **giữ nguyên** | Nếu đổi ⇒ **mọi** khoá thật đổi ⇒ phải cập nhật bảng §8.2 + `XC-003` §5.4 (`CHN-004` §15.2 giả định 6 đã ghi) |
+| 3 | Slug **không** cần đa ngôn ngữ ở GĐ1 | Nếu cần ⇒ phải thêm bảng dịch + slug theo locale ⇒ **đổi** mô hình §5.4 + `WebSlugRoutes` của `WEB-002` |
+| 4 | Trình duyệt/nhân viên tải ảnh **không** cần xử lý ảnh phía server (resize/WebP) ở GĐ1 | Nếu cần ⇒ thêm khối lượng xử lý ảnh (hàng đợi + thư viện) ⇒ **vượt** phạm vi GĐ1 (`WEB-002` ADR-08 đã ghi nợ) |
+| 5 | Media **không** chứa dữ liệu nhạy cảm (không có ảnh khách hàng/PII) | Nếu có ⇒ cần **URL có chữ ký hết hạn** (signed URL) + không cache công khai ⇒ **đổi** BR-003/BR-020 |
+| 6 | Một tệp ảnh **có thể** dùng lại cho nhiều sản phẩm **không** gây vấn đề **bản quyền/khoá xoá** | Nếu gây vấn đề ⇒ chọn `(TenantId, ProductId, Sha256)` — **Q2** quyết định điều này |
+| 7 | Mọi kênh bán đều là **chuỗi** mã (`web`, `shopee`…) và **ổn định** | Nếu đổi mã kênh ⇒ phải migrate dữ liệu visibility; **ADR-09** cố ý **không** dùng FK để đổi mã được mà không cần migration lớn |
+| 8 | `ProductVariant.Price` là `decimal` và **chưa** đi qua `Money` là **chấp nhận được** ở `CAT-003` (feature này không tính tiền) | Nếu `CAT-003` phải trả giá trong DTO ⇒ **bắt buộc** có `Money` (`XC-001`) trước (**F6**) |
+| 9 | `eCommerceConsts.Permissions.*` là nguồn sự thật **duy nhất** cho tên quyền và 5 quyền mới **sẽ** được thêm cùng PR | Nếu không ⇒ tái hiện **đúng** lỗi Phase 0: **`403` cho MỌI người** (`XC-004` **D2/E3**) |
+
+### 15.4 Lịch sử thay đổi
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.1 | 13/10/2026 | *(điền)* | Bản nháp đầu — **lập từ code thật** (`read`/`grep`), không viết theo trí nhớ: xác nhận `Product.Slug` **có** nhưng **không** unique index; **0** entity media/visibility; **0** hạ tầng lưu trữ; **0** `CatalogErrorCodes`/`CatalogLockKeys`; `shared/eCommerce.Kernel` + `eCommerce.Web` **chưa** tồn tại. **13 ADR** · **22 BR** · **12 NFR** · **22 test case** · 3 sơ đồ Mermaid. Trả lời **2 việc `WEB-002` giao**: (1) migration unique index `Slug` `NULLS NOT DISTINCT` (§11), (2) `ProductSlugChangedEto` **CÓ `OldSlug`** (**ADR-05**, trả lời **Q3** của `WEB-002`). Phát hiện **F1** (🚨 **`CAT-001`/`CAT-002` dùng trùng dải mã lỗi `0001–0007` với nghĩa khác nhau**), **F4** (không có hạ tầng lưu trữ), **F10** (`ChannelHub` không phát ETO khi kênh ngừng hoạt động), **F13** (chưa có metric cho media/SEO); kế thừa **F2** (`CAT-001` F5 + `WEB-002` F2 — **CAT-003 sở hữu**), **F6/F7/F8/F9/F11/F12** từ các tài liệu trước |

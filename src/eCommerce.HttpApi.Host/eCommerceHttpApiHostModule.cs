@@ -109,7 +109,10 @@ public class eCommerceHttpApiHostModule : AbpModule
         // Redis dùng cho cả cache và distributed lock.
         Configure<Volo.Abp.Caching.AbpDistributedCacheOptions>(options =>
         {
-            options.KeyPrefix = "eCommerce:";
+            // 🚨 C14 — ĐỒNG NHẤT CHỮ THƯỜNG: trước đây cache dùng "eCommerce:" (E HOA) còn lock dùng
+            // "ecommerce:" (thường) ⇒ hai quy ước tiền tố trong cùng một hệ thống, rất dễ gõ sai khi
+            // vận hành (gỡ cache/khoá treo bằng tay). Nay cả hai dùng "ecommerce:".
+            options.KeyPrefix = "ecommerce:";
         });
 
         Configure<Volo.Abp.DistributedLocking.AbpDistributedLockOptions>(options =>
