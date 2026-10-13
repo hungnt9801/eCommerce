@@ -82,6 +82,16 @@ public class eCommerceHttpApiHostModule : AbpModule
                 // ⚠️ DEV chạy http nên phải tắt; PRODUCTION phải BẬT lại (true) — nếu không sẽ
                 // chấp nhận metadata qua kênh không mã hoá.
                 options.RequireHttpsMetadata = false;
+
+                // 🚨 C9: host TỰ PHÁT và TỰ VALIDATE token trong CÙNG một tiến trình ⇒ claim `aud`
+                // do OpenIddict sinh không nhất thiết khớp giá trị "Audience" cấu hình, và việc
+                // kiểm tra audience sẽ làm MỌI token hợp lệ bị từ chối (đã đo: có token vẫn 401).
+                // ⇒ CHỈ bỏ kiểm tra audience ở Development. Production giữ mặc định (CÓ kiểm tra).
+                if (string.Equals(configuration["ASPNETCORE_ENVIRONMENT"], "Development",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    options.TokenValidationParameters.ValidateAudience = false;
+                }
             });
 
         // Connection string lấy từ appsettings.json (xem ConnectionStrings:Default).
