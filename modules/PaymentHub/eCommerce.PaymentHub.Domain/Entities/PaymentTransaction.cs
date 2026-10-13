@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Volo.Abp.Domain.Entities.Auditing;
 using Volo.Abp.MultiTenancy;
 
@@ -90,7 +91,7 @@ public class PaymentTransaction : FullAuditedAggregateRoot<Guid>, IMultiTenant
     public bool MarkSucceeded(string? providerTransactionId, string? idempotencyKey, string rawPayload, DateTime? paidAtUtc)
     {
         WebhookReceivedCount++;
-        LastWebhookPayload = Truncate(rawPayload, 8000);
+        LastWebhookPayload = Truncate(MaskSensitiveData(rawPayload), 8000);
 
         if (Status == PaymentTransactionStatus.Succeeded)
         {
@@ -108,7 +109,7 @@ public class PaymentTransaction : FullAuditedAggregateRoot<Guid>, IMultiTenant
     public void MarkFailed(string reason, string? rawPayload = null)
     {
         WebhookReceivedCount++;
-        LastWebhookPayload = Truncate(rawPayload ?? LastWebhookPayload, 8000);
+        LastWebhookPayload = Truncate(MaskSensitiveData(rawPayload ?? LastWebhookPayload), 8000);
 
         if (Status == PaymentTransactionStatus.Succeeded)
         {
@@ -126,6 +127,47 @@ public class PaymentTransaction : FullAuditedAggregateRoot<Guid>, IMultiTenant
         Status = RefundedAmount >= Amount
             ? PaymentTransactionStatus.Refunded
             : PaymentTransactionStatus.PartiallyRefunded;
+    }
+
+    /// <summary>
+    /// 🚨 B(C) — CHE DỮ LIỆU NHẠY CẢM trước khi lưu payload thô (phát hiện F2 của `XC-005`).
+    ///
+    /// VÌ SAO: <see cref="LastWebhookPayload"/> lưu payload IPN/webhook **tới 8.000 ký tự** để đối soát
+    /// và xử lý tranh chấp. Payload thật của cổng thanh toán **có thể chứa** số thẻ/tài khoản, token,
+    /// OTP... ⇒ đó là **dữ liệu nhạy cảm nằm trong DB**, và rất dễ bị **ghi tiếp ra log** khi gỡ lỗi.
+    ///
+    /// Che theo 2 lớp:
+    ///   1. Các trường có tên nhạy cảm (`password`, `secret`, `token`, `cardNumber`, `cvv`, `otp`, `pin`…).
+    ///   2. Chuỗi 12–19 chữ số (số thẻ/PAN), kể cả khi có dấu cách hoặc gạch — **giữ lại 4 số cuối**
+    ///      để vẫn đối soát được mà không lưu toàn bộ số thẻ.
+    ///
+    /// 📌 Lưu ý: đây là **giảm thiểu**, không phải bảo đảm. Không bao giờ được coi payload đã lưu là
+    /// "an toàn để in ra log" — xem `XC-005` BR-005.
+    /// </summary>
+    public static string? MaskSensitiveData(string? payload)
+    {
+        if (string.IsNullOrEmpty(payload))
+        {
+            return payload;
+        }
+
+        // Lớp 1: trường có tên nhạy cảm (JSON dạng "tenTruong":"giaTri").
+        var masked = Regex.Replace(
+            payload,
+            """(?i)("(?:password|secret|client_secret|token|access_token|refresh_token|card_?number|cvv|cvc|otp|pin)"\s*:\s*")[^"]*(")""",
+            "$1***$2");
+
+        // Lớp 2: chuỗi 12–19 chữ số (số thẻ/PAN) — giữ 4 số cuối.
+        // 🚨 BUG CỦA CHÍNH TÔI, DO TEST BẮT ĐƯỢC: mẫu đầu tiên `\b(?:\d[ -]?){12,19}\b` cho phép
+        // phần tử CUỐI kết thúc bằng dấu cách ⇒ khớp luôn dấu cách phía sau (`"9704 2292 0000 0001 "`,
+        // len=20) ⇒ `[^4..]` lấy `"001 "` và **mất chữ số cuối**. Mẫu đúng phải BẮT ĐẦU và KẾT THÚC
+        // bằng chữ số: `\d(?:[ -]?\d){11,18}` (tổng 12–19 chữ số).
+        masked = Regex.Replace(
+            masked,
+            @"\d(?:[ -]?\d){11,18}",
+            m => "***" + m.Value[^4..]);
+
+        return masked;
     }
 
     private static string? Truncate(string? value, int max)
