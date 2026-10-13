@@ -503,7 +503,7 @@ public class AuthorizationGuardTests
 | # | Câu hỏi | Cần ai | Trạng thái | Ảnh hưởng |
 |---|---|---|---|---|
 | **Q1** | Allowlist `[AllowAnonymous]` gồm những endpoint nào? | Kiến trúc trưởng | `Open` | Endpoint công khai = bề mặt tấn công |
-| **Q2** | `admin@abp.io / 1q2w3E*` (tài khoản seed) — có **bắt buộc đổi mật khẩu** ở lần đăng nhập đầu không? | Kiến trúc trưởng + Security | `Open` | 🔴 Tài khoản seed có mật khẩu **trong tài liệu** ⇒ rủi ro nếu lên production nguyên trạng |
+| **Q2** | `admin@abp.io / 1q2w3E*` (tài khoản seed) — có **bắt buộc đổi mật khẩu** ở lần đăng nhập đầu không? | Kiến trúc trưởng + Security | ✅ **`Closed` — ĐÃ TRIỂN KHAI** *(13/10/2026)* | Bật cờ **`ShouldChangePasswordOnNextLogin`** cho tài khoản seed + **cảnh báo rõ ra `stderr` khi KHÔNG phải Development**. Đã kiểm chứng cả 2 chế độ |
 | **Q3** | Vòng đời token: access **≤ 1 h**, refresh **≤ 14 ngày** — chấp nhận? | Kiến trúc trưởng | `Open` | Ảnh hưởng trải nghiệm + bảo mật |
 | **Q4** | Có cần **2FA/OTP** cho tài khoản quản trị không? | Kiến trúc trưởng + Security | `Open` | Nếu cần ⇒ thêm luồng + phụ thuộc SMS/Zalo OA (`NOT-002`) |
 | **Q5** | Có cần **đăng nhập Google/Zalo** cho khách hàng không? | BA | `Open` | Ảnh hưởng `WEB-001` + OpenIddict external provider |
