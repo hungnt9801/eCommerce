@@ -94,6 +94,12 @@ public class eCommerceHttpApiHostModule : AbpModule
                 }
             });
 
+        // 🚨 VÁ XC-005 (D8 + §11): health check + correlation id.
+        // ABP 10.7 KHÔNG kèm gói HealthChecks nào (đã quét DLL xác nhận) ⇒ dùng AddHealthChecks() có sẵn
+        // của ASP.NET Core + một check tự viết ⇒ KHÔNG thêm dependency nào.
+        context.Services.AddHealthChecks()
+            .AddCheck<HealthChecks.DatabaseHealthCheck>("database");
+
         // Connection string lấy từ appsettings.json (xem ConnectionStrings:Default).
         Configure<Volo.Abp.Data.AbpDbConnectionOptions>(options =>
         {
@@ -190,6 +196,11 @@ public class eCommerceHttpApiHostModule : AbpModule
         app.UseRouting();
         app.UseCors();
 
+        // 🚨 VÁ XC-005 (D2/BR-001/BR-002): gắn CorrelationId cho MỌI request và trả lại trong response.
+        // Trước đây KHÔNG hề gọi middleware này ⇒ `CorrelationId` chỉ là cột rỗng trong bảng audit của ABP,
+        // không nối được log giữa các tầng (đã kiểm chứng: 12/12 chỗ xuất hiện đều nằm trong migration).
+        app.UseCorrelationId();
+
         // 🔐 Bắt buộc: xác thực TRƯỚC phân quyền. OpenIddict chèn handler vào
         // AuthenticationMiddleware nên /connect/token được xử lý ở đây.
         app.UseAuthentication();
@@ -201,6 +212,14 @@ public class eCommerceHttpApiHostModule : AbpModule
         app.UseAbpSwaggerUI(options =>
         {
             options.SwaggerEndpoint("/swagger/v1/swagger.json", "eCommerce API");
+        });
+
+        // 🚨 VÁ XC-005 (D8): endpoint health check. Trả 200/503, KHÔNG lộ chi tiết (BR-012).
+        // ⚠️ `MapHealthChecks` là extension trên IEndpointRouteBuilder (không phải IApplicationBuilder)
+        // ⇒ phải gọi qua UseEndpoints. Đặt TRƯỚC UseConfiguredEndpoints (hàm map controller của ABP).
+        app.UseEndpoints(endpoints =>
+        {
+            endpoints.MapHealthChecks("/health-status");
         });
 
         app.UseConfiguredEndpoints();
