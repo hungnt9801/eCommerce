@@ -359,6 +359,13 @@ public sealed record TaxRateResolution(
 
 ### 6.3 Đặc tả **Mẫu 01 — Phụ lục III NĐ 174/2025/NĐ-CP** (đọc từ file gốc)
 
+> 🚨 **ĐỌC TRƯỚC KHI CODE — ngữ nghĩa cột (6) ĐÃ ĐƯỢC KẾ TOÁN CHỐT (13/10/2026):**
+> Kế toán chọn **CÂU 1 = B** ⇒ cột **(6) = (3) × thuế suất SAU GIẢM (8%)** = *số thuế ở mức 8%*,
+> **KHÔNG** dùng công thức in trong biểu mẫu `(3) × [(4) − (5)]` ở bảng dưới.
+> Đáp án **B** làm Phần III (`[09] = [08] − [06]`) **nhất quán**; còn công thức in trong mẫu thì mâu thuẫn với chính Phần III.
+> ⚠️ Vẫn **nên** chạy phép thử HTKK 5 phút (nhập 1 dòng) trước khi code — chênh lệch **6 triệu/100 triệu doanh thu**.
+> Chi tiết + cảnh báo đầy đủ: **§15.1.5**.
+
 Nguồn: file gốc *"PHỤ LỤC III (Kèm theo Nghị định số 174/2025/NĐ-CP ngày 30 tháng 6 năm 2025 của Chính phủ) — **Mẫu số 01**"*,
 tiêu đề: *"GIẢM THUẾ GIÁ TRỊ GIA TĂNG THEO NGHỊ QUYẾT SỐ 204/2025/QH15 (Kèm theo Tờ khai thuế GTGT — Kỳ tính thuế: Tháng…/Quý…/Lần phát sinh ngày…)"*
 
@@ -680,8 +687,8 @@ public class TaxRateResolverTests
 | **Q5** | Bản ghi phân loại có cần **đính kèm** văn bản/công văn làm căn cứ? | Kế toán trưởng | ✅ **`Closed` — CHƯA CẦN ở giai đoạn này** *(chốt 12/10/2026)* | Dùng trường **văn bản** `LegalBasisNote` (số công văn / mã HS). Nếu sau này cần tệp đính kèm ⇒ thêm bảng attachment, **không đổi mô hình dữ liệu hiện tại** |
 | **Q6** | Khi luật **gia hạn** mức 8% sau 31/12/2026: ai cập nhật, có cần duyệt không? | Kế toán trưởng | ✅ **`Closed` — KẾ TOÁN TRƯỞNG sửa, CÓ DUYỆT + AUDIT** *(chốt 12/10/2026)* | Thành **BR-011**: đổi khung hiệu lực phải **duyệt + audit**, và **cấm lùi hiệu lực về quá khứ**. Quyền đổi chuyển từ *host admin* → **kế toán trưởng** (§9). Kiểm bằng **TC-21** |
 | **Q7** | Có cần **báo cáo đối chiếu** giữa phân loại và doanh thu theo SKU để phát hiện phân loại sai? | Kiến trúc trưởng | ✅ **`Closed` — CÓ** *(chốt 12/10/2026)* | Yêu cầu được ghi nhận và **giao cho module `REP-*`** (báo cáo đối chiếu phân loại ↔ doanh thu theo SKU). **Không** thuộc phạm vi `XC-006`; tài liệu này chỉ cung cấp dữ liệu phân loại |
-| **Q8** | 🚩 Cột **(6)** của Mẫu 01: nhãn ghi *"Thuế GTGT của hàng hóa, dịch vụ bán ra **được giảm**"* nhưng công thức in trong mẫu là `(3) × [(4) − (5)]` = **(3) × 2%** ⇒ cho ra **số thuế ĐƯỢC GIẢM**, không phải số thuế ở mức 8%. Cách hiểu nào đúng? *(chi tiết + ví dụ số ở §15.1.4)* | **Kế toán trưởng** | `Open` | 🔴 Hiểu sai ⇒ **xuất Mẫu 01 sai số** ⇒ phải sửa và kê khai lại |
-| **Q9** | Mẫu 01 cần xuất **đúng định dạng file nộp được** của cơ quan thuế/HTKK, hay chỉ cần **bảng số liệu** để kế toán nhập lại? *(chi tiết ở §15.1.4)* | Kế toán trưởng | `Open` | Nếu phải đúng định dạng ⇒ cần **file mẫu chính thức**; nếu chỉ cần số liệu ⇒ tự thiết kế bảng |
+| **Q8** | 🚩 Cột **(6)** của Mẫu 01: nhãn ghi *"Thuế GTGT của hàng hóa, dịch vụ bán ra **được giảm**"* nhưng công thức in trong mẫu là `(3) × [(4) − (5)]` = **(3) × 2%** ⇒ cho ra **số thuế ĐƯỢC GIẢM**, không phải số thuế ở mức 8%. Cách hiểu nào đúng? *(chi tiết + ví dụ số ở §15.1.4)* | **Kế toán trưởng** | ✅ `Closed` — **CÂU 1 = B**: cột **(6) = (3) × thuế suất SAU GIẢM (8%)** = **8.000.000 đ** cho ví dụ 100 triệu (KHÔNG dùng công thức in trong mẫu `(3)×[(4)−(5)]` = 2.000.000 đ). ⚠️ **Kèm cảnh báo bắt buộc** — xem §15.1.5 | 🔴 Hiểu sai ⇒ **xuất Mẫu 01 sai số** ⇒ phải sửa và kê khai lại |
+| **Q9** | Mẫu 01 cần xuất **đúng định dạng file nộp được** của cơ quan thuế/HTKK, hay chỉ cần **bảng số liệu** để kế toán nhập lại? *(chi tiết ở §15.1.4)* | Kế toán trưởng | ✅ `Closed` — **CÂU 2 = A**: cần **file NỘP ĐƯỢC LUÔN** (import HTKK/eTax). 🚧 **CHẶN**: phải có **1 file mẫu do HTKK xuất ra** ⇒ thiết kế lớp ánh xạ định dạng tách riêng (HTKK đổi theo phiên bản). Xem §15.1.5 | Nếu phải đúng định dạng ⇒ cần **file mẫu chính thức**; nếu chỉ cần số liệu ⇒ tự thiết kế bảng |
 
 #### 15.1.4 ❓ Q8 & Q9 — nội dung để hỏi kế toán *(copy gửi thẳng được)*
 
@@ -744,3 +751,48 @@ hoặc xem chỉ tiêu **[08]** và **[09]** mà HTKK sinh ra rồi đối chi�
 |---|---|---|---|
 | v0.1 | 12/10/2026 | *(điền)* | Bản nháp đầu — thiết kế theo yêu cầu: **không hard-code danh mục Phụ lục I/II**, để **kế toán tự quyết định** |
 | v0.4 | 13/10/2026 | *(điền)* | 🚀 **Bắt đầu triển khai**: thêm module `Tax` (Domain + EF Core), migration 2 bảng + ràng buộc `EXCLUDE USING gist`, seed 4 mức thuế, 7 permission, **17 unit test** (solution: **37/37 pass**, build 0 lỗi/0 warning). Thêm **§14.5 trạng thái triển khai** và **`XC-006-phieu-hoi-ke-toan.md`** (phiếu hỏi kế toán cho Q8/Q9). ⚠️ Ghi rõ phần **chưa kiểm chứng**: `EXCLUDE`/migration/seed chưa chạy trên PostgreSQL thật |
+
+#### 15.1.5 ✅ TRẢ LỜI Q8 & Q9 (nhận 13/10/2026) + ⚠️ CẢNH BÁO BẮT BUỘC
+
+**Kế toán trả lời:** **Câu 1 = B** · **Câu 1b = A** · **Câu 2 = A**
+
+| Câu | Trả lời | Hệ quả cho hệ thống |
+|---|---|---|
+| **1** | **B** — cột (6) theo **tên cột**: `(3) × 8%` | Cột (6) = **số thuế GTGT ở mức 8%** của hàng bán ra (ví dụ 100 tr ⇒ **8.000.000 đ**) |
+| **1b** | **A** — Phần II **CHỈ liệt kê hàng thuộc diện giảm (8%)** | ✅ Đơn giản cho hệ thống: lọc theo `TaxClassification.Kind = Reduced` (mã `VAT8`), **không** đưa dòng 10%/5% vào Phần II |
+| **2** | **A** — cần **file nộp được luôn** | 🚧 **Chặn triển khai** cho tới khi có **1 file mẫu do HTKK xuất ra** |
+
+##### 🚩 CẢNH BÁO 1 — Trả lời "B" **MÂU THUẪN** với công thức in trong biểu mẫu
+
+| | Công thức | Kết quả cho ví dụ 100 triệu |
+|---|---|---|
+| **Công thức in trong mẫu** | `(6) = (3) × [(4) − (5)]` = `(3) × 2%` | **2.000.000 đ** |
+| **Trả lời "B"** | `(6) = (3) × (5)` = `(3) × 8%` | **8.000.000 đ** |
+
+⇒ **Lệch 6.000.000 đ cho mỗi 100 triệu doanh thu.** Nếu chọn sai ⇒ **kê khai sai, phải làm lại tờ khai**.
+
+**📌 Nhưng "B" lại có cơ sở nội tại — đây là lý do tôi KHÔNG bác bỏ câu trả lời:**
+Phần III của mẫu tính `[09] = [08] − [06]`.
+- Nếu **(6) = thuế ở mức 8%** (đáp án B) ⇒ `[09] = [08] − [06]` = **đúng số thuế ĐƯỢC GIẢM** ✅ **nhất quán**
+- Nếu **(6) = số thuế được giảm** (công thức in trong mẫu) ⇒ `[08] − [06]` sẽ **trừ hai lần** ❌ **mâu thuẫn**
+
+⇒ Biểu mẫu **tự mâu thuẫn** giữa công thức của cột (6) và công thức của Phần III. Đáp án **B** chọn cách hiểu làm Phần III **nhất quán**.
+
+##### ✅ Việc kiểm chứng 5 phút — **NÊN LÀM trước khi viết code xuất file**
+
+Phiếu hỏi đã đề nghị cách dễ nhất: **mở HTKK, nhập thử 1 dòng** (doanh thu 100.000.000 · (4) = 10% · (5) = 8%) rồi đọc **cột (6)** và **[08] / [09]**.
+Kế toán **chưa** ghi lại 2 con số này (mới chọn theo tên cột).
+
+> 🔒 **Khuyến nghị:** coi Q8 là **`Closed` về mặt nghiệp vụ** (theo kế toán trưởng — người có thẩm quyền), nhưng
+> **trước khi code** hãy chạy phép thử HTKK ở trên. Với mức lệch **6 triệu/100 triệu doanh thu**, một phép thử
+> 5 phút là rẻ hơn rất nhiều so với việc xuất sai rồi kê khai lại.
+
+##### 🚧 CẢNH BÁO 2 — Q9 = A tạo **điều kiện chặn**
+
+Cần **1 file mẫu do HTKK xuất ra** (hoặc file nộp mẫu của cơ quan thuế) để khớp **chính xác** định dạng ô/cột.
+Chưa có file ⇒ **chưa thể code phần xuất file**.
+
+**Thiết kế để giảm rủi ro bảo trì** (HTKK đổi định dạng theo phiên bản):
+1. Tách **lớp ánh xạ định dạng** (`IMau01Exporter`) khỏi lớp tính số ⇒ đổi định dạng **chỉ sửa 1 chỗ**.
+2. Số liệu tính bằng **cùng một hàm thuần** dùng chung cho cả bản Excel "bảng số liệu" (dự phòng).
+3. Ghi **version định dạng** đã dùng vào tệp xuất (truy vết được kỳ nào xuất bằng format nào).

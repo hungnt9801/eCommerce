@@ -79,22 +79,24 @@ Phần II của Mẫu 01 liệt kê **những hàng nào**?
 ## PHẦN TRẢ LỜI
 
 **Câu 1 — Cột (6) = ?**
-…………………………………………………………………………………………………………………
+✅ **B** — tính theo TÊN CỘT: `(3) × 8%` ⇒ ví dụ 100 triệu cho ra **8.000.000 đ**
 
 **Câu 1b — Phần II liệt kê hàng nào?**
-…………………………………………………………………………………………………………………
+✅ **A** — CHỈ hàng hoá/dịch vụ **thuộc diện được giảm (8%)**
 
 **Câu 2 — Chọn phương án (A hay B):**
-…………………………………………………………………………………………………………………
+✅ **A** — cần **file nộp được luôn** (import HTKK/eTax)
 
 **Ghi chú thêm (nếu có):**
-…………………………………………………………………………………………………………………
-…………………………………………………………………………………………………………………
+⚠️ Phiếu hỏi đã đề nghị phép thử HTKK 5 phút (nhập 1 dòng: 100.000.000 · (4)=10% · (5)=8%) và ghi lại
+cột (6) + chỉ tiêu [08]/[09]. **Kế toán chưa ghi 2 con số này.** Với mức lệch **6 triệu/100 triệu doanh thu**,
+đề nghị bổ sung phép thử này TRƯỚC khi lập trình xuất file.
+🚧 Phương án A của Câu 2 cần **1 file mẫu do HTKK xuất ra** — hiện CHƯA có ⇒ chưa thể code phần xuất file.
 
 | | |
 |---|---|
-| Ngày trả lời | ……… / ……… / ……… |
-| Người trả lời | ……………………………………… |
+| Ngày trả lời | **13 / 10 / 2026** |
+| Người trả lời | **Kế toán trưởng** |
 | Chức vụ | ……………………………………… |
 
 ---
