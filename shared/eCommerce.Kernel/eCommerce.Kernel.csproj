@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>eCommerce.Kernel</RootNamespace>
+    <!-- Gói ABP lấy theo Directory.Packages.props (một phiên bản ABP duy nhất cho cả solution). -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Chỉ cần Abp.Core để dùng BusinessException + mã lỗi theo quy ước chung.
+         KHÔNG tham chiếu EF/Ddd ⇒ Kernel là thư viện THUẦN, test được không cần hạ tầng. -->
+    <PackageReference Include="Volo.Abp.Core" />
+  </ItemGroup>
+
+</Project>

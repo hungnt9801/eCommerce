@@ -15,6 +15,9 @@
     <Project Path="modules/Tax/eCommerce.Tax.Domain/eCommerce.Tax.Domain.csproj" />
     <Project Path="modules/Tax/eCommerce.Tax.EntityFrameworkCore/eCommerce.Tax.EntityFrameworkCore.csproj" />
   </Folder>
+  <Folder Name="/shared/">
+    <Project Path="shared/eCommerce.Kernel/eCommerce.Kernel.csproj" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/eCommerce.Application.Contracts/eCommerce.Application.Contracts.csproj" />
     <Project Path="src/eCommerce.Application/eCommerce.Application.csproj" />

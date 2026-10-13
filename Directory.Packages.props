@@ -19,6 +19,7 @@
        xem docs/abp-modules-plan.md để biết kế hoạch, lệnh và thứ tự cụ thể.
   -->
   <ItemGroup Label="ABP framework (LGPL-3.0)">
+    <PackageVersion Include="Volo.Abp.Core" Version="10.7.0" />
     <PackageVersion Include="Volo.Abp.Account.Application" Version="10.7.0" />
     <PackageVersion Include="Volo.Abp.Account.Application.Contracts" Version="10.7.0" />
     <PackageVersion Include="Volo.Abp.AuditLogging.Domain" Version="10.7.0" />
