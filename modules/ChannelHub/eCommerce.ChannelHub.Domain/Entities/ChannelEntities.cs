@@ -89,7 +89,7 @@ public class ChannelShop : FullAuditedAggregateRoot<Guid>, IMultiTenant
 
     /// <summary>
     /// Ghi token mới. CHỈ được gọi khi đang giữ distributed lock
-    /// <c>eCommerceConsts.LockKeys.ChannelTokenRefresh(ChannelCode, ExternalShopId)</c>:
+    /// <c>ChannelHubConsts.LockKeys.ChannelTokenRefresh(ChannelCode, ExternalShopId)</c>:
     /// refresh token có rotate nên hai worker refresh song song sẽ làm mất token tốt.
     /// </summary>
     public void SetTokens(

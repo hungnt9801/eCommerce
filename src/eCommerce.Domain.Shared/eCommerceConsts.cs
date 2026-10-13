@@ -86,15 +86,18 @@ public static class eCommerceConsts
     /// <summary>Tên khoá distributed lock — mọi nơi phải dùng chung hàm này để không lệch khoá.</summary>
     public static class LockKeys
     {
-        /// <summary>Khoá khi refresh token của một shop trên một kênh (token có rotate → phải tuần tự).</summary>
-        public static string ChannelTokenRefresh(string channelCode, string shopId)
-            => $"ecommerce:channel:{channelCode}:{shopId}:token-refresh";
-
-        /// <summary>Khoá khi đẩy tồn kho/giá của một shop lên sàn.</summary>
-        public static string ChannelStockPush(string channelCode, string shopId)
-            => $"ecommerce:channel:{channelCode}:{shopId}:stock-push";
+        // 🚨 F1 — XC-003 §15.2: khoá của miền KÊNH đã được XOÁ khỏi đây (13/10/2026).
+        // Trước đó chúng tồn tại ở CẢ HAI nơi với CHUỖI KHÁC NHAU:
+        //   • ở đây: `ecommerce:channel:{channelCode}:{shopId}:token-refresh`
+        //   • ở module: `channel:{channelCode}:{shopId}:token-refresh`  (thiếu tiền tố `ecommerce:`)
+        // ⇒ Nếu hai đoạn code dùng hai bản khác nhau thì khoá KHÔNG bảo vệ gì, và KHÔNG có lỗi biên dịch nào.
+        // Khoá của miền kênh do CHÍNH module ChannelHub sở hữu — xem ChannelHubConsts.LockKeys.
 
         /// <summary>Khoá khi trừ tồn kho của một SKU trong một kho.</summary>
+        /// <remarks>
+        /// 📌 F4 — XC-003 §15.2: khoá này còn nằm ở app vì entity Inventory hiện ở <c>src/</c>.
+        /// Khi tách module Inventory (GĐ1) thì chuyển khoá này về module đó (quy ước D3 của XC-003).
+        /// </remarks>
         public static string InventorySku(string warehouseId, string sku)
             => $"ecommerce:inventory:{warehouseId}:{sku}";
 

@@ -837,7 +837,7 @@ public abstract class IntegrationEventBase
 | 3 | 2 webhook giống nhau đến **cùng lúc** | UNIQUE index `(TenantId, EventType, IdempotencyKey)` ⇒ **1 thắng**, luồng kia bắt `DbUpdateException` ⇒ trả `DuplicateIgnored` (**TC-09**) |
 | 4 | 2 người bấm **phát lại** cùng bản ghi DLQ | `RowVersion` + `UPDATE … WHERE Status = DeadLettered` ⇒ 1 thắng; luồng kia **ném** `0005`/`0006` |
 | 5 | Cùng lúc: relay phát lại sự kiện **và** handler đang xử lý bản ghi cũ | Chống trùng ở tầng nghiệp vụ (`InboxRecords`) là **chốt cuối** — tầng transport **không** đảm bảo |
-| 6 | Job định kỳ chạy **chồng** (instance trước chưa xong) | Khoá phân tán theo tên job: `messaging:job:{jobName}:{tenantId}` + `InboxRecords` khoá `{JobName}:{kỳ}` |
+| 6 | Job định kỳ chạy **chồng** (instance trước chưa xong) | Khoá phân tán theo tên job: `ecommerce:messaging:job:{jobName}:{tenantId}` + `InboxRecords` khoá `{JobName}:{kỳ}` |
 | 7 | Đổi trạng thái bản ghi inbox đồng thời | `RowVersion` (`xmin` của PostgreSQL) + `ExecuteUpdateAsync` có điều kiện |
 
 **Khoá phân tán dùng trong feature** *(tên chính xác — theo quy ước `XC-003`)*
@@ -849,8 +849,8 @@ public abstract class IntegrationEventBase
 | `order:{tenantId}:{orderId}` | theo đơn | chống 2 luồng cùng đổi trạng thái/ghi nhận thanh toán cho cùng đơn |
 | `tax:classification:{tenantId}:{targetId}` | theo SKU/danh mục (theo `XC-006`) | chống 2 kế toán cùng sửa phân loại — consumer của `TaxClassificationApprovedEto` cũng dùng khoá này |
 | `payment:{tenantId}:{orderId}` | theo đơn | chống 2 IPN song song tạo 2 giao dịch |
-| `messaging:dlq-replay:{tenantId}` | theo tenant | chỉ 1 tiến trình phát lại DLQ cho một tenant tại một thời điểm (tránh replay chồng) |
-| `messaging:job:{jobName}:{tenantId}` | theo job + tenant | chống job định kỳ chạy chồng |
+| `ecommerce:messaging:dlq-replay:{tenantId}` | theo tenant | chỉ 1 tiến trình phát lại DLQ cho một tenant tại một thời điểm (tránh replay chồng) |
+| `ecommerce:messaging:job:{jobName}:{tenantId}` | theo job + tenant | chống job định kỳ chạy chồng |
 
 > ⚠️ **Mất Redis ⇒ mất khoá** ⇒ **không** được dựa **duy nhất** vào lock. Bất biến **phải** được bảo vệ thêm bằng **ràng buộc DB** (unique index, `RowVersion`, `UPDATE … WHERE`).
 
@@ -1155,7 +1155,7 @@ public class MessagingTests : eCommerceTestBase<eCommerceEntityFrameworkCoreTest
 > (`eCommerce.Messaging.Domain` / `.Application` / `.Contracts`), mã lỗi `eCommerce:Messaging:*`.
 > Các **định danh vận hành** dùng tiền tố **chữ thường** `messaging`: route `/api/app/messaging/*` ·
 > metric `messaging_outbox_pending`, `messaging_inbox_failed`, `messaging_dlq_size`, `messaging_dlq_replayed` ·
-> lock key `messaging:job:{jobName}:{tenantId}`, `messaging:dlq-replay:{tenantId}`.
+> lock key `ecommerce:messaging:job:{jobName}:{tenantId}`, `ecommerce:messaging:dlq-replay:{tenantId}`.
 > ⇒ **Cùng một từ, chỉ khác hoa/thường** theo quy ước .NET (type/namespace viết hoa; route/metric/khoá viết thường)
 > ⇒ nếu grep thấy `messaging` chữ thường thì đó **không phải** chỗ sót.
 

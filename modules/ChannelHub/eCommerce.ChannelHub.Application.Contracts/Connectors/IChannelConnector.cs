@@ -105,7 +105,7 @@ public interface IChannelConnector
 
     /// <summary>
     /// Refresh access token. BẮT BUỘC được gọi trong distributed lock per-shop
-    /// (xem <c>eCommerceConsts.LockKeys.ChannelTokenRefresh</c>).
+    /// (xem <c>ChannelHubConsts.LockKeys.ChannelTokenRefresh</c>).
     /// </summary>
     Task<RefreshTokenResult> RefreshTokenAsync(ChannelShopContext shop, CancellationToken cancellationToken = default);
 

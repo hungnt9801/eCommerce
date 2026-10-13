@@ -483,8 +483,8 @@ Một giai đoạn **chỉ được bắt đầu code** khi:
 | Hướng dẫn + bảng sửa đổi so với tài liệu tham khảo | ✅ đã viết |
 | Danh sách 52 tài liệu | ✅ đã liệt kê (A.3) |
 | Script kiểm tra Mermaid | ✅ `npm --prefix tools run check:mermaid` — 7/7 khối PASS |
-| **Tài liệu thực tế** | 🟡 **3/52** — `XC-001` + `XC-002` + `XC-006` (**Draft**, chờ review) |
-| `XC-003`…`XC-005` | ⬜ chưa viết |
+| **Tài liệu thực tế** | 🟡 **4/52** — `XC-001` + `XC-002` + `XC-003` + `XC-006` (**Draft**, chờ review) |
+| `XC-004`…`XC-005` | ⬜ chưa viết |
 
 ### A.8 Tài liệu đã viết
 
@@ -492,4 +492,5 @@ Một giai đoạn **chỉ được bắt đầu code** khi:
 |---|---|---|---|
 | `XC-001` | [Money, Currency & chính sách làm tròn](features/XC-001-money-currency-lam-tron.md) | 🟡 `Draft` | 630 dòng · 7 quyết định thiết kế (ADR) · 12 BR · 6 NFR · 15 test case · **6/6 câu hỏi đã đóng** |
 | `XC-002` | [Outbox/Inbox & chống trùng sự kiện](features/XC-002-outbox-inbox-chong-trung-su-kien.md) | 🟡 `Draft` | **1196 dòng** · 12 ADR · **21 BR** · 13 NFR · **38 test case** · 2 state machine · 4 bảng trong data dictionary · ✅ **4 câu hỏi đã chốt 13/10/2026**: transport **in-process** · module **`Messaging`** · ngưỡng thử **5** · job DLQ **1 phút** · 🔍 đã **xác minh độc lập bằng quét 424 DLL ABP 10.7** (xác nhận **không** có `IsEventOrderingEnabled`) |
+| `XC-003` | [Khoá phân tán: quy ước & phạm vi](features/XC-003-khoa-phan-tan-quy-uoc.md) | 🟡 `Draft` | **bảng đăng ký khoá lập từ CODE THẬT** (8 khoá + 2 khoá ABP) · 10 ADR · 10 BR · 7 NFR · 14 test case · 🚨 **phát hiện F1: khoá kênh định nghĩa 2 nơi cho ra 2 CHUỖI KHÁC NHAU** (`ecommerce:channel:…` vs `channel:…`) ⇒ dùng lẫn là **khoá không bảo vệ gì** — **đã sửa**; **F3** (khoá Messaging thiếu tiền tố) **đã sửa**; **F2/F4** ghi nhận |
 | `XC-006` | [Phân loại thuế GTGT theo SKU](features/XC-006-phan-loai-thue-gtgt.md) | 🟡 `Draft` → 🚀 **đang triển khai** | **11 BR** · 8 NFR · **22 test case** · **7/9 câu hỏi đã đóng** · đặc tả **Mẫu 01 (Phụ lục III)** từ **file gốc** · danh mục Phụ lục I/II là **dữ liệu**, không hard-code · ✅ **code lõi xong**: module `Tax` (Domain+EFCore), migration + `EXCLUDE USING gist`, seed 4 mức thuế, **17 unit test** (⚠️ chưa chạy trên PostgreSQL thật) |
