@@ -131,13 +131,13 @@ dotnet run --project src/eCommerce.DbMigrator           # tạo 46 bảng + seed
 dotnet run --project src/eCommerce.HttpApi.Host         # chạy API
 
 # (1) API phải trả 401 khi không có token
-curl.exe -i http://localhost:5099/api/app/channel/shops
+curl.exe -i http://localhost:5000/api/app/channel/shops
 
 # (2) Lấy token bằng grant password
-curl.exe -X POST http://localhost:5099/connect/token -d "grant_type=password&client_id=eCommerce_App&client_secret=1q2w3e*&username=admin@abp.io&password=1q2w3E*&scope=eCommerce offline_access"
+curl.exe -X POST http://localhost:5000/connect/token -d "grant_type=password&client_id=eCommerce_App&client_secret=1q2w3e*&username=admin@abp.io&password=1q2w3E*&scope=eCommerce offline_access"
 
 # (3) Gọi API bằng token → kỳ vọng 200
-curl.exe -H "Authorization: Bearer <access_token>" http://localhost:5099/api/app/channel/shops
+curl.exe -H "Authorization: Bearer <access_token>" http://localhost:5000/api/app/channel/shops
 ```
 
 **Kỳ vọng đọc log:** sau ~60 giây phải thấy supervisor của ChannelHub đăng ký worker động cho shop

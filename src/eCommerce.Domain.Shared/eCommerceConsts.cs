@@ -77,9 +77,11 @@ public static class eCommerceConsts
     public static class ErrorCodes
     {
         public const string InsufficientStock = "eCommerce:Inventory:0001";
-        public const string ChannelShopNotFound = "eCommerce:Channel:0001";
-        public const string ChannelTokenExpired = "eCommerce:Channel:0002";
-        public const string ChannelRateLimited = "eCommerce:Channel:0003";
+        // 🚨 F2 của XC-003 — ĐÃ XOÁ 3 mã lỗi miền KÊNH khỏi đây (13/10/2026):
+        // chúng trùng khái niệm với ChannelHubErrorCodes nhưng KHÁC định dạng
+        // ("eCommerce:Channel:*" vs "ChannelHub:*") ⇒ hai nguồn sự thật cho cùng một mã lỗi.
+        // Theo quy ước "module sở hữu hằng số của mình", mã lỗi miền kênh nay CHỈ nằm ở
+        // ChannelHubConsts.cs, đã chuẩn hoá về dạng "eCommerce:Channel:*".
         public const string PaymentSignatureInvalid = "eCommerce:Payment:0001";
     }
 

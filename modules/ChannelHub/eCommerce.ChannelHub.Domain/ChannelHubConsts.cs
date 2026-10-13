@@ -35,8 +35,8 @@ public static class ChannelHubConsts
 /// <summary>Mã lỗi của miền kênh.</summary>
 public static class ChannelHubErrorCodes
 {
-    public const string ChannelShopNotFound = "ChannelHub:0001";
-    public const string ChannelTokenExpired = "ChannelHub:0002";
-    public const string ChannelRateLimited = "ChannelHub:0003";
-    public const string ChannelNotSupported = "ChannelHub:0004";
+    public const string ChannelShopNotFound = "eCommerce:Channel:0001";
+    public const string ChannelTokenExpired = "eCommerce:Channel:0002";
+    public const string ChannelRateLimited = "eCommerce:Channel:0003";
+    public const string ChannelNotSupported = "eCommerce:Channel:0004";
 }
