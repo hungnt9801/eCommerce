@@ -9,6 +9,7 @@ using Volo.Abp.PermissionManagement;
 using Volo.Abp.PermissionManagement.Identity;
 using Volo.Abp.PermissionManagement.OpenIddict;
 using Volo.Abp.SettingManagement;
+using Volo.Abp.Timing;
 
 namespace eCommerce;
 
@@ -41,4 +42,22 @@ namespace eCommerce;
 )]
 public class eCommerceDomainModule : AbpModule
 {
+    public override void ConfigureServices(ServiceConfigurationContext context)
+    {
+        // 🚨 BUG ĐÃ SỬA — CHỈ CHẠY THẬT VỚI POSTGRESQL MỚI LỘ RA:
+        //
+        // ABP mặc định `AbpClockOptions.Kind = Unspecified`, và khi đó `Clock.Now` trả về
+        // `DateTime.Now` ⇒ Kind = **Local**. Npgsql 10 (không bật legacy timestamp behaviour)
+        // **TỪ CHỐI** ghi DateTime Kind=Local vào cột `timestamp with time zone`:
+        //   "Cannot write DateTime with Kind=Local to PostgreSQL type 'timestamp with time zone',
+        //    only UTC is supported."
+        // ⇒ Seeder chết ngay khi tạo user đầu tiên, và biểu hiện là `DbUpdateException` rất khó đoán.
+        //
+        // Ép Kind = Utc để `Clock.Now` trả `DateTime.UtcNow`. Đây cũng là quy ước bất di bất dịch:
+        // **mọi thời điểm lưu trong DB là UTC** (cột đã đặt tên hậu tố `...AtUtc`).
+        Configure<AbpClockOptions>(options =>
+        {
+            options.Kind = DateTimeKind.Utc;
+        });
+    }
 }

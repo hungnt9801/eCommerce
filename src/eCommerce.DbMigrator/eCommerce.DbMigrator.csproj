@@ -10,6 +10,16 @@
     <ProjectReference Include="..\eCommerce.EntityFrameworkCore\eCommerce.EntityFrameworkCore.csproj" />
   </ItemGroup>
 
+  <!-- 🚨 BUG ĐÃ SỬA (chạy thật mới lộ ra):
+       appsettings.json KHÔNG được copy vào bin ⇒ lúc chạy app không có connection string
+       ⇒ ném lỗi, bị catch trong Program.cs, ghi qua ILogger<Program> NHƯNG không có console
+       provider ⇒ IM LẶNG hoàn toàn, chỉ thấy exit code 1. -->
+  <ItemGroup>
+    <None Update="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Volo.Abp.Autofac" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" />

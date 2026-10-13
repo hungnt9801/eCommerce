@@ -44,6 +44,13 @@ public class Program
         }
         catch (Exception ex)
         {
+            // 🚨 SỬA LỖI ĐÃ GẶP THẬT (khi mới bật PostgreSQL):
+            // Trước đây chỉ ghi qua ILogger<Program>, NHƯNG app console không đăng ký logging
+            // provider nào ⇒ log đi vào hư không ⇒ migration thất bại mà KHÔNG có một dòng
+            // thông báo, chỉ thấy exit code 1. Ghi thẳng ra stderr để luôn nhìn thấy.
+            Console.Error.WriteLine("=== MIGRATION THẤT BẠI ===");
+            Console.Error.WriteLine(ex.ToString());
+
             application.ServiceProvider
                 .GetRequiredService<ILogger<Program>>()
                 .LogError(ex, "Migration thất bại.");
