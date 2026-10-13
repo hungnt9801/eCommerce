@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>eCommerce.Messaging</RootNamespace>
+    <AssemblyName>eCommerce.Messaging.Domain</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Ddd.Domain: entity + repository port. DistributedLocking: IAbpDistributedLock cho bước giành khoá. -->
+    <PackageReference Include="Volo.Abp.Ddd.Domain" />
+    <PackageReference Include="Volo.Abp.DistributedLocking" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Kernel để dùng Money khi ghi kết quả (ví dụ số tiền đã xử lý) — chưa dùng ngay nhưng là hướng chung.
+         ⚠️ Từ modules/Messaging/eCommerce.Messaging.Domain phải lên **3** cấp mới tới gốc repo. -->
+    <ProjectReference Include="..\..\..\shared\eCommerce.Kernel\eCommerce.Kernel.csproj" />
+  </ItemGroup>
+
+</Project>

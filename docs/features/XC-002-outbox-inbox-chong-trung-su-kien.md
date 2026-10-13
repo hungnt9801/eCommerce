@@ -1210,3 +1210,35 @@ Bài học eShop: [dotnet/eShop](https://github.com/dotnet/eShop) (khảo sát m
 |---|---|---|---|
 | v0.1 | 12/10/2026 | *(điền)* | Bản nháp đầu — thiết kế **outbox/inbox có relay thật**, **inbox nghiệp vụ có đủ 5 chiều chống trùng**, **DLQ + job phát lại + cảnh báo**, quy tắc **ordering theo aggregate**, **idempotency key ổn định**, 2 state machine (outbox/inbox) có bảng guard ném lỗi. **21 BR · 13 NFR · 38 test case**. Toàn bộ kết luận về ABP 10.7 được **kiểm chứng từ mã nguồn + gói NuGet thật**; 8 điểm chưa chắc chắn được đưa vào **§15.1.1 "cần xác minh"** thay vì khẳng định |
 
+
+---
+
+## 14.6 ✅ TRẠNG THÁI TRIỂN KHAI (13/10/2026) — **mục (a) đã xong phần LÕI**
+
+Module **`Messaging`** đã được tạo theo **Q2** (`modules/Messaging/eCommerce.Messaging.Domain/`), và hợp đồng
+**chống trùng ở biên vào** đã có code + test:
+
+| Thành phần | Tệp | Ghi chú |
+|---|---|---|
+| `IIdempotencyGuard` + `IdempotencyGuard` | `Idempotency/IdempotencyGuard.cs` | Bọc **toàn bộ** xử lý (kiểm tra + chạy) trong **một** lần gọi, **tuần tự hoá bằng khoá phân tán** — chống đúng lỗi "kiểm tra rồi mới xử lý" ở hai bước rời nhau |
+| `IdempotencyKey` | `Idempotency/IdempotencyModels.cs` | Có **scope** (cùng giá trị khác miền là hai yêu cầu khác nhau); chuẩn hoá `trim` |
+| `IdempotencyRecord` | `Idempotency/IdempotencyRecord.cs` | State machine **NÉM LỖI** khi chuyển sai; có `PayloadHashVersion` (**Q9**) |
+| `CanonicalJsonHasher` | `Idempotency/CanonicalJsonHasher.cs` | JSON **chuẩn hoá** (thứ tự thuộc tính, khoảng trắng, `1` vs `1.0`); **phiên bản nằm trong đầu vào băm** ⇒ không sinh xung đột GIẢ sau nâng cấp |
+| `IIdempotencyStore` + `InMemoryIdempotencyStore` | `Idempotency/IIdempotencyStore.cs` | Cổng lưu trữ; bản in-memory **⚠️ chỉ cho test** (đã ghi rõ trong XML doc) |
+| `MessagingErrorCodes` | `Idempotency/MessagingErrorCodes.cs` | `eCommerce:Messaging:0001` xung đột payload · `0002` đang xử lý (**409** theo `XC-003` Q4) |
+
+**Kết quả kiểm chứng:** `117/117` unit test + `9/9` integration test · build **0 lỗi / 0 cảnh báo**.
+
+**3 lỗi THẬT do test bắt được trong chính code vừa viết** (ghi lại để thấy giá trị của test):
+1. **`decimal` giữ scale** ⇒ `1.0m.ToString()` = `"1.0"` ⇒ `{"x":1}` và `{"x":1.0}` cho **hash khác nhau**
+   ⇒ hệ thống sẽ **từ chối yêu cầu hợp lệ** (xung đột giả). Sửa bằng định dạng `G29`.
+2. **Dùng lại bản ghi hết hạn**: chỉ gia hạn mà **không khởi động lại** trạng thái ⇒ `HoanThanh` ném lỗi
+   vì `State` cũ vẫn là `HoanThanh` ⇒ **yêu cầu hợp lệ bị chặn bởi dữ liệu cũ**. Đã thêm `BatDauLai(...)`.
+3. **Đường dẫn `ProjectReference` sai** (`..\..\` thay vì `..\..\..\`) ⇒ `dotnet sln add` báo project không tải được.
+
+**⚠️ CÒN LẠI của `XC-002` (chưa làm):**
+- **Bảng PostgreSQL** cho `IdempotencyRecord` + migration với unique `(TenantId, Scope, KeyValue)`
+  **`NULLS NOT DISTINCT`** — bắt buộc, nếu thiếu thì ràng buộc **mất tác dụng khi `TenantId` NULL**
+  (đúng lỗi C4/F1 đã kiểm chứng). Hiện mới có bản lưu in-memory.
+- **Outbox/relay + job quét DLQ 1 phút** (Q4) + **7 metric** đã đăng ký ở `XC-005` nhưng **chưa wire nơi phát**.
+- **API phát lại theo `IdempotencyKey`** (Q7 đã chốt **CÓ**).

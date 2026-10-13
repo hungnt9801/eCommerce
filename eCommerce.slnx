@@ -6,6 +6,9 @@
     <Project Path="modules/ChannelHub/eCommerce.ChannelHub.Domain/eCommerce.ChannelHub.Domain.csproj" />
     <Project Path="modules/ChannelHub/eCommerce.ChannelHub.EntityFrameworkCore/eCommerce.ChannelHub.EntityFrameworkCore.csproj" />
   </Folder>
+  <Folder Name="/modules/Messaging/">
+    <Project Path="modules/Messaging/eCommerce.Messaging.Domain/eCommerce.Messaging.Domain.csproj" />
+  </Folder>
   <Folder Name="/modules/PaymentHub/">
     <Project Path="modules/PaymentHub/eCommerce.PaymentHub.Application/eCommerce.PaymentHub.Application.csproj" />
     <Project Path="modules/PaymentHub/eCommerce.PaymentHub.Domain/eCommerce.PaymentHub.Domain.csproj" />
