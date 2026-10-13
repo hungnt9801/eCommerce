@@ -166,6 +166,8 @@ Hai việc này **không chặn** GĐ1 về mặt kỹ thuật, nhưng **phải 
 | 3 | Thêm **Outbox/Inbox** của ABP + **DLQ** | Có test chứng minh event không mất khi giả lập publish lỗi |
 | 4 | Tạo `test/eCommerce.IntegrationTests` + Testcontainers PostgreSQL | 1 test mẫu chạy được trong CI |
 | 5 | `docs/coding-conventions.md` + `.editorconfig` | Nhóm thống nhất trước khi viết module đầu |
+| 6 | 🚨 **Migration `NULLS NOT DISTINCT`** cho **mọi** unique index có `TenantId` (phát hiện F1 của `XC-004`) | Test chứng minh **chèn trùng bị chặn khi `TenantId = NULL`** — ⚠️ **cần PostgreSQL**; hiện unique index **mất tác dụng** ở chế độ 1 tenant |
+| 7 | 🚨 **2 test reflection** trong CI: mọi `*AppService` có `[Authorize]` cấp class; mọi permission dùng trong `[Authorize]` đã được định nghĩa (`XC-004` TC-01/TC-02) | CI **đỏ** nếu vi phạm — chặn tái phát 2 lỗi đã xảy ra thật ở Phase 0 |
 
 ### 7.1 Các module GĐ1
 
@@ -483,8 +485,8 @@ Một giai đoạn **chỉ được bắt đầu code** khi:
 | Hướng dẫn + bảng sửa đổi so với tài liệu tham khảo | ✅ đã viết |
 | Danh sách 52 tài liệu | ✅ đã liệt kê (A.3) |
 | Script kiểm tra Mermaid | ✅ `npm --prefix tools run check:mermaid` — 7/7 khối PASS |
-| **Tài liệu thực tế** | 🟡 **4/52** — `XC-001` + `XC-002` + `XC-003` + `XC-006` (**Draft**, chờ review) |
-| `XC-004`…`XC-005` | ⬜ chưa viết |
+| **Tài liệu thực tế** | 🟡 **5/52** — `XC-001` + `XC-002` + `XC-003` + `XC-004` + `XC-006` (**Draft**, chờ review) |
+| `XC-005` | ⬜ chưa viết |
 
 ### A.8 Tài liệu đã viết
 
@@ -492,5 +494,6 @@ Một giai đoạn **chỉ được bắt đầu code** khi:
 |---|---|---|---|
 | `XC-001` | [Money, Currency & chính sách làm tròn](features/XC-001-money-currency-lam-tron.md) | 🟡 `Draft` | 630 dòng · 7 quyết định thiết kế (ADR) · 12 BR · 6 NFR · 15 test case · **6/6 câu hỏi đã đóng** |
 | `XC-002` | [Outbox/Inbox & chống trùng sự kiện](features/XC-002-outbox-inbox-chong-trung-su-kien.md) | 🟡 `Draft` | **1196 dòng** · 12 ADR · **21 BR** · 13 NFR · **38 test case** · 2 state machine · 4 bảng trong data dictionary · ✅ **4 câu hỏi đã chốt 13/10/2026**: transport **in-process** · module **`Messaging`** · ngưỡng thử **5** · job DLQ **1 phút** · 🔍 đã **xác minh độc lập bằng quét 424 DLL ABP 10.7** (xác nhận **không** có `IsEventOrderingEnabled`) |
+| `XC-004` | [Xác thực, phân quyền & chiều tenant](features/XC-004-xac-thuc-phan-quyen-tenant.md) | 🟡 `Draft` | **14 BR** · 8 NFR · **14 test case** · 🚨 **2 test reflection chặn tái phát lỗi Phase 0** (`TC-01` mọi app service phải có `[Authorize]`; `TC-02` mọi permission dùng phải được **định nghĩa**) · 🚨 **phát hiện F1: unique index mất tác dụng khi `TenantId` NULL** (PostgreSQL `NULLS DISTINCT`) ⇒ **chưa sửa được** (cần PostgreSQL) · F2 multi-tenancy chưa bật · F3/F4 password grant + mật khẩu seed trong tài liệu |
 | `XC-003` | [Khoá phân tán: quy ước & phạm vi](features/XC-003-khoa-phan-tan-quy-uoc.md) | 🟡 `Draft` | **bảng đăng ký khoá lập từ CODE THẬT** (8 khoá + 2 khoá ABP) · 10 ADR · 10 BR · 7 NFR · 14 test case · 🚨 **phát hiện F1: khoá kênh định nghĩa 2 nơi cho ra 2 CHUỖI KHÁC NHAU** (`ecommerce:channel:…` vs `channel:…`) ⇒ dùng lẫn là **khoá không bảo vệ gì** — **đã sửa**; **F3** (khoá Messaging thiếu tiền tố) **đã sửa**; **F2/F4** ghi nhận |
 | `XC-006` | [Phân loại thuế GTGT theo SKU](features/XC-006-phan-loai-thue-gtgt.md) | 🟡 `Draft` → 🚀 **đang triển khai** | **11 BR** · 8 NFR · **22 test case** · **7/9 câu hỏi đã đóng** · đặc tả **Mẫu 01 (Phụ lục III)** từ **file gốc** · danh mục Phụ lục I/II là **dữ liệu**, không hard-code · ✅ **code lõi xong**: module `Tax` (Domain+EFCore), migration + `EXCLUDE USING gist`, seed 4 mức thuế, **17 unit test** (⚠️ chưa chạy trên PostgreSQL thật) |
