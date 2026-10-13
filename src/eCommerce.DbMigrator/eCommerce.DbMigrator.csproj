@@ -8,6 +8,14 @@
 
   <ItemGroup>
     <ProjectReference Include="..\eCommerce.EntityFrameworkCore\eCommerce.EntityFrameworkCore.csproj" />
+    <!-- 🚨 BUG ĐÃ SỬA (C7) — BẮT BUỘC phải tham chiếu project này:
+         `eCommercePermissionDefinitionProvider` (định nghĩa 21 permission) nằm ở
+         `eCommerce.Application.Contracts`. DbMigrator phải nạp assembly đó thì
+         `IPermissionDefinitionManager.GetPermissionsAsync()` mới trả về danh sách THẬT.
+         Trước đây thiếu tham chiếu này ⇒ danh sách RỖNG ⇒ vòng lặp cấp quyền KHÔNG chạy lần nào
+         ⇒ `AbpPermissionGrants` = 0 ⇒ mọi API có [Authorize(permission)] trả 403 cho TẤT CẢ mọi người,
+         mà KHÔNG có lỗi nào được báo. -->
+    <ProjectReference Include="..\eCommerce.Application.Contracts\eCommerce.Application.Contracts.csproj" />
   </ItemGroup>
 
   <!-- 🚨 BUG ĐÃ SỬA (chạy thật mới lộ ra):
