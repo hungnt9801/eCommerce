@@ -141,11 +141,11 @@ public class PostgreSqlSchemaTests
     }
 
     [Fact]
-    public async Task F1_du_12_index_deu_dung_NULLS_NOT_DISTINCT()
+    public async Task F1_du_13_index_deu_dung_NULLS_NOT_DISTINCT()
     {
         // 🔒 BẤT BIẾN (ghi ở XC-004 Q6): mọi unique index trên entity IMultiTenant PHẢI có
         // `NULLS NOT DISTINCT`. Ai tạo migration mới mà quên ⇒ test này đỏ.
-        Assert.Equal(12L, await DemAsync(
+        Assert.Equal(13L, await DemAsync(
             "select count(*) from pg_indexes where schemaname = 'public' and indexdef like '%NULLS NOT DISTINCT%'"));
 
         // Kiểm tra ĐÍCH DANH để thông báo lỗi có ý nghĩa (tên index dài có thể bị PostgreSQL cắt ⇒ so theo tiền tố).
@@ -162,8 +162,10 @@ public class PostgreSqlSchemaTests
             "IX_PayTransactions_TenantId_ProviderCode_MerchantReference",
             "IX_ChnChannelShops_TenantId_ChannelCode_ExternalShopId",
             "IX_ChnChannelListings_TenantId_ChannelShopId_ProductVariantId",
-            // XC-002 — hàng rào CUỐI chống trùng ở biên vào (thêm 13/10/2026).
-            "IX_MsgIdempotencyRecords_TenantId_Scope_KeyValue"
+            // XC-002 — hàng rào CUỐI chống trùng ở biên vào (13/10/2026).
+            "IX_MsgIdempotencyRecords_TenantId_Scope_KeyValue",
+            // ADDR-001 — khoá danh mục ĐVHC là (PHIÊN BẢN, CẤP, MÃ), không phải mã trần (13/10/2026).
+            "IX_AddrAdministrativeUnits_TenantId_SchemaVersion_Level_Code"
         ];
 
         foreach (var ten in phaiCo)
@@ -251,6 +253,65 @@ public class PostgreSqlSchemaTests
                 """);
             await cmd.ExecuteNonQueryAsync();
         });
+
+        Assert.Equal(PostgresErrorCodes.CheckViolation, ex.SqlState);   // 23514
+    }
+
+    // ── 2c. ADDR-001 — danh mục ĐVHC: khoá là (PHIÊN BẢN, CẤP, MÃ) ──────────
+
+    /// <summary>Chèn một đơn vị hành chính. Khoá unique là (TenantId, SchemaVersion, Level, Code).</summary>
+    private async Task ChenDonViAsync(Guid? tenantId, int schemaVersion, int level, string code, string name, string? parent = null)
+    {
+        await using var cmd = _fixture.DataSource.CreateCommand("""
+            insert into "AddrAdministrativeUnits"
+                ("Id","TenantId","SchemaVersion","Level","Code","Name","ParentCode","IsActive",
+                 "ExtraProperties","ConcurrencyStamp","CreationTime","IsDeleted")
+            values ($1, $2, $3, $4, $5, $6, $7, true, '{}', 's', now(), false)
+            """);
+
+        cmd.Parameters.AddWithValue(Guid.NewGuid());
+        cmd.Parameters.AddWithValue((object?)tenantId ?? DBNull.Value);
+        cmd.Parameters.AddWithValue(schemaVersion);
+        cmd.Parameters.AddWithValue(level);
+        cmd.Parameters.AddWithValue(code);
+        cmd.Parameters.AddWithValue(name);
+        cmd.Parameters.AddWithValue((object?)parent ?? DBNull.Value);
+
+        await cmd.ExecuteNonQueryAsync();
+    }
+
+    [Fact]
+    public async Task ADDR001_chan_trung_don_vi_cung_phien_ban_cap_ma_khi_TenantId_NULL()
+    {
+        await ChenDonViAsync(null, 2, 1, "01", "Thành phố Hà Nội");
+
+        var ex = await Assert.ThrowsAsync<PostgresException>(
+            () => ChenDonViAsync(null, 2, 1, "01", "Hà Nội (bản trùng)"));
+
+        Assert.Equal(PostgresErrorCodes.UniqueViolation, ex.SqlState);   // 23505
+    }
+
+    [Fact]
+    public async Task ADDR001_CHO_PHEP_cung_ma_nhung_KHAC_phien_ban_schema()
+    {
+        // 🚩 ĐÂY LÀ ĐIỂM CỐT LÕI CỦA ADDR-001: mã `00004` là "Phường Ba Đình" ở v2 nhưng
+        // "Phường Trúc Bạch" ở v1. Hai bản ghi này **PHẢI cùng tồn tại** — nếu ràng buộc chỉ dựa trên
+        // mã trần thì một trong hai bị chặn (hoặc ghi đè) ⇒ **sai đơn vị**.
+        await ChenDonViAsync(null, 2, 2, "00004", "Phường Ba Đình", parent: "01");
+        await ChenDonViAsync(null, 1, 2, "00004", "Phường Trúc Bạch", parent: "001");
+
+        var soDong = await DemAsync(
+            "select count(*) from \"AddrAdministrativeUnits\" where \"Code\" = '00004'");
+
+        Assert.Equal(2L, soDong);
+    }
+
+    [Fact]
+    public async Task ADDR001_CHECK_chan_phien_ban_schema_khong_ho_tro()
+    {
+        // Hàng rào DB: chỉ có 2 phiên bản schema được hỗ trợ (1 = 3 cấp, 2 = 2 cấp).
+        var ex = await Assert.ThrowsAsync<PostgresException>(
+            () => ChenDonViAsync(null, 3, 1, "01", "Phiên bản lạ"));
 
         Assert.Equal(PostgresErrorCodes.CheckViolation, ex.SqlState);   // 23514
     }

@@ -11,6 +11,7 @@
     <ProjectReference Include="..\..\modules\PaymentHub\eCommerce.PaymentHub.EntityFrameworkCore\eCommerce.PaymentHub.EntityFrameworkCore.csproj" />
     <ProjectReference Include="..\..\modules\Tax\eCommerce.Tax.EntityFrameworkCore\eCommerce.Tax.EntityFrameworkCore.csproj" />
     <ProjectReference Include="..\..\modules\Messaging\eCommerce.Messaging.EntityFrameworkCore\eCommerce.Messaging.EntityFrameworkCore.csproj" />
+    <ProjectReference Include="..\..\modules\Address\eCommerce.Address.EntityFrameworkCore\eCommerce.Address.EntityFrameworkCore.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -68,6 +68,9 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
     // đăng ký và lỗi chỉ lộ ra lúc chạy ("has not been registered") — bài học Phase 0.
     public DbSet<Messaging.Idempotency.IdempotencyRecord> IdempotencyRecords { get; set; } = default!;
 
+    // ── Address (ADDR-001): danh mục đơn vị hành chính theo PHIÊN BẢN schema ──
+    public DbSet<Address.AdministrativeUnit> AdministrativeUnits { get; set; } = default!;
+
     public eCommerceDbContext(DbContextOptions<eCommerceDbContext> options)
         : base(options)
     {
@@ -83,6 +86,7 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
         builder.ConfigureTax();
         // Gọi qua tên đầy đủ để KHÔNG phải thêm using vào file này.
         Messaging.EntityFrameworkCore.MessagingDbContextModelCreatingExtensions.ConfigureMessaging(builder);
+        Address.EntityFrameworkCore.AddressDbContextModelCreatingExtensions.ConfigureAddress(builder);
 
         ConfigureCommerce(builder);
 

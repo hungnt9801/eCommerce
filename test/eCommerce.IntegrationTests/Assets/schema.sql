@@ -1068,3 +1068,40 @@ VALUES ('20261013092108_Add_Messaging_Idempotency', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE TABLE "AddrAdministrativeUnits" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "SchemaVersion" integer NOT NULL,
+    "Level" integer NOT NULL,
+    "Code" character varying(5) NOT NULL,
+    "Name" character varying(256) NOT NULL,
+    "ParentCode" character varying(5),
+    "IsActive" boolean NOT NULL,
+    "LegalBasis" character varying(512),
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_AddrAdministrativeUnits" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_AddrAdministrativeUnits_SchemaVersion" CHECK ("SchemaVersion" in (1, 2))
+);
+
+CREATE INDEX "IX_AddrAdministrativeUnits_SchemaVersion_Level_ParentCode" ON "AddrAdministrativeUnits" ("SchemaVersion", "Level", "ParentCode");
+
+CREATE INDEX "IX_AddrAdministrativeUnits_SchemaVersion_Name" ON "AddrAdministrativeUnits" ("SchemaVersion", "Name");
+
+CREATE UNIQUE INDEX "IX_AddrAdministrativeUnits_TenantId_SchemaVersion_Level_Code"
+    ON "AddrAdministrativeUnits" ("TenantId", "SchemaVersion", "Level", "Code")
+    NULLS NOT DISTINCT;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261013093715_Add_Address_AdministrativeUnits', '10.0.11');
+
+COMMIT;
+

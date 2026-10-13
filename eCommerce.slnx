@@ -2,6 +2,7 @@
   <Folder Name="/modules/" />
   <Folder Name="/modules/Address/">
     <Project Path="modules/Address/eCommerce.Address.Domain/eCommerce.Address.Domain.csproj" />
+    <Project Path="modules/Address/eCommerce.Address.EntityFrameworkCore/eCommerce.Address.EntityFrameworkCore.csproj" />
   </Folder>
   <Folder Name="/modules/ChannelHub/">
     <Project Path="modules/ChannelHub/eCommerce.ChannelHub.Application.Contracts/eCommerce.ChannelHub.Application.Contracts.csproj" />
