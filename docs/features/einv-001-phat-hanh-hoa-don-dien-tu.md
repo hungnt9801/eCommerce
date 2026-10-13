@@ -1093,3 +1093,45 @@ public class EInvoiceNumberAllocatorTests
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.1 | 14/10/2026 | *(điền)* | Bản nháp đầu — lập theo cấu trúc 16 mục của `XC-003`; **13 ADR**, **18 BR**, **14 NFR**, **26 test case**, 3 sơ đồ Mermaid. **Mọi khẳng định về code đều kèm đường dẫn file thật đã kiểm**. Ghi nhận **8 phát hiện F1–F8** ở §15.2, trong đó **F5** và **F8** là **mâu thuẫn thật giữa code hiện tại và tài liệu nền** (`TaxLockKeys` có tiền tố `ecommerce:` còn `ChannelHubConsts.LockKeys` **không** có; mã lỗi `eCommerce:Channel:*` vs `eCommerce:Tax:*`). **10 câu hỏi mở** chưa trả lời ⇒ **chưa** đủ Definition of Ready |
+
+---
+
+## 17. TRẠNG THÁI TRIỂN KHAI (13/10/2026) — mục (e): **lõi Domain đã xong**
+
+Module **`eCommerce.EInvoice.Domain`** đã tạo, hiện thực hoá **state machine 2 trục** — điểm dễ hiểu sai
+nhất của hoá đơn điện tử:
+
+| Trục | Enum | Giá trị |
+|---|---|---|
+| **1 — PHÁT HÀNH** (với khách) | `EInvoiceStatus` | `Nhap` → `DaKy` → `DaPhatHanh` → `DaDieuChinh` / `DaThayThe` / `DaHuy` |
+| **2 — GỬI CƠ QUAN THUẾ** (tuân thủ) | `TaxAuthorityStatus` | `ChuaGui` → `DaGui` → `DaNhan` / `BiTuChoi` (→ gửi lại) |
+
+**Vì sao 2 trục là bắt buộc:** hoá đơn có thể **đã phát hành cho khách** nhưng CQT **từ chối**. Gộp hai
+chuyện vào một trường trạng thái thì **không biểu diễn được** trạng thái thật đó ⇒ mất thông tin để xử lý.
+Test `CQT_TU_CHOI_thi_KHONG_doi_TRUC_PHAT_HANH` khoá bất biến này.
+
+**Kết quả:** `161/161` unit test (thêm **20** test) · build **0 lỗi / 0 cảnh báo**.
+
+**Ràng buộc PHÁP LÝ đã cưỡng chế bằng code (không chỉ bằng tài liệu):**
+
+| Bất biến | Cách cưỡng chế |
+|---|---|
+| **Phải KÝ trước khi PHÁT HÀNH** | `PhatHanh()` từ `Nhap` ⇒ ném `eCommerce:EInvoice:0102`; trạng thái **không đổi** khi bị từ chối |
+| **Điều chỉnh / thay thế / huỷ BẮT BUỘC có lý do** | `YeuCauLyDo(...)` ⇒ ném `0103` (lý do là thông tin bắt buộc trên chứng từ) |
+| **Không huỷ hoá đơn ĐÃ điều chỉnh / ĐÃ thay thế** | ném `0101` — nếu cho huỷ sẽ có **hai chứng từ cùng "xoá" một nghĩa vụ** ⇒ sổ sách không đối chiếu được |
+| **`DaHuy` là trạng thái KẾT THÚC** | mọi thao tác sau đó ném `0104` |
+| **Chưa phát hành thì không gửi CQT** | ném `0105` · **chưa gửi thì không nhận kết quả** ⇒ `0106` |
+| **Không xoá hoá đơn** | điều chỉnh/thay thế/huỷ chỉ **đổi trạng thái + trỏ** tới hoá đơn liên quan |
+
+**Mã lỗi dùng dải `0101–0199`** — tách khỏi dải `0001–0007` mà `EINV-001`/`EINV-002` từng đề xuất **trùng nhau** (phát hiện F2 của `EINV-003`).
+
+### ⚠️ CÒN LẠI của `EINV-001`
+
+| # | Việc | Ghi chú |
+|---|---|---|
+| 1 | **Ký hiệu mẫu số + cấp số hoá đơn** (quy tắc liên tục, không trùng) | Cần **khoá phân tán** + `IdempotencyGuard` (đã có) |
+| 2 | **Sinh XML** theo `TT 91/2026/TT-BTC` | 🚧 Cần **bảng trường bắt buộc** chính thức |
+| 3 | **Tích hợp NCC** (2 bước ký) | Phụ thuộc `SIGN-001`; cần **chứng thư sandbox** |
+| 4 | **Gửi CQT + parse `OK:` / `ERR:`** | Thuộc `EINV-002` |
+| 5 | **Bảng DB** cho `EInvoice` | Chưa nối EF Core (domain đã sẵn sàng) |
+| 6 | **Hoá đơn điều chỉnh/thay thế** | Cần bảng liên kết + ràng buộc "chỉ một bản thay thế đang hiệu lực" |

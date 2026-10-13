@@ -10,6 +10,9 @@
     <Project Path="modules/ChannelHub/eCommerce.ChannelHub.Domain/eCommerce.ChannelHub.Domain.csproj" />
     <Project Path="modules/ChannelHub/eCommerce.ChannelHub.EntityFrameworkCore/eCommerce.ChannelHub.EntityFrameworkCore.csproj" />
   </Folder>
+  <Folder Name="/modules/EInvoice/">
+    <Project Path="modules/EInvoice/eCommerce.EInvoice.Domain/eCommerce.EInvoice.Domain.csproj" />
+  </Folder>
   <Folder Name="/modules/Messaging/">
     <Project Path="modules/Messaging/eCommerce.Messaging.Domain/eCommerce.Messaging.Domain.csproj" />
     <Project Path="modules/Messaging/eCommerce.Messaging.EntityFrameworkCore/eCommerce.Messaging.EntityFrameworkCore.csproj" />
