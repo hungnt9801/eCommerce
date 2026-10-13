@@ -6,7 +6,7 @@
 | **Module** | Kernel/Tax dùng chung (`shared/eCommerce.Kernel` + module `Tax`) |
 | **Giai đoạn** | **Nền — phải xong trước `EINV-001`** (hoá đơn phụ thuộc phân loại này) |
 | **Ưu tiên** | **Must have** (là **yêu cầu pháp lý**, không phải tính năng) |
-| **Trạng thái** | `Draft` — chờ review |
+| **Trạng thái** | 🟡 `Draft` → **ĐANG TRIỂN KHAI** — phần lõi (Domain + EF Core + seed + test) **đã xong**, xem **§14.5** |
 | **Người viết / người review** | *(điền)* / **Kế toán trưởng + Kiến trúc trưởng** |
 | **Phiên bản / ngày** | `v0.1 — 12/10/2026` |
 | **Tài liệu liên quan** | `XC-001` (BR-012, BR-010) · `CAT-001` · `PRC-002` · `SAL-002` · `EINV-001` · `ACC-001` |
@@ -645,6 +645,28 @@ public class TaxRateResolverTests
 
 ---
 
+### 14.5 Trạng thái triển khai *(cập nhật 13/10/2026)*
+
+| Hạng mục | Trạng thái | Bằng chứng / ghi chú |
+|---|:--:|---|
+| Module `Tax` — 2 project `Domain` + `EntityFrameworkCore` | ✅ | `modules/Tax/` |
+| `TaxRateSchedule` — khung hiệu lực theo thời gian + **cấm lùi hiệu lực** (BR-011) | ✅ | guard ném `eCommerce:Tax:0007` |
+| `TaxClassification` — state machine **ném lỗi**, append-only | ✅ | `Draft→Approved→Active→Superseded/Expired`; `Cancel` chỉ khi Draft |
+| `TaxRateResolver` — **hàm thuần**, tự chuyển **8% → 10%** qua mốc 01/01/2027 | ✅ | `Classifications/TaxRateResolver.cs` |
+| Unit test | ✅ **17 test** (tổng solution **37**) | gồm mốc `31/12/2026` → `01/01/2027`, ưu tiên SKU > danh mục, SKU chưa phân loại |
+| Migration 2 bảng + index + CHECK | ✅ | `20261013012648_Add_Tax_Module` |
+| Ràng buộc **`EXCLUDE USING gist`** chống chồng khung (BR-009) | ⚠️ **sinh migration nhưng CHƯA chạy thử** | 🚨 Máy dev **không có PostgreSQL/Docker** ⇒ SQL thô này **chưa được kiểm chứng thực tế** |
+| Seed 4 mức thuế (`VAT0/5/10/8`, `VAT8` hết hạn 31/12/2026) | ✅ | `TaxRateScheduleDataSeedContributor` — idempotent |
+| 7 permission của module Tax | ✅ | `eCommerceConsts.Permissions.Tax*` + permission provider |
+| **Application service** (CRUD, duyệt, import Excel, xuất Mẫu 01) | ⬜ **chưa** | cần project `eCommerce.Tax.Application` (**phần Mẫu 01 chờ Q8/Q9**) |
+| Giao diện quản trị phân loại thuế | ⬜ chưa | thuộc `WEB-001` |
+
+> 🚨 **Giới hạn cần biết:** toàn bộ test hiện tại là **unit test không cần DB**. Ràng buộc `EXCLUDE`,
+> migration và seed **chưa từng chạy trên PostgreSQL thật** (máy dev không có Docker/PostgreSQL).
+> Việc đầu tiên khi có môi trường DB là chạy `dotnet ef database update` + 1 test chèn 2 khung chồng nhau.
+
+---
+
 ## 15. Câu hỏi mở, giả định & lịch sử thay đổi
 
 ### 15.1 Câu hỏi mở
@@ -721,4 +743,4 @@ hoặc xem chỉ tiêu **[08]** và **[09]** mà HTKK sinh ra rồi đối chi�
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.1 | 12/10/2026 | *(điền)* | Bản nháp đầu — thiết kế theo yêu cầu: **không hard-code danh mục Phụ lục I/II**, để **kế toán tự quyết định** |
-| v0.3 | 12/10/2026 | *(điền)* | ✅ **Đóng Q3** (7 cột Excel import là chuẩn chính thức) · **Q1** (hỗ trợ cả SKU và danh mục, **SKU ưu tiên**) · **Q5** (chưa cần tệp đính kèm) · **Q6** (kế toán trưởng sửa khung hiệu lực, **có duyệt + audit** ⇒ thành **BR-011**) · **Q7** (báo cáo đối chiếu giao cho `REP-*`). Thêm mã lỗi `eCommerce:Tax:0007` + **TC-21/TC-22**. Viết lại **Q8/Q9** thành khối gửi được cho kế toán (§15.1.4). Quyền đổi mức thuế chuyển từ host admin → **kế toán trưởng** |
+| v0.4 | 13/10/2026 | *(điền)* | 🚀 **Bắt đầu triển khai**: thêm module `Tax` (Domain + EF Core), migration 2 bảng + ràng buộc `EXCLUDE USING gist`, seed 4 mức thuế, 7 permission, **17 unit test** (solution: **37/37 pass**, build 0 lỗi/0 warning). Thêm **§14.5 trạng thái triển khai** và **`XC-006-phieu-hoi-ke-toan.md`** (phiếu hỏi kế toán cho Q8/Q9). ⚠️ Ghi rõ phần **chưa kiểm chứng**: `EXCLUDE`/migration/seed chưa chạy trên PostgreSQL thật |
