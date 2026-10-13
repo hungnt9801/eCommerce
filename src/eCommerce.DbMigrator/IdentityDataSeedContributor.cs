@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Volo.Abp.Authorization.Permissions;
 using Volo.Abp.Data;
@@ -36,6 +37,8 @@ public class eCommerceIdentityDataSeedContributor : IDataSeedContributor, ITrans
 
     private readonly IIdentityDataSeeder _identityDataSeeder;
     private readonly IIdentityRoleRepository _identityRoleRepository;
+    private readonly IIdentityUserRepository _identityUserRepository;
+    private readonly IConfiguration _configuration;
     private readonly IPermissionManager _permissionManager;
     private readonly IPermissionDefinitionManager _permissionDefinitionManager;
     private readonly ILogger<eCommerceIdentityDataSeedContributor> _logger;
@@ -43,12 +46,16 @@ public class eCommerceIdentityDataSeedContributor : IDataSeedContributor, ITrans
     public eCommerceIdentityDataSeedContributor(
         IIdentityDataSeeder identityDataSeeder,
         IIdentityRoleRepository identityRoleRepository,
+        IIdentityUserRepository identityUserRepository,
+        IConfiguration configuration,
         IPermissionManager permissionManager,
         IPermissionDefinitionManager permissionDefinitionManager,
         ILogger<eCommerceIdentityDataSeedContributor> logger)
     {
         _identityDataSeeder = identityDataSeeder;
         _identityRoleRepository = identityRoleRepository;
+        _identityUserRepository = identityUserRepository;
+        _configuration = configuration;
         _permissionManager = permissionManager;
         _permissionDefinitionManager = permissionDefinitionManager;
         _logger = logger;
@@ -101,5 +108,49 @@ public class eCommerceIdentityDataSeedContributor : IDataSeedContributor, ITrans
         _logger.LogInformation(
             "Đã cấp {Count} permission cho role 'admin' (user: {AdminEmail}).",
             permissions.Count, AdminEmail);
+
+        await BatBuocDoiMatKhauAsync();
+    }
+
+    /// <summary>
+    /// 🚨 SIẾT BẢO MẬT TÀI KHOẢN SEED — Q2 của `XC-004` (đã kiểm chứng bằng chạy thật, 13/10/2026).
+    ///
+    /// VẤN ĐỀ: tài khoản admin do **seeder mặc định của ABP** tạo với **mật khẩu đã biết** (`1q2w3E*`)
+    /// và mật khẩu đó **nằm trong tài liệu**. Nếu lên production nguyên trạng thì đó là **cửa vào toàn hệ thống**.
+    /// ⚠️ Chỉ đổi hằng số `AdminPassword` của ta là **KHÔNG đủ**: ABP đã tạo user TRƯỚC với mật khẩu của nó,
+    /// và `IdentityDataSeeder.SeedAsync` **chỉ tạo user nếu chưa có** ⇒ mật khẩu cũ **vẫn nguyên**.
+    ///
+    /// CÁCH LÀM: bật cờ **buộc đổi mật khẩu ở lần đăng nhập đầu**; và khi **KHÔNG phải Development**
+    /// thì **in cảnh báo rõ** ra `stderr` để người triển khai biết phải xử lý trước khi mở cho khách.
+    /// </summary>
+    private async Task BatBuocDoiMatKhauAsync()
+    {
+        var user = await _identityUserRepository.FindByNormalizedEmailAsync(AdminEmail.ToUpperInvariant());
+
+        if (user is null)
+        {
+            _logger.LogWarning("Không tìm thấy user '{AdminEmail}' để bật cờ buộc đổi mật khẩu.", AdminEmail);
+            return;
+        }
+
+        if (!user.ShouldChangePasswordOnNextLogin)
+        {
+            user.SetShouldChangePasswordOnNextLogin(true);
+            await _identityUserRepository.UpdateAsync(user);
+            _logger.LogInformation("Đã BẬT cờ buộc đổi mật khẩu ở lần đăng nhập đầu cho '{AdminEmail}'.", AdminEmail);
+        }
+
+        var moiTruong = _configuration["ASPNETCORE_ENVIRONMENT"] ?? "Production";
+
+        if (!string.Equals(moiTruong, "Development", StringComparison.OrdinalIgnoreCase))
+        {
+            Console.Error.WriteLine(
+                "================================================================");
+            Console.Error.WriteLine($"⚠️  MÔI TRƯỜNG: {moiTruong} (KHÔNG phải Development)");
+            Console.Error.WriteLine($"⚠️  Tài khoản '{AdminEmail}' vẫn dùng MẬT KHẨU MẶC ĐỊNH ĐÃ BIẾT.");
+            Console.Error.WriteLine("⚠️  Đã bật cờ buộc đổi mật khẩu ở lần đăng nhập đầu —");
+            Console.Error.WriteLine("⚠️  NHƯNG phải bảo đảm tài khoản này đổi được mật khẩu TRƯỚC khi mở cho khách.");
+            Console.Error.WriteLine("================================================================");
+        }
     }
 }
