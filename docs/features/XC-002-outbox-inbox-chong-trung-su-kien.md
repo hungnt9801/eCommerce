@@ -3,7 +3,7 @@
 | Thuộc tính | Nội dung |
 |---|---|
 | **Mã** | `XC-002` |
-| **Module** | **Nền dùng chung** — hạ tầng nhắn tin, đề xuất module `Messaging` (`eCommerce.Messaging.Domain` / `.Application` / `.Contracts`) + bảng ABP nằm trên **DbContext hợp nhất** ở `src/eCommerce.EntityFrameworkCore` |
+| **Module** | **Nền dùng chung** — hạ tầng nhắn tin, đề xuất module `Infrastructure` (`eCommerce.Infrastructure.Domain` / `.Application` / `.Contracts`) + bảng ABP nằm trên **DbContext hợp nhất** ở `src/eCommerce.EntityFrameworkCore` |
 | **Giai đoạn** | **Nền — phải xong TRƯỚC GĐ1** (mọi module phát/tiêu thụ sự kiện đều phụ thuộc) |
 | **Ưu tiên** | **Must have** |
 | **Trạng thái** | `Draft` — chờ review |
@@ -61,7 +61,7 @@
 | **D9** | Khoá phân tán dùng `IAbpDistributedLock` + **Redis** (`DistributedLock.Redis` 1.0.1) | (a) khoá trong bộ nhớ · (b) tự viết lock trên PostgreSQL · (c) **ABP DistributedLocking + Redis** | Redis 7 đã có trong `docker-compose.yml`; ABP đã dùng chính cơ chế này cho `AbpOutbox_*`/`AbpInbox_*`; Redis chết **không** làm sập app (`AbortOnConnectFail=false` — đã sửa ở Phase 0) | **Cấm** đặt tên khoá trùng `AbpOutbox_{DatabaseName}` / `AbpInbox_{DatabaseName}`; nhớ rằng mất Redis ⇒ lock không có ⇒ phải dựa vào ràng buộc DB |
 | **D10** | Sự kiện **liên module** đi qua `IDistributedEventBus`; **cấm** `ILocalEventBus` cho nghiệp vụ | (a) local event bus cho mọi thứ · (b) distributed + outbox | `ILocalEventBus` chạy **trong cùng tiến trình, cùng transaction** ⇒ không có biên, không retry, mất khi tiến trình chết; nhưng nó vẫn hữu dụng cho **domain event trong cùng module** | Có allowlist sự kiện được phép local (§7.1); kiểm bằng review + test |
 | **D11** | **ETO có khuôn bắt buộc** + version hoá event name | (a) DTO tuỳ ý · (b) base class `IntegrationEvent` của ta | Cần tối thiểu `EventId`, `OccurredOn`, `AggregateId`, `AggregateVersion`, `TenantId`, `ChannelCode`, `CorrelationId` để chống trùng, xếp thứ tự và truy vết | Payload to hơn (~100 byte/sự kiện); **cấm** phá vỡ tương thích ngược — thêm event name mới `...V2` |
-| **D12** | Entity của feature nằm ở **module `Messaging`** (project riêng), abstraction ở `.Contracts` | (a) đặt trong `eCommerce.Kernel` dùng chung · (b) đặt trong `src/eCommerce.Domain` (app) · (c) **module `Messaging`** | Quy ước #3/#4: **cấm** module tham chiếu `src/`; `eCommerce.Kernel` là thư viện dùng chung **không nên** mang EF entity + migration | Mọi module tham chiếu `eCommerce.Messaging.Contracts` (chỉ interface/DTO) để gọi `IIdempotencyGuard` — **không** tham chiếu `.Domain` |
+| **D12** | Entity của feature nằm ở **module `Infrastructure`** (project riêng), abstraction ở `.Contracts` | (a) đặt trong `eCommerce.Kernel` dùng chung · (b) đặt trong `src/eCommerce.Domain` (app) · (c) **module `Infrastructure`** | Quy ước #3/#4: **cấm** module tham chiếu `src/`; `eCommerce.Kernel` là thư viện dùng chung **không nên** mang EF entity + migration | Mọi module tham chiếu `eCommerce.Infrastructure.Contracts` (chỉ interface/DTO) để gọi `IIdempotencyGuard` — **không** tham chiếu `.Domain` |
 
 > Ghi lại cả phương án **BỊ LOẠI** và lý do — để 6 tháng sau không ai hỏi lại "sao không làm cách kia".
 > 📌 **Mọi kết luận về ABP ở trên đều lấy từ mã nguồn/gói thật đang dùng trong máy** (`ABP 10.7.0`, đọc tại `%USERPROFILE%\.nuget\packages\volo.abp.eventbus\10.7.0` và `...\volo.abp.entityframeworkcore\10.7.0`, đối chiếu nhánh `rel-10.7`). Chi tiết + phần **cần xác minh** ở §15.
@@ -88,9 +88,9 @@
 | **Post-Condition(s)** | • Sự kiện đã ghi **cùng transaction** với dữ liệu nghiệp vụ ⇒ **hoặc** cả hai cùng có, **hoặc** cả hai cùng không (**BR-XC-002-001**).<br>• Mọi lần tiêu thụ **có** bản ghi trong `InboxRecords`; nếu khoá chống trùng đã tồn tại ⇒ **không** phát sinh side effect thứ hai (**BR-XC-002-004/005**).<br>• Mọi lỗi xử lý **có** dấu vết: hoặc `RetryCount` tăng trong `AbpEventInbox`, hoặc một dòng trong `DeadLetterEvents` (**BR-XC-002-010/011**).<br>• Số dòng `AbpEventOutbox` tồn đọng **không** tăng đơn điệu (có cảnh báo — **NFR-XC-002-003**). |
 | **Basic Flow** | 1. App service mở **Unit of Work**, ghi dữ liệu nghiệp vụ.<br>2. App service gọi `IDistributedEventBus.PublishAsync(eto)` **mặc định `useOutbox: true`**; ABP **hoãn** việc ghi outbox tới lúc hoàn tất UoW (`AddToUnitOfWork`).<br>3. Khi UoW hoàn tất: ABP **ghi bản ghi outbox vào cùng DbContext** rồi `SaveChangesAsync`, **sau đó** mới `CommitTransactionsAsync` ⇒ **outbox và dữ liệu nghiệp vụ cùng một transaction**.<br>4. **Relay** (`OutboxSender`) thức dậy theo nhịp `PeriodTimeSpan` (mặc định **2 s**), giành khoá phân tán `AbpOutbox_{DatabaseName}`, lấy tối đa `OutboxWaitingEventMaxCount` (mặc định **1000**) bản ghi **cũ nhất theo `CreationTime`**.<br>5. Relay phát từng bản ghi (`PublishFromOutboxAsync`) rồi **xoá** bản ghi khỏi outbox (bản ghi outbox **không** có cột trạng thái).<br>6. Phía nhận: nếu `Inboxes` được cấu hình, sự kiện được **enqueue** vào `AbpEventInbox` (`Status = Pending`); `InboxProcessor` (cũng theo nhịp 2 s, khoá `AbpInbox_{DatabaseName}`) nhặt bản ghi **Pending** có `NextRetryTime` đến hạn, chạy handler trong **UoW mới có transaction**, rồi `MarkAsProcessedAsync`.<br>7. **Handler bắt buộc** mở đầu bằng `IIdempotencyGuard.AcquireAsync(...)` với khoá nghiệp vụ ổn định ⇒ ghi/khẳng định bản ghi `InboxRecords`; chỉ khi **giành được** khoá mới thực hiện side effect.<br>8. Kết thúc: bản ghi inbox `Processed`, sự kiện outbox đã bị xoá, metric ghi nhận. |
 | **Alternative Flow** | **A1: Xử lý lỗi tạm thời (DB timeout, NCC timeout)** — handler ném lỗi ⇒ wrapper ghi `DeadLetterEvents` (`Status = DeadLettered`, `RetryCount` hiện tại) rồi **ném lại** để ABP thử nhịp sau; khi thành công, job dọn đóng bản ghi DLQ (`Status = Resolved`).<br>**A2: Vượt ngưỡng thử** — `RetryCount >= ngưỡng cấu hình của ta` (mặc định **5**, **nhỏ hơn** `InboxProcessorMaxRetryCount = 10` của ABP) ⇒ bản ghi ở lại DLQ và **cảnh báo**; **không** để ABP tự `Discard`.<br>**A3: Phát lại DLQ** — Ops chọn bản ghi `DeadLettered`, bấm **Phát lại**; hệ thống **giữ nguyên `IdempotencyKey` gốc** (BR-XC-002-012), nạp lại payload vào `AbpEventInbox` với `MessageId` **mới**, ghi vết `Replayed` + `ReplayedBy`/`ReplayedAt`.<br>**A4: Sự kiện đến muộn/sai thứ tự** — consumer so `AggregateVersion` với version đã áp dụng: **nhỏ hơn hoặc bằng** ⇒ **bỏ qua có ghi log + metric** (không phải lỗi, không vào DLQ); **lớn hơn nhưng thiếu bản trung gian** ⇒ đẩy vào DLQ với `FailureKind = OutOfOrder` + cảnh báo (§7.4).<br>**A5: Sự kiện không cần chống trùng và không cần ordering** (ví dụ: xoá cache) — được phép chạy ở chế độ "làm lại được nhiều lần" (idempotent tự nhiên), **nhưng** vẫn đi qua outbox nếu là sự kiện liên module. |
-| **Exception Flow** | **E1:** cùng `IdempotencyKey` nhưng **`PayloadHash` khác** ⇒ `BusinessException` **`eCommerce:Messaging:0002`** (đây **không** phải bản ghi trùng — là **xung đột khoá**, phải điều tra).<br>**E2:** handler ném lỗi ⇒ **không** nuốt: wrapper ghi DLQ (`eCommerce:Messaging:0003` chỉ dùng làm **mã log/metric**, không trả cho client) rồi ném lại.<br>**E3:** phát lại bản ghi **không** ở trạng thái `DeadLettered` ⇒ **`eCommerce:Messaging:0005`**.<br>**E4:** payload không deserialize được về kiểu ETO / event name không có handler ⇒ `FailureKind = PoisonMessage`, **không** retry vô hạn, vào DLQ (**`eCommerce:Messaging:0007`** / **`0008`**).<br>**E5:** payload vượt ngưỡng kích thước của ta (> **100 KB**) ⇒ **`eCommerce:Messaging:0007`** — **cấm** nhét blob lớn vào outbox; ETO phải mang **tham chiếu** (id) để consumer tự đọc.<br>**E6:** chuyển trạng thái sai (ví dụ `Processed → Processing`) ⇒ **`eCommerce:Messaging:0006`**, **không** im lặng.<br>**E7:** `UPDATE … WHERE Status = …` ảnh hưởng **0 dòng** (đã bị luồng khác đổi) ⇒ **ném lỗi** (không coi là thành công).<br>**E8:** `AbpEventOutbox` tồn đọng vượt `OutboxWaitingEventMaxCount` liên tục ⇒ **cảnh báo** (không ném lỗi nghiệp vụ) + metric `messaging_outbox_pending`. |
-| **Business Rules** | • **BR-XC-002-001**: Mọi sự kiện nghiệp vụ liên module **phải** phát qua `IDistributedEventBus` với `useOutbox: true` **trong Unit of Work**; bản ghi outbox **phải** được ghi **cùng transaction** với dữ liệu nghiệp vụ.<br>• **BR-XC-002-002**: **Cấm** phát sự kiện nghiệp vụ trực tiếp (dual-write) — chỉ những sự kiện nằm trong **allowlist** "làm lại được nhiều lần" mới được phát ngoài outbox (§7.1).<br>• **BR-XC-002-003**: Relay **phải** là **background worker** quét theo thời gian; **cấm** lọc theo "transaction vừa commit" (bài học eShop).<br>• **BR-XC-002-004**: **Mọi** biên vào — HTTP webhook, consumer sự kiện, job định kỳ, callback thanh toán — **phải** idempotent: gọi `IIdempotencyGuard` **trước** mọi side effect.<br>• **BR-XC-002-005**: `InboxRecords` **phải** có `TenantId`, `ChannelCode`, `ExternalOrderId`, `EventType`, `PayloadHash` và **unique index** `(TenantId, EventType, IdempotencyKey)`; `PayloadHash` = SHA-256 của payload **chuẩn hoá** (canonical JSON).<br>• **BR-XC-002-006**: Cùng `IdempotencyKey` + **khác** `PayloadHash` ⇒ **NÉM** `eCommerce:Messaging:0002` — **cấm** coi là bản ghi trùng và **cấm** ghi đè.<br>• **BR-XC-002-007**: Idempotency key của thanh toán **ổn định**: sinh **một lần** ở lần thử đầu và **lưu vào DB**; mọi retry **đọc lại** khoá đó; **cấm** `Guid.NewGuid()` cho mỗi lần gọi.<br>• **BR-XC-002-008**: Mọi chuyển trạng thái **phải** có guard ở **tầng DB**: `UPDATE … WHERE Status = @expected` **hoặc** optimistic concurrency (`RowVersion`); số dòng ảnh hưởng **0** ⇒ **NÉM LỖI**.<br>• **BR-XC-002-009**: Guard sai **phải NÉM LỖI có mã** (quy ước #11) — **cấm** no-op im lặng (bài học `SetPaidStatus()` của eShop).<br>• **BR-XC-002-010**: Handler ném lỗi ⇒ **phải** có bản ghi `DeadLetterEvents` (**trước khi** ném lại), ghi ở **UoW riêng** để không bị rollback.<br>• **BR-XC-002-011**: Sự kiện vượt ngưỡng thử của ta **phải** nằm trong DLQ **trước** khi ABP xoá bản ghi inbox (cửa sổ `WaitTimeToDeleteProcessedInboxEvents` = **2 giờ**); ngưỡng thử của ta (**5**) **phải nhỏ hơn** `InboxProcessorMaxRetryCount` (**10**); **cấm** đặt `InboxProcessorFailurePolicy = RetryLater` hoặc `Discard`.<br>• **BR-XC-002-012**: Phát lại DLQ chỉ khi `Status = DeadLettered`, và **giữ nguyên `IdempotencyKey` gốc** — **cấm** sinh khoá mới khi phát lại.<br>• **BR-XC-002-013**: Có bản ghi mới trong DLQ ⇒ **phải có cảnh báo** (metric + alert), không chỉ ghi log.<br>• **BR-XC-002-014**: Đảm bảo thứ tự **chỉ theo từng aggregate**; consumer **phải** từ chối bản có `AggregateVersion` **≤** version đã áp dụng (bỏ qua + log/metric, **không** im lặng hoàn toàn) và đẩy DLQ `OutOfOrder` khi phát hiện **thiếu bản trung gian**.<br>• **BR-XC-002-015**: Mỗi ETO **phải** ghi rõ trong tài liệu module là **có** hay **không** yêu cầu ordering — **không** được để ngầm hiểu.<br>• **BR-XC-002-016**: Consumer chạm tồn kho **chỉ được ghi thêm** vào sổ cái kho (append-only) — **cấm** `UPDATE` số lượng; xử lý lại **không** được tạo bút toán thứ hai (liên kết `INV-001`, `XC-001`).<br>• **BR-XC-002-017**: Payload ETO chứa tiền **phải** là `decimal` + `Currency`; **cấm** `double`/`float` và **cấm** so sánh tiền bằng `==` (liên kết `XC-001` BR-003/BR-008).<br>• **BR-XC-002-018**: `InboxRecords` và `DeadLetterEvents` **phải** là `IMultiTenant` có `TenantId` bắt buộc; consumer chạy handler trong `ICurrentTenant.Change(tenantId của sự kiện)`.<br>• **BR-XC-002-019**: **Cấm** dùng `AbpEventInbox` / `AbpEventOutbox` cho **truy vấn vận hành theo tenant** (không có cột `TenantId`, `EventData` là `byte[]`) — mọi màn hình/báo cáo dùng bảng của ta.<br>• **BR-XC-002-020**: Mọi ETO **phải** có tối thiểu: `EventId` (Guid), `OccurredOn` (UTC), `AggregateId`, `AggregateVersion` (long), `TenantId?`, `ChannelCode?`, `CorrelationId?`.<br>• **BR-XC-002-021**: **Cấm** đưa PII nhạy cảm, mật khẩu, token, số thẻ, khoá API vào payload ETO (payload được lưu **nguyên văn** trong outbox/inbox/DLQ và không mã hoá ở tầng này). |
-| **Non-Functional Requirement** | • **NFR-XC-002-001**: Độ trễ phát sự kiện (từ commit tới khi relay phát) **p95 ≤ 2 s** khi hệ thống rảnh (khớp `PeriodTimeSpan` mặc định).<br>• **NFR-XC-002-002**: Thông lượng outbox **≥ 500 sự kiện/s** khi `BatchPublishOutboxEvents = true` và batch 1000.<br>• **NFR-XC-002-003**: Tồn đọng `AbpEventOutbox` **p99 < 1000** bản ghi; cảnh báo nếu chạm trần `OutboxWaitingEventMaxCount` **liên tục 5 phút**.<br>• **NFR-XC-002-004**: **0 sự kiện mất** khi kill tiến trình sau commit và trước relay (test 10.000 sự kiện, mất **0**).<br>• **NFR-XC-002-005**: Gửi lại cùng một webhook **100 lần** ⇒ **đúng 1** side effect (0 bản ghi nghiệp vụ trùng).<br>• **NFR-XC-002-006**: Handler lỗi ⇒ có bản ghi DLQ trong **≤ 1 s** (đo ở integration test).<br>• **NFR-XC-002-007**: Phát hiện bản ghi DLQ mới trong **< 60 s**.<br>• **NFR-XC-002-008**: Phát lại **1000** bản ghi DLQ trong **< 5 phút**.<br>• **NFR-XC-002-009**: **100%** log xử lý sự kiện có `CorrelationId` + `EventId` + `EventName`; tồn tại metric `messaging_outbox_pending`, `messaging_inbox_failed`, `messaging_dlq_size`, `messaging_dlq_replayed`.<br>• **NFR-XC-002-010**: Cách ly tenant: tenant A **không** đọc được inbox/DLQ của tenant B (test 2 tenant).<br>• **NFR-XC-002-011**: **0** `double`/`float` trong payload ETO có tiền (test reflection).<br>• **NFR-XC-002-012**: Payload ETO **≤ 100 KB** (ngưỡng của ta); vượt ⇒ ném `eCommerce:Messaging:0007`.<br>• **NFR-XC-002-013**: Độ trễ xử lý inbox end-to-end (enqueue → handler xong) **p95 < 5 s**. |
+| **Exception Flow** | **E1:** cùng `IdempotencyKey` nhưng **`PayloadHash` khác** ⇒ `BusinessException` **`eCommerce:Infrastructure:0002`** (đây **không** phải bản ghi trùng — là **xung đột khoá**, phải điều tra).<br>**E2:** handler ném lỗi ⇒ **không** nuốt: wrapper ghi DLQ (`eCommerce:Infrastructure:0003` chỉ dùng làm **mã log/metric**, không trả cho client) rồi ném lại.<br>**E3:** phát lại bản ghi **không** ở trạng thái `DeadLettered` ⇒ **`eCommerce:Infrastructure:0005`**.<br>**E4:** payload không deserialize được về kiểu ETO / event name không có handler ⇒ `FailureKind = PoisonMessage`, **không** retry vô hạn, vào DLQ (**`eCommerce:Infrastructure:0007`** / **`0008`**).<br>**E5:** payload vượt ngưỡng kích thước của ta (> **100 KB**) ⇒ **`eCommerce:Infrastructure:0007`** — **cấm** nhét blob lớn vào outbox; ETO phải mang **tham chiếu** (id) để consumer tự đọc.<br>**E6:** chuyển trạng thái sai (ví dụ `Processed → Processing`) ⇒ **`eCommerce:Infrastructure:0006`**, **không** im lặng.<br>**E7:** `UPDATE … WHERE Status = …` ảnh hưởng **0 dòng** (đã bị luồng khác đổi) ⇒ **ném lỗi** (không coi là thành công).<br>**E8:** `AbpEventOutbox` tồn đọng vượt `OutboxWaitingEventMaxCount` liên tục ⇒ **cảnh báo** (không ném lỗi nghiệp vụ) + metric `messaging_outbox_pending`. |
+| **Business Rules** | • **BR-XC-002-001**: Mọi sự kiện nghiệp vụ liên module **phải** phát qua `IDistributedEventBus` với `useOutbox: true` **trong Unit of Work**; bản ghi outbox **phải** được ghi **cùng transaction** với dữ liệu nghiệp vụ.<br>• **BR-XC-002-002**: **Cấm** phát sự kiện nghiệp vụ trực tiếp (dual-write) — chỉ những sự kiện nằm trong **allowlist** "làm lại được nhiều lần" mới được phát ngoài outbox (§7.1).<br>• **BR-XC-002-003**: Relay **phải** là **background worker** quét theo thời gian; **cấm** lọc theo "transaction vừa commit" (bài học eShop).<br>• **BR-XC-002-004**: **Mọi** biên vào — HTTP webhook, consumer sự kiện, job định kỳ, callback thanh toán — **phải** idempotent: gọi `IIdempotencyGuard` **trước** mọi side effect.<br>• **BR-XC-002-005**: `InboxRecords` **phải** có `TenantId`, `ChannelCode`, `ExternalOrderId`, `EventType`, `PayloadHash` và **unique index** `(TenantId, EventType, IdempotencyKey)`; `PayloadHash` = SHA-256 của payload **chuẩn hoá** (canonical JSON).<br>• **BR-XC-002-006**: Cùng `IdempotencyKey` + **khác** `PayloadHash` ⇒ **NÉM** `eCommerce:Infrastructure:0002` — **cấm** coi là bản ghi trùng và **cấm** ghi đè.<br>• **BR-XC-002-007**: Idempotency key của thanh toán **ổn định**: sinh **một lần** ở lần thử đầu và **lưu vào DB**; mọi retry **đọc lại** khoá đó; **cấm** `Guid.NewGuid()` cho mỗi lần gọi.<br>• **BR-XC-002-008**: Mọi chuyển trạng thái **phải** có guard ở **tầng DB**: `UPDATE … WHERE Status = @expected` **hoặc** optimistic concurrency (`RowVersion`); số dòng ảnh hưởng **0** ⇒ **NÉM LỖI**.<br>• **BR-XC-002-009**: Guard sai **phải NÉM LỖI có mã** (quy ước #11) — **cấm** no-op im lặng (bài học `SetPaidStatus()` của eShop).<br>• **BR-XC-002-010**: Handler ném lỗi ⇒ **phải** có bản ghi `DeadLetterEvents` (**trước khi** ném lại), ghi ở **UoW riêng** để không bị rollback.<br>• **BR-XC-002-011**: Sự kiện vượt ngưỡng thử của ta **phải** nằm trong DLQ **trước** khi ABP xoá bản ghi inbox (cửa sổ `WaitTimeToDeleteProcessedInboxEvents` = **2 giờ**); ngưỡng thử của ta (**5**) **phải nhỏ hơn** `InboxProcessorMaxRetryCount` (**10**); **cấm** đặt `InboxProcessorFailurePolicy = RetryLater` hoặc `Discard`.<br>• **BR-XC-002-012**: Phát lại DLQ chỉ khi `Status = DeadLettered`, và **giữ nguyên `IdempotencyKey` gốc** — **cấm** sinh khoá mới khi phát lại.<br>• **BR-XC-002-013**: Có bản ghi mới trong DLQ ⇒ **phải có cảnh báo** (metric + alert), không chỉ ghi log.<br>• **BR-XC-002-014**: Đảm bảo thứ tự **chỉ theo từng aggregate**; consumer **phải** từ chối bản có `AggregateVersion` **≤** version đã áp dụng (bỏ qua + log/metric, **không** im lặng hoàn toàn) và đẩy DLQ `OutOfOrder` khi phát hiện **thiếu bản trung gian**.<br>• **BR-XC-002-015**: Mỗi ETO **phải** ghi rõ trong tài liệu module là **có** hay **không** yêu cầu ordering — **không** được để ngầm hiểu.<br>• **BR-XC-002-016**: Consumer chạm tồn kho **chỉ được ghi thêm** vào sổ cái kho (append-only) — **cấm** `UPDATE` số lượng; xử lý lại **không** được tạo bút toán thứ hai (liên kết `INV-001`, `XC-001`).<br>• **BR-XC-002-017**: Payload ETO chứa tiền **phải** là `decimal` + `Currency`; **cấm** `double`/`float` và **cấm** so sánh tiền bằng `==` (liên kết `XC-001` BR-003/BR-008).<br>• **BR-XC-002-018**: `InboxRecords` và `DeadLetterEvents` **phải** là `IMultiTenant` có `TenantId` bắt buộc; consumer chạy handler trong `ICurrentTenant.Change(tenantId của sự kiện)`.<br>• **BR-XC-002-019**: **Cấm** dùng `AbpEventInbox` / `AbpEventOutbox` cho **truy vấn vận hành theo tenant** (không có cột `TenantId`, `EventData` là `byte[]`) — mọi màn hình/báo cáo dùng bảng của ta.<br>• **BR-XC-002-020**: Mọi ETO **phải** có tối thiểu: `EventId` (Guid), `OccurredOn` (UTC), `AggregateId`, `AggregateVersion` (long), `TenantId?`, `ChannelCode?`, `CorrelationId?`.<br>• **BR-XC-002-021**: **Cấm** đưa PII nhạy cảm, mật khẩu, token, số thẻ, khoá API vào payload ETO (payload được lưu **nguyên văn** trong outbox/inbox/DLQ và không mã hoá ở tầng này). |
+| **Non-Functional Requirement** | • **NFR-XC-002-001**: Độ trễ phát sự kiện (từ commit tới khi relay phát) **p95 ≤ 2 s** khi hệ thống rảnh (khớp `PeriodTimeSpan` mặc định).<br>• **NFR-XC-002-002**: Thông lượng outbox **≥ 500 sự kiện/s** khi `BatchPublishOutboxEvents = true` và batch 1000.<br>• **NFR-XC-002-003**: Tồn đọng `AbpEventOutbox` **p99 < 1000** bản ghi; cảnh báo nếu chạm trần `OutboxWaitingEventMaxCount` **liên tục 5 phút**.<br>• **NFR-XC-002-004**: **0 sự kiện mất** khi kill tiến trình sau commit và trước relay (test 10.000 sự kiện, mất **0**).<br>• **NFR-XC-002-005**: Gửi lại cùng một webhook **100 lần** ⇒ **đúng 1** side effect (0 bản ghi nghiệp vụ trùng).<br>• **NFR-XC-002-006**: Handler lỗi ⇒ có bản ghi DLQ trong **≤ 1 s** (đo ở integration test).<br>• **NFR-XC-002-007**: Phát hiện bản ghi DLQ mới trong **< 60 s**.<br>• **NFR-XC-002-008**: Phát lại **1000** bản ghi DLQ trong **< 5 phút**.<br>• **NFR-XC-002-009**: **100%** log xử lý sự kiện có `CorrelationId` + `EventId` + `EventName`; tồn tại metric `messaging_outbox_pending`, `messaging_inbox_failed`, `messaging_dlq_size`, `messaging_dlq_replayed`.<br>• **NFR-XC-002-010**: Cách ly tenant: tenant A **không** đọc được inbox/DLQ của tenant B (test 2 tenant).<br>• **NFR-XC-002-011**: **0** `double`/`float` trong payload ETO có tiền (test reflection).<br>• **NFR-XC-002-012**: Payload ETO **≤ 100 KB** (ngưỡng của ta); vượt ⇒ ném `eCommerce:Infrastructure:0007`.<br>• **NFR-XC-002-013**: Độ trễ xử lý inbox end-to-end (enqueue → handler xong) **p95 < 5 s**. |
 
 > **Ghi chú về tenant + kênh (theo mẫu §1):** Pre-condition **bắt buộc** ghi `TenantId`; `ChannelCode` **có** mặt với sự kiện phát sinh từ kênh bán (webhook sàn, IPN cổng thanh toán), và **không** áp dụng cho sự kiện hạ tầng thuần — nhưng **vẫn phải** là cột trong `InboxRecords` (nullable) để tra cứu vận hành theo kênh (**BR-XC-002-005**).
 
@@ -109,7 +109,7 @@ flowchart LR
     HT(("⚙️<br/>Hệ thống"))
     EXT(("🌐<br/>Hệ thống ngoài"))
 
-    subgraph MSG["📦 «Hạ tầng nhắn tin — Messaging»"]
+    subgraph MSG["📦 «Hạ tầng nhắn tin — Infrastructure»"]
         direction TB
         UC1(["«phát sự kiện qua outbox»"])
         UC2(["«relay phát sự kiện»"])
@@ -217,14 +217,14 @@ stateDiagram-v2
 |---|---|---|---|---|
 | 1 | `[*]` → `Received` | `MessageId` **không** rỗng **và** event name có handler đã đăng ký | `EnqueueAsync(IncomingEventInfo)` — ghi trong UoW của lần phát | Nếu event name **không** có handler ⇒ vẫn ghi inbox, nhưng lần xử lý sẽ vào DLQ `PoisonMessage` (**E4**) — **không** nuốt im lặng |
 | 2 | `Received` → `Processing` | `Status = Pending` **và** (`NextRetryTime == null` **hoặc** `<= now`) | `InboxProcessor` mở **UoW mới có transaction**, chạy handler | Không đến hạn ⇒ **ở lại `Received`** (không lỗi, không log lỗi) |
-| 3 | `Processing` → `Processed` | Handler chạy xong **và** `MarkAsProcessedAsync` ảnh hưởng **≥ 1 dòng** | Đóng UoW (commit) | Nếu `UPDATE` ảnh hưởng **0 dòng** (bị luồng khác đổi) ⇒ **NÉM** `eCommerce:Messaging:0006` |
-| 4 | `Processing` → `IgnoredDuplicate` | `IIdempotencyGuard` thấy `IdempotencyKey` **đã tồn tại** **và** `PayloadHash` **khớp** | **Không** side effect; ghi metric `messaging_inbox_duplicate`; kết thúc coi như `Processed` | Nếu `PayloadHash` **khác** ⇒ **NÉM** `eCommerce:Messaging:0002` (**BR-XC-002-006**) — **cấm** coi là trùng |
+| 3 | `Processing` → `Processed` | Handler chạy xong **và** `MarkAsProcessedAsync` ảnh hưởng **≥ 1 dòng** | Đóng UoW (commit) | Nếu `UPDATE` ảnh hưởng **0 dòng** (bị luồng khác đổi) ⇒ **NÉM** `eCommerce:Infrastructure:0006` |
+| 4 | `Processing` → `IgnoredDuplicate` | `IIdempotencyGuard` thấy `IdempotencyKey` **đã tồn tại** **và** `PayloadHash` **khớp** | **Không** side effect; ghi metric `messaging_inbox_duplicate`; kết thúc coi như `Processed` | Nếu `PayloadHash` **khác** ⇒ **NÉM** `eCommerce:Infrastructure:0002` (**BR-XC-002-006**) — **cấm** coi là trùng |
 | 5 | `Processing` → `Failed` | Handler ném bất kỳ exception nào | Wrapper ghi `DeadLetterEvents` **ở UoW riêng** rồi **ném lại** để ABP thử nhịp sau | Nếu **không** ghi được DLQ (DB lỗi) ⇒ **vẫn phải ném lại** + log `Critical` + metric `messaging_dlq_write_failed` (**không** được nuốt) |
 | 6 | `Failed` → `Processing` | `AttemptCount < MaxAttempts` (mặc định **5**) | Tăng `AttemptCount` trong DLQ; chờ nhịp kế tiếp | Nếu `AttemptCount >= MaxAttempts` ⇒ chuyển sang `DeadLettered` + **cảnh báo** (**BR-XC-002-011/013**) |
 | 7 | `Failed` → `Discarded` | `InboxProcessorFailurePolicy` là `RetryLater`/`Discard` **và** vượt `InboxProcessorMaxRetryCount` | ABP `MarkAsDiscardAsync` — **chỉ còn 1 dòng log warning** | 🚫 **Đây là cấu hình BỊ CẤM.** Nếu xảy ra (cấu hình sai) ⇒ job quét `Discarded → DeadLettered` **phải** vớt trong **< 2 giờ** (cửa sổ `WaitTimeToDeleteProcessedInboxEvents`) và **phát cảnh báo cấu hình sai** |
-| 8 | `DeadLettered` → `Replayed` | Người bấm có permission `eCommerce.Messaging.DeadLetter.Replay` **và** `Status = DeadLettered` | `Replayed` + `ReplayedBy` + `ReplayedAt`; nạp lại vào `AbpEventInbox` với `MessageId` **mới** nhưng **giữ nguyên `IdempotencyKey`** (**BR-XC-002-012**) | Nếu `Status ≠ DeadLettered` ⇒ **NÉM** `eCommerce:Messaging:0005` (E3) |
+| 8 | `DeadLettered` → `Replayed` | Người bấm có permission `eCommerce.Infrastructure.DeadLetter.Replay` **và** `Status = DeadLettered` | `Replayed` + `ReplayedBy` + `ReplayedAt`; nạp lại vào `AbpEventInbox` với `MessageId` **mới** nhưng **giữ nguyên `IdempotencyKey`** (**BR-XC-002-012**) | Nếu `Status ≠ DeadLettered` ⇒ **NÉM** `eCommerce:Infrastructure:0005` (E3) |
 | 9 | `Replayed` → `Processed` | Xử lý lại thành công | DLQ ghi `Resolved` + `ResolvedAt` | Nếu vẫn lỗi ⇒ quay lại `DeadLettered` (`AttemptCount` **cộng dồn**, không reset) |
-| 10 | `Processed` → bất kỳ | **KHÔNG** có guard nào cho phép | — | **Trạng thái hấp thụ (absorbing)**: mọi chuyển dịch khỏi `Processed` ⇒ **NÉM** `eCommerce:Messaging:0006` |
+| 10 | `Processed` → bất kỳ | **KHÔNG** có guard nào cho phép | — | **Trạng thái hấp thụ (absorbing)**: mọi chuyển dịch khỏi `Processed` ⇒ **NÉM** `eCommerce:Infrastructure:0006` |
 
 > ⚠️ **Quy tắc bất di bất dịch #11: guard sai phải NÉM LỖI (hoặc ghi log có cấu trúc), không im lặng.**
 > **Ai được phép chuyển:** `Received → Processing` do **`InboxProcessor`** (không phải người dùng); `DeadLettered → Replayed` do **Ops có permission**; `Discarded → DeadLettered` do **job quét**.
@@ -296,7 +296,7 @@ sequenceDiagram
             G-->>H: DuplicateIgnored
             Note over H: KHÔNG side effect, ghi metric
         else «khoá đã tồn tại nhưng PayloadHash KHÁC»
-            G-->>H: «ném eCommerce Messaging 0002»
+            G-->>H: «ném eCommerce Infrastructure 0002»
         else «khoá mới»
             G->>DB: ghi InboxRecords với PayloadHash
             H->>DB: side effect nghiệp vụ
@@ -563,20 +563,20 @@ Mục đích: **không bao giờ** để một sự kiện lỗi biến mất kh
 
 | Mục | Giá trị |
 |---|---|
-| Interface | `IMessagingAdminAppService` (đặt tại `eCommerce.Messaging.Contracts`) |
-| Implementation | `MessagingAdminAppService` (đặt tại `eCommerce.Messaging.Application`) |
+| Interface | `IInfrastructureAdminAppService` (đặt tại `eCommerce.Infrastructure.Contracts`) |
+| Implementation | `InfrastructureAdminAppService` (đặt tại `eCommerce.Infrastructure.Application`) |
 | `[Authorize]` | **cấp CLASS** + permission cụ thể ở từng method (⚠️ ABP **không** tự bảo vệ app service — đã gặp thật ở Phase 0) |
 
 | Method | Input (DTO) | Output (DTO) | Permission | Ghi chú |
 |---|---|---|---|---|
-| `GetInboxAsync` | `GetInboxRecordsInput` | `PagedResultDto<InboxRecordDto>` | `eCommerce.Messaging.Inbox.View` | lọc theo `Status`, `EventType`, `ChannelCode`, khoảng thời gian |
-| `GetDeadLettersAsync` | `GetDeadLettersInput` | `PagedResultDto<DeadLetterDto>` | `eCommerce.Messaging.DeadLetter.View` | **không** trả `Payload` đầy đủ (chỉ xem trước 4 KB) |
-| `GetDeadLetterPayloadAsync` | `Guid id` | `RemoteStreamContent` | `eCommerce.Messaging.DeadLetter.View` | tải payload để điều tra |
-| `ReplayAsync` | `Guid id` | `ReplayResultDto` | `eCommerce.Messaging.DeadLetter.Replay` | chỉ khi `Status = DeadLettered` |
-| `ReplayBatchAsync` | `ReplayBatchInput` | `ReplayBatchResultDto` | `eCommerce.Messaging.DeadLetter.Replay` | tối đa **1000** bản ghi/lần; **giữ nguyên** khoá |
-| `DiscardAsync` | `Guid id` + `string reason` | `void` | `eCommerce.Messaging.DeadLetter.Discard` | chuyển `Discarded` + **bắt buộc** lý do (audit) |
-| `GetStatsAsync` | — | `MessagingStatsDto` | `eCommerce.Messaging.Stats.View` | `outboxPending`, `inboxPending`, `dlqSize`, `duplicateIgnored24h` |
-| `GetOutboxBacklogAsync` | `GetBacklogInput` | `PagedResultDto<OutboxBacklogDto>` | `eCommerce.Messaging.Stats.View` | đọc `AbpEventOutbox` **chỉ để vận hành**, trả `EventName` + `CreationTime` — **không** trả `EventData` |
+| `GetInboxAsync` | `GetInboxRecordsInput` | `PagedResultDto<InboxRecordDto>` | `eCommerce.Infrastructure.Inbox.View` | lọc theo `Status`, `EventType`, `ChannelCode`, khoảng thời gian |
+| `GetDeadLettersAsync` | `GetDeadLettersInput` | `PagedResultDto<DeadLetterDto>` | `eCommerce.Infrastructure.DeadLetter.View` | **không** trả `Payload` đầy đủ (chỉ xem trước 4 KB) |
+| `GetDeadLetterPayloadAsync` | `Guid id` | `RemoteStreamContent` | `eCommerce.Infrastructure.DeadLetter.View` | tải payload để điều tra |
+| `ReplayAsync` | `Guid id` | `ReplayResultDto` | `eCommerce.Infrastructure.DeadLetter.Replay` | chỉ khi `Status = DeadLettered` |
+| `ReplayBatchAsync` | `ReplayBatchInput` | `ReplayBatchResultDto` | `eCommerce.Infrastructure.DeadLetter.Replay` | tối đa **1000** bản ghi/lần; **giữ nguyên** khoá |
+| `DiscardAsync` | `Guid id` + `string reason` | `void` | `eCommerce.Infrastructure.DeadLetter.Discard` | chuyển `Discarded` + **bắt buộc** lý do (audit) |
+| `GetStatsAsync` | — | `InfrastructureStatsDto` | `eCommerce.Infrastructure.Stats.View` | `outboxPending`, `inboxPending`, `dlqSize`, `duplicateIgnored24h` |
+| `GetOutboxBacklogAsync` | `GetBacklogInput` | `PagedResultDto<OutboxBacklogDto>` | `eCommerce.Infrastructure.Stats.View` | đọc `AbpEventOutbox` **chỉ để vận hành**, trả `EventName` + `CreationTime` — **không** trả `EventData` |
 
 > ⚠️ **BR-XC-002-019:** `GetOutboxBacklogAsync` **được phép** đọc bảng ABP **vì** đây là màn hình vận hành hạ tầng (không lọc theo tenant, không dùng làm số liệu nghiệp vụ) — và **phải** ghi rõ điều đó trong XML doc của method.
 
@@ -584,14 +584,14 @@ Mục đích: **không bao giờ** để một sự kiện lỗi biến mất kh
 
 | Method / Route | Permission | Mô tả |
 |---|---|---|
-| `GET /api/app/messaging/inbox` | `eCommerce.Messaging.Inbox.View` | danh sách bản ghi inbox nghiệp vụ |
-| `GET /api/app/messaging/dead-letters` | `eCommerce.Messaging.DeadLetter.View` | danh sách DLQ |
-| `GET /api/app/messaging/dead-letters/{id}/payload` | `eCommerce.Messaging.DeadLetter.View` | tải payload |
-| `POST /api/app/messaging/dead-letters/{id}/replay` | `eCommerce.Messaging.DeadLetter.Replay` | phát lại 1 bản ghi |
-| `POST /api/app/messaging/dead-letters/replay-batch` | `eCommerce.Messaging.DeadLetter.Replay` | phát lại theo lô |
-| `POST /api/app/messaging/dead-letters/{id}/discard` | `eCommerce.Messaging.DeadLetter.Discard` | bỏ qua (có lý do) |
-| `GET /api/app/messaging/stats` | `eCommerce.Messaging.Stats.View` | số liệu tồn đọng |
-| `GET /api/app/messaging/outbox-backlog` | `eCommerce.Messaging.Stats.View` | tồn đọng outbox (chỉ vận hành) |
+| `GET /api/app/messaging/inbox` | `eCommerce.Infrastructure.Inbox.View` | danh sách bản ghi inbox nghiệp vụ |
+| `GET /api/app/messaging/dead-letters` | `eCommerce.Infrastructure.DeadLetter.View` | danh sách DLQ |
+| `GET /api/app/messaging/dead-letters/{id}/payload` | `eCommerce.Infrastructure.DeadLetter.View` | tải payload |
+| `POST /api/app/messaging/dead-letters/{id}/replay` | `eCommerce.Infrastructure.DeadLetter.Replay` | phát lại 1 bản ghi |
+| `POST /api/app/messaging/dead-letters/replay-batch` | `eCommerce.Infrastructure.DeadLetter.Replay` | phát lại theo lô |
+| `POST /api/app/messaging/dead-letters/{id}/discard` | `eCommerce.Infrastructure.DeadLetter.Discard` | bỏ qua (có lý do) |
+| `GET /api/app/messaging/stats` | `eCommerce.Infrastructure.Stats.View` | số liệu tồn đọng |
+| `GET /api/app/messaging/outbox-backlog` | `eCommerce.Infrastructure.Stats.View` | tồn đọng outbox (chỉ vận hành) |
 
 | Mục | Giá trị |
 |---|---|
@@ -628,19 +628,19 @@ Mục đích: **không bao giờ** để một sự kiện lỗi biến mất kh
 
 | Mã | HTTP | Khi nào | Thông điệp |
 |---|---|---|---|
-| `eCommerce:Messaging:0001` | *(không lộ ra ngoài)* | Bản ghi trùng được bỏ qua | **Không phải lỗi** — ghi log `Information` + metric `messaging_inbox_duplicate` |
-| `eCommerce:Messaging:0002` | `409` | Cùng `IdempotencyKey` nhưng khác `PayloadHash` | `Khoá chống trùng {key} đã tồn tại với nội dung khác. Cần điều tra thủ công.` |
-| `eCommerce:Messaging:0003` | *(không lộ ra ngoài)* | Handler ném lỗi | mã dùng cho log/metric; bản ghi vào DLQ |
-| `eCommerce:Messaging:0004` | *(không lộ ra ngoài)* | Vượt ngưỡng thử của ta | DLQ `DeadLettered` + **cảnh báo** |
-| `eCommerce:Messaging:0005` | `409` | Phát lại bản ghi không ở `DeadLettered` | `Chỉ phát lại được bản ghi đang ở trạng thái DeadLettered.` |
-| `eCommerce:Messaging:0006` | `409` | Chuyển trạng thái sai / `UPDATE` 0 dòng | `Không thể chuyển trạng thái từ {from} sang {to}.` |
-| `eCommerce:Messaging:0007` | `400` | Payload không deserialize được **hoặc** > 100 KB | `Payload không hợp lệ hoặc vượt ngưỡng cho phép.` |
-| `eCommerce:Messaging:0008` | *(không lộ ra ngoài)* | Không có handler cho event name | DLQ `FailureKind = NoHandler` + cảnh báo (thường do **sai cấu hình module**) |
+| `eCommerce:Infrastructure:0001` | *(không lộ ra ngoài)* | Bản ghi trùng được bỏ qua | **Không phải lỗi** — ghi log `Information` + metric `messaging_inbox_duplicate` |
+| `eCommerce:Infrastructure:0002` | `409` | Cùng `IdempotencyKey` nhưng khác `PayloadHash` | `Khoá chống trùng {key} đã tồn tại với nội dung khác. Cần điều tra thủ công.` |
+| `eCommerce:Infrastructure:0003` | *(không lộ ra ngoài)* | Handler ném lỗi | mã dùng cho log/metric; bản ghi vào DLQ |
+| `eCommerce:Infrastructure:0004` | *(không lộ ra ngoài)* | Vượt ngưỡng thử của ta | DLQ `DeadLettered` + **cảnh báo** |
+| `eCommerce:Infrastructure:0005` | `409` | Phát lại bản ghi không ở `DeadLettered` | `Chỉ phát lại được bản ghi đang ở trạng thái DeadLettered.` |
+| `eCommerce:Infrastructure:0006` | `409` | Chuyển trạng thái sai / `UPDATE` 0 dòng | `Không thể chuyển trạng thái từ {from} sang {to}.` |
+| `eCommerce:Infrastructure:0007` | `400` | Payload không deserialize được **hoặc** > 100 KB | `Payload không hợp lệ hoặc vượt ngưỡng cho phép.` |
+| `eCommerce:Infrastructure:0008` | *(không lộ ra ngoài)* | Không có handler cho event name | DLQ `FailureKind = NoHandler` + cảnh báo (thường do **sai cấu hình module**) |
 
 ### 6.3 Cấu hình **bắt buộc** (ABP 10.7 — bật outbox/inbox tường minh)
 
 ```csharp
-// Trong module khởi động (ví dụ eCommerceEntityFrameworkCoreModule hoặc Messaging module)
+// Trong module khởi động (ví dụ eCommerceEntityFrameworkCoreModule hoặc Infrastructure module)
 Configure<AbpDistributedEventBusOptions>(options =>
 {
     // 1) BẮT BUỘC: nếu thiếu, AddToOutboxAsync trả false và ABP rơi về publish TRỰC TIẾP
@@ -687,10 +687,10 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>, IHasEventOut
 }
 ```
 
-### 6.4 Hợp đồng idempotency dùng chung (`eCommerce.Messaging.Contracts`)
+### 6.4 Hợp đồng idempotency dùng chung (`eCommerce.Infrastructure.Contracts`)
 
 ```csharp
-namespace eCommerce.Messaging;
+namespace eCommerce.Infrastructure;
 
 /// Mọi biên vào BẮT BUỘC gọi qua đây TRƯỚC mọi side effect (BR-XC-002-004)
 public interface IIdempotencyGuard
@@ -818,10 +818,10 @@ public abstract class IntegrationEventBase
 | 1 | **Không có exactly-once** — vận chuyển là **at-least-once** | Không cố đạt exactly-once; mọi handler **phải** idempotent (`IIdempotencyGuard`) |
 | 2 | Sự kiện nghiệp vụ **và** dữ liệu nghiệp vụ **cùng sống hoặc cùng chết** | Outbox ghi **cùng transaction** (BR-XC-002-001) — đã kiểm chứng `SaveChangesAsync` **trước** `CommitTransactionsAsync` |
 | 3 | Một sự kiện nghiệp vụ **không** gây side effect 2 lần | UNIQUE `(TenantId, EventType, IdempotencyKey)` + `PayloadHash` |
-| 4 | Cùng khoá nhưng **khác nội dung** ⇒ **không** im lặng | `BusinessException` `eCommerce:Messaging:0002` (BR-XC-002-006) |
+| 4 | Cùng khoá nhưng **khác nội dung** ⇒ **không** im lặng | `BusinessException` `eCommerce:Infrastructure:0002` (BR-XC-002-006) |
 | 5 | Handler lỗi **không** mất sự kiện | `DeadLetterEvents` ghi ở UoW riêng **trước khi** ném lại (BR-XC-002-010) |
 | 6 | Sự kiện vượt ngưỡng thử **không** bị ABP xoá âm thầm | Ngưỡng của ta (**5**) < `InboxProcessorMaxRetryCount` (**10**); **cấm** policy `RetryLater`/`Discard` (BR-XC-002-011) |
-| 7 | `Processed` là **trạng thái hấp thụ** | Guard ném `eCommerce:Messaging:0006` khi cố chuyển khỏi `Processed` |
+| 7 | `Processed` là **trạng thái hấp thụ** | Guard ném `eCommerce:Infrastructure:0006` khi cố chuyển khỏi `Processed` |
 | 8 | Sổ cái kho là **append-only** | Bút toán chỉ được **thêm**; chống trùng bằng `ReservationId`/`IdempotencyKey` (**BR-XC-002-016**, liên kết `INV-001`) |
 | 9 | Sự kiện đến muộn **không** ghi đè trạng thái mới hơn | `AggregateVersion` + `AppliedVersion` (BR-XC-002-014) |
 | 10 | Tiền trong payload là `decimal` + `Currency` | Không `double`/`float`; **cấm** so `==` (liên kết `XC-001` BR-003/BR-008) |
@@ -868,14 +868,14 @@ public abstract class IntegrationEventBase
 
 | Permission | Nhóm | Method được gán | Vai trò mặc định |
 |---|---|---|---|
-| `eCommerce.Messaging.Inbox.View` | Messaging | `GetInboxAsync` | Admin tenant · Nhân viên vận hành |
-| `eCommerce.Messaging.DeadLetter.View` | Messaging | `GetDeadLettersAsync`, `GetDeadLetterPayloadAsync` | Admin tenant · Nhân viên vận hành |
-| `eCommerce.Messaging.DeadLetter.Replay` | Messaging | `ReplayAsync`, `ReplayBatchAsync` | **Admin tenant** (thao tác có ảnh hưởng nghiệp vụ) |
-| `eCommerce.Messaging.DeadLetter.Discard` | Messaging | `DiscardAsync` | **Admin tenant** — bỏ qua một sự kiện là **quyết định có rủi ro**, phải có lý do |
-| `eCommerce.Messaging.Stats.View` | Messaging | `GetStatsAsync`, `GetOutboxBacklogAsync` | Admin tenant · Nhân viên vận hành |
+| `eCommerce.Infrastructure.Inbox.View` | Infrastructure | `GetInboxAsync` | Admin tenant · Nhân viên vận hành |
+| `eCommerce.Infrastructure.DeadLetter.View` | Infrastructure | `GetDeadLettersAsync`, `GetDeadLetterPayloadAsync` | Admin tenant · Nhân viên vận hành |
+| `eCommerce.Infrastructure.DeadLetter.Replay` | Infrastructure | `ReplayAsync`, `ReplayBatchAsync` | **Admin tenant** (thao tác có ảnh hưởng nghiệp vụ) |
+| `eCommerce.Infrastructure.DeadLetter.Discard` | Infrastructure | `DiscardAsync` | **Admin tenant** — bỏ qua một sự kiện là **quyết định có rủi ro**, phải có lý do |
+| `eCommerce.Infrastructure.Stats.View` | Infrastructure | `GetStatsAsync`, `GetOutboxBacklogAsync` | Admin tenant · Nhân viên vận hành |
 
 > ⚠️ **Nhắc lại (đã gặp thật ở Phase 0):** ABP **không** tự bảo vệ application service ⇒ **bắt buộc `[Authorize]` ở cấp CLASS**
-> trên `MessagingAdminAppService`; và **phải** khai báo các permission trong `*PermissionDefinitionProvider` —
+> trên `InfrastructureAdminAppService`; và **phải** khai báo các permission trong `*PermissionDefinitionProvider` —
 > **thiếu file này thì `[Authorize]` luôn từ chối** kể cả với admin.
 > 📌 Phát lại DLQ **không** được gán cho vai trò chỉ-xem, vì phát lại sai có thể tạo bút toán kho/hoá đơn trùng về mặt **vận hành** (dù tầng nghiệp vụ đã idempotent).
 
@@ -887,13 +887,13 @@ public abstract class IntegrationEventBase
 
 | Vùng UI | Thành phần | Dữ liệu hiển thị | Nguồn (DTO / trường) | Quy tắc |
 |---|---|---|---|---|
-| **Header — thẻ số liệu** | 4 ô số | `outboxPending` · `inboxPending` · `dlqSize` · `duplicateIgnored24h` | `MessagingStatsDto` | `dlqSize > 0` ⇒ ô **đỏ**; hiện nhãn thời điểm đo (`asOf`) để tránh hiểu là số thời gian thực |
+| **Header — thẻ số liệu** | 4 ô số | `outboxPending` · `inboxPending` · `dlqSize` · `duplicateIgnored24h` | `InfrastructureStatsDto` | `dlqSize > 0` ⇒ ô **đỏ**; hiện nhãn thời điểm đo (`asOf`) để tránh hiểu là số thời gian thực |
 | **Tab "Tồn đọng outbox"** | bảng | `EventName`, `CreationTime`, tuổi bản ghi | `OutboxBacklogDto` | **Chỉ vận hành**, **không** hiển thị `EventData` (BR-XC-002-019); sắp theo `CreationTime` tăng dần |
 | **Tab "Inbox nghiệp vụ"** | bảng + lọc | `EventType`, `ChannelCode`, `ExternalOrderId`, `IdempotencyKey` (rút gọn), `Status`, `AttemptCount`, `ReceivedAt`, `ProcessedAt` | `InboxRecordDto` | lọc theo `Status`/`EventType`/`ChannelCode`/khoảng ngày; **bản ghi tenant khác không hiển thị** |
 | **Tab "DLQ"** | bảng + lọc | `EventType`, `FailureKind`, `FailureCode`, `AttemptCount`, `FirstFailedAt`, `LastFailedAt`, `Status` | `DeadLetterDto` | mặc định lọc `Status = DeadLettered`; sắp theo `LastFailedAt` **giảm dần** |
 | **Chi tiết DLQ** | ngăn kéo | payload xem trước 4 KB + nút tải đầy đủ; `PayloadHash`; **so sánh** với `InboxRecords.PayloadHash` | `DeadLetterDetailDto` | nếu hash **lệch** ⇒ hiện cảnh báo đỏ "payload đã bị thay đổi, **không** được phát lại" |
 | **Hành động** | nút | **Phát lại** / **Phát lại theo lô** / **Bỏ qua** | `ReplayAsync`, `ReplayBatchAsync`, `DiscardAsync` | "Bỏ qua" **bắt buộc** nhập lý do; cả 3 hành động **bắt buộc** hộp thoại xác nhận ghi rõ **số bản ghi sẽ tác động** |
-| **Banner cấu hình** | cảnh báo | "Phát hiện `InboxProcessorFailurePolicy = RetryLater/Discard`" | `MessagingStatsDto` | hiện **banner đỏ** vì đây là cấu hình **bị cấm** (BR-XC-002-011) |
+| **Banner cấu hình** | cảnh báo | "Phát hiện `InboxProcessorFailurePolicy = RetryLater/Discard`" | `InfrastructureStatsDto` | hiện **banner đỏ** vì đây là cấu hình **bị cấm** (BR-XC-002-011) |
 
 > 📌 **Ghi rõ chênh lệch (thói quen tốt của tài liệu SRS gốc):**
 > 1. **`dlqSize` (số đếm) ≠ số dòng hiển thị** khi người dùng đang lọc (ví dụ lọc `FailureKind = HandlerError`). UI **phải** hiển thị `dlqSize` là **tổng theo tenant** và ghi rõ "đang lọc: N/M".
@@ -908,11 +908,11 @@ public abstract class IntegrationEventBase
 
 | Mục | Nội dung |
 |---|---|
-| Migration | `Added_Messaging_OutboxInboxDeadLetter` (trong `src/eCommerce.EntityFrameworkCore/Migrations`) |
+| Migration | `Added_Infrastructure_OutboxInboxDeadLetter` (trong `src/eCommerce.EntityFrameworkCore/Migrations`) |
 | Bảng tạo mới | `InboxRecords`, `DeadLetterEvents` (**của ta**) + `AbpEventOutbox`, `AbpEventInbox` (**do `builder.ConfigureEventOutbox()` / `builder.ConfigureEventInbox()` sinh ra**) |
 | Điều kiện bắt buộc | `eCommerceDbContext` **phải** implement `IHasEventOutbox` + `IHasEventInbox` và có `DbSet<OutgoingEventRecord>` / `DbSet<IncomingEventRecord>` — **thiếu `DbSet` thì `IRepository<T>` không được đăng ký** (lỗi đã gặp thật ở Phase 0 với `ChannelShop`) |
 | Index | Toàn bộ index ở §5.2 — **đặc biệt**: `UNIQUE (TenantId, EventType, IdempotencyKey)`, `UNIQUE có filter (TenantId, ChannelCode, ExternalOrderId)`, `UNIQUE (TenantId, EventType, PayloadHash, FailureKind)` |
-| Seed | **Không seed dữ liệu nghiệp vụ.** Chỉ seed **permission** (`eCommerce.Messaging.*`) qua `PermissionDefinitionProvider` — seed này **idempotent** (ABP tự xử lý) |
+| Seed | **Không seed dữ liệu nghiệp vụ.** Chỉ seed **permission** (`eCommerce.Infrastructure.*`) qua `PermissionDefinitionProvider` — seed này **idempotent** (ABP tự xử lý) |
 | Ảnh hưởng dữ liệu cũ | **Không backfill.** Chưa có sự kiện nào tồn đọng ở giai đoạn này. ⚠️ **Từ giai đoạn có dữ liệu thật**: nếu đổi `PayloadHash`/canonical hoá ⇒ **phải** có kế hoạch riêng, **không** sửa tại chỗ (xem Q9 ở §15) |
 | Rollback | `Down()` xoá 4 bảng. ⚠️ **An toàn chỉ khi chưa có nghiệp vụ chạy**; nếu đã có ⇒ **phải** xử lý `InboxRecords`/`DeadLetterEvents` còn `DeadLettered` **trước khi** rollback (không được xoá mất dấu vết sự kiện lỗi) |
 | Kiểm chứng | Migration phải chạy được **từ DB trống** *và* trên **DB đã có dữ liệu** (DoD §14.3) |
@@ -927,7 +927,7 @@ public abstract class IntegrationEventBase
 |---|---|---|---|
 | Sự kiện đến lần thứ 2 (redelivery) | at-least-once — **bình thường**, không phải lỗi | `IIdempotencyGuard` trả `AlreadyProcessed` ⇒ **0 side effect**; log `Information` + metric | — *(không có client)* |
 | Webhook gửi trùng | sàn retry theo lịch của họ | **Không** tạo bản ghi thứ 2; trả `200` **như lần đầu** (để sàn ngừng retry) | `200` + `alreadyProcessed: true` |
-| Cùng `IdempotencyKey`, khác `PayloadHash` | dữ liệu bị sửa, hoặc lỗi sinh khoá | **NÉM** `eCommerce:Messaging:0002`; **không** ghi đè; **không** vào DLQ (đây là lỗi **lập trình/dữ liệu**, không phải sự kiện lỗi) | `409` nếu lộ ra qua API |
+| Cùng `IdempotencyKey`, khác `PayloadHash` | dữ liệu bị sửa, hoặc lỗi sinh khoá | **NÉM** `eCommerce:Infrastructure:0002`; **không** ghi đè; **không** vào DLQ (đây là lỗi **lập trình/dữ liệu**, không phải sự kiện lỗi) | `409` nếu lộ ra qua API |
 | **Không có sự kiện trong outbox** | hàng đợi rỗng | Relay **thoát vòng lặp ngay** (`count <= 0`) — **không phải lỗi**, không log lỗi | — |
 | **Không có bản ghi DLQ** | hệ thống khoẻ | Trả danh sách rỗng | `200` + mảng rỗng (UI hiện "Không có sự kiện lỗi") |
 | Handler ném `BusinessException` do **vi phạm bất biến** (hết tồn kho) | nghiệp vụ chặn | Ghi DLQ `FailureKind = HandlerError` + `FailureCode`; **KHÔNG** rollback dữ liệu đã ghi ở transaction khác; retry nhịp sau | — |
@@ -939,9 +939,9 @@ public abstract class IntegrationEventBase
 | Redis chết | hạ tầng | Khoá phân tán **không** lấy được ⇒ relay/`InboxProcessor` **không** chạy (chờ) ⇒ **tồn đọng tăng + cảnh báo**; **không** sập app (`AbortOnConnectFail=false` — đã sửa ở Phase 0) | — |
 | Sự kiện đến muộn (`AggregateVersion` ≤ đã áp dụng) | đảo thứ tự | **Bỏ qua + log + metric** — **không phải lỗi**; **không** vào DLQ | — |
 | Thiếu bản trung gian (`version > applied + 1`) | mất sự kiện / xử lý lệch | DLQ `FailureKind = OutOfOrder` + **cảnh báo** | — |
-| Payload > 100 KB | nhét blob/danh sách lớn vào ETO | **NÉM** `eCommerce:Messaging:0007` **ngay tại chỗ phát** (trước khi ghi outbox) | `400` nếu là API |
-| Phát lại bản ghi không `DeadLettered` | thao tác sai / 2 người cùng bấm | **NÉM** `eCommerce:Messaging:0005` (luồng thua trong `RowVersion`) | `409` |
-| Cố chuyển khỏi trạng thái `Processed` | lỗi lập trình | **NÉM** `eCommerce:Messaging:0006` | `409` |
+| Payload > 100 KB | nhét blob/danh sách lớn vào ETO | **NÉM** `eCommerce:Infrastructure:0007` **ngay tại chỗ phát** (trước khi ghi outbox) | `400` nếu là API |
+| Phát lại bản ghi không `DeadLettered` | thao tác sai / 2 người cùng bấm | **NÉM** `eCommerce:Infrastructure:0005` (luồng thua trong `RowVersion`) | `409` |
+| Cố chuyển khỏi trạng thái `Processed` | lỗi lập trình | **NÉM** `eCommerce:Infrastructure:0006` | `409` |
 | Lỗi runtime DB (deadlock, timeout) | hạ tầng | **Rollback** UoW của ABP; bản ghi outbox **còn** ⇒ phát lại nhịp sau; log có `CorrelationId` | `500` cho API đồng bộ |
 | Sai quyền (thiếu permission) | auth | **Chặn** | `403` |
 | Sai/chưa xác thực | auth | **Chặn** | `401` |
@@ -970,7 +970,7 @@ public abstract class IntegrationEventBase
 | NFR-XC-002-009 | Observability | **100%** log xử lý có `CorrelationId` + `EventId` + `EventName`; có 4 metric bắt buộc | đọc log + kiểm tra metric registry |
 | NFR-XC-002-010 | Cách ly tenant | tenant A **không** đọc được inbox/DLQ của tenant B | integration test 2 tenant |
 | NFR-XC-002-011 | Không `double`/`float` cho tiền | **0** xuất hiện trong payload ETO | test reflection duyệt mọi property ETO |
-| NFR-XC-002-012 | Kích thước payload | **≤ 100 KB**; vượt ⇒ `eCommerce:Messaging:0007` | unit test biên 99 KB / 101 KB |
+| NFR-XC-002-012 | Kích thước payload | **≤ 100 KB**; vượt ⇒ `eCommerce:Infrastructure:0007` | unit test biên 99 KB / 101 KB |
 | NFR-XC-002-013 | Độ trễ xử lý inbox | **p95 < 5 s** (enqueue → handler xong) | integration test 10.000 sự kiện |
 
 ---
@@ -987,17 +987,17 @@ public abstract class IntegrationEventBase
 | TC-04 | Relay **không** lọc theo transaction vừa commit | **Integration** | chèn thẳng 2 dòng outbox với `CreationTime` **cũ** (giả lập restart) | **cả 2** được phát (khác hẳn hành vi eShop) | **BR-003** |
 | TC-05 | Outbox/inbox **đã bật** + cấm phát ngoài allowlist | **Integration** + Unit | (a) publish 1 ETO rồi kiểm tra có dòng outbox; (b) rà soát mọi `PublishAsync` trong code nghiệp vụ | (a) có dòng outbox; (b) **0** chỗ publish ngoài allowlist | **BR-002** |
 | TC-06 | Trùng khoá + hash khớp ⇒ **không** side effect | Unit | gọi `AcquireAsync` 2 lần cùng `(TenantId, EventType, Key)` cùng payload | lần 2: `AlreadyProcessed`, **0** bản ghi nghiệp vụ thêm | **BR-004**, **BR-005** |
-| TC-07 | Trùng khoá + hash **khác** ⇒ ném lỗi | Unit | cùng khoá, payload khác 1 ký tự | `BusinessException` `eCommerce:Messaging:0002` | **BR-006** |
+| TC-07 | Trùng khoá + hash **khác** ⇒ ném lỗi | Unit | cùng khoá, payload khác 1 ký tự | `BusinessException` `eCommerce:Infrastructure:0002` | **BR-006** |
 | TC-08 | Webhook gửi trùng 100 lần | **Integration** | cùng webhook × 100 (song song 10 luồng) | **1** đơn; 99 lần trả `alreadyProcessed` | **BR-004**, **NFR-005** |
 | TC-09 | 2 request **đồng thời** cùng khoá | **Integration** | 2 `Task` song song (PostgreSQL thật) | **đúng 1** thắng; luồng kia bắt `DbUpdateException` ⇒ `DuplicateIgnored` | **BR-005** |
 | TC-10 | Idempotency key thanh toán **ổn định** | Unit | 3 lần retry gọi thanh toán cho cùng đơn | **cùng một** `IdempotencyKey` ở cả 3 lần (đọc từ DB) | **BR-007** |
-| TC-11 | `UPDATE … WHERE Status` ảnh hưởng 0 dòng ⇒ ném | Unit | 2 luồng cùng `CompleteProcessing(id)` | luồng 2: **ném** `eCommerce:Messaging:0006` (không trả `true` âm thầm) | **BR-008** |
+| TC-11 | `UPDATE … WHERE Status` ảnh hưởng 0 dòng ⇒ ném | Unit | 2 luồng cùng `CompleteProcessing(id)` | luồng 2: **ném** `eCommerce:Infrastructure:0006` (không trả `true` âm thầm) | **BR-008** |
 | TC-12 | `RowVersion` conflict ⇒ ném | **Integration** | sửa cùng bản ghi bằng 2 DbContext | `AbpDbConcurrencyException` bị bọc thành lỗi nghiệp vụ | **BR-008** |
-| TC-13 | Guard sai từ trạng thái **hấp thụ** | Unit | chuyển `Processed → Processing` | **ném** `eCommerce:Messaging:0006` | **BR-009** |
+| TC-13 | Guard sai từ trạng thái **hấp thụ** | Unit | chuyển `Processed → Processing` | **ném** `eCommerce:Infrastructure:0006` | **BR-009** |
 | TC-14 | Handler lỗi ⇒ có DLQ **và** ném lại | **Integration** | handler ném `BusinessException` | có **1** dòng DLQ trong **≤ 1 s**; exception **được ném lại** (không nuốt) | **BR-010**, **NFR-006** |
 | TC-15 | Vượt ngưỡng thử (5) | **Integration** | handler lỗi liên tục 6 nhịp | DLQ `AttemptCount = 6`, `Status = DeadLettered`, **có cảnh báo** | **BR-011**, **BR-013** |
 | TC-16 | Cấu hình sai `RetryLater` ⇒ job quét **vớt** | **Integration** | đặt `WaitTimeToDeleteProcessedInboxEvents = 5 s`, policy `RetryLater` | job quét sao chép sang DLQ **trước** khi ABP xoá + **cảnh báo cấu hình sai** | **BR-011** |
-| TC-17 | Phát lại bản ghi **không** `DeadLettered` | Unit | `ReplayAsync` trên bản ghi `Resolved` | **ném** `eCommerce:Messaging:0005` | **BR-012** |
+| TC-17 | Phát lại bản ghi **không** `DeadLettered` | Unit | `ReplayAsync` trên bản ghi `Resolved` | **ném** `eCommerce:Infrastructure:0005` | **BR-012** |
 | TC-18 | Phát lại **giữ nguyên** khoá gốc | **Integration** | phát lại 1 bản ghi DLQ | `InboxRecords.IdempotencyKey` **không đổi**; không sinh khoá mới | **BR-012** |
 | TC-19 | Cảnh báo DLQ | **Integration** | ghi 1 bản ghi DLQ | metric `messaging_dlq_size` tăng + thông báo trong **< 60 s** | **BR-013**, **NFR-007** |
 | TC-20 | Sự kiện đến **muộn** (`version` ≤ đã áp dụng) | Unit | áp dụng `v5` rồi nhận `v3` | **bỏ qua** + log `Information` + metric; **không** DLQ; trạng thái **không** đổi | **BR-014** |
@@ -1016,21 +1016,21 @@ public abstract class IntegrationEventBase
 | TC-33 | Tồn đọng outbox + cảnh báo chạm trần | **Integration** | chặn relay 6 phút, bơm 1.100 sự kiện | metric phản ánh; **có cảnh báo** khi chạm `1000` liên tục 5 phút | **NFR-003** |
 | TC-34 | Phát lại DLQ theo lô | **Integration** | 1.000 bản ghi `DeadLettered` | xong trong **< 5 phút**; đúng 1.000 bản ghi `Replayed` | **NFR-008** |
 | TC-35 | Log + metric | Unit | chạy 1 vòng publish → consume → fail | log có `CorrelationId`/`EventId`/`EventName`; 4 metric tồn tại | **NFR-009** |
-| TC-36 | Kích thước payload | Unit | 99 KB và 101 KB | 99 KB OK; 101 KB **ném** `eCommerce:Messaging:0007` | **NFR-012** |
+| TC-36 | Kích thước payload | Unit | 99 KB và 101 KB | 99 KB OK; 101 KB **ném** `eCommerce:Infrastructure:0007` | **NFR-012** |
 | TC-37 | Độ trễ xử lý inbox end-to-end | **Integration** | 10.000 sự kiện | **p95 < 5 s** | **NFR-013** |
 | TC-38 | Bảo vệ endpoint vận hành | **Integration** | gọi `/api/app/messaging/dead-letters` không token / thiếu permission | `401` / `403`; có permission ⇒ `200` | §9 |
 
 ### 14.2 Fixture skeleton (xUnit + ABP + Testcontainers.PostgreSql)
 
 ```csharp
-public class MessagingTests : eCommerceTestBase<eCommerceEntityFrameworkCoreTestModule>
+public class InfrastructureTests : eCommerceTestBase<eCommerceEntityFrameworkCoreTestModule>
 {
     private readonly IIdempotencyGuard _guard;
     private readonly IDistributedEventBus _bus;
     private readonly IRepository<InboxRecord, Guid> _inbox;
     private readonly IRepository<DeadLetterEvent, Guid> _dlq;
 
-    public MessagingTests()
+    public InfrastructureTests()
     {
         _guard = GetRequiredService<IIdempotencyGuard>();
         _bus = GetRequiredService<IDistributedEventBus>();
@@ -1063,7 +1063,7 @@ public class MessagingTests : eCommerceTestBase<eCommerceEntityFrameworkCoreTest
     public async Task TC07_trung_khoa_hash_khac_thi_nem_0002()
     {
         var ex = await Should.ThrowAsync<BusinessException>(() => AcquireWithDifferentPayloadAsync());
-        ex.Code.ShouldBe("eCommerce:Messaging:0002");
+        ex.Code.ShouldBe("eCommerce:Infrastructure:0002");
     }
 
     // TC-09 · BR-005 — 2 luồng song song: ĐÚNG 1 thắng (PostgreSQL thật, KHÔNG dùng SQLite)
@@ -1134,16 +1134,36 @@ public class MessagingTests : eCommerceTestBase<eCommerceEntityFrameworkCoreTest
 
 | # | Câu hỏi | Cần ai trả lời | Trạng thái | Ảnh hưởng nếu chưa trả lời |
 |---|---|---|---|---|
-| **Q1** | Giai đoạn này chạy **transport in-process** (`LocalDistributedEventBus`, chưa có gói RabbitMQ) hay **đầu tư RabbitMQ ngay**? | Kiến trúc trưởng | `Open` | In-process ⇒ chống trùng tầng transport **vô hiệu** (đã kiểm chứng) và **không** có DLX native ⇒ **bắt buộc** bảng DLQ của ta. Chọn RabbitMQ sớm ⇒ có thêm lựa chọn DLX nhưng phải cấu hình broker |
-| **Q2** | Tên module/project chứa hạ tầng này: `Messaging` (`eCommerce.Messaging.*`) hay đặt khác? Có cần `.Contracts` riêng không? | Kiến trúc trưởng | `Open` | Ảnh hưởng namespace, mã lỗi (`eCommerce:Messaging:*`) và mọi module phải thêm reference. **Phải chốt trước khi code** |
-| **Q3** | Ngưỡng thử của ta = **5** và cửa sổ cảnh báo DLQ = **60 s** có phù hợp vận hành thực tế (đội mỏng, có thể không trực 24/7)? | Vận hành + Kiến trúc trưởng | `Open` | Ngưỡng quá thấp ⇒ DLQ đầy việc giả; quá cao ⇒ lỗi bị che lâu |
-| **Q4** | **Job quét DLQ** (lưới an toàn cho `Discarded`) chạy với nhịp bao nhiêu? (đề xuất **1 phút**, phải **nhỏ hơn nhiều** so với 2 giờ) | Kiến trúc trưởng | `Open` | Nếu nhịp > `WaitTimeToDeleteProcessedInboxEvents` ⇒ **mất sự kiện** khi cấu hình sai |
+| **Q1** | Giai đoạn này chạy **transport in-process** (`LocalDistributedEventBus`, chưa có gói RabbitMQ) hay **đầu tư RabbitMQ ngay**? | Kiến trúc trưởng | ✅ **`Closed` — TRANSPORT IN-PROCESS** *(chốt 13/10/2026)* | Chấp nhận hệ quả đã kiểm chứng: chống trùng tầng transport **vô hiệu** và **không** có DLX native ⇒ **bắt buộc** bảng inbox nghiệp vụ + DLQ của ta (**D3/D4**). RabbitMQ để lại khi tách service (**Q8**) |
+| **Q2** | Tên module/project chứa hạ tầng này: `Messaging` hay đặt khác? Có cần `.Contracts` riêng không? | Kiến trúc trưởng | ✅ **`Closed` — `Infrastructure`** *(chốt 13/10/2026)*: `eCommerce.Infrastructure.Domain` / `.Application` / `.Contracts`; mã lỗi **`eCommerce:Infrastructure:*`** | ✅ Có `.Contracts` riêng (mọi module chỉ tham chiếu `.Contracts`). ⚠️ Xem ghi chú tên module ngay dưới bảng |
+| **Q3** | Ngưỡng thử của ta = **5** và cửa sổ cảnh báo DLQ = **60 s** có phù hợp vận hành thực tế (đội mỏng, có thể không trực 24/7)? | Vận hành + Kiến trúc trưởng | ✅ **`Closed` — CHẤP NHẬN (5 và 60 s)** *(chốt 13/10/2026)* | 5 **nhỏ hơn** `InboxProcessorMaxRetryCount = 10` của ABP ⇒ ta phát hiện lỗi **trước khi** ABP xoá bản ghi inbox |
+| **Q4** | **Job quét DLQ** (lưới an toàn cho `Discarded`) chạy với nhịp bao nhiêu? | Kiến trúc trưởng | ✅ **`Closed` — 1 PHÚT** *(chốt 13/10/2026)* | 1 phút **≪ 2 giờ** (`WaitTimeToDeleteProcessedInboxEvents`) ⇒ an toàn. 🔒 **Bất biến:** nhịp job **phải** nhỏ hơn nhiều cửa sổ xoá, nếu không ⇒ **mất sự kiện** |
 | **Q5** | Có cần **thông báo cho khách/nhân viên** khi một sự kiện vào DLQ (email/Zalo OA), hay chỉ cần alert kỹ thuật? | BA + Vận hành | `Open` | Ảnh hưởng `Notifications`; hiện phạm vi chỉ nêu **alert kỹ thuật** |
 | **Q6** | Outbox của ABP **xoá cứng** bản ghi sau khi phát ⇒ **không có lịch sử**. Có cần bảng **lưu vết outbox** (archive) để đối soát/audit không? | Kiến trúc trưởng + Kế toán | `Open` | Nếu cần ⇒ thêm bảng + job archive (tăng phạm vi ~1 pd). Nếu không ⇒ chỉ dựa vào log/metric (đã ghi ở §3.1) |
 | **Q7** | Có cần **API/CLI phát lại theo `IdempotencyKey`** (thay vì theo `Id` bản ghi DLQ) cho Ops? | Vận hành | `Open` | Ảnh hưởng thiết kế endpoint; hiện chỉ có theo `Id` và theo **bộ lọc** |
 | **Q8** | Khi chuyển sang **RabbitMQ** (tách service), `MessageId` sẽ do broker cung cấp (`basicProperties.MessageId`) — có cần **buộc** đặt `MessageId = OutgoingEventInfo.Id` để tầng inbox dedupe được không? | Kiến trúc trưởng | `Open` | Nếu **không** đặt ⇒ dedupe tầng transport **vẫn** vô hiệu; nếu đặt ⇒ giảm tải cho bảng nghiệp vụ (chỉ là tối ưu, **không** thay thế) |
 | **Q9** | Khi **đổi thuật toán canonical JSON** (để hash), dữ liệu `InboxRecords` cũ có `PayloadHash` theo thuật toán cũ ⇒ cần **version hoá hash** (`PayloadHashVersion`) không? | Kiến trúc trưởng | `Open` | Nếu không ⇒ mọi bản ghi cũ trở thành "xung đột khoá" giả (E1) sau khi nâng cấp |
 | **Q10** | Version của `Testcontainers.PostgreSql` (và `xunit` runner) để ghim vào `Directory.Packages.props`? | Dev | `Open` | Chưa ghim được ⇒ chưa viết được test `Integration` (NFR quan trọng nhất phụ thuộc nó) |
+
+> 📌 **Ghi chú về tên module `Infrastructure` (Q2 đã chốt 13/10/2026):**
+> Trong DDD, `Infrastructure` là **tên một TẦNG**, nên `eCommerce.Infrastructure.Domain` / `.Application`
+> mang **hai nghĩa "tầng" chồng nhau** (tầng Infrastructure + tầng Domain/Application của kiến trúc module).
+> Điều này **đã được cân nhắc và chấp nhận**. Hai điểm giảm nhẹ: (1) tên project vẫn **nhất quán** với khuôn
+> `eCommerce.<Module>.<Layer>` đã chuẩn hoá toàn repo; (2) **đổi tên bây giờ gần như miễn phí** vì **chưa có
+> dòng code nào** — nếu sau khi bắt tay vào code mà thấy khó đọc, đổi trước khi viết (bài học từ việc đổi tên
+> `ChannelHub.Domain` → `eCommerce.ChannelHub.Domain` mất ~30 phút khi chưa có code nghiệp vụ).
+
+> ✅ **Nhật ký quyết định (13/10/2026):** Q1 = **transport in-process** · Q2 = module **`Infrastructure`**
+> (3 project + `.Contracts`, mã lỗi `eCommerce:Infrastructure:*`) · Q3 = ngưỡng thử **5**, cảnh báo DLQ **60 s** ·
+> Q4 = job quét DLQ **1 phút**. Còn mở: **Q5** (thông báo cho khách/nhân viên), **Q6** (bảng lưu vết outbox),
+> **Q7** (API phát lại theo `IdempotencyKey`), **Q8** (đặt `MessageId` khi sang RabbitMQ), **Q9** (version hoá `PayloadHash`),
+> **Q10** (ghim version `Testcontainers.PostgreSql`).
+
+> 📌 **Quy ước tiền tố (để không ai tưởng là sót khi grep):** tên **module/project** là `Infrastructure`,
+> nhưng các **định danh vận hành** giữ tiền tố **`messaging`** vì chúng mô tả **thứ được vận hành**, không phải tầng code:
+> route `/api/app/messaging/*` · metric `messaging_outbox_pending`, `messaging_inbox_failed`, `messaging_dlq_size`,
+> `messaging_dlq_replayed` · lock key `messaging:job:{jobName}:{tenantId}`, `messaging:dlq-replay:{tenantId}`.
+> ⇒ Grep `Infrastructure` tìm **code**; grep `messaging` tìm **bề mặt vận hành**. Quy ước này là **cố ý**.
 
 #### 15.1.1 ⚠️ Danh sách **cần xác minh** (KHÔNG được khẳng định khi chưa đọc mã/migration thật)
 
