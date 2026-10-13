@@ -19,7 +19,19 @@ namespace eCommerce.DbMigrator;
 /// </summary>
 public class IdentityDataSeedContributor : IDataSeedContributor, ITransientDependency
 {
-    public const string AdminEmail = "admin@ecommerce.local";
+    // 🚨 BUG ĐÃ SỬA (C5 — chạy thật với PostgreSQL mới lộ ra, 13/10/2026):
+    //
+    // Trước đây hằng số này là "admin@ecommerce.local", nhưng ABP có **seeder MẶC ĐỊNH của chính nó**
+    // (`Volo.Abp.Identity.Domain` → `IdentityDataSeedContributor` với `admin@abp.io`) và nó chạy TRƯỚC.
+    // Hệ quả đã KIỂM CHỨNG trên DB thật:
+    //   • `AbpUsers` chỉ có **admin@abp.io** — KHÔNG hề có `admin@ecommerce.local`
+    //   • log Host: "No user found matching username: admin@ecommerce.local" ⇒ không lấy được token
+    //   • `AbpPermissionGrants` = **0** ⇒ mọi API có `[Authorize(permission)]` trả **403 cho TẤT CẢ mọi người**
+    //   • tài liệu (README, tài liệu này) ghi **sai** tài khoản đăng nhập
+    //
+    // Nay dùng đúng email thật của ABP để: (1) tìm được user đã tồn tại, (2) khớp với tài liệu,
+    // (3) bảo đảm bước cấp permission chạy.
+    public const string AdminEmail = "admin@abp.io";
     public const string AdminPassword = "1q2w3E*";
 
     private readonly IIdentityDataSeeder _identityDataSeeder;

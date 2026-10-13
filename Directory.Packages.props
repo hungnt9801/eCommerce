@@ -35,6 +35,14 @@
     <PackageVersion Include="Volo.Abp.EntityFrameworkCore.PostgreSql" Version="10.7.0" />
     <PackageVersion Include="Volo.Abp.Autofac" Version="10.7.0" />
     <PackageVersion Include="Volo.Abp.AspNetCore.Mvc" Version="10.7.0" />
+    <!-- 🚨 BUG ĐÃ SỬA (chạy thật mới lộ): 2 gói dưới đây BẮT BUỘC với Host làm auth server.
+         • Volo.Abp.Identity.AspNetCore: đăng ký SignInManager<IdentityUser>. THIẾU nó thì
+           password grant KHÔNG chạy: "No service for type 'SignInManager`1[IdentityUser]' has been registered".
+         • Volo.Abp.AspNetCore.Authentication.JwtBearer: đặt DEFAULT CHALLENGE SCHEME. THIẾU nó thì
+           gọi API không token trả **500** thay vì **401**:
+           "No authenticationScheme was specified, and there was no DefaultChallengeScheme found". -->
+    <PackageVersion Include="Volo.Abp.Identity.AspNetCore" Version="10.7.0" />
+    <PackageVersion Include="Volo.Abp.AspNetCore.Authentication.JwtBearer" Version="10.7.0" />
     <PackageVersion Include="Volo.Abp.FeatureManagement.Application" Version="10.7.0" />
     <PackageVersion Include="Volo.Abp.FeatureManagement.Application.Contracts" Version="10.7.0" />
     <PackageVersion Include="Volo.Abp.FeatureManagement.Domain" Version="10.7.0" />

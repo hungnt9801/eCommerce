@@ -22,6 +22,10 @@
     <PackageReference Include="Volo.Abp.Caching.StackExchangeRedis" />
     <PackageReference Include="Volo.Abp.DistributedLocking" />
     <PackageReference Include="Volo.Abp.BackgroundWorkers" />
+    <!-- 🚨 2 gói BẮT BUỘC (xem ghi chú trong Directory.Packages.props): SignInManager cho password grant
+         + default challenge scheme để trả 401 thay vì 500. -->
+    <PackageReference Include="Volo.Abp.Identity.AspNetCore" />
+    <PackageReference Include="Volo.Abp.AspNetCore.Authentication.JwtBearer" />
     <PackageReference Include="DistributedLock.Redis" />
   </ItemGroup>
 

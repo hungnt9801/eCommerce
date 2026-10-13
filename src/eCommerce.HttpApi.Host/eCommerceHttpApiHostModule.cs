@@ -40,6 +40,10 @@ namespace eCommerce;
     typeof(AbpDistributedLockingModule),
     typeof(AbpBackgroundWorkersModule),
     typeof(AbpOpenIddictAspNetCoreModule),
+    // 🚨 C6a: đăng ký SignInManager<IdentityUser> — THIẾU thì password grant chết.
+    typeof(Volo.Abp.Identity.AspNetCore.AbpIdentityAspNetCoreModule),
+    // 🚨 C6b: đặt default challenge scheme — THIẾU thì API không token trả 500 thay vì 401.
+    typeof(Volo.Abp.AspNetCore.Authentication.JwtBearer.AbpAspNetCoreAuthenticationJwtBearerModule),
     typeof(eCommerceEntityFrameworkCoreModule),
     typeof(eCommerceApplicationModule),
     typeof(ChannelHub.ChannelHubApplicationModule),
