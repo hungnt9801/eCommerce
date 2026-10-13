@@ -801,3 +801,33 @@ public class AddressContractGuardTests
 | `ADDR-001` thuộc GĐ0 + mẫu + quy ước tài liệu | `docs/implementation-plan.md` Phụ lục A.3 · `docs/templates/feature-design-template.md` · `docs/design-doc-guidelines.md` §3, §5 |
 | Quy ước Mermaid (không `;`, không `<...>`) | `docs/design-doc-guidelines.md` §5 quy tắc 11-14 + §7 |
 | Nguồn dữ liệu thật: `v1` có `districts[].wards[]`; `v2` có `wards[]` trực thuộc tỉnh; `v2` = 34 tỉnh; `wards` rỗng ở endpoint danh sách | Gọi thật `https://provinces.open-api.vn/api/v2/p/` · `/api/v2/p/1?depth=2` · `/api/v1/p/1?depth=3` (13/10/2026) |
+
+---
+
+## 16. TRẠNG THÁI TRIỂN KHAI (13/10/2026) — mục (c): **lõi Domain đã xong**
+
+Module **`eCommerce.Address.Domain`** đã tạo, hiện thực hoá **đúng 3 phát hiện quan trọng nhất** của tài liệu này:
+
+| Thành phần | Tệp | Nội dung |
+|---|---|---|
+| `AdministrativeSchemaVersion` | `AdministrativeModels.cs` | **V1 = 3 cấp (63 tỉnh, có huyện)** · **V2 = 2 cấp (34 tỉnh, KHÔNG huyện)**; căn cứ `Luật 72/2025/QH15` + `NQ 60-NQ/TW` + `QĐ 19/2025/QĐ-TTg`. `TheoSo(3)` ⇒ **NÉM LỖI** |
+| `AdministrativeUnit` | `AdministrativeUnit.cs` | Khoá duy nhất là **(Phiên bản, Cấp, Mã)** — **KHÔNG** phải mã trần; mã đã **đóng** vẫn tra được nhưng **không dùng cho địa chỉ mới** |
+| `AdministrativeUnitResolver` | `AdministrativeUnitResolver.cs` | Tra **kèm phiên bản**; `KiemTraHaiCap` cho địa chỉ mới; `KiemTraBaCap` cho dữ liệu lịch sử; **FAIL-CLOSED** ở mọi nhánh không chắc chắn |
+| `AddressErrorCodes` | `AddressErrorCodes.cs` | `eCommerce:Address:0001…0007` |
+
+**Kết quả kiểm chứng:** `141/141` unit test (thêm **24** test) · build **0 lỗi / 0 cảnh báo**.
+
+**3 nhóm lỗi IM LẶNG đã được khoá bằng test:**
+1. 🚩 **Mã ĐVHC không phải khoá toàn cục** — test dựng dữ liệu có **cùng mã `00004`** là *Phường Ba Đình* ở v2 và *Phường Trúc Bạch* ở v1, rồi khẳng định resolver trả **hai đơn vị khác nhau**. Không có phiên bản trong phép tra thì đây là **trả sai đơn vị mà không báo lỗi**.
+2. **Xã không thuộc tỉnh** ⇒ `XaKhongThuocTinh`, **fail-closed** (không tự sửa, không trả đơn vị gần đúng).
+3. **Cấp huyện ở schema 2 cấp** ⇒ `HuyenKhongDuocPhepOCap2`, ném cả khi **tạo entity** lẫn khi **kiểm tra** — đúng quy tắc pháp lý từ 01/7/2025.
+   Ngoài ra: **mã đã đóng** dùng cho địa chỉ mới ⇒ `MaDaDong`, nhưng **vẫn tra được** để hiển thị lịch sử.
+
+### ⚠️ CÒN LẠI của `ADDR-001`
+
+| # | Việc | Ghi chú |
+|---|---|---|
+| 1 | **Bảng DB + migration** cho `AdministrativeUnit` | Unique `(TenantId, SchemaVersion, Level, Code)` **`NULLS NOT DISTINCT`** — bài học C4/F1. Domain đã sẵn sàng, chưa nối EF Core |
+| 2 | **Job đồng bộ** từ `provinces.open-api.vn` | ⚠️ Phát hiện F3: endpoint **danh sách** `/api/v2/p/` trả `wards: []` rỗng cho cả 34 tỉnh ⇒ **phải gọi `?depth=2` theo từng tỉnh** |
+| 3 | **Bảng ánh xạ 3 cấp ↔ 2 cấp** (ca sáp nhập tỉnh) | 🚧 **Q2 là ĐIỀU KIỆN CHẶN**: cần **văn bản chính thức có lớp text**; tài liệu này **cấm seed ánh xạ bằng suy luận** |
+| 4 | Truy vấn/API tra cứu + cache | Chờ #1 |

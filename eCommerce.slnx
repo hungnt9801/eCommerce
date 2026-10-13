@@ -1,5 +1,8 @@
 <Solution>
   <Folder Name="/modules/" />
+  <Folder Name="/modules/Address/">
+    <Project Path="modules/Address/eCommerce.Address.Domain/eCommerce.Address.Domain.csproj" />
+  </Folder>
   <Folder Name="/modules/ChannelHub/">
     <Project Path="modules/ChannelHub/eCommerce.ChannelHub.Application.Contracts/eCommerce.ChannelHub.Application.Contracts.csproj" />
     <Project Path="modules/ChannelHub/eCommerce.ChannelHub.Application/eCommerce.ChannelHub.Application.csproj" />
