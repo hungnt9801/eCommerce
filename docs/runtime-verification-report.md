@@ -5,7 +5,7 @@
 | **Ngày** | 13/10/2026 |
 | **Môi trường** | Docker Desktop 29.6.2 · `postgres:17-alpine` (**17.11**) · `redis:7-alpine` · `docker-compose.yml` của repo |
 | **Phạm vi** | Toàn bộ hạng mục Phase 0 ghi là *"chưa xác minh"*, cộng phần code `XC-006` (module `Tax`) và `XC-004` (chiều tenant) |
-| **Kết quả** | 🔴 **10 LỖI THẬT** được tìm ra — trong đó **6 lỗi thuộc loại "im lặng"** · **9 đã sửa + kiểm chứng** |
+| **Kết quả** | 🔴 **12 LỖI THẬT** được tìm ra — trong đó **7 lỗi thuộc loại "im lặng"** · **12 đã sửa + kiểm chứng** |
 | **Vì sao quan trọng** | 3 hạng mục Phase 0 ghi "chưa xác minh" (token · `401`/`403` · seeder) hoá ra **CHƯA TỪNG HOẠT ĐỘNG** |
 
 > **Kết luận cốt lõi:** review tài liệu **không** thay thế được việc chạy thật. 6/10 lỗi không có lỗi biên dịch,
@@ -13,7 +13,7 @@
 
 ---
 
-## 1. Bảng 10 lỗi thật
+## 1. Bảng 12 lỗi thật
 
 | # | Lỗi | Biểu hiện khi chạy | Loại | Trạng thái |
 |---|---|---|---|---|
@@ -27,6 +27,26 @@
 | **C7** | **0 permission được cấp** (3 nguyên nhân lồng nhau) | `AbpPermissionGrants` = 0 ⇒ mọi API `[Authorize(permission)]` trả **`403` cho TẤT CẢ** | 🟥 im lặng | ✅ sửa + **0 → 36 grant** |
 | **C8** | Tưởng là lỗi routing | Log Routing Debug: `Request matched endpoint 'GetShopsAsync'` ⇒ **route KHỚP**, lỗi ở tầng auth | — | ✅ **chẩn đoán xong** (cùng gốc C6b/C9) |
 | **C9** | Mục `AuthServer` **thiếu `Authority`/`Audience`** | Có token **vẫn `401`** — JwtBearer không có nguồn khoá để validate | 🟧 rõ | ✅ sửa |
+| **C10** 🆕 | **Worker động của ChannelHub KHÔNG BAO GIỜ chạy**: supervisor gọi `AddAsync` **mỗi nhịp** ⇒ ABP **thay thế** worker ⇒ timer reset ⇒ nếu nhịp supervisor ≤ nhịp worker thì worker không bao giờ tới nhịp đầu. **Với cấu hình mặc định (60 s vs 300 s) ⇒ đồng bộ sàn hoàn toàn không chạy** | Đo được: supervisor 5 s + worker 10 s ⇒ **8 lần `Replaced`, 0 lần worker chạy**; supervisor 600 s ⇒ worker chạy **ngay** | 🟥 im lặng | ✅ sửa + **kiểm chứng lại** (ca 5 s/10 s nay **0 replace** và worker **chạy**) |
+| **C11** 🆕 | **Khoá lock thật SAI quy ước**: `AbpDistributedLockOptions.KeyPrefix` ghép với tên khoá **KHÔNG có dấu phân cách** ⇒ khoá thật **`eCommercechannel:shopee:…`** (dính liền, E HOA) thay vì `ecommerce:channel:…` | `redis-cli MONITOR`: `"SET" "eCommercechannel:shopee:…:token-refresh" "EX" "30" "NX"` | 🟥 im lặng — lock vẫn "chạy", chỉ là **không ai giữ đúng khoá** | ✅ sửa (`KeyPrefix = "ecommerce:"`) + kiểm chứng lại bằng MONITOR |
+
+> 📌 **Cách tìm ra C11 (đáng ghi lại):** tôi giữ khoá bằng tay với **3 biến thể** theo suy đoán
+> (`ecommerce:…`, `channel:…`, `eCommerce:…`) — **cả ba đều KHÔNG chặn được** worker. Thay vì đoán thêm,
+> tôi dùng **`redis-cli MONITOR`** bắt lệnh Redis thật ⇒ ra ngay khoá đúng.
+> *(Commit `1541b31` ghi lỗi này là `C12`; `XC-003` gọi là **F5** — cùng một lỗi.)*
+
+---
+
+## 1b. ✅ Kiểm chứng DISTRIBUTED LOCK — hoàn tất `XC-003`
+
+**Phép thử A/B trên đúng khoá đã xác minh `ecommerce:channel:shopee:SHOP-LOCK-TEST:token-refresh`:**
+
+| Ca | Có ai giữ khoá? | Kết quả thực tế |
+|---|---|---|
+| **A** | Không | ✅ Token **được refresh** (`[PoC] RefreshTokenAsync` + `Da refresh token cho shop …`) |
+| **B** | **Có** (giữ bằng `redis-cli`) | ✅ **KHÔNG** refresh ⇒ **lock đã CHẶN đúng** |
+
+⇒ `XC-003` nay **đã kiểm chứng end-to-end**: supervisor chạy → worker động chạy → giành khoá → **khoá thật khớp quy ước** → **khoá chặn được thao tác tranh chấp**.
 
 ---
 

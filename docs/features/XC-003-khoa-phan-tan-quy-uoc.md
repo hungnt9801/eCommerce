@@ -227,6 +227,39 @@ graph LR
 > 📌 **Quy tắc:** đoạn khoá dùng **tên miền nghiệp vụ ngắn**, **không** dùng tên project đầy đủ — để khoá Redis ngắn
 > và **không đổi** khi project đổi tiền tố (bài học: `ChannelHub.Domain` → `eCommerce.ChannelHub.Domain` vừa rồi).
 
+### 5.4 ⚠️ CƠ CHẾ TIỀN TỐ THẬT — đã bắt được bằng `redis-cli MONITOR` (13/10/2026)
+
+**Đây là phần tài liệu này từng ghi SAI, nay đã sửa theo bằng chứng thực tế.**
+
+Khoá Redis **không** bằng đúng chuỗi mà hàm sinh khoá trả về. ABP bọc thêm tiền tố từ
+**`AbpDistributedLockOptions.KeyPrefix`** và ghép theo công thức:
+
+```
+khoá_thật = KeyPrefix + tên_khoá        ← 🚨 GHÉP KHÔNG CÓ DẤU PHÂN CÁCH
+```
+
+| Trước khi sửa (SAI) | Sau khi sửa (ĐÚNG) |
+|---|---|
+| `KeyPrefix = "eCommerce"` · tên khoá `channel:shopee:SHOP-1:token-refresh` | `KeyPrefix = "ecommerce:"` · cùng tên khoá |
+| ❌ khoá thật: **`eCommercechannel:shopee:SHOP-1:token-refresh`** (dính liền, chữ E HOA) | ✅ khoá thật: **`ecommerce:channel:shopee:SHOP-1:token-refresh`** |
+
+**Bằng chứng** — trích nguyên văn dòng `MONITOR` khi worker giành khoá:
+```
+"SET" "eCommercechannel:shopee:SHOP-LOCK-TEST:token-refresh" "<host>_<pid>_<guid>" "EX" "30" "NX"   ← TRƯỚC
+"SET" "ecommerce:channel:shopee:SHOP-LOCK-TEST:token-refresh"  "<host>_<pid>_<guid>" "EX" "30" "NX"   ← SAU
+```
+
+**Ba hệ quả bắt buộc:**
+1. 🔒 **`KeyPrefix` PHẢI có dấu phân cách ở cuối** (`"ecommerce:"`), vì ABP **không** tự thêm. Thiếu nó ⇒
+   tiền tố của hai hệ thống (hoặc hai module) **dính vào nhau** ⇒ khó đọc, dễ gõ sai khi gỡ khoá treo bằng tay.
+2. 🔒 **Tên khoá do module sinh KHÔNG chứa tiền tố** — tiền tố là việc của `KeyPrefix` (một nguồn sự thật duy nhất).
+   Đừng thêm `ecommerce:` vào hàm sinh khoá của module, nếu không sẽ thành **tiền tố đôi**.
+3. 📌 **TTL thực tế đo được: `EX 30`** (30 giây) cho khoá token-refresh — không phải 60 s như bảng §5 ghi ban đầu.
+
+> 🎯 **Cách tìm ra:** giữ khoá bằng tay với 3 biến thể (`ecommerce:…`, `channel:…`, `eCommerce:…`) — **cả ba đều
+> KHÔNG chặn được** worker ⇒ chứng tỏ khoá thật khác cả ba ⇒ dùng `redis-cli MONITOR` bắt lệnh Redis thật.
+> Đây là ví dụ điển hình của **lỗi im lặng**: code vẫn chạy, lock vẫn "hoạt động", chỉ là **không ai giữ đúng khoá**.
+
 ---
 
 ## 6. Hợp đồng API
@@ -502,6 +535,9 @@ public class LockConventionTests
 | **F2** | **Mã lỗi kênh định nghĩa 2 nơi, khác định dạng**: `eCommerceConsts.ErrorCodes.ChannelShopNotFound` = `eCommerce:Channel:0001` vs `ChannelHubErrorCodes.ChannelShopNotFound` = `ChannelHub:0001` | `eCommerceConsts.cs:59` vs `ChannelHubConsts.cs:38` | 🟠 **Trung bình** (không gây mất an toàn, nhưng chống đối soát/log) | ⬜ **Chưa sửa** — cần thống nhất về `eCommerce:Channel:*` và **module sở hữu**; việc này thuộc `coding-conventions.md`, **không** thuộc phạm vi lock. Đã ghi nhận để xử lý riêng |
 | **F3** | Khoá của `Messaging` (`XC-002`) viết `messaging:…` — **thiếu tiền tố** `ecommerce:` | `XC-002` §8.2 | 🟠 Trung bình | ✅ **Đã sửa 13/10/2026** trong `XC-002` → `ecommerce:messaging:…` |
 | **F4** | `eCommerceConsts.LockKeys.InventorySku` nằm ở **app** trong khi mọi khoá khác do **module** sở hữu | `eCommerceConsts.cs:99` | 🟡 Thấp | ⬜ Ghi nhận: khi tách module Inventory (GĐ1) thì chuyển khoá này về module (đúng quy ước D3) |
+| **F5** 🆕 | **`KeyPrefix` ghép KHÔNG dấu phân cách** ⇒ khoá thật là `eCommercechannel:…` (dính liền, E hoa) — **sai BR-002**. Phát hiện bằng `redis-cli MONITOR` sau khi 3 biến thể khoá theo tài liệu đều **không** chặn được worker | `MONITOR`: `"SET" "eCommercechannel:shopee:…:token-refresh"` | 🔴 **Cao** (khoá không đúng quy ước; vận hành gỡ khoá tay sẽ gõ sai) | ✅ **Đã sửa 13/10/2026**: `KeyPrefix = "ecommerce:"` ⇒ khoá thật `ecommerce:channel:…` (đã kiểm chứng lại bằng MONITOR) |
+| **F6** 🆕 | **Worker động của ChannelHub KHÔNG BAO GIỜ chạy**: supervisor gọi `AddAsync` **mỗi nhịp** ⇒ ABP **thay thế** worker ⇒ timer reset ⇒ nếu nhịp supervisor ≤ nhịp worker thì worker **không bao giờ** tới được nhịp đầu. **Với cấu hình mặc định (60 s vs 300 s) ⇒ đồng bộ sàn hoàn toàn không chạy** | Đo thực tế: supervisor 5 s + worker 10 s ⇒ **8 lần `Replaced`**, **0 lần worker chạy**; supervisor 600 s ⇒ worker chạy ngay | 🔴 **Cao** (tính năng cốt lõi im lặng không hoạt động) | ✅ **Đã sửa 13/10/2026**: chỉ đăng ký khi worker chưa có **hoặc** nhịp đã đổi ⇒ ca 5 s/10 s nay **0 lần replace** và worker **chạy** |
+| **F7** 🆕 | Tài liệu §5 ghi TTL khoá token-refresh là **60 s**; thực tế `EX 30` | `MONITOR` | 🟡 Thấp | ✅ Đã ghi lại ở §5.4 |
 
 ### 15.3 Giả định
 
