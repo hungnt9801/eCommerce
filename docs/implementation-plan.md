@@ -499,3 +499,32 @@ Một giai đoạn **chỉ được bắt đầu code** khi:
 | `XC-004` | [Xác thực, phân quyền & chiều tenant](features/XC-004-xac-thuc-phan-quyen-tenant.md) | 🟡 `Draft` | **14 BR** · 8 NFR · **14 test case** · 🚨 **2 test reflection chặn tái phát lỗi Phase 0** (`TC-01` mọi app service phải có `[Authorize]`; `TC-02` mọi permission dùng phải được **định nghĩa**) · 🚨 **phát hiện F1: unique index mất tác dụng khi `TenantId` NULL** (PostgreSQL `NULLS DISTINCT`) ⇒ **chưa sửa được** (cần PostgreSQL) · F2 multi-tenancy chưa bật · F3/F4 password grant + mật khẩu seed trong tài liệu |
 | `XC-003` | [Khoá phân tán: quy ước & phạm vi](features/XC-003-khoa-phan-tan-quy-uoc.md) | 🟡 `Draft` | **bảng đăng ký khoá lập từ CODE THẬT** (8 khoá + 2 khoá ABP) · 10 ADR · 10 BR · 7 NFR · 14 test case · 🚨 **phát hiện F1: khoá kênh định nghĩa 2 nơi cho ra 2 CHUỖI KHÁC NHAU** (`ecommerce:channel:…` vs `channel:…`) ⇒ dùng lẫn là **khoá không bảo vệ gì** — **đã sửa**; **F3** (khoá Messaging thiếu tiền tố) **đã sửa**; **F2/F4** ghi nhận |
 | `XC-006` | [Phân loại thuế GTGT theo SKU](features/XC-006-phan-loai-thue-gtgt.md) | 🟡 `Draft` → 🚀 **đang triển khai** | **11 BR** · 8 NFR · **22 test case** · **7/9 câu hỏi đã đóng** · đặc tả **Mẫu 01 (Phụ lục III)** từ **file gốc** · danh mục Phụ lục I/II là **dữ liệu**, không hard-code · ✅ **code lõi xong**: module `Tax` (Domain+EFCore), migration + `EXCLUDE USING gist`, seed 4 mức thuế, **17 unit test** (⚠️ chưa chạy trên PostgreSQL thật) |
+
+---
+
+## A.9 Tài liệu FEATURE — ✅ **46/46 đã viết** (13/10/2026)
+
+Toàn bộ 46 tài liệu feature của **A.3** đã viết xong. **Kiểm chứng tập trung (chạy máy, không phải tự khai):**
+
+| Kiểm chứng | Kết quả |
+|---|---|
+| Đủ **16/16 mục** theo mẫu `XC-003` (§0, §0.1 ADR, §1..§15) | ✅ **cả 46 tài liệu** |
+| Mermaid hợp lệ (parser thật) | ✅ **197 khối · 0 lỗi** |
+| Neo vào code thật (kèm `file:dòng`) | ✅ có — mỗi tài liệu ghi rõ phần **"chưa có trong code — kế hoạch GĐx"** và **"chưa kiểm chứng"** |
+| Tổng dung lượng tài liệu | **~4,8 MB** (riêng 46 tài liệu feature) |
+
+| GĐ | SL | Mã tài liệu |
+|---|---|---|
+| **GĐ0** Pháp lý | 7 | `ADDR-001` `ADDR-002` `ADDR-003` `EINV-001` `EINV-002` `EINV-003` `SIGN-001` |
+| **GĐ1** Bán trên website | 18 | `CAT-001` `CAT-002` `CAT-003` `PRC-001` `PRC-002` `INV-001` `INV-002` `INV-003` `SAL-001` `SAL-002` `SAL-003` `SAL-004` `SAL-005` `CUS-001` `REC-001` `WEB-001` `WEB-002` `WEB-003` |
+| **GĐ2** Vận hành & tuân thủ VN | 9 | `PRO-001` `PRO-002` `SHP-001` `SHP-002` `SHP-003` `SHP-004` `REC-002` `REC-003` `SAL-006` |
+| **GĐ3** Điều hành | 6 | `REP-001` `REP-002` `REP-003` `NOT-001` `NOT-002` `ACC-001` |
+| **GĐ4** Tăng trưởng | 6 | `CHN-001` `CHN-002` `CHN-003` `CHN-004` `LOY-001` `REV-001` |
+
+> ⚠️ **Trạng thái thật: `Draft` — CHƯA có tài liệu nào được con người review.**
+> Chúng do nhiều agent viết song song, **mỗi tài liệu neo vào code thật** (kèm `file:dòng`), và phần lớn
+> **đã phát hiện sai lệch thật** trong code hoặc trong tài liệu khác (xem **§15.2** của từng tài liệu).
+> Một số phát hiện đã được **sửa ngay trong code**, ví dụ:
+> • **C13** — tiền tố **ĐÔI** trên 3 hàm sinh khoá lock (`ecommerce:ecommerce:…`) → đã bỏ tiền tố + **4 test bất biến**
+> • **C16** — `ConventionalControllers` chỉ đăng ký 2 assembly ⇒ **mọi module mới trả `404` body rỗng** (đúng triệu chứng đã truy lỗi C8) → đã đăng ký động + **ghi log `[C16]`**
+> • **C15** — allowlist ở `XC-004` Q1 **mâu thuẫn** với webhook bắt buộc `[AllowAnonymous]` → đã bổ sung 2 nhóm
