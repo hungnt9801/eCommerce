@@ -520,12 +520,12 @@ public class LockConventionTests
 
 | # | Câu hỏi | Cần ai | Trạng thái | Ảnh hưởng |
 |---|---|---|---|---|
-| **Q1** | Timeout mặc định: **10 s** (HTTP) / **30 s** (job) có phù hợp? | Kiến trúc trưởng | `Open` | Quá ngắn ⇒ 409 giả; quá dài ⇒ treo request |
-| **Q2** | TTL từng khoá (cột cuối §5) — chấp nhận đề xuất hay cần chỉnh? | Kiến trúc trưởng | `Open` | TTL < thời gian thao tác ⇒ 2 chủ thể cùng chạy |
-| **Q3** | Redis production có cần **HA/Sentinel** không? | Vận hành | `Open` | Mất Redis ⇒ mất tính tuần tự (không mất dữ liệu) |
-| **Q4** | Khi **không giành được khoá ở tầng HTTP**, trả `409` hay `423 Locked`? | Kiến trúc trưởng | `Open` | Ảnh hưởng UI và retry policy của client |
-| **Q5** | Có cần **API/CLI liệt kê khoá đang giữ** (để gỡ khoá treo khi cần) không? | Vận hành | `Open` | Thuộc `XC-005`; khoá có TTL nên hiếm khi cần gỡ tay |
-| **Q6** | Có cần **cảnh báo khi tranh chấp cao** (NFR-003) gửi tới đâu? | Vận hành | `Open` | Thuộc `XC-005`/`NOT-*` |
+| **Q1** | Timeout mặc định: **10 s** (HTTP) / **30 s** (job) có phù hợp? | Kiến trúc trưởng | ✅ `Closed` — **CHẤP NHẬN 10 s (HTTP) / 30 s (job)** theo mặc định §4.2 | Quá ngắn ⇒ 409 giả; quá dài ⇒ treo request |
+| **Q2** | TTL từng khoá (cột cuối §5) — chấp nhận đề xuất hay cần chỉnh? | Kiến trúc trưởng | ✅ `Closed` — **CHẤP NHẬN TTL ở §5**; riêng TTL khoá token-refresh **đo thực tế = 30 s** (đã sửa §5.4) | TTL < thời gian thao tác ⇒ 2 chủ thể cùng chạy |
+| **Q3** | Redis production có cần **HA/Sentinel** không? | Vận hành | ✅ `Closed` — **CHƯA HA Redis ở GĐ1** *(chốt 13/10/2026)*; bật **Sentinel/Cluster khi có lưu lượng thật** (GĐ2+). ⚠️ Rủi ro đã ghi nhận: mất Redis ⇒ hỏng **khoá phân tán** + cache idempotency | Mất Redis ⇒ mất tính tuần tự (không mất dữ liệu) |
+| **Q4** | Khi **không giành được khoá ở tầng HTTP**, trả `409` hay `423 Locked`? | Kiến trúc trưởng | ✅ `Closed` — trả **`409 Conflict`** khi không giành được khoá ở tầng HTTP (dành `429` cho rate limit của sàn — ngữ nghĩa khác) | Ảnh hưởng UI và retry policy của client |
+| **Q5** | Có cần **API/CLI liệt kê khoá đang giữ** (để gỡ khoá treo khi cần) không? | Vận hành | ✅ `Closed` — **CÓ** API/CLI liệt kê khoá đang giữ. 🎯 Lý do RẤT cụ thể: khi kiểm chứng **C11**, tôi **không tìm được khoá thật** dù thử 3 biến thể, phải dùng `redis-cli MONITOR`; có API này thì gỡ khoá treo nhanh và đúng | Thuộc `XC-005`; khoá có TTL nên hiếm khi cần gỡ tay |
+| **Q6** | Có cần **cảnh báo khi tranh chấp cao** (NFR-003) gửi tới đâu? | Vận hành | ✅ `Closed` — cảnh báo tranh chấp cao gửi **email kỹ thuật** *(chốt 13/10/2026)* | Thuộc `XC-005`/`NOT-*` |
 
 ### 15.2 🚨 Sai lệch phát hiện được (nguồn gốc của tài liệu này)
 

@@ -502,13 +502,13 @@ public class AuthorizationGuardTests
 
 | # | Câu hỏi | Cần ai | Trạng thái | Ảnh hưởng |
 |---|---|---|---|---|
-| **Q1** | Allowlist `[AllowAnonymous]` gồm những endpoint nào? | Kiến trúc trưởng | `Open` | Endpoint công khai = bề mặt tấn công |
+| **Q1** | Allowlist `[AllowAnonymous]` gồm những endpoint nào? | Kiến trúc trưởng | ✅ `Closed` — allowlist **CHỈ**: `/connect/*` (OpenIddict) · `/api/abp/application-configuration` · `/health-status` · Swagger **chỉ ở Development**. Mọi endpoint khác đều phải xác thực | Endpoint công khai = bề mặt tấn công |
 | **Q2** | `admin@abp.io / 1q2w3E*` (tài khoản seed) — có **bắt buộc đổi mật khẩu** ở lần đăng nhập đầu không? | Kiến trúc trưởng + Security | ✅ **`Closed` — ĐÃ TRIỂN KHAI** *(13/10/2026)* | Bật cờ **`ShouldChangePasswordOnNextLogin`** cho tài khoản seed + **cảnh báo rõ ra `stderr` khi KHÔNG phải Development**. Đã kiểm chứng cả 2 chế độ |
-| **Q3** | Vòng đời token: access **≤ 1 h**, refresh **≤ 14 ngày** — chấp nhận? | Kiến trúc trưởng | `Open` | Ảnh hưởng trải nghiệm + bảo mật |
-| **Q4** | Có cần **2FA/OTP** cho tài khoản quản trị không? | Kiến trúc trưởng + Security | `Open` | Nếu cần ⇒ thêm luồng + phụ thuộc SMS/Zalo OA (`NOT-002`) |
-| **Q5** | Có cần **đăng nhập Google/Zalo** cho khách hàng không? | BA | `Open` | Ảnh hưởng `WEB-001` + OpenIddict external provider |
-| **Q6** | GĐ4 dùng **multi-tenant chung DB** hay **DB riêng mỗi tenant**? | Kiến trúc trưởng | `Open` | Ảnh hưởng F1: nếu **DB riêng** thì `TenantId` có thể bỏ ⇒ F1 nhẹ hơn |
-| **Q7** | Ai được sửa **quyền của vai trò** — chỉ host admin, hay cả tenant admin (trong phạm vi tenant)? | BA | `Open` | Ảnh hưởng thiết kế UI quản trị quyền |
+| **Q3** | Vòng đời token: access **≤ 1 h**, refresh **≤ 14 ngày** — chấp nhận? | Kiến trúc trưởng | ✅ `Closed` — **CHẤP NHẬN**: access **≤ 1 giờ**, refresh **≤ 14 ngày** | Ảnh hưởng trải nghiệm + bảo mật |
+| **Q4** | Có cần **2FA/OTP** cho tài khoản quản trị không? | Kiến trúc trưởng + Security | ✅ `Closed` — **KHÔNG làm 2FA/OTP ở GĐ1**, hoãn sang **GĐ3** *(chốt 13/10/2026)*. ⚠️ Bù lại: tài khoản seed nay **buộc đổi mật khẩu ở lần đăng nhập đầu** + cảnh báo ra `stderr` khi không phải Development | Nếu cần ⇒ thêm luồng + phụ thuộc SMS/Zalo OA (`NOT-002`) |
+| **Q5** | Có cần **đăng nhập Google/Zalo** cho khách hàng không? | BA | ✅ `Closed` — **KHÔNG** đăng nhập Google/Zalo cho khách ở GĐ1; hoãn sang GĐ3 (nhóm khách hàng) | Ảnh hưởng `WEB-001` + OpenIddict external provider |
+| **Q6** | GĐ4 dùng **multi-tenant chung DB** hay **DB riêng mỗi tenant**? | Kiến trúc trưởng | ✅ `Closed` — **CHUNG DB, lọc theo `TenantId`** *(chốt 13/10/2026)*. Đúng hướng code hiện tại. 🔒 **Bất biến kèm theo:** mọi unique index trên entity `IMultiTenant` **PHẢI** dùng `NULLS NOT DISTINCT` — nếu không sẽ tái hiện đúng lỗi F1/C4 (tạo trùng khi `TenantId` NULL) | Ảnh hưởng F1: nếu **DB riêng** thì `TenantId` có thể bỏ ⇒ F1 nhẹ hơn |
+| **Q7** | Ai được sửa **quyền của vai trò** — chỉ host admin, hay cả tenant admin (trong phạm vi tenant)? | BA | ✅ `Closed` — **CHỈ host admin** *(chốt 13/10/2026)*. API/UI sửa quyền vai trò phải **lọc theo host**, chặn tenant tự nới quyền | Ảnh hưởng thiết kế UI quản trị quyền |
 
 ### 15.2 🚨 Sai lệch & lỗ hổng phát hiện được
 
