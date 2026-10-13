@@ -2367,6 +2367,118 @@ namespace eCommerce.Migrations
                     b.ToTable("ChnChannelShops", (string)null);
                 });
 
+            modelBuilder.Entity("eCommerce.EInvoice.EInvoice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("ConcurrencyStamp");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<Guid?>("DeleterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("DeleterId");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("DeletionTime");
+
+                    b.Property<string>("ExtraProperties")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("ExtraProperties");
+
+                    b.Property<Guid?>("HoaDonBiDieuChinhId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("HoaDonBiThayTheId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("IsDeleted");
+
+                    b.Property<string>("KyHieuMauSo")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<string>("LoiCQT")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<string>("LyDo")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
+
+                    b.Property<string>("MaCQT")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("NgayLap")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("SoHoaDon")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TaxAuthorityStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.Property<string>("XmlDaKy")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HoaDonBiDieuChinhId")
+                        .HasDatabaseName("IX_EInvInvoices_HoaDonBiDieuChinhId");
+
+                    b.HasIndex("HoaDonBiThayTheId")
+                        .HasDatabaseName("IX_EInvInvoices_HoaDonBiThayTheId");
+
+                    b.HasIndex("Status", "TaxAuthorityStatus")
+                        .HasDatabaseName("IX_EInvInvoices_Status_TaxAuthorityStatus");
+
+                    b.HasIndex("TenantId", "KyHieuMauSo", "SoHoaDon")
+                        .IsUnique()
+                        .HasDatabaseName("IX_EInvInvoices_TenantId_KyHieuMauSo_SoHoaDon");
+
+                    b.ToTable("EInvInvoices", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_EInvInvoices_PhaiKyTruocKhiPhatHanh", "\"Status\" = 0 OR \"Status\" = 5 OR \"XmlDaKy\" IS NOT NULL");
+                        });
+                });
+
             modelBuilder.Entity("eCommerce.Inventory.InventoryItem", b =>
                 {
                     b.Property<Guid>("Id")

@@ -1105,3 +1105,46 @@ VALUES ('20261013093715_Add_Address_AdministrativeUnits', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE TABLE "EInvInvoices" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "KyHieuMauSo" character varying(32) NOT NULL,
+    "SoHoaDon" character varying(8) NOT NULL,
+    "NgayLap" timestamp with time zone NOT NULL,
+    "Status" integer NOT NULL,
+    "TaxAuthorityStatus" integer NOT NULL,
+    "MaCQT" character varying(64),
+    "LyDo" character varying(1024),
+    "HoaDonBiDieuChinhId" uuid,
+    "HoaDonBiThayTheId" uuid,
+    "LoiCQT" character varying(2048),
+    "XmlDaKy" text,
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_EInvInvoices" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_EInvInvoices_PhaiKyTruocKhiPhatHanh" CHECK ("Status" = 0 OR "Status" = 5 OR "XmlDaKy" IS NOT NULL)
+);
+
+CREATE INDEX "IX_EInvInvoices_HoaDonBiDieuChinhId" ON "EInvInvoices" ("HoaDonBiDieuChinhId");
+
+CREATE INDEX "IX_EInvInvoices_HoaDonBiThayTheId" ON "EInvInvoices" ("HoaDonBiThayTheId");
+
+CREATE INDEX "IX_EInvInvoices_Status_TaxAuthorityStatus" ON "EInvInvoices" ("Status", "TaxAuthorityStatus");
+
+CREATE UNIQUE INDEX "IX_EInvInvoices_TenantId_KyHieuMauSo_SoHoaDon"
+    ON "EInvInvoices" ("TenantId", "KyHieuMauSo", "SoHoaDon")
+    NULLS NOT DISTINCT;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261013094411_Add_EInvoice_Invoices', '10.0.11');
+
+COMMIT;
+

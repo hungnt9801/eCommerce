@@ -12,6 +12,7 @@
   </Folder>
   <Folder Name="/modules/EInvoice/">
     <Project Path="modules/EInvoice/eCommerce.EInvoice.Domain/eCommerce.EInvoice.Domain.csproj" />
+    <Project Path="modules/EInvoice/eCommerce.EInvoice.EntityFrameworkCore/eCommerce.EInvoice.EntityFrameworkCore.csproj" />
   </Folder>
   <Folder Name="/modules/Messaging/">
     <Project Path="modules/Messaging/eCommerce.Messaging.Domain/eCommerce.Messaging.Domain.csproj" />

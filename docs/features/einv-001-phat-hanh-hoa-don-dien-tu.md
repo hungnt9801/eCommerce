@@ -1135,3 +1135,42 @@ Test `CQT_TU_CHOI_thi_KHONG_doi_TRUC_PHAT_HANH` khoá bất biến này.
 | 4 | **Gửi CQT + parse `OK:` / `ERR:`** | Thuộc `EINV-002` |
 | 5 | **Bảng DB** cho `EInvoice` | Chưa nối EF Core (domain đã sẵn sàng) |
 | 6 | **Hoá đơn điều chỉnh/thay thế** | Cần bảng liên kết + ràng buộc "chỉ một bản thay thế đang hiệu lực" |
+---
+
+## 18. TRẠNG THÁI TRIỂN KHAI (13/10/2026) — mục (f): **bảng DB + cấp số hoá đơn**
+
+### 18.1 Bảng `EInvInvoices` — đã chứng minh trên PostgreSQL thật
+
+| Kiểm chứng trên DB thật | Kết quả |
+|---|---|
+| Số index `NULLS NOT DISTINCT` toàn hệ thống | ✅ **14** (11 → 12 → 13 → 14 qua 4 migration) |
+| **Chèn 2 hoá đơn cùng (Ký hiệu, Số)** | ✅ dòng 2 bị chặn: `duplicate key ... (null, 1C26TAA, 00000001) already exists` |
+| **CHECK `CK_EInvInvoices_PhaiKyTruocKhiPhatHanh`** | ✅ **CHẶN THẬT**: `Status = DaPhatHanh` + `XmlDaKy = null` ⇒ `violates check constraint` |
+| Đối chứng: `Nhap` không cần XML | ✅ được phép |
+
+⇒ **Ràng buộc pháp lý "phải ký trước khi phát hành" nay được cưỡng chế ở CẢ HAI tầng**: domain (ném `0102`) **và** DB (CHECK constraint). Không còn đường nào để lách.
+
+### 18.2 Cấp số hoá đơn — `EInvoiceNumberIssuer`
+
+| Bất biến | Cách cưỡng chế |
+|---|---|
+| **Không cấp số khi KHÔNG giữ khoá phân tán** | ném `eCommerce:EInvoice:0201` — vì "đọc số lớn nhất rồi cộng 1" là **read-modify-write**; hai yêu cầu đồng thời sẽ **cùng nhận một số** ⇒ **trùng số hoá đơn** (lỗi pháp lý, không phải lỗi chương trình) |
+| **Không tái sử dụng số của hoá đơn đã huỷ** | số lấy theo **số lớn nhất đã cấp**, không theo "hoá đơn còn hiệu lực" ⇒ huỷ hoá đơn **không giải phóng số** |
+| Số liên tục **theo từng ký hiệu mẫu số** | khoá `einvoice:number:{kyHieuMauSo}` + tra `Max(SoHoaDon)` theo ký hiệu |
+| Định dạng **8 chữ số** có 0 đứng đầu | `DinhDang` ném `0202` nếu số ≤ 0 |
+| **Kiểm tra tính liên tục** để đối chiếu CQT | `TimKhoangThieu(...)` trả các khoảng số bị thiếu |
+
+**Kết quả:** unit **178/178** (thêm **17** test cho cấp số) · integration **20/20** (thêm **4** test cho bảng mới) · build **0 lỗi / 0 cảnh báo**.
+
+> 🐛 **Lỗi tôi tự gây ra và đã sửa (đáng ghi lại):** test tích hợp đầu tiên **đỏ** vì các test dùng chung **một container PostgreSQL** ⇒ dữ liệu của test này đụng test khác. Đã sửa bằng cách **sinh ký hiệu mẫu số riêng cho từng test**. Đây là bài học chung cho mọi test tích hợp chạm bảng có ràng buộc unique.
+
+### ⚠️ CÒN LẠI của `EINV-001`
+
+| # | Việc |
+|---|---|
+| 1 | **Sinh XML** theo `TT 91/2026/TT-BTC` — 🚧 cần **bảng trường bắt buộc** chính thức |
+| 2 | **Tích hợp NCC** (2 bước ký) — phụ thuộc `SIGN-001`, cần **chứng thư sandbox** |
+| 3 | **Gửi CQT + parse `OK:` / `ERR:`** — thuộc `EINV-002` |
+| 4 | **Khoá ngoại tới `Address`** để địa chỉ trên hoá đơn là dữ liệu **đã xác minh** (hiện chưa có cột địa chỉ trên `EInvInvoices`) |
+| 5 | **Ràng buộc "chỉ một bản thay thế đang hiệu lực"** cho một hoá đơn gốc |
+| 6 | **Job gửi lại CQT** cho hoá đơn `BiTuChoi` |

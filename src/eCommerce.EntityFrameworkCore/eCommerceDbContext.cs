@@ -71,6 +71,9 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
     // ── Address (ADDR-001): danh mục đơn vị hành chính theo PHIÊN BẢN schema ──
     public DbSet<Address.AdministrativeUnit> AdministrativeUnits { get; set; } = default!;
 
+    // ── EInvoice (EINV-001): hoá đơn điện tử ──
+    public DbSet<EInvoice.EInvoice> Invoices { get; set; } = default!;
+
     public eCommerceDbContext(DbContextOptions<eCommerceDbContext> options)
         : base(options)
     {
@@ -87,6 +90,7 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
         // Gọi qua tên đầy đủ để KHÔNG phải thêm using vào file này.
         Messaging.EntityFrameworkCore.MessagingDbContextModelCreatingExtensions.ConfigureMessaging(builder);
         Address.EntityFrameworkCore.AddressDbContextModelCreatingExtensions.ConfigureAddress(builder);
+        EInvoice.EntityFrameworkCore.EInvoiceDbContextModelCreatingExtensions.ConfigureEInvoice(builder);
 
         ConfigureCommerce(builder);
 

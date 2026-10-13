@@ -145,7 +145,7 @@ public class PostgreSqlSchemaTests
     {
         // 🔒 BẤT BIẾN (ghi ở XC-004 Q6): mọi unique index trên entity IMultiTenant PHẢI có
         // `NULLS NOT DISTINCT`. Ai tạo migration mới mà quên ⇒ test này đỏ.
-        Assert.Equal(13L, await DemAsync(
+        Assert.Equal(14L, await DemAsync(
             "select count(*) from pg_indexes where schemaname = 'public' and indexdef like '%NULLS NOT DISTINCT%'"));
 
         // Kiểm tra ĐÍCH DANH để thông báo lỗi có ý nghĩa (tên index dài có thể bị PostgreSQL cắt ⇒ so theo tiền tố).
@@ -316,6 +316,82 @@ public class PostgreSqlSchemaTests
         Assert.Equal(PostgresErrorCodes.CheckViolation, ex.SqlState);   // 23514
     }
 
+    // ── 2d. EINV-001 — SỐ HOÁ ĐƠN không được trùng ──────────────────────────
+
+    private async Task ChenHoaDonAsync(Guid? tenantId, string kyHieu, string so, int status, string? xmlDaKy)
+    {
+        await using var cmd = _fixture.DataSource.CreateCommand("""
+            insert into "EInvInvoices"
+                ("Id","TenantId","KyHieuMauSo","SoHoaDon","NgayLap","Status","TaxAuthorityStatus","XmlDaKy",
+                 "ExtraProperties","ConcurrencyStamp","CreationTime","IsDeleted")
+            values ($1, $2, $3, $4, now(), $5, 0, $6, '{}', 's', now(), false)
+            """);
+
+        cmd.Parameters.AddWithValue(Guid.NewGuid());
+        cmd.Parameters.AddWithValue((object?)tenantId ?? DBNull.Value);
+        cmd.Parameters.AddWithValue(kyHieu);
+        cmd.Parameters.AddWithValue(so);
+        cmd.Parameters.AddWithValue(status);
+        cmd.Parameters.AddWithValue((object?)xmlDaKy ?? DBNull.Value);
+
+        await cmd.ExecuteNonQueryAsync();
+    }
+
+    [Fact]
+    public async Task EINV001_chan_trung_SO_HOA_DON_trong_cung_ky_hieu_khi_TenantId_NULL()
+    {
+        // 🚨 Neu index thieu NULLS NOT DISTINCT thi hai hoa don CUNG SO lot vao DB
+        // => vi pham quy dinh ve so hoa don (phai duy nhat va tang lien tuc).
+        // ⚠️ Ký hiệu SINH RIÊNG cho test này: các test dùng chung một container PostgreSQL nên
+        // dữ liệu của test khác có thể đụng vào (đây chính là lỗi đã gặp khi chạy lần đầu).
+        var kyHieu = "DUP" + Guid.NewGuid().ToString("N")[..6];
+
+        await ChenHoaDonAsync(null, kyHieu, "00000001", 1, "<xml/>");
+
+        var ex = await Assert.ThrowsAsync<PostgresException>(
+            () => ChenHoaDonAsync(null, kyHieu, "00000001", 1, "<xml/>"));
+
+        Assert.Equal(PostgresErrorCodes.UniqueViolation, ex.SqlState);   // 23505
+    }
+
+    [Fact]
+    public async Task EINV001_CHO_PHEP_cung_so_nhung_KHAC_ky_hieu_mau_so()
+    {
+        // So hoa don lien tuc THEO TUNG ky hieu mau so => hai ky hieu khac nhau co the cung so.
+        var ma = Guid.NewGuid().ToString("N")[..6];
+        var kyHieuA = "KH" + ma + "A";
+        var kyHieuB = "KH" + ma + "B";
+
+        await ChenHoaDonAsync(null, kyHieuA, "00000001", 1, "<xml/>");
+        await ChenHoaDonAsync(null, kyHieuB, "00000001", 1, "<xml/>");
+
+        var soDong = await DemAsync(
+            $"select count(*) from \"EInvInvoices\" where \"SoHoaDon\" = '00000001' and \"KyHieuMauSo\" in ('{kyHieuA}', '{kyHieuB}')");
+
+        Assert.Equal(2L, soDong);
+    }
+
+    [Fact]
+    public async Task EINV001_CHECK_chan_phat_hanh_hoa_don_CHUA_KY()
+    {
+        // 🚨 Hang rao DB cho bat bien PHAP LY: khong the phat hanh hoa don chua ky.
+        // Status 2 = DaPhatHanh nhung XmlDaKy = null => CHECK phai chan.
+        var ex = await Assert.ThrowsAsync<PostgresException>(
+            () => ChenHoaDonAsync(null, "1C26TAA", "00000099", 2, null));
+
+        Assert.Equal(PostgresErrorCodes.CheckViolation, ex.SqlState);   // 23514
+    }
+
+    [Fact]
+    public async Task EINV001_CHECK_cho_phep_trang_thai_NHAP_khong_co_XML()
+    {
+        // Doi chung: Nhap (0) thi KHONG can XML da ky.
+        await ChenHoaDonAsync(null, "1C26TAA", "00000098", 0, null);
+
+        var soDong = await DemAsync("select count(*) from \"EInvInvoices\" where \"SoHoaDon\" = '00000098'");
+
+        Assert.Equal(1L, soDong);
+    }
     // ── 3. Ràng buộc EXCLUDE — chống chồng khung hiệu lực ──────────────────
 
     [Fact]

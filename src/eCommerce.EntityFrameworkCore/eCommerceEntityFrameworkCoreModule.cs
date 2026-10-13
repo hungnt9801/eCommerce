@@ -28,6 +28,7 @@ namespace eCommerce.EntityFrameworkCore;
     typeof(PaymentHub.EntityFrameworkCore.PaymentHubEntityFrameworkCoreModule),
     typeof(Messaging.EntityFrameworkCore.MessagingEntityFrameworkCoreModule),
     typeof(Address.EntityFrameworkCore.AddressEntityFrameworkCoreModule),
+    typeof(EInvoice.EntityFrameworkCore.EInvoiceEntityFrameworkCoreModule),
     typeof(AbpEntityFrameworkCorePostgreSqlModule),
     typeof(AbpIdentityEntityFrameworkCoreModule),
     typeof(AbpPermissionManagementEntityFrameworkCoreModule),
