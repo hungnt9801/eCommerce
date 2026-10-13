@@ -43,7 +43,8 @@ namespace eCommerce;
     typeof(eCommerceEntityFrameworkCoreModule),
     typeof(eCommerceApplicationModule),
     typeof(ChannelHub.ChannelHubApplicationModule),
-    typeof(PaymentHub.PaymentHubApplicationModule)
+    typeof(PaymentHub.PaymentHubApplicationModule),
+    typeof(Tax.EntityFrameworkCore.TaxEntityFrameworkCoreModule)
 )]
 public class eCommerceHttpApiHostModule : AbpModule
 {

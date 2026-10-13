@@ -2,6 +2,9 @@ using eCommerce.ChannelHub.Channels;
 using eCommerce.ChannelHub.EntityFrameworkCore;
 using eCommerce.PaymentHub.EntityFrameworkCore;
 using eCommerce.PaymentHub.Payments;
+using eCommerce.Tax.Classifications;
+using eCommerce.Tax.EntityFrameworkCore;
+using eCommerce.Tax.RateSchedules;
 using Microsoft.EntityFrameworkCore;
 using Volo.Abp.Data;
 using Volo.Abp.EntityFrameworkCore;
@@ -54,6 +57,12 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
     // ---- PaymentHub (module) ----
     public DbSet<PaymentTransaction> PaymentTransactions { get; set; } = default!;
 
+    // ---- Tax (module) — XC-006 ----
+    // ⚠️ Phải khai báo DbSet, nếu không IRepository<TaxClassification, Guid> KHÔNG được đăng ký
+    //    (xem ghi chú dài ở khối ChannelHub phía trên).
+    public DbSet<TaxRateSchedule> TaxRateSchedules { get; set; } = default!;
+    public DbSet<TaxClassification> TaxClassifications { get; set; } = default!;
+
     public eCommerceDbContext(DbContextOptions<eCommerceDbContext> options)
         : base(options)
     {
@@ -66,6 +75,7 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
         // Cấu hình do từng module tự cung cấp.
         builder.ConfigureChannelHub();
         builder.ConfigurePaymentHub();
+        builder.ConfigureTax();
 
         ConfigureCommerce(builder);
 

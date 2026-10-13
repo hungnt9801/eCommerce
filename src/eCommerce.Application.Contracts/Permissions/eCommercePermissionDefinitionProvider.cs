@@ -46,5 +46,16 @@ public class eCommercePermissionDefinitionProvider : PermissionDefinitionProvide
         // ---- Thanh toán ----
         var payments = group.AddPermission(eCommerceConsts.Permissions.Payments.Default);
         payments.AddChild(eCommerceConsts.Permissions.Payments.Refund);
+
+        // ---- Thuế (XC-006) ----
+        var tax = group.AddPermission(eCommerceConsts.Permissions.TaxClassification.Default);
+        tax.AddChild(eCommerceConsts.Permissions.TaxClassification.View);
+        tax.AddChild(eCommerceConsts.Permissions.TaxClassification.Manage);
+        tax.AddChild(eCommerceConsts.Permissions.TaxClassification.Approve);
+        tax.AddChild(eCommerceConsts.Permissions.TaxClassification.Import);
+        tax.AddChild(eCommerceConsts.Permissions.TaxClassification.ExportMau01);
+
+        var rateSchedule = group.AddPermission(eCommerceConsts.Permissions.TaxRateSchedule.Default);
+        rateSchedule.AddChild(eCommerceConsts.Permissions.TaxRateSchedule.Manage);
     }
 }

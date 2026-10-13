@@ -50,6 +50,27 @@ public static class eCommerceConsts
             public const string Default = GroupName + ".Payments";
             public const string Refund = Default + ".Refund";
         }
+
+        /// <summary>
+        /// Quyền của module <b>Tax</b> (XC-006). Ba việc tách biệt có chủ ý:
+        /// kế toán nhập liệu — kế toán trưởng duyệt — kế toán trưởng xuất Mẫu 01.
+        /// </summary>
+        public static class TaxClassification
+        {
+            public const string Default = GroupName + ".Tax.Classification";
+            public const string View = Default + ".View";
+            public const string Manage = Default + ".Manage";
+            public const string Approve = Default + ".Approve";
+            public const string Import = Default + ".Import";
+            public const string ExportMau01 = Default + ".ExportMau01";
+        }
+
+        /// <summary>Đổi khung hiệu lực mức thuế suất — theo Q6 đã chốt, thuộc KẾ TOÁN TRƯỞNG, có duyệt + audit.</summary>
+        public static class TaxRateSchedule
+        {
+            public const string Default = GroupName + ".Tax.RateSchedule";
+            public const string Manage = Default + ".Manage";
+        }
     }
 
     /// <summary>Mã lỗi nghiệp vụ (dùng với BusinessException).</summary>
