@@ -107,7 +107,7 @@ Muốn có UI login/admin ⇒ phải **tạo project Web** trước (việc củ
 |---|---|
 | `eCommercePermissionDefinitionProvider.cs` | Định nghĩa 12 permission (`eCommerce.Products/Inventory/Channels/Orders/Payments.*`). **Thiếu file này thì `[Authorize]` luôn từ chối** dù user là admin |
 | `OpenIddictDataSeedContributor.cs` | Tạo scope `eCommerce` + client `eCommerce_App` (secret `1q2w3e*`, `ConsentType = Implicit` để không cần UI consent). Không có nó ⇒ `/connect/token` luôn `invalid_client` |
-| `IdentityDataSeedContributor.cs` | Seed admin `admin@ecommerce.local` / `1q2w3E*` **và cấp toàn bộ permission cho role `admin`** |
+| `IdentityDataSeedContributor.cs` | Seed admin `admin@abp.io` / `1q2w3E*` **và cấp toàn bộ permission cho role `admin`** |
 | `appsettings.Development.json` | `AuthServer:DisableTransportSecurityRequirement = true` — **chỉ để test HTTP ở localhost**; production phải để false |
 | `eCommerceHttpApiHostModule` | Bỏ `AddAlwaysAllowAuthorization()`; thêm `app.UseAuthentication()`; Redis `AbortOnConnectFail=false` |
 
@@ -134,7 +134,7 @@ dotnet run --project src/eCommerce.HttpApi.Host         # chạy API
 curl.exe -i http://localhost:5099/api/app/channel/shops
 
 # (2) Lấy token bằng grant password
-curl.exe -X POST http://localhost:5099/connect/token -d "grant_type=password&client_id=eCommerce_App&client_secret=1q2w3e*&username=admin@ecommerce.local&password=1q2w3E*&scope=eCommerce offline_access"
+curl.exe -X POST http://localhost:5099/connect/token -d "grant_type=password&client_id=eCommerce_App&client_secret=1q2w3e*&username=admin@abp.io&password=1q2w3E*&scope=eCommerce offline_access"
 
 # (3) Gọi API bằng token → kỳ vọng 200
 curl.exe -H "Authorization: Bearer <access_token>" http://localhost:5099/api/app/channel/shops

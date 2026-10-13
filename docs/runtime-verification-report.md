@@ -21,7 +21,7 @@
 | **C2** | Thiếu **`AbpClockOptions.Kind = Utc`** | `Npgsql: Cannot write DateTime with Kind=Local to PostgreSQL type 'timestamp with time zone', only UTC is supported` ⇒ seeder chết | 🟧 rõ | ✅ sửa |
 | **C3** | **Migration viết tay thiếu `.Designer.cs`** | EF **BỎ QUA im lặng**: `migrations list` không thấy, migration không chạy, `exit 0` | 🟥 im lặng | ✅ sửa |
 | **C4** | **F1 của `XC-004`**: unique index `(TenantId, …)` không chặn trùng khi `TenantId` NULL (PostgreSQL `NULLS DISTINCT`) | `INSERT 0 2` — **tạo được 2 dòng cùng `Code`** | 🟥 im lặng | ✅ sửa + **chứng minh trước/sau** |
-| **C5** | Tài khoản seed **ghi sai trong tài liệu** (`admin@ecommerce.local` vs thực tế `admin@abp.io`) | `No user found matching username: admin@ecommerce.local` | 🟧 rõ | ✅ sửa |
+| **C5** | Tài khoản seed **ghi sai trong tài liệu** — tài liệu ghi `admin@ecommerce.local`, **thực tế trong DB là `admin@abp.io`** (ABP có seeder mặc định riêng, chạy trước) | `No user found matching username: admin@ecommerce.local` | 🟧 rõ | ✅ sửa: hằng số + tài liệu nay dùng `admin@abp.io` |
 | **C6a** | `SignInManager<IdentityUser>` **chưa đăng ký** | `No service for type 'SignInManager\`1[IdentityUser]'` ⇒ **password grant chết** | 🟧 rõ | ✅ sửa |
 | **C6b** | **Không hề gọi `AddAuthentication(...)`** | API không token: `500` → `404` body rỗng (thay vì `401`) | 🟥 im lặng | ✅ sửa |
 | **C7** | **0 permission được cấp** (3 nguyên nhân lồng nhau) | `AbpPermissionGrants` = 0 ⇒ mọi API `[Authorize(permission)]` trả **`403` cho TẤT CẢ** | 🟥 im lặng | ✅ sửa + **0 → 36 grant** |

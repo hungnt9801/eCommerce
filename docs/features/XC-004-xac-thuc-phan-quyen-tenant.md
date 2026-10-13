@@ -373,7 +373,7 @@ Các permission **cụ thể** do từng module khai báo; bảng đăng ký ở
 |---|---|
 | Migration **bắt buộc** *(F1)* | Thay các unique index có `TenantId` sang **`NULLS NOT DISTINCT`** (SQL thô — EF Core không hỗ trợ). ⚠️ **CHƯA viết** — cần PostgreSQL để kiểm chứng |
 | Migration khác | **Không** (bảng permission/role là của ABP, đã có ở Phase 0) |
-| Seed | `IdentityDataSeedContributor`: tạo `admin@ecommerce.local` + vai trò `admin` + **gán TẤT CẢ permission** cho vai trò (`SetForRoleAsync(roleName, permission, true)`) — đã có, chạy **idempotent** |
+| Seed | `IdentityDataSeedContributor`: tạo `admin@abp.io` + vai trò `admin` + **gán TẤT CẢ permission** cho vai trò (`SetForRoleAsync(roleName, permission, true)`) — đã có, chạy **idempotent** |
 | Seed OpenIddict | scope `eCommerce` + client `eCommerce_App` — đã có, dạng **descriptor** |
 | ⚠️ **Thiếu khi làm SaaS (GĐ4)** | **Chưa** có seed **vai trò mặc định cho tenant mới** ⇒ tenant mới sẽ **không ai có quyền**. Ghi nhận cho GĐ4 |
 | Rủi ro cấu hình | `password` grant đang được `README` hướng dẫn cho dev — **phải** bảo đảm **không** bật ở production (BR-010, `TC-11`) |
@@ -503,7 +503,7 @@ public class AuthorizationGuardTests
 | # | Câu hỏi | Cần ai | Trạng thái | Ảnh hưởng |
 |---|---|---|---|---|
 | **Q1** | Allowlist `[AllowAnonymous]` gồm những endpoint nào? | Kiến trúc trưởng | `Open` | Endpoint công khai = bề mặt tấn công |
-| **Q2** | `admin@ecommerce.local / 1q2w3E*` (tài khoản seed) — có **bắt buộc đổi mật khẩu** ở lần đăng nhập đầu không? | Kiến trúc trưởng + Security | `Open` | 🔴 Tài khoản seed có mật khẩu **trong tài liệu** ⇒ rủi ro nếu lên production nguyên trạng |
+| **Q2** | `admin@abp.io / 1q2w3E*` (tài khoản seed) — có **bắt buộc đổi mật khẩu** ở lần đăng nhập đầu không? | Kiến trúc trưởng + Security | `Open` | 🔴 Tài khoản seed có mật khẩu **trong tài liệu** ⇒ rủi ro nếu lên production nguyên trạng |
 | **Q3** | Vòng đời token: access **≤ 1 h**, refresh **≤ 14 ngày** — chấp nhận? | Kiến trúc trưởng | `Open` | Ảnh hưởng trải nghiệm + bảo mật |
 | **Q4** | Có cần **2FA/OTP** cho tài khoản quản trị không? | Kiến trúc trưởng + Security | `Open` | Nếu cần ⇒ thêm luồng + phụ thuộc SMS/Zalo OA (`NOT-002`) |
 | **Q5** | Có cần **đăng nhập Google/Zalo** cho khách hàng không? | BA | `Open` | Ảnh hưởng `WEB-001` + OpenIddict external provider |
@@ -517,7 +517,7 @@ public class AuthorizationGuardTests
 | **F1** | **Unique index mất tác dụng khi `TenantId` là `NULL`** (PostgreSQL `NULLS DISTINCT`). Ảnh hưởng **mọi** unique index bắt đầu bằng `TenantId` (`CatProducts`, `CatProductVariants`, `InvItems`, `OrdOrders`, `TaxRateSchedules`, `TaxClassifications`…) ⇒ có thể tạo **trùng `Code`/`Number`/`Sku`** | 9+ entity `IMultiTenant` + migration dùng `unique: true` thường; `AbpTenantManagement` chưa cài, `ICurrentTenant` chưa dùng ở đâu | 🔴 **Cao** — **mất toàn vẹn dữ liệu**, im lặng | ⬜ **Chưa sửa** — cần migration `NULLS NOT DISTINCT` (§5.2). **Không thể kiểm chứng** vì máy dev không có PostgreSQL. **Đã ghi vào việc bắt buộc** |
 | **F2** | **Multi-tenancy chưa thực sự bật**: entity đã `IMultiTenant` + có `TenantId`, nhưng **không** có `AbpMultiTenantManagement`, **0** chỗ dùng `ICurrentTenant` | grep toàn repo | 🟠 **Trung bình** | ✅ **Đã ghi nhận** ở D8 + Q6. Hệ quả query filter cần **kiểm chứng runtime** (chưa làm được) |
 | **F3** | `README` hướng dẫn lấy token bằng **`password` grant** | `README.md` mục "Lấy token" | 🟠 **Trung bình** (dev) / 🔴 nếu lọt production | ⬜ Ghi rõ **chỉ dev** trong README (BR-010, `TC-11`) |
-| **F4** | Tài khoản seed **`admin@ecommerce.local / 1q2w3E*`** có mật khẩu **viết trong tài liệu** | `IdentityDataSeedContributor` + README | 🟠 **Trung bình** | ⬜ Q2: buộc đổi mật khẩu lần đầu, hoặc sinh mật khẩu ngẫu nhiên khi seed production |
+| **F4** | Tài khoản seed **`admin@abp.io / 1q2w3E*`** có mật khẩu **viết trong tài liệu** | `IdentityDataSeedContributor` + README | 🟠 **Trung bình** | ⬜ Q2: buộc đổi mật khẩu lần đầu, hoặc sinh mật khẩu ngẫu nhiên khi seed production |
 | **F5** | Mã lỗi trùng/khác định dạng giữa app và module (`eCommerce:Channel:0001` vs `ChannelHub:0001`) | Đã ghi ở `XC-003` §15.2 **F2** | 🟡 Thấp | ⬜ Vẫn chưa sửa — thuộc `coding-conventions.md` |
 
 ### 15.3 Giả định
