@@ -213,7 +213,7 @@ sequenceDiagram
     DB-->>APP: «đã commit — có dấu vết dù crash»
     APP->>NCC: «SOAP SubmitInvoice (XML đã ký) — timeout 30s»
     alt «NCC trả chuỗi OK:»
-        NCC-->>APP: «OK:pattern;serial;ma co quan thue»
+        NCC-->>APP: «OK:pattern·serial·ma co quan thue»
         APP->>PARSE: «Parse(chuỗi)»
         PARSE-->>APP: «Ok + TaxAuthorityCode»
         APP->>DB: «UoW 2 — Succeeded + raw XML + hoá đơn sang Sent»
