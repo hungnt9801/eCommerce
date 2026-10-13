@@ -156,6 +156,42 @@ public class eCommerceHttpApiHostModule : AbpModule
         {
             options.ConventionalControllers.Create(typeof(eCommerceApplicationModule).Assembly);
             options.ConventionalControllers.Create(typeof(ChannelHub.ChannelHubApplicationModule).Assembly);
+
+            // 🚨 C16 — LỖI IM LẶNG NGHIÊM TRỌNG do các agent viết tài liệu phát hiện (13/10/2026).
+            //
+            // Nếu CHỈ đăng ký 2 assembly trên thì mọi app service của module MỚI sẽ **KHÔNG có endpoint**
+            // ⇒ client nhận **404 body RỖNG** — đúng y triệu chứng đã gặp khi truy lỗi C8
+            // (`/api/app/channel/shops` trả 404 dù Swagger liệt kê), và **không có lỗi biên dịch nào**.
+            //
+            // Từ GĐ0 trở đi sẽ có thêm nhiều module (Invoice, Signing, Shipping, Promotion, Reporting…)
+            // ⇒ tự động đăng ký cho MỌI assembly `eCommerce*.Application` đã được nạp vào đồ thị module,
+            // thay vì phải nhớ sửa tay ở đây mỗi lần thêm module (quên = 404 im lặng).
+            var daDangKy = new HashSet<string>(StringComparer.Ordinal)
+            {
+                typeof(eCommerceApplicationModule).Assembly.GetName().Name!,
+                typeof(ChannelHub.ChannelHubApplicationModule).Assembly.GetName().Name!
+            };
+
+            var asmModuleMoi = AppDomain.CurrentDomain.GetAssemblies()
+                .Where(a => !a.IsDynamic)
+                .Where(a => a.GetName().Name is { } ten
+                            && ten.StartsWith("eCommerce", StringComparison.Ordinal)
+                            && ten.EndsWith(".Application", StringComparison.Ordinal))
+                .OrderBy(a => a.GetName().Name, StringComparer.Ordinal)
+                .ToList();
+
+            foreach (var asm in asmModuleMoi)
+            {
+                if (daDangKy.Add(asm.GetName().Name!))
+                {
+                    options.ConventionalControllers.Create(asm);
+                }
+            }
+
+            // Ghi ra log để vận hành THẤY được module nào đã được mở endpoint (không còn im lặng).
+            Console.WriteLine(
+                "[C16] ConventionalControllers đã đăng ký cho {0} assembly: {1}",
+                daDangKy.Count, string.Join(", ", daDangKy.OrderBy(x => x, StringComparer.Ordinal)));
         });
 
         // ⚠️ OpenIddict mặc định BẮT BUỘC HTTPS cho mọi endpoint.
