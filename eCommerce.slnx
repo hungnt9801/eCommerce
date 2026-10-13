@@ -23,6 +23,9 @@
     <Project Path="modules/PaymentHub/eCommerce.PaymentHub.Domain/eCommerce.PaymentHub.Domain.csproj" />
     <Project Path="modules/PaymentHub/eCommerce.PaymentHub.EntityFrameworkCore/eCommerce.PaymentHub.EntityFrameworkCore.csproj" />
   </Folder>
+  <Folder Name="/modules/Signing/">
+    <Project Path="modules/Signing/eCommerce.Signing.Domain/eCommerce.Signing.Domain.csproj" />
+  </Folder>
   <Folder Name="/modules/Tax/">
     <Project Path="modules/Tax/eCommerce.Tax.Domain/eCommerce.Tax.Domain.csproj" />
     <Project Path="modules/Tax/eCommerce.Tax.EntityFrameworkCore/eCommerce.Tax.EntityFrameworkCore.csproj" />

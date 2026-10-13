@@ -885,3 +885,34 @@ public class DigitalSigningTests
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.1 | 13/10/2026 | *(điền)* | Bản nháp đầu — chốt **13 ADR** (D1–D13); hợp đồng `IDigitalSigner` 2 bước (**D1**), **KHÔNG** giữ khoá bí mật (**D2**), xác thực chữ ký là **guard bắt buộc** (**D4**), append-only chứng thư (**D6**), `NULLS NOT DISTINCT` (**D13**); 16 BR · 8 NFR · 22 TC. **Số liệu lấy từ code thật**: chưa có dòng code nào của `SIGN-001` (**F1**), gói `System.Security.Cryptography.Xml` đã có sẵn (**F3**); ghi nhận **F2** (chưa có chứng thư sandbox ⇒ chưa kiểm chứng được) và **F4** (nợ có ý thức: tính hợp lệ chữ ký không biểu diễn được ở tầng DB) |
+
+---
+
+## 18. TRẠNG THÁI TRIỂN KHAI (13/10/2026) — mục (g): **lõi Domain đã xong**
+
+Module **`eCommerce.Signing.Domain`** đã tạo, mô hình hoá đúng **quy trình ký 2 bước thủ công**:
+
+| Bước | Hàm | Nội dung |
+|---|---|---|
+| **1 — chuẩn bị** | `SigningRequest.TaoYeuCau(maTaiLieu, hashTaiLieu, thuatToanBam)` | Ghi lại **hash** tài liệu; kiểm hash đúng định dạng (`SHA256` hex = **64** ký tự); trạng thái `ChoKy` |
+| **2 — nhận kết quả ký** | `SigningRequest.HoanTatKy(hashDaKy, chungThu, chuKy, nguoiKy, thoiDiemKy)` | **① hash phải KHỚP** · **② chứng thư phải còn hiệu lực TẠI THỜI ĐIỂM KÝ** · chữ ký + người ký bắt buộc |
+
+**Kết quả:** unit **195/195** (thêm **17** test) · integration **20/20** · build **0 lỗi / 0 cảnh báo**.
+
+### 🚨 Hai lỗi IM LẶNG đã bị khoá bằng test
+
+**1. Ký nhầm tài liệu** (`eCommerce:Sign:0002`). Nếu không kiểm hash, hệ thống sẽ **nhận chữ ký của tài liệu A và gắn vào tài liệu B** (tệp bị thay giữa hai bước, hoặc người ký ký nhầm tệp). Chữ ký **vẫn hợp lệ về kỹ thuật** nhưng **vô hiệu về pháp lý**, và **không có cảnh báo nào**.
+Test khẳng định: hash lệch ⇒ **ném lỗi** và trạng thái **KHÔNG đổi**, `ChuKyDaKy`/`ChungThuSoId` **vẫn null** (không "nhận tạm").
+
+**2. Chứng thư hết hiệu lực tại thời điểm ký** (`eCommerce:Sign:0003`). Yêu cầu ký có thể nằm chờ người ký **nhiều ngày** ⇒ phải kiểm hiệu lực **tại lúc ký**, không phải lúc tạo yêu cầu.
+Test dựng đúng ca này: chứng thư **còn hạn khi tạo yêu cầu** nhưng **hết hạn khi ký** ⇒ bị từ chối. Bao gồm cả ca **đã thu hồi** dù ngày vẫn trong hiệu lực, và **chưa hiệu lực**.
+
+### ⚠️ CÒN LẠI của `SIGN-001`
+
+| # | Việc | Ghi chú |
+|---|---|---|
+| 1 | **Bảng DB + migration** cho `SigningRequest` / `SigningCertificate` | Chưa nối EF Core. Cần unique `(TenantId, MaTaiLieu)` **`NULLS NOT DISTINCT`** cho yêu cầu ký |
+| 2 | **Xác thực chữ ký bằng khoá công khai của chứng thư** | 🚧 Hàm hiện tại **KHÔNG** tự kiểm chữ ký — cần **chứng thư thật**; đây đúng **Q6** (bước 2 là **tệp hash đã ký** hay **XML đã ký**). Đã ghi rõ trong XML doc của `SigningRequest` để **không ai hiểu nhầm là đã xác thực đầy đủ** |
+| 3 | **Lưu tệp chứng thư / khoá công khai** | Cần `IBlobContainer` (chưa có hạ tầng lưu tệp) + bảo vệ khoá riêng |
+| 4 | **OTP/PIN cho USB token** | Ngoài phạm vi phần mềm (do driver token) |
+| 5 | **Job nhắc yêu cầu ký quá hạn** | Chưa làm — phụ thuộc `NOT-*` |
