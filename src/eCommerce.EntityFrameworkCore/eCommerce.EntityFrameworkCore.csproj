@@ -10,6 +10,7 @@
     <ProjectReference Include="..\..\modules\ChannelHub\eCommerce.ChannelHub.EntityFrameworkCore\eCommerce.ChannelHub.EntityFrameworkCore.csproj" />
     <ProjectReference Include="..\..\modules\PaymentHub\eCommerce.PaymentHub.EntityFrameworkCore\eCommerce.PaymentHub.EntityFrameworkCore.csproj" />
     <ProjectReference Include="..\..\modules\Tax\eCommerce.Tax.EntityFrameworkCore\eCommerce.Tax.EntityFrameworkCore.csproj" />
+    <ProjectReference Include="..\..\modules\Messaging\eCommerce.Messaging.EntityFrameworkCore\eCommerce.Messaging.EntityFrameworkCore.csproj" />
   </ItemGroup>
 
   <ItemGroup>

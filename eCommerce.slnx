@@ -8,6 +8,7 @@
   </Folder>
   <Folder Name="/modules/Messaging/">
     <Project Path="modules/Messaging/eCommerce.Messaging.Domain/eCommerce.Messaging.Domain.csproj" />
+    <Project Path="modules/Messaging/eCommerce.Messaging.EntityFrameworkCore/eCommerce.Messaging.EntityFrameworkCore.csproj" />
   </Folder>
   <Folder Name="/modules/PaymentHub/">
     <Project Path="modules/PaymentHub/eCommerce.PaymentHub.Application/eCommerce.PaymentHub.Application.csproj" />

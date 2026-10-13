@@ -1029,3 +1029,42 @@ VALUES ('20261013024226_Fix_NullableTenantId_UniqueIndexes', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE TABLE "MsgIdempotencyRecords" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "Scope" character varying(64) NOT NULL,
+    "KeyValue" character varying(256) NOT NULL,
+    "PayloadHash" character varying(64) NOT NULL,
+    "PayloadHashVersion" integer NOT NULL,
+    "State" integer NOT NULL,
+    "Result" text,
+    "ErrorCode" character varying(64),
+    "ErrorMessage" character varying(1024),
+    "Attempts" integer NOT NULL,
+    "CompletedAtUtc" timestamp with time zone,
+    "ExpiresAtUtc" timestamp with time zone NOT NULL,
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_MsgIdempotencyRecords" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_MsgIdempotencyRecords_Attempts" CHECK ("Attempts" >= 1)
+);
+
+CREATE INDEX "IX_MsgIdempotencyRecords_ExpiresAtUtc" ON "MsgIdempotencyRecords" ("ExpiresAtUtc");
+
+CREATE UNIQUE INDEX "IX_MsgIdempotencyRecords_TenantId_Scope_KeyValue"
+    ON "MsgIdempotencyRecords" ("TenantId", "Scope", "KeyValue")
+    NULLS NOT DISTINCT;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261013092108_Add_Messaging_Idempotency', '10.0.11');
+
+COMMIT;
+

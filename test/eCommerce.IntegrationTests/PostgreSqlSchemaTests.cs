@@ -141,11 +141,11 @@ public class PostgreSqlSchemaTests
     }
 
     [Fact]
-    public async Task F1_du_11_index_deu_dung_NULLS_NOT_DISTINCT()
+    public async Task F1_du_12_index_deu_dung_NULLS_NOT_DISTINCT()
     {
         // 🔒 BẤT BIẾN (ghi ở XC-004 Q6): mọi unique index trên entity IMultiTenant PHẢI có
         // `NULLS NOT DISTINCT`. Ai tạo migration mới mà quên ⇒ test này đỏ.
-        Assert.Equal(11L, await DemAsync(
+        Assert.Equal(12L, await DemAsync(
             "select count(*) from pg_indexes where schemaname = 'public' and indexdef like '%NULLS NOT DISTINCT%'"));
 
         // Kiểm tra ĐÍCH DANH để thông báo lỗi có ý nghĩa (tên index dài có thể bị PostgreSQL cắt ⇒ so theo tiền tố).
@@ -161,7 +161,9 @@ public class PostgreSqlSchemaTests
             "IX_PayTransactions_TenantId_ProviderCode_IdempotencyKey",
             "IX_PayTransactions_TenantId_ProviderCode_MerchantReference",
             "IX_ChnChannelShops_TenantId_ChannelCode_ExternalShopId",
-            "IX_ChnChannelListings_TenantId_ChannelShopId_ProductVariantId"
+            "IX_ChnChannelListings_TenantId_ChannelShopId_ProductVariantId",
+            // XC-002 — hàng rào CUỐI chống trùng ở biên vào (thêm 13/10/2026).
+            "IX_MsgIdempotencyRecords_TenantId_Scope_KeyValue"
         ];
 
         foreach (var ten in phaiCo)
@@ -171,6 +173,86 @@ public class PostgreSqlSchemaTests
 
             Assert.True(co == 1L, $"Index '{ten}' KHÔNG có NULLS NOT DISTINCT ⇒ lỗi C4/F1 đã quay lại.");
         }
+    }
+
+    // ── 2b. XC-002 — chống trùng ở BIÊN VÀO (hàng rào cuối) ────────────────
+
+    /// <summary>Chèn một bản ghi idempotency. Cặp (TenantId, Scope, KeyValue) là ràng buộc unique.</summary>
+    private async Task ChenIdempotencyAsync(Guid? tenantId, string scope, string keyValue, string stamp)
+    {
+        await using var cmd = _fixture.DataSource.CreateCommand("""
+            insert into "MsgIdempotencyRecords"
+                ("Id","TenantId","Scope","KeyValue","PayloadHash","PayloadHashVersion","State","Attempts",
+                 "ExpiresAtUtc","ExtraProperties","ConcurrencyStamp","CreationTime","IsDeleted")
+            values ($1, $2, $3, $4, 'hash-abc', 1, 0, 1,
+                    now() + interval '7 days', '{}', $5, now(), false)
+            """);
+
+        cmd.Parameters.AddWithValue(Guid.NewGuid());
+        cmd.Parameters.AddWithValue((object?)tenantId ?? DBNull.Value);
+        cmd.Parameters.AddWithValue(scope);
+        cmd.Parameters.AddWithValue(keyValue);
+        cmd.Parameters.AddWithValue(stamp);
+
+        await cmd.ExecuteNonQueryAsync();
+    }
+
+    [Fact]
+    public async Task XC002_chan_trung_hai_ban_ghi_cung_khoa_khi_TenantId_NULL()
+    {
+        // 🚨 Nếu index thiếu `NULLS NOT DISTINCT` thì dòng thứ hai LỌT ⇒ webhook gửi lại sẽ được
+        // xử lý hai lần (trừ kho hai lần). Đây là hàng rào CUỐI khi Redis/khoá phân tán hỏng.
+        await ChenIdempotencyAsync(null, "vnpay:ipn", "GD-DUP", "idem-a");
+
+        var ex = await Assert.ThrowsAsync<PostgresException>(
+            () => ChenIdempotencyAsync(null, "vnpay:ipn", "GD-DUP", "idem-b"));
+
+        Assert.Equal(PostgresErrorCodes.UniqueViolation, ex.SqlState);   // 23505
+    }
+
+    [Fact]
+    public async Task XC002_cung_gia_tri_nhung_KHAC_scope_thi_duoc_phep()
+    {
+        // "12345" của Shopee KHÁC "12345" của VNPay — gộp lại sẽ là lỗi im lặng.
+        await ChenIdempotencyAsync(null, "shopee:order", "12345", "idem-c");
+        await ChenIdempotencyAsync(null, "vnpay:ipn", "12345", "idem-d");
+
+        var soDong = await DemAsync(
+            "select count(*) from \"MsgIdempotencyRecords\" where \"KeyValue\" = '12345'");
+
+        Assert.Equal(2L, soDong);
+    }
+
+    [Fact]
+    public async Task XC002_chan_trung_khi_TenantId_CO_gia_tri()
+    {
+        var tenant = Guid.NewGuid();
+
+        await ChenIdempotencyAsync(tenant, "ghtk:webhook", "VD-1", "idem-e");
+
+        var ex = await Assert.ThrowsAsync<PostgresException>(
+            () => ChenIdempotencyAsync(tenant, "ghtk:webhook", "VD-1", "idem-f"));
+
+        Assert.Equal(PostgresErrorCodes.UniqueViolation, ex.SqlState);
+    }
+
+    [Fact]
+    public async Task XC002_CHECK_constraint_Attempts_phai_lon_hon_0()
+    {
+        // Hàng rào DB cho bất biến "đã nhận thì phải có ít nhất 1 lần thử".
+        var ex = await Assert.ThrowsAsync<PostgresException>(async () =>
+        {
+            await using var cmd = _fixture.DataSource.CreateCommand("""
+                insert into "MsgIdempotencyRecords"
+                    ("Id","TenantId","Scope","KeyValue","PayloadHash","PayloadHashVersion","State","Attempts",
+                     "ExpiresAtUtc","ExtraProperties","ConcurrencyStamp","CreationTime","IsDeleted")
+                values (gen_random_uuid(), null, 'x:y', 'k', 'h', 1, 0, 0,
+                        now(), '{}', 's', now(), false)
+                """);
+            await cmd.ExecuteNonQueryAsync();
+        });
+
+        Assert.Equal(PostgresErrorCodes.CheckViolation, ex.SqlState);   // 23514
     }
 
     // ── 3. Ràng buộc EXCLUDE — chống chồng khung hiệu lực ──────────────────

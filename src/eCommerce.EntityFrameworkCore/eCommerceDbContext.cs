@@ -63,6 +63,11 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
     public DbSet<TaxRateSchedule> TaxRateSchedules { get; set; } = default!;
     public DbSet<TaxClassification> TaxClassifications { get; set; } = default!;
 
+    // ── Messaging (XC-002): bản ghi chống trùng ở biên vào ──────────────────
+    // ⚠️ BẮT BUỘC có DbSet: thiếu DbSet thì `IRepository<IdempotencyRecord, Guid>` KHÔNG được
+    // đăng ký và lỗi chỉ lộ ra lúc chạy ("has not been registered") — bài học Phase 0.
+    public DbSet<Messaging.Idempotency.IdempotencyRecord> IdempotencyRecords { get; set; } = default!;
+
     public eCommerceDbContext(DbContextOptions<eCommerceDbContext> options)
         : base(options)
     {
@@ -76,6 +81,8 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
         builder.ConfigureChannelHub();
         builder.ConfigurePaymentHub();
         builder.ConfigureTax();
+        // Gọi qua tên đầy đủ để KHÔNG phải thêm using vào file này.
+        Messaging.EntityFrameworkCore.MessagingDbContextModelCreatingExtensions.ConfigureMessaging(builder);
 
         ConfigureCommerce(builder);
 
