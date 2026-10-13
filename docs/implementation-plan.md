@@ -483,8 +483,8 @@ Một giai đoạn **chỉ được bắt đầu code** khi:
 | Hướng dẫn + bảng sửa đổi so với tài liệu tham khảo | ✅ đã viết |
 | Danh sách 52 tài liệu | ✅ đã liệt kê (A.3) |
 | Script kiểm tra Mermaid | ✅ `npm --prefix tools run check:mermaid` — 7/7 khối PASS |
-| **Tài liệu thực tế** | 🟡 **2/52** — `XC-001` + `XC-006` đã viết (**Draft**, chờ review) |
-| `XC-002`…`XC-005` | ⬜ chưa viết — sau khi `XC-001` được duyệt |
+| **Tài liệu thực tế** | 🟡 **3/52** — `XC-001` + `XC-002` + `XC-006` (**Draft**, chờ review) |
+| `XC-003`…`XC-005` | ⬜ chưa viết |
 
 ### A.8 Tài liệu đã viết
 
