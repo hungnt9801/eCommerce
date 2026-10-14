@@ -12,6 +12,7 @@
     <Project Path="modules/ChannelHub/eCommerce.ChannelHub.EntityFrameworkCore/eCommerce.ChannelHub.EntityFrameworkCore.csproj" />
   </Folder>
   <Folder Name="/modules/EInvoice/">
+    <Project Path="modules/EInvoice/eCommerce.EInvoice.Application/eCommerce.EInvoice.Application.csproj" />
     <Project Path="modules/EInvoice/eCommerce.EInvoice.Domain/eCommerce.EInvoice.Domain.csproj" />
     <Project Path="modules/EInvoice/eCommerce.EInvoice.EntityFrameworkCore/eCommerce.EInvoice.EntityFrameworkCore.csproj" />
   </Folder>
@@ -25,6 +26,7 @@
     <Project Path="modules/PaymentHub/eCommerce.PaymentHub.EntityFrameworkCore/eCommerce.PaymentHub.EntityFrameworkCore.csproj" />
   </Folder>
   <Folder Name="/modules/Signing/">
+    <Project Path="modules/Signing/eCommerce.Signing.Application/eCommerce.Signing.Application.csproj" />
     <Project Path="modules/Signing/eCommerce.Signing.Domain/eCommerce.Signing.Domain.csproj" />
     <Project Path="modules/Signing/eCommerce.Signing.EntityFrameworkCore/eCommerce.Signing.EntityFrameworkCore.csproj" />
   </Folder>
