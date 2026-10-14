@@ -27,15 +27,13 @@ public class EInvoiceResubmissionWorker : AsyncPeriodicBackgroundWorkerBase
 
     public EInvoiceResubmissionWorker(
         AbpAsyncTimer timer,
-        IServiceScopeFactory serviceScopeFactory,
-        ILogger<EInvoiceResubmissionWorker> logger)
+        IServiceScopeFactory serviceScopeFactory)
         : base(timer, serviceScopeFactory)
     {
-        Logger = logger;
+        // ⚠️ KHÔNG khai lại thuộc tính `Logger`: lớp cơ sở `BackgroundWorkerBase` **ĐÃ có** `Logger`
+        // ⇒ khai lại gây CS0108 "hides inherited member" (đã sửa 14/10/2026). Dùng luôn của lớp cơ sở.
         Timer.Period = NhipMacDinhGiay * 1000;
     }
-
-    protected ILogger<EInvoiceResubmissionWorker> Logger { get; }
 
     protected override async Task DoWorkAsync(PeriodicBackgroundWorkerContext workerContext)
     {

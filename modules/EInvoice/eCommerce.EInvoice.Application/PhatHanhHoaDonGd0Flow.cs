@@ -57,7 +57,7 @@ public static class PhatHanhHoaDonGd0Planner
         if (!kq.HopLe)
         {
             throw new BusinessException(kq.ErrorCode ?? AddressErrorCodes.KhongTimThayDonVi)
-                .WithData("thongDiep", kq.ThongDiep)
+                .WithData("thongDiep", kq.ThongDiep ?? string.Empty)
                 .WithData("tinhCode", dauVao.TinhCode)
                 .WithData("xaCode", dauVao.XaCode);
         }

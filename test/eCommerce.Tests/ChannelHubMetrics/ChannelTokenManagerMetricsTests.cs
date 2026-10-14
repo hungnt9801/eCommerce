@@ -131,7 +131,7 @@ public class ChannelTokenManagerMetricsTests
 
         await manager.GetValidContextAsync(ShopCanRefresh());
 
-        var nhan = Assert.Single(ghi.Ghi.Where(x => x.Ten == eCommerceMetricNames.LockTimeoutTotal)).Nhan;
+        var nhan = Assert.Single(ghi.Ghi, x => x.Ten == eCommerceMetricNames.LockTimeoutTotal).Nhan;
         var giaTriNhan = string.Join("|", nhan.Values.Select(v => v?.ToString()));
 
         // 🚨 `XC-005` BR-009: nhãn cardinality cao bị CẤM. `shopId`/`lockName` KHÔNG được có trong nhãn.
