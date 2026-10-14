@@ -99,7 +99,7 @@
          trong `test/eCommerce.Tests/eCommerce.Tests.csproj`. Đây là thư viện cho **XMLDSig** (SIGN-001/EINV-001)
          ⇒ lỗ hổng ở đây ảnh hưởng trực tiếp đường ký số.
          📌 Nếu sau khi nâng bản mà build VẪN báo lỗ hổng ở bản CŨ: đó là **cache audit của NuGet** —
-         cần `dotnet nuget locals http-cache --clear` + xoá `obj/` rồi restore lại.
+         cần xoá HTTP cache của NuGet (`dotnet nuget locals http-cache` + cờ xoá) + xoá `obj/` rồi restore lại.
       Cần CentralPackageTransitivePinningEnabled ở trên.
     -->
     <PackageVersion Include="System.Security.Cryptography.Xml" Version="10.0.13" />
