@@ -870,3 +870,59 @@ Lý do: người xác minh trước đó đã xác minh trên **thông tin CŨ**
 | 2 | **Job đồng bộ danh mục** từ API từng hãng — 🚧 **chưa có endpoint/tài liệu thật của GHN & GHTK** ⇒ phần này chỉ có thể làm tới khi có thông số |
 | 3 | **API xác minh ánh xạ** (màn hình cho vận hành) |
 | 4 | **Cảnh báo khi có sai lệch** — nối vào `NOT-*` (GĐ3) |
+
+---
+
+## 18. TRẠNG THÁI TRIỂN KHAI (14/10/2026) — **việc C: worker + adapter CẮM ĐƯỢC**
+
+### 🚨 MÂU THUẪN THIẾT KẾ ĐÃ PHÁT HIỆN VÀ GIẢI QUYẾT
+
+Adapter của hãng **CHỈ** cho biết **mã + tên phía hãng** — nó **KHÔNG** cho biết mã đó ứng với **đơn vị
+hành chính nào của ta**. Mà `CarrierAddressMapping` **BẮT BUỘC** có đơn vị đích (`OurAdministrativeUnitId`
+không được rỗng).
+
+⇒ **Hệ thống KHÔNG THỂ tự tạo ánh xạ mới.** Muốn tạo thì phải **khớp theo tên** — mà khớp theo tên chỉ là
+**gợi ý** (dấu tiếng Việt, "Phường" vs "Xã", tỉnh sáp nhập) ⇒ **giao hàng sai địa chỉ, không thu hồi được**.
+
+**Thiết kế đúng theo đó — worker chỉ làm 3 việc KHÔNG cần đoán:**
+| Việc | Hành động |
+|---|---|
+| Hãng **đổi tên** | Cập nhật tên (đối tượng đích đã có) — entity **tự hạ mức tin cậy** xuống `NghiNgo` vì cơ sở xác minh cũ đã đổi |
+| Mã **biến mất** | Đánh dấu `NghiNgo` (**KHÔNG xoá** — vận đơn cũ còn tham chiếu) ⇒ mã đó **không dùng được** cho vận đơn mới |
+| Mã **MỚI** | **Chỉ BÁO** là cần người ánh xạ (**0 bản ghi được tạo**) — có test khẳng định |
+
+### 🚧 TRẠNG THÁI THẬT VỀ ADAPTER (trung thực)
+
+`IKhungDiaChiHangSource` là **interface cắm được**; **CHƯA có hiện thực nào** cho GHN/GHTK vì **chưa có
+tài liệu API**. Khi hãng được cấu hình mà **không có adapter**, job ghi log **Warning** nêu **đúng tên hãng**
+và nói rõ *"cần tài liệu API để viết một lớp mỏng"* — **KHÔNG giả vờ đồng bộ thành công**.
+
+**ĐÃ KIỂM CHỨNG Ở RUNTIME** (bật `Address:CarrierSync:Enabled=true`, `Carriers=GHN,GHTK`):
+```
+Started background worker: eCommerce.Address.CarrierAddressSyncWorker
+CHƯA CÓ ADAPTER cho hãng GHN  ⇒ bỏ qua. Cần tài liệu API danh mục địa chỉ của hãng…
+CHƯA CÓ ADAPTER cho hãng GHTK ⇒ bỏ qua. Cần tài liệu API danh mục địa chỉ của hãng…
+D?ng b? danh m?c DVHC dang T?T (Address:Sync:Enabled = false)     ← job ĐVHC KHÔNG bị bật nhầm
+```
+DB: `AddrCarrierMappings` = **0** bản ghi ⇒ không đoán, không tạo rác.
+
+### 🔒 BA HÀNG RÀO (đã có test)
+| # | Hàng rào | Mã lỗi |
+|---|---|---|
+| 1 | Danh mục hãng **RỖNG** — hoặc **không khớp mã hãng** (không được đồng bộ danh mục hãng A lên ánh xạ hãng B) | `eCommerce:Address:0506` |
+| 2 | Danh mục hãng **quá ít** đơn vị | `0507` |
+| 3 | Số ánh xạ bị **đánh dấu nghi ngờ vượt 20%** | `0508` |
+
+*Lý do hàng rào 3:* đánh dấu nghi ngờ làm ánh xạ **không dùng được** (`0502`) ⇒ nếu áp dụng danh mục
+khuyết thì **mọi vận đơn mới fail-closed** ⇒ **sập luồng giao hàng** chỉ vì một lần gọi API hỏng.
+
+### 📌 CẤU HÌNH
+| Khoá | Mặc định | Ý nghĩa |
+|---|---|---|
+| `Address:CarrierSync:Enabled` | **`false`** | Bật/tắt job (mặc định TẮT: job gọi API ngoài + sửa dữ liệu tạo vận đơn) |
+| `Address:CarrierSync:PeriodSeconds` | `86400` | Nhịp |
+| `Address:CarrierSync:Carriers` | rỗng | Danh sách mã hãng, ví dụ `GHN,GHTK` |
+
+### ⚠️ CÒN LẠI ĐÚNG MỘT VIỆC — và nó KHÔNG phải việc code thuần
+Viết `IKhungDiaChiHangSource` cho **GHN** và **GHTK** khi có **tài liệu API danh mục địa chỉ**.
+Toàn bộ luật (kế hoạch · 3 hàng rào · áp dụng · 14 test) **đã xong** ⇒ phần còn lại là **lớp mỏng đọc JSON**.

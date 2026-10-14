@@ -25,6 +25,20 @@ public static class CarrierAddressErrorCodes
 
     /// <summary>Thiếu thông tin bắt buộc (mã hãng, mã địa chỉ hãng, đơn vị đích…).</summary>
     public const string ThieuThongTinBatBuoc = "eCommerce:Address:0505";
+    // ── Đồng bộ danh mục mã hãng (ADDR-002) — dải 05xx vì cùng miền nghiệp vụ ──
+
+    /// <summary>Danh mục hãng RỖNG (hoặc không khớp mã hãng) — từ chối.</summary>
+    public const string DanhMucHangRong = "eCommerce:Address:0506";
+
+    /// <summary>Danh mục hãng quá ÍT đơn vị — nghi hãng trả về một phần.</summary>
+    public const string DanhMucHangQuaIt = "eCommerce:Address:0507";
+
+    /// <summary>
+    /// Số ánh xạ bị ĐÁNH DẤU NGHI NGỜ vượt ngưỡng — từ chối.
+    /// Đánh dấu nghi ngờ làm ánh xạ **không dùng được** ⇒ nếu áp dụng hàng loạt thì **mọi vận đơn mới
+    /// fail-closed** ⇒ sập luồng giao hàng.
+    /// </summary>
+    public const string BienMatHangLoat = "eCommerce:Address:0508";
 }
 
 /// <summary>Cách một ánh xạ được tạo ra — quyết định **mức tin cậy** của nó.</summary>

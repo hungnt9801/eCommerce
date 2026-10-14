@@ -43,5 +43,6 @@ public class AddressApplicationModule : AbpModule
     public override async Task OnPostApplicationInitializationAsync(ApplicationInitializationContext context)
     {
         await context.AddBackgroundWorkerAsync<AdministrativeUnitSyncWorker>();
+        await context.AddBackgroundWorkerAsync<CarrierAddressSyncWorker>();
     }
 }
