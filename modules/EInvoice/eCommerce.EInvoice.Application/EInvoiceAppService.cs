@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Volo.Abp.Application;
+using Volo.Abp.BackgroundWorkers;
 using Volo.Abp.Application.Services;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Modularity;
@@ -43,6 +44,11 @@ public sealed record DanhDauKetQuaCqtRequest(string PhanHoiCqt);
 )]
 public class EInvoiceApplicationModule : AbpModule
 {
+    public override async Task OnApplicationInitializationAsync(Volo.Abp.ApplicationInitializationContext context)
+    {
+        // 🔒 Worker CỐ ĐỊNH (không phải dynamic) ⇒ không có nguy cơ "không bao giờ chạy" như lỗi C10.
+        await context.AddBackgroundWorkerAsync<EInvoiceResubmissionWorker>();
+    }
 }
 
 // ─────────────────────────── App service ───────────────────────────
@@ -135,7 +141,7 @@ public class EInvoiceAppService : ApplicationService
     public async Task<EInvoiceDto> GuiCqtAsync(Guid id)
     {
         var hoaDon = await _hoaDon.GetAsync(id);
-        hoaDon.GuiCQT();
+        hoaDon.GuiCQT(Clock.Now);
         await _hoaDon.UpdateAsync(hoaDon, autoSave: true);
 
         return EInvoiceDto.Tu(hoaDon);

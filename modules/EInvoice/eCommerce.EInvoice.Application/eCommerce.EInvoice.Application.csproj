@@ -11,6 +11,7 @@
 
   <ItemGroup>
     <PackageReference Include="Volo.Abp.Ddd.Application" />
+    <PackageReference Include="Volo.Abp.BackgroundWorkers" />
   </ItemGroup>
 
 </Project>

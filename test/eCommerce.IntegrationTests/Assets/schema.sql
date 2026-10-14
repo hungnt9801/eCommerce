@@ -1207,3 +1207,13 @@ VALUES ('20261014012331_Add_Signing_Tables', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+ALTER TABLE "EInvInvoices" ADD "LanGuiCuoiUtc" timestamp with time zone;
+
+ALTER TABLE "EInvInvoices" ADD "SoLanGuiCQT" integer NOT NULL DEFAULT 0;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261014031859_Add_EInvoice_CqtRetryCounters', '10.0.11');
+
+COMMIT;
+

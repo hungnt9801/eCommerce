@@ -46,6 +46,12 @@ public class EInvoice : FullAuditedAggregateRoot<Guid>, IMultiTenant
     /// <summary>Lỗi CQT trả về khi bị từ chối (chuỗi <c>ERR:</c> — xem `EINV-002`).</summary>
     public string? LoiCQT { get; protected set; }
 
+    /// <summary>Số lần đã gửi cơ quan thuế — đầu vào cho <see cref="EInvoiceResubmissionPolicy"/> (ngưỡng 5).</summary>
+    public int SoLanGuiCQT { get; protected set; }
+
+    /// <summary>Thời điểm gửi gần nhất — để chính sách giãn cách tối thiểu giữa hai lần gửi.</summary>
+    public DateTime? LanGuiCuoiUtc { get; protected set; }
+
     /// <summary>Ảnh chụp XML đã ký (để đối chiếu về sau và không phụ thuộc NCC còn giữ hay không).</summary>
     public string? XmlDaKy { get; protected set; }
 
@@ -192,7 +198,11 @@ public class EInvoice : FullAuditedAggregateRoot<Guid>, IMultiTenant
     // ── Trục 2: gửi cơ quan thuế (ĐỘC LẬP với trục 1) ──────────────────────
 
     /// <summary>Gửi hoá đơn sang cơ quan thuế. Chỉ khi **đã phát hành**.</summary>
-    public void GuiCQT()
+    /// <param name="thoiDiemGuiUtc">
+    /// Thời điểm gửi (UTC) — **truyền vào** thay vì đọc đồng hồ hệ thống để hàm **test được** và để
+    /// chính sách giãn cách (`EInvoiceResubmissionPolicy`) có dữ liệu thật.
+    /// </param>
+    public void GuiCQT(DateTime thoiDiemGuiUtc)
     {
         if (Status != EInvoiceStatus.DaPhatHanh)
         {
@@ -209,6 +219,10 @@ public class EInvoice : FullAuditedAggregateRoot<Guid>, IMultiTenant
 
         TaxAuthorityStatus = TaxAuthorityStatus.DaGui;
         LoiCQT = null;
+
+        // Bộ đếm phục vụ chính sách gửi lại: đếm MỌI lần gửi (kể cả lần sau khi bị từ chối).
+        SoLanGuiCQT++;
+        LanGuiCuoiUtc = thoiDiemGuiUtc;
     }
 
     /// <summary>CQT đã nhận — lưu mã cấp để tra cứu/đối chiếu.</summary>

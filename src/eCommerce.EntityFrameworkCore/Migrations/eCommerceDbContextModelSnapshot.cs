@@ -2417,6 +2417,9 @@ namespace eCommerce.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
+                    b.Property<DateTime?>("LanGuiCuoiUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime?>("LastModificationTime")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("LastModificationTime");
@@ -2444,6 +2447,9 @@ namespace eCommerce.Migrations
                         .IsRequired()
                         .HasMaxLength(8)
                         .HasColumnType("character varying(8)");
+
+                    b.Property<int>("SoLanGuiCQT")
+                        .HasColumnType("integer");
 
                     b.Property<int>("Status")
                         .HasColumnType("integer");

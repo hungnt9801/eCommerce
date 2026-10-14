@@ -99,7 +99,7 @@ public class EInvoiceStateMachineTests
         var hd = TaoHoaDon();
         hd.Ky("<xml/>");
 
-        var ex = Assert.Throws<BusinessException>(() => hd.GuiCQT());
+        var ex = Assert.Throws<BusinessException>(() => hd.GuiCQT(new DateTime(2026, 10, 13, 8, 0, 0, DateTimeKind.Utc)));
 
         Assert.Equal(EInvoiceErrorCodes.ChuaPhatHanhKhongDuocGuiCQT, ex.Code);
     }
@@ -118,7 +118,7 @@ public class EInvoiceStateMachineTests
     {
         var hd = HoaDonDaPhatHanh();
 
-        hd.GuiCQT();
+        hd.GuiCQT(new DateTime(2026, 10, 13, 8, 0, 0, DateTimeKind.Utc));
         Assert.Equal(TaxAuthorityStatus.DaGui, hd.TaxAuthorityStatus);
 
         hd.NhanKetQuaCQT("MCQT-123");
@@ -132,7 +132,7 @@ public class EInvoiceStateMachineTests
         // 🚩 Điểm quan trọng nhất của thiết kế 2 trục: hoá đơn ĐÃ phát hành cho khách,
         // nhưng CQT từ chối — CẢ HAI sự thật đều phải giữ.
         var hd = HoaDonDaPhatHanh();
-        hd.GuiCQT();
+        hd.GuiCQT(new DateTime(2026, 10, 13, 8, 0, 0, DateTimeKind.Utc));
 
         hd.BiTuChoiCQT("ERR:5");
 
@@ -145,7 +145,7 @@ public class EInvoiceStateMachineTests
     public void Gui_ket_qua_CQT_rong_thi_NEM_LOI()
     {
         var hd = HoaDonDaPhatHanh();
-        hd.GuiCQT();
+        hd.GuiCQT(new DateTime(2026, 10, 13, 8, 0, 0, DateTimeKind.Utc));
 
         Assert.Equal(EInvoiceErrorCodes.ThieuThongTinBatBuoc,
             Assert.Throws<BusinessException>(() => hd.NhanKetQuaCQT("  ")).Code);
@@ -160,13 +160,13 @@ public class EInvoiceStateMachineTests
         Assert.Equal(EInvoiceErrorCodes.ChuyenTrangThaiKhongHopLe,
             Assert.Throws<BusinessException>(() => hd.ChoPhepGuiLaiCQT()).Code);
 
-        hd.GuiCQT();
+        hd.GuiCQT(new DateTime(2026, 10, 13, 8, 0, 0, DateTimeKind.Utc));
         hd.BiTuChoiCQT("ERR:1");
         hd.ChoPhepGuiLaiCQT();
 
         Assert.Equal(TaxAuthorityStatus.ChuaGui, hd.TaxAuthorityStatus);
         // Lỗi cũ được xoá khi gửi lại (không giữ lỗi đã xử lý).
-        hd.GuiCQT();
+        hd.GuiCQT(new DateTime(2026, 10, 13, 8, 0, 0, DateTimeKind.Utc));
         Assert.Null(hd.LoiCQT);
     }
 
@@ -262,9 +262,9 @@ public class EInvoiceStateMachineTests
     public void Gui_CQT_hai_lan_lien_tiep_thi_NEM_LOI()
     {
         var hd = HoaDonDaPhatHanh();
-        hd.GuiCQT();
+        hd.GuiCQT(new DateTime(2026, 10, 13, 8, 0, 0, DateTimeKind.Utc));
 
         Assert.Equal(EInvoiceErrorCodes.ChuyenTrangThaiKhongHopLe,
-            Assert.Throws<BusinessException>(() => hd.GuiCQT()).Code);
+            Assert.Throws<BusinessException>(() => hd.GuiCQT(new DateTime(2026, 10, 13, 8, 0, 0, DateTimeKind.Utc))).Code);
     }
 }
