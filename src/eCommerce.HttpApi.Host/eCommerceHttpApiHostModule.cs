@@ -49,7 +49,10 @@ namespace eCommerce;
     typeof(eCommerceApplicationModule),
     typeof(ChannelHub.ChannelHubApplicationModule),
     typeof(PaymentHub.PaymentHubApplicationModule),
-    typeof(Tax.EntityFrameworkCore.TaxEntityFrameworkCoreModule)
+    typeof(Tax.EntityFrameworkCore.TaxEntityFrameworkCoreModule),
+    // 🚨 BẮT BUỘC: thiếu dòng này thì assembly Address.Application KHÔNG nằm trong đồ thị module
+    // ⇒ ABP không nạp, không quét app service, không tạo endpoint ⇒ API trả 404 body rỗng (bài học C8/C16).
+    typeof(Address.Application.AddressApplicationModule)
 )]
 public class eCommerceHttpApiHostModule : AbpModule
 {
@@ -100,6 +103,20 @@ public class eCommerceHttpApiHostModule : AbpModule
         context.Services.AddHealthChecks()
             .AddCheck<HealthChecks.DatabaseHealthCheck>("database");
 
+        // 🚨 MỤC (2) — HẠ TẦNG HTTP CHO CƠ QUAN THUẾ (EINV-002 phát hiện F3: trước đây repo
+        // KHÔNG có IHttpClientFactory). `AddHttpClient` nằm trong shared framework của ứng dụng web
+        // ⇒ KHÔNG cần thêm gói NuGet nào.
+        //
+        // 📌 BaseUrl đọc từ cấu hình `TaxAuthority:BaseUrl`; hiện chưa có endpoint thật của CQT nên
+        // để giá trị mặc định và GHI RÕ là chưa kiểm chứng được.
+        context.Services.AddHttpClient(eCommerce.TaxAuthority.TaxAuthorityClient.TenClientHttp, http =>
+        {
+            var baseUrl = configuration["TaxAuthority:BaseUrl"];
+            http.BaseAddress = new Uri(string.IsNullOrWhiteSpace(baseUrl) ? "http://localhost:9999/" : baseUrl);
+            http.Timeout = TimeSpan.FromSeconds(30);
+        });
+
+        context.Services.AddTransient<eCommerce.TaxAuthority.TaxAuthorityClient>();
         // Connection string lấy từ appsettings.json (xem ConnectionStrings:Default).
         Configure<Volo.Abp.Data.AbpDbConnectionOptions>(options =>
         {
