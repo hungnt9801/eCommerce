@@ -550,3 +550,16 @@ thuộc input bên ngoài** (văn bản pháp luật, tài liệu đối tác, c
 **Việc làm được ngay, không chờ ai (đề xuất lượt sau):**
 **(A)** worker đồng bộ ĐVHC dùng 4 hàng rào đã có · **(B)** ràng buộc `EINV-003` một bản thay thế hiệu lực ·
 **(C)** worker đồng bộ mã hãng với adapter cắm được.
+
+---
+
+## A.11 🔑 BÀN GIAO SANG GIAI ĐOẠN 1 (14/10/2026)
+
+📄 **ĐỌC TRƯỚC KHI LÀM GÌ TIẾP: [`docs/handover-gd1.md`](handover-gd1.md)**
+
+Chứa: trạng thái hiện tại (số liệu đã kiểm chứng) · **quy trình kiểm chứng đã trả giá** (13 quy tắc, rút ra
+từ **16 lỗi im lặng** thật) · **quyết định đang mở của GĐ1** (lỗi #22 — đơn hàng mất) · 5 input bên ngoài ·
+bản đồ tài liệu · quy ước bất biến · **cách mở session mới cho đúng**.
+
+> 🚨 **Quan trọng:** session mới **không nhớ** cuộc trò chuyện trước. File bàn giao là **bộ nhớ bền vững**.
+> **Đừng dán lại lịch sử trò chuyện cũ vào session mới** — nó sẽ **cạn ngữ cảnh ngay từ đầu**.
