@@ -25,6 +25,7 @@
   </Folder>
   <Folder Name="/modules/Signing/">
     <Project Path="modules/Signing/eCommerce.Signing.Domain/eCommerce.Signing.Domain.csproj" />
+    <Project Path="modules/Signing/eCommerce.Signing.EntityFrameworkCore/eCommerce.Signing.EntityFrameworkCore.csproj" />
   </Folder>
   <Folder Name="/modules/Tax/">
     <Project Path="modules/Tax/eCommerce.Tax.Domain/eCommerce.Tax.Domain.csproj" />

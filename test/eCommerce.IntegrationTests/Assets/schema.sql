@@ -1148,3 +1148,62 @@ VALUES ('20261013094411_Add_EInvoice_Invoices', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE TABLE "SigCertificates" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "SoSerial" character varying(128) NOT NULL,
+    "ChuSoHuu" character varying(512) NOT NULL,
+    "DonViPhatHanh" character varying(256) NOT NULL,
+    "HieuLucTu" timestamp with time zone NOT NULL,
+    "HieuLucDen" timestamp with time zone NOT NULL,
+    "TrangThai" integer NOT NULL,
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_SigCertificates" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_SigCertificates_HieuLuc" CHECK ("HieuLucDen" > "HieuLucTu")
+);
+
+CREATE TABLE "SigSigningRequests" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "MaTaiLieu" character varying(128) NOT NULL,
+    "HashTaiLieu" character varying(128) NOT NULL,
+    "ThuatToanBam" character varying(32) NOT NULL,
+    "TrangThai" integer NOT NULL,
+    "ChungThuSoId" uuid,
+    "ChuKyDaKy" text,
+    "ThoiDiemKy" timestamp with time zone,
+    "NguoiKy" character varying(256),
+    "LyDoHuy" character varying(1024),
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_SigSigningRequests" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_SigSigningRequests_DaKyPhaiCoDuBangChung" CHECK ("TrangThai" <> 1 OR ("ChuKyDaKy" IS NOT NULL AND "ThoiDiemKy" IS NOT NULL AND "NguoiKy" IS NOT NULL AND "ChungThuSoId" IS NOT NULL))
+);
+
+CREATE UNIQUE INDEX "IX_SigCertificates_TenantId_SoSerial" ON "SigCertificates" ("TenantId", "SoSerial") NULLS NOT DISTINCT;
+
+CREATE UNIQUE INDEX "IX_SigSigningRequests_TenantId_MaTaiLieu" ON "SigSigningRequests" ("TenantId", "MaTaiLieu") NULLS NOT DISTINCT;
+
+CREATE INDEX "IX_SigSigningRequests_TrangThai" ON "SigSigningRequests" ("TrangThai");
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261014012331_Add_Signing_Tables', '10.0.11');
+
+COMMIT;
+

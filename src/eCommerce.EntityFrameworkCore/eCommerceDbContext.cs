@@ -74,6 +74,10 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
     // ── EInvoice (EINV-001): hoá đơn điện tử ──
     public DbSet<EInvoice.EInvoice> Invoices { get; set; } = default!;
 
+    // ── Signing (SIGN-001): yêu cầu ký 2 bước + chứng thư số ──
+    public DbSet<Signing.SigningRequest> SigningRequests { get; set; } = default!;
+    public DbSet<Signing.SigningCertificate> SigningCertificates { get; set; } = default!;
+
     public eCommerceDbContext(DbContextOptions<eCommerceDbContext> options)
         : base(options)
     {
@@ -91,6 +95,7 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
         Messaging.EntityFrameworkCore.MessagingDbContextModelCreatingExtensions.ConfigureMessaging(builder);
         Address.EntityFrameworkCore.AddressDbContextModelCreatingExtensions.ConfigureAddress(builder);
         EInvoice.EntityFrameworkCore.EInvoiceDbContextModelCreatingExtensions.ConfigureEInvoice(builder);
+        Signing.EntityFrameworkCore.SigningDbContextModelCreatingExtensions.ConfigureSigning(builder);
 
         ConfigureCommerce(builder);
 

@@ -916,3 +916,32 @@ Test dựng đúng ca này: chứng thư **còn hạn khi tạo yêu cầu** nh�
 | 3 | **Lưu tệp chứng thư / khoá công khai** | Cần `IBlobContainer` (chưa có hạ tầng lưu tệp) + bảo vệ khoá riêng |
 | 4 | **OTP/PIN cho USB token** | Ngoài phạm vi phần mềm (do driver token) |
 | 5 | **Job nhắc yêu cầu ký quá hạn** | Chưa làm — phụ thuộc `NOT-*` |
+
+---
+
+## 19. TRẠNG THÁI TRIỂN KHAI (14/10/2026) — **bảng DB đã xong**
+
+Module **`eCommerce.Signing.EntityFrameworkCore`**: bảng `SigSigningRequests` + `SigCertificates` trên
+DbContext hợp nhất, **đã chứng minh trên PostgreSQL thật**:
+
+| Kiểm chứng trên DB thật | Kết quả |
+|---|---|
+| Số index `NULLS NOT DISTINCT` toàn hệ thống | ✅ **16** (11 → 12 → 13 → 14 → 16) |
+| **UNIQUE `(TenantId, MaTaiLieu)`** cho yêu cầu ký | ✅ mỗi tài liệu chỉ **MỘT** yêu cầu ký — tránh hai luồng cùng yêu cầu ký một hoá đơn |
+| **UNIQUE `(TenantId, SoSerial)`** cho chứng thư | ✅ serial do CA cấp là duy nhất |
+| **CHECK `CK_SigSigningRequests_DaKyPhaiCoDuBangChung`** | ✅ **CHẶN THẬT**: đặt `TrangThai = DaKy` mà thiếu `ChuKyDaKy`/`ThoiDiemKy`/`NguoiKy`/`ChungThuSoId` ⇒ `violates check constraint` |
+| Đối chứng: `ChoKy` không cần bằng chứng | ✅ được phép |
+| **CHECK `CK_SigCertificates_HieuLuc`** | ✅ `HieuLucDen > HieuLucTu` |
+
+⇒ Bất biến **"đã ký thì phải có đủ bằng chứng"** nay được cưỡng chế ở **cả hai tầng** (domain + DB).
+Không thể "đánh dấu đã ký" mà không có chữ ký, người ký, thời điểm ký và chứng thư.
+
+**Kết quả:** unit **220/220** · integration **20/20** (index bất biến nâng 14 → 16) · build **0 lỗi / 0 cảnh báo**.
+
+### ⚠️ CÒN LẠI của `SIGN-001`
+| # | Việc |
+|---|---|
+| 1 | **Xác thực chữ ký bằng khoá công khai** của chứng thư — 🚧 đúng **Q6** (bước 2 là tệp hash đã ký hay XML đã ký); cần **chứng thư thật** |
+| 2 | **Lưu tệp chứng thư** — cần `IBlobContainer` (chưa có hạ tầng lưu tệp trong repo) |
+| 3 | **Job nhắc yêu cầu ký quá hạn** — phụ thuộc `NOT-*` |
+| 4 | **Khoá ngoại `EInvoice` → `SigningRequest`** để biết hoá đơn nào đang chờ ký |

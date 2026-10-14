@@ -836,3 +836,32 @@ public class EInvoiceResponseParserTests
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.1 | 14/10/2026 | *(điền)* | Bản nháp đầu — lập **bảng đăng ký định dạng phản hồi (§5.3)**, ghi rõ **mức độ xác minh** từng dòng; chốt **D3 (`HTTP 200` không phải thành công)** và **D9 (cấm retry mù sau timeout)**; ghi **8 phát hiện F1–F8** với đường dẫn file thật; mở **9 câu hỏi**, trong đó **Q5 (thứ tự ký ↔ mã cơ quan thuế)** có rủi ro thiết kế cao nhất |
+
+
+---
+
+## 18. TRẠNG THÁI TRIỂN KHAI (14/10/2026) — **phần PHÂN TÍCH PHẢN HỒI đã xong**
+
+`EInvoiceResponseParser` (trong `modules/EInvoice/eCommerce.EInvoice.Domain/`) đã hiện thực quy ước
+`OK:` / `ERR:` với nguyên tắc **FAIL-CLOSED**:
+
+| Phản hồi | Kết quả | Ghi chú |
+|---|---|---|
+| `OK:<mã>` (mọi chữ hoa/thường, có khoảng trắng) | ✅ thành công + `MaCQT` | ⚠️ `OK:` **thiếu mã** ⇒ **NÉM LỖI** (`0302`): không có mã thì **không thể đối chiếu về sau** |
+| `ERR:<mã>` | ❌ thất bại + `MaLoi` (+ mô tả nếu có) | |
+| Rỗng / khoảng trắng | ❌ **NÉM LỖI** (`0303`) | Rỗng **không** phải thành công — không có bằng chứng CQT đã nhận |
+| **Chuỗi lạ** (`SUCCESS`, `200 OK`, XML, `Thành công`…) | ❌ **NÉM LỖI** (`0301`) | 🚨 **Nhánh chống lỗi im lặng quan trọng nhất**: coi "không nhận dạng được" là thành công ⇒ hoá đơn **chưa được cấp mã** mà kế toán tưởng đã xong |
+
+**Kết quả:** unit **220/220** (13 test cho parser) · build **0 lỗi / 0 cảnh báo**.
+
+> 🐛 **Kỳ vọng SAI của test (không phải lỗi code):** tôi gộp `"OK"` (thiếu dấu `:`) chung với `"OK:"` ⇒ test đỏ.
+> Hành vi của code là **đúng**: `"OK"` là **định dạng lạ** nên rơi vào nhánh "không nhận dạng được" — vẫn
+> **fail-closed**, chỉ khác mã lỗi. Đã sửa **kỳ vọng của test** và ghi lại lý do.
+
+### ⚠️ CÒN LẠI của `EINV-002`
+| # | Việc | Ghi chú |
+|---|---|---|
+| 1 | **`IHttpClientFactory` chưa có trong repo** (phát hiện F3, xác nhận: `grep IHttpClientFactory` = 0) | Cần thêm gói `Microsoft.Extensions.Http` + đăng ký client cho CQT (timeout, retry, certificate) |
+| 2 | **Gửi SOAP/XML thật tới CQT** | Cần **endpoint + chứng thư sandbox** từ CQT/NCC ⇒ **chưa kiểm chứng được** |
+| 3 | **Đối chiếu danh sách mã lỗi CQT** | `LaLoiTamThoi` hiện là **đề xuất** (chỉ `5`/`TIMEOUT`) — phải đối chiếu tài liệu thật |
+| 4 | **Job gửi lại hoá đơn `BiTuChoi`** | Dùng `IdempotencyGuard` + khoá phân tán đã có |

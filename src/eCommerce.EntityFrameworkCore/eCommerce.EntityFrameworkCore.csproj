@@ -13,6 +13,7 @@
     <ProjectReference Include="..\..\modules\Messaging\eCommerce.Messaging.EntityFrameworkCore\eCommerce.Messaging.EntityFrameworkCore.csproj" />
     <ProjectReference Include="..\..\modules\Address\eCommerce.Address.EntityFrameworkCore\eCommerce.Address.EntityFrameworkCore.csproj" />
     <ProjectReference Include="..\..\modules\EInvoice\eCommerce.EInvoice.EntityFrameworkCore\eCommerce.EInvoice.EntityFrameworkCore.csproj" />
+    <ProjectReference Include="..\..\modules\Signing\eCommerce.Signing.EntityFrameworkCore\eCommerce.Signing.EntityFrameworkCore.csproj" />
   </ItemGroup>
 
   <ItemGroup>
