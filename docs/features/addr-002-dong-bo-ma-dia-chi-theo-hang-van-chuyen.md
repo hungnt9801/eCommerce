@@ -835,3 +835,38 @@ public class CarrierAddressSchemaTests
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | `v0.1` | 13/10/2026 | *(điền)* | Bản nháp đầu — thiết kế 2 tầng (snapshot hãng ≠ mapping đã duyệt), state machine `SyncRun` **ném lỗi**, sổ drift append-only, idempotency + khoá phân tán theo hãng; **ghi nhận 6 sai lệch F1–F6** phát hiện khi **kiểm code thật**; 16 BR · 10 NFR · 20 test case |
+
+
+---
+
+## 17. TRẠNG THÁI TRIỂN KHAI (14/10/2026) — **lõi Domain đã xong** (mục 3 của GĐ0)
+
+`modules/Address/eCommerce.Address.Domain/Carrier/`:
+
+| Thành phần | Nội dung |
+|---|---|
+| `CarrierAddressMapping` | Ánh xạ (hãng, cấp, mã hãng) → đơn vị hành chính của ta; lưu **nguồn + thời điểm đồng bộ + cách khớp + trạng thái xác minh** |
+| `CarrierAddressMappingResolver` | `Tra(...)` **fail-closed** · `PhatHienSaiLech(...)` phát hiện mã biến mất / tên đổi / mã mới · `LayChuaXacMinh(...)` danh sách cần người xử lý |
+| `CarrierAddressErrorCodes` | `eCommerce:Address:0501…0505` |
+
+**Kết quả:** unit **253 → 273** (thêm **20** test) · build **0 lỗi**.
+
+### 🔒 Bốn bất biến chống lỗi IM LẶNG (đã khoá bằng test)
+
+1. **Chưa xác minh ⇒ KHÔNG dùng được** (`0502`). Kể cả khi ánh xạ chỉ tới **một** đơn vị và tên khớp — vẫn **không** được dùng. Khớp theo tên chỉ là **gợi ý** (dấu tiếng Việt, "Phường" vs "Xã", tỉnh sáp nhập). Dùng nó nghĩa là **gửi hàng tới địa chỉ suy đoán** — hàng đã đi thì **không thu hồi được**, và **không có cảnh báo nào** để biết là đã sai.
+2. **Scope theo HÃNG** — cùng mã `P-001` có thể là **hai địa chỉ khác nhau** ở GHN và GHTK. Test dựng đúng ca này và khẳng định hai kết quả **khác nhau**.
+3. **Trùng lặp cùng (hãng, mã) ⇒ NÉM LỖI**, KHÔNG chọn bừa cái đầu tiên (`0503`).
+4. **Đơn vị đích đã đóng** (sáp nhập) ⇒ **không** dùng cho vận đơn mới (`0504`).
+
+### 🚩 Điểm đáng chú ý về đồng bộ lại
+
+`CapNhatTuDongBo` **hạ mức tin cậy xuống `NghiNgo` khi TÊN đổi** — kể cả ánh xạ do con người đã xác minh.
+Lý do: người xác minh trước đó đã xác minh trên **thông tin CŨ**; hãng đổi tên nghĩa là **cơ sở của xác minh đã thay đổi** ⇒ phải xem lại. Đây là bài học trực tiếp từ `XC-006` (danh mục luật là **dữ liệu**, không hard-code) áp cho danh mục địa chỉ của hãng.
+
+### ⚠️ CÒN LẠI của `ADDR-002`
+| # | Việc |
+|---|---|
+| 1 | **Bảng DB + migration** cho `CarrierAddressMapping` — unique `(TenantId, CarrierCode, CarrierAddressCode)` **`NULLS NOT DISTINCT`** |
+| 2 | **Job đồng bộ danh mục** từ API từng hãng — 🚧 **chưa có endpoint/tài liệu thật của GHN & GHTK** ⇒ phần này chỉ có thể làm tới khi có thông số |
+| 3 | **API xác minh ánh xạ** (màn hình cho vận hành) |
+| 4 | **Cảnh báo khi có sai lệch** — nối vào `NOT-*` (GĐ3) |
