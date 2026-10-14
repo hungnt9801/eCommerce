@@ -2577,6 +2577,16 @@ namespace eCommerce.Migrations
                     b.HasIndex("Status", "TaxAuthorityStatus")
                         .HasDatabaseName("IX_EInvInvoices_Status_TaxAuthorityStatus");
 
+                    b.HasIndex("TenantId", "HoaDonBiDieuChinhId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_EInvInvoices_TenantId_HoaDonBiDieuChinhId")
+                        .HasFilter("\"HoaDonBiDieuChinhId\" IS NOT NULL AND NOT \"IsDeleted\"");
+
+                    b.HasIndex("TenantId", "HoaDonBiThayTheId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_EInvInvoices_TenantId_HoaDonBiThayTheId")
+                        .HasFilter("\"HoaDonBiThayTheId\" IS NOT NULL AND NOT \"IsDeleted\"");
+
                     b.HasIndex("TenantId", "KyHieuMauSo", "SoHoaDon")
                         .IsUnique()
                         .HasDatabaseName("IX_EInvInvoices_TenantId_KyHieuMauSo_SoHoaDon");

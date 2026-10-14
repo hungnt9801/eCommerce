@@ -995,3 +995,57 @@ public class EInvoiceRevisionSchemaTests
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.1 | 15/10/2026 | *(điền)* | Bản nháp đầu — lập theo cấu trúc **16 mục** của `XC-003`; **14 ADR**, **20 BR**, **11 NFR**, **31 test case**, **3 sơ đồ** Mermaid (giới hạn tối đa). **Mọi khẳng định về code đều kèm đường dẫn file thật đã kiểm bằng `read`/`grep`**; phần chưa có code đều ghi rõ *"chưa có trong code — kế hoạch GĐ0"*. Ghi nhận **11 phát hiện F1–F11**, trong đó **F2** (hai tài liệu `EINV-001`/`EINV-002` dùng **trùng dải mã lỗi với nghĩa khác nhau**), **F3** (hai tiền tố permission), **F5** (tiền tố khoá **đôi** ở `TaxLockKeys`) và **F9** (`CHECK Quantity` xung đột dòng delta) là **sai lệch thật giữa các tài liệu/giữa tài liệu và code**. **10 câu hỏi mở** chưa trả lời ⇒ **chưa** đủ Definition of Ready |
+
+
+---
+
+## 17. TRẠNG THÁI TRIỂN KHAI (14/10/2026) — **ràng buộc liên kết đã được cưỡng chế**
+
+### 🚨 BA PHÁT HIỆN THẬT
+
+**1. Tài liệu trong code MÂU THUẪN với code.**
+`EInvoice.HoaDonBiDieuChinhId` được ghi là *"hoá đơn bị điều chỉnh (nếu hoá đơn này là bản điều chỉnh)"*
+— tức field nằm trên **bản điều chỉnh**. Nhưng `DieuChinh()` đòi **chính hoá đơn này** phải `DaPhatHanh`
+rồi đặt nó thành `DaDieuChinh` ⇒ field nằm trên **HOÁ ĐƠN GỐC** và trỏ tới **bản điều chỉnh**.
+**Chiều đúng: GỐC → BẢN THAY THẾ/ĐIỀU CHỈNH.** Đã sửa tài liệu + **khoá chiều bằng test**.
+*Vì sao nguy hiểm:* viết truy vấn theo chiều ngược sẽ trả về **rỗng** và bị hiểu nhầm là *"chưa điều chỉnh"*.
+
+**2. Hai hoá đơn gốc KHÁC NHAU có thể cùng trỏ tới MỘT bản thay thế.**
+Máy trạng thái đã chặn *một gốc bị thay thế hai lần* (lần 2 ném `ChuyenTrangThaiKhongHopLe`),
+nhưng **chiều ngược lại thì không ai chặn** ⇒ một chứng từ "thay thế" hai hoá đơn khác nhau — **vô lý về
+pháp lý** (bản thay thế chỉ có một nội dung). Không có FK, không có ràng buộc duy nhất nào trên hai cột liên kết.
+
+**3. Test bất biến index có DANH SÁCH ĐÍCH DANH THIẾU 6/19 tên.**
+Test khẳng định **tổng số** index `NULLS NOT DISTINCT`, nhưng danh sách tên chỉ có 13. Hệ quả: nếu ai đó
+**THÊM một index mới** và **ĐỒNG THỜI làm hỏng một index khác** thì **tổng số không đổi** ⇒ test vẫn **xanh**
+trong khi một index đã **mất `NULLS NOT DISTINCT`** — đúng lớp lỗi C4/F1 mà test này sinh ra để chặn.
+Đã bổ sung đủ **19 tên**.
+
+### ✅ ĐÃ LÀM
+
+| Thay đổi | Chi tiết |
+|---|---|
+| **Guard domain** | `ThayThe`/`DieuChinh` từ chối `Guid.Empty` và **trỏ tới chính nó** — mã `eCommerce:EInvoice:0108` |
+| **Ràng buộc DB** | `UNIQUE (TenantId, HoaDonBiThayTheId)` + `(TenantId, HoaDonBiDieuChinhId)`, **index MỘT PHẦN** (`WHERE … IS NOT NULL AND NOT IsDeleted`) + **`NULLS NOT DISTINCT`** |
+| **Nâng cấp test** | Danh sách đích danh 13 → **19** tên; tổng số 17 → **19** |
+| **Tài liệu** | Sửa chiều liên kết + cảnh báo tên trường đọc ngược chiều |
+
+### ✅ CHỨNG MINH TRÊN POSTGRESQL THẬT
+
+| Thử nghiệm | Kết quả |
+|---|---|
+| Gốc A → bản thay thế X | ✅ `UPDATE 1` |
+| Gốc B → **cùng** X | ✅ **CHẶN**: `duplicate key value violates unique constraint "IX_EInvInvoices_TenantId_HoaDonBiThayTheId"` · `(null, cccc…) already exists` |
+| Hai hoá đơn **không liên kết** | ✅ `UPDATE 2` (index một phần không ảnh hưởng) |
+
+⚠️ **Chi tiết quyết định:** khoá hiển thị `(null, …)` — nghĩa là `TenantId` NULL. **Nếu thiếu
+`NULLS NOT DISTINCT` thì ca này sẽ LỌT trong im lặng** (đúng lỗi C4/F1 đã gặp). Đã kiểm: `schema.sql` có
+**19** index NND; integration **20/20**; unit **347/347**.
+
+### ⚠️ GHI CHÚ KỸ THUẬT
+- `NULLS NOT DISTINCT` **không diễn đạt được** bằng EF Core fluent API ⇒ migration dùng **SQL thô**:
+  `CREATE UNIQUE INDEX … NULLS NOT DISTINCT WHERE …`.
+- Tên index dài bị PostgreSQL **cắt ở 63 ký tự** ⇒ test so khớp theo **tiền tố** (`indexname like '{ten}%'`).
+- 🪤 **Bẫy đường dẫn đã vấp lại:** `Set-Location` **KHÔNG** đổi CWD của tiến trình .NET ⇒ mọi lời gọi
+  `[System.IO.File]` **PHẢI** dùng đường dẫn **tuyệt đối**. Vấp lần này làm hằng số tên index không được
+  thêm và build hỏng 2 lỗi (đã sửa).

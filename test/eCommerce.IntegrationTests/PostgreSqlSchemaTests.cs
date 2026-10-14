@@ -145,7 +145,7 @@ public class PostgreSqlSchemaTests
     {
         // 🔒 BẤT BIẾN (ghi ở XC-004 Q6): mọi unique index trên entity IMultiTenant PHẢI có
         // `NULLS NOT DISTINCT`. Ai tạo migration mới mà quên ⇒ test này đỏ.
-        Assert.Equal(17L, await DemAsync(
+        Assert.Equal(19L, await DemAsync(
             "select count(*) from pg_indexes where schemaname = 'public' and indexdef like '%NULLS NOT DISTINCT%'"));
 
         // Kiểm tra ĐÍCH DANH để thông báo lỗi có ý nghĩa (tên index dài có thể bị PostgreSQL cắt ⇒ so theo tiền tố).
@@ -165,7 +165,18 @@ public class PostgreSqlSchemaTests
             // XC-002 — hàng rào CUỐI chống trùng ở biên vào (13/10/2026).
             "IX_MsgIdempotencyRecords_TenantId_Scope_KeyValue",
             // ADDR-001 — khoá danh mục ĐVHC là (PHIÊN BẢN, CẤP, MÃ), không phải mã trần (13/10/2026).
-            "IX_AddrAdministrativeUnits_TenantId_SchemaVersion_Level_Code"
+            "IX_AddrAdministrativeUnits_TenantId_SchemaVersion_Level_Code",
+            // ⚠️ BỔ SUNG 14/10/2026 — 4 index sau ĐÃ CÓ trong DB nhưng THIẾU trong danh sách đích danh.
+            // 🚨 Vì sao đây là lỗ hổng thật: test khẳng định TỔNG SỐ, nên nếu ai đó THÊM một index mới
+            //    và ĐỒNG THỜI làm hỏng một index khác thì tổng số KHÔNG ĐỔI ⇒ test vẫn xanh trong khi
+            //    một index đã mất `NULLS NOT DISTINCT`. Danh sách đích danh là thứ duy nhất chặn được ca đó.
+            "IX_AddrCarrierMappings_TenantId_CarrierCode_CarrierAddressCode",
+            "IX_EInvInvoices_TenantId_KyHieuMauSo_SoHoaDon",
+            "IX_SigCertificates_TenantId_SoSerial",
+            "IX_SigSigningRequests_TenantId_MaTaiLieu",
+            // EINV-003 — một bản thay thế/điều chỉnh chỉ gắn với MỘT hoá đơn gốc (14/10/2026).
+            "IX_EInvInvoices_TenantId_HoaDonBiThayTheId",
+            "IX_EInvInvoices_TenantId_HoaDonBiDieuChinhId"
         ];
 
         foreach (var ten in phaiCo)

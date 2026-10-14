@@ -32,4 +32,10 @@ public static class EInvoiceErrorCodes
 
     /// <summary>Thiếu thông tin bắt buộc trên hoá đơn (số, ký hiệu, ngày lập…).</summary>
     public const string ThieuThongTinBatBuoc = "eCommerce:EInvoice:0107";
+
+    /// <summary>
+    /// Hoá đơn liên kết (thay thế / điều chỉnh) **vô nghĩa**: rỗng, hoặc trỏ tới chính nó.
+    /// Chặn ở tầng domain vì đây là giá trị **chắc chắn sai** mà không cần đọc DB.
+    /// </summary>
+    public const string ThieuHoaDonLienKet = "eCommerce:EInvoice:0108";
 }

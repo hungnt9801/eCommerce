@@ -37,10 +37,24 @@ public class EInvoice : FullAuditedAggregateRoot<Guid>, IMultiTenant
     /// <summary>Lý do điều chỉnh / thay thế / huỷ (BẮT BUỘC khi thực hiện các thao tác đó).</summary>
     public string? LyDo { get; protected set; }
 
-    /// <summary>Hoá đơn bị điều chỉnh (nếu hoá đơn này là bản điều chỉnh).</summary>
+    /// <summary>
+    /// Id của **hoá đơn ĐIỀU CHỈNH** — đặt trên **HOÁ ĐƠN GỐC** khi gốc bị điều chỉnh.
+    ///
+    /// 🚨 TÊN TRƯỜNG ĐỌC NGƯỢC CHIỀU VỚI NỘI DUNG (đã đối chiếu và sửa tài liệu 14/10/2026):
+    ///   • Tài liệu CŨ ghi *"hoá đơn bị điều chỉnh (nếu hoá đơn này là bản điều chỉnh)"* ⇒ **SAI**.
+    ///   • Thực tế: <see cref="DieuChinh"/> được gọi trên **gốc** (yêu cầu gốc đang `DaPhatHanh`) và
+    ///     đặt gốc thành `DaDieuChinh`; trường này lưu **Id của BẢN ĐIỀU CHỈNH**.
+    ///   • Chiều đúng: **GỐC → BẢN ĐIỀU CHỈNH**. Muốn tìm bản điều chỉnh của gốc X thì lọc
+    ///     `Id == X.Id` rồi đọc trường này — **KHÔNG** lọc `HoaDonBiDieuChinhId == X.Id` (đó là chiều ngược,
+    ///     sẽ trả về **rỗng** và bị hiểu nhầm là "chưa điều chỉnh").
+    /// </summary>
     public Guid? HoaDonBiDieuChinhId { get; protected set; }
 
-    /// <summary>Hoá đơn bị thay thế (nếu hoá đơn này là bản thay thế).</summary>
+    /// <summary>
+    /// Id của **hoá đơn THAY THẾ** — đặt trên **HOÁ ĐƠN GỐC** khi gốc bị thay thế.
+    /// 🚨 Cùng cảnh báo chiều như <see cref="HoaDonBiDieuChinhId"/>: chiều đúng là
+    /// **GỐC → BẢN THAY THẾ**, và gốc chuyển sang `DaThayThe`.
+    /// </summary>
     public Guid? HoaDonBiThayTheId { get; protected set; }
 
     /// <summary>Lỗi CQT trả về khi bị từ chối (chuỗi <c>ERR:</c> — xem `EINV-002`).</summary>
@@ -151,24 +165,59 @@ public class EInvoice : FullAuditedAggregateRoot<Guid>, IMultiTenant
         Status = EInvoiceStatus.DaPhatHanh;
     }
 
-    /// <summary>Điều chỉnh hoá đơn đã phát hành (hoá đơn này chuyển sang <see cref="EInvoiceStatus.DaDieuChinh"/>).</summary>
+    /// <summary>
+    /// Điều chỉnh hoá đơn đã phát hành (hoá đơn **này** = GỐC, chuyển sang <see cref="EInvoiceStatus.DaDieuChinh"/>;
+    /// <paramref name="hoaDonDieuChinhId"/> = Id **bản điều chỉnh**).
+    /// </summary>
     public void DieuChinh(string lyDo, Guid hoaDonDieuChinhId)
     {
         YeuCauTrangThai(EInvoiceStatus.DaPhatHanh, nameof(DieuChinh));
 
         LyDo = YeuCauLyDo(lyDo, nameof(DieuChinh));
-        HoaDonBiDieuChinhId = hoaDonDieuChinhId;
+        HoaDonBiDieuChinhId = YeuCauHoaDonLienKet(hoaDonDieuChinhId, nameof(DieuChinh));
         Status = EInvoiceStatus.DaDieuChinh;
     }
 
-    /// <summary>Thay thế hoá đơn đã phát hành.</summary>
+    /// <summary>
+    /// Thay thế hoá đơn đã phát hành (hoá đơn **này** = GỐC, chuyển sang <see cref="EInvoiceStatus.DaThayThe"/>;
+    /// <paramref name="hoaDonThayTheId"/> = Id **bản thay thế**).
+    /// </summary>
     public void ThayThe(string lyDo, Guid hoaDonThayTheId)
     {
         YeuCauTrangThai(EInvoiceStatus.DaPhatHanh, nameof(ThayThe));
 
         LyDo = YeuCauLyDo(lyDo, nameof(ThayThe));
-        HoaDonBiThayTheId = hoaDonThayTheId;
+        HoaDonBiThayTheId = YeuCauHoaDonLienKet(hoaDonThayTheId, nameof(ThayThe));
         Status = EInvoiceStatus.DaThayThe;
+    }
+
+    /// <summary>
+    /// Kiểm tra Id hoá đơn liên kết (thay thế / điều chỉnh).
+    ///
+    /// 🚨 VÌ SAO PHẢI KIỂM: trước 14/10/2026 hàm nhận **mọi** `Guid`. Hệ quả:
+    ///   • `Guid.Empty` ⇒ hoá đơn gốc chuyển sang `DaThayThe` nhưng **trỏ tới hư không** — gốc coi như
+    ///     "đã được xử lý" mà **không có chứng từ thay thế nào tồn tại**.
+    ///   • `hoaDonThayTheId == Id` ⇒ hoá đơn **tự thay thế chính nó** — vòng lặp vô nghĩa.
+    ///   Việc "hoá đơn đích có thật và đã phát hành hay không" được kiểm ở **tầng gọi** (cần đọc DB);
+    ///   ở đây chặn những giá trị **chắc chắn vô nghĩa** mà không cần I/O.
+    /// </summary>
+    private Guid YeuCauHoaDonLienKet(Guid id, string hanhDong)
+    {
+        if (id == Guid.Empty)
+        {
+            throw new BusinessException(EInvoiceErrorCodes.ThieuHoaDonLienKet)
+                .WithData("hanhDong", hanhDong)
+                .WithData("lyDo", "Id hoá đơn liên kết rỗng");
+        }
+
+        if (id == Id)
+        {
+            throw new BusinessException(EInvoiceErrorCodes.ThieuHoaDonLienKet)
+                .WithData("hanhDong", hanhDong)
+                .WithData("lyDo", "hoá đơn không thể liên kết tới chính nó");
+        }
+
+        return id;
     }
 
     /// <summary>

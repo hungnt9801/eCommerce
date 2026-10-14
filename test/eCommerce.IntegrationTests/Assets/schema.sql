@@ -1252,3 +1252,13 @@ VALUES ('20261014042922_Add_Addr002_CarrierMappings', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE UNIQUE INDEX "IX_EInvInvoices_TenantId_HoaDonBiDieuChinhId" ON "EInvInvoices" ("TenantId", "HoaDonBiDieuChinhId") NULLS NOT DISTINCT WHERE "HoaDonBiDieuChinhId" IS NOT NULL AND NOT "IsDeleted";
+
+CREATE UNIQUE INDEX "IX_EInvInvoices_TenantId_HoaDonBiThayTheId" ON "EInvInvoices" ("TenantId", "HoaDonBiThayTheId") NULLS NOT DISTINCT WHERE "HoaDonBiThayTheId" IS NOT NULL AND NOT "IsDeleted";
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261014095047_Add_Einv003_UniqueReplacementLink', '10.0.11');
+
+COMMIT;
+
