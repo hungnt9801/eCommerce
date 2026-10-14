@@ -148,3 +148,76 @@ if (permissions.Count == 0)
 > **Bài học lớn nhất:** **14 lỗi thật, 7 lỗi hoàn toàn im lặng** — và **2 lần tôi sửa theo giả thuyết mà chưa đo thì cả 2 lần đều SAI**
 > (C6b đoán do `SignInManager`; C7 đoán do trùng tên class). Khi đo bằng công cụ đúng (`redis-cli MONITOR`,
 > log `Microsoft.AspNetCore.Routing` mức `Debug`) thì nguyên nhân thật hiện ra ngay.
+
+---
+
+## 9. LỖI #22 (14/10/2026) — **ĐƠN HÀNG BỊ MẤT VĨNH VIỄN, HỆ THỐNG BÁO THÀNH CÔNG**
+
+**Mức độ: NGHIÊM TRỌNG NHẤT trong dự án tới nay** — mất dữ liệu doanh thu, không thể phục hồi, không có lỗi nào được ghi.
+
+### Phát hiện
+
+| Số liệu | Giá trị |
+|---|---|
+| Nơi `PublishAsync(...)` | **2** |
+| Handler đăng ký nhận (`IDistributedEventHandler`/`ILocalEventHandler`) | **0** |
+
+`ChannelShopSyncer.SyncAsync` (dòng 74) publish `ChannelOrderPulledEto` cho **từng đơn hàng** kéo từ
+Shopee/Lazada. **Không có handler nào** nhận sự kiện đó.
+
+### Vì sao mất VĨNH VIỄN (không chỉ chậm)
+
+Trình tự trong `ChannelShopSyncer`:
+1. `pull = await connector.PullOrdersAsync(...)` — lấy đơn từ sàn,
+2. `PublishAsync(new ChannelOrderPulledEto{...})` cho từng đơn → **không ai nhận** (nhưng KHÔNG ném lỗi),
+3. `shop.LastSyncedAtUtc = pull.NewSyncCursorUtc` — **TIẾN CON TRỎ ĐỒNG BỘ**,
+4. `shop.LastError = null`, lưu, trả về `OrdersPulled = N`, log mức **Information**.
+
+⇒ Bước 3 khiến sàn **không bao giờ gửi lại** những đơn đó. Admin nhìn thấy *"đồng bộ lúc vừa xong,
+0 lỗi, N đơn"* — trong khi **N đơn đã biến mất**.
+
+### Vì sao đây là dạng nguy hiểm nhất
+
+Đây là **báo thành công trong khi không làm gì** — cùng họ với các lỗi im lặng đã gặp (C1, C3, C10, C16),
+nhưng hậu quả nặng hơn vì (a) **không thể phục hồi** — con trỏ đã tiến, (b) nằm ở **đường doanh thu**,
+(c) **không có bất kỳ tín hiệu nào** để biết là đã sai.
+
+### 🚨 QUYẾT ĐỊNH: **KHÔNG** xây outbox ở bước này (có lý do, không phải bỏ sót)
+
+Trước khi viết code, tôi kiểm tra: **không có message broker nào được cấu hình** (chỉ PostgreSQL + Redis;
+không RabbitMQ/Kafka; `Directory.Packages.props` chỉ có `Volo.Abp.EventBus`).
+
+⇒ **Outbox lúc này là hạ tầng cho vấn đề CHƯA tồn tại**, và tệ hơn: nó sẽ **đảm bảo giao tin cậy
+tới KHÔNG AI** — tức làm vẻ ngoài *trông đáng tin hơn* trong khi dữ liệu vẫn mất. Thứ tự đúng là:
+**có người nhận trước, rồi mới bàn tới giao tin cậy.**
+
+### ✅ ĐÃ LÀM: biến lỗi IM LẶNG thành lỗi ỒN ÀO
+
+`EventCoverageChecker` (lõi thuần, `modules/Messaging/…/EventCoverage/`) + gọi trong
+`eCommerceHttpApiHostModule.OnApplicationInitialization`.
+
+**Bằng chứng từ log khởi động thật:**
+```
+fail: eCommerce.eCommerceHttpApiHostModule[0]
+  ?? PHAT HIEN 2 SU KIEN KHONG CO NGUOI NHAN (da quet 27 assembly).
+     Su kien duoc publish nhung khong ai xu ly => DU LIEU SE MAT IM LANG.
+   • ChannelOrderPulledEto - KHONG co handler nao dang ky nhan.
+   • ChannelShopTokenRefreshedEto - KHONG co handler nao dang ky nhan.
+```
+
+Kiểm tra chạy ở **mọi lần boot** ⇒ nếu ai thêm ETO mới mà quên handler, log sẽ **la ngay**.
+
+### Chi tiết kỹ thuật đã xử lý
+- **`·LineEto` là ETO CON** (`ChannelOrderPulledLineEto` là một dòng của `ChannelOrderPulledEto`) ⇒
+  **bỏ qua** trong kiểm tra. Nếu tính, báo cáo có **dương tính giả** và người đọc sẽ bắt đầu bỏ qua cảnh báo.
+- **Chỉ interface `IDistributedEventHandler`/`ILocalEventHandler`/`IEventHandler`** mới tính là người nhận.
+  Nếu tính mọi interface generic 1 tham số thì `IRepository<SuKienB>` sẽ khiến sự kiện **trông như đã có
+  người nhận** ⇒ bộ kiểm tra **im lặng bỏ qua đúng lỗi cần tìm** (có test khoá điều này).
+- **Ghi rõ số assembly đã quét** (27) — vì quét theo "assembly đã nạp" rất dễ thiếu (bài học C16),
+  nên phạm vi phải **nhìn thấy được** thay vì cho ra kết quả "sạch" giả tạo.
+
+### ⚠️ VIỆC CÒN LẠI (cần quyết định của con người, KHÔNG thể tự chọn)
+1. **Xây nơi nhận đơn hàng** (Order intake) — đây là GĐ1, và nó là điều kiện **bắt buộc** để đơn không mất.
+2. **Hoặc** tạm dừng tiến con trỏ đồng bộ khi chưa có nơi nhận (fail-closed: sàn sẽ gửi lại, đơn không mất
+   nhưng log sẽ đầy) — cần người quyết vì nó đánh đổi giữa *mất dữ liệu* và *lặp vô hạn*.
+3. Sau khi có người nhận + broker ⇒ **khi đó mới bật outbox** (ABP có sẵn `AbpEventBusBoxesModule`).

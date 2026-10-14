@@ -1,10 +1,13 @@
+using System.Reflection;
 using eCommerce.EntityFrameworkCore;
+using eCommerce.Messaging.EventCoverage;
 using Medallion.Threading;
 using Medallion.Threading.Redis;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using OpenIddict.Server.AspNetCore;
 using StackExchange.Redis;
 using Volo.Abp;
@@ -261,6 +264,16 @@ public class eCommerceHttpApiHostModule : AbpModule
         // không nối được log giữa các tầng (đã kiểm chứng: 12/12 chỗ xuất hiện đều nằm trong migration).
         app.UseCorrelationId();
 
+        // 🚨 KIỂM TRA ĐỘ PHỦ SỰ KIỆN (14/10/2026) — biến lỗi IM LẶNG thành lỗi ỒN ÀO.
+        //
+        // Lỗi thật: ChannelShopSyncer publish ChannelOrderPulledEto cho TỪNG đơn hàng kéo từ
+        // Shopee/Lazada, nhưng KHÔNG có handler nào nhận. Đồng bộ vẫn báo THÀNH CÔNG và TIẾN CON TRỎ
+        // ĐỒNG BỘ => sàn không gửi lại => đơn hàng MẤT VĨNH VIỄN mà không có lỗi nào được ghi.
+        //
+        // Vì sao kiểm tra lúc KHỞI ĐỘNG (không phải test): đây là bất biến về CẤU HÌNH DI của ứng dụng
+        // đang chạy, không phải về logic — test không nạp cùng bộ module nên không thấy được.
+        KiemTraDoPhuSuKien(context);
+
         // 📊 Đo độ trễ request và phát http_request_duration_seconds (XC-005).
         // Đặt sớm để bao được cả thời gian xác thực/phân quyền.
         app.UseMiddleware<Observability.HttpRequestDurationMiddleware>();
@@ -287,5 +300,60 @@ public class eCommerceHttpApiHostModule : AbpModule
         });
 
         app.UseConfiguredEndpoints();
+    }
+    /// <summary>
+    /// Quét mọi hợp đồng sự kiện (`*Eto`) trong các assembly `eCommerce*` và đối chiếu với handler đã
+    /// đăng ký; sự kiện **không có người nhận** bị ghi log **Error** ngay khi khởi động.
+    ///
+    /// ⚠️ Phạm vi quét là các assembly **ĐÃ NẠP** — nên log ghi rõ số assembly đã quét để nếu phạm vi
+    /// không đầy đủ thì **nhìn thấy được**, thay vì im lặng cho ra kết quả "sạch" giả tạo
+    /// (đây chính là bài học C16: quét theo "assembly đã nạp" rất dễ thiếu).
+    /// </summary>
+    private static void KiemTraDoPhuSuKien(ApplicationInitializationContext context)
+    {
+        var logger = context.ServiceProvider
+            .GetRequiredService<ILogger<eCommerceHttpApiHostModule>>();
+
+        var assemblies = AppDomain.CurrentDomain.GetAssemblies()
+            .Where(a => a.GetName().Name?.StartsWith("eCommerce", StringComparison.Ordinal) == true)
+            .ToList();
+
+        var kieu = new List<Type>();
+
+        foreach (var asm in assemblies)
+        {
+            try
+            {
+                kieu.AddRange(asm.GetTypes());
+            }
+            catch (ReflectionTypeLoadException ex)
+            {
+                // Nạp một phần còn hơn bỏ qua toàn bộ — nhưng phải ghi lại để không giả vờ là đã quét đủ.
+                kieu.AddRange(ex.Types.Where(t => t is not null)!);
+                logger.LogWarning(ex, "Không nạp được toàn bộ kiểu từ assembly {Assembly}.", asm.GetName().Name);
+            }
+        }
+
+        var suKien = kieu.Where(t => t.Name.EndsWith(EventCoverageChecker.HauToSuKien, StringComparison.Ordinal)).ToList();
+        var ketQua = EventCoverageChecker.KiemTra(suKien, kieu);
+
+        if (ketQua.CoSuKienBiBoQuen)
+        {
+            logger.LogError(
+                "🚨 PHÁT HIỆN {SoLuong} SỰ KIỆN KHÔNG CÓ NGƯỜI NHẬN (đã quét {SoAssembly} assembly). " +
+                "Sự kiện được publish nhưng không ai xử lý ⇒ DỮ LIỆU SẼ MẤT IM LẶNG.",
+                ketQua.SuKienKhongCoNguoiNhan.Count, assemblies.Count);
+
+            foreach (var ten in ketQua.SuKienKhongCoNguoiNhan)
+            {
+                logger.LogError("   • {TenSuKien} — KHÔNG có handler nào đăng ký nhận.", ten);
+            }
+        }
+        else
+        {
+            logger.LogInformation(
+                "Độ phủ sự kiện OK: {SoSuKien} hợp đồng sự kiện, tất cả đều có người nhận (đã quét {SoAssembly} assembly).",
+                ketQua.SuKienCoNguoiNhan.Count, assemblies.Count);
+        }
     }
 }
