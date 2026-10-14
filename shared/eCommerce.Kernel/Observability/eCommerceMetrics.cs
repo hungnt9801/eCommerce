@@ -1,7 +1,7 @@
 using System.Diagnostics.Metrics;
 using Volo.Abp.DependencyInjection;
 
-namespace eCommerce.Observability;
+namespace eCommerce.Kernel.Observability;
 
 /// <summary>
 /// **BẢNG ĐĂNG KÝ TÊN METRIC** — hợp đồng dùng chung, khớp 1-1 với `docs/features/XC-005-observability-log-metric.md` §5.1.

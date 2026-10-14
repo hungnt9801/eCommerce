@@ -1,3 +1,5 @@
+using System.Diagnostics.Metrics;
+using eCommerce.Kernel.Observability;
 using eCommerce.Messaging;
 using eCommerce.Messaging.Idempotency;
 using Volo.Abp;
@@ -278,5 +280,81 @@ public class IdempotencyGuardTests
         var soXoa = await store.XoaHetHanAsync(((DongHoGia)dongHo).Now.AddDays(8), 10);
 
         Assert.Equal(1, soXoa);
+    }
+
+    // ── 📊 KIỂM CHỨNG ĐIỂM PHÁT METRIC THẬT ────────────────────────────────
+
+    [Fact]
+    public async Task Xu_ly_loi_thi_PHAT_metric_messaging_inbox_failed_total()
+    {
+        // 🎯 Test này là BẰNG CHỨNG cho việc sửa LỖI TẦNG (XC-005 §16): trước đây 12 metric đã đăng ký
+        // nhưng KHÔNG nơi nào phát được, vì registry nằm ở tầng APP mà quy ước #3 CẤM module tham chiếu app.
+        // Sau khi chuyển sang shared/eCommerce.Kernel, module Messaging phát được metric thật.
+        using var meter = new Meter("eCommerce-Test-" + Guid.NewGuid());
+        var metrics = new eCommerceMetrics(meter);
+
+        var ghiDuoc = new List<(string Ten, long GiaTri, string? Module)>();
+        using var listener = new MeterListener();
+
+        listener.InstrumentPublished = (instrument, l) =>
+        {
+            if (ReferenceEquals(instrument.Meter, meter))
+            {
+                l.EnableMeasurementEvents(instrument);
+            }
+        };
+
+        listener.SetMeasurementEventCallback<long>((instrument, value, tags, _) =>
+        {
+            string? module = null;
+            foreach (var t in tags)
+            {
+                if (t.Key == eCommerceMetricTags.Module)
+                {
+                    module = t.Value?.ToString();
+                }
+            }
+
+            ghiDuoc.Add((instrument.Name, value, module));
+        });
+
+        listener.Start();
+
+        var guard = new IdempotencyGuard(
+            new InMemoryIdempotencyStore(), new KhoaPhanTanGia(), new DongHoGia(), metrics);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            guard.ThucThiAsync(Khoa(), "{}", _ => throw new InvalidOperationException("hỏng")));
+
+        var doDuoc = Assert.Single(ghiDuoc.Where(x => x.Ten == eCommerceMetricNames.MessagingInboxFailedTotal));
+        Assert.Equal(1L, doDuoc.GiaTri);
+        Assert.Equal("messaging", doDuoc.Module);
+    }
+
+    [Fact]
+    public async Task Xu_ly_THANH_CONG_thi_KHONG_phat_metric_loi()
+    {
+        // Đối chứng: đường thành công KHÔNG được phát metric lỗi (nếu phát thì cảnh báo sẽ nhiễu vô ích).
+        using var meter = new Meter("eCommerce-Test-" + Guid.NewGuid());
+        var metrics = new eCommerceMetrics(meter);
+
+        var dem = 0;
+        using var listener = new MeterListener();
+        listener.InstrumentPublished = (instrument, l) =>
+        {
+            if (ReferenceEquals(instrument.Meter, meter))
+            {
+                l.EnableMeasurementEvents(instrument);
+            }
+        };
+        listener.SetMeasurementEventCallback<long>((i, _, _, _) => Interlocked.Increment(ref dem));
+        listener.Start();
+
+        var guard = new IdempotencyGuard(
+            new InMemoryIdempotencyStore(), new KhoaPhanTanGia(), new DongHoGia(), metrics);
+
+        await guard.ThucThiAsync(Khoa(), "{}", _ => Task.FromResult<string?>("OK"));
+
+        Assert.Equal(0, dem);
     }
 }

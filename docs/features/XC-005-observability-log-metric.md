@@ -513,3 +513,35 @@ module cần phát, rồi mới wire được 3 điểm phát thật ở bảng 
 
 > 📌 Đây là ví dụ thứ hai trong dự án về **lỗi tầng** (lỗi đầu là `ConventionalControllers` chỉ thấy
 > assembly **đã nạp** — C16). Cả hai đều **không lộ ra khi build**, chỉ lộ khi hỏi *"vậy ai gọi cái này?"*.
+
+---
+
+## 17. ✅ ĐÃ SỬA LỖI TẦNG + ĐIỂM PHÁT METRIC ĐẦU TIÊN (14/10/2026)
+
+**Đã chuyển** `eCommerceMetrics` + `eCommerceMetricNames` + `eCommerceMetricTags` sang
+**`shared/eCommerce.Kernel/Observability/`** (namespace `eCommerce.Kernel.Observability`) và **xoá bản cũ**
+ở `src/eCommerce.Domain.Shared/Observability/` — **một nguồn sự thật duy nhất**.
+
+**Đã wire điểm phát THẬT đầu tiên:** `IdempotencyGuard` (module `Messaging`) phát
+`messaging_inbox_failed_total` kèm nhãn `module` + `reason` khi xử lý thất bại.
+
+**ĐÃ KIỂM CHỨNG BẰNG TEST** (`MeterListener`, 2 test mới):
+| Test | Khẳng định |
+|---|---|
+| `Xu_ly_loi_thi_PHAT_metric_messaging_inbox_failed_total` | Metric **được phát thật** với giá trị 1 và nhãn `module = messaging` |
+| `Xu_ly_THANH_CONG_thi_KHONG_phat_metric_loi` | Đường **thành công KHÔNG** phát metric lỗi (nếu phát thì cảnh báo sẽ nhiễu vô ích) |
+
+⇒ **12 metric nay đã có đường phát hợp lệ về mặt kiến trúc.** Đây là lần đầu tiên hệ thống có metric
+**thực sự được phát ra** (trước đó: đăng ký đủ + test đủ nhưng **không nơi nào phát được** vì registry
+nằm sai tầng).
+
+### ⚠️ CÒN LẠI — các điểm phát khác (cùng một mẫu, đã hết chướng ngại kiến trúc)
+
+| Metric | Nơi cần wire | Ghi chú |
+|---|---|---|
+| `lock_timeout_total` · `lock_skipped_total` | `ChannelTokenManager` (ChannelHub.Application) | Cần thêm `ProjectReference` Kernel cho `ChannelHub.Application` |
+| `channel_sync_failed_total` | `ChannelShopSyncer` | Cùng project trên |
+| `messaging_dlq_size` · `messaging_dlq_replayed_total` | Job DLQ | 🚧 **chưa có DLQ** (outbox/relay chưa làm) |
+| `messaging_outbox_pending` | Relay outbox | 🚧 **chưa có relay** |
+| `http_request_duration_seconds` | Middleware đo độ trễ | Cần một middleware mới trong Host |
+| `tax_unclassified_skus` · `payment_webhook_rejected_total` · `logging_failures_total` | Nơi phát tương ứng | Mẫu đã chứng minh |

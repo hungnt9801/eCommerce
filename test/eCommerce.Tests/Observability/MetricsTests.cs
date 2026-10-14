@@ -1,5 +1,5 @@
 using System.Diagnostics.Metrics;
-using eCommerce.Observability;
+using eCommerce.Kernel.Observability;
 
 namespace eCommerce.Tests.Observability;
 

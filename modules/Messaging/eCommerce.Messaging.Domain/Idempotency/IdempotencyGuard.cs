@@ -59,11 +59,24 @@ public class IdempotencyGuard : IIdempotencyGuard, ITransientDependency
     private readonly IAbpDistributedLock _khoaPhanTan;
     private readonly IClock _dongHo;
 
-    public IdempotencyGuard(IIdempotencyStore store, IAbpDistributedLock khoaPhanTan, IClock dongHo)
+    /// <summary>
+    /// Metric — tham số **tuỳ chọn** để: (a) DI tự inject bản thật, (b) test cũ vẫn chạy khi truyền null.
+    /// 🚨 Đây là lý do PHẢI chuyển `eCommerceMetrics` sang `shared/eCommerce.Kernel`: nó nằm trong MODULE,
+    /// mà quy ước #3 CẤM module tham chiếu app (`eCommerce.Domain.Shared`) ⇒ trước đây **về cấu trúc
+    /// không thể phát metric** (xem `XC-005` §16).
+    /// </summary>
+    private readonly eCommerce.Kernel.Observability.eCommerceMetrics? _metrics;
+
+    public IdempotencyGuard(
+        IIdempotencyStore store,
+        IAbpDistributedLock khoaPhanTan,
+        IClock dongHo,
+        eCommerce.Kernel.Observability.eCommerceMetrics? metrics = null)
     {
         _store = store;
         _khoaPhanTan = khoaPhanTan;
         _dongHo = dongHo;
+        _metrics = metrics;
     }
 
     public async Task<IdempotencyOutcome> ThucThiAsync(
@@ -140,6 +153,11 @@ public class IdempotencyGuard : IIdempotencyGuard, ITransientDependency
         }
         catch (Exception ex)
         {
+            // 📊 Phát metric THẬT (điểm phát đầu tiên của hệ thống — trước đây 12 metric không có nơi phát).
+            _metrics?.MessagingInboxFailed.Add(1,
+                new KeyValuePair<string, object?>(eCommerce.Kernel.Observability.eCommerceMetricTags.Module, "messaging"),
+                new KeyValuePair<string, object?>(eCommerce.Kernel.Observability.eCommerceMetricTags.Reason, ex.GetType().Name));
+
             banGhi.ThatBai(ex.GetType().Name, ex.Message, _dongHo.Now);
             await _store.CapNhatAsync(banGhi, cancellationToken);
 
