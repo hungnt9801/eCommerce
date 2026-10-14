@@ -116,6 +116,15 @@ public class eCommerceHttpApiHostModule : AbpModule
         //
         // 📌 BaseUrl đọc từ cấu hình `TaxAuthority:BaseUrl`; hiện chưa có endpoint thật của CQT nên
         // để giá trị mặc định và GHI RÕ là chưa kiểm chứng được.
+        // Nguồn danh mục ĐVHC chính thức (ADDR-001). BaseUrl đọc từ cấu hình để đổi môi trường.
+        context.Services.AddHttpClient<eCommerce.Address.ProvincesOpenApiSource>(http =>
+        {
+            var baseUrl = configuration["Address:Sync:BaseUrl"];
+            http.BaseAddress = new Uri(string.IsNullOrWhiteSpace(baseUrl)
+                ? "https://provinces.open-api.vn/"
+                : baseUrl);
+            http.Timeout = TimeSpan.FromSeconds(60);
+        });
         context.Services.AddHttpClient(eCommerce.TaxAuthority.TaxAuthorityClient.TenClientHttp, http =>
         {
             var baseUrl = configuration["TaxAuthority:BaseUrl"];

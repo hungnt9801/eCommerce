@@ -152,3 +152,55 @@ chỉ vì một lần gọi API hỏng**.
 
 Sau 3 việc đó, **toàn bộ phần GĐ0 làm được bằng code sẽ hết** — và khi đó câu trả lời cho *"còn gì nữa không?"*
 sẽ là một danh sách **chỉ gồm 5 input bên ngoài**, không còn việc kỹ thuật nào tồn.
+
+
+---
+
+## 9. CẬP NHẬT (14/10/2026) — **`ADDR-001` ĐÃ HOÀN TẤT** (việc **A** trong §5)
+
+| Thành phần | Nội dung |
+|---|---|
+| `ProvincesOpenApiParser` | **Lõi THUẦN** — phân tích JSON thật của API (13 test dùng **JSON rút từ phản hồi thật**) |
+| `ProvincesOpenApiSource` | Vỏ mỏng — gọi **35 HTTP** (1 danh sách + 34 tỉnh `?depth=2`), **fail-closed** nếu một tỉnh lỗi |
+| `AdministrativeUnitSyncWorker` | Job định kỳ, **khoá phân tán**, gọi 4 hàng rào ở §3 |
+
+### 🚨 MẶC ĐỊNH **TẮT** (`Address:Sync:Enabled = false`)
+Job này **gọi API bên ngoài** rồi **sửa danh mục địa chỉ đang dùng**. Bật mặc định nghĩa là một dịch vụ
+ngoài (hoặc mạng) có thể **thay đổi dữ liệu vận hành** mà không ai chủ động quyết định. Người vận hành
+bật bằng cấu hình, và tắt được ngay khi nguồn có sự cố.
+
+### 🐛 LỖI THẬT DO KIỂM CHỨNG END-TO-END BẮT ĐƯỢC (lỗi #23)
+
+**Triệu chứng:** worker log `Started background worker` nhưng **KHÔNG có dòng log nào** và DB vẫn **0 đơn vị**.
+
+**Nguyên nhân:** tôi đặt `Timer.Period = 86_400s` trong constructor và đọc nhịp từ cấu hình **bên trong**
+`DoWorkAsync` — nhưng `DoWorkAsync` chỉ chạy **SAU KHI hết nhịp đầu tiên**. Với nhịp mặc định 1 ngày,
+điều đó nghĩa là: cấu hình **không bao giờ có tác dụng ở lượt đầu**, và worker **im lặng không chạy gì
+trong suốt ngày đầu sau mỗi lần deploy** — lại đúng họ **lỗi im lặng** đã gặp nhiều lần.
+
+**Đã sửa:** đặt `Timer.RunOnStart = true`. An toàn vì job **mặc định TẮT** ⇒ lượt chạy ngay chỉ **đọc cấu
+hình rồi thoát, không gọi API ngoài**. Khi người vận hành bật thì đồng bộ ngay sau deploy là **mong muốn**.
+
+### ✅ BẰNG CHỨNG END-TO-END TRÊN API THẬT + POSTGRESQL THẬT
+
+| Lượt | Log / kết quả thật |
+|---|---|
+| Lượt 1 | `Đồng bộ danh mục ĐVHC xong (nguồn provinces.open-api.vn, phiên bản 2): +3355 mới, ~0 đổi tên, ~0 mở lại, -0 đóng.` |
+| Lượt 2 (5 giây sau) | `Đồng bộ danh mục ĐVHC: không có thay đổi (… 3355 đơn vị).` ⇒ **IDEMPOTENT** |
+| PostgreSQL | **34** tỉnh (`Level=1`) + **3321** xã (`Level=2`) = **3355** — khớp **chính xác** API (v2 = 34 tỉnh) |
+| Đệm 0 | `01 \| Thành phố Hà Nội` (API trả `code: 1`) · `00004 \| Phường Ba Đình \| 01` |
+| Toàn vẹn | **0 xã mồ côi** (mọi `ParentCode` đều trỏ tới đơn vị có thật) · **17** index `NULLS NOT DISTINCT` nguyên vẹn |
+
+### Ba cạm bẫy của API đã xử lý (mỗi cái có test)
+1. **`wards` RỖNG ở endpoint danh sách** (`/api/v2/p/` trả 34 tỉnh, **0 xã**) ⇒ phải gọi `?depth=2` **từng tỉnh**.
+   Ai chỉ gọi endpoint danh sách sẽ nhận danh mục **thiếu toàn bộ cấp xã**.
+2. **Mã là SỐ NGUYÊN** (`4`, `1267`) còn `AdministrativeUnit.Code` cần **đủ 5 ký tự** ⇒ **phải đệm 0 bên trái**;
+   mã dài hơn quy ước ⇒ **NÉM LỖI**, **không cắt bớt** (cắt bớt tạo mã "hợp lệ" nhưng SAI, không ai phát hiện).
+3. **v1 và v2 khác cấu trúc** (v2: `province.wards`; v1: `province.districts[].wards`) — parser xử lý cả hai.
+
+### Cập nhật §5 (việc còn lại)
+| # | Việc | Trạng thái mới |
+|---|---|---|
+| **A** | `ADDR-001` worker đồng bộ | ✅ **XONG** (mục 9 này) |
+| **B** | Ràng buộc `EINV-003` một bản thay thế hiệu lực | ⬜ còn lại |
+| **C** | Worker đồng bộ mã hãng (adapter cắm được) | ⬜ còn lại |

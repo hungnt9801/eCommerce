@@ -1,5 +1,9 @@
 using Volo.Abp.Application;
+using Microsoft.Extensions.DependencyInjection;
+using Volo.Abp;
+using Volo.Abp.BackgroundWorkers;
 using Volo.Abp.Modularity;
+using Volo.Abp.Threading;
 
 namespace eCommerce.Address.Application;
 
@@ -22,4 +26,22 @@ namespace eCommerce.Address.Application;
 )]
 public class AddressApplicationModule : AbpModule
 {
+    public override void ConfigureServices(ServiceConfigurationContext context)
+    {
+        // ⚠️ `AddHttpClient` KHÔNG đặt ở đây: project thư viện này không có gói `Microsoft.Extensions.Http`.
+        // Client HTTP được đăng ký ở **Host** — đúng mẫu đã có cho `TaxAuthorityClient`.
+        // Ở đây chỉ nối interface về đúng lớp hiện thực.
+        context.Services.AddTransient<Sync.IKhungDonViHanhChinhSource>(
+            sp => sp.GetRequiredService<ProvincesOpenApiSource>());
+    }
+
+    /// <summary>
+    /// Đăng ký job đồng bộ danh mục ĐVHC.
+    /// ⚠️ Thiếu dòng này thì **KHÔNG có lỗi build**, app vẫn khởi động, nhưng job **im lặng không bao giờ chạy**
+    /// (đây là dạng lỗi đã gặp nhiều lần trong dự án).
+    /// </summary>
+    public override async Task OnPostApplicationInitializationAsync(ApplicationInitializationContext context)
+    {
+        await context.AddBackgroundWorkerAsync<AdministrativeUnitSyncWorker>();
+    }
 }

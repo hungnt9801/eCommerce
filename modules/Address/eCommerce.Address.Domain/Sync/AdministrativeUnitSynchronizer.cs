@@ -16,6 +16,13 @@ public static class AdministrativeSyncErrorCodes
 
     /// <summary>Số đơn vị bị ĐÓNG vượt ngưỡng — từ chối để tránh phá hoại danh mục đang chạy.</summary>
     public const string DongHangLoatVuotNguong = "eCommerce:Address:0604";
+
+    /// <summary>
+    /// Dữ liệu nguồn SAI ĐỊNH DẠNG (thiếu trường, sai kiểu, mã dài hơn quy ước).
+    /// 🚨 Ném lỗi thay vì bỏ qua: bỏ qua sẽ tạo **danh mục thiếu** ⇒ lần đồng bộ sau sẽ **ĐÓNG** những
+    /// đơn vị bị thiếu đó. Sai định dạng phải dừng, không được đoán.
+    /// </summary>
+    public const string DanhMucSaiDinhDang = "eCommerce:Address:0605";
 }
 
 /// <summary>Một đơn vị hành chính trong **danh mục nguồn** (dữ liệu tải về, chưa phải entity).</summary>
