@@ -25,18 +25,23 @@ public class ChannelShopSyncer
     private readonly IDistributedEventBus _distributedEventBus;
     private readonly ILogger<ChannelShopSyncer> _logger;
 
+    /// <summary>📊 Metric — tham số tuỳ chọn (DI inject bản thật, test cũ truyền null vẫn chạy).</summary>
+    private readonly eCommerce.Kernel.Observability.eCommerceMetrics? _metrics;
+
     public ChannelShopSyncer(
         IRepository<ChannelShop, Guid> channelShopRepository,
         IChannelConnectorFactory connectorFactory,
         ChannelTokenManager tokenManager,
         IDistributedEventBus distributedEventBus,
-        ILogger<ChannelShopSyncer> logger)
+        ILogger<ChannelShopSyncer> logger,
+        eCommerce.Kernel.Observability.eCommerceMetrics? metrics = null)
     {
         _channelShopRepository = channelShopRepository;
         _connectorFactory = connectorFactory;
         _tokenManager = tokenManager;
         _distributedEventBus = distributedEventBus;
         _logger = logger;
+        _metrics = metrics;
     }
 
     public async Task<ChannelSyncResult> SyncAsync(Guid channelShopId, CancellationToken cancellationToken = default)
@@ -101,6 +106,14 @@ public class ChannelShopSyncer
         {
             result.Errors++;
             result.Message = ex.Message;
+
+            // 📊 Phát metric thất bại đồng bộ (`XC-005` §5.1). Nhãn HỮU HẠN: kênh + loại lỗi.
+            // KHÔNG đưa `shopId`/`orderId` vào nhãn (cardinality cao — xem `eCommerceMetricTags.Forbidden`).
+            _metrics?.ChannelSyncFailed.Add(1,
+                new KeyValuePair<string, object?>(
+                    eCommerce.Kernel.Observability.eCommerceMetricTags.Channel, shop.ChannelCode),
+                new KeyValuePair<string, object?>(
+                    eCommerce.Kernel.Observability.eCommerceMetricTags.Reason, ex.GetType().Name));
 
             // Ghi lỗi để hiển thị trên admin, nhưng KHÔNG nuốt exception ở tầng worker
             // (supervisor cần biết để log/cảnh báo).

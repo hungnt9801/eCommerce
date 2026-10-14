@@ -199,7 +199,7 @@ public class CarrierAddressMappingTests
 
         var sai = CarrierAddressMappingResolver.PhatHienSaiLech([AnhXa()], "GHN", ds);
 
-        var tenDoi = Assert.Single(sai.Where(s => s.Loai == LoaiSaiLech.TenDoi));
+        var tenDoi = Assert.Single(sai, s => s.Loai == LoaiSaiLech.TenDoi);
         Assert.Contains("Ba Đình (mới)", tenDoi.MoTa);
     }
 

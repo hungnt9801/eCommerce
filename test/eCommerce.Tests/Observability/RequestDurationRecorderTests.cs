@@ -77,7 +77,7 @@ public class RequestDurationRecorderTests
         RequestDurationRecorder.Ghi(metrics, TimeSpan.FromMilliseconds(12), "post",
             "/api/app/e-invoice/{id}/ky", 200);
 
-        var doDuoc = Assert.Single(ghi.Ghi.Where(x => x.Ten == eCommerceMetricNames.HttpRequestDurationSeconds));
+        var doDuoc = Assert.Single(ghi.Ghi, x => x.Ten == eCommerceMetricNames.HttpRequestDurationSeconds);
         var route = doDuoc.Nhan[eCommerceMetricTags.Route]?.ToString();
 
         Assert.Equal("/api/app/e-invoice/{id}/ky", route);
@@ -94,7 +94,7 @@ public class RequestDurationRecorderTests
 
         RequestDurationRecorder.Ghi(metrics, TimeSpan.FromMilliseconds(1), "  ", "/x", 200);
 
-        var doDuoc = Assert.Single(ghi.Ghi.Where(x => x.Ten == eCommerceMetricNames.HttpRequestDurationSeconds));
+        var doDuoc = Assert.Single(ghi.Ghi, x => x.Ten == eCommerceMetricNames.HttpRequestDurationSeconds);
         Assert.Equal("khong-ro", doDuoc.Nhan[eCommerceMetricTags.Method]);
     }
 
@@ -111,7 +111,7 @@ public class RequestDurationRecorderTests
                 metrics, "GET", () => "/x", () => 500,
                 () => throw new InvalidOperationException("lỗi mô phỏng")));
 
-        var doDuoc = Assert.Single(ghi.Ghi.Where(x => x.Ten == eCommerceMetricNames.HttpRequestDurationSeconds));
+        var doDuoc = Assert.Single(ghi.Ghi, x => x.Ten == eCommerceMetricNames.HttpRequestDurationSeconds);
         Assert.Equal("500", doDuoc.Nhan[eCommerceMetricTags.Status]);
     }
 
@@ -123,7 +123,7 @@ public class RequestDurationRecorderTests
         await RequestDurationRecorder.DoVaGhiAsync(metrics, "get", () => "/api/app/x", () => 200,
             () => Task.CompletedTask);
 
-        var doDuoc = Assert.Single(ghi.Ghi.Where(x => x.Ten == eCommerceMetricNames.HttpRequestDurationSeconds));
+        var doDuoc = Assert.Single(ghi.Ghi, x => x.Ten == eCommerceMetricNames.HttpRequestDurationSeconds);
         Assert.Equal("200", doDuoc.Nhan[eCommerceMetricTags.Status]);
         Assert.Equal("GET", doDuoc.Nhan[eCommerceMetricTags.Method]);
     }
@@ -135,7 +135,7 @@ public class RequestDurationRecorderTests
 
         await RequestDurationRecorder.DoVaGhiAsync(metrics, "GET", () => null, () => 404, () => Task.CompletedTask);
 
-        var doDuoc = Assert.Single(ghi.Ghi.Where(x => x.Ten == eCommerceMetricNames.HttpRequestDurationSeconds));
+        var doDuoc = Assert.Single(ghi.Ghi, x => x.Ten == eCommerceMetricNames.HttpRequestDurationSeconds);
         Assert.Equal(RequestDurationRecorder.NhanKhongKhop, doDuoc.Nhan[eCommerceMetricTags.Route]);
     }
 }

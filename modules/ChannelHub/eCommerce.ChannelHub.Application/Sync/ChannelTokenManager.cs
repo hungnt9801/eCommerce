@@ -31,6 +31,13 @@ public class ChannelTokenManager
     private readonly IOptions<ChannelHubOptions> _options;
     private readonly ILogger<ChannelTokenManager> _logger;
 
+    /// <summary>
+    /// 📊 Metric — tham số **tuỳ chọn** (DI tự inject bản thật; test cũ truyền null vẫn chạy).
+    /// 🔒 Có được ở đây là nhờ `eCommerceMetrics` đã chuyển về `shared/eCommerce.Kernel` (XC-005 §16/§17):
+    /// trước đây registry nằm ở tầng APP nên module **không thể** tham chiếu (quy ước #3).
+    /// </summary>
+    private readonly eCommerce.Kernel.Observability.eCommerceMetrics? _metrics;
+
     public ChannelTokenManager(
         IRepository<ChannelShop, Guid> channelShopRepository,
         IChannelConnectorFactory connectorFactory,
@@ -38,7 +45,8 @@ public class ChannelTokenManager
         IAbpDistributedLock distributedLock,
         IDistributedEventBus distributedEventBus,
         IOptions<ChannelHubOptions> options,
-        ILogger<ChannelTokenManager> logger)
+        ILogger<ChannelTokenManager> logger,
+        eCommerce.Kernel.Observability.eCommerceMetrics? metrics = null)
     {
         _channelShopRepository = channelShopRepository;
         _connectorFactory = connectorFactory;
@@ -47,6 +55,7 @@ public class ChannelTokenManager
         _distributedEventBus = distributedEventBus;
         _options = options;
         _logger = logger;
+        _metrics = metrics;
     }
 
     /// <summary>
@@ -73,6 +82,16 @@ public class ChannelTokenManager
 
         if (handle is null)
         {
+            // 📊 Phát metric TRƯỚC khi thoát: đây là sự kiện "không giành được khoá phân tán"
+            // (`XC-003` BR-010 yêu cầu **có** metric cho ca này — trước đây chỉ log, không ai đo được).
+            // ⚠️ Nhãn chỉ gồm giá trị HỮU HẠN (kênh, lý do) — KHÔNG đưa `shopId`/`lockName` vào nhãn
+            // (cardinality cao, xem `eCommerceMetricTags.Forbidden`).
+            _metrics?.LockTimeout.Add(1,
+                new KeyValuePair<string, object?>(
+                    eCommerce.Kernel.Observability.eCommerceMetricTags.Channel, shop.ChannelCode),
+                new KeyValuePair<string, object?>(
+                    eCommerce.Kernel.Observability.eCommerceMetricTags.Reason, "dang-refresh"));
+
             // Không giành được lock: worker khác đang refresh. Không được refresh song song
             // (sẽ làm mất token). Bỏ lượt này và để nhịp sau xử lý.
             _logger.LogWarning(

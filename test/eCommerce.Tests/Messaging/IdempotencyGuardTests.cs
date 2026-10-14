@@ -326,7 +326,7 @@ public class IdempotencyGuardTests
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             guard.ThucThiAsync(Khoa(), "{}", _ => throw new InvalidOperationException("hỏng")));
 
-        var doDuoc = Assert.Single(ghiDuoc.Where(x => x.Ten == eCommerceMetricNames.MessagingInboxFailedTotal));
+        var doDuoc = Assert.Single(ghiDuoc, x => x.Ten == eCommerceMetricNames.MessagingInboxFailedTotal);
         Assert.Equal(1L, doDuoc.GiaTri);
         Assert.Equal("messaging", doDuoc.Module);
     }

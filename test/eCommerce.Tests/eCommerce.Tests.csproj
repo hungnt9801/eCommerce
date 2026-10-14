@@ -15,6 +15,13 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+    <!-- 🚨 VÁ LỖ HỔNG BẮC CẦU (phát hiện 14/10/2026): project test đặt
+         ManagePackageVersionsCentrally=false nên BỎ QUA ghim ở Directory.Packages.props
+         => resolve 10.0.11 (KHUYẾN NGHỊ BẢO MẬT NU1902/NU1903: 1 moderate + 3 high).
+         Đây đúng là thư viện dùng cho XMLDSig (SIGN-001/EINV-001). Ghim tường minh ở đây
+         để bản test dùng CÙNG phiên bản đã vá như code sản phẩm. -->
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.13" />
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
   </ItemGroup>
 
   <ItemGroup>
