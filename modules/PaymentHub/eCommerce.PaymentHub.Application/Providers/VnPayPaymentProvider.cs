@@ -47,10 +47,32 @@ public class VnPayPaymentProvider : IPaymentProvider
 {
     private readonly VnPayOptions _options;
 
-    public VnPayPaymentProvider(IOptions<PaymentHubOptions> options)
+    /// <summary>📊 Metric — tuỳ chọn (DI inject bản thật; test truyền null vẫn chạy).</summary>
+    private readonly eCommerce.Kernel.Observability.eCommerceMetrics? _metrics;
+
+    public VnPayPaymentProvider(
+        IOptions<PaymentHubOptions> options,
+        eCommerce.Kernel.Observability.eCommerceMetrics? metrics = null)
     {
         _options = options.Value.VnPay;
+        _metrics = metrics;
     }
+
+    /// <summary>
+    /// 📊 Phát metric **webhook bị TỪ CHỐI** (không đáng tin). Nhãn HỮU HẠN: nhà cung cấp + lý do.
+    ///
+    /// 🚨 PHÂN BIỆT QUAN TRỌNG — chỉ 2 ca này mới là "từ chối":
+    ///   • **thiếu chữ ký**, • **chữ ký sai**.
+    ///   **KHÔNG** tính là từ chối khi chữ ký ĐÚNG nhưng `vnp_ResponseCode != 00`: đó là webhook
+    ///   **hợp lệ** báo **giao dịch thất bại/khách huỷ**. Nếu tính nhầm thì metric sẽ **báo động giả**
+    ///   mỗi lần khách huỷ thanh toán — và cảnh báo mất giá trị.
+    /// </summary>
+    private void GhiMetricTuChoi(string lyDo)
+        => _metrics?.PaymentWebhookRejected.Add(1,
+            new KeyValuePair<string, object?>(
+                eCommerce.Kernel.Observability.eCommerceMetricTags.Provider, ProviderCode),
+            new KeyValuePair<string, object?>(
+                eCommerce.Kernel.Observability.eCommerceMetricTags.Reason, lyDo));
 
     public string ProviderCode => "vnpay";
 
@@ -105,6 +127,7 @@ public class VnPayPaymentProvider : IPaymentProvider
 
         if (!parameters.TryGetValue("vnp_SecureHash", out var receivedHash))
         {
+            GhiMetricTuChoi("thieu-chu-ky");
             result.SignatureValid = false;
             result.IsSuccess = false;
             result.FailureReason = "Thiếu vnp_SecureHash.";
@@ -126,6 +149,11 @@ public class VnPayPaymentProvider : IPaymentProvider
         var expectedHash = HmacSha512(_options.HashSecret, BuildQueryString(toSign));
 
         result.SignatureValid = string.Equals(expectedHash, receivedHash, StringComparison.OrdinalIgnoreCase);
+
+        if (!result.SignatureValid)
+        {
+            GhiMetricTuChoi("chu-ky-sai");
+        }
         result.MerchantReference = parameters.GetValueOrDefault("vnp_TxnRef") ?? string.Empty;
         result.ProviderTransactionId = parameters.GetValueOrDefault("vnp_TransactionNo");
         result.Currency = parameters.GetValueOrDefault("vnp_CurrCode") ?? "VND";

@@ -17,7 +17,8 @@ public class VnPayWebhookTests
 {
     private const string HashSecret = "test_hash_secret_khong_dung_cho_production";
 
-    private static VnPayPaymentProvider CreateProvider() => new(
+    private static VnPayPaymentProvider CreateProvider(
+        eCommerce.Kernel.Observability.eCommerceMetrics? metrics = null) => new(
         Options.Create(new PaymentHubOptions
         {
             VnPay = new VnPayOptions
@@ -25,7 +26,8 @@ public class VnPayWebhookTests
                 TmnCode = "TESTTMN",
                 HashSecret = HashSecret
             }
-        }));
+        }),
+        metrics);
 
     private static string HmacSha512(string key, string input)
     {
@@ -141,5 +143,117 @@ public class VnPayWebhookTests
         Assert.Contains("vnp_Amount=12345678", result.CheckoutUrl);
         Assert.Contains("vnp_SecureHash=", result.CheckoutUrl);
         Assert.Contains("vnp_TxnRef=ORDER-2026-004", result.CheckoutUrl);
+    }
+
+    // ══════════════════════ 📊 METRIC "WEBHOOK BỊ TỪ CHỐI" ══════════════════════
+
+    private sealed class BoGhi : IDisposable
+    {
+        private readonly System.Diagnostics.Metrics.MeterListener _listener = new();
+
+        public List<(string Ten, long GiaTri, Dictionary<string, object?> Nhan)> Ghi { get; } = [];
+
+        public BoGhi(System.Diagnostics.Metrics.Meter meter)
+        {
+            _listener.InstrumentPublished = (instrument, l) =>
+            {
+                if (ReferenceEquals(instrument.Meter, meter))
+                {
+                    l.EnableMeasurementEvents(instrument);
+                }
+            };
+
+            _listener.SetMeasurementEventCallback<long>((instrument, value, tags, _) =>
+            {
+                var nhan = new Dictionary<string, object?>();
+                foreach (var t in tags)
+                {
+                    nhan[t.Key] = t.Value;
+                }
+
+                Ghi.Add((instrument.Name, value, nhan));
+            });
+
+            _listener.Start();
+        }
+
+        public void Dispose() => _listener.Dispose();
+    }
+
+    private static (VnPayPaymentProvider Provider, BoGhi Ghi) ProviderCoMetric()
+    {
+        var meter = new System.Diagnostics.Metrics.Meter("eCommerce-Test-" + Guid.NewGuid());
+        var metrics = new eCommerce.Kernel.Observability.eCommerceMetrics(meter);
+
+        return (CreateProvider(metrics), new BoGhi(meter));
+    }
+
+    private static long DemTuChoi(BoGhi ghi)
+        => ghi.Ghi
+            .Where(x => x.Ten == eCommerce.Kernel.Observability.eCommerceMetricNames.PaymentWebhookRejectedTotal)
+            .Sum(x => x.GiaTri);
+
+    [Fact]
+    public async Task IPN_thieu_chu_ky_thi_PHAT_metric_tu_choi()
+    {
+        var (provider, ghi) = ProviderCoMetric();
+        using var _ = ghi;
+
+        await provider.VerifyWebhookAsync("vnp_TxnRef=X&vnp_Amount=100", new Dictionary<string, string>());
+
+        Assert.Equal(1, DemTuChoi(ghi));
+        var nhan = Assert.Single(ghi.Ghi,
+            x => x.Ten == eCommerce.Kernel.Observability.eCommerceMetricNames.PaymentWebhookRejectedTotal).Nhan;
+        Assert.Equal("vnpay", nhan[eCommerce.Kernel.Observability.eCommerceMetricTags.Provider]);
+        Assert.Equal("thieu-chu-ky", nhan[eCommerce.Kernel.Observability.eCommerceMetricTags.Reason]);
+    }
+
+    [Fact]
+    public async Task IPN_chu_ky_SAI_thi_PHAT_metric_tu_choi()
+    {
+        var (provider, ghi) = ProviderCoMetric();
+        using var _ = ghi;
+
+        var body = BuildIpnQuery("ORDER-2026-009", 100000m, "00", "00");
+        var tampered = body.Replace("vnp_Amount=10000000", "vnp_Amount=99000000");
+
+        await provider.VerifyWebhookAsync(tampered, new Dictionary<string, string>());
+
+        var nhan = Assert.Single(ghi.Ghi,
+            x => x.Ten == eCommerce.Kernel.Observability.eCommerceMetricNames.PaymentWebhookRejectedTotal).Nhan;
+        Assert.Equal("chu-ky-sai", nhan[eCommerce.Kernel.Observability.eCommerceMetricTags.Reason]);
+    }
+
+    [Fact]
+    public async Task IPN_HOP_LE_thi_KHONG_phat_metric_tu_choi()
+    {
+        // Chống BÁO ĐỘNG GIẢ: webhook hợp lệ thì tuyệt đối không được tính là "bị từ chối".
+        var (provider, ghi) = ProviderCoMetric();
+        using var _ = ghi;
+
+        var body = BuildIpnQuery("ORDER-2026-010", 250000m, "00", "00");
+
+        var result = await provider.VerifyWebhookAsync(body, new Dictionary<string, string>());
+
+        Assert.True(result.SignatureValid);
+        Assert.Equal(0, DemTuChoi(ghi));
+    }
+
+    [Fact]
+    public async Task IPN_chu_ky_DUNG_nhung_giao_dich_THAT_BAI_thi_KHONG_tinh_la_TU_CHOI()
+    {
+        // 🚨 Đây là ca dễ tính nhầm nhất: chữ ký ĐÚNG nhưng `vnp_ResponseCode != 00`
+        // (khách huỷ / giao dịch thất bại). Đây là webhook **HỢP LỆ** — KHÔNG phải bị từ chối.
+        // Nếu tính nhầm thì metric sẽ báo động GIẢ mỗi lần khách huỷ thanh toán.
+        var (provider, ghi) = ProviderCoMetric();
+        using var _ = ghi;
+
+        var body = BuildIpnQuery("ORDER-2026-011", 250000m, "24", "02");   // 24 = khách huỷ
+
+        var result = await provider.VerifyWebhookAsync(body, new Dictionary<string, string>());
+
+        Assert.True(result.SignatureValid);      // chữ ký hợp lệ
+        Assert.False(result.IsSuccess);          // nhưng giao dịch thất bại
+        Assert.Equal(0, DemTuChoi(ghi));         // ⬅️ KHÔNG phải webhook bị từ chối
     }
 }

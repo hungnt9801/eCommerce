@@ -7,6 +7,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\eCommerce.PaymentHub.Domain\eCommerce.PaymentHub.Domain.csproj" />
+    <ProjectReference Include="..\..\..\shared\eCommerce.Kernel\eCommerce.Kernel.csproj" />
   </ItemGroup>
 
   <ItemGroup>
