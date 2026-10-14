@@ -7,6 +7,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\eCommerce.EInvoice.Domain\eCommerce.EInvoice.Domain.csproj" />
+    <!-- Luồng GĐ0 nối 3 module: chỉ tham chiếu tầng DOMAIN của module khác (module→module hợp lệ;
+         module→app BỊ CẤM theo quy ước #3). -->
+    <ProjectReference Include="..\..\Address\eCommerce.Address.Domain\eCommerce.Address.Domain.csproj" />
+    <ProjectReference Include="..\..\Signing\eCommerce.Signing.Domain\eCommerce.Signing.Domain.csproj" />
+    <ProjectReference Include="..\..\Messaging\eCommerce.Messaging.Domain\eCommerce.Messaging.Domain.csproj" />
   </ItemGroup>
 
   <ItemGroup>
