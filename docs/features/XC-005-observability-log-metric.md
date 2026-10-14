@@ -476,3 +476,40 @@ public class ObservabilityTests
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.1 | 13/10/2026 | *(điền)* | Bản nháp đầu — hiện trạng lấy **từ code thật** (0 gói observability; `CorrelationId` chỉ là cột DB, 12/12 trong migration; audit log đã có; 0 `Console.Write*`); lập **bảng đăng ký metric** gom 7 metric đang bị `XC-002`/`XC-003` yêu cầu mà chưa có nơi phát; phát hiện **F2** (payload webhook thô 8.000 ký tự) |
+
+
+---
+
+## 16. ⚠️ PHÁT HIỆN KIẾN TRÚC (14/10/2026) — **vì sao 7 metric vẫn CHƯA có nơi phát**
+
+Trong lúc làm mục (2) của GĐ0 (wire metric), tôi phát hiện **nguyên nhân gốc không phải "chưa làm" mà là
+một lỗi TẦNG**:
+
+`eCommerceMetrics` (bảng đăng ký + 12 instrument) đang nằm ở
+**`src/eCommerce.Domain.Shared/Observability/eCommerceMetrics.cs`** — tức **tầng APP**.
+
+Nhưng nơi cần phát metric lại là **bên trong MODULE**:
+| Metric | Nơi cần phát | Project |
+|---|---|---|
+| `messaging_inbox_failed_total` | `IdempotencyGuard` | `modules/Messaging/…Domain` |
+| `lock_timeout_total` · `lock_skipped_total` | `ChannelTokenManager` | `modules/ChannelHub/…Application` |
+| `channel_sync_failed_total` | `ChannelShopSyncer` | `modules/ChannelHub/…Application` |
+
+🚨 **Quy ước #3 của dự án CẤM module tham chiếu app** (`module→app forbidden`) ⇒ các module **KHÔNG THỂ**
+dùng `eCommerceMetrics` ở vị trí hiện tại. Đó là lý do **cấu trúc**: 12 instrument đã đăng ký + có 6 test
+`MeterListener`, nhưng **không nơi nào phát được** mà không vi phạm quy ước.
+
+### ✅ Cách sửa ĐÚNG (chưa thực hiện — cần một lượt riêng để làm và KIỂM CHỨNG)
+
+**Chuyển `eCommerceMetrics` + `eCommerceMetricNames` + `eCommerceMetricTags` sang
+`shared/eCommerce.Kernel/Observability/`** (namespace `eCommerce.Kernel.Observability`).
+
+Vì sao Kernel là đúng chỗ: nó **đã** được mọi module tham chiếu (`Messaging.Domain` → Kernel;
+`Address`/`EInvoice`/`Signing` → …), và hợp đồng quan sát **dùng chung** đúng bản chất "shared kernel" —
+giống `Money`/`Currency`. Sau khi chuyển thì **mọi module phát metric được mà KHÔNG vi phạm quy ước nào**.
+
+**Việc kèm theo khi chuyển:** cập nhật `MetricsTests` (đổi `using`), thêm `ProjectReference` Kernel cho các
+module cần phát, rồi mới wire được 3 điểm phát thật ở bảng trên. **Ước lượng: 1 lượt làm + kiểm chứng.**
+
+> 📌 Đây là ví dụ thứ hai trong dự án về **lỗi tầng** (lỗi đầu là `ConventionalControllers` chỉ thấy
+> assembly **đã nạp** — C16). Cả hai đều **không lộ ra khi build**, chỉ lộ khi hỏi *"vậy ai gọi cái này?"*.

@@ -71,6 +71,9 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
     // ── Address (ADDR-001): danh mục đơn vị hành chính theo PHIÊN BẢN schema ──
     public DbSet<Address.AdministrativeUnit> AdministrativeUnits { get; set; } = default!;
 
+    // ── Address (ADDR-002): ánh xạ mã địa chỉ theo hãng vận chuyển ──
+    public DbSet<Address.Carrier.CarrierAddressMapping> CarrierAddressMappings { get; set; } = default!;
+
     // ── EInvoice (EINV-001): hoá đơn điện tử ──
     public DbSet<EInvoice.EInvoice> Invoices { get; set; } = default!;
 

@@ -1217,3 +1217,38 @@ VALUES ('20261014031859_Add_EInvoice_CqtRetryCounters', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE TABLE "AddrCarrierMappings" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "CarrierCode" character varying(32) NOT NULL,
+    "CarrierLevel" character varying(32) NOT NULL,
+    "CarrierAddressCode" character varying(64) NOT NULL,
+    "CarrierAddressName" character varying(256) NOT NULL,
+    "OurAdministrativeUnitId" uuid NOT NULL,
+    "MatchMethod" integer NOT NULL,
+    "Status" integer NOT NULL,
+    "Source" character varying(512),
+    "SyncedAtUtc" timestamp with time zone NOT NULL,
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_AddrCarrierMappings" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_AddrCarrierMappings_Status" CHECK ("Status" in (0, 1, 2))
+);
+
+CREATE INDEX "IX_AddrCarrierMappings_Status_CarrierCode" ON "AddrCarrierMappings" ("Status", "CarrierCode");
+
+CREATE UNIQUE INDEX "IX_AddrCarrierMappings_TenantId_CarrierCode_CarrierAddressCode" ON "AddrCarrierMappings" ("TenantId", "CarrierCode", "CarrierAddressCode") NULLS NOT DISTINCT;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261014042922_Add_Addr002_CarrierMappings', '10.0.11');
+
+COMMIT;
+

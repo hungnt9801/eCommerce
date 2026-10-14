@@ -15,6 +15,12 @@ public static class AddressDbContextModelCreatingExtensions
     /// <summary>Tên index unique — migration thay bằng SQL thô để có `NULLS NOT DISTINCT`.</summary>
     public const string TenIndexUnique = "IX_AddrAdministrativeUnits_TenantId_SchemaVersion_Level_Code";
 
+    // ── ADDR-002: ánh xạ mã địa chỉ theo hãng vận chuyển ──
+    public const string TenBangMaHang = "AddrCarrierMappings";
+
+    /// <summary>Tên index unique cho ánh xạ mã hãng — cũng cần `NULLS NOT DISTINCT`.</summary>
+    public const string TenIndexUniqueMaHang = "IX_AddrCarrierMappings_TenantId_CarrierCode_CarrierAddressCode";
+
     public static void ConfigureAddress(this ModelBuilder builder)
     {
         Check.NotNull(builder, nameof(builder));
@@ -51,6 +57,35 @@ public static class AddressDbContextModelCreatingExtensions
             b.ToTable(t => t.HasCheckConstraint(
                 "CK_AddrAdministrativeUnits_SchemaVersion",
                 "\"SchemaVersion\" in (1, 2)"));
+        });
+
+        // ── ADDR-002: ánh xạ mã địa chỉ theo HÃNG VẬN CHUYỂN ────────────────────
+        builder.Entity<Carrier.CarrierAddressMapping>(b =>
+        {
+            b.ToTable(TenBangMaHang);
+            b.ConfigureByConvention();
+
+            b.Property(x => x.CarrierCode).IsRequired().HasMaxLength(32);
+            b.Property(x => x.CarrierLevel).IsRequired().HasMaxLength(32);
+            b.Property(x => x.CarrierAddressCode).IsRequired().HasMaxLength(64);
+            b.Property(x => x.CarrierAddressName).IsRequired().HasMaxLength(256);
+            b.Property(x => x.Source).HasMaxLength(512);
+
+            // 🔒 MỘT mã hãng chỉ được ánh xạ MỘT lần, và phải SCOPE THEO HÃNG (cùng mã có thể là
+            // hai địa chỉ khác nhau ở hai hãng). Đây là hàng rào cuối cho bất biến 0503.
+            // ⚠️ Cần `NULLS NOT DISTINCT` (bài học C4/F1) ⇒ migration dùng SQL thô.
+            b.HasIndex(x => new { x.TenantId, x.CarrierCode, x.CarrierAddressCode })
+                .IsUnique()
+                .HasDatabaseName(TenIndexUniqueMaHang);
+
+            // Tra nhanh "còn mã nào chưa xác minh" cho màn hình vận hành.
+            b.HasIndex(x => new { x.Status, x.CarrierCode })
+                .HasDatabaseName("IX_AddrCarrierMappings_Status_CarrierCode");
+
+            // Hàng rào DB: trạng thái chỉ nhận 3 giá trị (0 ChuaXacMinh · 1 DaXacMinh · 2 NghiNgo).
+            b.ToTable(t => t.HasCheckConstraint(
+                "CK_AddrCarrierMappings_Status",
+                "\"Status\" in (0, 1, 2)"));
         });
     }
 }
