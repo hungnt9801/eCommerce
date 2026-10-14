@@ -7,6 +7,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\eCommerce.ChannelHub.Domain\eCommerce.ChannelHub.Domain.csproj" />
+    <ProjectReference Include="..\..\..\shared\eCommerce.Kernel\eCommerce.Kernel.csproj" />
     <ProjectReference Include="..\eCommerce.ChannelHub.Application.Contracts\eCommerce.ChannelHub.Application.Contracts.csproj" />
   </ItemGroup>
 

@@ -259,6 +259,10 @@ public class eCommerceHttpApiHostModule : AbpModule
         // không nối được log giữa các tầng (đã kiểm chứng: 12/12 chỗ xuất hiện đều nằm trong migration).
         app.UseCorrelationId();
 
+        // 📊 Đo độ trễ request và phát http_request_duration_seconds (XC-005).
+        // Đặt sớm để bao được cả thời gian xác thực/phân quyền.
+        app.UseMiddleware<Observability.HttpRequestDurationMiddleware>();
+
         // 🔐 Bắt buộc: xác thực TRƯỚC phân quyền. OpenIddict chèn handler vào
         // AuthenticationMiddleware nên /connect/token được xử lý ở đây.
         app.UseAuthentication();
