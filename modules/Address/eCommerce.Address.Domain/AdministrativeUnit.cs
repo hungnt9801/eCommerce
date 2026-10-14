@@ -127,5 +127,36 @@ public class AdministrativeUnit : FullAuditedAggregateRoot<Guid>, IMultiTenant
         }
     }
 
+    /// <summary>
+    /// **Đổi tên** đơn vị theo danh mục chính thức.
+    ///
+    /// 🎯 VÌ SAO ĐỔI TÊN TẠI CHỖ (không tạo bản ghi mới): hoá đơn, vận đơn và địa chỉ khách hàng
+    /// đang tham chiếu tới **Id** này. Nếu tạo bản ghi mới rồi đóng bản cũ thì các tham chiếu cũ
+    /// **trỏ vào một đơn vị đã đóng** ⇒ tra cứu địa chỉ cũ sẽ **fail-closed** và không sửa được.
+    /// Tên là **thuộc tính mô tả**, không phải danh tính — danh tính là (phiên bản, cấp, mã).
+    /// </summary>
+    public void DoiTen(string tenMoi, string? legalBasis = null)
+    {
+        Name = Volo.Abp.Check.NotNullOrWhiteSpace(tenMoi, nameof(tenMoi), maxLength: 256);
+
+        if (!string.IsNullOrWhiteSpace(legalBasis))
+        {
+            LegalBasis = legalBasis;
+        }
+    }
+
+    /// <summary>
+    /// **Mở lại** đơn vị từng bị đóng, khi mã xuất hiện lại trong danh mục chính thức.
+    /// Không ném lỗi nếu đang mở (để lần đồng bộ lặp lại vẫn an toàn).
+    /// </summary>
+    public void MoLai(string? legalBasis = null)
+    {
+        IsActive = true;
+
+        if (!string.IsNullOrWhiteSpace(legalBasis))
+        {
+            LegalBasis = legalBasis;
+        }
+    }
     public override string ToString() => $"v{SchemaVersion}/{Level}/{Code} {Name}";
 }

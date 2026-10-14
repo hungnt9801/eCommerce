@@ -528,3 +528,25 @@ Toàn bộ 46 tài liệu feature của **A.3** đã viết xong. **Kiểm chứ
 > • **C13** — tiền tố **ĐÔI** trên 3 hàm sinh khoá lock (`ecommerce:ecommerce:…`) → đã bỏ tiền tố + **4 test bất biến**
 > • **C16** — `ConventionalControllers` chỉ đăng ký 2 assembly ⇒ **mọi module mới trả `404` body rỗng** (đúng triệu chứng đã truy lỗi C8) → đã đăng ký động + **ghi log `[C16]`**
 > • **C15** — allowlist ở `XC-004` Q1 **mâu thuẫn** với webhook bắt buộc `[AllowAnonymous]` → đã bổ sung 2 nhóm
+
+---
+
+## A.10 CHỐT GIAI ĐOẠN 0 (14/10/2026)
+
+📄 **Báo cáo chốt GĐ0: [`docs/gd0-closure-report.md`](gd0-closure-report.md)**
+
+**Kết luận:** GĐ0 **đóng ở mức có thể đóng bằng code**. 7/7 feature GĐ0 có Domain + DB + API; luồng
+nghiệp vụ khép kín từ *xác minh địa chỉ* tới *nhận kết quả cơ quan thuế*. Phần còn lại là **5 việc phụ
+thuộc input bên ngoài** (văn bản pháp luật, tài liệu đối tác, chứng thư số) — **không thể suy đoán**.
+
+**Bổ sung trong lượt chốt — `ADDR-001` lõi đồng bộ danh mục ĐVHC:**
+- `AdministrativeUnitSynchronizer` (lõi thuần, 16 test) + `AdministrativeUnit.DoiTen/MoLai`.
+- **4 hàng rào chống "đồng bộ phá hoại"**: `eCommerce:Address:0601` (danh mục rỗng) · `0602` (quá ít) ·
+  `0603` (thiếu cấp tỉnh) · `0604` (đóng vượt 20%).
+  *Lý do:* đồng bộ **đóng** những mã không còn trong nguồn; nếu nguồn trả về **một phần** thì sẽ
+  **đóng gần hết địa chỉ đang dùng** ⇒ mọi vận đơn mới fail-closed ⇒ **sập luồng bán hàng**.
+- Bất biến: **không bao giờ xoá** (chỉ đóng) · **đổi tên tại chỗ** (giữ `Id`) · **chỉ xét đúng phiên bản schema**.
+
+**Việc làm được ngay, không chờ ai (đề xuất lượt sau):**
+**(A)** worker đồng bộ ĐVHC dùng 4 hàng rào đã có · **(B)** ràng buộc `EINV-003` một bản thay thế hiệu lực ·
+**(C)** worker đồng bộ mã hãng với adapter cắm được.
