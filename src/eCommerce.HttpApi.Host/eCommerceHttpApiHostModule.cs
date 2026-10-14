@@ -52,6 +52,8 @@ namespace eCommerce;
     typeof(Tax.EntityFrameworkCore.TaxEntityFrameworkCoreModule),
     // 🚨 BẮT BUỘC: thiếu dòng này thì assembly Address.Application KHÔNG nằm trong đồ thị module
     // ⇒ ABP không nạp, không quét app service, không tạo endpoint ⇒ API trả 404 body rỗng (bài học C8/C16).
+    // 🚨 BAT BUOC: thieu dong nay thi cac type trong shared/eCommerce.Kernel KHONG duoc dang ky DI.
+    typeof(eCommerce.Kernel.eCommerceKernelModule),
     typeof(Address.Application.AddressApplicationModule),
     typeof(EInvoice.Application.EInvoiceApplicationModule),
     typeof(Signing.Application.SigningApplicationModule)
