@@ -545,3 +545,59 @@ nằm sai tầng).
 | `messaging_outbox_pending` | Relay outbox | 🚧 **chưa có relay** |
 | `http_request_duration_seconds` | Middleware đo độ trễ | Cần một middleware mới trong Host |
 | `tax_unclassified_skus` · `payment_webhook_rejected_total` · `logging_failures_total` | Nơi phát tương ứng | Mẫu đã chứng minh |
+
+---
+
+## 18. ĐIỂM PHÁT METRIC: 5/12 → **7/12** (14/10/2026)
+
+Thêm 2 điểm phát trong cùng một tính năng — **job đếm SKU chưa phân loại thuế**:
+
+| Metric | Nơi phát | Ghi chú |
+|---|---|---|
+| `tax_unclassified_skus` (gauge) | `TaxUnclassifiedSkusWorker` (tầng app) | Lõi đếm thuần: `TaxUnclassifiedSkuCounter` |
+| `lock_skipped_total` | Cùng worker, khi **không giành được khoá** | Khác `lock_timeout_total` (đã có ở `ChannelTokenManager`) |
+
+### 🎯 Vì sao đếm SKU chưa phân loại lại quan trọng về NGHIỆP VỤ
+
+Quyết định **D5**: SKU chưa phân loại **vẫn cho bán** nhưng **CHẶN phát hành hoá đơn**
+(`eCommerce:Tax:0003`). Nghĩa là SKU chưa phân loại là **việc đang tồn của kế toán**, và nó **chặn
+doanh thu hợp pháp**. Không đo được con số này thì nó **chỉ lộ ra khi có khách xin hoá đơn** — lúc đó đã muộn.
+
+### 🚨 SENTINEL `-1` = "CHƯA XÁC ĐỊNH" (KHÔNG để 0 khi đếm lỗi)
+
+Gauge mặc định là `0`, mà `0` mang nghĩa **"kế toán không còn việc gì"**. Nếu việc đếm **thất bại**
+(ví dụ bảng thuế suất trống) mà gauge vẫn là `0` thì hệ thống **nói dối một cách im lặng**.
+Vì vậy: đếm lỗi ⇒ đặt gauge = **`-1`** (hằng số `TaxUnclassifiedSkuCounter.ChuaXacDinh`) và ghi log Error.
+Dashboard **phải** phân biệt `-1` (chưa xác định) với `0` (đã xong).
+
+### 🚨 HAI CHI TIẾT DỄ SAI ĐÃ XỬ LÝ
+
+1. **`Timer.RunOnStart = true`**: gauge mặc định là 0 ⇒ nếu chờ hết nhịp 10 phút mới đếm lần đầu thì
+   **10 phút đầu sau mỗi lần deploy, dashboard hiển thị 0 một cách SAI**. Đếm ngay khi khởi động.
+2. **Đăng ký worker tường minh** trong `eCommerceApplicationModule.OnPostApplicationInitializationAsync`.
+   Nếu chỉ có class mà không đăng ký thì **KHÔNG có lỗi build**, app vẫn khởi động, nhưng job
+   **im lặng không bao giờ chạy** — và metric mãi mãi là 0. (Đây là dạng lỗi đã gặp 2 lần trong dự án.)
+
+### 🚨 GIỚI HẠN ĐÃ BIẾT của con số này (ghi rõ để không hiểu nhầm)
+
+Danh mục sản phẩm hiện **CHƯA có khái niệm `Category`** (`Product` chỉ có `BrandId`; `ProductVariant`
+không có `CategoryId`) ⇒ chuỗi danh mục truyền vào resolver là **rỗng**, phân loại chỉ có thể ở **cấp SKU**.
+Khi danh mục được thêm vào, **con số này sẽ GIẢM** vì nhiều SKU sẽ được phân loại theo danh mục — đó là
+điều đúng, không phải lỗi. `TaxRateResolver` đã sẵn sàng cho cấp danh mục.
+
+### ✅ ĐÃ KIỂM CHỨNG END-TO-END TRÊN POSTGRESQL THẬT (không chỉ unit test)
+
+| Bước | Bằng chứng |
+|---|---|
+| Worker khởi động | `Started background worker: eCommerce.Tax.TaxUnclassifiedSkusWorker` |
+| Chèn **1** SKU đang bán + **0** phân loại thuế vào DB thật | `CatProductVariants` = 1 dòng |
+| Worker **THỰC SỰ CHẠY** và đếm đúng | log: `Đếm SKU chưa phân loại thuế: 1/1 SKU đang bán chưa phân loại.` |
+| Cảnh báo hành động được | log Warning kèm `eCommerce:Tax:0003` |
+| Dọn dẹp | `CatProductVariants` = 0, `CatProducts` = 0 |
+
+### CÒN LẠI 5/12
+| Metric | Cần gì |
+|---|---|
+| `messaging_outbox_pending` · `messaging_dlq_size` · `messaging_dlq_replayed_total` | 🏗️ Outbox + DLQ (**chưa có**) |
+| `logging_failures_total` | 🏗️ Logger provider bắt lỗi sink |
+| `lock_ttl_exceeded_total` | ⬜ Chưa có chỗ phát (cần nơi phát hiện vượt TTL khoá) |

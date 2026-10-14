@@ -1,4 +1,7 @@
+using Volo.Abp;
 using Volo.Abp.Application;
+using Volo.Abp.BackgroundWorkers;
+using Volo.Abp.Threading;
 using Volo.Abp.FeatureManagement;
 using Volo.Abp.Identity;
 using Volo.Abp.Modularity;
@@ -27,9 +30,21 @@ namespace eCommerce;
     typeof(AbpIdentityApplicationModule),
     typeof(AbpPermissionManagementApplicationModule),
     typeof(AbpFeatureManagementApplicationModule),
-    typeof(AbpSettingManagementApplicationModule)
+    typeof(AbpSettingManagementApplicationModule),
+    typeof(Tax.TaxDomainModule)
 )]
 [DependsOn(typeof(AbpAccountApplicationModule))]
     public class eCommerceApplicationModule : AbpModule
 {
+    /// <summary>
+    /// Đăng ký job đếm SKU chưa phân loại thuế (`tax_unclassified_skus`).
+    ///
+    /// ⚠️ ĐÂY LÀ CHỖ DỄ SAI NHẤT (đã gặp 2 lần trong dự án): worker phải được **đăng ký tường minh**
+    /// thì mới chạy. Nếu chỉ có class mà không có dòng dưới đây thì **KHÔNG có lỗi build**, app vẫn
+    /// khởi động bình thường, nhưng job **im lặng không bao giờ chạy** — và metric sẽ mãi mãi là 0.
+    /// </summary>
+    public override async Task OnPostApplicationInitializationAsync(ApplicationInitializationContext context)
+    {
+        await context.AddBackgroundWorkerAsync<Tax.TaxUnclassifiedSkusWorker>();
+    }
 }

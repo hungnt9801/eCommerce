@@ -7,6 +7,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\eCommerce.Domain\eCommerce.Domain.csproj" />
+    <!-- Job đếm SKU chưa phân loại thuế: tầng app được phép tham chiếu module (module->app mới bị cấm). -->
+    <ProjectReference Include="..\..\modules\Tax\eCommerce.Tax.Domain\eCommerce.Tax.Domain.csproj" />
+    <!-- eCommerceMetrics (gauge tax_unclassified_skus) nam o shared/eCommerce.Kernel. -->
+    <ProjectReference Include="..\..\shared\eCommerce.Kernel\eCommerce.Kernel.csproj" />
     <ProjectReference Include="..\eCommerce.Application.Contracts\eCommerce.Application.Contracts.csproj" />
     <ProjectReference Include="..\..\modules\ChannelHub\eCommerce.ChannelHub.Application.Contracts\eCommerce.ChannelHub.Application.Contracts.csproj" />
   </ItemGroup>
