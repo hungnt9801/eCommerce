@@ -1970,3 +1970,62 @@ nên **không thể suy ra** — đoán kho là **nhập hàng vào kho sai**.
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.5 | 15/10/2026 | *(agent, session GĐ1)* | **`SAL-004` — trả hàng**: `TraHangAsync` **tái dùng** `StockDocumentAppService` (chứng từ & ghi sổ hai bước, khoá phân tán, `CHECK` DB) ⇒ sinh **phiếu NHẬP kho** ⇒ `Returned`; idempotent; **NÉM** nếu đơn chưa xác nhận. **Kiểm chứng HTTP**: `6/0/6` ⇒ **`10/0/10`**, sổ cái **5 bút toán**, 2 chứng từ `Posted`, huỷ-sau-xác-nhận **bị chặn**, **đối soát `0` lệch**, **`fail: 0`**. Ghi **bảng vòng đời đơn KÍN CẢ HAI CHIỀU** (§30.3) |
+
+---
+
+## 31. `SAL-004` (tiếp) — **LOẠI CHỨNG TỪ `CustomerReturn` RIÊNG CHO TRẢ HÀNG** (15/10/2026)
+
+### 31.1 Vấn đề của §30 (đã ghi ở §30.4 #4) và cách sửa
+
+Ở lát cắt trước, phiếu **trả hàng** phải **"mượn"** `StockDocumentType.GoodsReceipt` ⇒ sổ cái ghi
+`StockMovementType.Receipt` ⇒ **lẫn** *hàng nhập mua* với *hàng khách trả*.
+🚨 **Vì sao đây là lỗi NGHIÊM TRỌNG nhưng KHÓ THẤY:** cả hai loại đều **làm TĂNG `OnHand`** ⇒
+**tồn kho vẫn đúng** ⇒ **không test nào khác phát hiện**. Nhưng báo cáo *"đã bán bao nhiêu"* và
+*"khách trả bao nhiêu"* **lẫn nhau VĨNH VIỄN** — vì sổ cái **append-only**, dữ liệu đã ghi thì **không sửa được**.
+📌 Đây là loại lỗi **chỉ lộ ra khi đã quá muộn** (tháng sau kế toán hỏi *"tỉ lệ hoàn hàng là bao nhiêu?"*).
+
+### 31.2 Đã làm
+
+| # | Thay đổi | Ghi chú |
+|---|---|---|
+| 1 | `StockDocumentType.CustomerReturn = 3` — **thêm ở CUỐI DẢI** | `Type` lưu **dạng số** ⇒ **đổi số của giá trị cũ** sẽ **diễn giải lại toàn bộ lịch sử kho** mà **không có lỗi nào** (cùng bài học `StockMovementType`, `INV-001` §16.1) |
+| 2 | `TinhButToanChungTu` — nhánh riêng cho `CustomerReturn` ⇒ biến động `CustomerReturn` | tách khỏi `GoodsReceipt` **dù cùng tăng `OnHand`** |
+| 3 | `DonHangAppService.TraHangAsync` dùng `CustomerReturn` thay `GoodsReceipt` | |
+
+✅ **KHÔNG cần migration:** cột `InvStockDocuments.Type` là **`int`** và giá trị mới **thêm ở cuối** ⇒
+dữ liệu cũ (0/1/2) **không bị diễn giải lại**.
+
+### 31.3 ✅ BẰNG CHỨNG
+
+**Test đơn vị (+3):**
+- phiếu trả hàng sinh biến động **`CustomerReturn`**, ✅ **không** phải `Receipt`;
+- phiếu nhập mua **vẫn** `Receipt` ⇒ **hai loại không lẫn nhau**;
+- 🚨 **test khoá đúng điểm mù**: *"cả hai loại đều làm tăng `OnHand`"* ⇒ chứng minh **vì sao** lỗi này
+  **không** bị bắt ở bất kỳ test nào khác (nên cần test riêng này).
+
+**HTTP thật** (đo **mã số** biến động trong `InvStockLedger`):
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 0–1 | checkout → đơn → xác nhận (**`6/0/6`**) → **TRẢ HÀNG** | `200` · **`Returned`** · **`10/0/10`** ✅ |
+| 1b | **Sổ cái — 5 bút toán** | `0` `Receipt 10` · `1` `Reservation 4` · `3` **`Sale 4`** · `2` **`ReservationRelease 4`** · **`4` `CustomerReturn 4`** ✅ — **`4` = `CustomerReturn`**, không còn `0` |
+| 2 | Trả hàng lần hai | `Returned` · vẫn `10/0/10` ✅ (idempotent) |
+| 3 | Huỷ đơn sau khi đã xác nhận | `403` **`Inventory:0001`** ✅ |
+| 4 | **Đối soát kho** | **`soCapLech = 0`** ✅ |
+| 5–6 | Dọn dẹp · log | 0/0/0/0 ✅ · **`fail: 0`** ✅ |
+
+- build `--no-incremental`: **0 lỗi / 0 cảnh báo** · unit **693/693** (+3) · integration **38/38** · mermaid 197/0
+
+### 31.4 Còn lại
+
+| # | Việc |
+|---|---|
+| 1 | **Trả hàng MỘT PHẦN** (trả 2/4 món) — cần **dòng trả riêng** + **giới hạn luỹ kế** (không trả quá số đã mua, kể cả trả nhiều lần) |
+| 2 | **Hoàn tiền** (thuộc `PaymentHub`/kế toán) — hiện chỉ trả **tồn kho** |
+| 3 | `INV-003` phân bổ tồn theo kênh · `REC-001` · `WEB-001` |
+
+### 31.5 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.6 | 15/10/2026 | *(agent, session GĐ1)* | **Loại chứng từ `CustomerReturn` riêng**: `StockDocumentType.CustomerReturn = 3` (**cuối dải**, không cần migration) + nhánh trong `TinhButToanChungTu` + `TraHangAsync` dùng loại riêng ⇒ sổ cái ghi **`CustomerReturn`** thay vì `Receipt` ⇒ tách bạch *bán/trả*. **+3 unit** (gồm test khoá **điểm mù**: *cả hai loại đều tăng `OnHand`* nên lỗi này **không** bị bắt ở đâu khác). **Kiểm chứng HTTP**: bút toán trả hàng nay **`MovementType = 4`**; các bất biến của §30 **giữ nguyên** (`10/0/10`, idempotent, huỷ bị chặn, đối soát `0`, `fail: 0`) |

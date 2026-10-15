@@ -153,3 +153,48 @@ public class InventoryLockKeysTests
             InventoryLockKeys.TheoSku(tenant, kho, "  sku-1  "));
     }
 }
+
+/// <summary>
+/// 🚨 **`SAL-004`/§31 — phiếu TRẢ HÀNG phải là `CustomerReturn`, KHÔNG "mượn" `GoodsReceipt`.**
+/// 📌 Vì sao đáng có test riêng: cả hai loại đều **tăng `OnHand`**, nên nếu ai đó "tiện tay" map trả hàng về
+/// `Receipt` thì **tồn kho vẫn đúng** ⇒ **không có test nào khác phát hiện**; nhưng báo cáo
+/// *"đã bán bao nhiêu"* và *"khách trả bao nhiêu"* sẽ **lẫn nhau vĩnh viễn** (dữ liệu đã ghi thì **không sửa được**
+/// vì sổ cái **append-only**). Đây là loại lỗi **chỉ lộ ra khi đã quá muộn**.
+/// </summary>
+public class TinhButToanTraHangTests
+{
+    [Fact]
+    public void Phieu_TRA_HANG_sinh_bien_dong_CustomerReturn__KHONG_phai_Receipt()
+    {
+        var kho = Guid.NewGuid();
+
+        var ke = TinhButToanChungTu.ChoTungDong(StockDocumentType.CustomerReturn, 4, kho, null);
+
+        var but = Assert.Single(ke);
+        Assert.Equal(StockMovementType.CustomerReturn, but.Loai);
+        Assert.NotEqual(StockMovementType.Receipt, but.Loai);
+        Assert.Equal(4, but.DoLon);
+        Assert.Equal(kho, but.WarehouseId);
+    }
+
+    [Fact]
+    public void Phieu_NHAP_MUA_van_la_Receipt__hai_loai_KHONG_lan_nhau()
+    {
+        var ke = TinhButToanChungTu.ChoTungDong(StockDocumentType.GoodsReceipt, 4, Guid.NewGuid(), null);
+
+        Assert.Equal(StockMovementType.Receipt, Assert.Single(ke).Loai);
+    }
+
+    [Fact]
+    public void Ca_hai_loai_deu_LAM_TANG_OnHand__nen_sai_lan_nay_KHONG_lo_qua_ton_kho()
+    {
+        // 🚨 Chính vì cả hai đều tăng `OnHand` mà lỗi "mượn GoodsReceipt" **không** bị bắt ở đâu khác
+        // ⇒ phải khoá bằng test RIÊNG này.
+        var item = new InventoryItem(Guid.NewGuid(), Guid.NewGuid(), "SKU-1");
+        item.ApplyMovement(StockMovementType.Receipt, 10);
+        item.ApplyMovement(StockMovementType.CustomerReturn, 4);
+
+        Assert.Equal(14, item.OnHand);
+        Assert.Equal(14, item.Available);
+    }
+}

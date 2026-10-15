@@ -257,7 +257,9 @@ public class DonHangAppService : ApplicationService, IDonHangAppService
         var phieu = await _phieuKho.CreateAsync(new eCommerce.Application.Contracts.Inventory.CreateStockDocumentDto
         {
             Number = $"TH-{don.Number}",
-            Type = StockDocumentType.GoodsReceipt,
+            // 🚨 Dùng **loại chứng từ RIÊNG** (`CustomerReturn`) thay vì "mượn" `GoodsReceipt`:
+            // sổ cái ghi biến động `CustomerReturn` ⇒ báo cáo *bán* và *trả* **tách bạch** (`inv-001` §31).
+            Type = StockDocumentType.CustomerReturn,
             WarehouseId = warehouseId,
             OccurredAtUtc = thoiDiem,
             Note = $"Trả hàng cho đơn {don.Number}",

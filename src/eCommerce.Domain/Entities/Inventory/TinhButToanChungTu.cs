@@ -30,6 +30,11 @@ public static class TinhButToanChungTu
 
         switch (loai)
         {
+            case StockDocumentType.CustomerReturn:
+                // 📌 **TÁCH RIÊNG khỏi `GoodsReceipt`** dù cùng làm TĂNG `OnHand`: báo cáo *"đã bán bao nhiêu"*
+                // và *"khách trả bao nhiêu"* là hai câu hỏi khác nhau (`inv-001` §30.4 #4).
+                return [new ButToan(khoNguon, StockMovementType.CustomerReturn, soLuong, "Khách trả hàng — nhập lại kho")];
+
             case StockDocumentType.GoodsReceipt:
                 // Nhập kho (+OnHand). Khách trả hàng dùng CÙNG loại chứng từ này theo §1 Alternative Flow A1;
                 // `CustomerReturn` là **loại biến động** chi tiết hơn về mặt báo cáo.

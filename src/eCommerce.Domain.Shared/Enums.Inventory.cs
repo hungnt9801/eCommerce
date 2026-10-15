@@ -10,7 +10,16 @@ public enum StockDocumentType
     StockTransfer = 1,
 
     /// <summary>Phiếu **kiểm kê** (đếm thực tế; ghi phần **lệch**).</summary>
-    Stocktake = 2
+    Stocktake = 2,
+
+    // 🚨 **THÊM Ở CUỐI DẢI — KHÔNG BAO GIỜ ĐỔI SỐ CỦA GIÁ TRỊ CŨ.**
+    // `Type` lưu dạng **SỐ** trong `InvStockDocuments.Type` ⇒ đổi số của giá trị cũ sẽ **diễn giải lại
+    // toàn bộ lịch sử kho** (phiếu nhập thành phiếu kiểm kê…) mà **không có lỗi nào**.
+    // 📌 Trước vòng 39, phiếu **trả hàng** phải "mượn" `GoodsReceipt` ⇒ sổ cái ghi `Receipt` ⇒
+    // báo cáo *"nhập kho"* **lẫn** hàng nhập mua với hàng khách trả ⇒ **không tách được** `bán/trả`.
+
+    /// <summary>Phiếu **trả hàng** (khách gửi lại) ⇒ biến động `CustomerReturn` (`SAL-004`).</summary>
+    CustomerReturn = 3
 }
 
 /// <summary>Vòng đời chứng từ kho (`INV-001` **ADR-02**: **chứng từ + ghi sổ là HAI bước**).</summary>
