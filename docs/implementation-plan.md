@@ -411,9 +411,9 @@ một khuyến mãi phức tạp (nhiều điều kiện AND/OR) tính đúng ti
 | SAL-005 | **Webhook đơn từ sàn** (idempotent, chịu được sai thứ tự) | Sales |
 | CUS-001 | Hồ sơ khách hàng & sổ địa chỉ | Customers |
 | REC-001 | Đối soát thanh toán (`querydr` định kỳ) | Reconciliation | ✅ **ĐỐI SOÁT TỒN KHO XONG + kiểm chứng ĐẦY ĐỦ (15/10/2026)**: job định kỳ 15 phút (`RunOnStart`, UoW, khoá phân tán, log vô điều kiện); **phát hiện đúng** lệch và **đếm đúng** (1 cặp ⇒ báo `1`), **không báo động giả**; đối chiếu **độc lập** bằng SQL khớp. ⏳ **CÒN**: **ngưỡng cảnh báo + quy trình xử lý lệch** (**cần người quyết**) · **lịch sử đối soát** (`ReconRuns`, cần migration) · đối soát **thanh toán** (`querydr`) chưa làm (`inv-001` §37–§39) |
-| WEB-001 | UI admin: khung, đăng nhập, menu, phân quyền | Web |
-| WEB-002 | Storefront: duyệt & chi tiết sản phẩm (SEO) | Web |
-| WEB-003 | Storefront: giỏ hàng & checkout | Web |
+| WEB-001 | UI admin: khung, đăng nhập, menu, phân quyền | Web | ✅ **XONG + kiểm chứng (15/10/2026)**: khung MVC + theme · **cổng đăng nhập** (state machine 7 bước, **`BR-009` kiểm chứng**: `ReturnUrl` ngoài ⇒ `/`, nội bộ ⇒ giữ nguyên, `web-001` §49) · **harness đăng nhập** (mở khoá mọi kiểm chứng trang Web có dữ liệu) · **3 trang đã kiểm chứng hai chiều**: `/PhanBo` · `/SanPham` · `/DatHang`. ⏳ **CÒN**: menu/phân quyền hiển thị trên UI · quản lý đơn trên UI (xác nhận/huỷ/trả) |
+| WEB-002 | Storefront: duyệt & chi tiết sản phẩm (SEO) | Web | ✅ **một phần**: `/SanPham` (hàng đang bán × đơn giá, **đối chứng chéo API**, `web-001` §54). ⏳ **CÒN**: **chi tiết sản phẩm** + **SEO** (slug/meta — `CAT-003`) |
+| WEB-003 | Storefront: giỏ hàng & checkout | Web | ✅ **một phần — KHÁCH ĐẶT ĐƯỢC ĐƠN TRÊN WEB** (`/DatHang`, `web-001` §56–§61): **khoá checkout sinh ở GET** ⇒ **bấm hai lần ⇒ CHỈ MỘT ĐƠN** (kiểm qua UI) · `Reserved=4`/`Available=6` · **sổ giải trình khớp `GrandTotal`** · **thông điệp lỗi kèm mã + dữ liệu** (§59). ⏳ **CÒN**: giỏ **NHIỀU DÒNG** (hiện **một** SKU) |
 
 ### GĐ2 — Vận hành & tuân thủ VN (9 tài liệu)
 

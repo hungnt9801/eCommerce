@@ -357,7 +357,7 @@ danh sách trắng quá rộng) sẽ **tệ hơn không có test** — nó tạo
 | 1 | **Dịch dần danh sách trắng thành ánh xạ** khi mỗi miền (`CAT`/`Ord`/`Pay`/`Chn`…) có đường ghi thật: khi đó lỗi trùng **phải** trả mã nghiệp vụ |
 | 2 | **Job định kỳ** cập nhật/thu gọn danh sách trắng (ràng buộc của GĐ0 sẽ dần được dùng tới) |
 
-> **MỐC KIỂM CHỨNG VÒNG 55 (15/10/2026):** `694 unit + 38 integration` · build **0 lỗi / 0 cảnh báo** · mermaid **197/0** · **141 commit**, nhánh `main` **sạch**. Ba cơ chế tự bảo vệ: *ánh xạ ràng buộc DB* (Phụ lục B) · *đăng ký + log vô điều kiện cho job* (Phụ lục C nâng cấp §45) · *UoW cho worker* (§29.2). Cổng đăng nhập Web kiểm chứng hồi quy (web-001 §47).
+> **MỐC KIỂM CHỨNG VÒNG 55 (15/10/2026):** `694 unit + 38 integration` · build **0 lỗi / 0 cảnh báo** · mermaid **197/0** · **157 commit**, nhánh `main` **sạch**. Ba cơ chế tự bảo vệ: *ánh xạ ràng buộc DB* (Phụ lục B) · *đăng ký + log vô điều kiện cho job* (Phụ lục C nâng cấp §45) · *UoW cho worker* (§29.2). Cổng đăng nhập Web kiểm chứng hồi quy (web-001 §47).
 
 ---
 
