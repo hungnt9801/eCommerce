@@ -381,7 +381,7 @@ public class eCommerceHttpApiHostModule : AbpModule
         if (ketQua.CoSuKienBiBoQuen)
         {
             logger.LogError(
-                "🚨 PHÁT HIỆN {SoLuong} SỰ KIỆN KHÔNG CÓ NGƯỜI NHẬN (đã quét {SoAssembly} assembly). " +
+                "🚨 PHÁT HIỆN {SoLuong} SỰ KIỆN **MANG DỮ LIỆU** KHÔNG CÓ NGƯỜI NHẬN (đã quét {SoAssembly} assembly). " +
                 "Sự kiện được publish nhưng không ai xử lý ⇒ DỮ LIỆU SẼ MẤT IM LẶNG.",
                 ketQua.SuKienKhongCoNguoiNhan.Count, soAssembly);
 
@@ -390,7 +390,26 @@ public class eCommerceHttpApiHostModule : AbpModule
                 logger.LogError("   • {TenSuKien} — KHÔNG có handler nào đăng ký nhận.", ten);
             }
         }
-        else
+
+        // 🚨 SỰ KIỆN **THÔNG BÁO** (gắn `INotificationEvent`) không có người nhận ⇒ mức **Warning**, KHÔNG Error.
+        // VÌ SAO TÁCH: dữ liệu của loại này **đã nằm trong DB** (ví dụ token mới đã ghi vào `ChnChannelShops`),
+        // mất sự kiện chỉ khiến việc *thông báo* không xảy ra. Nếu gộp chung với loại mang dữ liệu thì log
+        // boot sẽ có **dương tính giả** ở mọi lần khởi động ⇒ người đọc **bắt đầu bỏ qua** cảnh báo ⇒ và
+        // **lỗi thật** (như lỗi #22) sẽ lọt qua. Đó chính là thứ cần tránh.
+        if (ketQua.CoSuKienThongBaoBiBoQuen)
+        {
+            logger.LogWarning(
+                "{SoLuong} sự kiện THÔNG BÁO chưa có người nhận (đã quét {SoAssembly} assembly) — KHÔNG mất dữ liệu " +
+                "(dữ liệu đã ở trong DB), nhưng nếu bạn MONG ĐỢI ai đó xử lý thì đây là thiếu sót cần bổ sung.",
+                ketQua.SuKienThongBaoKhongCoNguoiNhan.Count, soAssembly);
+
+            foreach (var ten in ketQua.SuKienThongBaoKhongCoNguoiNhan)
+            {
+                logger.LogWarning("   • {TenSuKien} — chưa có handler (là sự kiện thông báo).", ten);
+            }
+        }
+
+        if (!ketQua.CoSuKienBiBoQuen && !ketQua.CoSuKienThongBaoBiBoQuen)
         {
             logger.LogInformation(
                 "Độ phủ sự kiện OK: {SoSuKien} hợp đồng sự kiện, tất cả đều có người nhận (đã quét {SoAssembly} assembly).",

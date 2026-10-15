@@ -1,12 +1,25 @@
 namespace eCommerce.Messaging.EventCoverage;
 
 /// <summary>Kết quả kiểm tra độ phủ: sự kiện nào có người nhận, sự kiện nào bị bỏ quên.</summary>
+/// <param name="SuKienKhongCoNguoiNhan">
+/// Sự kiện **MANG DỮ LIỆU** (`*Eto` **không** gắn <c>INotificationEvent</c>) mà **không ai nhận**
+/// ⇒ 🚨 **DỮ LIỆU MẤT IM LẶNG**. Đây là điều kiện ghi log **Error**.
+/// </param>
+/// <param name="SuKienThongBaoKhongCoNguoiNhan">
+/// Sự kiện **THÔNG BÁO** (có gắn <c>INotificationEvent</c>) mà không ai nhận. Dữ liệu đã nằm trong DB
+/// ⇒ **chấp nhận được**, nhưng vẫn **ghi log** ở mức nhẹ hơn để không ai quên mất là chưa có người xử lý.
+/// </param>
+/// <param name="SuKienCoNguoiNhan">Sự kiện đã có người nhận.</param>
 public sealed record KetQuaPhuSongSuKien(
     IReadOnlyList<string> SuKienKhongCoNguoiNhan,
-    IReadOnlyList<string> SuKienCoNguoiNhan)
+    IReadOnlyList<string> SuKienCoNguoiNhan,
+    IReadOnlyList<string> SuKienThongBaoKhongCoNguoiNhan)
 {
-    /// <summary>Có sự kiện được publish nhưng KHÔNG ai nhận ⇒ dữ liệu sẽ mất.</summary>
+    /// <summary>Có sự kiện **mang dữ liệu** được publish nhưng KHÔNG ai nhận ⇒ dữ liệu sẽ mất.</summary>
     public bool CoSuKienBiBoQuen => SuKienKhongCoNguoiNhan.Count > 0;
+
+    /// <summary>Có sự kiện **thông báo** không ai nhận (không mất dữ liệu — chỉ thiếu thông báo).</summary>
+    public bool CoSuKienThongBaoBiBoQuen => SuKienThongBaoKhongCoNguoiNhan.Count > 0;
 }
 
 /// <summary>
@@ -55,6 +68,22 @@ public static class EventCoverageChecker
         => kieu.Name.EndsWith(HauToSuKienCon, StringComparison.Ordinal);
 
     /// <summary>
+    /// Tên interface đánh dấu **sự kiện THÔNG BÁO** (mất nó **không** mất dữ liệu).
+    /// ⚠️ So khớp theo **TÊN** để lõi này **không phụ thuộc ABP** và cũng không phụ thuộc `shared/`.
+    /// 🚨 **KHÔNG đổi tên interface này**: đổi tên ⇒ phân loại suy giảm về "mang dữ liệu"
+    /// (ồn ào hơn — hướng suy giảm **an toàn**, nhưng vẫn là suy giảm).
+    /// </summary>
+    public const string TenInterfaceSuKienThongBao = "INotificationEvent";
+
+    /// <summary>
+    /// Sự kiện này có phải **THÔNG BÁO** không (mất nó **không** mất dữ liệu)?
+    /// Nhận biết bằng **tên interface** — xem <see cref="TenInterfaceSuKienThongBao"/>.
+    /// </summary>
+    public static bool LaSuKienThongBao(Type kieu)
+        => kieu.GetInterfaces().Any(i =>
+            string.Equals(i.Name, TenInterfaceSuKienThongBao, StringComparison.Ordinal));
+
+    /// <summary>
     /// Đối chiếu **sự kiện được publish** với **người nhận đã đăng ký**.
     /// </summary>
     /// <param name="cacSuKien">Các kiểu sự kiện đang được publish (ví dụ mọi kiểu tên kết thúc bằng `Eto`).</param>
@@ -94,17 +123,25 @@ public static class EventCoverageChecker
         }
 
         // Sắp xếp + khử trùng để kết quả ỔN ĐỊNH (test và log không phụ thuộc thứ tự assembly nạp).
-        var tatCa = cacSuKien
+        // 🚨 Giữ kèm CỜ "thông báo" theo từng TÊN: cùng tên ở hai namespace khác nhau bị gộp làm một
+        //    (giới hạn đã biết của cách so khớp theo tên). Ca đó chọn **hướng an toàn**: chỉ coi là thông báo
+        //    khi **MỌI** kiểu cùng tên đều gắn marker ⇒ nếu một bên mang dữ liệu thì vẫn báo Error.
+        var theoTen = cacSuKien
             .Where(t => t is { IsClass: true, IsAbstract: false })
             .Where(t => !LaSuKienCon(t))
-            .Select(t => t.Name)
-            .Distinct(StringComparer.Ordinal)
-            .OrderBy(x => x, StringComparer.Ordinal)
-            .ToList();
+            .GroupBy(t => t.Name, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.All(LaSuKienThongBao), StringComparer.Ordinal);
 
-        var khongCo = tatCa.Where(x => !duocNhan.Contains(x)).ToList();
+        var tatCa = theoTen.Keys.OrderBy(x => x, StringComparer.Ordinal).ToList();
+
+        var khongCoNguoiNhan = tatCa.Where(x => !duocNhan.Contains(x)).ToList();
         var coNguoiNhan = tatCa.Where(duocNhan.Contains).ToList();
 
-        return new KetQuaPhuSongSuKien(khongCo, coNguoiNhan);
+        // 🚨 Đây là MỤC ĐÍCH CHÍNH của marker `INotificationEvent`: tách "không ai nhận" thành **2 loại**
+        // có mức độ hoàn toàn khác nhau — mất **DỮ LIỆU** (log Error) vs thiếu **THÔNG BÁO** (log Warning).
+        var mangDuLieu = khongCoNguoiNhan.Where(x => !theoTen[x]).ToList();
+        var thongBao = khongCoNguoiNhan.Where(x => theoTen[x]).ToList();
+
+        return new KetQuaPhuSongSuKien(mangDuLieu, coNguoiNhan, thongBao);
     }
 }

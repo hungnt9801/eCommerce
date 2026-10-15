@@ -875,3 +875,73 @@ EF sinh ra thứ tự `DROP COLUMN IsPublished` → `ADD COLUMN Status DEFAULT 0
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.3 | 15/10/2026 | *(agent, session GĐ1)* | **App service + DTO + API** (`F11`): 11 method, quyền theo method, map tay, `AutoInclude` cho guard `Publish`. **Kiểm chứng HTTP thật 13 phép đo** (tạo/thêm biến thể/trùng SKU/publish/unpublish/archive/đổi giá/đổi mã/list/xoá mềm). Phát hiện **ABP ánh xạ `BusinessException` → `403`** (§17.3). Ghi rõ việc còn lại **§17.4** |
+
+---
+
+## 18. SỰ KIỆN CATALOG + PHÂN LOẠI ETO (15/10/2026) — đóng `F12`, sửa một **dương tính giả** ở cảnh báo khởi động
+
+### 18.1 Vấn đề phải giải TRƯỚC khi phát sự kiện
+
+`EventCoverageChecker` báo **Error** *"DỮ LIỆU SẼ MẤT IM LẶNG"* cho **mọi** `*Eto` không có người nhận.
+Đo được trên Host thật (trước lượt này): `ChannelShopTokenRefreshedEto` bị báo **Error ở MỌI lần boot** —
+nhưng **nó không hề mất dữ liệu**: token mới **đã ghi** vào `ChnChannelShops` trước khi publish.
+⇒ **Dương tính giả**, đúng loại làm người đọc **bỏ qua cảnh báo** ⇒ và **lỗi thật** (lỗi #22) sẽ lọt qua.
+
+Thêm 2 ETO của Catalog vào tình trạng đó sẽ thành **3 dòng Error sai ở mọi lần boot** ⇒ **phải phân loại trước**.
+
+### 18.2 Đã làm
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| 1 | `eCommerce.Kernel.Events.INotificationEvent` | Marker **SỰ KIỆN THÔNG BÁO** (mất nó **không** mất dữ liệu). Kèm **câu hỏi tự vấn bắt buộc**: *"nếu sự kiện biến mất, tôi có mất thông tin mà DB không có không?"* |
+| 2 | `EventCoverageChecker` | `KetQuaPhuSongSuKien` tách **2 danh sách**: `SuKienKhongCoNguoiNhan` (mang dữ liệu) và `SuKienThongBaoKhongCoNguoiNhan`. Trùng **tên kiểu** ⇒ chọn hướng **an toàn** (coi là mang dữ liệu) |
+| 3 | Host `KiemTraDoPhuSuKien` | **Error** cho mang dữ liệu · **Warning** cho thông báo (kèm câu *"nếu bạn MONG ĐỢI ai đó xử lý thì đây là thiếu sót"*) |
+| 4 | `ChannelShopTokenRefreshedEto` | Gắn marker ⇒ hết **dương tính giả** |
+| 5 | `ProductPublishedEto`, `VariantPriceChangedEto` | 2 ETO của `CAT-001` (**F12**), đều là **thông báo** |
+| 6 | `ProductAppService` | Phát 2 ETO: `PublishAsync` (kèm danh sách SKU đang hoạt động) · `UpdateVariantPriceAsync` (**chỉ khi giá THỰC SỰ đổi**, kèm `OldPrice`) |
+| 7 | Test (**10** mới) | Phân loại 2 nhóm · trùng tên ⇒ an toàn · **`ChannelOrderPulledEto` CẤM gắn marker** (bất biến chống tái phát lỗi #22 ở dạng im lặng) · 3 ETO thông báo **phải** có marker |
+
+### 18.3 ✅ BẰNG CHỨNG (Host thật + PostgreSQL 17 thật)
+
+**Log khởi động thật (sau khi sửa):**
+
+```
+warn: eCommerce.eCommerceHttpApiHostModule[0]
+      3 sự kiện THÔNG BÁO chưa có người nhận (đã quét 27 assembly) — KHÔNG mất dữ liệu (dữ liệu đã ở trong DB),
+      nhưng nếu bạn MONG ĐỢI ai đó xử lý thì đây là thiếu sót cần bổ sung.
+        ChannelShopTokenRefreshedEto - chưa có handler (là sự kiện thông báo).
+        ProductPublishedEto - chưa có handler (là sự kiện thông báo).
+        VariantPriceChangedEto - chưa có handler (là sự kiện thông báo).
+```
+
+| Phép đo | Trước | Sau |
+|---|---|---|
+| Dòng `fail:` (**Error**) ở log khởi động | có (báo sai "dữ liệu sẽ mất") | **0** ✅ |
+| Dòng `warn:` | 0 | **4** (1 tiêu đề + 3 ETO thông báo) ✅ |
+| `ChannelOrderPulledEto` trong danh sách bỏ quên | không (đã có người nhận) | không ✅ |
+
+**Luồng API thật:** `publish` → **204** · đổi giá → **200** `coDoi=true` · DB: `Status=1`, `Price=120000.0000`
+⇒ **phát sự kiện thông báo KHÔNG làm hỏng luồng nghiệp vụ** (đây là điều cần và **có thể** kiểm chứng).
+
+### 18.4 ⚠️ ĐIỀU **KHÔNG** KIỂM CHỨNG ĐƯỢC (và một lần tôi suýt kết luận sai)
+
+**Không thể chứng minh "sự kiện đã được gửi tới người nhận"** — vì **chưa có người nhận nào** (đúng thiết kế),
+và **ABP không ghi log lúc publish** (đã kiểm: `Volo.Abp.EventBus.dll` **không** có message log nào cho việc publish).
+
+🚨 **Tôi đã suýt kết luận sai:** phép đo đầu tiên của tôi đếm số dòng log chứa `ProductPublishedEto` và ra `1`
+— nhưng đó là **dòng log khởi động** (danh sách ETO bỏ quên), **không phải** bằng chứng sự kiện được phát.
+Đã bỏ phép đo đó và ghi rõ giới hạn thay vì trình bày nó như bằng chứng.
+📌 **Cách chứng minh khi có người nhận:** viết **handler thật** (ví dụ `ChannelHub` đẩy catalog lên sàn ở GĐ4)
+rồi kiểm chứng bằng **trạng thái DB** của bên nhận — **không** đếm dòng log.
+
+### 18.5 Còn lại của `CAT-001`
+
+Như **§17.4** (ánh xạ lỗi unique · route 2 endpoint biến thể · SKU hoa/thường · unique `Slug` · tách module)
++ **chưa có người nhận** cho `ProductPublishedEto`/`VariantPriceChangedEto` (thuộc `CHN-*` đẩy catalog lên sàn
+và `WEB-002` xoá cache storefront — **GĐ1/GĐ4**). 📌 Khi có người nhận, 2 dòng **Warning** ở §18.3 sẽ tự hết.
+
+### 18.6 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.4 | 15/10/2026 | *(agent, session GĐ1)* | **Phân loại ETO** (`INotificationEvent`) ⇒ log boot còn **0 Error**, 3 Warning đúng bản chất; gắn marker cho `ChannelShopTokenRefreshedEto` (**sửa dương tính giả** ở mọi lần boot). Thêm **`ProductPublishedEto`** + **`VariantPriceChangedEto`** (**F12**) và phát từ `ProductAppService`. **+10 test**. Ghi rõ **§18.4**: chưa chứng minh được việc gửi tới người nhận, và một phép đo sai đã bị bỏ |

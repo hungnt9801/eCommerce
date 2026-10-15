@@ -6,6 +6,7 @@ using Volo.Abp.Application.Dtos;
 using Volo.Abp.Application.Services;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.DistributedLocking;
+using Volo.Abp.EventBus.Distributed;
 
 namespace eCommerce.Catalog;
 
@@ -39,15 +40,18 @@ public class ProductAppService : ApplicationService, IProductAppService
     private readonly IRepository<Product, Guid> _productRepository;
     private readonly IRepository<ProductVariant, Guid> _variantRepository;
     private readonly IAbpDistributedLock _distributedLock;
+    private readonly IDistributedEventBus _eventBus;
 
     public ProductAppService(
         IRepository<Product, Guid> productRepository,
         IRepository<ProductVariant, Guid> variantRepository,
-        IAbpDistributedLock distributedLock)
+        IAbpDistributedLock distributedLock,
+        IDistributedEventBus eventBus)
     {
         _productRepository = productRepository;
         _variantRepository = variantRepository;
         _distributedLock = distributedLock;
+        _eventBus = eventBus;
     }
 
     // ── Đọc ───────────────────────────────────────────────────────────────────
@@ -204,12 +208,30 @@ public class ProductAppService : ApplicationService, IProductAppService
             ?? throw new BusinessException(eCommerceConsts.ErrorCodes.Catalog.KhongTimThaySanPham)
                 .WithData("variantId", variantId);
 
+        // Giữ giá CŨ trước khi đổi — cần cho sự kiện (`OldPrice`) để bên nhận/đối soát biết
+        // "giá nào đã áp dụng lúc nào". `DoiGia` chỉ trả về có đổi hay không, không trả giá cũ.
+        var giaCu = bienThe.Price;
+
         var coDoi = bienThe.DoiGia(input.Price);
 
         if (coDoi)
         {
             await _variantRepository.UpdateAsync(bienThe, autoSave: true);
             Logger.LogInformation("Đã đổi giá SKU {Sku} thành {Gia}.", bienThe.Sku, bienThe.Price);
+
+            // 📣 Sự kiện THÔNG BÁO (xem `VariantPriceChangedEto`) — CHỈ phát khi giá **thực sự** đổi
+            // (`DoiGia` trả `true`) ⇒ không tạo sự kiện rác làm bên nhận đẩy giá lên sàn vô ích (tiêu quota).
+            // ⚠️ Giá mới **đã được ghi** ở dòng trên ⇒ mất sự kiện này **không** mất dữ liệu.
+            await _eventBus.PublishAsync(new Events.VariantPriceChangedEto
+            {
+                TenantId = bienThe.TenantId,
+                ProductId = productId,
+                VariantId = bienThe.Id,
+                Sku = bienThe.Sku,
+                OldPrice = giaCu,
+                NewPrice = bienThe.Price,
+                OccurredAtUtc = DateTime.UtcNow
+            });
         }
 
         return coDoi;
@@ -231,6 +253,22 @@ public class ProductAppService : ApplicationService, IProductAppService
         await _productRepository.UpdateAsync(sanPham, autoSave: true);
 
         Logger.LogInformation("Đã publish sản phẩm {Code}.", sanPham.Code);
+
+        // 📣 Sự kiện THÔNG BÁO (xem `ProductPublishedEto`): để `ChannelHub`/storefront biết mà hành động.
+        // ⚠️ Trạng thái `Published` **đã ghi** ở trên ⇒ mất sự kiện này **không mất dữ liệu**, chỉ **chậm**
+        //    cho tới lần đối chiếu sau. (Đó là lý do ETO này gắn `INotificationEvent`, không fail-closed.)
+        var bienTheDangBan = await _variantRepository.GetListAsync(x => x.ProductId == sanPham.Id && x.IsActive);
+
+        await _eventBus.PublishAsync(new Events.ProductPublishedEto
+        {
+            TenantId = sanPham.TenantId,
+            ProductId = sanPham.Id,
+            Code = sanPham.Code,
+            Name = sanPham.Name,
+            Slug = sanPham.Slug,
+            ActiveSkus = bienTheDangBan.Select(x => x.Sku).ToList(),
+            OccurredAtUtc = DateTime.UtcNow
+        });
     }
 
     [Authorize(eCommerceConsts.Permissions.Products.Publish)]

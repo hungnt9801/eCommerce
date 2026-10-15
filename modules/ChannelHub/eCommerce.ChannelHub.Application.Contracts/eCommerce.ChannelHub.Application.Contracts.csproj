@@ -7,6 +7,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\eCommerce.ChannelHub.Domain\eCommerce.ChannelHub.Domain.csproj" />
+    <!-- 🚨 Cần cho marker `INotificationEvent` (phân loại sự kiện ở `EventCoverageChecker`). -->
+    <ProjectReference Include="..\..\..\shared\eCommerce.Kernel\eCommerce.Kernel.csproj" />
   </ItemGroup>
 
   <ItemGroup>

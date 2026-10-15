@@ -1,4 +1,5 @@
 using eCommerce.ChannelHub.Channels;
+using eCommerce.Kernel.Events;
 
 namespace eCommerce.ChannelHub.Events;
 
@@ -39,9 +40,20 @@ public class ChannelOrderPulledLineEto
     public decimal DiscountAmount { get; set; }
 }
 
-/// <summary>Sự kiện: token của shop đã được refresh (để audit + cảnh báo vận hành).</summary>
+/// <summary>
+/// Sự kiện: token của shop đã được refresh (để audit + cảnh báo vận hành).
+///
+/// 📌 **ĐÂY LÀ SỰ KIỆN *THÔNG BÁO*** (gắn <see cref="INotificationEvent"/>) — trả lời câu hỏi
+/// *"nếu sự kiện này biến mất, tôi có mất thông tin mà DB **không** có không?"* ⇒ **KHÔNG**:
+/// token mới đã được ghi vào `ChnChannelShops` (`SetTokens` + `UpdateAsync`) **trước** khi publish.
+/// Mất sự kiện chỉ khiến việc *thông báo* không xảy ra (ví dụ không bắn cảnh báo vận hành).
+///
+/// ⇒ Nhờ marker này, `EventCoverageChecker` xếp nó vào nhóm **Warning** thay vì **Error**
+/// (trước 15/10/2026 nó bị báo **Error** *"DỮ LIỆU SẼ MẤT IM LẶNG"* ở **mọi lần boot** — một
+/// **dương tính giả** đúng loại làm người đọc bỏ qua cảnh báo thật).
+/// </summary>
 [Serializable]
-public class ChannelShopTokenRefreshedEto
+public class ChannelShopTokenRefreshedEto : INotificationEvent
 {
     public Guid? TenantId { get; set; }
     public Guid ChannelShopId { get; set; }

@@ -131,6 +131,28 @@ test/   eCommerce.Tests · eCommerce.IntegrationTests
 | **CẤM** chỉ dựa vào `[UnitOfWork]` / `IUnitOfWorkEnabled` trần cho handler. | Interceptor của ABP mặc định `requiresNew = false` ⇒ **tái dùng** UoW đã dispose ⇒ **vẫn lỗi y nguyên**. (Đây là lý do phải gọi `Begin(requiresNew: true)` **tường minh**.) |
 | Nếu handler **ném lỗi**, bên phát **không** được coi là thành công. | Ở luồng đồng bộ sàn, `PublishAsync` ném ⇒ `ChannelShopSyncer` bắt lỗi và **KHÔNG tiến con trỏ** (fail-closed vẫn đúng) ⇒ sàn gửi lại ⇒ **đơn không mất**. Đã kiểm chứng bằng trạng thái DB thật |
 
+### 6.2 🚨 Phân loại sự kiện: **mang dữ liệu** vs **thông báo** (bắt buộc, từ 15/10/2026)
+
+**Câu hỏi duy nhất cần trả lời trước khi tạo/publish một `*Eto`:**
+
+> *"Nếu sự kiện này biến mất hoàn toàn, tôi có mất thông tin mà **DB KHÔNG có** không?"*
+
+| Trả lời | Loại | Phải làm gì |
+|---|---|---|
+| **CÓ** | **MANG DỮ LIỆU** | **KHÔNG** gắn `INotificationEvent`. Bên publish **phải fail-closed**: chưa có người nhận ⇒ **không** tiến con trỏ/không coi là thành công (`ChannelShopSyncer` là mẫu — lỗi #22) |
+| **KHÔNG** | **THÔNG BÁO** | **PHẢI** gắn `eCommerce.Kernel.Events.INotificationEvent`. Mất nó chỉ làm bên nhận **chậm**, không mất dữ liệu |
+
+**Vì sao bắt buộc:** `EventCoverageChecker` báo **Error** *"DỮ LIỆU SẼ MẤT IM LẶNG"* cho `*Eto` không có
+người nhận. Trước 15/10/2026 **mọi** `*Eto` bị xếp cùng loại ⇒ `ChannelShopTokenRefreshedEto` (token đã
+ghi vào DB) bị báo **Error ở MỌI lần boot** ⇒ **dương tính giả** ⇒ người đọc **bỏ qua cảnh báo** ⇒ và
+**lỗi thật** (như lỗi #22) sẽ lọt qua. Tách hai loại ⇒ **0 Error** lúc boot, cảnh báo thông báo ở mức **Warning**.
+
+| Luật phụ | Ghi chú |
+|---|---|
+| **CẤM** gắn marker cho sự kiện mang dữ liệu. | `BatBienPhanQuyen`-style test đã có: `EventCoveragePhanLoaiTests` khẳng định `ChannelOrderPulledEto` **KHÔNG** được gắn marker |
+| Trùng **TÊN KIỂU** ở hai namespace ⇒ xếp vào loại **mang dữ liệu** (an toàn hơn). | Lõi so khớp theo **tên**; chỉ coi là "thông báo" khi **MỌI** kiểu cùng tên đều có marker |
+| ⚠️ **Phát sự kiện KHÔNG quan sát được nếu chưa có người nhận.** | ABP **không** log lúc publish (đã kiểm: không có message log nào trong `Volo.Abp.EventBus.dll`) ⇒ muốn **chứng minh** có người nhận thì **phải có handler thật** (test/handler). Đừng "chứng minh" bằng cách đếm dòng log khởi động — đó là **dương tính giả** ở tầng kiểm chứng |
+
 ---
 
 ## 7. Xác thực & phân quyền

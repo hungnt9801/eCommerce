@@ -174,7 +174,7 @@ Hai việc này **không chặn** GĐ1 về mặt kỹ thuật, nhưng **phải 
 
 | Module | Entity chính | API chính | Sự kiện phát | Phụ thuộc | DoD |
 |---|---|---|---|---|---|
-| **Catalog** | `Product`, `ProductVariant`(SKU), `Category`(cây), `Brand`, `ProductAttribute`/`Option`/`Mapping`, `ProductMedia`, `ProductChannelVisibility` | CRUD sản phẩm/biến thể/danh mục; tra cứu theo slug; publish/unpublish | `ProductPublishedEto`, `VariantPriceChangedEto` | Kernel | ✅ **`CAT-001` XONG phần domain + API (15/10/2026)** — vòng đời có guard, mã bất biến, chống trùng SKU toàn tenant, xoá mềm, **11 route chạy thật** (kiểm chứng HTTP); **còn**: ETO + `CAT-002`/`CAT-003` (`cat-001-…md` **§16/§17**) |
+| **Catalog** | `Product`, `ProductVariant`(SKU), `Category`(cây), `Brand`, `ProductAttribute`/`Option`/`Mapping`, `ProductMedia`, `ProductChannelVisibility` | CRUD sản phẩm/biến thể/danh mục; tra cứu theo slug; publish/unpublish | `ProductPublishedEto`, `VariantPriceChangedEto` | Kernel | ✅ **`CAT-001` XONG (15/10/2026)** — domain + API (**11 route chạy thật**) + **2 ETO** (đã phân loại *thông báo*); **còn**: `CAT-002`/`CAT-003` + người nhận cho 2 ETO (`cat-001-…md` **§16–§18**) |
 | **Pricing** | `PriceList`, `PriceListItem`, `ChannelPrice`, `TierPrice`, `CostPrice` | tính giá theo (SKU, kênh, số lượng, thời điểm); CRUD bảng giá | `PriceCalculatedEto` | Catalog, Kernel | **Pipeline tính giá có thứ tự tường minh** (chạy hết rồi mới so sánh); có test cho thứ tự ưu tiên + ghi đè |
 | **Inventory** | `Warehouse`, `StockItem`, `StockLedgerEntry`(đã có), **`StockReservation`**, `StockAllotment` | nhập/chuyển/kiểm kê; tra tồn khả dụng **theo kênh**; giữ chỗ/nhả chỗ | `StockChangedEto`, `StockReservedEto`, `StockReservationExpiredEto` | Catalog, Kernel | **Test chống oversell 2 luồng đồng thời** (integration, PostgreSQL thật + lock); ledger append-only không có UPDATE; reservation có TTL + job nhả |
 | **Sales** | `Cart`, `CartItem`, `CheckoutSession`, `Order`, `OrderLine`, `OrderStatusHistory`, `OrderReturn` | giỏ hàng; checkout; đặt hàng; huỷ; trả hàng; lịch sử trạng thái | `OrderPlacedEto`, `OrderPaidEto`, `OrderCancelledEto`, `OrderReturnedEto` | Catalog, Pricing, Inventory, Customers, PaymentHub | **State machine 4 trục** (thực hiện/tài chính/đối soát/phụ) + **ném lỗi** khi chuyển sai; tính lại giá tại checkout; idempotent theo `ExternalOrderId`; test: webhook gửi trùng không tạo 2 đơn |
@@ -629,9 +629,9 @@ khi Order intake đăng ký handler cho `ChannelOrderPulledEto`, fail-closed **t
 
 ### Việc tiếp theo (thứ tự đề xuất)
 
-1. **`CAT-002`/`CAT-003`** — danh mục (cây), thuộc tính, media/slug/hiển thị theo kênh; và **ETO
-   `ProductPublishedEto`/`VariantPriceChangedEto`** (`CAT-001` §17.4: phải **phân biệt ETO mang dữ liệu
-   vs ETO thông báo** trước khi phát, nếu không cảnh báo khởi động thành **dương tính giả**).
+1. **`CAT-002`/`CAT-003`** — danh mục (cây), thuộc tính, media/slug/hiển thị theo kênh.
+   ✅ **ETO đã có** (`CAT-001` §18) và đã **phân loại đúng**; **còn**: **người nhận** cho
+   `ProductPublishedEto`/`VariantPriceChangedEto` (thuộc `CHN-*` đẩy catalog lên sàn và `WEB-002` xoá cache).
 2. 🚨 **Cần người quyết:** `AbpExceptionHandlingOptions` có nên ánh xạ `BusinessException` → **`400`/`409`**
    thay vì **`403`**? Hiện lỗi nghiệp vụ **trùng mã trạng thái với lỗi thiếu quyền** ⇒ client/QA không
    phân biệt được (`CAT-001` **§17.3**). Đây là **thay đổi hợp đồng API toàn hệ thống** nên **không** tự ý làm.
