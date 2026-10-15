@@ -1090,3 +1090,60 @@ ca có dữ liệu đã xong.
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.w | 15/10/2026 | *(agent, session GĐ1)* | 🎉 **Trang mặt tiền đầu tiên `GET /PhanBo`** (bảng phân bổ tồn theo kênh × SKU, có **ca rỗng**). 🚨 **Sửa lỗi KIẾN TRÚC THẬT** phát hiện nhờ kiểm chứng: Web **thiếu module `Pricing`** trong `[DependsOn]` **và** thiếu `ProjectReference` ⇒ DI không dựng được controller ⇒ **`HTTP 500`** (build **xanh** hoàn toàn). **Kiểm chứng** bằng harness §49: chưa đăng nhập ⇒ `302` (cổng chặn đúng) · đã đăng nhập ⇒ **`200`**, tiêu đề + **ca rỗng** đúng, `fail: 0`. ⚠️ **Ca CÓ DỮ LIỆU chưa kiểm chứng** (DB rỗng) — ghi rõ |
+
+---
+
+## 51. ✅ **`/PhanBo` — CA CÓ DỮ LIỆU ĐÃ KIỂM CHỨNG, KHỚP API TỪNG DÒNG** (15/10/2026) — *đóng §50.3*
+
+### 51.1 Kịch bản đo — có **NGUỒN SỰ THẬT ĐỘC LẬP** để đối chiếu
+
+1. **Host thật**: tạo kho `10` · bảng giá `100.000` · **checkout giữ `4`** · **tạo đơn** ⇒ đơn ở **`Pending`** (chưa xác nhận).
+2. Gọi **API** `GET /api/app/don-hang/phan-bo-theo-kenh` ⇒ **nguồn sự thật**.
+3. **Web thật**: đăng nhập (harness §49) ⇒ mở **`GET /PhanBo`** ⇒ đọc **dòng của kênh** và **dòng TỔNG** trong HTML.
+4. **Đối chiếu hai nguồn** — đây là điểm làm phép đo có giá trị: trang **tự nói** một con số, API **cũng nói** ⇒
+   nếu chỉ xem trang thì chỉ biết *"trang có hiện gì đó"*, **không** biết nó **đúng**.
+
+### 51.2 🎯 Kết quả — **khớp TỪNG DÒNG**
+
+| Nguồn | `daBan` | `dangGiu` | `daTra` | `DangGiuTheoKho` |
+|---|---|---|---|---|
+| **API** (nguồn sự thật) | `0` | `4` | `0` | `3a2451f0-d44f-fac5-72a1-024eeb8b26fc = 4` |
+| **Trang `/PhanBo`** | `0` ✅ | **`4`** ✅ | `0` ✅ | **`3a2451f0-d44f-fac5-72a1-024eeb8b26fc: 4`** ✅ |
+
+**Dòng thật trong HTML** (trích nguyên văn):
+```html
+<tr><td>pbk-203243</td><td>PBSKU-203243</td>
+    <td class="so">0</td><td class="so">4</td><td class="so">0</td>
+    <td>3a2451f0-d44f-fac5-72a1-024eeb8b26fc: 4</td></tr>
+```
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | Bảng đã render (**không** còn ca rỗng) | ✅ |
+| 2 | **Dòng TỔNG** | `daBan=0` · **`dangGiu=4`** · `daTra=0` ✅ |
+| 3 | **`kho.id` xuất hiện và KHỚP** | ✅ — kiểm **định danh**, không chỉ số lượng |
+| 4 | `fail:` — **Web** và **Host** | **`0`** · **`0`** ✅ |
+| 5 | Dọn dẹp · cờ bảo mật | `don=0 ton=0 gc=0` ✅ · `baoMat=true` ✅ |
+
+📌 **Vì sao kiểm cả `kho.id`:** nếu chỉ kiểm *"có số 4"*, một trang **gán nhầm kho** vẫn **xanh** — mà **gán nhầm kho**
+chính là lỗi **nguy hiểm nhất** của miền phân bổ (hàng ở kho A **không** bù được đơn giao từ kho B).
+📌 **Vì sao đo ca `DangGiu` (chưa xác nhận):** nó là trạng thái **duy nhất** mà `DangGiu > 0` **và** `DaBan = 0` —
+tức phân biệt được **"đang giữ"** với **"đã bán"**. Nếu đo sau khi xác nhận thì `DaBan=4`, `DangGiu=0` và **không**
+phân biệt được hai cột **có bị hoán đổi** hay không.
+
+### 51.3 Trạng thái `WEB-001`
+
+| # | Hạng mục | Trạng thái |
+|---|---|---|
+| 1 | Khung đăng nhập + phân quyền (state machine 7 bước) | ✅ kiểm chứng (`BR-009` ✅ §49) |
+| 2 | **Harness đăng nhập** (mở khoá kiểm chứng trang có dữ liệu) | ✅ §49 |
+| 3 | **Trang mặt tiền đầu tiên** `/PhanBo` — **ca rỗng** | ✅ §50 |
+| 4 | **`/PhanBo` — ca CÓ DỮ LIỆU khớp API** | ✅ **§51 (đây)** |
+| 5 | Chuỗi mặt tiền: **danh sách SKU** → **giỏ** → **đặt hàng** | ⏳ chưa làm |
+| 6 | ⚠️ `fail: 2` khi đo bằng `-MaximumRedirection 0` (§49.3) | ⏳ chưa tách bạch (nghi do probe ngắt request) |
+
+### 51.4 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.v | 15/10/2026 | *(agent, session GĐ1)* | ✅ **`/PhanBo` ca CÓ DỮ LIỆU kiểm chứng, KHỚP API TỪNG DÒNG**: gieo đơn `Pending` có giữ chỗ `4` ⇒ API báo `0/4/0` + `theoKho={kho.id: 4}` ⇒ **trang hiện đúng `0/4/0`** và **`kho.id` khớp chính xác**; dòng TỔNG đúng; **`fail: 0`** ở cả Web và Host. 📌 Ghi lý do **phải đo ở trạng thái `DangGiu`** (phân biệt `DangGiu` vs `DaBan` — sau khi xác nhận thì hai cột **không** phân biệt được nếu bị hoán đổi) và **phải kiểm `kho.id`** (gán nhầm kho vẫn *"xanh"* nếu chỉ kiểm số) |
