@@ -1,0 +1,97 @@
+@using eCommerce.Web.Controllers
+@model DatHangTrangDto
+@{
+    Layout = null;
+}
+@*
+    🚨 GIỎ HÀNG → ĐẶT HÀNG TRÊN WEB (WEB-001 — mảnh cuối của GĐ1 về phía người dùng).
+    📌 MỘT view dùng cho HAI trạng thái: **biểu mẫu** (chưa đặt) và **kết quả** (đã đặt xong) — giảm số tệp,
+       và phép kiểm chứng chỉ phải đi qua MỘT đường render.
+    ⚠️ Mọi giá trị qua Razor `@` (tự HTML-encode). Tổng tiền hiển thị **nguyên văn từ sổ giải trình** (không tính lại).
+*@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Đặt hàng</title>
+    <style>
+        body { font-family: system-ui, sans-serif; margin: 2rem; color: #222; }
+        h1 { font-size: 1.3rem; }
+        table { border-collapse: collapse; max-width: 40rem; margin-top: .6rem; }
+        th, td { border: 1px solid #ccc; padding: .4rem .6rem; text-align: left; }
+        th { background: #f3f3f3; }
+        .so { text-align: right; }
+        .rong { padding: 1rem; background: #fffbe6; border: 1px solid #e6d38a; max-width: 40rem; }
+        .loi { padding: 1rem; background: #fdecea; border: 1px solid #e6a39a; max-width: 40rem; }
+        .ok { padding: 1rem; background: #eaf7ec; border: 1px solid #a3d8ae; max-width: 40rem; }
+        .ghichu { color: #666; font-size: .85rem; max-width: 40rem; }
+        label { display: inline-block; min-width: 9rem; }
+        input, select { padding: .25rem; }
+    </style>
+</head>
+<body>
+    <h1>Đặt hàng</h1>
+
+    @if (Model.Loi is not null)
+    {
+        <div class="loi" id="loi"><strong>Không đặt được:</strong> @Model.Loi</div>
+    }
+
+    @if (Model.DaDat)
+    {
+        <div class="ok" id="ket-qua">
+            <strong>ĐÃ ĐẶT HÀNG.</strong>
+            <table id="bang-ket-qua">
+                <tr><th>Số đơn</th><td id="so-don">@Model.SoDon</td></tr>
+                <tr><th>Trạng thái</th><td id="trang-thai">@Model.TrangThai</td></tr>
+                <tr><th>Tổng tiền (từ sổ giải trình)</th><td class="so" id="tong-tien">@Model.TongTien.ToString("N0")</td></tr>
+                <tr><th>Tiền tệ</th><td id="tien-te">@Model.TienTe</td></tr>
+                <tr><th>Khoá checkout</th><td id="khoa-checkout">@Model.KhoaCheckout</td></tr>
+            </table>
+            <p class="ghichu">Số tiền lấy <strong>nguyên văn</strong> từ sổ giải trình — <em>không</em> tính lại ở tầng UI.</p>
+        </div>
+    }
+
+    @if (Model.KhoList.Count == 0)
+    {
+        @* 🚨 CA RỖNG: chưa có kho nào ⇒ không thể đặt hàng. Phải nói RÕ, không để biểu mẫu trống khó hiểu. *@
+        <div class="rong" id="trong">
+            <strong>Chưa có kho nào đang hoạt động.</strong>
+            <div>Cần tạo kho (và bảng giá) trước khi đặt hàng.</div>
+        </div>
+    }
+    else
+    {
+        <form method="post" id="form-dat-hang">
+            @* 🔐 Chống giả mạo: token do chính trang này phát ra (đo được: form đăng nhập cũng dùng cùng cơ chế). *@
+            @* 🚨 **TOKEN CHỐNG GIẢ MẠO THẬT** — KHÔNG tự đặt GUID ngẫu nhiên: ABP bật kiểm anti-forgery cho POST
+               ⇒ token giả ⇒ **HTTP 400** (đã ĐO được ở vòng 65: POST trả 400, trang chỉ hiện form).
+               📌 `@Html.AntiForgeryToken()` phát token **khớp cookie** do chính máy chủ cấp. *@
+            @Html.AntiForgeryToken()
+            <div><label for="KhoId">Kho</label>
+                <select id="KhoId" name="KhoId">
+                    @foreach (var k in Model.KhoList)
+                    {
+                        <option value="@k.Id">@k.Code — @k.Name</option>
+                    }
+                </select>
+            </div>
+            <div><label for="Kenh">Kênh</label><input id="Kenh" name="Kenh" value="@Model.Kenh" /></div>
+            <div><label for="Sku">SKU</label><input id="Sku" name="Sku" value="@Model.Sku" /></div>
+            <div><label for="SoLuong">Số lượng</label><input id="SoLuong" name="SoLuong" type="number" min="1" value="@Model.SoLuong" /></div>
+            <div><label for="Thue">Thuế suất (0.1 = 10%)</label><input id="Thue" name="Thue" value="@Model.Thue" /></div>
+            <div style="margin-top:.6rem">
+                <button type="submit" id="nut-dat-hang">Đặt hàng</button>
+                <input type="hidden" name="KhoaCheckout" value="@Model.KhoaCheckout" />
+            </div>
+        </form>
+    }
+
+    <p class="ghichu">
+        Nguồn: <code>ICheckoutAppService.TinhVaGiuChoAsync</code> ⇒ <code>IDonHangAppService.TaoTuCheckoutAsync</code>
+        — **cùng** app service đã kiểm chứng ở tầng API (`SAL-001`/`SAL-002`). 📌 <strong>Khoá checkout</strong> sinh
+        <strong>một lần</strong> ở trang này và mang theo trong form ⇒ bấm hai lần <strong>không</strong> tạo hai đơn.
+    </p>
+</body>
+</html>

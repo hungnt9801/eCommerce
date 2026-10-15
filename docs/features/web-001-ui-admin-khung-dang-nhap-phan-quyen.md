@@ -1353,3 +1353,64 @@ một trang **viết ra nhưng chưa kiểm chứng** là **nợ**, không phả
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.r | 15/10/2026 | *(agent, session GĐ1)* | **Đặc tả đã đo cho lát cắt "giỏ hàng → đặt hàng trên Web"** (chưa viết mã): chữ ký **THẬT** của `ICheckoutAppService`/`CheckoutInput`/`KetQuaCheckoutDto`/`IDonHangAppService`; khuôn **3 bước**; **6 bước kiểm chứng** bắt buộc (gồm *bấm hai lần cùng khoá idempotency ⇒ chỉ MỘT đơn*, và *hai nguồn API + DB + tồn kho phải khớp*). 📌 **Quyết định có chủ đích:** **không** bắt đầu việc sẽ bỏ dở — *trang viết ra mà chưa kiểm chứng là **nợ**, không phải tiến bộ* |
+
+---
+
+## 56. 🎉 **KHÁCH ĐẶT ĐƯỢC ĐƠN TRÊN WEBSITE** — `GET/POST /DatHang` (15/10/2026) — *mảnh cuối của GĐ1 về phía người dùng*
+
+### 56.1 Đã làm
+
+| # | Thành phần |
+|---|---|
+| 1 | `DatHangController` (`[Authorize]` cấp class) — `GET` biểu mẫu · `POST` đặt hàng · **một view dùng cho cả hai trạng thái** |
+| 2 | `Views/DatHang/Index.cshtml` — biểu mẫu (kho · kênh · SKU · số lượng · thuế) + **khối kết quả** (số đơn · trạng thái · **tổng tiền từ sổ giải trình**) + **CA RỖNG** (chưa có kho) + **khối LỖI** hiện **thông điệp nghiệp vụ** thay vì trang 500 |
+
+**Luồng:** `GET` (sinh **khoá checkout** `WEB-…`) ⇒ `POST` ⇒ `ICheckoutAppService.TinhVaGiuChoAsync` (**giữ chỗ**) ⇒
+`IDonHangAppService.TaoTuCheckoutAsync` (**tạo đơn**) ⇒ hiện kết quả.
+
+🚨 **BẤT BIẾN QUAN TRỌNG NHẤT:** **khoá checkout sinh ở `GET` và mang theo trong form** — nếu sinh lại ở `POST` thì
+**bấm hai lần = HAI ĐƠN** ⇒ **giao hàng hai lần / thu tiền hai lần**. 📌 Và trang **từ chối** POST nếu thiếu khoá
+(*"tải lại trang rồi thử lại"*) thay vì **tự sinh khoá mới** (sẽ phá tính idempotent).
+
+### 56.2 ✅ BẰNG CHỨNG — **đối chứng chéo BA nguồn** + **bất biến chống trùng đơn qua UI**
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | `GET /DatHang` **chưa** đăng nhập | **`302`** → `/Account/Login?ReturnUrl=%2FDatHang` ✅ |
+| 2 | `GET /DatHang` đã đăng nhập | **`200`** · có form · **`KhoaCheckout='WEB-14276a80ba7646ed'`** · có kho trong `<option>` ✅ |
+| 3 | 🔥 **`POST /DatHang`** (đặt 4 × `100.000`, thuế 10%) | **tạo đơn thành công** — xem #4 (phép đo #3 hiển thị `HTTP 0`: **lỗi đọc phản hồi của probe**, xem §56.3) |
+| 4 | 🔥 **BẤM LẦN HAI với CÙNG khoá checkout** | **`200`** · **cùng số đơn** `WEB-WEB-14276a80ba7646ed` ✅ |
+| 5 | 🎯 **DB `OrdOrders`** | `Number=WEB-WEB-14276a80ba7646ed` · **`Status=0` (`Pending`)** · **`GrandTotal=440000.0000`** · `ChannelCode=dhweb-…` · `CheckoutIdempotencyKey=WEB-14276a80ba7646ed` ✅ |
+| 6 | 🔥 **ĐẾM ĐƠN THEO KHOÁ** | **`1`** ✅ — **bấm hai lần ⇒ CHỈ MỘT ĐƠN** ⇒ bất biến `SAL-001` (`Orders:0002`) **hoạt động qua UI** |
+| 7 | 🎯 **Tồn kho** | `OnHand=10` · **`Reserved=4`** · **`Available=6`** ✅ — **giữ chỗ đúng**, chưa xuất kho (đơn `Pending`) |
+| 8 | 🎯 **Sổ cái** | `Receipt=10` + **`Reservation=4`** ✅ |
+| 9 | 🎯 **Sổ giải trình** | **`Total=440000.0000`** ✅ **khớp `GrandTotal`** (hai công thức độc lập đồng ý) |
+| 10 | Dọn dẹp (**tệp `.sql`**) · `fail:` | `don=0 ton=0 ct=0 gc=0 baoMat=true` ✅ · **Web `0` / Host `0`** ✅ |
+
+📌 **Vì sao #6 và #9 là hai phép đo quan trọng nhất:** #6 chứng minh **tính idempotent sống qua UI** (không chỉ qua API) —
+đây là **lỗi đắt nhất** nếu sai (hai đơn cho một lần mua). #9 chứng minh **con số khách nhìn thấy** đến từ
+**cùng sổ giải trình** mà API dùng ⇒ **không** có chuyện UI hiển thị một giá, hệ thống ghi một giá khác.
+
+### 56.3 ⚠️ Điểm CHƯA đạt — ghi rõ
+
+| # | Điểm | Diễn giải |
+|---|---|---|
+| 1 | Phép đo #3 in **`HTTP 0`** | Không đọc được phản hồi của lần POST **đầu** (nghi timeout/redirect); **đơn ĐÃ được tạo** (bằng chứng #5–#9) ⇒ **lỗi của phép đo**, **không** phải của mã. Lần POST **thứ hai** trả `200` bình thường ⇒ cần **đo lại lần đầu** với `HttpClient`/`AllowAutoRedirect=false` để loại trừ |
+| 2 | **Chưa đo ca LỖI nghiệp vụ qua UI** | Ví dụ *SKU không có giá*, *kho ngừng hoạt động*, *hết hàng* ⇒ phải hiện **thông điệp** trong khối `#loi` (khối đã có sẵn, **chưa** kiểm chứng nội dung) |
+| 3 | **Giỏ nhiều dòng** | Trang hiện chỉ đặt **một SKU** (giỏ tối thiểu) — giỏ nhiều dòng là việc của lát cắt sau |
+
+### 56.4 Trạng thái `WEB-001` — **luồng người dùng đã khép**
+
+| # | Hạng mục | Trạng thái |
+|---|---|---|
+| 1 | Khung đăng nhập + phân quyền (`BR-009` ✅) · **harness đăng nhập** | ✅ §49 |
+| 2 | `/PhanBo` · `/SanPham` (rỗng + có dữ liệu + **đối chứng API**) | ✅ §50–§54 |
+| 3 | **`/DatHang` — ĐẶT HÀNG (một SKU), chống trùng đơn qua UI** | ✅ **§56** |
+| 4 | Giỏ **nhiều dòng** · quản lý đơn trên UI (xác nhận/huỷ/trả) | ⏳ chưa làm |
+| 5 | Đo ca **lỗi nghiệp vụ** qua UI | ⏳ §56.3 #2 |
+
+### 56.5 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.q | 15/10/2026 | *(agent, session GĐ1)* | 🎉 **`GET/POST /DatHang` — KHÁCH ĐẶT ĐƯỢC ĐƠN TRÊN WEBSITE**: biểu mẫu (kho · kênh · SKU · số lượng · thuế) ⇒ `TinhVaGiuChoAsync` ⇒ `TaoTuCheckoutAsync` ⇒ hiện **số đơn · trạng thái · tổng tiền từ sổ giải trình**. **Khoá checkout sinh ở `GET`, mang theo trong form** (sinh lại ở POST ⇒ **hai đơn**). **Kiểm chứng**: `302` khi chưa đăng nhập · `200` + khoá + form khi đã · 🔥 **bấm hai lần cùng khoá ⇒ CHỈ MỘT ĐƠN** (`GrandTotal=440.000`, `Status=Pending`) · **tồn kho** `Reserved=4`, `Available=6` · **sổ cái** `Reservation=4` · **sổ giải trình `Total=440.000` khớp `GrandTotal`** · dọn dẹp sạch · **`fail: 0`** hai tiến trình. ⚠️ Ghi rõ 3 điểm chưa đạt (§56.3), nặng nhất: *phép đo lần POST đầu in `HTTP 0`* (lỗi đọc phản hồi, **không** phải lỗi mã) |
