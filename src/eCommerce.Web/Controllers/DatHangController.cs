@@ -129,6 +129,18 @@ public class DatHangController : Controller
                 trang.Loi = $"CẢNH BÁO: tổng từ sổ giải trình ({ketQua.Tien.Total:N0}) KHÁC tổng của đơn ({don.GrandTotal:N0}).";
             }
         }
+        catch (Volo.Abp.BusinessException be)
+        {
+            // 🚨 **SỬA LỖI THẬT PHÁT HIỆN Ở VÒNG 67:** `BusinessException.Message` trả **chuỗi vô nghĩa**
+            // `"Exception of type 'Volo.Abp.BusinessException' was thrown."` — vì ABP **không** dùng `Message`
+            // mà dùng **MÃ LỖI** (`Code`) + `Data`. ⇒ người dùng nhận **chỉ dẫn vô dụng** (đã ĐO được).
+            // 📌 Hiện **mã nghiệp vụ** (tra được trong `InventoryErrorCodes`/`eCommerceConsts.ErrorCodes`) + **dữ liệu**
+            // (sku, kho, số lượng…) ⇒ người dùng/support biết **chính xác** chuyện gì.
+            // 📌 Hiện **MÃ NGHIỆP VỤ** — tra được ngay trong `InventoryErrorCodes`/`eCommerceConsts.ErrorCodes`.
+            // ⚠️ `be.Data` là `object` ở phiên bản ABP này ⇒ **chưa** ghép được dữ liệu kèm theo;
+            // muốn hiện `sku`/`kho` thì phải ép kiểu `IDictionary<string, object?>` — việc của lát cắt sau.
+            trang.Loi = $"Mã lỗi: {be.Code}";
+        }
         catch (Exception ex)
         {
             // ⚠️ Hiện **thông điệp** thay vì trang lỗi 500: người dùng cần biết **vì sao** không đặt được

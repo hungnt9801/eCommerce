@@ -1467,3 +1467,57 @@ nhiều lần* ⇒ nên coi mọi kết luận từ nó là **giả thuyết**, 
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.p | 15/10/2026 | *(agent, session GĐ1)* | **Đo ca lỗi nghiệp vụ qua UI** (§56.3 #2): `POST /DatHang` với **SKU không có giá** và với **thiếu SKU** ⇒ **`HTTP 200`** (không `500`), biểu mẫu còn để thử lại, **0 đơn**, **tồn kho không đổi**, **0 lượt giữ chỗ mồ côi** ⇒ **đường lỗi AN TOÀN và NGUYÊN TỬ** ✅; dọn dẹp sạch, **`fail: 0`** hai tiến trình. 🚨 **CHƯA kết luận:** **nội dung** thông điệp lỗi — phép trích `id="loi">([^<]*)<` **cắt ngay tại `<strong>`** ⇒ ra chuỗi rỗng, **không** chứng minh thông điệp trống. Ghi **bài học #8**: *trích HTML bằng `[^<]*` không đáng tin khi phần tử có thẻ con* (**lần thứ ba** kết luận suýt sai vì phép kiểm văn bản thô) |
+
+---
+
+## 58. 🚨 **LỖI THẬT VỀ THÔNG ĐIỆP LỖI TRÊN UI — ĐÃ SỬA** (15/10/2026) — *đóng §57.3*
+
+### 58.1 Phép đo ĐÚNG (trích cả khối `#loi` rồi bỏ thẻ) đã lộ ra lỗi thật
+
+| Ca | Thông điệp người dùng **nhận được** (trước khi sửa) |
+|---|---|
+| SKU **không có giá** | `Không đặt được: Exception of type 'Volo.Abp.BusinessException' was thrown.` 🚨 |
+| Thiếu SKU / số lượng 0 | `Không đặt được: Thiếu kho / SKU / số lượng (số lượng phải ≥ 1).` ✅ |
+
+🚨 **Vì sao đây là LỖI THẬT, không phải chi tiết nhỏ:** BusinessException.Message của ABP **KHÔNG chứa thông điệp
+nghiệp vụ** — ABP dùng **MÃ LỖI** (`Code`) + `Data`. ⇒ mã `catch (Exception ex) { Loi = ex.Message }` của tôi biến
+**mọi lỗi nghiệp vụ** thành **một câu tiếng Anh vô nghĩa với người dùng**.
+📌 Đây **đúng** loại lỗi đã ghi ở `inv-001` §34.2 (*mã lỗi **đúng kỹ thuật** nhưng **vô dụng** với người dùng*) —
+lần này ở **tầng hiển thị**.
+📌 Và nó **chỉ lộ ra** khi tôi **sửa phép đo** (§57.3 → §58.1): trước đó regex cắt tại `<strong>` ⇒ trích **rỗng** ⇒
+**suýt** kết luận *"không hiện gì"* — tức **cùng một lỗi** nhưng **chẩn đoán sai**.
+
+### 58.2 Đã sửa
+
+`csharp
+catch (Volo.Abp.BusinessException be)
+{
+    // Hiện MÃ NGHIỆP VỤ — tra được trong InventoryErrorCodes / eCommerceConsts.ErrorCodes
+    trang.Loi = $"Mã lỗi: {be.Code}";
+}
+catch (Exception ex) { trang.Loi = ex.Message; }
+`
+
+### 58.3 ✅ Bằng chứng SAU khi sửa (chạy lại cùng probe)
+
+- Ca **SKU không có giá** ⇒ `THONG DIEP LOI hien thi: 'Không đặt được: M&#xE3; l&#x1ED7;i: eCommerce:Pricing:0004'`
+- Ca **thiếu SKU** ⇒ `HTTP 200 | LOI: 'Không đặt được: Thi&#x1EBF;u kho / SKU / s&#x1ED1; l&#x1B0;&#x1EE3;ng (s&#x1ED1; l&#x1B0;&#x1EE3;ng ph&#x1EA3;i &#x2265; 1).'`
+- 🔥 **An toàn vẫn giữ**: `DON tao ra: 0 | TON: OnHand=10 Reserved=0 | GIU CHO: 0 | === [4] DON DEP (tep .sql) === | DON DEP: don=0 ton=0 ct=0 gc=0 baoMat=true | === [5] fail: Web=0 Host=0 ===`
+
+📌 **Vì sao vẫn phải kiểm phần AN TOÀN sau mỗi lần sửa:** thay đổi ở **đường lỗi** rất dễ vô tình **ghi một phần**
+dữ liệu (ví dụ tạo lượt giữ chỗ rồi mới ném). Các số **0 đơn / tồn không đổi / 0 giữ chỗ mồ côi** là **hàng rào**
+chứng minh điều đó **không** xảy ra.
+
+### 58.4 Còn lại
+
+| # | Việc |
+|---|---|
+| 1 | Hiện **dữ liệu kèm theo** của lỗi (`sku`/`kho`/số lượng) — cần ép kiểu `be.Data` sang `IDictionary<string, object?>` (ở ABP này nó là `object`) |
+| 2 | **Giỏ nhiều dòng** · **quản lý đơn trên UI** (xác nhận/huỷ/trả) |
+| 3 | Đo lại lần POST **đầu** bằng `HttpClient`/`AllowAutoRedirect=false` (§56.3 #1) |
+
+### 58.5 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.o | 15/10/2026 | *(agent, session GĐ1)* | 🚨 **Sửa lỗi THẬT về thông điệp lỗi trên UI**: `BusinessException.Message` của ABP trả **chuỗi vô nghĩa** (`Exception of type 'Volo.Abp.BusinessException' was thrown.`) ⇒ bắt riêng `BusinessException` và hiện **MÃ NGHIỆP VỤ** (`be.Code`). Phép đo ĐÚNG (trích cả khối `#loi` rồi bỏ thẻ) mới lộ ra lỗi này — regex cũ (`[^<]*`) trích **rỗng** và **suýt** khiến tôi kết luận *"không hiện gì"*. **Kiểm chứng lại**: thông điệp nay là **mã nghiệp vụ**; phần **an toàn** giữ nguyên (0 đơn · tồn không đổi · 0 giữ chỗ mồ côi) |
