@@ -50,6 +50,14 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
     /// <summary>Liên kết sản phẩm ↔ danh mục (`CAT-002`).</summary>
     public DbSet<Catalog.ProductCategory> ProductCategories { get; set; } = default!;
 
+    // ── Thuộc tính + tổ hợp biến thể (`CAT-002` lát cắt 4) ──────────────────────────────────────
+    // 🚨 NHỚ: thiếu `DbSet` ⇒ ABP **KHÔNG** đăng ký `IRepository<T>` ⇒ DI nổ (**HTTP 500**) dù build/migration
+    // đều xanh — xem `cat-002` §17.3. Có lưới an toàn CI: `DbSetRegistrationTests`.
+    public DbSet<Catalog.CatalogAttribute> CatalogAttributes { get; set; } = default!;
+    public DbSet<Catalog.CatalogAttributeValue> CatalogAttributeValues { get; set; } = default!;
+    public DbSet<Catalog.ProductAttributeSelection> ProductAttributeSelections { get; set; } = default!;
+    public DbSet<Catalog.ProductVariantAttribute> ProductVariantAttributes { get; set; } = default!;
+
     // ---- Inventory ----
     public DbSet<Inventory.InventoryItem> InventoryItems { get; set; } = default!;
     public DbSet<Inventory.StockLedgerEntry> StockLedgerEntries { get; set; } = default!;
@@ -187,6 +195,25 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
             b.Property(x => x.CompareAtPrice).HasPrecision(18, 4);
 
             b.HasIndex(x => new { x.TenantId, x.Sku }).IsUnique();
+
+            b.Property(x => x.AttributeHash).HasMaxLength(128);
+
+            // 🚨🚨 **HÀNG RÀO CUỐI CHO BẤT BIẾN "TỔ HỢP DUY NHẤT TRÊN MỖI SẢN PHẨM"** (`CAT-002` D7/BR-010).
+            //
+            // ⚠️ **LỆCH CÓ CHỦ Ý SO VỚI BẢNG INDEX CỦA TÀI LIỆU (§5.2)** — và đây là **sửa một lỗi trong tài liệu**:
+            // tài liệu ghi `UNIQUE (TenantId, ProductVariantId, AttributeHash)` **trên chính bảng `CatProductVariants`**.
+            // Nhưng trong bảng này `ProductVariantId` **chính là** khoá chính (`Id`) ⇒ index đó **luôn luôn đúng**
+            // và **KHÔNG chặn được gì** (vô nghĩa). Ý định thật của bất biến là *"tổ hợp duy nhất trên mỗi
+            // **SẢN PHẨM**"* ⇒ phải là `(TenantId, ProductId, AttributeHash)` — và bảng này **có** `ProductId`.
+            //
+            // 🎯 Vì sao phải có: `AttributeHash` là **khoá đối chiếu** khi sinh lại tổ hợp (BR-013). Không có
+            // hàng rào này thì 2 request đồng thời (hoặc Redis chết) tạo **hai biến thể cùng tổ hợp** ⇒
+            // storefront hiện 2 lựa chọn giống nhau và **không ai biết cái nào đúng**.
+            // Chỉ áp cho biến thể CÓ hash (biến thể thủ công của sản phẩm đơn giản có hash `NULL`).
+            b.HasIndex(x => new { x.TenantId, x.ProductId, x.AttributeHash })
+                .IsUnique()
+                .HasFilter("\"AttributeHash\" IS NOT NULL")
+                .HasDatabaseName("IX_CatProdVariants_TenantId_ProductId_AttributeHash");
         });
 
         // ── Cây danh mục (`CAT-002` D1/D2/D3/D9) ────────────────────────────────────────────────
@@ -270,6 +297,91 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
             b.HasOne<Catalog.Category>()
                 .WithMany()
                 .HasForeignKey(x => x.CategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ── Thuộc tính (`CAT-002` D4/BR-008) ──────────────────────────────────────────────────────
+        builder.Entity<Catalog.CatalogAttribute>(b =>
+        {
+            b.ToTable("CatAttributes");
+            b.ConfigureByConvention();
+
+            b.Property(x => x.Code).IsRequired().HasMaxLength(64);
+            b.Property(x => x.Name).IsRequired().HasMaxLength(256);
+
+            // `Usage` lưu dạng `int` (enum) — đọc bằng mắt trong DB là số, ghi rõ để không ai "sửa tay" sai.
+            b.Property(x => x.Usage).HasConversion<int>();
+
+            b.HasIndex(x => new { x.TenantId, x.Code })
+                .IsUnique()
+                .HasDatabaseName("IX_CatAttributes_TenantId_Code");
+        });
+
+        builder.Entity<Catalog.CatalogAttributeValue>(b =>
+        {
+            b.ToTable("CatAttributeValues");
+            b.ConfigureByConvention();
+
+            b.Property(x => x.Value).IsRequired().HasMaxLength(256);
+
+            b.HasIndex(x => new { x.TenantId, x.AttributeId, x.Value })
+                .IsUnique()
+                .HasDatabaseName("IX_CatAttrValues_TenantId_AttributeId_Value");
+
+            b.HasOne<Catalog.CatalogAttribute>()
+                .WithMany()
+                .HasForeignKey(x => x.AttributeId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<Catalog.ProductAttributeSelection>(b =>
+        {
+            b.ToTable("CatProductAttributeSelections");
+            b.ConfigureByConvention();
+
+            b.HasIndex(x => new { x.TenantId, x.ProductId, x.AttributeId, x.AttributeValueId })
+                .IsUnique()
+                .HasDatabaseName("IX_CatProdAttrSel_TenantId_ProductId_AttributeId_ValueId");
+
+            b.HasOne<Catalog.Product>()
+                .WithMany()
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            b.HasOne<Catalog.CatalogAttribute>()
+                .WithMany()
+                .HasForeignKey(x => x.AttributeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            b.HasOne<Catalog.CatalogAttributeValue>()
+                .WithMany()
+                .HasForeignKey(x => x.AttributeValueId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<Catalog.ProductVariantAttribute>(b =>
+        {
+            b.ToTable("CatProductVariantAttributes");
+            b.ConfigureByConvention();
+
+            // Mỗi biến thể có **ĐÚNG MỘT** giá trị cho mỗi thuộc tính (BR §8.1 #6).
+            b.HasIndex(x => new { x.TenantId, x.ProductVariantId, x.AttributeId })
+                .IsUnique()
+                .HasDatabaseName("IX_CatProdVarAttr_TenantId_VariantId_AttributeId");
+
+            b.HasOne<Catalog.ProductVariant>()
+                .WithMany()
+                .HasForeignKey(x => x.ProductVariantId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            b.HasOne<Catalog.CatalogAttribute>()
+                .WithMany()
+                .HasForeignKey(x => x.AttributeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            b.HasOne<Catalog.CatalogAttributeValue>()
+                .WithMany()
+                .HasForeignKey(x => x.AttributeValueId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 

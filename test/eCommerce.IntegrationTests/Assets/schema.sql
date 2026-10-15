@@ -1400,3 +1400,137 @@ VALUES ('20261015095145_Cat002b_ProductCategory', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+ALTER TABLE "CatProductVariants" ADD "AttributeHash" character varying(128);
+
+CREATE TABLE "CatAttributes" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "Code" character varying(64) NOT NULL,
+    "Name" character varying(256) NOT NULL,
+    "Usage" integer NOT NULL,
+    "IsActive" boolean NOT NULL,
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_CatAttributes" PRIMARY KEY ("Id")
+);
+
+CREATE TABLE "CatAttributeValues" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "AttributeId" uuid NOT NULL,
+    "Value" character varying(256) NOT NULL,
+    "SortOrder" integer NOT NULL,
+    "IsActive" boolean NOT NULL,
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_CatAttributeValues" PRIMARY KEY ("Id"),
+    CONSTRAINT "FK_CatAttributeValues_CatAttributes_AttributeId" FOREIGN KEY ("AttributeId") REFERENCES "CatAttributes" ("Id") ON DELETE RESTRICT
+);
+
+CREATE TABLE "CatProductAttributeSelections" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "ProductId" uuid NOT NULL,
+    "AttributeId" uuid NOT NULL,
+    "AttributeValueId" uuid NOT NULL,
+    "SortOrder" integer NOT NULL,
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_CatProductAttributeSelections" PRIMARY KEY ("Id"),
+    CONSTRAINT "FK_CatProductAttributeSelections_CatAttributeValues_AttributeV~" FOREIGN KEY ("AttributeValueId") REFERENCES "CatAttributeValues" ("Id") ON DELETE RESTRICT,
+    CONSTRAINT "FK_CatProductAttributeSelections_CatAttributes_AttributeId" FOREIGN KEY ("AttributeId") REFERENCES "CatAttributes" ("Id") ON DELETE RESTRICT,
+    CONSTRAINT "FK_CatProductAttributeSelections_CatProducts_ProductId" FOREIGN KEY ("ProductId") REFERENCES "CatProducts" ("Id") ON DELETE RESTRICT
+);
+
+CREATE TABLE "CatProductVariantAttributes" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "ProductVariantId" uuid NOT NULL,
+    "AttributeId" uuid NOT NULL,
+    "AttributeValueId" uuid NOT NULL,
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_CatProductVariantAttributes" PRIMARY KEY ("Id"),
+    CONSTRAINT "FK_CatProductVariantAttributes_CatAttributeValues_AttributeVal~" FOREIGN KEY ("AttributeValueId") REFERENCES "CatAttributeValues" ("Id") ON DELETE RESTRICT,
+    CONSTRAINT "FK_CatProductVariantAttributes_CatAttributes_AttributeId" FOREIGN KEY ("AttributeId") REFERENCES "CatAttributes" ("Id") ON DELETE RESTRICT,
+    CONSTRAINT "FK_CatProductVariantAttributes_CatProductVariants_ProductVaria~" FOREIGN KEY ("ProductVariantId") REFERENCES "CatProductVariants" ("Id") ON DELETE RESTRICT
+);
+
+CREATE UNIQUE INDEX "IX_CatProdVariants_TenantId_ProductId_AttributeHash" ON "CatProductVariants" ("TenantId", "ProductId", "AttributeHash") WHERE "AttributeHash" IS NOT NULL;
+
+CREATE UNIQUE INDEX "IX_CatAttributes_TenantId_Code" ON "CatAttributes" ("TenantId", "Code");
+
+CREATE INDEX "IX_CatAttributeValues_AttributeId" ON "CatAttributeValues" ("AttributeId");
+
+CREATE UNIQUE INDEX "IX_CatAttrValues_TenantId_AttributeId_Value" ON "CatAttributeValues" ("TenantId", "AttributeId", "Value");
+
+CREATE UNIQUE INDEX "IX_CatProdAttrSel_TenantId_ProductId_AttributeId_ValueId" ON "CatProductAttributeSelections" ("TenantId", "ProductId", "AttributeId", "AttributeValueId");
+
+CREATE INDEX "IX_CatProductAttributeSelections_AttributeId" ON "CatProductAttributeSelections" ("AttributeId");
+
+CREATE INDEX "IX_CatProductAttributeSelections_AttributeValueId" ON "CatProductAttributeSelections" ("AttributeValueId");
+
+CREATE INDEX "IX_CatProductAttributeSelections_ProductId" ON "CatProductAttributeSelections" ("ProductId");
+
+CREATE INDEX "IX_CatProductVariantAttributes_AttributeId" ON "CatProductVariantAttributes" ("AttributeId");
+
+CREATE INDEX "IX_CatProductVariantAttributes_AttributeValueId" ON "CatProductVariantAttributes" ("AttributeValueId");
+
+CREATE INDEX "IX_CatProductVariantAttributes_ProductVariantId" ON "CatProductVariantAttributes" ("ProductVariantId");
+
+CREATE UNIQUE INDEX "IX_CatProdVarAttr_TenantId_VariantId_AttributeId" ON "CatProductVariantAttributes" ("TenantId", "ProductVariantId", "AttributeId");
+
+DROP INDEX "IX_CatAttributes_TenantId_Code";
+
+CREATE UNIQUE INDEX "IX_CatAttributes_TenantId_Code" ON "CatAttributes" ("TenantId", "Code") NULLS NOT DISTINCT;
+
+DROP INDEX "IX_CatAttrValues_TenantId_AttributeId_Value";
+
+CREATE UNIQUE INDEX "IX_CatAttrValues_TenantId_AttributeId_Value" ON "CatAttributeValues" ("TenantId", "AttributeId", "Value") NULLS NOT DISTINCT;
+
+DROP INDEX "IX_CatProdAttrSel_TenantId_ProductId_AttributeId_ValueId";
+
+CREATE UNIQUE INDEX "IX_CatProdAttrSel_TenantId_ProductId_AttributeId_ValueId" ON "CatProductAttributeSelections" ("TenantId", "ProductId", "AttributeId", "AttributeValueId") NULLS NOT DISTINCT;
+
+DROP INDEX "IX_CatProdVarAttr_TenantId_VariantId_AttributeId";
+
+CREATE UNIQUE INDEX "IX_CatProdVarAttr_TenantId_VariantId_AttributeId" ON "CatProductVariantAttributes" ("TenantId", "ProductVariantId", "AttributeId") NULLS NOT DISTINCT;
+
+DROP INDEX "IX_CatProdVariants_TenantId_ProductId_AttributeHash";
+
+CREATE UNIQUE INDEX "IX_CatProdVariants_TenantId_ProductId_AttributeHash" ON "CatProductVariants" ("TenantId", "ProductId", "AttributeHash") NULLS NOT DISTINCT WHERE "AttributeHash" IS NOT NULL;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261015100156_Cat002c_AttributesAndVariantGeneration', '10.0.11');
+
+COMMIT;
+

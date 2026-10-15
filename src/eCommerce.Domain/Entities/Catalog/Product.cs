@@ -282,6 +282,19 @@ public class ProductVariant : FullAuditedEntity<Guid>, IMultiTenant
 
     public bool IsActive { get; protected set; } = true;
 
+    /// <summary>
+    /// 🚨 **Hash của TỔ HỢP thuộc tính** (`CAT-002` D7/BR-010/011) — `NULL` cho biến thể **không** sinh từ
+    /// tổ hợp (sản phẩm đơn giản, hoặc biến thể do người dùng tự tạo).
+    ///
+    /// Đây là **khoá đối chiếu** để biết tổ hợp nào **đã tồn tại** khi sinh lại (BR-013: **giữ nguyên**
+    /// `Id`/`Sku` cũ, **cấm** xoá-rồi-tạo-lại) ⇒ hash sinh **lệch** sẽ khiến hệ thống **tạo trùng** hoặc
+    /// **coi hai tổ hợp khác nhau là một** (bán sai hàng). ⚠️ **CHỈ** sinh bằng
+    /// `VariantCombinationGenerator.TinhAttributeHash` (BR-011).
+    ///
+    /// `(TenantId, ProductId, AttributeHash) WHERE AttributeHash IS NOT NULL` là **hàng rào cuối** ở DB.
+    /// </summary>
+    public string? AttributeHash { get; protected set; }
+
     protected ProductVariant() { }
 
     public ProductVariant(Guid id, string sku, decimal price, string? barcode = null) : base(id)
@@ -311,6 +324,23 @@ public class ProductVariant : FullAuditedEntity<Guid>, IMultiTenant
         }
 
         return coDoi;
+    }
+
+    /// <summary>
+    /// Gắn hash tổ hợp cho biến thể. ⚠️ Kiểm tra **hình dạng** hash (64 ký tự hex thường) để không ai
+    /// "tiện tay" truyền chuỗi khác vào — hash sai hình dạng vẫn **chạy** nhưng phá bất biến đối chiếu (BR-010).
+    /// </summary>
+    public void GanToHop(string attributeHash)
+    {
+        if (string.IsNullOrWhiteSpace(attributeHash) || attributeHash.Length != 64)
+        {
+            throw new ArgumentException(
+                "AttributeHash phải là chuỗi 64 ký tự hex (SHA-256 dạng thường). " +
+                "Dùng `VariantCombinationGenerator.TinhAttributeHash` (CAT-002 BR-011).",
+                nameof(attributeHash));
+        }
+
+        AttributeHash = attributeHash;
     }
 
     /// <summary>Ngừng bán biến thể này (không xoá — giữ lịch sử tham chiếu).</summary>

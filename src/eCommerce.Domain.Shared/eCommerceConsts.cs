@@ -277,6 +277,20 @@ public static class eCommerceConsts
         public static string CategoryTree(Guid? tenantId)
             => $"catalog:category-tree:{tenantId?.ToString() ?? "null"}";
 
+        /// <summary>
+        /// 🚨 **Khoá theo SẢN PHẨM cho bước SINH TỔ HỢP biến thể** (`CAT-002` D7/BR-015, §8.2).
+        /// Khoá theo **sản phẩm** (không theo tenant) **có chủ ý**: hai sản phẩm khác nhau vẫn sinh **song song**;
+        /// chỉ hai request trên **cùng một** sản phẩm mới phải tuần tự — nếu không, cả hai cùng chèn
+        /// `AttributeHash` giống nhau ⇒ một request nhận **lỗi unique khó hiểu** từ DB.
+        /// ⚠️ Tên khoá **KHÔNG** chứa tiền tố `ecommerce:` (`XC-003` §5.4 — tránh **tiền tố đôi**).
+        /// </summary>
+        public static string VariantCombination(Guid? tenantId, Guid productId)
+            => $"catalog:variant-combination:{tenantId?.ToString() ?? "null"}:{productId}";
+
+        /// <summary>Sửa/xoá **định nghĩa thuộc tính** trong khi có người đang sinh tổ hợp (`CAT-002` §8.2).</summary>
+        public static string AttributeDefinition(Guid? tenantId)
+            => $"catalog:attribute-definition:{tenantId?.ToString() ?? "null"}";
+
         // 📌 Khoá liên quan tới kênh bán (refresh token, đẩy tồn kho) do CHÍNH module ChannelHub
         // sở hữu — xem modules/ChannelHub/ChannelHub.Domain/ChannelHubConsts.cs.
         // Không khai báo lại ở đây để tránh hai nguồn sự thật cho cùng một khoá lock.

@@ -79,6 +79,25 @@ public enum ChannelListingStatus
 }
 
 /// <summary>
+/// **Loại sử dụng của thuộc tính** (`CAT-002` **D4**/BR-008) — tách **2 loại tường minh**, **không** dùng cờ `bool`.
+///
+/// ⚠️ VÌ SAO TÁCH HẲN 2 GIÁ TRỊ THAY VÌ MỘT CỜ `IsVariant`: hai loại có **luật khác hẳn nhau** —
+/// `Variant` **không được xoá** khi đã có biến thể dùng nó (`Catalog:0023`), còn `Specification` xoá được tự do.
+/// Nếu chỉ có một cờ `bool` thì guard rất dễ viết **sai nhánh** và **không có lỗi biên dịch** nào chỉ ra.
+///
+/// 📌 Đặt ở `Domain.Shared` (không phải trong entity) vì **DTO ở `Application.Contracts` cũng cần** —
+/// tầng đó **không** được tham chiếu `Domain` (layering). Đây đúng quy ước: mọi enum nằm ở `Enums.cs`.
+/// </summary>
+public enum CatalogAttributeUsage
+{
+    /// <summary>Chỉ **mô tả** (chất liệu, bảo hành…). **Không** tham gia sinh tổ hợp.</summary>
+    Specification = 0,
+
+    /// <summary>Sinh **biến thể** (màu, size…). Là trục của tích Descartes (BR-009).</summary>
+    Variant = 1
+}
+
+/// <summary>
 /// Vòng đời HIỂN THỊ của sản phẩm (`CAT-001` **D5** — state machine ở tầng DOMAIN).
 ///
 /// 🚨 VÌ SAO PHẢI CÓ ENUM + METHOD CÓ GUARD (thay vì `bool IsPublished` có `set` công khai):

@@ -1155,3 +1155,105 @@ cắt này là `assign-product/{categoryId}`, `unassign-product?categoryId&produ
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.4 | 15/10/2026 | *(agent, session GĐ1)* | **Lát cắt 3 — liên kết sản phẩm ↔ danh mục**: entity + `ProductCategoryService` + 4 route API + **unique có filter** cho BR-006 + **bổ sung guard "còn sản phẩm"** khi xoá danh mục (§18.1 #5). **Kiểm chứng HTTP 11 phép đo** (hạ danh mục chính cũ · `0021` cho danh mục ngừng dùng · `0021` khi còn sản phẩm · 0 `fail:`). **+4 unit · +4 integration**. Phát hiện **xung đột index `Slug`** (§18.3) và ghi lại **bài học lặp lại về đoán URL** (§18.5) |
+
+---
+
+## 19. TRẠNG THÁI TRIỂN KHAI — **LÁT CẮT 4: THUỘC TÍNH + SINH TỔ HỢP BIẾN THỂ** (15/10/2026)
+
+### 19.1 Đã làm
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| 1 | `CatalogAttribute` (`CatAttributes`) + `CatalogAttributeUsage` | `Specification`/`Variant` (**D4**/BR-008); enum đặt ở **`Domain.Shared`** (DTO cũng cần — Contracts **không** được tham chiếu `Domain`) |
+| 2 | `CatalogAttributeValue` (`CatAttributeValues`) | giá trị + `SortOrder`; unique `(TenantId, AttributeId, Value)` |
+| 3 | `ProductAttributeSelection` (`CatProductAttributeSelections`) | **bảng giá trị người bán chọn** — **nhiều giá trị cho một thuộc tính** là **hợp lệ** (xem §19.2) |
+| 4 | `ProductVariantAttribute` (`CatProductVariantAttributes`) | tổ hợp đã chốt của từng biến thể (để storefront dựng bộ chọn) |
+| 5 | `ProductVariant.AttributeHash` (`varchar(128)`, nullable) + `GanToHop()` | kiểm **hình dạng** hash (64 hex) để không ai truyền chuỗi khác |
+| 6 | `VariantCombinationGenerator` (hàm **THUẦN**) | tích Descartes (**BR-009**), **đếm bằng `long`** (tránh **tràn `int`** ⇒ số âm ⇒ lọt ngưỡng), chặn ngưỡng (**D6**), hàm băm **duy nhất của domain** (**BR-011**), hash **ổn định theo thứ tự** (**BR-016**) |
+| 7 | `VariantGenerationService` | khoá **theo sản phẩm** (`catalog:variant-combination:{tenantId}:{productId}`, BR-015) · **giữ nguyên** biến thể đã có (**BR-013**) · ghi biến thể + `ProductVariantAttribute` **cùng transaction** (BR-014) |
+| 8 | API `CatalogAttributeAppService` | 6 route: tạo thuộc tính · thêm giá trị · chọn/bỏ giá trị · xem lựa chọn · **sinh tổ hợp** |
+| 9 | Hàng rào DB | **5 unique index `NULLS NOT DISTINCT`** (sửa tay trong migration) — gồm **index CÓ FILTER** `(TenantId, ProductId, AttributeHash) WHERE AttributeHash IS NOT NULL` |
+| 10 | Mã lỗi | `0009` vượt ngưỡng · `0007` **giá 0** khi sinh · `0022` (đã đăng ký, dùng khi va chạm) · `eCommerce:Lock:0001` khi không giành được khoá |
+
+### 19.2 🚨🚨 LỖI THIẾT KẾ **DO TÔI GÂY RA**, ĐƯỢC **E2E BẮT** — và nó suýt "trông như chạy đúng"
+
+**Chuyện đã xảy ra:** tôi cho `SelectValueAsync` **THAY THẾ** giá trị cũ của cùng thuộc tính, kèm lập luận
+*"Đỏ + Xanh là vô nghĩa"*. Lập luận đó **SAI**:
+
+`CatProductAttributeSelections` và unique index của nó `(TenantId, ProductId, AttributeId, AttributeValueId)`
+cho phép **NHIỀU giá trị cho MỘT thuộc tính** — đó chính là **bảng màu/size mà người bán chọn** để hệ thống
+sinh **tổ hợp** (Đỏ-M, Đỏ-L, Xanh-M, Xanh-L).
+
+**Hệ quả nếu không bị bắt:** với luật "mỗi thuộc tính một giá trị", tích Descartes **luôn = 1** ⇒
+**tính năng sinh tổ hợp mất hết ý nghĩa** — mà **KHÔNG có lỗi nào**:
+• build **xanh** · unit test **xanh** (bộ sinh tổ hợp vẫn đúng khi được gọi trực tiếp) · migration **xanh**,
+• API trả **`200`**, vẫn **tạo được 1 biến thể** ⇒ nhìn như "chạy đúng".
+
+**Cách duy nhất phát hiện là kiểm chứng bằng TRẠNG THÁI THẬT:** lần chạy E2E đầu tiên cho `created:1`
+thay vì `4` ⇒ lộ ra ngay. Sau khi sửa (chọn = **THÊM** giá trị; bỏ giá trị cụ thể qua `UnselectValueAsync`),
+E2E cho `created:4` với **4 SKU** và **4 hash khác nhau**.
+
+📌 **Đây là lần thứ hai trong cùng feature mà "xanh ở mọi tầng" vẫn che một lỗi thật**
+(lần trước: thiếu `DbSet` ⇒ HTTP 500, §17.3). ⇒ Khẳng định lại: **kiểm chứng bằng trạng thái thật là bắt buộc**.
+
+### 19.3 Quyết định **BỔ SUNG** của tôi (tài liệu không quy định)
+
+1. **Giá khi sinh tổ hợp.** Tài liệu `CAT-002` **không** nói biến thể sinh ra lấy giá ở đâu. Nếu để mặc định
+   thì biến thể có **giá 0** và **BÁN ĐƯỢC với giá 0** ⇒ **mất tiền im lặng**. Đã chốt:
+   sản phẩm **chưa có** biến thể ⇒ **BẮT BUỘC** truyền `DefaultPrice > 0`, nếu không ⇒ **`Catalog:0007`**;
+   đã có biến thể ⇒ để trống thì kế thừa giá của biến thể đang hoạt động **rẻ nhất**.
+2. **Index `AttributeHash` — SỬA MỘT LỖI TRONG BẢNG INDEX CỦA TÀI LIỆU (§5.2).** Tài liệu ghi
+   `UNIQUE (TenantId, ProductVariantId, AttributeHash)` **trên chính bảng `CatProductVariants`** — nhưng ở đó
+   `ProductVariantId` **chính là** khoá chính ⇒ index **luôn đúng** và **không chặn được gì**. Ý định thật
+   (*"tổ hợp duy nhất trên mỗi **SẢN PHẨM**"*, D7/BR-010) ⇒ phải là `(TenantId, **ProductId**, AttributeHash)`
+   — và bảng này **có** `ProductId`. Đã làm đúng ý định (index **có filter**), ghi lại ở đây.
+3. **SKU sinh từ tổ hợp:** `{Mã sản phẩm}-{giá trị…}` (chuẩn hoá HOA/số/`-`), sắp theo `AttributeId` ⇒ **ổn định**
+   (SKU **bất biến sau giao dịch** — `CAT-001` D2). Vượt 64 ký tự ⇒ cắt + hậu tố 8 ký tự đầu của `AttributeHash`.
+
+### 19.4 ✅ BẰNG CHỨNG HTTP THẬT (Host + PostgreSQL 17)
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | 7 route thật (từ `swagger.json`) | `/catalog-attribute` · `/value/{attributeId}` · `/select-value/{productId}` · `/unselect-value` · `/unselect` · `/selections/{productId}` · `/generate-variants/{productId}` |
+| 3 | Chọn **4 giá trị** (Đỏ, Xanh, M, L) | `204` ×4 · `selections` trả **đủ 4** |
+| 4 | **Sinh tổ hợp 2×2** | `created:4` · SKU `…-X-M`, `…-X-L`, `…-XANH-M`, `…-XANH-L` · **4 hash khác nhau** · giá `150000` |
+| 5 | **Sinh LẠI (BR-013)** | `created:0`, **`existing:4`** · **giá giữ nguyên `150000`** dù truyền `999999` ⇒ **giữ nguyên `Id`/`Sku`** ✅ |
+| 6 | Chọn thêm `Tím` rồi sinh lại | `created:2, existing:4` ⇒ **chỉ tạo tổ hợp MỚI** ✅ |
+| 7 | **Vượt ngưỡng** (`maxCombinations=2`, có 6 tổ hợp) | **`eCommerce:Catalog:0009`** ✅ |
+| 8 | **Chưa có biến thể + không truyền giá** | **`Catalog:0007`** ✅ (chặn **bán giá 0**) · có giá ⇒ `200`, `created:1` |
+| 9 | Sản phẩm **không** có thuộc tính `Variant` | `created:0`, **không lỗi** (đúng §12) |
+| 10 | DB | **6 biến thể / 6 hash phân biệt** · **12** cặp biến thể–thuộc tính (6 × 2 trục) |
+| 11 | Log Host | **0 dòng `fail:`** |
+| 12 | Dọn dẹp | 0 sản phẩm / 0 biến thể / 0 thuộc tính / 0 giá trị · cờ bảo mật đã khôi phục |
+
+**DB thật:** 5 index **UNIQUE … NULLS NOT DISTINCT** (đo bằng `pg_indexes`), gồm
+`IX_CatProdVariants_TenantId_ProductId_AttributeHash` **… NULLS NOT DISTINCT WHERE ("AttributeHash" IS NOT NULL)**;
+cột `AttributeHash` = `varchar(128)` nullable.
+
+**Test:** unit **502** (+13 cho bộ sinh tổ hợp: tích Descartes · **hash ổn định theo thứ tự cả 2 chiều** ·
+hash **khác nhau khi tập giá trị khác nhau** · định dạng hash · vượt ngưỡng kèm `soToHop`/`nguong` ·
+**chống tràn số** với 100³ · ca biên) · integration **32** (bảng đếm index nay **28**).
+
+### 19.5 ⚠️ Còn lại của `CAT-002`
+
+| # | Việc | Ghi chú |
+|---|---|---|
+| 1 | `CatCategoryAttributes` (thuộc tính **được phép** trong danh mục + `IsRequired`) | §5.2 — tiện ích quản trị |
+| 2 | **Giảm** tập thuộc tính: biến thể cũ không còn tổ hợp tương ứng ⇒ chỉ `IsActive = false` (**BR-012**) | hiện `SinhToHopAsync` **không** xử lý ca này |
+| 3 | `ProductVariantCreatedEto` | phải **phân loại** *thông báo* vs *mang dữ liệu* (`coding-conventions` §6.2); `F8` outbox vẫn hoãn |
+| 4 | Chặn **xoá/đổi `Usage`** thuộc tính đang được biến thể dùng ⇒ `Catalog:0023` | đã đăng ký mã, **chưa** gắn guard |
+| 5 | UI admin (cây danh mục + bộ chọn biến thể) | §10 |
+
+### 19.6 🚨 Bài học quy trình: **đoán URL — lần thứ BA** (và cách chặn)
+
+Trong lượt này tôi **in route thật từ `swagger.json`** rồi… **vẫn viết lời gọi theo suy đoán**
+(`/{id}/values`, `/select/{id}`) ⇒ **404 toàn bộ**, và các phép đo sau đó **xanh vì lý do sai**
+(`created:0` được diễn giải là "chưa chọn giá trị" trong khi thực ra **lệnh chọn đã 404**).
+⇒ Quy tắc bổ sung (mạnh hơn quy tắc cũ): **in route + tham số THẬT, rồi SAO CHÉP vào lời gọi** — không viết
+lời gọi trước rồi mới in. Và: **một phép đo xanh sau một lời gọi 404 là phép đo vô giá trị**.
+
+### 19.7 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.5 | 15/10/2026 | *(agent, session GĐ1)* | **Lát cắt 4 — thuộc tính + sinh tổ hợp biến thể**: 4 entity + `AttributeHash` + `VariantCombinationGenerator` (hàm thuần, hash duy nhất, chống tràn số) + `VariantGenerationService` (khoá theo sản phẩm, BR-013) + **6 route API** + **5 unique index `NULLS NOT DISTINCT`** (1 index **có filter**). **Kiểm chứng HTTP 12 phép đo**. 🚨 **Sửa lỗi thiết kế do chính tôi gây ra** (chọn giá trị phải là **THÊM**, không phải **THAY** — §19.2) và **sửa một lỗi trong bảng index của tài liệu** (`AttributeHash` phải theo `ProductId` — §19.3). **+13 unit**. Ghi rõ phần còn lại (§19.5) và bài học đoán URL lần 3 (§19.6) |
