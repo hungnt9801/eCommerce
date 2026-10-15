@@ -121,6 +121,55 @@ public class BackgroundWorkerCoCheTests
             $"Chỉ thấy {tenWorker.Count} worker (đã biết ít nhất 6) ⇒ phép quét hỏng.");
     }
 
+    [Fact]
+    public void Worker_resolve_SERVICE_MIEN_thi_PHAI_co_UnitOfWork__luat_theo_BANG_CHUNG_do_duoc()
+    {
+        // 🚨 **LUẬT NÀY ĐƯỢC RÚT TỪ BẰNG CHỨNG ĐO ĐƯỢC — KHÔNG phải suy đoán.**
+        //
+        // **Đo được (vòng 35):** `StockReservationExpiryWorker` resolve `StockReservationService` (dịch vụ **miền**)
+        // mà không có UoW ⇒ `ObjectDisposedException: Cannot access a disposed context instance`.
+        //
+        // **Đo được (vòng 37) — ĐÍNH CHÍNH một suy đoán trước đó:** `TaxUnclassifiedSkusWorker` resolve
+        // **`IRepository<…>`** mà **KHÔNG** có UoW, và **nó CHẠY ĐƯỢC**: log ghi
+        // *"Đếm SKU chưa phân loại thuế: 0/0…"* và suốt phiên chạy **`fail: 0`**.
+        // ⇒ Lỗi **không** đến từ việc resolve `IRepository<>`; nó đến từ việc resolve **`*Service`** (đối tượng
+        // **giữ repository/DbContext đã tạo ở scope khác**) rồi dùng nó ngoài UoW.
+        //
+        // 📌 **Vì sao luật phải HẸP:** luật rộng *"mọi worker chạm DB phải có UoW"* sẽ **báo sai** cho
+        // `TaxUnclassifiedSkusWorker` ⇒ bị **vô hiệu hoá** (người ta thêm ngoại lệ cho tới khi test vô nghĩa).
+        // Luật hẹp thì **ít ồn** và **vẫn chặn đúng** hình mẫu đã gây sự cố.
+        var tatCaMa = DocTatCaMaNguon();
+        var viPham = new List<string>();
+
+        foreach (var (tenTep, noiDung) in tatCaMa)
+        {
+            if (!noiDung.Contains(TenLopCoSo, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            // `GetRequiredService<XxxService>()` — dịch vụ MIỀN (không phải `IRepository<…>`).
+            var coResolveService = Regex.IsMatch(noiDung, @"GetRequiredService<\s*\w*Service\s*>");
+            var coUow = noiDung.Contains("IUnitOfWorkManager", StringComparison.Ordinal);
+
+            if (coResolveService && !coUow)
+            {
+                viPham.Add($"{LayTenLop(noiDung) ?? tenTep} (khai ở {tenTep})");
+            }
+        }
+
+        Assert.True(viPham.Count == 0,
+            "🚨 WORKER resolve DỊCH VỤ MIỀN mà KHÔNG có `UnitOfWork` ⇒ sẽ ném "
+            + "`ObjectDisposedException: Cannot access a disposed context instance` ⇒ **job không làm gì cả "
+            + "mà không ai biết** (ĐÃ ĐO ĐƯỢC ở vòng 35):\n  "
+            + string.Join("\n  ", viPham)
+            + "\n\n⇒ Bọc công việc trong:\n"
+            + "   `using var scope = workerContext.ServiceProvider.CreateScope();`\n"
+            + "   `var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWorkManager>()"
+            + ".Begin(requiresNew: true, isTransactional: true);`\n"
+            + "   … lấy service từ `scope` … `await uow.CompleteAsync();`");
+    }
+
     // ── Đọc nguồn ────────────────────────────────────────────────────────────
 
     private static string LayTenLop(string noiDung)
@@ -152,11 +201,34 @@ public class BackgroundWorkerCoCheTests
                     continue;
                 }
 
-                ket.Add((Path.GetFileName(tep), File.ReadAllText(tep)));
+                ket.Add((Path.GetFileName(tep), BoChuThich(File.ReadAllText(tep))));
             }
         }
 
         return ket;
+    }
+
+    /// <summary>
+    /// 🚨 **BỎ CHÚ THÍCH TRƯỚC KHI ÁP LUẬT** — 🎯 **do chính MUTATION TEST phát hiện (vòng 37)**:
+    /// luật dùng **so khớp chuỗi** nên bị **THOẢ MÃN BỞI MỘT DÒNG COMMENT**. Khi thử nghiệm đột biến
+    /// (bỏ `UnitOfWork` khỏi worker), tôi để lại chuỗi gốc trong **comment** `// [MUTATION] …` ⇒
+    /// luật **vẫn xanh** ⇒ cơ chế **bị vô hiệu mà không ai biết** — đúng loại lỗi mà cả lớp test này tồn tại để chặn.
+    /// ⇒ Cắt `//` và `/* */` trước khi kiểm.
+    /// ⚠️ **Đánh đổi đã biết:** cách cắt này **thô** (không hiểu chuỗi ký tự) ⇒ nếu ai viết `"//"` **trong một chuỗi**
+    /// thì phần sau bị cắt nhầm. Với **luật văn bản nguồn** thì đánh đổi này chấp nhận được — và **an toàn theo
+    /// hướng ngược lại**: cắt nhầm chỉ làm luật **chặt hơn** (dễ ĐỎ), không làm nó **lỏng đi** (bỏ sót).
+    /// </summary>
+    private static string BoChuThich(string ma)
+    {
+        var khongKhoi = Regex.Replace(ma, @"/\*.*?\*/", " ", RegexOptions.Singleline);
+
+        return string.Join(
+            '\n',
+            khongKhoi.Split('\n').Select(dong =>
+            {
+                var viTri = dong.IndexOf("//", StringComparison.Ordinal);
+                return viTri >= 0 ? dong[..viTri] : dong;
+            }));
     }
 
     private static string TimGocRepo()

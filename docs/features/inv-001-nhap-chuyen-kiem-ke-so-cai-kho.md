@@ -1845,3 +1845,66 @@ nó chạy và **không** ném (dùng chính dòng log vô điều kiện nay đ
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.3 | 15/10/2026 | *(agent, session GĐ1)* | **Cơ chế cho "job im lặng"**: `BackgroundWorkerCoCheTests` (3 luật: **đăng ký** · **log vô điều kiện** · **phạm vi quét không thu hẹp**) — biến 3 bài học §27 thành **test CI**. 🚨 **Cơ chế tìm ra vi phạm THẬT ngay lần chạy đầu** (`ChannelSyncSupervisorWorker` thiếu log) ⇒ sửa gốc. **Mutation test** chứng minh cơ chế nổ đúng (gỡ đăng ký ⇒ ĐỎ, chỉ đúng tên). ⚠️ **Ghi nhận rủi ro tiềm ẩn: 5/6 worker không có `UnitOfWork`** (§28.3) — **không sửa mù**, cần kiểm chứng từng worker |
+
+---
+
+## 29. **ĐÍNH CHÍNH §28.3 BẰNG BẰNG CHỨNG + LUẬT HẸP CHO `UnitOfWork`** (15/10/2026)
+
+### 29.1 🔬 Đo được — và nó **đính chính** điều tôi suy đoán ở §28.3
+
+Chạy Host thật **15 giây**, đọc log:
+
+| Worker | Xuất hiện trong log | **Ném?** |
+|---|---|---|
+| `TaxUnclassifiedSkusWorker` | **có** — log: *"Đếm SKU chưa phân loại thuế: **0/0** SKU đang bán chưa phân loại."* | **KHÔNG** |
+| `StockReservationExpiryWorker` | có (dòng log vô điều kiện) | KHÔNG |
+| 4 worker còn lại | **không** (nhịp dài hơn 15 giây) | — |
+
+**`fail: 0`** trên toàn bộ phiên chạy.
+
+⇒ 🚨 **`TaxUnclassifiedSkusWorker` TRUY VẤN DB mà KHÔNG có `UnitOfWork` — và nó CHẠY ĐƯỢC.**
+Điều này **đính chính** cách tôi khái quát hoá ở §28.3: **lỗi `ObjectDisposedException` KHÔNG đến từ việc resolve
+`IRepository<>`**, mà từ việc resolve **`*Service` (dịch vụ MIỀN)** — đối tượng **giữ repository/DbContext được tạo
+ở scope khác** — rồi dùng nó ngoài UoW. 📌 Đây là khác biệt **quyết định** giữa một luật **dùng được** và một luật
+**báo sai rồi bị vô hiệu hoá**.
+
+⚠️ **4 worker không xuất hiện trong 15 giây KHÔNG phải bằng chứng là chúng khoẻ** (nhịp của chúng dài hơn).
+Ghi rõ để không ai đọc bảng trên thành *"4 worker kia ổn"*.
+
+### 29.2 Luật HẸP được thêm vào cơ chế (§28 → §29)
+
+`Worker_resolve_SERVICE_MIEN_thi_PHAI_co_UnitOfWork` — chỉ ĐỎ khi worker:
+- **resolve `GetRequiredService<…Service>()`** (dịch vụ miền), **VÀ**
+- **không** có `IUnitOfWorkManager`.
+
+📌 **Vì sao luật phải HẸP:** luật rộng *"mọi worker chạm DB phải có UoW"* sẽ **báo sai** cho
+`TaxUnclassifiedSkusWorker` (đã đo: nó chạy tốt) ⇒ người ta sẽ **thêm ngoại lệ** cho tới khi test **vô nghĩa**.
+Luật hẹp thì **ít ồn** và **vẫn chặn đúng** hình mẫu đã gây sự cố.
+
+### 29.3 🎯 **MUTATION TEST — BA lần, và lần thứ HAI phát hiện điểm yếu THẬT của cơ chế**
+
+| Lần | Cách đột biến | Kết quả | Bài học |
+|---|---|---|---|
+| 1 | thay `IUnitOfWorkManager` bằng tên kiểu khác | ❌ **không biên dịch** ⇒ test chạy trên **DLL cũ** ⇒ **không chứng minh được gì** | đột biến **phải biên dịch được**, nếu không phép kiểm **vô nghĩa** (cùng họ bài học *"build tăng dần bỏ qua tệp"*) |
+| 2 | bỏ `UnitOfWork` nhưng **giữ chuỗi gốc trong COMMENT** | 🚨 **test vẫn XANH** ⇒ **cơ chế bị vô hiệu** | 🚨 **so khớp chuỗi bị THOẢ MÃN BỞI MỘT DÒNG COMMENT** — điểm yếu **thật** của luật văn bản nguồn |
+| 3 | như lần 2, **sau khi bỏ chú thích** trước khi áp luật | ✅ **ĐỎ**, chỉ **đúng tên** `StockReservationExpiryWorker` | cơ chế **nay thật sự có tác dụng** |
+
+✅ **Sửa:** `DocTatCaMaNguon()` nay **bỏ `//` và `/* */`** trước khi áp luật.
+⚠️ **Đánh đổi đã biết:** cách cắt **thô** (không hiểu chuỗi ký tự) ⇒ nếu ai viết `"//"` **trong một chuỗi** thì phần
+sau bị cắt nhầm. Với **luật văn bản nguồn** thì chấp nhận được, và **an toàn theo hướng ngược lại**: cắt nhầm chỉ
+làm luật **chặt hơn** (dễ ĐỎ), **không** làm nó **lỏng đi** (bỏ sót).
+
+📌 **Bài học (mới, đáng nhớ):** *một luật kiểm bằng **văn bản nguồn** mà **không bỏ chú thích** thì có thể bị
+**thoả mãn bởi chính một dòng comment*** — và điều đó **chỉ lộ ra nhờ mutation test**, **không** lộ ra khi đọc code.
+
+### 29.4 Bằng chứng cuối
+
+- build `--no-incremental`: **0 lỗi / 0 cảnh báo** · unit **690/690** (+1 luật mới) · integration **38/38** · mermaid 197/0
+- Host thật: khởi động sạch, **`fail: 0`**, 2 worker đã chạy và **không** ném
+- Mutation test: **ĐỎ đúng tên** khi gỡ `UnitOfWork`; khôi phục từ **file sao lưu** ⇒ xanh lại
+
+### 29.5 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.4 | 15/10/2026 | *(agent, session GĐ1)* | **Đính chính §28.3 bằng BẰNG CHỨNG**: đo Host thật ⇒ `TaxUnclassifiedSkusWorker` **truy vấn DB không UoW mà KHÔNG ném** ⇒ lỗi `ObjectDisposedException` đến từ việc resolve **`*Service` miền**, **không** phải `IRepository<>`. Thêm **luật HẸP** (resolve `*Service` mà thiếu UoW ⇒ ĐỎ). 🎯 **Mutation test 3 lần**: lần 1 **không biên dịch** (vô nghĩa), lần 2 **phát hiện điểm yếu thật** — luật bị **thoả mãn bởi một dòng COMMENT** ⇒ sửa bằng **bỏ chú thích**, lần 3 **ĐỎ đúng tên**. Ghi bài học: *luật văn bản nguồn phải bỏ chú thích* |
