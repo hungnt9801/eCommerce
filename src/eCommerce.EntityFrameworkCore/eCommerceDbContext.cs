@@ -65,6 +65,11 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
     public DbSet<Pricing.PriceListItem> PriceListItems { get; set; } = default!;
     public DbSet<Pricing.ChannelPrice> ChannelPrices { get; set; } = default!;
 
+    // PRC-002 — **bậc thang giá**: bảng RIÊNG vì `PriceListItem` duy nhất theo `(TenantId, PriceListId, Sku)`
+    // (`PRC-001` BR-008) ⇒ **không chứa được nhiều bậc** cho cùng một SKU (`PRC-002` ADR-01).
+    public DbSet<Pricing.TierPriceSet> TierPriceSets { get; set; } = default!;
+    public DbSet<Pricing.TierPrice> TierPrices { get; set; } = default!;
+
     // ---- Inventory ----
     public DbSet<Inventory.InventoryItem> InventoryItems { get; set; } = default!;
     public DbSet<Inventory.StockLedgerEntry> StockLedgerEntries { get; set; } = default!;

@@ -400,7 +400,7 @@ một khuyến mãi phức tạp (nhiều điều kiện AND/OR) tính đúng ti
 | CAT-002 | Cây danh mục & thuộc tính/tổ hợp biến thể | Catalog |
 | CAT-003 | Media, SEO slug & **hiển thị theo kênh** | Catalog |
 | PRC-001 | Bảng giá & **giá theo kênh** | Pricing |
-| PRC-002 | Giá bậc thang (tier) & **pipeline tính giá + làm tròn** | Pricing |
+| PRC-002 | Giá bậc thang (tier) & **pipeline tính giá + làm tròn** | Pricing | 🟡 **lát cắt 1 XONG (15/10/2026)** — `TierPriceSet`/`TierPrice` + `ChonBacThang` (trùng `MinQuantity` ⇒ `0008`) + 2 unique index `NULLS NOT DISTINCT`; **còn**: **pipeline 8 bước + 4 điểm làm tròn**, API bậc thang, sổ giải trình |
 | INV-001 | Nhập / chuyển / kiểm kê & **sổ cái kho (append-only)** | Inventory |
 | INV-002 | **Giữ chỗ (reservation) + TTL** & job nhả kho | Inventory |
 | INV-003 | **Phân bổ tồn theo kênh** & tra tồn khả dụng | Inventory |

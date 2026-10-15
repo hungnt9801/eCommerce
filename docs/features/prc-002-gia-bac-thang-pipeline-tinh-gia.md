@@ -1064,3 +1064,62 @@ public class TierPriceSetStateMachineTests
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.1 | 14/10/2026 | *(điền)* | Bản nháp đầu — **14 ADR** · **21 BR** · **12 NFR** · **30 test case** · 3 sơ đồ Mermaid (state machine §3 · sequence §4.1 · ERD §5.1) · §4.2 chốt **8 bước pipeline + 4 điểm làm tròn R1–R4**. **Mọi khẳng định về code đều có đường dẫn file đã kiểm**: module `Pricing`/`TierPrice`/`Money` **chưa có** (`grep` 0 match) ⇒ §5/§6/§11 là **kế hoạch GĐ1**; ghi nhận **F1–F9**, trong đó **F3** là **mâu thuẫn thật giữa `PRC-001` và `XC-003`** về tiền tố khoá phân tán (đã chốt theo `XC-003` + code thật tại `eCommerceHttpApiHostModule.cs:127`) |
+
+---
+
+## 16. TRẠNG THÁI TRIỂN KHAI — **LÁT CẮT 1: BẬC THANG GIÁ (dữ liệu + chọn bậc)** (15/10/2026)
+
+### 16.1 Đã làm
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| 1 | `TierPriceSet` (`PrcTierPriceSets`) | **Aggregate root riêng** (ADR-01): `Code`/`Name`/`Scope`/`ChannelCode`/`Currency`/`EffectiveFrom-To`/`Priority`; **vòng đời đúng mô hình `TaxClassification`** (`Draft → Approved → Active → Expired/Superseded/Cancelled`, ADR-10) + **append-only** khi đã/đang hiệu lực |
+| 2 | `TierPrice` (`PrcTierPrices`) | `Sku` · `MinQuantity` · tiền lưu **2 cột** (`AmountValue` + `CurrencyCode` — BR-001); validate `MinQuantity ≥ 1`, không âm, **cùng loại tiền** với bộ |
+| 3 | `ChonBacThang` — **hàm THUẦN** (ADR-02) | bậc thắng = `MinQuantity` **lớn nhất ≤ quantity**; **hai bậc cùng `MinQuantity` ⇒ NÉM `Pricing:0008`**; không bậc nào đủ ⇒ **`null`** (rơi về giá cơ sở — **không phải lỗi**); thêm `KiemTraBoBac(...)` để tầng nhập liệu gộp lỗi thành **một** thông báo |
+| 4 | Ràng buộc DB | **unique `(TenantId, TierPriceSetId, Sku, MinQuantity)`** = **hàng rào cho ADR-02** · **unique `(TenantId, Code, EffectiveFrom)`** · FK `Restrict` — **cả hai đều sửa tay `NULLS NOT DISTINCT`** trong migration |
+| 5 | `TierPriceSet.PhatHanh(int soBacThucTe)` | 🚨 Số bậc **truyền từ DB** — áp dụng **bài học `PRC-001` §17.2 L1**: guard đọc trạng thái **không được lưu** thì **đảo chiều im lặng** sau một lần nạp lại |
+
+### 16.2 ✅ BẰNG CHỨNG
+
+| Phép đo | Kết quả |
+|---|---|
+| Build `--no-incremental` | **0 lỗi / 0 cảnh báo** |
+| Unit test | **558** (thêm **15**: 8 cho `ChonBacThang` + 7 cho `TierPriceSet`/`TierPrice`) |
+| Integration test | **34** (thêm **2**: **chặn hai bậc cùng `MinQuantity` khi `TenantId NULL`** + **đối chứng** cùng `MinQuantity` nhưng **khác SKU** vẫn được phép) |
+| **DB thật (PostgreSQL 17)** | 2 bảng `PrcTierPriceSets`/`PrcTierPrices`; **`IX_PrcTierPrices_TenantId_SetId_Sku_MinQty` UNIQUE … NULLS NOT DISTINCT** + **`IX_PrcTierPriceSets_TenantId_Code_EffectiveFrom` UNIQUE … NULLS NOT DISTINCT** (đo bằng `pg_indexes`); tổng **33** index `NULLS NOT DISTINCT` |
+| Migration | `20261015104259_Prc002_TierPrices` đã áp; `Assets/schema.sql` đã sinh lại |
+
+🚨 **Bước SỬA TAY trong migration (bắt buộc):** EF sinh `CREATE UNIQUE INDEX` **không** kèm `NULLS NOT DISTINCT`
+⇒ khi `TenantId = NULL` (hệ thống **1 tenant**) thì **hai bậc cùng `MinQuantity` LỌT** ⇒ `ChonBacThang` **NÉM `0008`**
+⇒ **checkout chết cho SKU đó**. Đã `DROP` + `CREATE … NULLS NOT DISTINCT` cho **cả hai** index.
+
+📌 **Đối chứng có chủ ý:** integration test thứ hai khẳng định **cùng `MinQuantity` nhưng khác `Sku` vẫn được phép** —
+nếu ai bỏ `Sku` khỏi index thì **một bộ bậc chỉ chứa được MỘT SKU** ⇒ mọi SKU khác **mất bậc thang** mà **không có lỗi nào**.
+
+### 16.3 ⚠️ **ĐIỀU CHƯA LÀM — và vì sao đây là điều quan trọng nhất cần biết ngay bây giờ**
+
+**Bậc thang CHƯA được nối vào bộ tra giá.** `PriceResolverAppService` hiện **KHÔNG** xét `TierPrice` —
+nó chỉ chạy **4 cấp giá cơ sở** (`PRC-001`). Lý do **có chủ ý**: `PRC-002` §4.2 định nghĩa **pipeline 8 bước**
+(B1–B8) với **thứ tự tường minh** và **4 điểm làm tròn** (R1–R4), trong đó bậc thang là **B3** và chọn đơn giá là **B5**
+(**ADR-03**: chạy **hết** các bước rồi **mới** so sánh — **cấm áp mù**). Nối bậc thang vào trước khi có B4/B5 sẽ là
+**pipeline nửa vời**, và tệ hơn: nếu coi bậc thang là "cùng cấp" với giá cơ sở thì hai ứng viên cùng cấp + cùng
+`Priority` ⇒ **NÉM `0001` ⇒ checkout chết**.
+
+⇒ **Trạng thái thật:** có **dữ liệu** bậc thang + **luật chọn bậc** đã test, **chưa** có tác dụng lên giá bán.
+Người dùng **đừng** kỳ vọng giảm giá theo số lượng cho tới khi lát cắt pipeline xong.
+
+### 16.4 Còn lại của `PRC-002`
+
+| # | Việc | Ghi chú |
+|---|---|---|
+| 1 | **Pipeline 8 bước B1–B8 + 4 điểm làm tròn R1–R4** (`IPricePipeline` **hàm thuần** + service nạp) | phần lớn nhất — **chặn** việc bậc thang có tác dụng |
+| 2 | **App service/API bậc thang** (tạo bộ · thêm bậc · phát hành · kích hoạt) | hiện chỉ có entity + migration |
+| 3 | **`AttributeHash`-style**: `PriceCalculationRecords` (sổ giải trình **append-only**) + `IdempotencyKey` bắt buộc (ADR-13) | cần cho "vì sao đơn này giá này" |
+| 4 | `MaxVariantCombinations`-tương đương cho bậc? — **không có**; nhưng cần **chặn số bậc** mỗi bộ (chưa có ngưỡng) | đề xuất khi làm API |
+| 5 | Rounding policy đọc **1 lần** cho mỗi lần tính (ADR-08) + `RoundingPolicyCode` vào sổ giải trình | phụ thuộc #1 |
+
+### 16.5 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.2 | 15/10/2026 | *(agent, session GĐ1)* | **Lát cắt 1**: `TierPriceSet` (vòng đời ADR-10 + append-only) + `TierPrice` + **`ChonBacThang` hàm thuần** (ADR-02: `MinQuantity` lớn nhất ≤ quantity; **trùng ⇒ NÉM `0008`**; không bậc nào ⇒ `null`) + **2 unique index `NULLS NOT DISTINCT`** (sửa tay — **hàng rào DB cho ADR-02**). **+15 unit · +2 integration** (có **đối chứng** khác SKU). Ghi rõ **§16.3: bậc thang CHƯA nối vào bộ tra giá** ⇒ chưa có tác dụng lên giá bán cho tới khi có pipeline B1–B8 |

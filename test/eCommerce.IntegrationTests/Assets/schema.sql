@@ -1633,3 +1633,70 @@ VALUES ('20261015101649_Pricing_PriceList_And_ChannelPrice', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE TABLE "PrcTierPriceSets" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "Code" character varying(64) NOT NULL,
+    "Name" character varying(256) NOT NULL,
+    "Scope" integer NOT NULL,
+    "ChannelCode" character varying(64),
+    "Currency" character varying(8) NOT NULL,
+    "EffectiveFrom" timestamp with time zone NOT NULL,
+    "EffectiveTo" timestamp with time zone,
+    "Priority" integer NOT NULL,
+    "Status" integer NOT NULL,
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_PrcTierPriceSets" PRIMARY KEY ("Id")
+);
+
+CREATE TABLE "PrcTierPrices" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "TierPriceSetId" uuid NOT NULL,
+    "Sku" character varying(64) NOT NULL,
+    "MinQuantity" integer NOT NULL,
+    "AmountValue" numeric(18,4) NOT NULL,
+    "CurrencyCode" character varying(8) NOT NULL,
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_PrcTierPrices" PRIMARY KEY ("Id"),
+    CONSTRAINT "FK_PrcTierPrices_PrcTierPriceSets_TierPriceSetId" FOREIGN KEY ("TierPriceSetId") REFERENCES "PrcTierPriceSets" ("Id") ON DELETE RESTRICT
+);
+
+CREATE UNIQUE INDEX "IX_PrcTierPrices_TenantId_SetId_Sku_MinQty" ON "PrcTierPrices" ("TenantId", "TierPriceSetId", "Sku", "MinQuantity");
+
+CREATE INDEX "IX_PrcTierPrices_TierPriceSetId" ON "PrcTierPrices" ("TierPriceSetId");
+
+CREATE UNIQUE INDEX "IX_PrcTierPriceSets_TenantId_Code_EffectiveFrom" ON "PrcTierPriceSets" ("TenantId", "Code", "EffectiveFrom");
+
+CREATE INDEX "IX_PrcTierPriceSets_TenantId_Status_Scope_ChannelCode" ON "PrcTierPriceSets" ("TenantId", "Status", "Scope", "ChannelCode");
+
+DROP INDEX "IX_PrcTierPriceSets_TenantId_Code_EffectiveFrom";
+
+CREATE UNIQUE INDEX "IX_PrcTierPriceSets_TenantId_Code_EffectiveFrom" ON "PrcTierPriceSets" ("TenantId", "Code", "EffectiveFrom") NULLS NOT DISTINCT;
+
+DROP INDEX "IX_PrcTierPrices_TenantId_SetId_Sku_MinQty";
+
+CREATE UNIQUE INDEX "IX_PrcTierPrices_TenantId_SetId_Sku_MinQty" ON "PrcTierPrices" ("TenantId", "TierPriceSetId", "Sku", "MinQuantity") NULLS NOT DISTINCT;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261015104259_Prc002_TierPrices', '10.0.11');
+
+COMMIT;
+

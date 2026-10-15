@@ -141,11 +141,11 @@ public class PostgreSqlSchemaTests
     }
 
     [Fact]
-    public async Task F1_du_31_index_deu_dung_NULLS_NOT_DISTINCT()
+    public async Task F1_du_33_index_deu_dung_NULLS_NOT_DISTINCT()
     {
         // 🔒 BẤT BIẾN (ghi ở XC-004 Q6): mọi unique index trên entity IMultiTenant PHẢI có
         // `NULLS NOT DISTINCT`. Ai tạo migration mới mà quên ⇒ test này đỏ.
-        Assert.Equal(31L, await DemAsync(
+        Assert.Equal(33L, await DemAsync(
             "select count(*) from pg_indexes where schemaname = 'public' and indexdef like '%NULLS NOT DISTINCT%'"));
 
         // Kiểm tra ĐÍCH DANH để thông báo lỗi có ý nghĩa (tên index dài có thể bị PostgreSQL cắt ⇒ so theo tiền tố).
@@ -742,5 +742,68 @@ public class PostgreSqlSchemaTests
         var ex = await Assert.ThrowsAsync<PostgresException>(() => command.ExecuteNonQueryAsync());
 
         Assert.Equal(PostgresErrorCodes.ForeignKeyViolation, ex.SqlState);   // 23503
+    }
+
+    // ── 2f. 🚨 PRC-002 — HÀNG RÀO DB CHO ADR-02 ("hai bậc cùng MinQuantity ⇒ NÉM") ─────────────
+
+    private async Task ChenBoBacAsync(Guid id, string code)
+    {
+        await using var command = _fixture.DataSource.CreateCommand(
+            "insert into \"PrcTierPriceSets\" " +
+            "(\"Id\",\"TenantId\",\"Code\",\"Name\",\"Scope\",\"Currency\",\"EffectiveFrom\",\"Priority\",\"Status\"," +
+            "\"ExtraProperties\",\"ConcurrencyStamp\",\"CreationTime\",\"IsDeleted\") " +
+            "values (@id, null, @code, 'Bo bac test', 0, 'VND', now(), 0, 0, '{}', 'stamp', now(), false)");
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("code", code);
+        await command.ExecuteNonQueryAsync();
+    }
+
+    private async Task ChenBacAsync(Guid id, Guid setId, string sku, int minQty)
+    {
+        await using var command = _fixture.DataSource.CreateCommand(
+            "insert into \"PrcTierPrices\" " +
+            "(\"Id\",\"TenantId\",\"TierPriceSetId\",\"Sku\",\"MinQuantity\",\"AmountValue\",\"CurrencyCode\"," +
+            "\"ExtraProperties\",\"ConcurrencyStamp\",\"CreationTime\",\"IsDeleted\") " +
+            "values (@id, null, @setId, @sku, @minQty, 90000, 'VND', '{}', 'stamp', now(), false)");
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("setId", setId);
+        command.Parameters.AddWithValue("sku", sku);
+        command.Parameters.AddWithValue("minQty", minQty);
+        await command.ExecuteNonQueryAsync();
+    }
+
+    [Fact]
+    public async Task PRC002_chan_HAI_bac_CUNG_MinQuantity_khi_TenantId_NULL()
+    {
+        // 🚨 Hàng rào DB cho ADR-02. Mất `NULLS NOT DISTINCT` ⇒ hai bậc trùng LỌT ⇒ `ChonBacThang` NÉM `0008`
+        // ⇒ **checkout chết** cho SKU đó (không phải bán sai giá, nhưng vẫn hỏng đường bán).
+        var duoi = Guid.NewGuid().ToString("N")[..6];
+        var setId = Guid.NewGuid();
+        var sku = $"PRC002-SKU-{duoi}";
+
+        await ChenBoBacAsync(setId, $"PRC002-BT-{duoi}");
+        await ChenBacAsync(Guid.NewGuid(), setId, sku, 10);
+
+        var ex = await Assert.ThrowsAsync<PostgresException>(
+            () => ChenBacAsync(Guid.NewGuid(), setId, sku, 10));
+
+        Assert.Equal(PostgresErrorCodes.UniqueViolation, ex.SqlState);   // 23505
+    }
+
+    [Fact]
+    public async Task PRC002_DOI_CHUNG_cung_MinQuantity_nhung_KHAC_Sku_thi_DUOC_PHEP()
+    {
+        // Đối chứng: index phải là `(set, SKU, MinQuantity)` — nếu ai đó bỏ `Sku` khỏi index thì
+        // **một bộ bậc chỉ chứa được MỘT SKU** ⇒ mọi SKU khác mất bậc thang mà không có lỗi nào.
+        var duoi = Guid.NewGuid().ToString("N")[..6];
+        var setId = Guid.NewGuid();
+
+        await ChenBoBacAsync(setId, $"PRC002-BT2-{duoi}");
+        await ChenBacAsync(Guid.NewGuid(), setId, $"PRC002-A-{duoi}", 10);
+        await ChenBacAsync(Guid.NewGuid(), setId, $"PRC002-B-{duoi}", 10);
+
+        var soBac = await DemAsync($"select count(*) from \"PrcTierPrices\" where \"TierPriceSetId\" = '{setId}'");
+
+        Assert.Equal(2L, soBac);
     }
 }

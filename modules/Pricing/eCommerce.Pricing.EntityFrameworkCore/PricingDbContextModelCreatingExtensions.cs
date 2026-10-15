@@ -92,6 +92,49 @@ public static class PricingDbContextModelCreatingExtensions
             b.HasIndex(x => new { x.TenantId, x.Sku, x.ChannelCode })
                 .HasDatabaseName("IX_PrcChannelPrices_TenantId_Sku_ChannelCode");
         });
+
+        // ── PRC-002: BẬC THANG GIÁ ────────────────────────────────────────────────────────────────
+        builder.Entity<TierPriceSet>(b =>
+        {
+            b.ToTable("PrcTierPriceSets");
+            b.ConfigureByConvention();
+
+            b.Property(x => x.Code).IsRequired().HasMaxLength(64);
+            b.Property(x => x.Name).IsRequired().HasMaxLength(256);
+            b.Property(x => x.ChannelCode).HasMaxLength(64);
+            b.Property(x => x.Scope).HasConversion<int>();
+            b.Property(x => x.Status).HasConversion<int>();
+            b.Property(x => x.Currency).HasConversion(c => c.Code, s => CurrencyTuMa(s)).IsRequired().HasMaxLength(8);
+
+            b.HasIndex(x => new { x.TenantId, x.Code, x.EffectiveFrom })
+                .IsUnique()
+                .HasDatabaseName("IX_PrcTierPriceSets_TenantId_Code_EffectiveFrom");
+
+            b.HasIndex(x => new { x.TenantId, x.Status, x.Scope, x.ChannelCode })
+                .HasDatabaseName("IX_PrcTierPriceSets_TenantId_Status_Scope_ChannelCode");
+        });
+
+        builder.Entity<TierPrice>(b =>
+        {
+            b.ToTable("PrcTierPrices");
+            b.ConfigureByConvention();
+
+            b.Property(x => x.Sku).IsRequired().HasMaxLength(64);
+            b.Property(x => x.AmountValue).HasPrecision(18, 4);
+            b.Property(x => x.CurrencyCode).IsRequired().HasMaxLength(8);
+            b.Ignore(x => x.Amount);
+
+            // 🚨 **HÀNG RÀO DB CHO ADR-02**: hai bậc cùng `MinQuantity` trên cùng SKU/bộ ⇒ **không lọt được**.
+            // Nếu thiếu: hai bậc trùng ⇒ `ChonBacThang` **NÉM `0008`** ⇒ **checkout chết** cho SKU đó.
+            b.HasIndex(x => new { x.TenantId, x.TierPriceSetId, x.Sku, x.MinQuantity })
+                .IsUnique()
+                .HasDatabaseName("IX_PrcTierPrices_TenantId_SetId_Sku_MinQty");
+
+            b.HasOne<TierPriceSet>()
+                .WithMany()
+                .HasForeignKey(x => x.TierPriceSetId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
     }
 
     /// <summary>
