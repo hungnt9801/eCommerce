@@ -2628,3 +2628,63 @@ trong phép đo — ghi nhận để không tuyên bố quá.
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v2.7 | 15/10/2026 | *(agent, session GĐ1)* | **`INV-003` bước 1b — `DangGiu` tách theo TỪNG KHO** (từ `InvStockReservations.WarehouseId`, **không migration**). **Kiểm chứng HAI PHA**: lúc đang giữ `dangGiu=4` + `dangGiuTheoKho={kho.id: 4}` (**khớp cả định danh kho**) · sau khi trả hết `dangGiu=0`, `daBan=4`, `daTra=4`; các bất biến cũ (`0040`/`0041`/đối soát `0`/`fail: 0`) giữ nguyên. ⚠️ Ghi rõ **giới hạn thật**: `DaBan`/`DaTra` **không** tách được theo kho (đơn không lưu kho) ⇒ cần migration + người quyết |
+
+---
+
+## 43. **NỢ VÒNG 36: `UnitOfWork` · `RunOnStart` · VÀ ĐIỂM YẾU CỦA CHÍNH CƠ CHẾ** (15/10/2026)
+
+### 43.1 Kết quả **khảo sát lại** 7 worker — bức tranh **chính xác hơn** phỏng đoán vòng 36
+
+| Worker | `UoW` | `IRepository<>` | resolve `*Service` | `RunOnStart` | Log ở **đầu** `DoWorkAsync`? |
+|---|---|---|---|---|---|
+| `InventoryReconciliationWorker` | ✅ | 0 | 1 | ✅ | ✅ (`L51`) |
+| `StockReservationExpiryWorker` | ✅ | 0 | 1 | ✅ | ✅ (`L55`) |
+| `TaxUnclassifiedSkusWorker` | ❌ | 3 | 0 | ✅ | ❌ *(không có trong 8 dòng đầu)* |
+| `AdministrativeUnitSyncWorker` | ❌ | 1 | 0 | ✅ | ❌ |
+| `CarrierAddressSyncWorker` | ❌ | 1 | 0 | ✅ | ❌ |
+| `ChannelSyncSupervisorWorker` | ❌ | 2 | 0 | 🚨 **THIẾU** | ✅ (`L52`) |
+| `EInvoiceResubmissionWorker` | ❌ | 1 | 0 | 🚨 **THIẾU** | ❌ |
+
+📌 **`UnitOfWork`: rủi ro vòng 36 KHÔNG được xác nhận.** 5 worker thiếu `UoW` nhưng **đều dùng `IRepository<>` trực tiếp**
+(**không** resolve `*Service`). Và `TaxUnclassifiedSkusWorker` — **cùng khuôn** — đã **đo được là CHẠY TỐT** (vòng 37:
+truy vấn DB, log ra kết quả, `fail: 0`). ⇒ **Không sửa mù 5 file**: luật hẹp (§29.2 — chỉ `*Service` cần `UoW`) **khớp bằng chứng**.
+
+### 43.2 🚨 **LỖI THẬT ĐÃ SỬA: hai worker THIẾU `Timer.RunOnStart`** — đúng lỗi `CHN-002`
+
+| Worker | Hậu quả thật |
+|---|---|
+| `ChannelSyncSupervisorWorker` | sau **mỗi lần deploy**, giám sát kênh **không chạy cho tới hết một nhịp** ⇒ **kênh đứng mà không ai biết** |
+| `EInvoiceResubmissionWorker` | sau mỗi deploy, hoá đơn cần **gửi lại** bị **trễ tối đa một nhịp** ⇒ có thể **lỡ hạn pháp lý** |
+
+📌 Đây **đúng** lỗi đã được ghi là **đã phát hiện và sửa** ở `CHN-002` — nhưng **mã nguồn vẫn thiếu**. ⇒ Sửa: thêm
+`Timer.RunOnStart = true` + **ghi lý do ngay tại chỗ** (để lần sau không xoá).
+
+### 43.3 ✅ BẰNG CHỨNG **TRƯỚC/SAU** (cùng một phép đo: log khởi động Host, cửa sổ ~15 giây)
+
+| Worker | Vòng 45 (trước) | **Vòng 51 (sau)** |
+|---|---|---|
+| `ChannelSyncSupervisorWorker` | **`0`** lần xuất hiện | **`1`** ✅ — **`RunOnStart` có tác dụng THẬT** |
+| `fail:` toàn log | `0` | **`0`** ✅ |
+
+- build `--no-incremental`: **0 lỗi / 0 cảnh báo** · unit **693/693** · integration **38/38**
+
+### 43.4 🚨 **ĐIỂM YẾU CỦA CHÍNH CƠ CHẾ** (`BackgroundWorkerCoCheTests` §28) — **đo được, chưa sửa**
+
+Luật hiện tại chỉ đòi **`Logger.LogInformation|Warning` tồn tại Ở ĐÂU ĐÓ trong tệp** ⇒ nó **XANH** ngay cả khi dòng log
+nằm **BÊN TRONG một điều kiện** — tức **không** bảo đảm *"log vô điều kiện ở đầu mỗi lượt"* như luật **muốn nói**.
+**Bằng chứng đo được:** **4/6 worker** có dòng log đầu tiên **không** nằm trong 8 dòng đầu của `DoWorkAsync`; và
+`EInvoiceResubmissionWorker` **vẫn không xuất hiện** trong log khởi động — **dù nay đã có `RunOnStart`** —
+vì nó **chỉ log khi có việc**.
+📌 **Vì sao phải ghi ngay:** một cơ chế **tưởng** đã bảo vệ mà **thực tế không** thì **tệ hơn không có cơ chế** —
+nó tạo **cảm giác an toàn giả** (đúng bài học đã ghi ở Phụ lục C §C.4, nhưng lần này **áp dụng cho chính cơ chế đó**).
+
+**⇒ Việc của lát cắt sau (đã xác định rõ, rẻ):**
+1. Siết luật: dòng log **phải là câu lệnh ĐẦU TIÊN** của `DoWorkAsync` (kiểm bằng cấu trúc văn bản, **có mutation test**);
+2. Thêm log vô điều kiện cho **4 worker** còn lại ⇒ mọi worker **đều nhìn thấy được** trong log khởi động;
+3. Đo lại **trước/sau** như §43.3 (kỳ vọng: **6/6 worker xuất hiện**).
+
+### 43.5 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v2.8 | 15/10/2026 | *(agent, session GĐ1)* | **Khảo sát lại 7 worker**: rủi ro `UnitOfWork` của vòng 36 **KHÔNG được xác nhận** (5 worker chỉ dùng `IRepository<>`, và worker **cùng khuôn** đã **đo được là chạy tốt**) ⇒ **không sửa mù**. 🚨 **Sửa lỗi THẬT:** `ChannelSyncSupervisorWorker` + `EInvoiceResubmissionWorker` **thiếu `Timer.RunOnStart`** (đúng lỗi `CHN-002` đã ghi là *"đã sửa"* nhưng mã vẫn thiếu) ⇒ **trước/sau đo được `0 → 1`** cho supervisor, `fail: 0`. 🚨 **Phát hiện điểm yếu của CHÍNH cơ chế**: luật chỉ đòi log **tồn tại ở đâu đó** ⇒ **4/6 worker** có log **bên trong điều kiện** mà test **vẫn XANH** |

@@ -32,6 +32,11 @@ public class EInvoiceResubmissionWorker : AsyncPeriodicBackgroundWorkerBase
     {
         // ⚠️ KHÔNG khai lại thuộc tính `Logger`: lớp cơ sở `BackgroundWorkerBase` **ĐÃ có** `Logger`
         // ⇒ khai lại gây CS0108 "hides inherited member" (đã sửa 14/10/2026). Dùng luôn của lớp cơ sở.
+        // 🚨 **CHẠY NGAY LẦN ĐẦU** (bài học `CHN-002`) — TRƯỚC vòng 51 worker này **THIẾU** dòng này:
+        // chu kỳ đầu **không chạy cho tới khi hết một nhịp** ⇒ sau **mỗi lần deploy**, việc của job
+        // **trễ tối đa một nhịp**. Với **hoá đơn điện tử**/giám sát kênh, trễ một nhịp có thể nghĩa là
+        // **lỡ hạn pháp lý** hoặc **không phát hiện kênh đứng** — mà **không có lỗi nào** để lần ra.
+        Timer.RunOnStart = true;
         Timer.Period = NhipMacDinhGiay * 1000;
     }
 
