@@ -1437,3 +1437,61 @@ Kho có **đúng 1** món (`OnHand = 1`).
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.7 | 15/10/2026 | *(agent, session GĐ1)* | **`INV-002` — giữ chỗ**: `StockReservation` (+`ExpiresAtUtc`, `Released` vs `Expired`) · `QuyetDinhGiuCho` (**hàm thuần**, biên `== coTheBan` được phép) · `StockReservationService` (**giành khoá TRƯỚC khi đọc tồn kho** — nếu không thì **hai khách cùng giữ được món cuối**) + job nhả chỗ quá hạn · API 5 route · unique index **có bộ lọc** `NULLS NOT DISTINCT`. **Kiểm chứng HTTP 9 phép đo**: **hai khách tranh món cuối ⇒ chỉ một người giữ được** (`coTheBan = 0`), nhả hai lần **bị chặn** (`0030`), job nhả **đúng lượt quá hạn** (`Expired` ≠ `Released`), **giữ chỗ không làm lệch đối soát**. 🚨 Ghi nhận **`500` ở ca giữ chỗ trùng nguồn** ⇒ exception filter thành **nợ không trì hoãn được** (§21.3 #1) |
+
+---
+
+## 22. `SAL-002` — **CHECKOUT MỘT BƯỚC (TÍNH TIỀN → GIỮ CHỖ)** (15/10/2026)
+
+### 22.1 Vị trí: đây là mắt xích **ghép ba mảnh** đã xây xong
+
+| Mảnh | Đã có từ | Vai trò trong checkout |
+|---|---|---|
+| **Pricing** (`tinh-gio`, pipeline B1–B8, sổ giải trình, idempotency) | `PRC-001`/`PRC-002` | **số tiền đúng** (bậc thang · làm tròn R1–R4 · tổng = Σ dòng) |
+| **Inventory** (`INV-001` ghi sổ, đối soát) | `INV-001` | tồn kho **có nguồn sự thật** + sổ cái append-only |
+| **Inventory** (`INV-002` giữ chỗ) | `INV-002` | **chống bán vượt tồn** khi nhiều khách tranh nhau |
+| **Ánh xạ vi phạm ràng buộc** (Phụ lục B) | vòng 29 | mọi va chạm trùng trả **mã nghiệp vụ**, không `500` |
+
+### 22.2 Đã làm — `CheckoutAppService` (`POST /api/app/checkout/tinh-va-giu-cho`)
+
+**Thứ tự và lý do:**
+1. **Tra sổ giải trình theo `IdempotencyKey` TRƯỚC** ⇒ đã có ⇒ **trả lại kết quả cũ** (kèm lượt giữ chỗ cũ) ⇒ **không** tính lại, **không** giữ chỗ thêm.
+2. Kiểm **giữ chỗ dở dang**: có lượt giữ chỗ cho cùng nguồn nhưng **không** có sổ giải trình ⇒ **DỪNG** (`0032`).
+   📌 Nếu chạy tiếp thì `Reserved` **tăng gấp đôi** — hàng bị giữ mà không có lý do nào trong sổ.
+3. **Tính tiền** (pipeline `Pricing`; hàm này **ghi sổ giải trình**).
+4. **Giữ chỗ từng dòng**, nguồn = `Checkout:{khoá}`.
+5. Bất kỳ bước nào ném ⇒ **rollback toàn bộ** ⇒ **fail-closed**.
+
+### 22.3 ✅ BẰNG CHỨNG HTTP THẬT (Host + PostgreSQL 17) — 5 phép đo
+
+Nền: kho có `S1 = 10`, `S2 = 1`; bảng giá `S1 = 100.000`, `S2 = 50.000` (kênh `cok-…`).
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | **Checkout thành công**: `S1 × 2` + `S2 × 1`, thuế 10%, giảm cấp đơn 5.000 | `200` · **tổng `269.500`** · **2 lượt giữ chỗ** · `daCo = False` · hết hạn `10:15` · DB: `S1 = 10/2/8`, `S2 = 1/1/0` ✅ — **kiểm tay khớp chính xác**: `(200k + 50k − 5k) × 1,1 = 269,5k` |
+| 2 | 🚨 **Gọi lại CÙNG khoá** (*khách bấm Đặt hàng hai lần*) | `200` · tổng **y hệt** · **`daCo = True`** · **`Reserved` vẫn `2` và `1`** ⇒ **không** giữ chỗ thêm ✅ |
+| 3 | **GET theo khoá** (client mất kết nối rồi hỏi lại) | `200` · tổng khớp · `daCo = True` ✅ |
+| 4 | 🔥 **FAIL-CLOSED**: giỏ `S1 × 2` + **`S2 × 99`** (chỉ có 1) | **`eCommerce:Inventory:0001`** · **0 lượt giữ chỗ mới** · **0 bản ghi sổ giải trình** cho khoá thất bại ⇒ **đã rollback CẢ việc tính giá** ✅ · `S1.Reserved` **vẫn `2`** (*dòng S1 không bị giữ một phần*) |
+| 5 | 🔥 **HAI KHÁCH TRANH MÓN CUỐI** (`S2` đã hết `Available`) | **`eCommerce:Inventory:0001`** · **0 bản ghi sổ giải trình** ⇒ **fail-closed** ✅ |
+
+- build `--no-incremental`: **0 lỗi / 0 cảnh báo** · unit **679/679** · integration **38/38** · mermaid 197/0 · **không đổi schema**
+- log: **`fail: 0`** · **1 dòng `CHECKOUT IDEMPOTENT`** (chứng minh nhánh replay **đã chạy**)
+- dọn dẹp: 0 kho / 0 giữ chỗ / 0 tồn / 0 sổ giải trình / 0 bảng giá ✅
+
+📌 **Phép đo #4 là phép đo quan trọng nhất:** nó phân biệt *"giữ được 1/2 món"* (khách **tưởng** đã đặt, hàng thì **không**)
+với **từ chối sạch sẽ**. Bản ghi **sổ giải trình cũng biến mất** — nghĩa là **không còn dấu vết** của một lần tính giá
+cho đơn **chưa** giữ được hàng.
+
+### 22.4 ⚠️ Giới hạn đã biết (ghi rõ, không che)
+
+| # | Giới hạn |
+|---|---|
+| 1 | **MỘT kho cho cả đơn** (`WarehouseId` của input). Chọn kho theo SKU/tồn khả dụng là việc của **`INV-003`** (phân bổ tồn theo kênh) — **chưa** làm |
+| 2 | **Chưa tạo ĐƠN HÀNG**: lát cắt này **giữ chỗ + tính tiền**. Sinh `Order`/`OrderLine` và chuyển giữ chỗ thành **xuất kho** là **`SAL-001`/`SAL-003`** |
+| 3 | `CheckoutAppService` gọi **app service khác** (`PriceCalculationAppService`) thay vì dịch vụ miền: chấp nhận được vì **cùng transaction** của request (UoW bao ngoài); nếu cần tái dùng **ngoài HTTP** thì phải tách thành dịch vụ miền |
+| 4 | **Chưa có job nhả chỗ định kỳ** ⇒ giữ chỗ quá hạn chỉ được nhả khi gọi `POST /nha-cho-het-han` |
+
+### 22.5 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.8 | 15/10/2026 | *(agent, session GĐ1)* | **`SAL-002` — checkout một bước**: `CheckoutAppService` (`POST /checkout/tinh-va-giu-cho` · `GET /checkout/theo-khoa`) ghép **Pricing** + **INV-002** trong **một** transaction. **Kiểm chứng HTTP 5 phép đo**: thành công (`269.500` — **kiểm tay khớp**) · **gọi lại cùng khoá ⇒ không giữ chỗ thêm** (`daCo = True`, `Reserved` không đổi) · **FAIL-CLOSED** (thiếu hàng ⇒ `Inventory:0001`, **0 lượt giữ chỗ**, **0 sổ giải trình** ⇒ **rollback cả việc tính giá**) · **hai khách tranh món cuối ⇒ đúng một người qua**. Ghi rõ **4 giới hạn** (§22.4) |
