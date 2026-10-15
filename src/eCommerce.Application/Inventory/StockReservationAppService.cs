@@ -13,13 +13,16 @@ public class StockReservationAppService : ApplicationService, IStockReservationA
 {
     private readonly IRepository<StockReservation, Guid> _giuChoRepository;
     private readonly StockReservationService _giuChoService;
+    private readonly ChotGiuChoService _chotService;
 
     public StockReservationAppService(
         IRepository<StockReservation, Guid> giuChoRepository,
-        StockReservationService giuChoService)
+        StockReservationService giuChoService,
+        ChotGiuChoService chotService)
     {
         _giuChoRepository = giuChoRepository;
         _giuChoService = giuChoService;
+        _chotService = chotService;
     }
 
     [Authorize(eCommerceConsts.Permissions.Inventory.Adjust)]
@@ -63,6 +66,18 @@ public class StockReservationAppService : ApplicationService, IStockReservationA
         var so = await _giuChoService.NhaChoHetHanAsync(at ?? Clock.Now);
 
         return new KetQuaNhaChoHetHanDto { SoLuotDaNha = so };
+    }
+
+    /// <summary>
+    /// 🚨 **CHỐT GIỮ CHỖ → XUẤT KHO** (`SAL-003`). 📌 Đây là thao tác **của luồng xác nhận đơn** (`SAL-001`);
+    /// mở thành endpoint để **kiểm chứng được** cho tới khi có đường đơn hàng đầy đủ.
+    /// </summary>
+    [Authorize(eCommerceConsts.Permissions.Inventory.Adjust)]
+    public async Task<KetQuaChotDto> ChotTheoNguonAsync(string referenceId, DateTime? at = null)
+    {
+        var so = await _chotService.ChotTheoNguonAsync(referenceId, at ?? Clock.Now);
+
+        return new KetQuaChotDto { ReferenceId = referenceId, SoLuotDaChot = so };
     }
 
     private static StockReservationDto ToDto(StockReservation gc) => new()

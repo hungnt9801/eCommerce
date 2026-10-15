@@ -170,3 +170,63 @@ public class StockReservationTests
         Assert.Equal(6, item.Available);
     }
 }
+
+/// <summary>
+/// Test **`SAL-003` — chốt giữ chỗ ⇒ xuất kho** (bất biến then chốt, ở tầng entity nên test được không cần DB).
+/// </summary>
+public class ChotGiuChoBatBienTests
+{
+    [Fact]
+    public void Chot_thi_OnHand_va_Reserved_CUNG_GIAM__Available_KHONG_DOI()
+    {
+        // 🚨 Nếu **chỉ** trừ `OnHand` mà quên trả `Reserved` thì `Available` **giảm hai lần** cho CÙNG một món
+        // ⇒ hệ thống tưởng hết hàng ⇒ **mất doanh thu** mà không có lỗi nào. Ngược lại (chỉ trả `Reserved`)
+        // ⇒ kho **thừa hàng ảo** ⇒ **bán thứ không có**.
+        var item = new InventoryItem(Guid.NewGuid(), Guid.NewGuid(), "SKU-1");
+
+        item.ApplyMovement(StockMovementType.Receipt, 10);      // nhập 10
+        item.ApplyMovement(StockMovementType.Reservation, 3);   // khách giữ 3
+
+        Assert.Equal(10, item.OnHand);
+        Assert.Equal(3, item.Reserved);
+        Assert.Equal(7, item.Available);
+
+        // ── Chốt: xuất kho (`Sale`) + trả giữ chỗ (`ReservationRelease`) ──
+        item.ApplyMovement(StockMovementType.Sale, 3);
+        item.ApplyMovement(StockMovementType.ReservationRelease, 3);
+
+        Assert.Equal(7, item.OnHand);       // 10 - 3
+        Assert.Equal(0, item.Reserved);     // 3 - 3
+        Assert.Equal(7, item.Available);    // 🚨 KHÔNG ĐỔI so với trước khi chốt
+    }
+
+    [Fact]
+    public void Chot_HAI_LAN_cung_mot_luot__neu_khong_chan_thi_Available_SAI_di()
+    {
+        // Đối chứng số học: nếu tầng gọi cho chốt hai lần (bug hoặc retry), `Available` sẽ sai:
+        // lần hai trừ thêm 3 ⇒ Available = 4 ⇒ hệ thống tưởng còn ít hàng hơn thực tế.
+        var item = new InventoryItem(Guid.NewGuid(), Guid.NewGuid(), "SKU-1");
+        item.ApplyMovement(StockMovementType.Receipt, 10);
+        item.ApplyMovement(StockMovementType.Reservation, 3);
+        item.ApplyMovement(StockMovementType.Sale, 3);
+        item.ApplyMovement(StockMovementType.ReservationRelease, 3);
+
+        var availableSauMotLan = item.Available;
+
+        // Lần hai: `ReservationRelease` sẽ NÉM vì `Reserved` = 0 (bất biến của entity chặn).
+        Assert.Throws<BusinessException>(() => item.ApplyMovement(StockMovementType.ReservationRelease, 3));
+        Assert.Equal(availableSauMotLan, item.Available);   // 🚨 KHÔNG thay đổi gì
+    }
+
+    [Fact]
+    public void Giu_cho_nhieu_hon_ton_thi_khong_bao_gio_chot_duoc__Available_am_bi_chan()
+    {
+        // Chuỗi thật: giữ 5 khi chỉ có 3 ⇒ `KiemTra` ở `INV-002` đã chặn từ đầu (test ở `QuyetDinhGiuChoTests`).
+        // Ở đây khoá thêm: nếu dữ liệu đã hỏng thì `ApplyMovement` **vẫn** chặn `Reserved > OnHand`.
+        var item = new InventoryItem(Guid.NewGuid(), Guid.NewGuid(), "SKU-1");
+        item.ApplyMovement(StockMovementType.Receipt, 3);
+
+        Assert.Throws<BusinessException>(() => item.ApplyMovement(StockMovementType.Reservation, 5));
+        Assert.Equal(3, item.Available);
+    }
+}

@@ -43,6 +43,13 @@ public class GiuChoInput
     public DateTime? At { get; set; }
 }
 
+/// <summary>Kết quả **chốt giữ chỗ** (`SAL-003`) — số lượt đã chốt (0 ⇒ nguồn này không còn gì đang giữ).</summary>
+public class KetQuaChotDto
+{
+    public string ReferenceId { get; set; } = default!;
+    public int SoLuotDaChot { get; set; }
+}
+
 /// <summary>Kết quả **nhả chỗ quá hạn** (job) — số lượt đã nhả.</summary>
 public class KetQuaNhaChoHetHanDto
 {
@@ -70,4 +77,11 @@ public interface IStockReservationAppService : IApplicationService
 
     /// <summary>**Job**: nhả mọi lượt giữ chỗ **quá hạn** (đánh dấu `Expired`, phân biệt với nhả do huỷ).</summary>
     Task<KetQuaNhaChoHetHanDto> NhaChoHetHanAsync(DateTime? at = null);
+
+    /// <summary>
+    /// 🚨 **CHỐT GIỮ CHỖ → XUẤT KHO** (`SAL-003`): mọi lượt `Held` của **một nguồn** (ví dụ `Checkout:{khoá}`)
+    /// chuyển thành **hàng ra khỏi kho**. Bất biến: `OnHand` và `Reserved` **cùng giảm** ⇒ `Available` **không đổi**.
+    /// **NÉM `0031`** nếu có lượt **quá hạn** (*hàng đã được trả về cho người khác* ⇒ xuất tiếp là **bán hai lần**).
+    /// </summary>
+    Task<KetQuaChotDto> ChotTheoNguonAsync(string referenceId, DateTime? at = null);
 }

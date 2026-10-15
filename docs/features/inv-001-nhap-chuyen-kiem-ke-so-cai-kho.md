@@ -1495,3 +1495,68 @@ cho đơn **chưa** giữ được hàng.
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.8 | 15/10/2026 | *(agent, session GĐ1)* | **`SAL-002` — checkout một bước**: `CheckoutAppService` (`POST /checkout/tinh-va-giu-cho` · `GET /checkout/theo-khoa`) ghép **Pricing** + **INV-002** trong **một** transaction. **Kiểm chứng HTTP 5 phép đo**: thành công (`269.500` — **kiểm tay khớp**) · **gọi lại cùng khoá ⇒ không giữ chỗ thêm** (`daCo = True`, `Reserved` không đổi) · **FAIL-CLOSED** (thiếu hàng ⇒ `Inventory:0001`, **0 lượt giữ chỗ**, **0 sổ giải trình** ⇒ **rollback cả việc tính giá**) · **hai khách tranh món cuối ⇒ đúng một người qua**. Ghi rõ **4 giới hạn** (§22.4) |
+
+---
+
+## 23. `SAL-003` — **CHỐT GIỮ CHỖ → XUẤT KHO** (15/10/2026)
+
+### 23.1 Đã làm — `ChotGiuChoService` (`POST /api/app/stock-reservation/chot-theo-nguon/{referenceId}`)
+
+**HAI BÚT TOÁN cho mỗi lượt chốt** (cố ý, **không** gộp):
+| Bút toán | Việc | Vì sao riêng |
+|---|---|---|
+| `Sale` | trừ `OnHand` | hàng **đã ra khỏi kho** |
+| `ReservationRelease` | trả `Reserved` | cam kết giữ chỗ **đã hoàn thành** |
+
+📌 **Gộp làm một bút toán sẽ MẤT khả năng truy vết:** báo cáo *"đã bán bao nhiêu"* (`Sale`) và *"còn đang giữ bao nhiêu"*
+(`Reservation` − `ReservationRelease`) là **hai câu hỏi khác nhau**. Cùng `ReferenceLineId` nhưng **khác `MovementType`**
+⇒ qua được unique index `(TenantId, ReferenceLineId, MovementType)` (bài học `INV-001` §19.2 **L1**) mà **vẫn** chặn ghi trùng.
+
+### 23.2 🚨 Bất biến then chốt — **toàn bộ lý do lớp này tồn tại**
+
+Khi chốt: **`OnHand` và `Reserved` cùng giảm đúng `q` ⇒ `Available` KHÔNG ĐỔI.**
+- Nếu **chỉ** trừ `OnHand` mà **quên** trả `Reserved` ⇒ `Available` **giảm hai lần** cho **cùng một** món hàng ⇒
+  hệ thống tưởng **hết hàng** ⇒ **mất doanh thu** mà **không có lỗi nào** để lần ra;
+- Nếu **chỉ** trả `Reserved` mà không trừ `OnHand` ⇒ kho **thừa hàng ảo** ⇒ **bán thứ không có**.
+
+### 23.3 **Chốt khi QUÁ HẠN ⇒ TỪ CHỐI** (`0031`) — quyết định có chủ ý
+
+Khi lượt giữ chỗ quá hạn, hàng **đã được trả về `Available`** (job/người khác đã nhả). Nếu vẫn cho xuất kho thì
+**cùng một món bán cho hai người**. ⇒ Từ chối là **đúng**; việc xử lý nghiệp vụ (*báo khách chọn lại*) thuộc
+**tầng đơn hàng** (`SAL-001`) — **không** nhồi vào tầng kho. 📌 Cố ý **không** "tự động nhả rồi xuất luôn": làm vậy là
+**che** mất sự việc *"khách này đã mất hàng"*.
+
+### 23.4 ✅ BẰNG CHỨNG HTTP THẬT (Host + PostgreSQL 17) — 5 phép đo
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | Nền `10` + **checkout giữ 3** (`SAL-002`) | `10/0/10` ⇒ **`10/3/7`** ✅ |
+| 2 | 🔥 **CHỐT GIỮ CHỖ → XUẤT KHO** | `200` · `soLuotDaChot = 1` ⇒ **`OnHand/Reserved/Available = 7/0/7`** ✅ — **`OnHand` VÀ `Reserved` cùng giảm `3`, `Available` KHÔNG đổi (`7`)** |
+| 2b | Sổ cái | **4 bút toán**: `Receipt(0)` 10 · `Reservation(1)` 3 · **`Sale(3)` 3** (balance 7) · **`ReservationRelease(2)` 3** ✅ |
+| 2c | Trạng thái giữ chỗ | **`Committed`** ✅ |
+| 3 | **Chốt lần hai** | `200` · `soLuotDaChot = 0` · vẫn `7/0/7` ✅ (*không lỗi, không xuất thêm*) |
+| 4 | **Đối soát kho** | `soCapLech = 0` ✅ — giữ chỗ + xuất kho **không** làm lệch |
+| 5 | 🔥 **Chốt khi QUÁ HẠN** (giữ lúc `11:00` TTL 5′, chốt lúc `11:10`) | **`eCommerce:Inventory:0031`** · vẫn **`7/2/5`** ⇒ **KHÔNG xuất kho** ✅ |
+
+- build `--no-incremental`: **0 lỗi / 0 cảnh báo** · unit **682/682** (+3) · integration **38/38** · mermaid 197/0 · **không đổi schema**
+- log: **`fail: 0`** · dọn dẹp: 0 kho / 0 giữ chỗ / 0 tồn / 0 sổ cái ✅
+
+📌 **Bài học vận hành (đã gặp thật lượt này):** ABP đưa **tham số đơn giản không-nullable vào ĐƯỜNG DẪN**, không phải
+query string ⇒ route thật là `…/chot-theo-nguon/{referenceId}`. Gọi sai dạng ⇒ **`405`** (Method Not Allowed) —
+một mã **dễ bị hiểu nhầm** là *"hết hạn chứng thực"* hay *"sai quyền"*, trong khi thực chất là **sai hình dạng URL**.
+⇒ Luôn **in route từ `swagger.json`** trước khi viết lời gọi (bài học đã ghi ở `PRC-001` §19.7).
+
+### 23.5 Còn lại
+
+| # | Việc | Ghi chú |
+|---|---|---|
+| 1 | **`SAL-001` — tạo ĐƠN HÀNG** dùng **đúng số tiền** từ sổ giải trình của `SAL-002` (**không** tính lại) | `Order`/`OrderLine` **đã có** từ GĐ0 (`Order.Recalculate()`, `SetTotals`) |
+| 2 | Gọi `ChotTheoNguonAsync` **từ luồng xác nhận đơn** (hiện mở endpoint để kiểm chứng) | |
+| 3 | **Job nhả chỗ định kỳ** (`Timer.RunOnStart` — bài học `CHN-002`) | |
+| 4 | **`INV-003`** phân bổ tồn theo kênh | |
+
+### 23.6 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.9 | 15/10/2026 | *(agent, session GĐ1)* | **`SAL-003` — chốt giữ chỗ → xuất kho**: `ChotGiuChoService` (khoá theo `(tenant, kho, SKU)`, **hai bút toán** `Sale` + `ReservationRelease`) + endpoint `POST /stock-reservation/chot-theo-nguon/{referenceId}`. **Kiểm chứng HTTP 5 phép đo**: **`OnHand` và `Reserved` cùng giảm ⇒ `Available` không đổi** (`10/3/7` → **`7/0/7`**) · 4 bút toán sổ cái · giữ chỗ `Committed` · chốt lần hai **không** xuất thêm · **chốt quá hạn bị chặn (`0031`)** · **đối soát `0` lệch**. Ghi **bài học `405`** (tham số path vs query) |
