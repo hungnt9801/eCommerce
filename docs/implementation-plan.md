@@ -633,9 +633,14 @@ khi Order intake đăng ký handler cho `ChannelOrderPulledEto`, fail-closed **t
    ✅ **ETO đã có** (`CAT-001` §18) và đã **phân loại đúng**; ✅ **mã lỗi đã chốt sổ đăng ký**
    (`CAT-001` §19: `CAT-002` dùng dải `0020+`; mã khoá phân tán dùng chung `eCommerce:Lock:0001`).
    **Còn**: **người nhận** cho `ProductPublishedEto`/`VariantPriceChangedEto` (thuộc `CHN-*` và `WEB-002`).
-2. 🚨 **Cần người quyết:** `AbpExceptionHandlingOptions` có nên ánh xạ `BusinessException` → **`400`/`409`**
-   thay vì **`403`**? Hiện lỗi nghiệp vụ **trùng mã trạng thái với lỗi thiếu quyền** ⇒ client/QA không
-   phân biệt được (`CAT-001` **§17.3**). Đây là **thay đổi hợp đồng API toàn hệ thống** nên **không** tự ý làm.
+2. 🚨 **Cần người quyết — CHÍNH SÁCH LỖI CỦA API (3 điểm, đo được ở `CAT-001` §17.3 + §19.7):**
+   (a) `AbpExceptionHandlingOptions` có nên ánh xạ `BusinessException` → **`400`/`409`** thay vì **`403`**?
+   Hiện lỗi nghiệp vụ **trùng mã trạng thái với lỗi thiếu quyền** ⇒ client/QA không phân biệt được.
+   (b) *"Không tìm thấy"* phải **nhất quán**: hiện `GET /{id}` trả **`404` không có mã**, còn
+   `GET /by-code` trả **`403` kèm `Catalog:0010`** — cùng một service, hai hành vi.
+   (c) **`404` đang ghi log mức `Error`** (`EntityNotFoundException` qua `AbpExceptionFilter`) ⇒ nhiễu cảnh báo.
+   ⚠️ **`Catalog:0012` còn bị `[Required]` của DTO che khuất trên đường API** ⇒ cần chốt ai chịu trách nhiệm
+   báo lỗi: **validation của DTO** hay **guard của domain**. Đây là **thay đổi hợp đồng API toàn hệ thống** ⇒ **không** tự ý làm.
 3. **`SAL-005` §16.4** — xử lý **cập nhật theo watermark** (D5, cần bổ sung 9 trường ETO) ·
    `SalMarketplaceOrderEventLogs` · **đẩy DLQ** cho xung đột payload khi `XC-002` có DLQ.
 4. **`WEB-001` §16.6** — menu/điều hướng theo permission + `[AllowAnonymous]` allowlist + ma trận quyền tự động cho UI.

@@ -1026,3 +1026,50 @@ làm lại toàn bộ khối sổ đăng ký. **Cách đúng:** `Copy-Item <file
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.5 | 15/10/2026 | *(agent, session GĐ1)* | **Chốt sổ đăng ký mã lỗi Catalog**: `CAT-001` §6.3 giữ dải `0001–0009`, `CAT-002` **đánh số lại sang `0020+`** (đã cập nhật `CAT-002` §4.1/§12), mã khoá phân tán về **`eCommerce:Lock:0001`** (`XC-003` D10). **+17 test** đăng ký (reflection) + **mutation test** xác nhận test bắt được vi phạm |
+
+### 19.7 🚨 Ba phát hiện ĐO ĐƯỢC khi kiểm chứng hợp đồng mã lỗi qua HTTP thật (sau khi đánh số lại)
+
+Kiểm chứng bằng **Host + PostgreSQL thật**, 8 phép đo. Kết quả **xác nhận việc đánh số lại đúng**, và
+**phát hiện thêm 3 điểm thô ở hợp đồng API** (2 điểm **có trước** lượt này):
+
+| # | Phép đo | Kết quả | Đánh giá |
+|---|---|---|---|
+| 1 | Tạo sản phẩm | `200` | ✅ |
+| 2 | **Tạo TRÙNG `Code`** | **`eCommerce:Catalog:0001`** (trước là `0005`) | ✅ **đánh số lại có hiệu lực thật** |
+| 3 | **Publish khi chưa có biến thể** (đối chứng) | **`Catalog:0003`** — không đổi | ✅ |
+| 4 | **Thêm TRÙNG SKU** (đối chứng) | **`Catalog:0002`** — không đổi | ✅ |
+| 5 | Tra cứu theo `Code` | `200` | ✅ |
+| 6 | ⚠️ **Tạo với `Code` RỖNG** | `400` — **KHÔNG có mã lỗi**, chỉ có `validationErrors` | 🚨 **`Catalog:0012` bị `[Required]` CHE KHUẤT trên đường API** |
+| 7 | ⚠️ **Tra cứu `Id` không tồn tại** | `404` — **`"code": null`** | 🚨 **hợp đồng "không tìm thấy" KHÔNG NHẤT QUÁN trong cùng một service** |
+| 8 | ⚠️ Log của phép đo 7 | **`fail:` (Error)** — `EntityNotFoundException` | 🚨 **404 bình thường lại ghi log mức Error ⇒ nhiễu cảnh báo** |
+
+**Chi tiết từng điểm (nói rõ nguyên nhân, không chỉ nêu triệu chứng):**
+
+1. **`Catalog:0012` bị che khuất (đo #6).** `CreateProductDto.Code` có `[Required]` + `[StringLength(64)]`
+   ⇒ **model validation** trả `400` **trước khi** vào `Product.ChuanHoaMa`. Nghĩa là `0012` **không thể**
+   chạm tới từ đường API (vẫn dùng được cho lời gọi **không qua** API: test, job, seed).
+   📌 Cùng họ với câu hỏi về `BusinessException` → `403` (§17.3): muốn client nhận **mã nghiệp vụ** thì phải
+   **chốt chính sách** giữa *validation của DTO* và *guard của domain* — **không tự ý đổi**.
+
+2. **"Không tìm thấy" không nhất quán (đo #7).** `GetAsync(Guid)` đi qua repository ⇒ ABP ném
+   `EntityNotFoundException` ⇒ `404` với `"code": null`; còn `GetByCodeAsync` (dùng `FirstOrDefaultAsync`)
+   ném `BusinessException` `Catalog:0010` ⇒ `403` **kèm mã**. **Cùng một service, hai hành vi.**
+   📌 Sửa **đúng** không phải là đổi `404` thành `403` (404 là ngữ nghĩa đúng cho "không tồn tại"),
+   mà là **gắn mã lỗi vào `404`** — việc đó cần `AbpExceptionHandlingOptions` ⇒ **cùng quyết định với §17.3**.
+
+3. **404 ghi log mức `Error` (đo #8).** `AbpExceptionFilter` ghi `fail:` cho `EntityNotFoundException`.
+   Khách gõ sai `Id` (hoặc bot dò đường) là **hành vi bình thường** ⇒ sinh dòng `Error` ⇒ **làm loãng**
+   cảnh báo thật (đúng họ vấn đề đã sửa ở **§18** với sự kiện thông báo). 📌 Cần chốt mức log cho
+   "không tìm thấy" — **chưa tự sửa** vì đây là cấu hình **toàn hệ thống**.
+
+⇒ **Ba điểm trên đã được ghi vào danh sách chờ quyết định của `implementation-plan.md` A.12**
+(đợt này **không** tự đổi hợp đồng API toàn hệ thống).
+
+**Trạng thái sau kiểm chứng:** build **0 lỗi/0 cảnh báo** · unit **451/451** · integration **23/23** ·
+dữ liệu thử đã dọn (0 sản phẩm/0 biến thể) · cờ bảo mật `ADMIN@ABP.IO = true` đã khôi phục.
+
+### 19.8 Lịch sử thay đổi (bổ sung lần 2)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.6 | 15/10/2026 | *(agent, session GĐ1)* | **Kiểm chứng hợp đồng mã lỗi qua HTTP thật (8 phép đo)**: xác nhận `0001`/`0002`/`0003` đúng sau đánh số lại; **phát hiện 3 điểm thô**: `0012` bị `[Required]` che khuất · "không tìm thấy" trả `404` **không có mã** trong khi đường `Code` trả `403` **có mã** · `404` ghi log mức **Error** (nhiễu cảnh báo). Cả 3 **ghi nhận, không tự sửa** (thuộc quyết định toàn hệ thống) |
