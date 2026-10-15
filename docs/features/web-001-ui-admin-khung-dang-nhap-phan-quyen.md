@@ -2538,3 +2538,52 @@ trong một đơn** — phá `CHECK`/unique của kho (`INV-001`). **`2` dòng �
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.0-j | 15/10/2026 | *(agent, session GĐ1)* | ✅ **GIỎ NHIỀU Ô NHẬP (3 dòng)** — ghép ở **SERVER**, neo **duy nhất** và **đúng ngữ cảnh** (sửa lỗi §97/H2). **Kiểm build 3/3** (`exit 0` · `0` lỗi · DLL có). **Kiểm chứng** số **tính trước**: `A×2 · B×3 · A×1` ⇒ HTTP **`200`**, tổng **`990,000`**, **`2` dòng đơn** (**GỘP `A` xuyên dòng**), tồn **`G7SKU-A-215437: 10/3/7 | G7SKU-B-215437: 10/3/7`**; **`fail: 0`** |
+
+---
+
+## 85. 🚨 **GIỮ DÒNG ĐÃ NHẬP: ĐẠT Ở ĐƯỜNG THÀNH CÔNG, HỎNG Ở ĐƯỜNG LỖI** (15/10/2026) — *chưa commit mã; ghi nhận để sửa đúng*
+
+### 85.1 Đã làm (build **thật sự xanh 3/3**: ``exit=0`` · ``0`` dòng ``': error '`` · DLL có)
+
+| # | Tệp | Thay đổi | Neo (duy nhất, đếm = 1) |
+|---|---|---|---|
+| 1 | ``DatHangController.cs`` (``DatHangTrangDto``) | + ``Sku2`` · ``SoLuong2`` · ``Sku3`` · ``SoLuong3`` | ``public decimal TongTien { get; set; }`` |
+| 2 | ``DatHangController.cs`` (xử lý) | gán 4 trường từ form | ``trang.DonId = don.Id;`` |
+| 3 | ``Views/DatHang/Index.cshtml`` | bind ``value="@Model.…"`` cho 4 ô | 4 dòng ``<input id="Sku2|SoLuong2|Sku3|SoLuong3" …`` |
+
+### 85.2 🚨 Kết quả đo — **đúng một nửa**, và nửa hỏng là nửa **quan trọng nhất**
+
+| # | Ca | Phép đo | Kết quả |
+|---|---|---|---|
+| 1 | **LỖI** (dòng 2 = SKU **không có giá**) | đơn có được tạo? | **``0``** ✅ *(chặn đúng)* |
+| 2 | **LỖI** | thông điệp | ``eCommerce:Pricing:0004 — sku=KHONG-CO-999 …`` ✅ |
+| 3 | **LỖI** | 🔥 **``Sku2`` được giữ?** | 🚨 **``False``** |
+| 4 | **LỖI** | 🔥 **``SoLuong2`` được giữ?** | 🚨 **``False``** |
+| 5 | **THÀNH CÔNG** (3 dòng hợp lệ) | tổng tiền | **``330.000``** ✅ *(= 3 × 100.000 × 1,1 — **gộp ``A`` xuyên dòng**)* |
+| 6 | **THÀNH CÔNG** | 🔥 **``Sku2`` được giữ?** | ✅ **``True``** |
+| 7 | ``fail:`` | — | **``0``** ✅ |
+
+### 85.3 Nguyên nhân — **và đây là giá trị thật của phép đo**
+
+Tôi đặt 4 phép gán **sau** dòng ``trang.DonId = don.Id;`` — dòng đó nằm trong **nhánh THÀNH CÔNG** (sau khi đã gọi checkout + tạo đơn).
+⇒ Ở **đường LỖI**, khối ``catch`` render lại trang **trước khi** các phép gán chạy ⇒ **ô dòng 2/3 bị xoá trắng**.
+📌 **Nghịch lý:** tính năng này sinh ra để **cứu người dùng khi có lỗi** — mà nó **chỉ** hoạt động khi **không** có lỗi.
+⇒ Nếu tôi **chỉ** đo đường thành công (như thói quen), tôi đã **commit một tính năng vô dụng** và **tài liệu hoá nó là xong**.
+
+### 85.4 ✅ Cách sửa (đã biết chính xác) — **việc đầu tiên của vòng sau**
+
+Chuyển **4 phép gán** lên **TRƯỚC** khối gọi ``_checkout.TinhVaGiuChoAsync(…)`` (tức chỗ ``trang.Sku = form.Sku`` được đặt), để **cả hai** đường
+(lỗi **và** thành công) đều render với dữ liệu đã nhập. 📌 **Vẫn giữ neo duy nhất** và **vẫn kiểm build 3/3** (Phần H1).
+
+### 85.5 Trạng thái hiện tại (trung thực)
+
+| Mục | Trạng thái |
+|---|---|
+| Mã (2 tệp) | **CÓ** trong cây làm việc, **build xanh**, **CHƯA commit** (**cố ý**) — vì phép kiểm **chưa đạt** |
+| Quy tắc *commit **trong** ``if (đạt)``* | ✅ **đã chặn** việc ghi sổ một tính năng **một nửa** — lần thứ **ba** quy tắc này phát huy tác dụng |
+
+### 85.6 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| — | 15/10/2026 | *(agent, session GĐ1)* | 🚨 **Thử GIỮ DÒNG ĐÃ NHẬP**: build **3/3 xanh**, nhưng **đo CẢ HAI đường** cho thấy **đường LỖI KHÔNG giữ** (``Sku2``/``SoLuong2`` = ``False``) vì 4 phép gán nằm trong **nhánh thành công**; đường **THÀNH CÔNG** giữ tốt (``330.000`` · ``True``). ⇒ **KHÔNG commit mã** (quy tắc *commit trong ``if``*); ghi **cách sửa** (chuyển 4 phép gán lên trước lời gọi checkout). 📌 **Bài học:** *tính năng "cứu khi có lỗi" phải được đo **Ở ĐƯỜNG LỖI*** |
