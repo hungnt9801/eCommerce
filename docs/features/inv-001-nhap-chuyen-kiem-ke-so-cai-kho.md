@@ -1618,3 +1618,58 @@ trên dữ liệu thật — một **đối chứng chéo** mà trước đây c
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.0 | 15/10/2026 | *(agent, session GĐ1)* | **`SAL-001` — tạo đơn từ checkout**: `DonHangAppService.TaoTuCheckoutAsync` lấy số tiền **từ sổ giải trình** (**không** tính lại) + **tripwire** `GrandTotal == TotalTuSoGiaiTrinh` (NÉM nếu lệch, **không** lưu đơn) + điều kiện **phải có hàng đang giữ**. **Kiểm chứng HTTP**: đơn `324.745` **khớp từng đồng** với sổ (`324.745`, chênh lệch `0`) · truy vết ngược trong DB khớp · **đối chứng** checkout không có hàng ⇒ `0` đơn · tạo đơn **không** tự xuất kho (`10/3/7`, giữ chỗ vẫn `Held`). Ghi **4 việc còn lại** (§24.5) |
+
+---
+
+## 25. `SAL-001` (tiếp) — **KHÉP VÒNG ĐƠN HÀNG: XÁC NHẬN ⇒ XUẤT KHO** (15/10/2026)
+
+### 25.1 Đã làm
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| 1 | **Cột `Order.CheckoutIdempotencyKey`** + **unique index có bộ lọc** `(TenantId, CheckoutIdempotencyKey)` **sửa tay `NULLS NOT DISTINCT`** | khoá này cần cho **ba** việc: (a) xác nhận đơn biết **chốt lượt giữ chỗ nào**; (b) **chặn HAI đơn cho MỘT checkout**; (c) **truy vết ngược** về bằng chứng giá. ⚠️ Trước vòng này khoá **chỉ có trong log** ⇒ **cả ba** việc **không** làm được |
+| 2 | **`XacNhanAsync(orderId)`** (`POST /api/app/don-hang/{id}/xac-nhan`) | chỉ đơn `Pending` mới xác nhận được ⇒ gọi `ChotGiuChoService.ChotTheoNguonAsync(Checkout:{khoá})` ⇒ **xuất kho** ⇒ `Confirmed`. **NÉM** nếu **không còn lượt giữ chỗ** hoặc lượt giữ chỗ **quá hạn** (`0031`) |
+
+📌 **`XacNhan` là bước DUY NHẤT biến *"hàng đang giữ"* thành *"hàng đã bán"*.** Trước bước này **không** xuất kho:
+khách còn có thể huỷ, và huỷ thì chỉ cần **nhả chỗ** (`INV-002`) — **không** phải tạo chứng từ đảo
+(sổ cái là **append-only**, `PRC-001` BR-004 tinh thần tương tự).
+
+### 25.2 ✅ BẰNG CHỨNG HTTP THẬT (Host + PostgreSQL 17) — khép vòng đầy đủ
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 0 | Checkout giữ 4 (`100.000`, thuế 10%) | `10/4/6` ✅ |
+| 1 | **Tạo đơn** | `200` · `440.000` **khớp** sổ giải trình · `Pending` · **`khoaCheckout` lưu đúng** ✅ |
+| 2 | 🚨 **Tạo đơn LẦN HAI từ cùng checkout** | **`eCommerce:Orders:0002`** ✅ (*chặn được: một checkout = một đơn ⇒ không giao hàng hai lần / thu tiền hai lần*) |
+| 3 | 🔥 **XÁC NHẬN ĐƠN ⇒ XUẤT KHO** | `200` · **`Confirmed`** · **`6/0/6`** ✅ — `OnHand` và `Reserved` **cùng giảm 4**, `Available` **KHÔNG đổi** · giữ chỗ **`Committed`** · sổ cái **4 bút toán** (`Receipt 10` · `Reservation 4` · **`Sale 4`** · **`ReservationRelease 4`**) |
+| 4 | **Xác nhận LẦN HAI** | `403` `Inventory:0001` · vẫn `6/0/6` ✅ |
+| 5 | 🔥 **Xác nhận khi giữ chỗ QUÁ HẠN** | **`Inventory:0031`** · `6/1/5` (hàng của đơn 2 **vẫn đang giữ**) · **đơn 2 vẫn `Pending`** ✅ ⇒ *không bán hai lần cùng một món* |
+| 6–7 | Dọn dẹp · log | 0 đơn / 0 kho / 0 giữ chỗ / 0 tồn ✅ · `fail: 2` (**đúng bằng** 2 ca vi phạm **cố tình** kích hoạt) |
+
+- build `--no-incremental`: **0 lỗi / 0 cảnh báo** · unit **682/682** · integration **38/38** · mermaid 197/0
+- **DB thật:** `IX_OrdOrders_TenantId_CheckoutIdempotencyKey` **UNIQUE … NULLS NOT DISTINCT** WHERE … IS NOT NULL; tổng **40** index `NULLS NOT DISTINCT`; `schema.sql` sinh lại
+
+### 25.3 🔧 Lỗi bảo trì **do chính tôi gây ra** — và đã sửa ngay trong lượt này
+
+Phép đo #2 (**lần chạy đầu**) trả **mã CHUNG `eCommerce:Db:0001`** thay vì mã nói rõ *"đã có đơn rồi"* — vì tôi
+**thêm ràng buộc mới mà QUÊN thêm dòng ánh xạ** trong `ViPhamRangBuocDb` (đúng quy tắc bảo trì tôi đã ghi ở
+**Phụ lục B §B.5**).
+⇒ Sửa: thêm mã **`eCommerce:Orders:0002`** + **một dòng ánh xạ** ⇒ chạy lại ⇒ trả **đúng mã** ✅.
+📌 **Bài học:** quy tắc bảo trì đã ghi **vẫn bị vi phạm trong chính vòng làm ra nó** — điều này cho thấy
+*"ghi quy tắc"* **không đủ**; cần **cơ chế**. Đề xuất: test quét **tên ràng buộc unique trong `schema.sql`**
+và so với danh sách đã ánh xạ ⇒ **thiếu là ĐỎ** (chưa làm; xem §25.4).
+
+### 25.4 Còn lại
+
+| # | Việc | Ghi chú |
+|---|---|---|
+| 1 | **Test tự động phát hiện ràng buộc CHƯA ánh xạ** | quét `schema.sql` (nguồn sự thật của DB) so với `ViPhamRangBuocDb.CacRangBuocDaAnhXa` — *"ghi quy tắc không đủ, cần cơ chế"* (§25.3) |
+| 2 | **`Job nhả chỗ định kỳ`** (`Timer.RunOnStart` — bài học `CHN-002`) | giữ chỗ quá hạn hiện chỉ nhả khi gọi API |
+| 3 | **Huỷ đơn ⇒ nhả chỗ** (đường đối xứng với xác nhận) | `NhaChoAsync` đã có; chưa nối vào luồng đơn |
+| 4 | **`INV-003`** phân bổ tồn theo kênh (hiện một kho cho cả đơn) | |
+
+### 25.5 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.1 | 15/10/2026 | *(agent, session GĐ1)* | **Khép vòng đơn hàng**: cột `Order.CheckoutIdempotencyKey` + **unique index chống hai đơn cho một checkout** (`NULLS NOT DISTINCT`, sửa tay) + **`XacNhanAsync`** (xác nhận ⇒ chốt giữ chỗ ⇒ **xuất kho** ⇒ `Confirmed`). **Kiểm chứng HTTP**: đơn `440.000` khớp sổ · **tạo đơn lần hai ⇒ `Orders:0002`** · **xác nhận ⇒ `6/0/6`** (`OnHand` & `Reserved` cùng giảm 4, `Available` không đổi, 4 bút toán sổ cái) · xác nhận hai lần **bị chặn** · **xác nhận khi quá hạn ⇒ `0031`**, đơn **vẫn `Pending`**. 🔧 **Sửa lỗi bảo trì do chính mình gây ra** (§25.3: thiếu dòng ánh xạ ⇒ mã chung) và **ghi nhận cần CƠ CHẾ** chứ không chỉ quy tắc |

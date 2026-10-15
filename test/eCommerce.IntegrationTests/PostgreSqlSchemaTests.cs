@@ -141,11 +141,11 @@ public class PostgreSqlSchemaTests
     }
 
     [Fact]
-    public async Task F1_du_39_index_deu_dung_NULLS_NOT_DISTINCT()
+    public async Task F1_du_40_index_deu_dung_NULLS_NOT_DISTINCT()
     {
         // 🔒 BẤT BIẾN (ghi ở XC-004 Q6): mọi unique index trên entity IMultiTenant PHẢI có
         // `NULLS NOT DISTINCT`. Ai tạo migration mới mà quên ⇒ test này đỏ.
-        Assert.Equal(39L, await DemAsync(
+        Assert.Equal(40L, await DemAsync(
             "select count(*) from pg_indexes where schemaname = 'public' and indexdef like '%NULLS NOT DISTINCT%'"));
 
         // Kiểm tra ĐÍCH DANH để thông báo lỗi có ý nghĩa (tên index dài có thể bị PostgreSQL cắt ⇒ so theo tiền tố).

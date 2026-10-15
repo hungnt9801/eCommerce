@@ -1913,3 +1913,17 @@ VALUES ('20261015115023_Inv002_StockReservation', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+ALTER TABLE "OrdOrders" ADD "CheckoutIdempotencyKey" character varying(128);
+
+CREATE UNIQUE INDEX "IX_OrdOrders_TenantId_CheckoutIdempotencyKey" ON "OrdOrders" ("TenantId", "CheckoutIdempotencyKey") WHERE "CheckoutIdempotencyKey" IS NOT NULL;
+
+DROP INDEX "IX_OrdOrders_TenantId_CheckoutIdempotencyKey";
+
+CREATE UNIQUE INDEX "IX_OrdOrders_TenantId_CheckoutIdempotencyKey" ON "OrdOrders" ("TenantId", "CheckoutIdempotencyKey") NULLS NOT DISTINCT WHERE "CheckoutIdempotencyKey" IS NOT NULL;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261015121002_Sal001_Order_CheckoutKey', '10.0.11');
+
+COMMIT;
+

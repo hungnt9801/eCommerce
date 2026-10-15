@@ -550,6 +550,15 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
             b.Property(x => x.ExternalOrderId).HasMaxLength(64);
             b.Property(x => x.Currency).IsRequired().HasMaxLength(8);
             b.Property(x => x.Note).HasMaxLength(2048);
+            b.Property(x => x.CheckoutIdempotencyKey).HasMaxLength(128);
+
+            // 🚨 **MỘT checkout chỉ được sinh MỘT đơn.** Không có index này thì khách bấm hai lần / client retry
+            // ⇒ **HAI ĐƠN** cho cùng một lần mua ⇒ giao hàng hai lần hoặc thu tiền hai lần.
+            // (Sửa tay `NULLS NOT DISTINCT` trong migration — nếu thiếu thì `TenantId = NULL` làm index VÔ HIỆU.)
+            b.HasIndex(x => new { x.TenantId, x.CheckoutIdempotencyKey })
+                .IsUnique()
+                .HasFilter("\"CheckoutIdempotencyKey\" IS NOT NULL")
+                .HasDatabaseName("IX_OrdOrders_TenantId_CheckoutIdempotencyKey");
 
             b.Property(x => x.Subtotal).HasPrecision(18, 4);
             b.Property(x => x.DiscountTotal).HasPrecision(18, 4);

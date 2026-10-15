@@ -50,6 +50,14 @@ public static class ViPhamRangBuocDb
         ["IX_InvStockDocumentLines_TenantId_Doc_Sku"] =
             new("eCommerce:Inventory:0015", "SKU này đã có dòng trong chứng từ (gộp số lượng vào MỘT dòng).", true),
 
+        // ── ĐƠN HÀNG (`SAL-001`) ─────────────────────────────────────────────────────────────────
+        // 📌 Dòng này được thêm vì CHÍNH lượt kiểm chứng đã phát hiện thiếu: tạo đơn lần hai từ cùng checkout
+        // trả **mã chung** `eCommerce:Db:0001` thay vì mã nói rõ *"đã có đơn rồi"*. Đúng quy tắc bảo trì ở đầu
+        // lớp này: **thêm ràng buộc mới ⇒ PHẢI thêm dòng ánh xạ**.
+        ["IX_OrdOrders_TenantId_CheckoutIdempotencyKey"] =
+            new("eCommerce:Orders:0002",
+                "Đã có ĐƠN cho lần checkout này rồi ⇒ không tạo đơn thứ hai.", true),
+
         // ── KHO: giữ chỗ (`INV-002`) ─────────────────────────────────────────────────────────────
         ["IX_InvStockReservations_TenantId_Ref_Sku_Kho"] =
             new("eCommerce:Inventory:0032",

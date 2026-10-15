@@ -3821,6 +3821,10 @@ namespace eCommerce.Migrations
                     b.Property<Guid?>("ChannelShopId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("CheckoutIdempotencyKey")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .IsRequired()
@@ -3915,6 +3919,11 @@ namespace eCommerce.Migrations
                         .HasColumnName("TenantId");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "CheckoutIdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("IX_OrdOrders_TenantId_CheckoutIdempotencyKey")
+                        .HasFilter("\"CheckoutIdempotencyKey\" IS NOT NULL");
 
                     b.HasIndex("TenantId", "Number")
                         .IsUnique();

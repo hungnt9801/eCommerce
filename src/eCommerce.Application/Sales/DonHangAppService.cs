@@ -31,17 +31,20 @@ public class DonHangAppService : ApplicationService, IDonHangAppService
     private readonly IRepository<OrderLine, Guid> _dongDonRepository;
     private readonly IRepository<StockReservation, Guid> _giuChoRepository;
     private readonly IPriceCalculationAppService _tinhGia;
+    private readonly ChotGiuChoService _chotGiuCho;
 
     public DonHangAppService(
         IRepository<Order, Guid> donRepository,
         IRepository<OrderLine, Guid> dongDonRepository,
         IRepository<StockReservation, Guid> giuChoRepository,
-        IPriceCalculationAppService tinhGia)
+        IPriceCalculationAppService tinhGia,
+        ChotGiuChoService chotGiuCho)
     {
         _donRepository = donRepository;
         _dongDonRepository = dongDonRepository;
         _giuChoRepository = giuChoRepository;
         _tinhGia = tinhGia;
+        _chotGiuCho = chotGiuCho;
     }
 
     [Authorize(eCommerceConsts.Permissions.Orders.Manage)]
@@ -72,7 +75,10 @@ public class DonHangAppService : ApplicationService, IDonHangAppService
             ChannelShopId = input.ChannelShopId,
             CustomerId = input.CustomerId,
             Note = input.Note,
-            Currency = tien.CurrencyCode
+            Currency = tien.CurrencyCode,
+            // 🔗 Lưu khoá để: (a) xác nhận đơn biết chốt lượt giữ chỗ nào, (b) unique index chặn HAI đơn
+            // cho cùng một checkout, (c) truy vết ngược về bằng chứng giá khi có khiếu nại.
+            CheckoutIdempotencyKey = khoa
         };
 
         await _donRepository.InsertAsync(don, autoSave: false);
@@ -108,6 +114,56 @@ public class DonHangAppService : ApplicationService, IDonHangAppService
             don.Number, khoa, don.GrandTotal, tien.Lines.Count, giuCho.Count);
 
         return ToDto(don, tien.Lines.Count, tien.Total, khoa);
+    }
+
+    /// <summary>
+    /// 🚨 **XÁC NHẬN ĐƠN** ⇒ **chốt giữ chỗ** ⇒ **xuất kho** (`SAL-003`) ⇒ `Confirmed`.
+    /// 📌 Đây là bước **duy nhất** biến *"hàng đang giữ"* thành *"hàng đã bán"*. Trước bước này **không** xuất kho:
+    /// khách còn có thể huỷ, và huỷ thì chỉ cần **nhả chỗ** (`INV-002`) — **không** phải tạo chứng từ đảo.
+    /// **NÉM** nếu: đơn không ở `Pending`, **hoặc** lượt giữ chỗ **đã quá hạn** (`0031` — *hàng đã được trả về
+    /// cho người khác*; xác nhận tiếp là **bán hai lần**).
+    /// </summary>
+    [Authorize(eCommerceConsts.Permissions.Orders.Manage)]
+    public async Task<DonHangDto> XacNhanAsync(Guid id, DateTime? at = null)
+    {
+        var don = await _donRepository.GetAsync(id);
+
+        if (don.Status != OrderStatus.Pending)
+        {
+            throw new BusinessException(eCommerceConsts.ErrorCodes.InsufficientStock)
+                .WithData("number", don.Number)
+                .WithData("status", don.Status.ToString())
+                .WithData("lyDo", "Chỉ đơn ở trạng thái `Pending` mới xác nhận được.");
+        }
+
+        if (string.IsNullOrWhiteSpace(don.CheckoutIdempotencyKey))
+        {
+            throw new BusinessException(InventoryErrorCodes.GiuChoKhongConGiu)
+                .WithData("number", don.Number)
+                .WithData("lyDo", "Đơn KHÔNG có khoá checkout ⇒ không biết chốt lượt giữ chỗ nào.");
+        }
+
+        var thoiDiem = at ?? Clock.Now;
+
+        // Chốt TOÀN BỘ lượt giữ chỗ của nguồn ⇒ `OnHand` và `Reserved` cùng giảm (bất biến `SAL-003`).
+        var soChot = await _chotGiuCho.ChotTheoNguonAsync($"Checkout:{don.CheckoutIdempotencyKey}", thoiDiem);
+
+        if (soChot == 0)
+        {
+            throw new BusinessException(InventoryErrorCodes.GiuChoKhongConGiu)
+                .WithData("number", don.Number)
+                .WithData("idempotencyKey", don.CheckoutIdempotencyKey)
+                .WithData("lyDo", "Không còn lượt giữ chỗ nào để chốt ⇒ KHÔNG xác nhận (đơn không có hàng).");
+        }
+
+        don.SetStatus(OrderStatus.Confirmed);
+        await _donRepository.UpdateAsync(don, autoSave: true);
+
+        Logger.LogInformation("XÁC NHẬN ĐƠN {Number}: đã chốt {So} lượt giữ chỗ ⇒ hàng ra khỏi kho.",
+            don.Number, soChot);
+
+        return ToDto(don, (int)await _dongDonRepository.CountAsync(x => x.OrderId == id),
+            don.GrandTotal, don.CheckoutIdempotencyKey ?? "(không có)");
     }
 
     public async Task<DonHangDto> GetAsync(Guid id)

@@ -64,5 +64,11 @@ public interface IDonHangAppService : IApplicationService
 {
     Task<DonHangDto> TaoTuCheckoutAsync(TaoDonTuCheckoutInput input);
 
+    /// <summary>
+    /// 🚨 **XÁC NHẬN ĐƠN** ⇒ chốt giữ chỗ ⇒ **xuất kho**. **NÉM** nếu đơn không ở `Pending`,
+    /// hoặc lượt giữ chỗ **đã quá hạn** (`0031` — *hàng đã được trả về cho người khác*).
+    /// </summary>
+    Task<DonHangDto> XacNhanAsync(Guid id, DateTime? at = null);
+
     Task<DonHangDto> GetAsync(Guid id);
 }

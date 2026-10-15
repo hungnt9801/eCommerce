@@ -51,6 +51,16 @@ public class Order : FullAuditedAggregateRoot<Guid>, IMultiTenant
 
     public string? Note { get; set; }
 
+    /// <summary>
+    /// 🚨 **Khoá idempotency của lần checkout đã sinh ra đơn này** (`SAL-001`).
+    /// 📌 **VÌ SAO CẦN CỘT NÀY (không thể suy ra từ chỗ khác):**
+    ///   • **Xác nhận đơn** phải biết **chốt lượt giữ chỗ nào** ⇒ cần khoá để tra `Checkout:{khoá}`;
+    ///   • **Chống tạo HAI đơn cho MỘT checkout** (khách bấm hai lần / client retry) ⇒ cần **unique index**;
+    ///   • **Truy vết ngược** từ đơn về **bằng chứng giá** (`PrcPriceCalculationRecords`) để trả lời khiếu nại.
+    /// ⚠️ Trước vòng 33 khoá này **chỉ có trong log** ⇒ cả ba việc trên **không làm được** (xem `inv-001` §24.5 #2).
+    /// </summary>
+    public string? CheckoutIdempotencyKey { get; set; }
+
     private readonly List<OrderLine> _lines = new();
 
     public IReadOnlyCollection<OrderLine> Lines => _lines.AsReadOnly();
