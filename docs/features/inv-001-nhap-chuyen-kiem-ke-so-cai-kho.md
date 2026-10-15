@@ -1673,3 +1673,118 @@ và so với danh sách đã ánh xạ ⇒ **thiếu là ĐỎ** (chưa làm; xe
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.1 | 15/10/2026 | *(agent, session GĐ1)* | **Khép vòng đơn hàng**: cột `Order.CheckoutIdempotencyKey` + **unique index chống hai đơn cho một checkout** (`NULLS NOT DISTINCT`, sửa tay) + **`XacNhanAsync`** (xác nhận ⇒ chốt giữ chỗ ⇒ **xuất kho** ⇒ `Confirmed`). **Kiểm chứng HTTP**: đơn `440.000` khớp sổ · **tạo đơn lần hai ⇒ `Orders:0002`** · **xác nhận ⇒ `6/0/6`** (`OnHand` & `Reserved` cùng giảm 4, `Available` không đổi, 4 bút toán sổ cái) · xác nhận hai lần **bị chặn** · **xác nhận khi quá hạn ⇒ `0031`**, đơn **vẫn `Pending`**. 🔧 **Sửa lỗi bảo trì do chính mình gây ra** (§25.3: thiếu dòng ánh xạ ⇒ mã chung) và **ghi nhận cần CƠ CHẾ** chứ không chỉ quy tắc |
+
+---
+
+## 26. **ĐƯỜNG HUỶ + JOB NHẢ CHỖ ĐỊNH KỲ** (15/10/2026) — *một phần ĐÃ kiểm chứng, một phần CHƯA*
+
+### 26.1 Đã làm
+
+| # | Thành phần | Trạng thái |
+|---|---|---|
+| 1 | **`StockReservationService.NhaTheoNguonAsync(referenceId, at, lyDo)`** — nhả **mọi** lượt `Held` của một nguồn (đường **đối xứng** với `ChotTheoNguonAsync`) | ✅ **đã kiểm chứng** |
+| 2 | **`DonHangAppService.HuyDonAsync`** (`POST /api/app/don-hang/{id}/huy-don`) — chỉ đơn `Pending`; **nhả chỗ NGAY** ⇒ `Cancelled`; **idempotent** (huỷ hai lần trả trạng thái hiện tại); **NÉM** nếu đơn **đã xác nhận** (*đã xuất kho ⇒ phải TRẢ HÀNG, không xoá bút toán*) | ✅ **đã kiểm chứng** |
+| 3 | **`StockReservationExpiryWorker`** (`AsyncPeriodicBackgroundWorkerBase`, nhịp **1 phút**, **`Timer.RunOnStart = true`**) + đăng ký trong `eCommerceApplicationModule` **theo đúng mẫu đã kiểm chứng** `TaxUnclassifiedSkusWorker` | ⚠️ **đã viết, CHƯA chứng minh có tác dụng** (§26.3) |
+
+### 26.2 ✅ BẰNG CHỨNG HTTP THẬT — **đường huỷ** (đã kiểm chứng)
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | Checkout giữ `S2 × 5` (TTL mặc định 15 phút) | `10/5/5` ✅ |
+| 2 | Tạo đơn từ checkout | `200` · `Pending` ✅ |
+| 3 | 🔥 **HUỶ ĐƠN** | `200` · **`Cancelled`** · **`10/0/10`** ✅ — **hàng về kho NGAY**, **không** chờ hết TTL · giữ chỗ **`Released`** |
+| 4 | **Huỷ lần hai** | `200` · `Cancelled` · vẫn `10/0/10` ✅ (**idempotent**, không nhả thêm) |
+| 5 | Dọn dẹp | 0 đơn / 0 kho / 0 giữ chỗ / 0 tồn ✅ · cờ bảo mật khôi phục |
+
+- build `--no-incremental`: **0 lỗi / 0 cảnh báo** · unit **686/686** · integration **38/38** · **không đổi schema**
+
+### 26.3 ⚠️ **JOB NHẢ CHỖ: CHƯA chứng minh được có tác dụng** — ghi rõ, không tô hồng
+
+**Phép đo dự kiến:** gieo một lượt giữ chỗ **đã quá hạn** (`ExpiresAtUtc = 2026-06-15`, "bây giờ" = 2026-10-15),
+rồi **khởi động lại Host** ⇒ nếu `RunOnStart` hoạt động thì hàng phải **về kho ngay** khi Host lên.
+
+**Kết quả 2 lần đo — CẢ HAI ĐỀU KHÔNG KẾT LUẬN ĐƯỢC:**
+
+| Lần | Kết quả | Lý do không kết luận được |
+|---|---|---|
+| 1 | `S1` **vẫn** `10/3/7`, giữ chỗ **vẫn `Held`**, log **0** dòng `JOB NHẢ CHỖ` | Worker **chỉ log khi `soDaNha > 0`** ⇒ **không phân biệt** được *"job không chạy"* với *"job chạy nhưng tìm thấy 0"* ⇒ phép đo **không có giá trị chẩn đoán** |
+| 2 | Sau khi thêm **log vô điều kiện**: vẫn **0** dòng | 🚨 **SQL gieo dữ liệu của chính tôi SAI cú pháp** (`"$SKU"` bị hiểu là **tên cột**) ⇒ **không có** lượt giữ chỗ quá hạn nào trong DB ⇒ phép đo **vô nghĩa** |
+
+**So sánh có giá trị duy nhất thu được:** trong log khởi động, **`TaxUnclassifiedSkusWorker` CÓ xuất hiện**
+(cùng mẫu `AsyncPeriodicBackgroundWorkerBase` + `RunOnStart`) ⇒ **cơ chế worker của ABP hoạt động trong Host này**;
+worker mới **không** xuất hiện ⇒ **nghi vấn nằm ở phía worker của tôi** (chưa chạy, hoặc chạy mà truy vấn ra 0),
+**chưa** xác định được là cái nào.
+
+**Việc đã sửa ngay (có giá trị độc lập):** worker nay **log vô điều kiện mỗi lượt quét** (`JOB NHẢ CHỖ: bắt đầu quét…`).
+⇒ Lần đo kế tiếp **một lần là đủ** để phân biệt:
+- **không** thấy dòng "bắt đầu quét" ⇒ worker **không được chạy** (đăng ký/vòng đời);
+- **có** dòng đó mà `Reserved` vẫn > 0 ⇒ **truy vấn** `NhaChoHetHanAsync` **không khớp** (điều kiện `Status`/`ExpiresAtUtc`
+  hoặc **phạm vi tenant/UoW** trong worker).
+
+📌 **Bài học (áp dụng cho mọi job sau này):** **job PHẢI log vô điều kiện mỗi lượt** — nếu chỉ log khi "có việc",
+thì *"im lặng"* **không** phân biệt được với *"không chạy"*, và mọi phép kiểm chứng job đều **mất giá trị**.
+📌 **Bài học phụ:** gieo dữ liệu kiểm chứng bằng SQL nhúng trong chuỗi PowerShell **dễ sai cú pháp im lặng** —
+nên viết ra **tệp `.sql`** (`'$bien'` trong nháy **đơn**) rồi `psql -f`, và **luôn `SELECT` lại để xác nhận đã gieo đúng**
+trước khi kết luận từ phép đo.
+
+### 26.4 Còn lại
+
+| # | Việc | Ưu tiên |
+|---|---|---|
+| 1 | 🚨 **Kết luận job nhả chỗ** bằng **một** phép đo đúng (gieo dữ liệu qua tệp `.sql` + xác nhận bằng `SELECT` trước khi chạy Host) | **cao** — *job im lặng là loại lỗi tệ nhất: hàng bị giữ vô hạn mà không ai biết* |
+| 2 | Huỷ đơn khi đã `Confirmed` ⇒ **phiếu nhập trả hàng** + đảo tiền (kế toán) | trung bình |
+| 3 | `INV-003` phân bổ tồn theo kênh (hiện một kho cho cả đơn) | trung bình |
+
+---
+
+## 27. **JOB NHẢ CHỖ — HAI NGUYÊN NHÂN GỐC ĐÃ TÌM RA VÀ SỬA** (15/10/2026) — *§27 này THAY THẾ kết luận §26.3*
+
+### 27.1 Kết quả cuối: **job HOẠT ĐỘNG** (đã kiểm chứng bằng trạng thái DB thật)
+
+| Thời điểm | `InvStockReservations.Status` | `InvItems.Reserved` | Sổ cái |
+|---|---|---|---|
+| **TRƯỚC** (giữ chỗ hết hạn `2026-06-15`, "bây giờ" `2026-10-15`) | **`0` (`Held`)** | **`3`** | (chưa có) |
+| **SAU khi khởi động Host** (`RunOnStart`) | **`3` (`Expired`)** ✅ | **`0`** ✅ | **`ReservationRelease` = `3`** ✅ |
+
+- `ReleasedAtUtc` được ghi (`2026-10-15 12:30:28`) ✅ · **`fail: 0`** trong log ✅
+- ⇒ **`RunOnStart` hoạt động**: hàng đã quá hạn **TỪ TRƯỚC** lúc khởi động được nhả **ngay**, không chờ hết nhịp.
+
+### 27.2 🚨 **HAI NGUYÊN NHÂN GỐC** — cả hai đều thuộc loại *"im lặng"* nguy hiểm nhất
+
+**NN1 — Dòng ĐĂNG KÝ WORKER không hề được ghi vào tệp (script báo "thành công").**
+`eCommerceApplicationModule` **không** chứa `AddBackgroundWorkerAsync<StockReservationExpiryWorker>()` dù script sửa tệp
+đã in *"đã đăng ký worker"*. Cùng họ bẫy đã gặp nhiều lần trong dự án: **ghép chuỗi/here-string trong script PowerShell**
+(`CRLF` vs `LF`, here-string trong biểu thức) ⇒ tệp **không đổi** mà **không có lỗi nào**.
+📌 **Phát hiện nhờ `git status`**: tệp **không** nằm trong danh sách thay đổi ⇒ mâu thuẫn với thông báo "thành công".
+⇒ **Bài học:** sau khi sửa tệp bằng script, **KIỂM LẠI TỆP** (`Select-String` / `git status`) — **không tin thông báo của script**.
+Sửa cuối cùng bằng công cụ `edit` (không ghép chuỗi).
+
+**NN2 — 🚨 WORKER CHẠY NHƯNG NÉM `ObjectDisposedException`** — *không có Unit of Work*.
+```
+System.ObjectDisposedException: Cannot access a disposed context instance.
+Object name: 'eCommerceDbContext'
+   at ... StockReservationExpiryWorker.DoWorkAsync(...)
+```
+`AsyncPeriodicBackgroundWorkerBase` **KHÔNG** tự mở `UnitOfWork` (khác request HTTP — vốn đã có UoW của ABP).
+Worker resolve `StockReservationService` (scoped, giữ repository → `DbContext`) mà **không** có UoW
+⇒ `DbContext` bị **dispose** trước khi dùng ⇒ **job không làm gì cả**.
+📌 Đúng **hình mẫu "job im lặng"**: không exception nào tới người dùng, chỉ là **hàng bị giữ vĩnh viễn** và
+*"hết hàng"* là triệu chứng duy nhất — **không thể truy nguyên** từ phía người dùng.
+✅ **Sửa:** bọc trong `CreateScope()` + `IUnitOfWorkManager.Begin(requiresNew: true, isTransactional: true)` và
+`await uow.CompleteAsync()`; lấy `IClock`/service từ **scope** (không inject scoped vào worker singleton).
+
+### 27.3 📌 **Vì sao tìm ra được — nhờ ĐÚNG MỘT thay đổi: log vô điều kiện**
+
+Ở §26.3, worker **chỉ log khi `soDaNha > 0`** ⇒ hai lần đo đều **không kết luận được** (*"im lặng"* không phân biệt
+*"không chạy"* với *"không có việc"*). Sau khi thêm **`Logger.LogInformation("JOB NHẢ CHỖ: bắt đầu quét…")` ở đầu
+`DoWorkAsync`**, chỉ **một** lần chạy đã chỉ ra: **worker CÓ chạy** (có dòng "bắt đầu quét") và **NÉM** ngay sau đó.
+⇒ **Bài học bắt buộc cho MỌI job từ nay:**
+1. **Log vô điều kiện ở đầu mỗi lượt** — để *"im lặng"* **luôn** có nghĩa là *"không chạy"*;
+2. **Bọc trong `UnitOfWork`** — worker nền **không** có UoW tự động;
+3. **Kiểm lại tệp sau khi sửa bằng script** — thông báo "thành công" **không** đủ tin.
+
+### 27.4 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.2 | 15/10/2026 | *(agent, session GĐ1)* | **Job nhả chỗ giữ hàng quá hạn — tìm ra 2 nguyên nhân gốc và sửa**: (NN1) dòng đăng ký worker **không được ghi** do bẫy ghép chuỗi (phát hiện nhờ `git status`); (NN2) worker **chạy nhưng ném `ObjectDisposedException`** vì **thiếu `UnitOfWork`** ⇒ **job im lặng, hàng bị giữ vĩnh viễn**. **Kiểm chứng bằng DB thật**: `Held/Reserved=3` ⇒ **`Expired/Reserved=0` + bút toán `ReservationRelease=3`**, `fail: 0`. **Ghi 3 bài học bắt buộc cho mọi job** (§27.3) |

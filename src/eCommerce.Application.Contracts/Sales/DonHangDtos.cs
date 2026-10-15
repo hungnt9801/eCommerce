@@ -70,5 +70,11 @@ public interface IDonHangAppService : IApplicationService
     /// </summary>
     Task<DonHangDto> XacNhanAsync(Guid id, DateTime? at = null);
 
+    /// <summary>
+    /// 🚨 **HUỶ ĐƠN** ⇒ **nhả chỗ NGAY** (không chờ job hết TTL) ⇒ hàng trở lại kho để người khác mua.
+    /// **NÉM** nếu đơn **đã xác nhận** (đã xuất kho) — khi đó phải **trả hàng**, không phải huỷ.
+    /// </summary>
+    Task<DonHangDto> HuyDonAsync(Guid id, DateTime? at = null);
+
     Task<DonHangDto> GetAsync(Guid id);
 }

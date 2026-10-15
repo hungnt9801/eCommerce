@@ -49,5 +49,14 @@ namespace eCommerce;
     public override async Task OnPostApplicationInitializationAsync(ApplicationInitializationContext context)
     {
         await context.AddBackgroundWorkerAsync<Tax.TaxUnclassifiedSkusWorker>();
+
+        // INV-002 — **JOB NHẢ CHỖ GIỮ HÀNG QUÁ HẠN**. 📌 Không có job này thì giữ chỗ **vô thời hạn trên thực tế**
+        // (khách bỏ ngang ⇒ hàng không ai mua được, **KHÔNG có lỗi nào** để lần ra). `Timer.RunOnStart = true`
+        // trong worker để hàng đã quá hạn **TỪ TRƯỚC** lúc deploy được nhả ngay (bài học `CHN-002`).
+        // 🚨 **BÀI HỌC VÒNG 35:** dòng đăng ký này **đã từng bị bỏ sót im lặng** — script sửa tệp báo "thành công"
+        // nhưng tệp **không đổi**, worker **không bao giờ chạy**, và phép kiểm chứng chỉ ra *"không có log"* mà
+        // **không** phân biệt được *"không chạy"* với *"chạy mà không có việc"*. ⇒ Sửa tệp bằng `edit` (không dùng
+        // ghép chuỗi trong script) và **kiểm lại tệp sau khi sửa** (`Select-String`) — xem `inv-001` §26.3.
+        await context.AddBackgroundWorkerAsync<eCommerce.Application.Inventory.StockReservationExpiryWorker>();
     }
 }

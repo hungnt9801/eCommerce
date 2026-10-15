@@ -146,6 +146,27 @@ public class StockReservationService : DomainService
         return giuCho;
     }
 
+    /// <summary>
+    /// Nhả **mọi** lượt giữ chỗ `Held` của một **nguồn** — đường **ĐỐI XỨNG** với `ChotTheoNguonAsync`.
+    /// 📌 Dùng khi **huỷ đơn/giỏ**: hàng phải về kho **ngay** để người khác mua được — chờ job hết TTL nghĩa là
+    /// hàng nằm chết thêm tới 15 phút **một cách vô ích**.
+    /// </summary>
+    public async Task<int> NhaTheoNguonAsync(string referenceId, DateTime at, ReservationStatus lyDo)
+    {
+        var dangGiu = await _giuChoRepository.GetListAsync(
+            x => x.ReferenceId == referenceId && x.Status == ReservationStatus.Held);
+
+        var soNha = 0;
+
+        foreach (var gc in dangGiu.OrderBy(x => x.Sku, StringComparer.Ordinal).ThenBy(x => x.Id))
+        {
+            await NhaChoAsync(gc.Id, at, lyDo);
+            soNha++;
+        }
+
+        return soNha;
+    }
+
     /// <summary>Nhả chỗ (khách huỷ / hết TTL). `lyDo` = `Released` hoặc `Expired`.</summary>
     public async Task<StockReservation> NhaChoAsync(Guid reservationId, DateTime at, ReservationStatus lyDo)
     {

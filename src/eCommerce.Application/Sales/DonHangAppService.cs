@@ -32,19 +32,22 @@ public class DonHangAppService : ApplicationService, IDonHangAppService
     private readonly IRepository<StockReservation, Guid> _giuChoRepository;
     private readonly IPriceCalculationAppService _tinhGia;
     private readonly ChotGiuChoService _chotGiuCho;
+    private readonly StockReservationService _giuChoService;
 
     public DonHangAppService(
         IRepository<Order, Guid> donRepository,
         IRepository<OrderLine, Guid> dongDonRepository,
         IRepository<StockReservation, Guid> giuChoRepository,
         IPriceCalculationAppService tinhGia,
-        ChotGiuChoService chotGiuCho)
+        ChotGiuChoService chotGiuCho,
+        StockReservationService giuChoService)
     {
         _donRepository = donRepository;
         _dongDonRepository = dongDonRepository;
         _giuChoRepository = giuChoRepository;
         _tinhGia = tinhGia;
         _chotGiuCho = chotGiuCho;
+        _giuChoService = giuChoService;
     }
 
     [Authorize(eCommerceConsts.Permissions.Orders.Manage)]
@@ -161,6 +164,50 @@ public class DonHangAppService : ApplicationService, IDonHangAppService
 
         Logger.LogInformation("XÁC NHẬN ĐƠN {Number}: đã chốt {So} lượt giữ chỗ ⇒ hàng ra khỏi kho.",
             don.Number, soChot);
+
+        return ToDto(don, (int)await _dongDonRepository.CountAsync(x => x.OrderId == id),
+            don.GrandTotal, don.CheckoutIdempotencyKey ?? "(không có)");
+    }
+
+    /// <summary>
+    /// 🚨 **HUỶ ĐƠN** ⇒ **NHẢ CHỖ NGAY** (đường **ĐỐI XỨNG** với <see cref="XacNhanAsync"/>).
+    /// 📌 **VÌ SAO PHẢI NHẢ NGAY (không chờ job hết TTL):** hàng phải trở lại kho **ngay** để người khác mua được.
+    /// Chờ job nghĩa là hàng nằm chết thêm tới 15 phút **một cách vô ích** — và với đơn bị huỷ thì **không có lý do gì**
+    /// để giữ tiếp. 📌 Đây cũng là điều kiện để **không** phải tạo chứng từ đảo: chưa xuất kho thì chỉ cần **nhả chỗ**.
+    /// **NÉM** nếu đơn **đã ghi sổ xuất kho** (`Confirmed`) — khi đó phải **trả hàng** (chứng từ nhập) và **đảo tiền**,
+    /// **không** phải huỷ.
+    /// </summary>
+    [Authorize(eCommerceConsts.Permissions.Orders.Manage)]
+    public async Task<DonHangDto> HuyDonAsync(Guid id, DateTime? at = null)
+    {
+        var don = await _donRepository.GetAsync(id);
+
+        if (don.Status == OrderStatus.Cancelled)
+        {
+            // Idempotent: huỷ hai lần ⇒ trả trạng thái hiện tại, KHÔNG nhả chỗ lần nữa (nhả hai lần sẽ bị `0030`).
+            return ToDto(don, (int)await _dongDonRepository.CountAsync(x => x.OrderId == id),
+                don.GrandTotal, don.CheckoutIdempotencyKey ?? "(không có)");
+        }
+
+        if (don.Status != OrderStatus.Pending)
+        {
+            throw new BusinessException(eCommerceConsts.ErrorCodes.InsufficientStock)
+                .WithData("number", don.Number)
+                .WithData("status", don.Status.ToString())
+                .WithData("lyDo",
+                    "Chỉ đơn `Pending` mới huỷ được. Đơn đã xác nhận (đã xuất kho) thì phải TRẢ HÀNG " +
+                    "(chứng từ nhập) — KHÔNG xoá bút toán sổ cái (append-only).");
+        }
+
+        var soNha = string.IsNullOrWhiteSpace(don.CheckoutIdempotencyKey)
+            ? 0
+            : await _giuChoService.NhaTheoNguonAsync(
+                $"Checkout:{don.CheckoutIdempotencyKey}", at ?? Clock.Now, ReservationStatus.Released);
+
+        don.SetStatus(OrderStatus.Cancelled);
+        await _donRepository.UpdateAsync(don, autoSave: true);
+
+        Logger.LogInformation("HUỶ ĐƠN {Number}: đã nhả {So} lượt giữ chỗ ⇒ hàng về kho NGAY.", don.Number, soNha);
 
         return ToDto(don, (int)await _dongDonRepository.CountAsync(x => x.OrderId == id),
             don.GrandTotal, don.CheckoutIdempotencyKey ?? "(không có)");
