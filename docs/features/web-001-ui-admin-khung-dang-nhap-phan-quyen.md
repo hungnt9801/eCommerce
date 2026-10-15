@@ -2047,3 +2047,59 @@ chỉ giữ **biến số cần kiểm**.
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.d | 15/10/2026 | *(agent, session GĐ1)* | 🎉 **Trả nợ §66.3/§68**: chứng minh **`HUỶ`** và **`TRẢ HÀNG`** chạy đúng trên đơn có **định dạng số đơn `WEB-…`** — bằng cách **cô lập biến số** (tạo đơn *hình dạng WEB* **qua API**, bỏ Web khỏi phương trình). **Kết quả**: `HUỶ` ⇒ `Cancelled`, tồn `10/0/10`, giữ chỗ `Released`; `XÁC NHẬN` ⇒ `OnHand`&`Reserved` cùng giảm; **`TRẢ HÀNG` ⇒ `Returned`**, phiếu **`TH-WEB-WEB-…-1`**, tồn về `10/0/10`; dọn sạch; **`fail: 0`**. Dùng **`tools/wait-host.ps1`** (chờ `1.8s`). ⇒ **Đường nối UI → API nay đủ CẢ BA chuyển trạng thái**; **bài học #13**: *khi phép đo phức tạp hỏng ≥2 lần ⇒ tách thành phép đo nhỏ nhất còn trả lời được câu hỏi* |
+
+---
+
+## 70. 🎯 **ĐÃ TÌM RA GỐC CỦA "WEB KHÔNG LÊN" (§68 · §79): WEB KHÔNG CÓ `/health-status`** (15/10/2026)
+
+### 70.1 Công cụ mới (`tools/wait-host.ps1`) làm **đúng việc nó sinh ra để làm**
+
+Probe vòng 83 dừng ở bước chờ **Web** — và lần này, thay vì **một câu vô nghĩa** (*"KHONG len trong 90 giay"*),
+công cụ **in 15 dòng cuối log**, trong đó có:
+
+```
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:5100
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+```
+
+⇒ 🚨 **Web ĐÃ LÊN và ĐANG LẮNG NGHE** — chỉ **2,4 giây** sau khi khởi động.
+⇒ **Sự thật ngược lại điều tôi kết luận ở §68 và §79.**
+
+### 70.2 🎯 **GỐC THẬT: `/health-status` là endpoint của HOST, KHÔNG phải của WEB**
+
+`tools/wait-host.ps1` (và mọi `ChoHost` trong các probe trước) kiểm `<Url>/health-status` = `200`. Endpoint đó **có trên Host** (:5000)
+— **nhưng Web (:5100) không phục vụ nó**. ⇒ Phép chờ **hỏi sai câu hỏi** ⇒ **luôn hết hạn** dù Web đã sẵn sàng.
+📌 Hậu quả: **hai vòng (79 và 83)** và **một phần vòng 66/68** bị chặn bởi **một endpoint không tồn tại** — và tôi đã
+**ghi vào tài liệu** là *"Web không lên"*, tức **một kết luận SAI**.
+
+### 70.3 📌 Bài học #14 — **kiểm tra ĐIỂM ĐO có tồn tại trước khi tin nó**
+
+Bài học §47 (đọc `StatusCode` trần) và §57.3 (regex cắt tại thẻ) là *"đo sai cách"*. Bài này là bậc cao hơn:
+**đo một thứ KHÔNG TỒN TẠI** — và vì phép đo **luôn thất bại**, nó **giống hệt** một phép đo đúng đang gặp lỗi thật.
+📌 **Dấu hiệu nhận biết (để lần sau bắt sớm):** một phép chờ **hết hạn ở MỌI lần chạy** với **cùng một thời lượng**
+⇒ **nghi ngờ ĐIỂM ĐO**, không phải đối tượng được đo. 📌 Và **công cụ in log** chính là thứ phá vỡ vòng lặp đó.
+
+**⇒ Sửa (chọn một, có đánh đổi rõ):**
+| Phương án | Ưu | Nhược |
+|---|---|---|
+| **(a)** Thêm endpoint `/health-status` cho **Web** (như Host) | mọi probe/công cụ dùng **cùng một điểm đo**; đúng chuẩn vận hành | thêm **mã sản phẩm** cho mục đích đo |
+| **(b)** Cho `wait-host.ps1` nhận **đường dẫn kiểm** (`-Path /health-status` mặc định, Web dùng `-Path /`) | **không** thêm mã sản phẩm; tổng quát cho mọi tiến trình | mỗi tiến trình một điểm đo khác nhau ⇒ dễ quên |
+📌 **Đề xuất:** **(a)** — vì `/health-status` **đã** là chuẩn của Host, và **một điểm đo thống nhất** rẻ hơn **ký ức của người viết probe**.
+
+### 70.4 Trạng thái vòng 83
+
+| # | Việc | Kết quả |
+|---|---|---|
+| 1 | Gieo dữ liệu (Host) | ✅ `idKho=3a24521f-…` · tồn `50` |
+| 2 | Chờ Host bằng công cụ | ✅ **"LÊN sau 2.4s"** |
+| 3 | Chờ Web | ❌ **hết hạn** — **vì điểm đo sai** (§70.2), **KHÔNG** phải vì Web chết |
+| 4 | **CA BIÊN của bộ tách giỏ** (§83 mục đích) | 🚨 **CHƯA chạy** (probe dừng trước) |
+| 5 | Dọn dẹp · tiến trình treo | `don=0 dong=0 ton=0 donvi=0 gc=0 sc=0 baoMat=true` ✅ · **0** ✅ |
+
+### 70.5 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.c | 15/10/2026 | *(agent, session GĐ1)* | 🎯 **Tìm ra GỐC của "Web không lên" (§68 · §79 · §83)**: công cụ `tools/wait-host.ps1` **in log** (đúng việc nó sinh ra để làm) ⇒ log cho thấy **`Now listening on: http://localhost:5100` + `Application started`** ⇒ **Web ĐÃ LÊN**; điểm đo `<Url>/health-status` **là của HOST**, Web **không phục vụ** nó ⇒ phép chờ **hỏi sai câu hỏi** ⇒ **hết hạn ở mọi lần chạy**. ⇒ Sửa lại **kết luận SAI** đã ghi ở §68/§79. **Bài học #14**: *kiểm ĐIỂM ĐO có tồn tại trước khi tin nó; phép chờ hết hạn ở MỌI lần chạy là dấu hiệu nghi ngờ ĐIỂM ĐO*. Đề xuất **(a)** thêm `/health-status` cho Web để **thống nhất một điểm đo** |
