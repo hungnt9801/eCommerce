@@ -926,3 +926,66 @@ sinh ra **kết luận tự tin nhưng sai**.
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.x | 15/10/2026 | *(agent, session GĐ1)* | **Kiểm chứng hồi quy Web**: cổng đăng nhập vẫn đúng — `GET /` chưa đăng nhập ⇒ URL cuối **`/Account/Login?ReturnUrl=%2F`**, thân là **form đăng nhập**, **không** rò nội dung quản trị; `[Authorize]` cấp class còn nguyên; **`fail: 0`**. 🚨 **Sửa lỗi KỸ THUẬT ĐO của tôi**: `Invoke-WebRequest` **tự đi theo redirect** ⇒ đọc `StatusCode` trần cho ra `200` và **suýt bị báo thành hồi quy**; ghi cách đo đúng (**`-MaximumRedirection 0`** hoặc kiểm **URL cuối** + **thân phản hồi**) |
+
+---
+
+## 48. **KIỂM CHỨNG `ReturnUrl` (BR-009) — KẾT QUẢ TRUNG THỰC: CHƯA KẾT LUẬN ĐƯỢC** (15/10/2026)
+
+### 48.1 Câu hỏi kiểm chứng
+
+**BR-009**: `ReturnUrl` **chỉ nội bộ**. Rủi ro nếu sai: **open redirect** (`ReturnUrl=https://evil.example` ⇒ sau khi đăng nhập,
+trình duyệt bị đưa sang **site của kẻ tấn công** — dùng để lừa tiếp hoặc đánh cắp phiên).
+
+### 48.2 🚨 **Lần đo 1 — DƯƠNG TÍNH GIẢ (tôi suýt kết luận sai)**
+
+| Phép kiểm (tìm chuỗi trong HTML) | Kết quả lần 1 | Diễn giải **SAI** của tôi |
+|---|---|---|
+| `ReturnUrl=/kho/ton` (nội bộ) | **không thấy** | *"nội bộ bị mất"* |
+| 🔥 `ReturnUrl=https://evil.example` | **THẤY** `evil.example` | *"có open redirect!"* |
+| `ReturnUrl=//evil.example` | **THẤY** | idem |
+| `ReturnUrl=javascript:…` | không thấy | — |
+
+📌 **Lần đo 2 (kiểm CẤU TRÚC) bác bỏ kết luận trên:**
+
+| Kiểm tra cấu trúc | Kết quả |
+|---|---|
+| Tìm `evil.example` **kèm 90 ký tự ngữ cảnh** trong HTML | **KHÔNG thấy** ✅ |
+| Các `input type="hidden"` của form đăng nhập | **chỉ 2**: `__RequestVerificationToken` và `LoginInput.RememberMe` — **KHÔNG có `ReturnUrl`** ✅ |
+| `ReturnUrl=/kho/ton` (nội bộ) **kèm ngữ cảnh** | **KHÔNG thấy** (⇒ lần 1 cũng là *"không thấy"* vì lý do **giống nhau**) |
+
+⇒ **Nguyên nhân dương tính giả:** phép kiểm lần 1 tìm **chuỗi trần** trong toàn bộ HTML — và HTML có chứa **token
+chống giả mạo ngẫu nhiên** (~1.000 ký tự base64, **khác nhau mỗi lần tải trang**). **Không** thể phân biệt
+*"giá trị được truyền tiếp"* với *"chuỗi tình cờ xuất hiện trong dữ liệu ngẫu nhiên"*.
+📌 **Bài học (nặng):** **tìm chuỗi trần trong HTML là phép kiểm KHÔNG ĐÁNG TIN** khi trang có **dữ liệu ngẫu nhiên**
+(token, nonce, `state`). Phải kiểm **cấu trúc** (thuộc tính/input nào chứa nó) hoặc **hành vi** (theo redirect thật).
+
+### 48.3 Kết luận **trung thực** — cái gì đã biết, cái gì **chưa**
+
+| Khẳng định | Trạng thái |
+|---|---|
+| Form đăng nhập **không** mang `ReturnUrl` (không có input ẩn, không echo) | ✅ **đã đo** |
+| Form đăng nhập POST về **chính trang đó** (`<form method="post">`, không `action`) | ✅ **đã đo** |
+| `GET /` chưa đăng nhập ⇒ `302` → `/Account/Login?ReturnUrl=%2F` (web-001 §47) | ✅ **đã đo** |
+| 🔥 **`ReturnUrl` NGOÀI có bị chấp nhận sau khi đăng nhập hay không** | 🚨 **CHƯA KIỂM CHỨNG** |
+| **BR-009** được thực thi **ở đâu** (callback? cookie `state`? allow-list?) | 🚨 **CHƯA XÁC ĐỊNH** |
+
+📌 **Vì sao không thể kết luận sớm:** `ReturnUrl` **không đi qua form** ⇒ nó phải được xử lý ở **bước khác** của state machine
+7 bước (`DangChuyenHuong` → `ChoDangNhap` → `DoiMaUyQuyen` → `PhienHopLe`). Muốn biết nó **có bị lọc** hay không thì
+**buộc phải đi hết luồng đăng nhập thật** rồi quan sát **đích cuối** — tức cần **harness đăng nhập** (§48.4).
+📌 **KHẲNG ĐỊNH AN TOÀN HIỆN TẠI:** **không** có bằng chứng về open redirect; **cũng KHÔNG** có bằng chứng rằng nó **đã được chặn**.
+⇒ Ghi là **câu hỏi mở có tính bảo mật**, **không** ghi là *"đã an toàn"*.
+
+### 48.4 Việc cần làm (khoá mọi kiểm chứng Web sau này)
+
+🚨 **Harness đăng nhập một lần** (đi hết state machine bằng script, giữ cookie jar):
+`GET /` → nhận `302` + cookie `state`/PKCE → `GET /Account/Login` (lấy `__RequestVerificationToken`) →
+`POST` thông tin đăng nhập → theo `code`/`state` → nhận cookie phiên → **gọi trang cần xác thực**.
+📌 **Vì sao đây là việc ƯU TIÊN:** **hiện không có cách nào** kiểm chứng *"một trang Web render dữ liệu thật"* —
+nên **mọi trang mặt tiền thêm vào sẽ KHÔNG kiểm chứng được**, trái **quy trình §2**. Đây là **nút thắt** của `WEB-001`,
+không phải tính năng phụ.
+
+### 48.5 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.y | 15/10/2026 | *(agent, session GĐ1)* | **Kiểm chứng `ReturnUrl` (BR-009)** — 🚨 **lần đo đầu là DƯƠNG TÍNH GIẢ**: tìm chuỗi trần trong HTML khớp **token chống giả mạo ngẫu nhiên** ⇒ suýt kết luận *"có open redirect"*. **Kiểm cấu trúc** bác bỏ: form đăng nhập **chỉ có 2 input ẩn** (`__RequestVerificationToken`, `LoginInput.RememberMe`) ⇒ **`ReturnUrl` KHÔNG đi qua form**. ⇒ **Kết luận trung thực: `BR-009` CHƯA kiểm chứng được** (cần **harness đăng nhập** đi hết 7 bước). Ghi **bài học**: *tìm chuỗi trần trong HTML không đáng tin khi trang có dữ liệu ngẫu nhiên* |
