@@ -96,6 +96,17 @@ public class PhanBoKenhDto
 
     /// <summary>Số lượng **đã trả** (từ các phiếu `CustomerReturn` của đơn thuộc kênh).</summary>
     public int DaTra { get; set; }
+
+    /// <summary>
+    /// 🚨 **`DangGiu` tách theo TỪNG KHO** — khoá = `WarehouseId`, giá trị = số đang giữ.
+    /// 📌 **Vì sao cần tách kho:** phân bổ là chuyện **theo kho** (hàng ở kho A **không** bù được đơn giao từ kho B).
+    /// Gộp mọi kho thành một số **che mất** tình trạng *"kho A hết phần trong khi kho B còn"* — đúng thứ `INV-003`
+    /// sinh ra để nhìn thấy.
+    /// ⚠️ **GIỚI HẠN ĐÃ BIẾT:** **CHỈ `DangGiu`** tách được theo kho — `DaBan`/`DaTra` **không**, vì `Order`/dòng đơn
+    /// **không lưu kho** (một đơn có thể giao từ nhiều kho). Đây là **lỗ hổng dữ liệu thật** của `INV-003`,
+    /// **không** phải chi tiết bỏ sót: sửa nó cần **thêm cột kho vào dòng đơn ⇒ migration + người quyết**.
+    /// </summary>
+    public Dictionary<string, int> DangGiuTheoKho { get; set; } = new();
 }
 
 public class DonHangDto

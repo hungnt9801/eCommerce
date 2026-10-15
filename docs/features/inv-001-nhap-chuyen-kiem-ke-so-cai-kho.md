@@ -2579,3 +2579,52 @@ quyết định **làm gì tiếp**. Bảng ghi *"chưa có gì"* trong khi th�
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v2.6 | 15/10/2026 | *(agent, session GĐ1)* | **Củng cố tài liệu**: sửa **lệch thật** — `handover` ghi `686 unit` (thực tế **693**) và **`§7.1` bỏ trống trạng thái** cho `SAL-001…004`/`INV-003`/`REC-001` dù **đã xong và kiểm chứng**. Nay mỗi dòng ghi **đã kiểm chứng gì + còn gì**. Kiểm chứng lại toàn bộ: build `0/0`, unit **693/693**, integration **38/38**, mermaid **197/0** |
+
+---
+
+## 42. `INV-003` — **BƯỚC 1b: `DangGiu` TÁCH THEO TỪNG KHO** (15/10/2026)
+
+### 42.1 Đã làm
+
+`PhanBoKenhDto.DangGiuTheoKho` (khoá = `WarehouseId`, giá trị = số đang giữ), suy ra từ
+`InvStockReservations.WarehouseId` ⇒ **không cần migration**.
+
+📌 **Vì sao phân bổ phải tách kho:** hàng ở **kho A không bù được** đơn giao từ **kho B**. Gộp mọi kho thành **một số**
+**che mất** tình trạng *"kho A hết phần trong khi kho B còn"* — đúng thứ `INV-003` sinh ra để **nhìn thấy**.
+
+⚠️ **GIỚI HẠN ĐÃ BIẾT — ghi rõ, không che:** **chỉ `DangGiu`** tách được theo kho. **`DaBan`/`DaTra` KHÔNG**, vì
+`Order`/dòng đơn **không lưu kho** (một đơn có thể giao từ nhiều kho). Đây là **lỗ hổng dữ liệu thật** của `INV-003`,
+**không** phải chi tiết bỏ sót: sửa cần **thêm cột kho vào dòng đơn ⇒ migration + người quyết**.
+
+### 42.2 ✅ BẰNG CHỨNG HTTP THẬT — **HAI PHA** của cùng một báo cáo
+
+| Thời điểm | `daBan` | `dangGiu` | `daTra` | `dangGiuTheoKho` |
+|---|---|---|---|---|
+| **Lúc ĐANG GIỮ** (trước xác nhận) | `0` ✅ | **`4`** ✅ | `0` ✅ | **`{3a2451e0-…: 4}`** ✅ — **đúng 1 kho**, khoá **khớp chính xác `kho.id`** của phép đo |
+| **Sau khi trả hết** | `4` ✅ | **`0`** ✅ | `4` ✅ | (không còn lượt `Held`) |
+
+📌 **Vì sao phải đo CẢ HAI PHA:** nếu chỉ đo lúc đang giữ thì **không phân biệt** được *"báo cáo đọc đúng trạng thái"*
+với *"báo cáo luôn hiện số đang giữ"*. Hai pha **ngược nhau** (`4 → 0`) chứng minh báo cáo **bám trạng thái thật**.
+📌 **Khoá `DangGiuTheoKho` khớp đúng GUID kho** (không phải chỉ "có một kho nào đó") ⇒ đã kiểm cả **định danh**, không chỉ số lượng.
+
+**Các bất biến cũ giữ nguyên trong cùng lượt chạy:** `0040` (trả vượt) ✅ · `0041` (**cả hai** hình dạng SKU lạ) ✅ ·
+sổ cái `CustomerReturn = 4` ✅ · **đối soát `0` lệch** ✅ · **`fail: 0`** ✅.
+
+- build `--no-incremental`: **0 lỗi / 0 cảnh báo** · unit **693/693** · integration **38/38** · **không đổi schema**
+
+⚠️ **Chưa khẳng định:** giá trị `dangGiuTheoKho` ở **pha sau khi trả hết** (kỳ vọng **rỗng**) **chưa** được assert
+trong phép đo — ghi nhận để không tuyên bố quá.
+
+### 42.3 Còn lại của `INV-003`
+
+| # | Việc | Ghi chú |
+|---|---|---|
+| 1 | **Hạn mức CỨNG theo kênh** | cần **bảng phân bổ** + migration ⇒ **cần người quyết** chính sách (chia theo SKU/kho/tỉ lệ? xử lý khi hết phần?) |
+| 2 | **Thêm `Kho` vào dòng đơn** | để `DaBan`/`DaTra` **cũng** tách được theo kho ⇒ **cần migration + người quyết** (đổi mô hình đơn hàng) |
+| 3 | **Phân trang** báo cáo | hiện **quét toàn bộ** đơn/dòng/giữ chỗ/phiếu trả — đủ cho GĐ1 |
+
+### 42.4 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v2.7 | 15/10/2026 | *(agent, session GĐ1)* | **`INV-003` bước 1b — `DangGiu` tách theo TỪNG KHO** (từ `InvStockReservations.WarehouseId`, **không migration**). **Kiểm chứng HAI PHA**: lúc đang giữ `dangGiu=4` + `dangGiuTheoKho={kho.id: 4}` (**khớp cả định danh kho**) · sau khi trả hết `dangGiu=0`, `daBan=4`, `daTra=4`; các bất biến cũ (`0040`/`0041`/đối soát `0`/`fail: 0`) giữ nguyên. ⚠️ Ghi rõ **giới hạn thật**: `DaBan`/`DaTra` **không** tách được theo kho (đơn không lưu kho) ⇒ cần migration + người quyết |

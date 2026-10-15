@@ -428,7 +428,14 @@ public class DonHangAppService : ApplicationService, IDonHangAppService
             {
                 foreach (var gc in giuCho)
                 {
-                    Lay(kenh, gc.Sku).DangGiu += gc.Quantity;
+                    var dongKenh = Lay(kenh, gc.Sku);
+                    dongKenh.DangGiu += gc.Quantity;
+
+                    // Tách theo kho — `WarehouseId` của **lượt giữ chỗ** (khác `Order`: đơn KHÔNG lưu kho).
+                    var khoaKho = gc.WarehouseId.ToString();
+                    dongKenh.DangGiuTheoKho[khoaKho] = dongKenh.DangGiuTheoKho.TryGetValue(khoaKho, out var daCo)
+                        ? daCo + gc.Quantity
+                        : gc.Quantity;
                 }
             }
 
