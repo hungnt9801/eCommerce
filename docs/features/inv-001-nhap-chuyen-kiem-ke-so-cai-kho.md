@@ -1560,3 +1560,61 @@ một mã **dễ bị hiểu nhầm** là *"hết hạn chứng thực"* hay *"s
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.9 | 15/10/2026 | *(agent, session GĐ1)* | **`SAL-003` — chốt giữ chỗ → xuất kho**: `ChotGiuChoService` (khoá theo `(tenant, kho, SKU)`, **hai bút toán** `Sale` + `ReservationRelease`) + endpoint `POST /stock-reservation/chot-theo-nguon/{referenceId}`. **Kiểm chứng HTTP 5 phép đo**: **`OnHand` và `Reserved` cùng giảm ⇒ `Available` không đổi** (`10/3/7` → **`7/0/7`**) · 4 bút toán sổ cái · giữ chỗ `Committed` · chốt lần hai **không** xuất thêm · **chốt quá hạn bị chặn (`0031`)** · **đối soát `0` lệch**. Ghi **bài học `405`** (tham số path vs query) |
+
+---
+
+## 24. `SAL-001` — **TẠO ĐƠN HÀNG TỪ CHECKOUT (SỐ TIỀN LẤY TỪ SỔ GIẢI TRÌNH)** (15/10/2026)
+
+### 24.1 Bất biến quan trọng nhất — và **vì sao KHÔNG tính lại giá**
+
+`DonHangAppService.TaoTuCheckoutAsync` (`POST /api/app/don-hang/tao-tu-checkout`) lấy số tiền **NGUYÊN VĂN** từ
+**sổ giải trình** (`PrcPriceCalculationRecords`) của `SAL-002` — **KHÔNG** chạy lại pipeline tính giá.
+
+📌 **Vì sao:** nếu tính lại, giữa hai thời điểm **giá có thể đã đổi** (bảng giá mới được kích hoạt, khuyến mãi hết hạn)
+⇒ **khách đã nhìn thấy một số, đơn ghi một số khác** ⇒ tranh chấp **không có cách giải quyết**, vì **cả hai bên đều
+"đúng" theo dữ liệu của mình**. Sổ giải trình là **bằng chứng** của con số đã báo khách.
+
+### 24.2 🚨 TRIPWIRE — lưới an toàn rẻ nhất cho loại lỗi tệ nhất của miền bán hàng
+
+Sau khi dựng đơn (`AddLine` với **đúng** `UnitPrice` đã làm tròn từ sổ → `SetDiscount` → `SetTotals` → `Recalculate()`),
+hệ thống **BẮT BUỘC** kiểm: `order.GrandTotal == tien.Total`; lệch ⇒ **NÉM, KHÔNG lưu đơn**.
+
+📌 Đây là **hai công thức độc lập** cho cùng một con số: `TinhTienDon` (pipeline giá, làm tròn **từng dòng** R1–R4) và
+`Order.Recalculate()` (tổng hợp ở tầng đơn). Nếu ai đó sửa **một trong hai** ⇒ tripwire **nổ ngay**, thay vì
+**âm thầm lệch vài đồng trên MỖI đơn** — loại lệch mà kế toán phát hiện sau hàng tháng và **không truy được nguyên nhân**.
+
+### 24.3 Điều kiện tiên quyết: **phải có hàng đang giữ**
+
+Đọc lượt giữ chỗ theo cùng nguồn `Checkout:{khoá}`; **không còn lượt `Held` nào ⇒ NÉM**.
+📌 *Đơn mà không có hàng là đơn không giao được* — tạo ra nó chỉ để rồi phải xin lỗi khách.
+
+### 24.4 ✅ BẰNG CHỨNG HTTP THẬT (Host + PostgreSQL 17)
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 0 | Checkout giữ 3 (`S1 = 100.000`, thuế 10%, giảm `7.777`, phí `3.000`) | tổng sổ giải trình = **`324.745`** (subtotal `300.000` · giảm `7.777` · thuế `29.522` · phí `3.000`) |
+| 1 | 🔥 **Tạo đơn từ checkout** | `200` · **`GrandTotal = 324.745`** **=** **`TotalTuSoGiaiTrinh = 324.745`** ⇒ **khớp từng đồng, chênh lệch `0`** ✅ · `Pending` · `VND` · dòng đơn `UnitPrice = 100.000` |
+| 2 | **DB + truy vết ngược** | `OrdOrders`: subtotal/discount/tax/shipping/grand **khớp** cột `tong_so_giai_trinh = 324.745` lấy từ **sổ giải trình** ✅ |
+| 3 | **Đối chứng**: checkout **chưa** giữ chỗ | `403` **`Pricing:0004`** (không có sổ giải trình) · **`0` đơn được tạo** ✅ |
+| 4 | **Tồn kho sau khi tạo đơn** (chưa xác nhận) | **`10/3/7`** · giữ chỗ **vẫn `Held`** ✅ — *tạo đơn **không** tự xuất kho; xuất kho là khi **xác nhận*** |
+| 5–6 | Dọn dẹp · log | 0 đơn / 0 dòng / 0 kho / 0 giữ chỗ / 0 sổ ✅ · **`fail: 0`** ✅ |
+
+- build `--no-incremental`: **0 lỗi / 0 cảnh báo** · unit **682/682** · integration **38/38** · mermaid 197/0 · **không đổi schema**
+
+📌 **Tripwire ĐÃ CHẠY và PASS** ⇒ hai công thức độc lập (`TinhTienDon` và `Order.Recalculate()`) **đồng ý với nhau**
+trên dữ liệu thật — một **đối chứng chéo** mà trước đây chưa từng có.
+
+### 24.5 Còn lại
+
+| # | Việc | Ghi chú |
+|---|---|---|
+| 1 | **`XacNhanAsync(orderId)`** — xác nhận đơn ⇒ gọi `ChotTheoNguonAsync` ⇒ xuất kho | hiện `ChotGiuChoService` đã có **endpoint** để kiểm chứng, **chưa** gọi từ luồng đơn |
+| 2 | **Lưu khoá checkout trên đơn** để xác nhận đơn biết chốt lượt giữ chỗ nào | hiện khoá chỉ có trong log; cần một cột (`ExternalOrderId`/cột riêng) — **cần migration** |
+| 3 | **Job nhả chỗ định kỳ** (`Timer.RunOnStart` — bài học `CHN-002`) | |
+| 4 | `DonHangAppService.GetAsync` hiện trả `TotalTuSoGiaiTrinh = GrandTotal` *(cùng một nguồn)* và `checkoutKey = "(xem log)"` | **thay thế thật** khi có cột ở #2 |
+
+### 24.6 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.0 | 15/10/2026 | *(agent, session GĐ1)* | **`SAL-001` — tạo đơn từ checkout**: `DonHangAppService.TaoTuCheckoutAsync` lấy số tiền **từ sổ giải trình** (**không** tính lại) + **tripwire** `GrandTotal == TotalTuSoGiaiTrinh` (NÉM nếu lệch, **không** lưu đơn) + điều kiện **phải có hàng đang giữ**. **Kiểm chứng HTTP**: đơn `324.745` **khớp từng đồng** với sổ (`324.745`, chênh lệch `0`) · truy vết ngược trong DB khớp · **đối chứng** checkout không có hàng ⇒ `0` đơn · tạo đơn **không** tự xuất kho (`10/3/7`, giữ chỗ vẫn `Held`). Ghi **4 việc còn lại** (§24.5) |
