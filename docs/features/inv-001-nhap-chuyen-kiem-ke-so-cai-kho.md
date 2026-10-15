@@ -2688,3 +2688,55 @@ nó tạo **cảm giác an toàn giả** (đúng bài học đã ghi ở Phụ l
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v2.8 | 15/10/2026 | *(agent, session GĐ1)* | **Khảo sát lại 7 worker**: rủi ro `UnitOfWork` của vòng 36 **KHÔNG được xác nhận** (5 worker chỉ dùng `IRepository<>`, và worker **cùng khuôn** đã **đo được là chạy tốt**) ⇒ **không sửa mù**. 🚨 **Sửa lỗi THẬT:** `ChannelSyncSupervisorWorker` + `EInvoiceResubmissionWorker` **thiếu `Timer.RunOnStart`** (đúng lỗi `CHN-002` đã ghi là *"đã sửa"* nhưng mã vẫn thiếu) ⇒ **trước/sau đo được `0 → 1`** cho supervisor, `fail: 0`. 🚨 **Phát hiện điểm yếu của CHÍNH cơ chế**: luật chỉ đòi log **tồn tại ở đâu đó** ⇒ **4/6 worker** có log **bên trong điều kiện** mà test **vẫn XANH** |
+
+---
+
+## 44. **7/7 WORKER NHÌN THẤY ĐƯỢC TRONG LOG** (15/10/2026) — *đóng §43.4 bước 2*
+
+### 44.1 Đã làm
+
+Thêm **log vô điều kiện ở ĐẦU `DoWorkAsync`** cho **4 worker** còn thiếu:
+
+| Worker | Trước | Sau |
+|---|---|---|
+| `TaxUnclassifiedSkusWorker` | log **bên trong điều kiện** | log ở **đầu mỗi lượt** ✅ |
+| `AdministrativeUnitSyncWorker` | idem | ✅ |
+| `CarrierAddressSyncWorker` | idem | ✅ |
+| `EInvoiceResubmissionWorker` | idem | ✅ |
+
+📌 Mỗi dòng log ghi **kèm lý do ngay tại chỗ** (vì sao **bắt buộc**) để lần sau **không ai xoá** — cùng cách đã dùng cho
+`ChannelSyncSupervisorWorker` (§43.2).
+
+### 44.2 ✅ BẰNG CHỨNG **TRƯỚC/SAU** (cùng phép đo: log khởi động Host ~15 giây)
+
+| Worker | Trước vòng 51–52 | **Sau vòng 52** |
+|---|---|---|
+| `TaxUnclassifiedSkusWorker` | 1 *(sau khi có việc)* | **3** ✅ |
+| `AdministrativeUnitSyncWorker` | **0** | **2** ✅ |
+| `CarrierAddressSyncWorker` | **0** | **2** ✅ |
+| `ChannelSyncSupervisorWorker` | **0** → 1 *(vòng 51)* | **1** ✅ |
+| `EInvoiceResubmissionWorker` | **0** | **2** ✅ |
+| `StockReservationExpiryWorker` | 1 | **1** ✅ |
+| `InventoryReconciliationWorker` | 2 | **2** ✅ |
+| **TỔNG** | **3/7 nhìn thấy được** | **🎯 7/7** ✅ |
+
+**`fail:` toàn log = `0`** ✅ ⇒ **mọi worker chạy và KHÔNG worker nào ném**.
+
+📌 **Vì sao con số này quan trọng hơn nó trông:** trước vòng 52, **4/7 job** chạy mà **không để lại dấu vết nào** khi
+không có việc ⇒ **không thể** trả lời câu hỏi *"job có chạy không?"* — và đó **chính là** câu hỏi đã làm tôi mất
+**2 vòng đo** ở vòng 35 (`inv-001` §26.3). Nay câu hỏi đó **luôn** trả lời được bằng **một dòng log**.
+
+### 44.3 Còn lại (đã ghi ở §43.4, **chưa** làm)
+
+🚨 **Siết LUẬT của cơ chế** `BackgroundWorkerCoCheTests`: hiện luật chỉ đòi `Logger.Log*` **tồn tại ở đâu đó trong tệp**
+⇒ nó **XANH** ngay cả khi log nằm **trong điều kiện** (đó là lý do **4 worker** lọt qua ở §43.4).
+**Việc cần làm:** buộc log phải là **câu lệnh ĐẦU TIÊN của `DoWorkAsync`** + **mutation test** chứng minh luật **nổ**
+(đúng kỷ luật đã áp ở Phụ lục C §C.4 và §29.3 — *một luật không có mutation test là một luật chưa được kiểm*).
+📌 Sau vòng 52, **dữ liệu đã sạch** (7/7 worker đều có log đầu) ⇒ siết luật **sẽ XANH ngay** — nhưng **vẫn phải**
+mutation test để chứng minh nó **có tác dụng**, chứ không phải *"xanh vì không kiểm gì"*.
+
+### 44.4 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v2.9 | 15/10/2026 | *(agent, session GĐ1)* | **Mọi job nay NHÌN THẤY ĐƯỢC**: thêm **log vô điều kiện ở đầu `DoWorkAsync`** cho 4 worker ⇒ **`3/7` → `7/7`** worker xuất hiện trong log khởi động, **`fail: 0`**. ⇒ câu hỏi *"job có chạy không?"* nay **luôn** trả lời được bằng một dòng log (trước đây **4/7 job** im lặng hoàn toàn). ⚠️ **Còn**: **siết LUẬT** của cơ chế (log phải là câu lệnh **đầu tiên**) + **mutation test** (§44.3) |

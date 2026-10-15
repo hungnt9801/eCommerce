@@ -56,6 +56,12 @@ public class TaxUnclassifiedSkusWorker : AsyncPeriodicBackgroundWorkerBase
 
     protected override async Task DoWorkAsync(PeriodicBackgroundWorkerContext workerContext)
     {
+        // 📌 **LOG VÔ ĐIỀU KIỆN Ở ĐẦU MỖI LƯỢT** — 🚨 **BẮT BUỘC cho mọi job** (`inv-001` §27.3 + §43.4):
+        // nếu chỉ log khi *"có việc"* thì *"im lặng"* **KHÔNG** phân biệt được *"job không chạy"* với
+        // *"job chạy mà không có việc"* ⇒ **mọi phép kiểm chứng job mất giá trị**. Dòng này được thêm vì
+        // **cơ chế** `BackgroundWorkerCoCheTests` (sau khi siết luật) phát hiện worker này **chưa** có nó.
+        Logger.LogInformation("JOB TaxUnclassifiedSkusWorker: bắt đầu một lượt (mốc {Moc}).", DateTime.UtcNow);
+
         var khoa = workerContext.ServiceProvider.GetRequiredService<IAbpDistributedLock>();
 
         await using var handle = await khoa.TryAcquireAsync(TenKhoa, TimeSpan.FromSeconds(5));
