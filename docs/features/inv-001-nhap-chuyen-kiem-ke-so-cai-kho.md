@@ -2792,3 +2792,51 @@ rồi **`git diff` xác nhận tệp đã về đúng trạng thái đã commit*
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v2.10 | 15/10/2026 | *(agent, session GĐ1)* | **Siết luật cơ chế worker**: từ *"log tồn tại ở đâu đó"* ⇒ **"log là CÂU LỆNH ĐẦU TIÊN của `DoWorkAsync`"** (không được log trong điều kiện). **Mutation test**: chuyển log xuống dưới một lệnh khác ⇒ luật **ĐỎ đúng tên + trích câu lệnh sai**; khôi phục ⇒ **694/694**. 🎯 **Và luật đã bắt được chính sự cố khôi phục của tôi** (tệp vẫn ở trạng thái đột biến dù lệnh khôi phục *báo thành công*) — **cùng họ lỗi với sự cố vòng 35, lần này bị chặn** |
+
+---
+
+## 46. **ĐÍNH CHÍNH §45.2 — LẦN "MUTATION" ĐẦU KHÔNG SẠCH, VÀ CODE ĐÃ ĐƯỢC SỬA THẬT** (15/10/2026)
+
+### 46.1 Điều tôi **nói sai** ở §45.2 và bằng chứng
+
+Ở §45.2 tôi ghi rằng mutation test *"chuyển dòng log xuống dưới `var distributedLock`"* đã làm luật **ĐỎ**.
+**Kiểm tra lại bằng `git diff` sau khi "khôi phục"** cho thấy tệp worker **CÓ DIFF so với bản đã commit** —
+nghĩa là **bản đã commit (HEAD) vốn đã đặt dòng log SAU `var distributedLock`** ⇒ **luật ĐỎ là do VI PHẠM CÓ SẴN**,
+**không phải** do đột biến của tôi.
+
+| Điều tôi đã viết (§45.2) | Sự thật (đo lại) |
+|---|---|
+| *"mutation làm luật ĐỎ"* | luật ĐỎ vì **`StockReservationExpiryWorker` vi phạm từ trước** (log **không** phải câu lệnh đầu tiên) |
+| *"khôi phục ⇒ 694/694"* | lệnh khôi phục **không** đưa tệp về HEAD; tôi phải **sửa tay** (đưa log lên đầu) rồi **`git diff` mới rỗng** |
+
+📌 **Nhưng sự thật này TỐT HƠN câu chuyện tôi kể:** luật mới **ngay lần chạy đầu đã tìm ra một vi phạm THẬT**
+trong mã đã commit — **không** phải test trang trí. Và commit `2ee945c` **có chứa sửa lỗi thật đó**
+(đưa `Logger.LogInformation("JOB NHẢ CHỖ: …")` lên **câu lệnh đầu tiên** của `DoWorkAsync`).
+
+### 46.2 ✅ **MUTATION TEST SẠCH** — chạy lại đúng cách
+
+| Bước | Việc | Kết quả |
+|---|---|---|
+| 1 | sao lưu tệp (nay đã **hợp lệ**) | ✅ |
+| 2 | **chuyển** dòng log xuống **dưới** `var distributedLock` | build ✅ |
+| 3 | chạy luật | **`Failed: 1`** 🚨 ⇒ luật **NỔ** đúng ✅ |
+| 4 | khôi phục từ file sao lưu | **`git diff` RỖNG** ✅ (lần này **kiểm** bằng `git diff`, không tin lời) |
+| 5 | chạy lại luật | **`Passed: 3`** ✅ |
+
+📌 **Vì sao phải ghi cả phần đính chính này:** một báo cáo *"mutation test đã chạy"* mà **thực ra** là *"luật bắt được
+lỗi có sẵn"* thì **không sai về kết luận** nhưng **sai về bằng chứng** — và **bằng chứng là thứ duy nhất** phân biệt
+được *"cơ chế có tác dụng"* với *"cơ chế tình cờ xanh"*. **Cùng nguyên tắc đã áp ở §39.4: kiểm lại dữ liệu, đừng tin
+thông báo của lệnh.**
+
+### 46.3 Bài học (bổ sung vào §39.4)
+
+5. 📌 **Sau khi "khôi phục", LUÔN `git diff`** — lệnh `Copy-Item`/script **báo thành công** mà tệp **không** về đúng
+   trạng thái (đã xảy ra **hai lần** trong dự án: vòng 35 đăng ký worker, vòng 53 khôi phục worker).
+6. 📌 **Mutation test chỉ có giá trị nếu trạng thái ĐẦU đã hợp lệ** — nếu tệp vốn vi phạm, luật ĐỎ **không** chứng minh
+   được gì về độ nhạy của luật.
+
+### 46.4 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v2.11 | 15/10/2026 | *(agent, session GĐ1)* | **ĐÍNH CHÍNH §45.2**: lần "mutation" đầu **không sạch** — luật ĐỎ là do **vi phạm CÓ SẴN** trong `StockReservationExpiryWorker` (log **không** phải câu lệnh đầu tiên của `DoWorkAsync`), và commit `2ee945c` **đã sửa lỗi thật đó**. **Mutation SẠCH** chạy lại: chuyển log xuống ⇒ **`Failed: 1`**; khôi phục ⇒ **`git diff` RỖNG** + luật **`Passed: 3`**. Thêm **2 bài học**: luôn `git diff` sau khi khôi phục · mutation test chỉ có giá trị khi **trạng thái đầu đã hợp lệ** |
