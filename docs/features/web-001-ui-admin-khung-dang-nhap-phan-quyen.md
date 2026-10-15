@@ -1249,3 +1249,56 @@ bị đọc nhầm thành vấn đề khác — xem `PRC-001` §19.7, `inv-001` 
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.t | 15/10/2026 | *(agent, session GĐ1)* | ✅ **Sửa §52.3 #2**: dọn dẹp bằng **tệp `.sql`** (không nháy lồng) ⇒ `item=0 bangGia=0 baoMat=true` + **0 tiến trình treo** ⇒ thành **chuẩn cho mọi probe**. 🔍 **Sửa §52.3 #1 — nguyên nhân gốc:** lời gọi API của tôi trả **`405`** (**route sai**), body là **trang lỗi `Byte[]`** ⇒ probe in rỗng; **không** phải lỗi parse JSON như tôi đoán. ⇒ *đối chứng chéo API↔trang* cho `/SanPham` **vẫn còn nợ**, nay đã biết **chính xác** cách làm nốt. Ghi **bài học #7**: *lời gọi API trả rỗng phải bị coi là ĐÁNG NGỜ — kiểm HTTP status trước khi kết luận về nội dung* (**lần thứ ba** dự án đọc nhầm lỗi sai-route thành vấn đề khác) |
+
+---
+
+## 54. ✅ **ĐỐI CHỨNG CHÉO API ↔ `/SanPham` ĐÃ HOÀN TẤT** (15/10/2026) — *đóng §52.3 #1 và §53.3 #1*
+
+### 54.1 Cách làm — dùng **route THẬT** lấy từ `route-check` (Phụ lục D)
+
+`GET /api/app/price-list/`**`items`**`/{priceListId}` — 🚨 **`items`** (số nhiều) cho **GET**, **`item`** cho **POST**.
+Đây **chính là** chỗ tôi gọi sai ở vòng 60–61 (dẫn tới `405` và kết luận nhầm *"lỗi parse JSON"*).
+
+### 54.2 🎯 Kết quả — **KHỚP HOÀN TOÀN hai đường độc lập**
+
+| Nguồn | `SP3SKU-A-…` | `SP3SKU-B-…` |
+|---|---|---|
+| **API** (`/items/`, `HTTP 200`, RAW JSON) | **`131000`** | **`262000`** |
+| **Trang `/SanPham`** (`HTTP 200`) | **`131000`** ✅ | **`262000`** ✅ |
+
+```
+RAW (API): [{"id":"…","priceListId":"…","sku":"SP3SKU-A-…","amount":131000.0000,"currencyCode":"VND"},
+            {"id":"…","sku":"SP3SKU-B-…","amount":262…}]
+ĐỐI CHỨNG CHÉO: sku=A API='131000' TRANG='131000' KHỚP=True
+                sku=B API='262000' TRANG='262000' KHỚP=True
+                => ✅ ĐỐI CHỨNG CHÉO KHỚP HOÀN TOÀN
+```
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | API qua **route đúng** | **`HTTP 200`** · **RAW JSON in ra được** ✅ *(khắc phục đúng bài học §53.2: in status + RAW trước khi parse)* |
+| 2 | 🔥 **Đối chứng chéo hai đường độc lập** | **khớp cả hai dòng** ✅ |
+| 3 | Dọn dẹp (**tệp `.sql`** — chuẩn §53.1) | `item=0 bangGia=0 baoMat=true don=0 ton=0` ✅ |
+| 4 | `fail:` — **Web** và **Host** | **`0`** · **`0`** ✅ |
+| 5 | Tiến trình `dotnet` treo | **`0`** ✅ |
+
+📌 **Vì sao hai giá được chọn "lạ" (`131.000` / `262.000`):** giá trị **khác nhau và không tròn** ⇒ nếu trang
+**hoán đổi hai dòng**, **lặp một dòng**, hoặc **làm tròn sai**, phép so **sẽ lệch** — cùng nguyên tắc đã dùng ở §52.2.
+
+### 54.3 Trạng thái `WEB-001`
+
+| # | Hạng mục | Trạng thái |
+|---|---|---|
+| 1 | Khung đăng nhập + phân quyền (`BR-009` ✅) | ✅ |
+| 2 | **Harness đăng nhập** | ✅ §49 |
+| 3 | `/PhanBo` — ca rỗng · **ca có dữ liệu (khớp API)** | ✅ §50 · §51 |
+| 4 | `/SanPham` — ca rỗng · ca có dữ liệu · **đối chứng chéo API** | ✅ §52 · **§54** |
+| 5 | **Cơ chế chống lỗi "sai route"** (`tools/route-check.ps1`) | ✅ **Phụ lục D** |
+| 6 | **Chuẩn dọn dẹp probe** (tệp `.sql` + kiểm tiến trình treo) | ✅ §53.1 |
+| 7 | **Giỏ hàng → đặt hàng trên Web** | ⏳ **chưa làm** — mảnh cuối |
+
+### 54.4 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.s | 15/10/2026 | *(agent, session GĐ1)* | ✅ **Đóng §52.3 #1**: **đối chứng chéo API ↔ `/SanPham`** dùng **route đúng** `GET /api/app/price-list/items/{id}` ⇒ API (`131.000`/`262.000`) **khớp hoàn toàn** trang; RAW JSON in được (khắc phục bài học §53.2); dọn dẹp bằng **tệp `.sql`** (chuẩn §53.1) ⇒ DB sạch, cờ bảo mật khôi phục, **0 tiến trình treo**, **`fail: 0`** ở cả hai tiến trình. ⇒ **`WEB-001` nay có 2 trang mặt tiền đều đã kiểm chứng hai chiều**; việc còn lại là **giỏ hàng → đặt hàng** |
