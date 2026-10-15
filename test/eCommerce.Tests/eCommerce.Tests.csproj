@@ -48,4 +48,10 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- 📌 Dữ liệu cho test `RangBuocDbChuaAnhXaTests` (danh sách trắng có lý do). Copy sang bin để test
+         đọc được kể cả khi chạy từ thư mục build. -->
+    <None Update="Data\RangBuocChuaAnhXa.txt" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

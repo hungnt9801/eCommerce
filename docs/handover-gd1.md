@@ -21,7 +21,7 @@
 | Điểm phát metric | **7/12** |
 
 > 📌 **CẬP NHẬT 15/10/2026 (lượt GĐ1 thứ 6 — `CAT-001` xong domain+API+ETO):** các số ở bảng trên là
-> **mốc bàn giao**. Sau các lượt GĐ1: **Test = 682 unit + 38 integration** · **2 tiến trình**
+> **mốc bàn giao**. Sau các lượt GĐ1: **Test = 686 unit + 38 integration** · **2 tiến trình**
 > (Host **5000** API/auth · Web **5100** UI) · build **0 lỗi/0 cảnh báo** · **lỗi #22 đã sửa** (fail-closed
 > **và** nơi nhận thật) · **`F-403` đã sửa** · **§7.0 xong #2/#5/#7** · **DB: 20 index `NULLS NOT DISTINCT`**
 > · **`CAT-001` xong** (domain + 11 route API + 2 ETO) · 🚨 **log khởi động nay 0 Error** (phân loại
@@ -297,3 +297,62 @@ Mỗi khi thêm unique index/`CHECK` **có ý nghĩa nghiệp vụ**, **phải**
 Nếu quên: ca đó rơi về mã chung `eCommerce:Db:0001` — **vẫn tốt hơn `500`**, nhưng **kém hữu ích cho CSKH**.
 📌 Test `So_rang_buoc_da_anh_xa_KHONG_giam_di` chốt **sàn 14** ràng buộc ⇒ sửa chữa nhầm làm **xoá** dòng ánh xạ sẽ **ĐỎ**,
 thay vì âm thầm để các ca đó quay lại `500`.
+
+---
+
+## PHỤ LỤC C — **CƠ CHẾ THAY VÌ QUY TẮC: ràng buộc DB phải được ÁNH XẠ hoặc KHAI BÁO có LÝ DO** (15/10/2026)
+
+### C.1 Vì sao cần (bài học đã trả giá)
+
+**Phụ lục B §B.5** đã **ghi quy tắc**: *"thêm unique index/`CHECK` mới ⇒ **phải** thêm một dòng vào `TheoRangBuoc`"*.
+**Và quy tắc đó đã bị vi phạm ngay trong vòng làm ra nó:** ràng buộc `IX_OrdOrders_TenantId_CheckoutIdempotencyKey`
+(vòng 33) trả **mã chung** `eCommerce:Db:0001` thay vì mã nói rõ *"đã có đơn cho lần checkout này"*
+(`inv-001` **§25.3**).
+⇒ **Ghi quy tắc KHÔNG ĐỦ — cần CƠ CHẾ chặn ở CI.**
+
+### C.2 Cơ chế
+
+`RangBuocDbChuaAnhXaTests` (unit test) đọc **`test/eCommerce.IntegrationTests/Assets/schema.sql`** — **nguồn sự thật
+của DB** (sinh từ migration) — lấy ra **mọi `UNIQUE INDEX` (trừ `PK_`)** + **mọi `CHECK` có tên** rồi đối chiếu:
+
+| Nhóm | Ý nghĩa | Kết quả |
+|---|---|---|
+| Có trong `ViPhamRangBuocDb.CacRangBuocDaAnhXa` | **ĐÃ MAP** ⇒ client nhận **mã nghiệp vụ** | ✅ |
+| Có trong **`test/eCommerce.Tests/Data/RangBuocChuaAnhXa.txt`** (`<TÊN>\|<LÝ DO>`) | **CHƯA MAP NHƯNG CÓ LÝ DO** | ✅ |
+| **Không** thuộc hai nhóm trên | 🚨 người thêm ràng buộc **phải chọn**: map, hoặc khai báo lý do | **ĐỎ** |
+
+**Quy mô hiện tại:** **17** ràng buộc **đã map** · **50** ràng buộc trong **danh sách trắng có lý do**.
+
+### C.3 Ba test phụ chống "danh sách trắng thành bãi rác"
+
+| Test | Chặn điều gì |
+|---|---|
+| `Danh_sach_trang_KHONG_duoc_chua_rang_buoc_DA_ANH_XA` | **hai nguồn sự thật** (vừa map vừa khai báo) ⇒ người sau không biết cái nào đúng (`XC-003` F2) |
+| `Danh_sach_trang_moi_dong_PHAI_co_ly_do` | **khai báo rỗng** = chỉ **che** ràng buộc đi, đúng thứ cơ chế này ngăn |
+| `Danh_sach_trang_KHONG_duoc_chua_ten_LA` | **dòng chết** (ràng buộc đã đổi tên/bị xoá) làm danh sách phình ra và **che mất** việc cần map lại |
+
+📌 **Vì sao đọc `schema.sql` mà không đọc DB sống:** test đơn vị **không** có PostgreSQL; `schema.sql` được **sinh lại
+sau mỗi migration** (đã nằm trong quy trình). ⚠️ Nếu quên sinh lại sau khi thêm ràng buộc thì test này **không thấy**
+ràng buộc mới — **nhưng** `PostgreSqlSchemaTests` (integration) sẽ **ĐỎ** vì đếm index `NULLS NOT DISTINCT` lệch
+⇒ **vẫn bị chặn** ở tầng khác.
+
+### C.4 ✅ BẰNG CHỨNG — **mutation test** (chứng minh cơ chế THẬT SỰ nổ, không chỉ xanh)
+
+| Bước | Kết quả |
+|---|---|
+| 1. Sao lưu danh sách trắng (`Copy-Item`, **không** dùng `git checkout` — bài học vòng 7) | ✅ |
+| 2. **Xoá một dòng thật** (`IX_OrdOrders_TenantId_Number\|…`) | |
+| 3. Chạy test | 🚨 **ĐỎ** — thông điệp chỉ **đúng** tên ràng buộc bị bỏ: `IX_OrdOrders_TenantId_Number` ✅ |
+| 4. **Khôi phục từ file sao lưu** | ✅ |
+| 5. Chạy lại toàn bộ | unit **686/686** · integration **38/38** · build **0 lỗi / 0 cảnh báo** ✅ |
+
+📌 **Vì sao mutation test là bằng chứng bắt buộc ở đây:** một test **luôn xanh** (vì quét hỏng, sai đường dẫn, hoặc
+danh sách trắng quá rộng) sẽ **tệ hơn không có test** — nó tạo **cảm giác an toàn giả**. Bước 3 chứng minh phép quét
+**thật sự đọc được** ràng buộc và **thật sự đối chiếu**.
+
+### C.5 Việc còn lại
+
+| # | Việc |
+|---|---|
+| 1 | **Dịch dần danh sách trắng thành ánh xạ** khi mỗi miền (`CAT`/`Ord`/`Pay`/`Chn`…) có đường ghi thật: khi đó lỗi trùng **phải** trả mã nghiệp vụ |
+| 2 | **Job định kỳ** cập nhật/thu gọn danh sách trắng (ràng buộc của GĐ0 sẽ dần được dùng tới) |

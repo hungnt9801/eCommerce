@@ -1,0 +1,66 @@
+# RÀNG BUỘC CỦA DB **CHƯA ĐƯỢC ÁNH XẠ** SANG MÃ NGHIỆP VỤ — kèm LÝ DO.
+#
+# 🚨 TỆP NÀY LÀ **DANH SÁCH TRẮNG CÓ LÝ DO**, KHÔNG PHẢI "nơi bỏ qua cho xong".
+# Định dạng: <TÊN_RÀNG_BUỘC>|<LÝ DO>
+#
+# 📌 CƠ CHẾ: test `RangBuocDbChuaAnhXaTests` đọc `Assets/schema.sql` (NGUỒN SỰ THẬT của DB, sinh từ
+# migration) và so với `ViPhamRangBuocDb.CacRangBuocDaAnhXa`. Ràng buộc nào KHÔNG nằm trong
+# `ViPhamRangBuocDb` VÀ KHÔNG nằm trong tệp này ⇒ **TEST ĐỎ**.
+# ⇒ Thêm ràng buộc mới thì BẮT BUỘC chọn một trong hai: (a) thêm dòng ánh xạ (nếu nó chặn một hành vi
+#   HỢP LỆ VỀ NGHIỆP VỤ — ví dụ retry/double-click), hoặc (b) thêm vào tệp này KÈM LÝ DO.
+#
+# 📌 VÌ SAO CẦN CƠ CHẾ NÀY (không chỉ quy tắc): quy tắc "thêm ràng buộc ⇒ thêm ánh xạ" ĐÃ ĐƯỢC GHI
+# ở `handover` Phụ lục B §B.5 — và **vẫn bị vi phạm ngay trong vòng làm ra nó** (`inv-001` §25.3:
+# ràng buộc `IX_OrdOrders_TenantId_CheckoutIdempotencyKey` trả mã chung `eCommerce:Db:0001`).
+# Ghi quy tắc KHÔNG ĐỦ; cần cơ chế chặn ở CI.
+
+IX_AbpFeatureGroups_Name|Bảng hạ tầng của ABP (framework): trùng khoá do framework quản lý, KHÔNG phải lỗi nghiệp vụ của hệ thống
+IX_AbpFeatures_Name|Bảng hạ tầng của ABP (framework): trùng khoá do framework quản lý, KHÔNG phải lỗi nghiệp vụ của hệ thống
+IX_AbpFeatureValues_Name_ProviderName_ProviderKey|Bảng hạ tầng của ABP (framework): trùng khoá do framework quản lý, KHÔNG phải lỗi nghiệp vụ của hệ thống
+IX_AbpPermissionGrants_TenantId_Name_ProviderName_ProviderKey|Bảng hạ tầng của ABP (framework): trùng khoá do framework quản lý, KHÔNG phải lỗi nghiệp vụ của hệ thống
+IX_AbpPermissionGroups_Name|Bảng hạ tầng của ABP (framework): trùng khoá do framework quản lý, KHÔNG phải lỗi nghiệp vụ của hệ thống
+IX_AbpPermissions_ResourceName_Name|Bảng hạ tầng của ABP (framework): trùng khoá do framework quản lý, KHÔNG phải lỗi nghiệp vụ của hệ thống
+IX_AbpSettingDefinitions_Name|Bảng hạ tầng của ABP (framework): trùng khoá do framework quản lý, KHÔNG phải lỗi nghiệp vụ của hệ thống
+IX_AbpSettings_Name_ProviderName_ProviderKey|Bảng hạ tầng của ABP (framework): trùng khoá do framework quản lý, KHÔNG phải lỗi nghiệp vụ của hệ thống
+IX_AddrAdministrativeUnits_TenantId_SchemaVersion_Level_Code|GĐ0 — địa chỉ: GĐ1 CHƯA có đường ghi nào chạm tới ⇒ chưa cần mã nghiệp vụ (khi có đường ghi thì PHẢI map)
+IX_AddrCarrierMappings_TenantId_CarrierCode_CarrierAddressCode|GĐ0 — địa chỉ: GĐ1 CHƯA có đường ghi nào chạm tới ⇒ chưa cần mã nghiệp vụ (khi có đường ghi thì PHẢI map)
+IX_CatAttributes_TenantId_Code|GĐ0/CAT — catalog: đã có tiền kiểm ở tầng app cho các ca thường; CHƯA có đường ghi nào trả về mã riêng
+IX_CatAttrValues_TenantId_AttributeId_Value|GĐ0/CAT — catalog: đã có tiền kiểm ở tầng app cho các ca thường; CHƯA có đường ghi nào trả về mã riêng
+IX_CatCategories_TenantId_Code|GĐ0/CAT — catalog: đã có tiền kiểm ở tầng app cho các ca thường; CHƯA có đường ghi nào trả về mã riêng
+IX_CatProdAttrSel_TenantId_ProductId_AttributeId_ValueId|GĐ0/CAT — catalog: đã có tiền kiểm ở tầng app cho các ca thường; CHƯA có đường ghi nào trả về mã riêng
+IX_CatProdCats_TenantId_ProductId_CategoryId|GĐ0/CAT — catalog: đã có tiền kiểm ở tầng app cho các ca thường; CHƯA có đường ghi nào trả về mã riêng
+IX_CatProdCats_TenantId_ProductId_ChiMotChinh|GĐ0/CAT — catalog: đã có tiền kiểm ở tầng app cho các ca thường; CHƯA có đường ghi nào trả về mã riêng
+IX_CatProducts_TenantId_Code|GĐ0/CAT — catalog: đã có tiền kiểm ở tầng app cho các ca thường; CHƯA có đường ghi nào trả về mã riêng
+IX_CatProductVariants_TenantId_Sku|GĐ0/CAT — catalog: đã có tiền kiểm ở tầng app cho các ca thường; CHƯA có đường ghi nào trả về mã riêng
+IX_CatProdVarAttr_TenantId_VariantId_AttributeId|GĐ0/CAT — catalog: đã có tiền kiểm ở tầng app cho các ca thường; CHƯA có đường ghi nào trả về mã riêng
+IX_CatProdVariants_TenantId_ProductId_AttributeHash|GĐ0/CAT — catalog: đã có tiền kiểm ở tầng app cho các ca thường; CHƯA có đường ghi nào trả về mã riêng
+IX_ChnChannelListings_TenantId_ChannelShopId_ProductVariantId|GĐ0 — kênh: chưa có đường ghi GĐ1 chạm tới
+IX_ChnChannels_Code|GĐ0 — kênh: chưa có đường ghi GĐ1 chạm tới
+IX_ChnChannelShops_TenantId_ChannelCode_ExternalShopId|GĐ0 — kênh: chưa có đường ghi GĐ1 chạm tới
+IX_EInvInvoices_TenantId_HoaDonBiDieuChinhId|GĐ0 — hoá đơn điện tử: chưa có đường ghi GĐ1 chạm tới
+IX_EInvInvoices_TenantId_HoaDonBiThayTheId|GĐ0 — hoá đơn điện tử: chưa có đường ghi GĐ1 chạm tới
+IX_EInvInvoices_TenantId_KyHieuMauSo_SoHoaDon|GĐ0 — hoá đơn điện tử: chưa có đường ghi GĐ1 chạm tới
+IX_InvItems_TenantId_WarehouseId_Sku|CHƯA PHÂN LOẠI — cần người xem: map hay thêm lý do
+IX_MsgIdempotencyRecords_TenantId_Scope_KeyValue|XC-002 — hạ tầng outbox/inbox: đã có xử lý riêng ở tầng messaging
+IX_OrdOrderLines_OrderId_ExternalLineId|Đơn hàng: đã có tiền kiểm ở tầng app (`DonHangAppService`) cho ca thường
+IX_OrdOrders_TenantId_ChannelCode_ExternalOrderId|Đơn hàng: đã có tiền kiểm ở tầng app (`DonHangAppService`) cho ca thường
+IX_OrdOrders_TenantId_Number|Đơn hàng: đã có tiền kiểm ở tầng app (`DonHangAppService`) cho ca thường
+IX_PayTransactions_TenantId_ProviderCode_IdempotencyKey|PaymentHub — thanh toán: chưa có đường ghi GĐ1 chạm tới
+IX_PayTransactions_TenantId_ProviderCode_MerchantReference|PaymentHub — thanh toán: chưa có đường ghi GĐ1 chạm tới
+IX_PrcChannelPrices_TenantId_Kenh_Shop_Sku_MinQty|CHƯA PHÂN LOẠI — cần người xem: map hay thêm lý do
+IX_PrcPriceListItems_TenantId_PriceListId_Sku|CHƯA PHÂN LOẠI — cần người xem: map hay thêm lý do
+IX_SalMktIntakes_TenantId_ChannelCode_ExternalOrderId|Đơn hàng: đã có tiền kiểm ở tầng app (`DonHangAppService`) cho ca thường
+IX_SigCertificates_TenantId_SoSerial|GĐ0/CAT — catalog: đã có tiền kiểm ở tầng app cho các ca thường; CHƯA có đường ghi nào trả về mã riêng
+IX_SigSigningRequests_TenantId_MaTaiLieu|Signing — chữ ký số: chưa có đường ghi GĐ1 chạm tới
+IX_TaxRateSchedules_TenantId_Code|XC-006 — thuế: đã có tiền kiểm ở tầng app
+CK_AddrAdministrativeUnits_SchemaVersion|CHECK của GĐ0 ngoài miền KHO: chưa có đường ghi GĐ1 chạm tới
+CK_AddrCarrierMappings_Status|CHECK của GĐ0 ngoài miền KHO: chưa có đường ghi GĐ1 chạm tới
+CK_CatCategories_Level_Khoang|CHECK của GĐ0 ngoài miền KHO: chưa có đường ghi GĐ1 chạm tới
+CK_CatCategories_Path_DinhDang|CHECK của GĐ0 ngoài miền KHO: chưa có đường ghi GĐ1 chạm tới
+CK_EInvInvoices_PhaiKyTruocKhiPhatHanh|CHECK của GĐ0 ngoài miền KHO: chưa có đường ghi GĐ1 chạm tới
+CK_MsgIdempotencyRecords_Attempts|CHECK của GĐ0 ngoài miền KHO: chưa có đường ghi GĐ1 chạm tới
+CK_SigCertificates_HieuLuc|CHECK của GĐ0 ngoài miền KHO: chưa có đường ghi GĐ1 chạm tới
+CK_SigSigningRequests_DaKyPhaiCoDuBangChung|CHECK của GĐ0 ngoài miền KHO: chưa có đường ghi GĐ1 chạm tới
+CK_TaxClassifications_EffectiveRange|CHECK của GĐ0 ngoài miền KHO: chưa có đường ghi GĐ1 chạm tới
+CK_TaxRateSchedules_EffectiveRange|CHECK của GĐ0 ngoài miền KHO: chưa có đường ghi GĐ1 chạm tới
+CK_TaxRateSchedules_Rate|CHECK của GĐ0 ngoài miền KHO: chưa có đường ghi GĐ1 chạm tới
