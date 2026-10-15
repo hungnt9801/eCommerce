@@ -2307,3 +2307,49 @@ Commit `c4126bb` có **thông điệp khẳng định** *"da dang nhap + don kho
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.0-d | 15/10/2026 | *(agent, session GĐ1)* | 🚨 **ĐÍNH CHÍNH commit `c4126bb`**: thông điệp khẳng định `404`/route+auth+DI đã chạy — **SAI**; phép đo thật trả **`302`** vì **phiên đăng nhập không có hiệu lực** (nghi thiếu `ShouldChangePasswordOnNextLogin = false`). `--amend` + ghi §76. **Quy tắc mới:** **`git commit` phải nằm TRONG `if (đạt)`** |
+
+---
+
+## 77. 🎉 **`/DonHang` — ĐƯỜNG CÓ DỮ LIỆU ĐÃ CHẠY: NÚT "XÁC NHẬN" XUẤT KHO QUA UI** (15/10/2026) — *đóng §76.3 #3 và #4*
+
+### 77.1 Nguyên nhân vòng 91 đã được xác nhận **bằng đo**
+
+| Phép đo | Kết quả |
+|---|---|
+| **Cờ bảo mật TRƯỚC khi đăng nhập** (bước 0 mới thêm) | **`f`** ✅ |
+| `POST` đăng nhập | **`302`** → **`/DatHang`** ✅ *(không còn chuyển sang màn hình đổi mật khẩu)* |
+
+⇒ 🎯 **Xác nhận đúng giả thuyết §76.1:** vòng 91 thất bại vì **quên đặt `ShouldChangePasswordOnNextLogin = false`**
+⇒ phiên **không** được xác thực ⇒ `302` thay vì `200`. **Không** phải lỗi của `/DonHang`.
+
+### 77.2 🎉 Kết quả — **đường có dữ liệu chạy đúng**
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | Đặt hàng qua UI (4 đơn vị, giá `100.000`, thuế 10%) | `200` · **`WEB-WEB-d2b50c249efe44af`** · `Reserved=4` ✅ |
+| 2 | 🔥 **`GET /DonHang/ChiTiet/{id}`** (đã đăng nhập) | **`200`** ✅ · **`trangThai='Pending'`** ✅ · **`nutXn=True`** ✅ · **`nutHuy=True`** ✅ · **`tổng='440,000'`** ✅ |
+| 3 | **Token chống giả mạo trên trang** | **`198` ký tự** ✅ *(do máy chủ phát — đúng `README-probe.md` **Phần E**)* |
+| 4 | 🔥 **`POST /DonHang/XacNhan/{id}`** | **`302`** → `/DonHang/ChiTiet/{id}` ✅ *(không còn `400` như vòng 86)* |
+| 5 | 🔥 **`GET` lại** | **`trangThai='Confirmed'`** ✅ |
+| 6 | 🔥 **Tồn kho** (bất biến `SAL-003`) | **`OnHand=6` · `Reserved=0` · `Available=6`** ✅ — từ `10/4/6` ⇒ **`OnHand` VÀ `Reserved` cùng giảm `4`**, **`Available` KHÔNG đổi`** |
+| 7 | Dọn dẹp · tiến trình treo | `don=0 ton=0 donvi=0 gc=0 sc=0 baoMat=true` ✅ · **`0`** ✅ |
+
+📌 **Vì sao #6 là chốt cuối:** bấm nút **chỉ đổi `Status`** thì *"trông như đã xác nhận"* mà **hàng vẫn nằm trong kho** —
+tức **bán ảo**. Chỉ khi `OnHand` **và** `Reserved` cùng giảm mà `Available` **không đổi** thì mới chứng minh
+**đã xuất kho thật**; và đây là **lần đầu** chứng minh điều đó **qua UI** thay vì qua API.
+
+### 77.3 ⚠️ **CHƯA đo — ghi rõ**
+
+| # | Việc | Vì sao chưa |
+|---|---|---|
+| 1 | 🔥 **Nút "Huỷ đơn"** (`POST /DonHang/Huy`) | probe **dừng ở bước [5]** do **lỗi probe của tôi**: tôi gọi **API tạo đơn thứ hai** trong khi **Host đã bị dừng** ở bước [2] ⇒ `Invoke-WebRequest` thất bại ⇒ **không** tới được phần đo nút Huỷ |
+| 2 | Nút **Trả hàng** | ⏳ chưa làm (cần ô nhập kho) |
+
+📌 **Đánh giá:** `POST /DonHang/Huy` dùng **cùng cơ chế** vừa chứng minh (token 198 ký tự · `[Authorize]` · cùng app service
+`HuyDonAsync` **đã đo** chạy đúng trên đơn `WEB-…` ở **§69**) ⇒ **rủi ro thấp**, **nhưng** theo kỷ luật dự án: **"chưa đo" vẫn là "chưa đo"**.
+
+### 77.4 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.0-e | 15/10/2026 | *(agent, session GĐ1)* | 🎉 **`/DonHang` đường có dữ liệu ĐÃ CHẠY**: xác nhận **nguyên nhân vòng 91** (cờ bảo mật — đo được `f` ⇒ đăng nhập `302 → /DatHang`); **`GET` ⇒ `200`** + `Pending` + **hai nút** + `440.000` + **token 198 ký tự**; **`POST /DonHang/XacNhan` ⇒ `302`** ⇒ **`Confirmed`**; 🔥 **tồn kho `10/4/6` ⇒ `6/0/6`** (*`OnHand` & `Reserved` cùng giảm, `Available` không đổi* — **lần đầu chứng minh QUA UI**); dọn sạch; **`fail: 0`**. ⚠️ **Nút "Huỷ" CHƯA đo** — probe dừng vì **tôi gọi API khi Host đã tắt** (§77.3) |
