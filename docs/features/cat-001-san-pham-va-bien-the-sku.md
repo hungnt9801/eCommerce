@@ -811,3 +811,67 @@ EF sinh ra thứ tự `DROP COLUMN IsPublished` → `ADD COLUMN Status DEFAULT 0
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.2 | 15/10/2026 | *(agent, session GĐ1)* | **Lõi domain**: `ProductStatus` + máy trạng thái có guard (D5) · mã bất biến sau publish (D2) · SKU hoá/kiểm tra (D11) · giá ≥ 0 · permission `View`/`Publish` (D10) · mã lỗi Catalog · khoá `catalog:sku:` (D7) · **FK `Cascade` → `Restrict`** (F7) · migration **sửa tay để CHUYỂN dữ liệu** thay vì mất trạng thái publish. **+23 unit · +3 integration**. Ghi rõ việc còn lại ở **16.3** |
+
+---
+
+## 17. TRẠNG THÁI TRIỂN KHAI (tiếp) — **APP SERVICE + API ĐÃ CHẠY THẬT** (15/10/2026)
+
+> Đóng **§16.3 #1** (`F11`). Lượt trước xong **lõi domain**; lượt này nối ra **API** và **kiểm chứng
+> bằng HTTP thật** (khả thi vì `F-403` của `XC-004` đã sửa).
+
+### 17.1 Đã thêm
+
+| Thành phần | Tệp | Nội dung |
+|---|---|---|
+| DTO | `src/eCommerce.Application.Contracts/Catalog/ProductDtos.cs` | `ProductDto`, `ProductVariantDto`, `GetProductsInput` (lọc `Keyword`/`Status`, phân trang), `CreateProductDto`, **`UpdateProductDto` KHÔNG có `Code`** (D2), `CreateVariantDto`, `UpdateVariantPriceDto` |
+| Hợp đồng | `…/Catalog/IProductAppService.cs` | 11 method; `[Authorize]` cấp class + quyền riêng theo method |
+| Hiện thực | `src/eCommerce.Application/Catalog/ProductAppService.cs` | **Map tay** (không AutoMapper — quy ước #12) |
+| Giới hạn dùng chung | `eCommerceConsts.CatalogLimits` | ⚠️ `Application.Contracts` **không** được tham chiếu `Domain` ⇒ hằng số độ dài phải nằm ở `Domain.Shared`, **không** chép lại số vào DTO |
+| `AutoInclude` | `eCommerceDbContext` | Bắt buộc để guard `Publish()` **thấy** biến thể của chính aggregate — xem ghi chú ở mapping |
+
+### 17.2 ✅ BẰNG CHỨNG HTTP THẬT (Host + PostgreSQL 17 thật, token `admin`)
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | 8 route thật (đọc từ `swagger.json`) | `/api/app/product` · `/{id}` · `/by-code` · `/variant/{productId}` · `/variant-price` · `/{id}/publish` · `/{id}/unpublish` · `/{id}/archive` |
+| 2 | Tạo sản phẩm | `200` · `status=Draft` |
+| 3 | **Publish khi CHƯA có biến thể** | lỗi nghiệp vụ **`eCommerce:Catalog:0003`** ✅ (guard **D9** chạy thật) |
+| 4 | Thêm biến thể | `200` · giá `123456.789` (khớp `numeric(18,4)`) |
+| 5 | **Thêm TRÙNG SKU ở sản phẩm KHÁC** | lỗi **`eCommerce:Catalog:0002`** ✅ (chống trùng **toàn tenant** — **D3/F6**) |
+| 6 | Publish khi **đã** có biến thể | **`204`** |
+| 7 | Đọc theo `Id` / theo `Code` | `200` · `status=Published` · `isPublished=true` · `soBienThe=1` |
+| 8 | Đổi giá (2 lần) | `coDoi=true` rồi `coDoi=false` ✅ (chỉ phát sự kiện khi **thật sự** đổi) |
+| 9 | **Đổi `Code` qua API cập nhật** | `Code` **KHÔNG đổi** ✅ (**D2** — bất biến sau publish) |
+| 10 | Danh sách + lọc | `200` · `totalCount=1` |
+| 11 | **Publish sau `Archive`** | lỗi **`eCommerce:Catalog:0004`** ✅ (trạng thái cuối — D5) |
+| 12 | `Unpublish` + `Delete` | `204` + **DB `IsDeleted = t`**, **biến thể VẪN CÒN** (`bien_the = 1`) ✅ (xoá mềm **D4** + FK `Restrict`) |
+| 13 | DB cuối | SKU xuất hiện **đúng 1 lần** · giá `150000.0000` · đã dọn sạch dữ liệu thử |
+
+### 17.3 🚨 PHÁT HIỆN MỚI — **ABP ánh xạ `BusinessException` → HTTP `403`**
+
+Đo được khi kiểm chứng: `POST …/{id}/publish` (vi phạm nghiệp vụ) trả **`403`** kèm body
+`{"error":{"code":"eCommerce:Catalog:0003", …}}` — **không phải** `400`/`409`.
+
+**Hệ quả thực tế (đã làm tôi hiểu sai một lần):**
+- Client/QA **không phân biệt được** *"vi phạm nghiệp vụ"* với *"thiếu quyền"* nếu chỉ nhìn mã trạng thái.
+- Chẩn đoán `ChanDoanTuChoiQuyenHandler` (`XC-004` §15.6) **không** kích hoạt — **đúng thiết kế**
+  (nó chỉ bắt lỗi **phân quyền**), nhưng điều đó nghĩa là **lỗi nghiệp vụ 403 cũng im lặng ở phía server**
+  theo cùng cách: chỉ có `AbpExceptionFilter` ghi `warn`, **không** có dấu hiệu ở mức `error`.
+- ⚠️ **Kết luận cần người quyết:** có nên cấu hình `AbpExceptionHandlingOptions` để ánh xạ
+  `BusinessException` → **`400`/`409`** cho **toàn hệ thống** không? Đây là **thay đổi hợp đồng API**,
+  nên **không** tự ý làm; ghi lại để chốt.
+
+### 17.4 Còn lại của `CAT-001`
+
+| # | Việc | Ghi chú |
+|---|---|---|
+| 1 | **ETO `ProductPublishedEto` / `VariantPriceChangedEto`** (`F12`) | ⚠️ **Chặn có lý do:** phải **phân biệt "ETO mang dữ liệu" (⇒ fail-closed) vs "ETO thông báo"** trước khi phát; nếu không, cảnh báo lúc khởi động sẽ thành **dương tính giả** và bị bỏ qua. `F8` (outbox) vẫn hoãn theo `XC-002` |
+| 2 | **Route của 2 endpoint biến thể do ABP tự sinh** (`/variant/{productId}`, `/variant-price?...`) | 🟡 Đã thử đặt `[HttpPost]/[HttpPut]` tường minh: **không được** — tầng `Application` **không** tham chiếu MVC và **tôi không kéo web vào tầng nghiệp vụ**. Chấp nhận route tự sinh; muốn route đẹp ⇒ đặt ở tầng **HttpApi** (chưa có project đó) |
+| 3 | Ánh xạ `DbUpdateException` (unique) → `Catalog:0002`/`0005` | Hiện dựa vào **kiểm tra trước trong khoá phân tán** + unique index DB là hàng rào cuối. Muốn có mã lỗi đẹp cho ca **hai request đồng thời** thì cần `IExceptionSubscriber` ở tầng **EFCore** (giữ kiến thức provider ở đúng tầng) — **chưa làm**, và **chưa kiểm chứng được** bằng E2E (khó tạo va chạm thật) |
+| 4 | SKU không phân biệt hoa/thường · unique index `Slug` · tách `modules/Catalog` | như **§16.3 #4–#6** |
+
+### 17.5 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.3 | 15/10/2026 | *(agent, session GĐ1)* | **App service + DTO + API** (`F11`): 11 method, quyền theo method, map tay, `AutoInclude` cho guard `Publish`. **Kiểm chứng HTTP thật 13 phép đo** (tạo/thêm biến thể/trùng SKU/publish/unpublish/archive/đổi giá/đổi mã/list/xoá mềm). Phát hiện **ABP ánh xạ `BusinessException` → `403`** (§17.3). Ghi rõ việc còn lại **§17.4** |

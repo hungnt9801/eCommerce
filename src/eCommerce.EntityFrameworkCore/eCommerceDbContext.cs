@@ -138,6 +138,16 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
 
             b.HasIndex(x => new { x.TenantId, x.Code }).IsUnique();
 
+            // 🚨 `AutoInclude` — BẮT BUỘC để **máy trạng thái của domain nhìn thấy biến thể**.
+            // VÌ SAO: repository của ABP **không** tự nạp collection con. Nếu thiếu dòng này thì
+            // `Product.Variants` **luôn rỗng** khi đọc từ DB ⇒ `Publish()` (guard `CAT-001` D9) luôn thấy
+            // "0 biến thể đang hoạt động" ⇒ **mọi lần publish đều ném lỗi** — mà đó lại là hành vi
+            // **trông như hợp lý** ("chưa có biến thể thì không publish được") nên rất khó truy.
+            // ⇒ Nạp kèm để guard đọc **đúng trạng thái thật của aggregate**.
+            // ⚠️ Đánh đổi đã biết: mọi truy vấn `Product` đều join thêm biến thể. Với quy mô GĐ1 chấp nhận
+            //    được; nếu danh mục lớn lên thì cân nhắc bỏ `AutoInclude` và nạp tường minh theo từng ca.
+            b.Navigation(x => x.Variants).AutoInclude();
+
             // 🚨 `CAT-001` **F7/D4** — ĐỔI TỪ `Cascade` SANG `Restrict` (15/10/2026).
             // VÌ SAO: `Cascade` khiến xoá cứng một `Product` **XOÁ MỌI BIẾN THỂ** của nó. Biến thể là thứ
             // được tham chiếu bởi **lịch sử bán** (`OrdOrderLines.ProductVariantId`) và **listing sàn**

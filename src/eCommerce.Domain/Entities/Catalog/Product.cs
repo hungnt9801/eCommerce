@@ -17,10 +17,10 @@ namespace eCommerce.Catalog;
 public class Product : FullAuditedAggregateRoot<Guid>, IMultiTenant
 {
     /// <summary>SKU: 1..64 ký tự, chỉ chữ/số và <c>. _ -</c> (`CAT-001` BR-002).</summary>
-    public const int DoDaiSkuToiDa = 64;
+    public const int DoDaiSkuToiDa = eCommerceConsts.CatalogLimits.SkuToiDa;
 
     /// <summary>Mã sản phẩm: 1..64 ký tự (khớp `HasMaxLength(64)` ở DbContext).</summary>
-    public const int DoDaiMaToiDa = 64;
+    public const int DoDaiMaToiDa = eCommerceConsts.CatalogLimits.MaToiDa;
 
     private static readonly Regex KhuonSku = new(@"^[A-Za-z0-9._-]+$", RegexOptions.Compiled);
 

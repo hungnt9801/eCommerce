@@ -81,6 +81,20 @@ public static class eCommerceConsts
         }
     }
 
+    /// <summary>
+    /// Giới hạn độ dài của miền **Catalog** — đặt ở `Domain.Shared` để **entity VÀ DTO dùng CHUNG một nguồn**
+    /// (`CAT-001` D11). ⚠️ Tầng `Application.Contracts` **không** được tham chiếu `Domain` (layering) ⇒
+    /// nếu để hằng số trong entity thì DTO buộc phải **chép lại số** ⇒ hai nguồn sự thật, lệch lúc nào không biết.
+    /// </summary>
+    public static class CatalogLimits
+    {
+        /// <summary>Độ dài tối đa của mã sản phẩm (`Code`) — khớp `HasMaxLength(64)` ở DbContext.</summary>
+        public const int MaToiDa = 64;
+
+        /// <summary>Độ dài tối đa của SKU — khớp `HasMaxLength(64)` ở DbContext.</summary>
+        public const int SkuToiDa = 64;
+    }
+
     /// <summary>Mã lỗi nghiệp vụ (dùng với BusinessException).</summary>
     public static class ErrorCodes
     {
@@ -128,6 +142,9 @@ public static class eCommerceConsts
 
             /// <summary>Thiếu thông tin bắt buộc (ví dụ tên sản phẩm rỗng).</summary>
             public const string ThieuThongTinBatBuoc = "eCommerce:Catalog:0010";
+
+            /// <summary>Không giành được khoá phân tán trong thời gian cho phép (đang có luồng khác xử lý cùng SKU).</summary>
+            public const string KhongGianhDuocKhoa = "eCommerce:Catalog:0011";
         }
     }
 
