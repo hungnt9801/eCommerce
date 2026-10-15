@@ -1568,3 +1568,45 @@ Nay họ nhận: **mã tra được** + **SKU cụ thể** + **kênh** + **thờ
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.n | 15/10/2026 | *(agent, session GĐ1)* | **Thông điệp lỗi nay kèm DỮ LIỆU**: ghép `be.Code` + `be.Data` qua `IDictionary` **không generic** (ABP khai `Data` là `object`) ⇒ người dùng thấy ``eCommerce:Pricing:0004 — sku=… — channelCode=… — at=… — lyDo=…``. **Kiểm chứng**: thông điệp **nguyên văn** đo được cho **cả hai** ca (không giá · thiếu SKU); phần **an toàn** giữ nguyên (`0` đơn · tồn không đổi · `0` giữ chỗ mồ côi); dọn sạch; **`fail: 0`** hai tiến trình |
+
+---
+
+## 60. **ĐO LẠI LẦN POST ĐẦU (§56.3 #1): CHƯA XONG — và lý do là LỖI THAO TÁC CỦA TÔI** (15/10/2026)
+
+### 60.1 Việc định làm
+
+§56.3 #1 ghi: lần `POST /DatHang` **đầu** in **`HTTP 0`** (không đọc được phản hồi) ⇒ cần đo lại bằng
+**`-MaximumRedirection 0`** / `HttpClient` với `AllowAutoRedirect = false` để đọc **status thô** và **`Location`**.
+
+### 60.2 🚨 Kết quả: **KHÔNG hoàn thành — do tôi sửa probe SAI**
+
+| Bước | Việc | Kết quả |
+|---|---|---|
+| 1 | tìm dòng `$p1 = Invoke-WebRequest` trong tệp probe cũ để thay bằng bản có `-MaximumRedirection 0` | **KHÔNG tìm thấy** (tệp đã bị sửa nhiều lần ⇒ vị trí/định dạng đã đổi) |
+| 2 | chèn 2 dòng chẩn đoán **theo số dòng** | 🚨 số dòng = **rỗng** ⇒ phép chèn dùng **`-1`** ⇒ chèn **vào ĐẦU tệp** ⇒ **script hỏng** ⇒ `exit 1`, không output |
+| 3 | kết luận | **KHÔNG** có dữ liệu mới cho §60 |
+
+📌 **Không có mã sản phẩm nào bị ảnh hưởng** — chỉ **probe tạm trong `%TEMP%`** bị hỏng (probe **không** nằm trong repo:
+đúng quy ước dự án). Kiểm lại: `git status` **sạch**, build **0/0**, unit **694/694**, mermaid **197/0**.
+
+### 60.3 📌 Bài học #9 — **sửa probe cũ bằng "phẫu thuật số dòng" là cách LÀM HỎNG**
+
+Số dòng **không phải** là hợp đồng: mỗi lần sửa tệp trước đó, **mọi chỉ số đều dịch chuyển**; và khi phép tìm
+**trả về rỗng**, biểu thức `$lines[$i-1]` **âm** ⇒ **ghi vào đầu tệp** ⇒ hỏng **im lặng** (chỉ lộ ra ở `exit 1`).
+⇒ **Quy tắc từ nay (áp dụng cho mọi probe):**
+1. **KHÔNG** phẫu thuật tệp probe cũ để đo việc mới ⇒ **VIẾT PROBE MỚI** (ngắn, một mục đích);
+2. nếu **buộc** phải sửa: **kiểm `$i` hợp lệ TRƯỚC khi ghi** (`if (-not $i) { throw }`) — *thất bại to phải ồn ào*;
+3. probe **nằm ngoài repo** ⇒ hỏng probe **không** ảnh hưởng sản phẩm (**đúng quy ước**, và là lý do quy ước đó tồn tại).
+
+### 60.4 Việc còn lại (đã chốt cách làm ĐÚNG)
+
+| # | Việc | Cách làm |
+|---|---|---|
+| 1 | Đo lại lần `POST` đầu (§56.3 #1) | **Viết probe MỚI** dùng `System.Net.Http.HttpClient` với `AllowAutoRedirect = $false` + `CookieContainer` (không phẫu thuật tệp cũ) |
+| 2 | Giỏ **nhiều dòng** · **quản lý đơn trên UI** | mở rộng `/DatHang` và thêm `/DonHang` (dùng `SAL-003`/`SAL-004` đã kiểm chứng) |
+
+### 60.5 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.m | 15/10/2026 | *(agent, session GĐ1)* | **Thử đo lại lần POST đầu (§56.3 #1) — THẤT BẠI**, nguyên nhân là **lỗi thao tác của tôi**: tìm dòng trong probe cũ **không thấy** ⇒ chèn với chỉ số **`-1`** ⇒ **ghi vào đầu tệp** ⇒ probe hỏng (`exit 1`, không output). 📌 **Không ảnh hưởng mã sản phẩm** (probe ở `%TEMP%`, **không** trong repo) — kiểm lại: `git status` sạch · build **0/0** · unit **694/694** · mermaid **197/0**. Ghi **bài học #9**: *không phẫu thuật probe cũ — viết probe MỚI; nếu buộc sửa thì **kiểm chỉ số trước khi ghi*** |
