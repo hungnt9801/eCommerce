@@ -464,3 +464,48 @@ bị bind nhầm vào `-WaitSeconds` và công cụ **báo lỗi rõ ràng** (kh
 6. **Phép kiểm văn bản thô trên HTML** (substring/regex `[^<]*`) là **nguồn kết luận sai** — đã 3 lần (`web-001` §48 · §52.3 · §57.3) ⇒ coi là **giả thuyết**, xác nhận bằng **cấu trúc** hoặc **hành vi**.
 7. **Mutation test** cho mọi **cơ chế** mới, và **`git diff`** sau khi khôi phục (`inv-001` §46.3).
 8. **Test tự động thay vì quy tắc suông** khi một lỗi đã tái phạm ≥ 2 lần (**Phụ lục C** là ví dụ gốc).
+
+---
+
+## PHỤ LỤC D (tiếp) — **`tools/wait-host.ps1`: HÀM CHỜ CHUẨN** (vòng 80, 15/10/2026)
+
+### D.6 Vì sao có (bài học #12 · `web-001` §68.3)
+
+**Bốn vòng liên tiếp** (69 · 75 · 77 · **79**) hỏng **công cụ ĐO**, không phải sản phẩm. Riêng vòng 79, probe `throw`
+đúng **một câu** *"Host tại … KHONG len trong 90 giay"* mà **KHÔNG in log** ⇒ **không biết VÌ SAO** (*cổng bị chiếm ·
+lỗi khởi động · kết nối DB · thiếu module*…).
+📌 Đó **đúng** lỗi đã ghi ở `inv-001` **§27.3** (*"im lặng không phân biệt được với không chạy"*) — nhưng ở **chính công cụ đo**.
+⇒ Theo **bài học Phụ lục C**: *ghi quy tắc **không đủ** — cần **công cụ***. Đây là công cụ đó, **dùng chung cho mọi probe**.
+
+### D.7 Công cụ làm gì
+
+| # | Việc |
+|---|---|
+| 1 | **Chờ** `<Url>/health-status` = **`200`** (không đoán bằng `Start-Sleep` mù), kiểm mỗi **2 giây** |
+| 2 | 🚨 **Hết hạn ⇒ IN 15 DÒNG CUỐI của `-LogFile`** (nếu có) **RỒI** ném lỗi có ngữ cảnh ⇒ *thất bại to **và có thông tin*** |
+| 3 | Nếu truyền **`-ProcessId`** mà tiến trình **đã thoát** ⇒ in **mã thoát** + đuôi log **ngay** (không chờ vô ích) |
+| 4 | Khi lên được ⇒ in **số giây đã chờ** (để phát hiện khởi động chậm dần theo thời gian) |
+
+**Cách dùng:**
+```powershell
+pwsh -File tools/wait-host.ps1 -Url http://localhost:5000 -LogFile "$env:TEMP\host.log"
+pwsh -File tools/wait-host.ps1 -Url http://localhost:5100 -LogFile "$env:TEMP\web.log" -TimeoutSeconds 120 -ProcessId $pid
+```
+
+### D.8 ✅ BẰNG CHỨNG — kiểm **CẢ HAI CHIỀU**
+
+| Ca | Kỳ vọng | Kết quả đo được |
+|---|---|---|
+| **1. URL không lắng nghe** (`:5999`, có log giả) | hết hạn · **in đuôi log** · **ném lỗi** | `exit **1**` ✅ · in **đủ 3 dòng** log — **kể cả dòng chẩn đoán** *"LOI THAT: khong ket noi duoc DB"* ✅ · thông báo *"Không chờ được … Xem đuôi log ở trên"* ✅ |
+| **2. Host THẬT** (`:5000`) | thành công · `exit 0` | **`✅ LÊN sau 2.3s — http://localhost:5000/health-status = 200`** ✅ · `exit **0**` ✅ |
+| 3 | không để lại tiến trình treo | **0** tiến trình `dotnet` treo ✅ |
+
+📌 **Vì sao phải kiểm CẢ HAI chiều:** công cụ **chỉ** kiểm ca thành công thì **không** chứng minh được nó **in log khi hỏng** —
+mà **đó chính là lý do nó tồn tại**. Ca 1 là ca **quan trọng nhất**, y như **cặp đối chứng** ở `inv-001` §38–§39.
+
+### D.9 Chưa làm (ghi rõ)
+
+| # | Việc |
+|---|---|
+| 1 | **Chuyển các probe cũ sang dùng công cụ này** — hiện mỗi probe vẫn có `ChoHost` **riêng**; việc *"dùng chung"* cần sửa **từng probe** (làm dần khi probe được viết lại) |
+| 2 | **`HUỶ`/`TRẢ HÀNG` trên đơn do Web tạo** — **vẫn chưa đo** (`web-001` §66.3 · §68); rủi ro đã khoanh vùng **thấp** (`web-001` §67) nhưng **chưa bằng không** |
