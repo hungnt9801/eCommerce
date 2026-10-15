@@ -221,3 +221,89 @@ Kiểm tra chạy ở **mọi lần boot** ⇒ nếu ai thêm ETO mới mà quê
 2. **Hoặc** tạm dừng tiến con trỏ đồng bộ khi chưa có nơi nhận (fail-closed: sàn sẽ gửi lại, đơn không mất
    nhưng log sẽ đầy) — cần người quyết vì nó đánh đổi giữa *mất dữ liệu* và *lặp vô hạn*.
 3. Sau khi có người nhận + broker ⇒ **khi đó mới bật outbox** (ABP có sẵn `AbpEventBusBoxesModule`).
+
+---
+
+## 9bis. ✅ LỖI #22 — **ĐÃ SỬA GỐC THEO PHƯƠNG ÁN B** (14/10/2026)
+
+> **Người quyết định:** chọn **"B ngay + A sau"** — chặn mất dữ liệu **ngay** bằng fail-closed, rồi xây
+> **Order intake** (việc A) trong GĐ1. Ghi ở `docs/handover-gd1.md` §4.
+
+### Ba việc đã làm
+
+| # | Việc | Nội dung |
+|---|---|---|
+| 1 | **Fail-closed** | `ChannelShopSyncer` **tự hỏi** `IEventCoverageProbe` xem `ChannelOrderPulledEto` có người nhận chưa; **có đơn mà chưa có nơi nhận** ⇒ **KHÔNG publish** + **KHÔNG tiến con trỏ** + ghi `LastError` + log **Error** + metric `channel_sync_failed_total{reason=ChuaCoNoiNhanDon}` |
+| 2 | **Một nguồn sự thật** | Cảnh báo lúc **khởi động** và quyết định lúc **đồng bộ** nay dùng **chung** `EventCoverageScan`/`IEventCoverageProbe` ⇒ hai nơi **không thể lệch nhau** (trước đây Host tự quét riêng) |
+| 3 | **Bịt biến thể thứ HAI** (phát hiện mới) | 🚨 `ChannelAppService.SyncNowAsync` — nút **"Đồng bộ ngay"** — **tự kéo đơn rồi tự tiến con trỏ** mà **KHÔNG phát sự kiện cho ai**. Đây là **cùng một lỗi** nhưng ở **đường do người vận hành bấm**, và **không cần handler nào bị thiếu** để gây mất đơn. Nay đi qua **cùng một cổng** `IChannelShopSyncService` |
+
+### Bằng chứng chạy thật (Host + PostgreSQL 17 thật)
+
+| Hạng mục | Kết quả |
+|---|---|
+| Log khởi động | `PHÁT HIỆN 2 SỰ KIỆN KHÔNG CÓ NGƯỜI NHẬN (đã quét 27 assembly)` — `ChannelOrderPulledEto`, `ChannelShopTokenRefreshedEto` |
+| Log đồng bộ | `fail: eCommerce.ChannelHub.Sync.ChannelShopSyncer` → `🚨 CHẶN BÀN GIAO ĐƠN … kéo được 2 đơn nhưng sự kiện ChannelOrderPulledEto KHÔNG có người nhận … Đã GIỮ NGUYÊN con trỏ đồng bộ để sàn gửi lại` |
+| **DB** | `LastSyncedAtUtc = (NULL)` ⇒ **con trỏ KHÔNG tiến** ✅ · `LastError = [eCommerce:Channel:0005] …` |
+| Nhịp sau | Kéo lại **đúng 2 đơn đó** rồi **chặn lại** ⇒ đúng hành vi *"sàn gửi lại"*. ⚠️ Nhịp mặc định **300 s** ⇒ log lặp mỗi 5 phút/shop (đánh đổi **đã được chấp nhận**) |
+| Test | **383 unit** (thêm **22**) + **20 integration** · build **0 lỗi/0 cảnh báo** |
+
+### 🎯 Vì sao dùng **chung** bộ dò thay vì kiểm tra lại ở từng nơi
+
+Câu hỏi *"sự kiện này có người nhận chưa?"* được hỏi ở **hai** nơi (lúc boot và lúc đồng bộ). Nếu mỗi nơi
+tự quét riêng thì chúng **có thể lệch nhau** — và lệch theo hướng nguy hiểm nghĩa là **log nói "có người
+nhận" trong khi thực tế đơn vẫn mất**. Nay cả hai đi qua **một** lớp ⇒ **không thể lệch**.
+
+### ⚠️ Điều **CHƯA** kiểm chứng được (nói thẳng)
+
+Đường **API** "Đồng bộ ngay" (`POST /api/app/channel/{id}/sync-now`) **chưa gọi được bằng HTTP thật** vì
+endpoint đó **luôn trả `403`** — xem **§10** (phát hiện **ngoài phạm vi**, có trước lượt sửa này).
+Bù lại: ánh xạ DTO được khoá bằng **test đơn vị** và phụ thuộc được khoá bằng **test reflection**.
+
+---
+
+## 10. PHÁT HIỆN MỚI (14/10/2026 — lộ ra khi kiểm chứng #22) — **MỌI API CÓ `[Authorize(permission)]` TRẢ `403` DÙ ĐÃ ĐƯỢC CẤP QUYỀN**
+
+> 📌 **Chưa gán số thứ tự**: `docs/handover-gd1.md` ghi *"24 lỗi thật"* nhưng tài liệu **chỉ đánh số tới
+> #23** ⇒ gán một số mới lúc này sẽ **trùng hoặc nhảy cóc**. Đặt tên tạm: **`F-403`**. Khi chốt lại dãy số
+> thì gán số chính thức.
+
+**Mức độ: CAO** — không mất dữ liệu, nhưng **mọi endpoint gắn quyền đều không dùng được**, kể cả với
+`admin`. Không có lỗi biên dịch, **không** exception trong log ứng dụng (chỉ thấy `403` ở phía client).
+
+### Bằng chứng (chạy thật, Host localhost:5000 + PostgreSQL 17)
+
+| Kiểm tra | Kết quả |
+|---|---|
+| `POST /connect/token` (password grant, `admin@abp.io`) | ✅ cấp token; **token có claim `role = admin`** (giải mã base64 phần payload) |
+| `GET /api/app/channel/shops` — chỉ cần **đăng nhập** (`[Authorize]` cấp class) | ✅ **200** |
+| `POST /api/app/channel/{id}/sync-now` — cần quyền `eCommerce.Channels.Sync` | ❌ **403** |
+| Log `Microsoft.AspNetCore.Authorization` mức **Debug** | `Authorization failed. These requirements were not met: **PermissionRequirement: eCommerce.Channels.Sync**` |
+| `AbpPermissions` (định nghĩa) | ✅ có `eCommerce.Channels.Sync`, `IsEnabled = t` |
+| `AbpPermissionGrants` | ✅ có `eCommerce.Channels.Sync · R · admin` |
+| `AbpUserRoles` + `AbpRoles` | ✅ user `admin` ∈ role `admin` |
+| **Xoá toàn bộ cache Redis** (`ecommerce:*`) rồi gọi lại | ❌ **vẫn 403** ⇒ **loại trừ** giả thuyết *"cache quyền cũ"* |
+
+### Trạng thái điều tra — **DỪNG ở đây, ghi rõ cái chưa kiểm chứng**
+
+**Đã loại trừ (bằng đo, không bằng suy luận):** thiếu định nghĩa permission · thiếu grant · thiếu role trên
+user · thiếu claim role trong token · cache Redis cũ · hỏng xác thực (class-level vẫn 200).
+
+**Giả thuyết còn lại — ⬜ CHƯA KIỂM CHỨNG:** ABP đối chiếu **tên claim vai trò**, còn `JwtBearer` mặc định
+**ánh xạ lại** claim (`DefaultInboundClaimTypeMap`) ⇒ `CurrentUser.Roles` có thể **rỗng** ⇒
+`RolePermissionValueProvider` **không thấy role nào** ⇒ **403**. Nếu đúng thì cách sửa là
+`options.MapInboundClaims = false` (hoặc cấu hình lại claim type) — **nhưng tôi CHƯA chứng minh được**,
+và **không sửa theo giả thuyết**: đây là vùng **bảo mật**, sửa sai ở đây có thể **mở quyền** cho người
+không được phép. (Bài học: 2 lần trước trong dự án, sửa theo giả thuyết mà chưa đo thì **cả 2 lần đều SAI**.)
+
+⚠️ **Mâu thuẫn với tài liệu cần làm rõ:** `docs/handover-gd1.md` §1 ghi *"35 route thật · ma trận
+`401`/`403`/`200` đúng"*. Kết quả đo được **không** khớp: `200` chỉ quan sát được ở endpoint **chỉ cần
+đăng nhập**; endpoint **cần quyền** trả `403`. Cần xác định lại ma trận quyền bằng **đo**, không bằng
+suy luận.
+
+### 🔧 Việc cần làm để đóng (đề xuất)
+
+1. Ghi log **tại chỗ kiểm tra**: `ICurrentUser.Roles` **rỗng hay không** trong một request có token — đo
+   trực tiếp thay vì suy từ cấu hình thư viện.
+2. Nếu đúng là ánh xạ claim: sửa **một chỗ** trong `AddJwtBearer`, rồi **kiểm chứng lại cả 3 trạng thái**
+   (`401` không token · `403` thiếu quyền · `200` có quyền) — **không** chỉ kiểm `200`.
+3. Thêm **test tích hợp** khoá ma trận quyền để không tái diễn (đúng tinh thần `XC-004` TC-01/TC-02).

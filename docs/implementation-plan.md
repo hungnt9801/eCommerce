@@ -563,3 +563,42 @@ bản đồ tài liệu · quy ước bất biến · **cách mở session mới
 
 > 🚨 **Quan trọng:** session mới **không nhớ** cuộc trò chuyện trước. File bàn giao là **bộ nhớ bền vững**.
 > **Đừng dán lại lịch sử trò chuyện cũ vào session mới** — nó sẽ **cạn ngữ cảnh ngay từ đầu**.
+
+---
+
+## A.12 LƯỢT GĐ1 ĐẦU TIÊN (14/10/2026) — **SỬA GỐC LỖI #22 (FAIL-CLOSED)**
+
+**Quyết định của người:** **"B ngay + A sau"** — chặn mất dữ liệu **ngay**, rồi xây **Order intake** (việc A)
+trong GĐ1. Và: **làm hạ tầng nền §7.0 trước khi vào các module GĐ1**.
+
+| Hạng mục | Kết quả |
+|---|---|
+| **Lỗi #22 (fail-closed)** | ✅ **XONG** — `ChannelShopSyncer` **không** publish + **không** tiến con trỏ khi lô có đơn mà chưa có người nhận |
+| **Biến thể thứ HAI của #22** (phát hiện mới) | ✅ **XONG** — nút *"Đồng bộ ngay"* (`ChannelAppService.SyncNowAsync`) trước đây **tự kéo đơn + tự tiến con trỏ + không phát sự kiện cho ai** ⇒ nay đi qua **cùng một cổng** `IChannelShopSyncService` (đóng luôn **F3** của `CHN-002`) |
+| **Một nguồn sự thật** cho *"sự kiện có người nhận chưa?"* | ✅ `EventCoverageScan` + `IEventCoverageProbe` (Messaging) dùng **chung** cho cảnh báo lúc boot **và** quyết định lúc đồng bộ ⇒ hai nơi **không thể lệch nhau** |
+| Kiểm chứng | Build **0/0** · **383 unit** + **20 integration** · Host thật `health 200` · **DB thật**: con trỏ **không tiến** + `LastError` `eCommerce:Channel:0005` · log **Error** thật |
+| Bằng chứng chi tiết | `docs/runtime-verification-report.md` §9bis · `docs/features/chn-002-connector-shopee.md` §16 |
+
+### 🚨 Phát hiện mới CHƯA sửa — `F-403` (chặn GĐ1 gate #4 về mặt thực chất)
+
+**Mọi** API có `[Authorize(permission)]` trả **`403` dù DB đã cấp quyền** (kể cả `admin`; token **có**
+claim `role = admin`; endpoint **chỉ cần đăng nhập** vẫn `200`). Đã **loại trừ bằng đo**: thiếu định
+nghĩa permission · thiếu grant · thiếu role · thiếu claim · **cache Redis cũ**. Chi tiết + việc cần làm:
+`docs/runtime-verification-report.md` **§10**.
+
+⚠️ **Mâu thuẫn cần làm rõ:** `docs/handover-gd1.md` §1 ghi *"ma trận `401`/`403`/`200` đúng"* — kết quả
+**đo được không khớp**. Đừng tin dòng đó; **đo lại**.
+
+### ⚠️ Hệ quả CẦN BIẾT của phương án B
+
+Cho tới khi xây xong **Order intake (A)**, **đồng bộ sàn bị chặn CÓ CHỦ Ý**: đơn **KHÔNG mất** (sàn gửi lại)
+nhưng cũng **chưa vào được hệ thống**, và log **Error** lặp **mỗi 5 phút/shop** (nhịp mặc định 300 s).
+Đây là **đánh đổi đã được người quyết định chấp nhận** — **không phải lỗi**, và **không cần bật cờ nào**:
+khi Order intake đăng ký handler cho `ChannelOrderPulledEto`, fail-closed **tự mở**.
+
+### Việc tiếp theo (thứ tự đề xuất)
+
+1. **Order intake `SAL-005`** — nơi nhận `ChannelOrderPulledEto` (**việc A**).
+2. **`F-403`** — đo rồi sửa ma trận quyền (kèm test tích hợp khoá ma trận `401`/`403`/`200`).
+3. **Hạ tầng nền §7.0 còn lại**: `eCommerce.Web` + login · 2 test reflection `XC-004` TC-01/TC-02 · `.editorconfig` + `docs/coding-conventions.md` · phần observability còn thiếu.
+4. **5 metric còn lại** · supervisor thiếu `Timer.RunOnStart` (`CHN-002` §16.5 #5).

@@ -79,11 +79,18 @@ public class ShopeeConnector : IChannelConnector
     {
         if (!_options.EnableLiveCalls)
         {
-            _logger.LogInformation(
-                "[PoC] ShopeeConnector.PullOrdersAsync (shop {ShopId}) — live calls đang TẮT, trả kết quả rỗng. " +
-                "Luồng worker/lock/event vẫn chạy đầy đủ.", shop.ExternalShopId);
+            var soDonGia = _options.PocOrdersPerPull;
 
-            return Task.FromResult(new PullOrdersResult { NewSyncCursorUtc = DateTime.UtcNow });
+            _logger.LogInformation(
+                "[PoC] ShopeeConnector.PullOrdersAsync (shop {ShopId}) — live calls đang TẮT, trả {SoDon} đơn giả. " +
+                "Luồng worker/lock/event/bàn giao đơn vẫn chạy đầy đủ.",
+                shop.ExternalShopId, soDonGia);
+
+            return Task.FromResult(new PullOrdersResult
+            {
+                Orders = TaoDonGia(shop, soDonGia),
+                NewSyncCursorUtc = DateTime.UtcNow
+            });
         }
 
         // TODO(tích hợp thật):
@@ -93,6 +100,47 @@ public class ShopeeConnector : IChannelConnector
         //   4) Nếu HTTP 429 → trả RateLimited = true để supervisor backoff
         throw new NotImplementedException(
             "Gọi API Shopee thật chưa được cài đặt trong khung này. Xem comment TODO trong ShopeeConnector.");
+    }
+
+    /// <summary>
+    /// Sinh đơn GIẢ cho PoC. ID **ổn định theo con trỏ đồng bộ**: khi con trỏ KHÔNG tiến (ca fail-closed
+    /// — chưa có nơi nhận đơn) thì nhịp sau kéo lại **đúng những đơn đó**, đúng như sàn gửi lại thật.
+    /// </summary>
+    private static List<ChannelOrderModel> TaoDonGia(ChannelShopContext shop, int soDon)
+    {
+        if (soDon <= 0)
+        {
+            return [];
+        }
+
+        var conTro = shop.LastSyncedAtUtc?.Ticks ?? 0;
+        var danhSach = new List<ChannelOrderModel>(soDon);
+
+        for (var i = 0; i < soDon; i++)
+        {
+            danhSach.Add(new ChannelOrderModel
+            {
+                ExternalOrderId = $"POC-{shop.ExternalShopId}-{conTro}-{i}",
+                PlacedAtUtc = DateTime.UtcNow.AddMinutes(-5 * (i + 1)),
+                Currency = "VND",
+                ShippingFee = 30_000m,
+                ChannelDiscount = 0m,
+                BuyerNote = "Đơn GIẢ do PoC sinh ra (ChannelHub:Shopee:PocOrdersPerPull).",
+                Lines =
+                [
+                    new ChannelOrderLineModel
+                    {
+                        ExternalLineId = $"POC-LINE-{shop.ExternalShopId}-{conTro}-{i}-0",
+                        Sku = $"POC-SKU-{i}",
+                        Quantity = 1,
+                        UnitPrice = 100_000m,
+                        DiscountAmount = 0m
+                    }
+                ]
+            });
+        }
+
+        return danhSach;
     }
 
     public Task<PushListingResult> PushListingAsync(ChannelShopContext shop, ChannelListingPushModel model, CancellationToken cancellationToken = default)

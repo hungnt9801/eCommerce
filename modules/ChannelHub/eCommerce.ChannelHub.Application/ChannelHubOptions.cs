@@ -45,4 +45,18 @@ public class ShopeeOptions
 
     /// <summary>Bật/tắt gọi HTTP thật. Trong PoC để false → connector chỉ mô phỏng, không cần credential.</summary>
     public bool EnableLiveCalls { get; set; }
+
+    /// <summary>
+    /// 🧪 **CHỈ DÙNG CHO PoC/DEV** — số đơn GIẢ mà connector trả về mỗi lần kéo khi
+    /// <see cref="EnableLiveCalls"/> = <c>false</c>. Mặc định **0** ⇒ hành vi cũ (trả lô rỗng).
+    ///
+    /// 🎯 VÌ SAO CẦN: đường **fail-closed chống mất đơn** (lỗi #22) chỉ chạy khi lô kéo về **CÓ đơn**.
+    /// Với connector mô phỏng trả lô rỗng thì đường đó **không bao giờ được chạy**, tức **không kiểm chứng
+    /// được** — mà một cổng an toàn chưa từng chạy thì không thể coi là đã hoạt động.
+    /// Tuỳ chọn này cho phép chạy **end-to-end thật** (Host + PostgreSQL thật) mà không cần credential sàn.
+    ///
+    /// ⚠️ ID đơn giả **ổn định theo con trỏ đồng bộ**: khi con trỏ không tiến (đúng ca fail-closed),
+    /// nhịp sau kéo lại **đúng những đơn đó** — mô phỏng trung thực hành vi "sàn gửi lại" của thực tế.
+    /// </summary>
+    public int PocOrdersPerPull { get; set; }
 }

@@ -33,6 +33,9 @@
     <ProjectReference Include="..\..\modules\Signing\eCommerce.Signing.Domain\eCommerce.Signing.Domain.csproj" />
     <ProjectReference Include="..\..\src\eCommerce.Domain\eCommerce.Domain.csproj" />
     <ProjectReference Include="..\..\modules\ChannelHub\eCommerce.ChannelHub.Application\eCommerce.ChannelHub.Application.csproj" />
+    <!-- Cần cho **test bất biến bằng reflection**: `ChannelAppService` (nút "Đồng bộ ngay") BẮT BUỘC
+         phải đi qua cổng đồng bộ chung `IChannelShopSyncService` — biến thể thứ hai của lỗi #22. -->
+    <ProjectReference Include="..\..\src\eCommerce.Application\eCommerce.Application.csproj" />
     <ProjectReference Include="..\..\modules\PaymentHub\eCommerce.PaymentHub.Application\eCommerce.PaymentHub.Application.csproj" />
     <ProjectReference Include="..\..\modules\Tax\eCommerce.Tax.Domain\eCommerce.Tax.Domain.csproj" />
   </ItemGroup>

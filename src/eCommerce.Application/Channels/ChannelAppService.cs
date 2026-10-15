@@ -1,5 +1,6 @@
 using eCommerce.ChannelHub.Channels;
 using eCommerce.ChannelHub.Connectors;
+using eCommerce.ChannelHub.Sync;
 using eCommerce.Channels.Dtos;
 using Microsoft.AspNetCore.Authorization;
 using Volo.Abp.Application.Dtos;
@@ -32,16 +33,24 @@ public class ChannelAppService : ApplicationService, IChannelAppService
     private readonly IStringEncryptionService _encryptionService;
     private readonly IGuidGenerator _guidGenerator;
 
+    /// <summary>
+    /// 🚨 Cổng đồng bộ DÙNG CHUNG với worker nền — xem ghi chú ở <see cref="SyncNowAsync"/>.
+    /// Cố ý **không** tự kéo đơn ở đây: hai đường đồng bộ song song là hai cơ hội để lệch nhau.
+    /// </summary>
+    private readonly IChannelShopSyncService _channelShopSyncService;
+
     public ChannelAppService(
         IRepository<ChannelShop, Guid> channelShopRepository,
         IChannelConnectorFactory connectorFactory,
         IStringEncryptionService encryptionService,
-        IGuidGenerator guidGenerator)
+        IGuidGenerator guidGenerator,
+        IChannelShopSyncService channelShopSyncService)
     {
         _channelShopRepository = channelShopRepository;
         _connectorFactory = connectorFactory;
         _encryptionService = encryptionService;
         _guidGenerator = guidGenerator;
+        _channelShopSyncService = channelShopSyncService;
     }
 
     public async Task<PagedResultDto<ChannelShopDto>> GetShopsAsync(PagedAndSortedResultRequestDto input)
@@ -137,53 +146,37 @@ public class ChannelAppService : ApplicationService, IChannelAppService
     }
 
     /// <summary>
-    /// Chạy đồng bộ ngay cho một shop. Trong skeleton, phần gọi API sàn đang mô phỏng
-    /// (ShopeeConnector trả kết quả rỗng khi EnableLiveCalls = false).
+    /// Chạy đồng bộ ngay cho một shop (nút "Đồng bộ ngay" trên admin).
+    ///
+    /// 🚨 **BIẾN THỂ THỨ HAI CỦA LỖI #22 — ĐÃ SỬA (14/10/2026).**
+    /// Trước đây method này **tự kéo đơn rồi tự tiến con trỏ** (`shop.LastSyncedAtUtc = …`) mà
+    /// **không hề phát sự kiện** cho bất kỳ ai ⇒ mọi đơn vừa kéo bị **vứt bỏ**, con trỏ vẫn tiến
+    /// ⇒ sàn **không gửi lại** ⇒ **đơn mất vĩnh viễn**, và API trả về *"thành công, N đơn"*.
+    /// Đây là đường **do người vận hành bấm** — tức đúng cái nút sẽ được bấm khi thấy đồng bộ có vẻ sai.
+    ///
+    /// Nay đi qua **cùng một cổng** với worker nền (<see cref="IChannelShopSyncService"/>) ⇒ chỉ còn
+    /// **MỘT** logic đồng bộ và **MỘT** chỗ quyết định fail-closed.
     /// </summary>
     [Authorize(eCommerceConsts.Permissions.Channels.Sync)]
     public async Task<ChannelSyncResultDto> SyncNowAsync(Guid id)
     {
-        var shop = await _channelShopRepository.GetAsync(id);
+        var ketQua = await _channelShopSyncService.SyncAsync(id);
 
-        var connector = _connectorFactory.Get(shop.ChannelCode);
-
-        var context = new ChannelShopContext
+        return new ChannelSyncResultDto
         {
-            ChannelShopId = shop.Id,
-            TenantId = shop.TenantId,
-            ChannelCode = shop.ChannelCode,
-            ExternalShopId = shop.ExternalShopId,
-            Region = shop.Region,
-            AccessToken = string.IsNullOrEmpty(shop.AccessTokenEncrypted)
-                ? null
-                : _encryptionService.Decrypt(shop.AccessTokenEncrypted),
-            RefreshToken = string.IsNullOrEmpty(shop.RefreshTokenEncrypted)
-                ? null
-                : _encryptionService.Decrypt(shop.RefreshTokenEncrypted),
-            LastSyncedAtUtc = shop.LastSyncedAtUtc
+            ChannelShopId = ketQua.ChannelShopId,
+            ChannelCode = ketQua.ChannelCode,
+            OrdersPulled = ketQua.OrdersPulled,
+            ListingsPushed = ketQua.ListingsPushed,
+            Errors = ketQua.Errors,
+            RateLimited = ketQua.RateLimited,
+            TokenRefreshed = ketQua.TokenRefreshed,
+            BiChanDoChuaCoNoiNhanDon = ketQua.BiChanDoChuaCoNoiNhanDon,
+            LyDoChan = ketQua.LyDoChan,
+            Message = ketQua.Message,
+            StartedAtUtc = ketQua.StartedAtUtc,
+            FinishedAtUtc = ketQua.FinishedAtUtc
         };
-
-        var startedAt = DateTime.UtcNow;
-        var pull = await connector.PullOrdersAsync(context);
-
-        var result = new ChannelSyncResultDto
-        {
-            ChannelShopId = shop.Id,
-            ChannelCode = shop.ChannelCode,
-            OrdersPulled = pull.Orders.Count,
-            RateLimited = pull.RateLimited,
-            Message = pull.Message,
-            StartedAtUtc = startedAt,
-            FinishedAtUtc = DateTime.UtcNow
-        };
-
-        if (!pull.RateLimited)
-        {
-            shop.LastSyncedAtUtc = pull.NewSyncCursorUtc ?? DateTime.UtcNow;
-            await _channelShopRepository.UpdateAsync(shop, autoSave: true);
-        }
-
-        return result;
     }
 
     /// <summary>

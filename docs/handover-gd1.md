@@ -20,6 +20,12 @@
 | Lỗi thật đã sửa | **24** — trong đó **16 lỗi IM LẶNG** |
 | Điểm phát metric | **7/12** |
 
+> 📌 **CẬP NHẬT 14/10/2026 (lượt sửa lỗi #22 — phương án B):** các số ở bảng trên là **mốc bàn giao**.
+> Sau lượt đó: **Test = 383 unit + 20 integration** · **Lỗi thật đã sửa = 25** (thêm **#22**) ·
+> build **0 lỗi/0 cảnh báo** · thêm **1 phát hiện mới CHƯA sửa** (`F-403`, xem **§4**).
+> Chi tiết & bằng chứng: `docs/runtime-verification-report.md` **§9bis** + **§10** ·
+> `docs/features/chn-002-connector-shopee.md` **§16**.
+
 ### Lệnh chuẩn
 ```powershell
 Set-Location 'D:\Projects\Tools\eCommerce'
@@ -101,32 +107,49 @@ Host cổng **5000**. DB: `docker exec -i ecommerce-postgres psql -U ecommerce -
 
 ## 4. GIAI ĐOẠN 1 — VIỆC TIẾP THEO
 
-### 🚨 QUYẾT ĐỊNH ĐANG MỞ — PHẢI HỎI NGƯỜI TRƯỚC KHI CODE
+### ✅ QUYẾT ĐỊNH ĐÃ CHỐT (14/10/2026) — **B ngay + A sau**
 
-Đọc **`docs/runtime-verification-report.md` §9 (LỖI #22)** — **lỗi nghiêm trọng nhất dự án**:
+Đọc **`docs/runtime-verification-report.md` §9 + §9bis** — **lỗi #22** (nay **đã sửa gốc theo phương án B**):
 
 > `ChannelShopSyncer` publish `ChannelOrderPulledEto` cho **từng đơn hàng** kéo từ Shopee/Lazada,
 > nhưng **KHÔNG có handler nào nhận**. Đồng bộ vẫn báo **THÀNH CÔNG** và **TIẾN CON TRỎ ĐỒNG BỘ**
 > (`shop.LastSyncedAtUtc = pull.NewSyncCursorUtc`) ⇒ sàn **không gửi lại** ⇒ **đơn mất VĨNH VIỄN**,
 > **không có lỗi nào được ghi**.
 
-**Đã chặn được sự IM LẶNG** (`EventCoverageChecker` la ở mức Error mỗi lần boot) — nhưng **gốc chưa sửa**.
-Ba lựa chọn, **cần người quyết vì là đánh đổi nghiệp vụ:**
+**Người đã chốt: phương án B làm NGAY, phương án A làm tiếp trong GĐ1.**
 
-| Lựa chọn | Đánh đổi |
+| Lựa chọn | Trạng thái |
 |---|---|
-| **A. Xây Order intake** (đúng gốc) | Hạng mục lớn; **đơn vẫn mất cho tới khi xong** |
-| **B. Tạm dừng tiến con trỏ** khi chưa có nơi nhận (fail-closed) | Đơn **không mất** (sàn gửi lại), nhưng log đầy + đồng bộ coi như "kẹt" |
-| **C. Chỉ để cảnh báo** (hiện tại) | Lỗi không còn im lặng, nhưng **đơn vẫn mất** |
+| **A. Xây Order intake** (đúng gốc — `SAL-005`) | ⬜ **CHƯA LÀM — đây là việc tiếp theo của GĐ1** |
+| **B. Fail-closed: dừng tiến con trỏ khi chưa có nơi nhận** | ✅ **ĐÃ XONG** — `ChannelShopSyncer` **không** publish và **không** tiến con trỏ khi lô có đơn mà chưa có người nhận; ghi `LastError` + log **Error** + metric |
+| **C. Chỉ để cảnh báo** | ❌ không chọn |
+
+**Đã bịt thêm một biến thể nữa của CÙNG lỗi** (phát hiện mới, đóng luôn **F3** của `CHN-002`):
+`ChannelAppService.SyncNowAsync` — nút **"Đồng bộ ngay"** — **tự kéo đơn rồi tự tiến con trỏ** mà
+**không phát sự kiện cho ai**. Đây là đường **do người vận hành bấm** và **không cần handler nào bị thiếu**
+để gây mất đơn. Nay cả hai đường đi qua **một** cổng `IChannelShopSyncService`.
+
+> ⚠️ **Hệ quả CẦN BIẾT:** cho tới khi xây xong Order intake (A), **đồng bộ sàn bị chặn CÓ CHỦ Ý**:
+> **đơn KHÔNG mất** (sàn gửi lại) nhưng cũng **chưa vào được hệ thống**, và log **Error** lặp
+> **mỗi 5 phút/shop** (nhịp mặc định 300 s). Đây là **đánh đổi đã được chấp nhận**, không phải lỗi.
+
+> 🚨 **PHÁT HIỆN MỚI CHƯA SỬA — `F-403`:** **mọi** API có `[Authorize(permission)]` trả **`403` dù DB đã
+> cấp quyền** (kể cả `admin`, token **có** claim `role = admin`; endpoint chỉ-cần-đăng-nhập vẫn `200`).
+> Đã **loại trừ** bằng đo: thiếu định nghĩa/grant/role/claim · cache Redis cũ. Xem
+> `docs/runtime-verification-report.md` **§10**. ⚠️ Việc này **mâu thuẫn** với dòng *"ma trận
+> `401`/`403`/`200` đúng"* ở §1 — **cần đo lại ma trận quyền**, đừng tin dòng đó.
 
 ### Phạm vi GĐ1 (theo kế hoạch)
 Đơn hàng · tồn kho · vận chuyển · khuyến mãi. Đọc `docs/implementation-plan.md` §A.9 để biết danh sách feature theo giai đoạn.
 
-### Việc kỹ thuật độc lập, làm được ngay
-| Việc | Ghi chú |
-|---|---|
-| **5 metric còn lại** | `messaging_dlq_*` · `messaging_outbox_pending` cần **outbox/DLQ** (chưa có, **không có mẫu trong repo** ⇒ rủi ro cao nhất) · `logging_failures_total` cần **logger provider** · `lock_ttl_exceeded_total` chưa có chỗ phát |
-| **Outbox/relay** | 🚨 **Cảnh báo:** **không có message broker** (chỉ PostgreSQL + Redis). Outbox lúc này là hạ tầng cho vấn đề **chưa tồn tại** — và sẽ **đảm bảo giao tin cậy tới KHÔNG AI** nếu chưa có người nhận. **Thứ tự đúng: có người nhận trước, rồi mới bàn tới giao tin cậy.** |
+### Việc tiếp theo, theo thứ tự đề xuất
+| # | Việc | Ghi chú |
+|---|---|---|
+| 1 | **Xây Order intake (`SAL-005`)** — nơi nhận `ChannelOrderPulledEto` | Đây là **việc A**; xong thì **đồng bộ sàn tự chạy lại** (fail-closed tự mở, không cần bật cờ nào) |
+| 2 | **`F-403`: đo rồi sửa ma trận quyền** | Chặn GĐ1 gate #4 về mặt thực chất; **đo trước, sửa sau** |
+| 3 | **5 metric còn lại** | `messaging_dlq_*` · `messaging_outbox_pending` cần **outbox/DLQ** (chưa có) · `logging_failures_total` cần **logger provider** · `lock_ttl_exceeded_total` chưa có chỗ phát |
+| 4 | **`CHN-002` §16.5 #5** — supervisor thiếu `Timer.RunOnStart = true` | Cùng họ lỗi #23; ảnh hưởng nhỏ |
+| 5 | **Outbox/relay** | 🚨 **Cảnh báo giữ nguyên:** **không có message broker** (chỉ PostgreSQL + Redis). **Thứ tự đúng: có người nhận trước (việc 1), rồi mới bàn tới giao tin cậy.** |
 
 ---
 

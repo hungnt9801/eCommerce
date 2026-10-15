@@ -39,4 +39,13 @@ public static class ChannelHubErrorCodes
     public const string ChannelTokenExpired = "eCommerce:Channel:0002";
     public const string ChannelRateLimited = "eCommerce:Channel:0003";
     public const string ChannelNotSupported = "eCommerce:Channel:0004";
+
+    /// <summary>
+    /// 🚨 **Chưa có nơi nhận đơn** ⇒ lô đơn bị **CHẶN BÀN GIAO** và con trỏ đồng bộ **KHÔNG tiến**
+    /// (fail-closed, lỗi #22). Đơn **không mất**: sàn sẽ gửi lại ở nhịp sau.
+    ///
+    /// ⚠️ Đây là trạng thái **CÓ CHỦ Ý** cho tới khi Order intake (GĐ1) được xây: nó đánh đổi
+    /// *"đồng bộ trông như kẹt + log đầy"* để lấy *"không mất đơn"*.
+    /// </summary>
+    public const string ChuaCoNoiNhanDon = "eCommerce:Channel:0005";
 }

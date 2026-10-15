@@ -9,6 +9,9 @@
     <ProjectReference Include="..\eCommerce.ChannelHub.Domain\eCommerce.ChannelHub.Domain.csproj" />
     <ProjectReference Include="..\..\..\shared\eCommerce.Kernel\eCommerce.Kernel.csproj" />
     <ProjectReference Include="..\eCommerce.ChannelHub.Application.Contracts\eCommerce.ChannelHub.Application.Contracts.csproj" />
+    <!-- 🚨 Cổng an toàn chống mất đơn (lỗi #22): dùng CHUNG bộ dò độ phủ sự kiện với cảnh báo lúc khởi
+         động ⇒ log boot và quyết định fail-closed KHÔNG THỂ lệch nhau. -->
+    <ProjectReference Include="..\..\Messaging\eCommerce.Messaging.Domain\eCommerce.Messaging.Domain.csproj" />
   </ItemGroup>
 
   <ItemGroup>

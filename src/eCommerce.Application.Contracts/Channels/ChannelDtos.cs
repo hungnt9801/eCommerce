@@ -64,6 +64,20 @@ public class ChannelSyncResultDto
     public int ListingsPushed { get; set; }
     public int Errors { get; set; }
     public bool RateLimited { get; set; }
+    public bool TokenRefreshed { get; set; }
+
+    /// <summary>
+    /// 🚨 `true` khi lô đơn **BỊ CHẶN BÀN GIAO** vì chưa có nơi nhận đơn (lỗi #22).
+    /// Con trỏ đồng bộ **KHÔNG tiến** ⇒ sàn gửi lại ⇒ **đơn không mất**.
+    ///
+    /// 📌 Có mặt ở DTO là **có chủ ý**: lỗi #22 nguy hiểm vì màn hình admin hiển thị *"thành công"*.
+    /// Admin PHẢI nhìn thấy trạng thái bị chặn này thay vì tưởng đồng bộ đã xong.
+    /// </summary>
+    public bool BiChanDoChuaCoNoiNhanDon { get; set; }
+
+    /// <summary>Lý do chặn bàn giao (nếu có).</summary>
+    public string? LyDoChan { get; set; }
+
     public string? Message { get; set; }
     public DateTime StartedAtUtc { get; set; }
     public DateTime FinishedAtUtc { get; set; }

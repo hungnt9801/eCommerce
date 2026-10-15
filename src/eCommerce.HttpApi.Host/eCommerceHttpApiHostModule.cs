@@ -311,47 +311,35 @@ public class eCommerceHttpApiHostModule : AbpModule
         app.UseConfiguredEndpoints();
     }
     /// <summary>
-    /// Quét mọi hợp đồng sự kiện (`*Eto`) trong các assembly `eCommerce*` và đối chiếu với handler đã
-    /// đăng ký; sự kiện **không có người nhận** bị ghi log **Error** ngay khi khởi động.
+    /// Báo cáo **độ phủ sự kiện** ngay khi khởi động: sự kiện nào được publish mà **không có người nhận**
+    /// bị ghi log **Error** ⇒ biến lỗi **im lặng** (mất dữ liệu) thành lỗi **ồn ào ở mọi lần boot**.
     ///
-    /// ⚠️ Phạm vi quét là các assembly **ĐÃ NẠP** — nên log ghi rõ số assembly đã quét để nếu phạm vi
-    /// không đầy đủ thì **nhìn thấy được**, thay vì im lặng cho ra kết quả "sạch" giả tạo
-    /// (đây chính là bài học C16: quét theo "assembly đã nạp" rất dễ thiếu).
+    /// 🚨 Dùng **CHUNG** <see cref="IEventCoverageProbe"/> với quyết định
+    /// **fail-closed** trong `ChannelShopSyncer` (lỗi #22). Trước đây chỗ này tự quét riêng ⇒ log lúc boot
+    /// và hành vi lúc đồng bộ **có thể lệch nhau**; lệch theo hướng nguy hiểm nghĩa là log nói
+    /// *"có người nhận"* trong khi đơn vẫn mất. Nay **một nguồn sự thật duy nhất**.
+    ///
+    /// ⚠️ Phạm vi quét là các assembly `eCommerce*` **ĐÃ NẠP** ⇒ log ghi rõ **số assembly đã quét** để nếu
+    /// phạm vi không đầy đủ thì **nhìn thấy được**, thay vì im lặng cho ra kết quả "sạch" giả tạo
+    /// (bài học C16: quét theo "assembly đã nạp" rất dễ thiếu).
     /// </summary>
     private static void KiemTraDoPhuSuKien(ApplicationInitializationContext context)
     {
         var logger = context.ServiceProvider
             .GetRequiredService<ILogger<eCommerceHttpApiHostModule>>();
 
-        var assemblies = AppDomain.CurrentDomain.GetAssemblies()
-            .Where(a => a.GetName().Name?.StartsWith("eCommerce", StringComparison.Ordinal) == true)
-            .ToList();
+        var probe = context.ServiceProvider
+            .GetRequiredService<IEventCoverageProbe>();
 
-        var kieu = new List<Type>();
-
-        foreach (var asm in assemblies)
-        {
-            try
-            {
-                kieu.AddRange(asm.GetTypes());
-            }
-            catch (ReflectionTypeLoadException ex)
-            {
-                // Nạp một phần còn hơn bỏ qua toàn bộ — nhưng phải ghi lại để không giả vờ là đã quét đủ.
-                kieu.AddRange(ex.Types.Where(t => t is not null)!);
-                logger.LogWarning(ex, "Không nạp được toàn bộ kiểu từ assembly {Assembly}.", asm.GetName().Name);
-            }
-        }
-
-        var suKien = kieu.Where(t => t.Name.EndsWith(EventCoverageChecker.HauToSuKien, StringComparison.Ordinal)).ToList();
-        var ketQua = EventCoverageChecker.KiemTra(suKien, kieu);
+        var ketQua = probe.KetQua.PhuSong;
+        var soAssembly = probe.KetQua.SoAssemblyDaQuet;
 
         if (ketQua.CoSuKienBiBoQuen)
         {
             logger.LogError(
                 "🚨 PHÁT HIỆN {SoLuong} SỰ KIỆN KHÔNG CÓ NGƯỜI NHẬN (đã quét {SoAssembly} assembly). " +
                 "Sự kiện được publish nhưng không ai xử lý ⇒ DỮ LIỆU SẼ MẤT IM LẶNG.",
-                ketQua.SuKienKhongCoNguoiNhan.Count, assemblies.Count);
+                ketQua.SuKienKhongCoNguoiNhan.Count, soAssembly);
 
             foreach (var ten in ketQua.SuKienKhongCoNguoiNhan)
             {
@@ -362,7 +350,7 @@ public class eCommerceHttpApiHostModule : AbpModule
         {
             logger.LogInformation(
                 "Độ phủ sự kiện OK: {SoSuKien} hợp đồng sự kiện, tất cả đều có người nhận (đã quét {SoAssembly} assembly).",
-                ketQua.SuKienCoNguoiNhan.Count, assemblies.Count);
+                ketQua.SuKienCoNguoiNhan.Count, soAssembly);
         }
     }
 }
