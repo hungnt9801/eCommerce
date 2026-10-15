@@ -1788,3 +1788,60 @@ Worker resolve `StockReservationService` (scoped, giữ repository → `DbContex
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.2 | 15/10/2026 | *(agent, session GĐ1)* | **Job nhả chỗ giữ hàng quá hạn — tìm ra 2 nguyên nhân gốc và sửa**: (NN1) dòng đăng ký worker **không được ghi** do bẫy ghép chuỗi (phát hiện nhờ `git status`); (NN2) worker **chạy nhưng ném `ObjectDisposedException`** vì **thiếu `UnitOfWork`** ⇒ **job im lặng, hàng bị giữ vĩnh viễn**. **Kiểm chứng bằng DB thật**: `Held/Reserved=3` ⇒ **`Expired/Reserved=0` + bút toán `ReservationRelease=3`**, `fail: 0`. **Ghi 3 bài học bắt buộc cho mọi job** (§27.3) |
+
+---
+
+## 28. **CƠ CHẾ CHO "JOB IM LẶNG"** — biến 3 bài học của §27 thành test (15/10/2026)
+
+### 28.1 Đã làm — `BackgroundWorkerCoCheTests`
+
+| # | Luật (kiểm được **bằng văn bản nguồn**) | Chặn sự cố nào |
+|---|---|---|
+| 1 | Mọi lớp `AsyncPeriodicBackgroundWorkerBase` **phải có** `AddBackgroundWorkerAsync<TênWorker>` ở **đâu đó** trong `src/`/`modules/` | **NN1** (§27.2): đăng ký không được ghi ⇒ worker **không bao giờ chạy** mà không có lỗi nào |
+| 2 | Mọi worker **phải có log vô điều kiện** (`Logger.LogInformation`/`LogWarning`) | **NN2** (§27.3): *"im lặng"* không phân biệt *"không chạy"* với *"không có việc"* ⇒ **mọi phép kiểm chứng job mất giá trị** |
+| 3 | **Phạm vi quét không được thu hẹp im lặng** — phải thấy **đủ** các worker đã biết (≥ 6, gồm 3 tên chốt) | bài học **C16**: phép quét hỏng ⇒ các test trên **XANH vô nghĩa** |
+
+⚠️ **Luật "phải có `UnitOfWork`" KHÔNG được đưa vào test này** — nó chỉ đúng cho worker **có chạm DB**, mà
+*"có chạm DB"* **không** xác định được đáng tin bằng văn bản nguồn ⇒ luật sẽ **báo sai** và bị **vô hiệu hoá**
+(§28.3).
+
+### 28.2 ✅ BẰNG CHỨNG — **cơ chế tìm ra vi phạm THẬT ngay lần chạy đầu**
+
+| Bước | Kết quả |
+|---|---|
+| Chạy lần đầu | 🚨 **ĐỎ** — `ChannelSyncSupervisorWorker` **thiếu log vô điều kiện** ✅ *(cơ chế tìm ra vi phạm thật, không phải test trang trí)* |
+| Sửa gốc | thêm `Logger.LogInformation("JOB ĐỒNG BỘ KÊNH: bắt đầu nhịp…")` ở đầu `DoWorkAsync` |
+| Chạy lại | **3/3 xanh** ✅ |
+| 🎯 **Mutation test** | gỡ dòng đăng ký `StockReservationExpiryWorker` (sao lưu bằng `Copy-Item`) ⇒ test **ĐỎ**, thông điệp chỉ **đúng tên**: `StockReservationExpiryWorker (khai ở StockReservationExpiryWorker.cs)` ✅ |
+| Khôi phục | từ **file sao lưu** (không `git checkout`) ⇒ xanh lại ✅ |
+
+- build `--no-incremental`: **0 lỗi / 0 cảnh báo** · unit **689/689** (+3) · integration **38/38** · mermaid 197/0
+
+### 28.3 ⚠️ **RỦI RO TIỀM ẨN PHÁT HIỆN ĐƯỢC: 5/6 worker KHÔNG có `UnitOfWork`**
+
+Khảo sát vòng 36 (đọc mã nguồn 6 worker):
+
+| Worker | Có `UnitOfWork`? | Có chạm DB? |
+|---|---|---|
+| `StockReservationExpiryWorker` (mới sửa) | **✅ có** | có |
+| `TaxUnclassifiedSkusWorker` | ❌ **không** | **có** (đếm SKU) ⚠️ |
+| `AdministrativeUnitSyncWorker` | ❌ không | (cần xem) |
+| `CarrierAddressSyncWorker` | ❌ không | (cần xem) |
+| `ChannelSyncSupervisorWorker` | ❌ **không** | **có** (`IRepository<ChannelShop>`) ⚠️ |
+| `EInvoiceResubmissionWorker` | ❌ không | (cần xem) |
+
+🚨 **Vì sao đây là rủi ro thật, không phải lo xa:** **đúng** lỗi này đã **ĐO ĐƯỢC** ở `StockReservationExpiryWorker`
+(`ObjectDisposedException: Cannot access a disposed context instance` — §27.2 **NN2**). Nghĩa là các worker
+**chạm DB mà không có UoW** đang ở tình trạng *"có thể ném ở mỗi nhịp"* — và **triệu chứng duy nhất** là
+*"job không làm gì"*, tức **đúng loại lỗi im lặng mà cả §27–§28 tồn tại để chặn**.
+📌 **KHÔNG sửa mù cả 5 worker trong một lượt:** mỗi worker có luồng nghiệp vụ riêng (đồng bộ đơn vị hành chính,
+địa chỉ hãng vận chuyển, giám sát kênh, gửi lại hoá đơn) ⇒ sửa mà **không kiểm chứng từng cái** là **đổi hành vi
+không có bằng chứng** — đúng thứ dự án này cấm.
+⇒ **Việc của lát cắt sau (ưu tiên CAO):** bọc `UnitOfWork` cho **từng** worker + **kiểm chứng bằng log** rằng
+nó chạy và **không** ném (dùng chính dòng log vô điều kiện nay đã bắt buộc).
+
+### 28.4 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.3 | 15/10/2026 | *(agent, session GĐ1)* | **Cơ chế cho "job im lặng"**: `BackgroundWorkerCoCheTests` (3 luật: **đăng ký** · **log vô điều kiện** · **phạm vi quét không thu hẹp**) — biến 3 bài học §27 thành **test CI**. 🚨 **Cơ chế tìm ra vi phạm THẬT ngay lần chạy đầu** (`ChannelSyncSupervisorWorker` thiếu log) ⇒ sửa gốc. **Mutation test** chứng minh cơ chế nổ đúng (gỡ đăng ký ⇒ ĐỎ, chỉ đúng tên). ⚠️ **Ghi nhận rủi ro tiềm ẩn: 5/6 worker không có `UnitOfWork`** (§28.3) — **không sửa mù**, cần kiểm chứng từng worker |

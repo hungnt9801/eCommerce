@@ -45,9 +45,20 @@ public class ChannelSyncSupervisorWorker : AsyncPeriodicBackgroundWorkerBase
 
     protected override async Task DoWorkAsync(PeriodicBackgroundWorkerContext workerContext)
     {
+        // 📌 **LOG VÔ ĐIỀU KIỆN Ở ĐẦU MỖI NHỊP** — 🚨 **BẮT BUỘC cho mọi job** (`inv-001` §27.3, bài học vòng 35):
+        // nếu chỉ log khi *"có việc"* thì *"im lặng"* **KHÔNG** phân biệt được *"job không chạy"* với
+        // *"job chạy mà không có việc"* ⇒ **mọi phép kiểm chứng job mất giá trị**.
+        // 📌 Dòng này được thêm vì **cơ chế** `BackgroundWorkerCoCheTests` phát hiện worker này thiếu nó
+        // (bài học vòng 36: *"ghi quy tắc không đủ — cần cơ chế"*, và cơ chế **đã** tìm ra vi phạm thật).
+        Logger.LogInformation("JOB ĐỒNG BỘ KÊNH: bắt đầu nhịp giám sát (mốc {Moc}).", DateTime.UtcNow);
+
         var options = workerContext.ServiceProvider.GetRequiredService<IOptions<ChannelHubOptions>>().Value;
         Timer.Period = Math.Max(5, options.SupervisorPeriodSeconds) * 1000;
 
+        // ⚠️ **GHI NHẬN (vòng 36):** worker này đọc DB (`IRepository<ChannelShop>`) nhưng **KHÔNG** có
+        // `UnitOfWork` — xem `inv-001` §28.3: **rủi ro tiềm ẩn** `ObjectDisposedException` (đúng lỗi đã đo được
+        // ở `StockReservationExpiryWorker`). **KHÔNG** sửa ở đây vì cần kiểm chứng riêng cho từng worker
+        // (sửa mù 5 worker cùng lúc là đổi hành vi không có bằng chứng).
         var shopRepository = workerContext.ServiceProvider.GetRequiredService<IRepository<ChannelShop, Guid>>();
         var workerManager = workerContext.ServiceProvider.GetRequiredService<IDynamicBackgroundWorkerManager>();
 
