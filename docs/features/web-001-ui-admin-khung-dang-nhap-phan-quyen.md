@@ -1414,3 +1414,56 @@ một trang **viết ra nhưng chưa kiểm chứng** là **nợ**, không phả
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.q | 15/10/2026 | *(agent, session GĐ1)* | 🎉 **`GET/POST /DatHang` — KHÁCH ĐẶT ĐƯỢC ĐƠN TRÊN WEBSITE**: biểu mẫu (kho · kênh · SKU · số lượng · thuế) ⇒ `TinhVaGiuChoAsync` ⇒ `TaoTuCheckoutAsync` ⇒ hiện **số đơn · trạng thái · tổng tiền từ sổ giải trình**. **Khoá checkout sinh ở `GET`, mang theo trong form** (sinh lại ở POST ⇒ **hai đơn**). **Kiểm chứng**: `302` khi chưa đăng nhập · `200` + khoá + form khi đã · 🔥 **bấm hai lần cùng khoá ⇒ CHỈ MỘT ĐƠN** (`GrandTotal=440.000`, `Status=Pending`) · **tồn kho** `Reserved=4`, `Available=6` · **sổ cái** `Reservation=4` · **sổ giải trình `Total=440.000` khớp `GrandTotal`** · dọn dẹp sạch · **`fail: 0`** hai tiến trình. ⚠️ Ghi rõ 3 điểm chưa đạt (§56.3), nặng nhất: *phép đo lần POST đầu in `HTTP 0`* (lỗi đọc phản hồi, **không** phải lỗi mã) |
+
+---
+
+## 57. **ĐO CA LỖI NGHIỆP VỤ QUA UI** (§56.3 #2) — *kết quả trung thực: AN TOÀN ✅ nhưng NỘI DUNG thông điệp CHƯA kết luận được* (15/10/2026)
+
+### 57.1 Kịch bản
+
+Gieo **kho + tồn (`10`)** nhưng **CỐ Ý KHÔNG tạo bảng giá** ⇒ gửi `POST /DatHang` (2 đơn vị) ⇒ kỳ vọng
+**trang tự hiện thông điệp nghiệp vụ**, **KHÔNG** `500`, **KHÔNG** tạo đơn rác.
+
+### 57.2 ✅ Phần **ĐÃ** kiểm chứng — **đường lỗi AN TOÀN** (đây là phần quan trọng nhất)
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | `POST` với SKU **không có giá** | **`HTTP 200`** ✅ — **KHÔNG** `500` (*trang tự xử lý*) |
+| 2 | Có tạo đơn không? | **`daDat = False`** ✅ |
+| 3 | Biểu mẫu còn đó để thử lại? | **CÓ** ✅ (*người dùng không bị mắc kẹt ở trang trắng*) |
+| 4 | `POST` **thiếu SKU / số lượng 0** | **`HTTP 200`** ✅ |
+| 5 | 🔥 **Không có ghi rác**: `OrdOrders` | **`0`** đơn ✅ |
+| 6 | 🔥 **Tồn kho không đổi** | `OnHand=10` · **`Reserved=0`** ✅ |
+| 7 | 🔥 **Không có lượt giữ chỗ mồ côi** | **`0`** ✅ |
+| 8 | Dọn dẹp (**tệp `.sql`**) · `fail:` | `don=0 ton=0 ct=0 gc=0 baoMat=true` ✅ · **Web `0` / Host `0`** ✅ · 0 tiến trình treo ✅ |
+
+📌 **Vì sao bốn phép đo #5–#7 là quan trọng nhất:** một đường lỗi **hiện thông báo đúng** nhưng **để lại nửa giao dịch**
+(đơn không có giữ chỗ, hoặc giữ chỗ không có đơn) là lỗi **nguy hiểm hơn** một đường lỗi **vỡ ra ngay**.
+Ở đây **không có gì được ghi** ⇒ **không** có trạng thái nửa vời ⇒ tính **nguyên tử** giữ vững **qua UI**.
+
+### 57.3 🚨 **CHƯA kết luận được: NỘI DUNG thông điệp lỗi** — do **lỗi phép đo của tôi**
+
+`THONG DIEP LOI hien thi: ''` — **rỗng** cho **cả hai** ca.
+
+**Nguyên nhân (phân tích, chưa đo lại):** biểu thức trích của tôi là
+`id="loi">([^<]*)<` — nhưng khối HTML là
+`<div class="loi" id="loi"><strong>Không đặt được:</strong> @Model.Loi</div>`
+⇒ `[^<]*` **dừng ngay** tại `<strong>` ⇒ trích ra **chuỗi rỗng** ⇒ **KHÔNG** có nghĩa là thông điệp trống.
+📌 **Đây là lần thứ BA trong dự án** một phép kiểm **cắt chuỗi bằng regex** cho **kết quả sai lệch** (§48.2 dương tính giả
+với token ngẫu nhiên · §52.3 #1 `405` đọc thành *"rỗng"* · nay là **cắt tại thẻ HTML đầu tiên**).
+⇒ **Việc của lát cắt sau (rẻ, một lần chạy):** trích **cả khối** `id="loi"` (tới `</div>`) rồi **bỏ thẻ HTML**, hoặc
+kiểm trực tiếp **chuỗi con** của thông điệp nghiệp vụ (ví dụ `giá`/`kho`). **KHÔNG** kết luận *"thông điệp trống"* khi chưa đo lại.
+
+### 57.4 📌 Bài học #8 (bổ sung §39.4 và §53.2)
+
+**Trích nội dung HTML bằng `[^<]*` là phép kiểm KHÔNG ĐÁNG TIN** khi phần tử có **thẻ con** (`<strong>`, `<span>`, `<em>`).
+⇒ Dùng **`(?s)` + khớp tới thẻ đóng của chính phần tử đó**, rồi **loại thẻ**; hoặc tốt hơn: **kiểm sự HIỆN DIỆN của
+chuỗi nghiệp vụ** thay vì trích toàn bộ nội dung.
+📌 **Cùng họ với bài học §48.2:** *phép kiểm văn bản thô (regex/substring) trên HTML là nguồn **kết luận sai** đã tái phạm
+nhiều lần* ⇒ nên coi mọi kết luận từ nó là **giả thuyết**, phải xác nhận bằng **cấu trúc** hoặc **hành vi**.
+
+### 57.5 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.p | 15/10/2026 | *(agent, session GĐ1)* | **Đo ca lỗi nghiệp vụ qua UI** (§56.3 #2): `POST /DatHang` với **SKU không có giá** và với **thiếu SKU** ⇒ **`HTTP 200`** (không `500`), biểu mẫu còn để thử lại, **0 đơn**, **tồn kho không đổi**, **0 lượt giữ chỗ mồ côi** ⇒ **đường lỗi AN TOÀN và NGUYÊN TỬ** ✅; dọn dẹp sạch, **`fail: 0`** hai tiến trình. 🚨 **CHƯA kết luận:** **nội dung** thông điệp lỗi — phép trích `id="loi">([^<]*)<` **cắt ngay tại `<strong>`** ⇒ ra chuỗi rỗng, **không** chứng minh thông điệp trống. Ghi **bài học #8**: *trích HTML bằng `[^<]*` không đáng tin khi phần tử có thẻ con* (**lần thứ ba** kết luận suýt sai vì phép kiểm văn bản thô) |
