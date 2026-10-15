@@ -1380,3 +1380,60 @@ Hiện nạp **toàn bộ** `InvStockLedger` rồi gom trong bộ nhớ. Với s
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.6 | 15/10/2026 | *(agent, session GĐ1)* | **Lát cắt 5 — API kho + đối soát có metric**: `WarehouseAppService` (tạo/lọc/ngừng dùng kho; trùng mã ⇒ `Inventory:0003`) và **`InventoryReconciliationService`** (`DoiSoatTonKho` hàm thuần: bảng **dấu** 11 loại, **`Reservation` dấu `0`**; đối soát **hai chiều**) + **metric ĐẦU TIÊN cho kho** `inventory_recon_mismatch_skus`. **Kiểm chứng HTTP 8 phép đo**; phép đo quyết định: **tạo lệch thật ⇒ đối soát phát hiện được** (`OnHand=55 vs sổ cái=50`) rồi **khớp lại** sau khi sửa. Ghi rõ giới hạn (§20.4: nạp toàn sổ cái — **không** dùng được ở quy mô lớn) và quyết định dùng `Warning` (§20.3) |
+
+---
+
+## 21. TRẠNG THÁI TRIỂN KHAI — **`INV-002` GIỮ CHỖ (CHỐNG BÁN VƯỢT TỒN)** (15/10/2026)
+
+### 21.1 Đã làm
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| 1 | **`StockReservation`** (`InvStockReservations`) | `WarehouseId` · `Sku` · `Quantity` · `Status` (`Held`/`Released`/`Committed`/`Expired`) · **`ExpiresAtUtc`** · `ReferenceType`/`ReferenceId` (truy vết về giỏ/đơn) |
+| 2 | **`QuyetDinhGiuCho`** — **hàm THUẦN** | `CoTheBan = OnHand − Reserved`; `KiemTra(...)` trả **lý do** (không ném) ⇒ tầng gọi quyết định HTTP. 📌 Biên `yeuCau == coTheBan` **PHẢI được phép** — viết `<` thay vì `<=` thì **món cuối cùng không ai mua được** (hàng nằm kho vĩnh viễn, không lỗi nào chỉ ra) |
+| 3 | **`StockReservationService`** | 🚨 **GIÀNH KHOÁ `(tenant, kho, SKU)` TRƯỚC KHI ĐỌC TỒN KHO**; rồi `KiemTra` → `Reservation` (tăng `Reserved`) + bút toán sổ cái + bản ghi giữ chỗ — **cùng transaction**; có `NhaChoAsync` và **`NhaChoHetHanAsync`** (job) |
+| 4 | **API** (`/api/app/stock-reservation`) | `POST /giu-cho` · `GET /{id}` · `GET /danh-sach` · `POST /{id}/nha-cho` · `POST /nha-cho-het-han` |
+| 5 | **Hàng rào DB** | unique `(TenantId, ReferenceId, Sku, WarehouseId)` **có bộ lọc** `ReferenceId IS NOT NULL` + **sửa tay `NULLS NOT DISTINCT`** ⇒ **cùng một giỏ/đơn không giữ chỗ hai lần** cho cùng SKU |
+
+🚨 **VÌ SAO KHOÁ PHẢI ĐƯỢC GIÀNH *TRƯỚC* KHI ĐỌC TỒN KHO:** đọc trước là **vô nghĩa** — hai request cùng đọc
+`Available = 1`, rồi cùng khoá **tuần tự**, nhưng **cả hai đã quyết định** dựa trên số cũ ⇒ **cả hai giữ được**
+⇒ **bán hai lần cùng một món**. Đây **đúng** là lỗi mà `INV-002` tồn tại để chặn.
+
+📌 **`Released` và `Expired` là hai trạng thái KHÁC NHAU có chủ ý:** cùng trả hàng về `Available`, nhưng lý do khác
+(*khách/đơn huỷ* vs *hết TTL*). Gộp làm một thì không trả lời được *"bao nhiêu đơn mất vì khách bỏ ngang?"*.
+
+### 21.2 ✅ BẰNG CHỨNG HTTP THẬT (Host + PostgreSQL 17) — 9 phép đo
+
+Kho có **đúng 1** món (`OnHand = 1`).
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | Chuẩn bị: nhập 1, ghi sổ | `OnHand/Reserved/Available = 1/0/1` ✅ |
+| 2 | **KHÁCH-1 giữ món cuối** | `200` · `Held` · hết hạn `10:15` ⇒ **`1/1/0`** ✅ |
+| 3 | 🚨 **KHÁCH-2 tranh món cuối** | **`eCommerce:Inventory:0001`** · **`coTheBan = 0` trả về cho client** (để hiển thị *"còn lại 0"*) · `Reserved` **vẫn `1`** ✅ ⇒ **KHÔNG bán vượt tồn** |
+| 4 | Khách 1 **huỷ** | `Released` ⇒ **`1/0/1`** ✅ |
+| 5 | 🚨 **Nhả chỗ LẦN HAI** | **`eCommerce:Inventory:0030`** · `1/0/1` **không đổi** ✅ (*không cộng `Available` gấp đôi*) |
+| 6 | Khách 2 giữ **lại được** (vì khách 1 đã nhả) | `200` · `Held` ⇒ `1/1/0` ✅ |
+| 7 | **JOB nhả chỗ quá hạn** (`at = 10:30`) | `soLuotDaNha = 1` ⇒ **`1/0/1`** ✅ · DB có **1 `Released` + 1 `Expired`** ⇒ **phân biệt đúng lý do** |
+| 8 | **Sổ cái + đối soát** | 5 bút toán (`Receipt`, `Reservation`, `ReservationRelease` ×2) · `BalanceAfter = 1` (OnHand **không** đổi) · **`soCapLech = 0`** ✅ — **giữ chỗ KHÔNG làm lệch đối soát** (đúng như `DoiSoatTonKho` cho `Reservation` dấu `0`) |
+| 9 | ⚠️ Giữ chỗ **trùng nguồn** (cùng `ReferenceId` + SKU) | **`500`** — unique index **chặn được** (không tạo trùng) nhưng lỗi ra dưới dạng **`23505` chưa được map** ⇒ xem §21.3 |
+
+- build `--no-incremental`: **0 lỗi / 0 cảnh báo** · unit **664/664** (+18) · integration **38/38** · mermaid 197/0
+- **DB thật:** `InvStockReservations` + `IX_InvStockReservations_TenantId_Ref_Sku_Kho` **UNIQUE … NULLS NOT DISTINCT
+  WHERE ReferenceId IS NOT NULL**; tổng **39** index `NULLS NOT DISTINCT`; `schema.sql` sinh lại
+- Dọn dẹp: 0 kho / 0 giữ chỗ / 0 tồn / 0 sổ cái ✅ · cờ bảo mật đã khôi phục
+
+### 21.3 ⚠️ Còn lại — **nay có 1 việc đã thành "nợ" rõ ràng, không thể trì hoãn thêm**
+
+| # | Việc | Vì sao **không** trì hoãn được nữa |
+|---|---|---|
+| 1 | 🚨 **Exception filter map `23505` → mã nghiệp vụ** | Đã xuất hiện ở **3 chỗ**: sổ cái `INV-001` (§19.5 #2), **giữ chỗ trùng nguồn** (§21.2 #9 — **đo được `500`**). Mỗi lần "trùng" hợp lệ về nghiệp vụ lại thành **`500`** ⇒ client **không phân biệt được** *"đã giữ rồi"* với *"hệ thống hỏng"* ⇒ **client sẽ retry** ⇒ tệ hơn |
+| 2 | **Job nhả chỗ chạy định kỳ** | hiện **gọi qua endpoint**; chưa có worker (bài học `CHN-002`: job phải `Timer.RunOnStart` để chạy ngay sau restart) |
+| 3 | **Chốt giữ chỗ thành xuất kho** (`Committed` → phiếu xuất) | `Chot()` đã có + test *"chốt giữ chỗ quá hạn ⇒ NÉM"*, **chưa** nối vào đường đơn hàng (`SAL-*`) |
+| 4 | 📌 **Chốt với BA**: diễn giải `Quantity` phiếu kiểm kê (§18.5) | vẫn treo |
+
+### 21.4 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.7 | 15/10/2026 | *(agent, session GĐ1)* | **`INV-002` — giữ chỗ**: `StockReservation` (+`ExpiresAtUtc`, `Released` vs `Expired`) · `QuyetDinhGiuCho` (**hàm thuần**, biên `== coTheBan` được phép) · `StockReservationService` (**giành khoá TRƯỚC khi đọc tồn kho** — nếu không thì **hai khách cùng giữ được món cuối**) + job nhả chỗ quá hạn · API 5 route · unique index **có bộ lọc** `NULLS NOT DISTINCT`. **Kiểm chứng HTTP 9 phép đo**: **hai khách tranh món cuối ⇒ chỉ một người giữ được** (`coTheBan = 0`), nhả hai lần **bị chặn** (`0030`), job nhả **đúng lượt quá hạn** (`Expired` ≠ `Released`), **giữ chỗ không làm lệch đối soát**. 🚨 Ghi nhận **`500` ở ca giữ chỗ trùng nguồn** ⇒ exception filter thành **nợ không trì hoãn được** (§21.3 #1) |

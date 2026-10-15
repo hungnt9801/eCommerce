@@ -1876,3 +1876,40 @@ VALUES ('20261015113253_Inv001_Fix_SoCai_Unique_ThemMovementType', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE TABLE "InvStockReservations" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "WarehouseId" uuid NOT NULL,
+    "Sku" character varying(64) NOT NULL,
+    "Quantity" integer NOT NULL,
+    "Status" integer NOT NULL,
+    "ExpiresAtUtc" timestamp with time zone NOT NULL,
+    "ReferenceType" character varying(64),
+    "ReferenceId" character varying(128),
+    "ReleasedAtUtc" timestamp with time zone,
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_InvStockReservations" PRIMARY KEY ("Id")
+);
+
+CREATE UNIQUE INDEX "IX_InvStockReservations_TenantId_Ref_Sku_Kho" ON "InvStockReservations" ("TenantId", "ReferenceId", "Sku", "WarehouseId") WHERE "ReferenceId" IS NOT NULL;
+
+CREATE INDEX "IX_InvStockReservations_TenantId_Status_ExpiresAtUtc" ON "InvStockReservations" ("TenantId", "Status", "ExpiresAtUtc");
+
+DROP INDEX "IX_InvStockReservations_TenantId_Ref_Sku_Kho";
+
+CREATE UNIQUE INDEX "IX_InvStockReservations_TenantId_Ref_Sku_Kho" ON "InvStockReservations" ("TenantId", "ReferenceId", "Sku", "WarehouseId") NULLS NOT DISTINCT WHERE "ReferenceId" IS NOT NULL;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261015115023_Inv002_StockReservation', '10.0.11');
+
+COMMIT;
+

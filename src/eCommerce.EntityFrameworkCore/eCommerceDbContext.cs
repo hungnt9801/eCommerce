@@ -82,6 +82,9 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
     public DbSet<Inventory.StockDocument> StockDocuments { get; set; } = default!;
     public DbSet<Inventory.StockDocumentLine> StockDocumentLines { get; set; } = default!;
 
+    // INV-002 — **giữ chỗ** (reservation) có TTL; chống bán vượt tồn khi nhiều khách tranh nhau.
+    public DbSet<Inventory.StockReservation> StockReservations { get; set; } = default!;
+
     // ---- Orders ----
     public DbSet<Orders.Order> Orders { get; set; } = default!;
     public DbSet<Orders.OrderLine> OrderLines { get; set; } = default!;
@@ -474,6 +477,29 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
                 .WithMany()
                 .HasForeignKey(x => x.StockDocumentId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ── INV-002: GIỮ CHỖ ─────────────────────────────────────────────────────────────────────
+        builder.Entity<Inventory.StockReservation>(b =>
+        {
+            b.ToTable("InvStockReservations");
+            b.ConfigureByConvention();
+
+            b.Property(x => x.Sku).IsRequired().HasMaxLength(64);
+            b.Property(x => x.Status).HasConversion<int>();
+            b.Property(x => x.ReferenceType).HasMaxLength(64);
+            b.Property(x => x.ReferenceId).HasMaxLength(128);
+
+            // Truy vấn của JOB nhả chỗ: các lượt `Held` đã quá hạn.
+            b.HasIndex(x => new { x.TenantId, x.Status, x.ExpiresAtUtc })
+                .HasDatabaseName("IX_InvStockReservations_TenantId_Status_ExpiresAtUtc");
+
+            // Một nguồn (giỏ/đơn) + một SKU chỉ giữ chỗ **MỘT** lần ⇒ chống tạo trùng khi retry.
+            // (Sửa tay `NULLS NOT DISTINCT` trong migration — nếu thiếu thì `TenantId = NULL` làm index vô hiệu.)
+            b.HasIndex(x => new { x.TenantId, x.ReferenceId, x.Sku, x.WarehouseId })
+                .IsUnique()
+                .HasFilter("\"ReferenceId\" IS NOT NULL")
+                .HasDatabaseName("IX_InvStockReservations_TenantId_Ref_Sku_Kho");
         });
 
         builder.Entity<Inventory.StockLedgerEntry>(b =>

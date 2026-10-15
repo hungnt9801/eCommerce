@@ -29,6 +29,17 @@ public static class InventoryErrorCodes
     /// <summary>Chứng từ **đã ghi sổ** ⇒ **KHÔNG** huỷ (muốn đảo phải tạo chứng từ ĐẢO).</summary>
     public const string ChungTuDaGhiSoKhongHuyDuoc = Nhom + "0013";
 
+    // ---- `INV-002` — giữ chỗ (reservation) ----
+
+    /// <summary>Lượt giữ chỗ **không còn `Held`** ⇒ không nhả/chốt được lần nữa.</summary>
+    public const string GiuChoKhongConGiu = Nhom + "0030";
+
+    /// <summary>Giữ chỗ **đã hết hạn** mà vẫn cố chốt ⇒ nguy cơ **bán hai lần cùng một món**.</summary>
+    public const string GiuChoDaHetHan = Nhom + "0031";
+
+    /// <summary>**Không đủ hàng** để giữ chỗ (dùng chung mã `0001` với "không đủ tồn" — cùng một nguyên nhân).</summary>
+    public const string KhongDuHangDeGiu = KhongDuTon;
+
     /// <summary>Mã kho **đã tồn tại** trong tenant (`INV-001` ADR-01).</summary>
     public const string MaKhoDaTonTai = Nhom + "0003";
 

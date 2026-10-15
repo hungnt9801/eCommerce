@@ -25,3 +25,20 @@ public enum StockDocumentStatus
     /// <summary>Đã huỷ (chỉ huỷ được khi còn `Draft`).</summary>
     Cancelled = 2
 }
+
+/// <summary>Trạng thái một lượt **giữ chỗ** (`INV-002`).</summary>
+public enum ReservationStatus
+{
+    /// <summary>Đang giữ — hàng đã bị trừ khỏi `Available` nhưng **chưa** xuất kho.</summary>
+    Held = 0,
+
+    /// <summary>Đã **nhả** (khách huỷ / hết TTL) — hàng trở lại `Available`.</summary>
+    Released = 1,
+
+    /// <summary>Đã **chốt** thành xuất kho thật (đơn được xác nhận).</summary>
+    Committed = 2,
+
+    /// <summary>Hết hạn (do job nhả) — **phân biệt** với `Released` để biết *vì sao* hàng được nhả.</summary>
+    Expired = 3
+}
+

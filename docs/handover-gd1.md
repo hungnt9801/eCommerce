@@ -21,7 +21,7 @@
 | Điểm phát metric | **7/12** |
 
 > 📌 **CẬP NHẬT 15/10/2026 (lượt GĐ1 thứ 6 — `CAT-001` xong domain+API+ETO):** các số ở bảng trên là
-> **mốc bàn giao**. Sau các lượt GĐ1: **Test = 646 unit + 38 integration** · **2 tiến trình**
+> **mốc bàn giao**. Sau các lượt GĐ1: **Test = 664 unit + 38 integration** · **2 tiến trình**
 > (Host **5000** API/auth · Web **5100** UI) · build **0 lỗi/0 cảnh báo** · **lỗi #22 đã sửa** (fail-closed
 > **và** nơi nhận thật) · **`F-403` đã sửa** · **§7.0 xong #2/#5/#7** · **DB: 20 index `NULLS NOT DISTINCT`**
 > · **`CAT-001` xong** (domain + 11 route API + 2 ETO) · 🚨 **log khởi động nay 0 Error** (phân loại
