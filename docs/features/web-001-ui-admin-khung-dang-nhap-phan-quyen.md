@@ -1845,3 +1845,51 @@ Nay đã chứng minh: **Web ⇒ DB ⇒ API vận hành** là **một mạch li�
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.h | 15/10/2026 | *(agent, session GĐ1)* | 🎉 **Đường nối UI → API kiểm chứng**: probe **viết lại theo bài học #11** (mỗi việc một dòng · biến có tên · **in giá trị trung gian**) chạy hết ngay lần đầu. **Đơn do WEB tạo** (`WEB-WEB-b3370ebb…`, `440.000`) **xác nhận được qua API** ⇒ **`Confirmed`**; 🔥 **bất biến `SAL-003` giữ đúng**: `OnHand` **và** `Reserved` cùng giảm `4` ⇒ **`Available` KHÔNG đổi** (`10/4/6` ⇒ `6/0/6`); giữ chỗ `Committed`; **4 bút toán sổ cái**; dọn sạch; **`fail: 0`**; 0 tiến trình treo |
+
+---
+
+## 66. **ĐO ĐƯỜNG NỐI UI → API CHO HUỶ VÀ TRẢ HÀNG: CHƯA XONG** (15/10/2026)
+
+### 66.1 Mục đích
+
+Sau khi §65 đã chứng minh **XÁC NHẬN** chạy được trên đơn do Web tạo, đo nốt **hai** chuyển trạng thái còn lại:
+**HUỶ** (`Reserved` ↓ · `Available` ↑ · `OnHand` không đổi) và **TRẢ HÀNG** (`OnHand` ↑ · `Available` ↑ · có `CustomerReturn`).
+
+### 66.2 🚨 Kết quả: **CHƯA chạy được** — **HAI lỗi liên tiếp trong probe của tôi**
+
+| Lần | Lỗi | Bản chất |
+|---|---|---|
+| 1 | **`ParserError: Missing closing '}'`** (dòng 30) | **ngoặc đơn lệch** khi tôi viết `$idBG = (Goi … }).Body \| ConvertFrom-Json).id` — **thừa một `)`** ⇒ PowerShell **không parse** ⇒ **không dòng nào chạy** |
+| 2 | **`Invoke-RestMethod` lỗi ở `LayToken`** (dòng 25) | probe **parse được**, chạy tới bước lấy token thì **Host chưa sẵn sàng** ⇒ dừng. **Chưa** xác định chắc nguyên nhân (nghi khởi động chậm / hàm chờ Host trả về sớm) |
+
+✅ **Không ảnh hưởng sản phẩm và không để lại dữ liệu:** probe lần 2 chạy tới `finally` ⇒ in
+`DON DEP: don=0 dong=0 ton=0 donvi=0 gc=0 sc=0 baoMat=true` ✅ · **0 tiến trình treo** ✅ · `git status` sạch ✅.
+
+### 66.3 ⚠️ Điều **vẫn còn nợ**
+
+| Việc | Trạng thái |
+|---|---|
+| `XÁC NHẬN` trên đơn do Web tạo | ✅ **đã kiểm chứng** (§65) |
+| **`HUỶ`** trên đơn do Web tạo | 🚨 **CHƯA kiểm chứng** |
+| **`TRẢ HÀNG`** trên đơn do Web tạo | 🚨 **CHƯA kiểm chứng** |
+| Quản lý đơn **trên UI** (`/DonHang`) | ⏳ chưa làm |
+
+📌 **Đánh giá rủi ro (để không phóng đại):** `HUỶ`/`TRẢ HÀNG` **đã** được kiểm chứng **đầy đủ ở tầng API** (`inv-001` §26 · §30–§36)
+**trên đơn do API tạo**. Điều **chưa** biết chỉ là chúng có phụ thuộc **định dạng số đơn `WEB-…`** hay không — mà §65 **đã**
+loại khả năng đó cho `XÁC NHẬN` (vì `XacNhanAsync` tra theo **`CheckoutIdempotencyKey`**). Nhiều khả năng `HUỶ`/`TRẢ HÀNG`
+cũng vậy, nhưng **"nhiều khả năng" không phải là "đã đo"** ⇒ **vẫn ghi là nợ**.
+
+### 66.4 📌 Bài học #12 — **kiểm CÚ PHÁP trước khi chạy probe dài**
+
+Cả hai lỗi ở §66.2 đều **không** liên quan nghiệp vụ, nhưng **ăn mất một vòng**.
+⇒ **Quy tắc bổ sung:**
+1. **Kiểm cú pháp TRƯỚC** — `[Parser]::ParseFile(...)` (đã dùng ở vòng 62 và **đã** cứu một lần) ⇒ chạy **trước mọi probe dài**;
+2. **Ngoặc đơn lệch là lỗi phổ biến nhất** khi ghép `(… .Body \| ConvertFrom-Json).id` ⇒ **tách thành hai dòng**:
+   `$r = Goi …` rồi `$x = $r.Body \| ConvertFrom-Json` rồi `$id = $x.id` (**bài học #11** một lần nữa);
+3. **Chờ Host phải kiểm bằng `200` của `/health-status`**, và nếu **không** lên thì **dừng với thông báo rõ** thay vì để lỗi token mơ hồ.
+
+### 66.5 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.g | 15/10/2026 | *(agent, session GĐ1)* | **Thử đo đường nối UI→API cho HUỶ và TRẢ HÀNG — CHƯA chạy được** do **hai lỗi probe của tôi**: (1) **ngoặc đơn lệch** ⇒ `ParserError` ⇒ không dòng nào chạy; (2) sau khi sửa cú pháp, dừng ở **`LayToken`** (Host chưa sẵn sàng). ✅ **Không ảnh hưởng sản phẩm**: dọn dẹp sạch (`don=0 … baoMat=true`), **0 tiến trình treo**, `git status` sạch. 🚨 **Nợ ghi rõ**: `HUỶ`/`TRẢ HÀNG` trên đơn do Web tạo **chưa kiểm chứng** (dù đã kiểm **đầy đủ ở tầng API** trên đơn do API tạo). **Bài học #12**: *kiểm cú pháp bằng `Parser::ParseFile` TRƯỚC mọi probe dài; tách biểu thức ghép thành nhiều dòng; chờ Host phải kiểm bằng `200`* |
