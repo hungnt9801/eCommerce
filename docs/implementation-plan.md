@@ -400,7 +400,7 @@ một khuyến mãi phức tạp (nhiều điều kiện AND/OR) tính đúng ti
 | CAT-002 | Cây danh mục & thuộc tính/tổ hợp biến thể | Catalog |
 | CAT-003 | Media, SEO slug & **hiển thị theo kênh** | Catalog |
 | PRC-001 | Bảng giá & **giá theo kênh** | Pricing |
-| PRC-002 | Giá bậc thang (tier) & **pipeline tính giá + làm tròn** | Pricing | 🟡 **lát cắt 1 XONG (15/10/2026)** — `TierPriceSet`/`TierPrice` + `ChonBacThang` (trùng `MinQuantity` ⇒ `0008`) + 2 unique index `NULLS NOT DISTINCT`; lát cắt 2: **tính tiền B6–B8 + 4 điểm làm tròn R1–R4** (hàm thuần) XONG; **còn**: **lắp B1–B5 + API tính tiền** (mới làm bậc thang có tác dụng), API bậc thang, sổ giải trình |
+| PRC-002 | Giá bậc thang (tier) & **pipeline tính giá + làm tròn** | Pricing | 🟡 **lát cắt 1 XONG (15/10/2026)** — `TierPriceSet`/`TierPrice` + `ChonBacThang` (trùng `MinQuantity` ⇒ `0008`) + 2 unique index `NULLS NOT DISTINCT`; lát cắt 2: **tính tiền B6–B8 + 4 điểm làm tròn R1–R4** (hàm thuần) XONG; lát cắt 3: **LẮP PIPELINE B1→B8 + API `price-calculation/tinh-gio`** XONG — **bậc thang đã có tác dụng**; **còn**: B4 (khuyến mãi/`PRO-*`), API bậc thang, `ChannelShopId` cho bộ bậc thang, sổ giải trình |
 | INV-001 | Nhập / chuyển / kiểm kê & **sổ cái kho (append-only)** | Inventory |
 | INV-002 | **Giữ chỗ (reservation) + TTL** & job nhả kho | Inventory |
 | INV-003 | **Phân bổ tồn theo kênh** & tra tồn khả dụng | Inventory |

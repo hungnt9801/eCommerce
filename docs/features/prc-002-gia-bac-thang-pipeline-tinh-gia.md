@@ -1180,3 +1180,60 @@ không ai biết); trộn loại tiền ⇒ **NÉM** (`PRC-001` BR-010).
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.3 | 15/10/2026 | *(agent, session GĐ1)* | **Lát cắt 2 — tính tiền đơn**: `TinhTienDon` (hàm **thuần**) cài **R1** (tròn đơn giá **trước** khi nhân), **R2/R3** (phân bổ bằng `MoneyAllocator` — **bảo toàn tổng**, rồi tròn từng phần), **R4** (thuế **theo từng dòng**), **tổng = Σ dòng đã tròn** (🚫 không tròn tổng) + `MaChinhSachLamTron` (ADR-08). **+16 unit**, gồm **đối chứng số học** chứng minh R4 không vô nghĩa (`153` vs `152` khi tròn tổng). Ghi rõ **§17.3**: pipeline B1–B5 + API tính tiền **chưa** làm ⇒ bậc thang **vẫn** chưa có tác dụng |
+
+---
+
+## 18. TRẠNG THÁI TRIỂN KHAI — **LÁT CẮT 3: LẮP PIPELINE B1→B8 (BẬC THANG CÓ TÁC DỤNG)** (15/10/2026)
+
+### 18.1 Đã làm
+
+| Bước | Thành phần | Ghi chú |
+|---|---|---|
+| **B1** | `ChinhSachSnapshot` (mã + `IRoundingPolicy` + chính sách thiếu giá + `At`) | đọc **MỘT LẦN** ở đầu request (ADR-08) — đọc lại giữa pipeline ⇒ hai dòng **cùng một** hoá đơn dùng **hai chính sách** ⇒ tổng không khớp Σ dòng |
+| **B2** | giá cơ sở **4 cấp** (`GiaCoSoResolver` — `PRC-001` D7) | **không đổi** luật đã kiểm chứng |
+| **B3** | ứng viên **BẬC THANG** (`ChonBacThang` — ADR-02) | theo phạm vi: khớp **kênh** → **mọi kênh**; nhiều bộ cùng phạm vi ⇒ `Priority` lớn nhất, bằng nhau ⇒ theo `Id` (**ổn định**, không phụ thuộc thứ tự DB) |
+| **B4** | điều chỉnh/khuyến mãi | **CHƯA có** (chờ `PRO-*`) — ghi ở §18.3 |
+| **B5** | `ChonDonGiaCuoi` — **hàm THUẦN** | **bậc thang thắng giá cơ sở** khi hiệu lực; ngược lại dùng giá cơ sở |
+| **B6–B8** | `TinhTienDon` (`PRC-002` lát cắt 2) | R1 tròn đơn giá → R2/R3 phân bổ → R4 thuế từng dòng → **tổng = Σ dòng** |
+| API | `POST /api/app/price-calculation/tinh-gio` | trả **chi tiết từng dòng** (`BaseLevel` · `WinningLevel` · `TierApplied` · `UnitPriceBeforeRounding` · phân bổ · thuế) ⇒ **giải trình được** (ADR-03) |
+
+📌 **Vì sao B3/B5 TÁCH khỏi `GiaCoSoResolver`** (quyết định thiết kế, ghi rõ): `GiaCoSoResolver` **NÉM** khi hai ứng
+viên **cùng cấp + cùng `Priority`**. Nếu nhét bậc thang vào cùng cấp với giá bảng giá mà `Priority` bằng nhau thì
+hệ thống **NÉM `Pricing:0001` ⇒ checkout CHẾT** — biến một tính năng (giảm giá theo số lượng) thành **sự cố**.
+
+### 18.2 ✅ BẰNG CHỨNG HTTP THẬT (Host + PostgreSQL 17)
+
+Giỏ: `S1 × 10` (thuế 10%) + `S2 × 2` (thuế 8%) · giảm giá cấp đơn `10.000` · phí `5.000`, bảng giá `S1=100.000`, `S2=50.000`, bộ bậc thang `S1: từ 10 ⇒ 90.000`.
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | **Bậc thang THẮNG** cho `S1` (SL 10) | `capCoSo = BangGia` (100.000) · **`capThang = BacThang`** · **đơn giá `90.000`** ✅ — 🚨 **đây là lần đầu bậc thang có tác dụng lên giá bán** |
+| 2 | `S2` (SL 2, dưới bậc) | `BacThang = false` · đơn giá `50.000` ✅ (không áp bậc oan) |
+| 3 | **R2/R3 phân bổ bảo toàn tổng** | giảm `9.000 + 1.000 = 10.000` ✅ · phí `4.500 + 500 = 5.000` ✅ |
+| 4 | **R4 thuế theo từng dòng** | `89.550` (dòng 1) + `7.960` (dòng 2) = **`97.510`** ✅ — kiểm tay: `(900.000−9.000+4.500)×10% = 89.550`; `(100.000−1.000+500)×8% = 7.960` |
+| 5 | **Tổng = Σ dòng đã làm tròn** | `1.092.510` = `985.050 + 107.460` ✅ (`khop = True`, kiểm bằng phép cộng độc lập trong probe) |
+| 6 | Chính sách làm tròn **được ghi lại** | `half-away-from-zero` ✅ (ADR-08) |
+| 7 | Dòng **không có giá nào** | **`eCommerce:Pricing:0004`** ✅ (không trả giá 0 thay cho *"không biết giá"*) |
+| 8 | 🔍 **Số lệnh EF cho CẢ giỏ = `5`** (đếm `Executed DbCommand` giữa hai marker) | ✅ **đạt NFR-002** — 5 lần nạp theo lô, **không** truy vấn trong vòng lặp |
+| 9 | Log Host | **0 dòng `fail:`** ✅ · dòng tổng kết có đủ trước/giảm/phí/thuế/tổng |
+
+- build `--no-incremental`: **0 lỗi / 0 cảnh báo** · unit **578/578** (+4 cho B5) · integration **34/34** · mermaid 197/0
+- Không đổi schema (không migration mới)
+
+### 18.3 ⚠️ Quyết định & lỗ hổng **đã biết** (ghi rõ, không che)
+
+| # | Vấn đề | Trạng thái / hệ quả |
+|---|---|---|
+| 1 | **Bậc thang LUÔN thắng giá cơ sở** khi hiệu lực — kể cả giá cơ sở đến từ **cấp shop** | Hệ quả của việc tách B3/B5 (§18.1). Nếu nghiệp vụ cần *"giá shop thắng bậc thang"* thì **phải** bổ sung luật ưu tiên giữa hai nguồn ⇒ **CẦN NGƯỜI QUYẾT** |
+| 2 | 🚨 `TierPriceSet` **CHƯA có cột `ChannelShopId`** | Bộ bậc thang ở phạm vi `ChannelShop` **chưa phân biệt được theo SHOP** (khớp theo **kênh**) ⇒ muốn theo từng shop phải **thêm cột + migration**. 📌 **Không tự đoán shop**: đoán sai ⇒ áp bậc thang shop A cho shop B ⇒ **bán sai giá** |
+| 3 | **B4 (điều chỉnh/khuyến mãi)** | **chưa có** — cần module `PRO-*`. Giảm giá hiện chỉ vào ở **cấp đơn** (`OrderDiscount`) |
+| 4 | Hệ thống **không** tự "chọn giá rẻ hơn" | Chọn theo **luật đã công bố** (có test riêng cho trường hợp bậc thang **đắt hơn** giá cơ sở ⇒ vẫn thắng). Tự chọn giá rẻ hơn ⇒ **doanh thu không dự đoán được** và người cấu hình **không hiểu vì sao** giá ra như vậy |
+| 5 | **Chính sách làm tròn / thiếu giá** vẫn **cứng trong code** | cấu hình theo tenant là việc của D14 — chưa làm |
+| 6 | **Sổ giải trình** `PriceCalculationRecords` + `IdempotencyKey` (ADR-13) | **chưa có** ⇒ *"vì sao đơn này giá này"* hiện trả lời được bằng **log**, chưa bằng **dữ liệu** |
+| 7 | **API bậc thang** (tạo bộ/thêm bậc/phát hành/kích hoạt) | **chưa có** — E2E phải chèn `TierPriceSet`/`TierPrice` bằng SQL |
+
+### 18.4 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.4 | 15/10/2026 | *(agent, session GĐ1)* | **Lát cắt 3 — lắp pipeline B1→B8**: `ChinhSachSnapshot` (ADR-08) + `ChonDonGiaCuoi` (B5, hàm thuần) + `PriceCalculationAppService` (**nạp 5 truy vấn cho cả giỏ**) + API `POST /api/v1/…/price-calculation/tinh-gio` trả **chi tiết từng dòng** (giải trình). 🚨 **Bậc thang CHÍNH THỨC có tác dụng lên giá bán** (đo được: `S1 × 10` ⇒ `90.000` thay vì `100.000`). **Kiểm chứng HTTP 9 phép đo**: phân bổ bảo toàn tổng · thuế từng dòng khớp **kiểm tay** · **tổng = Σ dòng** · `0004` khi không có giá · **5 lệnh EF** · **0 `fail:`**. Ghi rõ **7 quyết định/lỗ hổng** (§18.3), trong đó **2 việc cần người quyết** |

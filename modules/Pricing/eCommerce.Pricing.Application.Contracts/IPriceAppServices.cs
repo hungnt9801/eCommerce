@@ -49,3 +49,20 @@ public interface IPriceResolverAppService : IApplicationService
     /// <summary>Tra giá cho **nhiều** dòng (giỏ hàng) trong **một** lần nạp — tránh N+1 (NFR-002).</summary>
     Task<List<ResolvedPriceDto>> ResolveManyAsync(ResolveManyInput input);
 }
+
+/// <summary>
+/// 🚨 **TÍNH TIỀN CHO CẢ GIỎ** (`PRC-002` §4.2 — pipeline **B1→B8**) — điểm vào mà **checkout** (`SAL-002`) gọi.
+///
+/// 📌 **KHÁC `IPriceResolverAppService` ở đâu:** `IPriceResolverAppService` chỉ trả **đơn giá** (B2, giá cơ sở).
+/// Interface **này** chạy **hết pipeline**: giá cơ sở → **bậc thang** (B3) → chọn đơn giá (B5) → **làm tròn R1**
+/// → **phân bổ giảm giá/phí** (R2/R3) → **thuế từng dòng** (R4) → **tổng = Σ dòng**.
+/// ⇒ Dùng **cái này** cho giỏ/checkout; dùng cái kia khi chỉ cần **tra một đơn giá** (ví dụ hiển thị "từ … đồng").
+/// </summary>
+public interface IPriceCalculationAppService : IApplicationService
+{
+    /// <summary>
+    /// Tính tiền cả giỏ. **NÉM** `Pricing:0004` khi một dòng **không có giá nào** (kể cả giá niêm yết) —
+    /// **không** bao giờ trả giá 0 thay cho "không biết giá" (D14).
+    /// </summary>
+    Task<GioTinhTienDto> TinhGioAsync(TinhGioInput input);
+}
