@@ -102,10 +102,12 @@ public class DatHangController : Controller
                 OrderDiscount = 0,
                 OrderFee = 0,
                 IdempotencyKey = form.KhoaCheckout,
-                Items = new List<DongCheckoutDto>
-                {
-                    new() { Sku = form.Sku, Quantity = form.SoLuong, TaxRate = thue }
-                }
+                // 🚨 **GIỎ NHIỀU DÒNG (vòng 72)** — `Sku` nhận **danh sách** `SKU:SL,SKU:SL`.
+                // 📌 **Tương thích ngược:** một SKU trần (không `:`) ⇒ dùng `SoLuong` như trước.
+                // 📌 **Vì sao KHÔNG sửa view ở bước này:** đổi view + controller **cùng lúc** làm phép kiểm chứng
+                // khó **tách bạch** nguyên nhân khi sai. Bước này chỉ **nới dữ liệu vào** ⇒ nếu hỏng thì hỏng ở **một chỗ**.
+                // ⏳ Việc còn lại: **giao diện nhiều dòng thật** (nhiều ô nhập) — lát cắt sau.
+                Items = GioHelper.PhanTichGio(form.Sku, form.SoLuong, thue)
             });
 
             var don = await _donHang.TaoTuCheckoutAsync(new TaoDonTuCheckoutInput
@@ -202,6 +204,39 @@ public class KhoChonDto
     public string Code { get; set; } = default!;
 
     public string Name { get; set; } = default!;
+}
+
+/// <summary>
+/// 🚨 **PHÂN TÍCH GIỎ NHIỀU DÒNG** — nhận `SKU:SL,SKU:SL` (hoặc `SKU;SL`), và **một SKU trần** ⇒ dùng `soLuongMacDinh`.
+/// 📌 **VÌ SAO TÁCH THÀNH HÀM THUẦN:** nó là **logic dễ sai** (tách chuỗi, trùng SKU, số âm, khoảng trắng) mà
+/// **không** cần DB ⇒ tách ra để **đọc và kiểm** được độc lập. 📌 **GỘP SKU TRÙNG** thay vì tạo hai dòng cùng SKU:
+/// hai dòng cùng SKU trong **một** chứng từ sẽ **phá `CHECK`/unique** của kho (`SkuDaCoTrongChungTu`) — đã đo ở `INV-001`.
+/// </summary>
+internal static class GioHelper
+{
+    public static List<DongCheckoutDto> PhanTichGio(string? sku, int soLuongMacDinh, decimal thue)
+    {
+    var ket = new List<DongCheckoutDto>();
+
+    foreach (var phan in (sku ?? string.Empty).Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries))
+    {
+        var muc = phan.Trim();
+        if (muc.Length == 0) { continue; }
+
+        var phanTach = muc.Split(':', StringSplitOptions.RemoveEmptyEntries);
+        var maSku = phanTach[0].Trim();
+        if (maSku.Length == 0) { continue; }
+
+        var soLuong = phanTach.Length > 1 && int.TryParse(phanTach[1].Trim(), out var sl) ? sl : soLuongMacDinh;
+        if (soLuong < 1) { soLuong = soLuongMacDinh > 0 ? soLuongMacDinh : 1; }
+
+        var daCo = ket.FirstOrDefault(x => x.Sku == maSku);
+        if (daCo is not null) { daCo.Quantity += soLuong; }           // gộp SKU trùng
+        else { ket.Add(new DongCheckoutDto { Sku = maSku, Quantity = soLuong, TaxRate = thue }); }
+    }
+
+        return ket;
+    }
 }
 
 /// <summary>Dữ liệu **POST** từ biểu mẫu (tên trường khớp `name=` trong view).</summary>

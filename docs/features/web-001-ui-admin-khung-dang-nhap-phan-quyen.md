@@ -1654,3 +1654,56 @@ Vòng 69 (sửa probe cũ ⇒ **hỏng**, **0** dữ liệu, mất trọn một 
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.l | 15/10/2026 | *(agent, session GĐ1)* | ✅ **Đóng §56.3 #1** bằng **probe MỚI** (bài học #9): `POST /DatHang` lần đầu trả **`HTTP 200`** với **`Location` RỖNG** và **body `3.446` ký tự** ⇒ trang **render trực tiếp** ⇒ **`HTTP 0` cũ là lỗi đọc phản hồi của probe**, **không** phải lỗi mã. Kèm **đối chứng DB đầy đủ**: `Pending` · `GrandTotal=440.000` · **1 đơn theo khoá** · `Reserved=4`/`Available=6` · `Reservation=4` · **sổ giải trình `440.000` khớp** · dọn sạch · **`fail: 0`** · 0 tiến trình treo. 📌 **Bài học #10:** *viết probe mới **rẻ hơn** sửa probe cũ* — chứng minh bằng chi phí thật (vòng 69 hỏng & 0 dữ liệu vs vòng 70 chạy ngay & đủ dữ liệu) |
+
+---
+
+## 62. 🎉 **GIỎ NHIỀU DÒNG** (15/10/2026) — *đóng §56.3 #3 và `WEB-003` phần giỏ*
+
+### 62.1 Đã làm — **nới DỮ LIỆU VÀO trước, giao diện sau**
+
+`Sku` nhận **danh sách** `SKU:SL,SKU:SL` (chấp nhận cả `;`). **Một SKU trần** (không `:`) ⇒ dùng `SoLuong` như trước
+⇒ **tương thích ngược**.
+
+📌 **Vì sao vòng này KHÔNG sửa view:** đổi **view + controller cùng lúc** làm phép kiểm chứng **khó tách bạch nguyên nhân**
+khi sai. Bước này chỉ **nới dữ liệu vào** ⇒ nếu hỏng thì hỏng ở **một chỗ**. ⏳ **Còn lại:** giao diện **nhiều ô nhập** thật.
+
+📌 **Hàm phân tích được tách riêng** (`GioHelper.PhanTichGio`) vì đó là **logic dễ sai** (tách chuỗi · trùng SKU · số ≤ 0 ·
+khoảng trắng) mà **không cần DB** ⇒ đọc và kiểm được độc lập.
+🚨 **GỘP SKU TRÙNG** trong một lần đặt: hai dòng **cùng SKU** trong **một** chứng từ sẽ **phá `CHECK`/unique** của kho
+(`SkuDaCoTrongChungTu` — đã đo ở `INV-001`) ⇒ gộp lại thay vì gửi hai dòng.
+
+### 62.2 ✅ BẰNG CHỨNG — **số kỳ vọng tính trước, rồi so**
+
+Kỳ vọng: `(2 × 100.000 + 3 × 200.000) × 1,1 = **880.000**`.
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | 🔥 **`POST` với `Sku = "A:2,B:3"`** | **`HTTP 200`** · số đơn `WEB-WEB-65aa929a7ae1495a` · **tổng trên trang `880,000`** ✅ |
+| 2 | **`OrdOrders`** | **`GrandTotal=880000.0000`** ✅ |
+| 3 | 🔥 **SỐ DÒNG ĐƠN** | **`2`** ✅ |
+| 4 | **Dòng** | `A × 2 = 100.000` ✅ · `B × 3 = 200.000` ✅ |
+| 5 | **Giữ chỗ** | `A = 2` ✅ · `B = 3` ✅ |
+| 6 | 🔥 **Tồn kho từng SKU** | `A: OnHand=10 · Reserved=2 · Available=8` ✅ · `B: OnHand=10 · Reserved=3 · Available=7` ✅ |
+| 7 | **Sổ cái** | mỗi SKU: `Receipt=10` + `Reservation=2`/`Reservation=3` ✅ |
+| 8 | 🔥 **Sổ giải trình** | **`880000`** ✅ **= `GrandTotal`** |
+| 9 | Dọn dẹp · `fail:` · tiến trình treo | `don=0 dong=0 ton=0 ct=0 gc=0 baoMat=true` ✅ · **Web `0` / Host `0`** ✅ · **`0`** ✅ |
+
+📌 **Vì sao phép đo này mạnh:** con số **880.000** được **tính trước bằng tay** từ **hai** giá khác nhau và **hai** số lượng
+khác nhau ⇒ nó **phân biệt được**: (a) lấy sai giá của một dòng, (b) **hoán đổi** hai dòng, (c) **chỉ gửi một** dòng,
+(d) **bỏ thuế**. Mọi kiểu sai đó đều cho ra số **khác** `880.000`.
+📌 **Và #5–#7 kiểm ở mức TỪNG SKU** (không phải tổng) — vì tổng đúng **không** bảo đảm **phân bổ đúng** giữa hai SKU.
+
+### 62.3 Trạng thái `WEB-003` (giỏ hàng & checkout)
+
+| # | Hạng mục | Trạng thái |
+|---|---|---|
+| 1 | Đặt hàng **một SKU**, chống trùng đơn qua UI | ✅ §56–§61 |
+| 2 | **Giỏ NHIỀU DÒNG** (dữ liệu vào) | ✅ **§62** |
+| 3 | Giao diện **nhiều ô nhập** (thay ô `Sku` danh sách) | ⏳ |
+| 4 | Giỏ **giữ qua phiên** (thêm/xoá dòng trên UI) | ⏳ |
+
+### 62.4 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.k | 15/10/2026 | *(agent, session GĐ1)* | 🎉 **GIỎ NHIỀU DÒNG**: `Sku` nhận `SKU:SL,SKU:SL` (**tương thích ngược**), **gộp SKU trùng** (tránh phá unique của kho), logic tách riêng ở `GioHelper.PhanTichGio`. **Kiểm chứng** với số **tính trước**: `A:2,B:3` (`100.000`/`200.000`) ⇒ **`HTTP 200`**, **`GrandTotal=880000`**, **2 dòng đơn**, **`Reserved` A=2 · B=3**, **`Available` A=8 · B=7**, **sổ cái** 4 bút toán, **sổ giải trình `880000` khớp**, dọn sạch, **`fail: 0`**, 0 tiến trình treo |
