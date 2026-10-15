@@ -524,3 +524,26 @@ mà **đó chính là lý do nó tồn tại**. Ca 1 là ca **quan trọng nhấ
 Mọi **rủi ro về định dạng số đơn `WEB-…`** đã **bị bác bỏ bằng đo** (§67 khoanh vùng · §69 bác bỏ).
 📌 **Bài học phương pháp #13** (đã ghi ở `web-001` §69.4): *khi một phép đo phức tạp hỏng ≥ 2 lần ⇒ **tách** thành phép đo nhỏ nhất
 còn trả lời được câu hỏi* — vòng 81 thắng **ngay lần đầu** sau bốn vòng hỏng vì đã **cô lập biến số**.
+
+---
+
+## PHỤ LỤC F — **`tools/README-probe.md`: DANH MỤC KIỂM TRƯỚC KHI VIẾT PROBE** (vòng 87, 15/10/2026)
+
+**Vì sao có:** các vòng **69 · 75 · 77 · 79 · 83** mất trọn vòng vì **lỗi công cụ ĐO**, **không** vì nghiệp vụ khó.
+Mỗi lần là **một lớp lỗi khác**, và mỗi lần tôi **ghi một bài học** — rồi lần sau **vấp lớp khác**.
+📌 Đúng kết luận **Phụ lục C**: *ghi bài học **không đủ** — cần **công cụ** và **danh mục kiểm***.
+
+**Nội dung tệp (`tools/README-probe.md`)** — 6 phần:
+
+| Phần | Nội dung |
+|---|---|
+| **A** | **9 mục trước khi chạy**: kiểm **cú pháp** trước · sửa mã bằng **`edit`** (không `Replace` chuỗi) · **mỗi việc một dòng + in giá trị trung gian** · chờ bằng **`wait-host.ps1`** · **kiểm điểm đo có tồn tại** · **in route thật** trước khi gọi · **không lọc `stderr`** · **đo điều kiện tiên quyết** · **không phẫu thuật probe cũ** |
+| **B** | **4 mục khi đọc kết quả**: in **HTTP STATUS trước** · `Invoke-WebRequest` **tự đi theo redirect** ⇒ đọc **URL cuối** · **phép kiểm văn bản thô trên HTML là nguồn kết luận sai (3 lần)** · **`git diff`** sau khi khôi phục |
+| **C** | **Phép đo hỏng ≥ 2 lần ⇒ TÁCH** thành phép đo nhỏ nhất còn trả lời được câu hỏi (bài học #13) |
+| **D** | **3 mục dọn dẹp**: SQL qua **tệp `.sql`** · **`SELECT` xác nhận** + khôi phục cờ bảo mật · **kiểm tiến trình treo** |
+| **E** | 🔐 **LUẬT form Web**: mọi `POST` **phải mang token chống giả mạo** — `.cshtml` ⇒ `@Html.AntiForgeryToken()`; render trong C# ⇒ inject `IAntiforgery`; **probe phải trích token từ trang GET rồi gửi kèm**. Triệu chứng: `POST` ⇒ **`400`** và **DB không đổi** |
+| **F** | **Hai công cụ đã có** (`wait-host.ps1` · `route-check.ps1`) — dùng, đừng viết lại; **điểm đo nay thống nhất** (cả Host và Web đều có `/health-status`) |
+
+📌 **Vị trí trong bức tranh chung:** Phụ lục **B** (ánh xạ ràng buộc DB) · **C** (cơ chế job) · **D** (route · chờ)
+là **cơ chế cho MÃ SẢN PHẨM**; **Phụ lục F** là **danh mục cho BỘ ĐO** — tầng đã tiêu tốn **nhiều vòng nhất**
+trong giai đoạn gần đây mà **không** tạo ra giá trị người dùng.
