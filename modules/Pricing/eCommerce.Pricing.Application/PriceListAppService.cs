@@ -20,13 +20,16 @@ public class PriceListAppService : ApplicationService, IPriceListAppService
 {
     private readonly IRepository<PriceList, Guid> _bangGiaRepository;
     private readonly IRepository<PriceListItem, Guid> _dongGiaRepository;
+    private readonly PriceListActivationService _activationService;
 
     public PriceListAppService(
         IRepository<PriceList, Guid> bangGiaRepository,
-        IRepository<PriceListItem, Guid> dongGiaRepository)
+        IRepository<PriceListItem, Guid> dongGiaRepository,
+        PriceListActivationService activationService)
     {
         _bangGiaRepository = bangGiaRepository;
         _dongGiaRepository = dongGiaRepository;
+        _activationService = activationService;
     }
 
     public async Task<List<PriceListDto>> GetListAsync()
@@ -142,20 +145,19 @@ public class PriceListAppService : ApplicationService, IPriceListAppService
     [Authorize(PricingPermissions.Manage)]
     public async Task<PriceListDto> ActivateAsync(Guid priceListId, DateTime? at = null)
     {
-        var bg = await _bangGiaRepository.GetAsync(priceListId);
-
         var thoiDiem = at ?? Clock.Now;
 
-        // ADR-11: "chưa tới ngày" ⇒ trả `false`, **KHÔNG** ném.
-        var daKichHoat = bg.KichHoatNeuToiNgay(thoiDiem);
+        // 🚨 BR-007 được cưỡng chế trong DỊCH VỤ MIỀN (khoá phân tán theo phạm vi + thay thế bảng giá cũ
+        // trong cùng transaction). App service **KHÔNG** tự đổi trạng thái ở đây — nếu tự làm thì bất biến
+        // "chỉ MỘT bảng giá Active cho mỗi (tenant, scope, kênh)" **không có ai bảo vệ** (DB không có ràng buộc).
+        var (daKichHoat, soBiThayThe) = await _activationService.KichHoatAsync(priceListId, thoiDiem);
 
-        if (daKichHoat)
-        {
-            await _bangGiaRepository.UpdateAsync(bg, autoSave: true);
-            Logger.LogInformation("Đã KÍCH HOẠT bảng giá {Code} tại {At}.", bg.Code, thoiDiem);
-        }
-
+        var bg = await _bangGiaRepository.GetAsync(priceListId);
         var soDong = (int)await _dongGiaRepository.CountAsync(x => x.PriceListId == priceListId);
+
+        Logger.LogInformation(
+            "Kích hoạt bảng giá {Code}: daKichHoat={Da}, thayThe={SoCu}, soDong={SoDong}.",
+            bg.Code, daKichHoat, soBiThayThe, soDong);
 
         return ToDto(bg, soDong);
     }

@@ -1060,3 +1060,60 @@ hàng rào cuối"*.
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.3 | 15/10/2026 | *(agent, session GĐ1)* | **Lát cắt 2 — API bảng giá + bộ tra giá**: 2 project Application, 7 route bảng giá + 2 route tra giá; **kiểm chứng HTTP 12 phép đo** (4 cấp `Shop > Kênh > Bảng giá > Niêm yết` · append-only `0003` · thiếu giá `0004` · xung đột cùng cấp `0001` · **0 `fail:`**). 🚨 **Sửa 2 lỗi thật do chính tôi gây ra** — guard đọc trạng thái **không được lưu** (§17.2 **L1**) và constructor **kiểm tra mà quên gán** `PriceListId` (§17.2 **L2**, FK ở DB đã biến lỗi im lặng thành ồn ào). **Tổng quát hoá** test bất biến permission cho hằng số **do module sở hữu**. Ghi rõ phần còn lại (§17.4) |
+
+---
+
+## 18. TRẠNG THÁI TRIỂN KHAI — **LÁT CẮT 3: BR-007 (chỉ MỘT bảng giá `Active`/phạm vi)** (15/10/2026)
+
+### 18.1 Đã làm
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| 1 | `QuyetDinhKichHoatBangGia.CanThayThe(...)` | **Hàm THUẦN** quyết định bảng giá nào phải chuyển `Active → Superseded`; so kênh **đã chuẩn hoá** (`null`/`""`/khoảng trắng là **cùng** phạm vi; không phân biệt hoa/thường) |
+| 2 | `PriceListActivationService` (dịch vụ miền) | **Nơi DUY NHẤT** cưỡng chế BR-007: **giành khoá phân tán theo PHẠM VI** (`pricing:pricelist:{tenant}:{scope}:{kênh}`) → **nạp lại** danh sách `Active` **sau khi** có khoá → **thay thế** (Superseded, **KHÔNG xoá**) → kích hoạt cái mới, **cùng transaction** |
+| 3 | `PriceListAppService.ActivateAsync` | **Bỏ** việc tự đổi trạng thái; **gọi** dịch vụ miền (nếu app service tự làm thì bất biến **không có ai bảo vệ** — DB không có ràng buộc) |
+| 4 | `eCommerce.Kernel.Locking.LockErrorCodes` | Mã khoá **dùng chung** đặt ở **Kernel** (mọi module tham chiếu Kernel; `eCommerceConsts` là hằng số **tầng app** — module **không** được tham chiếu) |
+
+### 18.2 ✅ BẰNG CHỨNG HTTP THẬT (Host + PostgreSQL 17) — 7 phép đo
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | Kích hoạt `BG1` (phạm vi `Channel/b7kenh`) | `200` · `Status = 2` (**Active**) |
+| 2 | 🚨 **Kích hoạt `BG2` CÙNG phạm vi** | `200` · `BG2 = 2` (**Active**) · **`BG1 = 4` (Superseded)** ✅ — BR-007 cưỡng chế **thật** |
+| 3 | **Tra giá sau đó** | `90000` · cấp `BangGia` · **số ứng viên = 1** ✅ — **không** còn hai ứng viên cùng cấp ⇒ **không** ném `Pricing:0001` (đây chính là hậu quả nếu BR-007 bị bỏ: **checkout chết cho mọi SKU của kênh**) |
+| 4 | Kích hoạt `BG3` **KHÁC kênh** | `BG3 = Active` · **`BG2` VẪN Active** ✅ (khác phạm vi ⇒ không thay thế) |
+| 5 | **Kích hoạt lại `BG2`** (idempotent) | `2` Active (`BG2` + `BG3`) · `1` Superseded (`BG1`) ✅ — **không** tự thay thế chính nó |
+| 6 | Log Host | **0 dòng `fail:`** · log ghi rõ *"thay thế 1 bảng giá cùng phạm vi"* |
+| 7 | Dọn dẹp | 0 bảng giá / 0 dòng giá · cờ bảo mật đã khôi phục |
+
+**Test:** unit **543** (+12: 8 cho `CanThayThe` — cùng phạm vi · khác kênh · khác scope · idempotent · **`null` vs `""`** · không phân biệt hoa/thường · khu trùng; 4 cho **đồng nhất mã lỗi khoá**) · integration **32** · build **0 lỗi/0 cảnh báo** · mermaid 197/0.
+
+### 18.3 🚨 LỆCH QUY ƯỚC PHÁT HIỆN ĐƯỢC: mã lỗi **khoá** có **HAI** giá trị trong hệ thống
+
+`XC-003` **D10** quy định **một mã chung** `eCommerce:Lock:0001` cho tình huống không giành được khoá. Đo được:
+
+| Nơi khai | Giá trị | Đánh giá |
+|---|---|---|
+| `eCommerceConsts.ErrorCodes.KhongGianhDuocKhoa` (tầng app) | `eCommerce:Lock:0001` | ✅ đúng quy ước |
+| `eCommerce.Kernel.Locking.LockErrorCodes` (**mới**) | `eCommerce:Lock:0001` | ✅ bản **chuẩn** cho module |
+| `EInvoiceNumberingErrorCodes.KhongGianhDuocKhoaCapSo` (module EInvoice) | **`eCommerce:EInvoice:0201`** | 🚨 **LỆCH**: client/đối soát nhận **hai mã khác nhau cho CÙNG một nguyên nhân** |
+
+📌 **KHÔNG tự sửa**: đổi mã của `EInvoice` là **thay đổi hợp đồng API** của module đó (đã có tài liệu + test)
+⇒ **cần người quyết**. Thay vào đó: test `LockErrorCodeDongNhatTests` **khoá** (a) hai bản **chuẩn** phải khớp nhau,
+và (b) **ghi nhận** lệch của `EInvoice` — nếu ai hợp nhất nửa vời thì test **ĐỎ** và buộc cập nhật cả tài liệu
+`EInvoice` + `XC-003` §15.2.
+
+### 18.4 ⚠️ Giới hạn đã biết của lát cắt này
+
+1. **`CanThayThe` chỉ so `(Scope, ChannelCode)`** — đúng **nguyên văn** phát biểu BR-007. Với
+   `Scope = ChannelShop`, **hai shop khác nhau trên cùng kênh** hiện bị coi là **cùng phạm vi** ⇒ chúng **thay thế
+   nhau**. Nếu nghiệp vụ cần hai shop cùng kênh **cùng Active** thì `PRC-001` **BR-007 phải được phát biểu lại**
+   thành `(TenantId, Scope, ChannelCode, ChannelShopId)` — **cần người quyết**.
+2. **Chưa có guard "khoá bận"** cho thao tác **kích hoạt** ở góc `PublishAsync` (chỉ `ActivateAsync` đi qua khoá).
+3. Chưa có **job theo ngày** (ADR-10) ⇒ hết hạn vẫn phải gọi tay (`HetHanNeuQuaNgay` đã có sẵn).
+
+### 18.5 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.4 | 15/10/2026 | *(agent, session GĐ1)* | **Lát cắt 3 — BR-007**: hàm thuần `CanThayThe` + `PriceListActivationService` (**khoá theo phạm vi** + thay thế `Superseded` trong transaction); app service **không** tự đổi trạng thái. **Kiểm chứng HTTP 7 phép đo** (BG1 bị Superseded · tra giá **1 ứng viên** ⇒ không ném `0001` · khác kênh không bị thay thế · idempotent · **0 `fail:`**). Thêm `Kernel.Locking.LockErrorCodes` (mã khoá dùng chung cho module) và **phát hiện lệch mã lỗi khoá** ở module `EInvoice` (§18.3 — **ghi nhận, không tự sửa**). **+12 unit** |
