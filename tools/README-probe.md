@@ -72,3 +72,20 @@ chỉ giữ **biến số cần kiểm** (định dạng số đơn `WEB-…`).
 
 📌 **Điểm đo nay đã THỐNG NHẤT:** **cả Host (:5000) lẫn Web (:5100) đều có `/health-status`** (`web-001` §71)
 ⇒ dùng **cùng một lệnh** cho mọi tiến trình.
+
+---
+
+## G. 🐛 HAI LỖI PROBE **MỚI** PHÁT HIỆN Ở VÒNG 94 (đọc trước khi viết hàm trợ giúp)
+
+| # | Lỗi | Triệu chứng | Cách tránh |
+|---|---|---|---|
+| **G1** | Đặt tên tham số/biến là **biến tự động chỉ-đọc** của PowerShell | ``WriteError: Cannot overwrite variable pid because it is read-only or constant`` ⇒ **hàm ném lỗi ngay dòng gọi đầu tiên** ⇒ **không có gì chạy** | **KHÔNG** dùng: ``$pid`` · ``$home`` · ``$host`` · ``$input`` · ``$args`` · ``$error`` · ``$matches`` · ``$profile`` … Đặt tên rõ nghĩa: ``$idTienTrinh`` · ``$duongDanNha`` … |
+| **G2** | Hàm trích dòng gọi ``.Trim()`` trên **``$null``** | ``Where-Object: You cannot call a method on a null-valued expression`` ⇒ **probe đứt giữa đường** | Viết hàm chịu được rỗng: ``$dong = $ket \| Where-Object { $_ -and $_.Trim() } \| Select-Object -First 1; if ($null -eq $dong) { return '' }`` — **kiểm ``$_ -and`` trước khi gọi phương thức** |
+
+📌 **Điểm chung của G1 và G2 (bài học #11 nhắc lại lần thứ ba):** *hàm trợ giúp là nơi lỗi ẩn náu.* Một hàm trợ giúp viết ẩu
+làm **cả probe** đứt ở chỗ **không liên quan** tới điều đang đo — và người đọc dễ **kết luận sai về sản phẩm**.
+⇒ **Quy tắc:** hàm trợ giúp phải **chịu được đầu vào rỗng**, và **tên biến không được trùng biến hệ thống**.
+
+📌 **Và một ghi nhận tích cực:** ở **cả hai** lần hỏng của vòng 94, quy tắc mới
+(*``git commit`` phải nằm **TRONG** ``if (đạt)``*) **đã chặn được hồ sơ sai** — **không** tài liệu, **không** commit nào được ghi.
+Đây là **lần đầu** một quy tắc viết ra **chứng minh giá trị ngay trong vòng kế tiếp**.
