@@ -64,4 +64,20 @@ public static class InventoryErrorCodes
     /// <summary>Số lượng dòng chứng từ phải **≥ 1** (0 hoặc âm sẽ tạo bút toán vô nghĩa/đảo chiều ngầm).</summary>
     public const string SoLuongPhaiDuong = Nhom + "0023";
 
+    /// <summary>
+    /// 🚨 **Khách trả NHIỀU HƠN số đã mua** (tính **luỹ kế** các lần trả trước) — `SAL-004`.
+    /// 📌 **VÌ SAO CẦN MÃ RIÊNG (không mượn `0001`/`KhongDuTon`):** khi ca này trả `0001` (*"không đủ tồn"*),
+    /// client hiển thị **SAI thông điệp** — *"hết hàng, chờ nhập"* — trong khi **tồn kho KHÔNG hề thiếu**:
+    /// vấn đề là **dữ liệu đầu vào** (khách trả quá số đã mua).
+    /// 📌 Mã **đúng kỹ thuật** nhưng **sai nghiệp vụ** ⇒ người dùng nhận **chỉ dẫn sai**, và **không test nào
+    /// phát hiện** vì HTTP vẫn `403` (`inv-001` §34.2).
+    /// </summary>
+    public const string TraVuotSoDaMua = Nhom + "0040";
+
+    /// <summary>
+    /// **SKU trả hàng KHÔNG thuộc đơn** (`SAL-004`). 📌 Nếu **im lặng bỏ qua** thì khách **tưởng đã trả**
+    /// mà hệ thống **không ghi gì** ⇒ mất hàng, mất tiền, không dấu vết.
+    /// </summary>
+    public const string SkuKhongThuocDon = Nhom + "0041";
+
 }

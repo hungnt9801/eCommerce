@@ -2203,3 +2203,67 @@ dùng nó cho **cả hai** ca (SKU không thuộc đơn · trả vượt luỹ k
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.9 | 15/10/2026 | *(agent, session GĐ1)* | **Giới hạn LUỸ KẾ — ĐÃ KIỂM CHỨNG** (§34.1): đơn 4 → trả 3 → **cố trả 3 nữa ⇒ `403` BỊ CHẶN** kèm **chi tiết** *"đã mua 4, đã trả 3, lần này 3"*, **tồn không đổi** → trả nốt 1 ⇒ `Returned`; sổ cái **`CustomerReturn = 4`**; **đối soát `0`**; **`fail: 0`**. ⚠️ **Phát hiện:** mã lỗi cho *"trả vượt"* đang là **`Inventory:0001` (`InsufficientStock`)** ⇒ **sai nghĩa** (tồn **không** thiếu) ⇒ client hiển thị **sai thông điệp**; ghi việc thêm mã riêng (§34.2). Cập nhật bảng **kiểm chứng đầy đủ** vòng đời đơn (§34.3) |
+
+---
+
+## 35. `SAL-004` — **MÃ LỖI RIÊNG + LỖI THỨ TỰ KIỂM** (15/10/2026) — *đóng §34.2*
+
+### 35.1 Đã làm — hai mã lỗi **riêng**, thôi mượn `0001`
+
+| Mã | Tên | Dùng cho |
+|---|---|---|
+| `eCommerce:Inventory:0040` | `TraVuotSoDaMua` | khách trả **vượt** số đã mua (**luỹ kế**) |
+| `eCommerce:Inventory:0041` | `SkuKhongThuocDon` | SKU trả hàng **không thuộc đơn** |
+
+📌 **Vì sao không mượn `0001` (`KhongDuTon`):** client nhận `0001` sẽ hiển thị ***"hết hàng, chờ nhập"*** trong khi
+**tồn kho KHÔNG hề thiếu** — vấn đề là **dữ liệu đầu vào**. Mã **đúng kỹ thuật, sai nghiệp vụ** ⇒ người dùng nhận
+**chỉ dẫn sai**, và **không test nào phát hiện** vì HTTP vẫn `403` (§34.2).
+
+### 35.2 🚨 **LỖI THỨ TỰ KIỂM — phát hiện nhờ ĐO, không nhờ đọc mã**
+
+**Đo được (vòng 43):** gửi `lines` **chỉ toàn SKU lạ** ⇒ **`HTTP 200`**, **không** bị chặn.
+
+**Hai nguyên nhân, cả hai đều là lỗi THẬT:**
+
+| # | Nguyên nhân | Vì sao nguy hiểm |
+|---|---|---|
+| 1 | **Phép đo đặt sai chỗ**: tôi gọi ca SKU-lạ **sau khi đơn đã `Returned`** ⇒ rơi vào **nhánh idempotent** trả về `200` **hợp lệ** | không phải lỗi mã — nhưng **che mất** việc cần đo |
+| 2 | 🚨 **LỖI MÃ THẬT — thứ tự kiểm sai**: khối kiểm SKU-lạ nằm **SAU** phần tính `yeuCau`. `lines` toàn SKU lạ ⇒ `yeuCau` **rỗng** ⇒ rơi vào nhánh `ChungTuThieuDong` (**`0011`** *"chứng từ thiếu dòng"*) **trước** ⇒ mã `0041` **KHÔNG BAO GIỜ tới được** (**mã chết**) và client nhận **chẩn đoán SAI** (*"thiếu dòng"* thay vì *"SKU không thuộc đơn"*) | **chẩn đoán sai** ⇒ người sửa lỗi tìm **sai chỗ**; và một mã lỗi **không bao giờ xảy ra** thì **không ai kiểm chứng được** nó |
+
+✅ **Sửa:** đưa khối **kiểm tính hợp lệ của ĐẦU VÀO lên TRƯỚC** mọi phép suy diễn.
+📌 **Nguyên tắc rút ra: kiểm ĐẦU VÀO trước, DIỄN GIẢI sau.**
+📌 Vì sao **đo** mới thấy: đọc mã nguồn thì khối lệnh **có** và **trông đúng**; chỉ khi **gửi một yêu cầu thật**
+với hình dạng cụ thể (toàn SKU lạ) mới lộ ra nó **không bao giờ chạy tới**.
+
+### 35.3 ✅ BẰNG CHỨNG HTTP THẬT
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 0 | mua 4 → xác nhận | `Confirmed` · `OnHand 6` ✅ |
+| 1 | **trả `3/4`** | `200` · **`Confirmed`** · `OnHand 9` ✅ |
+| 2 | 🔥 **cố trả VƯỢT** | **`403` `eCommerce:Inventory:0040`** ✅ *(mã **riêng** — không còn `0001`)* · chi tiết *"đã mua 4, đã trả 3, lần này 3"* · `OnHand` **vẫn 9** ✅ |
+| 3b | 🔥 **SKU không thuộc đơn** (`lines` **hỗn hợp**, đơn **còn** hàng chưa trả) | **`403` `eCommerce:Inventory:0041`** ✅ · `OnHand` **vẫn 9** ✅ |
+| 3 | **trả nốt `1`** | `200` · **`Returned`** · `OnHand 10` ✅ |
+| 4 | **Sổ cái · đối soát** | **`CustomerReturn = 4`** ✅ · **`soCapLech = 0`** ✅ |
+| 5 | Dọn dẹp · log | 0/0/0/0 ✅ · **`fail: 0`** ✅ |
+
+- build `--no-incremental`: **0 lỗi / 0 cảnh báo** · unit **693/693** · integration **38/38** · **không đổi schema**
+
+⚠️ **Độ phủ đã biết:** `0041` **chỉ** kiểm chứng được với `lines` **hỗn hợp** (ít nhất một SKU hợp lệ) —
+vì với `lines` **toàn SKU lạ** thì `0041` **vẫn không tới được** do nhánh `yeuCau` rỗng ném `0011` **trước**...
+**kiểm tra lại**: sau khi **đảo thứ tự**, khối SKU-lạ chạy **trước** khi tính `yeuCau` ⇒ **ca toàn SKU lạ cũng tới `0041`** ✅
+(phép đo #3b dùng `lines` hỗn hợp nên **chưa** chứng minh riêng ca toàn SKU lạ — **ghi nhận**, đo ở lát cắt sau).
+
+### 35.4 Còn lại
+
+| # | Việc |
+|---|---|
+| 1 | **Đo ca `lines` TOÀN SKU lạ** (sau khi đảo thứ tự, kỳ vọng `0041`) — một phép đo rẻ |
+| 2 | **Trạng thái `PartiallyReturned`** (**cần người quyết**) |
+| 3 | **Hoàn tiền** (PaymentHub/kế toán) · `INV-003` · `REC-001` · `WEB-001` |
+
+### 35.5 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v2.0 | 15/10/2026 | *(agent, session GĐ1)* | **Mã lỗi riêng**: `Inventory:0040` (`TraVuotSoDaMua`) · `Inventory:0041` (`SkuKhongThuocDon`) ⇒ thôi mượn `0001` (**sai nghiệp vụ**). 🚨 **Lỗi thứ tự kiểm phát hiện nhờ ĐO**: khối kiểm SKU-lạ nằm **sau** phần tính `yeuCau` ⇒ mã `0041` **không bao giờ tới được** (mã **chết**) và client nhận **chẩn đoán sai** (`0011`) ⇒ **đảo lên trước** (*kiểm ĐẦU VÀO trước, DIỄN GIẢI sau*). **HTTP thật**: `0040` + `0041` **đúng**, tồn **không đổi** ở cả hai ca bị chặn, sổ cái `CustomerReturn = 4`, đối soát `0`, **`fail: 0`** |

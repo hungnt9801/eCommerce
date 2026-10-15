@@ -254,6 +254,25 @@ public class DonHangAppService : ApplicationService, IDonHangAppService
             throw new BusinessException(InventoryErrorCodes.ChungTuThieuDong).WithData("number", don.Number);
         }
 
+        // ── 🚨 KIỂM **TÍNH HỢP LỆ CỦA ĐẦU VÀO TRƯỚC** mọi phép suy diễn khác ──────────────────────────────
+        // 📌 **VÌ SAO PHẢI ĐẶT Ở ĐÂY (lỗi thứ tự phát hiện vòng 43):** khi khối này nằm **SAU** phần tính `yeuCau`,
+        // một yêu cầu mà `lines` **chỉ toàn SKU lạ** cho ra `yeuCau` **rỗng** ⇒ rơi vào nhánh
+        // `ChungTuThieuDong` (0011 *"chứng từ thiếu dòng"*) ⇒ mã `0041` **KHÔNG BAO GIỜ tới được** (mã chết)
+        // và client nhận **chẩn đoán sai** (*"thiếu dòng"* thay vì *"SKU không thuộc đơn"*).
+        // 📌 Nguyên tắc: **kiểm đầu vào trước, diễn giải sau.**
+        if (lines is { Count: > 0 })
+        {
+            var skuDon = dongDon.Select(x => x.Sku).ToHashSet(StringComparer.Ordinal);
+            var skuLa = lines.Select(l => l.Sku).Where(s => !skuDon.Contains(s)).Distinct(StringComparer.Ordinal).ToList();
+
+            if (skuLa.Count > 0)
+            {
+                throw new BusinessException(InventoryErrorCodes.SkuKhongThuocDon)
+                    .WithData("number", don.Number)
+                    .WithData("skuKhongThuocDon", string.Join(", ", skuLa));
+            }
+        }
+
         // ── 🚨 GIỚI HẠN LUỸ KẾ: đã trả bao nhiêu (các lần TRƯỚC) + lần này ≤ đã mua ─────────────────────
         // 📌 Vì sao phải LUỸ KẾ chứ không chỉ kiểm lần này: khách trả 2 rồi trả 2 nữa (đơn mua 4) — nếu chỉ kiểm
         // "lần này ≤ 4" thì **cả hai lần đều hợp lệ** ⇒ **trả 4 mà nhập lại 8** ⇒ **thừa hàng ảo**.
@@ -292,7 +311,7 @@ public class DonHangAppService : ApplicationService, IDonHangAppService
 
         if (vuot.Count > 0)
         {
-            throw new BusinessException(eCommerceConsts.ErrorCodes.InsufficientStock)
+            throw new BusinessException(InventoryErrorCodes.TraVuotSoDaMua)
                 .WithData("number", don.Number)
                 .WithData("lyDo", "Trả hàng VƯỢT số đã mua (tính LUỸ KẾ các lần trả trước).")
                 .WithData("chiTiet", string.Join("; ", vuot.Select(x =>
@@ -306,19 +325,6 @@ public class DonHangAppService : ApplicationService, IDonHangAppService
                 .WithData("lyDo", "Không còn gì để trả (đã trả hết).");
         }
 
-        // `lines` có SKU không thuộc đơn ⇒ NÉM (nếu im lặng bỏ qua thì khách tưởng đã trả mà hệ thống không ghi gì).
-        if (lines is { Count: > 0 })
-        {
-            var skuDon = dongDon.Select(x => x.Sku).ToHashSet(StringComparer.Ordinal);
-            var skuLa = lines.Select(l => l.Sku).Where(s => !skuDon.Contains(s)).Distinct(StringComparer.Ordinal).ToList();
-
-            if (skuLa.Count > 0)
-            {
-                throw new BusinessException(eCommerceConsts.ErrorCodes.InsufficientStock)
-                    .WithData("number", don.Number)
-                    .WithData("skuKhongThuocDon", string.Join(", ", skuLa));
-            }
-        }
 
         var thoiDiem = at ?? Clock.Now;
 
