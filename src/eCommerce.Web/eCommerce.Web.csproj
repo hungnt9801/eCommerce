@@ -15,6 +15,9 @@
          build xanh, chạy được, nhưng đồng bộ sàn / gọi cơ quan thuế bị chạy 2 lần ⇒ tiêu quota gấp đôi.
     -->
     <ProjectReference Include="..\eCommerce.Application\eCommerce.Application.csproj" />
+    <!-- 🚨 Vòng 58: trang mặt tiền gọi `IDonHangAppService` ⇒ ctor cần `IPriceCalculationAppService` của Pricing.
+         Thiếu reference này thì DI không dựng được controller ⇒ HTTP 500 (Host đã có reference từ trước). -->
+    <ProjectReference Include="..\..\modules\Pricing\eCommerce.Pricing.Application\eCommerce.Pricing.Application.csproj" />
     <ProjectReference Include="..\eCommerce.EntityFrameworkCore\eCommerce.EntityFrameworkCore.csproj" />
     <ProjectReference Include="..\..\shared\eCommerce.Kernel\eCommerce.Kernel.csproj" />
   </ItemGroup>

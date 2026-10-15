@@ -1,0 +1,97 @@
+@using eCommerce.Application.Contracts.Sales
+@model List<PhanBoKenhDto>
+@{
+    Layout = null;
+    var tongDaBan = Model.Sum(x => x.DaBan);
+    var tongDangGiu = Model.Sum(x => x.DangGiu);
+    var tongDaTra = Model.Sum(x => x.DaTra);
+}
+@*
+    🚨 TRANG MẶT TIỀN ĐẦU TIÊN (INV-003 · WEB-001).
+    📌 `Layout = null`: trang **tự chứa** ⇒ phép kiểm chứng **không** phụ thuộc layout/menu của khu quản trị
+    (giảm số thứ có thể sai khi ta đang muốn đo **đúng** đường dữ liệu). Khi có nhiều trang, sẽ chuyển sang layout chung.
+    ⚠️ Mọi giá trị đều qua Razor `@` (tự HTML-encode) ⇒ **không** nối chuỗi thô vào HTML.
+*@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Phân bổ tồn theo kênh</title>
+    <style>
+        body { font-family: system-ui, sans-serif; margin: 2rem; color: #222; }
+        h1 { font-size: 1.3rem; }
+        table { border-collapse: collapse; width: 100%; max-width: 60rem; }
+        th, td { border: 1px solid #ccc; padding: .4rem .6rem; text-align: left; }
+        th { background: #f3f3f3; }
+        .so { text-align: right; }
+        .rong { padding: 1rem; background: #fffbe6; border: 1px solid #e6d38a; max-width: 60rem; }
+        .ghichu { color: #666; font-size: .85rem; max-width: 60rem; }
+    </style>
+</head>
+<body>
+    <h1>Phân bổ tồn theo kênh</h1>
+
+    @if (Model.Count == 0)
+    {
+        @* 🚨 CA RỖNG: một trang **chỉ đúng khi có dữ liệu** là một trang **chưa** kiểm chứng. *@
+        <div class="rong" id="trong">
+            <strong>Chưa có dữ liệu phân bổ.</strong>
+            <div>Chưa có đơn hàng nào theo kênh, hoặc chưa có lượt giữ chỗ nào.</div>
+        </div>
+    }
+    else
+    {
+        <table id="bang-phan-bo">
+            <thead>
+                <tr>
+                    <th>Kênh</th>
+                    <th>SKU</th>
+                    <th class="so">Đã bán</th>
+                    <th class="so">Đang giữ</th>
+                    <th class="so">Đã trả</th>
+                    <th>Đang giữ theo kho</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var dong in Model)
+                {
+                    <tr>
+                        <td>@dong.ChannelCode</td>
+                        <td>@dong.Sku</td>
+                        <td class="so">@dong.DaBan</td>
+                        <td class="so">@dong.DangGiu</td>
+                        <td class="so">@dong.DaTra</td>
+                        <td>
+                            @if (dong.DangGiuTheoKho.Count == 0)
+                            {
+                                <span>—</span>
+                            }
+                            else
+                            {
+                                @string.Join(" · ", dong.DangGiuTheoKho.Select(kv => $"{kv.Key}: {kv.Value}"))
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+            <tfoot>
+                <tr>
+                    <th colspan="2">TỔNG</th>
+                    <th class="so" id="tong-da-ban">@tongDaBan</th>
+                    <th class="so" id="tong-dang-giu">@tongDangGiu</th>
+                    <th class="so" id="tong-da-tra">@tongDaTra</th>
+                    <th></th>
+                </tr>
+            </tfoot>
+        </table>
+    }
+
+    <p class="ghichu">
+        Nguồn: <code>GET /api/app/don-hang/phan-bo-theo-kenh</code> — cùng một app service với API
+        (một nguồn sự thật). <em>Đã bán</em> = đơn đã rời <code>Pending</code>;
+        <em>Đang giữ</em> = lượt giữ chỗ còn <code>Held</code>; <em>Đã trả</em> = phiếu <code>CustomerReturn</code>.
+        ⚠️ <em>Đã bán</em>/<em>Đã trả</em> <strong>chưa</strong> tách theo kho (đơn chưa lưu kho — xem <code>inv-001</code> §42.1).
+    </p>
+</body>
+</html>

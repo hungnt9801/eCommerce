@@ -1038,3 +1038,55 @@ khi request bị ngắt. **CHƯA** xác định chắc ⇒ ghi nhận, **không*
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.z | 15/10/2026 | *(agent, session GĐ1)* | 🎉 **Harness đăng nhập Web THÀNH CÔNG** (anti-forgery + `LoginInput.*` ⇒ cookie `.AspNetCore.Identity.Application`; `GET /` sau đăng nhập trả `200` tại `/`) ⇒ **mở khoá mọi kiểm chứng trang Web có dữ liệu** (trước đó là **nút thắt** khiến mọi trang thêm vào **không kiểm chứng được**). 🎯 **`BR-009` ĐÃ KIỂM CHỨNG** bằng **`Location` thô** (`-MaximumRedirection 0`) **có ca ĐỐI CHỨNG**: `https://evil.example/x` ⇒ **`/`** (lọc) · `//evil.example` ⇒ **`/`** (lọc) · `/kho/ton` ⇒ **`/kho/ton`** (giữ) ⇒ **không** open redirect **và** tính năng quay lại trang đích **vẫn đúng**. ⚠️ **`fail: 2` trong log chưa giải thích được** — ghi rõ (§49.3) |
+
+---
+
+## 50. 🎉 **TRANG MẶT TIỀN ĐẦU TIÊN: `GET /PhanBo`** (15/10/2026) + **LỖI KIẾN TRÚC THẬT ĐÃ SỬA**
+
+### 50.1 Đã làm
+
+| # | Thành phần |
+|---|---|
+| 1 | `PhanBoController` (`[Authorize]` **cấp class**) — gọi `IDonHangAppService.GetPhanBoTheoKenhAsync()` **in-process** |
+| 2 | `Views/PhanBo/Index.cshtml` — bảng **kênh × SKU** (`Đã bán` · `Đang giữ` · `Đã trả` · **`Đang giữ theo kho`**) + **dòng TỔNG** + **CA RỖNG** tường minh |
+
+📌 **Vì sao chọn trang này làm trang đầu tiên:** dữ liệu của nó **đã kiểm chứng ở tầng API** (`inv-001` §40 · §42)
+⇒ nếu trang hiển thị **sai** thì lỗi **chắc chắn** nằm ở **tầng hiển thị** ⇒ **phép đo tách bạch được**.
+Và nó có **ca rỗng** — *một trang chỉ đúng khi có dữ liệu là một trang **chưa** kiểm chứng*.
+
+### 50.2 🚨 **LỖI KIẾN TRÚC THẬT** phát hiện nhờ kiểm chứng (đã sửa)
+
+| Bước | Hiện tượng | Nguyên nhân gốc |
+|---|---|---|
+| 1 | Sau đăng nhập, `GET /PhanBo` ⇒ **`HTTP 500`** (`fail: 6`) | DI **không dựng được** controller: *"None of the constructors found … Cannot resolve parameter `eCommerce.Pricing.IPriceCalculationAppService`"* |
+| 2 | Thêm `Pricing` vào `[DependsOn]` của Web ⇒ **vẫn lỗi CS0234** | Web **thiếu `ProjectReference`** tới `modules/Pricing/eCommerce.Pricing.Application` (**Host có từ trước**) |
+| 3 | Thêm reference ⇒ build `0/0` ⇒ trang **chạy** ✅ | |
+
+📌 **Đây là lệch giữa Ý ĐỊNH và MÃ:** doc comment của `eCommerceWebModule` ghi rõ *"Web dùng **CÙNG đồ thị module**
+với Host"* — nhưng `[DependsOn]` **chưa** phản ánh điều đó. ⇒ **Quy tắc cho MỌI trang mặt tiền sau này:**
+**dùng app service của module nào ⇒ PHẢI nạp module đó ở Web** (và thêm `ProjectReference` nếu chưa có).
+📌 Và **kiểu lỗi này build XANH hoàn toàn** — chỉ lộ ra khi **chạy thật và gọi trang** ⇒ đúng lý do quy trình §2
+bắt buộc **khởi động thật + kiểm chứng trạng thái thật**.
+
+### 50.3 ✅ BẰNG CHỨNG (harness đăng nhập của §49)
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | `GET /PhanBo` **chưa** đăng nhập | **`302`** → `/Account/Login?ReturnUrl=%2FPhanBo` ✅ *(cổng chặn đúng cho trang mới)* |
+| 2 | Đăng nhập với `ReturnUrl=%2FPhanBo` ⇒ URL cuối | **`http://localhost:5100/PhanBo`** ✅ *(ReturnUrl **nội bộ** được tôn trọng — `BR-009` lần nữa)* |
+| 3 | 🔥 **`GET /PhanBo`** (đã đăng nhập) | **`200`** · `1.444` ký tự ✅ |
+| 4 | Tiêu đề `<h1>Phân bổ tồn theo kênh</h1>` | **đúng** ✅ |
+| 5 | 🔥 **CA RỖNG** hiển thị | **đúng** — *"Chưa có dữ liệu phân bổ"* ✅ *(DB đang rỗng)* |
+| 6 | Footer ghi **nguồn API** | **có** ✅ (*một nguồn sự thật*) |
+| 7 | `fail:` trong log Web | **`0`** ✅ |
+
+⚠️ **CHƯA kiểm chứng:** ca **CÓ DỮ LIỆU** (bảng render nhiều dòng + dòng TỔNG) — DB hiện **rỗng**.
+⇒ **Việc của lát cắt sau (rẻ, harness đã có):** gieo **một đơn có giữ chỗ** ⇒ mở `/PhanBo` ⇒ kỳ vọng **bảng hiện
+đúng số** và **`Đang giữ theo kho` khớp `kho.id`** (đối chiếu với API `phan-bo-theo-kenh`). **KHÔNG** tuyên bố
+ca có dữ liệu đã xong.
+
+### 50.4 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.w | 15/10/2026 | *(agent, session GĐ1)* | 🎉 **Trang mặt tiền đầu tiên `GET /PhanBo`** (bảng phân bổ tồn theo kênh × SKU, có **ca rỗng**). 🚨 **Sửa lỗi KIẾN TRÚC THẬT** phát hiện nhờ kiểm chứng: Web **thiếu module `Pricing`** trong `[DependsOn]` **và** thiếu `ProjectReference` ⇒ DI không dựng được controller ⇒ **`HTTP 500`** (build **xanh** hoàn toàn). **Kiểm chứng** bằng harness §49: chưa đăng nhập ⇒ `302` (cổng chặn đúng) · đã đăng nhập ⇒ **`200`**, tiêu đề + **ca rỗng** đúng, `fail: 0`. ⚠️ **Ca CÓ DỮ LIỆU chưa kiểm chứng** (DB rỗng) — ghi rõ |

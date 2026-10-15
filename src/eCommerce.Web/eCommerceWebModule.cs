@@ -45,7 +45,16 @@ namespace eCommerce.Web;
     typeof(AbpAspNetCoreMvcUiBasicThemeModule),
     typeof(AbpAccountWebModule),
     typeof(EntityFrameworkCore.eCommerceEntityFrameworkCoreModule),
-    typeof(eCommerceApplicationModule)
+    typeof(eCommerceApplicationModule),
+    // 🚨 **`Pricing` PHẢI ĐƯỢC NẠP Ở WEB** (phát hiện vòng 58): `DonHangAppService` — dùng bởi trang mặt tiền đầu tiên
+    // `PhanBoController` — có tham số ctor `IPriceCalculationAppService` ⇒ thiếu module này thì DI **KHÔNG dựng được**
+    // controller ⇒ **`HTTP 500`**: *"None of the constructors found … Cannot resolve parameter
+    // 'eCommerce.Pricing.IPriceCalculationAppService'"*.
+    // 📌 **Vì sao Web phải nạp module nghiệp vụ (không chỉ Host):** Web chạy **in-process** ⇒ mọi app service dùng ở
+    // trang Web phải **dựng được ngay trong tiến trình Web**. 📌 **Quy tắc cho MỌI trang mặt tiền sau này:**
+    // dùng app service của module nào ⇒ **phải nạp module đó ở Web** — và **`eCommerceWebModule` khai CÙNG đồ thị
+    // module với Host** (ghi ở doc comment) nhưng `[DependsOn]` **chưa** phản ánh điều đó ⇒ lệch giữa **ý định** và **mã**.
+    typeof(eCommerce.Pricing.PricingApplicationModule)
 )]
 public class eCommerceWebModule : AbpModule
 {
