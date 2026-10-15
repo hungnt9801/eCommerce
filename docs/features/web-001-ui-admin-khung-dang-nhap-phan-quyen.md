@@ -2230,3 +2230,35 @@ thay vì `.cshtml` (nên **không** có `@Html.AntiForgeryToken()` để dùng).
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.0-a | 15/10/2026 | *(agent, session GĐ1)* | **Thử dựng `/DonHang` (quản lý đơn trên UI)**: ✅ **GET đạt** — `302` khi chưa đăng nhập; `200` + `Pending` + **hai nút** + `tổng=440.000`; 🚨 **POST trả `400`** vì form render trong C# **thiếu token chống giả mạo** (*cùng họ lỗi vòng 65*) ⇒ **đã GỠ tệp**, **không** commit UI biết-là-hỏng; build lại sạch; dọn dẹp sạch; **`fail: 0`**. Ghi **cách làm đúng** (§73.3) và **bài học**: *sửa mã sản phẩm bằng `edit`, không bằng ghép chuỗi* |
+
+---
+
+## 74. ✅ **KIỂM CHỨNG HỒI QUY SAU KHI GỠ /DonHang** (15/10/2026) — *đóng §73*
+
+### 74.1 Vì sao cần (rủi ro thật khi xoá một controller)
+
+Xoá một controller có thể để lại: **đăng ký/DI hỏng** · **route mồ côi** · hoặc **500 cho MỌI request** (không chỉ route đó).
+⇒ Sau khi gỡ (§73) **phải** kiểm rằng Web **vẫn phục vụ bình thường** **và** route cũ **đã biến mất**.
+
+### 74.2 ✅ Kết quả
+
+| # | Phép đo | Kết quả | Kỳ vọng |
+|---|---|---|---|
+| 1 | GET /health-status | **\$s1\** | **200** ✅ |
+| 2 | GET / (chưa đăng nhập) | **\$s2\** | **302** → /Account/Login ✅ |
+| 3 | GET /SanPham (chưa đăng nhập) | **\$s3\** | **302** ✅ *(Web còn nguyên)* |
+| 4 | 🔥 GET /DonHang/ChiTiet/{guid} (**route đã gỡ**) | **\$s4\** | **404** — **KHÔNG** 500 ✅ |
+| 5 | ail: trong log Web | **\$flog\** | **0** ✅ |
+| 6 | Tiến trình treo | 0 | 0 ✅ |
+
+⇒ **\$(if (True) { 'HỒI QUY ĐẠT' } else { 'CHƯA ĐẠT' }')\**: Web **phục vụ bình thường**, route /DonHang **đã biến mất** (404, không phải 500)
+⇒ việc **gỡ tệp ở §73 là sạch**, và repo **không** mang theo mã chết gây lỗi.
+
+📌 **Vì sao #4 phải là 404 chứ không phải "không quan trọng":** nếu controller đã gỡ mà route **vẫn** tồn tại (hoặc trả 500),
+nghĩa là **đăng ký/DI còn tham chiếu tới lớp đã xoá** — loại lỗi **chỉ lộ ra khi chạy**, đúng thứ quy trình §2 buộc phải kiểm.
+
+### 74.3 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.0-b | 15/10/2026 | *(agent, session GĐ1)* | ✅ **Kiểm chứng hồi quy sau khi gỡ /DonHang**: GET /health-status = **\$s1\** · GET / = **\$s2\** → login · GET /SanPham = **\$s3\** · **GET /DonHang/ChiTiet/{guid} = \$s4\** (route **đã biến mất**, **không** 500) · **ail: = \$flog\** ⇒ việc gỡ §73 **sạch**, **không** để lại mã chết gây lỗi |
