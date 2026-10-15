@@ -920,3 +920,71 @@ public class PriceListStateMachineTests
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.1 | 13/10/2026 | *(điền)* | Bản nháp đầu — 14 ADR · 14 BR · 10 NFR · 22 test case · 3 sơ đồ Mermaid · **mọi khẳng định về code đều có đường dẫn file đã kiểm**; ghi rõ **module `Pricing` chưa có trong code** và **`Money`/`IIdempotencyGuard`/outbox-inbox chưa có** (phụ thuộc chặn `XC-001`/`XC-002`); ghi nhận **F1–F5** |
+
+---
+
+## 16. TRẠNG THÁI TRIỂN KHAI — **LÁT CẮT 1: MODULE PRICING + GIÁ CƠ SỞ 4 CẤP** (15/10/2026)
+
+### 16.1 Đã làm
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| 1 | **Module `Pricing`** (mới) | `modules/Pricing/…Domain` + `…EntityFrameworkCore`; `PricingDomainModule` **`[DependsOn]` Kernel** (dùng `Money`); **KHÔNG** tham chiếu `Catalog` (§15.1 **Q1**: Pricing làm việc theo **`Sku` chuỗi**) |
+| 2 | `PriceListStatus` + **máy trạng thái** `PriceList` | `Draft→Approved→Active→Expired/Superseded/Cancelled`; **guard do NGƯỜI ⇒ NÉM**, **guard do THỜI GIAN ⇒ trả `false`** (`PRC-002` ADR-11 — theo tiền lệ `TaxClassification`) |
+| 3 | **Append-only** (`BR-004`/E2) | `YeuCauChoPhepSuaNoiDung()` chặn sửa nội dung bảng giá đã/đang hiệu lực ⇒ `Pricing:0003`. Bảng giá `Active` **không** huỷ được |
+| 4 | Bất biến `Scope` ↔ kênh | `Scope = Channel/ChannelShop` mà **thiếu** `ChannelCode`/`ChannelShopId` ⇒ **NÉM** (bất biến **DB không bảo vệ được**) |
+| 5 | `PriceListItem` + `ChannelPrice` | Tiền lưu **2 cột** (`AmountValue` + `CurrencyCode`) ⇒ thoả **BR-001** (*"cấm lưu `decimal` tiền mà không có cột tiền tệ đi kèm"*); API miền vẫn là `Money` (computed) |
+| 6 | 🚨 **`GiaCoSoResolver` — hàm THUẦN, 4 cấp cố định** (**D7**/BR-006/BR-009) | `Shop → Kênh → Bảng giá → Niêm yết`; **trong cùng cấp** so `Priority`; **cùng cấp + cùng `Priority` ⇒ NÉM `0001`** (A2 — *"cấm chọn tuỳ tiện"*); trả **kèm `TatCaUngVien`** (ADR-03) |
+| 7 | Lọc **bậc số lượng** (A3) | chọn `MinQuantity` **lớn nhất ≤ quantity**; **hai bậc cùng `MinQuantity` cùng cấp/priority ⇒ NÉM `0008`** (ADR-02) |
+| 8 | Chính sách thiếu giá (**D14**) | mặc định **`NemLoi`** ⇒ `0004` **kèm `sku` + `channelCode` + `at`**; `DungGiaNiemYet` là lựa chọn có cấu hình |
+| 9 | Mã lỗi + khoá | `PricingErrorCodes` (`eCommerce:Pricing:0001…0008`) **trong module** (quy ước *"module sở hữu hằng số"*); `PricingLockKeys` **KHÔNG** chứa tiền tố `ecommerce:` (**ADR-12**) |
+| 10 | Migration + hàng rào DB | 3 bảng `PrcPriceLists`/`PrcPriceListItems`/`PrcChannelPrices`; **3 unique index `NULLS NOT DISTINCT`** (sửa tay) |
+
+### 16.2 ✅ BẰNG CHỨNG
+
+| Phép đo | Kết quả |
+|---|---|
+| Build `--no-incremental` | **0 lỗi / 0 cảnh báo** |
+| Unit test | **531** (thêm **23**: 4 cấp · `Priority` cùng cấp · **cùng cấp+cùng priority ⇒ NÉM** · **độc lập thứ tự duyệt** · trộn tiền tệ · bậc số lượng · máy trạng thái · append-only · khoá) |
+| Integration test | **32** (bảng đếm index `NULLS NOT DISTINCT` nay **31**) |
+| **DB thật (PostgreSQL 17)** | 3 bảng `Prc*` tồn tại; **`IX_PrcPriceLists_TenantId_Code_EffectiveFrom`**, **`IX_PrcPriceListItems_TenantId_PriceListId_Sku`**, **`IX_PrcChannelPrices_TenantId_Kenh_Shop_Sku_MinQty`** đều **UNIQUE … NULLS NOT DISTINCT** (đo bằng `pg_indexes`); **31** index `NULLS NOT DISTINCT` toàn hệ thống |
+| Migration | `20261015101649_Pricing_PriceList_And_ChannelPrice` đã áp; `Assets/schema.sql` đã sinh lại |
+
+#### 🚨 Bước **SỬA TAY** trong migration (bắt buộc)
+EF sinh `CREATE UNIQUE INDEX` **KHÔNG** kèm `NULLS NOT DISTINCT`; PostgreSQL coi **NULL là DISTINCT** ⇒ khi
+`TenantId = NULL` (hệ thống **1 tenant** hiện nay) thì **cả 3** unique index **mất tác dụng im lặng**:
+hai dòng giá cùng SKU trong một bảng giá **lọt** ⇒ resolve ra giá nào cũng "đúng"; hai `ChannelPrice` cùng
+khoá **lọt** ⇒ **bán sai giá**. Đã `DROP` + `CREATE … NULLS NOT DISTINCT` cho cả 3.
+
+#### 🛡️ Mutation test (đo thật)
+Đổi `if (thang.Count > 1)` thành `> 99` (bỏ luật chặn) ⇒ test
+`CUNG_CAP_CUNG_PRIORITY_thi_NEM_LOI_0001__KHONG_chon_bua` **ĐỎ** đúng như mong đợi; khôi phục (từ **file sao lưu**,
+**không** dùng `git checkout`) ⇒ xanh lại. ⇒ Luật chặn **thực sự** được test canh, không phải test trang trí.
+📌 **Bài học nhỏ:** sau khi khôi phục file, **phải build `--no-incremental`** — build tăng dần **bỏ qua** file
+được ghi lại với nội dung **y hệt** ⇒ test chạy trên **DLL cũ** và **ĐỎ sai**.
+
+### 16.3 🚨 Sai lệch doc/code phát hiện được
+
+| # | Phát hiện | Bằng chứng | Xử lý |
+|---|---|---|---|
+| **N1** | `ToMinorUnits()` — API mà **BR-002** (tài liệu này) và **ADR-14** (`PRC-002`) **yêu cầu** để so tiền — **KHÔNG tồn tại** trong code | `grep ToMinorUnits` toàn repo ⇒ **0 kết quả**; `eCommerce.Kernel/Money/Money.cs` có `IComparable<Money>` + toán tử `< > ==` + `Money.CmpCungLoaiTien` (ném khi khác tiền tệ) | **Đã chọn API thật**: so tiền qua **`Money`** (không qua `decimal`), và **kiểm tra loại tiền tường minh** để lỗi ra dưới **mã của Pricing** (`0005`) thay vì mã Kernel. 📌 Tài liệu **nên** sửa `ToMinorUnits()` → `Money` **hoặc** bổ sung API đó vào Kernel (**cần người quyết**) |
+| **N2** | Tiền **phải là `Money`** (BR-001) nhưng EF **không** value-convert được `Money` (record ctor **private**) | `Money` có ctor private + `static Cua(...)`; `HasConversion` chỉ map **1 property → 1 cột** | **Đã chọn**: lưu **2 cột** (`AmountValue` + `CurrencyCode`) — **thoả** nguyên văn BR-001 (*"cấm lưu `decimal` mà không có cột tiền tệ đi kèm"*) và đọc lại **đúng loại tiền**; API miền vẫn `Money` |
+| **N3** | `PRC-001` §8.2 nói tên khoá **có** tiền tố `ecommerce:` — **ngược** `XC-003` §5.4 và `PRC-002` **ADR-12** | `PRC-002` §15.2 **F3** đã ghi nhận mâu thuẫn này | **Code theo `XC-003`** (không tiền tố) + test `TC-22` tương đương ở mức unit; 📌 **§8.2 của tài liệu này cần sửa** |
+
+### 16.4 Còn lại của `PRC-001`
+
+| # | Việc | Ghi chú |
+|---|---|---|
+| 1 | **App service + API** (`PriceListAppService`, `PriceListItemAppService`, `ChannelPriceAppService`) + **`IPriceResolver` service** (nạp DB rồi giao cho `GiaCoSoResolver` thuần) | §6.1/§6.2 — để kiểm chứng **bằng HTTP thật** |
+| 2 | **Import hàng loạt** + idempotency (`IIdempotencyGuard` + `InboxRecords` — **D11**/`0006`) | phụ thuộc `XC-002` |
+| 3 | `CostPrice` (giá vốn) + luồng duyệt riêng | BR-013: **cấm** lộ ra storefront |
+| 4 | Job theo ngày (`Approved→Active`, `Active→Expired`) | ADR-10 |
+| 5 | `RowVersion` (optimistic concurrency — D9/`0007`) | cạnh tranh ghi |
+| 6 | Audit thay đổi giá (BR-014) | |
+| 7 | Bất biến *"chỉ **một** `PriceList` `Active` cho mỗi `(tenant, scope, kênh)`"* (BR-007) | **không có hàng rào DB** (D8/`F2`) ⇒ phải khoá + kiểm trong transaction |
+
+### 16.5 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.2 | 15/10/2026 | *(agent, session GĐ1)* | **Lát cắt 1**: dựng **module `Pricing`** + `PriceList` (máy trạng thái + append-only) + `PriceListItem` + `ChannelPrice` + **`GiaCoSoResolver` (hàm THUẦN, 4 cấp cố định, NÉM khi cùng cấp+cùng priority)** + lọc bậc số lượng + chính sách thiếu giá + mã lỗi/khoá của module + migration với **3 unique index `NULLS NOT DISTINCT`** (sửa tay). **+23 unit**, **mutation test** xác nhận luật chặn được test canh. Ghi **3 sai lệch doc/code** (N1 `ToMinorUnits` không tồn tại · N2 không map thẳng được `Money` · N3 mâu thuẫn tiền tố khoá). Còn lại: **§16.4** |

@@ -58,6 +58,13 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
     public DbSet<Catalog.ProductAttributeSelection> ProductAttributeSelections { get; set; } = default!;
     public DbSet<Catalog.ProductVariantAttribute> ProductVariantAttributes { get; set; } = default!;
 
+    // ── Pricing (`PRC-001` / `PRC-002`) ────────────────────────────────────────────────────────
+    // 🚨 Thiếu `DbSet` ⇒ ABP **KHÔNG** đăng ký `IRepository<T>` ⇒ DI nổ (**HTTP 500**) dù build/migration xanh.
+    // Lưới an toàn CI: `DbSetRegistrationTests` (mọi entity `eCommerce.*` trong model phải có `DbSet`).
+    public DbSet<Pricing.PriceList> PriceLists { get; set; } = default!;
+    public DbSet<Pricing.PriceListItem> PriceListItems { get; set; } = default!;
+    public DbSet<Pricing.ChannelPrice> ChannelPrices { get; set; } = default!;
+
     // ---- Inventory ----
     public DbSet<Inventory.InventoryItem> InventoryItems { get; set; } = default!;
     public DbSet<Inventory.StockLedgerEntry> StockLedgerEntries { get; set; } = default!;
@@ -130,6 +137,9 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
         Signing.EntityFrameworkCore.SigningDbContextModelCreatingExtensions.ConfigureSigning(builder);
 
         ConfigureCommerce(builder);
+
+        // Module Pricing (`PRC-001`/`PRC-002`) — mapping nằm trong module, gọi từ DbContext hợp nhất.
+        Pricing.EntityFrameworkCore.PricingDbContextModelCreatingExtensions.ConfigurePricing(builder);
 
         // Module ABP (thêm ở Phase 0) tự cung cấp cấu hình model của mình.
         // Mỗi hàm ConfigureXxx() đến từ package Volo.Abp.Xxx.EntityFrameworkCore tương ứng.

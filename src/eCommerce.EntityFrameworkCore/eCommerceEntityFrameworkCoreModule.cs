@@ -30,6 +30,7 @@ namespace eCommerce.EntityFrameworkCore;
     typeof(Address.EntityFrameworkCore.AddressEntityFrameworkCoreModule),
     typeof(EInvoice.EntityFrameworkCore.EInvoiceEntityFrameworkCoreModule),
     typeof(Signing.EntityFrameworkCore.SigningEntityFrameworkCoreModule),
+    typeof(Pricing.EntityFrameworkCore.PricingEntityFrameworkCoreModule),
     typeof(AbpEntityFrameworkCorePostgreSqlModule),
     typeof(AbpIdentityEntityFrameworkCoreModule),
     typeof(AbpPermissionManagementEntityFrameworkCoreModule),

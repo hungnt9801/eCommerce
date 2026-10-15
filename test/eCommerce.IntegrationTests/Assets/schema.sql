@@ -1534,3 +1534,102 @@ VALUES ('20261015100156_Cat002c_AttributesAndVariantGeneration', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE TABLE "PrcChannelPrices" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "ChannelCode" character varying(64) NOT NULL,
+    "ChannelShopId" uuid,
+    "Sku" character varying(64) NOT NULL,
+    "MinQuantity" integer NOT NULL,
+    "AmountValue" numeric(18,4) NOT NULL,
+    "CurrencyCode" character varying(8) NOT NULL,
+    "EffectiveFrom" timestamp with time zone NOT NULL,
+    "EffectiveTo" timestamp with time zone,
+    "Priority" integer NOT NULL,
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_PrcChannelPrices" PRIMARY KEY ("Id")
+);
+
+CREATE TABLE "PrcPriceLists" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "Code" character varying(64) NOT NULL,
+    "Name" character varying(256) NOT NULL,
+    "Scope" integer NOT NULL,
+    "ChannelCode" character varying(64),
+    "ChannelShopId" uuid,
+    "Currency" character varying(8) NOT NULL,
+    "EffectiveFrom" timestamp with time zone NOT NULL,
+    "EffectiveTo" timestamp with time zone,
+    "Priority" integer NOT NULL,
+    "Status" integer NOT NULL,
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_PrcPriceLists" PRIMARY KEY ("Id")
+);
+
+CREATE TABLE "PrcPriceListItems" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "PriceListId" uuid NOT NULL,
+    "Sku" character varying(64) NOT NULL,
+    "AmountValue" numeric(18,4) NOT NULL,
+    "CurrencyCode" character varying(8) NOT NULL,
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_PrcPriceListItems" PRIMARY KEY ("Id"),
+    CONSTRAINT "FK_PrcPriceListItems_PrcPriceLists_PriceListId" FOREIGN KEY ("PriceListId") REFERENCES "PrcPriceLists" ("Id") ON DELETE RESTRICT
+);
+
+CREATE UNIQUE INDEX "IX_PrcChannelPrices_TenantId_Kenh_Shop_Sku_MinQty" ON "PrcChannelPrices" ("TenantId", "ChannelCode", "ChannelShopId", "Sku", "MinQuantity");
+
+CREATE INDEX "IX_PrcChannelPrices_TenantId_Sku_ChannelCode" ON "PrcChannelPrices" ("TenantId", "Sku", "ChannelCode");
+
+CREATE INDEX "IX_PrcPriceListItems_PriceListId" ON "PrcPriceListItems" ("PriceListId");
+
+CREATE UNIQUE INDEX "IX_PrcPriceListItems_TenantId_PriceListId_Sku" ON "PrcPriceListItems" ("TenantId", "PriceListId", "Sku");
+
+CREATE UNIQUE INDEX "IX_PrcPriceLists_TenantId_Code_EffectiveFrom" ON "PrcPriceLists" ("TenantId", "Code", "EffectiveFrom");
+
+CREATE INDEX "IX_PrcPriceLists_TenantId_Status_Scope_ChannelCode" ON "PrcPriceLists" ("TenantId", "Status", "Scope", "ChannelCode");
+
+DROP INDEX "IX_PrcPriceLists_TenantId_Code_EffectiveFrom";
+
+CREATE UNIQUE INDEX "IX_PrcPriceLists_TenantId_Code_EffectiveFrom" ON "PrcPriceLists" ("TenantId", "Code", "EffectiveFrom") NULLS NOT DISTINCT;
+
+DROP INDEX "IX_PrcPriceListItems_TenantId_PriceListId_Sku";
+
+CREATE UNIQUE INDEX "IX_PrcPriceListItems_TenantId_PriceListId_Sku" ON "PrcPriceListItems" ("TenantId", "PriceListId", "Sku") NULLS NOT DISTINCT;
+
+DROP INDEX "IX_PrcChannelPrices_TenantId_Kenh_Shop_Sku_MinQty";
+
+CREATE UNIQUE INDEX "IX_PrcChannelPrices_TenantId_Kenh_Shop_Sku_MinQty" ON "PrcChannelPrices" ("TenantId", "ChannelCode", "ChannelShopId", "Sku", "MinQuantity") NULLS NOT DISTINCT;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261015101649_Pricing_PriceList_And_ChannelPrice', '10.0.11');
+
+COMMIT;
+
