@@ -1245,3 +1245,77 @@ tài liệu **chưa nói rõ** ⇒ **cần chốt** trước khi làm UI kiểm 
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.4 | 15/10/2026 | *(agent, session GĐ1)* | **Lát cắt 3 — dịch vụ ghi sổ + sinh bút toán**: `TinhButToanChungTu` (**hàm thuần**: nhập 1 bút toán · chuyển kho **2** bút toán · kiểm kê ghi **phần lệch**, khớp ⇒ **không ghi gì**) · `InventoryLockKeys.TheoSku` (không tiền tố `ecommerce:`) · `StockPostingService` (**khoá mọi SKU theo thứ tự sắp xếp** chống DEADLOCK; bút toán + tồn kho **cùng transaction**). 🚨 **Ghi rõ ADR-09 không đặt ở tầng Domain** (cần EF Core; Domain cố ý không phụ thuộc persistence) và **hàng rào đồng thời thật là unique index `ADR-05` ở DB** (§18.2). **+13 unit** (khoá **quy ước dấu** — chỗ dễ sai nhất). Ghi **1 diễn giải cần chốt với BA** (§18.5) |
+
+---
+
+## 19. TRẠNG THÁI TRIỂN KHAI — **LÁT CẮT 4: API KHO + GHI SỔ (KIỂM CHỨNG HTTP)** (15/10/2026)
+
+### 19.1 Đã làm
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| 1 | **`StockDocumentAppService`** (`/api/app/stock-document`) | `GET` (lọc theo loại) · `GET /{id}` · `GET /{id}/lines` · **`POST`** (tạo chứng từ `Draft`) · **`POST /{id}/ghi-so`** (ghi sổ) |
+| 2 | **Route tường minh** | 📌 Tên hàm là `GhiSoAsync` (**không** phải `PostAsync`) **có chủ ý**: ABP **bỏ** tên hàm khi nó trùng động từ HTTP ⇒ `PostAsync` cho route **mơ hồ** `POST /{id}` (đọc không biết là *"ghi sổ"* hay *"sửa"*) |
+| 3 | **Enum chuyển sang `Domain.Shared`** | `StockDocumentType`/`StockDocumentStatus` phải nằm ở `Domain.Shared` để **DTO dùng được** mà `Application.Contracts` **không** phải tham chiếu `eCommerce.Domain` — đúng quy ước repo (tiền lệ `StockMovementType`, `ProductStatus`) |
+| 4 | 🔐 **Quyền dùng lại `Inventory.Default`/`Inventory.Adjust`** | 📌 **Chưa** tách quyền chi tiết (`Receipt.Create`…) vì thêm permission **phải khai ở CẢ HAI NƠI + chạy lại `DbMigrator`**, nếu không ⇒ **403 im lặng cho mọi người** (bài học lượt 5). Việc tách quyền là **lát cắt riêng có kiểm chứng riêng** (§19.5 #1) |
+
+### 19.2 🚨 **HAI LỖI THẬT DO KIỂM CHỨNG HTTP BẮT ĐƯỢC** (không phải do đọc code)
+
+**L1 — Chính index ADR-05 của tôi CHẶN OAN phiếu chuyển kho ⇒ *chuyển kho KHÔNG DÙNG ĐƯỢC*.**
+Phiếu chuyển kho hợp lệ sinh **HAI** bút toán từ **MỘT** dòng chứng từ (`TransferOut` ở nguồn + `TransferIn` ở đích),
+nhưng unique index `(TenantId, ReferenceLineId)` chỉ cho **một** bút toán cho mỗi dòng ⇒ ghi sổ chuyển kho
+**luôn `500`** (`23505`). Test đơn vị **không** bắt được (nó chỉ kiểm *"kế hoạch bút toán"*, không chạm DB);
+**chỉ kiểm chứng HTTP mới lộ**.
+✅ **Sửa:** unique theo **`(TenantId, ReferenceLineId, MovementType)`** — hai vế **khác loại** ⇒ qua được;
+còn **ghi sổ lại cùng dòng cùng loại** (retry / hai request đồng thời) **vẫn bị chặn** ⇒ giữ nguyên mục đích ADR-05.
+📌 **Bài học:** *ràng buộc DB chặt hơn nghiệp vụ thì không phải "an toàn hơn" — nó là **tính năng không chạy được**.*
+
+**L2 — Miền ném `InvalidOperationException` cho *"không đủ tồn"* ⇒ client nhận `500`.**
+Xuất quá tồn (chuyển 999 khi có 60) trả **HTTP 500** — trong khi đây là **lỗi NGHIỆP VỤ** (người dùng cần biết
+*"không đủ hàng"*), không phải lỗi hệ thống. CSKH/client **không biết phải làm gì**.
+✅ **Sửa:** ném `BusinessException(eCommerceConsts.ErrorCodes.InsufficientStock)` kèm `sku`/`onHand`/`reserved`/
+`movementType`. Nay trả **`eCommerce:Inventory:0001`**.
+
+### 19.3 ✅ BẰNG CHỨNG HTTP THẬT (Host + PostgreSQL 17) — **10 phép đo, `fail = 0`**
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | Tạo phiếu nhập 100 ⇒ **`Draft`** | `200` · `Draft` · 1 dòng · **tồn kho = `0`** ✅ (*chứng từ **chưa** ảnh hưởng tồn kho* — ADR-02) |
+| 2 | **Ghi sổ** | `200` · `Posted` · **1 bút toán** · **tồn A = `100`** · sổ cái có `ReferenceType=GoodsReceipt`, `ReferenceId=PN-…`, `BalanceAfter=100` ✅ |
+| 3 | **Đối chiếu `OnHand` ↔ `SUM(sổ cái)`** (ADR-10) | `100 = 100` ✅ |
+| 4 | 🚨 **Ghi sổ LẦN HAI** | **`eCommerce:Inventory:0010`** · tồn **vẫn `100`** ✅ (*không cộng gấp đôi*) |
+| 5 | **Phiếu chuyển kho 30 (A→B)** | `200` · **`soButToan = 2`** · A = **`70`**, B = **`30`** · 🚨 **TỔNG TỒN KHÔNG ĐỔI = `True`** ✅ *(bất biến then chốt của chuyển kho)* |
+| 6 | **Kiểm kê: đếm 60 so với sổ 70** | `200` · **1 bút toán** · `StocktakeLoss` delta **`10`** · tồn A = **`60`** ✅ |
+| 7 | **Kiểm kê KHỚP** (60 so với 60) | `200` · **`soButToan = 0`** · `Posted` ✅ (*không ghi dòng sổ cái `0`*) |
+| 8 | 🚨 **Xuất quá tồn** (chuyển 999 khi có 60) | **`eCommerce:Inventory:0001`** ✅ · tồn **vẫn `60`** (**transaction ROLLBACK**) · chứng từ **vẫn `Draft`** ✅ |
+| 9 | **Chuyển kho cùng một kho** | **`eCommerce:Inventory:0021`** ✅ |
+| 10 | **Kho đã ngừng dùng** | **`eCommerce:Inventory:0002`** ✅ |
+
+- build `--no-incremental`: **0 lỗi / 0 cảnh báo** · unit **630/630** · integration **38/38** · mermaid 197/0
+- **DB thật:** `IX_InvStockLedger_TenantId_ReferenceLineId` = `UNIQUE … (TenantId, ReferenceLineId, MovementType)
+  **NULLS NOT DISTINCT** WHERE (ReferenceLineId IS NOT NULL)`; tổng **38** index `NULLS NOT DISTINCT`; `schema.sql` sinh lại
+- Dọn dẹp: 0 kho / 0 chứng từ / 0 sổ cái / 0 tồn kho · cờ bảo mật đã khôi phục
+
+### 19.4 ⚠️ Ghi chú vận hành (đã gặp thật)
+
+Sửa tay migration **hai lần liên tiếp không khớp** vì file dùng **CRLF** mà script so khớp bằng **LF** ⇒
+migration được áp **thiếu `NULLS NOT DISTINCT`** (đếm `pg_indexes` thấy `38 → 37`). Đã sửa bằng `edit` + **áp lại
+SQL trực tiếp** lên DB đang chạy (migration đã ghi vào `__EFMigrationsHistory`). 📌 **Bài học:** sau mỗi lần sửa tay
+migration, **luôn đếm lại index `NULLS NOT DISTINCT`** trên DB thật — đó là phép kiểm rẻ nhất phát hiện việc sửa tay **không** có tác dụng.
+
+### 19.5 Còn lại của `INV-001`
+
+| # | Việc | Ghi chú |
+|---|---|---|
+| 1 | **Tách quyền chi tiết** (`Inventory.Receipt.Create`/`Transfer.Create`/`Stocktake.Approve`) | phải khai **cả hai nơi** + **reseed**; làm thành lát cắt có kiểm chứng riêng |
+| 2 | **Exception filter** cho `23505` trên sổ cái (ca hai request **đồng thời**) | hiện vẫn **500** — ca hiếm; `GhiSo` tuần tự đã chặn (`0010`) |
+| 3 | **Idempotency** thực thi cho ghi sổ (ADR-07) | `IdempotencyKey` có trên entity, **chưa** dùng để chặn |
+| 4 | **Job đối soát** + **metric** (ADR-10 / §0 #9) | phép đo #3 mới là đối chiếu **thủ công** |
+| 5 | 📌 **Diễn giải `Quantity` của phiếu kiểm kê** (§18.5) | **cần chốt với BA** |
+| 6 | **API tạo kho** (hiện E2E chèn kho bằng SQL) | chưa có route cho `Warehouse` |
+
+### 19.6 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.5 | 15/10/2026 | *(agent, session GĐ1)* | **Lát cắt 4 — API kho + ghi sổ, kiểm chứng HTTP 10 phép đo (`fail = 0`)**: `StockDocumentAppService` (tạo chứng từ + **`POST /{id}/ghi-so`**), enum chuyển sang `Domain.Shared`, quyền dùng lại `Inventory.*`. 🚨 **Sửa 2 lỗi thật do kiểm chứng bắt:** (L1) **index ADR-05 chặn oan phiếu chuyển kho** ⇒ đổi thành unique `(ReferenceLineId, MovementType)` — *ràng buộc chặt hơn nghiệp vụ là tính năng không chạy được*; (L2) miền ném `InvalidOperationException` cho *"không đủ tồn"* ⇒ **`500`** ⇒ đổi thành `BusinessException` (`Inventory:0001`). Bất biến then chốt được đo: **chuyển kho ⇒ TỔNG TỒN KHÔNG ĐỔI**, ghi sổ hai lần **bị chặn**, xuất quá tồn **rollback** |

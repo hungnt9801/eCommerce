@@ -501,7 +501,14 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
             // EF không sinh được `NULLS NOT DISTINCT` lẫn bộ lọc kèm nhau):
             // bút toán điều chỉnh tay KHÔNG có dòng chứng từ; nếu unique **không** bộ lọc thì toàn hệ thống
             // chỉ được phép có **MỘT** bút toán không tham chiếu.
-            b.HasIndex(x => new { x.TenantId, x.ReferenceLineId })
+            // 🚨 **SỬA 15/10/2026 — LỖI THẬT DO KIỂM CHỨNG HTTP BẮT ĐƯỢC:** phiên bản đầu chỉ unique
+            // `(TenantId, ReferenceLineId)` ⇒ **CHẶN OAN** vế thứ hai của **phiếu chuyển kho** (một dòng chứng từ
+            // chuyển kho sinh **HAI** bút toán: `TransferOut` ở nguồn + `TransferIn` ở đích) ⇒ ghi sổ chuyển kho
+            // **luôn 500** (`23505`), tức là **tính năng chuyển kho không dùng được**.
+            // ✅ Nay unique theo **`(TenantId, ReferenceLineId, MovementType)`**: hai vế có **loại khác nhau**
+            // ⇒ qua được; còn **ghi sổ lại cùng một dòng cùng một loại** (retry / hai request đồng thời)
+            // vẫn **BỊ CHẶN** — giữ nguyên mục đích chống ghi trùng (ADR-05).
+            b.HasIndex(x => new { x.TenantId, x.ReferenceLineId, x.MovementType })
                 .IsUnique()
                 .HasFilter("\"ReferenceLineId\" IS NOT NULL")
                 .HasDatabaseName("IX_InvStockLedger_TenantId_ReferenceLineId");

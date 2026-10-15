@@ -3419,12 +3419,12 @@ namespace eCommerce.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("TenantId", "ReferenceLineId")
+                    b.HasIndex("TenantId", "ChannelCode", "OccurredAtUtc");
+
+                    b.HasIndex("TenantId", "ReferenceLineId", "MovementType")
                         .IsUnique()
                         .HasDatabaseName("IX_InvStockLedger_TenantId_ReferenceLineId")
                         .HasFilter("\"ReferenceLineId\" IS NOT NULL");
-
-                    b.HasIndex("TenantId", "ChannelCode", "OccurredAtUtc");
 
                     b.HasIndex("TenantId", "WarehouseId", "Sku", "OccurredAtUtc");
 

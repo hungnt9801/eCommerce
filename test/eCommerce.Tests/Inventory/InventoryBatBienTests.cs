@@ -88,7 +88,7 @@ public class InventoryItemBatBienTests
     {
         var item = Tao(onHand: 5);
 
-        Assert.Throws<InvalidOperationException>(() => item.ApplyMovement(StockMovementType.Sale, 6));
+        Assert.Throws<Volo.Abp.BusinessException>(() => item.ApplyMovement(StockMovementType.Sale, 6));
     }
 
     [Fact]
@@ -98,7 +98,7 @@ public class InventoryItemBatBienTests
         // ⇒ hệ thống tưởng CÒN hàng để bán (bán thứ không có). Test này khoá bất biến đã bổ sung.
         var item = Tao(onHand: 5);
 
-        Assert.Throws<InvalidOperationException>(() => item.ApplyMovement(StockMovementType.Reservation, 6));
+        Assert.Throws<Volo.Abp.BusinessException>(() => item.ApplyMovement(StockMovementType.Reservation, 6));
         Assert.Equal(5, item.OnHand);
         Assert.Equal(0, item.Reserved);
     }
@@ -128,7 +128,7 @@ public class InventoryItemBatBienTests
     {
         var item = Tao(onHand: 10);
 
-        Assert.Throws<InvalidOperationException>(() => item.ApplyMovement(StockMovementType.ReservationRelease, 1));
+        Assert.Throws<Volo.Abp.BusinessException>(() => item.ApplyMovement(StockMovementType.ReservationRelease, 1));
     }
 
     [Fact]

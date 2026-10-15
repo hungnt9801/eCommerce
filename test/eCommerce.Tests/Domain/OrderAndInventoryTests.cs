@@ -71,7 +71,7 @@ public class OrderAndInventoryTests
         item.ApplyMovement(StockMovementType.Receipt, 10);
 
         // Bán 11 khi chỉ có 10 ⇒ phải chặn ngay ở tầng domain.
-        Assert.Throws<InvalidOperationException>(() => item.ApplyMovement(StockMovementType.Sale, 11));
+        Assert.Throws<Volo.Abp.BusinessException>(() => item.ApplyMovement(StockMovementType.Sale, 11));
     }
 
     [Fact]

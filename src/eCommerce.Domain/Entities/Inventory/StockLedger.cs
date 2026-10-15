@@ -1,3 +1,4 @@
+using Volo.Abp;
 using Volo.Abp.Domain.Entities.Auditing;
 using Volo.Abp.MultiTenancy;
 
@@ -79,9 +80,16 @@ public class InventoryItem : FullAuditedAggregateRoot<Guid>, IMultiTenant
 
         if (onHandMoi < 0 || reservedMoi < 0)
         {
-            throw new InvalidOperationException(
-                $"Biến động kho {type} làm âm tồn kho của SKU '{Sku}' " +
-                $"(OnHand={onHandMoi}, Reserved={reservedMoi}). KHÔNG thay đổi gì.");
+            // 🚨 **LỖI NGHIỆP VỤ, KHÔNG phải lỗi hệ thống**: trước 15/10/2026 chỗ này ném
+            // `InvalidOperationException` ⇒ ABP map thành **HTTP 500** ⇒ client/CSKH thấy "lỗi hệ thống"
+            // trong khi thực chất là *"không đủ hàng để xuất"* — **người dùng không biết phải làm gì**.
+            // 📌 Kiểm chứng HTTP đã bắt được: xuất quá tồn trả **500** thay vì mã nghiệp vụ.
+            throw new BusinessException(eCommerceConsts.ErrorCodes.InsufficientStock)
+                .WithData("sku", Sku)
+                .WithData("onHand", onHandMoi)
+                .WithData("reserved", reservedMoi)
+                .WithData("movementType", type.ToString())
+                .WithData("lyDo", "Biến động kho làm ÂM tồn kho. KHÔNG thay đổi gì.");
         }
 
         if (reservedMoi > onHandMoi)
@@ -89,9 +97,11 @@ public class InventoryItem : FullAuditedAggregateRoot<Guid>, IMultiTenant
             // 🚨 Bất biến: **giữ chỗ KHÔNG được vượt tồn thực**. Trước `INV-001` chỉ kiểm `>= 0`
             // ⇒ `Reserved > OnHand` **LỌT** ⇒ `Available` **ÂM** ⇒ hệ thống tưởng còn hàng để bán
             // (bán thứ không có). DB nay có `CHECK` tương ứng (`ADR-03`) — code là lớp trong, DB là chốt cuối.
-            throw new InvalidOperationException(
-                $"Giữ chỗ VƯỢT tồn thực của SKU '{Sku}': Reserved={reservedMoi} > OnHand={onHandMoi}. " +
-                "KHÔNG thay đổi gì.");
+            throw new BusinessException(eCommerceConsts.ErrorCodes.InsufficientStock)
+                .WithData("sku", Sku)
+                .WithData("onHand", onHandMoi)
+                .WithData("reserved", reservedMoi)
+                .WithData("lyDo", "Giữ chỗ VƯỢT tồn thực (Reserved > OnHand) ⇒ Available ÂM. KHÔNG thay đổi gì.");
         }
 
         OnHand = onHandMoi;

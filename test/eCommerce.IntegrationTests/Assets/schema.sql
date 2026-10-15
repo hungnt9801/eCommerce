@@ -1862,3 +1862,17 @@ VALUES ('20261015112247_Inv001_Warehouse_StockDocument', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+DROP INDEX "IX_InvStockLedger_TenantId_ReferenceLineId";
+
+CREATE UNIQUE INDEX "IX_InvStockLedger_TenantId_ReferenceLineId" ON "InvStockLedger" ("TenantId", "ReferenceLineId", "MovementType") WHERE "ReferenceLineId" IS NOT NULL;
+
+DROP INDEX "IX_InvStockLedger_TenantId_ReferenceLineId";
+
+CREATE UNIQUE INDEX "IX_InvStockLedger_TenantId_ReferenceLineId" ON "InvStockLedger" ("TenantId", "ReferenceLineId", "MovementType") NULLS NOT DISTINCT WHERE "ReferenceLineId" IS NOT NULL;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261015113253_Inv001_Fix_SoCai_Unique_ThemMovementType', '10.0.11');
+
+COMMIT;
+
