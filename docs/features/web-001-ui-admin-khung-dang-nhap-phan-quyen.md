@@ -2401,3 +2401,51 @@ trong MỘT pha**, rồi mới chuyển pha — thay vì bật/tắt tiến trì
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.0-f | 15/10/2026 | *(agent, session GĐ1)* | 🎉 **Nút HUỶ của `/DonHang` ĐÃ ĐO** (nợ §77.3): probe **mới** tạo đơn **trong pha Host** ⇒ Web không cần Host. `POST /DonHang/Huy` ⇒ **`302`** ⇒ **`Cancelled`**, DB **`status=5`**, tồn **`10/2/8` → `10/0/10`** (*`Reserved` về 0, `Available` về 10, **`OnHand` không đổi*** = hàng **chưa từng rời kho**, chỉ **nhả chỗ**) ⇒ **`/DonHang` nay đủ HAI nút đã kiểm chứng qua UI**; dọn sạch; **`fail: 0`**; 0 tiến trình treo. **Quy tắc:** *probe hai pha ⇒ hoàn tất mọi việc cần Host trong MỘT pha* |
+
+---
+
+## 80. ✅ **LỐI VÀO /DonHang TỪ TRANG KẾT QUẢ ĐẶT HÀNG — ĐÃ KIỂM CHỨNG** (15/10/2026) — *trả nợ vòng 94*
+
+### 80.1 Đã làm (3 sửa, **mỗi sửa khớp đúng 1 lần**, build `0/0`)
+
+| # | Tệp | Thay đổi |
+|---|---|---|
+| 1 | `DatHangController.cs` (DTO) | thêm `public Guid? DonId` — **cầu nối** từ trang kết quả sang trang quản lý đơn |
+| 2 | `DatHangController.cs` (xử lý) | `trang.DonId = don.Id;` khi đặt hàng **thành công** |
+| 3 | `Views/DatHang/Index.cshtml` | liên kết **chỉ khi** `Model.DonId.HasValue` ⇒ `Url.Action("ChiTiet","DonHang", new { id = Model.DonId })` |
+
+📌 **Vì sao dùng `Url.Action`:** route đổi thì liên kết **tự đúng** — tránh đúng loại lỗi *sai route* đã tái phạm (Phụ lục D).
+
+### 80.2 ✅ BẰNG CHỨNG (probe `verify-lienket.ps1`, chạy **trọn**, `exit 0`)
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | Chờ Host/Web bằng **`tools/wait-host.ps1`** | `exit=0` · **LÊN sau 3s** / **2.5s** ✅ |
+| 2 | `POST /DatHang` (2 đơn vị) | **200** ✅ |
+| 3 | 🔥 **Liên kết có mặt trên trang kết quả** | **`True`** ✅ |
+| 4 | 🔥 **`href` đo được** | **`/DonHang/ChiTiet/3a245234-7189-5c03-d2b7-aa2b1602145c`** |
+| 5 | 🔥 **`Id` đơn TRONG DB** | **`3a245234-7189-5c03-d2b7-aa2b1602145c`** ⇒ **KHỚP CHÍNH XÁC** với `href` ✅ |
+| 6 | 🔥 **Bấm liên kết** | **HTTP `200`** · **`trangThai='Pending'`** ✅ |
+| 7 | Dọn dẹp · `fail:` · tiến trình treo | `don=0 ton=0 gc=0 sc=0 baoMat=true` ✅ · **`0`** ✅ · **0** ✅ |
+
+📌 **Vì sao #5 mới là phép đo quyết định:** kiểm *"có thẻ `<a>`"* là **chưa đủ** — liên kết có thể trỏ **sai đơn**.
+So `href` với **`Id` trong DB** mới chứng minh **đúng đơn vừa tạo**; và **#6** chứng minh bấm tới **thật sự mở được trang** (`200`),
+chứ không phải một liên kết **chết** (`404`).
+
+### 80.3 🐛 Hai lỗi probe của tôi ở vòng 94 — đã sửa và **cơ chế hoá** (Phần G)
+
+| Mã | Lỗi | Đã sửa thế nào ở vòng 95 |
+|---|---|---|
+| **G1** | tham số chờ đặt tên **`51228`** — **biến tự động chỉ-đọc** ⇒ hàm ném lỗi **ngay dòng gọi đầu tiên** ⇒ **không gì chạy** | đổi thành **``** |
+| **G2** | hàm trích dòng gọi **`.Trim()` trên ``** ⇒ probe **đứt giữa đường** | **`Where-Object {  -and .Trim() }`** rồi kiểm `` |
+
+📌 **Và điều đáng ghi nhất:** ở **cả hai** lần hỏng của vòng 94, quy tắc mới
+(*`git commit` phải nằm **TRONG** `if (đạt)`*, đặt ra ở vòng 92) **đã chặn được hồ sơ sai** — **không** tài liệu, **không** commit.
+⇒ Đây là **lần đầu** một quy tắc viết ra **chứng minh giá trị ngay trong vòng kế tiếp**; vòng 95 hoàn tất **đúng cách**:
+đo trước, **rồi** mới ghi sổ.
+
+### 80.4 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.0-h | 15/10/2026 | *(agent, session GĐ1)* | ✅ **Lối vào `/DonHang` ĐÃ KIỂM CHỨNG** (trả nợ vòng 94): probe **chạy trọn** với hàm trợ giúp viết theo **Phần G** ⇒ `POST /DatHang` **200**, liên kết **có mặt**, `href` **`/DonHang/ChiTiet/3a245234-7189-5c03-d2b7-aa2b1602145c`** **KHỚP CHÍNH XÁC** `Id` đơn trong DB (`3a245234-7189-5c03-d2b7-aa2b1602145c`), **bấm tới ⇒ HTTP `200`** trạng thái `Pending`; dọn sạch; **`fail: 0`**; 0 tiến trình treo. ⇒ **Người dùng nay ĐI TỪ ĐẶT HÀNG SANG XỬ LÝ ĐƠN bằng một cú bấm** |

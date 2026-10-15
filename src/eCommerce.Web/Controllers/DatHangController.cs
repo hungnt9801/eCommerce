@@ -120,6 +120,7 @@ public class DatHangController : Controller
             trang.DaDat = true;
             trang.SoDon = don.Number;
             trang.TrangThai = don.Status.ToString();
+            trang.DonId = don.Id;
             trang.TongTien = don.GrandTotal;
             trang.TienTe = ketQua.Tien?.CurrencyCode ?? "VND";
 
@@ -189,6 +190,9 @@ public class DatHangTrangDto
     public string? SoDon { get; set; }
 
     public string? TrangThai { get; set; }
+
+    /// <summary>Id đơn đã tạo — để trang kết quả **liên kết tới /DonHang/ChiTiet/{id}** (lối vào quản lý đơn).</summary>
+    public Guid? DonId { get; set; }
 
     public decimal TongTien { get; set; }
 

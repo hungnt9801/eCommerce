@@ -44,6 +44,10 @@
             <strong>ĐÃ ĐẶT HÀNG.</strong>
             <table id="bang-ket-qua">
                 <tr><th>Số đơn</th><td id="so-don">@Model.SoDon</td></tr>
+                @if (Model.DonId.HasValue)
+                {
+                    <tr><th>Quản lý</th><td><a id="lien-ket-quan-ly-don" href="@Url.Action("ChiTiet", "DonHang", new { id = Model.DonId })">Xem &amp; xử lý đơn này</a></td></tr>
+                }
                 <tr><th>Trạng thái</th><td id="trang-thai">@Model.TrangThai</td></tr>
                 <tr><th>Tổng tiền (từ sổ giải trình)</th><td class="so" id="tong-tien">@Model.TongTien.ToString("N0")</td></tr>
                 <tr><th>Tiền tệ</th><td id="tien-te">@Model.TienTe</td></tr>
