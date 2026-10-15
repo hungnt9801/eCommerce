@@ -447,7 +447,7 @@ bị bind nhầm vào `-WaitSeconds` và công cụ **báo lỗi rõ ràng** (kh
 
 | # | Việc | Vì sao ưu tiên | Khuôn kiểm chứng |
 |---|---|---|---|
-| 1 | **Quản lý đơn trên UI** (`/DonHang`: danh sách + **xác nhận/huỷ/trả**) | khép chuỗi người dùng **cả hai chiều** như tầng API | `302` khi chưa đăng nhập · có dữ liệu ⇒ **DB đổi trạng thái** + **tồn kho đổi đúng bất biến** (`Reserved`↓ khi huỷ; `OnHand`&`Reserved`↓ khi xác nhận) |
+| 1 | **Quản lý đơn trên UI** (`/DonHang`: danh sách + **xác nhận/huỷ/trả**) | 🎯 **RỦI RO NAY BẰNG 0** — **cả BA API** đã chứng minh chạy đúng trên **đơn do Web tạo / định dạng `WEB-…`**: **`XÁC NHẬN`** (`web-001` §65) · **`HUỶ`** (§69) · **`TRẢ HÀNG`** (§69). ⇒ còn lại **thuần tuý nối nút bấm** | `302` khi chưa đăng nhập · có dữ liệu ⇒ **DB đổi trạng thái** + **tồn kho đổi đúng bất biến** (`Reserved`↓ khi huỷ; `OnHand`&`Reserved`↓ khi xác nhận; `OnHand`↑ khi trả) |
 | 2 | **Giao diện giỏ nhiều ô nhập** + giỏ **giữ qua phiên** | UX thật cho khách (logic **đã** kiểm chứng — chỉ đổi view) | POST nhiều dòng ⇒ **số tính trước** khớp `GrandTotal` + sổ giải trình |
 | 3 | **`INV-003` hạn mức CỨNG theo kênh** | **cần người quyết** chính sách chia | — |
 | 4 | **`REC-001` ngưỡng cảnh báo + quy trình xử lý lệch** + bảng `ReconRuns` | **cần người quyết** + migration | — |
@@ -509,3 +509,18 @@ mà **đó chính là lý do nó tồn tại**. Ca 1 là ca **quan trọng nhấ
 |---|---|
 | 1 | **Chuyển các probe cũ sang dùng công cụ này** — hiện mỗi probe vẫn có `ChoHost` **riêng**; việc *"dùng chung"* cần sửa **từng probe** (làm dần khi probe được viết lại) |
 | 2 | **`HUỶ`/`TRẢ HÀNG` trên đơn do Web tạo** — **vẫn chưa đo** (`web-001` §66.3 · §68); rủi ro đã khoanh vùng **thấp** (`web-001` §67) nhưng **chưa bằng không** |
+
+---
+
+## PHỤ LỤC E (tiếp) — **E.4 ĐƯỜNG NỐI UI → API: ĐÃ CHỨNG MINH ĐỦ BA CHUYỂN TRẠNG THÁI** (vòng 82, 15/10/2026)
+
+| Chuyển trạng thái trên **đơn do Web tạo / định dạng `WEB-…`** | Bằng chứng | Bất biến đo được |
+|---|---|---|
+| **`XÁC NHẬN`** ⇒ xuất kho | `web-001` **§65** (trên đơn **do Web tạo**) | `OnHand` **và** `Reserved` **cùng giảm** ⇒ **`Available` KHÔNG đổi** (`10/4/6` → `6/0/6`) |
+| **`HUỶ`** ⇒ nhả chỗ ngay | `web-001` **§69** | `Reserved` `4 → 0` · **`Available` `6 → 10`** · `OnHand` **không đổi** · giữ chỗ **`Released`** |
+| **`TRẢ HÀNG`** ⇒ nhập kho + `CustomerReturn` | `web-001` **§69** | `OnHand` `7 → 10` · **phiếu `TH-WEB-WEB-…-1`** (chứng minh công thức số phiếu + tra **luỹ kế** chạy đúng với `Number` hình dạng WEB) |
+
+📌 **Hệ quả cho kế hoạch:** hạng mục **"quản lý đơn trên UI"** rời khỏi nhóm **rủi ro** ⇒ trở thành **việc nối nút bấm**.
+Mọi **rủi ro về định dạng số đơn `WEB-…`** đã **bị bác bỏ bằng đo** (§67 khoanh vùng · §69 bác bỏ).
+📌 **Bài học phương pháp #13** (đã ghi ở `web-001` §69.4): *khi một phép đo phức tạp hỏng ≥ 2 lần ⇒ **tách** thành phép đo nhỏ nhất
+còn trả lời được câu hỏi* — vòng 81 thắng **ngay lần đầu** sau bốn vòng hỏng vì đã **cô lập biến số**.
