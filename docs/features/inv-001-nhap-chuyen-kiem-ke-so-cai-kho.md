@@ -2267,3 +2267,52 @@ vì với `lines` **toàn SKU lạ** thì `0041` **vẫn không tới được**
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v2.0 | 15/10/2026 | *(agent, session GĐ1)* | **Mã lỗi riêng**: `Inventory:0040` (`TraVuotSoDaMua`) · `Inventory:0041` (`SkuKhongThuocDon`) ⇒ thôi mượn `0001` (**sai nghiệp vụ**). 🚨 **Lỗi thứ tự kiểm phát hiện nhờ ĐO**: khối kiểm SKU-lạ nằm **sau** phần tính `yeuCau` ⇒ mã `0041` **không bao giờ tới được** (mã **chết**) và client nhận **chẩn đoán sai** (`0011`) ⇒ **đảo lên trước** (*kiểm ĐẦU VÀO trước, DIỄN GIẢI sau*). **HTTP thật**: `0040` + `0041` **đúng**, tồn **không đổi** ở cả hai ca bị chặn, sổ cái `CustomerReturn = 4`, đối soát `0`, **`fail: 0`** |
+
+---
+
+## 36. `SAL-004` — **`0041` PHỦ CẢ HAI HÌNH DẠNG `lines`** (15/10/2026) — *đóng §35.4 #1*
+
+### 36.1 Đã đo — đóng độ phủ còn thiếu của §35.3
+
+Sau khi **đảo thứ tự kiểm** (§35.2), phải chứng minh mã `0041` **tới được** ở **cả hai** hình dạng `lines`:
+
+| # | Hình dạng `lines` | Kết quả | Ghi chú |
+|---|---|---|---|
+| 3b | **HỖN HỢP** (1 SKU hợp lệ + 1 SKU lạ) | **`403` `eCommerce:Inventory:0041`** ✅ | tồn **không đổi** (`OnHand 9`) |
+| 3c | 🔥 **TOÀN SKU LẠ** (không có SKU hợp lệ nào) | **`403` `eCommerce:Inventory:0041`** ✅ | tồn **không đổi** (`OnHand 9`) |
+
+📌 **Vì sao ca 3c mới là ca quan trọng:** trước khi **đảo thứ tự**, ca này rơi vào `yeuCau` **rỗng** ⇒ ném
+**`0011`** (*"chứng từ thiếu dòng"*) ⇒ mã `0041` **không bao giờ tới được** (§35.2 #2). Nay nó trả **`0041`**
+⇒ **việc đảo thứ tự đã được chứng minh có tác dụng**, không chỉ là thay đổi "trông hợp lý hơn".
+
+### 36.2 Bằng chứng đầy đủ của lượt đo này
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 0–1 | mua 4 → xác nhận → **trả `3/4`** | `OnHand 6` → **`Confirmed` · `OnHand 9`** ✅ |
+| 2 | 🔥 cố trả **vượt** | **`403` `Inventory:0040`** ✅ · chi tiết *"đã mua 4, đã trả 3, lần này 3"* · `OnHand` **vẫn 9** ✅ |
+| 3b | SKU lạ (`lines` **hỗn hợp**) | **`403` `Inventory:0041`** ✅ · `OnHand` **vẫn 9** ✅ |
+| 3c | SKU lạ (`lines` **toàn lạ**) | **`403` `Inventory:0041`** ✅ · `OnHand` **vẫn 9** ✅ |
+| 3 | trả nốt `1` | `200` · **`Returned`** · `OnHand 10` ✅ |
+| 4 | sổ cái · đối soát | **`CustomerReturn = 4`** ✅ · **`soCapLech = 0`** ✅ |
+| 5 | dọn dẹp · log | 0/0/0/0 ✅ · **`fail: 0`** ✅ |
+
+- build `--no-incremental`: **0 lỗi / 0 cảnh báo** · unit **693/693** · integration **38/38** · **không đổi schema**
+
+📌 **`SAL-004` (trả hàng) nay đã kiểm chứng ĐẦY ĐỦ:** trả toàn bộ · trả một phần · trả nốt · trả vượt (**bị chặn, mã riêng**)
+· SKU lạ (**bị chặn, mã riêng, cả hai hình dạng**) · idempotent · sổ cái `CustomerReturn` tách bạch · đối soát `0`.
+
+### 36.3 Còn lại (chuyển sang việc nghiệp vụ lớn hơn)
+
+| # | Việc | Ghi chú |
+|---|---|---|
+| 1 | **`INV-003`** phân bổ tồn theo kênh | hiện một kho cho cả đơn; `TraHangAsync` **phải hỏi kho** vì `Order` không lưu kho |
+| 2 | **`REC-001`** đối soát | nền đã có (`DoiSoatTonKho`, `inventory_recon_mismatch_skus`) |
+| 3 | **Hoàn tiền** (PaymentHub/kế toán) · **`WEB-001`** | |
+| 4 | **Trạng thái `PartiallyReturned`** | **cần người quyết** (đổi hợp đồng API) |
+
+### 36.4 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v2.1 | 15/10/2026 | *(agent, session GĐ1)* | **Đo ca `lines` TOÀN SKU LẠ** ⇒ xác nhận mã **`0041`** tới được ở **cả hai** hình dạng (hỗn hợp + toàn lạ) ⇒ **chứng minh việc đảo thứ tự kiểm (§35.2) có tác dụng thật**, không chỉ "trông hợp lý hơn". `SAL-004` nay **kiểm chứng đầy đủ**: tồn **không đổi** ở **mọi** ca bị chặn; sổ cái `CustomerReturn = 4`; đối soát `0`; **`fail: 0`** |
