@@ -1117,3 +1117,50 @@ và (b) **ghi nhận** lệch của `EInvoice` — nếu ai hợp nhất nửa v
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.4 | 15/10/2026 | *(agent, session GĐ1)* | **Lát cắt 3 — BR-007**: hàm thuần `CanThayThe` + `PriceListActivationService` (**khoá theo phạm vi** + thay thế `Superseded` trong transaction); app service **không** tự đổi trạng thái. **Kiểm chứng HTTP 7 phép đo** (BG1 bị Superseded · tra giá **1 ứng viên** ⇒ không ném `0001` · khác kênh không bị thay thế · idempotent · **0 `fail:`**). Thêm `Kernel.Locking.LockErrorCodes` (mã khoá dùng chung cho module) và **phát hiện lệch mã lỗi khoá** ở module `EInvoice` (§18.3 — **ghi nhận, không tự sửa**). **+12 unit** |
+
+---
+
+## 19. TRẠNG THÁI TRIỂN KHAI — **LÁT CẮT 4: CẤP 4 (giá niêm yết) + HẾT N+1** (15/10/2026)
+
+### 19.1 Đã làm
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| 1 | **Cấp 4 — giá niêm yết** | `ResolvePriceInput` thêm `ListPrice` + `ListPriceCurrency`. 🚨 Pricing **KHÔNG** đọc Catalog (§15.1 **Q1**) ⇒ giá niêm yết **PHẢI do bên gọi truyền vào** (`SAL-002`/storefront lấy từ Catalog). **CẤM tự bịa** — bịa ⇒ **bán sai giá** mà không ai biết |
+| 2 | **Hết N+1** (NFR-002) | `PriceResolverAppService` nay nạp **theo LÔ**: **đúng 3 truy vấn cho cả giỏ** (1) `ChannelPrice` theo **tập SKU**, (2) bảng giá `Active`, (3) dòng giá theo tập SKU — rồi lọc/gom **trong bộ nhớ**. Trước đây: **3 truy vấn × N dòng** (giỏ 50 dòng ≈ 150 truy vấn ⇒ **checkout chậm theo số dòng** mà vẫn "chạy đúng") |
+| 3 | 🔍 **Marker đo được** | Log `NAP-LO-BAT-DAU` / `NAP-LO-KET-THUC` ⇒ đếm được **số lệnh EF thật** (`Executed DbCommand`) giữa hai marker ⇒ NFR-002 **kiểm chứng được bằng đo**, không phải tự khai |
+
+### 19.2 ✅ BẰNG CHỨNG HTTP THẬT (Host + PostgreSQL 17)
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | Bảng giá `Active` cho `SKU1` = `111000` | `200` |
+| 2 | **Chỉ truyền `listPrice=250000`** (không bảng giá, không giá kênh) | `250000` · cấp **`GiaNiemYet`** · nguồn `ListPrice:caller` ✅ |
+| 3 | **Có bảng giá `111000` + `listPrice=250000`** | **`111000`** · cấp **`BangGia`** · **2 ứng viên** ✅ (cấp 3 **thắng** cấp 4 — đúng **D7**) |
+| 4 | **Không có gì cả** (không bảng giá, không `listPrice`) | **`eCommerce:Pricing:0004`** ✅ (không bịa giá) |
+| 5 | `resolve-many` **3 dòng khác SKU** | `200` · **3 kết quả** |
+| 6 | 🔍 **Số lệnh EF trong lô = `3`** (đếm `Executed DbCommand` giữa hai marker) | **ĐẠT NFR-002 (≤ 4)** ✅ — 3 dòng dùng chung **một** lần nạp |
+| 7 | Log Host | **0 dòng `fail:`** · mỗi dòng có log **cấp thắng + nguồn** để giải trình |
+
+- build `--no-incremental`: **0 lỗi / 0 cảnh báo** · unit **543/543** · integration **32/32** · mermaid 197/0
+- Không đổi schema (không có migration mới)
+
+### 19.3 📌 Vì sao phép đo số truy vấn **quan trọng hơn** việc "code trông đúng"
+
+N+1 **không** gây lỗi, **không** sai số, **không** hỏng dữ liệu — nó chỉ làm hệ thống **chậm dần theo kích thước
+giỏ hàng**. Trên môi trường dev (1–2 dòng) nó **không nhìn thấy được**; ở production (giỏ 20–50 dòng) nó thành
+**timeout checkout**. Vì vậy NFR-002 được kiểm bằng **đếm lệnh EF thật**, không bằng đọc code.
+
+### 19.4 ⚠️ Ghi rõ giới hạn / quyết định
+
+1. **Loại tiền khi bên gọi không khai:** lấy loại tiền của **bảng giá đang hiệu lực**; nếu **không có** bảng giá
+   nào ⇒ `VND`. Đây là **mặc định có ghi nhận**, không phải suy đoán ngầm — bên gọi nên truyền `ListPriceCurrency`.
+2. **Chính sách thiếu giá vẫn cứng `NemLoi`** (D14 yêu cầu cấu hình được theo tenant) ⇒ **chưa** làm.
+3. Truy vấn `ChannelPrice` nạp theo **tập SKU** (không lọc kênh ở SQL) ⇒ với catalog lớn, tập SKU của một giỏ
+   vẫn nhỏ nên chấp nhận được; nếu giỏ rất lớn thì nên thêm điều kiện kênh vào truy vấn.
+
+### 19.5 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.5 | 15/10/2026 | *(agent, session GĐ1)* | **Lát cắt 4**: thêm **cấp 4 giá niêm yết** (`ListPrice` do bên gọi truyền — **cấm Pricing tự bịa**) và **sửa N+1** trong bộ tra giá (nạp **theo lô: 3 truy vấn cho cả giỏ**). **Kiểm chứng HTTP 7 phép đo**, trong đó **đếm `Executed DbCommand` giữa hai marker ⇒ 3 lệnh** cho giỏ 3 dòng ⇒ **đạt NFR-002 (≤ 4)**. Ghi rõ giới hạn (§19.4) |

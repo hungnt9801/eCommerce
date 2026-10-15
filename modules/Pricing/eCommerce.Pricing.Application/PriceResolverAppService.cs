@@ -9,16 +9,19 @@ using Volo.Abp.Domain.Repositories;
 namespace eCommerce.Pricing;
 
 /// <summary>
-/// 🚨 **BỘ TRA GIÁ** — nạp ứng viên từ DB rồi giao **toàn bộ luật** cho `GiaCoSoResolver` (hàm THUẦN).
+/// 🚨 **BỘ TRA GIÁ** — nạp ứng viên **theo LÔ** rồi giao **toàn bộ luật** cho `GiaCoSoResolver` (hàm THUẦN).
 ///
-/// 📌 **PHÂN TÁCH TRÁCH NHIỆM** (`PRC-002` **ADR-04**): lớp này **chỉ** làm I/O + đọc **chính sách**;
-/// nó **KHÔNG** chứa luật chọn giá. Nhờ vậy luật tiền test được **không cần PostgreSQL**, và không trộn I/O
-/// với luật tiền — đúng tiền lệ `TaxRateResolver` (thuần) + `TaxRateResolverService` (nạp).
+/// 📌 **PHÂN TÁCH TRÁCH NHIỆM** (`PRC-002` **ADR-04**): lớp này **chỉ** làm I/O + đọc chính sách;
+/// **KHÔNG** chứa luật chọn giá (tiền lệ `TaxRateResolver` thuần + `TaxRateResolverService` nạp).
 ///
-/// 🚨 **THỨ TỰ CẤP KHÔNG ĐƯỢC ĐẢO** (`PRC-001` **D7**): `Shop(1) → Kênh(2) → Bảng giá(3) → Niêm yết(4)`.
-/// Lớp này nạp **tất cả** ứng viên của **cả 4 cấp** rồi mới giao đi — **KHÔNG** tự chọn ở đây. Nếu chỗ này
-/// "tiện tay" chọn trước thì luật chọn bị **chia làm hai nơi** ⇒ hai đường tính giá khác nhau (giỏ hàng vs
-/// checkout) và **không ai biết đường nào đúng**.
+/// 🚨 **NFR-002 — SỐ TRUY VẤN ≤ 4 CHO MỘT LẦN RESOLVE (kể cả giỏ nhiều dòng):**
+/// phiên bản đầu lặp từng dòng và truy vấn **trong vòng lặp** ⇒ **3 truy vấn × N dòng** (N+1). Giỏ 50 dòng
+/// thành ~150 truy vấn ⇒ **checkout chậm theo số dòng** mà vẫn "chạy đúng".
+/// Nay: nạp **đúng 3 truy vấn cho CẢ LÔ** rồi gom trong bộ nhớ.
+/// 🔍 **Đo được:** log có **marker** `NAP-LO-BAT-DAU` / `NAP-LO-KET-THUC` ⇒ **đếm được số lệnh EF thật**
+/// (`Executed DbCommand`) nằm giữa hai marker (xem `prc-001` §19.2 — bằng chứng đo, không tự khai).
+///
+/// ⚠️ **Đồng hồ đọc Ở TẦNG NÀY** (`Clock.Now`) — hàm thuần **cấm** đọc đồng hồ (`PRC-002` ADR-04).
 /// </summary>
 [Authorize(PricingPermissions.Default)]
 public class PriceResolverAppService : ApplicationService, IPriceResolverAppService
@@ -38,88 +41,108 @@ public class PriceResolverAppService : ApplicationService, IPriceResolverAppServ
     }
 
     public async Task<ResolvedPriceDto> ResolveAsync(ResolvePriceInput input)
-    {
-        var ketQua = await TraMotAsync(input);
-        return ketQua;
-    }
+        => (await TraTheLoAsync([input]))[0];
 
     public async Task<List<ResolvedPriceDto>> ResolveManyAsync(ResolveManyInput input)
-    {
-        var ketQua = new List<ResolvedPriceDto>(input.Items.Count);
+        => await TraTheLoAsync(input.Items);
 
-        foreach (var item in input.Items)
+    /// <summary>Tra giá cho **cả lô** trong **3 truy vấn** (NFR-002), rồi chạy hàm thuần cho từng dòng.</summary>
+    private async Task<List<ResolvedPriceDto>> TraTheLoAsync(IReadOnlyList<ResolvePriceInput> inputs)
+    {
+        if (inputs.Count == 0)
         {
-            ketQua.Add(await TraMotAsync(item));
+            return [];
+        }
+
+        var at = inputs[0].At ?? Clock.Now;
+
+        var tapSku = inputs.Select(x => x.Sku.Trim()).Distinct(StringComparer.Ordinal).ToList();
+
+        Logger.LogInformation("NAP-LO-BAT-DAU: {SoDong} dòng, {SoSku} SKU khác nhau.", inputs.Count, tapSku.Count);
+
+        // ── TRUY VẤN 1: mọi `ChannelPrice` của TẬP SKU (lọc kênh/shop/hiệu lực trong bộ nhớ) ──
+        var giaTheoKenh = await _giaTheoKenhRepository.GetListAsync(x => tapSku.Contains(x.Sku));
+
+        // ── TRUY VẤN 2: mọi bảng giá đang `Active` ──
+        var bangGiaHieuLuc = (await _bangGiaRepository.GetListAsync(x => x.Status == PriceListStatus.Active))
+            .Where(x => x.CoHieuLucTai(at))
+            .ToList();
+
+        var idBangGia = bangGiaHieuLuc.Select(x => x.Id).ToList();
+
+        // ── TRUY VẤN 3: mọi dòng giá của TẬP SKU trong các bảng giá đang hiệu lực ──
+        var dongGia = idBangGia.Count == 0
+            ? []
+            : await _dongGiaRepository.GetListAsync(x => idBangGia.Contains(x.PriceListId) && tapSku.Contains(x.Sku));
+
+        Logger.LogInformation(
+            "NAP-LO-KET-THUC: đã nạp {SoGiaKenh} giá theo kênh, {SoBangGia} bảng giá, {SoDongGia} dòng giá.",
+            giaTheoKenh.Count, bangGiaHieuLuc.Count, dongGia.Count);
+
+        var ketQua = new List<ResolvedPriceDto>(inputs.Count);
+
+        foreach (var input in inputs)
+        {
+            ketQua.Add(TraMotDong(input, at, giaTheoKenh, bangGiaHieuLuc, dongGia));
         }
 
         return ketQua;
     }
 
-    private async Task<ResolvedPriceDto> TraMotAsync(ResolvePriceInput input)
+    private ResolvedPriceDto TraMotDong(
+        ResolvePriceInput input,
+        DateTime at,
+        IReadOnlyList<ChannelPrice> giaTheoKenh,
+        IReadOnlyList<PriceList> bangGiaHieuLuc,
+        IReadOnlyList<PriceListItem> dongGia)
     {
         var sku = input.Sku.Trim();
         var kenh = input.ChannelCode.Trim();
 
-        // ⚠️ Đồng hồ đọc **Ở ĐÂY** (tầng app), KHÔNG trong hàm thuần (`PRC-002` ADR-04: pipeline cấm `DateTime.Now`).
-        var at = input.At ?? Clock.Now;
-
         var ungVien = new List<UngVienGia>();
 
-        // ── Cấp 1 + 2: `ChannelPrice` (có hiệu lực tại `at`) ────────────────────────────────────
-        var giaTheoKenh = await _giaTheoKenhRepository.GetListAsync(
-            x => x.ChannelCode == kenh && x.Sku == sku);
-
-        var giaTheoKenhHieuLuc = giaTheoKenh.Where(x => x.CoHieuLucTai(at)).ToList();
-
-        // Cấp 1: khớp CẢ kênh VÀ shop. Cấp 2: chỉ khớp kênh.
-        foreach (var gp in giaTheoKenhHieuLuc.Where(x => x.ChannelShopId == input.ChannelShopId && x.LaTheoShop))
+        // ── Cấp 1 + 2: `ChannelPrice` (lọc theo SKU + kênh + shop + hiệu lực) ──
+        foreach (var gp in giaTheoKenh.Where(x => x.Sku == sku && x.ChannelCode == kenh && x.CoHieuLucTai(at)))
         {
-            ungVien.Add(new UngVienGia(
-                CapGia.GiaTheoShop, gp.Amount, gp.Priority, $"ChannelPrice:{gp.Id}"));
+            if (gp.LaTheoShop && gp.ChannelShopId == input.ChannelShopId)
+            {
+                ungVien.Add(new UngVienGia(CapGia.GiaTheoShop, gp.Amount, gp.Priority, $"ChannelPrice:{gp.Id}"));
+            }
+            else if (!gp.LaTheoShop)
+            {
+                ungVien.Add(new UngVienGia(CapGia.GiaTheoKenh, gp.Amount, gp.Priority, $"ChannelPrice:{gp.Id}"));
+            }
         }
 
-        foreach (var gp in giaTheoKenhHieuLuc.Where(x => !x.LaTheoShop))
-        {
-            ungVien.Add(new UngVienGia(
-                CapGia.GiaTheoKenh, gp.Amount, gp.Priority, $"ChannelPrice:{gp.Id}"));
-        }
-
-        // Cấp 3: `PriceListItem` của bảng giá **đang hiệu lực** (khớp kênh: `All` hoặc đúng kênh).
-        var bangGiaHieuLuc = (await _bangGiaRepository.GetListAsync(x => x.Status == PriceListStatus.Active))
-            .Where(x => x.CoHieuLucTai(at))
+        // ── Cấp 3: `PriceListItem` của bảng giá đang hiệu lực, khớp phạm vi kênh ──
+        var bangGiaKhop = bangGiaHieuLuc
             .Where(x => x.Scope == PriceListScope.All
                         || (x.Scope == PriceListScope.Channel && x.ChannelCode == kenh)
                         || (x.Scope == PriceListScope.ChannelShop && x.ChannelCode == kenh
                             && x.ChannelShopId == input.ChannelShopId))
-            .ToList();
+            .ToDictionary(x => x.Id, x => (x.Priority, x.Code));
 
-        if (bangGiaHieuLuc.Count > 0)
+        foreach (var dong in dongGia.Where(x => x.Sku == sku && bangGiaKhop.ContainsKey(x.PriceListId)))
         {
-            var idBangGia = bangGiaHieuLuc.Select(x => x.Id).ToList();
+            var (uuTien, maBangGia) = bangGiaKhop[dong.PriceListId];
 
-            var dongGia = await _dongGiaRepository.GetListAsync(
-                x => idBangGia.Contains(x.PriceListId) && x.Sku == sku);
-
-            var uuTienTheoBang = bangGiaHieuLuc.ToDictionary(x => x.Id, x => (x.Priority, x.Code));
-
-            foreach (var dong in dongGia)
-            {
-                var (uuTien, maBangGia) = uuTienTheoBang[dong.PriceListId];
-
-                ungVien.Add(new UngVienGia(
-                    CapGia.BangGia, dong.Amount, uuTien, $"PriceList:{maBangGia}#{dong.Sku}"));
-            }
+            ungVien.Add(new UngVienGia(CapGia.BangGia, dong.Amount, uuTien, $"PriceList:{maBangGia}#{dong.Sku}"));
         }
 
-        // ── Cấp 4: giá niêm yết ────────────────────────────────────────────────────────────────
-        // 📌 Ở lát cắt này Pricing **không** đọc Catalog (Q1) ⇒ giá niêm yết do **bên gọi** truyền khi cần.
-        // Hiện chưa có tham số đó trong DTO ⇒ cấp 4 **chưa có ứng viên** nào; ghi rõ ở `prc-001` §17.
-        // (Không tự bịa giá niêm yết — bịa là **bán sai giá** mà không ai biết.)
+        // ── Cấp 4: **giá niêm yết do BÊN GỌI truyền vào** ─────────────────────────────────────────
+        // 🚨 Pricing **KHÔNG** đọc Catalog (`PRC-001` §15.1 **Q1**) ⇒ giá niêm yết **phải** do bên gọi cung cấp
+        // (`SAL-002`/API lấy từ Catalog). **CẤM tự bịa** một giá niêm yết: bịa ⇒ **bán sai giá** mà **không ai biết**.
+        var loaiTienNiemYet = input.ListPriceCurrency is null
+            ? LoaiTienMacDinh(bangGiaHieuLuc)
+            : Currency.FromCode(input.ListPriceCurrency);
 
-        // Loại tiền: dùng loại tiền của **bảng giá Active** nếu có, ngược lại `VND` (mặc định tenant).
-        var loaiTien = bangGiaHieuLuc.Count > 0 ? bangGiaHieuLuc[0].Currency : Currency.Vnd;
+        if (input.ListPrice is { } giaNiemYet)
+        {
+            ungVien.Add(new UngVienGia(
+                CapGia.GiaNiemYet, Money.Cua(giaNiemYet, loaiTienNiemYet), 0, "ListPrice:caller"));
+        }
 
-        var ket = GiaCoSoResolver.Giai(ungVien, loaiTien, ChinhSachThieuGia.NemLoi, sku, kenh, at);
+        var ket = GiaCoSoResolver.Giai(ungVien, loaiTienNiemYet, ChinhSachThieuGia.NemLoi, sku, kenh, at);
 
         Logger.LogInformation(
             "Tra giá SKU {Sku} kênh {Kenh} tại {At}: {Amount} (cấp {Cap}, nguồn {Nguon}, {SoUngVien} ứng viên).",
@@ -144,4 +167,11 @@ public class PriceResolverAppService : ApplicationService, IPriceResolverAppServ
                 .ToList()
         };
     }
+
+    /// <summary>
+    /// Loại tiền dùng khi bên gọi **không** khai: lấy loại tiền của **bảng giá đang hiệu lực** (nguồn sự thật
+    /// gần nhất); không có bảng giá nào ⇒ `VND` (mặc định tenant — ghi rõ ở `prc-001` §19.4).
+    /// </summary>
+    private static Currency LoaiTienMacDinh(IReadOnlyList<PriceList> bangGiaHieuLuc)
+        => bangGiaHieuLuc.Count > 0 ? bangGiaHieuLuc[0].Currency : Currency.Vnd;
 }

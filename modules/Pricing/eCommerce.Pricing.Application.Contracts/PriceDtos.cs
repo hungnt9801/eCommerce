@@ -129,6 +129,18 @@ public class ResolvePriceInput
     /// <summary>Thời điểm tra giá — ⚠️ **bắt buộc** trên thực tế; để trống ⇒ lấy giờ hệ thống **ở tầng app service**
     /// (hàm thuần **cấm** đọc đồng hồ — `PRC-002` ADR-04).</summary>
     public DateTime? At { get; set; }
+
+    /// <summary>
+    /// 🚨 **Giá niêm yết (cấp 4)** — **PHẢI do bên gọi truyền vào**, vì Pricing **không** đọc Catalog
+    /// (`PRC-001` §15.1 **Q1**). `SAL-002`/storefront lấy giá niêm yết từ Catalog rồi truyền xuống.
+    /// ⚠️ **CẤM Pricing tự bịa** giá niêm yết: bịa ⇒ **bán sai giá** mà **không ai biết**.
+    /// </summary>
+    [Range(0, double.MaxValue, ErrorMessage = "Giá niêm yết không được âm.")]
+    public decimal? ListPrice { get; set; }
+
+    /// <summary>Mã ISO loại tiền của `ListPrice` (để trống ⇒ dùng loại tiền của bảng giá đang hiệu lực, mặc định `VND`).</summary>
+    [StringLength(8)]
+    public string? ListPriceCurrency { get; set; }
 }
 
 /// <summary>Kết quả tra giá — **kèm `Cap` + `Nguon`** để luôn trả lời được *"vì sao giá này"* (BR-009/`PRC-002` ADR-03).</summary>
