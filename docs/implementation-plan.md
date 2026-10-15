@@ -576,18 +576,31 @@ trong GĐ1. Và: **làm hạ tầng nền §7.0 trước khi vào các module G�
 | **Lỗi #22 (fail-closed)** | ✅ **XONG** — `ChannelShopSyncer` **không** publish + **không** tiến con trỏ khi lô có đơn mà chưa có người nhận |
 | **Biến thể thứ HAI của #22** (phát hiện mới) | ✅ **XONG** — nút *"Đồng bộ ngay"* (`ChannelAppService.SyncNowAsync`) trước đây **tự kéo đơn + tự tiến con trỏ + không phát sự kiện cho ai** ⇒ nay đi qua **cùng một cổng** `IChannelShopSyncService` (đóng luôn **F3** của `CHN-002`) |
 | **Một nguồn sự thật** cho *"sự kiện có người nhận chưa?"* | ✅ `EventCoverageScan` + `IEventCoverageProbe` (Messaging) dùng **chung** cho cảnh báo lúc boot **và** quyết định lúc đồng bộ ⇒ hai nơi **không thể lệch nhau** |
-| Kiểm chứng | Build **0/0** · **383 unit** + **20 integration** · Host thật `health 200` · **DB thật**: con trỏ **không tiến** + `LastError` `eCommerce:Channel:0005` · log **Error** thật |
+| Kiểm chứng | Build **0/0** · **383 unit** + **20 integration** · Host thật `health 200` · **DB thật**: con trỏ **không tiến** + `LastError` `eCommerce:Channel:0005` · log **Error** thật · **ma trận quyền đo lại đầy đủ** (`401`/`403`/`200` trên endpoint **gắn quyền**) |
 | Bằng chứng chi tiết | `docs/runtime-verification-report.md` §9bis · `docs/features/chn-002-connector-shopee.md` §16 |
 
-### 🚨 Phát hiện mới CHƯA sửa — `F-403` (chặn GĐ1 gate #4 về mặt thực chất)
+### 🚨 `F-403` — **ĐÃ SỬA** (cùng lượt): mọi API gắn quyền trả `403` dù đã cấp quyền
 
-**Mọi** API có `[Authorize(permission)]` trả **`403` dù DB đã cấp quyền** (kể cả `admin`; token **có**
-claim `role = admin`; endpoint **chỉ cần đăng nhập** vẫn `200`). Đã **loại trừ bằng đo**: thiếu định
-nghĩa permission · thiếu grant · thiếu role · thiếu claim · **cache Redis cũ**. Chi tiết + việc cần làm:
-`docs/runtime-verification-report.md` **§10**.
+**Triệu chứng:** **mọi** endpoint có `[Authorize(permission)]` trả **`403`** kể cả với `admin`, trong khi
+endpoint **chỉ cần đăng nhập** vẫn `200` ⇒ **tưởng hệ thống vẫn tốt**. Nó **không phát ra một dòng log nào ở
+phía server** nên đã ẩn rất lâu.
 
-⚠️ **Mâu thuẫn cần làm rõ:** `docs/handover-gd1.md` §1 ghi *"ma trận `401`/`403`/`200` đúng"* — kết quả
-**đo được không khớp**. Đừng tin dòng đó; **đo lại**.
+**Nguyên nhân gốc (ĐO, không đoán):** `JwtBearer` mặc định `MapInboundClaims = true` ⇒ **đổi tên claim**
+`role`/`sub` sang khuôn WS-Federation cũ, trong khi **ABP đọc tên NGẮN OIDC** (`AbpClaimTypes`) ⇒
+`ICurrentUser` **RỖNG** ⇒ `RolePermissionValueProvider` không thấy vai trò nào ⇒ từ chối tất cả.
+Log chẩn đoán thật: `claim vai trò: …/claims/role=admin` nhưng `ABP current user: id='' · Roles=[(RỖNG)]`.
+
+**Đã sửa:** `MapInboundClaims = false` + `NameClaimType = "preferred_username"` + **bất biến lúc khởi động**
+`KiemTraBatBienTenClaim` (ghi **Error** nếu ai bật lại) — vì đây là bất biến **cấu hình**, test thường
+**không** thấy được. Đồng thời bịt **lỗ hổng quan sát** bằng `ChanDoanTuChoiQuyenHandler` (mỗi lần từ chối
+ghi một dòng `Warning` kèm đủ dữ kiện chẩn đoán).
+
+**Ma trận đã đo lại (Host thật):** không token → **401** · `client_credentials` (không quyền) → **403** ·
+admin có quyền → **200**. Chi tiết: `docs/features/XC-004-xac-thuc-phan-quyen-tenant.md` **§15.2 F6 + §15.6**.
+
+> ⚠️ **ĐÍNH CHÍNH:** dòng *"ma trận `401`/`403`/`200` đúng"* ở `docs/handover-gd1.md` §1 dựa trên ca `200`
+> đo **nhầm endpoint** (chỉ cần đăng nhập, **không** gắn quyền) ⇒ **không** chứng minh được máy phân quyền
+> hoạt động. **Bài học: đo trên "đối tượng gần giống" thì không phải là kiểm chứng.**
 
 ### ⚠️ Hệ quả CẦN BIẾT của phương án B
 
@@ -599,6 +612,6 @@ khi Order intake đăng ký handler cho `ChannelOrderPulledEto`, fail-closed **t
 ### Việc tiếp theo (thứ tự đề xuất)
 
 1. **Order intake `SAL-005`** — nơi nhận `ChannelOrderPulledEto` (**việc A**).
-2. **`F-403`** — đo rồi sửa ma trận quyền (kèm test tích hợp khoá ma trận `401`/`403`/`200`).
+2. **Test tích hợp ma trận quyền** trên endpoint **gắn quyền** (`XC-004` TC-05/TC-06) — `F-403` đã sửa nhưng ma trận hiện chỉ đo bằng **script thủ công**.
 3. **Hạ tầng nền §7.0 còn lại**: `eCommerce.Web` + login · 2 test reflection `XC-004` TC-01/TC-02 · `.editorconfig` + `docs/coding-conventions.md` · phần observability còn thiếu.
 4. **5 metric còn lại** · supervisor thiếu `Timer.RunOnStart` (`CHN-002` §16.5 #5).

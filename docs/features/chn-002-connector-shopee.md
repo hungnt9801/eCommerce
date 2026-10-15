@@ -899,7 +899,7 @@ Nhưng khi bật gọi sàn thật thì **mất đơn ngay lần bấm đầu ti
 
 | # | Việc | Trạng thái |
 |---|---|---|
-| 1 | **Đường API "Đồng bộ ngay" (`POST /api/app/channel/{id}/sync-now`) chưa gọi được bằng HTTP thật** | 🚧 **Chặn bởi phát hiện NGOÀI phạm vi**: endpoint cần quyền `eCommerce.Channels.Sync` nhưng **luôn trả `403`** dù DB đã cấp quyền. Đã ghi thành phát hiện riêng — xem `docs/runtime-verification-report.md` §10. **Bù lại:** ánh xạ DTO được khoá bằng **test đơn vị** (`ChannelAppServiceSyncNowTests`) và bất biến phụ thuộc bằng **test reflection** |
+| 1 | **Đường API "Đồng bộ ngay" (`POST /api/app/channel/{id}/sync-now`)** | ✅ **ĐÃ KIỂM CHỨNG END-TO-END BẰNG HTTP THẬT** (14/10/2026, sau khi sửa `F-403`). Phản hồi thật: `{"ordersPulled":2,"errors":1,"biChanDoChuaCoNoiNhanDon":true,"lyDoChan":"ChuaCoNoiNhanDon","message":"[eCommerce:Channel:0005] Kéo được 2 đơn nhưng CHƯA CÓ NƠI NHẬN …"}` · DB: `LastSyncedAtUtc = (NULL)` ⇒ **con trỏ KHÔNG tiến** ✅. *(Trước đó bị chặn bởi `F-403` — mọi endpoint gắn quyền trả `403`; xem `XC-004` §15.6)* |
 | 2 | **Order intake thật (`SAL-005`)** | ⬜ **Chưa xây** ⇒ đồng bộ sàn **vẫn đang bị chặn có chủ ý** (đơn không mất, nhưng cũng **chưa vào được hệ thống**). Đây là việc **A** đã được người chốt |
 | 3 | **`EventCoverageProbe` quét theo assembly ĐÃ NẠP** | ⚠️ Cùng giới hạn đã biết của C16. Nếu một handler nằm ở assembly **chưa nạp** thì bị coi là chưa có người nhận ⇒ hệ thống **fail-closed** (an toàn, không mất đơn) nhưng có thể **chặn nhầm**. Log ghi rõ **số assembly đã quét** để nhìn thấy được |
 | 4 | **So khớp người nhận theo TÊN KIỂU** (không kèm namespace) | ⚠️ Hai sự kiện **trùng tên** ở hai namespace khác nhau sẽ bị coi là một. Đã ghi rõ trong code; **chưa** kiểm chứng có ca trùng tên thật nào |

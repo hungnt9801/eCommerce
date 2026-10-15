@@ -89,6 +89,32 @@ public class eCommerceHttpApiHostModule : AbpModule
                 options.Authority = configuration["AuthServer:Authority"];
                 options.Audience = configuration["AuthServer:Audience"];
 
+                // 🚨🚨 F-403 — SỬA LỖI "MỌI API GẮN QUYỀN TRẢ 403 DÙ ĐÃ CẤP QUYỀN" (đo được 14/10/2026).
+                //
+                // `JwtBearer` mặc định BẬT `MapInboundClaims` ⇒ nó ĐỔI TÊN claim theo khuôn WS-Federation cũ:
+                //     `role` → `http://schemas.microsoft.com/ws/2008/06/identity/claims/role`
+                //     `sub`  → `http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier`
+                //     `email`→ `.../claims/emailaddress`   ·   `unique_name` → `.../claims/name`
+                //
+                // Nhưng **ABP đọc tên NGẮN của OIDC** (`AbpClaimTypes`: `sub`, `role`, `email`,
+                // `preferred_username`). Hệ quả đo được bằng log thật của `ChanDoanTuChoiQuyenHandler`:
+                //     `claim vai trò : .../claims/role=admin`        ← token CÓ vai trò
+                //     `ABP current user: id='' · IsAuthenticated=False · Roles=[(RỖNG)]`   ← ABP KHÔNG thấy
+                //     `quyền: 'eCommerce.Channels.Sync' · định nghĩa: ✅ · cấp: ❌`
+                // ⇒ `RolePermissionValueProvider` không có role nào để tra ⇒ **403**, dù DB đã cấp quyền.
+                //
+                // 🔎 Vì sao `[Authorize]` trần VẪN chạy (endpoint chỉ-cần-đăng-nhập trả 200): ASP.NET chỉ cần
+                // `Identity.IsAuthenticated`, thứ KHÔNG phụ thuộc tên claim. Chỉ **máy phân quyền của ABP**
+                // (đọc `sub`/`role` theo tên) mới hỏng — nên lỗi này **rất khó đoán** nếu không đo.
+                //
+                // ⚠️ Đã kiểm chứng toàn bộ mã nguồn: **không** chỗ nào dùng `ClaimTypes.*` hay `Identity.Name`
+                // ⇒ tắt ánh xạ KHÔNG làm hỏng chỗ nào khác (xem ma trận 401/403/200 sau khi sửa).
+                options.MapInboundClaims = false;
+
+                // Giữ `Identity.Name` có giá trị (trước đây nhờ `unique_name` được ánh xạ sang `.../claims/name`).
+                // Đặt TƯỜNG MINH để việc tắt ánh xạ không âm thầm làm `Name` rỗng — ABP dùng `preferred_username`.
+                options.TokenValidationParameters.NameClaimType = "preferred_username";
+
                 // ⚠️ DEV chạy http nên phải tắt; PRODUCTION phải BẬT lại (true) — nếu không sẽ
                 // chấp nhận metadata qua kênh không mã hoá.
                 options.RequireHttpsMetadata = false;
@@ -183,6 +209,19 @@ public class eCommerceHttpApiHostModule : AbpModule
         // Cấu hình ChannelHub / PaymentHub từ appsettings.json.
         Configure<ChannelHub.ChannelHubOptions>(configuration.GetSection("ChannelHub"));
         Configure<PaymentHub.Payments.PaymentHubOptions>(configuration.GetSection("PaymentHub"));
+
+        // 🚨 VÁ LỖ HỔNG QUAN SÁT (F-403, đo được 14/10/2026): khi request có token hợp lệ nhưng THIẾU QUYỀN,
+        // ASP.NET Core trả 403 và KHÔNG ghi một dòng log nào ở phía server ⇒ lỗi "mọi API gắn quyền đều 403"
+        // ẩn được rất lâu (chỉ nhìn thấy ở phía client). Handler dưới đây ghi MỘT dòng Warning cho mỗi lần
+        // từ chối, kèm dữ kiện chẩn đoán: quyền nào không đạt, quyền đó CÓ ĐƯỢC ĐỊNH NGHĨA hay không
+        // (đúng nguyên nhân đã xảy ra thật ở Phase 0 — XC-004 D2/E3), các LOẠI claim đang có, giá trị claim
+        // vai trò, và ICURRENTUSER.ROLES (góc nhìn của ABP).
+        //
+        // ⚠️ Handler này KHÔNG đổi quyết định cho phép/từ chối — nó chỉ ghi nhận rồi chuyển tiếp cho handler
+        // mặc định ⇒ mã trạng thái 401/403 giữ nguyên. Việc đó được KIỂM CHỨNG bằng ma trận 401/403/200.
+        context.Services.AddSingleton<
+            Microsoft.AspNetCore.Authorization.IAuthorizationMiddlewareResultHandler,
+            Authorization.ChanDoanTuChoiQuyenHandler>();
 
         // Auto API controllers: mọi class implements IApplicationService tự thành REST endpoint.
         Configure<AbpAspNetCoreMvcOptions>(options =>
@@ -283,6 +322,11 @@ public class eCommerceHttpApiHostModule : AbpModule
         // đang chạy, không phải về logic — test không nạp cùng bộ module nên không thấy được.
         KiemTraDoPhuSuKien(context);
 
+        // 🚨 KIỂM TRA BẤT BIẾN TÊN CLAIM (F-403, 14/10/2026) — cùng lý do: đây là bất biến về CẤU HÌNH
+        // của ứng dụng đang chạy. Bật lại `MapInboundClaims` sẽ làm MỌI API gắn quyền trả 403 mà
+        // KHÔNG có lỗi biên dịch và KHÔNG exception — đúng loại lỗi im lặng cần chặn.
+        KiemTraBatBienTenClaim(context);
+
         // 📊 Đo độ trễ request và phát http_request_duration_seconds (XC-005).
         // Đặt sớm để bao được cả thời gian xác thực/phân quyền.
         app.UseMiddleware<Observability.HttpRequestDurationMiddleware>();
@@ -351,6 +395,69 @@ public class eCommerceHttpApiHostModule : AbpModule
             logger.LogInformation(
                 "Độ phủ sự kiện OK: {SoSuKien} hợp đồng sự kiện, tất cả đều có người nhận (đã quét {SoAssembly} assembly).",
                 ketQua.SuKienCoNguoiNhan.Count, soAssembly);
+        }
+    }
+
+    /// <summary>
+    /// 🚨 **Bất biến lúc khởi động cho tên claim (F-403).**
+    ///
+    /// `JwtBearer` mặc định **ĐỔI TÊN** claim của token sang khuôn WS-Federation cũ
+    /// (`role` → `.../claims/role`, `sub` → `.../claims/nameidentifier`), trong khi **ABP đọc tên NGẮN OIDC**
+    /// (`AbpClaimTypes`: `sub`, `role`, `email`). Bật lại ánh xạ ⇒ `ICurrentUser` **rỗng** ⇒ máy phân quyền
+    /// của ABP từ chối **MỌI** người ⇒ **mọi API gắn quyền trả `403`**, mà:
+    ///   • **không** lỗi biên dịch · **không** exception · app vẫn khởi động bình thường,
+    ///   • endpoint **chỉ cần đăng nhập** vẫn trả `200` ⇒ tưởng hệ thống vẫn tốt.
+    ///
+    /// Vì vậy phải kiểm tra **lúc chạy thật** và **la ở mức Error**. Đây không phải chuyện lý thuyết: lỗi này
+    /// đã tồn tại thật và được đo ra ngày 14/10/2026 (xem `docs/runtime-verification-report.md` §10).
+    /// </summary>
+    private static void KiemTraBatBienTenClaim(ApplicationInitializationContext context)
+    {
+        var logger = context.ServiceProvider
+            .GetRequiredService<ILogger<eCommerceHttpApiHostModule>>();
+
+        try
+        {
+            var jwt = context.ServiceProvider
+                .GetRequiredService<Microsoft.Extensions.Options.IOptionsMonitor<
+                    Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerOptions>>()
+                .Get(JwtBearerDefaults.AuthenticationScheme);
+
+            var loi = new List<string>();
+
+            if (jwt.MapInboundClaims)
+            {
+                loi.Add(
+                    "`MapInboundClaims = true` ⇒ claim `role`/`sub` bị ĐỔI TÊN sang khuôn WS-Federation, " +
+                    "trong khi ABP đọc tên NGẮN OIDC ⇒ `ICurrentUser` RỖNG ⇒ MỌI API gắn quyền trả 403.");
+            }
+
+            if (!string.Equals(jwt.TokenValidationParameters.NameClaimType, "preferred_username", StringComparison.Ordinal))
+            {
+                loi.Add(
+                    $"`NameClaimType = '{jwt.TokenValidationParameters.NameClaimType}'` (mong đợi " +
+                    "'preferred_username') ⇒ `Identity.Name` có thể RỖNG dù token hợp lệ.");
+            }
+
+            if (loi.Count > 0)
+            {
+                foreach (var dong in loi)
+                {
+                    logger.LogError("🚨 BẤT BIẾN TÊN CLAIM BỊ VI PHẠM: {Dong}", dong);
+                }
+            }
+            else
+            {
+                logger.LogInformation(
+                    "Bất biến tên claim OK: MapInboundClaims = false · NameClaimType = '{NameClaimType}' " +
+                    "(khớp tên claim NGẮN mà ABP đọc).",
+                    jwt.TokenValidationParameters.NameClaimType);
+            }
+        }
+        catch (Exception ex)
+        {
+            // Không đọc được cấu hình ⇒ KHÔNG được im lặng bỏ qua (đây là bất biến bảo mật).
+            logger.LogError(ex, "Không kiểm tra được bất biến tên claim của JwtBearer.");
         }
     }
 }

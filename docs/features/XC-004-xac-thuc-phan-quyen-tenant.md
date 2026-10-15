@@ -519,6 +519,7 @@ public class AuthorizationGuardTests
 | **F3** | `README` hướng dẫn lấy token bằng **`password` grant** | `README.md` mục "Lấy token" | 🟠 **Trung bình** (dev) / 🔴 nếu lọt production | ⬜ Ghi rõ **chỉ dev** trong README (BR-010, `TC-11`) |
 | **F4** | Tài khoản seed **`admin@abp.io / 1q2w3E*`** có mật khẩu **viết trong tài liệu** | `IdentityDataSeedContributor` + README | 🟠 **Trung bình** | ⬜ Q2: buộc đổi mật khẩu lần đầu, hoặc sinh mật khẩu ngẫu nhiên khi seed production |
 | **F5** | Mã lỗi trùng/khác định dạng giữa app và module (`eCommerce:Channel:0001` vs `ChannelHub:0001`) | Đã ghi ở `XC-003` §15.2 **F2** | 🟡 Thấp | ⬜ Vẫn chưa sửa — thuộc `coding-conventions.md` |
+| 🚨 **F6** | **MỌI API gắn `[Authorize(permission)]` trả `403` dù DB đã cấp quyền** — `JwtBearer` **ĐỔI TÊN claim** theo khuôn WS-Federation cũ (`role` → `…/claims/role`, `sub` → `…/claims/nameidentifier`) trong khi **ABP đọc tên NGẮN OIDC** (`sub`, `role`) ⇒ `ICurrentUser` **RỖNG** ⇒ `RolePermissionValueProvider` không có vai trò nào để tra ⇒ từ chối **tất cả**. ⚠️ Endpoint **chỉ cần đăng nhập** vẫn trả `200` (vì ASP.NET chỉ cần `Identity.IsAuthenticated`) ⇒ **tưởng hệ thống vẫn tốt** | Log thật của `ChanDoanTuChoiQuyenHandler`: `claim vai trò: …/claims/role=admin` nhưng `ABP current user: id='' · IsAuthenticated=False · Roles=[(RỖNG)]`; `quyền 'eCommerce.Channels.Sync' · định nghĩa: ✅ · cấp: ❌`. Đã **loại trừ bằng đo**: thiếu định nghĩa/grant/role · **cache Redis** (`FLUSHDB` 126→0 key vẫn `403`) | 🔴 **Cao** — mọi chức năng gắn quyền **không dùng được**, kể cả với admin; **không** lỗi biên dịch, **không** exception | ✅ **ĐÃ SỬA (14/10/2026)** — `MapInboundClaims = false` + `NameClaimType = "preferred_username"`; **chi tiết & bằng chứng: §15.6** |
 
 ### 15.3 Giả định
 
@@ -534,6 +535,110 @@ public class AuthorizationGuardTests
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.1 | 13/10/2026 | *(điền)* | Bản nháp đầu — số liệu lấy **từ code thật** (21 permission định nghĩa = 21 hằng số; 0 `[AllowAnonymous]`); phát hiện **F1** (unique index + `TenantId NULL`), **F2** (multi-tenancy chưa bật), **F3/F4** (password grant + mật khẩu seed trong tài liệu); **F5** kế thừa từ `XC-003` |
+| v0.2 | 14/10/2026 | *(agent, session GĐ1)* | 🚨 Phát hiện & **sửa** **F6** (`MapInboundClaims` làm `ICurrentUser` rỗng ⇒ mọi API gắn quyền `403`). **Đính chính** ma trận ở §15.5: ca `200` của lượt trước đo trên endpoint **chỉ cần đăng nhập**, **không** phải endpoint gắn quyền ⇒ lỗ hổng F6 nằm đúng trong khoảng trống đó. Thêm §15.6 (nguyên nhân gốc + bằng chứng + ma trận đã đo lại) và bất biến lúc khởi động (`KiemTraBatBienTenClaim`) |
+
+---
+
+## 15.6 ✅ F6 — NGUYÊN NHÂN GỐC & KIỂM CHỨNG (14/10/2026)
+
+### Cách tìm ra (bằng ĐO, không bằng suy đoán)
+
+Trước đó tài liệu này **không hề nêu** F6. Nó lộ ra khi kiểm chứng **lỗi #22** và phát hiện
+`POST /api/app/channel/{id}/sync-now` **luôn `403`** dù `AbpPermissionGrants` đã có dòng
+`eCommerce.Channels.Sync · R · admin`.
+
+**Việc đầu tiên phải làm là bịt LỖ HỔNG QUAN SÁT:** một `403` **không sinh một dòng log nào ở phía
+server**, nên không có gì để đọc. Đã thêm `ChanDoanTuChoiQuyenHandler`
+(`src/eCommerce.HttpApi.Host/Authorization/`) ghi **một dòng `Warning`** mỗi lần từ chối, kèm:
+`requirements` · quyền không đạt · **quyền đó có được ĐỊNH NGHĨA hay không** · **các LOẠI claim** đang có ·
+**giá trị claim vai trò** · `ICurrentUser.Roles` (góc nhìn của ABP).
+
+Đó là thứ **trả lời được câu hỏi** — log thật:
+
+```
+warn: eCommerce.Authorization.ChanDoanTuChoiQuyenHandler[0]
+  🚫 TỪ CHỐI QUYỀN — 403 FORBIDDEN (đã xác thực nhưng KHÔNG đủ quyền)
+     endpoint    : eCommerce.Channels.ChannelAppService.SyncNowAsync (eCommerce.Application)
+     xác thực    : True · tên = 'admin'
+     loại claim  : aud, …, http://schemas.microsoft.com/ws/2008/06/identity/claims/role, …,
+                   http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier, …
+     claim vai trò: http://schemas.microsoft.com/ws/2008/06/identity/claims/role=admin
+     ABP current user: id='' · IsAuthenticated=False · Roles=[(RỖNG)]
+     requirements: DenyAnonymousAuthorizationRequirement, PermissionRequirement
+     quyền       : 'eCommerce.Channels.Sync' · định nghĩa: ✅ đã định nghĩa · cấp: ❌ KHÔNG được cấp
+```
+
+**Ba dữ kiện quyết định:** (1) quyền **ĐÃ** được định nghĩa ⇒ **không** phải nguyên nhân D2/E3;
+(2) token **CÓ** vai trò `admin` nhưng dưới tên `…/claims/role`; (3) **`ICurrentUser` RỖNG** —
+`id=''` vì claim `sub` đã bị đổi thành `…/claims/nameidentifier`.
+
+### Đã loại trừ bằng ĐO (không phải bằng lập luận)
+
+| Giả thuyết | Phép đo | Kết luận |
+|---|---|---|
+| Thiếu định nghĩa permission | `AbpPermissions` có `eCommerce.Channels.Sync`, `IsEnabled = t`; log chẩn đoán ghi *"✅ đã định nghĩa"* | ❌ loại |
+| Thiếu grant | `AbpPermissionGrants` có `eCommerce.Channels.Sync · R · admin` | ❌ loại |
+| Thiếu role / thiếu claim | `AbpUserRoles` có `admin`; token **có** claim vai trò | ❌ loại |
+| **Cache Redis cũ** | `redis-cli DBSIZE` = **126** → `FLUSHDB` → **0** → gọi lại | ❌ **loại dứt khoát** (vẫn `403`) |
+| Xác thực hỏng | Endpoint **chỉ cần đăng nhập** trả `200` | ❌ loại |
+
+### Sửa
+
+Trong `AddJwtBearer` (`eCommerceHttpApiHostModule.cs`):
+
+```csharp
+options.MapInboundClaims = false;                                   // 🚨 F6
+options.TokenValidationParameters.NameClaimType = "preferred_username";  // giữ Identity.Name
+```
+
+⚠️ **Trước khi sửa đã kiểm tra toàn bộ mã nguồn**: **không** chỗ nào dùng `ClaimTypes.*` hay
+`Identity.Name` ⇒ tắt ánh xạ **không** làm hỏng chỗ khác. Điều này được **chứng minh bằng ma trận bên dưới**,
+không phải bằng suy luận.
+
+### 🚨 BẤT BIẾN LÚC KHỞI ĐỘNG (chống tái phát im lặng)
+
+Đây là bất biến **cấu hình**, không phải logic ⇒ test thường **không** thấy được. Đã thêm
+`KiemTraBatBienTenClaim` chạy **mỗi lần boot**, ghi **Error** nếu `MapInboundClaims` bị bật lại hoặc
+`NameClaimType` sai. Log thật khi đúng:
+
+```
+info: eCommerce.eCommerceHttpApiHostModule[0]
+      Bất biến tên claim OK: MapInboundClaims = false · NameClaimType = 'preferred_username'
+      (khớp tên claim NGẮN mà ABP đọc).
+```
+
+### ✅ MA TRẬN ĐÃ ĐO LẠI (Host thật + PostgreSQL 17 thật + Redis 7 thật)
+
+| Ca | Endpoint | Trước khi sửa | **Sau khi sửa** |
+|---|---|---|---|
+| Không token | `GET /api/app/channel/shops` | `401` | **`401`** ✅ |
+| Token `client_credentials` (không người dùng/quyền) | `POST /api/app/channel/{id}/sync-now` | `403` | **`403`** ✅ |
+| Token admin **có** `eCommerce.Channels.Sync` | `POST /api/app/channel/{id}/sync-now` | ❌ **`403`** | **`200`** ✅ |
+| Token admin, endpoint **chỉ cần đăng nhập** | `GET /api/app/channel/shops` | `200` | **`200`** ✅ |
+
+Phản hồi thật của ca `200` (đồng thời là **kiểm chứng end-to-end đường API của lỗi #22**):
+
+```json
+{"channelCode":"shopee","ordersPulled":2,"errors":1,"rateLimited":false,"tokenRefreshed":false,
+ "biChanDoChuaCoNoiNhanDon":true,"lyDoChan":"ChuaCoNoiNhanDon",
+ "message":"[eCommerce:Channel:0005] Kéo được 2 đơn nhưng CHƯA CÓ NƠI NHẬN …"}
+```
+
+### 📌 ĐÍNH CHÍNH §15.5 (quan trọng — đây là lý do F6 ẩn được lâu)
+
+§15.5 ghi *"Có token + có quyền ⇒ `200`"*, nhưng chính ghi chú ngay dưới lại nói endpoint đó
+(`GET /api/app/channel/shops`) **chỉ** có `[Authorize]` trần. **Nghĩa là ca `200` CHƯA BAO GIỜ được đo trên
+một endpoint gắn permission.** Ma trận cũ vì vậy **không** chứng minh được máy phân quyền hoạt động — và
+F6 nằm **đúng** trong khoảng trống đó. Bài học: **một ca kiểm thử đo trên "đối tượng gần giống" thì không
+phải là kiểm chứng** — phải đo trên **đúng** loại endpoint.
+
+### 🔧 Còn lại của F6 (đề xuất, chưa làm)
+
+| # | Việc | Ghi chú |
+|---|---|---|
+| 1 | **Test tích hợp tự động cho ma trận `401`/`403`/`200` trên endpoint GẮN QUYỀN** | Hiện ma trận được đo bằng **script thủ công** (Host thật). `XC-004` TC-05/TC-06 yêu cầu điều này; test project **chưa** có hạ tầng `WebApplicationFactory` |
+| 2 | Ghi `coding-conventions.md`: **cấm** bật `MapInboundClaims`; mọi endpoint mới gắn permission **phải** được thêm vào ma trận | Việc của §7.0 #5 |
+| 3 | `TC-01`/`TC-02` (test reflection) | §7.0 #7 — **chưa làm** |
 
 ---
 
@@ -547,7 +652,7 @@ Toàn bộ nội dung tài liệu này **đã được kiểm chứng trên Post
 |---|---|---|
 | **Không token** | **`401`** | Trước đó là `500` → `404` body rỗng (xem C6b) |
 | **Có token nhưng THIẾU quyền** | **`403`** | Đo bằng cách **thu hồi** grant `eCommerce.Channels.Manage` + xoá cache Redis, rồi gọi `POST /api/app/channel/connect` |
-| **Có token + có quyền** | **`200`** | `GET /api/app/channel/shops` → `{"totalCount":0,"items":[]}` |
+| **Có token + có quyền** | **`200`** | ⚠️ **ĐÍNH CHÍNH 14/10/2026 — xem §15.6:** `GET /api/app/channel/shops` **chỉ** có `[Authorize]` trần, **KHÔNG** gắn permission. Vì vậy ca này **KHÔNG** chứng minh được máy phân quyền hoạt động — và **F6** (mọi endpoint gắn quyền trả `403`) nằm đúng trong khoảng trống đó. Ma trận **đã đo lại đầy đủ** ở **§15.6** |
 
 > 📌 Phát hiện phụ khi đo: `GET /api/app/channel/shops` **chỉ** có `[Authorize]` trần (chỉ cần đăng nhập),
 > nên nó trả `200` **kể cả khi thiếu** `eCommerce.Channels.Manage`. Muốn kiểm `403` phải gọi endpoint

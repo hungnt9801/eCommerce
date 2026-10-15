@@ -20,11 +20,12 @@
 | Lỗi thật đã sửa | **24** — trong đó **16 lỗi IM LẶNG** |
 | Điểm phát metric | **7/12** |
 
-> 📌 **CẬP NHẬT 14/10/2026 (lượt sửa lỗi #22 — phương án B):** các số ở bảng trên là **mốc bàn giao**.
-> Sau lượt đó: **Test = 383 unit + 20 integration** · **Lỗi thật đã sửa = 25** (thêm **#22**) ·
-> build **0 lỗi/0 cảnh báo** · thêm **1 phát hiện mới CHƯA sửa** (`F-403`, xem **§4**).
+> 📌 **CẬP NHẬT 14/10/2026 (lượt sửa lỗi #22 — phương án B, + sửa `F-403`):** các số ở bảng trên là
+> **mốc bàn giao**. Sau lượt đó: **Test = 383 unit + 20 integration** · **Lỗi thật đã sửa = 25** (thêm **#22**)
+> **+ `F-403`** (lỗi phân quyền, xem **§4**) · build **0 lỗi/0 cảnh báo** ·
+> **ma trận `401`/`403`/`200` đã đo lại ĐẦY ĐỦ trên endpoint GẮN QUYỀN** (trước đây ca `200` đo nhầm endpoint).
 > Chi tiết & bằng chứng: `docs/runtime-verification-report.md` **§9bis** + **§10** ·
-> `docs/features/chn-002-connector-shopee.md` **§16**.
+> `docs/features/chn-002-connector-shopee.md` **§16** · `docs/features/XC-004-…md` **§15.2 F6 + §15.6**.
 
 ### Lệnh chuẩn
 ```powershell
@@ -133,11 +134,19 @@ Host cổng **5000**. DB: `docker exec -i ecommerce-postgres psql -U ecommerce -
 > **đơn KHÔNG mất** (sàn gửi lại) nhưng cũng **chưa vào được hệ thống**, và log **Error** lặp
 > **mỗi 5 phút/shop** (nhịp mặc định 300 s). Đây là **đánh đổi đã được chấp nhận**, không phải lỗi.
 
-> 🚨 **PHÁT HIỆN MỚI CHƯA SỬA — `F-403`:** **mọi** API có `[Authorize(permission)]` trả **`403` dù DB đã
-> cấp quyền** (kể cả `admin`, token **có** claim `role = admin`; endpoint chỉ-cần-đăng-nhập vẫn `200`).
-> Đã **loại trừ** bằng đo: thiếu định nghĩa/grant/role/claim · cache Redis cũ. Xem
-> `docs/runtime-verification-report.md` **§10**. ⚠️ Việc này **mâu thuẫn** với dòng *"ma trận
-> `401`/`403`/`200` đúng"* ở §1 — **cần đo lại ma trận quyền**, đừng tin dòng đó.
+> 🚨 **`F-403` — ĐÃ SỬA (14/10/2026, cùng lượt):** **mọi** API có `[Authorize(permission)]` từng trả
+> **`403` dù DB đã cấp quyền** (kể cả `admin`), trong khi endpoint chỉ-cần-đăng-nhập vẫn `200`.
+> **Nguyên nhân gốc (đã ĐO, không đoán):** `JwtBearer` mặc định `MapInboundClaims = true` ⇒ nó **đổi tên**
+> claim `role`/`sub` sang khuôn WS-Federation cũ, mà **ABP đọc tên NGẮN OIDC** ⇒ `ICurrentUser` **RỖNG**
+> ⇒ `RolePermissionValueProvider` không thấy vai trò nào ⇒ từ chối tất cả. **Đã sửa:**
+> `MapInboundClaims = false` + `NameClaimType = "preferred_username"`, kèm **bất biến lúc khởi động**
+> `KiemTraBatBienTenClaim` (ghi **Error** nếu ai bật lại). Ma trận `401`/`403`/`200` **đã đo lại đầy đủ**
+> trên **endpoint GẮN QUYỀN** — xem `docs/features/XC-004-xac-thuc-phan-quyen-tenant.md` **§15.2 F6 + §15.6**.
+>
+> ⚠️ **ĐÍNH CHÍNH dòng ở §1:** *"ma trận `401`/`403`/`200` đúng"* — ca `200` của lượt trước được đo trên
+> endpoint **chỉ cần đăng nhập**, **không** phải endpoint gắn quyền ⇒ **không** chứng minh được máy phân
+> quyền hoạt động, và `F-403` nằm **đúng** trong khoảng trống đó. **Bài học: một ca kiểm thử đo trên
+> "đối tượng gần giống" thì KHÔNG phải là kiểm chứng.**
 
 ### Phạm vi GĐ1 (theo kế hoạch)
 Đơn hàng · tồn kho · vận chuyển · khuyến mãi. Đọc `docs/implementation-plan.md` §A.9 để biết danh sách feature theo giai đoạn.
@@ -146,10 +155,13 @@ Host cổng **5000**. DB: `docker exec -i ecommerce-postgres psql -U ecommerce -
 | # | Việc | Ghi chú |
 |---|---|---|
 | 1 | **Xây Order intake (`SAL-005`)** — nơi nhận `ChannelOrderPulledEto` | Đây là **việc A**; xong thì **đồng bộ sàn tự chạy lại** (fail-closed tự mở, không cần bật cờ nào) |
-| 2 | **`F-403`: đo rồi sửa ma trận quyền** | Chặn GĐ1 gate #4 về mặt thực chất; **đo trước, sửa sau** |
-| 3 | **5 metric còn lại** | `messaging_dlq_*` · `messaging_outbox_pending` cần **outbox/DLQ** (chưa có) · `logging_failures_total` cần **logger provider** · `lock_ttl_exceeded_total` chưa có chỗ phát |
-| 4 | **`CHN-002` §16.5 #5** — supervisor thiếu `Timer.RunOnStart = true` | Cùng họ lỗi #23; ảnh hưởng nhỏ |
-| 5 | **Outbox/relay** | 🚨 **Cảnh báo giữ nguyên:** **không có message broker** (chỉ PostgreSQL + Redis). **Thứ tự đúng: có người nhận trước (việc 1), rồi mới bàn tới giao tin cậy.** |
+| 2 | **Test tích hợp ma trận quyền** trên endpoint **GẮN QUYỀN** (`XC-004` TC-05/TC-06) | `F-403` đã sửa nhưng ma trận hiện **chỉ đo bằng script thủ công**; test project chưa có `WebApplicationFactory` |
+| 3 | **§7.0 #7 — `TC-01`/`TC-02`** (test reflection: mọi `*AppService` có `[Authorize]` cấp class; mọi permission dùng phải được định nghĩa) | **Chưa làm** |
+| 4 | **§7.0 #5 — `.editorconfig` + `docs/coding-conventions.md`** | **Chưa làm** (cần ghi luật: **cấm** bật `MapInboundClaims`) |
+| 5 | **§7.0 #2 — `eCommerce.Web` + login** | Hạng mục lớn nhất còn lại của §7.0 |
+| 6 | **5 metric còn lại** | `messaging_dlq_*` · `messaging_outbox_pending` cần **outbox/DLQ** (chưa có) · `logging_failures_total` cần **logger provider** · `lock_ttl_exceeded_total` chưa có chỗ phát |
+| 7 | **`CHN-002` §16.5 #5** — supervisor thiếu `Timer.RunOnStart = true` | Cùng họ lỗi #23; ảnh hưởng nhỏ |
+| 8 | **Outbox/relay** | 🚨 **Cảnh báo giữ nguyên:** **không có message broker** (chỉ PostgreSQL + Redis). **Thứ tự đúng: có người nhận trước (việc 1), rồi mới bàn tới giao tin cậy.** |
 
 ---
 

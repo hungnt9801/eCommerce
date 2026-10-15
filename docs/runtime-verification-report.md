@@ -261,11 +261,12 @@ Bù lại: ánh xạ DTO được khoá bằng **test đơn vị** và phụ thu
 
 ---
 
-## 10. PHÁT HIỆN MỚI (14/10/2026 — lộ ra khi kiểm chứng #22) — **MỌI API CÓ `[Authorize(permission)]` TRẢ `403` DÙ ĐÃ ĐƯỢC CẤP QUYỀN**
+## 10. `F-403` (14/10/2026 — lộ ra khi kiểm chứng #22) — **MỌI API CÓ `[Authorize(permission)]` TRẢ `403` DÙ ĐÃ ĐƯỢC CẤP QUYỀN** → ✅ **ĐÃ SỬA**
 
-> 📌 **Chưa gán số thứ tự**: `docs/handover-gd1.md` ghi *"24 lỗi thật"* nhưng tài liệu **chỉ đánh số tới
-> #23** ⇒ gán một số mới lúc này sẽ **trùng hoặc nhảy cóc**. Đặt tên tạm: **`F-403`**. Khi chốt lại dãy số
-> thì gán số chính thức.
+> 📌 **Tên gọi:** gọi là **`F-403`** ở đây, và là **`F6`** trong
+> `docs/features/XC-004-xac-thuc-phan-quyen-tenant.md` §15.2/§15.6 (nơi có đặc tả đầy đủ).
+> Không gán số thứ tự lỗi mới vì `docs/handover-gd1.md` ghi *"24 lỗi thật"* nhưng tài liệu **chỉ đánh số
+> tới #23** ⇒ gán số lúc này sẽ **trùng hoặc nhảy cóc**.
 
 **Mức độ: CAO** — không mất dữ liệu, nhưng **mọi endpoint gắn quyền đều không dùng được**, kể cả với
 `admin`. Không có lỗi biên dịch, **không** exception trong log ứng dụng (chỉ thấy `403` ở phía client).
@@ -283,27 +284,45 @@ Bù lại: ánh xạ DTO được khoá bằng **test đơn vị** và phụ thu
 | `AbpUserRoles` + `AbpRoles` | ✅ user `admin` ∈ role `admin` |
 | **Xoá toàn bộ cache Redis** (`ecommerce:*`) rồi gọi lại | ❌ **vẫn 403** ⇒ **loại trừ** giả thuyết *"cache quyền cũ"* |
 
-### Trạng thái điều tra — **DỪNG ở đây, ghi rõ cái chưa kiểm chứng**
+### Trạng thái điều tra — ✅ **ĐÃ TÌM RA NGUYÊN NHÂN GỐC VÀ ĐÃ SỬA** (cùng ngày)
 
 **Đã loại trừ (bằng đo, không bằng suy luận):** thiếu định nghĩa permission · thiếu grant · thiếu role trên
-user · thiếu claim role trong token · cache Redis cũ · hỏng xác thực (class-level vẫn 200).
+user · thiếu claim role trong token · hỏng xác thực (class-level vẫn 200).
 
-**Giả thuyết còn lại — ⬜ CHƯA KIỂM CHỨNG:** ABP đối chiếu **tên claim vai trò**, còn `JwtBearer` mặc định
-**ánh xạ lại** claim (`DefaultInboundClaimTypeMap`) ⇒ `CurrentUser.Roles` có thể **rỗng** ⇒
-`RolePermissionValueProvider` **không thấy role nào** ⇒ **403**. Nếu đúng thì cách sửa là
-`options.MapInboundClaims = false` (hoặc cấu hình lại claim type) — **nhưng tôi CHƯA chứng minh được**,
-và **không sửa theo giả thuyết**: đây là vùng **bảo mật**, sửa sai ở đây có thể **mở quyền** cho người
-không được phép. (Bài học: 2 lần trước trong dự án, sửa theo giả thuyết mà chưa đo thì **cả 2 lần đều SAI**.)
+**Cache Redis — ❌ LOẠI DỨT KHOÁT:** `redis-cli DBSIZE` = **126** → `FLUSHDB` → **0** → gọi lại ⇒ **vẫn `403`**.
 
-⚠️ **Mâu thuẫn với tài liệu cần làm rõ:** `docs/handover-gd1.md` §1 ghi *"35 route thật · ma trận
-`401`/`403`/`200` đúng"*. Kết quả đo được **không** khớp: `200` chỉ quan sát được ở endpoint **chỉ cần
-đăng nhập**; endpoint **cần quyền** trả `403`. Cần xác định lại ma trận quyền bằng **đo**, không bằng
-suy luận.
+**🚨 VIỆC ĐẦU TIÊN PHẢI LÀM LÀ BỊT LỖ HỔNG QUAN SÁT:** `403` **không sinh một dòng log nào ở phía
+server** ⇒ không có gì để đọc, và đó là lý do lỗi này ẩn được lâu. Đã thêm
+`ChanDoanTuChoiQuyenHandler` (`src/eCommerce.HttpApi.Host/Authorization/`) ghi **một dòng `Warning`** mỗi
+lần từ chối. Log thật lập tức chỉ ra nguyên nhân:
 
-### 🔧 Việc cần làm để đóng (đề xuất)
+```
+claim vai trò : http://schemas.microsoft.com/ws/2008/06/identity/claims/role=admin
+ABP current user: id='' · IsAuthenticated=False · Roles=[(RỖNG)]
+quyền         : 'eCommerce.Channels.Sync' · định nghĩa: ✅ đã định nghĩa · cấp: ❌ KHÔNG được cấp
+```
 
-1. Ghi log **tại chỗ kiểm tra**: `ICurrentUser.Roles` **rỗng hay không** trong một request có token — đo
-   trực tiếp thay vì suy từ cấu hình thư viện.
-2. Nếu đúng là ánh xạ claim: sửa **một chỗ** trong `AddJwtBearer`, rồi **kiểm chứng lại cả 3 trạng thái**
-   (`401` không token · `403` thiếu quyền · `200` có quyền) — **không** chỉ kiểm `200`.
-3. Thêm **test tích hợp** khoá ma trận quyền để không tái diễn (đúng tinh thần `XC-004` TC-01/TC-02).
+**NGUYÊN NHÂN GỐC:** `JwtBearer` mặc định **ĐỔI TÊN claim** theo khuôn WS-Federation cũ
+(`role` → `…/claims/role`, `sub` → `…/claims/nameidentifier`), trong khi **ABP đọc tên NGẮN OIDC**
+(`AbpClaimTypes`: `sub`, `role`, `email`) ⇒ `ICurrentUser` **RỖNG** ⇒ `RolePermissionValueProvider`
+không có vai trò nào để tra ⇒ **403 cho mọi người**.
+
+**SỬA:** `MapInboundClaims = false` + `TokenValidationParameters.NameClaimType = "preferred_username"`
+trong `AddJwtBearer`. Kèm **bất biến lúc khởi động** `KiemTraBatBienTenClaim` (ghi **Error** nếu ai bật lại
+ánh xạ) — vì đây là bất biến **cấu hình**, test thường **không** thấy được.
+
+**MA TRẬN ĐÃ ĐO LẠI (Host thật + PostgreSQL 17 thật):**
+
+| Ca | Endpoint | Trước | Sau |
+|---|---|---|---|
+| Không token | `GET /api/app/channel/shops` | `401` | **`401`** ✅ |
+| `client_credentials` (không quyền) | `POST /api/app/channel/{id}/sync-now` | `403` | **`403`** ✅ |
+| admin **có** `eCommerce.Channels.Sync` | `POST /api/app/channel/{id}/sync-now` | ❌ `403` | **`200`** ✅ |
+
+> 📄 **Chi tiết đầy đủ + đính chính ma trận cũ:** `docs/features/XC-004-xac-thuc-phan-quyen-tenant.md`
+> **§15.2 F6** và **§15.6**. 📌 **Bài học:** ma trận cũ đo ca `200` trên endpoint **chỉ cần đăng nhập**,
+> nên **không** chứng minh được máy phân quyền hoạt động — lỗi nằm **đúng** trong khoảng trống đó.
+> **Một ca kiểm thử đo trên "đối tượng gần giống" thì không phải là kiểm chứng.**
+
+⚠️ **Còn lại:** ma trận này hiện được đo bằng **script thủ công**; **chưa** có test tích hợp tự động cho
+endpoint gắn quyền (`XC-004` TC-05/TC-06 yêu cầu; test project chưa có hạ tầng `WebApplicationFactory`).
