@@ -89,3 +89,40 @@ làm **cả probe** đứt ở chỗ **không liên quan** tới điều đang �
 📌 **Và một ghi nhận tích cực:** ở **cả hai** lần hỏng của vòng 94, quy tắc mới
 (*``git commit`` phải nằm **TRONG** ``if (đạt)``*) **đã chặn được hồ sơ sai** — **không** tài liệu, **không** commit nào được ghi.
 Đây là **lần đầu** một quy tắc viết ra **chứng minh giá trị ngay trong vòng kế tiếp**.
+
+---
+
+## H. 🚨 HAI CÁI BẪY **NGHIÊM TRỌNG** PHÁT HIỆN Ở VÒNG 97 (đọc trước khi chèn mã / kiểm build)
+
+### H1. 🚨 **`dotnet build` … `Select-String "0 Error"` LÀ PHÉP KIỂM KHÔNG ĐÁNG TIN**
+
+``dotnet build`` in **tổng kết theo TỪNG DỰ ÁN**. Một dự án **thành công** vẫn in ``0 Error(s)`` ⇒ khớp mẫu ``0 Error``
+**dù một dự án KHÁC đang lỗi**. Vòng 97: tôi đọc ``build OK: True`` từ phép kiểm này, **trong khi** lời gọi thật có
+**80 dòng lỗi** ở ``DatHangController.cs`` ⇒ tôi **tưởng build xanh** và **tiêu mất hai vòng** (chạy probe rồi mới phát hiện
+``eCommerce.Web.dll`` **không tồn tại**).
+
+**⇒ Phép kiểm ĐÚNG (dùng từ nay):**
+| Cách | Ghi chú |
+|---|---|
+| 🔥 ``$LASTEXITCODE -eq 0`` **sau** ``dotnet build`` | **nguồn sự thật** — dùng cái này **trước tiên** |
+| 🔥 Đếm ``': error '`` (có tiền tố **đường dẫn:dòng**) | ``($b \| Select-String -Pattern ': error ' \| Measure-Object).Count`` ⇒ mong đợi **``0``** |
+| 🔥 Kiểm **tệp đầu ra TỒN TẠI** (``eCommerce.Web.dll`` / ``eCommerce.HttpApi.Host.dll``) | lỗi biên dịch ⇒ **không** sinh DLL ⇒ probe **chết ngay** với thông báo *"command or file was not found"* — **dễ đọc sai thành "app không lên"** |
+
+📌 **Và đừng quên in lại ĐẦU RA của công cụ chờ:** vòng 97 tôi viết ``ChoLen`` **chỉ in ``exit code``** ⇒ **nuốt mất** thông báo
+``Could not execute because the specified command or file was not found``. **Đúng lỗi §68.3 mà ``wait-host.ps1`` sinh ra để chống** —
+bị **vô hiệu ngay tại chỗ dùng**. ⇒ **Luôn in lại đầu ra của công cụ chờ.**
+
+### H2. 🚨 **KHÔNG chèn CÂU LỆNH vào giữa OBJECT INITIALIZER**
+
+Vòng 97 tôi chèn khối ``StringBuilder`` **ngay trước** dòng
+``Items = GioHelper.PhanTichGio(form.Sku, form.SoLuong, thue)`` — nhưng dòng đó nằm **TRONG** ``new CheckoutInput { … }``
+⇒ chèn **statement** vào giữa **danh sách khởi tạo** ⇒ **lỗi cú pháp C#** (``Syntax error, ',' expected`` · ``} expected`` · 80 dòng lỗi).
+📌 **Quy tắc:** trước khi chèn mã, **xác định NGỮ CẢNH** của dòng neo — nó là **câu lệnh**, **khởi tạo đối tượng**, hay **biểu thức**?
+Nếu là **initializer** ⇒ đặt mã **TRƯỚC** ``new …`` (hoặc **trước** câu lệnh chứa nó), **không** chen vào giữa.
+📌 **Cách kiểm ngữ cảnh rẻ nhất:** xem **thụt lề** và **các dấu ``{`` ``}`` ``(`` ``)`` chưa đóng** trong 5–10 dòng quanh dòng neo.
+
+### H3. 🔁 **Giá trị của việc HOÀN NGUYÊN**
+
+Vòng 97 **không** commit gì cho tính năng (cây làm việc bị **hoàn nguyên** » **``git status`` sạch** » **build lại ``0`` lỗi, ``exit 0``**,
+``eCommerce.Web.dll`` **có**). ⇒ Repo về **đúng trạng thái đã kiểm chứng gần nhất (183 commit)** thay vì mang theo mã **không biên dịch được**.
+📌 **Bài học:** ``git checkout -- <tệp>`` là cách **rẻ nhất** để thoát khỏi một bản sửa hỏng **chưa commit** — **nhanh hơn** sửa tiếp.
