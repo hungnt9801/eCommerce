@@ -7,6 +7,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\eCommerce.Domain.Shared\eCommerce.Domain.Shared.csproj" />
+    <!-- 📌 `Kernel` là thư viện DÙNG CHUNG (`Money`, mã khoá, metric) và **không** phụ thuộc dự án nào
+         ⇒ tham chiếu từ Domain KHÔNG tạo vòng lặp. Cần cho `InventoryReconciliationService` phát metric
+         `inventory_recon_mismatch_skus` (`INV-001` ADR-10). -->
+    <ProjectReference Include="..\..\shared\eCommerce.Kernel\eCommerce.Kernel.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -28,6 +28,10 @@ public static class eCommerceMetricNames
     public const string PaymentWebhookRejectedTotal = "payment_webhook_rejected_total";
     public const string ChannelSyncFailedTotal = "channel_sync_failed_total";
 
+    // ---- Nghiệp vụ KHO (INV-001 ADR-10) ---- 🚨 trước 15/10/2026 KHÔNG có metric nào cho kho
+    /// <summary>Số cặp `(kho, SKU)` có `OnHand` **LỆCH** với `SUM(sổ cái)` — đối soát định kỳ (INV-001 ADR-10).</summary>
+    public const string InventoryReconMismatchSkus = "inventory_recon_mismatch_skus";
+
     // ---- Nghiệp vụ thuế (XC-006) ----
     public const string TaxUnclassifiedSkus = "tax_unclassified_skus";
 
@@ -118,11 +122,15 @@ public sealed class eCommerceMetrics : ISingletonDependency
     // ---- Gauge (giá trị do nơi phát cập nhật) ----
     private long _messagingOutboxPending;
     private long _messagingDlqSize;
+    private long _inventoryReconMismatchSkus;
     private long _taxUnclassifiedSkus;
 
     public void SetMessagingOutboxPending(long value) => Interlocked.Exchange(ref _messagingOutboxPending, value);
     public void SetMessagingDlqSize(long value) => Interlocked.Exchange(ref _messagingDlqSize, value);
     public void SetTaxUnclassifiedSkus(long value) => Interlocked.Exchange(ref _taxUnclassifiedSkus, value);
+
+    /// <summary>Ghi số cặp `(kho, SKU)` đang LỆCH khi đối soát kho (`INV-001` ADR-10).</summary>
+    public void SetInventoryReconMismatchSkus(long value) => Interlocked.Exchange(ref _inventoryReconMismatchSkus, value);
 
     public eCommerceMetrics()
         : this(new Meter(MeterName, MeterVersion))

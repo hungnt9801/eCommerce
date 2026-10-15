@@ -29,6 +29,9 @@ public static class InventoryErrorCodes
     /// <summary>Chứng từ **đã ghi sổ** ⇒ **KHÔNG** huỷ (muốn đảo phải tạo chứng từ ĐẢO).</summary>
     public const string ChungTuDaGhiSoKhongHuyDuoc = Nhom + "0013";
 
+    /// <summary>Mã kho **đã tồn tại** trong tenant (`INV-001` ADR-01).</summary>
+    public const string MaKhoDaTonTai = Nhom + "0003";
+
     /// <summary>Phiếu **chuyển kho** mà **thiếu kho đích**.</summary>
     public const string ChuyenKhoThieuKhoDich = Nhom + "0020";
 

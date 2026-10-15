@@ -1319,3 +1319,64 @@ migration, **luôn đếm lại index `NULLS NOT DISTINCT`** trên DB thật —
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.5 | 15/10/2026 | *(agent, session GĐ1)* | **Lát cắt 4 — API kho + ghi sổ, kiểm chứng HTTP 10 phép đo (`fail = 0`)**: `StockDocumentAppService` (tạo chứng từ + **`POST /{id}/ghi-so`**), enum chuyển sang `Domain.Shared`, quyền dùng lại `Inventory.*`. 🚨 **Sửa 2 lỗi thật do kiểm chứng bắt:** (L1) **index ADR-05 chặn oan phiếu chuyển kho** ⇒ đổi thành unique `(ReferenceLineId, MovementType)` — *ràng buộc chặt hơn nghiệp vụ là tính năng không chạy được*; (L2) miền ném `InvalidOperationException` cho *"không đủ tồn"* ⇒ **`500`** ⇒ đổi thành `BusinessException` (`Inventory:0001`). Bất biến then chốt được đo: **chuyển kho ⇒ TỔNG TỒN KHÔNG ĐỔI**, ghi sổ hai lần **bị chặn**, xuất quá tồn **rollback** |
+
+---
+
+## 20. TRẠNG THÁI TRIỂN KHAI — **LÁT CẮT 5: API KHO + ĐỐI SOÁT TỒN KHO CÓ METRIC** (15/10/2026)
+
+### 20.1 Đã làm
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| 1 | **`WarehouseAppService`** (`/api/app/warehouse`) | `GET` (lọc `chiHoatDong`) · **`POST`** (tạo kho; **NÉM `Inventory:0003`** nếu trùng mã — để lỗi ra dưới **mã nghiệp vụ** thay vì `23505`) · **`POST /{id}/ngung-su-dung`** |
+| 2 | **`DoiSoatTonKho`** — **hàm THUẦN** | bảng **dấu** của 11 loại biến động + `Tong(...)`; ⚠️ **`Reservation`/`ReservationRelease` có dấu `0`** (chúng đổi **`Reserved`**, **không** đổi `OnHand`) |
+| 3 | 🚨 **`InventoryReconciliationService`** (ADR-10) | so **ảnh chụp** `InventoryItem.OnHand` với **nguồn sự thật** `SUM(StockLedgerEntry)`; phát **metric** `inventory_recon_mismatch_skus` (**đây là metric ĐẦU TIÊN cho kho** — §0 #9 ghi trước đó **không có** metric nào); log **`Warning`** (không phải `Error` — xem §20.3) |
+| 4 | **`GET /api/app/inventory-reconciliation/doi-soat`** | trả `soCapDaKiem` · `soCapLech` · chi tiết từng cặp lệch (`OnHand` · sổ cái · chênh lệch) |
+| 5 | 📌 `eCommerce.Domain` nay tham chiếu **`Kernel`** | để phát metric; `Kernel` **không** phụ thuộc dự án nào ⇒ **không** tạo vòng lặp |
+
+**Hai chiều đối soát (không chỉ một):** (a) mọi `InventoryItem` phải khớp tổng sổ cái; (b) **có bút toán mà KHÔNG có bản ghi tồn kho** cũng là lệch — và là loại **nguy hiểm hơn** (hệ thống sẽ **tạo lại bản ghi từ 0** ⇒ **mất toàn bộ số dư**).
+
+### 20.2 ✅ BẰNG CHỨNG HTTP THẬT (Host + PostgreSQL 17) — 8 phép đo
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | Tạo kho **bằng API** | `200` · `isActive = True` ✅ (không còn phải chèn SQL) |
+| 2 | **Tạo kho TRÙNG MÃ** | **`eCommerce:Inventory:0003`** ✅ |
+| 3 | Nhập 50 + ghi sổ ⇒ **đối soát ngay** | `soCapLech = 0` ✅ |
+| 4 | 🔥 **TẠO LỆCH THẬT** (sửa thẳng `OnHand` = 55 trong DB — *giả lập bug/sửa tay*) | **`soCapLech = 1`** · chi tiết **`OnHand=55 vs sổ cái=50, lệch +5`** ✅ — **đối soát PHÁT HIỆN ĐƯỢC lệch thật**, đây là phép đo chứng minh tính năng **có tác dụng**, không chỉ "trả về 0" |
+| 5 | Log Host | **0 dòng `fail:`** ✅ |
+| 6 | Sửa lệch (trả về 50) ⇒ đối soát lại | `soCapLech = 0` ✅ |
+| 7 | **Ngừng dùng kho** ⇒ tạo chứng từ mới | `200` (`isActive = False`) · chứng từ ⇒ **`Inventory:0002`** ✅ |
+| 8 | Dọn dẹp | 0 kho / 0 tồn / 0 sổ cái ✅ · cờ bảo mật đã khôi phục |
+
+- build `--no-incremental`: **0 lỗi / 0 cảnh báo** · unit **646/646** (+16) · integration **38/38** · mermaid 197/0 · **không đổi schema**
+
+### 20.3 📌 Quyết định: dùng `Warning`, **KHÔNG** `Error`
+
+Lệch tồn kho **cần người xem**, nhưng **không** làm chết request nào. Nếu log ở mức `Error` thì tiêu chí
+*"Host khởi động không có dòng `fail:`"* — một phần của **quy trình kiểm chứng §2** — sẽ **nhiễu** ở mọi lần chạy
+đối soát có lệch. Nhiễu dần sẽ khiến người trực **bỏ qua** cảnh báo thật. ⇒ Metric là kênh **báo động**,
+log `Warning` là kênh **chi tiết**.
+
+### 20.4 ⚠️ Giới hạn đã biết — **cách đối soát này KHÔNG dùng được ở quy mô lớn**
+
+Hiện nạp **toàn bộ** `InvStockLedger` rồi gom trong bộ nhớ. Với sổ cái hàng triệu dòng phải chuyển sang
+**truy vấn gom ở DB** (`GROUP BY` + `SUM`) hoặc đối soát theo **cửa sổ thời gian + số dư đầu kỳ**.
+📌 Ghi rõ ở đây để người sau **không** tưởng cách này dùng được mãi. Ngoài ra: **chưa có job** chạy định kỳ
+(hiện gọi qua API/`GET`); metric đã có nhưng **chưa có alert rule** nào gắn vào.
+
+### 20.5 Còn lại của `INV-001`
+
+| # | Việc |
+|---|---|
+| 1 | **Tách quyền chi tiết** (`Inventory.Receipt.Create`/`Transfer.Create`/`Stocktake.Approve`) + **reseed** |
+| 2 | **Exception filter** cho `23505` trên sổ cái (ca hai request **đồng thời**) — hiện vẫn `500` |
+| 3 | **Idempotency** thực thi cho ghi sổ (ADR-07) |
+| 4 | **Job định kỳ** chạy đối soát + **alert rule** trên metric `inventory_recon_mismatch_skus` |
+| 5 | 📌 **Chốt với BA**: diễn giải `Quantity` của phiếu kiểm kê (§18.5) |
+
+### 20.6 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.6 | 15/10/2026 | *(agent, session GĐ1)* | **Lát cắt 5 — API kho + đối soát có metric**: `WarehouseAppService` (tạo/lọc/ngừng dùng kho; trùng mã ⇒ `Inventory:0003`) và **`InventoryReconciliationService`** (`DoiSoatTonKho` hàm thuần: bảng **dấu** 11 loại, **`Reservation` dấu `0`**; đối soát **hai chiều**) + **metric ĐẦU TIÊN cho kho** `inventory_recon_mismatch_skus`. **Kiểm chứng HTTP 8 phép đo**; phép đo quyết định: **tạo lệch thật ⇒ đối soát phát hiện được** (`OnHand=55 vs sổ cái=50`) rồi **khớp lại** sau khi sửa. Ghi rõ giới hạn (§20.4: nạp toàn sổ cái — **không** dùng được ở quy mô lớn) và quyết định dùng `Warning` (§20.3) |
