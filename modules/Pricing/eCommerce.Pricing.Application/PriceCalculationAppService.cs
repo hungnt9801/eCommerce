@@ -302,4 +302,56 @@ public class PriceCalculationAppService : ApplicationService, IPriceCalculationA
 
         return null;
     }
+
+    /// <summary>
+    /// 🔍 **TRA SỔ GIẢI TRÌNH** theo `IdempotencyKey` — trả **đúng kết quả đã tính** (payload đầy đủ).
+    /// 📌 Đây là đường trả lời *"vì sao đơn này giá này?"* bằng **DỮ LIỆU**. Nếu không có đường tra thì sổ
+    /// ghi ra **không ai đọc được** ⇒ bằng chứng tồn tại mà **không dùng được**.
+    /// </summary>
+    public async Task<GioTinhTienDto> GetSoGiaiTrinhAsync(string idempotencyKey)
+    {
+        var khoa = (idempotencyKey ?? string.Empty).Trim();
+
+        var banGhi = await _soGiaiTrinhRepository.FirstOrDefaultAsync(x => x.IdempotencyKey == khoa)
+            ?? throw new BusinessException(PricingErrorCodes.KhongTimThayGia)
+                .WithData("lyDo", "Không có bản ghi sổ giải trình cho khoá này.")
+                .WithData("idempotencyKey", khoa);
+
+        Logger.LogInformation("Tra sổ giải trình khoá {Khoa}: bản ghi {Id}, tổng {Tong}, tính lúc {At}.",
+            khoa, banGhi.Id, banGhi.Total, banGhi.CalculatedAt);
+
+        return JsonSerializer.Deserialize<GioTinhTienDto>(banGhi.Payload)!;
+    }
+
+    /// <summary>Liệt kê sổ giải trình (tóm tắt, mới nhất trước) — để đối soát. (Tên bắt đầu bằng `Get` ⇒ ABP map thành **GET** — đúng quy ước: tra cứu KHÔNG được là POST.)</summary>
+    public async Task<List<PriceCalculationRecordDto>> GetLichSuGiaiTrinhAsync(DateTime? tuNgay = null, DateTime? denNgay = null, int toiDa = 50)
+    {
+        var soLuong = Math.Clamp(toiDa, 1, 200);
+
+        var ds = await _soGiaiTrinhRepository.GetListAsync();
+
+        return ds
+            .Where(x => tuNgay is null || x.CalculatedAt >= tuNgay.Value)
+            .Where(x => denNgay is null || x.CalculatedAt <= denNgay.Value)
+            .OrderByDescending(x => x.CalculatedAt)
+            .ThenBy(x => x.Id)
+            .Take(soLuong)
+            .Select(x => new PriceCalculationRecordDto
+            {
+                Id = x.Id,
+                IdempotencyKey = x.IdempotencyKey,
+                ChannelCode = x.ChannelCode,
+                ChannelShopId = x.ChannelShopId,
+                CalculatedAt = x.CalculatedAt,
+                RoundingPolicyCode = x.RoundingPolicyCode,
+                CurrencyCode = x.CurrencyCode,
+                Subtotal = x.Subtotal,
+                TotalDiscount = x.TotalDiscount,
+                TotalFee = x.TotalFee,
+                TotalTax = x.TotalTax,
+                Total = x.Total,
+                CreationTime = x.CreationTime
+            })
+            .ToList();
+    }
 }

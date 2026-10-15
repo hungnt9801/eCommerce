@@ -1355,3 +1355,49 @@ và buộc cập nhật tài liệu + chọn cách xử lý **tường minh**.
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.6 | 15/10/2026 | *(agent, session GĐ1)* | **Lát cắt 5 — sổ giải trình + idempotency (ADR-13)**: `PriceCalculationRecord` **append-only** + **`Payload` JSON** (giải trình từng đồng) + **idempotency tra TRƯỚC khi tính** + **`IdempotencyKey` BẮT BUỘC** (`400` nếu thiếu) + unique index **sửa tay `NULLS NOT DISTINCT`**. **Kiểm chứng HTTP 9 phép đo**; phép đo quyết định: **đổi dữ liệu giá ở giữa ⇒ lần gọi lại vẫn trả đúng kết quả đã lưu** (chứng minh **không** tính lại). 🔥 **Phát hiện lỗ hổng tiền: TỔNG ĐƠN CÓ THỂ ÂM** (§20.3) — ghi nhận bằng test + **3 phương án cần người quyết** |
+
+---
+
+## 21. TRẠNG THÁI TRIỂN KHAI — **LÁT CẮT 6: TRA SỔ GIẢI TRÌNH** (15/10/2026)
+
+### 21.1 Đã làm
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| 1 | `GET /api/app/price-calculation/so-giai-trinh?idempotencyKey=…` | trả **đúng kết quả đã tính** (payload đầy đủ: từng dòng · cấp thắng · nguồn · mã chính sách làm tròn). ⚠️ **NÉM `Pricing:0004`** nếu chưa có bản ghi — **không** trả rỗng im lặng |
+| 2 | `GET /api/app/price-calculation/lich-su-giai-trinh?tuNgay=&denNgay=&toiDa=` | liệt kê **tóm tắt**, mới nhất trước, `toiDa` kẹp `1..200` |
+| 3 | 🚨 **Sửa quy ước REST**: hai phương thức tra cứu ban đầu bị ABP map thành **`POST`** (vì tên không bắt đầu bằng `Get`) ⇒ **đổi tên** `TraSoAsync`/`LichSuAsync` ⇒ **`GetSoGiaiTrinhAsync`/`GetLichSuGiaiTrinhAsync`** ⇒ map **`GET`** đúng quy ước. 📌 *Tra cứu bằng `POST` là sai quy ước: nó khiến client/proxy/gateway coi là thao tác **ghi** (không cache được, không retry an toàn được).* |
+
+📌 **Vì sao lát cắt này quan trọng:** sổ giải trình ở lát cắt 5 **chỉ ghi** — mà mục đích của nó là **trả lời khi
+khách/kế toán hỏi** *"vì sao đơn này giá này?"*. **Bằng chứng tồn tại mà không có đường tra thì không dùng được.**
+
+### 21.2 ✅ BẰNG CHỨNG HTTP THẬT (Host + PostgreSQL 17)
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | Bảng giá `Active` `S1 = 120.000`; giỏ `S1 × 3` (thuế 10%), giảm `20.000`, phí `8.000` | |
+| 2 | **Tính giỏ** (khoá `checkout:TR-…`) | `200` · **tổng `382.800`** · đơn giá `120.000` · thuế `34.800` |
+| 3 | **TRA SỔ bằng `GET`** | `200` · **tổng `382.800` KHỚP** ✅ · **có chi tiết từng dòng** ✅ · **có cấp thắng + nguồn** (`BangGia` / `PriceList:TRBG-…#TR1-…`) ✅ · **có mã chính sách làm tròn** (`half-away-from-zero`) ✅ |
+| 4 | **Tra khoá KHÔNG tồn tại** | **`eCommerce:Pricing:0004`** ✅ (không trả rỗng im lặng) |
+| 5 | **Lịch sử sổ** (`GET`) | `200` · **có bản ghi của khoá K** · `calculatedAt = 2026-06-15 00:00:00` · **`CreationTime ≠ CalculatedAt`** ✅ — chứng minh *"thời điểm tính"* và *"thời điểm ghi sổ"* là **hai thứ khác nhau** (đúng thiết kế: bên gọi truyền `At`, hệ thống ghi sổ lúc khác) |
+| 6 | **DB thật** | `Payload` dài **`635` ký tự** — JSON **thật**, giải trình được; `CalculatedAt` = giờ bên gọi truyền |
+| 7 | Dọn dẹp · cờ bảo mật · log | 0/0 · `ShouldChangePasswordOnNextLogin = true` · **0 dòng `fail:`** ✅ |
+
+- build `--no-incremental`: **0 lỗi / 0 cảnh báo** · unit **581/581** · integration **34/34** · mermaid 197/0
+- Không đổi schema (không migration mới)
+
+### 21.3 Còn lại của `PRC-002`
+
+| # | Việc | Trạng thái |
+|---|---|---|
+| 1 | **B4 — điều chỉnh/khuyến mãi** (`PRO-*`) | chưa — giảm giá hiện chỉ vào ở cấp đơn |
+| 2 | 🚨 **Guard tổng đơn ÂM** (§20.3) | **CẦN NGƯỜI QUYẾT** (3 phương án a/b/c) — ghi nhận bằng test |
+| 3 | Cấu hình **chính sách làm tròn / thiếu giá** theo tenant (D14) | hiện **cứng trong code** |
+| 4 | **Ngưỡng số bậc** mỗi bộ | chưa có |
+| 5 | **Phân trang** cho `lich-su-giai-trinh` | hiện `toiDa` kẹp `1..200`, **chưa** có `SkipCount`/`TotalCount` (`PagedResultDto`) — chấp nhận được cho giai đoạn này, **cần** khi sổ lớn |
+
+### 21.4 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.7 | 15/10/2026 | *(agent, session GĐ1)* | **Lát cắt 6 — tra sổ giải trình**: `GET /so-giai-trinh` (trả **đúng payload đã lưu**, `0004` nếu không có) + `GET /lich-su-giai-trinh` (tóm tắt, lọc theo ngày). 🚨 **Sửa quy ước REST**: đổi tên phương thức để ABP map **`GET`** thay vì **`POST`** (*tra cứu bằng POST là sai quy ước*). **Kiểm chứng HTTP 7 phép đo**, gồm: tra sổ **khớp** kết quả đã tính · có **cấp thắng + nguồn + mã chính sách làm tròn** · `0004` khi khoá lạ · **`CreationTime ≠ CalculatedAt`** · `Payload` **635 ký tự** trong DB thật |

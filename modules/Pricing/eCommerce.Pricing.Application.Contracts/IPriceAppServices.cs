@@ -65,4 +65,15 @@ public interface IPriceCalculationAppService : IApplicationService
     /// **không** bao giờ trả giá 0 thay cho "không biết giá" (D14).
     /// </summary>
     Task<GioTinhTienDto> TinhGioAsync(TinhGioInput input);
+
+    /// <summary>
+    /// 🔍 **TRA SỔ GIẢI TRÌNH** theo `IdempotencyKey` ⇒ trả **đúng kết quả đã tính** (kèm chi tiết từng dòng).
+    /// 📌 **Đây là đường trả lời** khi khách/kế toán hỏi *"vì sao đơn này giá này?"* — **bằng DỮ LIỆU**, không bằng log
+    /// (log bị xoay vòng, không tra theo đơn được). Không có đường tra thì sổ ghi ra **không ai đọc được**.
+    /// ⚠️ **NÉM `Pricing:0004`** nếu chưa có bản ghi (không trả rỗng im lặng).
+    /// </summary>
+    Task<GioTinhTienDto> GetSoGiaiTrinhAsync(string idempotencyKey);
+
+    /// <summary>Liệt kê sổ giải trình gần đây (tóm tắt, mới nhất trước) — để đối soát/kiểm tra.</summary>
+    Task<List<PriceCalculationRecordDto>> GetLichSuGiaiTrinhAsync(DateTime? tuNgay = null, DateTime? denNgay = null, int toiDa = 50);
 }

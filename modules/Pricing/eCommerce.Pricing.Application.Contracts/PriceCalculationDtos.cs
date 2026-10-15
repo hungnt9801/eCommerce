@@ -120,3 +120,26 @@ public class GioTinhTienDto
 
     public List<ChiTietDongDto> Lines { get; set; } = new();
 }
+
+/// <summary>Bản ghi sổ giải trình (**tóm tắt** — không kèm payload) để liệt kê/lọc.</summary>
+public class PriceCalculationRecordDto
+{
+    public Guid Id { get; set; }
+    public string IdempotencyKey { get; set; } = default!;
+    public string ChannelCode { get; set; } = default!;
+    public Guid? ChannelShopId { get; set; }
+
+    /// <summary>Thời điểm **tính giá** (do bên gọi truyền) — KHÁC `CreationTime` (thời điểm ghi sổ).</summary>
+    public DateTime CalculatedAt { get; set; }
+
+    public string RoundingPolicyCode { get; set; } = default!;
+    public string CurrencyCode { get; set; } = default!;
+    public decimal Subtotal { get; set; }
+    public decimal TotalDiscount { get; set; }
+    public decimal TotalFee { get; set; }
+    public decimal TotalTax { get; set; }
+    public decimal Total { get; set; }
+
+    /// <summary>Thời điểm **ghi sổ** — dùng để phát hiện bản ghi bị ghi lại (điều **không** được phép xảy ra: ADR-13).</summary>
+    public DateTime CreationTime { get; set; }
+}
