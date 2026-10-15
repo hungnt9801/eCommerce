@@ -58,5 +58,11 @@ namespace eCommerce;
         // **không** phân biệt được *"không chạy"* với *"chạy mà không có việc"*. ⇒ Sửa tệp bằng `edit` (không dùng
         // ghép chuỗi trong script) và **kiểm lại tệp sau khi sửa** (`Select-String`) — xem `inv-001` §26.3.
         await context.AddBackgroundWorkerAsync<eCommerce.Application.Inventory.StockReservationExpiryWorker>();
+
+        // REC-001 — **JOB ĐỐI SOÁT TỒN KHO ĐỊNH KỲ**. 📌 Metric `inventory_recon_mismatch_skus` trước đây chỉ phát
+        // khi **có người gọi API** ⇒ nếu không ai gọi thì **lệch tồn KHÔNG được phát hiện**, và metric `0` trở thành
+        // **LỜI NÓI DỐI** (*"0 lệch"* vì **chưa ai đo**, không phải vì **không có lệch**). Job này khiến phép đo
+        // **luôn chạy** (và chạy **ngay** sau restart nhờ `Timer.RunOnStart`).
+        await context.AddBackgroundWorkerAsync<eCommerce.Application.Inventory.InventoryReconciliationWorker>();
     }
 }

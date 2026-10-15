@@ -2316,3 +2316,61 @@ Sau khi **đảo thứ tự kiểm** (§35.2), phải chứng minh mã `0041` **
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v2.1 | 15/10/2026 | *(agent, session GĐ1)* | **Đo ca `lines` TOÀN SKU LẠ** ⇒ xác nhận mã **`0041`** tới được ở **cả hai** hình dạng (hỗn hợp + toàn lạ) ⇒ **chứng minh việc đảo thứ tự kiểm (§35.2) có tác dụng thật**, không chỉ "trông hợp lý hơn". `SAL-004` nay **kiểm chứng đầy đủ**: tồn **không đổi** ở **mọi** ca bị chặn; sổ cái `CustomerReturn = 4`; đối soát `0`; **`fail: 0`** |
+
+---
+
+## 37. `REC-001` — **JOB ĐỐI SOÁT ĐỊNH KỲ** (15/10/2026)
+
+### 37.1 Khoảng trống thật đã đóng
+
+`InventoryReconciliationService` phát metric **`inventory_recon_mismatch_skus`** — nhưng **chỉ khi có ai đó GỌI API**
+đối soát. Nghĩa là: **không ai gọi ⇒ lệch tồn không được phát hiện**, và metric `0` trở thành **LỜI NÓI DỐI**:
+*"0 lệch"* vì **chưa ai đo**, **không phải** vì **không có lệch**.
+📌 Đúng loại lỗi im lặng mà các cơ chế vòng 34–37 tồn tại để chặn: **có phép đo mà không ai chạy phép đo**.
+
+### 37.2 Đã làm — `InventoryReconciliationWorker`
+
+| Thuộc tính | Giá trị | Lý do |
+|---|---|---|
+| Nhịp | **15 phút** (`900s`) | đối soát **quét toàn bộ** `InvItems` + `InvStockLedger` ⇒ **đắt hơn** job khác; 15 phút đủ nhanh trong ngày mà không quét liên tục |
+| `Timer.RunOnStart` | **`true`** | 🚨 nếu chờ hết nhịp thì **15 phút đầu sau mỗi deploy** metric sẽ là `0` **một cách SAI** (chưa ai đo) — **đúng vấn đề job này sinh ra để chặn** |
+| Khoá phân tán | `inventory:reconciliation-scan` | ⚠️ **không** tiền tố `ecommerce:` (`KeyPrefix` đã thêm) |
+| **Log vô điều kiện** | ở **đầu** mỗi lượt | bắt buộc theo **cơ chế** `BackgroundWorkerCoCheTests` ⇒ *"im lặng"* **luôn** nghĩa là *"không chạy"* |
+| **`UnitOfWork` + scope** | có | `AsyncPeriodicBackgroundWorkerBase` **không** tự mở UoW (bài học `ObjectDisposedException` §27.2 **NN2**) |
+| Mức log khi lệch | **`Warning`** | giữ mức `Error` sẽ phá tiêu chí *"không có dòng `fail:`"* của quy trình kiểm chứng (§22) |
+
+📌 **Worker này được viết theo đúng khuôn đã được CƠ CHẾ HOÁ** — và **cơ chế đã tự kiểm nó** ngay khi thêm vào:
+`BackgroundWorkerCoCheTests` **XANH** nghĩa là worker đã có **đăng ký** + **log vô điều kiện** + **UoW cho `*Service`**
+(3 luật của §28–§29). 📌 Đây là lần đầu **cơ chế hạ tầng giúp viết đúng ngay từ đầu**, thay vì phát hiện sau khi đo.
+
+### 37.3 ✅ BẰNG CHỨNG
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | build `--no-incremental` | **0 lỗi / 0 cảnh báo** ✅ |
+| 2 | unit (gồm **3 luật worker**) | **693/693** ✅ |
+| 3 | **Host thật** — job có chạy? | **CÓ**: 2 dòng log từ `InventoryReconciliationWorker` = *"bắt đầu quét"* + *"KHÔNG có lệch"* ✅ |
+| 4 | `RunOnStart` | chạy **ngay khi khởi động**, không chờ 15 phút ✅ |
+| 5 | **`fail:`** trong log | **0** ✅ (job **không** ném) |
+| 6 | Đối chiếu worker khác | `TaxUnclassifiedSkusWorker` cũng chạy ✅ (cơ chế worker của ABP hoạt động) |
+
+- integration **38/38** · mermaid 197/0 · **không đổi schema**
+
+⚠️ **Độ phủ đã biết:** mới chứng minh job **CHẠY** và **KHÔNG ném** trên **dữ liệu KHÔNG có lệch**.
+**CHƯA** đo ca **có lệch thật** (gieo lệch vào `InvItems`/sổ cái rồi xem job có **log `Warning`** + metric **> 0**).
+⇒ **Việc của lát cắt sau (rẻ, một lần chạy)**: gieo lệch ⇒ khởi động Host ⇒ kỳ vọng **`Warning`** với **số lệch đúng**.
+
+### 37.4 Còn lại của `REC-001`
+
+| # | Việc |
+|---|---|
+| 1 | **Đo ca CÓ lệch** (§37.3) — chứng minh `Warning` + metric > 0 |
+| 2 | **Lịch sử đối soát** (bảng `ReconRuns`) ⇒ biết *"đã đối soát lúc nào, lệch bao nhiêu"* theo thời gian (**cần migration**) |
+| 3 | **Ngưỡng cảnh báo** & **quy trình xử lý lệch** (ai xem, sửa thế nào — cần **người quyết**) |
+| 4 | `INV-003` phân bổ tồn theo kênh · hoàn tiền · `WEB-001` |
+
+### 37.5 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v2.2 | 15/10/2026 | *(agent, session GĐ1)* | **`REC-001` — job đối soát định kỳ** (`InventoryReconciliationWorker`, 15 phút, `RunOnStart`, khoá phân tán, **UoW**, **log vô điều kiện**) ⇒ đóng khoảng trống *"metric chỉ phát khi có người gọi API"* (§37.1). **Kiểm chứng**: build `0/0` · unit **693/693** *(cơ chế `BackgroundWorkerCoCheTests` tự kiểm worker mới — **lần đầu cơ chế giúp viết đúng ngay từ đầu**)* · **Host thật: job chạy, `fail: 0`**. ⚠️ **Chưa** đo ca **có lệch** (ghi rõ §37.3) |
