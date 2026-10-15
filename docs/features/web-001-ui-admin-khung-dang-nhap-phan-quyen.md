@@ -2495,3 +2495,46 @@ chứ không phải một liên kết **chết** (`404`).
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.0-i | 15/10/2026 | *(agent, session GĐ1)* | 🎉 **Nút TRẢ HÀNG của `/DonHang` ĐÃ KIỂM CHỨNG**: thêm action `TraHang(id, khoId)` + form thứ ba (**token + ô nhập kho**). Probe chạy trọn: `GET` ⇒ **200** trạng thái `Confirmed`, **nút + ô kho có mặt**; 🔥 `POST /DonHang/TraHang` ⇒ **`302`** ⇒ **`Returned`** (DB `status=6`); tồn **`OnHand=10 Reserved=0 Available=10`**; 🔥 phiếu trả **`TH-WEB-WEB-tra-214844-1`**; dọn sạch; **`fail: 0`**; 0 tiến trình treo. ⇒ **`/DonHang` nay đủ BA hành động đã kiểm chứng qua UI** |
+
+---
+
+## 83. ✅ **GIỎ NHIỀU Ô NHẬP (3 DÒNG) — GHÉP Ở SERVER, ĐÃ KIỂM CHỨNG** (15/10/2026) — *làm lại ĐÚNG cách sau §97*
+
+### 83.1 Đã làm — **KHÔNG JavaScript**, và **chèn mã ở ĐÚNG ngữ cảnh**
+
+| # | Tệp | Thay đổi | Neo (duy nhất) |
+|---|---|---|---|
+| 1 | `DatHangController.cs` | thêm **`Sku2` · `SoLuong2` · `Sku3` · `SoLuong3`** vào **`DatHangInput`** | `public Guid KhoId { get; set; }` |
+| 2 | `DatHangController.cs` | **ghép** dòng 2/3 thành chuỗi `SKU:SL,…` **TRƯỚC CẢ CÂU LỆNH** `var ketQua = await _checkout.TinhVaGiuChoAsync(new CheckoutInput …)` | chính dòng đó |
+| 3 | `Views/DatHang/Index.cshtml` | thêm **2 dòng nhập** (`#Sku2/…` · `#Sku3/…`) | `<div><label for="Sku">…` |
+
+📌 **Vì sao neo là "CẢ CÂU LỆNH" chứ không phải dòng `Items = …`:** vòng 97 tôi neo vào dòng **bên trong object initializer**
+⇒ chèn **statement** vào giữa **danh sách khởi tạo** ⇒ **80 dòng lỗi cú pháp C#**. Nay neo vào **câu lệnh** ⇒ khối mã nằm
+**trước** `new CheckoutInput` ⇒ hợp lệ. **Đã đếm số lần xuất hiện của mỗi neo = `1` trước khi sửa** (Phần H2).
+🔁 **Tương thích ngược:** dòng 1 vẫn là `Sku`/`SoLuong`.
+📌 **Vì sao ghép ở SERVER:** JS **không** kiểm được bằng probe HTTP ⇒ quy trình hiện tại **không** có cách chứng minh.
+📌 **Và ghép vào CHÍNH chuỗi của dòng 1** ⇒ **GỘP SKU TRÙNG** hoạt động **xuyên các dòng**.
+
+### 83.2 ✅ BẰNG CHỨNG — **ba dòng, có SKU trùng giữa dòng 1 và dòng 3**
+
+Kịch bản: `A × 2` · `B × 3` · `A × 1` (`A` = 100.000 · `B` = 200.000). Kỳ vọng **tính trước**: gộp `A = 3`
+⇒ `(3 × 100.000 + 3 × 200.000) × 1,1` = **`990.000`**.
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | 🔥 **KIỂM BUILD ĐÚNG CÁCH** (Phần H1) | **`exit=0`** · **`0`** dòng `': error '` · **`eCommerce.Web.dll` CÓ** ⇒ *"build thật sự xanh (3/3)"* ✅ |
+| 2 | `GET /DatHang` | ô **`Sku2`** · **`Sku3`** **có mặt** ✅ |
+| 3 | 🔥 **`POST` ba dòng** | **HTTP `200`** · **tổng `990,000`** ✅ |
+| 4 | 🔥 **Số dòng đơn trong DB** | **`2`** ✅ *(mong đợi **2** — `A` **GỘP** xuyên dòng 1 + dòng 3)* |
+| 5 | 🔥 **Dòng đơn** | **`G7SKU-A-215437 x 3 | G7SKU-B-215437 x 3`** ✅ |
+| 6 | 🔥 **Tồn kho TỪNG SKU** | **`G7SKU-A-215437: 10/3/7 | G7SKU-B-215437: 10/3/7`** ✅ *(`10/3/7` **cả hai** ⇒ giữ chỗ đúng `3 + 3`)* |
+| 7 | `fail:` · tiến trình treo | **`0`** ✅ · **0** ✅ |
+
+📌 **Vì sao #4 là phép đo quyết định:** `A` xuất hiện ở **hai dòng nhập** ⇒ nếu **không** gộp, DB sẽ có **hai dòng cùng SKU
+trong một đơn** — phá `CHECK`/unique của kho (`INV-001`). **`2` dòng đơn** chứng minh **gộp xuyên dòng** chạy đúng.
+
+### 83.3 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.0-j | 15/10/2026 | *(agent, session GĐ1)* | ✅ **GIỎ NHIỀU Ô NHẬP (3 dòng)** — ghép ở **SERVER**, neo **duy nhất** và **đúng ngữ cảnh** (sửa lỗi §97/H2). **Kiểm build 3/3** (`exit 0` · `0` lỗi · DLL có). **Kiểm chứng** số **tính trước**: `A×2 · B×3 · A×1` ⇒ HTTP **`200`**, tổng **`990,000`**, **`2` dòng đơn** (**GỘP `A` xuyên dòng**), tồn **`G7SKU-A-215437: 10/3/7 | G7SKU-B-215437: 10/3/7`**; **`fail: 0`** |

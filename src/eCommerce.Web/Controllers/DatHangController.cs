@@ -95,7 +95,14 @@ public class DatHangController : Controller
 
         try
         {
-            var ketQua = await _checkout.TinhVaGiuChoAsync(new CheckoutInput
+            // 🚨 GIỎ NHIỀU Ô NHẬP (§82): ghép dòng 2 và 3 vào CHUỖI của dòng 1 rồi đưa vào CÙNG bộ tách đã kiểm chứng.
+        // 📌 Ghép ở SERVER (không JS) ⇒ probe HTTP kiểm được. Dòng TRỐNG bị BỎ QUA (không sinh "SKU rỗng").
+        // ⚠️ Đặt TRƯỚC **cả câu lệnh** `var ketQua = ...` — KHÔNG chèn vào giữa `new CheckoutInput { ... }` (lỗi §97/H2).
+        var phanBoSung = new System.Text.StringBuilder();
+        if (!string.IsNullOrWhiteSpace(form.Sku2)) { phanBoSung.Append(',').Append(form.Sku2.Trim()).Append(':').Append(form.SoLuong2); }
+        if (!string.IsNullOrWhiteSpace(form.Sku3)) { phanBoSung.Append(',').Append(form.Sku3.Trim()).Append(':').Append(form.SoLuong3); }
+        if (phanBoSung.Length > 0) { form.Sku = form.Sku + phanBoSung.ToString(); }
+        var ketQua = await _checkout.TinhVaGiuChoAsync(new CheckoutInput
             {
                 ChannelCode = string.IsNullOrWhiteSpace(form.Kenh) ? "web" : form.Kenh,
                 WarehouseId = form.KhoId,
@@ -247,6 +254,20 @@ internal static class GioHelper
 public class DatHangInput
 {
     public Guid KhoId { get; set; }
+    /// <summary>🚨 **GIỎ NHIỀU Ô NHẬP** (`web-001` §82): dòng 2 và 3 của giỏ — để **trống** nếu không dùng.
+    /// 📌 **KHÔNG dùng JavaScript**: giá trị được **ghép ở SERVER** rồi đưa vào **cùng** bộ tách `GioHelper.PhanTichGio`
+    /// (đã kiểm chứng cả **ca biên** ở §72) ⇒ **kiểm chứng được bằng probe HTTP** thay vì phải kiểm hành vi trình duyệt.
+    /// 🔁 **Tương thích ngược:** dòng 1 vẫn là `Sku`/`SoLuong` ⇒ mọi lời gọi cũ **không đổi**.</summary>
+    public string Sku2 { get; set; } = string.Empty;
+
+    /// <inheritdoc cref="Sku2" />
+    public int SoLuong2 { get; set; } = 1;
+
+    /// <inheritdoc cref="Sku2" />
+    public string Sku3 { get; set; } = string.Empty;
+
+    /// <inheritdoc cref="Sku3" />
+    public int SoLuong3 { get; set; } = 1;
 
     public string Kenh { get; set; } = "web";
 
