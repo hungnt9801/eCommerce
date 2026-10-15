@@ -44,7 +44,26 @@ public enum StockMovementType
     Adjustment = 5,
 
     /// <summary>Chuyển kho.</summary>
-    Transfer = 6
+    Transfer = 6,
+
+    // 🚨🚨 **`INV-001` ADR-04 — CHỈ ĐƯỢC THÊM Ở CUỐI, KHÔNG BAO GIỜ ĐỔI SỐ CỦA GIÁ TRỊ CŨ.**
+    // `StockMovementType` được lưu **dạng số** trong `InvStockLedger.MovementType` ⇒ đổi số của giá trị cũ
+    // sẽ **diễn giải lại toàn bộ lịch sử kho**: một bút toán "Nhập kho" thành "Giữ chỗ" — **sai sổ cái mà
+    // không có lỗi nào**. Test `StockMovementTypeTests` khoá bất biến này.
+    // 📌 Trước `INV-001`, enum **THIẾU** giá trị cho **kiểm kê** và **chuyển kho đến/đi** ⇒ không ghi được
+    // nghiệp vụ thật (phải "mượn" `Adjustment`/`Transfer` ⇒ **mất khả năng truy vết**).
+
+    /// <summary>Kiểm kê **thừa** (đếm được nhiều hơn sổ) — `INV-001`.</summary>
+    StocktakeGain = 7,
+
+    /// <summary>Kiểm kê **thiếu** (đếm được ít hơn sổ) — `INV-001`.</summary>
+    StocktakeLoss = 8,
+
+    /// <summary>Chuyển kho — phần **ĐI** (kho nguồn) — `INV-001`.</summary>
+    TransferOut = 9,
+
+    /// <summary>Chuyển kho — phần **ĐẾN** (kho đích) — `INV-001`.</summary>
+    TransferIn = 10
 }
 
 public enum OrderStatus

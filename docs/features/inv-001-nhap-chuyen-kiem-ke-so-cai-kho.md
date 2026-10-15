@@ -1057,3 +1057,74 @@ public class StockLedgerInvariantTests
 | Sổ cái là **nguồn sự thật**, `InventoryItem` là **ảnh chụp** | `src/eCommerce.Domain/Entities/Inventory/StockLedger.cs:8,97` |
 | Test hiện có cho kho (chỉ ở tầng domain) | `test/eCommerce.Tests/Domain/OrderAndInventoryTests.cs:54-100` |
 | Fixture integration PostgreSQL **đã có** (cần môi trường thật) | `test/eCommerce.IntegrationTests/PostgreSqlSchemaTests.cs:1-23` |
+
+---
+
+## 16. TRẠNG THÁI TRIỂN KHAI — **LÁT CẮT 1: ĐÓNG 3 LỖ HỔNG NỀN (ADR-03/04/05)** (15/10/2026)
+
+### 16.1 Bối cảnh: `INV-001` **không** bắt đầu từ số 0
+
+§0 của tài liệu này đã **đo** rằng `InventoryItem`/`StockLedgerEntry` **đã tồn tại** từ GĐ0 kèm **4 lỗ hổng thật**.
+Vì vậy lát cắt này **KHÔNG tạo entity mới** — nó **đóng lỗ hổng**, đúng thứ tự ADR của tài liệu.
+
+| Lỗ hổng §0 (đã đo) | ADR | Trạng thái sau lát cắt này |
+|---|---|---|
+| Không có `CHECK` nào trên `InvItems`/`InvStockLedger`; kiểm âm kho **chỉ** ở C# | **ADR-03** | ✅ **5 `CHECK`** đã tạo **trong DB thật** (xem §16.2) |
+| `StockMovementType` **thiếu** giá trị cho **kiểm kê** và **chuyển kho đến/đi** | **ADR-04** | ✅ thêm **4 giá trị** (`StocktakeGain/Loss`, `TransferOut/In`) **ở CUỐI dải** + `ApplyMovement` xử lý đủ |
+| Không có cơ chế chống **ghi trùng** sổ cái ở tầng DB | **ADR-05** | ✅ `ReferenceLineId` + **unique index có bộ lọc** `NULLS NOT DISTINCT` |
+| `Reserved > OnHand` **lọt** (chỉ kiểm `>= 0`) ⇒ `Available` **ÂM** | — | ✅ thêm bất biến ở **cả** entity **và** DB (`CK_InvItems_Reserved_KhongVuotOnHand`) |
+
+### 16.2 ✅ BẰNG CHỨNG — **DB THẬT** (PostgreSQL 17), đo bằng `pg_constraint`/`pg_indexes`
+
+| Ràng buộc | Định nghĩa trong DB |
+|---|---|
+| `CK_InvItems_OnHand_KhongAm` | `CHECK ("OnHand" >= 0)` |
+| `CK_InvItems_Reserved_KhongAm` | `CHECK ("Reserved" >= 0)` |
+| `CK_InvItems_Reserved_KhongVuotOnHand` | `CHECK ("Reserved" <= "OnHand")` |
+| `CK_InvStockLedger_Balance_KhongAm` | `CHECK ("BalanceAfter" >= 0)` |
+| `CK_InvStockLedger_Delta_KhacKhong` | `CHECK ("QuantityDelta" <> 0)` |
+| `IX_InvStockLedger_TenantId_ReferenceLineId` | `CREATE UNIQUE INDEX … ("TenantId","ReferenceLineId") NULLS NOT DISTINCT WHERE ("ReferenceLineId" IS NOT NULL)` |
+
+- migration `20261015111042_Inv001_ReferenceLineId_Checks_Unique` đã áp; tổng index `NULLS NOT DISTINCT` toàn hệ thống: **35**
+- `Assets/schema.sql` đã sinh lại
+- **Test:** unit **600/600** (+19) · integration **38/38** (+4) · build `--no-incremental` **0 lỗi / 0 cảnh báo** · mermaid 197/0
+
+**4 test tích hợp mới (đều là hàng rào DB, không phải kiểm tra kiểu "code trông đúng"):**
+1. `CHECK` **chặn `OnHand` âm** (`23514`) — nếu không có: **bán thứ không có**.
+2. `CHECK` **chặn `Reserved` vượt `OnHand`** (`23514`) — nếu không có: `Available` **âm** ⇒ hệ thống tưởng còn hàng.
+3. **Unique chặn ghi trùng sổ cái** theo `ReferenceLineId` (`23505`) — nếu không có: **tồn kho tăng gấp đôi** khi retry/job chạy lại.
+4. 🚨 **ĐỐI CHỨNG BẮT BUỘC:** nhiều bút toán **KHÔNG** tham chiếu (`ReferenceLineId = NULL`) **vẫn được phép** — chứng minh bộ lọc `IS NOT NULL` **có tác dụng**. Nếu ai bỏ bộ lọc thì hệ thống chỉ cho phép **MỘT** bút toán điều chỉnh tay ⇒ **khoá cứng nghiệp vụ** với triệu chứng là lỗi unique rất khó hiểu.
+
+### 16.3 🚨 **LỖI THẬT DO CHÍNH TÔI GÂY RA VÀ ĐÃ SỬA TRONG LƯỢT NÀY**
+
+**Gán TRƯỚC — kiểm tra SAU ⇒ entity ở lại trạng thái SAI trong bộ nhớ.**
+Phiên bản đầu của `ApplyMovement` **gán** `OnHand`/`Reserved` rồi mới kiểm bất biến; khi vi phạm nó **NÉM** nhưng
+entity **đã bị biến đổi**. Test `Giu_cho_VUOT_ton_thuc_thi_NEM` bắt được: sau khi ném, `Reserved` = **6** (không phải `0`).
+Trong EF Core entity đó **vẫn đang được theo dõi**; nếu người gọi **bắt** exception rồi `SaveChanges` vì việc khác thì
+giá trị sai **được ghi xuống DB** — mà `CHECK` ở DB **có thể không chặn** (nếu giá trị vẫn thoả `>= 0`).
+⇒ Sửa: **tính → kiểm → rồi mới gán** (`onHandMoi`/`reservedMoi`). Thông điệp lỗi nay ghi rõ *"KHÔNG thay đổi gì"*.
+📌 **Bài học:** *ném lỗi mà để lại rác là gieo bug* — bất biến phải được kiểm **trước khi** biến đổi trạng thái.
+
+### 16.4 📌 Bài học phụ khi viết test
+
+`InvStockLedger` là `FullAuditedEntity<Guid>` ⇒ **KHÔNG** có cột `ExtraProperties` và **KHÔNG** có `ConcurrencyStamp`
+(chỉ `AggregateRoot` mới có). Lượt này tôi viết test chèn SQL có hai cột đó ⇒ lỗi `42703` **hai lần liên tiếp**
+(`ExtraProperties`, rồi `ConcurrencyStamp`). Đáng chú ý: **chính file test đã có ghi chú** về điều này ở một test khác
+⇒ bài học: *khi viết SQL tay, chép cột từ **chính bảng đó** trong test đã chạy được, đừng chép từ bảng "anh em"*.
+
+### 16.5 Còn lại của `INV-001`
+
+| # | Việc | Ghi chú |
+|---|---|---|
+| 1 | **Entity `Warehouse`** (ADR-01) + invariant `IsActive` | chưa có bảng kho |
+| 2 | **Chứng từ + ghi sổ 2 bước** (`Receipt`/`Transfer`/`Stocktake`, chỉ `Posted` mới sinh bút toán) — ADR-02/09 |
+| 3 | **Khoá phân tán theo `(tenant, warehouse, sku)`** khi ghi sổ (ADR-08, `ThrowOnTimeout` cho HTTP) |
+| 4 | **Idempotency key** `Invent:Post:{documentType}:{tenantId}:{documentId}` (ADR-07) |
+| 5 | **Job đối soát** `InventoryItem` với `SUM(StockLedgerEntry)` + **metric** (ADR-10; §0 #9 nói **không có** metric nào cho kho) |
+| 6 | **API** `goods-receipt`/`stock-transfer`/`stocktake` + permission `eCommerce.Inventory.*` |
+
+### 16.6 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.2 | 15/10/2026 | *(agent, session GĐ1)* | **Lát cắt 1 — đóng 3 lỗ hổng nền**: **ADR-03** 5 `CHECK` trên `InvItems`/`InvStockLedger` + bất biến `Reserved <= OnHand`; **ADR-04** thêm 4 `StockMovementType` **ở cuối dải** + `ApplyMovement` xử lý đủ (test khoá **giá trị số** để không diễn giải lại lịch sử); **ADR-05** `ReferenceLineId` + unique index **có bộ lọc** `NULLS NOT DISTINCT`. 🚨 **Sửa lỗi thật** *"gán trước — kiểm sau"* khiến entity ở lại trạng thái sai sau khi ném (§16.3). **+19 unit · +4 integration** (có **đối chứng** bút toán không tham chiếu). DB thật xác nhận **5 `CHECK`** + index bộ lọc; tổng **35** index `NULLS NOT DISTINCT` |

@@ -141,11 +141,11 @@ public class PostgreSqlSchemaTests
     }
 
     [Fact]
-    public async Task F1_du_34_index_deu_dung_NULLS_NOT_DISTINCT()
+    public async Task F1_du_35_index_deu_dung_NULLS_NOT_DISTINCT()
     {
         // 🔒 BẤT BIẾN (ghi ở XC-004 Q6): mọi unique index trên entity IMultiTenant PHẢI có
         // `NULLS NOT DISTINCT`. Ai tạo migration mới mà quên ⇒ test này đỏ.
-        Assert.Equal(34L, await DemAsync(
+        Assert.Equal(35L, await DemAsync(
             "select count(*) from pg_indexes where schemaname = 'public' and indexdef like '%NULLS NOT DISTINCT%'"));
 
         // Kiểm tra ĐÍCH DANH để thông báo lỗi có ý nghĩa (tên index dài có thể bị PostgreSQL cắt ⇒ so theo tiền tố).
@@ -805,5 +805,84 @@ public class PostgreSqlSchemaTests
         var soBac = await DemAsync($"select count(*) from \"PrcTierPrices\" where \"TierPriceSetId\" = '{setId}'");
 
         Assert.Equal(2L, soBac);
+    }
+
+    // ── 2g. 🚨 INV-001 — RÀNG BUỘC DB CHO TỒN KHO (ADR-03) + CHỐNG GHI TRÙNG SỔ CÁI (ADR-05) ──────
+
+    private async Task ChayAsync(string sql)
+    {
+        await using var command = _fixture.DataSource.CreateCommand(sql);
+        await command.ExecuteNonQueryAsync();
+    }
+
+    [Fact]
+    public async Task INV001_CHECK_chan_OnHand_AM__hang_rao_cuoi_cho_ban_thua_hang()
+    {
+        var duoi = Guid.NewGuid().ToString("N")[..6];
+        var id = Guid.NewGuid();
+
+        var ex = await Assert.ThrowsAsync<PostgresException>(() => ChayAsync(
+            "insert into \"InvItems\" (\"Id\",\"TenantId\",\"WarehouseId\",\"Sku\",\"OnHand\",\"Reserved\"," +
+            "\"ExtraProperties\",\"ConcurrencyStamp\",\"CreationTime\",\"IsDeleted\") " +
+            $"values ('{id}', null, '{Guid.NewGuid()}', 'INV-CHK-{duoi}', -1, 0, '{{}}', 'x', now(), false)"));
+
+        Assert.Equal(PostgresErrorCodes.CheckViolation, ex.SqlState);   // 23514
+    }
+
+    [Fact]
+    public async Task INV001_CHECK_chan_Reserved_VUOT_OnHand__Available_AM()
+    {
+        var duoi = Guid.NewGuid().ToString("N")[..6];
+        var id = Guid.NewGuid();
+
+        var ex = await Assert.ThrowsAsync<PostgresException>(() => ChayAsync(
+            "insert into \"InvItems\" (\"Id\",\"TenantId\",\"WarehouseId\",\"Sku\",\"OnHand\",\"Reserved\"," +
+            "\"ExtraProperties\",\"ConcurrencyStamp\",\"CreationTime\",\"IsDeleted\") " +
+            $"values ('{id}', null, '{Guid.NewGuid()}', 'INV-CHK2-{duoi}', 1, 2, '{{}}', 'x', now(), false)"));
+
+        Assert.Equal(PostgresErrorCodes.CheckViolation, ex.SqlState);
+    }
+
+    [Fact]
+    public async Task INV001_unique_chan_GHI_TRUNG_so_cai_theo_ReferenceLineId()
+    {
+        var duoi = Guid.NewGuid().ToString("N")[..6];
+        var lineId = Guid.NewGuid();
+        var kho = Guid.NewGuid();
+
+        string Lenh(Guid id) =>
+            "insert into \"InvStockLedger\" (\"Id\",\"TenantId\",\"WarehouseId\",\"Sku\",\"MovementType\"," +
+            "\"QuantityDelta\",\"BalanceAfter\",\"ReferenceLineId\",\"OccurredAtUtc\"," +
+            $"\"CreationTime\",\"IsDeleted\") values ('{id}', null, '{kho}', 'INV-LED-{duoi}', " +
+            $"0, 5, 5, '{lineId}', now(), now(), false)";
+
+        await ChayAsync(Lenh(Guid.NewGuid()));
+
+        var ex = await Assert.ThrowsAsync<PostgresException>(() => ChayAsync(Lenh(Guid.NewGuid())));
+
+        Assert.Equal(PostgresErrorCodes.UniqueViolation, ex.SqlState);   // 23505
+    }
+
+    [Fact]
+    public async Task INV001_nhieu_but_toan_KHONG_tham_chieu_van_DUOC__nho_bo_loc_IS_NOT_NULL()
+    {
+        // 🚨 ĐỐI CHỨNG BẮT BUỘC: bút toán điều chỉnh tay KHÔNG có dòng chứng từ (ReferenceLineId = NULL).
+        // Nếu unique index KHÔNG có bộ lọc `IS NOT NULL` thì toàn hệ thống chỉ được phép có **MỘT** bút toán
+        // không tham chiếu ⇒ **khoá cứng nghiệp vụ điều chỉnh** mà triệu chứng là lỗi unique rất khó hiểu.
+        var duoi = Guid.NewGuid().ToString("N")[..6];
+        var kho = Guid.NewGuid();
+
+        string Lenh(Guid id, int delta) =>
+            "insert into \"InvStockLedger\" (\"Id\",\"TenantId\",\"WarehouseId\",\"Sku\",\"MovementType\"," +
+            "\"QuantityDelta\",\"BalanceAfter\",\"ReferenceLineId\",\"OccurredAtUtc\"," +
+            $"\"CreationTime\",\"IsDeleted\") values ('{id}', null, '{kho}', 'INV-NUL-{duoi}', " +
+            $"0, {delta}, 5, null, now(), now(), false)";
+
+        await ChayAsync(Lenh(Guid.NewGuid(), 1));
+        await ChayAsync(Lenh(Guid.NewGuid(), 2));
+
+        var so = await DemAsync($"select count(*) from \"InvStockLedger\" where \"Sku\" = 'INV-NUL-{duoi}'");
+
+        Assert.Equal(2L, so);
     }
 }

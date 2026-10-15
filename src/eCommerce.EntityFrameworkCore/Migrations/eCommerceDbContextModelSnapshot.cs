@@ -3234,6 +3234,9 @@ namespace eCommerce.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
+                    b.Property<Guid?>("ReferenceLineId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("ReferenceType")
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
@@ -3251,6 +3254,11 @@ namespace eCommerce.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "ReferenceLineId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_InvStockLedger_TenantId_ReferenceLineId")
+                        .HasFilter("\"ReferenceLineId\" IS NOT NULL");
 
                     b.HasIndex("TenantId", "ChannelCode", "OccurredAtUtc");
 

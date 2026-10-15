@@ -1749,3 +1749,27 @@ VALUES ('20261015110229_Prc002_PriceCalculationRecords', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+ALTER TABLE "InvStockLedger" ADD "ReferenceLineId" uuid;
+
+CREATE UNIQUE INDEX "IX_InvStockLedger_TenantId_ReferenceLineId" ON "InvStockLedger" ("TenantId", "ReferenceLineId") WHERE "ReferenceLineId" IS NOT NULL;
+
+DROP INDEX "IX_InvStockLedger_TenantId_ReferenceLineId";
+
+CREATE UNIQUE INDEX "IX_InvStockLedger_TenantId_ReferenceLineId" ON "InvStockLedger" ("TenantId", "ReferenceLineId") NULLS NOT DISTINCT WHERE "ReferenceLineId" IS NOT NULL;
+
+ALTER TABLE "InvItems" ADD CONSTRAINT "CK_InvItems_OnHand_KhongAm" CHECK ("OnHand" >= 0);
+
+ALTER TABLE "InvItems" ADD CONSTRAINT "CK_InvItems_Reserved_KhongAm" CHECK ("Reserved" >= 0);
+
+ALTER TABLE "InvItems" ADD CONSTRAINT "CK_InvItems_Reserved_KhongVuotOnHand" CHECK ("Reserved" <= "OnHand");
+
+ALTER TABLE "InvStockLedger" ADD CONSTRAINT "CK_InvStockLedger_Balance_KhongAm" CHECK ("BalanceAfter" >= 0);
+
+ALTER TABLE "InvStockLedger" ADD CONSTRAINT "CK_InvStockLedger_Delta_KhacKhong" CHECK ("QuantityDelta" <> 0);
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261015111042_Inv001_ReferenceLineId_Checks_Unique', '10.0.11');
+
+COMMIT;
+

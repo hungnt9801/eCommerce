@@ -431,6 +431,19 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
 
             // Đối soát theo kênh.
             b.HasIndex(x => new { x.TenantId, x.ChannelCode, x.OccurredAtUtc });
+
+            // 🚨 **`INV-001` ADR-05 — HÀNG RÀO CHỐNG GHI TRÙNG SỔ CÁI.**
+            // Ghi sổ một dòng chứng từ HAI lần (retry · job chạy lại · người bấm hai lần) ⇒ lần hai **bị chặn**.
+            // 📌 Kiểm ở tầng app ("đã ghi chưa?") **KHÔNG đủ**: hai request **đồng thời** cùng thấy "chưa ghi"
+            // ⇒ ghi hai lần ⇒ **tồn kho tăng gấp đôi mà không có lỗi nào**.
+            // ⚠️ Bộ lọc `ReferenceLineId IS NOT NULL` là **BẮT BUỘC** (sửa tay trong migration —
+            // EF không sinh được `NULLS NOT DISTINCT` lẫn bộ lọc kèm nhau):
+            // bút toán điều chỉnh tay KHÔNG có dòng chứng từ; nếu unique **không** bộ lọc thì toàn hệ thống
+            // chỉ được phép có **MỘT** bút toán không tham chiếu.
+            b.HasIndex(x => new { x.TenantId, x.ReferenceLineId })
+                .IsUnique()
+                .HasFilter("\"ReferenceLineId\" IS NOT NULL")
+                .HasDatabaseName("IX_InvStockLedger_TenantId_ReferenceLineId");
         });
 
         builder.Entity<Orders.Order>(b =>
