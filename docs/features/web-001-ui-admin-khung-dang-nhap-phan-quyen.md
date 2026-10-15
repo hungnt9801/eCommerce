@@ -1753,3 +1753,52 @@ vì sao rỗng **thay vì** im lặng.
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.j | 15/10/2026 | *(agent, session GĐ1)* | ✅ **Kiểm chứng CA RỖNG của `/SanPham` và `/DatHang`**, kèm **đo điều kiện tiên quyết** (`bangGia=0 dongGia=0 kho=0 khoHoatDong=0 don=0`) để phép đo **có nghĩa**; cả hai trang hiện **khối rỗng nói rõ lý do**, **không** hiện bảng/form. ⇒ **CẢ BA trang mặt tiền (`/PhanBo` · `/SanPham` · `/DatHang`) nay đã kiểm chứng CẢ HAI CHIỀU** (rỗng + có dữ liệu + đối chứng chéo API/DB) |
+
+---
+
+## 64. **ĐO ĐƯỜNG NỐI UI → API (§E.2 #1): CHƯA XONG — lỗi ở BƯỚC TRÍCH `idDon` CỦA PROBE** (15/10/2026)
+
+### 64.1 Mục đích phép đo
+
+Đơn do **Web** tạo có `Number = "WEB-{khoá}"`. Phải chứng minh nó **vận hành được** bằng các API **đã kiểm chứng** —
+cụ thể **xác nhận đơn** (`SAL-003`) với bất biến: **`OnHand` và `Reserved` CÙNG giảm · `Available` KHÔNG đổi**.
+📌 Nếu không kiểm, `Web` chỉ tạo được **đơn "chết"** — và **không ai biết** cho tới khi khách thật bấm.
+
+### 64.2 ✅ Phần **ĐÃ** đạt (trước khi probe abort)
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | Gieo kho + giá `100.000` + tồn `10` | ✅ |
+| 2 | 🔥 **Đặt hàng QUA WEB** (`/DatHang`, 4 đơn vị, thuế 10%) | **`HTTP 200`** · số đơn **`WEB-WEB-6292baf9e4a34a28`** · **tổng `440,000`** ✅ |
+| 3 | Dọn dẹp (tệp `.sql`, chạy trong `finally`) | `don=0 dong=0 ton=0 donvi=0 gc=0 sc=0 baoMat=true` ✅ |
+
+### 64.3 🚨 Phần **CHƯA** đạt — nguyên nhân là **lỗi viết probe của tôi**
+
+Probe **abort** ngay sau #2, ở bước lấy `idDon` để gọi API xác nhận:
+
+```
+Select-Object: Property "FullName" cannot be found.
+  … LIMIT 1;' -PassThru | Select-Object -ExpandProperty FullName) …
+```
+
+**Nguyên nhân:** tôi gọi `Set-Content … -PassThru` rồi trông đợi một **`FileInfo`** để lấy `.FullName`, nhưng biểu thức đó
+**không** trả về đối tượng như tôi tưởng ⇒ **chuỗi lệnh đứt** ⇒ các bước sau (#3 · #4) **không chạy**.
+📌 **Đây là lỗi ở HÀM TRỢ GIÚP VIẾT ẨU, không phải ở mã sản phẩm** — và nó **im lặng về mặt HTTP**: đơn đã tạo xong,
+chỉ có **phép đo** dừng giữa đường.
+⇒ **Việc còn lại (rẻ, đã biết chính xác cách sửa):** ghi tệp `.sql` bằng **`Set-Content` riêng**, rồi gọi `SqlTep <đường-dẫn>`
+(đúng khuôn đã dùng ở **mọi probe khác**) — **KHÔNG** nhồi `Set-Content … -PassThru` vào giữa biểu thức.
+
+### 64.4 📌 Bài học #11
+
+**Hàm trợ giúp "một dòng" là nơi lỗi ẩn náu.** Trong probe này tôi viết
+`SqlTep (Set-Content … -PassThru | Select-Object -ExpandProperty FullName)` — **ba việc** (ghi tệp · lấy đường dẫn ·
+chạy SQL) **nhồi vào một biểu thức**. Khi một mắt xích hiểu sai kiểu trả về, **toàn bộ chuỗi đứt** và **không** có
+thông báo nào *"bước 3 chưa chạy"*.
+⇒ **Quy tắc:** **mỗi việc một dòng · một biến trung gian có tên**; và **in ra** giá trị trung gian (`idDon`, đường dẫn tệp)
+**trước khi** dùng — *giá trị không in ra là giá trị không kiểm được*.
+
+### 64.5 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.i | 15/10/2026 | *(agent, session GĐ1)* | **Thử đo đường nối UI → API** (đơn do Web tạo ⇒ xác nhận qua API): ✅ **đạt** phần *đặt hàng qua Web* (`HTTP 200`, `WEB-WEB-6292baf…`, **`440,000`**) và dọn dẹp sạch; ❌ **probe abort** ở bước trích `idDon` do **lỗi viết probe của tôi** (`Set-Content -PassThru` hiểu sai kiểu trả về) ⇒ **bước xác nhận qua API CHƯA chạy**. Ghi **bài học #11**: *hàm trợ giúp "một dòng" là nơi lỗi ẩn náu — mỗi việc một dòng, một biến trung gian có tên, và **in giá trị trung gian trước khi dùng*** |
