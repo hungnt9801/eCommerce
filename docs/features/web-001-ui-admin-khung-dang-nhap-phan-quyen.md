@@ -989,3 +989,52 @@ không phải tính năng phụ.
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.y | 15/10/2026 | *(agent, session GĐ1)* | **Kiểm chứng `ReturnUrl` (BR-009)** — 🚨 **lần đo đầu là DƯƠNG TÍNH GIẢ**: tìm chuỗi trần trong HTML khớp **token chống giả mạo ngẫu nhiên** ⇒ suýt kết luận *"có open redirect"*. **Kiểm cấu trúc** bác bỏ: form đăng nhập **chỉ có 2 input ẩn** (`__RequestVerificationToken`, `LoginInput.RememberMe`) ⇒ **`ReturnUrl` KHÔNG đi qua form**. ⇒ **Kết luận trung thực: `BR-009` CHƯA kiểm chứng được** (cần **harness đăng nhập** đi hết 7 bước). Ghi **bài học**: *tìm chuỗi trần trong HTML không đáng tin khi trang có dữ liệu ngẫu nhiên* |
+
+---
+
+## 49. 🎉 **HARNESS ĐĂNG NHẬP WEB (nút thắt đã mở) + BR-009 ĐÃ KIỂM CHỨNG** (15/10/2026)
+
+### 49.1 Harness đăng nhập — **thành công**, mở khoá mọi kiểm chứng trang Web
+
+| Bước | Việc | Kết quả |
+|---|---|---|
+| 1 | `GET /Account/Login?ReturnUrl=%2F` với **session** | `200` · lấy **`__RequestVerificationToken`** (155 ký tự) · cookie `.AspNetCore.Antiforgery.*` ✅ |
+| 2 | **`POST`** 4 trường: `LoginInput.UserNameOrEmailAddress` · `LoginInput.Password` · `LoginInput.RememberMe=false` · `__RequestVerificationToken` | **`200`** · **URL cuối = `http://localhost:5100/`** ✅ |
+| 3 | Cookie phiên được cấp | **`.AspNetCore.Identity.Application`** ✅ |
+| 4 | `GET /` **sau** đăng nhập | **`200` tại `/`** — **KHÔNG** còn bị đẩy về login ✅ |
+
+📌 **Tên trường chính xác** (đo được, không đoán): `LoginInput.UserNameOrEmailAddress` · `LoginInput.Password` ·
+`LoginInput.RememberMe` · `__RequestVerificationToken`. **Không** có trường `ReturnUrl` trong form (§48).
+📌 **Vì sao đây là bước ngoặt:** trước vòng 57 **không có cách nào** kiểm chứng *"một trang Web render dữ liệu thật"*
+⇒ **mọi trang mặt tiền thêm vào sẽ không kiểm chứng được**, trái **quy trình §2**. Nay **đã có** harness.
+📌 Điều kiện cần: `ShouldChangePasswordOnNextLogin = false` (đặt **và khôi phục `true`** sau khi đo — đã làm, in ra
+`KHOI PHUC: true`).
+
+### 49.2 🎯 **BR-009 ĐÃ KIỂM CHỨNG — KHÔNG có open redirect, và cơ chế lọc ĐÚNG**
+
+Đo bằng **`-MaximumRedirection 0`** để đọc **`Location` THÔ** (bài học §47: **không** để công cụ tự đi theo redirect):
+
+| Ca | `ReturnUrl` đưa vào | **`Location` THÔ** | Kết luận |
+|---|---|---|---|
+| **A** | `https://evil.example/x` (**ngoài**) | **`/`** | 🚨 **BỊ LỌC** ⇒ về trang chủ ✅ |
+| **B** | `//evil.example` (**protocol-relative**) | **`/`** | **BỊ LỌC** ✅ |
+| **C** | `/kho/ton` (**nội bộ**) — **ĐỐI CHỨNG** | **`/kho/ton`** | **ĐƯỢC GIỮ** ✅ |
+
+📌 **Ca C (đối chứng) là thứ làm phép đo có giá trị:** nó chứng minh cơ chế **giữ** URL nội bộ hợp lệ **đồng thời**
+**lọc** URL ngoài — tức **không** phải kiểu *"luôn chuyển về `/`"* (nếu vậy, ca A/B "đạt" **một cách vô nghĩa** và
+tính năng *quay lại trang đích* sẽ **hỏng âm thầm**). Đây đúng cách đã dùng cho `REC-001` (§38.1).
+⇒ **`BR-009` ✅ ĐÃ KIỂM CHỨNG** (cả hai hướng: lọc cái xấu **và** giữ cái tốt).
+
+### 49.3 ⚠️ Điểm **chưa giải thích được** — ghi rõ
+
+Log Web có **`fail: 2`**. Nguyên nhân **nghi ngờ**: probe dùng **`-MaximumRedirection 0`** ⇒ PowerShell ném
+*"maximum redirection count has been exceeded"* cho phản hồi **302** (3 lần theo `stderr`), có thể Web ghi log lỗi
+khi request bị ngắt. **CHƯA** xác định chắc ⇒ ghi nhận, **không** giảng hoà thành *"lỗi của probe"* khi chưa đo.
+📌 Việc của lát cắt sau (rẻ): dùng **`HttpClient` với `AllowAutoRedirect = false`** (không ném lỗi) để tách bạch
+*"lỗi do probe ngắt request"* với *"lỗi thật của Web"*.
+
+### 49.4 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.z | 15/10/2026 | *(agent, session GĐ1)* | 🎉 **Harness đăng nhập Web THÀNH CÔNG** (anti-forgery + `LoginInput.*` ⇒ cookie `.AspNetCore.Identity.Application`; `GET /` sau đăng nhập trả `200` tại `/`) ⇒ **mở khoá mọi kiểm chứng trang Web có dữ liệu** (trước đó là **nút thắt** khiến mọi trang thêm vào **không kiểm chứng được**). 🎯 **`BR-009` ĐÃ KIỂM CHỨNG** bằng **`Location` thô** (`-MaximumRedirection 0`) **có ca ĐỐI CHỨNG**: `https://evil.example/x` ⇒ **`/`** (lọc) · `//evil.example` ⇒ **`/`** (lọc) · `/kho/ton` ⇒ **`/kho/ton`** (giữ) ⇒ **không** open redirect **và** tính năng quay lại trang đích **vẫn đúng**. ⚠️ **`fail: 2` trong log chưa giải thích được** — ghi rõ (§49.3) |
