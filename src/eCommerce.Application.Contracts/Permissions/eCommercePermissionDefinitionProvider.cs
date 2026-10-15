@@ -36,6 +36,16 @@ public class eCommercePermissionDefinitionProvider : PermissionDefinitionProvide
         products.AddChild(eCommerceConsts.Permissions.Products.Delete);
         products.AddChild(eCommerceConsts.Permissions.Products.Publish);
 
+        // ---- Cây danh mục + thuộc tính (`CAT-002` §9.2) ----
+        // 🚨 BẮT BUỘC thêm ở **CẢ HAI NƠI** (hằng số + provider) — thiếu một nơi ⇒ 403 cho MỌI người kể cả admin.
+        var categories = group.AddPermission(eCommerceConsts.Permissions.Categories.Default);
+        categories.AddChild(eCommerceConsts.Permissions.Categories.Create);
+        categories.AddChild(eCommerceConsts.Permissions.Categories.Edit);
+        categories.AddChild(eCommerceConsts.Permissions.Categories.Delete);
+
+        var catalogAttributes = group.AddPermission(eCommerceConsts.Permissions.CatalogAttributes.Default);
+        catalogAttributes.AddChild(eCommerceConsts.Permissions.CatalogAttributes.Manage);
+
         // ---- Kho ----
         var inventory = group.AddPermission(eCommerceConsts.Permissions.Inventory.Default);
         inventory.AddChild(eCommerceConsts.Permissions.Inventory.Adjust);

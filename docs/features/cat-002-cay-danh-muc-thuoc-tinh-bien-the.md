@@ -915,3 +915,81 @@ public class CatalogPermissionTests
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.1 | 13/10/2026 | *(điền)* | Bản nháp đầu — lập **mô hình cây + tổ hợp biến thể từ code thật**; 11 ADR · 20 BR · 10 NFR · 24 test case · 3 sơ đồ Mermaid; phát hiện **F1** (`Product.BrandId` mồ côi), **F2** (`ProductVariant.Price` không đi qua `Money` — lệch `XC-001` D2), **F3** (hai kiểu tiền tố khoá lock giữa module), **F4** (hai cây thư mục module song song), **F5** (kế thừa `XC-003` F4); ghi rõ **CAT-002 hoàn toàn chưa có trong code** |
+
+---
+
+## 16. TRẠNG THÁI TRIỂN KHAI — **LÁT CẮT 1: CÂY DANH MỤC** (15/10/2026)
+
+> Lát cắt đầu của `CAT-002`: **cây danh mục** (`Category` + `CategoryTreeService` + hàng rào DB + phân quyền).
+> **CHƯA** làm: app service/API của danh mục · liên kết sản phẩm ↔ danh mục · **thuộc tính** ·
+> **sinh tổ hợp biến thể** — xem **16.4**.
+
+### 16.1 Đã làm
+
+| # | Thành phần | Nội dung | ADR |
+|---|---|---|---|
+| 1 | `Category` (`CatCategories`) | `Adjacency List` + **`Path` vật chất hoá** `/guid/guid/` (**D1**), `Path` chứa **`Guid`** không chứa slug (**D2**), **KHÔNG** có navigation `Children` (**D3** — mỗi nút một aggregate) | D1/D2/D3 |
+| 2 | Bất biến `Path`↔`Level` | Hàm **thuần** `TinhPath`/`TinhLevel`/`LaToTienCua`/`DoiTienToPath`; `KiemTraBatBien()` **NÉM `InvalidOperationException`** khi `Path` lệch `Level` (lỗi lập trình **phải lộ ra CI**, không tự sửa) | §8.1 #2, §12 |
+| 3 | Độ sâu | `Category.DoCaoToiDa = 5` ⇒ vượt ⇒ ném **`Catalog:0024`**; DB có `CHECK (Level BETWEEN 0 AND 5)` làm chốt cuối | §8.1 #3 |
+| 4 | `CategoryTreeService` | **Nơi DUY NHẤT** ghi `Path`/`Level`: `TaoNutAsync` · `DiChuyenNhanhAsync` (**khoá toàn tenant + chống chu trình + dựng lại `Path` cả cây con**) · `XoaMemAsync` (chặn khi còn nút con) | D3/D8/D9 |
+| 5 | Khoá phân tán | `LockKeys.CategoryTree(tenantId)` → `catalog:category-tree:{tenantId}` (**KHÔNG** tiền tố `ecommerce:` — tránh **tiền tố đôi**, lỗi C13) | D8/`XC-003` |
+| 6 | Hàng rào DB | `CHECK Path LIKE '/%/'` · `CHECK Level 0..5` · **unique `(TenantId, Code)` NULLS NOT DISTINCT** · **FK `ParentId` `ON DELETE RESTRICT`** | D9/`XC-004` BR-009 |
+| 7 | Phân quyền | `Categories` (+`Create`/`Edit`/`Delete`) và `CatalogAttributes` (+`Manage`) — thêm **cả 2 nơi** (hằng số **và** provider) | D10/§9.2 |
+| 8 | Mã lỗi | Dùng **sổ đăng ký đã chốt** (`cat-001` §19): `0020` chu trình · `0021` ràng buộc · `0024` độ sâu · `0025` mã danh mục không hợp lệ (mới) | §12 |
+
+### 16.2 ✅ BẰNG CHỨNG
+
+| Phép đo | Kết quả |
+|---|---|
+| Build `--no-incremental` | **0 lỗi / 0 cảnh báo** |
+| Unit test | **474** (thêm **23** test cây: `Path`/`Level`/độ sâu/chu trình/tiền tố/khoá) |
+| Integration test | **28** (thêm **5**: trùng `Code` khi `TenantId NULL` · `CHECK` `Path` · `CHECK` `Level` · **FK `Restrict` chặn xoá cứng** · **khẳng định cấu hình FK là `RESTRICT`**) |
+| **DB thật (PostgreSQL 17)** | Bảng `CatCategories` có đủ cột; `CK_CatCategories_Level_Khoang` + `CK_CatCategories_Path_DinhDang`; FK `ON DELETE RESTRICT`; **`IX_CatCategories_TenantId_Code` UNIQUE … NULLS NOT DISTINCT** (đo bằng `pg_indexes`) |
+| Migration | `20261015092958_Cat002_CategoryTree` đã áp (có trong `__EFMigrationsHistory`); `Assets/schema.sql` đã sinh lại |
+| Phân quyền | **6 grant** cho `Categories`/`CatalogAttributes` trong `AbpPermissionGrants` (seeder đã cấp) |
+
+#### 🚨 Bước **SỬA TAY** trong migration (và vì sao **bắt buộc**)
+
+EF sinh `CREATE UNIQUE INDEX` **KHÔNG** kèm `NULLS NOT DISTINCT`. PostgreSQL coi **NULL là DISTINCT** ⇒ khi
+`TenantId` là `NULL` (ĐÚNG tình trạng hiện nay — hệ thống **1 tenant**, `AbpTenantManagement` chưa cài) thì
+**hai danh mục cùng `Code` đều LỌT VÀO DB** và **không có lỗi nào**. Migration đã **sửa tay**: `DROP INDEX`
+rồi `CREATE UNIQUE INDEX … NULLS NOT DISTINCT`.
+
+**Kiểm chứng bước sửa tay bằng MUTATION TEST (đo thật):** xoá **cả hai** dòng SQL thô ⇒ sinh lại `schema.sql`
+⇒ test `CAT002_chan_trung_Code_khi_TenantId_NULL` **ĐỎ** với `Assert.Throws() Failure: No exception was thrown`
+— nghĩa là dòng trùng **đã lọt vào DB**. Sau đó khôi phục (từ file sao lưu) ⇒ xanh lại.
+⇒ Bước sửa tay là **cần thiết** và test **thực sự** bắt được việc mất nó.
+
+🚨 **Một lần mutation test của tôi SAI (ghi lại):** lần đầu tôi chỉ xoá dòng `DROP INDEX` mà **giữ** dòng
+`CREATE` ⇒ migration sinh ra **tạo index trùng tên** ⇒ test đỏ vì `42P07: relation already exists`, **không**
+phải vì hàng rào mất. **Test đỏ vì lý do SAI vẫn là test vô giá trị** ⇒ đã làm lại cho đúng (xoá cả hai dòng)
+và ghi lại đây. 📌 Kèm bài học vòng trước: **mutation test trên thay đổi CHƯA COMMIT thì phải sao lưu file**
+(`Copy-Item`), **KHÔNG** dùng `git checkout` (lệnh đó xoá luôn việc chưa commit).
+
+### 16.3 ⚠️ Điểm cần biết khi đọc lát cắt này
+
+1. **Khoá phân tán được lấy trong DỊCH VỤ MIỀN** (`CategoryTreeService`) ⇒ đã thêm
+   `Volo.Abp.DistributedLocking` cho `eCommerce.Domain`. **Tiền lệ:** `Messaging.Domain` cũng tham chiếu gói này.
+   Lý do: bất biến *"không chu trình"* **DB không bảo vệ được** (§8.1 #1) nên khoá nằm **cùng chỗ** với phần
+   kiểm tra là điều kiện để đọc hiểu đúng — tách ra tầng app sẽ khiến "ai giữ khoá" mờ đi.
+2. **`TaoNutAsync` KHÔNG lấy khoá cây**: nút mới là **lá**, `Path` suy từ cha đang tồn tại ⇒ **không thể** tạo
+   chu trình; trùng `Code` do **unique index** chặn. Ghi rõ để người sau không tưởng là thiếu sót.
+3. **`XoaMemAsync` mới chặn theo "còn NÚT CON"** — điều kiện *"còn SẢN PHẨM"* (§12 ⇒ `0021`) **chưa** làm được
+   vì bảng liên kết `CatProductCategories` **chưa tồn tại** trong lát cắt này.
+
+### 16.4 Còn lại của `CAT-002`
+
+| # | Việc | Ghi chú |
+|---|---|---|
+| 1 | **App service + API danh mục** (`GetTreeAsync`/`CreateAsync`/`MoveAsync`/`DeactivateAsync`/`DeleteAsync`) | §6.1/§6.2 — để kiểm chứng được **bằng HTTP thật** |
+| 2 | `CatProductCategories` (gán sản phẩm ↔ danh mục, **tối đa một** `IsPrimary`/sản phẩm — unique **có filter**) | §8.1 #7 |
+| 3 | `CatAttributes` + `CatAttributeValues` + `CatCategoryAttributes` | `CatalogAttributeUsage` (D4) |
+| 4 | **Sinh tổ hợp biến thể** (D5) + `AttributeHash` + unique `(TenantId, ProductVariantId, AttributeHash)` (D7) + ngưỡng `MaxVariantCombinations` ⇒ **`Catalog:0009`** (D6) | phần lớn nhất, phụ thuộc #3 |
+| 5 | ETO `CategoryTreeChangedEto` (xoá cache menu storefront — §8.2 #5) | cần **phân loại** *thông báo* theo `coding-conventions` §6.2 |
+| 6 | UI admin cây danh mục | §10.1 |
+
+### 16.5 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.2 | 15/10/2026 | *(agent, session GĐ1)* | **Lát cắt 1 — cây danh mục**: `Category` (D1/D2/D3) + `CategoryTreeService` (D8/D9, khoá toàn tenant + chống chu trình + dựng lại `Path` cây con) + hàng rào DB (`CHECK` ×2, unique **NULLS NOT DISTINCT** **sửa tay**, FK `RESTRICT`) + permission `Categories`/`CatalogAttributes` (D10) + mã lỗi theo **sổ đăng ký đã chốt** (`cat-001` §19). **+23 unit · +5 integration**; **mutation test** xác nhận bước sửa tay là cần thiết (và một lần mutation **sai** đã được ghi lại). Ghi rõ phần còn lại ở **16.4** |

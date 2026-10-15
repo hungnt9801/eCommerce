@@ -32,6 +32,25 @@ public static class eCommerceConsts
             public const string Publish = Default + ".Publish";
         }
 
+        /// <summary>
+        /// Quyền của **cây danh mục** (`CAT-002` §9.2). 🚨 `Move`/`Deactivate` là hành động **đổi cấu trúc
+        /// hiển thị ra ngoài** (menu storefront) nên gộp vào `Edit` **có chủ ý**, tách khỏi `Create`/`Delete`.
+        /// </summary>
+        public static class Categories
+        {
+            public const string Default = GroupName + ".Categories";
+            public const string Create = Default + ".Create";
+            public const string Edit = Default + ".Edit";
+            public const string Delete = Default + ".Delete";
+        }
+
+        /// <summary>Quyền của **định nghĩa thuộc tính** (`CAT-002` §9.2) — gồm cả sinh tổ hợp biến thể.</summary>
+        public static class CatalogAttributes
+        {
+            public const string Default = GroupName + ".CatalogAttributes";
+            public const string Manage = Default + ".Manage";
+        }
+
         public static class Inventory
         {
             public const string Default = GroupName + ".Inventory";
@@ -199,6 +218,13 @@ public static class eCommerceConsts
 
             /// <summary>Vượt độ sâu tối đa của cây danh mục (`CAT-002` §8.1 #3).</summary>
             public const string VuotDoSauDanhMuc = "eCommerce:Catalog:0024";
+
+            /// <summary>
+            /// `Code` **danh mục** không hợp lệ (rỗng/quá dài).
+            /// ⚠️ **KHÁC** `0012` (`MaSanPhamKhongHopLe` — mã của **sản phẩm**): dùng lẫn mã của hai loại thực thể
+            /// thì client/đối soát không biết lỗi nằm ở **sản phẩm** hay ở **danh mục**.
+            /// </summary>
+            public const string MaDanhMucKhongHopLe = "eCommerce:Catalog:0025";
         }
     }
 
@@ -233,6 +259,23 @@ public static class eCommerceConsts
         /// </remarks>
         public static string CatalogSku(string sku)
             => $"catalog:sku:{sku}";
+
+        /// <summary>
+        /// 🚨 **Khoá TOÀN TENANT cho cây danh mục** (`CAT-002` **D8**) — dùng cho **mọi** thao tác có thể
+        /// tạo **chu trình** hoặc làm `Path` lệch cây thật (di chuyển nhánh, xoá nút).
+        ///
+        /// **Vì sao khoá theo TENANT chứ không theo NÚT** (`CAT-002` §8.2): hai người cùng di chuyển **hai
+        /// nhánh khác nhau** vẫn có thể tạo chu trình (A→B và B→A) — khoá theo nút **không** chặn được ca đó.
+        /// Đánh đổi: cây thành tài nguyên **tuần tự hoá toàn tenant**, chấp nhận được vì di chuyển cây rất ít.
+        ///
+        /// ⚠️ Bất biến *"cây không có chu trình"* là bất biến **DB KHÔNG bảo vệ được** (`CAT-002` §8.1 #1)
+        /// ⇒ khoá này **không** phải "tối ưu hiệu năng" mà là **hàng rào đúng nghĩa**.
+        ///
+        /// ⚠️ Tên khoá **KHÔNG** chứa tiền tố `ecommerce:` (tiền tố do `AbpDistributedLockOptions.KeyPrefix`
+        /// cấp — `XC-003` §5.4; tự thêm sẽ thành **tiền tố đôi**, đúng lỗi C13 đã gặp).
+        /// </summary>
+        public static string CategoryTree(Guid? tenantId)
+            => $"catalog:category-tree:{tenantId?.ToString() ?? "null"}";
 
         // 📌 Khoá liên quan tới kênh bán (refresh token, đẩy tồn kho) do CHÍNH module ChannelHub
         // sở hữu — xem modules/ChannelHub/ChannelHub.Domain/ChannelHubConsts.cs.

@@ -141,11 +141,11 @@ public class PostgreSqlSchemaTests
     }
 
     [Fact]
-    public async Task F1_du_20_index_deu_dung_NULLS_NOT_DISTINCT()
+    public async Task F1_du_21_index_deu_dung_NULLS_NOT_DISTINCT()
     {
         // 🔒 BẤT BIẾN (ghi ở XC-004 Q6): mọi unique index trên entity IMultiTenant PHẢI có
         // `NULLS NOT DISTINCT`. Ai tạo migration mới mà quên ⇒ test này đỏ.
-        Assert.Equal(20L, await DemAsync(
+        Assert.Equal(21L, await DemAsync(
             "select count(*) from pg_indexes where schemaname = 'public' and indexdef like '%NULLS NOT DISTINCT%'"));
 
         // Kiểm tra ĐÍCH DANH để thông báo lỗi có ý nghĩa (tên index dài có thể bị PostgreSQL cắt ⇒ so theo tiền tố).
@@ -180,7 +180,11 @@ public class PostgreSqlSchemaTests
             // 🚨 SAL-005 — nhật ký nhận đơn sàn (15/10/2026). Đây là hàng rào chống **tạo 2 đơn cho 1 đơn
             //    thật**; mất `NULLS NOT DISTINCT` ⇒ khi `TenantId = NULL` index mất tác dụng IM LẶNG.
             //    ⚠️ Tên đặt TƯỜNG MINH trong DbContext vì tên EF tự sinh dài 67 ký tự > 63 ⇒ bị PostgreSQL CẮT.
-            "IX_SalMktIntakes_TenantId_ChannelCode_ExternalOrderId"
+            "IX_SalMktIntakes_TenantId_ChannelCode_ExternalOrderId",
+            // 🚨 CAT-002 — mã danh mục duy nhất trong tenant (15/10/2026). EF sinh index này **KHÔNG** kèm
+            //    `NULLS NOT DISTINCT` ⇒ đã sửa tay ngay trong migration `Cat002_CategoryTree`.
+            //    Mất nó ⇒ khi `TenantId = NULL` (tình trạng hiện nay) hai danh mục cùng `Code` LỌT VÀO DB **im lặng**.
+            "IX_CatCategories_TenantId_Code"
         ];
 
         foreach (var ten in phaiCo)
@@ -550,5 +554,93 @@ public class PostgreSqlSchemaTests
             $"select count(*) from \"CatProductVariants\" where \"ProductId\" = '{productId}'");
 
         Assert.Equal(1L, bienTheConLai);
+    }
+
+    // ── 2d. 🚨 CAT-002 — hàng rào DB của CÂY DANH MỤC ────────────────────────────────────────
+
+    private async Task ChenDanhMucAsync(Guid id, Guid? parentId, string code, string? path = null, int level = 0)
+    {
+        // Cột lấy từ DB THẬT (`information_schema.columns`) + migration `Cat002_CategoryTree`.
+        await using var command = _fixture.DataSource.CreateCommand(
+            "insert into \"CatCategories\" " +
+            "(\"Id\",\"TenantId\",\"ParentId\",\"Code\",\"Name\",\"Path\",\"Level\",\"SortOrder\",\"IsActive\"," +
+            "\"ExtraProperties\",\"ConcurrencyStamp\",\"CreationTime\",\"IsDeleted\") " +
+            "values (@id, null, @parentId, @code, 'Danh muc test', @path, @level, 0, true, '{}', 'stamp', now(), false)");
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("parentId", (object?)parentId ?? DBNull.Value);
+        command.Parameters.AddWithValue("code", code);
+        command.Parameters.AddWithValue("path", path ?? $"/{id}/");
+        command.Parameters.AddWithValue("level", level);
+        await command.ExecuteNonQueryAsync();
+    }
+
+    [Fact]
+    public async Task CAT002_chan_trung_Code_khi_TenantId_NULL()
+    {
+        // 🚨 EF sinh `CREATE UNIQUE INDEX` **KHÔNG** kèm `NULLS NOT DISTINCT`; migration đã sửa TAY.
+        // Nếu bước sửa tay bị mất thì test này ĐỎ — vì `TenantId = NULL` là ca THẬT (hệ thống 1 tenant).
+        var ma = "CAT002-DUP-" + Guid.NewGuid().ToString("N")[..6];
+
+        await ChenDanhMucAsync(Guid.NewGuid(), null, ma);
+
+        var ex = await Assert.ThrowsAsync<PostgresException>(
+            () => ChenDanhMucAsync(Guid.NewGuid(), null, ma));
+
+        Assert.Equal(PostgresErrorCodes.UniqueViolation, ex.SqlState);   // 23505
+    }
+
+    [Fact]
+    public async Task CAT002_CHECK_chan_Path_sai_dinh_dang()
+    {
+        // `CHECK ("Path" LIKE '/%/')` — §8.1 #2 phần ĐỊNH DẠNG (phần ngữ nghĩa phải do test domain lo).
+        var ex = await Assert.ThrowsAsync<PostgresException>(
+            () => ChenDanhMucAsync(Guid.NewGuid(), null, "CAT002-PATH-" + Guid.NewGuid().ToString("N")[..6], "khong-co-gach"));
+
+        Assert.Equal(PostgresErrorCodes.CheckViolation, ex.SqlState);    // 23514
+    }
+
+    [Fact]
+    public async Task CAT002_CHECK_chan_Level_vuot_do_sau()
+    {
+        // `CHECK ("Level" >= 0 AND "Level" <= 5)` — §8.1 #3.
+        var ex = await Assert.ThrowsAsync<PostgresException>(
+            () => ChenDanhMucAsync(Guid.NewGuid(), null, "CAT002-SAU-" + Guid.NewGuid().ToString("N")[..6], null, 6));
+
+        Assert.Equal(PostgresErrorCodes.CheckViolation, ex.SqlState);    // 23514
+    }
+
+    [Fact]
+    public async Task CAT002_FK_RESTRICT_chan_xoa_cung_nut_cha_con_con()
+    {
+        // 🚨 `CAT-002` D9: `Cascade` sẽ **xoá mất cả cây con** khi xoá một nút; `Restrict` buộc đi đường
+        // **xoá mềm** + guard. Nếu ai đổi lại thành `Cascade` ⇒ test này ĐỎ.
+        var cha = Guid.NewGuid();
+        var con = Guid.NewGuid();
+
+        await ChenDanhMucAsync(cha, null, "CAT002-CHA-" + Guid.NewGuid().ToString("N")[..6]);
+        await ChenDanhMucAsync(con, cha, "CAT002-CON-" + Guid.NewGuid().ToString("N")[..6], $"/{cha}/{con}/", 1);
+
+        await using (var command = _fixture.DataSource.CreateCommand(
+            "delete from \"CatCategories\" where \"Id\" = @id"))
+        {
+            command.Parameters.AddWithValue("id", cha);
+            var ex = await Assert.ThrowsAsync<PostgresException>(() => command.ExecuteNonQueryAsync());
+            Assert.Equal(PostgresErrorCodes.ForeignKeyViolation, ex.SqlState);   // 23503
+        }
+
+        // Và nút con PHẢI còn nguyên (không bị xoá theo).
+        var conCon = await DemAsync($"select count(*) from \"CatCategories\" where \"Id\" = '{con}'");
+        Assert.Equal(1L, conCon);
+    }
+
+    [Fact]
+    public async Task CAT002_FK_phai_la_RESTRICT_chu_khong_CASCADE()
+    {
+        // Khẳng định CẤU HÌNH (không chỉ hành vi) — `pg_constraint.confdeltype`: 'r' = RESTRICT.
+        // ⚠️ Ép `::text`: cột kiểu `"char"` ⇒ Npgsql trả `char`, `as string` cho ra null (đã gặp thật).
+        var kieu = await ChuoiAsync(
+            "select confdeltype::text from pg_constraint where conname = 'FK_CatCategories_CatCategories_ParentId'");
+
+        Assert.Equal("r", kieu);
     }
 }

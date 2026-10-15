@@ -175,6 +175,53 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
             b.HasIndex(x => new { x.TenantId, x.Sku }).IsUnique();
         });
 
+        // ── Cây danh mục (`CAT-002` D1/D2/D3/D9) ────────────────────────────────────────────────
+        builder.Entity<Catalog.Category>(b =>
+        {
+            b.ToTable("CatCategories");
+            b.ConfigureByConvention();
+
+            b.Property(x => x.Code).IsRequired().HasMaxLength(64);
+            b.Property(x => x.Name).IsRequired().HasMaxLength(256);
+            b.Property(x => x.Slug).HasMaxLength(256);
+
+            // `Path` = `/guid/guid/` — vật chất hoá để lấy cả cây bằng MỘT truy vấn tiền tố (D1).
+            b.Property(x => x.Path).IsRequired().HasMaxLength(Catalog.Category.DoDaiPathToiDa);
+
+            // `Code` duy nhất trong tenant. ⚠️ Unique index này **PHẢI** là `NULLS NOT DISTINCT`
+            // (hệ thống hiện 1 tenant ⇒ `TenantId` có thể NULL) — EF **không** sinh được, nên migration
+            // có bước SQL thô sửa lại (xem `Fix_NullableTenantId_UniqueIndexes` làm mẫu).
+            // Tên index đặt TƯỜNG MINH: tên tự sinh dài quá 63 ký tự sẽ bị PostgreSQL **cắt cụt**
+            // (đúng lỗi đã gặp ở `SalMarketplaceOrderIntakes`).
+            b.HasIndex(x => new { x.TenantId, x.Code })
+                .IsUnique()
+                .HasDatabaseName("IX_CatCategories_TenantId_Code");
+
+            // Truy vấn "các con của một nút" (dựng menu từng cấp) và truy vấn cây con theo tiền tố `Path`.
+            b.HasIndex(x => new { x.TenantId, x.ParentId })
+                .HasDatabaseName("IX_CatCategories_TenantId_ParentId");
+
+            b.HasIndex(x => new { x.TenantId, x.Path })
+                .HasDatabaseName("IX_CatCategories_TenantId_Path");
+
+            // 🚨 `Restrict` (`CAT-002` D9): xoá cứng một nút KHÔNG được kéo theo con (Cascade) và cũng
+            // không được để con **mồ côi**. DB chặn ở đây; app service đi đường **xoá mềm**.
+            b.HasOne<Catalog.Category>()
+                .WithMany()
+                .HasForeignKey(x => x.ParentId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // 🚨 Hàng rào cuối cho 2 bất biến mà tầng domain cũng kiểm tra (CAT-002 §8.1 #2 và #3).
+            // ⚠️ Đây là CHECK **định dạng/khoảng**, KHÔNG phải ràng buộc ngữ nghĩa: nó **không** phát hiện
+            // được `Path` không khớp cây thật, và **không** phát hiện được chu trình (§8.1 #1) —
+            // phần ngữ nghĩa phải do `CategoryTreeService` + test lo.
+            b.ToTable(t =>
+            {
+                t.HasCheckConstraint("CK_CatCategories_Path_DinhDang", "\"Path\" LIKE '/%/'");
+                t.HasCheckConstraint("CK_CatCategories_Level_Khoang", "\"Level\" >= 0 AND \"Level\" <= 5");
+            });
+        });
+
         builder.Entity<Inventory.InventoryItem>(b =>
         {
             b.ToTable("InvItems");

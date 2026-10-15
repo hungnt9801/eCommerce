@@ -13,6 +13,10 @@
     <PackageReference Include="Volo.Abp.AuditLogging.Domain" />
     <PackageReference Include="Volo.Abp.BackgroundJobs.Domain" />
     <PackageReference Include="Volo.Abp.Ddd.Domain" />
+    <!-- 🚨 Cần cho `CategoryTreeService` (`CAT-002` D8): thao tác DI CHUYỂN NHÁNH phải giành khoá phân tán
+         theo tenant + kiểm tra chu trình trong cùng transaction. Tiền lệ đã có: `Messaging.Domain`
+         cũng tham chiếu gói này (xem `<PackageReference>` tương ứng trong csproj của nó). -->
+    <PackageReference Include="Volo.Abp.DistributedLocking" />
     <PackageReference Include="Volo.Abp.FeatureManagement.Domain" />
     <PackageReference Include="Volo.Abp.Identity.Domain" />
     <PackageReference Include="Volo.Abp.OpenIddict.Domain" />

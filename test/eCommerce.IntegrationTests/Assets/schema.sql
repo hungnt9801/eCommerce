@@ -1310,3 +1310,48 @@ VALUES ('20261015085029_Cat001_ProductStatus_And_RestrictVariantFk', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE TABLE "CatCategories" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "ParentId" uuid,
+    "Code" character varying(64) NOT NULL,
+    "Name" character varying(256) NOT NULL,
+    "Slug" character varying(256),
+    "Path" character varying(1024) NOT NULL,
+    "Level" integer NOT NULL,
+    "SortOrder" integer NOT NULL,
+    "IsActive" boolean NOT NULL,
+    "MaxVariantCombinations" integer,
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_CatCategories" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_CatCategories_Level_Khoang" CHECK ("Level" >= 0 AND "Level" <= 5),
+    CONSTRAINT "CK_CatCategories_Path_DinhDang" CHECK ("Path" LIKE '/%/'),
+    CONSTRAINT "FK_CatCategories_CatCategories_ParentId" FOREIGN KEY ("ParentId") REFERENCES "CatCategories" ("Id") ON DELETE RESTRICT
+);
+
+CREATE INDEX "IX_CatCategories_ParentId" ON "CatCategories" ("ParentId");
+
+CREATE UNIQUE INDEX "IX_CatCategories_TenantId_Code" ON "CatCategories" ("TenantId", "Code");
+
+CREATE INDEX "IX_CatCategories_TenantId_ParentId" ON "CatCategories" ("TenantId", "ParentId");
+
+CREATE INDEX "IX_CatCategories_TenantId_Path" ON "CatCategories" ("TenantId", "Path");
+
+DROP INDEX "IX_CatCategories_TenantId_Code";
+
+CREATE UNIQUE INDEX "IX_CatCategories_TenantId_Code" ON "CatCategories" ("TenantId", "Code") NULLS NOT DISTINCT;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261015092958_Cat002_CategoryTree', '10.0.11');
+
+COMMIT;
+
