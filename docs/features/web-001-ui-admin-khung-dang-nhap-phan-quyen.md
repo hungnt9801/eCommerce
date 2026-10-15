@@ -2103,3 +2103,41 @@ Bài học §47 (đọc `StatusCode` trần) và §57.3 (regex cắt tại thẻ
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.c | 15/10/2026 | *(agent, session GĐ1)* | 🎯 **Tìm ra GỐC của "Web không lên" (§68 · §79 · §83)**: công cụ `tools/wait-host.ps1` **in log** (đúng việc nó sinh ra để làm) ⇒ log cho thấy **`Now listening on: http://localhost:5100` + `Application started`** ⇒ **Web ĐÃ LÊN**; điểm đo `<Url>/health-status` **là của HOST**, Web **không phục vụ** nó ⇒ phép chờ **hỏi sai câu hỏi** ⇒ **hết hạn ở mọi lần chạy**. ⇒ Sửa lại **kết luận SAI** đã ghi ở §68/§79. **Bài học #14**: *kiểm ĐIỂM ĐO có tồn tại trước khi tin nó; phép chờ hết hạn ở MỌI lần chạy là dấu hiệu nghi ngờ ĐIỂM ĐO*. Đề xuất **(a)** thêm `/health-status` cho Web để **thống nhất một điểm đo** |
+
+---
+
+## 71. ✅ **ĐÃ SỬA GỐC §70: `/health-status` CHO WEB — ĐIỂM ĐO THỐNG NHẤT** (15/10/2026)
+
+### 71.1 Đã làm
+
+Thêm `HealthStatusController` (`GET /health-status` ⇒ **`200`** + `{"status":"Healthy"}`) vào **Web**:
+- `[AllowAnonymous]` — probe phải kiểm được **trước khi đăng nhập** (nếu cần đăng nhập thì **không** dùng làm điểm chờ được);
+- 🔒 **`XC-005` BR-012**: **KHÔNG** đọc DB, **KHÔNG** trả chi tiết lỗi (không tên bảng/chuỗi kết nối/stack) — chỉ nói
+  *"tiến trình còn sống và phục vụ được HTTP"*, đúng mức cần cho phép chờ;
+- 📌 Vì sao chọn **(a) một điểm đo cho mọi tiến trình** thay vì **(b) cho công cụ nhận `-Path`**: `/health-status`
+  **đã** là chuẩn của Host ⇒ **nhất quán** rẻ hơn **ký ức của người viết probe** (mỗi điểm đo khác nhau là một chỗ để quên).
+
+### 71.2 ✅ BẰNG CHỨNG — **cùng MỘT lệnh, kết quả đảo chiều**
+
+| Phép đo | **TRƯỚC** vòng 84 | **SAU** vòng 84 |
+|---|---|---|
+| `tools/wait-host.ps1 -Url http://localhost:5100 …` | 🚨 **`exit 1`** — hết hạn **90s**, **mọi lần chạy** | ✅ **`exit 0`** · **`✅ LÊN sau 2.5s — http://localhost:5100/health-status = 200`** |
+| `GET /health-status` (Web) | **`404`** (điểm đo **không tồn tại**) | **`200`** · `{"status":"Healthy"}` ✅ |
+| `fail:` trong log Web · tiến trình treo | — | **`0`** ✅ · **`0`** ✅ |
+| build `--no-incremental` | — | **0 lỗi / 0 cảnh báo** ✅ |
+
+📌 **Vì sao cặp số này là bằng chứng đủ mạnh:** nó là **cùng một lệnh, cùng một tiến trình, cùng một máy** — chỉ **điểm đo** đổi
+(404 → 200) ⇒ **nhân quả rõ ràng**, không phải *"hình như đã hết lỗi"*. 📌 Và nó **đóng vòng** cho §70: *"phép chờ hết hạn ở
+**mọi lần chạy** là dấu hiệu nghi ngờ **ĐIỂM ĐO**"* — nay đã **sửa đúng chỗ đó**.
+
+### 71.3 Hệ quả cho các probe sau
+
+Từ nay `ChoHost 'http://localhost:5100'` (hoặc `tools/wait-host.ps1`) **chạy đúng cho cả Host lẫn Web** ⇒
+**hai vòng** bị chặn vì lý do này (79 · 83) **không còn tái diễn**, và **nợ của vòng 83** (đo **ca biên** của bộ tách giỏ)
+nay **chỉ còn là việc chạy lại probe**.
+
+### 71.4 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.b | 15/10/2026 | *(agent, session GĐ1)* | ✅ **Sửa gốc §70**: thêm **`GET /health-status` cho Web** (`HealthStatusController`, `[AllowAnonymous]`, không đọc DB, không lộ chi tiết — `XC-005` BR-012) ⇒ **điểm đo thống nhất** cho mọi tiến trình. **Kiểm chứng**: **cùng một lệnh** `tools/wait-host.ps1` chờ Web đảo từ **`exit 1`** (hết hạn 90s, mọi lần) sang **`exit 0`** (*"LÊN sau 2.5s"*); endpoint trả `200` + `{"status":"Healthy"}` (trước đó **`404`**); build `0/0`; `fail: 0`; 0 tiến trình treo |
