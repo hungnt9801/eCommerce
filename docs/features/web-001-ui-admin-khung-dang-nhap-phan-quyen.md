@@ -1707,3 +1707,49 @@ khác nhau ⇒ nó **phân biệt được**: (a) lấy sai giá của một dò
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.k | 15/10/2026 | *(agent, session GĐ1)* | 🎉 **GIỎ NHIỀU DÒNG**: `Sku` nhận `SKU:SL,SKU:SL` (**tương thích ngược**), **gộp SKU trùng** (tránh phá unique của kho), logic tách riêng ở `GioHelper.PhanTichGio`. **Kiểm chứng** với số **tính trước**: `A:2,B:3` (`100.000`/`200.000`) ⇒ **`HTTP 200`**, **`GrandTotal=880000`**, **2 dòng đơn**, **`Reserved` A=2 · B=3**, **`Available` A=8 · B=7**, **sổ cái** 4 bút toán, **sổ giải trình `880000` khớp**, dọn sạch, **`fail: 0`**, 0 tiến trình treo |
+
+---
+
+## 63. ✅ **CA RỖNG CỦA `/SanPham` VÀ `/DatHang` ĐÃ KIỂM CHỨNG** (15/10/2026)
+
+### 63.1 Nguyên tắc của phép đo — **ĐO ĐIỀU KIỆN TIÊN QUYẾT TRƯỚC**
+
+Ca rỗng **chỉ có nghĩa** khi dữ liệu **thật sự** rỗng. Nếu DB còn dữ liệu thì *"không thấy khối rỗng"* **không** nói lên
+điều gì về mã. ⇒ Probe **in trạng thái DB TRƯỚC khi đo**:
+
+```
+[DB TRUOC DO: bangGia=0 dongGia=0 kho=0 khoHoatDong=0 don=0]
+```
+⇒ **điều kiện tiên quyết ĐẠT** ⇒ phép đo **có ý nghĩa** ✅
+
+📌 **Vì sao đây là kỷ luật, không phải chi tiết:** đây **đúng** bài học đã trả giá ở `inv-001` §39 (`42703` làm cặp đối chứng
+cũng thành *"lệch"* ⇒ kết luận **sai** vì **không** kiểm dữ liệu gieo). Ở đây **không** gieo dữ liệu — nên phải kiểm
+**sự VẮNG MẶT** của dữ liệu. **Cùng một kỷ luật, hai chiều.**
+
+### 63.2 ✅ Kết quả
+
+| # | Trang | Phép đo | Kết quả |
+|---|---|---|---|
+| 1 | **`/SanPham`** | `HTTP` · khối rỗng · có bảng? | **`200`** · **khối `id="trong"` HIỆN** ✅ · **KHÔNG** có bảng ✅ |
+| 2 | `/SanPham` — **nội dung** khối rỗng | *"Chưa có hàng nào được niêm yết giá. Chưa có danh sách giá nào có dòng SKU, hoặc chưa có danh sách giá nào được tạo."* ✅ (nói **rõ vì sao** rỗng — không phải trang trắng) |
+| 3 | **`/DatHang`** | `HTTP` · khối rỗng · có form? | **`200`** · **khối `id="trong"` HIỆN** ✅ · **KHÔNG** có form ✅ |
+| 4 | Diễn giải `/DatHang` | *không có kho hoạt động ⇒ **ca rỗng đúng như thiết kế*** ✅ |
+| 5 | Khôi phục cờ bảo mật · `fail:` · tiến trình treo | `baoMat=true` ✅ · **Web `0`** ✅ · **`0`** ✅ |
+
+### 63.3 🏁 **CẢ BA TRANG MẶT TIỀN NAY ĐÃ KIỂM CHỨNG CẢ HAI CHIỀU**
+
+| Trang | **CA RỖNG** | **CA CÓ DỮ LIỆU** | **Đối chứng chéo API** |
+|---|---|---|---|
+| `/PhanBo` | ✅ §50 | ✅ §51 (khớp API **từng dòng**, gồm `kho.id`) | ✅ (API `phan-bo-theo-kenh`) |
+| `/SanPham` | ✅ **§63** | ✅ §52 | ✅ §54 (API `price-list/items`) |
+| `/DatHang` | ✅ **§63** | ✅ §56 · §61 · §62 (1 SKU & **nhiều dòng**) | ✅ (DB + tồn kho + sổ cái + **sổ giải trình**) |
+
+📌 **Vì sao "cả hai chiều" quan trọng:** một trang **chỉ** đúng khi có dữ liệu là trang **chưa** kiểm chứng — lỗi thường gặp
+nhất là **trang trắng / vỡ layout** khi rỗng (đúng lúc khách mới vào, chưa có gì để xem). Ba trang nay đều **nói rõ**
+vì sao rỗng **thay vì** im lặng.
+
+### 63.4 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.j | 15/10/2026 | *(agent, session GĐ1)* | ✅ **Kiểm chứng CA RỖNG của `/SanPham` và `/DatHang`**, kèm **đo điều kiện tiên quyết** (`bangGia=0 dongGia=0 kho=0 khoHoatDong=0 don=0`) để phép đo **có nghĩa**; cả hai trang hiện **khối rỗng nói rõ lý do**, **không** hiện bảng/form. ⇒ **CẢ BA trang mặt tiền (`/PhanBo` · `/SanPham` · `/DatHang`) nay đã kiểm chứng CẢ HAI CHIỀU** (rỗng + có dữ liệu + đối chứng chéo API/DB) |
