@@ -68,6 +68,15 @@ public class PriceListItem : FullAuditedAggregateRoot<Guid>, IMultiTenant
                 .WithData("amount", amount.Amount);
         }
 
+        // 🚨🚨 **PHẢI GÁN `PriceListId`** — phiên bản đầu CHỈ KIỂM TRA rồi **QUÊN GÁN** ⇒ mọi dòng giá
+        // được ghi với `PriceListId = Guid.Empty` (đã bắt thật 15/10/2026: EF gửi
+        // `Key (PriceListId)=(00000000-…-000000000000)` ⇒ vi phạm FK `23503`).
+        // 📌 Nếu DB **không** có FK thì đây là lỗi **hỏng dữ liệu IM LẶNG**: dòng giá không thuộc bảng giá nào
+        // ⇒ tra giá **không bao giờ** thấy nó ⇒ "SKU thiếu giá" mà không ai hiểu vì sao.
+        // ⇒ Hàng rào FK ở DB đã biến một lỗi im lặng thành lỗi **ồn ào**. Kiểm tra mà **không gán** thì
+        //   kiểm tra **không có giá trị gì**.
+        PriceListId = priceListId;
+
         Sku = sku.Trim();
         AmountValue = amount.Amount;
         CurrencyCode = amount.Currency.Code;

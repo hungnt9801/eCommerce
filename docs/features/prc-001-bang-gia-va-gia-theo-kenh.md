@@ -988,3 +988,75 @@ khoá **lọt** ⇒ **bán sai giá**. Đã `DROP` + `CREATE … NULLS NOT DISTI
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.2 | 15/10/2026 | *(agent, session GĐ1)* | **Lát cắt 1**: dựng **module `Pricing`** + `PriceList` (máy trạng thái + append-only) + `PriceListItem` + `ChannelPrice` + **`GiaCoSoResolver` (hàm THUẦN, 4 cấp cố định, NÉM khi cùng cấp+cùng priority)** + lọc bậc số lượng + chính sách thiếu giá + mã lỗi/khoá của module + migration với **3 unique index `NULLS NOT DISTINCT`** (sửa tay). **+23 unit**, **mutation test** xác nhận luật chặn được test canh. Ghi **3 sai lệch doc/code** (N1 `ToMinorUnits` không tồn tại · N2 không map thẳng được `Money` · N3 mâu thuẫn tiền tố khoá). Còn lại: **§16.4** |
+
+---
+
+## 17. TRẠNG THÁI TRIỂN KHAI — **LÁT CẮT 2: API BẢNG GIÁ + BỘ TRA GIÁ** (15/10/2026)
+
+### 17.1 Đã làm
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| 1 | **2 project Application** | `eCommerce.Pricing.Application.Contracts` (DTO + interface) + `eCommerce.Pricing.Application` (hiện thực); Host **tự** mở endpoint qua `ConventionalControllers` (quét mọi assembly `eCommerce*.Application` — bài học **C16**) |
+| 2 | `PriceListAppService` | `GetListAsync` · `GetAsync` · `CreateAsync` · `GetItemsAsync` · `AddItemAsync` · `PublishAsync` · `ActivateAsync` — **mọi** thao tác ghi gọi `YeuCauChoPhepSuaNoiDung()` trước (**append-only** BR-004) |
+| 3 | **`PriceResolverAppService`** | **Nạp ứng viên 4 cấp từ DB** rồi giao **toàn bộ luật** cho `GiaCoSoResolver` (hàm **thuần**) — `PRC-002` **ADR-04**. Đọc đồng hồ **ở tầng app** (`Clock.Now`), **không** trong hàm thuần. Có `ResolveManyAsync` cho giỏ nhiều dòng |
+| 4 | **Permission do MODULE sở hữu** | `PricingPermissions` trong module (tiền lệ `ChannelHubConsts`); `app → module` **được phép** ⇒ provider tham chiếu hằng số của module. **KHÔNG** khai lại ở `eCommerceConsts` (tránh **hai nguồn sự thật** — lỗi `XC-003` F2) |
+| 5 | 🛡️ **Test bất biến 2 chiều được TỔNG QUÁT HOÁ** | `BatBienPhanQuyenTests.HangSoPermission()` nay quét **cả** `eCommerceConsts.Permissions` **và** mọi lớp `*Permissions` do module sở hữu ⇒ module thêm sau **tự động** được canh, không phải sửa test (và **không** cám dỗ chép hằng số về tầng app) |
+
+### 17.2 🚨 HAI LỖI THẬT **DO CHÍNH TÔI GÂY RA**, ĐƯỢC KIỂM CHỨNG BẮT
+
+**L1 — guard "phát hành phải có ≥ 1 dòng" đọc **trạng thái KHÔNG được lưu** (sửa ở lát cắt này):**
+phiên bản đầu lưu `SoDong` **trên entity** nhưng **`Ignore` khi map** ⇒ sau khi nạp lại từ DB nó **luôn = 0**
+⇒ **mọi lần publish đều thất bại** — mà nhìn như "đúng luật".
+⇒ Đã sửa: `PhatHanh(int soDongThucTe)` — **số dòng do tầng service đọc từ DB** truyền vào (giống cách
+`Product.Publish(int)` đã làm). 📌 **Bài học:** *guard đọc trạng thái không được lưu thì **đảo chiều im lặng**
+sau một lần nạp lại.*
+
+**L2 — constructor chỉ **KIỂM TRA** mà **QUÊN GÁN** `PriceListId`:**
+`POST /api/app/price-list/item/{id}` trả **500**; lấy **chi tiết lỗi PostgreSQL** (bật `Include Error Detail=true`)
+thì ra: `Key (PriceListId)=(00000000-…-000000000000) is not present in table "PrcPriceLists"`.
+Log chẩn đoán xác nhận: `route` **đúng**, `bg.Id` **đúng**, nhưng **`dong.PriceListId = Guid.Empty`**.
+⇒ Đã sửa: gán `PriceListId = priceListId;`.
+📌 **Bài học:** *kiểm tra mà **không gán** thì kiểm tra **không có giá trị gì**.*
+📌 **Và:** **hàng rào FK ở DB đã biến một lỗi HỎNG DỮ LIỆU IM LẶNG thành lỗi ỒN ÀO** — nếu không có FK thì
+mọi dòng giá nằm ngoài mọi bảng giá, **tra giá không bao giờ thấy**, và triệu chứng duy nhất là
+*"SKU thiếu giá"* mà không ai hiểu vì sao. Đây là **bằng chứng thực tế** cho nguyên tắc *"ràng buộc DB là
+hàng rào cuối"*.
+
+### 17.3 ✅ BẰNG CHỨNG HTTP THẬT (Host + PostgreSQL 17) — 12 phép đo
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | Tạo bảng giá (`Scope=All`, VND) + thêm dòng `100000` | `200` ×2 |
+| 2 | **Phát hành** | `200` · status **`Approved`** · **`itemCount = 1`** |
+| 3 | **Kích hoạt** tại `2026-06-01` | `200` · status **`Active`** |
+| 4 | **Sửa dòng giá khi bảng giá ĐANG `Active`** | **`eCommerce:Pricing:0003`** ✅ (append-only, BR-004) |
+| 5 | **Tra giá — chỉ có bảng giá** | `100000` · cấp **`BangGia`** · nguồn `PriceList:PRCBG-…#PRCSKU-…` ✅ |
+| 6 | Thêm `ChannelPrice` **chỉ kênh** | `90000` · cấp **`GiaTheoKenh`** ✅ (**cấp 2 thắng cấp 3**) |
+| 7 | Thêm `ChannelPrice` **theo shop** | `80000` · cấp **`GiaTheoShop`** ✅ (**cấp 1 thắng cấp 2**) |
+| 8 | Tra giá **không** truyền `channelShopId` | `90000` · `GiaTheoKenh` ✅ (không "dính" giá của shop) |
+| 9 | SKU **không có giá** nào | **`eCommerce:Pricing:0004`** ✅ (kèm `sku`/`channelCode`/`at`) |
+| 10 | **Hai ứng viên cùng cấp + cùng `Priority`** | **`eCommerce:Pricing:0001`** ✅ (A2 — không chọn tuỳ tiện) |
+| 11 | Log Host | **0 dòng `fail:`** |
+| 12 | DB thật | bảng giá `Active` (`Status=2`) · dòng giá `100000.0000 / VND` · 3 giá theo kênh |
+
+- build `--no-incremental`: **0 lỗi / 0 cảnh báo** · unit **531/531** · integration **32/32** · mermaid 197/0
+- **Permission mới đã seed**: `eCommerce.Pricing` + `eCommerce.Pricing.Manage` (2 grant) — ⚠️ **bài học lượt 5**:
+  thêm permission ⇒ **phải chạy lại DbMigrator**, nếu không admin bị **403 im lặng**.
+
+### 17.4 Còn lại của `PRC-001`
+
+| # | Việc | Ghi chú |
+|---|---|---|
+| 1 | **Cấp 4 — giá niêm yết** | Pricing **không** đọc Catalog (§15.1 Q1) ⇒ giá niêm yết **phải do bên gọi truyền vào**; DTO hiện **chưa có** tham số đó ⇒ cấp 4 **chưa có ứng viên**. 📌 **Cấm tự bịa** giá niêm yết (bịa = bán sai giá mà không ai biết) |
+| 2 | **Chính sách thiếu giá cấu hình được** (`MissingPricePolicy` — D14) | hiện **cứng `NemLoi`**; cần Setting |
+| 3 | **Bất biến BR-007** *"chỉ MỘT bảng giá `Active` cho mỗi `(tenant, scope, kênh)`"* | **không có hàng rào DB** (D8/F2) ⇒ cần **khoá phân tán** (`PricingLockKeys` đã có) + kiểm trong transaction |
+| 4 | Import hàng loạt + idempotency (D11/`0006`) | phụ thuộc `XC-002` |
+| 5 | `CostPrice` (BR-013: **cấm** lộ ra storefront) · job theo ngày (ADR-10) · `RowVersion` (D9/`0007`) · audit (BR-014) | |
+| 6 | **N+1**: `ResolveManyAsync` hiện lặp từng dòng (mỗi dòng vài truy vấn) | NFR-002 yêu cầu **≤ 4 truy vấn/lần resolve** ⇒ cần nạp theo lô |
+
+### 17.5 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.3 | 15/10/2026 | *(agent, session GĐ1)* | **Lát cắt 2 — API bảng giá + bộ tra giá**: 2 project Application, 7 route bảng giá + 2 route tra giá; **kiểm chứng HTTP 12 phép đo** (4 cấp `Shop > Kênh > Bảng giá > Niêm yết` · append-only `0003` · thiếu giá `0004` · xung đột cùng cấp `0001` · **0 `fail:`**). 🚨 **Sửa 2 lỗi thật do chính tôi gây ra** — guard đọc trạng thái **không được lưu** (§17.2 **L1**) và constructor **kiểm tra mà quên gán** `PriceListId` (§17.2 **L2**, FK ở DB đã biến lỗi im lặng thành ồn ào). **Tổng quát hoá** test bất biến permission cho hằng số **do module sở hữu**. Ghi rõ phần còn lại (§17.4) |

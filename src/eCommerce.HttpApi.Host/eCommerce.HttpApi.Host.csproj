@@ -12,6 +12,7 @@
     <ProjectReference Include="..\..\modules\Address\eCommerce.Address.Application\eCommerce.Address.Application.csproj" />
     <ProjectReference Include="..\..\modules\EInvoice\eCommerce.EInvoice.Application\eCommerce.EInvoice.Application.csproj" />
     <ProjectReference Include="..\..\modules\Signing\eCommerce.Signing.Application\eCommerce.Signing.Application.csproj" />
+    <ProjectReference Include="..\..\modules\Pricing\eCommerce.Pricing.Application\eCommerce.Pricing.Application.csproj" />
     <ProjectReference Include="..\..\modules\ChannelHub\eCommerce.ChannelHub.Application\eCommerce.ChannelHub.Application.csproj" />
     <ProjectReference Include="..\..\modules\PaymentHub\eCommerce.PaymentHub.Application\eCommerce.PaymentHub.Application.csproj" />
     <ProjectReference Include="..\..\modules\Tax\eCommerce.Tax.EntityFrameworkCore\eCommerce.Tax.EntityFrameworkCore.csproj" />

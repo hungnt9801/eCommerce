@@ -44,6 +44,7 @@ public static class eCommerceConsts
             public const string Delete = Default + ".Delete";
         }
 
+        /// <summary>
         /// <summary>Quyền của **định nghĩa thuộc tính** (`CAT-002` §9.2) — gồm cả sinh tổ hợp biến thể.</summary>
         public static class CatalogAttributes
         {

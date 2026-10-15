@@ -74,9 +74,6 @@ public class PriceList : FullAuditedAggregateRoot<Guid>, IMultiTenant
 
     public PriceListStatus Status { get; protected set; } = PriceListStatus.Draft;
 
-    /// <summary>Đếm số dòng đã thêm (để guard "phát hành thiếu dòng" mà không cần nạp cả collection).</summary>
-    public int SoDong { get; protected set; }
-
     protected PriceList() { }
 
     public PriceList(
@@ -141,18 +138,13 @@ public class PriceList : FullAuditedAggregateRoot<Guid>, IMultiTenant
     public bool CoHieuLucTai(DateTime at)
         => at >= EffectiveFrom && (EffectiveTo is null || at <= EffectiveTo.Value);
 
-    /// <summary>Ghi nhận thêm một dòng (guard "phát hành thiếu dòng" dựa vào số này).</summary>
-    public void TangSoDong() => SoDong++;
-
-    public void GiamSoDong() => SoDong = SoDong > 0 ? SoDong - 1 : 0;
-
     /// <summary>
     /// `Draft → Approved`. **NÉM** khi: không ở `Draft`, hoặc **chưa có dòng nào** (`PRC-001` E1).
     /// 📌 Cố ý **không** cho "phát hành bảng giá rỗng": bảng giá rỗng vẫn `Active` được ⇒ mọi SKU **thiếu giá**
     /// ở cấp 3 ⇒ tuỳ `MissingPricePolicy` mà **ném lỗi ở checkout** hoặc **bán giá niêm yết** — cả hai đều
     /// là hậu quả của một thao tác trông "thành công".
     /// </summary>
-    public void PhatHanh()
+    public void PhatHanh(int soDongThucTe)
     {
         if (Status != PriceListStatus.Draft)
         {
@@ -161,7 +153,11 @@ public class PriceList : FullAuditedAggregateRoot<Guid>, IMultiTenant
                 .WithData("status", Status.ToString());
         }
 
-        if (SoDong <= 0)
+        // 🚨 Số dòng được TRUYỀN VÀO (đọc từ DB ở tầng service), **KHÔNG** đọc từ thuộc tính trên entity.
+        // LÝ DO (lỗi thật phát hiện 15/10/2026): phiên bản đầu lưu `SoDong` trên entity nhưng **không map**
+        // (`Ignore`) ⇒ sau khi nạp lại từ DB nó **luôn = 0** ⇒ guard "phải có ≥ 1 dòng" khiến **mọi lần publish
+        // đều thất bại** — mà nhìn như "đúng luật". Truyền số dòng từ nguồn sự thật (DB) là cách duy nhất đúng.
+        if (soDongThucTe <= 0)
         {
             throw new BusinessException(PricingErrorCodes.BangGiaThieuDong)
                 .WithData("lyDo", "Bảng giá CHƯA CÓ DÒNG nào ⇒ không phát hành được.")

@@ -213,7 +213,7 @@ public class PriceListTests
         // Bảng giá rỗng vẫn `Active` được ⇒ mọi SKU thiếu giá ở cấp 3 ⇒ hậu quả ở checkout.
         var bg = Tao();
 
-        var loi = Assert.Throws<BusinessException>(() => bg.PhatHanh());
+        var loi = Assert.Throws<BusinessException>(() => bg.PhatHanh(0));
 
         Assert.Equal(PricingErrorCodes.BangGiaThieuDong, loi.Code);
     }
@@ -222,9 +222,7 @@ public class PriceListTests
     public void PhatHanh_roi_KichHoat_hop_le()
     {
         var bg = Tao();
-        bg.TangSoDong();
-
-        bg.PhatHanh();
+        bg.PhatHanh(3);
         Assert.Equal(PriceListStatus.Approved, bg.Status);
 
         Assert.True(bg.KichHoatNeuToiNgay(new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc)));
@@ -236,8 +234,7 @@ public class PriceListTests
     {
         // "Chưa tới ngày" KHÔNG phải vi phạm guard ⇒ trả `false` (tiền lệ `ActivateIfDue` của TaxClassification).
         var bg = Tao();
-        bg.TangSoDong();
-        bg.PhatHanh();
+        bg.PhatHanh(2);
 
         Assert.False(bg.KichHoatNeuToiNgay(new DateTime(2025, 12, 31, 0, 0, 0, DateTimeKind.Utc)));
         Assert.Equal(PriceListStatus.Approved, bg.Status);
@@ -247,7 +244,7 @@ public class PriceListTests
     public void KichHoat_khi_dang_Draft_thi_NEM_LOI()
     {
         var bg = Tao();
-        bg.TangSoDong();
+
 
         Assert.Throws<BusinessException>(
             () => bg.KichHoatNeuToiNgay(new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc)));
@@ -258,8 +255,7 @@ public class PriceListTests
     {
         var den = new DateTime(2026, 6, 30, 0, 0, 0, DateTimeKind.Utc);
         var bg = Tao(den: den);
-        bg.TangSoDong();
-        bg.PhatHanh();
+        bg.PhatHanh(1);
         bg.KichHoatNeuToiNgay(new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc));
 
         Assert.False(bg.HetHanNeuQuaNgay(den));   // đúng ngày cuối ⇒ CHƯA hết hạn
@@ -272,8 +268,7 @@ public class PriceListTests
     {
         // 🚨 Append-only: sửa giá trong bảng đang hiệu lực ⇒ đơn/báo cáo CŨ trỏ tới con số đã biến mất.
         var bg = Tao();
-        bg.TangSoDong();
-        bg.PhatHanh();
+        bg.PhatHanh(2);
         bg.KichHoatNeuToiNgay(new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc));
 
         var loi = Assert.Throws<BusinessException>(() => bg.YeuCauChoPhepSuaNoiDung());
@@ -289,8 +284,7 @@ public class PriceListTests
         Assert.Equal(PriceListStatus.Cancelled, draft.Status);
 
         var active = Tao();
-        active.TangSoDong();
-        active.PhatHanh();
+        active.PhatHanh(1);
         active.KichHoatNeuToiNgay(new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc));
 
         Assert.Throws<BusinessException>(() => active.Huy());

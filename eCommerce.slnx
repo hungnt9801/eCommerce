@@ -26,6 +26,8 @@
     <Project Path="modules/PaymentHub/eCommerce.PaymentHub.EntityFrameworkCore/eCommerce.PaymentHub.EntityFrameworkCore.csproj" />
   </Folder>
   <Folder Name="/modules/Pricing/">
+    <Project Path="modules/Pricing/eCommerce.Pricing.Application/eCommerce.Pricing.Application.csproj" />
+    <Project Path="modules/Pricing/eCommerce.Pricing.Application.Contracts/eCommerce.Pricing.Application.Contracts.csproj" />
     <Project Path="modules/Pricing/eCommerce.Pricing.Domain/eCommerce.Pricing.Domain.csproj" />
     <Project Path="modules/Pricing/eCommerce.Pricing.EntityFrameworkCore/eCommerce.Pricing.EntityFrameworkCore.csproj" />
   </Folder>

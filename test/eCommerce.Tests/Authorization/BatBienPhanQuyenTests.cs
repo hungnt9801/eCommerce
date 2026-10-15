@@ -115,16 +115,56 @@ public class BatBienPhanQuyenTests
         }
     }
 
-    /// <summary>Mọi hằng số permission khai trong `eCommerceConsts.Permissions`.</summary>
+    /// <summary>
+    /// Mọi hằng số permission của hệ thống — gồm **`eCommerceConsts.Permissions`** (hằng số tầng app)
+    /// **VÀ** các lớp `*Permissions` do **module tự sở hữu** (ví dụ `eCommerce.Pricing.PricingPermissions`).
+    ///
+    /// 🚨 **VÌ SAO PHẢI QUÉT CẢ MODULE (15/10/2026):** quy ước dự án là *"module sở hữu hằng số của mình"*
+    /// (tiền lệ `ChannelHubConsts`) ⇒ nếu hàm này **chỉ** quét `eCommerceConsts.Permissions` thì mọi permission
+    /// mới của module sẽ làm test `TC02b` **ĐỎ** — và cách "sửa" sai là **chép hằng số về `eCommerceConsts`**,
+    /// tức là **tạo hai nguồn sự thật** cho cùng một tên permission (đúng họ lỗi `XC-003` F2 đã gặp).
+    /// ⇒ Quét **tổng quát**: mọi lớp `public static` tên `*Permissions` trong namespace `eCommerce.*`
+    /// của các assembly đã nạp ⇒ module thêm sau này **tự động** được canh, không phải sửa test.
+    /// </summary>
     private static IReadOnlyList<string> HangSoPermission()
-        => typeof(eCommerceConsts.Permissions)
+    {
+        var tuConsts = typeof(eCommerceConsts.Permissions)
             .GetNestedTypes(BindingFlags.Public)
             .SelectMany(t => t.GetFields(BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy))
             .Where(f => f is { IsLiteral: true, IsInitOnly: false } && f.FieldType == typeof(string))
+            .Select(f => (string)f.GetRawConstantValue()!);
+
+        var tuModule = AppDomain.CurrentDomain.GetAssemblies()
+            .Where(a => !a.IsDynamic)
+            .Where(a => a.GetName().Name is { } ten && ten.StartsWith("eCommerce", StringComparison.Ordinal))
+            .SelectMany(a =>
+            {
+                try
+                {
+                    return a.GetTypes();
+                }
+                catch (System.Reflection.ReflectionTypeLoadException ex)
+                {
+                    // `ex.Types` là `Type?[]` ⇒ dùng `OfType<Type>()` để LỌC null tường minh
+                    // (dùng `.Where(t => t is not null)!` vẫn để lại cảnh báo nullable ⇒ vi phạm "0 cảnh báo").
+                    return ex.Types.OfType<Type>();
+                }
+            })
+            .Where(t => t is { IsClass: true, IsAbstract: true, IsSealed: true })
+            .Where(t => t.Name.EndsWith("Permissions", StringComparison.Ordinal))
+            .Where(t => t.Namespace is not null && t.Namespace.StartsWith("eCommerce", StringComparison.Ordinal))
+            .SelectMany(t => t.GetFields(BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy))
+            .Where(f => f is { IsLiteral: true, IsInitOnly: false } && f.FieldType == typeof(string))
             .Select(f => (string)f.GetRawConstantValue()!)
+            // Chỉ nhận giá trị TRÔNG NHƯ tên permission (`eCommerce.…`) — lớp `*Permissions` có thể chứa
+            // hằng số khác (ví dụ tên nhóm) và ta không muốn chúng lọt vào bất biến 2 chiều.
+            .Where(v => v.StartsWith(eCommerceConsts.Permissions.GroupName + ".", StringComparison.Ordinal));
+
+        return tuConsts.Concat(tuModule)
             .Distinct(StringComparer.Ordinal)
             .OrderBy(x => x, StringComparer.Ordinal)
             .ToList();
+    }
 
     [Fact]
     public void Pham_vi_quet_phai_DU_va_khong_duoc_thu_hep_im_lang()

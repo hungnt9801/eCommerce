@@ -26,7 +26,7 @@
 > **và** nơi nhận thật) · **`F-403` đã sửa** · **§7.0 xong #2/#5/#7** · **DB: 20 index `NULLS NOT DISTINCT`**
 > · **`CAT-001` xong** (domain + 11 route API + 2 ETO) · 🚨 **log khởi động nay 0 Error** (phân loại
 > *ETO mang dữ liệu* vs *ETO thông báo* — `coding-conventions.md` **§6.2**) · **mã lỗi Catalog đã chốt
-> sổ đăng ký** (`CAT-001` **§19**) · **`CAT-002` lát cắt 1: CÂY DANH MỤC XONG** (entity + `CategoryTreeService` chống chu trình + hàng rào DB · **lát cắt 2: API cây danh mục** + **lát cắt 3: liên kết sản phẩm↔danh mục** + **lát cắt 4: THUỘC TÍNH + SINH TỔ HỢP BIẾN THỂ** + **lát cắt 5: BR-012 (biến thể mồ côi) + guard `0023`** XONG (kiểm chứng HTTP thật); `cat-002-…md` **§16–§20**) · 🟡 **`PRC-001` lát cắt 1 XONG** (module `Pricing` + giá cơ sở **4 cấp** hàm thuần; `prc-001-…md` **§16**).
+> sổ đăng ký** (`CAT-001` **§19**) · **`CAT-002` lát cắt 1: CÂY DANH MỤC XONG** (entity + `CategoryTreeService` chống chu trình + hàng rào DB · **lát cắt 2: API cây danh mục** + **lát cắt 3: liên kết sản phẩm↔danh mục** + **lát cắt 4: THUỘC TÍNH + SINH TỔ HỢP BIẾN THỂ** + **lát cắt 5: BR-012 (biến thể mồ côi) + guard `0023`** XONG (kiểm chứng HTTP thật); `cat-002-…md` **§16–§20**) · ✅ **`PRC-001` lát cắt 1+2 XONG** (module `Pricing` + giá cơ sở **4 cấp** hàm thuần + **API bảng giá & bộ tra giá, kiểm chứng HTTP thật**; `prc-001-…md` **§16–§17**).
 > Chi tiết: `implementation-plan.md` **A.12** · `runtime-verification-report.md` **§9bis/§10** ·
 > `chn-002-connector-shopee.md` **§16** · `XC-004-…md` **§15.2 F6/§15.6** · `web-001-…md` **§16** ·
 > `sal-005-webhook-don-tu-san.md` **§16** · `cat-001-…md` **§16–§18**.

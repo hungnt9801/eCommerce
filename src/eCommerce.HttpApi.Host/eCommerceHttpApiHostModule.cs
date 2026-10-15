@@ -59,7 +59,8 @@ namespace eCommerce;
     typeof(eCommerce.Kernel.eCommerceKernelModule),
     typeof(Address.Application.AddressApplicationModule),
     typeof(EInvoice.Application.EInvoiceApplicationModule),
-    typeof(Signing.Application.SigningApplicationModule)
+    typeof(Signing.Application.SigningApplicationModule),
+    typeof(Pricing.PricingApplicationModule)
 )]
 public class eCommerceHttpApiHostModule : AbpModule
 {

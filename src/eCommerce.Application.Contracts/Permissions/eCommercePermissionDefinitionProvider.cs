@@ -46,6 +46,12 @@ public class eCommercePermissionDefinitionProvider : PermissionDefinitionProvide
         var catalogAttributes = group.AddPermission(eCommerceConsts.Permissions.CatalogAttributes.Default);
         catalogAttributes.AddChild(eCommerceConsts.Permissions.CatalogAttributes.Manage);
 
+        // ---- Pricing (`PRC-001` §9) ----
+        // 🚨 BẮT BUỘC khai ở CẢ HAI NƠI (hằng số + provider) — thiếu một nơi ⇒ 403 cho MỌI người kể cả admin.
+        // 📌 Hằng số do **MODULE** Pricing sở hữu (`PricingPermissions`) — `app → module` ĐƯỢC PHÉP.
+        var pricing = group.AddPermission(eCommerce.Pricing.PricingPermissions.Default);
+        pricing.AddChild(eCommerce.Pricing.PricingPermissions.Manage);
+
         // ---- Kho ----
         var inventory = group.AddPermission(eCommerceConsts.Permissions.Inventory.Default);
         inventory.AddChild(eCommerceConsts.Permissions.Inventory.Adjust);

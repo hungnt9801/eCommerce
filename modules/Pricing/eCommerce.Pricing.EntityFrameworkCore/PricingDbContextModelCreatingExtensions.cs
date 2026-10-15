@@ -35,7 +35,6 @@ public static class PricingDbContextModelCreatingExtensions
             // Tiền tệ lưu bằng **mã ISO** (`VND`) — cột có thật, KHÔNG suy ra từ nơi khác (BR-001).
             b.Property(x => x.Currency).HasConversion(c => c.Code, s => CurrencyTuMa(s)).IsRequired().HasMaxLength(8);
 
-            b.Ignore(x => x.SoDong);
 
             // `PRC-001` **D8**: chống chồng khung Ở TẦNG ỨNG DỤNG + unique `(TenantId, Code, EffectiveFrom)`;
             // **cố ý KHÔNG** dùng `EXCLUDE USING gist` (nó chỉ chặn được chồng khung **trong cùng `Code`** —

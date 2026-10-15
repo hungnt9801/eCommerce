@@ -7,6 +7,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\eCommerce.Domain.Shared\eCommerce.Domain.Shared.csproj" />
+    <!-- 📌 `app → module` ĐƯỢC PHÉP (quy ước dự án): cần để PermissionDefinitionProvider đọc hằng số
+         permission do MODULE Pricing sở hữu (`PricingPermissions`) — tránh hai nguồn sự thật. -->
+    <ProjectReference Include="..\..\modules\Pricing\eCommerce.Pricing.Application.Contracts\eCommerce.Pricing.Application.Contracts.csproj" />
     <!-- 🚨 Cần cho marker `INotificationEvent` của các ETO miền Catalog (sự kiện thông báo). -->
     <ProjectReference Include="..\..\shared\eCommerce.Kernel\eCommerce.Kernel.csproj" />
   </ItemGroup>
