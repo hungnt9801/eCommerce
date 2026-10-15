@@ -36,6 +36,17 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
     public DbSet<Catalog.Product> Products { get; set; } = default!;
     public DbSet<Catalog.ProductVariant> ProductVariants { get; set; } = default!;
 
+    /// <summary>
+    /// 🚨 **`DbSet` NÀY LÀ BẮT BUỘC, KHÔNG PHẢI "CHO ĐẸP"** (`CAT-002`, phát hiện 15/10/2026):
+    /// ABP đăng ký `IRepository<T>` bằng cách **quét các thuộc tính `DbSet<>`** trên DbContext —
+    /// **KHÔNG** quét model. Chỉ khai `builder.Entity<Category>(...)` trong `OnModelCreating` mà **quên**
+    /// `DbSet` ⇒ **không có** `IRepository<Category, Guid>` ⇒ DI của app service **NỔ** khi có request đầu tiên:
+    /// *"None of the constructors found … Cannot resolve parameter IRepository`2[eCommerce.Catalog.Category …]"*
+    /// ⇒ **HTTP 500** (đã gặp thật, xem `cat-002` §17).
+    /// 🛡️ Lưới an toàn: `DbSetRegistrationTests` quét model và khẳng định **mọi** entity `eCommerce.*` đều có `DbSet`.
+    /// </summary>
+    public DbSet<Catalog.Category> Categories { get; set; } = default!;
+
     // ---- Inventory ----
     public DbSet<Inventory.InventoryItem> InventoryItems { get; set; } = default!;
     public DbSet<Inventory.StockLedgerEntry> StockLedgerEntries { get; set; } = default!;

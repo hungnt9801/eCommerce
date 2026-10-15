@@ -993,3 +993,83 @@ và ghi lại đây. 📌 Kèm bài học vòng trước: **mutation test trên 
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.2 | 15/10/2026 | *(agent, session GĐ1)* | **Lát cắt 1 — cây danh mục**: `Category` (D1/D2/D3) + `CategoryTreeService` (D8/D9, khoá toàn tenant + chống chu trình + dựng lại `Path` cây con) + hàng rào DB (`CHECK` ×2, unique **NULLS NOT DISTINCT** **sửa tay**, FK `RESTRICT`) + permission `Categories`/`CatalogAttributes` (D10) + mã lỗi theo **sổ đăng ký đã chốt** (`cat-001` §19). **+23 unit · +5 integration**; **mutation test** xác nhận bước sửa tay là cần thiết (và một lần mutation **sai** đã được ghi lại). Ghi rõ phần còn lại ở **16.4** |
+
+---
+
+## 17. TRẠNG THÁI TRIỂN KHAI — **LÁT CẮT 2: API CÂY DANH MỤC** (15/10/2026)
+
+### 17.1 Đã thêm
+
+| Thành phần | Tệp | Nội dung |
+|---|---|---|
+| DTO | `src/eCommerce.Application.Contracts/Catalog/CategoryDtos.cs` | `CategoryDto` (dùng **chung** cho cây lồng nhau **và** danh sách phẳng) · `GetCategoriesInput` (lọc `Keyword`/`IsActive`/`ParentId`, `Guid.Empty` = chỉ nút gốc) · `CreateCategoryDto` · **`UpdateCategoryDto` KHÔNG có `Code`/`ParentId`** · `MoveCategoryDto` |
+| Hợp đồng | `…/Catalog/ICategoryAppService.cs` | 8 method; `[Authorize]` cấp class (`Categories`) + quyền riêng theo method |
+| Hiện thực | `src/eCommerce.Application/Catalog/CategoryAppService.cs` | Map tay; **`Create`/`Move`/`Delete` BẮT BUỘC** đi qua `CategoryTreeService` |
+| Hàm thuần | `src/eCommerce.Application/Catalog/CayDanhMucBuilder.cs` | Dựng cây từ danh sách phẳng — **test được không cần DB** |
+
+### 17.2 ✅ BẰNG CHỨNG HTTP THẬT (Host + PostgreSQL 17, token `admin`)
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | 6 route thật (đọc từ `swagger.json`) | `/api/app/category` · `/{id}` · `/tree` · `/{id}/move` · `/{id}/deactivate` · `/{id}/activate` |
+| 2 | Tạo cây `A > A1 > A11` + nút gốc `B` | `200` ×4 |
+| 3 | `GET /tree` | **2 nút gốc**, lồng đúng `A→A1→A11`; `Path` khớp `Level` (0/1/2) |
+| 4 | 🚨 **Di chuyển `A1` vào chính cây con của nó (`A11`)** | **`eCommerce:Catalog:0020`** ✅ **và `Path` của `A1` KHÔNG đổi** (không để lại trạng thái nửa vời) |
+| 5 | Di chuyển `A1` sang `B` | **`204`** ✅ **DB: CẢ `A1` và `A11` đều được dựng lại `Path`, `Level` giữ nguyên** ✅ (đúng `D1`: sửa cả cây con) |
+| 6 | `GET /tree` sau di chuyển | `A11` nằm **dưới `A1` dưới `B`** ✅ |
+| 7 | **Xoá `B` khi `B` còn nút con (`A1`)** | **`Catalog:0021`** ✅ |
+| 8 | Xoá mềm `A11` (nút lá) | `204` · DB `IsDeleted = t` **chỉ ở `A11`** ✅ |
+| 9 | **Tạo nút ở cấp 6** | **`Catalog:0024`** ✅ |
+| 10 | Log Host | **0 dòng `fail:`** ✅ (trước khi sửa §17.3 là **14**) |
+| 11 | Dọn dẹp | 0 danh mục · cờ bảo mật `ADMIN@ABP.IO = true` đã khôi phục |
+
+⇒ **Bất biến *"không chu trình"* — bất biến mà PostgreSQL KHÔNG bảo vệ được (§8.1 #1) — đã được chứng minh
+ở tầng API THẬT**, kèm bằng chứng `Path` **không** bị sửa khi thao tác bị từ chối.
+
+### 17.3 🚨 LỖI THẬT GẶP KHI KIỂM CHỨNG: **thiếu `DbSet` ⇒ DI nổ ⇒ HTTP 500**
+
+Lần chạy kiểm chứng **đầu tiên** đã đổ: `POST /api/app/category` trả **`500`** với **14 dòng `fail:`**,
+mọi phép đo sau đó vô nghĩa. Đọc log ra nguyên nhân **thật** (không đoán):
+
+```
+Cannot resolve parameter 'IRepository`2[eCommerce.Catalog.Category, System.Guid] categoryRepository'
+of constructor 'Void .ctor(..., IRepository`2[eCommerce.Catalog.Category, System.Guid], CategoryTreeService)'
+```
+
+**Nguyên nhân gốc:** ABP đăng ký `IRepository<T>` bằng cách **quét các thuộc tính `DbSet<>`** trên DbContext,
+**KHÔNG** quét model. Tôi đã khai `builder.Entity<Category>(...)` trong `OnModelCreating` mà **quên**
+`public DbSet<Category> Categories` ⇒ **không có** repository ⇒ app service **nổ khi DI**.
+
+🚨 **Vì sao lỗi này nguy hiểm:** build **xanh**, `migration` **chạy**, integration test **xanh**,
+DB có đủ bảng + `CHECK` + FK — **chỉ khi gọi API thật** mới lộ. Đây đúng loại "xanh ở mọi tầng trừ tầng thật".
+
+🛡️ **Lưới an toàn đã thêm** (`test/eCommerce.Tests/EfCoreRegistration/DbSetRegistrationTests.cs`, 4 test):
+quét **model** và khẳng định **mọi** entity namespace `eCommerce.*` đều có `DbSet<T>` ⇒ biến lỗi
+*chỉ-lộ-khi-chạy* thành lỗi *lộ-ngay-trong-CI*. Kèm test chống "test rỗng" (khẳng định quét được ≥ 10 entity)
+và test khẳng định `CHECK`/`FK` **ở tầng model** bằng **SQL mà EF sẽ sinh** (`GenerateCreateScript`).
+
+### 17.4 🚨 HAI BÀI HỌC KỸ THUẬT KHÁC (ghi lại để không lặp)
+
+1. **Namespace test CÓ THỂ CHE KHUẤT namespace production.** Ban đầu tôi đặt namespace test là
+   `eCommerce.Tests.EntityFrameworkCore` ⇒ C# resolve `eCommerce.EntityFrameworkCore.eCommerceDbContext`
+   **theo namespace bao ngoài trước** ⇒ **build ĐỎ ở file KHÔNG LIÊN QUAN**
+   (`eCommerce.Tests.Marketplace`). Đổi thành `eCommerce.Tests.EfCoreRegistration` là hết.
+   📌 Quy ước: **không** đặt namespace test trùng tên namespace production.
+2. **`entity.GetCheckConstraints()` NÉM lỗi trên model chỉ-đọc.** Cách bền hơn (và mạnh hơn): đọc
+   `db.Database.GenerateCreateScript()` rồi khẳng định **đúng thứ sẽ được tạo ở DB**.
+
+### 17.5 Còn lại của `CAT-002`
+
+| # | Việc | Ghi chú |
+|---|---|---|
+| 1 | `CatProductCategories` (gán sản phẩm ↔ danh mục; **tối đa một `IsPrimary`/sản phẩm**) | §8.1 #7 — **điều kiện "còn SẢN PHẨM" của `DeleteAsync` phụ thuộc bảng này** |
+| 2 | `CatAttributes` + `CatAttributeValues` + `CatCategoryAttributes` | `CatalogAttributeUsage` (D4) |
+| 3 | **Sinh tổ hợp biến thể** (D5) + `AttributeHash` + unique (D7) + ngưỡng ⇒ **`Catalog:0009`** (D6) | phần lớn nhất |
+| 4 | ETO `CategoryTreeChangedEto` (xoá cache menu — §8.2 #5) | phải **phân loại** *thông báo* theo `coding-conventions` §6.2 |
+| 5 | UI admin cây danh mục | §10.1 |
+
+### 17.6 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.3 | 15/10/2026 | *(agent, session GĐ1)* | **Lát cắt 2 — API cây danh mục**: 6 route chạy thật; **kiểm chứng HTTP đầy đủ 11 phép đo** (chu trình `0020` + `Path` không đổi · dựng lại `Path` cả cây con · `0021` · xoá mềm · `0024` · **0 dòng `fail:`**). Phát hiện + sửa **lỗi thiếu `DbSet` ⇒ HTTP 500** (§17.3) và thêm **lưới an toàn CI**; ghi 2 bài học kỹ thuật (§17.4). **+11 unit** |
