@@ -95,6 +95,28 @@ public class StockReservationService : DomainService
             await _tonKhoRepository.InsertAsync(ton, autoSave: false);
         }
 
+        // 🚨 **KIỂM TRƯỚC — để ca THƯỜNG trả mã nghiệp vụ (`0032`) thay vì để DB nổ `23505`.**
+        // 📌 Vì sao vẫn GIỮ hàng rào DB: chỉ kiểm ở đây thì **hai request đồng thời** cùng thấy "chưa giữ"
+        // ⇒ **cả hai ghi** ⇒ `Reserved` tăng gấp đôi. Unique index là lớp **nguyên tử**; bộ lọc exception
+        // (`BoLocViPhamRangBuocDb`) là lớp biến `23505` thành **cùng một mã** `0032` ⇒ client thấy **một hành vi
+        // duy nhất** dù đi đường nào.
+        if (!string.IsNullOrWhiteSpace(referenceId))
+        {
+            var daGiu = await _giuChoRepository.FirstOrDefaultAsync(
+                x => x.ReferenceId == referenceId && x.Sku == maSku
+                     && x.WarehouseId == warehouseId && x.Status == ReservationStatus.Held);
+
+            if (daGiu is not null)
+            {
+                throw new BusinessException(InventoryErrorCodes.DaGiuChoNguonNay)
+                    .WithData("sku", maSku)
+                    .WithData("referenceId", referenceId)
+                    .WithData("reservationId", daGiu.Id)
+                    .WithData("expiresAtUtc", daGiu.ExpiresAtUtc)
+                    .WithData("lyDo", "Đã có lượt giữ chỗ ĐANG HIỆU LỰC cho cùng nguồn + SKU.");
+            }
+        }
+
         var hetHan = at.Add(ttl ?? TtlMacDinh);
 
         var giuCho = new StockReservation(

@@ -21,7 +21,7 @@
 | Điểm phát metric | **7/12** |
 
 > 📌 **CẬP NHẬT 15/10/2026 (lượt GĐ1 thứ 6 — `CAT-001` xong domain+API+ETO):** các số ở bảng trên là
-> **mốc bàn giao**. Sau các lượt GĐ1: **Test = 664 unit + 38 integration** · **2 tiến trình**
+> **mốc bàn giao**. Sau các lượt GĐ1: **Test = 679 unit + 38 integration** · **2 tiến trình**
 > (Host **5000** API/auth · Web **5100** UI) · build **0 lỗi/0 cảnh báo** · **lỗi #22 đã sửa** (fail-closed
 > **và** nơi nhận thật) · **`F-403` đã sửa** · **§7.0 xong #2/#5/#7** · **DB: 20 index `NULLS NOT DISTINCT`**
 > · **`CAT-001` xong** (domain + 11 route API + 2 ETO) · 🚨 **log khởi động nay 0 Error** (phân loại
@@ -243,3 +243,57 @@ Không chạy ⇒ trang vẫn trả **`200`** nhưng **thiếu toàn bộ CSS/JS
 > 📌 **Đừng dán lại toàn bộ nội dung cuộc trò chuyện cũ vào session mới.** File bàn giao này + git + 52 tài liệu
 > đã chứa mọi thứ cần thiết, ở dạng **ngắn gọn và đã kiểm chứng**. Dán lại lịch sử chỉ làm **cạn ngữ cảnh
 > của session mới ngay từ đầu** — đúng vấn đề đang muốn tránh.
+
+---
+
+## PHỤ LỤC B — **TRẢ NỢ: ÁNH XẠ VI PHẠM RÀNG BUỘC DB → LỖI NGHIỆP VỤ** (15/10/2026)
+
+### B.1 Vấn đề (đã **đo được**, không phải phòng xa)
+
+PostgreSQL trả `23505` (vi phạm duy nhất) / `23514` (vi phạm `CHECK`) / `23503` (khoá ngoại) khi ràng buộc DB chặn
+một hành vi **hợp lệ về nghiệp vụ** (retry · double-click · job chạy lại · hai request đồng thời). ABP để nguyên ⇒
+**HTTP `500`**. Hệ quả **không nhỏ**:
+- client **KHÔNG phân biệt được** *"đã làm rồi"* với *"hệ thống hỏng"* ⇒ **client sẽ retry** ⇒ tăng tải, có thể thành **vòng lặp**;
+- CSKH không có mã để phân loại sự cố;
+- log đầy `fail:` **không phân biệt** ràng buộc (bình thường) với lỗi hạ tầng (bất thường).
+
+**Đã đo `500` ở 3 chỗ:** ghi sổ sổ cái trùng · **giữ chỗ trùng nguồn** · số chứng từ/SKU trùng trong chứng từ.
+
+### B.2 Giải pháp
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| 1 | `ViPhamRangBuocDb` (**Kernel**, **hàm THUẦN**) | ánh xạ theo **TÊN RÀNG BUỘC** (không theo bảng — một bảng có nhiều ràng buộc **khác nghĩa**: `InvStockLedger` chặn *"ghi sổ trùng"*, `InvItems` chặn *"âm kho"*). Có **16** ràng buộc đã ánh xạ |
+| 2 | `BoLocViPhamRangBuocDb` (**tầng Host**) | 📌 Phải ở **Host** vì lỗi chỉ xuất hiện lúc `SaveChanges` — **sau** khi app service đã trả về; **không tầng nào phía trong bắt được**. Đây cũng chính là lý do `ADR-09` (`UPDATE … WHERE Status='Draft'`) **không** đặt ở Domain được: *kiểm tra nguyên tử chỉ có ở tầng DB* |
+| 3 | Trả lỗi | JSON **đúng dạng của ABP** (`{"error":{"code":…,"message":…,"data":{sqlState,constraint}}}`) + HTTP **`403`** (cùng quy ước `BusinessException` toàn hệ thống) ⇒ client **không phải xử lý hai định dạng** |
+| 4 | **Kiểm trước** ở `StockReservationService` | ca **thường** (khách bấm hai lần) trả `0032` **ngay**, không chờ DB nổ; **hàng rào DB vẫn giữ** cho ca **đồng thời** ⇒ bộ lọc biến `23505` thành **cùng một mã** ⇒ client thấy **một hành vi duy nhất** dù đi đường nào |
+
+### B.3 🚨 Ranh giới **KHÔNG** được vượt: không nuốt lỗi hệ thống
+
+`AnhXa` trả **`null`** cho mọi SQLSTATE **không** phải ràng buộc (`08006` mất kết nối, `53300` quá nhiều kết nối,
+`40001` serialization failure, `57014` query bị huỷ…) ⇒ lỗi **nổi lên `500` như cũ**.
+📌 Nếu ánh xạ cả những mã đó thì **sự cố hạ tầng bị che thành lỗi nghiệp vụ** ⇒ đội vận hành **không thấy**, client
+**retry vô hạn**. Có **test riêng** khoá ranh giới này.
+
+### B.4 ✅ BẰNG CHỨNG HTTP THẬT (Host + PostgreSQL 17)
+
+| # | Ca | Trước | **Nay** |
+|---|---|---|---|
+| 1 | Ghi sổ sổ cái **lần hai** | `403` `0010` (đã tốt) | `403` **`Inventory:0010`** ✅ |
+| 2 | 🚨 **Giữ chỗ trùng nguồn** (cùng `ReferenceId` + SKU) | **`500`** | `403` **`Inventory:0032`** ✅ |
+| 3 | 🚨 **Số chứng từ trùng** (unique index trên DB) | **`500`** | `403` **`Inventory:0014`** ✅ |
+| 4 | 🚨 **SKU trùng trong cùng chứng từ** | **`500`** | `403` **`Inventory:0015`** ✅ |
+| 5 | **Đối chứng**: chứng từ không tồn tại | — | `403` **`Inventory:0011`** ✅ (lỗi nghiệp vụ, **không** `500`) |
+
+- build `--no-incremental`: **0 lỗi / 0 cảnh báo** · unit **679/679** (+15) · integration **38/38** · mermaid 197/0
+- **Không đổi schema** (thuần tầng xử lý lỗi)
+- 📌 `fail: 3` trong log **đúng bằng** số ca vi phạm **cố tình** kích hoạt — đó là EF ghi lệnh SQL thất bại
+  (mức `Error` của **EF**, không phải exception chưa xử lý). Bộ lọc ghi thêm dòng **`Warning`** có `SQLSTATE` +
+  tên ràng buộc + **mã nghiệp vụ** ⇒ tra cứu được. **Không còn `500` nào.**
+
+### B.5 Bảo trì — **BẮT BUỘC** khi thêm ràng buộc mới
+
+Mỗi khi thêm unique index/`CHECK` **có ý nghĩa nghiệp vụ**, **phải** thêm một dòng vào `TheoRangBuoc`.
+Nếu quên: ca đó rơi về mã chung `eCommerce:Db:0001` — **vẫn tốt hơn `500`**, nhưng **kém hữu ích cho CSKH**.
+📌 Test `So_rang_buoc_da_anh_xa_KHONG_giam_di` chốt **sàn 14** ràng buộc ⇒ sửa chữa nhầm làm **xoá** dòng ánh xạ sẽ **ĐỎ**,
+thay vì âm thầm để các ca đó quay lại `500`.

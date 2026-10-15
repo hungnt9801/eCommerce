@@ -1,0 +1,115 @@
+namespace eCommerce.Kernel.Data;
+
+/// <summary>
+/// **HÀM THUẦN: ánh xạ VI PHẠM RÀNG BUỘC DB → LỖI NGHIỆP VỤ** (dùng cho exception filter).
+///
+/// 🚨 **VÌ SAO CẦN (nợ đã đo được, không phải phòng xa):** PostgreSQL trả `23505` (vi phạm duy nhất) /
+/// `23514` (vi phạm `CHECK`) khi một **ràng buộc thật sự chặn** một hành vi **hợp lệ về nghiệp vụ**
+/// (retry, double-click, job chạy lại). Nếu để nguyên, ABP trả **`500`** ⇒ client **KHÔNG phân biệt được**
+/// *"đã làm rồi"* với *"hệ thống hỏng"* ⇒ **client sẽ retry** ⇒ tạo thêm tải và có thể thành **vòng lặp**.
+/// ⇒ Đã đo **`500` ở 3 chỗ** trước khi làm phép ánh xạ này (sổ cái, giữ chỗ trùng nguồn, và ca hai request đồng thời).
+///
+/// 📌 **VÌ SAO ÁNH XẠ THEO *TÊN RÀNG BUỘC* (không theo bảng):** một bảng có thể có nhiều ràng buộc duy nhất
+/// mang **ý nghĩa nghiệp vụ khác nhau** (`InvStockLedger` chặn *"ghi sổ trùng"*, `InvItems` chặn *"âm kho"*).
+/// Ánh xạ theo bảng là **đoán**; theo **tên ràng buộc** là **biết chính xác**.
+///
+/// ⚠️ **BẢO TRÌ:** mỗi khi thêm unique index/`CHECK` mới **có ý nghĩa nghiệp vụ**, phải thêm một dòng vào đây —
+/// nếu không, ca đó rơi về mã chung `eCommerce:Db:0001` (vẫn **tốt hơn `500`**, nhưng kém hữu ích cho CSKH).
+/// </summary>
+public static class ViPhamRangBuocDb
+{
+    /// <summary>Kết quả ánh xạ: mã nghiệp vụ + thông điệp cho người dùng.</summary>
+    public sealed record KetQua(string Code, string Message, bool LaViPhamDuyNhat);
+
+    /// <summary>Mã **chung** khi không nhận ra ràng buộc — vẫn là lỗi **nghiệp vụ/dữ liệu**, KHÔNG phải `500`.</summary>
+    public const string MaChung = "eCommerce:Db:0001";
+
+    private static readonly Dictionary<string, KetQua> TheoRangBuoc = new(StringComparer.Ordinal)
+    {
+        // ── KHO: chống âm tồn / giữ chỗ vượt tồn (`CHECK` — `INV-001` ADR-03) ─────────────────────
+        ["CK_InvItems_OnHand_KhongAm"] =
+            new(MaChung, "Tồn kho sẽ bị ÂM ⇒ thao tác bị từ chối.", false),
+        ["CK_InvItems_Reserved_KhongAm"] =
+            new(MaChung, "Số lượng giữ chỗ sẽ bị ÂM ⇒ thao tác bị từ chối.", false),
+        ["CK_InvItems_Reserved_KhongVuotOnHand"] =
+            new("eCommerce:Inventory:0001", "Giữ chỗ VƯỢT tồn thực ⇒ không đủ hàng.", false),
+        ["CK_InvStockLedger_Balance_KhongAm"] =
+            new(MaChung, "Số dư sổ cái kho sẽ bị ÂM ⇒ thao tác bị từ chối.", false),
+        ["CK_InvStockLedger_Delta_KhacKhong"] =
+            new(MaChung, "Bút toán kho có độ lệch BẰNG 0 ⇒ vô nghĩa, bị từ chối.", false),
+
+        // ── KHO: chống ghi trùng (`INV-001` ADR-05) ──────────────────────────────────────────────
+        ["IX_InvStockLedger_TenantId_ReferenceLineId"] =
+            new("eCommerce:Inventory:0010", "Chứng từ này ĐÃ được ghi sổ (dòng này đã có bút toán).", true),
+
+        // ── KHO: danh mục + chứng từ ─────────────────────────────────────────────────────────────
+        ["IX_InvWarehouses_TenantId_Code"] =
+            new("eCommerce:Inventory:0003", "Mã kho đã tồn tại.", true),
+        ["IX_InvStockDocuments_TenantId_Number"] =
+            new("eCommerce:Inventory:0014", "Số chứng từ đã tồn tại.", true),
+        ["IX_InvStockDocumentLines_TenantId_Doc_Sku"] =
+            new("eCommerce:Inventory:0015", "SKU này đã có dòng trong chứng từ (gộp số lượng vào MỘT dòng).", true),
+
+        // ── KHO: giữ chỗ (`INV-002`) ─────────────────────────────────────────────────────────────
+        ["IX_InvStockReservations_TenantId_Ref_Sku_Kho"] =
+            new("eCommerce:Inventory:0032",
+                "Nguồn này (giỏ/đơn) ĐÃ giữ chỗ cho SKU này rồi ⇒ không giữ lần nữa.", true),
+
+        // ── PRICING: idempotency + sổ giải trình (ADR-13) ────────────────────────────────────────
+        ["IX_PrcPriceCalculationRecords_TenantId_IdempotencyKey"] =
+            new("eCommerce:Pricing:0006",
+                "Khoá idempotency này ĐÃ được dùng ⇒ gọi lại sẽ trả kết quả đã lưu.", true),
+        ["IX_PrcPriceLists_TenantId_Code_EffectiveFrom"] =
+            new("eCommerce:Pricing:0002", "Bảng giá cùng mã + ngày hiệu lực đã tồn tại.", true),
+        ["IX_PrcTierPriceSets_TenantId_Code_EffectiveFrom"] =
+            new("eCommerce:Pricing:0002", "Bộ bậc thang cùng mã + ngày hiệu lực đã tồn tại.", true),
+        ["IX_PrcTierPrices_TenantId_SetId_Sku_MinQty"] =
+            new("eCommerce:Pricing:0008", "Bậc thang TRÙNG `MinQuantity` cho SKU này.", true),
+
+        // ── CATALOG ──────────────────────────────────────────────────────────────────────────────
+        ["IX_CatProducts_TenantId_Sku"] =
+            new("eCommerce:Catalog:0004", "SKU đã tồn tại.", true),
+        ["IX_CatCategories_TenantId_ParentId_Slug"] =
+            new("eCommerce:Catalog:0020", "Danh mục trùng `Slug` trong cùng danh mục cha.", true)
+    };
+
+    /// <summary>Mã SQLSTATE của PostgreSQL mà ta xử lý.</summary>
+    public static bool LaViPhamDuyNhat(string? sqlState) => sqlState == "23505";
+
+    /// <summary>Mã SQLSTATE vi phạm `CHECK`.</summary>
+    public static bool LaViPhamCheck(string? sqlState) => sqlState == "23514";
+
+    /// <summary>Mã SQLSTATE vi phạm khoá ngoại.</summary>
+    public static bool LaViPhamKhoaNgoai(string? sqlState) => sqlState == "23503";
+
+    /// <summary>
+    /// Ánh xạ. `sqlState` **bắt buộc** phải là một trong ba loại trên, nếu không ⇒ trả `null`
+    /// (để lỗi thật **nổi lên như `500`** — **KHÔNG** nuốt lỗi hệ thống thành lỗi nghiệp vụ).
+    /// 🚨 Đây là ranh giới quan trọng: chỉ ánh xạ **vi phạm ràng buộc dữ liệu**, không ánh xạ lỗi hạ tầng.
+    /// </summary>
+    public static KetQua? AnhXa(string? sqlState, string? tenRangBuoc)
+    {
+        if (!LaViPhamDuyNhat(sqlState) && !LaViPhamCheck(sqlState) && !LaViPhamKhoaNgoai(sqlState))
+        {
+            return null;
+        }
+
+        var laDuyNhat = LaViPhamDuyNhat(sqlState);
+
+        if (tenRangBuoc is not null && TheoRangBuoc.TryGetValue(tenRangBuoc, out var kq))
+        {
+            return kq with { LaViPhamDuyNhat = laDuyNhat };
+        }
+
+        // Không nhận ra tên ràng buộc ⇒ mã CHUNG (vẫn là lỗi dữ liệu, KHÔNG phải `500`).
+        return new KetQua(
+            MaChung,
+            LaViPhamKhoaNgoai(sqlState)
+                ? "Dữ liệu tham chiếu KHÔNG tồn tại (khoá ngoại) ⇒ thao tác bị từ chối."
+                : "Dữ liệu vi phạm ràng buộc toàn vẹn của hệ thống ⇒ thao tác bị từ chối.",
+            laDuyNhat);
+    }
+
+    /// <summary>Tên các ràng buộc **đã có ánh xạ** — dùng cho test bảo trì (phát hiện thiếu sót).</summary>
+    public static IReadOnlyCollection<string> CacRangBuocDaAnhXa => TheoRangBuoc.Keys;
+}

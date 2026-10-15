@@ -225,6 +225,15 @@ public class eCommerceHttpApiHostModule : AbpModule
             Authorization.ChanDoanTuChoiQuyenHandler>();
 
         // Auto API controllers: mọi class implements IApplicationService tự thành REST endpoint.
+        // 🚨 **TRẢ NỢ (vòng 29):** map vi phạm ràng buộc DB (`23505`/`23514`/`23503`) thành **lỗi nghiệp vụ**
+        // thay vì `500`. Đã ĐO được `500` ở 3 chỗ trước khi làm việc này (ghi sổ trùng · giữ chỗ trùng nguồn ·
+        // hai request đồng thời). 📌 Phải đăng ký ở **tầng Host** vì lỗi chỉ xuất hiện lúc `SaveChanges`
+        // (sau khi app service đã trả về) — không tầng nào phía trong bắt được.
+        Configure<Microsoft.AspNetCore.Mvc.MvcOptions>(options =>
+        {
+            options.Filters.Add<HttpApi.Host.Filters.BoLocViPhamRangBuocDb>();
+        });
+
         Configure<AbpAspNetCoreMvcOptions>(options =>
         {
             options.ConventionalControllers.Create(typeof(eCommerceApplicationModule).Assembly);

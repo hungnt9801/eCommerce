@@ -43,6 +43,15 @@ public static class InventoryErrorCodes
     /// <summary>Mã kho **đã tồn tại** trong tenant (`INV-001` ADR-01).</summary>
     public const string MaKhoDaTonTai = Nhom + "0003";
 
+    /// <summary>Số chứng từ kho **đã tồn tại** trong tenant.</summary>
+    public const string SoChungTuDaTonTai = Nhom + "0014";
+
+    /// <summary>SKU **đã có dòng** trong cùng chứng từ (phải gộp số lượng vào MỘT dòng).</summary>
+    public const string SkuDaCoTrongChungTu = Nhom + "0015";
+
+    /// <summary>Nguồn (giỏ/đơn) **đã giữ chỗ** cho SKU này rồi (`INV-002`).</summary>
+    public const string DaGiuChoNguonNay = Nhom + "0032";
+
     /// <summary>Phiếu **chuyển kho** mà **thiếu kho đích**.</summary>
     public const string ChuyenKhoThieuKhoDich = Nhom + "0020";
 
