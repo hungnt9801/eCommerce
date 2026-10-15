@@ -609,9 +609,27 @@ nhưng cũng **chưa vào được hệ thống**, và log **Error** lặp **m�
 Đây là **đánh đổi đã được người quyết định chấp nhận** — **không phải lỗi**, và **không cần bật cờ nào**:
 khi Order intake đăng ký handler cho `ChannelOrderPulledEto`, fail-closed **tự mở**.
 
+### Tiến độ hạ tầng nền §7.0 (cập nhật 14/10/2026)
+
+| # | Việc (§7.0) | Trạng thái |
+|---|---|---|
+| 0 | Viết & duyệt `XC-001`…`XC-006` | 🟡 **đã viết đủ 6/6** nhưng **chưa có tài liệu nào được con người review** (đang `Draft`) |
+| 1 | `shared/eCommerce.Kernel` (Money, Currency, mã lỗi, lock key, metrics) | ✅ **có** — `Money`/`Currency`/`RoundingPolicy`/`MoneyAllocator` + `Observability` + test `MoneyTests` |
+| 2 | `eCommerce.Web` + `Volo.Account` + theme + màn hình login | ⬜ **CHƯA LÀM** — **hạng mục lớn nhất còn lại của §7.0**; solution hiện **chưa có project Web** |
+| 3 | Outbox/Inbox + DLQ | ⬜ **cố ý hoãn** — xem cảnh báo dưới |
+| 4 | `test/eCommerce.IntegrationTests` + Testcontainers PostgreSQL | ✅ **có** — **20** integration test chạy trên PostgreSQL 17 thật |
+| 5 | `docs/coding-conventions.md` + `.editorconfig` | ✅ **XONG (14/10/2026)** |
+| 6 | Migration `NULLS NOT DISTINCT` cho mọi unique index có `TenantId` | ✅ **XONG** — **19** index `NULLS NOT DISTINCT`, có test đối chiếu **đích danh tên index** |
+| 7 | 2 test reflection `XC-004` TC-01/TC-02 trong CI | ✅ **XONG (14/10/2026)** — `BatBienPhanQuyenTests` (**5** test) + **kiểm chứng ngược bằng đột biến** |
+| 8 | Observability (JSON console, `CorrelationId`, `/health-status`, mức log production) | 🟡 **một phần** — đã wire `UseCorrelationId` + `/health-status` + middleware đo độ trễ; **5/12 metric chưa có nơi phát** |
+
+> 🚨 **Vì sao #3 (Outbox/Inbox + DLQ) vẫn HOÃN:** **không có message broker** (chỉ PostgreSQL + Redis).
+> Outbox bảo đảm *giao tin cậy* — nhưng giao **cho không ai** thì dữ liệu **vẫn mất**. **Thứ tự đúng:
+> có NGƯỜI NHẬN trước (Order intake `SAL-005`), rồi mới bàn tới giao tin cậy.**
+
 ### Việc tiếp theo (thứ tự đề xuất)
 
 1. **Order intake `SAL-005`** — nơi nhận `ChannelOrderPulledEto` (**việc A**).
 2. **Test tích hợp ma trận quyền** trên endpoint **gắn quyền** (`XC-004` TC-05/TC-06) — `F-403` đã sửa nhưng ma trận hiện chỉ đo bằng **script thủ công**.
-3. **Hạ tầng nền §7.0 còn lại**: `eCommerce.Web` + login · 2 test reflection `XC-004` TC-01/TC-02 · `.editorconfig` + `docs/coding-conventions.md` · phần observability còn thiếu.
-4. **5 metric còn lại** · supervisor thiếu `Timer.RunOnStart` (`CHN-002` §16.5 #5).
+3. **`eCommerce.Web` + login (§7.0 #2)** — hạng mục lớn nhất còn lại của hạ tầng nền.
+4. **5 metric còn lại** · phần observability còn thiếu (§7.0 #8) · supervisor thiếu `Timer.RunOnStart` (`CHN-002` §16.5 #5).

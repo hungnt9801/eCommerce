@@ -1,0 +1,97 @@
+# .editorconfig — quy ước định dạng & phong cách mã nguồn
+#
+# 🎯 MỤC ĐÍCH: giữ NHẤT QUÁN trong một solution nhiều module, và **giảm việc phải nhớ** khi review.
+#    Quy ước đầy đủ (kèm LÝ DO và các bất biến kiến trúc): `docs/coding-conventions.md`.
+#
+# ⚠️ QUY TẮC KHI SỬA FILE NÀY:
+#    • **KHÔNG** đặt `severity = error` cho quy tắc ĐỊNH DẠNG. Một dòng `error` ở đây làm **hỏng build**
+#      ở mọi máy, ở mọi file chưa kịp sửa — và lỗi đó **không liên quan gì tới logic** đang viết.
+#    • Mức dùng: `suggestion` cho phong cách, `warning` cho thứ đã **kiểm chứng** là code hiện tại
+#      không vi phạm (nếu vi phạm, build sẽ hiện cảnh báo ngay — xem lại trước khi giữ).
+#    • Sau khi sửa, LUÔN chạy:
+#          dotnet build eCommerce.slnx -v q --no-incremental     # mong đợi: 0 lỗi / 0 cảnh báo
+
+root = true
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Mặc định cho MỌI file
+# ─────────────────────────────────────────────────────────────────────────────
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{cs,csx}]
+indent_size = 4
+
+# JSON/YAML/Markdown trong repo dùng 2 dấu cách (khớp tài liệu & file cấu hình sẵn có).
+[*.{json,yml,yaml}]
+indent_size = 2
+
+[*.md]
+indent_size = 2
+# Markdown: dấu cách cuối dòng ĐÔI KHI là ngắt dòng có chủ ý ⇒ không tự cắt.
+trim_trailing_whitespace = false
+
+[*.{csproj,props,targets,slnx,xml}]
+indent_size = 2
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C# — định dạng
+# ─────────────────────────────────────────────────────────────────────────────
+[*.cs]
+indent_style = space
+indent_size = 4
+tab_width = 4
+
+# `using` ngoài namespace; System lên trước (khớp toàn bộ mã hiện có).
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = false
+csharp_using_directive_placement = outside_namespace:suggestion
+
+# Namespace kiểu FILE-SCOPED (`namespace eCommerce.X;`) — toàn bộ repo đang dùng kiểu này,
+# và nó tránh một cấp thụt lề cho cả file.
+csharp_style_namespace_declarations = file_scoped:warning
+
+# Dấu ngoặc nhọn trên dòng mới (khớp mã hiện có).
+csharp_new_line_before_open_brace = all
+csharp_new_line_before_else = true
+csharp_new_line_before_catch = true
+csharp_new_line_before_finally = true
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C# — phong cách (suggestion: KHÔNG làm hỏng build)
+# ─────────────────────────────────────────────────────────────────────────────
+csharp_prefer_braces = true:suggestion
+csharp_prefer_simple_using_statement = true:suggestion
+csharp_style_var_for_built_in_types = false:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_expression_bodied_methods = when_on_single_line:suggestion
+csharp_style_expression_bodied_properties = true:suggestion
+csharp_style_prefer_pattern_matching = true:suggestion
+csharp_style_prefer_switch_expression = true:suggestion
+csharp_style_throw_expression = true:suggestion
+
+# `_camelCase` cho field private — khớp toàn bộ mã hiện có.
+dotnet_naming_rule.private_fields_underscore.severity = suggestion
+dotnet_naming_rule.private_fields_underscore.symbols = private_fields
+dotnet_naming_rule.private_fields_underscore.style = underscore_camel
+dotnet_naming_symbols.private_fields.applicable_kinds = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private
+dotnet_naming_style.underscore_camel.required_prefix = _
+dotnet_naming_style.underscore_camel.capitalization = camel_case
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C# — cảnh báo dùng CHUNG (không phải định dạng)
+# ─────────────────────────────────────────────────────────────────────────────
+# Biến khai mà không dùng: ẩu, và thường che một chỗ quên nối dây.
+dotnet_diagnostic.CS0219.severity = warning
+# `async` không có `await` ⇒ thường là quên `await` ở đâu đó (lỗi im lặng kinh điển).
+dotnet_diagnostic.CS1998.severity = warning
+# Nullable: giữ ở mức warning (KHÔNG error) — build đang sạch cảnh báo, xem quy tắc ở đầu file.
+dotnet_diagnostic.CS8600.severity = warning
+dotnet_diagnostic.CS8602.severity = warning
+dotnet_diagnostic.CS8604.severity = warning

@@ -156,12 +156,14 @@ Host cổng **5000**. DB: `docker exec -i ecommerce-postgres psql -U ecommerce -
 |---|---|---|
 | 1 | **Xây Order intake (`SAL-005`)** — nơi nhận `ChannelOrderPulledEto` | Đây là **việc A**; xong thì **đồng bộ sàn tự chạy lại** (fail-closed tự mở, không cần bật cờ nào) |
 | 2 | **Test tích hợp ma trận quyền** trên endpoint **GẮN QUYỀN** (`XC-004` TC-05/TC-06) | `F-403` đã sửa nhưng ma trận hiện **chỉ đo bằng script thủ công**; test project chưa có `WebApplicationFactory` |
-| 3 | **§7.0 #7 — `TC-01`/`TC-02`** (test reflection: mọi `*AppService` có `[Authorize]` cấp class; mọi permission dùng phải được định nghĩa) | **Chưa làm** |
-| 4 | **§7.0 #5 — `.editorconfig` + `docs/coding-conventions.md`** | **Chưa làm** (cần ghi luật: **cấm** bật `MapInboundClaims`) |
-| 5 | **§7.0 #2 — `eCommerce.Web` + login** | Hạng mục lớn nhất còn lại của §7.0 |
-| 6 | **5 metric còn lại** | `messaging_dlq_*` · `messaging_outbox_pending` cần **outbox/DLQ** (chưa có) · `logging_failures_total` cần **logger provider** · `lock_ttl_exceeded_total` chưa có chỗ phát |
-| 7 | **`CHN-002` §16.5 #5** — supervisor thiếu `Timer.RunOnStart = true` | Cùng họ lỗi #23; ảnh hưởng nhỏ |
-| 8 | **Outbox/relay** | 🚨 **Cảnh báo giữ nguyên:** **không có message broker** (chỉ PostgreSQL + Redis). **Thứ tự đúng: có người nhận trước (việc 1), rồi mới bàn tới giao tin cậy.** |
+| 3 | **§7.0 #2 — `eCommerce.Web` + login** | **Hạng mục lớn nhất còn lại của §7.0** (solution chưa có project Web) |
+| 4 | **§7.0 #8 — observability còn thiếu** | **5/12 metric chưa có nơi phát** |
+| 5 | **`CHN-002` §16.5 #5** — supervisor thiếu `Timer.RunOnStart = true` | Cùng họ lỗi #23; ảnh hưởng nhỏ |
+| 6 | **Outbox/relay** | 🚨 **Cảnh báo giữ nguyên:** **không có message broker** (chỉ PostgreSQL + Redis). **Thứ tự đúng: có người nhận trước (việc 1), rồi mới bàn tới giao tin cậy.** |
+
+> ✅ **ĐÃ XONG trong §7.0 (14/10/2026):** **#5** `docs/coding-conventions.md` + `.editorconfig` ·
+> **#7** 2 test reflection `XC-004` TC-01/TC-02 (`test/eCommerce.Tests/Authorization/BatBienPhanQuyenTests.cs`,
+> **5** test, đã **kiểm chứng ngược bằng đột biến**). Tiến độ đầy đủ §7.0: `docs/implementation-plan.md` **A.12**.
 
 ---
 
@@ -169,7 +171,8 @@ Host cổng **5000**. DB: `docker exec -i ecommerce-postgres psql -U ecommerce -
 
 | Cần biết | Đọc |
 |---|---|
-| Trạng thái tổng thể + kế hoạch | `docs/implementation-plan.md` (§A.7 trạng thái · §A.9 danh sách feature · §A.10 chốt GĐ0) |
+| Trạng thái tổng thể + kế hoạch + tiến độ §7.0 | `docs/implementation-plan.md` (§A.7 trạng thái · §A.9 danh sách feature · §A.10 chốt GĐ0 · **§A.12 tiến độ GĐ1 + §7.0**) |
+| **Quy ước viết code** (bắt buộc đọc trước khi viết module mới) | `docs/coding-conventions.md` + `.editorconfig` |
 | GĐ0 đã chốt tới đâu + 5 input | `docs/gd0-closure-report.md` |
 | **Lỗi thật đã gặp** (24 lỗi, 16 im lặng) | `docs/runtime-verification-report.md` |
 | Thiết kế từng feature (52 doc, mỗi doc 16 mục) | `docs/features/` — mỗi doc có mục **cuối** ghi trạng thái triển khai + việc còn lại |
