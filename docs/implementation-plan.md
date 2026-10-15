@@ -615,7 +615,7 @@ khi Order intake đăng ký handler cho `ChannelOrderPulledEto`, fail-closed **t
 |---|---|---|
 | 0 | Viết & duyệt `XC-001`…`XC-006` | 🟡 **đã viết đủ 6/6** nhưng **chưa có tài liệu nào được con người review** (đang `Draft`) |
 | 1 | `shared/eCommerce.Kernel` (Money, Currency, mã lỗi, lock key, metrics) | ✅ **có** — `Money`/`Currency`/`RoundingPolicy`/`MoneyAllocator` + `Observability` + test `MoneyTests` |
-| 2 | `eCommerce.Web` + `Volo.Account` + theme + màn hình login | ⬜ **CHƯA LÀM** — **hạng mục lớn nhất còn lại của §7.0**; solution hiện **chưa có project Web** |
+| 2 | `eCommerce.Web` + `Volo.Account` + theme + màn hình login | ✅ **XONG (15/10/2026)** — `src/eCommerce.Web` (cổng **5100**), theme **Basic** miễn phí + `Volo.Abp.Account.Web`. **Đăng nhập THẬT đã kiểm chứng** (vào được trang chủ quản trị). Chi tiết + bằng chứng: `docs/features/web-001-…md` **§16** |
 | 3 | Outbox/Inbox + DLQ | ⬜ **cố ý hoãn** — xem cảnh báo dưới |
 | 4 | `test/eCommerce.IntegrationTests` + Testcontainers PostgreSQL | ✅ **có** — **20** integration test chạy trên PostgreSQL 17 thật |
 | 5 | `docs/coding-conventions.md` + `.editorconfig` | ✅ **XONG (14/10/2026)** |
@@ -629,7 +629,7 @@ khi Order intake đăng ký handler cho `ChannelOrderPulledEto`, fail-closed **t
 
 ### Việc tiếp theo (thứ tự đề xuất)
 
-1. **Order intake `SAL-005`** — nơi nhận `ChannelOrderPulledEto` (**việc A**).
-2. **Test tích hợp ma trận quyền** trên endpoint **gắn quyền** (`XC-004` TC-05/TC-06) — `F-403` đã sửa nhưng ma trận hiện chỉ đo bằng **script thủ công**.
-3. **`eCommerce.Web` + login (§7.0 #2)** — hạng mục lớn nhất còn lại của hạ tầng nền.
+1. **Order intake `SAL-005`** — nơi nhận `ChannelOrderPulledEto` (**việc A**) ⇒ **mở lại đồng bộ sàn**.
+2. **`WEB-001` §16.6** — menu/điều hướng theo permission + `[AllowAnonymous]` allowlist + ma trận quyền tự động cho UI.
+3. **Test tích hợp ma trận quyền** trên endpoint **gắn quyền** (`XC-004` TC-05/TC-06) — hiện chỉ đo bằng **script thủ công**.
 4. **5 metric còn lại** · phần observability còn thiếu (§7.0 #8) · supervisor thiếu `Timer.RunOnStart` (`CHN-002` §16.5 #5).

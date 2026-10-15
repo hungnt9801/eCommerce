@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <RootNamespace>eCommerce.Web</RootNamespace>
+    <AssemblyName>eCommerce.Web</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      Tham chiếu GIỐNG Host: Web là một tiến trình UI chạy TRÊN CÙNG đồ thị module ⇒ tự gọi
+      app service trong tiến trình (không cần HTTP sang Host).
+
+      ⚠️ Vì dùng CHUNG đồ thị module với Host, mọi background worker/job sẽ bị đăng ký ở CẢ HAI tiến trình
+         ⇒ phải TẮT tường minh trong `eCommerceWebModule` (xem ghi chú ở đó). Đây là bẫy IM LẶNG:
+         build xanh, chạy được, nhưng đồng bộ sàn / gọi cơ quan thuế bị chạy 2 lần ⇒ tiêu quota gấp đôi.
+    -->
+    <ProjectReference Include="..\eCommerce.Application\eCommerce.Application.csproj" />
+    <ProjectReference Include="..\eCommerce.EntityFrameworkCore\eCommerce.EntityFrameworkCore.csproj" />
+    <ProjectReference Include="..\..\shared\eCommerce.Kernel\eCommerce.Kernel.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Volo.Abp.Autofac" />
+    <PackageReference Include="Volo.Abp.AspNetCore.Mvc" />
+    <!-- Theme MIỄN PHÍ (xem ghi chú ở Directory.Packages.props: LeptonX Lite không có bản 10.7.0). -->
+    <PackageReference Include="Volo.Abp.AspNetCore.Mvc.UI.Theme.Basic" />
+    <!-- Màn hình đăng nhập của module Account. ⚠️ Bản **KHÔNG** OpenIddict (xem lý do ở Directory.Packages.props). -->
+    <PackageReference Include="Volo.Abp.Account.Web" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Test bất biến bằng reflection cần thấy assembly này (xem `BatBienPhanQuyenTests`). -->
+    <InternalsVisibleTo Include="eCommerce.Tests" />
+  </ItemGroup>
+
+</Project>

@@ -45,6 +45,7 @@
     <Project Path="src/eCommerce.Domain/eCommerce.Domain.csproj" />
     <Project Path="src/eCommerce.EntityFrameworkCore/eCommerce.EntityFrameworkCore.csproj" />
     <Project Path="src/eCommerce.HttpApi.Host/eCommerce.HttpApi.Host.csproj" />
+    <Project Path="src/eCommerce.Web/eCommerce.Web.csproj" />
   </Folder>
   <Folder Name="/test/">
     <Project Path="test/eCommerce.IntegrationTests/eCommerce.IntegrationTests.csproj" />

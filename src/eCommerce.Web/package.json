@@ -1,0 +1,10 @@
+{
+  "version": "1.0.0",
+  "name": "ecommerce-web",
+  "private": true,
+  "//": "GĐ1 §7.0 #2 — thư viện client của theme MVC UI. Cài bằng: abp install-libs -wd src/eCommerce.Web",
+  "//version": "Ghim ĐÚNG 10.7.0 cho khớp version NuGet ABP đang ghim (quy ước #15: một version ABP trong toàn hệ thống).",
+  "dependencies": {
+    "@abp/aspnetcore.mvc.ui.theme.basic": "10.7.0"
+  }
+}

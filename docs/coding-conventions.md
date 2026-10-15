@@ -137,6 +137,16 @@ test/   eCommerce.Tests · eCommerce.IntegrationTests
 | Endpoint gắn permission **mới** ⇒ **phải** được thêm vào **ma trận `401`/`403`/`200`**. | ⚠️ Ma trận phải đo trên endpoint **GẮN QUYỀN**, **không** phải endpoint chỉ-cần-đăng-nhập |
 | `[AllowAnonymous]` **chỉ** trong **allowlist** có lý do. | Endpoint công khai là bề mặt tấn công |
 
+### 7.1 Bất biến cho **tiến trình UI** (`eCommerce.Web`) — đã trả giá, 15/10/2026
+
+| Luật | Ghi chú |
+|---|---|
+| 🚨 **CẤM** truyền scheme mặc định vào `AddAuthentication(...)`. | `AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)` **thay** scheme mặc định, mà module Account/Identity đăng nhập bằng `IdentityConstants.ApplicationScheme` (`"Identity.Application"`) ⇒ `[Authorize]` tìm cookie ở **nhầm** scheme ⇒ **luôn coi là chưa đăng nhập**. ⚠️ Đo bằng đột biến: **có** dòng đó ⇒ sau khi `POST /Account/Login` URL cuối vẫn là `/Account/Login?ReturnUrl=%2F`; **không** có ⇒ URL cuối là `/`. Build/test **xanh** và **chuyển hướng trông vẫn đúng** ⇒ nhìn qua không thấy sai. Cần thêm provider ngoài ⇒ dùng dạng **bổ sung**: `AddAuthentication().AddGoogle(...)` |
+| 🚨 **TẮT** background worker/job trong mọi tiến trình UI. | UI dùng **cùng đồ thị module** với Host ⇒ `ChannelSyncSupervisorWorker` (đồng bộ sàn), `EInvoiceSubmissionWorker` (gửi cơ quan thuế), `AdministrativeUnitSyncWorker`, `TaxUnclassifiedSkusWorker`… chạy ở **CẢ HAI** tiến trình ⇒ tiêu quota gấp đôi, gọi API ngoài gấp đôi. Bắt buộc: `AbpBackgroundWorkerOptions.IsEnabled = false` + `AbpBackgroundJobOptions.IsJobExecutionEnabled = false` |
+| Tiến trình UI **KHÔNG** làm auth server. | Auth server **duy nhất** là `eCommerce.HttpApi.Host`. Dùng `Volo.Abp.Account.Web` (**không** phải bản `.OpenIddict`) ⇒ tránh **hai nguồn sự thật** cho `OpenIddictApplications`/`OpenIddictTokens` trên cùng DB. Kiểm chứng: `POST /connect/token` trên cổng UI ⇒ **404** |
+| Đặt **tên/thương hiệu** ứng dụng tường minh. | Mặc định ABP là `"MyApplication"` — **nhìn thấy được** trên mọi trang nhưng build/test/health đều xanh. Cần `IBrandingProvider` (`AppName`) + `options.ApplicationName` |
+| Thư viện client của theme (`wwwroot/libs`) **không commit**. | Sinh ra từ `package.json` + `yarn.lock`; cài bằng `abp install-libs -wd src/eCommerce.Web`. ⚠️ Thiếu ⇒ trang vẫn trả **`200`** nhưng **thiếu toàn bộ CSS/JS** — không có lỗi biên dịch nào |
+
 ---
 
 ## 8. Quan sát: log & metric

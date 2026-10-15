@@ -91,7 +91,7 @@ eCommerce.slnx                        (15 project)
 
 ## 4. Chạy thử (cần làm đầu tiên trên máy bạn)
 
-**Yêu cầu:** .NET SDK 10, Docker Desktop **đang chạy**, `dotnet-ef` (đã cài trong môi trường dựng khung).
+**Yêu cầu:** .NET SDK 10, Docker Desktop **đang chạy**, `dotnet-ef`, **`abp` CLI 10.7.0** + **yarn** (chỉ cần cho UI ở bước 6).
 
 ```powershell
 cd D:\Projects\Tools\eCommerce
@@ -102,13 +102,38 @@ docker compose up -d
 # 2) Sinh migration (đã sinh sẵn bản Initial; chỉ chạy lại nếu đổi entity)
 dotnet ef migrations add <TenName> --project src/eCommerce.EntityFrameworkCore --output-dir Migrations
 
-# 3) Tạo bảng + seed kênh bán (shopee/lazada/tiktok/web)
+# 3) Tạo bảng + seed kênh bán + user/role/permission
 dotnet run --project src/eCommerce.DbMigrator
 
-# 4) Chạy API host
+# 4) Chạy API host (cổng 5000) — ĐÂY LÀ AUTH SERVER DUY NHẤT (OpenIddict phát token)
 dotnet run --project src/eCommerce.HttpApi.Host
-#    → Swagger: https://localhost:44300/swagger  (xem launchSettings/console để biết cổng)
+#    → Swagger:        http://localhost:5000/swagger
+#    → Health check:   http://localhost:5000/health-status   (mong đợi 200 Healthy)
+
+# 5) Lấy token để gọi API (dev: grant `password`)
+$tok = Invoke-RestMethod -Method Post -Uri 'http://localhost:5000/connect/token' `
+  -ContentType 'application/x-www-form-urlencoded' -Body @{
+    grant_type='client_credentials'; client_id='eCommerce_App'; client_secret='1q2w3e*'; scope='eCommerce' }
+Invoke-RestMethod 'http://localhost:5000/api/app/channel/shops' -Headers @{ Authorization = "Bearer $($tok.access_token)" }
+
+# 6) Chạy UI QUẢN TRỊ (cổng 5100) — cần bước 6a ĐÚNG MỘT LẦN trên máy mới
+# 6a) Cài thư viện client của theme (thư mục wwwroot/libs KHÔNG được commit)
+abp install-libs -wd src/eCommerce.Web
+# 6b) Chạy
+dotnet run --project src/eCommerce.Web
+#    → Đăng nhập: http://localhost:5100   (dev: admin@abp.io / 1q2w3E*)
 ```
+
+> 🚨 **Quên bước 6a** ⇒ trang UI vẫn trả **`200`** nhưng **thiếu toàn bộ CSS/JS** (hiển thị trơ),
+> và log sẽ có dòng `Could not find the bundle file '/libs/...'`. Không chạy `abp install-libs`
+> thì **không** có lỗi biên dịch nào — đúng loại *"trông như chạy được"*.
+
+> 📌 **Hai tiến trình, hai vai trò:** `HttpApi.Host` (5000) = API + **auth server duy nhất**;
+> `eCommerce.Web` (5100) = UI MVC dùng **cookie** của ABP Identity, **không** làm auth server
+> (kiểm chứng: `POST http://localhost:5100/connect/token` ⇒ **404**). UI gọi app service
+> **trong tiến trình**, dùng **chung DB**.
+> ⚠️ Mọi tiến trình UI **phải** tắt background worker/job (xem `src/eCommerce.Web/eCommerceWebModule.cs`) —
+> nếu không, worker chạy **hai lần** (đồng bộ sàn, gửi cơ quan thuế…).
 
 Kiểm tra ChannelHub chạy thật (không cần credential Shopee vì `EnableLiveCalls = false`):
 
@@ -128,7 +153,7 @@ Cách kiểm chứng nhanh nhất: thêm log hoặc xem bảng `ChnChannelShops.
 
 ---
 
-## 5. Test đang có (20 test, tất cả pass)
+## 5. Test đang có (388 unit + 20 integration — con số chuẩn: `docs/handover-gd1.md` §1)
 
 | Nhóm | Nội dung |
 |---|---|
@@ -149,22 +174,24 @@ dotnet test test\eCommerce.Tests\eCommerce.Tests.csproj
 ## 6. Đã có gì / còn thiếu gì
 
 ### ✅ Đã có (biên dịch + test được)
-- Khung ABP Modular Monolith đúng layering, 15 project, chạy được `dotnet build`.
+- Khung ABP Modular Monolith đúng layering, **19 project** (gồm `eCommerce.Web` — UI quản trị), chạy được `dotnet build`.
 - Domain commerce lõi: catalog, tồn kho append-only, đơn hàng, với bất biến được test.
 - **ChannelHub**: abstraction `IChannelConnector`, factory, `ShopeeConnector` (**thuật toán ký thật**), supervisor + worker động theo shop, `ChannelTokenManager` với distributed lock + double-check, ETO tích hợp.
 - **PaymentHub**: `PaymentTransaction` (idempotent), `IPaymentProvider`, `VnPayPaymentProvider` (**ký + xác thực IPN thật**).
 - EF Core/PostgreSQL: DbContext hợp nhất, mapping theo module, index unique chống trùng, migration đã sinh.
 - Hạ tầng: Redis cache + **Redis distributed lock** (bắt buộc khi chạy nhiều instance), Swagger, seed dữ liệu.
+- **UI quản trị (`eCommerce.Web`, cổng 5100)**: theme Basic (miễn phí) + **màn hình đăng nhập ABP Identity** — **đã kiểm chứng đăng nhập thật** (xem `docs/features/web-001-…md` §16).
 
 ### ❌ Chưa có (cố ý để lại, có ghi chú trong code)
-- **UI đăng nhập & trang quản trị**: chưa có, vì solution **chưa có project Web**.
-  API đã có auth server (OpenIddict) nhưng lấy token phải gọi `/connect/token` trực tiếp.
-  👉 Kế hoạch tạo project Web: [docs/abp-modules-plan.md](docs/abp-modules-plan.md) §3.3
+- ✅ ~~**UI đăng nhập & trang quản trị**~~ → **ĐÃ CÓ (15/10/2026)**: `src/eCommerce.Web` (cổng **5100**),
+  theme Basic miễn phí + màn hình đăng nhập ABP Identity; **đăng nhập thật đã kiểm chứng**
+  ([docs/features/web-001-…md](docs/features/web-001-ui-admin-khung-dang-nhap-phan-quyen.md) §16).
+  ⚠️ Màn hình **nghiệp vụ** (sản phẩm/tồn kho/đơn hàng) **chưa có** — sẽ thêm cùng các module GĐ1.
 - **`TenantManagement`, CMS Kit, Docs, Blogging** — chưa thêm (chưa cần ở Phase 0).
-- **Luồng cần database chưa được kiểm chứng**: cấp token thật, 401/403 của API, seeder,
-  và distributed lock per-shop khi refresh token Shopee. Cách kiểm chứng: xem
-  [docs/phase-0-execution-report.md](docs/phase-0-execution-report.md) §5.
-- **UI quản trị & storefront**: chưa có (đây là phần lớn nhất còn lại).
+- ✅ ~~**Luồng cần database chưa được kiểm chứng**~~ → **ĐÃ kiểm chứng**: cấp token thật, ma trận
+  `401/403/200` trên endpoint gắn quyền, seeder, distributed lock per-shop
+  ([docs/runtime-verification-report.md](docs/runtime-verification-report.md) §9bis/§10).
+- **Storefront (website bán hàng)**: chưa có (UI quản trị đã có khung) — thuộc GĐ1.
 - **Gọi HTTP thật tới Shopee/Lazada**: `ShopeeConnector` mới có phần ký + khung; các method đánh dấu `TODO` và ném `NotImplementedException` khi `EnableLiveCalls = true`.
 - **Webhook endpoint nhận IPN/push của sàn** và handler tạo đơn từ `ChannelOrderPulledEto`.
 - **Connector Lazada/TikTok Shop**, các cổng MoMo/payOS/ZaloPay/SePay/Casso.

@@ -20,12 +20,12 @@
 | Lỗi thật đã sửa | **24** — trong đó **16 lỗi IM LẶNG** |
 | Điểm phát metric | **7/12** |
 
-> 📌 **CẬP NHẬT 14/10/2026 (lượt sửa lỗi #22 — phương án B, + sửa `F-403`):** các số ở bảng trên là
-> **mốc bàn giao**. Sau lượt đó: **Test = 383 unit + 20 integration** · **Lỗi thật đã sửa = 25** (thêm **#22**)
-> **+ `F-403`** (lỗi phân quyền, xem **§4**) · build **0 lỗi/0 cảnh báo** ·
-> **ma trận `401`/`403`/`200` đã đo lại ĐẦY ĐỦ trên endpoint GẮN QUYỀN** (trước đây ca `200` đo nhầm endpoint).
-> Chi tiết & bằng chứng: `docs/runtime-verification-report.md` **§9bis** + **§10** ·
-> `docs/features/chn-002-connector-shopee.md` **§16** · `docs/features/XC-004-…md` **§15.2 F6 + §15.6**.
+> 📌 **CẬP NHẬT 15/10/2026 (thêm `eCommerce.Web` + màn hình đăng nhập):** các số ở bảng trên là
+> **mốc bàn giao**. Sau các lượt GĐ1: **Test = 388 unit + 20 integration** · **2 tiến trình**
+> (Host **5000** API/auth · Web **5100** UI) · build **0 lỗi/0 cảnh báo** · **lỗi #22 đã sửa** (fail-closed)
+> · **`F-403` đã sửa** · **§7.0 xong #2/#5/#7**.
+> Chi tiết: `implementation-plan.md` **A.12** · `runtime-verification-report.md` **§9bis/§10** ·
+> `chn-002-connector-shopee.md` **§16** · `XC-004-…md` **§15.2 F6/§15.6** · `web-001-…md` **§16**.
 
 ### Lệnh chuẩn
 ```powershell
@@ -156,14 +156,38 @@ Host cổng **5000**. DB: `docker exec -i ecommerce-postgres psql -U ecommerce -
 |---|---|---|
 | 1 | **Xây Order intake (`SAL-005`)** — nơi nhận `ChannelOrderPulledEto` | Đây là **việc A**; xong thì **đồng bộ sàn tự chạy lại** (fail-closed tự mở, không cần bật cờ nào) |
 | 2 | **Test tích hợp ma trận quyền** trên endpoint **GẮN QUYỀN** (`XC-004` TC-05/TC-06) | `F-403` đã sửa nhưng ma trận hiện **chỉ đo bằng script thủ công**; test project chưa có `WebApplicationFactory` |
-| 3 | **§7.0 #2 — `eCommerce.Web` + login** | **Hạng mục lớn nhất còn lại của §7.0** (solution chưa có project Web) |
+| 3 | **`WEB-001` §16.6** — menu/điều hướng theo permission · `[AllowAnonymous]` allowlist · ma trận quyền tự động cho UI | UI khung đã chạy thật (xem `docs/features/web-001-…md` **§16**) |
 | 4 | **§7.0 #8 — observability còn thiếu** | **5/12 metric chưa có nơi phát** |
 | 5 | **`CHN-002` §16.5 #5** — supervisor thiếu `Timer.RunOnStart = true` | Cùng họ lỗi #23; ảnh hưởng nhỏ |
 | 6 | **Outbox/relay** | 🚨 **Cảnh báo giữ nguyên:** **không có message broker** (chỉ PostgreSQL + Redis). **Thứ tự đúng: có người nhận trước (việc 1), rồi mới bàn tới giao tin cậy.** |
 
-> ✅ **ĐÃ XONG trong §7.0 (14/10/2026):** **#5** `docs/coding-conventions.md` + `.editorconfig` ·
-> **#7** 2 test reflection `XC-004` TC-01/TC-02 (`test/eCommerce.Tests/Authorization/BatBienPhanQuyenTests.cs`,
-> **5** test, đã **kiểm chứng ngược bằng đột biến**). Tiến độ đầy đủ §7.0: `docs/implementation-plan.md` **A.12**.
+> ✅ **ĐÃ XONG trong §7.0:** **#2** `eCommerce.Web` + màn hình đăng nhập (**chạy thật**, cổng **5100**) ·
+> **#5** `docs/coding-conventions.md` + `.editorconfig` ·
+> **#7** 2 test reflection `XC-004` TC-01/TC-02 (**5** test, **kiểm chứng ngược bằng đột biến**).
+> Tiến độ đầy đủ §7.0: `docs/implementation-plan.md` **A.12**.
+
+### 🖥️ Hai tiến trình — chạy thế nào
+
+| Tiến trình | Cổng | Vai trò | Lệnh |
+|---|---|---|---|
+| `eCommerce.HttpApi.Host` | **5000** | **API + auth server DUY NHẤT** (OpenIddict phát token) | `dotnet eCommerce.HttpApi.Host.dll` |
+| `eCommerce.Web` | **5100** | **UI quản trị** + màn hình đăng nhập (cookie của ABP Identity) | `dotnet eCommerce.Web.dll` |
+
+⚠️ **Trước khi chạy `eCommerce.Web` trên máy mới (hoặc sau khi clone):** thư mục `wwwroot/libs`
+**không** được commit (thư mục sinh ra) ⇒ **PHẢI** chạy:
+
+```powershell
+abp install-libs -wd src/eCommerce.Web        # cần yarn; tái tạo từ package.json + yarn.lock
+```
+
+Không chạy ⇒ trang vẫn trả **`200`** nhưng **thiếu toàn bộ CSS/JS** (hiển thị trơ) — đúng loại
+*"trông như chạy được"*. Đăng nhập: `admin@abp.io` / `1q2w3E*` (dev).
+
+🚨 **Hai bất biến bắt buộc cho MỌI tiến trình UI thêm sau này** (đã trả giá, xem `WEB-001` §16.4/§16.5):
+1. **KHÔNG** truyền scheme mặc định vào `AddAuthentication(...)` — sẽ **âm thầm** làm cookie đăng nhập
+   không được đọc (`[Authorize]` tìm ở nhầm scheme).
+2. **TẮT** `AbpBackgroundWorkerOptions.IsEnabled` và `AbpBackgroundJobOptions.IsJobExecutionEnabled`
+   — nếu không, worker chạy **HAI LẦN** (đồng bộ sàn, gửi cơ quan thuế…) ⇒ tiêu quota gấp đôi.
 
 ---
 

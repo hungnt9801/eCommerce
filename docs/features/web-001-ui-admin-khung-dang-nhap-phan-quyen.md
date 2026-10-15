@@ -764,3 +764,123 @@ public class AdminUiGuardTests
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.1 | 13/10/2026 | *(điền)* | Bản nháp đầu — hiện trạng lấy **từ code thật** (`eCommerce.slnx` 18 project / 0 Web; 21 permission = 21 hằng số; 0 `[AllowAnonymous]`; pipeline **thiếu** `UseStaticFiles`/`UseAbpRequestLocalization`; seed OpenIddict **thiếu** `authorization_code`). Chốt **10 ADR**, **18 BR**, **14 NFR**, **20 test case**, **bảng đăng ký menu** (§5.3). Ghi nhận **11 phát hiện** (F1–F11) và **6 điểm chưa kiểm chứng** (§15.4) |
+
+---
+
+## 16. TRẠNG THÁI TRIỂN KHAI (15/10/2026) — **KHUNG UI + MÀN HÌNH ĐĂNG NHẬP ĐÃ CHẠY THẬT**
+
+> Thực thi **§7.0 #2** của `docs/implementation-plan.md`. Commit ghi ở lịch sử thay đổi §16.7.
+
+### 16.1 Đã tạo gì
+
+| Thành phần | Tệp / gói | Ghi chú |
+|---|---|---|
+| Project UI | `src/eCommerce.Web/` (`Microsoft.NET.Sdk.Web`) | Tiến trình **riêng**, cổng **5100** (`appsettings.json` → `"Urls"`) |
+| Theme | `Volo.Abp.AspNetCore.Mvc.UI.Theme.Basic` **10.7.0** | 🚨 Theme **miễn phí** duy nhất dùng được: `LeptonXLite` **KHÔNG** có bản 10.7.0 (chuỗi version chỉ tới **5.7.0**) — đã hỏi `api.nuget.org` trước khi chọn |
+| Màn hình đăng nhập | `Volo.Abp.Account.Web` **10.7.0** (bản **KHÔNG** OpenIddict) | Xem **16.3** — chọn bản thuần là **có chủ ý** |
+| Module | `eCommerceWebModule.cs` | Cùng đồ thị module với Host, **cùng DB** ⇒ gọi app service **trong tiến trình** |
+| Thương hiệu | `eCommerceBrandingProvider.cs` | Mặc định ABP là `"MyApplication"` — xem **16.4** |
+| Trang chủ quản trị | `Controllers/HomeController.cs` + `Views/Home/Index.cshtml` | `[Authorize]` ở **cấp class** (quy ước #4) |
+| Thư viện client | `package.json` + `wwwroot/libs` (**sinh ra**, không commit) | Cài bằng `abp install-libs -wd src/eCommerce.Web` |
+
+### 16.2 ✅ BẰNG CHỨNG ĐO ĐƯỢC (Host/Web thật + PostgreSQL 17 thật)
+
+| Phép đo | Kết quả |
+|---|---|
+| `GET /` **chưa** đăng nhập | **`302`** → `http://localhost:5100/Account/Login?ReturnUrl=%2F` ✅ |
+| `GET /Account/Login` | **`200`** · HTML **10.145** ký tự · **có** `<form>` + `name="LoginInput.UserNameOrEmailAddress"` ✅ |
+| `GET /Account/Manage` chưa đăng nhập | **`302`** → `/Account/Login?ReturnUrl=%2FAccount%2FManage` ✅ |
+| `GET /libs/bootstrap/css/bootstrap.css` | **`200`** · **280.308** byte ⇒ tài nguyên theme **được phục vụ thật** ✅ |
+| **Đăng nhập THẬT** (`admin@abp.io`, kèm token chống giả mạo) | `POST /Account/Login` → theo chuyển hướng → URL cuối **`/`** · **`200`** · HTML có `Hệ thống eCommerce đa kênh` = **True** ✅ |
+| Cookie sau đăng nhập | `.AspNetCore.Antiforgery.…` + **`.AspNetCore.Identity.Application`** ✅ |
+| `<title>` trang chủ | `Trang quản trị \| eCommerce` ✅ |
+| Log khởi động | **0** dòng `fail:` · **0** exception ✅ |
+| Build | **0 lỗi / 0 cảnh báo** (`--no-incremental`) |
+| Test | **388** unit + **20** integration — **không** hồi quy |
+
+### 16.3 🚨 QUYẾT ĐỊNH: UI **KHÔNG** làm auth server (tránh hai nguồn sự thật)
+
+Ban đầu tôi dùng `Volo.Abp.Account.Web.OpenIddict`. Gói đó kéo `Volo.Abp.OpenIddict.AspNetCore` ⇒ tiến trình
+UI trở thành **auth server THỨ HAI**, trùng vai với `eCommerce.HttpApi.Host`, trên **cùng một DB**:
+hai nơi cùng quản `OpenIddictApplications`/`OpenIddictTokens`, mỗi nơi một **bộ chứng chỉ dev khác nhau**
+⇒ token phát từ UI **không** được Host chấp nhận (và ngược lại). Không phải lỗ hổng, nhưng là
+**hai nguồn sự thật** cho cùng một việc.
+
+**Đã đổi sang `Volo.Abp.Account.Web` (bản thuần).** UI dùng **cookie** của ABP Identity; OpenIddict
+**không cần** cho việc đăng nhập UI. Bằng chứng sau khi đổi (đo trên Web thật):
+
+```
+GET  /Account/Login                      -> 200   (màn hình đăng nhập vẫn nguyên)
+POST /connect/token                      -> 404   ⇒ KHÔNG còn auth server thứ hai
+GET  /.well-known/openid-configuration   -> 404
+```
+
+và Host vẫn nguyên vẹn: `/health-status` **200** · API không token **401** · `/connect/token` **200**
+(`expires_in=3599`).
+
+> 📌 **Hệ quả cho §15.4 (6 điểm chưa kiểm chứng):** các câu hỏi về `authorization_code`/PKCE, `ConsentType`,
+> và `expires_in` của **token UI** trở nên **không còn cần thiết cho UI khung** — vì đường đăng nhập UI
+> **không đi qua** `/connect/authorize` mà dùng **cookie**. Chúng vẫn cần nếu sau này có **client ngoài**
+> (SPA/mobile) dùng chính Host làm auth server.
+
+### 16.4 🚨 LỖI IM LẶNG #1 — scheme xác thực mặc định (đã sửa, **đã kiểm chứng ngược bằng ĐỘT BIẾN**)
+
+Trong `ConfigureServices` tôi từng viết:
+
+```csharp
+context.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+               .AddCookie(o => o.LoginPath = "/Account/Login");
+```
+
+với suy nghĩ *"thiếu scheme mặc định ⇒ `[Authorize]` trả `500` thay vì chuyển hướng"*. Build **xanh**,
+test **xanh**, và **chuyển hướng `302` về `/Account/Login` trông vẫn đúng** — nên nếu chỉ nhìn
+"có chuyển hướng" thì **không thấy sai**.
+
+**Đo bằng đột biến** (cùng một kịch bản đăng nhập thật, chỉ khác dòng trên):
+
+| Cấu hình | URL cuối sau `POST /Account/Login` | Trang quản trị render? |
+|---|---|---|
+| **CÓ** dòng trên (scheme mặc định = `"Cookies"`) | `/Account/Login?ReturnUrl=%2F` ⇒ **vẫn chưa đăng nhập** | ❌ `False` |
+| **KHÔNG** (bản đã sửa) | `/` | ✅ `True` |
+
+**Nguyên nhân:** module Account/Identity đăng nhập bằng scheme `IdentityConstants.ApplicationScheme`
+(`"Identity.Application"`), còn dòng trên đã **thay** scheme mặc định thành `"Cookies"`
+⇒ `[Authorize]` đi tìm cookie ở **nhầm** scheme ⇒ luôn coi là chưa đăng nhập.
+
+**Quy tắc rút ra (đã ghi vào `docs/coding-conventions.md` §7):** **KHÔNG** truyền scheme mặc định vào
+`AddAuthentication(...)`. Nếu cần thêm provider ngoài thì dùng dạng **bổ sung** `AddAuthentication().AddGoogle(...)`.
+
+### 16.5 🚨 LỖI IM LẶNG #2 — worker chạy **HAI LẦN** (đã xử lý)
+
+Vì Web dùng **cùng đồ thị module** với Host, mọi `BackgroundWorker`/`BackgroundJob` có mặt ở **cả hai**
+tiến trình: `ChannelSyncSupervisorWorker` (đồng bộ sàn), `EInvoiceSubmissionWorker` (gửi cơ quan thuế),
+`AdministrativeUnitSyncWorker`, `TaxUnclassifiedSkusWorker`… ⇒ **tiêu quota gấp đôi**, gọi API ngoài
+gấp đôi, tranh chấp con trỏ đồng bộ.
+
+**Đã tắt tường minh** trong `eCommerceWebModule`:
+
+```csharp
+Configure<AbpBackgroundWorkerOptions>(o => o.IsEnabled = false);
+Configure<AbpBackgroundJobOptions>(o => o.IsJobExecutionEnabled = false);
+```
+
+⚠️ Đây là **cấu hình**, không phải logic ⇒ **không** lỗi biên dịch, **không** exception, test **không** thấy.
+Chỉ phát hiện được khi **nghĩ tới** hoặc khi nhìn log thật của **cả hai** tiến trình.
+📌 Việc **bắt buộc** cho mọi tiến trình UI thêm sau này.
+
+### 16.6 ⚠️ CHƯA LÀM / CHƯA KIỂM CHỨNG (nói thẳng)
+
+| # | Việc | Trạng thái |
+|---|---|---|
+| 1 | **Menu/điều hướng theo permission**, `_ViewImports` đầy đủ, `WEB-001` §5.3 bảng đăng ký menu | ⬜ **Chưa làm** — hiện chỉ có 1 trang chủ tĩnh; chưa nối `IPageLayout`/menu contributor |
+| 2 | **`[AllowAnonymous]` allowlist** + `TC-03` | ⬜ Chưa làm (vẫn **0** chỗ dùng `[AllowAnonymous]`) |
+| 3 | **Ma trận `401/403/200` tự động cho Web UI** | ⬜ Hiện đo bằng **script thủ công** |
+| 4 | **`/api/abp/application-configuration` có thật sự anonymous** (§15.4 #2) | ⬜ Chưa đo |
+| 5 | **CSP / inline script của theme** (§15.4 #5) | ⬜ Chưa đo. Ghi nhận: khi **thiếu** `wwwroot/libs`, HTML render chứa `<script>console.log(...)` cảnh báo bundle — sau khi cài đủ libs thì không còn thấy dòng đó |
+| 6 | **`wwwroot/libs` không được commit** | ✅ Có chủ ý (sinh ra từ `package.json` + `yarn.lock`). ⚠️ **Máy mới PHẢI chạy** `abp install-libs -wd src/eCommerce.Web` trước, nếu không theme **thiếu CSS/JS** — trang vẫn trả `200` nhưng hiển thị trơ (đúng loại "trông như chạy được") |
+
+### 16.7 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.2 | 15/10/2026 | *(agent, session GĐ1)* | **Tạo `src/eCommerce.Web`** (theme Basic miễn phí + `Volo.Abp.Account.Web`) ⇒ **màn hình đăng nhập chạy thật** (đăng nhập `admin` vào được trang chủ quản trị). Sửa **2 lỗi im lặng**: scheme xác thực mặc định (**16.4**, kiểm chứng ngược bằng đột biến) và worker chạy hai lần (**16.5**). Ghi nhận việc còn lại ở **16.6** |

@@ -1,0 +1,63 @@
+@using Volo.Abp.AspNetCore.Mvc.UI.Layout
+@inject IPageLayout PageLayout
+@{
+    PageLayout.Content.Title = "Trang quản trị";
+    PageLayout.Content.BreadCrumb.Add("Trang chủ");
+}
+
+<div class="card mb-3">
+    <div class="card-header">
+        <h5 class="card-title mb-0">Hệ thống eCommerce đa kênh — khu vực quản trị</h5>
+    </div>
+    <div class="card-body">
+        <p class="mb-2">
+            Bạn đang đăng nhập vào <strong>tiến trình UI quản trị</strong> (<code>eCommerce.Web</code>).
+            UI dùng <strong>chung cơ sở dữ liệu</strong> với API host (<code>eCommerce.HttpApi.Host</code>),
+            và gọi app service <strong>trong tiến trình</strong>.
+        </p>
+        <p class="mb-0 text-muted small">
+            Đây là màn hình đầu tiên của GĐ1 hạ tầng nền (§7.0 #2). Các màn hình nghiệp vụ
+            (sản phẩm, tồn kho, đơn hàng…) sẽ được thêm cùng các module GĐ1.
+        </p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-4">
+        <div class="card mb-3">
+            <div class="card-body">
+                <h6 class="card-title">Nền tảng đã có</h6>
+                <ul class="mb-0 small">
+                    <li>Xác thực &amp; phân quyền (OpenIddict + ABP Identity)</li>
+                    <li>Địa chỉ hành chính 2 cấp (AddressHub)</li>
+                    <li>Hoá đơn điện tử + ký số (EInvoice, Signing)</li>
+                    <li>Thuế GTGT theo SKU (Tax)</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card mb-3">
+            <div class="card-body">
+                <h6 class="card-title">GĐ1 — đang làm</h6>
+                <ul class="mb-0 small">
+                    <li>Tồn kho &amp; chống bán vượt tồn</li>
+                    <li>Sản phẩm / biến thể (SKU)</li>
+                    <li>Giá theo kênh</li>
+                    <li>Giỏ hàng &amp; đặt hàng</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card mb-3">
+            <div class="card-body">
+                <h6 class="card-title">Lối vào nhanh</h6>
+                <ul class="mb-0 small">
+                    <li><a href="/Account/Manage">Quản lý tài khoản</a></li>
+                    <li><a href="/swagger" target="_blank" rel="noopener">API host (cổng 5000)</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>

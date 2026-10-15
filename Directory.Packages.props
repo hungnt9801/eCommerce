@@ -81,6 +81,27 @@
     <PackageVersion Include="Volo.Abp.Identity.EntityFrameworkCore" Version="10.7.0" />
     <PackageVersion Include="Volo.Abp.Identity.HttpApi" Version="10.7.0" />
   </ItemGroup>
+  <!--
+    GIAI ĐOẠN 1 — UI QUẢN TRỊ (§7.0 #2): `src/eCommerce.Web`.
+    ✅ ĐÃ XÁC MINH CÓ THẬT TRÊN nuget.org (hỏi `api.nuget.org/v3-flatcontainer` ngày 15/10/2026),
+       KHÔNG đoán: cả hai đều có bản **10.7.0** khớp version ABP đang ghim.
+
+    ⚠️ `Volo.Abp.AspNetCore.Mvc.UI.Theme.LeptonXLite` **KHÔNG** có bản 10.7.0 (chuỗi version của nó
+       chỉ tới 5.7.0) ⇒ **không** dùng được; chọn **BasicTheme** (miễn phí, LGPL) theo đúng
+       "quyết định 8" của kế hoạch (`docs/implementation-plan.md` §2).
+  -->
+  <ItemGroup Label="ABP MVC UI (free theme + màn hình login) — GĐ1">
+    <PackageVersion Include="Volo.Abp.AspNetCore.Mvc.UI.Theme.Basic" Version="10.7.0" />
+    <!--
+      ⚠️ CHỌN `Volo.Abp.Account.Web` (KHÔNG phải `.OpenIddict`): UI dùng **cookie** của ABP Identity,
+         KHÔNG cần làm auth server. Gói `.OpenIddict` kéo theo `Volo.Abp.OpenIddict.AspNetCore`
+         ⇒ tiến trình UI trở thành **auth server THỨ HAI** (trùng vai với `eCommerce.HttpApi.Host`)
+         trên **cùng DB**: hai nơi cùng quản `OpenIddictApplications`/`OpenIddictTokens`, mỗi nơi một
+         bộ chứng chỉ dev khác nhau ⇒ token phát từ UI **không** được Host chấp nhận, và ngược lại.
+         Không phải lỗi bảo mật, nhưng là **hai nguồn sự thật** cho cùng một việc — tránh hẳn.
+    -->
+    <PackageVersion Include="Volo.Abp.Account.Web" Version="10.7.0" />
+  </ItemGroup>
   <ItemGroup Label="Third-party — version đã được xác nhận qua `dotnet restore` thật">
     <!-- EF Core runtime được resolve là 10.0.11; Tools/Design phải cùng dòng để tránh lệch. -->
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.11" />
