@@ -1123,3 +1123,60 @@ Người dùng **đừng** kỳ vọng giảm giá theo số lượng cho tới 
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.2 | 15/10/2026 | *(agent, session GĐ1)* | **Lát cắt 1**: `TierPriceSet` (vòng đời ADR-10 + append-only) + `TierPrice` + **`ChonBacThang` hàm thuần** (ADR-02: `MinQuantity` lớn nhất ≤ quantity; **trùng ⇒ NÉM `0008`**; không bậc nào ⇒ `null`) + **2 unique index `NULLS NOT DISTINCT`** (sửa tay — **hàng rào DB cho ADR-02**). **+15 unit · +2 integration** (có **đối chứng** khác SKU). Ghi rõ **§16.3: bậc thang CHƯA nối vào bộ tra giá** ⇒ chưa có tác dụng lên giá bán cho tới khi có pipeline B1–B8 |
+
+---
+
+## 17. TRẠNG THÁI TRIỂN KHAI — **LÁT CẮT 2: TÍNH TIỀN ĐƠN (B6/B7/B8 + 4 ĐIỂM LÀM TRÒN)** (15/10/2026)
+
+### 17.1 Đã làm
+
+`TinhTienDon` — **hàm THUẦN** trong `modules/Pricing/…Domain`, cài **đúng 4 điểm làm tròn** của §4.2 và
+**ADR-06/ADR-07**:
+
+| Điểm | Việc | Luật bất di bất dịch |
+|---|---|---|
+| **R1** | làm tròn **đơn giá** qua `IRoundingPolicy` **sau** khi đã chọn (B5) | tròn **trước** khi so sánh ⇒ **chọn sai bậc/ứng viên** |
+| **R2/R3** | phân bổ **giảm giá** / **phí** cấp đơn theo trọng số thành tiền bằng **`MoneyAllocator`** (phần dư lớn nhất — **bảo toàn tổng**), rồi làm tròn **từng phần** | tròn **tổng** rồi chia ⇒ **mất/thừa 1–2 đồng** |
+| **R4** | thuế tính **theo TỪNG DÒNG** và làm tròn **từng dòng** | tròn **tổng thuế** ⇒ hoá đơn **không khớp** `Σ` theo mức thuế suất (`XC-001` BR-010) |
+| — | **Tổng đơn = Σ các dòng ĐÃ làm tròn** — 🚫 **không** làm tròn tổng | lệch 1–2 đồng ⇒ khách khiếu nại, kế toán không khớp |
+
+Thêm: **ADR-08** — `KetQuaTinhTien.MaChinhSachLamTron` ghi lại mã chính sách đã dùng ⇒ giải trình được
+*"vì sao hôm đó ra số này"*. Đầu vào `quantity < 1` ⇒ **NÉM** (im lặng coi là 1 sẽ tạo dòng tiền **sai** mà
+không ai biết); trộn loại tiền ⇒ **NÉM** (`PRC-001` BR-010).
+
+### 17.2 ✅ BẰNG CHỨNG (test đơn vị — **đây là kiểm chứng THẬT của một hàm thuần**)
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | **R1** đơn giá `12.345,6` ⇒ **`12.346`** (VND = 0 chữ số) | ✅ |
+| 2 | **R1 tròn TRƯỚC rồi mới nhân**: `10.000,5 × 3` ⇒ **`10.001 × 3 = 30.003`** (không phải `30.002`) | ✅ |
+| 3 | **R2 bảo toàn tổng**: chia `10.000` cho 3 dòng lẻ ⇒ **`Σ phần = 10.000`** | ✅ |
+| 4 | **R3** phí phân bổ bảo toàn tổng, mọi dòng có trọng số đều nhận > 0 | ✅ |
+| 5 | **R4 thuế theo từng dòng**: 2 mức thuế suất ⇒ `10.000` + `4.000` = **`14.000`** | ✅ |
+| 6 | 🚨 **R4 — đối chứng SỐ HỌC chứng minh luật KHÔNG vô nghĩa**: 3 dòng thuế `50,5` ⇒ **Σ dòng đã tròn = `153`**, còn **tròn tổng = `152`** ⇒ **hai cách cho hai kết quả khác nhau** (lệch 1 đồng thật) | ✅ |
+| 7 | **Tổng thanh toán = Σ dòng đã làm tròn** (đối chiếu lại bằng phép cộng độc lập trong test) | ✅ |
+| 8 | Đơn **0 đồng** + có phí ⇒ trả **0**, **không** ném lỗi khó hiểu | ✅ |
+| 9 | Chính sách **không làm tròn** ⇒ giữ nguyên `12.345,6789` | ✅ |
+| 10 | Đơn **rỗng** / `quantity < 1` / **trộn loại tiền** (cả ở khoản cấp đơn) ⇒ **NÉM** | ✅ |
+
+- build `--no-incremental`: **0 lỗi / 0 cảnh báo** · unit **574/574** (+16) · integration **34/34** · mermaid 197/0
+- Không đổi schema (hàm thuần, không migration)
+
+📌 **Vì sao KHÔNG có kiểm chứng HTTP ở lát cắt này:** `TinhTienDon` là **hàm thuần** — nó **không** có route,
+**không** đọc DB, **không** đọc đồng hồ. Với hàm thuần, **test đơn vị chính là kiểm chứng trạng thái thật**
+(đầu vào xác định ⇒ đầu ra xác định). Việc **nối** nó vào đường HTTP thuộc lát cắt **lắp pipeline** (§17.3).
+
+### 17.3 ⚠️ Điều **CHƯA** làm (trạng thái thật, không tô hồng)
+
+| # | Việc | Hệ quả hiện tại |
+|---|---|---|
+| 1 | **Lắp pipeline B1–B5** (snapshot chính sách · giá cơ sở 4 cấp · **thu thập ứng viên bậc thang** · điều chỉnh · chọn đơn giá) rồi **gọi** `TinhTienDon` cho B6–B8 | **Bậc thang VẪN chưa có tác dụng** (§16.3 vẫn đúng) và **giảm giá/phí/thuế chưa** xuất hiện ở API tra giá |
+| 2 | **API tính tiền** (nhận giỏ ⇒ trả `KetQuaTinhTien`) | chưa có route ⇒ chưa kiểm chứng được bằng HTTP |
+| 3 | **Thuế**: `ThueSuat` hiện do **bên gọi truyền vào** (Pricing **không** đọc module `Tax`) | đúng tinh thần `Q1` (không phụ thuộc chéo) — `Tax` cấp mức thuế, Pricing chỉ **áp** |
+| 4 | **Sổ giải trình** `PriceCalculationRecords` (ADR-13) + `IdempotencyKey` | chưa có ⇒ chưa trả lời được *"vì sao đơn này giá này"* bằng dữ liệu |
+
+### 17.4 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.3 | 15/10/2026 | *(agent, session GĐ1)* | **Lát cắt 2 — tính tiền đơn**: `TinhTienDon` (hàm **thuần**) cài **R1** (tròn đơn giá **trước** khi nhân), **R2/R3** (phân bổ bằng `MoneyAllocator` — **bảo toàn tổng**, rồi tròn từng phần), **R4** (thuế **theo từng dòng**), **tổng = Σ dòng đã tròn** (🚫 không tròn tổng) + `MaChinhSachLamTron` (ADR-08). **+16 unit**, gồm **đối chứng số học** chứng minh R4 không vô nghĩa (`153` vs `152` khi tròn tổng). Ghi rõ **§17.3**: pipeline B1–B5 + API tính tiền **chưa** làm ⇒ bậc thang **vẫn** chưa có tác dụng |
