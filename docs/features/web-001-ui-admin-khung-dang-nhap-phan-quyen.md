@@ -1147,3 +1147,57 @@ phân biệt được hai cột **có bị hoán đổi** hay không.
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.v | 15/10/2026 | *(agent, session GĐ1)* | ✅ **`/PhanBo` ca CÓ DỮ LIỆU kiểm chứng, KHỚP API TỪNG DÒNG**: gieo đơn `Pending` có giữ chỗ `4` ⇒ API báo `0/4/0` + `theoKho={kho.id: 4}` ⇒ **trang hiện đúng `0/4/0`** và **`kho.id` khớp chính xác**; dòng TỔNG đúng; **`fail: 0`** ở cả Web và Host. 📌 Ghi lý do **phải đo ở trạng thái `DangGiu`** (phân biệt `DangGiu` vs `DaBan` — sau khi xác nhận thì hai cột **không** phân biệt được nếu bị hoán đổi) và **phải kiểm `kho.id`** (gán nhầm kho vẫn *"xanh"* nếu chỉ kiểm số) |
+
+---
+
+## 52. **TRANG MẶT TIỀN THỨ HAI: `GET /SanPham`** (hàng đang bán + đơn giá) (15/10/2026)
+
+### 52.1 Đã làm
+
+| # | Thành phần |
+|---|---|
+| 1 | `SanPhamController` (`[Authorize]` cấp class) — gọi `IPriceListAppService.GetListAsync()` + `GetItemsAsync(id)` **in-process** |
+| 2 | `Views/SanPham/Index.cshtml` — bảng **(danh sách giá × SKU × đơn giá)** + **dòng TỔNG SỐ DÒNG** + **CA RỖNG** |
+
+📌 **Giá KHÔNG được tính ở tầng UI** — lấy **nguyên văn** từ `Pricing` (`PRC-001` Q1). Con số **cuối cùng** (thuế/phí/khuyến mãi)
+vẫn **phải** đến từ `PriceCalculation` (sổ giải trình) — ghi rõ ở chân trang thay vì để người đọc hiểu nhầm.
+📌 **Quy tắc "nạp module ở Web" được áp dụng CÓ CHỦ ĐÍCH lần đầu:** `Pricing` đã nạp từ vòng 58 (bài học `HTTP 500`)
+⇒ trang này **không** vấp lại lỗi cũ.
+
+### 52.2 ✅ BẰNG CHỨNG
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | `GET /SanPham` **chưa** đăng nhập | **`302`** → `/Account/Login?ReturnUrl=%2FSanPham` ✅ |
+| 2 | Đăng nhập với `ReturnUrl=%2FSanPham` ⇒ URL cuối | **`/SanPham`** ✅ |
+| 3 | 🔥 **`GET /SanPham`** (đã đăng nhập) | **`200`** · `2.083` ký tự · **bảng render** (không còn ca rỗng) ✅ |
+| 4 | 🔥 **Hai dòng SKU khớp dữ liệu đã gieo** | `SPSKU-A-…` ⇒ **`100,000`** ✅ · `SPSKU-B-…` ⇒ **`250,000`** ✅ |
+| 5 | **Dòng TỔNG SỐ DÒNG** | **`2`** ✅ |
+| 6 | Dọn dẹp · tiến trình treo | `bangGia=0 item=0 baoMat=true don=0 ton=0` ✅ · **0** tiến trình treo ✅ |
+
+📌 **Vì sao hai con số gieo được chọn KHÁC NHAU và "lạ" (`100.000`/`250.000`):** nếu dùng cùng một giá trị cho cả hai dòng
+thì một trang **hoán đổi/ghi lặp** vẫn *"xanh"*. Hai giá trị **khác nhau** buộc trang phải đọc **đúng từng dòng**.
+
+### 52.3 ⚠️ **Hai điểm CHƯA đạt — ghi rõ, không tô hồng**
+
+| # | Điểm chưa đạt | Ảnh hưởng | Cách sửa (lát cắt sau) |
+|---|---|---|---|
+| 1 | 🚨 **Đối chiếu API↔trang KHÔNG hiển thị được**: dòng *"API (nguồn sự thật)"* in **rỗng** ⇒ phép **so hai nguồn** (đã làm được ở §51 cho `/PhanBo`) **CHƯA** thực hiện cho trang này | Bằng chứng hiện tại là *"trang khớp **dữ liệu đã gieo**"* — **mạnh** nhưng **không** phải đối chứng chéo hai đường độc lập | In **JSON thô** của `GET /api/app/price-list/item/{id}` trước khi parse (nghi khác **kiểu chữ** hoa/thường của trường JSON) |
+| 2 | 🚨 **Dọn dẹp LẦN ĐẦU thất bại** (`syntax error at end of input`) do tôi ghép SQL có **nháy lồng** trong chuỗi PowerShell | Nếu không kiểm lại, dữ liệu thử **sẽ ở lại DB** và làm nhiễu các phép đo sau | Viết SQL ra **tệp `.sql`** (bài học vòng 35 §26.3) thay vì nhúng chuỗi; **luôn `SELECT` xác nhận sau khi dọn** (đã làm: `bangGia=0 item=0`) |
+| 3 | Quy trình sau khi chạy script dài | — | Kiểm thêm **tiến trình `dotnet` treo** (đã làm: **0**) — trước đây chưa từng kiểm |
+
+### 52.4 Trạng thái `WEB-001`
+
+| # | Hạng mục | Trạng thái |
+|---|---|---|
+| 1 | Khung đăng nhập + phân quyền (`BR-009` ✅) | ✅ |
+| 2 | **Harness đăng nhập** | ✅ §49 |
+| 3 | `/PhanBo` — **ca rỗng** · **ca có dữ liệu (khớp API từng dòng)** | ✅ §50 · §51 |
+| 4 | **`/SanPham` — hàng đang bán + đơn giá** | ✅ §52 *(thiếu đối chứng chéo API — §52.3 #1)* |
+| 5 | Giỏ hàng → đặt hàng trên Web | ⏳ chưa làm |
+
+### 52.5 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.u | 15/10/2026 | *(agent, session GĐ1)* | **Trang mặt tiền thứ hai `GET /SanPham`** (bảng danh sách giá × SKU × đơn giá, **ca rỗng** + **dòng TỔNG**). **Kiểm chứng**: chưa đăng nhập ⇒ `302`; đã đăng nhập ⇒ **`200`**, hai dòng SKU hiện **đúng hai giá khác nhau đã gieo** (`100.000` / `250.000`), TỔNG `2`; dọn dẹp sạch (`0/0`), cờ bảo mật khôi phục, **0 tiến trình treo**. ⚠️ **Hai điểm chưa đạt ghi rõ**: **đối chứng chéo API chưa hiển thị được** (probe in rỗng) và **dọn dẹp lần đầu lỗi** do ghép SQL nháy lồng (§52.3) |

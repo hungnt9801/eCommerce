@@ -1,0 +1,75 @@
+@using eCommerce.Web.Controllers
+@model List<SanPhamDongDto>
+@{
+    Layout = null;
+}
+@*
+    🚨 TRANG HÀNG ĐANG BÁN + ĐƠN GIÁ (WEB-001 — bước 2 của chuỗi mặt tiền).
+    📌 `Layout = null`: trang tự chứa ⇒ phép kiểm chứng tập trung vào ĐÚNG đường dữ liệu (xem ghi chú ở Views/PhanBo).
+    ⚠️ Mọi giá trị qua Razor `@` (tự HTML-encode). Giá định dạng bằng `ToString("N0")` + hậu tố đơn vị tiền tệ
+       — CHƯA đa tiền tệ ở tầng UI (inv-001 §42.1: giới hạn đã biết); ghi rõ ở chân trang thay vì im lặng.
+*@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hàng đang bán</title>
+    <style>
+        body { font-family: system-ui, sans-serif; margin: 2rem; color: #222; }
+        h1 { font-size: 1.3rem; }
+        table { border-collapse: collapse; width: 100%; max-width: 60rem; }
+        th, td { border: 1px solid #ccc; padding: .4rem .6rem; text-align: left; }
+        th { background: #f3f3f3; }
+        .so { text-align: right; }
+        .rong { padding: 1rem; background: #fffbe6; border: 1px solid #e6d38a; max-width: 60rem; }
+        .ghichu { color: #666; font-size: .85rem; max-width: 60rem; }
+    </style>
+</head>
+<body>
+    <h1>Hàng đang bán</h1>
+
+    @if (Model.Count == 0)
+    {
+        @* 🚨 CA RỖNG — bắt buộc: một trang chỉ đúng khi có dữ liệu là một trang CHƯA kiểm chứng. *@
+        <div class="rong" id="trong">
+            <strong>Chưa có hàng nào được niêm yết giá.</strong>
+            <div>Chưa có danh sách giá nào có dòng SKU, hoặc chưa có danh sách giá nào được tạo.</div>
+        </div>
+    }
+    else
+    {
+        <table id="bang-san-pham">
+            <thead>
+                <tr>
+                    <th>Danh sách giá</th>
+                    <th>SKU</th>
+                    <th class="so">Đơn giá</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var dong in Model)
+                {
+                    <tr>
+                        <td>@dong.MaBangGia — @dong.TenBangGia</td>
+                        <td>@dong.Sku</td>
+                        <td class="so">@dong.DonGia.ToString("N0")</td>
+                    </tr>
+                }
+            </tbody>
+            <tfoot>
+                <tr>
+                    <th colspan="2">TỔNG SỐ DÒNG</th>
+                    <th class="so" id="tong-dong">@Model.Count</th>
+                </tr>
+            </tfoot>
+        </table>
+    }
+
+    <p class="ghichu">
+        Nguồn: <code>IPriceListAppService</code> (<code>GET /api/app/price-list</code> + <code>/item/{id}</code>) —
+        cùng app service với API (một nguồn sự thật). ⚠️ Giá hiển thị <strong>chưa</strong> kèm thuế/phí/khuyến mãi:
+        con số **cuối cùng** phải lấy từ <code>PriceCalculation</code> (sổ giải trình) — xem <code>PRC-002</code>.
+    </p>
+</body>
+</html>
