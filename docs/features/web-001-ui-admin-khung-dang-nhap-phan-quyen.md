@@ -1201,3 +1201,51 @@ thì một trang **hoán đổi/ghi lặp** vẫn *"xanh"*. Hai giá trị **kh�
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.u | 15/10/2026 | *(agent, session GĐ1)* | **Trang mặt tiền thứ hai `GET /SanPham`** (bảng danh sách giá × SKU × đơn giá, **ca rỗng** + **dòng TỔNG**). **Kiểm chứng**: chưa đăng nhập ⇒ `302`; đã đăng nhập ⇒ **`200`**, hai dòng SKU hiện **đúng hai giá khác nhau đã gieo** (`100.000` / `250.000`), TỔNG `2`; dọn dẹp sạch (`0/0`), cờ bảo mật khôi phục, **0 tiến trình treo**. ⚠️ **Hai điểm chưa đạt ghi rõ**: **đối chứng chéo API chưa hiển thị được** (probe in rỗng) và **dọn dẹp lần đầu lỗi** do ghép SQL nháy lồng (§52.3) |
+
+---
+
+## 53. **SỬA 2 ĐIỂM CHƯA ĐẠT CỦA §52.3** (15/10/2026)
+
+### 53.1 ✅ §52.3 **#2 ĐÃ SỬA VÀ KIỂM CHỨNG** — dọn dẹp bằng **tệp `.sql`**
+
+**Cách làm:** ghi SQL ra **tệp `.sql`** (`Set-Content` + `docker exec -i … psql` đọc từ stdin) — **KHÔNG** ghép SQL
+có **nháy lồng** trong chuỗi PowerShell (nguyên nhân `syntax error` của §52.3 #2).
+
+**Bằng chứng (một lần chạy):**
+```
+UPDATE 1
+DELETE 2
+DELETE 1
+DON DEP: item=0 bangGia=0 baoMat=true don=0 ton=0
+tien trinh dotnet treo: 0
+```
+✅ **DB sạch** · ✅ **cờ bảo mật khôi phục `true`** · ✅ **0 tiến trình treo** (`dotnet` được lọc theo `CommandLine` chứa `eCommerce`).
+📌 Cách này nay là **chuẩn cho mọi probe**: *dọn dẹp bằng tệp `.sql` + `SELECT` xác nhận + kiểm tiến trình treo*.
+
+### 53.2 🔍 §52.3 **#1 — NGUYÊN NHÂN GỐC TÌM RA: TÔI GỌI SAI ROUTE** (không phải lỗi parse JSON)
+
+| Giả thuyết ban đầu (§52.3 #1) | Sự thật **đo được** |
+|---|---|
+| *"khác kiểu chữ hoa/thường của trường JSON"* | 🚨 **SAI**: `GET /api/app/price-list/item/{id}` trả **`HTTP 405`** ⇒ **route sai**, body là **trang lỗi** (không phải JSON) ⇒ probe in **rỗng** một cách **hợp lý** |
+| *"cần in JSON thô"* | body trả về là **`Byte[]`** ⇒ phải **decode** trước khi in (lỗi thứ hai của probe: `[System.Byte[]] does not contain a method named 'Substring'`) |
+
+📌 **Điều này KHÔNG làm suy suyển kết quả vòng 60:** trang `/SanPham` vẫn được chứng minh hiện **đúng hai giá đã gieo**
+(`100.000` / `250.000`) — *"nguồn sự thật"* ở vòng 60 là **dữ liệu tôi gieo**, không phải lời gọi API sai route.
+📌 **Nhưng nó để lại một khoảng trống thật:** *đối chứng chéo **API ↔ trang*** cho `/SanPham` **CHƯA** làm được —
+đúng như §52.3 #1 đã ghi. Nay ta biết **chính xác** vì sao và cần gì để làm nốt (route đúng, in **JSON đã decode**).
+📌 **Bài học #7 (bổ sung §39.4):** *một lời gọi API trả **rỗng** phải được coi là **ĐÁNG NGỜ**, không phải "không có dữ liệu"* —
+kiểm **HTTP status** trước khi kết luận về nội dung. (Đây là **lần thứ ba** trong dự án một lỗi `405/404` do **sai route**
+bị đọc nhầm thành vấn đề khác — xem `PRC-001` §19.7, `inv-001` §33.1. **Cùng một họ lỗi, lần thứ ba.**)
+
+### 53.3 Việc còn lại (đã chốt, rẻ)
+
+| # | Việc |
+|---|---|
+| 1 | Lấy **route đúng** của `price-list` từ `swagger.json` (in ra ở lượt này) ⇒ gọi **đúng** ⇒ in **JSON đã decode** ⇒ **đối chứng chéo API ↔ `/SanPham`** |
+| 2 | Áp **chuẩn dọn dẹp §53.1** cho **mọi** probe tiếp theo |
+
+### 53.4 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.t | 15/10/2026 | *(agent, session GĐ1)* | ✅ **Sửa §52.3 #2**: dọn dẹp bằng **tệp `.sql`** (không nháy lồng) ⇒ `item=0 bangGia=0 baoMat=true` + **0 tiến trình treo** ⇒ thành **chuẩn cho mọi probe**. 🔍 **Sửa §52.3 #1 — nguyên nhân gốc:** lời gọi API của tôi trả **`405`** (**route sai**), body là **trang lỗi `Byte[]`** ⇒ probe in rỗng; **không** phải lỗi parse JSON như tôi đoán. ⇒ *đối chứng chéo API↔trang* cho `/SanPham` **vẫn còn nợ**, nay đã biết **chính xác** cách làm nốt. Ghi **bài học #7**: *lời gọi API trả rỗng phải bị coi là ĐÁNG NGỜ — kiểm HTTP status trước khi kết luận về nội dung* (**lần thứ ba** dự án đọc nhầm lỗi sai-route thành vấn đề khác) |
