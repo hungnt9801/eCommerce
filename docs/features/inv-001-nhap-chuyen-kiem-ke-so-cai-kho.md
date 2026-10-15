@@ -1128,3 +1128,51 @@ giá trị sai **được ghi xuống DB** — mà `CHECK` ở DB **có thể kh
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.2 | 15/10/2026 | *(agent, session GĐ1)* | **Lát cắt 1 — đóng 3 lỗ hổng nền**: **ADR-03** 5 `CHECK` trên `InvItems`/`InvStockLedger` + bất biến `Reserved <= OnHand`; **ADR-04** thêm 4 `StockMovementType` **ở cuối dải** + `ApplyMovement` xử lý đủ (test khoá **giá trị số** để không diễn giải lại lịch sử); **ADR-05** `ReferenceLineId` + unique index **có bộ lọc** `NULLS NOT DISTINCT`. 🚨 **Sửa lỗi thật** *"gán trước — kiểm sau"* khiến entity ở lại trạng thái sai sau khi ném (§16.3). **+19 unit · +4 integration** (có **đối chứng** bút toán không tham chiếu). DB thật xác nhận **5 `CHECK`** + index bộ lọc; tổng **35** index `NULLS NOT DISTINCT` |
+
+---
+
+## 17. TRẠNG THÁI TRIỂN KHAI — **LÁT CẮT 2: KHO + CHỨNG TỪ (CHỨNG TỪ & GHI SỔ LÀ HAI BƯỚC)** (15/10/2026)
+
+### 17.1 Đã làm
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| 1 | **`Warehouse`** (`InvWarehouses`) — **ADR-01** | `Code` (duy nhất/tenant) · `Name` · `Address` · **`IsActive`** + `YeuCauDangHoatDong()`. 📌 Trước đây `InventoryItem.WarehouseId` là `Guid` **"trần"** ⇒ không trả lời được *kho còn hoạt động không? tên gì? thuộc tenant nào?* — và **nhập hàng vào kho đã đóng mà không gì chặn** (`WarehouseId` **vẫn** giữ kiểu `Guid`, **không FK cứng**, theo ADR-01: để di trú được dữ liệu tồn kho trước khi khai báo kho, và để **kho cũ** vẫn giải thích được lịch sử sổ cái) |
+| 2 | **`StockDocument`** (`InvStockDocuments`) + **`StockDocumentLine`** — **ADR-02** | `Type` (`GoodsReceipt`/`StockTransfer`/`Stocktake`) · `Status` (`Draft`/`Posted`/`Cancelled`) · `WarehouseId` · `ToWarehouseId` · `OccurredAtUtc` · `IdempotencyKey` (ADR-07) |
+| 3 | **Vòng đời + bất biến** | `Draft → Posted` (**NÉM** nếu chưa có dòng) · `Draft → Cancelled` · **đã ghi sổ ⇒ CẤM sửa, CẤM huỷ** (sổ cái append-only ⇒ muốn đảo phải tạo **chứng từ ĐẢO**) · chuyển kho **thiếu kho đích**/**trùng một kho**/**loại khác mà có kho đích** ⇒ **NÉM** · số lượng dòng **≥ 1** |
+| 4 | 🔥 **Hợp nhất mã lỗi kho về MỘT nguồn** | Phát hiện `eCommerceConsts.ErrorCodes.InsufficientStock` = `eCommerce:Inventory:0001` **ở tầng app** trong khi miền kho cần **cả dải** ⇒ dấu hiệu **hai nguồn sự thật** (họ lỗi `XC-003` **F2** đã gặp ở miền kênh). Nay `InventoryErrorCodes` là **bản chuẩn duy nhất**; tên cũ **giữ làm bí danh** (`= InventoryErrorCodes.KhongDuTon`) nên **không phá mã đang dùng**, và có **test** khoá hai đường dẫn cho **cùng một giá trị** |
+
+### 17.2 ✅ BẰNG CHỨNG — **DB THẬT** (PostgreSQL 17)
+
+| Index | `NULLS NOT DISTINCT`? |
+|---|---|
+| `IX_InvWarehouses_TenantId_Code` | **✅ có** |
+| `IX_InvStockDocuments_TenantId_Number` | **✅ có** |
+| `IX_InvStockDocumentLines_TenantId_Doc_Sku` | **✅ có** |
+
+🚨 **Vì sao phải sửa tay `NULLS NOT DISTINCT` cho CẢ BA:** `TenantId = NULL` (hệ thống 1 tenant) mà PostgreSQL
+coi NULL là DISTINCT ⇒ **cả ba unique index mất tác dụng**:
+• hai kho **cùng mã** ⇒ chứng từ trỏ `WarehouseId` **không biết** kho nào ⇒ tồn kho tách hai nơi mà báo cáo cộng gộp ⇒ **số liệu kho SAI**;
+• hai chứng từ **cùng số** ⇒ đối soát/kiểm toán **không phân biệt được** phiếu nào (*đúng loại lỗi mà số chứng từ tồn tại để ngăn*);
+• hai dòng **cùng SKU trong cùng phiếu** ⇒ người đọc phiếu thấy *"nhập 5"* nhưng sổ cái ghi **hai** bút toán ⇒ **cộng sai** mà không có lỗi nào.
+
+- migration `20261015112247_Inv001_Warehouse_StockDocument` đã áp; `Assets/schema.sql` sinh lại; tổng **38** index `NULLS NOT DISTINCT`
+- **Test:** unit **617/617** (+17) · integration **38/38** · build `--no-incremental` **0 lỗi / 0 cảnh báo** · mermaid 197/0
+
+📌 **Bất biến "ném lỗi KHÔNG để lại trạng thái sai" nay có test riêng** (`Ghi_so_khi_CHUA_CO_DONG_thi_NEM__va_GIU_NGUYEN_trang_thai`) — rút trực tiếp từ lỗi thật của lát cắt 1 (§16.3): entity bị biến đổi rồi mới ném ⇒ EF vẫn theo dõi ⇒ có thể ghi giá trị sai xuống DB.
+
+### 17.3 Còn lại của `INV-001`
+
+| # | Việc | Ghi chú |
+|---|---|---|
+| 1 | 🚨 **Dịch vụ GHI SỔ** — ADR-09: `UPDATE … WHERE Status = 'Draft'` + **kiểm số dòng**, **không** đọc-rồi-ghi | phần cốt lõi còn thiếu; nằm trong **khoá phân tán** `(tenant, warehouse, sku)` (ADR-08) |
+| 2 | **Sinh bút toán** cho 3 loại chứng từ (nhập: +`OnHand` ở kho nguồn; chuyển: −nguồn/+đích; kiểm kê: lệch) — **cùng transaction** với `InventoryItem` |
+| 3 | **Idempotency** thực thi (ADR-07: `Invent:Post:{documentType}:{tenantId}:{documentId}`) |
+| 4 | **Job đối soát** `InventoryItem` ↔ `SUM(StockLedgerEntry)` + **metric** (ADR-10; §0 #9: **không có** metric nào cho kho) |
+| 5 | **API + permission** `eCommerce.Inventory.Receipt.Create`… (hiện permission mới có `Default`/`Adjust` — cần bổ sung ở **cả hai nơi**: hằng số + provider, nếu không ⇒ 403 cho mọi người) |
+
+### 17.4 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.3 | 15/10/2026 | *(agent, session GĐ1)* | **Lát cắt 2 — kho + chứng từ**: `Warehouse` (ADR-01, có `IsActive` + bất biến *"kho ngừng dùng ⇒ không tạo chứng từ"*) và `StockDocument`/`StockDocumentLine` (ADR-02: **chứng từ và ghi sổ là HAI bước**; đã ghi sổ ⇒ **cấm sửa/cấm huỷ**) + bất biến chuyển kho. 🔥 **Hợp nhất mã lỗi kho về một nguồn** (`InventoryErrorCodes`) và biến mã cũ ở tầng app thành **bí danh** (chống họ lỗi `XC-003` F2). **3 unique index `NULLS NOT DISTINCT`** (sửa tay). **+17 unit** (gồm test *"ném lỗi không để lại trạng thái sai"*), DB thật xác nhận **38** index. Ghi rõ §17.3: **dịch vụ ghi sổ** là phần cốt lõi còn thiếu |

@@ -1773,3 +1773,92 @@ VALUES ('20261015111042_Inv001_ReferenceLineId_Checks_Unique', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE TABLE "InvStockDocuments" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "Type" integer NOT NULL,
+    "Status" integer NOT NULL,
+    "Number" character varying(64) NOT NULL,
+    "WarehouseId" uuid NOT NULL,
+    "ToWarehouseId" uuid,
+    "OccurredAtUtc" timestamp with time zone NOT NULL,
+    "Note" character varying(2048),
+    "IdempotencyKey" character varying(128),
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_InvStockDocuments" PRIMARY KEY ("Id")
+);
+
+CREATE TABLE "InvWarehouses" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "Code" character varying(32) NOT NULL,
+    "Name" character varying(256) NOT NULL,
+    "Address" character varying(512),
+    "IsActive" boolean NOT NULL,
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_InvWarehouses" PRIMARY KEY ("Id")
+);
+
+CREATE TABLE "InvStockDocumentLines" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "StockDocumentId" uuid NOT NULL,
+    "Sku" character varying(64) NOT NULL,
+    "Quantity" integer NOT NULL,
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_InvStockDocumentLines" PRIMARY KEY ("Id"),
+    CONSTRAINT "FK_InvStockDocumentLines_InvStockDocuments_StockDocumentId" FOREIGN KEY ("StockDocumentId") REFERENCES "InvStockDocuments" ("Id") ON DELETE RESTRICT
+);
+
+CREATE INDEX "IX_InvStockDocumentLines_StockDocumentId" ON "InvStockDocumentLines" ("StockDocumentId");
+
+CREATE UNIQUE INDEX "IX_InvStockDocumentLines_TenantId_Doc_Sku" ON "InvStockDocumentLines" ("TenantId", "StockDocumentId", "Sku");
+
+CREATE UNIQUE INDEX "IX_InvStockDocuments_TenantId_Number" ON "InvStockDocuments" ("TenantId", "Number");
+
+CREATE INDEX "IX_InvStockDocuments_TenantId_Status_Type_OccurredAtUtc" ON "InvStockDocuments" ("TenantId", "Status", "Type", "OccurredAtUtc");
+
+CREATE UNIQUE INDEX "IX_InvWarehouses_TenantId_Code" ON "InvWarehouses" ("TenantId", "Code");
+
+DROP INDEX "IX_InvWarehouses_TenantId_Code";
+
+CREATE UNIQUE INDEX "IX_InvWarehouses_TenantId_Code" ON "InvWarehouses" ("TenantId", "Code") NULLS NOT DISTINCT;
+
+DROP INDEX "IX_InvStockDocuments_TenantId_Number";
+
+CREATE UNIQUE INDEX "IX_InvStockDocuments_TenantId_Number" ON "InvStockDocuments" ("TenantId", "Number") NULLS NOT DISTINCT;
+
+DROP INDEX "IX_InvStockDocumentLines_TenantId_Doc_Sku";
+
+CREATE UNIQUE INDEX "IX_InvStockDocumentLines_TenantId_Doc_Sku" ON "InvStockDocumentLines" ("TenantId", "StockDocumentId", "Sku") NULLS NOT DISTINCT;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261015112247_Inv001_Warehouse_StockDocument', '10.0.11');
+
+COMMIT;
+

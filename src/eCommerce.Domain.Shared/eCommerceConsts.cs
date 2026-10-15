@@ -118,7 +118,13 @@ public static class eCommerceConsts
     /// <summary>Mã lỗi nghiệp vụ (dùng với BusinessException).</summary>
     public static class ErrorCodes
     {
-        public const string InsufficientStock = "eCommerce:Inventory:0001";
+        /// <summary>
+        /// 🚨 **ĐÃ GỘP VỀ MỘT NGUỒN DUY NHẤT (15/10/2026, `INV-001`)** — trước đây mã này khai **ở đây**
+        /// trong khi miền kho cần **cả dải** `eCommerce:Inventory:*` ⇒ dễ sinh **hai nguồn sự thật**
+        /// (đúng họ lỗi `XC-003` **F2**). Nay bản chuẩn là <see cref="InventoryErrorCodes.KhongDuTon"/>;
+        /// tên cũ **giữ lại làm bí danh** để không phá mã đang dùng.
+        /// </summary>
+        public const string InsufficientStock = eCommerce.Inventory.InventoryErrorCodes.KhongDuTon;
         // 🚨 F2 của XC-003 — ĐÃ XOÁ 3 mã lỗi miền KÊNH khỏi đây (13/10/2026):
         // chúng trùng khái niệm với ChannelHubErrorCodes nhưng KHÁC định dạng
         // ("eCommerce:Channel:*" vs "ChannelHub:*") ⇒ hai nguồn sự thật cho cùng một mã lỗi.

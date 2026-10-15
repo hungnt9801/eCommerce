@@ -77,6 +77,11 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
     public DbSet<Inventory.InventoryItem> InventoryItems { get; set; } = default!;
     public DbSet<Inventory.StockLedgerEntry> StockLedgerEntries { get; set; } = default!;
 
+    // INV-001 — **kho** + **chứng từ kho** (chứng từ và ghi sổ là HAI bước; ADR-01/ADR-02).
+    public DbSet<Inventory.Warehouse> Warehouses { get; set; } = default!;
+    public DbSet<Inventory.StockDocument> StockDocuments { get; set; } = default!;
+    public DbSet<Inventory.StockDocumentLine> StockDocumentLines { get; set; } = default!;
+
     // ---- Orders ----
     public DbSet<Orders.Order> Orders { get; set; } = default!;
     public DbSet<Orders.OrderLine> OrderLines { get; set; } = default!;
@@ -413,6 +418,62 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
             // Một SKU chỉ có một bản ghi tồn kho cho mỗi kho trong mỗi tenant.
             // Index này là hàng rào cuối cùng chống ghi trùng khi có race condition.
             b.HasIndex(x => new { x.TenantId, x.WarehouseId, x.Sku }).IsUnique();
+        });
+
+        // ── INV-001 ADR-01: KHO ──────────────────────────────────────────────────────────────────
+        builder.Entity<Inventory.Warehouse>(b =>
+        {
+            b.ToTable("InvWarehouses");
+            b.ConfigureByConvention();
+
+            b.Property(x => x.Code).IsRequired().HasMaxLength(32);
+            b.Property(x => x.Name).IsRequired().HasMaxLength(256);
+            b.Property(x => x.Address).HasMaxLength(512);
+
+            // Mã kho duy nhất trong tenant — hàng rào DB (sửa tay NULLS NOT DISTINCT trong migration).
+            b.HasIndex(x => new { x.TenantId, x.Code })
+                .IsUnique()
+                .HasDatabaseName("IX_InvWarehouses_TenantId_Code");
+        });
+
+        // ── INV-001 ADR-02: CHỨNG TỪ KHO + DÒNG CHỨNG TỪ ─────────────────────────────────────────
+        builder.Entity<Inventory.StockDocument>(b =>
+        {
+            b.ToTable("InvStockDocuments");
+            b.ConfigureByConvention();
+
+            b.Property(x => x.Number).IsRequired().HasMaxLength(64);
+            b.Property(x => x.Type).HasConversion<int>();
+            b.Property(x => x.Status).HasConversion<int>();
+            b.Property(x => x.Note).HasMaxLength(2048);
+            b.Property(x => x.IdempotencyKey).HasMaxLength(128);
+
+            // Số chứng từ duy nhất trong tenant — chống tạo trùng khi retry/import.
+            b.HasIndex(x => new { x.TenantId, x.Number })
+                .IsUnique()
+                .HasDatabaseName("IX_InvStockDocuments_TenantId_Number");
+
+            b.HasIndex(x => new { x.TenantId, x.Status, x.Type, x.OccurredAtUtc })
+                .HasDatabaseName("IX_InvStockDocuments_TenantId_Status_Type_OccurredAtUtc");
+        });
+
+        builder.Entity<Inventory.StockDocumentLine>(b =>
+        {
+            b.ToTable("InvStockDocumentLines");
+            b.ConfigureByConvention();
+
+            b.Property(x => x.Sku).IsRequired().HasMaxLength(64);
+
+            // Một SKU chỉ xuất hiện MỘT lần trong một chứng từ: hai dòng cùng SKU trong cùng phiếu nhập
+            // ⇒ người đọc phiếu thấy "nhập 5" nhưng sổ cái ghi hai bút toán ⇒ **cộng sai** mà không lỗi nào.
+            b.HasIndex(x => new { x.TenantId, x.StockDocumentId, x.Sku })
+                .IsUnique()
+                .HasDatabaseName("IX_InvStockDocumentLines_TenantId_Doc_Sku");
+
+            b.HasOne<Inventory.StockDocument>()
+                .WithMany()
+                .HasForeignKey(x => x.StockDocumentId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         builder.Entity<Inventory.StockLedgerEntry>(b =>
