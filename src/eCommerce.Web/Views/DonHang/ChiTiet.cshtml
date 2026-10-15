@@ -42,6 +42,13 @@
         @Html.AntiForgeryToken()
         <button type="submit" id="nut-huy">Huỷ đơn</button>
     </form>
+    @* Trả hàng: cần KHO nhận hàng trả ⇒ có ô nhập. API đã đo chạy đúng ở §69 (kể cả phiếu TH-{số đơn}-{n}). *@
+    <form method="post" action="/DonHang/TraHang/@Model.Id">
+        @Html.AntiForgeryToken()
+        <label for="o-kho-tra">Kho nhận hàng trả</label>
+        <input id="o-kho-tra" name="khoId" required />
+        <button type="submit" id="nut-tra-hang">Trả hàng</button>
+    </form>
 
     <p class="ghichu">
         Xác nhận ⇒ <strong>xuất kho</strong> (<code>OnHand</code> và <code>Reserved</code> cùng giảm, <code>Available</code> không đổi).

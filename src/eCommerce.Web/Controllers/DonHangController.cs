@@ -45,6 +45,17 @@ public class DonHangController : Controller
         return RedirectToAction(nameof(ChiTiet), new { id });
     }
 
+    /// <summary>`POST /DonHang/TraHang/{id}` ⇒ `TraHangAsync` (**nhập hàng trả về kho** + phiếu `CustomerReturn`)
+    /// ⇒ quay lại chi tiết. 📌 API này **đã đo** chạy đúng trên đơn định dạng `WEB-…` (`web-001` §69), gồm cả
+    /// công thức số phiếu `TH-{Number}-{n}` và tra **luỹ kế** đã trả.
+    /// ⚠️ Cần **kho nhận hàng trả** — nên view có ô nhập `khoId` (khác hai nút kia, không cần tham số).</summary>
+    [HttpPost]
+    public async Task<IActionResult> TraHang(Guid id, Guid khoId)
+    {
+        await _donHang.TraHangAsync(id, new TraHangInput { WarehouseId = khoId });
+
+        return RedirectToAction(nameof(ChiTiet), new { id });
+    }
     /// <summary>`POST /DonHang/Huy/{id}` ⇒ `HuyDonAsync` (**nhả chỗ ngay**) ⇒ quay lại chi tiết.</summary>
     [HttpPost]
     public async Task<IActionResult> Huy(Guid id)

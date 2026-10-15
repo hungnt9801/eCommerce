@@ -2449,3 +2449,49 @@ chứ không phải một liên kết **chết** (`404`).
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.0-h | 15/10/2026 | *(agent, session GĐ1)* | ✅ **Lối vào `/DonHang` ĐÃ KIỂM CHỨNG** (trả nợ vòng 94): probe **chạy trọn** với hàm trợ giúp viết theo **Phần G** ⇒ `POST /DatHang` **200**, liên kết **có mặt**, `href` **`/DonHang/ChiTiet/3a245234-7189-5c03-d2b7-aa2b1602145c`** **KHỚP CHÍNH XÁC** `Id` đơn trong DB (`3a245234-7189-5c03-d2b7-aa2b1602145c`), **bấm tới ⇒ HTTP `200`** trạng thái `Pending`; dọn sạch; **`fail: 0`**; 0 tiến trình treo. ⇒ **Người dùng nay ĐI TỪ ĐẶT HÀNG SANG XỬ LÝ ĐƠN bằng một cú bấm** |
+
+---
+
+## 81. 🎉 **/DonHang ĐỦ BA HÀNH ĐỘNG: NÚT "TRẢ HÀNG" ĐÃ KIỂM CHỨNG** (15/10/2026)
+
+### 81.1 Đã làm (2 sửa, **mỗi sửa khớp đúng 1 lần**, build `0/0`)
+
+| # | Tệp | Thay đổi |
+|---|---|---|
+| 1 | `DonHangController.cs` | thêm action `TraHang(Guid id, Guid khoId)` ⇒ `_donHang.TraHangAsync(id, new TraHangInput { WarehouseId = khoId })` ⇒ quay lại chi tiết |
+| 2 | `Views/DonHang/ChiTiet.cshtml` | thêm **form thứ ba** — có **`@Html.AntiForgeryToken()`** + **ô nhập kho** (`id="o-kho-tra"`, `name="khoId"`, `required`) + nút `id="nut-tra-hang"` |
+
+📌 **Vì sao nút này KHÁC hai nút kia:** trả hàng **bắt buộc biết KHO nhận** ⇒ cần **tham số từ người dùng**;
+`Xác nhận`/`Huỷ` không cần ⇒ form của chúng chỉ có token + nút.
+
+### 81.2 🎉 BẰNG CHỨNG (probe `verify-nut-tra.ps1`, chạy **trọn**, `exit 0`)
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | Gieo + tạo đơn + **XÁC NHẬN** (trong **pha Host** — theo quy tắc §78.1) | tồn **`OnHand=7 Reserved=0 Available=7`** ✅ *(hàng đã xuất)* |
+| 2 | `GET /DonHang/ChiTiet` | **200** · **`trangThai='Confirmed'`** · **nút Trả hàng: có** · **ô kho: có** · token **198 ký tự** ✅ |
+| 3 | 🔥 **`POST /DonHang/TraHang/{id}`** (kèm `khoId` + token) | **`302`** → `/DonHang/ChiTiet/{id}` ✅ |
+| 4 | 🔥 **`GET` lại** | **`trangThai='Returned'`** ✅ · **DB `status=6`** ✅ |
+| 5 | 🔥 **Tồn kho sau trả** | **`OnHand=10 Reserved=0 Available=10`** ✅ — hàng **về kho** |
+| 6 | 🔥 **Phiếu trả sinh ra** | **`TH-WEB-WEB-tra-214844-1`** ✅ *(đúng công thức `TH-{số đơn}-{n}`, có cả tra **luỹ kế**)* |
+| 7 | Dọn dẹp · `fail:` · tiến trình treo | `don=0 ton=0 phieu=0 gc=0 sc=0 baoMat=true` ✅ · **`0`** ✅ · **0** ✅ |
+
+📌 **Vì sao #6 là phép đo đắt giá nhất:** trả hàng **sinh chứng từ kho** (`CustomerReturn`) và **đánh số theo luỹ kế**
+(`StartsWith("TH-{số đơn}")`). Số phiếu **`TH-WEB-WEB-tra-214844-1`** chứng minh **cả hai** chạy đúng **qua UI** — không chỉ đổi `Status`.
+📌 **Và #5 + #6 cùng nhau** loại được hai kiểu sai ngược nhau: *“đổi trạng thái mà không nhập kho”* và *“nhập kho mà không ghi chứng từ”*.
+
+### 81.3 🏁 `/DonHang` — **bảng cuối, đủ ba hành động**
+
+| # | Hành động | Bằng chứng | Bất biến đo được |
+|---|---|---|---|
+| 1 | **Xác nhận** | §77.2 | `10/4/6 → 6/0/6` — `OnHand` **và** `Reserved` cùng giảm, `Available` **không đổi** |
+| 2 | **Huỷ** | §78.2 | `10/2/8 → 10/0/10` — **nhả chỗ ngay**, `OnHand` **không đổi** |
+| 3 | 🔥 **Trả hàng** | **§81.2** | `OnHand` `7 → 10` · phiếu **`TH-…-1`** · trạng thái **`Returned`** |
+| 4 | Cổng đăng nhập | §75.2 | chưa đăng nhập ⇒ **`302`** |
+| 5 | Lối vào từ UI | §80.2 | liên kết từ trang kết quả đặt hàng, `href` **khớp `Id` trong DB** |
+
+### 81.4 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.0-i | 15/10/2026 | *(agent, session GĐ1)* | 🎉 **Nút TRẢ HÀNG của `/DonHang` ĐÃ KIỂM CHỨNG**: thêm action `TraHang(id, khoId)` + form thứ ba (**token + ô nhập kho**). Probe chạy trọn: `GET` ⇒ **200** trạng thái `Confirmed`, **nút + ô kho có mặt**; 🔥 `POST /DonHang/TraHang` ⇒ **`302`** ⇒ **`Returned`** (DB `status=6`); tồn **`OnHand=10 Reserved=0 Available=10`**; 🔥 phiếu trả **`TH-WEB-WEB-tra-214844-1`**; dọn sạch; **`fail: 0`**; 0 tiến trình treo. ⇒ **`/DonHang` nay đủ BA hành động đã kiểm chứng qua UI** |
