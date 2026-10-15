@@ -2420,3 +2420,62 @@ hoặc đọc kỹ `DoiSoatTonKho` để biết nó tính **cặp (kho, SKU) nà
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v2.3 | 15/10/2026 | *(agent, session GĐ1)* | **`REC-001` — đo ca CÓ LỆCH** (có **cặp ĐỐI CHỨNG**): job **phát hiện** và ghi **`warn:`** *"phát hiện 2 cặp (kho, SKU) LỆCH"*; **đối chiếu ĐỘC LẬP bằng SQL cũng ra `2`** ⇒ **hai nguồn khớp**; **`fail: 0`**; chạy **ngay khi khởi động**. ⚠️ **Ghi rõ điểm chưa giải thích được:** tôi kỳ vọng **1** cặp nhưng nhận **2** ⇒ **không** giảng hoà; để lát cắt sau xác định **ca nào** đóng góp cặp thứ hai (§38.3) |
+
+---
+
+## 39. `REC-001` — **ĐÓNG ĐIỂM MỜ §38.3: "2 cặp lệch" là LỖI CỦA PHÉP ĐO, KHÔNG phải của mã** (15/10/2026)
+
+### 39.1 Nguyên nhân gốc — tìm ra trong **hai** bước
+
+**Bước 1 — in `information_schema.columns` của `InvStockLedger`:**
+`Id, TenantId, WarehouseId, Sku, MovementType, QuantityDelta, BalanceAfter, ReferenceType, ReferenceId,
+ChannelCode, OccurredAtUtc, Note, CreationTime, CreatorId, LastModificationTime, LastModifierId, IsDeleted, …`
+🚨 **KHÔNG có `ExtraProperties`** và **KHÔNG có `ConcurrencyStamp`**.
+
+**Bước 2 — hai lần gieo dữ liệu đều thất bại với `42703`:**
+```
+ERROR: column "ExtraProperties" of relation "InvStockLedger" does not exist
+ERROR: column "ConcurrencyStamp" of relation "InvStockLedger" does not exist
+```
+⇒ lệnh `INSERT` **sổ cái cho cặp ĐỐI CHỨNG** (`RCDUNG`) **không chạy** ⇒ `RCDUNG` có `OnHand = 5` nhưng
+**sổ cái rỗng** ⇒ **CŨNG LÀ LỆCH** ⇒ **2 cặp lệch** thay vì 1.
+📌 **Và tôi đã LỌC MẤT `stderr`** khi chạy probe ⇒ **thông báo lỗi không bao giờ tới mắt tôi**.
+📌 **Đây là lần thứ BA và THỨ TƯ** tôi dính **đúng** cái bẫy này trên **đúng** bảng `InvStockLedger`
+(bài học đã ghi ở vòng 21: *"`InvStockLedger` INSERTs failed `42703` twice (`ExtraProperties`, `ConcurrencyStamp`) —
+copy columns from a working insert on the same table"*). **Bài học đã ghi vẫn bị tái phạm.**
+
+### 39.2 🔥 Phép đo quyết định — với **seed ĐÚNG**
+
+| Cặp | `OnHand` | Sổ cái | `LECH` |
+|---|---|---|---|
+| `RCDUNG-…` *(đối chứng)* | `5` | **`5`** ✅ | **`false`** ✅ |
+| `RCLECH-…` | `10` | `0` | **`true`** ✅ |
+
+⇒ **Job báo: *"phát hiện `1` cặp (kho, SKU) LỆCH"*** ✅ — **đúng bằng 1**, khớp **hoàn toàn** với dữ liệu.
+`fail: 0` · dọn dẹp `0/0` ✅
+
+### 39.3 Kết luận — **không có lỗi trong mã**
+
+| Khẳng định | Bằng chứng |
+|---|---|
+| Job **đếm đúng** trong **cả hai** phép đo | 2 cặp lệch ⇒ báo `2` (§38.2) · **1 cặp lệch ⇒ báo `1`** (§39.2) |
+| Job **KHÔNG báo động giả** | cặp **đối chứng** khớp sổ cái ⇒ **không** bị tính ✅ (đây chính là giá trị của việc thiết kế **cặp đối chứng**) |
+| "2" ở §38.3 là do **dữ liệu gieo sai** | `42703` trên `InvStockLedger` (2 lần) ⇒ cặp đối chứng **không có** sổ cái |
+| ✅ **`REC-001` (job đối soát) ĐÃ KIỂM CHỨNG ĐẦY ĐỦ** | chạy · không ném · **phát hiện đúng** · **đếm đúng** · **không báo động giả** |
+
+### 39.4 📌 Bài học phương pháp — **đắt và lặp lại**
+
+1. 🚨 **KHÔNG BAO GIỜ lọc `stderr` khi chạy probe** — lỗi SQL **im lặng** đã **che mất sự thật** và khiến tôi
+   **kết luận sai về mã** (§38.3 suýt bị ghi thành *"có thể có lỗi đếm"*). Từ nay: **luôn hiện `stderr`**.
+2. 🚨 **XÁC NHẬN DỮ LIỆU GIEO TRƯỚC KHI KẾT LUẬN** — phép `SELECT` xác nhận **đã có** ở §38 nhưng tôi **chỉ in dòng
+   cuối** và **không đọc kỹ**: nó hiện `soCai=0` cho **cả hai** cặp, đáng lẽ **phải** làm tôi dừng lại.
+   ⇒ **In `SELECT` xác nhận NGAY CẠNH kết quả đo**, và **đọc nó**.
+3. 📌 **Danh sách cột: lấy từ `information_schema.columns`, KHÔNG đoán** — nhất là bảng đã từng gây `42703`.
+4. 📌 **Giá trị của "cặp ĐỐI CHỨNG"**: nếu không có nó, phép đo §39.2 với **1 cặp lệch** vẫn "xanh" ngay cả khi job
+   **báo lệch mọi SKU**. Nhờ có đối chứng mà ta biết job **phân biệt được** khớp/lệch.
+
+### 39.5 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v2.4 | 15/10/2026 | *(agent, session GĐ1)* | **Đóng điểm mờ §38.3**: *"2 cặp lệch"* là **lỗi của PHÉP ĐO**, **không** phải của mã — `InvStockLedger` **không có** `ExtraProperties`/`ConcurrencyStamp` ⇒ `INSERT` sổ cái cho **cặp đối chứng** thất bại (`42703`), **và tôi đã lọc mất `stderr`**. Với **seed đúng**: `RCDUNG` **khớp** (`LECH=false`), `RCLECH` lệch (`true`) ⇒ **job báo đúng `1` cặp** ✅. ⇒ **`REC-001` KIỂM CHỨNG ĐẦY ĐỦ**: chạy · không ném · **phát hiện đúng** · **đếm đúng** · **không báo động giả**. Ghi **4 bài học phương pháp** (§39.4), nặng nhất: **KHÔNG lọc `stderr` khi chạy probe** |
