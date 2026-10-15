@@ -1939,3 +1939,59 @@ tiếp bị chặn · đường gọi app service ở Web khác API). ⇒ **Kế
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.f | 15/10/2026 | *(agent, session GĐ1)* | **Khoanh vùng rủi ro định dạng `WEB-…` bằng ĐO** (bổ sung §66.3): **đọc mã** ⇒ `HuyDonAsync` **không** phụ thuộc `Number` (tra `CheckoutIdempotencyKey`), `TraHangAsync` **có** (số phiếu `TH-{Number}` + luỹ kế) nhưng **cùng một công thức ở cả hai phía**; **đo `information_schema`** ⇒ `Number` tối đa **64** > `27`/`29–30` ⇒ **không tràn cột**. 🚨 **Vẫn ghi rõ nợ:** *hành vi* `HUỶ`/`TRẢ HÀNG` trên đơn do Web tạo **CHƯA đo** — **rủi ro thấp nhưng chưa bằng không** |
+
+---
+
+## 68. **ĐO HÀNH VI `HUỶ` TRÊN ĐƠN WEB: VẪN CHƯA XONG — lần này Web KHÔNG LÊN** (15/10/2026)
+
+### 68.1 Tiến triển **thật** của probe (đã bỏ được hai lỗi cũ)
+
+| Lỗi đã sửa | Cách sửa |
+|---|---|
+| 🐛 **`ParserError`** (ngoặc đơn lệch, §66.2) | `[Parser]::ParseFile` **chạy trước** ⇒ lần này **cú pháp OK** ✅ |
+| 🐛 **`LayToken` thất bại** (§66.2) | 🎯 **tìm ra nguyên nhân thật:** tôi từng viết `scope='eCommerce offline access'.Replace(' ','_')` ⇒ scope thành **`eCommerce_offline_access`** (**SAI**) ⇒ **token bị từ chối**. Nay dùng **chuỗi đúng** `'eCommerce offline access'` ✅ |
+
+⇒ Probe **chạy qua được**: `[1] gieo xong: idKho=3a245219-… | idBangGia=3a245219-… | ton: OnHand=10 Reserved=0 Available=10` ✅
+
+### 68.2 🚨 Lỗi mới — **Web KHÔNG lên trong 90 giây**
+
+```
+Exception: Host tại http://localhost:5100 KHONG len trong 90 giay
+```
+
+Probe **dừng ở bước chờ Web** ⇒ các bước `[2]`–`[5]` (đặt hàng qua Web · lấy `idDon` · **gọi `huy-don`** · đối chứng DB)
+**chưa chạy**. 🚨 **Vẫn CHƯA đo được hành vi `HUỶ`** (nợ §66.3 **giữ nguyên**).
+
+✅ **Không ảnh hưởng sản phẩm, không để lại dữ liệu:** `finally` chạy ⇒
+`DON DEP: don=0 dong=0 ton=0 donvi=0 gc=0 sc=0 baoMat=true` ✅ · **0 tiến trình treo** ✅.
+
+### 68.3 🚨 **LỖI THIẾT KẾ CỦA CHÍNH PROBE — và cách sửa (đã biết)**
+
+Khi Host/Web **không lên**, probe `throw` **một câu** *"KHONG len trong 90 giay"* — **KHÔNG** in **đuôi log** của tiến trình đó.
+⇒ Người đọc (chính tôi, vòng sau) **không biết VÌ SAO** nó không lên: *cổng bị chiếm* · *lỗi khởi động* · *kết nối DB* · *thiếu module*…
+
+📌 **Vi phạm đúng nguyên tắc đã ghi ở `inv-001` §27.3** (*"im lặng không phân biệt được với không chạy"*) — nhưng lần này
+**ở chính công cụ ĐO**, không phải ở job sản phẩm. **Cùng một loại lỗi, tầng khác.**
+
+**⇒ Sửa (bắt buộc cho mọi probe từ nay):** hàm `ChoHost` khi hết thời gian chờ phải **in 15 dòng cuối của log**
+(`Get-Content … -Tail 15`) **trước khi** ném lỗi. 📌 *"Thất bại to phải ồn ào"* phải bao gồm **thông tin để chẩn đoán**, không chỉ **thông báo rằng đã thất bại**.
+
+### 68.4 📌 Nhận xét về **nhịp sửa lỗi** (để không mất phương hướng)
+
+| Vòng | Probe tới được bước | Lỗi chặn |
+|---|---|---|
+| 69 | (không chạy) | **phẫu thuật tệp probe** hỏng |
+| 75 | tạo đơn qua Web ✅ | trích `idDon` (`Set-Content -PassThru` hiểu sai) |
+| 77 | (không chạy) | **ngoặc lệch** ⇒ `ParserError`; sau đó **scope token sai** |
+| **79** | **gieo dữ liệu ✅** | **Web không lên** (chưa in log ⇒ **chưa biết vì sao**) |
+
+📌 **Mỗi vòng loại được một lớp lỗi**, nhưng **vẫn chưa đo xong** ⇒ **nợ giữ nguyên**, và **bốn vòng** đã dùng vào **công cụ đo** thay vì nghiệp vụ.
+⇒ **Kết luận thẳng:** đây là **nợ kỹ thuật của bộ probe**, không phải của sản phẩm — và cách trả nợ **không** phải *"viết probe thứ sáu"*,
+mà là **dựng một hàm chờ chuẩn** (chờ + in log khi hỏng + tham số hoá URL) **dùng chung** cho mọi probe, tức **cơ chế hoá lần thứ tư**
+(giống Phụ lục C/D đã làm cho ràng buộc DB và route).
+
+### 68.5 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.e | 15/10/2026 | *(agent, session GĐ1)* | **Thử đo hành vi `HUỶ` trên đơn Web**: ✅ sửa được **2 lỗi probe cũ** (**cú pháp** nhờ `Parser::ParseFile` trước; **token** nhờ tìm ra scope sai `eCommerce_offline_access`) ⇒ probe **gieo dữ liệu thành công**; ❌ **Web không lên trong 90 s** ⇒ dừng, **chưa đo được `HUỶ`**. ✅ Không ảnh hưởng sản phẩm (`don=0 … baoMat=true`, 0 tiến trình treo). 🚨 **Ghi lỗi thiết kế của probe**: `ChoHost` khi hết chờ **không in log** ⇒ **không biết vì sao** Web không lên — vi phạm chính nguyên tắc *"thất bại to phải ồn ào"*. **Đề xuất: cơ chế hoá một hàm chờ chuẩn dùng chung** (chờ + in đuôi log + tham số hoá URL) thay vì viết probe thứ sáu |
