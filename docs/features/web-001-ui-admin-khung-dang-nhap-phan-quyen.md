@@ -1802,3 +1802,46 @@ thông báo nào *"bước 3 chưa chạy"*.
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.i | 15/10/2026 | *(agent, session GĐ1)* | **Thử đo đường nối UI → API** (đơn do Web tạo ⇒ xác nhận qua API): ✅ **đạt** phần *đặt hàng qua Web* (`HTTP 200`, `WEB-WEB-6292baf…`, **`440,000`**) và dọn dẹp sạch; ❌ **probe abort** ở bước trích `idDon` do **lỗi viết probe của tôi** (`Set-Content -PassThru` hiểu sai kiểu trả về) ⇒ **bước xác nhận qua API CHƯA chạy**. Ghi **bài học #11**: *hàm trợ giúp "một dòng" là nơi lỗi ẩn náu — mỗi việc một dòng, một biến trung gian có tên, và **in giá trị trung gian trước khi dùng*** |
+
+---
+
+## 65. 🎉 **ĐƯỜNG NỐI UI → API ĐÃ KIỂM CHỨNG** (15/10/2026) — *đóng §64.3 và Phụ lục E #1 (phần chứng minh)*
+
+### 65.1 Viết lại probe theo **bài học #11**
+
+Mỗi việc **một dòng** · **biến trung gian có tên** · **in giá trị trung gian TRƯỚC khi dùng**
+(`[tep sql] …` · `idKho=…` · `khoaCheckout=…` · `idDon=…`) ⇒ probe **chạy hết** ngay lần đầu.
+
+### 65.2 🎯 Kết quả — **đơn do WEB tạo VẬN HÀNH ĐƯỢC bằng API đã kiểm chứng**
+
+| Bước | Phép đo | Kết quả |
+|---|---|---|
+| 1 | Gieo kho + giá `100.000` + tồn `10` | `idKho=3a245212-…` ✅ |
+| 2 | 🔥 **Đặt hàng QUA WEB** (4 đơn vị, thuế 10%) | `GET=200` · khoá `WEB-b3370ebb253f4a90` · **`POST=200`** · số đơn **`WEB-WEB-b3370ebb253f4a90`** · **tổng `440,000`** ✅ |
+| 3 | Lấy `idDon` bằng **tệp `.sql` riêng** và **in ra** | `idDon=3a245214-…` ✅ *(khắc phục đúng lỗi §64.3)* |
+| 4 | 🔥 **XÁC NHẬN QUA API** (`SAL-003`) | **`HTTP 200` · `status='Confirmed'`** ✅ |
+| 5 | 🎯 **BẤT BIẾN `SAL-003`** — tồn kho | **`OnHand=6` · `Reserved=0` · `Available=6`** ✅<br>*(từ `10/4/6` ⇒ **`OnHand` VÀ `Reserved` cùng giảm `4`**, **`Available` KHÔNG đổi`** — đúng như `inv-001` §25)* |
+| 6 | Giữ chỗ | `4` · **`status=2` (`Committed`)** ✅ |
+| 7 | Sổ cái | `Receipt 10` · `Reservation 4` · **`Sale 4`** · **`ReservationRelease 4`** ✅ |
+| 8 | Dọn dẹp · `fail:` · tiến trình treo | `don=0 dong=0 ton=0 donvi=0 gc=0 sc=0 baoMat=true` ✅ · **Web `0` / Host `0`** ✅ · **`0`** ✅ |
+
+📌 **Vì sao phép đo này quan trọng (và là rủi ro thật đã được loại):** đơn do Web tạo có `Number = "WEB-{khoá}"` —
+một **định dạng số đơn mới**. Nếu `XacNhanAsync` phụ thuộc vào **định dạng số đơn** (thay vì `CheckoutIdempotencyKey`)
+thì đơn Web sẽ là **"đơn chết"**: **tạo được mà không xác nhận/xuất kho được** — và **không lộ ra** cho tới khi khách thật bấm.
+Nay đã chứng minh: **Web ⇒ DB ⇒ API vận hành** là **một mạch liền**.
+📌 **Và bất biến kiểm ở mức TỒN KHO**, không chỉ ở `status`: `Available` **không đổi** là chi tiết dễ sai nhất
+(vì `OnHand` **và** `Reserved` cùng giảm ⇒ nếu ai đó quên một trong hai thì `Available` sẽ **sai**).
+
+### 65.3 Trạng thái
+
+| # | Hạng mục `WEB-003`/quản lý đơn | Trạng thái |
+|---|---|---|
+| 1 | Đặt hàng trên Web (1 SKU · **nhiều dòng** · chống trùng đơn) | ✅ §56–§62 |
+| 2 | **Đơn do Web tạo vận hành được qua API** (xác nhận ⇒ xuất kho) | ✅ **§65** |
+| 3 | **Quản lý đơn TRÊN UI** (`/DonHang`: danh sách + nút xác nhận/huỷ/trả) | ⏳ **còn** — nay **rủi ro đã hết**: chỉ là nối **nút bấm** vào API đã chứng minh chạy được với đơn Web |
+
+### 65.4 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.h | 15/10/2026 | *(agent, session GĐ1)* | 🎉 **Đường nối UI → API kiểm chứng**: probe **viết lại theo bài học #11** (mỗi việc một dòng · biến có tên · **in giá trị trung gian**) chạy hết ngay lần đầu. **Đơn do WEB tạo** (`WEB-WEB-b3370ebb…`, `440.000`) **xác nhận được qua API** ⇒ **`Confirmed`**; 🔥 **bất biến `SAL-003` giữ đúng**: `OnHand` **và** `Reserved` cùng giảm `4` ⇒ **`Available` KHÔNG đổi** (`10/4/6` ⇒ `6/0/6`); giữ chỗ `Committed`; **4 bút toán sổ cái**; dọn sạch; **`fail: 0`**; 0 tiến trình treo |
