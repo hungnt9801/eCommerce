@@ -1,0 +1,51 @@
+@using eCommerce.Application.Contracts.Sales
+@model DonHangDto
+@{
+    Layout = null;
+}
+@*
+    🚨 QUẢN LÝ ĐƠN TRÊN UI (WEB-001). 📌 `Layout = null`: trang tự chứa ⇒ phép kiểm chứng tập trung vào đường dữ liệu.
+    🔐 **MỖI form POST đều có `@Html.AntiForgeryToken()`** — thiếu là ABP trả 400 (bài học vòng 65 · 86 · `tools/README-probe.md` Phần E).
+*@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Đơn hàng</title>
+    <style>
+        body { font-family: system-ui, sans-serif; margin: 2rem; color: #222; }
+        h1 { font-size: 1.3rem; }
+        table { border-collapse: collapse; max-width: 40rem; }
+        th, td { border: 1px solid #ccc; padding: .4rem .6rem; text-align: left; }
+        th { background: #f3f3f3; }
+        form { display: inline; }
+        .ghichu { color: #666; font-size: .85rem; max-width: 40rem; }
+    </style>
+</head>
+<body>
+    <h1>Đơn hàng</h1>
+
+    <table id="bang-don">
+        <tr><th>Số đơn</th><td id="so-don">@Model.Number</td></tr>
+        <tr><th>Trạng thái</th><td id="trang-thai">@Model.Status</td></tr>
+        <tr><th>Tổng tiền</th><td id="tong-tien">@Model.GrandTotal.ToString("N0")</td></tr>
+        <tr><th>Khoá checkout</th><td id="khoa">@(Model.CheckoutIdempotencyKey ?? "(không có)")</td></tr>
+    </table>
+
+    @* Hai hành động đã ĐO chạy đúng trên đơn định dạng WEB-… (§65 · §69) *@
+    <form method="post" action="/DonHang/XacNhan/@Model.Id">
+        @Html.AntiForgeryToken()
+        <button type="submit" id="nut-xac-nhan">Xác nhận</button>
+    </form>
+    <form method="post" action="/DonHang/Huy/@Model.Id">
+        @Html.AntiForgeryToken()
+        <button type="submit" id="nut-huy">Huỷ đơn</button>
+    </form>
+
+    <p class="ghichu">
+        Xác nhận ⇒ <strong>xuất kho</strong> (<code>OnHand</code> và <code>Reserved</code> cùng giảm, <code>Available</code> không đổi).
+        Huỷ ⇒ <strong>nhả chỗ ngay</strong>. Cả hai dùng <code>IDonHangAppService</code> — cùng app service với API.
+    </p>
+</body>
+</html>

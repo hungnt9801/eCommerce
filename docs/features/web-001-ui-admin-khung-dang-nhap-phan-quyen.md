@@ -2262,3 +2262,48 @@ nghĩa là **đăng ký/DI còn tham chiếu tới lớp đã xoá** — loại 
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.0-b | 15/10/2026 | *(agent, session GĐ1)* | ✅ **Kiểm chứng hồi quy sau khi gỡ /DonHang**: GET /health-status = **\$s1\** · GET / = **\$s2\** → login · GET /SanPham = **\$s3\** · **GET /DonHang/ChiTiet/{guid} = \$s4\** (route **đã biến mất**, **không** 500) · **ail: = \$flog\** ⇒ việc gỡ §73 **sạch**, **không** để lại mã chết gây lỗi |
+
+---
+
+## 76. 🚨 **ĐÍNH CHÍNH COMMIT `c4126bb` — `GET` ĐÃ ĐĂNG NHẬP VÀ `POST`: CHƯA KIỂM CHỨNG** (15/10/2026)
+
+### 76.1 Điều **sai** và cách nó xảy ra
+
+Commit `c4126bb` có **thông điệp khẳng định** *"da dang nhap + don khong ton tai 404 (khong 500) => route+auth+DI+app service deu chay"*.
+**SỰ THẬT ĐO ĐƯỢC:** bước đó trả **`302`**, **KHÔNG** phải `404`.
+
+| Phép đo | Kết quả THẬT |
+|---|---|
+| Chờ Web bằng `tools/wait-host.ps1` | `exit=0` · **"LÊN sau 2.5s"** ✅ |
+| `GET /health-status` | **`200`** ✅ |
+| Chưa đăng nhập `GET /DonHang/ChiTiet/{guid}` | **`302`** → login ✅ *(đúng)* |
+| 🔥 **Đã đăng nhập** `GET /DonHang/ChiTiet/{guid}` | 🚨 **`302`** — **KHÔNG** `404` ⇒ **phiên đăng nhập KHÔNG có hiệu lực** |
+
+**Vì sao commit vẫn chạy:** script in `🚨 CHUA DAT` và **bỏ qua** việc ghi tài liệu, **nhưng** lệnh `git commit` nằm **ngoài** khối `if`
+⇒ commit chạy **dù phép kiểm thất bại**, mang theo **thông điệp khẳng định điều chưa xảy ra**.
+📌 **Đây là lỗi NGHIÊM TRỌNG HƠN lỗi kỹ thuật:** nó làm **hồ sơ dự án nói sai** — đúng loại lỗi mà tài liệu này tồn tại để chống.
+📌 **Nguyên nhân nghi ngờ cao:** probe **quên đặt `ShouldChangePasswordOnNextLogin = false`** trước khi đăng nhập ⇒ ABP chuyển sang
+**màn hình đổi mật khẩu** ⇒ phiên **không** được xác thực cho `/DonHang` (mọi probe trước đều đặt cờ này).
+
+### 76.2 Sửa ngay + **quy tắc mới**
+
+1. **Sửa thông điệp commit** (`--amend`) cho **đúng** trạng thái; ghi **§76** để hồ sơ **không** giữ khẳng định sai.
+2. 🚨 **Quy tắc mới (bổ sung `tools/README-probe.md` Phần A):** **`git commit` PHẢI nằm TRONG nhánh `if (đạt)`** —
+   *không bao giờ để lệnh commit chạy vô điều kiện sau một phép kiểm.*
+
+### 76.3 Trạng thái `/DonHang` — **trung thực**
+
+| # | Hạng mục | Trạng thái |
+|---|---|---|
+| 1 | `DonHangController` + `Views/DonHang/ChiTiet.cshtml` (**token trong mỗi form**, đúng Phần E) | ✅ **đã viết**, build `0/0` |
+| 2 | Chưa đăng nhập ⇒ **`302`** | ✅ **đã đo** |
+| 3 | **Đã đăng nhập ⇒ render** (`200` + trạng thái + hai nút) | 🚨 **CHƯA đo** |
+| 4 | **`POST` Xác nhận / Huỷ** | 🚨 **CHƯA đo** |
+
+⇒ `/DonHang` **có mặt trong mã**, build **sạch**, **cổng chặn đã đo** — **đường có dữ liệu CHƯA kiểm chứng** ⇒ **KHÔNG** coi là *"xong"*.
+
+### 76.4 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.0-d | 15/10/2026 | *(agent, session GĐ1)* | 🚨 **ĐÍNH CHÍNH commit `c4126bb`**: thông điệp khẳng định `404`/route+auth+DI đã chạy — **SAI**; phép đo thật trả **`302`** vì **phiên đăng nhập không có hiệu lực** (nghi thiếu `ShouldChangePasswordOnNextLogin = false`). `--amend` + ghi §76. **Quy tắc mới:** **`git commit` phải nằm TRONG `if (đạt)`** |
