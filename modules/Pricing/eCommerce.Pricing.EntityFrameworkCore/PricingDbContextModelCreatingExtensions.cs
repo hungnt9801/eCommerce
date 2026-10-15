@@ -137,6 +137,36 @@ public static class PricingDbContextModelCreatingExtensions
                 .HasForeignKey(x => x.TierPriceSetId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
+
+        // ── PRC-002 ADR-13: SỔ GIẢI TRÌNH (append-only) ──────────────────────────────────────────
+        builder.Entity<PriceCalculationRecord>(b =>
+        {
+            b.ToTable("PrcPriceCalculationRecords");
+            b.ConfigureByConvention();
+
+            b.Property(x => x.IdempotencyKey).IsRequired().HasMaxLength(128);
+            b.Property(x => x.ChannelCode).IsRequired().HasMaxLength(64);
+            b.Property(x => x.RoundingPolicyCode).IsRequired().HasMaxLength(64);
+            b.Property(x => x.CurrencyCode).IsRequired().HasMaxLength(8);
+            b.Property(x => x.Payload).IsRequired();
+
+            b.Property(x => x.Subtotal).HasPrecision(18, 4);
+            b.Property(x => x.TotalDiscount).HasPrecision(18, 4);
+            b.Property(x => x.TotalFee).HasPrecision(18, 4);
+            b.Property(x => x.TotalTax).HasPrecision(18, 4);
+            b.Property(x => x.Total).HasPrecision(18, 4);
+
+            // 🚨 **HÀNG RÀO DB cho ADR-13**: một `IdempotencyKey` chỉ có **MỘT** bản ghi ⇒ gọi lại KHÔNG ghi thêm.
+            // ⚠️ PHẢI sửa tay `NULLS NOT DISTINCT` trong migration: `TenantId = NULL` (1 tenant) mà PostgreSQL coi
+            // NULL là DISTINCT thì **khoá idempotency MẤT tác dụng** ⇒ mỗi lần gọi lại ghi thêm một bản ghi
+            // ⇒ sổ giải trình có **nhiều kết quả khác nhau cho cùng một đơn** ⇒ **hết giá trị làm bằng chứng**.
+            b.HasIndex(x => new { x.TenantId, x.IdempotencyKey })
+                .IsUnique()
+                .HasDatabaseName("IX_PrcPriceCalculationRecords_TenantId_IdempotencyKey");
+
+            b.HasIndex(x => new { x.TenantId, x.CalculatedAt })
+                .HasDatabaseName("IX_PrcPriceCalculationRecords_TenantId_CalculatedAt");
+        });
     }
 
     /// <summary>

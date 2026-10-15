@@ -1708,3 +1708,44 @@ VALUES ('20261015105644_Prc002_TierPriceSet_ChannelShopId', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE TABLE "PrcPriceCalculationRecords" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "IdempotencyKey" character varying(128) NOT NULL,
+    "ChannelCode" character varying(64) NOT NULL,
+    "ChannelShopId" uuid,
+    "CalculatedAt" timestamp with time zone NOT NULL,
+    "RoundingPolicyCode" character varying(64) NOT NULL,
+    "CurrencyCode" character varying(8) NOT NULL,
+    "Subtotal" numeric(18,4) NOT NULL,
+    "TotalDiscount" numeric(18,4) NOT NULL,
+    "TotalFee" numeric(18,4) NOT NULL,
+    "TotalTax" numeric(18,4) NOT NULL,
+    "Total" numeric(18,4) NOT NULL,
+    "Payload" text NOT NULL,
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_PrcPriceCalculationRecords" PRIMARY KEY ("Id")
+);
+
+CREATE INDEX "IX_PrcPriceCalculationRecords_TenantId_CalculatedAt" ON "PrcPriceCalculationRecords" ("TenantId", "CalculatedAt");
+
+CREATE UNIQUE INDEX "IX_PrcPriceCalculationRecords_TenantId_IdempotencyKey" ON "PrcPriceCalculationRecords" ("TenantId", "IdempotencyKey");
+
+DROP INDEX "IX_PrcPriceCalculationRecords_TenantId_IdempotencyKey";
+
+CREATE UNIQUE INDEX "IX_PrcPriceCalculationRecords_TenantId_IdempotencyKey" ON "PrcPriceCalculationRecords" ("TenantId", "IdempotencyKey") NULLS NOT DISTINCT;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261015110229_Prc002_PriceCalculationRecords', '10.0.11');
+
+COMMIT;
+

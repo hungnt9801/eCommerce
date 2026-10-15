@@ -1,3 +1,4 @@
+using System.Text.Json;
 using eCommerce.Kernel.Money;
 using eCommerce.Pricing.Dtos;
 using Microsoft.AspNetCore.Authorization;
@@ -31,19 +32,22 @@ public class PriceCalculationAppService : ApplicationService, IPriceCalculationA
     private readonly IRepository<PriceListItem, Guid> _dongGiaRepository;
     private readonly IRepository<TierPriceSet, Guid> _boBacRepository;
     private readonly IRepository<TierPrice, Guid> _bacRepository;
+    private readonly IRepository<PriceCalculationRecord, Guid> _soGiaiTrinhRepository;
 
     public PriceCalculationAppService(
         IRepository<ChannelPrice, Guid> giaTheoKenhRepository,
         IRepository<PriceList, Guid> bangGiaRepository,
         IRepository<PriceListItem, Guid> dongGiaRepository,
         IRepository<TierPriceSet, Guid> boBacRepository,
-        IRepository<TierPrice, Guid> bacRepository)
+        IRepository<TierPrice, Guid> bacRepository,
+        IRepository<PriceCalculationRecord, Guid> soGiaiTrinhRepository)
     {
         _giaTheoKenhRepository = giaTheoKenhRepository;
         _bangGiaRepository = bangGiaRepository;
         _dongGiaRepository = dongGiaRepository;
         _boBacRepository = boBacRepository;
         _bacRepository = bacRepository;
+        _soGiaiTrinhRepository = soGiaiTrinhRepository;
     }
 
     public async Task<GioTinhTienDto> TinhGioAsync(TinhGioInput input)
@@ -54,6 +58,28 @@ public class PriceCalculationAppService : ApplicationService, IPriceCalculationA
                 .WithData("lyDo", "Giỏ phải có ít nhất một dòng.");
         }
 
+        var khoa = input.IdempotencyKey.Trim();
+
+        // ── 🔒 IDEMPOTENCY (ADR-13): gọi lại cùng khoá ⇒ trả ĐÚNG kết quả ĐÃ LƯU, KHÔNG tính lại ──────────
+        // 📌 Vì sao tra TRƯỚC khi tính: nếu tính rồi mới tra thì lần gọi lại vẫn **tính lại** (tốn kém), và tệ hơn —
+        // nếu bảng giá/khuyến mãi đổi ở giữa thì **hai kết quả khác nhau cho cùng một đơn** ⇒ đơn **không giải
+        // trình được** và không biết số nào là số đã báo khách.
+        var daCo = await _soGiaiTrinhRepository.FirstOrDefaultAsync(x => x.IdempotencyKey == khoa);
+
+        if (daCo is not null)
+        {
+            Logger.LogInformation(
+                "IDEMPOTENT: khoá {Khoa} đã có bản ghi {Id} (tính lúc {At}, tổng {Tong}) ⇒ trả lại kết quả đã lưu.",
+                khoa, daCo.Id, daCo.CalculatedAt, daCo.Total);
+
+            return JsonSerializer.Deserialize<GioTinhTienDto>(daCo.Payload)!;
+        }
+
+        return await TinhMoiAsync(input, khoa);
+    }
+
+    private async Task<GioTinhTienDto> TinhMoiAsync(TinhGioInput input, string khoa)
+    {
         // ── B1: SNAPSHOT chính sách (một lần cho cả lần tính — ADR-08) ─────────────────────────
         var chinhSach = new ChinhSachSnapshot(
             MaChinhSachLamTron: ChinhSachLamTronMacDinh.Ten,
@@ -193,7 +219,7 @@ public class PriceCalculationAppService : ApplicationService, IPriceCalculationA
             tien.TongTruocGiam.Amount, tien.TongGiamGia.Amount, tien.TongPhi.Amount, tien.TongThue.Amount,
             tien.TongThanhToan.Amount, tien.MaChinhSachLamTron);
 
-        return new GioTinhTienDto
+        var ketQua = new GioTinhTienDto
         {
             CurrencyCode = tien.TongThanhToan.Currency.Code,
             RoundingPolicyCode = tien.MaChinhSachLamTron,
@@ -204,6 +230,27 @@ public class PriceCalculationAppService : ApplicationService, IPriceCalculationA
             Total = tien.TongThanhToan.Amount,
             Lines = chiTiet
         };
+
+        // ── 🔒 GHI SỔ GIẢI TRÌNH (append-only, ADR-13) ────────────────────────────────────────
+        // 📌 Ghi **sau khi** tính xong và **trước khi** trả: nếu ghi sau khi trả mà request đứt thì đơn có giá
+        // nhưng **không có bằng chứng** vì sao. Bản ghi chứa **payload đầy đủ** (từng dòng + ứng viên + cấp thắng).
+        var soGiaiTrinh = new PriceCalculationRecord(
+            GuidGenerator.Create(),
+            khoa,
+            input.ChannelCode.Trim(),
+            input.ChannelShopId,
+            chinhSach.At,
+            ketQua.RoundingPolicyCode,
+            ketQua.CurrencyCode,
+            ketQua.Subtotal, ketQua.TotalDiscount, ketQua.TotalFee, ketQua.TotalTax, ketQua.Total,
+            JsonSerializer.Serialize(ketQua));
+
+        await _soGiaiTrinhRepository.InsertAsync(soGiaiTrinh, autoSave: true);
+
+        Logger.LogInformation("Đã GHI SỔ GIẢI TRÌNH {Id} cho khoá {Khoa} (append-only — không sửa, không xoá).",
+            soGiaiTrinh.Id, khoa);
+
+        return ketQua;
     }
 
     /// <summary>Chính sách làm tròn mặc định (VND = 0 chữ số) — cấu hình được là việc của D14/§18.3.</summary>

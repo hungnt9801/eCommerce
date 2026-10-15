@@ -70,6 +70,9 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
     public DbSet<Pricing.TierPriceSet> TierPriceSets { get; set; } = default!;
     public DbSet<Pricing.TierPrice> TierPrices { get; set; } = default!;
 
+    // PRC-002 ADR-13 — **sổ giải trình tính giá** (append-only) + khoá idempotency.
+    public DbSet<Pricing.PriceCalculationRecord> PriceCalculationRecords { get; set; } = default!;
+
     // ---- Inventory ----
     public DbSet<Inventory.InventoryItem> InventoryItems { get; set; } = default!;
     public DbSet<Inventory.StockLedgerEntry> StockLedgerEntries { get; set; } = default!;

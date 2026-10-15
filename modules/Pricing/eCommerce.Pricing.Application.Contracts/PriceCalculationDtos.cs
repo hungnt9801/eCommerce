@@ -26,6 +26,16 @@ public class TinhGioInput
 
     /// <summary>Thời điểm tính — để trống ⇒ lấy giờ hệ thống **ở tầng app** (hàm thuần cấm đọc đồng hồ).</summary>
     public DateTime? At { get; set; }
+
+    /// <summary>
+    /// 🚨 **KHOÁ IDEMPOTENCY — BẮT BUỘC** (`PRC-002` **ADR-13**), ví dụ `checkout:{orderId}`.
+    /// Gọi lại **cùng khoá** ⇒ trả **đúng kết quả đã lưu**, **không** tính lại, **không** ghi thêm bản ghi.
+    /// 📌 **Vì sao bắt buộc:** nếu bỏ trống thì hai lần gọi cho **cùng một đơn** có thể ra **hai kết quả khác nhau**
+    /// (bảng giá/khuyến mãi đổi ở giữa) ⇒ **đơn không giải trình được** và không biết số nào là số đã báo khách.
+    /// </summary>
+    [System.ComponentModel.DataAnnotations.Required]
+    [StringLength(128)]
+    public string IdempotencyKey { get; set; } = default!;
 }
 
 public class DongGioInput

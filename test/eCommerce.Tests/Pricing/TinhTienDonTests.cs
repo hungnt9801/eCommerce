@@ -174,6 +174,35 @@ public class TinhTienDonTests
         Assert.Equal(12_345.6789m, kq.CacDong[0].DonGiaSauLamTron.Amount);
     }
 
+    // ── 🚨 LỖ HỔNG TIỀN THẬT (ghi nhận 15/10/2026 — CHƯA sửa, CẦN NGƯỜI QUYẾT) ──
+
+    [Fact]
+    public void TONG_DON_CO_THE_AM__khong_co_guard__day_la_LO_HONG_TIEN_CAN_NGUOI_QUYET()
+    {
+        // 🔥 PHÁT HIỆN THẬT (đo được qua HTTP, không phải suy đoán): khi **giảm giá cấp đơn** LỚN HƠN thành tiền
+        // của giỏ thì `TinhTienDon` trả **TỔNG ÂM** — ví dụ giỏ 3 đồng, giảm 10.000, phí 5.000 ⇒ `-4.997`.
+        //
+        // ⇒ Hệ thống đang **cho phép tổng đơn ÂM**, nghĩa là về mặt số học **đơn vị bán phải TRẢ TIỀN cho khách**
+        // mà **không có guard nào** chặn. Hậu quả thật: nếu tầng thanh toán/đối soát tin vào con số này thì
+        // **tiền ĐI RA** khỏi hệ thống (hoặc lệch sổ) mà không ai bị chặn ở đâu.
+        //
+        // 📌 **KHÔNG tự sửa** vì đây là **LUẬT NGHIỆP VỤ**, có (ít nhất) 3 cách xử lý KHÁC NHAU:
+        //    (a) **kẹp** giảm giá về tối đa bằng thành tiền (tổng ≥ 0) — thông dụng nhất;
+        //    (b) **TỪ CHỐI** đơn (NÉM lỗi) khi giảm giá vượt thành tiền — an toàn nhất, buộc người nhập sửa;
+        //    (c) **cho phép âm** (coi như phiếu hoàn tiền/credit) — nhưng khi đó phải có **chứng từ hoàn tiền**
+        //        và đối soát riêng, KHÔNG được lẫn vào đơn bán.
+        //    Ba cách này cho **ba hành vi hoàn toàn khác nhau** ⇒ chọn sai là **sai tiền**. **CẦN NGƯỜI QUYẾT.**
+        //
+        // Test này **GHI NHẬN hiện trạng** (không phải khẳng định nó đúng): nếu ai đó thêm guard thì test **ĐỎ**
+        // và buộc phải cập nhật `prc-002` §20.3 + chọn một trong ba cách trên **một cách tường minh**.
+        var kq = TinhTienDon.Tinh(
+            [Dong("A", 3, 1m)], Money.Vnd(10_000m), Money.Vnd(5_000m), Tron);
+
+        Assert.True(kq.TongThanhToan.Amount < 0m,
+            "Nếu test này ĐỎ: guard chống tổng ÂM đã được thêm ⇒ cập nhật prc-002 §20.3 và bỏ test ghi nhận này.");
+        Assert.Equal(-4_997m, kq.TongThanhToan.Amount);
+    }
+
     // ── Bất biến đầu vào ─────────────────────────────────────────────────────
 
     [Fact]

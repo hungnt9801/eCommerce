@@ -1286,3 +1286,72 @@ Nền: bảng giá `Active` `S1 = 100.000` (kênh `tak-…`). Bộ bậc thang *
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.5 | 15/10/2026 | *(agent, session GĐ1)* | **Lát cắt 4 — API bậc thang + đóng lỗ hổng `ChannelShopId`**: `TierPriceSetAppService` (7 route) chặn trùng `MinQuantity` bằng **mã nghiệp vụ `0008`**; thêm cột `ChannelShopId` + invariant **`ChannelShop` thiếu shop ⇒ NÉM** + migration; **B3 dùng shop** (thứ tự **shop → kênh → mọi kênh**). **Kiểm chứng HTTP 9 phép đo**, trong đó phép đo quan trọng nhất: **có `channelShopId` ⇒ bộ shop thắng (`70.000`)** và **không có ⇒ bộ shop KHÔNG áp (`90.000`)** ⇒ **phân biệt shop đúng**. Ghi **bài học vận hành**: `ef migrations add` xong **phải build lại** rồi mới chạy `DbMigrator` (nếu không: exit 0 mà cột không được tạo) |
+
+---
+
+## 20. TRẠNG THÁI TRIỂN KHAI — **LÁT CẮT 5: SỔ GIẢI TRÌNH + IDEMPOTENCY (ADR-13)** (15/10/2026)
+
+### 20.1 Đã làm
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| 1 | `PriceCalculationRecord` (`PrcPriceCalculationRecords`) | **Sổ giải trình APPEND-ONLY**: `IdempotencyKey` · `ChannelCode`/`ChannelShopId` · **`CalculatedAt`** (thời điểm **tính**, KHÁC `CreationTime` = thời điểm ghi sổ) · `RoundingPolicyCode` · các cột tiền + `CurrencyCode` (**BR-001**) · **`Payload` JSON đầy đủ** (từng dòng + ứng viên + cấp thắng) ⇒ giải trình được **từng đồng** |
+| 2 | 🔒 **Idempotency thật** | `TinhGioAsync` tra sổ **TRƯỚC** khi tính: gọi lại cùng khoá ⇒ **trả kết quả đã lưu**, **không** tính lại, **không** ghi thêm |
+| 3 | **`IdempotencyKey` BẮT BUỘC** (ADR-13) | Thiếu ⇒ **`400`** kèm nhắc tên trường. 📌 Bắt buộc vì nếu bỏ trống thì hai lần gọi cho **cùng một đơn** có thể ra **hai kết quả khác nhau** (bảng giá đổi ở giữa) ⇒ **không biết số nào là số đã báo khách** |
+| 4 | **Hàng rào DB** | unique `(TenantId, IdempotencyKey)` — **sửa tay `NULLS NOT DISTINCT`**; migration `20261015110229_Prc002_PriceCalculationRecords` đã áp |
+
+### 20.2 ✅ BẰNG CHỨNG HTTP THẬT (Host + PostgreSQL 17) — 9 phép đo
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | Bảng giá `Active` `S1 = 100.000`; giỏ `S1 × 3` (thuế 10%), giảm `10.000`, phí `5.000` | |
+| 2 | **Gọi lần 1** với khoá `checkout:SR-…` | `200` · **tổng `324.500`** · sổ có **1 bản ghi** (`Total 324.500`, `CalculatedAt = 2026-06-15 00:00:00+00` — **đúng giờ bên gọi truyền**, không phải giờ ghi sổ) |
+| 3 | 🔥 **ĐỔI DỮ LIỆU GIÁ Ở GIỮA**: chèn `ChannelPrice` cấp 2 = **`1` đồng** (sẽ **thắng** bảng giá) | |
+| 4 | **Gọi lần 2 CÙNG khoá** | **`324.500` — y hệt** ✅ · đơn giá vẫn **`100.000`** (giá `1` đồng **KHÔNG** xuất hiện) ⇒ **KHÔNG tính lại**, trả **đúng kết quả đã lưu** |
+| 5 | **Số bản ghi sau 2 lần gọi** | **`1`** ✅ ⇒ idempotent thật (không ghi thêm) |
+| 6 | **Gọi lần 3 với KHOÁ MỚI** trên giỏ khác | đơn giá **`1`** ⇒ **tính mới thật** ✅ (tổng bản ghi `2`) — khoá cũ **không** "dính" sang |
+| 7 | **Thiếu `IdempotencyKey`** | **`400`** · body có nhắc `IdempotencyKey` ✅ (ADR-13 bắt buộc) |
+| 8 | Dọn dẹp · cờ bảo mật | 0/0/0 · `ShouldChangePasswordOnNextLogin = true` ✅ |
+| 9 | Log | **0 dòng `fail:`** · **1 dòng `IDEMPOTENT:`** (chứng minh nhánh replay **đã chạy**) |
+
+📌 **Phép đo #4 là phép đo quan trọng nhất:** nó chứng minh idempotency **thật** — không phải "tra rồi vẫn tính lại"
+(kiểu làm cho có). Nếu ai đó đảo thứ tự (tính trước, tra sau) thì phép đo này **ĐỎ** vì giá `1` đồng sẽ thắng.
+
+- build `--no-incremental`: **0 lỗi / 0 cảnh báo** · unit **581/581** · integration **34/34** · mermaid 197/0
+- **DB thật**: bảng `PrcPriceCalculationRecords` + `IX_PrcPriceCalculationRecords_TenantId_IdempotencyKey` **UNIQUE … NULLS NOT DISTINCT** (đo `pg_indexes`); tổng **34** index `NULLS NOT DISTINCT`; `Assets/schema.sql` sinh lại
+
+### 20.3 🔥🚨 **LỖ HỔNG TIỀN THẬT PHÁT HIỆN ĐƯỢC: TỔNG ĐƠN CÓ THỂ ÂM**
+
+Trong phép đo #6 (giỏ `3` đồng, giảm giá cấp đơn `10.000`, phí `5.000`) kết quả trả về **`thanhToan = -4.997`**.
+Đây **không** phải lỗi của phép đo — đó là **hành vi thật của `TinhTienDon`**: **không có guard** chặn tổng âm.
+
+**Hậu quả:** giảm giá cấp đơn **lớn hơn** thành tiền của giỏ ⇒ hệ thống (về mặt số học) **phải TRẢ TIỀN cho khách**.
+Nếu tầng thanh toán/đối soát tin vào con số này thì **tiền ĐI RA** khỏi hệ thống (hoặc lệch sổ) mà **không bị chặn ở đâu**.
+
+🚨 **KHÔNG tự sửa** — đây là **LUẬT NGHIỆP VỤ**, có **ít nhất 3 cách xử lý KHÁC NHAU**:
+
+| Cách | Hành vi | Hệ quả |
+|---|---|---|
+| **(a) Kẹp** giảm giá về tối đa bằng thành tiền | tổng ≥ 0 | thông dụng nhất; nhưng khách **tưởng** được giảm nhiều hơn thực tế |
+| **(b) TỪ CHỐI** đơn (NÉM lỗi) | buộc người nhập sửa | an toàn nhất về tiền; nhưng chặn cả ca **hợp lệ** (đơn 0 đồng có phí) |
+| **(c) Cho phép âm** (coi như phiếu hoàn tiền/credit) | tổng âm là **hợp lệ** | **PHẢI** có chứng từ hoàn tiền + đối soát riêng, **không** lẫn vào đơn bán |
+
+⇒ Chọn sai = **sai tiền**. **CẦN NGƯỜI QUYẾT.** Hiện trạng được **ghi nhận bằng test**
+(`TONG_DON_CO_THE_AM__khong_co_guard__day_la_LO_HONG_TIEN_CAN_NGUOI_QUYET`) ⇒ khi guard được thêm, test **ĐỎ**
+và buộc cập nhật tài liệu + chọn cách xử lý **tường minh**.
+
+### 20.4 Còn lại của `PRC-002`
+
+| # | Việc |
+|---|---|
+| 1 | **API tra sổ giải trình** (`GET /price-calculation/records/{key}`) — hiện sổ chỉ ghi, chưa có đường tra |
+| 2 | **B4 — điều chỉnh/khuyến mãi** (`PRO-*`) |
+| 3 | 🚨 **Guard tổng âm (§20.3)** — cần người quyết |
+| 4 | Cấu hình **chính sách làm tròn / thiếu giá** theo tenant (D14) |
+| 5 | **Ngưỡng số bậc** mỗi bộ + đối chiếu `MaxVariantCombinations` cho cấu hình lớn |
+
+### 20.5 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.6 | 15/10/2026 | *(agent, session GĐ1)* | **Lát cắt 5 — sổ giải trình + idempotency (ADR-13)**: `PriceCalculationRecord` **append-only** + **`Payload` JSON** (giải trình từng đồng) + **idempotency tra TRƯỚC khi tính** + **`IdempotencyKey` BẮT BUỘC** (`400` nếu thiếu) + unique index **sửa tay `NULLS NOT DISTINCT`**. **Kiểm chứng HTTP 9 phép đo**; phép đo quyết định: **đổi dữ liệu giá ở giữa ⇒ lần gọi lại vẫn trả đúng kết quả đã lưu** (chứng minh **không** tính lại). 🔥 **Phát hiện lỗ hổng tiền: TỔNG ĐƠN CÓ THỂ ÂM** (§20.3) — ghi nhận bằng test + **3 phương án cần người quyết** |
