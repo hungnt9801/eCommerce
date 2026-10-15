@@ -1610,3 +1610,47 @@ Số dòng **không phải** là hợp đồng: mỗi lần sửa tệp trước
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.m | 15/10/2026 | *(agent, session GĐ1)* | **Thử đo lại lần POST đầu (§56.3 #1) — THẤT BẠI**, nguyên nhân là **lỗi thao tác của tôi**: tìm dòng trong probe cũ **không thấy** ⇒ chèn với chỉ số **`-1`** ⇒ **ghi vào đầu tệp** ⇒ probe hỏng (`exit 1`, không output). 📌 **Không ảnh hưởng mã sản phẩm** (probe ở `%TEMP%`, **không** trong repo) — kiểm lại: `git status` sạch · build **0/0** · unit **694/694** · mermaid **197/0**. Ghi **bài học #9**: *không phẫu thuật probe cũ — viết probe MỚI; nếu buộc sửa thì **kiểm chỉ số trước khi ghi*** |
+
+---
+
+## 61. ✅ **ĐÓNG §56.3 #1 BẰNG PROBE MỚI: `HTTP 0` CŨ LÀ LỖI ĐO, KHÔNG PHẢI LỖI MÃ** (15/10/2026)
+
+### 61.1 Cách làm — theo **bài học #9** (§60.3)
+
+🚨 **KHÔNG** phẫu thuật tệp probe cũ (đã làm hỏng ở vòng 69). **Viết PROBE MỚI**, **một mục đích duy nhất**:
+đo lần `POST /DatHang` **đầu** bằng **status THÔ** (`-MaximumRedirection 0`) và xác nhận kết quả **qua DB**.
+
+### 61.2 🎯 Kết quả — **`HTTP 200`, render TRỰC TIẾP (không redirect)**
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | `GET /DatHang` (đã đăng nhập) | **`200`** · `KhoaCheckout=WEB-4f965ee1c3e24c9d` ✅ |
+| 2 | 🔥 **`POST` lần ĐẦU — status THÔ** | **`HTTP 200`** ✅ · **`Location` = RỖNG** ✅ · **body `3.446` ký tự** ✅ |
+| 3 | Diễn giải | ⇒ trang **render kết quả TRỰC TIẾP**, **không** redirect ⇒ **`HTTP 0` ở vòng 65 là LỖI ĐỌC PHẢN HỒI của probe cũ**, **KHÔNG** phải hành vi của mã |
+
+### 61.3 🎯 Đối chứng DB đầy đủ (cùng lượt chạy)
+
+| Nguồn | Giá trị |
+|---|---|
+| **`OrdOrders`** | `WEB-WEB-4f965ee1c3e24c9d` · **`Status=0` (`Pending`)** · **`GrandTotal=440000.0000`** · `CheckoutIdempotencyKey=WEB-4f965ee1c3e24c9d` ✅ |
+| **Đếm đơn theo khoá** | **`1`** ✅ |
+| **Tồn kho** | `OnHand=10` · **`Reserved=4`** · **`Available=6`** ✅ |
+| **Sổ cái** | `Receipt=10` · **`Reservation=4`** ✅ |
+| **Sổ giải trình** | **`440000.0000`** ✅ **= `GrandTotal`** |
+| Dọn dẹp · `fail:` · tiến trình treo | `don=0 ton=0 ct=0 gc=0 baoMat=true` ✅ · **Web `0` / Host `0`** ✅ · **`0`** ✅ |
+
+📌 **Vì sao phép đo này đáng làm dù chỉ để "giải thích một con số cũ":** `HTTP 0` là **dấu hiệu mơ hồ** — nó có thể là
+*lỗi đo* **hoặc** *mã treo/ngắt kết nối*. Để nguyên nghĩa là **một chỗ không biết** trong hồ sơ kiểm chứng; và
+**"không biết" không được phép** nằm trong tài liệu của dự án này. Nay nó đã thành **biết**: mã trả `200` **bình thường**.
+
+### 61.4 📌 Bài học #10 — **viết probe mới RẺ HƠN sửa probe cũ**
+
+Vòng 69 (sửa probe cũ ⇒ **hỏng**, **0** dữ liệu, mất trọn một vòng) so với vòng 70 (viết probe mới ⇒ **chạy được ngay lần đầu**,
+**đủ** dữ liệu để đóng **hai** việc: §56.3 #1 và đối chứng DB).
+⇒ **Quy tắc đã được chứng minh bằng chi phí thật:** *probe cũ là **dùng một lần**; việc mới ⇒ **probe mới***.
+
+### 61.5 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.l | 15/10/2026 | *(agent, session GĐ1)* | ✅ **Đóng §56.3 #1** bằng **probe MỚI** (bài học #9): `POST /DatHang` lần đầu trả **`HTTP 200`** với **`Location` RỖNG** và **body `3.446` ký tự** ⇒ trang **render trực tiếp** ⇒ **`HTTP 0` cũ là lỗi đọc phản hồi của probe**, **không** phải lỗi mã. Kèm **đối chứng DB đầy đủ**: `Pending` · `GrandTotal=440.000` · **1 đơn theo khoá** · `Reserved=4`/`Available=6` · `Reservation=4` · **sổ giải trình `440.000` khớp** · dọn sạch · **`fail: 0`** · 0 tiến trình treo. 📌 **Bài học #10:** *viết probe mới **rẻ hơn** sửa probe cũ* — chứng minh bằng chi phí thật (vòng 69 hỏng & 0 dữ liệu vs vòng 70 chạy ngay & đủ dữ liệu) |
