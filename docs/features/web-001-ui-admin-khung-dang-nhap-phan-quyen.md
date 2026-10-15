@@ -1521,3 +1521,50 @@ chứng minh điều đó **không** xảy ra.
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.o | 15/10/2026 | *(agent, session GĐ1)* | 🚨 **Sửa lỗi THẬT về thông điệp lỗi trên UI**: `BusinessException.Message` của ABP trả **chuỗi vô nghĩa** (`Exception of type 'Volo.Abp.BusinessException' was thrown.`) ⇒ bắt riêng `BusinessException` và hiện **MÃ NGHIỆP VỤ** (`be.Code`). Phép đo ĐÚNG (trích cả khối `#loi` rồi bỏ thẻ) mới lộ ra lỗi này — regex cũ (`[^<]*`) trích **rỗng** và **suýt** khiến tôi kết luận *"không hiện gì"*. **Kiểm chứng lại**: thông điệp nay là **mã nghiệp vụ**; phần **an toàn** giữ nguyên (0 đơn · tồn không đổi · 0 giữ chỗ mồ côi) |
+
+---
+
+## 59. **THÔNG ĐIỆP LỖI NAY KÈM DỮ LIỆU** (15/10/2026) — *đóng §58.4 #1*
+
+### 59.1 Đã làm
+
+Bắt `BusinessException` và ghép **mã nghiệp vụ** + **dữ liệu kèm theo** (`sku`, `channelCode`, `at`, `lyDo`…):
+
+```csharp
+var thongDiep = new System.Text.StringBuilder($"Mã lỗi: {be.Code}");
+if (be.Data is System.Collections.IDictionary duLieu)          // ⚠️ ở ABP này `Data` khai báo là `object`
+    foreach (System.Collections.DictionaryEntry muc in duLieu)
+        thongDiep.Append(" — ").Append(muc.Key).Append('=').Append(muc.Value);
+trang.Loi = thongDiep.ToString();
+```
+📌 Dùng giao diện **KHÔNG GENERIC** `IDictionary` ⇒ **không phụ thuộc** kiểu generic cụ thể của ABP; nếu không ép được thì
+**vẫn** hiện mã lỗi (**không vỡ**) — *suy giảm mềm* thay vì hỏng.
+
+### 59.2 ✅ BẰNG CHỨNG (chạy lại cùng probe — đo **nguyên văn** thông điệp người dùng thấy)
+
+| Ca | Thông điệp hiển thị |
+|---|---|
+| **SKU không có giá** | ``Không đặt được: Mã lỗi: eCommerce:Pricing:0004 — sku=LOISKU-… — channelCode=loi-… — at=15/10/2026 1:55:33 PM — lyDo=Không có giá nào khớp ⇒ theo chính sách mặc định là NÉM LỖI (bán với giá đoán mò là lỗi không sửa được về sau).`` ✅ |
+| **Thiếu SKU / số lượng 0** | ``Không đặt được: Thiếu kho / SKU / số lượng (số lượng phải ≥ 1).`` ✅ |
+| 🔥 **Vẫn an toàn** | **`0` đơn** · `OnHand=10` · **`Reserved=0`** · **`0`** giữ chỗ mồ côi ✅ |
+| Dọn dẹp · `fail:` | `don=0 ton=0 ct=0 gc=0 baoMat=true` ✅ · **Web `0` / Host `0`** ✅ |
+
+📌 **Vì sao thông điệp này là bước tiến thật, không phải trang trí:** trước vòng 67 người dùng nhận
+*"Exception of type 'Volo.Abp.BusinessException' was thrown."* — **không** nói được **cái gì** sai, **ở đâu**, **vì sao**.
+Nay họ nhận: **mã tra được** + **SKU cụ thể** + **kênh** + **thời điểm** + **lý do nghiệp vụ** ⇒ tự xử lý được
+(hoặc gửi support **một dòng đủ thông tin**). 📌 Đúng nguyên tắc đã ghi ở `inv-001` §34.2: *mã lỗi phải **hữu dụng** với người nhận*.
+
+### 59.3 Còn lại
+
+| # | Việc |
+|---|---|
+| 1 | **Giỏ nhiều dòng** (hiện **một** SKU) |
+| 2 | **Quản lý đơn trên UI**: xác nhận / huỷ / trả hàng (`SAL-003`/`SAL-004` đã có API) |
+| 3 | Đo lại lần POST **đầu** bằng `HttpClient`/`AllowAutoRedirect=false` (§56.3 #1) |
+| 4 | `INV-003` hạn mức cứng · `REC-001` ngưỡng/quy trình · hoàn tiền |
+
+### 59.4 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.n | 15/10/2026 | *(agent, session GĐ1)* | **Thông điệp lỗi nay kèm DỮ LIỆU**: ghép `be.Code` + `be.Data` qua `IDictionary` **không generic** (ABP khai `Data` là `object`) ⇒ người dùng thấy ``eCommerce:Pricing:0004 — sku=… — channelCode=… — at=… — lyDo=…``. **Kiểm chứng**: thông điệp **nguyên văn** đo được cho **cả hai** ca (không giá · thiếu SKU); phần **an toàn** giữ nguyên (`0` đơn · tồn không đổi · `0` giữ chỗ mồ côi); dọn sạch; **`fail: 0`** hai tiến trình |

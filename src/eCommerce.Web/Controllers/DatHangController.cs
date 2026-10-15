@@ -137,9 +137,21 @@ public class DatHangController : Controller
             // 📌 Hiện **mã nghiệp vụ** (tra được trong `InventoryErrorCodes`/`eCommerceConsts.ErrorCodes`) + **dữ liệu**
             // (sku, kho, số lượng…) ⇒ người dùng/support biết **chính xác** chuyện gì.
             // 📌 Hiện **MÃ NGHIỆP VỤ** — tra được ngay trong `InventoryErrorCodes`/`eCommerceConsts.ErrorCodes`.
-            // ⚠️ `be.Data` là `object` ở phiên bản ABP này ⇒ **chưa** ghép được dữ liệu kèm theo;
-            // muốn hiện `sku`/`kho` thì phải ép kiểu `IDictionary<string, object?>` — việc của lát cắt sau.
-            trang.Loi = $"Mã lỗi: {be.Code}";
+            // 📌 Kèm **DỮ LIỆU** (`sku`, `kho`, số lượng…) mà app service đã gắn vào lỗi — nhờ đó người dùng/support
+            // biết **chính xác** bản ghi nào có vấn đề, không phải mò.
+            // ⚠️ `be.Data` khai báo là `object` ở phiên bản ABP này ⇒ dùng giao diện **KHÔNG GENERIC** `IDictionary`
+            // để không phụ thuộc kiểu generic cụ thể; nếu không ép được thì **vẫn** hiện mã lỗi (không vỡ).
+            var thongDiep = new System.Text.StringBuilder($"Mã lỗi: {be.Code}");
+
+            if (be.Data is System.Collections.IDictionary duLieu)
+            {
+                foreach (System.Collections.DictionaryEntry muc in duLieu)
+                {
+                    thongDiep.Append(" — ").Append(muc.Key).Append('=').Append(muc.Value);
+                }
+            }
+
+            trang.Loi = thongDiep.ToString();
         }
         catch (Exception ex)
         {
