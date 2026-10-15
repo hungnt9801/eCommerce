@@ -358,3 +358,74 @@ danh sách trắng quá rộng) sẽ **tệ hơn không có test** — nó tạo
 | 2 | **Job định kỳ** cập nhật/thu gọn danh sách trắng (ràng buộc của GĐ0 sẽ dần được dùng tới) |
 
 > **MỐC KIỂM CHỨNG VÒNG 55 (15/10/2026):** `694 unit + 38 integration` · build **0 lỗi / 0 cảnh báo** · mermaid **197/0** · **141 commit**, nhánh `main` **sạch**. Ba cơ chế tự bảo vệ: *ánh xạ ràng buộc DB* (Phụ lục B) · *đăng ký + log vô điều kiện cho job* (Phụ lục C nâng cấp §45) · *UoW cho worker* (§29.2). Cổng đăng nhập Web kiểm chứng hồi quy (web-001 §47).
+
+---
+
+## PHỤ LỤC D — **CƠ CHẾ `tools/route-check.ps1`: chống lỗi "SAI ROUTE"** (15/10/2026)
+
+### D.1 Vì sao có (bài học đã trả giá **BA lần**)
+
+| # | Ca | Sai route | Tôi đã **đọc nhầm** thành |
+|---|---|---|---|
+| 1 | `PRC-001` §19.7 | `POST …/chot-theo-nguon?referenceId=…` ⇒ **`405`** (tham số là **đoạn đường dẫn**) | *"lỗi xác thực"* |
+| 2 | `inv-001` §33.1 | `POST /{id}/tra-hang` **không còn** `{warehouseId}` ⇒ **`404`** | *"chưa làm xong"* |
+| 3 | `web-001` §53.2 | `GET /api/app/price-list/item/{id}` ⇒ **`405`** (route đúng là **`items`** cho GET, `item` cho POST) | *"khác kiểu chữ hoa/thường của JSON"* |
+
+📌 **Ba lần** cùng một họ lỗi ⇒ đúng kết luận đã rút ở **Phụ lục C**: **ghi bài học KHÔNG ĐỦ — cần CÔNG CỤ** khiến việc **đúng**
+trở thành việc **dễ nhất**.
+
+### D.2 Công cụ làm gì
+
+`pwsh -File tools/route-check.ps1 -Match 'price-list' -Call '<url>'`
+
+| # | Việc | Chi tiết |
+|---|---|---|
+| 1 | **Tự khởi động Host** nếu chưa chạy (và **tự dừng** nếu chính nó khởi động) | không để lại tiến trình treo |
+| 2 | **In ROUTE THẬT** từ `swagger.json` (nguồn do **chính Host ban hành**) khớp mẫu `-Match` | **KHÔNG đoán route** |
+| 3 | Gọi thử URL và **in `HTTP STATUS` TRƯỚC**, rồi mới tới body | 🚨 *"rỗng"* luôn đọc được là *"rỗng **VÌ SAO**"* |
+| 4 | Gặp **`404`/`405`** ⇒ in **🚨 SAI ROUTE — ĐỐI CHIẾU danh sách route ở trên TRƯỚC KHI kết luận** | chặn đúng lỗi đã xảy ra 3 lần |
+| 5 | **Giải mã `Byte[]`** trước khi in body | bài học §53.2 (`Invoke-WebRequest` có thể trả `Byte[]` ⇒ `.Substring` **ném lỗi**) |
+
+### D.3 ✅ BẰNG CHỨNG — chạy thật (exit `0`, không stderr)
+
+```
+Host chưa chạy ⇒ khởi động từ …\eCommerce.HttpApi.Host\bin\Debug\net10.0
+
+=== ROUTE THẬT khớp /price-list/ (6 đường dẫn) ===
+  /api/app/price-list                        GET   ()
+  /api/app/price-list                        POST  ()
+  /api/app/price-list/{id}                   GET   id(path)
+  /api/app/price-list/items/{priceListId}    GET   priceListId(path)     ← GET dùng "items"
+  /api/app/price-list/item/{priceListId}     POST  priceListId(path)     ← POST dùng "item"
+  /api/app/price-list/publish/{priceListId}  POST  priceListId(path)
+  /api/app/price-list/activate/{priceListId} POST  priceListId(path) at(query)
+
+=== GỌI THỬ (1 lời gọi) ===
+  GET   http://localhost:5000/api/app/price-list/item/0000…0001
+        HTTP 405
+        🚨 SAI ROUTE — ĐỐI CHIẾU danh sách route ở trên TRƯỚC KHI kết luận bất cứ điều gì.
+        body:
+XONG.
+Đã dừng Host do chính công cụ khởi động.
+```
+📌 **Chứng minh giá trị ngay lần chạy đầu:** chính bảng route này **lộ ra** chỗ tôi gọi sai ở vòng 60–61
+(**`items`** cho GET vs **`item`** cho POST) — thứ mà **3 vòng** đọc bài học suông đã **không** chặn được.
+
+### D.4 Dùng thế nào (và một hạn chế **đã biết**)
+
+| Việc | Lệnh |
+|---|---|
+| Xem route khớp mẫu | `pwsh -File tools/route-check.ps1 -Match 'don-hang'` |
+| Gọi thử **một** URL | `pwsh -File tools/route-check.ps1 -Call 'http://localhost:5000/api/app/price-list'` |
+| Gọi thử **POST** | `pwsh -File tools/route-check.ps1 -Call 'POST http://localhost:5000/api/app/price-list'` |
+
+⚠️ **Hạn chế đã biết:** tham số `-Call` là **mảng**, nhưng khi gọi qua **`Start-Process -ArgumentList`** thì PowerShell
+**tách token** ⇒ **chỉ nên truyền MỘT URL mỗi lần gọi** (hoặc gọi nhiều lần). Đã đo: truyền 2 URL ⇒ URL thứ hai
+bị bind nhầm vào `-WaitSeconds` và công cụ **báo lỗi rõ ràng** (không im lặng làm sai).
+
+### D.5 Việc còn lại
+
+| # | Việc |
+|---|---|
+| 1 | 🚨 **Quy trình §2 (kiểm chứng) nay có thêm bước BẮT BUỘC:** trước khi viết lời gọi API mới ⇒ chạy `route-check.ps1 -Match '<mẫu>'` để **lấy route thật**. Đưa bước này vào **danh sách kiểm trước khi viết probe**. |
+| 2 | Làm nốt **đối chứng chéo API ↔ `/SanPham`** bằng route **`items`** (§53.3 #1) — nay chỉ còn **một lần chạy** |
