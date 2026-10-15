@@ -1176,3 +1176,72 @@ coi NULL là DISTINCT ⇒ **cả ba unique index mất tác dụng**:
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.3 | 15/10/2026 | *(agent, session GĐ1)* | **Lát cắt 2 — kho + chứng từ**: `Warehouse` (ADR-01, có `IsActive` + bất biến *"kho ngừng dùng ⇒ không tạo chứng từ"*) và `StockDocument`/`StockDocumentLine` (ADR-02: **chứng từ và ghi sổ là HAI bước**; đã ghi sổ ⇒ **cấm sửa/cấm huỷ**) + bất biến chuyển kho. 🔥 **Hợp nhất mã lỗi kho về một nguồn** (`InventoryErrorCodes`) và biến mã cũ ở tầng app thành **bí danh** (chống họ lỗi `XC-003` F2). **3 unique index `NULLS NOT DISTINCT`** (sửa tay). **+17 unit** (gồm test *"ném lỗi không để lại trạng thái sai"*), DB thật xác nhận **38** index. Ghi rõ §17.3: **dịch vụ ghi sổ** là phần cốt lõi còn thiếu |
+
+---
+
+## 18. TRẠNG THÁI TRIỂN KHAI — **LÁT CẮT 3: DỊCH VỤ GHI SỔ + SINH BÚT TOÁN** (15/10/2026)
+
+### 18.1 Đã làm
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| 1 | **`TinhButToanChungTu`** — **hàm THUẦN** | quyết định bút toán cho một dòng chứng từ: **nhập** ⇒ 1 bút toán `Receipt` (+); **chuyển kho** ⇒ **2** bút toán (`TransferOut` ở nguồn + `TransferIn` ở đích); **kiểm kê** ⇒ ghi **phần LỆCH** (`StocktakeGain`/`StocktakeLoss`), **khớp ⇒ KHÔNG ghi gì** |
+| 2 | 🚨 **Quy ước DẤU được khoá bằng test** | `StockMovementType` **tự quy định chiều** trong `ApplyMovement` ⇒ tham số luôn là **độ lớn DƯƠNG**. Truyền số **âm** cho `TransferOut` sẽ **đảo chiều** (*"xuất kho −5"* thành **NHẬP 5**) mà **không có lỗi nào** |
+| 3 | **`InventoryLockKeys.TheoSku(tenant, kho, sku)`** | khoá theo **từng SKU** (không theo cả kho: hai nhân viên nhập **hai SKU khác nhau** cùng kho **không** phải chờ nhau). **Không** tiền tố `ecommerce:` (`XC-003` §5.4 — bài học `PRC-001` **N3**) |
+| 4 | **`StockPostingService.GhiSoAsync`** | trình tự: đọc chứng từ + dòng (sắp theo `Sku`) → kiểm **kho còn hoạt động** → **giành khoá cho MỌI SKU theo thứ tự đã sắp xếp** → `GhiSo` → **sinh bút toán + cập nhật `InventoryItem` cùng transaction** |
+
+🚨 **VÌ SAO PHẢI SẮP XẾP SKU TRƯỚC KHI GIÀNH KHOÁ:** hai chứng từ cùng hai SKU nhưng **thứ tự ngược nhau** ⇒
+mỗi bên giữ một khoá và chờ bên kia ⇒ **DEADLOCK**. Xếp theo thứ tự **cố định** thì không bao giờ xảy ra.
+
+### 18.2 ⚠️ **ADR-09: CÁCH LÀM THỰC TẾ VÀ GIỚI HẠN — ghi rõ, không che**
+
+Tài liệu đề xuất `UPDATE … WHERE Status = 'Draft'` + **kiểm số dòng** để chặn **hai request ĐỒNG THỜI** cùng ghi sổ.
+Cách đó cần **EF Core ngay trong tầng Domain** — mà tầng Domain của dự án **cố ý không phụ thuộc persistence**
+(đã kiểm: `GetDbContextAsync` không tồn tại ở đó) ⇒ **không** đặt ở tầng Domain.
+
+✅ **Hàng rào ĐỒNG THỜI thật nằm ở DB và ĐÃ CÓ từ lát cắt 1** (`ADR-05`): unique `(TenantId, ReferenceLineId)` trên
+`InvStockLedger`. Hai request đồng thời cùng ghi sổ sẽ chèn bút toán với **cùng `ReferenceLineId`** ⇒ request thứ hai
+**vi phạm unique** ⇒ transaction **rollback** ⇒ tồn kho **KHÔNG** bị cộng hai lần. Đúng tinh thần ADR:
+*"chống ghi trùng bằng unique index, KHÔNG bằng kiểm tra ở app"*.
+
+⚠️ **CÒN LẠI:** biến `23505` đó thành **mã nghiệp vụ** (`ChungTuKhongOTrangThaiNhap`) bằng một exception filter —
+hiện client sẽ thấy **500** cho ca hiếm (hai request đồng thời). Ghi ở §18.4 #1.
+
+### 18.3 ✅ BẰNG CHỨNG
+
+| Phép đo | Kết quả |
+|---|---|
+| build `--no-incremental` | **0 lỗi / 0 cảnh báo** |
+| unit | **630/630** (+13: 10 cho `TinhButToanChungTu` + 3 cho `InventoryLockKeys`) |
+| integration | **38/38** · mermaid 197/0 |
+| DB | **không đổi schema** (lát cắt này thuần luật + dịch vụ miền) |
+
+**Các phép đo đáng chú ý trong test:**
+- **Chuyển kho sinh ĐÚNG 2 bút toán** (một ĐI ở nguồn, một ĐẾN ở đích) — *thiếu một vế là **mất hàng***;
+- **`DoLon` luôn DƯƠNG** — khoá quy ước dấu (chiều do `Loai` quyết định);
+- **Kiểm kê khớp ⇒ KHÔNG bút toán** — không ghi dòng sổ cái `0` (DB có `CHECK QuantityDelta <> 0`);
+- **Kiểm kê khi chưa có bản ghi tồn** ⇒ coi tồn = 0 ⇒ đếm 4 nghĩa là **thừa 4**;
+- **khoá chuẩn hoá SKU** — `"  sku-1  "` và `"SKU-1"` cho **cùng** khoá (nếu không, hai request cùng SKU vẫn **lọt** khoá ⇒ mất tác dụng chống bán vượt tồn).
+
+### 18.4 Còn lại của `INV-001`
+
+| # | Việc | Ghi chú |
+|---|---|---|
+| 1 | **Exception filter** biến `23505` (sổ cái) thành `ChungTuKhongOTrangThaiNhap` | hiện ca hiếm (2 request đồng thời) trả **500** |
+| 2 | **API + permission**: tạo chứng từ (nhập/chuyển/kiểm kê) + ghi sổ | cần permission **mới** ở **cả hai nơi** (hằng số + provider) + **chạy lại DbMigrator**, nếu không ⇒ **403 im lặng** |
+| 3 | **Idempotency** thực thi (ADR-07) cho `GhiSoAsync` | hiện chỉ có `IdempotencyKey` trên entity, **chưa** dùng để chặn |
+| 4 | **Job đối soát** `InventoryItem` ↔ `SUM(StockLedgerEntry)` + **metric** (ADR-10) | §0 #9: **không có** metric nào cho kho |
+| 5 | **Kiểm kê cần `SoDemDuoc`** — hiện dùng `StockDocumentLine.Quantity` làm số đếm được | diễn giải này **cần chốt** với BA (xem §18.5) |
+
+### 18.5 📌 Diễn giải cần chốt với BA
+
+Với phiếu **kiểm kê**, trường `Quantity` của dòng hiện được hiểu là **số ĐẾM ĐƯỢC (số thực tế)**, không phải
+"số lệch". Đây là lựa chọn **hợp lý nhất** (nhân viên kiểm kê ghi số đếm được; phần lệch do hệ thống tính), nhưng
+tài liệu **chưa nói rõ** ⇒ **cần chốt** trước khi làm UI kiểm kê, vì hai cách hiểu cho **hai kết quả khác nhau**
+(nếu hiểu là "số lệch" thì `Quantity` âm là hợp lệ — mà `StockDocumentLine` **cấm** số ≤ 0).
+
+### 18.6 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.4 | 15/10/2026 | *(agent, session GĐ1)* | **Lát cắt 3 — dịch vụ ghi sổ + sinh bút toán**: `TinhButToanChungTu` (**hàm thuần**: nhập 1 bút toán · chuyển kho **2** bút toán · kiểm kê ghi **phần lệch**, khớp ⇒ **không ghi gì**) · `InventoryLockKeys.TheoSku` (không tiền tố `ecommerce:`) · `StockPostingService` (**khoá mọi SKU theo thứ tự sắp xếp** chống DEADLOCK; bút toán + tồn kho **cùng transaction**). 🚨 **Ghi rõ ADR-09 không đặt ở tầng Domain** (cần EF Core; Domain cố ý không phụ thuộc persistence) và **hàng rào đồng thời thật là unique index `ADR-05` ở DB** (§18.2). **+13 unit** (khoá **quy ước dấu** — chỗ dễ sai nhất). Ghi **1 diễn giải cần chốt với BA** (§18.5) |
