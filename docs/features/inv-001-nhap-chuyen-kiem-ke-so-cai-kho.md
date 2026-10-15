@@ -2533,3 +2533,49 @@ Kịch bản: mua **4** → xác nhận → trả **3** → (2 ca bị chặn: `
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v2.5 | 15/10/2026 | *(agent, session GĐ1)* | **`INV-003` bước 1 — "nhìn thấy" phân bổ tồn theo kênh**: `GetPhanBoTheoKenhAsync` ⇒ mỗi cặp (kênh, SKU) có **`DaBan`/`DangGiu`/`DaTra`**, **suy ra từ đơn** (không thêm cột ⇒ **không migration**). **Kiểm chứng HTTP**: `daBan=4 dangGiu=0 daTra=4` **khớp dữ liệu thật**; `dangGiu=0` là **đối chứng ngược** đúng (giữ chỗ đã `Committed` sau khi trả hết). Các bất biến cũ giữ nguyên (`0040`/`0041`, sổ cái, đối soát `0`, `fail: 0`) |
+
+---
+
+## 41. **CỦNG CỐ TÀI LIỆU — SỬA LỆCH GIỮA TÀI LIỆU VÀ TRẠNG THÁI ĐÃ KIỂM CHỨNG** (15/10/2026)
+
+### 41.1 Lệch tìm thấy
+
+| # | Tài liệu | Ghi sai | Thực tế |
+|---|---|---|---|
+| 1 | `handover-gd1.md` §1 | **`Test = 686 unit`** | **`693 unit`** (+7 từ các vòng 34–39) |
+| 2 | `implementation-plan.md` §7.1 — dòng `SAL-001…004`, `INV-003`, `REC-001` | **KHÔNG có trạng thái** (bỏ trống) | đã **xong và kiểm chứng** ở các vòng 32–48 |
+
+📌 **Vì sao đây là lỗi THẬT, không phải việc trang trí:** bảng §7.1 là **bản đồ tiến độ** mà người tiếp nhận dùng để
+quyết định **làm gì tiếp**. Bảng ghi *"chưa có gì"* trong khi thực tế **đã xong và đã kiểm chứng** ⇒ người sau
+**làm lại việc đã làm** (hoặc **không dám tin** phần đã làm) — đúng loại **lãng phí** mà tài liệu tồn tại để chặn.
+📌 Và **số đếm test sai** thì tệ hơn: nó là **căn cứ để tin** rằng bộ kiểm thử còn nguyên vẹn.
+
+### 41.2 Đã sửa
+
+| # | Việc |
+|---|---|
+| 1 | `handover-gd1.md`: **`Test = 693 unit + 38 integration`** |
+| 2 | `§7.1` — **`SAL-001`**: tạo đơn từ checkout (tiền **từ sổ giải trình** + **tripwire** + khoá checkout + `XacNhan`) |
+| 3 | **`SAL-002`**: `tinh-va-giu-cho` (giữ chỗ fail-closed, idempotent) |
+| 4 | **`SAL-003`**: chốt giữ chỗ ⇒ xuất kho (`OnHand` & `Reserved` cùng giảm) + job nhả chỗ quá hạn |
+| 5 | **`SAL-004`**: huỷ ⇒ nhả chỗ **ngay**; **trả hàng** (toàn bộ · một phần · **luỹ kế**) + loại chứng từ **`CustomerReturn`** |
+| 6 | **`INV-003`**: ✅ **bước 1** (báo cáo phân bổ theo kênh) · ⏳ **còn** hạn mức cứng (**cần người quyết**) |
+| 7 | **`REC-001`**: ✅ **đối soát tồn kho** (job + phát hiện đúng, đếm đúng, không báo động giả) · ⏳ **còn** ngưỡng/quy trình + `ReconRuns` + đối soát **thanh toán** |
+
+📌 **Mỗi dòng ghi rõ ĐÃ kiểm chứng gì và CÒN gì** — để người sau **không** phải suy đoán từ commit log.
+
+### 41.3 Kiểm chứng sau khi sửa
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | build `--no-incremental` | **0 lỗi / 0 cảnh báo** ✅ |
+| 2 | unit · integration | **693/693** ✅ · **38/38** ✅ |
+| 3 | mermaid | **197 khối · 0 lỗi** ✅ |
+| 4 | `§7.1` sau khi sửa | 6/6 dòng có **trạng thái + phần còn lại** ✅ |
+| 5 | `handover` sau khi sửa | còn **0** chỗ ghi `686`/`682`/`679 unit` ✅ |
+
+### 41.4 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v2.6 | 15/10/2026 | *(agent, session GĐ1)* | **Củng cố tài liệu**: sửa **lệch thật** — `handover` ghi `686 unit` (thực tế **693**) và **`§7.1` bỏ trống trạng thái** cho `SAL-001…004`/`INV-003`/`REC-001` dù **đã xong và kiểm chứng**. Nay mỗi dòng ghi **đã kiểm chứng gì + còn gì**. Kiểm chứng lại toàn bộ: build `0/0`, unit **693/693**, integration **38/38**, mermaid **197/0** |
