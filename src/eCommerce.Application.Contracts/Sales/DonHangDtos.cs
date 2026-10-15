@@ -47,6 +47,29 @@ public class TraHangLineDto
     public int Quantity { get; set; }
 }
 
+/// <summary>
+/// **Đầu vào trả hàng** (`SAL-004`) — gói **TƯỜNG MINH** thay vì nhiều tham số rời.
+///
+/// 🚨 **VÌ SAO ĐỔI SANG DTO (bài học vòng 40–41):** chữ ký cũ
+/// `TraHangAsync(Guid id, Guid warehouseId, List&lt;TraHangLineDto&gt;? lines, DateTime? at)` khiến `lines` — một
+/// **tham số phức tạp duy nhất** — bị ASP.NET Core bind **cả body** theo quy tắc **ngầm**; client gửi
+/// `{ "lines": [ … ] }` nhận **`400`** mà **không rõ vì sao** (đã đo: `inv-001` §32.3).
+/// Gói vào **một DTO** thì hình dạng body **hiển nhiên** — *hợp đồng API rõ hơn là phụ thuộc quy tắc bind ngầm*.
+/// </summary>
+public class TraHangInput
+{
+    [Required]
+    public Guid WarehouseId { get; set; }
+
+    /// <summary>
+    /// **Để trống** ⇒ trả **phần CÒN LẠI** của đơn; **có giá trị** ⇒ chỉ trả các dòng đó.
+    /// 🚨 Luôn bị kiểm **LUỸ KẾ**: `đã trả (các lần trước) + lần này ≤ đã mua`.
+    /// </summary>
+    public List<TraHangLineDto>? Lines { get; set; }
+
+    public DateTime? At { get; set; }
+}
+
 public class DonHangDto
 {
     public Guid Id { get; set; }
@@ -99,7 +122,7 @@ public interface IDonHangAppService : IApplicationService
     /// 🚨 **NÉM** nếu **luỹ kế** số đã trả (các lần trước **cộng lại**) **vượt** số đã mua — *trả hai lần cho cùng
     /// một món* là lỗi **không sửa được** vì sổ cái **append-only** (phải tạo chứng từ đảo).
     /// </summary>
-    Task<DonHangDto> TraHangAsync(Guid id, Guid warehouseId, List<TraHangLineDto>? lines = null, DateTime? at = null);
+    Task<DonHangDto> TraHangAsync(Guid id, TraHangInput input);
 
     Task<DonHangDto> GetAsync(Guid id);
 }

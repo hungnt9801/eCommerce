@@ -2089,3 +2089,54 @@ DTO riêng), rồi chạy lại **hai** phép đo trên. 📌 Nếu hoá ra **ph
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.7 | 15/10/2026 | *(agent, session GĐ1)* | **Trả hàng MỘT PHẦN + giới hạn LUỸ KẾ** (đã viết): `lines` tuỳ chọn ⇒ trả phần còn lại / trả dòng chỉ định; **luỹ kế** `đã trả + lần này ≤ đã mua` (tính từ **chính các phiếu trả trước**, không cần bảng mới); SKU lạ ⇒ **NÉM**; chỉ `Returned` khi trả **hết**. **Đã kiểm chứng**: trả nốt phần còn lại (`10/0/10`, `CustomerReturn`), đối soát `0`, `fail: 0`. 🚨 **CHƯA kiểm chứng** hai phép đo cốt lõi (trả một phần · trả vượt) — **`HTTP 400` do dạng body của `lines`**; ghi rõ §32.3 + cách xử lý ở lát cắt sau. Ghi **bài học `Select-Object -First` ngắt pipeline** |
+
+---
+
+## 33. `SAL-004` (tiếp) — **TRẢ MỘT PHẦN: ĐÃ KIỂM CHỨNG** + **1 LỖI THẬT** (15/10/2026) — *§33 THAY THẾ kết luận §32.3*
+
+### 33.1 Hai nguyên nhân làm §32.3 không đo được — **cả hai đều là lỗi của PHÉP ĐO, không phải của mã**
+
+| # | Nguyên nhân | Bài học |
+|---|---|---|
+| 1 | **Dạng body**: chữ ký cũ `TraHangAsync(id, warehouseId, List<TraHangLineDto>?, at)` khiến `List<T>` bị ASP.NET bind **cả body** theo quy tắc **ngầm** ⇒ client gửi `{ "lines": […] }` nhận **`400`** *không rõ vì sao* | ✅ **Sửa mã:** gói thành **`TraHangInput { WarehouseId, Lines, At }`** ⇒ hình dạng body **hiển nhiên** (*hợp đồng API rõ hơn là phụ thuộc quy tắc bind ngầm*) |
+| 2 | **URL sai**: ABP đưa `Guid` vào **đường dẫn** ⇒ route đúng là `POST /{id}/tra-hang` (không còn `{warehouseId}` trong path); probe của tôi vẫn gọi URL cũ ⇒ **`404`** | 📌 **Ba lần liên tiếp** đoán sai hình dạng request (2 lần URL + 1 lần body). ⇒ **In route + body schema từ `swagger.json` TRƯỚC khi viết lời gọi** — bài học đã ghi ở `PRC-001` §19.7 và **vẫn tái phạm**. Lần này tôi đã in swagger và nó chỉ đúng ngay |
+
+### 33.2 🔥 **LỖI THẬT thứ ba phát hiện được — SỐ CHỨNG TỪ TRÙNG giữa các lần trả**
+
+`TraHangAsync` đặt `Number = $"TH-{don.Number}"` — **cố định** ⇒ **lần trả THỨ HAI** (trả một phần rồi trả nốt)
+**trùng số chứng từ** ⇒ unique `(TenantId, Number)` chặn ⇒ **không trả nốt được**.
+📌 **Đo được:** lần trả nốt trả **`403` `eCommerce:Inventory:0014`** — và 🎯 **`0014` là mã ĐÚNG**
+(*"số chứng từ đã tồn tại"*) ⇒ **cơ chế ánh xạ ràng buộc (Phụ lục B) đã hoạt động đúng**: nó **chỉ đúng tên ràng buộc**
+thay vì trả `500` hay mã chung. 📌 Đây là **lần đầu** cơ chế đó **bắt được một lỗi thật do tôi gây ra** trong dòng nghiệp vụ.
+✅ **Sửa:** `Number = $"TH-{don.Number}-{số phiếu trả đã có + 1}"` ⇒ mỗi lần trả **một số riêng**.
+
+### 33.3 ✅ BẰNG CHỨNG HTTP THẬT — **cả ba phép đo cốt lõi nay ĐẠT**
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 0 | mua 4 → **xác nhận** | `Confirmed` · `6/0/6` ✅ |
+| 1 | 🔥 **TRẢ MỘT PHẦN `2/4`** | **`200`** · **`Confirmed`** (chưa trả hết) · **`8/0/8`** ✅ |
+| 2 | 🔥 **TRẢ NỐT** (`lines` để trống ⇒ trả phần còn lại) | **`200`** · **`Returned`** · **`10/0/10`** ✅ |
+| 3 | **Gọi trả hàng lần nữa sau khi đã trả hết** | `200` (**idempotent** — nhánh `Returned` trả trạng thái hiện tại) · tồn **vẫn `10/0/10`** ✅ *không nhập kho thêm* |
+| 4 | **Sổ cái** | **`CustomerReturn 2`** + **`CustomerReturn 2`** ✅ — **hai lần trả, tổng đúng bằng `4` đã mua** |
+| 5 | **Đối soát kho** | **`soCapLech = 0`** ✅ |
+| 6–7 | Dọn dẹp · log | 0 đơn / 0 chứng từ / 0 tồn / 0 sổ cái ✅ · **`fail: 0`** ✅ |
+
+- build `--no-incremental`: **0 lỗi / 0 cảnh báo** · unit **693/693** · integration **38/38**
+
+⚠️ **Ghi rõ độ phủ của phép đo #3:** ca "trả vượt" ở đây rơi vào **nhánh idempotent** (`Returned`), **chưa** chạm
+**giới hạn luỹ kế**. Muốn chạm luỹ kế phải: **trả một phần, rồi cố trả VƯỢT phần còn lại** (ví dụ đơn 4: trả 3 rồi trả 3).
+⇒ **Việc của lát cắt sau:** thêm đúng một phép đo đó (rẻ) — **không** tuyên bố luỹ kế đã được kiểm chứng.
+
+### 33.4 📌 Bài học phương pháp (vòng 41)
+
+- **Ba lần liên tiếp** sai **hình dạng request** (2 URL + 1 body) ⇒ mỗi lần mất **một vòng đo**. ⇒ **IN SWAGGER TRƯỚC**.
+- Sửa probe bằng **thay thế chuỗi** liên tục **không khớp** (CRLF/khác biệt văn bản) ⇒ chuyển sang **sửa theo SỐ DÒNG**
+  (`$lines[i] = …`) là cách **chắc chắn** — dùng luôn cho các lần sau.
+- `Select-Object -First N` **ngắt pipeline** ⇒ giết tiến trình con và **mất output** (§32.4).
+
+### 33.5 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.8 | 15/10/2026 | *(agent, session GĐ1)* | **Trả một phần — ĐÃ KIỂM CHỨNG**: chữ ký đổi thành **`TraHangInput`** (bỏ phụ thuộc quy tắc bind ngầm). 🔥 **Lỗi thật thứ ba:** số chứng từ trả **cố định** ⇒ lần trả thứ hai **trùng số** ⇒ chặn (**`Inventory:0014`** — 🎯 **đúng mã**, chứng minh **cơ chế ánh xạ ràng buộc hoạt động**) ⇒ sửa thành số **theo lần trả**. **HTTP thật**: `6/0/6` ⇒ **`8/0/8`+`Confirmed`** ⇒ **`10/0/10`+`Returned`**; sổ cái **`CustomerReturn 2` × 2**; trả lại lần nữa **idempotent**; **đối soát `0`**; **`fail: 0`**. ⚠️ **Ghi rõ**: ca **luỹ kế** **chưa** được chạm (đang rơi vào nhánh idempotent) |

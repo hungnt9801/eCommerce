@@ -223,9 +223,13 @@ public class DonHangAppService : ApplicationService, IDonHangAppService
     /// **NÉM** nếu đơn ở `Pending` (chưa xuất kho ⇒ huỷ, không phải trả hàng) hoặc đã `Cancelled`/`Returned`.
     /// </summary>
     [Authorize(eCommerceConsts.Permissions.Orders.Manage)]
-    public async Task<DonHangDto> TraHangAsync(Guid id, Guid warehouseId, List<TraHangLineDto>? lines = null, DateTime? at = null)
+    public async Task<DonHangDto> TraHangAsync(Guid id, TraHangInput input)
     {
         var don = await _donRepository.GetAsync(id);
+
+        var warehouseId = input.WarehouseId;
+        var lines = input.Lines;
+        var at = input.At;
 
         if (don.Status == OrderStatus.Returned)
         {
@@ -322,7 +326,11 @@ public class DonHangAppService : ApplicationService, IDonHangAppService
         // khoá phân tán, `CHECK` DB) **được áp nguyên vẹn** thay vì viết một đường ghi tồn kho thứ hai.
         var phieu = await _phieuKho.CreateAsync(new eCommerce.Application.Contracts.Inventory.CreateStockDocumentDto
         {
-            Number = $"TH-{don.Number}",
+            // 🚨 **SỐ CHỨNG TỪ PHẢI KHÁC NHAU GIỮA CÁC LẦN TRẢ** — lỗi thật phát hiện vòng 41:
+            // số cố định `TH-{đơn}` ⇒ lần trả **thứ hai** (trả một phần rồi trả nốt) **trùng số** ⇒
+            // unique `(TenantId, Number)` chặn ⇒ **không trả nốt được** (`Inventory:0014`).
+            // 📌 Đúng loại lỗi mà cơ chế ánh xạ ràng buộc (Phụ lục B) đã chỉ **đúng tên ràng buộc** — không còn `500`.
+            Number = $"TH-{don.Number}-{idPhieuTraCu.Count + 1}",
             // 🚨 Dùng **loại chứng từ RIÊNG** (`CustomerReturn`) thay vì "mượn" `GoodsReceipt`:
             // sổ cái ghi biến động `CustomerReturn` ⇒ báo cáo *bán* và *trả* **tách bạch** (`inv-001` §31).
             Type = StockDocumentType.CustomerReturn,
