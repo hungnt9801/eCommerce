@@ -2140,3 +2140,66 @@ thay vì trả `500` hay mã chung. 📌 Đây là **lần đầu** cơ chế đ
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.8 | 15/10/2026 | *(agent, session GĐ1)* | **Trả một phần — ĐÃ KIỂM CHỨNG**: chữ ký đổi thành **`TraHangInput`** (bỏ phụ thuộc quy tắc bind ngầm). 🔥 **Lỗi thật thứ ba:** số chứng từ trả **cố định** ⇒ lần trả thứ hai **trùng số** ⇒ chặn (**`Inventory:0014`** — 🎯 **đúng mã**, chứng minh **cơ chế ánh xạ ràng buộc hoạt động**) ⇒ sửa thành số **theo lần trả**. **HTTP thật**: `6/0/6` ⇒ **`8/0/8`+`Confirmed`** ⇒ **`10/0/10`+`Returned`**; sổ cái **`CustomerReturn 2` × 2**; trả lại lần nữa **idempotent**; **đối soát `0`**; **`fail: 0`**. ⚠️ **Ghi rõ**: ca **luỹ kế** **chưa** được chạm (đang rơi vào nhánh idempotent) |
+
+---
+
+## 34. `SAL-004` — **GIỚI HẠN LUỸ KẾ: ĐÃ KIỂM CHỨNG** (15/10/2026) — *đóng nốt §33.3 (độ phủ)*
+
+### 34.1 Phép đo còn thiếu của §33 — nay đã chạy
+
+§33.3 ghi rõ: ca *"trả vượt"* trước đó rơi vào **nhánh idempotent** (`Returned`) nên **chưa** chạm **giới hạn luỹ kế**.
+Phép đo đúng phải là: **trả một phần, rồi cố trả VƯỢT phần còn lại** trên **đơn còn đang `Confirmed`**.
+
+✅ **Đã chạy — và ĐẠT** (probe tối giản mới, dùng đúng dạng request đã xác nhận bằng `swagger.json`):
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 0 | mua 4 → **xác nhận** | `Confirmed` · **`OnHand 6`** ✅ |
+| 1 | **trả `3/4`** (một phần) | `200` · **`Confirmed`** · **`OnHand 9`** ✅ |
+| 2 | 🔥 **cố trả VƯỢT `3` nữa** (chỉ còn `1`) | **`403`** · 🚨 **BỊ CHẶN** ✅ · **chi tiết**: *"LKSKU-…: **đã mua 4, đã trả 3, lần này 3**"* ✅ · **`OnHand` VẪN `9`** (không nhập thêm) ✅ |
+| 3 | **trả nốt `1`** (phần còn lại) | `200` · **`Returned`** · **`OnHand 10`** ✅ |
+| 4 | **Sổ cái · đối soát** | **`CustomerReturn = 4`** ✅ (tổng **đúng bằng** số đã mua) · **`soCapLech = 0`** ✅ |
+| 5 | Dọn dẹp · log | 0 đơn / 0 chứng từ / 0 tồn / 0 sổ cái ✅ · **`fail: 0`** ✅ |
+
+- build `--no-incremental`: **0 lỗi / 0 cảnh báo** · unit **693/693** · integration **38/38**
+
+📌 **Vì sao phép đo này quan trọng:** không có nó, *"trả 4 mà nhập lại 8"* (thừa hàng ảo) là **hoàn toàn có thể xảy ra
+mà mọi phép đo khác vẫn xanh** — và vì sổ cái **append-only**, sửa lại phải **tạo chứng từ đảo**. Giờ nó **đã bị khoá**.
+
+### 34.2 ⚠️ Phát hiện khi đo — **MÃ LỖI chưa tương xứng với ý nghĩa nghiệp vụ**
+
+Ca *"trả vượt"* trả mã **`eCommerce:Inventory:0001`** = **`InsufficientStock`** (*"không đủ tồn"*).
+📌 **Sai về nghĩa:** tồn kho **không hề thiếu** — vấn đề là **khách trả nhiều hơn số đã mua**.
+Client nhận `0001` sẽ hiển thị **sai thông điệp** (*"hết hàng"*) cho một **lỗi dữ liệu đầu vào**.
+⇒ **Việc của lát cắt sau (rẻ):** thêm mã riêng, ví dụ **`eCommerce:Inventory:00xx` "Trả vượt số đã mua"**, và
+dùng nó cho **cả hai** ca (SKU không thuộc đơn · trả vượt luỹ kế) — hiện **cả hai** đang mượn `0001`.
+📌 **Bài học chung:** một mã lỗi **đúng kỹ thuật** nhưng **sai nghiệp vụ** ⇒ người dùng cuối nhận **chỉ dẫn sai**
+(*"chờ nhập hàng"* thay vì *"kiểm tra số lượng trả"*), và **không có test nào phát hiện** vì **HTTP vẫn 403**.
+
+### 34.3 Vòng đời đơn hàng — trạng thái kiểm chứng **đầy đủ** (cập nhật §30.3)
+
+| Trạng thái | Đường vào | Tồn kho | Kiểm chứng |
+|---|---|---|---|
+| (giỏ) | `checkout` | **giữ chỗ** | ✅ HTTP |
+| `Pending` | `tao-tu-checkout` | không đổi | ✅ HTTP |
+| `Confirmed` | `xac-nhan` | **xuất kho** (`OnHand`↓ & `Reserved`↓; `Available` **không đổi**) | ✅ HTTP |
+| `Cancelled` | `huy-don` | **nhả chỗ NGAY** | ✅ HTTP |
+| `Confirmed` (giữ) | `tra-hang` **một phần** | **nhập kho một phần** | ✅ HTTP §33–§34 |
+| `Returned` | `tra-hang` hết | **nhập kho đủ** | ✅ HTTP |
+| bị chặn | `tra-hang` **vượt luỹ kế** | **không đổi** | ✅ HTTP §34.1 |
+| giữ chỗ hết hạn | **job** định kỳ | `Reserved`↓ | ✅ DB thật §27 |
+
+### 34.4 Còn lại
+
+| # | Việc |
+|---|---|
+| 1 | **Mã lỗi riêng** cho *"trả vượt số đã mua"* + *"SKU không thuộc đơn"* (§34.2) |
+| 2 | **Trạng thái `PartiallyReturned`** — hiện đơn trả một phần **trông như** chưa trả gì (**cần người quyết**: đổi hợp đồng API) |
+| 3 | **Hoàn tiền** (thuộc `PaymentHub`/kế toán) |
+| 4 | `INV-003` phân bổ tồn theo kênh · `REC-001` · `WEB-001` |
+
+### 34.5 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.9 | 15/10/2026 | *(agent, session GĐ1)* | **Giới hạn LUỸ KẾ — ĐÃ KIỂM CHỨNG** (§34.1): đơn 4 → trả 3 → **cố trả 3 nữa ⇒ `403` BỊ CHẶN** kèm **chi tiết** *"đã mua 4, đã trả 3, lần này 3"*, **tồn không đổi** → trả nốt 1 ⇒ `Returned`; sổ cái **`CustomerReturn = 4`**; **đối soát `0`**; **`fail: 0`**. ⚠️ **Phát hiện:** mã lỗi cho *"trả vượt"* đang là **`Inventory:0001` (`InsufficientStock`)** ⇒ **sai nghĩa** (tồn **không** thiếu) ⇒ client hiển thị **sai thông điệp**; ghi việc thêm mã riêng (§34.2). Cập nhật bảng **kiểm chứng đầy đủ** vòng đời đơn (§34.3) |
