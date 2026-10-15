@@ -2189,3 +2189,44 @@ khả năng *"gộp sai thành 4 hoặc 6"* và khả năng *"chỉ giữ chỗ 
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.a | 15/10/2026 | *(agent, session GĐ1)* | ✅ **Đo CA BIÊN của bộ tách giỏ nhiều dòng** (nợ vòng 83, nay chạy được nhờ §71): **cả bốn ca ĐÚNG** — `SKU:0` ⇒ dùng mặc định (không có dòng 0); `SKU:abc` ⇒ dùng mặc định; **`SKU:2,SKU:3` ⇒ GỘP = `5`** (`550.000`, DB **1 dòng × 5**); **`SKU:2,KHONG-CO:1` ⇒ KHÔNG tạo đơn** + thông điệp **`eCommerce:Pricing:0004 — sku=… — lyDo=…`**. **Đối chứng**: `3` đơn · dòng `1`/`2`/`5` · **`Reserved=8 = 1+2+5`** ⇒ khớp **tổng** *và* **từng đơn**; dọn sạch; **`fail: 0`**; 0 tiến trình treo |
+
+---
+
+## 73. **`/DonHang` (QUẢN LÝ ĐƠN TRÊN UI): GET ĐÃ ĐẠT — POST `400` — ĐÃ GỠ, GHI ĐÚNG PHÁT HIỆN** (15/10/2026)
+
+### 73.1 ✅ Phần **ĐÃ ĐO ĐƯỢC** (trước khi lộ lỗi POST)
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | 🔐 **Chưa đăng nhập** `GET /DonHang/ChiTiet/{guid}` | **`302`** → `/Account/Login?ReturnUrl=%2FDonHang%2FChiTiet%2F…` ✅ *(cổng chặn đúng cho route mới)* |
+| 2 | Đặt hàng qua UI (4 đơn vị) | `200` · **`WEB-WEB-ddadc05e52d145d6`** · `Reserved=4` ✅ |
+| 3 | 🔥 **`GET /DonHang/ChiTiet/{id}`** | **`200`** · **`trangThai='Pending'`** ✅ · **cả hai nút hiện** (`nut-xac-nhan` · `nut-huy`) ✅ · **`tổng='440,000'`** ✅ |
+| 4 | Dọn dẹp · `fail:` · tiến trình treo | `don=0 dong=0 ton=0 donvi=0 gc=0 sc=0 baoMat=true` ✅ · **Web `0` / Host `0`** ✅ · **`0`** ✅ |
+
+### 73.2 🚨 **LỖI THẬT phát hiện được — và đó là lý do KHÔNG commit**
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 5 | **`POST /DonHang/XacNhan/{id}`** | 🚨 **`400`** (mong đợi `302`) · `Location` rỗng |
+| 6 | Hệ quả (đo tiếp) | **trạng thái VẪN `Pending`** · tồn **vẫn `10/4`** ⇒ **nút bấm KHÔNG hoạt động** |
+
+**Nguyên nhân:** form do tôi render **thiếu token chống giả mạo** (`__RequestVerificationToken`) ⇒ ABP từ chối POST bằng `400`.
+📌 **Đây là CÙNG họ lỗi đã gặp ở `/DatHang` vòng 65** (tôi đặt GUID ngẫu nhiên thay vì token thật) — lần này ở **form render trong C#**
+thay vì `.cshtml` (nên **không** có `@Html.AntiForgeryToken()` để dùng).
+📌 **Ý nghĩa:** nếu commit như cũ thì người dùng thấy **hai nút bấm mà bấm vào là lỗi** — **tệ hơn không có trang**.
+
+**⇒ Đã GỠ tệp `DonHangController.cs` (chưa từng được commit)** ⇒ repo **không** chứa UI biết-là-hỏng; build lại **sạch**.
+
+### 73.3 Việc còn lại — **đã biết chính xác cách làm**
+
+| # | Việc |
+|---|---|
+| 1 | Dựng `/DonHang` dưới dạng **`.cshtml`** (không render trong C#) ⇒ dùng `@Html.AntiForgeryToken()` — **đúng khuôn đã chạy** ở `Views/DatHang/Index.cshtml` |
+| 2 | Hoặc giữ render trong C#: inject `IAntiforgery`, lấy `GetAndStoreTokens(HttpContext).RequestToken`, chèn `<input name="__RequestVerificationToken" …>` vào **mỗi** form |
+| 3 | ⚠️ **Bài học phụ (lỗi của tôi trong chính vòng này):** bản vá nhanh bằng **ghép nháy lồng trong PowerShell** làm **lỗi cú pháp C#** ⇒ *sửa mã sản phẩm phải bằng công cụ `edit`, **không** bằng `.Replace` chuỗi* — cùng họ với **bài học #9** (phẫu thuật tệp) và **#11** (nhồi nhiều việc vào một biểu thức) |
+
+### 73.4 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.0-a | 15/10/2026 | *(agent, session GĐ1)* | **Thử dựng `/DonHang` (quản lý đơn trên UI)**: ✅ **GET đạt** — `302` khi chưa đăng nhập; `200` + `Pending` + **hai nút** + `tổng=440.000`; 🚨 **POST trả `400`** vì form render trong C# **thiếu token chống giả mạo** (*cùng họ lỗi vòng 65*) ⇒ **đã GỠ tệp**, **không** commit UI biết-là-hỏng; build lại sạch; dọn dẹp sạch; **`fail: 0`**. Ghi **cách làm đúng** (§73.3) và **bài học**: *sửa mã sản phẩm bằng `edit`, không bằng ghép chuỗi* |
