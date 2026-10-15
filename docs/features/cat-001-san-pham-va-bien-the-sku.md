@@ -752,3 +752,62 @@ public class ProductCatalogTests
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.1 | *(điền)* | *(điền)* | Bản nháp đầu — **lập từ code thật**: `Product`/`ProductVariant` đã có (`Product.cs`), 2 unique index `(TenantId, Code)`/`(TenantId, Sku)` **đã** `NULLS NOT DISTINCT`; phát hiện **F3** (`IsPublished` không guard), **F4** (`eCommerce.Kernel` chưa có), **F6** (kiểm trùng SKU yếu hơn DB), **F7** (FK `CASCADE` nguy hiểm), **F8** (outbox chưa bật), **F9** (thiếu `Products.View`/`Products.Publish`), **F5** (slug không unique — chuyển `CAT-003`) |
+
+---
+
+## 16. TRẠNG THÁI TRIỂN KHAI (15/10/2026) — **LÕI DOMAIN CATALOG ĐÃ XONG**
+
+> Lượt này làm **phần lõi domain + phân quyền + hàng rào DB** của `CAT-001` (§7.1 GĐ1).
+> **CHƯA** làm app service/DTO/API (**F11**) và sự kiện (**F12**) — xem **16.3**.
+
+### 16.1 Đã làm (đóng/giảm các phát hiện §15.2)
+
+| # | Nội dung | Đóng phát hiện |
+|---|---|---|
+| 1 | **`ProductStatus` + máy trạng thái có GUARD** (`Publish`/`Unpublish`/`Archive`); `IsPublished` nay là **property dẫn xuất chỉ-đọc** ⇒ **không còn đường nào set thẳng** | **D5**, **F3** ✅ |
+| 2 | **`Publish()` NÉM LỖI khi không có biến thể đang hoạt động** | **D9** ✅ |
+| 3 | **`DoiMa()` chỉ khi còn `Draft`** — mã sản phẩm **bất biến sau khi publish** | **D2** ✅ |
+| 4 | **Chuẩn hoá + kiểm tra SKU** (trim, 1..64, chỉ `A-Za-z0-9._-`), chống trùng **trong sản phẩm** không phân biệt hoa/thường | **D11/BR-002** ✅ |
+| 5 | **Giá ≥ 0**; `DoiGia()` trả về **có đổi hay không** (để chỉ phát sự kiện khi **thực sự** đổi) | BR-011 ✅ |
+| 6 | **`NgungBan()`/`MoBanLai()`** cho biến thể (ngừng bán **không xoá** ⇒ giữ lịch sử tham chiếu) | D4 |
+| 7 | **Thêm permission `Products.View` + `Products.Publish`** (hằng số **và** `PermissionDefinitionProvider`) | **D10**, **F9** ✅ |
+| 8 | **Mã lỗi Catalog `eCommerce:Catalog:0001…0010`** | **F10** ✅ |
+| 9 | **Khoá phân tán `catalog:sku:{sku}`** (chống 2 request cùng vượt bước "kiểm tra chưa tồn tại") | **D6/D7**, **F2** ✅ |
+| 10 | 🚨 **FK biến thể: `Cascade` → `Restrict`** ⇒ xoá cứng `Product` **không còn** xoá mất biến thể | **D4**, **F7** ✅ |
+
+### 16.2 ✅ BẰNG CHỨNG KIỂM CHỨNG (PostgreSQL 17 thật)
+
+| Phép đo | Kết quả |
+|---|---|
+| Build | **0 lỗi / 0 cảnh báo** (`--no-incremental`) |
+| Unit test | **424** (thêm **23** test vòng đời/bất biến) |
+| Integration test | **23** (thêm **3**: FK chặn xoá cứng · xoá mềm giữ biến thể · **cấu hình FK là `RESTRICT`**) |
+| DB thật | `CatProducts.Status` **có**, `IsPublished` **đã bỏ**; `pg_constraint.confdeltype = 'r'` (**RESTRICT** — đo bằng SQL, không suy luận) |
+| `Assets/schema.sql` | **đã sinh lại**; DDL cuối cùng có `ON DELETE RESTRICT` |
+| Migration | `20261015085029_Cat001_ProductStatus_And_RestrictVariantFk` đã áp (có trong `__EFMigrationsHistory`) |
+
+#### 🚨 Migration này **ĐÃ SỬA TAY CÓ CHỦ Ý** — và đây là lý do
+
+EF sinh ra thứ tự `DROP COLUMN IsPublished` → `ADD COLUMN Status DEFAULT 0`, kèm cảnh báo
+*"may result in the loss of data"*. **Cảnh báo đó ĐÚNG và nghiêm trọng hơn vẻ ngoài của nó:**
+`Status = 0` là **`Draft`** ⇒ **mọi sản phẩm ĐANG BÁN sẽ âm thầm thành Nháp** — mất trạng thái publish,
+**không có lỗi nào**. Nên đã **đổi thứ tự**: `ADD COLUMN` → **`UPDATE` chuyển dữ liệu** (`IsPublished = true`
+⇒ `Status = 1`) → mới `DROP COLUMN`. `Down()` làm ngược tương ứng ⇒ **rollback cũng không mất trạng thái**.
+
+### 16.3 ⚠️ CHƯA LÀM (nói thẳng)
+
+| # | Việc | Ghi chú |
+|---|---|---|
+| 1 | **`IProductAppService` + DTO + API** (CRUD, tra theo slug, publish/unpublish) | **F11 — chính là việc tiếp theo của `CAT-001`** |
+| 2 | **`ProductPublishedEto` / `VariantPriceChangedEto`** | **F12**. ⚠️ **F8 (outbox)** vẫn hoãn theo `XC-002` ⇒ 2 ETO này sẽ **không có người nhận**; cần **phân biệt "ETO mang dữ liệu" (fail-closed) vs "ETO thông báo"** trước khi phát — nếu không, cảnh báo lúc khởi động sẽ thành **dương tính giả** và bị bỏ qua |
+| 3 | **Chống trùng SKU toàn tenant ở tầng app service** | Hiện **DB** đã chặn (unique `(TenantId, Sku)` + `NULLS NOT DISTINCT`); app service sẽ **kiểm tra trước trong khoá `catalog:sku:`** + map `DbUpdateException` ⇒ `Catalog:0002` (**D3/F6**) |
+| 4 | **SKU không phân biệt HOA/thường** | Chống trùng trong bộ nhớ đã so không phân biệt hoa/thường, nhưng **DB thì có** ⇒ `sku-a` và `SKU-A` vẫn cùng tồn tại được. Muốn chặn cần **functional unique index** `(TenantId, UPPER(Sku))` — **chưa làm** |
+| 5 | **Unique index cho `Slug`** | **F5** — thuộc `CAT-003` (storefront route) |
+| 6 | **Tách `modules/Catalog`** | **D1/F1** — làm khi `CAT-002`/`CAT-003` thêm entity, để không sửa hai lần |
+| 7 | **`ProductShippingProfile`, `Category`, `Brand`, thuộc tính, media, hiển thị theo kênh** | `CAT-002`/`CAT-003` |
+
+### 16.4 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.2 | 15/10/2026 | *(agent, session GĐ1)* | **Lõi domain**: `ProductStatus` + máy trạng thái có guard (D5) · mã bất biến sau publish (D2) · SKU hoá/kiểm tra (D11) · giá ≥ 0 · permission `View`/`Publish` (D10) · mã lỗi Catalog · khoá `catalog:sku:` (D7) · **FK `Cascade` → `Restrict`** (F7) · migration **sửa tay để CHUYỂN dữ liệu** thay vì mất trạng thái publish. **+23 unit · +3 integration**. Ghi rõ việc còn lại ở **16.3** |

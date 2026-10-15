@@ -77,3 +77,26 @@ public enum ChannelListingStatus
     Error = 3,
     Delisted = 4
 }
+
+/// <summary>
+/// Vòng đời HIỂN THỊ của sản phẩm (`CAT-001` **D5** — state machine ở tầng DOMAIN).
+///
+/// 🚨 VÌ SAO PHẢI CÓ ENUM + METHOD CÓ GUARD (thay vì `bool IsPublished` có `set` công khai):
+/// `IsPublished` là `bool` công khai ⇒ **không có chỗ nào** để chặn chuyển trạng thái sai
+/// (ví dụ publish một sản phẩm **không có biến thể** nào — bán không được, mà vẫn hiện trên storefront).
+/// Quy ước dự án: **máy trạng thái PHẢI NÉM LỖI**, không im lặng bỏ qua (bài học `SetPaidStatus()` của eShop).
+/// </summary>
+public enum ProductStatus
+{
+    /// <summary>Nháp — chưa từng hiện ra ngoài.</summary>
+    Draft = 0,
+
+    /// <summary>Đang bán (hiện trên storefront/kênh).</summary>
+    Published = 1,
+
+    /// <summary>Đã ngừng bán nhưng **giữ nguyên** dữ liệu (có thể publish lại).</summary>
+    Unpublished = 2,
+
+    /// <summary>Lưu trữ — kết thúc vòng đời; **không** publish lại.</summary>
+    Archived = 3
+}

@@ -26,9 +26,15 @@ public class eCommercePermissionDefinitionProvider : PermissionDefinitionProvide
 
         // ---- Sản phẩm / danh mục ----
         var products = group.AddPermission(eCommerceConsts.Permissions.Products.Default);
+        // 🚨 `View` và `Publish` **BẮT BUỘC phải có mặt ở ĐÂY** (`CAT-001` D10 / F9):
+        // hằng số khai trong `eCommerceConsts` mà **không** định nghĩa ở provider ⇒ ABP coi là
+        // **luôn bị từ chối** ⇒ `403` cho MỌI người, **kể cả admin** — đúng lỗi Phase 0 (`XC-004` D2/E3).
+        // 🛡️ Lưới an toàn: `BatBienPhanQuyenTests.TC02b` khoá bất biến "hằng số ↔ định nghĩa khớp 2 CHIỀU".
+        products.AddChild(eCommerceConsts.Permissions.Products.View);
         products.AddChild(eCommerceConsts.Permissions.Products.Create);
         products.AddChild(eCommerceConsts.Permissions.Products.Edit);
         products.AddChild(eCommerceConsts.Permissions.Products.Delete);
+        products.AddChild(eCommerceConsts.Permissions.Products.Publish);
 
         // ---- Kho ----
         var inventory = group.AddPermission(eCommerceConsts.Permissions.Inventory.Default);

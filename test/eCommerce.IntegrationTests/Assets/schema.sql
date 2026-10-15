@@ -1294,3 +1294,19 @@ VALUES ('20261015082700_Add_Sal005_MarketplaceOrderIntake', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+ALTER TABLE "CatProductVariants" DROP CONSTRAINT "FK_CatProductVariants_CatProducts_ProductId";
+
+ALTER TABLE "CatProducts" ADD "Status" integer NOT NULL DEFAULT 0;
+
+UPDATE "CatProducts" SET "Status" = 1 WHERE "IsPublished" = true;
+
+ALTER TABLE "CatProducts" DROP COLUMN "IsPublished";
+
+ALTER TABLE "CatProductVariants" ADD CONSTRAINT "FK_CatProductVariants_CatProducts_ProductId" FOREIGN KEY ("ProductId") REFERENCES "CatProducts" ("Id") ON DELETE RESTRICT;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261015085029_Cat001_ProductStatus_And_RestrictVariantFk', '10.0.11');
+
+COMMIT;
+

@@ -2074,9 +2074,6 @@ namespace eCommerce.Migrations
                         .HasDefaultValue(false)
                         .HasColumnName("IsDeleted");
 
-                    b.Property<bool>("IsPublished")
-                        .HasColumnType("boolean");
-
                     b.Property<DateTime?>("LastModificationTime")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("LastModificationTime");
@@ -2093,6 +2090,9 @@ namespace eCommerce.Migrations
                     b.Property<string>("Slug")
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
 
                     b.Property<Guid?>("TenantId")
                         .HasColumnType("uuid")
@@ -3852,7 +3852,7 @@ namespace eCommerce.Migrations
                     b.HasOne("eCommerce.Catalog.Product", null)
                         .WithMany("Variants")
                         .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 

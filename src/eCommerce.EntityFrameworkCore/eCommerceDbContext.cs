@@ -138,10 +138,16 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
 
             b.HasIndex(x => new { x.TenantId, x.Code }).IsUnique();
 
+            // 🚨 `CAT-001` **F7/D4** — ĐỔI TỪ `Cascade` SANG `Restrict` (15/10/2026).
+            // VÌ SAO: `Cascade` khiến xoá cứng một `Product` **XOÁ MỌI BIẾN THỂ** của nó. Biến thể là thứ
+            // được tham chiếu bởi **lịch sử bán** (`OrdOrderLines.ProductVariantId`) và **listing sàn**
+            // (`ChannelListings.ProductVariantId`) ⇒ xoá cascade **phá lịch sử** và để lại tham chiếu treo,
+            // **không có lỗi nào**. Nay DB **CHẶN** xoá cứng khi còn biến thể ⇒ buộc đi qua **xoá mềm**
+            // (`IsDeleted`, `CAT-001` D4) + unpublish ở tầng app service.
             b.HasMany(x => x.Variants)
                 .WithOne()
                 .HasForeignKey(x => x.ProductId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         builder.Entity<Catalog.ProductVariant>(b =>

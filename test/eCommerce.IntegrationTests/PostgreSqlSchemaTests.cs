@@ -455,4 +455,100 @@ public class PostgreSqlSchemaTests
 
         Assert.Equal(2L, soDong);
     }
+
+    // ── 2c. 🚨 CAT-001 F7 — xoá cứng `Product` KHÔNG được Cascade xoá biến thể ─────────────
+
+    private async Task ChenSanPhamAsync(Guid id, string code)
+    {
+        await using var command = _fixture.DataSource.CreateCommand(
+            "insert into \"CatProducts\" " +
+            "(\"Id\",\"TenantId\",\"Code\",\"Name\",\"Status\",\"ExtraProperties\",\"ConcurrencyStamp\",\"CreationTime\",\"IsDeleted\") " +
+            "values (@id, null, @code, 'SP test', 0, '{}', 'stamp', now(), false)");
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("code", code);
+        await command.ExecuteNonQueryAsync();
+    }
+
+    private async Task ChenBienTheAsync(Guid id, Guid productId, string sku)
+    {
+        // ⚠️ Cột lấy từ **DB THẬT** (`information_schema.columns`), không đoán: `CatProductVariants` là
+        // `FullAuditedEntity<Guid>` ⇒ **KHÔNG** có `ExtraProperties` và **KHÔNG** có `ConcurrencyStamp`
+        // (khác `CatProducts` là aggregate root). Đã gặp lỗi 42703 khi viết test này vì đoán sai.
+        await using var command = _fixture.DataSource.CreateCommand(
+            "insert into \"CatProductVariants\" " +
+            "(\"Id\",\"TenantId\",\"ProductId\",\"Sku\",\"Price\",\"IsActive\",\"CreationTime\",\"IsDeleted\") " +
+            "values (@id, null, @productId, @sku, 100000.0000, true, now(), false)");
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("productId", productId);
+        command.Parameters.AddWithValue("sku", sku);
+        await command.ExecuteNonQueryAsync();
+    }
+
+    [Fact]
+    public async Task CAT001_F7_xoa_cung_san_pham_bi_CHAN_khi_con_bien_the()
+    {
+        // 🚨 VÌ SAO TEST NÀY: trước đây FK là `ON DELETE CASCADE` ⇒ xoá cứng một `Product` **XOÁ MỌI
+        // BIẾN THỂ** của nó. Biến thể là thứ được **lịch sử bán** (`OrdOrderLines.ProductVariantId`) và
+        // **listing sàn** (`ChannelListings.ProductVariantId`) tham chiếu ⇒ xoá cascade **phá lịch sử**
+        // và để lại **tham chiếu treo**, KHÔNG có lỗi nào. Nay DB phải **CHẶN** (RESTRICT).
+        var productId = Guid.NewGuid();
+        var ma = "CAT001-F7-" + Guid.NewGuid().ToString("N")[..6];
+
+        await ChenSanPhamAsync(productId, ma);
+        await ChenBienTheAsync(Guid.NewGuid(), productId, "SKU-F7-" + Guid.NewGuid().ToString("N")[..6]);
+
+        var ex = await Assert.ThrowsAsync<PostgresException>(() => XoaCungSanPhamAsync(productId));
+
+        // 23503 = foreign_key_violation
+        Assert.Equal(PostgresErrorCodes.ForeignKeyViolation, ex.SqlState);
+
+        // Và biến thể PHẢI còn nguyên (không bị xoá theo).
+        var conLai = await DemAsync(
+            $"select count(*) from \"CatProductVariants\" where \"ProductId\" = '{productId}'");
+        Assert.Equal(1L, conLai);
+    }
+
+    [Fact]
+    public async Task CAT001_F7_rang_buoc_FK_phai_la_RESTRICT_chu_khong_CASCADE()
+    {
+        // 🚨 Khẳng định **CẤU HÌNH** chứ không chỉ hành vi: nếu ai đó đổi lại thành `Cascade` mà dữ liệu
+        // test chưa có biến thể, test hành vi ở trên vẫn có thể xanh ⇒ đây là **hàng rào bổ sung**.
+        // `pg_constraint.confdeltype`: 'r' = RESTRICT · 'c' = CASCADE · 'a' = NO ACTION.
+        // ⚠️ Ép `::text` là BẮT BUỘC: cột này có kiểu `"char"` của PostgreSQL và Npgsql trả về `char`
+        // ⇒ `ExecuteScalarAsync() as string` cho ra **null** (đã gặp thật khi viết test này).
+        var kieu = await ChuoiAsync(
+            "select confdeltype::text from pg_constraint where conname = 'FK_CatProductVariants_CatProducts_ProductId'");
+
+        Assert.Equal("r", kieu);
+    }
+
+    private async Task XoaCungSanPhamAsync(Guid id)
+    {
+        await using var command = _fixture.DataSource.CreateCommand(
+            "delete from \"CatProducts\" where \"Id\" = @id");
+        command.Parameters.AddWithValue("id", id);
+        await command.ExecuteNonQueryAsync();
+    }
+
+    [Fact]
+    public async Task CAT001_xoa_MEM_san_pham_van_DUOC_va_giu_bien_the()
+    {
+        // Đối chứng: đường HỢP LỆ là xoá MỀM (`IsDeleted = true`) — biến thể vẫn còn ⇒ lịch sử tra được.
+        var productId = Guid.NewGuid();
+
+        await ChenSanPhamAsync(productId, "CAT001-MEM-" + Guid.NewGuid().ToString("N")[..6]);
+        await ChenBienTheAsync(Guid.NewGuid(), productId, "SKU-MEM-" + Guid.NewGuid().ToString("N")[..6]);
+
+        await using (var command = _fixture.DataSource.CreateCommand(
+            "update \"CatProducts\" set \"IsDeleted\" = true, \"DeletionTime\" = now() where \"Id\" = @id"))
+        {
+            command.Parameters.AddWithValue("id", productId);
+            await command.ExecuteNonQueryAsync();
+        }
+
+        var bienTheConLai = await DemAsync(
+            $"select count(*) from \"CatProductVariants\" where \"ProductId\" = '{productId}'");
+
+        Assert.Equal(1L, bienTheConLai);
+    }
 }

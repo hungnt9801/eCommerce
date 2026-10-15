@@ -174,7 +174,7 @@ Hai việc này **không chặn** GĐ1 về mặt kỹ thuật, nhưng **phải 
 
 | Module | Entity chính | API chính | Sự kiện phát | Phụ thuộc | DoD |
 |---|---|---|---|---|---|
-| **Catalog** | `Product`, `ProductVariant`(SKU), `Category`(cây), `Brand`, `ProductAttribute`/`Option`/`Mapping`, `ProductMedia`, `ProductChannelVisibility` | CRUD sản phẩm/biến thể/danh mục; tra cứu theo slug; publish/unpublish | `ProductPublishedEto`, `VariantPriceChangedEto` | Kernel | Không có `Product` phình to (tách `ProductShippingProfile`); SKU unique theo tenant; có test bất biến |
+| **Catalog** | `Product`, `ProductVariant`(SKU), `Category`(cây), `Brand`, `ProductAttribute`/`Option`/`Mapping`, `ProductMedia`, `ProductChannelVisibility` | CRUD sản phẩm/biến thể/danh mục; tra cứu theo slug; publish/unpublish | `ProductPublishedEto`, `VariantPriceChangedEto` | Kernel | 🟡 **lõi domain XONG (15/10/2026)** — `ProductStatus` + máy trạng thái có guard, mã bất biến sau publish, SKU hoá/kiểm tra, permission `View`/`Publish`, mã lỗi Catalog, FK `Restrict`; **còn**: app service/DTO/API + ETO (`cat-001-…md` **§16**) |
 | **Pricing** | `PriceList`, `PriceListItem`, `ChannelPrice`, `TierPrice`, `CostPrice` | tính giá theo (SKU, kênh, số lượng, thời điểm); CRUD bảng giá | `PriceCalculatedEto` | Catalog, Kernel | **Pipeline tính giá có thứ tự tường minh** (chạy hết rồi mới so sánh); có test cho thứ tự ưu tiên + ghi đè |
 | **Inventory** | `Warehouse`, `StockItem`, `StockLedgerEntry`(đã có), **`StockReservation`**, `StockAllotment` | nhập/chuyển/kiểm kê; tra tồn khả dụng **theo kênh**; giữ chỗ/nhả chỗ | `StockChangedEto`, `StockReservedEto`, `StockReservationExpiredEto` | Catalog, Kernel | **Test chống oversell 2 luồng đồng thời** (integration, PostgreSQL thật + lock); ledger append-only không có UPDATE; reservation có TTL + job nhả |
 | **Sales** | `Cart`, `CartItem`, `CheckoutSession`, `Order`, `OrderLine`, `OrderStatusHistory`, `OrderReturn` | giỏ hàng; checkout; đặt hàng; huỷ; trả hàng; lịch sử trạng thái | `OrderPlacedEto`, `OrderPaidEto`, `OrderCancelledEto`, `OrderReturnedEto` | Catalog, Pricing, Inventory, Customers, PaymentHub | **State machine 4 trục** (thực hiện/tài chính/đối soát/phụ) + **ném lỗi** khi chuyển sai; tính lại giá tại checkout; idempotent theo `ExternalOrderId`; test: webhook gửi trùng không tạo 2 đơn |
@@ -629,11 +629,11 @@ khi Order intake đăng ký handler cho `ChannelOrderPulledEto`, fail-closed **t
 
 ### Việc tiếp theo (thứ tự đề xuất)
 
-1. ✅ **Order intake `SAL-005`** — **XONG (15/10/2026)**: nơi nhận `ChannelOrderPulledEto` đã chạy thật
-   (cổng fail-closed **mở**, đơn được lưu, **sàn gửi lại không tạo đơn trùng**). Chi tiết + bằng chứng +
-   giới hạn còn lại: `docs/features/sal-005-webhook-don-tu-san.md` **§16**.
-2. **`SAL-005` §16.4** — xử lý **cập nhật theo watermark** (D5, cần `SAL-003` + bổ sung 9 trường ETO) ·
-   `SalMarketplaceEventLogs` · **đẩy DLQ** cho xung đột payload khi `XC-002` có DLQ.
+1. **`CAT-001` §16.3** — **app service + DTO + API** (CRUD sản phẩm/biến thể, tra theo slug, publish/unpublish)
+   + `ProductPublishedEto`/`VariantPriceChangedEto` (⚠️ cần **phân biệt ETO mang dữ liệu vs ETO thông báo**
+   trước khi phát, nếu không cảnh báo khởi động sẽ thành **dương tính giả**).
+2. **`SAL-005` §16.4** — xử lý **cập nhật theo watermark** (D5, cần bổ sung 9 trường ETO) ·
+   `SalMarketplaceOrderEventLogs` · **đẩy DLQ** cho xung đột payload khi `XC-002` có DLQ.
 3. **`WEB-001` §16.6** — menu/điều hướng theo permission + `[AllowAnonymous]` allowlist + ma trận quyền tự động cho UI.
 4. **Test tích hợp ma trận quyền** trên endpoint **gắn quyền** (`XC-004` TC-05/TC-06) — hiện chỉ đo bằng **script thủ công**.
 5. **5 metric còn lại** · phần observability còn thiếu (§7.0 #8) · supervisor thiếu `Timer.RunOnStart` (`CHN-002` §16.5 #5).
