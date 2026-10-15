@@ -1302,3 +1302,54 @@ RAW (API): [{"id":"…","priceListId":"…","sku":"SP3SKU-A-…","amount":131000
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.s | 15/10/2026 | *(agent, session GĐ1)* | ✅ **Đóng §52.3 #1**: **đối chứng chéo API ↔ `/SanPham`** dùng **route đúng** `GET /api/app/price-list/items/{id}` ⇒ API (`131.000`/`262.000`) **khớp hoàn toàn** trang; RAW JSON in được (khắc phục bài học §53.2); dọn dẹp bằng **tệp `.sql`** (chuẩn §53.1) ⇒ DB sạch, cờ bảo mật khôi phục, **0 tiến trình treo**, **`fail: 0`** ở cả hai tiến trình. ⇒ **`WEB-001` nay có 2 trang mặt tiền đều đã kiểm chứng hai chiều**; việc còn lại là **giỏ hàng → đặt hàng** |
+
+---
+
+## 55. **ĐẶC TẢ ĐÃ ĐO CHO LÁT CẮT "GIỎ HÀNG → ĐẶT HÀNG TRÊN WEB"** (15/10/2026) — *chưa làm, đã chuẩn bị để làm ngay*
+
+### 55.1 Vì sao dừng ở đây thay vì viết tiếp
+
+Lát cắt **giỏ hàng → đặt hàng** cần **viết mã mới + kiểm chứng đầy đủ** (2 trang + 1 POST + đối chứng DB).
+Ở vòng 64 phần **ngân sách kiểm chứng** không còn đủ để làm **trọn vẹn** ⇒ **KHÔNG bắt đầu** việc sẽ phải bỏ dở:
+một trang **viết ra nhưng chưa kiểm chứng** là **nợ**, không phải tiến bộ — đúng **quy trình §2**.
+📌 Thay vào đó, lượt này **ĐO SẴN mọi thứ cần biết** để lát cắt sau **không phải dò lại** (đây là phần tốn thời gian nhất).
+
+### 55.2 Chữ ký **THẬT** đã đo (không đoán)
+
+| Thành phần | Chữ ký / hình dạng **đo được** |
+|---|---|
+| `ICheckoutAppService` | `Task<KetQuaCheckoutDto> TinhVaGiuChoAsync(CheckoutInput input)` · `Task<KetQuaCheckoutDto> GetTheoKhoaAsync(string idempotencyKey)` |
+| `CheckoutInput` | `ChannelCode` (**bắt buộc**, ≤64) · `ChannelShopId?` · `WarehouseId` (**bắt buộc**) · `Items: List<DongCheckoutDto>` (**≥1**) · `OrderDiscount` (≥0) · `OrderFee` (≥0) · `TtlPhut` (1..1440, trống ⇒ **15**) · `IdempotencyKey` · `At` |
+| `KetQuaCheckoutDto` | `Tien: GioTinhTienDto` (sổ giải trình) · `ReservationIds: List<Guid>` (**theo thứ tự `Items`**) · `ExpiresAtUtc` · `LaKetQuaDaCo` (**replay idempotent — KHÔNG ghi gì mới**) |
+| `IDonHangAppService` | `TaoTuCheckoutAsync(TaoDonTuCheckoutInput)` · `GetAsync(id)` · `XacNhanAsync` · `HuyDonAsync` · `TraHangAsync` · `GetPhanBoTheoKenhAsync()` |
+
+### 55.3 Khuôn triển khai (đúng 3 bước đã chứng minh)
+
+| # | Việc | Ghi chú |
+|---|---|---|
+| 1 | `GET /DatHang` — biểu mẫu: **kho** (chọn từ `IWarehouseAppService.GetListAsync`), **kênh**, **SKU**, **số lượng** | 🔐 `[Authorize]` cấp class; **`[Authorize]` + `[ValidateAntiForgeryToken]`** nếu POST |
+| 2 | `POST /DatHang` — gọi `TinhVaGiuChoAsync` (khoá idempotency sinh **một lần** ở form, gửi kèm) ⇒ `TaoTuCheckoutAsync` ⇒ **redirect** sang `/DatHang/KetQua/{id}` | 📌 **Khoá idempotency phải sinh ở GET và mang theo trong form** — nếu sinh lại ở POST thì **bấm hai lần = hai đơn** |
+| 3 | `GET /DatHang/KetQua/{id}` — hiển thị **số đơn · tổng tiền (từ `Tien`) · trạng thái** | ⚠️ Tổng **phải** lấy từ **sổ giải trình** (cùng nguồn với `SAL-001`) — **không** tính lại ở UI |
+
+**Kiểm chứng phải làm (khuôn §51 · §54):**
+1. chưa đăng nhập ⇒ **`302`** → `/Account/Login?ReturnUrl=…` cho **cả ba** route;
+2. đăng nhập ⇒ `GET /DatHang` **`200`** + **ca rỗng** (kho/sản phẩm rỗng ⇒ thông báo, không vỡ);
+3. 🔥 **POST** ⇒ **đối chứng chéo**: `GET /api/app/don-hang/{id}` **và** DB (`OrdOrders`: số đơn, `GrandTotal`, `Status`) **và** tồn kho (`OnHand`, `Reserved`) — **ba nguồn phải khớp**;
+4. **bấm hai lần cùng khoá idempotency** ⇒ **chỉ MỘT đơn** (bất biến đã kiểm chứng ở `SAL-001`, phải kiểm **lại qua UI**);
+5. dọn dẹp bằng **tệp `.sql`** (chuẩn §53.1) + `SELECT` xác nhận + **kiểm tiến trình treo**;
+6. trước khi viết lời gọi API mới ⇒ **`tools/route-check.ps1 -Match '<mẫu>'`** (**bước BẮT BUỘC**, Phụ lục D).
+
+### 55.4 Mốc kiểm chứng vòng 64
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | build `--no-incremental` | **0 lỗi / 0 cảnh báo** ✅ |
+| 2 | unit · integration | **694/694** ✅ · **38/38** ✅ |
+| 3 | mermaid | **197 khối · 0 lỗi** ✅ |
+| 4 | git | nhánh `main` · **0 thay đổi treo** ✅ |
+
+### 55.5 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.r | 15/10/2026 | *(agent, session GĐ1)* | **Đặc tả đã đo cho lát cắt "giỏ hàng → đặt hàng trên Web"** (chưa viết mã): chữ ký **THẬT** của `ICheckoutAppService`/`CheckoutInput`/`KetQuaCheckoutDto`/`IDonHangAppService`; khuôn **3 bước**; **6 bước kiểm chứng** bắt buộc (gồm *bấm hai lần cùng khoá idempotency ⇒ chỉ MỘT đơn*, và *hai nguồn API + DB + tồn kho phải khớp*). 📌 **Quyết định có chủ đích:** **không** bắt đầu việc sẽ bỏ dở — *trang viết ra mà chưa kiểm chứng là **nợ**, không phải tiến bộ* |
