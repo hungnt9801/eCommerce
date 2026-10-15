@@ -46,6 +46,7 @@ public class StockReservationExpiryWorker : AsyncPeriodicBackgroundWorkerBase
 
     protected override async Task DoWorkAsync(PeriodicBackgroundWorkerContext workerContext)
     {
+        Logger.LogInformation("JOB NHẢ CHỖ: bắt đầu quét lượt giữ chỗ quá hạn (mốc {Moc}).", DateTime.UtcNow);
         var distributedLock = workerContext.ServiceProvider.GetRequiredService<IAbpDistributedLock>();
 
         await using var handle = await distributedLock.TryAcquireAsync(TenKhoa, TimeSpan.FromSeconds(30));
@@ -61,7 +62,6 @@ public class StockReservationExpiryWorker : AsyncPeriodicBackgroundWorkerBase
         // *"im lặng"* **KHÔNG** phân biệt được *"job không chạy"* với *"job chạy mà không có việc"*. Chính dòng log
         // này đã phát hiện worker **chạy rồi NÉM** `ObjectDisposedException` ⇒ đổi từ **im lặng** (không ai biết)
         // thành **ồn ào** (thấy ngay trong 1 lượt chạy).
-        Logger.LogInformation("JOB NHẢ CHỖ: bắt đầu quét lượt giữ chỗ quá hạn (mốc {Moc}).", DateTime.UtcNow);
 
         // 🚨🚨 **BẮT BUỘC: BỌC TRONG UNIT OF WORK + SCOPE RIÊNG.**
         // `AsyncPeriodicBackgroundWorkerBase` **KHÔNG** tự mở UoW (khác request HTTP — vốn đã có UoW của ABP).

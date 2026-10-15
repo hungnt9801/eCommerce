@@ -2740,3 +2740,55 @@ mutation test để chứng minh nó **có tác dụng**, chứ không phải *"
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v2.9 | 15/10/2026 | *(agent, session GĐ1)* | **Mọi job nay NHÌN THẤY ĐƯỢC**: thêm **log vô điều kiện ở đầu `DoWorkAsync`** cho 4 worker ⇒ **`3/7` → `7/7`** worker xuất hiện trong log khởi động, **`fail: 0`**. ⇒ câu hỏi *"job có chạy không?"* nay **luôn** trả lời được bằng một dòng log (trước đây **4/7 job** im lặng hoàn toàn). ⚠️ **Còn**: **siết LUẬT** của cơ chế (log phải là câu lệnh **đầu tiên**) + **mutation test** (§44.3) |
+
+---
+
+## 45. **SIẾT LUẬT CƠ CHẾ: LOG PHẢI LÀ CÂU LỆNH ĐẦU TIÊN** + MUTATION TEST (15/10/2026) — *đóng §43.4 bước 1*
+
+### 45.1 Luật mới (thay luật yếu cũ)
+
+`Worker_phai_LOG_NGAY_CAU_LENH_DAU_TIEN_cua_DoWorkAsync__khong_duoc_log_trong_DIEU_KIEN`
+
+**Luật cũ (yếu):** chỉ đòi `Logger.Log*` **tồn tại Ở ĐÂU ĐÓ trong tệp** ⇒ **XANH** ngay cả khi dòng log nằm
+**BÊN TRONG một điều kiện** ⇒ **không** bảo đảm điều luật **muốn nói**.
+**Luật mới (siết):** **câu lệnh đầu tiên** của thân `DoWorkAsync` (sau khi **bỏ chú thích**) **phải** bắt đầu bằng
+`Logger.Log…` ⇒ tức **trước mọi `if`/`foreach`/truy vấn**.
+
+📌 **Vì sao cần:** **đo được ở vòng 51–52** — luật cũ để lọt **4/7 worker** có log trong điều kiện, và **3/7 job
+im lặng hoàn toàn** trong log khởi động ⇒ **không thể** trả lời *"job có chạy không?"* (câu hỏi đã làm mất
+**2 vòng đo** ở vòng 35).
+
+### 45.2 🎯 **MUTATION TEST** — chứng minh luật **NỔ** (không chỉ xanh)
+
+| Bước | Việc | Kết quả |
+|---|---|---|
+| 1 | sao lưu `StockReservationExpiryWorker.cs` (`Copy-Item`) | ✅ |
+| 2 | **đổi vị trí**: chuyển dòng log xuống **dưới** `var distributedLock = …` (**giữ nguyên chuỗi** để không thể "xanh nhờ thiếu chuỗi") | |
+| 3 | chạy luật | 🚨 **ĐỎ**, thông điệp **chỉ đúng tên** `StockReservationExpiryWorker` **và trích câu lệnh sai**: *"câu lệnh ĐẦU TIÊN là `var distributedLock = workerContext.ServiceProvider.GetRe…`"* ✅ |
+| 4 | khôi phục + chạy lại | **694/694** ✅ |
+
+### 45.3 🎯 **Sự cố nhỏ trong chính bước khôi phục — VÀ LUẬT ĐÃ BẮT ĐƯỢC NÓ**
+
+Bước **khôi phục từ file sao lưu không có tác dụng** (tệp vẫn ở trạng thái đã đột biến) — và **đúng lúc đó**
+bộ test **ĐỎ** ở `StockReservationExpiryWorker`. Tôi chỉ phát hiện nhờ **chạy lại toàn bộ** và **đọc thông điệp**.
+⇒ Sửa: đưa dòng log về **ngay sau dấu `{` của thân** (kiểm bằng **hai số dòng**: log **L49** < `distributedLock` **L50**),
+rồi **`git diff` xác nhận tệp đã về đúng trạng thái đã commit** (`không diff`).
+📌 **Đây là ví dụ ĐẸP NHẤT về giá trị của cơ chế:** nó bắt được **chính lỗi của người làm ra nó** — một lỗi
+**hoàn toàn im lặng** (tệp bị đột biến mà lệnh khôi phục **báo thành công**), đúng loại lỗi đã gây ra
+**sự cố vòng 35** (đăng ký worker không được ghi). **Cùng một họ lỗi, lần này bị chặn.**
+
+### 45.4 Bằng chứng cuối
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | build `--no-incremental` | **0 lỗi / 0 cảnh báo** ✅ |
+| 2 | unit | **694/694** ✅ (+1 luật mới) |
+| 3 | integration | **38/38** ✅ |
+| 4 | Mutation test | **ĐỎ đúng tên + trích câu lệnh sai** ✅ |
+| 5 | `git diff` tệp worker | **không diff** ⇒ về đúng trạng thái đã commit ✅ |
+
+### 45.5 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v2.10 | 15/10/2026 | *(agent, session GĐ1)* | **Siết luật cơ chế worker**: từ *"log tồn tại ở đâu đó"* ⇒ **"log là CÂU LỆNH ĐẦU TIÊN của `DoWorkAsync`"** (không được log trong điều kiện). **Mutation test**: chuyển log xuống dưới một lệnh khác ⇒ luật **ĐỎ đúng tên + trích câu lệnh sai**; khôi phục ⇒ **694/694**. 🎯 **Và luật đã bắt được chính sự cố khôi phục của tôi** (tệp vẫn ở trạng thái đột biến dù lệnh khôi phục *báo thành công*) — **cùng họ lỗi với sự cố vòng 35, lần này bị chặn** |

@@ -170,6 +170,79 @@ public class BackgroundWorkerCoCheTests
             + "   … lấy service từ `scope` … `await uow.CompleteAsync();`");
     }
 
+    [Fact]
+    public void Worker_phai_LOG_NGAY_CAU_LENH_DAU_TIEN_cua_DoWorkAsync__khong_duoc_log_trong_DIEU_KIEN()
+    {
+        // 🚨 **LUẬT SIẾT (vòng 53) — vì luật cũ QUÁ YẾU:** luật trước chỉ đòi `Logger.Log*` **tồn tại Ở ĐÂU ĐÓ**
+        // trong tệp ⇒ nó **XANH** ngay cả khi dòng log nằm **BÊN TRONG một điều kiện** — tức **không** bảo đảm
+        // *"log vô điều kiện ở đầu mỗi lượt"* như luật **muốn nói**.
+        // 📌 **ĐO ĐƯỢC (vòng 51–52):** **4/7 worker** có dòng log đầu tiên **không** nằm ở đầu `DoWorkAsync`, và
+        // **3/7 job im lặng hoàn toàn** trong log khởi động ⇒ **không thể** trả lời *"job có chạy không?"*
+        // (chính câu hỏi đã làm mất **2 vòng đo** ở vòng 35).
+        // 📌 Một cơ chế **tưởng** đã bảo vệ mà **thực tế không** thì **tệ hơn không có cơ chế**: nó tạo
+        // **cảm giác an toàn giả** (Phụ lục C §C.4 · `inv-001` §29.3 · §43.4).
+        var tatCaMa = DocTatCaMaNguon();
+        var viPham = new List<string>();
+
+        foreach (var (tenTep, noiDung) in tatCaMa)
+        {
+            if (!noiDung.Contains(TenLopCoSo, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var tenLop = LayTenLop(noiDung) ?? tenTep;
+            var than = LayThanDoWork(noiDung);
+
+            if (than is null)
+            {
+                viPham.Add($"{tenLop} (khai ở {tenTep}): KHÔNG đọc được thân `DoWorkAsync`");
+                continue;
+            }
+
+            var cauDau = than.FirstOrDefault(d => d.Trim().Length > 0);
+
+            // 📌 Câu lệnh đầu tiên (sau khi BỎ chú thích — `DocTatCaMaNguon` đã bỏ) PHẢI là một lời gọi log.
+            if (cauDau is null || !cauDau.TrimStart().StartsWith("Logger.Log", StringComparison.Ordinal))
+            {
+                viPham.Add($"{tenLop} (khai ở {tenTep}): câu lệnh ĐẦU TIÊN là `{cauDau?.Trim() ?? "(rỗng)"}`");
+            }
+        }
+
+        Assert.True(viPham.Count == 0,
+            "🚨 WORKER LOG **BÊN TRONG ĐIỀU KIỆN** (hoặc không log ở đầu) ⇒ *\"im lặng\"* **KHÔNG** phân biệt được "
+            + "*\"job không chạy\"* với *\"job chạy mà không có việc\"*:\n  "
+            + string.Join("\n  ", viPham)
+            + "\n\n⇒ Đặt `Logger.LogInformation(\"JOB …: bắt đầu một lượt (mốc {Moc}).\", DateTime.UtcNow);` "
+            + "thành **CÂU LỆNH ĐẦU TIÊN** của `DoWorkAsync`, **trước** mọi `if`/`foreach`/truy vấn.");
+    }
+
+    /// <summary>
+    /// Thân `DoWorkAsync`: các dòng **sau** dấu `{` mở thân, lấy **15 dòng đầu** (đủ để thấy câu lệnh đầu tiên).
+    /// ⚠️ Cách đọc **thô** (không parse C#) — chấp nhận được cho **luật văn bản nguồn**, và **an toàn theo hướng
+    /// chặt hơn**: đọc sai chỉ làm luật **dễ ĐỎ**, không làm nó **lỏng đi**.
+    /// </summary>
+    private static List<string>? LayThanDoWork(string noiDung)
+    {
+        var dong = noiDung.Split('\n');
+
+        var viTriChuKy = Array.FindIndex(dong, d => d.Contains("override async Task DoWorkAsync", StringComparison.Ordinal));
+
+        if (viTriChuKy < 0)
+        {
+            return null;
+        }
+
+        var viTriMo = Array.FindIndex(dong, viTriChuKy, d => d.Trim() == "{");
+
+        if (viTriMo < 0)
+        {
+            return null;
+        }
+
+        return dong.Skip(viTriMo + 1).Take(15).ToList();
+    }
+
     // ── Đọc nguồn ────────────────────────────────────────────────────────────
 
     private static string LayTenLop(string noiDung)
