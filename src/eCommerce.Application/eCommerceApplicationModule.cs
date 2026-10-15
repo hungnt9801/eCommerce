@@ -31,6 +31,9 @@ namespace eCommerce;
     typeof(AbpPermissionManagementApplicationModule),
     typeof(AbpFeatureManagementApplicationModule),
     typeof(AbpSettingManagementApplicationModule),
+    // 🚨 `SAL-005` — nơi nhận đơn sàn (`MarketplaceOrderIntakeHandler`) cần `IIdempotencyGuard`
+    // của module Messaging (`XC-002`). Thiếu dòng này ⇒ handler không resolve được ⇒ đơn mất im lặng.
+    typeof(Messaging.MessagingDomainModule),
     typeof(Tax.TaxDomainModule)
 )]
 [DependsOn(typeof(AbpAccountApplicationModule))]

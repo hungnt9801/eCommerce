@@ -255,9 +255,29 @@ nhận" trong khi thực tế đơn vẫn mất**. Nay cả hai đi qua **một*
 
 ### ⚠️ Điều **CHƯA** kiểm chứng được (nói thẳng)
 
+*(Đã giải quyết ở mục dưới — giữ lại để thấy lịch sử.)*
 Đường **API** "Đồng bộ ngay" (`POST /api/app/channel/{id}/sync-now`) **chưa gọi được bằng HTTP thật** vì
 endpoint đó **luôn trả `403`** — xem **§10** (phát hiện **ngoài phạm vi**, có trước lượt sửa này).
 Bù lại: ánh xạ DTO được khoá bằng **test đơn vị** và phụ thuộc được khoá bằng **test reflection**.
+
+### ✅ 9bis.1 **VIỆC A ĐÃ XONG (15/10/2026) — `SAL-005`: NƠI NHẬN ĐƠN THẬT ⇒ LỖI #22 ĐÓNG HOÀN TOÀN**
+
+Lượt trước **chặn** mất đơn (fail-closed). Lượt này **xây nơi nhận** ⇒ cổng **tự mở**, không cần bật cờ nào.
+
+| Phép đo (Host + PostgreSQL 17 thật) | Kết quả |
+|---|---|
+| Log boot — sự kiện **KHÔNG có người nhận** | chỉ còn **`ChannelShopTokenRefreshedEto`**; `ChannelOrderPulledEto` **đã có nơi nhận** ⇒ **cổng đã mở** ✅ |
+| Đơn được lưu | **10 đơn ↔ 10 dòng đơn ↔ 10 nhật ký** (1:1:1) |
+| Con trỏ đồng bộ | **tiến** · `LastError` rỗng ⇒ kênh **không còn kẹt** ✅ |
+| **Sàn gửi lại** (con trỏ về `NULL`), **còn** bản ghi idempotency | **`DON TRUNG = 0`** ✅ |
+| **Sàn gửi lại**, đã **XOÁ** bản ghi idempotency (chỉ còn lưới DB) | **`DON TRUNG = 0`** · mỗi `ExternalOrderId` xuất hiện **đúng 1 lần** ✅ |
+| Đường API "Đồng bộ ngay" | ✅ **đã gọi được bằng HTTP thật** sau khi sửa `F-403` (§10) — phản hồi `biChanDoChuaCoNoiNhanDon` + DB con trỏ **không tiến** |
+
+🚨 **2 lỗi thật phát hiện khi kiểm chứng:** (1) handler của `IDistributedEventBus` chạy **sau** khi UoW nơi
+phát hoàn tất ⇒ `DbContext` đã dispose ⇒ `ObjectDisposedException` — sửa bằng **UoW riêng**
+(`requiresNew: true`), quy tắc đã ghi vào `docs/coding-conventions.md` **§6.1**;
+(2) connector PoC sinh `PlacedAtUtc` **mới mỗi lần kéo** ⇒ không thể kiểm chứng đường "sàn gửi lại".
+Chi tiết + giới hạn còn lại: `docs/features/sal-005-webhook-don-tu-san.md` **§16**.
 
 ---
 

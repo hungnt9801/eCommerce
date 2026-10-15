@@ -629,7 +629,11 @@ khi Order intake đăng ký handler cho `ChannelOrderPulledEto`, fail-closed **t
 
 ### Việc tiếp theo (thứ tự đề xuất)
 
-1. **Order intake `SAL-005`** — nơi nhận `ChannelOrderPulledEto` (**việc A**) ⇒ **mở lại đồng bộ sàn**.
-2. **`WEB-001` §16.6** — menu/điều hướng theo permission + `[AllowAnonymous]` allowlist + ma trận quyền tự động cho UI.
-3. **Test tích hợp ma trận quyền** trên endpoint **gắn quyền** (`XC-004` TC-05/TC-06) — hiện chỉ đo bằng **script thủ công**.
-4. **5 metric còn lại** · phần observability còn thiếu (§7.0 #8) · supervisor thiếu `Timer.RunOnStart` (`CHN-002` §16.5 #5).
+1. ✅ **Order intake `SAL-005`** — **XONG (15/10/2026)**: nơi nhận `ChannelOrderPulledEto` đã chạy thật
+   (cổng fail-closed **mở**, đơn được lưu, **sàn gửi lại không tạo đơn trùng**). Chi tiết + bằng chứng +
+   giới hạn còn lại: `docs/features/sal-005-webhook-don-tu-san.md` **§16**.
+2. **`SAL-005` §16.4** — xử lý **cập nhật theo watermark** (D5, cần `SAL-003` + bổ sung 9 trường ETO) ·
+   `SalMarketplaceEventLogs` · **đẩy DLQ** cho xung đột payload khi `XC-002` có DLQ.
+3. **`WEB-001` §16.6** — menu/điều hướng theo permission + `[AllowAnonymous]` allowlist + ma trận quyền tự động cho UI.
+4. **Test tích hợp ma trận quyền** trên endpoint **gắn quyền** (`XC-004` TC-05/TC-06) — hiện chỉ đo bằng **script thủ công**.
+5. **5 metric còn lại** · phần observability còn thiếu (§7.0 #8) · supervisor thiếu `Timer.RunOnStart` (`CHN-002` §16.5 #5).

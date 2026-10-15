@@ -1262,3 +1262,35 @@ VALUES ('20261014095047_Add_Einv003_UniqueReplacementLink', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE TABLE "SalMarketplaceOrderIntakes" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "ChannelCode" character varying(32) NOT NULL,
+    "ExternalShopId" character varying(64) NOT NULL,
+    "ExternalOrderId" character varying(64) NOT NULL,
+    "OrderId" uuid,
+    "MarketplacePlacedAtUtc" timestamp with time zone,
+    "PayloadHash" character varying(64) NOT NULL,
+    "ReceivedAtUtc" timestamp with time zone NOT NULL,
+    "CorrelationId" character varying(64),
+    "SkipReason" character varying(500),
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_SalMarketplaceOrderIntakes" PRIMARY KEY ("Id")
+);
+
+CREATE UNIQUE INDEX "IX_SalMktIntakes_TenantId_ChannelCode_ExternalOrderId" ON "SalMarketplaceOrderIntakes" ("TenantId", "ChannelCode", "ExternalOrderId") NULLS NOT DISTINCT;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261015082700_Add_Sal005_MarketplaceOrderIntake', '10.0.11');
+
+COMMIT;
+

@@ -121,7 +121,15 @@ test/   eCommerce.Tests · eCommerce.IntegrationTests
 | **Có NGƯỜI NHẬN trước, rồi mới nói tới giao tin cậy.** | Outbox bảo đảm *giao tin cậy*, nhưng giao **cho không ai** thì dữ liệu **vẫn mất** |
 | Nơi **publish** một `*Eto` **phải** kiểm tra có người nhận rồi **fail-closed** nếu chưa. | Dùng `IEventCoverageProbe` — **một nguồn sự thật** với cảnh báo lúc khởi động |
 | **CẤM** tự quét assembly để tự trả lời "có người nhận chưa". | Hai nơi tự quét ⇒ **có thể lệch nhau**, và lệch theo hướng nguy hiểm = **log nói có, thực tế mất** |
-| ⚠️ Quét theo "assembly **đã nạp**" rất dễ **thiếu** (bài học C16). | Luôn **ghi ra số assembly đã quét** để phạm vi **nhìn thấy được** |
+| ⚠️ Quét theo "assembly **đã nạp**" rất dễ **thiếu** (bài học C16). | Luôn **ghi ra số assembly đã nạp/đã quét** để phạm vi **nhìn thấy được** |
+
+### 6.1 🚨 Handler của `IDistributedEventBus` **PHẢI** mở UoW riêng — đã đo được, 15/10/2026
+
+| Luật | Ghi chú |
+|---|---|
+| Handler **ghi dữ liệu** cho một sự kiện `IDistributedEventBus` **PHẢI** tự mở `IUnitOfWorkManager.Begin(requiresNew: true, isTransactional: true)`. | ABP giao sự kiện (transport **in-process**) **SAU KHI UoW của NƠI PHÁT hoàn tất** — để người nhận không đọc dữ liệu chưa commit. Hệ quả: `eCommerceDbContext` của UoW đó **ĐÃ BỊ DISPOSE** ⇒ dùng repository ngay sẽ ném `ObjectDisposedException: Cannot access a disposed context instance. Object name: 'eCommerceDbContext'`. ⚠️ **Không** lỗi biên dịch, **không** lỗi khi build/test — chỉ lộ khi **chạy thật**. Bằng chứng stack: `EfCoreIdempotencyStore.TimAsync` → `IdempotencyGuard.ThucThiAsync` → `MarketplaceOrderIntakeHandler.HandleEventAsync` |
+| **CẤM** chỉ dựa vào `[UnitOfWork]` / `IUnitOfWorkEnabled` trần cho handler. | Interceptor của ABP mặc định `requiresNew = false` ⇒ **tái dùng** UoW đã dispose ⇒ **vẫn lỗi y nguyên**. (Đây là lý do phải gọi `Begin(requiresNew: true)` **tường minh**.) |
+| Nếu handler **ném lỗi**, bên phát **không** được coi là thành công. | Ở luồng đồng bộ sàn, `PublishAsync` ném ⇒ `ChannelShopSyncer` bắt lỗi và **KHÔNG tiến con trỏ** (fail-closed vẫn đúng) ⇒ sàn gửi lại ⇒ **đơn không mất**. Đã kiểm chứng bằng trạng thái DB thật |
 
 ---
 

@@ -141,11 +141,11 @@ public class PostgreSqlSchemaTests
     }
 
     [Fact]
-    public async Task F1_du_13_index_deu_dung_NULLS_NOT_DISTINCT()
+    public async Task F1_du_20_index_deu_dung_NULLS_NOT_DISTINCT()
     {
         // 🔒 BẤT BIẾN (ghi ở XC-004 Q6): mọi unique index trên entity IMultiTenant PHẢI có
         // `NULLS NOT DISTINCT`. Ai tạo migration mới mà quên ⇒ test này đỏ.
-        Assert.Equal(19L, await DemAsync(
+        Assert.Equal(20L, await DemAsync(
             "select count(*) from pg_indexes where schemaname = 'public' and indexdef like '%NULLS NOT DISTINCT%'"));
 
         // Kiểm tra ĐÍCH DANH để thông báo lỗi có ý nghĩa (tên index dài có thể bị PostgreSQL cắt ⇒ so theo tiền tố).
@@ -176,7 +176,11 @@ public class PostgreSqlSchemaTests
             "IX_SigSigningRequests_TenantId_MaTaiLieu",
             // EINV-003 — một bản thay thế/điều chỉnh chỉ gắn với MỘT hoá đơn gốc (14/10/2026).
             "IX_EInvInvoices_TenantId_HoaDonBiThayTheId",
-            "IX_EInvInvoices_TenantId_HoaDonBiDieuChinhId"
+            "IX_EInvInvoices_TenantId_HoaDonBiDieuChinhId",
+            // 🚨 SAL-005 — nhật ký nhận đơn sàn (15/10/2026). Đây là hàng rào chống **tạo 2 đơn cho 1 đơn
+            //    thật**; mất `NULLS NOT DISTINCT` ⇒ khi `TenantId = NULL` index mất tác dụng IM LẶNG.
+            //    ⚠️ Tên đặt TƯỜNG MINH trong DbContext vì tên EF tự sinh dài 67 ký tự > 63 ⇒ bị PostgreSQL CẮT.
+            "IX_SalMktIntakes_TenantId_ChannelCode_ExternalOrderId"
         ];
 
         foreach (var ten in phaiCo)

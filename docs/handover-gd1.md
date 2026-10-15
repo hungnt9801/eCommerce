@@ -20,12 +20,13 @@
 | Lỗi thật đã sửa | **24** — trong đó **16 lỗi IM LẶNG** |
 | Điểm phát metric | **7/12** |
 
-> 📌 **CẬP NHẬT 15/10/2026 (thêm `eCommerce.Web` + màn hình đăng nhập):** các số ở bảng trên là
-> **mốc bàn giao**. Sau các lượt GĐ1: **Test = 388 unit + 20 integration** · **2 tiến trình**
-> (Host **5000** API/auth · Web **5100** UI) · build **0 lỗi/0 cảnh báo** · **lỗi #22 đã sửa** (fail-closed)
-> · **`F-403` đã sửa** · **§7.0 xong #2/#5/#7**.
+> 📌 **CẬP NHẬT 15/10/2026 (thêm `SAL-005` — nơi nhận đơn ⇒ lỗi #22 ĐÓNG HOÀN TOÀN):** các số ở bảng trên là
+> **mốc bàn giao**. Sau các lượt GĐ1: **Test = 401 unit + 20 integration** · **2 tiến trình**
+> (Host **5000** API/auth · Web **5100** UI) · build **0 lỗi/0 cảnh báo** · **lỗi #22 đã sửa** (fail-closed
+> **và** nơi nhận thật) · **`F-403` đã sửa** · **§7.0 xong #2/#5/#7** · **DB: 20 index `NULLS NOT DISTINCT`**.
 > Chi tiết: `implementation-plan.md` **A.12** · `runtime-verification-report.md` **§9bis/§10** ·
-> `chn-002-connector-shopee.md` **§16** · `XC-004-…md` **§15.2 F6/§15.6** · `web-001-…md` **§16**.
+> `chn-002-connector-shopee.md` **§16** · `XC-004-…md` **§15.2 F6/§15.6** · `web-001-…md` **§16** ·
+> `sal-005-webhook-don-tu-san.md` **§16**.
 
 ### Lệnh chuẩn
 ```powershell
@@ -154,16 +155,15 @@ Host cổng **5000**. DB: `docker exec -i ecommerce-postgres psql -U ecommerce -
 ### Việc tiếp theo, theo thứ tự đề xuất
 | # | Việc | Ghi chú |
 |---|---|---|
-| 1 | **Xây Order intake (`SAL-005`)** — nơi nhận `ChannelOrderPulledEto` | Đây là **việc A**; xong thì **đồng bộ sàn tự chạy lại** (fail-closed tự mở, không cần bật cờ nào) |
-| 2 | **Test tích hợp ma trận quyền** trên endpoint **GẮN QUYỀN** (`XC-004` TC-05/TC-06) | `F-403` đã sửa nhưng ma trận hiện **chỉ đo bằng script thủ công**; test project chưa có `WebApplicationFactory` |
-| 3 | **`WEB-001` §16.6** — menu/điều hướng theo permission · `[AllowAnonymous]` allowlist · ma trận quyền tự động cho UI | UI khung đã chạy thật (xem `docs/features/web-001-…md` **§16**) |
-| 4 | **§7.0 #8 — observability còn thiếu** | **5/12 metric chưa có nơi phát** |
-| 5 | **`CHN-002` §16.5 #5** — supervisor thiếu `Timer.RunOnStart = true` | Cùng họ lỗi #23; ảnh hưởng nhỏ |
-| 6 | **Outbox/relay** | 🚨 **Cảnh báo giữ nguyên:** **không có message broker** (chỉ PostgreSQL + Redis). **Thứ tự đúng: có người nhận trước (việc 1), rồi mới bàn tới giao tin cậy.** |
+| 1 | **`SAL-005` §16.4** — xử lý **cập nhật theo watermark** (D5) + `SalMarketplaceEventLogs` + **đẩy DLQ** cho xung đột payload | Cần bổ sung **9 trường ETO** (F2) — hiện đơn nhận về là **tạo-một-lần** (không mất đơn, nhưng có thể cũ) |
+| 2 | **`WEB-001` §16.6** — menu/điều hướng theo permission · `[AllowAnonymous]` allowlist · ma trận quyền tự động cho UI | UI khung đã chạy thật (`web-001-…md` **§16**) |
+| 3 | **`§7.0 #8` — observability còn thiếu** | **5/12 metric chưa có nơi phát** |
+| 4 | **`CHN-002` §16.5 #5** — supervisor thiếu `Timer.RunOnStart = true` | ⚠️ Nay đã thấy **tác động thật**: nhịp supervisor đầu tiên luôn **trễ 60 s** ⇒ mọi lần deploy/kiểm chứng phải chờ 60 s mới thấy worker chạy |
+| 5 | **Outbox/relay** | 🚨 Cảnh báo **giữ nguyên**: **không có message broker** (chỉ PostgreSQL + Redis) ⇒ outbox vẫn là hạ tầng cho vấn đề **chưa tồn tại** |
 
-> ✅ **ĐÃ XONG trong §7.0:** **#2** `eCommerce.Web` + màn hình đăng nhập (**chạy thật**, cổng **5100**) ·
-> **#5** `docs/coding-conventions.md` + `.editorconfig` ·
-> **#7** 2 test reflection `XC-004` TC-01/TC-02 (**5** test, **kiểm chứng ngược bằng đột biến**).
+> ✅ **ĐÃ XONG trong §7.0:** **#2** `eCommerce.Web` + màn hình đăng nhập (chạy thật, cổng **5100**) ·
+> **#5** `docs/coding-conventions.md` + `.editorconfig` · **#7** 2 test reflection `XC-004` TC-01/TC-02.
+> **ĐÃ XONG `SAL-005`** (nơi nhận đơn) ⇒ **lỗi #22 đóng hoàn toàn**.
 > Tiến độ đầy đủ §7.0: `docs/implementation-plan.md` **A.12**.
 
 ### 🖥️ Hai tiến trình — chạy thế nào

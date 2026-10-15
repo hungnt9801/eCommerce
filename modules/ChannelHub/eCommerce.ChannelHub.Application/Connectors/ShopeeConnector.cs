@@ -121,7 +121,12 @@ public class ShopeeConnector : IChannelConnector
             danhSach.Add(new ChannelOrderModel
             {
                 ExternalOrderId = $"POC-{shop.ExternalShopId}-{conTro}-{i}",
-                PlacedAtUtc = DateTime.UtcNow.AddMinutes(-5 * (i + 1)),
+                // ⚠️ `PlacedAtUtc` phải TẤT ĐỊNH theo (shop, con trỏ, chỉ số) — KHÔNG dùng `DateTime.UtcNow`.
+                // 🚨 Vì sao: khi con trỏ không tiến (đúng ca fail-closed) hoặc khi sàn **gửi lại** cùng một đơn,
+                //    connector phải trả về **CÙNG nội dung**. Nếu `PlacedAtUtc` đổi mỗi lần kéo thì "cùng một đơn"
+                //    lại có payload khác ⇒ tầng chống trùng báo **XUNG ĐỘT PAYLOAD** (đúng theo thiết kế) và
+                //    **không thể kiểm chứng** đường "sàn gửi lại" — đã gặp thật khi kiểm chứng E2E 15/10/2026.
+                PlacedAtUtc = new DateTime(conTro, DateTimeKind.Utc).AddMinutes(i),
                 Currency = "VND",
                 ShippingFee = 30_000m,
                 ChannelDiscount = 0m,

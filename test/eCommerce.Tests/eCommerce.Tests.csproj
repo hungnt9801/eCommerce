@@ -36,6 +36,9 @@
     <!-- Cần cho **test bất biến bằng reflection**: `ChannelAppService` (nút "Đồng bộ ngay") BẮT BUỘC
          phải đi qua cổng đồng bộ chung `IChannelShopSyncService` — biến thể thứ hai của lỗi #22. -->
     <ProjectReference Include="..\..\src\eCommerce.Application\eCommerce.Application.csproj" />
+    <!-- 🚨 Cần cho **test bất biến quy ước #3**: entity của module nơi nhận đơn PHẢI có `DbSet` trên
+         DbContext hợp nhất, nếu không `IRepository<T>` không được đăng ký (lỗi Phase 0). -->
+    <ProjectReference Include="..\..\src\eCommerce.EntityFrameworkCore\eCommerce.EntityFrameworkCore.csproj" />
     <ProjectReference Include="..\..\modules\PaymentHub\eCommerce.PaymentHub.Application\eCommerce.PaymentHub.Application.csproj" />
     <ProjectReference Include="..\..\modules\Tax\eCommerce.Tax.Domain\eCommerce.Tax.Domain.csproj" />
   </ItemGroup>

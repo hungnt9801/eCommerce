@@ -1002,3 +1002,67 @@ public class MarketplaceIntakeTests : eCommerceTestBase<eCommerceEntityFramework
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.1 | 14/10/2026 | *(điền)* | Bản nháp đầu — theo đúng cấu trúc 16 mục của `XC-003`. **Chốt nguyên tắc nền**: *"webhook là gợi ý, pull + đối soát là sự thật"* (D2) và *"một khoá cho hai đường"* (D4). Chốt **watermark theo `update_time` của sàn** (D5) + **luật 4 nhánh** (§3.3) + **"không đoán khi cùng mốc"** (D6). Lập **Data Dictionary 2 bảng mới** (`SalMarketplaceOrderIntakes`, `SalMarketplaceEventLogs`) — **chưa có trong code - kế hoạch GĐ1** — và **2 cột** bổ sung cho `OrdOrders`. **12 ADR · 20 BR · 12 NFR · 27 test case · 3 sơ đồ Mermaid.** Phát hiện **F1** (webhook GĐ4 vs `SAL-005` GĐ1), **F2/F3** (ETO + `ChannelOrderModel` thiếu watermark — lần thứ ba cùng phát hiện được nêu), **F4** (nền `XC-002` chưa có), **F5** (luật gap của `XC-002` không áp dụng được cho watermark), **F6** (allowlist `[AllowAnonymous]`), **F7** (nguy cơ trừ giảm giá **hai lần** — đã xử lý bằng BR-011/TC-16), **F8** (`Order` không lưu `PlacedAtUtc`), **F9** (vị trí ghim Testcontainers), **F10** (thứ tự migration `OrdOrders` với `SAL-003`) |
+
+---
+
+## 16. TRẠNG THÁI TRIỂN KHAI (15/10/2026) — **NƠI NHẬN ĐƠN ĐÃ CHẠY THẬT** (lỗi #22 đóng hoàn toàn)
+
+> Đây là **việc A** đã được người chốt ở `docs/handover-gd1.md` §4: lượt trước **chặn** mất đơn bằng
+> fail-closed, lượt này **xây nơi nhận thật** ⇒ cổng fail-closed **tự mở**, không cần bật cờ nào.
+
+### 16.1 Đã làm
+
+| # | Thành phần | Tệp | Nội dung |
+|---|---|---|---|
+| 1 | `MarketplaceOrderIntake` (entity) | `src/eCommerce.Domain/Entities/Orders/MarketplaceOrderIntake.cs` | Nhật ký nhận **MỘT đơn sàn**: khoá nghiệp vụ `(TenantId, ChannelCode, ExternalOrderId)`, `PayloadHash`, `OrderId`, **`MarketplacePlacedAtUtc`**, `CorrelationId`, `SkipReason` (nhận D7; `SalMarketplaceEventLogs` **chưa làm** — xem 16.4) |
+| 2 | `MarketplaceOrderFactory` (**lõi thuần**) | `src/eCommerce.Application/Marketplace/` | Dựng `Order` + dòng từ ETO. Số đơn **tất định** (D8). **D9**: giảm giá dòng → `OrderLine.DiscountAmount`, giảm giá đơn → `Order.DiscountTotal` (**mỗi khoản một nơi**) |
+| 3 | `MarketplaceOrderIntakeHandler` | `src/eCommerce.Application/Marketplace/` | `IDistributedEventHandler<ChannelOrderPulledEto>`. **Khoá idempotency mức ĐƠN** `"{channelCode}:order"/"{externalOrderId}"` (D4) ⇒ pull hôm nay và webhook GĐ4 dùng **chung** khoá |
+| 4 | `MarketplaceErrorCodes` | `eCommerce:Marketplace:0001…0004` | |
+| 5 | Migration + index | `20261015082700_Add_Sal005_MarketplaceOrderIntake` | `IX_SalMktIntakes_TenantId_ChannelCode_ExternalOrderId` **`NULLS NOT DISTINCT`** |
+| 6 | 3 hàng rào chống trùng | — | (a) khoá phân tán + bản ghi idempotency (`XC-002`), (b) nhật ký nhận đơn, (c) unique index DB `NULLS NOT DISTINCT` |
+| 7 | Test | `test/…/Marketplace/` (**13** test) | Bất biến tiền **D9** · số đơn tất định · >64 ký tự **NÉM** (không cắt) · đơn không dòng hàng **NÉM** · **có handler nhận ETO** · handler có marker DI · `DbSet` bắt buộc |
+
+### 16.2 ✅ BẰNG CHỨNG CHẠY THẬT (Host + PostgreSQL 17 thật)
+
+| Phép đo | Kết quả |
+|---|---|
+| Log boot | Danh sách sự kiện **KHÔNG có người nhận** chỉ còn **`ChannelShopTokenRefreshedEto`** — `ChannelOrderPulledEto` **đã có nơi nhận** ⇒ **cổng fail-closed đã mở** ✅ |
+| Đơn được tạo | **10 đơn ↔ 10 dòng đơn ↔ 10 nhật ký** (1:1:1) |
+| Con trỏ đồng bộ | **tiến** (`2026-10-15 08:45:29`) · `LastError` rỗng ⇒ kênh **không còn kẹt** ✅ |
+| **Sàn gửi lại** (đặt con trỏ về `NULL`), **còn** bản ghi idempotency | `DON TRUNG = 0` ✅ (chặn bằng khoá idempotency) |
+| **Sàn gửi lại**, đã **XOÁ** bản ghi idempotency (chỉ còn lưới DB) | `DON TRUNG = 0` ✅ · mỗi `ExternalOrderId` xuất hiện **đúng 1 lần** (chặn bằng nhật ký + unique index) |
+| Bản ghi bị ghi vết (`SkipReason`) | **0** ⇒ không có xung đột payload trong lượt này |
+| Test | **401 unit** (thêm **13**) + **20 integration** · build **0 lỗi/0 cảnh báo** |
+| Tổng index `NULLS NOT DISTINCT` | **20** (thêm index mới; test bất biến liệt kê **đích danh**) |
+
+### 16.3 🚨 HAI LỖI THẬT PHÁT HIỆN KHI KIỂM CHỨNG (đã sửa)
+
+**L1 — Handler của `IDistributedEventBus` chạy SAU khi UoW nơi phát hoàn tất ⇒ `DbContext` đã dispose.**
+Log thật: `System.ObjectDisposedException: Cannot access a disposed context instance. Object name: 'eCommerceDbContext'`
+với stack `EfCoreIdempotencyStore.TimAsync` → `IdempotencyGuard.ThucThiAsync` → **handler**.
+⇒ Không lỗi biên dịch, không lỗi khi build/test; **chỉ lộ khi chạy thật**.
+**Sửa:** handler mở **UoW riêng** `Begin(requiresNew: true, isTransactional: true)`.
+⚠️ **Không** dùng `[UnitOfWork]` trần: interceptor ABP mặc định `requiresNew = false` ⇒ **tái dùng** UoW đã dispose.
+📌 Quy tắc đã ghi vào `docs/coding-conventions.md` **§6.1** cho mọi handler sau này.
+
+**L2 — connector PoC sinh `PlacedAtUtc` mới mỗi lần kéo** ⇒ "cùng một đơn" lại có payload khác ⇒ tầng chống
+trùng báo **XUNG ĐỘT PAYLOAD** (đúng thiết kế) và **không thể kiểm chứng** đường "sàn gửi lại".
+⇒ `ShopeeConnector` nay sinh `PlacedAtUtc` **tất định** theo `(shop, con trỏ, chỉ số)`.
+
+### 16.4 ⚠️ QUYẾT ĐỊNH & GIỚI HẠN (nói thẳng, không giả vờ)
+
+| # | Nội dung | Trạng thái |
+|---|---|---|
+| 1 | **Xử lý CẬP NHẬT đơn sàn theo watermark** (`update_time`) — D5 + **luật 4 nhánh** (§3.3) | ⬜ **CHƯA LÀM**. Hiện **tạo-một-lần**: đơn đã nhận thì **không sửa**. ⇒ **không mất đơn**, nhưng đơn có thể **cũ** so với sàn. ⚠️ Phụ thuộc **F2/F3** (ETO + `ChannelOrderModel` thiếu `UpdatedAtUtc`) — **vẫn còn** |
+| 2 | **`SalMarketplaceEventLogs`** (nhật ký append-only theo SỰ KIỆN — D7) | ⬜ **CHƯA LÀM**. Mới có nhật ký theo **ĐƠN**. Sự kiện trùng vẫn được chặn (khoá idempotency) nhưng **không** có vết từng lần nhận |
+| 3 | 🚨 **Xung đột payload: KHÔNG ném lỗi, mà GHI VẾT rồi đi tiếp** (khác D6 nguyên bản "đẩy DLQ") | ✅ **Có chủ ý, đã đo lý do:** ném lỗi ⇒ `PublishAsync` ném ⇒ **con trỏ không tiến** ⇒ sàn gửi lại đúng đơn đó ⇒ **lặp vô hạn + CHẶN CẢ KÊNH** (đã đo: con trỏ kẹt `NULL` qua nhiều nhịp). Nay: **giữ bản đầu** (không ghi đè ⇒ không mất dữ liệu; **tất định**: không instance nào ghi đè) + `SkipReason` + log **Error**. 📌 Khi `XC-002` có **DLQ**, nhánh này **PHẢI** chuyển sang đẩy DLQ (**việc còn lại**) |
+| 4 | **Cột `Order.PlacedAtUtc`** (**F8**) | 🟡 **Giảm nhẹ**: mốc đặt hàng của sàn nay được lưu ở **nhật ký nhận đơn** (`MarketplacePlacedAtUtc`) ⇒ **không còn mất**; nhưng `Order` vẫn chưa có cột ⇒ báo cáo theo kênh phải JOIN |
+| 5 | **9 trường còn thiếu của ETO** (**F2**) | ⬜ **VẪN CÒN** — không cần cho đường pull tạo-một-lần, nhưng **chặn** phần cập nhật/webhook |
+| 6 | Khoá phân tán theo đơn `ecommerce:order:mp-intake:{tenantId}:{channelCode}:{externalOrderId}` (D10) | 🟡 Hiện dùng khoá của `IdempotencyKey` (`messaging:idempotency:{scope}:{value}`) — **đã tuần tự hoá đúng** cùng đơn; khoá riêng theo D10 **chưa** thêm (tránh hai nguồn khoá) |
+| 7 | **Ma trận test tự động cho intake** | ⚠️ Lượt này kiểm chứng bằng **script thủ công trên Host thật**; **chưa** có integration test tự động (test project chưa có `WebApplicationFactory`) |
+
+### 16.5 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.2 | 15/10/2026 | *(agent, session GĐ1)* | **Xây nơi nhận đơn** ⇒ **lỗi #22 đóng hoàn toàn**: `MarketplaceOrderIntake` + `MarketplaceOrderFactory` (D8/D9) + `MarketplaceOrderIntakeHandler` + migration `NULLS NOT DISTINCT` + **13 test**. Kiểm chứng thật: cổng fail-closed **mở**, 10 đơn được lưu, **sàn gửi lại KHÔNG tạo đơn trùng** (kể cả khi đã xoá bản ghi idempotency). Phát hiện & sửa **2 lỗi thật** (16.3). Ghi rõ **giới hạn còn lại** (16.4) |

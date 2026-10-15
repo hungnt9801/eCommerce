@@ -44,6 +44,13 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
     public DbSet<Orders.Order> Orders { get; set; } = default!;
     public DbSet<Orders.OrderLine> OrderLines { get; set; } = default!;
 
+    /// <summary>
+    /// Nhật ký nhận đơn từ sàn (`SAL-005`). 🚨 **BẮT BUỘC có `DbSet`** — thiếu ⇒
+    /// `IRepository&lt;MarketplaceOrderIntake, Guid&gt;` **không được đăng ký** (quy ước #3, lỗi Phase 0)
+    /// ⇒ handler nhận đơn **không resolve được** ⇒ đơn lại mất.
+    /// </summary>
+    public DbSet<Orders.MarketplaceOrderIntake> MarketplaceOrderIntakes { get; set; } = default!;
+
     // ---- ChannelHub (module) ----
     // 🚨 VÌ SAO PHẢI KHAI BÁO DbSet Ở ĐÂY:
     // AddDefaultRepositories(includeAllEntities: true) chỉ tạo IRepository<T> cho entity
@@ -229,6 +236,32 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
             b.HasIndex(x => new { x.OrderId, x.ExternalLineId })
                 .IsUnique()
                 .HasFilter("\"ExternalLineId\" IS NOT NULL");
+        });
+
+        // ---- Nhật ký nhận đơn từ sàn (`SAL-005`) ----
+        builder.Entity<Orders.MarketplaceOrderIntake>(b =>
+        {
+            b.ToTable("SalMarketplaceOrderIntakes");
+            b.ConfigureByConvention();
+
+            b.Property(x => x.ChannelCode).IsRequired().HasMaxLength(32);
+            b.Property(x => x.ExternalShopId).IsRequired().HasMaxLength(64);
+            b.Property(x => x.ExternalOrderId).IsRequired().HasMaxLength(64);
+            b.Property(x => x.PayloadHash).IsRequired().HasMaxLength(64);
+            b.Property(x => x.CorrelationId).HasMaxLength(64);
+            b.Property(x => x.SkipReason).HasMaxLength(500);
+
+            // 🎯 Hàng rào chống trùng ở mức ĐƠN (khoá nghiệp vụ giống `OrdOrders`).
+            // ⚠️ EF **không** mô hình hoá được `NULLS NOT DISTINCT` ⇒ migration sinh ra phải được
+            //    bổ sung mệnh đề đó (xem migration `Add_Sal005_MarketplaceOrderIntake`), nếu không
+            //    index **mất tác dụng im lặng** khi `TenantId` NULL (lỗi C4/F1).
+            // ⚠️ ĐẶT TÊN TƯỜNG MINH: tên EF tự sinh là
+            //    `IX_SalMarketplaceOrderIntakes_TenantId_ChannelCode_ExternalOrderId` = **67 ký tự**,
+            //    vượt giới hạn **63** của PostgreSQL ⇒ bị **cắt** (kèm dấu `~`) ⇒ test bất biến index
+            //    (đối chiếu **đích danh tên**) sẽ không tìm thấy. Tên dưới đây = **52 ký tự**.
+            b.HasIndex(x => new { x.TenantId, x.ChannelCode, x.ExternalOrderId })
+                .IsUnique()
+                .HasDatabaseName("IX_SalMktIntakes_TenantId_ChannelCode_ExternalOrderId");
         });
     }
 }

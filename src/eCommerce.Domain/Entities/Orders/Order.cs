@@ -64,6 +64,19 @@ public class Order : FullAuditedAggregateRoot<Guid>, IMultiTenant
     }
 
     /// <summary>
+    /// Tạo đơn **kèm chiều tenant** — dùng khi nguồn đơn là **hệ thống ngoài** (sàn TMĐT) và tenant
+    /// đến từ dữ liệu nguồn chứ không từ `ICurrentTenant` của tiến trình đang xử lý.
+    ///
+    /// 🎯 Vì sao cần ctor riêng: `TenantId` là `protected set`, mà tầng app (nơi nhận đơn sàn) **không**
+    /// được phép gán trực tiếp. Nếu bỏ qua, tenant của đơn nguồn sẽ **rơi im lặng** và chỉ còn tenant
+    /// của tiến trình — đúng loại mất mát không ai phát hiện (`XC-004` F2 ghi nhận multi-tenancy chưa bật).
+    /// </summary>
+    public Order(Guid id, string number, string channelCode, Guid? tenantId) : this(id, number, channelCode)
+    {
+        TenantId = tenantId;
+    }
+
+    /// <summary>
     /// Thêm một dòng đơn. Idempotent theo (ExternalLineId / Sku): webhook gửi lại cùng đơn
     /// sẽ không tạo dòng trùng.
     /// </summary>
