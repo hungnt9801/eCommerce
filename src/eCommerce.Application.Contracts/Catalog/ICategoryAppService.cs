@@ -41,6 +41,23 @@ public interface ICategoryAppService : IApplicationService
 
     Task ActivateAsync(Guid id);
 
-    /// <summary>🚨 **Xoá MỀM**; **NÉM** `eCommerce:Catalog:0021` khi nút còn **nút con** (`CAT-002` D9).</summary>
+    /// <summary>🚨 **Xoá MỀM**; **NÉM** `eCommerce:Catalog:0021` khi nút còn **nút con** hoặc còn **sản phẩm** (`CAT-002` D9).</summary>
     Task DeleteAsync(Guid id);
+
+    // ── Liên kết sản phẩm ↔ danh mục (`CAT-002` BR-005/006/007) ────────────────────────────────
+
+    /// <summary>
+    /// Gán sản phẩm vào danh mục. **NÉM** `0021` khi danh mục đã **ngừng dùng** (bất biến **chỉ tầng domain**
+    /// bảo vệ được — xem ghi chú ở `ProductCategoryService`). Gán lại là **idempotent**.
+    /// </summary>
+    Task AssignProductAsync(Guid categoryId, AssignProductDto input);
+
+    /// <summary>Bỏ gán (idempotent — không ném lỗi khi chưa có liên kết).</summary>
+    Task UnassignProductAsync(Guid categoryId, Guid productId);
+
+    /// <summary>Đặt danh mục **chính** cho sản phẩm; trả về `CategoryId` **cũ** (nếu có) để client biết đã đổi cái nào.</summary>
+    Task<Guid?> SetPrimaryAsync(Guid productId, SetPrimaryCategoryDto input);
+
+    /// <summary>Danh sách sản phẩm trong một danh mục (storefront dựng trang danh mục).</summary>
+    Task<List<Guid>> GetProductIdsAsync(Guid categoryId);
 }

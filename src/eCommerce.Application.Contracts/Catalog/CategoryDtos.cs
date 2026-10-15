@@ -95,3 +95,22 @@ public class MoveCategoryDto
 {
     public Guid? ParentId { get; set; }
 }
+
+/// <summary>Gán một sản phẩm vào danh mục (`CAT-002` BR-005/006).</summary>
+public class AssignProductDto
+{
+    [Required]
+    public Guid ProductId { get; set; }
+
+    /// <summary>`true` ⇒ đặt luôn làm **danh mục chính** (tự **hạ** danh mục chính cũ — BR-006).</summary>
+    public bool IsPrimary { get; set; }
+
+    public int SortOrder { get; set; }
+}
+
+/// <summary>Đặt danh mục **chính** cho một sản phẩm.</summary>
+public class SetPrimaryCategoryDto
+{
+    [Required]
+    public Guid CategoryId { get; set; }
+}

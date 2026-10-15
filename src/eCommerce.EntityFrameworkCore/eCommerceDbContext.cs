@@ -47,6 +47,9 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
     /// </summary>
     public DbSet<Catalog.Category> Categories { get; set; } = default!;
 
+    /// <summary>Liên kết sản phẩm ↔ danh mục (`CAT-002`).</summary>
+    public DbSet<Catalog.ProductCategory> ProductCategories { get; set; } = default!;
+
     // ---- Inventory ----
     public DbSet<Inventory.InventoryItem> InventoryItems { get; set; } = default!;
     public DbSet<Inventory.StockLedgerEntry> StockLedgerEntries { get; set; } = default!;
@@ -231,6 +234,43 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
                 t.HasCheckConstraint("CK_CatCategories_Path_DinhDang", "\"Path\" LIKE '/%/'");
                 t.HasCheckConstraint("CK_CatCategories_Level_Khoang", "\"Level\" >= 0 AND \"Level\" <= 5");
             });
+        });
+
+        // ── Liên kết sản phẩm ↔ danh mục (`CAT-002` BR-006) ──────────────────────────────────────
+        builder.Entity<Catalog.ProductCategory>(b =>
+        {
+            b.ToTable("CatProductCategories");
+            b.ConfigureByConvention();
+
+            // Chống GÁN TRÙNG cùng một cặp (sản phẩm, danh mục).
+            // ⚠️ Tên TƯỜNG MINH: tên EF tự sinh dài > 63 ký tự ⇒ PostgreSQL **cắt cụt** (lỗi đã gặp thật).
+            b.HasIndex(x => new { x.TenantId, x.ProductId, x.CategoryId })
+                .IsUnique()
+                .HasDatabaseName("IX_CatProdCats_TenantId_ProductId_CategoryId");
+
+            // Truy vấn "sản phẩm trong một danh mục" (storefront).
+            b.HasIndex(x => new { x.TenantId, x.CategoryId })
+                .HasDatabaseName("IX_CatProdCats_TenantId_CategoryId");
+
+            // 🚨 **TỐI ĐA MỘT danh mục CHÍNH cho mỗi sản phẩm** (BR-006) — unique index **CÓ FILTER**.
+            // Đây là hàng rào DUY NHẤT diễn đạt được bất biến này: unique index KHÔNG có điều kiện sẽ chặn
+            // luôn việc một sản phẩm nằm trong NHIỀU danh mục (điều hoàn toàn hợp lệ).
+            // ⚠️ EF không sinh được `NULLS NOT DISTINCT` cho index có filter ⇒ migration có bước SQL thô.
+            b.HasIndex(x => new { x.TenantId, x.ProductId })
+                .IsUnique()
+                .HasFilter("\"IsPrimary\"")
+                .HasDatabaseName("IX_CatProdCats_TenantId_ProductId_ChiMotChinh");
+
+            // FK `Restrict`: xoá cứng sản phẩm/danh mục KHÔNG được kéo mất liên kết ở đây.
+            b.HasOne<Catalog.Product>()
+                .WithMany()
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            b.HasOne<Catalog.Category>()
+                .WithMany()
+                .HasForeignKey(x => x.CategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         builder.Entity<Inventory.InventoryItem>(b =>

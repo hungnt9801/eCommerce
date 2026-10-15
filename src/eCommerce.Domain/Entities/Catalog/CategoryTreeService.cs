@@ -30,15 +30,18 @@ public class CategoryTreeService : DomainService
     public const int ChoKhoaToiDaGiay = 30;
 
     private readonly IRepository<Category, Guid> _categoryRepository;
+    private readonly IRepository<ProductCategory, Guid> _lienKetRepository;
     private readonly IAbpDistributedLock _distributedLock;
     private readonly ICurrentTenant _currentTenant;
 
     public CategoryTreeService(
         IRepository<Category, Guid> categoryRepository,
+        IRepository<ProductCategory, Guid> lienKetRepository,
         IAbpDistributedLock distributedLock,
         ICurrentTenant currentTenant)
     {
         _categoryRepository = categoryRepository;
+        _lienKetRepository = lienKetRepository;
         _distributedLock = distributedLock;
         _currentTenant = currentTenant;
     }
@@ -191,6 +194,20 @@ public class CategoryTreeService : DomainService
                 .WithData("lyDo", "Danh mục còn NÚT CON ⇒ không xoá được (chỉ có thể NGỪNG DÙNG).")
                 .WithData("nut", nut.Code)
                 .WithData("soNutCon", soNutCon);
+        }
+
+        // 🚨 Bổ sung 15/10/2026 (lát cắt 3 — khi bảng liên kết `CatProductCategories` ra đời):
+        // XOÁ danh mục còn SẢN PHẨM sẽ làm sản phẩm **mất khỏi mọi danh mục** ⇒ storefront không hiển thị nữa,
+        // **không có lỗi nào**. `CAT-002` §12 yêu cầu ném `0021`. (Trước lát cắt 3, điều kiện này **chưa làm được**
+        // vì bảng liên kết chưa tồn tại — đã ghi rõ ở §16.3.)
+        var soSanPham = await _lienKetRepository.CountAsync(x => x.CategoryId == nutId);
+
+        if (soSanPham > 0)
+        {
+            throw new BusinessException(eCommerceConsts.ErrorCodes.Catalog.DanhMucConRangBuoc)
+                .WithData("lyDo", "Danh mục còn SẢN PHẨM ⇒ không xoá được (chỉ có thể NGỪNG DÙNG).")
+                .WithData("nut", nut.Code)
+                .WithData("soSanPham", soSanPham);
         }
 
         // Xoá MỀM (`IsDeleted`) — dữ liệu vẫn tra được cho lịch sử/đối soát.

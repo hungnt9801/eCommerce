@@ -1073,3 +1073,85 @@ và test khẳng định `CHECK`/`FK` **ở tầng model** bằng **SQL mà EF s
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.3 | 15/10/2026 | *(agent, session GĐ1)* | **Lát cắt 2 — API cây danh mục**: 6 route chạy thật; **kiểm chứng HTTP đầy đủ 11 phép đo** (chu trình `0020` + `Path` không đổi · dựng lại `Path` cả cây con · `0021` · xoá mềm · `0024` · **0 dòng `fail:`**). Phát hiện + sửa **lỗi thiếu `DbSet` ⇒ HTTP 500** (§17.3) và thêm **lưới an toàn CI**; ghi 2 bài học kỹ thuật (§17.4). **+11 unit** |
+
+---
+
+## 18. TRẠNG THÁI TRIỂN KHAI — **LÁT CẮT 3: LIÊN KẾT SẢN PHẨM ↔ DANH MỤC** (15/10/2026)
+
+### 18.1 Đã làm
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| 1 | `ProductCategory` (`CatProductCategories`) | `ProductId` · `CategoryId` · `IsPrimary` · `SortOrder`; validate Guid rỗng ⇒ `Catalog:0011` |
+| 2 | `ProductCategoryService` (dịch vụ miền) | `GanAsync` (**idempotent** — double-click không tạo trùng) · `BoGanAsync` · `DatDanhMucChinhAsync` (**hạ** danh mục chính cũ rồi đặt cái mới) |
+| 3 | API | `AssignProductAsync` · `UnassignProductAsync` · `SetPrimaryAsync` (trả về **danh mục chính CŨ**) · `GetProductIdsAsync` — đều theo §9.2 (`Categories.Edit`) |
+| 4 | Hàng rào DB | **unique `(TenantId, ProductId, CategoryId)` NULLS NOT DISTINCT** (chống gán trùng) · 🚨 **unique CÓ FILTER `(TenantId, ProductId) NULLS NOT DISTINCT WHERE "IsPrimary"`** (tối đa **một** danh mục chính — BR-006) · FK ×2 `Restrict` |
+| 5 | **Bổ sung guard xoá** | `CategoryTreeService.XoaMemAsync` nay **chặn cả khi danh mục còn SẢN PHẨM** ⇒ `Catalog:0021`. ⚠️ Điều này trước đây **chưa làm được** vì bảng liên kết chưa tồn tại (đã ghi ở §16.3) — **nay đã đóng** |
+
+### 18.2 ✅ BẰNG CHỨNG HTTP THẬT (Host + PostgreSQL 17)
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | 4 route thật (đọc từ `swagger.json`) | `/assign-product/{categoryId}` · `/unassign-product?categoryId&productId` · `/set-primary/{productId}` · `/product-ids/{categoryId}` |
+| 3 | Gán sản phẩm vào DM1 (**không** chính) + DM2 (**chính**) | `204` ×2 |
+| 4 | DB sau khi gán | DM1 `IsPrimary = f`, DM2 `= t` |
+| 5 | 🚨 **Đặt DM1 làm chính ⇒ DM2 phải bị HẠ (BR-006)** | `200`, trả về **danh mục chính CŨ** (đúng `CategoryId` của DM2); DB: DM1 `t`, DM2 `f` ✅ |
+| 6 | **Gán vào danh mục đã NGỪNG DÙNG** | **`eCommerce:Catalog:0021`** ✅ (bất biến **chỉ tầng domain** bảo vệ) |
+| 7 | **Xoá danh mục còn SẢN PHẨM** | **`Catalog:0021`** ✅ |
+| 8 | Bỏ gán rồi xoá danh mục | `204` ✅ · DB `IsDeleted = t` **chỉ ở DM1** |
+| 9 | `product-ids` của DM2 | `200` · **1 sản phẩm** |
+| 10 | Log Host | **0 dòng `fail:`** |
+| 11 | Dọn dẹp | 0 sản phẩm / 0 danh mục / 0 liên kết · cờ bảo mật đã khôi phục |
+
+**DB thật (đo bằng `pg_indexes`/`pg_constraint`):** index `IX_CatProdCats_TenantId_ProductId_CategoryId`
+**UNIQUE … NULLS NOT DISTINCT** · index `IX_CatProdCats_TenantId_ProductId_ChiMotChinh`
+**UNIQUE … NULLS NOT DISTINCT WHERE "IsPrimary"** · 2 FK `ON DELETE RESTRICT`.
+
+**Integration test (+4, tổng 32):** chặn gán trùng khi `TenantId NULL` · **chặn HAI danh mục chính** (BR-006) ·
+🚨 **ĐỐI CHỨNG: nhiều danh mục KHÔNG chính vẫn ĐƯỢC phép** (nếu index có filter bị viết sai thành index
+thường thì sản phẩm chỉ nằm được trong **một** danh mục — lỗi chỉ lộ khi khách không tìm thấy sản phẩm
+trong danh mục thứ hai) · FK `Restrict` chặn xoá cứng danh mục còn sản phẩm.
+
+### 18.3 🚨 XUNG ĐỘT THIẾT KẾ PHÁT HIỆN ĐƯỢC — index `Slug` của `CatCategories` (§5.2)
+
+Bảng index của tài liệu yêu cầu:
+`UNIQUE NULLS NOT DISTINCT (TenantId, ParentId, Slug)`.
+**Vấn đề:** `NULLS NOT DISTINCT` khiến **hai dòng có `Slug = NULL`** bị coi là **trùng nhau** ⇒
+**KHÔNG tạo được hai danh mục cùng cha mà đều không có slug** — trong khi "không có slug" là trạng thái
+**bình thường** (slug là phần SEO, thuộc `CAT-003`, và danh mục nháp chưa cần slug).
+
+⇒ Nếu làm **đúng nguyên văn** tài liệu thì thao tác rất thường gặp sẽ **bị chặn** với thông báo khó hiểu
+(vi phạm unique index). **Cách đúng** là **index MỘT PHẦN**: `UNIQUE (TenantId, ParentId, Slug)
+NULLS NOT DISTINCT WHERE "Slug" IS NOT NULL` (đúng họ với index "một danh mục chính" ở §18.1 #4).
+
+📌 **Quyết định:** index này **thuộc `CAT-003`** (SEO/slug) nên **chưa** thêm ở lát cắt này —
+`CAT-003` **phải** dùng dạng **có filter** như trên, **không** chép nguyên văn §5.2.
+Ghi ở đây để người làm `CAT-003` không lặp lại.
+
+### 18.4 ⚠️ Điểm chưa hoàn thiện (ghi rõ)
+
+1. **Không có khoá phân tán cho thao tác gán danh mục** — `CAT-002` §8.2 **không** quy định (chỉ có 3 khoá:
+   cây danh mục · tổ hợp biến thể · định nghĩa thuộc tính). Hệ quả: hai request **đồng thời** cùng đặt
+   "danh mục chính" ⇒ **DB chặn** request thua bằng `DbUpdateException` (**lỗi kỹ thuật**, không phải mã
+   nghiệp vụ). Cùng họ với việc ánh xạ lỗi unique đã ghi ở `cat-001` §17.4 — cần `IExceptionSubscriber`
+   ở tầng EFCore mới có mã đẹp.
+2. **Thuộc tính** (`CatAttributes`/`CatAttributeValues`/`CatCategoryAttributes`/
+   `CatProductAttributeSelections`/`CatProductVariantAttributes`) và **sinh tổ hợp biến thể** (D5/D6/D7 +
+   `AttributeHash`) **chưa** làm — xem §17.5 #2/#3.
+
+### 18.5 🚨 BÀI HỌC LẶP LẠI: **đoán URL ⇒ 404** (lần thứ hai)
+
+Lần chạy kiểm chứng **đầu tiên** của lát cắt này: tôi tự viết URL theo suy đoán
+(`/{id}/products`, `/{id}/products/{productId}`, `/products/{id}/primary`) ⇒ **404 toàn bộ**, và một phép đo
+sau đó **vô tình xanh vì lý do sai** (xoá danh mục "còn sản phẩm" trả `204` — vì thực ra **chưa có liên kết nào**
+do các lệnh gán đều 404). Nếu tôi chỉ nhìn "204 = thành công" thì đã **kết luận sai hoàn toàn**.
+
+⇒ **QUY TẮC (đã có từ `cat-001` §17, nay nhấn lại vì tôi vẫn tái phạm):** trước khi viết lời gọi, **in route
+thật + tham số thật từ `swagger.json`** rồi **sao chép** — không suy đoán từ tên method. Route thật của lát
+cắt này là `assign-product/{categoryId}`, `unassign-product?categoryId&productId`, `set-primary/{productId}`.
+
+### 18.6 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.4 | 15/10/2026 | *(agent, session GĐ1)* | **Lát cắt 3 — liên kết sản phẩm ↔ danh mục**: entity + `ProductCategoryService` + 4 route API + **unique có filter** cho BR-006 + **bổ sung guard "còn sản phẩm"** khi xoá danh mục (§18.1 #5). **Kiểm chứng HTTP 11 phép đo** (hạ danh mục chính cũ · `0021` cho danh mục ngừng dùng · `0021` khi còn sản phẩm · 0 `fail:`). **+4 unit · +4 integration**. Phát hiện **xung đột index `Slug`** (§18.3) và ghi lại **bài học lặp lại về đoán URL** (§18.5) |

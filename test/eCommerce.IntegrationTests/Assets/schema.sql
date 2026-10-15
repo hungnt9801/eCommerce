@@ -1355,3 +1355,48 @@ VALUES ('20261015092958_Cat002_CategoryTree', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE TABLE "CatProductCategories" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "ProductId" uuid NOT NULL,
+    "CategoryId" uuid NOT NULL,
+    "IsPrimary" boolean NOT NULL,
+    "SortOrder" integer NOT NULL,
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_CatProductCategories" PRIMARY KEY ("Id"),
+    CONSTRAINT "FK_CatProductCategories_CatCategories_CategoryId" FOREIGN KEY ("CategoryId") REFERENCES "CatCategories" ("Id") ON DELETE RESTRICT,
+    CONSTRAINT "FK_CatProductCategories_CatProducts_ProductId" FOREIGN KEY ("ProductId") REFERENCES "CatProducts" ("Id") ON DELETE RESTRICT
+);
+
+CREATE INDEX "IX_CatProdCats_TenantId_CategoryId" ON "CatProductCategories" ("TenantId", "CategoryId");
+
+CREATE UNIQUE INDEX "IX_CatProdCats_TenantId_ProductId_CategoryId" ON "CatProductCategories" ("TenantId", "ProductId", "CategoryId");
+
+CREATE UNIQUE INDEX "IX_CatProdCats_TenantId_ProductId_ChiMotChinh" ON "CatProductCategories" ("TenantId", "ProductId") WHERE "IsPrimary";
+
+CREATE INDEX "IX_CatProductCategories_CategoryId" ON "CatProductCategories" ("CategoryId");
+
+CREATE INDEX "IX_CatProductCategories_ProductId" ON "CatProductCategories" ("ProductId");
+
+DROP INDEX "IX_CatProdCats_TenantId_ProductId_CategoryId";
+
+CREATE UNIQUE INDEX "IX_CatProdCats_TenantId_ProductId_CategoryId" ON "CatProductCategories" ("TenantId", "ProductId", "CategoryId") NULLS NOT DISTINCT;
+
+DROP INDEX "IX_CatProdCats_TenantId_ProductId_ChiMotChinh";
+
+CREATE UNIQUE INDEX "IX_CatProdCats_TenantId_ProductId_ChiMotChinh" ON "CatProductCategories" ("TenantId", "ProductId") NULLS NOT DISTINCT WHERE "IsPrimary";
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261015095145_Cat002b_ProductCategory', '10.0.11');
+
+COMMIT;
+

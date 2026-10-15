@@ -23,14 +23,20 @@ namespace eCommerce.Catalog;
 public class CategoryAppService : ApplicationService, ICategoryAppService
 {
     private readonly IRepository<Category, Guid> _categoryRepository;
+    private readonly IRepository<ProductCategory, Guid> _lienKetRepository;
     private readonly CategoryTreeService _categoryTreeService;
+    private readonly ProductCategoryService _productCategoryService;
 
     public CategoryAppService(
         IRepository<Category, Guid> categoryRepository,
-        CategoryTreeService categoryTreeService)
+        IRepository<ProductCategory, Guid> lienKetRepository,
+        CategoryTreeService categoryTreeService,
+        ProductCategoryService productCategoryService)
     {
         _categoryRepository = categoryRepository;
+        _lienKetRepository = lienKetRepository;
         _categoryTreeService = categoryTreeService;
+        _productCategoryService = productCategoryService;
     }
 
     /// <summary>
@@ -170,6 +176,49 @@ public class CategoryAppService : ApplicationService, ICategoryAppService
     public async Task DeleteAsync(Guid id)
         // 🚨 XOÁ MỀM + chặn khi còn nút con (`CAT-002` D9). Không xoá cứng: FK `Restrict` + guard.
         => await _categoryTreeService.XoaMemAsync(id);
+
+    // ── Liên kết sản phẩm ↔ danh mục (`CAT-002` BR-005/006/007) ────────────────────────────────
+
+    [Authorize(eCommerceConsts.Permissions.Categories.Edit)]
+    public async Task AssignProductAsync(Guid categoryId, AssignProductDto input)
+    {
+        await _productCategoryService.GanAsync(input.ProductId, categoryId, input.IsPrimary);
+
+        if (input.SortOrder != 0)
+        {
+            var lienKet = await _lienKetRepository.FirstOrDefaultAsync(
+                x => x.ProductId == input.ProductId && x.CategoryId == categoryId);
+
+            if (lienKet is not null)
+            {
+                lienKet.SortOrder = input.SortOrder;
+                await _lienKetRepository.UpdateAsync(lienKet, autoSave: true);
+            }
+        }
+    }
+
+    [Authorize(eCommerceConsts.Permissions.Categories.Edit)]
+    public async Task UnassignProductAsync(Guid categoryId, Guid productId)
+        => await _productCategoryService.BoGanAsync(productId, categoryId);
+
+    [Authorize(eCommerceConsts.Permissions.Categories.Edit)]
+    public async Task<Guid?> SetPrimaryAsync(Guid productId, SetPrimaryCategoryDto input)
+        => await _productCategoryService.DatDanhMucChinhAsync(productId, input.CategoryId);
+
+    public async Task<List<Guid>> GetProductIdsAsync(Guid categoryId)
+    {
+        // ⚠️ Kiểm tra danh mục TỒN TẠI để phân biệt "danh mục rỗng" với "danh mục không có"
+        // (trả `[]` cho cả hai sẽ khiến client tưởng danh mục tồn tại mà rỗng).
+        _ = await _categoryRepository.GetAsync(categoryId);
+
+        var lienKet = await _lienKetRepository.GetListAsync(x => x.CategoryId == categoryId);
+
+        return lienKet
+            .OrderByDescending(x => x.IsPrimary)
+            .ThenBy(x => x.SortOrder)
+            .Select(x => x.ProductId)
+            .ToList();
+    }
 
     private static string? ChuanHoaSlug(string? slug)
         => string.IsNullOrWhiteSpace(slug) ? null : slug.Trim().ToLowerInvariant();

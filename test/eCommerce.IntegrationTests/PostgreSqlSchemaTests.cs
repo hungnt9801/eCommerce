@@ -141,11 +141,11 @@ public class PostgreSqlSchemaTests
     }
 
     [Fact]
-    public async Task F1_du_21_index_deu_dung_NULLS_NOT_DISTINCT()
+    public async Task F1_du_23_index_deu_dung_NULLS_NOT_DISTINCT()
     {
         // 🔒 BẤT BIẾN (ghi ở XC-004 Q6): mọi unique index trên entity IMultiTenant PHẢI có
         // `NULLS NOT DISTINCT`. Ai tạo migration mới mà quên ⇒ test này đỏ.
-        Assert.Equal(21L, await DemAsync(
+        Assert.Equal(23L, await DemAsync(
             "select count(*) from pg_indexes where schemaname = 'public' and indexdef like '%NULLS NOT DISTINCT%'"));
 
         // Kiểm tra ĐÍCH DANH để thông báo lỗi có ý nghĩa (tên index dài có thể bị PostgreSQL cắt ⇒ so theo tiền tố).
@@ -642,5 +642,105 @@ public class PostgreSqlSchemaTests
             "select confdeltype::text from pg_constraint where conname = 'FK_CatCategories_CatCategories_ParentId'");
 
         Assert.Equal("r", kieu);
+    }
+
+    // ── 2e. 🚨 CAT-002 (lát cắt 3) — LIÊN KẾT SẢN PHẨM ↔ DANH MỤC ──────────────────────────────
+
+    private async Task ChenLienKetAsync(Guid id, Guid productId, Guid categoryId, bool laChinh, string ma)
+    {
+        // Cột lấy từ DB THẬT + migration `Cat002b_ProductCategory`. FK là `Restrict` ⇒ sản phẩm + danh mục
+        // phải tồn tại trước.
+        // ⚠️ CHỈ chèn khi CHƯA có: test "nhiều danh mục KHÔNG chính" gọi helper này 3 lần với **cùng**
+        // `productId` ⇒ chèn lại sẽ đụng `PK_CatProducts` (23505) và làm test đỏ vì **lý do SAI**.
+        // (Không thêm `ON CONFLICT` vào `ChenSanPhamAsync`/`ChenDanhMucAsync` vì test
+        //  `CAT002_chan_trung_Code_khi_TenantId_NULL` đang **mong đợi** lỗi trùng phát ra TỪ helper đó.)
+        if (await DemAsync($"select count(*) from \"CatProducts\" where \"Id\" = '{productId}'") == 0)
+        {
+            await ChenSanPhamAsync(productId, $"LK-SP-{ma}");
+        }
+
+        if (await DemAsync($"select count(*) from \"CatCategories\" where \"Id\" = '{categoryId}'") == 0)
+        {
+            await ChenDanhMucAsync(categoryId, null, $"LK-DM-{ma}");
+        }
+
+        await using var command = _fixture.DataSource.CreateCommand(
+            "insert into \"CatProductCategories\" " +
+            "(\"Id\",\"TenantId\",\"ProductId\",\"CategoryId\",\"IsPrimary\",\"SortOrder\"," +
+            "\"ExtraProperties\",\"ConcurrencyStamp\",\"CreationTime\",\"IsDeleted\") " +
+            "values (@id, null, @productId, @categoryId, @laChinh, 0, '{}', 'stamp', now(), false)");
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("productId", productId);
+        command.Parameters.AddWithValue("categoryId", categoryId);
+        command.Parameters.AddWithValue("laChinh", laChinh);
+        await command.ExecuteNonQueryAsync();
+    }
+
+    [Fact]
+    public async Task CAT002b_chan_GAN_TRUNG_cung_cap_sanpham_danhmuc_khi_TenantId_NULL()
+    {
+        var duoi = Guid.NewGuid().ToString("N")[..6];
+        var sanPham = Guid.NewGuid();
+        var danhMuc = Guid.NewGuid();
+
+        await ChenLienKetAsync(Guid.NewGuid(), sanPham, danhMuc, false, duoi);
+
+        var ex = await Assert.ThrowsAsync<PostgresException>(
+            () => ChenLienKetAsync(Guid.NewGuid(), sanPham, danhMuc, false, duoi));
+
+        Assert.Equal(PostgresErrorCodes.UniqueViolation, ex.SqlState);   // 23505
+    }
+
+    [Fact]
+    public async Task CAT002b_chan_HAI_danh_muc_CHINH_cho_cung_san_pham__BR006()
+    {
+        // 🚨 Đây là bất biến mà CHỈ unique index CÓ FILTER mới diễn đạt được (BR-006).
+        // Mất `NULLS NOT DISTINCT` ⇒ hai dòng "chính" cùng `TenantId = NULL` đều LỌT ⇒ hai breadcrumb/URL SEO.
+        var duoi = Guid.NewGuid().ToString("N")[..6];
+        var sanPham = Guid.NewGuid();
+
+        await ChenLienKetAsync(Guid.NewGuid(), sanPham, Guid.NewGuid(), true, duoi + "a");
+
+        var ex = await Assert.ThrowsAsync<PostgresException>(
+            () => ChenLienKetAsync(Guid.NewGuid(), sanPham, Guid.NewGuid(), true, duoi + "b"));
+
+        Assert.Equal(PostgresErrorCodes.UniqueViolation, ex.SqlState);   // 23505
+    }
+
+    [Fact]
+    public async Task CAT002b_DOI_CHUNG_nhieu_danh_muc_KHONG_chinh_thi_DUOC_PHEP()
+    {
+        // 🚨 ĐỐI CHỨNG BẮT BUỘC: nếu index có filter bị viết SAI (bỏ `WHERE "IsPrimary"`) thì nó chặn luôn
+        // việc một sản phẩm nằm trong NHIỀU danh mục — điều **hoàn toàn hợp lệ** và rất cần cho storefront.
+        // Không có test này thì lỗi đó sẽ chỉ lộ ra khi khách không tìm thấy sản phẩm trong danh mục thứ hai.
+        var duoi = Guid.NewGuid().ToString("N")[..6];
+        var sanPham = Guid.NewGuid();
+
+        await ChenLienKetAsync(Guid.NewGuid(), sanPham, Guid.NewGuid(), false, duoi + "a");
+        await ChenLienKetAsync(Guid.NewGuid(), sanPham, Guid.NewGuid(), false, duoi + "b");
+        await ChenLienKetAsync(Guid.NewGuid(), sanPham, Guid.NewGuid(), false, duoi + "c");
+
+        var soLienKet = await DemAsync(
+            $"select count(*) from \"CatProductCategories\" where \"ProductId\" = '{sanPham}'");
+
+        Assert.Equal(3L, soLienKet);
+    }
+
+    [Fact]
+    public async Task CAT002b_FK_RESTRICT_chan_xoa_cung_danh_muc_con_san_pham()
+    {
+        var duoi = Guid.NewGuid().ToString("N")[..6];
+        var sanPham = Guid.NewGuid();
+        var danhMuc = Guid.NewGuid();
+
+        await ChenLienKetAsync(Guid.NewGuid(), sanPham, danhMuc, false, duoi);
+
+        await using var command = _fixture.DataSource.CreateCommand(
+            "delete from \"CatCategories\" where \"Id\" = @id");
+        command.Parameters.AddWithValue("id", danhMuc);
+
+        var ex = await Assert.ThrowsAsync<PostgresException>(() => command.ExecuteNonQueryAsync());
+
+        Assert.Equal(PostgresErrorCodes.ForeignKeyViolation, ex.SqlState);   // 23503
     }
 }
