@@ -1995,3 +1995,55 @@ mà là **dựng một hàm chờ chuẩn** (chờ + in log khi hỏng + tham s�
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.e | 15/10/2026 | *(agent, session GĐ1)* | **Thử đo hành vi `HUỶ` trên đơn Web**: ✅ sửa được **2 lỗi probe cũ** (**cú pháp** nhờ `Parser::ParseFile` trước; **token** nhờ tìm ra scope sai `eCommerce_offline_access`) ⇒ probe **gieo dữ liệu thành công**; ❌ **Web không lên trong 90 s** ⇒ dừng, **chưa đo được `HUỶ`**. ✅ Không ảnh hưởng sản phẩm (`don=0 … baoMat=true`, 0 tiến trình treo). 🚨 **Ghi lỗi thiết kế của probe**: `ChoHost` khi hết chờ **không in log** ⇒ **không biết vì sao** Web không lên — vi phạm chính nguyên tắc *"thất bại to phải ồn ào"*. **Đề xuất: cơ chế hoá một hàm chờ chuẩn dùng chung** (chờ + in đuôi log + tham số hoá URL) thay vì viết probe thứ sáu |
+
+---
+
+## 69. 🎉 **TRẢ NỢ §66.3/§68: `HUỶ` VÀ `TRẢ HÀNG` CHẠY ĐÚNG TRÊN ĐƠN ĐỊNH DẠNG `WEB-…`** (15/10/2026)
+
+### 69.1 🎯 **Cách đo SẮC HƠN — cô lập BIẾN SỐ thay vì chạy lại toàn bộ đường**
+
+Sau 4 vòng hỏng vì **công cụ đo**, tôi đổi **cách tiếp cận** thay vì cố sửa probe cũ:
+📌 **Câu hỏi thật** không phải *"đường Web có chạy không"* — mà là *"`HUỶ`/`TRẢ HÀNG` có phụ thuộc **định dạng số đơn `WEB-…`** không"* (§67).
+⇒ **Tạo đơn có ĐÚNG hình dạng đó QUA API** (`Number = "WEB-WEB-…"` + `CheckoutIdempotencyKey = "WEB-…"`) ⇒ **loại Web khỏi phương trình**.
+📌 **Lợi ích kép:** (a) **rẻ hơn** — chỉ cần **Host**, không cần Web/đăng nhập/anti-forgery; (b) **sắc hơn** — nếu hỏng thì hỏng **đúng vì `Number`**,
+nếu chạy được thì giả thuyết **bị bác bỏ**, không còn *"có thể do Web"*.
+
+### 69.2 🎉 Kết quả — **cả hai chuyển trạng thái ĐÚNG**, và **phiếu trả sinh đúng công thức**
+
+| Bước | Phép đo | Kết quả |
+|---|---|---|
+| 0 | Chờ Host bằng **`tools/wait-host.ps1`** (dogfood công cụ vòng 80) | `exit=0` · **"✅ LÊN sau 1.8s"** ✅ |
+| 1 | Gieo kho + tồn `10` cho 2 SKU (`A` 100.000 · `B` 200.000) | ✅ |
+| 2 | 🔥 **Đơn hình dạng WEB** (`Number=WEB-WEB-212139a`) | `Pending` · **`Reserved A=4`** ✅ |
+| 3 | 🔥 **`HUỶ`** | **`200` · `Cancelled`** ✅ · DB **`status=5`** · **`OnHand=10 · Reserved=0 · Available=10`** ✅ *(hàng **về kho ngay**)* · giữ chỗ **`status=1` (`Released`)** ✅ |
+| 4a | **Đơn 2 hình dạng WEB** → **`XÁC NHẬN`** | `200` · tồn `B: OnHand=7 · Reserved=0` ✅ *(10 − 3 đã xuất — `Reserved` và `OnHand` cùng giảm)* |
+| 4b | 🔥 **`TRẢ HÀNG`** | **`200` · `Returned`** ✅ · DB **`status=6`** · 🔥 **phiếu trả `TH-WEB-WEB-212139b-1`** ✅ · tồn `B: OnHand=10 · Reserved=0 · Available=10` ✅ |
+| 5–6 | Dọn dẹp · `fail:` · tiến trình treo | `don=0 dong=0 ton=0 donvi=0 gc=0 sc=0 baoMat=true` ✅ · **`0`** ✅ · **`0`** ✅ |
+
+📌 **Vì sao bước 4b là bằng chứng mạnh nhất cho câu hỏi ban đầu:** phiếu trả có số **`TH-WEB-WEB-212139b-1`** ⇒
+**chính công thức** `TH-{don.Number}-{n}` (số phiếu theo **lần trả**, sửa ở vòng 41) **chạy đúng** với `Number` **hình dạng WEB**,
+**và** tra **luỹ kế** (dùng `StartsWith`) **cũng** chạy đúng (không lỗi) ⇒ **không** có phụ thuộc định dạng nào bị vỡ.
+
+### 69.3 ✅ **NỢ ĐÃ TRẢ — trạng thái đường nối UI → API nay ĐỦ CẢ BA chuyển trạng thái**
+
+| Chuyển trạng thái trên đơn định dạng WEB | Trạng thái |
+|---|---|
+| **`XÁC NHẬN`** (⇒ xuất kho) | ✅ **đã đo** (§65 — trên đơn do **Web** tạo) |
+| **`HUỶ`** (⇒ nhả chỗ ngay) | ✅ **đã đo** (**§69.2**) |
+| **`TRẢ HÀNG`** (⇒ nhập kho + `CustomerReturn`) | ✅ **đã đo** (**§69.2**) |
+
+📌 **Kết luận gọn:** *định dạng số đơn `WEB-…` **không** là rủi ro* — đã **bác bỏ bằng đo**, không còn là *"rủi ro thấp chưa bằng không"* như §67.3.
+
+### 69.4 📌 Bài học #13 — **khi đường dài liên tục hỏng, hãy CÔ LẬP biến số**
+
+Bốn vòng (69 · 75 · 77 · 79) tôi cố **chạy lại toàn bộ đường UI → API** ⇒ mỗi vòng vấp **một lỗi công cụ khác nhau**
+(phẫu thuật tệp · trích giá trị · cú pháp · scope token · chờ Web). Vòng 81 **thắng ngay lần đầu** vì tôi **bỏ hẳn Web** và
+chỉ giữ **biến số cần kiểm**.
+⇒ **Quy tắc:** *khi một phép đo phức tạp hỏng ≥ 2 lần, đừng sửa nó — hãy **tách thành phép đo nhỏ nhất còn trả lời được câu hỏi***.
+📌 Và điều này **không** làm bằng chứng yếu đi: nó **mạnh hơn**, vì **cô lập được nguyên nhân** (đúng tinh thần **cặp đối chứng** `inv-001` §38–§39).
+
+### 69.5 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.d | 15/10/2026 | *(agent, session GĐ1)* | 🎉 **Trả nợ §66.3/§68**: chứng minh **`HUỶ`** và **`TRẢ HÀNG`** chạy đúng trên đơn có **định dạng số đơn `WEB-…`** — bằng cách **cô lập biến số** (tạo đơn *hình dạng WEB* **qua API**, bỏ Web khỏi phương trình). **Kết quả**: `HUỶ` ⇒ `Cancelled`, tồn `10/0/10`, giữ chỗ `Released`; `XÁC NHẬN` ⇒ `OnHand`&`Reserved` cùng giảm; **`TRẢ HÀNG` ⇒ `Returned`**, phiếu **`TH-WEB-WEB-…-1`**, tồn về `10/0/10`; dọn sạch; **`fail: 0`**. Dùng **`tools/wait-host.ps1`** (chờ `1.8s`). ⇒ **Đường nối UI → API nay đủ CẢ BA chuyển trạng thái**; **bài học #13**: *khi phép đo phức tạp hỏng ≥2 lần ⇒ tách thành phép đo nhỏ nhất còn trả lời được câu hỏi* |
