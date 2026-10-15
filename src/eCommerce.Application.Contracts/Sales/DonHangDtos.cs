@@ -70,6 +70,34 @@ public class TraHangInput
     public DateTime? At { get; set; }
 }
 
+/// <summary>
+/// 🚨 **PHÂN BỔ TỒN THEO KÊNH** (`INV-003` — **bước 1: NHÌN THẤY**, chưa áp hạn mức).
+/// Một dòng cho mỗi **cặp (kênh, SKU)**: *kênh này đã bán bao nhiêu, đang giữ bao nhiêu, đã trả bao nhiêu*.
+///
+/// 📌 **VÌ SAO PHẢI "NHÌN THẤY" TRƯỚC KHI "ÁP HẠN MỨC":** không đo được hiện trạng thì **không thể** chọn hạn mức
+/// (bao nhiêu là hợp lý?) và **không thể** kiểm chứng rằng hạn mức có tác dụng. Đặt hạn mức mù ⇒ hoặc **chặn nhầm**
+/// đơn hợp lệ (mất doanh thu) hoặc **không chặn gì** (hạn mức vô nghĩa).
+/// 📌 **VÌ SAO SUY RA TỪ ĐƠN, KHÔNG THÊM CỘT:** `InvStockReservations` **không có** `ChannelCode`; nhưng mỗi lượt
+/// giữ chỗ trỏ tới nguồn `Checkout:{khoá}` và **đơn giữ chính khoá đó** (`CheckoutIdempotencyKey`) + `ChannelCode`
+/// ⇒ **suy ra được** mà **không cần migration**. Thêm cột sẽ là lựa chọn **khác** (cần người quyết) và chỉ nên làm
+/// khi cần **hạn mức cứng**.
+/// </summary>
+public class PhanBoKenhDto
+{
+    public string ChannelCode { get; set; } = default!;
+
+    public string Sku { get; set; } = default!;
+
+    /// <summary>Số lượng **đã bán** (đơn **không** ở `Pending`/`Cancelled`).</summary>
+    public int DaBan { get; set; }
+
+    /// <summary>Số lượng **đang giữ chỗ** (`Held`) của các đơn thuộc kênh này.</summary>
+    public int DangGiu { get; set; }
+
+    /// <summary>Số lượng **đã trả** (từ các phiếu `CustomerReturn` của đơn thuộc kênh).</summary>
+    public int DaTra { get; set; }
+}
+
 public class DonHangDto
 {
     public Guid Id { get; set; }
@@ -123,6 +151,9 @@ public interface IDonHangAppService : IApplicationService
     /// một món* là lỗi **không sửa được** vì sổ cái **append-only** (phải tạo chứng từ đảo).
     /// </summary>
     Task<DonHangDto> TraHangAsync(Guid id, TraHangInput input);
+
+    /// <summary>🚨 **PHÂN BỔ TỒN THEO KÊNH** (`INV-003` bước 1 — chỉ đọc): mỗi cặp (kênh, SKU) đã bán / đang giữ / đã trả.</summary>
+    Task<List<PhanBoKenhDto>> GetPhanBoTheoKenhAsync();
 
     Task<DonHangDto> GetAsync(Guid id);
 }

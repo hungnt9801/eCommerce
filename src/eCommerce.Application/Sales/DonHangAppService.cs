@@ -368,6 +368,91 @@ public class DonHangAppService : ApplicationService, IDonHangAppService
         return ToDto(don, dongDon.Count, don.GrandTotal, don.CheckoutIdempotencyKey ?? "(không có)");
     }
 
+    /// <summary>
+    /// 🚨 **PHÂN BỔ TỒN THEO KÊNH** (`INV-003` **bước 1 — NHÌN THẤY**): mỗi cặp **(kênh, SKU)** ⇒
+    /// *đã bán* · *đang giữ* · *đã trả*.
+    ///
+    /// 📌 **Suy ra từ ĐƠN, không thêm cột:** `InvStockReservations` **không có** `ChannelCode`, nhưng mỗi lượt giữ chỗ
+    /// trỏ tới `Checkout:{khoá}` và **đơn giữ chính khoá đó** (`CheckoutIdempotencyKey`) + `ChannelCode` ⇒ suy ra được
+    /// **không cần migration**. 📌 Thêm cột/hạn mức cứng là lựa chọn **khác** — **cần người quyết** (xem tài liệu).
+    /// </summary>
+    public async Task<List<PhanBoKenhDto>> GetPhanBoTheoKenhAsync()
+    {
+        var donList = await _donRepository.GetListAsync();
+        var dongList = await _dongDonRepository.GetListAsync();
+        var giuChoList = await _giuChoRepository.GetListAsync(x => x.Status == ReservationStatus.Held);
+
+        var dongTheoDon = dongList.GroupBy(x => x.OrderId).ToDictionary(g => g.Key, g => g.ToList());
+        var giuChoTheoNguon = giuChoList
+            .GroupBy(x => x.ReferenceId ?? string.Empty)
+            .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.Ordinal);
+
+        var ket = new Dictionary<(string Kenh, string Sku), PhanBoKenhDto>();
+
+        PhanBoKenhDto Lay(string kenh, string sku)
+        {
+            var khoa = (kenh, sku);
+
+            if (!ket.TryGetValue(khoa, out var dto))
+            {
+                dto = new PhanBoKenhDto { ChannelCode = kenh, Sku = sku };
+                ket[khoa] = dto;
+            }
+
+            return dto;
+        }
+
+        foreach (var don in donList)
+        {
+            var kenh = don.ChannelCode ?? "(không kênh)";
+
+            if (!dongTheoDon.TryGetValue(don.Id, out var dong))
+            {
+                continue;
+            }
+
+            // "Đã bán" = đơn **đã rời khỏi** `Pending` và **không** bị `Cancelled` (tức đã xuất kho / đã trả một phần).
+            var daBan = don.Status is OrderStatus.Confirmed or OrderStatus.Shipped or OrderStatus.Completed or OrderStatus.Returned;
+
+            foreach (var d in dong)
+            {
+                if (daBan)
+                {
+                    Lay(kenh, d.Sku).DaBan += d.Quantity;
+                }
+            }
+
+            // "Đang giữ" = lượt giữ chỗ `Held` của **chính nguồn checkout của đơn này**.
+            if (!string.IsNullOrWhiteSpace(don.CheckoutIdempotencyKey)
+                && giuChoTheoNguon.TryGetValue($"Checkout:{don.CheckoutIdempotencyKey}", out var giuCho))
+            {
+                foreach (var gc in giuCho)
+                {
+                    Lay(kenh, gc.Sku).DangGiu += gc.Quantity;
+                }
+            }
+
+            // "Đã trả" = các dòng của **phiếu `CustomerReturn`** sinh từ đơn này (số phiếu có tiền tố `TH-{số đơn}`).
+            foreach (var phieu in await _phieuKho.GetListAsync(StockDocumentType.CustomerReturn))
+            {
+                if (!phieu.Number.StartsWith($"TH-{don.Number}", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                foreach (var d in await _phieuKho.GetLinesAsync(phieu.Id))
+                {
+                    Lay(kenh, d.Sku).DaTra += d.Quantity;
+                }
+            }
+        }
+
+        return ket.Values
+            .OrderBy(x => x.ChannelCode, StringComparer.Ordinal)
+            .ThenBy(x => x.Sku, StringComparer.Ordinal)
+            .ToList();
+    }
+
     public async Task<DonHangDto> GetAsync(Guid id)
     {
         var don = await _donRepository.GetAsync(id);

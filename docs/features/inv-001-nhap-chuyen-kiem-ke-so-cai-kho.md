@@ -2479,3 +2479,57 @@ copy columns from a working insert on the same table"*). **Bài học đã ghi v
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v2.4 | 15/10/2026 | *(agent, session GĐ1)* | **Đóng điểm mờ §38.3**: *"2 cặp lệch"* là **lỗi của PHÉP ĐO**, **không** phải của mã — `InvStockLedger` **không có** `ExtraProperties`/`ConcurrencyStamp` ⇒ `INSERT` sổ cái cho **cặp đối chứng** thất bại (`42703`), **và tôi đã lọc mất `stderr`**. Với **seed đúng**: `RCDUNG` **khớp** (`LECH=false`), `RCLECH` lệch (`true`) ⇒ **job báo đúng `1` cặp** ✅. ⇒ **`REC-001` KIỂM CHỨNG ĐẦY ĐỦ**: chạy · không ném · **phát hiện đúng** · **đếm đúng** · **không báo động giả**. Ghi **4 bài học phương pháp** (§39.4), nặng nhất: **KHÔNG lọc `stderr` khi chạy probe** |
+
+---
+
+## 40. `INV-003` — **BƯỚC 1: "NHÌN THẤY" PHÂN BỔ TỒN THEO KÊNH** (15/10/2026)
+
+### 40.1 Vì sao bước 1 là **nhìn thấy**, không phải **áp hạn mức**
+
+📌 **Không đo được hiện trạng thì KHÔNG THỂ chọn hạn mức** (bao nhiêu là hợp lý?) và **không thể kiểm chứng** rằng
+hạn mức có tác dụng. Đặt hạn mức mù ⇒ **hoặc chặn nhầm đơn hợp lệ** (mất doanh thu) **hoặc không chặn gì**
+(hạn mức vô nghĩa). ⇒ **Đo trước, áp sau** — đúng nguyên tắc đã dùng cho `REC-001` (job đo trước khi có ngưỡng).
+
+### 40.2 Đã làm — `GetPhanBoTheoKenhAsync` (`GET /api/app/don-hang/phan-bo-theo-kenh`)
+
+Mỗi cặp **(kênh, SKU)** ⇒ **`DaBan`** · **`DangGiu`** · **`DaTra`**.
+
+📌 **Suy ra từ ĐƠN, KHÔNG thêm cột ⇒ KHÔNG cần migration:**
+`InvStockReservations` **không có** `ChannelCode` — nhưng mỗi lượt giữ chỗ trỏ tới nguồn `Checkout:{khoá}`, và
+**đơn giữ chính khoá đó** (`CheckoutIdempotencyKey`) + **`ChannelCode`** ⇒ **suy ra được**.
+📌 **Thêm cột / hạn mức cứng là lựa chọn KHÁC** — **cần người quyết** (xem §40.5).
+
+| Trường | Nguồn |
+|---|---|
+| `DaBan` | dòng đơn của các đơn **đã rời `Pending`** và **không** `Cancelled` |
+| `DangGiu` | lượt giữ chỗ **`Held`** có `ReferenceId = Checkout:{khoá của đơn}` |
+| `DaTra` | dòng của các phiếu **`CustomerReturn`** có số **`TH-{số đơn}`** |
+
+### 40.3 ✅ BẰNG CHỨNG HTTP THẬT
+
+Kịch bản: mua **4** → xác nhận → trả **3** → (2 ca bị chặn: `0040` · `0041`) → trả nốt **1**.
+
+| Phép đo | Kết quả |
+|---|---|
+| 🔥 **Báo cáo phân bổ** | `kenh=lkk-… sku=LKSKU-…` **`daBan=4` · `dangGiu=0` · `daTra=4`** ✅ — **khớp hoàn toàn** dữ liệu thật |
+| Các bất biến khác (cùng lượt chạy) | `0040` ✅ · `0041` (**cả hai** hình dạng) ✅ · sổ cái `CustomerReturn=4` ✅ · **đối soát `0`** ✅ · **`fail: 0`** ✅ |
+
+📌 **Vì sao `dangGiu=0` là ĐÚNG (không phải lỗi):** sau khi **trả hết**, lượt giữ chỗ đã `Committed` (không còn `Held`)
+⇒ `DangGiu` **phải** bằng 0. Đây là **đối chứng ngược**: nếu báo cáo hiện `dangGiu=4` thì nó đã **đếm sai trạng thái**.
+
+- build `--no-incremental`: **0 lỗi / 0 cảnh báo** · unit **693/693** · integration **38/38** · **không đổi schema**
+
+### 40.4 Còn lại của `INV-003`
+
+| # | Việc | Ghi chú |
+|---|---|---|
+| 1 | **Hạn mức cứng theo kênh** (chặn kênh bán quá phần được chia) | cần **bảng phân bổ** + migration ⇒ **cần người quyết** (chính sách: chia theo SKU? theo kho? theo tỉ lệ? xử lý khi hết phần?) |
+| 2 | **Lọc theo kho** trong báo cáo (hiện gộp mọi kho) | cần vì `Order` **không** lưu kho (`SAL-004` phải hỏi kho) |
+| 3 | **`DangGiu` theo kho** | idem |
+| 4 | Hiệu năng: báo cáo hiện **quét toàn bộ** đơn/dòng/giữ chỗ/phiếu trả | đủ cho GĐ1; cần phân trang khi dữ liệu lớn |
+
+### 40.5 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v2.5 | 15/10/2026 | *(agent, session GĐ1)* | **`INV-003` bước 1 — "nhìn thấy" phân bổ tồn theo kênh**: `GetPhanBoTheoKenhAsync` ⇒ mỗi cặp (kênh, SKU) có **`DaBan`/`DangGiu`/`DaTra`**, **suy ra từ đơn** (không thêm cột ⇒ **không migration**). **Kiểm chứng HTTP**: `daBan=4 dangGiu=0 daTra=4` **khớp dữ liệu thật**; `dangGiu=0` là **đối chứng ngược** đúng (giữ chỗ đã `Committed` sau khi trả hết). Các bất biến cũ giữ nguyên (`0040`/`0041`, sổ cái, đối soát `0`, `fail: 0`) |
