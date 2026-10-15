@@ -357,7 +357,7 @@ danh sách trắng quá rộng) sẽ **tệ hơn không có test** — nó tạo
 | 1 | **Dịch dần danh sách trắng thành ánh xạ** khi mỗi miền (`CAT`/`Ord`/`Pay`/`Chn`…) có đường ghi thật: khi đó lỗi trùng **phải** trả mã nghiệp vụ |
 | 2 | **Job định kỳ** cập nhật/thu gọn danh sách trắng (ràng buộc của GĐ0 sẽ dần được dùng tới) |
 
-> **MỐC KIỂM CHỨNG VÒNG 55 (15/10/2026):** `694 unit + 38 integration` · build **0 lỗi / 0 cảnh báo** · mermaid **197/0** · **157 commit**, nhánh `main` **sạch**. Ba cơ chế tự bảo vệ: *ánh xạ ràng buộc DB* (Phụ lục B) · *đăng ký + log vô điều kiện cho job* (Phụ lục C nâng cấp §45) · *UoW cho worker* (§29.2). Cổng đăng nhập Web kiểm chứng hồi quy (web-001 §47).
+> **MỐC KIỂM CHỨNG VÒNG 74 (15/10/2026):** `694 unit + 38 integration` · build **0 lỗi / 0 cảnh báo** · mermaid **197/0** · **160 commit**, nhánh `main` **sạch**. **Ba cơ chế tự bảo vệ:** *ánh xạ ràng buộc DB* (**Phụ lục B**) · *đăng ký + log vô điều kiện cho job* (**Phụ lục C**, siết ở §45) · *UoW cho worker* (`inv-001` §29.2). **Công cụ:** `tools/route-check.ps1` (**Phụ lục D** — chống lỗi *sai route* đã tái phạm 3 lần). **Web:** cổng đăng nhập (`BR-009` ✅) + **harness đăng nhập** + **3 trang mặt tiền kiểm chứng CẢ HAI CHIỀU** (`/PhanBo` · `/SanPham` · `/DatHang` — *khách ĐẶT ĐƯỢC ĐƠN trên web*, giỏ **nhiều dòng**).
 
 ---
 
@@ -429,3 +429,38 @@ bị bind nhầm vào `-WaitSeconds` và công cụ **báo lỗi rõ ràng** (kh
 |---|---|
 | 1 | 🚨 **Quy trình §2 (kiểm chứng) nay có thêm bước BẮT BUỘC:** trước khi viết lời gọi API mới ⇒ chạy `route-check.ps1 -Match '<mẫu>'` để **lấy route thật**. Đưa bước này vào **danh sách kiểm trước khi viết probe**. |
 | 2 | Làm nốt **đối chứng chéo API ↔ `/SanPham`** bằng route **`items`** (§53.3 #1) — nay chỉ còn **một lần chạy** |
+
+---
+
+## PHỤ LỤC E — **TRẠNG THÁI & VIỆC TIẾP THEO (chốt vòng 74, 15/10/2026)**
+
+### E.1 Đã xong và **đã kiểm chứng** (không cần làm lại)
+
+| Nhóm | Nội dung |
+|---|---|
+| **Hạ tầng nền** | `eCommerce.Kernel` (Money · Locking · Observability · ánh xạ ràng buộc DB) · **3 cơ chế tự bảo vệ** (B/C nâng cấp §45 · `inv-001` §29.2) · **7/7 job nhìn thấy được** trong log (`inv-001` §44) |
+| **Nghiệp vụ** | `CAT-001/002` · `PRC-001/002` (**sổ giải trình** — mọi con số bán hàng lấy từ đây) · `INV-001` (nhập/chuyển/kiểm kê/**sổ cái append-only**) · `INV-002` (giữ chỗ + job nhả chỗ quá hạn) · `SAL-001…004` (đặt đơn → **xác nhận** → **huỷ** → **trả hàng** toàn bộ/một phần/luỹ kế + `CustomerReturn`) · `INV-003` **bước 1** (phân bổ theo kênh **và** theo kho) · `REC-001` **đối soát tồn kho** (job định kỳ, **phát hiện + đếm đúng**) |
+| **Web** | khung + cổng đăng nhập (`BR-009`) + **harness đăng nhập** + **3 trang hai chiều**: `/PhanBo` · `/SanPham` · **`/DatHang` (đặt được đơn, giỏ nhiều dòng, chống trùng đơn qua UI, thông điệp lỗi kèm mã + dữ liệu)** |
+| **Công cụ** | `tools/route-check.ps1` (Phụ lục D) · **chuẩn dọn dẹp probe** (tệp `.sql` + `SELECT` xác nhận + kiểm tiến trình treo, `web-001` §53.1) |
+
+### E.2 Việc tiếp theo — **thứ tự ưu tiên đề xuất** (kèm cách kiểm chứng đã chứng minh)
+
+| # | Việc | Vì sao ưu tiên | Khuôn kiểm chứng |
+|---|---|---|---|
+| 1 | **Quản lý đơn trên UI** (`/DonHang`: danh sách + **xác nhận/huỷ/trả**) | khép chuỗi người dùng **cả hai chiều** như tầng API | `302` khi chưa đăng nhập · có dữ liệu ⇒ **DB đổi trạng thái** + **tồn kho đổi đúng bất biến** (`Reserved`↓ khi huỷ; `OnHand`&`Reserved`↓ khi xác nhận) |
+| 2 | **Giao diện giỏ nhiều ô nhập** + giỏ **giữ qua phiên** | UX thật cho khách (logic **đã** kiểm chứng — chỉ đổi view) | POST nhiều dòng ⇒ **số tính trước** khớp `GrandTotal` + sổ giải trình |
+| 3 | **`INV-003` hạn mức CỨNG theo kênh** | **cần người quyết** chính sách chia | — |
+| 4 | **`REC-001` ngưỡng cảnh báo + quy trình xử lý lệch** + bảng `ReconRuns` | **cần người quyết** + migration | — |
+| 5 | **`CAT-003`** (slug/partial index · **chi tiết sản phẩm + SEO** cho `WEB-002`) | mở rộng storefront | |
+| 6 | **Hoàn tiền** (`PaymentHub`/kế toán) · **`CUS-001`** · **`SAL-005`** (intake sàn) · `REC-001` **đối soát thanh toán** (`querydr`) | phần còn lại của GĐ1 | |
+
+### E.3 **Kỷ luật bắt buộc** khi làm tiếp (đã trả giá để rút ra)
+
+1. **In route thật TRƯỚC khi viết lời gọi API** — `tools/route-check.ps1 -Match '<mẫu>'` (**Phụ lục D**; lỗi *sai route* đã tái phạm **3 lần**).
+2. **KHÔNG phẫu thuật probe cũ** — viết **probe mới** (bài học #9/#10, `web-001` §60–§61); hỏng probe **không** ảnh hưởng sản phẩm (probe ở `%TEMP%`).
+3. **KHÔNG lọc `stderr`**; **đo điều kiện tiên quyết** trước khi kết luận (`inv-001` §39.4 · `web-001` §63.1).
+4. **Dọn dẹp bằng tệp `.sql`** + `SELECT` xác nhận + kiểm tiến trình treo.
+5. **`Invoke-WebRequest` tự đi theo redirect** ⇒ đọc **status thô** (`-MaximumRedirection 0`) hoặc **URL cuối** (`web-001` §47).
+6. **Phép kiểm văn bản thô trên HTML** (substring/regex `[^<]*`) là **nguồn kết luận sai** — đã 3 lần (`web-001` §48 · §52.3 · §57.3) ⇒ coi là **giả thuyết**, xác nhận bằng **cấu trúc** hoặc **hành vi**.
+7. **Mutation test** cho mọi **cơ chế** mới, và **`git diff`** sau khi khôi phục (`inv-001` §46.3).
+8. **Test tự động thay vì quy tắc suông** khi một lỗi đã tái phạm ≥ 2 lần (**Phụ lục C** là ví dụ gốc).
