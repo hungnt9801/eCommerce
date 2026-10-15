@@ -2353,3 +2353,51 @@ tức **bán ảo**. Chỉ khi `OnHand` **và** `Reserved` cùng giảm mà `Ava
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.0-e | 15/10/2026 | *(agent, session GĐ1)* | 🎉 **`/DonHang` đường có dữ liệu ĐÃ CHẠY**: xác nhận **nguyên nhân vòng 91** (cờ bảo mật — đo được `f` ⇒ đăng nhập `302 → /DatHang`); **`GET` ⇒ `200`** + `Pending` + **hai nút** + `440.000` + **token 198 ký tự**; **`POST /DonHang/XacNhan` ⇒ `302`** ⇒ **`Confirmed`**; 🔥 **tồn kho `10/4/6` ⇒ `6/0/6`** (*`OnHand` & `Reserved` cùng giảm, `Available` không đổi* — **lần đầu chứng minh QUA UI**); dọn sạch; **`fail: 0`**. ⚠️ **Nút "Huỷ" CHƯA đo** — probe dừng vì **tôi gọi API khi Host đã tắt** (§77.3) |
+
+---
+
+## 78. 🎉 **`/DonHang` ĐỦ HAI NÚT: NÚT "HUỶ" ĐÃ ĐO — HÀNG VỀ KHO NGAY** (15/10/2026) — *đóng §77.3 #1*
+
+### 78.1 Lỗi probe vòng 92 đã sửa **đúng cách** (không phẫu thuật probe cũ)
+
+Vòng 92 dừng vì tôi **gọi API tạo đơn sau khi Host đã tắt**. Nay viết **probe MỚI** (`verify-nut-huy.ps1`) theo **bài học #9**
+(*viết mới thay vì sửa probe cũ*) với **một thay đổi cấu trúc**: **đơn được tạo NGAY TRONG BƯỚC GIEO, khi Host còn chạy**
+⇒ pha Web **không cần Host** ⇒ **không** còn chỗ để tắt nhầm.
+
+📌 **Quy tắc rút ra:** khi một probe cần **hai tiến trình ở hai thời điểm khác nhau**, hãy **hoàn tất mọi việc cần Host
+trong MỘT pha**, rồi mới chuyển pha — thay vì bật/tắt tiến trình xen kẽ.
+
+### 78.2 🎉 Kết quả — **cả hai nút của `/DonHang` nay đã kiểm chứng qua UI**
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | Cờ bảo mật trước đăng nhập | **`f`** ✅ |
+| 2 | Tồn sau gieo | **`OnHand=10 · Reserved=0 · Available=10`** ✅ |
+| 3 | 🔥 **Đơn tạo TRƯỚC khi tắt Host** | `id=3a24522f-…` · `status=Pending` · **`Reserved=2` · `Available=8`** ✅ |
+| 4 | Đăng nhập · `GET /DonHang/ChiTiet` | `302 → /` ✅ · **`200`** · **`trangThai='Pending'`** ✅ · **token `198` ký tự** ✅ |
+| 5 | 🔥 **`POST /DonHang/Huy/{id}`** | **`302`** → `/DonHang/ChiTiet/{id}` ✅ |
+| 6 | 🔥 **`GET` lại** | **`trangThai='Cancelled'`** ✅ · **DB `status=5`** ✅ |
+| 7 | 🔥 **Tồn kho sau huỷ** | **`OnHand=10` · `Reserved=0` · `Available=10`** ✅ — **hàng VỀ KHO NGAY**, `OnHand` **không đổi** |
+| 8 | Dọn dẹp · `fail:` · tiến trình treo | `don=0 ton=0 gc=0 sc=0 baoMat=true` ✅ · **Web `0` / Host `0`** ✅ · **`0`** ✅ |
+
+📌 **Vì sao #7 là chốt cuối:** huỷ đơn phải **nhả chỗ NGAY** (khác "xác nhận" là **trừ kho**).
+`Reserved` `2 → 0` **và** `Available` `8 → 10` trong khi `OnHand` **giữ nguyên `10`** ⇒ hàng **chưa từng rời kho**
+(chỉ có "chỗ" bị giữ, nay được nhả). Nếu ai đó "huỷ" bằng cách **trừ tồn** thì `OnHand` sẽ **giảm** ⇒ **mất hàng ảo** — phép đo này loại đúng lỗi đó.
+
+### 78.3 Trạng thái `/DonHang` — **bảng cuối**
+
+| # | Hạng mục | Trạng thái |
+|---|---|---|
+| 1 | Controller + view, **token trong mỗi form** | ✅ build `0/0` |
+| 2 | Chưa đăng nhập ⇒ `302` | ✅ **đo** (§75.2) |
+| 3 | Đã đăng nhập ⇒ **`200`** + trạng thái + **hai nút** + tổng | ✅ **đo** (§77.2 · §78.2) |
+| 4 | 🔥 **Nút "Xác nhận"** ⇒ `302` ⇒ `Confirmed` · tồn `10/4/6 → 6/0/6` (**xuất kho**) | ✅ **đo** (§77.2) |
+| 5 | 🔥 **Nút "Huỷ"** ⇒ `302` ⇒ `Cancelled` · tồn `10/2/8 → 10/0/10` (**nhả chỗ ngay**) | ✅ **đo** (**§78.2**) |
+| 6 | Nút **"Trả hàng"** | ⏳ **chưa làm** (cần ô nhập kho) |
+| 7 | Tách **menu/điều hướng** tới `/DonHang` | ⏳ chưa làm *(chưa có lối vào từ UI — hiện truy cập bằng URL)* |
+
+### 78.4 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.0-f | 15/10/2026 | *(agent, session GĐ1)* | 🎉 **Nút HUỶ của `/DonHang` ĐÃ ĐO** (nợ §77.3): probe **mới** tạo đơn **trong pha Host** ⇒ Web không cần Host. `POST /DonHang/Huy` ⇒ **`302`** ⇒ **`Cancelled`**, DB **`status=5`**, tồn **`10/2/8` → `10/0/10`** (*`Reserved` về 0, `Available` về 10, **`OnHand` không đổi*** = hàng **chưa từng rời kho**, chỉ **nhả chỗ**) ⇒ **`/DonHang` nay đủ HAI nút đã kiểm chứng qua UI**; dọn sạch; **`fail: 0`**; 0 tiến trình treo. **Quy tắc:** *probe hai pha ⇒ hoàn tất mọi việc cần Host trong MỘT pha* |
