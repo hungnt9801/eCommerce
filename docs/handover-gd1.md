@@ -21,11 +21,12 @@
 | Điểm phát metric | **7/12** |
 
 > 📌 **CẬP NHẬT 15/10/2026 (lượt GĐ1 thứ 6 — `CAT-001` xong domain+API+ETO):** các số ở bảng trên là
-> **mốc bàn giao**. Sau các lượt GĐ1: **Test = 434 unit + 23 integration** · **2 tiến trình**
+> **mốc bàn giao**. Sau các lượt GĐ1: **Test = 451 unit + 23 integration** · **2 tiến trình**
 > (Host **5000** API/auth · Web **5100** UI) · build **0 lỗi/0 cảnh báo** · **lỗi #22 đã sửa** (fail-closed
 > **và** nơi nhận thật) · **`F-403` đã sửa** · **§7.0 xong #2/#5/#7** · **DB: 20 index `NULLS NOT DISTINCT`**
 > · **`CAT-001` xong** (domain + 11 route API + 2 ETO) · 🚨 **log khởi động nay 0 Error** (phân loại
-> *ETO mang dữ liệu* vs *ETO thông báo* — `coding-conventions.md` **§6.2**).
+> *ETO mang dữ liệu* vs *ETO thông báo* — `coding-conventions.md` **§6.2**) · **mã lỗi Catalog đã chốt
+> sổ đăng ký** (`CAT-001` **§19**: `CAT-002` dùng dải `0020+`; mã khoá phân tán dùng chung `eCommerce:Lock:0001`).
 > Chi tiết: `implementation-plan.md` **A.12** · `runtime-verification-report.md` **§9bis/§10** ·
 > `chn-002-connector-shopee.md` **§16** · `XC-004-…md` **§15.2 F6/§15.6** · `web-001-…md` **§16** ·
 > `sal-005-webhook-don-tu-san.md` **§16** · `cat-001-…md` **§16–§18**.

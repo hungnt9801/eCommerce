@@ -132,7 +132,7 @@ public class ProductAppService : ApplicationService, IProductAppService
         // hai request đồng thời cùng mã vẫn có thể lọt qua bước kiểm tra này (xem ghi chú ở 16.3 của tài liệu).
         if (await _productRepository.AnyAsync(x => x.Code == ma))
         {
-            throw new BusinessException(eCommerceConsts.ErrorCodes.Catalog.MaDaTonTai).WithData("code", ma);
+            throw new BusinessException(eCommerceConsts.ErrorCodes.Catalog.MaSanPhamDaTonTai).WithData("code", ma);
         }
 
         var sanPham = new Product(GuidGenerator.Create(), ma, input.Name)
@@ -177,7 +177,7 @@ public class ProductAppService : ApplicationService, IProductAppService
 
         if (handle is null)
         {
-            throw new BusinessException(eCommerceConsts.ErrorCodes.Catalog.KhongGianhDuocKhoa)
+            throw new BusinessException(eCommerceConsts.ErrorCodes.KhongGianhDuocKhoa)
                 .WithData("sku", sku)
                 .WithData("choGiay", ChoKhoaToiDaGiay);
         }

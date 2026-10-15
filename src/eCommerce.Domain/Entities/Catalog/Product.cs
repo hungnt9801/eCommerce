@@ -176,12 +176,17 @@ public class Product : FullAuditedAggregateRoot<Guid>, IMultiTenant
         Status = ProductStatus.Archived;
     }
 
-    /// <summary>Chuẩn hoá + kiểm tra mã sản phẩm.</summary>
+    /// <summary>
+    /// Chuẩn hoá + kiểm tra mã sản phẩm.
+    /// ⚠️ Dùng <c>MaSanPhamKhongHopLe</c> (**0012**) — **KHÔNG** dùng `SkuKhongHopLe` (0008) vì đó là mã của **SKU**;
+    /// dùng lẫn mã ⇒ client/đối soát không phân biệt được lỗi ở `Code` hay ở `SKU` (bài học 15/10/2026:
+    /// hai tài liệu từng gán trùng dải mã — xem sổ đăng ký ở `eCommerceConsts.ErrorCodes.Catalog`).
+    /// </summary>
     public static string ChuanHoaMa(string? ma)
     {
         if (string.IsNullOrWhiteSpace(ma))
         {
-            throw new BusinessException(eCommerceConsts.ErrorCodes.Catalog.SkuKhongHopLe)
+            throw new BusinessException(eCommerceConsts.ErrorCodes.Catalog.MaSanPhamKhongHopLe)
                 .WithData("truong", "Code")
                 .WithData("lyDo", "rỗng");
         }
@@ -190,7 +195,7 @@ public class Product : FullAuditedAggregateRoot<Guid>, IMultiTenant
 
         if (s.Length > DoDaiMaToiDa)
         {
-            throw new BusinessException(eCommerceConsts.ErrorCodes.Catalog.SkuKhongHopLe)
+            throw new BusinessException(eCommerceConsts.ErrorCodes.Catalog.MaSanPhamKhongHopLe)
                 .WithData("truong", "Code")
                 .WithData("doDai", s.Length)
                 .WithData("toiDa", DoDaiMaToiDa);

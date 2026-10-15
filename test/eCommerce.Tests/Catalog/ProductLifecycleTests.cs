@@ -187,10 +187,12 @@ public class ProductLifecycleTests
     }
 
     [Fact]
-    public void Ma_san_pham_rong_thi_NEM_LOI()
+    public void Ma_san_pham_rong_thi_NEM_LOI__MaSanPhamKhongHopLe()
     {
         var loi = Assert.Throws<BusinessException>(() => SanPhamMoi(code: "   "));
-        Assert.Equal(eCommerceConsts.ErrorCodes.Catalog.SkuKhongHopLe, loi.Code);
+
+        // ⚠️ Mã của **`Code`** (0012), KHÔNG phải mã của **SKU** (0008) — xem sổ đăng ký mã lỗi Catalog.
+        Assert.Equal(eCommerceConsts.ErrorCodes.Catalog.MaSanPhamKhongHopLe, loi.Code);
     }
 
     [Fact]

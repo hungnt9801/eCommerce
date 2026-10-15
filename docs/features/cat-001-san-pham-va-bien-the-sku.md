@@ -945,3 +945,84 @@ và `WEB-002` xoá cache storefront — **GĐ1/GĐ4**). 📌 Khi có người nh
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.4 | 15/10/2026 | *(agent, session GĐ1)* | **Phân loại ETO** (`INotificationEvent`) ⇒ log boot còn **0 Error**, 3 Warning đúng bản chất; gắn marker cho `ChannelShopTokenRefreshedEto` (**sửa dương tính giả** ở mọi lần boot). Thêm **`ProductPublishedEto`** + **`VariantPriceChangedEto`** (**F12**) và phát từ `ProductAppService`. **+10 test**. Ghi rõ **§18.4**: chưa chứng minh được việc gửi tới người nhận, và một phép đo sai đã bị bỏ |
+
+---
+
+## 19. SỔ ĐĂNG KÝ MÃ LỖI CATALOG — chốt `0020+` cho `CAT-002` (15/10/2026)
+
+### 19.1 🚨 Mâu thuẫn phát hiện được giữa hai tài liệu (và nó do **tôi** tạo ra)
+
+Khi bắt đầu `CAT-002`, đối chiếu `CAT-001` **§6.3** với `CAT-002` **§12** thì thấy **hai tài liệu gán CÙNG
+dải số** `eCommerce:Catalog:0001…0009` cho **NGHĨA KHÁC NHAU**:
+
+| Mã | `CAT-001` §6.3 | `CAT-002` §12 (trước) |
+|---|---|---|
+| `0001` | `Code` sản phẩm trùng | **chu trình cây danh mục** |
+| `0002` | `SKU` trùng | **xoá danh mục còn con** |
+| `0003` | Publish thiếu biến thể | **vượt trần tổ hợp** |
+
+Nếu cứ thế triển khai thì **cùng một mã mang hai nghĩa** — client/đối soát **không thể** phân loại lỗi.
+Đây đúng họ lỗi *"hai nguồn sự thật cho cùng một mã"* mà `XC-003` F2/F5 đã gặp.
+
+**Nguồn gốc (nói thẳng):** §6.3 đã có bảng mã lỗi **trước** khi tôi triển khai, nhưng ở lượt domain tôi
+đặt mã theo **tên gọi hợp lý** mà **không đối chiếu từng ô số** với §6.3 ⇒ lệch ở các ô `0001`, `0005`,
+`0006`, `0008`, `0009`. Ngoài ra tôi tự chế `eCommerce:Catalog:0011` cho **khoá phân tán**, trong khi
+`XC-003` **D10** đã quy định **một mã dùng chung** `eCommerce:Lock:0001` cho **mọi** module.
+
+### 19.2 ✅ Đã chốt
+
+1. **`CAT-001` §6.3 là chuẩn cho dải `0001–0009`** (vì đã triển khai + **kiểm chứng thật**).
+2. **`CAT-002` đánh số lại sang `0020+`**; mã *"vượt trần tổ hợp"* dùng đúng ô `0009` mà §6.3 đã dành sẵn;
+   mã *"SKU đã tồn tại"* **dùng chung** `0002`. `CAT-002` §12 (và cả §4.1, §6) **đã được cập nhật**.
+3. **Mã khoá phân tán** chuyển về `eCommerce:Lock:0001` (`XC-003` D10) — **bỏ** `Catalog:0011` tự chế.
+4. Các mã **bổ sung ngoài §6.3** được ghi rõ là *"BỔ SUNG"*: `0010` không tìm thấy · `0011` thiếu thông tin
+   bắt buộc · `0012` `Code` sản phẩm không hợp lệ (⚠️ **khác** `0008` là mã của **SKU**).
+
+### 19.3 Sổ đăng ký (nguồn sự thật duy nhất)
+
+| Mã | Hằng số | Nghĩa | Nguồn |
+|---|---|---|---|
+| `0001` | `MaSanPhamDaTonTai` | `Code` sản phẩm trùng trong tenant | §6.3 |
+| `0002` | `SkuDaTonTai` | `SKU` trùng trong tenant (kể cả va unique index) | §6.3 |
+| `0003` | `KhongCoBienTheHoatDong` | Publish khi không có biến thể đang hoạt động | §6.3 |
+| `0004` | `ChuyenTrangThaiKhongHopLe` | Chuyển trạng thái sai (state machine) | §6.3 |
+| `0005` | `DaPhatSinhGiaoDich` | Đổi `SKU` đã phát sinh giao dịch | §6.3 |
+| `0006` | `SanPhamConThamChieu` | Xoá sản phẩm còn tham chiếu (chỉ xoá mềm) | §6.3 |
+| `0007` | `GiaKhongHopLe` | `Price`/`CompareAtPrice` âm | §6.3 |
+| `0008` | `SkuKhongHopLe` | `SKU` không hợp lệ sau chuẩn hoá | §6.3 |
+| `0009` | `VuotTranToHopBienThe` | Vượt trần tổ hợp biến thể | §6.3 (**dành cho `CAT-002`**) |
+| `0010` | `KhongTimThaySanPham` | Không tìm thấy sản phẩm | **BỔ SUNG** |
+| `0011` | `ThieuThongTinBatBuoc` | Thiếu thông tin bắt buộc (tên rỗng) | **BỔ SUNG** |
+| `0012` | `MaSanPhamKhongHopLe` | `Code` sản phẩm không hợp lệ (rỗng/quá dài) | **BỔ SUNG** |
+| `0020` | `ChuTrinhDanhMuc` | Di chuyển danh mục vào cây con của nó (chu trình) | `CAT-002` D8 |
+| `0021` | `DanhMucConRangBuoc` | Xoá/gán danh mục còn con/sản phẩm, hoặc đã ngừng dùng | `CAT-002` D9 |
+| `0022` | `TrungToHopThuocTinh` | Va chạm tổ hợp thuộc tính khi đã kiểm (race) | `CAT-002` D7 |
+| `0023` | `ThuocTinhDangDuocDung` | Thuộc tính `Variant` đang được biến thể dùng | `CAT-002` §12 |
+| `0024` | `VuotDoSauDanhMuc` | Vượt độ sâu tối đa của cây danh mục | `CAT-002` §8.1 #3 |
+| — | `ErrorCodes.KhongGianhDuocKhoa` | Quá timeout giành khoá — **dùng chung mọi module** | `XC-003` **D10** |
+
+### 19.4 🛡️ Lưới an toàn (test `CatalogErrorCodeRegistryTests`)
+
+Dùng **reflection** nên **mọi mã thêm sau này** đều được bảo vệ tự động:
+
+| Bất biến | Nếu vi phạm |
+|---|---|
+| Định dạng `eCommerce:Catalog:nnnn` | CI đỏ |
+| **KHÔNG hai hằng số nào trùng giá trị** | CI đỏ — chặn đúng lỗi *"hai nguồn sự thật cho một mã"* |
+| Vị trí `0001/0002/…/0009` và `0020/0021` khớp §6.3 + §12 | CI đỏ (đổi số = đổi **hợp đồng** với client, phải cố ý) |
+| `KhongGianhDuocKhoa` **không** nằm trong dải `Catalog:*` | CI đỏ |
+
+**Kiểm chứng (đo thật):** build **0 lỗi/0 cảnh báo** · unit **451/451** (+17) · integration **23/23** ·
+**mutation test**: cố ý cho 2 mã trùng giá trị + đổi 1 mã sai ô ⇒ **2 test đỏ đúng như mong đợi**, sau đó khôi phục.
+
+### 19.5 🚨 Bài học quy trình (thứ hai trong cùng một buổi)
+
+**Mutation test trên thay đổi CHƯA COMMIT thì KHÔNG được dùng `git checkout -- <file>` để khôi phục** —
+lệnh đó trả file về **HEAD**, tức là **xoá luôn** công việc chưa commit. Tôi đã mắc đúng lỗi này và phải
+làm lại toàn bộ khối sổ đăng ký. **Cách đúng:** `Copy-Item <file> $env:TEMP\...bak` **trước** khi sửa.
+
+### 19.6 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.5 | 15/10/2026 | *(agent, session GĐ1)* | **Chốt sổ đăng ký mã lỗi Catalog**: `CAT-001` §6.3 giữ dải `0001–0009`, `CAT-002` **đánh số lại sang `0020+`** (đã cập nhật `CAT-002` §4.1/§12), mã khoá phân tán về **`eCommerce:Lock:0001`** (`XC-003` D10). **+17 test** đăng ký (reflection) + **mutation test** xác nhận test bắt được vi phạm |

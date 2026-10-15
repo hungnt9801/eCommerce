@@ -107,44 +107,98 @@ public static class eCommerceConsts
         public const string PaymentSignatureInvalid = "eCommerce:Payment:0001";
 
         /// <summary>
-        /// Mã lỗi miền **Catalog** (`CAT-001` §6.3, dải `eCommerce:Catalog:00xx`).
-        /// 📌 Ở app (không phải module) vì entity Catalog hiện vẫn nằm ở `src/` — `CAT-001` **D1**:
-        /// tách thành `modules/Catalog` khi `CAT-002`/`CAT-003` thêm entity, lúc đó dời cả file này.
+        /// 🚨 **MÃ LỖI DÙNG CHUNG CHO KHOÁ PHÂN TÁN** — **KHÔNG** thuộc dải của module nào.
+        ///
+        /// Vì sao **không** nằm trong dải `eCommerce:Catalog:*`: không giành được khoá là **cơ chế hạ tầng**,
+        /// không phải lỗi nghiệp vụ của Catalog. `XC-003` **D10** quy định **một mã chung** cho mọi module
+        /// (kèm HTTP `409` và thông điệp chuẩn).
+        ///
+        /// 🚨 **BÀI HỌC THẬT (15/10/2026):** lúc đầu tôi tự chế `eCommerce:Catalog:0011` cho ca này
+        /// ⇒ **vi phạm** `XC-003` D10 và tạo **hai nguồn sự thật** cho cùng một nguyên nhân: Catalog ném
+        /// `Catalog:0011` còn mọi module khác ném `Lock:0001`. Đã sửa: dùng **mã chung** dưới đây.
+        /// </summary>
+        public const string KhongGianhDuocKhoa = "eCommerce:Lock:0001";
+
+        /// <summary>
+        /// <summary>
+        /// 🚨 **SỔ ĐĂNG KÝ MÃ LỖI MIỀN CATALOG — NGUỒN SỰ THẬT DUY NHẤT.**
+        ///
+        /// ⚠️ **ĐỌC TRƯỚC KHI THÊM MÃ MỚI:** hai tài liệu `CAT-001` (§6.3) và `CAT-002` (§12) từng gán
+        /// **CÙNG dải số** `eCommerce:Catalog:0001…0009` cho **NGHĨA KHÁC NHAU** — đo được 15/10/2026:
+        ///
+        /// | Mã | `CAT-001` §6.3 | `CAT-002` §12 |
+        /// |---|---|---|
+        /// | `0001` | Code sản phẩm trùng | **chu trình cây danh mục** |
+        /// | `0002` | SKU trùng | **xoá danh mục còn con** |
+        /// | `0003` | Publish thiếu biến thể | **vượt trần tổ hợp** |
+        ///
+        /// ⇒ Cứ thế triển khai thì **cùng một mã mang hai nghĩa** tuỳ tài liệu được đọc — đúng họ lỗi
+        /// *"hai nguồn sự thật"* mà `XC-003` F2/F5 đã gặp. **ĐÃ CHỐT:** lấy `CAT-001` §6.3 làm chuẩn cho
+        /// dải thấp (đã triển khai + kiểm chứng thật), `CAT-002` **đánh số lại** sang dải **`0020+`**.
+        ///
+        /// 📌 Ở `src/` (không phải module) vì entity Catalog hiện vẫn nằm ở `src/` — `CAT-001` **D1**:
+        /// tách thành `modules/Catalog` khi `CAT-002`/`CAT-003` thêm entity, lúc đó dời cả khối này.
+        ///
+        /// 🛡️ Bất biến được khoá bằng test `CatalogErrorCodeRegistryTests` (bắt trùng giá trị + sai vị trí).
         /// </summary>
         public static class Catalog
         {
-            /// <summary>Sản phẩm không tồn tại.</summary>
-            public const string KhongTimThaySanPham = "eCommerce:Catalog:0001";
+            // ── Dải 0001–0009: `CAT-001` §6.3 (đã triển khai + kiểm chứng) ──
 
-            /// <summary>SKU đã tồn tại trong tenant (xung đột ở tầng DB — `CAT-001` D3/F6).</summary>
+            /// <summary>`Code` sản phẩm đã tồn tại trong tenant (`CAT-001` §6.3).</summary>
+            public const string MaSanPhamDaTonTai = "eCommerce:Catalog:0001";
+
+            /// <summary>SKU đã tồn tại trong tenant (kể cả khi va vào unique index — `CAT-001` D3/F6).</summary>
             public const string SkuDaTonTai = "eCommerce:Catalog:0002";
 
             /// <summary>Publish khi sản phẩm **không có biến thể đang hoạt động** (`CAT-001` D9).</summary>
             public const string KhongCoBienTheHoatDong = "eCommerce:Catalog:0003";
 
-            /// <summary>Chuyển trạng thái không hợp lệ (state machine phải NÉM, không im lặng).</summary>
+            /// <summary>Chuyển trạng thái không hợp lệ (state machine phải NÉM, không im lặng — `CAT-001` D5).</summary>
             public const string ChuyenTrangThaiKhongHopLe = "eCommerce:Catalog:0004";
 
-            /// <summary>Mã sản phẩm/SKU đã tồn tại (kiểm tra trước khi ghi).</summary>
-            public const string MaDaTonTai = "eCommerce:Catalog:0005";
+            /// <summary>Đổi `SKU` đã phát sinh giao dịch (`CAT-001` **D2**/BR-003).</summary>
+            public const string DaPhatSinhGiaoDich = "eCommerce:Catalog:0005";
 
-            /// <summary>SKU không hợp lệ sau khi chuẩn hoá (rỗng/ký tự không cho phép/quá dài).</summary>
-            public const string SkuKhongHopLe = "eCommerce:Catalog:0006";
+            /// <summary>Xoá sản phẩm còn được tham chiếu — chỉ cho **xoá mềm** (`CAT-001` D4/F7).</summary>
+            public const string SanPhamConThamChieu = "eCommerce:Catalog:0006";
 
-            /// <summary>Giá không hợp lệ (âm).</summary>
+            /// <summary>`Price`/`CompareAtPrice` âm (`CAT-001` BR-011).</summary>
             public const string GiaKhongHopLe = "eCommerce:Catalog:0007";
 
-            /// <summary>Thao tác bị cấm khi SKU/sản phẩm đã phát sinh giao dịch.</summary>
-            public const string DaPhatSinhGiaoDich = "eCommerce:Catalog:0008";
+            /// <summary>`SKU` không hợp lệ sau chuẩn hoá (rỗng/ký tự lạ/quá dài — `CAT-001` BR-002).</summary>
+            public const string SkuKhongHopLe = "eCommerce:Catalog:0008";
 
-            /// <summary>Không được xoá cứng — chỉ xoá mềm (`CAT-001` D4/F7).</summary>
-            public const string CamXoaCung = "eCommerce:Catalog:0009";
+            /// <summary>Vượt trần tổ hợp biến thể (`CAT-001` BR-007 / `CAT-002` D6) — **dành cho `CAT-002`**.</summary>
+            public const string VuotTranToHopBienThe = "eCommerce:Catalog:0009";
 
-            /// <summary>Thiếu thông tin bắt buộc (ví dụ tên sản phẩm rỗng).</summary>
-            public const string ThieuThongTinBatBuoc = "eCommerce:Catalog:0010";
+            // ── Dải 0010+: BỔ SUNG ngoài §6.3 (ghi rõ để không ai tưởng là có trong tài liệu gốc) ──
 
-            /// <summary>Không giành được khoá phân tán trong thời gian cho phép (đang có luồng khác xử lý cùng SKU).</summary>
-            public const string KhongGianhDuocKhoa = "eCommerce:Catalog:0011";
+            /// <summary>Không tìm thấy sản phẩm. ⚠️ **BỔ SUNG** — `CAT-001` §6.3 **không** có mã này.</summary>
+            public const string KhongTimThaySanPham = "eCommerce:Catalog:0010";
+
+            /// <summary>Thiếu thông tin bắt buộc (ví dụ tên sản phẩm rỗng). ⚠️ **BỔ SUNG**.</summary>
+            public const string ThieuThongTinBatBuoc = "eCommerce:Catalog:0011";
+
+            /// <summary>`Code` sản phẩm không hợp lệ (rỗng/quá dài). ⚠️ **BỔ SUNG** — KHÁC mã của SKU (0008).</summary>
+            public const string MaSanPhamKhongHopLe = "eCommerce:Catalog:0012";
+
+            // ── Dải 0020+: `CAT-002` (đánh số LẠI — §12 của tài liệu đó đã được cập nhật) ──
+
+            /// <summary>Di chuyển danh mục vào **cây con của chính nó** ⇒ tạo chu trình (`CAT-002` D8/§12).</summary>
+            public const string ChuTrinhDanhMuc = "eCommerce:Catalog:0020";
+
+            /// <summary>Xoá/gán danh mục còn **con** hoặc còn **sản phẩm**, hoặc danh mục đã ngừng dùng (`CAT-002` D9).</summary>
+            public const string DanhMucConRangBuoc = "eCommerce:Catalog:0021";
+
+            /// <summary>Va chạm tổ hợp thuộc tính khi đã kiểm tra (race) (`CAT-002` D7).</summary>
+            public const string TrungToHopThuocTinh = "eCommerce:Catalog:0022";
+
+            /// <summary>Thuộc tính `Variant` đang được biến thể dùng ⇒ chỉ cho `IsActive = false` (`CAT-002` §12).</summary>
+            public const string ThuocTinhDangDuocDung = "eCommerce:Catalog:0023";
+
+            /// <summary>Vượt độ sâu tối đa của cây danh mục (`CAT-002` §8.1 #3).</summary>
+            public const string VuotDoSauDanhMuc = "eCommerce:Catalog:0024";
         }
     }
 

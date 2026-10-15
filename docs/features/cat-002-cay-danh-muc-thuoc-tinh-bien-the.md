@@ -63,7 +63,7 @@
 | **D3** | Entity danh mục là **aggregate của chính nó**, **không** nạp cả cây vào bộ nhớ | (a) `Category` chứa `List<Category> Children` như `Product.Variants` (`Product.cs:27`) · (b) mỗi nút là một aggregate, thao tác cây qua domain service + lock | (a) nạp cả cây vào 1 aggregate ⇒ **tranh chấp ghi giữa hai nhánh khác nhau** (hai người sửa 2 nhánh vẫn đụng nhau) và bộ nhớ tăng theo cây; (b) đúng ranh giới giao dịch, chỉ khoá khi **di chuyển nhánh** | Không có navigation `Children` ⇒ **thao tác cây phải đi qua `CategoryTreeService`** (không được sửa `ParentId` trực tiếp từ app service) |
 | **D4** | **Tách 2 loại thuộc tính**: `Variant` (sinh biến thể) và `Specification` (chỉ mô tả) | (a) một loại duy nhất, cờ `IsVariant` · (b) hai loại tường minh | Cùng một cờ nhưng **luật khác hẳn**: `Variant` **không được xoá** khi đã có biến thể dùng nó, còn `Specification` xoá được tự do. Nếu chỉ có cờ thì guard rất dễ viết sai | Enum `CatalogAttributeUsage { Specification = 0, Variant = 1 }`; tổ hợp chỉ sinh từ `Variant` |
 | **D5** | Tổ hợp biến thể sinh **một lần, tường minh** — **không** sinh lại tự động mỗi khi đọc | (a) tính động khi đọc (kiểu `Dictionary<string,int>` của OCC) · (b) sinh bản ghi `ProductVariant` thật | (a) **không gắn được SKU/giá/tồn kho** vào tổ hợp ⇒ `Inventory` và `ChannelHub` không có gì để tham chiếu (đã kiểm: `ChannelListing` map theo `ProductVariantId`, xem `eCommerceDbContext.cs:74-76`); (b) mỗi tổ hợp **là** một SKU thật ⇒ tồn kho/kênh hoạt động ngay | Đổi tập thuộc tính ⇒ phải **sinh lại/đối chiếu**, không được xoá biến thể đã phát sinh giao dịch (D9) |
-| **D6** | **Chặn bùng nổ tổ hợp** bằng `MaxVariantCombinations` (mặc định **200**) + **kiểm tra TRƯỚC khi ghi** | (a) không giới hạn · (b) giới hạn cứng trong code · (c) ngưỡng cấu hình được theo tenant | Tích Descartes **nổ theo cấp số nhân** (5 màu × 6 size × 4 chất liệu = 120; thêm 3 kiểu dáng = 360); (a) treo request và phình DB; (b) mọi tenant phải chịu cùng ngưỡng — sai cho cả shop nhỏ và shop lớn | Vượt ngưỡng ⇒ **ném lỗi** `eCommerce:Catalog:0003` **kèm số tổ hợp dự kiến** để người dùng biết phải giảm gì |
+| **D6** | **Chặn bùng nổ tổ hợp** bằng `MaxVariantCombinations` (mặc định **200**) + **kiểm tra TRƯỚC khi ghi** | (a) không giới hạn · (b) giới hạn cứng trong code · (c) ngưỡng cấu hình được theo tenant | Tích Descartes **nổ theo cấp số nhân** (5 màu × 6 size × 4 chất liệu = 120; thêm 3 kiểu dáng = 360); (a) treo request và phình DB; (b) mọi tenant phải chịu cùng ngưỡng — sai cho cả shop nhỏ và shop lớn | Vượt ngưỡng ⇒ **ném lỗi** `eCommerce:Catalog:0009` **kèm số tổ hợp dự kiến** để người dùng biết phải giảm gì |
 | **D7** | Tổ hợp giá trị là **duy nhất trên mỗi sản phẩm**, cưỡng chế bằng **unique index trên cột hash** | (a) kiểm tra trong code rồi insert · (b) unique index trên bảng con `ProductVariantAttribute` | (a) kiểm tra-rồi-ghi là **race condition** kinh điển (2 request cùng lúc đều qua kiểm tra); (b) unique index trên bảng con **không** diễn đạt được "**tổ hợp** (A=đỏ,Size=M) là duy nhất" vì mỗi dòng chỉ là một cặp | Thêm cột **`AttributeHash`** = chuỗi chuẩn hoá đã sắp xếp của tổ hợp; unique `(TenantId, ProductVariantId, AttributeHash)` **NULLS NOT DISTINCT** theo `XC-004` BR-009 — đây là **hàng rào cuối cùng** khi lock/Redis chết (`XC-003` D2) |
 | **D8** | Thao tác **di chuyển nhánh** dùng **khoá phân tán theo tenant** + **kiểm tra chu trình trong transaction** | (a) chỉ kiểm tra trong code · (b) lock + kiểm tra + `UPDATE … WHERE` | (a) hai người cùng di chuyển 2 nhánh có thể tạo **chu trình** (A→B và B→A) mà không ai thấy lỗi; (b) lock giảm tranh chấp, **ràng buộc thật** là kiểm tra lại `Path` trong cùng transaction + `CHECK` độ sâu | Khoá **toàn tenant** (không phải theo nút) ⇒ di chuyển cây là thao tác **tuần tự hoá toàn tenant**, chấp nhận vì tần suất rất thấp |
 | **D9** | **Không xoá cứng** danh mục còn con hoặc còn sản phẩm — **ném lỗi**; biến thể đã phát sinh giao dịch thì **ngừng bán**, không xoá | (a) `OnDelete(Cascade)` như `Product → Variants` (`eCommerceDbContext.cs:111-114`) · (b) chặn bằng guard + `Restrict` ở DB | (a) xoá 1 nút danh mục mà **mất sản phẩm** (hoặc xoá cả cây) là tai nạn không hồi phục và **không có lỗi biên dịch**; (b) `Restrict` + guard ném lỗi có mã ⇒ người dùng hiểu ngay | Phải có **luồng "ngừng dùng"** (soft) thay cho xoá: `Category.IsActive = false` |
@@ -86,8 +86,8 @@
 | **Post-Condition(s)** | • Cây danh mục **không có chu trình**, mọi nút có `Path` khớp cây thật và `Level` = số tổ tiên.<br>• Mỗi sản phẩm có **tối đa một** danh mục chính; mọi danh mục được gán đều **đang hoạt động**.<br>• Mọi biến thể có `Sku` **duy nhất trong tenant** và **một** `AttributeHash` **duy nhất trong sản phẩm**.<br>• Mọi thao tác ghi đi qua **Unit of Work**; sự kiện đi qua **outbox** (`XC-002`). |
 | **Basic Flow** | 1. Quản trị tạo nút danh mục gốc: hệ thống sinh `Path = /{id}/`, `Level = 0`.<br>2. Tạo nút con: `Path = parent.Path + {id} + "/"`, `Level = parent.Level + 1`; kiểm tra `Level < MaxDepth`.<br>3. Định nghĩa `CatalogAttribute` (ví dụ "Màu sắc", `Usage = Variant`) và các `CatalogAttributeValue` ("Đỏ", "Xanh").<br>4. Gán thuộc tính vào danh mục ⇒ sản phẩm trong danh mục **kế thừa** tập thuộc tính được phép.<br>5. Trên sản phẩm, chọn tập giá trị cho từng thuộc tính `Variant`.<br>6. Hệ thống tính **tích Descartes**, kiểm tra `số tổ hợp ≤ MaxVariantCombinations` ⇒ nếu vượt, **dừng và báo lỗi** (D6).<br>7. Trong **một** transaction: tạo `ProductVariant` cho mỗi tổ hợp + `ProductVariantAttribute` cho từng cặp (thuộc tính, giá trị) + cột `AttributeHash`.<br>8. Phát `ProductVariantCreatedEto` (một sự kiện cho mỗi SKU mới) để `Tax` (XC-006) tạo dòng "SKU chưa phân loại".<br>9. Storefront đọc cây bằng **một** truy vấn `Path LIKE` + `Level` để dựng menu. |
 | **Alternative Flow** | **A1: Sinh lại tổ hợp sau khi thêm giá trị thuộc tính** — hệ thống **đối chiếu** tập tổ hợp hiện có với tập mới: tổ hợp **đã có** thì giữ nguyên `Id`/`Sku` (không mất liên kết tồn kho/kênh); tổ hợp **mới** thì tạo; tổ hợp **không còn** thì **ngừng bán** (`IsActive = false`) **chứ không xoá** (D9).<br>**A2: Di chuyển nhánh** — dùng khoá `catalog:category-tree:{tenantId}` (D8), kiểm tra nút đích **không nằm trong cây con** của nút nguồn, rồi cập nhật `Path`/`Level` cho **toàn bộ** cây con trong **một** transaction.<br>**A3: Thuộc tính `Specification`** — chỉ để hiển thị/lọc, **không** tham gia sinh tổ hợp, **xoá được** tự do.<br>**A4: Danh mục ảo (không bán)** — nút chỉ để nhóm menu: `IsActive = true` nhưng **không** gán sản phẩm trực tiếp; không có cơ chế riêng, chỉ là quy ước vận hành. |
-| **Exception Flow** | **E1:** di chuyển nút vào chính cây con của nó (tạo chu trình) ⇒ `BusinessException` `eCommerce:Catalog:0001`.<br>**E2:** xoá danh mục còn nút con hoặc còn sản phẩm ⇒ `BusinessException` `eCommerce:Catalog:0002` (D9) — **không** xoá lan.<br>**E3:** số tổ hợp vượt `MaxVariantCombinations` ⇒ `BusinessException` `eCommerce:Catalog:0003` kèm `{soToHop}` + `{nguong}` (D6).<br>**E4:** sinh tổ hợp tạo ra SKU đã tồn tại **trong tenant** ⇒ `BusinessException` `eCommerce:Catalog:0004`; ràng buộc DB `IX_CatProductVariants_TenantId_Sku` là chốt cuối.<br>**E5:** tổ hợp giá trị đã tồn tại trên sản phẩm ⇒ `BusinessException` `eCommerce:Catalog:0005`; unique index `(TenantId, ProductVariantId, AttributeHash)` là chốt cuối (D7).<br>**E6:** thuộc tính `Variant` bị xoá/ngừng dùng trong khi đã có biến thể dùng nó ⇒ `BusinessException` `eCommerce:Catalog:0006` (chỉ **ngừng dùng** `IsActive = false`, không xoá).<br>**E7:** không giành được khoá khi di chuyển nhánh/sinh tổ hợp ⇒ `BusinessException` `eCommerce:Lock:0001` (`XC-003` §6.2), HTTP `409`.<br>**E8:** `Level` vượt `MaxDepth` ⇒ `BusinessException` `eCommerce:Catalog:0007`. |
-| **Business Rules** | • **BR-CAT-002-001**: `Path` của một nút **phải** bằng `Path` của cha + `Id` của chính nút, bao bằng `/`; nút gốc có `Path = /{Id}/`; **cấm** ghi `Path` thủ công ngoài `CategoryTreeService`.<br>• **BR-CAT-002-002**: `Level` **phải** bằng số tổ tiên (nút gốc = 0) và **phải** khớp `Path`; vi phạm ⇒ ném lỗi, **không** tự sửa im lặng.<br>• **BR-CAT-002-003**: Cây **không được có chu trình**; di chuyển nút vào cây con của chính nó ⇒ **ném** `eCommerce:Catalog:0001`.<br>• **BR-CAT-002-004**: Độ sâu cây **≤ `MaxDepth`** (mặc định **5**) — vượt ⇒ **ném** `eCommerce:Catalog:0007`.<br>• **BR-CAT-002-005**: Danh mục còn nút con **hoặc** còn sản phẩm **không được xoá** ⇒ **ném** `eCommerce:Catalog:0002`; **cấm** `Cascade` (D9).<br>• **BR-CAT-002-006**: Mỗi sản phẩm có **tối đa một** danh mục chính (`IsPrimary = true`); gán danh mục chính mới ⇒ danh mục chính cũ tự chuyển `false` **trong cùng transaction**.<br>• **BR-CAT-002-007**: Mọi danh mục được gán cho sản phẩm **phải** tồn tại và `IsActive = true`; gán danh mục ngừng dùng ⇒ **ném** `eCommerce:Catalog:0002`.<br>• **BR-CAT-002-008**: Mọi `CatalogAttribute` **phải** khai `Usage` ∈ {`Specification`, `Variant`}; **chỉ** `Variant` được dùng để sinh tổ hợp.<br>• **BR-CAT-002-009**: Tổ hợp biến thể là **tích Descartes** của các giá trị đã chọn trên các thuộc tính `Variant`; số tổ hợp **≤ `MaxVariantCombinations`** (mặc định **200**) — vượt ⇒ **ném** `eCommerce:Catalog:0003` **trước khi** ghi bất cứ dòng nào.<br>• **BR-CAT-002-010**: Mỗi tổ hợp sinh ra **phải** có `Sku` duy nhất trong tenant và **một** `AttributeHash` duy nhất trên sản phẩm (D7) — cưỡng chế bằng unique index, không chỉ bằng kiểm tra trong code.<br>• **BR-CAT-002-011**: `AttributeHash` **phải** được sinh bằng **một** hàm duy nhất trong domain (giá trị đã sắp xếp theo `AttributeId`); **cấm** ghép chuỗi tại chỗ (bài học "khoá lệch" của `XC-003` F1).<br>• **BR-CAT-002-012**: **Cấm xoá cứng** biến thể đã phát sinh giao dịch (đơn hàng/tồn kho/listing); thay bằng `IsActive = false` (D9).<br>• **BR-CAT-002-013**: Sinh lại tổ hợp **phải giữ nguyên** `Id`/`Sku` của tổ hợp đã tồn tại — **cấm** xoá-rồi-tạo-lại (A1).<br>• **BR-CAT-002-014**: Mọi thao tác ghi (tạo/sửa/di chuyển/xoá/gán/sinh tổ hợp) **phải** đi qua **Unit of Work** của ABP; **cấm** `SaveChanges` rời.<br>• **BR-CAT-002-015**: Mọi thao tác di chuyển nhánh và sinh tổ hợp **phải** chạy trong **khoá phân tán** theo quy ước `XC-003`; **cấm** acquire lồng cùng tên khoá (`XC-003` D6).<br>• **BR-CAT-002-016**: `AttributeHash` **phải** ổn định với **thứ tự** chọn giá trị (chọn "Đỏ→M" và "M→Đỏ" cho **cùng** hash) ⇒ phải sắp xếp trước khi băm.<br>• **BR-CAT-002-017**: Mọi trường số đo khối lượng/kích thước dùng `decimal`; **cấm** `double`/`float` (`XC-001` BR-008, D11).<br>• **BR-CAT-002-018**: Mọi unique index có `TenantId` **phải** dùng **`NULLS NOT DISTINCT`** (`XC-004` BR-009) — áp cho **mọi** index mới của `CAT-002`.<br>• **BR-CAT-002-019**: Mọi permission mới **phải** được khai ở **cả** `eCommerceConsts.Permissions` **và** `eCommercePermissionDefinitionProvider` trong cùng PR (D10); thiếu một nơi ⇒ `403` cho mọi người (`XC-004` E3).<br>• **BR-CAT-002-020**: Mọi app service **phải** có `[Authorize]` ở **cấp class** (`XC-004` BR-001, D3). |
+| **Exception Flow** | **E1:** di chuyển nút vào chính cây con của nó (tạo chu trình) ⇒ `BusinessException` `eCommerce:Catalog:0020`.<br>**E2:** xoá danh mục còn nút con hoặc còn sản phẩm ⇒ `BusinessException` `eCommerce:Catalog:0021` (D9) — **không** xoá lan.<br>**E3:** số tổ hợp vượt `MaxVariantCombinations` ⇒ `BusinessException` `eCommerce:Catalog:0009` kèm `{soToHop}` + `{nguong}` (D6).<br>**E4:** sinh tổ hợp tạo ra SKU đã tồn tại **trong tenant** ⇒ `BusinessException` `eCommerce:Catalog:0002`; ràng buộc DB `IX_CatProductVariants_TenantId_Sku` là chốt cuối.<br>**E5:** tổ hợp giá trị đã tồn tại trên sản phẩm ⇒ `BusinessException` `eCommerce:Catalog:0022`; unique index `(TenantId, ProductVariantId, AttributeHash)` là chốt cuối (D7).<br>**E6:** thuộc tính `Variant` bị xoá/ngừng dùng trong khi đã có biến thể dùng nó ⇒ `BusinessException` `eCommerce:Catalog:0023` (chỉ **ngừng dùng** `IsActive = false`, không xoá).<br>**E7:** không giành được khoá khi di chuyển nhánh/sinh tổ hợp ⇒ `BusinessException` `eCommerce:Lock:0001` (`XC-003` §6.2), HTTP `409`.<br>**E8:** `Level` vượt `MaxDepth` ⇒ `BusinessException` `eCommerce:Catalog:0024`. |
+| **Business Rules** | • **BR-CAT-002-001**: `Path` của một nút **phải** bằng `Path` của cha + `Id` của chính nút, bao bằng `/`; nút gốc có `Path = /{Id}/`; **cấm** ghi `Path` thủ công ngoài `CategoryTreeService`.<br>• **BR-CAT-002-002**: `Level` **phải** bằng số tổ tiên (nút gốc = 0) và **phải** khớp `Path`; vi phạm ⇒ ném lỗi, **không** tự sửa im lặng.<br>• **BR-CAT-002-003**: Cây **không được có chu trình**; di chuyển nút vào cây con của chính nó ⇒ **ném** `eCommerce:Catalog:0020`.<br>• **BR-CAT-002-004**: Độ sâu cây **≤ `MaxDepth`** (mặc định **5**) — vượt ⇒ **ném** `eCommerce:Catalog:0024`.<br>• **BR-CAT-002-005**: Danh mục còn nút con **hoặc** còn sản phẩm **không được xoá** ⇒ **ném** `eCommerce:Catalog:0021`; **cấm** `Cascade` (D9).<br>• **BR-CAT-002-006**: Mỗi sản phẩm có **tối đa một** danh mục chính (`IsPrimary = true`); gán danh mục chính mới ⇒ danh mục chính cũ tự chuyển `false` **trong cùng transaction**.<br>• **BR-CAT-002-007**: Mọi danh mục được gán cho sản phẩm **phải** tồn tại và `IsActive = true`; gán danh mục ngừng dùng ⇒ **ném** `eCommerce:Catalog:0021`.<br>• **BR-CAT-002-008**: Mọi `CatalogAttribute` **phải** khai `Usage` ∈ {`Specification`, `Variant`}; **chỉ** `Variant` được dùng để sinh tổ hợp.<br>• **BR-CAT-002-009**: Tổ hợp biến thể là **tích Descartes** của các giá trị đã chọn trên các thuộc tính `Variant`; số tổ hợp **≤ `MaxVariantCombinations`** (mặc định **200**) — vượt ⇒ **ném** `eCommerce:Catalog:0009` **trước khi** ghi bất cứ dòng nào.<br>• **BR-CAT-002-010**: Mỗi tổ hợp sinh ra **phải** có `Sku` duy nhất trong tenant và **một** `AttributeHash` duy nhất trên sản phẩm (D7) — cưỡng chế bằng unique index, không chỉ bằng kiểm tra trong code.<br>• **BR-CAT-002-011**: `AttributeHash` **phải** được sinh bằng **một** hàm duy nhất trong domain (giá trị đã sắp xếp theo `AttributeId`); **cấm** ghép chuỗi tại chỗ (bài học "khoá lệch" của `XC-003` F1).<br>• **BR-CAT-002-012**: **Cấm xoá cứng** biến thể đã phát sinh giao dịch (đơn hàng/tồn kho/listing); thay bằng `IsActive = false` (D9).<br>• **BR-CAT-002-013**: Sinh lại tổ hợp **phải giữ nguyên** `Id`/`Sku` của tổ hợp đã tồn tại — **cấm** xoá-rồi-tạo-lại (A1).<br>• **BR-CAT-002-014**: Mọi thao tác ghi (tạo/sửa/di chuyển/xoá/gán/sinh tổ hợp) **phải** đi qua **Unit of Work** của ABP; **cấm** `SaveChanges` rời.<br>• **BR-CAT-002-015**: Mọi thao tác di chuyển nhánh và sinh tổ hợp **phải** chạy trong **khoá phân tán** theo quy ước `XC-003`; **cấm** acquire lồng cùng tên khoá (`XC-003` D6).<br>• **BR-CAT-002-016**: `AttributeHash` **phải** ổn định với **thứ tự** chọn giá trị (chọn "Đỏ→M" và "M→Đỏ" cho **cùng** hash) ⇒ phải sắp xếp trước khi băm.<br>• **BR-CAT-002-017**: Mọi trường số đo khối lượng/kích thước dùng `decimal`; **cấm** `double`/`float` (`XC-001` BR-008, D11).<br>• **BR-CAT-002-018**: Mọi unique index có `TenantId` **phải** dùng **`NULLS NOT DISTINCT`** (`XC-004` BR-009) — áp cho **mọi** index mới của `CAT-002`.<br>• **BR-CAT-002-019**: Mọi permission mới **phải** được khai ở **cả** `eCommerceConsts.Permissions` **và** `eCommercePermissionDefinitionProvider` trong cùng PR (D10); thiếu một nơi ⇒ `403` cho mọi người (`XC-004` E3).<br>• **BR-CAT-002-020**: Mọi app service **phải** có `[Authorize]` ở **cấp class** (`XC-004` BR-001, D3). |
 | **Non-Functional Requirement** | • **NFR-CAT-002-001**: Lấy **toàn bộ** cây 500 nút ⇒ p95 **< 50 ms**.<br>• **NFR-CAT-002-002**: Sinh **200** tổ hợp (kèm 200 dòng `ProductVariantAttribute`) ⇒ p95 **< 1 s**.<br>• **NFR-CAT-002-003**: **0** chu trình trong cây sau **100** thao tác di chuyển ngẫu nhiên (property test).<br>• **NFR-CAT-002-004**: **0** bản ghi vi phạm bất biến khi Redis chết (ràng buộc DB vẫn chặn) — `XC-003` D2.<br>• **NFR-CAT-002-005**: **100 %** app service của Catalog có `[Authorize]` cấp class (`XC-004` TC-01).<br>• **NFR-CAT-002-006**: **0** permission dùng trong `[Authorize]` mà chưa định nghĩa (`XC-004` TC-02).<br>• **NFR-CAT-002-007**: Cách ly tenant: cây danh mục của tenant A **không** đọc/ghi được từ tenant B.<br>• **NFR-CAT-002-008**: Mọi thao tác sinh tổ hợp **phải** có dấu vết quan sát được: log có `CorrelationId` + metric khi bị chặn vì vượt ngưỡng (`XC-005`). |
 
 ---
@@ -162,7 +162,7 @@ stateDiagram-v2
     DangHoatDong --> NgungDung : «ngừng dùng (IsActive = false)»
     NgungDung --> DangHoatDong : «kích hoạt lại»
     DangHoatDong --> ChoXoa : «yêu cầu xoá»
-    ChoXoa --> DangHoatDong : «còn nút con hoặc còn sản phẩm — NÉM eCommerce:Catalog:0002»
+    ChoXoa --> DangHoatDong : «còn nút con hoặc còn sản phẩm — NÉM eCommerce:Catalog:0021»
     ChoXoa --> DaXoa : «không còn con và không còn sản phẩm»
     DaXoa --> [*]
 ```
@@ -171,24 +171,24 @@ stateDiagram-v2
 
 | # | Từ → Sang | Guard (điều kiện cho phép) | Hành động kèm theo | Nếu guard sai thì? |
 |---|---|---|---|---|
-| 1 | `[*]` → `NutMoi` | Có permission `eCommerce.Categories.Create`; `ParentId` (nếu có) tồn tại và `Level < MaxDepth` | Sinh `Path`, `Level` (BR-001/002); ghi qua UoW | **Ném** `eCommerce:Catalog:0007` nếu vượt độ sâu |
+| 1 | `[*]` → `NutMoi` | Có permission `eCommerce.Categories.Create`; `ParentId` (nếu có) tồn tại và `Level < MaxDepth` | Sinh `Path`, `Level` (BR-001/002); ghi qua UoW | **Ném** `eCommerce:Catalog:0024` nếu vượt độ sâu |
 | 2 | `NutMoi` → `DangHoatDong` | `Code` không trùng trong tenant | Ghi + outbox | DB unique `(TenantId, Code)` **NULLS NOT DISTINCT** chặn ⇒ lỗi DB được bọc thành `BusinessException` |
-| 3 | `DangHoatDong` → `DangHoatDong` | Nút đích **không** nằm trong cây con của nút nguồn; đã giành khoá `catalog:category-tree:{tenantId}` | Dựng lại `Path`/`Level` cho **toàn bộ** cây con trong **một** transaction | **Ném** `eCommerce:Catalog:0001` (chu trình) hoặc `eCommerce:Lock:0001` (không giành được khoá) |
+| 3 | `DangHoatDong` → `DangHoatDong` | Nút đích **không** nằm trong cây con của nút nguồn; đã giành khoá `catalog:category-tree:{tenantId}` | Dựng lại `Path`/`Level` cho **toàn bộ** cây con trong **một** transaction | **Ném** `eCommerce:Catalog:0020` (chu trình) hoặc `eCommerce:Lock:0001` (không giành được khoá) |
 | 4 | `DangHoatDong` → `NgungDung` | Có permission `eCommerce.Categories.Edit` | `IsActive = false`; **không** xoá liên kết sản phẩm | — |
-| 5 | `NgungDung` → `DangHoatDong` | Cha (nếu có) đang `DangHoatDong` **hoặc** là gốc | `IsActive = true` | **Ném** `eCommerce:Catalog:0002` (cha đang ngừng dùng ⇒ cây sẽ mâu thuẫn) |
+| 5 | `NgungDung` → `DangHoatDong` | Cha (nếu có) đang `DangHoatDong` **hoặc** là gốc | `IsActive = true` | **Ném** `eCommerce:Catalog:0021` (cha đang ngừng dùng ⇒ cây sẽ mâu thuẫn) |
 | 6 | `DangHoatDong` → `ChoXoa` | Có permission `eCommerce.Categories.Delete` | Bắt đầu kiểm tra ràng buộc | — |
-| 7 | `ChoXoa` → `DangHoatDong` | **Còn** nút con **hoặc** còn `ProductCategory` | **Không** thay đổi dữ liệu | **Ném** `eCommerce:Catalog:0002` — **cấm** xoá lan (BR-005) |
+| 7 | `ChoXoa` → `DangHoatDong` | **Còn** nút con **hoặc** còn `ProductCategory` | **Không** thay đổi dữ liệu | **Ném** `eCommerce:Catalog:0021` — **cấm** xoá lan (BR-005) |
 | 8 | `ChoXoa` → `DaXoa` | Không còn con, không còn sản phẩm, không còn `ProductVariant` tham chiếu | Xoá cứng nút (chỉ nút lá, chưa từng dùng) | — |
 
 **Bảng chuyển trạng thái & guard — (B) tổ hợp biến thể:**
 
 | # | Từ → Sang | Guard (điều kiện cho phép) | Hành động kèm theo | Nếu guard sai thì? |
 |---|---|---|---|---|
-| 1 | `[*]` → `Moi` | Tập thuộc tính `Variant` có **≥ 1** giá trị cho **mỗi** thuộc tính đã chọn; `soToHop ≤ MaxVariantCombinations` | Sinh `ProductVariant` + `AttributeHash`; phát `ProductVariantCreatedEto` | **Ném** `eCommerce:Catalog:0003` **trước khi ghi** (BR-009) |
-| 2 | `Moi` → `DangBan` | `Sku` chưa tồn tại trong tenant | Ghi + outbox | **Ném** `eCommerce:Catalog:0004`; DB unique `(TenantId, Sku)` chặn |
-| 3 | `Moi` → `Moi` | Tổ hợp sinh lại **trùng** `AttributeHash` đã có trên sản phẩm | **Không tạo mới** — đối chiếu và giữ `Id`/`Sku` cũ (BR-013) | Nếu vẫn cố chèn ⇒ **Ném** `eCommerce:Catalog:0005`; DB unique `(TenantId, ProductVariantId, AttributeHash)` chặn |
+| 1 | `[*]` → `Moi` | Tập thuộc tính `Variant` có **≥ 1** giá trị cho **mỗi** thuộc tính đã chọn; `soToHop ≤ MaxVariantCombinations` | Sinh `ProductVariant` + `AttributeHash`; phát `ProductVariantCreatedEto` | **Ném** `eCommerce:Catalog:0009` **trước khi ghi** (BR-009) |
+| 2 | `Moi` → `DangBan` | `Sku` chưa tồn tại trong tenant | Ghi + outbox | **Ném** `eCommerce:Catalog:0002`; DB unique `(TenantId, Sku)` chặn |
+| 3 | `Moi` → `Moi` | Tổ hợp sinh lại **trùng** `AttributeHash` đã có trên sản phẩm | **Không tạo mới** — đối chiếu và giữ `Id`/`Sku` cũ (BR-013) | Nếu vẫn cố chèn ⇒ **Ném** `eCommerce:Catalog:0022`; DB unique `(TenantId, ProductVariantId, AttributeHash)` chặn |
 | 4 | `DangBan` → `NgungBan` | Biến thể đã phát sinh giao dịch (đơn/tồn kho/listing) và **không còn** giá trị thuộc tính hợp lệ | `IsActive = false`; **giữ nguyên** `Id`/`Sku` | — |
-| 5 | `DangBan` → `DaXoa` | **CHỈ** khi chưa từng phát sinh giao dịch (không có `StockLedgerEntry`, không có `ChannelListing`, không có dòng đơn) | Xoá cứng | **Ném** `eCommerce:Catalog:0006` nếu đã có giao dịch (BR-012) |
+| 5 | `DangBan` → `DaXoa` | **CHỈ** khi chưa từng phát sinh giao dịch (không có `StockLedgerEntry`, không có `ChannelListing`, không có dòng đơn) | Xoá cứng | **Ném** `eCommerce:Catalog:0023` nếu đã có giao dịch (BR-012) |
 | 6 | `NgungBan` → `DangBan` | Giá trị thuộc tính của tổ hợp **đang** hợp lệ trở lại | `IsActive = true` | — |
 
 > ⚠️ **Trạng thái hấp thụ (absorbing):** `DaXoa` của cả hai vòng đời. Không có chuyển ra khỏi `DaXoa`.
@@ -224,7 +224,7 @@ sequenceDiagram
         APP->>DOM: SinhToHop(giaTriDaChon)
         Note over DOM: kiểm tra số tổ hợp so với MaxVariantCombinations<br/>sắp xếp giá trị rồi sinh AttributeHash
         alt «vượt ngưỡng»
-            DOM-->>APP: ném eCommerce:Catalog:0003 (kèm số tổ hợp · ngưỡng)
+            DOM-->>APP: ném eCommerce:Catalog:0009 (kèm số tổ hợp · ngưỡng)
             APP-->>U: 400 nội dung nêu rõ phải giảm gì
         else «trong ngưỡng»
             DOM-->>APP: danh sách tổ hợp + AttributeHash
@@ -453,13 +453,13 @@ Quan hệ giữa các bảng:
 
 | Mã | HTTP | Khi nào | Thông điệp |
 |---|---|---|---|
-| `eCommerce:Catalog:0001` | `400` | Di chuyển nút vào cây con của chính nó (chu trình) | `Không thể di chuyển danh mục vào chính nhánh con của nó.` |
-| `eCommerce:Catalog:0002` | `409` | Xoá danh mục còn con/còn sản phẩm; gán danh mục đã ngừng dùng | `Danh mục còn {soNutCon} danh mục con và {soSanPham} sản phẩm — hãy chuyển hoặc ngừng dùng thay vì xoá.` |
-| `eCommerce:Catalog:0003` | `400` | Số tổ hợp vượt `MaxVariantCombinations` | `Tổ hợp dự kiến {soToHop} vượt ngưỡng cho phép {nguong} — hãy giảm số giá trị thuộc tính.` |
-| `eCommerce:Catalog:0004` | `409` | SKU sinh ra đã tồn tại trong tenant | `SKU '{sku}' đã tồn tại.` |
-| `eCommerce:Catalog:0005` | `409` | Tổ hợp giá trị đã tồn tại trên sản phẩm | `Tổ hợp thuộc tính này đã có biến thể.` |
-| `eCommerce:Catalog:0006` | `409` | Xoá/ngừng thuộc tính `Variant` đang được biến thể dùng | `Thuộc tính đang được {soBienThe} biến thể sử dụng — chỉ có thể ngừng dùng.` |
-| `eCommerce:Catalog:0007` | `400` | Vượt độ sâu `MaxDepth` | `Danh mục vượt quá {maxDepth} cấp.` |
+| `eCommerce:Catalog:0020` | `400` | Di chuyển nút vào cây con của chính nó (chu trình) | `Không thể di chuyển danh mục vào chính nhánh con của nó.` |
+| `eCommerce:Catalog:0021` | `409` | Xoá danh mục còn con/còn sản phẩm; gán danh mục đã ngừng dùng | `Danh mục còn {soNutCon} danh mục con và {soSanPham} sản phẩm — hãy chuyển hoặc ngừng dùng thay vì xoá.` |
+| `eCommerce:Catalog:0009` | `400` | Số tổ hợp vượt `MaxVariantCombinations` | `Tổ hợp dự kiến {soToHop} vượt ngưỡng cho phép {nguong} — hãy giảm số giá trị thuộc tính.` |
+| `eCommerce:Catalog:0002` | `409` | SKU sinh ra đã tồn tại trong tenant | `SKU '{sku}' đã tồn tại.` |
+| `eCommerce:Catalog:0022` | `409` | Tổ hợp giá trị đã tồn tại trên sản phẩm | `Tổ hợp thuộc tính này đã có biến thể.` |
+| `eCommerce:Catalog:0023` | `409` | Xoá/ngừng thuộc tính `Variant` đang được biến thể dùng | `Thuộc tính đang được {soBienThe} biến thể sử dụng — chỉ có thể ngừng dùng.` |
+| `eCommerce:Catalog:0024` | `400` | Vượt độ sâu `MaxDepth` | `Danh mục vượt quá {maxDepth} cấp.` |
 | `eCommerce:Lock:0001` | `409` | Không giành được khoá (kế thừa `XC-003` §6.2) | `Tài nguyên đang được xử lý bởi tiến trình khác, vui lòng thử lại.` |
 
 > 📌 **Tiền tố mã lỗi `eCommerce:Catalog:*`** nhất quán với tiền lệ đã có: `eCommerce:Inventory:0001` /
@@ -527,8 +527,8 @@ khoá đối chiếu **ổn định** — `CAT-002` BR-011/016 bảo đảm đi�
 | 5 | Tổ hợp giá trị **duy nhất trên mỗi sản phẩm** | Unique `(TenantId, ProductVariantId, AttributeHash)` **NULLS NOT DISTINCT** | ✅ **Có** |
 | 6 | Mỗi biến thể có **đúng một** giá trị cho mỗi thuộc tính | Unique `(TenantId, ProductVariantId, AttributeId)` | ✅ **Có** |
 | 7 | Mỗi sản phẩm có **tối đa một** danh mục chính | Unique **có filter** `(TenantId, ProductId) WHERE IsPrimary` | ✅ **Có** |
-| 8 | Không xoá danh mục còn con/còn sản phẩm | Guard ném `eCommerce:Catalog:0002` + FK `Restrict` | ✅ **Có** (`Restrict` chặn ở DB) |
-| 9 | Không xoá biến thể đã phát sinh giao dịch | Guard ném `eCommerce:Catalog:0006` + FK `Restrict` từ `InvStockLedger`/`ChannelListing` | ⚠️ **Một phần** — `InvStockLedger` hiện tham chiếu theo **`Sku` chứ không theo `ProductVariantId`** (`StockLedger.cs:90`), nên **không có FK** để chặn ⇒ **phải** kiểm tra bằng truy vấn (`TC-12`). **Chưa kiểm chứng đầy đủ — cần review khi code** |
+| 8 | Không xoá danh mục còn con/còn sản phẩm | Guard ném `eCommerce:Catalog:0021` + FK `Restrict` | ✅ **Có** (`Restrict` chặn ở DB) |
+| 9 | Không xoá biến thể đã phát sinh giao dịch | Guard ném `eCommerce:Catalog:0023` + FK `Restrict` từ `InvStockLedger`/`ChannelListing` | ⚠️ **Một phần** — `InvStockLedger` hiện tham chiếu theo **`Sku` chứ không theo `ProductVariantId`** (`StockLedger.cs:90`), nên **không có FK** để chặn ⇒ **phải** kiểm tra bằng truy vấn (`TC-12`). **Chưa kiểm chứng đầy đủ — cần review khi code** |
 | 10 | Mọi thao tác ghi qua **Unit of Work** | ABP UoW mặc định cho app service | ✅ **Có** |
 
 ### 8.2 Xử lý đồng thời
@@ -620,7 +620,7 @@ vì ABP ghép `KeyPrefix`; xem `XC-003` §5.4 dòng 252-256)*
 | Bảng biến thể | SKU, tổ hợp giá trị, giá, trạng thái | `ProductVariantDto[]` | sửa giá (thuộc `PRC-*`), ngừng bán |
 | Nút "Sinh biến thể" | — | — | gọi `generate-variants` kèm `IdempotencyKey` |
 
-> ⚠️ **Bắt buộc:** nếu server trả `eCommerce:Catalog:0003`, UI **phải** hiển thị **số tổ hợp dự kiến + ngưỡng**
+> ⚠️ **Bắt buộc:** nếu server trả `eCommerce:Catalog:0009`, UI **phải** hiển thị **số tổ hợp dự kiến + ngưỡng**
 > và gợi ý *"giảm số giá trị thuộc tính"*. Đây là tình huống **bình thường** khi dữ liệu lớn, **không** phải sự cố.
 
 ---
@@ -643,21 +643,32 @@ vì ABP ghép `KeyPrefix`; xem `XC-003` §5.4 dòng 252-256)*
 
 ## 12. Xử lý lỗi & trường hợp biên
 
+> 🚨 **ĐÃ ĐÁNH SỐ LẠI MÃ LỖI (15/10/2026).** Bảng này **trước đây** gán `eCommerce:Catalog:0001…0007` cho
+> các nghĩa **trùng dải** với `CAT-001` §6.3 nhưng **khác nghĩa** — ví dụ `0001` là *"chu trình cây"* ở đây
+> nhưng là *"Code sản phẩm trùng"* ở `CAT-001`; `0003` là *"vượt trần tổ hợp"* ở đây nhưng là
+> *"Publish thiếu biến thể"* ở `CAT-001`. Cùng một mã mang **hai nghĩa** ⇒ client/đối soát không phân loại được.
+>
+> **Chuẩn đã chốt:** `CAT-001` §6.3 giữ dải thấp (đã triển khai + kiểm chứng thật); `CAT-002` chuyển sang
+> dải **`0020+`**; mã *"vượt trần tổ hợp"* dùng đúng vị trí `0009` mà `CAT-001` §6.3 đã dành sẵn;
+> mã *"SKU đã tồn tại"* **dùng chung** `0002`. Sổ đăng ký đầy đủ (nguồn sự thật duy nhất):
+> `src/eCommerce.Domain.Shared/eCommerceConsts.cs` → `ErrorCodes.Catalog`, được khoá bằng test
+> `CatalogErrorCodeRegistryTests`. Chi tiết quyết định: **`cat-001-…md` §19**.
+
 | Tình huống | Nguyên nhân | Hành vi hệ thống | Phản hồi tới client |
 |---|---|---|---|
 | Danh mục chưa có nút con nào | dữ liệu bình thường | Trả mảng rỗng | **Không phải lỗi** (`200` + `[]`) |
 | Sản phẩm chưa gán danh mục | dữ liệu bình thường | Trả `Categories = []` | **Không phải lỗi** |
 | Sản phẩm không có thuộc tính `Variant` | sản phẩm đơn giản | **Không** sinh tổ hợp; cho phép sản phẩm không có biến thể | **Không phải lỗi** |
-| Di chuyển nút vào cây con của nó | thao tác sai | **Ném** `BusinessException` `eCommerce:Catalog:0001`, rollback | `400` + thông điệp nêu rõ |
-| Xoá danh mục còn con | thao tác sai | **Ném** `eCommerce:Catalog:0002`; **không** xoá gì | `409` + số nút con/số sản phẩm |
-| Xoá danh mục còn sản phẩm | thao tác sai | **Ném** `eCommerce:Catalog:0002` | `409` |
-| Gán danh mục đã `IsActive = false` | dữ liệu cũ | **Ném** `eCommerce:Catalog:0002` (BR-007) | `409` |
-| Vượt `MaxVariantCombinations` | chọn quá nhiều giá trị | **Ném** `eCommerce:Catalog:0003` **trước khi ghi**; ghi metric `catalog_variant_combination_blocked_total` (NFR-008) | `400` + số tổ hợp + ngưỡng |
+| Di chuyển nút vào cây con của nó | thao tác sai | **Ném** `BusinessException` `eCommerce:Catalog:0020`, rollback | `400` + thông điệp nêu rõ |
+| Xoá danh mục còn con | thao tác sai | **Ném** `eCommerce:Catalog:0021`; **không** xoá gì | `409` + số nút con/số sản phẩm |
+| Xoá danh mục còn sản phẩm | thao tác sai | **Ném** `eCommerce:Catalog:0021` | `409` |
+| Gán danh mục đã `IsActive = false` | dữ liệu cũ | **Ném** `eCommerce:Catalog:0021` (BR-007) | `409` |
+| Vượt `MaxVariantCombinations` | chọn quá nhiều giá trị | **Ném** `eCommerce:Catalog:0009` **trước khi ghi**; ghi metric `catalog_variant_combination_blocked_total` (NFR-008) | `400` + số tổ hợp + ngưỡng |
 | Sinh tổ hợp trùng `AttributeHash` | bấm lại / dữ liệu đã có | **Đối chiếu** và giữ `Id`/`Sku` cũ; trả `Existing = N` | `200` |
-| SKU sinh ra đã tồn tại | trùng mã ngoài tổ hợp | **Ném** `eCommerce:Catalog:0004`; DB unique là chốt cuối | `409` |
-| Vẫn chèn được tổ hợp trùng dù đã kiểm (race) | Redis chết / 2 instance | DB unique `(TenantId, ProductVariantId, AttributeHash)` **NÉM** ⇒ bọc thành `eCommerce:Catalog:0005` | `409` |
-| Thuộc tính `Variant` đang được biến thể dùng mà bị xoá | thao tác sai | **Ném** `eCommerce:Catalog:0006`; chỉ cho `IsActive = false` | `409` |
-| Vượt độ sâu `MaxDepth` | tạo/move nút quá sâu | **Ném** `eCommerce:Catalog:0007`; `CHECK` ở DB là chốt cuối | `400` |
+| SKU sinh ra đã tồn tại | trùng mã ngoài tổ hợp | **Ném** `eCommerce:Catalog:0002`; DB unique là chốt cuối | `409` |
+| Vẫn chèn được tổ hợp trùng dù đã kiểm (race) | Redis chết / 2 instance | DB unique `(TenantId, ProductVariantId, AttributeHash)` **NÉM** ⇒ bọc thành `eCommerce:Catalog:0022` | `409` |
+| Thuộc tính `Variant` đang được biến thể dùng mà bị xoá | thao tác sai | **Ném** `eCommerce:Catalog:0023`; chỉ cho `IsActive = false` | `409` |
+| Vượt độ sâu `MaxDepth` | tạo/move nút quá sâu | **Ném** `eCommerce:Catalog:0024`; `CHECK` ở DB là chốt cuối | `400` |
 | Không giành được khoá | instance khác đang chạy | **Ném** `eCommerce:Lock:0001` (`XC-003` D10 — **không** bỏ qua im lặng) | `409` |
 | Redis chết | sự cố hạ tầng | **Fail-open** theo `XC-003` E2: chạy tiếp; **unique index + FK** là hàng rào cuối. ⚠️ Bất biến "không chu trình" **không** được DB bảo vệ | bình thường (`XC-003` §12) |
 | `TenantId` rỗng khi tạo nút | thiếu ngữ cảnh tenant | Ghi `NULL` (hệ thống 1 tenant hiện nay — `XC-004` §5.2) | bình thường |
@@ -699,20 +710,20 @@ vì ABP ghép `KeyPrefix`; xem `XC-003` §5.4 dòng 252-256)*
 | TC-01 | Tạo nút gốc ⇒ `Path`/`Level` đúng | Unit | `CreateCategory(ParentId = null)` | `Path = /{id}/`, `Level = 0` | **BR-001**, BR-002 |
 | TC-02 | Tạo nút con ⇒ `Path` nối cha | Unit | cha có `Path = /A/`, `Level = 0` | `Path = /A/{id}/`, `Level = 1` | **BR-001** |
 | TC-03 | Di chuyển nhánh ⇒ **toàn bộ** cây con đổi `Path` | Unit + Integration | nhánh 3 cấp đổi cha | cả 3 nút có `Path`/`Level` mới | **BR-001/002** |
-| TC-04 | Di chuyển vào cây con của chính nó ⇒ **ném** | Unit | `Move(A, newParent = A.Con)` | `BusinessException` `eCommerce:Catalog:0001` | **BR-003** |
-| TC-05 | Vượt độ sâu ⇒ **ném** | Unit | tạo nút `Level = 6` | `BusinessException` `eCommerce:Catalog:0007` | **BR-004** |
-| TC-06 | Xoá danh mục còn nút con ⇒ **ném**, không xoá gì | Unit | nút có 2 con | `eCommerce:Catalog:0002`; số nút **không đổi** | **BR-005**, D9 |
-| TC-07 | Xoá danh mục còn sản phẩm ⇒ **ném** | Unit | nút có 3 `ProductCategory` | `eCommerce:Catalog:0002` | **BR-005** |
+| TC-04 | Di chuyển vào cây con của chính nó ⇒ **ném** | Unit | `Move(A, newParent = A.Con)` | `BusinessException` `eCommerce:Catalog:0020` | **BR-003** |
+| TC-05 | Vượt độ sâu ⇒ **ném** | Unit | tạo nút `Level = 6` | `BusinessException` `eCommerce:Catalog:0024` | **BR-004** |
+| TC-06 | Xoá danh mục còn nút con ⇒ **ném**, không xoá gì | Unit | nút có 2 con | `eCommerce:Catalog:0021`; số nút **không đổi** | **BR-005**, D9 |
+| TC-07 | Xoá danh mục còn sản phẩm ⇒ **ném** | Unit | nút có 3 `ProductCategory` | `eCommerce:Catalog:0021` | **BR-005** |
 | TC-08 | Gán danh mục chính mới ⇒ chính cũ tự `false` | Unit | sản phẩm đã có `IsPrimary = true` | **đúng một** `IsPrimary = true` | **BR-006** |
 | TC-09 | `Path`/`Level` **khớp** cây thật sau N thao tác | Unit (property) | 100 thao tác tạo/move ngẫu nhiên (seed cố định) | 100 % nút có `Path`/`Level` đúng; **0** chu trình | **NFR-003**, BR-002 |
 | TC-10 | Sinh tổ hợp: tích Descartes đúng số lượng | Unit | 2 màu × 3 size = 6 | 6 biến thể, mỗi biến thể 2 dòng `ProductVariantAttribute` | **BR-009** |
 | TC-11 | `AttributeHash` **ổn định theo thứ tự chọn** | Unit | chọn "Đỏ→M" và "M→Đỏ" | **cùng** hash; nếu chèn cả hai ⇒ `0005` | **BR-016**, D7 |
-| TC-12 | Vượt `MaxVariantCombinations` ⇒ **ném trước khi ghi** | Unit | 5 màu × 6 size × 4 chất liệu × 3 kiểu = 360 > 200 | `eCommerce:Catalog:0003`; **0** dòng nào được ghi | **BR-009**, D6 |
+| TC-12 | Vượt `MaxVariantCombinations` ⇒ **ném trước khi ghi** | Unit | 5 màu × 6 size × 4 chất liệu × 3 kiểu = 360 > 200 | `eCommerce:Catalog:0009`; **0** dòng nào được ghi | **BR-009**, D6 |
 | TC-13 | 2 luồng cùng sinh tổ hợp ⇒ **chỉ 1 thành công** | **Integration** (Redis + PostgreSQL) | 2 `Task` song song cùng `productId` | 1 thắng; luồng kia `eCommerce:Lock:0001`; **0** biến thể trùng | **BR-015**, NFR-004 |
 | TC-14 | Chèn trùng khi `TenantId = NULL` **bị chặn** | **Integration** (PostgreSQL) | 2 `Category` cùng `Code`, `TenantId = NULL` | DB **từ chối** (`duplicate key … NULLS NOT DISTINCT`) | **BR-018**, NFR-010 |
 | TC-15 | Sinh lại tổ hợp **giữ nguyên** `Id`/`Sku` cũ | Unit | sinh lần 1, thêm 1 giá trị, sinh lần 2 | tổ hợp cũ **không đổi** `Id`/`Sku`; chỉ thêm mới | **BR-013**, A1 |
 | TC-16 | Thuộc tính `Specification` **không** sinh tổ hợp | Unit | 1 `Specification` + 1 `Variant` | số biến thể = tích của **chỉ** `Variant` | **BR-008** |
-| TC-17 | Xoá biến thể đã có giao dịch ⇒ **ném** | Unit | biến thể có `StockLedgerEntry` cùng SKU | `eCommerce:Catalog:0006` | **BR-012**, D9 |
+| TC-17 | Xoá biến thể đã có giao dịch ⇒ **ném** | Unit | biến thể có `StockLedgerEntry` cùng SKU | `eCommerce:Catalog:0023` | **BR-012**, D9 |
 | TC-18 | Hiệu năng lấy cây 500 nút | **Integration** | 500 nút, 5 cấp | p95 **< 50 ms** | **NFR-001** |
 | TC-19 | Hiệu năng sinh 200 tổ hợp | **Integration** | 200 tổ hợp | p95 **< 1 s** | **NFR-002** |
 | TC-20 | Mọi app service Catalog có `[Authorize]` cấp class | Unit (reflection) | quét type `*AppService` của Catalog | **100 %** | **BR-020**, NFR-005 |
@@ -746,7 +757,7 @@ public class CategoryTreeTests
         var sut = GetRequiredService<ICategoryTreeService>();
 
         var ex = await Assert.ThrowsAsync<BusinessException>(() => sut.MoveAsync(nutChaId, nutConId));
-        Assert.Equal("eCommerce:Catalog:0001", ex.Code);
+        Assert.Equal("eCommerce:Catalog:0020", ex.Code);
     }
 
     // TC-09 — Path va Level PHAI khop cay that sau nhieu thao tac (NFR-003)
@@ -777,7 +788,7 @@ public class VariantCombinationTests
         var ex = await Assert.ThrowsAsync<BusinessException>(() => sut.GenerateVariantsAsync(
             new GenerateVariantsDto { ProductId = productId, Selections = Selections360(), IdempotencyKey = "tc12" }));
 
-        Assert.Equal("eCommerce:Catalog:0003", ex.Code);
+        Assert.Equal("eCommerce:Catalog:0009", ex.Code);
         Assert.Equal(truoc, await DemBienTheAsync(productId)); // KHONG ghi dong nao
     }
 

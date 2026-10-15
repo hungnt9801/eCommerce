@@ -630,8 +630,9 @@ khi Order intake đăng ký handler cho `ChannelOrderPulledEto`, fail-closed **t
 ### Việc tiếp theo (thứ tự đề xuất)
 
 1. **`CAT-002`/`CAT-003`** — danh mục (cây), thuộc tính, media/slug/hiển thị theo kênh.
-   ✅ **ETO đã có** (`CAT-001` §18) và đã **phân loại đúng**; **còn**: **người nhận** cho
-   `ProductPublishedEto`/`VariantPriceChangedEto` (thuộc `CHN-*` đẩy catalog lên sàn và `WEB-002` xoá cache).
+   ✅ **ETO đã có** (`CAT-001` §18) và đã **phân loại đúng**; ✅ **mã lỗi đã chốt sổ đăng ký**
+   (`CAT-001` §19: `CAT-002` dùng dải `0020+`; mã khoá phân tán dùng chung `eCommerce:Lock:0001`).
+   **Còn**: **người nhận** cho `ProductPublishedEto`/`VariantPriceChangedEto` (thuộc `CHN-*` và `WEB-002`).
 2. 🚨 **Cần người quyết:** `AbpExceptionHandlingOptions` có nên ánh xạ `BusinessException` → **`400`/`409`**
    thay vì **`403`**? Hiện lỗi nghiệp vụ **trùng mã trạng thái với lỗi thiếu quyền** ⇒ client/QA không
    phân biệt được (`CAT-001` **§17.3**). Đây là **thay đổi hợp đồng API toàn hệ thống** nên **không** tự ý làm.
