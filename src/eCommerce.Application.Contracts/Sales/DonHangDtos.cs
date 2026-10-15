@@ -36,6 +36,17 @@ public class TaoDonTuCheckoutInput
     public string? Note { get; set; }
 }
 
+/// <summary>Một dòng khách trả: SKU + số lượng (phải ≥ 1 và **không vượt** số còn lại của dòng đơn).</summary>
+public class TraHangLineDto
+{
+    [Required]
+    [StringLength(64)]
+    public string Sku { get; set; } = default!;
+
+    [Range(1, int.MaxValue, ErrorMessage = "Số lượng trả phải ≥ 1.")]
+    public int Quantity { get; set; }
+}
+
 public class DonHangDto
 {
     public Guid Id { get; set; }
@@ -83,7 +94,12 @@ public interface IDonHangAppService : IApplicationService
     /// 📌 `WarehouseId` phải **do bên gọi cấp**: `Order` **không** lưu kho (một đơn có thể giao từ nhiều kho —
     /// `INV-003`), nên không thể suy ra. **NÉM** nếu đơn không ở trạng thái cho phép trả hàng.
     /// </summary>
-    Task<DonHangDto> TraHangAsync(Guid id, Guid warehouseId, DateTime? at = null);
+    /// <summary>
+    /// **Trả hàng MỘT PHẦN**: `lines` **để trống** ⇒ trả **toàn bộ** đơn còn lại; có `lines` ⇒ chỉ trả các dòng đó.
+    /// 🚨 **NÉM** nếu **luỹ kế** số đã trả (các lần trước **cộng lại**) **vượt** số đã mua — *trả hai lần cho cùng
+    /// một món* là lỗi **không sửa được** vì sổ cái **append-only** (phải tạo chứng từ đảo).
+    /// </summary>
+    Task<DonHangDto> TraHangAsync(Guid id, Guid warehouseId, List<TraHangLineDto>? lines = null, DateTime? at = null);
 
     Task<DonHangDto> GetAsync(Guid id);
 }

@@ -223,7 +223,7 @@ public class DonHangAppService : ApplicationService, IDonHangAppService
     /// **NÉM** nếu đơn ở `Pending` (chưa xuất kho ⇒ huỷ, không phải trả hàng) hoặc đã `Cancelled`/`Returned`.
     /// </summary>
     [Authorize(eCommerceConsts.Permissions.Orders.Manage)]
-    public async Task<DonHangDto> TraHangAsync(Guid id, Guid warehouseId, DateTime? at = null)
+    public async Task<DonHangDto> TraHangAsync(Guid id, Guid warehouseId, List<TraHangLineDto>? lines = null, DateTime? at = null)
     {
         var don = await _donRepository.GetAsync(id);
 
@@ -250,6 +250,72 @@ public class DonHangAppService : ApplicationService, IDonHangAppService
             throw new BusinessException(InventoryErrorCodes.ChungTuThieuDong).WithData("number", don.Number);
         }
 
+        // ── 🚨 GIỚI HẠN LUỸ KẾ: đã trả bao nhiêu (các lần TRƯỚC) + lần này ≤ đã mua ─────────────────────
+        // 📌 Vì sao phải LUỸ KẾ chứ không chỉ kiểm lần này: khách trả 2 rồi trả 2 nữa (đơn mua 4) — nếu chỉ kiểm
+        // "lần này ≤ 4" thì **cả hai lần đều hợp lệ** ⇒ **trả 4 mà nhập lại 8** ⇒ **thừa hàng ảo**.
+        // Và vì sổ cái **append-only**, sửa lại phải **tạo chứng từ đảo** ⇒ đây là lỗi **đắt** để sửa.
+        var maTienTo = $"TH-{don.Number}";
+
+        var phieuTraCu = await _phieuKho.GetListAsync(StockDocumentType.CustomerReturn);
+        var idPhieuTraCu = phieuTraCu.Where(x => x.Number.StartsWith(maTienTo, StringComparison.Ordinal))
+            .Select(x => x.Id).ToList();
+
+        var daTraTheoSku = new Dictionary<string, int>(StringComparer.Ordinal);
+
+        foreach (var idPhieu in idPhieuTraCu)
+        {
+            foreach (var d in await _phieuKho.GetLinesAsync(idPhieu))
+            {
+                daTraTheoSku[d.Sku] = daTraTheoSku.TryGetValue(d.Sku, out var cu) ? cu + d.Quantity : d.Quantity;
+            }
+        }
+
+        // `lines` rỗng ⇒ trả **toàn bộ phần CÒN LẠI** (không phải "toàn bộ đơn" — nếu đã trả một phần thì chỉ trả nốt).
+        var yeuCau = dongDon
+            .Select(x => new
+            {
+                x.Sku,
+                DaMua = x.Quantity,
+                DaTra = daTraTheoSku.TryGetValue(x.Sku, out var t) ? t : 0,
+                YeuCau = lines is { Count: > 0 }
+                    ? lines.Where(l => l.Sku == x.Sku).Sum(l => l.Quantity)
+                    : Math.Max(0, x.Quantity - (daTraTheoSku.TryGetValue(x.Sku, out var t2) ? t2 : 0))
+            })
+            .Where(x => x.YeuCau > 0)
+            .ToList();
+
+        var vuot = yeuCau.Where(x => x.DaTra + x.YeuCau > x.DaMua).ToList();
+
+        if (vuot.Count > 0)
+        {
+            throw new BusinessException(eCommerceConsts.ErrorCodes.InsufficientStock)
+                .WithData("number", don.Number)
+                .WithData("lyDo", "Trả hàng VƯỢT số đã mua (tính LUỸ KẾ các lần trả trước).")
+                .WithData("chiTiet", string.Join("; ", vuot.Select(x =>
+                    $"{x.Sku}: đã mua {x.DaMua}, đã trả {x.DaTra}, lần này {x.YeuCau}")));
+        }
+
+        if (yeuCau.Count == 0)
+        {
+            throw new BusinessException(InventoryErrorCodes.ChungTuThieuDong)
+                .WithData("number", don.Number)
+                .WithData("lyDo", "Không còn gì để trả (đã trả hết).");
+        }
+
+        // `lines` có SKU không thuộc đơn ⇒ NÉM (nếu im lặng bỏ qua thì khách tưởng đã trả mà hệ thống không ghi gì).
+        if (lines is { Count: > 0 })
+        {
+            var skuDon = dongDon.Select(x => x.Sku).ToHashSet(StringComparer.Ordinal);
+            var skuLa = lines.Select(l => l.Sku).Where(s => !skuDon.Contains(s)).Distinct(StringComparer.Ordinal).ToList();
+
+            if (skuLa.Count > 0)
+            {
+                throw new BusinessException(eCommerceConsts.ErrorCodes.InsufficientStock)
+                    .WithData("number", don.Number)
+                    .WithData("skuKhongThuocDon", string.Join(", ", skuLa));
+            }
+        }
+
         var thoiDiem = at ?? Clock.Now;
 
         // 📌 Dùng LẠI dịch vụ kho: tạo phiếu nhập + ghi sổ ⇒ mọi bất biến của `INV-001` (chứng từ & ghi sổ hai bước,
@@ -263,16 +329,22 @@ public class DonHangAppService : ApplicationService, IDonHangAppService
             WarehouseId = warehouseId,
             OccurredAtUtc = thoiDiem,
             Note = $"Trả hàng cho đơn {don.Number}",
-            Lines = dongDon.Select(x => new eCommerce.Application.Contracts.Inventory.CreateStockDocumentLineDto
+            Lines = yeuCau.Select(x => new eCommerce.Application.Contracts.Inventory.CreateStockDocumentLineDto
             {
                 Sku = x.Sku,
-                Quantity = x.Quantity
+                Quantity = x.YeuCau
             }).ToList()
         });
 
         var ketQua = await _phieuKho.GhiSoAsync(phieu.Id, thoiDiem);
 
-        don.SetStatus(OrderStatus.Returned);
+        // 📌 **Trạng thái:** chỉ `Returned` khi **đã trả HẾT**; trả một phần thì **giữ `Confirmed`**.
+        // ⚠️ **GHI NHẬN:** chưa có trạng thái `PartiallyReturned` ⇒ đơn trả một phần **trông như** đơn chưa trả gì.
+        // Cần trạng thái/cờ riêng (lát cắt sau) — **không** tự bịa trạng thái mới ở đây vì nó đổi hợp đồng API.
+        var sauKhiTra = yeuCau.ToDictionary(x => x.Sku, x => x.DaTra + x.YeuCau, StringComparer.Ordinal);
+        var conLai = dongDon.Any(x => sauKhiTra[x.Sku] < x.Quantity);
+
+        don.SetStatus(conLai ? OrderStatus.Confirmed : OrderStatus.Returned);
         await _donRepository.UpdateAsync(don, autoSave: true);
 
         Logger.LogInformation(

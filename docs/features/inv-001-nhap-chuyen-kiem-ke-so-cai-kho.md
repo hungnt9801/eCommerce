@@ -2029,3 +2029,63 @@ dữ liệu cũ (0/1/2) **không bị diễn giải lại**.
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.6 | 15/10/2026 | *(agent, session GĐ1)* | **Loại chứng từ `CustomerReturn` riêng**: `StockDocumentType.CustomerReturn = 3` (**cuối dải**, không cần migration) + nhánh trong `TinhButToanChungTu` + `TraHangAsync` dùng loại riêng ⇒ sổ cái ghi **`CustomerReturn`** thay vì `Receipt` ⇒ tách bạch *bán/trả*. **+3 unit** (gồm test khoá **điểm mù**: *cả hai loại đều tăng `OnHand`* nên lỗi này **không** bị bắt ở đâu khác). **Kiểm chứng HTTP**: bút toán trả hàng nay **`MovementType = 4`**; các bất biến của §30 **giữ nguyên** (`10/0/10`, idempotent, huỷ bị chặn, đối soát `0`, `fail: 0`) |
+
+---
+
+## 32. `SAL-004` (tiếp) — **TRẢ HÀNG MỘT PHẦN + GIỚI HẠN LUỸ KẾ** — *đã viết; kiểm chứng HTTP **CHƯA XONG*** (15/10/2026)
+
+### 32.1 Đã làm (mã nguồn)
+
+`TraHangAsync(id, warehouseId, lines = null, at = null)`:
+- **`lines` để trống** ⇒ trả **phần CÒN LẠI** (không phải "toàn bộ đơn" — nếu đã trả một phần thì chỉ trả nốt);
+- **`lines` có giá trị** ⇒ chỉ trả các dòng đó;
+- 🚨 **GIỚI HẠN LUỸ KẾ:** `đã trả (các lần TRƯỚC) + lần này ≤ đã mua`.
+  📌 **Vì sao phải LUỸ KẾ chứ không chỉ kiểm lần này:** khách trả `2` rồi trả `2` nữa (đơn mua `4`) — nếu chỉ kiểm
+  *"lần này ≤ 4"* thì **cả hai lần đều hợp lệ** ⇒ **trả 4 mà nhập lại 8** ⇒ **thừa hàng ảo**. Và vì sổ cái
+  **append-only**, sửa lại phải **tạo chứng từ đảo** ⇒ đây là lỗi **đắt** để sửa.
+  "Đã trả" được tính từ **chính các phiếu trả trước** (`Number` bắt đầu `TH-{số đơn}`) — **không** cần bảng mới.
+- SKU **không thuộc đơn** ⇒ **NÉM** (nếu im lặng bỏ qua thì khách tưởng đã trả mà hệ thống **không ghi gì**).
+- **Trạng thái:** chỉ `Returned` khi **đã trả HẾT**; trả một phần **giữ `Confirmed`**.
+
+⚠️ **GHI NHẬN (chưa xử lý):** chưa có trạng thái `PartiallyReturned` ⇒ **đơn trả một phần trông NHƯ đơn chưa trả gì**.
+Cần trạng thái/cờ riêng — **không** tự bịa trạng thái mới vì nó **đổi hợp đồng API** (cần người quyết).
+
+### 32.2 ✅ Phần **ĐÃ** kiểm chứng (HTTP thật)
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 0 | mua 4 → xác nhận | `Confirmed` · `6/0/6` ✅ |
+| 2 | **trả nốt phần còn lại** (`lines` để trống) | `200` · **`Returned`** · **`10/0/10`** ✅ |
+| 4 | sổ cái | `Receipt 10` · `Reservation 4` · `Sale 4` · `ReservationRelease 4` · **`CustomerReturn 4`** ✅ |
+| 5 | **đối soát kho** | **`soCapLech = 0`** ✅ |
+| 7 | log | **`fail: 0`** ✅ · dọn dẹp 0/0/0/0 ✅ |
+
+- build `--no-incremental`: **0 lỗi / 0 cảnh báo** · unit **693/693** · integration **38/38**
+
+### 32.3 🚨 Phần **CHƯA** kiểm chứng — ghi rõ, **không** tuyên bố là đã xong
+
+Hai phép đo **quan trọng nhất** của lát cắt này **CHƯA chạy được**:
+
+| Phép đo dự kiến | Kết quả thực tế | Đánh giá |
+|---|---|---|
+| **trả MỘT PHẦN `2/4`** ⇒ `OnHand` `6 → 8`, trạng thái **vẫn `Confirmed`** | **`HTTP 400`** (không đổi tồn kho) | 🚨 **CHƯA kiểm chứng** |
+| **trả VƯỢT** (sau khi đã trả hết) ⇒ **bị chặn** | **`HTTP 400`** | 🚨 **CHƯA kiểm chứng** |
+
+**Nguyên nhân nghi ngờ (chưa khẳng định):** **dạng body** cho tham số `lines`.
+`TraHangAsync(…, List<TraHangLineDto>? lines = null, …)` là **một** tham số phức tạp ⇒ ASP.NET Core bind **cả body**
+vào `List<T>`; probe của tôi gửi **`{ "lines": [ … ] }`** (bọc trong object) ⇒ **400**.
+Lần thử sửa sang **mảng trần** (`[ { … } ]`) **không** được áp vào tệp probe (thay thế chuỗi **không khớp**) nên
+kết quả trên **vẫn là của dạng body cũ**.
+⇒ 📌 **Việc của lát cắt sau (rẻ, một lần chạy):** xác định dạng đúng (mảng trần **hoặc** tham số `[FromBody]` bọc trong
+DTO riêng), rồi chạy lại **hai** phép đo trên. 📌 Nếu hoá ra **phải** bọc trong DTO thì cân nhắc **đổi chữ ký** cho
+**tường minh** (`TraHangInput { WarehouseId, Lines, At }`) — hợp đồng API rõ hơn là phụ thuộc quy tắc bind ngầm.
+
+📌 **Bài học phương pháp (vòng 40):** `Select-Object -First N` **ngắt pipeline** ⇒ khi nó nằm sau một tiến trình con
+(`pwsh -File`) thì tiến trình bị **giết** và **mất toàn bộ output** (exit 1, không dòng nào). ⇒ Khi chạy probe dài,
+**ghi ra tệp** rồi **đọc tệp**, đừng lọc bằng `-First` trên pipeline của tiến trình con.
+
+### 32.4 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.7 | 15/10/2026 | *(agent, session GĐ1)* | **Trả hàng MỘT PHẦN + giới hạn LUỸ KẾ** (đã viết): `lines` tuỳ chọn ⇒ trả phần còn lại / trả dòng chỉ định; **luỹ kế** `đã trả + lần này ≤ đã mua` (tính từ **chính các phiếu trả trước**, không cần bảng mới); SKU lạ ⇒ **NÉM**; chỉ `Returned` khi trả **hết**. **Đã kiểm chứng**: trả nốt phần còn lại (`10/0/10`, `CustomerReturn`), đối soát `0`, `fail: 0`. 🚨 **CHƯA kiểm chứng** hai phép đo cốt lõi (trả một phần · trả vượt) — **`HTTP 400` do dạng body của `lines`**; ghi rõ §32.3 + cách xử lý ở lát cắt sau. Ghi **bài học `Select-Object -First` ngắt pipeline** |
