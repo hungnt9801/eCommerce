@@ -1893,3 +1893,49 @@ Cả hai lỗi ở §66.2 đều **không** liên quan nghiệp vụ, nhưng **�
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.g | 15/10/2026 | *(agent, session GĐ1)* | **Thử đo đường nối UI→API cho HUỶ và TRẢ HÀNG — CHƯA chạy được** do **hai lỗi probe của tôi**: (1) **ngoặc đơn lệch** ⇒ `ParserError` ⇒ không dòng nào chạy; (2) sau khi sửa cú pháp, dừng ở **`LayToken`** (Host chưa sẵn sàng). ✅ **Không ảnh hưởng sản phẩm**: dọn dẹp sạch (`don=0 … baoMat=true`), **0 tiến trình treo**, `git status` sạch. 🚨 **Nợ ghi rõ**: `HUỶ`/`TRẢ HÀNG` trên đơn do Web tạo **chưa kiểm chứng** (dù đã kiểm **đầy đủ ở tầng API** trên đơn do API tạo). **Bài học #12**: *kiểm cú pháp bằng `Parser::ParseFile` TRƯỚC mọi probe dài; tách biểu thức ghép thành nhiều dòng; chờ Host phải kiểm bằng `200`* |
+
+---
+
+## 67. **PHÂN TÍCH ĐỊNH DẠNG SỐ ĐƠN `WEB-…` — KHOANH VÙNG RỦI RO BẰNG ĐO** (15/10/2026) — *bổ sung §66.3*
+
+### 67.1 Đọc MÃ để biết chỗ nào **thật sự** phụ thuộc `don.Number`
+
+| Hàm | Phụ thuộc `don.Number`? | Bằng chứng trong mã |
+|---|---|---|
+| **`HuyDonAsync`** | ✅ **KHÔNG** | nhả chỗ qua **`CheckoutIdempotencyKey`** (`$"Checkout:{don.CheckoutIdempotencyKey}"`); `don.Number` xuất hiện **chỉ** trong `WithData("number", …)` (thông báo lỗi) và **log** ⇒ **không** ảnh hưởng hành vi |
+| **`TraHangAsync`** | 🚨 **CÓ** (2 chỗ) | `var maTienTo = $"TH-{don.Number}";` và `phieuTraCu.Where(x => x.Number.StartsWith(maTienTo, …))` — dùng để **đặt số phiếu trả** và **tính LUỸ KẾ đã trả** |
+
+📌 **Điểm quan trọng:** ở `TraHangAsync`, **cả hai** chỗ dùng **CÙNG MỘT công thức** `TH-{don.Number}` (một chỗ **ghi**, một chỗ **đọc**)
+⇒ với đơn Web (`Number = "WEB-{khoá}"`) số phiếu là `TH-WEB-{khoá}` **nhất quán** ở cả hai phía ⇒ **không** lệch do định dạng.
+
+### 67.2 🎯 Rủi ro CÒN LẠI đã **ĐO** (không suy đoán): **độ dài có vượt cột không?**
+
+`Number` của đơn Web = `"WEB-"` + 20 ký tự khoá = **24**; số phiếu trả = `"TH-"` + số đơn = **27** *(và `TH-{đơn}-{n}` khi trả nhiều lần ≈ **29–30**)*.
+
+| Cột | Độ dài tối đa (đo từ `information_schema`) |
+|---|---|
+| `InvStockDocuments.Number` | **64** |
+| `OrdOrders.Number` | **64** |
+| `OrdOrders.CheckoutIdempotencyKey` | **128** |
+
+⇒ **`27 < 64`** và **`30 < 64`** ✅ ⇒ **KHÔNG có rủi ro tràn cột** ⇒ **rủi ro định dạng `WEB-…` cho `TraHangAsync` ĐÃ ĐƯỢC LOẠI BẰNG ĐO**.
+📌 Và `CheckoutIdempotencyKey` (**128**) chứa thoải mái khoá `WEB-{20}` (**24**) ✅.
+
+### 67.3 ⚠️ PHÂN BIỆT RÕ: cái gì **ĐÃ ĐO** — cái gì **vẫn là SUY LUẬN**
+
+| Khẳng định | Loại |
+|---|---|
+| `HuyDonAsync` **không** dùng `Number` cho hành vi | ✅ **ĐỌC MÃ** (bằng chứng cụ thể) |
+| `TraHangAsync` **có** dùng `Number` (số phiếu + luỹ kế), **cùng một công thức** ở cả hai phía | ✅ **ĐỌC MÃ** |
+| Độ dài `24`/`27`/`29–30` **< 64** ⇒ không tràn cột | ✅ **ĐO** (`information_schema`) |
+| **`HUỶ`/`TRẢ HÀNG` chạy được trên đơn do WEB tạo** | 🚨 **VẪN CHƯA ĐO** (2 lần probe hỏng vì lỗi công cụ của tôi, §66.2) |
+
+📌 **Vì sao vẫn phải đo hành vi dù phân tích đã khoanh vùng:** phân tích nói *"không có lý do **cấu trúc** nào để hỏng"*,
+nhưng nó **không** loại được các nguyên nhân **không nằm trong mã tôi đọc** (ví dụ: ràng buộc DB khác · trạng thái chuyển
+tiếp bị chặn · đường gọi app service ở Web khác API). ⇒ **Kết luận trung thực: rủi ro THẤP nhưng CHƯA BẰNG KHÔNG.**
+
+### 67.4 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.f | 15/10/2026 | *(agent, session GĐ1)* | **Khoanh vùng rủi ro định dạng `WEB-…` bằng ĐO** (bổ sung §66.3): **đọc mã** ⇒ `HuyDonAsync` **không** phụ thuộc `Number` (tra `CheckoutIdempotencyKey`), `TraHangAsync` **có** (số phiếu `TH-{Number}` + luỹ kế) nhưng **cùng một công thức ở cả hai phía**; **đo `information_schema`** ⇒ `Number` tối đa **64** > `27`/`29–30` ⇒ **không tràn cột**. 🚨 **Vẫn ghi rõ nợ:** *hành vi* `HUỶ`/`TRẢ HÀNG` trên đơn do Web tạo **CHƯA đo** — **rủi ro thấp nhưng chưa bằng không** |
