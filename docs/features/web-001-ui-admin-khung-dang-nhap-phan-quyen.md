@@ -884,3 +884,45 @@ Chỉ phát hiện được khi **nghĩ tới** hoặc khi nhìn log thật củ
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.2 | 15/10/2026 | *(agent, session GĐ1)* | **Tạo `src/eCommerce.Web`** (theme Basic miễn phí + `Volo.Abp.Account.Web`) ⇒ **màn hình đăng nhập chạy thật** (đăng nhập `admin` vào được trang chủ quản trị). Sửa **2 lỗi im lặng**: scheme xác thực mặc định (**16.4**, kiểm chứng ngược bằng đột biến) và worker chạy hai lần (**16.5**). Ghi nhận việc còn lại ở **16.6** |
+
+---
+
+## 47. **KIỂM CHỨNG HỒI QUY WEB (15/10/2026)** — cổng đăng nhập **VẪN ĐÚNG**; và **một lỗi KỸ THUẬT ĐO của tôi**
+
+### 47.1 Vì sao đo lại
+
+Web **chưa được đo lại từ ~vòng 20**, trong khi từ đó tới nay đã có **~30 vòng** thay đổi (khoá, job, phân quyền, route). ⇒ Phải kiểm
+**cổng đăng nhập** còn đúng chuẩn đã ghi ở §… (`GET /` chưa đăng nhập ⇒ `302` → `/Account/Login?ReturnUrl=%2F`) hay **đã hồi quy**.
+
+### 47.2 🚨 **Lỗi KỸ THUẬT ĐO của tôi — và cách sửa**
+
+| Lần đo | Tôi báo | Sự thật |
+|---|---|---|
+| Đầu tiên | `GET /` ⇒ **`HTTP 200`** ⇒ *"nghi hồi quy"* | 🚨 **SAI CÁCH ĐO**: `Invoke-WebRequest` **TỰ ĐỘNG ĐI THEO REDIRECT** ⇒ `StatusCode` là của **phản hồi CUỐI** (trang đăng nhập), **không** phải `302` của phản hồi **ĐẦU** |
+| Sau khi kiểm kỹ | URL cuối = **`/Account/Login?ReturnUrl=%2F`** ✅ · nội dung = **form đăng nhập** ✅ · **không** có nội dung quản trị ✅ | ⇒ **CỔNG ĐĂNG NHẬP HOẠT ĐỘNG ĐÚNG** |
+
+📌 **Cách đo ĐÚNG cho mọi lần sau** (ghi vào quy trình):
+- dùng **`-MaximumRedirection 0`** (hoặc kiểm **`BaseResponse.RequestMessage.RequestUri`** sau khi gọi), **KHÔNG** đọc `StatusCode` trần;
+- nếu muốn chắc chắn **không rò nội dung**, kiểm **thân phản hồi**: có **form đăng nhập** và **KHÔNG** có nội dung quản trị.
+
+📌 **Vì sao bài học này đáng ghi:** nếu tôi tin `StatusCode` trần, tôi đã **báo động hồi quy giả** — hoặc tệ hơn, lần sau gặp
+một cổng **thật sự hỏng** thì **không phân biệt được** với trường hợp này. **Đo sai cách còn nguy hiểm hơn không đo**, vì nó
+sinh ra **kết luận tự tin nhưng sai**.
+
+### 47.3 ✅ Kết quả kiểm chứng hồi quy
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | `GET /` chưa đăng nhập ⇒ **URL cuối** | **`http://localhost:5100/Account/Login?ReturnUrl=%2F`** ✅ |
+| 2 | Thân phản hồi cuối | **có form đăng nhập** ✅ · **KHÔNG** có nội dung quản trị ✅ |
+| 3 | `GET /Account/Login` | **`200`** · nội dung **`10.145`** ký tự · **có `<form>`** ✅ |
+| 4 | `[Authorize]` cấp class trên `HomeController` | **còn nguyên** ✅ (`HomeController.cs:14`) |
+| 5 | Log Web | **`fail: 0`** ✅ · 16 dòng |
+
+⇒ **Không có hồi quy**: cổng đăng nhập (bước 1 của state machine 7 bước) **vẫn đúng** sau ~30 vòng thay đổi.
+
+### 47.4 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.x | 15/10/2026 | *(agent, session GĐ1)* | **Kiểm chứng hồi quy Web**: cổng đăng nhập vẫn đúng — `GET /` chưa đăng nhập ⇒ URL cuối **`/Account/Login?ReturnUrl=%2F`**, thân là **form đăng nhập**, **không** rò nội dung quản trị; `[Authorize]` cấp class còn nguyên; **`fail: 0`**. 🚨 **Sửa lỗi KỸ THUẬT ĐO của tôi**: `Invoke-WebRequest` **tự đi theo redirect** ⇒ đọc `StatusCode` trần cho ra `200` và **suýt bị báo thành hồi quy**; ghi cách đo đúng (**`-MaximumRedirection 0`** hoặc kiểm **URL cuối** + **thân phản hồi**) |
