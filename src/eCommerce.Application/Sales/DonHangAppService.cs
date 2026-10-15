@@ -33,6 +33,7 @@ public class DonHangAppService : ApplicationService, IDonHangAppService
     private readonly IPriceCalculationAppService _tinhGia;
     private readonly ChotGiuChoService _chotGiuCho;
     private readonly StockReservationService _giuChoService;
+    private readonly eCommerce.Application.Contracts.Inventory.IStockDocumentAppService _phieuKho;
 
     public DonHangAppService(
         IRepository<Order, Guid> donRepository,
@@ -40,7 +41,8 @@ public class DonHangAppService : ApplicationService, IDonHangAppService
         IRepository<StockReservation, Guid> giuChoRepository,
         IPriceCalculationAppService tinhGia,
         ChotGiuChoService chotGiuCho,
-        StockReservationService giuChoService)
+        StockReservationService giuChoService,
+        eCommerce.Application.Contracts.Inventory.IStockDocumentAppService phieuKho)
     {
         _donRepository = donRepository;
         _dongDonRepository = dongDonRepository;
@@ -48,6 +50,7 @@ public class DonHangAppService : ApplicationService, IDonHangAppService
         _tinhGia = tinhGia;
         _chotGiuCho = chotGiuCho;
         _giuChoService = giuChoService;
+        _phieuKho = phieuKho;
     }
 
     [Authorize(eCommerceConsts.Permissions.Orders.Manage)]
@@ -211,6 +214,70 @@ public class DonHangAppService : ApplicationService, IDonHangAppService
 
         return ToDto(don, (int)await _dongDonRepository.CountAsync(x => x.OrderId == id),
             don.GrandTotal, don.CheckoutIdempotencyKey ?? "(không có)");
+    }
+
+    /// <summary>
+    /// 🚨 **TRẢ HÀNG** cho đơn đã xác nhận ⇒ **sinh phiếu NHẬP kho** (dùng lại `StockDocumentAppService` đã kiểm chứng)
+    /// ⇒ hàng **về kho thật** (`OnHand` tăng) ⇒ `Returned`.
+    /// 📌 **KHÔNG** xoá/đảo bút toán cũ: sổ cái **append-only** ⇒ trả hàng là **ghi bút toán MỚI**.
+    /// **NÉM** nếu đơn ở `Pending` (chưa xuất kho ⇒ huỷ, không phải trả hàng) hoặc đã `Cancelled`/`Returned`.
+    /// </summary>
+    [Authorize(eCommerceConsts.Permissions.Orders.Manage)]
+    public async Task<DonHangDto> TraHangAsync(Guid id, Guid warehouseId, DateTime? at = null)
+    {
+        var don = await _donRepository.GetAsync(id);
+
+        if (don.Status == OrderStatus.Returned)
+        {
+            // Idempotent: trả hàng hai lần ⇒ trả trạng thái hiện tại, KHÔNG nhập kho lần nữa (nhập hai lần = thừa hàng ảo).
+            return ToDto(don, (int)await _dongDonRepository.CountAsync(x => x.OrderId == id),
+                don.GrandTotal, don.CheckoutIdempotencyKey ?? "(không có)");
+        }
+
+        if (don.Status != OrderStatus.Confirmed && don.Status != OrderStatus.Shipped && don.Status != OrderStatus.Completed)
+        {
+            throw new BusinessException(eCommerceConsts.ErrorCodes.InsufficientStock)
+                .WithData("number", don.Number)
+                .WithData("status", don.Status.ToString())
+                .WithData("lyDo",
+                    "Chỉ đơn ĐÃ XÁC NHẬN (đã xuất kho) mới trả hàng được. Đơn `Pending` thì HUỶ, không phải trả hàng.");
+        }
+
+        var dongDon = await _dongDonRepository.GetListAsync(x => x.OrderId == id);
+
+        if (dongDon.Count == 0)
+        {
+            throw new BusinessException(InventoryErrorCodes.ChungTuThieuDong).WithData("number", don.Number);
+        }
+
+        var thoiDiem = at ?? Clock.Now;
+
+        // 📌 Dùng LẠI dịch vụ kho: tạo phiếu nhập + ghi sổ ⇒ mọi bất biến của `INV-001` (chứng từ & ghi sổ hai bước,
+        // khoá phân tán, `CHECK` DB) **được áp nguyên vẹn** thay vì viết một đường ghi tồn kho thứ hai.
+        var phieu = await _phieuKho.CreateAsync(new eCommerce.Application.Contracts.Inventory.CreateStockDocumentDto
+        {
+            Number = $"TH-{don.Number}",
+            Type = StockDocumentType.GoodsReceipt,
+            WarehouseId = warehouseId,
+            OccurredAtUtc = thoiDiem,
+            Note = $"Trả hàng cho đơn {don.Number}",
+            Lines = dongDon.Select(x => new eCommerce.Application.Contracts.Inventory.CreateStockDocumentLineDto
+            {
+                Sku = x.Sku,
+                Quantity = x.Quantity
+            }).ToList()
+        });
+
+        var ketQua = await _phieuKho.GhiSoAsync(phieu.Id, thoiDiem);
+
+        don.SetStatus(OrderStatus.Returned);
+        await _donRepository.UpdateAsync(don, autoSave: true);
+
+        Logger.LogInformation(
+            "TRẢ HÀNG đơn {Number}: phiếu nhập {Phieu} đã ghi sổ ({SoButToan} bút toán) ⇒ HÀNG VỀ KHO.",
+            don.Number, phieu.Number, ketQua.PostedEntries);
+
+        return ToDto(don, dongDon.Count, don.GrandTotal, don.CheckoutIdempotencyKey ?? "(không có)");
     }
 
     public async Task<DonHangDto> GetAsync(Guid id)

@@ -76,5 +76,14 @@ public interface IDonHangAppService : IApplicationService
     /// </summary>
     Task<DonHangDto> HuyDonAsync(Guid id, DateTime? at = null);
 
+    /// <summary>
+    /// 🚨 **TRẢ HÀNG** cho đơn **đã xác nhận** ⇒ sinh **phiếu NHẬP kho** (hàng về kho thật) ⇒ `Returned`.
+    /// 📌 **VÌ SAO KHÔNG xoá/đảo bút toán cũ:** sổ cái là **append-only** (`BR-004` tinh thần) ⇒ muốn "trả lại hàng"
+    /// thì phải **ghi một bút toán mới** (`Receipt`/`CustomerReturn`), **không** sửa quá khứ.
+    /// 📌 `WarehouseId` phải **do bên gọi cấp**: `Order` **không** lưu kho (một đơn có thể giao từ nhiều kho —
+    /// `INV-003`), nên không thể suy ra. **NÉM** nếu đơn không ở trạng thái cho phép trả hàng.
+    /// </summary>
+    Task<DonHangDto> TraHangAsync(Guid id, Guid warehouseId, DateTime? at = null);
+
     Task<DonHangDto> GetAsync(Guid id);
 }

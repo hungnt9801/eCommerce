@@ -1908,3 +1908,65 @@ làm luật **chặt hơn** (dễ ĐỎ), **không** làm nó **lỏng đi** (b�
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.4 | 15/10/2026 | *(agent, session GĐ1)* | **Đính chính §28.3 bằng BẰNG CHỨNG**: đo Host thật ⇒ `TaxUnclassifiedSkusWorker` **truy vấn DB không UoW mà KHÔNG ném** ⇒ lỗi `ObjectDisposedException` đến từ việc resolve **`*Service` miền**, **không** phải `IRepository<>`. Thêm **luật HẸP** (resolve `*Service` mà thiếu UoW ⇒ ĐỎ). 🎯 **Mutation test 3 lần**: lần 1 **không biên dịch** (vô nghĩa), lần 2 **phát hiện điểm yếu thật** — luật bị **thoả mãn bởi một dòng COMMENT** ⇒ sửa bằng **bỏ chú thích**, lần 3 **ĐỎ đúng tên**. Ghi bài học: *luật văn bản nguồn phải bỏ chú thích* |
+
+---
+
+## 30. `SAL-004` — **TRẢ HÀNG (khép vòng đời đơn CẢ HAI CHIỀU)** (15/10/2026)
+
+### 30.1 Đã làm — `DonHangAppService.TraHangAsync` (`POST /api/app/don-hang/{id}/tra-hang/{warehouseId}`)
+
+**TÁI DÙNG dịch vụ kho đã kiểm chứng** (`StockDocumentAppService.CreateAsync` + `GhiSoAsync`) thay vì viết đường ghi
+tồn kho thứ hai ⇒ mọi bất biến của `INV-001` **được áp nguyên vẹn**: chứng từ & ghi sổ **hai bước**, **khoá phân tán**
+theo `(tenant, kho, SKU)`, **`CHECK` ở DB**, `ReferenceLineId` chống ghi trùng.
+
+📌 **VÌ SAO "TRẢ HÀNG" LÀ GHI BÚT TOÁN MỚI, KHÔNG PHẢI XOÁ BÚT TOÁN CŨ:** sổ cái là **append-only** ⇒ muốn trả lại
+hàng thì phải **ghi một chứng từ nhập MỚI**. Xoá/đảo bút toán cũ sẽ phá **chính khả năng truy vết** mà sổ cái tồn tại vì nó.
+📌 **`WarehouseId` do bên gọi cấp**: `Order` **không** lưu kho (một đơn có thể giao từ nhiều kho — việc của `INV-003`)
+nên **không thể suy ra** — đoán kho là **nhập hàng vào kho sai**.
+
+**Quy tắc trạng thái:** chỉ đơn **đã xác nhận** (`Confirmed`/`Shipped`/`Completed`) mới trả hàng được;
+`Pending` ⇒ phải **HUỶ** (chưa xuất kho thì chỉ cần nhả chỗ); `Returned` ⇒ **idempotent**.
+
+### 30.2 ✅ BẰNG CHỨNG HTTP THẬT — **vòng đời đơn khép CẢ HAI CHIỀU**
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 0 | checkout giữ 4 → đơn → **XÁC NHẬN** | `Confirmed` · **`6/0/6`** ✅ |
+| 1 | 🔥 **TRẢ HÀNG** | `200` · **`Returned`** · **`10/0/10`** ✅ — **hàng VỀ KHO thật** |
+| 1b | **Sổ cái (5 bút toán)** | `Receipt 10` · `Reservation 4` · **`Sale 4`** · **`ReservationRelease 4`** · **`Receipt 4`** (phiếu nhập trả hàng) ✅ |
+| 1c | **Chứng từ kho (2 phiếu)** | phiếu nhập gốc `TH-…-1` **`Posted`** + **`TH-TH-…-O1`** (trả hàng) **`Posted`** ✅ |
+| 2 | **Trả hàng LẦN HAI** | `Returned` · vẫn `10/0/10` ✅ (**idempotent** — không nhập kho thêm ⇒ không **thừa hàng ảo**) |
+| 3 | **Huỷ đơn SAU khi đã xác nhận** | `403` **`Inventory:0001`** ✅ — *phải **trả hàng**, không phải huỷ* |
+| 4 | 🔥 **Đối soát kho** | **`soCapLech = 0`** ✅ |
+| 5–6 | Dọn dẹp · log | 0 đơn / 0 chứng từ / 0 tồn / 0 sổ cái ✅ · **`fail: 0`** ✅ |
+
+- build `--no-incremental`: **0 lỗi / 0 cảnh báo** · unit **690/690** · integration **38/38** · mermaid 197/0 · **không đổi schema**
+
+### 30.3 Vòng đời đơn hàng — nay **KÍN CẢ HAI CHIỀU**
+
+| Trạng thái | Đường vào | Tồn kho |
+|---|---|---|
+| (giỏ) | `checkout` | **giữ chỗ** (`Reserved` ↑, `Available` ↓) |
+| `Pending` | `tao-tu-checkout` | không đổi (hàng vẫn **đang giữ**) |
+| `Confirmed` | `xac-nhan` | **xuất kho** (`OnHand` ↓ **và** `Reserved` ↓ ⇒ `Available` **không đổi**) |
+| `Cancelled` | `huy-don` (từ `Pending`) | **nhả chỗ NGAY** (`Reserved` ↓ ⇒ `Available` ↑) |
+| `Returned` | `tra-hang` (từ `Confirmed`) | **nhập kho** (`OnHand` ↑ ⇒ `Available` ↑) |
+| `Expired` (giữ chỗ) | **job** nhả chỗ quá hạn | `Reserved` ↓ ⇒ `Available` ↑ |
+
+📌 **Không có đường nào sửa quá khứ**: mọi thay đổi tồn kho đều đi qua **chứng từ + sổ cái append-only**, và
+**đối soát `soCapLech = 0`** ở mọi bước đã đo.
+
+### 30.4 Còn lại
+
+| # | Việc | Ghi chú |
+|---|---|---|
+| 1 | **Trả hàng MỘT PHẦN** (trả 2/4 món) | hiện trả **toàn bộ** đơn; trả một phần cần dòng trả riêng + đối chiếu tiền hoàn |
+| 2 | **Hoàn tiền** khi trả hàng | thuộc `PaymentHub`/kế toán — **chưa** làm; hiện chỉ **trả hàng** (tồn kho) |
+| 3 | `INV-003` phân bổ tồn theo kênh | (một kho cho cả đơn) |
+| 4 | 📌 **`MovementType = CustomerReturn`** cho phiếu trả hàng | hiện dùng `GoodsReceipt` ⇒ `Receipt`; `CustomerReturn` **đã có** trong enum và cho báo cáo chính xác hơn — cần loại chứng từ riêng |
+
+### 30.5 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.5 | 15/10/2026 | *(agent, session GĐ1)* | **`SAL-004` — trả hàng**: `TraHangAsync` **tái dùng** `StockDocumentAppService` (chứng từ & ghi sổ hai bước, khoá phân tán, `CHECK` DB) ⇒ sinh **phiếu NHẬP kho** ⇒ `Returned`; idempotent; **NÉM** nếu đơn chưa xác nhận. **Kiểm chứng HTTP**: `6/0/6` ⇒ **`10/0/10`**, sổ cái **5 bút toán**, 2 chứng từ `Posted`, huỷ-sau-xác-nhận **bị chặn**, **đối soát `0` lệch**, **`fail: 0`**. Ghi **bảng vòng đời đơn KÍN CẢ HAI CHIỀU** (§30.3) |
