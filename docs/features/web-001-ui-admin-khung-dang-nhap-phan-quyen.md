@@ -2141,3 +2141,51 @@ nay **chỉ còn là việc chạy lại probe**.
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.b | 15/10/2026 | *(agent, session GĐ1)* | ✅ **Sửa gốc §70**: thêm **`GET /health-status` cho Web** (`HealthStatusController`, `[AllowAnonymous]`, không đọc DB, không lộ chi tiết — `XC-005` BR-012) ⇒ **điểm đo thống nhất** cho mọi tiến trình. **Kiểm chứng**: **cùng một lệnh** `tools/wait-host.ps1` chờ Web đảo từ **`exit 1`** (hết hạn 90s, mọi lần) sang **`exit 0`** (*"LÊN sau 2.5s"*); endpoint trả `200` + `{"status":"Healthy"}` (trước đó **`404`**); build `0/0`; `fail: 0`; 0 tiến trình treo |
+
+---
+
+## 72. ✅ **CA BIÊN CỦA BỘ TÁCH GIỎ NHIỀU DÒNG — ĐÃ ĐO, CẢ BỐN CA ĐÚNG** (15/10/2026) — *trả nợ vòng 83*
+
+### 72.1 Bối cảnh
+
+Vòng 83 định đo **ca biên** nhưng dừng ở bước chờ Web (điểm đo sai — §70). Sau khi **sửa gốc** (§71: thêm `/health-status`
+cho Web), probe chạy **trọn** và cho kết quả dưới đây. 📌 **Giá `100.000` · thuế `10%`** ⇒ mọi con số dưới **tính trước**.
+
+### 72.2 🎯 Kết quả — **cả bốn ca đúng**
+
+| Ca | Đầu vào | Kết quả đo được | Đánh giá |
+|---|---|---|---|
+| **A** | `SKU:0` (số lượng **0**) | đơn tạo · tổng **`110.000`** = **1** × 100.000 × 1,1 | ✅ **KHÔNG** có dòng số lượng 0 lọt vào đơn (dùng mặc định) |
+| **B** | `SKU:abc` (**không phải số**) | tổng **`220.000`** = **2** × 100.000 × 1,1 | ✅ dùng `SoLuong` mặc định · **không** vỡ |
+| **C** | `SKU:2,SKU:3` (**SKU TRÙNG**) | tổng **`550.000`** = **5** × 100.000 × 1,1 · DB: **1 dòng × 5** | 🔥 **GỘP đúng** — nếu **không** gộp thì hai dòng cùng SKU sẽ **phá `CHECK`/unique** của kho (`SkuDaCoTrongChungTu`, đã đo ở `INV-001`) |
+| **D** | `SKU:2,KHONG-CO:1` (**SKU LẠ**) | **KHÔNG tạo đơn** (DB còn **3** đơn) · lỗi hiện: **`eCommerce:Pricing:0004 — sku=KHONG-CO-999 — channelCode=… — at=… — lyDo=Không có giá nào khớp`** | ✅ chặn đúng **và** thông điệp **kèm mã + dữ liệu** (từ §59) |
+
+**Đối chứng DB (cùng lượt):**
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | Số đơn | **`3`** ✅ *(ca D **không** tạo đơn)* |
+| 2 | Dòng đơn | `…5d0f4cd…` × **1** · `…a68943c…` × **2** · `…0831c09…` × **5** ✅ |
+| 3 | Tổng tiền từng đơn | `110.000` · `220.000` · `550.000` ✅ — **khớp số tính trước** |
+| 4 | 🔥 **Tồn kho** | `OnHand=50` · **`Reserved=8`** · **`Available=42`** ✅ — mà **`8 = 1 + 2 + 5`** ⇒ khớp **tổng ba đơn** **và** khớp **từng dòng** |
+| 5 | Dọn dẹp · `fail:` · tiến trình treo | `don=0 dong=0 ton=0 donvi=0 gc=0 sc=0 baoMat=true` ✅ · **Web `0` / Host `0`** ✅ · **`0`** ✅ |
+
+📌 **Vì sao phép đo #4 là chốt cuối:** `Reserved` **không** chỉ khớp **tổng** mà khớp **từng đơn** (`1`, `2`, `5`) ⇒ nó loại luôn
+khả năng *"gộp sai thành 4 hoặc 6"* và khả năng *"chỉ giữ chỗ cho một phần"*. **Tổng đúng chưa đủ** — phải khớp **cả cách chia**.
+
+### 72.3 Trạng thái `WEB-003` sau vòng này
+
+| # | Hạng mục | Trạng thái |
+|---|---|---|
+| 1 | Đặt hàng 1 SKU · chống trùng đơn qua UI | ✅ §56–§61 |
+| 2 | Giỏ **nhiều dòng** (đường hạnh phúc) | ✅ §62 |
+| 3 | **Giỏ nhiều dòng — CA BIÊN** (0 · không-số · **trùng** · **SKU lạ**) | ✅ **§72** |
+| 4 | Đường nối UI → API (xác nhận · huỷ · trả) | ✅ §65 · §69 |
+| 5 | **Giao diện nhiều ô nhập** · giỏ giữ qua phiên | ⏳ |
+| 6 | **Quản lý đơn TRÊN UI** (`/DonHang`) | ⏳ *(rủi ro đã **bằng 0** — Phụ lục E.4)* |
+
+### 72.4 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.a | 15/10/2026 | *(agent, session GĐ1)* | ✅ **Đo CA BIÊN của bộ tách giỏ nhiều dòng** (nợ vòng 83, nay chạy được nhờ §71): **cả bốn ca ĐÚNG** — `SKU:0` ⇒ dùng mặc định (không có dòng 0); `SKU:abc` ⇒ dùng mặc định; **`SKU:2,SKU:3` ⇒ GỘP = `5`** (`550.000`, DB **1 dòng × 5**); **`SKU:2,KHONG-CO:1` ⇒ KHÔNG tạo đơn** + thông điệp **`eCommerce:Pricing:0004 — sku=… — lyDo=…`**. **Đối chứng**: `3` đơn · dòng `1`/`2`/`5` · **`Reserved=8 = 1+2+5`** ⇒ khớp **tổng** *và* **từng đơn**; dọn sạch; **`fail: 0`**; 0 tiến trình treo |
