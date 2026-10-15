@@ -187,6 +187,77 @@ public class VariantCombinationGeneratorTests
         Assert.Equal(eCommerceConsts.ErrorCodes.Catalog.ThieuThongTinBatBuoc, loi.Code);
     }
 
+    // ── BR-012 + BR-013: ĐỐI CHIẾU tổ hợp (trái tim của "sinh lại") ─────────────
+
+    [Fact]
+    public void DoiChieu_tao_moi_khi_chua_co_bien_the_nao()
+    {
+        var kq = VariantCombinationGenerator.DoiChieu(["h1", "h2"], []);
+
+        Assert.Equal(new[] { "h1", "h2" }, kq.TaoMoi.ToArray());
+        Assert.Empty(kq.GiuNguyen);
+        Assert.Empty(kq.NgungBan);
+        Assert.Empty(kq.KichHoatLai);
+    }
+
+    [Fact]
+    public void DoiChieu_GIU_NGUYEN_bien_the_dang_ban__BR013()
+    {
+        var kq = VariantCombinationGenerator.DoiChieu(["h1"], [("h1", true)]);
+
+        Assert.Empty(kq.TaoMoi);
+        Assert.Equal(new[] { "h1" }, kq.GiuNguyen.ToArray());
+        Assert.Empty(kq.NgungBan);
+    }
+
+    [Fact]
+    public void DoiChieu_NGUNG_BAN_bien_the_mo_coi__BR012__va_KHONG_xoa()
+    {
+        // 🚨 Ca thật: người bán BỎ màu "Xanh" ⇒ tổ hợp "Xanh-M"/"Xanh-L" không còn mong muốn.
+        // Nếu bỏ mặc thì chúng VẪN ĐANG BÁN nhưng KHÔNG xuất hiện trong bộ chọn nào ⇒ khách không tìm thấy,
+        // hệ thống vẫn bán ⇒ lệch tồn kho/doanh thu mà KHÔNG có lỗi nào.
+        var kq = VariantCombinationGenerator.DoiChieu(
+            ["do-m", "do-l"],
+            [("do-m", true), ("do-l", true), ("xanh-m", true), ("xanh-l", true)]);
+
+        Assert.Empty(kq.TaoMoi);
+        Assert.Equal(2, kq.GiuNguyen.Count);
+        Assert.Equal(new[] { "xanh-l", "xanh-m" }, kq.NgungBan.OrderBy(x => x).ToArray());
+    }
+
+    [Fact]
+    public void DoiChieu_KICH_HOAT_LAI_khi_to_hop_QUAY_LAI__giu_nguyen_Id_Sku()
+    {
+        // Chiều ngược lại: người bán chọn lại "Xanh" ⇒ biến thể CŨ phải được mở bán lại,
+        // KHÔNG tạo biến thể mới (BR-013) — nếu tạo mới thì SKU cũ vẫn tồn tại ⇒ trùng lặp vĩnh viễn.
+        var kq = VariantCombinationGenerator.DoiChieu(["do-m", "xanh-m"], [("do-m", true), ("xanh-m", false)]);
+
+        Assert.Empty(kq.TaoMoi);
+        Assert.Equal(new[] { "do-m" }, kq.GiuNguyen.ToArray());
+        Assert.Equal(new[] { "xanh-m" }, kq.KichHoatLai.ToArray());
+        Assert.Empty(kq.NgungBan);
+    }
+
+    [Fact]
+    public void DoiChieu_KHONG_dung_toi_bien_the_da_ngung_ban_va_khong_con_mong_muon()
+    {
+        // Biến thể đã ngừng bán và tổ hợp vẫn không mong muốn ⇒ KHÔNG tính vào NgungBan (tránh log/đếm sai).
+        var kq = VariantCombinationGenerator.DoiChieu(["do-m"], [("do-m", true), ("xanh-m", false)]);
+
+        Assert.Empty(kq.NgungBan);
+        Assert.Empty(kq.KichHoatLai);
+    }
+
+    [Fact]
+    public void DoiChieu_rong_thi_ngung_ban_TAT_CA_bien_the_dang_ban()
+    {
+        var kq = VariantCombinationGenerator.DoiChieu([], [("h1", true), ("h2", true), ("h3", false)]);
+
+        Assert.Empty(kq.TaoMoi);
+        Assert.Equal(2, kq.NgungBan.Count);       // chỉ 2 cái ĐANG BÁN
+        Assert.Empty(kq.KichHoatLai);
+    }
+
     [Fact]
     public void Mot_truc_mot_gia_tri_thi_ra_DUNG_mot_to_hop()
     {

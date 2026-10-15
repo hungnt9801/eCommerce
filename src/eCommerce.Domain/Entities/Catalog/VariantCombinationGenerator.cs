@@ -123,6 +123,70 @@ public static class VariantCombinationGenerator
     }
 
     /// <summary>
+    /// Kết quả **đối chiếu** giữa tổ hợp MONG MUỐN và biến thể HIỆN CÓ — trái tim của **BR-012** + **BR-013**.
+    /// </summary>
+    /// <param name="TaoMoi">Hash của tổ hợp **chưa** có biến thể ⇒ tạo biến thể mới.</param>
+    /// <param name="GiuNguyen">Hash đã có biến thể **đang bán** ⇒ **giữ nguyên** `Id`/`Sku` (BR-013).</param>
+    /// <param name="NgungBan">Hash **có biến thể** nhưng tổ hợp **không còn** trong tập mong muốn ⇒ **NGỪNG BÁN**, **cấm xoá** (BR-012).</param>
+    /// <param name="KichHoatLai">Hash có biến thể **đang ngừng bán** mà tổ hợp **đã quay lại** ⇒ mở bán lại.</param>
+    public sealed record DoiChieuToHop(
+        IReadOnlyList<string> TaoMoi,
+        IReadOnlyList<string> GiuNguyen,
+        IReadOnlyList<string> NgungBan,
+        IReadOnlyList<string> KichHoatLai);
+
+    /// <summary>
+    /// 🚨 **ĐỐI CHIẾU TỔ HỢP** (`CAT-002` **BR-012** + **BR-013**) — hàm **THUẦN** nên test được trực tiếp.
+    ///
+    /// **VÌ SAO PHẢI CÓ HÀM NÀY:** khi người bán **bỏ** một giá trị khỏi lựa chọn (ví dụ bỏ màu `Xanh`),
+    /// các biến thể `Xanh-M`, `Xanh-L` **không còn tổ hợp tương ứng**. Nếu bỏ mặc thì chúng **vẫn đang bán**
+    /// nhưng **không xuất hiện trong bộ chọn nào** ⇒ khách **không thể** tìm thấy chúng, còn hệ thống thì
+    /// **vẫn bán** (đơn từ sàn/kênh khác vẫn vào) ⇒ **lệch tồn kho và doanh thu** mà **không có lỗi nào**.
+    /// `CAT-002` **BR-012** chốt: **ngừng bán** (`IsActive = false`), **CẤM xoá** (biến thể đã có thể đã phát sinh
+    /// giao dịch — `CAT-001` D2/BR-005).
+    ///
+    /// 📌 Và chiều ngược lại: nếu tổ hợp **quay lại** (người bán chọn lại `Xanh`), biến thể **cũ** phải được
+    /// **mở bán lại** — **giữ nguyên `Id`/`Sku`** (BR-013), **không** tạo biến thể mới.
+    /// </summary>
+    public static DoiChieuToHop DoiChieu(
+        IReadOnlyList<string> hashMongMuon,
+        IReadOnlyList<(string Hash, bool IsActive)> bienTheHienCo)
+    {
+        ArgumentNullException.ThrowIfNull(hashMongMuon);
+        ArgumentNullException.ThrowIfNull(bienTheHienCo);
+
+        var mongMuon = hashMongMuon.ToHashSet(StringComparer.Ordinal);
+        var hienCo = bienTheHienCo.ToDictionary(x => x.Hash, x => x.IsActive, StringComparer.Ordinal);
+
+        var taoMoi = new List<string>();
+        var giuNguyen = new List<string>();
+        var kichHoatLai = new List<string>();
+
+        foreach (var hash in hashMongMuon)
+        {
+            if (!hienCo.TryGetValue(hash, out var dangBan))
+            {
+                taoMoi.Add(hash);
+            }
+            else if (dangBan)
+            {
+                giuNguyen.Add(hash);
+            }
+            else
+            {
+                kichHoatLai.Add(hash);
+            }
+        }
+
+        var ngungBan = bienTheHienCo
+            .Where(x => x.IsActive && !mongMuon.Contains(x.Hash))
+            .Select(x => x.Hash)
+            .ToList();
+
+        return new DoiChieuToHop(taoMoi, giuNguyen, ngungBan, kichHoatLai);
+    }
+
+    /// <summary>
     /// 🚨 **HÀM BĂM DUY NHẤT CỦA DOMAIN** (BR-011) — mọi nơi cần `AttributeHash` **phải** gọi hàm này.
     ///
     /// Cách làm: sắp xếp cặp (thuộc tính, giá trị) theo `AttributeId`, ghép `attrId:valueId` bằng `|`,

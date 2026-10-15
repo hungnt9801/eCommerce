@@ -25,6 +25,7 @@ public class CatalogAttributeAppService : ApplicationService, ICatalogAttributeA
     private readonly IRepository<CatalogAttribute, Guid> _thuocTinhRepository;
     private readonly IRepository<CatalogAttributeValue, Guid> _giaTriRepository;
     private readonly IRepository<ProductAttributeSelection, Guid> _luaChonRepository;
+    private readonly IRepository<ProductVariantAttribute, Guid> _bienTheThuocTinhRepository;
     private readonly IRepository<Product, Guid> _sanPhamRepository;
     private readonly VariantGenerationService _variantGenerationService;
 
@@ -32,12 +33,14 @@ public class CatalogAttributeAppService : ApplicationService, ICatalogAttributeA
         IRepository<CatalogAttribute, Guid> thuocTinhRepository,
         IRepository<CatalogAttributeValue, Guid> giaTriRepository,
         IRepository<ProductAttributeSelection, Guid> luaChonRepository,
+        IRepository<ProductVariantAttribute, Guid> bienTheThuocTinhRepository,
         IRepository<Product, Guid> sanPhamRepository,
         VariantGenerationService variantGenerationService)
     {
         _thuocTinhRepository = thuocTinhRepository;
         _giaTriRepository = giaTriRepository;
         _luaChonRepository = luaChonRepository;
+        _bienTheThuocTinhRepository = bienTheThuocTinhRepository;
         _sanPhamRepository = sanPhamRepository;
         _variantGenerationService = variantGenerationService;
     }
@@ -144,7 +147,92 @@ public class CatalogAttributeAppService : ApplicationService, ICatalogAttributeA
             productId, thuocTinh.Code, giaTri.Value);
     }
 
+    /// <summary>
+    /// 🚨 **Ngừng dùng một thuộc tính** — **BỊ CHẶN** nếu đang có biến thể dùng nó (`Catalog:0023`).
+    ///
+    /// **VÌ SAO SIẾT CHẶT HƠN TÀI LIỆU:** `CAT-002` §12 cho phép ngừng dùng thuộc tính và chỉ cấm **xoá**.
+    /// Nhưng ngừng dùng một thuộc tính làm nó **rớt khỏi** bước sinh tổ hợp ⇒ **mọi** biến thể của **mọi**
+    /// sản phẩm đang dùng thuộc tính đó thành **mồ côi** và (theo BR-012) **ngừng bán** — tức **một cú click
+    /// ngừng bán cả dòng sản phẩm**, chỉ để lại vài dòng log. Đó đúng là họ *"hành động nhỏ, hậu quả lớn,
+    /// không ai thấy"* mà dự án đang truy. ⇒ **Chặn** và buộc làm **tường minh**:
+    /// bỏ chọn giá trị ở từng sản phẩm ⇒ sinh lại (biến thể ngừng bán **có ghi log + đếm**).
+    /// </summary>
+    [Authorize(eCommerceConsts.Permissions.CatalogAttributes.Manage)]
+    public async Task DeactivateAttributeAsync(Guid attributeId)
+    {
+        var thuocTinh = await _thuocTinhRepository.GetAsync(attributeId);
+
+        var soBienTheDung = await _bienTheThuocTinhRepository.CountAsync(x => x.AttributeId == attributeId);
+
+        if (soBienTheDung > 0)
+        {
+            throw new BusinessException(eCommerceConsts.ErrorCodes.Catalog.ThuocTinhDangDuocDung)
+                .WithData("lyDo", "Thuộc tính đang được BIẾN THỂ dùng ⇒ không ngừng dùng được. " +
+                                  "Hãy bỏ chọn giá trị ở từng sản phẩm rồi sinh lại tổ hợp (biến thể sẽ NGỪNG BÁN, không bị xoá).")
+                .WithData("thuocTinh", thuocTinh.Code)
+                .WithData("soBienTheDung", soBienTheDung);
+        }
+
+        thuocTinh.NgungDung();
+        await _thuocTinhRepository.UpdateAsync(thuocTinh, autoSave: true);
+
+        Logger.LogInformation("Đã NGỪNG DÙNG thuộc tính {Code}.", thuocTinh.Code);
+    }
+
+    [Authorize(eCommerceConsts.Permissions.CatalogAttributes.Manage)]
+    public async Task ReactivateAttributeAsync(Guid attributeId)
+    {
+        var thuocTinh = await _thuocTinhRepository.GetAsync(attributeId);
+
+        thuocTinh.KichHoat();
+        await _thuocTinhRepository.UpdateAsync(thuocTinh, autoSave: true);
+    }
+
+    /// <summary>Ngừng dùng **một giá trị** — cũng **BỊ CHẶN** nếu đang có biến thể dùng (`Catalog:0023`).</summary>
+    [Authorize(eCommerceConsts.Permissions.CatalogAttributes.Manage)]
+    public async Task DeactivateValueAsync(Guid attributeValueId)
+    {
+        var giaTri = await _giaTriRepository.GetAsync(attributeValueId);
+
+        var soBienTheDung = await _bienTheThuocTinhRepository.CountAsync(x => x.AttributeValueId == attributeValueId);
+
+        if (soBienTheDung > 0)
+        {
+            throw new BusinessException(eCommerceConsts.ErrorCodes.Catalog.ThuocTinhDangDuocDung)
+                .WithData("lyDo", "Giá trị thuộc tính đang được BIẾN THỂ dùng ⇒ không ngừng dùng được " +
+                                  "(xem ghi chú ở `DeactivateAttributeAsync`).")
+                .WithData("giaTri", giaTri.Value)
+                .WithData("soBienTheDung", soBienTheDung);
+        }
+
+        giaTri.NgungDung();
+        await _giaTriRepository.UpdateAsync(giaTri, autoSave: true);
+    }
+
+    [Authorize(eCommerceConsts.Permissions.CatalogAttributes.Manage)]
+    public async Task ReactivateValueAsync(Guid attributeValueId)
+    {
+        var giaTri = await _giaTriRepository.GetAsync(attributeValueId);
+
+        giaTri.KichHoat();
+        await _giaTriRepository.UpdateAsync(giaTri, autoSave: true);
+    }
+
     /// <summary>Bỏ **một giá trị cụ thể** khỏi lựa chọn của sản phẩm.</summary>
+    /// <summary>
+    /// Bỏ **một giá trị cụ thể** khỏi lựa chọn của sản phẩm.
+    ///
+    /// 🚨🚨 **XOÁ CỨNG — BẮT BUỘC, ĐỌC TRƯỚC KHI SỬA THÀNH `DeleteAsync`.**
+    /// Lựa chọn là **dữ liệu ĐẦU VÀO thuần** (không được lịch sử nào tham chiếu) nên **xoá cứng là đúng**.
+    /// Nếu xoá **mềm** (mặc định của `FullAuditedAggregateRoot`) thì dòng cũ **vẫn nằm trong bảng** và
+    /// **vẫn chiếm** unique index `(TenantId, ProductId, AttributeId, AttributeValueId)`
+    /// (`NULLS NOT DISTINCT`) ⇒ lần **chọn lại** cùng giá trị sẽ **vi phạm unique** ⇒ **HTTP 500**,
+    /// và người dùng thấy *"chọn lại giá trị cũ không được"* mà **không hiểu vì sao**.
+    ///
+    /// 📌 **Đã gặp thật (15/10/2026):** E2E cho thấy `reactivated: 0` và **4 dòng `fail:`** trong log —
+    /// tức là **bỏ chọn rồi chọn lại** đã nổ. Bài học kèm theo: probe của tôi **không in mã HTTP** của lệnh
+    /// chọn nên suýt nữa đã bỏ qua; **mọi lời gọi trong probe PHẢI in mã trạng thái**.
+    /// </summary>
     [Authorize(eCommerceConsts.Permissions.CatalogAttributes.Manage)]
     public async Task UnselectValueAsync(Guid productId, Guid attributeValueId)
     {
@@ -153,7 +241,7 @@ public class CatalogAttributeAppService : ApplicationService, ICatalogAttributeA
 
         foreach (var c in cu)
         {
-            await _luaChonRepository.DeleteAsync(c, autoSave: true);
+            await _luaChonRepository.HardDeleteAsync(c, autoSave: true);
         }
     }
 
@@ -165,7 +253,8 @@ public class CatalogAttributeAppService : ApplicationService, ICatalogAttributeA
 
         foreach (var c in cu)
         {
-            await _luaChonRepository.DeleteAsync(c, autoSave: true);
+            // 🚨 **XOÁ CỨNG có chủ ý** — xem ghi chú ở `UnselectValueAsync`.
+            await _luaChonRepository.HardDeleteAsync(c, autoSave: true);
         }
     }
 
@@ -202,7 +291,9 @@ public class CatalogAttributeAppService : ApplicationService, ICatalogAttributeA
         {
             Created = ketQua.SoTaoMoi,
             Existing = ketQua.SoDaCo,
-            Skus = ketQua.DanhSachSku.ToList()
+            Skus = ketQua.DanhSachSku.ToList(),
+            Deactivated = ketQua.SoNgungBan,
+            Reactivated = ketQua.SoKichHoatLai
         };
     }
 

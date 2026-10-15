@@ -8,11 +8,18 @@ using Volo.Abp.MultiTenancy;
 
 namespace eCommerce.Catalog;
 
-/// <summary>Kết quả sinh tổ hợp (`CAT-002` §4.1 — "kết quả: số tạo mới · số đã có").</summary>
+/// <summary>Kết quả sinh tổ hợp (`CAT-002` §4.1 + BR-012).</summary>
 /// <param name="SoTaoMoi">Số biến thể **mới** được tạo.</param>
-/// <param name="SoDaCo">Số tổ hợp **đã tồn tại** (giữ nguyên `Id`/`Sku` — BR-013).</param>
+/// <param name="SoDaCo">Số tổ hợp **đã tồn tại** và **đang bán** (giữ nguyên `Id`/`Sku` — BR-013).</param>
 /// <param name="DanhSachSku">SKU của các biến thể **mới** (để phát `ProductVariantCreatedEto` sau này).</param>
-public sealed record KetQuaSinhToHop(int SoTaoMoi, int SoDaCo, IReadOnlyList<string> DanhSachSku);
+/// <param name="SoNgungBan">Số biến thể **NGỪNG BÁN** vì tổ hợp không còn trong tập mong muốn (**BR-012** — **không** xoá).</param>
+/// <param name="SoKichHoatLai">Số biến thể **mở bán lại** vì tổ hợp đã quay lại (giữ nguyên `Id`/`Sku`).</param>
+public sealed record KetQuaSinhToHop(
+    int SoTaoMoi,
+    int SoDaCo,
+    IReadOnlyList<string> DanhSachSku,
+    int SoNgungBan = 0,
+    int SoKichHoatLai = 0);
 
 /// <summary>
 /// Dịch vụ miền **sinh tổ hợp biến thể** (`CAT-002` D5/D6/D7, §4.1, BR-009→016).
@@ -116,10 +123,20 @@ public class VariantGenerationService : DomainService
 
         var bienTheHienCo = await _bienTheRepository.GetListAsync(x => x.ProductId == productId);
 
+        // 🚨 ĐỐI CHIẾU bằng hàm THUẦN (BR-012 + BR-013) — quyết định tạo mới / giữ nguyên / NGỪNG BÁN / mở bán lại.
+        var doiChieu = VariantCombinationGenerator.DoiChieu(
+            toHop.Select(x => x.AttributeHash).ToList(),
+            bienTheHienCo
+                .Where(x => x.AttributeHash is not null)
+                .Select(x => (Hash: x.AttributeHash!, x.IsActive))
+                .ToList());
+
         var theoHash = bienTheHienCo
             .Where(x => x.AttributeHash is not null)
             .GroupBy(x => x.AttributeHash!, StringComparer.Ordinal)
             .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+
+        var canTao = doiChieu.TaoMoi.ToHashSet(StringComparer.Ordinal);
 
         var gia = giaMacDinh ?? bienTheHienCo
             .Where(x => x.IsActive)
@@ -145,18 +162,12 @@ public class VariantGenerationService : DomainService
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var skuMoi = new List<string>();
-        var soDaCo = 0;
+        var tatCaGiaTri = await _giaTriRepository.GetListAsync();
 
-        foreach (var th in toHop)
+        // ── 1. Tạo biến thể MỚI cho tổ hợp chưa có (BR-013 chỉ áp cho tổ hợp ĐÃ có) ──
+        foreach (var th in toHop.Where(x => canTao.Contains(x.AttributeHash)))
         {
-            if (theoHash.ContainsKey(th.AttributeHash))
-            {
-                // BR-013: tổ hợp đã tồn tại ⇒ **GIỮ NGUYÊN** `Id`/`Sku`, **cấm** xoá-rồi-tạo-lại.
-                soDaCo++;
-                continue;
-            }
-
-            var maSku = SinhSku(sanPham.Code, th, thuocTinhVariant, await _giaTriRepository.GetListAsync());
+            var maSku = SinhSku(sanPham.Code, th, thuocTinhVariant, tatCaGiaTri);
 
             if (!maSkuDaDung.Add(maSku))
             {
@@ -182,16 +193,35 @@ public class VariantGenerationService : DomainService
             skuMoi.Add(maSku);
         }
 
-        if (skuMoi.Count > 0)
+        // ── 2. NGỪNG BÁN biến thể mồ côi (BR-012: **KHÔNG** xoá — biến thể có thể đã phát sinh giao dịch) ──
+        foreach (var hash in doiChieu.NgungBan)
+        {
+            var bienThe = theoHash[hash];
+            bienThe.NgungBan();
+            await _bienTheRepository.UpdateAsync(bienThe, autoSave: false);
+        }
+
+        // ── 3. MỞ BÁN LẠI biến thể cũ khi tổ hợp quay lại (giữ nguyên `Id`/`Sku`) ──
+        foreach (var hash in doiChieu.KichHoatLai)
+        {
+            var bienThe = theoHash[hash];
+            bienThe.MoBanLai();
+            await _bienTheRepository.UpdateAsync(bienThe, autoSave: false);
+        }
+
+        if (skuMoi.Count > 0 || doiChieu.NgungBan.Count > 0 || doiChieu.KichHoatLai.Count > 0)
         {
             await _sanPhamRepository.UpdateAsync(sanPham, autoSave: true);
         }
 
         Logger.LogInformation(
-            "Sinh tổ hợp cho {Code}: tạo mới {Moi}, đã có {DaCo} (ngưỡng {Nguong}).",
-            sanPham.Code, skuMoi.Count, soDaCo, nguong);
+            "Sinh tổ hợp cho {Code}: tạo mới {Moi}, đang bán {DangBan}, NGỪNG BÁN {Ngung}, mở bán lại {Lai} (ngưỡng {Nguong}).",
+            sanPham.Code, skuMoi.Count, doiChieu.GiuNguyen.Count,
+            doiChieu.NgungBan.Count, doiChieu.KichHoatLai.Count, nguong);
 
-        return new KetQuaSinhToHop(skuMoi.Count, soDaCo, skuMoi);
+        return new KetQuaSinhToHop(
+            skuMoi.Count, doiChieu.GiuNguyen.Count, skuMoi,
+            doiChieu.NgungBan.Count, doiChieu.KichHoatLai.Count);
     }
 
     /// <summary>

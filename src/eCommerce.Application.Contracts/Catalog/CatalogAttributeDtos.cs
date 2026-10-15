@@ -95,5 +95,11 @@ public class GenerateVariantsResultDto
 
     public int Existing { get; set; }
 
+    /// <summary>Số biến thể **NGỪNG BÁN** vì tổ hợp không còn trong tập mong muốn (**BR-012** — **không** xoá).</summary>
+    public int Deactivated { get; set; }
+
+    /// <summary>Số biến thể **mở bán lại** vì tổ hợp đã quay lại (giữ nguyên `Id`/`Sku` — BR-013).</summary>
+    public int Reactivated { get; set; }
+
     public List<string> Skus { get; set; } = new();
 }

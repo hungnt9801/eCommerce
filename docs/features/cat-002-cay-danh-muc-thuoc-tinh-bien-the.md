@@ -1257,3 +1257,76 @@ lời gọi trước rồi mới in. Và: **một phép đo xanh sau một lời
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.5 | 15/10/2026 | *(agent, session GĐ1)* | **Lát cắt 4 — thuộc tính + sinh tổ hợp biến thể**: 4 entity + `AttributeHash` + `VariantCombinationGenerator` (hàm thuần, hash duy nhất, chống tràn số) + `VariantGenerationService` (khoá theo sản phẩm, BR-013) + **6 route API** + **5 unique index `NULLS NOT DISTINCT`** (1 index **có filter**). **Kiểm chứng HTTP 12 phép đo**. 🚨 **Sửa lỗi thiết kế do chính tôi gây ra** (chọn giá trị phải là **THÊM**, không phải **THAY** — §19.2) và **sửa một lỗi trong bảng index của tài liệu** (`AttributeHash` phải theo `ProductId` — §19.3). **+13 unit**. Ghi rõ phần còn lại (§19.5) và bài học đoán URL lần 3 (§19.6) |
+
+---
+
+## 20. TRẠNG THÁI TRIỂN KHAI — **LÁT CẮT 5: BR-012 (biến thể mồ côi) + GUARD `0023`** (15/10/2026)
+
+### 20.1 Đã làm
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| 1 | **BR-012** — biến thể **mồ côi** | `VariantCombinationGenerator.DoiChieu(...)` (hàm **THUẦN**) phân loại: **tạo mới** · **giữ nguyên** (đang bán) · **NGỪNG BÁN** (tổ hợp không còn mong muốn) · **MỞ BÁN LẠI** (tổ hợp quay lại). `VariantGenerationService` áp dụng: `NgungBan()` / `MoBanLai()` — **TUYỆT ĐỐI KHÔNG xoá** (biến thể có thể đã phát sinh giao dịch — `CAT-001` D2/BR-005) |
+| 2 | Kết quả sinh tổ hợp | thêm `deactivated` (số ngừng bán) và `reactivated` (số mở bán lại) ⇒ **nhìn thấy được** hậu quả của một lần sinh lại |
+| 3 | **Guard `0023`** | `DeactivateAttributeAsync` / `DeactivateValueAsync` **NÉM** `Catalog:0023` khi đang có **biến thể dùng**; kèm `ReactivateAttributeAsync` / `ReactivateValueAsync` |
+
+### 20.2 🚨 **SIẾT CHẶT HƠN TÀI LIỆU** — và vì sao
+
+`CAT-002` §12 cho phép **ngừng dùng** thuộc tính và chỉ **cấm xoá**. Tôi **siết**: ngừng dùng cũng **BỊ CHẶN**
+khi đang có biến thể dùng.
+
+**Lý do (không phải khó tính):** ngừng dùng một thuộc tính làm nó **rớt khỏi** bước sinh tổ hợp ⇒ **mọi** biến thể
+của **mọi** sản phẩm đang dùng thuộc tính đó thành **mồ côi** ⇒ theo **BR-012** chúng **ngừng bán** —
+tức **một cú click ngừng bán cả dòng sản phẩm**, chỉ để lại vài dòng log. Đó đúng là họ lỗi
+*"hành động nhỏ — hậu quả lớn — không ai thấy"* mà dự án đang truy.
+
+⇒ Đường **tường minh** thay thế: bỏ chọn giá trị ở từng sản phẩm ⇒ **sinh lại** ⇒ biến thể ngừng bán
+**có đếm + có log**. Ghi nhận đây là **lệch có chủ ý** so với §12 để người review quyết định.
+
+### 20.3 🚨 LỖI THẬT **DO E2E BẮT** trong chính lát cắt này: **xoá mềm lựa chọn ⇒ chọn lại bị 500**
+
+**Triệu chứng đo được:** sau khi **bỏ chọn** rồi **chọn lại** cùng một giá trị, lần sinh lại cho
+`reactivated: 0` (đáng lẽ `1`) và log có **4 dòng `fail:`**.
+
+**Nguyên nhân gốc:** `UnselectValueAsync` dùng `DeleteAsync` (ABP **xoá MỀM** vì entity là
+`FullAuditedAggregateRoot`) ⇒ dòng cũ **vẫn nằm trong bảng** và **vẫn chiếm**
+unique index `(TenantId, ProductId, AttributeId, AttributeValueId) NULLS NOT DISTINCT`
+⇒ lần **chọn lại** vi phạm unique ⇒ **HTTP 500**.
+
+**Đã sửa:** dùng **`HardDeleteAsync`** cho **lựa chọn** — đây là **dữ liệu ĐẦU VÀO thuần**, **không** được
+lịch sử nào tham chiếu ⇒ xoá cứng là **đúng** (khác hẳn sản phẩm/biến thể/danh mục, nơi xoá cứng bị **cấm**
+vì phá lịch sử).
+
+📌 **Bài học kèm theo (quan trọng ngang bản sửa):** probe của tôi **không in mã HTTP** của lệnh *chọn lại*
+⇒ **suýt bỏ qua** một lỗi 500. Quy tắc bổ sung: **mọi lời gọi trong probe PHẢI in mã trạng thái** —
+một lời gọi không được kiểm tra mã thì **không phải** là kiểm chứng.
+
+### 20.4 ✅ BẰNG CHỨNG HTTP THẬT (Host + PostgreSQL 17)
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | Chọn `Đỏ` + `Xanh`, sinh lần 1 | `created:2` · SKU `MBSP-…-X`, `MBSP-…-XANH` |
+| 2 | **Bỏ chọn `Xanh` rồi sinh lại (BR-012)** | `created:0, existing:1, **deactivated:1**` · **DB: biến thể Xanh VẪN CÒN** với `IsActive = f` ✅ (**không** xoá) |
+| 3 | **Chọn lại `Xanh` rồi sinh lại (BR-013)** | **`reactivated:1`, `created:0`** · chọn lại: `204` · **DB: 2 biến thể, 2 đang bán** ✅ (giữ nguyên `Id`/`Sku`) |
+| 4 | **Ngừng dùng THUỘC TÍNH đang được biến thể dùng** | **`eCommerce:Catalog:0023`** ✅ |
+| 5 | **Ngừng dùng GIÁ TRỊ đang được biến thể dùng** | **`eCommerce:Catalog:0023`** ✅ |
+| 6 | Đối chứng: giá trị **chưa** dùng | `204` (ngừng) · `204` (mở lại) ✅ |
+| 7 | Log Host | **0 dòng `fail:`** (trước khi sửa §20.3 là **4**) ✅ |
+| 8 | Dọn dẹp | 0 sản phẩm / 0 biến thể / 0 thuộc tính · cờ bảo mật đã khôi phục |
+
+**Test:** unit **508** (+6 cho `DoiChieu`: tạo mới · giữ nguyên · **ngừng bán mồ côi** · **mở bán lại** ·
+không đụng biến thể đã ngừng · tập rỗng ⇒ ngừng bán tất cả) · integration **32** · build **0 lỗi/0 cảnh báo**.
+
+### 20.5 Còn lại của `CAT-002`
+
+| # | Việc | Ghi chú |
+|---|---|---|
+| 1 | `CatCategoryAttributes` (thuộc tính **được phép** trong danh mục + `IsRequired`) | §5.2 — tiện ích quản trị; **không** chặn luồng bán |
+| 2 | `ProductVariantCreatedEto` | phải **phân loại** *thông báo* vs *mang dữ liệu* (`coding-conventions` §6.2) |
+| 3 | UI admin (cây danh mục + bộ chọn biến thể) | §10 |
+
+### 20.6 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.6 | 15/10/2026 | *(agent, session GĐ1)* | **Lát cắt 5 — BR-012 + guard `0023`**: hàm thuần `DoiChieu` (tạo mới/giữ nguyên/**ngừng bán**/**mở bán lại**), `VariantGenerationService` áp dụng **không xoá**; kết quả sinh tổ hợp thêm `deactivated`/`reactivated`; **guard `0023`** cho ngừng dùng thuộc tính/giá trị (**siết hơn tài liệu** §12 — §20.2). 🚨 **Sửa lỗi thật do E2E bắt**: xoá **mềm** lựa chọn làm lần **chọn lại** nổ **500** ⇒ chuyển sang **`HardDeleteAsync`** (§20.3) + quy tắc *"mọi lời gọi trong probe phải in mã trạng thái"*. **+6 unit**, kiểm chứng HTTP **8 phép đo** |

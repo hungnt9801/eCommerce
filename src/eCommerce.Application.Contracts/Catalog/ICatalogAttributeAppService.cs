@@ -32,6 +32,19 @@ public interface ICatalogAttributeAppService : IApplicationService
     /// </summary>
     Task SelectValueAsync(Guid productId, SelectAttributeValueDto input);
 
+    /// <summary>
+    /// 🚨 Ngừng dùng **thuộc tính** — **NÉM** `Catalog:0023` nếu đang có biến thể dùng nó
+    /// (siết chặt hơn tài liệu §12 — xem ghi chú ở `CatalogAttributeAppService.DeactivateAttributeAsync`).
+    /// </summary>
+    Task DeactivateAttributeAsync(Guid attributeId);
+
+    Task ReactivateAttributeAsync(Guid attributeId);
+
+    /// <summary>Ngừng dùng **một giá trị** — cũng **NÉM** `Catalog:0023` nếu đang có biến thể dùng.</summary>
+    Task DeactivateValueAsync(Guid attributeValueId);
+
+    Task ReactivateValueAsync(Guid attributeValueId);
+
     /// <summary>Bỏ **một giá trị cụ thể** khỏi lựa chọn của sản phẩm.</summary>
     Task UnselectValueAsync(Guid productId, Guid attributeValueId);
 
