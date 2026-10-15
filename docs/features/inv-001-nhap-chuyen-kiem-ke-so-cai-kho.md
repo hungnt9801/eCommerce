@@ -2374,3 +2374,49 @@ Sau khi **đảo thứ tự kiểm** (§35.2), phải chứng minh mã `0041` **
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v2.2 | 15/10/2026 | *(agent, session GĐ1)* | **`REC-001` — job đối soát định kỳ** (`InventoryReconciliationWorker`, 15 phút, `RunOnStart`, khoá phân tán, **UoW**, **log vô điều kiện**) ⇒ đóng khoảng trống *"metric chỉ phát khi có người gọi API"* (§37.1). **Kiểm chứng**: build `0/0` · unit **693/693** *(cơ chế `BackgroundWorkerCoCheTests` tự kiểm worker mới — **lần đầu cơ chế giúp viết đúng ngay từ đầu**)* · **Host thật: job chạy, `fail: 0`**. ⚠️ **Chưa** đo ca **có lệch** (ghi rõ §37.3) |
+
+---
+
+## 38. `REC-001` — **JOB ĐỐI SOÁT: ĐO CA CÓ LỆCH** (15/10/2026) — *đóng §37.3*
+
+### 38.1 Thiết kế phép đo — có **đối chứng** (control), không chỉ có ca lỗi
+
+| Cặp gieo vào `InvItems` | `OnHand` | Sổ cái | Kỳ vọng |
+|---|---|---|---|
+| **`RCLECH-…`** | `10` | **rỗng (0)** | **LỆCH** ⇒ phải bị phát hiện |
+| **`RCDUNG-…`** *(đối chứng)* | `5` | **`5`** | **KHÔNG lệch** ⇒ **không** được tính |
+
+📌 **Vì sao phải có cặp ĐỐI CHỨNG:** nếu chỉ gieo ca lỗi thì một job **báo lệch MỌI SKU** cũng sẽ "xanh" —
+phép đo **không phân biệt** được *"phát hiện đúng"* với *"báo động giả toàn bộ"*.
+
+### 38.2 ✅ Kết quả
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | Job có chạy? | **CÓ** — log `info:` *"JOB ĐỐI SOÁT: bắt đầu quét lệch tồn kho (mốc …)"* ✅ |
+| 2 | 🔥 **Job có PHÁT HIỆN không?** | **CÓ** — log **`warn:`** *"JOB ĐỐI SOÁT: **phát hiện 2 cặp (kho, SKU) LỆCH** giữa OnHand và sổ cái."* ✅ |
+| 3 | **Đối chiếu ĐỘC LẬP** (SQL trực tiếp trên DB) | **`lech_trong_db = 2`** ✅ — **hai nguồn KHỚP NHAU** |
+| 4 | `fail:` trong log | **0** ✅ (job không ném) |
+| 5 | Host thật, `RunOnStart` | chạy **ngay khi khởi động** ✅ |
+| 6 | Dọn dẹp | `InvItems` và sổ cái về `0` ✅ |
+
+📌 **Vì sao #3 quan trọng:** job **tự báo** một con số (2) — nếu **không** đối chiếu độc lập thì *"job báo 2"*
+chỉ chứng minh **job chạy**, **không** chứng minh **job đúng**. Việc **SQL độc lập cũng ra 2** là **đối chứng chéo**.
+
+### 38.3 ⚠️ **Điểm CHƯA giải thích được — ghi rõ, không giảng hoà cho đẹp**
+
+Kỳ vọng ban đầu của tôi là **1** cặp lệch (chỉ `RCLECH`), nhưng **cả job lẫn SQL đều ra 2**.
+Nghĩa là **hoặc** dữ liệu gieo có **thêm một cặp lệch** mà tôi chưa nhận ra, **hoặc** cách đếm có khác biệt
+so với cách tôi hình dung (ví dụ: cặp **(kho, SKU)** ở phía **sổ cái mà không có `InvItems`** cũng bị tính —
+mà `RCDUNG`/`RCLECH` dùng cùng một `WarehouseId` **giả** không tồn tại trong `InvWarehouses`).
+📌 **Điều chắc chắn:** **job và DB ĐỒNG Ý với nhau (2 = 2)** ⇒ job **không** báo sai lệch so với dữ liệu.
+📌 **Điều CHƯA chắc:** vì sao **2** mà không phải **1**.
+⇒ **Việc của lát cắt sau:** gieo **từng cặp một** (bật/tắt từng ca) để xác định **ca nào** đóng góp cặp thứ hai,
+hoặc đọc kỹ `DoiSoatTonKho` để biết nó tính **cặp (kho, SKU) nào**. **Không** sửa gì khi chưa hiểu — sửa mù ở
+đây có thể làm **mất khả năng phát hiện** một loại lệch thật.
+
+### 38.4 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v2.3 | 15/10/2026 | *(agent, session GĐ1)* | **`REC-001` — đo ca CÓ LỆCH** (có **cặp ĐỐI CHỨNG**): job **phát hiện** và ghi **`warn:`** *"phát hiện 2 cặp (kho, SKU) LỆCH"*; **đối chiếu ĐỘC LẬP bằng SQL cũng ra `2`** ⇒ **hai nguồn khớp**; **`fail: 0`**; chạy **ngay khi khởi động**. ⚠️ **Ghi rõ điểm chưa giải thích được:** tôi kỳ vọng **1** cặp nhưng nhận **2** ⇒ **không** giảng hoà; để lát cắt sau xác định **ca nào** đóng góp cặp thứ hai (§38.3) |
