@@ -357,7 +357,7 @@ danh sách trắng quá rộng) sẽ **tệ hơn không có test** — nó tạo
 | 1 | **Dịch dần danh sách trắng thành ánh xạ** khi mỗi miền (`CAT`/`Ord`/`Pay`/`Chn`…) có đường ghi thật: khi đó lỗi trùng **phải** trả mã nghiệp vụ |
 | 2 | **Job định kỳ** cập nhật/thu gọn danh sách trắng (ràng buộc của GĐ0 sẽ dần được dùng tới) |
 
-> **MỐC KIỂM CHỨNG VÒNG 74 (15/10/2026):** `694 unit + 38 integration` · build **0 lỗi / 0 cảnh báo** · mermaid **197/0** · **160 commit**, nhánh `main` **sạch**. **Ba cơ chế tự bảo vệ:** *ánh xạ ràng buộc DB* (**Phụ lục B**) · *đăng ký + log vô điều kiện cho job* (**Phụ lục C**, siết ở §45) · *UoW cho worker* (`inv-001` §29.2). **Công cụ:** `tools/route-check.ps1` (**Phụ lục D** — chống lỗi *sai route* đã tái phạm 3 lần). **Web:** cổng đăng nhập (`BR-009` ✅) + **harness đăng nhập** + **3 trang mặt tiền kiểm chứng CẢ HAI CHIỀU** (`/PhanBo` · `/SanPham` · `/DatHang` — *khách ĐẶT ĐƯỢC ĐƠN trên web*, giỏ **nhiều dòng**).
+> **MỐC KIỂM CHỨNG VÒNG 88 (15/10/2026):** `694 unit + 38 integration` · build **0 lỗi / 0 cảnh báo** · mermaid **197/0** · **174 commit**, nhánh `main` **sạch**. **Ba cơ chế tự bảo vệ** (Phụ lục **B** · **C** nâng cấp §45 · UoW inv-001 §29.2) · **ba công cụ** (`route-check.ps1` · `wait-host.ps1` · **`README-probe.md`** — danh mục kiểm trước khi viết probe) · **Phụ lục D/E/F**. **Web:** cổng đăng nhập (BR-009 ✅) · **harness đăng nhập** · **điểm đo thống nhất** (`/health-status` cho cả Host và Web) · **3 trang hai chiều** (`/PhanBo` · `/SanPham` · `/DatHang`) — *khách ĐẶT ĐƯỢC ĐƠN trên web*, giỏ **nhiều dòng** (**cả ca biên**), chống trùng đơn qua UI, thông điệp lỗi kèm mã + dữ liệu.
 
 ---
 
