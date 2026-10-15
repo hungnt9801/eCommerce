@@ -1237,3 +1237,52 @@ Giỏ: `S1 × 10` (thuế 10%) + `S2 × 2` (thuế 8%) · giảm giá cấp đơ
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.4 | 15/10/2026 | *(agent, session GĐ1)* | **Lát cắt 3 — lắp pipeline B1→B8**: `ChinhSachSnapshot` (ADR-08) + `ChonDonGiaCuoi` (B5, hàm thuần) + `PriceCalculationAppService` (**nạp 5 truy vấn cho cả giỏ**) + API `POST /api/v1/…/price-calculation/tinh-gio` trả **chi tiết từng dòng** (giải trình). 🚨 **Bậc thang CHÍNH THỨC có tác dụng lên giá bán** (đo được: `S1 × 10` ⇒ `90.000` thay vì `100.000`). **Kiểm chứng HTTP 9 phép đo**: phân bổ bảo toàn tổng · thuế từng dòng khớp **kiểm tay** · **tổng = Σ dòng** · `0004` khi không có giá · **5 lệnh EF** · **0 `fail:`**. Ghi rõ **7 quyết định/lỗ hổng** (§18.3), trong đó **2 việc cần người quyết** |
+
+---
+
+## 19. TRẠNG THÁI TRIỂN KHAI — **LÁT CẮT 4: API BẬC THANG + ĐÓNG LỖ HỔNG `ChannelShopId`** (15/10/2026)
+
+### 19.1 Đã làm
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| 1 | **API bộ bậc thang** `TierPriceSetAppService` | `GetList` · `Get` · `GetTiers` · `Create` · **`AddTier`** · `Publish` · `Activate` (route `/api/app/tier-price-set/…`) — trước đây E2E phải chèn SQL (§18.3 #7 **đã đóng**) |
+| 2 | 🚨 **Chặn trùng `MinQuantity` bằng MÃ NGHIỆP VỤ** | `AddTier` kiểm **trước** khi ghi ⇒ **`Pricing:0008`** (`ADR-02`). Unique index ở DB vẫn là **hàng rào cuối**, nhưng client **không** phải nhận lỗi `23505` khó hiểu |
+| 3 | 🚨 **`ChannelShopId` cho `TierPriceSet`** (+ migration) | Cột mới + invariant **`Scope = ChannelShop` mà THIẾU `ChannelShopId` ⇒ NÉM`**; `Scope ≠ ChannelShop` ⇒ **bỏ qua** `channelShopId` (không lưu shop "lạc" gây khớp sai về sau) |
+| 4 | **B3 dùng `ChannelShopId`** | Thứ tự ưu tiên phạm vi: **shop → kênh → mọi kênh** (trước đây bộ bậc thang `ChannelShop` **không** phân biệt được shop — §18.3 #2 **đã đóng**) |
+| 5 | Migration `20261015105644_Prc002_TierPriceSet_ChannelShopId` | `AddColumn<Guid>("ChannelShopId")` — đã áp; `Assets/schema.sql` sinh lại; tổng **33** index `NULLS NOT DISTINCT` **không đổi** (không thêm index mới) |
+
+### 19.2 ✅ BẰNG CHỨNG HTTP THẬT (Host + PostgreSQL 17)
+
+Nền: bảng giá `Active` `S1 = 100.000` (kênh `tak-…`). Bộ bậc thang **kênh**: `1 ⇒ 100.000`, `10 ⇒ 90.000`. Bộ bậc thang **shop**: `1 ⇒ 70.000`.
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | Tạo bộ bậc thang **qua API** + thêm 2 bậc | `200` ×3 ✅ (không còn phải chèn SQL) |
+| 2 | 🚨 **Thêm bậc TRÙNG `MinQuantity`** (`10` lần nữa) | **`eCommerce:Pricing:0008`** ✅ — **mã nghiệp vụ**, không phải lỗi `23505` lộ ra client |
+| 3 | 🚨 **`Scope = ChannelShop` mà THIẾU `ChannelShopId`** | **NÉM** (`Pricing:0004`) ✅ — nếu im lặng thì bộ bậc thang **áp cho MỌI shop** của kênh ⇒ **bán sai giá** |
+| 4 | Tạo bộ bậc thang **theo shop** | `channelShopId` **được lưu đúng** (`2ad3a84b-…`) ✅ |
+| 5 | Phát hành + kích hoạt **cả hai** bộ | `Active` · `tierCount` = **2** và **1** (đếm **từ DB**) ✅ |
+| 6 | **Tính giỏ CÓ `channelShopId`** | đơn giá **`70.000`** · cấp `BacThang` · nguồn **`TierPriceSet:TABTS-…`** ✅ (bộ **shop** thắng bộ **kênh**) |
+| 7 | **Tính giỏ KHÔNG có `channelShopId`** | đơn giá **`90.000`** · nguồn **`TABTK-…`** ✅ — 🚨 **bộ bậc thang của SHOP KHÔNG áp** ⇒ **phân biệt shop đúng** (đây chính là lỗ hổng đã đóng) |
+| 8 | Số lượng `2` (dưới bậc `10`) | `100.000` từ bậc `1` ✅ (không áp bậc oan) |
+| 9 | Dọn dẹp · cờ bảo mật · log | 0/0/0 · `ShouldChangePasswordOnNextLogin = true` · **0 dòng `fail:`** ✅ |
+
+- build `--no-incremental`: **0 lỗi / 0 cảnh báo** · unit **580/580** (+2 invariant mới) · integration **34/34** · mermaid 197/0
+- ⚠️ **Bài học vận hành (đã gặp thật lượt này):** sau khi `dotnet ef migrations add`, **PHẢI build lại** rồi mới chạy `DbMigrator` — DLL cũ **không chứa** migration mới ⇒ chạy xong **exit 0** mà **cột KHÔNG được tạo** (kiểm bằng `information_schema.columns` mới phát hiện).
+
+### 19.3 Còn lại của `PRC-002`
+
+| # | Việc | Ghi chú |
+|---|---|---|
+| 1 | **B4 — điều chỉnh/khuyến mãi** | cần module `PRO-*`; hiện giảm giá chỉ vào ở **cấp đơn** |
+| 2 | **Sổ giải trình** `PriceCalculationRecords` (**append-only**) + `IdempotencyKey` bắt buộc (ADR-13) | *"vì sao đơn này giá này"* hiện trả lời bằng **log**, chưa bằng **dữ liệu** |
+| 3 | **Ngưỡng số bậc mỗi bộ** (chưa có) + **`MaxVariantCombinations`-tương đương** | đề xuất khi làm API hàng loạt |
+| 4 | Cấu hình **chính sách làm tròn / thiếu giá** theo tenant (D14) | hiện **cứng trong code** |
+| 5 | 🚨 **CẦN NGƯỜI QUYẾT:** *giá shop* vs *bậc thang* — hiện **bậc thang luôn thắng** (§18.3 #1) | và **`BR-007` có thêm `ChannelShopId`?** (cùng loại câu hỏi, ở `PRC-001`) |
+
+### 19.4 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.5 | 15/10/2026 | *(agent, session GĐ1)* | **Lát cắt 4 — API bậc thang + đóng lỗ hổng `ChannelShopId`**: `TierPriceSetAppService` (7 route) chặn trùng `MinQuantity` bằng **mã nghiệp vụ `0008`**; thêm cột `ChannelShopId` + invariant **`ChannelShop` thiếu shop ⇒ NÉM** + migration; **B3 dùng shop** (thứ tự **shop → kênh → mọi kênh**). **Kiểm chứng HTTP 9 phép đo**, trong đó phép đo quan trọng nhất: **có `channelShopId` ⇒ bộ shop thắng (`70.000`)** và **không có ⇒ bộ shop KHÔNG áp (`90.000`)** ⇒ **phân biệt shop đúng**. Ghi **bài học vận hành**: `ef migrations add` xong **phải build lại** rồi mới chạy `DbMigrator` (nếu không: exit 0 mà cột không được tạo) |

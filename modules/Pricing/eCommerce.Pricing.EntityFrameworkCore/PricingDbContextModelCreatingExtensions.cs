@@ -29,6 +29,7 @@ public static class PricingDbContextModelCreatingExtensions
             b.Property(x => x.Code).IsRequired().HasMaxLength(64);
             b.Property(x => x.Name).IsRequired().HasMaxLength(256);
             b.Property(x => x.ChannelCode).HasMaxLength(64);
+            b.Property(x => x.ChannelShopId);
             b.Property(x => x.Scope).HasConversion<int>();
             b.Property(x => x.Status).HasConversion<int>();
 
@@ -102,6 +103,7 @@ public static class PricingDbContextModelCreatingExtensions
             b.Property(x => x.Code).IsRequired().HasMaxLength(64);
             b.Property(x => x.Name).IsRequired().HasMaxLength(256);
             b.Property(x => x.ChannelCode).HasMaxLength(64);
+            b.Property(x => x.ChannelShopId);
             b.Property(x => x.Scope).HasConversion<int>();
             b.Property(x => x.Status).HasConversion<int>();
             b.Property(x => x.Currency).HasConversion(c => c.Code, s => CurrencyTuMa(s)).IsRequired().HasMaxLength(8);

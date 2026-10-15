@@ -1700,3 +1700,11 @@ VALUES ('20261015104259_Prc002_TierPrices', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+ALTER TABLE "PrcTierPriceSets" ADD "ChannelShopId" uuid;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261015105644_Prc002_TierPriceSet_ChannelShopId', '10.0.11');
+
+COMMIT;
+

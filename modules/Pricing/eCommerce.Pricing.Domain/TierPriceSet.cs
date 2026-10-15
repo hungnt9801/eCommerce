@@ -133,6 +133,10 @@ public class TierPriceSet : FullAuditedAggregateRoot<Guid>, IMultiTenant
 
     public string? ChannelCode { get; protected set; }
 
+    /// <summary>Shop cụ thể khi `Scope = ChannelShop` (`PRC-002` §18.3 #2 — trước đây THIẾU cột này nên bộ bậc
+    /// thang theo shop chỉ khớp được theo kênh ⇒ **có thể áp bậc thang của shop A cho shop B**).</summary>
+    public Guid? ChannelShopId { get; protected set; }
+
     public Currency Currency { get; protected set; } = Currency.Vnd;
 
     public DateTime EffectiveFrom { get; protected set; }
@@ -147,7 +151,7 @@ public class TierPriceSet : FullAuditedAggregateRoot<Guid>, IMultiTenant
 
     public TierPriceSet(
         Guid id, string code, string name, PriceListScope scope, Currency currency,
-        DateTime effectiveFrom, string? channelCode = null, DateTime? effectiveTo = null) : base(id)
+        DateTime effectiveFrom, string? channelCode = null, Guid? channelShopId = null, DateTime? effectiveTo = null) : base(id)
     {
         if (string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(name))
         {
@@ -176,7 +180,17 @@ public class TierPriceSet : FullAuditedAggregateRoot<Guid>, IMultiTenant
         Currency = currency;
         EffectiveFrom = effectiveFrom;
         EffectiveTo = effectiveTo;
+        // Bất biến: `ChannelShop` mà THIẾU `ChannelShopId` ⇒ không xác định được shop ⇒ âm thầm áp cho MỌI shop
+        // của kênh đó ⇒ **bán sai giá**. DB không bảo vệ được ⇒ NÉM ở đây.
+        if (scope == PriceListScope.ChannelShop && channelShopId is null)
+        {
+            throw new BusinessException(PricingErrorCodes.KhongTimThayGia)
+                .WithData("lyDo", "`Scope = ChannelShop` nhưng THIẾU `ChannelShopId` ⇒ không xác định được shop.")
+                .WithData("scope", scope.ToString());
+        }
+
         ChannelCode = string.IsNullOrWhiteSpace(channelCode) ? null : channelCode.Trim();
+        ChannelShopId = scope == PriceListScope.ChannelShop ? channelShopId : null;
     }
 
     public bool CoHieuLucTai(DateTime at)

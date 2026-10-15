@@ -107,6 +107,36 @@ public class TierPriceSetTests
     }
 
     [Fact]
+    public void Scope_ChannelShop_ma_THIEU_ChannelShopId_thi_NEM_LOI()
+    {
+        // 🚨 Bất biến DB KHÔNG bảo vệ được: `ChannelShop` thiếu `ChannelShopId` ⇒ không xác định được shop
+        // ⇒ bộ bậc thang **áp cho MỌI shop của kênh** ⇒ **bán sai giá**. (Trước 15/10/2026 entity còn
+        // KHÔNG CÓ cột này ⇒ lỗ hổng thật; nay đã có và được canh bằng test.)
+        Assert.Throws<BusinessException>(() => new TierPriceSet(
+            Guid.NewGuid(), "BT-2", "Bo bac shop", PriceListScope.ChannelShop, Currency.Vnd,
+            new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), channelCode: "shopee", channelShopId: null));
+    }
+
+    [Fact]
+    public void Scope_ChannelShop_co_ChannelShopId_thi_OK__va_Scope_khac_thi_BO_QUA_shopId()
+    {
+        var shopId = Guid.NewGuid();
+
+        var bo = new TierPriceSet(
+            Guid.NewGuid(), "BT-3", "Bo bac shop", PriceListScope.ChannelShop, Currency.Vnd,
+            new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), channelCode: "shopee", channelShopId: shopId);
+
+        Assert.Equal(shopId, bo.ChannelShopId);
+
+        // `Scope = All` mà truyền shopId ⇒ BỎ QUA (không lưu shop "lạc" gây khớp sai về sau).
+        var boAll = new TierPriceSet(
+            Guid.NewGuid(), "BT-4", "Bo bac all", PriceListScope.All, Currency.Vnd,
+            new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), channelCode: null, channelShopId: shopId);
+
+        Assert.Null(boAll.ChannelShopId);
+    }
+
+    [Fact]
     public void PhatHanh_khi_CHUA_co_bac_nao_thi_NEM_LOI()
     {
         var bo = Tao();

@@ -221,14 +221,14 @@ public class PriceCalculationAppService : ApplicationService, IPriceCalculationA
         string sku, int quantity, string kenh, Guid? shopId,
         IReadOnlyList<TierPriceSet> boBacHieuLuc, IReadOnlyList<TierPrice> cacBac)
     {
-        // ⚠️ **LỖ HỔNG ĐÃ BIẾT (ghi rõ, không che):** `TierPriceSet` hiện **CHƯA có cột `ChannelShopId`**
-        // ⇒ bộ bậc thang ở phạm vi `ChannelShop` **chưa phân biệt được theo SHOP** (khớp theo **kênh**).
-        // ⇒ Muốn bậc thang theo từng shop thì phải thêm cột + migration (việc của lát cắt sau; xem `prc-002` §18.3).
-        // 📌 Không tự "đoán" shop: đoán sai ⇒ áp bậc thang của shop A cho shop B ⇒ **bán sai giá**.
+        // 📌 `ChannelShopId` đã có từ lát cắt này ⇒ bộ bậc thang theo SHOP được phân biệt **đúng** (§18.3 #2 đã đóng).
+        // Không tự "đoán" shop: đoán sai ⇒ áp bậc thang của shop A cho shop B ⇒ **bán sai giá**.
         var khop = boBacHieuLuc
             .Where(b => b.Scope == PriceListScope.All
-                        || (b.Scope != PriceListScope.All && b.ChannelCode == kenh))
-            .OrderBy(b => b.Scope == PriceListScope.All ? 1 : 0)
+                        || (b.Scope == PriceListScope.Channel && b.ChannelCode == kenh)
+                        || (b.Scope == PriceListScope.ChannelShop && b.ChannelCode == kenh
+                            && b.ChannelShopId == shopId))
+            .OrderBy(b => b.Scope == PriceListScope.ChannelShop ? 0 : b.Scope == PriceListScope.Channel ? 1 : 2)
             .ThenByDescending(b => b.Priority)
             .ThenBy(b => b.Id)
             .ToList();
