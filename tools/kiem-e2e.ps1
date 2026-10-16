@@ -136,12 +136,18 @@ select count(*)::text from "CusCustomers" where "Name" like 'K97E2E%';
 select count(*)::text from "OrdOrders" where "Number" like 'K97E2E-%';
 '@) -join '').Trim()
 
-        if ($dem -ne '0' -or $demDon -ne '0') {
-            throw ("TIEN DE: con {0} khach probe 'K97E2E%' va {1} don 'K97E2E-%' trong DB ⇒ lan chay truoc KHONG don dep.`n" +
-                "🚨 Dung lai va don truoc — ⚠️ neu khong thi cac ca 'co form hanh dong' se XANH VI DU LIEU CU." -f $dem, $demDon)
+        # 🔑 **KIEM CA NHAT KY SOT** — 📌 neu con nhat ky tu lan truoc thi ca `D9a` (mong doi **dung 1**) se
+        # do vi **ly do vo hinh** (⚠️ no la `2`, khong phai vi nhat ky hong).
+        $demNhatKy = (@(Invoke-Psql -Sql @'
+select count(*)::text from "CusDataExportLogs" where "CustomerId" = 'e0000000-0000-0000-0000-0000000000e1';
+'@) -join '').Trim()
+
+        if ($dem -ne '0' -or $demDon -ne '0' -or $demNhatKy -ne '0') {
+            throw ("TIEN DE: con {0} khach 'K97E2E%', {1} don 'K97E2E-%', {2} nhat ky xuat trong DB ⇒ lan chay truoc KHONG don dep.`n" +
+                "🚨 Dung lai va don truoc — ⚠️ neu khong thi cac ca 'co form hanh dong' se XANH VI DU LIEU CU." -f $dem, $demDon, $demNhatKy)
         }
 
-        Write-Output '   ✅ Tien de: khong con du lieu probe cu (khach + don).'
+        Write-Output '   ✅ Tien de: khong con du lieu probe cu (khach + don + nhat ky xuat).'
     }
 
     # ── ① DUNG WEB CU (neu co) + CHO CONG TRONG ─────────────────────────────────────────────
@@ -344,6 +350,39 @@ select count(*)::text from "OrdOrderLines" where "Id" = 'e0000000-0000-0000-0000
             # 🔑 **MOI DONG HANG CO `NGUON`** — 📌 cung bat bien nhu `CacDong`: ban xuat khong co nguon thi
             # **khong kiem chung duoc**.
             Kq 'D8e dong hang co `nguon` (kiem chung duoc)' ($jsonXuat -match 'OrdOrderLines\.Sku') 'nguon = OrdOrderLines.*'
+
+            # ══════════════════════════════════════════════════════════════════════════════════════
+            # 🚨 **D9 — NHAT KY KIEM TOAN** (`CUS-001` §22).
+            # 🔑 **VI SAO CA NAY QUAN TRONG:** cau hoi luat la *"**AI** da xuat du lieu cua toi, **KHI NAO**,
+            # **BAO NHIEU LAN**"*. 🔒 Log **KHONG** tra loi duoc (bi xoay vong, khong tra cuu duoc, nam NGOAI
+            # giao dich) ⇒ 📌 phai co **BANG TRA DUOC**.
+            # ⚠️ Va ca nay do **DB THAT**, khong phai ma nguon: 🔑 mot repository duoc tiem ma **khong ghi**
+            # thi ban xuat van `200` — 📌 ta chi biet khi **doc bang**.
+            # ══════════════════════════════════════════════════════════════════════════════════════
+            $soNhatKy = (@(Invoke-Psql -Sql @'
+select count(*)::text from "CusDataExportLogs" where "CustomerId" = 'e0000000-0000-0000-0000-0000000000e1';
+'@) -join '').Trim()
+
+            Kq 'D9a DB CO dong nhat ky xuat (bang CusDataExportLogs)' ($soNhatKy -eq '1') ("soDong=" + $soNhatKy)
+
+            # 🔑 **NOI DUNG phai dung** — ⚠️ mot dong **rong** cung lam `count = 1` ⇒ 📌 phai kiem tung truong.
+            $nhatKy = (@(Invoke-Psql -Sql @'
+select "NguoiXuat" || '|' || "SoDongHoSo"::text || '|' || "SoDonHang"::text || '|' || "DonHangBiCat"::text || '|' || ("LyDo" is null)::text from "CusDataExportLogs" where "CustomerId" = 'e0000000-0000-0000-0000-0000000000e1' order by "CreationTime" desc limit 1;
+'@) -join '').Trim()
+
+            Write-Output ("   nhat ky = " + $nhatKy)
+
+            # 📌 `admin` = ten dang nhap cua nguoi dang nhap (🔑 do **DB tra ve**, khong do ta doan).
+            Kq 'D9b nhat ky co NGUOI XUAT that (khong rong)' ($nhatKy -match '^admin\|') 'nguoi xuat = admin'
+            Kq 'D9c nhat ky co SO DON = 1 (khop ban xuat)' ($nhatKy -match '\|1\|') 'soDonHang = 1'
+            Kq 'D9d nhat ky ghi donHangBiCat = false' ($nhatKy -match '\|false\|') 'khong bi cat'
+
+            # 🔒 **VA NHAT KY KHONG DUOC CHUA PII** — 🔑 no chi ghi **so lieu**, khong ghi **noi dung**.
+            # ⚠️ Neu nhat ky chua PII thi ta vua **tao ban sao thu hai** cua du lieu ca nhan o mot noi **khong
+            # ai kiem soat** — 📌 dung cai ma `ADR-11` cam.
+            Kq 'D9e 🚨 nhat ky KHONG chua PII (chi so lieu)' `
+                (($nhatKy -notmatch 'k97e2e@') -and ($nhatKy -notmatch '0900000001') -and ($nhatKy -notmatch 'K97E2E')) `
+                'khong co email/sdt/ten trong nhat ky'
         }
     }
 
@@ -466,6 +505,14 @@ delete from "OrdOrderLines" where "OrderId" = 'e0000000-0000-0000-0000-000000000
 
         Invoke-Psql -Sql @'
 delete from "OrdOrders" where "Id" = 'e0000000-0000-0000-0000-0000000000e2';
+'@ | Out-Null
+
+        # 🚨 **XOA NHAT KY KIEM TOAN CUA PROBE** (`CUS-001` §22) — 📌 `CusDataExportLogs` la bang **DU LIEU
+        # THAT** (khong phai bang trong nhu `CusCustomers`), nen ⚠️ no **KHONG** nam trong danh sach
+        # *"phai rong"* cua `kiem-db.ps1` ⇒ 🔑 neu khong don thi no **tich luy** qua moi lan chay
+        # (📌 va do la **dung** voi bang that — nhung **sai** voi mot lan chay probe).
+        Invoke-Psql -Sql @'
+delete from "CusDataExportLogs" where "CustomerId" = 'e0000000-0000-0000-0000-0000000000e1';
 '@ | Out-Null
 
         Invoke-Psql -Sql @'

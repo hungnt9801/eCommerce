@@ -3256,6 +3256,59 @@ namespace eCommerce.Migrations
                     b.ToTable("CusCustomers", (string)null);
                 });
 
+            modelBuilder.Entity("eCommerce.Customers.CustomerDataExportLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("DonHangBiCat")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("LyDo")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<string>("NguoiXuat")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<int>("SoDonHang")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SoDongHoSo")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.Property<DateTime>("XuatLucUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "CustomerId")
+                        .HasDatabaseName("IX_CusDataExportLogs_TenantId_CustomerId");
+
+                    b.HasIndex("TenantId", "XuatLucUtc")
+                        .HasDatabaseName("IX_CusDataExportLogs_TenantId_XuatLucUtc");
+
+                    b.ToTable("CusDataExportLogs", (string)null);
+                });
+
             modelBuilder.Entity("eCommerce.Customers.CustomerGroup", b =>
                 {
                     b.Property<Guid>("Id")

@@ -1334,3 +1334,131 @@ Sau khi thêm logic, `dotnet build` báo **`exit 0` · 0 error**, ⚠️ nhưng 
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.2 | 17/10/2026 | *(agent, session GĐ1)* | **§21 — LÁT CẮT 5: BẢN XUẤT GỒM ĐƠN HÀNG** (đóng nợ §20.7 #3): thêm **`DonHangCaNhanDto`** + **`DongHangCaNhanDto`** + **`DonHang`**/**`DonHangBiCat`**/**`TongSoDon`** vào `XuatDuLieuCaNhanDto` + **`TranDonHangMotLanXuat = 200`** + đọc `OrdOrders`/`OrdOrderLines` trong `XuatDuLieuCaNhanAsync` + **`DonHangTomTat`** (kiểu **CÓ TÊN** cho phép chiếu EF) + tham chiếu `eCommerce.Domain`. 🔑 **VÌ SAO ĐÂY LÀ NỢ LỚN NHẤT CỦA §20:** *"tôi đã mua gì, khi nào, bao nhiêu tiền"* mới là **lý do** chủ thể dữ liệu hỏi ⇒ 📌 **phần lớn** dữ liệu cá nhân thật nằm ở **ĐƠN HÀNG**, không ở hồ sơ; 🔒 bản xuất thiếu đơn hàng trả lời **câu hỏi dễ** và **bỏ** câu hỏi thật. ➕ **Và nợ này KHÔNG cần credential** ⇒ việc **đúng** để làm ngay. ✅ **BỐN QUYẾT ĐỊNH:** ① **tách `DonHang` khỏi `CacDong`** (📌 `CacDong` là danh sách *cố định* của **hồ sơ**; đơn hàng **dài và tăng theo thời gian** ⇒ nhét vào sẽ làm bản xuất **không đọc được** khi khách mua nhiều; ➕ tách ra thì **đếm được**) · ② **có trần + `DonHangBiCat`** (🔑 trần vì **hiệu năng** và **ít người đọc**; 🚨 **im lặng cắt bớt** sẽ khiến người đọc tin *"khách chỉ có bấy nhiêu đơn"* ⇒ **lời khẳng định SAI về dữ liệu cá nhân**) · ③ **sắp xếp TẤT ĐỊNH** (`CreationTime` rồi `Id`) + **đếm TỔNG trước khi cắt** (📌 nếu chỉ sắp theo thời gian thì nhiều đơn cùng mốc cho **thứ tự khác nhau mỗi lần** ⇒ bản xuất **không tái lập được**) · ④ **nạp dòng hàng MỘT LẦN** (chống **N+1**: 200 lệnh SQL) + **`DonHangTomTat` kiểu CÓ TÊN** (🔒 lỗi dịch biểu thức EF sẽ **ném lúc chạy**, không phải lúc build ⇒ khó lần ra). ➕ **Dòng tóm tắt `So don hang` trong `CacDong`** — 🔑 thấy **ngay** quy mô mua hàng kể cả khi không đọc hết danh sách đơn. ➕ **Tham chiếu `eCommerce.Domain`** (`module → app` **hợp lệ**) và **đọc thẳng repository** — ⚠️ gọi `IOrderAppService` sẽ tạo **vòng** vì `eCommerce.Application` **đã** tham chiếu `Customers.Application`. ✅ **KIỂM CHỨNG — 5 CA MỚI ĐO TRÊN DỮ LIỆU THẬT trong E2E THƯỜNG TRÚ** (gieo 1 đơn `K97E2E-DON-001` kênh `web` `250000` + 1 dòng hàng `K97E2E-SKU-01` × 2, **trỏ đúng khách probe**): **D8a** có đơn · **D8b** mã đơn + kênh + tổng tiền · **D8c** SKU + số lượng · **D8d** không bị cắt · **D8e** dòng hàng có `nguon`. ➡️ **E2E 21/21** · **8 bước** · `exit 0` · **149.6s** · 1155 unit · 38 integration · mermaid 197/0 · DB 21/21 · test cổng 17/17. ➕ **Dọn dẹp CÓ THỨ TỰ** (🔑 dòng hàng → đơn → khách, ⚠️ `OrdOrders.CustomerId` trỏ tới `CusCustomers`) + **điều kiện tiên đề** kiểm **cả** khách sót **và** đơn sót. 🐞 **HAI LỖI:** (1) 🚨 **here-string LỒNG trong here-string** ⇒ `ParserError` — 🔒 **LẦN THỨ BA** của họ lỗi này (§25.5 · §32 · lượt này) ⇒ ✅ dùng **công cụ sửa tệp**; (2) 🚨🚨 **ĐIỀU ĐÁNG GIÁ NHẤT — BUILD dùng BẢN CACHE VÀ MÃ CỦA TÔI BỊ MẤT MỘT PHẦN MÀ KHÔNG AI BÁO:** `dotnet build` báo **`exit 0` · 0 error** ⚠️ nhưng `D8a–D8e` **ĐỎ**; 🔑 **chẩn đoán đúng là ĐO, không suy luận:** (a) soi **chuỗi trong DLL** ⇒ không có `OrdOrderLines` ⚠️ **nhưng cách này KHÔNG ĐỦ** (hằng chuỗi có thể bị **intern** vào DLL khác) — 📌 **tôi đã suýt kết luận sai** vì điều đó; (b) ✅ **ĐO CỠ DLL:** `36352` → **`44544`** byte ⇒ **bằng chứng quyết định** rằng mã **đã vào**; (c) đọc **mã nguồn trên đĩa** ⇒ phát hiện **khối đọc đơn hàng + dòng tóm tắt BỊ MẤT** (⚠️ phép `String.Replace` **không khớp** hoặc **ghi đè một phần** — 🔒 cùng họ §26.5 #1), 📌 và tệp **không** dựng được như đang có (dòng log vẫn tham chiếu `dto.TongSoDon`) ⇒ ⚠️ **bản cache đã che lỗi biên dịch**. 🔒 **BÀI HỌC (quan trọng hơn cả hai lỗi):** ① **`exit 0` KHÔNG chứng minh DLL đã đổi** — 🔑 phải **KIỂM MỐC** (`tools\kiem-moc-build.ps1`) hoặc **ĐO CỠ/CHUỖI** trong DLL — 📌 **lần thứ SÁU** của họ bẫy này; ② ⚠️ **"không thấy chuỗi trong DLL" KHÔNG đủ để kết luận** (hằng chuỗi có thể nằm ở DLL khác) ⇒ **cỡ DLL** và **mốc thời gian** là bằng chứng **mạnh hơn**; ③ 🔒 **sửa mã bằng `String.Replace` là NGUỒN của họ lỗi này** — đã vấp **nhiều lần** ⇒ **dùng `edit` với ngữ cảnh** và **kiểm lại tệp SAU khi sửa**. Ghi **§21.6** (nợ: 🚨 **chưa gồm ĐỊA CHỈ GIAO HÀNG** (*"giao tới đâu"* là PII **quan trọng** — nhưng entity `Address` **chưa tồn tại** ⇒ **nợ CHẶN**) · chưa gồm **LỊCH SỬ THANH TOÁN** (⚠️ `PayTransactions` có `OrderId` **không** phải `CustomerId` ⇒ phải đi **qua đơn hàng**) · chưa gồm **dữ liệu THUẾ** (`EInvoice` cũng chứa PII) · 🚨 **chưa có CI** · **tên sản phẩm không có** (chỉ **SKU** — 🔑 đánh đổi **có chủ ý** vì SKU **bất biến**, ⚠️ nhưng khách đọc SKU **không hiểu ngay**) · **chưa có bảng kiểm toán riêng cho mỗi lần xuất**) |
+
+---
+
+## 22. ✅ **LÁT CẮT 6 — NHẬT KÝ KIỂM TOÁN XUẤT DỮ LIỆU CÁ NHÂN** (17/10/2026) — *đóng nợ §20.7 #4 và §21.6 #6*
+
+### 22.1 🔑 **Vì sao LOG không đủ — ba câu hỏi luật đặt ra**
+
+Ở §20–§21, mỗi lần xuất PII đều ghi **một dòng log** (neo `[CUS-XUAT-DU-LIEU-CA-NHAN]`). Nhưng câu hỏi luật
+đặt ra là: **AI** đã xuất dữ liệu của tôi? **KHI NÀO**? **BAO NHIÊU LẦN**?
+
+🔒 **Log không trả lời được** vì:
+<list type="number">
+  <item><b>Log bị xoay vòng/hết hạn</b> — 📌 sau 30 ngày (hoặc sau khi xoay tệp) **không còn** gì để tra;
+    ⚠️ và *"năm ngoái ai đã xuất dữ liệu của tôi"* là câu hỏi **có thật**;</item>
+  <item><b>Log không TRA CỨU được</b> — 🔑 muốn tra *"khách X bị xuất mấy lần"* phải **grep một tệp văn bản**,
+    📌 và grep phụ thuộc **định dạng dòng log** (đổi một chữ là hỏng);</item>
+  <item><b>Log nằm NGOÀI giao dịch</b> — ⚠️ nếu lần xuất **thất bại giữa đường** thì dòng log có thể **không**
+    được ghi, trong khi 🔒 một **lần THỬ xuất** cũng là sự kiện **cần vết**.</item>
+</list>
+
+✅ Bảng `CusDataExportLogs` trả lời **cả ba bằng MỘT câu truy vấn** — 📌 và đó là khác biệt giữa **ghi lại** và
+**trả lời được**.
+
+### 22.2 ✅ **Năm quyết định thiết kế**
+
+**① `CreationAuditedEntity`, KHÔNG `FullAudited` và KHÔNG aggregate.** 🔒 **Không soft-delete** — 🚨 một nhật ký
+kiểm toán **xóa được** thì **không còn là** nhật ký: 📌 người có quyền xóa sẽ **xóa vết của chính mình**.
+➕ Không `AggregateRoot` (ghi-một-lần, đọc-nhiều ⇒ không có bất biến nghiệp vụ để bảo vệ) · không
+`ConcurrencyStamp`/`ExtraProperties` (⚠️ chúng tồn tại để hỗ trợ **sửa đổi có kiểm soát** — 🔒 mà một dòng
+**không bao giờ sửa** thì hai cột đó là **trống rỗng**).
+
+**② KHÔNG UNIQUE INDEX — cố ý.** 🔑 Nhiều lần xuất cùng một khách trong cùng một giây là **hợp lệ**, và
+📌 chính sự **lặp lại** mới là thứ cần **phát hiện**; ⚠️ một unique index sẽ **chặn** lần thứ hai ⇒ 🔒 ta **mất**
+đúng dấu hiệu đáng ngờ nhất. ➕ **Hệ quả:** bảng này **không** làm tăng số index cần `NULLS NOT DISTINCT`
+⇒ ✅ **NND vẫn = 48** (đã đo).
+
+**③ UoW RIÊNG (`requiresNew: true`) để ghi nhật ký.** ⚠️ Nếu ghi chung UoW, một lỗi ở bước sau sẽ **cuốn theo**
+cả nhật ký ⇒ 📌 ta **mất vết** đúng ở những lần **đáng ngờ nhất**. 🔑 Và nếu ghi nhật ký **thất bại**, ta
+**KHÔNG** chặn nghiệp vụ của người dùng (họ đang làm việc **hợp pháp**) — ⚠️ nhưng phải **nói thật** bằng
+`LogError` + neo `[CUS-NHAT-KY-XUAT-LOI]`: 🔒 một vết **im lặng mất** còn tệ hơn một vết **không có** (ta **tưởng**
+là có).
+
+**④ Bất biến ở ENTITY, không chỉ ở DB.** `CustomerId` rỗng ⇒ **NÉM** (*"xuất dữ liệu của ai?"* là câu hỏi đầu
+tiên) · `NguoiXuat` rỗng/khoảng trắng ⇒ **NÉM** (🔑 một vết rỗng là một vết **vô dụng**) · số âm ⇒ **NÉM**
+(⚠️ số âm **không thể** là sự thật).
+
+**⑤ CẮT theo độ dài, KHÔNG NÉM.** 📌 Đây là **nhật ký kiểm toán**; ⚠️ nếu nó **ném** vì một lý do quá dài thì
+🔑 **sự kiện xuất PII sẽ không được ghi** — ta **mất vết** chỉ vì một **cái tên**. 🔒 Một vết **bị cắt** vẫn
+**tốt hơn** không có vết nào.
+
+➕ **Và nhật ký KHÔNG chứa PII** — 🔑 nó ghi **số liệu** (`SoDongHoSo`, `SoDonHang`, `DonHangBiCat`), không ghi
+**nội dung**. 📌 Nếu nó chứa PII thì ta vừa tạo **bản sao thứ hai** của dữ liệu cá nhân ở một nơi **không ai
+kiểm soát** — đúng cái mà `ADR-11` cấm.
+
+### 22.3 🗄️ **Migration + schema thật**
+
+`20261016204226_Cus001_NhatKyXuatDuLieuCaNhan` — bảng `CusDataExportLogs`
+(`Id`, `TenantId`, `CustomerId`, `NguoiXuat`, `XuatLucUtc`, `SoDongHoSo`, `SoDonHang`, `DonHangBiCat`, `LyDo`,
+`CreationTime`, `CreatorId`) + **2 index** tra cứu (**theo khách** — *"dữ liệu của TÔI bị xuất khi nào"*;
+**theo thời gian** — *"tuần này AI đã xuất gì"*).
+
+✅ **Đã đo trên DB thật:** bảng **có thật** (11 cột) · `has-pending-model-changes` = **không có thay đổi** ·
+**NND = 48** không đổi · **36** migration.
+
+### 22.4 ✅ **KIỂM CHỨNG — 15 UNIT TEST + 5 CA E2E**
+
+**`CustomerDataExportLogTests` (15 ca ĐẠT):**
+| Ca | Bất biến |
+|---|---|
+**TC01** | `CustomerId` rỗng ⇒ **NÉM** (không có *"xuất chung chung"*) |
+**TC02** | `NguoiXuat` `null`/`""`/`"   "` ⇒ **NÉM** — 🚨 *"một vết rỗng là một vết vô dụng"* |
+**TC03** | số âm ⇒ **NÉM** |
+**TC04** | **`0` là HỢP LỆ** — khách chưa mua gì là **bình thường** (⚠️ chặn `0` sẽ làm ta **không ghi được** nhật ký cho lần xuất **đầu tiên** — 📌 đúng lần quan trọng nhất) |
+**TC05** | tên quá dài ⇒ **CẮT, không ném** |
+**TC06** | `LyDo` quá dài ⇒ cắt; `""`/`"   "` ⇒ **`null`** (🔑 phân biệt *"không có lý do"* với *"có nhưng rỗng"*) |
+**TC07** | lý do hợp lệ đi qua **nguyên vẹn** (chống cắt quá tay) |
+**TC08** | 🚨 **chống lỗi "tham số hoán đổi"** — `SoDongHoSo` và `SoDonHang` **cùng kiểu `int`**; 🔒 nếu hoán đổi thì nhật ký **vẫn hợp lệ** (dữ liệu **sai** nhưng **không triệu chứng**) ⇒ ✅ dùng **hai giá trị KHÁC NHAU** và kiểm **từng trường** |
+🚨 **TC09** | **KHÔNG soft-delete** — kiểm **dấu hiệu thật** (`IsDeleted`/`DeletionTime`/`DeleterId` **không tồn tại**) + kiểu cơ sở **không** chứa `FullAudited` |
+**TC10** | **append-only** — mọi trường nghiệp vụ **không có setter công khai** (⚠️ sửa được = che giấu được) |
+**TC11** | có `DbSet` **và** map đúng bảng `CusDataExportLogs` |
+**TC12** | **không có unique index** (🔑 vì sự **lặp lại** mới là thứ cần **phát hiện**) |
+
+**5 ca E2E mới (`kiem-e2e.ps1`, đo DB THẬT):** **D9a** DB **có** dòng nhật ký · **D9b** có **người xuất thật**
+(`admin`, ⚠️ không rỗng) · **D9c** **số đơn = 1** khớp bản xuất · **D9d** `donHangBiCat = false` · 🚨 **D9e** nhật
+ký **KHÔNG chứa PII** (không email/SĐT/tên).
+
+➡️ **E2E: 26/26 ĐẠT** · **8 bước** · `exit 0` · **152s** · **1170** unit · 38 integration · mermaid 197/0 ·
+DB 21/21 · test cổng 17/17.
+
+### 22.5 🐞 **BA lỗi của tôi — lỗi #1 là lỗi THẬT trong SẢN PHẨM**
+
+**① 🚨🚨 QUÊN `DbSet<>` TRÊN `eCommerceDbContext` ⇒ `/KhachHang` TRẢ `500`.**
+🔑 ABP đăng ký `IRepository<T>` bằng cách **QUÉT các thuộc tính `DbSet<>`** (không quét model) ⇒
+`IRepository<CustomerDataExportLog>` **không được đăng ký** ⇒ **DI nổ lúc chạy**.
+⚠️ **Triệu chứng KHÔNG hề trỏ tới nhật ký:** nó là `GET /KhachHang` (danh sách khách) trả **`500`** — 🔒 và
+**build xanh, 1155 unit test xanh**.
+📌 **Và đây KHÔNG phải lỗi mới:** nó **đã xảy ra thật** ở `CAT-002` (15/10/2026) với `Category` ⇒ 🔑 **đã có**
+`DbSetRegistrationTests` sinh ra để chặn nó. ⚠️ Nhưng lần này tôi **thêm entity rồi chạy E2E TRƯỚC khi chạy unit
+test** ⇒ 📌 **lưới an toàn có sẵn mà tôi không đi qua**. ✅ Chữa: thêm `DbSet` + thêm **TC11** khoá riêng cho
+entity này.
+🔒 **BÀI HỌC:** *"chạy đúng thứ tự các bước kiểm"* **cũng** là một phần của độ tin cậy — 📌 thêm entity thì
+**chạy unit test TRƯỚC**, đừng để E2E làm lưới đầu tiên.
+
+**② ⚠️ ĐOÁN namespace ABP `ISoftDelete` — SAI HAI LẦN** (`Volo.Abp.Domain.Entities.SoftDelete` rồi
+`Volo.Abp.SoftDelete`, cả hai **không tồn tại**).
+✅ **Chữa (và cách này MẠNH HƠN):** thay vì import namespace, kiểm **DẤU HIỆU THẬT** của xóa mềm — sự **hiện
+diện** của `IsDeleted`/`DeletionTime`/`DeleterId`. 🔑 Cách này không quan tâm ABP gọi interface là gì; 📌 nó hỏi
+*"entity có khả năng bị xóa mềm không"* — **đúng câu hỏi ta cần**.
+
+**③ ⚠️ Đặt tên test CÓ DẤU CÁCH** (`TC04_... khach khong co don nao ...`) ⇒ **6 lỗi cú pháp C#**.
+🔑 Khác với PowerShell (nơi dấu cách trong tên hàm **hợp lệ**), C# **không** cho. ✅ Chữa: `_`.
+
+### 22.6 ⏳ NỢ
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+**1** | 🚨 **Chưa có UI xem nhật ký** | 📌 Bảng có thật, nhưng **người kiểm toán chưa có màn hình** ⇒ hiện phải **truy vấn SQL**. 🔑 Đây là nợ **kế tiếp** |
+**2** | **Chưa có cảnh báo khi xuất LẶP LẠI bất thường** | 🔑 Bảng đã **đủ dữ liệu** để phát hiện (📌 và vì thế tôi **cố ý không** đặt unique index) — ⚠️ nhưng **chưa có** luật cảnh báo |
+**3** | **`LyDo` chưa được điền từ UI** | ⚠️ Luôn `null` hiện tại ⇒ 📌 *"vì sao xuất"* chưa trả lời được |
+**4** | 🚨 **Bảng KHÔNG nằm trong `kiem-db.ps1`** | 🔒 **Cố ý** (đây là **dữ liệu thật**, không phải bảng phải-rỗng) — ⚠️ nhưng nghĩa là **không có cổng** nào kiểm nó **tăng đúng** khi xuất |
+**5** | **Chưa có chính sách LƯU TRỮ** (bao lâu thì xóa nhật ký) | 📌 Luật yêu cầu **giới hạn thời gian lưu** — ⚠️ nhưng xóa nhật ký kiểm toán lại **mâu thuẫn** với mục đích của nó ⇒ 🔒 cần **thiết kế**, không thể làm vội |
+**6** | **Chưa gồm dữ liệu module khác** (địa chỉ giao, thanh toán, thuế) | ⚠️ Vẫn là **nợ chặn** (`Address` chưa tồn tại) |
+
+### 22.7 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.3 | 17/10/2026 | *(agent, session GĐ1)* | **§22 — LÁT CẮT 6: NHẬT KÝ KIỂM TOÁN XUẤT DỮ LIỆU CÁ NHÂN** (đóng nợ §20.7 #4 và §21.6 #6): thêm **`CustomerDataExportLog`** (`CreationAuditedEntity`, **KHÔNG** soft-delete, **KHÔNG** aggregate, **KHÔNG** `ConcurrencyStamp`/`ExtraProperties`) + **`DbSet<CustomerDataExportLog>`** + mapping `CusDataExportLogs` + **2 index** tra cứu (theo **khách** và theo **thời gian**) + migration **`20261016204226_Cus001_NhatKyXuatDuLieuCaNhan`** + ghi nhật ký trong **UoW RIÊNG** (`requiresNew: true`) + **15 unit test** + **5 ca E2E**. 🔑 **VÌ SAO LOG KHÔNG ĐỦ:** câu hỏi luật là **AI** đã xuất dữ liệu của tôi, **KHI NÀO**, **BAO NHIÊU LẦN** — 🔒 log **không trả lời được** vì (a) **bị xoay vòng/hết hạn** (*"năm ngoái ai đã xuất dữ liệu của tôi"* là câu hỏi **có thật**), (b) **không TRA CỨU được** (phải grep tệp văn bản, 📌 và grep phụ thuộc **định dạng dòng log**), (c) **nằm NGOÀI giao dịch** (⚠️ một lần **THỬ xuất** thất bại cũng là sự kiện **cần vết**); ✅ bảng trả lời **cả ba bằng MỘT câu truy vấn**. ✅ **NĂM QUYẾT ĐỊNH:** ① **`CreationAuditedEntity`** — 🔒 **không soft-delete** (🚨 nhật ký **xóa được** thì **không còn là** nhật ký: người có quyền xóa sẽ **xóa vết của chính mình**), ➕ không aggregate, ➕ không `ConcurrencyStamp`/`ExtraProperties` (⚠️ chúng phục vụ **sửa đổi có kiểm soát**, 🔒 mà dòng **không bao giờ sửa** thì chúng **trống rỗng**); ② **KHÔNG unique index** (🔑 nhiều lần xuất cùng khách cùng giây là **hợp lệ**, và 📌 chính sự **lặp lại** mới cần **phát hiện**; ⚠️ unique index sẽ **chặn** lần thứ hai ⇒ **mất** dấu hiệu đáng ngờ nhất) ⇒ ✅ **hệ quả: NND vẫn = 48**; ③ **UoW RIÊNG** (`requiresNew: true`) — ⚠️ ghi chung UoW thì một lỗi ở bước sau **cuốn theo** cả nhật ký ⇒ **mất vết** đúng ở lần **đáng ngờ nhất**; 🔑 và nếu ghi nhật ký **thất bại** thì **KHÔNG** chặn nghiệp vụ (người dùng làm việc **hợp pháp**) nhưng phải **nói thật** (`LogError` + `[CUS-NHAT-KY-XUAT-LOI]`): 🔒 một vết **im lặng mất** tệ hơn một vết **không có**; ④ **bất biến ở ENTITY**: `CustomerId` rỗng ⇒ **NÉM**, `NguoiXuat` rỗng/khoảng trắng ⇒ **NÉM** (🔑 vết rỗng là vết **vô dụng**), số âm ⇒ **NÉM**; ⑤ **CẮT theo độ dài, KHÔNG NÉM** — 📌 nếu nhật ký **ném** vì một cái tên quá dài thì 🔑 **sự kiện xuất PII không được ghi** ⇒ 🔒 vết **bị cắt** vẫn **tốt hơn** không có. ➕ **Nhật ký KHÔNG chứa PII** (ghi **số liệu**, không ghi **nội dung**) — 📌 nếu chứa thì ta tạo **bản sao thứ hai** của dữ liệu cá nhân ở nơi **không ai kiểm soát** (`ADR-11`). ✅ **MIGRATION + SCHEMA THẬT:** `CusDataExportLogs` 11 cột + 2 index; đo được: **bảng có thật** · `has-pending-model-changes` = **không có thay đổi** · **NND = 48** · **36** migration. ✅ **KIỂM CHỨNG 15 UNIT TEST + 5 CA E2E:** **TC01** `CustomerId` rỗng ⇒ ném · **TC02** `NguoiXuat` `null`/`""`/`"   "` ⇒ ném · **TC03** số âm ⇒ ném · **TC04** **`0` HỢP LỆ** (⚠️ chặn `0` sẽ làm **không ghi được** nhật ký lần xuất **đầu tiên** — 📌 lần quan trọng nhất) · **TC05** tên dài ⇒ **cắt** · **TC06** `LyDo` dài ⇒ cắt, `""` ⇒ `null` · **TC07** lý do hợp lệ **nguyên vẹn** · 🚨 **TC08 chống lỗi "tham số hoán đổi"** (`SoDongHoSo`/`SoDonHang` **cùng `int`** — 🔒 hoán đổi thì nhật ký **vẫn hợp lệ**, dữ liệu **sai** mà **không triệu chứng**) · 🚨 **TC09 KHÔNG soft-delete** (kiểm **dấu hiệu thật** `IsDeleted`/`DeletionTime`/`DeleterId`, không import namespace ABP) · **TC10 append-only** (không setter công khai) · **TC11** có `DbSet` + map đúng bảng · **TC12** **không unique index**; **E2E: D9a** DB có dòng · **D9b** người xuất thật (`admin`) · **D9c** số đơn = 1 · **D9d** `donHangBiCat = false` · 🚨 **D9e** nhật ký **KHÔNG chứa PII** ⇒ **E2E 26/26** · **8 bước** · `exit 0` · **152s** · **1170** unit · 38 integration · mermaid 197/0 · DB 21/21 · test cổng 17/17. 🐞 **BA LỖI:** (1) 🚨🚨 **QUÊN `DbSet<>` TRÊN `eCommerceDbContext` ⇒ `/KhachHang` TRẢ `500`** — 🔑 ABP đăng ký `IRepository<T>` bằng **QUÉT `DbSet<>`** (không quét model) ⇒ `IRepository<CustomerDataExportLog>` **không được đăng ký** ⇒ **DI nổ lúc chạy**; ⚠️ **triệu chứng KHÔNG hề trỏ tới nhật ký** (nó là `GET` **danh sách khách**) và 🔒 **build xanh, 1155 unit test xanh**; 📌 **KHÔNG phải lỗi mới** — **đã xảy ra thật** ở `CAT-002` (15/10/2026) với `Category` ⇒ 🔑 **đã có** `DbSetRegistrationTests` sinh ra để chặn nó, ⚠️ nhưng lần này tôi **thêm entity rồi chạy E2E TRƯỚC khi chạy unit test** ⇒ 📌 **lưới an toàn có sẵn mà tôi không đi qua**; ✅ chữa: thêm `DbSet` + **TC11** khoá riêng cho entity này; 🔒 **bài học: *"chạy đúng thứ tự các bước kiểm"* CŨNG là một phần của độ tin cậy — thêm entity thì chạy unit test TRƯỚC, đừng để E2E làm lưới đầu tiên**; (2) ⚠️ **ĐOÁN namespace ABP `ISoftDelete` — SAI HAI LẦN** ⇒ ✅ chữa bằng cách **mạnh hơn**: kiểm **DẤU HIỆU THẬT** của xóa mềm thay vì import namespace (🔑 không quan tâm ABP gọi interface là gì, 📌 hỏi *"entity có khả năng bị xóa mềm không"*); (3) ⚠️ **đặt tên test CÓ DẤU CÁCH** ⇒ **6 lỗi cú pháp C#** (🔑 khác PowerShell, nơi dấu cách **hợp lệ**) ⇒ ✅ `_`. Ghi **§22.6** (nợ: 🚨 **chưa có UI xem nhật ký** ⇒ người kiểm toán phải **truy vấn SQL** (**nợ kế tiếp**) · **chưa có cảnh báo khi xuất LẶP LẠI bất thường** (🔑 bảng đã **đủ dữ liệu**, 📌 và vì thế tôi **cố ý không** đặt unique index) · **`LyDo` chưa được điền từ UI** · 🚨 **bảng KHÔNG nằm trong `kiem-db.ps1`** — 🔒 **cố ý** (đây là **dữ liệu thật**, ⚠️ nhưng nghĩa là **không có cổng** nào kiểm nó **tăng đúng** khi xuất) · **chưa có chính sách LƯU TRỮ** (📌 luật yêu cầu **giới hạn thời gian lưu** — ⚠️ nhưng xóa nhật ký kiểm toán lại **mâu thuẫn** với mục đích của nó ⇒ 🔒 cần **thiết kế**) · **chưa gồm dữ liệu module khác** (**nợ chặn**)) |

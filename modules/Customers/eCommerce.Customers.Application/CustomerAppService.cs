@@ -4,6 +4,7 @@ using Volo.Abp;
 using Volo.Abp.Application.Services;
 using Volo.Abp.DistributedLocking;
 using Volo.Abp.Domain.Repositories;
+using Volo.Abp.Uow;
 using eCommerce.Orders;
 
 namespace eCommerce.Customers;
@@ -32,16 +33,26 @@ public class CustomerAppService : ApplicationService
     private readonly IRepository<Orders.Order, Guid> _donHangRepository;
     private readonly IRepository<Orders.OrderLine, Guid> _dongHangRepository;
 
+    /// <summary>🔑 **NHAT KY KIEM TOAN** (`CUS-001` §22) — tra loi *"AI / KHI NAO / BAO NHIEU LAN"*.</summary>
+    private readonly IRepository<CustomerDataExportLog, Guid> _nhatKyXuatRepository;
+
+    /// <summary>🔒 De mo **UoW RIENG** cho nhat ky — xem `XuatDuLieuCaNhanAsync`.</summary>
+    private readonly IUnitOfWorkManager _unitOfWorkManager;
+
     public CustomerAppService(
         IRepository<Customer, Guid> khachRepository,
         IAbpDistributedLock khoa,
         IRepository<Orders.Order, Guid> donHangRepository,
-        IRepository<Orders.OrderLine, Guid> dongHangRepository)
+        IRepository<Orders.OrderLine, Guid> dongHangRepository,
+        IRepository<CustomerDataExportLog, Guid> nhatKyXuatRepository,
+        IUnitOfWorkManager unitOfWorkManager)
     {
         _khachRepository = khachRepository;
         _khoa = khoa;
         _donHangRepository = donHangRepository;
         _dongHangRepository = dongHangRepository;
+        _nhatKyXuatRepository = nhatKyXuatRepository;
+        _unitOfWorkManager = unitOfWorkManager;
     }
 
     /// <summary>
@@ -482,6 +493,48 @@ public class CustomerAppService : ApplicationService
             "XUAT DU LIEU CA NHAN: khach={CustomerId} · so dong ho so={SoDong} · so don={SoDon} · bi cat={BiCat} · " +
             "nguoi xuat={NguoiXuat} · {MoTa}. [CUS-XUAT-DU-LIEU-CA-NHAN]",
             khach.Id, dto.CacDong.Count, dto.TongSoDon, dto.DonHangBiCat, nguoiXuat, MoTaAnToan(khach));
+
+        // ══════════════════════════════════════════════════════════════════════════════════════════
+        // 🚨 **NHAT KY KIEM TOAN** (`CUS-001` §22) — 🔑 tra loi **AI / KHI NAO / BAO NHIEU LAN**.
+        //
+        // 🔒 **VI SAO GHI TRONG `requiresNew: true` (UoW RIENG):**
+        //
+        // 📌 `Logger.LogWarning` o tren **KHONG** du: log bi **xoay vong**, **khong tra cuu duoc**, va — quan
+        // trong nhat — ⚠️ **nam ngoai giao dich**. 🔑 Nhung mot **lan THU xuat PII** cung la su kien **can vet**
+        // (co the la **lam dung**: nguoi ta thu di thu lai de lay du lieu).
+        //
+        // ✅ UoW **rieng** nghia la: neu nhat ky ghi **xong** roi phan sau **nem**, 🔒 **vet VAN CON**.
+        // ⚠️ Nguoc lai (ghi chung UoW), mot loi o buoc sau se **cuon theo** ca nhat ky ⇒ 📌 ta **mat vet**
+        // dung o nhung lan **dang ngo** nhat.
+        // ⚠️ Va ta **KHONG** de loi ghi nhat ky lam **hong** ban xuat cua nguoi dung: 🔑 nguoi dung dang lam
+        // viec **hop phap**; 📌 neu nhat ky loi thi **ghi log loi** (co the sua), khong **chan** nghiep vu.
+        // ══════════════════════════════════════════════════════════════════════════════════════════
+        try
+        {
+            using var uow = _unitOfWorkManager.Begin(requiresNew: true, isTransactional: true);
+
+            await _nhatKyXuatRepository.InsertAsync(new CustomerDataExportLog(
+                Guid.NewGuid(),
+                khach.Id,
+                nguoiXuat,
+                dto.XuatLucUtc,
+                soDongHoSo: dto.CacDong.Count,
+                soDonHang: dto.TongSoDon,
+                donHangBiCat: dto.DonHangBiCat), autoSave: false);
+
+            // 📌 `CompleteAsync` **tu luu** moi thay doi trong UoW nay ⇒ 🔑 khong can `autoSave: true`
+            // (va `autoSave: true` se **luu hai lan** — 📌 thua mot vong ghi DB).
+            await uow.CompleteAsync();
+        }
+        catch (Exception ex)
+        {
+            // ⚠️ **KHONG** nem tiep — xem ly do o tren. 🔑 Nhung phai **noi that** la vet **KHONG** duoc ghi,
+            // 📌 vi mot vet **im lang mat** con te hon mot vet **khong co** (ta tuong la co).
+            Logger.LogError(ex,
+                "🚨 KHONG GHI DUOC NHAT KY XUAT PII (khach={CustomerId}). ⚠️ VET BI MAT — can xu ly ngay. " +
+                "[CUS-NHAT-KY-XUAT-LOI]",
+                khach.Id);
+        }
 
         return dto;
     }

@@ -117,6 +117,18 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
     public DbSet<Customers.Customer> Customers { get; set; } = default!;
     public DbSet<Customers.CustomerGroup> CustomerGroups { get; set; } = default!;
 
+    /// <summary>
+    /// 🚨 **NHAT KY KIEM TOAN XUAT DU LIEU CA NHAN** (`CUS-001` §22) — 🔑 tra loi *"AI / KHI NAO / BAO NHIEU LAN"*.
+    ///
+    /// ⚠️ **KHONG DUOC BO DONG NAY** — ABP dang ky `IRepository<T>` bang cach **QUET cac thuoc tinh
+    /// `DbSet<>`** tren DbContext (xem chu thich o dau danh sach nay). 📌 Thieu no thi:
+    /// entity **van co bang trong DB** va **van mapping duoc**, nhung 🔒 `IRepository<CustomerDataExportLog>`
+    /// **khong duoc dang ky** ⇒ DI **nem luc chay** ⇒ 📌 `/KhachHang` tra **`500`** — ⚠️ va trieu chung
+    /// **khong he** tro tới nhat ky (do la `GET` danh sach khach).
+    /// ➕ Day la **loi DA GAP THAT** khi lam lat cat nay (`CUS-001` §22.5).
+    /// </summary>
+    public DbSet<Customers.CustomerDataExportLog> CustomerDataExportLogs { get; set; } = default!;
+
     // ---- Orders ----
     public DbSet<Orders.Order> Orders { get; set; } = default!;
     public DbSet<Orders.OrderLine> OrderLines { get; set; } = default!;

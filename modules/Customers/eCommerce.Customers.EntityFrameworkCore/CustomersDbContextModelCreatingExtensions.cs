@@ -77,5 +77,31 @@ public static class CustomersDbContextModelCreatingExtensions
             b.HasIndex(x => new { x.TenantId, x.Status })
                 .HasDatabaseName("IX_CusCustomers_TenantId_Status");
         });
+
+        // ── NHẬT KÝ KIỂM TOÁN XUẤT DỮ LIỆU CÁ NHÂN (`CUS-001` §22) ────────────────────────────────
+        // 🚨 Bảng này trả lời **AI / KHI NÀO / BAO NHIÊU LẦN** đã xuất PII của một khách — 🔒 ba câu hỏi
+        // mà **log KHÔNG trả lời được** (log bị xoay vòng, không tra cứu được, và nằm ngoài giao dịch).
+        // Xem `CustomerDataExportLog` để biết vì sao nó **không** soft-delete và **không** có aggregate.
+        builder.Entity<CustomerDataExportLog>(b =>
+        {
+            b.ToTable("CusDataExportLogs");
+            b.ConfigureByConvention();
+
+            b.Property(x => x.NguoiXuat).IsRequired().HasMaxLength(CustomerDataExportLog.DoDaiNguoiXuatToiDa);
+            b.Property(x => x.LyDo).HasMaxLength(CustomerDataExportLog.DoDaiLyDoToiDa);
+            b.Property(x => x.XuatLucUtc).IsRequired();
+
+            // ⚠️ **KHÔNG unique index** — 📌 cố ý: nhiều lần xuất cùng một khách trong cùng một giây là
+            // **hợp lệ**, và 🔑 chính sự **lặp lại** mới là thứ cần **phát hiện**; một unique index sẽ **che**
+            // dấu hiệu đó. ➕ Vì thế **NND vẫn = 48** (không phát sinh index cần `NULLS NOT DISTINCT`).
+            //
+            // 📌 Index tra cứu theo **khách** — 🔑 đó là câu hỏi thật: *"dữ liệu của TÔI bị xuất khi nào"*.
+            b.HasIndex(x => new { x.TenantId, x.CustomerId })
+                .HasDatabaseName("IX_CusDataExportLogs_TenantId_CustomerId");
+
+            // 📌 Index theo **thời gian** — 🔑 cho câu hỏi của người kiểm toán: *"tuần này AI đã xuất gì"*.
+            b.HasIndex(x => new { x.TenantId, x.XuatLucUtc })
+                .HasDatabaseName("IX_CusDataExportLogs_TenantId_XuatLucUtc");
+        });
     }
 }
