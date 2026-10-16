@@ -2633,3 +2633,44 @@ thì đã **commit một tính năng vô dụng** và **tài liệu hoá nó là
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.0-k | 15/10/2026 | *(agent, session GĐ1)* | ✅ **GIỮ CÁC DÒNG ĐÃ NHẬP — ĐÃ KIỂM CHỨNG CẢ HAI ĐƯỜNG** (trả nợ §85): chuyển 4 phép gán lên **trước lời gọi checkout** (L109–112 < L113 · `catch` L150). **Đo được**: **LỖI** ⇒ `Sku2` `True` · `SoLuong2` `True` · `Sku3` `True` · **`0`** đơn; **THÀNH CÔNG** ⇒ tổng **`330,000`** (gộp xuyên dòng) · `Sku2` `True`; build **3/3** (`exit=0` · `0` lỗi · DLL có); **`fail: 0`** |
+
+---
+
+## 86. ✅ **GIỎ GIỮ QUA PHIÊN (COOKIE gio-web) — ĐÃ KIỂM CHỨNG** (15/10/2026)
+
+### 86.1 Đã làm — **cookie HttpOnly**, không đổi cấu hình module
+
+| # | Vị trí (đọc lại mã để xác nhận) | Thay đổi |
+|---|---|---|
+| 1 | `LuuGio` (**L47**) | ghi dòng hàng vào cookie `gio-web` dạng `SKU:SL,SKU:SL` (`HttpOnly` · `IsEssential` · `MaxAge` 2 giờ) |
+| 2 | `KhoiPhucGio` (**L63**) | khôi phục **tối đa 3 dòng** từ cookie; 🔒 dữ liệu hỏng ⇒ **BỎ QUA**, không ném |
+| 3 | `GET /DatHang` (**L88**) | gọi `KhoiPhucGio` (**L103**) ⇒ **tải lại trang KHÔNG mất giỏ** |
+| 4 | `POST /DatHang` (**L113**) | gọi `LuuGio` **ngay đầu** (**L129**) ⇒ **mọi** đường render lại — **kể cả đường LỖI** — đều giữ giỏ |
+| 5 | nhánh **THÀNH CÔNG** (**L190**) | `Response.Cookies.Delete("gio-web")` ⇒ đặt xong thì **giỏ rỗng** |
+
+📌 **Vì sao CHỌN cookie thay vì `ISession`:** `ISession` đòi thêm cấu hình (`AddSession`/`UseSession`) trong **module Web** —
+nhiều tệp hơn, nhiều rủi ro hơn, mà **lợi ích không khác** cho một giỏ tối đa 3 dòng. Cookie còn **kiểm được bằng probe HTTP**.
+🔒 **An toàn:** cookie **chỉ chứa `SKU:SL`** — **không** chứa giá, **không** chứa khoá checkout, **không** chứa tổng tiền;
+server **luôn** tính lại giá từ sổ giải trình (bất biến đã có). Dữ liệu cookie bị sửa ⇒ **bỏ qua** ⇒ không thể lợi dụng.
+⚠️ **Bất biến §56 được GIỮ:** khoá checkout **vẫn sinh MỚI ở mỗi GET** — cookie **không** mang khoá ⇒ **không** phá tính chống trùng đơn.
+
+### 86.2 ✅ BẰNG CHỨNG (probe `verify-gio-phien.ps1`, chạy trọn, `exit 0`)
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | **POST LỖI** (dòng 2 = SKU không có giá) rồi **GET MỚI** (cùng phiên) | 🔥 dòng 1 = **`GASKU-082729`** ✅ · dòng 2 = **`KHONG-CO-999`** ✅ · `SL2` = **`7`** ✅ |
+| 2 | 🔥 **Khoá checkout giữa hai lần GET** | `'…'` → `'…'` · **KHÁC NHAU = `True`** ✅ *(bất biến §56 **không** bị phá)* |
+| 3 | **POST THÀNH CÔNG** (`A×1` + `A×2`) | tổng **`330.000`** ✅ *(gộp `A` xuyên dòng)* |
+| 4 | 🔥 **GET MỚI sau khi đặt xong** | dòng 1 = **`''`** ✅ · dòng 2 = **`''`** ✅ ⇒ **giỏ đã được XOÁ** |
+| 5 | `fail:` · tiến trình treo | **`0`** ✅ · **0** ✅ |
+
+📌 **Vì sao #1 là phép đo quyết định:** đây là **lần đầu** giỏ sống **qua một lần tải lại trang** — và nó được đo **ở đường LỖI**
+(đúng bài học §84: *tính năng "cứu khi có lỗi" phải đo ở đường lỗi*).
+📌 **Và #2 là phép đo chống hồi quy:** dễ nhất là "tiện tay" lưu cả **khoá checkout** vào cookie — việc đó sẽ **phá** tính chống
+trùng đơn (bấm hai lần ⇒ hai đơn). Đo **khoá khác nhau giữa hai GET** chứng minh bất biến §56 **còn nguyên**.
+
+### 86.3 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.0-l | 15/10/2026 | *(agent, session GĐ1)* | ✅ **GIỎ GIỮ QUA PHIÊN** bằng cookie `gio-web` (`HttpOnly`, 2 giờ): `LuuGio` (L47) · `KhoiPhucGio` (L63) · GET khôi phục (L103) · POST ghi giỏ **ngay đầu** (L129) · **THÀNH CÔNG ⇒ XOÁ giỏ** (L190). **Kiểm chứng**: sau **LỖI** + **GET MỚI** ⇒ dòng 1 **`GASKU-082729`** · dòng 2 **`KHONG-CO-999`** · `SL2` **`7`**; **khoá checkout KHÁC nhau giữa hai GET** (**`True`** — bất biến §56 còn nguyên); **THÀNH CÔNG** ⇒ tổng **`330.000`**; **GET MỚI ⇒ giỏ RỖNG** (`''`/`''`); build **3/3**; **`fail: 0`** |

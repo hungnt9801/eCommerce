@@ -41,12 +41,55 @@ public class DatHangController : Controller
         _kho = kho;
     }
 
-    /// <summary>`GET /DatHang` — biểu mẫu. Khoá checkout sinh **tại đây** (xem bất biến ở doc của lớp).</summary>
+    /// <summary>🚨 **GIỎ GIỮ QUA PHIÊN** (`web-001` §86) — ghi dòng hàng vào cookie `gio-web` (HttpOnly, 2 giờ).
+    /// 📌 Gọi ở **ĐẦU** POST ⇒ **mọi** đường render lại (kể cả đường **LỖI**) đều giữ giỏ; đường **THÀNH CÔNG** thì **xoá** cookie.
+    /// 📌 Chọn **cookie** thay vì `ISession` để **không** phải đổi cấu hình module — và **probe HTTP kiểm được** hành vi.</summary>
+    private static void LuuGio(HttpResponse traLoi, DatHangInput form)
+    {
+        var phan = new List<string> { $"{form.Sku}:{form.SoLuong}" };
+        if (!string.IsNullOrWhiteSpace(form.Sku2)) { phan.Add($"{form.Sku2}:{form.SoLuong2}"); }
+        if (!string.IsNullOrWhiteSpace(form.Sku3)) { phan.Add($"{form.Sku3}:{form.SoLuong3}"); }
+
+        traLoi.Cookies.Append("gio-web", string.Join(',', phan), new CookieOptions
+        {
+            HttpOnly = true,
+            IsEssential = true,
+            MaxAge = TimeSpan.FromHours(2)
+        });
+    }
+
+    /// <summary>Khôi phục tối đa **3 dòng** từ cookie `gio-web` (dạng `SKU:SL,SKU:SL`).
+    /// 🔒 Cookie do người dùng sửa được ⇒ dữ liệu hỏng thì **BỎ QUA**, không ném (không có gì để tin ở đây).</summary>
+    private static void KhoiPhucGio(DatHangTrangDto trang, string? gio)
+    {
+        if (string.IsNullOrWhiteSpace(gio)) { return; }
+
+        var dong = gio.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var dem = 0;
+        foreach (var mot in dong)
+        {
+            var phan = mot.Split(':');
+            if (phan.Length != 2) { continue; }
+            if (!int.TryParse(phan[1], out var soLuong) || soLuong < 1) { continue; }
+
+            var sku = phan[0].Trim();
+            if (sku.Length == 0) { continue; }
+
+            if (dem == 0) { trang.Sku = sku; trang.SoLuong = soLuong; }
+            else if (dem == 1) { trang.Sku2 = sku; trang.SoLuong2 = soLuong; }
+            else if (dem == 2) { trang.Sku3 = sku; trang.SoLuong3 = soLuong; }
+            dem++;
+        }
+    }
+
+    /// <summary>`GET /DatHang` — biểu mẫu. Khoá checkout sinh **tại đây** (xem bất biến ở doc của lớp).
+    /// 🚨 **GIỎ GIỮ QUA PHIÊN** (§86): có cookie `gio-web` ⇒ **khôi phục** dòng đã nhập ⇒ **tải lại trang không mất giỏ**.
+    /// ⚠️ Khoá checkout **vẫn sinh MỚI mỗi lần GET** (bất biến §56 — chống trùng đơn) — cookie chỉ mang **dòng hàng**, **không** mang khoá.</summary>
     public async Task<IActionResult> Index()
     {
         var khoList = await _kho.GetListAsync(chiHoatDong: true);
 
-        return View(new DatHangTrangDto
+        var trang = new DatHangTrangDto
         {
             KhoList = khoList.Select(x => new KhoChonDto { Id = x.Id, Code = x.Code, Name = x.Name }).ToList(),
             Kenh = "web",
@@ -55,7 +98,11 @@ public class DatHangController : Controller
             Thue = "0.1",
             KhoaCheckout = $"WEB-{Guid.NewGuid():N}"[..20],
             TokenChongGiaMa = Guid.NewGuid().ToString("N")
-        });
+        };
+
+        KhoiPhucGio(trang, Request.Cookies["gio-web"]);
+
+        return View(trang);
     }
 
     /// <summary>
@@ -77,6 +124,9 @@ public class DatHangController : Controller
             KhoaCheckout = form.KhoaCheckout,   // 🚨 GIỮ NGUYÊN khoá của form (không sinh lại) — xem bất biến ở doc lớp
             TokenChongGiaMa = Guid.NewGuid().ToString("N")
         };
+
+        // 🚨 GIỎ GIỮ QUA PHIÊN (§86): ghi giỏ NGAY TẠI ĐÂY ⇒ mọi đường render lại (kể cả đường LỖI) đều còn dòng đã nhập.
+        LuuGio(Response, form);
 
         if (string.IsNullOrWhiteSpace(form.Sku) || form.SoLuong < 1 || form.KhoId == Guid.Empty)
         {
@@ -136,6 +186,8 @@ public class DatHangController : Controller
             trang.SoDon = don.Number;
             trang.TrangThai = don.Status.ToString();
             trang.DonId = don.Id;
+            // ✅ ĐẶT HÀNG XONG ⇒ **XOÁ GIỎ** (cookie) — tải lại trang là biểu mẫu trắng, không còn dòng cũ.
+            Response.Cookies.Delete("gio-web");
             trang.TongTien = don.GrandTotal;
             trang.TienTe = ketQua.Tien?.CurrencyCode ?? "VND";
 
