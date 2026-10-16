@@ -5,6 +5,13 @@
     PageLayout.Content.BreadCrumb.Add("Trang chủ");
 }
 
+@* 🚨 `WEB-001` — LỐI VÀO bằng UI (thay vì phải gõ URL tay): menu **lọc theo quyền**.
+   📌 Trước lượt này `eCommerce.Web` **không có menu nào** (`web-001` §81.2 #7) và Basic theme render menu
+   **không** kiểm quyền (đã kiểm bằng `strings` trên DLL theme).
+   ⚠️ Dùng **ViewComponent** (C#), KHÔNG dùng `<partial>`: `<partial>` **im lặng render rỗng** khi không
+   tìm thấy view ⇒ sai thì **không có triệu chứng** (đã đo được: HTTP 200, log 0 lỗi, menu biến mất). *@
+@await Component.InvokeAsync("Menu")
+
 <div class="card mb-3">
     <div class="card-header">
         <h5 class="card-title mb-0">Hệ thống eCommerce đa kênh — khu vực quản trị</h5>
@@ -24,7 +31,14 @@
 
 <div class="row">
     <div class="col-md-4">
-        <div class="card mb-3">
+        @* 🚨 `WEB-001` — LỐI VÀO bằng UI (thay vì phải gõ URL tay): menu **lọc theo quyền**.
+   📌 Trước lượt này `eCommerce.Web` **không có menu nào** (`web-001` §81.2 #7) và Basic theme render menu
+   **không** kiểm quyền (đã kiểm bằng `strings` trên DLL theme).
+   ⚠️ Dùng **ViewComponent** (C#), KHÔNG dùng `<partial>`: `<partial>` **im lặng render rỗng** khi không
+   tìm thấy view ⇒ sai thì **không có triệu chứng** (đã đo được: HTTP 200, log 0 lỗi, menu biến mất). *@
+@await Component.InvokeAsync("Menu")
+
+<div class="card mb-3">
             <div class="card-body">
                 <h6 class="card-title">Nền tảng đã có</h6>
                 <ul class="mb-0 small">
@@ -37,7 +51,14 @@
         </div>
     </div>
     <div class="col-md-4">
-        <div class="card mb-3">
+        @* 🚨 `WEB-001` — LỐI VÀO bằng UI (thay vì phải gõ URL tay): menu **lọc theo quyền**.
+   📌 Trước lượt này `eCommerce.Web` **không có menu nào** (`web-001` §81.2 #7) và Basic theme render menu
+   **không** kiểm quyền (đã kiểm bằng `strings` trên DLL theme).
+   ⚠️ Dùng **ViewComponent** (C#), KHÔNG dùng `<partial>`: `<partial>` **im lặng render rỗng** khi không
+   tìm thấy view ⇒ sai thì **không có triệu chứng** (đã đo được: HTTP 200, log 0 lỗi, menu biến mất). *@
+@await Component.InvokeAsync("Menu")
+
+<div class="card mb-3">
             <div class="card-body">
                 <h6 class="card-title">GĐ1 — đang làm</h6>
                 <ul class="mb-0 small">
@@ -50,7 +71,14 @@
         </div>
     </div>
     <div class="col-md-4">
-        <div class="card mb-3">
+        @* 🚨 `WEB-001` — LỐI VÀO bằng UI (thay vì phải gõ URL tay): menu **lọc theo quyền**.
+   📌 Trước lượt này `eCommerce.Web` **không có menu nào** (`web-001` §81.2 #7) và Basic theme render menu
+   **không** kiểm quyền (đã kiểm bằng `strings` trên DLL theme).
+   ⚠️ Dùng **ViewComponent** (C#), KHÔNG dùng `<partial>`: `<partial>` **im lặng render rỗng** khi không
+   tìm thấy view ⇒ sai thì **không có triệu chứng** (đã đo được: HTTP 200, log 0 lỗi, menu biến mất). *@
+@await Component.InvokeAsync("Menu")
+
+<div class="card mb-3">
             <div class="card-body">
                 <h6 class="card-title">Lối vào nhanh</h6>
                 <ul class="mb-0 small">

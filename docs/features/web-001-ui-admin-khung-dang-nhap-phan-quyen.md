@@ -3055,3 +3055,108 @@ còn ghi thẳng DB thì **không**. Sau khi `DEL` 3 key ⇒ chính sách **đ�
 |---|---|---|---|
 | v1.0-t | 16/10/2026 | *(agent, session GĐ1)* | ✅ **CƯỠNG CHẾ `INV-003`**: `HanMucKenh` (hàm thuần, **làm tròn xuống**, `0 = TẮT`, `Block` mới chặn) · áp trong `StockReservationService` **sau khoá + đọc tồn, trước `Reserved`** · mã lỗi mới **`eCommerce:Inventory:0042`** · nối `channelCode` từ checkout · **18 test** mới (**52** ở khu `Settings`). **Kiểm chứng API thuần**: (A) tắt ⇒ **200** · (B) `Absolute=4`+`Block` đặt 6 ⇒ **403 + `0042` + 0 giữ chỗ** · (C) **biên** đặt đúng 4 ⇒ **200** · (D) `Warn` ⇒ **200 + có cảnh báo log**; `fail: 0`; môi trường sạch. 🐛 Hai lỗi probe (§94.3): *không đọc mã lỗi* (nhầm `0001` là `0042`) và *mẫu grep sai vì backtick* |
 
+
+---
+
+## 95. ✅ **MENU ĐIỀU HƯỚNG LỌC THEO QUYỀN** (16/10/2026) — *đóng nợ §81.2 #7*
+
+> ⚠️ **PHẠM VI NÓI RÕ:** lát cắt này làm **menu + lọc quyền + lối vào bằng UI**. **Chưa** làm ba **trang**
+> mà API của chúng đã có (`/KhachHang`, `/ThanhToan`, `/HanMucKenh`) — xem **§95.5**. Và **chưa** thay
+> `[Authorize]` trên controller bằng `[Authorize(quyền)]` (xem **§95.6** nợ 2).
+
+### 95.1 Vấn đề: **menu không tồn tại, và menu của theme KHÔNG kiểm quyền**
+
+| # | Sự thật **đo được** | Cách đo |
+|---|---|---|
+| **1** | `eCommerce.Web` **không có menu nào** — người dùng phải **gõ URL tay** để vào `/DonHang`, `/PhanBo`, `/SanPham` | `web-001` §81.2 #7 (ghi từ trước) + `glob` trên `Views/` (chỉ có `_ViewStart`/`_ViewImports`, **không** `_Layout`/`_Menu`) |
+| **2** | Basic theme **CÓ** view component `Menu_` nhưng nó **KHÔNG** đọc `RequirePermissions` | `strings` trên `Volo.Abp.AspNetCore.Mvc.UI.Theme.Basic.dll` ⇒ chỉ thấy `get_Items`/`get_IsLeaf`; hàm `CheckPermissionsAsync` **chỉ** có trong `Volo.Abp.AspNetCore.Mvc.UI.Theme.Shared.dll` ở lớp **`ToolbarManager`**, **không** ở menu |
+
+🚨 **Hệ quả của (2) nếu cứ dùng menu theme:** **mọi mục hiện cho MỌI người** ⇒ người dùng bấm vào ⇒
+`403`/trang lỗi ⇒ **"menu nói dối"**. 📌 Đây **đúng** họ lỗi `F-403`/`XC-004` **D2** — chỉ khác là ở **UI**
+thay vì ở API.
+
+### 95.2 Đã làm gì
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| **1** | **`MucDieuHuong`** (`Navigation/`) | Dữ liệu **THUẦN**: `Nhan` · `Url` · **`QuyenCanCo`** · `MoTa`. 🔑 Có `QuyenCanCo` ⇒ có **chỗ** khai *"mục này cần quyền gì"* — thiếu nó thì mọi mục buộc phải hiện cho mọi người |
+| **2** | **`BoLocDieuHuong.Loc(...)`** | **LÕI THUẦN** (không ABP, không Razor) ⇒ test được **mọi** nhánh. 🔒 **FAIL-CLOSED**: hàm kiểm quyền trả `false` **hoặc NÉM** ⇒ **ẨN** mục |
+| **3** | **`MenuDieuHuong.TatCa`** | **MỘT nguồn** khai menu (3 mục: `/DonHang`, `/PhanBo`, `/SanPham`) — kèm lý do chọn quyền cho từng mục |
+| **4** | **`DichVuDieuHuong`** | **MỘT chỗ** trả lời *"menu nào hiện cho người đang đăng nhập"*: lấy principal + gọi `IAuthorizationService` |
+| **5** | **`MenuViewComponent`** (C#) | Dựng HTML bằng `TagBuilder` — **không** phụ thuộc một tệp `.cshtml` nào |
+| **6** | `Views/Home/Index.cshtml` | `@await Component.InvokeAsync("Menu")` — **lối vào bằng UI** (thay vì gõ URL) |
+| **7** | **`MenuDieuHuongTests`** (5 ca, **quét nguồn**) | 3 bất biến: **URL phải có controller thật** · **quyền phải có thật** · **lõi phải THUẦN + fail-closed** |
+
+### 95.3 🚨 **BỐN CÁI BẪY IM LẶNG** — cả bốn đều **đo được**, không phải suy đoán
+
+| # | Cái bẫy | Triệu chứng **thật** | Cách sửa |
+|---|---|---|---|
+| **1** | 🚨 **`AuthorizeAsync(null!, policy)` KHÔNG dùng người dùng hiện tại** | Trang chủ **`200`**, log **`0` lỗi**, **menu biến mất hoàn toàn**. `null` = **không có principal** ⇒ **mọi** policy **thất bại**; mà `Loc` **fail-closed** ⇒ ẩn **hết** ⇒ ViewComponent trả rỗng (đúng thiết kế "không có mục thì không render khung") ⇒ **không triệu chứng nào** | Lấy **principal thật** qua `ICurrentPrincipalAccessor` (ABP, không cần `HttpContext`). ⚠️ `ICurrentUser` **không** có thuộc tính `User` (build đỏ) — hai lần vấp, ghi ở mã |
+| **2** | 🚨 **`<partial>` render RỖNG khi không tìm thấy view** | Đổi sang `Views/Shared/_Menu.cshtml` + `<partial name="_Menu" />` ⇒ **cùng** triệu chứng: `200`, `0` lỗi, **không** menu. Và `.cshtml` **không** nằm trong `bin/` ⇒ câu hỏi *"Razor có biên dịch tệp mới"* thành **điểm mù** | Dùng **ViewComponent** (mã C#): **biên dịch là biết**. 📌 Cũng đúng khuôn ABP (`Menu_` của theme là view component) |
+| **3** | **Bộ quét nguồn có thể XANH VÔ NGHĨA** | Lần chạy đầu, regex quét menu dùng `Singleline` + `.*?` ⇒ bị **comment chứa `{`/`}`** cắt vụn ⇒ **0 mục** ⇒ test "URL phải có controller" sẽ **xanh** dù menu sai. Lần sửa 2: đòi `new() {` **cùng dòng** nhưng tệp khai **khác dòng** ⇒ vẫn 0 mục | Sửa regex **theo dòng**, **và** thêm **lưới an toàn** `Assert.True(mucMenu.Count > 0, "bộ quét hỏng")` ⇒ không bao giờ xanh vô nghĩa |
+| **4** | **`"..".Length` = 2, không phải 10** | Test "URL phải có controller" đỏ: *"cần `DonHangController`"* **dù tệp CÓ** — vì tên bị cắt thành `DonHangC` | `[..^"Controller".Length]` — **độ dài lấy từ chính chuỗi**, không số ma thuật |
+
+📌 **Điểm chung của cả bốn:** *"sai mà không có lỗi nào"*. Ba trong bốn cái chỉ lộ ra khi **in HTML thật**
+hoặc **in kết quả bộ quét** — **không** cái nào lộ ra khi đọc mã.
+
+### 95.4 ✅ Kiểm chứng
+
+**Unit test `MenuDieuHuongTests` (5 ca, quét nguồn):**
+
+| Nhóm | Nội dung |
+|---|---|
+| 🚨 **URL phải có controller thật** | đọc `MenuDieuHuong.TatCa` ⇒ mọi `Url` phải khớp `src/eCommerce.Web/Controllers/*Controller.cs` · **lưới an toàn**: bộ quét **phải** tìm thấy ≥ 1 mục |
+| 🚨 **Quyền phải có thật** | quét **mọi** tệp `*Permissions.cs` (cả module) + `eCommerceConsts.cs`, dựng bảng `Class.Const` ⇒ đối chiếu **hai** phần tử cuối của biểu thức quyền trong menu |
+| **Lõi phải THUẦN** | `BoLocDieuHuong.cs` **cấm** chứa `using Volo.Abp*` / `using Microsoft.AspNetCore*` / `[Inject]` / `IAuthorizationService` |
+| **Fail-closed trong mã** | khối `catch` của bộ lọc **phải** gán `coQuyen = false` (đổi sang `true` ⇒ test đỏ) |
+| **Menu một nguồn** | không view nào được viết cứng `href="<URL của menu>"` (mục viết cứng sẽ **hiện cho mọi người**) |
+
+**Probe HTTP thật (`tools\_tam-web\web-001-kiem.ps1`) — 7/7 ca ĐẠT** (Web :5100 + PostgreSQL 17 + đăng nhập thật):
+
+| # | Ca | Kỳ vọng | **Đo được** |
+|---|---|---|---|
+| B1 | Truy cập `/` **chưa** đăng nhập | `302` → `/Account/Login` (không lộ menu quản trị) | **`302`** ✅ |
+| C1 | Đăng nhập bằng form MVC | `200` | **`200`** ✅ |
+| **D1** | 🚨 Trang chủ **render khung menu thật** | có `aria-label="Điều hướng quản trị"` | **có** ✅ |
+| — | Số mục menu trên HTML (admin đủ quyền) | **3/3** | **3/3** ✅ |
+| **E1** | 🚨 **Thu hồi `eCommerce.Pricing`** (rồi **khởi động lại** Web) | mục **"Sản phẩm" BIẾN MẤT** khỏi HTML | **`href="/SanPham"` = False** ✅ |
+| E2 | Mục **không** bị thu quyền (`/DonHang`) | **vẫn hiện** | **`href="/DonHang"` = True** ✅ |
+| **E3** | Số mục menu **giảm đúng 1** | từ **3** xuống **2** | **truoc=3 · sau=2** ✅ |
+| F2 | **Khôi phục** quyền đã thu hồi | quyền trở lại | **count=1** ✅ |
+
+📌 **Ca E1 là phép đo quan trọng nhất:** nó chứng minh menu **thật sự** phụ thuộc quyền ở **đường chạy**,
+không chỉ trong unit test. ⚠️ Và nó **bắt buộc** phải **khởi động lại Web** — quyền được **cache trong
+tiến trình** (bài học `INV-003` §16.6: đổi DB mà không restart ⇒ **giá trị CŨ vẫn hiệu lực** và phép đo
+cho **kết quả SAI mà không có lỗi nào**).
+📌 Log: `fail:` = **0**, `Exception` = **0** ⇒ không có lỗi render ẩn.
+
+### 95.5 ⏳ BA TRANG BỊ CẮT — có lý do, KHÔNG phải bỏ sót
+
+Tôi **đã định** khai thêm ba mục menu `/KhachHang`, `/ThanhToan`, `/HanMucKenh` — app service + API của
+chúng **đã có thật** (`CustomerAppService`, `PaymentAppService`, `ChinhSachHanMucAppService`).
+Nhưng kiểm `src/eCommerce.Web/Controllers/` thì **ba trang đó CHƯA TỒN TẠI**, và host `eCommerce.Web`
+cũng **chưa** nạp module `Customers`/`PaymentHub`.
+
+🚨 **Vì sao KHÔNG khai bừa:** một mục menu trỏ tới route **không tồn tại** biến **`404`** thành
+**"tính năng trông như đã có"** — người dùng bấm vào, thấy lỗi, và **không ai** phân biệt được
+*"chưa làm"* với *"hệ thống hỏng"*. 📌 Đúng cùng họ lỗi mà cả dự án đang chống.
+🛡️ `MenuDieuHuongTests.MOI_Url_trong_menu_PHAI_co_controller_THAT` **khoá** bất biến này ⇒ thêm lại
+ba mục đó mà không tạo trang ⇒ **test đỏ**.
+➡️ **Đường đúng:** làm **trang** trước (controller + view + nạp module ở Web), **rồi** mới thêm mục menu.
+
+### 95.6 ⏳ NỢ (KHÔNG phải tính năng đã có)
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+| **1** | **Ba trang + ba mục menu** (`/KhachHang`, `/ThanhToan`, `/HanMucKenh`) | §95.5. API **đã có** ⇒ chỉ còn **trang** |
+| **2** | 🚨 **Controller vẫn `[Authorize]` trần (không quyền cụ thể)** | Menu nay **không** hiện mục thiếu quyền, **nhưng** người dùng **vẫn gõ URL tay được** ⇒ vào trang rồi **`403` từ app service** (an toàn dữ liệu, nhưng UX xấu và **không** có chỉ dẫn). Cần `[Authorize(quyền)]` ở controller + trang `403` **có chỉ dẫn** |
+| **3** | **Chưa có nhóm menu cha/con** (`MucDieuHuong` là danh sách phẳng) | Khi có > ~8 mục thì cần nhóm |
+| **4** | **Chưa có trang `403`/`404` tuỳ biến** | Hiện dùng mặc định của framework |
+| **5** | **Menu chưa hiện trên MỌI trang** — mới ở `Views/Home/Index.cshtml` | Các trang khác **chưa** gọi ViewComponent ⇒ người dùng phải quay về trang chủ để chuyển màn hình. 📌 Nên đặt trong layout — nhưng theme Basic **nhúng layout trong DLL**, nên cần quyết định (đè layout vs. thêm partial vào từng view) |
+| **6** | **Quyền được cache trong tiến trình** | Đổi quyền ⇒ **phải khởi động lại Web** (đo được ở §95.4). Đây là hành vi của ABP; cần **ghi vào tài liệu vận hành** để người trực không kết luận sai |
+
+### 95.7 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v2.1 | 16/10/2026 | *(agent, session GĐ1)* | **§95 — MENU LỌC THEO QUYỀN (đóng nợ §81.2 #7)**: `MucDieuHuong` + **`BoLocDieuHuong` (lõi THUẦN, FAIL-CLOSED)** + `MenuDieuHuong.TatCa` (**một nguồn**) + `DichVuDieuHuong` + **`MenuViewComponent` (C#)** + lối vào ở trang chủ · **5 unit test quét nguồn** (URL phải có controller thật · quyền phải có thật · lõi phải thuần · fail-closed trong mã · menu một nguồn) · **7/7 ca HTTP thật** (gồm **thu hồi quyền ⇒ mục biến mất: 3 → 2**). 🚨 **Phát hiện Basic theme render menu KHÔNG kiểm quyền** (`strings` trên DLL) · **BỐN cái bẫy im lặng** (§95.3): `AuthorizeAsync(null)` **không** dùng user hiện tại · `<partial>` render rỗng không lỗi · bộ quét nguồn xanh vô nghĩa · `"..".Length`=2. Ghi **§95.5** (3 trang bị **cắt có lý do**) · **§95.6** (nợ: controller chưa gắn quyền, menu mới ở 1 trang, quyền cache trong tiến trình) |
