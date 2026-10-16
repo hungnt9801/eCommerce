@@ -4,6 +4,7 @@ using Volo.Abp;
 using Volo.Abp.Application.Services;
 using Volo.Abp.DistributedLocking;
 using Volo.Abp.Domain.Repositories;
+using eCommerce.Orders;
 
 namespace eCommerce.Customers;
 
@@ -25,11 +26,36 @@ public class CustomerAppService : ApplicationService
     private readonly IRepository<Customer, Guid> _khachRepository;
     private readonly IAbpDistributedLock _khoa;
 
-    public CustomerAppService(IRepository<Customer, Guid> khachRepository, IAbpDistributedLock khoa)
+    /// <summary>`CUS-001` §20.7 #3 — **ban xuat du lieu ca nhan PHAI gom don hang** (📌 do la **phan LON**
+    /// du lieu ca nhan that). 🔒 Nhung doc **THANG** repository (khong qua app service cua app chinh):
+    /// ⚠️ goi `IOrderAppService` se tao **vong** vi `eCommerce.Application` **da** tham chieu module nay.</summary>
+    private readonly IRepository<Orders.Order, Guid> _donHangRepository;
+    private readonly IRepository<Orders.OrderLine, Guid> _dongHangRepository;
+
+    public CustomerAppService(
+        IRepository<Customer, Guid> khachRepository,
+        IAbpDistributedLock khoa,
+        IRepository<Orders.Order, Guid> donHangRepository,
+        IRepository<Orders.OrderLine, Guid> dongHangRepository)
     {
         _khachRepository = khachRepository;
         _khoa = khoa;
+        _donHangRepository = donHangRepository;
+        _dongHangRepository = dongHangRepository;
     }
+
+    /// <summary>
+    /// 🚨 **TRAN SO DON MOT LAN XUAT** — 🔑 co tran vi **hai** ly do:
+    /// <list type="number">
+    ///   <item>**Hieu nang:** mot khach mua hang nam co the co **hang nghin** don ⇒ 📌 keo het vao mot ban xuat
+    ///     se **rat cham** va co the **het bo nho**;</item>
+    ///   <item>**It nguoi doc:** 🔒 mot tep JSON 5000 don thi **khong ai doc** — 📌 va mot ban xuat **khong ai doc**
+    ///     thi **khong phuc vu** quyen truy cap.</item>
+    /// </list>
+    /// ⚠️ **VA KHI CHAM TRAN THI PHAI NOI RO** (`DonHangBiCat`) — 🔑 mot ban xuat **im lang cat bot** se khien
+    /// nguoi doc tin rang *"khach chi co bay nhieu don"*, 📌 va do la mot **loi khang dinh sai ve du lieu ca nhan**.
+    /// </summary>
+    public const int TranDonHangMotLanXuat = 200;
 
     // ── ĐỌC ─────────────────────────────────────────────────────────────────────────────────────
     // 🚨 Ba method ĐỌC của hợp đồng `ICustomerDirectory` **KHÔNG** còn ở đây — chúng đã chuyển sang lớp
@@ -362,12 +388,100 @@ public class CustomerAppService : ApplicationService
             ]
         };
 
+        // ══════════════════════════════════════════════════════════════════════════════════════════
+        // 🚨 **DON HANG (§20.7 #3) — PHAN LON DU LIEU CA NHAN THAT.**
+        // 📌 Mot ban xuat chi co *"ten, email, sdt"* la **thieu hut nghiem trong**: 🔑 chu the du lieu muon
+        // biet *"toi da mua gi, khi nao, bao nhieu tien"* — 📌 va do moi la **ly do** ho hoi.
+        // ══════════════════════════════════════════════════════════════════════════════════════════
+
+        var truyVanDon = await _donHangRepository.GetQueryableAsync();
+
+        // ⚠️ **SAP XEP TAT DINH** (`CreationTime` roi `Id`): 🔑 neu chi sap xep theo thoi gian thi nhieu don
+        // cung moc se cho **thu tu khac nhau moi lan** ⇒ 📌 ban xuat **khong tai lap duoc** ⇒ kho so sanh.
+        var tatCaDon = truyVanDon
+            .Where(x => x.CustomerId == khach.Id)
+            .OrderBy(x => x.CreationTime)
+            .ThenBy(x => x.Id)
+            .Select(x => new DonHangTomTat
+            {
+                Id = x.Id,
+                Number = x.Number,
+                ChannelCode = x.ChannelCode,
+                Currency = x.Currency,
+                GrandTotal = x.GrandTotal,
+                Status = x.Status,
+                PaymentStatus = x.PaymentStatus,
+                CreationTime = x.CreationTime
+            });
+
+        // 📌 Dem **TONG** truoc khi cat: 🔑 de noi duoc *"co bao nhieu, hien bao nhieu"*.
+        var tongSoDon = await AsyncExecuter.CountAsync(tatCaDon);
+
+        var donHienThi = await AsyncExecuter.ToListAsync(tatCaDon.Take(TranDonHangMotLanXuat));
+
+        dto.TongSoDon = tongSoDon;
+        dto.DonHangBiCat = tongSoDon > TranDonHangMotLanXuat;
+
+        if (donHienThi.Count > 0)
+        {
+            // 📌 Nap **MOT LAN** moi dong hang cua cac don nay (tranh N+1: 🔑 mot lenh SQL cho moi don se
+            // thanh **200 lenh** — 📌 cham va de gay tai).
+            var cacDonId = donHienThi.Select(x => x.Id).ToList();
+            var truyVanDong = await _dongHangRepository.GetQueryableAsync();
+
+            var tatCaDong = await AsyncExecuter.ToListAsync(
+                truyVanDong.Where(x => cacDonId.Contains(x.OrderId))
+                    .OrderBy(x => x.CreationTime)
+                    .ThenBy(x => x.Id));
+
+            var dongTheoDon = tatCaDong
+                .GroupBy(x => x.OrderId)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            foreach (var d in donHienThi)
+            {
+                var dongCuaDon = dongTheoDon.TryGetValue(d.Id, out var ds) ? ds : [];
+
+                dto.DonHang.Add(new DonHangCaNhanDto
+                {
+                    OrderId = d.Id,
+                    SoDon = d.Number,
+                    MaKenh = d.ChannelCode,
+                    TienTe = d.Currency,
+                    TongTien = d.GrandTotal,
+                    TrangThai = d.Status.ToString(),
+                    TrangThaiThanhToan = d.PaymentStatus.ToString(),
+                    NgayTaoUtc = d.CreationTime,
+                    CacDong = dongCuaDon.Select(l => new DongHangCaNhanDto
+                    {
+                        MaSku = l.Sku,
+                        SoLuong = l.Quantity,
+                        DonGia = l.UnitPrice,
+                        Nguon = "OrdOrderLines.Sku + Quantity + UnitPrice (theo OrderId)"
+                    }).ToList()
+                });
+            }
+        }
+
+        // 📌 **THEM DONG TOM TAT vao `CacDong`** — 🔑 de nguoi doc ban xuat thay **ngay** quy mo mua hang,
+        // ngay ca khi ho **khong** doc het danh sach don.
+        dto.CacDong.Add(new DongDuLieuCaNhanDto
+        {
+            Truong = "So don hang",
+            GiaTri = dto.DonHangBiCat
+                ? $"{tongSoDon} (⚠️ ban xuat CHI liet ke {TranDonHangMotLanXuat} don CU NHAT — xem `donHangBiCat`)"
+                : tongSoDon.ToString(),
+            Nguon = "OrdOrders.CustomerId",
+            LyDo = "Cho biet khach da mua bao nhieu don — 🔑 va neu bi cat thi NOI RO la da cat.",
+            LaDuLieuCaNhan = false
+        });
+
         // 🔒 **LOG CHI QUA `MoTaAnToan`** (PII da che) — xem quyet dinh (2) o tren.
         // 📌 `Warning` (khong `Information`): xuat PII la **su kien can vet**, khong phai thao tac thuong ngay.
         Logger.LogWarning(
-            "XUAT DU LIEU CA NHAN: khach={CustomerId} · so dong={SoDong} · nguoi xuat={NguoiXuat} · {MoTa}. " +
-            "[CUS-XUAT-DU-LIEU-CA-NHAN]",
-            khach.Id, dto.CacDong.Count, nguoiXuat, MoTaAnToan(khach));
+            "XUAT DU LIEU CA NHAN: khach={CustomerId} · so dong ho so={SoDong} · so don={SoDon} · bi cat={BiCat} · " +
+            "nguoi xuat={NguoiXuat} · {MoTa}. [CUS-XUAT-DU-LIEU-CA-NHAN]",
+            khach.Id, dto.CacDong.Count, dto.TongSoDon, dto.DonHangBiCat, nguoiXuat, MoTaAnToan(khach));
 
         return dto;
     }
@@ -393,4 +507,24 @@ public class CustomerAppService : ApplicationService
     /// <summary>Mô tả khách an toàn để ghi log — **CHỈ** qua <see cref="PiiMasker"/> (`ADR-11`).</summary>
     private static string MoTaAnToan(Customer k)
         => $"email={PiiMasker.CheEmail(k.Email)} · sđt={PiiMasker.CheDienThoai(k.Phone)}";
+}
+
+/// <summary>
+/// 🔑 **KIEU TOM TAT DON HANG cho phep chieu cua EF** — ⚠️ **KHONG** dung anonymous type o day.
+///
+/// 📌 **VI SAO:** `AsyncExecuter.CountAsync(...)` tren mot `IQueryable` co `Select` sang **anonymous type**
+/// co the khong dich duoc (EF phai dich bieu thuc tren **kieu co ten**). 🔒 Va mot loi dich bieu thuc o day
+/// se **nem luc chay** (khong phai luc build) ⇒ 📌 ta chi biet khi **goi that** — dung loai loi kho lan ra.
+/// ✅ Kieu **co ten** lam phep chieu **tuong minh** va **dich duoc**.
+/// </summary>
+internal sealed class DonHangTomTat
+{
+    public Guid Id { get; set; }
+    public string Number { get; set; } = default!;
+    public string ChannelCode { get; set; } = default!;
+    public string Currency { get; set; } = default!;
+    public decimal GrandTotal { get; set; }
+    public OrderStatus Status { get; set; }
+    public PaymentStatus PaymentStatus { get; set; }
+    public DateTime CreationTime { get; set; }
 }

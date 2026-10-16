@@ -130,12 +130,18 @@ try {
 select count(*)::text from "CusCustomers" where "Name" like 'K97E2E%';
 '@) -join '').Trim()
 
-        if ($dem -ne '0') {
-            throw ("TIEN DE: con {0} khach probe 'K97E2E%' trong DB ⇒ lan chay truoc KHONG don dep.`n" +
-                "🚨 Dung lai va don truoc — ⚠️ neu khong thi cac ca 'co form hanh dong' se XANH VI DU LIEU CU." -f $dem)
+        # 🔑 **KIEM CA DON HANG SOT** — 📌 mot don mo coi (khach da bi xoa) cung lam ca `D8` do vi **ly do
+        # vo hinh**: no **khong thuoc** khach probe nao, nhung **van** nam trong DB.
+        $demDon = (@(Invoke-Psql -Sql @'
+select count(*)::text from "OrdOrders" where "Number" like 'K97E2E-%';
+'@) -join '').Trim()
+
+        if ($dem -ne '0' -or $demDon -ne '0') {
+            throw ("TIEN DE: con {0} khach probe 'K97E2E%' va {1} don 'K97E2E-%' trong DB ⇒ lan chay truoc KHONG don dep.`n" +
+                "🚨 Dung lai va don truoc — ⚠️ neu khong thi cac ca 'co form hanh dong' se XANH VI DU LIEU CU." -f $dem, $demDon)
         }
 
-        Write-Output '   ✅ Tien de: khong con du lieu probe cu.'
+        Write-Output '   ✅ Tien de: khong con du lieu probe cu (khach + don).'
     }
 
     # ── ① DUNG WEB CU (neu co) + CHO CONG TRONG ─────────────────────────────────────────────
@@ -173,7 +179,33 @@ values ('e0000000-0000-0000-0000-0000000000e1',null,'K97E2E Khach Probe','k97e2e
 select count(*)::text from "CusCustomers" where "Id" = 'e0000000-0000-0000-0000-0000000000e1';
 '@ -SoDongMongDoi 1 | Out-Null
 
-        Write-Output '   ✅ Da gieo 1 khach probe (K97E2E) + tat co bao mat de dang nhap.'
+        # 🚨 **GIE0 THEM 1 DON HANG** (`CUS-001` §20.7 #3) — 🔑 vi **phan LON** du lieu ca nhan that nam o
+        # **don hang**, khong o ho so khach. ⚠️ Neu khong gieo thi ca `D8` se **khong do duoc gi**.
+        # 📌 Don hang PHAI tro ve **dung khach probe** (`CustomerId`) — 🔑 neu khong thi no **khong thuoc**
+        # ban xuat cua khach do, va ca kiem se do vi **ly do sai**.
+        TiemVaoDb -Sql @'
+delete from "OrdOrderLines" where "OrderId" = 'e0000000-0000-0000-0000-0000000000e2';
+'@ -KhongNemKhiThieuKiem | Out-Null
+
+        TiemVaoDb -Sql @'
+delete from "OrdOrders" where "Id" = 'e0000000-0000-0000-0000-0000000000e2';
+'@ -KhongNemKhiThieuKiem | Out-Null
+
+        TiemVaoDb -Sql @'
+insert into "OrdOrders" ("Id","TenantId","Number","ChannelCode","CustomerId","Status","PaymentStatus","Currency","Subtotal","DiscountTotal","TaxTotal","ShippingTotal","GrandTotal","ExtraProperties","ConcurrencyStamp","CreationTime","IsDeleted")
+values ('e0000000-0000-0000-0000-0000000000e2',null,'K97E2E-DON-001','web','e0000000-0000-0000-0000-0000000000e1',4,2,'VND',250000,0,0,0,250000,'{}','k97e2e2',now(),false);
+'@ -KiemSql @'
+select count(*)::text from "OrdOrders" where "Id" = 'e0000000-0000-0000-0000-0000000000e2';
+'@ -SoDongMongDoi 1 | Out-Null
+
+        TiemVaoDb -Sql @'
+insert into "OrdOrderLines" ("Id","TenantId","OrderId","Sku","Quantity","UnitPrice","DiscountAmount","TaxAmount","CreationTime","IsDeleted")
+values ('e0000000-0000-0000-0000-0000000000e3',null,'e0000000-0000-0000-0000-0000000000e2','K97E2E-SKU-01',2,125000,0,0,now(),false);
+'@ -KiemSql @'
+select count(*)::text from "OrdOrderLines" where "Id" = 'e0000000-0000-0000-0000-0000000000e3';
+'@ -SoDongMongDoi 1 | Out-Null
+
+        Write-Output '   ✅ Da gieo 1 khach probe (K97E2E) + 1 don hang (K97E2E-DON-001) + tat co bao mat de dang nhap.'
     }
 
     # ── ③ KHOI DONG WEB + CHO LEN ───────────────────────────────────────────────────────────
@@ -287,6 +319,31 @@ select count(*)::text from "CusCustomers" where "Id" = 'e0000000-0000-0000-0000-
             Kq 'D7d tep xuat co CANH BAO "tai lieu mat" + can cu luat' `
                 (($jsonXuat -match 'TAI LIEU MAT') -and ($jsonXuat -match '91/2025/QH15')) `
                 'canh bao nam TRONG tep nguoi dung nhan'
+
+            # ══════════════════════════════════════════════════════════════════════════════════════
+            # 🚨 **D8 — DON HANG TRONG BAN XUAT** (`CUS-001` §20.7 #3).
+            # 🔑 **VI SAO DAY LA CA QUAN TRONG NHAT SAU D7:** *"toi da mua gi?"* moi la **ly do** chu the
+            # du lieu hoi — 📌 mot ban xuat chi co *"ten, email, sdt"* la **thieu hut nghiem trong**.
+            # ⚠️ Va ca nay do **du lieu THAT trong DB**, khong phai chuoi trong ma nguon.
+            # ══════════════════════════════════════════════════════════════════════════════════════
+            Kq 'D8a ban xuat CO don hang (so don > 0)' ($jsonXuat -match '"tongSoDon":\s*[1-9]') 'tongSoDon > 0'
+
+            Kq 'D8b don hang co MA DON that + kenh + tong tien' `
+                (($jsonXuat -match 'K97E2E-DON-001') -and ($jsonXuat -match '"maKenh":\s*"web"') -and ($jsonXuat -match '250000')) `
+                'ma don + kenh + tong tien'
+
+            Kq 'D8c dong hang co SKU that + so luong' `
+                (($jsonXuat -match 'K97E2E-SKU-01') -and ($jsonXuat -match '"soLuong":\s*2')) `
+                'SKU + so luong'
+
+            # 🚨 **KHONG CAT BOT** — 🔑 neu `donHangBiCat = true` thi ca nay **khong** ap dung (⚠️ va script
+            # phai **noi ro** no khong kiem duoc, chu **khong** duoc coi la DAT).
+            $coCat = $jsonXuat -match '"donHangBiCat":\s*true'
+            Kq 'D8d ban xuat KHONG bi cat (chi 1 don < tran 200)' (-not $coCat) ("biCat=" + $coCat)
+
+            # 🔑 **MOI DONG HANG CO `NGUON`** — 📌 cung bat bien nhu `CacDong`: ban xuat khong co nguon thi
+            # **khong kiem chung duoc**.
+            Kq 'D8e dong hang co `nguon` (kiem chung duoc)' ($jsonXuat -match 'OrdOrderLines\.Sku') 'nguon = OrdOrderLines.*'
         }
     }
 
@@ -400,6 +457,17 @@ finally {
 
     # ① Don du lieu probe.
     try {
+        # 🔑 **THU TU QUAN TRONG: DONG HANG TRUOC, KHACH SAU.**
+        # 📌 `OrdOrders.CustomerId` tro toi `CusCustomers` ⇒ ⚠️ xoa khach truoc se **vi pham khoa ngoai**
+        # (hoac de lai don **mo coi**), va 🔒 lan sau ca `D8` se do vi **ly do vo hinh**.
+        Invoke-Psql -Sql @'
+delete from "OrdOrderLines" where "OrderId" = 'e0000000-0000-0000-0000-0000000000e2';
+'@ | Out-Null
+
+        Invoke-Psql -Sql @'
+delete from "OrdOrders" where "Id" = 'e0000000-0000-0000-0000-0000000000e2';
+'@ | Out-Null
+
         Invoke-Psql -Sql @'
 delete from "CusCustomers" where "Id" = 'e0000000-0000-0000-0000-0000000000e1';
 '@ | Out-Null

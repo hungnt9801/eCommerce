@@ -1223,3 +1223,114 @@ phép tiêm đã xảy ra** (`ham-tiem.ps1`) ⇒ 📌 nhờ vậy tôi **không*
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.1 | 17/10/2026 | *(agent, session GĐ1)* | **§20 — LÁT CẮT 4: XUẤT DỮ LIỆU CÁ NHÂN** (quyền truy cập của chủ thể, Luật **91/2025/QH15**): thêm **`XuatDuLieuCaNhanDto`** + **`DongDuLieuCaNhanDto`** (`Truong` · `GiaTri` · **`Nguon`** · **`LyDo`** · `LaDuLieuCaNhan`) + **`CustomerAppService.XuatDuLieuCaNhanAsync(customerId)`** (route thật: `POST /api/app/customer/xuat-du-lieu-ca-nhan/{customerId}`) + **`GET /KhachHang/XuatDuLieu/{id}`** (tải **tệp JSON**) + nút trên `/KhachHang`. 🔑 **VÌ SAO KHÔNG CHỈ LÀ "THÊM ENDPOINT":** Luật cho chủ thể quyền **TRUY CẬP** và **LẤY BẢN SAO** — 📌 hệ thống **không** làm được thì **không tuân thủ**, và 🔒 **không thể "chữa" bằng tài liệu** (*"không có đường gọi"* = *"không có tính năng"*). 🚨 **HAI QUYẾT ĐỊNH THIẾT KẾ:** ① **quyền = `Customers.Manage`** (không phải `Default`) — 🔑 `Default` là *"xem hồ sơ"*, còn đây là *"xuất toàn bộ PII của một người ra một tệp"*: **mức độ tiếp cận khác hẳn**; 📌 nếu dùng `Default` thì **mọi** nhân viên đọc danh sách khách cũng **xuất được** và **không ai biết** (cả hai đều là *"xem khách"*); ② **mỗi dòng có `Nguon` + `LyDo`** — 🔑 bản xuất không có nguồn thì **không kiểm chứng được**, và *"sao các anh có cái này?"* **chính là** câu hỏi luật bắt trả lời (**mục đích xử lý**); 📌 nên **không** tái dùng `CustomerDto` (DTO **vận hành**, không nói *"trường này ở đâu ra"*). ➕ **`XuatLucUtc` + `NguoiXuat`** (🔒 trả lời *"ai đã xem dữ liệu của tôi"*) · ⛔ **`CanhBao` tài liệu mật BẮT BUỘC** · ⚠️ **trường TRỐNG vẫn có DÒNG** (*"không có"* ≠ *"không hiện"*) · ⚠️ **`Ghi chu noi bo` ghi RÕ là của nhân viên** (📌 không thì khách **hiểu sai**; 🔑 và đó là loại dữ liệu **dễ bị lợi dụng nhất**). ✅ **Web UI trả TỆP, không render vào trang:** 🔒 trang HTML chứa PII sẽ bị **cache/in/chụp màn hình/ở lại lịch sử trình duyệt**; 📌 tệp tải về thì người dùng **biết mình đang giữ gì** (đúng điều luật muốn); ➕ tên tệp có tiền tố `xuat-du-lieu-ca-nhan-` · `WriteIndented` + `UnsafeRelaxedJsonEscaping` (🔑 đọc được bằng mắt, **giữ dấu tiếng Việt**). ✅ **KIỂM CHỨNG 12/12 ca DB + HTTP + LOG thật** (gồm 🚨 **D2: log KHÔNG chứa PII thô** — 🔒 `ADR-11`: ghi PII thô vào log là **bản sao thứ hai** ở nơi **không ai kiểm soát**) ➕ **5 ca mới trong E2E thường trú** (D7/D7a/D7b/D7c/D7d — 🔑 đo **đường đi thật của người dùng** qua cookie phiên) ⇒ **E2E 16/16** · **8 bước** · `exit 0` · **150.5s** · 1155 unit · 38 integration · mermaid 197/0 · DB 21/21 · test cổng 17/17. 🐞 **BA LỖI CỦA TÔI:** (1) 🚨 **viết `INSERT` bằng THOÁT NHÁY** ⇒ `ParserError` — 🔒 **LẦN THỨ TƯ** của họ lỗi này (§25.5 · §26.5 #1 · §32.9 #2 · lượt này), ✅ chữa bằng here-string, ⚠️ **rồi lại viết here-string LỒNG TRONG here-string** ⇒ `ParserError` lần nữa ⇒ 🔑 phải ghi tệp bằng **công cụ sửa tệp**; (2) 🚨 **dùng MẬT KHẨU làm CLIENT SECRET** ⇒ `invalid_client` (`ID2055`) ⇒ probe **dừng** — 🔑 **HAI chuỗi khác nhau**: `AdminPassword = "1q2w3E*"` (**`E`** hoa) nhưng `ClientSecret = "1q2w3e*"` (**`e`** thường) ⇒ 📌 **LẦN THỨ HAI** của họ lỗi *"sai một ký tự trong thông tin đăng nhập ⇒ suýt kết luận sai về sản phẩm"*; (3) **`$home` là biến CHỈ-ĐỌC** — 🔒 **LẦN THỨ BA** ⇒ 📌 **ghi vào tài liệu KHÔNG ĐỦ**. 🔑 **ĐIỂM CHUNG #1 VÀ #2: cả hai là lỗi của PHÉP ĐO, KHÔNG của SẢN PHẨM** — và cả hai đều có thể dẫn tới **kết luận sai về sản phẩm**; ✅ **nhờ kiểm token trước (B1) và khẳng định phép tiêm đã xảy ra (`ham-tiem.ps1`) mà tôi KHÔNG kết luận sai lần nào trong lượt này**. Ghi **§20.7** (nợ: 🚨 **chưa có self-service cho chính chủ** — cần **cổng khách hàng**, hệ thống chưa có · **chưa có XOÁ dữ liệu** (⚠️ luật cũng có quyền này; 📌 xoá **khó hơn** xuất vì **sổ cái append-only** + **chứng từ kế toán** có nghĩa vụ lưu ⇒ 🔒 cần **thiết kế**, không thể làm vội) · 🚨 **bản xuất CHƯA gồm dữ liệu từ MODULE KHÁC** (**đơn hàng**, **địa chỉ giao**, **lịch sử thanh toán** — 🔑 mà đó là **phần lớn** dữ liệu cá nhân thật, **nợ LỚN**) · **chưa có bảng kiểm toán riêng cho mỗi lần xuất** (hiện chỉ **log**; 🔑 *"ai đã xuất dữ liệu của tôi"* là câu hỏi luật ⇒ nên là **bảng tra được**) · **chưa có sổ địa chỉ** (**nợ chặn**)) |
+
+---
+
+## 21. ✅ **LÁT CẮT 5 — BẢN XUẤT GỒM ĐƠN HÀNG** (17/10/2026) — *đóng nợ §20.7 #3*
+
+### 21.1 🔑 **Vì sao đây là nợ LỚN NHẤT của tính năng vừa xây**
+
+Ở §20, bản xuất chỉ có **hồ sơ khách** (`ten`, `email`, `sdt`, `trạng thái`…). ⚠️ Nhưng *"tôi đã mua gì, khi
+nào, bao nhiêu tiền"* mới là **lý do** chủ thể dữ liệu hỏi — 📌 tức **phần lớn** dữ liệu cá nhân thật nằm ở
+**ĐƠN HÀNG**, không ở hồ sơ.
+🔒 Một bản xuất thiếu đơn hàng là **thiếu hụt nghiêm trọng**: nó trả lời **câu hỏi dễ** và **bỏ** câu hỏi thật.
+
+🔑 **Và nợ này KHÔNG cần credential** — chỉ cần đọc `OrdOrders` + `OrdOrderLines` theo `CustomerId`, với
+**cùng khuôn** (`Nguon` + `LyDo`) đã có. 📌 Nên nó là việc **đúng** để làm ngay.
+
+### 21.2 ✅ **Bốn quyết định thiết kế**
+
+**① TÁCH `DonHang` KHỎI `CacDong`.** 📌 `CacDong` là danh sách *(trường, giá trị)* **cố định** của **hồ sơ**;
+còn đơn hàng là danh sách **DÀI và TĂNG THEO THỜI GIAN**. 🔒 Nhét vào `CacDong` sẽ làm bản xuất **không đọc
+được** khi khách mua nhiều (📌 500 đơn nằm lẫn trong danh sách trường là **vô dụng** cho cả hai mục đích).
+➕ Tách ra thì **đếm được** — người đọc thấy ngay *"khách này có bao nhiêu đơn"*.
+
+**② CÓ TRẦN, VÀ KHI CHẠM TRẦN THÌ PHẢI NÓI RÕ** (`TranDonHangMotLanXuat = 200` + `DonHangBiCat`).
+🔑 Trần vì **hai** lý do: **hiệu năng** (một khách mua hàng năm có thể có **hàng nghìn** đơn) và
+**ít người đọc** (📌 một tệp JSON 5000 đơn thì **không ai đọc** — và bản xuất **không ai đọc** thì **không phục
+vụ** quyền truy cập).
+🚨 **Và `DonHangBiCat` là bắt buộc:** 🔒 một bản xuất **im lặng cắt bớt** sẽ khiến người đọc tin rằng
+*"khách chỉ có bấy nhiêu đơn"* — 📌 và đó là một **lời khẳng định SAI về dữ liệu cá nhân**.
+
+**③ SẮP XẾP TẤT ĐỊNH** (`CreationTime` rồi `Id`): 🔑 nếu chỉ sắp xếp theo thời gian thì nhiều đơn cùng mốc sẽ
+cho **thứ tự khác nhau mỗi lần** ⇒ 📌 bản xuất **không tái lập được** ⇒ khó so sánh.
+➕ **Và đếm TỔNG trước khi cắt** ⇒ nói được *"có bao nhiêu, hiện bao nhiêu"*.
+
+**④ NẠP DÒNG HÀNG MỘT LẦN (chống N+1).** 📌 Một lệnh SQL cho mỗi đơn sẽ thành **200 lệnh** — chậm và dễ gây tải.
+➕ **Và `DonHangTomTat` là kiểu CÓ TÊN**, không phải anonymous type: 🔒 một lỗi dịch biểu thức ở đây sẽ **ném
+lúc chạy** (không phải lúc build) ⇒ 📌 chỉ biết khi **gọi thật** — đúng loại lỗi **khó lần ra**.
+
+➕ **Tham chiếu `eCommerce.Domain`** từ module (`module → app` là **hợp lệ**), 🔑 và **đọc thẳng repository**
+chứ **không** gọi `IOrderAppService`: ⚠️ gọi app service của app chính sẽ tạo **vòng**, vì
+`eCommerce.Application` **đã** tham chiếu `Customers.Application`.
+
+### 21.3 ✅ **Dòng tóm tắt trong `CacDong`**
+
+➕ Thêm dòng **`So don hang`** vào `CacDong` — 🔑 để người đọc thấy **ngay** quy mô mua hàng **kể cả khi**
+không đọc hết danh sách đơn. ⚠️ Và khi bị cắt, `GiaTri` **nói rõ**: *"… (⚠️ bản xuất CHỈ liệt kê 200 đơn CŨ
+NHẤT — xem `donHangBiCat`)"*.
+
+### 21.4 ✅ **KIỂM CHỨNG — 5 CA MỚI, ĐO TRÊN DỮ LIỆU THẬT, TRONG E2E THƯỜNG TRÚ**
+
+E2E gieo **1 đơn thật** (`K97E2E-DON-001`, kênh `web`, `GrandTotal = 250000`) + **1 dòng hàng**
+(`K97E2E-SKU-01`, `SoLuong = 2`) — 🔑 **trỏ về đúng khách probe** (`CustomerId`).
+
+| Ca | Đo được |
+|---|---|
+**D8a** | Bản xuất **có** đơn hàng (`tongSoDon > 0`) |
+**D8b** | Đơn có **mã đơn thật** + **kênh** + **tổng tiền** |
+**D8c** | Dòng hàng có **SKU thật** + **số lượng** |
+**D8d** | **Không bị cắt** (`donHangBiCat = false`, vì 1 < trần 200) |
+**D8e** | Dòng hàng có **`nguon`** (`OrdOrderLines.*`) |
+
+➡️ **E2E: 21/21 ĐẠT** · **8 bước** · `exit 0` · **149.6s** · 1155 unit · 38 integration · mermaid 197/0 ·
+DB 21/21 · test cổng 17/17.
+➕ **Dọn dẹp có thứ tự:** 🔑 xoá **dòng hàng → đơn → khách** (⚠️ `OrdOrders.CustomerId` trỏ tới `CusCustomers`
+⇒ xoá khách trước sẽ **vi phạm khoá ngoại** hoặc để lại đơn **mồ côi**). ➕ **Điều kiện tiên đề** nay kiểm
+**cả** khách sót **và** đơn sót.
+
+### 21.5 🐞 **HAI lỗi của tôi — và một trong đó là lỗi CÔNG CỤ đã cắn lần thứ SÁU**
+
+**① 🚨 HERE-STRING LỒNG TRONG HERE-STRING ⇒ `ParserError`** — 🔒 **LẦN THỨ BA** của họ lỗi này
+(§25.5 · §32 · lượt này). ✅ Chữa: dùng **công cụ sửa tệp** (`edit`) với ngữ cảnh, **không** here-string.
+
+**② 🚨🚨 VÀ ĐIỀU ĐÁNG GIÁ NHẤT — BUILD dùng BẢN CACHE, VÀ MÃ CỦA TÔI BỊ MẤT MỘT PHẦN MÀ KHÔNG AI BÁO:**
+Sau khi thêm logic, `dotnet build` báo **`exit 0` · 0 error**, ⚠️ nhưng `D8a–D8e` **ĐỎ**.
+🔑 **Chẩn đoán đúng là ĐO, không suy luận:**
+<list type="number">
+  <item>Soi **chuỗi trong DLL** ⇒ `OrdOrderLines` **KHÔNG có** (⚠️ cách này **không đủ**: hằng chuỗi có thể bị
+    **intern** vào một DLL khác — 📌 tôi đã **suýt kết luận sai** vì điều đó);</item>
+  <item>**Đo CỠ DLL:** `36352` → **`44544`** byte sau khi build lại ⇒ 🔑 **bằng chứng quyết định** rằng mã
+    **đã vào**;</item>
+  <item>Đọc **mã nguồn trên đĩa** ⇒ phát hiện **khối đọc đơn hàng + dòng tóm tắt BỊ MẤT** (⚠️ phép
+    `String.Replace` của tôi ở bước trước **không khớp** hoặc **ghi đè** một phần — 🔒 cùng họ với §26.5 #1);
+    📌 và tệp **không** dựng được như đang có (dòng log vẫn tham chiếu `dto.TongSoDon`) — ⚠️ tức bản **cache**
+    đã che lỗi biên dịch.</item>
+</list>
+
+🔒 **BÀI HỌC (quan trọng hơn cả hai lỗi):**
+<list type="number">
+  <item>**`exit 0` KHÔNG chứng minh DLL đã đổi** — 🔑 phải **KIỂM MỐC** (`tools\kiem-moc-build.ps1`) hoặc
+    **ĐO CỠ/CHUỖI** trong DLL. 📌 Đây là lần thứ **SÁU** của họ bẫy này trong dự án;</item>
+  <item>⚠️ **"Không thấy chuỗi trong DLL" KHÔNG đủ để kết luận** (hằng chuỗi có thể nằm ở DLL khác) ⇒
+    🔑 **cỡ DLL** và **mốc thời gian** là bằng chứng **mạnh hơn**;</item>
+  <item>🔒 **Sửa mã bằng `String.Replace` là NGUỒN của họ lỗi này** — đã vấp **nhiều lần** ⇒ 📌 dùng **`edit`
+    với ngữ cảnh**, và **kiểm lại tệp SAU khi sửa**.</item>
+</list>
+
+### 21.6 ⏳ NỢ
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+**1** | 🚨 **Bản xuất vẫn CHƯA gồm ĐỊA CHỈ GIAO HÀNG** | 🔑 *"giao tới đâu"* là dữ liệu cá nhân **quan trọng** — 📌 nhưng entity `Address` **chưa tồn tại** ⇒ **nợ CHẶN** |
+**2** | **Chưa gồm LỊCH SỬ THANH TOÁN** | ⚠️ `PayTransactions` có `OrderId` (không phải `CustomerId`) ⇒ 📌 phải đi **qua đơn hàng** — khả thi nhưng chưa làm |
+**3** | **Chưa gồm dữ liệu THUẾ** (`EInvoice`) | 📌 Hóa đơn điện tử cũng chứa PII (tên, mã số thuế) |
+**4** | 🚨 **Chưa có CI** | 📌 Nay **8 bước** là nền |
+**5** | **Tên sản phẩm không có trong bản xuất** (chỉ **SKU**) | 🔑 Đây là **đánh đổi có chủ ý** (SKU **bất biến**, tên có thể đổi) — ⚠️ nhưng 📌 khách đọc SKU **không hiểu ngay** ⇒ nên bổ sung **tên tại thời điểm mua** (snapshot) nếu có |
+**6** | **Chưa có bảng kiểm toán riêng cho mỗi lần xuất** | ⚠️ Vẫn chỉ có **log** |
+
+### 21.7 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.2 | 17/10/2026 | *(agent, session GĐ1)* | **§21 — LÁT CẮT 5: BẢN XUẤT GỒM ĐƠN HÀNG** (đóng nợ §20.7 #3): thêm **`DonHangCaNhanDto`** + **`DongHangCaNhanDto`** + **`DonHang`**/**`DonHangBiCat`**/**`TongSoDon`** vào `XuatDuLieuCaNhanDto` + **`TranDonHangMotLanXuat = 200`** + đọc `OrdOrders`/`OrdOrderLines` trong `XuatDuLieuCaNhanAsync` + **`DonHangTomTat`** (kiểu **CÓ TÊN** cho phép chiếu EF) + tham chiếu `eCommerce.Domain`. 🔑 **VÌ SAO ĐÂY LÀ NỢ LỚN NHẤT CỦA §20:** *"tôi đã mua gì, khi nào, bao nhiêu tiền"* mới là **lý do** chủ thể dữ liệu hỏi ⇒ 📌 **phần lớn** dữ liệu cá nhân thật nằm ở **ĐƠN HÀNG**, không ở hồ sơ; 🔒 bản xuất thiếu đơn hàng trả lời **câu hỏi dễ** và **bỏ** câu hỏi thật. ➕ **Và nợ này KHÔNG cần credential** ⇒ việc **đúng** để làm ngay. ✅ **BỐN QUYẾT ĐỊNH:** ① **tách `DonHang` khỏi `CacDong`** (📌 `CacDong` là danh sách *cố định* của **hồ sơ**; đơn hàng **dài và tăng theo thời gian** ⇒ nhét vào sẽ làm bản xuất **không đọc được** khi khách mua nhiều; ➕ tách ra thì **đếm được**) · ② **có trần + `DonHangBiCat`** (🔑 trần vì **hiệu năng** và **ít người đọc**; 🚨 **im lặng cắt bớt** sẽ khiến người đọc tin *"khách chỉ có bấy nhiêu đơn"* ⇒ **lời khẳng định SAI về dữ liệu cá nhân**) · ③ **sắp xếp TẤT ĐỊNH** (`CreationTime` rồi `Id`) + **đếm TỔNG trước khi cắt** (📌 nếu chỉ sắp theo thời gian thì nhiều đơn cùng mốc cho **thứ tự khác nhau mỗi lần** ⇒ bản xuất **không tái lập được**) · ④ **nạp dòng hàng MỘT LẦN** (chống **N+1**: 200 lệnh SQL) + **`DonHangTomTat` kiểu CÓ TÊN** (🔒 lỗi dịch biểu thức EF sẽ **ném lúc chạy**, không phải lúc build ⇒ khó lần ra). ➕ **Dòng tóm tắt `So don hang` trong `CacDong`** — 🔑 thấy **ngay** quy mô mua hàng kể cả khi không đọc hết danh sách đơn. ➕ **Tham chiếu `eCommerce.Domain`** (`module → app` **hợp lệ**) và **đọc thẳng repository** — ⚠️ gọi `IOrderAppService` sẽ tạo **vòng** vì `eCommerce.Application` **đã** tham chiếu `Customers.Application`. ✅ **KIỂM CHỨNG — 5 CA MỚI ĐO TRÊN DỮ LIỆU THẬT trong E2E THƯỜNG TRÚ** (gieo 1 đơn `K97E2E-DON-001` kênh `web` `250000` + 1 dòng hàng `K97E2E-SKU-01` × 2, **trỏ đúng khách probe**): **D8a** có đơn · **D8b** mã đơn + kênh + tổng tiền · **D8c** SKU + số lượng · **D8d** không bị cắt · **D8e** dòng hàng có `nguon`. ➡️ **E2E 21/21** · **8 bước** · `exit 0` · **149.6s** · 1155 unit · 38 integration · mermaid 197/0 · DB 21/21 · test cổng 17/17. ➕ **Dọn dẹp CÓ THỨ TỰ** (🔑 dòng hàng → đơn → khách, ⚠️ `OrdOrders.CustomerId` trỏ tới `CusCustomers`) + **điều kiện tiên đề** kiểm **cả** khách sót **và** đơn sót. 🐞 **HAI LỖI:** (1) 🚨 **here-string LỒNG trong here-string** ⇒ `ParserError` — 🔒 **LẦN THỨ BA** của họ lỗi này (§25.5 · §32 · lượt này) ⇒ ✅ dùng **công cụ sửa tệp**; (2) 🚨🚨 **ĐIỀU ĐÁNG GIÁ NHẤT — BUILD dùng BẢN CACHE VÀ MÃ CỦA TÔI BỊ MẤT MỘT PHẦN MÀ KHÔNG AI BÁO:** `dotnet build` báo **`exit 0` · 0 error** ⚠️ nhưng `D8a–D8e` **ĐỎ**; 🔑 **chẩn đoán đúng là ĐO, không suy luận:** (a) soi **chuỗi trong DLL** ⇒ không có `OrdOrderLines` ⚠️ **nhưng cách này KHÔNG ĐỦ** (hằng chuỗi có thể bị **intern** vào DLL khác) — 📌 **tôi đã suýt kết luận sai** vì điều đó; (b) ✅ **ĐO CỠ DLL:** `36352` → **`44544`** byte ⇒ **bằng chứng quyết định** rằng mã **đã vào**; (c) đọc **mã nguồn trên đĩa** ⇒ phát hiện **khối đọc đơn hàng + dòng tóm tắt BỊ MẤT** (⚠️ phép `String.Replace` **không khớp** hoặc **ghi đè một phần** — 🔒 cùng họ §26.5 #1), 📌 và tệp **không** dựng được như đang có (dòng log vẫn tham chiếu `dto.TongSoDon`) ⇒ ⚠️ **bản cache đã che lỗi biên dịch**. 🔒 **BÀI HỌC (quan trọng hơn cả hai lỗi):** ① **`exit 0` KHÔNG chứng minh DLL đã đổi** — 🔑 phải **KIỂM MỐC** (`tools\kiem-moc-build.ps1`) hoặc **ĐO CỠ/CHUỖI** trong DLL — 📌 **lần thứ SÁU** của họ bẫy này; ② ⚠️ **"không thấy chuỗi trong DLL" KHÔNG đủ để kết luận** (hằng chuỗi có thể nằm ở DLL khác) ⇒ **cỡ DLL** và **mốc thời gian** là bằng chứng **mạnh hơn**; ③ 🔒 **sửa mã bằng `String.Replace` là NGUỒN của họ lỗi này** — đã vấp **nhiều lần** ⇒ **dùng `edit` với ngữ cảnh** và **kiểm lại tệp SAU khi sửa**. Ghi **§21.6** (nợ: 🚨 **chưa gồm ĐỊA CHỈ GIAO HÀNG** (*"giao tới đâu"* là PII **quan trọng** — nhưng entity `Address` **chưa tồn tại** ⇒ **nợ CHẶN**) · chưa gồm **LỊCH SỬ THANH TOÁN** (⚠️ `PayTransactions` có `OrderId` **không** phải `CustomerId` ⇒ phải đi **qua đơn hàng**) · chưa gồm **dữ liệu THUẾ** (`EInvoice` cũng chứa PII) · 🚨 **chưa có CI** · **tên sản phẩm không có** (chỉ **SKU** — 🔑 đánh đổi **có chủ ý** vì SKU **bất biến**, ⚠️ nhưng khách đọc SKU **không hiểu ngay**) · **chưa có bảng kiểm toán riêng cho mỗi lần xuất**) |

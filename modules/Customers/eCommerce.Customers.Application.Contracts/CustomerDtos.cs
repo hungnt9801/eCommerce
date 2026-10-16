@@ -138,6 +138,69 @@ public class XuatDuLieuCaNhanDto
 
     /// <summary>Cac dong du lieu ca nhan — 🔑 **moi dong** tu mo ta **nguon** va **ly do**.</summary>
     public List<DongDuLieuCaNhanDto> CacDong { get; set; } = [];
+
+    /// <summary>
+    /// 🚨 **DON HANG CUA KHACH** — 🔑 **phan LON** du lieu ca nhan that nam o day, **khong** o ho so khach.
+    ///
+    /// 📌 **VI SAO TACH KHOI `CacDong` (khong nhet moi don hang thanh mot dong):** `CacDong` la danh sach
+    /// *(truong, gia tri)* **co dinh** cua **ho so**; con don hang la **danh sach DAI va TANG THEO THOI GIAN**.
+    /// 🔒 Nhet vao `CacDong` se lam ban xuat **khong doc duoc** khi khach mua nhieu (📌 mot danh sach 500 don
+    /// nam lan trong danh sach truong la **vo dung** cho ca hai muc dich).
+    /// ➕ Va tach ra thi **dem duoc**: nguoi doc thay ngay *"khach nay co bao nhieu don"*.
+    /// </summary>
+    public List<DonHangCaNhanDto> DonHang { get; set; } = [];
+
+    /// <summary>
+    /// ⚠️ **CO bi CAT khong** — `true` nghia la khach co **nhieu hon** `TranDonHangMotLanXuat` don.
+    /// 🔒 Bat buoc phai noi ra: 📌 mot ban xuat **im lang cat bot** se khien nguoi doc tin rang
+    /// *"khach chi co bay nhieu don"* — va **do la mot loi khang dinh sai** ve du lieu ca nhan.
+    /// </summary>
+    public bool DonHangBiCat { get; set; }
+
+    /// <summary>Tong so don cua khach (🔑 ke ca khi bi cat) — de nguoi doc biet **quy mo that**.</summary>
+    public int TongSoDon { get; set; }
+}
+
+/// <summary>Mot don hang trong ban xuat du lieu ca nhan.</summary>
+public class DonHangCaNhanDto
+{
+    public Guid OrderId { get; set; }
+
+    /// <summary>Ma don (hien thi cho khach — 📌 khach quen ma don, khong quen GUID).</summary>
+    public string SoDon { get; set; } = default!;
+
+    /// <summary>Kenh ban (`shopee` / `web`…) — 🔑 khach can biet don den tu dau.</summary>
+    public string MaKenh { get; set; } = default!;
+
+    public string TienTe { get; set; } = default!;
+
+    public decimal TongTien { get; set; }
+
+    /// <summary>Trang thai don — 🔑 tra loi *"don cua toi dang o dau"* (cau hoi pho bien nhat).</summary>
+    public string TrangThai { get; set; } = default!;
+
+    /// <summary>Trang thai thanh toan — ⚠️ 🔑 khach can biet **da tra tien chua**, khong chi *"don da xac nhan"*.</summary>
+    public string TrangThaiThanhToan { get; set; } = default!;
+
+    public DateTime NgayTaoUtc { get; set; }
+
+    /// <summary>Cac dong hang — 🔑 *"toi da mua gi"* la **cau hoi chinh** cua chu the du lieu.</summary>
+    public List<DongHangCaNhanDto> CacDong { get; set; } = [];
+}
+
+/// <summary>Mot dong hang trong ban xuat.</summary>
+public class DongHangCaNhanDto
+{
+    /// <summary>Ma SKU — ⚠️ **KHONG** phai ten san pham: 📌 ten san pham nam o `CatProducts` va **co the doi**;
+    /// 🔑 ban xuat phai phan anh **thoi diem mua**, nen ghi **ma** (bat bien) chu khong chi **ten** (co the doi).</summary>
+    public string MaSku { get; set; } = default!;
+
+    public int SoLuong { get; set; }
+
+    public decimal DonGia { get; set; }
+
+    /// <summary>🔑 **NGUON** — cung ly do nhu `DongDuLieuCaNhanDto.Nguon`.</summary>
+    public string Nguon { get; set; } = default!;
 }
 
 /// <summary>

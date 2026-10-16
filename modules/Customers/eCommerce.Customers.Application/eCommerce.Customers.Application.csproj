@@ -8,6 +8,13 @@
   <ItemGroup>
     <ProjectReference Include="..\eCommerce.Customers.Application.Contracts\eCommerce.Customers.Application.Contracts.csproj" />
     <ProjectReference Include="..\..\..\src\eCommerce.Domain.Shared\eCommerce.Domain.Shared.csproj" />
+    <!-- 🚨 `CUS-001` §20.7 #3 (17/10/2026) — **BAN XUAT DU LIEU CA NHAN PHAI GOM DON HANG**.
+         📌 `Order.CustomerId` nam o `eCommerce.Domain` ⇒ can tham chieu de doc `IRepository<Order, Guid>`.
+         🔒 **HUONG THAM CHIEU LA HOP LE:** `module → app` (app chinh) — 📌 nguoc lai moi bi cam.
+         ⚠️ **VI SAO KHONG GOI QUA `IOrderAppService`:** 🔑 mot module khong nen phu thuoc vao **app service**
+         cua app chinh (se la **vong**: `eCommerce.Application` **da** tham chieu `Customers.Application`).
+         ➕ Va `XuatDuLieuCaNhanAsync` la ham **doc-thuan** — 📌 goi repo truc tiep la **dung muc**. -->
+    <ProjectReference Include="..\..\..\src\eCommerce.Domain\eCommerce.Domain.csproj" />
   </ItemGroup>
 
   <ItemGroup>
