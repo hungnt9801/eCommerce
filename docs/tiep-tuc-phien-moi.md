@@ -163,3 +163,44 @@ cho **6** commit liên tiếp) ⇒ dòng đó **giống hệt ở MỌI commit**
    sau khi thay.
 3. **`-replace` không báo lỗi khi không khớp** ⇒ phải **in kết quả** để xác nhận (đúng bài học
    `tools\README-probe.md`: *"đo lại sau khi ghi"*).
+
+---
+
+## 🛡️ CƠ CHẾ MỚI: **CHẶN COMMIT MESSAGE CÓ DẤU** (16/10/2026)
+
+**VÌ SAO CẦN CƠ CHẾ (không chỉ ghi quy tắc):** quy tắc *"commit message ASCII không dấu"* **đã có** trong
+tài liệu này, nhưng trong phiên 16/10/2026 nó **bị vi phạm 1 lần** — commit `d06cb3d` có **6 byte ngoài
+ASCII** vì **quên kiểm** trước khi commit, phải sửa bằng `--amend`.
+📌 Đúng bài học **Phụ lục C**: *"ghi quy tắc KHÔNG ĐỦ, cần CƠ CHẾ"*.
+
+### Đã làm
+
+| # | Việc | Trạng thái |
+|---|---|---|
+| **1** | Hook `tools/git-hooks/commit-msg` (**shell**, dùng `sh` đi kèm Git for Windows) | ✅ **đã ĐO: chặn thật** |
+| **2** | Cài vào `.git/hooks/commit-msg` (máy này) | ✅ đã cài |
+| **3** | Kiểm chứng **hai chiều** | ✅ message có dấu ⇒ **exit 1** + in số byte/dòng vi phạm · message ASCII ⇒ **exit 0** |
+
+### Cài đặt (hook KHÔNG được commit — `.git/` không nằm trong repo)
+
+```powershell
+# Cách 1 (khuyến nghị — một lệnh, không cần copy tệp):
+git config core.hooksPath tools/git-hooks
+
+# Cách 2 (copy):
+Copy-Item tools/git-hooks/commit-msg .git/hooks/commit-msg -Force
+```
+📌 Git for Windows **có** `sh` đi kèm (`C:\Program Files\Git\bin\sh.exe`) và **tự dùng nó** để chạy hook —
+**kể cả khi** `sh` không có trong `PATH` của PowerShell. (Đã đo: `Test-Path` = `True`.)
+
+### 🚨 Ba cái bẫy gặp khi làm chính cơ chế này (ghi lại vì rất dễ tái diễn)
+
+| # | Cái bẫy | Triệu chứng **thật** |
+|---|---|---|
+| **1** | `sh` **không có trong `PATH`** của PowerShell | Gọi `sh tools/git-hooks/commit-msg` ⇒ *"The term 'sh' is not recognized"*. **Không** có nghĩa hook vô dụng — Git tự tìm `sh` của nó |
+| **2** | 🚨 **Script kiểm ASCII tự chết vì ký tự ngoài ASCII** | Phiên bản PowerShell của bộ kiểm in kết quả bằng **tiếng Việt có dấu + emoji** ⇒ `Write-Output` gặp lỗi **mã hoá console** ⇒ với `$ErrorActionPreference='Stop'` script **dừng trước khi in dòng nào** ⇒ **0 dòng output, exit 0** — trông y hệt *"chạy tốt"*. 📌 **Script kiểm ASCII mà không chạy được vì ký tự ngoài ASCII** |
+| **3** | Bộ đo dùng `$env:TEMP` (đường dẫn **rút gọn 8.3**: `C:\Users\VNVC~1.HVT\...`) | Tiến trình con **không giải được** đường dẫn đó ⇒ script báo *"Không tìm thấy tệp message"* ⇒ **tưởng script hỏng**, thật ra **tệp thử không tồn tại** với tiến trình con |
+
+📌 **Điểm chung:** cả ba đều cho triệu chứng *"có vẻ không chạy"* nhưng nguyên nhân ở **ba tầng khác nhau**
+(`PATH` · **nội dung chính script** · **bộ đo**). Cách phân biệt: **gọi bằng đường dẫn tuyệt đối + `-Command`
++ in từng bước**, thay vì kết luận từ việc "không thấy output".

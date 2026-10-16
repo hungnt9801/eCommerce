@@ -1,0 +1,47 @@
+#!/bin/sh
+# ============================================================================
+# commit-msg HOOK - CHAN COMMIT MESSAGE CO KY TU NGOAI ASCII
+#
+# VI SAO CAN HOOK (khong chi ghi quy tac): quy tac "commit message ASCII khong dau" DA CO trong ban giao,
+# nhung trong phien 16/10/2026 no BI VI PHAM 1 lan (d6cb3d, 6 byte co dau) - vi nguoi viet QUEN KIEM
+# truoc khi commit, va phai sua bang --amend.
+# => Dung bai hoc Phu luc C cua du an: "ghi quy tac KHONG DU, can CO CHE".
+# => Hook nay bien quy tac thanh KHONG THE QUEN: commit BI CHAN neu message co ky tu ngoai ASCII.
+#
+# Day la hook commit-msg (khong phai pre-commit) vi no can NOI DUNG message; pre-commit chi thay index.
+# Git truyen duong dan tep message tam trong $1.
+#
+# CAI DAT (hook KHONG duoc commit - .git/ khong nam trong repo):
+#     git config core.hooksPath tools/git-hooks
+# core.hooksPath la MOT lenh, khong can copy tep va khong can chmod.
+# Git for Windows CO sh di kem (C:\Program Files\Git\bin\sh.exe) va tu dung no de chay hook - ke ca khi
+# `sh` KHONG co trong PATH cua PowerShell. (Da do: Test-Path = True.)
+#
+# Co che phia PowerShell (chay ngay, khong can Git for Windows): tools/commit-msg-kiem.ps1
+# ============================================================================
+
+thongDiep="$1"
+
+# LC_ALL=C + tr de dem byte ngoai ASCII - KHONG phu thuoc `grep -P` (khong phai luc nao cung co).
+# tr -d '\000-\177' giu lai MOI byte > 0x7F; neu con byte nao => message co dau.
+soByteLa=$(LC_ALL=C tr -d '\000-\177' < "$thongDiep" | wc -c | tr -d ' ')
+
+if [ "$soByteLa" -gt 0 ]; then
+    echo "" >&2
+    echo "COMMIT BI CHAN: commit message co $soByteLa byte NGOAI ASCII." >&2
+    echo "" >&2
+    echo "Quy tac du an: commit message PHAI thuan ASCII (khong dau)." >&2
+    echo "Ly do: message di qua nhieu cong cu/terminal; ky tu co dau bi hong ma o mot so moi truong" >&2
+    echo "       => lich su kho doc va kho tim kiem." >&2
+    echo "" >&2
+    echo "Cac dong vi pham:" >&2
+    LC_ALL=C grep -n '[^ -~	]' "$thongDiep" | head -5 >&2
+    echo "" >&2
+    echo "Cach sua: viet lai message khong dau, roi:" >&2
+    echo "    git commit --amend -F <tep-message>" >&2
+    echo "Hoac kiem truoc bang: pwsh -File tools/commit-msg-kiem.ps1 -TepMessage <tep-message>" >&2
+    echo "" >&2
+    exit 1
+fi
+
+exit 0
