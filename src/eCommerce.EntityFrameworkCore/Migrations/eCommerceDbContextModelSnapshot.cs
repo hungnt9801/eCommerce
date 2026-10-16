@@ -2362,6 +2362,11 @@ namespace eCommerce.Migrations
                     b.HasIndex("TenantId", "Code")
                         .IsUnique();
 
+                    b.HasIndex("TenantId", "Slug")
+                        .IsUnique()
+                        .HasDatabaseName("IX_CatProducts_TenantId_Slug")
+                        .HasFilter("\"Slug\" IS NOT NULL");
+
                     b.ToTable("CatProducts", (string)null);
                 });
 

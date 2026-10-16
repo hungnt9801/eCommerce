@@ -141,14 +141,13 @@ public class PostgreSqlSchemaTests
     }
 
     [Fact]
-    public async Task F1_du_42_index_deu_dung_NULLS_NOT_DISTINCT()
+    public async Task F1_du_43_index_deu_dung_NULLS_NOT_DISTINCT()
     {
         // 🔒 BẤT BIẾN (ghi ở XC-004 Q6): mọi unique index trên entity IMultiTenant PHẢI có
         // `NULLS NOT DISTINCT`. Ai tạo migration mới mà quên ⇒ test này đỏ.
-        // 📌 40 → **42** (16/10/2026, migration `Inv003_ChannelLimits_Rec001_ReconRuns`): 2 unique index mới,
-        //    cả hai đều có `TenantId` **và** một cột **NULLABLE** ở giữa khoá
-        //    (`InvChannelLimits.WarehouseId` · `ReconRunMismatches` không có cột nullable nhưng vẫn có `TenantId`).
-        Assert.Equal(42L, await DemAsync(
+        // 📌 40 → **42** (16/10/2026, `Inv003_ChannelLimits_Rec001_ReconRuns`) → **43**
+        //    (16/10/2026, `Cat003_ProductSlug_Unique`: slug là **khoá URL công khai**).
+        Assert.Equal(43L, await DemAsync(
             "select count(*) from pg_indexes where schemaname = 'public' and indexdef like '%NULLS NOT DISTINCT%'"));
 
         // Kiểm tra ĐÍCH DANH để thông báo lỗi có ý nghĩa (tên index dài có thể bị PostgreSQL cắt ⇒ so theo tiền tố).
@@ -196,7 +195,13 @@ public class PostgreSqlSchemaTests
             // 🚨 REC-001 — chống ghi trùng cặp `(kho, SKU)` trong MỘT lượt đối soát (16/10/2026).
             //    Job retry / hai luồng cùng ghi mà index mất tác dụng ⇒ lịch sử có dòng trùng ⇒ câu hỏi
             //    *"lệch này xuất hiện bao nhiêu lần"* đếm SAI (số liệu để người quyết định).
-            "IX_ReconRunMismatches_TenantId_Run_Kho_Sku"
+            "IX_ReconRunMismatches_TenantId_Run_Kho_Sku",
+            // 🚨 CAT-003 — **slug là khoá định danh CÔNG KHAI trên URL** (16/10/2026). Mất
+            //    `NULLS NOT DISTINCT` ⇒ hai sản phẩm cùng slug (tenant `NULL`) LỌT ⇒ **hai sản phẩm tranh một
+            //    URL**: một trong hai **không bao giờ** truy cập được và máy tìm kiếm **đánh chỉ mục sai sản phẩm**
+            //    — im lặng hoàn toàn. ⚠️ Index có **bộ lọc** `Slug IS NOT NULL` ⇒ EF **không** sinh được
+            //    `NULLS NOT DISTINCT` kèm bộ lọc ⇒ đã sửa tay trong migration `Cat003_ProductSlug_Unique`.
+            "IX_CatProducts_TenantId_Slug"
         ];
 
         foreach (var ten in phaiCo)

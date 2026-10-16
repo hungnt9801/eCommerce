@@ -37,6 +37,45 @@ public class ProductPublishedEto : INotificationEvent
 }
 
 /// <summary>
+/// Sự kiện: **slug (khoá định danh công khai trên URL) của sản phẩm đã đổi** — `CAT-003` **ADR-05**.
+///
+/// 🎯 **ĐÂY LÀ CÂU TRẢ LỜI CHO `Q3` CỦA `WEB-002`** (*"ETO `ProductSlugChangedEto` có mang `OldSlug` không? Ai phát?"*):
+/// <list type="bullet">
+///   <item><b>CÓ mang <see cref="OldSlug"/></b> — không có nó thì `WEB-002` **không** dựng được bảng chuyển hướng
+///     **301** (`WEB-002` **BR-005**) ⇒ khách vào **link cũ** nhận **`404`** thay vì được chuyển hướng,
+///     và **không có lỗi nào** để lần ra (SEO mất âm thầm).</item>
+///   <item><b>Ai phát:</b> `ProductAppService` (tầng application) — **KHÔNG** phải entity `Product`, vì ETO nằm ở
+///     `Application.Contracts` mà tầng `Domain` **không được** tham chiếu (bất biến #2/#3). Đúng khuôn đang có
+///     của repo: `Product.Publish()` không phát `ProductPublishedEto`, `ProductAppService.PublishAsync` phát.</item>
+/// </list>
+///
+/// 📌 **PHÂN LOẠI: sự kiện *MANG DỮ LIỆU* hay *THÔNG BÁO*?**
+/// Slug **hiện tại** đã được ghi vào `CatProducts.Slug` **trước** khi phát (nguồn sự thật vẫn ở DB).
+/// Nhưng **`OldSlug`** thì **chỉ tồn tại trong sự kiện này** — DB **không** giữ lịch sử slug (bảng `WebSlugRoutes`
+/// là của `WEB-002`, `CAT-003` ADR-06 **cố ý** không sở hữu).
+/// ⚠️ Vì vậy khi có message broker, sự kiện này **phải** đi qua **outbox** (`XC-002`): mất nó ⇒ mất **khả năng 301**
+/// cho **đúng cặp slug đó**, và không có cách nào dựng lại (`inv-001` §22 — bài học *"ETO mang dữ liệu"*).
+/// 📌 Hiện chưa có broker ⇒ in-process; đây là **nợ đã ghi**, không phải "đã an toàn".
+/// </summary>
+[Serializable]
+public class ProductSlugChangedEto
+{
+    public Guid? TenantId { get; set; }
+
+    public Guid ProductId { get; set; }
+
+    public string ProductCode { get; set; } = default!;
+
+    /// <summary>Slug **CŨ** (`null` = trước đó sản phẩm **chưa có** URL công khai). 🔑 Đây là lý do ETO tồn tại.</summary>
+    public string? OldSlug { get; set; }
+
+    /// <summary>Slug **MỚI** (`null` = sản phẩm **không còn** URL công khai — ví dụ ngừng hiển thị).</summary>
+    public string? NewSlug { get; set; }
+
+    public DateTime OccurredAtUtc { get; set; }
+}
+
+/// <summary>
 /// Sự kiện: **giá niêm yết của một biến thể đã đổi**.
 ///
 /// 📌 **SỰ KIỆN *THÔNG BÁO*** — giá mới **đã được ghi** vào `CatProductVariants.Price` trước khi publish.

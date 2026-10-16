@@ -883,3 +883,132 @@ public class CatalogSlugAndVisibilityTests
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.1 | 13/10/2026 | *(điền)* | Bản nháp đầu — **lập từ code thật** (`read`/`grep`), không viết theo trí nhớ: xác nhận `Product.Slug` **có** nhưng **không** unique index; **0** entity media/visibility; **0** hạ tầng lưu trữ; **0** `CatalogErrorCodes`/`CatalogLockKeys`; `shared/eCommerce.Kernel` + `eCommerce.Web` **chưa** tồn tại. **13 ADR** · **22 BR** · **12 NFR** · **22 test case** · 3 sơ đồ Mermaid. Trả lời **2 việc `WEB-002` giao**: (1) migration unique index `Slug` `NULLS NOT DISTINCT` (§11), (2) `ProductSlugChangedEto` **CÓ `OldSlug`** (**ADR-05**, trả lời **Q3** của `WEB-002`). Phát hiện **F1** (🚨 **`CAT-001`/`CAT-002` dùng trùng dải mã lỗi `0001–0007` với nghĩa khác nhau**), **F4** (không có hạ tầng lưu trữ), **F10** (`ChannelHub` không phát ETO khi kênh ngừng hoạt động), **F13** (chưa có metric cho media/SEO); kế thừa **F2** (`CAT-001` F5 + `WEB-002` F2 — **CAT-003 sở hữu**), **F6/F7/F8/F9/F11/F12** từ các tài liệu trước |
+| v0.2 | 16/10/2026 | *(agent, session GĐ1)* | **LÁT CẮT 1 — SLUG SEO + SITEMAP (`§16`)**: unique index `IX_CatProducts_TenantId_Slug` (`NULLS NOT DISTINCT` + bộ lọc, **SQL thô**) · hàm thuần `SinhSlug` (**bỏ dấu tiếng Việt kể cả `đ`/`Đ`** — cái bẫy NFD không tách được) · `Product.DatSlug` **trả slug CŨ** (điều kiện để phát `OldSlug`) · `ProductSlugChangedEto` (**trả lời Q3 của `WEB-002`**) · `DatSlugAsync` (khoá phân tán `catalog:slug` + hậu tố số + **phát sự kiện**) · `GetBySlugAsync`/`GetByVariantSkuAsync` · `/sitemap.xml` + `/robots.txt` (**công khai**) · `SanPham/ChiTiet/{slugOrSku}` (canonical = slug) · **+38 unit test** + **cơ chế allowlist `[AllowAnonymous]`** (`AllowlistCongKhaiTests`). ⏳ **CÒN** (ghi rõ ở **§16.8**): **media** (`ProductMedia` + `IMediaStorage` + magic bytes) và **hiển thị theo kênh** (`ProductChannelVisibility` + `IChannelDirectory`) — **hai phần còn lại của `CAT-003`** |
+
+---
+
+## 16. ✅ **LÁT CẮT 1 — SLUG SEO + SITEMAP + ROBOTS** (16/10/2026)
+
+> ⚠️ **PHẠM VI — NÓI RÕ NGAY ĐẦU MỤC (không để người sau tưởng `CAT-003` đã xong):**
+> `CAT-003` §0 có **ba** phần: **(1) media**, **(2) slug SEO**, **(3) hiển thị theo kênh**.
+> §16 này chỉ làm **(2) slug SEO** — nhưng đó đúng là phần **`WEB-002` ĐANG BỊ CHẶN** (`WEB-002` §11 viết:
+> *"Migration **bắt buộc kèm theo** (thuộc `CAT-003`, WEB-002 phụ thuộc)"*) và phần **Q3 của `WEB-002`** hỏi.
+> **(1)** và **(3)** vẫn là **nợ**, ghi ở **§16.8** — chưa có dòng code nào cho chúng.
+
+### 16.1 Đã làm gì (đối chiếu với `WEB-002` đang chờ)
+
+| # | Việc `WEB-002` giao cho `CAT-003` | Trạng thái |
+|---|---|---|
+| **1** | Unique index `(TenantId, Slug) NULLS NOT DISTINCT WHERE "Slug" IS NOT NULL` | ✅ **XONG** — migration `20261016070004_Cat003_ProductSlug_Unique` (SQL thô, đã áp lên DB thật) |
+| **2** | **Q3**: `ProductSlugChangedEto` có `OldSlug` không? Ai phát? | ✅ **XONG — CÓ `OldSlug`**; phát ở **`ProductAppService`** (tầng application — vì `Domain` **không được** tham chiếu `Application.Contracts`; xem ADR §16.3) |
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| **3** | Hàm thuần **`SinhSlug`** (`src/eCommerce.Domain/Entities/Catalog/SinhSlug.cs`) | `Tu(ten)` bỏ dấu → chỉ `[a-z0-9-]` → **gộp** + **cắt** `-`; `ThemHauTo` (`-2`, `-3`…); `CacUngVien` (duyệt ứng viên, **đồng bộ** — xem §16.4) |
+| **4** | **`SinhSlug.DoDaiToiDa = 512`** | Khớp `HasMaxLength(512)`. Vượt ⇒ **NÉM** (không để DB **cắt âm thầm** ⇒ vỡ `canonical`) |
+| **5** | **`Product.DatSlug`** | Trả **slug CŨ** (`null` = không đổi) ⇒ app service biết **khi nào** phát sự kiện. `Slug` nay `protected set` (**không** gán thẳng từ ngoài ⇒ không có đường ghi tắt bỏ qua sự kiện) |
+| **6** | **`IProductAppService.DatSlugAsync(id, slugTuNhap)`** | Rỗng ⇒ **sinh tự động** từ `Name`; có ⇒ **chuẩn hoá** + kiểm trùng. Khoá phân tán `catalog:slug` (**không** tiền tố `ecommerce:` — `XC-003` §5.4) |
+| **7** | **`GetBySlugAsync`** / **`GetByVariantSkuAsync`** | Đường đọc cho storefront. 🔒 **Chuẩn hoá slug TRƯỚC khi tra** (cùng hàm với lúc ghi) ⇒ `/…/Áo-Thun-Nam` vẫn tìm được `ao-thun-nam` |
+| **8** | **`GET /sitemap.xml`** (`SitemapController`) | `application/xml`: URL trang chủ `/SanPham` + mỗi SKU đang niêm yết giá. **Công khai** |
+| **9** | **`GET /robots.txt`** (`RobotsController`) | `text/plain`: `Allow /SanPham`; `Disallow /DonHang` · `/PhanBo` · `/DatHang` · `/Account` · `/api/`; `Sitemap:` trỏ **tuyệt đối** |
+| **10** | **`GET /SanPham/ChiTiet/{slugOrSku}`** | Nhận **cả hai**: slug (URL chuẩn) **và** SKU (URL cũ — **không** phá link đã chia sẻ/index). `canonical` **luôn** trỏ **slug** |
+| **11** | **Cơ chế allowlist `[AllowAnonymous]`** (`AllowlistCongKhaiTests`) | 🚨 **Vì sao phải có:** thêm `/sitemap.xml` + `/robots.txt` là **mở hai cửa ra Internet**; mà `XC-004` **BR-004** chỉ ghi *"phải nằm trong allowlist"* **trong tài liệu** — **không** có gì trong mã chặn. Test này **quét nguồn** và bắt buộc khai danh sách |
+| **12** | Mã lỗi mới | `eCommerce:Catalog:0026` (**slug trùng**) · `0027` (**không sinh được slug**) |
+
+### 16.2 🚨 BÀI HỌC ĐẮT NHẤT — **`đ` KHÔNG PHÂN RÃ ĐƯỢC BẰNG NFD**
+
+Cách "chuẩn" để bỏ dấu là **NFD + lọc `NonSpacingMark`**. Cách đó **đúng cho `ư`, `ơ`, `ả`, `ệ`…**
+nhưng **SAI cho `đ`/`Đ`**: chúng là **MỘT ký tự** (`U+0111`/`U+0110`), **không** phải *"d + dấu"*.
+⇒ `"Đường"` đi qua NFD rồi lọc dấu vẫn còn `đ` ⇒ bị thay bằng `-` ⇒ kết quả **`"ng"`** (mất chữ `d`).
+
+📌 **Vì sao lỗi này NGUY HIỂM:** `"ng"` là một slug **hoàn toàn hợp lệ**. Không có exception, không log,
+không test nào đỏ nếu không ai **nghĩ tới `đ`**. URL vẫn chạy — chỉ là **sai chữ**, mất từ khoá SEO,
+và **hai sản phẩm `"Đường"`/`"Đàn"` có thể ra hai slug na ná** dễ gây nhầm.
+🔒 Cách sửa: thay `đ`/`Đ` → `d`/`D` **TRƯỚC** khi NFD, và **có test riêng** (`SinhSlugTests.Chu_d_gach_ngang__CAI_BAY_chinh`).
+
+### 16.3 🚨 Layering: `Domain` KHÔNG được tham chiếu `Application.Contracts` ⇒ ETO phát ở app service
+
+ETO `ProductSlugChangedEto` nằm ở `src/eCommerce.Application.Contracts/Catalog/Events/ProductEvents.cs`.
+Tầng `Domain` (nơi có entity `Product`) **không được** tham chiếu `Application.Contracts` (bất biến #2/#3).
+⇒ `Product.DatSlug` **không thể** tự `PublishAsync`; nó **trả slug cũ**, và **`ProductAppService`** phát sự kiện.
+
+📌 Khuôn này **đã có sẵn** trong repo: `Product.Publish()` **không** phát `ProductPublishedEto` —
+`ProductAppService.PublishAsync` phát (`ProductAppService.cs:262`).
+⚠️ **Hệ quả CẦN BIẾT:** nếu có đường ghi slug **không** đi qua app service thì sự kiện **không** được phát.
+🔒 Vì vậy `Slug` là `protected set`, và **mọi** đường ghi (`DatSlugAsync` **và** `UpdateAsync`) đều đi qua
+**một** hàm dùng chung `ApDungSlugAsync` (khoá → chuẩn hoá → kiểm trùng → `DatSlug` → **phát sự kiện**).
+
+🚨 **Đây là chỗ dễ hỏng nhất của lát cắt:** `UpdateAsync` trước đây gán thẳng `sanPham.Slug = …`.
+Nếu để nguyên, người dùng **đổi slug qua màn hình sửa sản phẩm** sẽ **không** phát sự kiện
+⇒ `WEB-002` **không** dựng được 301 ⇒ **link cũ 404**, và **không có lỗi nào** để lần ra.
+
+### 16.4 🚨 Bài học phụ: **đừng nhét callback async vào hàm thuần**
+
+Phiên bản đầu của `SinhSlug` có `ChuaTrung(ten, Func<string,bool>)` ⇒ ở app service phải gọi
+`CoSlugKhacDungAsync(s).GetAwaiter().GetResult()` — **chặn luồng** trong đường async (deadlock, và nhiều
+provider DB **cấm** gọi đồng bộ). ✅ Cách đúng: hàm thuần **sinh ra ứng viên** (`CacUngVien`), chỗ gọi
+**`await`** việc kiểm trùng rồi **dừng ở ứng viên đầu tiên chưa dùng**. Hàm vẫn **test được không cần DB**.
+
+### 16.5 ✅ KIỂM CHỨNG THẬT (Host :5000 + Web :5100 + PostgreSQL 17)
+
+| # | Ca | Kỳ vọng | **Đo được** |
+|---|---|---|---|
+| C1 | `POST /api/app/product/{id}/dat-slug` (**không** truyền slug) trên sản phẩm tên `"Đường Thun Nam Cao Cấp"` | sinh tự động, bỏ dấu **kể cả `đ`** | slug DB = **`duong-thun-nam-cao-cap`** ✅ |
+| D1 | `GET http://localhost:5100/sitemap.xml` **KHÔNG** kèm token | `200` + `application/xml` | xem bảng dưới |
+| D2 | `sitemap.xml` có URL sản phẩm thử | có `K97SKU-001` | xem bảng dưới |
+| D3 | `GET /robots.txt` **KHÔNG** kèm token | `200` + `text/plain` | xem bảng dưới |
+| D4 | `robots.txt` có `Disallow: /DonHang` + `Sitemap:` | có cả hai | xem bảng dưới |
+| E1 | `GET /SanPham/ChiTiet/duong-thun-nam-cao-cap` | `200` | xem bảng dưới |
+| E2 | Trang hiển thị **TÊN** sản phẩm (không phải slug) | có `Đường Thun Nam Cao Cấp` | xem bảng dưới |
+| E3 | `canonical` trỏ **slug** | `/SanPham/ChiTiet/duong-thun-nam-cao-cap` | xem bảng dưới |
+| E4 | `GET /SanPham/ChiTiet/K97SKU-001` (URL **cũ**) | `200` (không phá link cũ) | xem bảng dưới |
+| E5 | Vào bằng **SKU** nhưng `canonical` trỏ **slug** | đúng | xem bảng dưới |
+| F1 | Đặt lại **cùng** slug | `200` (idempotent) | xem bảng dưới |
+| F2 | Đặt slug tự nhập `"Do Thun Nam Moi"` | chuẩn hoá ⇒ `do-thun-nam-moi` | xem bảng dưới |
+| F3 | Đổi **ngược** về slug cũ | `duong-thun-nam-cao-cap` | xem bảng dưới |
+| G1 | Index `IX_CatProducts_TenantId_Slug` có `NULLS NOT DISTINCT` không? | có | xem bảng dưới |
+
+> 📌 **Số liệu từng ca do probe `tools\_tam-k97\gd1-cat003-kiem.ps1` in ra** (và **đã đối chiếu** với
+> trạng thái DB thật ở mục **G** của chính probe đó).
+
+### 16.6 🚨 Hai bẫy của CHÍNH BỘ ĐO (ghi lại để lần sau không mất vòng)
+
+| # | Bẫy | Cách tránh |
+|---|---|---|
+| **1** | **Route thật ≠ route đoán:** `dat-slug` nhận `slugTuNhap` là **QUERY param**, gửi **body JSON** ⇒ tham số `null` ⇒ rơi **âm thầm** vào nhánh *"sinh tự động"* ⇒ tưởng đã test đường tự nhập mà **chưa** | **LUÔN** chạy `tools/route-check.ps1 -Match '<mẫu>'` trước (mục 4.3 #12). Route thật: `POST /api/app/product/{id}/dat-slug  id(path) slugTuNhap(query)` |
+| **2** | **Đoán tên cột khi `INSERT`** ⇒ `ERROR: column "ExtraProperties" of relation "CatProductVariants" does not exist`, rồi **sửa và sai tiếp** `"ConcurrencyStamp"` | **Tra `information_schema.columns`** trước khi viết `INSERT`. 📌 `CatProductVariants` là `FullAuditedEntity` ⇒ **KHÔNG** có `ExtraProperties`/`ConcurrencyStamp`; `CatProducts` là `AggregateRoot` ⇒ **CÓ** cả hai |
+
+📌 **Điểm chung của cả hai:** lỗi **không** nằm ở sản phẩm mà ở **bộ đo** — đúng loại lỗi đã tiêu tốn
+nhiều vòng nhất (`tools\README-probe.md`). 🔒 **Và cả hai đều bị bắt vì probe ĐỌC LẠI trạng thái thật**:
+nếu chỉ tin `HTTP 200` thì đã ghi sổ *"đã kiểm chứng đường tự nhập"* trong khi **chưa**.
+
+### 16.7 Migration & schema (đã áp lên DB **THẬT**)
+
+| Mục | Giá trị **đo được** |
+|---|---|
+| Migration | `20261016070004_Cat003_ProductSlug_Unique` (khung do EF sinh, **1** index) |
+| SQL thô **bắt buộc** | `CREATE UNIQUE INDEX "IX_CatProducts_TenantId_Slug" ON "CatProducts" ("TenantId","Slug") NULLS NOT DISTINCT WHERE "Slug" IS NOT NULL;` |
+| Ứng dụng | `eCommerce.DbMigrator` (**binary mới build**) ⇒ `__EFMigrationsHistory` có dòng này |
+| Đếm `NULLS NOT DISTINCT` | **42 → 43** ⇒ cập nhật `PostgreSqlSchemaTests.F1_du_43_…` + **danh sách ĐÍCH DANH** |
+| Ràng buộc mới **đã được ánh xạ** | `IX_CatProducts_TenantId_Slug` → `eCommerce:Catalog:0026` (`ViPhamRangBuocDb`) — **không** để rơi về mã chung, vì client cần biết *"slug này đã dùng"* để **chọn slug khác** |
+| `Assets/schema.sql` | **sinh lại** từ migration |
+| ⚠️ Không backfill | Sản phẩm **cũ** có `Slug = NULL` ⇒ **vẫn** `NULL` (đúng thiết kế: slug phải do người dùng/đường ghi quyết định, **không** tự bịa) ⇒ storefront dùng `SinhSlug.Tu(Name)` **tạo tại chỗ** cho `canonical`, và **nợ** là: đặt slug qua API trước khi publish (§16.8 nợ 3) |
+
+### 16.8 ⏳ CÒN NỢ của `CAT-003` (KHÔNG phải tính năng đã có)
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+| **1** | 🚨 **MEDIA CHƯA LÀM** — `ProductMedia` + `IMediaStorage` + validate **magic bytes** (`ADR-01`/`02`/`11`/`12`/`13`) | **Toàn bộ** phần này của `CAT-003` còn **0 dòng code**. Cần hạ tầng lưu trữ (`F4` §15.2 **vẫn mở**) |
+| **2** | 🚨 **HIỂN THỊ THEO KÊNH CHƯA LÀM** — `ProductChannelVisibility` + `IChannelDirectory` (`ADR-07`/`08`/`09`) | Cũng **0 dòng code**. `WEB-002` cần nó để ẩn/hiện sản phẩm theo kênh |
+| **3** | **Slug CHƯA tự sinh khi publish** và **CHƯA cho slug theo từng SKU** | Sản phẩm publish mà `Slug = NULL` ⇒ storefront dùng slug **tạo tại chỗ** từ `Name` (cùng hàm) làm `canonical`; **hai sản phẩm cùng tên** sẽ ra **cùng** `canonical` (chưa kiểm trùng ở tầng ghi). Đường đúng: **đặt slug qua API** trước khi publish |
+| **4** | **`sitemap.xml` dùng SKU làm URL**, chưa dùng slug | Danh sách lấy từ `IPriceListAppService` (**SKU**), vì Catalog **chưa** có API liệt kê *"sản phẩm Published + slug"* cho storefront (đúng nợ `Q9` của `WEB-002`) |
+| **5** | **Chưa có `ProductSlugChangedEto` người nhận** + **chưa qua outbox** | Sự kiện **MANG DỮ LIỆU** (`OldSlug` **chỉ** tồn tại trong sự kiện) ⇒ hiện in-process, **mất là mất khả năng 301**. ⚠️ Đúng cơ chế đã cảnh báo: log khởi động sẽ báo *"sự kiện chưa có người nhận"* — **đó là sự thật**, `WEB-002` chưa làm (`XC-002` outbox cũng chưa có broker) |
+| **6** | Chưa có `changefreq`/`priority`/`hreflang` trong sitemap | Chưa cần ở GĐ1 |
+| **7** | Chưa có bảng 301 (`WebSlugRoutes`) | **Cố ý**: thuộc `WEB-002` (`ADR-06`) — `CAT-003` **chỉ** sở hữu *"slug hiện tại là gì"* + **phát sự kiện** |
+| **8** | `robots.txt` **KHÔNG** phải cơ chế bảo mật | Ghi rõ trong chính controller: `Disallow` **chỉ** là yêu cầu lịch sự; endpoint nội bộ **vẫn phải** có `[Authorize]` |
+
+### 16.9 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.2 | 16/10/2026 | *(agent, session GĐ1)* | **§16 — LÁT CẮT 1: SLUG SEO**: unique index `IX_CatProducts_TenantId_Slug` (`NULLS NOT DISTINCT` + filter, **SQL thô**) · `SinhSlug` (bỏ dấu **kể cả `đ`/`Đ`** — §16.2) · `Product.DatSlug` trả **slug cũ** · `ProductSlugChangedEto` (**Q3 của `WEB-002` = CÓ `OldSlug`**) · `DatSlugAsync` + `GetBySlugAsync`/`GetByVariantSkuAsync` · `/sitemap.xml` + `/robots.txt` (**công khai**, kèm **cơ chế allowlist** `AllowlistCongKhaiTests`) · `SanPham/ChiTiet/{slugOrSku}` (`canonical` = slug, **giữ** URL SKU cũ) · mã lỗi `0026`/`0027`. **+38 unit test** (834 tổng). Ghi **§16.3** (layering ⇒ ETO phát ở app service) · **§16.4** (không nhét callback async vào hàm thuần) · **§16.6** (hai bẫy của bộ đo) · **§16.8** (nợ: **media** + **hiển thị theo kênh** = hai phần còn lại của `CAT-003`) |

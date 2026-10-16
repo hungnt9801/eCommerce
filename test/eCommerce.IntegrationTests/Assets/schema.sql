@@ -2021,3 +2021,15 @@ VALUES ('20261016034601_Inv003_ChannelLimits_Rec001_ReconRuns', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE UNIQUE INDEX "IX_CatProducts_TenantId_Slug" ON "CatProducts" ("TenantId", "Slug") WHERE "Slug" IS NOT NULL;
+
+DROP INDEX "IX_CatProducts_TenantId_Slug";
+
+CREATE UNIQUE INDEX "IX_CatProducts_TenantId_Slug" ON "CatProducts" ("TenantId", "Slug") NULLS NOT DISTINCT WHERE "Slug" IS NOT NULL;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261016070004_Cat003_ProductSlug_Unique', '10.0.11');
+
+COMMIT;
+

@@ -199,6 +199,21 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
 
             b.HasIndex(x => new { x.TenantId, x.Code }).IsUnique();
 
+            // 🚨 **`CAT-003` ADR-03 — SLUG LÀ KHOÁ ĐỊNH DANH CÔNG KHAI TRÊN URL ⇒ PHẢI DUY NHẤT.**
+            // (`WEB-002` §11 đã giao việc này cho `CAT-003`; `CAT-001` F5 chuyển sang đây.)
+            // 📌 VÌ SAO KHÔNG CHỈ KIỂM Ở TẦNG APP: hai request đồng thời cùng thấy *"slug chưa ai dùng"*
+            // ⇒ **cả hai ghi** ⇒ hai sản phẩm cùng một URL ⇒ **một trong hai không bao giờ truy cập được**,
+            // và **máy tìm kiếm đánh chỉ mục SAI sản phẩm** — im lặng hoàn toàn (đúng họ lỗi `XC-003` F1).
+            // ⚠️ Bộ lọc `Slug IS NOT NULL` là **BẮT BUỘC** (không thì index vô hiệu vì mọi sản phẩm chưa có
+            // slug đều `NULL`), và **cần SQL thô** vì EF **không** sinh được `NULLS NOT DISTINCT` kèm bộ lọc
+            // (cùng cách `Inv001_Fix_SoCai_Unique_ThemMovementType` đã làm).
+            // 🔒 Tên đặt TƯỜNG MINH: tên EF tự sinh `IX_CatProducts_TenantId_Slug` là **33 ký tự** (an toàn),
+            // nhưng đặt tay để `PostgreSqlSchemaTests` đối chiếu **đích danh** được.
+            b.HasIndex(x => new { x.TenantId, x.Slug })
+                .IsUnique()
+                .HasFilter("\"Slug\" IS NOT NULL")
+                .HasDatabaseName("IX_CatProducts_TenantId_Slug");
+
             // 🚨 `AutoInclude` — BẮT BUỘC để **máy trạng thái của domain nhìn thấy biến thể**.
             // VÌ SAO: repository của ABP **không** tự nạp collection con. Nếu thiếu dòng này thì
             // `Product.Variants` **luôn rỗng** khi đọc từ DB ⇒ `Publish()` (guard `CAT-001` D9) luôn thấy

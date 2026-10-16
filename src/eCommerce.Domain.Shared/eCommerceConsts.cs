@@ -278,6 +278,25 @@ public static class eCommerceConsts
             /// thì client/đối soát không biết lỗi nằm ở **sản phẩm** hay ở **danh mục**.
             /// </summary>
             public const string MaDanhMucKhongHopLe = "eCommerce:Catalog:0025";
+
+            /// <summary>
+            /// 🚨 **SLUG TRÙNG trong tenant** (`CAT-003` **ADR-03**) — hàng rào DB
+            /// `IX_CatProducts_TenantId_Slug` (`NULLS NOT DISTINCT`, filter `Slug IS NOT NULL`).
+            /// 📌 **VÌ SAO LÀ LỖI NGHIỆP VỤ, KHÔNG PHẢI `500`:** slug là **khoá định danh công khai trên URL**;
+            /// hai sản phẩm cùng slug ⇒ **một** trong hai URL **không bao giờ** truy cập được, và **máy tìm kiếm
+            /// đánh chỉ mục sai sản phẩm**. Client cần biết *"slug này đã dùng"* để **chọn slug khác**, chứ
+        /// không phải "hệ thống hỏng" (đúng họ lỗi Phụ lục B: ràng buộc chặn hành vi **hợp lệ về nghiệp vụ**).
+            /// </summary>
+            public const string SlugDaTonTai = "eCommerce:Catalog:0026";
+
+            /// <summary>
+            /// **Không sinh được slug** từ tên sản phẩm (`CAT-003` **ADR-04**).
+            /// 📌 Hàm sinh slug **thuần** trả **chuỗi rỗng** khi tên không còn ký tự dùng được (ví dụ toàn
+            /// ký tự đặc biệt / emoji) — nó **cố ý KHÔNG bịa** ra `slug-{guid}` vì `Guid` **không có giá trị SEO**
+            /// (ADR-04) và sẽ **che** dữ liệu vào vô nghĩa. ⇒ Chỗ gọi phải **quyết định**: hoặc người dùng
+            /// **tự nhập slug**, hoặc sản phẩm **chưa có URL công khai**. Trả mã riêng để client biết cần nhập tay.
+            /// </summary>
+            public const string KhongSinhDuocSlug = "eCommerce:Catalog:0027";
         }
     }
 

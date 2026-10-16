@@ -31,7 +31,15 @@ public class Product : FullAuditedAggregateRoot<Guid>, IMultiTenant
 
     public string Name { get; set; } = default!;
 
-    public string? Slug { get; set; }
+    /// <summary>
+    /// 🚨 **Khoá định danh CÔNG KHAI của sản phẩm trên URL** (`CAT-003` ADR-03/ADR-05).
+    ///
+    /// ⚠️ **`protected set`** — cố ý **KHÔNG** cho gán thẳng từ ngoài: đổi slug **phải** đi qua
+    /// <see cref="DatSlug"/> để (a) **chuẩn hoá**, (b) **phát sự kiện `ProductSlugChangedEto` kèm `OldSlug`**
+    /// ⇒ `WEB-002` giữ được **301** (`CAT-003` **ADR-05**). Nếu cho `set` công khai thì đường gán tắt **không phát
+    /// sự kiện** ⇒ link cũ **404** và **không có lỗi nào** nổi lên (đúng họ lỗi im lặng `XC-003` F1).
+    /// </summary>
+    public string? Slug { get; protected set; }
 
     public string? Description { get; set; }
 
@@ -69,6 +77,61 @@ public class Product : FullAuditedAggregateRoot<Guid>, IMultiTenant
         }
 
         Name = name.Trim();
+    }
+
+    /// <summary>
+    /// 🚨 **ĐẶT SLUG — ĐƯỜNG DUY NHẤT** (`CAT-003` **ADR-05**).
+    ///
+    /// **VÌ SAO SLUG BẤT BIẾN MẶC ĐỊNH (không sinh lại khi đổi `Name`):** mọi lần sửa tên sản phẩm mà **tự động**
+    /// đổi slug sẽ **phá URL đã được Google index** và **link đã chia sẻ** ⇒ mất SEO **âm thầm** (không lỗi,
+    /// không log). ⇒ Đổi slug là **hành động TƯỜNG MINH** của người dùng.
+    ///
+    /// 🔑 **Phát <see cref="ProductSlugChangedEto"/> kèm `OldSlug`** — trả lời **Q3 của `WEB-002`**:
+    /// *"ETO có mang `OldSlug` không?"* ⇒ **CÓ**. Không có nó thì `WEB-002` **không** dựng được bảng 301
+    /// (`WEB-002` **BR-005**) ⇒ khách vào link cũ nhận **404** thay vì được chuyển hướng.
+    ///
+    /// 🔒 **Không phát sự kiện khi slug KHÔNG đổi** (idempotent): nếu phát, `WEB-002` sẽ ghi một dòng 301
+    /// *"từ A đến A"* mỗi lần gọi lặp ⇒ bảng chuyển hướng đầy **dòng vô nghĩa** và **vòng lặp 301**.
+    /// </summary>
+    /// <param name="slugMoi">Slug đã sinh/chọn (chuỗi rỗng hoặc `null` = **chưa có URL công khai**).</param>
+    /// <returns>
+    /// <c>null</c> nếu slug **KHÔNG đổi** (chỗ gọi **không** ghi DB, **không** phát sự kiện);
+    /// ngược lại trả **slug CŨ** để app service phát `ProductSlugChangedEto` kèm `OldSlug`.
+    /// </returns>
+    /// <remarks>
+    /// ⚠️ **VÌ SAO TRẢ `string?` MÀ KHÔNG TỰ PHÁT SỰ KIỆN Ở ĐÂY (layering):** ETO nằm ở
+    /// `eCommerce.Application.Contracts` mà tầng `Domain` **không được** tham chiếu (bất biến #2/#3 của dự án).
+    /// Khuôn có sẵn của repo là như vậy: `Product.Publish()` **không** phát `ProductPublishedEto` —
+    /// `ProductAppService.PublishAsync` phát (`ProductAppService.cs:262`).
+    /// 📌 Hệ quả CẦN BIẾT: nếu có đường ghi slug **không** đi qua app service thì sự kiện **không** được phát
+    /// ⇒ `WEB-002` không dựng được 301. Vì vậy `Slug` có `protected set` (**không** gán thẳng từ ngoài),
+    /// và test `ProductSlugTests` khoá lại hợp đồng "trả về slug cũ".
+    /// </remarks>
+    public string? DatSlug(string? slugMoi)
+    {
+        var chuanHoa = string.IsNullOrWhiteSpace(slugMoi) ? null : slugMoi.Trim();
+
+        if (chuanHoa is { Length: > SinhSlug.DoDaiToiDa })
+        {
+            throw new BusinessException(eCommerceConsts.ErrorCodes.Catalog.ThieuThongTinBatBuoc)
+                .WithData("truong", nameof(slugMoi))
+                .WithData("doDai", chuanHoa.Length)
+                .WithData("toiDa", SinhSlug.DoDaiToiDa)
+                .WithData("lyDo", "Slug vượt độ dài tối đa ⇒ sẽ bị DB cắt hoặc vỡ `canonical`.");
+        }
+
+        // 🔒 So sánh **phân biệt hoa/thường** (`Ordinal`): slug là **khoá URL**; `"SP-A"` và `"sp-a"` là hai
+        // khoá khác nhau ở tầng DB (index `NULLS NOT DISTINCT` không gộp hoa/thường) ⇒ coi là "không đổi" sẽ
+        // khiến DB giữ một giá trị mà hàm này tưởng đã đổi ⇒ lệch giữa bộ nhớ và DB.
+        if (string.Equals(Slug, chuanHoa, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var slugCu = Slug;
+        Slug = chuanHoa;
+
+        return slugCu;
     }
 
     /// <summary>

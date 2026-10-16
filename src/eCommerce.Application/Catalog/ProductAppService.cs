@@ -122,6 +122,77 @@ public class ProductAppService : ApplicationService, IProductAppService
 
     // ── Ghi ───────────────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// 🚨 **TRA THEO SLUG** (`CAT-003`) — đường đọc cho **storefront**. Xem hợp đồng ở
+    /// <see cref="IProductAppService.GetBySlugAsync"/>.
+    ///
+    /// 🔒 **Chuẩn hoá slug TRƯỚC khi tra** bằng **cùng** hàm `SinhSlug.Tu` dùng lúc ghi ⇒ người dùng gõ
+    /// `/SanPham/ChiTiet/Áo-Thun-Nam` vẫn tìm thấy `ao-thun-nam` (URL không phân biệt dấu/hoa-thường ở tầng vào).
+    /// 📌 Không có bước này thì **chỉ** URL đúng từng ký tự mới chạy ⇒ khách dán link từ nơi khác (bị mã hoá,
+    /// hoặc viết hoa) nhận `404` — **không có lỗi nào**, chỉ là mất khách.
+    /// ⚠️ `null` khi không tìm thấy (**không** ném): *"slug không tồn tại"* là ca **bình thường**.
+    /// </summary>
+    public async Task<ProductDto?> GetBySlugAsync(string slug)
+    {
+        if (string.IsNullOrWhiteSpace(slug))
+        {
+            return null;
+        }
+
+        var chuanHoa = SinhSlug.Tu(slug);
+
+        if (chuanHoa.Length == 0)
+        {
+            return null;
+        }
+
+        var sanPham = await _productRepository.FirstOrDefaultAsync(x => x.Slug == chuanHoa);
+
+        if (sanPham is null)
+        {
+            return null;
+        }
+
+        var bienThe = await _variantRepository.GetListAsync(x => x.ProductId == sanPham.Id);
+
+        return ToDto(sanPham, bienThe);
+    }
+
+    /// <summary>
+    /// Tra sản phẩm theo **SKU biến thể** (`CAT-003`) — đường **TƯƠNG THÍCH NGƯỢC** cho URL cũ
+    /// (xem hợp đồng ở <see cref="IProductAppService.GetByVariantSkuAsync"/>).
+    /// 🔒 `null` khi không tìm thấy (**không** ném) — *"SKU không tồn tại"* là ca **bình thường**.
+    /// </summary>
+    public async Task<ProductDto?> GetByVariantSkuAsync(string sku)
+    {
+        if (string.IsNullOrWhiteSpace(sku))
+        {
+            return null;
+        }
+
+        var maSku = sku.Trim();
+
+        var bienThe = await _variantRepository.FirstOrDefaultAsync(x => x.Sku == maSku);
+
+        if (bienThe is null)
+        {
+            return null;
+        }
+
+        var sanPham = await _productRepository.FindAsync(bienThe.ProductId);
+
+        if (sanPham is null)
+        {
+            // ⚠️ Biến thể mồ côi (sản phẩm bị xoá cứng?) — trả `null` thay vì ném: storefront chỉ cần `404`.
+            // 📌 Đây là ca đã có guard riêng của `CAT-002` (`BR-012`/`0023`); ở đây **không** nhân bản guard.
+            return null;
+        }
+
+        var tatCaBienThe = await _variantRepository.GetListAsync(x => x.ProductId == sanPham.Id);
+
+        return ToDto(sanPham, tatCaBienThe);
+    }
+
     [Authorize(eCommerceConsts.Permissions.Products.Create)]
     public async Task<ProductDto> CreateAsync(CreateProductDto input)
     {
@@ -137,10 +208,35 @@ public class ProductAppService : ApplicationService, IProductAppService
 
         var sanPham = new Product(GuidGenerator.Create(), ma, input.Name)
         {
-            Slug = ChuanHoaSlug(input.Slug),
             Description = input.Description,
             BrandId = input.BrandId
         };
+
+        // 🔑 `CAT-003` ADR-04: slug **chuẩn hoá qua CÙNG một hàm** với đường tự sinh (`SinhSlug.Tu`) —
+        // lần đầu code này tự `Trim().ToLowerInvariant()` (KHÔNG bỏ dấu) ⇒ hai đường cho ra hai dạng slug
+        // ⇒ URL của khách có dấu tiếng Việt và `canonical` khác nhau tuỳ đường tạo.
+        // 📌 Không phát sự kiện ở đây: sản phẩm **vừa được tạo** ⇒ **chưa có** URL công khai nào để chuyển hướng.
+        if (!string.IsNullOrWhiteSpace(input.Slug))
+        {
+            var slugMoi = SinhSlug.Tu(input.Slug);
+
+            if (slugMoi.Length == 0)
+            {
+                throw new BusinessException(eCommerceConsts.ErrorCodes.Catalog.KhongSinhDuocSlug)
+                    .WithData("slugNguoiNhap", input.Slug)
+                    .WithData("lyDo", "Slug tự nhập không còn ký tự dùng được sau khi chuẩn hoá.");
+            }
+
+            // Kiểm trùng ngay khi tạo: DB vẫn là hàng rào cuối (`IX_CatProducts_TenantId_Slug` ⇒ `0026`).
+            if (await CoSlugKhacDungAsync(slugMoi, sanPham.Id))
+            {
+                throw new BusinessException(eCommerceConsts.ErrorCodes.Catalog.SlugDaTonTai)
+                    .WithData("slug", slugMoi)
+                    .WithData("lyDo", "Slug này đã được sản phẩm KHÁC dùng ⇒ URL công khai sẽ trùng.");
+            }
+
+            sanPham.DatSlug(slugMoi);
+        }
 
         await _productRepository.InsertAsync(sanPham, autoSave: true);
 
@@ -156,9 +252,24 @@ public class ProductAppService : ApplicationService, IProductAppService
 
         // 🚨 KHÔNG chạm vào `Code` (D2) — `UpdateProductDto` cố ý không có trường đó.
         sanPham.Name = input.Name;
-        sanPham.Slug = ChuanHoaSlug(input.Slug);
         sanPham.Description = input.Description;
         sanPham.BrandId = input.BrandId;
+
+        // 🚨 `CAT-003` ADR-05: **ĐỔI `Name` KHÔNG tự đổi slug** (làm vậy sẽ phá URL đã được index ⇒ mất SEO
+        // âm thầm). Nhưng nếu DTO **có** gửi slug thì đó là ý định **TƯỜNG MINH** của người dùng ⇒ áp dụng,
+        // và **BẮT BUỘC** đi qua cùng đường với `DatSlugAsync` (khoá phân tán + kiểm trùng + **PHÁT SỰ KIỆN**).
+        // 📌 Nếu đường này gán thẳng `sanPham.Slug = …` thì `ProductSlugChangedEto` **không** được phát
+        // ⇒ `WEB-002` không dựng được 301 ⇒ **link cũ 404** mà **không có lỗi nào** — đúng họ lỗi im lặng.
+        if (!string.IsNullOrWhiteSpace(input.Slug))
+        {
+            var slugCu = await ApDungSlugAsync(sanPham, input.Slug);
+
+            if (slugCu is not null)
+            {
+                Logger.LogInformation("ĐÃ ĐỔI SLUG (qua `UpdateAsync`) sản phẩm {Code}: {SlugCu} → {SlugMoi}. [SLUG-DA-DOI]",
+                    sanPham.Code, slugCu, sanPham.Slug);
+            }
+        }
 
         await _productRepository.UpdateAsync(sanPham, autoSave: true);
 
@@ -239,6 +350,156 @@ public class ProductAppService : ApplicationService, IProductAppService
 
     // ── Vòng đời (D5) ─────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// 🚨 **SINH / ĐỔI SLUG SEO** (`CAT-003` **ADR-04/ADR-05**) — xem hợp đồng ở
+    /// <see cref="IProductAppService.DatSlugAsync"/>.
+    ///
+    /// 🔒 **KHOÁ PHÂN TÁN theo slug** trước khi kiểm trùng: nếu chỉ kiểm bằng `SELECT` thì **hai request đồng
+    /// thời** cùng thấy *"chưa trùng"* ⇒ cả hai ghi ⇒ hàng rào DB nổ (`0026`) và một người dùng nhận lỗi
+    /// **đáng lẽ không cần**. 📌 Khoá này **không** thay thế unique index — nó chỉ làm ca **thường**
+    /// (hai người cùng lúc) trả **kết quả đúng**; ca **đồng thời thật** vẫn được DB chặn (hai lớp, như `INV-002`).
+    /// ⚠️ Tên khoá **KHÔNG** có tiền tố `ecommerce:` (`XC-003` §5.4 — `KeyPrefix` đã thêm).
+    /// </summary>
+    [Authorize(eCommerceConsts.Permissions.Products.Edit)]
+    public async Task<bool> DatSlugAsync(Guid id, string? slugTuNhap)
+    {
+        var sanPham = await _productRepository.GetAsync(id);
+
+        // 🔑 Người dùng TỰ NHẬP ⇒ dùng CHUNG đường với `UpdateAsync` (khoá + kiểm trùng + phát sự kiện).
+        //    🚨 `ApDungSlugAsync` **tự giành khoá** nên ở đây KHÔNG giữ khoá nữa (tránh khoá lồng nhau
+        //    trên cùng một tên khoá — hành vi của `TryAcquireAsync` lồng nhau là **không xác định**).
+        if (!string.IsNullOrWhiteSpace(slugTuNhap))
+        {
+            var slugCuTruoc = await ApDungSlugAsync(sanPham, slugTuNhap);
+
+            if (slugCuTruoc is null)
+            {
+                Logger.LogInformation("SLUG KHÔNG ĐỔI (idempotent): sản phẩm {Code} vẫn là {Slug}. [SLUG-KHONG-DOI]",
+                    sanPham.Code, sanPham.Slug);
+                return false;
+            }
+
+            await _productRepository.UpdateAsync(sanPham, autoSave: true);
+
+            Logger.LogInformation("ĐÃ ĐỔI SLUG sản phẩm {Code}: {SlugCu} → {SlugMoi}. [SLUG-DA-DOI]",
+                sanPham.Code, slugCuTruoc, sanPham.Slug);
+
+            return true;
+        }
+
+        await using var khoa = await _distributedLock.TryAcquireAsync("catalog:slug", TimeSpan.FromSeconds(ChoKhoaToiDaGiay))
+            ?? throw new BusinessException(eCommerceConsts.ErrorCodes.KhongGianhDuocKhoa)
+                .WithData("khoa", "catalog:slug").WithData("choGiay", ChoKhoaToiDaGiay);
+
+        // 🔑 Sinh TẤT ĐỊNH từ `Name` + hậu tố số khi trùng (`ADR-04`), kiểm trùng **trong cùng transaction**.
+        // 📌 Duyệt **tuần tự có `await`** — KHÔNG dùng `.Result`/`.GetAwaiter().GetResult()` (chặn luồng
+        // trong đường async ⇒ dễ deadlock, và nhiều provider DB cấm gọi đồng bộ). Thường chỉ 1 vòng.
+        var slugMoi = string.Empty;
+
+        foreach (var ungVien in SinhSlug.CacUngVien(sanPham.Name))
+        {
+            if (!await CoSlugKhacDungAsync(ungVien, sanPham.Id))
+            {
+                slugMoi = ungVien;
+                break;
+            }
+        }
+
+        if (slugMoi.Length == 0)
+        {
+            // 🚨 KHÔNG bịa `slug-{guid}` (ADR-04: Guid không có giá trị SEO) — ném lỗi để người dùng nhập tay.
+            throw new BusinessException(eCommerceConsts.ErrorCodes.Catalog.KhongSinhDuocSlug)
+                .WithData("productCode", sanPham.Code)
+                .WithData("name", sanPham.Name)
+                .WithData("lyDo", "Tên sản phẩm không sinh được slug (toàn ký tự đặc biệt) ⇒ cần nhập slug tay.");
+        }
+
+        // 🔑 `DatSlug` trả **slug CŨ** (hoặc `null` nếu KHÔNG đổi) — xem chú thích ở entity.
+        var slugCu = sanPham.DatSlug(slugMoi);
+
+        if (slugCu is null)
+        {
+            // Idempotent: gọi lặp ⇒ **không** ghi DB, **không** phát sự kiện (tránh dòng 301 "A → A" và vòng lặp 301).
+            Logger.LogInformation("SLUG KHÔNG ĐỔI (idempotent): sản phẩm {Code} vẫn là {Slug}. [SLUG-KHONG-DOI]",
+                sanPham.Code, slugMoi);
+            return false;
+        }
+
+        await _productRepository.UpdateAsync(sanPham, autoSave: true);
+
+        Logger.LogInformation("ĐÃ ĐỔI SLUG sản phẩm {Code}: {SlugCu} → {SlugMoi}. [SLUG-DA-DOI]",
+            sanPham.Code, slugCu ?? "(chưa có)", slugMoi);
+
+        await PhatSuKienDoiSlugAsync(sanPham, slugCu);
+
+        return true;
+    }
+
+    /// <summary>Slug này đã có **sản phẩm KHÁC** dùng chưa? 🔒 Bỏ qua chính sản phẩm đang sửa.</summary>
+    private async Task<bool> CoSlugKhacDungAsync(string slug, Guid boQuaId)
+        => await _productRepository.AnyAsync(x => x.Slug == slug && x.Id != boQuaId);
+
+    /// <summary>
+    /// 🔑 **ĐƯỜNG DUY NHẤT áp slug do NGƯỜI DÙNG gửi** (dùng chung cho `DatSlugAsync` và `UpdateAsync`):
+    /// giành khoá phân tán → chuẩn hoá → kiểm trùng **trong cùng transaction** → `DatSlug` → **phát sự kiện**.
+    ///
+    /// 📌 **VÌ SAO PHẢI GOM VỀ MỘT CHỖ:** nếu `UpdateAsync` tự gán `sanPham.Slug = …` thì sự kiện
+    /// `ProductSlugChangedEto` **không** được phát ⇒ `WEB-002` **không** dựng được **301** ⇒ khách vào link cũ
+    /// nhận **404**, và **không có lỗi nào** để lần ra (SEO mất âm thầm). Đây đúng loại "hai đường ghi cho cùng
+    /// một đại lượng" mà dự án đã trả giá (`XC-003` F1).
+    /// </summary>
+    /// <returns>Slug **CŨ** nếu slug thực sự đổi; `null` nếu **không đổi** (idempotent).</returns>
+    private async Task<string?> ApDungSlugAsync(Product sanPham, string slugNguoiNhap)
+    {
+        await using var khoa = await _distributedLock.TryAcquireAsync("catalog:slug", TimeSpan.FromSeconds(ChoKhoaToiDaGiay))
+            ?? throw new BusinessException(eCommerceConsts.ErrorCodes.KhongGianhDuocKhoa)
+                .WithData("khoa", "catalog:slug").WithData("choGiay", ChoKhoaToiDaGiay);
+
+        var slugMoi = SinhSlug.Tu(slugNguoiNhap);
+
+        if (slugMoi.Length == 0)
+        {
+            throw new BusinessException(eCommerceConsts.ErrorCodes.Catalog.KhongSinhDuocSlug)
+                .WithData("slugNguoiNhap", slugNguoiNhap)
+                .WithData("lyDo", "Slug tự nhập không còn ký tự dùng được sau khi chuẩn hoá.");
+        }
+
+        if (await CoSlugKhacDungAsync(slugMoi, sanPham.Id))
+        {
+            throw new BusinessException(eCommerceConsts.ErrorCodes.Catalog.SlugDaTonTai)
+                .WithData("slug", slugMoi)
+                .WithData("lyDo", "Slug này đã được sản phẩm KHÁC dùng ⇒ URL công khai sẽ trùng.");
+        }
+
+        var slugCu = sanPham.DatSlug(slugMoi);
+
+        if (slugCu is null)
+        {
+            return null;   // Idempotent — không phát sự kiện (tránh dòng 301 "A → A" và vòng lặp 301).
+        }
+
+        await PhatSuKienDoiSlugAsync(sanPham, slugCu);
+
+        return slugCu;
+    }
+
+    /// <summary>
+    /// Phát <see cref="Events.ProductSlugChangedEto"/> kèm **`OldSlug`** — trả lời **Q3 của `WEB-002`**.
+    /// ⚠️ Đây là **sự kiện MANG DỮ LIỆU**: `OldSlug` **chỉ** tồn tại trong sự kiện (DB **không** giữ lịch sử slug;
+    /// bảng `WebSlugRoutes` là của `WEB-002` — `CAT-003` ADR-06 cố ý không sở hữu).
+    /// ⇒ Khi có message broker, sự kiện này **phải** đi qua **outbox** (`XC-002`); hiện in-process là **nợ đã ghi**.
+    /// </summary>
+    private async Task PhatSuKienDoiSlugAsync(Product sanPham, string? slugCu)
+        => await _eventBus.PublishAsync(new Events.ProductSlugChangedEto
+        {
+            TenantId = sanPham.TenantId,
+            ProductId = sanPham.Id,
+            ProductCode = sanPham.Code,
+            OldSlug = slugCu,
+            NewSlug = sanPham.Slug,
+            OccurredAtUtc = DateTime.UtcNow
+        });
+
     [Authorize(eCommerceConsts.Permissions.Products.Publish)]
     public async Task PublishAsync(Guid id)
     {
@@ -315,9 +576,11 @@ public class ProductAppService : ApplicationService, IProductAppService
 
     // ── Nội bộ ────────────────────────────────────────────────────────────────
 
-    private static string? ChuanHoaSlug(string? slug)
-        => string.IsNullOrWhiteSpace(slug) ? null : slug.Trim().ToLowerInvariant();
-
+    // 🚨 ĐÃ XOÁ `ChuanHoaSlug(slug) => slug.Trim().ToLowerInvariant()` (16/10/2026, `CAT-003`).
+    // VÌ SAO XOÁ (chứ không để lại): nó **KHÔNG bỏ dấu tiếng Việt** ⇒ đường "tạo/cập nhật sản phẩm" cho ra
+    // slug `đường-đi` trong khi đường "tự sinh" (`SinhSlug.Tu`) cho ra `duong-di` ⇒ **HAI dạng URL** cho cùng
+    // một sản phẩm tuỳ theo đường ghi, và `canonical`/`sitemap` sẽ trỏ một dạng còn khách vào dạng kia.
+    // 📌 Đây đúng họ lỗi "hai đường ghi cho cùng một đại lượng": để lại hàm cũ thì người sau **sẽ** dùng nó.
     private static ProductDto ToDto(Product sp, IReadOnlyCollection<ProductVariant> bienThe) => new()
     {
         Id = sp.Id,

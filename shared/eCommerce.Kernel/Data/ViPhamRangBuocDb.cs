@@ -93,6 +93,18 @@ public static class ViPhamRangBuocDb
         ["CK_ReconRuns_SoLechVuot_KhongVuotTong"] =
             new(MaChung, "Lượt đối soát có số lệch VƯỢT NGƯỠNG lớn hơn TỔNG số lệch ⇒ dữ liệu không hợp lệ.", false),
 
+        // ── CATALOG: SLUG là khoá URL công khai (`CAT-003` ADR-03, 16/10/2026) ───────────────────
+        // 📌 Ràng buộc này CHẶN MỘT HÀNH VI HỢP LỆ VỀ NGHIỆP VỤ: hai người (hoặc hai request đồng thời) cùng
+        // chọn một slug ⇒ trước đây là **HTTP 500** ⇒ client **không phân biệt** *"slug đã dùng"* với
+        // *"hệ thống hỏng"* ⇒ **gửi lại** ⇒ vòng lặp (đúng lý do Phụ lục B tồn tại).
+        // 🔑 Mã riêng `eCommerce:Catalog:0026` (KHÔNG mượn `0025` = *"mã danh mục không hợp lệ"*):
+        // ca này cần chỉ dẫn *"chọn slug KHÁC"*, không phải *"sửa mã sản phẩm"*.
+        // ⚠️ Đây cũng là ca NẶNG của lỗi C4/F1: `TenantId` có thể `NULL` ⇒ thiếu `NULLS NOT DISTINCT` là
+        // index **mất tác dụng im lặng** (xem chú thích migration `Cat003_ProductSlug_Unique`).
+        ["IX_CatProducts_TenantId_Slug"] =
+            new("eCommerce:Catalog:0026",
+                "Slug này ĐÃ được sản phẩm khác dùng ⇒ URL công khai sẽ trùng. Chọn slug khác.", true),
+
         // ── ĐỐI SOÁT (`REC-001`) ────────────────────────────────────────────────────────────────
         // 📌 Ràng buộc này CHẶN MỘT HÀNH VI HỢP LỆ VỀ NGHIỆP VỤ: job chạy lại / hai instance cùng quét
         // (khoá phân tán hết hạn) / đường ghi tay đều có thể chốt **cùng một cặp `(kho, SKU)`** trong một lượt.
