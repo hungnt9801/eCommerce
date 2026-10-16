@@ -1113,3 +1113,113 @@ Phiên bản đầu: `CustomerAppService` **hiện thực luôn** `ICustomerDire
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.2 | 16/10/2026 | *(agent, session GĐ1)* | **§16 — LÁT CẮT 1**: **module `Customers` MỚI** (4 project) · `Customer` + `CustomerGroup` · **máy trạng thái NÉM LỖI** (`ADR-04`) · **nâng cấp vãng lai** (`ADR-07`, một-tài-khoản-một-khách) · **`PiiMasker`** (`ADR-11`) · **`ICustomerDirectory`** + lớp nội bộ `CustomerDirectory` (`ADR-12`) · **3 unique index `NULLS NOT DISTINCT`** (nhóm · tài khoản · idempotency) · mã lỗi `0001…0008` · permission `eCommerce.Customers` · **+43 unit test** (889 tổng). Ghi **§16.2** (hợp đồng nội bộ **không** được để ABP sinh endpoint — đo được `POST` cho method đọc) · **§16.4** (nợ: **sổ địa chỉ BỊ CHẶN** vì `Address` chưa tồn tại · chưa kiểm chứng HTTP · **chưa nối đường bán hàng**) |
+
+---
+
+## 20. ✅ **LÁT CẮT 4 — XUẤT DỮ LIỆU CÁ NHÂN** (17/10/2026) — *quyền truy cập của chủ thể, Luật **91/2025/QH15***
+
+### 20.1 🔑 **Vì sao — và vì sao nó KHÔNG chỉ là "thêm một endpoint"**
+
+Luật **91/2025/QH15** cho chủ thể dữ liệu quyền **TRUY CẬP** (biết mình đang bị lưu gì) và **LẤY BẢN SAO**.
+📌 Một hệ thống **không** làm được điều đó thì **không tuân thủ** — và 🔒 **không thể "chữa" bằng cách ghi trong
+tài liệu**: **không có đường gọi** nghĩa là **không có tính năng**.
+
+📌 Trước lát cắt này, `KhachHangController` **đã ghi rõ** trong chú thích: *"nếu cần xuất thì đó phải là một
+tính năng riêng có kiểm soát (**chưa làm — nợ đã ghi**)"*. ✅ Nay **đã làm**, và chú thích đó **đã được sửa**
+(🔑 một chú thích nói *"chưa làm"* khi đã làm là **chú thích nói ngược sự thật** — bài học §18.6 #3).
+
+### 20.2 🚨 **HAI QUYẾT ĐỊNH THIẾT KẾ — cả hai đều có lý do**
+
+**① QUYỀN = `Customers.Manage`, KHÔNG phải `Customers.Default`.**
+🔑 `Default` là quyền **XEM HỒ SƠ** (danh sách, chi tiết). Còn đây là **XUẤT TOÀN BỘ PII CỦA MỘT NGƯỜI RA MỘT TỆP**
+— 📌 đó là **mức độ tiếp cận khác hẳn**: một người có thể được phép *"xem khách trong màn hình"* mà **không**
+nên được phép *"tải cả hồ sơ về máy mình"*.
+🔒 Tách quyền là **nguyên tắc tối thiểu đặc quyền** — và nó **cũng** là điều luật đòi hỏi (*"chỉ người có
+trách nhiệm"*). ⚠️ Nếu dùng `Default` thì **mọi** nhân viên đọc được danh sách khách cũng **xuất được** — 📌 và
+**không ai biết**, vì cả hai đều là *"xem khách"*.
+
+**② MỖI DÒNG CÓ `Nguon` VÀ `LyDo`.**
+🔑 Một bản xuất **không có nguồn** thì **không kiểm chứng được**, và người vận hành **không trả lời được** câu
+hỏi *"sao các anh có cái này?"* — 📌 mà đó **chính là** câu hỏi luật bắt phải trả lời (**mục đích xử lý**).
+➕ Nên `XuatDuLieuCaNhanDto` **không** tái dùng `CustomerDto`: 🔑 `CustomerDto` là DTO **vận hành** — nó
+**không** nói *"trường này ở đâu ra"*, *"vì sao hệ thống giữ nó"*.
+
+### 20.3 ✅ **Cấu trúc bản xuất**
+
+| Phần | Nội dung |
+|---|---|
+**Định danh bản xuất** | `CustomerId` · `TenKhach` (⚠️ một bản xuất **không tên chủ thể** là một bản xuất **không kiểm chứng được**) · `XuatLucUtc` · `NguoiXuat` (🔒 trả lời *"ai đã xem dữ liệu của tôi"*) |
+⛔ **`CanhBao`** | **BẮT BUỘC** — 🔒 bản xuất chứa **dữ liệu cá nhân**, phải xử lý như **tài liệu mật** |
+**10 dòng dữ liệu** | Mã khách · Họ tên · Email · SĐT · Tài khoản đăng nhập · Trạng thái · Nhóm khách · Giá trị vòng đời · **Ghi chú nội bộ** · Ngày tạo — mỗi dòng có `Nguon` + `LyDo` + `LaDuLieuCaNhan` |
+
+🔑 **HAI CHI TIẾT ĐÁNG CHÚ Ý:**
+<list type="bullet">
+  <item>⚠️ **Trường TRỐNG vẫn phải có DÒNG** (`GiaTri = null`): 🔒 *"không có"* và *"không hiện"* là **hai điều
+    khác nhau** với người đang hỏi *"các anh giữ gì về tôi"*;</item>
+  <item>⚠️ **`Ghi chu noi bo` được GHI RÕ là ghi chú của nhân viên**, không phải thông tin khách cung cấp —
+    📌 nếu không nói rõ thì khách đọc một câu do nhân viên viết cho nhân viên và **hiểu sai**; và 🔑 đó cũng là
+    loại dữ liệu **dễ bị lợi dụng nhất**.</item>
+</list>
+
+### 20.4 ✅ **Web UI: tải về dưới dạng TỆP, không render vào trang**
+
+`GET /KhachHang/XuatDuLieu/{id}` (🔑 `GET` vì thao tác **chỉ đọc** — đúng ngữ nghĩa HTTP; 🔒 **quyền nằm ở
+`CustomerAppService`**, không phải ở controller) trả **tệp JSON tải về**.
+
+🔒 **VÌ SAO LÀ TỆP (không phải trang HTML):** một trang HTML chứa PII sẽ bị **cache**, **in**, **chụp màn hình**,
+và **ở lại** trong lịch sử trình duyệt. 📌 Một tệp tải về thì người dùng **biết mình đang giữ gì** — 🔑 và đó
+đúng là điều luật muốn: chủ thể **kiểm soát bản sao**.
+➕ Tên tệp có tiền tố `xuat-du-lieu-ca-nhan-` + mã khách ⇒ 🔒 người dùng **nhận ra ngay** đây là tài liệu mật.
+➕ `WriteIndented` + `UnsafeRelaxedJsonEscaping` ⇒ 🔑 tệp **đọc được bằng mắt** và **giữ nguyên dấu tiếng Việt**
+(⚠️ escape mặc định biến `Đ` thành `\u0110` — đúng nhưng **khó đọc** cho người không phải lập trình viên).
+
+### 20.5 ✅ **KIỂM CHỨNG — 12/12 CA DB + HTTP + LOG THẬT, và 5 CA MỚI TRONG E2E THƯỜNG TRÚ**
+
+**Probe API (12/12 ĐẠT):**
+| Ca | Đo được |
+|---|---|
+**A1** tiền đề | Gieo 1 khách có Email/SĐT/Note (khẳng định bằng `select`) |
+**B1** | Lấy được token — ⚠️ **kiểm trước** vì `401` là lỗi **đăng nhập**, không phải lỗi sản phẩm |
+**C1** | `POST /api/app/customer/xuat-du-lieu-ca-nhan/{id}` ⇒ **`200`** |
+**C2** | Có `customerId` + `tenKhach` |
+**C3** | Có `xuatLucUtc` + `nguoiXuat` (**vết kiểm toán**) |
+**C4** | Có `canhBao` chứa **`TAI LIEU MAT`** + **`91/2025/QH15`** |
+**C5** | **MỌI** dòng có `nguon` + `lyDo` (`soDong=10`) |
+**C6** | Trả về **đủ PII thật**: Email + SĐT |
+**C7** | **4** dòng đánh dấu `LaDuLieuCaNhan` |
+**C8** | Trường **trống** vẫn có dòng (không bị bỏ) |
+**D1** | Log có neo **`[CUS-XUAT-DU-LIEU-CA-NHAN]`** (có vết) |
+🚨 **D2** | **Log KHÔNG chứa PII thô** (`emailTho=0` · `sdtTho=0`) — 🔒 `ADR-11`: ghi PII thô vào log nghĩa là **bản sao thứ hai** của dữ liệu cá nhân ở một nơi **không ai kiểm soát** |
+
+**5 ca mới trong `kiem-e2e.ps1` (E2E thường trú):** **D7** nút *"Xuất dữ liệu"* có trên trang ·
+**D7a** `GET /KhachHang/XuatDuLieu/{id}` = **`200`** (🔑 đo **đường đi thật của người dùng** qua cookie phiên) ·
+**D7b** tệp chứa **PII thật** · **D7c** mọi dòng có `nguon`+`lyDo` · **D7d** tệp có **cảnh báo tài liệu mật**.
+➡️ **E2E: 16/16 ĐẠT** · **8 bước** · `exit 0` · **150.5s**.
+
+### 20.6 🐞 **Lỗi của tôi — và một lỗi lặp lại LẦN THỨ TƯ**
+
+| # | Lỗi | Bài học |
+|---|---|---|
+🚨 **1** | **Viết `INSERT` bằng THOÁT NHÁY** trong probe ⇒ **`ParserError`** | 🔒 **LẦN THỨ TƯ** của họ lỗi này (§25.5 · §26.5 #1 · §32.9 #2 · lượt này). ✅ Chữa: **here-string**. 📌 Và tôi lại **viết here-string LỒNG TRONG here-string** ⇒ `ParserError` lần nữa ⇒ 🔑 phải **ghi tệp bằng công cụ sửa tệp** |
+🚨 **2** | **Dùng mật khẩu làm client secret** ⇒ `invalid_client` (`ID2055`) ⇒ probe **dừng** | 🔑 **HAI chuỗi KHÁC NHAU:** `AdminPassword = "1q2w3E*"` (chữ **`E`** hoa) nhưng `ClientSecret = "1q2w3e*"` (chữ **`e`** thường). 📌 **Lần thứ HAI** của họ lỗi *"sai một ký tự trong thông tin đăng nhập ⇒ 401/invalid_client ⇒ suýt kết luận sai về sản phẩm"* (§20.6 #1 · lượt này) |
+**3** | **`$home` là biến CHỈ-ĐỌC** (E2E, §32) | 🔒 **LẦN THỨ BA** của cùng một lỗi ⇒ 📌 **ghi vào tài liệu KHÔNG ĐỦ** |
+
+🔑 **ĐIỂM CHUNG CỦA #1 VÀ #2:** cả hai đều là **lỗi của PHÉP ĐO, không phải của SẢN PHẨM** — và 🔒 cả hai đều
+có thể dẫn tới **kết luận sai về sản phẩm**. ✅ Cách chặn đã có: **kiểm token trước** (B1) và **khẳng định
+phép tiêm đã xảy ra** (`ham-tiem.ps1`) ⇒ 📌 nhờ vậy tôi **không** kết luận sai lần nào trong lượt này.
+
+### 20.7 ⏳ NỢ
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+**1** | 🚨 **Chưa có xuất dữ liệu cho CHÍNH CHỦ tự làm** (self-service) | 📌 Hiện luồng là **nhân viên hỗ trợ xuất hộ**. 🔑 Luật cho quyền đó, nhưng để **chủ thể tự tải** cần **đăng nhập của khách** — hệ thống **chưa có** cổng khách hàng |
+**2** | **Chưa có XOÁ dữ liệu** (quyền được xoá) | ⚠️ Luật cũng có quyền này. 📌 Xoá khó hơn xuất: **sổ cái append-only** và **chứng từ kế toán** có nghĩa vụ lưu ⇒ 🔒 cần **thiết kế** (xoá gì, giữ gì, ẩn danh hoá ra sao), **không** thể làm vội |
+**3** | **Bản xuất chưa gồm dữ liệu từ MODULE KHÁC** | 🚨 Chưa gồm **đơn hàng**, **địa chỉ giao**, **lịch sử thanh toán** — 🔑 mà đó là **phần lớn** dữ liệu cá nhân thật. 📌 Nợ **lớn** đã ghi |
+**4** | **Chưa có bản ghi kiểm toán RIÊNG cho mỗi lần xuất** | ⚠️ Hiện chỉ có **dòng log** (`Warning`). 🔑 *"ai đã xuất dữ liệu của tôi"* là câu hỏi luật ⇒ 📌 nên là **bảng** (tra được), không phải **log** (đọc bằng mắt) |
+**5** | **Chưa có sổ địa chỉ** (`CUS-001`) | Entity `Address` **không tồn tại** — **nợ chặn** |
+
+### 20.8 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.1 | 17/10/2026 | *(agent, session GĐ1)* | **§20 — LÁT CẮT 4: XUẤT DỮ LIỆU CÁ NHÂN** (quyền truy cập của chủ thể, Luật **91/2025/QH15**): thêm **`XuatDuLieuCaNhanDto`** + **`DongDuLieuCaNhanDto`** (`Truong` · `GiaTri` · **`Nguon`** · **`LyDo`** · `LaDuLieuCaNhan`) + **`CustomerAppService.XuatDuLieuCaNhanAsync(customerId)`** (route thật: `POST /api/app/customer/xuat-du-lieu-ca-nhan/{customerId}`) + **`GET /KhachHang/XuatDuLieu/{id}`** (tải **tệp JSON**) + nút trên `/KhachHang`. 🔑 **VÌ SAO KHÔNG CHỈ LÀ "THÊM ENDPOINT":** Luật cho chủ thể quyền **TRUY CẬP** và **LẤY BẢN SAO** — 📌 hệ thống **không** làm được thì **không tuân thủ**, và 🔒 **không thể "chữa" bằng tài liệu** (*"không có đường gọi"* = *"không có tính năng"*). 🚨 **HAI QUYẾT ĐỊNH THIẾT KẾ:** ① **quyền = `Customers.Manage`** (không phải `Default`) — 🔑 `Default` là *"xem hồ sơ"*, còn đây là *"xuất toàn bộ PII của một người ra một tệp"*: **mức độ tiếp cận khác hẳn**; 📌 nếu dùng `Default` thì **mọi** nhân viên đọc danh sách khách cũng **xuất được** và **không ai biết** (cả hai đều là *"xem khách"*); ② **mỗi dòng có `Nguon` + `LyDo`** — 🔑 bản xuất không có nguồn thì **không kiểm chứng được**, và *"sao các anh có cái này?"* **chính là** câu hỏi luật bắt trả lời (**mục đích xử lý**); 📌 nên **không** tái dùng `CustomerDto` (DTO **vận hành**, không nói *"trường này ở đâu ra"*). ➕ **`XuatLucUtc` + `NguoiXuat`** (🔒 trả lời *"ai đã xem dữ liệu của tôi"*) · ⛔ **`CanhBao` tài liệu mật BẮT BUỘC** · ⚠️ **trường TRỐNG vẫn có DÒNG** (*"không có"* ≠ *"không hiện"*) · ⚠️ **`Ghi chu noi bo` ghi RÕ là của nhân viên** (📌 không thì khách **hiểu sai**; 🔑 và đó là loại dữ liệu **dễ bị lợi dụng nhất**). ✅ **Web UI trả TỆP, không render vào trang:** 🔒 trang HTML chứa PII sẽ bị **cache/in/chụp màn hình/ở lại lịch sử trình duyệt**; 📌 tệp tải về thì người dùng **biết mình đang giữ gì** (đúng điều luật muốn); ➕ tên tệp có tiền tố `xuat-du-lieu-ca-nhan-` · `WriteIndented` + `UnsafeRelaxedJsonEscaping` (🔑 đọc được bằng mắt, **giữ dấu tiếng Việt**). ✅ **KIỂM CHỨNG 12/12 ca DB + HTTP + LOG thật** (gồm 🚨 **D2: log KHÔNG chứa PII thô** — 🔒 `ADR-11`: ghi PII thô vào log là **bản sao thứ hai** ở nơi **không ai kiểm soát**) ➕ **5 ca mới trong E2E thường trú** (D7/D7a/D7b/D7c/D7d — 🔑 đo **đường đi thật của người dùng** qua cookie phiên) ⇒ **E2E 16/16** · **8 bước** · `exit 0` · **150.5s** · 1155 unit · 38 integration · mermaid 197/0 · DB 21/21 · test cổng 17/17. 🐞 **BA LỖI CỦA TÔI:** (1) 🚨 **viết `INSERT` bằng THOÁT NHÁY** ⇒ `ParserError` — 🔒 **LẦN THỨ TƯ** của họ lỗi này (§25.5 · §26.5 #1 · §32.9 #2 · lượt này), ✅ chữa bằng here-string, ⚠️ **rồi lại viết here-string LỒNG TRONG here-string** ⇒ `ParserError` lần nữa ⇒ 🔑 phải ghi tệp bằng **công cụ sửa tệp**; (2) 🚨 **dùng MẬT KHẨU làm CLIENT SECRET** ⇒ `invalid_client` (`ID2055`) ⇒ probe **dừng** — 🔑 **HAI chuỗi khác nhau**: `AdminPassword = "1q2w3E*"` (**`E`** hoa) nhưng `ClientSecret = "1q2w3e*"` (**`e`** thường) ⇒ 📌 **LẦN THỨ HAI** của họ lỗi *"sai một ký tự trong thông tin đăng nhập ⇒ suýt kết luận sai về sản phẩm"*; (3) **`$home` là biến CHỈ-ĐỌC** — 🔒 **LẦN THỨ BA** ⇒ 📌 **ghi vào tài liệu KHÔNG ĐỦ**. 🔑 **ĐIỂM CHUNG #1 VÀ #2: cả hai là lỗi của PHÉP ĐO, KHÔNG của SẢN PHẨM** — và cả hai đều có thể dẫn tới **kết luận sai về sản phẩm**; ✅ **nhờ kiểm token trước (B1) và khẳng định phép tiêm đã xảy ra (`ham-tiem.ps1`) mà tôi KHÔNG kết luận sai lần nào trong lượt này**. Ghi **§20.7** (nợ: 🚨 **chưa có self-service cho chính chủ** — cần **cổng khách hàng**, hệ thống chưa có · **chưa có XOÁ dữ liệu** (⚠️ luật cũng có quyền này; 📌 xoá **khó hơn** xuất vì **sổ cái append-only** + **chứng từ kế toán** có nghĩa vụ lưu ⇒ 🔒 cần **thiết kế**, không thể làm vội) · 🚨 **bản xuất CHƯA gồm dữ liệu từ MODULE KHÁC** (**đơn hàng**, **địa chỉ giao**, **lịch sử thanh toán** — 🔑 mà đó là **phần lớn** dữ liệu cá nhân thật, **nợ LỚN**) · **chưa có bảng kiểm toán riêng cho mỗi lần xuất** (hiện chỉ **log**; 🔑 *"ai đã xuất dữ liệu của tôi"* là câu hỏi luật ⇒ nên là **bảng tra được**) · **chưa có sổ địa chỉ** (**nợ chặn**)) |

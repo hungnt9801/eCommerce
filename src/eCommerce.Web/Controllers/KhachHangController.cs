@@ -42,8 +42,9 @@ public class KhachHangController : Controller
     public async Task<IActionResult> Index(string? tuKhoa = null)
     {
         // ⚠️ `toiDa: 100` là **trần có chủ ý**: hồ sơ khách là dữ liệu cá nhân ⇒ 🔒 **không** kéo cả bảng
-        // về một trang. 📌 Người vận hành cần **tra cứu**, không cần **xuất toàn bộ** — và nếu cần xuất thì
-        // đó phải là một **tính năng riêng có kiểm soát** (chưa làm — nợ đã ghi).
+        // về một trang. 📌 Người vận hành cần **tra cứu**, không cần **xuất toàn bộ** — muốn xuất thì phải
+        // đi qua **một hồ sơ cụ thể** (xem `XuatDuLieu` ngay dưới): 🔑 xuất **từng người** là việc luật cho
+        // phép và có kiểm soát; xuất **cả bảng** thì **không** ai kiểm soát được.
         var ds = await _khachHang.GetDanhSachAsync(
             keyword: string.IsNullOrWhiteSpace(tuKhoa) ? null : tuKhoa.Trim(),
             toiDa: 100);
@@ -51,6 +52,38 @@ public class KhachHangController : Controller
         ViewBag.TuKhoa = tuKhoa;
 
         return View(ds);
+    }
+
+    /// <summary>
+    /// `GET /KhachHang/XuatDuLieu/{id}` — 🚨 **XUẤT DỮ LIỆU CÁ NHÂN CỦA MỘT KHÁCH** (Luat **91/2025/QH15**).
+    ///
+    /// **VÌ SAO LÀ `GET` NHƯNG VẪN AN TOÀN:** đây là thao tác **CHỈ ĐỌC** (không đổi trạng thái) ⇒ 📌 `GET` là
+    /// đúng ngữ nghĩa HTTP. 🔒 **Và quyền nằm ở `CustomerAppService.XuatDuLieuCaNhanAsync`** (`Customers.Manage`)
+    /// — lớp bảo vệ **thật**, không phải ở đây.
+    ///
+    /// ⚠️ **TẢI VỀ DƯỚI DẠNG TỆP JSON** (`File`) chứ **không** render vào trang: 🔑 một trang HTML chứa PII sẽ
+    /// bị **cache**, **in**, **chụp màn hình**, và **ở lại** trong lịch sử trình duyệt. 📌 Một tệp tải về thì
+    /// người dùng **biết mình đang giữ gì** — và 🔒 đó đúng là điều luật muốn (chủ thể **kiểm soát** bản sao).
+    /// ➕ Tên tệp có **mã khách** để phân biệt khi xuất nhiều người.
+    /// </summary>
+    /// <param name="id">Khách cần xuất.</param>
+    public async Task<IActionResult> XuatDuLieu(Guid id)
+    {
+        var duLieu = await _khachHang.XuatDuLieuCaNhanAsync(id);
+
+        // 🔑 `JsonSerializerOptions` có `WriteIndented` ⇒ 🔒 tệp **đọc được bằng mắt** (chu the du lieu khong
+        // phai lap trinh vien). ⚠️ Va `Encoder` mac dinh se escape tieng Viet thanh `\uXXXX` ⇒ 📌 kho doc;
+        // dung `UnsafeRelaxedJsonEscaping` de **giu nguyen dau** (day la TEP TAI VE, khong phai HTML ⇒ an toan).
+        var json = System.Text.Json.JsonSerializer.Serialize(duLieu, new System.Text.Json.JsonSerializerOptions
+        {
+            WriteIndented = true,
+            Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+        });
+
+        // 📌 Tien to `xuat-du-lieu-ca-nhan-` de nguoi dung **nhan ra ngay** day la tai lieu mat.
+        var tenTep = $"xuat-du-lieu-ca-nhan-{id:N}.json";
+
+        return File(System.Text.Encoding.UTF8.GetBytes(json), "application/json", tenTep);
     }
 
     /// <summary>

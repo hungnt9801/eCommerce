@@ -164,6 +164,8 @@ delete from "CusCustomers" where "Id" = 'e0000000-0000-0000-0000-0000000000e1';
 
         # 🚨 **KHANG DINH PHEP TIEM DA XAY RA** (bai hoc §25.5) — 🔑 `CusCustomers` co `IsDeleted` nen phai
         # keo theo cot do, ⚠️ va ten cot phai la **THAT** (📌 doan ten cot da tra gia **BA LAN**).
+        # ➕ Email/sdt o day duoc ca **D7b** doi chieu ⇒ 📌 chung phai la gia tri **CO THAT trong DB**,
+        # khong phai chuoi minh tu nghi ra (🔑 neu khong thi D7b se do vi **ly do sai**).
         TiemVaoDb -Sql @'
 insert into "CusCustomers" ("Id","TenantId","Name","Email","Phone","Status","ExtraProperties","ConcurrencyStamp","CreationTime","IsDeleted")
 values ('e0000000-0000-0000-0000-0000000000e1',null,'K97E2E Khach Probe','k97e2e@example.invalid','0900000001',1,'{}','k97e2e1',now(),false);
@@ -253,6 +255,40 @@ select count(*)::text from "CusCustomers" where "Id" = 'e0000000-0000-0000-0000-
     # 🔑 **D5 — FORM HANH DONG voi DU LIEU THAT.** ⚠️ Chi render khi co dong ⇒ 🔑 day la ly do phai **gieo
     # du lieu TRUOC** (quy tac ③).
     Kq 'D5 /KhachHang co NUT HANH DONG (voi du lieu that)' ($htmlKh -match 'Chan|MoChan') 'nut chan/go chan'
+
+    # 🚨 **D7 — XUAT DU LIEU CA NHAN (Luat 91/2025/QH15).** 🔑 Quyen **TRUY CAP** cua chu the — neu nut nay
+    # khong co thi tinh nang **khong ton tai** doi voi nguoi dung (📌 *"co API"* KHONG phai *"co tinh nang"*).
+    $coNutXuat = $htmlKh -match 'XuatDuLieu'
+    Kq 'D7 /KhachHang co NUT "Xuat du lieu" (Luat 91/2025/QH15)' $coNutXuat 'loi vao tinh nang xuat'
+
+    if ($coNutXuat) {
+        # ① Tai TEP THAT qua cookie phien ⇒ 🔑 do **duong di THAT cua nguoi dung**, khong phai goi API truc tiep.
+        $tepXuat = Join-Path $thuMucTam 'xuat-du-lieu.json'
+        $maXuat = ([string](& curl.exe -s -b $jar -c $jar -o $tepXuat -w '%{http_code}' ($web + "/KhachHang/XuatDuLieu/$idKhach"))).Trim()
+
+        $jsonXuat = if (Test-Path $tepXuat) { [System.IO.File]::ReadAllText($tepXuat, [Text.Encoding]::UTF8) } else { '' }
+
+        Kq 'D7a GET /KhachHang/XuatDuLieu/{id} tra 200' ($maXuat -eq '200') ("HTTP " + $maXuat)
+
+        if ($maXuat -eq '200') {
+            # ② 🔒 **KHANG DINH NOI DUNG** — 📌 mot tep 200 ma **rong** thi tinh nang **khong** hoat dong,
+            # nhung `HTTP 200` **mot minh** se bao **DAT** (dung loai *"XANH vi LY DO SAI"*).
+            Kq 'D7b tep xuat chua PII THAT (email + sdt)' `
+                (($jsonXuat -match 'k97e2e@example.invalid') -and ($jsonXuat -match '0900000001')) `
+                'email + sdt cua khach probe'
+
+            # 🔑 Moi dong PHAI co `nguon` + `lyDo` — 📌 ban xuat khong co nguon thi **khong kiem chung duoc**,
+            # va nguoi van hanh khong tra loi duoc *"sao cac anh co cai nay?"* (muc dich xu ly).
+            Kq 'D7c MOI dong co `nguon` + `lyDo` (kiem chung duoc)' `
+                (($jsonXuat -notmatch '"nguon":\s*""') -and ($jsonXuat -notmatch '"lyDo":\s*""')) `
+                'khong co dong nao thieu nguon/lyDo'
+
+            # 🔒 Canh bao **tai lieu mat** phai co TRONG CHINH TEP — 📌 khong chi trong tai lieu ky thuat.
+            Kq 'D7d tep xuat co CANH BAO "tai lieu mat" + can cu luat' `
+                (($jsonXuat -match 'TAI LIEU MAT') -and ($jsonXuat -match '91/2025/QH15')) `
+                'canh bao nam TRONG tep nguoi dung nhan'
+        }
+    }
 
     # ── ⑥ MENU HAI TANG (tach khoi menu TRUOC khi kiem — quy tac ④) ─────────────────────────
     # 🔒 **TACH KHOI MENU THEO NEO `aria-label`** — ⚠️ neu kiem `href="#"` tren **CA TRANG** thi se bat

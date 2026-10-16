@@ -222,6 +222,156 @@ public class CustomerAppService : ApplicationService
         return ToDto(khach);
     }
 
+    // ── XUAT DU LIEU CA NHAN (quyen truy cap cua chinh chu) ─────────────────────────────────────
+
+    /// <summary>
+    /// 🚨 **XUAT TOAN BO DU LIEU CA NHAN CUA MOT KHACH** — quyen **TRUY CAP** cua chu the
+    /// (Luat **91/2025/QH15**). Xem `XuatDuLieuCaNhanDto` de biet vi sao **khong** chi tra `CustomerDto`.
+    ///
+    /// **HAI QUYET DINH THIET KE, VA CA HAI DEU CO LY DO:**
+    ///
+    /// **① QUYEN = `Customers.Manage`, KHONG phai `Customers.Default`.**
+    /// 🔑 `Default` la quyen **XEM HO SO** (danh sach, chi tiet). Con day la **XUAT TOAN BO PII CUA MOT NGUOI
+    /// RA MOT TEP** — 📌 do la **muc do tiep can khac han**: mot nguoi co the duoc phep *"xem khach trong man
+    /// hinh"* ma **khong** nen duoc phep *"tai ca ho so ve may minh"*. 🔒 Tach quyen la **nguyen tac toi thieu
+    /// dac quyen** — va no **cung** la dieu luat doi hoi (*"chi nguoi co trach nhiem"*).
+    /// ⚠️ Neu dung `Default` thi moi nhan vien doc duoc danh sach khach cung **xuat duoc** — 📌 va **khong ai
+    /// biet**, vi ca hai deu la *"xem khach"*.
+    ///
+    /// **② MOI DONG CO `Nguon` VA `LyDo`.** 🔑 Mot ban xuat **khong co nguon** thi **khong kiem chung duoc**,
+    /// va nguoi van hanh **khong tra loi duoc** cau hoi *"sao cac anh co cai nay?"* — 📌 ma do chinh la cau hoi
+    /// luat bat phai tra loi (muc dich xu ly).
+    ///
+    /// 🔒 **VA KHONG GHI PII VAO LOG:** `MoTaAnToan` chi tra **email/sdt da che** (`ADR-11`). 📌 Ghi PII tho
+    /// vao log nghia la **ban sao thu hai** cua du lieu ca nhan nam o mot noi **khong ai kiem soat** — dung cai
+    /// ma ban xuat nay sinh ra de tranh.
+    /// </summary>
+    /// <param name="customerId">Khach can xuat.</param>
+    [Authorize(eCommerceConsts.Permissions.Customers.Manage)]
+    public async Task<XuatDuLieuCaNhanDto> XuatDuLieuCaNhanAsync(Guid customerId)
+    {
+        var khach = await _khachRepository.FindAsync(customerId)
+            ?? throw new BusinessException(CustomerErrorCodes.KhongTimThayKhach)
+                .WithData("customerId", customerId)
+                .WithData("lyDo", "Khach KHONG ton tai ⇒ khong co du lieu ca nhan nao de xuat.");
+
+        // 🔑 **NGUOI XUAT:** uu tien TEN HIEN THI, roi TEN DANG NHAP, cuoi cung la mot chuoi **noi ro**
+        // (⚠️ khong de trong: mot vet kiem toan rong la mot vet **vo dung**).
+        var nguoiXuat = CurrentUser.Name ?? CurrentUser.UserName ?? "(khong xac dinh duoc nguoi xuat)";
+
+        var dto = new XuatDuLieuCaNhanDto
+        {
+            CustomerId = khach.Id,
+            TenKhach = khach.Name,
+            XuatLucUtc = DateTime.UtcNow,
+            NguoiXuat = nguoiXuat,
+
+            // ⛔ **CANH BAO BAT BUOC** — 🔒 tep nay la **tai lieu mat**.
+            CanhBao = "BAN XUAT CHUA DU LIEU CA NHAN (Luat 91/2025/QH15). " +
+                      "Phai duoc xu ly nhu TAI LIEU MAT: khong gui qua kenh khong ma hoa, " +
+                      "khong luu o noi khong kiem soat, va phai xoa khi da giao cho chu the.",
+
+            CacDong =
+            [
+                // 🔑 **MOI DONG CO NGUON + LY DO.** 📌 Thu tu: dinh danh → lien he → nghiep vu.
+                new()
+                {
+                    Truong = "Ma khach",
+                    GiaTri = khach.Id.ToString(),
+                    Nguon = "CusCustomers.Id",
+                    LyDo = "Dinh danh khach trong he thong (moi ho so, don hang, giao dich deu tro ve ma nay).",
+                    LaDuLieuCaNhan = false
+                },
+                new()
+                {
+                    Truong = "Ho ten",
+                    GiaTri = khach.Name,
+                    Nguon = "CusCustomers.Name",
+                    LyDo = "Goi ten khach khi lien he va tren hoa don/chung tu.",
+                    LaDuLieuCaNhan = true
+                },
+                new()
+                {
+                    Truong = "Email",
+                    GiaTri = khach.Email,
+                    Nguon = "CusCustomers.Email",
+                    LyDo = "Gui xac nhan don hang, hoa don dien tu, va ho tro khach.",
+                    LaDuLieuCaNhan = true
+                },
+                new()
+                {
+                    Truong = "So dien thoai",
+                    GiaTri = khach.Phone,
+                    Nguon = "CusCustomers.Phone",
+                    LyDo = "Lien he giao hang va ho tro khach.",
+                    LaDuLieuCaNhan = true
+                },
+                new()
+                {
+                    Truong = "Tai khoan dang nhap",
+                    GiaTri = khach.IdentityUserId?.ToString(),
+                    Nguon = "CusCustomers.IdentityUserId",
+                    LyDo = "Lien ket ho so khach voi tai khoan dang nhap (neu co) de khach tu xem don cua minh.",
+                    LaDuLieuCaNhan = false
+                },
+                new()
+                {
+                    Truong = "Trang thai ho so",
+                    GiaTri = khach.Status.ToString(),
+                    Nguon = "CusCustomers.Status",
+                    LyDo = "Cho biet ho so dang hoat dong hay bi chan (⚠️ bi chan thi khong giao dich duoc).",
+                    LaDuLieuCaNhan = false
+                },
+                new()
+                {
+                    Truong = "Nhom khach",
+                    GiaTri = khach.CustomerGroupId?.ToString(),
+                    Nguon = "CusCustomers.CustomerGroupId",
+                    LyDo = "Phan nhom khach de ap chinh sach gia/khuyen mai.",
+                    LaDuLieuCaNhan = false
+                },
+                new()
+                {
+                    Truong = "Gia tri vong doi",
+                    GiaTri = khach.LifetimeValueAmount is null
+                        ? null
+                        : $"{khach.LifetimeValueAmount} {khach.LifetimeValueCurrency}",
+                    Nguon = "CusCustomers.LifetimeValueAmount + LifetimeValueCurrency",
+                    LyDo = "Tong gia tri mua hang tich luy — dung de xep hang khach, khong dung de ra quyet dinh tu dong.",
+                    LaDuLieuCaNhan = false
+                },
+                new()
+                {
+                    Truong = "Ghi chu noi bo",
+                    GiaTri = khach.Note,
+                    // ⚠️ **GHI RO LA GHI CHU NOI BO** — 🔑 neu khong noi ro thi khach doc mot cau do nhan vien
+                    // viet cho nhan vien va **hieu sai**; va 📌 do cung la loai du lieu de bi loi dung nhat.
+                    Nguon = "CusCustomers.Note",
+                    LyDo = "GHI CHU NOI BO cua nhan vien (vi du: yeu cau giao hang dac biet). " +
+                           "⚠️ Day KHONG phai thong tin khach tu cung cap.",
+                    LaDuLieuCaNhan = true
+                },
+                new()
+                {
+                    Truong = "Ngay tao ho so",
+                    GiaTri = khach.CreationTime.ToString("o"),
+                    Nguon = "CusCustomers.CreationTime",
+                    LyDo = "Cho biet he thong bat dau luu du lieu cua khach tu khi nao.",
+                    LaDuLieuCaNhan = false
+                }
+            ]
+        };
+
+        // 🔒 **LOG CHI QUA `MoTaAnToan`** (PII da che) — xem quyet dinh (2) o tren.
+        // 📌 `Warning` (khong `Information`): xuat PII la **su kien can vet**, khong phai thao tac thuong ngay.
+        Logger.LogWarning(
+            "XUAT DU LIEU CA NHAN: khach={CustomerId} · so dong={SoDong} · nguoi xuat={NguoiXuat} · {MoTa}. " +
+            "[CUS-XUAT-DU-LIEU-CA-NHAN]",
+            khach.Id, dto.CacDong.Count, nguoiXuat, MoTaAnToan(khach));
+
+        return dto;
+    }
+
     // ── CHUYỂN ĐỔI ──────────────────────────────────────────────────────────────────────────────
 
     private static CustomerDto ToDto(Customer k) => new()

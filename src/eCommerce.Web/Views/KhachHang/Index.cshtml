@@ -112,6 +112,16 @@
                                 }
                             </td>
                             <td class="text-end">
+                                @* 🚨 XUAT DU LIEU CA NHAN (Luat 91/2025/QH15) - quyen TRUY CAP cua chu the.
+                                   🔑 VI SAO LA LIEN KET (khong phai form POST): day la thao tac CHI DOC
+                                   (khong doi trang thai) => GET la dung ngu nghia HTTP.
+                                   🔒 VA QUYEN NAM O `CustomerAppService` (`Customers.Manage`) - lop bao ve
+                                   THAT, khong phai o day. *@
+                                <a class="btn btn-sm btn-outline-secondary"
+                                   asp-action="XuatDuLieu" asp-route-id="@k.Id"
+                                   title="Tải toàn bộ dữ liệu cá nhân của khách này (Luat 91/2025/QH15) - TÀI LIỆU MẬT">
+                                    Xuất dữ liệu
+                                </a>
                                 @if (!k.DungDuoc)
                                 {
                                     <form method="post" asp-action="MoChan" class="d-inline">

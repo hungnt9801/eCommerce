@@ -93,3 +93,82 @@ public interface ICustomerDirectory
     /// </summary>
     Task<bool> ChoPhepGiaoDichAsync(Guid? customerId);
 }
+
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════
+// 🚨 **XUAT DU LIEU CA NHAN** — QUYEN TRUY CAP CUA CHINH CHU (`CUS-001`, Luat **91/2025/QH15**).
+//
+// 🔑 **VI SAO CO NHOM DTO NAY (khong phai "them mot endpoint cho vui"):**
+//
+// Luat **91/2025/QH15** cho chu the du lieu quyen **TRUY CAP** (biet minh dang bi luu gi) va **LAY BAN SAO**.
+// 📌 Mot he thong **khong** lam duoc dieu do thi **khong tuan thu** — va 🔒 no khong the "chua" bang cach
+// ghi trong tai lieu: **khong co duong goi** nghia la **khong co tinh nang**.
+//
+// ⚠️ **VA VI SAO NO KHONG CHI LA "TRA VE `CustomerDto`":** `CustomerDto` la DTO **van hanh** — no **khong**
+// noi *"truong nay o dau ra"*, *"vi sao he thong giu no"*. 📌 Mot ban xuat ma **khong co NGUON** thi nguoi
+// doc **khong kiem chung duoc**, va nguoi van hanh **khong tra loi duoc** cau hoi *"sao cac anh co cai nay?"*
+// 🔑 Nen moi dong phai kem **nguon** (`Nguon`) va **ly do** (`LyDo`) — do la khac biet giua **ban xuat** va
+// **bang du lieu**.
+// ══════════════════════════════════════════════════════════════════════════════════════════════════
+
+/// <summary>
+/// 🚨 **BAN XUAT DU LIEU CA NHAN CUA MOT KHACH** — 🔑 moi dong co **NGUON** va **LY DO**.
+/// </summary>
+public class XuatDuLieuCaNhanDto
+{
+    /// <summary>Khach duoc xuat.</summary>
+    public Guid CustomerId { get; set; }
+
+    /// <summary>Ten khach — 🔑 de nguoi doc **biet ban xuat nay cua ai** (⚠️ mot ban xuat khong ten chu the
+    /// la mot ban xuat **khong kiem chung duoc**).</summary>
+    public string TenKhach { get; set; } = default!;
+
+    /// <summary>Thoi diem xuat (UTC) — 🔑 **bat buoc** cho **vet kiem toan**: *"toi da lay du lieu cua minh
+    /// luc nao"* la mot cau hoi co that.</summary>
+    public DateTime XuatLucUtc { get; set; }
+
+    /// <summary>
+    /// Nguoi thuc hien xuat — 📌 thuong la **nhan vien** ho tro (khach chua co kenh tu phuc vu).
+    /// 🔒 Ghi lai de tra loi *"ai da xem du lieu cua toi"* — do cung la mot phan cua **tinh than** luat.
+    /// </summary>
+    public string NguoiXuat { get; set; } = default!;
+
+    /// <summary>⛔ **CANH BAO BAT BUOC** — 🔒 ban xuat chua **du lieu ca nhan**; phai duoc xu ly nhu **tai lieu mat**.</summary>
+    public string CanhBao { get; set; } = default!;
+
+    /// <summary>Cac dong du lieu ca nhan — 🔑 **moi dong** tu mo ta **nguon** va **ly do**.</summary>
+    public List<DongDuLieuCaNhanDto> CacDong { get; set; } = [];
+}
+
+/// <summary>
+/// Mot dong du lieu ca nhan — 🔑 **KHONG** chi la *(ten truong, gia tri)*.
+/// </summary>
+public class DongDuLieuCaNhanDto
+{
+    /// <summary>Ten truong theo **NGON NGU NGUOI DUNG** (`Ho ten`, `Email`…), khong phai ten cot DB.
+    /// 📌 Nguoi doc ban xuat la **chu the du lieu** hoac **nhan vien ho tro**, khong phai lap trinh vien.</summary>
+    public string Truong { get; set; } = default!;
+
+    /// <summary>Gia tri — ⚠️ `null` = he thong **khong** co du lieu do (📌 phai hien **ro** la trong, khong bo dong:
+    /// 🔑 *"khong co"* va *"khong hien"* la **hai dieu khac nhau** voi nguoi dang hoi *"cac anh giu gi ve toi"*).</summary>
+    public string? GiaTri { get; set; }
+
+    /// <summary>
+    /// 🔑 **NGUON** — bang/cot that trong he thong (vi du `CusCustomers.Email`).
+    /// 🔒 Bat buoc: mot ban xuat **khong co nguon** thi **khong kiem chung duoc**.
+    /// </summary>
+    public string Nguon { get; set; } = default!;
+
+    /// <summary>
+    /// 🔑 **LY DO he thong giu truong nay** — tra loi cau hoi *"sao cac anh co cai nay?"*.
+    /// 📌 Day la phan **luat** yeu cau (muc dich xu ly), khong phai phan ky thuat.
+    /// </summary>
+    public string LyDo { get; set; } = default!;
+
+    /// <summary>
+    /// ⚠️ `true` = **du lieu ca nhan** (PII) — 🔒 phai duoc bao ve khi luu/truyen.
+    /// 📌 Cac dong `false` (vi du `Trang thai`) van nam trong ban xuat vi chung **thuoc ve** chu the,
+    /// nhung **khong** canh bao nhu PII.
+    /// </summary>
+    public bool LaDuLieuCaNhan { get; set; }
+}
