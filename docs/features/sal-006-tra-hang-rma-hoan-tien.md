@@ -1252,3 +1252,91 @@ Probe gọi cổng **THẬT** (không có credential sandbox) ⇒ VNPay trả n�
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.3 | 16/10/2026 | *(agent, session GĐ1)* | **§17 — LÁT CẮT 2: `RefundAsync` VNPAY + API HOÀN TIỀN (đóng F2)**: `VnPayRequestBuilder` (lõi thuần: ký HMAC-SHA512, tham số `refund`/`querydr`, đọc phản hồi) · `RefundAsync` + `QueryStatusAsync` **CÀI THẬT** (hết `NotImplementedException`) · **`RefundResult`** thay `bool` (**3** trạng thái tách biệt) · `providerTransactionId` (`vnp_TransactionNo`) · **project `Application.Contracts` MỚI** + `PaymentAppService` + **4 endpoint** (swagger thật) · mã `Payment:0005` · **+27 unit test** (955 tổng) · **12/12 ca HTTP thật**. 🚨 **Phép đo bắt được LỖ HỔNG THẬT** (§17.6): phản hồi **không đọc được** bị trả `ChoXacNhan=false` ⇒ client có thể **retry mù** ⇒ **hoàn HAI LẦN**; đã vá + tách neo log `[PAY-KHONG-XAC-DINH]`. Ghi **§17.8** (nợ: **chưa kiểm chứng tiền thật ra**, chưa có RMA, chưa có webhook controller, chưa có job đối soát) |
+
+---
+
+## 20. ✅ **LÁT CẮT 3 — ĐƯỜNG GỌI ĐỐI SOÁT THANH TOÁN HÀNG LOẠT (`querydr`)** (17/10/2026) — *mục 7 của gói bàn giao*
+
+### 20.1 🔑 **Vì sao cần hàm LÔ, không đủ hàm MỘT — và vì sao đây là lỗ hổng thật**
+
+Đã có `PostTruyVanTrangThaiAsync(id)` (§trước): nó gọi cổng `querydr` cho **một** giao dịch, và 🔒 bảo đảm
+bất biến **CHỈ TIẾN, KHÔNG LÙI** (không hạ trạng thái khi cổng nói *"chưa biết"*).
+
+🚨 **Nhưng hàm một có một lỗ hổng về VẬN HÀNH:** nó buộc người vận hành **biết trước** giao dịch nào cần kiểm —
+📌 mà đó **chính là** thứ họ **KHÔNG** biết (nếu biết thì đã không cần đối soát).
+⚠️ Hệ quả: **IPN mất** ⇒ giao dịch kẹt ở `Pending` ⇒ **không ai** phát hiện ⇒ 🔒 **tiền đã vào nhưng hệ thống
+không biết**, và **không có lỗi nào**.
+
+### 20.2 ✅ **Hai bất biến của hàm lô**
+
+| # | Bất biến | Vì sao |
+|---|---|---|
+**1** | **CHỈ xét giao dịch CHƯA ở trạng thái CUỐI** (`Initiated`/`Pending`/`Failed`) | ⚠️ Gọi cổng cho giao dịch `Succeeded`/`Refunded` là **lãng phí quota** — mà quota là tài nguyên **có giới hạn** của cổng |
+**2** | 🔑 **GỌI LẠI CHÍNH HÀM MỘT — KHÔNG tự cập nhật DB** | 📌 Hàm một đã bảo đảm **CHỈ TIẾN, KHÔNG LÙI**. ⚠️ Nếu hàm lô tự viết lại việc cập nhật thì bất biến đó có **HAI** chỗ phải đúng — và chỗ thứ hai sẽ **lệch** khi ai đó sửa chỗ thứ nhất |
+
+➕ **Có trần `toiDa`** (`Clamp(1, 100)`): mỗi giao dịch là **một lời gọi HTTP ra ngoài** ⇒ quét vô hạn sẽ **treo**
+request và **tiêu quota**. 🔒 Trần là hằng số **hữu hạn cứng**, không nhận số client gửi thẳng.
+
+### 20.3 🚨 **Quyết định thiết kế quan trọng nhất: TÁCH BA CON SỐ, KHÔNG GỘP**
+
+`KetQuaDoiSoatThanhToanDto` trả **`SoDaXet`** · **`SoDoiTrangThai`** · **`SoKhongXacDinh`** · **`SoThuDuoc`** ·
+**`MaDaDoi`** — 🔑 **không** gộp thành *"đã đối soát N giao dịch"*.
+
+📌 **VÌ SAO:** nếu chỉ trả một con số thì **ba tình huống rất khác nhau** trông **giống hệt nhau**:
+| Tình huống | Ý nghĩa thật |
+|---|---|
+**đã kiểm, không có gì đổi** | ✅ tốt |
+🚨 **cổng CHƯA cấu hình** ⇒ không kiểm được gì | ⚠️ **KHÔNG PHẢI** "tốt" |
+**tiền đã vào** mà hệ thống chưa biết | 🔑 **vừa phát hiện và sửa** ⇒ cần người xem log |
+
+🔒 Gộp ba ca đó lại là biến *"KHÔNG KIỂM ĐƯỢC"* thành *"đã kiểm, không sao"* — **đúng loại nói dối mà cả dự án
+đang chống**.
+
+### 20.4 🚨 **Một phát hiện về NHÀ CUNG CẤP (không phải lỗi, nhưng phải ghi)**
+
+`VnPayPaymentProvider.QueryStatusAsync` trả **`Pending`** khi `HttpClient` **rỗng** (cổng **chưa cấu hình**) —
+nó **KHÔNG ném** (cố ý, để tránh `NullReferenceException` bị nuốt thành *"hoàn tiền thất bại"* chung chung).
+
+🔒 **Hệ quả:** ở tầng HTTP, *"cổng chưa cấu hình"* và *"cổng nói chưa biết"* **giống hệt nhau**.
+📌 Đó **không phải** bug — bất biến **CHỈ TIẾN** vẫn được giữ. 🔑 **Nhưng** nó có nghĩa: **không thể** phân biệt
+hai ca đó chỉ bằng mã trạng thái ⇒ 📌 vì vậy hàm lô **đếm** `SoKhongXacDinh` và **log `Warning`** khi con số đó
+**bằng** `SoDaXet` — neo `[PAY-DOISOAT-KHONG-XAC-DINH]`.
+
+### 20.5 ✅ **KIỂM CHỨNG — 7/7 CA TRÊN DB + HTTP + LOG THẬT**
+
+| Ca | Đo được |
+|---|---|
+**A1** tiền đề | Gieo **1 giao dịch `Pending`** + **1 giao dịch `Succeeded`** (kiểm bằng `select`) |
+**C1** | `POST /api/app/payment/doi-soat-loat` ⇒ **`200`** |
+**C2** | 🔒 **`soDaXet = 1`** — giao dịch `Succeeded` **KHÔNG** bị xét (bất biến ①) |
+**C3** | 🚨 **`soKhongXacDinh = 1`** — cổng chưa cấu hình ⇒ **KHÔNG** trả *"0 thay đổi = mọi thứ ổn"* |
+**C4** | **`soDoiTrangThai = 0`** — **không** bịa ra thay đổi |
+**D1** | 🚨 **log CÓ neo `[PAY-DOISOAT-KHONG-XAC-DINH]`** (`Warning`) — **không im lặng** |
+**E1** | **DB vẫn `Status = 1`** — trạng thái **không** bị hạ/đổi khi cổng nói *"chưa biết"* (🔑 bất biến **CHỈ TIẾN, KHÔNG LÙI** giữ được **qua cả hàm lô**) |
+
+➕ **Route thật đo được** (`tools\route-check.ps1`): `/api/app/payment/doi-soat-loat` **POST** `toiDa(query)` —
+📌 nằm cạnh 4 route cũ, không đè.
+
+### 20.6 🐞 **Ba lỗi của tôi trong lượt này — và một trong đó suýt làm tôi kết luận sai về sản phẩm**
+
+| # | Lỗi | Bài học |
+|---|---|---|
+🚨 **1** | **Sai CHỮ HOA mật khẩu** (`1q2w3e*` thay vì **`1q2w3E*`**) ⇒ token `401` ⇒ **5/7 ca đỏ** | 🔑 **`401` là lỗi ĐĂNG NHẬP, không phải lỗi sản phẩm.** 📌 Nếu tôi không kiểm *"token có lấy được không"* trước thì đã **kết luận sai** rằng hàm lô hỏng. ✅ **Luật mới: kiểm TOKEN trước khi tin mọi ca đỏ sau nó** |
+🚨 **2** | **Sửa mã theo CHỈ SỐ DÒNG** ⇒ **phá cấu trúc tệp** (`CS1519: Invalid token 'if'`) — phải `git checkout` khôi phục | 🔒 **Chỉ số dòng đổi khi tôi thêm/xoá dòng ở trên.** 📌 Dùng `edit` với ngữ cảnh, **không** dùng chỉ số |
+**3** | **Suy kiểu từ DTO**: viết `canDoiSoat` là **mảng chuỗi** nhưng `x.Status` (entity) là **ENUM** ⇒ `CS1503`; rồi so `sau == truoc` với hai kiểu khác nhau ⇒ `CS0019` | 🔑 **DTO và ENTITY có thể đặt CÙNG tên trường với KIỂU KHÁC NHAU** (`PaymentTransactionDto.Status` là **chuỗi** — `ChuyenDto` làm `.ToString()` — còn `PaymentTransaction.Status` là **enum**). 📌 **Đọc kiểu TỪ ENTITY, không suy từ DTO** |
+
+### 20.7 ⏳ NỢ
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+**1** | 🚨 **Chưa có JOB ĐỊNH KỲ gọi đối soát lô** | 📌 Hàm lô đã có **đường gọi**, nhưng **chưa ai gọi nó theo lịch** ⇒ đối soát vẫn **phải bấm tay**. 🔑 Cần `AsyncPeriodicBackgroundWorkerBase` (khuôn đã có: `MarketplaceReconciliationWorker` của `SAL-005`) |
+**2** | 🚨 **Chưa có UI đối soát lô** | `/DoiSoatThanhToan` hiện chỉ có nút **truy vấn từng giao dịch** |
+**3** | 🚨 **`SoKhongXacDinh` KHÔNG phân biệt được "chưa cấu hình" với "cổng chậm"** | ⚠️ Xem §20.4 — 📌 muốn phân biệt thì nhà cung cấp phải trả **lý do**, không chỉ `Pending` |
+**4** | **Chưa kiểm luồng THU ĐƯỢC TIỀN thật** (`SoThuDuoc > 0`) | 🔒 Cần **credential sandbox** VNPay ⇒ **nợ chặn** (giống `HoanTienAsync`) |
+**5** | **Chưa có metric** cho `SoDoiTrangThai`/`SoKhongXacDinh` | 📌 Hiện chỉ **log**; `eCommerceMetrics` đã có sẵn khuôn |
+
+### 20.8 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.1 | 17/10/2026 | *(agent, session GĐ1)* | **§20 — LÁT CẮT 3: ĐƯỜNG GỌI ĐỐI SOÁT THANH TOÁN HÀNG LOẠT (`querydr`)**: thêm **`IPaymentAppService.PostDoiSoatLoatAsync(toiDa)`** + **`KetQuaDoiSoatThanhToanDto`** (🔑 **tách BA con số `SoDaXet`/`SoDoiTrangThai`/`SoKhongXacDinh` — gộp lại là biến *"KHÔNG KIỂM ĐƯỢC"* thành *"đã kiểm, không sao"*). 🔑 **VÌ SAO CẦN HÀM LÔ:** hàm một buộc người vận hành **biết trước** giao dịch nào cần kiểm — mà đó **chính là** thứ họ **không** biết; ⚠️ **IPN mất** ⇒ giao dịch kẹt `Pending` ⇒ **không ai phát hiện** ⇒ **tiền đã vào mà hệ thống không biết**, **không lỗi nào**. 🔒 **HAI BẤT BIẾN:** ① **chỉ xét giao dịch CHƯA ở trạng thái cuối** (gọi cổng cho `Succeeded`/`Refunded` là **lãng phí quota**); ② **GỌI LẠI CHÍNH HÀM MỘT, không tự cập nhật DB** (nếu không thì bất biến **CHỈ TIẾN, KHÔNG LÙI** có **hai** chỗ phải đúng và chỗ thứ hai sẽ **lệch**). 🚨 **PHÁT HIỆN VỀ NHÀ CUNG CẤP:** `QueryStatusAsync` trả `Pending` khi `HttpClient` **rỗng** và **không ném** (cố ý) ⇒ ở tầng HTTP *"cổng chưa cấu hình"* và *"cổng nói chưa biết"* **giống hệt nhau** ⇒ 📌 hàm lô **đếm** `SoKhongXacDinh` và **log `Warning`** `[PAY-DOISOAT-KHONG-XAC-DINH]` khi nó **bằng** `SoDaXet`. ✅ **7/7 ca DB + HTTP + LOG thật**: `A1` tiền đề · `C1` `200` · `C2` **`soDaXet=1`** (bỏ qua `Succeeded`) · `C3` **`soKhongXacDinh=1`** · `C4` `soDoiTrangThai=0` · `D1` **log có neo** · `E1` **DB không đổi** (bất biến CHỈ TIẾN giữ **qua cả hàm lô**). ➕ route thật: `/api/app/payment/doi-soat-loat` **POST**. 🐞 **Ba lỗi của tôi:** (1) 🚨 **sai CHỮ HOA mật khẩu** (`1q2w3e*` vs **`1q2w3E*`**) ⇒ token `401` ⇒ **5/7 ca đỏ** — 🔑 **`401` là lỗi ĐĂNG NHẬP, không phải lỗi sản phẩm**; nếu không kiểm token trước thì đã **kết luận sai** rằng hàm lô hỏng (**luật mới: kiểm TOKEN trước khi tin mọi ca đỏ sau nó**); (2) 🚨 **sửa mã theo CHỈ SỐ DÒNG** ⇒ **phá cấu trúc tệp** (`CS1519`) — 🔒 chỉ số dòng **đổi** khi thêm/xoá dòng ở trên ⇒ dùng `edit` với **ngữ cảnh**; (3) **suy kiểu từ DTO** — `canDoiSoat` là mảng **chuỗi** nhưng `x.Status` (entity) là **ENUM** ⇒ `CS1503`, rồi `sau == truoc` hai kiểu khác nhau ⇒ `CS0019` — 🔑 **DTO và ENTITY có thể đặt CÙNG tên trường với KIỂU KHÁC NHAU** (`ChuyenDto` làm `.ToString()`), **đọc kiểu TỪ ENTITY**. Ghi **§20.7** (nợ: 🚨 **chưa có JOB ĐỊNH KỲ** gọi đối soát lô ⇒ vẫn phải bấm tay · chưa có UI đối soát lô · 🚨 `SoKhongXacDinh` **không phân biệt** *"chưa cấu hình"* với *"cổng chậm"* · chưa kiểm luồng **THU ĐƯỢC TIỀN** thật (🔒 **cần credential sandbox** — **nợ chặn**) · chưa có **metric**) |

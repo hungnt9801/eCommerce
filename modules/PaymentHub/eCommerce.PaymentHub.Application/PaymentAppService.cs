@@ -284,6 +284,95 @@ public class PaymentAppService : ApplicationService, IPaymentAppService
         return ChuyenDto(gd);
     }
 
+    /// <inheritdoc />
+    public async Task<KetQuaDoiSoatThanhToanDto> PostDoiSoatLoatAsync(int toiDa = 50)
+    {
+        // 📌 Trần: mỗi giao dịch là **một lời gọi HTTP ra ngoài** ⇒ quét vô hạn sẽ **treo** request và
+        // **tiêu quota** của cổng. 🔒 Trần là hằng số **hữu hạn cứng** (không nhận số client gửi thẳng).
+        var soLuong = Math.Clamp(toiDa, 1, 100);
+
+        var truyVan = await _giaoDich.GetQueryableAsync();
+
+        // 🔒 **CHỈ xét giao dịch CHƯA ở trạng thái CUỐI.** ⚠️ Gọi cổng cho giao dịch `Succeeded`/`Refunded`
+        // là **lãng phí quota** (tài nguyên **có giới hạn** của cổng) mà **không** đổi được gì.
+        //
+        // 🚨 **BÀI HỌC KIỂU (đã vấp ngay trong lượt này):** `x.Status` ở đây là **ENUM** (entity
+        // `PaymentTransaction`), ⚠️ **KHÔNG** phải chuỗi như `PaymentTransactionDto.Status`.
+        // 📌 Tôi viết `canDoiSoat` là **mảng chuỗi** ⇒ **`CS1503`** (*"cannot convert from
+        // `PaymentTransactionStatus` to `string`"*). 🔑 **DTO và ENTITY có thể đặt CÙNG tên trường với
+        // KIỂU KHÁC NHAU** — phải đọc kiểu **từ entity**, không suy từ DTO.
+        var canDoiSoat = new[]
+        {
+            Payments.PaymentTransactionStatus.Initiated,
+            Payments.PaymentTransactionStatus.Pending,
+            Payments.PaymentTransactionStatus.Failed
+        };
+
+        var ds = await AsyncExecuter.ToListAsync(
+            truyVan.Where(x => canDoiSoat.Contains(x.Status))
+                .OrderBy(x => x.CreationTime)
+                .Take(soLuong));
+
+        var ketQua = new KetQuaDoiSoatThanhToanDto { SoDaXet = ds.Count };
+
+        foreach (var gd in ds)
+        {
+            // ⚠️ **KIỂU KHÁC NHAU — và đây là chỗ dễ sai nhất của hàm này:**
+            //   • `gd.Status` (ENTITY `PaymentTransaction`) là **ENUM**;
+            //   • `PostTruyVanTrangThaiAsync(...).Status` (DTO `PaymentTransactionDto`) là **CHUỖI**
+            //     (`ChuyenDto` làm `gd.Status.ToString()`).
+            // 📌 Nên **KHÔNG** so sánh trực tiếp hai giá trị đó — 🔒 phải đưa về **cùng một kiểu**.
+            // 🔑 Tôi đã vấp đúng chỗ này trong lượt: viết `sau == truoc` ⇒ **`CS0019`**. 📌 DTO và ENTITY
+            // có thể đặt **cùng tên trường** với **kiểu khác nhau** ⇒ phải đọc kiểu **từ entity**.
+            var truoc = gd.Status.ToString();
+
+            // 🔑 **GỌI LẠI CHÍNH HÀM MỘT — KHÔNG tự cập nhật DB ở đây.**
+            // 📌 Lý do: hàm một đã bảo đảm bất biến **CHỈ TIẾN, KHÔNG LÙI** (không hạ trạng thái khi cổng nói
+            // *"chưa biết"*). ⚠️ Nếu hàm lô tự viết lại việc cập nhật thì bất biến đó có **HAI** chỗ phải
+            // đúng — và chỗ thứ hai sẽ **lệch** khi ai đó sửa chỗ thứ nhất.
+            var sau = (await PostTruyVanTrangThaiAsync(gd.Id)).Status;
+
+            if (string.Equals(sau, truoc, StringComparison.Ordinal))
+            {
+                // ⚠️ **KHÔNG xác định được** — cổng nói *"chưa biết"*, lỗi hạ tầng, **hoặc chưa cấu hình**:
+                // 📌 ba ca đó **giống nhau ở đây** vì `VnPayPaymentProvider.QueryStatusAsync` trả `Pending`
+                // cho cả ba (nó **không** ném khi `HttpClient` rỗng). 🔒 Nên con số này nghĩa là
+                // *"KHÔNG KIỂM ĐƯỢC"*, **KHÔNG** phải *"đã kiểm và ổn"*.
+                ketQua.SoKhongXacDinh++;
+
+                continue;
+            }
+
+            ketQua.SoDoiTrangThai++;
+            ketQua.MaDaDoi.Add(gd.MerchantReference);
+
+            if (string.Equals(sau, nameof(Payments.PaymentTransactionStatus.Succeeded), StringComparison.Ordinal))
+            {
+                ketQua.SoThuDuoc++;
+            }
+        }
+
+        // 🚨 **CẢNH BÁO KHI LƯỢT QUÉT KHÔNG MANG LẠI THÔNG TIN NÀO** — 🔑 đây là dấu hiệu **cấu hình sai**
+        // (hoặc cổng chết), **KHÔNG** phải *"hệ thống khoẻ"*. 📌 Nếu không log ca này thì người vận hành đọc
+        // *"đã đối soát 50 giao dịch, 0 thay đổi"* và **tin** rằng mọi thứ ổn.
+        if (ketQua.SoDaXet > 0 && ketQua.SoKhongXacDinh == ketQua.SoDaXet)
+        {
+            Logger.LogWarning(
+                "ĐỐI SOÁT LÔ: KHÔNG xác định được giao dịch nào trong {So} giao dịch ⇒ lượt quét KHÔNG mang lại " +
+                "thông tin. Nguyên nhân thường gặp: cổng CHƯA cấu hình (`PaymentHub:VnPay:TmnCode`/`HashSecret` " +
+                "rỗng) hoặc cổng không trả lời. [PAY-DOISOAT-KHONG-XAC-DINH]",
+                ketQua.SoDaXet);
+        }
+        else
+        {
+            Logger.LogInformation(
+                "ĐỐI SOÁT LÔ: xét {So} · đổi trạng thái {Doi} · thu được {Thu} · không xác định {KXD}. [PAY-DOISOAT-XONG]",
+                ketQua.SoDaXet, ketQua.SoDoiTrangThai, ketQua.SoThuDuoc, ketQua.SoKhongXacDinh);
+        }
+
+        return ketQua;
+    }
+
     // ── CHUYỂN ĐỔI ──────────────────────────────────────────────────────────────────────────────
 
     private static PaymentTransactionDto ChuyenDto(Payments.PaymentTransaction gd) => new()

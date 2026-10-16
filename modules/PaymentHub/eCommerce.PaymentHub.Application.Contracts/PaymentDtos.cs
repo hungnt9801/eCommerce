@@ -127,4 +127,68 @@ public interface IPaymentAppService
     /// IPN **mất** (`REC-001`).
     /// </summary>
     Task<PaymentTransactionDto> PostTruyVanTrangThaiAsync(Guid paymentTransactionId);
+
+    /// <summary>
+    /// 🚨 **ĐỐI SOÁT LÔ TỪ CỔNG** (`querydr` hàng loạt) — `REC-001` mục 7.
+    ///
+    /// ══════════════════════════════════════════════════════════════════════════════════════════════
+    /// 🔑 **VÌ SAO CẦN HÀM LÔ (không đủ hàm MỘT):** đối soát là công việc **ĐỊNH KỲ**, không phải tra cứu
+    /// từng ca. 📌 Một hàm một (`PostTruyVanTrangThaiAsync`) buộc người vận hành **biết trước** giao dịch
+    /// nào cần kiểm — mà điều đó **chính là** thứ họ **không** biết (nếu biết thì đã không cần đối soát).
+    /// ⚠️ Hệ quả nếu chỉ có hàm một: **IPN mất** ⇒ giao dịch kẹt ở `Pending` ⇒ **không ai** phát hiện
+    /// ⇒ 🔒 tiền đã vào nhưng hệ thống **không** biết, và **không có lỗi nào**.
+    ///
+    /// 🔒 **HAI BẤT BIẾN:**
+    /// <list type="number">
+    ///   <item>**CHỈ xét giao dịch CHƯA ở trạng thái cuối** — ⚠️ gọi cổng cho giao dịch `Succeeded`/`Refunded`
+    ///     là **lãng phí quota** (cổng có giới hạn) mà **không** đổi được gì;</item>
+    ///   <item>**CHỈ TIẾN, KHÔNG LÙI** — việc này do `PostTruyVanTrangThaiAsync` bảo đảm (nó **không** hạ trạng
+    ///     thái khi cổng nói *"chưa biết"*), 🔑 và hàm lô **không** được bỏ qua đường đó: nó **gọi lại** chính
+    ///     hàm một, không tự cập nhật DB.</item>
+    /// </list>
+    /// ⚠️ **GIỚI HẠN ĐÃ BIẾT:** nếu cổng **chưa cấu hình** (`HttpClient` rỗng), nhà cung cấp trả `Pending`
+    /// cho **mọi** giao dịch ⇒ hàm này trả **`SoKhongXacDinh` = tất cả** và **`SoDoiTrangThai` = 0**.
+    /// 🚨 Đó **không phải** *"mọi thứ đều ổn"* — 📌 nó là *"KHÔNG ĐỐI SOÁT ĐƯỢC"*. 🔒 Vì vậy DTO tách
+    /// **`SoDoiTrangThai`** khỏi **`SoKhongXacDinh`**: gộp hai con số đó lại sẽ biến *"không kiểm được"*
+    /// thành *"đã kiểm, không sao"* — đúng loại nói dối mà dự án đang chống.
+    /// </summary>
+    /// <param name="toiDa">Trần số giao dịch một lượt quét. 📌 Có trần vì mỗi giao dịch là **một lời gọi
+    /// HTTP ra ngoài** — quét vô hạn sẽ **treo** request và **tiêu quota** của cổng.</param>
+    Task<KetQuaDoiSoatThanhToanDto> PostDoiSoatLoatAsync(int toiDa = 50);
+}
+
+
+/// <summary>
+/// 🚨 **KẾT QUẢ MỘT LƯỢT ĐỐI SOÁT LÔ** (`REC-001` mục 7) — 🔑 **tách ba con số, KHÔNG gộp**.
+///
+/// 📌 **VÌ SAO PHẢI TÁCH:** nếu chỉ trả *"đã đối soát N giao dịch"* thì ba tình huống **rất khác nhau**
+/// trông **giống hệt nhau**:
+/// <list type="bullet">
+///   <item>**đã kiểm và không có gì đổi** (tốt);</item>
+///   <item>🚨 **cổng chưa cấu hình** ⇒ **không kiểm được gì** (⚠️ **không phải** "tốt");</item>
+///   <item>tiền **đã vào** mà hệ thống chưa biết ⇒ **vừa phát hiện và sửa** (cần người xem log).</item>
+/// </list>
+/// 🔒 Gộp ba ca đó thành một con số là biến *"không kiểm được"* thành *"đã kiểm, không sao"* — đúng loại
+/// nói dối mà cả dự án đang chống.
+/// </summary>
+public class KetQuaDoiSoatThanhToanDto
+{
+    /// <summary>Tổng số giao dịch **đã xét** (chưa ở trạng thái cuối, trong trần `toiDa`).</summary>
+    public int SoDaXet { get; set; }
+
+    /// <summary>Số giao dịch **ĐỔI trạng thái** nhờ lượt này — 🔑 con số **HÀNH ĐỘNG ĐƯỢC**.
+    /// 🚨 Lớn hơn `0` nghĩa là **IPN đã mất** (hoặc cổng chậm) ⇒ **cần người xem log**.</summary>
+    public int SoDoiTrangThai { get; set; }
+
+    /// <summary>🚨 Số giao dịch **KHÔNG xác định được** (cổng nói *"chưa biết"* / lỗi hạ tầng / **chưa cấu hình**).
+    /// ⚠️ **KHÔNG** phải *"đã kiểm và ổn"*. 📌 Nếu con số này **bằng** `SoDaXet` thì lượt đối soát
+    /// **không mang lại thông tin nào** — và đó là dấu hiệu **cấu hình sai**, không phải hệ thống khoẻ.</summary>
+    public int SoKhongXacDinh { get; set; }
+
+    /// <summary>Số giao dịch cổng xác nhận **đã thu tiền** trong lượt này — 🔑 lưới an toàn cho **IPN mất**.</summary>
+    public int SoThuDuoc { get; set; }
+
+    /// <summary>Danh sách ngắn `merchantReference` **đã đổi trạng thái** — để người vận hành **tra tiếp**
+    /// mà không phải quét log. 🔒 Có trần (do chỗ gọi áp) để một lượt lớn không trả về hàng nghìn dòng.</summary>
+    public List<string> MaDaDoi { get; set; } = [];
 }
