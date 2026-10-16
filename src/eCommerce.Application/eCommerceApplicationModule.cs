@@ -70,5 +70,9 @@ namespace eCommerce;
             // vòng 35 với `StockReservationExpiryWorker` — `inv-001` §27 **NN1**).
             // 🔑 Và `BackgroundWorkerCoCheTests` **bắt** điều này bằng phép quét mã nguồn.
             await context.AddBackgroundWorkerAsync<eCommerce.Application.Marketplace.MarketplaceReconciliationWorker>();
+        // 🚨 `REC-001` muc 7 — **JOB DOI SOAT THANH TOAN DINH KY**. 📌 Bien endpoint `doi-soat-loat`
+        // (phai BAM TAY) thanh co che TU CHAY: neu chi co endpoint thi **IPN mat** => giao dich ket `Pending`
+        // => 🔑 **tien da vao ma he thong khong biet** cho toi khi **tinh co** co nguoi bam.
+        await context.AddBackgroundWorkerAsync<eCommerce.Application.PaymentHub.PaymentReconciliationWorker>();
     }
 }

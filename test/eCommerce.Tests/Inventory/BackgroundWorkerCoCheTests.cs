@@ -109,7 +109,12 @@ public class BackgroundWorkerCoCheTests
             "StockReservationExpiryWorker",
             "TaxUnclassifiedSkusWorker",
             "ChannelSyncSupervisorWorker",
-            "MarketplaceReconciliationWorker"
+            "MarketplaceReconciliationWorker",
+
+            // 🚨 `REC-001` muc 7 (17/10/2026) — **JOB DOI SOAT THANH TOAN DINH KY**. 📌 Dua vao danh sach
+            // BAT BUOC vi day la job **tra tien**: neu no **im lang** khong chay thi **IPN mat** => giao dich
+            // ket `Pending` => 🔑 **tien da vao ma he thong khong biet** - va **khong co loi nao**.
+            "PaymentReconciliationWorker"
         ];
 
         var thieu = batBuoc.Where(t => !tenWorker.Contains(t)).ToList();
@@ -118,8 +123,8 @@ public class BackgroundWorkerCoCheTests
             "Phép quét KHÔNG thấy các worker đã biết ⇒ phạm vi quét bị thu hẹp ⇒ test trên VÔ NGHĨA:\n  "
             + string.Join("\n  ", thieu));
 
-        Assert.True(tenWorker.Count >= 7,
-            $"Chỉ thấy {tenWorker.Count} worker (đã biết ít nhất 7) ⇒ phép quét hỏng.");
+        Assert.True(tenWorker.Count >= 8,
+            $"Chỉ thấy {tenWorker.Count} worker (đã biết ít nhất 8) ⇒ phép quét hỏng.");
     }
 
     [Fact]

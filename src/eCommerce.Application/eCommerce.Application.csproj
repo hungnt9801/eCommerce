@@ -29,6 +29,16 @@
     <!-- 🚨 `SAL-005` — nơi nhận đơn sàn dùng `IIdempotencyGuard` của module Messaging (`XC-002`).
          app → module là HỢP LỆ (module → app mới bị cấm). -->
     <ProjectReference Include="..\..\modules\Messaging\eCommerce.Messaging.Domain\eCommerce.Messaging.Domain.csproj" />
+    <!-- 🚨 `REC-001` mục 7 (17/10/2026) — **JOB ĐỐI SOÁT THANH TOÁN ĐỊNH KỲ** (`PaymentReconciliationWorker`).
+         📌 **VÌ SAO CẦN `PaymentHub.Domain` (không phải `…Application`):** job **KHÔNG** được gọi
+         `IPaymentAppService` — lớp đó mang `[Authorize]` ở **cấp class** (quy ước #4) ⇒ interceptor của ABP
+         kiểm quyền **ngay cả khi gọi trong tiến trình**, mà worker **không có principal** ⇒
+         **`AbpAuthorizationException`** (🔒 lỗi **ĐÃ ĐO ĐƯỢC** ở `SAL-005`).
+         ✅ Nên job đọc **thẳng** `IRepository<PaymentTransaction, Guid>` + `IPaymentProvider` (đều ở tầng
+         **Domain**), và dùng **cùng** hàm luật thuần `LuatDoiSoatThanhToan.Quyet` mà app service dùng
+         ⇒ 🔑 **một định nghĩa, hai chỗ gọi**.
+         📌 app → module là **HỢP LỆ** (module → app mới bị cấm) — cùng khuôn hai tham chiếu ở trên. -->
+    <ProjectReference Include="..\..\modules\PaymentHub\eCommerce.PaymentHub.Domain\eCommerce.PaymentHub.Domain.csproj" />
   </ItemGroup>
 
   <ItemGroup>

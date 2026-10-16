@@ -1340,3 +1340,110 @@ hai ca đó chỉ bằng mã trạng thái ⇒ 📌 vì vậy hàm lô **đếm*
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.1 | 17/10/2026 | *(agent, session GĐ1)* | **§20 — LÁT CẮT 3: ĐƯỜNG GỌI ĐỐI SOÁT THANH TOÁN HÀNG LOẠT (`querydr`)**: thêm **`IPaymentAppService.PostDoiSoatLoatAsync(toiDa)`** + **`KetQuaDoiSoatThanhToanDto`** (🔑 **tách BA con số `SoDaXet`/`SoDoiTrangThai`/`SoKhongXacDinh` — gộp lại là biến *"KHÔNG KIỂM ĐƯỢC"* thành *"đã kiểm, không sao"*). 🔑 **VÌ SAO CẦN HÀM LÔ:** hàm một buộc người vận hành **biết trước** giao dịch nào cần kiểm — mà đó **chính là** thứ họ **không** biết; ⚠️ **IPN mất** ⇒ giao dịch kẹt `Pending` ⇒ **không ai phát hiện** ⇒ **tiền đã vào mà hệ thống không biết**, **không lỗi nào**. 🔒 **HAI BẤT BIẾN:** ① **chỉ xét giao dịch CHƯA ở trạng thái cuối** (gọi cổng cho `Succeeded`/`Refunded` là **lãng phí quota**); ② **GỌI LẠI CHÍNH HÀM MỘT, không tự cập nhật DB** (nếu không thì bất biến **CHỈ TIẾN, KHÔNG LÙI** có **hai** chỗ phải đúng và chỗ thứ hai sẽ **lệch**). 🚨 **PHÁT HIỆN VỀ NHÀ CUNG CẤP:** `QueryStatusAsync` trả `Pending` khi `HttpClient` **rỗng** và **không ném** (cố ý) ⇒ ở tầng HTTP *"cổng chưa cấu hình"* và *"cổng nói chưa biết"* **giống hệt nhau** ⇒ 📌 hàm lô **đếm** `SoKhongXacDinh` và **log `Warning`** `[PAY-DOISOAT-KHONG-XAC-DINH]` khi nó **bằng** `SoDaXet`. ✅ **7/7 ca DB + HTTP + LOG thật**: `A1` tiền đề · `C1` `200` · `C2` **`soDaXet=1`** (bỏ qua `Succeeded`) · `C3` **`soKhongXacDinh=1`** · `C4` `soDoiTrangThai=0` · `D1` **log có neo** · `E1` **DB không đổi** (bất biến CHỈ TIẾN giữ **qua cả hàm lô**). ➕ route thật: `/api/app/payment/doi-soat-loat` **POST**. 🐞 **Ba lỗi của tôi:** (1) 🚨 **sai CHỮ HOA mật khẩu** (`1q2w3e*` vs **`1q2w3E*`**) ⇒ token `401` ⇒ **5/7 ca đỏ** — 🔑 **`401` là lỗi ĐĂNG NHẬP, không phải lỗi sản phẩm**; nếu không kiểm token trước thì đã **kết luận sai** rằng hàm lô hỏng (**luật mới: kiểm TOKEN trước khi tin mọi ca đỏ sau nó**); (2) 🚨 **sửa mã theo CHỈ SỐ DÒNG** ⇒ **phá cấu trúc tệp** (`CS1519`) — 🔒 chỉ số dòng **đổi** khi thêm/xoá dòng ở trên ⇒ dùng `edit` với **ngữ cảnh**; (3) **suy kiểu từ DTO** — `canDoiSoat` là mảng **chuỗi** nhưng `x.Status` (entity) là **ENUM** ⇒ `CS1503`, rồi `sau == truoc` hai kiểu khác nhau ⇒ `CS0019` — 🔑 **DTO và ENTITY có thể đặt CÙNG tên trường với KIỂU KHÁC NHAU** (`ChuyenDto` làm `.ToString()`), **đọc kiểu TỪ ENTITY**. Ghi **§20.7** (nợ: 🚨 **chưa có JOB ĐỊNH KỲ** gọi đối soát lô ⇒ vẫn phải bấm tay · chưa có UI đối soát lô · 🚨 `SoKhongXacDinh` **không phân biệt** *"chưa cấu hình"* với *"cổng chậm"* · chưa kiểm luồng **THU ĐƯỢC TIỀN** thật (🔒 **cần credential sandbox** — **nợ chặn**) · chưa có **metric**) |
+
+---
+
+## 21. ✅ **LÁT CẮT 4 — JOB ĐỐI SOÁT THANH TOÁN ĐỊNH KỲ** (17/10/2026) — *đóng nợ §20.7 #1*
+
+### 21.1 🔑 **Vấn đề: endpoint đã có, nhưng vẫn phải có NGƯỜI BẤM**
+
+Ở §20 tôi đã thêm `PostDoiSoatLoatAsync` ⇒ **đường gọi** đã có. ⚠️ Nhưng **vẫn phải có người bấm**.
+📌 Và đối soát là công việc **ĐỊNH KỲ**, không phải việc ai đó **nhớ ra**.
+🚨 Hệ quả nếu chỉ có endpoint: **IPN mất** ⇒ giao dịch kẹt `Pending` ⇒ 🔑 **tiền đã vào mà hệ thống không
+biết** — cho tới khi **tình cờ** có người mở trang và bấm. **Không có lỗi nào** để nhắc họ.
+
+### 21.2 🚨 **BÀI HỌC QUYẾT ĐỊNH — HAI LỐI SAI, VÀ CẢ HAI ĐỀU TỆ**
+
+Lớp `PaymentAppService` mang **`[Authorize]` ở cấp class** (quy ước #4 **bắt buộc** cho mọi app service) ⇒
+interceptor của ABP kiểm quyền **NGAY CẢ KHI GỌI TRONG TIẾN TRÌNH**, mà worker **KHÔNG có principal**
+⇒ **`AbpAuthorizationException`**.
+📌 **Lỗi này ĐÃ XẢY RA THẬT** ở `SAL-005`: `MarketplaceReconciliationWorker` gọi `IDeadLetterAppService` ⇒ job
+**chết giữa đường**, log chỉ có neo **mở đầu** và **không** có neo kết thúc — 🔒 và tệ hơn: các ca kiểm
+*"job không ghi gì"* **vẫn XANH** vì job **chết**, không phải vì job **cố ý** không ghi.
+
+| Lối | Vì sao **sai** |
+|---|---|
+**Chép luật sang worker** | ⚠️ Luật *"CHỈ TIẾN, KHÔNG LÙI"* có **HAI** định nghĩa ⇒ 🔒 chúng sẽ **lệch** khi ai đó sửa một chỗ |
+**Cho worker gọi app service** | 🚨 **`AbpAuthorizationException`** ⇒ job **chết im lặng** |
+
+✅ **LỐI ĐÚNG (lượt này):** đặt luật ở **một hàm THUẦN trong tầng Domain** —
+`LuatDoiSoatThanhToan.Quyet(hienTai, tuCong)` — 🔑 **không** `[Authorize]`, **không** DI, **không** I/O
+⇒ **cả** app service **và** worker gọi **cùng một** định nghĩa. 📌 **Một định nghĩa, hai chỗ gọi.**
+➕ Worker đọc **thẳng** `IRepository<PaymentTransaction, Guid>` + `IPaymentProvider` (cùng khuôn
+`MarketplaceReconciliationWorker`).
+
+### 21.3 ✅ **Luật — BỐN NHÁNH, và THỨ TỰ NHÁNH quan trọng**
+
+| # | Nhánh | Quyết định |
+|---|---|---|
+**①** | Đã ở **trạng thái cuối** (`Succeeded`/`PartiallyRefunded`/`Refunded`) | `KhongDoi` — 🔒 **kể cả khi** cổng nói `Failed`/`Cancelled` |
+**②** | Cổng xác nhận `Succeeded` | `GhiDaThuTien` — 🔑 **kể cả khi** đang là `Failed` |
+**③** | Cổng xác nhận `Failed`/`Cancelled` | `GhiThatBai` |
+**④** | Còn lại (`Pending`/`Initiated`) | `KhongDoi` — ⚠️ **KHÔNG** hạ trạng thái |
+
+🚨 **VÌ SAO NHÁNH ① PHẢI ĐỨNG TRƯỚC:** ghi `Failed` lên một giao dịch **đã hoàn tiền** sẽ **xoá dấu vết dòng
+tiền** (`RefundedAmount` vẫn còn nhưng `Status` nói *"chưa từng thu"*) ⇒ **kế toán không đối chiếu được**.
+
+🔑 **VÌ SAO `Failed` KHÔNG phải trạng thái cuối — CỐ Ý:** một giao dịch `Failed` **vẫn được** đối soát lại
+(IPN đến muộn, hoặc lần trước cổng trả lỗi tạm thời) ⇒ cần cơ hội **sửa thành `Succeeded`** khi cổng xác nhận
+tiền **đã** vào. 📌 **Đó chính là lưới an toàn cho IPN mất.**
+
+🔑 **VÀ `DaKetThuc` PHẢI KHỚP CHÍNH XÁC** danh sách mà `PaymentTransaction.MarkSucceeded`/`MarkFailed` dùng.
+⚠️ Nếu lệch thì sinh ca **vô nghĩa**: hàm quyết định nói *"cứ ghi"*, rồi entity **im lặng** `return`
+⇒ 📌 chỗ gọi **đếm** là *"đã đổi trạng thái"* trong khi **DB không đổi** ⇒ **báo cáo đối soát SAI**.
+
+### 21.4 ✅ **Job — ba quyết định vận hành**
+
+| Quyết định | Vì sao |
+|---|---|
+**Nhịp 15 phút** ⚠️ | Đối soát **gọi HTTP ra cổng** cho **từng** giao dịch ⇒ 🔒 **không** được dày như `MarketplaceReconciliationWorker` (10 phút, chỉ **đọc** DB). Nhịp dày hơn **không** làm cảnh báo tốt hơn — 📌 điều quyết định là **con người có đọc log hay không** — mà lại **tiêu quota** của cổng (tài nguyên **có hạn**) |
+**Trần 50 giao dịch/lượt** | Mỗi giao dịch là **một lời gọi HTTP**: trần để một tồn đọng lớn **không** làm lượt quét chạy hàng giờ |
+🔑 **CŨ NHẤT TRƯỚC** rồi mới cắt trần | Giao dịch kẹt **lâu nhất** là **đáng lo nhất**. ⚠️ Nếu lấy **mới nhất** trước thì một tồn đọng lớn khiến giao dịch cũ **không bao giờ** được xét — 🔒 đó là *"đói"* (starvation) và nó **im lặng**. ➕ Và khi chạm trần, log **NÓI RÕ** đã cắt bớt (`[PAY-JOB-CAT-BOT]`) |
+
+➕ **`isTransactional: true`** — ⚠️ **khác** `MarketplaceReconciliationWorker` (chỉ **đọc**): job này **GHI**
+trạng thái ⇒ 🔒 phải nguyên tử, không để nửa lượt quét được ghi.
+
+### 21.5 ✅ **KIỂM CHỨNG — 20 UNIT TEST + JOB CHẠY THẬT**
+
+**`LuatDoiSoatThanhToanTests` (20 ca)** — hàm thuần:
+| Nhóm | Bất biến |
+|---|---|
+`DaKetThuc` đúng cho **3** trạng thái cuối · **không** đúng cho **4** trạng thái chưa cuối | 🔑 **`Failed` KHÔNG phải cuối** — cố ý |
+🚨 **Trạng thái cuối ⇒ `KhongDoi` với MỌI câu trả lời của cổng** | Quét **mọi** giá trị enum — bắt được cả nhánh `default` **sai** |
+🔑 **`Failed` + cổng nói `Succeeded` ⇒ `GhiDaThuTien`** | **Lưới an toàn IPN mất** |
+Cổng nói `Failed`/`Cancelled` ⇒ `GhiThatBai` · cổng nói *"chưa biết"* ⇒ **không lùi** | |
+🔒 **Quét LƯỚI BAO PHỦ: mọi cặp `(hiện tại, từ cổng)`** | Bắt hai loại lỗi mà ca cụ thể **không** bắt: ① giá trị enum **mới** rơi vào `default` sai; ② 🔑 **hạ trạng thái** |
+
+**JOB CHẠY THẬT (đo trên Host + log + DB):**
+| Neo | Đo được |
+|---|---|
+`[PAY-JOB-BAT-DAU]` | ✅ job **chạy** (📌 không có neo này thì *"im lặng"* **không phân biệt được** với *"không chạy"*) |
+`[PAY-JOB-XONG]` | ✅ job chạy **XONG** — 🔑 phân biệt với *"chạy rồi NÉM"* |
+cảnh báo **KHÔNG XÁC ĐỊNH** | ✅ phát hiện **1 giao dịch** nhưng cổng chưa cấu hình ⇒ **NÓI RÕ** *"lượt quét KHÔNG mang lại thông tin"* thay vì *"0 thay đổi = mọi thứ ổn"* |
+**DB `Status` vẫn `1`** | ✅ bất biến **CHỈ TIẾN, KHÔNG LÙI** giữ được **qua CẢ JOB** |
+➕ tên worker xuất hiện trong danh sách worker đã chạy: **`eCommerce.Application.PaymentHub.PaymentReconciliationWorker`** |
+
+### 21.6 🐞 **Lỗi của tôi — và lần này là BẪY CŨ TÁI DIỄN**
+
+| # | Lỗi | Bài học |
+|---|---|---|
+🚨 **1** | **Lượt probe đầu: job KHÔNG có neo nào** (3/6 ca đỏ). Tôi tưởng đăng ký hỏng ⇒ **kiểm mã nguồn, kiểm chuỗi trong DLL: đều ĐÚNG**. 🔑 Nguyên nhân thật: **`eCommerce.Application.dll` trong thư mục Host là bản CŨ** (Host đang chạy giữ tệp ⇒ build ghi hụt) | 🚨 **Đây là LẦN THỨ BA** gặp bẫy *"build `exit 0` mà nhị phân không đổi"* (`web-001` §97.6 #2, §98.6 #1, và lượt này). 🔒 **Luật đã có từ §97.6 nhưng tôi vẫn suýt kết luận SAI về SẢN PHẨM** — 📌 vì tôi **kiểm mốc DLL của tệp khác** (`PaymentHub.Application`) mà **không** kiểm tệp mà Host **thực sự nạp** (bản copy trong `bin` của Host). ✅ **Luật siết lại: kiểm mốc của BẢN COPY trong `bin` của tiến trình sẽ chạy — không phải bản trong thư mục dự án** |
+**2** | Tôi **grep tên lớp trong DLL bằng `Encoding.Unicode`** và kết luận "DLL không có worker" | ⚠️ File .NET dùng **UTF-8** cho siêu dữ liệu chuỗi. 📌 Kết luận từ **phép đo sai công cụ** — phải thử **cả hai** bảng mã trước khi tin |
+**3** | Log console **làm hỏng dấu tiếng Việt** (`b?t d?u`) | 📌 Bài học đã ghi nhiều lần — **chỉ dùng neo ASCII** khi so khớp |
+
+### 21.7 ⏳ NỢ
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+**1** | **Chưa có metric** cho `SoDoiTrangThai`/`SoKhongXacDinh` | 📌 Hiện chỉ **log**; `eCommerceMetrics` đã có sẵn khuôn (xem `MarketplaceReconciliationWorker` dùng `metric.SetMessagingDlqSize`) |
+**2** | 🚨 **Cảnh báo vẫn chỉ là LOG** — chưa có **alert rule** | 🔑 Cùng nợ với `SAL-005` §19.6: *"job phát hiện"* **≠** *"có người biết"* |
+**3** | **Chưa kiểm luồng THU ĐƯỢC TIỀN thật** (`SoThuDuoc > 0`) | 🔒 Cần **credential sandbox VNPay** ⇒ **nợ chặn** (giống `HoanTienAsync`) |
+**4** | **Ngưỡng/nhịp là hằng số**, chưa thành setting | ⚠️ Muốn đổi nhịp phải **deploy lại** |
+**5** | **Chưa có UI** hiển thị kết quả lượt đối soát gần nhất | 📌 Người vận hành phải đọc **log** |
+**6** | **Chưa có test tích hợp cho worker** | ⚠️ Lượt này kiểm bằng **probe** (script tay) — 📌 cùng nợ `web-001` §98.7 #1 |
+
+### 21.8 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.2 | 17/10/2026 | *(agent, session GĐ1)* | **§21 — LÁT CẮT 4: JOB ĐỐI SOÁT THANH TOÁN ĐỊNH KỲ** (đóng nợ §20.7 #1): thêm **`LuatDoiSoatThanhToan`** (**hàm THUẦN tầng Domain** — 🔑 **vì sao ở Domain, không ở app service:** `PaymentAppService` mang `[Authorize]` cấp class (quy ước #4) ⇒ interceptor ABP kiểm quyền **ngay cả khi gọi trong tiến trình**, mà worker **không có principal** ⇒ **`AbpAuthorizationException`** — 📌 **lỗi ĐÃ XẢY RA THẬT** ở `SAL-005`; ⚠️ **hai lối sai:** *chép luật sang worker* ⇒ luật có **HAI** định nghĩa và sẽ **lệch**, *cho worker gọi app service* ⇒ **chết im lặng**; ✅ **lối đúng: một định nghĩa, hai chỗ gọi**) + **`PaymentReconciliationWorker`** (nhịp **15 phút** vì mỗi giao dịch là **một lời gọi HTTP ra cổng** — ⚠️ khác `MarketplaceReconciliationWorker` 10 phút chỉ **đọc**; trần **50/lượt**; 🔑 **CŨ NHẤT TRƯỚC** rồi mới cắt trần — nếu lấy **mới nhất** trước thì tồn đọng lớn khiến giao dịch cũ **không bao giờ** được xét ⇒ *"đói"* **im lặng**; ➕ chạm trần thì log **NÓI RÕ**; `isTransactional: true` vì job **GHI**) + đăng ký trong `OnPostApplicationInitializationAsync` + `ProjectReference` → `PaymentHub.Domain` + `PaymentReconciliationWorker` vào **danh sách BẮT BUỘC** của `BackgroundWorkerCoCheTests` (`>= 8`). 🔒 **LUẬT BỐN NHÁNH, THỨ TỰ QUAN TRỌNG:** ① trạng thái **cuối** ⇒ `KhongDoi` (**kể cả** khi cổng nói `Failed` — ghi `Failed` lên giao dịch **đã hoàn tiền** sẽ **xoá dấu vết dòng tiền**, kế toán **không đối chiếu được**); ② cổng nói `Succeeded` ⇒ `GhiDaThuTien` (**kể cả** khi đang `Failed` — 🔑 **lưới an toàn IPN mất**); ③ cổng nói `Failed`/`Cancelled` ⇒ `GhiThatBai`; ④ còn lại ⇒ **KHÔNG LÙI**. 🔑 **`Failed` KHÔNG phải trạng thái cuối — CỐ Ý.** 🔑 **`DaKetThuc` PHẢI KHỚP** danh sách của `MarkSucceeded`/`MarkFailed` — ⚠️ lệch thì hàm quyết định nói *"cứ ghi"*, entity **im lặng** `return`, chỗ gọi **đếm** là *"đã đổi"* mà **DB không đổi** ⇒ **báo cáo SAI**. ✅ **20 unit test** (gồm 🔒 **quét LƯỚI BAO PHỦ mọi cặp trạng thái** — bắt giá trị enum **mới** rơi vào `default` sai **và** bắt **hạ trạng thái**) + **JOB CHẠY THẬT**: `[PAY-JOB-BAT-DAU]` → cảnh báo **KHÔNG XÁC ĐỊNH** → `[PAY-JOB-XONG]`, và **DB `Status` vẫn `1`** (bất biến CHỈ TIẾN giữ **qua cả job**). 🐞 **Ba lỗi:** (1) 🚨 **BẪY CŨ TÁI DIỄN — LẦN THỨ BA**: lượt probe đầu job **không có neo nào** (3/6 đỏ); tôi tưởng **đăng ký hỏng** nhưng mã nguồn **và** DLL đều **đúng** — nguyên nhân thật là **`eCommerce.Application.dll` trong thư mục Host là bản CŨ** (Host đang chạy giữ tệp ⇒ build ghi hụt). 🔒 **Luật §97.6 đã có mà tôi vẫn suýt kết luận SAI về SẢN PHẨM** vì tôi kiểm mốc **tệp khác** (`PaymentHub.Application`) chứ **không** kiểm **bản copy trong `bin` của tiến trình sẽ chạy** ⇒ ✅ **siết luật: kiểm mốc của CHÍNH bản copy đó**; (2) tôi grep tên lớp trong DLL bằng **`Encoding.Unicode`** rồi kết luận *"DLL không có worker"* — ⚠️ .NET dùng **UTF-8** cho siêu dữ liệu chuỗi ⇒ 📌 **kết luận từ phép đo sai công cụ**; (3) log console **làm hỏng dấu tiếng Việt** ⇒ chỉ dùng **neo ASCII**. Ghi **§21.7** (nợ: chưa có **metric** · 🚨 cảnh báo vẫn **chỉ là LOG**, chưa có **alert rule** — *"job phát hiện"* **≠** *"có người biết"* · chưa kiểm luồng **THU ĐƯỢC TIỀN** thật (🔒 **cần credential sandbox** — **nợ chặn**) · nhịp/ngưỡng là **hằng số** chưa thành setting · chưa có **UI** kết quả lượt gần nhất · chưa có **test tích hợp cho worker**) |

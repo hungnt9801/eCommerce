@@ -251,34 +251,54 @@ public class PaymentAppService : ApplicationService, IPaymentAppService
 
         var trangThaiTuCong = await _cong.QueryStatusAsync(gd.MerchantReference);
 
-        // 🔒 **CHỈ TIẾN, KHÔNG LÙI**: nếu cổng nói *"chưa biết"* (`Pending`) mà ta **đã** có tiền
-        // (`Succeeded`/`Refunded`) thì **KHÔNG** được hạ trạng thái — đó sẽ là *"đổi trạng thái đã thu tiền
-        // về chưa thu"* và mở đường cho việc **thu lại** hoặc **huỷ đơn oan**.
-        // 📌 Đây đúng họ lỗi đã trả giá ở `PaymentTransaction` (nhánh trạng thái CUỐI của `MarkSucceeded`).
-        var dangCoTien = gd.Status is Payments.PaymentTransactionStatus.Succeeded
-            or Payments.PaymentTransactionStatus.PartiallyRefunded
-            or Payments.PaymentTransactionStatus.Refunded;
+        // 🚨🔑 **LUẬT NẰM Ở MỘT CHỖ DUY NHẤT** — `LuatDoiSoatThanhToan.Quyet` (tầng **Domain**, hàm **THUẦN**).
+        // 📌 **VÌ SAO KHÔNG VIẾT LẠI Ở ĐÂY:** job định kỳ (`PaymentReconciliationWorker`) **KHÔNG** gọi được
+        // lớp này — `PaymentAppService` mang `[Authorize]` ở **cấp class** (quy ước #4) ⇒ interceptor của ABP
+        // kiểm quyền **ngay cả khi gọi trong tiến trình**, mà worker **không có principal** ⇒
+        // **`AbpAuthorizationException`** (🔒 lỗi **ĐÃ ĐO ĐƯỢC** ở `SAL-005`).
+        // ⚠️ Nếu job **chép** luật sang chỗ nó thì luật *"CHỈ TIẾN, KHÔNG LÙI"* có **HAI** định nghĩa ⇒
+        // chúng sẽ **lệch** khi ai đó sửa một chỗ. ✅ Nên cả hai chỗ **gọi cùng một hàm**.
+        var quyetDinh = Payments.LuatDoiSoatThanhToan.Quyet(gd.Status, trangThaiTuCong);
 
-        if (!dangCoTien && trangThaiTuCong == Payments.PaymentTransactionStatus.Succeeded)
+        switch (quyetDinh)
         {
-            // Cổng xác nhận đã thu tiền ⇒ đây **chính là** lưới an toàn khi IPN **mất** (`REC-001`).
-            gd.MarkSucceeded(null, null, "{\"nguon\":\"querydr\"}", null);
-            await _giaoDich.UpdateAsync(gd, autoSave: true);
+            case Payments.LuatDoiSoatThanhToan.QuyetDinh.GhiDaThuTien:
+                // Cổng xác nhận đã thu tiền ⇒ đây **chính là** lưới an toàn khi IPN **mất** (`REC-001`).
+                gd.MarkSucceeded(null, null, "{\"nguon\":\"querydr\"}", null);
+                await _giaoDich.UpdateAsync(gd, autoSave: true);
 
-            Logger.LogWarning(
-                "ĐỐI SOÁT `querydr` PHÁT HIỆN giao dịch ĐÃ THU TIỀN nhưng chưa được ghi nhận (IPN có thể đã mất): " +
-                "giao dịch={MerchantReference} · số tiền={SoTien}. [PAY-QUERYDR-THU-DUOC]",
-                gd.MerchantReference, gd.Amount);
-        }
-        else if (!dangCoTien && trangThaiTuCong == Payments.PaymentTransactionStatus.Failed)
-        {
-            gd.MarkFailed("Cổng xác nhận giao dịch không thành công (nguồn: querydr).");
-            await _giaoDich.UpdateAsync(gd, autoSave: true);
-        }
-        else if (!dangCoTien && trangThaiTuCong == Payments.PaymentTransactionStatus.Cancelled)
-        {
-            gd.MarkFailed("Cổng xác nhận khách ĐÃ HUỶ giao dịch (nguồn: querydr).");
-            await _giaoDich.UpdateAsync(gd, autoSave: true);
+                Logger.LogWarning(
+                    "ĐỐI SOÁT `querydr` PHÁT HIỆN giao dịch ĐÃ THU TIỀN nhưng chưa được ghi nhận (IPN có thể đã mất): " +
+                    "giao dịch={MerchantReference} · số tiền={SoTien}. [PAY-QUERYDR-THU-DUOC]",
+                    gd.MerchantReference, gd.Amount);
+                break;
+
+            case Payments.LuatDoiSoatThanhToan.QuyetDinh.GhiThatBai:
+                gd.MarkFailed(trangThaiTuCong == Payments.PaymentTransactionStatus.Cancelled
+                    ? "Cổng xác nhận khách ĐÃ HUỶ giao dịch (nguồn: querydr)."
+                    : "Cổng xác nhận giao dịch không thành công (nguồn: querydr).");
+                await _giaoDich.UpdateAsync(gd, autoSave: true);
+                break;
+
+            default:
+                // 🔒 `KhongDoi` gồm **HAI** ca **rất khác nhau** — và 📌 chỗ gọi **phải** phân biệt:
+                //   (a) giao dịch **đã ở trạng thái cuối** ⇒ **KHÔNG CẦN** kiểm (bình thường);
+                //   (b) cổng nói *"chưa biết"* ⇒ **KHÔNG KIỂM ĐƯỢC** (⚠️ **KHÔNG** phải "đã kiểm và ổn").
+                if (Payments.LuatDoiSoatThanhToan.DaKetThuc(gd.Status))
+                {
+                    Logger.LogDebug(
+                        "ĐỐI SOÁT `querydr`: giao dịch {MerchantReference} đã ở trạng thái CUỐI ({TrangThai}) ⇒ không đụng.",
+                        gd.MerchantReference, gd.Status);
+                }
+                else
+                {
+                    Logger.LogInformation(
+                        "ĐỐI SOÁT `querydr`: cổng CHƯA xác nhận được giao dịch {MerchantReference} (trạng thái cổng={TuCong}) " +
+                        "⇒ giữ nguyên {TrangThai}, sẽ thử lại lượt sau. [PAY-QUERYDR-CHUA-BIET]",
+                        gd.MerchantReference, trangThaiTuCong, gd.Status);
+                }
+
+                break;
         }
 
         return ChuyenDto(gd);
