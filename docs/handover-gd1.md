@@ -1,3 +1,5 @@
+> 🚩 **PHIÊN MỚI: đọc docs\tiep-tuc-phien-moi.md TRƯỚC** (gói bàn giao: trạng thái đã kiểm chứng · quy tắc bắt buộc · việc đang dở · prompt gợi ý).
+
 # BÀN GIAO — ĐỌC FILE NÀY TRƯỚC KHI LÀM GÌ
 
 > **Mục đích:** session mới **KHÔNG nhớ** cuộc trò chuyện trước. File này là **bộ nhớ bền vững**:
@@ -357,7 +359,7 @@ danh sách trắng quá rộng) sẽ **tệ hơn không có test** — nó tạo
 | 1 | **Dịch dần danh sách trắng thành ánh xạ** khi mỗi miền (`CAT`/`Ord`/`Pay`/`Chn`…) có đường ghi thật: khi đó lỗi trùng **phải** trả mã nghiệp vụ |
 | 2 | **Job định kỳ** cập nhật/thu gọn danh sách trắng (ràng buộc của GĐ0 sẽ dần được dùng tới) |
 
-> **MỐC KIỂM CHỨNG VÒNG 99 (15/10/2026):** `694 unit + 38 integration` · build **0 lỗi / 0 cảnh báo** (kiểm bằng **mã thoát + đếm `': error '` + DLL tồn tại** — Phụ lục **H1**) · mermaid **197/0** · **185 commit**, nhánh `main` **sạch**. **Ba cơ chế tự bảo vệ** (Phụ lục **B** · **C** · UoW) · **ba công cụ** (`route-check.ps1` · `wait-host.ps1` · `README-probe.md` — **danh mục kiểm Phần A–H**). **Web (khép kín, không cần gõ URL):** đặt hàng **1 SKU · NHIỀU Ô NHẬP (3 dòng, gộp SKU trùng xuyên dòng)** · chống trùng đơn qua UI · **điểm đo thống nhất** (`/health-status` cho cả Host và Web) · **lối vào `/DonHang` từ trang kết quả** · 🔥 **`/DonHang` đủ BA hành động đã đo tới TẬN TỒN KHO VÀ CHỨNG TỪ**: **xác nhận** (`10/4/6→6/0/6`) · **huỷ** (`10/2/8→10/0/10`, nhả chỗ ngay) · **trả hàng** (`OnHand 7→10` + phiếu `TH-…-1`).
+> **MỐC KIỂM CHỨNG VÒNG 108 (16/10/2026):** `746 unit + 38 integration` · build **0 loi / 0 canh bao** (kiem bang **ma thoat + dem `': error '` + DLL ton tai** — muc 4.3 #10 cua `docs\tiep-tuc-phien-moi.md`) · mermaid **197/0** · **197 commit**, nhanh `main` **sach**. **Da xong (co bang chung):** ha tang nen §7.0 · `CAT-001/002` · `PRC-001/002` · `INV-001/002` · **`SAL-001…004`** · `INV-003` (**buoc 1 + CUONG CHE han muc**, ma loi `eCommerce:Inventory:0042`) · `REC-001` (job doi soat phat hien + dem dung) · **chinh sach CHO PHEP CHON** (7 setting ABP, khong migration) · **Web khep kin**: 3 trang hai chieu + gio **toi 5 dong** (gop SKU trung xuyen dong, ca bien, giu dong ca hai duong, song qua phien, chon so dong 1..5) + **`/DonHang` du BA hanh dong** (xac nhan/huy/tra hang — do toi TAN TON KHO VA CHUNG TU) + loi vao tu trang ket qua + **chi tiet SP + SEO**. **Con no:** xem **muc 5** cua `docs\tiep-tuc-phien-moi.md`.
 
 ---
 
