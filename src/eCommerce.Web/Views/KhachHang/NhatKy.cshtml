@@ -186,4 +186,21 @@ else
     liệu cá nhân — nên màn hình này <strong>không</strong> phải tài liệu mật (khác bản xuất ở mục “Xuất dữ liệu”).
 </div>
 
+@* 🔑 **XUAT TEP CSV** (`CUS-001` §25) — 📌 nguoi kiem toan **phai dinh kem bang chung** vao bao cao.
+   ⚠️ Khong co tep thi ho **chep tay**, va 🔒 du lieu **chep tay** thi **khong kiem chung duoc**.
+   🔑 Tep mang **DUNG BO LOC dang xem** — 📌 vi *"cai toi thay"* va *"cai toi gui di"* PHAI khop nhau. *@
+<p class="mb-0">
+    <a asp-action="NhatKyCsv"
+       asp-route-customerId="@ViewBag.CustomerId"
+       asp-route-tuNgay="@tuNgay"
+       asp-route-denNgay="@denNgay"
+       asp-route-nguoiXuat="@nguoiXuat"
+       class="btn btn-sm btn-outline-primary">
+        Xuất tệp CSV (theo bộ lọc đang xem)
+    </a>
+    <span class="text-muted small ms-2">
+        ⚠️ Tệp có BOM UTF-8 (Excel mở đúng tiếng Việt) và tự ghi rõ nếu bị cắt bớt
+    </span>
+</p>
+
 <p class="text-muted small mt-3 mb-0">[NHATKYXUATDULIEU-MAN-HINH]</p>

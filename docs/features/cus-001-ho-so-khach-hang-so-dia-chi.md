@@ -1676,3 +1676,141 @@ DB 21/21 · test cổng 17/17.
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.5 | 17/10/2026 | *(agent, session GĐ1)* | **§24 — LÁT CẮT 8: TEST LỌC NGÀY + LỌC THEO NGƯỜI XUẤT** (đóng nợ §23.6 #4 và #6) — 🚨 **VÀ ĐÃ BẮT ĐƯỢC MỘT LỖI SẢN PHẨM THẬT: lỗi MÚI GIỜ trong bộ lọc ngày.** ➕ Thêm **`nguoiXuat`** vào `GetNhatKyXuatDuLieuAsync` (**khớp CHÍNH XÁC** `==`, **không** `Contains`) + **`GetDanhSachNguoiXuatNhatKyAsync`** (dropdown từ **dữ liệu THẬT**, `Distinct().OrderBy()`) + dropdown trong `NhatKy.cshtml` + **hidden `customerId`** khi lọc + **11 ca E2E** (`D11a`–`D14`). 🚨 **LỖI MÚI GIỜ (§24.1):** ở §23.3 tôi viết `tu?.ToUniversalTime()` kèm chú thích *"phải so sánh cùng mốc, nếu không sẽ lệch theo múi giờ máy chủ"* — 🔑 **chú thích ĐÚNG về nguyên tắc nhưng CÁCH LÀM thì SAI**: `DateTime.TryParse("2020-01-02")` cho `Kind = **Unspecified**`, và `ToUniversalTime()` trên `Unspecified` **coi là giờ ĐỊA PHƯƠNG** rồi **TRỪ offset** (máy chủ `SE Asia Standard Time` = **UTC+7**) ⇒ `2020-01-02 00:00` thành **`2020-01-01 17:00` UTC** ⇒ 🔒 **bộ lọc DỊCH SỚM 7 TIẾNG**: `tuNgay` **rộng hơn** ⇒ **LỌT** dòng lẽ ra phải **loại**; `denNgay` **hẹp hơn** ⇒ **MẤT** dòng lẽ ra phải **hiện**; 🔑 **và đây là loại lỗi TỆ NHẤT với màn hình KIỂM TOÁN:** nó **không báo lỗi**, kết quả **trông như hợp lý**, và 📌 người kiểm toán **kết luận sai về bằng chứng** (*"không ai xuất trong ngày đó"* khi thực tế **CÓ**); ✅ chữa: nhãn form đã ghi rõ *"(UTC)"* ⇒ 🔑 **ngày trên form LÀ ngày UTC** ⇒ dùng `DateTimeStyles.AssumeUniversal | AdjustToUniversal` và **BỎ** `ToUniversalTime()` (📌 chọn cách này thay vì *"để `Unspecified` rồi tin nó đúng"* — 🔒 **`Unspecified` chính là nguồn của lỗi**), ➕ ca **`D12`** khoá lại (lọc `tuNgay = denNgay = 2020-01-02` **phải** thấy dòng `03:04:05`). 🐞 **LỖI CỦA PHÉP ĐO (§24.2) — suýt làm tôi tin sản phẩm hỏng:** lần chạy đầu `D11c`/`D13c` **ĐỎ** với `con admin = True` (⚠️ trông như **bộ lọc không hoạt động**) — 🔑 **nhưng nguyên nhân là PHÉP ĐO:** tôi kiểm `>admin<` trên **CẢ TRANG** và nó khớp **`<option>admin</option>` của DROPDOWN**, 📌 **không** phải một dòng trong bảng; ✅ chữa: tách **`<tbody>`** trước rồi mới kiểm; 🔒 **cùng họ với §97.6 #3** (`href="#"` duy nhất trên trang là **dropdown của THEME**) — **phải tách đúng VÙNG trước khi khẳng định**, ⚠️ nếu không ta **đo một thứ khác** với thứ mình **tưởng**; ➕ thêm ca **`D11a`** khẳng định vùng `<tbody>` **KHÔNG rỗng** — 🔑 chống *"đo một vùng rỗng"* (📌 nếu tách hỏng thì **mọi** ca *"KHÔNG có X"* sẽ **XANH vì lý do SAI**). ✅ **LỌC THEO NGƯỜI XUẤT — KHỚP CHÍNH XÁC, ba lý do:** ① `Contains` làm **"ẩn"** (nhân viên **An** khớp **Anh**, **Hoàng An**…) ⇒ ⚠️ kết quả **thừa** ⇒ 📌 với màn hình **kiểm toán**, *"thừa"* nghĩa là **gán sai cho người khác** — 🔑 **nghiêm trọng hơn** *"thiếu"*; ② `Contains` **không dùng được index** ⇒ quét **cả bảng**, ⚠️ bảng nhật ký **chỉ tăng** ⇒ 📌 chậm **ngày càng tệ**; ③ giá trị đến từ **dropdown** (dữ liệu **thật**) ⇒ 📌 không cần *"tìm gần đúng"*; 🔑 **và dropdown là một QUYẾT ĐỊNH:** ⚠️ ô nhập tự do ⇒ gõ sai một ký tự ⇒ **0 dòng** ⇒ 📌 với màn hình **kiểm toán**, *"0 dòng"* bị đọc thành *"không ai xuất"* = 🔒 **kết luận sai về bằng chứng** từ một **lỗi gõ tay**; ➕ form lọc **giữ `customerId`** (hidden) — ⚠️ nếu không thì bấm *"Lọc"* **mất ngữ cảnh khách** ⇒ 📌 trả về nhật ký của **MỌI** khách trong khi người dùng **tưởng** đang xem của một người. ✅ **KIỂM CHỨNG 11 CA E2E MỚI — MỖI BỘ LỌC ĐO CẢ HAI CHIỀU** (🔑 vì ⚠️ một bộ lọc **luôn trả về TẤT CẢ** thì *"lọc được"* trông **đúng** ở mọi ca chỉ kiểm *"có thấy dòng X không"*): **D11a** tách `<tbody>` **không rỗng** (`687` ký tự) · **D11b** `200` · **D11c** ✅ **chiều "CÓ"** · 🚨 **D11d** ✅ **chiều "KHÔNG"** (dòng hôm nay **BỊ LOẠI**) · **D11e** tổng = **1** (🔑 **đếm đúng**, không chỉ *"không thấy"*) · 🚨 **D12** `denNgay` **bao gồm** cả ngày đó (nửa mở) ⇒ 🔑 **khoá lỗi múi giờ** · **D13a** `200` · **D13b** ✅ **chiều "CÓ"** · 🚨 **D13c** ✅ **chiều "KHÔNG"** · **D13d** dropdown có **CẢ HAI** người xuất **THẬT** · **D14** form **giữ `customerId`**. ➡️ **E2E 43/43** · **8 bước** · `exit 0` · **157s** · **1170** unit · 38 integration · mermaid 197/0 · DB 21/21 · test cổng 17/17. 🐞 **LỖI THỨ BA:** ⚠️ viết khối chú thích **`@* … *@`** (cú pháp **Razor**) trong **`KhachHangController.cs`** — một tệp **C#** ⇒ **`error CS1056: Unexpected character '@'`**; 🔑 **bài học: cú pháp chú thích KHÔNG giống nhau giữa `.cshtml` và `.cs`** ⇒ ✅ chuyển sang `//`. Ghi **§24.6** (nợ: 🚨 **chưa có test lọc ngày ở tầng UNIT** (🔑 hiện `D11`–`D14` **đo qua HTTP + DB thật** — mạnh hơn 📌 nhưng **chậm** và cần Web chạy) · **chưa có XUẤT nhật ký ra CSV** (nợ từ §23.6 #1) · **chưa có cảnh báo xuất LẶP LẠI** · **`LyDo` vẫn chưa được điền** (**nợ từ §22.6 #3 vẫn mở**) · **chưa phân trang** (📌 tạm chấp nhận) · ⚠️ **múi giờ: ngày trên form là UTC** (🔑 nhất quán với `XuatLucUtc` — 📌 nhưng ⚠️ **chưa có chỉ dẫn cho người dùng ở múi giờ khác**) · **chưa gồm dữ liệu module khác** (**nợ chặn**)) |
+
+---
+
+## 25. ✅ **LÁT CẮT 9 — XUẤT NHẬT KÝ KIỂM TOÁN RA CSV** (17/10/2026) — *đóng nợ §24.6 #2 và §23.6 #1*
+
+### 25.1 🔑 **Vì sao — "bằng chứng phải đi kèm báo cáo"**
+
+Người kiểm toán **phải đính kèm bằng chứng** vào báo cáo. ⚠️ Không có tệp thì họ **chép tay** — 📌 và dữ liệu
+**chép tay** thì **không kiểm chứng được**: 🔒 không ai biết nó có khớp với hệ thống hay không.
+
+✅ `GET /KhachHang/NhatKyCsv` trả **tệp CSV** + liên kết *"Xuất tệp CSV (theo bộ lọc đang xem)"* trên màn hình.
+
+### 25.2 🚨 **BA CÁI BẪY CỦA CSV — mỗi cái tạo ra một tệp ĐỌC SAI**
+
+🔒 **Và một tệp bằng chứng đọc sai còn tệ hơn KHÔNG CÓ tệp:** 📌 nó khiến người ta **tin** rằng mình đã kiểm.
+
+| # | Bẫy | Hậu quả |
+|---|---|---|
+**①** | **Thiếu BOM UTF-8** | 🔑 Excel (bản phổ biến ở VN) **không** tự nhận UTF-8 ⇒ tiếng Việt thành **rác** — ⚠️ và tệp đó là thứ **gửi cho cơ quan kiểm toán** |
+**②** | **Dấu phẩy trong dữ liệu** | ⚠️ một lý do như *"theo yêu cầu, qua điện thoại"* **tách thành hai cột** ⇒ 🔒 **toàn bộ các cột sau bị LỆCH**, 📌 và người đọc **không hề biết** (bảng vẫn trông hợp lệ) |
+**③** | **Dấu `"` trong dữ liệu** | ⚠️ theo **RFC 4180** phải **nhân đôi** (`"` → `""`) — 📌 nếu không thì dấu `"` **đóng trường sớm** và phần còn lại **tràn ra ngoài** |
+
+➕ **Và `\r\n` (không phải `\n`)**: 🔒 RFC 4180 quy định **CRLF**; ⚠️ một số trình đọc coi `\n` trần là **ký tự
+trong ô** ⇒ 📌 **toàn bộ tệp thành MỘT ô**.
+
+### 25.3 ✅ **`CsvNhatKy` — lớp HÀM THUẦN, và vì sao nó tồn tại**
+
+🔑 **Không `string.Join(",")` trong controller.** Lớp này gom **ba quy tắc** vào **một chỗ**:
+`Boc` (**luôn** bọc `"…"` + nhân đôi `"`) · `Dong` (ghép một dòng, dùng `Boc` cho **mọi** trường) ·
+`XuongDong` (**CRLF**) · `Bom` (**EF BB BF**).
+
+🔒 **VÌ SAO `Boc` LUÔN BỌC (kể cả khi không cần):** ⚠️ nếu chỉ bọc khi *"thấy dấu phẩy"* thì một giá trị chứa
+**xuống dòng** hoặc chứa `"` sẽ được xử lý **khác nhau tuỳ dữ liệu** ⇒ 📌 đó là loại lỗi **chỉ xuất hiện với một
+số dòng** ⇒ 🔑 **không tái hiện được** ở ca kiểm bình thường. ✅ Luôn bọc ⇒ **một quy tắc duy nhất**.
+
+➕ **Và `null` ghi thành Ô TRỐNG** (không phải chữ `"null"`) — 🔑 nếu ghi chữ `null` thì người đọc **không phân
+biệt được** *"không có dữ liệu"* với *"dữ liệu là chuỗi null"*.
+
+🔑 **Vì nó là hàm THUẦN** ⇒ ✅ **test được bằng unit test nhanh** — 📌 và đó **chính là** nợ §24.6 #1
+(*"chưa có test ở tầng unit"*).
+
+### 25.4 🔒 **HAI DÒNG BẮT BUỘC NẰM TRONG CHÍNH TỆP**
+
+**① DÒNG TIỀN ĐỀ** — ai xuất tệp, lúc nào, và **tệp KHÔNG chứa PII**. 🔑 Tệp **rời khỏi hệ thống** ⇒ 📌 nó phải
+**tự mô tả** được.
+**② ⛔ DÒNG CẢNH BÁO KHI BỊ CẮT** — 🔒 tệp được đọc ở **nơi khác, lúc khác, bởi người khác** ⇒ 📌 người đó
+**không có cách nào** biết bằng chứng đã bị cắt. 🔑 Đó là **chính xác** kiểu **kết luận sai về bằng chứng** mà
+§22–§24 đang chống.
+
+➕ **Tên tệp có mốc thời gian UTC** ⇒ 🔑 xuất nhiều lần **không ghi đè** nhau, và 📌 người đọc biết **bản nào là
+bản nào**.
+➕ **Tái dùng ĐÚNG bộ lọc của màn hình** (cùng tham số + cùng `KieuUtc`) — 📌 nếu lọc khác nhau thì *"cái tôi
+thấy"* và *"cái tôi gửi đi"* **không khớp**, 🔑 và đó là điều tệ nhất với một bằng chứng.
+
+### 25.5 ✅ **KIỂM CHỨNG — 11 UNIT TEST + 11 CA E2E**
+
+**`CsvNhatKyTests` (11/11 ĐẠT):** **TC01** BOM đúng **`EF BB BF`** · 🚨 **TC02** `Encoding.UTF8.GetBytes`
+**KHÔNG** tự thêm BOM (đo được: `"Nhật"` = **6 byte**, không phải 9) ⇒ phải **ghép thủ công** · 🚨 **TC03** dấu
+phẩy **không** tách cột · **TC04** `"` **nhân đôi** · **TC05** luôn bọc (một quy tắc) · **TC06** `null` ⇒ ô
+trống · **TC07** ghép dòng đúng số trường — 🔑 **đọc bằng bộ đọc CSV thật**, không đếm dấu phẩy · **TC08** CRLF ·
+**TC09** dòng cảnh báo có **cả hai** con số · **TC10** dòng tiền đề có luật + **"KHÔNG chứa nội dung dữ liệu cá
+nhân"** · **TC11** mọi trường đều được bọc.
+
+**11 ca E2E mới (đo TỆP THẬT, byte thô):**
+| Ca | Đo được |
+|---|---|
+**D15a** | Tải được tệp (`637` byte) |
+🚨 **D15b** | **BOM UTF-8** — đo **byte thô** `EF BB BF` (📌 `Invoke-WebRequest` **che mất** BOM vì nó giải mã) |
+**D15c** | `Content-Type: text/csv` |
+**D15d** | `Content-Disposition` có tên `nhat-ky-xuat-du-lieu-ca-nhan-…csv` |
+**D15e** | Có **dòng tiền đề** (luật + *"KHÔNG chứa nội dung dữ liệu cá nhân"*) |
+**D15f** | Có **dòng dữ liệu thật** (`K97E2E-nhanvien-b` + `"17"`) |
+🚨 **D15g** | **Escape RFC 4180**: dữ liệu probe có **dấu phẩy VÀ nháy kép** ⇒ đo được `"K97E2E ly do, co ""nhay kep"" trong do"` |
+**D15h** | Dòng tiêu đề có **đúng 8 trường** (hệ quả của escape: không bị lệch cột) |
+🚨 **D15i** | **Không** bị cắt ⇒ **KHÔNG** có dòng cảnh báo (⚠️ không báo động giả) |
+🚨 **D16a** | ✅ **CHIỀU CÒN LẠI**: ép `toiDa=1` ⇒ **CÓ** dòng cảnh báo |
+**D16b** | Dòng cảnh báo có **cả hai** con số (`Chỉ chứa 1 trên tổng 2`) |
+**D16c** | Tệp bị cắt **chỉ có 1 dòng dữ liệu** (🔑 `toiDa` **thật sự** được áp dụng) |
+**D16d** | Dòng được giữ là dòng **MỚI NHẤT** (`admin` hôm nay) — 🔑 khoá luận điểm *"mới nhất trước"* |
+
+🔑 **VÌ SAO `D15i` MỘT MÌNH KHÔNG ĐỦ:** ⚠️ nó chỉ kiểm *"không bị cắt thì không có cảnh báo"*. 🔒 Nếu chỉ có nó
+thì một bản **bỏ hẳn dòng cảnh báo** vẫn **XANH toàn bộ** — 📌 tức phép kiểm **không bao giờ chạy** ở nhánh quan
+trọng. ✅ Đo **cả hai chiều** là nguyên tắc đã dùng ở §24 (`D11`/`D13`): 🔑 một phép kiểm chỉ đo **một phía** thì
+*"luôn đúng"* và *"không hoạt động"* **trông giống hệt nhau**.
+
+➡️ **E2E: 56/56 ĐẠT** · **8 bước** · `exit 0` · **148.4s** · **1181** unit · 38 integration · mermaid 197/0 ·
+DB 21/21 · test cổng 17/17.
+
+### 25.6 🐞 **BỐN lỗi của tôi — và ba trong đó là lỗi của PHÉP ĐO**
+
+**① `CurrentUser` không tồn tại trong `Controller`** (`CS0103`) — 📌 `Controller` **không** kế thừa
+`ApplicationService`. ⚠️ Rồi thử `ICurrentUser` (`Volo.Abp.Users`) ⇒ cũng **không resolve** (dự án Web thiếu
+tham chiếu gói).
+✅ **Chữa (và đơn giản hơn):** dùng thẳng **`HttpContext?.User?.Identity?.Name`** — 🔑 không thêm phụ thuộc nào,
+và 📌 đây là **nguồn thật** mà mọi lớp khác cũng đọc từ đó (cookie auth của Web).
+
+**② 🚨 Kỳ vọng của tôi SAI: `"Nhật"` = 5 byte?** — ⚠️ **Sai.** `"Nhật"` là **4 ký tự**, và `ậ` chiếm **3 byte**
+trong UTF-8 (không phải 2) ⇒ **6 byte**. 📌 Sản phẩm đúng, **test của tôi sai** ⇒ ✅ sửa **kỳ vọng**, và 🔑 ghi
+rõ **phép đếm** vào test (vì chính con số đó là bằng chứng *"có BOM"* và *"không BOM"* khác nhau thật).
+
+**③ 🚨 `D16c` ĐO SAI — và suýt làm tôi kết luận `toiDa` không hoạt động.** Tôi kiểm *"tệp bị cắt có dòng
+`K97E2E-nhanvien-b`"* ⇒ **0 dòng** ⇒ ⚠️ trông như **`toiDa` không có tác dụng**.
+🔑 **Sự thật:** `GetNhatKyXuatDuLieuAsync` sắp **mới nhất TRƯỚC** ⇒ `toiDa = 1` giữ dòng **HÔM NAY** (`admin`),
+⚠️ **không** phải dòng 2020. ✅ **Chữa:** đếm **số dòng dữ liệu** (bất kể là ai) — 📌 đó mới là điều `toiDa`
+điều khiển.
+
+**④ 🚨 `D16d` ĐO SAI LẦN NỮA — vì tôi quên rằng MỌI Ô ĐỀU ĐƯỢC BỌC `"`.** Hai lần liên tiếp đếm **0**:
+lần đầu neo `^\d{4}-` (⚠️ dòng bắt đầu bằng `"`), lần hai neo `"admin"` trên chuỗi **giải mã**.
+🔑 **Và đây là lần thứ ba trong cùng một ca mà phép đo của tôi sai** ⇒ ✅ **đổi cách làm:** thay vì **đoán
+thêm**, tôi **IN RA dòng thật** rồi mới kết luận:
+```
+"2026-10-16 21:30:57","admin","e0000000-…-0000000000e1","K97E2E Khach Probe","11","1","khong","(khong ghi ly do)"
+```
+🔒 **Bài học (lặp lại từ §24.5):** khi một phép đo cho kết quả **bất ngờ**, 🔑 việc đúng là **ĐO CHUỖI THẬT**,
+không phải **suy luận thêm một tầng nữa**.
+
+**⑤ ➕ Và hai lần tôi viết cú pháp SAI loại tệp:** `//` (C#) trong **tệp PowerShell** ⇒ `ParserError`, và
+**vô tình xoá mất ca `D14`** khi chèn khối mới. ✅ Chữa: dùng **công cụ sửa tệp** với ngữ cảnh, và **kiểm lại**
+danh sách ca (`D14` = 1, `D15` = 1) trước khi chạy.
+🔑 **Bài học: `//` là C#, `#` là PowerShell** — 📌 cùng họ với lỗi `@*` (Razor) trong `.cs` ở §24.
+
+### 25.7 ⏳ NỢ
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+**1** | **Chưa có cảnh báo khi xuất LẶP LẠI bất thường** | 🔑 Bảng đã **đủ dữ liệu** (📌 và vì thế tôi **cố ý** không đặt unique index ở §22) |
+**2** | **`LyDo` vẫn chưa được điền** | ⚠️ Nợ từ §22.6 #3 → §23.6 #2 → **vẫn mở**; 📌 tệp CSV ghi `"(khong ghi ly do)"` |
+**3** | **Chưa phân trang** | 📌 Tạm chấp nhận (trần **100**/CSV, **500**/API + lọc ngày + lọc người) |
+**4** | ⚠️ **Múi giờ: ngày trên form là UTC** | 🔑 Nhất quán với `XuatLucUtc` — 📌 nhưng **chưa có chỉ dẫn** cho người dùng ở múi giờ khác |
+**5** | ⚠️ **CSV dùng dấu phẩy — chưa hỗ trợ `;` cho Excel locale** | 📌 Ở một số locale, Excel mặc định dùng `;` ⇒ 🔒 tệp sẽ **thành một cột**. ⚠️ **BOM giúp ích nhưng không giải quyết hết** — 📌 nợ **thật**, chưa xử lý |
+**6** | **Chưa có test cho `toiDa` ở tầng unit** | 🔑 Hiện đo qua E2E (`D16a`–`D16d`) |
+**7** | **Chưa gồm dữ liệu module khác** (địa chỉ giao, thanh toán, thuế) | ⚠️ **Nợ chặn** (`Address` chưa tồn tại) |
+
+### 25.8 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.6 | 17/10/2026 | *(agent, session GĐ1)* | **§25 — LÁT CẮT 9: XUẤT NHẬT KÝ KIỂM TOÁN RA CSV** (đóng nợ §24.6 #2 và §23.6 #1): thêm **`CsvNhatKy`** (**hàm THUẦN**: `Boc` luôn bọc `"…"` + nhân đôi `"` · `Dong` · `XuongDong` = **CRLF** · `Bom` = **EF BB BF** · `DongTienDe` · `DongCanhBaoCat`) + **`GET /KhachHang/NhatKyCsv`** (BOM ghép **thủ công** + tên tệp có **mốc UTC** + `toiDa`) + liên kết *"Xuất tệp CSV (theo bộ lọc đang xem)"* + **11 unit test** + **11 ca E2E**. 🔑 **VÌ SAO:** người kiểm toán **phải đính kèm bằng chứng** vào báo cáo; ⚠️ không có tệp thì họ **chép tay** — 📌 và dữ liệu **chép tay** thì **không kiểm chứng được**. 🚨 **BA CÁI BẪY CỦA CSV (mỗi cái tạo ra một tệp ĐỌC SAI, 🔒 và tệp bằng chứng đọc sai còn tệ hơn KHÔNG CÓ tệp vì 📌 nó khiến người ta TIN rằng mình đã kiểm):** ① **thiếu BOM UTF-8** ⇒ Excel (bản phổ biến ở VN) **không** tự nhận UTF-8 ⇒ tiếng Việt thành **rác**, ⚠️ và tệp đó là thứ **gửi cho cơ quan kiểm toán** · ② **dấu phẩy trong dữ liệu** ⇒ *"theo yêu cầu, qua điện thoại"* **tách thành hai cột** ⇒ 🔒 **toàn bộ các cột sau bị LỆCH**, 📌 và người đọc **không hề biết** · ③ **dấu `"` trong dữ liệu** ⇒ theo **RFC 4180** phải **nhân đôi**, 📌 nếu không thì nó **đóng trường sớm** và phần còn lại **tràn ra ngoài**; ➕ và **`\r\n`** (RFC 4180 quy định **CRLF**) — ⚠️ `\n` trần bị một số trình đọc coi là **ký tự trong ô** ⇒ 📌 **toàn bộ tệp thành MỘT ô**. ✅ **`CsvNhatKy` gom BA QUY TẮC vào MỘT CHỖ** (không `string.Join(",")` trong controller), 🔒 **`Boc` LUÔN BỌC** kể cả khi không cần: ⚠️ nếu chỉ bọc khi *"thấy dấu phẩy"* thì giá trị chứa **xuống dòng**/`"` được xử lý **khác nhau tuỳ dữ liệu** ⇒ 📌 lỗi **chỉ xuất hiện với một số dòng** ⇒ **không tái hiện được**; ✅ luôn bọc ⇒ **một quy tắc duy nhất**; ➕ **`null` ⇒ Ô TRỐNG** (không phải chữ `"null"`) vì 🔑 người đọc phải phân biệt được *"không có dữ liệu"* với *"dữ liệu là chuỗi null"*; 🔑 **và vì là hàm THUẦN** ⇒ ✅ test được bằng **unit test nhanh** — 📌 **chính là nợ §24.6 #1**. 🔒 **HAI DÒNG BẮT BUỘC NẰM TRONG CHÍNH TỆP:** ① **dòng tiền đề** (ai xuất, lúc nào, **tệp KHÔNG chứa PII**) — 🔑 tệp **rời khỏi hệ thống** ⇒ phải **tự mô tả** được; ② ⛔ **dòng cảnh báo khi bị cắt** — 🔒 tệp được đọc ở **nơi khác, lúc khác, bởi người khác** ⇒ 📌 người đó **không có cách nào** biết bằng chứng đã bị cắt (🔑 **chính xác** kiểu **kết luận sai về bằng chứng** mà §22–§24 chống); ➕ tên tệp có **mốc UTC** (🔑 không ghi đè nhau) + **tái dùng ĐÚNG bộ lọc của màn hình** (cùng tham số + cùng `KieuUtc`) — 📌 nếu lọc khác nhau thì *"cái tôi thấy"* và *"cái tôi gửi đi"* **không khớp**. ✅ **KIỂM CHỨNG 11 UNIT TEST + 11 CA E2E:** **TC01** BOM `EF BB BF` · 🚨 **TC02** `Encoding.UTF8.GetBytes` **KHÔNG** tự thêm BOM (⚠️ `File(Encoding.UTF8.GetBytes(s), …)` ⇒ **KHÔNG CÓ BOM** dù `Content-Type` ghi `charset=utf-8`) ⇒ phải **ghép thủ công** · 🚨 **TC03** dấu phẩy **không** tách cột · **TC04** `"` **nhân đôi** · **TC05** luôn bọc · **TC06** `null` ⇒ ô trống · **TC07** ghép dòng đúng số trường (🔑 **đọc bằng bộ đọc CSV THẬT**, ⚠️ không đếm dấu phẩy — 📌 nếu đếm thì test **tự vô hiệu** đúng ở chỗ cần nhất) · **TC08** CRLF · **TC09** cảnh báo có **cả hai** con số · **TC10** tiền đề có luật + *"KHÔNG chứa nội dung dữ liệu cá nhân"* · **TC11** mọi trường đều được bọc; **E2E đo TỆP THẬT (byte thô):** **D15a** tải được (`637` byte) · 🚨 **D15b** **BOM** đo **byte thô** `EF BB BF` (📌 `Invoke-WebRequest` **che mất** BOM vì nó **giải mã** ⇒ ✅ dùng `curl.exe -D` + đọc byte) · **D15c** `text/csv` · **D15d** tên tệp có mốc · **D15e** dòng tiền đề · **D15f** dòng dữ liệu thật · 🚨 **D15g** **escape RFC 4180** với dữ liệu probe có **dấu phẩy VÀ nháy kép** ⇒ đo được `"K97E2E ly do, co ""nhay kep"" trong do"` · **D15h** tiêu đề **đúng 8 trường** · 🚨 **D15i** không bị cắt ⇒ **KHÔNG** có cảnh báo (⚠️ không báo động giả) · 🚨 **D16a** ✅ **CHIỀU CÒN LẠI** (ép `toiDa=1` ⇒ **CÓ** cảnh báo) · **D16b** cảnh báo có **cả hai** con số · **D16c** tệp bị cắt **chỉ 1 dòng dữ liệu** (🔑 `toiDa` **thật sự** được áp dụng) · **D16d** dòng được giữ là **MỚI NHẤT** (🔑 khoá luận điểm *"mới nhất trước"*); 🔑 **VÌ SAO `D15i` MỘT MÌNH KHÔNG ĐỦ:** ⚠️ nó chỉ kiểm *"không bị cắt thì không có cảnh báo"* ⇒ 🔒 một bản **bỏ hẳn dòng cảnh báo** vẫn **XANH toàn bộ** — 📌 phép kiểm **không bao giờ chạy** ở nhánh quan trọng; ✅ đo **cả hai chiều** (nguyên tắc §24): 🔑 một phép kiểm chỉ đo **một phía** thì *"luôn đúng"* và *"không hoạt động"* **trông giống hệt nhau**. ➡️ **E2E 56/56** · **8 bước** · `exit 0` · **148.4s** · **1181** unit · 38 integration · mermaid 197/0 · DB 21/21 · test cổng 17/17. 🐞 **NĂM LỖI — ba trong đó là lỗi của PHÉP ĐO:** ① **`CurrentUser` không tồn tại trong `Controller`** (`CS0103`; `Controller` **không** kế thừa `ApplicationService`) — ⚠️ rồi thử `ICurrentUser` (`Volo.Abp.Users`) cũng **không resolve** (dự án Web thiếu tham chiếu gói) ⇒ ✅ **chữa đơn giản hơn:** dùng thẳng **`HttpContext?.User?.Identity?.Name`** (🔑 không thêm phụ thuộc, 📌 và là **nguồn thật** mà mọi lớp khác đọc từ đó); ② 🚨 **kỳ vọng của tôi SAI: `"Nhật"` = 5 byte?** — ⚠️ sai: `"Nhật"` là **4 ký tự** và `ậ` chiếm **3 byte** (không phải 2) ⇒ **6 byte**; 📌 **sản phẩm đúng, test của tôi sai** ⇒ ✅ sửa **kỳ vọng** + ghi rõ **phép đếm** vào test (🔑 chính con số đó là bằng chứng *"có BOM"* khác *"không BOM"*); ③ 🚨 **`D16c` ĐO SAI, suýt làm tôi kết luận `toiDa` không hoạt động** — tôi kiểm *"tệp bị cắt có dòng `K97E2E-nhanvien-b`"* ⇒ **0 dòng** ⇒ ⚠️ trông như **`toiDa` vô tác dụng**; 🔑 sự thật: hàm sắp **mới nhất TRƯỚC** ⇒ `toiDa = 1` giữ dòng **HÔM NAY** (`admin`), ⚠️ **không** phải dòng 2020 ⇒ ✅ đếm **số dòng dữ liệu** (bất kể là ai) — 📌 đó mới là điều `toiDa` điều khiển; ④ 🚨 **`D16d` ĐO SAI LẦN NỮA vì tôi quên MỌI Ô ĐỀU ĐƯỢC BỌC `"`** — hai lần liên tiếp đếm **0** (lần đầu neo `^\d{4}-`, ⚠️ dòng bắt đầu bằng `"`; lần hai neo `"admin"` trên chuỗi **giải mã**) ⇒ 🔑 **lần thứ ba trong cùng một ca mà phép đo của tôi sai** ⇒ ✅ **đổi cách làm: thay vì ĐOÁN thêm, IN RA dòng thật** rồi mới kết luận — đo được `"2026-10-16 21:30:57","admin","e0000000-…","K97E2E Khach Probe","11","1","khong","(khong ghi ly do)"`; 🔒 **bài học (lặp lại từ §24.5): khi một phép đo cho kết quả BẤT NGỜ, việc đúng là ĐO CHUỖI THẬT, không phải SUY LUẬN THÊM MỘT TẦNG NỮA**; ⑤ ➕ **hai lần viết cú pháp SAI loại tệp:** `//` (C#) trong **tệp PowerShell** ⇒ `ParserError`, và **vô tình xoá mất ca `D14`** khi chèn khối mới ⇒ ✅ dùng **công cụ sửa tệp** + **kiểm lại danh sách ca** (`D14` = 1, `D15` = 1) trước khi chạy; 🔑 **bài học: `//` là C#, `#` là PowerShell** — 📌 cùng họ với lỗi `@*` (Razor) trong `.cs` ở §24. Ghi **§25.7** (nợ: **chưa có cảnh báo xuất LẶP LẠI** (🔑 bảng đã **đủ dữ liệu**) · **`LyDo` vẫn chưa được điền** (**nợ từ §22.6 #3 → §23.6 #2 → vẫn mở**; 📌 tệp CSV ghi `"(khong ghi ly do)"`) · **chưa phân trang** · ⚠️ **múi giờ: ngày trên form là UTC** (📌 chưa có chỉ dẫn cho người dùng khác múi) · ⚠️ **CSV dùng dấu phẩy — chưa hỗ trợ `;` cho locale Excel** (📌 ở một số locale Excel mặc định `;` ⇒ 🔒 tệp **thành một cột**; ⚠️ BOM **giúp ích nhưng không giải quyết hết** — **nợ THẬT**) · **chưa có test `toiDa` ở tầng unit** · **chưa gồm dữ liệu module khác** (**nợ chặn**)) |

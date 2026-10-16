@@ -1,5 +1,6 @@
 using eCommerce.Customers;
 using System.Globalization;
+using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -150,6 +151,103 @@ public class KhachHangController : Controller
         ViewBag.CacNguoiXuat = await _khachHang.GetDanhSachNguoiXuatNhatKyAsync(customerId);
 
         return View(ketQua);
+    }
+
+    /// <summary>
+    /// `GET /KhachHang/NhatKyCsv` — 🔑 **XUẤT NHẬT KÝ KIỂM TOÁN RA TỆP CSV** (`CUS-001` §25).
+    ///
+    /// 🔑 **VÌ SAO CẦN (không chỉ "tiện"):** người kiểm toán **phải đính kèm bằng chứng** vào báo cáo.
+    /// ⚠️ Không có tệp thì họ **chép tay** — 📌 và dữ liệu **chép tay** thì **không kiểm chứng được**
+    /// (🔒 không ai biết nó có khớp với hệ thống hay không).
+    ///
+    /// 🔒 **BA ĐIỀU BẮT BUỘC, VÀ CẢ BA ĐỀU NẰM TRONG CHÍNH TỆP** (xem `CsvNhatKy`):
+    /// <list type="number">
+    ///   <item>**BOM UTF-8** — ⚠️ thiếu nó thì Excel đọc tiếng Việt thành **rác**, 🔑 và tệp đó là thứ
+    ///     **gửi cho cơ quan kiểm toán**;</item>
+    ///   <item>**Dòng tiền đề** — ai xuất, lúc nào, và **tệp KHÔNG chứa PII** (🔑 tệp **rời khỏi hệ thống**
+    ///     ⇒ 📌 nó phải **tự mô tả** được);</item>
+    ///   <item>⛔ **Dòng cảnh báo khi bị cắt** — 🔒 tệp được đọc ở **nơi khác, lúc khác, bởi người khác**
+    ///     ⇒ 📌 người đó **không có cách nào** biết bằng chứng đã bị cắt.</item>
+    /// </list>
+    ///
+    /// ⚠️ **TÁI DÙNG ĐÚNG BỘ LỌC CỦA MÀN HÌNH** (cùng tham số + cùng `KieuUtc`) — 📌 nếu lọc khác nhau thì
+    /// *"cái tôi thấy"* và *"cái tôi gửi đi"* **không khớp**, 🔑 và đó là điều tệ nhất với một bằng chứng.
+    /// </summary>
+    /// <param name="toiDa">
+    /// ⚠️ **Tran so dong** — 🔑 de **che do kiem thu** co the ep tep **bi cat** va 📌 nho vay kiem duoc
+    /// **dong canh bao** (⚠️ neu khong co duong nay thi dong canh bao **khong bao gio** duoc do ⇒
+    /// 🔒 mot phep kiem co the **luon xanh** vi no **khong bao gio** chay).
+    /// 📌 App service da `Clamp(1..500)` ⇒ 🔑 duong nay **khong** mo them kha nang lay qua nhieu.
+    /// </param>
+    public async Task<IActionResult> NhatKyCsv(Guid? customerId = null, string? tuNgay = null, string? denNgay = null, string? nguoiXuat = null, int toiDa = 100)
+    {
+        // 🔑 Cung `KieuUtc` nhu `NhatKy` — ⚠️ lech mot lan nua o day thi tep va man hinh **khong khop**.
+        const DateTimeStyles KieuUtc = DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal;
+
+        var tu = DateTime.TryParse(tuNgay, CultureInfo.InvariantCulture, KieuUtc, out var t) ? t : (DateTime?)null;
+        var den = DateTime.TryParse(denNgay, CultureInfo.InvariantCulture, KieuUtc, out var d) ? d : (DateTime?)null;
+
+        var ketQua = await _khachHang.GetNhatKyXuatDuLieuAsync(
+            customerId: customerId,
+            tuNgayUtc: tu,
+            denNgayUtc: den,
+            nguoiXuat: nguoiXuat,
+            toiDa: toiDa);
+
+        var luc = DateTime.UtcNow;
+                // 🔑 **NGUOI XUAT TEP** — 📌 de tep CSV **tu mo ta** duoc *"ai da xuat no"*.
+        // ⚠️ **VI SAO KHONG DUNG `CurrentUser`:** 📌 `Controller` **khong** ke thua `ApplicationService`
+        // ⇒ thuoc tinh do **khong ton tai** (loi build that: `CS0103`); va `ICurrentUser` cung **khong**
+        // resolve duoc trong du an Web nay (thieu tham chieu goi).
+        // ✅ Dung thang **`HttpContext.User`** — 🔑 khong them phu thuoc nao, va 📌 day la **nguon that**
+        // ma moi lop khac cung doc tu do (cookie auth cua Web).
+        // 🔒 Luu y: day la **nguoi xuat TEP**, KHAC voi **nguoi xuat du lieu** o tung dong nhat ky
+        // (`NguoiXuat`) — 📌 hai cau hoi khac nhau, nen tep phai co **ca hai**.
+        var nguoiXuatTep = HttpContext?.User?.Identity?.Name ?? "(khong xac dinh)";
+
+        var sb = new StringBuilder();
+
+        // 🔑 Dong tien de (kem dong canh bao NGAY DUOI neu bi cat) — 📌 de nguoi doc **thay ngay**.
+        sb.Append(CsvNhatKy.DongTienDe(nguoiXuatTep, luc, ketQua.CacDong.Count, ketQua.TongSo)).Append(CsvNhatKy.XuongDong);
+
+        if (ketQua.BiCat)
+        {
+            // ⛔ **BAT BUOC** — xem ly do (3) o tren.
+            sb.Append(CsvNhatKy.DongCanhBaoCat(ketQua.CacDong.Count, ketQua.TongSo, luc)).Append(CsvNhatKy.XuongDong);
+        }
+
+        sb.Append(CsvNhatKy.XuongDong);
+
+        // 📌 Tieu de cot — 🔑 ASCII de **moi trinh doc** deu xu ly duoc, ⚠️ va de script kiem co neo on dinh.
+        sb.Append(CsvNhatKy.Dong("LucUtc", "NguoiXuat", "CustomerId", "TenKhach", "SoDongHoSo", "SoDonHang", "DonHangBiCat", "LyDo"))
+          .Append(CsvNhatKy.XuongDong);
+
+        foreach (var nk in ketQua.CacDong)
+        {
+            sb.Append(CsvNhatKy.Dong(
+                nk.XuatLucUtc.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
+                nk.NguoiXuat,
+                nk.CustomerId.ToString(),
+                // ⚠️ Khach da bi xoa ⇒ `null` ⇒ 🔑 ghi ro chu **KHONG** de trong (📌 de trong trong nhu loi hien thi).
+                nk.TenKhach ?? "(ho so da bi xoa)",
+                nk.SoDongHoSo.ToString(CultureInfo.InvariantCulture),
+                nk.SoDonHang.ToString(CultureInfo.InvariantCulture),
+                nk.DonHangBiCat ? "CO" : "khong",
+                nk.LyDo ?? "(khong ghi ly do)")).Append(CsvNhatKy.XuongDong);
+        }
+
+        // 🔒 **BOM + UTF-8** — xem ly do (1). ⚠️ `Encoding.UTF8` **KHONG** tu them BOM khi `GetBytes`
+        // ⇒ 📌 phai ghep **thu cong** (day la bay da gap that).
+        var than = Encoding.UTF8.GetBytes(sb.ToString());
+        var bytes = new byte[CsvNhatKy.Bom.Length + than.Length];
+        CsvNhatKy.Bom.CopyTo(bytes, 0);
+        than.CopyTo(bytes, CsvNhatKy.Bom.Length);
+
+        // 📌 Ten tep co **moc thoi gian UTC** ⇒ 🔑 xuat nhieu lan thi khong **ghi de** nhau, va
+        // 📌 nguoi doc biet **ban nao la ban nao**.
+        var tenTep = $"nhat-ky-xuat-du-lieu-ca-nhan-{luc:yyyyMMdd-HHmmss}.csv";
+
+        return File(bytes, "text/csv", tenTep);
     }
 
     /// <summary>

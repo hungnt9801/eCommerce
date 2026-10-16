@@ -395,7 +395,7 @@ select "NguoiXuat" || '|' || "SoDongHoSo"::text || '|' || "SoDonHang"::text || '
             # hinh hien **dung tung dong**, khong phai lap lai mot dong.
             TiemVaoDb -Sql @'
 insert into "CusDataExportLogs" ("Id","TenantId","CustomerId","NguoiXuat","XuatLucUtc","SoDongHoSo","SoDonHang","DonHangBiCat","LyDo","CreationTime","CreatorId")
-values ('e0000000-0000-0000-0000-0000000000e4',null,'e0000000-0000-0000-0000-0000000000e1','K97E2E-nhanvien-b','2020-01-02 03:04:05+00',17,0,false,'K97E2E ly do kiem thu',now(),null);
+values ('e0000000-0000-0000-0000-0000000000e4',null,'e0000000-0000-0000-0000-0000000000e1','K97E2E-nhanvien-b','2020-01-02 03:04:05+00',17,0,false,'K97E2E ly do, co "nhay kep" trong do',now(),null);
 '@ -KiemSql @'
 select count(*)::text from "CusDataExportLogs" where "Id" = 'e0000000-0000-0000-0000-0000000000e4';
 '@ -SoDongMongDoi 1 | Out-Null
@@ -513,6 +513,118 @@ select count(*)::text from "CusDataExportLogs" where "Id" = 'e0000000-0000-0000-
             Kq 'D14 form loc GIU customerId (khong mat ngu canh khach)' `
                 ($htmlNk -match 'name="customerId"') `
                 'co hidden customerId trong form loc'
+
+            # ── ⑤ XUAT TEP CSV (`CUS-001` §25) ────────────────────────────────────────────────
+            # 🔑 **VI SAO DO TEP THAT (khong chi doc ma nguon):** 🔒 mot action tra `File(...)` co the
+            # sai **BOM**, sai **escape**, hoac sai **ten tep** — ⚠️ va `HTTP 200` **mot minh** se bao
+            # **DAT** cho ca ba loi do (📌 dung loai *"XANH vi LY DO SAI"*).
+            $tepCsv = Join-Path $thuMucTam 'nhatky.csv'
+            $hdrCsv = Join-Path $thuMucTam 'nhatky-hdr.txt'
+
+            # 📌 **KHONG** dung `Invoke-WebRequest`: no **giai ma** noi dung ⇒ 🔒 se **an mat BOM**
+            # (⚠️ chinh thu ta can kiem). ✅ Dung `curl.exe -D` de lay header + ghi byte tho.
+            & curl.exe -s -b $jar -c $jar -D $hdrCsv -o $tepCsv ($web + "/KhachHang/NhatKyCsv?customerId=$idKhach") | Out-Null
+
+            Kq 'D15a tai duoc tep CSV (tep co du lieu)' ((Test-Path $tepCsv) -and ((Get-Item $tepCsv).Length -gt 50)) `
+                ("bytes = " + (Get-Item $tepCsv -ErrorAction SilentlyContinue).Length)
+
+            if (Test-Path $tepCsv) {
+                $b = [IO.File]::ReadAllBytes($tepCsv)
+
+                # 🚨 **BOM UTF-8** — 🔑 thieu no thi Excel doc tieng Viet thanh **rac**, 📌 va tep do la thu
+                # **duoc gui cho co quan kiem toan**. ⚠️ `Encoding.UTF8.GetString` se **bo qua** BOM khi doc
+                # ⇒ 🔒 nen phai kiem bang **BYTE THO**.
+                Kq 'D15b 🚨 tep co BOM UTF-8 (EF BB BF) — Excel moi doc dung tieng Viet' `
+                    ($b.Length -ge 3 -and $b[0] -eq 0xEF -and $b[1] -eq 0xBB -and $b[2] -eq 0xBF) `
+                    ("3 byte dau = {0:X2} {1:X2} {2:X2}" -f $b[0], $b[1], $b[2])
+
+                $csv = [Text.Encoding]::UTF8.GetString($b)
+
+                $hdr = if (Test-Path $hdrCsv) { [IO.File]::ReadAllText($hdrCsv) } else { '' }
+
+                Kq 'D15c header Content-Type = text/csv' ($hdr -match 'text/csv') 'content-type'
+                Kq 'D15d header Content-Disposition co ten tep nhat-ky-...csv' `
+                    ($hdr -match 'nhat-ky-xuat-du-lieu-ca-nhan-.*\.csv') 'ten tep co moc thoi gian'
+
+                # 🔑 **DONG TIEN DE** — 📌 tep **roi khoi he thong** nen phai **tu mo ta** duoc.
+                Kq 'D15e tep co DONG TIEN DE (can cu luat + KHONG chua PII)' `
+                    (($csv -match '91/2025/QH15') -and ($csv -match 'KHONG chua noi dung du lieu ca nhan')) `
+                    'dong tien de'
+
+                # 🔑 **DU LIEU THAT** trong tep — ⚠️ khong chi tieu de.
+                Kq 'D15f tep co DONG DU LIEU that (K97E2E-nhanvien-b + 17)' `
+                    (($csv -match 'K97E2E-nhanvien-b') -and ($csv -match '"17"')) 'dong du lieu'
+
+                # 🚨 **ESCAPE RFC 4180** — 🔑 **CA QUAN TRONG NHAT CUA D15.** 📌 `LyDo` co **dau phay VA
+                # nhay kep** ⇒ 🔒 neu khong escape thi cot bi **LECH**, va ⚠️ nguoi doc **khong he biet**
+                # (bang van trong hop le).
+                Kq 'D15g 🚨 escape RFC 4180: dau phay + nhay kep duoc boc va nhan doi' `
+                    ($csv -match '"K97E2E ly do, co ""nhay kep"" trong do"') `
+                    'truong duoc boc "..." va " -> ""'
+
+                # 🔑 **SO COT DUNG** — 📌 kiem he qua cua escape: dong tieu de phai co **8** truong.
+                $dongTieuDe = @($csv -split "`r`n" | Where-Object { $_ -match '^"LucUtc"' } | Select-Object -First 1)
+                $soTruong = if ($dongTieuDe.Count -gt 0) { (@([regex]::Matches($dongTieuDe[0], '","')).Count + 1) } else { 0 }
+                Kq 'D15h dong tieu de co DUNG 8 truong (khong bi lech cot)' ($soTruong -eq 8) ("soTruong = " + $soTruong)
+
+                # ⛔ **KHONG CAT** (2 < tran 100) ⇒ 🔒 tep **KHONG** duoc co dong canh bao.
+                Kq 'D15i 🚨 KHONG bi cat thi tep KHONG co dong canh bao (khong bao dong gia)' `
+                    ($csv -notmatch 'CANH BAO') 'khong co dong canh bao'
+
+                # ══════════════════════════════════════════════════════════════════════════════════
+                # 🚨 **D16 — CHIEU CON LAI: EP TEP BI CAT ⇒ DONG CANH BAO PHAI XUAT HIEN.**
+                #
+                # 🔑 **VI SAO CA NAY BAT BUOC (khong the bo qua):** ⚠️ `D15i` chi kiem *"KHONG bi cat thi
+                # KHONG co canh bao"*. 🔒 Neu chi co no thi mot ban **bo han dong canh bao** van **XANH
+                # toan bo** — 📌 tuc la phep kiem **khong bao gio chay** o nhanh quan trong.
+                # ✅ Do **CA HAI CHIEU** la nguyen tac da dung o §24 (`D11`/`D13`): 🔑 mot phep kiem chi do
+                # **mot phia** thi *"luon dung"* va *"khong hoat dong"* **trong giong het nhau**.
+                #
+                # 📌 `toiDa=1` trong khi co **2** dong ⇒ 🔒 buoc phai bi cat ⇒ ⛔ phai co dong canh bao.
+                # ══════════════════════════════════════════════════════════════════════════════════
+                $tepCat = Join-Path $thuMucTam 'nhatky-cat.csv'
+                & curl.exe -s -b $jar -c $jar -o $tepCat ($web + "/KhachHang/NhatKyCsv?customerId=$idKhach&toiDa=1") | Out-Null
+
+                $csvCat = if (Test-Path $tepCat) { [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes($tepCat)) } else { '' }
+
+                Kq 'D16a 🚨 tep bi cat thi CO dong CANH BAO (chieu con lai)' `
+                    ($csvCat -match 'CANH BAO') 'co dong canh bao'
+
+                # 🔑 **VA DONG CANH BAO PHAI CO CA HAI CON SO** — ⚠️ *"bi cat"* ma khong noi **cat con bao nhieu**
+                # thi nguoi doc **khong biet** phan thieu lon den dau.
+                # 📌 **LUU Y PHEP DO:** hai con so nam **TRONG CAU** (`Chi chua 1 tren tong 2 lan xuat`)
+                # ⇒ 🔑 **KHONG** kiem `"1"` (o rieng) — ⚠️ do la **phep do sai** toi da mac lan dau.
+                Kq 'D16b dong canh bao co CA HAI con so (1 hien thi / 2 tong)' `
+                    (($csvCat -match 'Chi chua 1 tren tong 2 lan xuat') -and ($csvCat -match 'Dang hien thi: 1 / tong 2')) `
+                    'hai con so trong cau'
+
+                # 🔑 **VA CHI CO 1 DONG DU LIEU** — 📌 chung minh `toiDa` **that su** duoc ap dung
+                # (⚠️ khong chi la *"co chu CANH BAO o dau do"*).
+                #
+                # 🚨 **PHEP DO PHAI DUNG HAI DIEU:**
+                #   (a) **THU TU SAP XEP:** `GetNhatKyXuatDuLieuAsync` sap **moi nhat TRUOC** ⇒ 🔒 `toiDa = 1`
+                #       giu dong **HOM NAY** (`admin`), ⚠️ **KHONG** phai dong 2020 (`K97E2E-nhanvien-b`).
+                #       📌 Lan dau toi kiem `nhanvien-b` ⇒ **0 dong** ⇒ ⚠️ **suyt ket luan rang `toiDa` khong
+                #       hoat dong** — trong khi su that la **phep do cua toi sai**;
+                #   (b) **MOI O DEU DUOC BOC `"`** ⇒ 🔒 neo phai bat dau bang `"` (⚠️ lan hai toi van dem **0**
+                #       vi neo `^\d{4}-` **khong khop** mot dong bat dau bang `"`). 📌 Cung ho voi bai hoc
+                #       *"phai tach dung VUNG / dung DINH DANG truoc khi khang dinh"* (§24.5, §97.6 #3).
+                # 🔑 Cach kiem **dung**: dem **SO DONG DU LIEU** (bat ke la ai) — 📌 do moi la dieu `toiDa`
+                # dieu khien.
+                $soDongDuLieu = @($csvCat -split "`r`n" | Where-Object { $_ -match '^"\d{4}-\d{2}-\d{2} ' }).Count
+                Kq 'D16c tep bi cat CHI co 1 dong du lieu (toiDa duoc ap dung that)' ($soDongDuLieu -eq 1) ("soDong = " + $soDongDuLieu)
+
+                # ➕ Va khang dinh **dong nao** duoc giu — 🔑 khoa luan diem *"moi nhat truoc"* (⚠️ neu ai
+                # doi thu tu sap xep thi ca nay DO, 📌 va do la chu y: nguoi kiem toan can **moi nhat truoc**).
+                # 📌 Neo phai tinh **dau boc `"`** — xem (b) o tren.
+                # 🔑 **IN DONG THAT khi do** — ⚠️ day la lan THU BA phep do cua toi sai; 📌 nen thay vi
+                # doan them, **in ra** roi moi ket luan (🔒 cung bai hoc *"do chuoi THAT thay vi suy luan"*).
+                $dongDuLieu = @($csvCat -split "`r`n" | Where-Object { $_ -match '^"\d{4}-\d{2}-\d{2} ' })
+                if ($dongDuLieu.Count -gt 0) { Write-Output ("   dong du lieu trong tep bi cat = " + $dongDuLieu[0]) } else { Write-Output '   (khong co dong du lieu nao)' }
+
+                $giuMoiNhat = $dongDuLieu.Count -gt 0 -and $dongDuLieu[0] -match '","admin",'
+                Kq 'D16d dong duoc giu la dong MOI NHAT (admin hom nay)' $giuMoiNhat 'giu dong moi nhat'
+            }
         }
     }
 
