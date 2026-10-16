@@ -29,7 +29,15 @@ public static class PaymentErrorCodes
     /// 🚨 Hoàn cho giao dịch chưa thu = **chi tiền chưa từng nhận** (mất tiền thật).</summary>
     public const string ChuaThuDuocTienKhongHoanDuoc = Nhom + "0003";
 
-    /// <summary>**SỐ TIỀN HOÀN KHÔNG HỢP LỆ** (`≤ 0`).
-    /// 📌 Số âm không chỉ vô nghĩa — nó **GIẢM** `RefundedAmount` ⇒ **che mất** một lần hoàn đã xảy ra.</summary>
+    /// <summary>**SỐ TIỀN HOÀN KHÔNG HỢP LỆ** (`≤ 0`), **hoặc** thiếu `lyDo`/`NguoiThucHien`.
+    /// 📌 Số âm không chỉ vô nghĩa — nó **GIẢM** `RefundedAmount` ⇒ **che mất** một lần hoàn đã xảy ra.
+    /// 📌 Mã này cũng dùng cho **thiếu lý do**: cả hai ca đều là *"yêu cầu hoàn tiền không hợp lệ"* và
+    /// chỉ dẫn cho người dùng **giống nhau** (*"sửa tham số rồi gửi lại"*).</summary>
     public const string SoTienHoanKhongHopLe = Nhom + "0004";
+
+    /// <summary>**KHÔNG TÌM THẤY GIAO DỊCH** theo Id.
+    /// 📌 Tách khỏi các mã khác vì chỉ dẫn khác hẳn: *"kiểm lại Id / giao dịch đã bị xoá"* —
+    /// **không** phải *"sửa số tiền"* và **không** phải *"gỡ chặn"*.
+    /// ⚠️ Trả `404`-nghĩa (không phải `400`) để client phân biệt *"sai tham số"* với *"không có đối tượng"*.</summary>
+    public const string KhongTimThayGiaoDich = Nhom + "0005";
 }

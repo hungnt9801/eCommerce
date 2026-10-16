@@ -26,6 +26,7 @@
     <Project Path="modules/Messaging/eCommerce.Messaging.EntityFrameworkCore/eCommerce.Messaging.EntityFrameworkCore.csproj" />
   </Folder>
   <Folder Name="/modules/PaymentHub/">
+    <Project Path="modules/PaymentHub/eCommerce.PaymentHub.Application.Contracts/eCommerce.PaymentHub.Application.Contracts.csproj" />
     <Project Path="modules/PaymentHub/eCommerce.PaymentHub.Application/eCommerce.PaymentHub.Application.csproj" />
     <Project Path="modules/PaymentHub/eCommerce.PaymentHub.Domain/eCommerce.PaymentHub.Domain.csproj" />
     <Project Path="modules/PaymentHub/eCommerce.PaymentHub.EntityFrameworkCore/eCommerce.PaymentHub.EntityFrameworkCore.csproj" />

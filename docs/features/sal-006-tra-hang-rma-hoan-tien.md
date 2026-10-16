@@ -1099,3 +1099,156 @@ Ghi rõ để **không** ai đọc *"846 test xanh"* thành *"hoàn tiền đã 
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.2 | 16/10/2026 | *(agent, session GĐ1)* | **§16 — LÁT CẮT 1: BẤT BIẾN HOÀN TIỀN Ở TẦNG DOMAIN**: `RegisterRefund` nay **kiểm trước khi gán** (3 ca ⇒ 3 mã riêng `0002`/`0003`/`0004` trong `PaymentErrorCodes` **của module**) · `ConHoanDuoc` · 🚨 **vá 2 bug trạng thái CUỐI** (`MarkSucceeded`/`MarkFailed` hồi sinh giao dịch đã hoàn tiền) · **+12 unit test** (846 tổng). Ghi **§16.3** (hai hàm trạng thái phải nhất quán) · **§16.5** (nợ: `RefundAsync` **vẫn chưa cài**, chưa có API, chưa có RMA) |
+
+---
+
+## 17. ✅ **LÁT CẮT 2 — `RefundAsync` VNPAY + API HOÀN TIỀN** (16/10/2026)
+
+> ⚠️ **PHẠM VI NÓI RÕ:** lát cắt này **cài thật** `RefundAsync`/`QueryStatusAsync` của VNPay và dựng
+> **app service + 4 endpoint** cho vận hành — tức đóng **F2** (§15.2) và **nợ #1/#2** của §16.5.
+> 🚫 **CHƯA** có phiếu RMA (`ReturnRequest`, §0), **chưa** nối `SAL-004` ↔ hoàn tiền, **chưa** có bảng
+> dòng hoàn tiền + metric, và **chưa** kiểm chứng được **tiền thật ra** (không có credential sandbox).
+> Nợ ghi ở **§17.7**.
+
+### 17.1 Vì sao phải sửa **KIỂU TRẢ VỀ** trước khi cài (bài học thiết kế)
+
+`IPaymentProvider.RefundAsync` cũ trả `Task<bool>` — và đó là **sai kiểu**, không phải *"chưa đẹp"*:
+
+| Vấn đề của `bool` | Hậu quả **cụ thể** |
+|---|---|
+| Không phân biệt **"cổng đã nhận"** với **"tiền đã ra"** | Hoàn tiền VN là **BẤT ĐỒNG BỘ**: cổng nhận (mã `00`) rồi xử lý sau, **có thể thất bại** ⇒ `true` bị đọc là *"đã hoàn xong"* ⇒ **không ai** theo dõi bước xác nhận |
+| Không có chỗ ghi **mã phản hồi** | Khi sai thì **không điều tra được** (cổng chỉ nói *"Invalid Checksum"*, không nói sai ở đâu) |
+| Không phân biệt **lỗi hạ tầng** với **cổng từ chối** | Timeout nghĩa là **KHÔNG BIẾT** cổng có nhận hay không ⇒ `false` bị đọc là *"chắc chắn chưa hoàn"* ⇒ **thử lại** ⇒ **hoàn HAI LẦN** |
+
+⇒ Thay bằng **`RefundResult`** với **ba** trạng thái **tách biệt**:
+`DaNhanYeuCau` (cổng đã nhận) · `DaHoanThat` (tiền **đã ra**, đã ghi sổ) · `ChoXacNhan` (**phải** đối soát tiếp).
+📌 Cùng họ lỗi *"báo thành công trong khi chưa làm xong"* đã gây **mất đơn vĩnh viễn** ở `ChannelShopSyncer`.
+
+### 17.2 Đã làm gì
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| **1** | **`VnPayRequestBuilder`** (**MỚI**, lõi thuần) | `ThamSoHoanTien` (`vnp_Command=refund`, `vnp_TransactionType` `02`/`03`) · `ThamSoTruyVan` (`querydr`) · `DungChuoiKy` · `Ky` (HMAC-SHA512 hex thường) · `TinhSoTien` (**×100**, `AwayFromZero`) · `KiemChuKy` · `DocPhanHoi` · `DocJsonPhang` |
+| **2** | **`VnPayPaymentProvider.RefundAsync`** | **CÀI THẬT**: ký + POST JSON + đọc phản hồi. ⚠️ **Luôn** `DaHoanThat = false` + `ChoXacNhan = true` khi cổng nhận (`00` — xem §17.3) |
+| **3** | **`QueryStatusAsync`** | **CÀI THẬT** (`querydr`) + **ánh xạ mã có chủ ý** (§17.4) |
+| **4** | **`IPaymentProvider.RefundAsync`** thêm `providerTransactionId` | `vnp_TransactionNo` (từ **IPN đã xác thực**) ⇒ tra giao dịch gốc **tất định**, không để cổng tự đoán |
+| **5** | **`eCommerce.PaymentHub.Application.Contracts`** (**PROJECT MỚI**) | `PaymentTransactionDto` · `HoanTienInput` · `HoanTienKetQuaDto` · `IPaymentAppService`. 📌 Trước đó module **không có** project Contracts ⇒ không có hợp đồng nào cho tầng ngoài |
+| **6** | **`PaymentAppService`** (**MỚI**) | 4 endpoint + **4 bất biến** cưỡng chế (§17.5) |
+| **7** | **`PaymentErrorCodes.KhongTimThayGiaoDich`** (`0005`) | Mã riêng cho *"không có giao dịch"* — chỉ dẫn khác hẳn *"sửa số tiền"* |
+| **8** | **`PaymentTransaction.DungDuocDeHoan`** | Gộp **một chỗ** điều kiện *"đã thu được tiền"* (được kiểm ở **2** nơi) |
+| **9** | **DI**: `IPaymentProvider` + `AddHttpClient<VnPayPaymentProvider>` (ở **Host**) | §17.6 |
+| **10** | **4 endpoint** (đo bằng swagger thật) | `GET theo-ma` · `GET danh-sach` · `POST hoan-tien/{id}` · `POST truy-van-trang-thai/{id}` |
+
+### 17.3 🚨 **`00` = "CỔNG ĐÃ NHẬN", KHÔNG PHẢI "TIỀN ĐÃ RA"** — bất biến trung tâm
+
+`DocPhanHoi` **cố ý** đặt:
+
+```csharp
+kq.DaNhanYeuCau = true;    // cổng nhận yêu cầu
+kq.DaHoanThat   = false;   // ⇐ LUÔN false khi chỉ có mã `00`
+kq.ChoXacNhan   = true;    // ⇒ PHẢI đối soát `querydr`
+```
+
+📌 Nếu đổi `DaHoanThat = true` ở đây thì `PaymentAppService` sẽ gọi `RegisterRefund` ⇒ **ghi sổ "đã hoàn"**
+trong khi tiền **chưa** ra ⇒ **sổ sách nói dối**, khách khiếu nại, và **không ai** theo dõi bước xác nhận.
+🔒 Test `DocPhanHoi__ma_00__DA_NHAN_yeu_cau_NHUNG_CHUA_xac_nhan_tien_ra` khoá bất biến này.
+
+### 17.4 Ánh xạ mã `querydr` — chỗ **KHÔNG ĐƯỢC ĐOÁN**
+
+| Mã | Trạng thái nội bộ | Vì sao |
+|---|---|---|
+| `00` | `Succeeded` | đã thu tiền |
+| `24` | `Cancelled` | khách **cố ý** huỷ — **khác** `Failed` (không phải lỗi) |
+| `01`/`02`/`04`/`07` | `Failed` | giao dịch không thành công |
+| **khác** | **`Pending`** | 🚨 **KHÔNG ĐOÁN**: mã lạ ⇒ *"vẫn chưa biết"* ⇒ để job gọi lại. Ánh xạ bừa sang `Failed` sẽ **chôn** một giao dịch **đã thu tiền** ⇒ **mất tiền im lặng** |
+
+⚠️ Và lỗi hạ tầng/cấu hình ⇒ **`Pending`** (không phải `Failed`): *"chưa biết"* **khác** *"không thành công"*.
+
+### 17.5 Bốn bất biến cưỡng chế trong `PaymentAppService`
+
+| # | Bất biến | Vì sao |
+|---|---|---|
+| **1** | **Chỉ ghi sổ khi `DaHoanThat`** | §17.3 |
+| **2** | **Lỗi hạ tầng ⇒ `ChoXacNhan = true`** (buộc đối soát) | 🚨 **Phát hiện ĐO ĐƯỢC** — xem §17.6 |
+| **3** | **Khoá phân tán `payments:refund:{id}`** | ⚠️ Entity **không** đủ: `RegisterRefund` chặn ở tầng **ghi sổ**, nhưng hai request cùng qua kiểm tra rồi **cả hai gọi cổng** ⇒ hoàn **gấp đôi** — và bất biến chỉ *phát hiện* **SAU KHI** tiền đã ra |
+| **4** | **Lý do + `NguoiThucHien` BẮT BUỘC** | Hoàn tiền không lý do thì 6 tháng sau **không ai** giải thích được vì sao tiền ra (và đó cũng là `vnp_OrderInfo` cổng yêu cầu) |
+
+➕ **`TruyVanTrangThaiAsync` CHỈ TIẾN, KHÔNG LÙI**: nếu cổng nói *"chưa biết"* (`Pending`) mà ta **đã** có tiền thì **KHÔNG** hạ trạng thái — hạ sẽ mở đường cho việc **thu lại** hoặc **huỷ đơn oan**.
+📌 Cùng họ lỗi đã vá ở nhánh trạng thái CUỐI của `MarkSucceeded` (§16.3).
+
+### 17.6 🚨 **Phép đo bắt được LỖ HỔNG THẬT trong hợp đồng** (giá trị lớn nhất của lát cắt)
+
+Probe gọi cổng **THẬT** (không có credential sandbox) ⇒ VNPay trả nội dung **không phải JSON**
+⇒ `DocPhanHoi` ném `FormatException` ⇒ `loiHaTang = "FormatException"`.
+
+**Kết quả ĐO ĐƯỢC ở lần chạy đầu: `choXacNhan = false`** ❌ — tức tầng gọi **được phép hiểu**
+*"chắc chắn chưa hoàn"* ⇒ có thể **thử lại** ⇒ **hoàn HAI LẦN**.
+
+🔑 **Vì sao đây là lỗ hổng THẬT, không phải chi tiết nhỏ:** *"**KHÔNG đọc được phản hồi**"* **KHÁC HẲN**
+*"**cổng TỪ CHỐI**"*:
+
+| Ca | Cổng đã xử lý? | `ChoXacNhan` **đúng** |
+|---|---|---|
+| Cổng từ chối (đọc được phản hồi, mã ≠ `00`) | **Có, đã xử lý và không hoàn** | `false` ✅ |
+| **Không đọc được phản hồi** (HTML 502, JSON méo, timeout) | **KHÔNG BIẾT** | **`true`** ⬅ **đã sửa** |
+
+⇒ Sửa: đặt `ChoXacNhan = true` **ngay trong nhánh không-đọc-được**, và `PaymentAppService` **phân nhánh** theo
+`LoiHaTang` (nó **không** chỉ để ghi log — nó là **cờ phân biệt**), thêm neo log riêng **`[PAY-KHONG-XAC-DINH]`**.
+
+📌 **Bài học:** nếu chỉ đọc mã thì cả hai ca **trông giống nhau** (đều `DaNhanYeuCau = false`).
+**Chỉ phép đo với một phản hồi THẬT (dù lỗi) mới lộ ra** rằng hai ca cần **hai kết luận khác nhau**.
+
+### 17.7 ✅ Kiểm chứng
+
+**Unit test `VnPayRefundTests` — 27 ca:**
+
+| Nhóm | Nội dung |
+|---|---|
+| Tham số `refund` | đủ trường bắt buộc · `02` (toàn phần) vs `03` (một phần) · **KHÔNG thêm `vnp_TransactionNo` rỗng** (rỗng làm **lệch chữ ký**) |
+| `TinhSoTien` | ×100 + `AwayFromZero` (5 ca) · **không dùng `double`** (số tiền lớn 10^15) |
+| **Chữ ký** | khớp **HMAC-SHA512 tính ĐỘC LẬP bằng .NET** · khoá sắp xếp `Ordinal` + URL-encode · **bỏ** `vnp_SecureHash{Type}` khi ký · **bỏ tham số RỖNG** cho khớp quy tắc VNPay · thiếu chữ ký ⇒ `false` (không ném) · sai khoá ⇒ `false` |
+| **`DocPhanHoi`** | 🚨 **mã `00` ⇒ `DaHoanThat = FALSE` + `ChoXacNhan = TRUE`** · **chữ ký sai ⇒ KHÔNG tin dù nội dung nói thành công** (chống giả mạo) · thiếu `HashSecret` ⇒ **fail-closed** · mã khác `00` ⇒ từ chối + lý do · thân rỗng ⇒ không ném · **không phải JSON ⇒ `FormatException` được BẮT** |
+| `DocJsonPhang` | giữ **nguyên văn** giá trị · `null` ⇒ **rỗng** (không phải chuỗi `"null"`) · JSON hỏng ⇒ `FormatException` |
+| `querydr` | đúng `vnp_Command` + đủ trường |
+| **`RefundResult` mặc định** | 🔒 **tất cả `false`** (**fail-closed**): không chắc thì **không** ghi sổ |
+
+**Probe HTTP thật (`tools\_tam-pay\sal-006-kiem.ps1`) — 12/12 ca ĐẠT:**
+
+| # | Ca | Kỳ vọng | **Đo được** |
+|---|---|---|---|
+| C1 | `GET /api/app/payment/theo-ma` | `200` + đúng giao dịch + `conHoanDuoc=199000` | **`200`** ✅ |
+| C2 | `GET /api/app/payment/danh-sach` | `200` + thấy 3 giao dịch thử | **`200`** ✅ |
+| **D1** | Hoàn **vượt** số đã thu (`250000` / đã thu `199000`) | **`403`** · `Payment:0002` · **KHÔNG gọi cổng** | **`403` · `eCommerce:Payment:0002`** ✅ |
+| D2 | Số tiền `= 0` | `403` · `Payment:0004` | **`403` · `0004`** ✅ |
+| D3 | Giao dịch **CHƯA THU** (`Initiated`) | `403` · `Payment:0003` | **`403` · `0003`** ✅ |
+| D4 | **Thiếu lý do** | `403` (audit bắt buộc) | **`403`** ✅ |
+| **E1** | 🚨 Gọi cổng **THẬT** (không credential) | **`RefundedAmount` VẪN `= 0`** | **`0.0000`** trong DB ✅ — **KHÔNG ghi sổ nhầm** |
+| E2 | Không có trường `success` trần | có `choXacNhan` + `daHoanThat` | ✅ |
+| **E3** | 🚨 Cổng chưa xác nhận ⇒ `daHoanThat=false` + **`choXacNhan=true`** | đúng | **`false` / `true`** ✅ (sau khi vá §17.6) |
+| E4 | Lỗi hạ tầng **được ghi rõ** | `loiHaTang` có giá trị | **`FormatException`** ✅ |
+| F1 | `POST truy-van-trang-thai` | `200` + **không hạ** trạng thái giao dịch đã thu tiền | **`200`** ✅ |
+| F2 | Tra mã **không tồn tại** | **`204`** (ABP: `null` ⇒ No Content), **không ném** | **`204`** ✅ |
+
+**Neo log (đo được):** `PAY-KHONG-XAC-DINH` = **1** — và đó là neo **đúng** cho ca này;
+`PAY-DA-HOAN`/`PAY-CHO-XAC-NHAN`/`PAY-TU-CHOI-HOAN` = **0** (vì cổng chưa từng xác nhận và chưa từng từ chối
+— ta **không đọc được** phản hồi). 📌 Ba neo **phải khác nhau**: gộp lại thì không phân biệt được
+*"đã hoàn"* với *"chưa biết"* — đúng thứ §17.6 vừa vá.
+
+### 17.8 ⏳ NỢ (KHÔNG phải tính năng đã có)
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+| **1** | 🚨 **CHƯA kiểm chứng được TIỀN THẬT RA** | Không có credential sandbox VNPay ⇒ `RefundAsync` mới được kiểm ở **lõi thuần** (chữ ký, tham số, đọc phản hồi) + **nhánh lỗi hạ tầng**. ⚠️ Đọc *"12/12 ca ĐẠT"* **KHÔNG** có nghĩa *"đã hoàn được tiền"* |
+| **2** | **Chưa có phiếu RMA** (`ReturnRequest` + 2 trục con, §0) | Luồng trả hàng theo RMA **chưa có code** |
+| **3** | **Chưa nối đường GHI giao dịch:** không có app service tạo `PaymentTransaction` | ⇒ giao dịch chỉ vào DB qua **webhook**/ghi thẳng ⇒ **chưa có luồng đặt hàng → thanh toán → hoàn** khép kín |
+| **4** | **Chưa có webhook controller** (`POST /api/webhooks/vnpay`) | ⇒ `MarkSucceeded` **chưa** được gọi ở đường thật; `querydr` là **lưới an toàn duy nhất** hiện có |
+| **5** | **Chưa nối `SAL-004` ↔ hoàn tiền** | Trả hàng kho (`CustomerReturn`) và hoàn tiền vẫn **tách rời** |
+| **6** | **Chưa có bảng dòng hoàn tiền + metric** | `RefundedAmount` là **tổng trên entity** ⇒ không truy vấn *"hoàn lúc nào, vì sao, ai duyệt"*. Cần bảng dòng + ràng buộc tổng **ở DB** (§8.2) |
+| **7** | **Chưa có job đối soát `querydr`** | Hàm **đã cài** và **đã kiểm**, nhưng **chưa** có worker chạy định kỳ ⇒ các yêu cầu `ChoXacNhan` **chưa ai xác nhận tự động** |
+| **8** | **`Reason`/`CreateBy` đang** là `"eCommerce"` | Chưa truyền người dùng thật xuống cổng (audit phía VNPay) |
+
+### 17.9 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.3 | 16/10/2026 | *(agent, session GĐ1)* | **§17 — LÁT CẮT 2: `RefundAsync` VNPAY + API HOÀN TIỀN (đóng F2)**: `VnPayRequestBuilder` (lõi thuần: ký HMAC-SHA512, tham số `refund`/`querydr`, đọc phản hồi) · `RefundAsync` + `QueryStatusAsync` **CÀI THẬT** (hết `NotImplementedException`) · **`RefundResult`** thay `bool` (**3** trạng thái tách biệt) · `providerTransactionId` (`vnp_TransactionNo`) · **project `Application.Contracts` MỚI** + `PaymentAppService` + **4 endpoint** (swagger thật) · mã `Payment:0005` · **+27 unit test** (955 tổng) · **12/12 ca HTTP thật**. 🚨 **Phép đo bắt được LỖ HỔNG THẬT** (§17.6): phản hồi **không đọc được** bị trả `ChoXacNhan=false` ⇒ client có thể **retry mù** ⇒ **hoàn HAI LẦN**; đã vá + tách neo log `[PAY-KHONG-XAC-DINH]`. Ghi **§17.8** (nợ: **chưa kiểm chứng tiền thật ra**, chưa có RMA, chưa có webhook controller, chưa có job đối soát) |

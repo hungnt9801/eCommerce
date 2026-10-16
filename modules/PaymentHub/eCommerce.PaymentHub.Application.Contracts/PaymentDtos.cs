@@ -1,0 +1,130 @@
+using eCommerce.PaymentHub.Payments;
+using Volo.Abp.Application.Dtos;
+
+namespace eCommerce.PaymentHub;
+
+/// <summary>Giao dịch thanh toán trả ra ngoài (API vận hành) — `SAL-006`.</summary>
+public class PaymentTransactionDto
+{
+    public Guid Id { get; set; }
+    public string ProviderCode { get; set; } = default!;
+    public Guid? OrderId { get; set; }
+    public string MerchantReference { get; set; } = default!;
+
+    /// <summary>Mã giao dịch do **CỔNG** cấp — ⚠️ **BẮT BUỘC** để hoàn tiền tra được giao dịch gốc
+    /// (`vnp_TransactionNo`). `null` nghĩa là **chưa từng nhận IPN hợp lệ** ⇒ hoàn tiền sẽ phải để cổng tự tra
+    /// và **có thể thất bại**.</summary>
+    public string? ProviderTransactionId { get; set; }
+
+    public decimal Amount { get; set; }
+    public decimal RefundedAmount { get; set; }
+
+    /// <summary>🔒 **Số tiền CÒN hoàn được** — client cần biết **trước khi** gửi, thay vì gửi rồi nhận lỗi.</summary>
+    public decimal ConHoanDuoc { get; set; }
+
+    public string Currency { get; set; } = "VND";
+    public string Status { get; set; } = default!;
+    public DateTime? PaidAtUtc { get; set; }
+    public string? FailureReason { get; set; }
+    public int WebhookReceivedCount { get; set; }
+    public DateTime CreationTime { get; set; }
+
+    /// <summary>`true` ⇒ đã ở **trạng thái CUỐI** (đã thu / đã hoàn / một phần) ⇒ **không** hoàn thêm được
+    /// nếu <see cref="ConHoanDuoc"/> bằng 0.</summary>
+    public bool DaThuTien { get; set; }
+}
+
+/// <summary>
+/// 🚨 **YÊU CẦU HOÀN TIỀN** (`SAL-006`).
+///
+/// 🔒 **Ba trường bắt buộc và vì sao:**
+/// <list type="bullet">
+///   <item><see cref="SoTien"/> — hoàn bao nhiêu (phải `> 0` và `≤` số còn hoàn được);</item>
+///   <item><see cref="LyDo"/> — **BẮT BUỘC**: hoàn tiền mà không ghi lý do thì 6 tháng sau **không ai**
+///     giải thích được vì sao tiền ra (và đây cũng là `vnp_OrderInfo` mà cổng yêu cầu);</item>
+///   <item><see cref="NguoiThucHien"/> — **ai** yêu cầu (audit).</item>
+/// </list>
+/// </summary>
+public class HoanTienInput
+{
+    public decimal SoTien { get; set; }
+    public string LyDo { get; set; } = default!;
+    public string NguoiThucHien { get; set; } = default!;
+}
+
+/// <summary>
+/// 🚨 **KẾT QUẢ HOÀN TIỀN TRẢ RA API** — **KHÔNG** có trường `Success` trần.
+///
+/// **VÌ SAO (đây là điểm dễ gây mất tiền nhất của cả tính năng):** hoàn tiền là giao dịch **BẤT ĐỒNG BỘ**.
+/// Cổng **nhận** yêu cầu (mã `00`) rồi xử lý **sau**. Nếu API trả `{ "success": true }` thì người vận hành
+/// **đọc là "đã hoàn xong"** ⇒ **không ai** theo dõi bước xác nhận ⇒ khách **chưa** nhận tiền mà hệ thống
+/// **đã** ghi `Refunded` ⇒ **sổ sách nói dối**.
+/// ⇒ Trả **ba** trạng thái tách biệt, buộc người đọc phải phân biệt:
+/// <see cref="DaNhanYeuCau"/> (cổng đã nhận) · <see cref="DaHoanThat"/> (tiền **đã ra**, đã ghi sổ) ·
+/// <see cref="ChoXacNhan"/> (**phải** đối soát tiếp).
+/// </summary>
+public class HoanTienKetQuaDto
+{
+    public Guid PaymentTransactionId { get; set; }
+    public string MerchantReference { get; set; } = default!;
+
+    /// <summary>Cổng **đã nhận** yêu cầu. ⚠️ **KHÔNG** đồng nghĩa tiền đã ra.</summary>
+    public bool DaNhanYeuCau { get; set; }
+
+    /// <summary>🚨 Tiền **ĐÃ RA** và **ĐÃ ghi sổ** (`RefundedAmount` đã tăng). Chỉ `true` khi cổng xác nhận
+    /// hoàn tiền **thành công ngay** (một số ngân hàng nội bộ). Với VNPay điển hình: **`false`**.</summary>
+    public bool DaHoanThat { get; set; }
+
+    /// <summary>🚨 `true` ⇒ **yêu cầu đã gửi nhưng kết quả CHƯA BIẾT** ⇒ **phải** đối soát (`querydr`).
+    /// 🔒 Khi cờ này bật, `RefundedAmount` **KHÔNG** được tăng — và đó là **hành vi đúng**, không phải lỗi.</summary>
+    public bool ChoXacNhan { get; set; }
+
+    /// <summary>Số tiền **còn hoàn được** sau thao tác này (client hiển thị ngay).</summary>
+    public decimal ConHoanDuoc { get; set; }
+
+    public decimal DaHoanTong { get; set; }
+    public string? MaPhanHoi { get; set; }
+    public string? ThongDiep { get; set; }
+    public string? MaGiaoDichHoan { get; set; }
+
+    /// <summary>Lý do thất bại — **không** chứa dữ liệu nhạy cảm.</summary>
+    public string? LyDoThatBai { get; set; }
+
+    /// <summary>⚠️ **LỖI HẠ TẦNG** (timeout/không kết nối được): *"KHÔNG BIẾT cổng đã nhận hay chưa"*.
+    /// **CẤM** người gọi *"thử lại"* — có thể hoàn **HAI LẦN**. Đường đúng: gọi
+    /// <c>truy-van-trang-thai</c> để xác định trước.</summary>
+    public string? LoiHaTang { get; set; }
+
+    /// <summary>Trạng thái giao dịch **sau** thao tác (đọc từ DB thật, không phải suy diễn).</summary>
+    public string TrangThaiSau { get; set; } = default!;
+}
+
+/// <summary>
+/// 🚨 **APP SERVICE THANH TOÁN — VẬN HÀNH** (`SAL-006`).
+///
+/// 📌 **VÌ SAO CẦN (trước 16/10/2026 KHÔNG có app service nào cho PaymentHub):**
+/// `PaymentTransaction` + `IPaymentProvider` tồn tại **chỉ trong module**; **không** có endpoint, **không**
+/// có webhook controller ⇒ *"hoàn tiền"* — **cổng kiểm soát "KHÔNG MẤT TIỀN"** của GĐ1 — **không có đường
+/// nào gọi tới**. Xem `sal-006` §17.
+/// </summary>
+public interface IPaymentAppService
+{
+    /// <summary>Chi tiết một giao dịch (`merchantReference`) — để tra trước khi hoàn.</summary>
+    Task<PaymentTransactionDto?> GetTheoMaAsync(string merchantReference);
+
+    /// <summary>Danh sách giao dịch (mới nhất trước) — tra theo `merchantReference`/trạng thái, có trần.</summary>
+    Task<List<PaymentTransactionDto>> GetDanhSachAsync(string? merchantReference = null, string? trangThai = null, int toiDa = 50);
+
+    /// <summary>
+    /// 🚨 **YÊU CẦU HOÀN TIỀN** — gọi cổng, rồi **chỉ ghi sổ** khi <c>DaHoanThat = true</c>.
+    /// ⚠️ Trả ba trạng thái tách biệt; xem <see cref="HoanTienKetQuaDto"/>.
+    /// </summary>
+    Task<HoanTienKetQuaDto> HoanTienAsync(Guid paymentTransactionId, HoanTienInput input);
+
+    /// <summary>
+    /// **TRUY VẤN TRẠNG THÁI TỪ CỔNG** (`querydr`) và cập nhật DB nếu cổng nói đã thu tiền.
+    /// 🔑 Đây là đường **xác nhận** cho các yêu cầu hoàn tiền đang `ChoXacNhan`, và là lưới an toàn khi
+    /// IPN **mất** (`REC-001`).
+    /// </summary>
+    Task<PaymentTransactionDto> PostTruyVanTrangThaiAsync(Guid paymentTransactionId);
+}

@@ -163,6 +163,29 @@ public class eCommerceHttpApiHostModule : AbpModule
                 : baseUrl);
             http.Timeout = TimeSpan.FromSeconds(60);
         });
+        // 🚨 `SAL-006` — **HẠ TẦNG HTTP CHO HOÀN TIỀN / TRUY VẤN VNPAY** (bổ sung 16/10/2026).
+        //
+        // **VÌ SAO Ở HOST, KHÔNG Ở MODULE:** `AddHttpClient` nằm trong shared framework của ứng dụng web
+        // (`Microsoft.Extensions.Http`) — KHÔNG có trong `Volo.Abp.Ddd.Application`. Thêm gói đó vào module
+        // **nghiệp vụ** là kéo hạ tầng web xuống tầng application (đúng thứ `XC-002` D12 cấm).
+        // 📌 Cùng khuôn với `ProvincesOpenApiSource` và `TaxAuthorityClient` ở dưới.
+        //
+        // 🚨 VÌ SAO BẮT BUỘC (lỗi **im lặng** nếu thiếu): `VnPayPaymentProvider.RefundAsync`/`QueryStatusAsync`
+        // cần `HttpClient`. Trước 16/10/2026 hai hàm đó là `NotImplementedException` nên **không ai** để ý
+        // rằng `HttpClient` **chưa từng** được đăng ký. Nếu nay thiếu dòng dưới đây thì `_http` là `null`
+        // ⇒ hàm trả *"Chưa cấu hình HttpClient"*. 📌 Triệu chứng: *"hoàn tiền luôn thất bại"* mà log
+        // **không** có lỗi mạng nào ⇒ mất hàng giờ điều tra **sai hướng** (sang cổng, sang mạng, sang chứng từ).
+        //
+        // 🔒 Dùng **typed client** (KHÔNG `new HttpClient()` trong provider): tránh **cạn socket** khi job
+        // đối soát chạy nhiều, và giữ **một** chỗ cấu hình `Timeout`/handler.
+        // ⚠️ `BaseAddress` KHÔNG đặt ở đây: VNPay dùng **URL tuyệt đối** từ `VnPayOptions.TransactionApiUrl`
+        // (đổi được giữa sandbox và thật **không cần** build lại). `Timeout` để **30 giây** — hoàn tiền là
+        // thao tác tiền, chờ lâu hơn ném-lỗi-sớm; nhưng **cũng không** để vô hạn (job đối soát sẽ treo).
+        context.Services.AddHttpClient<eCommerce.PaymentHub.Payments.VnPayPaymentProvider>(http =>
+        {
+            http.Timeout = TimeSpan.FromSeconds(30);
+        });
+
         context.Services.AddHttpClient(eCommerce.TaxAuthority.TaxAuthorityClient.TenClientHttp, http =>
         {
             var baseUrl = configuration["TaxAuthority:BaseUrl"];

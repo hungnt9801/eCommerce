@@ -7,11 +7,15 @@
 
   <ItemGroup>
     <ProjectReference Include="..\eCommerce.PaymentHub.Domain\eCommerce.PaymentHub.Domain.csproj" />
+    <ProjectReference Include="..\eCommerce.PaymentHub.Application.Contracts\eCommerce.PaymentHub.Application.Contracts.csproj" />
     <ProjectReference Include="..\..\..\shared\eCommerce.Kernel\eCommerce.Kernel.csproj" />
+    <!-- Quyen + ma loi DUNG CHUNG (`eCommerceConsts`) - quy uoc: app/module -> Domain.Shared DUOC PHEP. -->
+    <ProjectReference Include="..\..\..\src\eCommerce.Domain.Shared\eCommerce.Domain.Shared.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Volo.Abp.Ddd.Application" />
+    <PackageReference Include="Volo.Abp.DistributedLocking" />
     <PackageReference Include="Volo.Abp.EventBus" />
   </ItemGroup>
 

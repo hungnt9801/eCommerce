@@ -212,6 +212,17 @@ public class PaymentTransaction : FullAuditedAggregateRoot<Guid>, IMultiTenant
     /// </summary>
     public decimal ConHoanDuoc => Math.Max(0m, Amount - RefundedAmount);
 
+    /// <summary>
+    /// **Giao dịch có ĐỦ ĐIỀU KIỆN để hoàn tiền không** (`SAL-006`).
+    /// 🔑 Gộp **một chỗ** điều kiện *"đã thu được tiền"* — vì nó được kiểm ở **hai** nơi (app service
+    /// **trước khi** gọi cổng, và `RegisterRefund` **trước khi** ghi sổ). Hai bản chép tay sẽ **lệch nhau**
+    /// khi thêm trạng thái mới (đúng họ lỗi "hai nguồn sự thật" — và đã xảy ra thật với
+    /// `MarkSucceeded`/`MarkFailed` ở `sal-006` §16.2).
+    /// </summary>
+    public bool DungDuocDeHoan => Status is PaymentTransactionStatus.Succeeded
+        or PaymentTransactionStatus.PartiallyRefunded
+        or PaymentTransactionStatus.Refunded;
+
 
     /// <summary>
     /// 🚨 B(C) — CHE DỮ LIỆU NHẠY CẢM trước khi lưu payload thô (phát hiện F2 của `XC-005`).

@@ -2,6 +2,7 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using eCommerce.PaymentHub.Payments;
+using eCommerce.PaymentHub.Providers;
 using Microsoft.Extensions.Options;
 
 namespace eCommerce.PaymentHub.Payments;
@@ -50,12 +51,24 @@ public class VnPayPaymentProvider : IPaymentProvider
     /// <summary>📊 Metric — tuỳ chọn (DI inject bản thật; test truyền null vẫn chạy).</summary>
     private readonly eCommerce.Kernel.Observability.eCommerceMetrics? _metrics;
 
+    /// <summary>
+    /// 🌐 `HttpClient` để gọi API giao dịch của VNPay (`refund`, `querydr`).
+    /// ⚠️ **Tuỳ chọn** (`null` được phép): nếu Host **chưa** cấu hình `AddHttpClient`, provider vẫn dựng được
+    /// và `CreatePaymentAsync`/`VerifyWebhookAsync` (thuần) vẫn chạy; chỉ `RefundAsync`/`QueryStatusAsync`
+    /// trả lỗi **hạ tầng có mã** thay vì **NỔ** `NullReferenceException`.
+    /// 📌 Vì sao quan trọng: một `NullReferenceException` ở đây sẽ bị nuốt thành *"hoàn tiền thất bại"* chung
+    /// chung ⇒ **không ai** biết là **lỗi cấu hình DI** — mất hàng giờ điều tra sai hướng.
+    /// </summary>
+    private readonly HttpClient? _http;
+
     public VnPayPaymentProvider(
         IOptions<PaymentHubOptions> options,
-        eCommerce.Kernel.Observability.eCommerceMetrics? metrics = null)
+        eCommerce.Kernel.Observability.eCommerceMetrics? metrics = null,
+        HttpClient? http = null)
     {
         _options = options.Value.VnPay;
         _metrics = metrics;
+        _http = http;
     }
 
     /// <summary>
@@ -183,18 +196,176 @@ public class VnPayPaymentProvider : IPaymentProvider
         return Task.FromResult(result);
     }
 
-    public Task<bool> RefundAsync(string merchantReference, decimal amount, string reason, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// 🚨 **GỬI YÊU CẦU HOÀN TIỀN** (`SAL-006`) — `vnp_Command=refund` (API giao dịch, **POST JSON**).
+    ///
+    /// 🔒 **BẤT BIẾN QUAN TRỌNG NHẤT: mã `00` NGHĨA LÀ "CỔNG ĐÃ NHẬN", KHÔNG PHẢI "TIỀN ĐÃ RA".**
+    /// VNPay xử lý hoàn tiền **bất đồng bộ** ở phía ngân hàng ⇒ hàm này **luôn** trả
+    /// `DaHoanThat = false` + `ChoXacNhan = true` khi cổng nhận yêu cầu. Tầng gọi **phải** xác nhận bằng
+    /// <see cref="QueryStatusAsync"/> **trước khi** gọi `PaymentTransaction.RegisterRefund`.
+    /// 📌 Lý do (đã trả giá ở dạng khác trong dự án): ghi *"đã hoàn"* khi tiền chưa ra ⇒**sổ sách nói dối**,
+    /// khách khiếu nại, và **không ai** theo dõi bước xác nhận.
+    ///
+    /// ⚠️ **LỖI HẠ TẦNG ≠ LỖI NGHIỆP VỤ** (đây là chỗ dễ mất tiền nhất):
+    /// timeout / không kết nối được ⇒ **KHÔNG BIẾT** cổng có nhận được yêu cầu hay không.
+    /// ⇒ Trả `LoiHaTang` **và** `ChoXacNhan = true` — **cấm** người gọi *"retry mù"* (có thể hoàn **HAI LẦN**).
+    /// Đường đúng: **tra `querydr`** rồi mới quyết định.
+    /// </summary>
+    public async Task<RefundResult> RefundAsync(
+        string merchantReference,
+        decimal amount,
+        string reason,
+        string? providerTransactionId = null,
+        CancellationToken cancellationToken = default)
     {
-        // TODO: POST {TransactionApiUrl} với vnp_Command=refund, ký như trên.
-        // Lưu ý: hoàn tiền là giao dịch KHÔNG đồng bộ — phải gọi querydr để xác nhận kết quả.
-        throw new NotImplementedException("Hoàn tiền VNPay chưa được cài đặt trong khung này.");
+        if (string.IsNullOrWhiteSpace(merchantReference))
+        {
+            return new RefundResult { LyDoThatBai = "Thiếu mã giao dịch gốc (`merchantReference`)." };
+        }
+
+        if (amount <= 0m)
+        {
+            return new RefundResult { LyDoThatBai = "Số tiền hoàn phải LỚN HƠN 0." };
+        }
+
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            // 🚨 Lý do là tham số **bắt buộc** của cổng (`vnp_OrderInfo`) VÀ là dấu vết audit:
+            // hoàn tiền mà không ghi lý do thì 6 tháng sau không ai giải thích được vì sao tiền ra.
+            return new RefundResult { LyDoThatBai = "Hoàn tiền BẮT BUỘC có lý do (vnp_OrderInfo + audit)." };
+        }
+
+        if (_http is null)
+        {
+            return new RefundResult
+            {
+                LoiHaTang = "Chưa cấu hình HttpClient cho PaymentHub ⇒ KHÔNG gọi được cổng.",
+                LyDoThatBai = "Lỗi CẤU HÌNH (không phải lỗi cổng): thiếu `AddHttpClient`. Không được coi là 'đã hoàn'."
+            };
+        }
+
+        // ⚠️ Không biết số tiền gốc ⇒ **không** tự đoán `02`/`03`. VNPay sẽ tự kiểm và từ chối nếu sai loại
+        // kèm mã lỗi rõ ràng — **tốt hơn** là ta đoán sai rồi hoàn một phần trong khi ý định là toàn phần.
+        // 📌 Người gọi có thể truyền `amount` bằng đúng số đã thu ⇒ khi đó `03` (một phần) vẫn hoàn đúng số tiền.
+        var thamSo = VnPayRequestBuilder.ThamSoHoanTien(
+            _options.TmnCode, merchantReference, amount,
+            laHoanToanPhan: false, lyDo: reason, nguoiThucHien: "eCommerce",
+            maGiaoDichCuaCong: providerTransactionId);
+
+        return await GoiApiGiaoDichAsync(thamSo, cancellationToken);
     }
 
-    public Task<PaymentTransactionStatus> QueryStatusAsync(string merchantReference, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// **TRUY VẤN TRẠNG THÁI GIAO DỊCH** (`vnp_Command=querydr`) — `SAL-006` **BR** và `REC-001`.
+    ///
+    /// 📌 **VÌ SAO BẮT BUỘC PHẢI CÓ (không phải "tính năng thêm"):** IPN/webhook **có thể mất**
+    /// (mạng, deploy, cổng bỏ sót). Không có `querydr` thì giao dịch đã thu tiền **mãi mãi** ở `Pending`,
+    /// và **không ai biết** khách đã trả hay chưa ⇒ đơn không được xử lý, hoặc bị huỷ oan.
+    ///
+    /// 🔒 **Ánh xạ mã phản hồi (đọc kỹ vì đây là chỗ suy diễn nguy hiểm):**
+    /// <list type="bullet">
+    ///   <item>`00` ⇒ **đã thu tiền** ⇒ `Succeeded`;</item>
+    ///   <item>`01`/`02`/`04`/`07` ⇒ giao dịch **chưa/không** thành công ⇒ `Failed` (khách chưa trả);</item>
+    ///   <item>`24` ⇒ khách **huỷ** ⇒ `Cancelled` (⚠️ khác `Failed`: khách **cố ý** huỷ, không phải lỗi);</item>
+    ///   <item>khác ⇒ **KHÔNG ĐOÁN**: trả `Pending` — nghĩa là *"vẫn chưa biết"*, để job đối soát gọi lại.
+    ///     📌 Ánh xạ bừa một mã lạ sang `Failed` sẽ **chôn** một giao dịch đã thu tiền ⇒ **mất tiền im lặng**.</item>
+    /// </list>
+    /// ⚠️ Lỗi hạ tầng/cấu hình ⇒ **`Pending`** (không phải `Failed`): *"chưa biết"* **khác** *"không thành công"*.
+    /// </summary>
+    public async Task<PaymentTransactionStatus> QueryStatusAsync(
+        string merchantReference,
+        CancellationToken cancellationToken = default)
     {
-        // TODO: POST {TransactionApiUrl} với vnp_Command=querydr.
-        // ⚠️ BẮT BUỘC có job đối soát dùng hàm này: IPN/webhook có thể mất.
-        throw new NotImplementedException("Truy vấn giao dịch VNPay chưa được cài đặt trong khung này.");
+        if (string.IsNullOrWhiteSpace(merchantReference) || _http is null)
+        {
+            return PaymentTransactionStatus.Pending;
+        }
+
+        var thamSo = VnPayRequestBuilder.ThamSoTruyVan(_options.TmnCode, merchantReference);
+        var kq = await GoiApiGiaoDichAsync(thamSo, cancellationToken);
+
+        if (kq.LoiHaTang is not null || !kq.DaNhanYeuCau)
+        {
+            // ⚠️ "Chưa biết" KHÁC "không thành công" — trả `Pending` để job còn gọi lại.
+            return PaymentTransactionStatus.Pending;
+        }
+
+        return kq.MaPhanHoi switch
+        {
+            VnPayRequestBuilder.MaThanhCong => PaymentTransactionStatus.Succeeded,
+            "24" => PaymentTransactionStatus.Cancelled,
+            "01" or "02" or "04" or "07" => PaymentTransactionStatus.Failed,
+            _ => PaymentTransactionStatus.Pending
+        };
+    }
+
+    /// <summary>
+    /// 🌐 Gọi `{TransactionApiUrl}` với tham số đã ký, rồi đọc phản hồi.
+    /// 🔒 **Mọi** lỗi hạ tầng được **BẮT** và chuyển thành <see cref="RefundResult.LoiHaTang"/> —
+    /// **không** để exception lọt lên: exception thô ở tầng gọi sẽ bị hiểu là *"hoàn tiền thất bại"*
+    /// trong khi sự thật là *"**chưa biết** cổng có nhận hay không"* → hai kết luận **trái ngược**.
+    /// </summary>
+    private async Task<RefundResult> GoiApiGiaoDichAsync(
+        SortedDictionary<string, string> thamSo,
+        CancellationToken cancellationToken)
+    {
+        var chuoiKy = VnPayRequestBuilder.DungChuoiKy(thamSo);
+        var chuKy = VnPayRequestBuilder.Ky(_options.HashSecret, chuoiKy);
+
+        // VNPay nhận **JSON** cho API giao dịch, và chữ ký là **một trường trong JSON** (khác IPN dạng query string).
+        var than = new Dictionary<string, string>(thamSo, StringComparer.Ordinal)
+        {
+            ["vnp_SecureHash"] = chuKy
+        };
+
+        try
+        {
+            using var noiDung = new StringContent(
+                System.Text.Json.JsonSerializer.Serialize(than), Encoding.UTF8, "application/json");
+
+            using var phanHoi = await _http!.PostAsync(_options.TransactionApiUrl, noiDung, cancellationToken);
+            var thanPhanHoi = await phanHoi.Content.ReadAsStringAsync(cancellationToken);
+
+            // 🔒 Đọc phản hồi **kể cả** khi HTTP không phải 2xx: VNPay trả JSON mô tả lỗi kèm mã,
+            // và mã đó hữu ích hơn hẳn "HTTP 400". ⚠️ `DocPhanHoi` **tự kiểm chữ ký** — phản hồi không
+            // hợp lệ **không** được tin dù nội dung nói "thành công".
+            var kq = VnPayRequestBuilder.DocPhanHoi(thanPhanHoi, _options.HashSecret);
+
+            if (!phanHoi.IsSuccessStatusCode && kq.LyDoThatBai is null)
+            {
+                kq.LyDoThatBai = $"Cổng trả HTTP {(int)phanHoi.StatusCode}.";
+            }
+
+            return kq;
+        }
+        catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            // ⏱️ TIMEOUT ⇒ **KHÔNG BIẾT** cổng có nhận được yêu cầu hay không.
+            return new RefundResult
+            {
+                LoiHaTang = "Timeout",
+                // 📌 Ghi **loại** exception vào lý do (không chỉ nói "timeout"): `TaskCanceledException` có thể
+                // đến từ `HttpClient.Timeout` **hoặc** từ một tầng khác — phân biệt được thì mới sửa đúng chỗ.
+                LyDoThatBai = $"Hết thời gian chờ cổng ({ex.InnerException?.GetType().Name ?? ex.GetType().Name}). " +
+                              "KHÔNG BIẾT cổng đã nhận yêu cầu hay chưa " +
+                              "⇒ CẤM retry mù (có thể hoàn HAI LẦN); phải tra `querydr` trước.",
+                ChoXacNhan = true
+            };
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return new RefundResult { LoiHaTang = "Cancelled", LyDoThatBai = "Yêu cầu bị huỷ theo `CancellationToken`." };
+        }
+        catch (HttpRequestException ex)
+        {
+            return new RefundResult
+            {
+                LoiHaTang = "HttpRequestException",
+                LyDoThatBai = $"Không kết nối được cổng ({ex.GetType().Name}). KHÔNG BIẾT cổng đã nhận yêu cầu " +
+                              "hay chưa ⇒ CẤM retry mù; phải tra `querydr` trước.",
+                ChoXacNhan = true
+            };
+        }
     }
 
     // ---------- helpers ----------
