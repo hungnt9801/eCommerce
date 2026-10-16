@@ -15,6 +15,27 @@ namespace eCommerce.Settings;
 ///   • ✅ **`PhamVi`** (`Channel` | `ChannelWarehouse`) **nay CÓ tác dụng**: quyết định dòng `(kênh, kho)` có được
 ///     xét hay không (xem <see cref="ChonHanMuc"/>) — không còn là "ô chọn không đổi gì".
 /// </summary>
+/// <summary>
+/// 🔑 **NGUỒN TỐI THIỂU ĐỂ CHIẾU SANG <see cref="HanMucKenh.DongHanMuc"/>.**
+///
+/// 📌 **VÌ SAO LÀ GIAO DIỆN (không nhận thẳng entity `InvChannelLimit`):** `eCommerce.Tests`
+/// **KHÔNG** tham chiếu `eCommerce.Domain` (layering — `Application.Contracts` không được tham chiếu
+/// `Domain`, và test đi theo cùng khuôn). 🔒 Nhận **entity** ⇒ hàm thuần **không test được** — mà
+/// **không test được** chính là lý do phép chiếu này từng nằm inline trong một hàm `async` chạm 4 repository.
+/// ✅ Giao diện này chỉ có **đúng 5 thuộc tính** cần cho việc chọn hạn mức ⇒ test **cài đặt nó bằng một
+/// `record` 5 dòng**, không cần DB, không cần mock.
+/// ⚠️ **Đánh đổi đã biết:** thêm một giao diện cho một phép chiếu là hơi thừa về mặt kỹ thuật — 📌 nhưng nó
+/// **mua được** khả năng test cho **đúng chỗ** mà `DonVi` có thể bị đánh rơi (xem chú thích `ChieuDongHanMuc`).
+/// </summary>
+public interface IDongHanMucNguon
+{
+    Guid Id { get; }
+    Guid? WarehouseId { get; }
+    decimal GiaTri { get; }
+    HanhDongHanMuc HanhDong { get; }
+    DonViHanMuc? DonVi { get; }
+}
+
 public static class HanMucKenh
 {
     /// <summary>
@@ -76,6 +97,31 @@ public static class HanMucKenh
     /// 📌 Đặt ở record này (chứ không tra DB lúc chạy) để `ChonHanMuc` vẫn là **hàm THUẦN** — cùng lý do
     /// đã ghi ở chú thích `DongHanMuc` gốc.</param>
     public sealed record DongHanMuc(Guid Id, Guid? WarehouseId, decimal GiaTri, HanhDongHanMuc HanhDong, DonViHanMuc? DonVi = null);
+    /// <summary>
+    /// 🔑 **CHIẾU ENTITY `InvChannelLimit` → `DongHanMuc`** — hàm **THUẦN**, và **tồn tại để test được**.
+    ///
+    /// ══════════════════════════════════════════════════════════════════════════════════════════════════
+    /// 🚨 **VÌ SAO TÁCH RA (đây KHÔNG phải chi tiết kỹ thuật — đây là chỗ BUG ẨN NẤP):**
+    ///
+    /// Phép chiếu này là **chỗ DUY NHẤT** mà `DonVi` đi từ **entity** sang **luật chọn**. 🔒 Nếu nó đánh rơi
+    /// `DonVi` (ví dụ ai đó rút gọn còn 4 tham số), thì **mọi** dòng đều thành *"kế thừa setting"* —
+    /// 🚨 và hậu quả **không có lỗi nào**: hạn mức `200 chiếc` bị đọc thành `200%` ⇒ **không chặn gì cả**.
+    ///
+    /// 📌 Trước khi tách, phép chiếu nằm **inline trong `StockReservationService.GiuChoAsync`** — một hàm
+    /// `async` chạm **4 repository + khoá phân tán + `ISettingProvider`** ⇒ **không** test được nếu không có
+    /// **mock/DB**. 🔑 Luật đã trả giá nhiều lần trong dự án: **tách lõi quyết định ra hàm thuần ⇒ có test
+    /// cho MỌI nhánh** (`CAT-003` `SinhSlug` · `SAL-005` `LuatWatermark` · `INV-003` `ChonHanMuc`).
+    /// ══════════════════════════════════════════════════════════════════════════════════════════════════
+    /// </summary>
+    /// <param name="cacDong">Các entity hạn mức **của đúng kênh** đã đọc từ `InvChannelLimits`.</param>
+    public static List<DongHanMuc> ChieuDongHanMuc(IEnumerable<IDongHanMucNguon> cacDong)
+    {
+        ArgumentNullException.ThrowIfNull(cacDong);
+
+        return cacDong
+            .Select(x => new DongHanMuc(x.Id, x.WarehouseId, x.GiaTri, x.HanhDong, x.DonVi))
+            .ToList();
+    }
 
     /// <summary>Nguồn của hạn mức đang áp — 🔑 **phải ghi được vào log/DB**, nếu không thì *"vì sao đơn bị chặn"* không trả lời được.</summary>
     public enum NguonHanMuc

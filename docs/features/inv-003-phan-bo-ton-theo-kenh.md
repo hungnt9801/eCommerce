@@ -1367,3 +1367,84 @@ Nghiệp vụ thật dùng **hai đơn vị cho hai kênh khác nhau**:
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.1 | 17/10/2026 | *(agent, session GĐ1)* | **§18 — LÁT CẮT 3: `DonVi` THEO TỪNG DÒNG** (đóng nợ §16.8 **#1 — nợ số 1 về nghiệp vụ**): thêm cột **`DonVi` (nullable)** vào `InvChannelLimits` + migration `20261016175736_Inv003_DonViTheoTungDong` (**áp lên DB thật**; NND **giữ 48** vì không thêm unique index) + `DongHanMuc.DonVi` + **`ChonHanMuc` trả `chon.DonVi ?? donVi`** + `KetQuaHanMuc.DonVi` (**không nullable**) + `StockReservationService` truyền `x.DonVi` + app service **đọc/ghi** `DonVi` (**chuỗi sai ⇒ NÉM**, không im lặng) + **cột & ô chọn "Đơn vị"** trên màn hình (`/HanMucKenh`). 🔑 **HAI QUYẾT ĐỊNH:** (①) **`null` = "không override"** — dùng `0`/giá trị mặc định làm cờ sẽ tạo **hai cách diễn đạt cùng một ý** (và `Percent = 0` là **đơn vị hợp lệ**); nhờ vậy **dữ liệu cũ không đổi hành vi** ⇒ migration **an toàn**; (②) **trộn `DonVi` NGAY CẠNH việc chọn dòng** — vì `DongHanMuc` **và** `KetQuaHanMuc` là hai chỗ chứa `DonVi`, nên có **hai** đường lấy sai; 🚨 ca xấu nhất là lấy `GiaTri` của dòng theo kho mà `DonVi` của dòng cả kênh ⇒ `30` (chiếc) đọc thành `30%` — **không lỗi nào**. ✅ **10 unit test** (`HanMucKenhDonViTests`) + **7/7 ca DB/HTTP thật**: `A1` tiền đề · `C1` API trả override · `C2` API trả `null` (kế thừa) · `D1` POST ⇒ DB `0` · `D2` POST rỗng ⇒ DB `NULL` · `D3` **sai ⇒ `403` + `Settings:0001`** · `D4` **không để lại rác**. 🐞 **Ba lỗi của tôi**: (1) 🚨 **kỳ vọng probe ĐOÁN NGƯỢC thứ tự enum** (`DonVi = 0` là **`Percent`**, không phải `Absolute`) ⇒ ca đỏ dù sản phẩm **ĐÚNG** — 🔑 **đọc enum từ mã nguồn, không đoán**; (2) nhiều `String.Replace` **không khớp** ⇒ tưởng đã sửa mà file **không đổi** (✅ kiểm lại bằng `Select-String`); (3) 🚨 **chú thích đã lỗi thời** trong `InvChannelLimit` vẫn nói *"`DonVi` vẫn là setting dùng chung"* — **chú thích nói ngược sự thật thì tệ hơn không có chú thích** (đã sửa cùng lượt). Ghi **§18.7** (nợ: 🚨 `Percent` vẫn tính trên tồn của **từng `(kho, SKU)`** — tồn **chưa** mô hình hoá theo kênh · `DonVi` là **chuỗi** ở DTO vì layering · chưa có nút **"Sửa"** điền sẵn · chưa có **test tích hợp** cho đường giữ chỗ thật) |
+
+---
+
+## 19. ✅ **LÁT CẮT 4 — TÁCH PHÉP CHIẾU RA HÀM THUẦN + KHOÁ CHỖ `DonVi` CÓ THỂ BỊ ĐÁNH RƠI** (17/10/2026) — *đóng nợ §18.7 #4 (một phần)*
+
+### 19.1 🔑 **Vấn đề: mắt xích yếu nhất của chuỗi `DonVi` nằm ở giữa, và KHÔNG test được**
+
+Ở §18 tôi đã khoá **luật chọn** (`ChonHanMuc`) bằng **10 unit test**. 🚨 Nhưng `DonVi` phải đi qua **ba** chặng:
+
+<list type="number">
+  <item>**entity `InvChannelLimit`** (cột `DonVi`) — ✅ đã đo bằng probe §18.5;</item>
+  <item>🚨 **phép CHIẾU entity → `DongHanMuc`** — **chỗ yếu nhất, và TRƯỚC LƯỢT NÀY KHÔNG CÓ TEST NÀO**;</item>
+  <item>**luật chọn** `ChonHanMuc` — ✅ 10 unit test (§18.5).</item>
+</list>
+
+📌 **Vì sao chặng ② nguy hiểm:** nếu phép chiếu **đánh rơi** `DonVi` (ví dụ ai đó rút gọn còn 4 tham số khi
+"làm gọn" mã), thì **mọi** dòng đều thành *"kế thừa setting"* ⇒ 🚨 hạn mức `200 chiếc` bị đọc thành `200%`
+⇒ **không chặn gì cả** — **không có lỗi nào, không log, không ném**.
+
+🔒 **Và vì sao nó không test được:** phép chiếu nằm **inline** trong `StockReservationService.GiuChoAsync` —
+một hàm `async` chạm **4 repository + khoá phân tán + `ISettingProvider`**. Muốn test thì phải có **mock**
+(⚠️ `eCommerce.Tests` **không** có thư viện mock, và thêm nó vào **Central Package Management** là rủi ro
+**không cần thiết**) hoặc **DB** (⚠️ cũng chưa có fixture).
+
+### 19.2 ✅ **Cách sửa — tách phép chiếu thành hàm THUẦN, và cho nó một GIAO DIỆN TỐI THIỂU**
+
+| Bước | Chi tiết |
+|---|---|
+**1** | Thêm **`IDongHanMucNguon`** — giao diện **đúng 5 thuộc tính** mà việc chọn hạn mức cần (`Id`, `WarehouseId`, `GiaTri`, `HanhDong`, `DonVi`) |
+**2** | `InvChannelLimit` **cài đặt** giao diện đó (chỉ thêm tên vào danh sách — **không** đổi một dòng logic) |
+**3** | **`HanMucKenh.ChieuDongHanMuc(IEnumerable<IDongHanMucNguon>)`** — hàm **THUẦN**, `static` |
+**4** | `StockReservationService` **gọi** hàm đó thay vì `.Select(...)` inline |
+
+🔑 **VÌ SAO LÀ GIAO DIỆN, KHÔNG NHẬN THẲNG ENTITY** (`InvChannelLimit`):
+`eCommerce.Tests` **KHÔNG** tham chiếu `eCommerce.Domain` (layering — 📌 cùng khuôn với việc
+`Application.Contracts` không được tham chiếu `Domain`, đã vấp **ba lần** trong dự án).
+🔒 Nhận **entity** ⇒ hàm thuần **không test được** — mà **không test được** chính là **lý do** phép chiếu này
+từng nằm inline trong một hàm `async` chạm 4 repository.
+✅ Giao diện chỉ có **5 thuộc tính** ⇒ test **cài đặt nó bằng một `record` 5 dòng**, không cần DB, không cần mock.
+
+⚠️ **Đánh đổi đã biết:** thêm **một** giao diện cho **một** phép chiếu là **hơi thừa về mặt kỹ thuật**.
+📌 Nhưng nó **mua được** khả năng test cho **đúng chỗ** mà `DonVi` có thể bị đánh rơi — 🔑 và đó là **toàn bộ**
+mục đích của lát cắt này.
+
+### 19.3 ✅ **KIỂM CHỨNG — 14 CA (10 cũ + 4 MỚI) VÀ ĐÃ TIÊM LẠI ĐÚNG LỖI**
+
+**4 ca MỚI trong `HanMucKenhDonViTests`:**
+| Ca | Bất biến |
+|---|---|
+🚨 **`ChieuDongHanMuc__GIU_NGUYEN_DonVi__khong_danh_roi`** | **`DonVi` đi QUA được phép chiếu** — 📌 khẳng định **cả 4** trường khác (`Id`, `GiaTri`, `HanhDong`) để một phép chiếu "đúng DonVi mà sai GiaTri" cũng **ĐỎ** |
+🚨 **`ChieuDongHanMuc__DonVi_null__GIU_null`** | ⚠️ Nếu phép chiếu biến `null` thành một giá trị (`?? Percent`) thì **mọi dòng cũ** (cột `DonVi` = `NULL`) bị **âm thầm** gán đơn vị — 🔑 và lỗi đó **không** lộ ra ở đường chạy: hạn mức vẫn *"chạy"*, chỉ **sai đơn vị** |
+**`ChieuDongHanMuc__giu_DU_ca_hai_dong__va_DUNG_thu_tu`** | 🔒 Bất biến *"không mất dòng"*: nếu nuốt mất một dòng thì `ChonHanMuc` (chọn **giá trị nhỏ nhất**) có thể **nới** hạn mức ⇒ **cho qua đơn vượt** |
+🚨 **`ChieuDongHanMuc__roi_vao_ChonHanMuc__DonVi_di_TRON_VEN_ca_chuoi`** | **CA NỐI CHUỖI** — chiếu **rồi** chọn, tức **đúng đường thật** của `GiuChoAsync` (`GetListAsync` → `ChieuDongHanMuc` → `ChonHanMuc`), chỉ **khác** là dữ liệu đến từ `record` thay vì DB |
+
+🚨 **VÀ TÔI ĐÃ TIÊM LẠI ĐÚNG LỖI ĐỂ CHẮC LƯỚI BẮT** (bài học `CAT-003` §25.3 / `sal-005` §19.5 /
+`web-001` §98.5 — *"lưới chưa từng bắt được gì thì chưa chứng minh nó bắt được gì"*):
+<list type="bullet">
+  <item>Tiêm: bỏ `x.DonVi` khỏi `.Select(...)` trong `ChieuDongHanMuc`;</item>
+  <item>✅ Kết quả: **3 ca ĐỎ** — `GIU_NGUYEN_DonVi`, `roi_vao_ChonHanMuc`, `giu_DU_ca_hai_dong`;</item>
+  <item>✅ Sau khi khôi phục: **1127 unit test xanh** (+4) · **38 integration** · mermaid **197/0**.</item>
+</list>
+
+📌 **Điều đáng chú ý:** ca `DonVi_null__GIU_null` **vẫn XANH** khi tiêm — 🔑 và đó là **đúng**: bỏ `x.DonVi`
+làm mọi dòng thành `null`, nên ca *"`null` giữ `null`"* **không** phân biệt được. 📌 Bài học: **một ca kiểm
+không bắt được lỗi nào trong lượt tiêm thì nó không sai — nó chỉ không phải ca bắt lỗi đó.** 🔒 Vì vậy phải
+có **nhiều** ca cho **nhiều** hình dạng lỗi.
+
+### 19.4 ⏳ NỢ
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+**1** | 🚨 **VẪN CHƯA có test tích hợp đầu-cuối thật** cho `GiuChoAsync` | 📌 Nay **cả ba chặng** của chuỗi `DonVi` đều có test **thành phần** (entity ⇒ probe · chiếu ⇒ 4 unit · luật ⇒ 10 unit). ⚠️ Nhưng **đường thật** (`GetListAsync` trên DB → chiếu → chọn → **áp**) **chưa** được chạy liền mạch trong test. 🔑 Cần: fixture DB (`Testcontainers` **đã** có trong `IntegrationTests`) hoặc `WebApplicationFactory` |
+**2** | 🚨 **`eCommerce.Tests` KHÔNG có thư viện mock** | 📌 Và tôi **cố ý không thêm**: thêm gói vào **CPM** là thay đổi **hạ tầng test** với rủi ro **không cần thiết** cho một lát cắt nhỏ. 🔑 Nhưng nếu về sau cần mock nhiều nơi thì phải **quyết định** — và ghi lý do |
+**3** | 🚨 **Chưa có fixture DB trong `eCommerce.Tests`** | 📌 Cùng họ với nợ `CAT-003` §25.7 #2 / `sal-005` §18.7 #1: nhiều ca *"không đo được"* đều vì **thiếu đường gọi** |
+**4** | **`IDongHanMucNguon` là giao diện chỉ có MỘT người cài đặt** | ⚠️ Đánh đổi **có chủ ý** (xem §19.2). 📌 Nếu về sau có nguồn thứ hai (ví dụ ảnh chụp/cache) thì nó **có ích**; nếu không, nó là **một lớp gián tiếp** |
+
+### 19.5 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.2 | 17/10/2026 | *(agent, session GĐ1)* | **§19 — LÁT CẮT 4: TÁCH PHÉP CHIẾU + KHOÁ CHỖ `DonVi` BỊ ĐÁNH RƠI** (đóng nợ §18.7 #4 một phần): thêm **`IDongHanMucNguon`** (giao diện **5 thuộc tính** — 🔑 vì `eCommerce.Tests` **không** tham chiếu `Domain`, nhận **entity** thì hàm thuần **không test được**) · `InvChannelLimit` cài đặt nó · **`HanMucKenh.ChieuDongHanMuc`** (**hàm THUẦN**) · `StockReservationService` gọi hàm đó thay vì `.Select(...)` inline · **+4 unit test ⇒ 1127**. 🚨 **CHỖ YẾU NHẤT CỦA CHUỖI `DonVi` NẰM Ở GIỮA:** §18 đã khoá **luật chọn** (10 ca) và probe đã đo **entity**, nhưng **phép chiếu entity → `DongHanMuc`** — chỗ `DonVi` **có thể bị đánh rơi** — **KHÔNG có test nào**, vì nó nằm **inline trong một hàm `async` chạm 4 repository + khoá phân tán**. ⚠️ Và hậu quả nếu đánh rơi: **mọi** dòng thành *"kế thừa setting"* ⇒ `200 chiếc` đọc thành `200%` ⇒ **không chặn gì cả**, **không lỗi nào**. 🚨 **ĐÃ TIÊM LẠI ĐÚNG LỖI để chắc lưới bắt** (bỏ `x.DonVi` khỏi phép chiếu ⇒ **3 ca ĐỎ**); ✅ khôi phục ⇒ **1127 unit + 38 integration + mermaid 197/0**. 📌 **Và một quan sát có giá trị:** ca `DonVi_null__GIU_null` **vẫn XANH** khi tiêm — 🔑 **đúng**, vì bỏ `x.DonVi` làm mọi dòng thành `null` nên ca đó **không phân biệt được** ⇒ 📌 **một ca không bắt được lỗi nào trong lượt tiêm thì không sai — nó chỉ không phải ca bắt lỗi đó** ⇒ phải có **nhiều ca cho nhiều hình dạng lỗi**. 🐞 **Hai lỗi của tôi:** (1) `using eCommerce.Inventory;` **không** thêm được vì tệp dùng **file-scoped namespace** (`namespace X;` — **không** có dòng `using` nào) ⇒ sửa bằng cách đổi hướng sang **giao diện tối thiểu** (tốt hơn cho **test**); (2) sao lưu `.k97bak` **sau khi** tiêm ⇒ khôi phục lại **đúng bản đã tiêm** — 🔑 **phải sao lưu TRƯỚC khi sửa, không phải sau**. Ghi **§19.4** (nợ: 🚨 **vẫn chưa có test tích hợp đầu-cuối thật** cho `GiuChoAsync` — cả ba chặng đã có test **thành phần** nhưng **đường thật** chưa chạy liền mạch · 🚨 `eCommerce.Tests` **không có thư viện mock** (**cố ý** không thêm vì CPM) · 🚨 **chưa có fixture DB** trong `eCommerce.Tests` · `IDongHanMucNguon` có **một** người cài đặt — **đánh đổi có chủ ý**) |

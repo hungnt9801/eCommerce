@@ -180,4 +180,90 @@ public class HanMucKenhDonViTests
             Assert.True(Enum.IsDefined(kq.DonVi), $"DonVi phải là giá trị hợp lệ, đang là {kq.DonVi}.");
         }
     }
+
+    // ══════════════════════════════════════════════════════════════════════════════════════════════════
+    // 🚨 **PHÉP CHIẾU ENTITY → `DongHanMuc`** — chỗ **DUY NHẤT** mà `DonVi` đi từ entity sang luật chọn.
+    //
+    // 📌 **VÌ SAO CẦN TEST RIÊNG CHO MỘT PHÉP CHIẾU 5 DÒNG:** nếu nó **đánh rơi** `DonVi` (ví dụ ai đó rút gọn
+    // còn 4 tham số), thì **mọi** dòng đều thành *"kế thừa setting"* ⇒ 🚨 hạn mức `200 chiếc` bị đọc thành
+    // `200%` ⇒ **không chặn gì cả**, **không có lỗi nào**. 🔒 Và trước khi tách, phép chiếu nằm **inline**
+    // trong một hàm `async` chạm **4 repository + khoá phân tán** ⇒ **không** test được.
+    // ══════════════════════════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>Cài đặt **tối thiểu** của nguồn — 🔑 nhờ giao diện `IDongHanMucNguon` mà test **không** cần
+    /// entity/DB/mock.</summary>
+    private sealed record Nguon(
+        Guid Id,
+        Guid? WarehouseId,
+        decimal GiaTri,
+        HanhDongHanMuc HanhDong,
+        DonViHanMuc? DonVi) : IDongHanMucNguon;
+
+    [Fact]
+    public void ChieuDongHanMuc__GIU_NGUYEN_DonVi__khong_danh_roi()
+    {
+        // 🚨 **CA QUAN TRỌNG NHẤT CỦA PHẦN CHIẾU.** Khẳng định `DonVi` **đi qua** được phép chiếu.
+        var id = Guid.NewGuid();
+
+        var ketQua = HanMucKenh.ChieuDongHanMuc([new Nguon(id, null, 200m, HanhDongHanMuc.Block, DonViHanMuc.Percent)]);
+
+        var dong = Assert.Single(ketQua);
+        Assert.Equal(id, dong.Id);
+        Assert.Equal(200m, dong.GiaTri);
+        Assert.Equal(HanhDongHanMuc.Block, dong.HanhDong);
+        Assert.Equal(DonViHanMuc.Percent, dong.DonVi);
+    }
+
+    [Fact]
+    public void ChieuDongHanMuc__DonVi_null__GIU_null__khong_bien_thanh_gia_tri_mac_dinh()
+    {
+        // 🔒 `null` = *"không override"*. ⚠️ Nếu phép chiếu biến `null` thành một giá trị (ví dụ
+        // `?? DonViHanMuc.Percent`) thì **mọi dòng cũ** (cột `DonVi` = `NULL`) sẽ **âm thầm** bị gán đơn vị
+        // ⇒ 🔑 và lỗi đó **không** lộ ra ở đường chạy: hạn mức vẫn "chạy", chỉ **sai đơn vị**.
+        var ketQua = HanMucKenh.ChieuDongHanMuc([new Nguon(Guid.NewGuid(), null, 10m, HanhDongHanMuc.Warn, null)]);
+
+        Assert.Null(Assert.Single(ketQua).DonVi);
+    }
+
+    [Fact]
+    public void ChieuDongHanMuc__giu_DU_ca_hai_dong__va_DUNG_thu_tu()
+    {
+        // 🔒 Bất biến "không mất dòng": nếu phép chiếu lọc/nuốt mất một dòng thì dòngcòn lại có thể thắng
+        // `ChonHanMuc` một cách **sai** (và `ChonHanMuc` chọn **giá trị nhỏ nhất** ⇒ mất dòng lớn hơn nghĩa là
+        // **nới** hạn mức ⇒ **cho qua đơn vượt**).
+        var idA = Guid.NewGuid();
+        var idB = Guid.NewGuid();
+
+        var ketQua = HanMucKenh.ChieuDongHanMuc(
+        [
+            new Nguon(idA, null, 50m, HanhDongHanMuc.Block, DonViHanMuc.Percent),
+            new Nguon(idB, KhoA, 30m, HanhDongHanMuc.Warn, DonViHanMuc.Absolute)
+        ]);
+
+        Assert.Equal(2, ketQua.Count);
+        Assert.Equal(idA, ketQua[0].Id);
+        Assert.Equal(idB, ketQua[1].Id);
+        Assert.Equal(DonViHanMuc.Percent, ketQua[0].DonVi);
+        Assert.Equal(DonViHanMuc.Absolute, ketQua[1].DonVi);
+        Assert.Equal(KhoA, ketQua[1].WarehouseId);
+    }
+
+    [Fact]
+    public void ChieuDongHanMuc__roi_vao_ChonHanMuc__DonVi_di_TRON_VEN_ca_chuoi()
+    {
+        // 🔑 **CA NỐI CHUỖI** — phép chiếu **rồi** luật chọn: đây là đường thật của `GiuChoAsync`
+        // (`GetListAsync` → `ChieuDongHanMuc` → `ChonHanMuc`), chỉ **khác** là dữ liệu đến từ `record` thay vì DB.
+        // 📌 Nếu ai đó viết lại `ChieuDongHanMuc` cho "gọn" thì ca này **ĐỎ** — và đó là mục đích của nó.
+        var dong = HanMucKenh.ChieuDongHanMuc(
+        [
+            new Nguon(Guid.NewGuid(), null, 50m, HanhDongHanMuc.Block, DonViHanMuc.Percent),
+            new Nguon(Guid.NewGuid(), KhoA, 30m, HanhDongHanMuc.Block, DonViHanMuc.Absolute)
+        ]);
+
+        var kq = HanMucKenh.ChonHanMuc(
+            PhamViHanMuc.ChannelWarehouse, dong, KhoA, DonViHanMuc.Percent, 0m, HanhDongHanMuc.Block, out _);
+
+        Assert.Equal(30m, kq.GiaTri);
+        Assert.Equal(DonViHanMuc.Absolute, kq.DonVi);
+    }
 }

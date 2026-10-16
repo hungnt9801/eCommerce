@@ -42,7 +42,7 @@ namespace eCommerce.Inventory;
 /// người vận hành sửa** ⇒ phải có **vết ai sửa/khi nào** (`LastModifierId`/`LastModificationTime`), và xoá
 /// là **xoá mềm** (`ISoftDelete`) để *"hạn mức cũ đã tắt"* vẫn **giải thích được** lịch sử chặn đơn.
 /// </summary>
-public class InvChannelLimit : FullAuditedAggregateRoot<Guid>, IMultiTenant
+public class InvChannelLimit : FullAuditedAggregateRoot<Guid>, IMultiTenant, IDongHanMucNguon
 {
     /// <summary>Độ dài tối đa của mã kênh — **đồng bộ** với `StockLedgerEntry.ChannelCode` và `Order.ChannelCode` (32).
     /// 🔑 Nguồn DUY NHẤT là <see cref="eCommerceConsts.InventoryLimits.MaKenhToiDa"/> (ở `Domain.Shared`) vì

@@ -126,9 +126,7 @@ public class StockReservationService : DomainService
         // nên so khớp ở đây cũng dùng giá trị đã chuẩn hoá ⇒ không có ca "kênh `Shopee` vs `shopee`" làm hạn mức im lặng không khớp.
         var cacDongHanMuc = kenhChuanHoa is null
             ? []
-            : (await _hanMucKenhRepository.GetListAsync(x => x.ChannelCode == kenhChuanHoa))
-                .Select(x => new HanMucKenh.DongHanMuc(x.Id, x.WarehouseId, x.GiaTri, x.HanhDong, x.DonVi))
-                .ToList();
+            : HanMucKenh.ChieuDongHanMuc(await _hanMucKenhRepository.GetListAsync(x => x.ChannelCode == kenhChuanHoa));
 
         var hanMucDangAp = HanMucKenh.ChonHanMuc(
             phamViHanMuc, cacDongHanMuc, warehouseId, donViHanMuc, giaTriMacDinh, hanhDongMacDinh, out var dongBiBoQua);
