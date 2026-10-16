@@ -77,9 +77,15 @@ foreach ($tm in $ThuMuc) {
     foreach ($t in (Get-ChildItem -Path $duongDan -Filter $Ten -File -ErrorAction SilentlyContinue)) {
         # Khoa = duong dan TUONG DOI (on dinh giua cac may) — ⚠️ KHONG dung duong dan tuyet doi.
         $khoa = (Join-Path $tm $t.Name).Replace('\', '/')
+        # 🚨 **MOC LA SO TICK UTC — KHONG phai chuoi ISO.**
+        # 🔒 **LY DO (do duoc ngay 17/10/2026):** `ConvertFrom-Json` **TU DONG** chuyen chuoi ISO-8601
+        # thanh `[datetime]`; ⚠️ va `[datetime] -eq [string]` trong PowerShell tra **False**,
+        # trong khi `[datetime] -eq [datetime]` tra **True** ⇒ 🔑 phep so sanh **phu thuoc KIEU**
+        # chu khong phu thuoc GIA TRI ⇒ ket qua **khong dang tin**.
+        # 📌 So tick la **so nguyen** ⇒ khong co chuyen doi ngam nao chen vao giua ⇒ so sanh **chinh xac**.
         $thay += [pscustomobject]@{
             Khoa = $khoa
-            Moc  = $t.LastWriteTime.ToString('o')
+            Moc  = $t.LastWriteTimeUtc.Ticks
             Ten  = $t.Name
         }
     }
@@ -107,21 +113,74 @@ if ($Kiem) {
         exit 2
     }
 
-    $mocCu = Get-Content $tepMoc -Raw | ConvertFrom-Json
-    $bangCu = @{}
-    foreach ($m in $mocCu) { $bangCu[$m.Khoa] = $m.Moc }
+    # 🚨 **DOC MOC — VA KIEM NO CO PHAI MANG THAT KHONG.**
+    #
+    # 🔒 **BAY DA DO DUOC NGAY KHI VIET SCRIPT NAY (17/10/2026):** ban dau toi viet
+    #     `$mocCu = Get-Content ... | ConvertFrom-Json`  roi  `foreach ($m in $mocCu) { ... }`
+    # ⚠️ Neu tep moc chua **MOT OBJECT** thay vi **MANG** (vi du `ConvertTo-Json` tren mot phan tu don),
+    # thi `foreach` **KHONG** duyet phan tu — no duyet **THUOC TINH** cua object ⇒ `$bangCu` **RONG**
+    # ⇒ 🔑 **MOI tep bi coi la "MOI"** ⇒ va buoc kiem **XANH** du binary **KHONG DOI**.
+    #
+    # 🚨 **Va day dung la loai hong ma script nay sinh ra de chong:** mot phep kiem **XANH vi LY DO SAI**
+    # ⇒ nguoi sua **tin** rang ban build da vao ⇒ **ket luan sai ve SAN PHAM**.
+    # 📌 `@(...)` ep ve **MANG**; va neu mang do **RONG**/thieu truong `Khoa` thi **DUNG** (exit 2) —
+    # 🔑 **khong** duoc coi la "moi tep deu moi".
+    #
+    # 🚨 **BAY THU HAI — VA NO TINH VI HON (cung do duoc ngay 17/10/2026):** `ConvertFrom-Json` **TU DONG**
+    # chuyen chuoi ISO-8601 (`2026-10-17T02:06:04.123+07:00`) thanh **`[datetime]`**. ⚠️ Khi do
+    # `$bangCu[$khoa] -eq $t.Moc` la phep so sanh **`[datetime]` voi `[string]`** ⇒ 🔒 **LUON FALSE**
+    # ⇒ **MOI** tep roi vao nhanh *"MOI (chua co trong moc)"* ⇒ va buoc kiem **XANH** du binary **KHONG DOI**.
+    # 📌 Nghia la phep kiem **tu vo hieu hoan toan im lang** — dung loai hong ma no sinh ra de chong.
+    # ✅ **CACH CHUA:** ep **CA HAI VE** ve `[string]`. 🔑 So sanh **chuoi voi chuoi** thi khong co chuyen
+    # doi ngam nao chen vao giua.
+    # 📌 Bai hoc chung: `ConvertFrom-Json` **khong** tra ve "du lieu tho" — no **suy kieu**. 🔒 Voi du lieu
+    # dung de **SO SANH**, phai tu ep kieu thay vi tin vao suy kieu.
+    $mocCu = @(Get-Content $tepMoc -Raw | ConvertFrom-Json)
 
+    $bangCu = @{}
+    foreach ($m in $mocCu) {
+        if ($null -ne $m.Khoa -and $null -ne $m.Moc) {
+            $bangCu[[string]$m.Khoa] = [long]$m.Moc
+        }
+    }
+
+    if ($bangCu.Count -eq 0) {
+        Write-Output ("🚨 Tep moc {0} KHONG doc duoc dong nao (rong / sai dinh dang)." -f $tepMoc)
+        Write-Output "⇒ PHEP KIEM VO NGHIA ⇒ DUNG (⚠️ KHONG duoc coi la 'moi tep deu MOI')."
+        exit 2
+    }
+
+    # 🚨🔑 **TÊN BIẾN PHẢI NÓI ĐÚNG ĐIỀU KIỆN ĐANG KIỂM — VÌ TÔI ĐÃ VIẾT NGƯỢC Ở ĐÂY (đo được 17/10/2026).**
+    #
+    # 📌 **Chuyện đã xảy ra:** bản đầu đặt tên `$khongDoi` cho nhánh **SO KHỚP** (`-eq`) rồi **BÁO ĐỘNG**
+    # trên nhánh đó ⇒ 🔒 cổng báo *"BAN BUILD KHONG VAO"* **ngay cả khi mọi tệp ĐỀU ĐỔI**.
+    # ⚠️ Và tệ hơn: nó **báo động đúng lúc phải im lặng** ⇒ **vô dụng đúng lúc cần nhất** —
+    # 📌 một cổng **luôn đỏ** thì người ta **học cách bỏ qua nó**.
+    #
+    # ✅ **Cách chữa KHÔNG chỉ là đảo `if`:** đặt tên biến theo **ĐIỀU KIỆN ĐANG KIỂM**
+    # (*"tệp có ĐỔI không?"*) thay vì theo **kết quả** (*"không đổi"*) — 🔑 như vậy `if ($coDoi)`
+    # đọc lên là **hiển nhiên đúng**, không còn chỗ cho việc đảo nhầm.
+    #
+    # 📌 **BÀI HỌC CHUNG:** điều kiện **PHỦ ĐỊNH** (`$khongDoi`, `$khongLoi`, `$chuaXong`) là nơi
+    # **dễ đảo nhầm nhất** — vì cả *"đúng"* lẫn *"sai"* đều đọc ra **có lý**. 🔒 Dùng tên **KHẲNG ĐỊNH**.
+    $coDoi = @()
     $khongDoi = @()
     $moi = @()
 
     foreach ($t in $thay) {
         if (-not $bangCu.ContainsKey($t.Khoa)) {
+            # Tệp **chưa có** trong mốc (ví dụ vừa thêm dự án) ⇒ 📌 **KHÔNG** phải lỗi, nhưng cũng
+            # **KHÔNG** chứng minh được bản build đã vào ⇒ phải **nói ra**.
             $moi += $t.Khoa
             continue
         }
 
-        if ($bangCu[$t.Khoa] -eq $t.Moc) {
+        if ($bangCu[$t.Khoa] -eq [long]$t.Moc) {
+            # 🔑 **KHỚP MỐC = TỆP KHÔNG ĐỔI = BẢN BUILD KHÔNG VÀO** ⇒ đây mới là ca **BÁO ĐỘNG**.
             $khongDoi += [pscustomobject]@{ Khoa = $t.Khoa; Moc = $t.Moc }
+        }
+        else {
+            $coDoi += $t.Khoa
         }
     }
 

@@ -1563,3 +1563,97 @@ khỏi `All` ⇒ ✅ **3 ca ĐỎ**, gồm ca **chiều ngược** mới. ✅ Kh
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.3 | 17/10/2026 | *(agent, session GĐ1)* | **§22 — LÁT CẮT 5: METRIC CHO ĐỐI SOÁT THANH TOÁN** (đóng nợ §21.7 #1): thêm **`payment_recon_changed_total`** (counter, nhãn `result`=`succeeded`/`failed`) + **`payment_recon_unresolved_total`** (gauge) + **`MetricDoiSoatThanhToan`** (🔑 **hàm phát metric DÙNG CHUNG** ở **tầng Domain** — ⚠️ *chép hai chỗ* ⇒ hai bản **lệch** khi ai đó sửa một chỗ, và 🔒 lệch ở **metric** thì **ÂM THẦM**: biểu đồ vẫn vẽ, chỉ **sai số**; ⚠️ *đặt ở `PaymentHub.Application`* ⇒ `eCommerce.Application` **không** thấy nó (tham chiếu **ngược tầng**); 🔒 *đặt trong `LuatDoiSoatThanhToan`* ⇒ **phá** tính **thuần** của luật — tách ra giữ được **cả hai**) + `ProjectReference` → `eCommerce.Kernel` cho `PaymentHub.Domain` + gọi từ **cả** app service **và** job. 🔑 **HAI metric vì HAI câu hỏi khác nhau:** counter = *"đã phát hiện và sửa bao nhiêu"*, gauge = *"còn bao nhiêu ca chưa ngã ngũ"*; 📌 gộp lại thì *"KHÔNG KIỂM ĐƯỢC"* và *"đã kiểm và sửa"* trông **giống hệt nhau**. 🚨 **PHÁT HIỆN HAI LỖI THẬT trong bảng đăng ký metric:** (①) `InventoryReconMismatchSkus` **có** hằng số nhưng **thiếu** trong `All` ⇒ chú thích *"nguồn sự thật duy nhất"* **SAI**; (②) **`SetInventoryReconMismatchSkus` ghi vào biến NHƯNG CHƯA BAO GIỜ CÓ GAUGE đọc nó** ⇒ 🚨 giá trị **MẤT**, metric **không bao giờ phát** — 🔑 và đây là loại hỏng **TỆ NHẤT**: job đối soát kho **vẫn chạy**, **vẫn ghi**, **không lỗi nào**, chỉ là **không ai** nhận được con số ⇒ một gauge *"0 lệch"* khi ấy là **LỜI NÓI DỐI** (`0` vì **chưa ai ĐO**). 🔑 **Vì sao lọt:** test cũ chỉ kiểm **MỘT CHIỀU** — ✅ nay thêm ca **chiều NGƯỢC** dùng **phản chiếu** (🚨 và nó **BẮT ĐƯỢC lỗi #2 ngay lập tức**). ✅ **Bỏ `Assert.Equal(12, …)`** — 🔑 con số cứng chỉ có giá trị **một lần** rồi thành **RÀO CẢN**: mỗi metric **hợp lệ** mới làm nó **ĐỎ** ⇒ người sửa **đổi số** mà **không suy nghĩ**; thay bằng bất biến thật (**không trùng** · **không rỗng** · **đối chiếu chiều ngược**). ✅ **7 unit test mới** + sửa bộ test metric **⇒ 1155 unit** (+7) · **38 integration** · mermaid **197/0**; ➕ **job chạy THẬT** với mã mới (`[PAY-JOB-BAT-DAU]` → cảnh báo → `[PAY-JOB-XONG]`, **DB không đổi**). 🚨 **ĐÃ TIÊM LẠI ĐÚNG LỖI:** bỏ `PaymentReconChangedTotal` khỏi `All` ⇒ **3 ca ĐỎ** (gồm ca **chiều ngược** mới). 🐞 **Bốn lỗi của tôi:** (1) 🚨 **BẪY CŨ LẦN THỨ TƯ** — khôi phục mã xong test **vẫn đỏ**, tôi suýt kết luận *"khôi phục không sạch"* nhưng sự thật là **binary cũ** ⇒ 🔒 **§97.6/§98.6/§21.6 đã ghi luật mà nó VẪN cắn** ⇒ 📌 phải đưa việc kiểm mốc DLL vào **script dùng chung**, không dựa vào trí nhớ; (2) viết **overload ném vô điều kiện** (`=> throw new NotSupportedException()`) — **rác**, 🔒 lọt vào commit là **bẫy cho người sau**; (3) **sửa mã theo CHỈ SỐ DÒNG** ⇒ xoá nhầm dòng phân cách — ⚠️ **lần thứ hai** trong hai lượt; (4) **chú thích sai kiểu** (`// ENUM` trong khi là **chuỗi**) ⇒ mất một vòng sửa. Ghi **§22.8** (nợ: 🚨 **cảnh báo vẫn CHƯA có alert rule** — *"có metric"* **≠** *"có cảnh báo"* · **chưa có tầng XUẤT metric** (OpenTelemetry → Prometheus) ⇒ `Meter` chỉ **phát**, không collector thì **không ai đọc** · 🚨 **việc kiểm mốc DLL vẫn là QUY TẮC TRONG ĐẦU** — đã cắn **bốn lần** ⇒ nên có `tools\build-va-kiem-moc.ps1` · chưa có **test tích hợp cho worker** · chưa kiểm luồng **THU ĐƯỢC TIỀN** thật (🔒 **cần credential sandbox** — **nợ chặn**)) |
+
+---
+
+## 23. ✅ **LÁT CẮT 6 — MỘT LỆNH CHẠY TẤT CẢ PHÉP KIỂM** (17/10/2026) — *đóng nợ §22.8 #3*
+
+### 23.1 🔑 **Vấn đề: năm bước chạy TAY, và bước nào cũng có bẫy riêng**
+
+Trước lát cắt này, **mỗi vòng làm việc** phải chạy **năm bước bằng tay**. ⚠️ Ba bẫy đã cắn **nhiều lần**:
+
+| Bẫy | Hậu quả |
+|---|---|
+🚨 **`dotnet build … \| Select-String`** | 🔒 **CHE MẤT exit code** — `$LASTEXITCODE` khi đó là của `Select-String` (**luôn 0**) ⇒ *"build 0 lỗi"* có thể **SAI** |
+🚨 **`build exit 0` mà binary KHÔNG ĐỔI** | Test **ĐỎ vì LÝ DO SAI** ⇒ **kết luận sai về SẢN PHẨM** (**BỐN LẦN**: §97.6 · §98.6 · §21.6 · §22.7) |
+⚠️ **Quên một bước** | 📌 *"tất cả xanh"* nhưng thực ra **chưa chạy** bước đó — và **không ai** biết |
+
+### 23.2 ✅ **`tools\kiem-tat-ca.ps1` — một lệnh, năm bước, exit code THẬT**
+
+**Năm bước:** ① dọn tiến trình + chờ cổng `5000`/`5100` **TRỐNG** → ② build **+ kiểm mốc nhi phân** →
+③ unit test → ④ integration test → ⑤ mermaid.
+
+🔒 **Hai quy tắc mà chính script THI HÀNH (không phải lời khuyên):**
+<list type="number">
+  <item>**Không bao giờ ống dẫn output của lệnh mà ta cần exit code** — mỗi lệnh ghi ra **tệp tạm** rồi đọc
+    tệp đó (hàm `ChayLenh` dùng `*>` chứ **không** dùng `|`);</item>
+  <item>🚨 **Build xong PHẢI kiểm mốc nhi phân** — `exit 1` ⇒ **bản build KHÔNG VÀO** ⇒ 🔒 **DỪNG NGAY**,
+    **không** chạy test.</item>
+</list>
+
+➕ **Bước ① cũng là một cổng:** nó dừng tiến trình eCommerce cũ và **chờ cổng trống** — 📌 vì một tiến trình
+đang chạy **giữ tệp** là **nguyên nhân gốc** của cả **bốn lần** trả giá ở §23.1.
+
+➕ **Bước E2E (`-DayDu`) BÁO LỖI thay vì im lặng bỏ qua** — 🔑 một bước *"im lặng bỏ qua"* nguy hiểm hơn một
+bước **báo lỗi**: 📌 nó khiến người ta tin rằng **đã** kiểm.
+
+### 23.3 ✅ **KIỂM CHỨNG — và tôi đã TIÊM LỖI để chắc các cổng BẮT**
+
+| Ca | Kết quả đo |
+|---|---|
+**Chạy đầy đủ** | ✅ **`exit 0` · 56.7s** — build (68 tệp, mọi mốc đều đổi) · **1155 unit** · **38 integration** · mermaid **197/0** |
+🚨 **Tiêm LỖI BUILD** (thêm mã sai) | ✅ **`exit 1`**, in **dòng lỗi có tệp + số dòng**, 🔒 **KHÔNG chạy unit test** |
+🚨 **Cổng "binary không đổi"** | ✅ **`exit 1`** kèm *"🚨 2 TEP **KHONG DOI** sau build ⇒ BAN BUILD KHONG VAO"* + hướng dẫn sửa |
+**Bước E2E** (`-DayDu`) | ✅ **`exit 1`** kèm *"Chua co script E2E … 🔒 NỢ ĐÃ GHI"* — 🔑 **báo rõ** thay vì bỏ qua im lặng |
+
+### 23.4 🚨 **TÔI ĐÃ VIẾT NGƯỢC ĐIỀU KIỆN CỦA CỔNG — và đó là bài học lớn nhất của lượt này**
+
+**Triệu chứng đo được:** cổng báo *"🚨 2 TEP **KHONG DOI** ⇒ BAN BUILD KHONG VAO"* **ngay cả khi mọi tệp
+ĐỀU ĐỔI** — tức cổng **LUÔN ĐỎ**.
+
+**Nguyên nhân:** bản đầu tôi đặt tên `$khongDoi` cho nhánh **SO KHỚP** (`-eq`) rồi **BÁO ĐỘNG** trên nhánh đó.
+📌 Nghĩa là tên biến nói *"không đổi"* nhưng nhánh lại chạy khi **mốc khớp = tệp KHÔNG đổi** — và tôi đã
+**gán kết quả vào nhầm biến**, rồi báo động trên **chính** nhánh đó.
+
+🚨 **VÌ SAO ĐÂY LÀ LỖI NGHIÊM TRỌNG, KHÔNG PHẢI CHUYỆN ĐẶT TÊN:** một cổng **luôn đỏ** thì 🔒
+**người ta học cách bỏ qua nó** ⇒ 📌 nó **vô dụng đúng lúc cần nhất**. Và cổng này sinh ra để chống **bốn
+lần trả giá** — hỏng nó nghĩa là **quay lại** đúng cái bẫy đó.
+
+🔑 **Cách chữa KHÔNG chỉ là đảo `if`:** tôi đặt lại tên theo **ĐIỀU KIỆN ĐANG KIỂM** (*"tệp có **ĐỔI**
+không?"* — `$coDoi`) thay vì theo **kết quả** (*"không đổi"*) ⇒ như vậy `if ($coDoi)` đọc lên là
+**hiển nhiên đúng**, 🔒 **không còn chỗ cho việc đảo nhầm**.
+
+📌 **BÀI HỌC CHUNG (áp dụng cho mọi mã trong dự án):** điều kiện **PHỦ ĐỊNH** (`$khongDoi`, `$khongLoi`,
+`$chuaXong`) là nơi **dễ đảo nhầm nhất** — vì cả *"đúng"* lẫn *"sai"* đều đọc ra **có lý**.
+🔒 **Dùng tên KHẲNG ĐỊNH.**
+
+### 23.5 🐞 **Bốn lỗi của tôi trong lượt này — và một trong đó là "đo bằng công cụ sai"**
+
+| # | Lỗi | Bài học |
+|---|---|---|
+🚨 **1** | **Viết ngược điều kiện của cổng** (xem §23.4) | 🔒 Điều kiện **phủ định** dễ đảo nhầm ⇒ **dùng tên khẳng định** |
+🚨 **2** | **Đo bằng công cụ sai:** tôi grep tên lớp trong DLL bằng **`Encoding.Unicode`** rồi kết luận *"DLL không có worker"* | ⚠️ .NET dùng **UTF-8** cho siêu dữ liệu chuỗi ⇒ 📌 **kết luận từ phép đo sai công cụ** (đã vấp ở §21.6 #2) |
+**3** | **`ConvertFrom-Json` TỰ ĐỔI KIỂU:** nó chuyển chuỗi ISO-8601 thành **`[datetime]`**, và `[datetime] -eq [string]` trả **False** trong khi `[datetime] -eq [datetime]` trả **True** | 🔑 **Phép so sánh phụ thuộc KIỂU, không phụ thuộc GIÁ TRỊ** ⇒ 🔒 **không đáng tin**. ✅ Chữa: lưu **số tick UTC** (số nguyên) ⇒ **không có chuyển đổi ngầm nào chen vào giữa**. 📌 Bài học chung: `ConvertFrom-Json` **không** trả *"dữ liệu thô"* — nó **suy kiểu** |
+**4** | **`Write-Error` của PowerShell ép `exit 1`** ⇒ hai nguyên nhân **KHÁC NHAU** (*"binary không đổi"* và *"phép kiểm vô nghĩa"*) có **cùng** mã thoát | 🔒 Hai nguyên nhân khác nhau **phải** có hai mã khác nhau — nếu không thì người đọc log **không phân biệt được** và sẽ đi **sửa sai chỗ**. ✅ Chữa: `Write-Output` + `exit 2` |
+
+➕ **Và một điều đáng ghi về PHÉP ĐO:** trong lượt này tôi **nhiều lần** đọc `$LASTEXITCODE` **sau một ống
+dẫn** (`… | Select-Object`) ⇒ nhận **giá trị cũ** ⇒ suýt kết luận *"script sai"* trong khi script **đúng**.
+📌 Đúng bài học mà chính script này được viết ra để thi hành.
+➕ ➕ **Và một lần `bin\` RỖNG** (0 tệp `.dll`) làm cổng báo *"không thấy tệp nào"* — 🔑 phép kiểm **đúng**;
+📌 cái **sai** là tôi suy luận *"cổng hỏng"* trước khi **kiểm điều kiện tiên quyết**.
+
+### 23.6 ⏳ NỢ
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+**1** | 🚨 **Chưa có CI** (không `.github`, không `azure-pipelines`, không `Jenkinsfile`) | 📌 Nay **đã có nền**: khi thêm CI thì **chỉ cần gọi** `tools\kiem-tat-ca.ps1` |
+**2** | 🚨 **Probe E2E vẫn là SCRIPT TAY** | 🔒 `-DayDu` **báo lỗi** thay vì bỏ qua (tốt), nhưng **chưa có** script trong `_tam-kiem` ⇒ `web-001` §98.7 #1 **vẫn mở** |
+**3** | **Thời gian chạy ~57s** | ⚠️ `--no-incremental` là **có chủ ý** (chống bẫy binary không đổi) ⇒ **chậm hơn** nhưng **đúng hơn**. 📌 Có `-BoQuaIntegration` cho vòng lặp nhanh |
+**4** | **Integration test cần Docker** | 📌 Nếu Docker không chạy, bước ④ đỏ vì **MÔI TRƯỜNG** — script **nói rõ** điều đó thay vì để người đọc tưởng **mã nguồn** hỏng |
+**5** | **Chưa kiểm DB sau khi chạy** | 📌 Các vòng trước tôi kiểm `AbpSettings`/`PayTransactions`… **bằng tay** — 🔑 nên thành **bước ⑥** |
+
+### 23.7 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.4 | 17/10/2026 | *(agent, session GĐ1)* | **§23 — LÁT CẮT 6: MỘT LỆNH CHẠY TẤT CẢ PHÉP KIỂM** (đóng nợ §22.8 #3): thêm **`tools\kiem-tat-ca.ps1`** — **một lệnh, năm bước, exit code THẬT**: ① **dọn tiến trình + chờ cổng `5000`/`5100` TRỐNG** (📌 đây là **nguyên nhân gốc** của cả **bốn lần** trả giá) · ② **build + KIỂM MỐC nhi phân** · ③ unit test · ④ integration test · ⑤ mermaid. 🔒 **Hai quy tắc mà chính script THI HÀNH:** **① KHÔNG BAO GIỜ ống dẫn output của lệnh mà ta cần exit code** (mỗi lệnh ghi ra **tệp tạm** rồi đọc — hàm `ChayLenh` dùng `*>` **không** dùng `|`) — 📌 vì `dotnet build … \| Select-String` 🔒 **CHE MẤT exit code**; **② build xong PHẢI kiểm mốc** ⇒ 🚨 `exit 1` ⇒ **DỪNG NGAY, KHÔNG chạy test** (test trên binary cũ đỏ vì **LÝ DO SAI** ⇒ **kết luận sai về SẢN PHẨM**). ➕ **Bước E2E (`-DayDu`) BÁO LỖI thay vì im lặng bỏ qua** — 🔑 *"im lặng bỏ qua"* nguy hiểm hơn *"báo lỗi"*: 📌 nó khiến người ta tin rằng **đã** kiểm. ✅ **KIỂM CHỨNG + ĐÃ TIÊM LỖI:** chạy đầy đủ **`exit 0` · 56.7s · 68 tệp mọi mốc đều đổi · 1155 unit · 38 integration · mermaid 197/0**; 🚨 **tiêm LỖI BUILD** ⇒ **`exit 1`** + in **dòng lỗi có tệp/số dòng** + 🔒 **KHÔNG chạy unit test**; 🚨 **cổng binary-không-đổi** ⇒ **`exit 1`** + hướng dẫn sửa. 🚨🚨 **VÀ TÔI ĐÃ VIẾT NGƯỢC ĐIỀU KIỆN CỦA CỔNG — bài học lớn nhất của lượt:** cổng báo *"2 TEP KHONG DOI ⇒ BAN BUILD KHONG VAO"* **ngay cả khi mọi tệp ĐỀU ĐỔI** ⇒ 🔒 **cổng LUÔN ĐỎ**, và 📌 **một cổng luôn đỏ thì người ta học cách BỎ QUA nó** ⇒ nó **vô dụng đúng lúc cần nhất** (mà nó sinh ra để chống **bốn lần** trả giá!). 🔑 **Cách chữa KHÔNG chỉ là đảo `if`:** đặt tên theo **ĐIỀU KIỆN ĐANG KIỂM** (`$coDoi` = *"tệp có ĐỔI không?"*) thay vì theo **KẾT QUẢ** (`$khongDoi`) ⇒ `if ($coDoi)` đọc lên **hiển nhiên đúng** ⇒ 🔒 **không còn chỗ cho việc đảo nhầm**. 📌 **BÀI HỌC CHUNG:** điều kiện **PHỦ ĐỊNH** (`$khongDoi`/`$khongLoi`/`$chuaXong`) là nơi **dễ đảo nhầm nhất** vì cả *"đúng"* lẫn *"sai"* đều đọc ra **có lý** ⇒ 🔒 **dùng tên KHẲNG ĐỊNH**. 🐞 **Bốn lỗi:** (1) 🚨 **viết ngược điều kiện cổng**; (2) 🚨 **đo bằng công cụ sai** — grep tên lớp trong DLL bằng **`Encoding.Unicode`** rồi kết luận *"DLL không có worker"* (⚠️ .NET dùng **UTF-8**) — 📌 **lần thứ hai** (§21.6 #2); (3) **`ConvertFrom-Json` TỰ ĐỔI KIỂU** — nó chuyển ISO-8601 thành **`[datetime]`** và `[datetime] -eq [string]` trả **False** còn `[datetime] -eq [datetime]` trả **True** ⇒ 🔑 **phép so sánh phụ thuộc KIỂU, không phụ thuộc GIÁ TRỊ** ⇒ 🔒 **không đáng tin**; ✅ chữa bằng **số tick UTC** (số nguyên) ⇒ **không có chuyển đổi ngầm nào chen vào** (📌 `ConvertFrom-Json` **không** trả *"dữ liệu thô"* — nó **suy kiểu**); (4) **`Write-Error` ép `exit 1`** ⇒ hai nguyên nhân **KHÁC NHAU** (*"binary không đổi"* vs *"phép kiểm vô nghĩa"*) có **cùng** mã ⇒ 🔒 người đọc log **không phân biệt được** và sẽ **sửa sai chỗ**; ✅ chữa: `Write-Output` + `exit 2`. ➕ **Hai điều về PHÉP ĐO:** tôi **nhiều lần** đọc `$LASTEXITCODE` **sau một ống dẫn** ⇒ nhận **giá trị CŨ** ⇒ suýt kết luận *"script sai"* khi script **đúng** (📌 đúng bài học mà script này thi hành); và một lần **`bin\` RỖNG** (0 `.dll`) làm cổng báo *"không thấy tệp nào"* — 🔑 phép kiểm **đúng**, 📌 cái sai là tôi suy luận *"cổng hỏng"* trước khi **kiểm điều kiện tiên quyết**. Ghi **§23.6** (nợ: 🚨 **CHƯA CÓ CI** — không `.github`/`azure-pipelines`/`Jenkinsfile`; 📌 nay **đã có nền**, thêm CI thì **chỉ cần gọi** script này · 🚨 **probe E2E vẫn là SCRIPT TAY** ⇒ `web-001` §98.7 #1 **vẫn mở** · ~57s vì `--no-incremental` **có chủ ý** (chống bẫy) · integration test **cần Docker** — script **nói rõ** để không ai tưởng **mã nguồn** hỏng · **chưa kiểm DB sau khi chạy** (nên thành **bước ⑥**)) |

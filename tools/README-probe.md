@@ -214,3 +214,51 @@ pwsh -File tools\kiem-moc-build.ps1 -Kiem -Ten 'eCommerce.Application.dll'
 
 ➕ **Tệp mốc `.moc-build.json`** nằm ở **gốc repo** và **đã** vào `.gitignore` (nó là **công cụ kiểm chứng**,
 không phải mã nguồn).
+
+---
+
+## 🚨 `kiem-tat-ca.ps1` — **MỘT LỆNH, NĂM BƯỚC**, đúng exit code
+
+### Vì sao có script này
+
+Trước nó, **mỗi vòng làm việc** phải chạy **năm bước bằng tay**: build · kiem moc · unit test · integration
+test · mermaid. ⚠️ Và mỗi bước đều có **bẫy riêng đã cắn người**:
+
+| Bẫy | Hậu quả |
+|---|---|
+🚨 **`dotnet build … \| Select-String`** | 🔒 **CHE MẤT exit code** (`$LASTEXITCODE` khi đó là của `Select-String`, **luôn 0**) ⇒ *"build 0 lỗi"* có thể là **SAI** |
+🚨 **`build exit 0` mà binary KHÔNG ĐỔI** | Test **ĐỎ vì LÝ DO SAI** ⇒ kết luận sai về **SẢN PHẨM** (**BỐN LẦN**: `web-001` §97.6 · §98.6 · `sal-006` §21.6 · §22.7) |
+⚠️ **Quên một bước** | 📌 *"tất cả xanh"* nhưng thực ra **chưa chạy** bước đó — và **không ai** biết |
+
+✅ Script gom lại: **một lệnh, năm bước, exit code thật, DỪNG NGAY khi hỏng.**
+
+### Cách dùng
+
+```powershell
+# Vòng lặp nhanh trong lúc sửa
+pwsh -File tools\kiem-tat-ca.ps1 -BoQuaIntegration
+
+# Trước khi commit (mặc định)
+pwsh -File tools\kiem-tat-ca.ps1
+
+# Đầy đủ (thêm E2E có phiên — ⚠️ hiện BÁO LỖI vì probe E2E vẫn là script tay)
+pwsh -File tools\kiem-tat-ca.ps1 -DayDu
+```
+
+**Năm bước:** ① dọn tiến trình + chờ cổng `5000`/`5100` **TRỐNG** → ② build **+ kiểm mốc nhi phân** →
+③ unit test → ④ integration test → ⑤ mermaid.
+
+### 🔒 Hai quy tắc mà **chính script** thi hành (không phải lời khuyên)
+
+**① Không bao giờ ống dẫn output của lệnh mà ta cần exit code.** Mỗi lệnh ghi ra **tệp tạm**, rồi đọc tệp
+đó ⇒ ✅ `$LASTEXITCODE` luôn là của **chính lệnh**. (Hàm `ChayLenh` dùng `*>` chứ **không** dùng `|`.)
+
+**② Build xong **phải** kiểm mốc nhi phân.** 🚨 `exit 1` ⇒ **bản build KHÔNG VÀO** ⇒ 🔒 **DỪNG** ngay,
+**không** chạy test (test trên binary cũ sẽ đỏ vì **LÝ DO SAI** và làm người sửa **kết luận sai về sản phẩm**).
+
+➕ **Bước ① cũng là một cổng:** nó **dừng** tiến trình eCommerce cũ và **chờ cổng trống** — 📌 vì một tiến
+trình đang chạy **giữ tệp** là **nguyên nhân gốc** của cả **bốn lần** trả giá ở trên.
+
+➕ **Bước E2E `-DayDu` BÁO LỖI thay vì im lặng bỏ qua** — 🔑 một bước *"im lặng bỏ qua"* nguy hiểm hơn một
+bước **báo lỗi**: 📌 nó khiến người ta tin rằng **đã** kiểm. 🚨 Đây chính là **nợ đã ghi**
+(`web-001` §98.7 #1: probe E2E vẫn là **script tay**).
