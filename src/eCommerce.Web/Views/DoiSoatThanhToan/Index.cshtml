@@ -1,0 +1,130 @@
+@using Volo.Abp.AspNetCore.Mvc.UI.Layout
+@inject IPageLayout PageLayout
+@model List<eCommerce.PaymentHub.PaymentTransactionDto>
+@{
+    PageLayout.Content.Title = "Đối soát thanh toán";
+    PageLayout.Content.BreadCrumb.Add("Trang chủ");
+    PageLayout.Content.BreadCrumb.Add("Vận hành");
+    PageLayout.Content.BreadCrumb.Add("Đối soát thanh toán");
+
+    var maThamChieu = ViewBag.MaThamChieu as string;
+    var trangThai = ViewBag.TrangThai as string;
+    var thongBao = TempData["ThongBaoThanhToan"] as string;
+    var loi = TempData["LoiThanhToan"] as string;
+}
+
+@* 🚨 `REC-001` mục 7 — ĐỐI SOÁT THANH TOÁN (`querydr`).
+
+   🔑 VÌ SAO NÚT "TRUY VẤN TỪ CỔNG" LÀ HÀNH ĐỘNG QUAN TRỌNG NHẤT CỦA TRANG:
+   đối soát **nội bộ** chỉ so được **hai nguồn của chính mình** (DB vs sổ cái). 🔒 Chỉ `querydr` mới trả lời
+   được câu hỏi **duy nhất quan trọng**: *"cổng thanh toán nói gì?"* — mà đó là **nguồn sự thật** về việc
+   tiền đã vào hay chưa. ⚠️ Không có nút này thì mọi "đối soát" chỉ là **tự đối chiếu với chính mình**.
+
+   🔒 MÀN HÌNH **CHỈ ĐỌC** (trừ nút truy vấn): **KHÔNG** có nút hoàn tiền ở đây.
+   📌 Hoàn tiền là **hành động di chuyển TIỀN THẬT** — nó cần màn hình riêng, có xác nhận hai bước và
+   hiện **số tiền + lý do** trước khi bấm. ⚠️ Đặt một nút "Hoàn tiền" cạnh danh sách là cách **dễ nhất**
+   để ai đó bấm nhầm. *@
+
+@if (!string.IsNullOrWhiteSpace(thongBao))
+{
+    <div class="alert alert-success">@thongBao</div>
+}
+@if (!string.IsNullOrWhiteSpace(loi))
+{
+    @* 🔒 Lỗi hiện ĐÚNG mã + thông điệp (controller đã bắt `BusinessException`).
+       📌 Không bắt thì `AbpExceptionFilter` biến thành `500` + "An internal error occurred…"
+       ⇒ người vận hành KHÔNG biết là *"cổng chưa cấu hình"* hay *"hệ thống hỏng"*. *@
+    <div class="alert alert-danger">@loi</div>
+}
+
+<div class="card mb-3">
+    <div class="card-body">
+        <form method="get" asp-action="Index" class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label">Mã tham chiếu</label>
+                <input class="form-control" name="maThamChieu" value="@maThamChieu" placeholder="(để trống = không lọc)" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Trạng thái</label>
+                @* 📌 Ô nhập TỰ DO (không dropdown cứng): trạng thái do cổng định nghĩa và có thể **mới** hơn
+                   danh sách ta biết. 🔒 Một dropdown cứng sẽ **ẩn** đúng những trạng thái bất thường cần tìm. *@
+                <input class="form-control" name="trangThai" value="@trangThai" placeholder="(để trống = tất cả)" />
+            </div>
+            <div class="col-md-4">
+                <button class="btn btn-primary w-100" type="submit">Tra cứu</button>
+            </div>
+        </form>
+        <p class="text-muted small mt-2 mb-0">
+            Để trống bộ lọc ⇒ hiện tối đa <strong>50 giao dịch gần nhất</strong>.
+        </p>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header"><strong>Giao dịch (@Model.Count)</strong></div>
+    <div class="card-body p-0">
+        @if (Model.Count == 0)
+        {
+            @* 🔑 Nói rõ "không khớp bộ lọc" thay vì bảng trống: bảng trống làm người dùng tưởng tính năng hỏng. *@
+            <p class="p-3 mb-0 text-muted">
+                Không có giao dịch nào khớp bộ lọc hiện tại.
+                @if (!string.IsNullOrWhiteSpace(maThamChieu) || !string.IsNullOrWhiteSpace(trangThai))
+                {
+                    <a asp-action="Index">Xoá bộ lọc</a>
+                }
+            </p>
+        }
+        else
+        {
+            <table class="table table-sm mb-0">
+                <thead>
+                    <tr>
+                        <th>Mã tham chiếu</th>
+                        <th>Cổng</th>
+                        <th class="text-end">Số tiền</th>
+                        <th>Trạng thái</th>
+                        <th>Mã giao dịch cổng</th>
+                        <th>Cập nhật</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var g in Model)
+                    {
+                        <tr>
+                            <td><code>@g.MerchantReference</code></td>
+                            <td>@g.ProviderCode</td>
+                            <td class="text-end">@g.Amount.ToString("#,##0") @g.Currency</td>
+                            <td>
+                                @* ⚠️ KHÔNG tô màu "xanh = tốt" một cách mù quáng: chỉ `Succeeded` mới là thành công.
+                                   📌 Tô xanh mọi trạng thái khác "Failed" sẽ làm trạng thái LẠ trông như ĐÃ XONG. *@
+                                @if (string.Equals(g.Status, "Succeeded", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    <span class="badge bg-success">@g.Status</span>
+                                }
+                                else if (string.Equals(g.Status, "Failed", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    <span class="badge bg-danger">@g.Status</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary" title="Trạng thái khác 'Succeeded'/'Failed' — cần xem xét">@g.Status</span>
+                                }
+                            </td>
+                            <td class="text-muted small">@g.ProviderTransactionId</td>
+                            <td class="text-muted small">@(g.PaidAtUtc?.ToString("yyyy-MM-dd HH:mm") ?? "—")</td>
+                            <td class="text-end">
+                                <form method="post" asp-action="TruyVanTrangThai" class="d-inline"
+                                      onsubmit="return confirm('Gọi CỔNG THANH TOÁN để lấy trạng thái thật của giao dịch này?');">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@g.Id" />
+                                    <button class="btn btn-sm btn-outline-primary" type="submit">Truy vấn từ cổng</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>

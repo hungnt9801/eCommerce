@@ -18,6 +18,12 @@
     <!-- 🚨 Vòng 58: trang mặt tiền gọi `IDonHangAppService` ⇒ ctor cần `IPriceCalculationAppService` của Pricing.
          Thiếu reference này thì DI không dựng được controller ⇒ HTTP 500 (Host đã có reference từ trước). -->
     <ProjectReference Include="..\..\modules\Pricing\eCommerce.Pricing.Application\eCommerce.Pricing.Application.csproj" />
+    <!-- 🚨 `WEB-001` — `/KhachHang` + `/DoiSoatThanhToan` cần hai module này. Thiếu `ProjectReference` thì
+         `DependsOn` KHÔNG biên dịch được (khác với lỗi lúc chạy — đây là loại lỗi TỐT: nó đỏ ngay).
+         📌 Trước lượt 19, `eCommerce.Web` CHƯA tham chiếu hai module này ⇒ hai trang đó chưa làm được
+         (đã ghi ở `web-001` §95.4 như một nợ CÓ LÝ DO, không phải bỏ sót). -->
+    <ProjectReference Include="..\..\modules\Customers\eCommerce.Customers.Application\eCommerce.Customers.Application.csproj" />
+    <ProjectReference Include="..\..\modules\PaymentHub\eCommerce.PaymentHub.Application\eCommerce.PaymentHub.Application.csproj" />
     <ProjectReference Include="..\eCommerce.EntityFrameworkCore\eCommerce.EntityFrameworkCore.csproj" />
     <ProjectReference Include="..\..\shared\eCommerce.Kernel\eCommerce.Kernel.csproj" />
   </ItemGroup>

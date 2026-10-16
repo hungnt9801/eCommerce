@@ -1,0 +1,58 @@
+@*
+    🚨 `WEB-001` — TRANG `403` TỰ LÀM.
+
+    🔑 VÌ SAO TỒN TẠI: mặc định của khung là **trang trắng** ⇒ người dùng **không biết** mình thiếu gì để xin.
+    📌 Nỗi đau **đã đo được** trong dự án (lỗi `F-403`): mọi API gắn quyền trả `403` dù DB đã cấp quyền,
+    và **phía client không có manh mối nào**.
+
+    🔒 PHÂN BIỆT RÕ VỚI `401`: `403` nghĩa là *"hệ thống BIẾT bạn là ai, nhưng bạn KHÔNG được phép"*.
+    ⇒ Việc cần làm là **xin cấp quyền**, KHÔNG phải đăng nhập lại.
+    ⚠️ Nhầm hai ca này làm người dùng **đăng nhập lại vô ích** rồi **vẫn** bị chặn — và họ kết luận *"hệ thống hỏng"*.
+*@
+@{
+    ViewBag.Title = "Không đủ quyền";
+    Layout = null;
+    var duongDan = ViewBag.DuongDan as string;
+}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>403 — Không đủ quyền</title>
+    <link rel="stylesheet" href="~/libs/bootstrap/dist/css/bootstrap.min.css" />
+</head>
+<body class="bg-light">
+    <div class="container py-5" style="max-width: 720px;">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <h1 class="h3 mb-3">403 — Không đủ quyền</h1>
+
+                @if (!string.IsNullOrWhiteSpace(duongDan))
+                {
+                    <p class="mb-2">Địa chỉ yêu cầu: <code>@duongDan</code></p>
+                }
+
+                <p class="mb-2">
+                    Bạn <strong>đã đăng nhập</strong>, nhưng tài khoản hiện tại <strong>không có quyền</strong>
+                    cho màn hình này.
+                </p>
+
+                <p class="mb-2"><strong>Việc cần làm:</strong></p>
+                <ul>
+                    <li>Liên hệ quản trị viên để được <strong>cấp quyền</strong> cho vai trò của bạn.</li>
+                    <li>
+                        <strong>Không</strong> cần đăng nhập lại — đăng nhập lại <em>không</em> làm thay đổi quyền.
+                    </li>
+                </ul>
+
+                @* 🔑 Neo ASCII `[LOI-403-THIEP-QUYEN]` — để phép kiểm HTTP khẳng định ĐÚNG trang tự làm đã
+                   render (thay vì trang mặc định của khung, cũng trả `403`). *@
+                <p class="text-muted small mb-0">[LOI-403-THIEP-QUYEN][LOI-403-KHONG-CAN-DANG-NHAP-LAI]</p>
+
+                <a class="btn btn-primary mt-3" href="/">Về trang chủ</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

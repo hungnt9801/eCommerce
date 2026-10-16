@@ -67,6 +67,48 @@ public static class MenuDieuHuong
             // sẽ đỏ nếu ai thêm mục cho một trang chưa làm).
             QuyenCanCo = eCommerceConsts.Permissions.Inventory.Default,
             MoTa = "Lịch sử lượt quét + dòng lệch cần xử lý"
+        },
+
+        // ══════════════════════════════════════════════════════════════════════════════════════════════
+        // 🚨 **NHÓM CHA "VẬN HÀNH"** (`WEB-001` — menu **HAI TẦNG**) — lượt 19/40.
+        //
+        // 🔑 **VÌ SAO CẦN NHÓM (không để phẳng):** danh sách phẳng **phình ra** theo số màn hình, và 🔒 khi mọi
+        // mục **ngang hàng về thị giác** thì người dùng **không phân biệt** việc **hằng ngày** (`Đơn hàng`,
+        // `Sản phẩm`) với việc **cấu hình/đối chiếu** (`Đối soát`, `Hạn mức kênh`).
+        // 📌 Nhóm tách **luồng bán hàng** khỏi **luồng vận hành** — và đó là khác biệt **thật** về công việc.
+        //
+        // 🔒 **QUY TẮC CỦA MỤC CHA (được `MenuDieuHuongTests` kiểm):**
+        //   • `Url = "#"` — bấm mục cha chỉ **mở nhóm**, KHÔNG đi tới trang. ⚠️ Nếu khai một `Url` "giả"
+        //     (ví dụ `/VanHanh`) thì nó thành **404** — đúng loại *"báo có trong khi chưa có"* mà dự án chống;
+        //   • **KHÔNG khai `QuyenCanCo` ở cha** — quyền của nhóm là **hợp của các con**; `BoLocDieuHuong`
+        //     ẩn nhóm khi **mọi con** bị ẩn (🔑 nếu khai quyền ở cha thì nhóm **luôn hiện** và có thể **rỗng**).
+        // ══════════════════════════════════════════════════════════════════════════════════════════════
+        new()
+        {
+            Nhan = "Vận hành",
+            Url = "#",
+            MoTa = "Cấu hình và đối chiếu (không thuộc luồng bán hàng hằng ngày)",
+            Con =
+            [
+                new()
+                {
+                    Nhan = "Hạn mức kênh",
+                    Url = "/HanMucKenh",
+                    // `HanMucKenhController` gọi `IChinhSachHanMucAppService` — service đó `[Authorize]`
+                    // **cấp class** bằng `ChannelLimits.Default` (đọc), còn các method **ghi** dùng
+                    // `ChannelLimits.Manage`. 🔑 Menu khai quyền **đọc** (mở được trang); nút ghi tự chặn.
+                    QuyenCanCo = eCommerceConsts.Permissions.ChannelLimits.Default,
+                    MoTa = "Chính sách đang áp + hạn mức phân bổ riêng cho từng kênh"
+                },
+                new()
+                {
+                    Nhan = "Đối soát thanh toán",
+                    Url = "/DoiSoatThanhToan",
+                    // `DoiSoatThanhToanController` gọi `IPaymentAppService` (`[Authorize(Payments.Default)]`).
+                    QuyenCanCo = eCommerceConsts.Permissions.Payments.Default,
+                    MoTa = "Tra cứu giao dịch + trạng thái truy vấn từ cổng thanh toán"
+                }
+            ]
         }
 
         // ══════════════════════════════════════════════════════════════════════════════════════════════

@@ -1,0 +1,285 @@
+@using eCommerce.Application.Contracts.Inventory
+@using Volo.Abp.AspNetCore.Mvc.UI.Layout
+@inject IPageLayout PageLayout
+@model HanMucKenhManHinhDto
+@{
+    PageLayout.Content.Title = "Hạn mức kênh";
+    PageLayout.Content.BreadCrumb.Add("Trang chủ");
+    PageLayout.Content.BreadCrumb.Add("Vận hành");
+    PageLayout.Content.BreadCrumb.Add("Hạn mức kênh");
+
+    var kenhDangLoc = ViewBag.KenhDangLoc as string;
+    var kenhKhaDung = ViewBag.KenhKhaDung as List<KenhKhaDungDto> ?? [];
+    var chinhSach = Model.ChinhSach;
+    var thongBao = TempData["ThongBaoHanMuc"] as string;
+    var loi = TempData["LoiHanMuc"] as string;
+}
+
+@* 🚨 `INV-003` — HẠN MỨC PHÂN BỔ THEO KÊNH (đóng mục (1) của GĐ1).
+
+   📌 VÌ SAO MÀN HÌNH NÀY LÀ ĐIỀU KIỆN ĐỂ `InvChannelLimits` CÓ NGHĨA: app service + API **đã có**,
+   nhưng **chưa có màn hình nào gọi** ⇒ đường ghi chuẩn **tồn tại mà không ai dùng được**.
+   🔑 Hệ quả ĐÃ ĐO ĐƯỢC (`inv-003` §16.6): người vận hành phải ghi SQL tay rồi **xoá cache setting tay** —
+   và cache có **HAI tầng** (Redis + bộ nhớ) với mẫu key dễ sai ⇒ **4 phép đo cho kết quả SAI**.
+
+   🔒 HAI QUYẾT ĐỊNH CỦA MÀN HÌNH (đọc kỹ — chúng là lý do trang này trông như nó trông):
+     ① **Chính sách và bảng nằm CÙNG một trang.** Hạn mức *"100"* **không có nghĩa** nếu không biết đơn vị
+        (`Percent` = 100% hay `Absolute` = 100 chiếc?). Tách hai trang ⇒ người dùng đọc một con số **mà
+        không biết đơn vị** ⇒ **hiểu sai cấu hình của chính mình**.
+     ② **Cột "Đang tắt" hiện RÕ.** Quy ước toàn hệ thống: `GiaTri <= 0` nghĩa là **TẮT** hạn mức.
+        ⚠️ Nếu chỉ hiện số `0`, người vận hành dễ tưởng *"hạn mức = 0 ⇒ chặn hết"* — **ngược hẳn** sự thật.
+*@
+
+@if (!string.IsNullOrWhiteSpace(thongBao))
+{
+    <div class="alert alert-success">@thongBao</div>
+}
+@if (!string.IsNullOrWhiteSpace(loi))
+{
+    @* 🔒 Lỗi hiện ĐÚNG mã + thông điệp từ app service (đã bắt `BusinessException` ở controller).
+       📌 Không hiện lỗi này thì `AbpExceptionFilter` biến nó thành `500` + "An internal error occurred…"
+       ⇒ người dùng KHÔNG BIẾT mình gõ sai mã kênh. *@
+    <div class="alert alert-danger">@loi</div>
+}
+
+@if (chinhSach.SettingKhongHopLe.Count > 0)
+{
+    @* 🚨 CẢNH BÁO QUAN TRỌNG NHẤT CỦA TRANG: hàm đọc chính sách KHÔNG ném khi gặp giá trị lạ — nó dùng
+       MẶC ĐỊNH AN TOÀN để không làm chết đường đặt hàng. ⚠️ Nhưng nếu không NÓI RA thì người vận hành
+       TIN cấu hình của mình có hiệu lực ⇒ đúng loại "tắt im lặng" mà dự án đang chống. *@
+    <div class="alert alert-warning">
+        <strong>Cấu hình KHÔNG hợp lệ</strong> — hệ thống đang dùng <em>giá trị mặc định an toàn</em>, KHÔNG phải
+        giá trị bạn đặt. Các setting cần sửa:
+        <ul class="mb-0">
+            @foreach (var s in chinhSach.SettingKhongHopLe)
+            {
+                <li><code>@s</code></li>
+            }
+        </ul>
+    </div>
+}
+
+<div class="card mb-3">
+    <div class="card-header"><strong>Chính sách đang áp</strong></div>
+    <div class="card-body">
+        <form method="post" asp-action="DoiChinhSach">
+            @Html.AntiForgeryToken()
+
+            <div class="row g-2 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label">Đơn vị hạn mức</label>
+                    <select class="form-select" name="donViHanMuc">
+                        <option value="">(không đổi)</option>
+                        @foreach (var dv in new[] { "Percent", "Absolute" })
+                        {
+                            <option value="@dv" selected="@(chinhSach.DonVi == dv)">@dv</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Khi vượt hạn mức</label>
+                    <select class="form-select" name="hanhDongHanMuc">
+                        <option value="">(không đổi)</option>
+                        @foreach (var hd in new[] { "Block", "Warn" })
+                        {
+                            <option value="@hd" selected="@(chinhSach.HanhDong == hd)">@hd</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Phạm vi</label>
+                    <select class="form-select" name="phamViHanMuc">
+                        <option value="">(không đổi)</option>
+                        @foreach (var pv in new[] { "Channel", "ChannelWarehouse" })
+                        {
+                            <option value="@pv" selected="@(chinhSach.PhamVi == pv)">@pv</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Giá trị dùng chung (0 = TẮT)</label>
+                    <input class="form-control" type="number" step="any" min="0" name="giaTriMacDinh"
+                           value="@chinhSach.GiaTriMacDinh.ToString(System.Globalization.CultureInfo.InvariantCulture)" />
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label">Ngưỡng đối soát — đơn vị</label>
+                    <select class="form-select" name="nguongDoiSoatDonVi">
+                        <option value="">(không đổi)</option>
+                        @foreach (var dv in new[] { "Percent", "Absolute" })
+                        {
+                            <option value="@dv" selected="@(chinhSach.NguongDoiSoatDonVi == dv)">@dv</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Ngưỡng đối soát — giá trị</label>
+                    <input class="form-control" type="number" step="any" min="0" name="nguongDoiSoatGiaTri"
+                           value="@chinhSach.NguongDoiSoatGiaTri.ToString(System.Globalization.CultureInfo.InvariantCulture)" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Ngưỡng đối soát — hành động</label>
+                    <select class="form-select" name="nguongDoiSoatHanhDong">
+                        <option value="">(không đổi)</option>
+                        @foreach (var hd in new[] { "Warn", "RequireConfirmation" })
+                        {
+                            <option value="@hd" selected="@(chinhSach.NguongDoiSoatHanhDong == hd)">@hd</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <button class="btn btn-primary w-100" type="submit">Lưu chính sách</button>
+                </div>
+            </div>
+
+            <p class="text-muted small mt-2 mb-0">
+                Ghi qua <code>ISettingManager</code> ⇒ <strong>cache hai tầng tự xoá</strong>
+                (không cần sửa DB + xoá cache tay).
+            </p>
+        </form>
+    </div>
+</div>
+
+@if (chinhSach.GhiChu.Count > 0)
+{
+    <div class="alert alert-info">
+        <strong>Giới hạn đã biết</strong> (màn hình không hứa quá):
+        <ul class="mb-0">
+            @foreach (var gc in chinhSach.GhiChu)
+            {
+                <li>@gc</li>
+            }
+        </ul>
+    </div>
+}
+
+<div class="card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <strong>Hạn mức riêng từng kênh</strong>
+        <form method="get" asp-action="Index" class="d-flex gap-2">
+            <select class="form-select form-select-sm" name="kenh" style="min-width: 220px;">
+                <option value="">— tất cả kênh —</option>
+                @foreach (var k in kenhKhaDung)
+                {
+                    <option value="@k.Code" selected="@(kenhDangLoc == k.Code)">
+                        @k.Code — @k.Name (@k.SoDongHanMuc dòng)
+                    </option>
+                }
+            </select>
+            <button class="btn btn-sm btn-outline-secondary" type="submit">Lọc</button>
+        </form>
+    </div>
+    <div class="card-body p-0">
+        @if (Model.DanhSach.Count == 0)
+        {
+            @* 🔑 Nói RÕ "chưa cấu hình riêng" thay vì để bảng trống: bảng trống làm người dùng tưởng
+               "tính năng hỏng", trong khi sự thật là "kênh đang dùng giá trị dùng chung" — một trạng thái HỢP LỆ. *@
+            <p class="p-3 mb-0 text-muted">
+                Chưa có hạn mức riêng nào cho kênh này ⇒ đang dùng <strong>giá trị dùng chung</strong>
+                (@chinhSach.GiaTriMacDinh · @chinhSach.DonVi).
+            </p>
+        }
+        else
+        {
+            <table class="table table-sm mb-0">
+                <thead>
+                    <tr>
+                        <th>Kênh</th>
+                        <th>Kho</th>
+                        <th class="text-end">Giá trị</th>
+                        <th>Hành động</th>
+                        <th>Trạng thái</th>
+                        <th>Cập nhật lần cuối</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var d in Model.DanhSach)
+                    {
+                        <tr>
+                            <td><code>@d.ChannelCode</code></td>
+                            <td>
+                                @if (d.WarehouseId is null)
+                                {
+                                    <span class="text-muted">(cả kênh)</span>
+                                }
+                                else
+                                {
+                                    @($"{d.WarehouseCode} — {d.WarehouseName}")
+                                }
+                            </td>
+                            <td class="text-end">@d.GiaTri</td>
+                            <td>@d.HanhDong</td>
+                            <td>
+                                @if (d.DangTat)
+                                {
+                                    @* ⚠️ QUAN TRỌNG: `0` nghĩa là TẮT, KHÔNG phải "chặn hết".
+                                       Hiện nhầm ý nghĩa này làm người vận hành hiểu NGƯỢC cấu hình. *@
+                                    <span class="badge bg-secondary" title="GiaTri &lt;= 0 nghĩa là TẮT hạn mức (không phải chặn hết)">Đang tắt</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-success">Đang áp</span>
+                                }
+                            </td>
+                            <td class="text-muted small">@((d.LastModificationTime ?? d.CreationTime).ToString("yyyy-MM-dd HH:mm"))</td>
+                            <td class="text-end">
+                                <form method="post" asp-action="XoaHanMuc" class="d-inline"
+                                      onsubmit="return confirm('Xoá hạn mức này? Kênh sẽ quay về dùng giá trị dùng chung.');">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@d.Id" />
+                                    <input type="hidden" name="kenh" value="@d.ChannelCode" />
+                                    <button class="btn btn-sm btn-outline-danger" type="submit">Xoá</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header"><strong>Đặt / cập nhật hạn mức</strong></div>
+    <div class="card-body">
+        <form method="post" asp-action="DatHanMuc">
+            @Html.AntiForgeryToken()
+
+            <div class="row g-2 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label">Kênh</label>
+                    @* 🔑 DÙNG DROPDOWN thay vì ô gõ tay: gõ sai mã ⇒ app service NÉM `Inventory:0046`
+                       (đúng — fail-closed). Nhưng chọn từ danh mục thì KHÔNG THỂ gõ sai. *@
+                    <select class="form-select" name="channelCode" required>
+                        <option value="">— chọn kênh —</option>
+                        @foreach (var k in kenhKhaDung)
+                        {
+                            <option value="@k.Code">@k.Code — @k.Name@(k.IsActive ? "" : " (NGỪNG hoạt động)")</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Giá trị (0 = TẮT)</label>
+                    <input class="form-control" type="number" step="any" min="0" name="giaTri" value="0" required />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Hành động (trống = Block)</label>
+                    <select class="form-select" name="hanhDong">
+                        <option value="">(mặc định: Block — fail-closed)</option>
+                        <option value="Block">Block</option>
+                        <option value="Warn">Warn</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <button class="btn btn-primary w-100" type="submit">Lưu hạn mức</button>
+                </div>
+            </div>
+
+            <p class="text-muted small mt-2 mb-0">
+                Hạn mức là theo cặp <strong>(kênh, kho)</strong>. Màn hình này đặt hạn mức
+                <strong>cả kênh</strong> (chưa hỗ trợ chọn kho — nợ đã ghi ở <code>INV-003</code>).
+            </p>
+        </form>
+    </div>
+</div>

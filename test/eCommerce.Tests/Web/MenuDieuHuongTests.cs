@@ -107,6 +107,103 @@ public class MenuDieuHuongTests
         return ketQua;
     }
 
+    /// <summary>
+    /// 🚨 **BỘ QUÉT MỤC CON (menu HAI TẦNG)** — lượt 19/40 (`WEB-001`).
+    ///
+    /// 📌 **VÌ SAO PHẢI CÓ HÀM RIÊNG (không dùng lại regex của `CacMucMenu`):** regex đó khớp tới dấu `}`
+    /// **ĐẦU TIÊN ở cuối dòng** — đúng cho mục **phẳng**, nhưng với mục **có con** thì dấu `}` đầu tiên là
+    /// của **CON** ⇒ thân bị **cắt trước** `Url`/`QuyenCanCo` của cha.
+    /// 🔑 Và hậu quả **nguy hiểm**: cha bị đọc thành mục **không có `Url`** ⇒ `continue` ⇒ **phép quét bỏ qua
+    /// im lặng** cả nhánh con ⇒ lưới an toàn *"mọi `Url` phải có controller thật"* **ngừng bảo vệ** nhánh đó
+    /// mà **vẫn xanh** — đúng loại *"cơ chế trông có mà thực tế không"*.
+    ///
+    /// 🔒 **Cách làm:** đi theo **độ sâu ngoặc** (`{` tăng, `}` giảm) để tìm dấu `}` **cân bằng** của từng mục.
+    /// ⚠️ Cách này **thô** (không hiểu chuỗi ký tự), nhưng **an toàn theo hướng chặt hơn**: đọc sai chỉ làm
+    /// luật **dễ ĐỎ**, không làm nó **lỏng đi**. 📌 Và **lưới an toàn** `mucMenu.Count > 0` bên dưới vẫn canh.
+    /// </summary>
+    private static List<(string Url, string? Quyen)> CacMucMenuKeCaCon()
+    {
+        var nguon = NguonMenu();
+        var dong = nguon.Split('\n');
+
+        var khuonUrl = new Regex(@"Url\s*=\s*""(?<url>[^""]+)""", RegexOptions.Compiled);
+        var khuonQuyen = new Regex(
+            @"QuyenCanCo\s*=\s*(?<quyen>eCommerceConsts\.[A-Za-z0-9_.]+|null)",
+            RegexOptions.Compiled);
+
+        var ketQua = new List<(string Url, string? Quyen)>();
+
+        for (var i = 0; i < dong.Length; i++)
+        {
+            // Mục bắt đầu bằng `new()` (có thể xuống dòng trước `{`).
+            if (dong[i].Trim() != "new()")
+            {
+                continue;
+            }
+
+            var j = i;
+            while (j < dong.Length && dong[j].Trim() != "{")
+            {
+                j++;
+            }
+
+            if (j >= dong.Length)
+            {
+                continue;
+            }
+
+            var sau = 0;
+            var than = new List<string>();
+
+            for (; j < dong.Length; j++)
+            {
+                var d = dong[j];
+
+                foreach (var ch in d)
+                {
+                    if (ch == '{')
+                    {
+                        sau++;
+                    }
+                    else if (ch == '}')
+                    {
+                        sau--;
+
+                        if (sau == 0)
+                        {
+                            break;
+                        }
+                    }
+                }
+
+                than.Add(d);
+
+                if (sau == 0)
+                {
+                    break;
+                }
+            }
+
+            var noiDung = string.Join("\n", than);
+            var url = khuonUrl.Match(noiDung);
+
+            if (!url.Success)
+            {
+                continue;
+            }
+
+            var quyen = khuonQuyen.Match(noiDung);
+
+            ketQua.Add((url.Groups["url"].Value, quyen.Success ? quyen.Groups["quyen"].Value : null));
+        }
+
+        return ketQua;
+    }
+
+    /// <summary>Các mục **mà người dùng thực sự bấm được** (`Url` khác `#`) — mục cha dùng `#` nên bị loại.</summary>
+    private static List<(string Url, string? Quyen)> CacMucBamDuoc()
+        => CacMucMenuKeCaCon().Where(m => m.Url != "#").ToList();
+
     // ── (1) 🚨 MỌI Url PHẢI CÓ CONTROLLER THẬT ─────────────────────────────────────────────────
 
     [Fact]
@@ -125,7 +222,7 @@ public class MenuDieuHuongTests
             .Select(t => t![..^"Controller".Length])
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        var mucMenu = CacMucMenu();
+        var mucMenu = CacMucMenuKeCaCon();
 
         // 🛡️ Lưới an toàn cho CHÍNH bộ quét: nếu regex hỏng thì `mucMenu` rỗng và test sẽ **xanh vô nghĩa**
         // (đúng loại "cơ chế bị vô hiệu hoá im lặng"). Ép phải có ít nhất 1 mục.
@@ -137,6 +234,16 @@ public class MenuDieuHuongTests
 
         foreach (var (url, _) in mucMenu)
         {
+            // 🚨 **BỎ QUA MỤC CHA** (`Url = "#"`): mục cha **không** trỏ tới trang — bấm vào chỉ **mở nhóm**.
+            // 📌 Không bỏ qua thì test đòi một `#Controller` **không tồn tại** ⇒ test ĐỎ **sai** (báo lỗi
+            // ở chỗ không có lỗi) ⇒ rồi người ta thêm ngoại lệ cho tới khi test **vô nghĩa**.
+            // 🔑 Quy tắc thật vẫn được giữ: mọi **CON** (`Url` thật) **vẫn** phải có controller — và bộ quét
+            // `CacMucMenuKeCaCon` **có** duyệt vào nhánh con nên bất biến đó không bị nới.
+            if (url == "#")
+            {
+                continue;
+            }
+
             var doan = url.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
 
             if (doan.Length == 0)
@@ -217,7 +324,7 @@ public class MenuDieuHuongTests
 
         Assert.True(giaTri.Count > 0, "Không đọc được hằng số quyền nào ⇒ bộ quét hỏng.");
 
-        var quyenCuaMenu = CacMucMenu()
+        var quyenCuaMenu = CacMucMenuKeCaCon()
             .Where(x => x.Quyen is not null && x.Quyen != "null")
             .Select(x => (x.Url, Ten: x.Quyen!))
             .ToList();
@@ -302,7 +409,7 @@ public class MenuDieuHuongTests
         // 📌 Không đoán "cái gì là menu" — chỉ kiểm *"URL menu có bị viết cứng không"*.
         var thuMucViews = Path.Combine(GocRepo(), "src", "eCommerce.Web", "Views");
 
-        var urlCuaMenu = CacMucMenu()
+        var urlCuaMenu = CacMucMenuKeCaCon()
             .Select(x => x.Url)
             .Where(u => u.Length > 1)                  // bỏ "/" (trang chủ)
             .Distinct(StringComparer.OrdinalIgnoreCase)

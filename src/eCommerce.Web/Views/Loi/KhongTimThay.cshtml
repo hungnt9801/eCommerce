@@ -1,0 +1,54 @@
+@*
+    🚨 `WEB-001` — TRANG `404` TỰ LÀM.
+
+    🔑 VÌ SAO TỒN TẠI: mặc định của khung là **trang trắng**. Người dùng bấm một mục menu (hoặc gõ URL sai)
+    và **không phân biệt được** ba khả năng RẤT KHÁC NHAU: *"đường dẫn sai"*, *"màn hình chưa làm"*,
+    *"hệ thống hỏng"*. 🔒 Cả ba dẫn tới cùng triệu chứng *"bấm vào không thấy gì"* ⇒ người ta đi tìm lỗi ở sai chỗ.
+
+    ⚠️ TRANG NÀY **KHÔNG** hiện chi tiết nội bộ (không stack trace, không tên bảng, không `Id`):
+    trang lỗi là chỗ DỄ RÒ RỈ NHẤT vì nó hiện cho người CHƯA được phép.
+*@
+@{
+    ViewBag.Title = "Không tìm thấy trang";
+    Layout = null;
+    var duongDan = ViewBag.DuongDan as string;
+}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>404 — Không tìm thấy trang</title>
+    <link rel="stylesheet" href="~/libs/bootstrap/dist/css/bootstrap.min.css" />
+</head>
+<body class="bg-light">
+    <div class="container py-5" style="max-width: 720px;">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <h1 class="h3 mb-3">404 — Không tìm thấy trang</h1>
+
+                @if (!string.IsNullOrWhiteSpace(duongDan))
+                {
+                    <p class="mb-2">Địa chỉ yêu cầu: <code>@duongDan</code></p>
+                }
+
+                <p class="mb-2">Có hai khả năng, và <strong>cách xử lý khác nhau</strong>:</p>
+                <ul>
+                    <li>
+                        <strong>Đường dẫn gõ sai</strong> ⇒ kiểm lại, hoặc quay về trang chủ.
+                    </li>
+                    <li>
+                        <strong>Màn hình CHƯA ĐƯỢC LÀM</strong> ⇒ nếu bạn vào từ một mục menu, đó là lỗi cấu hình menu
+                        (menu <em>không</em> được trỏ tới trang chưa tồn tại).
+                        @* 🔑 Neo ASCII `[LOI-404-KHONG-CO-MAN-HINH]` để phép kiểm HTTP phân biệt được
+                           "trang lỗi tự làm đã render" với "khung trả trang mặc định". *@
+                        <span class="text-muted">[LOI-404-KHONG-CO-MAN-HINH][LOI-404-DUONG-DAN-SAI-HOAC-CHUA-LAM]</span>
+                    </li>
+                </ul>
+
+                <a class="btn btn-primary mt-2" href="/">Về trang chủ</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

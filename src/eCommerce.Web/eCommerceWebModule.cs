@@ -65,6 +65,12 @@ namespace eCommerce.Web;
     // dùng app service của module nào ⇒ **phải nạp module đó ở Web** — và **`eCommerceWebModule` khai CÙNG đồ thị
     // module với Host** (ghi ở doc comment) nhưng `[DependsOn]` **chưa** phản ánh điều đó ⇒ lệch giữa **ý định** và **mã**.
     typeof(eCommerce.Pricing.PricingApplicationModule)
+        ,
+        // 🚨 `WEB-001` — hai module cho `/KhachHang` và `/DoiSoatThanhToan`. 📌 `typeof(...)` là **bắt buộc**:
+        // chỉ thêm `ProjectReference` mà **không** thêm `DependsOn` thì DI **không** đăng ký app service của
+        // module ⇒ lỗi chỉ lộ ra **lúc chạy** (`Could not resolve IChinhSach...`), ⚠️ không phải lúc build.
+        typeof(Customers.CustomersApplicationModule),
+        typeof(PaymentHub.PaymentHubApplicationModule)
 )]
 public class eCommerceWebModule : AbpModule
 {

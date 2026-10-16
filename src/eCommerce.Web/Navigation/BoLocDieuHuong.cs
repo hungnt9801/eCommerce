@@ -28,6 +28,25 @@ public sealed record MucDieuHuong
 
     /// <summary>Mô tả ngắn (tooltip/`title`) — giúp người dùng biết mục dùng để làm gì.</summary>
     public string? MoTa { get; init; }
+
+    /// <summary>
+    /// 🚨 **MỤC CON** (menu **hai tầng**) — rỗng ⇒ mục này là **lá** (bấm là mở trang).
+    ///
+    /// 🔑 **VÌ SAO CẦN MỤC CHA (không chỉ làm phẳng mọi mục):** danh sách phẳng **phình ra** theo số màn hình,
+    /// và 🔒 khi mọi mục **ngang hàng nhau về thị giác** thì người dùng **không biết** việc nào **thường ngày**
+    /// (`Đơn hàng`) và việc nào **thỉnh thoảng** (`Đối soát`, `Hạn mức kênh`) ⇒ 📌 họ bấm vào màn hình **vận hành**
+    /// trước, hoặc **không tìm thấy** màn hình họ cần.
+    /// 📌 Nhóm *"Vận hành"* gom các màn hình **cấu hình/đối chiếu** — chúng **không** thuộc luồng bán hàng hằng ngày.
+    ///
+    /// ⚠️ **Quy tắc (được `MenuDieuHuongTests` kiểm):** một mục **có con** thì <see cref="Url"/> **không** được
+    /// trỏ tới trang thật — bấm vào mục cha chỉ **mở nhóm**, và một `Url` "giả" sẽ biến thành **404**.
+    /// 🔒 Vì vậy mục cha dùng `Url = "#"` và **cấm** khai `QuyenCanCo` ở cha (quyền nằm ở **từng con** —
+    /// cha hiện khi **ít nhất một** con hiện, xem <see cref="BoLocDieuHuong"/>).
+    /// </summary>
+    public IReadOnlyList<MucDieuHuong> Con { get; init; } = [];
+
+    /// <summary>`true` ⇒ mục này là **nhóm cha** (chỉ mở/thu), không phải liên kết tới trang.</summary>
+    public bool LaNhom => Con.Count > 0;
 }
 
 /// <summary>
@@ -68,6 +87,24 @@ public static class BoLocDieuHuong
         {
             if (muc is null)
             {
+                continue;
+            }
+
+            // 🚨 **MỤC CHA (nhóm) — LỌC CON TRƯỚC, RỒI MỚI QUYẾT ĐỊNH CHA.**
+            // 📌 Thứ tự này là **bắt buộc**: quyền của một nhóm **không phải** một quyền riêng — nó là
+            // **hợp của các con**. 🔑 Nếu kiểm quyền của cha trước (mà cha **không** khai quyền) thì nhóm
+            // **luôn hiện**, kể cả khi **mọi** con bị ẩn ⇒ người dùng thấy một nhóm **rỗng** — 📌 trông như
+            // *"hệ thống thiếu màn hình"* và làm người ta đi tìm lỗi không tồn tại.
+            if (muc.LaNhom)
+            {
+                var conHien = Loc(muc.Con, kiemTraQuyen);
+
+                // 🔒 Nhóm chỉ hiện khi **ít nhất một** con hiện. ⚠️ Nhóm rỗng ⇒ **ẨN**, không hiện khung rỗng.
+                if (conHien.Count > 0)
+                {
+                    ketQua.Add(muc with { Con = conHien });
+                }
+
                 continue;
             }
 

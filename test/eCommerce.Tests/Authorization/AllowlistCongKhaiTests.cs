@@ -66,7 +66,23 @@ public class AllowlistCongKhaiTests
         // ⚠️ **NỢ ĐÃ GHI NHẬN (`cat-003` §20.7):** tệp tải lên đang được phục vụ từ CÙNG TÊN MIỀN với ứng dụng —
         // đúng điều §17.6 cảnh báo. Việc cần làm: dời sang **tên miền/CDN riêng** (không phải sửa nghiệp vụ,
         // chỉ đổi URL). 📌 Ghi ngay tại dòng allowlist vì đây là chỗ người review **sẽ đọc**.
-        "eCommerce.Web.Controllers.CatMediaController"
+        "eCommerce.Web.Controllers.CatMediaController",
+
+        // 🚨 `WEB-001` — TRANG LỖI `403`/`404` TỰ LÀM (`GET /Loi/ChanQuyen`, `GET /Loi/KhongTimThay`).
+        //
+        // 🔑 **VÌ SAO BẮT BUỘC CÔNG KHAI (đây KHÔNG phải nới lỏng bảo mật):** chính người **CHƯA** đăng nhập
+        // (hoặc **thiếu** quyền) mới là người nhận `401`/`403`. ⚠️ Nếu trang lỗi cũng đòi đăng nhập thì nó
+        // **tự chặn chính nó** ⇒ người dùng quay lại **trang trắng** — 📌 tức là **bịt điểm mù này bằng một
+        // điểm mù khác** (đúng lỗi `F-403` mà dự án đã trả giá).
+        //
+        // 🔒 **RỦI RO ĐÃ GIẢM THIỂU (đo được, không suy đoán):**
+        //  • Lớp này **CHỈ trả view TĨNH** — **KHÔNG** gọi app service nào ⇒ **không** có dữ liệu nào để lộ;
+        //  • **KHÔNG** hiện chi tiết nội bộ: không stack trace, không tên bảng, không `Id`. 📌 Trang lỗi là chỗ
+        //    **dễ rò rỉ nhất** vì nó hiện cho **người chưa được phép**;
+        //  • `duongDan` chỉ được render qua Razor (`@duongDan`) ⇒ **escape** tự động, không có XSS phản chiếu;
+        //  • Trả **đúng mã trạng thái** (`403`/`404`) chứ **không** trả `200` — ⚠️ một trang `403` trả `200`
+        //    sẽ làm **mọi** phép kiểm HTTP và **mọi** công cụ giám sát hiểu sai.
+        "eCommerce.Web.Controllers.LoiController"
     ];
 
     /// <summary>Cửa công khai map TAY (không có `[AllowAnonymous]`) — cũng phải khai tường minh.</summary>

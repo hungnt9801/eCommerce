@@ -3160,3 +3160,87 @@ ba mục đó mà không tạo trang ⇒ **test đỏ**.
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v2.1 | 16/10/2026 | *(agent, session GĐ1)* | **§95 — MENU LỌC THEO QUYỀN (đóng nợ §81.2 #7)**: `MucDieuHuong` + **`BoLocDieuHuong` (lõi THUẦN, FAIL-CLOSED)** + `MenuDieuHuong.TatCa` (**một nguồn**) + `DichVuDieuHuong` + **`MenuViewComponent` (C#)** + lối vào ở trang chủ · **5 unit test quét nguồn** (URL phải có controller thật · quyền phải có thật · lõi phải thuần · fail-closed trong mã · menu một nguồn) · **7/7 ca HTTP thật** (gồm **thu hồi quyền ⇒ mục biến mất: 3 → 2**). 🚨 **Phát hiện Basic theme render menu KHÔNG kiểm quyền** (`strings` trên DLL) · **BỐN cái bẫy im lặng** (§95.3): `AuthorizeAsync(null)` **không** dùng user hiện tại · `<partial>` render rỗng không lỗi · bộ quét nguồn xanh vô nghĩa · `"..".Length`=2. Ghi **§95.5** (3 trang bị **cắt có lý do**) · **§95.6** (nợ: controller chưa gắn quyền, menu mới ở 1 trang, quyền cache trong tiến trình) |
+
+---
+
+## 96. ✅ **LÁT CẮT 4 — BA TRANG MỚI + MENU HAI TẦNG + TRANG LỖI `403`/`404`** (16/10/2026) — *đóng nợ §95.4*
+
+### 96.1 Đã làm gì
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| **1** | **`/HanMucKenh`** | Controller + view ⇒ 🔑 **ĐÓNG MỤC (1) CỦA GĐ1** (*"đường GHI chuẩn cho admin + API quản lý hạn mức kênh `InvChannelLimits`"*) |
+| **2** | **`/DoiSoatThanhToan`** | Tra cứu giao dịch + **truy vấn trạng thái từ cổng** (`querydr`) |
+| **3** | **`/KhachHang`** | Hồ sơ khách + tạo/nâng cấp/**chặn**/**gỡ chặn** |
+| **4** | **Menu HAI TẦNG** | Nhóm **"Vận hành"** chứa 2 mục con (`HanMucKenh`, `DoiSoatThanhToan`) |
+| **5** | **Trang lỗi `403`/`404` tự làm** | `LoiController` (`[AllowAnonymous]`) + 2 view **tĩnh** |
+
+### 96.2 🔑 **Vì sao `/HanMucKenh` được làm TRƯỚC `/KhachHang` và `/ThanhToan`** — quyết định có lý do
+
+`IChinhSachHanMucAppService` nằm ở **`eCommerceApplicationModule`** — mà `eCommerce.Web` **đã** nạp.
+⚠️ Còn `ICustomerAppService` và `IPaymentAppService` nằm ở **module riêng**, và Web **CHƯA** tham chiếu chúng.
+🔑 Làm trang **không cần wiring mới** trước ⇒ có **giá trị chạy được ngay** và **đo được** bằng route + HTTP.
+📌 Sau đó mới thêm **hai `ProjectReference`** + **hai `DependsOn`** để làm hai trang còn lại — **trong cùng lượt**.
+
+### 96.3 🚨 **NĂM quyết định thiết kế (mỗi cái chống một cách hiểu sai cụ thể)**
+
+| # | Quyết định | Chống điều gì |
+|---|---|---|
+**1** | `/HanMucKenh`: **chính sách và bảng nằm CÙNG một trang** | 📌 Hạn mức *"100"* **không có nghĩa** nếu không biết **đơn vị** (`Percent` = 100% hay `Absolute` = 100 chiếc?). Tách hai trang ⇒ người dùng đọc một con số **mà không biết đơn vị** ⇒ **hiểu sai cấu hình của chính mình** |
+**2** | `/HanMucKenh`: cột **"Đang tắt"** hiện rõ | ⚠️ Quy ước toàn hệ thống: `GiaTri <= 0` nghĩa là **TẮT**. Nếu chỉ hiện số `0`, người vận hành dễ tưởng *"hạn mức = 0 ⇒ chặn hết"* — **ngược hẳn** sự thật |
+**3** | `/DoiSoatThanhToan`: **KHÔNG có nút hoàn tiền** | 📌 Hoàn tiền là **di chuyển TIỀN THẬT** ⇒ cần màn hình riêng, xác nhận hai bước, hiện **số tiền + lý do**. ⚠️ Đặt nút *"Hoàn tiền"* cạnh danh sách là cách **dễ nhất** để ai đó bấm nhầm |
+**4** | `/KhachHang`: **CHỈ** hiện trường cần cho công việc | 🔒 Hồ sơ khách là **dữ liệu cá nhân** (Luật **91/2025/QH15**). 📌 Một màn hình hiện **nhiều hơn** mức cần thiết là một **rò rỉ** — **kể cả khi người xem CÓ quyền**. 🔑 Và nó **không có triệu chứng nào**: không lỗi, không log |
+**5** | Trang lỗi: `[AllowAnonymous]` + trả **ĐÚNG mã** + **neo ASCII** | 📌 Chính người **CHƯA** đăng nhập mới nhận `401`/`403` ⇒ trang lỗi **phải** công khai, nếu không nó **tự chặn chính nó** ⇒ quay về **trang trắng** (*"bịt điểm mù này bằng một điểm mù khác"*) |
+
+### 96.4 🔑 **Menu hai tầng — và vì sao quyền của NHÓM là HỢP CỦA CÁC CON**
+
+🔒 **Quy tắc:** mục **cha** dùng `Url = "#"` và **KHÔNG** khai `QuyenCanCo`.
+📌 **Vì sao:** quyền của một nhóm **không phải** một quyền riêng — nó là **hợp của các con**.
+⚠️ Nếu kiểm quyền của cha trước (mà cha **không** khai quyền) thì nhóm **luôn hiện**, kể cả khi **mọi** con bị ẩn
+⇒ người dùng thấy một **nhóm RỖNG** ⇒ trông như *"hệ thống thiếu màn hình"*.
+✅ `BoLocDieuHuong.Loc` nay **lọc con TRƯỚC**, rồi chỉ thêm cha khi **ít nhất một** con hiện.
+
+➕ **Và `MenuDieuHuongTests` được mở rộng:** bộ quét cũ khớp tới dấu `}` **đầu tiên** — với mục **có con** thì đó là
+dấu của **CON** ⇒ thân bị **cắt trước** `Url` của cha ⇒ cha bị đọc thành mục **không có `Url`** ⇒ `continue`
+⇒ 🚨 **phép quét bỏ qua im lặng cả nhánh con** ⇒ lưới *"mọi `Url` phải có controller thật"* **ngừng bảo vệ**
+nhánh đó **mà vẫn xanh**. ✅ Sửa: đi theo **độ sâu ngoặc** để tìm dấu `}` **cân bằng**, và **bỏ qua `#`** của mục cha.
+
+### 96.5 ✅ **KIỂM CHỨNG — 11/11 CA TRÊN HTTP + DB THẬT** (Web `:5100`)
+
+| Nhóm | Ca **ĐẠT** |
+|---|---|
+**Trang lỗi** | **C1** `GET /Loi/KhongTimThay` ⇒ **`404` THẬT** · **C2** trang **tự làm** đã render (neo `[LOI-404-…]`) · **C3** **không** rò rỉ chi tiết nội bộ (không `Stack Trace`) · **C4** `GET /Loi/ChanQuyen` ⇒ **`403` THẬT** · **C5** trang 403 **nói rõ** *"không cần đăng nhập lại"* |
+**Ba trang mới** | **D** `/HanMucKenh` · `/DoiSoatThanhToan` · `/KhachHang` ⇒ **`302` → `/Account/Login?ReturnUrl=…`** (🔑 **không** `404`/`500`) |
+**Bảo mật menu** | **E1** menu **KHÔNG** hiện cho người chưa đăng nhập (tránh thanh điều hướng **rỗng/giả**) |
+**Hạ tầng** | **F1** log: `fail=0`, `unhandled=0`, 🚨 **`Could not resolve=0`** ⇒ hai module mới **nạp ĐÚNG** |
+
+### 96.6 🐞 **BỐN lỗi trong lượt này — cả bốn là lỗi CỦA TÔI, ba trong đó làm phép đo SAI**
+
+| # | Lỗi | Bài học |
+|---|---|---|
+**1** | View không biết `HanMucKenhManHinhDto` ⇒ **`CS0246`** | 🔑 `.cshtml` **KHÔNG** tự biết namespace của dự án ⇒ cần `@using` trong `_ViewImports.cshtml` |
+**2** | **Đoán** tên trường DTO (`Provider`, `LastModificationTime`, `IsBlocked`, `BlockReason`, `Ma`/`Ten`/`DienThoai`) ⇒ **6 lỗi `CS1061`/`CS0117`** | 📌 Đọc **đúng** tên trường (`ProviderCode`, `PaidAtUtc`, `DungDuoc`, `Name`/`Phone`) thay vì **giả định** theo thói quen |
+**3** | 🚨 **`Invoke-WebRequest -MaximumRedirection 0` + `$_.Exception.Response.Headers['Location']`** ⇒ `$ma` **RỖNG** cho **cả ba** trang | 🔑 Công cụ **không** giữ `StatusCode` như tôi giả định. ⚠️ **Nguy hiểm:** ca kiểm hiện **"KHÔNG ĐẠT"** trong khi **sản phẩm ĐÚNG** (curl xác nhận `302` ⇒ `/Account/Login`) ⇒ 🔑 suýt nữa tôi đi **sửa sản phẩm** vì một **lỗi của phép đo**. ✅ Sửa: dùng **`curl.exe -w "%{http_code}\|%{redirect_url}"`** |
+**4** | 🚨 So khớp **chữ có dấu** trong trang HTML (`KHNGCN`, `DANGNHAPLAI`) ⇒ **không khớp** dù chuỗi **có** trong trang | 📌 Cả `curl` qua pipe **và** `Invoke-WebRequest` đều **decode sai** UTF-8 trong môi trường này ⇒ 🔑 **dùng NEO ASCII THUẦN** (`[LOI-403-KHONG-CAN-DANG-NHAP-LAI]`) thay vì so khớp tiếng Việt. 📌 **Bài học lặp lại lần thứ HAI** (lần đầu ở `sal-005` §19.5) |
+
+📌 **Và một quyết định tôi tự sửa giữa đường:** tôi đã viết một view **dự phòng** `_DuPhong.cshtml` cho `/HanMucKenh`,
+rồi **xoá nó** — vì nó có thể render **THAY** màn hình thật mà **không rõ ràng**. 🔑 Một cơ chế *"trông có mà thực tế không"*
+thì **tệ hơn** không có.
+
+### 96.7 ⏳ NỢ
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+**1** | **Chưa kiểm được với NGƯỜI ĐÃ ĐĂNG NHẬP** | 🚨 Probe hiện **chỉ** đo được *"redirect khi chưa đăng nhập"* + *"trang lỗi render"*. 📌 **CHƯA** đo được: HTML **thật** của 3 trang mới, **menu 2 tầng render**, nút ghi hoạt động. 🔑 Cần **cookie phiên** (luồng OpenIddict có mật khẩu) — **cùng loại nợ "thiếu đường gọi"** đã gặp ở `CAT-003` §25.6 và `sal-005` §18.6 |
+**2** | `/HanMucKenh` **chưa chọn được KHO** | Form hiện chỉ đặt hạn mức **cả kênh** (`WarehouseId = null`). ⚠️ App service **đã hỗ trợ** kho ⇒ đây là **nợ UI**, không phải nợ API |
+**3** | `/KhachHang` **chưa phân trang** | Trần cứng **100** hồ sơ/lần. 📌 Chấp nhận được (dữ liệu cá nhân **không** nên kéo cả bảng) nhưng cần phân trang khi lớn |
+**4** | `/KhachHang` **chưa có nút "nâng cấp khách vãng lai"** | App service **đã có** (`NangCapKhachVangLaiAsync`) — nợ UI |
+**5** | 🚨 **CHƯA có xuất dữ liệu cá nhân cho chính chủ** | Luật **91/2025/QH15** (quyền truy cập/xoá). 📌 Trang **không** giả vờ có |
+**6** | 🚨 **CHƯA có sổ địa chỉ** (`CUS-001`) | Entity `Address` **không tồn tại** trong `AddressHub` — **nợ chặn** |
+**7** | `/DoiSoatThanhToan` **chưa có UI hoàn tiền** | 🔑 **Cố ý** (xem §96.3 #3): hoàn tiền cần màn hình riêng + xác nhận hai bước |
+
+### 96.8 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.4 | 16/10/2026 | *(agent, session GĐ1)* | **§96 — LÁT CẮT 4: BA TRANG MỚI + MENU HAI TẦNG + TRANG LỖI 403/404** (đóng nợ §95.4): **`/HanMucKenh`** (🔑 **ĐÓNG MỤC (1) CỦA GĐ1** — đường ghi chuẩn cho admin) · **`/DoiSoatThanhToan`** (`querydr`) · **`/KhachHang`** (hồ sơ + chặn/gỡ chặn) · **`LoiController`** (`[AllowAnonymous]`, `403`/`404` **trả ĐÚNG mã**) + **hai `ProjectReference`** + **hai `DependsOn`** cho Web · **menu HAI TẦNG** (nhóm *"Vận hành"*; 🔑 **quyền của nhóm là HỢP CỦA CÁC CON** — lọc con trước, ẩn nhóm rỗng) · **mở rộng `MenuDieuHuongTests`** (đi theo **độ sâu ngoặc**; bỏ qua `#`) · **allowlist công khai** cho `LoiController` (**có lý do**: nếu không, trang lỗi **tự chặn chính nó**). ✅ **11/11 ca HTTP + DB thật** (`:5100`): trang lỗi `404`/`403` **đúng mã** + **không rò rỉ** · ba trang mới **`302` → `/Account/Login`** (**không** `404`/`500`) · menu **ẩn** với người chưa đăng nhập · **`Could not resolve=0`**. 🚨 **NĂM quyết định thiết kế** (§96.3): chính sách + bảng **cùng trang** (đơn vị `Percent`/`Absolute` quyết định ý nghĩa con số) · cột **"Đang tắt"** (`0` = TẮT, **không** phải "chặn hết") · **KHÔNG** nút hoàn tiền cạnh danh sách · `/KhachHang` **chỉ** hiện trường cần (dữ liệu cá nhân — Luật **91/2025/QH15**) · trang lỗi **`[AllowAnonymous]`** + **neo ASCII**. 🐞 **BỐN lỗi của tôi, ba làm phép đo SAI**: `CS0246` (view thiếu `@using`) · **đoán** tên trường DTO (**6 lỗi**) · 🚨 **`Invoke-WebRequest -MaximumRedirection 0`** không giữ `StatusCode` ⇒ **ba ca "KHÔNG ĐẠT" trong khi sản phẩm ĐÚNG** (suýt sửa sản phẩm vì lỗi phép đo) ⇒ chuyển sang **`curl`** · 🚨 **so khớp dấu tiếng Việt** trong HTML **không khớp** (cả `curl` và `IWR` decode sai UTF-8) ⇒ dùng **neo ASCII thuần**. 📌 **Và tự sửa giữa đường:** **xoá** view dự phòng `_DuPhong.cshtml` — nó có thể render **thay** màn hình thật mà **không rõ ràng**, và một cơ chế *"trông có mà thực tế không"* thì **tệ hơn** không có. Ghi **§96.7** (nợ: 🚨 **chưa kiểm được với người ĐÃ đăng nhập** — cần **cookie phiên**, cùng loại nợ *"thiếu đường gọi"* · chưa chọn **kho** · chưa phân trang · chưa *"nâng cấp khách vãng lai"* · 🚨 **chưa có xuất dữ liệu cá nhân** theo Luật 91/2025/QH15 · 🚨 **chưa có sổ địa chỉ** · chưa có UI hoàn tiền — **cố ý**) |

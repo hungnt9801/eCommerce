@@ -1,0 +1,163 @@
+@using Volo.Abp.AspNetCore.Mvc.UI.Layout
+@inject IPageLayout PageLayout
+@model List<eCommerce.Customers.CustomerDto>
+@{
+    PageLayout.Content.Title = "Khách hàng";
+    PageLayout.Content.BreadCrumb.Add("Trang chủ");
+    PageLayout.Content.BreadCrumb.Add("Khách hàng");
+
+    var tuKhoa = ViewBag.TuKhoa as string;
+    var thongBao = TempData["ThongBaoKhach"] as string;
+    var loi = TempData["LoiKhach"] as string;
+}
+
+@* 🚨 `CUS-001` — HỒ SƠ KHÁCH HÀNG.
+
+   🔒 **ĐÂY LÀ DỮ LIỆU CÁ NHÂN** (Luật BV dữ liệu cá nhân **91/2025/QH15**) — và đó là điều quyết định
+   màn hình này trông như nó trông:
+     • **CHỈ** hiện trường **cần cho công việc**: tên, email, điện thoại, trạng thái chặn;
+     • **KHÔNG** hiện địa chỉ đầy đủ, lịch sử đơn, hay bất kỳ trường nào không phục vụ câu hỏi
+       *"khách này là ai, có đang bị chặn không"*.
+
+   📌 **NGUYÊN TẮC:** một màn hình hiện **nhiều hơn** mức cần thiết là một **rò rỉ** — kể cả khi người xem
+   **CÓ** quyền. 🔑 Và nó **không có triệu chứng nào**: không lỗi, không log, chỉ là dữ liệu ở nơi không cần.
+
+   ⚠️ **NỢ ĐÃ GHI (`CUS-001`) — màn hình KHÔNG giả vờ có:**
+     • **CHƯA** có **xuất dữ liệu cá nhân** cho chính chủ (quyền truy cập/xoá theo Luật 91/2025/QH15);
+     • **CHƯA** có **sổ địa chỉ** (entity `Address` **không tồn tại** trong `AddressHub`);
+     • **CHƯA** phân trang — trần cứng **100** hồ sơ/lần.
+   📌 Ba dòng đó ghi ở `cus-001`; màn hình **không** có nút nào cho chúng (nút không hoạt động còn tệ hơn không có). *@
+
+@if (!string.IsNullOrWhiteSpace(thongBao))
+{
+    <div class="alert alert-success">@thongBao</div>
+}
+@if (!string.IsNullOrWhiteSpace(loi))
+{
+    @* 🔒 Lỗi hiện ĐÚNG mã + thông điệp (controller đã bắt `BusinessException`).
+       📌 Lý do chặn/gỡ chặn là **BẮT BUỘC** (audit, `ADR-04`): ở đây người dùng **biết** mình thiếu gì. *@
+    <div class="alert alert-danger">@loi</div>
+}
+
+<div class="alert alert-secondary">
+    <strong>Dữ liệu cá nhân.</strong> Màn hình này chỉ hiện thông tin cần cho công việc.
+    📌 Chưa có <em>xuất dữ liệu cho chính chủ</em> và chưa có <em>sổ địa chỉ</em> (nợ đã ghi ở <code>CUS-001</code>).
+</div>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <form method="get" asp-action="Index" class="row g-2 align-items-end">
+            <div class="col-md-8">
+                <label class="form-label">Tìm theo tên / email / điện thoại</label>
+                <input class="form-control" name="tuKhoa" value="@tuKhoa" placeholder="(để trống = 100 hồ sơ gần nhất)" />
+            </div>
+            <div class="col-md-4">
+                <button class="btn btn-primary w-100" type="submit">Tìm</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <strong>Hồ sơ khách (@Model.Count)</strong>
+        @* 🔒 Trần 100 là CÓ CHỦ Ý: hồ sơ khách là dữ liệu cá nhân ⇒ KHÔNG kéo cả bảng về một trang.
+           📌 Người vận hành cần TRA CỨU, không cần XUẤT TOÀN BỘ — và nếu cần xuất thì đó phải là
+           một tính năng riêng CÓ KIỂM SOÁT (chưa làm — nợ đã ghi). *@
+        <span class="text-muted small">tối đa 100 hồ sơ / lần</span>
+    </div>
+    <div class="card-body p-0">
+        @if (Model.Count == 0)
+        {
+            <p class="p-3 mb-0 text-muted">
+                Không có hồ sơ nào khớp.
+                @if (!string.IsNullOrWhiteSpace(tuKhoa))
+                {
+                    <a asp-action="Index">Xoá từ khoá</a>
+                }
+            </p>
+        }
+        else
+        {
+            <table class="table table-sm mb-0">
+                <thead>
+                    <tr>
+                        <th>Tên</th>
+                        <th>Email</th>
+                        <th>Điện thoại</th>
+                        <th>Trạng thái</th>
+                        <th class="text-end">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var k in Model)
+                    {
+                        <tr>
+                            <td>@k.Name</td>
+                            <td class="text-muted small">@k.Email</td>
+                            <td class="text-muted small">@k.Phone</td>
+                            <td>
+                                @if (!k.DungDuoc)
+                                {
+                                    <span class="badge bg-danger" title="DungDuoc = false ⇒ khách KHÔNG dùng được (đang chặn)">Đang chặn</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-success">Bình thường</span>
+                                }
+                            </td>
+                            <td class="text-end">
+                                @if (!k.DungDuoc)
+                                {
+                                    <form method="post" asp-action="MoChan" class="d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@k.Id" />
+                                        @* 🔒 Lý do BẮT BUỘC: 6 tháng sau phải biết VÌ SAO gỡ chặn (audit).
+                                           📌 `required` ở client là tiện; guard THẬT nằm ở entity (ném `BusinessException`). *@
+                                        <input class="form-control form-control-sm d-inline-block" style="width: 220px;"
+                                               name="lyDo" placeholder="Lý do gỡ chặn (bắt buộc)" required />
+                                        <button class="btn btn-sm btn-outline-success" type="submit">Gỡ chặn</button>
+                                    </form>
+                                }
+                                else
+                                {
+                                    <form method="post" asp-action="Chan" class="d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@k.Id" />
+                                        <input class="form-control form-control-sm d-inline-block" style="width: 220px;"
+                                               name="lyDo" placeholder="Lý do chặn (bắt buộc)" required />
+                                        <button class="btn btn-sm btn-outline-danger" type="submit">Chặn</button>
+                                    </form>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header"><strong>Tạo hồ sơ khách</strong></div>
+    <div class="card-body">
+        <form method="post" asp-action="TaoKhach" class="row g-2 align-items-end">
+            @Html.AntiForgeryToken()
+            <div class="col-md-3">
+                <label class="form-label">Tên (bắt buộc)</label>
+                <input class="form-control" name="ten" required />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Email</label>
+                <input class="form-control" type="email" name="email" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Điện thoại</label>
+                <input class="form-control" name="dienThoai" />
+            </div>
+            <div class="col-md-3">
+                <button class="btn btn-primary w-100" type="submit">Tạo hồ sơ</button>
+            </div>
+        </form>
+    </div>
+</div>
