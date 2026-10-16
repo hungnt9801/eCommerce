@@ -1911,3 +1911,77 @@ buộc Integration test **cũng** chạy; ➕ và khi `-BoQuaIntegration` thì n
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.7 | 17/10/2026 | *(agent, session GĐ1)* | **§26 — LÁT CẮT 9: TEST CHO CHÍNH CÁC CỔNG KIỂM CHỨNG** (tích hợp thành **bước ⑦**): thêm **`tools\test-cong-kiem.ps1`** — **12 ca**, hai nhóm. 🔑 **VÌ SAO:** **HAI lỗi thật** trong **cổng chống lỗi** đều tìm ra nhờ **MAY MẮN** — **§23.4** (`kiem-moc-build.ps1` **viết ngược điều kiện** ⇒ 🔒 **cổng LUÔN ĐỎ**; ⚠️ phát hiện vì tôi **tình cờ** chạy nó trên bản build **vừa xong**) và **§25.5** (phép **tiêm không xảy ra** ⇒ cổng báo **XANH**; ⚠️ phát hiện vì tôi **tình cờ** đo lại). 🔒 Và **một cổng LUÔN ĐỎ thì người ta học cách BỎ QUA nó** ⇒ 📌 dựa vào **may mắn** để phát hiện lỗi trong **cổng chống lỗi** là **không chấp nhận được**. 🔒 **HAI QUY TẮC THIẾT KẾ:** ① **KHÔNG THÊM PHỤ THUỘC** (máy chỉ có **Pester 3.4.0** — API **khác** Pester 5; cả toolchain là **script thuần + exit code** ⇒ `Describe`/`It` **tự viết**; 🔑 thêm framework là đổi **công cụ**, không thêm **giá trị**); ② **MỌI CA PHẢI TỰ DỌN DẸP** (⚠️ ca "tiêm" tạo **dữ liệu thật**; ném giữa đường mà không dọn thì lần sau **hỏng vì dữ liệu ca trước** ⇒ 🔑 test **tự làm hỏng chính nó**; ✅ `try/finally` + **ca K** kiểm DB **sạch lại**). **NHÓM `kiem-moc-build.ps1` (7 ca):** 🚨 **A** `-GhiNho`→**BUILD**→`-Kiem` ⇒ mốc **ĐỔI** ⇒ `exit 0` (chống **cổng luôn đỏ**) · 🚨 **A2** `-GhiNho`→**KHÔNG** build→`-Kiem` ⇒ `exit 1` (chiều **đối xứng**) · **B** mốc **cũ** ⇒ `exit 0` · **C** mốc **rỗng** ⇒ `exit 2` · 🚨 **D** mốc **sai định dạng** (object đơn) ⇒ `exit 2` (🔑 khóa bẫy *"`foreach` duyệt thuộc tính ⇒ bảng tra cứu **rỗng** ⇒ mọi tệp thành **MỚI**"*) · **E** **chưa có** mốc ⇒ `exit 2` · **F** **lọc rỗng** ⇒ `exit 2`. **NHÓM `kiem-db.ps1` (5 ca, ⚠️ cần Docker):** **G** DB sạch ⇒ `exit 0` · 🚨 **H** dòng **XOÁ MỀM** ⇒ `exit 1` (🔑 **đáng giá nhất** — phép **đếm thường BỎ SÓT**) · **I** cờ bảo mật `false` ⇒ `exit 1` · 🚨 **J** probe GUID trong **`AbpAuditLogs`** ⇒ **nhóm ⑥ TỰ DÒ bắt** · **K** DB **sạch lại** ⇒ `exit 0`. ➕ 🔒 **mọi SQL là HERE-STRING** (không thoát nháy) và **mỗi ca tiêm phải KHUẲNG ĐỊNH dòng đã vào** bằng `SELECT` **độc lập**. ✅ **TÍCH HỢP:** nhóm nhanh **luôn** chạy; ⚠️ nhóm DB **chạm DB thật** ⇒ chỉ chạy khi Integration test **cũng** chạy, và khi `-BoQuaIntegration` thì **NÓI RÕ** đã bỏ qua (📌 *"im lặng bỏ qua"* nguy hiểm hơn *"báo rõ"*). ✅ **KIỂM CHỨNG:** chạy đầy đủ **7 bước** ⇒ **12/12 test** · **1155 unit** · **38 integration** · mermaid **197/0** · **DB 21/21** · `exit 0` · **130.8s**; chạy nhanh ⇒ **7/7** · **98.4s**; 🚨 **tiêm lại đúng lỗi §23.4** ⇒ ✅ **3 ca ĐỎ** ⇒ 🔑 **bộ test THẬT SỰ BẮT**. 🐞 **BA LỖI:** (1) 🚨 **phép TIÊM LẠI lỗi §23.4 KHÔNG XẢY RA** (phép `String.Replace` không khớp) ⇒ bộ test báo `exit 0` ⇒ 📌 **suýt kết luận** *"bộ test không bắt được gì"* — 🔒 **lần thứ HAI của §25.5, cách nhau ĐÚNG MỘT VÒNG**!! ✅ chữa: **ĐO NGAY sau khi tiêm** (`K97TIEM` count) + dùng **chỉ số** (`IndexOf`) thay vì khớp cả khối; (2) **kỳ vọng ca A SAI** — tôi viết `-GhiNho`→`-Kiem` **ngay** và kỳ vọng `exit 0`, ⚠️ nhưng `-GhiNho` ghi mốc **hiện tại** ⇒ **khớp** ⇒ 🔑 `exit 1` mới **ĐÚNG** ⇒ 📌 **§23.4 lặp lại ở dạng khác, nhưng lần này CỔNG ĐÚNG, chỉ KỲ VỌNG của tôi SAI** ⇒ 🔑 **kiểm lại KỲ VỌNG trước khi sửa CỔNG**; (3) **ca A không TẤT ĐỊNH** — build **tăng dần** không ghi lại binary ⇒ mốc **không đổi** ⇒ ca đỏ **ngẫu nhiên** ⇒ 🔒 một ca **không tất định** thì **KHÔNG phải lưới an toàn** (📌 nó đỏ ngẫu nhiên ⇒ người ta **bỏ qua** nó); ✅ chữa bằng **`--no-incremental`** ⇒ tất định, ⚠️ đổi lại chậm hơn (~40s) — 🔒 **trả giá thời gian ở MỘT chỗ** để biết chắc cổng **còn đúng**. Ghi **§26.6** (nợ: 🚨 **chưa có CI** — nay **7 bước** là nền · 🚨 **probe E2E vẫn SCRIPT TAY** ⇒ `web-001` §98.7 #1 **vẫn mở** · chưa test `route-check.ps1`/`wait-host.ps1` (⚠️ cũng là **cổng**) · bộ test **~45s** vì `--no-incremental` · 🚨 **phép tiêm vẫn dựa vào `String.Replace`/chỉ số** — đã vấp **hai lần** ⇒ nên có **hàm tiêm dùng chung luôn KIỂM LẠI sau khi tiêm**)) |
+
+---
+
+## 27. ✅ **LÁT CẮT 10 — THƯ VIỆN TIÊM TỰ KHẲNG ĐỊNH** (17/10/2026) — *đóng nợ §26.6 #5*
+
+### 27.1 🔑 **CÙNG MỘT LỖI, HAI VÒNG LIÊN TIẾP — nên không thể để nó là "kỷ luật cá nhân"**
+
+| Vòng | Chuyện gì xảy ra | Hậu quả |
+|---|---|---|
+**§25.5** | Tiêm dòng probe bằng `INSERT` có **thoát nháy** ⇒ **sai cú pháp SQL** | ⚠️ Dòng **KHÔNG hề tồn tại** ⇒ suýt **kết luận sai về sản phẩm** |
+**§26.5 #1** | Tiêm lại lỗi bằng `String.Replace` và **phép thay KHÔNG khớp** | ⚠️ Bộ test báo `exit 0` ⇒ suýt kết luận *"bộ test không bắt được gì"* |
+
+🔒 **ĐIỂM CHUNG:** phép tiêm **KHÔNG XẢY RA**, nhưng **không ai kiểm** ⇒ và *"cổng không bắt"* **trông GIỐNG HỆT
+NHAU** với *"tiêm không thành"*. 📌 Vì vậy một ca **XANH** có thể xanh **vì lý do sai**.
+
+🔑 **Và tôi đã ghi bài học này HAI LẦN rồi vẫn vấp lại** ⇒ 🔒 kết luận: **kỷ luật cá nhân không đủ.**
+✅ Phải là **cơ chế**: mọi hàm tiêm **TỰ KHẲNG ĐỊNH** rằng phép tiêm **đã xảy ra**, và **NÉM** nếu không.
+
+### 27.2 ✅ **`tools\ham-tiem.ps1` — năm hàm, mỗi hàm khẳng định một điều**
+
+| Hàm | Tự khẳng định |
+|---|---|
+**`TiemVaoTep`** | 🔑 Khối cũ **phải khớp ĐÚNG MỘT LẦN** — ⚠️ khớp **0** lần = *phép tiêm không xảy ra*; khớp **>1** lần = `Replace` thay **hết** ⇒ **vượt ý định**. ➕ Nội dung **phải đổi**. ➕ Có `-NeoXacNhan` thì neo **phải có**. ➕ **Đọc lại từ đĩa** — ⚠️ tệp bị **khoá** có thể **ghi hụt im lặng** (📌 cùng họ bẫy *"build `exit 0` mà binary không đổi"*) |
+**`KhoiPhucTep`** | Nội dung **phải về đúng bản gốc** và `-NeoDaTiem` **phải mất** — 🔒 nếu không thì một phép khôi phục hỏng làm **các ca sau** đỏ vì **lý do vô hình** |
+**`TiemVaoDb`** | 🚨 Câu SQL **phải có ít nhất một nháy đơn** ⇒ ⚠️ không có ⇒ gần như chắc chắn chuỗi đã bị **lớp gọi ăn mất** ⇒ **NÉM trước khi chạm DB**. ➕ Sau khi ghi **đọc lại** (`-KiemSql` + `-SoDongMongDoi`) và **NÉM** nếu lệch |
+**`Invoke-Psql`** | 🔒 Ghi ra **tệp tạm rồi đọc**, **KHÔNG** ống dẫn — ⚠️ ống dẫn **che mất exit code** ⇒ 📌 `docker` thất bại bị hiểu nhầm là *"0 dòng"*, và *"0 dòng"* lại bị hiểu nhầm là *"sạch"* |
+**`TrongKhiDonDep`** | Dọn dẹp **luôn** chạy, kể cả khi ca kiểm **NÉM** |
+
+🔒 **VÀ KHÔNG ĐẶT `param` Ở CẤP TỆP:** ⚠️ một tệp có `[CmdletBinding()]` ở cấp cao nhất sẽ **đòi tham số** khi bị
+dot-source ⇒ 📌 **treo** hoặc **lỗi** tuỳ ngữ cảnh gọi. ✅ Tệp này **chỉ có hàm**.
+
+### 27.3 🚨 **Một lỗi của tôi NGAY KHI VIẾT thư viện này**
+
+Bản đầu tôi chặn câu SQL chứa **`''`**. ⚠️ **SAI:** `''` là **cú pháp HỢP LỆ** (một nháy đơn **bị thoát** trong
+literal) ⇒ phép chặn đó **cấm luôn** những câu **đúng** như `where "Id" = ''x''`.
+
+🔑 **BÀI HỌC:** một phép kiểm *"trông có vẻ chặt"* mà **sai ngữ nghĩa** thì sẽ **chặn việc ĐÚNG** — 📌 và người
+ta sẽ **gỡ nó ra** thay vì **sửa nó** (🔒 đúng số phận của một *"cổng luôn đỏ"*, §23.4).
+✅ **Chữa:** kiểm **sự VẮNG MẶT của nháy đơn** (dấu hiệu chuỗi bị ăn mất) — thay vì kiểm sự **có mặt của `''`**.
+
+### 27.4 ✅ **KIỂM CHỨNG — 5 CA MỚI (L, M, N, O, P) VÀ ĐÃ SO SÁNH TRỰC TIẾP**
+
+| Ca | Bất biến |
+|---|---|
+🚨 **L** | Khối cũ **không khớp** ⇒ **NÉM** — 🔑 **chính là §26.5 #1** |
+**M** | Khối cũ khớp **>1 lần** ⇒ **NÉM** |
+**N** | Neo không có trong khối mới ⇒ **NÉM** |
+**O** | Tiêm **được** ⇒ neo **có** ⇒ khôi phục ⇒ neo **mất** — 🔒 vòng tròn **khép kín, cả hai chiều** |
+🚨 **P** | SQL **không có nháy đơn** ⇒ **NÉM** kèm thông điệp trỏ tới **§25.5** — 🔑 **chính là lỗi §25.5** |
+
+➕ **SO SÁNH TRỰC TIẾP (đo được):**
+| Cách | Kết quả đo |
+|---|---|
+**Cũ** (`String.Replace`, khối không khớp) | ⚠️ Nội dung **KHÔNG đổi** và **KHÔNG ném** ⇒ 📌 **IM LẶNG** |
+**Mới** (`TiemVaoTep`) | ✅ **NÉM**: *"TiemVaoTep: khoi cu KHONG khop trong [...] ⇒ PHEP TIEM KHONG XAY RA."* |
+
+➕ **Tổng bộ test cổng:** **17/17 ĐẠT** (12 cũ + 5 mới) · **7 bước** · `exit 0` · **132s** · **1155 unit** ·
+**38 integration** · mermaid **197/0** · **DB 21/21**.
+
+### 27.5 ⏳ NỢ
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+**1** | 🚨 **Chưa có CI** | 📌 Nay **7 bước** là nền: thêm CI thì **chỉ cần gọi** `kiem-tat-ca.ps1` |
+**2** | 🚨 **Probe E2E vẫn là SCRIPT TAY** | 🔒 `-DayDu` **báo lỗi** thay vì bỏ qua, nhưng `web-001` §98.7 #1 **vẫn mở** |
+**3** | **Thư viện chưa được dùng ở các probe cũ** | ⚠️ `test-cong-kiem.ps1` đã dùng; 📌 các probe khác **chưa** — 🔑 nên chuyển dần |
+**4** | **Chưa test `route-check.ps1` / `wait-host.ps1`** | ⚠️ Hai script này cũng là **cổng** |
+**5** | **`TiemVaoDb` chưa có ca kiểm "đọc lại THẤY LỆCH thì ném"** | 📌 Hiện mới kiểm ca **chặn nháy đơn** (P); 🔑 ca *"ghi được nhưng đọc lại lệch"* **chưa** có |
+
+### 27.6 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.8 | 17/10/2026 | *(agent, session GĐ1)* | **§27 — LÁT CẮT 10: THƯ VIỆN TIÊM TỰ KHẲNG ĐỊNH** (đóng nợ §26.6 #5): thêm **`tools\ham-tiem.ps1`** (**dot-source**, 🔒 **không có `param` cấp tệp** — ⚠️ tệp có `[CmdletBinding()]` cấp cao nhất sẽ **đòi tham số** khi bị dot-source ⇒ treo/lỗi) gồm **5 hàm**. 🔑 **VÌ SAO:** **CÙNG MỘT LỖI, HAI VÒNG LIÊN TIẾP** — **§25.5** (tiêm có **thoát nháy** ⇒ **sai cú pháp SQL** ⇒ dòng probe **KHÔNG hề tồn tại** ⇒ suýt **kết luận sai về sản phẩm**) và **§26.5 #1** (tiêm lại bằng `String.Replace` và **phép thay KHÔNG khớp** ⇒ bộ test báo `exit 0` ⇒ suýt kết luận *"bộ test không bắt được gì"*); 🔒 **điểm chung: phép tiêm KHÔNG XẢY RA nhưng KHÔNG AI KIỂM** ⇒ *"cổng không bắt"* **trông giống hệt** *"tiêm không thành"* ⇒ 📌 một ca **XANH** có thể xanh **vì lý do sai**; 🔑 **và tôi đã ghi bài học này HAI LẦN rồi vẫn vấp lại** ⇒ **kỷ luật cá nhân không đủ, phải là CƠ CHẾ**. **`TiemVaoTep`** khẳng định: khối cũ khớp **ĐÚNG MỘT LẦN** (⚠️ **0** lần = tiêm không xảy ra; **>1** lần = `Replace` thay **hết** ⇒ vượt ý định) · nội dung **phải đổi** · `-NeoXacNhan` **phải có** · **đọc lại từ đĩa** (⚠️ tệp bị **khoá** có thể **ghi hụt im lặng** — cùng họ bẫy *"build `exit 0` mà binary không đổi"*). **`KhoiPhucTep`** khẳng định nội dung **về đúng bản gốc** và `-NeoDaTiem` **phải mất** (🔒 nếu không thì một phép khôi phục hỏng làm **các ca sau** đỏ vì **lý do vô hình**). **`TiemVaoDb`** 🚨 chặn câu SQL **không có nháy đơn nào** (dấu hiệu chuỗi đã bị **lớp gọi ăn mất**) **TRƯỚC** khi chạm DB, ➕ sau khi ghi **đọc lại** (`-KiemSql` + `-SoDongMongDoi`) và **NÉM** nếu lệch. **`Invoke-Psql`** ghi ra **tệp tạm rồi đọc**, **KHÔNG** ống dẫn (⚠️ ống dẫn **che mất exit code** ⇒ `docker` thất bại bị hiểu nhầm là *"0 dòng"*, và *"0 dòng"* lại bị hiểu nhầm là *"sạch"*). **`TrongKhiDonDep`** dọn dẹp **luôn** chạy kể cả khi ca kiểm **NÉM**. 🚨 **MỘT LỖI CỦA TÔI NGAY KHI VIẾT thư viện:** bản đầu chặn câu SQL chứa **`''`** — ⚠️ **SAI**, vì `''` là **cú pháp HỢP LỆ** (nháy đơn **bị thoát** trong literal) ⇒ phép chặn đó **cấm luôn** câu **đúng** như `where "Id" = ''x''`; 🔑 **bài học: một phép kiểm *"trông có vẻ chặt"* mà SAI NGỮ NGHĨA thì sẽ CHẶN VIỆC ĐÚNG — và người ta sẽ GỠ NÓ RA thay vì SỬA NÓ** (🔒 đúng số phận của một *"cổng luôn đỏ"*, §23.4); ✅ chữa: kiểm **sự VẮNG MẶT của nháy đơn** thay vì sự **có mặt của `''`**. ✅ **KIỂM CHỨNG — 5 ca mới:** 🚨 **L** khối cũ **không khớp** ⇒ **NÉM** (🔑 **chính là §26.5 #1**) · **M** khớp **>1 lần** ⇒ **NÉM** · **N** neo không có trong khối mới ⇒ **NÉM** · **O** tiêm **được** ⇒ neo **có** ⇒ khôi phục ⇒ neo **mất** (🔒 khép kín **cả hai chiều**) · 🚨 **P** SQL **không có nháy đơn** ⇒ **NÉM** kèm thông điệp trỏ tới **§25.5** (🔑 **chính là lỗi §25.5**). ➕ **SO SÁNH TRỰC TIẾP (đo được):** cách **cũ** (`String.Replace`, khối không khớp) ⇒ nội dung **KHÔNG đổi** và **KHÔNG ném** = 📌 **IM LẶNG**; cách **mới** ⇒ ✅ **NÉM** *"PHEP TIEM KHONG XAY RA"*. ➕ **Tổng bộ test cổng: 17/17 ĐẠT** (12 cũ + 5 mới) · **7 bước** · `exit 0` · **132s** · **1155 unit** · **38 integration** · mermaid **197/0** · **DB 21/21**. Ghi **§27.5** (nợ: 🚨 **chưa có CI** — nay **7 bước** là nền · 🚨 **probe E2E vẫn SCRIPT TAY** ⇒ `web-001` §98.7 #1 **vẫn mở** · **thư viện chưa được dùng ở các probe CŨ** (🔑 nên chuyển dần) · chưa test `route-check.ps1`/`wait-host.ps1` (⚠️ cũng là **cổng**) · **`TiemVaoDb` chưa có ca kiểm "đọc lại THẤY LỆCH thì ném"** — mới kiểm ca **chặn nháy đơn**)) |

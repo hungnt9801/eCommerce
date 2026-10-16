@@ -252,7 +252,95 @@ if (-not $ChiKiemDb) {
 }
 
 # ══════════════════════════════════════════════════════════════════════════════════════════════
-# NHOM 2 — `kiem-db.ps1` (⚠️ CAN Docker + PostgreSQL)
+# NHOM 2 — `ham-tiem.ps1` (📌 nhanh, KHONG cham DB)
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+if (-not $ChiKiemDb) {
+    # 🔑 Dot-source thu vien: 🔒 no chi co **ham**, khong co `param` cap tep ⇒ nạp an toan.
+    . (Join-Path $PSScriptRoot 'ham-tiem.ps1')
+
+    Describe 'ham-tiem.ps1 — thu vien TU KHANG DINH sau moi phep tiem' {
+
+        It 'L) TiemVaoTep: khoi cu KHONG khop ⇒ NEM (🛡️ chan §26.5 #1)' {
+            # 🚨 **CA QUAN TRONG NHAT CUA NHOM NAY.** 📌 §26.5 #1: phep `String.Replace` **khong khop** ⇒
+            # ⚠️ **phep tiem khong xay ra** ⇒ bo test bao `exit 0` ⇒ 🔑 **suyt ket luan** *"bo test khong bat
+            # duoc gi"*. ✅ Ham nay **NEM** ⇒ tu nay *"tiem khong thanh"* la **loi on ao**, khong con la
+            # **gia dinh ngam**.
+            $tep = Join-Path $thuMucTam 'thu-l-khong-khop.txt'
+            [System.IO.File]::WriteAllText($tep, 'noi dung goc')
+
+            $nem = $false
+            try { $null = TiemVaoTep -DuongDan $tep -KhoiCu 'KHOI KHONG HE TON TAI' -KhoiMoi 'x' }
+            catch { $nem = $true }
+
+            KhangDinh $nem 'TiemVaoTep KHONG nem khi khoi cu khong khop ⇒ 🔒 PHEP TIEM KHONG XAY RA ma im lang'
+            BangNhau ([System.IO.File]::ReadAllText($tep)) 'noi dung goc' 'Tep khong duoc doi'
+        }
+
+        It 'M) TiemVaoTep: khoi cu khop NHIEU HON MOT lan ⇒ NEM (⚠️ Replace se thay HET)' {
+            # 🔑 Nhieu hon mot lan la mot **bay that**: `Replace` thay **het** ⇒ 📌 phep tiem vuot y dinh, va
+            # ca kiem se do vi **ly do khac** voi dieu ta tuong.
+            $tep = Join-Path $thuMucTam 'thu-m-nhieu-lan.txt'
+            [System.IO.File]::WriteAllText($tep, "AAA`nBBB`nAAA")
+
+            $nem = $false
+            try { $null = TiemVaoTep -DuongDan $tep -KhoiCu 'AAA' -KhoiMoi 'ZZZ' } catch { $nem = $true }
+
+            KhangDinh $nem 'TiemVaoTep KHONG nem khi khoi cu khop nhieu lan'
+            BangNhau ([System.IO.File]::ReadAllText($tep)) "AAA`nBBB`nAAA" 'Tep khong duoc doi'
+        }
+
+        It 'N) TiemVaoTep: neo khong xuat hien trong khoi moi ⇒ NEM' {
+            $tep = Join-Path $thuMucTam 'thu-n-neo.txt'
+            [System.IO.File]::WriteAllText($tep, 'goc')
+
+            $nem = $false
+            try { $null = TiemVaoTep -DuongDan $tep -KhoiCu 'goc' -KhoiMoi 'moi' -NeoXacNhan 'K97KHONGCO' } catch { $nem = $true }
+
+            KhangDinh $nem 'TiemVaoTep KHONG nem khi neo khong co trong khoi moi'
+        }
+
+        It 'O) TiemVaoTep + KhoiPhucTep: tiem DUOC ⇒ neo CO ⇒ khoi phuc ⇒ neo MAT (vong tron khep kin)' {
+            # 🔒 **CA KHANG DINH CA HAI CHIEU** — 🔑 neu chi kiem chieu tiem thi mot phep **khoi phuc hong**
+            # se lam **cac ca sau** do vi **ly do vo hinh** (📌 ma ca truoc con lai).
+            $tep = Join-Path $thuMucTam 'thu-o-vong-tron.txt'
+            [System.IO.File]::WriteAllText($tep, 'dau KHOICUOI cuoi')
+
+            $t = TiemVaoTep -DuongDan $tep -KhoiCu 'KHOICUOI' -KhoiMoi 'K97TIEM' -NeoXacNhan 'K97TIEM'
+
+            try {
+                $sauTiem = [System.IO.File]::ReadAllText($tep)
+                KhangDinh ($sauTiem -match 'K97TIEM') 'Sau khi tiem, neo KHONG co ⇒ phep tiem khong xay ra'
+            }
+            finally {
+                KhoiPhucTep -TayTiem $t -NeoDaTiem 'K97TIEM'
+            }
+
+            $sauKhoiPhuc = [System.IO.File]::ReadAllText($tep)
+            BangNhau $sauKhoiPhuc 'dau KHOICUOI cuoi' 'Noi dung sau khi khoi phuc'
+            KhangDinh ($sauKhoiPhuc -notmatch 'K97TIEM') 'Neo VAN CON sau khi khoi phuc'
+        }
+
+        It 'P) TiemVaoDb: chan cau SQL KHONG co nhay don (🛡️ chan §25.5 TRUOC khi cham DB)' {
+            # 🚨 **CA CHAN §25.5** — 📌 mot cau SQL **that su** luon co **it nhat mot nhay don** (moi gia tri
+            # chuoi deu can no). ⚠️ Khong co nhay don nao ⇒ gan nhu chac chan chuoi da bi **lop goi an mat**
+            # ⇒ 🔑 va phep tiem se **khong xay ra** ma ta **tuong cong khong bat**.
+            $nem = $false
+            $thongDiep = ''
+
+            try {
+                # ⚠️ **KHONG** co nhay don nao ⇒ phai bi chan **TRUOC** khi goi DB.
+                $null = TiemVaoDb -Sql 'insert into "X" ("Id") values (abc)'
+            }
+            catch { $nem = $true; $thongDiep = $_.Exception.Message }
+
+            KhangDinh $nem 'TiemVaoDb KHONG chan cau SQL khong co nhay don'
+            KhangDinh ($thongDiep -match '25.5') "Thong diep loi KHONG tro tới §25.5: $thongDiep"
+        }
+    }
+}
+
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# NHOM 3 — `kiem-db.ps1` (⚠️ CAN Docker + PostgreSQL)
 # ══════════════════════════════════════════════════════════════════════════════════════════════
 if (-not $ChiKiemMoc) {
     $scriptDb = Join-Path $PSScriptRoot 'kiem-db.ps1'

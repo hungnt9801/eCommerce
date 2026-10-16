@@ -477,3 +477,63 @@ sinh ra để chống. ⇒ **Phải có test TỰ ĐỘNG, không phụ thuộc 
 🚨 Tiêm lại **đúng lỗi §23.4** (đảo điều kiện) ⇒ ✅ **3 ca ĐỎ** (A, A2, B) ⇒ 🔑 **bộ test THẬT SỰ BẮT**.
 📌 Và **lần tiêm đầu KHÔNG xảy ra** (phép thay chuỗi không khớp) ⇒ ⚠️ tôi **suýt** kết luận *"test không bắt
 được gì"* — 🔒 **lần thứ HAI** của bài học §25.5, **cách nhau đúng một vòng**.
+
+---
+
+## 🚨 `ham-tiem.ps1` — **THƯ VIỆN TIÊM: TỰ KHẲNG ĐỊNH sau mỗi phép tiêm**
+
+### Vì sao — **CÙNG MỘT LỖI, HAI VÒNG LIÊN TIẾP**
+
+| Vòng | Chuyện gì xảy ra | Hậu quả |
+|---|---|---|
+`sal-006` **§25.5** | Tiêm dòng probe bằng `INSERT` có **thoát nháy** ⇒ **sai cú pháp SQL** | ⚠️ Dòng **KHÔNG hề tồn tại** ⇒ suýt **kết luận sai về sản phẩm** |
+`sal-006` **§26.5 #1** | Tiêm lại lỗi bằng `String.Replace` và **phép thay KHÔNG khớp** | ⚠️ Bộ test báo `exit 0` ⇒ suýt kết luận *"bộ test không bắt được gì"* |
+
+🔒 **ĐIỂM CHUNG:** phép tiêm **KHÔNG XẢY RA**, nhưng **không ai kiểm** ⇒ và *"cổng không bắt"* **trông GIỐNG
+HỆT NHAU** với *"tiêm không thành"*. 📌 Vì vậy một ca **XANH** có thể xanh **vì lý do sai**.
+
+✅ **CÁCH CHẶN:** mọi hàm trong thư viện này **TỰ KHẲNG ĐỊNH** rằng phép tiêm **ĐÃ XẢY RA** — 🔑 và **NÉM**
+nếu không. 📌 Từ đây, *"tiêm không thành"* trở thành một **lỗi ồn ào**, không còn là một **giả định ngầm**.
+
+### Cách dùng — **dot-source**, không chạy trực tiếp
+
+```powershell
+. (Join-Path $PSScriptRoot 'ham-tiem.ps1')     # nạp các hàm
+
+$t = TiemVaoTep -DuongDan $f -KhoiCu $cu -KhoiMoi $moi -NeoXacNhan 'K97TIEM'
+try { ... chạy phép kiểm ... } finally { KhoiPhucTep -TayTiem $t -NeoDaTiem 'K97TIEM' }
+```
+
+⚠️ **KHÔNG** đặt `param` ở cấp tệp: 🔑 một tệp có `[CmdletBinding()]` ở cấp cao nhất sẽ **đòi tham số** khi bị
+dot-source ⇒ 📌 nó **treo** hoặc **lỗi** tuỳ ngữ cảnh gọi. ✅ Tệp này **chỉ có hàm**.
+
+### Năm hàm — và mỗi hàm khẳng định điều gì
+
+| Hàm | Tự khẳng định |
+|---|---|
+**`TiemVaoTep`** | 🔑 Khối cũ **phải khớp ĐÚNG MỘT LẦN** (⚠️ khớp **0** lần = phép tiêm không xảy ra; khớp **>1** lần = `Replace` thay **hết** ⇒ vượt ý định). ➕ Nội dung **phải đổi**. ➕ Nếu có `-NeoXacNhan` thì neo **phải có** trong nội dung mới. ➕ **Đọc lại từ đĩa** — ⚠️ tệp bị **khoá** có thể **ghi hụt im lặng** (📌 cùng họ với bẫy *"build `exit 0` mà binary không đổi"*) |
+**`KhoiPhucTep`** | Nội dung **phải trở về đúng bản gốc**, và `-NeoDaTiem` **phải MẤT** — 🔒 nếu không thì một phép khôi phục hỏng sẽ làm **các ca sau** đỏ vì **lý do vô hình** |
+**`TiemVaoDb`** | 🚨 Câu SQL **phải có ít nhất một nháy đơn** (mọi giá trị chuỗi đều cần nó) ⇒ ⚠️ không có nháy nào ⇒ gần như chắc chắn chuỗi đã bị **lớp gọi ăn mất** ⇒ **NÉM trước khi chạm DB**. ➕ Sau khi ghi, **đọc lại** (`-KiemSql` + `-SoDongMongDoi`) và **NÉM** nếu lệch |
+**`Invoke-Psql`** | 🔒 Ghi ra **tệp tạm rồi đọc**, **KHÔNG** ống dẫn — ⚠️ ống dẫn **che mất exit code** ⇒ 📌 `docker` thất bại bị hiểu nhầm là *"0 dòng"*, và *"0 dòng"* lại bị hiểu nhầm là *"sạch"* |
+**`TrongKhiDonDep`** | Dọn dẹp **luôn** chạy, kể cả khi ca kiểm **NÉM** |
+
+### 🚨 Một lỗi của tôi ngay khi viết thư viện này
+
+Bản đầu tôi chặn câu SQL có **`''`** — ⚠️ **SAI**: `''` là **cú pháp HỢP LỆ** (một nháy đơn **bị thoát** trong
+literal), nên phép chặn đó **cấm luôn** những câu **đúng** như `where "Id" = ''x''`.
+🔑 **Bài học:** phép kiểm *"trông có vẻ chặt"* mà **sai ngữ nghĩa** thì sẽ **chặn việc đúng** — 📌 và người ta
+sẽ **gỡ nó ra** thay vì **sửa nó**. ✅ Chữa: kiểm **sự VẮNG MẶT của nháy đơn** (dấu hiệu bị ăn mất), thay vì
+kiểm sự **có mặt của `''`**.
+
+### ✅ Đã kiểm giá trị thật (5 ca mới: L, M, N, O, P)
+
+| Ca | Bất biến |
+|---|---|
+🚨 **L** | Khối cũ **không khớp** ⇒ **NÉM** — 🔑 **chính là §26.5 #1** |
+**M** | Khối cũ khớp **>1 lần** ⇒ **NÉM** |
+**N** | Neo không có trong khối mới ⇒ **NÉM** |
+**O** | Tiêm **được** ⇒ neo **có** ⇒ khôi phục ⇒ neo **mất** (🔒 vòng tròn **khép kín**, cả hai chiều) |
+🚨 **P** | SQL **không có nháy đơn** ⇒ **NÉM** kèm thông điệp trỏ tới **§25.5** — 🔑 **chính là lỗi §25.5** |
+
+➕ **So sánh trực tiếp (đo được):** cách cũ `String.Replace` với khối không khớp ⇒ nội dung **không đổi** và
+**KHÔNG ném** (📌 **im lặng**); cách mới `TiemVaoTep` ⇒ **NÉM** kèm *"PHEP TIEM KHONG XAY RA"*.
