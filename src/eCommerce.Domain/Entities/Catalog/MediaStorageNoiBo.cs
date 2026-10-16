@@ -33,20 +33,35 @@ namespace eCommerce.Catalog;
 ///   (b) **không** phục vụ tệp qua HTTP — việc đó thuộc tầng phục vụ, và **phải** đặt `Content-Type` từ
 ///     `DinhDangDaKiem` + `nosniff` + **không** dùng cùng tên miền (xem giới hạn `polyglot` ở `NhanDangAnh`).
 /// </summary>
-public class MediaStorageNoiBo : IMediaStorage, ITransientDependency
+public class MediaStorageNoiBo : IMediaStorage
 {
     /// <summary>Tên thư mục gốc trong `ContentRoot` — đổi được qua `MediaStorage:ThuMucGoc`.</summary>
     public const string ThuMucMacDinh = "media-noi-bo";
 
     private readonly string _goc;
-    private readonly ILogger<MediaStorageNoiBo> _logger;
+    private readonly Microsoft.Extensions.Logging.ILogger<MediaStorageNoiBo> _logger;
 
-    public MediaStorageNoiBo(IHostEnvironment moiTruong, ILogger<MediaStorageNoiBo> logger)
+    /// <summary>
+    /// 🚨 **ĐƯỜNG DẪN GỐC ĐƯỢC TRUYỀN VÀO — lớp này KHÔNG tự đi tìm `ContentRoot`.**
+    ///
+    /// 📌 **VÌ SAO ĐỔI (sự cố thật 16/10/2026 — xem `CatalogMediaModule`):** bản đầu nhận
+    /// `IHostEnvironment` qua constructor và tự ghép `ContentRootPath`. Lớp đó **không resolve được**
+    /// trong Host (`IMediaStorage` không có đăng ký) ⇒ **mọi** POST tải ảnh trả `500`.
+    /// 🔒 Nay gốc do **chỗ đăng ký** (`CatalogMediaModule`) truyền vào ⇒ lớp này chỉ phụ thuộc
+    /// **`string` + `ILogger`**, dựng được trong unit test **không cần** host giả.
+    /// ⚠️ **Chọn `ContentRoot`, KHÔNG `AppContext.BaseDirectory`:** trong `dotnet run`, `BaseDirectory` là
+    /// `bin/Debug/...` ⇒ tệp **biến mất** khi `dotnet clean`/build lại ⇒ mất ảnh **không lỗi nào**.
+    /// </summary>
+    public MediaStorageNoiBo(string duongDanGoc, ILogger<MediaStorageNoiBo>? logger = null)
     {
-        // 📌 `ContentRootPath` (không phải `AppContext.BaseDirectory`): trong `dotnet run`, `BaseDirectory`
-        // là `bin/Debug/...` ⇒ tệp **biến mất** khi `dotnet clean`/build lại ⇒ mất ảnh **không lỗi nào**.
-        _goc = Path.Combine(moiTruong.ContentRootPath, ThuMucMacDinh);
-        _logger = logger;
+        if (string.IsNullOrWhiteSpace(duongDanGoc))
+        {
+            throw new ArgumentException("Đường dẫn gốc kho tệp KHÔNG được rỗng.", nameof(duongDanGoc));
+        }
+
+        _goc = duongDanGoc;
+        // 📌 `logger` cho phép `null` ⇒ test dựng kho **không cần** hạ tầng logging.
+        _logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<MediaStorageNoiBo>.Instance;
     }
 
     /// <inheritdoc />

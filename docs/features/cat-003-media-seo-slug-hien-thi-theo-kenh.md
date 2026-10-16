@@ -1370,3 +1370,131 @@ vào việc test xanh.
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.5 | 16/10/2026 | *(agent, session GĐ1)* | **§19 — SỬA SỰ CỐ MÃ LỖI (lỗi của chính tôi)**: đánh số lại slug/media theo `CAT-003` **§6.3** (`0026`→`0201` · `0027`→`0202` · `0030`→`0204` · `0028`/`0029`→`0206` · `0031`→`0210`) phủ **15 chỗ / 5 tệp** · **bỏ alias sai** `DaCoAnhChinh = TepKhongPhaiAnh` (hai nghĩa khác hẳn dùng một mã — **lưới an toàn cho qua**) · **bỏ CHUỖI CỨNG** trong `ViPhamRangBuocDb` ⇒ dùng hằng số (`Kernel` nay tham chiếu `Domain.Shared`, **không** vòng lặp) · **+6 test** (1043 tổng): 5 dòng **sổ đăng ký** khoá số theo tài liệu + `Alias_chi_duoc_dung_khi_HAI_TEN_THAT_SU_cung_mot_nghia`. 📌 **Ba lỗi trong một lượt** đều là *"mã lệch nguồn sự thật mà không gì buộc khớp"* — và **cả ba đều qua được** build + 1081 test xanh ⇒ phát hiện bằng **đọc lại giá trị THẬT**, không bằng test. Ghi **§19.3** (alias qua được phép kiểm trùng giá trị) · **§19.4** (chuỗi cứng ⇒ build/test xanh khi mã lệch) · **§19.5** (ba việc loại bỏ khả năng tái diễn) |
+
+---
+
+## 20. ✅ **LÁT CẮT 4 — APP SERVICE TẢI ẢNH + ENDPOINT PHỤC VỤ TỆP** (16/10/2026) — *đóng nợ §17.8 #2*
+
+> ⚠️ **PHẠM VI NÓI RÕ — ĐỌC KỸ TRƯỚC KHI TIN:**
+> **ĐÃ KIỂM CHỨNG (26/32 ca HTTP thật):** toàn bộ **đường TẢI LÊN** — kiểm trần dung lượng · **magic bytes** ·
+> trần số ảnh · ghi tệp thật · ghi DB thật · **ảnh đầu tiên tự thành ảnh chính** · **đổi ảnh chính một
+> transaction** · **không tạo tệp mồ côi** · `[Authorize]` hoạt động.
+> 🚨 **CHƯA KIỂM CHỨNG ĐƯỢC (6 ca, xem §20.6):** **đường PHỤC VỤ TỆP qua HTTP** (`GET /CatMedia/{id}`) —
+> lỗi **hạ tầng đo** (gốc kho giữa hai tiến trình), **không** phải lỗi nghiệp vụ, nhưng **tôi không được
+> phép nói nó chạy** khi chưa đo sạch. 📌 Coi 6 ca đó là **CHƯA XONG**.
+
+### 20.1 Vì sao chọn **đọc `byte[]` qua DTO** (và đánh đổi đã biết)
+
+`TaiAnhInput.NoiDung` là `byte[]` ⇒ client gửi **base64** trong JSON. ⚠️ **Đánh đổi:**
+base64 làm dữ liệu **+33 %**, và toàn bộ nằm trong một **chuỗi JSON** ⇒ tốn băng thông **và** RAM gấp đôi
+(chuỗi base64 + mảng byte sau khi giải mã).
+📌 **Vì sao vẫn chọn:** DTO phải ở `Application.Contracts`, mà tầng đó **không được** tham chiếu
+`Microsoft.AspNetCore.Http` (`IFormFile`) — **kiến trúc đã chặn đúng** (build **`CS0246`** ngay lần đầu).
+🔒 **NỢ ĐÃ GHI:** chuyển sang `multipart/form-data` bằng cách đặt DTO trong tầng `HttpApi` (hoặc thêm
+endpoint nhận luồng thô) — khi đó **trần dung lượng chặn được theo `Content-Length` TRƯỚC khi đọc thân request**,
+đúng điều `CAT-003` §E6 yêu cầu.
+
+### 20.2 🚨 **THỨ TỰ BỐN PHÉP KIỂM LÀ MỘT PHẦN CỦA ĐẶC TẢ**
+
+| Bước | Kiểm | **Vì sao ở đúng vị trí đó** |
+|---|---|---|
+① | **Trần dung lượng** (10 MB) | Người dùng có thể gửi tệp **vài GB**. Đọc hết để rồi phát hiện vượt trần là **tự làm mất dịch vụ** (`DoS`) |
+② | **Magic bytes** (`ADR-13`) | Tệp không phải ảnh thì **không được** ghi vào kho: ghi rồi xoá là **hai** thao tác I/O và có **cửa sổ** tệp xấu **tồn tại trên đĩa** |
+③ | **Trần số ảnh** (50) | 🔒 Vượt trần mà **vẫn** ghi tệp ⇒ **tệp mồ côi** (tệp có thật, **không** dòng DB nào trỏ tới ⇒ **không ai biết để dọn**). Đếm **trước** ⇒ vượt trần là **0 tệp, 0 dòng** |
+④ | **Tạo entity** (DB) | Chỉ tồn tại khi bytes **chắc chắn** có ⇒ đúng thứ tự *"ghi tệp TRƯỚC, DB SAU"* |
+
+📌 **Thứ tự "ghi tệp trước, DB sau" là chủ ý** — chọn **kiểu hỏng dễ sống hơn**: DB hỏng ⇒ **tệp mồ côi**
+(tốn dung lượng, **dọn được**); làm ngược ⇒ **dòng DB trỏ tới tệp không tồn tại** ⇒ storefront hiện **ảnh vỡ**
+(**không sửa được, không có log**). `CAT-003` §237 đã chốt đúng điều này.
+
+➕ **Giảm tệp mồ côi trong ca phổ biến nhất:** nếu `SaveChanges` **NÉM**, `catch` **xoá tệp vừa ghi**
+(log `Warning` nếu xoá cũng hỏng). ⚠️ **Không** thay thế job dọn — lỗi tiến trình (`kill -9`) vẫn để lại rác.
+
+### 20.3 🚨 **HAI LỖI DI — CẢ HAI LỌT QUA BUILD + 1043 TEST XANH**
+
+| # | Lỗi | Hậu quả **đo được** | Sửa |
+|---|---|---|---|
+**1** | `IMediaStorage` **không được đăng ký**: lớp hiện thực có `ITransientDependency` (đúng quy ước) trong `eCommerce.Domain` (assembly **có** trong đồ thị) | **MỌI** POST trả **`500`** *"None of the constructors found … Cannot resolve parameter 'IMediaStorage'"* | Tạo **`CatalogMediaModule`** đăng ký **tường minh** (theo khuôn `eCommerceKernelModule`: *"chỉ tham chiếu project là KHÔNG ĐỦ"*) |
+**2** | **Quên thêm module vào `DependsOn`** | Host/Web **không nạp** module ⇒ **vẫn** `500` | Thêm vào **cả** `eCommerceHttpApiHostModule` **và** `eCommerceWebModule` |
+**3** | **Module có constructor THAM SỐ** | Host **KHÔNG khởi động nổi**: `MissingMethodException: Cannot dynamically create an instance … No parameterless constructor defined` | Constructor **rỗng**; lấy dịch vụ **trong factory `sp =>`** |
+
+🔒 **Lưới an toàn đã thêm:** `CatalogMediaModuleTests` (**5 ca**, **reflection + quét mã nguồn**, chạy vài ms):
+module **phải** có constructor rỗng · **phải** `public`, kế thừa `AbpModule` · **phải** có
+`typeof(CatalogMediaModule)` trong `DependsOn` của **CẢ Host VÀ Web** (mỗi tiến trình đồ thị **riêng**).
+➕ `CatalogMediaModule` **ghi log gốc kho** (`[MEDIA-GOC-KHO]`) — khi *"ghi một nơi, đọc nơi khác"* thì thứ
+cần biết **đầu tiên** là **mỗi tiến trình đang trỏ vào đâu**.
+
+### 20.4 🚨 **XUNG ĐỘT THIẾT KẾ: "MỌI APP SERVICE PHẢI `[Authorize]`" ⚔️ "PHỤC VỤ ẢNH PHẢI CÔNG KHAI"**
+
+Bản đầu tôi tách `MediaPhucVuAppService` (**`[Authorize]`**, theo `BatBienPhanQuyenTests`) và để
+**controller** `[AllowAnonymous]` gọi nó ⇒ `GET /CatMedia/{id}` trả **`500`** kèm
+`AbpAuthorizationException`.
+🔑 **VÌ SAO:** app service của ABP có **interceptor kiểm quyền chạy MỖI LẦN GỌI** — kể cả lời gọi
+**trong tiến trình**; mà phục vụ ảnh xảy ra với **principal ẩn danh** ⇒ `[Authorize]` **từ chối**.
+📌 Tức hai ràng buộc **không thể** cùng đúng trong một lớp.
+
+🔒 **CÁCH GIẢI (không nới lỏng lưới nào):** bỏ lớp app service đó; **controller** — với tư cách **cửa công khai
+DUY NHẤT, đã được allowlist duyệt** — đọc repository + kho tệp **trực tiếp**. 📌 Đúng khuôn
+`SitemapController`/`RobotsController` (cũng `[AllowAnonymous]`, cũng tự đọc dữ liệu).
+⚠️ **Đánh đổi:** nghiệp vụ phục vụ không tái dùng được từ API. 🔑 Nhưng phục vụ tệp (đặt header, trả bytes) là
+**việc của tầng HTTP**, **không** phải nghiệp vụ ⇒ đặt ở controller là **đúng chỗ**, không phải chỗ tạm.
+
+### 20.5 ✅ **KIỂM CHỨNG — 26/32 ca HTTP THẬT** (Host :5000 + Web :5100 + PostgreSQL 17)
+
+| Nhóm | Ca **ĐẠT** (đo được) |
+|---|---|
+**Tiền đề** | A1 gieo 1 sản phẩm thử |
+**Tải lên** | C1 `200` · C2 URL do **máy chủ** dựng `/CatMedia/{id}` (không phải khoá lưu trữ) · C3 `contentType=image/png` **suy từ magic bytes** · C4 `dinhDang=Png` · **C5 🚨 ảnh ĐẦU TIÊN TỰ ĐỘNG thành ảnh chính** · C7 DB **đúng 1** dòng |
+**Không ghi đè** | E1 lần 2 tạo **dòng mới** · E2 lần 2 **không** tự thành ảnh chính · **E3 🚨 DB vẫn đúng 1 ảnh chính** · E4 hai URL **khác nhau** |
+**Từ chối (bảo mật)** | **F1 🚨 HTML đội lốt `.png` ⇒ `403` + `Catalog:0206`** · **F2 🚨 KHÔNG tệp mồ côi** · F3 không ghi dòng DB · F4 lỗi **không** mang `toiDaByte` (phân biệt được với vượt dung lượng) |
+**Trần dung lượng** | **G1 11 MB ⇒ `403` + `0206`** · **G2 lỗi MANG `toiDaByte`** ⇒ nhật ký **phân biệt** *"tấn công"* với *"quy trình"* · G3 không tệp mồ côi |
+**Ràng buộc ảnh chính** | H1 thiếu `Alt` ⇒ `403` · H2 **không** ghi DB, **không** tệp mồ côi |
+**Đổi ảnh chính** | I1 `200` · **I2 🚨 sau đổi VẪN đúng 1 ảnh chính** (bỏ cờ cũ cùng transaction) · I3 ảnh chính **đúng** ảnh vừa chỉ định · **I4 gọi lại (retry) ⇒ `200`, KHÔNG ném** |
+**Sản phẩm sai** | J1 sản phẩm không tồn tại ⇒ `403` + `Catalog:0010` · **J2 🚨 KHÔNG ghi tệp** |
+
+📌 **J2 là ca đáng chú ý:** chặn theo **`Guid` gõ sai** ⇒ nếu **không** kiểm sản phẩm tồn tại thì tệp đã được
+ghi **trước khi** FK nổ ⇒ **tệp mồ côi** từ một lỗi đánh máy.
+
+### 20.6 🚨 **6 CA CHƯA KIỂM CHỨNG ĐƯỢC — LỖI HẠ TẦNG ĐO, KHÔNG PHẢI LỖI NGHIỆP VỤ** (nhưng **chưa xong**)
+
+**Triệu chứng:** `GET /CatMedia/{id}` trả **`404`**; log Web ghi `[MEDIA-MAT-TEP]`
+*"dong DB co nhung kho tep KHONG co bytes"*.
+
+**Đã loại trừ (đo được, không phải suy đoán):**
+* ✅ **Không phải lỗi phân quyền** (lỗi đó đã sửa ở §20.4) — nay là `404`, **không** còn `500`;
+* ✅ **Không phải hai gốc kho khác nhau**: log `[MEDIA-GOC-KHO]` của **cả hai** tiến trình in **cùng một**
+  đường dẫn (`…\tools\_tam-media2\kho-chung`, `tu cau hinh: True`);
+* ✅ **Không phải sai khoá**: khoá trong DB khớp **đúng** tên tệp **có thật** trong kho (đã đối chiếu chuỗi);
+* ✅ **Đường kiểm "tệp mất" hoạt động ĐÚNG**: nó phát hiện thật và **ghi log `Error`** — tức guard mới
+  (`MEDIA-MAT-TEP`) làm đúng việc của nó.
+
+**Kết luận trung thực:** triệu chứng **thay đổi giữa các lần chạy** (lần thì tệp **1** mất, lần thì tệp **2**
+mất) ⇒ đặc trưng của **tranh chấp thứ tự trong BỘ ĐO**, không phải lỗi tất định của sản phẩm.
+📌 **Nguyên nhân khả dĩ nhất:** probe khởi động lại Host **trong khi** tiến trình cũ còn giữ cổng
+(`Stop-Process` + `Start-Sleep 3` **không** bảo đảm) ⇒ một Host **cũ** (cấu hình **cũ**) ghi tệp vào gốc **khác**,
+rồi tiến trình mới đọc không thấy. 🔒 Bằng chứng: log `[MEDIA-GOC-KHO]` xuất hiện **HAI lần** trong `host.log`
+với **hai gốc khác nhau** (`…Temp\ecommerce-media-dung-chung` rồi `…kho-chung`).
+🚨 **NỢ:** chạy lại **một lần sạch** (dừng hết tiến trình, xác nhận cổng trống **trước** khi khởi động) để
+đóng 6 ca này. ⚠️ **Cho tới lúc đó, đường phục vụ tệp qua HTTP được coi là CHƯA XONG.**
+
+### 20.7 ⏳ NỢ (KHÔNG phải tính năng đã có)
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+| **1** | 🚨 **6 ca phục vụ tệp CHƯA đo sạch** (§20.6) | Phải chạy lại một lần sạch |
+| **2** | 🚨 **Ảnh đã XOÁ MỀM trả `404`** | Ý định ban đầu là phục vụ được (theo `ADR-11`), nhưng `IDataFilter.Disable<ISoftDelete>()` **không** resolve được trong `eCommerce.Web` (`CS0246`, đã thử cả hai namespace). ⇒ Link ảnh đã phát ra ngoài **có thể vỡ** sau khi gỡ ảnh. **Không** mất dữ liệu (bytes còn) ⇒ **khôi phục được** |
+| **3** | **Tệp tải lên phục vụ từ CÙNG TÊN MIỀN** | Đúng điều §17.6 cảnh báo. Giảm thiểu: `nosniff` + `Content-Type` do máy chủ + tên tệp do máy chủ. 🚨 Cần **tên miền/CDN riêng** |
+| **4** | **Base64 trong JSON** (+33 % + gấp đôi RAM) | §20.1 — cần `multipart/form-data` |
+| **5** | **Gốc kho mặc định là thư mục tạm của HĐH** | Không dùng chung **giữa các máy** ⇒ nhiều container **phải** cấu hình `MediaStorage:ThuMucGoc` hoặc dùng S3 |
+| **6** | **Chưa có job dọn tệp mồ côi** | §18.7 #3 |
+| **7** | **Chưa có tải NHIỀU ảnh một request** | Mỗi request một ảnh ⇒ 10 ảnh = 10 request |
+| **8** | **Chưa nén/đổi kích cỡ ảnh** | Lưu **ảnh gốc** ⇒ tốn dung lượng + băng thông; chưa sinh thumbnail |
+| **9** | **Chưa có UI quản lý ảnh** | Chưa trang, chưa menu |
+| **10** | 🚨 **HIỂN THỊ THEO KÊNH vẫn 0 dòng code** | Phần **thứ ba** của `CAT-003` |
+| **11** | **`0204` dùng chung cho `SortOrder` trùng VÀ vượt trần ảnh** | Theo §6.3 (client xử lý giống nhau), ghi lại để biết |
+
+### 20.8 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.6 | 16/10/2026 | *(agent, session GĐ1)* | **§20 — LÁT CẮT 4: APP SERVICE TẢI ẢNH + ENDPOINT PHỤC VỤ** (đóng nợ §17.8 #2): `IProductMediaAppService`/`ProductMediaAppService` (**4 method**: danh sách · tải lên · sửa metadata · đặt ảnh chính · xoá mềm) · `CatMediaController` (**cửa công khai duy nhất**, đã allowlist) · `CatalogLimits.AnhToiDaByte` (10 MB) + `SoAnhToiDaMoiSanPham` (50) · `CatalogMediaModule` + `CatalogMediaModuleTests` (**5 ca**) · **+5 test** (1048 tổng). 🚨 **BA LỖI DI** (cả ba lọt qua build + **1043 test xanh**): `IMediaStorage` không được đăng ký · quên thêm module vào `DependsOn` · module có constructor **tham số** (`MissingMethodException`, Host **không khởi động nổi**). 🚨 **MỘT XUNG ĐỘT THIẾT KẾ**: app service `[Authorize]` bị interceptor ABP **từ chối** khi gọi ẩn danh ⇒ phải bỏ lớp đó, controller đọc repository trực tiếp. ✅ **26/32 ca HTTP thật ĐẠT** (toàn bộ đường TẢI LÊN + ràng buộc + từ chối bảo mật + đổi ảnh chính). 🚨 **6 ca phục vụ tệp CHƯA đo sạch** — lỗi **hạ tầng đo** (tranh chấp thứ tự khởi động Host), đã loại trừ **bốn** nguyên nhân bằng đo đạc; **coi là CHƯA XONG**. Ghi **§20.2** (thứ tự 4 phép kiểm) · **§20.4** (xung đột `[Authorize]` ⚔️ công khai) · **§20.6** (sáu ca chưa đo + bốn nguyên nhân đã loại trừ) · **§20.7** (11 nợ, gồm **ảnh xoá mềm trả 404** và **cùng tên miền**) |

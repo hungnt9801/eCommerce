@@ -49,7 +49,24 @@ public class AllowlistCongKhaiTests
         // 🔒 Cả hai CHỈ đọc dữ liệu **đã công khai** (SKU đang niêm yết giá + URL công khai), **không** nhận
         // tham số ⇒ không có đường dò dữ liệu riêng tư qua chúng. Xem ghi chú phạm vi ở đầu mỗi controller.
         "eCommerce.Web.Controllers.SitemapController",
-        "eCommerce.Web.Controllers.RobotsController"
+        "eCommerce.Web.Controllers.RobotsController",
+
+        // 🚨 `CAT-003` — PHỤC VỤ TỆP ẢNH (`GET /CatMedia/{id}`): **BẮT BUỘC** công khai vì ảnh sản phẩm phải
+        // hiện ở nơi KHÔNG có phiên đăng nhập — **storefront**, **thẻ chia sẻ mạng xã hội** (`og:image`:
+        // trình thu thập của Facebook/Zalo KHÔNG đăng nhập), và **kết quả tìm kiếm ảnh**.
+        //
+        // 🔒 RỦI RO ĐÃ ĐƯỢC GIẢM THIỂU (đo được, không phải suy đoán):
+        //  • `Content-Type` do **MÁY CHỦ** đặt, suy từ `DinhDangDaKiem` (đã kiểm **magic bytes**, `ADR-13`) —
+        //    KHÔNG từ tên tệp/`Content-Type` client gửi ⇒ đây là lớp chặn *"HTML độc hại đội lốt .png"*;
+        //  • `X-Content-Type-Options: nosniff` ⇒ trình duyệt KHÔNG đoán lại loại tệp rồi thực thi;
+        //  • `Content-Disposition: inline` với tên tệp do **máy chủ** sinh ⇒ không có `HTTP response splitting`;
+        //  • CHỈ nhận `id:guid`, KHÔNG nhận tham số đường dẫn/khoá ⇒ không có đường dò tệp của người khác
+        //    (URL do máy chủ dựng từ `Id`, không từ khoá lưu trữ).
+        //
+        // ⚠️ **NỢ ĐÃ GHI NHẬN (`cat-003` §20.7):** tệp tải lên đang được phục vụ từ CÙNG TÊN MIỀN với ứng dụng —
+        // đúng điều §17.6 cảnh báo. Việc cần làm: dời sang **tên miền/CDN riêng** (không phải sửa nghiệp vụ,
+        // chỉ đổi URL). 📌 Ghi ngay tại dòng allowlist vì đây là chỗ người review **sẽ đọc**.
+        "eCommerce.Web.Controllers.CatMediaController"
     ];
 
     /// <summary>Cửa công khai map TAY (không có `[AllowAnonymous]`) — cũng phải khai tường minh.</summary>

@@ -163,6 +163,43 @@ public static class eCommerceConsts
 
         /// <summary>Độ dài tối đa của SKU — khớp `HasMaxLength(64)` ở DbContext.</summary>
         public const int SkuToiDa = 64;
+
+        // ── ẢNH SẢN PHẨM (`CAT-003`) ──────────────────────────────────────────────────────────────
+        // 📌 Đặt Ở ĐÂY (không ở entity `ProductMedia`) vì **`Application.Contracts` KHÔNG được tham chiếu
+        // `Domain`** ⇒ DTO không đọc được hằng số trong entity. ⚠️ Đã **vấp thật** khi viết
+        // `ProductMediaDtos.cs`: `using eCommerce.Catalog;` rồi dùng `ProductMedia.DoDaiAltToiDa`
+        // ⇒ **4 lỗi `CS0103`** — kiến trúc đã chặn đúng, và thông báo lỗi chỉ thẳng ra chỗ sai.
+
+        /// <summary>Độ dài tối đa của `Alt` — khớp `HasMaxLength(512)` ở DbContext (`ProductMedia`).</summary>
+        public const int AltAnhToiDa = 512;
+
+        /// <summary>Độ dài tối đa của khoá lưu trữ — khớp `HasMaxLength(512)` ở DbContext (`ProductMedia`).</summary>
+        public const int KhoaLuuTruToiDa = 512;
+
+        /// <summary>
+        /// 🚨 **TRẦN DUNG LƯỢNG MỘT TỆP ẢNH = 10 MB** (`NFR-CAT-003-003`).
+        ///
+        /// 📌 **VÌ SAO PHẢI KIỂM TRƯỚC KHI ĐỌC HẾT TỆP (không phải "kiểm sau cho tiện"):** người dùng có thể
+        /// gửi tệp **vài GB**. Đọc hết vào bộ nhớ để rồi phát hiện vượt trần là **tự làm mất dịch vụ**
+        /// (đúng họ lỗi `DoS`; `CAT-003` §E6 ghi rõ: *"không đọc hết luồng; chặn theo `Content-Length` trước"*).
+        /// 🔒 Vì vậy ở đường HTTP **phải** kiểm `Content-Length` + `IFormFile.Length` **TRƯỚC**, rồi mới đọc.
+        ///
+        /// 📌 Vì sao **10 MB**: ảnh máy ảnh/điện thoại hiện nay thường **3–8 MB**; trần 1 MB sẽ chặn **ảnh gốc
+        /// hợp lệ** (buộc nhân viên tự nén — việc họ **không** làm, và ta nhận được ảnh nén kém), còn trần
+        /// 100 MB cho một request **chiếm** băng thông + RAM gấp **10 lần** mà **không** có ích lợi nào.
+        /// </summary>
+        public const long AnhToiDaByte = 10L * 1024 * 1024;
+
+        /// <summary>
+        /// 🚨 **TRẦN SỐ ẢNH MỖI SẢN PHẨM = 50** (`NFR-CAT-003-004`) — vượt ⇒ mã `0204` **và `0` dòng ghi**.
+        ///
+        /// 📌 **VÌ SAO PHẢI CÓ TRẦN (không phải "cứ cho thêm"):** mỗi ảnh là **dung lượng lưu trữ trả tiền**
+        /// + **băng thông** mỗi lần khách xem. Không trần thì một script lỗi (hoặc bấm nhầm nhiều lần) đẩy
+        /// **hàng nghìn** ảnh vào một sản phẩm — hoá đơn tăng, và **không có gì chặn**.
+        /// 🔒 Kiểm **TRƯỚC khi ghi tệp** ⇒ vượt trần thì **không** để lại **tệp mồ côi** (tệp có thật trong kho
+        /// nhưng **không** dòng DB nào trỏ tới ⇒ **không ai biết để dọn**).
+        /// </summary>
+        public const int SoAnhToiDaMoiSanPham = 50;
     }
 
     /// <summary>

@@ -49,6 +49,11 @@ namespace eCommerce;
     // 🚨 C6b: đặt default challenge scheme — THIẾU thì API không token trả 500 thay vì 401.
     typeof(Volo.Abp.AspNetCore.Authentication.JwtBearer.AbpAspNetCoreAuthenticationJwtBearerModule),
     typeof(eCommerceEntityFrameworkCoreModule),
+  // 🚨 `CAT-003` — **KHO TỆP MEDIA**: thiếu dòng này thì `IMediaStorage` **KHÔNG** được đăng ký
+  // ⇒ **MỌI** POST tải ảnh trả `500` (`"code": null`, *"An internal error occurred"*) — KHÔNG phải
+  // `400`/`403` có mã. 📌 Đã đo thật (probe `cat-003` 32 ca, 5 đạt). ⚠️ `ITransientDependency` trên lớp
+  // hiện thực là **KHÔNG ĐỦ**: quét tự động **không** đăng ký được nó (xem chú thích `CatalogMediaModule`).
+  typeof(eCommerce.Catalog.CatalogMediaModule),
     typeof(eCommerceApplicationModule),
     typeof(ChannelHub.ChannelHubApplicationModule),
     typeof(PaymentHub.PaymentHubApplicationModule),

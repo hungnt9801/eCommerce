@@ -46,6 +46,16 @@ namespace eCommerce.Web;
     typeof(AbpAccountWebModule),
     typeof(EntityFrameworkCore.eCommerceEntityFrameworkCoreModule),
     typeof(eCommerceApplicationModule),
+    // 🚨 `CAT-003` — **KHO TỆP MEDIA** (`IMediaStorage`). Cần ở **CẢ Host VÀ Web** vì mỗi tiến trình có
+    // đồ thị module **RIÊNG**: Host phục vụ API tải lên, Web phục vụ `GET /CatMedia/{id}`.
+    // 🔑 **ĐÚNG CÙNG HỌ LỖI ĐÃ TRẢ GIÁ Ở VÒNG 58** (xem khối chú thích `Pricing` ngay dưới): thiếu module
+    // ⇒ DI **không dựng được** ⇒ **`HTTP 500`** *"None of the constructors found … Cannot resolve parameter"*.
+    // 📌 Ở `CAT-003` tôi đã trả giá **hai lần** cho cùng một họ lỗi này:
+    //   (a) lớp hiện thực chỉ có `ITransientDependency` ⇒ quét tự động **KHÔNG** đăng ký;
+    //   (b) tạo `CatalogMediaModule` nhưng **quên thêm vào `DependsOn`** ⇒ module **không nằm trong đồ thị**
+    //       ⇒ vẫn `500`.
+    // ⚠️ Và cả hai lần, **1043 unit test vẫn xanh** — chỉ **probe HTTP thật** bắt được.
+    typeof(eCommerce.Catalog.CatalogMediaModule),
     // 🚨 **`Pricing` PHẢI ĐƯỢC NẠP Ở WEB** (phát hiện vòng 58): `DonHangAppService` — dùng bởi trang mặt tiền đầu tiên
     // `PhanBoController` — có tham số ctor `IPriceCalculationAppService` ⇒ thiếu module này thì DI **KHÔNG dựng được**
     // controller ⇒ **`HTTP 500`**: *"None of the constructors found … Cannot resolve parameter

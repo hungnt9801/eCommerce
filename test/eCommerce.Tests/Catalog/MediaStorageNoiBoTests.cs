@@ -31,7 +31,7 @@ public class MediaStorageNoiBoTests : IDisposable
         _gocTest = Path.Combine(Path.GetTempPath(), "ecom-media-test-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_gocTest);
 
-        _kho = new MediaStorageNoiBo(new MoiTruongGia(_gocTest), NullLogger<MediaStorageNoiBo>.Instance);
+        _kho = new MediaStorageNoiBo(_gocTest);
     }
 
     public void Dispose()
@@ -229,10 +229,13 @@ public class MediaStorageNoiBoTests : IDisposable
     {
         var kq = await _kho.LuuAsync(AnhPngThat(), DinhDangMedia.Png, null, Guid.NewGuid());
 
-        // ⚠️ **BẪY ĐÃ VẤP:** đường dẫn thật là `<ContentRoot>/<ThuMucMacDinh>/<khoá>`, **KHÔNG** phải
-        // `<ContentRoot>/<khoá>` — tôi quên `ThuMucMacDinh` ở lần chạy đầu nên test ĐỎ dù khoá **hoàn toàn đúng**.
-        // 📌 Đây là lỗi của **bộ đo** (giả định cấu trúc thư mục), không phải của sản phẩm.
-        var thuMucKho = Path.GetFullPath(Path.Combine(_gocTest, MediaStorageNoiBo.ThuMucMacDinh));
+        // 📌 **BẪY ĐÃ VẤP HAI LẦN — ghi lại vì rất dễ tái diễn:** lần đầu tôi ghép `<ContentRoot>/<khoá>`
+        // trong khi lớp **cũ** tự thêm `ThuMucMacDinh` ⇒ test ĐỎ. 🔑 **Nay lớp KHÔNG tự thêm gì**: gốc do
+        // **chỗ đăng ký** truyền vào (`CatalogMediaModule` ghép `ContentRootPath` + `ThuMucMacDinh`), và
+        // test truyền thẳng `_gocTest` ⇒ đường dẫn thật là `<gocTest>/<khoá>`.
+        // ⇒ **Bất biến của lớp này:** *gốc nhận vào CHÍNH LÀ thư mục kho* — không tự suy diễn thêm.
+        // 📌 Đó cũng là điều làm lớp này **test được** không cần host giả.
+        var thuMucKho = Path.GetFullPath(_gocTest);
         var duongDanDay = Path.GetFullPath(Path.Combine(thuMucKho, kq.KhoaLuuTru));
 
         // 🔒 Đối chứng cho các test chặn ở trên: **đường hợp lệ** phải nằm **trong** thư mục kho.
