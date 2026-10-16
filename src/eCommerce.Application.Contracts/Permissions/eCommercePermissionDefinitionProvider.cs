@@ -97,6 +97,10 @@ public class eCommercePermissionDefinitionProvider : PermissionDefinitionProvide
         // 🚨 BẮT BUỘC khai ở CẢ HAI NƠI (hằng số + ở đây): thiếu một nơi ⇒ `403` cho MỌI người kể cả `admin`.
         // 🔒 Tách `View` (`Customers.Default`) khỏi `Manage`: hồ sơ khách là **dữ liệu cá nhân** (Luật 91/2025/QH15)
         // ⇒ người **đọc** để chăm sóc khách **không** đương nhiên được **chặn/gỡ chặn/nâng cấp**.
+        // 🔐 `XC-002` — vận hành hàng đợi thư chết. 📌 Tách khỏi `Inventory` để giữ **đặc quyền tối thiểu**
+        // (DLQ chứa payload sự kiện ⇒ đọc nó là một quyền **riêng**).
+        var operations = group.AddPermission(eCommerceConsts.Permissions.Operations.Default);
+        operations.AddChild(eCommerceConsts.Permissions.Operations.DeadLetters);
         var customers = group.AddPermission(eCommerceConsts.Permissions.Customers.Default);
         customers.AddChild(eCommerceConsts.Permissions.Customers.Manage);
     }

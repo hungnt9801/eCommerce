@@ -1242,3 +1242,97 @@ Module **`Messaging`** đã được tạo theo **Q2** (`modules/Messaging/eComm
   (đúng lỗi C4/F1 đã kiểm chứng). Hiện mới có bản lưu in-memory.
 - **Outbox/relay + job quét DLQ 1 phút** (Q4) + **7 metric** đã đăng ký ở `XC-005` nhưng **chưa wire nơi phát**.
 - **API phát lại theo `IdempotencyKey`** (Q7 đã chốt **CÓ**).
+---
+
+## 16. ✅ **TRẠNG THÁI TRIỂN KHAI — DLQ (`XC-002` mục (a) phần DLQ) ĐÃ CÓ BẢNG + ĐƯỜNG ĐỌC** (16/10/2026)
+
+> ⚠️ **ĐỌC KỸ:** mục này ghi **cả** phần **đã xong** **và** phần **chưa xong**. 🚨 Phần **outbox/inbox**
+> (§16.4) **CHƯA** triển khai — và đó là phát hiện **mới quan trọng**.
+
+### 16.1 🔑 **SAI LỆCH TÊN BẢNG — CỐ Ý, và đây là lý do**
+
+| Nguồn | Tên |
+|---|---|
+📄 **Tài liệu (mục 2/4/5 ở trên)** | **`DeadLetterEvents`** |
+🔧 **Đã xây (16/10/2026)** | **`MsgDeadLetters`** |
+
+🔒 **VÌ SAO ĐỔI — VÀ VÌ SAO TÔI GHI RA THAY VÌ LẶNG LẼ:**
+<list type="number">
+  <item>**Tiền tố bảng là quy ước ĐANG THỰC THI của dự án:** `Cat*` (Catalog) · `Sal*` (Sales) · `Inv*`
+    (Inventory) · `Ord*` (Orders) · `Chn*` (ChannelHub) · `Cus*` (Customers) · 🔑 **`Msg*` (Messaging)**.
+    📌 Bảng `IdempotencyRecords` của **chính module Messaging** đã đặt là **`MsgIdempotencyRecords`**
+    (§13 của tài liệu này / migration `20261013092108_Add_Messaging_Idempotency`) ⇒ **`DeadLetterEvents`
+    sẽ phá vỡ** quy ước đó **ngay trong cùng một module**;</item>
+  <item>⚠️ **RỦI RO THẬT NẾU ĐẶT SAI:** một bảng không tiền tố sẽ **không** xuất hiện khi ai đó duyệt DB
+    **theo nhóm** (*"bảng Messaging có gì"*) ⇒ và **không** được dọn bởi các script vận hành viết theo tiền tố.
+    📌 Đây là loại sai lệch **âm thầm**: DB vẫn chạy, chỉ con người bị nhầm;</item>
+  <item>🔑 **TÊN `DeadLetterEvents` còn gợi ý SAI về nội dung:** bảng này **không** chỉ chứa "sự kiện" của
+    event bus — nó chứa **mọi payload không xử lý được** từ **mọi** nguồn (đơn sàn, webhook, job nhập liệu).
+    📌 Chữ **`Msg`** (message) đúng nghĩa hơn **`Events`**.</item>
+</list>
+📌 **Việc cần làm:** sửa tài liệu (`XC-002`) cho khớp — **đã ghi ở đây**. ⚠️ Nếu nhóm muốn giữ
+`DeadLetterEvents` thì phải **đổi tên bảng** (migration) **và** đổi `MsgIdempotencyRecords` cho nhất quán —
+🔒 **không** để hai quy ước cùng tồn tại.
+
+### 16.2 ✅ **ĐÃ XONG**
+
+| # | Thành phần | Tệp / chi tiết |
+|---|---|---|
+| **1** | **Bảng `MsgDeadLetters`** | Migration `20261016145709_Xc002_DeadLetterQueue` · 🔒 **2 index**: `IX_MsgDeadLetters_TenantId_ChuaXuLy` (**có bộ lọc** `NOT "DaXuLy"`) + `IX_MsgDeadLetters_TenantId_Khoa` |
+| **2** | **`DeadLetterMessage`** (domain) | 🔒 **3 bất biến** (§18.3 của `sal-005`): payload **nguyên vẹn** · **khoá nghiệp vụ là cột riêng** · **mô tả chữ BẮT BUỘC** |
+| **3** | **`DeadLetterWriter`** | 🚨 **HAI chế độ UoW**: chung · **`requiresNew`** (khi việc xử lý **đã ném lỗi**) |
+| **4** | **`DeadLetterAppService` + 4 endpoint** | 🔑 **ĐƯỜNG ĐỌC** — `danh-sach` · `{id}/chi-tiet` · `{id}/danh-dau-da-xu-ly` · `thong-ke` |
+| **5** | **Quyền `eCommerce.Operations.DeadLetters`** | 🔒 **TÁCH khỏi `Inventory`** (đặc quyền tối thiểu: DLQ chứa payload sự kiện) |
+| **6** | **Nối luật watermark** | `XungDot` ⇒ **đẩy DLQ** · `DenMuon` ⇒ **không ghi đè + đẩy DLQ** (bằng chứng) |
+
+### 16.3 ✅ **KIỂM CHỨNG — 24/25 + 1 xác nhận riêng, TRÊN DB + HTTP THẬT**
+
+| Nhóm | Ca **ĐẠT** |
+|---|---|
+**Mặc định** | **C1** `DaXuLy` null ⇒ **chỉ 2 dòng chưa xử lý** · **C2** không chứa dòng đã xử lý · **C3 🚨 dòng CŨ NHẤT đứng TRƯỚC** (10 ngày trước 1 giờ) · **C4** `lyDo` là **chuỗi tên enum** · **C5** danh sách **KHÔNG** kèm payload |
+**Lọc** | **D1** `true` ⇒ 1 dòng · **D2** `false` ⇒ **cả 3** (🔑 **3 giá trị, không phải 2**) · **D3** theo `LyDo` · **D4 🚨 lý do SAI ⇒ NÉM** `Messaging:0006` + **D5** mang `hopLe` · **D6** tra theo **khoá nghiệp vụ** |
+**Chi tiết** | **E1** `200` + **payload GỐC nguyên vẹn** · **E2** có `payloadHash` · **E3 🚨 Id không tồn tại ⇒ `Messaging:0007`** (**không** trả `204`) |
+**Xử lý** | **F1** `200` · **F2 🚨 DB `DaXuLy = true`** · **F3 🚨 `NguoiXuLy = admin`** · **F4** danh sách còn 1 dòng · **F6** ném mà **không** để rác · **F7 🚨 gọi lại = NO-OP** (giữ lý do **đầu**) |
+**Thống kê** | **G1** `1` chưa + `2` đã · **G2 🚨 `cuNhatChuaXuLyUtc` có giá trị** · **G3** `theoLyDo` |
+**Lý do rỗng** | ✅ **Xác nhận riêng:** `400` + `"The LyDoXuLy field is required."` + 🚨 DB **KHÔNG** đổi |
+
+### 16.4 🚨 **HAI PHÁT HIỆN — và cả hai đều là NỢ THẬT**
+
+**🚨 (1) KHÔNG có bảng `AbpEventOutbox` / `AbpEventInbox` trong DB.**
+Kiểm `information_schema.tables`: **không** có bảng nào tên `Abp*Outbox*`/`Abp*Inbox*`.
+⇒ 📄 Tài liệu này nói *"outbox ghi **cùng transaction** với dữ liệu nghiệp vụ"* (§ mục 2) **CHƯA ĐÚNG** với
+cấu hình hiện tại. ⚠️ Hệ quả nếu outbox **không** bật: tiến trình chết **giữa** `SaveChanges` và publish
+⇒ **sự kiện mất** dù dữ liệu đã ghi ⇒ 🔑 **đúng loại hỏng mà `XC-002` sinh ra để chống**.
+🔒 **Cần xác nhận:** bật outbox **có chủ ý tắt** (ví dụ để đơn giản hoá) hay **thiếu cấu hình**?
+📌 Chưa kết luận — ghi nợ ở §16.5 #1.
+
+**🚨 (2) Quyền MỚI cần NẠP LẠI tiến trình mới có hiệu lực — quan sát được thật.**
+Dấu hiệu đã gặp: `[Authorize(eCommerce.Operations.Default)]` trả **`403`** dù
+<list type="bullet">
+  <item>`AbpPermissionGrants` **ĐÃ CÓ** dòng `eCommerce.Operations | R | admin`;</item>
+  <item>chẩn đoán ghi **`đã định nghĩa: ✅`** mà **`cấp: ❌ KHÔNG được cấp`**;</item>
+  <item>quyền **CŨ** (`Inventory`) cùng token cùng role ⇒ **`200`**;</item>
+  <item>và 🔑 **khởi động lại Host ⇒ `200`** (không đổi một dòng mã nào).</item>
+</list>
+🔑 **KẾT LUẬN ĐO ĐƯỢC:** ABP **cache** định nghĩa/grant quyền ⇒ một quyền **mới thêm** có thể cần
+**nạp lại tiến trình** mới hoạt động. 📌 **Vì sao phải ghi ra:** nếu không biết, người sau sẽ **đi tìm lỗi
+trong mã** (như tôi đã mất nhiều lượt) trong khi **mã đúng** — chỉ là **cache**.
+🔒 **Việc cần làm khi triển khai thật:** sau khi thêm quyền mới ⇒ **restart** (hoặc xoá cache quyền),
+**và** kiểm bằng một request thật **trước khi** coi là xong. ⚠️ Đây là **bước triển khai**, không phải lỗi mã.
+
+### 16.5 ⏳ NỢ
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+**1** | 🚨 **Xác nhận outbox/inbox có bật không** | §16.4 (1). 📌 Nếu **không**: mọi publish hiện **không** nằm trong transaction nghiệp vụ ⇒ **mất sự kiện** khi tiến trình chết |
+**2** | 🚨 **Chưa có job phát lại** (`XC-002` mục (a) phần *"job phát lại"*) | Nay có **đường đọc** + **đánh dấu**, nhưng **phát lại vẫn thủ công**. 🔒 Cố ý: phát lại tự động **có thể gây hỏng lần nữa** ⇒ phải **có người** + audit |
+**3** | 🚨 **Chưa có cảnh báo khi có bản ghi DLQ mới** (`XC-002` mục (a)) | `thong-ke` **đã có** `cuNhatChuaXuLyUtc` ⇒ 🔑 **đủ dữ kiện** để làm cảnh báo, nhưng **chưa ai gọi định kỳ** |
+**4** | **Chưa có UI** cho DLQ | Endpoint **đã có**; trang `/VanHanh/Dlq` **chưa** làm |
+**5** | **Chưa có job dọn DLQ theo thời hạn** | Bảng **chỉ tăng** |
+**6** | **Chưa có job đối soát `D12`** | Cờ `GapSuspected` của `SAL-005` **tồn đọng** — 📌 `DanhDauDaDoiSoat` **đã có** nhưng **chưa ai gọi** |
+
+### 16.6 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.1 | 16/10/2026 | *(agent, session GĐ1)* | **§16 — DLQ ĐÃ CÓ BẢNG + ĐƯỜNG ĐỌC**: bảng **`MsgDeadLetters`** (⚠️ **sai lệch tên so với tài liệu `DeadLetterEvents` — CỐ Ý**, theo tiền tố `Msg*` mà `MsgIdempotencyRecords` đã dùng; ghi rõ lý do ở §16.1) · migration `20261016145709_Xc002_DeadLetterQueue` (**2 index**, một index **có bộ lọc** `NOT "DaXuLy"`) · **4 endpoint** (`danh-sach` · `chi-tiet` · `danh-dau-da-xu-ly` · `thong-ke`) · quyền **`eCommerce.Operations.DeadLetters`** (**tách khỏi `Inventory`** — đặc quyền tối thiểu) · **24/25 ca HTTP + DB thật** + **1 xác nhận riêng** cho lý do rỗng. 🔑 **Ba quyết định:** **mặc định chỉ chưa xử lý** (*"còn việc gì"*) · **sắp xếp CŨ NHẤT TRƯỚC** (không dùng mặc định *mới nhất trước* — nó **che** đúng dòng cần gấp nhất) · **`DaXuLy` ba giá trị** (`null`/`true`/`false` — hai giá trị **không** diễn đạt được *"tất cả"*). 🚨 **HAI PHÁT HIỆN**: (1) **KHÔNG có bảng `AbpEventOutbox`/`AbpEventInbox`** ⇒ tài liệu nói *"outbox ghi cùng transaction"* **CHƯA ĐÚNG** với cấu hình ⇒ nợ #1; (2) 🔑 **quyền MỚI cần NẠP LẠI tiến trình** — `403` dù grant **có trong DB** và chẩn đoán ghi **`đã định nghĩa ✅`** nhưng **`cấp ❌`**; quyền **CŨ** cùng token ⇒ `200`; **khởi động lại ⇒ `200`** ⇒ **cache quyền**, **không phải lỗi mã** ⇒ ghi **bước triển khai**. 🐞 **Bộ đo sai lần thứ CHÍN (một phần):** ca `F5` "đỏ" vì tôi kỳ vọng `403` còn **validation của DTO** chặn trước bằng **`400`** — 🔑 **guard ĐÚNG** (đã xác nhận `"The LyDoXuLy field is required."` + DB **không** đổi), chỉ **kỳ vọng của probe quá hẹp** ⇒ **lặp lại bài học lần thứ 7**: một ca đỏ có thể đỏ vì **tầng khác** chặn trước |

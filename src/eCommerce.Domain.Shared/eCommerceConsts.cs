@@ -141,6 +141,22 @@ public static class eCommerceConsts
         /// 🔒 `Manage` còn là quyền **bắt buộc** cho `Chan`/`MoChan` (`ADR-04`: cần lý do + người chịu trách nhiệm).
         /// ⚠️ **THIẾU ĐỊNH NGHĨA ⇒ `403` CHO MỌI NGƯỜI** (kể cả `admin`) — đúng lỗi `F-403`/`XC-004` D2.
         /// </summary>
+        /// <summary>
+        /// 🔐 **QUYỀN VẬN HÀNH** (`XC-002`) — đọc và xử lý **hàng đợi thư chết**.
+        /// 📌 **VÌ SAO TÁCH KHỎI `Inventory`:** người trực vận hành sự kiện hỏng **không nhất thiết** có quyền
+        /// sửa tồn kho. 🔒 Nếu gộp, ta buộc phải **cấp quyền sửa kho** cho người chỉ cần **đọc DLQ** — mà DLQ
+        /// chứa **payload sự kiện** (dữ liệu đơn hàng, mã shop) ⇒ đó là **mở rộng quyền không cần thiết**
+        /// (nguyên tắc **đặc quyền tối thiểu**).
+        /// </summary>
+        public static class Operations
+        {
+            public const string Default = GroupName + ".Operations";
+
+            /// <summary>Đọc + đánh dấu đã xử lý một dòng DLQ. 📌 Tách riêng khỏi `Default` khi nào có nhu cầu
+            /// *"chỉ xem, không sửa"* — hiện **chưa** cần, nên **không** thêm (tránh quyền **chết**).</summary>
+            public const string DeadLetters = Default + ".DeadLetters";
+        }
+
         public static class Customers
         {
             /// <summary>Xem hồ sơ khách (đã có kiểm PII khi log — `ADR-11`).</summary>
@@ -221,6 +237,24 @@ public static class eCommerceConsts
     /// ⇒ để hằng số trong entity thì DTO buộc phải **chép lại số** ⇒ hai nguồn sự thật, lệch lúc nào không biết
     /// (build đã **bắt được thật**: `CS0103: The name 'InvChannelLimit' does not exist`).
     /// </summary>
+    /// <summary>
+    /// 🔒 **HẰNG SỐ ĐỘ DÀI CHO VẬN HÀNH** (`XC-002` DLQ) — ⚠️ **CỐ Ý Ở `Domain.Shared`, KHÔNG ở
+    /// `Application.Contracts`**: DTO ở Contracts **KHÔNG** đọc được hằng số của entity
+    /// (`Application.Contracts` không tham chiếu `Domain`) ⇒ 🔑 đặt ở đây để **một** nguồn sự thật dùng cho
+    /// **cả** ràng buộc DB (`HasMaxLength`) **và** validation của DTO.
+    /// 📌 Đây là **lần thứ ba** bài học này xuất hiện (`ProductMediaDtos` §20.3, `HienThiKenhDtos` §24.4)
+    /// ⇒ nên nó nằm ở đây **trước khi** ai đó vấp lại.
+    /// </summary>
+    public static class OperationsLimits
+    {
+        /// <summary>Độ dài tối đa lý do xử lý một dòng DLQ — khớp `DeadLetterMessage.DoDaiLyDoToiDa`.
+        /// 🔒 Lý do là **bằng chứng** (audit), nên phải đủ chỗ để nói **rõ** — không phải một từ.</summary>
+        public const int LyDoXuLyDlqToiDa = 2000;
+
+        /// <summary>Trần số dòng một trang khi đọc DLQ. 📌 Cùng con số với `TranDongMotTrang` của
+        /// `DoiSoatAppService` — **một** con số cho *"một trang"* trong toàn dự án thì dễ nhớ hơn.</summary>
+        public const int TranDongDlqMotTrang = 200;
+    }
     public static class InventoryLimits
     {
         /// <summary>Độ dài tối đa của mã kênh — khớp `HasMaxLength(32)` của `InvChannelLimits.ChannelCode`
