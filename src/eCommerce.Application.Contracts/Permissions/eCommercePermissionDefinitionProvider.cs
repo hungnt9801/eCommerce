@@ -36,6 +36,12 @@ public class eCommercePermissionDefinitionProvider : PermissionDefinitionProvide
         products.AddChild(eCommerceConsts.Permissions.Products.Delete);
         products.AddChild(eCommerceConsts.Permissions.Products.Publish);
 
+        // 🚨 `CAT-003` — quyền **TẢI TỆP LÊN**, tách khỏi `Edit` (xem chú thích ở `eCommerceConsts`):
+        // tải tệp là **ĐƯỜNG VÀO TỪ INTERNET** (phải kiểm **nội dung nhị phân** theo `ADR-13`, và là
+        // bề mặt tấn công: XSS lưu trữ / DoS dung lượng) — **khác hẳn** sửa mô tả sản phẩm.
+        // 🔒 BẮT BUỘC khai ở **CẢ HAI NƠI** (hằng số + provider): thiếu một nơi ⇒ `403` cho MỌI người kể cả admin.
+        products.AddChild(eCommerceConsts.Permissions.Products.ManageMedia);
+
         // ---- Cây danh mục + thuộc tính (`CAT-002` §9.2) ----
         // 🚨 BẮT BUỘC thêm ở **CẢ HAI NƠI** (hằng số + provider) — thiếu một nơi ⇒ 403 cho MỌI người kể cả admin.
         var categories = group.AddPermission(eCommerceConsts.Permissions.Categories.Default);

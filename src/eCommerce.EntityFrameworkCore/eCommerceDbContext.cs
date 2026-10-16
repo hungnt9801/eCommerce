@@ -35,6 +35,12 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
     // ---- Catalog ----
     public DbSet<Catalog.Product> Products { get; set; } = default!;
     public DbSet<Catalog.ProductVariant> ProductVariants { get; set; } = default!;
+    /// <summary>
+    /// ẢNH SẢN PHẨM (`CAT-003`). 🚨 **BẮT BUỘC có `DbSet`** — thiếu ⇒ `IRepository&lt;ProductMedia, Guid&gt;`
+    /// **không được đăng ký** (quy ước #3, lỗi Phase 0) ⇒ app service **không resolve được** ⇒ `HTTP 500`
+    /// dù build/migration **đều xanh**. Lưới an toàn CI: `DbSetRegistrationTests`.
+    /// </summary>
+    public DbSet<Catalog.ProductMedia> ProductMedia { get; set; } = default!;
 
     /// <summary>
     /// 🚨 **`DbSet` NÀY LÀ BẮT BUỘC, KHÔNG PHẢI "CHO ĐẸP"** (`CAT-002`, phát hiện 15/10/2026):
@@ -242,6 +248,51 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
             // (`IsDeleted`, `CAT-001` D4) + unpublish ở tầng app service.
             b.HasMany(x => x.Variants)
                 .WithOne()
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // 🚨 `CAT-003` — **ẢNH SẢN PHẨM**. Xem `ADR-02` (metadata ở DB, **bytes ở object storage**),
+        // `ADR-12` (tối đa MỘT ảnh chính/sản phẩm), `ADR-13` (định dạng do MÁY CHỦ kiểm bằng magic bytes).
+        builder.Entity<Catalog.ProductMedia>(b =>
+        {
+            b.ToTable("CatProductMedia");
+            b.ConfigureByConvention();
+
+            b.Property(x => x.KhoaLuuTru).IsRequired().HasMaxLength(Catalog.ProductMedia.DoDaiKhoaLuuTruToiDa);
+            b.Property(x => x.Alt).HasMaxLength(Catalog.ProductMedia.DoDaiAltToiDa);
+
+            // 🔒 `DinhDangDaKiem` lưu **SỐ** (enum) ⇒ chỉ có MỘT nguồn quyết định `Content-Type` khi phục vụ tệp.
+            // 📌 Nếu lưu chuỗi MIME thô thì thêm/đổi định dạng là sửa **dữ liệu**, không phải sửa **mã** —
+            // và dữ liệu cũ sẽ có giá trị không ai còn kiểm được.
+            b.Property(x => x.DinhDangDaKiem).HasConversion<int>();
+
+            // Truy vấn nóng: "ảnh của sản phẩm này, theo thứ tự hiển thị".
+            b.HasIndex(x => new { x.TenantId, x.ProductId, x.ThuTu })
+                .HasDatabaseName("IX_CatProductMedia_TenantId_ProductId_ThuTu");
+
+            // 🚨🚨 **HÀNG RÀO CUỐI CHO `ADR-12`: TỐI ĐA MỘT ẢNH CHÍNH MỖI SẢN PHẨM.**
+            //
+            // **VÌ SAO PHẢI Ở DB (không chỉ ở app service):** đặt ảnh chính là thao tác *"đọc ảnh chính hiện
+            // tại → bỏ đánh dấu → đánh dấu ảnh mới"*. Hai request **đồng thời** (double-click, hai tab, hai
+            // nhân viên) **cùng** đọc thấy *"chưa có ảnh chính"* ⇒ **cả hai** đánh dấu ⇒ **HAI ảnh chính**
+            // ⇒ mọi chỗ đọc *"ảnh chính là ảnh nào"* trả **kết quả khác nhau tuỳ truy vấn** (thẻ chia sẻ dùng
+            // một ảnh, danh sách dùng ảnh khác) — **không lỗi nào nổi lên**.
+            // 📌 Đây đúng bài học `XC-003` D2: **"bỏ app đi, DB có chặn không?"**
+            // ⚠️ Cần **SQL thô** trong migration: EF **không** sinh được unique index **có bộ lọc** này
+            // (và càng không sinh được `NULLS NOT DISTINCT` — dù index này **không** cần vì `TenantId` có
+            // `NULLS NOT DISTINCT` **không** áp dụng cho bộ lọc một phần tử… xem chú thích ở migration).
+            b.HasIndex(x => new { x.TenantId, x.ProductId })
+                .IsUnique()
+                .HasFilter("\"LaAnhChinh\"")
+                .HasDatabaseName("IX_CatProductMedia_MotAnhChinh");
+
+            // 📌 FK `Restrict` (không `Cascade`): xoá cứng một sản phẩm **KHÔNG** được kéo mất ảnh một cách
+            // âm thầm — ảnh là **tài sản** (đã tốn dung lượng lưu trữ và công nhập liệu).
+            // ⚠️ Nhưng ảnh **cũng** phải dọn theo sản phẩm ⇒ việc đó thuộc **app service** (xoá mềm sản phẩm
+            // + gọi `IMediaStorage.XoaAsync`), xem `CAT-003` §16.8.
+            b.HasOne<Catalog.Product>()
+                .WithMany()
                 .HasForeignKey(x => x.ProductId)
                 .OnDelete(DeleteBehavior.Restrict);
         });

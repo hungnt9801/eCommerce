@@ -2136,3 +2136,40 @@ VALUES ('20261016104803_Rec001_XuLyLech', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE TABLE "CatProductMedia" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "ProductId" uuid NOT NULL,
+    "KhoaLuuTru" character varying(512) NOT NULL,
+    "DinhDangDaKiem" integer NOT NULL,
+    "KichThuocByte" bigint NOT NULL,
+    "Alt" character varying(512),
+    "ThuTu" integer NOT NULL,
+    "LaAnhChinh" boolean NOT NULL,
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_CatProductMedia" PRIMARY KEY ("Id"),
+    CONSTRAINT "FK_CatProductMedia_CatProducts_ProductId" FOREIGN KEY ("ProductId") REFERENCES "CatProducts" ("Id") ON DELETE RESTRICT
+);
+
+DROP INDEX IF EXISTS "IX_CatProductMedia_MotAnhChinh";
+
+CREATE UNIQUE INDEX "IX_CatProductMedia_MotAnhChinh" ON "CatProductMedia" ("TenantId", "ProductId") NULLS NOT DISTINCT WHERE "LaAnhChinh";
+
+CREATE INDEX "IX_CatProductMedia_ProductId" ON "CatProductMedia" ("ProductId");
+
+CREATE INDEX "IX_CatProductMedia_TenantId_ProductId_ThuTu" ON "CatProductMedia" ("TenantId", "ProductId", "ThuTu");
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261016112214_Cat003_ProductMedia', '10.0.11');
+
+COMMIT;
+

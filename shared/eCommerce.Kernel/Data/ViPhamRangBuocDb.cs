@@ -117,6 +117,17 @@ public static class ViPhamRangBuocDb
         ["IX_CusCustomers_TenantId_IdentityUserId"] =
             new("eCommerce:Customers:0004",
                 "Tài khoản này ĐÃ gắn với một hồ sơ khách khác ⇒ một tài khoản chỉ được một hồ sơ (ADR-07).", true),
+        // ── MEDIA SẢN PHẨM (`CAT-003` ADR-12, 16/10/2026) ─────────────────────────────────────────
+        // 📌 Ràng buộc này CHẶN MỘT HÀNH VI HỢP LỆ VỀ NGHIỆP VỤ: đặt ảnh chính là thao tác
+        // *"đọc ảnh chính hiện tại → bỏ đánh dấu → đánh dấu ảnh mới"*; hai request ĐỒNG THỜI
+        // (double-click, hai tab, hai nhân viên) **cùng** thấy *"chưa có ảnh chính"* ⇒ **cả hai** đánh dấu.
+        // 🔑 Mã riêng `eCommerce:Catalog:0030` (KHÔNG mượn `0011` = *"thiếu thông tin bắt buộc"*):
+        // ca này cần chỉ dẫn *"bỏ đánh dấu ảnh chính hiện tại trước"* — khác hẳn *"điền thêm trường"*.
+        // ⚠️ Ca NẶNG của lỗi C4/F1: `TenantId` có thể `NULL` ⇒ thiếu `NULLS NOT DISTINCT` là index
+        // **mất tác dụng im lặng** (xem chú thích migration `Cat003_ProductMedia`).
+        ["IX_CatProductMedia_MotAnhChinh"] =
+            new("eCommerce:Catalog:0030",
+                "Sản phẩm này ĐÃ có ảnh chính ⇒ bỏ đánh dấu ảnh chính hiện tại TRƯỚC khi đặt ảnh mới.", true),
         ["IX_CusGroups_TenantId_Code"] =
             new("eCommerce:Customers:0008",
                 "Mã nhóm khách này ĐÃ tồn tại trong tenant ⇒ chọn mã khác (KHÔNG tạo hai nhóm cùng mã).", true),

@@ -1012,3 +1012,130 @@ nếu chỉ tin `HTTP 200` thì đã ghi sổ *"đã kiểm chứng đường t�
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.2 | 16/10/2026 | *(agent, session GĐ1)* | **§16 — LÁT CẮT 1: SLUG SEO**: unique index `IX_CatProducts_TenantId_Slug` (`NULLS NOT DISTINCT` + filter, **SQL thô**) · `SinhSlug` (bỏ dấu **kể cả `đ`/`Đ`** — §16.2) · `Product.DatSlug` trả **slug cũ** · `ProductSlugChangedEto` (**Q3 của `WEB-002` = CÓ `OldSlug`**) · `DatSlugAsync` + `GetBySlugAsync`/`GetByVariantSkuAsync` · `/sitemap.xml` + `/robots.txt` (**công khai**, kèm **cơ chế allowlist** `AllowlistCongKhaiTests`) · `SanPham/ChiTiet/{slugOrSku}` (`canonical` = slug, **giữ** URL SKU cũ) · mã lỗi `0026`/`0027`. **+38 unit test** (834 tổng). Ghi **§16.3** (layering ⇒ ETO phát ở app service) · **§16.4** (không nhét callback async vào hàm thuần) · **§16.6** (hai bẫy của bộ đo) · **§16.8** (nợ: **media** + **hiển thị theo kênh** = hai phần còn lại của `CAT-003`) |
+
+---
+
+## 17. ✅ **LÁT CẮT 2 — MEDIA SẢN PHẨM: MAGIC BYTES + ENTITY + DB CONSTRAINT** (16/10/2026)
+
+> ⚠️ **PHẠM VI NÓI RÕ:** lát cắt này làm **lõi bảo mật** (`ADR-13`), **entity + bất biến domain** (`ADR-12`),
+> **hợp đồng lưu trữ** (`ADR-02`), và **ràng buộc DB** đã **kiểm chứng thật**. 🚫 **CHƯA** làm:
+> **lớp hiện thực `IMediaStorage`** (đĩa cục bộ/S3) · **app service tải lên** (endpoint) · **UI quản lý ảnh** ·
+> **hiển thị theo kênh** (`ProductChannelVisibility` — vẫn **0 dòng code**). Nợ ghi ở **§17.8**.
+
+### 17.1 Vì sao **không tin `Content-Type`/đuôi tệp** là **lỗ hổng bảo mật**, không phải "chuyện đẹp"
+
+`Content-Type` và đuôi tệp là **do client khai** — kẻ tấn công chỉ cần đổi một chuỗi là qua mọi phép kiểm
+dựa trên chúng. Hệ quả **cụ thể, không trừu tượng**:
+
+| # | Kịch bản | Hậu quả |
+|---|---|---|
+| **1** | Tải lên **HTML/script độc hại** kèm `Content-Type: image/png`, tên `a.png` | Hệ thống lưu vào kho tệp với tên `…png`. Nếu kho **phục vụ như tài liệu tĩnh** (S3 + CloudFront, `nginx` + thư mục upload — **rất hay gặp**), trình duyệt **thực thi/hiển thị** nó ⇒ **XSS lưu trữ** |
+| **2** | Tải lên **PHP/JSP** | Nếu máy chủ web **có** trình thông dịch trong thư mục đó ⇒ **thực thi từ xa** |
+| **3** | Tải lên tệp **không phải ảnh** (PDF, ZIP) | Mọi bước sau (cắt/nén/đổi kích cỡ) **hỏng**, và lỗi nổi lên ở **nơi không liên quan** |
+
+📌 **Chữ ký nhị phân (magic bytes)** là thứ duy nhất **kẻ tấn công không đổi được** nếu vẫn muốn nó là ảnh.
+
+### 17.2 Đã làm gì
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| **1** | **`NhanDangAnh`** (**MỚI**, `Domain/Entities/Catalog/`) | **LÕI THUẦN**: nhận dạng `Jpeg`/`Png`/`Gif`/`WebP` từ **≤ 12 byte đầu** · `Mime(...)` · `DuoiTep(...)`. **Không** ném khi tệp lạ ⇒ chỗ gọi tự chọn mã lỗi |
+| **2** | **`ProductMedia`** (**MỚI**) | Entity `CatProductMedia`: `KhoaLuuTru` (**con trỏ**, không phải bytes) · `DinhDangDaKiem` (enum) · `KichThuocByte` · `Alt` · `ThuTu` · `LaAnhChinh` (**`protected set`**) |
+| **3** | **`IMediaStorage`** (**MỚI**) | Hợp đồng `LuuAsync`/`DocAsync`/`XoaAsync` (`ADR-02`) — **bytes không vào DB** |
+| **4** | **4 mã lỗi mới** `Catalog:0028…0031` | *tệp không phải ảnh* · *ảnh quá kích thước* · *đã có ảnh chính* · *không tìm thấy ảnh* |
+| **5** | **Quyền `Products.ManageMedia`** | Tách khỏi `Edit` — tải tệp là **đường vào từ Internet** |
+| **6** | **Migration `20261016112214_Cat003_ProductMedia`** | Bảng + **unique index CÓ BỘ LỌC `NULLS NOT DISTINCT`** (SQL thô) + FK `Restrict` |
+| **7** | **`NhanDangAnhTests` (24 ca) + `ProductMediaTests` (17 ca)** | Xem §17.5 |
+
+### 17.3 🚨 Ba bất biến — mỗi cái chặn một kiểu hỏng **im lặng**
+
+| # | Bất biến | Vì sao **phải** ở đúng tầng đó |
+|---|---|---|
+| **1** | 🚨 **KHÔNG lưu bytes trong DB** (`ADR-02`) | ⚠️ Thêm `byte[] NoiDung` vào entity là việc **rất dễ** khi ai đó muốn "cho nhanh" — và **không có lỗi biên dịch nào**. Hệ quả: bảng **phình** (mỗi ảnh vài trăm KB × N ảnh × N sản phẩm), `pg_dump`/backup **chậm và đắt**, và vì PostgreSQL đọc theo **trang 8 KB**, đọc **1 dòng metadata** cũng kéo theo trang chứa blob. 🔒 **Khoá bằng test reflection** (`ProductMediaTests.ADR02__…`) |
+| **2** | 🚨 **Tối đa MỘT ảnh chính mỗi sản phẩm** (`ADR-12`) | Đặt ảnh chính là thao tác *"đọc ảnh chính hiện tại → bỏ đánh dấu → đánh dấu ảnh mới"*. Hai request **đồng thời** **cùng** thấy *"chưa có ảnh chính"* ⇒ **cả hai** đánh dấu. 🔒 **Phải** là unique index **ở DB** (tầng ứng dụng **không thể** chặn) — đúng bài học `XC-003` D2: *"bỏ app đi, DB có chặn không?"* |
+| **3** | 🚨 **Ảnh chính PHẢI có `Alt`** | Ảnh chính hiện ở **danh sách sản phẩm**, **thẻ chia sẻ mạng xã hội**, **kết quả tìm kiếm ảnh**. Thiếu `Alt` ⇒ mất kênh SEO **và** trình đọc màn hình đọc URL tệp ⇒ **nghĩa vụ trợ năng**. 🔒 Luật đặt ở **đường DUY NHẤT** đổi cờ (`LaAnhChinh` là `protected set`) — app service có **nhiều** đường và đường nào quên là **im lặng** sai |
+
+### 17.4 ✅ **Kiểm chứng DB THẬT — `NULLS NOT DISTINCT` hoạt động**
+
+Bốn phép đo trên **PostgreSQL 17 thật** (không phải suy luận):
+
+| # | Thao tác | Kết quả **đo được** |
+|---|---|---|
+| T1 | Tạo sản phẩm thử | `1` ✅ |
+| T2 | Thêm **ảnh chính thứ nhất** | `INSERT 0 1` · số ảnh chính = **1** ✅ |
+| **T3** | Thêm **ảnh chính thứ hai** | 🚨 **`ERROR: duplicate key value violates unique constraint "IX_CatProductMedia_MotAnhChinh"`**<br>**`DETAIL: Key ("TenantId", "ProductId")=(null, e0000000…) already exists`** ✅ |
+| T4 | Thêm **ảnh PHỤ** (không chính) | `INSERT 0 1` ⇒ tổng **2** ảnh, **1** ảnh chính ✅ |
+
+📌 **Chi tiết quan trọng nhất nằm ở T3:** `"TenantId" = null` **khớp** với `null` khác — đúng hành vi của
+**`NULLS NOT DISTINCT`**. Nếu **quên** mệnh đề đó (EF Core 10 **không** sinh được nó), PostgreSQL coi hai
+`null` là **khác nhau** ⇒ dòng thứ hai **lọt** ⇒ **sản phẩm có hai ảnh chính** và **không lỗi nào**.
+🔒 T4 chứng minh ràng buộc **không** chặn nhầm: nhiều **ảnh phụ** vẫn được — bộ lọc `WHERE "LaAnhChinh"`
+làm đúng việc của nó.
+
+**Số index `NULLS NOT DISTINCT` toàn DB: 46 → 47** (đã cập nhật `PostgreSqlSchemaTests.F1_du_47_…`
+**và** danh sách **đích danh**).
+
+### 17.5 ✅ Unit test — **+41 ca** (1016 tổng)
+
+**`NhanDangAnhTests` (24 ca):**
+
+| Nhóm | Nội dung |
+|---|---|
+| Nhận đúng | 4 định dạng (5 ca, gồm cả `GIF87a` **và** `GIF89a`) |
+| 🚨 **Từ chối** | **HTML đội lốt `.png`** · PHP · PDF · ZIP · JSON · **PE (tệp thực thi Windows)** |
+| Chữ ký **sai vị trí** | PNG ở offset 1 ⇒ **từ chối** · thiếu byte thứ ba của JPEG ⇒ **từ chối** |
+| 🚨 **WebP phải kiểm HAI chữ ký** | `RIFF` đơn thuần (**WAV/AVI**) ⇒ **từ chối** · `WEBP` **sai vị trí** (offset 4) ⇒ **từ chối** · đúng cả hai vị trí ⇒ nhận |
+| **Không đọc quá mảng** | mọi độ dài `0…11` ⇒ **không ném** (chỉ `null`/`Jpeg`) |
+| MIME/đuôi tệp | gắn chặt với định dạng **đã nhận dạng** · định dạng lạ ⇒ **NÉM** (không trả mặc định) |
+| Bất biến `SoByteCanDoc` | đủ cho **mọi** định dạng trong danh sách (thêm định dạng dài hơn mà quên nâng ⇒ test đỏ) |
+
+**`ProductMediaTests` (17 ca):**
+
+| Nhóm | Nội dung |
+|---|---|
+| 🚨 **`ADR-02`** | **reflection**: entity **KHÔNG** có thuộc tính kiểu bytes · **đối chứng**: **CÓ** `KhoaLuuTru` |
+| 🚨 **`Alt` cho ảnh chính** | thiếu ⇒ **NÉM** + cờ **nguyên vẹn** · `Alt` toàn khoảng trắng ⇒ **NÉM** · có `Alt` ⇒ được · **bỏ** đánh dấu ⇒ **không** cần `Alt` (nếu đòi thì **bế tắc**) |
+| 🚨 **Chỉ một đường đổi cờ** | `LaAnhChinh` **KHÔNG** có setter công khai (reflection) |
+| Dữ liệu vào | thiếu `ProductId` · khoá rỗng · **kích thước ≤ 0 ⇒ mã `TepKhongPhaiAnh`** (tệp rỗng **không thể** có magic bytes) |
+| `Alt` | chuẩn hoá khoảng trắng · rỗng ⇒ `null` · quá dài ⇒ **NÉM** |
+| Mặc định | ảnh mới **KHÔNG** phải ảnh chính |
+
+### 17.6 🚨 Giới hạn **ĐÃ BIẾT** của phép kiểm magic bytes (đừng đọc thành "đã an toàn")
+
+Chữ ký chỉ chứng minh **phần đầu tệp** đúng định dạng. Một tệp **polyglot** (đầu là GIF hợp lệ, phần sau là
+HTML/script) **vẫn qua** được phép kiểm này.
+🔒 **Phòng thủ nhiều lớp — bắt buộc, không thay thế được:**
+1. Kho tệp **phải** phục vụ với `Content-Type` do **MÁY CHỦ** đặt (từ `DinhDangDaKiem` qua `NhanDangAnh.Mime`),
+   **kèm** `X-Content-Type-Options: nosniff`;
+2. **Không** phục vụ tệp tải lên từ **cùng tên miền** với ứng dụng (dùng miền/kho riêng) ⇒ dù có thực thi
+   được cũng **không** đọc được cookie/phiên của miền chính.
+
+📌 Ghi ở đây để người sau **không** đọc *"đã kiểm magic bytes"* thành *"đã an toàn"*.
+
+### 17.7 🐞 Bẫy của chính migration (ghi lại)
+
+Lần chạy migrator **đầu** thất bại: `DROP INDEX "IX_CatProductMedia_MotAnhChinh"` ⇒
+**`42704: index … does not exist`**.
+🔑 **Nguyên nhân:** tôi viết `DROP` **không** có `IF EXISTS`, nhưng EF sinh `CreateIndex` và `Sql(DROP)`
+trong **cùng một migration** — thứ tự thực thi khiến `DROP` chạy **trước khi** index được tạo (hoặc EF
+**gộp** lời gọi). 📌 Sửa: **`DROP INDEX IF EXISTS`**.
+⚠️ Và migration **rollback sạch** (bảng `CatProductMedia` **không** tồn tại sau lỗi) ⇒ **không** để lại
+trạng thái nửa vời. 🔒 Đó là lý do **mọi** migration của dự án phải chạy được **lại từ đầu**.
+
+### 17.8 ⏳ NỢ (KHÔNG phải tính năng đã có)
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+| **1** | 🚨 **CHƯA có lớp hiện thực `IMediaStorage`** | Mới có **hợp đồng**. Cần bản **đĩa cục bộ** (dev) và/hoặc **S3** (thật). ⚠️ Chưa có ⇒ **chưa tải được ảnh nào** |
+| **2** | 🚨 **CHƯA có app service tải lên + endpoint** | ⇒ `ProductMedia` **chưa có đường ghi** nào ngoài SQL tay. 📌 Cùng họ `SAL-006` §17: *"đã cài nhưng không có đường gọi tới"* |
+| **3** | **CHƯA có UI quản lý ảnh** | Chưa có trang, chưa có menu |
+| **4** | **`AnhQuaKichThuoc` (`0029`) chưa được dùng ở đâu** | Trần dung lượng phải cưỡng chế ở **đường tải lên** (chưa làm) — hiện mới có mã lỗi |
+| **5** | **Chưa dọn tệp khi xoá sản phẩm/ảnh** | FK `Restrict` chặn xoá cứng, nhưng **tệp mồ côi** trong kho lưu trữ **chưa** có job dọn ⇒ **tốn dung lượng** |
+| **6** | **Chưa kiểm kích thước ảnh thật (px)** | Entity lưu **byte**, không lưu **chiều rộng/cao** ⇒ chưa kiểm được *"ảnh quá nhỏ/quá lớn"* theo pixel |
+| **7** | 🚨 **HIỂN THỊ THEO KÊNH vẫn 0 dòng code** (`ProductChannelVisibility`) | Phần **thứ ba** của `CAT-003` — xem §16.8 nợ 2 |
+
+### 17.9 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.3 | 16/10/2026 | *(agent, session GĐ1)* | **§17 — LÁT CẮT 2: MEDIA SẢN PHẨM (lõi bảo mật + domain + DB)**: `NhanDangAnh` (**magic bytes**, `ADR-13` — **lõi THUẦN**, 4 định dạng, WebP kiểm **hai** chữ ký, **không đọc quá mảng**) · `ProductMedia` (**`ADR-02`** không bytes trong DB · **`ADR-12`** tối đa một ảnh chính · `Alt` **bắt buộc** cho ảnh chính) · `IMediaStorage` (**hợp đồng**, bytes ở object storage) · mã `Catalog:0028…0031` · quyền `Products.ManageMedia` · migration `20261016112214_Cat003_ProductMedia` với **unique index có bộ lọc + `NULLS NOT DISTINCT`** (SQL thô, `DROP INDEX IF EXISTS`) · **+41 unit test** (1016 tổng) · **NND 46 → 47**. ✅ **Kiểm chứng DB THẬT (4 phép đo)**: ảnh chính thứ hai bị **`duplicate key … IX_CatProductMedia_MotAnhChinh`** chặn, với `Key ("TenantId","ProductId")=(null, …)` ⇒ **`NULLS NOT DISTINCT` hoạt động**. Ghi **§17.6** (giới hạn **polyglot** + phòng thủ nhiều lớp) · **§17.7** (bẫy `DROP INDEX` không `IF EXISTS`) · **§17.8** (nợ: **chưa có lớp hiện thực `IMediaStorage`**, **chưa có app service/endpoint**, chưa có UI, `0029` chưa dùng, chưa dọn tệp mồ côi, chưa kiểm px, **hiển thị theo kênh vẫn 0 dòng code**) |

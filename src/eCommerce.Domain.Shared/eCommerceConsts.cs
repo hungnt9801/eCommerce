@@ -30,6 +30,16 @@ public static class eCommerceConsts
             /// khác sửa mô tả nội bộ ⇒ quyền phải tách để giao cho vai trò khác nhau.
             /// </summary>
             public const string Publish = Default + ".Publish";
+
+            /// <summary>
+            /// 🚨 **Tải lên / sửa / xoá ảnh sản phẩm** (`CAT-003` — `Products.ManageMedia` theo §6 Hợp đồng API).
+            /// 📌 **VÌ SAO TÁCH KHỎI `Edit`:** tải tệp lên là **đường vào từ Internet** — cần kiểm **nội dung nhị
+            /// phân** (`ADR-13`), và là bề mặt tấn công (`XSS` lưu trữ, `DoS` dung lượng). Người *"sửa mô tả sản phẩm"*
+            /// **không** đương nhiên được **đẩy tệp lên máy chủ**: hai việc có **rủi ro hoàn toàn khác nhau**.
+            /// 🔒 Gộp quyền ⇒ mọi nhân viên sửa sản phẩm đều tải được tệp lên.
+            /// ⚠️ Không khai ở `eCommercePermissionDefinitionProvider` ⇒ `403` cho **mọi** người (kể cả admin).
+            /// </summary>
+            public const string ManageMedia = Default + ".ManageMedia";
         }
 
         /// <summary>
@@ -339,6 +349,25 @@ public static class eCommerceConsts
             /// **tự nhập slug**, hoặc sản phẩm **chưa có URL công khai**. Trả mã riêng để client biết cần nhập tay.
             /// </summary>
             public const string KhongSinhDuocSlug = "eCommerce:Catalog:0027";
+
+            // ── Media (`CAT-003`) — dải 0028–0031 ──
+
+            /// <summary>🚨 **TỆP TẢI LÊN KHÔNG PHẢI ẢNH** (magic bytes không khớp) — `ADR-13`.
+            /// 📌 **VÌ SAO MÃ RIÊNG (không dùng mã chung "dữ liệu vào không hợp lệ"):** chỉ dẫn cho người
+            /// dùng **rất cụ thể** — *"tệp này không phải ảnh, hãy chọn tệp khác"* — và cho **nhật ký bảo mật**
+            /// biết đây **có thể là ý đồ tấn công** (đổi đuôi/tên tệp), **khác hẳn** *"thiếu trường bắt buộc"*.
+            /// 🔒 Trả mã riêng còn giúp **phân biệt** khi điều tra: một chuỗi `0028` tăng vọt là **dấu hiệu**.</summary>
+            public const string TepKhongPhaiAnh = "eCommerce:Catalog:0028";
+
+            /// <summary>**ẢNH VƯỢT KÍCH THƯỚC TỐI ĐA** cho phép.</summary>
+            public const string AnhQuaKichThuoc = "eCommerce:Catalog:0029";
+
+            /// <summary>**SẢN PHẨM ĐÃ CÓ ẢNH CHÍNH** (`ADR-12`: tối đa MỘT `IsPrimary` cho mỗi sản phẩm).
+            /// 📌 Hướng dẫn: *"bỏ đánh dấu ảnh chính hiện tại trước"* — khác hẳn *"tệp không hợp lệ"*.</summary>
+            public const string DaCoAnhChinh = "eCommerce:Catalog:0030";
+
+            /// <summary>**KHÔNG TÌM THẤY** ảnh theo Id (hoặc ảnh thuộc sản phẩm khác).</summary>
+            public const string KhongTimThayAnh = "eCommerce:Catalog:0031";
         }
     }
 
