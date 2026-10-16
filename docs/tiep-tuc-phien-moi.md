@@ -145,6 +145,34 @@ Tệp lớn nhất về mặt tiến độ GĐ1: `web-001-…` (270 KB — chứ
 
 ---
 
+## 🚨 **MÃ LỖI PHẢI THEO TÀI LIỆU, KHÔNG TỰ CHỌN** (sự cố thật 16/10/2026, `cat-003` §19)
+
+Ở `CAT-003` §16 tôi **tự chọn** dải `0026`–`0031` cho mã lỗi slug + media **trong khi §6.3 của CÙNG tài
+liệu đó đã quy định dải riêng `0201`–`0212`** ⇒ **một mã hai nghĩa**.
+
+🔒 **QUY TẮC (đã có tiền lệ chốt trong `CatalogErrorCodeRegistryTests`):** *số mã lỗi theo **TÀI LIỆU**;
+**KHÔNG** sửa tài liệu cho khớp mã.* Trước khi thêm mã lỗi, **đọc mục "Mã lỗi nghiệp vụ" của chính
+feature doc đó**.
+
+📌 **Ba lỗi trong một lượt, và CẢ BA đều qua được build + 1081 test xanh:**
+1. Tự chọn dải số sai (số nào cũng đúng định dạng `\d{4}` ⇒ không lưới nào bắt);
+2. `DaCoAnhChinh = TepKhongPhaiAnh` — **alias** ⇒ hai nghĩa khác hẳn dùng một mã; và **alias là hai tên
+   MỘT giá trị** nên `KHONG_co_hai_hang_so_nao_TRUNG_GIA_TRI` **cho qua**;
+3. 🚨 `ViPhamRangBuocDb` ghi **CHUỖI CỨNG** ⇒ đổi hằng số thì chuỗi **ở lại giá trị cũ**; build + test
+   **vẫn xanh** vì không gì buộc chuỗi khớp hằng số.
+
+🔒 **Ba lớp chặn đã thêm:** (a) **sổ đăng ký** khoá số theo tài liệu; (b) dùng **hằng số** thay chuỗi
+cứng trong `ViPhamRangBuocDb` (`Kernel` nay tham chiếu `Domain.Shared`, **không** vòng lặp); (c) **test alias**.
+
+📌 **Bài học lớn nhất:** đây là lần thứ **TƯ** liên tiếp *"test xanh"* **không** đồng nghĩa *"đúng"*.
+Cách phát hiện **luôn** là **đọc lại giá trị THẬT** và đối chiếu tài liệu — **không** dựa vào test.
+
+### 🚨 **Kiểm ASCII TRƯỚC khi commit — và kiểm LẠI sau khi amend**
+Bản nháp đầu bị hook chặn vì tôi viết ký tự **`§`** (ký hiệu đoạn mục kiểu tài liệu) — **2 byte × 12 = 24**.
+🔒 **Quy tắc:** viết `muc 6.3`, **KHÔNG** viết `§6.3`; và **đếm byte > 127 TRƯỚC** khi gọi `git commit`.
+⚠️ **Bẫy thêm:** lệnh `--amend` của tôi **dùng lại message CŨ** (không truyền `-F` đúng cách) ⇒ subject
+**vẫn** còn ký tự lạ. ⇒ **Luôn kiểm `git log -1 --format=%s` SAU khi commit/amend**, không chỉ tin exit code.
+
 ## ⚠️ BÀI HỌC QUY TRÌNH (16/10/2026) — **KIỂM LẠI LỊCH SỬ TRƯỚC KHI "SỬA" TÀI LIỆU**
 
 Trong phiên này tôi **suýt báo động sai**: thấy `docs/implementation-plan.md` có dòng
