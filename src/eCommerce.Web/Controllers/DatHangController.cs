@@ -81,6 +81,9 @@ public class DatHangController : Controller
         var phan = new List<string> { $"{form.Sku}:{form.SoLuong}" };
         if (!string.IsNullOrWhiteSpace(form.Sku2)) { phan.Add($"{form.Sku2}:{form.SoLuong2}"); }
         if (!string.IsNullOrWhiteSpace(form.Sku3)) { phan.Add($"{form.Sku3}:{form.SoLuong3}"); }
+        // 🚨 §88: dòng 4/5 cũng được lưu ⇒ giỏ 5 dòng vẫn sống qua phiên.
+        if (!string.IsNullOrWhiteSpace(form.Sku4)) { phan.Add($"{form.Sku4}:{form.SoLuong4}"); }
+        if (!string.IsNullOrWhiteSpace(form.Sku5)) { phan.Add($"{form.Sku5}:{form.SoLuong5}"); }
 
         traLoi.Cookies.Append("gio-web", string.Join(',', phan), new CookieOptions
         {
@@ -110,6 +113,8 @@ public class DatHangController : Controller
             if (dem == 0) { trang.Sku = sku; trang.SoLuong = soLuong; }
             else if (dem == 1) { trang.Sku2 = sku; trang.SoLuong2 = soLuong; }
             else if (dem == 2) { trang.Sku3 = sku; trang.SoLuong3 = soLuong; }
+            else if (dem == 3) { trang.Sku4 = sku; trang.SoLuong4 = soLuong; }
+            else if (dem == 4) { trang.Sku5 = sku; trang.SoLuong5 = soLuong; }
             dem++;
         }
     }
@@ -185,6 +190,9 @@ public class DatHangController : Controller
         var phanBoSung = new System.Text.StringBuilder();
         if (!string.IsNullOrWhiteSpace(form.Sku2)) { phanBoSung.Append(',').Append(form.Sku2.Trim()).Append(':').Append(form.SoLuong2); }
         if (!string.IsNullOrWhiteSpace(form.Sku3)) { phanBoSung.Append(',').Append(form.Sku3.Trim()).Append(':').Append(form.SoLuong3); }
+            // 🚨 §88: dòng 4/5 — cùng nguyên tắc: bỏ qua dòng TRỐNG, ghép vào CÙNG chuỗi ⇒ GỘP SKU TRÙNG xuyên MỌI dòng.
+            if (!string.IsNullOrWhiteSpace(form.Sku4)) { phanBoSung.Append(',').Append(form.Sku4.Trim()).Append(':').Append(form.SoLuong4); }
+            if (!string.IsNullOrWhiteSpace(form.Sku5)) { phanBoSung.Append(',').Append(form.Sku5.Trim()).Append(':').Append(form.SoLuong5); }
         if (phanBoSung.Length > 0) { form.Sku = form.Sku + phanBoSung.ToString(); }
         // 🚨 GIỮ CÁC DÒNG ĐÃ NHẬP (§84): mang dòng 2/3 TRẢ LẠI form để người dùng KHÔNG phải gõ lại.
         // ⚠️ ĐẶT Ở ĐÂY — TRƯỚC lời gọi checkout — để CẢ HAI đường (LỖI và THÀNH CÔNG) đều render với dữ liệu đã nhập.
@@ -309,6 +317,21 @@ public class DatHangTrangDto
 
     /// <inheritdoc cref="Sku3" />
     public int SoLuong3 { get; set; } = 1;
+    /// <summary>🚨 **SỐ DÒNG GIỎ** (`web-001` §88) — 1..**5**; dòng 4/5 dùng ``Sku4``/``Sku5`` (dòng 1..3 GIỮ NGUYÊN tên
+    /// ``Sku``/``Sku2``/``Sku3`` ⇒ **không phá** mọi probe và phép kiểm đã có).</summary>
+    public int SoDong { get; set; } = 3;
+
+    /// <inheritdoc cref="SoDong" />
+    public string Sku4 { get; set; } = string.Empty;
+
+    /// <inheritdoc cref="Sku4" />
+    public int SoLuong4 { get; set; } = 1;
+
+    /// <inheritdoc cref="Sku4" />
+    public string Sku5 { get; set; } = string.Empty;
+
+    /// <inheritdoc cref="Sku5" />
+    public int SoLuong5 { get; set; } = 1;
 
     public string? TienTe { get; set; }
 
@@ -378,6 +401,21 @@ public class DatHangInput
 
     /// <inheritdoc cref="Sku3" />
     public int SoLuong3 { get; set; } = 1;
+    /// <summary>🚨 **SỐ DÒNG GIỎ** (`web-001` §88) — 1..**5**; dòng 4/5 dùng ``Sku4``/``Sku5`` (dòng 1..3 GIỮ NGUYÊN tên
+    /// ``Sku``/``Sku2``/``Sku3`` ⇒ **không phá** mọi probe và phép kiểm đã có).</summary>
+    public int SoDong { get; set; } = 3;
+
+    /// <inheritdoc cref="SoDong" />
+    public string Sku4 { get; set; } = string.Empty;
+
+    /// <inheritdoc cref="Sku4" />
+    public int SoLuong4 { get; set; } = 1;
+
+    /// <inheritdoc cref="Sku4" />
+    public string Sku5 { get; set; } = string.Empty;
+
+    /// <inheritdoc cref="Sku5" />
+    public int SoLuong5 { get; set; } = 1;
 
     public string Kenh { get; set; } = "web";
 

@@ -2718,3 +2718,57 @@ Razor encode `×`→`&#xD7;` và `·`→`&#xB7;` — **đúng chuẩn HTML, an t
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.0-m | 15/10/2026 | *(agent, session GĐ1)* | ✅ **HIỆN GIỎ ĐANG LƯU + NÚT XOÁ GIỎ**: `TomTatGio` + `MoTaGio` + `GET /DatHang/XoaGio` + khối `#gio-da-luu` (chỉ hiện khi có dữ liệu). **Kiểm chứng**: ban đầu **không** có khối (**`False`**); sau **POST LỖI** + GET mới ⇒ khối hiện, tóm tắt **`GBSKU-083039 × 3 · KHONG-CO-083039 × 7`**, dòng 1 **`GBSKU-083039`**, nút xoá **`True`**; sau `XoaGio` ⇒ **không** còn khối + ô **trống**; build **3/3**; **`fail: 0`**. 🐛 Lần chạy đầu `DAT=False` do **phép kiểm so văn bản thô** với HTML đã encode (**bài học B3, lần 4**) — sửa **phép kiểm**, không sửa sản phẩm |
+
+---
+
+## 88. ✅ **GIỎ TỚI 5 DÒNG (PHẦN SERVER) — ĐÃ KIỂM CHỨNG** (15/10/2026)
+
+### 88.1 Đã làm — **tương thích ngược TUYỆT ĐỐI**
+
+| # | Thay đổi | Neo (đếm trước khi sửa) |
+|---|---|---|
+| 1 | **CẢ HAI** DTO: `SoDong` (1..5) + `Sku4`/`SoLuong4` + `Sku5`/`SoLuong5` | `public int SoLuong3 …` — **xuất hiện 2 lần** (**cố ý**) |
+| 2 | `LuuGio`: lưu thêm dòng 4/5 (**L85–86**) | `phan.Add($"{form.Sku3}:…")` |
+| 3 | Ghép trước lời gọi checkout (**L194–195**) | regex `phanBoSung\.Append.*` |
+| 4 | `KhoiPhucGio`: khôi phục tới **5 dòng** | nhánh `dem == 2` |
+
+📌 **Dòng 4/5 dùng TÊN MỚI** ⇒ dòng 1..3 giữ nguyên ⇒ **không phá** probe/phép kiểm đã có (§62 · §72 · §83 · §84 · §86 · §87).
+
+### 88.2 ✅ BẰNG CHỨNG — số **tính trước**, **GỘP xuyên 5 dòng**, **cookie 5 dòng**
+
+Kịch bản `A×1 · B×2 · A×3 · B×1` (dòng 5 trống) ⇒ gộp `A=4` · `B=3` ⇒ `(4×100.000 + 3×200.000) × 1,1` = **`1.100.000`** · **2** dòng đơn.
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | 🔥 `POST` **5 dòng** | HTTP **200** · tổng **`1,100,000`** ✅ |
+| 2 | 🔥 **Số dòng đơn** | **`2`** ✅ *(gộp `A` 1+3 · `B` 2+4)* |
+| 3 | `GrandTotal` | **`1100000.0000`** ✅ |
+| 4 | 🔥 **Giữ chỗ TỪNG SKU** | **`A: 10/4`** · **`B: 10/3`** ✅ |
+| 5 | 🔥 **LỖI ở DÒNG 4** ⇒ **cookie** (đã giải mã URL) | **`GCSKU-A-083653:1,KHONG-CO-999:9`** ✅ |
+| 6 | `fail:` | **`0`** ✅ |
+
+📌 **#2 + #4 là cặp chốt:** `2` dòng đơn chứng minh **gộp**; `Reserved A=4 / B=3` chứng minh **giữ chỗ đúng TỪNG SKU** xuyên 5 dòng.
+📌 **#5 đo `LuuGio` NGAY TẠI NGUỒN** (cookie) thay vì ô HTML ⇒ **không** phụ thuộc view — view là phần **chưa** làm.
+
+### 88.3 🐛 Ba lỗi phép kiểm của tôi (không phải lỗi sản phẩm) — và quy tắc
+
+| # | Lỗi | Quy tắc |
+|---|---|---|
+| 1 | **VƯỢT PHẠM VI**: kỳ vọng thấy ô `Sku4` **trên HTML** khi **view chưa làm** ⇒ `DAT=False` dù **mọi thứ đã đạt** | **Điều kiện `đạt` CHỈ chứa những gì THUỘC phạm vi thay đổi này**; phần chưa làm ⇒ **ghi là nợ** |
+| 2 | **Cookie URL-encode** (`:`→`%3A`, `,`→`%2C`) mà kiểm chuỗi thô | Kiểm cookie ⇒ **giải mã URL trước** (họ bài học **B3**, lần **5**) |
+| 3 | **Nháy KÉP** làm `@{Fail=0; Dat=True; TonB=B: 10/3; TonA=A: 10/4; SoDong=2; GrandTotal=1100000.0000; Tong=1,100,000; SauLoi_dong4=GCSKU-A-083653:1,KHONG-CO-999:9}`/`` bị **nội suy** ⇒ chuỗi tìm-kiếm sai ⇒ **vá không áp** (đếm = 0) — **hai lần liên tiếp** | Chuỗi chứa `$` ⇒ **nháy ĐƠN** (`''` để lồng nháy đơn); hoặc **biến trung gian** |
+
+📌 **Quy tắc `commit` trong `if (đạt)` đã chặn việc ghi sổ kết luận sai — lần thứ NĂM.**
+
+### 88.4 ⚠️ Nợ ghi rõ
+
+| # | Việc |
+|---|---|
+| 1 | **Ô nhập dòng 4/5 trên VIEW** + nút **"Thêm dòng"/"Bớt dòng"** — server **đã sẵn sàng** |
+| 2 | Kẹp `soDong` **1..5** ở `GET` (`SoDong` có ở DTO, chưa đọc từ query) |
+
+### 88.5 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.0-n | 15/10/2026 | *(agent, session GĐ1)* | ✅ **GIỎ 5 DÒNG (SERVER)**: 2 DTO + `LuuGio` (L85–86) + ghép (L194–195) + `KhoiPhucGio` 5 dòng; dòng 1..3 giữ nguyên tên. **Kiểm chứng**: `A×1 · B×2 · A×3 · B×1` ⇒ tổng **`1,100,000`**, **`2` dòng đơn**, `GrandTotal` **`1100000.0000`**, giữ chỗ **`A: 10/4`**/**`B: 10/3`**, cookie **`GCSKU-A-083653:1,KHONG-CO-999:9`**; build **3/3**; **`fail: 0`**. 🐛 Ba lỗi phép kiểm (§88.3) |
