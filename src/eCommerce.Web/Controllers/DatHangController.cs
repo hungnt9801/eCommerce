@@ -122,7 +122,7 @@ public class DatHangController : Controller
     /// <summary>`GET /DatHang` — biểu mẫu. Khoá checkout sinh **tại đây** (xem bất biến ở doc của lớp).
     /// 🚨 **GIỎ GIỮ QUA PHIÊN** (§86): có cookie `gio-web` ⇒ **khôi phục** dòng đã nhập ⇒ **tải lại trang không mất giỏ**.
     /// ⚠️ Khoá checkout **vẫn sinh MỚI mỗi lần GET** (bất biến §56 — chống trùng đơn) — cookie chỉ mang **dòng hàng**, **không** mang khoá.</summary>
-    public async Task<IActionResult> Index()
+    public async Task<IActionResult> Index(int? soDong)
     {
         var khoList = await _kho.GetListAsync(chiHoatDong: true);
 
@@ -137,6 +137,8 @@ public class DatHangController : Controller
             TokenChongGiaMa = Guid.NewGuid().ToString("N")
         };
 
+        // 🚨 §89: SỐ DÒNG hiển thị — kẹp **1..5**. 📌 Mặc định 3 (giữ nguyên hành vi cũ khi không có `?soDong`).
+        trang.SoDong = Math.Clamp(soDong ?? 3, 1, 5);
         KhoiPhucGio(trang, Request.Cookies["gio-web"]);
         // 🚨 §87: mô tả giỏ đang lưu để view hiển thị kèm nút "Xoá giỏ" (rỗng ⇒ không hiện).
         trang.TomTatGio = MoTaGio(Request.Cookies["gio-web"]);
@@ -160,6 +162,7 @@ public class DatHangController : Controller
             Sku = form.Sku,
             SoLuong = form.SoLuong,
             Thue = form.Thue,
+            SoDong = form.SoDong,   // 🚨 §89: giữ SỐ DÒNG người dùng đang thấy qua các lần render lại
             KhoaCheckout = form.KhoaCheckout,   // 🚨 GIỮ NGUYÊN khoá của form (không sinh lại) — xem bất biến ở doc lớp
             TokenChongGiaMa = Guid.NewGuid().ToString("N")
         };

@@ -2772,3 +2772,52 @@ Kịch bản `A×1 · B×2 · A×3 · B×1` (dòng 5 trống) ⇒ gộp `A=4` ·
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.0-n | 15/10/2026 | *(agent, session GĐ1)* | ✅ **GIỎ 5 DÒNG (SERVER)**: 2 DTO + `LuuGio` (L85–86) + ghép (L194–195) + `KhoiPhucGio` 5 dòng; dòng 1..3 giữ nguyên tên. **Kiểm chứng**: `A×1 · B×2 · A×3 · B×1` ⇒ tổng **`1,100,000`**, **`2` dòng đơn**, `GrandTotal` **`1100000.0000`**, giữ chỗ **`A: 10/4`**/**`B: 10/3`**, cookie **`GCSKU-A-083653:1,KHONG-CO-999:9`**; build **3/3**; **`fail: 0`**. 🐛 Ba lỗi phép kiểm (§88.3) |
+
+---
+
+## 89. ✅ **CHỌN SỐ DÒNG GIỎ (1..5) TRÊN UI — ĐÃ KIỂM CHỨNG** (15/10/2026) — *hoàn thiện §88*
+
+### 89.1 Đã làm — **liên kết thuần server** (không JavaScript)
+
+| # | Thay đổi | Neo (đếm = 1) |
+|---|---|---|
+| 1 | `GET /DatHang` nhận **`?soDong=N`** | chữ ký `Index()` |
+| 2 | Kẹp **1..5**: `trang.SoDong = Math.Clamp(soDong ?? 3, 1, 5)` | lời gọi `KhoiPhucGio` |
+| 3 | `POST` mang **`SoDong`** từ form sang trang (**giữ số ô** trong lần render của POST) | `Thue = form.Thue,` |
+| 4 | View: **dòng 4/5 có điều kiện** + `hidden SoDong` + nút **"Thêm dòng"/"Bớt dòng"** | dòng `SoLuong3` |
+| 5 | 🐛 **Sửa khiếm khuyết tự phát hiện:** dòng **2/3 nay CÓ ĐIỀU KIỆN** theo `SoDong` | khối 4 dòng `Sku2/Sku3` |
+
+📌 **Khiếm khuyết #5 là thật:** nếu dòng 2/3 **luôn** hiện thì nút **"Bớt dòng"** chỉ ẩn được dòng **4/5** ⇒ nút và biểu mẫu **không nhất quán**.
+Phát hiện khi **đọc lại view** sau khi thêm nút — **không** phải khi chạy.
+📌 **Vì sao LIÊN KẾT, không JS:** `?soDong=N` **thuần server** ⇒ **probe HTTP kiểm được** toàn bộ (JS thì phải kiểm bằng trình duyệt — **chưa** có trong quy trình).
+🔁 **Tương thích ngược:** mặc định **3** ⇒ không có `?soDong` thì hành vi **y như trước**; tên ô dòng 1..3 **không đổi**.
+
+### 89.2 ✅ BẰNG CHỨNG (probe `verify-sodong.ps1`, chạy trọn, `exit 0`)
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | **Mặc định** | số ô `Sku` = **`3`** · `SoDong` = **`3`** · nút Thêm **`True`** · nút Bớt **`True`** ✅ |
+| 2 | 🔥 `?soDong=5` | **`5`** ô · `SoDong` **`5`** · 🔥 **nút "Thêm dòng" BIẾN MẤT** (**biên trên**) ✅ |
+| 3 | 🔥 `?soDong=2` | **`2`** ô · **ô `Sku3` KHÔNG còn** (`False`) ✅ |
+| 4 | 🔥 `?soDong=9` (**kẹp**) | `SoDong` = **`5`** · không còn nút Thêm ✅ |
+| 5 | 🔥 `?soDong=0` (**kẹp**) | `SoDong` = **`1`** · **nút "Bớt dòng" BIẾN MẤT** (**biên dưới**) ✅ |
+| 6 | 🔥 **POST LỖI kèm `SoDong=5`** ⇒ **chính lần render của POST** | **`5`** ô · `SoDong` **`5`** ✅ |
+| 7 | `fail:` · tiến trình treo | **`0`** ✅ · **0** ✅ |
+
+📌 **#4 + #5 là phép kiểm BẢO MẬT/ỔN ĐỊNH:** `?soDong` do **người dùng** đặt ⇒ **phải kẹp ở server**. Không kẹp thì `?soDong=999` render **999 ô**; `?soDong=-5` có thể gây lỗi. Đo **hai đầu biên** (`9`→`5` · `0`→`1`) chứng minh kẹp chạy.
+📌 **#2 + #5 đo "nút biến mất ở biên"** — chi tiết dễ quên; sai thì người dùng bấm mãi mà số ô **không đổi**.
+
+### 89.3 🐛 Phép kiểm của tôi lại **vượt phạm vi** (lần 2) — và **nợ mới**
+
+Lần chạy đầu #6 báo sai vì tôi kiểm `SoDong` sau **một GET MỚI** (không có `?soDong`) ⇒ mặc định **3**.
+Nhưng phạm vi vòng này là **"`SoDong` đi cùng POST"** — không phải **"`SoDong` sống qua phiên"**.
+⇒ **Sửa phép kiểm** để đọc **chính response của POST** ⇒ **đạt**.
+📌 **Nợ mới (ghi rõ):** `SoDong` **CHƯA** lưu vào cookie ⇒ **GET mới** (không `?soDong`) trở về **3 ô**.
+**Cách sửa rẻ (vòng sau):** lưu `SoDong` vào cookie `gio-web` (định dạng `soDong=5|SKU:SL,…` hoặc cookie thứ hai `so-dong`) — **hoặc** để nguyên vì nút Thêm/Bớt đã cho phép chọn lại.
+📌 **Quy tắc nhắc lại:** *điều kiện `đạt` chỉ chứa những gì **thuộc phạm vi thay đổi này*** — tôi đã vi phạm **hai lần** (§88.3 #1 và §89.3).
+
+### 89.4 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.0-o | 15/10/2026 | *(agent, session GĐ1)* | ✅ **CHỌN SỐ DÒNG (1..5) TRÊN UI** — `?soDong=N` (kẹp 1..5) · `SoDong` mang qua POST · dòng 2/3 **và** 4/5 **có điều kiện** · nút **Thêm/Bớt dòng** (liên kết, không JS). **Kiểm chứng**: mặc định **`3`** ô · `?soDong=5` ⇒ **`5`** ô + **hết nút Thêm** · `?soDong=2` ⇒ **`2`** ô + **không còn `Sku3`** · `?soDong=9`⇒**`5`** · `?soDong=0`⇒**`1`** + **hết nút Bớt** · **POST LỖI kèm `SoDong=5`** ⇒ render POST **`5`** ô; build **3/3**; **`fail: 0`**. 📌 **Nợ:** `SoDong` chưa sống qua **GET mới** (§89.3) |

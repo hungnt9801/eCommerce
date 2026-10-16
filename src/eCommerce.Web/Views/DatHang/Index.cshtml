@@ -92,10 +92,40 @@
 <div><label for="Sku">SKU</label><input id="Sku" name="Sku" value="@Model.Sku" /></div>
 
                 @* 🚨 GIỎ NHIỀU Ô NHẬP (§82): dòng 2 và 3 — để TRỐNG nếu không dùng. Ghép ở SERVER (không JS). *@
-                <div><label for="Sku2">SKU dòng 2</label><input id="Sku2" name="Sku2" value="@Model.Sku2" /></div>
-                <div><label for="SoLuong2">SL dòng 2</label><input id="SoLuong2" name="SoLuong2" type="number" min="1" value="@Model.SoLuong2" /></div>
-                <div><label for="Sku3">SKU dòng 3</label><input id="Sku3" name="Sku3" value="@Model.Sku3" /></div>
-                <div><label for="SoLuong3">SL dòng 3</label><input id="SoLuong3" name="SoLuong3" type="number" min="1" value="@Model.SoLuong3" /></div>
+                @* 🚨 §89: dòng 2/3 nay **CÓ ĐIỀU KIỆN** theo `SoDong` — nếu không, nút "Bớt dòng" chỉ ẩn được dòng 4/5 (khiếm khuyết thật phát hiện ở vòng 106). *@
+                @if (Model.SoDong >= 2)
+                {
+                    <div><label for="Sku2">SKU dòng 2</label><input id="Sku2" name="Sku2" value="@Model.Sku2" /></div>
+                    <div><label for="SoLuong2">SL dòng 2</label><input id="SoLuong2" name="SoLuong2" type="number" min="1" value="@Model.SoLuong2" /></div>
+                }
+                @if (Model.SoDong >= 3)
+                {
+                    <div><label for="Sku3">SKU dòng 3</label><input id="Sku3" name="Sku3" value="@Model.Sku3" /></div>
+                    <div><label for="SoLuong3">SL dòng 3</label><input id="SoLuong3" name="SoLuong3" type="number" min="1" value="@Model.SoLuong3" /></div>
+                }
+
+                @* 🚨 §89: SỐ DÒNG + DÒNG 4/5. 📌 Nút là **LIÊN KẾT** `?soDong=N` (thuần server, KHÔNG JS) ⇒ probe HTTP kiểm được. *@
+                <input type="hidden" id="SoDong" name="SoDong" value="@Model.SoDong" />
+                <p id="dieu-huong-dong">
+                    @if (Model.SoDong >= 4)
+                    {
+                        <div><label for="Sku4">SKU dòng 4</label><input id="Sku4" name="Sku4" value="@Model.Sku4" /></div>
+                        <div><label for="SoLuong4">SL dòng 4</label><input id="SoLuong4" name="SoLuong4" type="number" min="1" value="@Model.SoLuong4" /></div>
+                    }
+                    @if (Model.SoDong >= 5)
+                    {
+                        <div><label for="Sku5">SKU dòng 5</label><input id="Sku5" name="Sku5" value="@Model.Sku5" /></div>
+                        <div><label for="SoLuong5">SL dòng 5</label><input id="SoLuong5" name="SoLuong5" type="number" min="1" value="@Model.SoLuong5" /></div>
+                    }
+                    @if (Model.SoDong < 5)
+                    {
+                        <a id="nut-them-dong" href="/DatHang?soDong=@(Model.SoDong + 1)">Thêm dòng</a>
+                    }
+                    @if (Model.SoDong > 1)
+                    {
+                        <a id="nut-bot-dong" href="/DatHang?soDong=@(Model.SoDong - 1)">Bớt dòng</a>
+                    }
+                </p>
             <div><label for="SoLuong">Số lượng</label><input id="SoLuong" name="SoLuong" type="number" min="1" value="@Model.SoLuong" /></div>
             <div><label for="Thue">Thuế suất (0.1 = 10%)</label><input id="Thue" name="Thue" value="@Model.Thue" /></div>
             <div style="margin-top:.6rem">
