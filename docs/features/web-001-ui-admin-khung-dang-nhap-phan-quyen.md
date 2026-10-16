@@ -3350,3 +3350,108 @@ cần **câu trả lời nằm trong sản phẩm**, không phải trong **mã n
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.5 | 17/10/2026 | *(agent, session GĐ1)* | **§97 — LÁT CẮT 5: ĐƯỜNG GỌI CÓ PHIÊN + SỬA HAI LỖI SẢN PHẨM THẬT** (đóng nợ §96.7 #1): probe **đăng nhập thật** (form + cookie phiên, **6 bước**, dùng lại được cho **mọi** trang UI) ⇒ phát hiện **HAI lỗi sản phẩm mà 1101 unit test + probe §96 KHÔNG thấy**. 🚨 **LỖI #1: `MenuViewComponent` CHƯA BAO GIỜ render MỤC CON** — menu render, nhóm *"Vận hành"* **có mặt**, nhưng **hai mục con KHÔNG có** ⇒ nhóm thành **`href="#"`** = **liên kết CHẾT** ⇒ 🔒 người dùng **KHÔNG có lối vào** `/HanMucKenh` + `/DoiSoatThanhToan` (đúng nợ *"màn hình vô hình vì thiếu lối vào"*); ⚠️ **không có lỗi nào** — trang `200`, menu render, chỉ **thiếu** hai mục; 📌 tôi đã làm **hai phần ba** menu hai tầng ở lượt 19 và **không kiểm phần thứ ba**. 🚨 **LỖI #2: căn cứ pháp lý `91/2025/QH15` CHỈ nằm trong chú thích Razor** ⇒ **KHÔNG render** ⇒ người dùng **và người kiểm toán** không thấy căn cứ — trong khi đó là **LÝ DO** màn hình bị giới hạn trường; 🔑 một khiếu nại *"tại sao giới hạn dữ liệu của tôi"* cần câu trả lời **nằm trong sản phẩm**. ✅ **22/22 ca HTTP + DB thật** (có phiên): ba trang `200` · **D6 căn cứ pháp lý** · **E3 mục con menu** · **F3 DB ghi thật**. 🐞 **SÁU lỗi của tôi, ba loại NGUY HIỂM**: (1) 🚨 **`RZ1003` — chú thích Razor LỒNG NHAU** (Razor kết thúc ở `*@` **đầu tiên** ⇒ phần còn lại thành **MÃ**); (2) 🚨 **build `exit 0` + `Build succeeded` NHƯNG MỐC DLL KHÔNG ĐỔI** (tiến trình Web giữ tệp) — 🔑 **tôi đã báo "0 lỗi" nhiều lần mà bản build KHÔNG vào** ⇒ **luật mới: sau mỗi build, KIỂM MỐC DLL**; (3) 🚨 **đọc tệp HTML CŨ** ⇒ `D6` đỏ **hai lần** dù sản phẩm đã sửa; (4) `$HOME` là biến **chỉ-đọc**; (5) `$chi-so` — PowerShell **không** cho `-` trong tên biến; (6) **`Status` là SỐ NGUYÊN** mà tôi gieo chuỗi ⇒ seeding thất bại (✅ **tiền đề đã `throw` DỪNG NGAY**). ➕ **Ba lỗi của PHÉP ĐO**: 🚨 **Razor escape tiếng Việt thành ENTITY SỐ** (`&#x110;`) ⇒ `-match` trả **FALSE** dù chuỗi **CÓ** (✅ giải mã entity trước) · **`href="#"` duy nhất là dropdown CỦA THEME** ⇒ `E5` đỏ vì **lý do SAI** (✅ tách khối menu) · **ngưỡng token sai**. Ghi **§97.7** (nợ: 🚨 **chưa có kiểm chứng UI tự động trong CI** · chưa chọn **kho** · chưa phân trang + chưa *"nâng cấp khách vãng lai"* · 🚨 chưa có **xuất dữ liệu cá nhân** · 🚨 chưa có **sổ địa chỉ** · chưa kiểm **vai trò chỉ-đọc**) |
+
+---
+
+## 98. ✅ **LÁT CẮT 6 — BIẾN HAI LỖI THÀNH LỖI KHÔNG THỂ TÁI DIỄN** (17/10/2026) — *đóng nợ §97.7 #1*
+
+### 98.1 Vấn đề — và vì sao nó nghiêm trọng hơn "thêm test"
+
+Ở **§97** tôi tìm ra **hai lỗi sản phẩm thật**, và cả hai đều có **cùng một nguyên nhân sâu xa**:
+🔑 **KHÔNG có phép kiểm nào chạm tới LỚP RENDER.**
+
+| Lỗi (§97) | Vì sao 1101 unit test **không** thấy | Vì sao 11 ca probe **không** thấy |
+|---|---|---|
+**Mục con menu không render** | Test chỉ soi **DỮ LIỆU** menu (`MenuDieuHuong`, `BoLocDieuHuong`); lớp render là `ViewComponent` (**cần host/DI**) ⇒ **không test nào gọi được** | Probe chỉ hỏi *"chưa đăng nhập có bị chặn không"* — **không** hỏi *"menu có mục con không"* |
+**Căn cứ pháp lý chỉ trong chú thích** | Không có test nào đọc `.cshtml` | Chưa có phiên ⇒ chưa đọc được HTML thật |
+
+📌 **Hệ quả nếu chỉ sửa mà không thêm lưới:** hai lỗi này **quay lại** ở lần refactor tiếp theo — và
+🔒 lần sau **không ai** có phiên đăng nhập sẵn để phát hiện.
+
+### 98.2 ✅ **Cách chặn — ba việc, và việc thứ nhất là điều kiện của hai việc kia**
+
+| # | Việc | Vì sao |
+|---|---|---|
+**1** | **TÁCH `MenuViewComponent.DungHtml` thành HÀM THUẦN** | 🔑 Đây là **điều kiện** để test được. `ViewComponent` cần `ViewComponentContext` ⇒ **không** test trực tiếp được. Hàm thuần **gọi thẳng**, khẳng định **HTML THẬT**. 📌 Đúng khuôn đã trả giá ở `CAT-003` (`SinhSlug`) và `SAL-005` (`LuatWatermark`): **tách lõi quyết định ⇒ có test cho MỌI nhánh** |
+**2** | **`MenuRenderTests` (10 ca)** — khẳng định **HTML**, không khẳng định dữ liệu | Xem §98.3 |
+**3** | **`ViewAnchorTests` (2 ca)** — mọi view phải có **neo ASCII nằm NGOÀI chú thích Razor** | Xem §98.4 |
+
+➕ **Và thêm `ProjectReference` từ `eCommerce.Tests` → `eCommerce.Web`** — ⚠️ trước đó test project **không**
+tham chiếu Web ⇒ **không thể** test lớp render. 🔑 Đó là **lý do kỹ thuật** khiến lỗi §97 #1 tồn tại lâu.
+
+### 98.3 ✅ **`MenuRenderTests` — 10 ca, khoá ĐÚNG hai lỗi đã xảy ra**
+
+| Ca | Bất biến |
+|---|---|
+🚨 **`MUC_CON__phai_RENDER_ra_HTML__khong_chi_nam_trong_du_lieu`** | **Ca quan trọng nhất.** Khẳng định **HTML** có `href="/HanMucKenh"` **VÀ** nhãn *"Hạn mức kênh"* — 📌 nếu chỉ khớp `href` thì một liên kết **mồ côi (không nhãn)** vẫn qua được, mà đó là liên kết **người dùng không đọc được** |
+`MUC_CON__nam_TRONG_long_muc_cha` | Con phải **nằm trong** `<li>` của nhóm; nếu render **ngang hàng** thì menu **mất tính hai tầng** |
+🚨 **`MUC_CHA__KHONG_duoc_la_lien_ket_chet_href_hash`** | Nhóm **không** được là `a href="#"` |
+`MUC_CHA__co_role_heading` | `role="heading"` là **dấu hiệu đo được** rằng đây là **nhãn nhóm**, không phải liên kết |
+`MOI_muc_LA__co_href__va_URL_khong_bao_gio_la_hash` | **Hai chiều:** không URL nào là `#`, **và** mọi URL khai **phải có mặt** trong HTML (🔑 nếu ai thêm nhánh render mới mà **quên in ra**, ca này ĐỎ) |
+`Menu_RONG__khong_render_gi` | Danh sách rỗng ⇒ **rỗng thật**, không có khung rỗng |
+`Menu_CO_muc__co_neo_aria_label` | Neo `aria-label` dùng bởi probe HTTP |
+`Nhom_co_N_con__phan_hoi_DU_N_lien_ket` (×3) | 🔒 Chống biến thể **"chỉ render con ĐẦU TIÊN"** |
+
+🚨 **Và ca `Menu_RONG` đã BẮT ĐƯỢC một bất nhất quán THẬT ngay khi viết:** `DungHtml([])` vẫn dựng `<nav>`
+rỗng, trong khi `Invoke()` trả `HtmlString.Empty` — 🔑 **hai đường gọi cho hai kết quả khác nhau với cùng
+đầu vào**. ✅ Sửa: đưa kiểm rỗng vào **chính hàm thuần**.
+
+### 98.4 ✅ **`ViewAnchorTests` — neo phải nằm NGOÀI chú thích Razor**
+
+**Bảng neo** (đường dẫn view → neo **ASCII bắt buộc phải HIỂN THỊ**):
+`Views/HanMucKenh/Index.cshtml` → `[HANMUCKENH-MAN-HINH]` · `Views/KhachHang/Index.cshtml` →
+`[KHACHHANG-MAN-HINH]` · `Views/DoiSoatThanhToan/Index.cshtml` → `[DOISOATTHANHTOAN-MAN-HINH]` ·
+`Views/Loi/ChanQuyen.cshtml` → `[LOI-403-THIEP-QUYEN]` · `Views/Loi/KhongTimThay.cshtml` → `[LOI-404-…]`
+
+🔒 **Test CẮT hết `@* … *@` rồi mới khẳng định neo còn** ⇒ nếu ai chuyển neo vào chú thích, **ĐỎ ngay**.
+📌 Regex dùng **non-greedy** (`.*?` với `Singleline`) — ⚠️ và **đúng như vậy ở đây** vì **Razor KHÔNG hỗ trợ
+chú thích lồng nhau** (bài học `RZ1003` ở §97.6), nên non-greedy **khớp đúng ngữ nghĩa của Razor**.
+
+🔑 **VÌ SAO NEO PHẢI LÀ ASCII THUẦN:** Razor escape tiếng Việt thành **entity số** (`Đ` → `&#x110;`) ⇒ khẳng
+định **chữ có dấu** trên HTML sẽ **thất bại dù chuỗi CÓ** (bài học **ba lần** trong dự án: `sal-005` §19.5 ·
+`web-001` §97.6 · **và ngay lượt này, lần thứ ba**). ✅ Test có ca khẳng định **mọi neo đều ASCII**.
+
+⚠️ **GIỚI HẠN ĐÃ BIẾT:** test kiểm **neo**, **không** kiểm **cả câu**. 📌 Nghĩa là nó bảo đảm *"view có một
+dòng hiển thị được"*, **không** bảo đảm *"câu đó đúng"*. 🔑 Đánh đổi **có chủ ý**: kiểm nội dung câu là việc
+của **review người**; kiểm *"có hiển thị hay không"* là việc **máy**.
+
+### 98.5 ✅ **KIỂM CHỨNG — và tôi ĐÃ TIÊM LẠI ĐÚNG HAI LỖI ĐỂ CHẮC LƯỚI BẮT**
+
+🚨 **Bài học `CAT-003` §25.3 / `sal-005` §19.5: một lưới an toàn CHƯA TỪNG BẮT ĐƯỢC GÌ thì chưa chứng minh
+nó bắt được gì.** ⇒ Lượt này tôi **tiêm lại** đúng hai lỗi §97:
+
+| Việc tiêm | Kết quả |
+|---|---|
+Chuyển neo `[KHACHHANG-MAN-HINH]` **vào trong** chú thích Razor | ✅ **`ViewAnchorTests` ĐỎ** — *"neo `[KHACHHANG-MAN-HINH]` KHÔNG nằm trong phần HIỂN THỊ"* |
+Xoá khối render **mục con** khỏi `MenuViewComponent` | ✅ **7 ca `MenuRenderTests` ĐỎ** (bao gồm *"Mục con phải xuất hiện SAU nhãn nhóm"*) |
+
+➡️ **Cả hai lưới THẬT SỰ BẮT.** ✅ Sau đó **khôi phục** ⇒ **1113 unit test xanh**.
+➕ **Xác nhận E2E bằng phiên thật: 6/6 ca** (`B1` có phiên · `D6` căn cứ pháp lý · **2 neo hiển thị** ·
+**`E3` menu có mục con** · `E5` không liên kết chết) — 📌 tức các lưới mới **không** phá hành vi thật.
+
+### 98.6 🐞 **Ba lỗi của tôi trong lượt này — và cả ba là CÙNG MỘT HỌ: "build/test đọc bản CŨ"**
+
+| # | Lỗi | Bài học |
+|---|---|---|
+**1** | 🚨 **`build exit 0` + `Build succeeded` NHƯNG MỐC DLL KHÔNG ĐỔI** (00:37:16 → 00:37:16) | 🔑 **Đây là lần thứ HAI trong hai lượt.** ✅ Lần này **phát hiện được** — vì §97.6 đã đặt **luật: sau mỗi build, KIỂM MỐC DLL**. 📌 Nếu không có luật đó, tôi đã **kết luận sai** rằng lưới an toàn không bắt (hoặc tệ hơn: rằng sản phẩm còn lỗi) |
+**2** | 🚨 **Chạy test trên binary CŨ** ⇒ **7 ca đỏ** dù mã nguồn **đã** đúng (`ulCon` **có** trong tệp) | 📌 Phải **`--no-incremental`** khi nghi ngờ, và **kiểm `--no-build`** cho lần chạy sau |
+**3** | 🚨 **`$HOME` lần thứ HAI** (đã vấp ở §97.6 #4) ⇒ script chết giữa đường | 🔑 Bài học **không** tự động áp dụng cho lần sau — 📌 nên ghi vào **khuôn probe** chứ không chỉ vào tài liệu |
+**4** | 🚨 **So khớp chữ có dấu trong HTML lần thứ BA** ⇒ `E3` đỏ dù menu **đúng** (`$khoi` rỗng vì `'Điều hướng'` bị escape) | ✅ Sửa: **giải mã entity** trong probe. 📌 **Ba lần** trong ba lượt ⇒ đây **phải** thành **hàm dùng chung** cho mọi probe UI |
+
+### 98.7 ⏳ Nợ
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+**1** | 🚨 **Probe có phiên VẪN là script TAY, chưa vào CI** | 📌 Nay **lõi** đã có test tự động (§98.3/§98.4), nhưng **đường E2E** (đăng nhập → HTML thật) **chưa** tự động. 🔑 Cần: đưa 6 ca E2E thành **integration test** dùng `WebApplicationFactory` + cookie |
+**2** | 🚨 **Hàm `GiaiMa` bị chép lại ở MỌI probe** | 📌 Đã vấp **3 lần** ⇒ nên đưa vào `tools\` như **module dùng chung**, không chép tay |
+**3** | `/HanMucKenh` **chưa chọn được KHO** | Form chỉ đặt hạn mức **cả kênh**; app service **đã** hỗ trợ kho ⇒ **nợ UI** |
+**4** | `/KhachHang` **chưa phân trang** · chưa nút **"nâng cấp khách vãng lai"** | App service **đã có** `NangCapKhachVangLaiAsync` |
+**5** | 🚨 **Chưa có xuất dữ liệu cá nhân** cho chính chủ | Luật **91/2025/QH15** — 📌 căn cứ pháp lý **đã hiện**, **tính năng** thì chưa |
+**6** | 🚨 **Chưa có sổ địa chỉ** (`CUS-001`) | Entity `Address` **không tồn tại** trong `AddressHub` — **nợ chặn** |
+**7** | **Chưa kiểm vai trò CHỈ-ĐỌC** | Probe dùng **admin**; chưa đo *"người chỉ có quyền đọc"* thấy gì |
+
+### 98.8 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.6 | 17/10/2026 | *(agent, session GĐ1)* | **§98 — LÁT CẮT 6: BIẾN HAI LỖI THÀNH LỖI KHÔNG THỂ TÁI DIỄN** (đóng nợ §97.7 #1): **tách `MenuViewComponent.DungHtml` thành HÀM THUẦN** (🔑 **điều kiện** để test được — `ViewComponent` cần `ViewComponentContext` nên **không** test trực tiếp) · **`MenuRenderTests` 10 ca** (khẳng định **HTML** chứ không dữ liệu: mục con **phải có** `href` **VÀ** nhãn · con nằm **trong** nhóm · **không** `href="#"` · `role="heading"` · **hai chiều** *"mọi URL khai phải có trong HTML"* · rỗng ⇒ rỗng thật · **đúng N liên kết**) · **`ViewAnchorTests` 2 ca** (**neo ASCII phải nằm NGOÀI chú thích Razor**; cắt `@* … *@` non-greedy — **đúng** vì Razor **không** hỗ trợ lồng nhau) · **`ProjectReference` test → Web** · **+12 test ⇒ 1113**. 🚨 **ĐÃ TIÊM LẠI ĐÚNG HAI LỖI §97 ĐỂ CHỨNG MINH LƯỚI BẮT** (bài học `CAT-003` §25.3: *"lưới chưa từng bắt được gì thì chưa chứng minh nó bắt được gì"*): chuyển neo vào chú thích ⇒ **`ViewAnchorTests` ĐỎ**; xoá khối render con ⇒ **7 ca ĐỎ** ⇒ ✅ **cả hai bắt thật**. ➕ **E2E 6/6** xác nhận lưới **không** phá hành vi thật. 🐞 **BỐN lỗi của tôi, cùng một họ "đọc bản CŨ"**: (1) 🚨 **`build exit 0` mà MỐC DLL KHÔNG ĐỔI** (**lần thứ HAI** — ✅ **phát hiện được** vì §97.6 đã đặt **luật kiểm mốc**; 📌 không có luật đó thì tôi đã **kết luận sai**); (2) 🚨 **chạy test trên binary CŨ** ⇒ 7 ca đỏ dù mã **đã đúng**; (3) 🚨 **`$HOME` lần thứ HAI**; (4) 🚨 **so khớp chữ có dấu trong HTML lần thứ BA** ⇒ sửa bằng **giải mã entity**. 🚨 **Và ca `Menu_RONG` đã bắt được một bất nhất quán THẬT ngay khi viết:** `DungHtml([])` dựng `<nav>` rỗng trong khi `Invoke()` trả rỗng ⇒ **hai đường gọi, hai kết quả** ⇒ đã sửa. Ghi **§98.7** (nợ: 🚨 probe E2E **vẫn là script tay** — cần vào CI bằng `WebApplicationFactory` + cookie · 🚨 hàm `GiaiMa` **bị chép lại ở mọi probe** (đã vấp 3 lần) · chưa chọn **kho** · chưa phân trang · chưa *"nâng cấp khách vãng lai"* · 🚨 chưa có **xuất dữ liệu cá nhân** · 🚨 chưa có **sổ địa chỉ** · chưa kiểm **vai trò chỉ-đọc**) |

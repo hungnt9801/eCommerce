@@ -39,6 +39,10 @@
     <!-- 🚨 Cần cho **test bất biến quy ước #3**: entity của module nơi nhận đơn PHẢI có `DbSet` trên
          DbContext hợp nhất, nếu không `IRepository<T>` không được đăng ký (lỗi Phase 0). -->
     <ProjectReference Include="..\..\src\eCommerce.EntityFrameworkCore\eCommerce.EntityFrameworkCore.csproj" />
+    <!-- 🚨 `WEB-001` muc 97.7 #1 — can tham chieu `eCommerce.Web` de test TRUC TIEP `MenuViewComponent`.
+         📌 LY DO: loi "menu co nhom nhung KHONG render muc con" da lot qua 1101 unit test vi khong co
+         test nao cham toi lop render. 🔑 Muon loi do KHONG TAI DIEN DUOC thi phai test CHINH lop render. -->
+    <ProjectReference Include="..\..\src\eCommerce.Web\eCommerce.Web.csproj" />
     <ProjectReference Include="..\..\modules\PaymentHub\eCommerce.PaymentHub.Application\eCommerce.PaymentHub.Application.csproj" />
     <ProjectReference Include="..\..\modules\Tax\eCommerce.Tax.Domain\eCommerce.Tax.Domain.csproj" />
     <ProjectReference Include="..\..\modules\Pricing\eCommerce.Pricing.Domain\eCommerce.Pricing.Domain.csproj" />

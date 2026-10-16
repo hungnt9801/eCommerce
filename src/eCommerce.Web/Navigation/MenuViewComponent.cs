@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Html;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.AspNetCore.Mvc.ViewComponents;
+using Volo.Abp.AspNetCore.Mvc.UI.Bootstrap.TagHelpers.Extensions;
 
 namespace eCommerce.Web.Navigation;
 
@@ -18,8 +19,27 @@ namespace eCommerce.Web.Navigation;
 /// `TagBuilder` ⇒ **không** phụ thuộc thêm một tệp `.cshtml` nào. 📌 Đây cũng **đúng khuôn ABP**: theme
 /// dựng menu bằng view component (`Menu_`), ta chỉ thay phần **quyết định hiện/ẩn**.
 ///
-/// 🔑 **Quyết định hiện/ẩn nằm ở <see cref="BoLocDieuHuong.Loc"/> (hàm THUẦN, đã có unit test)** —
-/// lớp này **chỉ** dựng HTML.
+/// 🔑 **Quyết định hiện/ẩn nằm ở <see cref="BoLocDieuHuong.Loc"/> (hàm THUẦN, đã có unit test)** — lớp này
+/// **chỉ** dựng HTML.
+///
+/// ══════════════════════════════════════════════════════════════════════════════════════════════════
+/// 🚨 **BÀI HỌC LỚN NHẤT CỦA LỚP NÀY — VÀ LÝ DO NÓ ĐƯỢC TÁCH THÀNH HÀM THUẦN (`DungHtml`):**
+///
+/// Ở **lượt 19**, `MenuDieuHuong` **đã** khai mục con **và** `BoLocDieuHuong` **đã** lọc quyền cho con —
+/// nhưng lớp này **chỉ render `muc.Url`** ⇒ 🚨 **mục con KHÔNG BAO GIỜ hiện**.
+///
+/// 📌 **Triệu chứng (đo được ở lượt 20, khi có phiên đăng nhập thật):** menu render, nhóm **"Vận hành"**
+/// **có mặt**, nhưng nó là **`href="#"`** — một **liên kết CHẾT** bấm vào không đi đâu ⇒ 🔒 người dùng
+/// **KHÔNG có lối vào** `/HanMucKenh` và `/DoiSoatThanhToan`.
+/// ⚠️ **Và không có lỗi nào:** trang `200`, menu render, log sạch — chỉ là **thiếu** hai mục.
+///
+/// 🔑 **VÌ SAO NÓ LỌT QUA 1101 UNIT TEST + 11 CA PROBE:** không test nào **chạm tới lớp render** — mọi phép
+/// kiểm chỉ soi **dữ liệu menu** (`MenuDieuHuong`, `BoLocDieuHuong`) chứ không soi **HTML sinh ra**.
+/// ⇒ ✅ **Cách chặn tái diễn:** tách việc dựng HTML thành **hàm THUẦN** `DungHtml` để **unit test gọi trực
+/// tiếp**, và mỗi **mục con** + mỗi **liên kết chết** đều có ca kiểm khoá lại.
+/// 📌 Đây đúng khuôn đã trả giá ở `CAT-003` (`SinhSlug`) và `SAL-005` (`LuatWatermark`):
+/// **tách lõi quyết định ra hàm thuần ⇒ có test cho MỌI nhánh.**
+/// ══════════════════════════════════════════════════════════════════════════════════════════════════
 /// </summary>
 public class MenuViewComponent : ViewComponent
 {
@@ -42,6 +62,32 @@ public class MenuViewComponent : ViewComponent
             return new HtmlContentViewComponentResult(HtmlString.Empty);
         }
 
+        return new HtmlContentViewComponentResult(DungHtml(mucMenu));
+    }
+
+    /// <summary>
+    /// 🔑 **DỰNG HTML MENU — HÀM THUẦN, KHÔNG PHỤ THUỘC DI/HTTP** ⇒ **unit test gọi trực tiếp được**.
+    ///
+    /// 📌 **VÌ SAO TÁCH RA (đây là điều chặn lỗi tái diễn, không phải chi tiết kỹ thuật):** ở lượt 19, lỗi
+    /// *"mục con không bao giờ render"* sống sót qua **1101 unit test** vì **không** test nào gọi được
+    /// lớp render (nó là `ViewComponent`, cần `ViewComponentContext`). 🔒 Hàm thuần này phá bỏ rào đó:
+    /// test **gọi thẳng**, khẳng định **HTML thật**, không cần host.
+    /// </summary>
+    /// <param name="mucMenu">Danh sách **ĐÃ LỌC QUYỀN** (từ <see cref="BoLocDieuHuong.Loc"/>).</param>
+    public static IHtmlContent DungHtml(IReadOnlyList<MucDieuHuong> mucMenu)
+    {
+        ArgumentNullException.ThrowIfNull(mucMenu);
+
+        // 🔒 **DANH SÁCH RỖNG ⇒ TRẢ RỖNG THẬT** — và đây là **bất biến của CHÍNH hàm thuần**, không chỉ
+        // của `Invoke()`. 📌 Lý do: nếu `DungHtml([])` vẫn dựng `<nav>` rỗng thì **hai** đường gọi cho **hai**
+        // kết quả khác nhau cho cùng một đầu vào — 🔑 và chỗ gọi mới (không qua `Invoke()`) sẽ **âm thầm**
+        // tạo ra thanh điều hướng rỗng. ⚠️ Thanh rỗng làm người dùng tưởng *"hệ thống thiếu menu"*.
+        // (Ca `Menu_RONG__khong_render_gi` trong `MenuRenderTests` đã **bắt** sự bất nhất quán này.)
+        if (mucMenu.Count == 0)
+        {
+            return HtmlString.Empty;
+        }
+
         // 🔒 `aria-label` là **neo đo được** cho probe: nhờ nó mà phép kiểm HTTP phân biệt được
         // *"menu có render"* với *"trang chủ tình cờ chứa chữ Đơn hàng ở chỗ khác"*.
         var nav = new TagBuilder("nav");
@@ -56,24 +102,20 @@ public class MenuViewComponent : ViewComponent
             var li = new TagBuilder("li");
             li.Attributes["class"] = "nav-item";
 
-            // 🚨 **MỤC CHA (NHÓM) — RENDER HAI TẦNG** (`WEB-001`, lượt 20).
-            //
-            // 📌 **LỖI SẢN PHẨM ĐÃ ĐO ĐƯỢC:** trước lượt này, `MenuDieuHuong` **có** khai mục con và
-            // `BoLocDieuHuong` **có** lọc theo quyền cho con — nhưng **lớp này chỉ render `muc.Url`**
-            // ⇒ mục con **KHÔNG BAO GIỜ hiện**. 🔒 Và triệu chứng là: nhóm "Vận hành" render thành
-            // một liên kết `href="#"` **bấm vào không đi đâu** ⇒ người dùng **KHÔNG có lối vào**
-            // `/HanMucKenh` và `/DoiSoatThanhToan` — đúng nợ *"màn hình vô hình vì thiếu lối vào"*.
-            // ⚠️ Nó **không có lỗi nào**: trang `200`, menu render, chỉ là **thiếu** hai mục.
-            // 🔑 Đây là lý do phép kiểm `E3`/`E4` tồn tại: *"menu có nhóm"* **không** suy ra *"nhóm có mục con"*.
+            // 🚨 **MỤC CHA (NHÓM) — RENDER HAI TẦNG.**
+            // 📌 Nhóm **KHÔNG** phải liên kết ⇒ dùng `span` (⚠️ **KHÔNG** `a href="#"`: đó là **liên kết chết**,
+            // bấm vào nhảy về đầu trang và trông như hỏng).
             if (muc.LaNhom)
             {
-                // Nhóm **KHÔNG** phải liên kết ⇒ dùng `span` (không phải `a href="#"`).
-                // 📌 `href="#"` là **liên kết chết**: bấm vào nhảy về đầu trang và trông như hỏng.
                 var span = new TagBuilder("span");
                 span.Attributes["class"] = "nav-link fw-semibold disabled";
                 span.Attributes["role"] = "heading";
                 span.Attributes["aria-level"] = "2";
-                span.Attributes["title"] = muc.MoTa ?? string.Empty;
+
+                if (!string.IsNullOrWhiteSpace(muc.MoTa))
+                {
+                    span.Attributes["title"] = muc.MoTa;
+                }
 
                 span.InnerHtml.Append(muc.Nhan);
                 li.InnerHtml.AppendHtml(span);
@@ -121,6 +163,6 @@ public class MenuViewComponent : ViewComponent
 
         nav.InnerHtml.AppendHtml(ul);
 
-        return new HtmlContentViewComponentResult(nav);
+        return nav;
     }
 }
