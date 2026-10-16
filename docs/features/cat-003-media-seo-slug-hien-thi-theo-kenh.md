@@ -1585,3 +1585,67 @@ E3 | `host.log` có `MEDIA-TAI-LEN` (đường tải lên chạy thật) | ✅ |
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.7 | 16/10/2026 | *(agent, session GĐ1)* | **§21 — ĐÓNG NỢ §20.6: PHỤC VỤ TỆP ĐÃ ĐO SẠCH (17/17)**: 🚨 **SẢN PHẨM ĐÚNG, LỖI Ở BỘ ĐO** — chẩn đoán ở §20.6 **được xác nhận**: `MEDIA-GOC-KHO` = **2** lần (gốc khác nhau) khi đỏ, **1** lần khi đạt ⇒ nguyên nhân là **tiến trình Host CŨ còn giữ cổng**. 🔒 **Sửa BỘ ĐO ba việc**: (1) **chờ tới khi cổng TRỐNG** (vòng lặp, không `Start-Sleep` mù); (2) 🚨 **chạy TUẦN TỰ** — Host ghi → **dừng hẳn** → Web đọc (loại bỏ tranh chấp do chính bộ đo tạo ra); (3) **kiểm tiền đề** trước mỗi phép đo. ✅ **17/17 ca đạt**, gồm **D1 `200` không cần đăng nhập** · **D2 `Content-Type` do máy chủ** · **D3 `nosniff`** · **D4 đúng 24 byte** · **D5 `Content-Disposition` tên do máy chủ sinh** · **D6 `ETag`** · **D7 `404`** · **E1 `host.log` đúng 1 lần khởi động**. Ghi **§21.5** (ba bài học: *"test xanh" và "probe đỏ" có thể cùng sai* · *đo song song tự tạo tranh chấp* · *chờ theo ĐIỀU KIỆN, không theo THỜI GIAN*) · **§21.6** (nợ còn lại: **ảnh xoá mềm `404`** · cùng tên miền · base64 · gốc kho tạm · job dọn · nén/UI · **hiển thị theo kênh 0 dòng code**) |
+
+---
+
+## 22. 🔬 **THỬ GỠ NỢ §21.6 #2 (`ISoftDelete`) — THẤT BẠI, NHƯNG GHI LẠI ĐỂ KHÔNG THỬ LẠI** (16/10/2026)
+
+### 22.1 Vì sao ghi một lần **thất bại**
+
+🚨 **Nếu không ghi, vòng sau sẽ thử lại y hệt** và tốn đúng ngần ấy thời gian.
+📌 Đây là loại *"kiến thức âm"* đắt nhất: nó **không** để lại dấu vết trong mã, nên **không có gì** nhắc
+người sau rằng đường đó đã bị đi rồi.
+
+### 22.2 Mục tiêu
+
+Gỡ nợ **§21.6 #2**: ảnh đã **xoá mềm** hiện trả **`404`**, trong khi `ADR-11` chọn xoá mềm **chính vì** URL ảnh
+**đã** phát ra ngoài ⇒ chặn phục vụ là **ảnh vỡ** ở nơi ta **không** sửa được.
+🔒 Cách đúng về nguyên tắc: `IDataFilter.Disable<ISoftDelete>()` khi đọc ảnh.
+
+### 22.3 Đã thử **bốn** cách — **cả bốn** đều thất bại
+
+| # | Cách | Kết quả **đo được** |
+|---|---|---|
+**1** | Controller (`eCommerce.Web`) dùng `DataFilter.Disable<>()` — thuộc tính của `ApplicationService` | ❌ **`CS0120`** *"An object reference is required"* — `Controller` **không** có thuộc tính đó |
+**2** | Controller **tiêm** `IDataFilter`, `using` **bốn** namespace khác nhau (`Volo.Abp.Auditing` · `Volo.Abp.Data` · `Volo.Abp.Domain.Entities.Auditing` · `Volo.Abp.ObjectExtending`) | ❌ **`CS0246`** cho `ISoftDelete` ở **cả bốn** |
+**3** | Chuyển phép đọc sang **tầng Application** (nơi có `ApplicationService.DataFilter`) + hợp đồng ở `Application.Contracts` | ❌ **`CS0246`** — `ISoftDelete` **cũng không** resolve ở `eCommerce.Application` |
+**4** | Thêm `PackageReference` `Volo.Abp.Auditing.Contracts` + `PackageVersion` (CPM) | ❌ **`CS0246`** — vẫn không resolve ⇒ **đã GỠ** gói (không để lại tham chiếu vô ích) |
+
+### 22.4 🔑 **Bằng chứng quyết định — và một bài học về CÁCH ĐO**
+
+* `using Volo.Abp.Auditing;` + `typeof(ISoftDelete)` **KHÔNG** biên dịch ở **cả** `eCommerce.Domain` **lẫn**
+  `eCommerce.Application`, dù **cả hai** đều tham chiếu `Volo.Abp.Ddd.Domain` ⇒ **`CS0246`**;
+* `eCommerce.Domain.dll` **không** chứa **cả hai** chuỗi `ISoftDelete` **và** `Volo.Abp.Data`/`Volo.Abp.Auditing`
+  ⇒ interface đó nằm ở assembly **bắc cầu**, và assembly đó **không** được chuyển tiếp như một tham chiếu biên dịch;
+* 🚨 **VÀ MỘT LẦN TÔI TỰ LỪA MÌNH:** tôi **quét chuỗi** trong `Volo.Abp.Core.dll`, thấy
+  `Volo.Abp.Data` + `ISoftDelete` **gần nhau** ⇒ kết luận *"nó ở `Volo.Abp.Core.dll`, mọi project đều có"*,
+  rồi viết `using Volo.Abp.Data;` và **tin là xong**. Build **vẫn `CS0246`**.
+  📌 **Bài học:** *"hai chuỗi nằm gần nhau trong một DLL"* **KHÔNG** chứng minh kiểu đó **định nghĩa** ở đó
+  — bảng chuỗi còn chứa **tham chiếu** và **tên tham số**.
+  🔒 Cách đo **đúng** để biết một kiểu nằm ở đâu: **`Assembly.GetType("<namespace>.<Ten>")`** hoặc một phép
+  **biên dịch thật** — **không** quét chuỗi.
+
+### 22.5 Trạng thái sau khi thử
+
+🔒 **Đã HOÀN NGUYÊN toàn bộ** về bản đã kiểm (`git status` **sạch**; build **0 lỗi/0 cảnh báo**;
+**1048 unit + 38 integration** xanh).
+✅ **KHÔNG** để lại mã chết, **KHÔNG** để lại tham chiếu gói vô ích.
+📌 **Hành vi hiện tại (giữ nguyên):** ảnh đã xoá mềm ⇒ **`404`**. ⚠️ **Vẫn là nợ** — chỉ là nợ **đã biết đường
+không đi được bằng bốn cách trên**.
+
+### 22.6 🚨 **BƯỚC TIẾP THEO CỤ THỂ (cho vòng sau — đừng thử lại bốn cách ở §22.3)**
+
+1. **Tìm đúng assembly** chứa `ISoftDelete`: viết một tệp **tạm** trong `eCommerce.Domain` có
+   `Assembly.GetReferencedAssemblies()`, build, chạy ⇒ in ra **assembly nào** export kiểu đó.
+   📌 **Đừng** quét chuỗi DLL (xem §22.4);
+2. Nếu assembly đó **có** trên NuGet cùng phiên bản ABP ⇒ thêm `PackageReference` + `PackageVersion`
+   (**cả hai**, nếu không ⇒ **`NU1010`**);
+3. Nếu **không** ⇒ dùng **SQL thô** hoặc một **repository chuyên biệt** đọc bỏ qua bộ lọc (ví dụ
+   `IRepository<...>` cấu hình `IgnoreQueryFilters`), **hoặc** chấp nhận nợ và **ghi rõ** như hiện tại;
+4. 🔒 **Bất kể chọn gì:** phải có **ca probe** chứng minh — *"xoá mềm ảnh rồi `GET /CatMedia/{id}` vẫn `200`"*.
+
+### 22.7 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.8 | 16/10/2026 | *(agent, session GĐ1)* | **§22 — THỬ GỠ NỢ `ISoftDelete`: THẤT BẠI, GHI LẠI ĐỂ KHÔNG THỬ LẠI**: thử **bốn** cách (controller dùng `DataFilter` ⇒ `CS0120` · controller tiêm `IDataFilter` với **bốn** namespace ⇒ `CS0246` · chuyển sang tầng Application ⇒ `CS0246` · thêm gói `Volo.Abp.Auditing.Contracts` ⇒ vẫn `CS0246`, **đã gỡ**). 🔑 **Bằng chứng**: `ISoftDelete` không resolve ở **cả** `eCommerce.Domain` **lẫn** `eCommerce.Application`; `eCommerce.Domain.dll` **không** chứa chuỗi đó ⇒ nằm ở assembly **bắc cầu không được chuyển tiếp**. 🚨 **Một lần tự lừa mình**: quét **chuỗi** trong `Volo.Abp.Core.dll` thấy `Volo.Abp.Data` + `ISoftDelete` gần nhau ⇒ kết luận sai; **build vẫn `CS0246`** ⇒ bài học *"hai chuỗi gần nhau KHÔNG chứng minh kiểu định nghĩa ở đó"*, cách đo đúng là **`Assembly.GetType`** hoặc biên dịch thật. 🔒 **Hoàn nguyên toàn bộ**: `git status` sạch · build **0/0** · **1048 + 38** test xanh · **không** mã chết, **không** gói vô ích. Ghi **§22.6** (bước tiếp theo **cụ thể** cho vòng sau, kèm ca probe bắt buộc) |
