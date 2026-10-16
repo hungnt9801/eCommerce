@@ -44,6 +44,38 @@ public class DatHangController : Controller
     /// <summary>🚨 **GIỎ GIỮ QUA PHIÊN** (`web-001` §86) — ghi dòng hàng vào cookie `gio-web` (HttpOnly, 2 giờ).
     /// 📌 Gọi ở **ĐẦU** POST ⇒ **mọi** đường render lại (kể cả đường **LỖI**) đều giữ giỏ; đường **THÀNH CÔNG** thì **xoá** cookie.
     /// 📌 Chọn **cookie** thay vì `ISession` để **không** phải đổi cấu hình module — và **probe HTTP kiểm được** hành vi.</summary>
+    /// <summary>🚨 §87 — mô tả cookie `gio-web` thành chuỗi người đọc được (vd `A × 2 · B × 3`).
+    /// 🔒 Cookie sửa được ⇒ dữ liệu sai định dạng thì **BỎ QUA** phần đó (chỉ để HIỂN THỊ, không dùng để tính tiền).</summary>
+    private static string MoTaGio(string? gio)
+    {
+        if (string.IsNullOrWhiteSpace(gio)) { return string.Empty; }
+
+        var phan = new List<string>();
+        foreach (var mot in gio.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var hai = mot.Split(':');
+            if (hai.Length != 2) { continue; }
+            if (!int.TryParse(hai[1], out var soLuong) || soLuong < 1) { continue; }
+
+            var sku = hai[0].Trim();
+            if (sku.Length == 0) { continue; }
+
+            phan.Add($"{sku} × {soLuong}");
+        }
+
+        return string.Join(" · ", phan);
+    }
+
+    /// <summary>🚨 §87 — `GET /DatHang/XoaGio`: **XOÁ giỏ đang lưu** (cookie `gio-web`) rồi quay lại biểu mẫu.
+    /// ⚠️ Đây là **GET có tác dụng phụ** (xoá cookie) — chấp nhận được vì: cookie **chỉ chứa SKU:SL** (không giá, không khoá,
+    /// không tổng tiền) nên kẻ tấn công **không thu được gì** ngoài việc làm rỗng giỏ của chính người dùng.</summary>
+    [HttpGet]
+    public IActionResult XoaGio()
+    {
+        Response.Cookies.Delete("gio-web");
+
+        return RedirectToAction(nameof(Index));
+    }
     private static void LuuGio(HttpResponse traLoi, DatHangInput form)
     {
         var phan = new List<string> { $"{form.Sku}:{form.SoLuong}" };
@@ -101,6 +133,8 @@ public class DatHangController : Controller
         };
 
         KhoiPhucGio(trang, Request.Cookies["gio-web"]);
+        // 🚨 §87: mô tả giỏ đang lưu để view hiển thị kèm nút "Xoá giỏ" (rỗng ⇒ không hiện).
+        trang.TomTatGio = MoTaGio(Request.Cookies["gio-web"]);
 
         return View(trang);
     }
@@ -279,6 +313,9 @@ public class DatHangTrangDto
     public string? TienTe { get; set; }
 
     public string? Loi { get; set; }
+    /// <summary>🚨 **MÔ TẢ GIỎ ĐANG LƯU** (`web-001` §87) — chuỗi người đọc được (vd `A × 2 · B × 3`) khi cookie `gio-web` có dữ liệu.
+    /// 📌 Để người dùng **thấy** giỏ còn giữ gì, và có nút **Xoá giỏ** ngay cạnh. Rỗng ⇒ view **không** hiện khối này.</summary>
+    public string TomTatGio { get; set; } = string.Empty;
 }
 
 public class KhoChonDto

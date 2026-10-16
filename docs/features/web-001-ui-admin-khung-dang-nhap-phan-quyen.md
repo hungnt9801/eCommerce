@@ -2674,3 +2674,47 @@ trùng đơn (bấm hai lần ⇒ hai đơn). Đo **khoá khác nhau giữa hai 
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.0-l | 15/10/2026 | *(agent, session GĐ1)* | ✅ **GIỎ GIỮ QUA PHIÊN** bằng cookie `gio-web` (`HttpOnly`, 2 giờ): `LuuGio` (L47) · `KhoiPhucGio` (L63) · GET khôi phục (L103) · POST ghi giỏ **ngay đầu** (L129) · **THÀNH CÔNG ⇒ XOÁ giỏ** (L190). **Kiểm chứng**: sau **LỖI** + **GET MỚI** ⇒ dòng 1 **`GASKU-082729`** · dòng 2 **`KHONG-CO-999`** · `SL2` **`7`**; **khoá checkout KHÁC nhau giữa hai GET** (**`True`** — bất biến §56 còn nguyên); **THÀNH CÔNG** ⇒ tổng **`330.000`**; **GET MỚI ⇒ giỏ RỖNG** (`''`/`''`); build **3/3**; **`fail: 0`** |
+
+---
+
+## 87. ✅ **HIỆN "GIỎ ĐANG LƯU" + NÚT "XOÁ GIỎ" — ĐÃ KIỂM CHỨNG** (15/10/2026) — *hoàn thiện §86*
+
+### 87.1 Đã làm (4 sửa, **mỗi neo khớp đúng 1 lần**, build **3/3**: `exit=0` · `0` dòng `': error '` · DLL có)
+
+| # | Tệp | Thay đổi | Neo |
+|---|---|---|---|
+| 1 | `DatHangController.cs` | `DatHangTrangDto.TomTatGio` | `public string? Loi { get; set; }` |
+| 2 | `DatHangController.cs` (GET) | `trang.TomTatGio = MoTaGio(Request.Cookies["gio-web"])` | lời gọi `KhoiPhucGio` |
+| 3 | `DatHangController.cs` | helper `MoTaGio` + action `GET /DatHang/XoaGio` | chữ ký `LuuGio` |
+| 4 | `Views/DatHang/Index.cshtml` | khối `#gio-da-luu` (**chỉ hiện khi có dữ liệu**) + `#tom-tat-gio` + `#nut-xoa-gio` | dòng `<div>` của ô `Sku` |
+
+🔒 `MoTaGio` **chỉ để HIỂN THỊ** — cookie sai định dạng thì **bỏ qua phần đó**; **không** dùng cookie để tính tiền.
+⚠️ `XoaGio` là **GET có tác dụng phụ** (xoá cookie) — chấp nhận được vì cookie **chỉ chứa `SKU:SL`** ⇒ kẻ tấn công **không thu được gì** ngoài việc làm rỗng giỏ của chính người dùng.
+
+### 87.2 ✅ BẰNG CHỨNG (probe `verify-xoagio.ps1`, chạy trọn, `exit 0`)
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | `GET` khi **chưa** có giỏ | có khối `#gio-da-luu`? **`False`** ✅ *(không hiện khối rỗng)* |
+| 2 | **POST LỖI** ⇒ **GET MỚI** | 🔥 khối **HIỆN** · tóm tắt = **`GBSKU-083039 × 3 · KHONG-CO-083039 × 7`** ✅ |
+| 3 | cùng lượt | dòng 1 giữ **`GBSKU-083039`** ✅ · nút xoá có mặt: **`True`** ✅ |
+| 4 | 🔥 `GET /DatHang/XoaGio` (theo redirect) | còn khối? **`False`** ✅ · dòng 1 = **`''`** ✅ ⇒ **giỏ đã xoá** |
+| 5 | `fail:` · tiến trình treo | **`0`** ✅ · **0** ✅ |
+
+📌 **Vì sao #1 quan trọng:** dễ sai nhất là **luôn** hiện khối *"Giỏ đang lưu: (rỗng)"* — vừa gây nhiễu vừa **gợi ý sai** rằng trong giỏ có hàng.
+📌 **Và #4 đo CẢ hai điều cùng lúc:** `XoaGio` **chuyển hướng** về biểu mẫu **và** cookie **đã bị xoá**.
+
+### 87.3 🐛 Bài học **B3 tái phạm lần thứ 4** — phép kiểm của tôi sai, không phải sản phẩm
+
+Lần chạy đầu, phép kiểm so **văn bản THÔ** với chuỗi chưa-encode ⇒ **`DAT=False`** dù mọi hành vi **đúng**:
+Razor encode `×`→`&#xD7;` và `·`→`&#xB7;` — **đúng chuẩn HTML, an toàn XSS**. Đo được:
+`GBSKU-… &#xD7; 3 &#xB7; KHONG-CO-… &#xD7; 7`.
+⇒ **Sửa PHÉP KIỂM** (`[System.Net.WebUtility]::HtmlDecode`) rồi chạy lại ⇒ **đạt**. **KHÔNG** sửa sản phẩm.
+📌 **Quy tắc (nhắc lại lần 4):** kiểm nội dung **hiển thị** trên HTML ⇒ **luôn GIẢI MÃ ENTITY trước khi so**.
+📌 Và **quy tắc `commit` trong `if (đạt)`** đã **chặn** việc tôi ghi sổ một kết luận sai — **lần thứ tư**.
+
+### 87.4 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.0-m | 15/10/2026 | *(agent, session GĐ1)* | ✅ **HIỆN GIỎ ĐANG LƯU + NÚT XOÁ GIỎ**: `TomTatGio` + `MoTaGio` + `GET /DatHang/XoaGio` + khối `#gio-da-luu` (chỉ hiện khi có dữ liệu). **Kiểm chứng**: ban đầu **không** có khối (**`False`**); sau **POST LỖI** + GET mới ⇒ khối hiện, tóm tắt **`GBSKU-083039 × 3 · KHONG-CO-083039 × 7`**, dòng 1 **`GBSKU-083039`**, nút xoá **`True`**; sau `XoaGio` ⇒ **không** còn khối + ô **trống**; build **3/3**; **`fail: 0`**. 🐛 Lần chạy đầu `DAT=False` do **phép kiểm so văn bản thô** với HTML đã encode (**bài học B3, lần 4**) — sửa **phép kiểm**, không sửa sản phẩm |
