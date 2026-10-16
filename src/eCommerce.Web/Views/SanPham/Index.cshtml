@@ -52,7 +52,9 @@
                 {
                     <tr>
                         <td>@dong.MaBangGia — @dong.TenBangGia</td>
-                        <td>@dong.Sku</td>
+                        @* 🚨 §92: LIÊN KẾT sang trang CHI TIẾT. Dùng `Url.Action` (không ghép URL) ⇒ route đổi thì link TỰ đúng
+                           (Phụ lục D) và SKU được URL-encode. `class` (không `id`) vì mỗi dòng một link — `id` phải DUY NHẤT. *@
+                        <td><a class="lien-ket-chi-tiet" href="@Url.Action("ChiTiet", "SanPham", new { sku = dong.Sku })">@dong.Sku</a></td>
                         <td class="so">@dong.DonGia.ToString("N0")</td>
                     </tr>
                 }

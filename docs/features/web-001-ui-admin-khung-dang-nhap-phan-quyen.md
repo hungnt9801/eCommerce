@@ -2902,3 +2902,36 @@ Route **mặc định** của MVC là `{controller}/{action}/{id?}` ⇒ đoạn 
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.0-q | 15/10/2026 | *(agent, session GĐ1)* | ✅ **CHI TIẾT SẢN PHẨM + SEO**: `GET /SanPham/ChiTiet/{sku}` (**route tường minh**), cùng `IPriceListAppService`, `title`/`meta description`/`canonical`, **`404`** khi không có giá, `HtmlEncode`. **Kiểm chứng**: đối chứng chéo API **`123456.0000`**; trang **`200`**, `<title>` **`GGSKU-084536 — 123,456 VND`**, giá thấp nhất **khớp**; SKU lạ ⇒ **`404`**; build **3/3**; **`fail: 0`**. 🐛 **Lỗi route** (`sku` không bind vì route mặc định dùng `id`) — **ca DƯƠNG** phát hiện, ca âm đã "đạt" vì **lý do sai** |
+
+---
+
+## 92. ✅ **LIÊN KẾT TỪ `/SanPham` SANG TRANG CHI TIẾT — ĐÃ KIỂM CHỨNG** (16/10/2026) — *đóng nợ §91.4 #1*
+
+### 92.1 Đã làm (1 sửa, dùng công cụ `edit` — **không** ghép chuỗi; build **3/3**)
+
+| # | Tệp | Thay đổi |
+|---|---|---|
+| 1 | `Views/SanPham/Index.cshtml` | ô SKU nay là liên kết: `<a class="lien-ket-chi-tiet" href="@Url.Action("ChiTiet", "SanPham", new { sku = dong.Sku })">@dong.Sku</a>` |
+
+📌 **Vì sao `Url.Action` thay vì ghép URL:** route đổi thì link **tự đúng** (Phụ lục D) và SKU được **URL-encode**.
+📌 **Vì sao `class` chứ không `id`:** mỗi dòng có một link ⇒ `id` sẽ **trùng** (HTML không hợp lệ); dùng `class` cho đúng.
+
+### 92.2 ✅ BẰNG CHỨNG (probe chạy trọn, `exit 0`)
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | **Đối chứng chéo API** `items/{id}` | **`123456.0000`** ✅ *(cùng nguồn dữ liệu)* |
+| 2 | 🔥 `/SanPham` có link? | **`True`** ✅ |
+| 3 | 🔥 **`href` đo được** | **`/SanPham/ChiTiet/GHSKU-093002`** — **TRỎ ĐÚNG** `True` ✅ |
+| 4 | 🔥 **Bấm link đó** | HTTP **`200`** ✅ · **`<title>`** = **`GHSKU-093002 — 123,456 VND`** ✅ *(chứa SKU **và** giá khớp API)* |
+| 5 | `fail:` · tiến trình treo | **`0`** ✅ · **0** ✅ |
+
+📌 **Vì sao #3 + #4 cùng nhau mới đủ:** chỉ kiểm *"có thẻ `<a>`"* thì link có thể **trỏ sai** (hoặc trỏ `/SanPham/ChiTiet/0000…`);
+chỉ kiểm `href` thì link có thể **chết** (`404`). Đo **cả hai** ⇒ đường đi **trọn vẹn**: *danh sách → chi tiết*, đúng SKU, có giá.
+
+### 92.3 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.0-r | 16/10/2026 | *(agent, session GĐ1)* | ✅ **Liên kết `/SanPham` → `/SanPham/ChiTiet/{sku}`** (ô SKU, `Url.Action`, `class` không `id`). **Kiểm chứng**: `/SanPham` = **200** và có link **`True`**, `href` = **`/SanPham/ChiTiet/GHSKU-093002`** (**trỏ đúng**), **bấm ⇒ 200** với `<title>` chứa SKU + giá **khớp** API (`123456`); build **3/3**; **`fail: 0`**. ⚠️ **Nợ còn lại:** **slug thay SKU** + `sitemap.xml`/`robots.txt` (phần còn lại của `CAT-003`) |
+
