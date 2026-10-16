@@ -1069,13 +1069,46 @@ Phiên bản đầu: `CustomerAppService` **hiện thực luôn** `ICustomerDire
 |---|---|---|
 | **1** | 🚨 **SỔ ĐỊA CHỈ CHƯA LÀM** (`CustomerAddressLink` + `AddressType` + cờ mặc định) | **BỊ CHẶN CÓ THẬT**: `Address` **chưa tồn tại** trong `AddressHub`. Bất biến *"tối đa MỘT địa chỉ mặc định cho mỗi (khách, loại)"* ở DB **chưa** viết được (partial unique index cần bảng đích tồn tại) |
 | **2** | **Chưa có `CustomerGroup` API/seed** | Entity + mapping + ràng buộc DB **đã có**; **chưa** có endpoint CRUD và **chưa** seed nhóm mặc định (`RETAIL`/`WHOLESALE`/`VIP`) ⇒ hiện phải ghi DB tay |
-| **3** | **Chưa kiểm chứng HTTP** cho lát cắt này | Đã đo **route thật**; **chưa** gọi API thật (tạo/claim/chặn) và **chưa** đọc lại DB. ⚠️ Ghi rõ để **không** ai đọc *"889 test xanh"* thành *"API khách đã chạy"* |
+| **3** | **Chưa kiểm chứng HTTP** cho lát cắt này | ✅ **ĐÃ KIỂM CHỨNG 16/10/2026 — 15/15 ca** (xem **§16.6**): nay **đã gọi API thật** + **đọc lại DB** + **kiểm log không chứa PII thô** |
 | **4** | **Chưa nối đường bán hàng với `ChoPhepGiaoDichAsync`** | `SAL-002`/`SAL-001` **chưa** gọi ⇒ khách `Blocked` **vẫn đặt được hàng** ở đường thật. 📌 Đây là **cổng nghiệp vụ còn trống** (rủi ro: khách chây nợ vẫn mua) |
 | **5** | **Chưa có xuất dữ liệu cá nhân** (quyền *"yêu cầu cung cấp"*) và **chưa có đường xoá mềm có kiểm** | Luật 91/2025/QH15 đã nêu ở §0; hiện mới có `IsDeleted` (hạ tầng `FullAudited`) |
 | **6** | **Chưa có `TenantId` filter test** + chưa có ETO `CustomerChangedEto` | Module khác (`LOY-001` D8) sẽ cần **ETO**; nay chưa phát sự kiện nào |
 | **7** | `GetDanhSachAsync` **chưa phân trang** (có **trần** `toiDa ≤ 500`) | Cần `PagedResultDto` trước khi có UI thật |
 
-### 16.5 Lịch sử thay đổi (bổ sung)
+### 16.6 ✅ **KIỂM CHỨNG HTTP THẬT — 15/15 ca ĐẠT** (16/10/2026, Host :5000 + PostgreSQL 17)
+
+> Đóng nợ **§16.4 #3**. Probe: `tools\_tam-cus\cus-001-kiem.ps1` (token thật, gọi API thật, **đọc lại DB**).
+
+| # | Ca | Kỳ vọng | **Đo được** |
+|---|---|---|---|
+| C1 | `POST tao-khach` (khách mới + khoá idempotency) | `200` · `Inactive` · **là khách vãng lai** | **`200`** · `Inactive` · `laKhachVangLai=true` ✅ |
+| C2 | **Gửi lại CÙNG khoá idempotency** | trả **CÙNG** khách, không tạo thứ hai | **`200`** · **cùng `id`** (`3a2455fd-…`) ✅ |
+| D1 | Trùng **email** với khoá idempotency **khác** | `403` · `Customers:0003` | **`403` · `eCommerce:Customers:0003`** ✅ |
+| E1 | Nâng cấp khách vãng lai | hết vãng lai · tự `Active` | **`200`** · `laKhachVangLai=false` · `Active` ✅ |
+| E2 | **Gọi LẠI** cùng tài khoản | idempotent (`200`, **không** ném) | **`200`** ✅ |
+| E3 | Nâng cấp sang tài khoản **KHÁC** | `403` · `Customers:0004` | **`403` · `0004`** ✅ (đổi chủ sở hữu ⇒ chặn) |
+| F0 | `cho-phep-giao-dich/{id}` (hợp đồng nội bộ) | **`404`** — đã gỡ khỏi API | **`404`** ✅ (xác nhận §16.2 đã sửa) |
+| F1 | Chặn khách | `Blocked` · `dungDuoc=false` | **`200`** · `Blocked` · `dungDuoc=false` ✅ |
+| F2 | Chặn **LẦN HAI** | idempotent | **`200`** ✅ |
+| F3 | Nâng cấp khách **ĐANG BỊ CHẶN** | `403` · `Customers:0005` | **`403` · `0005`** ✅ (không cho đường vòng qua lệnh chặn) |
+| F4 | Gỡ chặn (có lý do) | `Active` · `dungDuoc=true` | **`200`** · `Active` · `true` ✅ |
+| F5 | Gỡ chặn khách **KHÔNG** bị chặn | `403` · `Customers:0002` | **`403` · `0002`** ✅ (**không im lặng** — đúng `ADR-04`) |
+| G1 | Email **sai định dạng** | `403` · `Customers:0007` | **`403` · `0007`** ✅ |
+| I1 | Neo log đường tạo khách | có dòng | `CUS-DA-TAO` = 1 · `CUS-IDEM-TRUNG` = 1 · `CUS-LIENHE-TRUNG` = 1 · `CUS-DOI-TRANG-THAI` = 3 ✅ |
+| **I2** | 🚨 **Log KHÔNG được chứa email thô** (`ADR-11`) | **0** dòng | **0 dòng** ✅ — *PII thật sự được che ở đường chạy thật* |
+
+**Trạng thái DB sau phép đo (đọc bằng `SELECT`):**
+
+| Kiểm | Giá trị **đo được** |
+|---|---|
+| `CusCustomers` (khách thử `K98%`) | **1** dòng: `Status=1` (`Active`) · có `IdentityUserId` · `IdempotencyKey=k98:order:1` · **`IsDeleted=false`** |
+| Tổng `CusCustomers` | **1** — 🔒 **không có rác**: ca G1 (email sai) **NÉM trước khi ghi** ⇒ DB **sạch** |
+| Index `NULLS NOT DISTINCT` của 2 bảng khách | **3** (đúng 3 bất biến: nhóm · tài khoản · idempotency) |
+
+📌 **Vì sao ca I2 quan trọng nhất:** mọi thứ khác là *"API trả đúng mã"*; **I2** mới chứng minh **nghĩa vụ pháp lý**
+(Luật 91/2025/QH15) **có hiệu lực ở đường chạy thật** — tức `PiiMasker` **được dùng**, không chỉ **tồn tại**.
+
+### 16.7 Lịch sử thay đổi (bổ sung)
 
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
