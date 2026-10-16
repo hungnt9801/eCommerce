@@ -1139,3 +1139,112 @@ trạng thái nửa vời. 🔒 Đó là lý do **mọi** migration của dự �
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.3 | 16/10/2026 | *(agent, session GĐ1)* | **§17 — LÁT CẮT 2: MEDIA SẢN PHẨM (lõi bảo mật + domain + DB)**: `NhanDangAnh` (**magic bytes**, `ADR-13` — **lõi THUẦN**, 4 định dạng, WebP kiểm **hai** chữ ký, **không đọc quá mảng**) · `ProductMedia` (**`ADR-02`** không bytes trong DB · **`ADR-12`** tối đa một ảnh chính · `Alt` **bắt buộc** cho ảnh chính) · `IMediaStorage` (**hợp đồng**, bytes ở object storage) · mã `Catalog:0028…0031` · quyền `Products.ManageMedia` · migration `20261016112214_Cat003_ProductMedia` với **unique index có bộ lọc + `NULLS NOT DISTINCT`** (SQL thô, `DROP INDEX IF EXISTS`) · **+41 unit test** (1016 tổng) · **NND 46 → 47**. ✅ **Kiểm chứng DB THẬT (4 phép đo)**: ảnh chính thứ hai bị **`duplicate key … IX_CatProductMedia_MotAnhChinh`** chặn, với `Key ("TenantId","ProductId")=(null, …)` ⇒ **`NULLS NOT DISTINCT` hoạt động**. Ghi **§17.6** (giới hạn **polyglot** + phòng thủ nhiều lớp) · **§17.7** (bẫy `DROP INDEX` không `IF EXISTS`) · **§17.8** (nợ: **chưa có lớp hiện thực `IMediaStorage`**, **chưa có app service/endpoint**, chưa có UI, `0029` chưa dùng, chưa dọn tệp mồ côi, chưa kiểm px, **hiển thị theo kênh vẫn 0 dòng code**) |
+
+---
+
+## 18. ✅ **LÁT CẮT 3 — KHO TỆP CỤC BỘ (`IMediaStorage` HIỆN THỰC)** (16/10/2026) — *đóng nợ §17.8 #1*
+
+> ⚠️ **PHẠM VI NÓI RÕ:** lát cắt này làm **lớp hiện thực** `IMediaStorage` trên **đĩa cục bộ** ⇒ media
+> **thật sự ghi/đọc/xoá được**. 🚫 **CHƯA** làm: **app service tải lên + endpoint** · **UI quản lý ảnh** ·
+> **job dọn tệp mồ côi** · **hiển thị theo kênh**. Nợ ghi ở **§18.7**.
+
+### 18.1 Vì sao bắt đầu bằng **đĩa cục bộ** (không nhảy thẳng lên S3)
+
+| # | Lý do | Hệ quả |
+|---|---|---|
+| **1** | Hợp đồng `IMediaStorage` đã tách **nghiệp vụ** khỏi **nơi lưu** | Kiểm **toàn bộ** đường ghi/đọc/xoá **ngay trên máy dev** — không cần tài khoản cloud, không cần mạng |
+| **2** | Lên thật chỉ là **thay lớp hiện thực** | **Không phải sửa một dòng** nghiệp vụ nào |
+| **3** | 🔒 **Không** vi phạm `ADR-02` | Bytes nằm **ngoài** PostgreSQL; bảng chỉ giữ **metadata** |
+
+📌 Giới hạn **đã biết và phải xử lý trước khi scale**: mỗi instance một đĩa ⇒ **không dùng được khi chạy
+nhiều instance**; và lớp này **không** phục vụ tệp qua HTTP (việc đó thuộc tầng phục vụ — xem §17.6).
+
+### 18.2 🚨 **CHỐNG THOÁT THƯ MỤC** — bảo vệ quan trọng nhất của lát cắt
+
+**Vì sao là lỗ hổng nghiêm trọng nhất của mọi chức năng tải tệp:** nếu khoá đến từ dữ liệu người dùng
+kiểm soát, một khoá như `../../appsettings.json` hoặc `../../wwwroot/x.html` sẽ khiến hệ thống
+**ghi/đọc/xoá tệp NGOÀI thư mục kho** — ghi đè cấu hình, hoặc **đặt tệp thực thi vào thư mục web**.
+📌 Trong lớp này khoá **do hệ thống sinh**, NHƯNG nó **được lưu vào DB và đọc lại** ở mọi lần phục vụ/xoá
+⇒ nó là **dữ liệu**, phải kiểm **như dữ liệu không tin được**.
+
+🔒 **Bốn lớp kiểm (làm hết, không lớp nào thay được lớp nào):**
+
+| # | Lớp | Chặn ca nào |
+|---|---|---|
+| **1** | Khoá **không rỗng** | `""`, `"   "` |
+| **2** | Khoá **không tuyệt đối** (`Path.IsPathRooted`) | `/etc/passwd` · `C:\Windows\…` — đường dẫn tuyệt đối **bỏ qua hoàn toàn** gốc kho |
+| **3** | Khoá **không chứa `..`** — kiểm trên **từng đoạn đã tách** (`Split('/')`), không trên chuỗi thô | `../x` · `..\x` · `media/../../x` (cả `\` được chuẩn hoá về `/` trước khi tách) |
+| **4** | 🚨 **LƯỚI AN TOÀN CUỐI:** sau khi ghép, **kiểm lại** đường dẫn kết quả vẫn **nằm trong** gốc kho | Mọi cách viết `..` mà ba lớp trên **chưa nghĩ tới** (mã hoá, ký tự lạ, `.` lặp) |
+
+⚠️ **MỘT CHI TIẾT DỄ SAI Ở LỚP 4 (đã viết đúng có chủ ý):** phép so **phải** dùng **tiền tố có dấu phân cách**
+(`goc + Path.DirectorySeparatorChar`), **KHÔNG** `StartsWith(goc)` trần.
+📌 Vì sao: `/kho-media-khac` **cũng** bắt đầu bằng `/kho-media` ⇒ so trần sẽ **cho qua** một thư mục
+**anh em** — đúng loại lỗi *"trông như đã kiểm"*.
+
+### 18.3 Ba bất biến an toàn khác
+
+| # | Bất biến | Vì sao |
+|---|---|---|
+| **1** | **Khoá do HỆ THỐNG sinh** — `media/{tenant}/{product}/{guid}.{ext}`, `guid` **mới** mỗi lần lưu | Nếu dùng **tên tệp client gửi** thì hai tệp khác nhau **ghi đè** nhau ⇒ **mất ảnh của người khác**, **không lỗi nào**. 🔒 Hợp đồng `IMediaStorage` **không** nhận tham số tên tệp — đó là **chủ ý** |
+| **2** | **Đuôi tệp lấy từ `DinhDangDaKiem`** (đã kiểm magic bytes) | `Content-Type` khi phục vụ **khớp** nội dung thật — đây là lớp chặn *"HTML đội lốt `.png`"* |
+| **3** | **`XoaAsync` IDEMPOTENT** | Xoá ảnh là thao tác người dùng **bấm lại** và **có thể chạy lại** sau lỗi mạng; ném ở lần thứ hai sẽ chặn **việc dọn dẹp** ⇒ **tệp mồ côi** tốn dung lượng |
+
+➕ **Lỗi I/O khi xoá được BẮT và ghi log `Warning`, KHÔNG ném**: thứ tự đúng là **xoá DB trước, xoá tệp sau**;
+nếu ném ở đây thì dòng DB **không** bị xoá và người dùng **mãi** thấy ảnh đó. Tệp còn lại chỉ là **rác**
+(dọn được bằng job), còn dòng DB còn lại là **sai dữ liệu**.
+
+### 18.4 ✅ Kiểm chứng — **21 unit test**
+
+| Nhóm | Nội dung |
+|---|---|
+| **Hợp đồng I/O** | lưu rồi đọc lại ⇒ **đúng bytes** · khoá do hệ thống sinh (có đuôi theo định dạng, nằm trong `media/`, **không** chứa `..`) · **lưu hai lần ⇒ hai khoá KHÁC nhau** (không ghi đè) · đọc khoá không tồn tại ⇒ **`null`** (không ném) |
+| **Xoá** | xoá rồi đọc ⇒ `null` · **xoá hai lần ⇒ không ném** · xoá khoá không tồn tại ⇒ không ném |
+| **Nội dung rỗng** | ⇒ **NÉM** `TepKhongPhaiAnh` (không tạo tệp rác 0 byte) |
+| 🚨 **CHỐNG THOÁT THƯ MỤC (ĐỌC)** | **6 dạng** khoá `..` (gồm `\` Windows) — mỗi ca **ghi một tệp BÍ MẬT ngay cạnh** thư mục kho rồi thử đọc nó ⇒ **NÉM** `KhongTimThayAnh` |
+| 🚨 **CHỐNG THOÁT THƯ MỤC (GHI TUYỆT ĐỐI)** | `/etc/passwd` · `C:\Windows\…` ⇒ **NÉM** |
+| 🚨 **CHỐNG THOÁT THƯ MỤC (XOÁ)** | khoá `../` ⇒ **NÉM**, và **tệp NGOÀI vẫn còn nguyên** — 📌 đường **xoá** nguy hiểm hơn đường **đọc** |
+| 🚨 **ĐỐI CHỨNG** | đường **hợp lệ** phải nằm **trong** thư mục kho — nếu test này đỏ thì các test chặn kia có thể **xanh vì lý do sai** (chặn tất cả) |
+| **Tách tenant** | có/không `tenantId` ⇒ khoá ở **thư mục khác** nhau |
+| **Không ghi ra ngoài** | số tệp trong `ContentRoot` tăng **đúng 1** |
+
+📌 Mỗi test dùng **thư mục tạm RIÊNG** (`Guid`) và **tự dọn** ⇒ test **độc lập**, chạy song song được,
+**không** để lại rác trong repo. ⚠️ Đây **không phải** chi tiết nhỏ: dùng chung một thư mục thì test này
+xoá tệp của test kia ⇒ **đỏ ngẫu nhiên** — loại lỗi tốn thời gian nhất để tìm.
+
+### 18.5 🛡️ `.gitignore` — **bắt buộc**, nếu không repo phình vô hạn
+
+Đã thêm `**/media-noi-bo/` và `media-noi-bo/`.
+📌 **Vì sao:** đây là **nội dung người dùng tải lên**, **không** phải mã nguồn. Commit vào repo sẽ làm
+repo **phình vô hạn** (mỗi ảnh vài trăm KB) và **không bao giờ** dọn được — *xoá ảnh trong repo = xoá
+lịch sử git*.
+✅ **Kiểm chứng:** tạo tệp thật trong `src/eCommerce.Web/media-noi-bo/thu/a.png` ⇒
+`git status` **không** thấy nó; `git check-ignore -v` xác nhận `.gitignore:52:media-noi-bo/`.
+
+### 18.6 🐞 Bộ đo lại sai (lần thứ ba trong ba lượt liên tiếp)
+
+Ca `Luu__dat_tep_DUNG_trong_thu_muc_kho__khong_ra_ngoai` **ĐỎ** ở lần chạy đầu dù sản phẩm **hoàn toàn đúng**:
+tôi ghép `ContentRoot + khoá`, nhưng đường dẫn thật là `ContentRoot + ThuMucMacDinh + khoá`.
+📌 **Lỗi của bộ đo** (giả định cấu trúc thư mục), không phải của sản phẩm — và nó **che** mất việc sản phẩm
+chạy đúng.
+🔑 **Ba lượt liên tiếp, ba lỗi bộ đo khác nhau** (§17.7 `DROP INDEX` · §18.6 lượt trước: `t` vs `true` ·
+lượt này: cấu trúc thư mục). 📌 **Điểm chung:** cả ba đều là **giả định về công cụ/hệ thống**, không phải
+về **dữ liệu** — và cách phát hiện **luôn** là *"in giá trị THẬT ra trước khi viết kỳ vọng"*
+(`tools\README-probe.md`).
+
+### 18.7 ⏳ NỢ (KHÔNG phải tính năng đã có)
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+| **1** | 🚨 **CHƯA có app service tải lên + endpoint** | Kho tệp **dùng được** nhưng **chưa có đường gọi từ ngoài** ⇒ vẫn **chưa tải được ảnh qua API/UI**. 📌 Cùng họ `SAL-006` §17 (*"đã cài nhưng không có đường gọi tới"*) |
+| **2** | **CHƯA có UI quản lý ảnh** | Chưa trang, chưa menu |
+| **3** | **CHƯA có job dọn tệp mồ côi** | Nếu DB ghi hỏng sau khi ghi tệp ⇒ **tệp mồ côi** (rác). Chấp nhận được (`§17.8` đã ghi: ghi tệp trước, DB sau) nhưng cần job |
+| **4** | **CHƯA có tầng PHỤC VỤ tệp** | Chưa endpoint `GET` trả ảnh ⇒ **phải** đặt `Content-Type` từ `DinhDangDaKiem` + `nosniff` + **không** dùng cùng tên miền (xem §17.6) |
+| **5** | **Chưa giới hạn dung lượng ở đường ghi** | `AnhQuaKichThuoc` (`0029`) vẫn chưa dùng — trần phải cưỡng chế **trước khi** nhận bytes (chưa làm) |
+| **6** | **Chưa cấu hình được thư mục gốc** | `MediaStorageNoiBo` dùng `ContentRootPath/media-noi-bo` **cố định**; kế hoạch ghi ở doc comment là `MediaStorage:ThuMucGoc` nhưng **chưa** đọc configuration |
+| **7** | 🚨 **HIỂN THỊ THEO KÊNH vẫn 0 dòng code** | Phần **thứ ba** của `CAT-003` (§16.8 nợ 2) |
+
+### 18.8 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.4 | 16/10/2026 | *(agent, session GĐ1)* | **§18 — LÁT CẮT 3: KHO TỆP CỤC BỘ** (đóng nợ §17.8 #1): `MediaStorageNoiBo` hiện thực `IMediaStorage` trên đĩa · 🚨 **CHỐNG THOÁT THƯ MỤC 4 lớp** (rỗng · tuyệt đối · `..` theo **đoạn** · **lưới an toàn tiền tố có dấu phân cách**) · khoá do **hệ thống** sinh (`guid`, không tên tệp client) · `XoaAsync` **idempotent** + lỗi I/O **không ném** (chỉ log) · **+21 unit test** (1037 tổng) · `.gitignore` `media-noi-bo`. Ghi **§18.2** (chi tiết dễ sai ở lớp 4: `StartsWith` trần cho qua thư mục **anh em**) · **§18.6** (bộ đo sai lần thứ **ba** liên tiếp: giả định cấu trúc thư mục) · **§18.7** (nợ: **chưa có app service/endpoint**, chưa UI, chưa job dọn tệp mồ côi, chưa tầng phục vụ tệp, chưa trần dung lượng, chưa cấu hình thư mục gốc, **hiển thị theo kênh vẫn 0 dòng code**) |

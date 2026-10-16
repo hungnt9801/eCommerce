@@ -42,3 +42,11 @@ src/eCommerce.Web/wwwroot/libs/
 
 ## Tài liệu: ảnh/export tạm
 docs/**/*.tmp.md
+
+# 🚨 `CAT-003` — KHO TỆP MEDIA CỤC BỘ (`MediaStorageNoiBo`).
+# 📌 VÌ SAO PHẢI BỎ QUA: đây là **nội dung người dùng tải lên** (ảnh sản phẩm) — **không** phải mã nguồn.
+# Commit nó vào repo sẽ làm repo **phình vô hạn** (mỗi ảnh vài trăm KB), và **không bao giờ** dọn được
+# (xoá ảnh trong repo = xoá lịch sử git). 🔒 Ở production, thư mục này **phải** được thay bằng kho dùng
+# chung (S3/Azure) — xem giới hạn đã biết ở `MediaStorageNoiBo`.
+**/media-noi-bo/
+media-noi-bo/
