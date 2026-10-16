@@ -126,3 +126,28 @@ Nếu là **initializer** ⇒ đặt mã **TRƯỚC** ``new …`` (hoặc **trư
 Vòng 97 **không** commit gì cho tính năng (cây làm việc bị **hoàn nguyên** » **``git status`` sạch** » **build lại ``0`` lỗi, ``exit 0``**,
 ``eCommerce.Web.dll`` **có**). ⇒ Repo về **đúng trạng thái đã kiểm chứng gần nhất (183 commit)** thay vì mang theo mã **không biên dịch được**.
 📌 **Bài học:** ``git checkout -- <tệp>`` là cách **rẻ nhất** để thoát khỏi một bản sửa hỏng **chưa commit** — **nhanh hơn** sửa tiếp.
+
+---
+
+## I. 🚨 **PROBE + SETTING CỦA ABP + LOG TIẾNG VIỆT** (vòng GĐ1 `INV-003`/`REC-001`, 16/10/2026)
+
+> **Vì sao có mục này:** phép kiểm hạn mức theo kênh cho **4 ca SAI** (F2 · G2 · G3 · H2a) và **không có lỗi nào**
+> chỉ ra — nguyên nhân nằm **hoàn toàn ở PROBE**, không ở sản phẩm. 📌 Đúng kết luận Phụ lục C: *ghi bài học
+> **không đủ** — cần **danh mục** để lần sau không vấp lại.*
+
+| # | Bẫy | Triệu chứng **đo được** | Cách tránh |
+|---|---|---|---|
+| **I1** | 🔴 **Mẫu key cache setting SAI** | Xoá cache bằng `--pattern '*TenSetting*'` ⇒ **`(không có)`** (0 key) và **giá trị CŨ vẫn có hiệu lực** ⇒ 4 ca sai | Key THẬT: `c:Volo.Abp.SettingManagement.Setting,*` + `*AbpInMemorySettingCacheStamp*`. 🔒 **IN RA SỐ KEY đã xoá** — `0 key` là **dấu hiệu MẪU SAI**, không phải *"không có gì để xoá"* |
+| **I2** | 🔴 **Cache tầng 2 TRONG BỘ NHỚ tiến trình** | Xoá Redis **không đủ**: setting vẫn là giá trị cũ cho tới khi Host khởi động lại | Đổi setting ⇒ **xoá cache + KHỞI ĐỘNG LẠI Host**; hoặc tách **mỗi nhóm chính sách = một phiên Host** (probe `INV-003` làm đúng vậy: 5 phiên) |
+| **I3** | 🔴 **`UPDATE 0` là BẰNG CHỨNG, không phải lỗi vặt** | Đổi `Recon.Mismatch.Action` ⇒ **`UPDATE 0`** (setting **không có dòng nào** trong `AbpSettings`; giá trị đến từ `SettingDefinitionProvider`) ⇒ lượt quét ghi `KetLuan = 1` **dù đã "đổi"** | **ĐỌC SỐ DÒNG bị ảnh hưởng** sau mỗi `UPDATE`/`DELETE`. Giá trị **mặc định** của setting **KHÔNG nằm trong DB** ⇒ `SELECT` rỗng nghĩa *"đang dùng mặc định trong mã"*, **không** nghĩa *"chưa đặt"*. Muốn đổi ⇒ **`INSERT`** |
+| **I4** | 🔴 **Log có tiếng Việt ⇒ KHÔNG tìm được bằng chuỗi có dấu** | `Select-String 'HẠN MỨC KÊNH'` ⇒ **0 dòng**, nhưng dòng đó **CÓ** trong log (`H?N M?C` — console logger làm hỏng dấu) | **Đặt NEO ASCII trong chính câu log** (`[INV003-HANMUC-AP-DUNG]` · `[REC001-CO-LECH]`) rồi tìm bằng neo. 📌 Neo là **một phần của mã sản phẩm** ⇒ phải thêm vào `Logger.*` **ngay khi viết log**, không phải sửa probe |
+| **I5** | 🔴 **Điều kiện tiên quyết của DỮ LIỆU GIEO bị bỏ qua** | Dòng sổ cái gieo **thất bại** (sai tên cột) mà probe vẫn chạy ⇒ ca "đối soát đúng" và ca "dữ liệu gieo hỏng" cho **cùng kết quả** | **ĐỌC LẠI** điều kiện tiên quyết **sau khi gieo** và **in ra** (`A5 SOCAI_THUONG=1000`). ⚠️ Đã dính **hai lần trong cùng một vòng**: sai `ExtraProperties` **rồi** sai `ConcurrencyStamp` — vì **đoán** tên cột ⇒ **luôn `information_schema.columns`** trước khi viết `INSERT` |
+| **I6** | 🔴 **`$ketQua.Add($f ...)` + `$f \| Out-Null`** | Hàm trả về object ⇒ **in cả bảng thuộc tính** ra output; dùng `\| Out-Null` để chặn thì **chặn luôn** các `Write-Output` **bên trong** ⇒ **không một dòng kết quả nào** để đọc | Hàm **ghi vào một `List` tham chiếu** (tham số `-Mang`) và **KHÔNG `return`** object; điều khiển việc in bằng **`-Im`** |
+| **I7** | 🔴 **Hết hàng giữa chừng làm hỏng phép đo** | Các ca `Warn`/`PhamVi` trả `0001` (*không đủ hàng*) ⇒ phép đo **không trả lời được** câu hỏi đang hỏi | **Cô lập biến số:** phép đo *"hạn mức nào đang áp"* chỉ có nghĩa khi **tồn khả dụng DƯ** (gieo `1000`, không phải `40`) |
+
+📌 **Ba quy tắc gọn để dán vào đầu mọi probe có setting/log:**
+
+1. Đổi setting ⇒ **xoá ĐÚNG key + khởi động lại Host** + **in số key đã xoá** + **in số dòng UPDATE**.
+2. Log nghiệp vụ ⇒ **neo ASCII trong chính câu log**, tìm bằng neo.
+3. Gieo dữ liệu ⇒ **đọc lại bằng `SELECT`** và **in điều kiện tiên quyết**; **tra `information_schema.columns`** trước khi `INSERT`.
+

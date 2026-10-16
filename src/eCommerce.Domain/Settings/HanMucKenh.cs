@@ -7,11 +7,13 @@ namespace eCommerce.Settings;
 /// chỗ **dễ sai** và **không cần DB** ⇒ tách ra để **kiểm được bằng unit test** trước khi tin nó trong đường đặt hàng.
 /// 🔒 Hàm **không ném**, **không side effect**, chỉ trả **quyết định**.
 ///
-/// ⚠️ **PHẠM VI v1 (ghi rõ, không giấu):**
-///   • hạn mức lấy từ **MỘT** giá trị dùng chung (`Inv.ChannelLimit.DefaultValue`) — **bảng riêng cho từng kênh** là lát cắt sau;
+/// ⚠️ **PHẠM VI v2 (ghi rõ, không giấu):**
+///   • ✅ hạn mức lấy từ **bảng RIÊNG TỪNG KÊNH** (`InvChannelLimits`) — xem <see cref="ChonHanMuc"/>; chỉ khi
+///     kênh **chưa** cấu hình mới rơi về giá trị **dùng chung** (`Inv.ChannelLimit.DefaultValue`);
 ///   • **`Percent`** = phần trăm của **tồn khả dụng CỦA TỪNG `(kho, SKU)`** tại thời điểm giữ chỗ — không phải tổng của cả kênh
 ///     (tồn kho chưa mô hình hoá "theo kênh"; đây là **giới hạn đã biết**, ghi ở `web-001` §94);
-///   • **`PhamVi`** (`Channel` | `ChannelWarehouse`) **đã khai báo** nhưng chưa làm khác nhau ở v1 ⇒ **nợ**.
+///   • ✅ **`PhamVi`** (`Channel` | `ChannelWarehouse`) **nay CÓ tác dụng**: quyết định dòng `(kênh, kho)` có được
+///     xét hay không (xem <see cref="ChonHanMuc"/>) — không còn là "ô chọn không đổi gì".
 /// </summary>
 public static class HanMucKenh
 {
@@ -66,4 +68,107 @@ public static class HanMucKenh
     /// </summary>
     public static bool HanMucVoNghia(DonViHanMuc donVi, decimal giaTri, int tonKhaDung)
         => giaTri > 0 && TinhHanMuc(donVi, giaTri, tonKhaDung) <= 0;
+
+    // ── `INV-003` v2 — CHỌN HẠN MỨC TỪ BẢNG RIÊNG TỪNG KÊNH ────────────────────────────────────────
+
+    /// <summary>Dòng hạn mức **đã đọc từ DB** (dạng rút gọn) để <see cref="ChonHanMuc"/> là **hàm THUẦN**.</summary>
+    public sealed record DongHanMuc(Guid Id, Guid? WarehouseId, decimal GiaTri, HanhDongHanMuc HanhDong);
+
+    /// <summary>Nguồn của hạn mức đang áp — 🔑 **phải ghi được vào log/DB**, nếu không thì *"vì sao đơn bị chặn"* không trả lời được.</summary>
+    public enum NguonHanMuc
+    {
+        /// <summary>Dòng `(kênh, kho)` trong `InvChannelLimits` — chặt nhất, ưu tiên cao nhất.</summary>
+        BangTheoKenhVaKho,
+
+        /// <summary>Dòng `(kênh, mọi kho)` trong `InvChannelLimits`.</summary>
+        BangTheoKenh,
+
+        /// <summary>Không có dòng nào cho kênh ⇒ dùng `Inv.ChannelLimit.DefaultValue`.</summary>
+        MacDinhChung
+    }
+
+    /// <summary>Kết quả chọn hạn mức: **đã trộn** mọi nguồn thành **MỘT** con số + **MỘT** hành động + **nguồn**.</summary>
+    public sealed record KetQuaHanMuc(
+        PhamViHanMuc PhamVi,
+        NguonHanMuc Nguon,
+        Guid? DongId,
+        decimal GiaTri,
+        DonViHanMuc DonVi,
+        HanhDongHanMuc HanhDong);
+
+    /// <summary>
+    /// 🎯 **CHỌN HẠN MỨC ĐANG ÁP** cho một `(kênh, kho)` — hàm **THUẦN** (không DB, không side effect).
+    ///
+    /// **LUẬT CHỌN (thứ tự ưu tiên từ chặt tới lỏng):**
+    /// <list type="number">
+    ///   <item><b>`ChannelWarehouse`</b> (phạm vi chặt): dòng có **đúng** `WarehouseId` thắng → nếu không có thì dòng `WarehouseId = null` → nếu vẫn không có thì mặc định chung.</item>
+    ///   <item><b>`Channel`</b> (phạm vi lỏng): **CHỈ** xét dòng `WarehouseId = null`; dòng theo kho bị **bỏ qua có chủ ý**
+    ///     (trả về trong <c>boQua</c> để chỗ gọi **ghi cảnh báo** — nếu bỏ qua **im lặng** thì người vận hành
+    ///     đã cấu hình hạn mức theo kho mà **không hiểu vì sao nó không có tác dụng**).</item>
+    /// </list>
+    /// 🔒 **Cấm "nhiều dòng cùng khớp" là BẤT KHẢ THI ở DB** (unique index `NULLS NOT DISTINCT` trên
+    /// `(TenantId, ChannelCode, WarehouseId)`) ⇒ hàm này **không** phải chỗ chống trùng.
+    /// 📌 Nhưng vì dữ liệu có thể đến từ **cache/ảnh chụp cũ** hoặc từ test, hàm **vẫn** chọn **tất định**:
+    /// nhiều dòng cùng khớp ⇒ lấy **giá trị NHỎ NHẤT** (chặt nhất), rồi tới `Id` nhỏ nhất — **không** phụ thuộc
+    /// thứ tự đầu vào (nếu lấy "dòng đầu tiên" thì kết quả phụ thuộc thứ tự DB trả về ⇒ cùng dữ liệu, hai kết quả).
+    /// </summary>
+    /// <param name="phamVi">Phạm vi đang cấu hình (`Inv.ChannelLimit.Scope`).</param>
+    /// <param name="cacDong">Các dòng hạn mức **của đúng kênh này** đã đọc từ `InvChannelLimits`.</param>
+    /// <param name="warehouseId">Kho đang giữ chỗ.</param>
+    /// <param name="donVi">Đơn vị **dùng chung** (`Inv.ChannelLimit.Unit`) — không phải thuộc tính từng dòng (ghi rõ ở `InvChannelLimit`).</param>
+    /// <param name="giaTriMacDinh">Giá trị mặc định dùng chung (`Inv.ChannelLimit.DefaultValue`).</param>
+    /// <param name="hanhDongMacDinh">Hành động mặc định dùng chung (`Inv.ChannelLimit.Action`).</param>
+    /// <param name="boQua">Các dòng bị **bỏ qua do phạm vi** ⇒ chỗ gọi dùng để ghi cảnh báo (KHÔNG im lặng).</param>
+    public static KetQuaHanMuc ChonHanMuc(
+        PhamViHanMuc phamVi,
+        IEnumerable<DongHanMuc> cacDong,
+        Guid warehouseId,
+        DonViHanMuc donVi,
+        decimal giaTriMacDinh,
+        HanhDongHanMuc hanhDongMacDinh,
+        out IReadOnlyList<DongHanMuc> boQua)
+    {
+        ArgumentNullException.ThrowIfNull(cacDong);
+
+        var tatCa = cacDong as IReadOnlyList<DongHanMuc> ?? cacDong.ToList();
+        var biBoQua = new List<DongHanMuc>();
+
+        var ungVien = new List<DongHanMuc>();
+
+        if (phamVi == PhamViHanMuc.ChannelWarehouse)
+        {
+            // ① Đúng (kênh, kho) — chặt nhất.
+            ungVien.AddRange(tatCa.Where(x => x.WarehouseId == warehouseId));
+
+            // ② Không có dòng theo kho ⇒ rơi về dòng cả kênh.
+            if (ungVien.Count == 0)
+            {
+                ungVien.AddRange(tatCa.Where(x => x.WarehouseId is null));
+            }
+        }
+        else
+        {
+            ungVien.AddRange(tatCa.Where(x => x.WarehouseId is null));
+
+            // 🚨 Dòng theo KHO bị bỏ qua ⇒ phải TRẢ RA để chỗ gọi ghi cảnh báo (không bỏ qua im lặng).
+            biBoQua.AddRange(tatCa.Where(x => x.WarehouseId is not null));
+        }
+
+        boQua = biBoQua;
+
+        if (ungVien.Count == 0)
+        {
+            return new KetQuaHanMuc(phamVi, NguonHanMuc.MacDinhChung, null, giaTriMacDinh, donVi, hanhDongMacDinh);
+        }
+
+        // 🔒 Chọn TẤT ĐỊNH khi có nhiều dòng cùng khớp (xem chú thích): giá trị nhỏ nhất (chặt nhất) rồi `Id` nhỏ nhất.
+        var chon = ungVien
+            .OrderBy(x => x.GiaTri)
+            .ThenBy(x => x.Id)
+            .First();
+
+        var nguon = chon.WarehouseId is null ? NguonHanMuc.BangTheoKenh : NguonHanMuc.BangTheoKenhVaKho;
+
+        return new KetQuaHanMuc(phamVi, nguon, chon.Id, chon.GiaTri, donVi, chon.HanhDong);
+    }
 }

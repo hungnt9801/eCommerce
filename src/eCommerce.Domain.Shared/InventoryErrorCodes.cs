@@ -90,4 +90,30 @@ public static class InventoryErrorCodes
     /// </summary>
     public const string VuotHanMucKenh = Nhom + "0042";
 
+    /// <summary>
+    /// **Hạn mức theo kênh THIẾU mã kênh** (`INV-003` — bảng `InvChannelLimits`).
+    /// 📌 **VÌ SAO LÀ LỖI, KHÔNG PHẢI "MẶC ĐỊNH CHO QUA":** một dòng hạn mức **không gắn kênh** sẽ **không bao giờ
+    /// khớp** lúc giữ chỗ ⇒ người vận hành tưởng đã siết kênh, thực tế **không có gì được siết**.
+    /// Đây đúng họ lỗi "cấu hình sai mà im lặng" mà `INV-003` sinh ra để chặn.
+    /// </summary>
+    public const string HanMucKenhThieuMaKenh = Nhom + "0043";
+
+    /// <summary>
+    /// **Hạn mức theo kênh có giá trị ÂM** (`INV-003`).
+    /// 📌 Quy ước toàn hệ thống: `0` = **TẮT**; cho phép số âm tạo ra **hai cách diễn đạt cùng một ý**
+    /// (âm và 0 đều là tắt) ⇒ chỗ đọc hiểu khác nhau ⇒ hạn mức **âm thầm** khác nhau giữa các đường.
+    /// </summary>
+    public const string HanMucKenhGiaTriAm = Nhom + "0044";
+
+    /// <summary>
+    /// **Hạn mức theo kênh ĐÃ TỒN TẠI cho phạm vi đó** (`INV-003`) — hàng rào DB
+    /// `IX_InvChannelLimits_TenantId_ChannelCode_WarehouseId` (`NULLS NOT DISTINCT`).
+    /// 📌 **VÌ SAO MÃ RIÊNG (không mượn `0043`):** `0043` nghĩa *"thiếu mã kênh"* — một **lỗi dữ liệu vào**.
+    /// Ca này là **xung đột/trùng lặp**: người vận hành cần nghe *"sửa dòng đang có"*, **không** phải
+    /// *"bạn quên mã kênh"*. Trả sai chỉ dẫn ở đây làm người dùng **đi sửa trường không sai**
+    /// (bài học `0040`/`0042`: **mã đúng kỹ thuật nhưng sai nghiệp vụ**).
+    /// 🔒 Cũng **không** được nuốt thành `500`: hai request đồng thời / màn hình bấm hai lần là **bình thường**.
+    /// </summary>
+    public const string HanMucKenhDaTonTai = Nhom + "0045";
+
 }

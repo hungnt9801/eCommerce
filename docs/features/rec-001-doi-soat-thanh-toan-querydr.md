@@ -1009,3 +1009,198 @@ public class ReconciliationSchemaTests   // cần PostgreSQL (Testcontainers)
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.1 | 14/10/2026 | *(điền)* | Bản nháp đầu — lập từ **code thật** (mọi khẳng định có đường dẫn file); phát hiện **F1–F8**; chốt **D1–D13**; xác minh đặc tả `querydr` từ **tài liệu chính thức của VNPay**; xác định **H1/H2/H3** là **điều kiện tiên quyết** ở `PaymentHub` |
+
+---
+
+## 16. 🚨 **LỊCH SỬ LƯỢT QUÉT + ÁP NGƯỠNG THẬT** — BẢNG `ReconRuns` (16/10/2026)
+
+> ### ⚠️ ĐỌC MỤC NÀY TRƯỚC KHI ĐỌC TIẾP — **PHẠM VI TÊN GỌI**
+>
+> | | |
+> |---|---|
+> | **Tài liệu này (`REC-001`)** | **Đối soát THANH TOÁN** (`querydr` định kỳ) — mã `REC-001` **theo `docs/implementation-plan.md:413`**, **CHƯA làm** (§0–§15 giữ nguyên giá trị thiết kế) |
+> | **Mục 16 này** | **Đối soát TỒN KHO** — công việc **đang chạy thật trong mã** (`InventoryReconciliationWorker` + `InventoryReconciliationService`), được `implementation-plan.md:413` ghi **dưới cùng mã `REC-001`** |
+> | **Vì sao ghi vào đây** | Theo yêu cầu của phiên GĐ1 (*"ghi tài liệu vào `rec-001-…md`"*) **và** vì **không** có tài liệu `REC-*` nào khác mô tả đối soát tồn kho (grep `DoiSoatTonKho` trên `docs/features/` chỉ thấy `inv-001`). 📌 **Ghi rõ ra đây** thay vì để người sau **tự đoán** tài liệu nào nói về cái gì |
+> | **Tài liệu liên quan** | Lịch sử chi tiết của **job đối soát tồn kho**: `inv-001` **§37–§39** (job · đo ca có lệch · đóng điểm mờ) · **§16.7/§16.8** của `inv-003` (cùng migration, cùng bảng) |
+
+### 16.1 Vấn đề thật (đã đo, không phải phòng xa)
+
+Job đối soát tồn kho đã **phát hiện + đếm đúng** lệch (`inv-001` §38–§39), nhưng **chỉ** ghi vào **log + metric**.
+Ba câu hỏi vận hành **không trả lời được**:
+
+| # | Câu hỏi | Vì sao **không** trả lời được với log/metric |
+|---|---|---|
+| **1** | *"Lệch này MỚI xuất hiện hay đã có từ tuần trước?"* | Log bị cuốn; **không có gì để so** giữa các lượt |
+| **2** | *"Lượt quét 3 giờ sáng có **CHẠY** không, hay job im lặng chết?"* | Metric chỉ giữ **giá trị HIỆN TẠI**: `0` **không phân biệt** *"đã đo và khớp"* với *"chưa ai đo"* — đúng vấn đề mà chính job sinh ra để chặn (`inv-001` §37.1) |
+| **3** | *"Lệch lúc đó được xét theo **NGƯỠNG** nào?"* | Chính sách nay là **dữ liệu cấu hình** ⇒ đổi setting về sau là **mất** ngữ cảnh của các lần chặn trước |
+
+**Thêm một khoảng trống thứ tư (nghiệp vụ):** `Recon.Threshold.Unit` / `Value` / `Mismatch.Action` đã có trong
+`ChinhSachDoiSoatVaHanMuc.cs` từ trước, nhưng job **chỉ ĐỌC rồi ghi log** — **không** dùng chúng để phân loại gì cả.
+⇒ Lệch `1` đơn vị và lệch `10 000` đơn vị **giống hệt nhau**. Người vận hành đặt `0,5 %` và **tin** mình chỉ bị
+báo khi lệch đáng kể — nhưng hệ thống báo **mọi** lệch. Đây đúng họ *"ô chọn có mà không đổi gì"*.
+
+### 16.2 Hai bảng mới
+
+#### `ReconRuns` — **một dòng cho MỘT lượt quét**
+
+| Cột | Kiểu | Ý nghĩa |
+|---|---|---|
+| `BatDauUtc` / `KetThucUtc` | `timestamptz` | mốc bắt đầu / kết thúc lượt |
+| `SoCapDaDo` | `int` | số cặp `(kho, SKU)` **đã đo** (kể cả cặp **khớp**) |
+| `SoLech` · `SoLechVuotNguong` | `int` | tổng số lệch · số lệch **vượt** ngưỡng |
+| `CoVuotNguong` | `bool` | cờ truy vấn nhanh *"lượt cần người xem"* |
+| `KetLuan` | `int` | `0 = KhongVuot` · `1 = VuotCanhBao` · `2 = VuotCanXacNhan` |
+| **`DonViNguong` · `GiaTriNguong` · `HanhDong` · `NguongHopLe`** | ảnh chụp | 🚨 **CHÍNH SÁCH ĐANG ÁP CỦA LƯỢT ĐÓ** |
+
+🔑 **VÌ SAO LƯU ẢNH CHỤP CHÍNH SÁCH (không đọc lại setting khi hiển thị):** setting là **giá trị HIỆN TẠI**.
+Lượt quét đã qua phải giữ **đúng** ngưỡng nó đã dùng — nếu không thì câu hỏi *"vì sao lượt đó không báo động"*
+**không trả lời được** sau khi ai đó đổi setting.
+
+🔒 **Ghi CẢ lượt KHÔNG có lệch** (`SoLech = 0`): đó chính là **bằng chứng "đã đo"**.
+Nếu chỉ ghi lượt có lệch thì bảng rỗng **không phân biệt** được *"hệ thống khớp"* với *"job chưa bao giờ chạy"*.
+
+#### `ReconRunMismatches` — **một dòng cho MỘT cặp `(kho, SKU)` lệch** của một lượt
+
+| Cột | Ý nghĩa |
+|---|---|
+| `ReconRunId` | lượt sinh ra dòng (`FK … ON DELETE RESTRICT`) |
+| `WarehouseId` · `Sku` | cặp bị lệch |
+| `OnHand` · `TongSoCai` · `ChenhLech` | ảnh chụp **có dấu** (đọc ra được **lệch về phía nào**) |
+| `VuotNguong` | dòng này có **vượt** ngưỡng của lượt hay không |
+
+🔒 **Trần `10 000` dòng/lượt** (`SoDongLechToiDaMoiLuot`): bảng lịch sử **không** được phép phình theo **một** sự cố
+diện rộng (một lần sửa SQL tay sai có thể làm **mọi** cặp lệch). Vượt trần ⇒ **không im lặng**: log `Warning`
++ số lệch **THẬT** vẫn nằm ở `ReconRuns.SoLech`.
+
+📌 **VÌ SAO TÁCH BẢNG (không nhồi JSON vào `ReconRuns`):** câu hỏi vận hành thật là *"SKU này lệch từ lượt nào?"*
+và *"cặp này lệch bao nhiêu lần?"* — nhồi JSON thì **không truy vấn** được bằng SQL ⇒ **không ai làm** ⇒ dữ liệu
+trở thành **ghi cho có**.
+
+### 16.3 Hàm **THUẦN** `NguongLech` — luật áp ngưỡng
+
+| Đơn vị | Luật | Ghi chú |
+|---|---|---|
+| **`Absolute`** | vượt khi `|lệch| > giá trị` | ⚠️ **`>`** không `>=`: ngưỡng `5` nghĩa *"lệch 5 vẫn chấp nhận được"* |
+| **`Percent`** | vượt khi `|lệch| × 100 > giá trị × |cơ sở|` · **cơ sở = `TongSoCai`** (sổ cái = **nguồn sự thật**) | 📌 **KHÔNG** lấy `OnHand` làm mẫu số: `OnHand` **chính là** giá trị đang nghi ngờ ⇒ *"lệch 100 % của một ảnh chụp sai"* vẫn ra 100 % ⇒ **ngưỡng tự triệt tiêu** |
+
+🔒 **`TongSoCai = 0` mà có lệch ⇒ VƯỢT** (không có cơ sở để tính tỷ lệ; đây là ca lệch nặng nhất: ảnh chụp **có** hàng, sổ cái **không có gì**).
+
+🔒 **`giá trị <= 0` ⇒ MỌI lệch đều VƯỢT** (hành vi cũ, fail-closed). 📌 Cố ý **không** hiểu `0` là *"bỏ qua mọi lệch"* —
+làm vậy là **tắt im lặng**, đúng thứ `REC-001` sinh ra để chặn.
+
+📌 **Nhân `100` hai vế (không chia, không làm tròn):** `33,33 %` của `3` = `0,9999`; lệch `1` **phải** được coi là vượt.
+Nếu chia rồi làm tròn **sớm** thì `0,9999 → 0` ⇒ ca đó **lọt** ⇒ **bỏ sót lệch**. (Dự án **cấm** so `decimal` trần bằng `==` — `XC-001` BR-003 — ở đây **chỉ** so `>`.)
+
+### 16.4 Mã lỗi & ánh xạ ràng buộc DB
+
+| Thành phần | Ánh xạ | Ghi chú |
+|---|---|---|
+| `IX_ReconRunMismatches_TenantId_Run_Kho_Sku` (`23505`) | **`eCommerce:Recon:0001`** (`ReconErrorCodes.CapLechDaGhiTrongLuot`) | Dải **RIÊNG** `eCommerce:Recon:` — **không** mượn mã miền kho (bài học `0040`/`0042`). Ca thật: job chạy lại · hai instance cùng quét |
+| `CK_ReconRuns_SoLechVuot_KhongVuotTong` (`23514`) | mã chung `eCommerce:Db:0001` | Hàng rào **phòng vệ chiều sâu**: tầng domain **đã** ném `ArgumentException` ⇒ để DB nổ nghĩa là **có đường ghi tắt qua domain** = **bug**, không phải hành vi nghiệp vụ |
+| `CK_ReconRuns_SoCapDaDo_KhongAm` · `CK_ReconRuns_MocThoiGian_HopLe` | mã chung | như trên |
+
+### 16.5 ✅ KIỂM CHỨNG THẬT — **lượt quét có ẢNH CHỤP CHÍNH SÁCH, ngưỡng CÓ tác dụng** (16/10/2026)
+
+> 📌 **Phép đo được TÁCH riêng** (`tools\_tam-gd1\gd1-rec001-nguong.ps1`) theo **danh mục C** của `tools\README-probe.md`:
+> phép đo gộp trong probe chính **đã hỏng một lần** — và lý do là bài học đáng ghi: **`UPDATE 0`**.
+
+**Bằng chứng trực tiếp (đọc từ `ReconRuns` — nguồn sự thật):**
+
+| # | `DonViNguong` | `GiaTriNguong` | `HanhDong` | `SoLech` | `SoLechVuotNguong` | `CoVuotNguong` | `KetLuan` |
+|---|---|---|---|---|---|---|---|
+| 1–5 | `0` (Percent) | `0.5` | `0` (Warn) | 1 | 1 | `true` | **`1`** (VuotCanhBao) |
+| **6** (sau khi đổi chính sách) | **`1` (Absolute)** | **`1`** | **`1` (RequireConfirmation)** | 1 | 1 | `true` | **`2`** (VuotCanXacNhan) |
+
+🔑 **HAI kết luận đo được từ bảng này:**
+
+1. **Ảnh chụp chính sách là SỰ THẬT:** 5 lượt cũ **giữ nguyên** `Percent/0.5/Warn` + `KetLuan = 1`, dù setting trong DB
+   **đã đổi** ⇒ đổi cấu hình **KHÔNG** viết lại lịch sử (đúng mục đích của 4 cột ảnh chụp).
+2. **Ngưỡng CÓ tác dụng lên DỮ LIỆU:** **cùng** dữ liệu lệch (`K94SKU-LECH`: `OnHand = 7`, sổ cái `= 3`, lệch `+4`),
+   **cùng** số lệch (`SoLech = 1`, `SoLechVuotNguong = 1`), nhưng **`KetLuan` KHÁC** (`1` vs `2`) **chỉ vì** `HanhDong` khác.
+
+**Kiểm CHIỀU NGƯỢC (chống "ngưỡng chỉ trang trí"):** đặt `Recon.Threshold.Value = 999` ⇒ lượt mới nhất:
+
+| `GiaTriNguong` | `SoLech` | `SoLechVuotNguong` | `CoVuotNguong` | `KetLuan` |
+|---|---|---|---|---|
+| **`999`** | `1` | **`0`** | **`false`** | **`0`** (KhongVuot) |
+
+📌 **Vì sao ca này quan trọng nhất:** nếu ngưỡng **không** được áp thì `CoVuotNguong` vẫn `true`
+(lệch `4` so với ngưỡng `999`). Nó về **`false`** ⇒ ngưỡng **thật sự** lọc được **báo động giả**.
+
+**Log (neo ASCII — xem `inv-003` §16.6 lý do phải dùng neo):**
+
+```
+JOB D?I SOAT: b?t d?u qu�t l?ch t?n kho (m?c 10/16/2026 05:22:49). [REC001-JOB-BAT-DAU]
+JOB D?I SOAT: CHINH SACH dang �p d?ng - ngu?ng Absolute(1) � khi l?ch th� RequireConfirmation. [REC001-CHINH-SACH]
+JOB D?I SOAT: ph�t hi?n 1 c?p (kho, SKU) L?CH gi?a OnHand v� s? c�i. [REC001-CO-LECH]
+```
+
+📌 **`1 cặp` là con số ĐÚNG:** dữ liệu thử có **`K94SKU-LECH`** lệch **có chủ đích**;
+`K94SKU-THUONG` (tồn 1000 = sổ cái 1000) và `K94SKU-PT` (100 = 100) **KHỚP** ⇒ **không** báo lệch giả.
+⚠️ Ở lần chạy **đầu** tôi đã đọc `1 cặp` khi dòng sổ cái gieo **thất bại** (sai tên cột) ⇒ lúc đó con số **đúng do may**,
+và **không** chứng minh được gì. **Phải đọc lại điều kiện tiên quyết** (`A2 LECH_KY_VONG`) trước khi tin con số.
+
+### 16.6 🚨 BÀI HỌC — **`UPDATE 0` LÀ BẰNG CHỨNG, KHÔNG PHẢI LỖI VẶT**
+
+Lần đo **gộp** đầu tiên cho `KetLuan = 1` **dù đã đổi `Recon.Mismatch.Action = RequireConfirmation`**.
+Nguyên nhân **đo được**: cả 3 lệnh `UPDATE` in **`UPDATE 0`** ⇒ **4 setting `Recon.*` KHÔNG có dòng nào** trong
+`AbpSettings` (giá trị đang dùng đến từ `SettingDefinitionProvider`: `Percent` / `0.5` / `Warn`).
+⇒ Muốn **đổi** giá trị mặc định thì phải **`INSERT`**, không phải `UPDATE`.
+
+**Quy tắc bổ sung (đã đưa vào neo/probe):**
+
+| # | Quy tắc | Vì sao |
+|---|---|---|
+| **1** | **Sau mỗi `UPDATE`/`DELETE` để đổi cấu hình: ĐỌC SỐ DÒNG bị ảnh hưởng** | `UPDATE 0` = *"câu lệnh chạy thành công mà KHÔNG đổi gì"* — đúng họ lỗi **im lặng** dự án đã trả giá nhiều lần |
+| **2** | Giá trị mặc định của setting **KHÔNG nằm trong DB** (đến từ `SettingDefinitionProvider`) | ⇒ `SELECT` **rỗng** **không** có nghĩa *"setting chưa được đặt"*; nó nghĩa *"đang dùng mặc định trong mã"* |
+| **3** | Đổi setting ⇒ **xoá cache ĐÚNG key + khởi động lại Host** (xem `inv-003` §16.6) | Cache tầng 2 nằm **trong bộ nhớ tiến trình** |
+
+### 16.7 Migration & schema (đã áp lên DB **THẬT**)
+
+| Mục | Giá trị **đo được** |
+|---|---|
+| Migration | `20261016034601_Inv003_ChannelLimits_Rec001_ReconRuns` (**cùng migration** với `inv-003` §16.7 — hai việc **cùng cần migration** nên làm **một lần**) |
+| Bảng | `ReconRuns` · `ReconRunMismatches` |
+| Unique index | `IX_ReconRunMismatches_TenantId_Run_Kho_Sku` — **`NULLS NOT DISTINCT`** (SQL thô; EF **không** sinh được) |
+| Index tra cứu | `IX_ReconRuns_TenantId_BatDauUtc` · `IX_ReconRuns_TenantId_CoVuotNguong_BatDauUtc` |
+| `CHECK` | `CK_ReconRuns_SoLechVuot_KhongVuotTong` · `CK_ReconRuns_SoCapDaDo_KhongAm` · `CK_ReconRuns_MocThoiGian_HopLe` |
+| FK | `FK_ReconRunMismatches_ReconRuns_ReconRunId` — **`Restrict`** (lịch sử là **bằng chứng**; xoá cứng một lượt **không** được kéo mất các dòng lệch) |
+| 🔒 `ReconRuns` **KHÔNG có unique index** | **CỐ Ý:** hai lượt quét trong cùng một giây là **hợp lệ** (`RunOnStart` sau khởi động + API gọi tay). Đặt unique ở đây sẽ **chặn oan** một lượt quét thật ⇒ **mất lịch sử** |
+| `UnitOfWork` của job | đổi `isTransactional: false → true`: nay lượt quét **GHI**, nên *"lượt + các dòng lệch"* phải **cùng một transaction** |
+| Đếm `NULLS NOT DISTINCT` | **40 → 42** (`PostgreSqlSchemaTests.F1_du_42_…` + **danh sách đích danh**) |
+
+### 16.8 ✅ ĐÃ KIỂM CHỨNG vs ⏳ CÒN NỢ
+
+**✅ Đã kiểm chứng:**
+
+1. **4 hàng rào DB mới nổ ĐÚNG MÃ ở đường lỗi** (đúng mục 4.3 #16 của gói bàn giao — *"tính năng cứu khi có lỗi phải được đo Ở ĐƯỜNG LỖI"*):
+
+   | Ca | Kết quả **đo được** |
+   |---|---|
+   | Hai dòng *"hạn mức CẢ KÊNH"* cùng kênh | **`23505`** · `duplicate key … "IX_InvChannelLimits_TenantId_ChannelCode_WarehouseId"` ✅ (⇒ **`NULLS NOT DISTINCT` HOẠT ĐỘNG**) |
+   | **ĐỐI CHỨNG:** cùng kênh nhưng **KHÁC kho** | **LỌT ĐÚNG** ✅ (chứng minh index **không** phải *"cấm trùng mã kênh toàn cục"*) |
+   | Hai dòng cùng `(kênh, kho)` | **`23505`** ✅ |
+   | `GiaTri = -1` | **`23514`** · `violates check constraint "CK_InvChannelLimits_GiaTri_KhongAm"` ✅ |
+   | `SoLechVuotNguong = 4 > SoLech = 3` | **`23514`** · `"CK_ReconRuns_SoLechVuot_KhongVuotTong"` ✅ |
+   | Xoá cứng một lượt còn dòng lệch | **`23503`** · `violates foreign key constraint "FK_ReconRunMismatches_ReconRuns_ReconRunId"` ✅ (⇒ FK `Restrict` **hoạt động**) |
+
+2. **Lịch sử lượt quét được ghi thật**, kể cả lượt **không** lệch (`SoLech = 0` xuất hiện khi dữ liệu thử sạch).
+3. **Ảnh chụp chính sách bất biến** (§16.5 kết luận 1) · **ngưỡng lọc được báo động giả** (§16.5 chiều ngược).
+4. `793 unit` (**+47**, trong đó **có** test cho `NguongLech` · `ReconRun` · `ReconRunMismatch`) · `38 integration` · build **0 lỗi/0 cảnh báo**.
+
+**⏳ Còn nợ (KHÔNG phải tính năng đã có):**
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+| 1 | **API/UI để xem lịch sử lượt quét** | Hiện **chỉ** đọc được bằng SQL. 📌 `ReconRuns` là **bảng lịch sử**, chưa có đường đọc cho người vận hành |
+| 2 | **Quy trình xử lý lệch** (`RequireConfirmation` ⇒ *"chờ AI xác nhận, bằng thao tác nào?"*) | `KetLuan = 2` **đã ghi được**, nhưng **chưa có** màn hình/endpoint để người xác nhận và đóng lệch — **cần người quyết** |
+| 3 | **Xoá dòng lệch theo thời gian (retention)** | Bảng có trần **mỗi lượt** nhưng **không** có chính sách xoá theo tuổi ⇒ theo năm sẽ phình. Cần người quyết số ngày |
+| 4 | **`REC-001` đối soát THANH TOÁN (`querydr`)** | §0–§15 của tài liệu này — **CHƯA làm**; đây vẫn là *"cổng kiểm soát GĐ1"* còn trống |
+| 5 | Ghi lượt quét vào **outbox/ETO** để báo cho kênh khác | Chưa cần ở GĐ1 (không có broker — xem `docs\handover-gd1.md` §4 mục 5) |
+
+### 16.9 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.2 | 16/10/2026 | *(agent, session GĐ1)* | **ĐỐI SOÁT TỒN KHO**: bảng `ReconRuns` (**kèm ẢNH CHỤP chính sách**: đơn vị/giá trị ngưỡng/hành động/cờ hợp lệ) + `ReconRunMismatches` (trần 10 000 dòng/lượt) · hàm thuần `NguongLech` (**cơ sở = sổ cái**, không phải `OnHand`) · mã lỗi dải riêng `eCommerce:Recon:0001` · job đổi sang `UoW` **transactional**. **Kiểm chứng thật:** ảnh chụp chính sách bất biến qua 6 lượt · ngưỡng **lọc được báo động giả** (`999` ⇒ `CoVuotNguong = false`) · **4 hàng rào DB nổ đúng mã** ở đường lỗi. Ghi **§16.1** (vấn đề) · **§16.6** (`UPDATE 0` là bằng chứng) · **§16.8** (nợ: API xem lịch sử · quy trình xử lý lệch · retention) |
+

@@ -85,6 +85,19 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
     // INV-002 — **giữ chỗ** (reservation) có TTL; chống bán vượt tồn khi nhiều khách tranh nhau.
     public DbSet<Inventory.StockReservation> StockReservations { get; set; } = default!;
 
+    /// <summary>
+    /// 🚨 **`INV-003` — HẠN MỨC PHÂN BỔ RIÊNG TỪNG KÊNH.** Không có `DbSet` ⇒ ABP **không** đăng ký
+    /// `IRepository&lt;InvChannelLimit, Guid&gt;` ⇒ `StockReservationService` **không resolve được** ⇒ **HTTP 500**
+    /// ngay lần giữ chỗ đầu tiên (đúng lỗi đã gặp ở `cat-002` §17, lưới an toàn: `DbSetRegistrationTests`).
+    /// </summary>
+    public DbSet<Inventory.InvChannelLimit> InvChannelLimits { get; set; } = default!;
+
+    /// <summary>`REC-001` — **lịch sử lượt quét đối soát tồn kho** (+ dòng lệch). Xem chú thích `DbSet` phía trên.</summary>
+    public DbSet<Inventory.ReconRun> ReconRuns { get; set; } = default!;
+
+    /// <summary>`REC-001` — các cặp `(kho, SKU)` lệch của **một** lượt quét.</summary>
+    public DbSet<Inventory.ReconRunMismatch> ReconRunMismatches { get; set; } = default!;
+
     // ---- Orders ----
     public DbSet<Orders.Order> Orders { get; set; } = default!;
     public DbSet<Orders.OrderLine> OrderLines { get; set; } = default!;
@@ -538,6 +551,91 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
                 .IsUnique()
                 .HasFilter("\"ReferenceLineId\" IS NOT NULL")
                 .HasDatabaseName("IX_InvStockLedger_TenantId_ReferenceLineId");
+        });
+
+        // ── INV-003: HẠN MỨC PHÂN BỔ **RIÊNG TỪNG KÊNH** ────────────────────────────────────────────
+        // 📌 Thay cho "một giá trị dùng chung" trước đây: mỗi kênh một hạn mức, tuỳ chọn **theo kho**.
+        // ⚠️ Khoá nghiệp vụ `(TenantId, ChannelCode, WarehouseId)` với `WarehouseId` **NULLABLE**
+        // (`null` = hạn mức **cả kênh**) ⇒ unique index **BẮT BUỘC** `NULLS NOT DISTINCT`, mà EF **không**
+        // sinh được ⇒ migration có **SQL thô** (đúng mẫu `Inv001_Fix_SoCai_Unique_ThemMovementType`).
+        // 🚨 Thiếu `NULLS NOT DISTINCT`: PostgreSQL coi `NULL` là khác nhau ⇒ khai **hai** dòng
+        // *"hạn mức cả kênh"* cho cùng kênh **LỌT** ⇒ hai hạn mức cho một kênh, không lỗi nào.
+        builder.Entity<Inventory.InvChannelLimit>(b =>
+        {
+            b.ToTable("InvChannelLimits");
+            b.ConfigureByConvention();
+
+            b.Property(x => x.ChannelCode).IsRequired().HasMaxLength(Inventory.InvChannelLimit.DoDaiMaKenhToiDa);
+
+            // Đọc bằng mắt trong DB là **số** — ghi rõ để không ai "sửa tay" sai (0=Block, 1=Warn).
+            b.Property(x => x.HanhDong).HasConversion<int>();
+
+            b.Property(x => x.GiaTri).HasPrecision(18, 4);
+
+            b.HasIndex(x => new { x.TenantId, x.ChannelCode, x.WarehouseId })
+                .IsUnique()
+                .HasDatabaseName("IX_InvChannelLimits_TenantId_ChannelCode_WarehouseId");
+
+            // 🔒 `GiaTri >= 0`: âm là **vô nghĩa** (quy ước `0` = TẮT) ⇒ chặn ở DB, không chỉ ở domain
+            // (đường ghi tắt bằng SQL/hàng đợi import sẽ không đi qua hàm tạo).
+            b.ToTable(t =>
+            {
+                t.HasCheckConstraint("CK_InvChannelLimits_GiaTri_KhongAm", "\"GiaTri\" >= 0");
+            });
+        });
+
+        // ── REC-001: LỊCH SỬ LƯỢT QUÉT ĐỐI SOÁT TỒN KHO ────────────────────────────────────────────
+        builder.Entity<Inventory.ReconRun>(b =>
+        {
+            b.ToTable("ReconRuns");
+            b.ConfigureByConvention();
+
+            b.Property(x => x.DonViNguong).HasConversion<int>();
+            b.Property(x => x.HanhDong).HasConversion<int>();
+            b.Property(x => x.KetLuan).HasConversion<int>();
+            b.Property(x => x.GiaTriNguong).HasPrecision(18, 4);
+
+            // 📌 KHÔNG unique index: **cố ý** — hai lượt quét trong cùng một giây là **hợp lệ**
+            // (job chạy `RunOnStart` ngay sau khởi động + nhịp quét đến hạn cùng lúc; hoặc API gọi tay).
+            // Đặt unique ở đây sẽ **chặn oan** một lượt quét thật ⇒ mất lịch sử, đúng thứ bảng này chống.
+
+            // Truy vấn vận hành hay dùng: *"các lượt quét gần đây của tenant"* và *"lượt nào có vượt ngưỡng"*.
+            b.HasIndex(x => new { x.TenantId, x.BatDauUtc })
+                .HasDatabaseName("IX_ReconRuns_TenantId_BatDauUtc");
+
+            b.HasIndex(x => new { x.TenantId, x.CoVuotNguong, x.BatDauUtc })
+                .HasDatabaseName("IX_ReconRuns_TenantId_CoVuotNguong_BatDauUtc");
+
+            b.ToTable(t =>
+            {
+                // 🔒 Bất biến "số VƯỢT NGƯỠNG không lớn hơn tổng số LỆCH" — chặn ở DB vì đây là số liệu
+                // người vận hành **dùng để quyết định**; một dòng vô lý làm hỏng cả báo cáo xu hướng.
+                t.HasCheckConstraint("CK_ReconRuns_SoLechVuot_KhongVuotTong",
+                    "\"SoLechVuotNguong\" >= 0 AND \"SoLech\" >= 0 AND \"SoLechVuotNguong\" <= \"SoLech\"");
+                t.HasCheckConstraint("CK_ReconRuns_SoCapDaDo_KhongAm", "\"SoCapDaDo\" >= 0");
+                t.HasCheckConstraint("CK_ReconRuns_MocThoiGian_HopLe", "\"KetThucUtc\" >= \"BatDauUtc\"");
+            });
+        });
+
+        builder.Entity<Inventory.ReconRunMismatch>(b =>
+        {
+            b.ToTable("ReconRunMismatches");
+            b.ConfigureByConvention();
+
+            b.Property(x => x.Sku).IsRequired().HasMaxLength(64);
+
+            // Một cặp `(kho, SKU)` chỉ xuất hiện **MỘT** lần trong một lượt quét ⇒ index này chống ghi trùng
+            // khi job retry / hai luồng cùng ghi. Có `TenantId` ⇒ **BẮT BUỘC** `NULLS NOT DISTINCT` (SQL thô trong migration).
+            b.HasIndex(x => new { x.TenantId, x.ReconRunId, x.WarehouseId, x.Sku })
+                .IsUnique()
+                .HasDatabaseName("IX_ReconRunMismatches_TenantId_Run_Kho_Sku");
+
+            // 📌 FK `Restrict` (không `Cascade`): lịch sử đối soát là **bằng chứng**; xoá cứng một lượt
+            // **không** được phép kéo mất các dòng lệch của nó một cách âm thầm.
+            b.HasOne<Inventory.ReconRun>()
+                .WithMany()
+                .HasForeignKey(x => x.ReconRunId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         builder.Entity<Orders.Order>(b =>

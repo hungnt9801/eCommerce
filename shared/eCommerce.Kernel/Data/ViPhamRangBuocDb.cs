@@ -63,6 +63,45 @@ public static class ViPhamRangBuocDb
             new("eCommerce:Inventory:0032",
                 "Nguồn này (giỏ/đơn) ĐÃ giữ chỗ cho SKU này rồi ⇒ không giữ lần nữa.", true),
 
+        // ── KHO: hạn mức phân bổ RIÊNG TỪNG KÊNH (`INV-003`, bảng `InvChannelLimits`) ────────────
+        // 📌 Ràng buộc này CHẶN MỘT HÀNH VI HỢP LỆ VỀ NGHIỆP VỤ: người vận hành (hoặc màn hình admin bấm hai lần)
+        // khai hạn mức cho cùng một `(kênh, kho)` LẦN HAI ⇒ trước đây là **HTTP 500**, client **không phân biệt**
+        // được *"đã có hạn mức rồi"* với *"hệ thống hỏng"* ⇒ **bấm lại** ⇒ vòng lặp (đúng lý do Phụ lục B tồn tại).
+        // ⚠️ Đây là ca NẶNG của lỗi C4/F1: cột phân biệt *"cả kênh"* với *"một kho"* chính là `WarehouseId`
+        // (NULLABLE) ⇒ thiếu `NULLS NOT DISTINCT` là index **mất tác dụng im lặng** (xem chú thích migration).
+        ["IX_InvChannelLimits_TenantId_ChannelCode_WarehouseId"] =
+            new("eCommerce:Inventory:0045",
+                "Kênh này ĐÃ có hạn mức cho phạm vi đó (cả kênh, hoặc đúng kho này) ⇒ sửa dòng đang có thay vì thêm dòng mới.", true),
+
+        // ── KHO: `CHECK` của `INV-003` + `REC-001` (16/10/2026) ─────────────────────────────────
+        // 📌 **QUYẾT ĐỊNH CÓ Ý THỨC — dùng mã CHUNG `eCommerce:Db:0001`, KHÔNG bịa mã nghiệp vụ:**
+        // các `CHECK` dưới đây là **hàng rào phòng vệ chiều sâu** trên những đường ghi **ĐANG CHẠY THẬT**
+        // (`InvChannelLimits` do người vận hành cấu hình, `ReconRuns` do job 15 phút ghi). Tầng domain **đã**
+        // kiểm trước và **NÉM lỗi nghiệp vụ có mã riêng** (`HanMucKenhGiaTriAm` = `0044`, `ArgumentException`
+        // cho mốc thời gian/số lệch) ⇒ để DB nổ nghĩa là **có đường ghi TẮT qua domain**, tức là **bug**, chứ
+        // không phải một hành vi nghiệp vụ bình thường cần mã riêng.
+        // 🔒 Vì sao **KHÔNG** để chúng ở danh sách trắng: danh sách trắng nghĩa *"chưa có đường ghi nào chạm tới"* —
+        // điều đó **SAI** với 4 ràng buộc này, và một lời khai sai trong danh sách trắng làm cơ chế mất giá trị.
+        // 📌 Chúng **vẫn** phải được ánh xạ (đây là lý do khối này tồn tại): có ánh xạ thì ca đó trả **403 kèm
+        // SQLSTATE + tên ràng buộc** (tra được ngay), thay vì `500` mù.
+        ["CK_InvChannelLimits_GiaTri_KhongAm"] =
+            new(MaChung, "Hạn mức theo kênh KHÔNG được âm (quy ước `0` = TẮT). Giá trị âm chỉ đến được DB nếu có đường ghi bỏ qua tầng domain.", false),
+        ["CK_ReconRuns_MocThoiGian_HopLe"] =
+            new(MaChung, "Lượt đối soát có mốc KẾT THÚC trước mốc BẮT ĐẦU ⇒ dữ liệu thời gian không hợp lệ.", false),
+        ["CK_ReconRuns_SoCapDaDo_KhongAm"] =
+            new(MaChung, "Lượt đối soát có số cặp đã đo ÂM ⇒ dữ liệu không hợp lệ.", false),
+        ["CK_ReconRuns_SoLechVuot_KhongVuotTong"] =
+            new(MaChung, "Lượt đối soát có số lệch VƯỢT NGƯỠNG lớn hơn TỔNG số lệch ⇒ dữ liệu không hợp lệ.", false),
+
+        // ── ĐỐI SOÁT (`REC-001`) ────────────────────────────────────────────────────────────────
+        // 📌 Ràng buộc này CHẶN MỘT HÀNH VI HỢP LỆ VỀ NGHIỆP VỤ: job chạy lại / hai instance cùng quét
+        // (khoá phân tán hết hạn) / đường ghi tay đều có thể chốt **cùng một cặp `(kho, SKU)`** trong một lượt.
+        // Trước đây là **500** ⇒ client **không phân biệt** *"đã ghi rồi"* với *"hệ thống hỏng"* ⇒ **chạy lại**.
+        // 🔑 Mã `eCommerce:Recon:0001` (KHÔNG mượn mã miền kho — bài học `0040`/`0042`).
+        ["IX_ReconRunMismatches_TenantId_Run_Kho_Sku"] =
+            new("eCommerce:Recon:0001",
+                "Lượt đối soát này ĐÃ ghi dòng lệch cho đúng cặp (kho, SKU) đó ⇒ không ghi lần nữa.", true),
+
         // ── PRICING: idempotency + sổ giải trình (ADR-13) ────────────────────────────────────────
         ["IX_PrcPriceCalculationRecords_TenantId_IdempotencyKey"] =
             new("eCommerce:Pricing:0006",

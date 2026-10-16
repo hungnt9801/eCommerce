@@ -1927,3 +1927,97 @@ VALUES ('20261015121002_Sal001_Order_CheckoutKey', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE TABLE "InvChannelLimits" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "ChannelCode" character varying(32) NOT NULL,
+    "WarehouseId" uuid,
+    "GiaTri" numeric(18,4) NOT NULL,
+    "HanhDong" integer NOT NULL,
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_InvChannelLimits" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_InvChannelLimits_GiaTri_KhongAm" CHECK ("GiaTri" >= 0)
+);
+
+CREATE TABLE "ReconRuns" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "BatDauUtc" timestamp with time zone NOT NULL,
+    "KetThucUtc" timestamp with time zone NOT NULL,
+    "SoCapDaDo" integer NOT NULL,
+    "SoLech" integer NOT NULL,
+    "DonViNguong" integer NOT NULL,
+    "GiaTriNguong" numeric(18,4) NOT NULL,
+    "HanhDong" integer NOT NULL,
+    "NguongHopLe" boolean NOT NULL,
+    "SoLechVuotNguong" integer NOT NULL,
+    "CoVuotNguong" boolean NOT NULL,
+    "KetLuan" integer NOT NULL,
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_ReconRuns" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_ReconRuns_MocThoiGian_HopLe" CHECK ("KetThucUtc" >= "BatDauUtc"),
+    CONSTRAINT "CK_ReconRuns_SoCapDaDo_KhongAm" CHECK ("SoCapDaDo" >= 0),
+    CONSTRAINT "CK_ReconRuns_SoLechVuot_KhongVuotTong" CHECK ("SoLechVuotNguong" >= 0 AND "SoLech" >= 0 AND "SoLechVuotNguong" <= "SoLech")
+);
+
+CREATE TABLE "ReconRunMismatches" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "ReconRunId" uuid NOT NULL,
+    "WarehouseId" uuid NOT NULL,
+    "Sku" character varying(64) NOT NULL,
+    "OnHand" integer NOT NULL,
+    "TongSoCai" integer NOT NULL,
+    "ChenhLech" integer NOT NULL,
+    "VuotNguong" boolean NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_ReconRunMismatches" PRIMARY KEY ("Id"),
+    CONSTRAINT "FK_ReconRunMismatches_ReconRuns_ReconRunId" FOREIGN KEY ("ReconRunId") REFERENCES "ReconRuns" ("Id") ON DELETE RESTRICT
+);
+
+CREATE UNIQUE INDEX "IX_InvChannelLimits_TenantId_ChannelCode_WarehouseId" ON "InvChannelLimits" ("TenantId", "ChannelCode", "WarehouseId");
+
+CREATE INDEX "IX_ReconRunMismatches_ReconRunId" ON "ReconRunMismatches" ("ReconRunId");
+
+CREATE UNIQUE INDEX "IX_ReconRunMismatches_TenantId_Run_Kho_Sku" ON "ReconRunMismatches" ("TenantId", "ReconRunId", "WarehouseId", "Sku");
+
+CREATE INDEX "IX_ReconRuns_TenantId_BatDauUtc" ON "ReconRuns" ("TenantId", "BatDauUtc");
+
+CREATE INDEX "IX_ReconRuns_TenantId_CoVuotNguong_BatDauUtc" ON "ReconRuns" ("TenantId", "CoVuotNguong", "BatDauUtc");
+
+DROP INDEX "IX_InvChannelLimits_TenantId_ChannelCode_WarehouseId";
+
+CREATE UNIQUE INDEX "IX_InvChannelLimits_TenantId_ChannelCode_WarehouseId" ON "InvChannelLimits" ("TenantId", "ChannelCode", "WarehouseId") NULLS NOT DISTINCT;
+
+DROP INDEX "IX_ReconRunMismatches_TenantId_Run_Kho_Sku";
+
+CREATE UNIQUE INDEX "IX_ReconRunMismatches_TenantId_Run_Kho_Sku" ON "ReconRunMismatches" ("TenantId", "ReconRunId", "WarehouseId", "Sku") NULLS NOT DISTINCT;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261016034601_Inv003_ChannelLimits_Rec001_ReconRuns', '10.0.11');
+
+COMMIT;
+

@@ -25,6 +25,14 @@ namespace eCommerce.Application.Inventory;
 ///     (bài học `ObjectDisposedException`, `inv-001` §27.2 **NN2**);
 ///   • **khoá phân tán** (⚠️ **không** thêm tiền tố `ecommerce:` — `KeyPrefix` đã thêm);
 ///   • **`Timer.RunOnStart = true`** (bài học `CHN-002`) ⇒ đối soát **ngay sau restart**, không chờ hết nhịp.
+///
+/// 🚨 **`REC-001` v2 — LƯU LỊCH SỬ + ÁP NGƯỠNG:** lượt quét nay gọi
+/// `InventoryReconciliationService.DoiSoatTonKhoAsync(chinhSach)` ⇒ ghi **1 dòng `ReconRuns`** (kèm **ảnh chụp**
+/// đơn vị/giá trị ngưỡng/hành động) + các dòng `ReconRunMismatches`, và **phân loại theo ngưỡng** thật.
+/// 📌 Nhờ vậy log/metric **không còn** là nơi duy nhất trả lời *"job có chạy"*: bảng `ReconRuns` giữ **cả**
+/// lượt không lệch ⇒ `0` lệch đọc được là *"đã đo"*, không phải *"chưa ai đo"*.
+/// ⚠️ Vì lượt quét nay **GHI** dữ liệu, `UnitOfWork` của job là **transactional** (`isTransactional: true`) —
+/// hoặc cả lượt + các dòng lệch được ghi, hoặc **không** gì (không để lại *"lượt có số lệch nhưng không có dòng nào"*).
 /// </summary>
 public class InventoryReconciliationWorker : AsyncPeriodicBackgroundWorkerBase
 {
@@ -51,7 +59,7 @@ public class InventoryReconciliationWorker : AsyncPeriodicBackgroundWorkerBase
     {
         // 📌 **LOG VÔ ĐIỀU KIỆN** — bắt buộc (cơ chế `BackgroundWorkerCoCheTests`): không có dòng này thì
         // *"job im lặng"* **không phân biệt được** với *"job không chạy"*.
-        Logger.LogInformation("JOB ĐỐI SOÁT: bắt đầu quét lệch tồn kho (mốc {Moc}).", DateTime.UtcNow);
+        Logger.LogInformation("JOB ĐỐI SOÁT: bắt đầu quét lệch tồn kho (mốc {Moc}). [REC001-JOB-BAT-DAU]", DateTime.UtcNow);
 
         var distributedLock = workerContext.ServiceProvider.GetRequiredService<IAbpDistributedLock>();
 
@@ -67,7 +75,9 @@ public class InventoryReconciliationWorker : AsyncPeriodicBackgroundWorkerBase
 
         var uowManager = scope.ServiceProvider.GetRequiredService<IUnitOfWorkManager>();
 
-        using var uow = uowManager.Begin(requiresNew: true, isTransactional: false);
+        // 🚨 Đổi từ `isTransactional: false` (v1, chỉ đọc) sang `true`: lượt quét **GHI** `ReconRuns` +
+        // `ReconRunMismatches` ⇒ hai bảng phải cùng một transaction với nhau (xem chú thích ở đầu lớp).
+        using var uow = uowManager.Begin(requiresNew: true, isTransactional: true);
 
         var service = scope.ServiceProvider.GetRequiredService<InventoryReconciliationService>();
 
@@ -81,7 +91,7 @@ public class InventoryReconciliationWorker : AsyncPeriodicBackgroundWorkerBase
         var giaTri = ChinhSach.DocSo(await setting.GetOrNullAsync(TenChinhSach.NguongDoiSoat_GiaTri), 0.5m, out var giaTriHopLe);
         var hanhDong = ChinhSach.DocHanhDongLech(await setting.GetOrNullAsync(TenChinhSach.NguongDoiSoat_HanhDong), out var hanhDongHopLe);
 
-        Logger.LogInformation("JOB ĐỐI SOÁT: CHÍNH SÁCH đang áp dụng — ngưỡng {DonVi}({GiaTri}) · khi lệch thì {HanhDong}.",
+        Logger.LogInformation("JOB ĐỐI SOÁT: CHÍNH SÁCH đang áp dụng — ngưỡng {DonVi}({GiaTri}) · khi lệch thì {HanhDong}. [REC001-CHINH-SACH]",
             donVi, giaTri, hanhDong);
 
         if (!donViHopLe || !giaTriHopLe || !hanhDongHopLe)
@@ -97,7 +107,8 @@ public class InventoryReconciliationWorker : AsyncPeriodicBackgroundWorkerBase
                 TenChinhSach.NguongDoiSoat_DonVi, TenChinhSach.NguongDoiSoat_GiaTri, TenChinhSach.NguongDoiSoat_HanhDong);
         }
 
-        var lech = await service.DoiSoatTonKhoAsync();
+        var lech = await service.DoiSoatTonKhoAsync(
+            new InventoryReconciliationService.ChinhSachNguong(donVi, giaTri, hanhDong, donViHopLe && giaTriHopLe && hanhDongHopLe));
 
         await uow.CompleteAsync();
 
@@ -105,11 +116,11 @@ public class InventoryReconciliationWorker : AsyncPeriodicBackgroundWorkerBase
         // sẽ phá tiêu chí "không có dòng `fail:`" của quy trình kiểm chứng (đã ghi ở `inv-001` §22).
         if (lech.Count > 0)
         {
-            Logger.LogWarning("JOB ĐỐI SOÁT: phát hiện {So} cặp (kho, SKU) LỆCH giữa OnHand và sổ cái.", lech.Count);
+            Logger.LogWarning("JOB ĐỐI SOÁT: phát hiện {So} cặp (kho, SKU) LỆCH giữa OnHand và sổ cái. [REC001-CO-LECH]", lech.Count);
         }
         else
         {
-            Logger.LogInformation("JOB ĐỐI SOÁT: KHÔNG có lệch (đã đo {So} cặp).", 0);
+            Logger.LogInformation("JOB ĐỐI SOÁT: KHÔNG có lệch (đã đo {So} cặp). [REC001-KHONG-LECH]", 0);
         }
     }
 }

@@ -38,6 +38,10 @@ public class StockReservationService : DomainService
     private readonly IAbpDistributedLock _distributedLock;
     private readonly ICurrentTenant _currentTenant;
 
+    /// <summary>🚨 `INV-003` — **hạn mức RIÊNG từng kênh** (bảng `InvChannelLimits`). Đọc **sau khi đã có khoá**
+    /// và **trước** khi tăng `Reserved`.</summary>
+    private readonly IRepository<InvChannelLimit, Guid> _hanMucKenhRepository;
+
     /// <summary>🚨 `INV-003` — **chính sách "cho phép chọn"** (`web-001` §93): đọc hạn mức theo kênh **lúc chạy**
     /// thay vì hằng số trong mã. 📌 Domain service **được phép** dùng `ISettingProvider` (ABP: settings là hạ tầng dùng chung).</summary>
     private readonly ISettingProvider _setting;
@@ -47,6 +51,7 @@ public class StockReservationService : DomainService
         IRepository<InventoryItem, Guid> tonKhoRepository,
         IRepository<StockLedgerEntry, Guid> soCaiRepository,
         IRepository<Warehouse, Guid> khoRepository,
+        IRepository<InvChannelLimit, Guid> hanMucKenhRepository,
         IAbpDistributedLock distributedLock,
         ICurrentTenant currentTenant,
         ISettingProvider setting)
@@ -55,15 +60,22 @@ public class StockReservationService : DomainService
         _tonKhoRepository = tonKhoRepository;
         _soCaiRepository = soCaiRepository;
         _khoRepository = khoRepository;
+        _hanMucKenhRepository = hanMucKenhRepository;
         _distributedLock = distributedLock;
         _currentTenant = currentTenant;
         _setting = setting;
     }
 
     /// <summary>Giữ chỗ. **NÉM** `Inventory:0001` nếu không đủ hàng; **NÉM** `Inventory:0042` nếu **vượt hạn mức kênh**
-    /// và chính sách `Inv.ChannelLimit.Action = Block` (`INV-003`).
-    /// 📌 `channelCode` **tuỳ chọn** (mặc định `null`): có thì dùng để **áp + ghi log hạn mức theo kênh**;
-    /// không có thì hạn mức vẫn áp (giá trị **dùng chung**) và log ghi `(không có)` — **không** im lặng bỏ qua.</summary>
+    /// và hành động đang áp là `Block` (`INV-003`).
+    /// 📌 `channelCode` **tuỳ chọn** (mặc định `null`):
+    /// <list type="bullet">
+    ///   <item><b>có</b> ⇒ tra bảng **riêng từng kênh** `InvChannelLimits` (dòng `(kênh, kho)` trước, rồi `(kênh, mọi kho)`);</item>
+    ///   <item><b>không có</b> ⇒ **không** có hạn mức riêng nào áp được ⇒ rơi về **giá trị dùng chung** (`Inv.ChannelLimit.DefaultValue`)
+    ///     và log ghi `(không có)` — **không** im lặng bỏ qua.</item>
+    /// </list>
+    /// 🔒 Nguồn hạn mức đang áp (`BangTheoKenhVaKho` / `BangTheoKenh` / `MacDinhChung`) **luôn** được ghi vào log
+    /// và vào dữ liệu lỗi `0042` ⇒ *"vì sao đơn này bị chặn"* trả lời được **không cần suy luận**.</summary>
     public async Task<StockReservation> GiuChoAsync(
         Guid warehouseId, string sku, int quantity, DateTime at, TimeSpan? ttl = null,
         string? referenceType = null, string? referenceId = null, string? channelCode = null)
@@ -87,39 +99,70 @@ public class StockReservationService : DomainService
         var onHand = ton?.OnHand ?? 0;
         var reserved = ton?.Reserved ?? 0;
 
-        // 🚨 `INV-003` — **CƯỠNG CHẾ HẠN MỨC THEO KÊNH** (chính sách "cho phép chọn": `Inv.ChannelLimit.*`).
+        // 🚨 `INV-003` — **CƯỠNG CHẾ HẠN MỨC THEO KÊNH** (chính sách "cho phép chọn": `Inv.ChannelLimit.*`
+        // + bảng **RIÊNG TỪNG KÊNH** `InvChannelLimits`).
         // 📌 Đặt **SAU khi đã có khoá + đã đọc tồn**, **TRƯỚC** khi tăng `Reserved` ⇒ chặn **trước** mọi thay đổi.
-        // ⚠️ `hanMuc <= 0` ⇒ **TẮT** chính sách (mặc định `DefaultValue = 0`) ⇒ hành vi **y như trước** khi có `INV-003`.
+        // ⚠️ Hạn mức `<= 0` ⇒ **TẮT** chính sách ⇒ hành vi **y như trước** khi có `INV-003`.
         var tonKhaDung = onHand - reserved;
 
         var donViHanMuc = ChinhSach.DocDonViHanMuc(await _setting.GetOrNullAsync(TenChinhSach.HanMuc_DonVi), out var donViHopLe);
-        var giaTriHanMuc = ChinhSach.DocSo(await _setting.GetOrNullAsync(TenChinhSach.HanMuc_GiaTriMacDinh), 0m, out var giaTriHopLe);
-        var hanhDongHanMuc = ChinhSach.DocHanhDongHanMuc(await _setting.GetOrNullAsync(TenChinhSach.HanMuc_HanhDong), out var hanhDongHopLe);
+        var giaTriMacDinh = ChinhSach.DocSo(await _setting.GetOrNullAsync(TenChinhSach.HanMuc_GiaTriMacDinh), 0m, out var giaTriHopLe);
+        var hanhDongMacDinh = ChinhSach.DocHanhDongHanMuc(await _setting.GetOrNullAsync(TenChinhSach.HanMuc_HanhDong), out var hanhDongHopLe);
+        var phamViHanMuc = ChinhSach.DocPhamViHanMuc(await _setting.GetOrNullAsync(TenChinhSach.HanMuc_PhamVi), out var phamViHopLe);
 
-        if (!donViHopLe || !giaTriHopLe || !hanhDongHopLe)
+        if (!donViHopLe || !giaTriHopLe || !hanhDongHopLe || !phamViHopLe)
         {
             // 🔒 Cấu hình sai ⇒ **KHÔNG** chặn bán (dùng mặc định `Block` với `giaTri = 0` = tắt) nhưng **phải ồn ào**.
             Logger.LogWarning("HẠN MỨC KÊNH (`INV-003`): CẤU HÌNH KHÔNG HỢP LỆ ⇒ dùng mặc định an toàn " +
-                "(donVi={DonVi} hopLe={DonViOk} · giaTri={GiaTri} hopLe={GiaTriOk} · hanhDong={HanhDong} hopLe={HanhDongOk}).",
-                donViHanMuc, donViHopLe, giaTriHanMuc, giaTriHopLe, hanhDongHanMuc, hanhDongHopLe);
+                "(donVi={DonVi} hopLe={DonViOk} · giaTriMacDinh={GiaTri} hopLe={GiaTriOk} · hanhDong={HanhDong} hopLe={HanhDongOk} · " +
+                "phamVi={PhamVi} hopLe={PhamViOk}).",
+                donViHanMuc, donViHopLe, giaTriMacDinh, giaTriHopLe, hanhDongMacDinh, hanhDongHopLe, phamViHanMuc, phamViHopLe);
         }
 
-        var hanMuc = HanMucKenh.TinhHanMuc(donViHanMuc, giaTriHanMuc, tonKhaDung);
+        var kenhChuanHoa = string.IsNullOrWhiteSpace(channelCode) ? null : InvChannelLimit.ChuẩnHoáKenh(channelCode);
 
-        if (HanMucKenh.HanMucVoNghia(donViHanMuc, giaTriHanMuc, tonKhaDung))
+        // 📌 Nạp **mọi** dòng hạn mức của ĐÚNG kênh này (thường 0–2 dòng). Lọc theo kênh ở DB (không nạp cả bảng).
+        // 🔒 `ChannelCode` đã được chuẩn hoá (trim + chữ thường) **tại một chỗ duy nhất** (`InvChannelLimit`),
+        // nên so khớp ở đây cũng dùng giá trị đã chuẩn hoá ⇒ không có ca "kênh `Shopee` vs `shopee`" làm hạn mức im lặng không khớp.
+        var cacDongHanMuc = kenhChuanHoa is null
+            ? []
+            : (await _hanMucKenhRepository.GetListAsync(x => x.ChannelCode == kenhChuanHoa))
+                .Select(x => new HanMucKenh.DongHanMuc(x.Id, x.WarehouseId, x.GiaTri, x.HanhDong))
+                .ToList();
+
+        var hanMucDangAp = HanMucKenh.ChonHanMuc(
+            phamViHanMuc, cacDongHanMuc, warehouseId, donViHanMuc, giaTriMacDinh, hanhDongMacDinh, out var dongBiBoQua);
+
+        if (dongBiBoQua.Count > 0)
+        {
+            // 🚨 **KHÔNG im lặng**: người vận hành ĐÃ cấu hình hạn mức theo KHO nhưng `Inv.ChannelLimit.Scope = Channel`
+            // ⇒ dòng đó **không có tác dụng**. Nếu bỏ qua im lặng thì họ **tin** đã siết theo kho (đúng loại "ô chọn
+            // không đổi gì" mà §5 việc 2 của gói bàn giao gọi là nợ tệ hơn không làm).
+            Logger.LogWarning("HẠN MỨC KÊNH (`INV-003`): BỎ QUA {So} dòng hạn mức THEO KHO vì `{Setting}` = {PhamVi} " +
+                "(chỉ xét hạn mức cả kênh). Kênh {Kenh}, kho {Kho}. Muốn dùng hạn mức theo kho ⇒ đổi setting sang `ChannelWarehouse`. [INV003-BOQUA-DONG-THEO-KHO]",
+                dongBiBoQua.Count, TenChinhSach.HanMuc_PhamVi, phamViHanMuc, kenhChuanHoa ?? "(không có)", warehouseId);
+        }
+
+        var hanMuc = HanMucKenh.TinhHanMuc(hanMucDangAp.DonVi, hanMucDangAp.GiaTri, tonKhaDung);
+
+        Logger.LogInformation("HẠN MỨC KÊNH (`INV-003`): kênh {Kenh} · kho {Kho} · nguồn {Nguon} · giá trị {GiaTri} · " +
+            "hành động {HanhDong} ⇒ hạn mức {HanMuc} (tồn khả dụng {Ton}). [INV003-HANMUC-AP-DUNG]",
+            kenhChuanHoa ?? "(không có)", warehouseId, hanMucDangAp.Nguon, hanMucDangAp.GiaTri, hanMucDangAp.HanhDong, hanMuc, tonKhaDung);
+
+        if (HanMucKenh.HanMucVoNghia(hanMucDangAp.DonVi, hanMucDangAp.GiaTri, tonKhaDung))
         {
             // 🔔 Cấu hình CÓ Ý ĐỊNH áp hạn mức nhưng hạn mức tính ra 0 ⇒ chính sách **TẮT**.
             // 📌 Không sửa hành vi, chỉ **nói ra** — nếu im lặng thì người vận hành **tin** hạn mức đang chạy (bài học `CHN-002`).
-            Logger.LogWarning("HẠN MỨC KÊNH (`INV-003`): HẠN MỨC VÔ NGHĨA — cấu hình {DonVi}={GiaTri} nhưng tồn khả dụng {Ton} " +
-                "⇒ hạn mức tính ra 0 ⇒ chính sách đang **TẮT** cho (kho {Kho}, SKU {Sku}).",
-                donViHanMuc, giaTriHanMuc, tonKhaDung, warehouseId, maSku);
+            Logger.LogWarning("HẠN MỨC KÊNH (`INV-003`): HẠN MỨC VÔ NGHĨA — cấu hình {DonVi}={GiaTri} (nguồn {Nguon}) " +
+                "nhưng tồn khả dụng {Ton} ⇒ hạn mức tính ra 0 ⇒ chính sách đang **TẮT** cho (kho {Kho}, SKU {Sku}).",
+                hanMucDangAp.DonVi, hanMucDangAp.GiaTri, hanMucDangAp.Nguon, tonKhaDung, warehouseId, maSku);
         }
 
         if (HanMucKenh.VuotHanMuc(quantity, hanMuc))
         {
-            var kenh = string.IsNullOrWhiteSpace(channelCode) ? "(không có)" : channelCode;
+            var kenh = kenhChuanHoa ?? "(không có)";
 
-            if (HanMucKenh.NenChan(hanhDongHanMuc, quantity, hanMuc))
+            if (HanMucKenh.NenChan(hanMucDangAp.HanhDong, quantity, hanMuc))
             {
                 throw new BusinessException(InventoryErrorCodes.VuotHanMucKenh)
                     .WithData("channelCode", kenh)
@@ -127,17 +170,19 @@ public class StockReservationService : DomainService
                     .WithData("warehouseId", warehouseId)
                     .WithData("soLuongYeuCau", quantity)
                     .WithData("hanMuc", hanMuc)
-                    .WithData("donVi", donViHanMuc.ToString())
-                    .WithData("giaTriCauHinh", giaTriHanMuc)
+                    .WithData("donVi", hanMucDangAp.DonVi.ToString())
+                    .WithData("giaTriCauHinh", hanMucDangAp.GiaTri)
+                    .WithData("nguonHanMuc", hanMucDangAp.Nguon.ToString())
+                    .WithData("phamVi", phamViHanMuc.ToString())
                     .WithData("tonKhaDung", tonKhaDung)
                     .WithData("lyDo", $"Kênh {kenh} vượt hạn mức phân bổ: yêu cầu {quantity} > hạn mức {hanMuc} " +
-                        $"({donViHanMuc}={giaTriHanMuc}, tồn khả dụng {tonKhaDung}).");
+                        $"({hanMucDangAp.DonVi}={hanMucDangAp.GiaTri}, nguồn {hanMucDangAp.Nguon}, tồn khả dụng {tonKhaDung}).");
             }
 
             // `Warn` ⇒ **cho qua** nhưng ghi cảnh báo rõ (kèm số liệu để người vận hành hiểu VÌ SAO).
             Logger.LogWarning("HẠN MỨC KÊNH (`INV-003`, Warn): {Kenh} · {Sku} · kho {Kho} — yêu cầu {YeuCau} > hạn mức {HanMuc} " +
-                "(donVi={DonVi} giaTri={GiaTri} tonKhaDung={Ton}). VẪN CHO QUA vì `Inv.ChannelLimit.Action = Warn`.",
-                kenh, maSku, warehouseId, quantity, hanMuc, donViHanMuc, giaTriHanMuc, tonKhaDung);
+                "(donVi={DonVi} giaTri={GiaTri} nguon={Nguon} tonKhaDung={Ton}). VẪN CHO QUA vì hành động của kênh là `Warn`. [INV003-WARN-CHO-QUA]",
+                kenh, maSku, warehouseId, quantity, hanMuc, hanMucDangAp.DonVi, hanMucDangAp.GiaTri, hanMucDangAp.Nguon, tonKhaDung);
         }
 
         var lyDo = QuyetDinhGiuCho.KiemTra(onHand, reserved, quantity);

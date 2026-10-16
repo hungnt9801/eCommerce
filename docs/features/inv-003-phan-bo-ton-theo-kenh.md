@@ -1031,3 +1031,169 @@ public class StockAllotmentTests
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.1 | 13/10/2026 | *(điền)* | Bản nháp đầu. Chốt **12 quyết định** (D1…D12), **20 BR**, **11 NFR**, **20 test case**; lập từ **code thật** (đã kiểm: chưa có `StockAllotment`/`AvailableToPromise`, `Channel.HoldsInventory` đã có, unique index `InvItems` đã `NULLS NOT DISTINCT`). Trả lời `CHN-004` **Q1** (nguồn sự thật ATP) và ghi **F1** (tiền tố khoá **đôi** của `InventorySku` — chưa kiểm chứng bằng `MONITOR`), **F2** (`ChannelListing.AllottedQuantity` chết), **F6** (xung đột hai chiều với `CHN-004` D9/D11), **F7** (thiếu đường đọc tồn công khai cho storefront) |
+
+---
+
+## 16. 🚨 **HẠN MỨC PHÂN BỔ **RIÊNG TỪNG KÊNH** — BẢNG `InvChannelLimits` (16/10/2026)
+
+> **Lát cắt này THAY THẾ kết luận "v1" ở §15.1 (nợ 1) và chú thích cũ của `HanMucKenh`.**
+> 📌 Trước lát cắt này, **mọi** kênh dùng **CHUNG một** giá trị hạn mức (`Inv.ChannelLimit.DefaultValue`).
+
+### 16.1 Vấn đề thật (không phải phòng xa)
+
+"Một giá trị hạn mức cho mọi kênh" có **hai hệ quả đo được**, cả hai **không sinh lỗi**:
+
+| # | Hệ quả | Vì sao nghiêm trọng |
+|---|---|---|
+| **1** | Muốn **siết** kênh A ⇒ **siết luôn** kênh B, C, D | Người vận hành **không dám** bật chính sách ⇒ hạn mức **không bao giờ** được dùng ⇒ tính năng **tồn tại trên giấy** |
+| **2** | Hai kênh có **hợp đồng khác nhau** (Shopee siết, TikTok thả) **không thể** diễn đạt | Tầng nghiệp vụ **bị ép** xuống mức thấp nhất: chọn giá trị *"an toàn cho mọi kênh"* = **an toàn cho không kênh nào** |
+
+📌 Đây đúng họ lỗi dự án đã đặt tên: ***"ô chọn có mà chọn không đổi gì"*** — **tệ hơn không làm**, vì người vận hành **tin** một điều không đúng.
+
+### 16.2 Bảng `InvChannelLimits` — khoá nghiệp vụ & vì sao `WarehouseId` **NULLABLE**
+
+| Cột | Kiểu | Ý nghĩa |
+|---|---|---|
+| `TenantId` | `uuid NULL` | tenant (hệ thống hiện **1 tenant** ⇒ `NULL`) |
+| `ChannelCode` | `varchar(32) NOT NULL` | mã kênh — **chuẩn hoá `trim` + chữ thường** ở **MỘT chỗ duy nhất** (`InvChannelLimit.ChuẩnHoáKenh`) |
+| `WarehouseId` | `uuid NULL` | 🔑 **`NULL` = hạn mức CẢ KÊNH** (mọi kho); có giá trị = hạn mức **của kênh TRONG kho đó** |
+| `GiaTri` | `numeric(18,4) NOT NULL` | giá trị hạn mức (`0` = **TẮT** — quy ước toàn hệ thống) |
+| `HanhDong` | `int NOT NULL` | `0 = Block` · `1 = Warn` — **hành động RIÊNG của dòng** |
+
+🔑 **Khoá nghiệp vụ = `(TenantId, ChannelCode, WarehouseId)`.**
+
+⚠️ **`WarehouseId` NULLABLE chính là ca NẶNG NHẤT của lỗi C4/F1** (đã trả giá, `XC-004` Q6): cột **phân biệt**
+*"cả kênh"* với *"một kho"* lại **chính là** cột `NULL`, mà PostgreSQL **mặc định coi hai `NULL` là KHÁC NHAU**.
+⇒ Unique index **BẮT BUỘC** `NULLS NOT DISTINCT`, và EF Core **không** sinh được mệnh đề đó ⇒ migration có **SQL thô**.
+🚨 Thiếu nó: người vận hành khai **HAI** dòng *"hạn mức cả kênh"* cho cùng một kênh mà **không gì chặn**
+⇒ **hai hạn mức cho một kênh** ⇒ hành vi phụ thuộc **thứ tự đọc** (không tất định, **không lỗi nào nổi lên**).
+
+### 16.3 Hàm **THUẦN** `HanMucKenh.ChonHanMuc` — luật chọn & vì sao `PhamVi` nay **CÓ** tác dụng
+
+`PhamViHanMuc` (`Inv.ChannelLimit.Scope`) từng là *"ô chọn không đổi gì"*. Nay nó **quyết định dòng nào được xét**:
+
+| `PhamVi` | Thứ tự xét | Nguồn trả về |
+|---|---|---|
+| **`ChannelWarehouse`** (chặt) | ① dòng có **đúng** `(kênh, kho)` → ② dòng `(kênh, NULL)` → ③ giá trị dùng chung | `BangTheoKenhVaKho` · `BangTheoKenh` · `MacDinhChung` |
+| **`Channel`** (lỏng) | **CHỈ** dòng `(kênh, NULL)` → giá trị dùng chung; dòng theo kho **bị BỎ QUA** | `BangTheoKenh` · `MacDinhChung` |
+
+🔒 **Bỏ qua KHÔNG được im lặng:** dòng theo kho bị bỏ qua được **trả ra** qua tham số `out boQua`, và chỗ gọi
+**ghi `Warning`** kèm hướng dẫn (*"đổi setting sang `ChannelWarehouse`"*). Nếu bỏ qua im lặng thì người vận hành
+đã cấu hình hạn mức theo kho mà **không hiểu vì sao nó không có tác dụng**.
+
+🔑 **Nguồn hạn mức (`NguonHanMuc`) được trả về và GHI VÀO LOG + DỮ LIỆU LỖI `0042`.** Không có nó thì câu hỏi
+*"vì sao đơn này bị chặn"* **không trả lời được** — người vận hành phải **suy luận** từ nhiều bảng.
+
+🔒 **Tất định khi nhiều dòng cùng khớp** (dữ liệu đến từ cache/ảnh chụp cũ): chọn **giá trị NHỎ NHẤT** (chặt nhất) rồi `Id` nhỏ nhất.
+📌 Lấy *"dòng đầu tiên"* ⇒ kết quả **phụ thuộc thứ tự DB trả về** ⇒ **cùng dữ liệu, hai kết quả**.
+
+### 16.4 Mã lỗi mới (dải `eCommerce:Inventory:0xxx`)
+
+| Mã | Khi nào | Vì sao **mã riêng**, không mượn mã khác |
+|---|---|---|
+| `0043` `HanMucKenhThieuMaKenh` | Tạo dòng hạn mức **không có mã kênh** | Dòng không gắn kênh **không bao giờ khớp** ⇒ người vận hành **tưởng đã siết kênh** ⇒ **tắt im lặng** |
+| `0044` `HanMucKenhGiaTriAm` | Giá trị hạn mức **âm** | `0` = TẮT; cho phép âm tạo **hai cách diễn đạt cùng một ý** ⇒ chỗ đọc hiểu khác nhau ⇒ hạn mức **âm thầm** khác nhau |
+| `0045` `HanMucKenhDaTonTai` | DB chặn **trùng** `(kênh, kho)` | `0043` nghĩa *"thiếu mã kênh"* — **sai chỉ dẫn** cho ca trùng lặp (bài học `0040`/`0042`: **mã đúng kỹ thuật nhưng sai nghiệp vụ**) |
+
+### 16.5 ✅ KIỂM CHỨNG HTTP THẬT — **15/15 ca ĐẠT** (Host :5000 + PostgreSQL 17 + Redis 7)
+
+> 📌 **Phương pháp:** mỗi **nhóm chính sách** chạy trong **một phiên Host riêng** (5 phiên), vì ABP cache setting
+> **TRONG BỘ NHỚ tiến trình** — xem **§16.6**: đây là bài học tốn **một vòng** của chính lát cắt này.
+
+| Phiên | Chính sách | Ca | Kỳ vọng | **Đo được** |
+|---|---|---|---|---|
+| 1 | `Absolute` · `Block` · `Channel` · mặc định **0** | E1 kênh lạ, xin 30 | `200` | **`200`** ✅ (mặc định `0` = TẮT ⇒ **không chặn oan**) |
+| 1 | | E2 `k94kenh-shopee` (dòng riêng **5**), xin 6 | `403` · `0042` | **`403` `0042`** · `nguonHanMuc = BangTheoKenh` · `hanMuc = 5` ✅ |
+| 1 | | E3 **BIÊN** xin đúng **5** | `200` | **`200`** ✅ (bằng hạn mức ⇒ **cho qua**) |
+| 1 | | E4 `k94kenh-web` (dòng riêng 5, hành động **WARN**), xin 6 | `200` | **`200`** ✅ (log `[INV003-WARN-CHO-QUA]`) |
+| 1 | | E4b **ĐỐI CHỨNG** cùng 6 nhưng kênh `Block` | `403` `0042` | **`403` `0042`** ✅ |
+| 1 | | E5 gọi mã kênh **HOA** toàn bộ | `403` `0042` | **`403` `0042`** ✅ (chuẩn hoá ở **một chỗ**) |
+| 1 | | E6 **KHÔNG** truyền kênh, mặc định 0 | `200` | **`200`** ✅ |
+| 1 | | E7 cùng kênh+kho có dòng theo kho **2** nhưng `Scope=Channel` | `200` | **`200`** ✅ (dòng theo kho **bị bỏ qua** ⇒ `PhamVi` **CÓ** tác dụng) |
+| 2 | `Absolute` · `Block` · `Channel` · mặc định **3** | F2 kênh lạ xin 4 | `403` `0042` | **`403` `0042`** · `nguonHanMuc = MacDinhChung` ✅ (rơi về **mặc định chung**) |
+| 2 | | F2b **BIÊN** xin đúng 3 | `200` | **`200`** ✅ |
+| 2 | | F3 kênh shopee (dòng riêng 5) xin 4 | `200` | **`200`** ✅ (dòng **RIÊNG** thắng mặc định 3) |
+| 3 | `Absolute` · `Block` · **`ChannelWarehouse`** · mặc định 3 | G2 kênh shopee xin 3 (dòng kho = **2**) | `403` `0042` | **`403` `0042`** · `nguonHanMuc = BangTheoKenhVaKho` · `hanMuc = 2` ✅ (dòng theo kho **CHẶT HƠN** dòng cả kênh 5) |
+| 3 | | G3 **BIÊN** theo kho: xin đúng 2 | `200` | **`200`** ✅ |
+| 4 | **`Percent`** · `Block` · `ChannelWarehouse` | H2a `k94kenh-pt` = 10 %, tồn khả dụng 100 ⇒ hạn mức **10**; xin 11 | `403` `0042` | **`403` `0042`** · `hanMuc = 10` ✅ |
+| 4 | | H2b **BIÊN** xin đúng 10 | `200` | **`200`** ✅ |
+| 5 | `Recon.Mismatch.Action = RequireConfirmation` + ngưỡng `Absolute(1)` | lượt quét **mới** của job đối soát | `KetLuan = 2` | xem **`rec-001`** §16.5 |
+
+**Trạng thái thật sau phép đo (đọc từ DB, không suy luận):**
+
+| Chỉ số | Giá trị đo được | Ý nghĩa |
+|---|---|---|
+| `InvStockReservations` có `ReferenceId like 'K94-%'` | **9** dòng | chỉ các ca **ĐI QUA** mới sinh giữ chỗ ⇒ 6 ca `403` **không** để lại dấu vết ✅ |
+| `InvItems(K94SKU-THUONG)` | `OnHand = 1000`, `Reserved = 83`, `Available = 917` | khớp **chính xác** tổng số lượng của 9 ca đi qua (30+5+6+30+3+3+4+2 = **83**) ✅ |
+| `InvItems(K94SKU-PT)` | `OnHand = 100`, `Reserved = 10` | khớp ca H2b ✅ |
+| `InvStockLedger` tổng nhập `K94SKU-THUONG` | **1000** | **điều kiện tiên quyết** của phép so lệch: SKU này **KHỚP** sổ cái |
+| Neo log `INV003-HANMUC-AP-DUNG` | có dòng | chính sách đang áp **đọc được từ log** (xem §16.6 về **neo ASCII**) |
+
+### 16.6 🚨 BÀI HỌC CỦA CHÍNH LÁT CẮT NÀY — **bẫy cache nằm ở PROBE, không ở sản phẩm**
+
+Lần chạy **đầu tiên** của phép kiểm cho **4 ca SAI** (F2 · G2 · G3 · H2a) — và **không có lỗi nào** chỉ ra.
+Nguyên nhân **đã đo**, không đoán:
+
+| # | Điều đã xảy ra | Bằng chứng |
+|---|---|---|
+| 1 | Đổi `AbpSettings` trong DB rồi xoá cache bằng `--pattern '*TenSetting*'` | Lệnh **không khớp key nào** (`redis-cli --scan` ⇒ `(không có)`), và ca F2 vẫn **cho qua** ⇒ **giá trị CŨ** còn hiệu lực |
+| 2 | Key cache **THẬT** của ABP dài và khác hẳn | `c:Volo.Abp.SettingManagement.Setting,k:ecommerce:pn:G,pk:,n:Inv.ChannelLimit.Unit` + `ecommerce:_AbpInMemorySettingCacheStamp` |
+| 3 | Đọc log **có dấu** bằng `Select-String` ⇒ **0 dòng** | `host.log` **làm hỏng dấu tiếng Việt** (`HẠN MỨC` → `H?N M?C`) ⇒ **mọi mẫu có dấu đều khớp RỖNG**; phải tìm bằng **neo ASCII** |
+| 4 | Phép đo "hạn mức nào đang áp" bị **hết hàng giữa chừng** ở một lần chạy | Các ca `Warn`/`PhamVi` trả `0001` (*không đủ hàng*) ⇒ phép đo **không trả lời được** câu hỏi đang hỏi |
+
+**⇒ Ba quy tắc cho probe sau (bổ sung vào `tools\README-probe.md`):**
+
+1. **Đổi setting của ABP ⇒ xoá cache bằng ĐÚNG mẫu `c:Volo.Abp.SettingManagement.Setting,*` + `*AbpInMemorySettingCacheStamp*`,
+   VÀ khởi động lại Host** (cache tầng 2 nằm **trong bộ nhớ tiến trình**, không chỉ Redis).
+   🔒 **In ra SỐ KEY đã xoá** — `0 key` là **dấu hiệu mẫu SAI**, không phải *"không có gì để xoá"*.
+2. **Log có tiếng Việt ⇒ tìm bằng NEO ASCII** (`[INV003-HANMUC-AP-DUNG]`), **không** bằng chuỗi có dấu.
+3. **Cô lập biến số:** phép đo "hạn mức nào đang áp" chỉ có nghĩa khi **tồn khả dụng DƯ** — nếu không, ca hỏng
+   trả `0001` và ta **tưởng** đó là kết quả về hạn mức.
+
+### 16.7 Migration & schema (đã áp lên DB **THẬT**)
+
+| Mục | Giá trị **đo được** |
+|---|---|
+| Migration | `20261016034601_Inv003_ChannelLimits_Rec001_ReconRuns` (**khung do EF sinh**, 3 bảng) |
+| Bảng tạo mới | `InvChannelLimits` · `ReconRuns` · `ReconRunMismatches` |
+| SQL thô **bắt buộc** | 2 × `CREATE UNIQUE INDEX … NULLS NOT DISTINCT` (`InvChannelLimits` · `ReconRunMismatches`) |
+| `CHECK` mới | `CK_InvChannelLimits_GiaTri_KhongAm` (+ 3 `CHECK` của `ReconRuns` — xem `rec-001` §16.7) |
+| Ứng dụng | `eCommerce.DbMigrator` (**binary MỚI build**) ⇒ `__EFMigrationsHistory` có dòng migration này |
+| Đếm `NULLS NOT DISTINCT` | **40 → 42** ⇒ cập nhật `PostgreSqlSchemaTests.F1_du_42_…` + **danh sách ĐÍCH DANH** (2 tên mới) |
+| Ràng buộc mới **đã được ÁNH XẠ** | `IX_InvChannelLimits_…` → `eCommerce:Inventory:0045` · 4 `CHECK` → mã chung `eCommerce:Db:0001` (**cố ý**: hàng rào phòng vệ chiều sâu ⇒ để DB nổ nghĩa là **bug**, không phải hành vi nghiệp vụ) |
+| `Assets/schema.sql` | **sinh lại** từ migration ⇒ `RangBuocDbChuaAnhXaTests` thấy ràng buộc mới |
+
+### 16.8 ✅ ĐÃ KIỂM CHỨNG vs ⏳ CÒN NỢ (ghi rõ, không giấu)
+
+**✅ Đã kiểm chứng:**
+
+1. Bảng **riêng từng kênh** có tác dụng **thật** trên đường giữ chỗ (15 ca HTTP + trạng thái DB khớp **từng đơn vị**).
+2. **Nguồn hạn mức** trả về đúng **3 nguồn** (`BangTheoKenh` · `BangTheoKenhVaKho` · `MacDinhChung`) — **đo được** từ dữ liệu lỗi `0042`.
+3. **`PhamVi` CÓ tác dụng** (E7 vs G2: **cùng** dữ liệu, `Scope` khác ⇒ **kết quả khác**).
+4. **Hành động RIÊNG của kênh CÓ tác dụng** (E4 `Warn` cho qua vs E4b `Block` chặn — **cùng** số lượng, **cùng** kho).
+5. 4 **hàng rào DB** mới nổ **đúng mã** ở **đường lỗi** (`23505` ×2 · `23514` ×1 · `23503`) — xem `rec-001` §16.6.
+6. `793 unit` (**+47**) · `38 integration` · build **0 lỗi / 0 cảnh báo**.
+
+**⏳ Còn nợ (KHÔNG phải tính năng đã có):**
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+| 1 | **`DonVi` (`Percent`/`Absolute`) vẫn là setting DÙNG CHUNG**, không phải thuộc tính từng dòng | Trộn hai đơn vị trong cùng báo cáo là nguồn sai số khó thấy ⇒ cần người quyết trước khi cho per-row |
+| 2 | **`Percent` vẫn tính trên tồn khả dụng của TỪNG `(kho, SKU)`** | Tồn kho **chưa** mô hình hoá theo kênh (§5 việc 3 của gói bàn giao) |
+| 3 | **Chưa có API/admin UI** để quản lý `InvChannelLimits` | Hiện phải ghi DB. ⚠️ Kèm **bẫy cache** ở §16.6 ⇒ đây là nợ **ưu tiên cao**, xem §16.9 |
+| 4 | **Chưa có job/ETO** khi hạn mức thay đổi (`CHN-004` cần biết để đẩy tồn lên sàn) | Thuộc `CHN-004` (GĐ4); `inv-003` **D11** đã chốt: Inventory là **nguồn sự thật**, `ChannelAllotmentChangedEto` **chỉ** để kiểm trần |
+| 5 | Bảng `InvChannelLimits` **KHÔNG phải "ngân sách đã cấp"** (`StockAllotment` của §5.2) | Đây là **TRẦN**, đọc lúc chạy, **không trừ dần** — `F3` §15.2 vẫn còn nguyên giá trị |
+
+### 16.9 🚨 NỢ NÀO ĐÁNG LÀM TIẾP (đề xuất, kèm lý do)
+
+| Ưu tiên | Việc | Vì sao |
+|---|---|---|
+| **1** | **Đường GHI chuẩn cho admin** (`Volo.Abp.SettingManagement.HttpApi` **hoặc** app service dùng `ISettingManager`) + API cho `InvChannelLimits` | §16.6 chứng minh: ghi DB tay + xoá cache tay là **bẫy đã làm SAI 4 phép đo**. Mỗi lần vận hành sửa hạn mức là một lần **có thể** rơi vào bẫy đó |
+| **2** | **`DonVi` theo từng dòng** (§16.8 nợ 1 — sau khi người quyết) | Đây là nợ **số 1** về nghiệp vụ: kênh A muốn `%`, kênh B muốn số tuyệt đối |
+| **3** | Job/ETO khi hạn mức đổi (thuộc `CHN-004`) | Không có ⇒ sàn **không biết** hạn mức đã đổi ⇒ hai nguồn số (đúng **F6** §15.2) |
+
+### 16.10 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.2 | 16/10/2026 | *(agent, session GĐ1)* | **Hạn mức RIÊNG TỪNG KÊNH**: bảng `InvChannelLimits` (khoá `(TenantId, ChannelCode, WarehouseId)`, `WarehouseId NULL` = cả kênh) + migration `Inv003_ChannelLimits_Rec001_ReconRuns` (SQL thô `NULLS NOT DISTINCT`) + hàm thuần `HanMucKenh.ChonHanMuc` (3 nguồn · `PhamVi` **có** tác dụng · bỏ qua **không** im lặng) + 3 mã lỗi (`0043`/`0044`/`0045`) + **47 unit test**. **Kiểm chứng HTTP 15/15 ca** qua **5 phiên Host** (mỗi nhóm chính sách một phiên). Ghi **§16.6** (bẫy cache **ở probe**) · **§16.8** (nợ) · **§16.9** (thứ tự làm tiếp) |
