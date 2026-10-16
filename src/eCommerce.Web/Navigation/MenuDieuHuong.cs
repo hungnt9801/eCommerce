@@ -56,6 +56,17 @@ public static class MenuDieuHuong
             // đó là ích lợi của việc để hằng số ở nơi có kiểu — **không** phải chuỗi trần.
             QuyenCanCo = eCommerce.Pricing.PricingPermissions.Default,
             MoTa = "Danh mục sản phẩm kèm giá niêm yết"
+        },
+        new()
+        {
+            Nhan = "Đối soát tồn kho",
+            Url = "/DoiSoat",
+            // `DoiSoatController` gọi `IDoiSoatAppService` (`[Authorize(Inventory.Default)]`).
+            // 📌 Trang này **đã tồn tại thật** (`Controllers/DoiSoatController.cs`) — mục menu chỉ được thêm
+            // SAU khi trang có, đúng quy tắc đã đặt ở `web-001` §95.5 (và `MOI_Url_trong_menu_PHAI_co_controller_THAT`
+            // sẽ đỏ nếu ai thêm mục cho một trang chưa làm).
+            QuyenCanCo = eCommerceConsts.Permissions.Inventory.Default,
+            MoTa = "Lịch sử lượt quét + dòng lệch cần xử lý"
         }
 
         // ══════════════════════════════════════════════════════════════════════════════════════════════

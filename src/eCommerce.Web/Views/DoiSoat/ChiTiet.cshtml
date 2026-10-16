@@ -1,0 +1,150 @@
+@using eCommerce.Inventory
+@model eCommerce.Web.Controllers.DoiSoatChiTietDto
+@using Volo.Abp.AspNetCore.Mvc.UI.Layout
+@inject IPageLayout PageLayout
+@{
+    PageLayout.Content.Title = "Dòng lệch đối soát";
+    PageLayout.Content.BreadCrumb.Add("Trang chủ");
+    PageLayout.Content.BreadCrumb.Add("Đối soát tồn kho");
+    PageLayout.Content.BreadCrumb.Add("Dòng lệch");
+
+    bool chiChuaXuLy = ViewBag.ChiChuaXuLy ?? true;
+}
+
+@* 🚨 `REC-001` — DÒNG LỆCH CỦA MỘT LƯỢT + Ô XỬ LÝ.
+
+   🔒 BA BẤT BIẾN ĐƯỢC THỂ HIỆN Ở MÀN HÌNH NÀY (xem `rec-001` §17.3):
+     ① `OnHand`/`TongSoCai`/`ChenhLech` là **ẢNH CHỤP lúc quét** ⇒ hiện dạng **chỉ đọc**, KHÔNG có ô sửa
+        (sửa là **phá bằng chứng**);
+     ② Xử lý lệch **BẮT BUỘC có lý do** ⇒ ô `lyDo` có `required`, và app service **NÉM** nếu thiếu;
+     ③ Gọi lại **KHÔNG ghi đè** bằng chứng ⇒ dòng đã xử lý **không** hiện form nữa. *@
+
+<h4 class="mb-1">Dòng lệch — lượt @Model.Luot.BatDauUtc.ToString("yyyy-MM-dd HH:mm:ss") UTC</h4>
+<p class="text-muted small mb-3">
+    @Model.Luot.SoCapDaDo cặp đã đo · @Model.Luot.SoLech lệch · @Model.Luot.SoLechVuotNguong vượt ngưỡng ·
+    còn <strong>@Model.Luot.SoLechChuaXuLy</strong> dòng chưa xử lý ·
+    chính sách <code>@Model.Luot.DonViNguong @Model.Luot.GiaTriNguong</code> / <code>@Model.Luot.HanhDong</code>
+    @if (!Model.Luot.NguongHopLe)
+    {
+        <span class="badge bg-dark ms-1">ngưỡng SAI tại thời điểm quét</span>
+    }
+</p>
+
+<div class="mb-3">
+    @if (chiChuaXuLy)
+    {
+        <a class="btn btn-sm btn-outline-secondary" asp-action="ChiTiet" asp-route-id="@Model.Luot.Id" asp-route-chiChuaXuLy="false">Hiện cả dòng đã xử lý</a>
+    }
+    else
+    {
+        <a class="btn btn-sm btn-outline-warning" asp-action="ChiTiet" asp-route-id="@Model.Luot.Id" asp-route-chiChuaXuLy="true">Chỉ dòng chưa xử lý</a>
+    }
+    <a class="btn btn-sm btn-outline-primary" asp-action="Index">« Danh sách lượt</a>
+</div>
+
+@* 🚨 HIỆN LỖI NGHIỆP VỤ Ở ĐÂY (không phải trang lỗi 500).
+
+   📌 VÌ SAO CẦN: `POST /DoiSoat/XuLyLech` thiếu lý do ⇒ `AbpExceptionFilter` biến `BusinessException`
+   thành **`500` + "An internal error occurred…"** ⇒ người dùng **KHÔNG BIẾT** mình thiếu gì.
+   Controller nay **bắt `BusinessException`** và đưa thông điệp vào `TempData` ⇒ hiện tại chỗ.
+
+   🔒 Và đây **KHÔNG** phải "nuốt guard": lỗi vẫn **dừng** thao tác và **không ghi gì** — chỉ **đổi chỗ hiện**
+   từ "trang lỗi hệ thống" sang "thông báo cho người dùng". Xem `rec-001` §18. *@
+@if (TempData["LoiXuLyLech"] is string loiXuLy && !string.IsNullOrWhiteSpace(loiXuLy))
+{
+    <div class="alert alert-danger">
+        <strong>Không xử lý được lệch.</strong> @loiXuLy
+    </div>
+}
+
+@if (Model.DongLech.TotalCount == 0)
+{
+    <div class="alert alert-success">
+        <strong>Không có dòng lệch nào</strong> khớp bộ lọc.
+        @if (chiChuaXuLy)
+        {
+            <span>Đây là tin <strong>tốt</strong>: mọi dòng lệch của lượt này đã được xử lý. </span>
+        }
+    </div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-sm align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>Kho</th>
+                    <th>SKU</th>
+                    <th class="text-end" title="Ảnh chụp OnHand lúc quét">Tồn (OnHand)</th>
+                    <th class="text-end" title="Tổng CÓ DẤU của sổ cái (nguồn sự thật) lúc quét">Sổ cái</th>
+                    <th class="text-end" title="OnHand − TongSoCai; dấu cho biết lệch về phía nào">Lệch</th>
+                    <th>Vượt ngưỡng</th>
+                    <th>Trạng thái xử lý</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var d in Model.DongLech.Items)
+                {
+                    <tr class="@(d.VuotNguong && !d.DaXuLy ? "table-warning" : "")">
+                        <td>@(d.WarehouseCode ?? d.WarehouseId.ToString())</td>
+                        <td><code>@d.Sku</code></td>
+                        <td class="text-end">@d.OnHand</td>
+                        <td class="text-end">@d.TongSoCai</td>
+                        <td class="text-end @(d.ChenhLech < 0 ? "text-danger" : (d.ChenhLech > 0 ? "text-primary" : ""))">
+                            @* 🔒 Giữ DẤU: âm = hệ thống ghi THIẾU so với sổ; dương = ghi THỪA. *@
+                            @(d.ChenhLech > 0 ? "+" : "")@d.ChenhLech
+                        </td>
+                        <td>
+                            @if (d.VuotNguong)
+                            {
+                                <span class="badge bg-danger">vượt</span>
+                            }
+                            else
+                            {
+                                <span class="text-muted small">dưới ngưỡng</span>
+                            }
+                        </td>
+                        <td>
+                            @if (d.DaXuLy)
+                            {
+                                @* ③ Dòng ĐÃ xử lý ⇒ KHÔNG hiện form (gọi lại là no-op, không ghi đè bằng chứng). *@
+                                <div class="small">
+                                    <span class="badge bg-success">đã xử lý</span>
+                                    <div class="text-muted">
+                                        @d.XuLyLucUtc?.ToString("yyyy-MM-dd HH:mm") · <strong>@d.NguoiXuLy</strong>
+                                    </div>
+                                    <div>@d.LyDoXuLy</div>
+                                </div>
+                            }
+                            else
+                            {
+                                <form asp-action="XuLyLech" method="post" class="row g-1">
+                                    @* 🚨 BẮT BUỘC: thiếu token ⇒ POST trả 400 (bài học vòng 86). *@
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="dongLechId" value="@d.Id" />
+                                    <input type="hidden" name="reconRunId" value="@Model.Luot.Id" />
+                                    <div class="col-12 col-md-4">
+                                        <input class="form-control form-control-sm" name="nguoiXuLy"
+                                               placeholder="Người xử lý" required maxlength="256" />
+                                    </div>
+                                    <div class="col-12 col-md-5">
+                                        <input class="form-control form-control-sm" name="lyDo"
+                                               placeholder="Lý do (bắt buộc — audit)" required maxlength="1024" />
+                                    </div>
+                                    <div class="col-12 col-md-3">
+                                        <button type="submit" class="btn btn-sm btn-primary w-100">Đánh dấu đã xử lý</button>
+                                    </div>
+                                </form>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <p class="text-muted small">
+        Tổng @Model.DongLech.TotalCount dòng.
+        @* 🔒 Nói RÕ vì sao không có ô sửa số đo — nếu không, người dùng sẽ đi tìm và tự sửa DB. *@
+        <em>Tồn/Sổ cái/Lệch là <strong>ảnh chụp tại thời điểm quét</strong> nên không sửa được: sửa là phá bằng chứng đối soát.</em>
+    </p>
+}

@@ -1347,3 +1347,115 @@ sai ⇒ **`throw` DỪNG NGAY**, không chạy tiếp.
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.3 | 16/10/2026 | *(agent, session GĐ1)* | **§17 — LÁT CẮT 2: ĐƯỜNG ĐỌC + QUY TRÌNH XỬ LÝ LỆCH (đóng nợ §16.8)**: `ReconRunMismatch.DanhDauDaXuLy` (**3 bất biến** ở tầng domain) · **4 cột** + **index CÓ ĐIỀU KIỆN** (`WHERE NOT "DaXuLy"`) · `IDoiSoatAppService`/`DoiSoatAppService` (**4 endpoint**, đã đo swagger) · **`SoLechChuaXuLy`** (con số **hành động được**) · mã `Recon:0002`/`0003` · **+15 unit test** (975 tổng) · **19/19 ca HTTP thật**. 🚨 **Bộ đo cũng có lỗi** (§17.7): `INSERT` kho thất bại im lặng mà probe **vẫn in ĐẠT** — nay có **`A1` kiểm tiền đề của bước gieo** (sai ⇒ **dừng ngay**). Ghi **§17.3** (4 quyết định thiết kế) · **§17.4** (index có điều kiện — nghịch lý báo cáo tồn đọng) · **§17.8** (nợ: retention · UI Web · job `D12` · metric · số lần lệch theo cặp) |
+
+---
+
+## 18. ✅ **LÁT CẮT 3 — UI ĐỐI SOÁT TỒN KHO (`/DoiSoat`)** (16/10/2026) — *đóng nợ §17.8 #2*
+
+> ⚠️ **PHẠM VI NÓI RÕ:** lát cắt này làm **hai trang Web** (`Index` = lịch sử lượt · `ChiTiet` = dòng lệch + ô xử lý)
+> và **mục menu** trỏ tới chúng. 🚫 **CHƯA** làm: **retention** (§17.8 #1), **metric** cho đường xử lý lệch,
+> endpoint tổng hợp *"số lần lệch theo cặp"*.
+
+### 18.1 Vì sao rủi ro thấp
+
+`DoiSoatAppService` (**4 endpoint**, **19/19 ca HTTP thật** — §17) **đã có và đã kiểm**. Web chạy **in-process**
+và nạp `eCommerceApplicationModule` ⇒ app service **dùng được ngay**, **không** cần module mới.
+📌 Phần còn lại là **nối màn hình vào API đã kiểm** — đúng khuôn `web-001` §66 (*"rủi ro đã hết: chỉ là nối nút bấm"*).
+
+### 18.2 Đã làm gì
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| **1** | **`DoiSoatController`** | `GET /DoiSoat` (lịch sử lượt) · `GET /DoiSoat/ChiTiet/{id}` (dòng lệch) · `POST /DoiSoat/XuLyLech` |
+| **2** | **`Views/DoiSoat/Index.cshtml`** | Bảng lượt: thời điểm · số giây · cặp đã đo · lệch · vượt ngưỡng · **chưa xử lý** · ảnh chụp chính sách · kết luận. 🔒 Dòng **còn việc** được **tô nền vàng** + badge |
+| **3** | **`Views/DoiSoat/ChiTiet.cshtml`** | Dòng lệch + **form xử lý** (ô lý do + người xử lý) có **token chống giả mạo** |
+| **4** | **Mục menu `/DoiSoat`** | Thêm vào `MenuDieuHuong.TatCa` — **chỉ sau khi trang đã tồn tại** (đúng quy tắc `web-001` §95.5) |
+| **5** | 🚨 **Bắt `BusinessException` ở controller** | Xem §18.4 — **phát hiện quan trọng nhất** của lát cắt |
+
+### 18.3 🔑 Hai mặc định **NGƯỢC NHAU** của hai trang — và vì sao
+
+| Trang | Mặc định lọc | **Vì sao** |
+|---|---|---|
+| `Index` (lịch sử lượt) | hiện **TẤT CẢ** | Người mới mở cần thấy **bức tranh đầy đủ** trước (kể cả lượt sạch) để biết hệ thống **có** đang chạy. Nếu mặc định chỉ hiện *"còn việc"*, một hệ thống **khoẻ mạnh** sẽ hiện **danh sách rỗng** ⇒ người dùng tưởng **tính năng hỏng** |
+| `ChiTiet` (dòng lệch) | chỉ hiện dòng **CHƯA xử lý** | Mục đích là **làm việc**. Hiện cả dòng đã xong sẽ **chôn** việc cần làm |
+
+📌 **Trạng thái rỗng phải NÓI RÕ vì sao** — nếu chỉ để trắng, người dùng không phân biệt được
+*"hệ thống khoẻ"* với *"tính năng hỏng"*. Cả hai trang đều in thông báo riêng cho ca rỗng.
+
+### 18.4 🚨 **PHÁT HIỆN QUAN TRỌNG NHẤT: `AbpExceptionFilter` biến lỗi NGHIỆP VỤ thành `500` + trang lỗi CHUNG**
+
+**Đo được ở lần chạy probe ĐẦU TIÊN:** `POST /DoiSoat/XuLyLech` **thiếu lý do** ⇒ **`HTTP 500`**.
+Log có `"code": "eCommerce:Recon:0002"` nhưng thông điệp là
+*`"An internal error occurred during your request!"`* ⇒ **người dùng KHÔNG BIẾT mình thiếu gì để sửa**.
+
+📌 **Vì sao đây là lỗi THẬT, không phải chi tiết nhỏ:** trên **API**, client là **máy** — nó đọc `code`
+và tự xử lý. Trên **UI**, người dùng là **người** — họ chỉ thấy *"đã xảy ra lỗi nội bộ"* và
+**không có hành động nào để làm tiếp**. Một form bắt buộc lý do mà nói *"lỗi nội bộ"* thì người dùng sẽ
+**thử lại y hệt** (vì không biết sai ở đâu) — hoặc **bỏ luôn tính năng**.
+
+🔒 **Cách sửa — và PHÂN BIỆT hai việc rất khác nhau (đây là mấu chốt):**
+
+| | Nghĩa | Đúng/Sai |
+|---|---|---|
+| **Nuốt guard** | bắt exception rồi **đi tiếp như thành công** | 🚨 **SAI** — người dùng tưởng đã xong, lệch **chưa** được xử lý |
+| **Hiện lỗi cho người dùng** (đã làm) | bắt exception ⇒ **dừng lại**, **không ghi gì**, **hiện đúng mã + thông điệp** | ✅ **ĐÚNG** |
+
+📌 Bằng chứng **vẫn** được giữ nguyên: exception ném **trước** mọi phép gán trong `DanhDauDaXuLy`
+⇒ entity **không** bị đụng tới. Probe ca **G1** đo được `DaXuLy = false` sau POST lỗi.
+
+🔒 **Chỉ bắt `BusinessException`** (lỗi nghiệp vụ **có mã**); **KHÔNG** bắt `Exception` chung —
+lỗi hạ tầng/lập trình **phải** nổi lên thành `500` để **không** bị che.
+
+### 18.5 ✅ Kiểm chứng
+
+**Probe HTML thật (`tools\_tam-rec2\rec-001-ui-kiem.ps1`) — 22/22 ca ĐẠT** (Web :5100 + PostgreSQL 17 + đăng nhập thật bằng form MVC):
+
+| # | Ca | Kỳ vọng | **Đo được** |
+|---|---|---|---|
+| A1 | **Tiền đề**: 2 dòng lệch + 1 kho đã gieo | đúng số | lệch=**2** · kho=**1** ✅ |
+| C1 | Đăng nhập | `200` | **`200`** ✅ |
+| **D1** | Menu có mục *"Đối soát tồn kho"* trỏ `/DoiSoat` | có `href` | **có** ✅ |
+| E1 | `GET /DoiSoat` | `200` (**không** `404`/`500`) | **`200`** (22 718 ký tự) ✅ |
+| E2–E5 | Tiêu đề · nút lọc · lượt của ta trên bảng · badge **vượt** | có | ✅ |
+| F1 | `GET /DoiSoat/ChiTiet/{id}` | `200` | **`200`** ✅ |
+| F2–F4 | 2 dòng lệch · **mã kho** (không GUID) · **dấu lệch** (`−10` và `+3`) | có | ✅ |
+| F5 | **Form xử lý** (ô lý do + người xử lý) | có | ✅ |
+| **F6** | **Token chống giả mạo** trong form | có | ✅ |
+| F7 | Nói rõ số đo là **ảnh chụp**, không sửa được | có | ✅ |
+| **G1** | POST **thiếu lý do** | **KHÔNG ghi** (`DaXuLy = false`) | **`false`** ✅ |
+| **G2** | 🚨 POST lỗi ⇒ trang **HIỆN mã lỗi + thông điệp** | có `Recon:0002` | **có** ✅ *(sau khi vá §18.4)* |
+| H1 | POST đủ lý do | `302` (**không** `400` ⇒ token OK) | **`302`** ✅ |
+| **H2** | 🚨 DB ghi **THẬT** | `DaXuLy=true` + người + lý do | **`true\|probe.web\|…kiểm kê…`** ✅ |
+| **H3** | 🚨 và **KHÔNG sửa SỐ ĐO** | `90\|100` giữ nguyên | **`90\|100`** ✅ |
+| **I1** | Dòng **đã xử lý BIẾN MẤT** khỏi danh sách mặc định | không còn | **không còn** ✅ |
+| I2 | Bật *"hiện cả dòng đã xử lý"* ⇒ thấy lại + **bằng chứng** | có người + lý do | **`probe.web`** ✅ |
+| J | Log | không lỗi | `fail:` = **0** · `Exception` = **0** ✅ |
+
+📌 **Ca I1/I2 là cặp đo cho thấy màn hình phục vụ đúng mục đích:** mặc định **chỉ việc cần làm**,
+và bằng chứng **vẫn tra được** khi cần — hai nhu cầu **ngược nhau** của cùng một dữ liệu.
+
+### 18.6 🐞 Bộ đo lại có lỗi (lần thứ hai trong hai lượt liên tiếp)
+
+Ca **H2** **ĐỎ** ở lần chạy đầu dù dữ liệu **hoàn toàn đúng**: tôi viết kỳ vọng `'t|probe.web|…'`
+(giả định PostgreSQL trả `t` cho boolean) trong khi nó trả **`true`** — và `psql` ở đây **không** dùng
+chế độ rút gọn. 📌 Cùng họ với lỗi bộ đo ở **§17.7**: **giả định về định dạng của công cụ**, không phải
+về dữ liệu.
+🔒 **Cách tránh:** khi so sánh giá trị của DB, **in giá trị ra trước** rồi mới viết kỳ vọng
+(đúng nguyên tắc `tools\README-probe.md`: *"đo lại sau khi ghi"*).
+
+### 18.7 ⏳ NỢ (KHÔNG phải tính năng đã có)
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+| **1** | **Retention** | Vẫn chưa có (như §17.8 #1) — bảng **chỉ tăng** |
+| **2** | **Chưa phân trang ở trang chi tiết** | `MaxResultCount = 200` (trần API) — lượt có > 200 dòng lệch sẽ **cắt bớt mà không nói**. ⚠️ Cần phân trang **trước khi** có lượt lệch diện rộng |
+| **3** | **`WarehouseCode` có thể `null`** | Nếu kho bị xoá cứng (dù FK `Restrict` cản) ⇒ view rơi về in **GUID**. Chấp nhận được nhưng **không** đẹp |
+| **4** | **Chưa có nút "xử lý hàng loạt"** | Mỗi dòng một form. Với lượt lệch diện rộng, người trực phải bấm **N lần** ⇒ cần chọn nhiều + lý do chung. 📌 **Nhưng** phải giữ **lý do bắt buộc** (không được "chọn tất cả rồi bấm") |
+| **5** | **UI chưa hiện `KetLuan` bằng tiếng Việt** | Hiện mã enum (`VuotCanXacNhan`) — cần bảng dịch |
+| **6** | **Menu mới ở trang chủ + trang đối soát** | Như `web-001` §95.6 #5: chưa đặt trong **layout** ⇒ vẫn phải quay về trang chủ để chuyển màn hình |
+
+### 18.8 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.4 | 16/10/2026 | *(agent, session GĐ1)* | **§18 — LÁT CẮT 3: UI ĐỐI SOÁT (`/DoiSoat`)** (đóng nợ §17.8 #2): `DoiSoatController` (**3 route**) · `Views/DoiSoat/Index.cshtml` (**bảng lượt, tô đậm dòng còn việc**) · `Views/DoiSoat/ChiTiet.cshtml` (**form xử lý có token**) · **mục menu `/DoiSoat`** (thêm **sau khi** trang tồn tại) · **+1 ca menu guard vẫn xanh** · **22/22 ca probe HTML thật**. 🚨 **PHÁT HIỆN**: `AbpExceptionFilter` biến `BusinessException` thành **`500` + "An internal error occurred…"** ⇒ người dùng không biết thiếu gì; đã **bắt `BusinessException` ở controller** và **hiện mã + thông điệp** — kèm phân biệt rõ với *"nuốt guard"*. Ghi **§18.3** (hai mặc định **ngược nhau** của hai trang) · **§18.6** (bộ đo lại sai: giả định `t` vs `true`) · **§18.7** (nợ: retention · **chưa phân trang chi tiết** · chưa có xử lý hàng loạt · chưa Việt hoá `KetLuan`) |

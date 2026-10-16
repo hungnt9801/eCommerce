@@ -1,0 +1,130 @@
+@using eCommerce.Inventory
+@using Volo.Abp.Application.Dtos
+@model PagedResultDto<LuotDoiSoatDto>
+@using Volo.Abp.AspNetCore.Mvc.UI.Layout
+@inject IPageLayout PageLayout
+@{
+    PageLayout.Content.Title = "Đối soát tồn kho";
+    PageLayout.Content.BreadCrumb.Add("Trang chủ");
+    PageLayout.Content.BreadCrumb.Add("Đối soát tồn kho");
+
+    bool chiConViec = ViewBag.ChiConViec ?? false;
+    int trang = ViewBag.Trang ?? 1;
+}
+
+@* 🚨 `REC-001` — LỊCH SỬ LƯỢT QUÉT ĐỐI SOÁT.
+
+   📌 VÌ SAO MÀN HÌNH NÀY TỒN TẠI: `ReconRuns` đã có **14 lượt thật** trong DB nhưng **không có đường đọc**
+   nào cho người vận hành ⇒ lệch tồn kho được **phát hiện rồi nằm im**. Xem `rec-001` §16.8 và §17.
+
+   🔒 Điểm quan trọng nhất của màn hình: **`SoLechChuaXuLy`** — con số **HÀNH ĐỘNG ĐƯỢC**.
+   Nếu chỉ hiện tổng `SoLech`, danh sách **mãi** hiện như cũ và **không ai đọc nữa**. *@
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0">Lịch sử lượt quét đối soát</h4>
+    <div>
+        @if (chiConViec)
+        {
+            <a class="btn btn-sm btn-outline-secondary" asp-action="Index">Hiện tất cả</a>
+        }
+        else
+        {
+            <a class="btn btn-sm btn-outline-warning" asp-action="Index" asp-route-chiConViec="true">Chỉ lượt còn việc</a>
+        }
+    </div>
+</div>
+
+@if (Model.TotalCount == 0)
+{
+    @* ⚠️ Trạng thái RỖNG phải NÓI RÕ vì sao — nếu chỉ để trắng, người dùng không phân biệt được
+       "hệ thống khoẻ" với "tính năng hỏng". *@
+    <div class="alert alert-info">
+        <strong>Không có lượt đối soát nào</strong> khớp bộ lọc hiện tại.
+        @if (chiConViec)
+        {
+            <span>Đây là tin <strong>tốt</strong>: không lượt nào còn dòng lệch chưa xử lý. </span>
+            <a asp-action="Index">Xem tất cả lượt</a>
+        }
+        else
+        {
+            <span>Job đối soát có thể chưa chạy lần nào.</span>
+        }
+    </div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>Bắt đầu (UTC)</th>
+                    <th class="text-end">Giây</th>
+                    <th class="text-end">Cặp đã đo</th>
+                    <th class="text-end">Lệch</th>
+                    <th class="text-end">Vượt ngưỡng</th>
+                    <th class="text-end">Chưa xử lý</th>
+                    <th>Chính sách (ngưỡng)</th>
+                    <th>Kết luận</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var luot in Model.Items)
+                {
+                    @* 🔒 Tô đậm dòng CÒN VIỆC: người trực quét mắt qua bảng phải thấy ngay việc cần làm. *@
+                    var conViec = luot.SoLechChuaXuLy > 0;
+                    <tr class="@(conViec ? "table-warning" : "")">
+                        <td>@luot.BatDauUtc.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                        <td class="text-end">@luot.SoGiayQuet.ToString("0.0")</td>
+                        <td class="text-end">@luot.SoCapDaDo</td>
+                        <td class="text-end">@luot.SoLech</td>
+                        <td class="text-end">
+                            @luot.SoLechVuotNguong
+                            @if (luot.CoVuotNguong)
+                            {
+                                <span class="badge bg-danger ms-1">vượt</span>
+                            }
+                        </td>
+                        <td class="text-end">
+                            @if (conViec)
+                            {
+                                <span class="badge bg-warning text-dark">@luot.SoLechChuaXuLy</span>
+                            }
+                            else
+                            {
+                                <span class="text-success">0</span>
+                            }
+                        </td>
+                        <td class="small">
+                            @luot.DonViNguong @luot.GiaTriNguong · @luot.HanhDong
+                            @if (!luot.NguongHopLe)
+                            {
+                                @* 🚨 Cấu hình SAI, KHÔNG phải "kho lệch nhiều" — nói rõ để người đọc
+                                   không đi tìm nguyên nhân ở kho. *@
+                                <span class="badge bg-dark ms-1" title="Ngưỡng KHÔNG hợp lệ tại thời điểm quét ⇒ mọi lệch bị coi là vượt ngưỡng">ngưỡng SAI</span>
+                            }
+                        </td>
+                        <td class="small">@luot.KetLuan</td>
+                        <td class="text-end">
+                            <a class="btn btn-sm btn-outline-primary" asp-action="ChiTiet" asp-route-id="@luot.Id">Xem lệch</a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center">
+        <span class="text-muted small">Tổng @Model.TotalCount lượt · trang @trang</span>
+        <div>
+            @if (trang > 1)
+            {
+                <a class="btn btn-sm btn-outline-secondary" asp-action="Index" asp-route-chiConViec="@chiConViec" asp-route-trang="@(trang - 1)">« Trước</a>
+            }
+            @if (trang * 20 < Model.TotalCount)
+            {
+                <a class="btn btn-sm btn-outline-secondary" asp-action="Index" asp-route-chiConViec="@chiConViec" asp-route-trang="@(trang + 1)">Sau »</a>
+            }
+        </div>
+    </div>
+}
