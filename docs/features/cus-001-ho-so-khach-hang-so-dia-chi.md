@@ -1814,3 +1814,110 @@ danh sách ca (`D14` = 1, `D15` = 1) trước khi chạy.
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.6 | 17/10/2026 | *(agent, session GĐ1)* | **§25 — LÁT CẮT 9: XUẤT NHẬT KÝ KIỂM TOÁN RA CSV** (đóng nợ §24.6 #2 và §23.6 #1): thêm **`CsvNhatKy`** (**hàm THUẦN**: `Boc` luôn bọc `"…"` + nhân đôi `"` · `Dong` · `XuongDong` = **CRLF** · `Bom` = **EF BB BF** · `DongTienDe` · `DongCanhBaoCat`) + **`GET /KhachHang/NhatKyCsv`** (BOM ghép **thủ công** + tên tệp có **mốc UTC** + `toiDa`) + liên kết *"Xuất tệp CSV (theo bộ lọc đang xem)"* + **11 unit test** + **11 ca E2E**. 🔑 **VÌ SAO:** người kiểm toán **phải đính kèm bằng chứng** vào báo cáo; ⚠️ không có tệp thì họ **chép tay** — 📌 và dữ liệu **chép tay** thì **không kiểm chứng được**. 🚨 **BA CÁI BẪY CỦA CSV (mỗi cái tạo ra một tệp ĐỌC SAI, 🔒 và tệp bằng chứng đọc sai còn tệ hơn KHÔNG CÓ tệp vì 📌 nó khiến người ta TIN rằng mình đã kiểm):** ① **thiếu BOM UTF-8** ⇒ Excel (bản phổ biến ở VN) **không** tự nhận UTF-8 ⇒ tiếng Việt thành **rác**, ⚠️ và tệp đó là thứ **gửi cho cơ quan kiểm toán** · ② **dấu phẩy trong dữ liệu** ⇒ *"theo yêu cầu, qua điện thoại"* **tách thành hai cột** ⇒ 🔒 **toàn bộ các cột sau bị LỆCH**, 📌 và người đọc **không hề biết** · ③ **dấu `"` trong dữ liệu** ⇒ theo **RFC 4180** phải **nhân đôi**, 📌 nếu không thì nó **đóng trường sớm** và phần còn lại **tràn ra ngoài**; ➕ và **`\r\n`** (RFC 4180 quy định **CRLF**) — ⚠️ `\n` trần bị một số trình đọc coi là **ký tự trong ô** ⇒ 📌 **toàn bộ tệp thành MỘT ô**. ✅ **`CsvNhatKy` gom BA QUY TẮC vào MỘT CHỖ** (không `string.Join(",")` trong controller), 🔒 **`Boc` LUÔN BỌC** kể cả khi không cần: ⚠️ nếu chỉ bọc khi *"thấy dấu phẩy"* thì giá trị chứa **xuống dòng**/`"` được xử lý **khác nhau tuỳ dữ liệu** ⇒ 📌 lỗi **chỉ xuất hiện với một số dòng** ⇒ **không tái hiện được**; ✅ luôn bọc ⇒ **một quy tắc duy nhất**; ➕ **`null` ⇒ Ô TRỐNG** (không phải chữ `"null"`) vì 🔑 người đọc phải phân biệt được *"không có dữ liệu"* với *"dữ liệu là chuỗi null"*; 🔑 **và vì là hàm THUẦN** ⇒ ✅ test được bằng **unit test nhanh** — 📌 **chính là nợ §24.6 #1**. 🔒 **HAI DÒNG BẮT BUỘC NẰM TRONG CHÍNH TỆP:** ① **dòng tiền đề** (ai xuất, lúc nào, **tệp KHÔNG chứa PII**) — 🔑 tệp **rời khỏi hệ thống** ⇒ phải **tự mô tả** được; ② ⛔ **dòng cảnh báo khi bị cắt** — 🔒 tệp được đọc ở **nơi khác, lúc khác, bởi người khác** ⇒ 📌 người đó **không có cách nào** biết bằng chứng đã bị cắt (🔑 **chính xác** kiểu **kết luận sai về bằng chứng** mà §22–§24 chống); ➕ tên tệp có **mốc UTC** (🔑 không ghi đè nhau) + **tái dùng ĐÚNG bộ lọc của màn hình** (cùng tham số + cùng `KieuUtc`) — 📌 nếu lọc khác nhau thì *"cái tôi thấy"* và *"cái tôi gửi đi"* **không khớp**. ✅ **KIỂM CHỨNG 11 UNIT TEST + 11 CA E2E:** **TC01** BOM `EF BB BF` · 🚨 **TC02** `Encoding.UTF8.GetBytes` **KHÔNG** tự thêm BOM (⚠️ `File(Encoding.UTF8.GetBytes(s), …)` ⇒ **KHÔNG CÓ BOM** dù `Content-Type` ghi `charset=utf-8`) ⇒ phải **ghép thủ công** · 🚨 **TC03** dấu phẩy **không** tách cột · **TC04** `"` **nhân đôi** · **TC05** luôn bọc · **TC06** `null` ⇒ ô trống · **TC07** ghép dòng đúng số trường (🔑 **đọc bằng bộ đọc CSV THẬT**, ⚠️ không đếm dấu phẩy — 📌 nếu đếm thì test **tự vô hiệu** đúng ở chỗ cần nhất) · **TC08** CRLF · **TC09** cảnh báo có **cả hai** con số · **TC10** tiền đề có luật + *"KHÔNG chứa nội dung dữ liệu cá nhân"* · **TC11** mọi trường đều được bọc; **E2E đo TỆP THẬT (byte thô):** **D15a** tải được (`637` byte) · 🚨 **D15b** **BOM** đo **byte thô** `EF BB BF` (📌 `Invoke-WebRequest` **che mất** BOM vì nó **giải mã** ⇒ ✅ dùng `curl.exe -D` + đọc byte) · **D15c** `text/csv` · **D15d** tên tệp có mốc · **D15e** dòng tiền đề · **D15f** dòng dữ liệu thật · 🚨 **D15g** **escape RFC 4180** với dữ liệu probe có **dấu phẩy VÀ nháy kép** ⇒ đo được `"K97E2E ly do, co ""nhay kep"" trong do"` · **D15h** tiêu đề **đúng 8 trường** · 🚨 **D15i** không bị cắt ⇒ **KHÔNG** có cảnh báo (⚠️ không báo động giả) · 🚨 **D16a** ✅ **CHIỀU CÒN LẠI** (ép `toiDa=1` ⇒ **CÓ** cảnh báo) · **D16b** cảnh báo có **cả hai** con số · **D16c** tệp bị cắt **chỉ 1 dòng dữ liệu** (🔑 `toiDa` **thật sự** được áp dụng) · **D16d** dòng được giữ là **MỚI NHẤT** (🔑 khoá luận điểm *"mới nhất trước"*); 🔑 **VÌ SAO `D15i` MỘT MÌNH KHÔNG ĐỦ:** ⚠️ nó chỉ kiểm *"không bị cắt thì không có cảnh báo"* ⇒ 🔒 một bản **bỏ hẳn dòng cảnh báo** vẫn **XANH toàn bộ** — 📌 phép kiểm **không bao giờ chạy** ở nhánh quan trọng; ✅ đo **cả hai chiều** (nguyên tắc §24): 🔑 một phép kiểm chỉ đo **một phía** thì *"luôn đúng"* và *"không hoạt động"* **trông giống hệt nhau**. ➡️ **E2E 56/56** · **8 bước** · `exit 0` · **148.4s** · **1181** unit · 38 integration · mermaid 197/0 · DB 21/21 · test cổng 17/17. 🐞 **NĂM LỖI — ba trong đó là lỗi của PHÉP ĐO:** ① **`CurrentUser` không tồn tại trong `Controller`** (`CS0103`; `Controller` **không** kế thừa `ApplicationService`) — ⚠️ rồi thử `ICurrentUser` (`Volo.Abp.Users`) cũng **không resolve** (dự án Web thiếu tham chiếu gói) ⇒ ✅ **chữa đơn giản hơn:** dùng thẳng **`HttpContext?.User?.Identity?.Name`** (🔑 không thêm phụ thuộc, 📌 và là **nguồn thật** mà mọi lớp khác đọc từ đó); ② 🚨 **kỳ vọng của tôi SAI: `"Nhật"` = 5 byte?** — ⚠️ sai: `"Nhật"` là **4 ký tự** và `ậ` chiếm **3 byte** (không phải 2) ⇒ **6 byte**; 📌 **sản phẩm đúng, test của tôi sai** ⇒ ✅ sửa **kỳ vọng** + ghi rõ **phép đếm** vào test (🔑 chính con số đó là bằng chứng *"có BOM"* khác *"không BOM"*); ③ 🚨 **`D16c` ĐO SAI, suýt làm tôi kết luận `toiDa` không hoạt động** — tôi kiểm *"tệp bị cắt có dòng `K97E2E-nhanvien-b`"* ⇒ **0 dòng** ⇒ ⚠️ trông như **`toiDa` vô tác dụng**; 🔑 sự thật: hàm sắp **mới nhất TRƯỚC** ⇒ `toiDa = 1` giữ dòng **HÔM NAY** (`admin`), ⚠️ **không** phải dòng 2020 ⇒ ✅ đếm **số dòng dữ liệu** (bất kể là ai) — 📌 đó mới là điều `toiDa` điều khiển; ④ 🚨 **`D16d` ĐO SAI LẦN NỮA vì tôi quên MỌI Ô ĐỀU ĐƯỢC BỌC `"`** — hai lần liên tiếp đếm **0** (lần đầu neo `^\d{4}-`, ⚠️ dòng bắt đầu bằng `"`; lần hai neo `"admin"` trên chuỗi **giải mã**) ⇒ 🔑 **lần thứ ba trong cùng một ca mà phép đo của tôi sai** ⇒ ✅ **đổi cách làm: thay vì ĐOÁN thêm, IN RA dòng thật** rồi mới kết luận — đo được `"2026-10-16 21:30:57","admin","e0000000-…","K97E2E Khach Probe","11","1","khong","(khong ghi ly do)"`; 🔒 **bài học (lặp lại từ §24.5): khi một phép đo cho kết quả BẤT NGỜ, việc đúng là ĐO CHUỖI THẬT, không phải SUY LUẬN THÊM MỘT TẦNG NỮA**; ⑤ ➕ **hai lần viết cú pháp SAI loại tệp:** `//` (C#) trong **tệp PowerShell** ⇒ `ParserError`, và **vô tình xoá mất ca `D14`** khi chèn khối mới ⇒ ✅ dùng **công cụ sửa tệp** + **kiểm lại danh sách ca** (`D14` = 1, `D15` = 1) trước khi chạy; 🔑 **bài học: `//` là C#, `#` là PowerShell** — 📌 cùng họ với lỗi `@*` (Razor) trong `.cs` ở §24. Ghi **§25.7** (nợ: **chưa có cảnh báo xuất LẶP LẠI** (🔑 bảng đã **đủ dữ liệu**) · **`LyDo` vẫn chưa được điền** (**nợ từ §22.6 #3 → §23.6 #2 → vẫn mở**; 📌 tệp CSV ghi `"(khong ghi ly do)"`) · **chưa phân trang** · ⚠️ **múi giờ: ngày trên form là UTC** (📌 chưa có chỉ dẫn cho người dùng khác múi) · ⚠️ **CSV dùng dấu phẩy — chưa hỗ trợ `;` cho locale Excel** (📌 ở một số locale Excel mặc định `;` ⇒ 🔒 tệp **thành một cột**; ⚠️ BOM **giúp ích nhưng không giải quyết hết** — **nợ THẬT**) · **chưa có test `toiDa` ở tầng unit** · **chưa gồm dữ liệu module khác** (**nợ chặn**)) |
+
+---
+
+## 26. ✅ **LÁT CẮT 10 — LÝ DO XUẤT LÀ BẮT BUỘC** (17/10/2026) — *đóng nợ §22.6 #3 → §23.6 #2 → §25.7 #2*
+
+### 26.1 🔑 **Nợ đi qua BA lát cắt mà vẫn mở — nên nó phải đóng**
+
+Ở **§22** tôi tạo cột `LyDo` (và **có test** cho nó: `TC06`/`TC07`/`TC10`). Ở **§23** màn hình hiện
+*"(không ghi lý do)"*. Ở **§25** tệp CSV cũng ghi *"(khong ghi ly do)"*.
+
+⚠️ Nhưng **chưa bao giờ** có đường để **điền** nó. 🔒 **Và một cột luôn rỗng thì tệ hơn không có cột:** 📌 nó
+khiến ta **tưởng** rằng mình đã trả lời được câu hỏi — trong khi cả ba lát cắt đều đang **hiển thị sự trống rỗng
+đó**.
+
+### 26.2 🚨 **Vì sao lý do là BẮT BUỘC (không phải "nên có")**
+
+🔑 **Lý do là một phần của BẢN GHI KIỂM TOÁN**, không phải ghi chú tiện lợi.
+🔒 Một lần xuất **không có lý do** thì khi khách hỏi *"sao các anh xuất dữ liệu của tôi?"*, hệ thống **không có
+câu trả lời** — ⚠️ và đó **chính xác** là câu hỏi mà Luật **91/2025/QH15** cho khách quyền hỏi.
+
+➕ **Và bắt buộc NGAY TỪ ĐẦU (thay vì để sau) là quan trọng:** 📌 khi đã có dữ liệu thật thì **không thể** thêm
+ràng buộc mà không **phá vỡ** lịch sử — ⚠️ hoặc phải **bỏ qua** nó, 🔒 và một ràng buộc bị bỏ qua thì **không còn
+là** ràng buộc.
+
+### 26.3 ✅ **Ba quyết định**
+
+**① GUARD Ở APP SERVICE, KHÔNG CHỈ Ở UI.** ⚠️ `required` trong HTML là **tiện nghi**, **không phải guard** —
+📌 API, script, và job đều gọi được hàm này. 🔒 `CustomerAppService.XuatDuLieuCaNhanAsync` mới là lớp bảo vệ
+**thật**. ➕ Và **`IsNullOrWhiteSpace`** (không chỉ `IsNullOrEmpty`): 🔑 chuỗi **khoảng trắng** không phải là
+lý do — 📌 cùng bài học đã áp dụng ở `CustomerDataExportLog`.
+
+**② LÝ DO ĐI THẲNG VÀO NHẬT KÝ.** 🔑 Không chỉ **trả về** cho người gọi: 🔒 một lý do **không được lưu** thì
+**không trả lời được** câu hỏi luật về sau.
+
+**③ FORM `GET` (không phải `POST`).** Thao tác **chỉ đọc** ⇒ 📌 đúng ngữ nghĩa HTTP, và không cần anti-forgery
+token. ⚠️ Với `POST` thì **mỗi dòng** trong bảng khách cần một token riêng — 📌 phức tạp mà không thêm an toàn.
+
+### 26.4 ✅ **KIỂM CHỨNG — 3 CA MỚI, MỘT CA LÀ GUARD**
+
+| Ca | Đo được |
+|---|---|
+🚨 **D9f** | **Lý do được LƯU** — `admin\|11\|1\|false\|K97E2E khach yeu cau qua dien thoai` ⇒ 🔑 chứng minh đường **UI → controller → app service → nhật ký** thông suốt (⚠️ không chỉ được **kiểm** rồi **bỏ đi**) |
+🚨 **D9g** | **THIẾU lý do ⇒ KHÔNG xuất được** (`HTTP = 500`, ⚠️ **khác** `200`) — ✅ đo **thẳng HTTP**, không qua form ⇒ 📌 đo đúng lớp bảo vệ **thật** |
+**D9h** | Lần xuất **bị từ chối KHÔNG ghi thêm** nhật ký (`soNhatKy = 1`) — 🔑 nếu có thì nhật ký **đếm cả lần bị từ chối**, 📌 và đó là thông tin **sai** |
+
+🔑 **VÀ `D9e` PHẢI ĐƯỢC SỬA — nó đã đỏ vì LÝ DO ĐÚNG:** bản đầu tôi cấm **`K97E2E`** ở **mọi nơi** trong dòng nhật
+ký ⇒ ⚠️ nó **đỏ dù sản phẩm đúng**, vì 🔑 `NguoiXuat` **thật sự** là `K97E2E-nhanvien-b` (📌 tên **nhân viên
+probe**, **không phải** PII của khách). ✅ **Chỉ** cấm **PII của KHÁCH** (`k97e2e@` · `0900000001` · tên khách) —
+🔑 đó mới là điều `ADR-11` bảo vệ; 📌 còn tên **người xuất** thì **PHẢI** có (nhật ký mà không biết **AI** thì
+vô dụng).
+
+➡️ **E2E: 59/59 ĐẠT** · **8 bước** · `exit 0` · **154.6s** · **1181** unit · 38 integration · mermaid 197/0 ·
+DB 21/21 · test cổng 17/17.
+
+### 26.5 🐞 **HAI lỗi của tôi — và lỗi #1 là một BẪY PowerShell đáng ghi lại**
+
+**① 🚨 `?` LÀ ALIAS CỦA `Where-Object` — nên `"$idKhach?lyDo="` KHÔNG cho `idKhach` + `?lyDo=`.**
+
+Dòng này trong E2E:
+```powershell
+$urlXuat = $web + "/KhachHang/XuatDuLieu/$idKhach?lyDo=" + [uri]::EscapeDataString($lyDoXuat)
+```
+⚠️ Cho URL **sai**: `/KhachHang/XuatDuLieu/=K97E2E%20...` — `$idKhach` **biến mất**, `?lyDo` **biến mất**, chỉ
+còn `=`.
+
+🔑 **ĐO ĐƯỢC (bốn cách ghép, cùng một script):**
+| Cách viết | Kết quả đo |
+|---|---|
+`"X/" + $idKhach + "?lyDo="` | ✅ `X/e0000000-…-0000000000e1?lyDo=` |
+`"X/${idKhach}?lyDo="` | ✅ `X/e0000000-…-0000000000e1?lyDo=` |
+`"X/$($idKhach)?lyDo="` | ✅ `X/e0000000-…-0000000000e1?lyDo=` |
+🚨 `"X/$idKhach?lyDo="` | ❌ **`=`** |
+
+🔑 **NGUYÊN NHÂN:** trong nội suy, `$idKhach?lyDo=` bị hiểu là **pipeline** `$idKhach | ?lyDo=` (`?` là **alias**
+của `Where-Object`) ⇒ không phải phép ghép chuỗi. 📌 Và `?lyDo=` là một tham số **không hợp lệ** ⇒ kết quả chỉ
+còn `=`.
+
+🔒 **HẬU QUẢ ĐO ĐƯỢC:** URL thành `{id}` **rỗng** ⇒ guard `lyDo` **NÉM** ⇒ **`HTTP 500`** ⇒ ⚠️ **tôi suýt kết
+luận rằng GUARD CỦA SẢN PHẨM SAI** — 🔒 trong khi **sản phẩm đúng**, **phép đo của tôi** mới sai.
+✅ **Cách đúng:** nối bằng `+`, hoặc `"${idKhach}?lyDo="`, hoặc `"$($idKhach)?lyDo="`.
+🔑 **VÀ GHI LẠI THÀNH QUY TẮC:** ⚠️ **nơi nguy hiểm nhất là QUERY STRING** — 📌 đúng chỗ ta luôn viết `"…?thamso="`.
+➕ Sau khi sửa, tôi **quét toàn bộ script** tìm cùng mẫu (`"\$bien?…"`) ⇒ ✅ không còn chỗ nào khác.
+
+**② 🚨 `D9f` ĐỎ vì câu SQL đọc `("LyDo" is null)::text` — đọc `true`/`false`, KHÔNG đọc GIÁ TRỊ.**
+🔑 **Bài học:** khi một trường được **kiểm**, phải đọc **GIÁ TRỊ** của nó — 📌 `is null` chỉ trả lời *"có hay
+không"*, 🔒 còn câu hỏi ở đây là *"giá trị là gì"*. ✅ Chữa: `coalesce("LyDo", '(khong co)')`.
+
+➕ **Và `D9e` đỏ theo sau đó** — nhưng vì **lý do đúng** (xem §26.4). 📌 Cả hai lần đều là **lỗi phép đo**, và cả
+hai lần **tôi đọc log / in dòng thật rồi mới kết luận** — 🔑 đúng theo bài học §25.6 #4.
+
+### 26.6 ⏳ NỢ
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+**1** | **Chưa có cảnh báo khi xuất LẶP LẠI bất thường** | 🔑 Bảng đã **đủ dữ liệu** (📌 và vì thế tôi **cố ý** không đặt unique index ở §22) |
+**2** | **Chưa phân trang** | 📌 Tạm chấp nhận (trần **100**/CSV, **500**/API + lọc ngày + lọc người) |
+**3** | ⚠️ **Múi giờ: ngày trên form là UTC** | 🔑 Nhất quán với `XuatLucUtc` — 📌 nhưng **chưa có chỉ dẫn** cho người dùng ở múi giờ khác |
+**4** | ⚠️ **CSV dùng dấu phẩy — chưa hỗ trợ `;` cho locale Excel** | 📌 Ở một số locale, Excel mặc định `;` ⇒ 🔒 tệp **thành một cột**; ⚠️ BOM **giúp ích nhưng không giải quyết hết** — **nợ thật** |
+**5** | **Chưa có test `toiDa` ở tầng unit** | 🔑 Hiện đo qua E2E (`D16a`–`D16d`) |
+**6** | **`LyDo` chưa bắt buộc ở tầng ENTITY** | ⚠️ Guard ở **app service** ⇒ 📌 một job ghi thẳng repository vẫn **lọt**. 🔑 Cân nhắc: đưa vào **constructor** của `CustomerDataExportLog` (📌 nhưng sẽ phá **dữ liệu cũ** nếu có — hiện **chưa có**, nên **còn kịp**) |
+**7** | **Chưa gồm dữ liệu module khác** (địa chỉ giao, thanh toán, thuế) | ⚠️ **Nợ chặn** (`Address` chưa tồn tại) |
+
+### 26.7 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.7 | 17/10/2026 | *(agent, session GĐ1)* | **§26 — LÁT CẮT 10: LÝ DO XUẤT LÀ BẮT BUỘC** (đóng nợ §22.6 #3 → §23.6 #2 → §25.7 #2): thêm **`lyDo`** vào `CustomerAppService.XuatDuLieuCaNhanAsync` (**guard `IsNullOrWhiteSpace` ⇒ NÉM `ThieuThongTinBatBuoc`**) + truyền vào `CustomerDataExportLog` + tham số ở `KhachHangController.XuatDuLieu` + **form GET + ô nhập `lyDo` `required`** ở `/KhachHang` + **3 ca E2E** (`D9f`/`D9g`/`D9h`). 🔑 **VÌ SAO ĐÓ LÀ NỢ PHẢI ĐÓNG:** ở **§22** tôi tạo cột `LyDo` (**có test**: `TC06`/`TC07`/`TC10`), ở **§23** màn hình hiện *"(không ghi lý do)"*, ở **§25** tệp CSV cũng ghi *"(khong ghi ly do)"* — ⚠️ **nhưng CHƯA BAO GIỜ có đường để ĐIỀN nó**; 🔒 **và một cột luôn rỗng thì tệ hơn không có cột:** 📌 nó khiến ta **tưởng** mình đã trả lời được câu hỏi, trong khi cả ba lát cắt đang **hiển thị sự trống rỗng đó**. 🚨 **VÌ SAO BẮT BUỘC (không phải "nên có"):** 🔑 lý do là một phần của **BẢN GHI KIỂM TOÁN**; 🔒 một lần xuất **không có lý do** thì khi khách hỏi *"sao các anh xuất dữ liệu của tôi?"* hệ thống **không có câu trả lời** — ⚠️ **chính xác** câu hỏi mà Luật **91/2025/QH15** cho khách quyền hỏi; ➕ **và bắt buộc NGAY TỪ ĐẦU (thay vì để sau) là quan trọng:** 📌 khi đã có dữ liệu thật thì **không thể** thêm ràng buộc mà không **phá vỡ** lịch sử — ⚠️ hoặc phải **bỏ qua** nó, 🔒 và một ràng buộc bị bỏ qua thì **không còn là** ràng buộc. ✅ **BA QUYẾT ĐỊNH:** ① **guard ở APP SERVICE, không chỉ ở UI** — ⚠️ `required` trong HTML là **tiện nghi**, **không phải guard** (📌 API/script/job đều gọi được hàm này) ⇒ 🔒 `CustomerAppService` mới là lớp bảo vệ **thật**; ➕ **`IsNullOrWhiteSpace`** (không chỉ `IsNullOrEmpty`) vì 🔑 chuỗi **khoảng trắng** không phải là lý do; ② **lý do đi THẲNG VÀO NHẬT KÝ** — 🔑 không chỉ **trả về** cho người gọi, vì 🔒 một lý do **không được lưu** thì **không trả lời được** câu hỏi luật về sau; ③ **form `GET`** (thao tác **chỉ đọc** ⇒ 📌 đúng ngữ nghĩa HTTP + không cần anti-forgery token; ⚠️ với `POST` thì **mỗi dòng** cần một token riêng — 📌 phức tạp mà không thêm an toàn). ✅ **KIỂM CHỨNG 3 CA MỚI:** 🚨 **D9f** lý do **được lưu** (`admin\|11\|1\|false\|K97E2E khach yeu cau qua dien thoai`) ⇒ 🔑 chứng minh đường **UI → controller → app service → nhật ký** thông suốt (⚠️ không chỉ được **kiểm** rồi **bỏ đi**) · 🚨 **D9g** **thiếu lý do ⇒ KHÔNG xuất được** (`HTTP = 500`, ⚠️ **khác** `200`) — ✅ đo **thẳng HTTP**, không qua form ⇒ đo đúng lớp bảo vệ **thật** · **D9h** lần bị **từ chối KHÔNG ghi thêm** nhật ký (`soNhatKy = 1`) — 🔑 nếu có thì nhật ký **đếm cả lần bị từ chối**, 📌 và đó là thông tin **sai**; ➕ **và `D9e` PHẢI ĐƯỢC SỬA — nó đã đỏ vì LÝ DO ĐÚNG:** bản đầu cấm **`K97E2E`** ở **mọi nơi** ⇒ ⚠️ **đỏ dù sản phẩm đúng**, vì 🔑 `NguoiXuat` **thật sự** là `K97E2E-nhanvien-b` (📌 tên **nhân viên probe**, **không phải** PII của khách) ⇒ ✅ **chỉ** cấm **PII của KHÁCH** (`k97e2e@` · `0900000001` · tên khách) — 🔑 đó mới là điều `ADR-11` bảo vệ, 📌 còn tên **người xuất** thì **PHẢI** có (nhật ký mà không biết **AI** thì vô dụng). ➡️ **E2E 59/59** · **8 bước** · `exit 0` · **154.6s** · **1181** unit · 38 integration · mermaid 197/0 · DB 21/21 · test cổng 17/17. 🐞 **HAI LỖI — VÀ LỖI #1 LÀ MỘT BẪY POWERSHELL ĐÁNG GHI LẠI:** ① 🚨 **`?` LÀ ALIAS CỦA `Where-Object`** ⇒ dòng `$web + "/KhachHang/XuatDuLieu/$idKhach?lyDo=" + …` cho URL **SAI** `/KhachHang/XuatDuLieu/=K97E2E%20…` — `$idKhach` **biến mất**, `?lyDo` **biến mất**, chỉ còn `=`; 🔑 **ĐO ĐƯỢC bốn cách ghép:** `"X/" + $idKhach + "?lyDo="` ✅ · `"X/${idKhach}?lyDo="` ✅ · `"X/$($idKhach)?lyDo="` ✅ · 🚨 `"X/$idKhach?lyDo="` ❌ **`=`**; 🔑 **nguyên nhân:** trong nội suy `$idKhach?lyDo=` bị hiểu là **pipeline** `$idKhach | ?lyDo=` (`?` là **alias** của `Where-Object`) ⇒ 📌 không phải phép ghép chuỗi, và `?lyDo=` là tham số **không hợp lệ** nên chỉ còn `=`; 🔒 **hậu quả đo được:** URL có `{id}` **rỗng** ⇒ guard `lyDo` **NÉM** ⇒ **`HTTP 500`** ⇒ ⚠️ **tôi suýt kết luận rằng GUARD CỦA SẢN PHẨM SAI** — 🔒 trong khi **sản phẩm đúng**, **phép đo của tôi** mới sai; ✅ **cách đúng:** nối bằng `+`, hoặc `"${idKhach}?lyDo="`, hoặc `"$($idKhach)?lyDo="`; 🔑 **VÀ GHI THÀNH QUY TẮC: nơi nguy hiểm nhất là QUERY STRING** — 📌 đúng chỗ ta luôn viết `"…?thamso="`; ➕ sau khi sửa, tôi **quét toàn bộ script** tìm cùng mẫu (`"\$bien?…"`) ⇒ ✅ không còn chỗ nào khác; ② 🚨 **`D9f` đỏ vì câu SQL đọc `("LyDo" is null)::text`** — nó trả **`true`/`false`**, **KHÔNG** trả **GIÁ TRỊ** ⇒ 🔑 **bài học:** khi một trường được **kiểm**, phải đọc **GIÁ TRỊ** của nó — 📌 `is null` chỉ trả lời *"có hay không"*, 🔒 mà câu hỏi ở đây là *"giá trị là gì"*; ✅ chữa: `coalesce("LyDo", '(khong co)')`; ➕ và `D9e` đỏ theo sau đó — nhưng vì **lý do đúng**; 📌 cả hai lần đều là **lỗi phép đo**, và cả hai lần **tôi đọc log / in dòng thật rồi mới kết luận** (🔑 đúng theo bài học §25.6 #4). Ghi **§26.6** (nợ: **chưa có cảnh báo xuất LẶP LẠI** (🔑 bảng đã **đủ dữ liệu**) · **chưa phân trang** · ⚠️ **múi giờ: ngày trên form là UTC** (chưa có chỉ dẫn) · ⚠️ **CSV chưa hỗ trợ `;` cho locale Excel** (📌 một số locale ⇒ 🔒 tệp **thành một cột**; ⚠️ BOM **không giải quyết hết** — **nợ thật**) · **chưa có test `toiDa` ở tầng unit** · **`LyDo` chưa bắt buộc ở tầng ENTITY** (⚠️ guard ở **app service** ⇒ 📌 job ghi thẳng repository vẫn **lọt**; 🔑 cân nhắc đưa vào **constructor** — 📌 hiện **chưa có dữ liệu cũ** nên **còn kịp**) · **chưa gồm dữ liệu module khác** (**nợ chặn**)) |

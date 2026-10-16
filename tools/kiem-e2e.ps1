@@ -302,7 +302,23 @@ select count(*)::text from "OrdOrderLines" where "Id" = 'e0000000-0000-0000-0000
     if ($coNutXuat) {
         # ① Tai TEP THAT qua cookie phien ⇒ 🔑 do **duong di THAT cua nguoi dung**, khong phai goi API truc tiep.
         $tepXuat = Join-Path $thuMucTam 'xuat-du-lieu.json'
-        $maXuat = ([string](& curl.exe -s -b $jar -c $jar -o $tepXuat -w '%{http_code}' ($web + "/KhachHang/XuatDuLieu/$idKhach"))).Trim()
+        # 🚨 **PHAI GUI `lyDo`** (`CUS-001` §26): 🔑 ly do la **BAT BUOC** ⇒ ⚠️ thieu no thi guard o app service
+        # **NEM** ⇒ `500`, 📌 va ca D7 se do **vi ly do dung** (khong phai loi san pham).
+        # 🔒 Va day chinh la dieu ta muon: **khong the** xuat PII ma khong ghi ly do.
+        $lyDoXuat = 'K97E2E khach yeu cau qua dien thoai'
+        $urlXuat = $web + "/KhachHang/XuatDuLieu/" + $idKhach + "?lyDo=" + [uri]::EscapeDataString($lyDoXuat)
+
+        # 🚨 **BAI HOC PowerShell (DO DUOC o `CUS-001` §26.5) — `?` LA ALIAS CUA `Where-Object`:**
+        # ⚠️ Chuoi `"$idKhach?lyDo="` **KHONG** cho `idKhach` + `?lyDo=` — 🔒 no bi hieu la **pipeline**
+        # `$idKhach | ?lyDo=` ⇒ 📌 ket qua chi con **`=`**.
+        # 🔑 **HAU QUA DO DUOC:** URL thanh `/KhachHang/XuatDuLieu/=K97E2E%20...` ⇒ `{id}` **rong** ⇒
+        # ⚠️ guard `lyDo` **NEM** ⇒ **`HTTP 500`** ⇒ 📌 va toi **suyt ket luan rang guard cua san pham sai**
+        # (🔒 trong khi san pham dung; **phep do cua toi** moi sai).
+        # ✅ **CACH DUNG (da do ca bon):** noi bang `+` · hoac `"${idKhach}?lyDo="` (ngoac nhon) ·
+        # hoac `"$($idKhach)?lyDo="`. ➕ Va **tranh** `"?..."` ngay sau mot bien trong ngoi suy.
+        # 📌 Ghi lai o day vi 🔑 **nơi nguy hiem nhat la query string** — dung cho moi URL co tham so.
+
+        $maXuat = ([string](& curl.exe -s -b $jar -c $jar -o $tepXuat -w '%{http_code}' $urlXuat)).Trim()
 
         $jsonXuat = if (Test-Path $tepXuat) { [System.IO.File]::ReadAllText($tepXuat, [Text.Encoding]::UTF8) } else { '' }
 
@@ -366,8 +382,14 @@ select count(*)::text from "CusDataExportLogs" where "CustomerId" = 'e0000000-00
             Kq 'D9a DB CO dong nhat ky xuat (bang CusDataExportLogs)' ($soNhatKy -eq '1') ("soDong=" + $soNhatKy)
 
             # 🔑 **NOI DUNG phai dung** — ⚠️ mot dong **rong** cung lam `count = 1` ⇒ 📌 phai kiem tung truong.
+            # 🚨 **DOC GIA TRI `LyDo`, KHONG phai `is null`** — ⚠️ **BAY PHEP DO (da mac that o §26.5):**
+            # ban dau cau nay doc `("LyDo" is null)::text` ⇒ 🔒 no tra **`true`/`false`**, **KHONG** tra
+            # gia tri ⇒ 📌 ca `D9f` (kiem ly do **duoc luu**) **khong bao gio** doc duoc ly do ⇒ ⚠️ no DO
+            # **du san pham dung**.
+            # 🔑 **Bai hoc:** khi mot truong duoc **kiem**, phai doc **GIA TRI** cua no — 📌 `is null` chi tra
+            # loi *"co hay khong"*, 🔒 va cau hoi o day la *"gia tri la gi"*.
             $nhatKy = (@(Invoke-Psql -Sql @'
-select "NguoiXuat" || '|' || "SoDongHoSo"::text || '|' || "SoDonHang"::text || '|' || "DonHangBiCat"::text || '|' || ("LyDo" is null)::text from "CusDataExportLogs" where "CustomerId" = 'e0000000-0000-0000-0000-0000000000e1' order by "CreationTime" desc limit 1;
+select "NguoiXuat" || '|' || "SoDongHoSo"::text || '|' || "SoDonHang"::text || '|' || "DonHangBiCat"::text || '|' || coalesce("LyDo", '(khong co)') from "CusDataExportLogs" where "CustomerId" = 'e0000000-0000-0000-0000-0000000000e1' order by "CreationTime" desc limit 1;
 '@) -join '').Trim()
 
             Write-Output ("   nhat ky = " + $nhatKy)
@@ -377,12 +399,43 @@ select "NguoiXuat" || '|' || "SoDongHoSo"::text || '|' || "SoDonHang"::text || '
             Kq 'D9c nhat ky co SO DON = 1 (khop ban xuat)' ($nhatKy -match '\|1\|') 'soDonHang = 1'
             Kq 'D9d nhat ky ghi donHangBiCat = false' ($nhatKy -match '\|false\|') 'khong bi cat'
 
+            # 🚨 **D9f — LY DO DUOC LUU** (`CUS-001` §26). 🔑 Ca nay chung minh ly do **di tu UI → controller →
+            # app service → nhat ky** (⚠️ khong chi duoc **kiem** roi **bo di**).
+            # 📌 `LyDo` la truong **cuoi** trong cau select ⇒ 🔑 khong the trung voi phan nao khac.
+            Kq 'D9f 🚨 nhat ky LUU DUOC ly do xuat (UI -> DB)' `
+                ($nhatKy -match 'K97E2E khach yeu cau qua dien thoai') `
+                'ly do co trong nhat ky'
+
+            # 🚨 **D9g — GUARD: THIEU LY DO THI KHONG XUAT DUOC** (`CUS-001` §26).
+            # 🔑 **CA QUAN TRONG NHAT CUA §26:** ⚠️ neu thieu ly do ma **van xuat duoc** thi rang buoc
+            # **khong ton tai** — 📌 va `required` o HTML chi la **tien nghi** (🔒 script/API khong biet no).
+            # ✅ Do **THANG HTTP**, khong qua form ⇒ 📌 do dung lop bao ve **that**.
+            $maKhongLyDo = ([string](& curl.exe -s -b $jar -c $jar -o (Join-Path $thuMucTam 'khong-ly-do.txt') -w '%{http_code}' ($web + "/KhachHang/XuatDuLieu/$idKhach"))).Trim()
+
+            Kq 'D9g 🚨 THIEU ly do ⇒ KHONG xuat duoc (guard that, khong chi required o HTML)' `
+                ($maKhongLyDo -ne '200') `
+                ("HTTP = " + $maKhongLyDo + " (phai KHAC 200)")
+
+            # ➕ Va khang dinh **khong co dong nhat ky MOI** nao duoc ghi cho lan that bai do —
+            # 🔑 neu co thi nhat ky **dem ca lan bi tu choi**, 📌 va do la thong tin **sai**.
+            $soNhatKySau = (@(Invoke-Psql -Sql @'
+select count(*)::text from "CusDataExportLogs" where "CustomerId" = 'e0000000-0000-0000-0000-0000000000e1';
+'@) -join '').Trim()
+
+            Kq 'D9h lan xuat BI TU CHOI khong ghi them nhat ky' ($soNhatKySau -eq '1') ("soNhatKy = " + $soNhatKySau + " (mong doi 1: chi cua lan xuat THANH CONG o D7)")
+
             # 🔒 **VA NHAT KY KHONG DUOC CHUA PII** — 🔑 no chi ghi **so lieu**, khong ghi **noi dung**.
             # ⚠️ Neu nhat ky chua PII thi ta vua **tao ban sao thu hai** cua du lieu ca nhan o mot noi **khong
             # ai kiem soat** — 📌 dung cai ma `ADR-11` cam.
-            Kq 'D9e 🚨 nhat ky KHONG chua PII (chi so lieu)' `
-                (($nhatKy -notmatch 'k97e2e@') -and ($nhatKy -notmatch '0900000001') -and ($nhatKy -notmatch 'K97E2E')) `
-                'khong co email/sdt/ten trong nhat ky'
+            #
+            # 🚨 **PHEP DO PHAI CHINH XAC (da mac that o §26.5):** ban dau toi cam **`K97E2E`** o **moi noi**
+            # trong dong nhat ky ⇒ ⚠️ no DO **du san pham dung**, vi 🔑 `NguoiXuat` **that su** la
+            # `K97E2E-nhanvien-b` trong ca `D10` (📌 ten **nhan vien probe**, khong phai PII cua khach).
+            # ✅ **CHI** cam **PII cua KHACH** (`k97e2e@` · `0900000001` · ten khach) — 🔑 do moi la dieu
+            # `ADR-11` bao ve. 📌 Con ten **nguoi xuat** thi **PHAI** co (nhat ky ma khong biet **AI** thi vo dung).
+            Kq 'D9e 🚨 nhat ky KHONG chua PII cua KHACH (chi so lieu + nguoi xuat)' `
+                (($nhatKy -notmatch 'k97e2e@') -and ($nhatKy -notmatch '0900000001') -and ($nhatKy -notmatch 'K97E2E Khach Probe')) `
+                'khong co email/sdt/ten KHACH trong nhat ky'
 
             # ══════════════════════════════════════════════════════════════════════════════════════
             # 🚨 **D10 — MAN HINH NHAT KY KIEM TOAN** (`/KhachHang/NhatKy`, `CUS-001` §23).

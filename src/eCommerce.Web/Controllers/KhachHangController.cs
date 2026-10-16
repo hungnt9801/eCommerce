@@ -69,9 +69,14 @@ public class KhachHangController : Controller
     /// ➕ Tên tệp có **mã khách** để phân biệt khi xuất nhiều người.
     /// </summary>
     /// <param name="id">Khách cần xuất.</param>
-    public async Task<IActionResult> XuatDuLieu(Guid id)
+    /// <param name="lyDo">
+    /// 🚨 **LY DO XUAT — BAT BUOC** (`CUS-001` §26). 🔑 *"Vi sao du lieu cua toi bi xuat"* la cau hoi luat.
+    /// ⚠️ **KHONG** kiem o day: 🔒 rang buoc o controller la **tien nghi**, khong phai **guard** —
+    /// 📌 guard **that** nam o `CustomerAppService.XuatDuLieuCaNhanAsync` (moi duong goi deu di qua do).
+    /// </param>
+    public async Task<IActionResult> XuatDuLieu(Guid id, string? lyDo = null)
     {
-        var duLieu = await _khachHang.XuatDuLieuCaNhanAsync(id);
+        var duLieu = await _khachHang.XuatDuLieuCaNhanAsync(id, lyDo);
 
         // 🔑 `JsonSerializerOptions` có `WriteIndented` ⇒ 🔒 tệp **đọc được bằng mắt** (chu the du lieu khong
         // phai lap trinh vien). ⚠️ Va `Encoder` mac dinh se escape tieng Viet thanh `\uXXXX` ⇒ 📌 kho doc;

@@ -117,11 +117,22 @@
                                    (khong doi trang thai) => GET la dung ngu nghia HTTP.
                                    🔒 VA QUYEN NAM O `CustomerAppService` (`Customers.Manage`) - lop bao ve
                                    THAT, khong phai o day. *@
-                                <a class="btn btn-sm btn-outline-secondary"
-                                   asp-action="XuatDuLieu" asp-route-id="@k.Id"
-                                   title="Tải toàn bộ dữ liệu cá nhân của khách này (Luat 91/2025/QH15) - TÀI LIỆU MẬT">
-                                    Xuất dữ liệu
-                                </a>
+                                @* 🚨 **LY DO XUAT LA BAT BUOC** (`CUS-001` §26) — 🔑 Luat **91/2025/QH15** cho khach
+                                   quyen biet **VI SAO** du lieu cua ho bi xuat.
+                                   ⚠️ **required** o client chi la **tien nghi**; 🔒 guard **THAT** nam o
+                                   `CustomerAppService.XuatDuLieuCaNhanAsync` (📌 API/script cung di qua do).
+                                   🔑 Day la **form GET** (khong phai POST): thao tac **chi doc** ⇒ 📌 dung ngu
+                                   nghia HTTP, va khong can anti-forgery token. *@
+                                <form method="get" asp-action="XuatDuLieu" class="d-inline-flex align-items-center gap-1">
+                                    <input type="hidden" name="id" value="@k.Id" />
+                                    <input class="form-control form-control-sm" style="width: 190px;"
+                                           name="lyDo" placeholder="Lý do xuất (bắt buộc)" required
+                                           title="Luat 91/2025/QH15: phai ghi VI SAO xuat du lieu cua khach" />
+                                    <button class="btn btn-sm btn-outline-secondary" type="submit"
+                                            title="Tải toàn bộ dữ liệu cá nhân của khách này (Luat 91/2025/QH15) - TÀI LIỆU MẬT">
+                                        Xuất dữ liệu
+                                    </button>
+                                </form>
                                 @if (!k.DungDuoc)
                                 {
                                     <form method="post" asp-action="MoChan" class="d-inline">

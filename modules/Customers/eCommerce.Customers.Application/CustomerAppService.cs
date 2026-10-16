@@ -284,9 +284,38 @@ public class CustomerAppService : ApplicationService
     /// ma ban xuat nay sinh ra de tranh.
     /// </summary>
     /// <param name="customerId">Khach can xuat.</param>
+    /// <param name="lyDo">
+    /// 🚨 **LY DO XUAT — BAT BUOC** (`CUS-001` §26). 🔑 Tra loi cau hoi luat: *"**vi sao** du lieu cua toi bi xuat"*.
+    ///
+    /// **⚠️ VI SAO BAT BUOC (khong phai "nen co"):** 📌 ly do la **mot phan cua ban ghi kiem toan**, khong phai
+    /// ghi chu tien loi. 🔒 Mot lan xuat **khong co ly do** thi khi khach hoi *"sao cac anh xuat du lieu cua
+    /// toi?"*, he thong **khong co cau tra loi** — ⚠️ va do **chinh xac** la cau hoi ma Luat **91/2025/QH15**
+    /// cho khach quyen hoi.
+    /// ➕ Va 🔑 **bat buoc ngay tu dau** (thay vi de sau) la **quan trong**: 📌 khi da co du lieu that thi
+    /// **khong the** them rang buoc ma khong **pha vo** lich su (⚠️ hoac phai **bo qua** no — 🔒 va mot rang buoc
+    /// bi bo qua thi **khong con la** rang buoc).
+    ///
+    /// 🔒 **KIEM O DAY (app service), KHONG CHI O UI:** ⚠️ rang buoc o UI la **tien nghi**, khong phai **guard**
+    /// — 📌 API, script, va job deu goi duoc ham nay. ✅ Day moi la lop bao ve **that**.
+    ///
+    /// 📌 **Do dai** da bi chan o **entity** (`CustomerDataExportLog.DoDaiLyDoToiDa = 512`) ⇒ 🔑 tang nay chi
+    /// can kiem **khong rong**.
+    /// </param>
     [Authorize(eCommerceConsts.Permissions.Customers.Manage)]
-    public async Task<XuatDuLieuCaNhanDto> XuatDuLieuCaNhanAsync(Guid customerId)
+    public async Task<XuatDuLieuCaNhanDto> XuatDuLieuCaNhanAsync(Guid customerId, string? lyDo = null)
     {
+        // 🚨 **GUARD THAT** — xem `<param name="lyDo">`. ⚠️ `IsNullOrWhiteSpace` (khong chi `IsNullOrEmpty`):
+        // 🔑 chuoi **KHOANG TRANG** khong phai la ly do (📌 cung bai hoc da ap dung o `CustomerDataExportLog`).
+        if (string.IsNullOrWhiteSpace(lyDo))
+        {
+            throw new BusinessException(CustomerErrorCodes.ThieuThongTinBatBuoc)
+                .WithData("truong", nameof(lyDo))
+                .WithData("lyDo", "Xuat du lieu ca nhan PHAI co LY DO — Luat 91/2025/QH15 cho khach quyen biet " +
+                    "VI SAO du lieu cua ho bi xuat, va mot ban ghi kiem toan khong co ly do thi KHONG tra loi duoc.");
+        }
+
+        var lyDoSach = lyDo.Trim();
+
         var khach = await _khachRepository.FindAsync(customerId)
             ?? throw new BusinessException(CustomerErrorCodes.KhongTimThayKhach)
                 .WithData("customerId", customerId)
@@ -520,7 +549,10 @@ public class CustomerAppService : ApplicationService
                 dto.XuatLucUtc,
                 soDongHoSo: dto.CacDong.Count,
                 soDonHang: dto.TongSoDon,
-                donHangBiCat: dto.DonHangBiCat), autoSave: false);
+                donHangBiCat: dto.DonHangBiCat,
+                // 🔑 **LY DO di thang vao nhat ky** — 📌 khong chi tra ve cho nguoi goi: 🔒 mot ly do
+                // **khong duoc luu** thi **khong tra loi duoc** cau hoi luat ve sau.
+                lyDo: lyDoSach), autoSave: false);
 
             // 📌 `CompleteAsync` **tu luu** moi thay doi trong UoW nay ⇒ 🔑 khong can `autoSave: true`
             // (va `autoSave: true` se **luu hai lan** — 📌 thua mot vong ghi DB).
