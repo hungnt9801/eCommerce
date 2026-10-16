@@ -1649,3 +1649,134 @@ không đi được bằng bốn cách trên**.
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.8 | 16/10/2026 | *(agent, session GĐ1)* | **§22 — THỬ GỠ NỢ `ISoftDelete`: THẤT BẠI, GHI LẠI ĐỂ KHÔNG THỬ LẠI**: thử **bốn** cách (controller dùng `DataFilter` ⇒ `CS0120` · controller tiêm `IDataFilter` với **bốn** namespace ⇒ `CS0246` · chuyển sang tầng Application ⇒ `CS0246` · thêm gói `Volo.Abp.Auditing.Contracts` ⇒ vẫn `CS0246`, **đã gỡ**). 🔑 **Bằng chứng**: `ISoftDelete` không resolve ở **cả** `eCommerce.Domain` **lẫn** `eCommerce.Application`; `eCommerce.Domain.dll` **không** chứa chuỗi đó ⇒ nằm ở assembly **bắc cầu không được chuyển tiếp**. 🚨 **Một lần tự lừa mình**: quét **chuỗi** trong `Volo.Abp.Core.dll` thấy `Volo.Abp.Data` + `ISoftDelete` gần nhau ⇒ kết luận sai; **build vẫn `CS0246`** ⇒ bài học *"hai chuỗi gần nhau KHÔNG chứng minh kiểu định nghĩa ở đó"*, cách đo đúng là **`Assembly.GetType`** hoặc biên dịch thật. 🔒 **Hoàn nguyên toàn bộ**: `git status` sạch · build **0/0** · **1048 + 38** test xanh · **không** mã chết, **không** gói vô ích. Ghi **§22.6** (bước tiếp theo **cụ thể** cho vòng sau, kèm ca probe bắt buộc) |
+
+---
+
+## 23. ✅ **LÁT CẮT 5 — HIỂN THỊ SẢN PHẨM THEO KÊNH** (`ADR-08`/`BR-012`) (16/10/2026) — *phần CUỐI của `CAT-003`*
+
+> ⚠️ **PHẠM VI NÓI RÕ:** lát cắt này làm **BẢNG CHUYỂN TRẠNG THÁI** (bất biến domain, **23 ca test**) ·
+> **ENTITY + RÀNG BUỘC DB** (`NULLS NOT DISTINCT`, **đã kiểm chứng trên DB thật**) · **migration**.
+> 🚫 **CHƯA** làm: **`IChannelDirectory`** (tra `Channel.IsActive`) · **app service/API** · **kiểm `ChannelListing`
+> còn `Synced`** (`0209`) · **UI** · **job đối chiếu khi kênh ngừng hoạt động** (`F10`). Nợ ghi ở **§23.7**.
+
+### 23.1 🔑 **Điều DỄ HIỂU SAI NHẤT — và nó gây hỏng IM LẶNG**
+
+`KeThua` **KHÔNG** phải *"trạng thái trung gian chờ xử lý"* — nó **LÀ trạng thái CUỐI CÙNG HỢP LỆ** cho
+**đa số** cặp `(sản phẩm, kênh)`. 📌 Thiết kế **cố ý** KHÔNG tạo bản ghi cho mọi cặp:
+**10.000 sản phẩm × 5 kênh = 50.000 dòng rỗng** ⇒ tốn dung lượng, chậm mọi truy vấn, **không** mang thông tin nào.
+
+🚨 **HỆ QUẢ BẮT BUỘC NHỚ Ở MỌI TRUY VẤN HIỂN THỊ:**
+<list type="bullet">
+  <item>**PHẢI** dùng `LEFT JOIN` + `COALESCE(trạng thái, 'HienThi')`;</item>
+  <item>🚨 **CẤM** `INNER JOIN` — nó **làm MẤT** khỏi kênh đúng những sản phẩm **đang hiển thị bình thường**
+    (vì chúng **không có** bản ghi nào). 📌 Đây là lỗi **im lặng**: sản phẩm biến mất khỏi storefront mà
+    **không có ngoại lệ nào**, và log **không** có gì để lần ra.</item>
+</list>
+🔒 Vì vậy `TrangThaiHienThi.KeThua = 0` **có chủ ý**: `default(TrangThaiHienThi)` **trùng** nghĩa
+*"không có bản ghi"* ⇒ tránh lớp lỗi *"quên khởi tạo ⇒ rơi vào trạng thái lạ"*.
+
+### 23.2 🚨 **Bảng chuyển trạng thái — guard ở TẦNG DOMAIN, không ở app service**
+
+**Vì sao ở entity:** guard là **bất biến nghiệp vụ**; nếu chỉ kiểm ở app service thì **đường ghi thứ hai**
+(job, seed, API mới) sẽ **bỏ qua** nó và **không có lỗi nào**.
+📌 Cùng khuôn `Product.Slug` (§16.3) và `ReconRunMismatch.DanhDauDaXuLy` (`REC-001` §17.3):
+**một đường ghi duy nhất thì luật chỉ có một chỗ.** 🔒 Và `TrangThai` là **`protected set`** ⇒
+**không có** đường nào ghi trạng thái mà **không** chạy bảng chuyển (khoá bằng test reflection).
+
+| Từ | Sang | Điều kiện | Nếu vi phạm |
+|---|---|---|---|
+`KeThua` | `HienThi` | sản phẩm **đã publish** | **NÉM** `0205` |
+`KeThua` | `An` | có **lý do** không rỗng | **NÉM** `0205` |
+`An` | `HienThi` | sản phẩm **đã publish** | **NÉM** `0205` |
+`HienThi` | `An` | có **lý do** không rỗng | **NÉM** `0205` |
+`HienThi`/`An` | `NgungBan` | *(app service kiểm `ChannelListing` ⇒ `0209`)* | **NÉM** `0209` |
+🚫 `NgungBan` | ***bất kỳ*** | **KHÔNG** có guard nào cho phép | **NÉM** `0205` |
+*Mọi cặp khác* | — | không có trong bảng | **NÉM** `0205` |
+
+### 23.3 🚨 **HAI QUYẾT ĐỊNH VỀ THỨ TỰ — cả hai đều là "thứ tự là một phần của đặc tả"**
+
+**① HẤP THỤ TRƯỚC.** `NgungBan` được kiểm **ĐẦU TIÊN**, trước cả lý do/publish.
+📌 Lý do: `NgungBan` chặn **mọi** chuyển dịch ⇒ nếu kiểm *"thiếu lý do"* trước thì người dùng nhận
+*"thiếu lý do"* trong khi **thật ra** cặp `(sản phẩm, kênh)` đã **ngừng bán** — thông báo **sai** dẫn họ đi
+sửa một thứ **không** giải quyết được gì. 🔑 Cùng bài học `REC-001` §17.3.
+
+**② `NgungBan ⇒ NgungBan` **NÉM** — KHÁC mọi cặp no-op khác.** Xem §23.4.
+
+### 23.4 🚨 **XUNG ĐỘT ĐẶC TẢ tôi phải tự quyết — và test cũ của tôi ĐÃ SAI**
+
+`CAT-003` §3 ghi: *"`*mọi cặp khác*` ⇒ **luôn ném lỗi**"*. Mà `KeThua ⇒ KeThua` **không** có trong bảng
+⇒ theo câu đó thì **phải ném**. ❗ **Nhưng** nó **xung đột** với một bất biến đã chốt ở **hai** chỗ khác
+(`REC-001` §17.3, `CAT-003` §17.3): **gọi lại đúng trạng thái hiện tại là NO-OP, KHÔNG ném** — vì đó là
+**retry/double-click**, không phải *"chuyển sai"*.
+
+🔒 **TÔI CHỌN NO-OP, và đây là lý do:**
+
+| Lý lẽ | Nội dung |
+|---|---|
+**①** | `KeThua ⇒ KeThua` **KHÔNG đổi trạng thái nào** ⇒ nó **không phải** một *chuyển dịch*. Câu *"mọi cặp khác đều ném"* nói về các **chuyển dịch** — cặp `(X, X)` **không** phải chuyển dịch |
+**②** | Nếu ném, một **retry** (mạng chập, double-click, job chạy lại) trên bản ghi vừa tạo sẽ **ĐỎ** ⇒ client **thử lại** ⇒ **vòng lặp lỗi cho một việc đã đúng** |
+**③** | Các cặp no-op khác (`HienThi ⇒ HienThi`, `An ⇒ An`) **đã** là no-op — cho `KeThua` ném là **bất đối xứng vô cớ** |
+
+🔑 **NGOẠI LỆ DUY NHẤT: `NgungBan ⇒ NgungBan` **NÉM**.** 📌 Vì `NgungBan` là **hấp thụ TUYỆT ĐỐI**: mọi lời gọi
+đều nằm trong một thao tác **không được phép**, và **im lặng chấp nhận sẽ CHE MẤT** việc người dùng đang cố
+làm một điều sai (tưởng rằng có thể bán lại trên kênh đó).
+➕ **Và no-op KHÔNG ghi đè `LyDo`** — bằng chứng của lần ẩn đầu phải còn (`REC-001` §17.3 bất biến 2).
+
+### 23.5 ✅ **KIỂM CHỨNG — 23 ca unit + RÀNG BUỘC DB THẬT**
+
+**`ProductChannelVisibilityTests` (23 ca):** khởi tạo (**luôn** `KeThua` · `KeThua = 0` là mặc định enum) ·
+dữ liệu vào (mã kênh rỗng/quá dài · `ProductId` rỗng) · **các cặp hợp lệ** (5 ca, gồm `An ⇒ HienThi` **xoá
+lý do cũ**) · **guard chặn** (chưa publish ⇒ **NÉM** · thiếu lý do ⇒ **NÉM**, 3 dạng) ·
+🚫 **`NgungBan` hấp thụ: MỌI đích đều NÉM** (duyệt cả `Enum.GetValues`) · 🚨 **`NgungBan ⇒ NgungBan` NÉM** ·
+🚨 **duyệt MỌI cặp `(từ, sang)`** và khẳng định cặp **ngoài bảng** luôn **NÉM** (bắt được **nhánh `switch`
+quên `throw`** — thứ mà test từng-ca **không thể** bao hết) · `KeThua ⇒ KeThua` **no-op** · **mọi chuyển dịch
+về `Loi` NÉM** · no-op **không ghi đè `LyDo`** · lỗi **mang đủ** `tu`/`sang`/`sanPhamId`/`kenh` ·
+`TrangThai` **không có setter công khai** (reflection).
+
+➕ **Lưới an toàn cho chính phép quét:** khẳng định `soCapNgoaiBang > 0` — nếu hàm dựng trạng thái hỏng thì
+vòng lặp không chạy ca nào ⇒ test **xanh vô nghĩa** (đúng loại *"cảm giác an toàn giả"* mà Phụ lục C cảnh báo).
+
+**✅ RÀNG BUỘC DB THẬT (PostgreSQL 17, 3 phép đo):**
+
+| # | Thao tác | Kết quả **đo được** |
+|---|---|---|
+T1 | Bản ghi **đầu tiên** `(SP, SHOPEE)` | `INSERT 0 1` · số dòng = **1** ✅ |
+**T2** | Bản ghi **thứ hai** cho **cùng** `(SP, SHOPEE)` | 🚨 **`ERROR: duplicate key value violates unique constraint "IX_CatProductChannelVisibilities_TenantId_SanPham_Kenh"`**<br>**`DETAIL: Key ("TenantId", "ProductId", "ChannelCode")=(null, e0000000…, SHOPEE) already exists`** ✅ |
+T3 | Bản ghi cho **kênh KHÁC** `(SP, LAZADA)` | `INSERT 0 1` ⇒ tổng **2** dòng, **2** kênh ✅ |
+
+📌 **Chi tiết quan trọng nhất ở T2:** `"TenantId" = null` **khớp** với `null` khác — đúng hành vi
+**`NULLS NOT DISTINCT`**. Nếu **quên** mệnh đề đó (EF Core 10 **không** sinh được), PostgreSQL coi hai `null`
+là **khác nhau** ⇒ dòng thứ hai **lọt** ⇒ **HAI cấu hình hiển thị** cho cùng cặp ⇒ mọi truy vấn hiển thị trả
+**kết quả khác nhau tuỳ truy vấn** — và **không lỗi nào**.
+🔒 **T3 chứng minh ràng buộc KHÔNG chặn nhầm:** nhiều **kênh** khác nhau cho cùng sản phẩm **vẫn được**.
+
+**Số index `NULLS NOT DISTINCT` toàn DB: 47 → 48** (đã cập nhật `F1_du_48_…` **và** danh sách **đích danh**).
+
+➕ **`DROP INDEX IF EXISTS`** trong migration — 📌 **bài học đã trả giá ở `Cat003_ProductMedia`**: viết
+`DROP INDEX` trần ⇒ **`42704: index does not exist`** ⇒ migration **thất bại**.
+
+### 23.6 📌 **Ghi nhớ về cơ chế CI (đã kiểm, không phải suy đoán)**
+
+* `RangBuocDbChuaAnhXaTests` **CHẶN ĐÚNG**: bắt `IX_CatProductChannelVisibilities_TenantId_SanPham_Kenh`
+  **chưa được ánh xạ** ⇒ đã thêm vào `ViPhamRangBuocDb` với mã `0205` **dùng hằng số** (không chuỗi cứng —
+  bài học `CAT-003` §19.4);
+* `PostgreSqlSchemaTests.F1_du_48_…` đối chiếu **đích danh** danh sách index;
+* `DbSetRegistrationTests` phủ `DbSet` mới.
+
+### 23.7 ⏳ NỢ (KHÔNG phải tính năng đã có)
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+| **1** | 🚨 **CHƯA có `IChannelDirectory`** | Guard *"`ChannelCode` tồn tại **và** `IsActive = true`"* (**`0207`**) **chưa** cưỡng chế được ⇒ hiện **có thể** ghi cấu hình cho một kênh **không tồn tại/đã ngừng**. 📌 Cần hợp đồng chỉ-đọc ở `Application.Contracts` + hiện thực đọc `Channel` (khuôn `ICustomerDirectory`) |
+| **2** | 🚨 **CHƯA có app service/API** | Entity + guard **đã có**, nhưng **chưa có đường gọi từ ngoài** ⇒ cùng họ `SAL-006` §17 (*"đã cài nhưng không có đường gọi tới"*) |
+| **3** | 🚨 **CHƯA kiểm `ChannelListing` còn `Synced`** (`0209`) | Guard `⇒ NgungBan` hiện chỉ kiểm **bảng chuyển**; phần *"còn listing đồng bộ"* chưa làm ⇒ hiện **ngừng bán được** dù kênh **vẫn đang bán** |
+| **4** | **CHƯA có UI** | Chưa trang, chưa menu |
+| **5** | **CHƯA có job đối chiếu khi kênh ngừng hoạt động** (`F10`) | Bản ghi trỏ tới kênh đã ngừng **không** được tự chuyển trạng thái + **không** có log/metric |
+| **6** | **CHƯA có truy vấn hiển thị dùng `LEFT JOIN`** | 🔒 Đây là **điều nguy hiểm nhất khi có người viết truy vấn storefront đầu tiên** — xem §23.1. **Cần** hoặc một `IChannelVisibilityResolver` **duy nhất**, hoặc ghi cảnh báo ngay tại chỗ |
+| **7** | **`0207`/`0209` chưa có hằng số** | Chỉ thêm khi làm nợ #1/#3 (theo §6.3) |
+
+### 23.8 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.9 | 16/10/2026 | *(agent, session GĐ1)* | **§23 — LÁT CẮT 5: HIỂN THỊ THEO KÊNH (phần CUỐI của `CAT-003`)**: `TrangThaiHienThi` (`KeThua=0` **có chủ ý**) · `ProductChannelVisibility` với **bảng chuyển trạng thái ở TẦNG DOMAIN** (`TrangThai` **`protected set`** ⇒ một đường ghi) · mã `Catalog:0205` · migration `20261016135724` với **unique index `NULLS NOT DISTINCT`** (`DROP INDEX IF EXISTS`) · **+23 unit test** (1071 tổng) · **NND 47 → 48** · ánh xạ `ViPhamRangBuocDb` (**dùng hằng số**). ✅ **Kiểm chứng DB THẬT (3 phép đo)**: dòng thứ hai cho cùng `(SP, kênh)` bị **`duplicate key … IX_CatProductChannelVisibilities_TenantId_SanPham_Kenh`** chặn với `Key ("TenantId","ProductId","ChannelCode")=(null, …)` ⇒ **`NULLS NOT DISTINCT` hoạt động**; kênh **khác** vẫn thêm được. 🚨 **XUNG ĐỘT ĐẶC TẢ đã tự quyết** (§23.4): tài liệu ghi *"mọi cặp khác luôn ném"* **xung đột** với bất biến no-op đã chốt ở hai chỗ — **test cũ của tôi ĐÃ SAI** (khẳng định `KeThua ⇒ KeThua` phải ném); chọn **NO-OP** cho cặp không-đổi-trạng-thái, **giữ NÉM** cho `NgungBan ⇒ NgungBan` (hấp thụ tuyệt đối). Ghi **§23.1** (`INNER JOIN` làm **mất** sản phẩm **im lặng**) · **§23.3** (thứ tự: hấp thụ trước) · **§23.7** (nợ: **chưa có `IChannelDirectory`** ⇒ `0207` chưa cưỡng chế · **chưa có app service/API** · **chưa kiểm `ChannelListing`** ⇒ `0209` · chưa UI · chưa job `F10` · **chưa có truy vấn `LEFT JOIN`**) |

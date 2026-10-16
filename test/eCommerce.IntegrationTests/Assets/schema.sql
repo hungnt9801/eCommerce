@@ -2173,3 +2173,37 @@ VALUES ('20261016112214_Cat003_ProductMedia', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE TABLE "CatProductChannelVisibilities" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "ProductId" uuid NOT NULL,
+    "ChannelCode" character varying(32) NOT NULL,
+    "TrangThai" integer NOT NULL,
+    "LyDo" character varying(1024),
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_CatProductChannelVisibilities" PRIMARY KEY ("Id"),
+    CONSTRAINT "FK_CatProductChannelVisibilities_CatProducts_ProductId" FOREIGN KEY ("ProductId") REFERENCES "CatProducts" ("Id") ON DELETE RESTRICT
+);
+
+CREATE INDEX "IX_CatProductChannelVisibilities_ProductId" ON "CatProductChannelVisibilities" ("ProductId");
+
+CREATE INDEX "IX_CatProductChannelVisibilities_TenantId_Kenh_TrangThai" ON "CatProductChannelVisibilities" ("TenantId", "ChannelCode", "TrangThai");
+
+DROP INDEX IF EXISTS "IX_CatProductChannelVisibilities_TenantId_SanPham_Kenh";
+
+CREATE UNIQUE INDEX "IX_CatProductChannelVisibilities_TenantId_SanPham_Kenh" ON "CatProductChannelVisibilities" ("TenantId", "ProductId", "ChannelCode") NULLS NOT DISTINCT;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261016135724_Cat003_ProductChannelVisibility', '10.0.11');
+
+COMMIT;
+

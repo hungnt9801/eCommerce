@@ -141,14 +141,14 @@ public class PostgreSqlSchemaTests
     }
 
     [Fact]
-    public async Task F1_du_47_index_deu_dung_NULLS_NOT_DISTINCT()
+    public async Task F1_du_48_index_deu_dung_NULLS_NOT_DISTINCT()
     {
         // 🔒 BẤT BIẾN (ghi ở XC-004 Q6): mọi unique index trên entity IMultiTenant PHẢI có
         // `NULLS NOT DISTINCT`. Ai tạo migration mới mà quên ⇒ test này đỏ.
         // 📌 40 → 42 (`Inv003_ChannelLimits_Rec001_ReconRuns`) → 43 (`Cat003_ProductSlug_Unique`)
         //    → **46** (16/10/2026, `Cus001_Customers_CustomerGroups`: 3 unique index — nhóm khách,
         //    một-tài-khoản-một-khách, khoá idempotency).
-        Assert.Equal(47L, await DemAsync(
+        Assert.Equal(48L, await DemAsync(
             "select count(*) from pg_indexes where schemaname = 'public' and indexdef like '%NULLS NOT DISTINCT%'"));
 
         // Kiểm tra ĐÍCH DANH để thông báo lỗi có ý nghĩa (tên index dài có thể bị PostgreSQL cắt ⇒ so theo tiền tố).

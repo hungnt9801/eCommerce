@@ -41,6 +41,13 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
     /// dù build/migration **đều xanh**. Lưới an toàn CI: `DbSetRegistrationTests`.
     /// </summary>
     public DbSet<Catalog.ProductMedia> ProductMedia { get; set; } = default!;
+    /// <summary>
+    /// HIỂN THỊ SẢN PHẨM THEO KÊNH (`CAT-003` `ADR-08`). 🚨 **BẮT BUỘC có `DbSet`** — thiếu ⇒
+    /// `IRepository&lt;ProductChannelVisibility, Guid&gt;` **không được đăng ký** (quy ước #3) ⇒ app service
+    /// **không resolve được** ⇒ **`HTTP 500`** dù build/migration **xanh**. Lưới an toàn CI: `DbSetRegistrationTests`.
+    /// ⚠️ Và bài học `CAT-003` §20.3: `DbSet` **có** vẫn **chưa đủ** — module còn phải nằm trong đồ thị (`DependsOn`).
+    /// </summary>
+    public DbSet<Catalog.ProductChannelVisibility> ProductChannelVisibilities { get; set; } = default!;
 
     /// <summary>
     /// 🚨 **`DbSet` NÀY LÀ BẮT BUỘC, KHÔNG PHẢI "CHO ĐẸP"** (`CAT-002`, phát hiện 15/10/2026):
@@ -254,6 +261,45 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
 
         // 🚨 `CAT-003` — **ẢNH SẢN PHẨM**. Xem `ADR-02` (metadata ở DB, **bytes ở object storage**),
         // `ADR-12` (tối đa MỘT ảnh chính/sản phẩm), `ADR-13` (định dạng do MÁY CHỦ kiểm bằng magic bytes).
+        // 🚨 `CAT-003` `ADR-08` — **HIỂN THỊ SẢN PHẨM THEO KÊNH**.
+        builder.Entity<Catalog.ProductChannelVisibility>(b =>
+        {
+            b.ToTable("CatProductChannelVisibilities");
+            b.ConfigureByConvention();
+
+            b.Property(x => x.ChannelCode).IsRequired().HasMaxLength(Catalog.ProductChannelVisibility.DoDaiMaKenhToiDa);
+            b.Property(x => x.LyDo).HasMaxLength(Catalog.ProductChannelVisibility.DoDaiLyDoToiDa);
+
+            // 🔒 Lưu **SỐ** (enum) ⇒ chỉ có MỘT nguồn quyết định nghĩa của trạng thái.
+            // 📌 Nếu lưu chuỗi thì đổi tên enum là sửa **dữ liệu**, không phải sửa **mã** — và dữ liệu cũ
+            // sẽ có giá trị không ai còn kiểm được.
+            b.Property(x => x.TrangThai).HasConversion<int>();
+
+            // Truy vấn nóng: "kênh này đang HIỂN THỊ gì / ẩn gì".
+            b.HasIndex(x => new { x.TenantId, x.ChannelCode, x.TrangThai })
+                .HasDatabaseName("IX_CatProductChannelVisibilities_TenantId_Kenh_TrangThai");
+
+            // 🚨🚨 **HÀNG RÀO CUỐI CHO BẤT BIẾN `(TenantId, ProductId, ChannelCode)` LÀ DUY NHẤT.**
+            //
+            // **VÌ SAO PHẢI Ở DB (không chỉ ở app service):** đặt trạng thái là thao tác *"đọc bản ghi hiện tại
+            // → quyết định → ghi"*. Hai request **ĐỒNG THỜI** (double-click, hai tab, hai nhân viên) **cùng**
+            // đọc thấy *"chưa có bản ghi"* ⇒ **cả hai** `INSERT` ⇒ **HAI bản ghi** cho cùng cặp
+            // `(sản phẩm, kênh)` ⇒ mọi truy vấn hiển thị trả **kết quả khác nhau tuỳ truy vấn** (kênh đọc cái
+            // này, báo cáo đọc cái kia) — và **không có lỗi nào nổi lên**.
+            // 📌 Đây **đúng** bài học `XC-003` D2: **"bỏ app đi, DB có chặn không?"**
+            // ⚠️ Cần **SQL thô** trong migration: EF Core 10 **không** sinh được `NULLS NOT DISTINCT`.
+            b.HasIndex(x => new { x.TenantId, x.ProductId, x.ChannelCode })
+                .IsUnique()
+                .HasDatabaseName("IX_CatProductChannelVisibilities_TenantId_SanPham_Kenh");
+
+            // 📌 FK `Restrict` (không `Cascade`): xoá cứng một sản phẩm **KHÔNG** được kéo mất cấu hình hiển thị
+            // theo kênh một cách âm thầm — đó là **quyết định kinh doanh** đã ghi (kèm lý do cho ca ẩn).
+            b.HasOne<Catalog.Product>()
+                .WithMany()
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
         builder.Entity<Catalog.ProductMedia>(b =>
         {
             b.ToTable("CatProductMedia");

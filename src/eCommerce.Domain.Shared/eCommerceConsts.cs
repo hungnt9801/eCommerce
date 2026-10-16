@@ -434,6 +434,15 @@ public static class eCommerceConsts
 
             /// <summary>**KHÔNG TÌM THẤY** ảnh theo Id (hoặc ảnh thuộc sản phẩm khác) — `CAT-003` §6.3 `0210`.</summary>
             public const string KhongTimThayAnh = "eCommerce:Catalog:0210";
+
+            /// <summary>🚨 **CHUYỂN TRẠNG THÁI HIỂN THỊ KHÔNG HỢP LỆ** (`CAT-003` §6.3 **`0205`**) — theo **bảng chuyển**
+            /// ở `ProductChannelVisibility.ChuyenSang`. Gồm: chuyển tới `KeThua`/`Loi` · hiện sản phẩm **chưa publish**
+            /// · **ẩn mà thiếu lý do** · 🚫 **mọi chuyển dịch ra khỏi `NgungBan`** (trạng thái **hấp thụ**).
+            /// 📌 **VÌ SAO MÃ RIÊNG (không dùng `0204` = thứ tự ảnh/vượt trần):** chỉ dẫn **rất khác** —
+            /// *"xem lại bảng chuyển trạng thái / nhập lý do / publish sản phẩm trước"*, **không** phải *"sửa ảnh"*.
+            /// 📌 `WithData` mang **`tu`**, **`sang`**, **`sanPhamId`**, **`kenh`** ⇒ người vận hành biết **chính xác**
+            /// cặp nào bị chặn mà **không** phải tự đi tìm.</summary>
+            public const string ChuyenTrangThaiHienThiKhongHopLe = "eCommerce:Catalog:0205";
         }
     }
 

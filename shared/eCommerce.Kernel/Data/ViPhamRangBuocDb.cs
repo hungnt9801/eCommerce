@@ -128,6 +128,17 @@ public static class ViPhamRangBuocDb
         ["IX_CatProductMedia_MotAnhChinh"] =
             new(eCommerceConsts.ErrorCodes.Catalog.DaCoAnhChinh,
                 "Sản phẩm này ĐÃ có ảnh chính ⇒ bỏ đánh dấu ảnh chính hiện tại TRƯỚC khi đặt ảnh mới.", true),
+        // ── HIỂN THỊ THEO KÊNH (`CAT-003` ADR-08, 16/10/2026) ────────────────────────────────────
+        // 📌 Ràng buộc này CHẶN MỘT HÀNH VI HỢP LỆ VỀ NGHIỆP VỤ: đặt trạng thái là thao tác
+        // *"đọc bản ghi hiện tại → quyết định → ghi"*; hai request ĐỒNG THỜI (double-click, hai tab)
+        // **cùng** đọc thấy *"chưa có bản ghi"* ⇒ **cả hai** `INSERT`.
+        // 🔑 Mã `eCommerce:Catalog:0205` (KHÔNG mượn `0011` = *"thiếu thông tin bắt buộc"*): ca này cần chỉ dẫn
+        // *"cặp `(sản phẩm, kênh)` này ĐÃ có cấu hình hiển thị ⇒ SỬA bản ghi đó, đừng tạo mới"*.
+        // ⚠️ Ca NẶNG của lỗi C4/F1: `TenantId` có thể `NULL` ⇒ thiếu `NULLS NOT DISTINCT` là index
+        // **mất tác dụng im lặng** (xem chú thích migration `Cat003_ProductChannelVisibility`).
+        ["IX_CatProductChannelVisibilities_TenantId_SanPham_Kenh"] =
+            new(eCommerceConsts.ErrorCodes.Catalog.ChuyenTrangThaiHienThiKhongHopLe,
+                "Cặp (sản phẩm, kênh) này ĐÃ có cấu hình hiển thị ⇒ SỬA bản ghi hiện có, KHÔNG tạo bản ghi thứ hai.", true),
         ["IX_CusGroups_TenantId_Code"] =
             new("eCommerce:Customers:0008",
                 "Mã nhóm khách này ĐÃ tồn tại trong tenant ⇒ chọn mã khác (KHÔNG tạo hai nhóm cùng mã).", true),
