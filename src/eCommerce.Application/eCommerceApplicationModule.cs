@@ -64,5 +64,11 @@ namespace eCommerce;
         // **LỜI NÓI DỐI** (*"0 lệch"* vì **chưa ai đo**, không phải vì **không có lệch**). Job này khiến phép đo
         // **luôn chạy** (và chạy **ngay** sau restart nhờ `Timer.RunOnStart`).
         await context.AddBackgroundWorkerAsync<eCommerce.Application.Inventory.InventoryReconciliationWorker>();
+
+            // 🚨 `SAL-005` **D12** + `XC-002` — đối soát sàn + cảnh báo DLQ. 📌 **BẮT BUỘC đăng ký**:
+            // thiếu dòng này thì worker **KHÔNG BAO GIỜ CHẠY** mà **không có lỗi nào** (đã trả giá thật ở
+            // vòng 35 với `StockReservationExpiryWorker` — `inv-001` §27 **NN1**).
+            // 🔑 Và `BackgroundWorkerCoCheTests` **bắt** điều này bằng phép quét mã nguồn.
+            await context.AddBackgroundWorkerAsync<eCommerce.Application.Marketplace.MarketplaceReconciliationWorker>();
     }
 }

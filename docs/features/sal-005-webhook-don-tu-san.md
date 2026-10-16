@@ -1269,3 +1269,100 @@ minh handler chạy đúng ở runtime. ✅ **Cái ĐÃ kiểm được:** entit
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.4 | 16/10/2026 | *(agent, session GĐ1)* | **§18 — LÁT CẮT 3: NỐI WATERMARK + DLQ** (đóng nợ §17.8 #3): **DLQ** `DeadLetterMessage` (bảng `MsgDeadLetters` + **2 index**, một index **có bộ lọc** `NOT "DaXuLy"`) · **`DeadLetterWriter`** với **HAI CHẾ ĐỘ UoW** (chung / **`requiresNew`** khi việc xử lý đã ném lỗi) · mã `Messaging:0006`/`0007` · migration `20261016145709_Xc002_DeadLetterQueue` (**áp lên DB thật**, NND **giữ 48** vì index không unique) · **nối luật 4 nhánh** vào `MarketplaceOrderIntakeHandler` · **+25 unit test** (1100 tổng). 🔑 **Ba bất biến DLQ**: payload **nguyên vẹn** · khoá nghiệp vụ **cột riêng** · mô tả **bắt buộc**. 🚨 **Quyết định quan trọng nhất:** *"ghi DLQ trong **cùng** transaction với việc đã hỏng"* ⇒ DLQ **cũng bị rollback** ⇒ **rỗng đúng lúc cần nhất** ⇒ phải có `DayVaoDlqUoWRiengAsync`. 🔑 **Nối luật:** `ApDung`/`Trung`/`XungDot`/`DenMuon` — `DenMuon` **KHÔNG ghi đè** nhưng **đẩy DLQ** làm bằng chứng. ⚠️ `AggregateVersion = null` ⇒ giữ hành vi cũ, **không bịa phiên bản**. 🚨 **§18.6: CHƯA ĐO ĐƯỢC RUNTIME** — không có đường phát `ChannelOrderPulledEto` (connector `EnableLiveCalls = false`) ⇒ probe **từ chối kết luận** (ca `C1` **ĐỎ** đúng thiết kế, in kết luận trung thực). 📌 **Bài học lần thứ TÁM:** *"test xanh"* ≠ *"đúng"*. Ghi **§18.7** (nợ: **chưa đo runtime** · **chưa có job `D12`** ⇒ cờ `GapSuspected` **tồn đọng** · chưa dọn DLQ · chưa phát lại · **chưa có API/UI đọc DLQ** ⇒ vẫn **không ai đọc được** · **`Order` nội bộ chưa cập nhật** · **connector chưa trả `update_time`** ⇒ tính năng **chưa có tác dụng** trên dữ liệu thật · 🚨 **không có bảng `AbpEventOutbox`** ⇒ tài liệu nói *"phát vào outbox"* **chưa đúng** với cấu hình hiện tại) |
+
+---
+
+## 19. ✅ **LÁT CẮT 4 — JOB ĐỐI SOÁT `D12` + CẢNH BÁO DLQ** (16/10/2026) — *đóng nợ §18.7 #1 (một phần) + #2 + #3*
+
+> ⚠️ **PHẠM VI NÓI RÕ:** job **CHẠY THẬT** và **13/13 ca đo được** trên **log + DB thật**.
+> 🚨 **Nhưng nó CỐ Ý KHÔNG tự hạ cờ `GapSuspected`** — xem §19.2, đó là **quyết định**, không phải thiếu sót.
+
+### 19.1 🔑 **Hai nợ, một đường gọi**
+
+| Nợ (§18.7) | Trước lượt này | Sau lượt này |
+|---|---|---|
+**#2** — chưa có job `D12` | `DanhDauDaDoiSoat` **đã có** nhưng **chưa ai gọi** ⇒ cờ `GapSuspected` **tồn đọng im lặng** | ✅ Job **đếm + in khoá nghiệp vụ + tuổi** của các đơn bị nghi ngờ |
+**#3** — chưa có cảnh báo DLQ | DLQ có **4 endpoint** nhưng **chỉ đọc được khi có người mở trang** | ✅ Job đặt metric `messaging_dlq_size` + **cảnh báo theo TUỔI** |
+
+🔑 **Điểm chung — và đây là lý do gộp vào một job:** cả hai đều là *"dấu vết được tạo ra rồi không ai đọc"*.
+📌 Một hàng đợi cần **ai đó nhìn nó định kỳ**; một cờ cảnh báo cần **ai đó đếm nó**. Không có **nhịp**, cả hai
+**tồn đọng vô hình**.
+
+### 19.2 🚨 **ĐIỀU JOB CỐ Ý *KHÔNG* LÀM — quyết định quan trọng nhất của lớp này**
+
+🚨 **Nó KHÔNG tự hạ cờ `GapSuspected`.**
+
+📌 Lý do: `DanhDauDaDoiSoat` **BẮT BUỘC có lý do** vì hạ cờ là **KHẲNG ĐỊNH** *"đã kiểm và dữ liệu khớp"*.
+Một job **không thể** khẳng định điều đó — nó **không gọi được sàn** (`EnableLiveCalls = false`, không credential
+sandbox; và chính `D12` là để *phát hiện* nghi ngờ, **không** phải để *xoá* nó).
+
+🔒 **Nếu job tự hạ cờ:** nó **xoá mất bằng chứng** về khả năng mất dữ liệu **mà không hề kiểm gì** ⇒ biến dấu vết
+cảnh báo thành **dấu vết giả**. ⚠️ Và tệ hơn: sau khi bị hạ, **không ai** còn biết đơn đó từng bị nghi ngờ.
+
+🔑 **Vậy job làm gì?** Nó biến *"cờ tồn đọng im lặng"* thành **DANH SÁCH VIỆC ĐỌC ĐƯỢC + ĐẾM ĐƯỢC + CÓ TUỔI**:
+in **khoá nghiệp vụ** của từng đơn (không chỉ *"có 37 đơn"*), **tuổi** bằng giờ, và **nói thẳng** là cần đối soát
+thủ công. ⇒ Người vận hành có **danh sách cụ thể** thay vì phải tự đi tìm.
+📌 Đây là **đường gọi**, **không phải tự động sửa** — và sự khác biệt đó là **cố ý**.
+
+### 19.3 🚨 **CẢNH BÁO THEO *TUỔI*, KHÔNG CHỈ THEO *SỐ LƯỢNG*** — quyết định thiết kế thứ hai
+
+**Ngưỡng: 24 giờ** (`NguongTuoiCanhBaoGio`). 📌 **Vì sao số lượng KHÔNG đủ:** 5 dòng mới trong 1 giờ là
+**bình thường** (sàn vừa gửi lệch thứ tự — chuyện xảy ra), còn 5 dòng từ **3 tuần** là **báo động**.
+🔑 **Cùng con số, hai ý nghĩa trái ngược.** Một hàng đợi chỉ có *"số lượng"* mà không có *"tuổi"* thì **không**
+phân biệt được hai ca đó.
+⚠️ **Và hệ quả vận hành:** nếu cảnh báo ở **mọi** dòng mới thì log **ngập** ⇒ rồi **không ai đọc cảnh báo thật**.
+🔒 Vì vậy: dòng **mới** ⇒ `Information`; dòng **quá 24 giờ** ⇒ `Warning`.
+
+### 19.4 ✅ **KIỂM CHỨNG — 13/13 CA TRÊN LOG + DB THẬT**
+
+Tiền đề: **1 đơn `GapSuspected = true`** + **1 dòng DLQ chưa xử lý 48 giờ** (> ngưỡng 24) ⇒ **phải** có cảnh báo.
+
+| Nhóm | Ca **ĐẠT** |
+|---|---|
+**Chạy** | **C1** có neo `[D12-JOB-BAT-DAU]` · **C1b 🚨 có neo `[D12-JOB-XONG]`** ⇒ *"chạy XONG"*, **không** phải *"chạy rồi ném"* · **C1c 🚨 KHÔNG có `AbpAuthorizationException`** |
+**Cảnh báo** | **C2 🚨 `[D12-DLQ-TON-DONG]`** (48 giờ > 24) · **C3 🚨 `[D12-GAP-TON-DONG]`** · **C4** không báo *"rỗng"* sai |
+**Đủ dữ liệu** | **D1** in **khoá nghiệp vụ** `shopee/K97D12EXT` · **D2** in **tuổi** `30.0` · **D3 🚨 nói rõ job CỐ Ý không tự hạ cờ** · **D4** DLQ: số dòng + tuổi + `HaWatermark` |
+**🚨 KHÔNG GHI** | **E1 cờ `GapSuspected` VẪN `true`** · **E2 dòng DLQ VẪN chưa xử lý** |
+
+🔑 **Ca `E1`/`E2` là ca quan trọng nhất về mặt nghiệp vụ:** chúng chứng minh job **không** tự sửa dữ liệu.
+📌 Và **ca `C1b` là ca quan trọng nhất về mặt kỹ thuật** — xem §19.5.
+
+### 19.5 🐞 **BA lỗi trong lượt này — cả ba đều là lỗi CỦA TÔI, và hai trong đó là loại nguy hiểm**
+
+**(1) 🚨 `AbpAuthorizationException` — job chết giữa đường.** Worker gọi `IDeadLetterAppService.GetThongKeAsync()`;
+vì `DeadLetterAppService` mang `[Authorize]` ở **cấp class** (quy ước #4 bắt buộc), interceptor của ABP kiểm quyền
+**ngay cả khi gọi trong tiến trình** — mà worker **không có principal** ⇒ **bị từ chối**.
+📌 **Cùng họ** với `CatMediaController` (`CAT-003` §22).
+🔑 **Và điều làm nó nguy hiểm:** job chết **không báo cho ai** — chỉ đọc log mới thấy. ⚠️ **Tệ nhất:** trong lượt đó
+các ca *"job không ghi gì"* **vẫn XANH** ⇒ chúng xanh **vì lý do SAI** (job không ghi vì **chết**, không phải vì
+**cố ý**).
+✅ **Sửa:** worker đọc **repository trực tiếp**; người dùng đi qua app service.
+✅ **Và thêm hai cơ chế chống tái diễn:** **neo `[D12-JOB-XONG]`** (phân biệt *"chạy xong"* với *"chạy rồi ném"*)
+➕ **luật mới** `Worker_KHONG_duoc_goi_APP_SERVICE_co_Authorize` trong `BackgroundWorkerCoCheTests`.
+
+**(2) 🚨 Neo "chạy xong" là điều kiện để phép đo CÓ NGHĨA.** 📌 Nếu **không** có nó, một job chết vẫn *"có chạy"* theo
+log ⇒ **mọi** ca kiểm job đều **vô nghĩa**. 🔑 Đây là bài học `inv-001` §27 **NN2** (*"log trong điều kiện"*) ở dạng
+**mới**: *"log ở đầu nhưng không log ở cuối"*.
+
+**(3) Phép đo so khớp dấu tiếng Việt — sai hai lần.** Console logger làm hỏng dấu (`giờ` → `gi?`) ⇒ ca `D2`/`D3`
+đỏ dù **log thật có đủ dữ liệu**. ✅ Sửa: **chuẩn hoá bỏ dấu + bỏ ký tự không phải chữ** rồi mới so khớp, và dùng
+**vân tay số** (`300GI`, `480GI`, `CHUAXLY`) thay vì chữ có dấu.
+📌 **Bài học:** với log console, **đừng** so khớp chữ có dấu — ⚠️ và **đừng** tin `-match` tiếng Việt là đúng.
+
+### 19.6 ⏳ NỢ
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+**1** | 🚨 **Job vẫn KHÔNG tự đối soát được** | §19.2. 📌 Cần **connector trả `update_time`** + **credential sandbox** ⇒ khi đó job **mới** có thể gọi sàn và **tự** hạ cờ **một cách trung thực** |
+**2** | **Chưa có UI cho DLQ** | Endpoint **đã có**; trang chưa làm |
+**3** | **Chưa có job DỌN DLQ theo thời hạn** | Bảng **chỉ tăng** |
+**4** | **Chưa có job phát lại** | Cố ý: phát lại **có thể gây hỏng lần nữa** ⇒ phải **có người** |
+**5** | **Cảnh báo mới ở mức LOG + METRIC** | Chưa gửi **thông báo** (email/Slack/alert rule). 📌 Metric `messaging_dlq_size` **đã có** ⇒ **đủ dữ kiện** để dựng alert rule |
+**6** | **Ngưỡng 24 giờ là HẰNG SỐ** | Chưa thành **setting** như `REC-001` (`TenChinhSach`). 📌 Cần khi các kênh có SLA khác nhau |
+**7** | **Chưa có metric cho cờ `GapSuspected`** | Chỉ có **log**. 📌 Nên thêm một metric để vẽ biểu đồ xu hướng |
+
+### 19.7 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.5 | 16/10/2026 | *(agent, session GĐ1)* | **§19 — LÁT CẮT 4: JOB `D12` + CẢNH BÁO DLQ** (đóng nợ §18.7 #1 một phần + #2 + #3): `MarketplaceReconciliationWorker` (**nhịp 10 phút**, `RunOnStart`, **khoá phân tán**, **UoW chỉ-đọc**) + **đăng ký** trong `eCommerceApplicationModule` + **+1 luật cơ chế** (1101 test). 🔑 **HAI QUYẾT ĐỊNH LỚN:** (①) 🚨 **job CỐ Ý KHÔNG tự hạ cờ `GapSuspected`** — hạ cờ là **KHẲNG ĐỊNH** đã kiểm khớp, mà job **không gọi được sàn**; tự hạ ⇒ **xoá bằng chứng mà không kiểm gì** ⇒ **dấu vết giả**; (②) 🚨 **cảnh báo theo TUỔI (ngưỡng 24 giờ), không chỉ theo SỐ LƯỢNG** — *"5 dòng mới trong 1 giờ"* là **bình thường** còn *"5 dòng từ 3 tuần"* là **báo động**; cùng con số, **hai ý nghĩa trái ngược**. ✅ **13/13 ca trên LOG + DB THẬT**: có neo **mở đầu** *và* **kết thúc** · **không** `AbpAuthorizationException` · **cảnh báo DLQ + GAP bật** · log in **khoá nghiệp vụ** + **tuổi** · **nói rõ job cố ý không tự hạ cờ** · 🚨 **cờ `GapSuspected` VẪN `true`** + **DLQ VẪN chưa xử lý** (job **không** tự sửa dữ liệu). 🐞 **BA lỗi của tôi, hai loại nguy hiểm:** (1) 🚨 **`AbpAuthorizationException`** — worker gọi app service `[Authorize]` ⇒ **job chết giữa đường mà không báo cho ai**; ⚠️ **và các ca *"job không ghi gì"* vẫn XANH vì lý do SAI** ⇒ sửa bằng **đọc repository trực tiếp** + **neo kết thúc** + **luật mới** `Worker_KHONG_duoc_goi_APP_SERVICE_co_Authorize`; (2) 🚨 **neo "chạy xong" là điều kiện để phép đo có nghĩa** — không có nó thì job chết vẫn *"có chạy"* theo log (bài học `inv-001` §27 NN2 ở dạng mới); (3) **so khớp dấu tiếng Việt sai hai lần** — console logger làm hỏng dấu ⇒ sửa bằng **chuẩn hoá bỏ dấu** + **vân tay số**. Ghi **§19.6** (nợ: **chưa tự đối soát được** — cần connector trả `update_time` + credential sandbox · chưa UI DLQ · chưa dọn DLQ · chưa phát lại · cảnh báo mới ở mức **log + metric**, chưa có alert rule · **ngưỡng 24 giờ là hằng số** · chưa có metric cho `GapSuspected`) |

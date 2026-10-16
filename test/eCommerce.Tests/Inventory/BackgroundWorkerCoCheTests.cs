@@ -108,7 +108,8 @@ public class BackgroundWorkerCoCheTests
         [
             "StockReservationExpiryWorker",
             "TaxUnclassifiedSkusWorker",
-            "ChannelSyncSupervisorWorker"
+            "ChannelSyncSupervisorWorker",
+            "MarketplaceReconciliationWorker"
         ];
 
         var thieu = batBuoc.Where(t => !tenWorker.Contains(t)).ToList();
@@ -117,8 +118,54 @@ public class BackgroundWorkerCoCheTests
             "Phép quét KHÔNG thấy các worker đã biết ⇒ phạm vi quét bị thu hẹp ⇒ test trên VÔ NGHĨA:\n  "
             + string.Join("\n  ", thieu));
 
-        Assert.True(tenWorker.Count >= 6,
-            $"Chỉ thấy {tenWorker.Count} worker (đã biết ít nhất 6) ⇒ phép quét hỏng.");
+        Assert.True(tenWorker.Count >= 7,
+            $"Chỉ thấy {tenWorker.Count} worker (đã biết ít nhất 7) ⇒ phép quét hỏng.");
+    }
+
+    [Fact]
+    public void Worker_KHONG_duoc_goi_APP_SERVICE_co_Authorize__se_nem_AbpAuthorizationException()
+    {
+        // 🚨 **LUẬT NÀY RÚT TỪ MỘT LỖI ĐO ĐƯỢC NGÀY 16/10/2026** — khi xây job `D12`
+        // (`MarketplaceReconciliationWorker`).
+        //
+        // **Chuyện đã xảy ra:** worker gọi `IDeadLetterAppService.GetThongKeAsync()`. Vì `DeadLetterAppService`
+        // mang `[Authorize(...)]` ở **cấp class** (quy ước #4 — `TC01` **bắt buộc** điều đó), interceptor của ABP
+        // kiểm quyền **NGAY CẢ KHI GỌI TRONG TIẾN TRÌNH** — mà worker **KHÔNG có principal** ⇒ **`AbpAuthorizationException`**.
+        //
+        // 📌 **Hệ quả ĐO ĐƯỢC:** job **chết giữa đường**; log chỉ có neo mở đầu và **KHÔNG** có neo kết thúc.
+        // 🔑 **Và nguy hiểm hơn:** job chết như vậy **không báo cho ai** — chỉ đọc log mới thấy.
+        // ⚠️ **Tệ nhất:** trong lượt đó, các ca kiểm *"job không ghi gì"* **vẫn XANH** ⇒ chúng xanh **vì lý do SAI**
+        // (job không ghi vì nó **chết**, không phải vì nó **cố ý** không ghi). 🔑 Đây là lý do phải có **neo kết thúc**
+        // **và** luật này.
+        //
+        // 🔒 **Cách đúng:** worker đọc **repository** trực tiếp (không qua tầng phân quyền); **người dùng** đi qua
+        // app service. 📌 Cùng họ với `CatMediaController` (`CAT-003` §22): `[AllowAnonymous]` gọi app service
+        // `[Authorize]` ⇒ interceptor chặn **trong tiến trình**.
+        var tatCaMa = DocTatCaMaNguon();
+        var viPham = new List<string>();
+
+        foreach (var (tenTep, noiDung) in tatCaMa)
+        {
+            if (!noiDung.Contains(TenLopCoSo, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            // App service là nơi quy ước #4 đặt `[Authorize]` ⇒ resolve nó trong worker là mầm lỗi.
+            var m = Regex.Match(noiDung, @"GetRequiredService<\s*(\w*AppService)\s*>");
+
+            if (m.Success)
+            {
+                viPham.Add($"{LayTenLop(noiDung) ?? tenTep} (khai ở {tenTep}) gọi '{m.Groups[1].Value}'");
+            }
+        }
+
+        Assert.True(viPham.Count == 0,
+            "🚨 WORKER gọi APP SERVICE (có `[Authorize]` ở cấp class) ⇒ `AbpAuthorizationException` vì worker "
+            + "KHÔNG có principal ⇒ JOB CHẾT GIỮA ĐƯỜNG mà không báo cho ai:\n  "
+            + string.Join("\n  ", viPham)
+            + "\n\n⇒ Worker phải đọc REPOSITORY trực tiếp (không qua tầng phân quyền)."
+            + "\n📌 Lỗi này ĐÃ ĐO ĐƯỢC (16/10/2026), và nó làm các ca \"job không ghi gì\" XANH VÌ LÝ DO SAI.");
     }
 
     [Fact]
