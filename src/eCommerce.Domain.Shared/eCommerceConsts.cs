@@ -120,6 +120,25 @@ public static class eCommerceConsts
             /// <summary>Thêm/sửa/xoá hạn mức theo kênh và đổi chính sách (`Inv.ChannelLimit.*`, `Recon.*`).</summary>
             public const string Manage = Default + ".Manage";
         }
+
+        /// <summary>
+        /// 🚨 **`CUS-001` — HỒ SƠ KHÁCH HÀNG.**
+        ///
+        /// 📌 **VÌ SAO TÁCH `View` VÀ `Manage` (không gộp một quyền):** hồ sơ khách là **dữ liệu CÁ NHÂN**
+        /// (Luật BV dữ liệu cá nhân **91/2025/QH15**). Người **đọc** để chăm sóc khách (**CSKH**) **không**
+        /// đương nhiên được **chặn/gỡ chặn/nâng cấp** hồ sơ (đổi quyền mua hàng + đổi chủ sở hữu) —
+        /// hai việc có **mức rủi ro khác hẳn nhau**.
+        /// 🔒 `Manage` còn là quyền **bắt buộc** cho `Chan`/`MoChan` (`ADR-04`: cần lý do + người chịu trách nhiệm).
+        /// ⚠️ **THIẾU ĐỊNH NGHĨA ⇒ `403` CHO MỌI NGƯỜI** (kể cả `admin`) — đúng lỗi `F-403`/`XC-004` D2.
+        /// </summary>
+        public static class Customers
+        {
+            /// <summary>Xem hồ sơ khách (đã có kiểm PII khi log — `ADR-11`).</summary>
+            public const string Default = GroupName + ".Customers";
+
+            /// <summary>Tạo/nâng cấp/chặn/gỡ chặn hồ sơ khách.</summary>
+            public const string Manage = Default + ".Manage";
+        }
     }
 
     /// <summary>

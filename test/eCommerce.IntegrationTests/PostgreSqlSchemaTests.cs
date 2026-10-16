@@ -141,13 +141,14 @@ public class PostgreSqlSchemaTests
     }
 
     [Fact]
-    public async Task F1_du_43_index_deu_dung_NULLS_NOT_DISTINCT()
+    public async Task F1_du_46_index_deu_dung_NULLS_NOT_DISTINCT()
     {
         // 🔒 BẤT BIẾN (ghi ở XC-004 Q6): mọi unique index trên entity IMultiTenant PHẢI có
         // `NULLS NOT DISTINCT`. Ai tạo migration mới mà quên ⇒ test này đỏ.
-        // 📌 40 → **42** (16/10/2026, `Inv003_ChannelLimits_Rec001_ReconRuns`) → **43**
-        //    (16/10/2026, `Cat003_ProductSlug_Unique`: slug là **khoá URL công khai**).
-        Assert.Equal(43L, await DemAsync(
+        // 📌 40 → 42 (`Inv003_ChannelLimits_Rec001_ReconRuns`) → 43 (`Cat003_ProductSlug_Unique`)
+        //    → **46** (16/10/2026, `Cus001_Customers_CustomerGroups`: 3 unique index — nhóm khách,
+        //    một-tài-khoản-một-khách, khoá idempotency).
+        Assert.Equal(46L, await DemAsync(
             "select count(*) from pg_indexes where schemaname = 'public' and indexdef like '%NULLS NOT DISTINCT%'"));
 
         // Kiểm tra ĐÍCH DANH để thông báo lỗi có ý nghĩa (tên index dài có thể bị PostgreSQL cắt ⇒ so theo tiền tố).
@@ -201,7 +202,17 @@ public class PostgreSqlSchemaTests
             //    URL**: một trong hai **không bao giờ** truy cập được và máy tìm kiếm **đánh chỉ mục sai sản phẩm**
             //    — im lặng hoàn toàn. ⚠️ Index có **bộ lọc** `Slug IS NOT NULL` ⇒ EF **không** sinh được
             //    `NULLS NOT DISTINCT` kèm bộ lọc ⇒ đã sửa tay trong migration `Cat003_ProductSlug_Unique`.
-            "IX_CatProducts_TenantId_Slug"
+            "IX_CatProducts_TenantId_Slug",
+            // 🚨 CUS-001 — **3 bất biến của hồ sơ khách** (16/10/2026):
+            //   • `IX_CusGroups_TenantId_Code`: mã nhóm khách là **đầu vào của bảng giá** (`PRC-001` Q5) —
+            //     thiếu mệnh đề ⇒ **HAI nhóm `VIP`** ⇒ giá bán **không xác định**, không lỗi nào;
+            //   • `IX_CusCustomers_TenantId_IdentityUserId`: 🔑 **một tài khoản ⇒ tối đa MỘT khách** (`ADR-07`) —
+            //     thiếu mệnh đề ⇒ *"khách này là ai"* có hai câu trả lời, lịch sử mua/điểm **phân mảnh**;
+            //   • `IX_CusCustomers_TenantId_IdempotencyKey`: chống **tạo hai khách cho một lần gọi** khi retry
+            //     (`ADR-05`) — thiếu mệnh đề ⇒ webhook gửi lại tạo khách thứ hai.
+            "IX_CusGroups_TenantId_Code",
+            "IX_CusCustomers_TenantId_IdentityUserId",
+            "IX_CusCustomers_TenantId_IdempotencyKey"
         ];
 
         foreach (var ten in phaiCo)

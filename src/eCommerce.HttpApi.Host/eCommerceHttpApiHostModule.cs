@@ -67,7 +67,11 @@ namespace eCommerce;
     typeof(Address.Application.AddressApplicationModule),
     typeof(EInvoice.Application.EInvoiceApplicationModule),
     typeof(Signing.Application.SigningApplicationModule),
-    typeof(Pricing.PricingApplicationModule)
+    typeof(Pricing.PricingApplicationModule),
+    // 🚨 `CUS-001` — **BẮT BUỘC**: thiếu dòng này thì assembly `eCommerce.Customers.Application` **KHÔNG** nằm
+    // trong đồ thị module ⇒ ABP không quét app service ⇒ **không tạo endpoint** ⇒ API trả **404 body rỗng**
+    // dù build/test **xanh** (bài học C8/C16, đã trả giá).
+    typeof(Customers.CustomersApplicationModule)
 )]
 public class eCommerceHttpApiHostModule : AbpModule
 {

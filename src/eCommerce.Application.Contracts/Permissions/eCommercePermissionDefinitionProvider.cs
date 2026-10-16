@@ -86,5 +86,12 @@ public class eCommercePermissionDefinitionProvider : PermissionDefinitionProvide
         // 🛡️ Lưới an toàn: `BatBienPhanQuyenTests` khoá bất biến "hằng số ↔ định nghĩa khớp 2 CHIỀU".
         var channelLimits = group.AddPermission(eCommerceConsts.Permissions.ChannelLimits.Default);
         channelLimits.AddChild(eCommerceConsts.Permissions.ChannelLimits.Manage);
+
+        // ---- Hồ sơ khách hàng (`CUS-001`) ----
+        // 🚨 BẮT BUỘC khai ở CẢ HAI NƠI (hằng số + ở đây): thiếu một nơi ⇒ `403` cho MỌI người kể cả `admin`.
+        // 🔒 Tách `View` (`Customers.Default`) khỏi `Manage`: hồ sơ khách là **dữ liệu cá nhân** (Luật 91/2025/QH15)
+        // ⇒ người **đọc** để chăm sóc khách **không** đương nhiên được **chặn/gỡ chặn/nâng cấp**.
+        var customers = group.AddPermission(eCommerceConsts.Permissions.Customers.Default);
+        customers.AddChild(eCommerceConsts.Permissions.Customers.Manage);
     }
 }

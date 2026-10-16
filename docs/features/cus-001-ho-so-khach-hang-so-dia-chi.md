@@ -992,3 +992,91 @@ public class CustomerAddressInvariantTests
 > ⚠️ **Chưa kiểm chứng:** **thời hạn cụ thể** để thực hiện quyền của chủ thể dữ liệu (điều luật chỉ ghi
 > *"trong thời hạn theo quy định của pháp luật"*) và **trình tự xác minh danh tính** chủ thể. ⇒ Đây là **Q3**;
 > **không** được ghi một con số thời hạn nào vào thiết kế trước khi pháp chế xác nhận.
+
+---
+
+## 16. ✅ **LÁT CẮT 1 — MODULE `Customers`: HỒ SƠ KHÁCH + NHÓM KHÁCH + PII** (16/10/2026)
+
+> ⚠️ **PHẠM VI NÓI RÕ — SỔ ĐỊA CHỈ CHƯA LÀM, VÀ CÓ LÝ DO ĐO ĐƯỢC:**
+> `CUS-001` §0 chốt **3 bất biến**, trong đó bất biến #1 là *"`Address` thuộc `AddressHub`, `Customers` chỉ giữ
+> **liên kết**"*. Nhưng khi kiểm mã: **`Address` CHƯA TỒN TẠI** trong `AddressHub` — module đó hiện chỉ có
+> bảng ĐVHC (`AdministrativeUnit`) và mã địa chỉ theo hãng vận chuyển (`CarrierAddressMapping`).
+> ⇒ `CustomerAddressLink` **không thể** trỏ tới bảng chưa có ⇒ **sổ địa chỉ bị CHẶN CÓ THẬT** (§16.5 nợ 1).
+> 📌 Đây **đúng** điều tài liệu §0 đã cảnh báo: *"`ADDR-001`…`ADR-003` là **phụ thuộc chặn**"*.
+> **Lát cắt này làm phần KHÔNG bị chặn** — và không giả vờ rằng đã xong.
+
+### 16.1 Đã làm gì
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| **1** | **Module `Customers` MỚI** (`modules/Customers/…`, 4 project: Domain · Application · Application.Contracts · EntityFrameworkCore) | Khuôn theo `Pricing`. 🚨 **Bắt buộc** `[DependsOn(CustomersApplicationModule)]` ở Host — thiếu ⇒ ABP không quét app service ⇒ **404 body rỗng** dù build/test xanh (bài học C8/C16) |
+| **2** | **`Customer`** (bảng `CusCustomers`) | `Name` · `Email`/`Phone` (**PII**, có kiểm định dạng + chuẩn hoá) · `IdentityUserId` (**`null` = khách vãng lai**, `ADR-03`) · `Status` · `CustomerGroupId` · **LTV cột rời** (`ADR-10`) · **`IdempotencyKey`** (`ADR-05`) |
+| **3** | **`CustomerGroup`** (bảng `CusGroups`) | `ADR-09`: nhóm khách là **DỮ LIỆU** (đầu vào bảng giá `PRC-001` Q5), **không** hard-code `enum` |
+| **4** | **Máy trạng thái NÉM LỖI** (`ADR-04`) | `KichHoat` **không** ra được khỏi `Blocked` · `Chan`/`MoChan` **BẮT BUỘC có lý do** · `MoChan` khách không bị chặn ⇒ **NÉM** |
+| **5** | **Nâng cấp khách vãng lai** (`ADR-07`) | **một tài khoản ⇒ tối đa MỘT khách**; đã có chủ ⇒ NÉM · đang bị chặn ⇒ NÉM · gọi lại **đúng** tài khoản đó ⇒ **idempotent** |
+| **6** | **`PiiMasker`** (`ADR-11`) | Che email/SĐT **giữ đủ để đối chiếu, không đủ để dùng**; có `CheTrongChuoi` cho payload thô |
+| **7** | **`ICustomerDirectory`** (hợp đồng đọc cho module khác — `ADR-12`) | CHỈ ĐỌC. Hiện thực ở lớp nội bộ **`CustomerDirectory`** (`ITransientDependency`, **không** phải application service) |
+| **8** | **3 unique index `NULLS NOT DISTINCT`** (SQL thô) | nhóm khách · **một-tài-khoản-một-khách** · **khoá idempotency** — vì `TenantId` có thể `NULL` |
+| **9** | Mã lỗi riêng `eCommerce:Customers:0001…0008` · permission `eCommerce.Customers`(`.Manage`) | 8 mã, mỗi mã một **hành động khác nhau** cho CSKH |
+| **10** | API **5 endpoint** (đo bằng swagger thật) | `danh-sach` (**GET**) · `tao-khach` · `nang-cap-khach-vang-lai/{id}` · `chan-khach/{id}` · `mo-chan-khach/{id}` |
+
+### 16.2 🚨 Bài học ĐO ĐƯỢC: **hợp đồng nội bộ KHÔNG được để ABP sinh thành endpoint**
+
+Phiên bản đầu: `CustomerAppService` **hiện thực luôn** `ICustomerDirectory` (mà interface đó kế thừa
+`IApplicationService`). **Đo bằng `tools/route-check.ps1`** ⇒ swagger có:
+
+```
+/api/app/customer/tim-theo-id/{customerId}               POST   ← SAI ngữ nghĩa
+/api/app/customer/tim-theo-tai-khoan/{identityUserId}    POST   ← SAI ngữ nghĩa
+/api/app/customer/cho-phep-giao-dich/{customerId}        POST   ← SAI ngữ nghĩa
+```
+
+⇒ Ba method **CHỈ ĐỌC** bị conventional controller sinh thành **`POST`** (mặc định của nó).
+📌 **Vì sao đây là lỗi thật, không phải "chuyện hình thức":** `POST` bị proxy/CDN coi là **không idempotent**
+⇒ **không cache**, công cụ vận hành **không dám gọi lại**, và không ai đọc swagger hiểu được đây là tra cứu.
+🔒 **Cách sửa (đã áp):** bỏ `IApplicationService` khỏi `ICustomerDirectory`; lớp hiện thực là
+`CustomerDirectory` (`ITransientDependency`) ⇒ **không** sinh endpoint. `ADR-12` vốn nói hợp đồng này được gọi
+**trong cùng tiến trình**, **không** qua HTTP ⇒ đây mới là **đúng ý định thiết kế**.
+📌 **Bài học chung:** *"một lớp phục vụ hai vai trò"* (vừa là API, vừa là hợp đồng nội bộ) **lộ ra ngay**
+ở phép đo route đầu tiên — nếu chỉ đọc mã thì **không thấy** gì bất thường.
+
+### 16.3 ✅ Kiểm chứng
+
+| Nhóm | Số ca | Nội dung |
+|---|---|---|
+| Trạng thái | 8 | `Inactive` **vẫn dùng được** · `KichHoat` idempotent · `Chan` cần lý do · **`KichHoat` KHÔNG ra được khỏi `Blocked`** · `MoChan` khách không bị chặn ⇒ NÉM · `MoChan` cần lý do |
+| Nâng cấp vãng lai (`ADR-07`) | 5 | được + tự `Active` · **gọi lại cùng tài khoản ⇒ idempotent** · **đã có chủ khác ⇒ NÉM** · **đang bị chặn ⇒ NÉM** · tài khoản rỗng ⇒ NÉM |
+| Liên hệ / PII | 10 | email sai (4 dạng) · SĐT sai (3 dạng) · email **chuẩn hoá chữ thường** · không có liên hệ ⇒ vẫn tạo được · tên rỗng ⇒ NÉM |
+| Khoá idempotency | 1 | **không ghi đè** khoá đã có |
+| 🚨 **`ADR-01` (reflection)** | 1 | `Customer` **KHÔNG** có cột `Street`/`Ward`/`Province`/`Address`… ⇒ chặn "hai mô hình địa chỉ" tái phát (`TC-14`) |
+| `PiiMasker` | 13 | che email/SĐT đúng dạng · rỗng ⇒ `(không có)` · **không có `@` ⇒ KHÔNG in nguyên văn** · che trong payload · **idempotent** |
+| Cơ chế CI khác | — | `RangBuocDbChuaAnhXaTests` **chặn được** 3 ràng buộc mới chưa ánh xạ (lần thứ **3** trong lượt này) · `DbSetRegistrationTests` (2 `DbSet` mới) · `BatBienPhanQuyenTests` (permission khai **cả hai nơi**) |
+| **Tổng** | **+43** | `889 unit` · `38 integration` · build **0 lỗi/0 cảnh báo** · **46** index `NULLS NOT DISTINCT` (**43 → 46**) |
+
+**DB THẬT sau migration `20261016081435_Cus001_Customers_CustomerGroups`:**
+
+| Kiểm | Kết quả **đo được** |
+|---|---|
+| `__EFMigrationsHistory` | có dòng migration này |
+| Bảng | `CusCustomers` · `CusGroups` |
+| Index `NULLS NOT DISTINCT` toàn DB | **46** (trước: 43) |
+| Permission seed | `AbpPermissionGrants` có `eCommerce.Customers` + `eCommerce.Customers.Manage` |
+| Route thật (swagger) | **5** endpoint, **không** còn `POST`-cho-method-đọc |
+
+### 16.4 ⏳ NỢ (KHÔNG phải tính năng đã có)
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+| **1** | 🚨 **SỔ ĐỊA CHỈ CHƯA LÀM** (`CustomerAddressLink` + `AddressType` + cờ mặc định) | **BỊ CHẶN CÓ THẬT**: `Address` **chưa tồn tại** trong `AddressHub`. Bất biến *"tối đa MỘT địa chỉ mặc định cho mỗi (khách, loại)"* ở DB **chưa** viết được (partial unique index cần bảng đích tồn tại) |
+| **2** | **Chưa có `CustomerGroup` API/seed** | Entity + mapping + ràng buộc DB **đã có**; **chưa** có endpoint CRUD và **chưa** seed nhóm mặc định (`RETAIL`/`WHOLESALE`/`VIP`) ⇒ hiện phải ghi DB tay |
+| **3** | **Chưa kiểm chứng HTTP** cho lát cắt này | Đã đo **route thật**; **chưa** gọi API thật (tạo/claim/chặn) và **chưa** đọc lại DB. ⚠️ Ghi rõ để **không** ai đọc *"889 test xanh"* thành *"API khách đã chạy"* |
+| **4** | **Chưa nối đường bán hàng với `ChoPhepGiaoDichAsync`** | `SAL-002`/`SAL-001` **chưa** gọi ⇒ khách `Blocked` **vẫn đặt được hàng** ở đường thật. 📌 Đây là **cổng nghiệp vụ còn trống** (rủi ro: khách chây nợ vẫn mua) |
+| **5** | **Chưa có xuất dữ liệu cá nhân** (quyền *"yêu cầu cung cấp"*) và **chưa có đường xoá mềm có kiểm** | Luật 91/2025/QH15 đã nêu ở §0; hiện mới có `IsDeleted` (hạ tầng `FullAudited`) |
+| **6** | **Chưa có `TenantId` filter test** + chưa có ETO `CustomerChangedEto` | Module khác (`LOY-001` D8) sẽ cần **ETO**; nay chưa phát sự kiện nào |
+| **7** | `GetDanhSachAsync` **chưa phân trang** (có **trần** `toiDa ≤ 500`) | Cần `PagedResultDto` trước khi có UI thật |
+
+### 16.5 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.2 | 16/10/2026 | *(agent, session GĐ1)* | **§16 — LÁT CẮT 1**: **module `Customers` MỚI** (4 project) · `Customer` + `CustomerGroup` · **máy trạng thái NÉM LỖI** (`ADR-04`) · **nâng cấp vãng lai** (`ADR-07`, một-tài-khoản-một-khách) · **`PiiMasker`** (`ADR-11`) · **`ICustomerDirectory`** + lớp nội bộ `CustomerDirectory` (`ADR-12`) · **3 unique index `NULLS NOT DISTINCT`** (nhóm · tài khoản · idempotency) · mã lỗi `0001…0008` · permission `eCommerce.Customers` · **+43 unit test** (889 tổng). Ghi **§16.2** (hợp đồng nội bộ **không** được để ABP sinh endpoint — đo được `POST` cho method đọc) · **§16.4** (nợ: **sổ địa chỉ BỊ CHẶN** vì `Address` chưa tồn tại · chưa kiểm chứng HTTP · **chưa nối đường bán hàng**) |

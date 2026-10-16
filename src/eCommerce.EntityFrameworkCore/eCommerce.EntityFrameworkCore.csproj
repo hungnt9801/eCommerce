@@ -15,6 +15,8 @@
     <ProjectReference Include="..\..\modules\EInvoice\eCommerce.EInvoice.EntityFrameworkCore\eCommerce.EInvoice.EntityFrameworkCore.csproj" />
     <ProjectReference Include="..\..\modules\Signing\eCommerce.Signing.EntityFrameworkCore\eCommerce.Signing.EntityFrameworkCore.csproj" />
     <ProjectReference Include="..\..\modules\Pricing\eCommerce.Pricing.EntityFrameworkCore\eCommerce.Pricing.EntityFrameworkCore.csproj" />
+    <!-- `CUS-001` — hồ sơ khách + nhóm khách (module tự cung cấp hàm mapping `ConfigureCustomers`). -->
+    <ProjectReference Include="..\..\modules\Customers\eCommerce.Customers.EntityFrameworkCore\eCommerce.Customers.EntityFrameworkCore.csproj" />
   </ItemGroup>
 
   <ItemGroup>

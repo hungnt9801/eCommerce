@@ -98,6 +98,12 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
     /// <summary>`REC-001` — các cặp `(kho, SKU)` lệch của **một** lượt quét.</summary>
     public DbSet<Inventory.ReconRunMismatch> ReconRunMismatches { get; set; } = default!;
 
+    // ── Customers (`CUS-001`) ───────────────────────────────────────────────────────────────────
+    // 🚨 NHỚ: thiếu `DbSet` ⇒ ABP **KHÔNG** đăng ký `IRepository<T>` ⇒ DI nổ (**HTTP 500**) dù build/migration
+    // đều xanh — xem `cat-002` §17.3. Lưới an toàn CI: `DbSetRegistrationTests`.
+    public DbSet<Customers.Customer> Customers { get; set; } = default!;
+    public DbSet<Customers.CustomerGroup> CustomerGroups { get; set; } = default!;
+
     // ---- Orders ----
     public DbSet<Orders.Order> Orders { get; set; } = default!;
     public DbSet<Orders.OrderLine> OrderLines { get; set; } = default!;
@@ -169,6 +175,10 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
 
         // Module Pricing (`PRC-001`/`PRC-002`) — mapping nằm trong module, gọi từ DbContext hợp nhất.
         Pricing.EntityFrameworkCore.PricingDbContextModelCreatingExtensions.ConfigurePricing(builder);
+
+        // `CUS-001` — hồ sơ khách + nhóm khách. 🔒 Hai bất biến DB ở đây: `IdempotencyKey` duy nhất theo tenant
+        // và **một tài khoản ↔ tối đa một khách** (`ADR-07`) — cả hai cần SQL thô `NULLS NOT DISTINCT` + bộ lọc.
+        global::eCommerce.Customers.EntityFrameworkCore.CustomersDbContextModelCreatingExtensions.ConfigureCustomers(builder);
 
         // Module ABP (thêm ở Phase 0) tự cung cấp cấu hình model của mình.
         // Mỗi hàm ConfigureXxx() đến từ package Volo.Abp.Xxx.EntityFrameworkCore tương ứng.

@@ -105,6 +105,22 @@ public static class ViPhamRangBuocDb
             new("eCommerce:Catalog:0026",
                 "Slug này ĐÃ được sản phẩm khác dùng ⇒ URL công khai sẽ trùng. Chọn slug khác.", true),
 
+        // ── KHÁCH HÀNG (`CUS-001`, 16/10/2026) ──────────────────────────────────────────────────
+        // 📌 Cả ba ràng buộc dưới đây CHẶN MỘT HÀNH VI HỢP LỆ VỀ NGHIỆP VỤ (retry webhook / bấm hai lần /
+        // hai request đồng thời) ⇒ client **cần mã** để phân biệt *"đã có rồi"* với *"hệ thống hỏng"*.
+        // Trước đây là `23505` ⇒ **HTTP 500** ⇒ consumer **retry vô hạn** (đúng lý do Phụ lục B tồn tại).
+        // ⚠️ Cả ba đều là ca NẶNG của lỗi C4/F1: `TenantId` có thể `NULL` ⇒ thiếu `NULLS NOT DISTINCT`
+        // là index **mất tác dụng im lặng** (xem chú thích migration `Cus001_Customers_CustomerGroups`).
+        ["IX_CusCustomers_TenantId_IdempotencyKey"] =
+            new("eCommerce:Customers:0003",
+                "Lần gọi này ĐÃ tạo khách rồi (khoá idempotency trùng) ⇒ dùng lại hồ sơ cũ, KHÔNG tạo mới.", true),
+        ["IX_CusCustomers_TenantId_IdentityUserId"] =
+            new("eCommerce:Customers:0004",
+                "Tài khoản này ĐÃ gắn với một hồ sơ khách khác ⇒ một tài khoản chỉ được một hồ sơ (ADR-07).", true),
+        ["IX_CusGroups_TenantId_Code"] =
+            new("eCommerce:Customers:0008",
+                "Mã nhóm khách này ĐÃ tồn tại trong tenant ⇒ chọn mã khác (KHÔNG tạo hai nhóm cùng mã).", true),
+
         // ── ĐỐI SOÁT (`REC-001`) ────────────────────────────────────────────────────────────────
         // 📌 Ràng buộc này CHẶN MỘT HÀNH VI HỢP LỆ VỀ NGHIỆP VỤ: job chạy lại / hai instance cùng quét
         // (khoá phân tán hết hạn) / đường ghi tay đều có thể chốt **cùng một cặp `(kho, SKU)`** trong một lượt.

@@ -2033,3 +2033,72 @@ VALUES ('20261016070004_Cat003_ProductSlug_Unique', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE TABLE "CusCustomers" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "Name" character varying(256) NOT NULL,
+    "Email" character varying(256),
+    "Phone" character varying(32),
+    "IdentityUserId" uuid,
+    "Status" integer NOT NULL,
+    "CustomerGroupId" uuid,
+    "LifetimeValueAmount" numeric(18,2),
+    "LifetimeValueCurrency" character varying(3),
+    "IdempotencyKey" character varying(128),
+    "Note" character varying(1024),
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_CusCustomers" PRIMARY KEY ("Id")
+);
+
+CREATE TABLE "CusGroups" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "Code" character varying(32) NOT NULL,
+    "Name" character varying(128) NOT NULL,
+    "Description" character varying(512),
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_CusGroups" PRIMARY KEY ("Id")
+);
+
+CREATE UNIQUE INDEX "IX_CusCustomers_TenantId_IdempotencyKey" ON "CusCustomers" ("TenantId", "IdempotencyKey") WHERE "IdempotencyKey" IS NOT NULL;
+
+CREATE UNIQUE INDEX "IX_CusCustomers_TenantId_IdentityUserId" ON "CusCustomers" ("TenantId", "IdentityUserId") WHERE "IdentityUserId" IS NOT NULL;
+
+CREATE INDEX "IX_CusCustomers_TenantId_Status" ON "CusCustomers" ("TenantId", "Status");
+
+CREATE UNIQUE INDEX "IX_CusGroups_TenantId_Code" ON "CusGroups" ("TenantId", "Code");
+
+DROP INDEX "IX_CusGroups_TenantId_Code";
+
+CREATE UNIQUE INDEX "IX_CusGroups_TenantId_Code" ON "CusGroups" ("TenantId", "Code") NULLS NOT DISTINCT;
+
+DROP INDEX "IX_CusCustomers_TenantId_IdentityUserId";
+
+CREATE UNIQUE INDEX "IX_CusCustomers_TenantId_IdentityUserId" ON "CusCustomers" ("TenantId", "IdentityUserId") NULLS NOT DISTINCT WHERE "IdentityUserId" IS NOT NULL;
+
+DROP INDEX "IX_CusCustomers_TenantId_IdempotencyKey";
+
+CREATE UNIQUE INDEX "IX_CusCustomers_TenantId_IdempotencyKey" ON "CusCustomers" ("TenantId", "IdempotencyKey") NULLS NOT DISTINCT WHERE "IdempotencyKey" IS NOT NULL;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261016081435_Cus001_Customers_CustomerGroups', '10.0.11');
+
+COMMIT;
+
