@@ -33,7 +33,9 @@ public class StockReservationAppService : ApplicationService, IStockReservationA
         var ttl = input.TtlPhut is { } phut ? TimeSpan.FromMinutes(phut) : (TimeSpan?)null;
 
         var gc = await _giuChoService.GiuChoAsync(
-            input.WarehouseId, input.Sku, input.Quantity, at, ttl, input.ReferenceType, input.ReferenceId);
+            input.WarehouseId, input.Sku, input.Quantity, at, ttl, input.ReferenceType, input.ReferenceId,
+            // 🚨 `INV-003`: chuyển **kênh** xuống tầng domain để **áp + ghi log hạn mức theo kênh** (§94).
+            input.ChannelCode);
 
         return ToDto(gc);
     }

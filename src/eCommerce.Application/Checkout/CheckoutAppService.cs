@@ -110,6 +110,9 @@ public class CheckoutAppService : ApplicationService, ICheckoutAppService
                 TtlPhut = input.TtlPhut,
                 ReferenceType = nameof(Contracts.Checkout.CheckoutInput),
                 ReferenceId = thamChieu,
+                // 🚨 `INV-003`: kênh của checkout được chuyển xuống `StockReservationService` để **áp hạn mức theo kênh**
+                // (chính sách "cho phép chọn": `Inv.ChannelLimit.*`, `web-001` §93–§94).
+                ChannelCode = input.ChannelCode,
                 At = at
             });
 

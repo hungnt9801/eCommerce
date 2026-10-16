@@ -80,4 +80,14 @@ public static class InventoryErrorCodes
     /// </summary>
     public const string SkuKhongThuocDon = Nhom + "0041";
 
+    /// <summary>
+    /// 🚨 **VƯỢT HẠN MỨC THEO KÊNH** (`INV-003` — phần **cưỡng chế**).
+    /// 📌 **VÌ SAO MÃ RIÊNG (không mượn `0001`):** ``0001`` nghĩa *"kho không đủ hàng"* ⇒ client sẽ hiển thị
+    /// *"hết hàng, chờ nhập"* — trong khi **tồn kho còn thừa**: vấn đề là **chính sách phân bổ của kênh**
+    /// (đúng họ lỗi đã trả giá ở ``TraVuotSoDaMua`` = ``0040``: **mã đúng kỹ thuật nhưng sai nghiệp vụ**).
+    /// 🔒 Đây là lỗi **fail-closed** theo mặc định (``Inv.ChannelLimit.Action = Block``) — đổi sang ``Warn``
+    /// thì **KHÔNG** ném mã này mà chỉ **ghi cảnh báo**.
+    /// </summary>
+    public const string VuotHanMucKenh = Nhom + "0042";
+
 }

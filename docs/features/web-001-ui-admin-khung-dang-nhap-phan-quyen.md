@@ -2995,3 +2995,63 @@ còn ghi thẳng DB thì **không**. Sau khi `DEL` 3 key ⇒ chính sách **đ�
 |---|---|---|---|
 | v1.0-s | 16/10/2026 | *(agent, session GĐ1)* | ✅ **CHÍNH SÁCH CHO PHÉP CHỌN** cho `INV-003` + `REC-001`: 7 setting (ABP Settings, **không migration**), 4 enum + 6 hàm đọc **thuần**, provider khai báo mặc định **an toàn**, job đối soát **đọc + log** chính sách, **34 unit test**. **Kiểm chứng**: **34/34** test đạt; chạy thật ra **`Percent(0.5) · Warn`**; đặt `Absolute`/`5`/`RequireConfirmation` + **xoá cache** ⇒ ra **`Absolute(5) · RequireConfirmation`**. 🐛 **Hai phát hiện thật:** (a) `NumberStyles.Number` khiến `"0,5"` thành **`5`** (**sai 10 lần**) — test bắt được, đã siết; (b) ghi thẳng `AbpSettings` **không** có tác dụng cho tới khi xoá **cache Redis** của ABP |
 
+
+---
+
+## 94. ✅ **CƯỠNG CHẾ HẠN MỨC THEO KÊNH Ở ĐƯỜNG GIỮ CHỖ (`INV-003`) — ĐÃ KIỂM CHỨNG** (16/10/2026) — *nối tiếp §93*
+
+### 94.1 Đã làm — **chính sách "cho phép chọn" nay CÓ TÁC DỤNG**
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| 1 | `eCommerce.Settings.HanMucKenh` | **hàm THUẦN**: `TinhHanMuc` · `VuotHanMuc` · `NenChan` · **`HanMucVoNghia`** |
+| 2 | `StockReservationService.GiuChoAsync` | nhận thêm **`channelCode`**; đọc `Inv.ChannelLimit.*`; áp hạn mức **sau khi đã có khoá + đã đọc tồn**, **TRƯỚC** khi tăng `Reserved` |
+| 3 | `InventoryErrorCodes.VuotHanMucKenh` | mã mới **`eCommerce:Inventory:0042`** |
+| 4 | `GiuChoInput.ChannelCode` + `StockReservationAppService` + `CheckoutAppService` | **nối kênh** từ checkout xuống tầng domain |
+| 5 | `HanMucKenhTests` | **18 test** mới (tổng khu `Settings`: **52**) |
+
+🔒 **Công thức (có chủ đích):**
+• `Absolute` ⇒ hạn mức = `giaTri` (làm tròn **xuống**) · `Percent` ⇒ `floor(tồnKhảDụng × giaTri / 100)`
+— **làm tròn XUỐNG** vì làm tròn **lên** sẽ cho giữ **nhiều hơn** tỷ lệ đã chọn (phá chính chính sách).
+• `giaTri <= 0` ⇒ hạn mức `0` = **TẮT** ⇒ **không bao giờ chặn** (đường thoát duy nhất, để không chặn hết hàng).
+• **`Block` mới chặn**; `Warn` **không** chặn nhưng **ghi cảnh báo kèm số liệu**.
+
+📌 **Mã lỗi riêng `0042` là cố ý:** mượn `0001` (*"không đủ tồn"*) ⇒ client hiển thị *"hết hàng, chờ nhập"* trong khi **kho còn thừa** ⇒
+**chỉ dẫn sai** cho CSKH — đúng họ lỗi đã trả giá ở `0040` (`TraVuotSoDaMua`).
+
+### 94.2 ✅ BẰNG CHỨNG (probe `verify-hanmuc.ps1`, **API thuần**, chạy trọn `exit 0`)
+
+| # | Ca | Kỳ vọng | Kết quả |
+|---|---|---|---|
+| **A** | chính sách **TẮT** (mặc định `DefaultValue = 0`), đặt **6** | `200` (không chặn oan) | **`200`** ✅ · mã lỗi **rỗng** ✅ |
+| **B** | `Absolute=4` · `Action=Block`, đặt **6** | `403` + mã `0042`, **không** tạo giữ chỗ | **`403`** ✅ · **`eCommerce:Inventory:0042`** ✅ · **0** lượt giữ chỗ ✅ |
+| **C** | `Absolute=4` · `Block`, đặt **đúng 4** (**BIÊN**) | `200` (bằng hạn mức ⇒ cho qua) | **`200`** ✅ |
+| **D** | `Action=Warn`, đặt **6** | `200` + **cảnh báo trong log** | **`200`** ✅ · mã lỗi **rỗng** ✅ · **cảnh báo: `True`** ✅ |
+| **E** | `fail:` trong log Host · dọn dẹp | `0` · sạch | **`0`** ✅ · `setting=0 kho=0 ton=0 gc=0 baoMat=true` ✅ |
+
+📌 **Vì sao (A) và (C) quan trọng ngang (B):** một hạn mức **chặn nhầm** còn tệ hơn **không có** hạn mức —
+(A) chứng minh **tắt là tắt thật**, (C) chứng minh **biên đúng** (nếu dùng `>=` thay `>` thì đơn **đúng hạn mức** bị chặn oan).
+📌 **(D) chứng minh lựa chọn `Warn` có hiệu lực thật** — không chỉ đổi cờ trong DB.
+
+### 94.3 🐛 Hai lỗi **của chính probe** (không phải sản phẩm) — và bài học
+
+| # | Lỗi | Bài học |
+|---|---|---|
+| 1 | **(D) ban đầu trả `403`** ⇒ tôi suýt kết luận *"`Warn` không hoạt động"*. Sự thật: các ca (A) 6 + (C) 4 đã **giữ hết 10** đơn vị ⇒ (D) bị chặn vì **KHÔNG ĐỦ TỒN** (mã `0001`), **không** phải hạn mức | **Đo mã lỗi, không chỉ HTTP status.** Cùng `403` nhưng **hai nguyên nhân khác nhau** ⇒ chỉ `code` phân biệt được. Và **gieo dư tồn** để biến cần đo là **biến duy nhất** (bài học #13) |
+| 2 | **`canhBao=False`** dù log **có** dòng cảnh báo: mẫu grep `INV-003, Warn` không khớp vì log chứa `` `INV-003`, Warn `` (**có backtick**) | **Họ lỗi B3 (lần 6):** phép kiểm văn bản phải khớp **đúng dạng thật**. Đổi sang mẫu ASCII chắc chắn (`Inv.ChannelLimit.Action = Warn`) |
+
+### 94.4 ⚠️ NỢ GHI RÕ (KHÔNG đưa vào phép kiểm §94.2)
+
+| # | Việc | Vì sao |
+|---|---|---|
+| 1 | **Bảng hạn mức RIÊNG cho từng kênh** + migration | v1 dùng **một** giá trị chung (`DefaultValue`); *"theo kênh"* hiện chỉ đúng ở chỗ **kênh được truyền + ghi log**, **chưa** có hạn mức khác nhau cho từng kênh |
+| 2 | **`Percent` theo TỔNG của kênh** | hiện tính trên **tồn khả dụng của từng `(kho, SKU)`** — tồn kho **chưa** mô hình hoá "theo kênh" |
+| 3 | **`PhamVi` (`Channel` vs `ChannelWarehouse`)** | đã **khai báo** nhưng **chưa** làm khác nhau ⇒ *"có ô chọn mà chọn không đổi gì"* — cần làm hoặc **bỏ** |
+| 4 | **Đường GHI chuẩn cho admin** (SettingManagement HTTP API / `ISettingManager`) | như §93.5 #1 — hiện phải sửa DB **và xoá cache tay** (đã dùng trong probe) |
+
+### 94.5 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.0-t | 16/10/2026 | *(agent, session GĐ1)* | ✅ **CƯỠNG CHẾ `INV-003`**: `HanMucKenh` (hàm thuần, **làm tròn xuống**, `0 = TẮT`, `Block` mới chặn) · áp trong `StockReservationService` **sau khoá + đọc tồn, trước `Reserved`** · mã lỗi mới **`eCommerce:Inventory:0042`** · nối `channelCode` từ checkout · **18 test** mới (**52** ở khu `Settings`). **Kiểm chứng API thuần**: (A) tắt ⇒ **200** · (B) `Absolute=4`+`Block` đặt 6 ⇒ **403 + `0042` + 0 giữ chỗ** · (C) **biên** đặt đúng 4 ⇒ **200** · (D) `Warn` ⇒ **200 + có cảnh báo log**; `fail: 0`; môi trường sạch. 🐛 Hai lỗi probe (§94.3): *không đọc mã lỗi* (nhầm `0001` là `0042`) và *mẫu grep sai vì backtick* |
+

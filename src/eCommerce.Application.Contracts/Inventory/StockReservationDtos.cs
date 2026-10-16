@@ -40,6 +40,12 @@ public class GiuChoInput
     [StringLength(128)]
     public string? ReferenceId { get; set; }
 
+    /// <summary>🚨 **KÊNH** (`INV-003`) — dùng để **áp hạn mức phân bổ theo kênh** (`Inv.ChannelLimit.*`).
+    /// 📌 **Tuỳ chọn**: để trống thì hạn mức **vẫn** áp theo **giá trị dùng chung** (`Inv.ChannelLimit.DefaultValue`)
+    /// và log ghi `(không có)` — **không** im lặng bỏ qua chính sách.</summary>
+    [StringLength(64)]
+    public string? ChannelCode { get; set; }
+
     public DateTime? At { get; set; }
 }
 
