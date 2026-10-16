@@ -235,3 +235,69 @@ public class DongDuLieuCaNhanDto
     /// </summary>
     public bool LaDuLieuCaNhan { get; set; }
 }
+
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════
+// 🚨 **DOC NHAT KY KIEM TOAN XUAT DU LIEU CA NHAN** (`CUS-001` §23).
+//
+// 🔑 **VI SAO CAN DTO NAY (khong tra thang entity):**
+//
+// Bang `CusDataExportLogs` la **bang chung** — 🔒 nhung mot bang chung **khong ai doc duoc** thi **khong phuc
+// vu** cau hoi nao. 📌 O §22 toi da ghi no: *"chua co UI xem nhat ky ⇒ nguoi kiem toan phai TRUY VAN SQL"*.
+//
+// ⚠️ **VA VI SAO KHONG TRA ENTITY:** entity co `TenantId`, `CreatorId`, va cac chi tiet **noi bo** khong giup
+// nguoi doc. 🔑 Mot DTO **chi co thu nguoi kiem toan can** thi man hinh **khong bi roi** — 📌 va do cung la
+// cach **khong vo tinh** lo cau truc noi bo ra ngoai.
+// ══════════════════════════════════════════════════════════════════════════════════════════════════
+
+/// <summary>
+/// 🚨 **MOT DONG NHAT KY KIEM TOAN** — tra loi *"**AI** da xuat du lieu cua toi, **KHI NAO**"*.
+/// </summary>
+public class NhatKyXuatDuLieuDto
+{
+    public Guid Id { get; set; }
+
+    /// <summary>Khach **bi xuat** — 🔑 cot quan trong nhat khi tra theo mot nguoi cu the.</summary>
+    public Guid CustomerId { get; set; }
+
+    /// <summary>
+    /// Ten khach — ⚠️ **CO THE NULL**: 🔒 nhat ky phai **song sot** ke ca khi ho so khach bi xoa
+    /// (📌 do la ly do `CustomerId` **khong** dat FK cung). 🔑 Khi null thi man hinh phai **noi ro**
+    /// *"(ho so da bi xoa)"* — ⚠️ chu **khong** duoc de trong (de trong trong nhu **loi hien thi**).
+    /// </summary>
+    public string? TenKhach { get; set; }
+
+    /// <summary>🔑 **AI** da xuat.</summary>
+    public string NguoiXuat { get; set; } = default!;
+
+    /// <summary>🔑 **KHI NAO** (UTC).</summary>
+    public DateTime XuatLucUtc { get; set; }
+
+    public int SoDongHoSo { get; set; }
+
+    public int SoDonHang { get; set; }
+
+    /// <summary>⚠️ Ban xuat co **bi cat bot** khong (nhieu don hon tran).</summary>
+    public bool DonHangBiCat { get; set; }
+
+    public string? LyDo { get; set; }
+}
+
+/// <summary>
+/// **KET QUA TRA CUU NHAT KY** — 🔑 **gom ca TONG SO** de nguoi doc biet *"dang xem mot phan hay tat ca"*.
+/// </summary>
+public class KetQuaNhatKyXuatDuLieuDto
+{
+    /// <summary>Cac dong nhat ky (moi nhat truoc).</summary>
+    public List<NhatKyXuatDuLieuDto> CacDong { get; set; } = [];
+
+    /// <summary>
+    /// 🔑 **TONG SO dong khop bo loc** (ke ca khi `CacDong` bi cat theo tran).
+    /// ⚠️ **BAT BUOC** — 📌 cung ly do nhu `DonHangBiCat` o §21: 🔒 mot man hinh **im lang cat bot** se khien
+    /// nguoi kiem toan tin rang *"chi co bay nhieu lan xuat"*, va 🔑 do la mot **ket luan sai ve bang chung**.
+    /// </summary>
+    public int TongSo { get; set; }
+
+    /// <summary>⚠️ `true` = co **nhieu hon** tran ⇒ man hinh phai **noi ro** la dang xem mot phan.</summary>
+    public bool BiCat { get; set; }
+}

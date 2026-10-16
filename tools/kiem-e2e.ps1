@@ -383,6 +383,48 @@ select "NguoiXuat" || '|' || "SoDongHoSo"::text || '|' || "SoDonHang"::text || '
             Kq 'D9e 🚨 nhat ky KHONG chua PII (chi so lieu)' `
                 (($nhatKy -notmatch 'k97e2e@') -and ($nhatKy -notmatch '0900000001') -and ($nhatKy -notmatch 'K97E2E')) `
                 'khong co email/sdt/ten trong nhat ky'
+
+            # ══════════════════════════════════════════════════════════════════════════════════════
+            # 🚨 **D10 — MAN HINH NHAT KY KIEM TOAN** (`/KhachHang/NhatKy`, `CUS-001` §23).
+            # 🔑 **VI SAO CA NAY CAN THIET:** o §22 bang nhat ky **da co**, nhung 🔒 mot bang chung **khong ai
+            # doc duoc** thi **khong phuc vu** cau hoi nao. 📌 Ca nay do **HTML THAT** cua man hinh do.
+            # ⚠️ Va no do **2 dong** (khong phai 1): 🔑 voi 1 dong thi **khong phan biet duoc** *"man hinh
+            # hien dung"* voi *"man hinh chi hien dong dau"* — 📌 mot loi rat de mac.
+            # ══════════════════════════════════════════════════════════════════════════════════════
+            # 📌 Gieo THEM 1 dong nhat ky **co so lieu KHAC HAN** (17 dong ho so) ⇒ 🔑 de kiem duoc rang man
+            # hinh hien **dung tung dong**, khong phai lap lai mot dong.
+            TiemVaoDb -Sql @'
+insert into "CusDataExportLogs" ("Id","TenantId","CustomerId","NguoiXuat","XuatLucUtc","SoDongHoSo","SoDonHang","DonHangBiCat","LyDo","CreationTime","CreatorId")
+values ('e0000000-0000-0000-0000-0000000000e4',null,'e0000000-0000-0000-0000-0000000000e1','K97E2E-nhanvien-b','2020-01-02 03:04:05+00',17,0,false,'K97E2E ly do kiem thu',now(),null);
+'@ -KiemSql @'
+select count(*)::text from "CusDataExportLogs" where "Id" = 'e0000000-0000-0000-0000-0000000000e4';
+'@ -SoDongMongDoi 1 | Out-Null
+
+            $trangNk = TaiTrang -DuongDan "/KhachHang/NhatKy?customerId=$idKhach" -TepLuu (Join-Path $thuMucTam 'nhatky.html')
+            $htmlNk = GiaiMaHtml $trangNk.Html
+
+            Kq 'D10a GET /KhachHang/NhatKy tra 200' ($trangNk.Ma -eq '200') ("HTTP " + $trangNk.Ma)
+
+            # 🔑 **NEO MAN HINH** — 📌 chung minh day dung la trang nhat ky (khong phai trang khac tra 200).
+            Kq 'D10b man hinh co NEO [NHATKYXUATDULIEU-MAN-HINH]' ($htmlNk -match '\[NHATKYXUATDULIEU-MAN-HINH\]') 'neo ASCII'
+
+            # 🚨 **NOI RO QUY MO** — 🔑 quy tac (1) cua man hinh: mot bang **im lang cat bot** bien bang chung
+            # thanh **ket luan sai**. 📌 Phai thay **CA HAI** con so (hien thi / tong).
+            Kq 'D10c man hinh NOI RO "hien thi / tong" (chong cat bot im lang)' `
+                (($htmlNk -match 'dòng đang hiển thị trên tổng') -and ($htmlNk -match '>2<')) `
+                'co cau noi ro quy mo + tong = 2'
+
+            Kq 'D10d man hinh hien CA HAI dong (nguoi xuat a VA b)' `
+                (($htmlNk -match 'K97E2E-nhanvien-b') -and ($htmlNk -match 'admin')) `
+                'hai dong voi hai nguoi xuat khac nhau'
+
+            # ⚠️ Dong cu (2020) co `SoDongHoSo = 17` ⇒ 🔑 phai hien **dung 17**, khong phai lap lai so cua dong kia.
+            Kq 'D10e man hinh hien DUNG so lieu tung dong (17)' ($htmlNk -match '>17<') 'SoDongHoSo = 17'
+
+            # ✅ **KHONG bi cat** (2 < tran 100) ⇒ 📌 phai noi *"dang hien thi TAT CA"*, ⚠️ khong duoc bao dong gia.
+            Kq 'D10f KHONG bi cat thi noi "tat ca" (khong bao dong gia)' `
+                (($htmlNk -match 'Đang hiển thị <strong>tất cả') -and ($htmlNk -notmatch 'ĐÃ BỊ CẮT')) `
+                'khong bao dong gia'
         }
     }
 

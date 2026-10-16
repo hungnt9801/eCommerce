@@ -1462,3 +1462,102 @@ diện** của `IsDeleted`/`DeletionTime`/`DeleterId`. 🔑 Cách này không qu
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.3 | 17/10/2026 | *(agent, session GĐ1)* | **§22 — LÁT CẮT 6: NHẬT KÝ KIỂM TOÁN XUẤT DỮ LIỆU CÁ NHÂN** (đóng nợ §20.7 #4 và §21.6 #6): thêm **`CustomerDataExportLog`** (`CreationAuditedEntity`, **KHÔNG** soft-delete, **KHÔNG** aggregate, **KHÔNG** `ConcurrencyStamp`/`ExtraProperties`) + **`DbSet<CustomerDataExportLog>`** + mapping `CusDataExportLogs` + **2 index** tra cứu (theo **khách** và theo **thời gian**) + migration **`20261016204226_Cus001_NhatKyXuatDuLieuCaNhan`** + ghi nhật ký trong **UoW RIÊNG** (`requiresNew: true`) + **15 unit test** + **5 ca E2E**. 🔑 **VÌ SAO LOG KHÔNG ĐỦ:** câu hỏi luật là **AI** đã xuất dữ liệu của tôi, **KHI NÀO**, **BAO NHIÊU LẦN** — 🔒 log **không trả lời được** vì (a) **bị xoay vòng/hết hạn** (*"năm ngoái ai đã xuất dữ liệu của tôi"* là câu hỏi **có thật**), (b) **không TRA CỨU được** (phải grep tệp văn bản, 📌 và grep phụ thuộc **định dạng dòng log**), (c) **nằm NGOÀI giao dịch** (⚠️ một lần **THỬ xuất** thất bại cũng là sự kiện **cần vết**); ✅ bảng trả lời **cả ba bằng MỘT câu truy vấn**. ✅ **NĂM QUYẾT ĐỊNH:** ① **`CreationAuditedEntity`** — 🔒 **không soft-delete** (🚨 nhật ký **xóa được** thì **không còn là** nhật ký: người có quyền xóa sẽ **xóa vết của chính mình**), ➕ không aggregate, ➕ không `ConcurrencyStamp`/`ExtraProperties` (⚠️ chúng phục vụ **sửa đổi có kiểm soát**, 🔒 mà dòng **không bao giờ sửa** thì chúng **trống rỗng**); ② **KHÔNG unique index** (🔑 nhiều lần xuất cùng khách cùng giây là **hợp lệ**, và 📌 chính sự **lặp lại** mới cần **phát hiện**; ⚠️ unique index sẽ **chặn** lần thứ hai ⇒ **mất** dấu hiệu đáng ngờ nhất) ⇒ ✅ **hệ quả: NND vẫn = 48**; ③ **UoW RIÊNG** (`requiresNew: true`) — ⚠️ ghi chung UoW thì một lỗi ở bước sau **cuốn theo** cả nhật ký ⇒ **mất vết** đúng ở lần **đáng ngờ nhất**; 🔑 và nếu ghi nhật ký **thất bại** thì **KHÔNG** chặn nghiệp vụ (người dùng làm việc **hợp pháp**) nhưng phải **nói thật** (`LogError` + `[CUS-NHAT-KY-XUAT-LOI]`): 🔒 một vết **im lặng mất** tệ hơn một vết **không có**; ④ **bất biến ở ENTITY**: `CustomerId` rỗng ⇒ **NÉM**, `NguoiXuat` rỗng/khoảng trắng ⇒ **NÉM** (🔑 vết rỗng là vết **vô dụng**), số âm ⇒ **NÉM**; ⑤ **CẮT theo độ dài, KHÔNG NÉM** — 📌 nếu nhật ký **ném** vì một cái tên quá dài thì 🔑 **sự kiện xuất PII không được ghi** ⇒ 🔒 vết **bị cắt** vẫn **tốt hơn** không có. ➕ **Nhật ký KHÔNG chứa PII** (ghi **số liệu**, không ghi **nội dung**) — 📌 nếu chứa thì ta tạo **bản sao thứ hai** của dữ liệu cá nhân ở nơi **không ai kiểm soát** (`ADR-11`). ✅ **MIGRATION + SCHEMA THẬT:** `CusDataExportLogs` 11 cột + 2 index; đo được: **bảng có thật** · `has-pending-model-changes` = **không có thay đổi** · **NND = 48** · **36** migration. ✅ **KIỂM CHỨNG 15 UNIT TEST + 5 CA E2E:** **TC01** `CustomerId` rỗng ⇒ ném · **TC02** `NguoiXuat` `null`/`""`/`"   "` ⇒ ném · **TC03** số âm ⇒ ném · **TC04** **`0` HỢP LỆ** (⚠️ chặn `0` sẽ làm **không ghi được** nhật ký lần xuất **đầu tiên** — 📌 lần quan trọng nhất) · **TC05** tên dài ⇒ **cắt** · **TC06** `LyDo` dài ⇒ cắt, `""` ⇒ `null` · **TC07** lý do hợp lệ **nguyên vẹn** · 🚨 **TC08 chống lỗi "tham số hoán đổi"** (`SoDongHoSo`/`SoDonHang` **cùng `int`** — 🔒 hoán đổi thì nhật ký **vẫn hợp lệ**, dữ liệu **sai** mà **không triệu chứng**) · 🚨 **TC09 KHÔNG soft-delete** (kiểm **dấu hiệu thật** `IsDeleted`/`DeletionTime`/`DeleterId`, không import namespace ABP) · **TC10 append-only** (không setter công khai) · **TC11** có `DbSet` + map đúng bảng · **TC12** **không unique index**; **E2E: D9a** DB có dòng · **D9b** người xuất thật (`admin`) · **D9c** số đơn = 1 · **D9d** `donHangBiCat = false` · 🚨 **D9e** nhật ký **KHÔNG chứa PII** ⇒ **E2E 26/26** · **8 bước** · `exit 0` · **152s** · **1170** unit · 38 integration · mermaid 197/0 · DB 21/21 · test cổng 17/17. 🐞 **BA LỖI:** (1) 🚨🚨 **QUÊN `DbSet<>` TRÊN `eCommerceDbContext` ⇒ `/KhachHang` TRẢ `500`** — 🔑 ABP đăng ký `IRepository<T>` bằng **QUÉT `DbSet<>`** (không quét model) ⇒ `IRepository<CustomerDataExportLog>` **không được đăng ký** ⇒ **DI nổ lúc chạy**; ⚠️ **triệu chứng KHÔNG hề trỏ tới nhật ký** (nó là `GET` **danh sách khách**) và 🔒 **build xanh, 1155 unit test xanh**; 📌 **KHÔNG phải lỗi mới** — **đã xảy ra thật** ở `CAT-002` (15/10/2026) với `Category` ⇒ 🔑 **đã có** `DbSetRegistrationTests` sinh ra để chặn nó, ⚠️ nhưng lần này tôi **thêm entity rồi chạy E2E TRƯỚC khi chạy unit test** ⇒ 📌 **lưới an toàn có sẵn mà tôi không đi qua**; ✅ chữa: thêm `DbSet` + **TC11** khoá riêng cho entity này; 🔒 **bài học: *"chạy đúng thứ tự các bước kiểm"* CŨNG là một phần của độ tin cậy — thêm entity thì chạy unit test TRƯỚC, đừng để E2E làm lưới đầu tiên**; (2) ⚠️ **ĐOÁN namespace ABP `ISoftDelete` — SAI HAI LẦN** ⇒ ✅ chữa bằng cách **mạnh hơn**: kiểm **DẤU HIỆU THẬT** của xóa mềm thay vì import namespace (🔑 không quan tâm ABP gọi interface là gì, 📌 hỏi *"entity có khả năng bị xóa mềm không"*); (3) ⚠️ **đặt tên test CÓ DẤU CÁCH** ⇒ **6 lỗi cú pháp C#** (🔑 khác PowerShell, nơi dấu cách **hợp lệ**) ⇒ ✅ `_`. Ghi **§22.6** (nợ: 🚨 **chưa có UI xem nhật ký** ⇒ người kiểm toán phải **truy vấn SQL** (**nợ kế tiếp**) · **chưa có cảnh báo khi xuất LẶP LẠI bất thường** (🔑 bảng đã **đủ dữ liệu**, 📌 và vì thế tôi **cố ý không** đặt unique index) · **`LyDo` chưa được điền từ UI** · 🚨 **bảng KHÔNG nằm trong `kiem-db.ps1`** — 🔒 **cố ý** (đây là **dữ liệu thật**, ⚠️ nhưng nghĩa là **không có cổng** nào kiểm nó **tăng đúng** khi xuất) · **chưa có chính sách LƯU TRỮ** (📌 luật yêu cầu **giới hạn thời gian lưu** — ⚠️ nhưng xóa nhật ký kiểm toán lại **mâu thuẫn** với mục đích của nó ⇒ 🔒 cần **thiết kế**) · **chưa gồm dữ liệu module khác** (**nợ chặn**)) |
+
+---
+
+## 23. ✅ **LÁT CẮT 7 — MÀN HÌNH NHẬT KÝ KIỂM TOÁN** (17/10/2026) — *đóng nợ §22.6 #1*
+
+### 23.1 🔑 **Vì sao — "bằng chứng không ai đọc được thì không phục vụ câu hỏi nào"**
+
+Ở §22 tôi đã xây bảng `CusDataExportLogs` (nhật ký kiểm toán xuất PII). 🔒 **Nhưng một bằng chứng không ai
+đọc được thì không phục vụ câu hỏi nào** — 📌 và tôi đã **tự ghi nợ** ở §22.6 #1:
+*"chưa có UI xem nhật ký ⇒ người kiểm toán phải **TRUY VẤN SQL**"*.
+
+✅ Lát cắt này **đóng nợ đó**: `GET /KhachHang/NhatKy` (`[NHATKYXUATDULIEU-MAN-HINH]`) + liên kết từ `/KhachHang`.
+
+### 23.2 🔒 **BA QUY TẮC HIỂN THỊ — mỗi cái chống một cách nói dối**
+
+**① PHẢI NÓI RÕ KHI BỊ CẮT.** ⚠️ Nếu bảng chỉ hiện 100 dòng mà **không nói gì** thì người kiểm toán **tin** rằng
+*"chỉ có 100 lần xuất"* — 📌 và đó là một **kết luận sai về bằng chứng**. Vì vậy dòng đầu **luôn** nói
+*"**N** dòng đang hiển thị trên tổng **M** lần xuất"*, ➕ khi `BiCat` thì hiện **cảnh báo** *"⚠️ ĐÃ BỊ CẮT — còn X
+lần xuất không hiển thị"*.
+
+**② KHÁCH ĐÃ BỊ XOÁ THÌ PHẢI NÓI RÕ.** 🔒 `CustomerId` **không** đặt FK cứng ⇒ nhật ký **sống sót** khi hồ sơ
+khách bị xoá (📌 **đó là lý do thiết kế**). ⚠️ Nhưng nếu màn hình để **trống** thì người đọc hiểu là **lỗi hiển
+thị** ⇒ 📌 hiện rõ *"(hồ sơ đã bị xoá)"* kèm `title` giải thích.
+
+**③ KHÔNG CÓ DÒNG NÀO ≠ "KHÔNG CÓ GÌ BẤT THƯỜNG".** 🔑 Câu chữ khi rỗng nói đúng điều đó: *"Không có lần xuất
+nào khớp **bộ lọc**. 📌 Điều này **không** có nghĩa là *'không ai từng xuất dữ liệu'*."*
+
+➕ **Và `LyDo` trống thì hiện *"(không ghi lý do)"*** — ⚠️ để trống trông như **lỗi**, trong khi sự thật là
+**nợ đã ghi** (§22.6 #3: `LyDo` chưa được điền từ UI).
+
+### 23.3 ✅ **HAI QUYẾT ĐỊNH KỸ THUẬT**
+
+**① LỌC NGÀY KIỂU NỬA MỞ (`< den + 1 ngày`).** 🔒 Nếu lấy `<= denNgay` với mốc `00:00` thì **mọi** lần xuất
+**trong ngày cuối cùng** bị **mất** — ⚠️ và đó là loại lỗi **im lặng** nguy hiểm nhất với một màn hình **kiểm
+toán**: 🔑 người kiểm toán kết luận *"không ai xuất"* khi thực tế **có**.
+
+**② KHÔNG PARSE NGÀY Ở CONTROLLER — nhận CHUỖI rồi `TryParse`.** 📌 Nếu nhận `DateTime?` thẳng thì một giá trị
+rác trên URL làm **`ModelState` không hợp lệ** ⇒ ⚠️ trang trả **`400`**: người kiểm toán **gõ sai một ký tự** là
+**mất cả màn hình**, thay vì chỉ **bỏ qua bộ lọc**. 🔒 Với màn hình **kiểm toán**, *"hiện nhiều hơn yêu cầu"*
+**an toàn hơn** *"không hiện gì"*.
+
+➕ **Quyền = `Customers.Manage`** — 🔑 **nhất quán với quyền XUẤT**: nếu một người được phép **xuất** PII thì họ
+**cũng** phải được phép **xem vết** của việc xuất. 📌 Ngược lại thì ta có tình huống vô lý: người **làm** được
+việc nhưng **không tự kiểm** được mình. ⚠️ Và **không** dùng `Customers.Default`: 🔒 nhật ký này nói **ai đã làm
+gì với dữ liệu cá nhân** ⇒ 📌 nó là **thông tin về nhân viên**, không phải **thông tin về khách**.
+
+➕ **Sắp xếp tất định** (`XuatLucUtc` rồi `Id`, mới nhất trước) — 🔑 nếu chỉ sắp theo thời gian thì nhiều dòng
+cùng mốc cho **thứ tự khác nhau mỗi lần** ⇒ 📌 kết quả **không tái lập được**.
+
+### 23.4 ✅ **KIỂM CHỨNG — 6 CA E2E MỚI, ĐO HTML THẬT**
+
+| Ca | Đo được |
+|---|---|
+**D10a** | `GET /KhachHang/NhatKy` ⇒ **`200`** |
+**D10b** | Màn hình có neo **`[NHATKYXUATDULIEU-MAN-HINH]`** (🔑 chứng minh đúng là trang nhật ký) |
+🚨 **D10c** | Màn hình **nói rõ "hiển thị / tổng"** + tổng = **2** — 📌 chống **cắt bớt im lặng** |
+**D10d** | Hiện **CẢ HAI** dòng (người xuất `admin` **và** `K97E2E-nhanvien-b`) |
+**D10e** | Hiện **đúng số liệu từng dòng** (`17`) — ⚠️ không lặp lại số của dòng kia |
+**D10f** | **Không** bị cắt ⇒ nói **"tất cả"**, ⚠️ **không báo động giả** |
+
+🔑 **VÌ SAO ĐO **2** DÒNG (không phải 1):** ⚠️ với **một** dòng thì **không phân biệt được** *"màn hình hiện
+đúng"* với *"màn hình chỉ hiện dòng đầu"* — 📌 một lỗi **rất dễ mắc**. ➕ Và hai dòng có **số liệu khác hẳn
+nhau** (`1` vs `17`) ⇒ kiểm được rằng màn hình hiện **đúng từng dòng**.
+
+➕ **Neo view mới vào `ViewAnchorTests`** ⇒ khoá *"màn hình tồn tại và render"* ở tầng unit test.
+
+➡️ **E2E: 32/32 ĐẠT** · **8 bước** · `exit 0` · **149.8s** · **1170** unit · 38 integration · mermaid 197/0 ·
+DB 21/21 · test cổng 17/17.
+
+### 23.5 🐞 **Hai lỗi của tôi**
+
+**① ⚠️ Viết bộ lọc NGÀY vào view TRƯỚC khi service nhận tham số đó.** 🔑 Nếu tôi dừng ở đó thì form **hiện ra
+nhưng không có tác dụng** — 📌 một **control chết** còn tệ hơn **không có control**: người dùng **tin** rằng họ
+đã lọc, và 🔒 với màn hình **kiểm toán** thì *"tôi đã lọc"* dẫn tới **kết luận sai về bằng chứng**.
+✅ Chữa: thêm `tuNgayUtc`/`denNgayUtc` vào app service **trước khi** build.
+🔑 **Bài học:** thêm UI thì phải hỏi **ngay** *"service có nhận tham số này chưa?"* — 📌 cùng họ với
+*"nút bấm không có handler"*.
+
+**② ⚠️ `String.Replace` không khớp ⇒ nav link KHÔNG được thêm** (in ra `CANH BAO: khong khop view`).
+🔒 **Lần thứ BẢY** của họ lỗi này trong dự án. ✅ Chữa: dùng **công cụ sửa tệp** (`edit`) với ngữ cảnh chính xác.
+📌 Và **may mắn** là script của tôi **in cảnh báo** thay vì **im lặng** — 🔑 đó là lý do tôi phát hiện ngay.
+
+### 23.6 ⏳ NỢ
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+**1** | 🚨 **Chưa có XUẤT nhật ký ra tệp (CSV)** | 📌 Người kiểm toán thường cần **đính kèm bằng chứng** vào báo cáo ⇒ ⚠️ hiện phải **chép tay** |
+**2** | **Chưa có cảnh báo khi xuất LẶP LẠI bất thường** | 🔑 Bảng đã **đủ dữ liệu** (📌 và vì thế tôi **cố ý không** đặt unique index ở §22) — ⚠️ nhưng **chưa có** luật cảnh báo |
+**3** | **`LyDo` vẫn chưa được điền** (⚠️ màn hình hiện *"(không ghi lý do)"*) | 📌 Nợ từ §22.6 #3 **vẫn mở** — cần ô nhập lý do ở luồng xuất |
+**4** | **Chưa có bộ lọc theo NGƯỜI XUẤT** | 🔑 Câu hỏi *"nhân viên X đã xuất những gì"* là câu hỏi **kiểm toán** thật |
+**5** | **Chưa phân trang** (chỉ **trần 100** + lọc ngày) | 📌 Chấp nhận được **tạm**, nhưng ⚠️ một khách có **>100** lần xuất thì phải lọc ngày để xem hết |
+**6** | **Chưa có test cho lọc NGÀY** | ⚠️ Logic nửa mở mới thêm **chưa được khoá** bằng test ⇒ 📌 **nợ kế tiếp** |
+**7** | **Chưa gồm dữ liệu module khác** (địa chỉ giao, thanh toán, thuế) | ⚠️ **Nợ chặn** (`Address` chưa tồn tại) |
+
+### 23.7 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.4 | 17/10/2026 | *(agent, session GĐ1)* | **§23 — LÁT CẮT 7: MÀN HÌNH NHẬT KÝ KIỂM TOÁN** (đóng nợ §22.6 #1): thêm **`NhatKyXuatDuLieuDto`** + **`KetQuaNhatKyXuatDuLieuDto`** (`CacDong` + **`TongSo`** + **`BiCat`**) + **`CustomerAppService.GetNhatKyXuatDuLieuAsync(customerId, tuNgayUtc, denNgayUtc, toiDa)`** (route thật `GET /api/app/customer/nhat-ky-xuat-du-lieu`) + **`GET /KhachHang/NhatKy`** (`NhatKy.cshtml`, neo **`[NHATKYXUATDULIEU-MAN-HINH]`**) + liên kết từ `/KhachHang` + neo vào **`ViewAnchorTests`**. 🔑 **VÌ SAO:** ở §22 tôi đã xây bảng `CusDataExportLogs` — 🔒 nhưng **một bằng chứng không ai đọc được thì không phục vụ câu hỏi nào** — 📌 và tôi đã **tự ghi nợ**: *"người kiểm toán phải TRUY VẤN SQL"*. 🔒 **BA QUY TẮC HIỂN THỊ (mỗi cái chống một cách NÓI DỐI):** ① **phải nói rõ khi bị cắt** (⚠️ bảng chỉ hiện 100 dòng mà **không nói gì** ⇒ người kiểm toán **tin** *"chỉ có 100 lần xuất"* = **kết luận sai về bằng chứng**; ➕ khi `BiCat` thì hiện **cảnh báo**) · ② **khách đã bị xoá thì phải nói rõ** (🔒 `CustomerId` **không** FK cứng ⇒ nhật ký **sống sót** khi hồ sơ khách bị xoá — 📌 **đó là lý do thiết kế**; ⚠️ để **trống** thì người đọc hiểu là **lỗi hiển thị**) · ③ **không có dòng nào ≠ "không có gì bất thường"** (🔑 câu chữ khi rỗng phải nói đúng: *"không có lần xuất nào khớp **bộ lọc**"*) · ➕ **`LyDo` trống ⇒ hiện *"(không ghi lý do)"*** (⚠️ để trống trông như **lỗi**, trong khi sự thật là **nợ đã ghi**). ✅ **HAI QUYẾT ĐỊNH KỸ THUẬT:** ① **lọc ngày kiểu NỬA MỞ** (`< den + 1 ngày`) — 🔒 nếu lấy `<= denNgay` với mốc `00:00` thì **mọi** lần xuất **trong ngày cuối cùng** bị **mất**, ⚠️ và đó là loại lỗi **im lặng** nguy hiểm nhất với màn hình **kiểm toán** (🔑 kết luận *"không ai xuất"* khi thực tế **có**); ② **KHÔNG parse ngày ở controller** — nhận **CHUỖI** rồi `TryParse` (📌 nếu nhận `DateTime?` thẳng thì giá trị rác trên URL làm **`ModelState` không hợp lệ** ⇒ **`400`**: gõ sai một ký tự là **mất cả màn hình**; 🔒 với màn hình **kiểm toán**, *"hiện nhiều hơn yêu cầu"* **an toàn hơn** *"không hiện gì"*). ➕ **Quyền = `Customers.Manage`** — 🔑 **nhất quán với quyền XUẤT**: ai **xuất** được PII thì **cũng** phải **xem vết** được (📌 ngược lại thì người **làm** được việc nhưng **không tự kiểm** được mình); ⚠️ **không** dùng `Customers.Default` vì 🔒 nhật ký nói **ai đã làm gì với dữ liệu cá nhân** ⇒ nó là **thông tin về NHÂN VIÊN**, không phải về khách. ➕ **Sắp xếp TẤT ĐỊNH** (`XuatLucUtc` rồi `Id`) — 📌 nếu không thì kết quả **không tái lập được**. ✅ **KIỂM CHỨNG 6 CA E2E MỚI ĐO HTML THẬT:** **D10a** `200` · **D10b** neo màn hình · 🚨 **D10c** nói rõ *"hiển thị / tổng"* + tổng = **2** (chống **cắt bớt im lặng**) · **D10d** hiện **cả hai** dòng (`admin` **và** `K97E2E-nhanvien-b`) · **D10e** hiện **đúng số liệu từng dòng** (**17**) · **D10f** không bị cắt ⇒ nói *"tất cả"*, ⚠️ **không báo động giả**; 🔑 **vì sao đo 2 DÒNG (không phải 1):** ⚠️ với **một** dòng thì **không phân biệt được** *"màn hình hiện đúng"* với *"màn hình chỉ hiện dòng đầu"* — 📌 một lỗi **rất dễ mắc**; ➕ hai dòng có **số liệu khác hẳn nhau** (`1` vs `17`) ⇒ kiểm được **đúng từng dòng**; ➕ **neo view vào `ViewAnchorTests`** ⇒ khoá *"màn hình tồn tại và render"* ở tầng unit. ➡️ **E2E 32/32** · **8 bước** · `exit 0` · **149.8s** · **1170** unit · 38 integration · mermaid 197/0 · DB 21/21 · test cổng 17/17. 🐞 **HAI LỖI:** (1) ⚠️ **viết bộ lọc NGÀY vào view TRƯỚC khi service nhận tham số đó** — 🔑 nếu dừng ở đó thì form **hiện ra nhưng không có tác dụng**: 📌 một **control chết** còn tệ hơn **không có control**, vì người dùng **tin** rằng họ đã lọc, và 🔒 với màn hình **kiểm toán** thì *"tôi đã lọc"* dẫn tới **kết luận sai về bằng chứng** ⇒ ✅ chữa: thêm `tuNgayUtc`/`denNgayUtc` vào app service **trước khi** build; 🔑 **bài học: thêm UI thì phải hỏi NGAY *"service có nhận tham số này chưa?"*** — cùng họ với *"nút bấm không có handler"*; (2) ⚠️ **`String.Replace` không khớp ⇒ nav link KHÔNG được thêm** (script in `CANH BAO: khong khop view`) — 🔒 **lần thứ BẢY** của họ lỗi này ⇒ ✅ dùng **công cụ sửa tệp** (`edit`); 📌 và **may mắn** là script **in cảnh báo** thay vì **im lặng** — 🔑 đó là lý do tôi phát hiện ngay. Ghi **§23.6** (nợ: 🚨 **chưa có XUẤT nhật ký ra CSV** (📌 người kiểm toán cần **đính kèm bằng chứng** ⇒ ⚠️ hiện **chép tay**) · **chưa có cảnh báo xuất LẶP LẠI** (🔑 bảng đã **đủ dữ liệu**) · **`LyDo` vẫn chưa được điền** (**nợ từ §22.6 #3 vẫn mở**) · **chưa lọc theo NGƯỜI XUẤT** (🔑 câu hỏi *"nhân viên X đã xuất gì"* là câu hỏi **kiểm toán** thật) · **chưa phân trang** (📌 tạm chấp nhận) · ⚠️ **chưa có test cho lọc NGÀY** (logic nửa mở mới thêm **chưa được khoá** ⇒ **nợ kế tiếp**) · **chưa gồm dữ liệu module khác** (**nợ chặn**)) |

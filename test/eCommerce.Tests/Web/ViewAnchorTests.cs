@@ -43,6 +43,9 @@ public class ViewAnchorTests
     [
         ("Views/HanMucKenh/Index.cshtml", "[HANMUCKENH-MAN-HINH]"),
         ("Views/KhachHang/Index.cshtml", "[KHACHHANG-MAN-HINH]"),
+        // 🚨 `CUS-001` §23 — man hinh NHAT KY KIEM TOAN xuat du lieu ca nhan. 🔑 Neo nay khang dinh man hinh
+        // **ton tai va render**; 📌 con **NOI DUNG** (co hien du so lieu khong) do **E2E** do tren HTML that.
+        ("Views/KhachHang/NhatKy.cshtml", "[NHATKYXUATDULIEU-MAN-HINH]"),
         ("Views/DoiSoatThanhToan/Index.cshtml", "[DOISOATTHANHTOAN-MAN-HINH]"),
         ("Views/Loi/ChanQuyen.cshtml", "[LOI-403-THIEP-QUYEN]"),
         ("Views/Loi/KhongTimThay.cshtml", "[LOI-404-KHONG-CO-MAN-HINH]")

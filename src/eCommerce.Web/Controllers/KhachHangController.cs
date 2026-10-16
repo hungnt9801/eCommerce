@@ -1,4 +1,5 @@
 using eCommerce.Customers;
+using System.Globalization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -84,6 +85,37 @@ public class KhachHangController : Controller
         var tenTep = $"xuat-du-lieu-ca-nhan-{id:N}.json";
 
         return File(System.Text.Encoding.UTF8.GetBytes(json), "application/json", tenTep);
+    }
+
+    /// <summary>
+    /// `GET /KhachHang/NhatKy` — 🚨 **MÀN HÌNH NHẬT KÝ KIỂM TOÁN XUẤT DỮ LIỆU CÁ NHÂN** (`CUS-001` §23).
+    ///
+    /// 🔑 **VÌ SAO CẦN MÀN HÌNH NÀY:** ở §22 tôi đã xây bảng `CusDataExportLogs` — 🔒 nhưng một **bằng chứng
+    /// không ai đọc được** thì **không phục vụ** câu hỏi nào. 📌 Nợ đã ghi ở §22.6 #1 (*"người kiểm toán phải
+    /// TRUY VẤN SQL"*) — controller này đóng nợ đó.
+    ///
+    /// ⚠️ **KHÔNG PARSE NGÀY Ở ĐÂY:** 🔑 tham số nhận **CHUỖI** rồi để **model binder + `TryParse`** xử lý.
+    /// 📌 Nếu nhận `DateTime?` thẳng thì một giá trị rác trên URL sẽ làm **`ModelState` không hợp lệ** và
+    /// ⚠️ trang trả **`400`** — tức người kiểm toán **gõ sai một ký tự** là **mất cả màn hình**, thay vì
+    /// chỉ **bỏ qua bộ lọc**. 🔒 Với một màn hình **kiểm toán**, *"hiện nhiều hơn yêu cầu"* **an toàn hơn**
+    /// *"không hiện gì"*.
+    /// </summary>
+    public async Task<IActionResult> NhatKy(Guid? customerId = null, string? tuNgay = null, string? denNgay = null)
+    {
+        var tu = DateTime.TryParse(tuNgay, CultureInfo.InvariantCulture, DateTimeStyles.None, out var t) ? t : (DateTime?)null;
+        var den = DateTime.TryParse(denNgay, CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d : (DateTime?)null;
+
+        var ketQua = await _khachHang.GetNhatKyXuatDuLieuAsync(
+            customerId: customerId,
+            // 📌 **UTC** — nhat ky luu UTC ⇒ 🔑 phai so sanh cung moc, neu khong se lech theo mui gio may chu.
+            tuNgayUtc: tu?.ToUniversalTime(),
+            denNgayUtc: den?.ToUniversalTime());
+
+        ViewBag.TuNgay = tuNgay;
+        ViewBag.DenNgay = denNgay;
+        ViewBag.CustomerId = customerId;
+
+        return View(ketQua);
     }
 
     /// <summary>

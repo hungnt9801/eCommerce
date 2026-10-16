@@ -539,6 +539,98 @@ public class CustomerAppService : ApplicationService
         return dto;
     }
 
+    // ── NHAT KY KIEM TOAN (doc) ────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// 🚨 **TRA CUU NHAT KY XUAT DU LIEU CA NHAN** (`CUS-001` §23) — tra loi *"**AI** da xuat du lieu cua toi,
+    /// **KHI NAO**, **BAO NHIEU LAN**"*.
+    ///
+    /// 🔑 **VI SAO CAN DUONG DOC NAY:** o §22 toi da xay bang `CusDataExportLogs` — 🔒 nhung mot bang chung
+    /// **khong ai doc duoc** thi **khong phuc vu** cau hoi nao. 📌 Nay nguoi kiem toan **tu xem duoc**, khong
+    /// phai **truy van SQL** (do la **no da ghi** o §22.6 #1).
+    ///
+    /// 🔐 **QUYEN = `Customers.Manage`** — 🔑 **nhat quan voi quyen XUAT** (`XuatDuLieuCaNhanAsync`):
+    /// neu mot nguoi duoc phep **xuat** PII thi ho **cung** phai duoc phep **xem vet** cua viec xuat.
+    /// 📌 Nguoc lai thi ta co tinh huong vo ly: nguoi **lam** duoc viec nhung **khong tu kiem** duoc minh.
+    /// ⚠️ Va **khong** dung `Customers.Default` (quyen **xem ho so**): 🔒 nhat ky nay noi **ai da lam gi** voi
+    /// du lieu ca nhan ⇒ 📌 no la **thong tin ve nhan vien**, khong phai **thong tin ve khach**.
+    ///
+    /// **⏳ SAP XEP:** moi nhat truoc, ⚠️ **tat dinh** (`XuatLucUtc` roi `Id`) — 🔑 neu chi sap theo thoi gian
+    /// thi nhieu dong cung moc se cho **thu tu khac nhau moi lan** ⇒ 📌 ket qua **khong tai lap duoc**.
+    /// </summary>
+    /// <param name="customerId">⚠️ **Tuy chon** — loc theo mot khach (📌 cau hoi cua **chu the du lieu**).</param>
+    /// <param name="tuNgayUtc">⚠️ **Tuy chon** — **kem** (bao gom).</param>
+    /// <param name="denNgayUtc">
+    /// ⚠️ **Tuy chon** — 🔒 **KHONG bao gom** (nua mo). 📌 **VI SAO NUA MO:** neu lay `<= denNgay` voi moc
+    /// `00:00` thi **moi** lan xuat **trong ngay cuoi cung** bi **mat** — ⚠️ va do la loai loi **im lang**
+    /// nguy hiem nhat voi mot man hinh **kiem toan** (🔑 nguoi kiem toan ket luan *"khong ai xuat"* khi
+    /// thuc te **co**). ✅ Nua mo (`< den + 1 ngay`) lam moc ngay **tron ven**.
+    /// </param>
+    /// <param name="toiDa">Tran so dong (⚠️ **co cat** — xem `KetQuaNhatKyXuatDuLieuDto.BiCat`).</param>
+    [Authorize(eCommerceConsts.Permissions.Customers.Manage)]
+    public async Task<KetQuaNhatKyXuatDuLieuDto> GetNhatKyXuatDuLieuAsync(
+        Guid? customerId = null,
+        DateTime? tuNgayUtc = null,
+        DateTime? denNgayUtc = null,
+        int toiDa = 100)
+    {
+        var soLuong = Math.Clamp(toiDa, 1, 500);
+
+        var truyVan = await _nhatKyXuatRepository.GetQueryableAsync();
+
+        if (customerId is not null)
+        {
+            truyVan = truyVan.Where(x => x.CustomerId == customerId.Value);
+        }
+
+        if (tuNgayUtc is not null)
+        {
+            truyVan = truyVan.Where(x => x.XuatLucUtc >= tuNgayUtc.Value);
+        }
+
+        if (denNgayUtc is not null)
+        {
+            // 🔒 **NUA MO** — xem chu thich o `<param name="denNgayUtc">`.
+            var mocSau = denNgayUtc.Value.Date.AddDays(1);
+            truyVan = truyVan.Where(x => x.XuatLucUtc < mocSau);
+        }
+
+        // 📌 Dem **TONG** truoc khi cat — 🔑 de man hinh noi duoc *"co bao nhieu, hien bao nhieu"*.
+        var tongSo = await AsyncExecuter.CountAsync(truyVan);
+
+        var nhatKy = await AsyncExecuter.ToListAsync(
+            truyVan.OrderByDescending(x => x.XuatLucUtc).ThenByDescending(x => x.Id).Take(soLuong));
+
+        // 🔑 **TRA TEN KHACH** — ⚠️ de nguoi kiem toan doc duoc *"xuat du lieu cua AI"*, chu khong phai mot GUID.
+        // 📌 Gom **MOT LAN** (tranh N+1) va 🔒 **KHONG** nem neu khach da bi xoa: nhat ky phai **song sot**.
+        var cacKhachId = nhatKy.Select(x => x.CustomerId).Distinct().ToList();
+        var truyVanKhach = await _khachRepository.GetQueryableAsync();
+
+        var tenTheoKhach = (await AsyncExecuter.ToListAsync(
+                truyVanKhach.Where(x => cacKhachId.Contains(x.Id))
+                    .Select(x => new { x.Id, x.Name })))
+            .ToDictionary(x => x.Id, x => x.Name);
+
+        return new KetQuaNhatKyXuatDuLieuDto
+        {
+            TongSo = tongSo,
+            BiCat = tongSo > soLuong,
+            CacDong = nhatKy.Select(x => new NhatKyXuatDuLieuDto
+            {
+                Id = x.Id,
+                CustomerId = x.CustomerId,
+                // ⚠️ `GetValueOrDefault` ⇒ `null` khi ho so da bi xoa ⇒ 📌 man hinh phai **noi ro**, khong de trong.
+                TenKhach = tenTheoKhach.GetValueOrDefault(x.CustomerId),
+                NguoiXuat = x.NguoiXuat,
+                XuatLucUtc = x.XuatLucUtc,
+                SoDongHoSo = x.SoDongHoSo,
+                SoDonHang = x.SoDonHang,
+                DonHangBiCat = x.DonHangBiCat,
+                LyDo = x.LyDo
+            }).ToList()
+        };
+    }
+
     // ── CHUYỂN ĐỔI ──────────────────────────────────────────────────────────────────────────────
 
     private static CustomerDto ToDto(Customer k) => new()

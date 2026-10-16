@@ -1,0 +1,162 @@
+@using Volo.Abp.AspNetCore.Mvc.UI.Layout
+@inject IPageLayout PageLayout
+@model eCommerce.Customers.KetQuaNhatKyXuatDuLieuDto
+@{
+    PageLayout.Content.Title = "Nhật ký xuất dữ liệu cá nhân";
+    PageLayout.Content.BreadCrumb.Add("Trang chủ");
+    PageLayout.Content.BreadCrumb.Add("Khách hàng");
+    PageLayout.Content.BreadCrumb.Add("Nhật ký xuất dữ liệu");
+
+    var tuNgay = ViewBag.TuNgay as string;
+    var denNgay = ViewBag.DenNgay as string;
+}
+
+@*
+    🚨 MÀN HÌNH NHẬT KÝ KIỂM TOÁN XUẤT DỮ LIỆU CÁ NHÂN (`CUS-001` §23) — Luật **91/2025/QH15**.
+
+    🔑 VÌ SAO MÀN HÌNH NÀY TỒN TẠI:
+    Ở §22 tôi đã xây bảng `CusDataExportLogs` — 🔒 nhưng một **bằng chứng không ai đọc được** thì **không
+    phục vụ** câu hỏi nào. 📌 Nợ đã ghi ở §22.6 #1: *"chưa có UI xem nhật ký ⇒ người kiểm toán phải TRUY VẤN
+    SQL"*. Màn hình này đóng nợ đó.
+
+    🔒 BA QUY TẮC HIỂN THỊ ĐƯỢC THI HÀNH Ở ĐÂY:
+
+    **① PHẢI NÓI RÕ KHI BỊ CẮT.** ⚠️ Nếu bảng chỉ hiện 100 dòng mà không nói gì thì người kiểm toán **tin** rằng
+    *"chỉ có 100 lần xuất"* — 📌 và đó là một **kết luận sai về bằng chứng**. Vì vậy dòng đầu **luôn** nói
+    *"hiện N / tổng M"*.
+
+    **② KHÁCH ĐÃ BỊ XOÁ THÌ PHẢI NÓI RÕ.** 🔒 `CustomerId` **không** đặt FK cứng ⇒ nhật ký **sống sót** khi hồ sơ
+    khách bị xoá (📌 đó là lý do thiết kế). ⚠️ Nhưng nếu màn hình để **trống** thì người đọc hiểu là **lỗi hiển
+    thị** — 📌 nên phải ghi *"(hồ sơ đã bị xoá)"*.
+
+    **③ PII KHÔNG NẰM Ở ĐÂY.** 🔑 Nhật ký chỉ ghi **SỐ LIỆU** (`số dòng hồ sơ`, `số đơn`), **không** ghi email/sđt
+    ⇒ 📌 màn hình này **an toàn để xem** và **an toàn để in** (khác hẳn bản xuất ở §20–§21, vốn là **tài liệu
+    mật**).
+*@
+
+<div class="mb-3">
+    <a asp-action="Index" class="btn btn-sm btn-outline-secondary">← Về danh sách khách</a>
+</div>
+
+@*
+    🔑 **DÒNG NÓI RÕ QUY MÔ** — 🚨 KHÔNG ĐƯỢC BỎ.
+    ⚠️ Đây là quy tắc ①: một bảng **im lặng cắt bớt** biến bằng chứng thành **kết luận sai**.
+*@
+<div class="alert @(Model.BiCat ? "alert-warning" : "alert-info") py-2">
+    <strong>@Model.CacDong.Count</strong> dòng đang hiển thị trên tổng
+    <strong>@Model.TongSo</strong> lần xuất.
+    @if (Model.BiCat)
+    {
+        <span>
+            ⚠️ <strong>ĐÃ BỊ CẮT</strong> — còn @(Model.TongSo - Model.CacDong.Count) lần xuất **không** hiển thị.
+            Thu hẹp khoảng ngày để xem phần còn lại.
+        </span>
+    }
+    else
+    {
+        <span>✅ Đang hiển thị <strong>tất cả</strong>.</span>
+    }
+</div>
+
+<form method="get" asp-action="NhatKy" class="row g-2 align-items-end mb-3">
+    <div class="col-auto">
+        <label class="form-label">Từ ngày (UTC)</label>
+        <input class="form-control" type="date" name="tuNgay" value="@tuNgay" />
+    </div>
+    <div class="col-auto">
+        <label class="form-label">Đến ngày (UTC)</label>
+        <input class="form-control" type="date" name="denNgay" value="@denNgay" />
+    </div>
+    <div class="col-auto">
+        <button class="btn btn-primary" type="submit">Lọc</button>
+    </div>
+</form>
+
+@if (Model.CacDong.Count == 0)
+{
+    @* ⚠️ **"0 dòng" KHÔNG phải "không có gì bất thường"** — 🔑 nó chỉ có nghĩa là **không có lần xuất nào
+       khớp bộ lọc**. 📌 Nên câu chữ phải nói đúng điều đó, không được để người đọc suy diễn. *@
+    <div class="alert alert-secondary">
+        Không có lần xuất dữ liệu cá nhân nào khớp bộ lọc.
+        <br />
+        <small class="text-muted">
+            📌 Điều này **không** có nghĩa là *"không ai từng xuất dữ liệu"* — hãy xoá bộ lọc ngày để xem tất cả.
+        </small>
+    </div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>Lúc (UTC)</th>
+                    <th>Người xuất</th>
+                    <th>Khách</th>
+                    <th class="text-end">Dòng hồ sơ</th>
+                    <th class="text-end">Đơn hàng</th>
+                    <th>Ghi chú</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var nk in Model.CacDong)
+                {
+                    <tr>
+                        <td class="text-nowrap">@nk.XuatLucUtc.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                        @* 🔑 Người xuất là **cột quan trọng nhất** — đó là câu hỏi *"AI đã xem dữ liệu của tôi"*. *@
+                        <td><strong>@nk.NguoiXuat</strong></td>
+                        <td>
+                            @if (nk.TenKhach is null)
+                            {
+                                @* 🚨 Quy tắc ②: **KHÔNG** để trống. ⚠️ Để trống trông như **lỗi hiển thị**, trong khi
+                                   sự thật là **hồ sơ khách đã bị xoá** — và 🔑 nhật ký **vẫn còn** (đó là thiết kế). *@
+                                <span class="text-muted fst-italic" title="Hồ sơ khách không còn trong hệ thống — nhật ký vẫn được giữ">
+                                    (hồ sơ đã bị xoá)
+                                </span>
+                            }
+                            else
+                            {
+                                @nk.TenKhach
+                            }
+                            <br />
+                            <small class="text-muted">@nk.CustomerId</small>
+                        </td>
+                        <td class="text-end">@nk.SoDongHoSo</td>
+                        <td class="text-end">
+                            @nk.SoDonHang
+                            @if (nk.DonHangBiCat)
+                            {
+                                @* ⚠️ Bản xuất đó **đã bị cắt** ⇒ 🔑 người kiểm toán phải biết, nếu không họ tin
+                                   rằng khách chỉ có bấy nhiêu đơn. *@
+                                <span class="badge bg-warning text-dark" title="Bản xuất này đã bị cắt bớt đơn hàng">cắt</span>
+                            }
+                        </td>
+                        <td class="text-muted small">
+                            @if (string.IsNullOrWhiteSpace(nk.LyDo))
+                            {
+                                @* ⚠️ Nợ đã ghi (§22.6 #3): `LyDo` chưa được điền từ UI ⇒ 📌 phần lớn sẽ trống.
+                                   🔑 Nói rõ *"không ghi lý do"* thay vì để trống — để trống trông như **lỗi**. *@
+                                <span class="fst-italic">(không ghi lý do)</span>
+                            }
+                            else
+                            {
+                                @nk.LyDo
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+<div class="alert alert-secondary small">
+    <strong>🔒 Vì sao nhật ký này tồn tại:</strong> Luật <strong>91/2025/QH15</strong> cho chủ thể dữ liệu quyền
+    biết <strong>ai</strong> đã truy cập dữ liệu của mình. Nhật ký này trả lời ba câu hỏi
+    <strong>AI</strong> — <strong>KHI NÀO</strong> — <strong>BAO NHIÊU LẦN</strong>.
+    <br />
+    📌 Nhật ký chỉ ghi <strong>số liệu</strong> (số dòng hồ sơ, số đơn), <strong>không</strong> ghi nội dung dữ
+    liệu cá nhân — nên màn hình này <strong>không</strong> phải tài liệu mật (khác bản xuất ở mục “Xuất dữ liệu”).
+</div>
+
+<p class="text-muted small mt-3 mb-0">[NHATKYXUATDULIEU-MAN-HINH]</p>
