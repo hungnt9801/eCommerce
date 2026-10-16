@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using Volo.Abp;
 using Volo.Abp.Domain.Entities.Auditing;
 using Volo.Abp.MultiTenancy;
 
@@ -86,16 +87,26 @@ public class PaymentTransaction : FullAuditedAggregateRoot<Guid>, IMultiTenant
 
     /// <summary>
     /// Ghi nhận webhook ĐÃ QUA XÁC THỰC CHỮ KÝ.
-    /// Idempotent: nếu giao dịch đã ở trạng thái cuối thì chỉ tăng bộ đếm, không đổi trạng thái.
+    /// Idempotent: nếu giao dịch đã ở trạng thái **CUỐI** thì chỉ tăng bộ đếm, **không** đổi trạng thái.
     /// </summary>
+    /// <remarks>
+    /// 🚨 **SỬA 16/10/2026 (`SAL-006`) — `Refunded`/`PartiallyRefunded` CŨNG LÀ TRẠNG THÁI CUỐI.**
+    /// Phiên bản trước **chỉ** chặn `Succeeded` ⇒ webhook gửi lại (IPN là **at-least-once**) sau khi đã hoàn tiền
+    /// sẽ **"hồi sinh"** giao dịch về `Succeeded`, trong khi `RefundedAmount` **vẫn** giữ số đã hoàn
+    /// ⇒ **sổ sách tự mâu thuẫn**: *"Succeeded, đã thu tiền — mà đã hoàn 100 %"*.
+    /// 📌 Hệ quả tiếp theo: job đối soát nhìn `Status = Succeeded` ⇒ **tưởng khách còn nợ / đơn còn phải giao**
+    /// ⇒ có thể **thu thêm** hoặc **giao hàng** cho đơn đã hoàn. **Không có lỗi nào nổi lên.**
+    /// </remarks>
     public bool MarkSucceeded(string? providerTransactionId, string? idempotencyKey, string rawPayload, DateTime? paidAtUtc)
     {
         WebhookReceivedCount++;
         LastWebhookPayload = Truncate(MaskSensitiveData(rawPayload), 8000);
 
-        if (Status == PaymentTransactionStatus.Succeeded)
+        if (Status is PaymentTransactionStatus.Succeeded
+            or PaymentTransactionStatus.PartiallyRefunded
+            or PaymentTransactionStatus.Refunded)
         {
-            return false; // webhook gửi trùng — không xử lý lại
+            return false; // webhook gửi trùng — không xử lý lại (kể cả sau khi đã hoàn tiền)
         }
 
         ProviderTransactionId = providerTransactionId ?? ProviderTransactionId;
@@ -111,9 +122,15 @@ public class PaymentTransaction : FullAuditedAggregateRoot<Guid>, IMultiTenant
         WebhookReceivedCount++;
         LastWebhookPayload = Truncate(MaskSensitiveData(rawPayload ?? LastWebhookPayload), 8000);
 
-        if (Status == PaymentTransactionStatus.Succeeded)
+        if (Status is PaymentTransactionStatus.Succeeded
+            or PaymentTransactionStatus.PartiallyRefunded
+            or PaymentTransactionStatus.Refunded)
         {
-            // Đã có tiền rồi thì không được ghi đè thành thất bại.
+            // 🚨 **Đã có tiền rồi thì KHÔNG được ghi đè thành thất bại** — và điều đó **càng đúng** khi tiền
+            // đã được **hoàn**: ghi `Failed` lên một giao dịch đã hoàn sẽ **xoá dấu vết dòng tiền**
+            // (`RefundedAmount` vẫn còn nhưng `Status` nói "chưa từng thu") ⇒ kế toán **không đối chiếu được**.
+            // 📌 Cùng lý do với `MarkSucceeded` (xem chú thích ở đó) — hai hàm phải **nhất quán** về
+            // *"trạng thái nào là CUỐI"*; lệch nhau là mầm của sổ sách tự mâu thuẫn.
             return;
         }
 
@@ -121,13 +138,80 @@ public class PaymentTransaction : FullAuditedAggregateRoot<Guid>, IMultiTenant
         FailureReason = Truncate(reason, 2000);
     }
 
+    /// <summary>
+    /// 🚨 **GHI NHẬN HOÀN TIỀN — CÓ KIỂM, KHÔNG ĐƯỢC HOÀN VƯỢT SỐ ĐÃ THU** (`SAL-006`).
+    ///
+    /// **VÌ SAO PHẢI KIỂM (đây là lỗi THẬT đã có trong mã, không phải phòng xa):**
+    /// phiên bản trước là `RefundedAmount += amount;` **không kiểm gì cả** ⇒ hoàn **vượt** số đã thu **LỌT**,
+    /// và <see cref="PaymentTransactionStatus"/> chuyển sang `Refunded` ⇒
+    /// <list type="bullet">
+    ///   <item>**KẾ TOÁN SAI**: hệ thống ghi *"đã hoàn nhiều hơn đã thu"* mà **không có lỗi nào**;</item>
+    ///   <item>**MẤT TIỀN THẬT nếu cổng cho phép**: một lỗi gọi lặp/double-click ⇒ hoàn hai lần
+    ///     ⇒ tiền ra khỏi tài khoản mà sổ nội bộ **không** phát hiện.</item>
+    /// </list>
+    /// 📌 Đây **đúng họ lỗi** mà dự án đã trả giá **hai lần**: `SAL-004` **`0040`** (*"khách trả nhiều hơn số đã mua"*)
+    /// và `INV-003` **`0042`** (*"mượn mã `0001` ⇒ CSKH nhận chỉ dẫn sai"*).
+    ///
+    /// 🔒 **Ba bất biến được cưỡng chế Ở ĐÂY (không chỉ ở app service):**
+    ///   (1) **chỉ hoàn được giao dịch ĐÃ THU TIỀN** (`Succeeded`/`PartiallyRefunded`/`Refunded`) —
+    ///       hoàn một giao dịch `Initiated`/`Failed` nghĩa là **hoàn tiền chưa từng vào**;
+    ///   (2) **`amount > 0`** — hoàn `0` hoặc số âm là vô nghĩa (số âm còn **giảm** số đã hoàn ⇒ che lỗi);
+    ///   (3) **`RefundedAmount + amount <= Amount`** — tổng hoàn **không** được vượt số đã thu.
+    ///
+    /// ⚠️ **TÍNH TRƯỚC — KIỂM — RỒI MỚI GÁN** (bài học `InventoryItem.ApplyMovement`, 15/10/2026):
+    /// nếu gán trước rồi kiểm, entity **ở lại trạng thái SAI trong bộ nhớ**; EF vẫn đang theo dõi nó ⇒
+    /// một `SaveChanges` **vì việc khác** sẽ **ghi số sai xuống DB**. *"Ném lỗi mà để lại rác là gieo bug."*
+    /// </summary>
+    /// <exception cref="Volo.Abp.BusinessException">`eCommerce:Payment:0002` khi hoàn vượt số đã thu.</exception>
     public void RegisterRefund(decimal amount)
     {
-        RefundedAmount += amount;
+        if (amount <= 0m)
+        {
+            throw new BusinessException(PaymentErrorCodes.SoTienHoanKhongHopLe)
+                .WithData("soTienHoan", amount)
+                .WithData("lyDo", "Số tiền hoàn phải LỚN HƠN 0 (số âm sẽ làm GIẢM số đã hoàn ⇒ che mất lỗi).");
+        }
+
+        if (Status is not (PaymentTransactionStatus.Succeeded
+            or PaymentTransactionStatus.PartiallyRefunded
+            or PaymentTransactionStatus.Refunded))
+        {
+            // 🚨 Hoàn tiền cho giao dịch CHƯA THU ĐƯỢC là **mất tiền thật**: hệ thống chi ra số tiền mà
+            // chưa bao giờ nhận. Ném lỗi để người vận hành biết **ngay**, thay vì để sổ sách sai âm thầm.
+            throw new BusinessException(PaymentErrorCodes.ChuaThuDuocTienKhongHoanDuoc)
+                .WithData("trangThai", Status.ToString())
+                .WithData("merchantReference", MerchantReference)
+                .WithData("lyDo", "Chỉ hoàn được giao dịch ĐÃ THU TIỀN (Succeeded/PartiallyRefunded/Refunded).");
+        }
+
+        var tongSauKhiHoan = RefundedAmount + amount;
+
+        if (tongSauKhiHoan > Amount)
+        {
+            throw new BusinessException(PaymentErrorCodes.HoanVuotSoDaThu)
+                .WithData("soDaThu", Amount)
+                .WithData("daHoan", RefundedAmount)
+                .WithData("soTienHoanLanNay", amount)
+                .WithData("tongSauKhiHoan", tongSauKhiHoan)
+                .WithData("merchantReference", MerchantReference)
+                .WithData("lyDo", $"Hoàn {amount} nhưng đã thu {Amount} và đã hoàn {RefundedAmount} " +
+                    $"⇒ tổng {tongSauKhiHoan} VƯỢT số đã thu. Dừng lại và kiểm tra.");
+        }
+
+        RefundedAmount = tongSauKhiHoan;
+
         Status = RefundedAmount >= Amount
             ? PaymentTransactionStatus.Refunded
             : PaymentTransactionStatus.PartiallyRefunded;
     }
+
+    /// <summary>
+    /// **Số tiền CÒN hoàn được** (`Amount − RefundedAmount`). 🔒 Không bao giờ âm nhờ bất biến (3) ở
+    /// <see cref="RegisterRefund"/> — nhưng vẫn kẹp về `0` để hàm này **không bao giờ** trả số âm cho UI.
+    /// 📌 Dùng cho API hoàn tiền: client cần biết **còn bao nhiêu** trước khi gửi, thay vì nhận lỗi.
+    /// </summary>
+    public decimal ConHoanDuoc => Math.Max(0m, Amount - RefundedAmount);
+
 
     /// <summary>
     /// 🚨 B(C) — CHE DỮ LIỆU NHẠY CẢM trước khi lưu payload thô (phát hiện F2 của `XC-005`).

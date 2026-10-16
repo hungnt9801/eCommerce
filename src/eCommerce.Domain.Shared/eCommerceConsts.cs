@@ -166,6 +166,13 @@ public static class eCommerceConsts
         // ChannelHubConsts.cs, đã chuẩn hoá về dạng "eCommerce:Channel:*".
         public const string PaymentSignatureInvalid = "eCommerce:Payment:0001";
 
+        // 📌 CÁC MÃ HOÀN TIỀN (`0002`/`0003`/`0004`) **CỐ Ý KHÔNG Ở ĐÂY** — chúng nằm ở
+        // `modules/PaymentHub/eCommerce.PaymentHub.Domain/Payments/PaymentErrorCodes.cs`.
+        // VÌ SAO: `PaymentHub.Domain` **KHÔNG** tham chiếu `eCommerce.Domain.Shared` (module tự chứa — quy ước #2
+        // "module sở hữu hằng số của mình"), mà entity `PaymentTransaction` **cần** ném các mã đó.
+        // ⇒ Để bản chuẩn trong module; nếu để thêm ở đây nữa là **HAI nguồn sự thật** cho cùng một mã
+        // (đúng họ lỗi `XC-003` F2 mà dự án đã trả giá).
+
         /// <summary>
         /// 🚨 **MÃ LỖI DÙNG CHUNG CHO KHOÁ PHÂN TÁN** — **KHÔNG** thuộc dải của module nào.
         ///

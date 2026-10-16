@@ -1013,3 +1013,89 @@ public class ReturnRmaTests
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.1 | 14/10/2026 | *(điền)* | Bản nháp đầu — chốt **phiếu trả RMA + 2 trục con** + bảng chuyển trạng thái **ném lỗi**; chốt **3 ADR tiền/kho/tiền-hoàn** (snapshot · `MoneyAllocator` · **cấm retry mù** khi `Unknown`); lập **bảng ép DB** §8.2 trả lời câu hỏi *"bỏ lock/ bỏ app đi, DB có chặn không?"* (2 bất biến **chưa đạt** — thuộc PaymentHub/Inventory); ghi nhận **F1–F13** từ code thật (`Order.SetStatus`, `RegisterRefund`, `RefundAsync` chưa cài đặt, thiếu `.Contracts`, thiếu `Money`, thiếu movement type hàng hỏng, thiếu nền `XC-002`, registry metric chưa có metric hoàn tiền, thiếu cột `ReturnedQuantity`) |
+| v0.2 | 16/10/2026 | *(agent, session GĐ1)* | **LÁT CẮT 1 — BẤT BIẾN HOÀN TIỀN Ở TẦNG DOMAIN (`§16`)**: vá **`F1`** của chính tài liệu này — `RegisterRefund` **không kiểm gì** ⇒ nay **NÉM** ở 3 ca (hoàn vượt số đã thu · chưa thu được tiền · số tiền `≤ 0`), mỗi ca **một mã lỗi riêng** (`PaymentErrorCodes` `0002`/`0003`/`0004`); phát hiện **2 bug thật** ở trạng thái CUỐI (`MarkSucceeded`/`MarkFailed` **"hồi sinh"** giao dịch đã hoàn tiền); **+12 unit test**. ⏳ **CÒN**: `RefundAsync` của VNPay **vẫn `NotImplementedException`** (F2) · chưa có app service/API hoàn tiền · chưa có phiếu RMA · chưa nối `SAL-004` ↔ hoàn tiền |
+
+---
+
+## 16. ✅ **LÁT CẮT 1 — BẤT BIẾN HOÀN TIỀN Ở TẦNG DOMAIN** (16/10/2026)
+
+> ⚠️ **PHẠM VI NÓI RÕ:** lát cắt này **chỉ** làm **tầng domain của `PaymentHub`** — nơi `SAL-006` §15.2 **F1**
+> đã chỉ ra: *"`RegisterRefund` không kiểm gì"*. **Chưa** làm: phiếu RMA, app service/API hoàn tiền,
+> và `RefundAsync` của VnPay (vẫn `NotImplementedException` — **F2**). Nợ ghi ở **§16.5**.
+
+### 16.1 Vấn đề: **mã hoàn tiền KHÔNG có gì chặn** (đã đọc mã, không suy đoán)
+
+Phiên bản `RegisterRefund` trước lát cắt này **nguyên văn** là:
+
+```csharp
+public void RegisterRefund(decimal amount)
+{
+    RefundedAmount += amount;
+    Status = RefundedAmount >= Amount ? Refunded : PartiallyRefunded;
+}
+```
+
+⇒ **Không** kiểm trạng thái, **không** kiểm số tiền, **không** kiểm tổng đã hoàn. Ba hệ quả **đọc được từ mã**:
+
+| # | Hệ quả | Vì sao nghiêm trọng |
+|---|---|---|
+| **1** | Hoàn **vượt** số đã thu **LỌT** | Sổ ghi *"đã hoàn nhiều hơn đã thu"* mà **không lỗi nào**; status nhảy `Refunded` ⇒ **kế toán tin là xong** |
+| **2** | Hoàn cho giao dịch **CHƯA THU ĐƯỢC** (`Initiated`/`Failed`) **LỌT** | **Chi tiền chưa từng nhận** — mất tiền thật |
+| **3** | `amount ≤ 0` **LỌT** | Số âm **GIẢM** `RefundedAmount` ⇒ **che mất** một lần hoàn đã xảy ra |
+
+📌 **Vì sao DB KHÔNG cứu được (đối chiếu §8.2 của tài liệu này):** bất biến *"hoàn ≤ thu"* là bất biến
+**liên cột theo THỜI GIAN** (tổng của nhiều lần), **không** phải một hàng ⇒ **không** viết được `CHECK`.
+⇒ **Tầng domain là chốt DUY NHẤT** cho tới khi có bảng dòng hoàn tiền + ràng buộc tổng.
+
+### 16.2 Đã làm gì
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| **1** | `RegisterRefund` **kiểm TRƯỚC khi gán** | 🔒 **Tính → kiểm → mới gán** (bài học `InventoryItem.ApplyMovement`, 15/10/2026): gán trước rồi kiểm ⇒ entity **ở lại trạng thái SAI trong bộ nhớ**, EF vẫn theo dõi ⇒ một `SaveChanges` **vì việc khác** ghi số sai xuống DB. *"Ném lỗi mà để lại rác là gieo bug."* |
+| **2** | Ba mã lỗi **RIÊNG** (`PaymentErrorCodes`) | `0002` hoàn vượt số đã thu · `0003` chưa thu được tiền · `0004` số tiền `≤ 0`. 📌 **Vì sao không gộp một mã:** mỗi ca cần **một hành động khác nhau** của CSKH (kiểm **số tiền** vs kiểm **trạng thái** vs sửa **tham số**) — gộp là **chỉ dẫn sai**, đúng bài học `INV-003` `0042` |
+| **3** | 📍 `PaymentErrorCodes` đặt **TRONG MODULE** (`modules/PaymentHub/.../Payments/`) | ⚠️ `PaymentHub.Domain` **không** tham chiếu `eCommerce.Domain.Shared` (module tự chứa — quy ước #2). Khai thêm bản ở `eCommerceConsts` sẽ thành **HAI nguồn sự thật** cho cùng mã (đúng họ lỗi `XC-003` **F2** đã xảy ra với mã miền KÊNH) |
+| **4** | `ConHoanDuoc` (`Amount − RefundedAmount`, kẹp `≥ 0`) | Client cần biết **còn bao nhiêu** trước khi gửi, thay vì gửi rồi nhận lỗi |
+| **5** | 🚨 **Vá 2 bug THẬT về trạng thái CUỐI** | `MarkSucceeded` **chỉ** chặn `Succeeded` ⇒ webhook gửi lại (IPN **at-least-once**) sau khi hoàn tiền **"hồi sinh"** giao dịch về `Succeeded` ⇒ **sổ sách tự mâu thuẫn** (*"Succeeded, đã thu tiền — mà đã hoàn 100 %"*). `MarkFailed` **cùng lỗi** (ghi `Failed` lên giao dịch đã hoàn ⇒ **xoá dấu vết dòng tiền**). Nay **cả hai** coi `Succeeded`/`PartiallyRefunded`/`Refunded` là **trạng thái CUỐI** |
+
+### 16.3 🚨 Bài học: **hai hàm trạng thái phải NHẤT QUÁN về "trạng thái nào là CUỐI"**
+
+`MarkSucceeded` và `MarkFailed` **cùng** phải trả lời một câu: *"trạng thái nào là cuối?"*.
+Phiên bản trước: **cả hai** đều chỉ chặn `Succeeded` — **cả hai đều quên** `PartiallyRefunded`/`Refunded`
+vì hai giá trị đó **được thêm sau** (khi làm hoàn tiền) mà **không** rà lại hai hàm này.
+📌 Đây là dạng lỗi *"thêm giá trị enum mới ⇒ phải rà MỌI chỗ chuyển trạng thái"* — **không** có lỗi biên dịch nào chỉ ra.
+
+🔒 **Và cả hai bug đều do TEST bắt, không do đọc mã:** test
+`Webhook_gui_lai_sau_khi_da_Refunded__KHONG_doi_trang_thai_ve_Succeeded` **ĐỎ** ngay lần chạy đầu.
+⇒ Bài học Phụ lục C lặp lại: **cơ chế (test) bắt được thứ mà đọc mã bỏ sót**.
+
+### 16.4 ✅ Kiểm chứng
+
+| Nhóm | Số ca | Nội dung |
+|---|---|---|
+| Hoàn vượt / cộng dồn | 3 | vượt ⇒ NÉM + **entity nguyên vẹn** · cộng dồn vượt ⇒ NÉM ở lần vượt, các lần trước giữ nguyên · hoàn đúng bằng ⇒ `Refunded` |
+| Trạng thái chưa thu | 3 | `Initiated` · `Pending` · `Failed` ⇒ **đều NÉM** `0003` |
+| Số tiền không hợp lệ | 3 | `0` · `-1` · `-500000` ⇒ **đều NÉM** `0004` |
+| Ba mã phải **khác nhau** + không mượn `0001` | 1 | chống "một mã cho mọi ca" |
+| Trạng thái cuối (bug vừa vá) | 1 | webhook gửi lại sau `Refunded` ⇒ **không** hồi sinh |
+| Hoàn một phần | 1 | `PartiallyRefunded` + `ConHoanDuoc` giảm đúng |
+| **Tổng** | **+12** | `846 unit` (toàn bộ xanh) · build **0 lỗi / 0 cảnh báo** |
+
+📌 **Chưa có kiểm chứng HTTP** cho lát cắt này — **vì chưa có API/endpoint hoàn tiền** (mới có tầng domain).
+Ghi rõ để **không** ai đọc *"846 test xanh"* thành *"hoàn tiền đã chạy được"*.
+
+### 16.5 ⏳ NỢ (KHÔNG phải tính năng đã có)
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+| **1** | 🚨 **`RefundAsync` của VNPay vẫn `NotImplementedException`** (**F2** của tài liệu này) | Chưa gọi được cổng ⇒ **chưa hoàn tiền thật được**. 📌 Đây vẫn là **cổng kiểm soát GĐ1 còn trống** (*"không mất tiền"*) |
+| **2** | **Chưa có app service/API hoàn tiền** | Chưa có đường nào gọi `RegisterRefund` từ bên ngoài (grep: **0** chỗ gọi) ⇒ bất biến mới **chưa được dùng ở đường thật** |
+| **3** | **Chưa có phiếu RMA** (`ReturnRequest` + 2 trục con, `§0` của tài liệu này) | Toàn bộ luồng trả hàng theo RMA **chưa có code** |
+| **4** | **Chưa nối `SAL-004` ↔ hoàn tiền** | `SAL-004` đã làm **trả hàng kho** (`CustomerReturn`); **hoàn TIỀN** cho khách vẫn tách rời |
+| **5** | **Chưa có metric/bảng dòng hoàn tiền** | `RefundedAmount` là **tổng trên entity** ⇒ không truy vấn được *"hoàn lúc nào, vì sao, ai duyệt"*. Cần bảng dòng + ràng buộc tổng **ở DB** (§8.2) |
+| **6** | **Chưa dùng `Money`** (`eCommerce.Kernel`) cho số tiền hoàn | Hiện `decimal` trần; `RegisterRefund` **chỉ** dùng `>`/`<=` nên an toàn trước `XC-001` BR-003, nhưng chưa theo `XC-001` |
+
+### 16.6 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.2 | 16/10/2026 | *(agent, session GĐ1)* | **§16 — LÁT CẮT 1: BẤT BIẾN HOÀN TIỀN Ở TẦNG DOMAIN**: `RegisterRefund` nay **kiểm trước khi gán** (3 ca ⇒ 3 mã riêng `0002`/`0003`/`0004` trong `PaymentErrorCodes` **của module**) · `ConHoanDuoc` · 🚨 **vá 2 bug trạng thái CUỐI** (`MarkSucceeded`/`MarkFailed` hồi sinh giao dịch đã hoàn tiền) · **+12 unit test** (846 tổng). Ghi **§16.3** (hai hàm trạng thái phải nhất quán) · **§16.5** (nợ: `RefundAsync` **vẫn chưa cài**, chưa có API, chưa có RMA) |
