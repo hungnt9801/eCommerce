@@ -45,17 +45,20 @@ public class HienThiKenhAppService : ApplicationService, IHienThiKenhAppService
     private readonly IRepository<Product, Guid> _sanPhamRepository;
     private readonly IRepository<ChannelListingEntity, Guid> _listingRepository;
     private readonly IChannelDirectory _kenh;
+    private readonly IChannelVisibilityResolver _hieuLuc;
 
     public HienThiKenhAppService(
         IRepository<ProductChannelVisibility, Guid> hienThiRepository,
         IRepository<Product, Guid> sanPhamRepository,
         IRepository<ChannelListingEntity, Guid> listingRepository,
-        IChannelDirectory kenh)
+        IChannelDirectory kenh,
+        IChannelVisibilityResolver hieuLuc)
     {
         _hienThiRepository = hienThiRepository;
         _sanPhamRepository = sanPhamRepository;
         _listingRepository = listingRepository;
         _kenh = kenh;
+        _hieuLuc = hieuLuc;
     }
 
     /// <inheritdoc />
@@ -167,6 +170,80 @@ public class HienThiKenhAppService : ApplicationService, IHienThiKenhAppService
         return await TaoDtoAsync(hienCo);
     }
 
+    /// <summary>Giới hạn số sản phẩm một request tra hiệu lực.
+    /// 📌 **VÌ SAO PHẢI CÓ:** câu `IN (…)` của PostgreSQL có **giới hạn tham số** (~65 535), và một request
+    /// không giới hạn sẽ kéo **cả danh mục** ⇒ chậm + tốn băng thông. 🔑 `200` khớp `TranDongMotTrang` đã dùng
+    /// ở `DoiSoatAppService` — **một** con số cho *"một trang"* trong toàn dự án thì dễ nhớ hơn nhiều con số.
+    /// ⚠️ Vượt trần ⇒ **NÉM** (không im lặng cắt bớt): cắt bớt sẽ khiến client tưởng **đã** nhận đủ
+    /// ⇒ **thiếu sản phẩm trên storefront** mà **không có lỗi nào**.</summary>
+    private const int TranSanPhamMotLanTra = 200;
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<HienThiHieuLucDto>> PostTraHieuLucAsync(TraHieuLucInput input)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+
+        var maKenh = input.ChannelCode?.Trim() ?? string.Empty;
+
+        // 🔒 Kiểm kênh **TRƯỚC** — cùng lý do như `PostDatAsync`: `0207` là chỉ dẫn **đúng nguyên nhân**,
+        // còn nếu bỏ qua thì mọi sản phẩm trả `HienThi` *"kế thừa"* và người dùng tưởng **mọi thứ ổn**.
+        if (!await _kenh.KenhHoatDongAsync(maKenh))
+        {
+            throw new BusinessException(eCommerceConsts.ErrorCodes.Catalog.KenhKhongHoatDong)
+                .WithData("kenh", maKenh)
+                .WithData("lyDo", "Kênh KHÔNG tồn tại hoặc đã NGỪNG hoạt động.");
+        }
+
+        var dsId = input.ProductIds.Distinct().ToList();
+
+        if (dsId.Count == 0)
+        {
+            return [];
+        }
+
+        if (dsId.Count > TranSanPhamMotLanTra)
+        {
+            // 🚨 **NÉM, KHÔNG cắt bớt.** 📌 Nếu cắt bớt, client nhận **ít hơn** yêu cầu và **không biết** ⇒
+            // storefront **thiếu sản phẩm** mà **không lỗi nào** — đúng loại hỏng im lặng mà cả `ADR-08` xoay quanh.
+            throw new BusinessException(eCommerceConsts.ErrorCodes.Catalog.ThieuThongTinBatBuoc)
+                .WithData("soSanPham", dsId.Count)
+                .WithData("toiDa", TranSanPhamMotLanTra)
+                .WithData("lyDo", $"Một lần chỉ tra được tối đa {TranSanPhamMotLanTra} sản phẩm ⇒ chia nhỏ yêu cầu.");
+        }
+
+        // 🔑 **ĐI QUA RESOLVER** — đây là **điểm duy nhất** biết quy tắc `LEFT JOIN` + *"vắng bản ghi ⇒ HienThi"*.
+        var hieuLuc = await _hieuLuc.TraNhieuAsync(dsId, maKenh);
+
+        var ketQua = new List<HienThiHieuLucDto>(dsId.Count);
+
+        foreach (var id in dsId)
+        {
+            // 📌 `TryGetValue` có nhánh dự phòng: sản phẩm **không tồn tại** (đã xoá cứng) **không** có trong
+            // kết quả ⇒ trả `HienThi` + *"không có bản ghi"*. ⚠️ **KHÔNG** bỏ qua sản phẩm đó: bỏ qua sẽ làm
+            // client **không phân biệt** *"không tồn tại"* với *"không nằm trong yêu cầu"*.
+            var kq = hieuLuc.TryGetValue(id, out var co)
+                ? co
+                : new KetQuaHienThiKenh(TrangThaiHienThi.HienThi, CoBanGhiTuongMinh: false, LyDo: null);
+
+            var dangHienThi = kq.TrangThai is not (TrangThaiHienThi.An or TrangThaiHienThi.NgungBan);
+
+            if (input.ChiHienThi && !dangHienThi)
+            {
+                continue;
+            }
+
+            ketQua.Add(new HienThiHieuLucDto
+            {
+                ProductId = id,
+                TrangThai = kq.TrangThai.ToString(),
+                CoBanGhiTuongMinh = kq.CoBanGhiTuongMinh,
+                LyDo = kq.LyDo,
+                DangHienThi = dangHienThi
+            });
+        }
+
+        return ketQua;
+    }
     // ── Hàm dùng chung ────────────────────────────────────────────────────────────────────────────
 
     /// <summary>Xoá bản ghi để quay về `KeThua`. 🔒 **Idempotent**: chưa có bản ghi ⇒ trả `null`, **không ném**.</summary>

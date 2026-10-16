@@ -2007,3 +2007,94 @@ khi một ca không đo được vì **thiếu đường gọi**, việc đúng 
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.1 | 16/10/2026 | *(agent, session GĐ1)* | **§25 — LÁT CẮT 7: `IChannelVisibilityResolver`** (đóng nợ §24.7 #1): hợp đồng **3 method** (`TraMotAsync` · `TraNhieuAsync` **hàng loạt** · `LocSanPhamHienThiAsync`) + `ChannelVisibilityResolver` (`LEFT JOIN` bằng `DefaultIfEmpty()`) + `ChannelVisibilityJoinGuardTests` (**4 ca**, **+4** ⇒ **1075 test**). 🔑 **Ba quyết định**: trả trạng thái **HIỆU LỰC** (không trả `KeThua`) · `CoBanGhiTuongMinh` **riêng** (UI hiện nhãn *"Kế thừa"*) · **hàm hàng loạt** (N+1 **và** buộc xử lý ca *"không bản ghi"* **một lần**). 🚨 **PHÁT HIỆN LỚN: lưới an toàn của tôi đã KHÔNG bảo vệ gì** — tôi **tiêm** một `INNER JOIN` giả để kiểm, và lưới **không bắt**; truy ra **hai** lỗi: (①) cửa sổ `Take(6)` **mượn** `into nhom` + `DefaultIfEmpty()` của phép `join` **KẾ TIẾP** ⇒ **cho qua `INNER JOIN` thật** (🚨 **tệ hơn không có lưới** vì tạo **cảm giác an toàn giả**) — **đã sửa** bằng cách cắt đoạn theo `join`/`select` kế tiếp; (②) nhận diện chỉ theo tên bảng/biến ⇒ **đổi tên biến là qua** — **KHÔNG sửa được bằng quét văn bản**, nên **ghi giới hạn trong chú thích lớp** + thêm ca **`Phep_quet_PHAI_thay_join_trong_HOP_DONG`** (lưới cho chính lưới) + ghi nợ **interceptor runtime**. 🚨 **§25.6: ca cốt lõi CHƯA ĐO ĐƯỢC** (*"sản phẩm không có bản ghi vẫn hiển thị"*) vì **chưa có endpoint** phơi resolver và **chưa có fixture DB** cho integration test ⇒ **coi là CHƯA XONG**, không suy từ *"test xanh"*. 📌 **Bài học quy trình:** tôi tiêu nhiều thời gian vào **CÁCH ĐO** hơn là sản phẩm — khi một ca không đo được vì **thiếu đường gọi**, việc đúng là **làm đường gọi** hoặc **ghi nợ**, **không** thử thêm cách đo thứ tư |
+
+---
+
+## 26. ✅ **ĐÓNG NỢ §25.6 — CA CỐT LÕI ĐÃ ĐO ĐƯỢC TRÊN DB THẬT (19/19)** (16/10/2026)
+
+### 26.1 Kết luận trước
+
+🚨 **CA CỐT LỚN NHẤT CỦA `CAT-003` ĐÃ ĐO ĐƯỢC:** **sản phẩm KHÔNG có bản ghi hiển thị VẪN CÓ MẶT trên kênh**
+với `TrangThai = HienThi` + `CoBanGhiTuongMinh = false`.
+✅ **`LEFT JOIN` chạy ĐÚNG** — và ca này là **ca DUY NHẤT** phân biệt `LEFT JOIN` **đúng** với `INNER JOIN` **sai**.
+📌 Ở §25.6 tôi đã ghi rõ nó **CHƯA ĐO ĐƯỢC** và **coi là CHƯA XONG**; nay **đã đo** trên **PostgreSQL 17 thật**.
+
+### 26.2 Đã làm gì để đo được
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| **1** | **Endpoint `POST hien-thi-kenh/tra-hieu-luc`** | 🔑 **Đường gọi DUY NHẤT phơi quy tắc `LEFT JOIN`** — không có nó thì `ADR-08` **không đo được** từ ngoài |
+| **2** | **`TraHieuLucInput`** / **`HienThiHieuLucDto`** | `ChannelCode` + `ProductIds` + `ChiHienThi`; trả `TrangThai` · `CoBanGhiTuongMinh` · `LyDo` · **`DangHienThi`** |
+| **3** | **Trần `200` sản phẩm/lần tra** | ⚠️ Vượt ⇒ **NÉM** (không im lặng cắt bớt) |
+
+### 26.3 🔑 Hai quyết định của endpoint
+
+**① `DangHienThi` là một trường, KHÔNG để client tự suy từ `TrangThai`.**
+📌 *"Hiển thị"* nghĩa là **KHÔNG** `An` **VÀ** **KHÔNG** `NgungBan`. Nếu để mỗi client tự viết điều kiện đó, thì
+viết `!= An` mà **quên** `NgungBan` là lỗi **rất dễ** — và hậu quả là **bán lại** sản phẩm đã **ngừng bán**
+(trạng thái **hấp thụ**, cố ý không cho quay lại). 🔒 Một định nghĩa, **một chỗ**.
+
+**② Vượt trần 200 ⇒ NÉM, KHÔNG cắt bớt.**
+📌 Nếu cắt bớt, client nhận **ít hơn** yêu cầu và **không biết** ⇒ **storefront thiếu sản phẩm** mà
+**không có lỗi nào** — đúng loại hỏng im lặng mà cả `ADR-08` xoay quanh. 🔑 Lỗi **mang** `soSanPham` + `toiDa`
+⇒ client biết **chia nhỏ thế nào**.
+
+➕ **Phân biệt rõ với `GetDanhSachAsync`:** hàm kia trả **bản ghi TƯỜNG MINH** (quản trị), hàm này trả
+**trạng thái HIỆU LỰC** (hiển thị). 📌 Trộn hai việc này là **nguồn gốc** của `INNER JOIN` — vì quản trị chỉ cần
+bản ghi, còn hiển thị **cần cả** sản phẩm **không** có bản ghi.
+
+### 26.4 ✅ **KIỂM CHỨNG — 19/19 CA HTTP + DB THẬT** (Host :5000 + PostgreSQL 17)
+
+**Tiền đề (A1):** 4 sản phẩm · **3 bản ghi** · 🚨 **B KHÔNG có bản ghi** (kiểm bằng `select count(*)`).
+
+| Nhóm | Ca **ĐẠT** (đo được) |
+|---|---|
+🚨 **CA CỐT LÕI** | **C1** tra 4 sản phẩm ⇒ `200` + **4 dòng** (không mất dòng nào) · **C2 🚨🚨 B VẪN CÓ MẶT** · **C3 B ⇒ `HienThi`** · **C4 B ⇒ `CoBanGhiTuongMinh = false`** · **C5 B ⇒ `DangHienThi = true`** |
+**Phân biệt kế thừa** | **C6** A (tường minh `HienThi`) ⇒ `CoBanGhiTuongMinh = true` ⇒ **A và B phân biệt được** |
+**Trạng thái khác** | **C7** C (`An`) ⇒ có **lý do** + `DangHienThi = false` · **C8** D (`NgungBan`) ⇒ `DangHienThi = false` · **C9** **không** dòng nào trả `KeThua` |
+**Lọc hiển thị** | **D1** còn **2** dòng · **D2 🚨 GIỮ B** (kế thừa) · **D3** bỏ C và D |
+**Guard `0207`** | **E1** kênh không tồn tại ⇒ `403` + `0207` |
+**Ranh giới trần** | **F1** **đúng 200** ⇒ `200` + **đủ 200 dòng** · **F2** 200 sản phẩm không tồn tại ⇒ **tất cả** `HienThi` + `tuongMinh = false` · **F3** **201** ⇒ **NÉM** `403` + `0011` · **F4** lỗi mang **`soSanPham` + `toiDa`** |
+**Rỗng** | **G1** danh sách rỗng ⇒ `200` + 0 dòng (**không ném**) |
+
+📌 **Ca `C2` là ca đáng giá nhất của cả `CAT-003`.** Trước lượt này, **1075 test xanh** và **mọi probe trước**
+đều **không** chứng minh được nó — vì **không có đường gọi** nào phơi resolver. 🔑 Nay nó là một **phép đo**
+trên DB thật.
+
+### 26.5 🐞 **Bộ đo sai — lần thứ BẢY**, và lần này lỗi **che mất chính guard cần kiểm**
+
+**Lần chạy đầu: `F1`/`F2` ĐỎ.** ⚠️ Nguyên nhân **là lỗi của TÔI, không phải sản phẩm**: tôi sinh Id bằng
+<code>'e0000000-0000-0000-0000-0000000000' + $_.ToString('00')</code> ⇒ chuỗi **42 ký tự** ⇒ **GUID SAI ĐỊNH DẠNG**
+⇒ `[ApiController]` chặn ở tầng **validation** ⇒ **`HTTP 400`** — **TRƯỚC KHI** vào app service.
+🚨 **Tức ca đó KHÔNG hề kiểm guard của tôi**, và nếu tôi chỉ nhìn *"HTTP 400, không phải 200"* thì rất dễ
+kết luận *"guard chạy đúng"*.
+🔑 **Sửa (và làm ca kiểm MẠNH HƠN):** dùng `[guid]::NewGuid()` (GUID **hợp lệ**, không tồn tại) và kiểm
+**ĐÚNG RANH GIỚI** — **200 ⇒ được**, **201 ⇒ chặn**. 📌 Thêm ca `F2` (200 sản phẩm không tồn tại ⇒ tất cả
+`HienThi` + `tuongMinh = false`), đối xứng với ca `B`.
+📌 **Bài học:** một ca đỏ có thể đỏ vì **tầng khác** chặn trước. 🔒 Phải **kiểm mã lỗi VÀ tầng phát sinh**,
+không chỉ kiểm *"có lỗi hay không"*.
+
+### 26.6 📌 Bài học quy trình (từ §25.6 → §26)
+
+Ở §25.6 tôi **thử bốn cách đo** và **không** cách nào chạy, rồi **ghi nợ**. 🔑 Lượt này tôi làm **việc đúng**:
+**làm đường gọi** (endpoint) — và ca cốt lõi thành **phép đo được** trong **một** lượt.
+📌 **Quy tắc rút ra:** khi một ca không đo được vì **thiếu đường gọi**, thì **làm đường gọi** (hoặc đường gọi
+đó **chính là** tính năng cần xây) — **đừng** thử thêm cách đo thứ N+1. ⚠️ Và **đường gọi đó thường có ích
+thật** (storefront **cần** biết *"kênh này đang hiển thị gì"*), nên nó **không** phải mã chỉ để test.
+
+### 26.7 ⏳ NỢ (cập nhật)
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+**1** | 🚨 **CHƯA có interceptor runtime kiểm SQL THẬT** | §25.7 #1 — vẫn là lưới **chắc chắn** cho `INNER JOIN`. 📌 Nay **đã có probe** chứng minh hành vi đúng, nên interceptor là **phòng ngừa hồi quy** (không còn là "để biết nó có chạy không") |
+**2** | ✅ **Endpoint đo được resolver** | **ĐÓNG** (§26.2) |
+**3** | **Chưa test ca DỮ LIỆU BẨN** (trùng `(ProductId, ChannelCode)`) | `TraNhieuAsync` **có** xử lý (chọn bản ghi tường minh) nhưng **chưa** đo |
+**4** | **Chưa đo hiệu năng** (`NFR-CAT-003-002`: p95 < 20 ms với 10.000 sản phẩm) | ⚠️ Nay **đo được** vì đã có endpoint ⇒ cần `EXPLAIN` + đo thời gian |
+**5** | **Chưa có UI/job `F10`** | Như §24.7 |
+**6** | **`TraMotAsync` chưa có đường gọi** | Endpoint mới dùng `TraNhieuAsync`; `TraMotAsync` hiện **chưa ai gọi** ⇒ hoặc dùng, hoặc gỡ |
+
+### 26.8 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.2 | 16/10/2026 | *(agent, session GĐ1)* | **§26 — ĐÓNG NỢ §25.6: CA CỐT LÕI ĐÃ ĐO ĐƯỢC (19/19)**: endpoint **`POST hien-thi-kenh/tra-hieu-luc`** (**đường gọi duy nhất phơi `LEFT JOIN`**) + `TraHieuLucInput`/`HienThiHieuLucDto` + **trần 200 sản phẩm** (**NÉM**, không cắt bớt). 🔑 **HAI QUYẾT ĐỊNH**: (①) **`DangHienThi` là một TRƯỜNG** — không để client tự suy từ `TrangThai` (viết `!= An` mà quên `NgungBan` ⇒ **bán lại** sản phẩm đã ngừng bán); (②) **vượt trần ⇒ NÉM** (cắt bớt ⇒ storefront **thiếu sản phẩm** mà **không lỗi nào**) + lỗi mang `soSanPham`/`toiDa`. ✅ **19/19 ca HTTP + DB thật**: 🚨 **C2 SẢN PHẨM KHÔNG CÓ BẢN GHI VẪN CÓ MẶT** · C3–C5 `HienThi` + `tuongMinh=false` + `DangHienThi=true` · **C6 phân biệt được KẾ THỪA với tường minh** · C9 **không** trả `KeThua` · **D2 lọc hiển thị GIỮ bản ghi kế thừa** · E1 `0207` · **F1 đúng 200 ⇒ đủ 200 dòng / F3 201 ⇒ NÉM** · G1 rỗng không ném. 🐞 **Bộ đo sai lần thứ BẢY — và nó CHE MẤT chính guard cần kiểm**: `F1`/`F2` đỏ vì tôi sinh **GUID sai định dạng** (42 ký tự) ⇒ `[ApiController]` chặn ở **validation** ⇒ `400` **trước khi** vào app service ⇒ ca đó **không hề kiểm guard**; 🔑 sửa bằng `[guid]::NewGuid()` + kiểm **đúng ranh giới 200/201**. 📌 **Bài học quy trình (§26.6):** khi một ca không đo được vì **thiếu đường gọi**, việc đúng là **làm đường gọi** — và đường gọi đó **thường có ích thật** (storefront **cần** nó), **không** phải mã chỉ để test |

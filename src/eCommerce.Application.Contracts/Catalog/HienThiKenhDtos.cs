@@ -104,4 +104,66 @@ public interface IHienThiKenhAppService
 
     /// <summary>Đặt trạng thái hiển thị trên một kênh — xem **quy ước** ở `DatHienThiKenhInput`.</summary>
     Task<HienThiKenhDto?> PostDatAsync(Guid productId, DatHienThiKenhInput input);
+
+    /// <summary>
+    /// 🚨 **TRA TRẠNG THÁI HIỆU LỰC CỦA NHIỀU SẢN PHẨM TRÊN MỘT KÊNH** — đi qua
+    /// `IChannelVisibilityResolver` (**`LEFT JOIN`**).
+    ///
+    /// 🔑 **VÌ SAO ENDPOINT NÀY TỒN TẠI (không chỉ để "cho đủ bộ"):**
+    /// <list type="number">
+    ///   <item>**Nó là đường gọi DUY NHẤT phơi quy tắc `LEFT JOIN` ra ngoài** ⇒ không có nó thì quy tắc
+    ///     `ADR-08` **không đo được** từ bên ngoài (đúng nợ `CAT-003` §25.6);</item>
+    ///   <item>🔒 **Nó là đường gọi THẬT cho storefront/kênh:** *"kênh này đang hiển thị gì"* là câu hỏi
+    ///     trung tâm của `ADR-08`;</item>
+    ///   <item>📌 Và vì nó phơi **trạng thái HIỆU LỰC**, client **không** phải tự nhớ quy tắc
+    ///     *"vắng bản ghi ⇒ `HienThi`"* — chỗ nào tự nhớ thì chỗ đó **ẩn nhầm** sản phẩm.</item>
+    /// </list>
+    /// ⚠️ **KHÁC HẲN `GetDanhSachAsync`:** hàm kia trả **bản ghi TƯỜNG MINH** (để quản trị),
+    /// còn hàm này trả **trạng thái HIỆU LỰC** (để hiển thị). 📌 Trộn hai việc này là nguồn gốc của
+    /// **`INNER JOIN`** — vì quản trị chỉ cần bản ghi, còn hiển thị **cần cả** sản phẩm **không** có bản ghi.
+    /// </summary>
+    Task<IReadOnlyList<HienThiHieuLucDto>> PostTraHieuLucAsync(TraHieuLucInput input);
+}
+
+/// <summary>Input tra trạng thái **hiệu lực** của nhiều sản phẩm trên một kênh.</summary>
+public class TraHieuLucInput
+{
+    /// <summary>Mã kênh. 🔒 Bắt buộc — *"hiển thị trên kênh nào"* không có mặc định hợp lý.</summary>
+    [Required]
+    [StringLength(eCommerceConsts.CatalogLimits.MaKenhHienThiToiDa)]
+    public string ChannelCode { get; set; } = default!;
+
+    /// <summary>Danh sách sản phẩm cần tra. 📌 Giới hạn độ dài để một request không kéo **toàn bộ** danh mục
+    /// (xem hằng số ở app service) — 🔒 và để câu `IN` không vượt giới hạn tham số của PostgreSQL.</summary>
+    [Required]
+    public List<Guid> ProductIds { get; set; } = [];
+
+    /// <summary>
+    /// 🔑 `true` ⇒ **CHỈ trả** những sản phẩm **đang hiển thị** (`HienThi`/kế thừa) — tức **bỏ** `An` và `NgungBan`.
+    /// 📌 Mặc định `false`: trả **cả** trạng thái ẩn, để client **hiện được** lý do ẩn (thay vì im lặng bỏ đi
+    /// rồi người dùng tự hỏi *"sản phẩm của tôi đâu"*).
+    /// </summary>
+    public bool ChiHienThi { get; set; }
+}
+
+/// <summary>Trạng thái **hiệu lực** của một sản phẩm trên một kênh.</summary>
+public class HienThiHieuLucDto
+{
+    public Guid ProductId { get; set; }
+
+    /// <summary>Trạng thái **hiệu lực** — 🔒 đã áp quy tắc *"vắng bản ghi ⇒ `HienThi`"* (`ADR-08`).
+    /// ⚠️ **KHÔNG BAO GIỜ** là `KeThua`: đó là trạng thái **lưu trữ**, không phải trạng thái **hiệu lực**.</summary>
+    public string TrangThai { get; set; } = default!;
+
+    /// <summary>`true` nếu có bản ghi **tường minh**; `false` nếu **kế thừa**.
+    /// 📌 UI dùng trường này để hiện nhãn **"Kế thừa"** (`CAT-003` §A2) — nếu chỉ có `TrangThai` thì
+    /// **không** phân biệt được *"kế thừa"* với *"đã đặt tường minh = `HienThi`"*.</summary>
+    public bool CoBanGhiTuongMinh { get; set; }
+
+    /// <summary>Lý do (chỉ có khi bản ghi tường minh ở trạng thái `An`).</summary>
+    public string? LyDo { get; set; }
+
+    /// <summary>Trạng thái này **có hiển thị** trên kênh không (`HienThi`/kế thừa ⇒ `true`).
+    /// 🔒 Đây là **định nghĩa DUY NHẤT** của *"hiển thị"* — client **không** tự suy từ `TrangThai`.</summary>
+    public bool DangHienThi { get; set; }
 }
