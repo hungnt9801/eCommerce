@@ -262,3 +262,61 @@ trình đang chạy **giữ tệp** là **nguyên nhân gốc** của cả **b�
 ➕ **Bước E2E `-DayDu` BÁO LỖI thay vì im lặng bỏ qua** — 🔑 một bước *"im lặng bỏ qua"* nguy hiểm hơn một
 bước **báo lỗi**: 📌 nó khiến người ta tin rằng **đã** kiểm. 🚨 Đây chính là **nợ đã ghi**
 (`web-001` §98.7 #1: probe E2E vẫn là **script tay**).
+
+---
+
+## 🚨 `kiem-db.ps1` — **CỔNG BẤT BIẾN DB** (bước ⑥ của `kiem-tat-ca.ps1`)
+
+### Vì sao có script này
+
+Mỗi vòng làm việc, tôi vẫn kiểm DB **bằng tay** (5–6 câu `psql`) trước khi commit. ⚠️ Và đó là **bước dễ
+quên nhất** — 📌 quên nó thì *"tất cả xanh"* nhưng **dữ liệu thử nghiệm còn nằm trong DB**, và lần sau một
+phép đo sẽ **đọc phải chúng** rồi **kết luận sai**.
+
+➕ **Và đây là bước DUY NHẤT chạm vào TRẠNG THÁI THẬT** (không phải mã nguồn): mermaid kiểm **tài liệu**,
+test kiểm **mã**, còn bước này kiểm **cái đang nằm trong database**.
+
+### 🚨🚨 RANH GIỚI BẤT BIẾN — bài học quan trọng nhất
+
+| Nhóm | Bảng | Kỳ vọng |
+|---|---|---|
+**① PHẢI RỖNG** (dấu vết thử nghiệm) | `AbpSettings` · `CusCustomers` · `CusGroups` · `CatProductMedia` · `CatProductChannelVisibilities` · `MsgDeadLetters` · `SalMarketplaceOrderIntakes` · `InvChannelLimits` · `PayTransactions` · `ReconRunMismatches` | **0 dòng** |
+**② GIỮ LỊCH SỬ** (🚨 **KHÔNG** được coi là rác) | **`ReconRuns`** | 🔑 **con số TĂNG DẦN là ĐÚNG** |
+
+🔒 **Vì sao nhóm ② quan trọng:** `ReconRuns` là **nhật ký lượt quét đối soát** — job
+`InventoryReconciliationWorker` ghi **một dòng mỗi nhịp**. 📌 Đặt một phép kiểm *"phải rỗng"* lên nó sẽ
+**ĐỎ** sau vài giờ chạy job, rồi người ta sẽ **vô hiệu hoá phép kiểm** — hoặc tệ hơn: **xoá dữ liệu thật**
+để cho nó xanh. 🔒 Xoá `ReconRuns` là **xoá bằng chứng kiểm toán**.
+
+🔑 **Bài học chung:** một phép kiểm *"bảng phải rỗng"* chỉ đúng với bảng **không có ý nghĩa nghiệp vụ**.
+⚠️ Áp nó lên bảng **có lịch sử** là **tự tạo ra một cổng luôn đỏ** — 📌 và **cổng luôn đỏ thì người ta học
+cách bỏ qua nó** (cùng bài học `sal-006` §23.4).
+
+### Năm nhóm bất biến
+
+| Nhóm | Kiểm gì |
+|---|---|
+**①** | Bảng phải rỗng — ⚠️ đếm **CẢ** bản ghi **XOÁ MỀM** (`IsDeleted`). 📌 Một dòng xoá mềm **không** hiện trong truy vấn thường nhưng **vẫn chiếm** unique index `NULLS NOT DISTINCT` ⇒ lần gieo sau **thất bại vì lý do khó hiểu** |
+**②** | `AbpUsers.NormalizedUserName = 'ADMIN'` phải có `ShouldChangePasswordOnNextLogin = true`. 🚨 Probe **tắt** cờ này để đăng nhập ⇒ 🔒 quên bật lại = commit một **admin không bị buộc đổi mật khẩu** |
+**③** | Số unique index `NULLS NOT DISTINCT` — 🔑 đọc **từ chính test** (`F1_du_48…`), **không** viết cứng. ⚠️ Một con số cứng trong script sẽ **lệch** với con số trong test ⇒ **hai nguồn sự thật** |
+**④** | Quyền bắt buộc phải còn (9 quyền, gồm `eCommerce.Pricing`, `eCommerce.Operations`, `eCommerce.ChannelLimits`…) — 🔑 **cơ sở** cho `WEB-001` (menu theo quyền) |
+**⑤** | Dấu vết thử nghiệm: **mọi** tiền tố probe (`K9`, `k9`, `K97`) — 🔑 phép kiểm **mạnh nhất** vì bắt rác ở **mọi** bảng có cột mã, không chỉ 10 bảng ở nhóm ① |
+
+### Mã thoát
+
+| Mã | Nghĩa |
+|---|---|
+**0** | ✅ Mọi bất biến ĐẠT |
+**1** | 🚨 Có bất biến **HỎNG** (kèm danh sách) |
+**2** | ⚠️ **Phép kiểm VÔ NGHĨA** — không kết nối được PostgreSQL, hoặc đọc được **0 quyền**. 🔒 **KHÔNG** được coi là *"DB sạch"* |
+
+➕ `-ChoPhepRong` (⚠️ **KHÔNG** dùng trước khi commit): cho phép bảng nhóm ① có dữ liệu, **cảnh báo** thay vì
+thất bại. 📌 Dùng khi chạy trên DB **đang phát triển**.
+
+### ✅ Đã tiêm lỗi để chắc cổng BẮT (3 ca, cả 3 đều ĐỎ)
+
+| Tiêm | Kết quả đo |
+|---|---|
+Dòng **XOÁ MỀM** trong `InvChannelLimits` | ✅ ĐỎ — `TONG=1 · conSong=0 · xoaMem=1` ⇒ 🔑 **đếm thường sẽ bỏ sót ca này** |
+`ShouldChangePasswordOnNextLogin = false` | ✅ ĐỎ + nhắc rõ *"Probe TẮT cờ này để đăng nhập"* |
+Dòng `K97TIEM1` trong `PayTransactions` | ✅ **2** bất biến đỏ (nhóm ① **và** nhóm ⑤) |

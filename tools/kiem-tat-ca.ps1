@@ -233,7 +233,35 @@ Buoc 'Tai lieu: kiem khoi mermaid' {
     if ($m.Ma -ne 0) { throw "KIEM MERMAID DO (exit $($m.Ma))." }
 }
 
-# ── BUOC 5 (tuy chon): E2E CO PHIEN ────────────────────────────────────────────────────────
+# ── BUOC 5: BAT BIEN DB ────────────────────────────────────────────────────────────────────
+Buoc 'Bat bien DB (khong con dau vet thu nghiem)' {
+    # 🔑 **BUOC NAY TON TAI VI "QUEN KIEM DB" LA BUOC DE QUEN NHAT.** Moi vong lam viec toi van kiem DB
+    # **bang tay** (5-6 cau `psql`) truoc khi commit — ⚠️ va quen no thi *"tat ca xanh"* nhung **du lieu thu
+    # nghiem con nam trong DB** ⇒ 📌 lan sau mot phep do se **doc phai chung** roi **ket luan sai**.
+    # 🚨 **VA NO LA BUOC DUY NHAT CHAM VAO TRANG THAI THAT** (khong phai ma nguon): mermaid kiem **tai lieu**,
+    # test kiem **ma**, con buoc nay kiem **cai dang nam trong database**.
+    $d = ChayLenh 'pwsh' @('-NoProfile', '-File', (Join-Path $PSScriptRoot 'kiem-db.ps1')) 'db.log'
+
+    # 📌 In **cac dong ket qua** (co neo ✅/🚨/DB:) thay vi ca tep — 🔑 de nguoi doc thay **con so THAT**,
+    # khong phai mot dong *"OK"* suong.
+    Get-Content $d.Log | Where-Object { $_ -match '✅|🚨|DB:|📌' } |
+        Select-Object -First 26 | ForEach-Object { "   $_" }
+
+    if ($d.Ma -eq 2) {
+        # 🔒 Ma 2 = **khong ket noi duoc / phep kiem VO NGHIA** ⇒ ⚠️ **KHONG** duoc coi la *"DB sach"*.
+        # 📌 Phan biet hai ma nay la bai hoc cua `kiem-moc-build.ps1` (⚠️ `Write-Error` ep exit 1 lam **lan**
+        # hai nguyen nhan **khac nhau** ⇒ nguoi doc log **khong phan biet duoc** va se **sua sai cho**).
+        Get-Content $d.Log | Select-Object -Last 6 | ForEach-Object { "   $_" }
+        throw 'KIEM DB VO NGHIA (khong ket noi duoc PostgreSQL?) — kiem Docker/container truoc khi ket luan.'
+    }
+
+    if ($d.Ma -ne 0) {
+        Get-Content $d.Log | Select-String 'HONG' | Select-Object -First 8 | ForEach-Object { "   $($_.Line.Trim())" }
+        throw "BAT BIEN DB HONG (exit $($d.Ma)) — xem log: $($d.Log)"
+    }
+}
+
+# ── BUOC 6 (tuy chon): E2E CO PHIEN ────────────────────────────────────────────────────────
 if ($DayDu -and -not $BoQuaE2E) {
     Buoc 'E2E co phien dang nhap (web-001 §97)' {
         $script = Join-Path $thuMucTam 'e2e.ps1'

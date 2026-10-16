@@ -1657,3 +1657,88 @@ dẫn** (`… | Select-Object`) ⇒ nhận **giá trị cũ** ⇒ suýt kết lu
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.4 | 17/10/2026 | *(agent, session GĐ1)* | **§23 — LÁT CẮT 6: MỘT LỆNH CHẠY TẤT CẢ PHÉP KIỂM** (đóng nợ §22.8 #3): thêm **`tools\kiem-tat-ca.ps1`** — **một lệnh, năm bước, exit code THẬT**: ① **dọn tiến trình + chờ cổng `5000`/`5100` TRỐNG** (📌 đây là **nguyên nhân gốc** của cả **bốn lần** trả giá) · ② **build + KIỂM MỐC nhi phân** · ③ unit test · ④ integration test · ⑤ mermaid. 🔒 **Hai quy tắc mà chính script THI HÀNH:** **① KHÔNG BAO GIỜ ống dẫn output của lệnh mà ta cần exit code** (mỗi lệnh ghi ra **tệp tạm** rồi đọc — hàm `ChayLenh` dùng `*>` **không** dùng `|`) — 📌 vì `dotnet build … \| Select-String` 🔒 **CHE MẤT exit code**; **② build xong PHẢI kiểm mốc** ⇒ 🚨 `exit 1` ⇒ **DỪNG NGAY, KHÔNG chạy test** (test trên binary cũ đỏ vì **LÝ DO SAI** ⇒ **kết luận sai về SẢN PHẨM**). ➕ **Bước E2E (`-DayDu`) BÁO LỖI thay vì im lặng bỏ qua** — 🔑 *"im lặng bỏ qua"* nguy hiểm hơn *"báo lỗi"*: 📌 nó khiến người ta tin rằng **đã** kiểm. ✅ **KIỂM CHỨNG + ĐÃ TIÊM LỖI:** chạy đầy đủ **`exit 0` · 56.7s · 68 tệp mọi mốc đều đổi · 1155 unit · 38 integration · mermaid 197/0**; 🚨 **tiêm LỖI BUILD** ⇒ **`exit 1`** + in **dòng lỗi có tệp/số dòng** + 🔒 **KHÔNG chạy unit test**; 🚨 **cổng binary-không-đổi** ⇒ **`exit 1`** + hướng dẫn sửa. 🚨🚨 **VÀ TÔI ĐÃ VIẾT NGƯỢC ĐIỀU KIỆN CỦA CỔNG — bài học lớn nhất của lượt:** cổng báo *"2 TEP KHONG DOI ⇒ BAN BUILD KHONG VAO"* **ngay cả khi mọi tệp ĐỀU ĐỔI** ⇒ 🔒 **cổng LUÔN ĐỎ**, và 📌 **một cổng luôn đỏ thì người ta học cách BỎ QUA nó** ⇒ nó **vô dụng đúng lúc cần nhất** (mà nó sinh ra để chống **bốn lần** trả giá!). 🔑 **Cách chữa KHÔNG chỉ là đảo `if`:** đặt tên theo **ĐIỀU KIỆN ĐANG KIỂM** (`$coDoi` = *"tệp có ĐỔI không?"*) thay vì theo **KẾT QUẢ** (`$khongDoi`) ⇒ `if ($coDoi)` đọc lên **hiển nhiên đúng** ⇒ 🔒 **không còn chỗ cho việc đảo nhầm**. 📌 **BÀI HỌC CHUNG:** điều kiện **PHỦ ĐỊNH** (`$khongDoi`/`$khongLoi`/`$chuaXong`) là nơi **dễ đảo nhầm nhất** vì cả *"đúng"* lẫn *"sai"* đều đọc ra **có lý** ⇒ 🔒 **dùng tên KHẲNG ĐỊNH**. 🐞 **Bốn lỗi:** (1) 🚨 **viết ngược điều kiện cổng**; (2) 🚨 **đo bằng công cụ sai** — grep tên lớp trong DLL bằng **`Encoding.Unicode`** rồi kết luận *"DLL không có worker"* (⚠️ .NET dùng **UTF-8**) — 📌 **lần thứ hai** (§21.6 #2); (3) **`ConvertFrom-Json` TỰ ĐỔI KIỂU** — nó chuyển ISO-8601 thành **`[datetime]`** và `[datetime] -eq [string]` trả **False** còn `[datetime] -eq [datetime]` trả **True** ⇒ 🔑 **phép so sánh phụ thuộc KIỂU, không phụ thuộc GIÁ TRỊ** ⇒ 🔒 **không đáng tin**; ✅ chữa bằng **số tick UTC** (số nguyên) ⇒ **không có chuyển đổi ngầm nào chen vào** (📌 `ConvertFrom-Json` **không** trả *"dữ liệu thô"* — nó **suy kiểu**); (4) **`Write-Error` ép `exit 1`** ⇒ hai nguyên nhân **KHÁC NHAU** (*"binary không đổi"* vs *"phép kiểm vô nghĩa"*) có **cùng** mã ⇒ 🔒 người đọc log **không phân biệt được** và sẽ **sửa sai chỗ**; ✅ chữa: `Write-Output` + `exit 2`. ➕ **Hai điều về PHÉP ĐO:** tôi **nhiều lần** đọc `$LASTEXITCODE` **sau một ống dẫn** ⇒ nhận **giá trị CŨ** ⇒ suýt kết luận *"script sai"* khi script **đúng** (📌 đúng bài học mà script này thi hành); và một lần **`bin\` RỖNG** (0 `.dll`) làm cổng báo *"không thấy tệp nào"* — 🔑 phép kiểm **đúng**, 📌 cái sai là tôi suy luận *"cổng hỏng"* trước khi **kiểm điều kiện tiên quyết**. Ghi **§23.6** (nợ: 🚨 **CHƯA CÓ CI** — không `.github`/`azure-pipelines`/`Jenkinsfile`; 📌 nay **đã có nền**, thêm CI thì **chỉ cần gọi** script này · 🚨 **probe E2E vẫn là SCRIPT TAY** ⇒ `web-001` §98.7 #1 **vẫn mở** · ~57s vì `--no-incremental` **có chủ ý** (chống bẫy) · integration test **cần Docker** — script **nói rõ** để không ai tưởng **mã nguồn** hỏng · **chưa kiểm DB sau khi chạy** (nên thành **bước ⑥**)) |
+
+---
+
+## 24. ✅ **LÁT CẮT 7 — BƯỚC ⑥: CỔNG BẤT BIẾN DB** (17/10/2026) — *đóng nợ §23.6 #5*
+
+### 24.1 🔑 **Vấn đề: bước dễ quên nhất, và là bước DUY NHẤT chạm TRẠNG THÁI THẬT**
+
+Mỗi vòng làm việc tôi vẫn kiểm DB **bằng tay** (5–6 câu `psql`) trước khi commit. ⚠️ Và đó là bước **dễ
+quên nhất** — 📌 quên nó thì *"tất cả xanh"* nhưng **dữ liệu thử nghiệm còn nằm trong DB**, và lần sau một
+phép đo sẽ **đọc phải chúng** rồi **kết luận sai**.
+
+➕ **Và nó KHÁC HẲN năm bước kia:** mermaid kiểm **tài liệu**, test kiểm **mã**, còn bước này kiểm
+**cái đang nằm trong database**. 🔒 Không bước nào khác trong `kiem-tat-ca.ps1` chạm vào **trạng thái thật**.
+
+### 24.2 🚨🚨 **RANH GIỚI BẤT BIẾN — BÀI HỌC QUAN TRỌNG NHẤT CỦA LƯỢT NÀY**
+
+Khi khảo sát DB, tôi thấy **`ReconRuns` = 55 dòng**. 📌 Phản xạ đầu tiên là *"rác, phải xoá"* — ⚠️ **SAI**:
+`ReconRuns` là **nhật ký lượt quét đối soát**, do `InventoryReconciliationWorker` ghi **một dòng mỗi nhịp**
+⇒ 🔑 **con số TĂNG DẦN là ĐÚNG**.
+
+| Nhóm | Bảng | Kỳ vọng |
+|---|---|---|
+**① PHẢI RỖNG** (dấu vết thử nghiệm) | `AbpSettings` · `CusCustomers` · `CusGroups` · `CatProductMedia` · `CatProductChannelVisibilities` · `MsgDeadLetters` · `SalMarketplaceOrderIntakes` · `InvChannelLimits` · `PayTransactions` · `ReconRunMismatches` | **0 dòng** |
+**② GIỮ LỊCH SỬ** (🚨 **KHÔNG** được coi là rác) | **`ReconRuns`** | 🔑 **tăng dần là ĐÚNG** |
+
+🔒 **Vì sao nhóm ② phải được ghi rõ:** đặt một phép kiểm *"phải rỗng"* lên nó sẽ **ĐỎ** sau vài giờ chạy job,
+rồi người ta sẽ **vô hiệu hoá phép kiểm** — hoặc **tệ hơn**: **xoá dữ liệu thật** để cho nó xanh.
+🔑 Xoá `ReconRuns` là **xoá bằng chứng kiểm toán**.
+
+🔑 **BÀI HỌC CHUNG (áp dụng cho mọi phép kiểm "phải rỗng" sau này):** một phép kiểm *"bảng phải rỗng"* chỉ
+đúng với bảng **không có ý nghĩa nghiệp vụ**. ⚠️ Áp nó lên bảng **có lịch sử** là **tự tạo ra một cổng luôn
+đỏ** — 📌 và **cổng luôn đỏ thì người ta học cách bỏ qua nó** (đúng bài học **§23.4** của chính tôi).
+
+### 24.3 ✅ **Năm nhóm bất biến của `tools\kiem-db.ps1`**
+
+| Nhóm | Kiểm gì |
+|---|---|
+**①** | Bảng phải rỗng — ⚠️ đếm **CẢ** bản ghi **XOÁ MỀM** (`IsDeleted`). 📌 Một dòng xoá mềm **không** hiện trong truy vấn thường nhưng **vẫn chiếm** unique index `NULLS NOT DISTINCT` ⇒ lần gieo sau **thất bại vì lý do khó hiểu** |
+**②** | `ADMIN.ShouldChangePasswordOnNextLogin = true`. 🚨 Probe **tắt** cờ này để đăng nhập ⇒ 🔒 quên bật lại = commit một **admin không bị buộc đổi mật khẩu** |
+**③** | Số unique index `NULLS NOT DISTINCT` — 🔑 đọc **từ chính test** (`F1_du_48…`), **KHÔNG** viết cứng. ⚠️ Một con số cứng trong script sẽ **lệch** với con số trong test ⇒ **hai nguồn sự thật** |
+**④** | **9 quyền bắt buộc** phải còn (gồm `eCommerce.Pricing`, `eCommerce.Operations`, `eCommerce.ChannelLimits`…) — 🔑 **cơ sở** cho `WEB-001` (menu theo quyền): 📌 thiếu **một** quyền thì **cả một nhóm menu biến mất**, và nó biến mất **im lặng** |
+**⑤** | Dấu vết thử nghiệm: **MỌI** tiền tố probe (`K9`, `k9`, `K97`) — 🔑 phép kiểm **MẠNH NHẤT** vì bắt rác ở **mọi** bảng có cột mã, không chỉ 10 bảng ở nhóm ① |
+
+🔒 **Mã thoát tách hai nguyên nhân** (bài học §23.5 #4): **0** = mọi bất biến đạt · **1** = có bất biến
+**hỏng** · **2** = ⚠️ **phép kiểm VÔ NGHĨA** (không kết nối được PostgreSQL, hoặc đọc được **0 quyền**)
+⇒ **KHÔNG** được coi là *"DB sạch"*.
+
+### 24.4 ✅ **KIỂM CHỨNG — ĐÃ TIÊM LỖI Ở CẢ BA NHÓM**
+
+| Tiêm | Kết quả đo |
+|---|---|
+Dòng **XOÁ MỀM** trong `InvChannelLimits` | ✅ **ĐỎ** — `TONG=1 · conSong=0 · xoaMem=1` ⇒ 🔑 **một phép đếm thường sẽ BỎ SÓT ca này** |
+`ShouldChangePasswordOnNextLogin = false` | ✅ **ĐỎ** + nhắc rõ *"Probe TẮT cờ này để đăng nhập"* |
+Dòng `K97TIEM1` trong `PayTransactions` | ✅ **HAI** bất biến đỏ (nhóm ① **và** nhóm ⑤) — 🔑 đúng: một dòng rác vi phạm **hai** luật độc lập |
+➕ **Tiêm rác rồi chạy `kiem-tat-ca.ps1`** | ✅ **`exit 1`** — 🚨 **cả lượt bị chặn**, không chỉ script con |
+
+**➕ Chạy trên DB sạch:** ✅ **20/20 bất biến ĐẠT** · **`exit 0`** · **6 bước, 62–64s**.
+
+### 24.5 🐞 **Ba lỗi của tôi trong lượt này**
+
+| # | Lỗi | Bài học |
+|---|---|---|
+**1** | **Đoán tên cột** (`MsgDeadLetters.EventName`) ⇒ **lỗi SQL** | 🚨 Tên thật là **`TenSuKien`**. 🔒 **Đây là lần thứ BA** của cùng một lỗi (`CAT-003` §16.6 #2 · `REC-001` #14 · lượt này) ⇒ 📌 luôn tra `information_schema.columns` **trước** khi viết SQL |
+**2** | **Đọc số `NND` từ test bằng cách lọc theo từ khoá `NND`** ⇒ **không khớp** (dòng số nằm cách xa dòng tên ca) ⇒ script **im lặng** chuyển sang chế độ *"chỉ in số, không kết luận"* | 🚨 **Đây là loại hỏng TỆ NHẤT:** ⚠️ phép kiểm **tự yếu đi mà không ai biết**. 🔑 Và nó **nguy hiểm hơn một ca ĐỎ**, vì một ca đỏ **buộc** người ta xem. ✅ Chữa: đọc số từ **dòng `Assert.Equal`** trong **cùng ca kiểm**, và **in rõ** `thucTe=48 · tuTest=48` |
+**3** | **`-Db` trùng alias của `-Debug`** ⇒ PowerShell từ chối chạy cả script | 📌 `-Debug` có alias `db`; ✅ đổi thành **`-TenDb`**. 🔑 Bài học: **tên tham số cũng có thể trùng** — không chỉ tên biến |
+
+➕ **Và một quan sát về chính phép đo:** tôi **nhiều lần** viết `@(Select-String … | Measure-Object).Count`
+rồi nhận **1** dù có nhiều kết quả ⇒ 📌 lại là **bài học về ống dẫn** (`sal-006` §23.5, lần thứ **hai**).
+🔒 Kiểm bằng `$h.Count` sau khi **gán vào biến** thì luôn đúng.
+
+### 24.6 ⏳ NỢ
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+**1** | 🚨 **Chưa có CI** | 📌 Nay `kiem-tat-ca.ps1` (6 bước) là **nền**: thêm CI thì **chỉ cần gọi nó** |
+**2** | 🚨 **Probe E2E vẫn là SCRIPT TAY** | 🔒 bước này **báo lỗi** thay vì bỏ qua, nhưng `web-001` §98.7 #1 **vẫn mở** |
+**3** | **Danh sách "phải rỗng" phải cập nhật tay** khi thêm bảng có dấu vết thử nghiệm | ⚠️ 📌 Nhóm ⑤ (tiền tố probe) bắt được phần lớn, nhưng **không** bắt bảng **không có cột mã** — 🔑 nợ thật |
+**4** | **Chưa kiểm `AbpPermissionGrants` có dòng lạ** | 📌 Hiện chỉ kiểm **thiếu**, **không** kiểm **thừa** |
+**5** | **Chưa kiểm số dòng `ReconRuns` có TĂNG** | 🔑 Có thể kiểm: chạy `kiem-db` hai lần và xác nhận con số **không giảm**. 📌 Nhưng cần cẩn thận: nó **phải** tăng chỉ khi job chạy ⇒ 🔒 kiểm *"không giảm"* là bất biến **đúng**, kiểm *"phải tăng"* là **sai** |
+
+### 24.7 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.5 | 17/10/2026 | *(agent, session GĐ1)* | **§24 — LÁT CẮT 7: BƯỚC ⑥ CỔNG BẤT BIẾN DB** (đóng nợ §23.6 #5): thêm **`tools\kiem-db.ps1`** + tích hợp thành **bước ⑥** của `kiem-tat-ca.ps1`. 🔑 **VÌ SAO CẦN:** đây là bước **dễ quên nhất** (tôi vẫn làm **bằng tay** mỗi vòng) — ⚠️ quên nó thì *"tất cả xanh"* nhưng **dữ liệu thử nghiệm còn trong DB** ⇒ lần sau một phép đo **đọc phải chúng** rồi **kết luận sai**; ➕ và nó là bước **DUY NHẤT** chạm **TRẠNG THÁI THẬT** (mermaid kiểm **tài liệu**, test kiểm **mã**). 🚨🚨 **RANH GIỚI BẤT BIẾN — BÀI HỌC LỚN NHẤT:** khảo sát thấy **`ReconRuns` = 55 dòng** và phản xạ đầu là *"rác, phải xoá"* — ⚠️ **SAI**: đó là **nhật ký lượt quét** do `InventoryReconciliationWorker` ghi **mỗi nhịp** ⇒ 🔑 **tăng dần là ĐÚNG**. 📌 Đặt phép kiểm *"phải rỗng"* lên nó sẽ **ĐỎ** sau vài giờ, rồi người ta **vô hiệu hoá phép kiểm** — hoặc **tệ hơn**: **xoá dữ liệu thật** để nó xanh (🔒 **xoá bằng chứng kiểm toán**). 🔑 **BÀI HỌC CHUNG:** phép kiểm *"bảng phải rỗng"* chỉ đúng với bảng **không có ý nghĩa nghiệp vụ**; áp lên bảng **có lịch sử** là **tự tạo cổng luôn đỏ** — và **cổng luôn đỏ thì người ta học cách bỏ qua** (đúng bài học **§23.4**!). ✅ **NĂM NHÓM:** ① **10 bảng phải rỗng** — ⚠️ đếm **CẢ bản ghi XOÁ MỀM** (📌 dòng xoá mềm **không** hiện trong truy vấn thường nhưng **vẫn chiếm** unique index `NULLS NOT DISTINCT` ⇒ lần gieo sau that bai **vì lý do khó hiểu**); ② **`ADMIN.ShouldChangePasswordOnNextLogin = true`** (🚨 probe tắt cờ này để đăng nhập ⇒ quên bật lại = commit một **admin không bị buộc đổi mật khẩu**); ③ số `NULLS NOT DISTINCT` — 🔑 đọc **TỪ CHÍNH TEST** (`F1_du_48…`), **không** viết cứng (⚠️ con số cứng sẽ **lệch** với test ⇒ **hai nguồn sự thật**); ④ **9 quyền bắt buộc** phải còn (🔑 cơ sở cho `WEB-001`: thiếu một quyền thì **cả một nhóm menu biến mất**, và biến mất **im lặng**); ⑤ 🔑 **MỌI tiền tố probe** (`K9`/`k9`/`K97`) — phép kiểm **MẠNH NHẤT** vì bắt rác ở **mọi** bảng có cột mã. 🔒 **Mã thoát tách hai nguyên nhân** (bài học §23.5 #4): **0** đạt · **1** hỏng · **2** ⚠️ **VÔ NGHĨA** (không kết nối được PostgreSQL, hoặc đọc được **0 quyền**) ⇒ **KHÔNG** coi là *"DB sạch"*. ✅ **ĐÃ TIÊM LỖI Ở CẢ BA NHÓM:** dòng **XOÁ MỀM** ⇒ **ĐỎ** (`TONG=1 · conSong=0 · xoaMem=1` — 🔑 một phép **đếm thường sẽ BỎ SÓT** ca này); `ShouldChangePasswordOnNextLogin=false` ⇒ **ĐỎ**; dòng `K97TIEM1` ⇒ **HAI** bất biến đỏ (nhóm ① **và** ⑤ — 🔑 đúng: một dòng rác vi phạm **hai** luật độc lập); ➕ **tiêm rác rồi chạy `kiem-tat-ca.ps1`** ⇒ **`exit 1`** — 🚨 **cả lượt bị chặn**, không chỉ script con. ✅ Trên DB sạch: **20/20 ĐẠT · `exit 0` · 6 bước 62–64s**. 🐞 **BA LỖI:** (1) 🚨 **đoán tên cột** (`MsgDeadLetters.EventName`) ⇒ **lỗi SQL**; tên thật là **`TenSuKien`** — 🔒 **lần thứ BA** của cùng lỗi (`CAT-003` §16.6 #2 · `REC-001` #14 · lượt này) ⇒ 📌 luôn tra `information_schema.columns` **trước** khi viết SQL; (2) 🚨 **đọc số `NND` từ test bằng lọc theo từ khoá `NND`** ⇒ **không khớp** (dòng số nằm cách xa dòng tên ca) ⇒ script **im lặng** chuyển sang chế độ *"chỉ in số, không kết luận"* — ⚠️ **đây là loại hỏng TỆ NHẤT: phép kiểm tự yếu đi mà không ai biết**, và nó **nguy hiểm hơn một ca ĐỎ** vì ca đỏ **buộc** người ta xem; ✅ chữa: đọc từ **dòng `Assert.Equal`** trong **cùng ca kiểm** + in rõ `thucTe=48 · tuTest=48`; (3) **`-Db` trùng alias của `-Debug`** ⇒ PowerShell **từ chối chạy cả script**; ✅ đổi thành **`-TenDb`** — 🔑 **tên tham số cũng có thể trùng**, không chỉ tên biến. ➕ **Và một quan sát về phép đo:** tôi nhiều lần viết `@(Select-String … \| Measure-Object).Count` rồi nhận **1** dù có nhiều kết quả ⇒ 📌 lại là **bài học về ống dẫn** (§23.5, lần thứ **hai**). Ghi **§24.6** (nợ: 🚨 **chưa có CI** — nay 6 bước là **nền** · 🚨 **probe E2E vẫn là SCRIPT TAY** ⇒ `web-001` §98.7 #1 **vẫn mở** · **danh sách "phải rỗng" phải cập nhật TAY** khi thêm bảng (⚠️ nhóm ⑤ không bắt được bảng **không có cột mã** — 🔑 nợ thật) · chưa kiểm `AbpPermissionGrants` có dòng **THỪA** · chưa kiểm `ReconRuns` **không giảm** (🔑 *"không giảm"* là bất biến **đúng**, *"phải tăng"* là **sai**)) |
