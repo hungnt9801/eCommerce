@@ -296,28 +296,43 @@ Buoc 'Test cho chinh cac cong kiem chung (khong phu thuoc MAY MAN)' {
     }
 }
 
-# ── BUOC 7 (tuy chon): E2E CO PHIEN ────────────────────────────────────────────────────────
+# ── BUOC 8 (tuy chon): E2E CO PHIEN ────────────────────────────────────────────────────────
 if ($DayDu -and -not $BoQuaE2E) {
-    Buoc 'E2E co phien dang nhap (web-001 §97)' {
-        $script = Join-Path $thuMucTam 'e2e.ps1'
+    Buoc 'E2E co phien dang nhap (web-001 §97 — HTML THAT)' {
+        # 🔑 **BUOC NAY LA NO LON NHAT CON LAI — VA NO KHONG CON LA SCRIPT TAY.**
+        #
+        # 📌 `web-001` §97: khi toi lam **duong goi CO PHIEN**, no **ngay lap tuc** phat hien **HAI loi san pham**
+        # ma **1101 unit test + 11 ca probe deu KHONG thay**:
+        #   ① `MenuViewComponent` **CHUA BAO GIO render MUC CON** ⇒ nhom thanh `href="#"` — **lien ket CHET**
+        #      ⇒ 🔒 nguoi dung **KHONG co loi vao** `/HanMucKenh` + `/DoiSoatThanhToan`;
+        #   ② **Can cu phap ly `91/2025/QH15`** chi nam trong **chu thich Razor** ⇒ **KHONG render**.
+        #
+        # 🚨 **VI SAO CHUNG LOT QUA:** unit test chi soi **DU LIEU** (menu la gi), ⚠️ **khong** soi **HTML sinh ra**.
+        # 🔒 **Va do la ly do buoc nay phai la THUONG TRU:** 📌 moi vong toi **phai tu viet lai** probe (hoac
+        # **quen**) ⇒ 🔑 mot cong **khong chay tu dong** thi **khong phai** cong.
+        $e = ChayLenh 'pwsh' @('-NoProfile', '-File', (Join-Path $PSScriptRoot 'kiem-e2e.ps1')) 'e2e.log'
 
-        if (-not (Test-Path $script)) {
-            # ⚠️ **KHONG** chep lai script E2E o day: no dai va da co noi khac. 📌 Thay vao do, **noi ro**
-            # la thieu — 🔑 mot buoc "im lang bo qua" nguy hiem hon mot buoc **bao loi**.
-            throw ("Chua co script E2E o {0}.`n" -f $script +
-                "   📌 Script do la probe co phien (form login + cookie) — xem web-001 muc 97.2 va tools\README-probe.md.`n" +
-                "   🔒 NO DA GHI: probe E2E van la script tay, chua dua vao day.")
+        # 📌 In **cac dong ket qua** (neo ✅/🚨/E2E:) — 🔑 de nguoi doc thay **tung ca**, khong phai mot dong *"OK"*.
+        Get-Content $e.Log | Where-Object { $_ -match '✅|🚨|E2E:|Khoi menu|DON DEP' } |
+            Select-Object -First 26 | ForEach-Object { "   $_" }
+
+        if ($e.Ma -eq 0) {
+            Write-Output '   ✅ HTML THAT: moi ca E2E DAT.'
         }
-
-        $e = ChayLenh 'pwsh' @('-NoProfile', '-File', $script) 'e2e.log'
-        Get-Content $e.Log | Select-Object -Last 12 | ForEach-Object { "   $_" }
-
-        if ($e.Ma -ne 0) { throw "E2E DO (exit $($e.Ma))." }
+        else {
+            Get-Content $e.Log | Select-String 'CAC CA KHONG DAT' -Context 0,8 |
+                ForEach-Object { $_.Context.PostContext | ForEach-Object { "   $_" } }
+            throw "E2E DO (exit $($e.Ma)) — xem log: $($e.Log). 🔒 DUNG ket luan gi ve SAN PHAM truoc khi doc tung ca."
+        }
     }
 }
 elseif (-not $BoQuaE2E -and -not $DayDu) {
     Write-Output ""
-    Write-Output '── [BO QUA] E2E co phien (them -DayDu de chay; ⚠️ no la SCRIPT TAY, xem `web-001` §98.7 #1)'
+    Write-Output '── [BO QUA] E2E co phien (them -DayDu de chay).'
+    Write-Output '   📌 Buoc nay kiem **HTML THAT** sau khi **dang nhap that** — 🔑 no bat duoc loi ma'
+    Write-Output '      unit test **KHONG** bat (vi unit test chi soi DU LIEU, khong soi HTML sinh ra):'
+    Write-Output '        • muc con cua menu hai tang co render khong (loi web-001 #1 — lien ket chet);'
+    Write-Output '        • can cu phap ly co HIEN THI khong (loi web-001 #2 — chi nam trong chu thich Razor).'
 }
 
 # ── TONG KET ───────────────────────────────────────────────────────────────────────────────

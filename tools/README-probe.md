@@ -537,3 +537,74 @@ kiểm sự **có mặt của `''`**.
 
 ➕ **So sánh trực tiếp (đo được):** cách cũ `String.Replace` với khối không khớp ⇒ nội dung **không đổi** và
 **KHÔNG ném** (📌 **im lặng**); cách mới `TiemVaoTep` ⇒ **NÉM** kèm *"PHEP TIEM KHONG XAY RA"*.
+
+---
+
+## 🚨 `kiem-e2e.ps1` — **KIỂM E2E CÓ PHIÊN ĐĂNG NHẬP (HTML THẬT)** — bước ⑧
+
+### Vì sao — **NỢ LỚN NHẤT VÀ LÂU NHẤT, VÀ NÓ ĐÃ ĐÓNG**
+
+📌 `web-001` **§97**: khi tôi làm **đường gọi CÓ PHIÊN**, nó **ngay lập tức** phát hiện **HAI lỗi sản phẩm**
+mà **1101 unit test + 11 ca probe ĐỀU KHÔNG THẤY**:
+
+| # | Lỗi | Vì sao lọt qua |
+|---|---|---|
+**①** | `MenuViewComponent` **CHƯA BAO GIỜ render MỤC CON** ⇒ nhóm *"Vận hành"* thành `href="#"` — **liên kết CHẾT** ⇒ 🔒 người dùng **không có lối vào** `/HanMucKenh` + `/DoiSoatThanhToan` | Unit test chỉ soi **DỮ LIỆU** (menu là gì), ⚠️ **không** soi **HTML sinh ra** |
+**②** | **Căn cứ pháp lý `91/2025/QH15`** chỉ nằm trong **chú thích Razor** ⇒ **KHÔNG render** | Probe cũ không đọc HTML thật của trang đó |
+
+🔒 **Và đó là lý do bước này phải là THƯỜNG TRÚ:** 📌 mỗi vòng tôi **phải tự viết lại** probe (hoặc **quên**)
+⇒ 🔑 một cổng **không chạy tự động** thì **không phải** cổng.
+
+### 🔒 NĂM QUY TẮC ĐƯỢC THI HÀNH TRONG SCRIPT (mỗi cái là một bài học đã trả giá)
+
+1. **PHẢI GIẢI MÃ ENTITY SỐ TRƯỚC KHI SO KHỚP.** 📌 Razor escape tiếng Việt thành `&#x110;` (`Đ`) ⇒
+   `-match 'Điều hướng'` trả **FALSE DÙ CHUỖI CÓ**. 🔒 Bài học này đã vấp **BA LẦN** ⇒ ✅ `GiaiMaHtml`.
+2. **NEO PHẢI LÀ ASCII THUẦN** ⇒ `[KHACHHANG-MAN-HINH]`, `[HANMUCKENH-MAN-HINH]`, `nav-pills`.
+3. **TIỀN ĐỀ PHẢI ĐƯỢC KHẲNG ĐỊNH TRƯỚC KHI ĐO.** ⚠️ Các form hành động (`Chan`/`MoChan`) **chỉ render khi có
+   dữ liệu thật** ⇒ 🔑 phải **gieo dữ liệu TRƯỚC** (và script **kiểm DB sạch trước khi chạy** — nếu không thì
+   ca *"có form hành động"* sẽ **XANH VÌ DỮ LIỆU CŨ**).
+4. **KHÔNG CÓ LIÊN KẾT CHẾT — NHƯNG PHẢI KIỂM TRONG KHOI MENU.** 📌 `href="#"` **duy nhất** trên trang thường là
+   **dropdown của THEME** (`navbar-nav`), không phải menu ta ⇒ ✅ **tách khối menu theo ranh giới `</nav>`**
+   rồi mới kiểm.
+5. **MỌI THỨ PHẢI ĐƯỢC DỌN DẸP — KỂ CẢ KHI ĐỎ.** 🔒 `try/finally` + **khẳng định đã dọn sạch**
+   (`khach probe con=0` · `co bao mat=True`) — 📌 nếu không thì lần sau `kiem-db.ps1` sẽ **ĐỎ vì lý do vô hình**.
+
+### 11 ca
+
+| Nhóm | Ca |
+|---|---|
+**Phiên** | **B1** `GET /KhachHang` = `200` (🔑 bằng chứng **duy nhất** rằng cookie phiên có tác dụng) |
+**Nội dung** | **D1** neo `[KHACHHANG-MAN-HINH]` · **D2** neo `[HANMUCKENH-MAN-HINH]` · 🚨 **D6** căn cứ pháp lý `91/2025/QH15` **hiển thị** · **D3** ô chọn `donVi` (`INV-003` mục 5 việc 2) · **D4** nói rõ *"0 = TẮT"* · **D5** nút hành động **với dữ liệu thật** |
+🚨 **Menu** | **E1** menu render · **E2** nhóm *"Vận hành"* · 🚨 **E3** **mục con `/HanMucKenh`** · 🚨 **E5** trong khối menu **không** có `href="#"` |
+
+### 🚨 HAI LỖI CỦA TÔI NGAY KHI VIẾT SCRIPT NÀY — VÀ MỘT TRONG ĐÓ RẤT ĐÁNG GIÁ
+
+**① `$home` là biến CHỈ-ĐỌC của PowerShell** ⇒ script **chết giữa đường**. 🔒 **LẦN THỨ BA** trong dự án
+(`web-001` §97.6 #4 · §98.6 #3 · lượt này) ⇒ ✅ đổi thành `$trangChu`.
+
+**② 🚨 CẮT KHỐI MENU BẰNG ĐỘ DÀI CỐ ĐỊNH ⇒ ca `E5` TỰ VÔ HIỆU.**
+📌 Bản đầu tôi cắt `Substring($iMenu, 2000)`. ⚠️ Nhưng menu thật **DÀI HƠN 2200 ký tự** (đo được: nhóm
+*"Vận hành"* nằm **ngoài** cửa sổ ⇒ `IndexOf('Van h')` trả **`-1`**).
+🔒 **HẬU QUẢ:** `href="#"` của nhóm nằm ở **CUỐI** menu — **ngoài** cửa sổ ⇒ ca **E5** (*"không có liên kết
+chết"*) **LUÔN XANH**. 📌 Nghĩa là phép kiểm **tự vô hiệu đúng ở chỗ nó quan trọng nhất** — nó sinh ra để bắt
+**liên kết chết**, mà liên kết chết lại **chính là thứ bị cắt mất**. 🔑 Và nó **im lặng** (`DAT`).
+➕ **Và tôi đã tiêm lỗi để kiểm — nhưng phép tiêm đầu KHÔNG TÁI HIỆN ĐÚNG LỖI LỊCH SỬ:** tôi bỏ khối
+`ulCon` nhưng **giữ nhánh `span`**, nên nhóm render thành `<span>` **không có `href`** ⇒ 📌 **không có gì để
+`E5` bắt**, và `E3` bắt (đúng). 🔑 **Tôi suýt kết luận *"E5 hỏng"*** — trong khi sự thật là **phép tiêm của tôi
+sai** (lần thứ **BA** của họ lỗi này!).
+✅ **Cách chữa:** trước §97 renderer render **MỌI** mục — kể cả nhóm — thành `<a href = muc.Url>`, và nhóm có
+`Url = "#"` ⇒ đó là **nguồn `href="#"` duy nhất**. ✅ Nên phép tiêm đúng là **khôi phục renderer cũ**.
+➕ Và cắt khối theo **ranh giới `</nav>`** (không theo độ dài).
+
+### ✅ KIỂM CHỨNG — ĐÃ TIÊM ĐÚNG LỖI LỊCH SỬ
+
+| Ca | Kết quả đo |
+|---|---|
+**Mã đúng + DB sạch** | ✅ **11/11** · `exit 0` · khối menu **1118** ký tự |
+🚨 **Tiêm ĐÚNG lỗi lịch sử** (khôi phục renderer cũ) — `K97TIEM` **đã khẳng định vào tệp** | ✅ **9/11** · `exit 1` · 🚨 **`E3` ĐỎ** (mục con không render) **VÀ `E5` ĐỎ** (`href="#"` = liên kết chết) · khối menu **725** ký tự |
+✅ **Khôi phục + build lại** | ✅ **11/11** · `exit 0` |
+
+➕ **Tích hợp:** `tools\kiem-tat-ca.ps1` **bước ⑧** (chỉ chạy khi `-DayDu`). ➕ Khi **không** `-DayDu` thì nó
+**in rõ nó kiểm GÌ** — 📌 *"im lặng bỏ qua"* nguy hiểm hơn *"báo rõ"*.
+➕ **Chạy đầy đủ 8 bước:** ✅ `exit 0` · **147.4s** · **1155 unit** · **38 integration** · mermaid **197/0** ·
+**DB 21/21** · **test cổng 17/17** · **E2E 11/11**.

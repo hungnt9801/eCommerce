@@ -1,0 +1,417 @@
+<#
+.SYNOPSIS
+    🚨 **KIEM E2E CO PHIEN DANG NHAP** — KHANG DINH HTML THAT cua cac trang admin.
+
+.DESCRIPTION
+    ══════════════════════════════════════════════════════════════════════════════════════════════════
+    🔑 **VI SAO SCRIPT NAY TON TAI — VA VI SAO NO LA NO LON NHAT CON LAI.**
+
+    O `web-001` **§97**, khi toi lam **duong goi CO PHIEN**, no **ngay lap tuc** phat hien **HAI loi san pham**
+    ma **1101 unit test + 11 ca probe deu KHONG thay**:
+
+      ① `MenuViewComponent` **CHUA BAO GIO render MUC CON** ⇒ nhom *"Van hanh"* thanh `href="#"` — mot
+         **lien ket CHET**, va 🔒 nguoi dung **KHONG co loi vao** `/HanMucKenh` + `/DoiSoatThanhToan`;
+      ② **Can cu phap ly `91/2025/QH15`** chi nam trong **chu thich Razor** ⇒ **KHONG render** ⇒ nguoi dung
+         **va nguoi kiem toan** khong thay can cu — trong khi do la **LY DO** man hinh bi gioi han truong.
+
+    🚨 **VI SAO CHUNG LOT QUA:** unit test chi soi **DU LIEU** (menu la gi), ⚠️ **khong** soi **HTML sinh ra**;
+    va probe cu chi hoi *"chua dang nhap co bi chan khong"* — 📌 **khong** hoi *"menu co muc con khong"*.
+
+    🔒 **VA DO LA LY DO SCRIPT NAY PHAI LA MOT BUOC THUONG TRU, KHONG PHAI SCRIPT TAY:** 📌 moi vong toi
+    **phai tu viet lai** probe (hoac **quen**), ⇒ 🔑 mot cong **khong chay tu dong** thi **khong phai** cong.
+
+    ══════════════════════════════════════════════════════════════════════════════════════════════════
+    🔒 **NAM QUY TAC DUOC THI HANH TRONG SCRIPT NAY (moi cai deu la mot bai hoc da tra gia):**
+
+    **① PHAI GIAI MA ENTITY SO TRUOC KHI SO KHOP.** 📌 `Razor` escape tieng Viet thanh `&#x110;` (`Đ`) ⇒
+    `-match 'Điều hướng'` tra **FALSE DU CHUOI CO**. 🔒 Bai hoc nay da vap **BA LAN** (`sal-005` §19.5 ·
+    `web-001` §97.6 · va **mot lan nua** khi viet probe). ✅ `GiaiMaHtml` lo viec do.
+
+    **② NEO SO KHOP PHAI LA ASCII THUAN.** 🔑 Vi `Razor` escape, mot neo co dau la **neo khong dang tin**.
+    📌 Nen cac neo o day la `[KHACHHANG-MAN-HINH]`, `[HANMUCKENH-MAN-HINH]`, `KHACHHANG-MAN-HINH`, …
+
+    **③ TIEN DE PHAI DUOC KHANG DINH TRUOC KHI DO.** ⚠️ Cac form hanh dong (`Chan`/`MoChan`) **chi render khi
+    co du lieu that** ⇒ 🔑 phai **gieo du lieu TRUOC**, va **khang dinh da gieo** — 📌 neu khong thi mot ca
+    **DO** se bi hieu nham la *"san pham hong"* trong khi that ra **tien de thieu**.
+
+    **④ KHONG CO LIEN KET CHET.** 🚨 `href="#"` bam vao **khong di dau** va **trong nhu hong**. ⚠️ **Nhung:**
+    phai kiem **TRONG KHOI MENU** — 📌 `href="#"` **duy nhat** tren trang thuong la **dropdown cua THEME**
+    (`navbar-nav`), khong phai menu cua ta (bai hoc `web-001` §97.6). ✅ Nen tach khoi menu **theo neo**
+    `aria-label` **truoc**, roi moi kiem.
+
+    **⑤ MOI THU PHAI DUOC DON DEP — KE CA KHI DO.** 🔒 Dung `try/finally`: 📌 mot ca E2E **nem giua duong**
+    ma khong don se de lai **du lieu probe** ⇒ va lan sau `kiem-db.ps1` se **DO** vi **ly do vo hinh**.
+    ✅ Dung `ham-tiem.ps1` de **tu khang dinh** moi cau SQL (bai hoc §25.5: *"tiem khong thanh"* va
+    *"cong khong bat"* **trong giong het nhau**).
+
+.PARAMETER BoQuaGieoDuLieu
+    ⚠️ Bo qua viec gieo du lieu (📌 chi dung khi biet chac DB da co du lieu — ⚠️ **KHONG** dung trong CI).
+.PARAMETER GiuWeb
+    ⚠️ **KHONG** dung tien trinh Web khi xong (📌 de lai phuc vu viec kiem bang mat). 🔑 Mac dinh la **dung**.
+.PARAMETER TimeoutGiay
+    Cho Web len toi da bao nhieu giay (mac dinh 180).
+.PARAMETER BoQuaTienDeDb
+    ⚠️ Bo qua phep kiem *"DB sach truoc khi chay"* (📌 chi dung khi can chay lai nhanh).
+
+.EXAMPLE
+    pwsh -File tools\kiem-e2e.ps1
+#>
+[CmdletBinding()]
+param(
+    [switch]$BoQuaGieoDuLieu,
+    [switch]$GiuWeb,
+    [int]$TimeoutGiay = 180,
+    [switch]$BoQuaTienDeDb
+)
+
+$ErrorActionPreference = 'Stop'
+
+$goc = Split-Path -Parent $PSScriptRoot
+$thuMucTam = Join-Path $PSScriptRoot '_tam-e2e'
+New-Item -ItemType Directory -Force -Path $thuMucTam | Out-Null
+
+# 🔑 Nap thu vien tiem: 🔒 no chi co **ham**, khong co `param` cap tep ⇒ nap an toan.
+. (Join-Path $PSScriptRoot 'ham-tiem.ps1')
+
+$ketQua = [System.Collections.Generic.List[object]]::new()
+$web = 'http://localhost:5100'
+$jar = Join-Path $thuMucTam 'cookie.txt'
+$tienTrinh = $null
+
+function Kq {
+    param([string]$Ten, [bool]$Dat, [string]$ChiTiet = '')
+    $ketQua.Add([pscustomobject]@{ Ten = $Ten; Dat = $Dat; ChiTiet = $ChiTiet })
+    Write-Output ("   [{0}] {1} | {2}" -f $Ten, $(if ($Dat) { 'DAT' } else { 'KHONG DAT' }), $ChiTiet)
+}
+
+<#
+    🔒 **GIAI MA ENTITY SO** — ⚠️ **BAT BUOC** truoc moi phep so khop chuoi co dau.
+    📌 `Razor` escape `Đ` thanh `&#x110;`, `ả` thanh `&#x1EA3;` ⇒ 🔑 so khop chuoi goc se **THAT BAI DU
+    CHUOI CO**. ✅ Ho tro ca dang thap phan (`&#273;`) va dang hex (`&#x110;`).
+#>
+function GiaiMaHtml {
+    param([string]$Html)
+
+    $h = [regex]::Replace($Html, '&#x([0-9A-Fa-f]+);', {
+            param($m)
+            [string][char][Convert]::ToInt32($m.Groups[1].Value, 16)
+        })
+
+    $h = [regex]::Replace($h, '&#(\d+);', {
+            param($m)
+            [string][char][int]$m.Groups[1].Value
+        })
+
+    return $h
+}
+
+<#
+    🔒 **TAI TRANG VA TRA VE HTML DA GIAI MA** — dung `curl.exe` voi **cookie jar**.
+    ⚠️ **KHONG** dung `Invoke-WebRequest -MaximumRedirection 0`: 📌 no **nem** va **khong** lo `StatusCode`
+    (bai hoc probe cu).
+#>
+function TaiTrang {
+    param([string]$DuongDan, [string]$TepLuu)
+
+    $ma = & curl.exe -s -b $jar -c $jar -o $TepLuu -w '%{http_code}' ($web + $DuongDan)
+    $html = if (Test-Path $TepLuu) { [System.IO.File]::ReadAllText($TepLuu, [Text.Encoding]::UTF8) } else { '' }
+
+    return [pscustomobject]@{ Ma = ([string]$ma).Trim(); Html = $html; HtmlGoc = $html }
+}
+
+try {
+    Write-Output '=== KIEM E2E CO PHIEN DANG NHAP ==='
+
+    # ── TIEN DE: DB phai SACH truoc khi chay ────────────────────────────────────────────────
+    if (-not $BoQuaTienDeDb) {
+        # 🛡️ LY DO: 🔑 neu DB **da co** du lieu probe tu lan chay truoc (vi mot lan chay **nem giua duong**),
+        # thi cac ca *"co form hanh dong"* se **XANH vi du lieu CU** ⇒ 📌 mot ca **XANH vi LY DO SAI**.
+        $dem = (@(Invoke-Psql -Sql @'
+select count(*)::text from "CusCustomers" where "Name" like 'K97E2E%';
+'@) -join '').Trim()
+
+        if ($dem -ne '0') {
+            throw ("TIEN DE: con {0} khach probe 'K97E2E%' trong DB ⇒ lan chay truoc KHONG don dep.`n" +
+                "🚨 Dung lai va don truoc — ⚠️ neu khong thi cac ca 'co form hanh dong' se XANH VI DU LIEU CU." -f $dem)
+        }
+
+        Write-Output '   ✅ Tien de: khong con du lieu probe cu.'
+    }
+
+    # ── ① DUNG WEB CU (neu co) + CHO CONG TRONG ─────────────────────────────────────────────
+    # ⚠️ Phai lam TRUOC khi khoi dong: 🔑 mot tien trinh cu dang giu cong 5100 se lam `Start-Process` **that bai
+    # im lang**, va ta se **do mot trang CU** (📌 bai hoc "doc ban CU" — `web-001` §97.6 #3).
+    foreach ($cong in @(5100)) {
+        foreach ($k in @(Get-NetTCPConnection -LocalPort $cong -State Listen -ErrorAction SilentlyContinue)) {
+            Stop-Process -Id $k.OwningProcess -Force -ErrorAction SilentlyContinue
+        }
+    }
+    Start-Sleep -Seconds 2
+
+    # ── ② GIAO DU LIEU (TRUOC khi do — quy tac ③) ───────────────────────────────────────────
+    $idKhach = 'e0000000-0000-0000-0000-0000000000e1'
+
+    if (-not $BoQuaGieoDuLieu) {
+        # 🔑 **Gieo TRUOC khi do** vi cac nut hanh dong (`Chan`) **chi render khi co dong that**.
+        # ⚠️ **TAT co bao mat** de dang nhap duoc ⇒ 🔒 phai **BAT LAI** trong `finally`.
+        TiemVaoDb -Sql @'
+update "AbpUsers" set "ShouldChangePasswordOnNextLogin" = false where "NormalizedUserName" = 'ADMIN';
+'@ -KhongNemKhiThieuKiem | Out-Null
+
+        TiemVaoDb -Sql @'
+delete from "CusCustomers" where "Id" = 'e0000000-0000-0000-0000-0000000000e1';
+'@ -KhongNemKhiThieuKiem | Out-Null
+
+        # 🚨 **KHANG DINH PHEP TIEM DA XAY RA** (bai hoc §25.5) — 🔑 `CusCustomers` co `IsDeleted` nen phai
+        # keo theo cot do, ⚠️ va ten cot phai la **THAT** (📌 doan ten cot da tra gia **BA LAN**).
+        TiemVaoDb -Sql @'
+insert into "CusCustomers" ("Id","TenantId","Name","Email","Phone","Status","ExtraProperties","ConcurrencyStamp","CreationTime","IsDeleted")
+values ('e0000000-0000-0000-0000-0000000000e1',null,'K97E2E Khach Probe','k97e2e@example.invalid','0900000001',1,'{}','k97e2e1',now(),false);
+'@ -KiemSql @'
+select count(*)::text from "CusCustomers" where "Id" = 'e0000000-0000-0000-0000-0000000000e1';
+'@ -SoDongMongDoi 1 | Out-Null
+
+        Write-Output '   ✅ Da gieo 1 khach probe (K97E2E) + tat co bao mat de dang nhap.'
+    }
+
+    # ── ③ KHOI DONG WEB + CHO LEN ───────────────────────────────────────────────────────────
+    $env:ASPNETCORE_ENVIRONMENT = 'Development'
+    $binWeb = Join-Path $goc 'src\eCommerce.Web\bin\Debug\net10.0'
+    $logWeb = Join-Path $thuMucTam 'web.log'
+
+    $tienTrinh = Start-Process dotnet -ArgumentList 'eCommerce.Web.dll' -WorkingDirectory $binWeb `
+        -PassThru -WindowStyle Hidden -RedirectStandardOutput $logWeb `
+        -RedirectStandardError (Join-Path $thuMucTam 'web.err')
+
+    $cho = Join-Path $PSScriptRoot 'wait-host.ps1'
+    & pwsh -NoProfile -File $cho -Url $web -LogFile $logWeb -TimeoutSeconds $TimeoutGiay -ProcessId $tienTrinh.Id |
+        Select-Object -Last 1 | ForEach-Object { Write-Output ("   $_") }
+
+    if ($LASTEXITCODE -ne 0) {
+        throw ("Web KHONG len trong {0}s. Xem log: {1}" -f $TimeoutGiay, $logWeb)
+    }
+
+    # ── ④ DANG NHAP THAT (form + cookie) ────────────────────────────────────────────────────
+    $trangLogin = Join-Path $thuMucTam 'login.html'
+    & curl.exe -s -c $jar -o $trangLogin ($web + '/Account/Login') | Out-Null
+
+    $htmlLogin = [System.IO.File]::ReadAllText($trangLogin, [Text.Encoding]::UTF8)
+
+    # ⚠️ **KHONG doan ten truong** `__RequestVerificationToken` — 📌 doc tu **HTML that**.
+    $m = [regex]::Match($htmlLogin, 'name="__RequestVerificationToken"[^>]*value="(?<t>[^"]+)"')
+
+    if (-not $m.Success) {
+        # 🔑 **KHONG** co token nghia la trang dang nhap **khong render** ⇒ 📌 moi ca sau do **VO NGHIA**
+        # (⚠️ khong duoc coi la *"san pham hong"*).
+        throw "Trang /Account/Login KHONG co __RequestVerificationToken ⇒ PHEP KIEM VO NGHIA (trang khong render?)."
+    }
+
+    $token = $m.Groups['t'].Value
+
+    & curl.exe -s -b $jar -c $jar -o (Join-Path $thuMucTam 'login-post.html') -w '%{http_code}' -L `
+        --data-urlencode ("__RequestVerificationToken=" + $token) `
+        --data-urlencode 'LoginInput.UserNameOrEmailAddress=admin@abp.io' `
+        --data-urlencode 'LoginInput.Password=1q2w3E*' `
+        ($web + '/Account/Login') | Out-Null
+
+    # 🚨 **KHANG DINH CO PHIEN THAT** — 🔑 `200` tren `/KhachHang` (thay vi `302` ve trang dang nhap) la
+    # **bang chung duy nhat** rang cookie phien da co tac dung. ⚠️ Neu bo qua buoc nay thi **moi ca sau**
+    # se do vi **ly do sai** (📌 do trang dang nhap chu khong do san pham).
+    $kh = TaiTrang -DuongDan '/KhachHang' -TepLuu (Join-Path $thuMucTam 'khachhang.html')
+
+    Kq 'B1 CO PHIEN THAT (GET /KhachHang = 200)' ($kh.Ma -eq '200') ("HTTP {0}" -f $kh.Ma)
+
+    if ($kh.Ma -ne '200') {
+        throw ("DANG NHAP THAT BAI ⇒ PHEP KIEM VO NGHIA (HTTP {0} tren /KhachHang).`n" +
+            "🚨 Day la loi DANG NHAP, KHONG phai loi san pham — kiem mat khau `1q2w3E*` truoc khi ket luan." -f $kh.Ma)
+    }
+
+    # ── ⑤ DO HTML THAT ──────────────────────────────────────────────────────────────────────
+    $hm = TaiTrang -DuongDan '/HanMucKenh' -TepLuu (Join-Path $thuMucTam 'hanmuc.html')
+    # ⚠️ **KHONG** dat ten bien la `$home`: 🔒 PowerShell co bien **CHI-DOC** `$HOME` ⇒ script **chet giua duong**.
+
+    $htmlKh = GiaiMaHtml $kh.Html
+    $htmlHm = GiaiMaHtml $hm.Html
+    $trangChu = TaiTrang -DuongDan '/' -TepLuu (Join-Path $thuMucTam 'trangchu.html')
+    $htmlHome = GiaiMaHtml $trangChu.Html
+
+    Write-Output ("   HTTP: /KhachHang={0} · /HanMucKenh={1} · /= {2}" -f $kh.Ma, $hm.Ma, $trangChu.Ma)
+
+    # 🚨 **D1/D6 — NEO HIEN THI + CAN CU PHAP LY.** 🔑 Neo ASCII de **khong** phu thuoc cach Razor escape;
+    # va can cu phap ly phai **HIEN THI** (⚠️ khong phai trong chu thich Razor — loi `web-001` #2).
+    Kq 'D1 NEO [KHACHHANG-MAN-HINH] HIEN THI' ($htmlKh -match '\[KHACHHANG-MAN-HINH\]') 'neo ASCII'
+    Kq 'D6 CAN CU PHAP LY 91/2025/QH15 HIEN THI' ($htmlKh -match '91/2025/QH15') 'khong nam trong chu thich Razor'
+    Kq 'D2 NEO [HANMUCKENH-MAN-HINH] HIEN THI' ($htmlHm -match '\[HANMUCKENH-MAN-HINH\]') 'neo ASCII'
+
+    # 🚨 **D3 — FORM DOI CHINH SACH + O CHON DON VI (INV-003 muc 5 viec 2).** 🔑 `DonVi` theo tung dong la no
+    # so 1 ve nghiep vu; neu man hinh **khong** co o chon thi nguoi van hanh **khong dat duoc** no.
+    Kq 'D3 /HanMucKenh co O CHON DON VI (INV-003)' ($htmlHm -match 'name="donVi"') 'o chon don vi theo dong'
+
+    # 🔒 **D4 — NOI RO "0 = TAT".** ⚠️ Neu khong noi ro thi nguoi van hanh hieu nham `0` la *"chan het"*.
+    Kq 'D4 /HanMucKenh NOI RO "0 = TAT"' ($htmlHm -match '0\s*=\s*TẮT') 'chong hieu nguoc'
+
+    # 🔑 **D5 — FORM HANH DONG voi DU LIEU THAT.** ⚠️ Chi render khi co dong ⇒ 🔑 day la ly do phai **gieo
+    # du lieu TRUOC** (quy tac ③).
+    Kq 'D5 /KhachHang co NUT HANH DONG (voi du lieu that)' ($htmlKh -match 'Chan|MoChan') 'nut chan/go chan'
+
+    # ── ⑥ MENU HAI TANG (tach khoi menu TRUOC khi kiem — quy tac ④) ─────────────────────────
+    # 🔒 **TACH KHOI MENU THEO NEO `aria-label`** — ⚠️ neu kiem `href="#"` tren **CA TRANG** thi se bat
+    # **dropdown cua THEME** (`navbar-nav`) ⇒ 📌 ca kiem **DO vi LY DO SAI** (bai hoc `web-001` §97.6).
+    # 🔑 **TIM NEO THEO CA HAI BAN** — ⚠️ `Razor` escape tieng Viet thanh entity so ⇒ ban **da giai ma** co
+    # `Điều hướng`, con ban **goc** co `&#x110;i&#x1EC1;u`. 📌 Thu **ca hai**, va sua cuoi cung la `nav-pills`
+    # (🔑 chuoi ASCII nay **khong bao gio** bi escape ⇒ la neo **dang tin nhat**).
+    $iMenu = $htmlHome.IndexOf('Điều hướng quản trị')
+
+    if ($iMenu -lt 0) { $iMenu = $kh.HtmlGoc.IndexOf('nav-pills') }
+    if ($iMenu -lt 0) { $iMenu = $htmlHome.IndexOf('nav-pills') }
+    if ($iMenu -lt 0) { $iMenu = $kh.HtmlGoc.IndexOf('aria-label') }
+
+    # ⚠️ Neo co the bi escape ⇒ thu **ca** ban goc va ban da giai ma; neu van khong thay thi **khong doan**.
+    if ($iMenu -lt 0) {
+        # 🔑 Thu lai tren ban **GOC** (chua giai ma) — 📌 neu ban da giai ma ma khong thay, co the `aria-label`
+        # nam trong **thuoc tinh** va van con entity o ban goc.
+        $iMenu = $kh.HtmlGoc.IndexOf('nav-pills')
+        if ($iMenu -lt 0) { $iMenu = $htmlHome.IndexOf('nav-pills') }
+    }
+
+    # 🚨🚨 **LAY KHOI MENU THEO RANH GIOI THAT — KHONG dung do dai CO DINH.**
+    #
+    # 📌 **LOI DA DO DUOC (17/10/2026, ngay khi viet script nay):** ban dau toi cat
+    # `Substring($iMenu, 2000)` — ⚠️ **2000 KY TU CO DINH**. Va menu that **DAI HON 2200 ky tu**
+    # (do duoc: nhom *"Van hanh"* nam **ngoai** cua so ⇒ `IndexOf('Van h')` tra **-1**).
+    # 🔒 **Hau qua:** ca **E5** (*"khong co lien ket chet"*) **LUON XANH** — ⚠️ vi `href="#"` cua nhom nam o
+    # **CUOI** menu, **ngoai** cua so. 📌 Nghia la phep kiem **tu vo hieu** dung o cho no quan trong nhat:
+    # no sinh ra de bat **lien ket chet**, ma lien ket chet lai chinh la thu **bi cat mat**.
+    # 🔑 Va no **im lang**: E5 bao `DAT` ⇒ 🔒 dung loai *"XANH vi LY DO SAI"* ma ca du an dang chong.
+    #
+    # ✅ **CACH DUNG:** cat tu neo menu den **the dong `</nav>`** — 🔑 do la **ranh gioi THAT** cua khoi menu,
+    # khong phu thuoc do dai. ➕ Va neu **khong thay** `</nav>` thi phai **NOI RO** (⚠️ khong duoc cat bua).
+    $khoiMenu = ''
+    $coRanhGioi = $false
+
+    if ($iMenu -ge 0) {
+        # 🔑 **CAT THEO `<ul>` DAU TIEN SAU `nav-pills`** — ⚠️ **KHONG** dung `</nav>`.
+        #
+        # 🚨 **LOI DA DO DUOC (17/10/2026, ngay khi viet script nay):** ban dau toi cat
+        # `Substring($iMenu, 2000)` (do dai **CO DINH**) ⇒ 🔒 va menu that **DAI HON 2200 ky tu**
+        # (do duoc: nhom *"Van hanh"* nam **ngoai** cua so ⇒ `IndexOf('Van h')` tra **-1**)
+        # ⇒ ca **E5** (*"khong co lien ket chet"*) **LUON XANH**, ⚠️ vi `href="#"` cua nhom nam o **CUOI** menu.
+        # 📌 Nghia la phep kiem **tu vo hieu dung o cho no quan trong nhat** — no sinh ra de bat **lien ket chet**,
+        # ma lien ket chet lai chinh la thu **bi cat mat**. 🔑 Va no **im lang** (`DAT`) ⇒ 🔒 dung loai
+        # *"XANH vi LY DO SAI"* ma ca du an dang chong.
+        #
+        # ➕ **VA `</nav>` CUNG SAI:** `MenuViewComponent` render `<nav><ul>…</ul></nav>` — 🔑 `<ul>` **KHONG**
+        # co `</ul>` dong ngay sau `</nav>`; nhung khoi `Substring` tu `nav-pills` den `</nav>` **van** dung.
+        # 📌 Cai **sai that** la **do dai co dinh**. ✅ Nen: cat tu `nav-pills` den **`</nav>`** (ranh gioi that),
+        # va neu **khong thay** `</nav>` thi **NOI RO** (⚠️ khong cat bua).
+        $iDong = $htmlHome.IndexOf('</nav>', $iMenu)
+
+        if ($iDong -gt $iMenu) {
+            $khoiMenu = $htmlHome.Substring($iMenu, $iDong - $iMenu + '</nav>'.Length)
+            $coRanhGioi = $true
+        }
+        else {
+            # ⚠️ Khong thay the dong ⇒ **KHONG** cat bua: bao ro la **khong do duoc**.
+            Write-Output '   ⚠️ Khong thay `</nav>` sau neo menu ⇒ KHONG xac dinh duoc ranh gioi khoi menu.'
+        }
+    }
+
+    Write-Output ("   Khoi menu: {0} ky tu (ranh gioi `</nav>`={1})" -f $khoiMenu.Length, $coRanhGioi)
+
+    if (-not $coRanhGioi) {
+        # ⚠️ **KHONG do duoc khoi menu** ⇒ 🔒 **KHONG** duoc coi la *"khong co lien ket chet"*.
+        # 📌 Day la bai hoc trung tam: *"0 tim thay"* KHONG phai *"sach"* (`kiem-db.ps1` nhom (6)).
+        Kq 'E1 MENU RENDER (co neo dieu huong)' $false 'khong thay neo `aria-label`/`nav-pills` hoac the dong `</nav>`'
+        Kq 'E2 MENU co MUC CHA "Van hanh"' $false 'khong do duoc (thieu ranh gioi khoi menu)'
+        Kq 'E3 🚨 MENU co MUC CON /HanMucKenh' $false 'khong do duoc (thieu ranh gioi khoi menu)'
+        Kq 'E5 TRONG KHOI MENU khong co lien ket chet href=hash' $false 'khong do duoc (thieu ranh gioi khoi menu)'
+    }
+    else {
+        Kq 'E1 MENU RENDER (co neo dieu huong)' $true ("khoi menu {0} ky tu" -f $khoiMenu.Length)
+
+        # 🚨 **E2 — MUC CHA.** 🔑 *"menu co nhom"* **KHONG** suy ra *"nhom co MUC CON"* ⇒ 📌 phai kiem **ca hai**.
+        $coNhom = $khoiMenu -match 'Vận hành'
+        Kq 'E2 MENU co MUC CHA "Van hanh"' $coNhom 'nhom hai tang'
+
+        # 🚨 **E3 — MUC CON.** 🔑 **CA QUAN TRONG NHAT CUA SCRIPT NAY:** day chinh la loi `web-001` #1 —
+        # `MenuDieuHuong` **co** khai muc con, `BoLocDieuHuong` **co** loc quyen cho con, ⚠️ nhung
+        # `MenuViewComponent` **chi render `muc.Url`** ⇒ 📌 muc con **KHONG BAO GIO hien**, va nhom thanh
+        # `href="#"` — **lien ket CHET**. 🔒 Trieu chung te nhat: trang `200`, menu render, **khong loi nao**.
+        $coMucCon = $khoiMenu -match '/HanMucKenh'
+        Kq 'E3 🚨 MENU co MUC CON /HanMucKenh' $coMucCon 'chong loi MenuViewComponent #1'
+
+        # 🚨 **E5 — KHONG LIEN KET CHET.** ⚠️ Kiem **TRONG KHOI MENU** (quy tac ④).
+        $coHash = $khoiMenu -match 'href="#"'
+        Kq 'E5 TRONG KHOI MENU khong co lien ket chet href=hash' (-not $coHash) 'chong lien ket chet'
+    }
+
+    # ── ⑦ TONG KET ──────────────────────────────────────────────────────────────────────────
+    $soDat = @($ketQua | Where-Object { $_.Dat }).Count
+
+    Write-Output ''
+    Write-Output ("E2E: {0}/{1} ca DAT" -f $soDat, $ketQua.Count)
+
+    if ($soDat -ne $ketQua.Count) {
+        Write-Output 'CAC CA KHONG DAT:'
+        foreach ($k in ($ketQua | Where-Object { -not $_.Dat })) {
+            Write-Output ("   🚨 {0} :: {1}" -f $k.Ten, $k.ChiTiet)
+        }
+    }
+}
+finally {
+    # 🔒 **DON DEP — KE CA KHI DO.** 📌 Mot ca E2E nem giua duong ma khong don se de lai **du lieu probe**
+    # ⇒ va lan sau `kiem-db.ps1` se **DO** vi **ly do vo hinh**.
+
+    # ① Don du lieu probe.
+    try {
+        Invoke-Psql -Sql @'
+delete from "CusCustomers" where "Id" = 'e0000000-0000-0000-0000-0000000000e1';
+'@ | Out-Null
+
+        Invoke-Psql -Sql @'
+delete from "CusCustomers" where "Name" like 'K97E2E%';
+'@ | Out-Null
+
+        # 🚨 **BAT LAI CO BAO MAT** — 🔑 quen buoc nay nghia la **commit mot admin KHONG bi buoc doi mat khau**.
+        Invoke-Psql -Sql @'
+update "AbpUsers" set "ShouldChangePasswordOnNextLogin" = true where "NormalizedUserName" = 'ADMIN';
+'@ | Out-Null
+
+        # 🔒 **KHANG DINH DA DON SACH** — ⚠️ neu khong thi ta **tin** rang da don trong khi du lieu **van con**
+        # (📌 dung loai "tin sai" ma `ham-tiem.ps1` sinh ra de chong).
+        $con = (@(Invoke-Psql -Sql @'
+select count(*)::text from "CusCustomers" where "Name" like 'K97E2E%';
+'@) -join '').Trim()
+
+        $baoMat = (@(Invoke-Psql -Sql @'
+select "ShouldChangePasswordOnNextLogin"::text from "AbpUsers" where "NormalizedUserName" = 'ADMIN';
+'@) -join '').Trim()
+
+        Write-Output ''
+        Write-Output ("   DON DEP: khach probe con={0} (mong doi 0) · co bao mat={1} (mong doi True)" -f $con, $baoMat)
+
+        if ($con -ne '0' -or $baoMat -ne 'True') {
+            Write-Output '   🚨 DON DEP KHONG DAY DU ⇒ lan chay sau co the XANH VI DU LIEU CU.'
+        }
+    }
+    catch {
+        # ⚠️ Khong nem tiep: loi don dep **khong** duoc che loi cua ca kiem — nhung phai **noi len**.
+        Write-Output ("   🚨 DON DEP THAT BAI: {0}" -f $_.Exception.Message)
+    }
+
+    # ② Dung Web (🔑 mac dinh la dung — de cong 5100 TRONG cho lan sau).
+    if ($null -ne $tienTrinh -and -not $GiuWeb) {
+        Stop-Process -Id $tienTrinh.Id -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 2
+        Write-Output '   Da dung Web (cong 5100 TRONG).'
+    }
+    elseif ($GiuWeb) {
+        Write-Output ("   ⚠️ -GiuWeb: Web VAN CHAY (pid {0}) — 🔒 nho dung truoc khi build." -f $tienTrinh.Id)
+    }
+
+    Remove-Item -Recurse -Force $thuMucTam -ErrorAction SilentlyContinue
+}
+
+$soDat = @($ketQua | Where-Object { $_.Dat }).Count
+
+exit $(if ($soDat -ne $ketQua.Count) { 1 } else { 0 })

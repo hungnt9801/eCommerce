@@ -3455,3 +3455,83 @@ Xoá khối render **mục con** khỏi `MenuViewComponent` | ✅ **7 ca `MenuRe
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.6 | 17/10/2026 | *(agent, session GĐ1)* | **§98 — LÁT CẮT 6: BIẾN HAI LỖI THÀNH LỖI KHÔNG THỂ TÁI DIỄN** (đóng nợ §97.7 #1): **tách `MenuViewComponent.DungHtml` thành HÀM THUẦN** (🔑 **điều kiện** để test được — `ViewComponent` cần `ViewComponentContext` nên **không** test trực tiếp) · **`MenuRenderTests` 10 ca** (khẳng định **HTML** chứ không dữ liệu: mục con **phải có** `href` **VÀ** nhãn · con nằm **trong** nhóm · **không** `href="#"` · `role="heading"` · **hai chiều** *"mọi URL khai phải có trong HTML"* · rỗng ⇒ rỗng thật · **đúng N liên kết**) · **`ViewAnchorTests` 2 ca** (**neo ASCII phải nằm NGOÀI chú thích Razor**; cắt `@* … *@` non-greedy — **đúng** vì Razor **không** hỗ trợ lồng nhau) · **`ProjectReference` test → Web** · **+12 test ⇒ 1113**. 🚨 **ĐÃ TIÊM LẠI ĐÚNG HAI LỖI §97 ĐỂ CHỨNG MINH LƯỚI BẮT** (bài học `CAT-003` §25.3: *"lưới chưa từng bắt được gì thì chưa chứng minh nó bắt được gì"*): chuyển neo vào chú thích ⇒ **`ViewAnchorTests` ĐỎ**; xoá khối render con ⇒ **7 ca ĐỎ** ⇒ ✅ **cả hai bắt thật**. ➕ **E2E 6/6** xác nhận lưới **không** phá hành vi thật. 🐞 **BỐN lỗi của tôi, cùng một họ "đọc bản CŨ"**: (1) 🚨 **`build exit 0` mà MỐC DLL KHÔNG ĐỔI** (**lần thứ HAI** — ✅ **phát hiện được** vì §97.6 đã đặt **luật kiểm mốc**; 📌 không có luật đó thì tôi đã **kết luận sai**); (2) 🚨 **chạy test trên binary CŨ** ⇒ 7 ca đỏ dù mã **đã đúng**; (3) 🚨 **`$HOME` lần thứ HAI**; (4) 🚨 **so khớp chữ có dấu trong HTML lần thứ BA** ⇒ sửa bằng **giải mã entity**. 🚨 **Và ca `Menu_RONG` đã bắt được một bất nhất quán THẬT ngay khi viết:** `DungHtml([])` dựng `<nav>` rỗng trong khi `Invoke()` trả rỗng ⇒ **hai đường gọi, hai kết quả** ⇒ đã sửa. Ghi **§98.7** (nợ: 🚨 probe E2E **vẫn là script tay** — cần vào CI bằng `WebApplicationFactory` + cookie · 🚨 hàm `GiaiMa` **bị chép lại ở mọi probe** (đã vấp 3 lần) · chưa chọn **kho** · chưa phân trang · chưa *"nâng cấp khách vãng lai"* · 🚨 chưa có **xuất dữ liệu cá nhân** · 🚨 chưa có **sổ địa chỉ** · chưa kiểm **vai trò chỉ-đọc**) |
+
+---
+
+## 99. ✅ **LÁT CẮT 7 — ĐÓNG NỢ §98.7 #1: `kiem-e2e.ps1` THƯỜNG TRÚ** (17/10/2026)
+
+### 99.1 🔑 **Nợ lớn nhất và lâu nhất — và vì sao nó quan trọng hơn vẻ ngoài**
+
+Ở **§97**, khi tôi làm **đường gọi CÓ PHIÊN**, nó **ngay lập tức** phát hiện **HAI lỗi sản phẩm** mà
+**1101 unit test + 11 ca probe ĐỀU KHÔNG THẤY**. 🔒 Nhưng **đường gọi đó là SCRIPT TAY** — 📌 nên ở **§98.7 #1**
+tôi phải ghi nó thành **nợ**: *"probe E2E vẫn là script tay; nên đưa vào CI"*.
+
+🔑 **VÌ SAO ĐÓ LÀ NỢ LỚN NHẤT:** 📌 mỗi vòng tôi **phải tự viết lại** probe (hoặc **quên**) ⇒ 🔒 một cổng
+**không chạy tự động** thì **không phải** cổng. ➕ Và **hai lỗi nó bắt được** là loại **tệ nhất**:
+trang `200`, không lỗi nào, chỉ **thiếu** thứ người dùng cần.
+
+### 99.2 ✅ **NĂM QUY TẮC ĐƯỢC THI HÀNH TRONG SCRIPT**
+
+| # | Quy tắc | Vì sao |
+|---|---|---|
+**①** | **Giải mã entity số trước khi so khớp** | 📌 Razor escape `Đ` → `&#x110;` ⇒ `-match 'Điều hướng'` trả **FALSE DÙ CHUỖI CÓ**. 🔒 Đã vấp **BA LẦN** |
+**②** | **Neo phải là ASCII thuần** | `[KHACHHANG-MAN-HINH]` · `[HANMUCKENH-MAN-HINH]` · `nav-pills` |
+**③** | **Tiền đề phải khẳng định TRƯỚC khi đo** | ⚠️ Form hành động **chỉ render khi có dữ liệu thật** ⇒ 🔑 **gieo trước**; ➕ script **kiểm DB sạch trước khi chạy** (nếu không, ca *"có form hành động"* sẽ **XANH VÌ DỮ LIỆU CŨ**) |
+**④** | **Kiểm liên kết chết TRONG KHỐI MENU** | 📌 `href="#"` **duy nhất** trên trang thường là **dropdown của THEME** ⇒ ✅ tách khối menu theo **`</nav>`** rồi mới kiểm |
+**⑤** | **Dọn dẹp kể cả khi ĐỎ** | 🔒 `try/finally` + **khẳng định đã dọn** ⇒ 📌 nếu không thì lần sau `kiem-db.ps1` **ĐỎ vì lý do vô hình** |
+
+### 99.3 ✅ **11 ca — và đã tiêm ĐÚNG lỗi lịch sử**
+
+**Ca:** **B1** phiên thật (`/KhachHang` = `200`) · **D1/D2** neo hiển thị · 🚨 **D6** căn cứ pháp lý `91/2025/QH15`
+**hiển thị** · **D3** ô chọn `donVi` · **D4** *"0 = TẮT"* · **D5** nút hành động với dữ liệu thật ·
+**E1** menu render · **E2** nhóm *"Vận hành"* · 🚨 **E3** **mục con `/HanMucKenh`** · 🚨 **E5** không `href="#"`.
+
+| Ca đo | Kết quả |
+|---|---|
+**Mã đúng + DB sạch** | ✅ **11/11** · `exit 0` · khối menu **1118** ký tự |
+🚨 **Tiêm ĐÚNG lỗi lịch sử** (khôi phục renderer cũ) — `K97TIEM` **đã khẳng định vào tệp** | ✅ **9/11** · `exit 1` · 🚨 **`E3` ĐỎ** **VÀ `E5` ĐỎ** · khối menu **725** ký tự |
+✅ **Khôi phục + build lại** | ✅ **11/11** · `exit 0` |
+
+➗ **Tích hợp thành BƯỚC ⑧.** ✅ **Chạy đầy đủ 8 bước:** `exit 0` · **147.4s** · **1155 unit** · **38 integration**
+· mermaid **197/0** · **DB 21/21** · **test cổng 17/17** · **E2E 11/11**.
+
+### 99.4 🐞 **Hai lỗi của tôi — và lỗi #2 là loại đáng giá nhất**
+
+**① `$home` là biến CHỈ-ĐỌC của PowerShell** ⇒ script **chết giữa đường**.
+🔒 **LẦN THỨ BA** trong dự án (§97.6 #4 · §98.6 #3 · lượt này) ⇒ ✅ `$trangChu`.
+📌 **Kết luận:** ghi vào tài liệu **không đủ** — phải vào **khuôn script**.
+
+**② 🚨 CẮT KHỐI MENU BẰNG ĐỘ DÀI CỐ ĐỊNH ⇒ ca `E5` TỰ VÔ HIỆU.** Bản đầu tôi cắt `Substring($iMenu, 2000)`.
+⚠️ Nhưng menu thật **DÀI HƠN 2200 ký tự** (đo được: `IndexOf('Van h')` trả **`-1`**) ⇒ 🔒 `href="#"` của nhóm
+nằm ở **CUỐI** menu, **ngoài** cửa sổ ⇒ ca **E5** **LUÔN XANH**. 📌 Nghĩa là phép kiểm **tự vô hiệu đúng ở chỗ
+nó quan trọng nhất**: nó sinh ra để bắt **liên kết chết**, mà liên kết chết lại **chính là thứ bị cắt mất**.
+🔑 Và nó **im lặng** (`DAT`) — đúng loại *"XANH vì LÝ DO SAI"*.
+✅ **Chữa:** cắt theo **ranh giới `</nav>`**, không theo độ dài.
+
+**➕ VÀ ĐIỀU ĐÁNG GIÁ NHẤT — phép tiêm đầu của tôi KHÔNG TÁI HIỆN ĐÚNG LỖI LỊCH SỬ:**
+tôi bỏ khối `ulCon` nhưng **giữ nhánh `span`** ⇒ nhóm render thành `<span>` **không có `href`** ⇒ 📌
+**không có gì để `E5` bắt**. 🔑 **Tôi suýt kết luận *"E5 hỏng"*** — trong khi sự thật là **PHÉP TIÊM CỦA TÔI SAI**.
+📌 **Đây là lần thứ BA của cùng họ lỗi** (§25.5 · §26.5 #1 · lượt này): *"phép tiêm không tái hiện đúng lỗi"*.
+🔒 **Và nó là loại nguy hiểm nhất vì nó chỉ ra SAI CHỖ:** nó khiến tôi đi **sửa cổng** trong khi cổng **đúng**.
+✅ **Chữa:** trước §97 renderer render **MỌI** mục — kể cả nhóm — thành `<a href = muc.Url>`, và nhóm có
+`Url = "#"` ⇒ đó là **nguồn `href="#"` duy nhất**. ✅ Nên phép tiêm đúng là **khôi phục renderer cũ**.
+🔑 **Và từ nay, trước khi kết luận *"cổng không bắt"*, phải trả lời: `K97TIEM` có trong tệp không?**
+(Lần này tôi **đã** kiểm — và đó là điều giúp tôi không kết luận sai.)
+
+### 99.5 ⏳ NỢ
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+**1** | 🚨 **Chưa có CI** | 📌 Nay **8 bước** là nền: thêm CI thì **chỉ cần gọi** `kiem-tat-ca.ps1 -DayDu` |
+**2** | **E2E chỉ chạy khi `-DayDu`** (~15s) | ⚠️ 📌 Nếu CI gọi **thiếu** `-DayDu` thì bước này **không chạy** ⇒ 🔒 cần **một chỗ** ghi rõ *"CI phải dùng `-DayDu`"* |
+**3** | **Chưa kiểm vai trò CHỈ-ĐỌC** | 📌 Probe dùng **admin**; chưa đo *"người chỉ có quyền đọc"* thấy gì |
+**4** | `/HanMucKenh` **chưa chọn được KHO** · `/KhachHang` **chưa phân trang** | ⚠️ App service **đã** hỗ trợ ⇒ **nợ UI** |
+**5** | 🚨 **Chưa có xuất dữ liệu cá nhân** cho chính chủ | 🔒 Luật **91/2025/QH15** — 📌 nay căn cứ pháp lý **đã hiện**, **tính năng** thì chưa |
+**6** | 🚨 **Chưa có sổ địa chỉ** (`CUS-001`) | Entity `Address` **không tồn tại** — **nợ chặn** |
+**7** | **Chưa kiểm `NhanVien`/vai trò khác** | 📌 E2E dùng **admin** |
+
+### 99.6 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.7 | 17/10/2026 | *(agent, session GĐ1)* | **§99 — LÁT CẮT 7: ĐÓNG NỢ §98.7 #1 — `tools\kiem-e2e.ps1` THƯỜNG TRÚ** (tích hợp thành **bước ⑧**): 🔑 **NỢ LỚN NHẤT VÀ LÂU NHẤT** — ở **§97** đường gọi có phiên **ngay lập tức** phát hiện **HAI lỗi sản phẩm** mà **1101 unit test + 11 ca probe ĐỀU KHÔNG THẤY**, ⚠️ nhưng nó là **SCRIPT TAY**; 🔒 một cổng **không chạy tự động** thì **không phải** cổng. **(A) NĂM QUY TẮC:** ① **giải mã entity số** trước khi so khớp (📌 Razor escape `Đ` → `&#x110;` ⇒ `-match` trả **FALSE dù chuỗi CÓ**; 🔒 đã vấp **BA LẦN**) · ② **neo ASCII thuần** · ③ **tiền đề khẳng định TRƯỚC khi đo** (⚠️ form hành động **chỉ render khi có dữ liệu thật** ⇒ gieo trước; ➕ **kiểm DB sạch trước khi chạy** — 📌 nếu không thì ca *"có form hành động"* sẽ **XANH VÌ DỮ LIỆU CŨ**) · ④ **kiểm liên kết chết TRONG KHỐI MENU** (📌 `href="#"` **duy nhất** trên trang thường là **dropdown của THEME**) · ⑤ **dọn dẹp kể cả khi ĐỎ** (`try/finally` + **khẳng định đã dọn**). **(B) 11 CA:** **B1** phiên thật (`/KhachHang`=`200`) · **D1/D2** neo hiển thị · 🚨 **D6** **căn cứ pháp lý `91/2025/QH15` HIỂN THỊ** · **D3** ô chọn `donVi` · **D4** *"0 = TẮT"* · **D5** nút hành động với **dữ liệu thật** · **E1** menu render · **E2** nhóm *"Vận hành"* · 🚨 **E3** **mục con `/HanMucKenh`** · 🚨 **E5** không `href="#"`. **(C) KIỂM CHỨNG:** mã đúng + DB sạch ⇒ **11/11 · `exit 0` · khối menu 1118 ký tự**; 🚨 **tiêm ĐÚNG lỗi lịch sử** (khôi phục renderer cũ, `K97TIEM` **đã khẳng định vào tệp**) ⇒ **9/11 · `exit 1` · `E3` ĐỎ VÀ `E5` ĐỎ** · khối menu **725** ký tự; ✅ khôi phục + build lại ⇒ **11/11 · `exit 0`**; ✅ **tích hợp bước ⑧**; ✅ **chạy đầy đủ 8 bước: `exit 0` · 147.4s · 1155 unit · 38 integration · mermaid 197/0 · DB 21/21 · test cổng 17/17 · E2E 11/11**. 🐞 **HAI LỖI CỦA TÔI:** (1) **`$home` là biến CHỈ-ĐỌC của PowerShell** ⇒ script **chết giữa đường** — 🔒 **LẦN THỨ BA** trong dự án (§97.6 #4 · §98.6 #3 · lượt này) ⇒ 📌 **ghi vào tài liệu KHÔNG ĐỦ, phải vào KHUÔN SCRIPT**; (2) 🚨 **CẮT KHỐI MENU BẰNG ĐỘ DÀI CỐ ĐỊNH ⇒ ca `E5` TỰ VÔ HIỆU**: bản đầu cắt `Substring($iMenu, 2000)`, ⚠️ nhưng menu thật **DÀI HƠN 2200 ký tự** (đo được: `IndexOf('Van h')` = **`-1`**) ⇒ `href="#"` của nhóm nằm **ngoài** cửa sổ ⇒ **E5 LUÔN XANH** ⇒ 📌 phép kiểm **tự vô hiệu đúng ở chỗ nó quan trọng nhất** (nó sinh ra để bắt **liên kết chết**, mà liên kết chết lại **chính là thứ bị cắt mất**), 🔑 và nó **im lặng**; ✅ chữa: cắt theo **ranh giới `</nav>`**. ➕ **VÀ ĐIỀU ĐÁNG GIÁ NHẤT:** **phép tiêm đầu của tôi KHÔNG TÁI HIỆN ĐÚNG LỖI LỊCH SỬ** — tôi bỏ khối `ulCon` nhưng **giữ nhánh `span`** ⇒ nhóm render thành `<span>` **không có `href`** ⇒ 📌 **không có gì để `E5` bắt**; 🔑 **tôi suýt kết luận *"E5 hỏng"*** — trong khi sự thật là **PHÉP TIÊM CỦA TÔI SAI** (📌 **lần thứ BA** của họ lỗi này: §25.5 · §26.5 #1 · lượt này) ⇒ 🔒 **loại nguy hiểm nhất vì nó chỉ ra SAI CHỖ: nó khiến tôi đi SỬA CỔNG trong khi cổng ĐÚNG**; ✅ chữa: trước §97 renderer render **MỌI** mục (kể cả nhóm) thành `<a href = muc.Url>`, và nhóm có `Url = "#"` ⇒ đó là **nguồn `href="#"` duy nhất** ⇒ phép tiêm đúng là **khôi phục renderer cũ**; 🔑 **và từ nay, trước khi kết luận *"cổng không bắt"*, phải trả lời: `K97TIEM` có trong tệp không?** Ghi **§99.5** (nợ: 🚨 **chưa có CI** — nay **8 bước** là nền, CI **chỉ cần** gọi `kiem-tat-ca.ps1 -DayDu` · **E2E chỉ chạy khi `-DayDu`** ⇒ ⚠️ nếu CI gọi **thiếu** `-DayDu` thì bước này **không chạy** ⇒ 🔒 cần **một chỗ** ghi rõ · chưa kiểm **vai trò CHỈ-ĐỌC** · `/HanMucKenh` **chưa chọn được KHO** + `/KhachHang` **chưa phân trang** (⚠️ app service **đã** hỗ trợ ⇒ **nợ UI**) · 🚨 **chưa có xuất dữ liệu cá nhân** (🔒 Luật **91/2025/QH15** — nay căn cứ pháp lý **đã hiện**, **tính năng** thì chưa) · 🚨 **chưa có sổ địa chỉ** (`CUS-001` — entity `Address` **không tồn tại**, **nợ chặn**) · chưa kiểm `NhanVien`/vai trò khác) |
