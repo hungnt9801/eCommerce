@@ -1,5 +1,7 @@
 using System.Text.Json;
 using eCommerce.ChannelHub.Events;
+using eCommerce.Messaging;
+using eCommerce.Messaging.DeadLetter;
 using eCommerce.Messaging.Idempotency;
 using Microsoft.Extensions.Logging;
 using Volo.Abp;
@@ -47,6 +49,7 @@ public class MarketplaceOrderIntakeHandler : IDistributedEventHandler<ChannelOrd
     private readonly IUnitOfWorkManager _unitOfWorkManager;
     private readonly ICorrelationIdProvider _correlationIdProvider;
     private readonly ILogger<MarketplaceOrderIntakeHandler> _logger;
+    private readonly DeadLetterWriter _dlq;
 
     public MarketplaceOrderIntakeHandler(
         IRepository<Orders.Order, Guid> orderRepository,
@@ -55,7 +58,8 @@ public class MarketplaceOrderIntakeHandler : IDistributedEventHandler<ChannelOrd
         IGuidGenerator guidGenerator,
         IUnitOfWorkManager unitOfWorkManager,
         ICorrelationIdProvider correlationIdProvider,
-        ILogger<MarketplaceOrderIntakeHandler> logger)
+        ILogger<MarketplaceOrderIntakeHandler> logger,
+        DeadLetterWriter dlq)
     {
         _orderRepository = orderRepository;
         _intakeRepository = intakeRepository;
@@ -64,6 +68,7 @@ public class MarketplaceOrderIntakeHandler : IDistributedEventHandler<ChannelOrd
         _unitOfWorkManager = unitOfWorkManager;
         _correlationIdProvider = correlationIdProvider;
         _logger = logger;
+        _dlq = dlq;
     }
 
     public async Task HandleEventAsync(ChannelOrderPulledEto eventData)
@@ -147,6 +152,27 @@ public class MarketplaceOrderIntakeHandler : IDistributedEventHandler<ChannelOrd
                     eventData.ChannelCode, eventData.ExternalOrderId);
 
                 await GhiVetXungDotPayloadAsync(eventData, ct);
+
+                // 🚨 `XC-002` — **ĐẨY DLQ** (nợ §17.8 #3 của `sal-005` ĐÃ ĐÓNG ở đây).
+                // 📌 Trước lượt này chỉ có `LogError`, và chính chú thích cũ ghi rõ: *"khi `XC-002` có DLQ thì
+                // nhánh này PHẢI chuyển sang đẩy DLQ"*. 🔒 Nay DLQ **đã có** ⇒ thực hiện đúng điều đã hứa.
+                // 🔑 Vì sao `LogError` **KHÔNG đủ**: log bị **xoay vòng** (retention vài ngày), **không** tra cứu
+                // được theo khoá nghiệp vụ, và **không ai** biết còn tồn bao nhiêu ⇒ **mất dữ liệu nhưng có vẻ
+                // như đã xử lý**.
+                // 📌 Dùng chế độ **chung UoW** (không phải UoW riêng): việc xử lý **không** hỏng — ta **quyết định**
+                // đẩy DLQ, và bản ghi DLQ **phải** cùng transaction với vết `SkipReason` ở trên.
+                await _dlq.DayVaoDlqAsync(
+                    tenSuKien: nameof(ChannelOrderPulledEto),
+                    khoaNghiepVu: $"{eventData.ChannelCode}:order:{eventData.ExternalOrderId}",
+                    payloadJson: payloadJson,
+                    payloadHash: payloadHash,
+                    lyDo: Messaging.DeadLetter.LyDoVaoDlq.XungDotPayload,
+                    moTaLyDo:
+                        "Cùng khoá đơn nhưng NỘI DUNG KHÁC bản đã nhận. GIỮ bản đầu (không đoán bản nào đúng) "
+                        + "và đẩy DLQ để người xử lý quyết định.",
+                    tenantId: eventData.TenantId,
+                    cancellationToken: ct);
+
                 break;
 
             case IdempotencyOutcomeKind.DangXuLy:
@@ -200,17 +226,122 @@ public class MarketplaceOrderIntakeHandler : IDistributedEventHandler<ChannelOrd
 
         if (daNhan is not null)
         {
+            // ══════════════════════════════════════════════════════════════════════════════════════════
+            // 🚨 **CẬP NHẬT THEO WATERMARK** (`SAL-005` D5/D6) — **NỢ §17.8 #3 ĐÃ ĐÓNG Ở ĐÂY.**
+            //
+            // 📌 TRƯỚC LƯỢT NÀY: đơn đã nhận thì **lần sau KHÔNG sửa** — cập nhật của sàn (đổi địa chỉ,
+            // huỷ, đổi trạng thái) **BỊ BỎ HOÀN TOÀN**. Chú thích cũ ghi rõ đó là đánh đổi **cố ý**
+            // (*"an toàn trước, đầy đủ sau"*). 🔒 Nay làm phần **đầy đủ**.
+            //
+            // 🔑 **LUẬT 4 NHÁNH (`LuatWatermark.Tinh`) — KHÔNG tự viết lại ở đây:**
+            //   • `ApDung`   (v_in > v_đã_áp) ⇒ **ghi** cập nhật + watermark;
+            //   • `Trung`    (v_in == v_đã_áp, hash GIỐNG) ⇒ **không làm gì** (retry của sàn — bình thường);
+            //   • `XungDot`  (v_in == v_đã_áp, hash KHÁC) ⇒ 🚨 **KHÔNG đoán bản nào đúng** ⇒ **đẩy DLQ**;
+            //   • `DenMuon`  (v_in < v_đã_áp) ⇒ **KHÔNG ghi đè** (bản cũ hơn) — ⚠️ nhưng **không im lặng**:
+            //      đẩy DLQ để có **bằng chứng** sàn gửi sai thứ tự (hoặc hai nguồn tranh nhau).
+            //      📌 Đây **không phải** lỗi ⇒ `MoTaLyDo` nói rõ *"cần xem xét, không phải hỏng"*.
+            //
+            // ⚠️ **`AggregateVersion` có thể `null`** (connector chưa trả `update_time` — nợ §17.8).
+            //    Xử lý: coi như **không có watermark** ⇒ giữ nguyên hành vi cũ (chỉ ghi vết `SkipReason`)
+            //    và **KHÔNG** đẩy DLQ (vì **không thể** kết luận gì về thứ tự). 📌 Tuyệt đối **không** bịa
+            //    một phiên bản cho nó: bịa ⇒ mọi cập nhật sau đó bị coi là *"đến muộn"* ⇒ **bỏ hết**.
+            // ══════════════════════════════════════════════════════════════════════════════════════════
+            if (suKien.AggregateVersion is { } vVao)
+            {
+                var quyetDinh = LuatWatermark.Tinh(
+                    vVao,
+                    daNhan.AppliedSourceVersion,
+                    payloadHash,
+                    daNhan.AppliedPayloadHash);
+
+                switch (quyetDinh.KetLuan)
+                {
+                    case KetLuanWatermark.ApDung:
+                        // 🔒 `ApDungWatermark` **NÉM** nếu phiên bản không tăng (`Sales:0003`) — đó là hàng rào
+                        // ở **tầng domain**, không phải ở đây. 📌 Ta đã hỏi luật trước, nên ở nhánh này nó
+                        // **không** ném; nếu ném thì đó là **bất nhất quán** giữa luật và entity ⇒ **phải** nổi lên.
+                        daNhan.ApDungWatermark(
+                            vVao,
+                            payloadHash,
+                            suKien.SourceUpdatedAtUtc,
+                            quyetDinh.NghiNgoThieuBanTrungGian);
+
+                        await _intakeRepository.UpdateAsync(daNhan, autoSave: true, cancellationToken: cancellationToken);
+
+                        // ⚠️ **CẬP NHẬT ĐƠN NỘI BỘ** — nợ đã ghi: hiện `Order` **chưa** có đường áp cập nhật từ sàn
+                        // (đó là phần `SAL-006`/đồng bộ trạng thái). 📌 Ta **vẫn** áp watermark + phát hiện xung đột
+                        // (giá trị thật của `D5`), nhưng **KHÔNG** giả vờ rằng đơn nội bộ đã được cập nhật.
+                        // 🔑 Ghi log rõ để **không** ai đọc nhầm là đã đồng bộ xong.
+                        _logger.LogInformation(
+                            "ĐÃ ÁP WATERMARK cho đơn sàn {ChannelCode}/{ExternalOrderId}: phiên bản {PhienBan} " +
+                            "(nghiNgoThieuBan={NghiNgo}). [WM-DA-AP]",
+                            suKien.ChannelCode, suKien.ExternalOrderId, vVao, quyetDinh.NghiNgoThieuBanTrungGian);
+                        break;
+
+                    case KetLuanWatermark.Trung:
+                        // 📌 Sàn gửi lại **đúng** bản đã nhận ⇒ **không làm gì**. Đây là ca **bình thường nhất**
+                        // (retry của sàn, worker pull lại) ⇒ **KHÔNG** log `Warning`, **KHÔNG** DLQ.
+                        _logger.LogDebug(
+                            "Đơn sàn {ChannelCode}/{ExternalOrderId} TRÙNG (cùng phiên bản + cùng hash) — bỏ qua. [WM-TRUNG]",
+                            suKien.ChannelCode, suKien.ExternalOrderId);
+                        break;
+
+                    case KetLuanWatermark.XungDot:
+                        // 🚨 CÙNG phiên bản nhưng NỘI DUNG KHÁC ⇒ **KHÔNG đoán** (`D6`) ⇒ **đẩy DLQ**.
+                        daNhan.DanhDauBoQua(
+                            $"XUNG ĐỘT: cùng phiên bản {vVao} nhưng hash khác bản đã áp. Giữ bản đầu; đã đẩy DLQ.");
+                        await _intakeRepository.UpdateAsync(daNhan, autoSave: true, cancellationToken: cancellationToken);
+
+                        await _dlq.DayVaoDlqAsync(
+                            tenSuKien: nameof(ChannelOrderPulledEto),
+                            khoaNghiepVu: $"{suKien.ChannelCode}:order:{suKien.ExternalOrderId}",
+                            payloadJson: JsonSerializer.Serialize(suKien),
+                            payloadHash: payloadHash,
+                            lyDo: Messaging.DeadLetter.LyDoVaoDlq.XungDotPayload,
+                            moTaLyDo:
+                                $"Cùng phiên bản {vVao} nhưng PayloadHash KHÁC bản đã áp "
+                                + $"({daNhan.AppliedPayloadHash}). KHÔNG đoán bản nào đúng — giữ bản đầu.",
+                            tenantId: suKien.TenantId,
+                            cancellationToken: cancellationToken);
+                        break;
+
+                    case KetLuanWatermark.DenMuon:
+                        // 🔒 **KHÔNG GHI ĐÈ** bản cũ hơn — đây là bất biến trung tâm của cả feature.
+                        // ⚠️ Nhưng **KHÔNG im lặng**: đẩy DLQ để có **bằng chứng** (log bị xoay vòng, DLQ thì không).
+                        daNhan.DanhDauBoQua(
+                            $"ĐẾN MUỘN: phiên bản {vVao} < đã áp {daNhan.AppliedSourceVersion}. Không ghi đè; đã đẩy DLQ.");
+                        await _intakeRepository.UpdateAsync(daNhan, autoSave: true, cancellationToken: cancellationToken);
+
+                        await _dlq.DayVaoDlqAsync(
+                            tenSuKien: nameof(ChannelOrderPulledEto),
+                            khoaNghiepVu: $"{suKien.ChannelCode}:order:{suKien.ExternalOrderId}",
+                            payloadJson: JsonSerializer.Serialize(suKien),
+                            payloadHash: payloadHash,
+                            lyDo: Messaging.DeadLetter.LyDoVaoDlq.HaWatermark,
+                            moTaLyDo:
+                                $"Bản đến MUỘN (phiên bản {vVao} < đã áp {daNhan.AppliedSourceVersion}). "
+                                + "KHÔNG ghi đè — cần xem xét (sàn gửi sai thứ tự, hoặc hai nguồn tranh nhau). "
+                                + "Đây KHÔNG phải lỗi hệ thống.",
+                            tenantId: suKien.TenantId,
+                            cancellationToken: cancellationToken);
+                        break;
+                }
+
+                return daNhan.OrderId?.ToString();
+            }
+
+            // ── Không có `AggregateVersion` ⇒ giữ nguyên hành vi cũ (không thể kết luận về thứ tự) ──────────
             if (!string.Equals(daNhan.PayloadHash, payloadHash, StringComparison.Ordinal))
             {
-                // Cùng đơn, khác nội dung, mà không có watermark ⇒ KHÔNG đoán (D6). Ghi vết rồi thoát.
                 daNhan.DanhDauBoQua(
-                    $"Nội dung khác bản đã nhận lúc {daNhan.ReceivedAtUtc:O} nhưng CHƯA hỗ trợ cập nhật theo watermark " +
-                    "(SAL-005 D5/D6) ⇒ giữ nguyên bản cũ, cần xử lý thủ công.");
+                    $"Nội dung khác bản đã nhận lúc {daNhan.ReceivedAtUtc:O} nhưng sự kiện KHÔNG có "
+                    + "`AggregateVersion` (connector chưa trả `update_time`) ⇒ KHÔNG thể xét thứ tự ⇒ "
+                    + "giữ nguyên bản cũ, cần xử lý thủ công.");
                 await _intakeRepository.UpdateAsync(daNhan, autoSave: true, cancellationToken: cancellationToken);
 
                 _logger.LogWarning(
-                    "🚨 Đơn sàn {ChannelCode}/{ExternalOrderId} đã nhận trước đó với NỘI DUNG KHÁC và CHƯA có xử lý " +
-                    "cập nhật ⇒ giữ nguyên bản cũ (không mất dữ liệu) và GHI VẾT để xử lý thủ công.",
+                    "🚨 Đơn sàn {ChannelCode}/{ExternalOrderId}: nội dung KHÁC nhưng KHÔNG có `AggregateVersion` " +
+                    "⇒ không thể áp watermark ⇒ giữ bản cũ + GHI VẾT. [WM-THIEU-PHIEN-BAN]",
                     suKien.ChannelCode, suKien.ExternalOrderId);
             }
 

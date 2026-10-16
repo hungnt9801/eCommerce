@@ -1159,3 +1159,113 @@ lần phát lại**"*.
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.1 | 16/10/2026 | *(agent, session GĐ1)* | **§17 — LÁT CẮT 2: WATERMARK `D5`**: `PayloadCanonicalizer` (canonical JSON + SHA-256 + `ThanhPhienBan` **làm tròn xuống**) · `LuatWatermark` (**4 nhánh**, lõi thuần) · **8 trường ETO** + **3 trường `ChannelOrderModel`** (**gỡ F2/F3**) · **5 cột watermark** + index cờ lệch · `ApDungWatermark` (**NÉM khi hạ watermark**) · **+39 unit test** (928 tổng). Ghi **§17.3** (4 cái bẫy im lặng) · **§17.5** (`EventId`/`OccurredOn` **cố ý không thêm** — ABP cấp ở envelope; thêm là **nguồn sự thật thứ hai**) · **§17.6** (nợ: handler **chưa nối** · **chưa có DLQ** · chưa có event log · chưa có job đối soát · connector **chưa trả `update_time`**) |
+
+---
+
+## 18. ✅ **LÁT CẮT 3 — NỐI WATERMARK VÀO HANDLER + DLQ (`XC-002`)** (16/10/2026) — *đóng nợ §17.8 #3*
+
+> ⚠️ **PHẠM VI NÓI RÕ — ĐỌC KỸ TRƯỚC KHI TIN:**
+> ✅ **ĐÃ LÀM + KIỂM ĐƯỢC:** **DLQ** (bảng + entity + writer) · **nối luật watermark** vào handler · migration.
+> 🚨 **CHƯA ĐO ĐƯỢC RUNTIME (§18.6):** **không có đường nào phát `ChannelOrderPulledEto`** trong probe ⇒
+> **không** sự kiện nào đi qua handler ⇒ **KHÔNG kết luận gì** về hành vi runtime. 📌 Coi phần đó là **CHƯA XONG**.
+
+### 18.1 🔑 **Đóng đúng điều đã HỨA — và điều đó nằm trong chú thích cũ**
+
+Chú thích cũ của handler ghi **nguyên văn**:
+> *"Nay: GIỮ bản đầu …, **GHI VẾT** … ⇒ **không im lặng**. 📌 Khi `XC-002` có **DLQ** (đã cố ý hoãn), nhánh này
+> **PHẢI chuyển sang đẩy DLQ**."*
+
+✅ **Nay DLQ đã có ⇒ thực hiện đúng điều đã hứa.** 📌 Và nợ §17.8 #3 ghi: *"đơn đã nhận thì lần sau **không**
+sửa ⇒ **cập nhật của sàn BỊ BỎ**"* — phần đó **cũng** đã làm.
+
+### 18.2 🚨 **DLQ — vì sao `LogError` KHÔNG ĐỦ (và hai lựa chọn "quen thuộc" đều SAI)**
+
+| Lựa chọn | Hệ quả |
+|---|---|
+🚨 **Ném lỗi để nơi phát retry** | Với luồng đơn từ sàn, nơi phát **giữ con trỏ đồng bộ** ⇒ sàn gửi lại **đúng** đơn đó ⇒ **lặp vô hạn** và **chặn CẢ KÊNH**. 📌 Đã **đo được thật** (con trỏ kẹt ở `NULL` qua nhiều nhịp) ⇒ **một đơn nghi vấn sập luồng bán hàng** |
+🚨 **Chỉ `LogError`** | Sự kiện **biến mất**: log **xoay vòng** (retention vài ngày), **không** tra cứu được theo **khoá nghiệp vụ**, **không ai** biết còn tồn bao nhiêu ⇒ **mất dữ liệu nhưng có vẻ như đã xử lý** |
+✅ **DLQ** | Sự kiện được **giữ nguyên vẹn**, luồng **đi tiếp** (không chặn kênh), người vận hành **tra cứu + xử lý + phát lại** được |
+
+### 18.3 🔒 **Ba bất biến của `DeadLetterMessage`** (mỗi cái làm DLQ **dùng được**, không chỉ **ghi được**)
+
+| # | Bất biến | Vì sao |
+|---|---|---|
+**1** | 🚨 **`PayloadJson` giữ NGUYÊN VẸN** — không cắt, không chuẩn hoá lại | **Cắt** ⇒ **không phát lại được**. **Chuẩn hoá lại** ⇒ **mất** chính khác biệt là **nguyên nhân** vào DLQ (xung đột payload là *"cùng khoá, khác nội dung"* — chuẩn hoá thì hai bản có thể **trông giống nhau**) |
+**2** | **`KhoaNghiepVu` là cột RIÊNG** | Câu hỏi vận hành phổ biến nhất: *"đơn `SHOPEE/12345` có vấn đề gì?"*. 📌 Không có cột này thì phải **quét cả bảng** bằng `LIKE` trên JSON — chậm, và **sai** khi khoá xuất hiện trong trường khác |
+**3** | **`MoTaLyDo` (chữ) BẮT BUỘC** | 🔒 Một mã enum **không** cho người trực biết **phải làm gì**. 📌 Cùng bài học `REC-001` §17.5 |
+
+➕ **`DanhDauDaXuLy` giữ nguyên hai khuôn đã chốt:** **bắt buộc** lý do + người xử lý · **NO-OP TRƯỚC**,
+kiểm tham số **SAU** (nếu kiểm tham số trước thì **retry** không mang lý do sẽ **NÉM** trên dòng **đã xong**
+⇒ consumer **retry vô hạn** vì việc **không cần làm gì** — `REC-001` §17.3).
+➕ **Xoá là XOÁ MỀM** — DLQ là **bằng chứng** một sự kiện đã hỏng; xoá cứng thì lần sau gặp lại **không ai biết**.
+
+### 18.4 🚨 **QUYẾT ĐỊNH QUAN TRỌNG NHẤT CỦA `DeadLetterWriter`: HAI CHẾ ĐỘ UoW**
+
+| Chế độ | Dùng khi | **Vì sao** |
+|---|---|---|
+`DayVaoDlqAsync` — **chung UoW** | Ta **quyết định** đẩy DLQ (xung đột / hến watermark) | Bản ghi DLQ **phải** cùng transaction với vết `SkipReason`: nếu một cái ghi được còn cái kia không, thì **không ai** đối chiếu được *"DLQ nói gì"* với *"nhật ký nói gì"* |
+🚨 `DayVaoDlqUoWRiengAsync` — **UoW MỚI** (`requiresNew`) | **Chính việc xử lý đã NÉM LỖI** | 📌 Lúc đó UoW nơi gọi **sẽ bị rollback** ⇒ ghi DLQ **cùng** UoW thì **bản ghi DLQ CŨNG BỊ ROLLBACK** ⇒ **DLQ rỗng đúng lúc cần nó nhất**, và ta quay về đúng tình trạng *"chỉ có log, rồi log bị xoay vòng"* |
+
+🔑 **Đây là lỗi kinh điển của mọi thiết kế DLQ:** *"ghi DLQ trong cùng transaction với việc đã hỏng"*.
+⚠️ **Giới hạn đã biết:** nếu **chính** `DayVaoDlqUoWRiengAsync` cũng hỏng (DB chết) thì sự kiện **mất** và chỉ
+còn log `Critical`. 📌 Không tránh được khi **cùng** một DB vừa là nơi hỏng vừa là nơi ghi DLQ — cách chắc hơn là
+DLQ ở **hạ tầng khác** (hàng đợi thật). Ghi ở §18.7.
+
+### 18.5 🔑 **NỐI LUẬT WATERMARK — bốn nhánh, KHÔNG tự viết lại**
+
+Trước lượt này: **đơn đã nhận thì lần sau KHÔNG sửa** ⇒ cập nhật của sàn **BỊ BỎ HOÀN TOÀN**.
+Nay mọi cập nhật đi qua **`LuatWatermark.Tinh`** (luật đã có + đã có test):
+
+| Nhánh | Hành vi | **Vì sao** |
+|---|---|---|
+`ApDung` (`v_in > v_đã_áp`) | **Ghi** watermark + hash + mốc, kèm cờ *"nghi ngờ thiếu bản"* | Đây là **giá trị thật** của `D5` |
+`Trung` (`=` + hash **giống**) | **Không làm gì** (`LogDebug`) | 📌 **Ca bình thường nhất** (sàn retry, worker pull lại) ⇒ **KHÔNG** `Warning`, **KHÔNG** DLQ |
+`XungDot` (`=` + hash **khác**) | 🚨 **ĐẨY DLQ** + vết | Cùng phiên bản mà nội dung khác ⇒ **KHÔNG đoán** bản nào đúng (`D6`) |
+`DenMuon` (`v_in < v_đã_áp`) | 🔒 **KHÔNG ghi đè** + **ĐẨY DLQ** | Bất biến trung tâm: **watermark CHỈ TĂNG**. ⚠️ Nhưng **không im lặng** — DLQ là **bằng chứng** sàn gửi sai thứ tự. 📌 Mô tả nói rõ *"KHÔNG phải lỗi hệ thống"* |
+
+⚠️ **`AggregateVersion = null`** (connector chưa trả `update_time` — nợ §17.8): handler giữ **hành vi cũ**
+(chỉ ghi vết `SkipReason`) và **KHÔNG** đẩy DLQ. 🔒 **Tuyệt đối không bịa một phiên bản cho nó**: bịa ⇒ mọi cập nhật
+sau đó bị coi là *"đến muộn"* ⇒ **bỏ hết**.
+
+➕ **Và ghi log RÕ điều CHƯA làm:** khi `ApDung`, handler áp watermark **nhưng KHÔNG** cập nhật đơn nội bộ
+(`Order` chưa có đường áp cập nhật từ sàn — phần `SAL-006`/đồng bộ trạng thái). 🔑 Log nói **thẳng** để
+**không ai đọc nhầm** là đã đồng bộ xong.
+
+### 18.6 🚨 **ĐIỀU CHƯA ĐO ĐƯỢC — và tôi TỪ CHỐI kết luận**
+
+Probe (`tools\_tam-dlq\sal-005-watermark-dlq-kiem.ps1`) seed **đúng** trạng thái (nhật ký nhận `wm=1000` +
+DLQ **rỗng**) rồi khởi động Host, và đo qua **log thật** (neo `[WM-*]`/`[DLQ-DA-DAY]`) + **DB thật**.
+
+**Kết quả đo được:** `WM-DA-AP = 0` · `WM-TRUNG = 0` · `DLQ-DA-DAY = 0` · `WM-THIEU-PHIEN-BAN = 0`.
+⇒ 🚨 **KHÔNG sự kiện nào đi qua handler** ⇒ **KHÔNG đo được runtime**.
+
+📌 **Nguyên nhân:** **không có đường nào phát `ChannelOrderPulledEto`** trong môi trường probe —
+`ChannelShopSyncer` chỉ phát khi có **connector thật** gọi sàn, mà `EnableLiveCalls = false` và **không có
+credential sandbox**. ➕ Và **chưa có endpoint** nào phát sự kiện để kiểm.
+
+🔒 **Vì vậy probe có một ca `C1` khẳng định *"handler CÓ chạy trong lượt này"* — và nó ĐỎ.** 📌 Đó là **thiết kế
+đúng**: một probe **không thấy gì** thì **không** được phép xanh. ➕ Probe **in thẳng kết luận trung thực**:
+*"KHÔNG đo được runtime của watermark/DLQ bằng probe này ⇒ GHI NỢ, KHÔNG kết luận gì về sản phẩm"*.
+
+📌 **Bài học lặp lại (lần thứ TÁM trong chuỗi lượt này):** **1100 unit test xanh + 25 ca DLQ xanh KHÔNG** chứng
+minh handler chạy đúng ở runtime. ✅ **Cái ĐÃ kiểm được:** entity DLQ (25 ca) · build · migration **áp lên DB thật** ·
+`DbSetRegistrationTests` · `EventCoverageChecker` (handler **vẫn** có người nhận ⇒ cổng fail-closed **không** bị đóng oan).
+
+### 18.7 ⏳ NỢ (KHÔNG phải tính năng đã có)
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+**1** | 🚨 **CHƯA đo runtime của watermark + DLQ** | §18.6. 📌 Cần **một trong hai**: (a) endpoint **chỉ ở Development** phát thử `ChannelOrderPulledEto`; hoặc (b) fixture tích hợp dựng **đồ thị module + DB** để gọi handler trực tiếp. 🔑 Đây là **cùng loại nợ** đã gặp ở `CAT-003` §25.6 — và cách sửa cũng **giống**: **làm đường gọi**, đừng tìm cách đo khác |
+**2** | **CHƯA có job đối chiếu `D12`** | Cờ `GapSuspected` **sẽ tồn đọng** — không ai hạ nó. 📌 `DanhDauDaDoiSoat` **đã có** nhưng **chưa ai gọi**. ⚠️ Nghịch lý: nay `DenMuon`/`XungDot` **đẩy DLQ** ⇒ có **bằng chứng**, nhưng **chưa ai đọc** DLQ |
+**3** | **CHƯA có job dọn DLQ** | Bảng **chỉ tăng**. 📌 Một hàng đợi **không bao giờ được đọc** thì **tệ như không có** |
+**4** | **CHƯA có phát lại tự động từ DLQ** | Hiện chỉ **ghi** + **đánh dấu đã xử lý**. 🔒 Phát lại **phải** là thao tác **có người** (và có audit) — phát lại tự động một sự kiện đã hỏng có thể **gây hỏng lần nữa** |
+**5** | **CHƯA có API/UI đọc DLQ** | Entity + index (`IX_MsgDeadLetters_TenantId_ChuaXuLy`) **đã có**, nhưng **chưa có endpoint** ⇒ vẫn **không ai đọc được** |
+**6** | 🚨 **`Order` nội bộ CHƯA được cập nhật** khi `ApDung` | Watermark **đã** áp, nhưng **trạng thái/địa chỉ/tiền** của đơn nội bộ **vẫn cũ**. 🔑 Log nói rõ ⇒ không hiểu nhầm |
+**7** | **Connector chưa trả `update_time`** | ⇒ mọi ETO hiện có `AggregateVersion = null` ⇒ **nhánh watermark KHÔNG chạy** trên dữ liệu thật. 🚨 Nghĩa là tính năng vừa nối **chưa có tác dụng** cho tới khi connector trả `update_time` |
+**8** | **`AbpEventOutbox`/`AbpEventInbox` CHƯA có trong DB** | 🚨 Phát hiện khi kiểm bảng: **không** có bảng outbox ⇒ tài liệu nói *"phát ETO vào **outbox** cùng transaction"* **chưa đúng** với cấu hình hiện tại. 📌 Cần xác nhận có chủ ý hay thiếu cấu hình — ⚠️ nếu là thiếu thì **mất sự kiện khi tiến trình chết giữa chừng** |
+
+### 18.8 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.4 | 16/10/2026 | *(agent, session GĐ1)* | **§18 — LÁT CẮT 3: NỐI WATERMARK + DLQ** (đóng nợ §17.8 #3): **DLQ** `DeadLetterMessage` (bảng `MsgDeadLetters` + **2 index**, một index **có bộ lọc** `NOT "DaXuLy"`) · **`DeadLetterWriter`** với **HAI CHẾ ĐỘ UoW** (chung / **`requiresNew`** khi việc xử lý đã ném lỗi) · mã `Messaging:0006`/`0007` · migration `20261016145709_Xc002_DeadLetterQueue` (**áp lên DB thật**, NND **giữ 48** vì index không unique) · **nối luật 4 nhánh** vào `MarketplaceOrderIntakeHandler` · **+25 unit test** (1100 tổng). 🔑 **Ba bất biến DLQ**: payload **nguyên vẹn** · khoá nghiệp vụ **cột riêng** · mô tả **bắt buộc**. 🚨 **Quyết định quan trọng nhất:** *"ghi DLQ trong **cùng** transaction với việc đã hỏng"* ⇒ DLQ **cũng bị rollback** ⇒ **rỗng đúng lúc cần nhất** ⇒ phải có `DayVaoDlqUoWRiengAsync`. 🔑 **Nối luật:** `ApDung`/`Trung`/`XungDot`/`DenMuon` — `DenMuon` **KHÔNG ghi đè** nhưng **đẩy DLQ** làm bằng chứng. ⚠️ `AggregateVersion = null` ⇒ giữ hành vi cũ, **không bịa phiên bản**. 🚨 **§18.6: CHƯA ĐO ĐƯỢC RUNTIME** — không có đường phát `ChannelOrderPulledEto` (connector `EnableLiveCalls = false`) ⇒ probe **từ chối kết luận** (ca `C1` **ĐỎ** đúng thiết kế, in kết luận trung thực). 📌 **Bài học lần thứ TÁM:** *"test xanh"* ≠ *"đúng"*. Ghi **§18.7** (nợ: **chưa đo runtime** · **chưa có job `D12`** ⇒ cờ `GapSuspected` **tồn đọng** · chưa dọn DLQ · chưa phát lại · **chưa có API/UI đọc DLQ** ⇒ vẫn **không ai đọc được** · **`Order` nội bộ chưa cập nhật** · **connector chưa trả `update_time`** ⇒ tính năng **chưa có tác dụng** trên dữ liệu thật · 🚨 **không có bảng `AbpEventOutbox`** ⇒ tài liệu nói *"phát vào outbox"* **chưa đúng** với cấu hình hiện tại) |

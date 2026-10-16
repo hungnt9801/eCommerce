@@ -24,4 +24,13 @@ public static class MessagingErrorCodes
 
     /// <summary>Payload không phải JSON hợp lệ nên không băm được.</summary>
     public const string PayloadKhongHopLe = "eCommerce:Messaging:0005";
+    /// <summary>🚨 **THIẾU THÔNG TIN BẮT BUỘC** — dùng cho các guard của `DeadLetterMessage` (`0006`).
+    /// 📌 **VÌ SAO MÃ RIÊNG (không mượn `0005` = *"payload không hợp lệ"*):** chỉ dẫn **rất khác** —
+    /// *"điền thêm trường / ghi rõ lý do xử lý"*, **không** phải *"sự kiện sai định dạng"*.
+    /// 🔒 Và `WithData("truong", …)` nói **trường nào** ⇒ người dùng không phải đoán.</summary>
+    public const string ThieuThongTinBatBuoc = "eCommerce:Messaging:0006";
+
+    /// <summary>🚨 **KHÔNG TÌM THẤY** bản ghi (DLQ / bản ghi idempotency) — `0007`.
+    /// 📌 Tách khỏi `0006` vì chỉ dẫn khác hẳn: *"kiểm lại khoá / dữ liệu đã bị xoá"*.</summary>
+    public const string KhongTimThay = "eCommerce:Messaging:0007";
 }

@@ -151,6 +151,12 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
     // ⚠️ BẮT BUỘC có DbSet: thiếu DbSet thì `IRepository<IdempotencyRecord, Guid>` KHÔNG được
     // đăng ký và lỗi chỉ lộ ra lúc chạy ("has not been registered") — bài học Phase 0.
     public DbSet<Messaging.Idempotency.IdempotencyRecord> IdempotencyRecords { get; set; } = default!;
+    /// <summary>
+    /// 🚨 **HÀNG ĐỢI THƯ CHẾT** (`XC-002`). **BẮT BUỘC có `DbSet`** — thiếu ⇒
+    /// `IRepository&lt;DeadLetterMessage, Guid&gt;` **không được đăng ký** và lỗi chỉ lộ ra **lúc chạy**
+    /// (*"has not been registered"*, bài học Phase 0). Lưới an toàn CI: `DbSetRegistrationTests`.
+    /// </summary>
+    public DbSet<Messaging.DeadLetter.DeadLetterMessage> DeadLetterMessages { get; set; } = default!;
 
     // ── Address (ADDR-001): danh mục đơn vị hành chính theo PHIÊN BẢN schema ──
     public DbSet<Address.AdministrativeUnit> AdministrativeUnits { get; set; } = default!;
@@ -782,6 +788,40 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
+        // 🚨 `XC-002` — **HÀNG ĐỢI THƯ CHẾT**. Xem chú thích entity để biết vì sao "chỉ ghi log" là KHÔNG ĐỦ
+        // (log bị xoay vòng, không tra cứu theo khoá, không biết còn tồn bao nhiêu ⇒ **mất dữ liệu nhưng có vẻ
+        // như đã xử lý**).
+        builder.Entity<Messaging.DeadLetter.DeadLetterMessage>(b =>
+        {
+            b.ToTable("MsgDeadLetters");
+            b.ConfigureByConvention();
+
+            b.Property(x => x.TenSuKien).IsRequired().HasMaxLength(Messaging.DeadLetter.DeadLetterMessage.DoDaiTenSuKienToiDa);
+            b.Property(x => x.KhoaNghiepVu).IsRequired().HasMaxLength(Messaging.DeadLetter.DeadLetterMessage.DoDaiKhoaNghiepVuToiDa);
+            b.Property(x => x.MoTaLyDo).IsRequired().HasMaxLength(Messaging.DeadLetter.DeadLetterMessage.DoDaiLyDoToiDa);
+            b.Property(x => x.PayloadHash).IsRequired().HasMaxLength(64);
+            b.Property(x => x.NguoiXuLy).HasMaxLength(256);
+            b.Property(x => x.LyDoXuLy).HasMaxLength(Messaging.DeadLetter.DeadLetterMessage.DoDaiLyDoToiDa);
+            b.Property(x => x.CorrelationId).HasMaxLength(128);
+
+            // 📌 `PayloadJson` là `text` (không giới hạn độ dài): 🔒 **CẮT payload là không phát lại được** —
+            // đúng bất biến (1) ở chú thích entity.
+            b.Property(x => x.PayloadJson).IsRequired();
+
+            b.Property(x => x.LyDo).HasConversion<int>();
+
+            // 📌 Truy vấn NÓNG NHẤT: *"còn gì CHƯA xử lý?"* — index **có bộ lọc** để luôn **nhỏ**.
+            // 🔑 Nghịch lý của mọi hàng đợi lỗi: sau một thời gian, **phần lớn** dòng đã xử lý ⇒ không lọc thì
+            // chính truy vấn *"còn việc gì"* trở thành truy vấn **nặng nhất** ⇒ chậm dần cho tới khi **không ai đọc**.
+            // 📌 Cùng khuôn `IX_ReconRunMismatches_TenantId_Run_ChuaXuLy` (`REC-001` §17.4).
+            b.HasIndex(x => new { x.TenantId, x.VaoDlqLucUtc })
+                .HasFilter("NOT \"DaXuLy\"")
+                .HasDatabaseName("IX_MsgDeadLetters_TenantId_ChuaXuLy");
+
+            // 📌 Tra theo **khoá nghiệp vụ** — câu hỏi *"đơn/sự kiện này có vấn đề gì?"*.
+            b.HasIndex(x => new { x.TenantId, x.KhoaNghiepVu })
+                .HasDatabaseName("IX_MsgDeadLetters_TenantId_Khoa");
+        });
         builder.Entity<Orders.Order>(b =>
         {
             b.ToTable("OrdOrders");
