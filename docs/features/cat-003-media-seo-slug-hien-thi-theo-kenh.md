@@ -1498,3 +1498,90 @@ với **hai gốc khác nhau** (`…Temp\ecommerce-media-dung-chung` rồi `…k
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.6 | 16/10/2026 | *(agent, session GĐ1)* | **§20 — LÁT CẮT 4: APP SERVICE TẢI ẢNH + ENDPOINT PHỤC VỤ** (đóng nợ §17.8 #2): `IProductMediaAppService`/`ProductMediaAppService` (**4 method**: danh sách · tải lên · sửa metadata · đặt ảnh chính · xoá mềm) · `CatMediaController` (**cửa công khai duy nhất**, đã allowlist) · `CatalogLimits.AnhToiDaByte` (10 MB) + `SoAnhToiDaMoiSanPham` (50) · `CatalogMediaModule` + `CatalogMediaModuleTests` (**5 ca**) · **+5 test** (1048 tổng). 🚨 **BA LỖI DI** (cả ba lọt qua build + **1043 test xanh**): `IMediaStorage` không được đăng ký · quên thêm module vào `DependsOn` · module có constructor **tham số** (`MissingMethodException`, Host **không khởi động nổi**). 🚨 **MỘT XUNG ĐỘT THIẾT KẾ**: app service `[Authorize]` bị interceptor ABP **từ chối** khi gọi ẩn danh ⇒ phải bỏ lớp đó, controller đọc repository trực tiếp. ✅ **26/32 ca HTTP thật ĐẠT** (toàn bộ đường TẢI LÊN + ràng buộc + từ chối bảo mật + đổi ảnh chính). 🚨 **6 ca phục vụ tệp CHƯA đo sạch** — lỗi **hạ tầng đo** (tranh chấp thứ tự khởi động Host), đã loại trừ **bốn** nguyên nhân bằng đo đạc; **coi là CHƯA XONG**. Ghi **§20.2** (thứ tự 4 phép kiểm) · **§20.4** (xung đột `[Authorize]` ⚔️ công khai) · **§20.6** (sáu ca chưa đo + bốn nguyên nhân đã loại trừ) · **§20.7** (11 nợ, gồm **ảnh xoá mềm trả 404** và **cùng tên miền**) |
+
+---
+
+## 21. ✅ **ĐÓNG NỢ §20.6 — PHỤC VỤ TỆP QUA HTTP ĐÃ ĐO SẠCH (17/17)** (16/10/2026)
+
+### 21.1 Kết luận trước, giải thích sau
+
+🚨 **SẢN PHẨM ĐÚNG. LỖI NẰM Ở BỘ ĐO.** 6 ca *"chưa đo sạch"* ở §20.6 nay **ĐẠT hết**; và chẩn đoán tôi đưa
+ra ở §20.6 — *"tranh chấp thứ tự trong bộ đo, không phải lỗi tất định của sản phẩm"* — **được xác nhận bằng
+đo đạc**, không phải bằng suy luận.
+
+### 21.2 🚨 **Nguyên nhân gốc — và cách chứng minh nó**
+
+**Nguyên nhân:** probe cũ khởi động lại Host trong khi **tiến trình cũ còn giữ cổng 5000**
+(`Stop-Process` + `Start-Sleep 3` **không** bảo đảm). Một Host **cấu hình CŨ** còn sống ghi tệp vào gốc kho
+**khác**, rồi tiến trình mới đọc **không thấy** ⇒ `404`.
+
+🔒 **Bằng chứng (neo log, không phải phỏng đoán):**
+
+| Lần chạy | `MEDIA-GOC-KHO` trong `host.log` | Kết quả |
+|---|---|---|
+Cũ (§20.6) | **2** lần, với **HAI GỐC KHÁC NHAU** | `404` — 6 ca đỏ |
+Mới (§21) | **1** lần | `200` — **17/17 đạt** |
+
+📌 Con số **`1`** chính là *"không còn tiến trình cũ"* — và nó **là điều kiện** để phép đo có nghĩa.
+
+### 21.3 🔑 **Cách sửa BỘ ĐO — ba việc, mỗi việc đóng một khe hở**
+
+| # | Việc | Vì sao |
+|---|---|---|
+**1** | **Dừng HẾT tiến trình và CHỜ tới khi cổng TRỐNG** (vòng lặp tối đa 30 s, không `Start-Sleep` mù) | `Stop-Process` là **bất đồng bộ**: tiến trình có thể còn sống vài giây. Ngủ một khoảng cố định là **đoán**, không phải **kiểm** |
+**2** | 🚨 **Chạy TUẦN TỰ: Host ghi tệp → DỪNG HẲN Host → mới khởi động Web để đọc** | Loại bỏ **hoàn toàn** khả năng hai tiến trình cùng ghi. 📌 Đây là thay đổi **quyết định**: bộ đo cũ chạy **song song** nên tự tạo ra tranh chấp mà nó không kiểm soát được |
+**3** | **Kiểm TIỀN ĐỀ trước mỗi phép đo** (`A1` cổng trống · `A2` gieo đúng số dòng + **kho RỖNG** · `B3` khoá DB trỏ tới **tệp có thật**) | Cùng nguyên tắc đã trả giá ở `REC-001` §17.7: *"bước gieo thất bại im lặng"* là dạng nguy hiểm nhất của lỗi bộ đo |
+
+➕ **Và đo lại ĐÚNG thứ đã sai:** `C2` kiểm **tệp vẫn còn sau khi Host dừng** ⇒ chứng minh ghi **bền**, không
+phải trong RAM; `E1` kiểm **`host.log` chỉ có 1 lần khởi động** ⇒ chứng minh phép đo **sạch**.
+
+### 21.4 ✅ **KIỂM CHỨNG — 17/17 CA ĐẠT** (Web :5100 + PostgreSQL 17 + kho đĩa thật)
+
+| # | Ca | **Đo được** |
+|---|---|---|
+A1 | Cổng 5000 + 5100 **TRỐNG** trước khi bắt đầu | ✅ |
+A2 | Tiền đề: 1 sản phẩm + kho tệp **RỖNG** | sp=1 · tep=0 ✅ |
+B1 | Tải ảnh lên | `200` · url=`/CatMedia/3a24571b-…` ✅ |
+B2 | **Tệp đã ghi THẬT** vào kho dùng chung | kho: 0 → **1** ✅ |
+**B3** | 🚨 **KHOÁ trong DB trỏ tới TỆP CÓ THẬT** | `coTep=True` (`111b3363….png`) ✅ |
+C1 | Dừng hẳn Host, cổng 5000 TRỐNG | ✅ |
+C2 | **Tệp VẪN CÒN** sau khi Host dừng (ghi **bền**) | kho=1 ✅ |
+**D1** | 🚨 **Phục vụ được KHÔNG cần đăng nhập** (storefront/`og:image`) | **`HTTP 200`** ✅ |
+**D2** | 🚨 `Content-Type` do **MÁY CHỦ** đặt = `image/png` | ✅ |
+**D3** | `X-Content-Type-Options: nosniff` | ✅ |
+**D4** | **Bytes trả về ĐÚNG** nội dung đã tải | `24` byte (khớp) ✅ |
+**D5** | `Content-Disposition: inline` + tên tệp **do máy chủ sinh** | `inline; filename="3a24571b…png"` ✅ |
+D6 | **ETag** để cache CDN/trình duyệt | `"3a24571b…-639277546350880100"` ✅ |
+D7 | Ảnh không tồn tại ⇒ **`404`** (KHÔNG phải `500`) | ✅ |
+**E1** | 🚨 `host.log` có **ĐÚNG 1** lần khởi động ⇒ phép đo **sạch** | soLan=**1** ✅ |
+**E2** | `web.log` **KHÔNG** có `MEDIA-MAT-TEP` (không dòng DB nào trỏ tới tệp mất) | ✅ |
+E3 | `host.log` có `MEDIA-TAI-LEN` (đường tải lên chạy thật) | ✅ |
+
+### 21.5 📌 Ba bài học (ghi lại vì rất dễ tái diễn)
+
+1. 🚨 **"Test xanh" và "probe đỏ" có thể cùng SAI** — lần này probe đỏ vì **bộ đo**, không vì sản phẩm.
+   🔑 Cách phân biệt: **triệu chứng có TẤT ĐỊNH không?** (§20.6: *"lần thì tệp 1 mất, lần thì tệp 2 mất"* —
+   đó là dấu hiệu **tranh chấp**, không phải lỗi logic).
+2. 🚨 **Đo SONG SONG hai tiến trình ghi cùng một tài nguyên là tự tạo ra tranh chấp** — nếu thứ tự không
+   quan trọng với sản phẩm thì **đừng** để nó quan trọng với bộ đo. Nay chạy **tuần tự**.
+3. 🔒 **Chờ theo ĐIỀU KIỆN, không chờ theo THỜI GIAN** (`while (!congTrong) sleep 1` thay cho `Start-Sleep 3`).
+   📌 `Start-Sleep` là **đoán**; vòng lặp kiểm điều kiện là **biết**.
+
+### 21.6 ⏳ NỢ CÒN LẠI (đã cập nhật sau khi đóng §20.6)
+
+| # | Nợ | Trạng thái |
+|---|---|---|
+**1** | ✅ **Phục vụ tệp qua HTTP** | **ĐÓNG** (§21) |
+**2** | 🚨 **Ảnh đã XOÁ MỀM trả `404`** | **CÒN** — `IDataFilter.Disable<ISoftDelete>()` không resolve trong `eCommerce.Web`. Link ảnh đã phát ra ngoài **có thể vỡ**; **không** mất dữ liệu (bytes còn ⇒ khôi phục được) |
+**3** | **Cùng tên miền** | **CÒN** — cần tên miền/CDN riêng |
+**4** | **Base64 trong JSON** (+33 %) | **CÒN** |
+**5** | **Gốc kho mặc định = thư mục tạm** (không dùng chung giữa các máy) | **CÒN** |
+**6** | **Chưa có job dọn tệp mồ côi** | **CÒN** |
+**7** | **Chưa nén/thumbnail · chưa tải nhiều ảnh · chưa UI ảnh** | **CÒN** |
+**8** | 🚨 **HIỂN THỊ THEO KÊNH — 0 dòng code** | **CÒN** (phần **thứ ba** của `CAT-003`) |
+
+### 21.7 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.7 | 16/10/2026 | *(agent, session GĐ1)* | **§21 — ĐÓNG NỢ §20.6: PHỤC VỤ TỆP ĐÃ ĐO SẠCH (17/17)**: 🚨 **SẢN PHẨM ĐÚNG, LỖI Ở BỘ ĐO** — chẩn đoán ở §20.6 **được xác nhận**: `MEDIA-GOC-KHO` = **2** lần (gốc khác nhau) khi đỏ, **1** lần khi đạt ⇒ nguyên nhân là **tiến trình Host CŨ còn giữ cổng**. 🔒 **Sửa BỘ ĐO ba việc**: (1) **chờ tới khi cổng TRỐNG** (vòng lặp, không `Start-Sleep` mù); (2) 🚨 **chạy TUẦN TỰ** — Host ghi → **dừng hẳn** → Web đọc (loại bỏ tranh chấp do chính bộ đo tạo ra); (3) **kiểm tiền đề** trước mỗi phép đo. ✅ **17/17 ca đạt**, gồm **D1 `200` không cần đăng nhập** · **D2 `Content-Type` do máy chủ** · **D3 `nosniff`** · **D4 đúng 24 byte** · **D5 `Content-Disposition` tên do máy chủ sinh** · **D6 `ETag`** · **D7 `404`** · **E1 `host.log` đúng 1 lần khởi động**. Ghi **§21.5** (ba bài học: *"test xanh" và "probe đỏ" có thể cùng sai* · *đo song song tự tạo tranh chấp* · *chờ theo ĐIỀU KIỆN, không theo THỜI GIAN*) · **§21.6** (nợ còn lại: **ảnh xoá mềm `404`** · cùng tên miền · base64 · gốc kho tạm · job dọn · nén/UI · **hiển thị theo kênh 0 dòng code**) |
