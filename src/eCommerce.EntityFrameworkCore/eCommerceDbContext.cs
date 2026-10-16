@@ -745,6 +745,19 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
             b.HasIndex(x => new { x.TenantId, x.ChannelCode, x.ExternalOrderId })
                 .IsUnique()
                 .HasDatabaseName("IX_SalMktIntakes_TenantId_ChannelCode_ExternalOrderId");
+
+            // 🚨 `SAL-005` **BR-SAL-005-009 / D12** — **INDEX CHO CỜ "NGHI NGỜ THIẾU BẢN TRUNG GIAN"**.
+            //
+            // **VÌ SAO BẮT BUỘC (đây là ĐIỀU KIỆN CHẠY của job đối soát, KHÔNG phải tối ưu):**
+            // job đối soát hằng ngày quét **đúng** tập `GapSuspected = true` để tự đi lấy lại đơn từ sàn
+            // (`D12`: *"job đối soát chủ động là BẮT BUỘC, không phải tuỳ chọn"* — vì sàn **không** đảm bảo
+            // giao webhook). Bảng intake **chỉ tăng** (mỗi đơn sàn một dòng, append-only theo thiết kế):
+            // không có index thì mỗi nhịp job quét **toàn bộ** bảng.
+            // 📌 Hệ quả nếu thiếu: job chậm dần ⇒ tới một lúc **vượt cửa sổ chạy** ⇒ **không hoàn thành**
+            // ⇒ cờ `GapSuspected` **tồn đọng** ⇒ đơn sai trạng thái **không ai phát hiện** — mà **không có
+            // lỗi nào** để lần ra (job chỉ *"chạy lâu hơn"*).
+            b.HasIndex(x => new { x.TenantId, x.GapSuspected })
+                .HasDatabaseName("IX_SalMktIntakes_TenantId_GapSuspected");
         });
     }
 }

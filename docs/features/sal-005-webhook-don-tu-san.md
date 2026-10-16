@@ -1053,11 +1053,11 @@ trùng báo **XUNG ĐỘT PAYLOAD** (đúng thiết kế) và **không thể ki�
 
 | # | Nội dung | Trạng thái |
 |---|---|---|
-| 1 | **Xử lý CẬP NHẬT đơn sàn theo watermark** (`update_time`) — D5 + **luật 4 nhánh** (§3.3) | ⬜ **CHƯA LÀM**. Hiện **tạo-một-lần**: đơn đã nhận thì **không sửa**. ⇒ **không mất đơn**, nhưng đơn có thể **cũ** so với sàn. ⚠️ Phụ thuộc **F2/F3** (ETO + `ChannelOrderModel` thiếu `UpdatedAtUtc`) — **vẫn còn** |
+| 1 | **Xử lý CẬP NHẬT đơn sàn theo watermark** (`update_time`) — D5 + **luật 4 nhánh** (§3.3) | 🟡 **LÕI XONG 16/10/2026** (§17): `PayloadCanonicalizer` + `LuatWatermark` + 5 cột watermark + 8 trường ETO + 3 trường model. ⏳ **Handler CHƯA nối** ⇒ hành vi chạy **vẫn** tạo-một-lần |. Hiện **tạo-một-lần**: đơn đã nhận thì **không sửa**. ⇒ **không mất đơn**, nhưng đơn có thể **cũ** so với sàn. ⚠️ Phụ thuộc **F2/F3** (ETO + `ChannelOrderModel` thiếu `UpdatedAtUtc`) — **vẫn còn** |
 | 2 | **`SalMarketplaceEventLogs`** (nhật ký append-only theo SỰ KIỆN — D7) | ⬜ **CHƯA LÀM**. Mới có nhật ký theo **ĐƠN**. Sự kiện trùng vẫn được chặn (khoá idempotency) nhưng **không** có vết từng lần nhận |
 | 3 | 🚨 **Xung đột payload: KHÔNG ném lỗi, mà GHI VẾT rồi đi tiếp** (khác D6 nguyên bản "đẩy DLQ") | ✅ **Có chủ ý, đã đo lý do:** ném lỗi ⇒ `PublishAsync` ném ⇒ **con trỏ không tiến** ⇒ sàn gửi lại đúng đơn đó ⇒ **lặp vô hạn + CHẶN CẢ KÊNH** (đã đo: con trỏ kẹt `NULL` qua nhiều nhịp). Nay: **giữ bản đầu** (không ghi đè ⇒ không mất dữ liệu; **tất định**: không instance nào ghi đè) + `SkipReason` + log **Error**. 📌 Khi `XC-002` có **DLQ**, nhánh này **PHẢI** chuyển sang đẩy DLQ (**việc còn lại**) |
 | 4 | **Cột `Order.PlacedAtUtc`** (**F8**) | 🟡 **Giảm nhẹ**: mốc đặt hàng của sàn nay được lưu ở **nhật ký nhận đơn** (`MarketplacePlacedAtUtc`) ⇒ **không còn mất**; nhưng `Order` vẫn chưa có cột ⇒ báo cáo theo kênh phải JOIN |
-| 5 | **9 trường còn thiếu của ETO** (**F2**) | ⬜ **VẪN CÒN** — không cần cho đường pull tạo-một-lần, nhưng **chặn** phần cập nhật/webhook |
+| 5 | **9 trường còn thiếu của ETO** (**F2**) | 🟡 **7/9 XONG 16/10/2026** (§17): watermark + truy vết. **2 trường `EventId`/`OccurredOn` CỐ Ý KHÔNG THÊM** — ABP cấp ở envelope; thêm là **nguồn sự thật thứ hai** (§17.5) | — không cần cho đường pull tạo-một-lần, nhưng **chặn** phần cập nhật/webhook |
 | 6 | Khoá phân tán theo đơn `ecommerce:order:mp-intake:{tenantId}:{channelCode}:{externalOrderId}` (D10) | 🟡 Hiện dùng khoá của `IdempotencyKey` (`messaging:idempotency:{scope}:{value}`) — **đã tuần tự hoá đúng** cùng đơn; khoá riêng theo D10 **chưa** thêm (tránh hai nguồn khoá) |
 | 7 | **Ma trận test tự động cho intake** | ⚠️ Lượt này kiểm chứng bằng **script thủ công trên Host thật**; **chưa** có integration test tự động (test project chưa có `WebApplicationFactory`) |
 
@@ -1066,3 +1066,96 @@ trùng báo **XUNG ĐỘT PAYLOAD** (đúng thiết kế) và **không thể ki�
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.2 | 15/10/2026 | *(agent, session GĐ1)* | **Xây nơi nhận đơn** ⇒ **lỗi #22 đóng hoàn toàn**: `MarketplaceOrderIntake` + `MarketplaceOrderFactory` (D8/D9) + `MarketplaceOrderIntakeHandler` + migration `NULLS NOT DISTINCT` + **13 test**. Kiểm chứng thật: cổng fail-closed **mở**, 10 đơn được lưu, **sàn gửi lại KHÔNG tạo đơn trùng** (kể cả khi đã xoá bản ghi idempotency). Phát hiện & sửa **2 lỗi thật** (16.3). Ghi rõ **giới hạn còn lại** (16.4) |
+
+---
+
+## 17. ✅ **LÁT CẮT 2 — WATERMARK `D5` + TRƯỜNG ETO + LUẬT 4 NHÁNH** (16/10/2026)
+
+> ⚠️ **PHẠM VI NÓI RÕ:** lát cắt này làm **hạ tầng + lõi quyết định** của watermark — đúng **nút thắt**
+> mà §16.4 #1 và #5 đã chỉ ra (*"phụ thuộc F2/F3 — ETO + `ChannelOrderModel` thiếu `UpdatedAtUtc`"*).
+> 🚫 **CHƯA** nối vào `MarketplaceOrderIntakeHandler` (handler vẫn **tạo-một-lần**) và **CHƯA** có DLQ thật
+> (`XC-002` chưa có bảng DLQ) ⇒ **chưa** đẩy được xung đột vào DLQ. Nợ ghi ở **§17.6**.
+
+### 17.1 Vì sao watermark — và vì sao là **thời gian của SÀN** (`D5`)
+
+Trước lát cắt này đường pull là **TẠO-MỘT-LẦN**: đơn đã nhận thì **không sửa**. Nghĩa là nếu sàn đổi
+**địa chỉ / trạng thái / số tiền**, hệ thống giữ bản **CŨ** và **không có gì** cho biết bản nào mới hơn.
+
+**Vì sao không dùng bộ đếm nội bộ *"tăng 1 mỗi sự kiện"*:** nó trả lời *"tôi **nhận** bản này lúc nào"* —
+mà thứ tự **nhận** **KHÁC** thứ tự **xảy ra** (webhook và pull là **hai** đường vào — `D2`).
+Sàn **chỉ** cho `update_time`; đó là **nguồn duy nhất** trả lời được câu hỏi duy nhất cần trả lời:
+*"bản này có MỚI HƠN bản kia không?"*.
+
+### 17.2 Đã làm gì
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| **1** | **`PayloadCanonicalizer`** (`modules/Messaging/…/PayloadCanonicalizer.cs`) — **MỚI** | Canonical JSON (khoá sắp xếp **`Ordinal`**, **đệ quy**, không khoảng trắng) + băm SHA-256 hex 64 · `ThanhPhienBan(DateTime) → epoch giây` (**làm tròn XUỐNG**) |
+| **2** | **`LuatWatermark`** + `KetLuanWatermark`/`KetQuaWatermark` — **MỚI** | **Luật 4 nhánh** (`Đến muộn` · `Trùng` · `Xung đột` · `Áp dụng`) + cờ **nghi ngờ thiếu bản trung gian**. **Lõi THUẦN** ⇒ test được **mọi** nhánh, không cần DB |
+| **3** | **8 trường mới của `ChannelOrderPulledEto`** | `AggregateVersion` · `SourceUpdatedAtUtc` · `PayloadHash` · `CorrelationId` · `IsFromWebhook` · `MarketplaceStatusRaw` · `EventKind` (**+** `AggregateId` đã có sẵn dưới dạng `(ChannelCode, ExternalOrderId)`) |
+| **4** | **3 trường mới của `ChannelOrderModel`** (**F3**) | `UpdatedAtUtc` (**nguồn DUY NHẤT** cho watermark) · `StatusRaw` · `EventKind` |
+| **5** | **5 cột watermark của `SalMarketplaceOrderIntakes`** | `AppliedSourceVersion` · `AppliedSourceUpdatedAtUtc` · `AppliedPayloadHash` · `GapSuspected` · `LastReconciledAtUtc` |
+| **6** | **`MarketplaceOrderIntake.ApDungWatermark(...)`** | 🚨 **NÉM `eCommerce:Sales:0003`** nếu phiên bản mới **không lớn hơn** — bất biến **ở tầng entity** |
+| **7** | **`DanhDauDaDoiSoat(...)`** | Ops hạ cờ — **BẮT BUỘC lý do** (audit) |
+| **8** | **Migration `20261016084519_Sal005_Watermark_Intake`** | 5 cột + **index `IX_SalMktIntakes_TenantId_GapSuspected`** |
+| **9** | **`ChannelShopSyncer` điền đủ trường** | Băm **trên model connector** (không phải trên ETO) · `CorrelationId` **một giá trị cho MỘT LẦN KÉO** · cảnh báo **một lần** khi thiếu `update_time` |
+
+### 17.3 🚨 Bốn cái bẫy đã xử lý (mỗi cái đều **im lặng** nếu làm sai)
+
+| # | Cái bẫy | Hậu quả nếu làm sai | Cách chặn |
+|---|---|---|---|
+| **1** | **Băm ETO thay vì băm NỘI DUNG** | `TenantId`/`ChannelShopId` (**ngữ cảnh VẬN CHUYỂN**) lọt vào hash ⇒ cùng nội dung đến từ hai shop ra **hash khác** ⇒ **DLQ giả** | Băm **`ChannelOrderModel`** — hash là hash của **nội dung nghiệp vụ** |
+| **2** | **Làm tròn epoch GẦN NHẤT** thay vì **XUỐNG** | `update_time` có **độ phân giải 1 giây**; `.900` nhảy sang giây sau ⇒ hai bản **cùng một cập nhật** bị coi là *"bản sau MỚI HƠN"* ⇒ **ghi đè im lặng** (đúng thứ `D6` cấm) | `Math.Floor` + test **hai mốc cùng giây** |
+| **3** | **Suy diễn watermark từ `PlacedAtUtc`** khi sàn không trả `update_time` | `PlacedAtUtc` **luôn** ≤ `update_time` (đơn được sửa **sau** khi đặt) ⇒ watermark đặt **quá thấp** ⇒ không chặn được gì; hoặc **quá cao** ⇒ **chặn mọi cập nhật hợp lệ** | Để **`null`** + **NÉM** ở consumer (`E1`) + cảnh báo log — *thà không xử lý còn hơn xử lý dựa trên suy đoán* |
+| **4** | **Một cột hash duy nhất** cho cả *"bản đến gần nhất"* và *"bản đang có hiệu lực"* | Một bản **đến muộn** (bị bỏ qua) sẽ **xoá mất** hash của bản đang hiệu lực ⇒ nhánh **C/D** sau đó so với **SAI mốc** ⇒ bản **trùng** bị coi là **xung đột** | **HAI cột tách biệt**: `PayloadHash` (nhận gần nhất) vs `AppliedPayloadHash` (đang hiệu lực) |
+
+### 17.4 ✅ Kiểm chứng
+
+| Nhóm | Số ca | Nội dung |
+|---|---|---|
+| `PayloadCanonicalizer` | 14 | **cùng nội dung khác thứ tự khoá ⇒ CÙNG hash** (chốt quan trọng nhất) · khác nội dung ⇒ khác hash · **thứ tự phần tử MẢNG làm khác hash** · khoá sắp xếp `Ordinal` · sắp xếp **đệ quy** · hex 64 · `null` không ném · **hai mốc cùng giây ⇒ cùng phiên bản** · `Unspecified` coi là UTC · round-trip · mốc trước 1970 |
+| `LuatWatermark` | 16 | **cả 4 nhánh** · **đến muộn KHÔNG DLQ** (ca bình thường) · hash so **`Ordinal`** · `<=` ⇒ luồng thua · thiếu hash ⇒ **không** DLQ hàng loạt · **so phiên bản TRƯỚC khi so hash** · cờ nghi ngờ theo ngưỡng + biên · **watermark đơn điệu** qua dãy đến sai thứ tự · mỗi phiên bản chỉ áp **đúng một lần** |
+| `MarketplaceOrderIntake` | 9 | `null` **khác** `0` · áp lần đầu ghi đủ mốc · **hạ watermark ⇒ NÉM + entity nguyên vẹn** · **bằng nhau cũng NÉM** · cờ `GapSuspected` **chỉ BẬT, không tự TẮT** · đối soát **bắt buộc lý do** · **đối soát KHÔNG đụng watermark** (khoá `SetWatermarkAsync` **không tồn tại**) |
+| **Tổng** | **+39** | `928 unit` · `38 integration` · build **0 lỗi/0 cảnh báo** · mermaid **197/0** |
+
+**DB THẬT sau migration `20261016084519_Sal005_Watermark_Intake`:**
+
+| Kiểm | Kết quả **đo được** |
+|---|---|
+| `__EFMigrationsHistory` | có dòng migration này |
+| 5 cột mới của `SalMarketplaceOrderIntakes` | **đủ 5**: `AppliedSourceVersion` · `AppliedSourceUpdatedAtUtc` · `AppliedPayloadHash` · `GapSuspected` · `LastReconciledAtUtc` |
+| Index | `IX_SalMktIntakes_TenantId_GapSuspected` (**mới**) · `IX_SalMktIntakes_TenantId_ChannelCode_ExternalOrderId` (đã có) |
+| `NULLS NOT DISTINCT` toàn DB | **46** (không đổi — watermark **không** thêm unique index) |
+
+### 17.5 🚨 `EventId`/`OccurredOn` — **CỐ Ý KHÔNG THÊM** (phát hiện khi khảo sát)
+
+`SAL-005` §7.1 liệt kê `EventId` và `OccurredOn` là **2 trong 9 trường cần bổ sung**. Khi khảo sát:
+**repo có 13 lớp `*Eto` và KHÔNG lớp nào khai hai trường đó** — vì **ABP** đã cấp chúng ở **envelope** của
+`IDistributedEventBus` / `AbpEventOutbox` (cùng `MessageId`, `OccurredOn`).
+
+⇒ **Thêm vào ETO là dựng NGUỒN SỰ THẬT THỨ HAI** cho cùng một đại lượng: `EventId` của envelope và
+`EventId` của thân ETO **sẽ** lệch nhau (envelope sinh lại mỗi lần phát lại; thân ETO giữ giá trị gốc) —
+đúng họ lỗi `XC-003` **F2**. 📌 Và `SAL-005` **BR-019** đã cảnh báo đúng điều này:
+*"**Cấm** coi «đã có bản ghi `AbpEventInbox`» là đã chống trùng — `MessageId` **không** unique và **đổi mỗi
+lần phát lại**"*.
+
+⇒ **7 trường miền được thêm** (watermark + truy vết), **2 trường transport do ABP cấp** — ghi rõ ở đây
+để người sau **không** "bổ sung cho đủ danh sách" rồi tạo nguồn sự thật thứ hai.
+
+### 17.6 ⏳ NỢ (KHÔNG phải tính năng đã có)
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+| **1** | 🚨 **Handler CHƯA dùng luật watermark** | `MarketplaceOrderIntakeHandler` vẫn **tạo-một-lần** ⇒ cập nhật của sàn **vẫn bị bỏ**. Lõi + cột + ETO **đã sẵn**, nhưng **chưa nối**. ⚠️ Đọc *"928 test xanh"* **KHÔNG** có nghĩa *"đơn sàn cập nhật được"* |
+| **2** | 🚨 **CHƯA có DLQ** (`XC-002` chưa có bảng `DeadLetterEvents`) | Nhánh **XUNG ĐỘT** hiện **tính ra** `PhaiDayDlq = true` nhưng **không có nơi nhận** ⇒ GĐ1 giữ nguyên hành vi cũ: **giữ bản đầu + `SkipReason` + log Error** (`sal-005` §16.4 #3) |
+| **3** | **`SalMarketplaceEventLogs` (D7) CHƯA LÀM** | Append-only theo **SỰ KIỆN**; hiện mới có nhật ký theo **ĐƠN** ⇒ sự kiện trùng **không có vết từng lần nhận** |
+| **4** | **`GapThresholdSeconds` chưa cấu hình được** | Hiện là **tham số** của hàm thuần (mặc định **3600**); chưa đọc từ `SettingManagement` ⇒ chưa đổi được bằng vận hành |
+| **5** | **Job đối soát chủ động (D12) CHƯA có** | Đã có **index** cho cờ `GapSuspected`, nhưng **chưa** có worker nào quét cờ đó ⇒ cờ sẽ **tồn đọng** (rủi ro đã ghi ở chú thích index) |
+| **6** | **`Order.PlacedAtUtc` (F8) vẫn thiếu** | Giảm nhẹ: mốc đặt hàng của sàn **đã** lưu ở intake (`MarketplacePlacedAtUtc`) |
+| **7** | **Connector CHƯA trả `UpdatedAtUtc`** | 📌 Đây là **chặn thật** cho đường chạy: mọi ETO hiện có `AggregateVersion = null` ⇒ khi consumer được nối, nó sẽ **NÉM `eCommerce:Sales:0001`**. Cảnh báo `[MP-THIEU-UPDATE-TIME]` **đã có** để lộ ra ngay |
+
+### 17.7 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.1 | 16/10/2026 | *(agent, session GĐ1)* | **§17 — LÁT CẮT 2: WATERMARK `D5`**: `PayloadCanonicalizer` (canonical JSON + SHA-256 + `ThanhPhienBan` **làm tròn xuống**) · `LuatWatermark` (**4 nhánh**, lõi thuần) · **8 trường ETO** + **3 trường `ChannelOrderModel`** (**gỡ F2/F3**) · **5 cột watermark** + index cờ lệch · `ApDungWatermark` (**NÉM khi hạ watermark**) · **+39 unit test** (928 tổng). Ghi **§17.3** (4 cái bẫy im lặng) · **§17.5** (`EventId`/`OccurredOn` **cố ý không thêm** — ABP cấp ở envelope; thêm là **nguồn sự thật thứ hai**) · **§17.6** (nợ: handler **chưa nối** · **chưa có DLQ** · chưa có event log · chưa có job đối soát · connector **chưa trả `update_time`**) |

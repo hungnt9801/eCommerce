@@ -1,6 +1,7 @@
 using eCommerce.ChannelHub.Channels;
 using eCommerce.ChannelHub.Connectors;
 using eCommerce.ChannelHub.Events;
+using eCommerce.Messaging;
 using eCommerce.Messaging.EventCoverage;
 using Microsoft.Extensions.Logging;
 using Volo.Abp.Domain.Repositories;
@@ -38,6 +39,19 @@ public class ChannelShopSyncer : IChannelShopSyncService
     private readonly ChannelTokenManager _tokenManager;
     private readonly IDistributedEventBus _distributedEventBus;
     private readonly ILogger<ChannelShopSyncer> _logger;
+
+    /// <summary>
+    /// 🔒 **Cờ "đã cảnh báo thiếu `update_time`"** — chỉ ghi log **MỘT LẦN** cho cả tiến trình.
+    ///
+    /// **VÌ SAO KHÔNG GHI MỖI ĐƠN:** một nhịp kéo có thể có hàng nghìn đơn thiếu `update_time` ⇒ hàng nghìn
+    /// dòng log **giống hệt nhau** ⇒ **chôn mất** cảnh báo thật. 📌 Đúng bài học đã trả giá: *"dương tính giả
+    /// làm người đọc bắt đầu bỏ qua cảnh báo"* — và đó là lúc cảnh báo **THẬT** bị bỏ qua.
+    ///
+    /// ⚠️ **Giới hạn ĐÃ BIẾT:** `Syncer` là transient ⇒ cờ này **chỉ** có tác dụng trong **một** lần resolve
+    /// (một nhịp đồng bộ). Nhịp sau sẽ cảnh báo lại **một lần** nữa — **có chủ ý**: cảnh báo vẫn định kỳ
+    /// (không bị mất hẳn) nhưng không nhân lên theo số đơn.
+    /// </summary>
+    private bool _daCanhBaoThieuUpdateTime;
 
     /// <summary>
     /// 🔒 **BẮT BUỘC** (không phải tham số tuỳ chọn — cố ý khác `_metrics`): đây là **cổng an toàn chống
@@ -138,8 +152,42 @@ public class ChannelShopSyncer : IChannelShopSyncService
 
         if (quyetDinh.ChoPhepPhatSuKien)
         {
+            // 🔑 `CorrelationId` **một giá trị cho MỘT LẦN KÉO** (cả lô đơn của nhịp này) để khi điều tra
+            // nối được *"nhịp đồng bộ nào sinh ra đơn này"*. 📌 Khác `EventId` (mỗi sự kiện một mã) —
+            // và **khác** `SyncCursor` (con trỏ là mốc của **lần sau**, không phải mã của lần này).
+            var correlationId = Guid.NewGuid().ToString("N");
+
             foreach (var order in pull.Orders)
             {
+                // 🚨 `SAL-005` §7.1 — **ETO PHẢI MANG WATERMARK**.
+                //
+                // 📌 `PayloadHash` được tính trên **CHÍNH `order`** (model của connector), **KHÔNG** phải trên
+                // ETO đã dựng: băm ETO thì `TenantId`/`ChannelShopId` (ngữ cảnh **VẬN CHUYỂN**) lọt vào hash
+                // ⇒ **cùng một nội dung đơn** đến từ hai shop/kênh khác nhau sẽ ra **hash khác nhau**.
+                // Hash phải là hash của **NỘI DUNG NGHIỆP VỤ**.
+                var payloadHash = PayloadCanonicalizer.Bam(order);
+
+                // 🔒 Thiếu `UpdatedAtUtc` ⇒ **KHÔNG** suy diễn từ `PlacedAtUtc` (xem chú thích ở
+                // `ChannelOrderModel.UpdatedAtUtc`): để `null` ⇒ consumer **NÉM** `eCommerce:Sales:0001`
+                // + DLQ `PoisonMessage` — *thà không xử lý còn hơn xử lý dựa trên suy đoán*.
+                // 📌 Đây là điểm **cố ý** để lỗi trở nên **ồn ào**: nếu connector trả `update_time` rỗng thì
+                // phải sửa **connector**, không phải để tầng dưới đoán.
+                var phienBan = order.UpdatedAtUtc is { } mocCapNhat
+                    ? PayloadCanonicalizer.ThanhPhienBan(mocCapNhat)
+                    : (long?)null;
+
+                if (phienBan is null && !_daCanhBaoThieuUpdateTime)
+                {
+                    // 📌 Ghi **MỘT LẦN** cho cả tiến trình (không phải mỗi đơn): hàng nghìn dòng log giống nhau
+                    // sẽ **chôn mất** cảnh báo thật — đúng bài học "dương tính giả làm người đọc bỏ qua cảnh báo".
+                    _daCanhBaoThieuUpdateTime = true;
+                    _logger.LogWarning(
+                        "KÊNH {ChannelCode}: sàn KHÔNG trả `update_time` cho đơn ⇒ ETO KHÔNG có watermark " +
+                        "và consumer sẽ NÉM (eCommerce:Sales:0001) + DLQ. Cần sửa CONNECTOR để trả `update_time`. " +
+                        "[MP-THIEU-UPDATE-TIME] (chỉ ghi 1 lần cho cả tiến trình)",
+                        shop.ChannelCode);
+                }
+
                 await _distributedEventBus.PublishAsync(new ChannelOrderPulledEto
                 {
                     TenantId = shop.TenantId,
@@ -152,6 +200,16 @@ public class ChannelShopSyncer : IChannelShopSyncService
                     ShippingFee = order.ShippingFee,
                     ChannelDiscount = order.ChannelDiscount,
                     BuyerNote = order.BuyerNote,
+
+                    // ── Watermark + truy vết (`SAL-005` §7.1) ────────────────────────────────────
+                    AggregateVersion = phienBan,
+                    SourceUpdatedAtUtc = order.UpdatedAtUtc,
+                    PayloadHash = payloadHash,
+                    CorrelationId = correlationId,
+                    IsFromWebhook = false,
+                    MarketplaceStatusRaw = order.StatusRaw,
+                    EventKind = order.EventKind,
+
                     Lines = order.Lines.Select(l => new ChannelOrderPulledLineEto
                     {
                         ExternalLineId = l.ExternalLineId,

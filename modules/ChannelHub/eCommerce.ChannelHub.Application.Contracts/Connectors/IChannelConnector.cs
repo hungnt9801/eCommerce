@@ -36,6 +36,33 @@ public class ChannelOrderModel
     public decimal ShippingFee { get; set; }
     public decimal ChannelDiscount { get; set; }
     public List<ChannelOrderLineModel> Lines { get; set; } = new();
+
+    // ══════════════════════════════════════════════════════════════════════════════════════════════
+    // 🚨 `SAL-005` **F2/F3** — **BA TRƯỜNG CÒN THIẾU CỦA MODEL** (bổ sung 16/10/2026).
+    //
+    // 📌 `SAL-005` §16.4 #1 nói rõ phần **cập nhật theo watermark** bị **phụ thuộc F2/F3**:
+    // *"ETO + `ChannelOrderModel` thiếu `UpdatedAtUtc`"*. Không có `UpdatedAtUtc` thì **không có nguồn**
+    // cho `AggregateVersion` ⇒ luật watermark **không thể** chạy, bất kể ETO có trường hay không.
+    // ⇒ Ba trường dưới đây **gỡ đúng nút thắt đó**.
+    // ══════════════════════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// ⭐ **`update_time` của sàn** — nguồn **DUY NHẤT** cho watermark `D5`
+    /// (epoch giây UTC của trường này ⇒ `ChannelOrderPulledEto.AggregateVersion`).
+    /// ⚠️ **`null`** (sàn không trả) ⇒ **KHÔNG** được suy diễn từ `PlacedAtUtc`: đơn có thể được sửa
+    /// **sau** khi đặt, nên lấy mốc đặt hàng làm watermark sẽ **chặn** mọi cập nhật hợp lệ
+    /// (`PlacedAtUtc` **luôn** ≤ `update_time`). Consumer **NÉM** khi thiếu (E1) — thà không xử lý
+    /// còn hơn xử lý dựa trên suy đoán.
+    /// </summary>
+    public DateTime? UpdatedAtUtc { get; set; }
+
+    /// <summary>Trạng thái **THÔ** của sàn (giữ nguyên văn để điều tra) — đi vào
+    /// `ChannelOrderPulledEto.MarketplaceStatusRaw`. 🔒 Ánh xạ sang trạng thái nội bộ thuộc `SAL-003`.</summary>
+    public string? StatusRaw { get; set; }
+
+    /// <summary>`Created`/`Updated`/`Cancelled` **nếu** sàn cung cấp. ⚠️ **Cấm** suy watermark từ trường này
+    /// (nó nói **loại** thay đổi, **không** nói **bản nào mới hơn**).</summary>
+    public string? EventKind { get; set; }
 }
 
 public class PullOrdersResult

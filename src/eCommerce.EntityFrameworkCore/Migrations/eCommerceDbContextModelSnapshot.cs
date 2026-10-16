@@ -4152,6 +4152,15 @@ namespace eCommerce.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("AppliedPayloadHash")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("AppliedSourceUpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("AppliedSourceVersion")
+                        .HasColumnType("bigint");
+
                     b.Property<string>("ChannelCode")
                         .IsRequired()
                         .HasMaxLength(32)
@@ -4199,6 +4208,9 @@ namespace eCommerce.Migrations
                         .HasColumnType("text")
                         .HasColumnName("ExtraProperties");
 
+                    b.Property<bool>("GapSuspected")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -4212,6 +4224,9 @@ namespace eCommerce.Migrations
                     b.Property<Guid?>("LastModifierId")
                         .HasColumnType("uuid")
                         .HasColumnName("LastModifierId");
+
+                    b.Property<DateTime?>("LastReconciledAtUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime?>("MarketplacePlacedAtUtc")
                         .HasColumnType("timestamp with time zone");
@@ -4236,6 +4251,9 @@ namespace eCommerce.Migrations
                         .HasColumnName("TenantId");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "GapSuspected")
+                        .HasDatabaseName("IX_SalMktIntakes_TenantId_GapSuspected");
 
                     b.HasIndex("TenantId", "ChannelCode", "ExternalOrderId")
                         .IsUnique()

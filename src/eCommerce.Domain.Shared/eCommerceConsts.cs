@@ -185,6 +185,22 @@ public static class eCommerceConsts
         // ChannelHubConsts.cs, đã chuẩn hoá về dạng "eCommerce:Channel:*".
         public const string PaymentSignatureInvalid = "eCommerce:Payment:0001";
 
+        /// <summary>
+        /// 🚨 **WATERMARK CỦA ĐƠN SÀN KHÔNG TIẾN** (`SAL-005` **BR-SAL-005-008** / nhánh `E4`).
+        ///
+        /// **NGHĨA CHÍNH XÁC:** một luồng khác **đã** áp một bản **mới hơn** (hoặc bằng) cho **cùng** đơn sàn
+        /// ⇒ luồng này **THUA** và **phải không ghi gì thêm**.
+        ///
+        /// 🔑 **VÌ SAO MÃ RIÊNG (không mượn mã nào khác):** đây **không** phải lỗi hệ thống, **không** phải
+        /// lỗi dữ liệu vào, và **không** đáng để người trực bị đánh thức — nó là **kết quả ĐÚNG của một cuộc
+        /// đua** giữa hai đường vào (webhook + pull, `D2`). Nhưng nó **tuyệt đối không được nuốt**: coi là
+        /// *"thành công"* thì luồng thua **vẫn ghi tiếp** ⇒ hai luồng cùng ghi ⇒ trạng thái cuối **phụ thuộc
+        /// thứ tự đến** — đúng thứ `D6` cấm.
+        /// 📌 Đây là cùng khuôn với `INV-003` **`0043`** (thiếu mã kênh): mã **hẹp** cho một ca **hẹp**,
+        /// để `WithData` nói được **ai thắng** (`phienBanHienTai` vs `phienBanMoi`).
+        /// </summary>
+        public const string SalesWatermarkKhongTien = "eCommerce:Sales:0003";
+
         // 📌 CÁC MÃ HOÀN TIỀN (`0002`/`0003`/`0004`) **CỐ Ý KHÔNG Ở ĐÂY** — chúng nằm ở
         // `modules/PaymentHub/eCommerce.PaymentHub.Domain/Payments/PaymentErrorCodes.cs`.
         // VÌ SAO: `PaymentHub.Domain` **KHÔNG** tham chiếu `eCommerce.Domain.Shared` (module tự chứa — quy ước #2

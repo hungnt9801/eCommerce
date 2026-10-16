@@ -2102,3 +2102,21 @@ VALUES ('20261016081435_Cus001_Customers_CustomerGroups', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+ALTER TABLE "SalMarketplaceOrderIntakes" ADD "AppliedPayloadHash" text;
+
+ALTER TABLE "SalMarketplaceOrderIntakes" ADD "AppliedSourceUpdatedAtUtc" timestamp with time zone;
+
+ALTER TABLE "SalMarketplaceOrderIntakes" ADD "AppliedSourceVersion" bigint;
+
+ALTER TABLE "SalMarketplaceOrderIntakes" ADD "GapSuspected" boolean NOT NULL DEFAULT FALSE;
+
+ALTER TABLE "SalMarketplaceOrderIntakes" ADD "LastReconciledAtUtc" timestamp with time zone;
+
+CREATE INDEX "IX_SalMktIntakes_TenantId_GapSuspected" ON "SalMarketplaceOrderIntakes" ("TenantId", "GapSuspected");
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261016084519_Sal005_Watermark_Intake', '10.0.11');
+
+COMMIT;
+
