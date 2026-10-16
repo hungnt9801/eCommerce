@@ -1909,3 +1909,101 @@ chỉ sửa kỳ vọng: hãy **thêm ca** khoá lại sự thật vừa học.
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.0 | 16/10/2026 | *(agent, session GĐ1)* | **§24 — LÁT CẮT 6: `IChannelDirectory` + API HIỂN THỊ THEO KÊNH** (đóng nợ §23.7 #1/#2/#3): `IChannelDirectory` (**chỉ đọc** · `ITransientDependency` **không** app service ⇒ không mở API không review · **không** tự kiểm `IsDeleted`) · `ChannelDirectory` · `IHienThiKenhAppService`/`HienThiKenhAppService` (**2 endpoint**) · `HienThiKenhDtos` · mã `0207`/`0209` · hằng số ở `CatalogLimits` (Contracts **không** tham chiếu Domain). 🔑 **QUY ƯỚC**: `KeThua` ⇒ **XOÁ BẢN GHI** (không lưu `KeThua`) — tránh **hai cách biểu diễn** cùng trạng thái **và** tránh **bế tắc** (`ChuyenSang(KeThua)` **NÉM**). 🚨 **GUARD `0209` phải đi qua DANH SÁCH BIẾN THỂ** (`ChannelListing` trỏ `ProductVariantId` — so `ProductId` làm guard **mất tác dụng im lặng**). ✅ **23/23 ca HTTP + DB thật**: `0207` (kênh ngừng/không tồn tại, **0 dòng ghi**) · chưa publish `0205` · ghi thật (DB = `1`, **tên kênh** tra qua directory) · thiếu lý do `0205` · `0209` **kèm `soListing`** · gỡ listing ⇒ ngừng bán được (DB = `3`) · **hấp thụ** · `KeThua` ⇒ `204` + **xoá MỀM** (`IsDeleted = true`). 🐞 **Bộ đo sai lần thứ NĂM**, hai lớp bắt: **tiền đề** (`ExtraProperties` không tồn tại ⇒ **dừng ngay**) và **kỳ vọng sai** (đếm cả dòng xoá mềm ⇒ sửa **và** thêm ca `J4` khoá sự thật). Ghi **§24.4** (hai lỗi tra cứu: namespace `.Channels` · `AsyncExecuter` phải **tiêm**) · **§24.7** (nợ: **chưa có `LEFT JOIN` resolver** · **`KeThua` không kiểm listing** · `ListingDangDongBo` hằng số cục bộ · chưa job `F10` · chưa UI · N+1 · quyền) |
+
+---
+
+## 25. ✅ **LÁT CẮT 7 — `IChannelVisibilityResolver` (ĐÓNG NỢ §24.7 #1)** + 🚨 **PHÁT HIỆN: LƯỚI AN TOÀN CỦA TÔI ĐÃ KHÔNG BẢO VỆ GÌ** (16/10/2026)
+
+### 25.1 Đã làm gì
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| **1** | **`IChannelVisibilityResolver`** | 3 method: `TraMotAsync` · `TraNhieuAsync` (**hàng loạt**) · `LocSanPhamHienThiAsync` (**lọc** theo kênh) |
+| **2** | **`ChannelVisibilityResolver`** | 🔑 **`LEFT JOIN`** bằng `join … into nhom` + `from v in nhom.DefaultIfEmpty()`; 🔒 **`v == null ⇒ HienThi`** |
+| **3** | **`ChannelVisibilityJoinGuardTests`** (**4 ca**) | 🛡️ Quét mã nguồn chặn `INNER JOIN` + khoá giá trị enum + khoá tập trạng thái bị ẩn |
+
+### 25.2 🔑 Ba quyết định thiết kế
+
+| # | Quyết định | Vì sao |
+|---|---|---|
+**1** | `TraMotAsync`/`TraNhieuAsync` trả **trạng thái HIỆU LỰC** (`HienThi` khi kế thừa), **KHÔNG** trả `KeThua` | 📌 Trả `KeThua` ra ngoài sẽ buộc **mọi** chỗ gọi tự nhớ quy tắc *"`KeThua` nghĩa là `HienThi`"* — chỗ nào quên thì **ẩn nhầm** sản phẩm |
+**2** | **`CoBanGhiTuongMinh`** là một trường **riêng** | 📌 UI cần phân biệt *"kế thừa"* với *"đã đặt tường minh = `HienThi`"* để hiện nhãn **"Kế thừa"** (`CAT-003` §A2). Nếu chỉ trả `TrangThai` thì **không** phân biệt được |
+**3** | 🚨 **Có hàm HÀNG LOẠT** (không chỉ hàm một) | 📌 Hai lý do: (a) một trang storefront cần trạng thái của **N** sản phẩm — gọi hàm một trong vòng lặp là **N+1**; (b) 🔑 quan trọng hơn: hàm hàng loạt **buộc** người viết xử lý ca *"không có bản ghi"* **một lần**, thay vì **N** lần ở **N** chỗ |
+
+### 25.3 🚨 **HAI LỖI TRONG CHÍNH LƯỚI AN TOÀN — và cách tôi tìm ra chúng**
+
+**Cách tìm ra: tôi TIÊM một `INNER JOIN` giả vào mã nguồn để xem lưới an toàn có bắt không.** 🔑 Đó là
+**phép kiểm bắt buộc** cho mọi lưới an toàn — *"một lưới chưa từng bắt được gì thì chưa chứng minh nó bắt được gì"*.
+📌 Và nó **đã** phát hiện hai lỗi:
+
+| # | Lỗi | Vì sao **nguy hiểm** |
+|---|---|---|
+**1** | Cửa sổ `Take(6)` dòng cho một `join` **mượn** `into nhom` + `DefaultIfEmpty()` của phép `join` **KẾ TIẾP** trong cùng truy vấn | 🚨 **Cho qua một `INNER JOIN` thật** — **tệ hơn không có lưới** vì nó tạo **cảm giác an toàn giả** |
+**2** | Nhận diện **chỉ** theo tên bảng/biến ⇒ `join v in b on p.Id equals v.ProductId` (**tên biến `b`**) **KHÔNG** bị đếm | 🔑 Chỉ cần **đổi tên biến** là qua được lưới |
+
+✅ **Đã sửa lỗi ①:** đoạn của một `join` nay **kết thúc** ở `join`/`select`/`group` **kế tiếp** — vì `DefaultIfEmpty()`
+của **chính** phép join đó phải nằm **TRƯỚC** `select`. 📌 Nếu nó nằm **sau** `select` thì nó **không thuộc** phép join này.
+
+### 25.4 🚨 **Lỗi ② KHÔNG SỬA ĐƯỢC BẰNG QUÉT VĂN BẢN — và tôi CHỌN nói thẳng thay vì giả vờ**
+
+Đây là **quét văn bản**, **không** phải **phân tích ngữ nghĩa**. Nó **KHÔNG THỂ** chắc chắn biết một `join` trỏ tới
+**bảng nào** nếu người viết dùng tên biến **không gợi ý gì**. 📌 Tôi **đã thử** thêm dấu hiệu *"khoá join trỏ tới
+`.ProductId`"* — nhưng nó **quá rộng** (bắt cả join hợp lệ khác) và **vẫn hụt** ca tiêm của tôi.
+
+🔒 **Thay vì giả vờ, tôi làm ba việc:**
+1. **Ghi giới hạn NGAY TRONG CHÚ THÍCH LỚP** của test — kèm **mã ví dụ** cho thấy lưới bỏ qua (để người sau
+   **không** đọc nó thành *"đã an toàn"*);
+2. ➕ **Thêm ca `Phep_quet_PHAI_thay_join_trong_HOP_DONG`** — 🛡️ **lưới an toàn CHO CHÍNH lưới an toàn**:
+   nếu ai đó viết lại hợp đồng theo cách phép quét không nhận ra, `soJoinDaKiem` về `0` ⇒ **test ĐỎ** và buộc
+   người sửa **cập nhật phép quét** (thay vì để lưới **ngừng bảo vệ mà vẫn xanh**);
+3. 🚨 **Ghi nợ cụ thể (§25.7 #1):** một **interceptor runtime** kiểm **SQL THẬT** là lưới **chắc chắn**.
+
+📌 **Thứ tự tin cậy (từ mạnh nhất)** — ghi rõ trong chú thích lớp:
+**hợp đồng** (đã probe DB) → **test quét** (best-effort, chặn cách viết phổ biến) → **interceptor runtime** (nợ).
+
+### 25.5 ✅ **KIỂM CHỨNG — phân loại TRUNG THỰC (đọc kỹ, đừng suy rộng)**
+
+| Mức | Nội dung | Trạng thái |
+|---|---|---|
+**① Unit test** | `ChannelVisibilityJoinGuardTests` **4 ca**: quét `INNER JOIN` (**có** lưới an toàn cho chính phép quét) · phép quét **PHẢI** thấy `join` trong hợp đồng · `HienThi = 1` · tập trạng thái bị ẩn | ✅ **1075 test xanh** |
+**② Phép kiểm lưới an toàn** | **Tiêm** một `INNER JOIN` giả ⇒ phát hiện **hai** lỗi (mục 25.3) | ✅ **lưới bắt** sau khi sửa (lỗi ①) |
+**③ Biên dịch + phân tích** | `DefaultIfEmpty()` là khuôn **chuẩn** của `LEFT JOIN` trong LINQ; provider dịch thành `LEFT JOIN` | ✅ **suy luận mạnh, KHÔNG phải đo** |
+**④ 🚨 Probe trên DB THẬT cho resolver** | Truy vấn resolver với **4 sản phẩm** (A tường minh · **B KHÔNG có bản ghi** · C `An` · D `NgungBan`) | ❌ **CHƯA ĐO ĐƯỢC** — xem §25.6 |
+
+### 25.6 🚨 **ĐIỀU CHƯA KIỂM CHỨNG ĐƯỢC — và vì sao (nói thẳng)**
+
+**Ca cốt lõi** cần đo là: *"sản phẩm **KHÔNG có bản ghi** vẫn **HIỆN** trên kênh"*. 📌 Đó là ca **duy nhất**
+phân biệt `LEFT JOIN` **đúng** với `INNER JOIN` **sai**.
+
+🚨 **Tôi ĐÃ VIẾT probe cho ca đó và nó KHÔNG chạy được**, vì:
+<list type="bullet">
+  <item>endpoint hiện có (`GET hien-thi-kenh/danh-sach`) trả **bản ghi TƯỜNG MINH** ⇒ nó **không** gọi resolver ⇒
+    **không** kiểm được `LEFT JOIN`;</item>
+  <item>dự án **chưa có endpoint** nào phơi `IChannelVisibilityResolver` ra ngoài;</item>
+  <item>và `eCommerce.IntegrationTests` **chỉ** có `PostgreSqlSchemaFixture` (kiểm **schema**), **không** có fixture
+    dựng **đồ thị module + DB** ⇒ **không** chạy được resolver trong test.</item>
+</list>
+
+🔒 **Vì vậy tôi COI ca đó là CHƯA XONG.** ⚠️ Nó **không** phải "đã kiểm vì test xanh" — **1075 test xanh KHÔNG**
+chứng minh `LEFT JOIN` chạy đúng. 📌 Bài học lặp lại **lần thứ SÁU** trong chuỗi lượt này: *"test xanh"* **không**
+đồng nghĩa *"đúng"*.
+➕ **Và tôi đã tiêu nhiều thời gian vào CÁCH ĐO hơn là vào sản phẩm** — ghi lại như một **bài học quy trình**:
+khi một ca không đo được vì **thiếu đường gọi**, việc đúng là **làm đường gọi** (endpoint/fixture) **hoặc**
+**ghi nợ**, **không** phải thử thêm cách đo thứ tư.
+
+### 25.7 ⏳ NỢ (KHÔNG phải tính năng đã có)
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+| **1** | 🚨 **CHƯA có interceptor runtime kiểm SQL THẬT** | 🔒 Lưới **chắc chắn** cho `INNER JOIN`: bắt `DbCommandInterceptor`, và nếu SQL chạm bảng hiển thị **mà không có `LEFT JOIN`** ⇒ **NÉM**. 📌 Đây là cách **duy nhất** không phụ thuộc tên biến. ⚠️ Thay thế/bổ sung cho `ChannelVisibilityJoinGuardTests` |
+| **2** | 🚨 **CHƯA có endpoint/fixture để ĐO resolver trên DB thật** | §25.6. 📌 Cần **một trong hai**: (a) endpoint `GET hien-thi-kenh/hieu-luc?kenh=…&ids=…`; hoặc (b) fixture DB cho integration test |
+| **3** | **`TraNhieuAsync` gom theo `ProductId` bằng vòng lặp** | 📌 Có xử lý **dữ liệu bẩn** (chọn bản ghi tường minh khi trùng) — nhưng **chưa** có test cho ca trùng. ⚠️ Nên có, vì unique index **cấm** trùng nhưng dữ liệu nhập tay có thể có |
+| **4** | **Chưa đo hiệu năng** (`NFR-CAT-003-002`: p95 < 20 ms với 10.000 sản phẩm) | 📌 `TraNhieuAsync` dùng `Contains` trên danh sách Id ⇒ cần `EXPLAIN` khi có dữ liệu thật |
+| **5** | **`TraMotAsync` với sản phẩm không tồn tại trả `HienThi`** (không ném) | 📌 **Cố ý** (tra cứu, không phá trang). ⚠️ Nhưng chỗ nào cần phân biệt *"không tồn tại"* thì phải hỏi repository sản phẩm |
+| **6** | **Chưa có UI/job `F10`** | Như §24.7 |
+
+### 25.8 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.1 | 16/10/2026 | *(agent, session GĐ1)* | **§25 — LÁT CẮT 7: `IChannelVisibilityResolver`** (đóng nợ §24.7 #1): hợp đồng **3 method** (`TraMotAsync` · `TraNhieuAsync` **hàng loạt** · `LocSanPhamHienThiAsync`) + `ChannelVisibilityResolver` (`LEFT JOIN` bằng `DefaultIfEmpty()`) + `ChannelVisibilityJoinGuardTests` (**4 ca**, **+4** ⇒ **1075 test**). 🔑 **Ba quyết định**: trả trạng thái **HIỆU LỰC** (không trả `KeThua`) · `CoBanGhiTuongMinh` **riêng** (UI hiện nhãn *"Kế thừa"*) · **hàm hàng loạt** (N+1 **và** buộc xử lý ca *"không bản ghi"* **một lần**). 🚨 **PHÁT HIỆN LỚN: lưới an toàn của tôi đã KHÔNG bảo vệ gì** — tôi **tiêm** một `INNER JOIN` giả để kiểm, và lưới **không bắt**; truy ra **hai** lỗi: (①) cửa sổ `Take(6)` **mượn** `into nhom` + `DefaultIfEmpty()` của phép `join` **KẾ TIẾP** ⇒ **cho qua `INNER JOIN` thật** (🚨 **tệ hơn không có lưới** vì tạo **cảm giác an toàn giả**) — **đã sửa** bằng cách cắt đoạn theo `join`/`select` kế tiếp; (②) nhận diện chỉ theo tên bảng/biến ⇒ **đổi tên biến là qua** — **KHÔNG sửa được bằng quét văn bản**, nên **ghi giới hạn trong chú thích lớp** + thêm ca **`Phep_quet_PHAI_thay_join_trong_HOP_DONG`** (lưới cho chính lưới) + ghi nợ **interceptor runtime**. 🚨 **§25.6: ca cốt lõi CHƯA ĐO ĐƯỢC** (*"sản phẩm không có bản ghi vẫn hiển thị"*) vì **chưa có endpoint** phơi resolver và **chưa có fixture DB** cho integration test ⇒ **coi là CHƯA XONG**, không suy từ *"test xanh"*. 📌 **Bài học quy trình:** tôi tiêu nhiều thời gian vào **CÁCH ĐO** hơn là sản phẩm — khi một ca không đo được vì **thiếu đường gọi**, việc đúng là **làm đường gọi** hoặc **ghi nợ**, **không** thử thêm cách đo thứ tư |
