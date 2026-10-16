@@ -9,6 +9,8 @@
 
     var tuNgay = ViewBag.TuNgay as string;
     var denNgay = ViewBag.DenNgay as string;
+    var nguoiXuat = ViewBag.NguoiXuat as string;
+    var cacNguoiXuat = ViewBag.CacNguoiXuat as List<string> ?? new List<string>();
 }
 
 @*
@@ -68,8 +70,33 @@
         <input class="form-control" type="date" name="denNgay" value="@denNgay" />
     </div>
     <div class="col-auto">
+        @*
+            🔑 **DROPDOWN, KHONG O NHAP TU DO** — 📌 danh sach nay den tu **DU LIEU THAT**
+            (`GetDanhSachNguoiXuatNhatKyAsync`).
+
+            ⚠️ **VI SAO LA MOT QUYET DINH, KHONG PHAI SU LUA:** 🔒 neu la o nhap tu do thi nguoi kiem toan
+            **go sai mot ky tu** se nhan **0 dong** — va 📌 voi mot man hinh **kiem toan** thi *"0 dong"* bi doc
+            thanh *"khong ai xuat"*: 🔑 mot **ket luan sai ve bang chung** sinh ra tu mot **loi go tay**.
+            ✅ Dropdown lam dieu do **khong the** xay ra.
+        *@
+        <label class="form-label">Người xuất</label>
+        <select class="form-select" name="nguoiXuat">
+            <option value="">(tất cả)</option>
+            @foreach (var n in cacNguoiXuat)
+            {
+                <option value="@n" selected="@(n == nguoiXuat)">@n</option>
+            }
+        </select>
+    </div>
+    <div class="col-auto">
         <button class="btn btn-primary" type="submit">Lọc</button>
     </div>
+    @* ⚠️ **GIU `customerId` KHI LOC** — 🔑 neu khong thi bam "Loc" se **mat ngu canh khach** va
+       📌 tra ve nhat ky cua **MOI** khach (⚠️ trong khi nguoi dung tuong dang xem cua mot nguoi). *@
+    @if (ViewBag.CustomerId is Guid giuKhach)
+    {
+        <input type="hidden" name="customerId" value="@giuKhach" />
+    }
 </form>
 
 @if (Model.CacDong.Count == 0)

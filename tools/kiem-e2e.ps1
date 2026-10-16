@@ -425,6 +425,94 @@ select count(*)::text from "CusDataExportLogs" where "Id" = 'e0000000-0000-0000-
             Kq 'D10f KHONG bi cat thi noi "tat ca" (khong bao dong gia)' `
                 (($htmlNk -match 'Đang hiển thị <strong>tất cả') -and ($htmlNk -notmatch 'ĐÃ BỊ CẮT')) `
                 'khong bao dong gia'
+
+            # ══════════════════════════════════════════════════════════════════════════════════════
+            # 🚨 **D11–D15 — LOC (NGAY + NGUOI XUAT)** — `CUS-001` §23.6 #4 va #6.
+            # 🔑 **VI SAO PHAI DO CA HAI CHIEU:** ⚠️ mot bo loc **luon tra VE TAT CA** thi *"loc duoc"* nom
+            # **dung** o moi ca chi kiem *"co thay dong X khong"*. 📌 Nen moi bo loc phai duoc do **ca**
+            # *"co dong can thay"* **VA** *"KHONG co dong phai bi loai"*.
+            # ⚠️ Va 🔑 **logic ngay NUA MO** (`< den + 1 ngay`) moi them o §23 **chua co test nao** —
+            # 📌 do la **no ke tiep** da ghi; cac ca duoi day khoa no lai.
+            #
+            # 📌 **DU LIEU:** dong cu = `K97E2E-nhanvien-b` luc **2020-01-02** (17 dong ho so);
+            # dong moi = `admin` luc **HOM NAY** (1 dong ho so). 🔑 Hai dong **khac ca ngay LAN nguoi xuat**
+            # ⇒ do duoc **ca hai** bo loc **doc lap**.
+            # ══════════════════════════════════════════════════════════════════════════════════════
+
+            # ── ① LOC NGAY: khoang chi chua dong CU ────────────────────────────────────────────
+            $trangNgay = TaiTrang -DuongDan "/KhachHang/NhatKy?customerId=$idKhach&tuNgay=2020-01-01&denNgay=2020-01-31" -TepLuu (Join-Path $thuMucTam 'nhatky-ngay.html')
+            $htmlNgay = GiaiMaHtml $trangNgay.Html
+
+            # 🚨 **TACH `<tbody>` TRUOC KHI KIEM** — 🔒 **BAT BUOC**, va day la mot bai hoc DO DUOC:
+            # 📌 lan dau toi kiem `>admin<` tren **CA TRANG** ⇒ no khop **`<option>admin</option>` cua DROPDOWN**
+            # ⇒ ⚠️ ca kiem **DO DU SAN PHAM DUNG** (bo loc hoat dong tot).
+            # 🔑 **Cung ho voi bai hoc §97.6 #3** (`href="#"` duy nhat tren trang la **dropdown cua THEME**):
+            # **phai tach dung vung TRUOC khi khang dinh** — neu khong, ta do **mot thu khac** voi thu minh tuong.
+            function LayThanBang {
+                param([string]$Html)
+                $i = $Html.IndexOf('<tbody>')
+                if ($i -lt 0) { return '' }
+                $j = $Html.IndexOf('</tbody>', $i)
+                if ($j -lt 0) { return '' }
+                return $Html.Substring($i, $j - $i)
+            }
+
+            $thanNgay = LayThanBang $htmlNgay
+
+            # 🔑 Chong "do MOT VUNG RONG": 🔒 neu `LayThanBang` tra `''` thi **moi** ca "KHONG co X" se
+            # **XANH vi ly do SAI** (⚠️ khong co gi thi khong co gi de tim). 📌 Phai khang dinh vung do **khong rong**.
+            Kq 'D11a tach duoc <tbody> (vung do KHONG rong)' ($thanNgay.Length -gt 50) ("thanBang = " + $thanNgay.Length + " ky tu")
+
+            Kq 'D11b loc ngay [2020-01-01..2020-01-31] => 200' ($trangNgay.Ma -eq '200') ("HTTP " + $trangNgay.Ma)
+
+            # 🔑 **CHIEU "CO"**: dong trong khoang PHAI hien.
+            Kq 'D11c loc ngay GIU dong trong khoang (K97E2E-nhanvien-b)' ($thanNgay -match 'K97E2E-nhanvien-b') 'dong 2020-01-02 co mat'
+
+            # 🚨 **CHIEU "KHONG"** — 🔑 CA QUAN TRONG HON: dong HOM NAY **phai bi loai**.
+            # ⚠️ Neu bo loc **khong hoat dong** thi ca duoi day se DO ⇒ 📌 va do chinh la dieu ta can.
+            $conAdmin = $thanNgay -match '>admin<'
+            Kq 'D11d 🚨 loc ngay LOAI dong ngoai khoang (admin hom nay)' (-not $conAdmin) ("trong <tbody> con admin = " + $conAdmin)
+
+            # 📌 Va tong phai la **1** — 🔑 khong chi *"khong thay admin"* ma phai **dem dung**.
+            Kq 'D11e loc ngay => tong = 1 (khong chi "khong thay")' ($htmlNgay -match 'trên tổng\s*<strong>1</strong>') 'tong = 1'
+
+            # ── ② LOC NGAY: moc `denNgay` phai BAO GOM ca ngay do (logic NUA MO) ────────────────
+            # 🚨 **CA KHOA LOGIC NUA MO.** 🔒 Neu ai doi thanh `<= denNgay` (moc `00:00`) thi dong luc
+            # `2020-01-02 03:04:05` se **BI MAT** khi loc `denNgay=2020-01-02` ⇒ ⚠️ va do la loai loi
+            # **im lang** nguy hiem nhat voi man hinh **kiem toan**.
+            # ➕ Va ca nay cung khoa **loi mui gio** (`ToUniversalTime()` dich som 7 tieng — §24.5).
+            $trangMoc = TaiTrang -DuongDan "/KhachHang/NhatKy?customerId=$idKhach&tuNgay=2020-01-02&denNgay=2020-01-02" -TepLuu (Join-Path $thuMucTam 'nhatky-moc.html')
+            $htmlMoc = GiaiMaHtml $trangMoc.Html
+            $thanMoc = LayThanBang $htmlMoc
+
+            Kq 'D12 🚨 denNgay BAO GOM ca ngay do (nua mo) — dong 03:04:05 van hien' `
+                (($thanMoc -match 'K97E2E-nhanvien-b') -and ($htmlMoc -match 'trên tổng\s*<strong>1</strong>')) `
+                'tuNgay = denNgay = 2020-01-02 van thay dong 03:04:05'
+
+            # ── ③ LOC NGUOI XUAT ──────────────────────────────────────────────────────────────
+            $trangNv = TaiTrang -DuongDan "/KhachHang/NhatKy?customerId=$idKhach&nguoiXuat=K97E2E-nhanvien-b" -TepLuu (Join-Path $thuMucTam 'nhatky-nv.html')
+            $htmlNv = GiaiMaHtml $trangNv.Html
+            $thanNv = LayThanBang $htmlNv
+
+            Kq 'D13a loc nguoi xuat => 200' ($trangNv.Ma -eq '200') ("HTTP " + $trangNv.Ma)
+            Kq 'D13b loc nguoi xuat GIU dong dung nguoi do' (($thanNv -match 'K97E2E-nhanvien-b') -and ($htmlNv -match 'trên tổng\s*<strong>1</strong>')) 'chi 1 dong'
+
+            # 🚨 **CHIEU "KHONG"** — 🔑 loc theo nguoi khac thi dong `admin` **phai bi loai**.
+            $conAdminNv = $thanNv -match '>admin<'
+            Kq 'D13c 🚨 loc nguoi xuat LOAI dong cua nguoi khac (admin)' (-not $conAdminNv) ("trong <tbody> con admin = " + $conAdminNv)
+
+            # 🔑 **DROPDOWN den tu DU LIEU THAT** — 📌 ca hai nguoi xuat phai co trong `<select>`.
+            # ⚠️ Neu dropdown **viet cung** trong view thi no se **khong** co ten nhan vien probe.
+            Kq 'D13d dropdown co CA HAI nguoi xuat THAT' `
+                (($htmlNk -match 'value="K97E2E-nhanvien-b"') -and ($htmlNk -match 'value="admin"')) `
+                'dropdown tu du lieu that, khong viet cung'
+
+            # ── ④ GIU `customerId` KHI LOC ────────────────────────────────────────────────────
+            # ⚠️ **BAY THAT:** neu form khong gui lai `customerId` thi bam "Loc" se **mat ngu canh khach**
+            # ⇒ 📌 tra ve nhat ky cua **MOI** khach, trong khi nguoi dung **tuong** dang xem cua mot nguoi.
+            Kq 'D14 form loc GIU customerId (khong mat ngu canh khach)' `
+                ($htmlNk -match 'name="customerId"') `
+                'co hidden customerId trong form loc'
         }
     }
 

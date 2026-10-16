@@ -100,20 +100,54 @@ public class KhachHangController : Controller
     /// chỉ **bỏ qua bộ lọc**. 🔒 Với một màn hình **kiểm toán**, *"hiện nhiều hơn yêu cầu"* **an toàn hơn**
     /// *"không hiện gì"*.
     /// </summary>
-    public async Task<IActionResult> NhatKy(Guid? customerId = null, string? tuNgay = null, string? denNgay = null)
+    public async Task<IActionResult> NhatKy(Guid? customerId = null, string? tuNgay = null, string? denNgay = null, string? nguoiXuat = null)
     {
-        var tu = DateTime.TryParse(tuNgay, CultureInfo.InvariantCulture, DateTimeStyles.None, out var t) ? t : (DateTime?)null;
-        var den = DateTime.TryParse(denNgay, CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d : (DateTime?)null;
+
+        // 🚨 **NGAY TREN FORM LA NGAY UTC — KHONG DUOC `ToUniversalTime()`.**
+        // (Loi THẬT, đo được ở `CUS-001` §24.5.)
+
+        // ⚠️ **CHUYEN GI XAY RA:** `DateTime.TryParse("2020-01-02")` cho `Kind = Unspecified`, va
+        // `ToUniversalTime()` tren `Unspecified` **coi no la GIO DIA PHUONG** roi **TRU offset**.
+        // 📌 May chu o `SE Asia Standard Time` (UTC+7) ⇒ `2020-01-02 00:00` thanh **`2020-01-01 17:00` UTC**
+        // ⇒ 🔒 **bo loc dich SOM 7 TIENG**:
+        // <list type="bullet">
+        // <item>`tuNgay` **rong hon** ⇒ **LOT** nhung dong le ra phai bi **loai**;</item>
+        // <item>`denNgay` **hep hon** ⇒ **MAT** nhung dong le ra phai **hien**.</item>
+        // </list>
+        // 🔑 **Va day la loai loi TE NHAT voi mot man hinh KIEM TOAN:** no **khong bao loi**, ket qua
+        // **trong nhu hop ly**, va 📌 nguoi kiem toan **ket luan sai ve bang chung** (⚠️ *"khong ai xuat
+        // trong ngay do"* khi thuc te **CO**).
+
+        // ✅ **CACH DUNG:** nhan ngay **nhu ngay UTC** — 🔑 nhan (label) da ghi ro *"(UTC)"*, nen
+        // 📌 **khong** co gi phai chuyen doi. ➕ Va nhat quan voi `XuatLucUtc` (cung UTC).
+
+        // 📌 `DateTimeStyles.AssumeUniversal | AdjustToUniversal` lam dieu do **tuong minh** — ⚠️ chu
+        // **khong** de `Kind = Unspecified` roi **tin** rang no dung: 🔒 `Unspecified` la nguon cua
+        // chinh loi nay.
+
+        const DateTimeStyles KieuUtc = DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal;
+
+        var tu = DateTime.TryParse(tuNgay, CultureInfo.InvariantCulture, KieuUtc, out var t) ? t : (DateTime?)null;
+        var den = DateTime.TryParse(denNgay, CultureInfo.InvariantCulture, KieuUtc, out var d) ? d : (DateTime?)null;
 
         var ketQua = await _khachHang.GetNhatKyXuatDuLieuAsync(
             customerId: customerId,
-            // 📌 **UTC** — nhat ky luu UTC ⇒ 🔑 phai so sanh cung moc, neu khong se lech theo mui gio may chu.
-            tuNgayUtc: tu?.ToUniversalTime(),
-            denNgayUtc: den?.ToUniversalTime());
+            // 📌 **KHONG** `ToUniversalTime()` o day — xem chu thich `KieuUtc` o tren.
+            tuNgayUtc: tu,
+            denNgayUtc: den,
+            nguoiXuat: nguoiXuat);
 
         ViewBag.TuNgay = tuNgay;
         ViewBag.DenNgay = denNgay;
+        ViewBag.NguoiXuat = nguoiXuat;
         ViewBag.CustomerId = customerId;
+
+        // 🔑 **DANH SACH NGUOI XUAT THAT** — 📌 de man hinh dung **dropdown** thay vi o nhap tu do.
+        // ⚠️ O nhap tu do se khien nguoi kiem toan **go sai mot ky tu** va 🔒 nhan duoc **0 dong** —
+        // 📌 ma voi man hinh **kiem toan** thi *"0 dong"* bi doc thanh *"khong ai xuat"*.
+        // 🔑 Day cung la ly do toi chon **khop CHINH XAC** o app service: gia tri den tu **du lieu that**,
+        // chu khong phai tu tri nho nguoi dung.
+        ViewBag.CacNguoiXuat = await _khachHang.GetDanhSachNguoiXuatNhatKyAsync(customerId);
 
         return View(ketQua);
     }

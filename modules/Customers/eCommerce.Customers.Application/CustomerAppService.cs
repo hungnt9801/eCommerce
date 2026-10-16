@@ -566,12 +566,27 @@ public class CustomerAppService : ApplicationService
     /// nguy hiem nhat voi mot man hinh **kiem toan** (🔑 nguoi kiem toan ket luan *"khong ai xuat"* khi
     /// thuc te **co**). ✅ Nua mo (`< den + 1 ngay`) lam moc ngay **tron ven**.
     /// </param>
+    /// <param name="nguoiXuat">
+    /// ⚠️ **Tuy chon** — loc theo **NGUOI XUAT**. 🔑 Cau hoi kiem toan that: *"nhan vien X da xuat nhung gi"*.
+    ///
+    /// 🔒 **KHOP CHINH XAC (`==`), KHONG `Contains`** — 📌 **VI SAO LA MOT QUYET DINH, KHONG PHAI SU LUA:**
+    /// <list type="bullet">
+    ///   <item>`Contains` lam **"an"** (nhan vien **An** khop voi **Anh**, **Hoang An**, …) ⇒ ⚠️ ket qua
+    ///     **thua** dong ⇒ 📌 voi mot man hinh **kiem toan**, *"thua"* nghia la **gan sai** cho nguoi khac
+    ///     — 🔑 va do la loi **nghiem trong hon** *"thieu"*;</item>
+    ///   <item>`Contains` **KHONG dung duoc index** ⇒ 🔑 quet **ca bang** — ⚠️ bang nhat ky **chi tang**, nen
+    ///     day la loai cham **ngay cang te**;</item>
+    ///   <item>Gia tri den tu **dropdown** (danh sach nguoi xuat **that**), ⚠️ **khong** phai o nhap tu do
+    ///     ⇒ 📌 khong can *"tim gan dung"*.</item>
+    /// </list>
+    /// </param>
     /// <param name="toiDa">Tran so dong (⚠️ **co cat** — xem `KetQuaNhatKyXuatDuLieuDto.BiCat`).</param>
     [Authorize(eCommerceConsts.Permissions.Customers.Manage)]
     public async Task<KetQuaNhatKyXuatDuLieuDto> GetNhatKyXuatDuLieuAsync(
         Guid? customerId = null,
         DateTime? tuNgayUtc = null,
         DateTime? denNgayUtc = null,
+        string? nguoiXuat = null,
         int toiDa = 100)
     {
         var soLuong = Math.Clamp(toiDa, 1, 500);
@@ -581,6 +596,14 @@ public class CustomerAppService : ApplicationService
         if (customerId is not null)
         {
             truyVan = truyVan.Where(x => x.CustomerId == customerId.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(nguoiXuat))
+        {
+            // 🔒 **KHOP CHINH XAC** — xem chu thich o `<param name="nguoiXuat">`.
+            // 📌 `Trim()` o day (khong o UI) ⇒ 🔑 de **moi duong goi** (UI, API, script) deu duoc chuan hoa.
+            var ten = nguoiXuat.Trim();
+            truyVan = truyVan.Where(x => x.NguoiXuat == ten);
         }
 
         if (tuNgayUtc is not null)
@@ -629,6 +652,34 @@ public class CustomerAppService : ApplicationService
                 LyDo = x.LyDo
             }).ToList()
         };
+    }
+
+    /// <summary>
+    /// 🔑 **DANH SACH NGUOI DA XUAT** (cho **dropdown** cua man hinh nhat ky) — 📌 du lieu **THAT**, khong phai
+    /// mot danh sach viet cung trong view.
+    ///
+    /// ⚠️ **VI SAO KHONG DUNG O NHAP TU DO:** 🔒 nguoi kiem toan **go sai mot ky tu** se nhan **0 dong**, va
+    /// 📌 voi mot man hinh **kiem toan** thi *"0 dong"* bi doc thanh *"khong ai xuat"* — 🔑 mot **ket luan sai
+    /// ve bang chung** sinh ra tu mot **loi go tay**. ✅ Dropdown lam dieu do **khong the** xay ra.
+    ///
+    /// ➕ Va day cung la ly do `GetNhatKyXuatDuLieuAsync` loc theo **khop CHINH XAC**: 🔑 gia tri den tu
+    /// **du lieu that** ⇒ 📌 khong can *"tim gan dung"*, va **an** khong bi lan voi **Anh**.
+    /// </summary>
+    /// <param name="customerId">⚠️ Tuy chon — thu hep danh sach theo mot khach.</param>
+    [Authorize(eCommerceConsts.Permissions.Customers.Manage)]
+    public async Task<List<string>> GetDanhSachNguoiXuatNhatKyAsync(Guid? customerId = null)
+    {
+        var truyVan = await _nhatKyXuatRepository.GetQueryableAsync();
+
+        if (customerId is not null)
+        {
+            truyVan = truyVan.Where(x => x.CustomerId == customerId.Value);
+        }
+
+        // 📌 Sap xep **tat dinh** (`OrderBy`) ⇒ 🔑 dropdown khong doi thu tu moi lan tai trang
+        // (⚠️ neu khong, nguoi dung se **tuong** danh sach da doi ⇒ 📌 mat long tin vao man hinh kiem toan).
+        return await AsyncExecuter.ToListAsync(
+            truyVan.Select(x => x.NguoiXuat).Distinct().OrderBy(x => x));
     }
 
     // ── CHUYỂN ĐỔI ──────────────────────────────────────────────────────────────────────────────

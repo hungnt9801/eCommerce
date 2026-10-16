@@ -1561,3 +1561,118 @@ nhưng không có tác dụng** — 📌 một **control chết** còn tệ hơn
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.4 | 17/10/2026 | *(agent, session GĐ1)* | **§23 — LÁT CẮT 7: MÀN HÌNH NHẬT KÝ KIỂM TOÁN** (đóng nợ §22.6 #1): thêm **`NhatKyXuatDuLieuDto`** + **`KetQuaNhatKyXuatDuLieuDto`** (`CacDong` + **`TongSo`** + **`BiCat`**) + **`CustomerAppService.GetNhatKyXuatDuLieuAsync(customerId, tuNgayUtc, denNgayUtc, toiDa)`** (route thật `GET /api/app/customer/nhat-ky-xuat-du-lieu`) + **`GET /KhachHang/NhatKy`** (`NhatKy.cshtml`, neo **`[NHATKYXUATDULIEU-MAN-HINH]`**) + liên kết từ `/KhachHang` + neo vào **`ViewAnchorTests`**. 🔑 **VÌ SAO:** ở §22 tôi đã xây bảng `CusDataExportLogs` — 🔒 nhưng **một bằng chứng không ai đọc được thì không phục vụ câu hỏi nào** — 📌 và tôi đã **tự ghi nợ**: *"người kiểm toán phải TRUY VẤN SQL"*. 🔒 **BA QUY TẮC HIỂN THỊ (mỗi cái chống một cách NÓI DỐI):** ① **phải nói rõ khi bị cắt** (⚠️ bảng chỉ hiện 100 dòng mà **không nói gì** ⇒ người kiểm toán **tin** *"chỉ có 100 lần xuất"* = **kết luận sai về bằng chứng**; ➕ khi `BiCat` thì hiện **cảnh báo**) · ② **khách đã bị xoá thì phải nói rõ** (🔒 `CustomerId` **không** FK cứng ⇒ nhật ký **sống sót** khi hồ sơ khách bị xoá — 📌 **đó là lý do thiết kế**; ⚠️ để **trống** thì người đọc hiểu là **lỗi hiển thị**) · ③ **không có dòng nào ≠ "không có gì bất thường"** (🔑 câu chữ khi rỗng phải nói đúng: *"không có lần xuất nào khớp **bộ lọc**"*) · ➕ **`LyDo` trống ⇒ hiện *"(không ghi lý do)"*** (⚠️ để trống trông như **lỗi**, trong khi sự thật là **nợ đã ghi**). ✅ **HAI QUYẾT ĐỊNH KỸ THUẬT:** ① **lọc ngày kiểu NỬA MỞ** (`< den + 1 ngày`) — 🔒 nếu lấy `<= denNgay` với mốc `00:00` thì **mọi** lần xuất **trong ngày cuối cùng** bị **mất**, ⚠️ và đó là loại lỗi **im lặng** nguy hiểm nhất với màn hình **kiểm toán** (🔑 kết luận *"không ai xuất"* khi thực tế **có**); ② **KHÔNG parse ngày ở controller** — nhận **CHUỖI** rồi `TryParse` (📌 nếu nhận `DateTime?` thẳng thì giá trị rác trên URL làm **`ModelState` không hợp lệ** ⇒ **`400`**: gõ sai một ký tự là **mất cả màn hình**; 🔒 với màn hình **kiểm toán**, *"hiện nhiều hơn yêu cầu"* **an toàn hơn** *"không hiện gì"*). ➕ **Quyền = `Customers.Manage`** — 🔑 **nhất quán với quyền XUẤT**: ai **xuất** được PII thì **cũng** phải **xem vết** được (📌 ngược lại thì người **làm** được việc nhưng **không tự kiểm** được mình); ⚠️ **không** dùng `Customers.Default` vì 🔒 nhật ký nói **ai đã làm gì với dữ liệu cá nhân** ⇒ nó là **thông tin về NHÂN VIÊN**, không phải về khách. ➕ **Sắp xếp TẤT ĐỊNH** (`XuatLucUtc` rồi `Id`) — 📌 nếu không thì kết quả **không tái lập được**. ✅ **KIỂM CHỨNG 6 CA E2E MỚI ĐO HTML THẬT:** **D10a** `200` · **D10b** neo màn hình · 🚨 **D10c** nói rõ *"hiển thị / tổng"* + tổng = **2** (chống **cắt bớt im lặng**) · **D10d** hiện **cả hai** dòng (`admin` **và** `K97E2E-nhanvien-b`) · **D10e** hiện **đúng số liệu từng dòng** (**17**) · **D10f** không bị cắt ⇒ nói *"tất cả"*, ⚠️ **không báo động giả**; 🔑 **vì sao đo 2 DÒNG (không phải 1):** ⚠️ với **một** dòng thì **không phân biệt được** *"màn hình hiện đúng"* với *"màn hình chỉ hiện dòng đầu"* — 📌 một lỗi **rất dễ mắc**; ➕ hai dòng có **số liệu khác hẳn nhau** (`1` vs `17`) ⇒ kiểm được **đúng từng dòng**; ➕ **neo view vào `ViewAnchorTests`** ⇒ khoá *"màn hình tồn tại và render"* ở tầng unit. ➡️ **E2E 32/32** · **8 bước** · `exit 0` · **149.8s** · **1170** unit · 38 integration · mermaid 197/0 · DB 21/21 · test cổng 17/17. 🐞 **HAI LỖI:** (1) ⚠️ **viết bộ lọc NGÀY vào view TRƯỚC khi service nhận tham số đó** — 🔑 nếu dừng ở đó thì form **hiện ra nhưng không có tác dụng**: 📌 một **control chết** còn tệ hơn **không có control**, vì người dùng **tin** rằng họ đã lọc, và 🔒 với màn hình **kiểm toán** thì *"tôi đã lọc"* dẫn tới **kết luận sai về bằng chứng** ⇒ ✅ chữa: thêm `tuNgayUtc`/`denNgayUtc` vào app service **trước khi** build; 🔑 **bài học: thêm UI thì phải hỏi NGAY *"service có nhận tham số này chưa?"*** — cùng họ với *"nút bấm không có handler"*; (2) ⚠️ **`String.Replace` không khớp ⇒ nav link KHÔNG được thêm** (script in `CANH BAO: khong khop view`) — 🔒 **lần thứ BẢY** của họ lỗi này ⇒ ✅ dùng **công cụ sửa tệp** (`edit`); 📌 và **may mắn** là script **in cảnh báo** thay vì **im lặng** — 🔑 đó là lý do tôi phát hiện ngay. Ghi **§23.6** (nợ: 🚨 **chưa có XUẤT nhật ký ra CSV** (📌 người kiểm toán cần **đính kèm bằng chứng** ⇒ ⚠️ hiện **chép tay**) · **chưa có cảnh báo xuất LẶP LẠI** (🔑 bảng đã **đủ dữ liệu**) · **`LyDo` vẫn chưa được điền** (**nợ từ §22.6 #3 vẫn mở**) · **chưa lọc theo NGƯỜI XUẤT** (🔑 câu hỏi *"nhân viên X đã xuất gì"* là câu hỏi **kiểm toán** thật) · **chưa phân trang** (📌 tạm chấp nhận) · ⚠️ **chưa có test cho lọc NGÀY** (logic nửa mở mới thêm **chưa được khoá** ⇒ **nợ kế tiếp**) · **chưa gồm dữ liệu module khác** (**nợ chặn**)) |
+
+---
+
+## 24. ✅ **LÁT CẮT 8 — TEST LỌC NGÀY + LỌC THEO NGƯỜI XUẤT** (17/10/2026) — *đóng nợ §23.6 #4 và #6*
+
+### 24.1 🚨 **VÀ ĐÃ BẮT ĐƯỢC MỘT LỖI SẢN PHẨM THẬT — lỗi MÚI GIỜ trong bộ lọc ngày**
+
+Ở §23.3 tôi đã viết **`tu?.ToUniversalTime()`** trong controller, kèm chú thích *"phải so sánh cùng mốc, nếu
+không sẽ lệch theo múi giờ máy chủ"*. 🔑 **Chú thích đó ĐÚNG về nguyên tắc — nhưng CÁCH LÀM thì SAI.**
+
+**Đo được (máy chủ ở `SE Asia Standard Time`, UTC+7):**
+| Bước | Giá trị |
+|---|---|
+`DateTime.TryParse("2020-01-02")` | `Kind = **Unspecified**` |
+`ToUniversalTime()` trên `Unspecified` | ⚠️ **coi là giờ ĐỊA PHƯƠNG** rồi **TRỪ offset** ⇒ `2020-01-01 17:00` |
+Dòng nhật ký thật | `2020-01-02 03:04:05+00` |
+
+🔒 **HẬU QUẢ — bộ lọc DỊCH SỚM 7 TIẾNG:**
+<list type="bullet">
+  <item>`tuNgay` **rộng hơn** ⇒ 🔴 **LỌT** những dòng lẽ ra phải bị **loại**;</item>
+  <item>`denNgay` **hẹp hơn** ⇒ 🔴 **MẤT** những dòng lẽ ra phải **hiện**.</item>
+</list>
+
+🔑 **VÀ ĐÂY LÀ LOẠI LỖI TỆ NHẤT VỚI MỘT MÀN HÌNH KIỂM TOÁN:** nó **không báo lỗi**, kết quả **trông như hợp lý**,
+và 📌 người kiểm toán **kết luận sai về bằng chứng** — ⚠️ *"không ai xuất trong ngày đó"* khi thực tế **CÓ**.
+
+✅ **CHỮA:** nhãn form đã ghi rõ *"(UTC)"* ⇒ 🔑 **ngày trên form LÀ ngày UTC** ⇒ dùng
+`DateTimeStyles.AssumeUniversal | AdjustToUniversal` và **BỎ** `ToUniversalTime()`.
+📌 Chọn cách này thay vì *"để `Unspecified` rồi tin nó đúng"*: 🔒 **`Unspecified` chính là nguồn của lỗi**.
+
+➕ **Và ca `D12` khoá nó lại:** lọc `tuNgay = denNgay = 2020-01-02` **phải** thấy dòng lúc `03:04:05`.
+
+### 24.2 🐞 **Và một lỗi THỨ HAI — lỗi của PHÉP ĐO, suýt làm tôi tin sản phẩm hỏng**
+
+Lần chạy đầu tiên: `D11c` và `D13c` **ĐỎ** với `con admin = True`. ⚠️ Trông như **bộ lọc không hoạt động**.
+
+🔑 **NHƯNG nguyên nhân là PHÉP ĐO:** tôi kiểm `>admin<` trên **CẢ TRANG**, và nó khớp
+**`<option>admin</option>` của DROPDOWN** — 📌 chứ **không** phải một dòng trong bảng.
+✅ **Chữa:** tách **`<tbody>`** trước rồi mới kiểm.
+
+🔒 **CÙNG HỌ VỚI BÀI HỌC §97.6 #3** (`href="#"` duy nhất trên trang là **dropdown của THEME**):
+**phải tách đúng VÙNG trước khi khẳng định** — ⚠️ nếu không, ta **đo một thứ khác** với thứ mình **tưởng**.
+➕ Và thêm ca **`D11a`** khẳng định vùng `<tbody>` **KHÔNG rỗng** — 🔑 chống *"đo một vùng rỗng"*: 📌 nếu tách
+hỏng thì **mọi** ca *"KHÔNG có X"* sẽ **XANH vì lý do SAI** (⚠️ không có gì thì không có gì để tìm).
+
+### 24.3 ✅ **Lọc theo NGƯỜI XUẤT — và vì sao khớp CHÍNH XÁC**
+
+Thêm `nguoiXuat` vào `GetNhatKyXuatDuLieuAsync` + **dropdown** (`GetDanhSachNguoiXuatNhatKyAsync`) + giữ
+`customerId` khi lọc.
+
+🔒 **KHỚP CHÍNH XÁC (`==`), KHÔNG `Contains` — ba lý do:**
+<list type="number">
+  <item>`Contains` làm **"ẩn"** (nhân viên **An** khớp với **Anh**, **Hoàng An**, …) ⇒ ⚠️ kết quả **thừa** dòng
+    ⇒ 📌 với màn hình **kiểm toán**, *"thừa"* nghĩa là **gán sai cho người khác** — 🔑 **nghiêm trọng hơn**
+    *"thiếu"*;</item>
+  <item>`Contains` **không dùng được index** ⇒ quét **cả bảng**; ⚠️ bảng nhật ký **chỉ tăng** ⇒ 📌 loại chậm
+    **ngày càng tệ**;</item>
+  <item>Giá trị đến từ **dropdown** (danh sách người xuất **thật**), ⚠️ **không** phải ô nhập tự do
+    ⇒ 📌 không cần *"tìm gần đúng"*.</item>
+</list>
+
+🔑 **VÀ DROPDOWN LÀ MỘT QUYẾT ĐỊNH, KHÔNG PHẢI SỰ LƯỜI:** ⚠️ nếu là ô nhập tự do thì người kiểm toán **gõ sai một
+ký tự** sẽ nhận **0 dòng** — 📌 và với màn hình **kiểm toán** thì *"0 dòng"* bị đọc thành *"không ai xuất"*:
+🔒 một **kết luận sai về bằng chứng** sinh ra từ một **lỗi gõ tay**.
+➕ Sắp xếp dropdown **tất định** (`OrderBy`) ⇒ 🔑 không đổi thứ tự mỗi lần tải trang.
+
+➕ **Và form lọc giữ `customerId`** (hidden input) — ⚠️ nếu không thì bấm *"Lọc"* sẽ **mất ngữ cảnh khách** ⇒
+📌 trả về nhật ký của **MỌI** khách trong khi người dùng **tưởng** đang xem của một người.
+
+### 24.4 ✅ **KIỂM CHỨNG — 11 CA E2E MỚI, MỖI BỘ LỌC ĐO CẢ HAI CHIỀU**
+
+🔑 **VÌ SAO PHẢI ĐO CẢ HAI CHIỀU:** ⚠️ một bộ lọc **luôn trả về TẤT CẢ** thì *"lọc được"* trông **đúng** ở mọi
+ca chỉ kiểm *"có thấy dòng X không"*. 📌 Nên mỗi bộ lọc phải được đo **cả** *"có dòng cần thấy"* **VÀ**
+*"KHÔNG có dòng phải bị loại"*.
+
+| Ca | Đo được |
+|---|---|
+**D11a** | Tách được `<tbody>` — ⚠️ vùng đo **KHÔNG rỗng** (`687` ký tự) — 🛡️ chống *"đo vùng rỗng"* |
+**D11b** | Lọc ngày `[2020-01-01..2020-01-31]` ⇒ **`200`** |
+**D11c** | ✅ **CHIỀU "CÓ"**: dòng trong khoảng **hiện** |
+🚨 **D11d** | ✅ **CHIỀU "KHÔNG"**: dòng **hôm nay** (`admin`) **BỊ LOẠI** (`False`) |
+**D11e** | Tổng = **1** — 🔑 không chỉ *"không thấy"* mà **đếm đúng** |
+🚨 **D12** | `denNgay` **BAO GỒM** cả ngày đó (nửa mở) — dòng `03:04:05` vẫn hiện — 🔑 **khoá lỗi múi giờ §24.1** |
+**D13a** | Lọc người xuất ⇒ **`200`** |
+**D13b** | ✅ **CHIỀU "CÓ"**: đúng người đó **hiện**, tổng = **1** |
+🚨 **D13c** | ✅ **CHIỀU "KHÔNG"**: dòng của người khác **BỊ LOẠI** |
+**D13d** | Dropdown có **CẢ HAI** người xuất **THẬT** (`admin` + `K97E2E-nhanvien-b`) |
+**D14** | Form lọc **GIỮ** `customerId` |
+
+➡️ **E2E: 43/43 ĐẠT** · **8 bước** · `exit 0` · **157s** · **1170** unit · 38 integration · mermaid 197/0 ·
+DB 21/21 · test cổng 17/17.
+
+### 24.5 🐞 **Lỗi thứ ba: `@*` trong tệp C#**
+
+⚠️ Tôi viết khối chú thích **`@* … *@`** (cú pháp **Razor**) trong **`KhachHangController.cs`** — một tệp
+**C#** ⇒ **`error CS1056: Unexpected character '@'`**.
+🔑 **Bài học:** cú pháp chú thích **không** giống nhau giữa `.cshtml` và `.cs`. ✅ Chữa: chuyển sang `//`.
+
+### 24.6 ⏳ NỢ
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+**1** | 🚨 **Chưa có test cho lọc ngày ở tầng UNIT** | 🔑 Hiện `D11`–`D14` **đo qua HTTP + DB thật** (mạnh hơn, 📌 nhưng **chậm** và cần Web chạy) ⇒ ⚠️ nên có test nhanh cho **logic** nếu tách được |
+**2** | **Chưa có XUẤT nhật ký ra CSV** | 📌 Người kiểm toán cần **đính kèm bằng chứng** (nợ từ §23.6 #1) |
+**3** | **Chưa có cảnh báo khi xuất LẶP LẠI bất thường** | 🔑 Bảng đã **đủ dữ liệu** |
+**4** | **`LyDo` vẫn chưa được điền** | ⚠️ Nợ từ §22.6 #3 **vẫn mở** |
+**5** | **Chưa phân trang** | 📌 Tạm chấp nhận (trần **100** + lọc ngày + lọc người) |
+**6** | ⚠️ **Múi giờ: ngày trên form là UTC** | 🔑 Nhất quán với `XuatLucUtc` — 📌 nhưng ⚠️ **chưa có chỉ dẫn cho người dùng ở múi giờ khác** (họ phải tự quy đổi) |
+**7** | **Chưa gồm dữ liệu module khác** (địa chỉ giao, thanh toán, thuế) | ⚠️ **Nợ chặn** (`Address` chưa tồn tại) |
+
+### 24.7 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.5 | 17/10/2026 | *(agent, session GĐ1)* | **§24 — LÁT CẮT 8: TEST LỌC NGÀY + LỌC THEO NGƯỜI XUẤT** (đóng nợ §23.6 #4 và #6) — 🚨 **VÀ ĐÃ BẮT ĐƯỢC MỘT LỖI SẢN PHẨM THẬT: lỗi MÚI GIỜ trong bộ lọc ngày.** ➕ Thêm **`nguoiXuat`** vào `GetNhatKyXuatDuLieuAsync` (**khớp CHÍNH XÁC** `==`, **không** `Contains`) + **`GetDanhSachNguoiXuatNhatKyAsync`** (dropdown từ **dữ liệu THẬT**, `Distinct().OrderBy()`) + dropdown trong `NhatKy.cshtml` + **hidden `customerId`** khi lọc + **11 ca E2E** (`D11a`–`D14`). 🚨 **LỖI MÚI GIỜ (§24.1):** ở §23.3 tôi viết `tu?.ToUniversalTime()` kèm chú thích *"phải so sánh cùng mốc, nếu không sẽ lệch theo múi giờ máy chủ"* — 🔑 **chú thích ĐÚNG về nguyên tắc nhưng CÁCH LÀM thì SAI**: `DateTime.TryParse("2020-01-02")` cho `Kind = **Unspecified**`, và `ToUniversalTime()` trên `Unspecified` **coi là giờ ĐỊA PHƯƠNG** rồi **TRỪ offset** (máy chủ `SE Asia Standard Time` = **UTC+7**) ⇒ `2020-01-02 00:00` thành **`2020-01-01 17:00` UTC** ⇒ 🔒 **bộ lọc DỊCH SỚM 7 TIẾNG**: `tuNgay` **rộng hơn** ⇒ **LỌT** dòng lẽ ra phải **loại**; `denNgay` **hẹp hơn** ⇒ **MẤT** dòng lẽ ra phải **hiện**; 🔑 **và đây là loại lỗi TỆ NHẤT với màn hình KIỂM TOÁN:** nó **không báo lỗi**, kết quả **trông như hợp lý**, và 📌 người kiểm toán **kết luận sai về bằng chứng** (*"không ai xuất trong ngày đó"* khi thực tế **CÓ**); ✅ chữa: nhãn form đã ghi rõ *"(UTC)"* ⇒ 🔑 **ngày trên form LÀ ngày UTC** ⇒ dùng `DateTimeStyles.AssumeUniversal | AdjustToUniversal` và **BỎ** `ToUniversalTime()` (📌 chọn cách này thay vì *"để `Unspecified` rồi tin nó đúng"* — 🔒 **`Unspecified` chính là nguồn của lỗi**), ➕ ca **`D12`** khoá lại (lọc `tuNgay = denNgay = 2020-01-02` **phải** thấy dòng `03:04:05`). 🐞 **LỖI CỦA PHÉP ĐO (§24.2) — suýt làm tôi tin sản phẩm hỏng:** lần chạy đầu `D11c`/`D13c` **ĐỎ** với `con admin = True` (⚠️ trông như **bộ lọc không hoạt động**) — 🔑 **nhưng nguyên nhân là PHÉP ĐO:** tôi kiểm `>admin<` trên **CẢ TRANG** và nó khớp **`<option>admin</option>` của DROPDOWN**, 📌 **không** phải một dòng trong bảng; ✅ chữa: tách **`<tbody>`** trước rồi mới kiểm; 🔒 **cùng họ với §97.6 #3** (`href="#"` duy nhất trên trang là **dropdown của THEME**) — **phải tách đúng VÙNG trước khi khẳng định**, ⚠️ nếu không ta **đo một thứ khác** với thứ mình **tưởng**; ➕ thêm ca **`D11a`** khẳng định vùng `<tbody>` **KHÔNG rỗng** — 🔑 chống *"đo một vùng rỗng"* (📌 nếu tách hỏng thì **mọi** ca *"KHÔNG có X"* sẽ **XANH vì lý do SAI**). ✅ **LỌC THEO NGƯỜI XUẤT — KHỚP CHÍNH XÁC, ba lý do:** ① `Contains` làm **"ẩn"** (nhân viên **An** khớp **Anh**, **Hoàng An**…) ⇒ ⚠️ kết quả **thừa** ⇒ 📌 với màn hình **kiểm toán**, *"thừa"* nghĩa là **gán sai cho người khác** — 🔑 **nghiêm trọng hơn** *"thiếu"*; ② `Contains` **không dùng được index** ⇒ quét **cả bảng**, ⚠️ bảng nhật ký **chỉ tăng** ⇒ 📌 chậm **ngày càng tệ**; ③ giá trị đến từ **dropdown** (dữ liệu **thật**) ⇒ 📌 không cần *"tìm gần đúng"*; 🔑 **và dropdown là một QUYẾT ĐỊNH:** ⚠️ ô nhập tự do ⇒ gõ sai một ký tự ⇒ **0 dòng** ⇒ 📌 với màn hình **kiểm toán**, *"0 dòng"* bị đọc thành *"không ai xuất"* = 🔒 **kết luận sai về bằng chứng** từ một **lỗi gõ tay**; ➕ form lọc **giữ `customerId`** (hidden) — ⚠️ nếu không thì bấm *"Lọc"* **mất ngữ cảnh khách** ⇒ 📌 trả về nhật ký của **MỌI** khách trong khi người dùng **tưởng** đang xem của một người. ✅ **KIỂM CHỨNG 11 CA E2E MỚI — MỖI BỘ LỌC ĐO CẢ HAI CHIỀU** (🔑 vì ⚠️ một bộ lọc **luôn trả về TẤT CẢ** thì *"lọc được"* trông **đúng** ở mọi ca chỉ kiểm *"có thấy dòng X không"*): **D11a** tách `<tbody>` **không rỗng** (`687` ký tự) · **D11b** `200` · **D11c** ✅ **chiều "CÓ"** · 🚨 **D11d** ✅ **chiều "KHÔNG"** (dòng hôm nay **BỊ LOẠI**) · **D11e** tổng = **1** (🔑 **đếm đúng**, không chỉ *"không thấy"*) · 🚨 **D12** `denNgay` **bao gồm** cả ngày đó (nửa mở) ⇒ 🔑 **khoá lỗi múi giờ** · **D13a** `200` · **D13b** ✅ **chiều "CÓ"** · 🚨 **D13c** ✅ **chiều "KHÔNG"** · **D13d** dropdown có **CẢ HAI** người xuất **THẬT** · **D14** form **giữ `customerId`**. ➡️ **E2E 43/43** · **8 bước** · `exit 0` · **157s** · **1170** unit · 38 integration · mermaid 197/0 · DB 21/21 · test cổng 17/17. 🐞 **LỖI THỨ BA:** ⚠️ viết khối chú thích **`@* … *@`** (cú pháp **Razor**) trong **`KhachHangController.cs`** — một tệp **C#** ⇒ **`error CS1056: Unexpected character '@'`**; 🔑 **bài học: cú pháp chú thích KHÔNG giống nhau giữa `.cshtml` và `.cs`** ⇒ ✅ chuyển sang `//`. Ghi **§24.6** (nợ: 🚨 **chưa có test lọc ngày ở tầng UNIT** (🔑 hiện `D11`–`D14` **đo qua HTTP + DB thật** — mạnh hơn 📌 nhưng **chậm** và cần Web chạy) · **chưa có XUẤT nhật ký ra CSV** (nợ từ §23.6 #1) · **chưa có cảnh báo xuất LẶP LẠI** · **`LyDo` vẫn chưa được điền** (**nợ từ §22.6 #3 vẫn mở**) · **chưa phân trang** (📌 tạm chấp nhận) · ⚠️ **múi giờ: ngày trên form là UTC** (🔑 nhất quán với `XuatLucUtc` — 📌 nhưng ⚠️ **chưa có chỉ dẫn cho người dùng ở múi giờ khác**) · **chưa gồm dữ liệu module khác** (**nợ chặn**)) |
