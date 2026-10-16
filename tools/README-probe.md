@@ -420,3 +420,60 @@ tệp có chứa here-string thì dùng **công cụ sửa tệp** (`edit`), **k
 
 📌 **Đây là mặt NGƯỢC LẠI của bài học `web-001` §97** (*"một ca ĐỎ có thể đỏ vì **TẦNG KHÁC** từ chối trước"*):
 🔑 ở đây là *"một ca **XANH** có thể xanh vì **PHÉP TIÊM không xảy ra**"*.
+
+---
+
+## 🚨 `test-cong-kiem.ps1` — **TEST CHO CHÍNH CÁC CỔNG KIỂM CHỨNG**
+
+### Vì sao có file này — **HAI LỖI THẬT, CẢ HAI TÌM RA NHỜ MAY MẮN**
+
+| Lỗi | Chuyện gì xảy ra | Phát hiện nhờ |
+|---|---|---|
+🚨 `sal-006` **§23.4** | `kiem-moc-build.ps1` bị **VIẾT NGƯỢC ĐIỀU KIỆN** ⇒ 🔒 **cổng LUÔN ĐỎ** (báo *"BAN BUILD KHONG VAO"* **ngay cả khi mọi tệp ĐỀU ĐỔI**) | ⚠️ Tôi **tình cờ** chạy nó trên một bản build **vừa xong** |
+🚨 `sal-006` **§25.5** | Phép **tiêm lỗi KHÔNG hề xảy ra** (sai cú pháp SQL do thoát nháy) ⇒ cổng báo **XANH** | ⚠️ Tôi **tình cờ** đo lại trạng thái thật |
+
+🔒 **Và một cổng LUÔN ĐỎ thì người ta học cách BỎ QUA nó** ⇒ hỏng nó nghĩa là **quay lại** đúng cái bẫy mà nó
+sinh ra để chống. ⇒ **Phải có test TỰ ĐỘNG, không phụ thuộc may mắn.**
+
+### Hai quy tắc thiết kế
+
+1. 🔒 **KHÔNG THÊM PHỤ THUỘC.** Máy này chỉ có **Pester 3.4.0** (API khác Pester 5), và cả toolchain trong
+   `tools\` là **script thuần + exit code** ⇒ file này cũng thế: `Describe`/`It` **tự viết**.
+   🔑 Thêm một framework ở đây là đổi **công cụ**, không phải thêm **giá trị**.
+2. 🔒 **MỌI CA PHẢI TỰ DỌN DẸP.** Các ca "tiêm" tạo **dữ liệu thật**; ⚠️ nếu một ca **ném giữa đường** mà
+   không dọn thì lần chạy sau **hỏng vì dữ liệu ca trước còn lại** ⇒ 🔑 một test **tự làm hỏng chính nó**.
+   ✅ `try/finally` cho **mọi** ca có side effect.
+
+### 12 ca — chia hai nhóm
+
+**Nhóm `kiem-moc-build.ps1` (7 ca, 📌 không chạm DB):**
+
+| Ca | Bất biến |
+|---|---|
+🚨 **A** | `-GhiNho` → **BUILD** → `-Kiem` ⇒ mốc **ĐỔI** ⇒ **`exit 0`** ⇒ 🛡️ chống **cổng luôn đỏ** (§23.4). ⚠️ **Phải dùng `--no-incremental`**: build **tăng dần** không ghi lại binary ⇒ mốc **không đổi** ⇒ ca kiểm **không tất định** (🔑 và một ca **không tất định** thì **không phải lưới an toàn**) |
+🚨 **A2** | `-GhiNho` → **KHÔNG** build → `-Kiem` ⇒ mốc **không đổi** ⇒ **`exit 1`** ⇒ 🛡️ chống **cổng luôn xanh** (chiều đối xứng) |
+**B** | Mốc **cũ** (lùi 2020) ⇒ tệp đổi ⇒ `exit 0`, **không** báo động |
+**C** | Mốc **rỗng** ⇒ `exit 2` — ⚠️ **KHÔNG** được coi là *"ĐÃ VÀO"* |
+**D** | Mốc **sai định dạng** (object đơn) ⇒ `exit 2` — 🚨 khóa đúng bẫy *"`foreach` duyệt thuộc tính ⇒ bảng tra cứu rỗng ⇒ mọi tệp thành MỚI ⇒ cổng XANH dù binary không đổi"* |
+**E** | **Chưa có** mốc ⇒ `exit 2` |
+**F** | **Lọc rỗng** (không tệp nào khớp) ⇒ `exit 2` — 🛡️ *"không tìm thấy tệp nào"* **KHÔNG** được coi là *"mọi tệp đều đổi"* |
+
+**Nhóm `kiem-db.ps1` (5 ca, ⚠️ cần Docker + PostgreSQL):**
+
+| Ca | Bất biến |
+|---|---|
+**G** | DB sạch ⇒ **0** bất biến hỏng ⇒ `exit 0` |
+🚨 **H** | Dòng **XOÁ MỀM** trong bảng *"phải rỗng"* ⇒ `exit 1` — 🔑 **ca đáng giá nhất**: một phép **đếm thường sẽ BỎ SÓT** ca này |
+**I** | Cờ bảo mật admin `= false` ⇒ `exit 1` |
+🚨 **J** | Dòng probe GUID trong **`AbpAuditLogs`** (bảng **KHÔNG** có trong danh sách viết tay) ⇒ **nhóm ⑥ TỰ DÒ bắt** |
+**K** | Sau **mọi** ca tiêm ⇒ DB **sạch lại** ⇒ `exit 0` — 🔒 ca này **bảo vệ chính bộ test** |
+
+➕ 🔒 **Mọi câu SQL trong file này là HERE-STRING** ⇒ **không có phép thoát nháy nào** (bài học §25.5).
+➕ 🚨 **Mỗi ca tiêm phải KHUẲNG ĐỊNH dòng đã vào** bằng một `SELECT` độc lập — 📌 nếu không thì
+*"cổng không bắt"* và *"tiêm không thành"* **trông GIỐNG HỆT NHAU**.
+
+### ✅ Đã kiểm giá trị thật
+
+🚨 Tiêm lại **đúng lỗi §23.4** (đảo điều kiện) ⇒ ✅ **3 ca ĐỎ** (A, A2, B) ⇒ 🔑 **bộ test THẬT SỰ BẮT**.
+📌 Và **lần tiêm đầu KHÔNG xảy ra** (phép thay chuỗi không khớp) ⇒ ⚠️ tôi **suýt** kết luận *"test không bắt
+được gì"* — 🔒 **lần thứ HAI** của bài học §25.5, **cách nhau đúng một vòng**.

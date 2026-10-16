@@ -1,0 +1,14 @@
+
+── kiem-moc-build.ps1 — cong chong "build exit 0 ma binary KHONG DOI" ──
+   🚨 A) Moc VUA GHI ⇒ MOI tep deu DOI ⇒ exit 0
+      Kiem khi moc KHOP: mong doi [0] nhung do duoc [1]
+   ✅ B) Moc CU (lui ve nam 2020) ⇒ tep DOI ⇒ exit 0, KHONG bao dong
+   ✅ C) Moc RONG ⇒ phep kiem VO NGHIA ⇒ exit 2 (⚠️ KHONG duoc coi la "DA VAO")
+   ✅ D) Moc SAI DINH DANG (object don, thieu truong) ⇒ exit 2, KHONG "moi tep deu MOI"
+   ✅ E) Chua co moc ⇒ exit 2 (⚠️ KHONG duoc coi la "DA VAO")
+   ✅ F) Loc RONG (khong tep nao khop) ⇒ exit 2, KHONG "0 tep ⇒ DA VAO"
+
+════════ TEST CONG KIEM: 5/6 DAT · 1 HONG ════════
+
+   🚨 [kiem-moc-build.ps1 — cong chong "build exit 0 ma binary KHONG DOI"] A) Moc VUA GHI ⇒ MOI tep deu DOI ⇒ exit 0
+      Kiem khi moc KHOP: mong doi [0] nhung do duoc [1]

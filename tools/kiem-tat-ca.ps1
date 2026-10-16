@@ -261,7 +261,42 @@ Buoc 'Bat bien DB (khong con dau vet thu nghiem)' {
     }
 }
 
-# ── BUOC 6 (tuy chon): E2E CO PHIEN ────────────────────────────────────────────────────────
+# ── BUOC 6: TEST CHO CHINH CAC CONG KIEM CHUNG ─────────────────────────────────────────────
+Buoc 'Test cho chinh cac cong kiem chung (khong phu thuoc MAY MAN)' {
+    # 🔑 **BUOC NAY TON TAI VI HAI LOI THAT DA TIM RA NHO MAY MAN:**
+    #   • `sal-006` §23.4 — `kiem-moc-build.ps1` bi **VIET NGUOC DIEU KIEN** ⇒ 🔒 **cong LUON DO**
+    #     (⚠️ phat hien duoc vi toi **tinh co** chay no tren mot ban build **vua xong**);
+    #   • `sal-006` §25.5 — phep tiem loi **KHONG he xay ra** (sai cu phap SQL) ⇒ 📌 suyt ket luan
+    #     *"co che khong hoat dong"* (⚠️ phat hien duoc vi toi **tinh co** do lai trang thai that).
+    # 🔒 **Va mot cong LUON DO thi nguoi ta hoc cach BO QUA no** ⇒ hong no = **quay lai** dung cai bay ma no
+    # sinh ra de chong. ⇒ Phai co test **TU DONG**.
+    #
+    # 📌 **PHAM VI:** nhom ca nhanh (`kiem-moc-build.ps1`) **luon** chay — no chi cham **tep**, khong cham DB.
+    # ⚠️ **Nhom ca cho `kiem-db.ps1` CHAM VAO DB THAT** (tiem roi don) ⇒ 🔑 chi chay khi buoc Integration test
+    # **cung** chay: 📌 neu `-BoQuaIntegration` (vong lap nhanh) thi bo qua nhom do — ⚠️ **nhung NOI RO**.
+    $thamSoTest = @('-NoProfile', '-File', (Join-Path $PSScriptRoot 'test-cong-kiem.ps1'))
+
+    if ($BoQuaIntegration) {
+        # 🔑 `-ChiKiemMoc` = **chi** nhom khong cham DB. ⚠️ Cac ca nhom DB se **khong** duoc kiem ⇒ phai bao.
+        $thamSoTest += '-ChiKiemMoc'
+    }
+
+    $t = ChayLenh 'pwsh' $thamSoTest 'test-cong.log'
+
+    Get-Content $t.Log | Where-Object { $_ -match '✅|🚨|TEST CONG KIEM' } |
+        Select-Object -First 20 | ForEach-Object { "   $_" }
+
+    if ($t.Ma -ne 0) {
+        Get-Content $t.Log | Select-String '🚨' | Select-Object -First 8 | ForEach-Object { "   $($_.Line.Trim())" }
+        throw "CONG KIEM CHUNG BI HONG (exit $($t.Ma)) — xem log: $($t.Log)"
+    }
+
+    if ($BoQuaIntegration) {
+        Write-Output '   ⚠️ Chi chay nhom ca KHONG cham DB (theo -BoQuaIntegration) ⇒ 🔒 DUNG commit voi ket qua nay.'
+    }
+}
+
+# ── BUOC 7 (tuy chon): E2E CO PHIEN ────────────────────────────────────────────────────────
 if ($DayDu -and -not $BoQuaE2E) {
     Buoc 'E2E co phien dang nhap (web-001 §97)' {
         $script = Join-Path $thuMucTam 'e2e.ps1'

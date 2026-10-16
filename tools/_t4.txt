@@ -1,0 +1,9 @@
+
+── kiem-db.ps1 — cong bat bien DB ──
+   ✅ G) DB sach ⇒ 0 bat bien HONG ⇒ exit 0
+   ✅ H) Dong XOA MEM trong bang "phai rong" ⇒ exit 1 (⚠️ mot phep DEM THUONG se bo sot)
+   ✅ I) Co bao mat admin = false ⇒ exit 1
+   ✅ J) Dong probe GUID trong bang KHONG co trong danh sach viet tay ⇒ nhom (6) TU DO bat
+   ✅ K) Sau moi ca tiem ⇒ DB SACH LAI (exit 0) — 🔑 test TU DON DEP
+
+════════ TEST CONG KIEM: 5/5 DAT · 0 HONG ════════
