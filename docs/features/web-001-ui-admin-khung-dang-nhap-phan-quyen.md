@@ -3244,3 +3244,109 @@ thì **tệ hơn** không có.
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.4 | 16/10/2026 | *(agent, session GĐ1)* | **§96 — LÁT CẮT 4: BA TRANG MỚI + MENU HAI TẦNG + TRANG LỖI 403/404** (đóng nợ §95.4): **`/HanMucKenh`** (🔑 **ĐÓNG MỤC (1) CỦA GĐ1** — đường ghi chuẩn cho admin) · **`/DoiSoatThanhToan`** (`querydr`) · **`/KhachHang`** (hồ sơ + chặn/gỡ chặn) · **`LoiController`** (`[AllowAnonymous]`, `403`/`404` **trả ĐÚNG mã**) + **hai `ProjectReference`** + **hai `DependsOn`** cho Web · **menu HAI TẦNG** (nhóm *"Vận hành"*; 🔑 **quyền của nhóm là HỢP CỦA CÁC CON** — lọc con trước, ẩn nhóm rỗng) · **mở rộng `MenuDieuHuongTests`** (đi theo **độ sâu ngoặc**; bỏ qua `#`) · **allowlist công khai** cho `LoiController` (**có lý do**: nếu không, trang lỗi **tự chặn chính nó**). ✅ **11/11 ca HTTP + DB thật** (`:5100`): trang lỗi `404`/`403` **đúng mã** + **không rò rỉ** · ba trang mới **`302` → `/Account/Login`** (**không** `404`/`500`) · menu **ẩn** với người chưa đăng nhập · **`Could not resolve=0`**. 🚨 **NĂM quyết định thiết kế** (§96.3): chính sách + bảng **cùng trang** (đơn vị `Percent`/`Absolute` quyết định ý nghĩa con số) · cột **"Đang tắt"** (`0` = TẮT, **không** phải "chặn hết") · **KHÔNG** nút hoàn tiền cạnh danh sách · `/KhachHang` **chỉ** hiện trường cần (dữ liệu cá nhân — Luật **91/2025/QH15**) · trang lỗi **`[AllowAnonymous]`** + **neo ASCII**. 🐞 **BỐN lỗi của tôi, ba làm phép đo SAI**: `CS0246` (view thiếu `@using`) · **đoán** tên trường DTO (**6 lỗi**) · 🚨 **`Invoke-WebRequest -MaximumRedirection 0`** không giữ `StatusCode` ⇒ **ba ca "KHÔNG ĐẠT" trong khi sản phẩm ĐÚNG** (suýt sửa sản phẩm vì lỗi phép đo) ⇒ chuyển sang **`curl`** · 🚨 **so khớp dấu tiếng Việt** trong HTML **không khớp** (cả `curl` và `IWR` decode sai UTF-8) ⇒ dùng **neo ASCII thuần**. 📌 **Và tự sửa giữa đường:** **xoá** view dự phòng `_DuPhong.cshtml` — nó có thể render **thay** màn hình thật mà **không rõ ràng**, và một cơ chế *"trông có mà thực tế không"* thì **tệ hơn** không có. Ghi **§96.7** (nợ: 🚨 **chưa kiểm được với người ĐÃ đăng nhập** — cần **cookie phiên**, cùng loại nợ *"thiếu đường gọi"* · chưa chọn **kho** · chưa phân trang · chưa *"nâng cấp khách vãng lai"* · 🚨 **chưa có xuất dữ liệu cá nhân** theo Luật 91/2025/QH15 · 🚨 **chưa có sổ địa chỉ** · chưa có UI hoàn tiền — **cố ý**) |
+
+---
+
+## 97. ✅ **LÁT CẮT 5 — ĐƯỜNG GỌI CÓ PHIÊN ĐĂNG NHẬP + SỬA HAI LỖI SẢN PHẨM THẬT** (17/10/2026) — *đóng nợ §96.7 #1*
+
+### 97.1 🔑 **Vì sao lát cắt này quan trọng hơn vẻ ngoài**
+
+Ở **§96.6** tôi ghi rõ: probe **chỉ** đo được *"redirect khi chưa đăng nhập"* + *"trang lỗi render"*, và
+🚨 **chưa** đo được HTML **thật** của ba trang mới, **menu hai tầng render**, hay nút ghi hoạt động.
+📌 Đó là **nợ "thiếu đường gọi"** — và bài học đã ghi hai lần (`CAT-003` §25.6, `sal-005` §18.6):
+**khi một ca không đo được vì thiếu đường gọi, việc đúng là LÀM ĐƯỜNG GỌI.**
+
+✅ **Lượt này làm đúng điều đó:** probe **đăng nhập thật** (form + cookie phiên) ⇒ và **ngay lập tức**
+phát hiện **HAI lỗi sản phẩm** mà **1101 unit test + probe §96 đều không thấy**.
+
+### 97.2 ✅ **Đường gọi có phiên — cách làm (dùng lại được cho MỌI trang UI sau này)**
+
+| Bước | Chi tiết |
+|---|---|
+**1** | `GET /Account/Login` (lưu cookie vào **cookie jar**) |
+**2** | Trích `__RequestVerificationToken` từ HTML |
+**3** | `POST /Account/Login` với `LoginInput.UserNameOrEmailAddress` + `LoginInput.Password` + token, **giữ cookie** |
+**4** | Kiểm **có phiên thật**: `GET /KhachHang` ⇒ **`200`** (không còn `302`) |
+**5** | Từ đây đo **HTML thật**: form/`action`/neo · **menu render** · **POST thật** |
+**6** | 🚨 **Gieo dữ liệu TRƯỚC khi đo** (xem §97.4) |
+
+🔒 Từ nay **mọi** trang UI đều kiểm được **bằng HTTP thật**, không cần suy luận.
+
+### 97.3 🚨 **LỖI SẢN PHẨM #1 — `MenuViewComponent` CHƯA BAO GIỜ RENDER MỤC CON**
+
+**Triệu chứng đo được:** menu render, nhóm **"Vận hành"** **có mặt**, nhưng **hai mục con**
+(`/HanMucKenh`, `/DoiSoatThanhToan`) **KHÔNG có** trong HTML ⇒ nhóm render thành **`href="#"`** —
+🔑 **một liên kết CHẾT bấm vào không đi đâu**.
+
+**Nguyên nhân:** `MenuDieuHuong` **có** khai mục con **và** `BoLocDieuHuong` **có** lọc quyền cho con —
+nhưng `MenuViewComponent` **chỉ render `muc.Url`** ⇒ **mục con không bao giờ được vẽ**.
+📌 Tôi đã làm **hai phần ba** của menu hai tầng ở lượt 19 và **không kiểm phần thứ ba**.
+
+🚨 **Và triệu chứng là loại tệ nhất:** trang `200`, menu render, **không có lỗi nào** — chỉ **thiếu** hai mục.
+🔒 Hệ quả thật: người dùng **KHÔNG có lối vào** `/HanMucKenh` và `/DoiSoatThanhToan` ⇒ đúng nợ
+*"màn hình vô hình vì thiếu lối vào"* mà `web-001` §81.2 #7 sinh ra để chống.
+
+✅ **Sửa:** `MenuViewComponent` render nhóm thành **`span`** (⚠️ **không** phải `a href="#"` — đó là
+**liên kết chết**) + **`ul` con** với `nav-link` thật.
+🔑 **Và ca kiểm `E3`/`E4` tồn tại chính vì điều này:** *"menu có nhóm"* **KHÔNG** suy ra *"nhóm có mục con"*.
+
+### 97.4 🚨 **LỖI SẢN PHẨM #2 — CĂN CỨ PHÁP LÝ CHỈ NẰM TRONG CHÚ THÍCH RAZOR**
+
+**Triệu chứng:** `/KhachHang` render **"Dữ liệu cá nhân."** nhưng **KHÔNG** có **`91/2025/QH15`**.
+**Nguyên nhân:** chuỗi đó **chỉ** nằm trong khối `@* … *@` — mà **Razor KHÔNG render chú thích**.
+⇒ 🔒 Người dùng (và người **kiểm toán**) **KHÔNG thấy căn cứ pháp lý nào**, trong khi đó là **LÝ DO**
+màn hình bị giới hạn trường.
+
+📌 **Đây là lỗi nghiêm trọng hơn vẻ ngoài:** một khiếu nại *"tại sao các anh giới hạn dữ liệu của tôi"*
+cần **câu trả lời nằm trong sản phẩm**, không phải trong **mã nguồn**.
+🔑 Và nó **không có triệu chứng nào**: trang `200`, vẫn render, chỉ **thiếu một câu**.
+
+✅ **Sửa:** đưa câu đó vào **văn bản hiển thị**:
+`(theo Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15)`.
+
+### 97.5 ✅ **KIỂM CHỨNG — 22/22 CA TRÊN HTTP + DB THẬT (có phiên)**
+
+| Nhóm | Ca **ĐẠT** |
+|---|---|
+**Phiên** | **B1** sau login `/KhachHang` ⇒ **`200`** (không còn `302`) |
+**Ba trang** | **C** mỗi trang ⇒ **`200`** + **không** còn form đăng nhập |
+**Nội dung** | **D1** form đổi chính sách · **D2** form đặt hạn mức + **dropdown kênh thật** · **D3** anti-forgery trong **mọi** form POST · **D4** nói rõ **"0 = TẮT"** · **D5** form chặn/gỡ chặn (**với dữ liệu thật**) · **D6** 🚨 **căn cứ pháp lý `91/2025/QH15`** · **D7** nút **truy vấn từ cổng** · **D8** **không** có nút hoàn tiền (**cố ý**) |
+**Menu hai tầng** | **E1** menu render · **E2** nhóm **"Vận hành"** · **E3 🚨 mục con `/HanMucKenh`** · **E5** trong khối menu **không** có liên kết chết `href="#"` |
+**Ghi thật** | **F1** POST `DatHanMuc` ⇒ `200` · **F2** thông báo thành công (**không** bị anti-forgery chặn) · **F3 🚨 DB ghi thật** |
+
+➕ **Tiền đề có gieo dữ liệu** (`C2`): **1 khách + 1 giao dịch** — 🔑 **bắt buộc** để form hành động render.
+
+### 97.6 🐞 **SÁU lỗi của tôi trong lượt này — và ba trong đó là loại NGUY HIỂM**
+
+| # | Lỗi | Bài học |
+|---|---|---|
+**1** | 🚨 **`RZ1003` — chú thích Razor LỒNG NHAU**: tôi viết `@* … \`@* … *@\` … *@` trong chú thích ⇒ Razor **kết thúc ở `*@` ĐẦU TIÊN** ⇒ phần còn lại thành **MÃ** | 🔒 **Razor KHÔNG hỗ trợ chú thích lồng nhau.** ⚠️ Và tôi viết **chính `@* *@`** trong chú thích giải thích lỗi đó — lần thứ hai trong cùng một khối |
+**2** | 🚨 **BUILD "THÀNH CÔNG" MÀ DLL KHÔNG ĐỔI** — `dotnet build` **exit 0** + `Build succeeded`, nhưng **mốc DLL KHÔNG đổi** (tiến trình Web đang giữ tệp) | 🔑 **Tôi đã báo "0 lỗi" nhiều lần mà bản build KHÔNG vào.** ✅ Luật mới: **sau mỗi build, KIỂM MỐC THỜI GIAN CỦA DLL** — không tin `exit 0` |
+**3** | 🚨 **Đọc tệp HTML CŨ** ⇒ ca `D6` đỏ **hai lần** dù sản phẩm đã sửa | 🔑 Phải **tải lại** trang **sau** khi gieo dữ liệu/sửa mã. 📌 Cùng họ với lỗi "đọc tệp cũ" ở vòng 18 |
+**4** | **`$HOME` là biến chỉ-đọc** ⇒ script chết giữa đường | 📌 Dùng tên khác (`$trangChu`) |
+**5** | **`$chi-so`** — PowerShell **không** cho dấu `-` trong tên biến | 📌 Đặt tên không dấu gạch |
+**6** | **`Status` là SỐ NGUYÊN**, tôi gieo chuỗi (`'Active'`, `'Succeeded'`) ⇒ seeding **thất bại** | ✅ **Tiền đề đã `throw` DỪNG NGAY** (đúng thiết kế) — 📌 nhờ vậy tôi **không** kết luận sai về sản phẩm |
+
+➕ **Ba lỗi của PHÉP ĐO** (không phải sản phẩm), đã sửa:
+- 🚨 **Razor escape tiếng Việt thành ENTITY SỐ** (`&#x110;` cho `Đ`) ⇒ `-match 'Điều hướng'` trả **FALSE**
+  **dù chuỗi CÓ**. ✅ Sửa: **giải mã entity** trước khi so khớp (`GiaiMa`);
+- **`href="#"` duy nhất trên trang là DROPDOWN CỦA THEME** (`navbar-nav`), **không** phải menu ta
+  ⇒ kiểm trên **cả trang** làm ca `E5` đỏ vì **lý do SAI**. ✅ Sửa: **tách khối menu** rồi mới kiểm;
+- **Ngưỡng token sai** (đòi `>= 4` trong khi trang có **2** form POST).
+
+### 97.7 ⏳ NỢ
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+**1** | 🚨 **Chưa có kiểm chứng UI TỰ ĐỘNG trong CI** | Probe đăng nhập là **script tay**; 📌 chưa có **integration test có phiên**. 🔑 Nên đưa vào CI để **mọi thay đổi view** được kiểm |
+**2** | `/HanMucKenh` **chưa chọn được KHO** | Form chỉ đặt hạn mức **cả kênh** (`WarehouseId = null`). ⚠️ App service **đã hỗ trợ** kho ⇒ **nợ UI** |
+**3** | `/KhachHang` **chưa phân trang** · chưa nút **"nâng cấp khách vãng lai"** | App service **đã có** `NangCapKhachVangLaiAsync` ⇒ nợ UI |
+**4** | 🚨 **Chưa có xuất dữ liệu cá nhân** cho chính chủ | Luật **91/2025/QH15** (quyền truy cập/xoá). 📌 Nay **căn cứ pháp lý đã hiện** trên màn hình, nhưng **tính năng** thì chưa |
+**5** | 🚨 **Chưa có sổ địa chỉ** (`CUS-001`) | Entity `Address` **không tồn tại** trong `AddressHub` — **nợ chặn** |
+**6** | **Chưa kiểm `NhanVien`/vai trò khác** | Probe dùng **admin**; 📌 chưa đo *"người CHỈ có quyền đọc"* thấy gì (menu ẩn đúng chưa, nút ghi có bị chặn không) |
+
+### 97.8 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.5 | 17/10/2026 | *(agent, session GĐ1)* | **§97 — LÁT CẮT 5: ĐƯỜNG GỌI CÓ PHIÊN + SỬA HAI LỖI SẢN PHẨM THẬT** (đóng nợ §96.7 #1): probe **đăng nhập thật** (form + cookie phiên, **6 bước**, dùng lại được cho **mọi** trang UI) ⇒ phát hiện **HAI lỗi sản phẩm mà 1101 unit test + probe §96 KHÔNG thấy**. 🚨 **LỖI #1: `MenuViewComponent` CHƯA BAO GIỜ render MỤC CON** — menu render, nhóm *"Vận hành"* **có mặt**, nhưng **hai mục con KHÔNG có** ⇒ nhóm thành **`href="#"`** = **liên kết CHẾT** ⇒ 🔒 người dùng **KHÔNG có lối vào** `/HanMucKenh` + `/DoiSoatThanhToan` (đúng nợ *"màn hình vô hình vì thiếu lối vào"*); ⚠️ **không có lỗi nào** — trang `200`, menu render, chỉ **thiếu** hai mục; 📌 tôi đã làm **hai phần ba** menu hai tầng ở lượt 19 và **không kiểm phần thứ ba**. 🚨 **LỖI #2: căn cứ pháp lý `91/2025/QH15` CHỈ nằm trong chú thích Razor** ⇒ **KHÔNG render** ⇒ người dùng **và người kiểm toán** không thấy căn cứ — trong khi đó là **LÝ DO** màn hình bị giới hạn trường; 🔑 một khiếu nại *"tại sao giới hạn dữ liệu của tôi"* cần câu trả lời **nằm trong sản phẩm**. ✅ **22/22 ca HTTP + DB thật** (có phiên): ba trang `200` · **D6 căn cứ pháp lý** · **E3 mục con menu** · **F3 DB ghi thật**. 🐞 **SÁU lỗi của tôi, ba loại NGUY HIỂM**: (1) 🚨 **`RZ1003` — chú thích Razor LỒNG NHAU** (Razor kết thúc ở `*@` **đầu tiên** ⇒ phần còn lại thành **MÃ**); (2) 🚨 **build `exit 0` + `Build succeeded` NHƯNG MỐC DLL KHÔNG ĐỔI** (tiến trình Web giữ tệp) — 🔑 **tôi đã báo "0 lỗi" nhiều lần mà bản build KHÔNG vào** ⇒ **luật mới: sau mỗi build, KIỂM MỐC DLL**; (3) 🚨 **đọc tệp HTML CŨ** ⇒ `D6` đỏ **hai lần** dù sản phẩm đã sửa; (4) `$HOME` là biến **chỉ-đọc**; (5) `$chi-so` — PowerShell **không** cho `-` trong tên biến; (6) **`Status` là SỐ NGUYÊN** mà tôi gieo chuỗi ⇒ seeding thất bại (✅ **tiền đề đã `throw` DỪNG NGAY**). ➕ **Ba lỗi của PHÉP ĐO**: 🚨 **Razor escape tiếng Việt thành ENTITY SỐ** (`&#x110;`) ⇒ `-match` trả **FALSE** dù chuỗi **CÓ** (✅ giải mã entity trước) · **`href="#"` duy nhất là dropdown CỦA THEME** ⇒ `E5` đỏ vì **lý do SAI** (✅ tách khối menu) · **ngưỡng token sai**. Ghi **§97.7** (nợ: 🚨 **chưa có kiểm chứng UI tự động trong CI** · chưa chọn **kho** · chưa phân trang + chưa *"nâng cấp khách vãng lai"* · 🚨 chưa có **xuất dữ liệu cá nhân** · 🚨 chưa có **sổ địa chỉ** · chưa kiểm **vai trò chỉ-đọc**) |

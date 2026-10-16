@@ -11,22 +11,27 @@
     var loi = TempData["LoiKhach"] as string;
 }
 
-@* 🚨 `CUS-001` — HỒ SƠ KHÁCH HÀNG.
+@*
+    CUS-001 - HO SO KHACH HANG.
 
-   🔒 **ĐÂY LÀ DỮ LIỆU CÁ NHÂN** (Luật BV dữ liệu cá nhân **91/2025/QH15**) — và đó là điều quyết định
-   màn hình này trông như nó trông:
-     • **CHỈ** hiện trường **cần cho công việc**: tên, email, điện thoại, trạng thái chặn;
-     • **KHÔNG** hiện địa chỉ đầy đủ, lịch sử đơn, hay bất kỳ trường nào không phục vụ câu hỏi
-       *"khách này là ai, có đang bị chặn không"*.
+    DAY LA DU LIEU CA NHAN (Luat Bao ve du lieu ca nhan 91/2025/QH15) - va do la dieu quyet dinh
+    man hinh nay trong nhu no trong:
+      - CHI hien truong CAN cho cong viec: ten, email, dien thoai, trang thai chan;
+      - KHONG hien dia chi day du, lich su don, hay bat ky truong nao khong phuc vu cau hoi
+        "khach nay la ai, co dang bi chan khong".
 
-   📌 **NGUYÊN TẮC:** một màn hình hiện **nhiều hơn** mức cần thiết là một **rò rỉ** — kể cả khi người xem
-   **CÓ** quyền. 🔑 Và nó **không có triệu chứng nào**: không lỗi, không log, chỉ là dữ liệu ở nơi không cần.
+    NGUYEN TAC: mot man hinh hien NHIEU HON muc can thiet la mot RO RI - ke ca khi nguoi xem CO quyen.
+    Va no KHONG CO TRIEU CHUNG NAO: khong loi, khong log, chi la du lieu o noi khong can.
 
-   ⚠️ **NỢ ĐÃ GHI (`CUS-001`) — màn hình KHÔNG giả vờ có:**
-     • **CHƯA** có **xuất dữ liệu cá nhân** cho chính chủ (quyền truy cập/xoá theo Luật 91/2025/QH15);
-     • **CHƯA** có **sổ địa chỉ** (entity `Address` **không tồn tại** trong `AddressHub`);
-     • **CHƯA** phân trang — trần cứng **100** hồ sơ/lần.
-   📌 Ba dòng đó ghi ở `cus-001`; màn hình **không** có nút nào cho chúng (nút không hoạt động còn tệ hơn không có). *@
+    NO DA GHI (CUS-001) - man hinh KHONG gia vo co:
+      - CHUA co xuat du lieu ca nhan cho chinh chu (quyen truy cap/xoa theo Luat 91/2025/QH15);
+      - CHUA co so dia chi (entity Address KHONG TON TAI trong AddressHub);
+      - CHUA phan trang - tran cung 100 ho so/lan.
+
+    GHI CHU KY THUAT: KHONG duoc viet ky hieu mo/dong chu thich Razor LONG NHAU trong khoi nay.
+    Razor khong ho tro long nhau: no ket thuc o ky hieu dong DAU TIEN va phan con lai thanh MA.
+    Do dung la loi RZ1003 da vap o vong 20.
+*@
 
 @if (!string.IsNullOrWhiteSpace(thongBao))
 {
@@ -34,14 +39,15 @@
 }
 @if (!string.IsNullOrWhiteSpace(loi))
 {
-    @* 🔒 Lỗi hiện ĐÚNG mã + thông điệp (controller đã bắt `BusinessException`).
-       📌 Lý do chặn/gỡ chặn là **BẮT BUỘC** (audit, `ADR-04`): ở đây người dùng **biết** mình thiếu gì. *@
+    @* Loi hien DUNG ma + thong diep (controller da bat BusinessException).
+       Ly do chan/go chan la BAT BUOC (audit, ADR-04): o day nguoi dung BIET minh thieu gi. *@
     <div class="alert alert-danger">@loi</div>
 }
 
 <div class="alert alert-secondary">
-    <strong>Dữ liệu cá nhân.</strong> Màn hình này chỉ hiện thông tin cần cho công việc.
-    📌 Chưa có <em>xuất dữ liệu cho chính chủ</em> và chưa có <em>sổ địa chỉ</em> (nợ đã ghi ở <code>CUS-001</code>).
+    <strong>Dữ liệu cá nhân.</strong> Màn hình này chỉ hiện thông tin cần cho công việc
+    (theo Luật Bảo vệ dữ liệu cá nhân <strong>91/2025/QH15</strong>).
+    Chưa có <em>xuất dữ liệu cho chính chủ</em> và chưa có <em>sổ địa chỉ</em> (nợ đã ghi ở <code>CUS-001</code>).
 </div>
 
 <div class="card mb-3">
@@ -61,9 +67,8 @@
 <div class="card mb-3">
     <div class="card-header d-flex justify-content-between align-items-center">
         <strong>Hồ sơ khách (@Model.Count)</strong>
-        @* 🔒 Trần 100 là CÓ CHỦ Ý: hồ sơ khách là dữ liệu cá nhân ⇒ KHÔNG kéo cả bảng về một trang.
-           📌 Người vận hành cần TRA CỨU, không cần XUẤT TOÀN BỘ — và nếu cần xuất thì đó phải là
-           một tính năng riêng CÓ KIỂM SOÁT (chưa làm — nợ đã ghi). *@
+        @* Tran 100 la CO CHU Y: ho so khach la du lieu ca nhan nen KHONG keo ca bang ve mot trang.
+           Nguoi van hanh can TRA CUU, khong can XUAT TOAN BO. *@
         <span class="text-muted small">tối đa 100 hồ sơ / lần</span>
     </div>
     <div class="card-body p-0">
@@ -99,7 +104,7 @@
                             <td>
                                 @if (!k.DungDuoc)
                                 {
-                                    <span class="badge bg-danger" title="DungDuoc = false ⇒ khách KHÔNG dùng được (đang chặn)">Đang chặn</span>
+                                    <span class="badge bg-danger" title="DungDuoc = false: khách KHÔNG dùng được (đang chặn)">Đang chặn</span>
                                 }
                                 else
                                 {
@@ -112,8 +117,8 @@
                                     <form method="post" asp-action="MoChan" class="d-inline">
                                         @Html.AntiForgeryToken()
                                         <input type="hidden" name="id" value="@k.Id" />
-                                        @* 🔒 Lý do BẮT BUỘC: 6 tháng sau phải biết VÌ SAO gỡ chặn (audit).
-                                           📌 `required` ở client là tiện; guard THẬT nằm ở entity (ném `BusinessException`). *@
+                                        @* Ly do BAT BUOC: 6 thang sau phai biet VI SAO go chan (audit).
+                                           required o client la tien; guard THAT nam o entity. *@
                                         <input class="form-control form-control-sm d-inline-block" style="width: 220px;"
                                                name="lyDo" placeholder="Lý do gỡ chặn (bắt buộc)" required />
                                         <button class="btn btn-sm btn-outline-success" type="submit">Gỡ chặn</button>

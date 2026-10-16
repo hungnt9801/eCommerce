@@ -56,6 +56,55 @@ public class MenuViewComponent : ViewComponent
             var li = new TagBuilder("li");
             li.Attributes["class"] = "nav-item";
 
+            // 🚨 **MỤC CHA (NHÓM) — RENDER HAI TẦNG** (`WEB-001`, lượt 20).
+            //
+            // 📌 **LỖI SẢN PHẨM ĐÃ ĐO ĐƯỢC:** trước lượt này, `MenuDieuHuong` **có** khai mục con và
+            // `BoLocDieuHuong` **có** lọc theo quyền cho con — nhưng **lớp này chỉ render `muc.Url`**
+            // ⇒ mục con **KHÔNG BAO GIỜ hiện**. 🔒 Và triệu chứng là: nhóm "Vận hành" render thành
+            // một liên kết `href="#"` **bấm vào không đi đâu** ⇒ người dùng **KHÔNG có lối vào**
+            // `/HanMucKenh` và `/DoiSoatThanhToan` — đúng nợ *"màn hình vô hình vì thiếu lối vào"*.
+            // ⚠️ Nó **không có lỗi nào**: trang `200`, menu render, chỉ là **thiếu** hai mục.
+            // 🔑 Đây là lý do phép kiểm `E3`/`E4` tồn tại: *"menu có nhóm"* **không** suy ra *"nhóm có mục con"*.
+            if (muc.LaNhom)
+            {
+                // Nhóm **KHÔNG** phải liên kết ⇒ dùng `span` (không phải `a href="#"`).
+                // 📌 `href="#"` là **liên kết chết**: bấm vào nhảy về đầu trang và trông như hỏng.
+                var span = new TagBuilder("span");
+                span.Attributes["class"] = "nav-link fw-semibold disabled";
+                span.Attributes["role"] = "heading";
+                span.Attributes["aria-level"] = "2";
+                span.Attributes["title"] = muc.MoTa ?? string.Empty;
+
+                span.InnerHtml.Append(muc.Nhan);
+                li.InnerHtml.AppendHtml(span);
+
+                var ulCon = new TagBuilder("ul");
+                ulCon.Attributes["class"] = "nav flex-column ms-3";
+
+                foreach (var con in muc.Con)
+                {
+                    var liCon = new TagBuilder("li");
+                    liCon.Attributes["class"] = "nav-item";
+
+                    var aCon = new TagBuilder("a");
+                    aCon.Attributes["class"] = "nav-link";
+                    aCon.Attributes["href"] = con.Url;
+
+                    if (!string.IsNullOrWhiteSpace(con.MoTa))
+                    {
+                        aCon.Attributes["title"] = con.MoTa;
+                    }
+
+                    aCon.InnerHtml.Append(con.Nhan);
+                    liCon.InnerHtml.AppendHtml(aCon);
+                    ulCon.InnerHtml.AppendHtml(liCon);
+                }
+
+                li.InnerHtml.AppendHtml(ulCon);
+                ul.InnerHtml.AppendHtml(li);
+                continue;
+            }
+
             var a = new TagBuilder("a");
             a.Attributes["class"] = "nav-link";
             a.Attributes["href"] = muc.Url;
