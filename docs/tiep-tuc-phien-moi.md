@@ -94,13 +94,14 @@ Tệp lớn nhất về mặt tiến độ GĐ1: `web-001-…` (270 KB — chứ
 
 | # | Việc | Vì sao / ghi chú |
 |---|---|---|
-| **1** | **`INV-003` — bảng hạn mức RIÊNG từng kênh** (`InvChannelLimits`) **+** **`REC-001` — bảng `ReconRuns`** | hai việc **cùng cần migration** ⇒ làm một lần. Tuân thủ mục 4.1 (NULLS NOT DISTINCT, DbSet, cập nhật số index). Hiện hạn mức dùng **một** giá trị chung (`Inv.ChannelLimit.DefaultValue`); lịch sử quét đối soát **chưa** lưu |
-| 2 | **`PhamVi` (`Channel` vs `ChannelWarehouse`) đang "có ô chọn mà chọn không đổi gì"** | phải **làm** hoặc **bỏ** — để nguyên là nợ **tệ hơn** (người vận hành tin có tác dụng) |
-| 3 | **`Percent` theo TỔNG của kênh** | hiện tính trên tồn khả dụng của **từng `(kho, SKU)`**; tồn kho **chưa** mô hình hoá theo kênh |
-| 4 | **Đường GHI chuẩn cho admin** (nạp `Volo.Abp.SettingManagement.HttpApi` + Application vào Host/Web, **hoặc** app service dùng `ISettingManager`) | hiện swagger **không** có route `setting` ⇒ phải sửa DB + xoá cache tay (chính là bẫy mục 4.4) |
-| 5 | **`REC-001`: áp NGƯỠNG thật** (phân loại lệch theo `Percent`/`Absolute`, hành động `Warn`/`RequireConfirmation`) | hiện mới **đọc + log** chính sách |
+| **1** | ~~**`INV-003` — bảng hạn mức RIÊNG từng kênh** (`InvChannelLimits`) **+** **`REC-001` — bảng `ReconRuns`**~~ | ✅ **XONG 16/10/2026** — một migration `Inv003_ChannelLimits_Rec001_ReconRuns` · `inv-003` **§16** · `rec-001` **§16**. Tuân thủ 4.1 (`NULLS NOT DISTINCT` **40 → 42**, `DbSet`, danh sách đích danh) |
+| 2 | ~~**`PhamVi` (`Channel` vs `ChannelWarehouse`) "có ô chọn mà chọn không đổi gì"**~~ | ✅ **XONG 16/10/2026** — `HanMucKenh.ChonHanMuc` quyết định dòng nào được xét; dòng theo kho bị **bỏ qua** thì **ghi cảnh báo**, không im lặng (`inv-003` §16.3) |
+| 3 | **`Percent` theo TỔNG của kênh** | ⏳ **CÒN** — hiện tính trên tồn khả dụng của **từng `(kho, SKU)`**; tồn kho **chưa** mô hình hoá theo kênh |
+| 4 | ~~**Đường GHI chuẩn cho admin** (`ISettingManager` **hoặc** HttpApi của ABP)~~ | ✅ **XONG 16/10/2026** — `ChinhSachHanMucAppService` (`ISettingManager` ⇒ cache 2 tầng tự xoá) + API hạn mức kênh · `inv-003` **§17**. 📌 HttpApi của ABP **đã nạp nhưng KHÔNG đủ** (đo bằng swagger: chỉ có `emailing`/`timezone`) |
+| 5 | ~~**`REC-001`: áp NGƯỠNG thật**~~ | ✅ **XONG 16/10/2026** — `NguongLech` (**cơ sở = sổ cái**) + ảnh chụp chính sách ở `ReconRuns` + `KetLuan`; đo được: ngưỡng `999` ⇒ `CoVuotNguong=false` (`rec-001` §16.5) |
 | 6 | **`CAT-003`: slug thay SKU** + `sitemap.xml`/`robots.txt` | nền đã có: `/SanPham/ChiTiet/{sku}` + `<title>`/`meta description`/`canonical` |
-| 7 | **Hoàn tiền** (`SAL-006`/`PaymentHub`) · **`CUS-001`** (hồ sơ khách + sổ địa chỉ) · **`SAL-005`** (webhook đơn từ sàn) · **`REC-001` đối soát thanh toán `querydr`** | phần còn lại của GĐ1 |
+| 7 | **Hoàn tiền** (`SAL-006`/`PaymentHub`) · **`CUS-001`** (hồ sơ khách + sổ địa chỉ) · **`SAL-005`** (webhook đơn từ sàn: **còn** watermark D5 + DLQ + 9 trường ETO) · **`REC-001` đối soát thanh toán `querydr`** | phần còn lại của GĐ1 |
+| 7b | **`REC-001` đối soát tồn kho: API/UI xem lịch sử lượt quét** + **quy trình xử lý lệch** + **retention** | bảng `ReconRuns`/`ReconRunMismatches` **đã có dữ liệu**, nhưng **chưa có đường đọc** cho người vận hành (`rec-001` §16.8) |
 | 8 | **Đối soát `REC-002`/`REC-003`** (settlement sàn · COD) · báo cáo `REP-001…003` | sau các mục trên |
 
 ---

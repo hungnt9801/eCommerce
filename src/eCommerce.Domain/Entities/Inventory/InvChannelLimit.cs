@@ -40,8 +40,10 @@ namespace eCommerce.Inventory;
 /// </summary>
 public class InvChannelLimit : FullAuditedAggregateRoot<Guid>, IMultiTenant
 {
-    /// <summary>Độ dài tối đa của mã kênh — **đồng bộ** với `StockLedgerEntry.ChannelCode` và `Order.ChannelCode` (32).</summary>
-    public const int DoDaiMaKenhToiDa = 32;
+    /// <summary>Độ dài tối đa của mã kênh — **đồng bộ** với `StockLedgerEntry.ChannelCode` và `Order.ChannelCode` (32).
+    /// 🔑 Nguồn DUY NHẤT là <see cref="eCommerceConsts.InventoryLimits.MaKenhToiDa"/> (ở `Domain.Shared`) vì
+    /// DTO ở `Application.Contracts` **không** được tham chiếu `Domain` (layering) — xem chú thích ở đó.</summary>
+    public const int DoDaiMaKenhToiDa = eCommerceConsts.InventoryLimits.MaKenhToiDa;
 
     public Guid? TenantId { get; protected set; }
 

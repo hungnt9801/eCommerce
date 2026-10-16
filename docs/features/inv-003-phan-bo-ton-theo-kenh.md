@@ -1197,3 +1197,76 @@ Nguyên nhân **đã đo**, không đoán:
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.2 | 16/10/2026 | *(agent, session GĐ1)* | **Hạn mức RIÊNG TỪNG KÊNH**: bảng `InvChannelLimits` (khoá `(TenantId, ChannelCode, WarehouseId)`, `WarehouseId NULL` = cả kênh) + migration `Inv003_ChannelLimits_Rec001_ReconRuns` (SQL thô `NULLS NOT DISTINCT`) + hàm thuần `HanMucKenh.ChonHanMuc` (3 nguồn · `PhamVi` **có** tác dụng · bỏ qua **không** im lặng) + 3 mã lỗi (`0043`/`0044`/`0045`) + **47 unit test**. **Kiểm chứng HTTP 15/15 ca** qua **5 phiên Host** (mỗi nhóm chính sách một phiên). Ghi **§16.6** (bẫy cache **ở probe**) · **§16.8** (nợ) · **§16.9** (thứ tự làm tiếp) |
+| v0.3 | 16/10/2026 | *(agent, session GĐ1)* | ✅ **ĐÓNG NỢ §16.9 #1 — ĐƯỜNG GHI CHUẨN CHO ADMIN** (**§17**): 6 endpoint `/api/app/chinh-sach-han-muc/*` qua **`ISettingManager`** (tự xoá cache **2 tầng**) + quản lý `InvChannelLimits` (**UPSERT**, **validate kênh có thật** ⇒ `0046`, **validate hành động** ⇒ `Settings:0001`, **xoá mềm**) + permission mới `eCommerce.ChannelLimits` / `.Manage` (đã seed, kiểm trong DB). **Kiểm chứng HTTP 11/11 ca**, trong đó **phép đo then chốt**: đổi chính sách qua API ⇒ **giữ chỗ bị chặn `0042` NGAY**, **KHÔNG** khởi động lại Host, **KHÔNG** xoá cache tay |
+
+---
+
+## 17. ✅ **ĐƯỜNG GHI CHUẨN CHO ADMIN** — ĐÓNG NỢ §16.9 #1 (16/10/2026)
+
+### 17.1 Vấn đề đã đóng
+
+§16.9 xếp *"đường GHI chuẩn cho admin"* là **ưu tiên 1** vì §16.6 đã **đo được**: quy trình vận hành cũ
+(**sửa `AbpSettings` bằng SQL + xoá cache bằng tay**) đã làm **4 phép đo cho kết quả SAI mà không có lỗi nào**.
+Nghĩa là: **mỗi lần** người vận hành sửa hạn mức là một lần **có thể** rơi vào bẫy đó.
+
+### 17.2 Đã làm gì
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| **1** | **`ChinhSachHanMucAppService`** (`src/eCommerce.Application/Inventory/`) | 6 endpoint: `chinh-sach` (GET) · `doi-chinh-sach` (POST) · `danh-sach` (GET) · `kenh-kha-dung` (GET) · `dat-han-muc` (POST) · `{id}/xoa-han-muc` (POST) |
+| **2** | 🔒 **Ghi qua `ISettingManager.SetGlobalAsync`** | Đây là **điểm mấu chốt**: ABP **tự xoá cache cả 2 tầng** (Redis **và** bộ nhớ tiến trình) ⇒ **không** cần khởi động lại Host, **không** cần `redis-cli DEL` |
+| **3** | **UPSERT theo khoá nghiệp vụ `(kênh, kho)`** | 📌 Cố ý **không** cho client tự chọn `Id`: nếu để client thêm dòng trùng khoá thì DB chặn (`0045`) và người dùng nhận lỗi **đáng lẽ không cần** |
+| **4** | **Validate mã kênh có THẬT** (đọc `ChnChannels`) ⇒ **NÉM `0046`** | Chống "tắt im lặng": hạn mức gắn mã kênh **không có thật** sẽ **không bao giờ khớp** lúc giữ chỗ (xem §16.1) |
+| **5** | **Validate giá trị setting ở đường GHI** ⇒ **NÉM `eCommerce:Settings:0001`** | 📌 **Cố ý KHÁC đường ĐỌC**: đường đọc gặp giá trị lạ thì **im lặng dùng mặc định** (để **không** làm chết việc bán hàng). Nhưng đường **ghi** mà chấp nhận giá trị lạ = lưu một cấu hình **sẽ bị bỏ qua** ⇒ người vận hành **tin** đã đổi. Ở đây **NÉM**, kèm **danh sách giá trị hợp lệ** |
+| **6** | **Cảnh báo NGAY tại chỗ ghi** khi `PhamVi = Channel` mà vừa lưu dòng **theo kho** | §16.3: dòng đó **sẽ bị bỏ qua** lúc chạy ⇒ nói ra **trong cùng một lần bấm** thay vì để người dùng tự phát hiện sau |
+| **7** | **Xoá MỀM** dòng hạn mức | Lịch sử chặn đơn (`0042`) phải còn **đối chiếu được** — *"vì sao tháng trước đơn này bị chặn"* |
+| **8** | **`GhichuNo()` trả ra trong DTO** | 🚨 Phần dễ bị bỏ nhất khi làm API: API trả *"đã lưu"* trong khi nghiệp vụ **còn giới hạn** ⇒ người vận hành **tin** một điều không đúng. API nay **tự nói ra** 3 nợ đang mở (§16.8) |
+| **9** | Permission mới **`eCommerce.ChannelLimits`** + **`.Manage`** | 📌 **VÌ SAO RIÊNG (không mượn `Inventory.Adjust`)**: hạn mức **không phải** nghiệp vụ kho và **không phải** cấu hình hạ tầng — đây là **quyết định kinh doanh** ⇒ người sửa tồn **không đương nhiên** được đổi trần bán của kênh. ⚠️ Thiếu định nghĩa ⇒ **`403` cho MỌI người** ⇒ đã khai ở **cả hai nơi** và **seed** (`AbpPermissionGrants`: 2 dòng **đo được**) |
+| **10** | Nạp **`Volo.Abp.SettingManagement.HttpApi`** | ⚠️ **Nhưng KHÔNG thay thế được** lớp này: **đo bằng swagger thật** — ABP 10.7 chỉ phơi `setting-management/emailing` + `setting-management/timezone`, **không** có route cho setting nghiệp vụ |
+
+### 17.3 ✅ KIỂM CHỨNG HTTP THẬT — **11/11 ca ĐẠT**
+
+> 🔑 **PHÉP ĐO THEN CHỐT (E1):** đổi chính sách **qua API** rồi **giữ chỗ NGAY trong CÙNG phiên Host**
+> (**không** khởi động lại, **không** xoá cache tay).
+
+| # | Ca | Kỳ vọng | **Đo được** |
+|---|---|---|---|
+| C1 | Đọc chính sách ban đầu | `200` + 3 ghi chú nợ | **`200`** · `Percent/Block/Channel` · `GiaTriMacDinh=0` · **3 ghi chú** ✅ |
+| D1 | Đổi chính sách qua API (`Absolute`·`Block`·`Channel`·mặc định **2**) | `200` + giá trị mới | **`200`** · `DonVi=Absolute` · `GiaTriMacDinh=2` ✅ |
+| **E1** | 🎯 kênh **chưa** cấu hình, xin **3 > mặc định 2** — **cùng phiên Host** | `403` · `0042` | **`403` · `0042`** · `nguonHanMuc = MacDinhChung` ✅ ⇒ **chính sách có hiệu lực NGAY** (nếu cache cũ còn thì `0` ⇒ sẽ **đi qua**) |
+| E2 | **BIÊN**: xin **đúng 2** | `200` | **`200`** ✅ |
+| F1 | Danh mục kênh có thật | ≥ 4 kênh, có `web` | **4 kênh** (`lazada` · `shopee` · `tiktok` · `web`) · `web.holdsInventory=false` ✅ |
+| G1 | Đặt hạn mức `Shopee` (HOA) = 5, hành động `Warn` | `200` + chuẩn hoá | **`200`** · `channelCode=shopee` · `hanhDong=Warn` ✅ |
+| G2 | Gửi **lần hai** cùng `(kênh, cả kênh)` = 9 | **SỬA**, không tạo dòng mới | **`1` dòng** · `giaTri=9` ✅ (UPSERT) |
+| G3 | Kênh **không tồn tại** | `403` · `0046` | **`403` · `eCommerce:Inventory:0046`** ✅ |
+| G4 | Hành động **lạ** | `403` · `Settings:0001` | **`403` · `eCommerce:Settings:0001`** ✅ |
+| G5 | Đặt dòng **theo kho** khi `PhamVi=Channel` | `200` + **cảnh báo** | **`200`** ✅ (neo log `INV003-BOQUA-DONG-THEO-KHO` — xem §17.4) |
+| H1 | **Xoá mềm** dòng theo kho | biến mất khỏi danh sách | `204` · **2 → 1 dòng** · DB: `IsDeleted=true` ✅ |
+| I1 | Đổi **ngược** mặc định về `0` | kênh lạ xin 3 **đi qua** | **`200`** ✅ (**đo cả hai chiều**) |
+
+**Trạng thái thật sau phép đo (đọc từ DB):**
+
+| Chỉ số | Giá trị đo được |
+|---|---|
+| `InvChannelLimits` | 2 dòng: `shopee`/cả kênh `9` (`IsDeleted=false`) · `shopee`/kho `1` (**`IsDeleted=true`** — xoá mềm) |
+| `AbpSettings` | `Inv.ChannelLimit.Unit = Absolute` — **do ĐƯỜNG API ghi**, không phải SQL tay |
+| `InvStockReservations` (`K96-*`) | **2** dòng = đúng 2 ca đi qua (E2 = 2 · I1 = 3) |
+| `InvItems(K96SKU-THUONG)` | `OnHand=500` · `Reserved=5` = **2 + 3** ✅ khớp từng đơn vị |
+
+### 17.4 🚨 Bài học lặp lại: **log tiếng Việt vẫn phải có NEO ASCII**
+
+Lần đo đầu của §17.3 cho **11/11 ca ĐẠT** nhưng phần **L (log)** trả **`0 dòng`** cho **mọi** mẫu có dấu
+(`'ĐỔI CHÍNH SÁCH'` · `'HẠN MỨC KÊNH: THÊM'` …) — vì console logger **làm hỏng dấu tiếng Việt** trong `host.log`
+(đúng bẫy `inv-003` §16.6 #3, và `tools\README-probe.md` mục **I4**).
+⇒ Đã thêm **neo ASCII** vào chính câu log của lớp mới: `[SETTING-DA-DOI]` · `[SETTING-KHONG-DOI-GI]` ·
+`[HANMUC-THEM]` · `[HANMUC-SUA]` · `[HANMUC-XOA-MEM]`.
+
+📌 **Quy tắc rút ra (đã ghi vào `tools\README-probe.md` I4):** **neo ASCII là một phần của MÃ SẢN PHẨM**, phải
+thêm **ngay khi viết `Logger.*`** — không phải việc của probe. Bằng chứng: hai lát cắt liên tiếp đều **đo được**
+đúng hành vi nhưng **không đọc được log** vì thiếu neo.
+
+### 17.5 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.3 | 16/10/2026 | *(agent, session GĐ1)* | **§17 — ĐƯỜNG GHI CHUẨN CHO ADMIN**: `ChinhSachHanMucAppService` (6 endpoint) + ghi qua **`ISettingManager`** (cache 2 tầng tự xoá) + UPSERT `(kênh, kho)` + validate kênh (`0046`) & hành động (`Settings:0001`) + cảnh báo tại chỗ ghi + xoá mềm + `GhichuNo()` + permission `eCommerce.ChannelLimits`. Nạp `Volo.Abp.SettingManagement.HttpApi` (**đo được: không đủ** — chỉ có `emailing`/`timezone`). **Kiểm chứng 11/11 ca**, then chốt là **E1** (hiệu lực **ngay**, không restart). Ghi **§17.4** (neo ASCII là việc của mã sản phẩm) |

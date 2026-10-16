@@ -30,6 +30,11 @@
          + default challenge scheme để trả 401 thay vì 500. -->
     <PackageReference Include="Volo.Abp.Identity.AspNetCore" />
     <PackageReference Include="Volo.Abp.AspNetCore.Authentication.JwtBearer" />
+    <!-- 🚨 `INV-003`/`REC-001` — **ĐƯỜNG GHI CHUẨN CHO ADMIN** (mục 5 việc 4 của gói bàn giao): endpoint
+         `setting-management/*` để đổi setting QUA API ⇒ `ISettingManager` **tự xoá cache** (cả Redis **và**
+         cache trong bộ nhớ tiến trình). Thiếu gói này thì swagger **không** có route `setting` ⇒ phải sửa
+         `AbpSettings` bằng SQL + xoá cache tay = **đúng cái bẫy đã làm SAI 4 phép đo** (`inv-003` §16.6). -->
+    <PackageReference Include="Volo.Abp.SettingManagement.HttpApi" />
     <PackageReference Include="DistributedLock.Redis" />
   </ItemGroup>
 

@@ -79,5 +79,12 @@ public class eCommercePermissionDefinitionProvider : PermissionDefinitionProvide
 
         var rateSchedule = group.AddPermission(eCommerceConsts.Permissions.TaxRateSchedule.Default);
         rateSchedule.AddChild(eCommerceConsts.Permissions.TaxRateSchedule.Manage);
+
+        // ---- Hạn mức theo kênh + chính sách "cho phép chọn" (`INV-003` / `REC-001`) ----
+        // 🚨 BẮT BUỘC khai ở CẢ HAI NƠI (hằng số `eCommerceConsts.Permissions.ChannelLimits` + ở đây):
+        // thiếu một nơi ⇒ ABP coi là **luôn bị từ chối** ⇒ `403` cho MỌI người kể cả `admin` (lỗi `F-403`).
+        // 🛡️ Lưới an toàn: `BatBienPhanQuyenTests` khoá bất biến "hằng số ↔ định nghĩa khớp 2 CHIỀU".
+        var channelLimits = group.AddPermission(eCommerceConsts.Permissions.ChannelLimits.Default);
+        channelLimits.AddChild(eCommerceConsts.Permissions.ChannelLimits.Manage);
     }
 }

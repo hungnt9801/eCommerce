@@ -57,6 +57,13 @@ namespace eCommerce;
     // ⇒ ABP không nạp, không quét app service, không tạo endpoint ⇒ API trả 404 body rỗng (bài học C8/C16).
     // 🚨 BAT BUOC: thieu dong nay thi cac type trong shared/eCommerce.Kernel KHONG duoc dang ky DI.
     typeof(eCommerce.Kernel.eCommerceKernelModule),
+    // 🚨 `INV-003`/`REC-001` — **ĐƯỜNG GHI CHUẨN CHO ADMIN** (mục 5 việc 4): nạp HttpApi của
+    // `SettingManagement` ⇒ có endpoint `setting-management/*` ⇒ đổi setting qua API thì **cache tự được xoá**
+    // (cả Redis **và** cache trong bộ nhớ tiến trình).
+    // 📌 VÌ SAO BẮT BUỘC (bài học đã trả giá — `inv-003` §16.6): ghi `AbpSettings` bằng SQL + xoá cache tay
+    // đã làm **4 phép đo cho kết quả SAI mà không có lỗi nào**; và **cache tầng 2 sống trong tiến trình**
+    // nên "đổi setting" mà không khởi động lại Host ⇒ **giá trị CŨ vẫn có hiệu lực**.
+    typeof(Volo.Abp.SettingManagement.AbpSettingManagementHttpApiModule),
     typeof(Address.Application.AddressApplicationModule),
     typeof(EInvoice.Application.EInvoiceApplicationModule),
     typeof(Signing.Application.SigningApplicationModule),

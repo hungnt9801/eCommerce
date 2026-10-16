@@ -99,6 +99,27 @@ public static class eCommerceConsts
             public const string Default = GroupName + ".Tax.RateSchedule";
             public const string Manage = Default + ".Manage";
         }
+
+        /// <summary>
+        /// 🚨 **`INV-003` / `REC-001` — CHÍNH SÁCH "CHO PHÉP CHỌN" + HẠN MỨC RIÊNG TỪNG KÊNH.**
+        ///
+        /// 📌 **VÌ SAO CẦN PERMISSION RIÊNG (không mượn `Inventory.Adjust`):** hạn mức phân bổ **không phải**
+        /// nghiệp vụ kho (`Adjust` = sửa tồn) và **không phải** cấu hình hạ tầng (nhóm `SettingManagement`).
+        /// Đây là **quyết định kinh doanh** (*"kênh nào được bán bao nhiêu"*) ⇒ người được cấp quyền sửa tồn
+        /// **không đương nhiên** được đổi trần bán của kênh (bài học `0040`/`0042`: mã/quyền đúng kỹ thuật
+        /// nhưng **sai nghiệp vụ** ⇒ người nhận **chỉ dẫn sai**).
+        ///
+        /// ⚠️ **THIẾU ĐỊNH NGHĨA ⇒ `403` CHO MỌI NGƯỜI** (kể cả `admin`) — đúng lỗi `F-403`/`XC-004` D2.
+        /// Vì vậy hằng số ở đây **phải** được khai trong `eCommercePermissionDefinitionProvider`.
+        /// </summary>
+        public static class ChannelLimits
+        {
+            /// <summary>Xem hạn mức theo kênh + chính sách đang áp.</summary>
+            public const string Default = GroupName + ".ChannelLimits";
+
+            /// <summary>Thêm/sửa/xoá hạn mức theo kênh và đổi chính sách (`Inv.ChannelLimit.*`, `Recon.*`).</summary>
+            public const string Manage = Default + ".Manage";
+        }
     }
 
     /// <summary>
@@ -113,6 +134,19 @@ public static class eCommerceConsts
 
         /// <summary>Độ dài tối đa của SKU — khớp `HasMaxLength(64)` ở DbContext.</summary>
         public const int SkuToiDa = 64;
+    }
+
+    /// <summary>
+    /// Giới hạn độ dài của miền **Kho / kênh** (`INV-003`) — đặt ở `Domain.Shared` để **entity VÀ DTO dùng CHUNG
+    /// một nguồn**. ⚠️ Lý do y hệt `CatalogLimits`: tầng `Application.Contracts` **không** được tham chiếu `Domain`
+    /// ⇒ để hằng số trong entity thì DTO buộc phải **chép lại số** ⇒ hai nguồn sự thật, lệch lúc nào không biết
+    /// (build đã **bắt được thật**: `CS0103: The name 'InvChannelLimit' does not exist`).
+    /// </summary>
+    public static class InventoryLimits
+    {
+        /// <summary>Độ dài tối đa của mã kênh — khớp `HasMaxLength(32)` của `InvChannelLimits.ChannelCode`
+        /// **và** `Order.ChannelCode` / `StockLedgerEntry.ChannelCode`.</summary>
+        public const int MaKenhToiDa = 32;
     }
 
     /// <summary>Mã lỗi nghiệp vụ (dùng với BusinessException).</summary>
@@ -144,6 +178,18 @@ public static class eCommerceConsts
         /// `Catalog:0011` còn mọi module khác ném `Lock:0001`. Đã sửa: dùng **mã chung** dưới đây.
         /// </summary>
         public const string KhongGianhDuocKhoa = "eCommerce:Lock:0001";
+
+        /// <summary>
+        /// 🚨 **Giá trị setting KHÔNG hợp lệ** (đường GHI cấu hình — `INV-003`/`REC-001`).
+        ///
+        /// 📌 **VÌ SAO CẦN (và vì sao khác hẳn đường ĐỌC):** hàm đọc chính sách (`ChinhSach.Doc*`) **KHÔNG ném**
+        /// khi gặp giá trị lạ — nó trả **mặc định an toàn** + cờ `hopLe = false` để chỗ gọi **ghi cảnh báo**.
+        /// Thiết kế đó là **cố ý** cho đường giữ chỗ (một giá trị gõ sai **không** được làm chết việc bán hàng).
+        /// 🔒 Nhưng ở **đường GHI của admin** thì ngược lại: chấp nhận giá trị lạ nghĩa là lưu vào DB một cấu hình
+        /// **sẽ bị bỏ qua lúc chạy** ⇒ người vận hành **tin** đã đổi mà thực tế không —— đúng loại "tắt im lặng".
+        /// ⇒ Ở đường ghi: **NÉM**, kèm **danh sách giá trị hợp lệ** để người dùng sửa được ngay.
+        /// </summary>
+        public const string GiaTriSettingKhongHopLe = "eCommerce:Settings:0001";
 
         /// <summary>
         /// <summary>

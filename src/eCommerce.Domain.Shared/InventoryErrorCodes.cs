@@ -116,4 +116,16 @@ public static class InventoryErrorCodes
     /// </summary>
     public const string HanMucKenhDaTonTai = Nhom + "0045";
 
+    /// <summary>
+    /// 🚨 **Mã kênh KHÔNG tồn tại** khi cấu hình hạn mức (`INV-003` — đường ghi admin).
+    /// 📌 **VÌ SAO LÀ LỖI, KHÔNG PHẢI "CỨ LƯU RỒI TÍNH SAU":** hạn mức gắn một mã kênh **không có thật** sẽ
+    /// **không bao giờ khớp** lúc giữ chỗ (`StockReservationService` lọc theo `ChannelCode` của đơn)
+    /// ⇒ người vận hành **tin** đã siết kênh trong khi **không có gì** được siết — đúng họ "tắt im lặng"
+    /// mà dự án đã trả giá nhiều lần. 📌 Nếu kênh **mới** chưa có trong `ChnChannels`, việc đúng là
+    /// **thêm kênh trước**, không phải bỏ qua kiểm.
+    /// 🔒 Không mượn `0043` (*"thiếu mã kênh"*) cũng không mượn `0045` (*"đã tồn tại"*): ba ca này cần
+    /// **ba chỉ dẫn khác nhau** cho người dùng (bài học `0040`/`0042`: mã đúng kỹ thuật nhưng sai nghiệp vụ).
+    /// </summary>
+    public const string HanMucKenhKhongTonTai = Nhom + "0046";
+
 }

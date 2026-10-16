@@ -67,6 +67,12 @@
     <PackageVersion Include="Volo.Abp.SettingManagement.Domain" Version="10.7.0" />
     <PackageVersion Include="Volo.Abp.SettingManagement.Domain.Shared" Version="10.7.0" />
     <PackageVersion Include="Volo.Abp.SettingManagement.EntityFrameworkCore" Version="10.7.0" />
+    <!-- 🚨 `INV-003`/`REC-001` — **ĐƯỜNG GHI CHUẨN CHO ADMIN**: gói HttpApi này phơi endpoint
+         `setting-management/*` (đọc/ghi setting theo provider) ⇒ `ISettingManager` **tự xoá cache**.
+         📌 VÌ SAO BẮT BUỘC (bài học đã trả giá, `inv-003` §16.6): ghi thẳng `AbpSettings` bằng SQL rồi xoá cache
+         bằng tay ⇒ mẫu key dễ SAI (`'*TenSetting*'` khớp **0 key**) **và** cache tầng 2 nằm **trong bộ nhớ
+         tiến trình** ⇒ setting "đã đổi" mà **giá trị CŨ vẫn có hiệu lực**, **không lỗi nào nổi lên**. -->
+    <PackageVersion Include="Volo.Abp.SettingManagement.HttpApi" Version="10.7.0" />
     <PackageVersion Include="Volo.Abp.Swashbuckle" Version="10.7.0" />
     <!-- KHÔNG có Volo.Abp.AutoMapper: đã bỏ AutoMapper (map tay) để loại advisory GHSA-rvv3-g6hj-g44x. -->
     <PackageVersion Include="Volo.Abp.EventBus" Version="10.7.0" />
