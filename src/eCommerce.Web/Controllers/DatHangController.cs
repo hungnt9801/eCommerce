@@ -137,8 +137,19 @@ public class DatHangController : Controller
             TokenChongGiaMa = Guid.NewGuid().ToString("N")
         };
 
-        // 🚨 §89: SỐ DÒNG hiển thị — kẹp **1..5**. 📌 Mặc định 3 (giữ nguyên hành vi cũ khi không có `?soDong`).
-        trang.SoDong = Math.Clamp(soDong ?? 3, 1, 5);
+        // 🚨 §90: SỐ DÒNG — ưu tiên `?soDong`, nếu không có thì đọc **COOKIE `so-dong`** (nhớ qua phiên), rồi mới mặc định 3.
+        // 🔒 Cookie do người dùng sửa được ⇒ ép kiểu AN TOÀN: hỏng / ngoài biên ⇒ **KHÔNG ném**, dùng đường mặc định.
+        var soDongChon = soDong;
+        if (soDongChon is null && int.TryParse(Request.Cookies["so-dong"], out var tuCookie)) { soDongChon = tuCookie; }
+        trang.SoDong = Math.Clamp(soDongChon ?? 3, 1, 5);
+
+        // 📌 GHI lại cookie mỗi lần GET ⇒ lựa chọn số dòng **sống qua phiên** (trước §90, một GET mới trở về 3 — nợ §89.3).
+        Response.Cookies.Append("so-dong", trang.SoDong.ToString(), new CookieOptions
+        {
+            HttpOnly = true,
+            IsEssential = true,
+            MaxAge = TimeSpan.FromHours(2)
+        });
         KhoiPhucGio(trang, Request.Cookies["gio-web"]);
         // 🚨 §87: mô tả giỏ đang lưu để view hiển thị kèm nút "Xoá giỏ" (rỗng ⇒ không hiện).
         trang.TomTatGio = MoTaGio(Request.Cookies["gio-web"]);
@@ -169,6 +180,13 @@ public class DatHangController : Controller
 
         // 🚨 GIỎ GIỮ QUA PHIÊN (§86): ghi giỏ NGAY TẠI ĐÂY ⇒ mọi đường render lại (kể cả đường LỖI) đều còn dòng đã nhập.
         LuuGio(Response, form);
+        // 🚨 §90: giữ luôn SỐ DÒNG người dùng đang thấy (kẹp 1..5) ⇒ GET sau (không `?soDong`) vẫn đúng số ô.
+        Response.Cookies.Append("so-dong", Math.Clamp(form.SoDong, 1, 5).ToString(), new CookieOptions
+        {
+            HttpOnly = true,
+            IsEssential = true,
+            MaxAge = TimeSpan.FromHours(2)
+        });
 
         if (string.IsNullOrWhiteSpace(form.Sku) || form.SoLuong < 1 || form.KhoId == Guid.Empty)
         {

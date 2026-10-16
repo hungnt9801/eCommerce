@@ -2821,3 +2821,38 @@ Nhưng phạm vi vòng này là **"`SoDong` đi cùng POST"** — không phải 
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.0-o | 15/10/2026 | *(agent, session GĐ1)* | ✅ **CHỌN SỐ DÒNG (1..5) TRÊN UI** — `?soDong=N` (kẹp 1..5) · `SoDong` mang qua POST · dòng 2/3 **và** 4/5 **có điều kiện** · nút **Thêm/Bớt dòng** (liên kết, không JS). **Kiểm chứng**: mặc định **`3`** ô · `?soDong=5` ⇒ **`5`** ô + **hết nút Thêm** · `?soDong=2` ⇒ **`2`** ô + **không còn `Sku3`** · `?soDong=9`⇒**`5`** · `?soDong=0`⇒**`1`** + **hết nút Bớt** · **POST LỖI kèm `SoDong=5`** ⇒ render POST **`5`** ô; build **3/3**; **`fail: 0`**. 📌 **Nợ:** `SoDong` chưa sống qua **GET mới** (§89.3) |
+
+---
+
+## 90. ✅ **SỐ DÒNG SỐNG QUA PHIÊN (COOKIE so-dong) — ĐÃ KIỂM CHỨNG** (15/10/2026) — *đóng nợ §89.3*
+
+### 90.1 Đã làm (2 sửa, neo duy nhất, build **3/3**)
+
+| # | Vị trí (đọc lại mã) | Thay đổi |
+|---|---|---|
+| 1 | `GET` (**L140–152**) | ưu tiên `?soDong` → **cookie `so-dong`** → mặc định **3**; rồi **GHI lại cookie** |
+| 2 | `POST` (**L184**) | ghi cookie `so-dong` (kẹp **1..5**) ngay cạnh `LuuGio` ⇒ GET sau **vẫn đúng số ô** |
+
+🔒 **Ép kiểu AN TOÀN:** `int.TryParse` + `Math.Clamp` ⇒ cookie **rác** hoặc **ngoài biên** ⇒ **KHÔNG ném**, dùng đường mặc định.
+📌 **Vì sao cookie riêng `so-dong`** thay vì nhồi vào `gio-web`: giữ **định dạng** cookie giỏ **nguyên vẹn** (các probe cũ đọc `gio-web` theo `SKU:SL`) ⇒ **không phá** phép kiểm đã có.
+
+### 90.2 ✅ BẰNG CHỨNG (probe chạy trọn, `exit 0`)
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | 🔥 `?soDong=5` rồi **GET KHÔNG query** | **`5`** ô ✅ *(trước §90 là **3** — đúng nợ §89.3)* |
+| 2 | 🔥 `?soDong=2` rồi **GET KHÔNG query** | **`2`** ô ✅ |
+| 3 | 🔥 cookie **RÁC** (`so-dong=abc`) | HTTP **200** · **`3`** ô ✅ *(mặc định, **không** ném)* |
+| 4 | 🔥 cookie **NGOÀI BIÊN** (`so-dong=99`) | **`5`** ô ✅ *(**kẹp** đúng)* |
+| 5 | 🔥 **POST LỖI** (`SoDong=5`) rồi **GET KHÔNG query** | **`5`** ô ✅ *(POST cũng ghi cookie)* |
+| 6 | `fail:` · tiến trình treo | **`0`** ✅ · **0** ✅ |
+
+📌 **#3 + #4 là phép kiểm CHỐNG LỖI do dữ liệu người dùng:** cookie **sửa được** ⇒ phải giả định **mọi giá trị**. Đo **rác** và **ngoài biên**
+chứng minh server **không ném** và **kẹp đúng** — nếu không, người dùng sửa cookie sẽ làm **hỏng trang** thay vì chỉ thấy mặc định.
+📌 **#5 chứng minh cả HAI đường đều ghi cookie** (GET và POST) ⇒ số ô **không nhảy** khi có lỗi.
+
+### 90.3 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.0-p | 15/10/2026 | *(agent, session GĐ1)* | ✅ **SỐ DÒNG SỐNG QUA PHIÊN**: cookie `so-dong` (`HttpOnly`, 2 giờ), đọc theo thứ tự **`?soDong` → cookie → 3**, ghi ở **cả GET và POST**; 🔒 `TryParse` + `Clamp` chịu **rác/ngoài biên**. **Kiểm chứng**: `?soDong=5` rồi GET không query ⇒ **`5`** ô; `?soDong=2` ⇒ **`2`**; cookie `abc` ⇒ **`3`** (200, không ném); cookie `99` ⇒ **`5`** (kẹp); POST lỗi rồi GET ⇒ **`5`**; build **3/3**; **`fail: 0`** |
