@@ -2587,3 +2587,49 @@ Chuyển **4 phép gán** lên **TRƯỚC** khối gọi ``_checkout.TinhVaGiuCh
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | — | 15/10/2026 | *(agent, session GĐ1)* | 🚨 **Thử GIỮ DÒNG ĐÃ NHẬP**: build **3/3 xanh**, nhưng **đo CẢ HAI đường** cho thấy **đường LỖI KHÔNG giữ** (``Sku2``/``SoLuong2`` = ``False``) vì 4 phép gán nằm trong **nhánh thành công**; đường **THÀNH CÔNG** giữ tốt (``330.000`` · ``True``). ⇒ **KHÔNG commit mã** (quy tắc *commit trong ``if``*); ghi **cách sửa** (chuyển 4 phép gán lên trước lời gọi checkout). 📌 **Bài học:** *tính năng "cứu khi có lỗi" phải được đo **Ở ĐƯỜNG LỖI*** |
+
+---
+
+## 84. ✅ **GIỮ CÁC DÒNG ĐÃ NHẬP KHI TRANG RENDER LẠI — ĐÃ KIỂM CHỨNG Ở CẢ HAI ĐƯỜNG** (15/10/2026) — *trả nợ §85*
+
+### 84.1 Vấn đề, bản sửa SAI (vòng 100) và bản sửa ĐÚNG (vòng 101)
+
+Trước vòng 100, sau **mỗi** lần POST, hai ô **dòng 2/3 mất trắng** — người dùng phải **gõ lại** (đau nhất khi **có lỗi** ở dòng 2/3).
+**Sửa:** thêm 4 trường vào `DatHangTrangDto` + **gán từ form** + **bind lại** `value="@Model.…"` trong view.
+
+| Vòng | Vị trí 4 phép gán | Kết quả đo |
+|---|---|---|
+| **100 (SAI)** | **sau** `trang.DonId = don.Id;` ⇒ nằm trong **nhánh THÀNH CÔNG** | 🚨 **đường LỖI KHÔNG giữ** (`False`) ⇒ tính năng **vô dụng đúng lúc cần nhất** (§85) |
+| **101 (ĐÚNG)** | **trước CẢ CÂU LỆNH** `var ketQua = await _checkout.TinhVaGiuChoAsync(new CheckoutInput …)` ⇒ **trước cả** `catch` | ✅ **CẢ HAI đường giữ đúng** |
+
+📌 **Vị trí cuối cùng (đọc lại mã để xác nhận, không suy đoán):** gán ở **L109–112**, lời gọi checkout ở **L113**, `catch` ở **L150**.
+⇒ Khối `catch` render trang **sau khi** dữ liệu đã được đưa vào `trang` ⇒ **ô dòng 2/3 không còn bị xoá**.
+
+### 84.2 ✅ BẰNG CHỨNG — đo **CẢ HAI ĐƯỜNG** (probe `verify-giudong.ps1`, chạy trọn, `exit 0`)
+
+| # | Ca | Phép đo | Kết quả |
+|---|---|---|---|
+| 1 | **LỖI** (dòng 2 = SKU **không có giá**) | đơn có được tạo? | **`0`** ✅ *(không tạo đơn rác)* |
+| 2 | **LỖI** | 🔥 **`Sku2` được giữ?** | ✅ **`True`** |
+| 3 | **LỖI** | 🔥 **`SoLuong2` được giữ?** | ✅ **`True`** |
+| 4 | **LỖI** | 🔥 **`Sku3` được giữ?** | ✅ **`True`** |
+| 5 | **THÀNH CÔNG** (`A×1` + `A×2`) | tổng tiền | **`330,000`** ✅ *(kỳ vọng **`330.000`** = `3 × 100.000 × 1,1` — **gộp `A` xuyên dòng**)* |
+| 6 | **THÀNH CÔNG** | 🔥 **`Sku2` được giữ?** | ✅ **`True`** |
+| 7 | `fail:` · tiến trình treo | — | **`0`** ✅ · **0** ✅ |
+
+📌 **Vì sao phải đo CẢ HAI:** đường **LỖI** là đường **quan trọng nhất** cho tính năng này. Vòng 100 **chỉ** đo đường thành công
+thì đã **commit một tính năng vô dụng** và **tài liệu hoá nó là xong** — đúng loại sai mà **quy tắc `commit` trong `if (đạt)`**
+đã chặn (lần thứ **ba** trong ba vòng gần đây).
+
+### 84.3 📌 Bài học mới (bổ sung `tools/README-probe.md`)
+
+> 🚨 **Tính năng "cứu người dùng KHI CÓ LỖI" PHẢI được đo Ở ĐƯỜNG LỖI.**
+> Nếu chỉ đo đường thành công, một tính năng **chỉ chạy khi không có lỗi** vẫn "xanh" — và **vô dụng** đúng lúc cần nhất.
+> 📌 **Cách kiểm rẻ:** với mọi thay đổi ở **đường xử lý lỗi** (`catch`/render lại/thông báo), **tạo lỗi có chủ đích**
+> rồi mới đo — **đừng** dùng ca thành công làm bằng chứng.
+
+### 84.4 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.0-k | 15/10/2026 | *(agent, session GĐ1)* | ✅ **GIỮ CÁC DÒNG ĐÃ NHẬP — ĐÃ KIỂM CHỨNG CẢ HAI ĐƯỜNG** (trả nợ §85): chuyển 4 phép gán lên **trước lời gọi checkout** (L109–112 < L113 · `catch` L150). **Đo được**: **LỖI** ⇒ `Sku2` `True` · `SoLuong2` `True` · `Sku3` `True` · **`0`** đơn; **THÀNH CÔNG** ⇒ tổng **`330,000`** (gộp xuyên dòng) · `Sku2` `True`; build **3/3** (`exit=0` · `0` lỗi · DLL có); **`fail: 0`** |

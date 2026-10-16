@@ -102,6 +102,14 @@ public class DatHangController : Controller
         if (!string.IsNullOrWhiteSpace(form.Sku2)) { phanBoSung.Append(',').Append(form.Sku2.Trim()).Append(':').Append(form.SoLuong2); }
         if (!string.IsNullOrWhiteSpace(form.Sku3)) { phanBoSung.Append(',').Append(form.Sku3.Trim()).Append(':').Append(form.SoLuong3); }
         if (phanBoSung.Length > 0) { form.Sku = form.Sku + phanBoSung.ToString(); }
+        // 🚨 GIỮ CÁC DÒNG ĐÃ NHẬP (§84): mang dòng 2/3 TRẢ LẠI form để người dùng KHÔNG phải gõ lại.
+        // ⚠️ ĐẶT Ở ĐÂY — TRƯỚC lời gọi checkout — để CẢ HAI đường (LỖI và THÀNH CÔNG) đều render với dữ liệu đã nhập.
+        // 📌 Vòng 100 đặt 4 phép gán này SAU `trang.DonId = don.Id;` (nhánh THÀNH CÔNG) ⇒ đường LỖI bị XOÁ TRẮNG ô
+        //    ⇒ tính năng "cứu khi có lỗi" lại chỉ chạy khi KHÔNG có lỗi (đo được ở §85). Neo duy nhất, đếm = 1.
+        trang.Sku2 = form.Sku2 ?? string.Empty;
+        trang.SoLuong2 = form.SoLuong2;
+        trang.Sku3 = form.Sku3 ?? string.Empty;
+        trang.SoLuong3 = form.SoLuong3;
         var ketQua = await _checkout.TinhVaGiuChoAsync(new CheckoutInput
             {
                 ChannelCode = string.IsNullOrWhiteSpace(form.Kenh) ? "web" : form.Kenh,
@@ -202,6 +210,19 @@ public class DatHangTrangDto
     public Guid? DonId { get; set; }
 
     public decimal TongTien { get; set; }
+    /// <summary>🚨 **GIỮ CÁC DÒNG ĐÃ NHẬP** (`web-001` §84): dòng 2/3 của giỏ được **mang trả lại** vào form
+    /// khi trang render lại (sau lỗi **hoặc** sau khi đặt xong) ⇒ người dùng **không phải gõ lại**.
+    /// 📌 Trước vòng 100, hai ô này **mất trắng** sau mỗi lần POST — dễ thấy khi có lỗi ở dòng 2/3.</summary>
+    public string Sku2 { get; set; } = string.Empty;
+
+    /// <inheritdoc cref="Sku2" />
+    public int SoLuong2 { get; set; } = 1;
+
+    /// <inheritdoc cref="Sku2" />
+    public string Sku3 { get; set; } = string.Empty;
+
+    /// <inheritdoc cref="Sku3" />
+    public int SoLuong3 { get; set; } = 1;
 
     public string? TienTe { get; set; }
 

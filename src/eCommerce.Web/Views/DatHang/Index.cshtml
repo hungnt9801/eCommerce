@@ -85,10 +85,10 @@
             <div><label for="Sku">SKU</label><input id="Sku" name="Sku" value="@Model.Sku" /></div>
 
                 @* 🚨 GIỎ NHIỀU Ô NHẬP (§82): dòng 2 và 3 — để TRỐNG nếu không dùng. Ghép ở SERVER (không JS). *@
-                <div><label for="Sku2">SKU dòng 2</label><input id="Sku2" name="Sku2" /></div>
-                <div><label for="SoLuong2">SL dòng 2</label><input id="SoLuong2" name="SoLuong2" type="number" min="1" value="1" /></div>
-                <div><label for="Sku3">SKU dòng 3</label><input id="Sku3" name="Sku3" /></div>
-                <div><label for="SoLuong3">SL dòng 3</label><input id="SoLuong3" name="SoLuong3" type="number" min="1" value="1" /></div>
+                <div><label for="Sku2">SKU dòng 2</label><input id="Sku2" name="Sku2" value="@Model.Sku2" /></div>
+                <div><label for="SoLuong2">SL dòng 2</label><input id="SoLuong2" name="SoLuong2" type="number" min="1" value="@Model.SoLuong2" /></div>
+                <div><label for="Sku3">SKU dòng 3</label><input id="Sku3" name="Sku3" value="@Model.Sku3" /></div>
+                <div><label for="SoLuong3">SL dòng 3</label><input id="SoLuong3" name="SoLuong3" type="number" min="1" value="@Model.SoLuong3" /></div>
             <div><label for="SoLuong">Số lượng</label><input id="SoLuong" name="SoLuong" type="number" min="1" value="@Model.SoLuong" /></div>
             <div><label for="Thue">Thuế suất (0.1 = 10%)</label><input id="Thue" name="Thue" value="@Model.Thue" /></div>
             <div style="margin-top:.6rem">
