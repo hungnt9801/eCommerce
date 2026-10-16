@@ -14,4 +14,20 @@
     <PackageReference Include="Volo.Abp.Core" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- 🚨 `CAT-003` (16/10/2026) — THAM CHIẾU `Domain.Shared` ĐỂ MÃ LỖI KHÔNG THỂ LỆCH.
+         📌 **SỰ CỐ THẬT ĐÃ XẢY RA:** `ViPhamRangBuocDb.cs` ghi **chuỗi cứng** `"eCommerce:Catalog:0026"` và
+         `"eCommerce:Catalog:0030"`. Khi tôi đánh số lại slug/media theo `CAT-003` §6.3 (`0026`→`0201`,
+         `0030`→`0204`), các chuỗi đó **ở lại giá trị cũ** — và **build vẫn XANH**, test **vẫn XANH**, vì
+         không có gì buộc một chuỗi phải khớp một hằng số. Hệ quả nếu lọt: ràng buộc DB dịch thành **mã
+         KHÔNG tồn tại** ⇒ client nhận mã lạ ⇒ **không phân loại được lỗi** (đúng họ `XC-003` F2/F5).
+         🔒 **Cách sửa không thể tái diễn:** dùng **hằng số** thay vì chuỗi ⇒ đổi số là **lỗi biên dịch**
+         ở mọi chỗ dùng, không phải một cuộc đi tìm chuỗi.
+         ⚠️ **ĐÁNH ĐỔI ĐÃ CÂN NHẮC:** `Kernel` mất tính "chỉ phụ thuộc `Abp.Core`". Nhưng `Domain.Shared`
+         là thư viện **hằng số + kiểu chia sẻ THUẦN** (không EF, không hạ tầng) ⇒ Kernel **vẫn** test được
+         không cần DB. 📌 Kiểm **không có vòng lặp**: `Domain.Shared` **không** trỏ `Kernel`.
+         📌 Nếu sau này cần trả lại tính thuần: chuyển `ViPhamRangBuocDb` sang tầng có `Domain.Shared`. -->
+    <ProjectReference Include="..\..\src\eCommerce.Domain.Shared\eCommerce.Domain.Shared.csproj" />
+  </ItemGroup>
+
 </Project>

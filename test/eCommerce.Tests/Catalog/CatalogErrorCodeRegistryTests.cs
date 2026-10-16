@@ -84,6 +84,15 @@ public class CatalogErrorCodeRegistryTests
     // Dải 0020+ đánh số LẠI cho `CAT-002` (tài liệu §12 đã được cập nhật).
     [InlineData(nameof(eCommerceConsts.ErrorCodes.Catalog.ChuTrinhDanhMuc), "eCommerce:Catalog:0020")]
     [InlineData(nameof(eCommerceConsts.ErrorCodes.Catalog.DanhMucConRangBuoc), "eCommerce:Catalog:0021")]
+    // 🚨 `CAT-003` §6.3 — **DẢI RIÊNG `0201`–`0212`** cho slug + media. Số **theo TÀI LIỆU**, không tự chọn.
+    // 📌 Tiền lệ đã chốt ở test này: *"Dải 0020+ đánh số LẠI cho `CAT-002`"* ⇒ tài liệu là nguồn sự thật.
+    // ⚠️ Ở `CAT-003` §16 tôi đã tự chọn `0026`/`0027` cho slug **trong khi §6.3 đã quy định `0201`/`0202`**
+    // ⇒ một mã hai nghĩa. Đã sửa; các dòng dưới **khoá lại** để không tái diễn.
+    [InlineData(nameof(eCommerceConsts.ErrorCodes.Catalog.SlugDaTonTai), "eCommerce:Catalog:0201")]
+    [InlineData(nameof(eCommerceConsts.ErrorCodes.Catalog.KhongSinhDuocSlug), "eCommerce:Catalog:0202")]
+    [InlineData(nameof(eCommerceConsts.ErrorCodes.Catalog.DaCoAnhChinh), "eCommerce:Catalog:0204")]
+    [InlineData(nameof(eCommerceConsts.ErrorCodes.Catalog.TepKhongPhaiAnh), "eCommerce:Catalog:0206")]
+    [InlineData(nameof(eCommerceConsts.ErrorCodes.Catalog.KhongTimThayAnh), "eCommerce:Catalog:0210")]
     public void Vi_tri_ma_theo_tai_lieu(string tenHangSo, string giaTriMongDoi)
     {
         var f = CacHangSo.SingleOrDefault(x => x.Name == tenHangSo);
@@ -116,5 +125,29 @@ public class CatalogErrorCodeRegistryTests
             .ToList();
 
         Assert.NotEmpty(dai0020);
+    }
+[Fact]
+    public void Alias_chi_duoc_dung_khi_HAI_TEN_THAT_SU_cung_mot_nghia()
+    {
+        // 🚨 **VÌ SAO TEST NÀY TỒN TẠI (lỗi thật 16/10/2026, suýt lọt):** tôi viết
+        // `DaCoAnhChinh = TepKhongPhaiAnh` (alias sang `0206`) ⇒ hai nghĩa **khác hẳn nhau** dùng **cùng**
+        // một mã: client nhận `0206` và hiện *"tệp không hợp lệ, chọn tệp khác"* — trong khi **tệp hoàn
+        // toàn hợp lệ** và việc cần làm là *"bỏ ảnh chính cũ"*.
+        // 📌 **Alias QUA ĐƯỢC** phép kiểm trùng giá trị (hai tên, một giá trị) ⇒ lưới an toàn cũ **không**
+        // bắt được. Test này khoá đúng chỗ đó: alias **chỉ** hợp lệ khi hai tên **thật sự** cùng nghĩa.
+        //
+        // 📌 **KHÔNG có alias nào trong sổ đăng ký** — và đó là **kết luận đã kiểm**, không phải giả định:
+        // `KHONG_co_hai_hang_so_nao_TRUNG_GIA_TRI` ở trên **cấm** hai hằng số cùng giá trị, nên alias
+        // **không thể** tồn tại mà CI vẫn xanh. 🚨 Điều này tốt hơn về **an toàn**: alias là cách **dễ nhất**
+        // để hai nghĩa khác nhau dùng chung một mã (đúng lỗi `DaCoAnhChinh = TepKhongPhaiAnh` tôi vừa mắc).
+        // ⇒ Cần phân biệt *"tấn công"* với *"quy trình"* (định dạng vs dung lượng `0206`) thì dùng
+        // **`WithData`**, KHÔNG dùng alias.
+
+        // 🚨 Alias KHÔNG được phép: "đã có ảnh chính" là việc **khác hẳn** "tệp không phải ảnh".
+        Assert.NotEqual(eCommerceConsts.ErrorCodes.Catalog.TepKhongPhaiAnh,
+            eCommerceConsts.ErrorCodes.Catalog.DaCoAnhChinh);
+        Assert.NotEqual(eCommerceConsts.ErrorCodes.Catalog.TepKhongPhaiAnh,
+            eCommerceConsts.ErrorCodes.Catalog.KhongTimThayAnh);
+        Assert.Equal("eCommerce:Catalog:0204", eCommerceConsts.ErrorCodes.Catalog.DaCoAnhChinh);
     }
 }

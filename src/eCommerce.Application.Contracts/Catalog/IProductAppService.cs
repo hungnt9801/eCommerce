@@ -56,7 +56,7 @@ public interface IProductAppService : IApplicationService
     /// 📣 **Phát `ProductSlugChangedEto` kèm `OldSlug`** khi slug **thực sự** đổi ⇒ trả lời **Q3 của `WEB-002`**
     /// (có `OldSlug` mới dựng được **301**, `WEB-002` BR-005).
     /// 🔒 **KHÔNG tự sinh lại khi đổi `Name`** (ADR-05): làm vậy sẽ **phá URL đã index** ⇒ mất SEO **âm thầm**.
-    /// ⚠️ **NÉM `Catalog:0026`** nếu slug trùng; **NÉM `Catalog:0027`** nếu tên không sinh được slug mà người
+    /// ⚠️ **NÉM `Catalog:0201`** (`SlugDaTonTai`) nếu slug trùng; **NÉM `Catalog:0202`** (`KhongSinhDuocSlug`) nếu tên không sinh được slug mà người
     /// dùng cũng không nhập tay.
     /// </summary>
     /// <param name="id">Sản phẩm.</param>

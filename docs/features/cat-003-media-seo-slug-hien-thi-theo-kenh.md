@@ -1248,3 +1248,125 @@ về **dữ liệu** — và cách phát hiện **luôn** là *"in giá trị TH
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.4 | 16/10/2026 | *(agent, session GĐ1)* | **§18 — LÁT CẮT 3: KHO TỆP CỤC BỘ** (đóng nợ §17.8 #1): `MediaStorageNoiBo` hiện thực `IMediaStorage` trên đĩa · 🚨 **CHỐNG THOÁT THƯ MỤC 4 lớp** (rỗng · tuyệt đối · `..` theo **đoạn** · **lưới an toàn tiền tố có dấu phân cách**) · khoá do **hệ thống** sinh (`guid`, không tên tệp client) · `XoaAsync` **idempotent** + lỗi I/O **không ném** (chỉ log) · **+21 unit test** (1037 tổng) · `.gitignore` `media-noi-bo`. Ghi **§18.2** (chi tiết dễ sai ở lớp 4: `StartsWith` trần cho qua thư mục **anh em**) · **§18.6** (bộ đo sai lần thứ **ba** liên tiếp: giả định cấu trúc thư mục) · **§18.7** (nợ: **chưa có app service/endpoint**, chưa UI, chưa job dọn tệp mồ côi, chưa tầng phục vụ tệp, chưa trần dung lượng, chưa cấu hình thư mục gốc, **hiển thị theo kênh vẫn 0 dòng code**) |
+
+---
+
+## 19. 🚨 **SỬA SỰ CỐ: MÃ LỖI SAI DẢI + MỘT MÃ HAI NGHĨA** (16/10/2026)
+
+> 📌 **Đây là sửa lỗi CỦA CHÍNH TÔI, không phải tính năng mới.** Ghi lại vì đây là **họ lỗi** mà dự án đã
+> trả giá nhiều lần (`CatalogErrorCodeRegistryTests` sinh ra để chặn nó), và vì **lưới an toàn hiện có
+> đã KHÔNG bắt được một nửa** của nó.
+
+### 19.1 Sự cố: tôi tự chọn dải số **trong khi tài liệu đã quy định dải khác**
+
+Ở **§16** (lượt trước), tôi thêm mã lỗi slug + media **tự chọn** dải `0026`–`0031`:
+
+| Hằng số | Tôi đã dùng (§16) | 🚨 `CAT-003` §6.3 **đã** quy định |
+|---|---|---|
+| `SlugDaTonTai` | `0026` | **`0201`** |
+| `KhongSinhDuocSlug` | `0027` | **`0202`** |
+| `TepKhongPhaiAnh` | `0028` | **`0206`** |
+| `AnhQuaKichThuoc` | `0029` | **`0206`** |
+| `DaCoAnhChinh` | `0030` | **`0204`** |
+| `KhongTimThayAnh` | `0031` | **`0210`** |
+
+📌 **§6.3 của CHÍNH tài liệu này** đã mở đầu bằng dòng:
+*"### 6.3 Mã lỗi nghiệp vụ — 🚨 **DẢI RIÊNG `0201`–`0212`**"*. Tôi **không đọc mục đó** khi viết §16.
+
+🔒 **Và dự án đã có TIỀN LỆ CHỐT** nằm ngay trong `CatalogErrorCodeRegistryTests`:
+*"Dải 0020+ đánh số LẠI cho `CAT-002` (tài liệu §12 đã được cập nhật)"* ⇒ **số phải theo TÀI LIỆU**,
+**không** sửa tài liệu cho khớp mã. Tôi đã đi ngược quy ước đã chốt.
+
+**Hệ quả nếu lọt:** **một mã hai nghĩa** giữa tài liệu (`0201` = slug trùng) và mã nguồn (`0026` =
+slug trùng, còn `0201` **không tồn tại**) ⇒ client và đối soát **không phân loại được lỗi** — đúng họ
+`XC-003` F2/F5.
+
+### 19.2 ✅ Đã sửa
+
+| # | Việc | Nội dung |
+|---|---|---|
+| **1** | **Đánh số lại theo §6.3** | `0201` · `0202` · `0204` · `0206` · `0210`, phủ **toàn bộ** 15 chỗ dùng ở **5 tệp** |
+| **2** | **Khoá số bằng SỔ ĐĂNG KÝ** | Thêm **5 dòng** vào `CatalogErrorCodeRegistryTests.Vi_tri_ma_theo_tai_lieu` ⇒ đổi số là **CI đỏ** |
+| **3** | **Bỏ hằng số alias sai** | Xem §19.3 |
+| **4** | 🚨 **Bỏ CHUỖI CỨNG trong `ViPhamRangBuocDb`** | Xem §19.4 — **phát hiện quan trọng nhất** |
+
+📌 **`0206` gộp cả *"sai định dạng"* và *"vượt dung lượng"*** (theo §6.3) nên **không** có mã riêng cho
+dung lượng. Cần phân biệt khi điều tra thì dùng **`WithData("toiDaByte", …)`**, **không** dùng alias.
+
+### 19.3 🚨 Lỗi thứ hai — **nghiêm trọng hơn lỗi ban đầu**, do tôi gây ra KHI ĐANG SỬA
+
+Trong lúc sửa §19.1, tôi viết:
+
+```csharp
+public const string DaCoAnhChinh = TepKhongPhaiAnh;   // ❌ HAI NGHĨA KHÁC HẲN, MỘT MÃ
+```
+
+⇒ *"sản phẩm đã có ảnh chính"* và *"tệp không phải ảnh"* **cùng** mã `0206`.
+Kịch bản hỏng **cụ thể**: người dùng bấm đặt ảnh chính khi đã có ảnh chính ⇒ nhận `0206` ⇒ UI hiện
+*"tệp không hợp lệ, hãy chọn tệp khác"* — trong khi **tệp hoàn toàn hợp lệ** và việc cần làm là
+**bỏ đánh dấu ảnh chính cũ**. Người dùng sẽ **thử tải lại cùng tệp** — vô ích, và **không có gì chỉ ra
+việc đúng cần làm**.
+
+🔑 **VÌ SAO LƯỚI AN TOÀN KHÔNG BẮT ĐƯỢC (đây là điều đáng ghi nhất):**
+`KHONG_co_hai_hang_so_nao_TRUNG_GIA_TRI` kiểm **trùng giá trị** — và alias là **hai tên, MỘT giá trị**
+⇒ phép kiểm **cho qua**. 🚨 Tức lưới an toàn bảo vệ đúng **ca ngược lại** với ca nguy hiểm nhất.
+📌 Tôi phát hiện vì **đọc lại** giá trị sau khi sửa (`Select-String` in ra 4 dòng), **không** vì test.
+
+**Đã sửa:** `DaCoAnhChinh = "eCommerce:Catalog:0204"` (mã **riêng**, đúng §6.3) và **thêm**
+`Alias_chi_duoc_dung_khi_HAI_TEN_THAT_SU_cung_mot_nghia` để khoá lại.
+
+📌 **Kết luận đã kiểm:** sau khi bỏ alias, sổ đăng ký **không còn alias nào** (kiểm bằng script trên toàn
+bộ 31 hằng số). 🔒 Điều này **tốt hơn về an toàn**: alias là cách **dễ nhất** để hai nghĩa khác nhau
+dùng chung một mã.
+
+### 19.4 🚨 Phát hiện quan trọng nhất: `ViPhamRangBuocDb` ghi **CHUỖI CỨNG** ⇒ build/test **vẫn XANH** khi mã lệch
+
+`ViPhamRangBuocDb.cs` (ánh xạ vi phạm ràng buộc DB → lỗi nghiệp vụ) chứa:
+
+```csharp
+["IX_CatProducts_TenantId_Slug"]    = new("eCommerce:Catalog:0026", …),   // ❌ chuỗi cứng
+["IX_CatProductMedia_MotAnhChinh"]  = new("eCommerce:Catalog:0030", …),   // ❌ chuỗi cứng
+```
+
+Khi tôi đổi hằng số sang `0201`/`0204`, **hai chuỗi này ở lại giá trị cũ** — và:
+* **build XANH** (không có gì buộc chuỗi khớp hằng số);
+* **1043 unit test XANH**;
+* **38 integration test XANH**.
+
+⇒ Ràng buộc DB sẽ dịch thành **mã KHÔNG tồn tại** ⇒ client nhận mã lạ ⇒ **không phân loại được lỗi**.
+📌 Đây **đúng họ lỗi** mà cả `CatalogErrorCodeRegistryTests` **và** `RangBuocDbChuaAnhXaTests` tồn tại để
+chặn — nhưng cả hai đều kiểm **sự tồn tại** của ánh xạ, **không** kiểm **giá trị** của nó.
+
+🔒 **Cách sửa KHÔNG THỂ tái diễn:** `ViPhamRangBuocDb` nay dùng **hằng số**
+(`eCommerceConsts.ErrorCodes.Catalog.SlugDaTonTai`) ⇒ đổi số là **lỗi biên dịch** ở mọi chỗ dùng, không
+phải một cuộc đi tìm chuỗi.
+
+⚠️ **Đánh đổi đã cân nhắc:** `eCommerce.Kernel` **mất** tính *"chỉ phụ thuộc `Abp.Core`"* — nay tham chiếu
+`Domain.Shared`. 📌 Vì `Domain.Shared` là thư viện **hằng số + kiểu chia sẻ THUẦN** (không EF, không hạ
+tầng), `Kernel` **vẫn** test được không cần DB. ✅ Đã kiểm **không có vòng lặp**: `Domain.Shared`
+**không** trỏ `Kernel`.
+
+### 19.5 📌 Ba lỗi trong một lượt — bài học chung
+
+| # | Lỗi | Lưới an toàn nào **đã** bắt | Lưới nào **KHÔNG** |
+|---|---|---|---|
+| **1** | Tự chọn dải số `0026`+ thay vì `0201`+ theo §6.3 | ❌ **không** (số nào cũng đúng định dạng `\d{4}`) | — |
+| **2** | `DaCoAnhChinh = TepKhongPhaiAnh` (alias sai) | ❌ **không** — alias là *hai tên một giá trị*, phép kiểm trùng **cho qua** | — |
+| **3** | `ViPhamRangBuocDb` giữ **chuỗi cứng** | ❌ **không** — build + **1081 test** đều xanh | — |
+
+🔑 **Điểm chung của cả ba:** đều là **mã lệch khỏi nguồn sự thật** mà **không** có gì **buộc** chúng khớp.
+Và điểm chung của cách phát hiện: **đọc lại giá trị THẬT** (in ra, đối chiếu tài liệu) — **không** dựa
+vào việc test xanh.
+📌 Đây là lần thứ **tư** liên tiếp trong chuỗi lượt này mà *"test xanh"* **không** đồng nghĩa *"đúng"*
+(§17.7 `DROP INDEX` · §18.6 `t` vs `true` · §18.6 cấu trúc thư mục · §19 này).
+
+🔒 **Ba việc đã làm để loại bỏ khả năng tái diễn (không chỉ sửa lần này):**
+1. **Sổ đăng ký** (`CatalogErrorCodeRegistryTests`) khoá **số** theo tài liệu ⇒ đổi số là **CI đỏ**;
+2. **Hằng số thay chuỗi cứng** trong `ViPhamRangBuocDb` ⇒ đổi số là **lỗi biên dịch**;
+3. **Test alias** khoá *"hai tên một nghĩa"* ⇒ alias sai là **CI đỏ**.
+
+### 19.6 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.5 | 16/10/2026 | *(agent, session GĐ1)* | **§19 — SỬA SỰ CỐ MÃ LỖI (lỗi của chính tôi)**: đánh số lại slug/media theo `CAT-003` **§6.3** (`0026`→`0201` · `0027`→`0202` · `0030`→`0204` · `0028`/`0029`→`0206` · `0031`→`0210`) phủ **15 chỗ / 5 tệp** · **bỏ alias sai** `DaCoAnhChinh = TepKhongPhaiAnh` (hai nghĩa khác hẳn dùng một mã — **lưới an toàn cho qua**) · **bỏ CHUỖI CỨNG** trong `ViPhamRangBuocDb` ⇒ dùng hằng số (`Kernel` nay tham chiếu `Domain.Shared`, **không** vòng lặp) · **+6 test** (1043 tổng): 5 dòng **sổ đăng ký** khoá số theo tài liệu + `Alias_chi_duoc_dung_khi_HAI_TEN_THAT_SU_cung_mot_nghia`. 📌 **Ba lỗi trong một lượt** đều là *"mã lệch nguồn sự thật mà không gì buộc khớp"* — và **cả ba đều qua được** build + 1081 test xanh ⇒ phát hiện bằng **đọc lại giá trị THẬT**, không bằng test. Ghi **§19.3** (alias qua được phép kiểm trùng giá trị) · **§19.4** (chuỗi cứng ⇒ build/test xanh khi mã lệch) · **§19.5** (ba việc loại bỏ khả năng tái diễn) |

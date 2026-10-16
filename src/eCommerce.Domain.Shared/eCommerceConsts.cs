@@ -334,12 +334,14 @@ public static class eCommerceConsts
             /// <summary>
             /// 🚨 **SLUG TRÙNG trong tenant** (`CAT-003` **ADR-03**) — hàng rào DB
             /// `IX_CatProducts_TenantId_Slug` (`NULLS NOT DISTINCT`, filter `Slug IS NOT NULL`).
+            /// 📌 Theo `CAT-003` §6.3, `0201` **bao CẢ ca** *"`Publish` khi thiếu `Slug`"* — cùng mã vì
+            /// client xử lý **giống nhau**: *"nhập/đổi slug rồi thử lại"*.
             /// 📌 **VÌ SAO LÀ LỖI NGHIỆP VỤ, KHÔNG PHẢI `500`:** slug là **khoá định danh công khai trên URL**;
             /// hai sản phẩm cùng slug ⇒ **một** trong hai URL **không bao giờ** truy cập được, và **máy tìm kiếm
             /// đánh chỉ mục sai sản phẩm**. Client cần biết *"slug này đã dùng"* để **chọn slug khác**, chứ
         /// không phải "hệ thống hỏng" (đúng họ lỗi Phụ lục B: ràng buộc chặn hành vi **hợp lệ về nghiệp vụ**).
             /// </summary>
-            public const string SlugDaTonTai = "eCommerce:Catalog:0026";
+            public const string SlugDaTonTai = "eCommerce:Catalog:0201";
 
             /// <summary>
             /// **Không sinh được slug** từ tên sản phẩm (`CAT-003` **ADR-04**).
@@ -348,26 +350,53 @@ public static class eCommerceConsts
             /// (ADR-04) và sẽ **che** dữ liệu vào vô nghĩa. ⇒ Chỗ gọi phải **quyết định**: hoặc người dùng
             /// **tự nhập slug**, hoặc sản phẩm **chưa có URL công khai**. Trả mã riêng để client biết cần nhập tay.
             /// </summary>
-            public const string KhongSinhDuocSlug = "eCommerce:Catalog:0027";
+            public const string KhongSinhDuocSlug = "eCommerce:Catalog:0202";
 
-            // ── Media (`CAT-003`) — dải 0028–0031 ──
+            // ══════════════════════════════════════════════════════════════════════════════════════
+            // 🚨 **DẢI RIÊNG `0201`–`0212` CHO MEDIA + SLUG — THEO `CAT-003` §6.3, KHÔNG PHẢI `0026`+.**
+            //
+            // **BÀI HỌC THẬT (16/10/2026, sửa ngay trong lượt này):** ở `CAT-003` §16 tôi đã tự chọn
+            // dải `0026`–`0031` cho slug + media, **trong khi §6.3 của CÙNG tài liệu đó** đã quy định
+            // **dải riêng `0201`–`0212`**. Hệ quả: **một mã hai nghĩa** giữa tài liệu và mã nguồn —
+            // đúng họ lỗi mà `CatalogErrorCodeRegistryTests` sinh ra để chặn (xem chú thích ở test đó:
+            // `CAT-001` §6.3 và `CAT-002` §12 từng gán **cùng dải** `0001…0009` cho **nghĩa khác nhau**).
+            // 📌 Và có **tiền lệ đã chốt** ngay trong `CatalogErrorCodeRegistryTests` dòng 84:
+            // *"Dải 0020+ đánh số LẠI cho `CAT-002` (tài liệu §12 đã được cập nhật)"* ⇒ **số phải theo tài liệu**.
+            // 🔒 Lần này tôi **không** sửa tài liệu cho khớp mã: tài liệu §6.3 là **hợp đồng với client**.
+            //
+            // ⚠️ **`0026`/`0027` KHÔNG còn tồn tại** — nếu còn chỗ nào dùng số đó thì đó là **mã chết**.
+            // ══════════════════════════════════════════════════════════════════════════════════════
 
             /// <summary>🚨 **TỆP TẢI LÊN KHÔNG PHẢI ẢNH** (magic bytes không khớp) — `ADR-13`.
             /// 📌 **VÌ SAO MÃ RIÊNG (không dùng mã chung "dữ liệu vào không hợp lệ"):** chỉ dẫn cho người
             /// dùng **rất cụ thể** — *"tệp này không phải ảnh, hãy chọn tệp khác"* — và cho **nhật ký bảo mật**
             /// biết đây **có thể là ý đồ tấn công** (đổi đuôi/tên tệp), **khác hẳn** *"thiếu trường bắt buộc"*.
-            /// 🔒 Trả mã riêng còn giúp **phân biệt** khi điều tra: một chuỗi `0028` tăng vọt là **dấu hiệu**.</summary>
-            public const string TepKhongPhaiAnh = "eCommerce:Catalog:0028";
+            /// 🔒 Trả mã riêng còn giúp **phân biệt** khi điều tra: một chuỗi `0206` tăng vọt là **dấu hiệu**.
+            /// 📌 Theo `CAT-003` §6.3, `0206` **bao CẢ dung lượng vượt trần** (`NFR-CAT-003-003`: **10 MB**/tệp).
+            /// 🔒 Chỗ gọi **ghi `WithData("toiDaByte", …)`** để nhật ký **phân biệt được** *"tấn công"* với
+            /// *"quy trình"* — xem `CatalogLimits.AnhToiDaByte`. ⚠️ **KHÔNG** tạo hằng số alias cho dung lượng:
+            /// `CatalogErrorCodeRegistryTests` cấm hai hằng số **trùng giá trị**, và alias `0206b` thì **sai định dạng**.</summary>
+            public const string TepKhongPhaiAnh = "eCommerce:Catalog:0206";
 
-            /// <summary>**ẢNH VƯỢT KÍCH THƯỚC TỐI ĐA** cho phép.</summary>
-            public const string AnhQuaKichThuoc = "eCommerce:Catalog:0029";
+            /// <summary>🚨 **SẢN PHẨM ĐÃ CÓ ẢNH CHÍNH** (`ADR-12`: tối đa **MỘT** `IsPrimary`/sản phẩm) —
+            /// `CAT-003` §6.3 **`0204`** (*"`SortOrder` trùng **hoặc** vượt trần số media"*).
+            ///
+            /// 🔒 **VÌ SAO PHẢI LÀ MÃ RIÊNG (và đây là chỗ tôi vừa viết SAI rồi sửa ngay trong lượt này):**
+            /// mã này là **nhãn cho ràng buộc DB** `IX_CatProductMedia_MotAnhChinh` (đã ánh xạ ở
+            /// `ViPhamRangBuocDb`) — nó chặn một hành vi **HỢP LỆ VỀ NGHIỆP VỤ** (đặt ảnh chính khi đã có)
+            /// và client cần chỉ dẫn **cụ thể**: *"bỏ đánh dấu ảnh chính hiện tại TRƯỚC"*.
+            /// ⚠️ Tôi đã viết `DaCoAnhChinh = TepKhongPhaiAnh` ( alias sang `0206`) ⇒ **hai nghĩa khác hẳn nhau
+            /// dùng CÙNG một mã**: client nhận `0206` và hiện *"tệp không hợp lệ, chọn tệp khác"* — trong khi
+            /// **tệp hoàn toàn hợp lệ** và việc cần làm là **bỏ ảnh chính cũ**. 🚨 Đây **đúng họ lỗi** mà
+            /// `CatalogErrorCodeRegistryTests` tồn tại để chặn, và nó **suýt lọt** vì alias **qua được**
+            /// phép kiểm trùng giá trị (hai tên, một giá trị).
+            /// 📌 Bài học: **alias chỉ đúng khi hai tên THẬT SỰ cùng một nghĩa** — không phải khi hai việc
+            /// *"cùng nhóm"*.</summary>
+            public const string DaCoAnhChinh = "eCommerce:Catalog:0204";
 
-            /// <summary>**SẢN PHẨM ĐÃ CÓ ẢNH CHÍNH** (`ADR-12`: tối đa MỘT `IsPrimary` cho mỗi sản phẩm).
-            /// 📌 Hướng dẫn: *"bỏ đánh dấu ảnh chính hiện tại trước"* — khác hẳn *"tệp không hợp lệ"*.</summary>
-            public const string DaCoAnhChinh = "eCommerce:Catalog:0030";
 
-            /// <summary>**KHÔNG TÌM THẤY** ảnh theo Id (hoặc ảnh thuộc sản phẩm khác).</summary>
-            public const string KhongTimThayAnh = "eCommerce:Catalog:0031";
+            /// <summary>**KHÔNG TÌM THẤY** ảnh theo Id (hoặc ảnh thuộc sản phẩm khác) — `CAT-003` §6.3 `0210`.</summary>
+            public const string KhongTimThayAnh = "eCommerce:Catalog:0210";
         }
     }
 

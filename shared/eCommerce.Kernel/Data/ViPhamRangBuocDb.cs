@@ -97,12 +97,12 @@ public static class ViPhamRangBuocDb
         // 📌 Ràng buộc này CHẶN MỘT HÀNH VI HỢP LỆ VỀ NGHIỆP VỤ: hai người (hoặc hai request đồng thời) cùng
         // chọn một slug ⇒ trước đây là **HTTP 500** ⇒ client **không phân biệt** *"slug đã dùng"* với
         // *"hệ thống hỏng"* ⇒ **gửi lại** ⇒ vòng lặp (đúng lý do Phụ lục B tồn tại).
-        // 🔑 Mã riêng `eCommerce:Catalog:0026` (KHÔNG mượn `0025` = *"mã danh mục không hợp lệ"*):
+        // 🔑 Mã riêng `SlugDaTonTai` (`CAT-003` §6.3 = `0201`; KHÔNG mượn `0025` = *"mã danh mục không hợp lệ"*):
         // ca này cần chỉ dẫn *"chọn slug KHÁC"*, không phải *"sửa mã sản phẩm"*.
         // ⚠️ Đây cũng là ca NẶNG của lỗi C4/F1: `TenantId` có thể `NULL` ⇒ thiếu `NULLS NOT DISTINCT` là
         // index **mất tác dụng im lặng** (xem chú thích migration `Cat003_ProductSlug_Unique`).
         ["IX_CatProducts_TenantId_Slug"] =
-            new("eCommerce:Catalog:0026",
+            new(eCommerceConsts.ErrorCodes.Catalog.SlugDaTonTai,
                 "Slug này ĐÃ được sản phẩm khác dùng ⇒ URL công khai sẽ trùng. Chọn slug khác.", true),
 
         // ── KHÁCH HÀNG (`CUS-001`, 16/10/2026) ──────────────────────────────────────────────────
@@ -121,12 +121,12 @@ public static class ViPhamRangBuocDb
         // 📌 Ràng buộc này CHẶN MỘT HÀNH VI HỢP LỆ VỀ NGHIỆP VỤ: đặt ảnh chính là thao tác
         // *"đọc ảnh chính hiện tại → bỏ đánh dấu → đánh dấu ảnh mới"*; hai request ĐỒNG THỜI
         // (double-click, hai tab, hai nhân viên) **cùng** thấy *"chưa có ảnh chính"* ⇒ **cả hai** đánh dấu.
-        // 🔑 Mã riêng `eCommerce:Catalog:0030` (KHÔNG mượn `0011` = *"thiếu thông tin bắt buộc"*):
+        // 🔑 Mã riêng `DaCoAnhChinh` (`CAT-003` §6.3 = `0204`; KHÔNG mượn `0011` = *"thiếu thông tin bắt buộc"*):
         // ca này cần chỉ dẫn *"bỏ đánh dấu ảnh chính hiện tại trước"* — khác hẳn *"điền thêm trường"*.
         // ⚠️ Ca NẶNG của lỗi C4/F1: `TenantId` có thể `NULL` ⇒ thiếu `NULLS NOT DISTINCT` là index
         // **mất tác dụng im lặng** (xem chú thích migration `Cat003_ProductMedia`).
         ["IX_CatProductMedia_MotAnhChinh"] =
-            new("eCommerce:Catalog:0030",
+            new(eCommerceConsts.ErrorCodes.Catalog.DaCoAnhChinh,
                 "Sản phẩm này ĐÃ có ảnh chính ⇒ bỏ đánh dấu ảnh chính hiện tại TRƯỚC khi đặt ảnh mới.", true),
         ["IX_CusGroups_TenantId_Code"] =
             new("eCommerce:Customers:0008",
