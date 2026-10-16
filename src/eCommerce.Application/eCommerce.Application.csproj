@@ -13,6 +13,19 @@
     <ProjectReference Include="..\..\shared\eCommerce.Kernel\eCommerce.Kernel.csproj" />
     <ProjectReference Include="..\eCommerce.Application.Contracts\eCommerce.Application.Contracts.csproj" />
     <ProjectReference Include="..\..\modules\ChannelHub\eCommerce.ChannelHub.Application.Contracts\eCommerce.ChannelHub.Application.Contracts.csproj" />
+    <!-- 🚨 `CAT-003` (16/10/2026) — **ĐỌC THỰC THỂ `Channel` ĐỂ TRA KÊNH** (`IChannelDirectory`, guard `0207`).
+         📌 **VÌ SAO CẦN CẢ HAI THAM CHIẾU:** `Application.Contracts` của ChannelHub **chỉ** có hợp đồng
+         (`IChannelConnector`, `IChannelShopSyncService`, ETO) — **KHÔNG** có entity `Channel`. Mà guard `0207`
+         cần đọc `Channel.Code` + `Channel.IsActive` ⇒ phải với tới `ChannelHub.Domain`.
+         🔑 Chọn `…EntityFrameworkCore` (không `…Domain`) vì nó **kéo theo** `Domain` **và** là thứ `eCommerce.Web`
+         đã tham chiếu từ trước ⇒ **không** tạo tham chiếu mới ở tầng Web; ⚠️ và `DbContext` của module đó
+         **đã** được hợp nhất vào `eCommerceDbContext` nên không có hai context.
+         ⚠️ **ĐÁNH ĐỔI ĐÃ CÂN NHẮC:** `Application` của dự án chính nay biết tới tầng EF của **một** module khác —
+         điều này **không** lý tưởng về mặt "sạch tầng". 📌 Phương án sạch hơn (làm khi có thời gian): tách
+         `ChannelDirectory` sang một lớp ở `eCommerce.EntityFrameworkCore` **chỉ** hiện thực hợp đồng
+         `IChannelDirectory` (hợp đồng **đã** ở `Application.Contracts` nên **không** phải sửa chỗ gọi).
+         📌 Ghi ở đây để người sau biết đây là **đánh đổi có ý thức**, không phải sơ suất. -->
+    <ProjectReference Include="..\..\modules\ChannelHub\eCommerce.ChannelHub.EntityFrameworkCore\eCommerce.ChannelHub.EntityFrameworkCore.csproj" />
     <!-- 🚨 `SAL-005` — nơi nhận đơn sàn dùng `IIdempotencyGuard` của module Messaging (`XC-002`).
          app → module là HỢP LỆ (module → app mới bị cấm). -->
     <ProjectReference Include="..\..\modules\Messaging\eCommerce.Messaging.Domain\eCommerce.Messaging.Domain.csproj" />

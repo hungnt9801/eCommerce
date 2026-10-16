@@ -200,6 +200,19 @@ public static class eCommerceConsts
         /// nhưng **không** dòng DB nào trỏ tới ⇒ **không ai biết để dọn**).
         /// </summary>
         public const int SoAnhToiDaMoiSanPham = 50;
+
+        // ── HIỂN THỊ THEO KÊNH (`CAT-003` `ADR-08`) ───────────────────────────────────────────────
+        // 📌 Đặt Ở ĐÂY (không ở entity `ProductChannelVisibility`) vì **`Application.Contracts` KHÔNG được
+        // tham chiếu `Domain`** ⇒ DTO không đọc được hằng số trong entity. ⚠️ Cùng lỗi đã vấp ở `CAT-003` §20.3
+        // (`ProductMediaDtos.cs` ⇒ **`CS0246`**) — và **vấp LẦN HAI** ngay lượt này, nên ghi lại để lần sau
+        // **nghĩ tới `CatalogLimits` TRƯỚC** khi viết DTO.
+
+        /// <summary>Độ dài tối đa của mã kênh — khớp `Channel.Code` / `InvChannelLimits.ChannelCode` /
+        /// `ProductChannelVisibility.ChannelCode` (`HasMaxLength(32)`).</summary>
+        public const int MaKenhHienThiToiDa = 32;
+
+        /// <summary>Độ dài tối đa của lý do ẩn — khớp `ProductChannelVisibility.LyDo` (`HasMaxLength(1024)`).</summary>
+        public const int LyDoAnToiDa = 1024;
     }
 
     /// <summary>
@@ -443,6 +456,28 @@ public static class eCommerceConsts
             /// 📌 `WithData` mang **`tu`**, **`sang`**, **`sanPhamId`**, **`kenh`** ⇒ người vận hành biết **chính xác**
             /// cặp nào bị chặn mà **không** phải tự đi tìm.</summary>
             public const string ChuyenTrangThaiHienThiKhongHopLe = "eCommerce:Catalog:0205";
+            /// <summary>🚨 **KÊNH KHÔNG TỒN TẠI HOẶC ĐÃ NGỪNG HOẠT ĐỘNG** — `CAT-003` §6.3 **`0207`**.
+            /// 📌 **VÌ SAO LÀ LỖI NGHIỆP VỤ (không phải "dữ liệu vào sai"):** người vận hành chọn một kênh
+            /// **từ danh sách cũ** (hoặc kênh vừa bị ngừng) ⇒ cần chỉ dẫn **cụ thể**: *"chọn kênh đang hoạt động"*.
+            /// 🚨 **VÀ VÌ SAO PHẢI CƯỠNG CHẾ Ở ĐÂY (không chỉ ở UI):** nếu UI là chỗ duy nhất kiểm thì **API**
+            /// và **job** vẫn ghi được cấu hình cho một kênh **không tồn tại** ⇒ bản ghi **mồ côi** —
+            /// và truy vấn hiển thị sau đó **không** giải thích được vì sao sản phẩm *"ở trên kênh"* mà
+            /// kênh đó **không có thật**.
+            /// 📌 `WithData` mang **`kenh`** ⇒ thông báo nói **kênh nào**, không bắt người dùng tự đoán.</summary>
+            public const string KenhKhongHoatDong = "eCommerce:Catalog:0207";
+
+            /// <summary>🚨 **CÒN LIÊN KẾT ĐANG ĐỒNG BỘ TRÊN KÊNH** ⇒ KHÔNG được ngừng bán — `CAT-003` §6.3 **`0209`**.
+            /// 📌 **VÌ SAO CHẶN (đây là bảo vệ TIỀN và UY TÍN):** nếu ta đánh dấu *"ngừng bán"* trên hệ thống
+            /// **trong khi** sàn **vẫn đang bán** (listing còn `Synced`), thì:
+            /// <list type="bullet">
+            ///   <item>khách **vẫn đặt được** trên sàn, nhưng hệ thống **không còn** coi sản phẩm đó thuộc kênh
+            ///     ⇒ đơn về **không khớp** với cấu hình ⇒ tranh chấp **ai chịu trách nhiệm**;</item>
+            ///   <item>tồn kho **không còn** được phân bổ cho kênh đó ⇒ **bán quá tồn** (oversell) ⇒ phải huỷ đơn
+            ///     của khách ⇒ **mất uy tín**, và sàn có thể **phạt**.</item>
+            /// </list>
+            /// 🔒 Vì vậy guard phải **NÉM kèm DANH SÁCH** listing còn lại (không chỉ nói *"còn listing"*) —
+            /// người vận hành cần biết **gỡ cái nào**.</summary>
+            public const string ConLienKetDongBo = "eCommerce:Catalog:0209";
         }
     }
 

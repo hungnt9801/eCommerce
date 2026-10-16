@@ -1780,3 +1780,132 @@ là **khác nhau** ⇒ dòng thứ hai **lọt** ⇒ **HAI cấu hình hiển th
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.9 | 16/10/2026 | *(agent, session GĐ1)* | **§23 — LÁT CẮT 5: HIỂN THỊ THEO KÊNH (phần CUỐI của `CAT-003`)**: `TrangThaiHienThi` (`KeThua=0` **có chủ ý**) · `ProductChannelVisibility` với **bảng chuyển trạng thái ở TẦNG DOMAIN** (`TrangThai` **`protected set`** ⇒ một đường ghi) · mã `Catalog:0205` · migration `20261016135724` với **unique index `NULLS NOT DISTINCT`** (`DROP INDEX IF EXISTS`) · **+23 unit test** (1071 tổng) · **NND 47 → 48** · ánh xạ `ViPhamRangBuocDb` (**dùng hằng số**). ✅ **Kiểm chứng DB THẬT (3 phép đo)**: dòng thứ hai cho cùng `(SP, kênh)` bị **`duplicate key … IX_CatProductChannelVisibilities_TenantId_SanPham_Kenh`** chặn với `Key ("TenantId","ProductId","ChannelCode")=(null, …)` ⇒ **`NULLS NOT DISTINCT` hoạt động**; kênh **khác** vẫn thêm được. 🚨 **XUNG ĐỘT ĐẶC TẢ đã tự quyết** (§23.4): tài liệu ghi *"mọi cặp khác luôn ném"* **xung đột** với bất biến no-op đã chốt ở hai chỗ — **test cũ của tôi ĐÃ SAI** (khẳng định `KeThua ⇒ KeThua` phải ném); chọn **NO-OP** cho cặp không-đổi-trạng-thái, **giữ NÉM** cho `NgungBan ⇒ NgungBan` (hấp thụ tuyệt đối). Ghi **§23.1** (`INNER JOIN` làm **mất** sản phẩm **im lặng**) · **§23.3** (thứ tự: hấp thụ trước) · **§23.7** (nợ: **chưa có `IChannelDirectory`** ⇒ `0207` chưa cưỡng chế · **chưa có app service/API** · **chưa kiểm `ChannelListing`** ⇒ `0209` · chưa UI · chưa job `F10` · **chưa có truy vấn `LEFT JOIN`**) |
+
+---
+
+## 24. ✅ **LÁT CẮT 6 — `IChannelDirectory` + APP SERVICE/API HIỂN THỊ THEO KÊNH** (16/10/2026) — *đóng nợ §23.7 #1/#2/#3*
+
+> ⚠️ **PHẠM VI NÓI RÕ:** lát cắt này làm **`IChannelDirectory`** (guard `0207`) · **`HienThiKenhAppService`**
+> (**2 endpoint**) · **guard `0209`** (kiểm `ChannelListing` còn `Synced`) · mã `0207`/`0209`.
+> 🚫 **CHƯA** làm: **UI** · **job đối chiếu `F10`** · **`IChannelVisibilityResolver`** (truy vấn `LEFT JOIN`).
+> Nợ ghi ở **§24.7**.
+
+### 24.1 🔑 **QUY ƯỚC LỚN NHẤT CỦA LÁT CẮT: `KeThua` NGHĨA LÀ XOÁ BẢN GHI**
+
+`DatHienThiKenhInput.TrangThai = KeThua` ⇒ **XOÁ** bản ghi (quay về kế thừa), **KHÔNG** lưu giá trị `KeThua`.
+
+**Vì sao** (`ADR-08`): `KeThua` **chính là** *"không có bản ghi"* — **hai cách diễn đạt CÙNG một sự thật**.
+🔒 Nếu ta **lưu** một bản ghi mang giá trị `KeThua` thì:
+<list type="bullet">
+  <item>bảng có **HAI** cách biểu diễn **cùng một trạng thái** ⇒ mọi truy vấn `LEFT JOIN` phải xử lý **cả hai**
+    — và chỗ nào quên thì **sai im lặng**;</item>
+  <item>🚨 **Và nó tạo BẾ TẮC:** `ProductChannelVisibility.ChuyenSang(KeThua, …)` **NÉM** `0205` ⇒ nếu phải đi qua
+    `ChuyenSang` thì **không bao giờ** gỡ được cấu hình. 🔑 Vì vậy quy ước này **KHÔNG** đi qua `ChuyenSang` —
+    và tôi **không** kiểm guard `NgungBan` khi xoá. 📌 Xoá bản ghi **không phải** một *"chuyển dịch"*, nên bảng
+    chuyển **không** áp. ⚠️ Nếu áp, người dùng **không bao giờ** gỡ được cấu hình đã `NgungBan`, và điều đó
+    **phá** chính ý nghĩa của `ADR-08` (*"vắng bản ghi là trạng thái hợp lệ"*).</item>
+</list>
+✅ **Ca `J1`/`J2` trong probe chứng minh:** từ `NgungBan`, gọi `KeThua` trả **`204`** và bản ghi **bị xoá**.
+➕ **Và `J4` chứng minh xoá là XOÁ MỀM** (`IsDeleted = true`, dòng **vẫn còn**) — giữ **lịch sử** quyết định
+kinh doanh theo kênh, thứ mà báo cáo lịch sử cần.
+
+### 24.2 🚨 **GUARD `0207` — KÊNH PHẢI TỒN TẠI VÀ ĐANG HOẠT ĐỘNG**
+
+🔒 `IChannelDirectory.KenhHoatDongAsync` kiểm `Code == ma && IsActive`.
+📌 **VÌ SAO PHẢI Ở TẦNG NÀY (không chỉ ở UI):** nếu UI là chỗ kiểm **duy nhất** thì **API** và **job** vẫn ghi
+được cấu hình cho một kênh **không có thật** ⇒ **bản ghi mồ côi**, và truy vấn hiển thị sau đó **không** giải
+thích được vì sao sản phẩm *"ở trên kênh"* mà kênh đó **không tồn tại**.
+📌 **Và kiểm TRƯỚC mọi thứ khác** ⇒ thông báo lỗi **đúng nguyên nhân** (thay vì ném `0010` *"không tìm thấy
+sản phẩm"* chỉ vì thứ tự kiểm).
+
+**`IChannelDirectory` — ba quyết định:**
+| # | Quyết định | Vì sao |
+|---|---|---|
+**1** | 🔒 **Chỉ ĐỌC** (không có `Set*`) | Đổi trạng thái kênh là việc của người vận hành qua app service riêng (có quyền + audit). Nếu `Catalog` ghi được vào kênh thì **ranh giới module** mất nghĩa và **audit** không còn biết ai làm gì |
+**2** | **Không** tự kiểm `IsDeleted` (để bộ lọc `IRepository` lo) | 📌 Kiểm **hai lần** thì hai chỗ có thể **lệch nhau** khi ai đó tắt bộ lọc |
+**3** | **`ITransientDependency`**, KHÔNG phải app service | ⚠️ App service ⇒ ABP **tự sinh API controller** ⇒ **mở ra Internet** một đường tra kênh **không ai review** |
+
+⚠️ **`Channel` là bảng DÙNG CHUNG (không `IMultiTenant`)** — kênh là **định nghĩa hệ thống**, **không** thuộc
+tenant nào ⇒ hai tenant thấy **cùng** danh sách kênh, và **không** có rủi ro rò dữ liệu giữa tenant ở đây.
+
+### 24.3 🚨 **GUARD `0209` — CÒN `ChannelListing` Ở `Synced` THÌ KHÔNG NGỪNG BÁN**
+
+**Vì sao đây là bảo vệ TIỀN và UY TÍN:** nếu ta đánh dấu *"ngừng bán"* **trong khi** sàn **vẫn đang bán**:
+<list type="bullet">
+  <item>khách **vẫn đặt được** trên sàn, nhưng hệ thống **không còn** coi sản phẩm thuộc kênh ⇒ đơn về
+    **không khớp** cấu hình ⇒ tranh chấp **ai chịu trách nhiệm**;</item>
+  <item>tồn kho **không còn** được phân bổ cho kênh đó ⇒ **BÁN QUÁ TỒN** (oversell) ⇒ phải **huỷ đơn của khách**
+    ⇒ **mất uy tín**, và sàn có thể **phạt**.</item>
+</list>
+
+🔒 **VÀ THÔNG BÁO PHẢI KÈM DANH SÁCH** (`soListing` + `listing` = `Id:InternalSku`).
+📌 Một thông báo *"còn listing"* **không** cho người vận hành biết **gỡ cái nào** ⇒ với hàng trăm SKU thì đó là
+**bế tắc**. ✅ Ca `G2` trong probe khẳng định lỗi **mang** `soListing`.
+
+🚨 **MỘT CHI TIẾT DỄ SAI — VÀ NÓ LÀM GUARD MẤT TÁC DỤNG IM LẶNG:**
+`ChannelListing` trỏ tới **`ProductVariantId`**, **KHÔNG** phải `ProductId`. 📌 Nếu chỉ so `ProductId` thì
+guard **luôn** thấy *"không còn listing"* ⇒ **cho ngừng bán** dù sàn vẫn bán — và **không có lỗi nào**.
+🔑 Vì vậy app service **phải** đi qua danh sách biến thể của sản phẩm (`SelectMany(p => p.Variants)`).
+
+### 24.4 📌 **Hai lỗi tôi đã vấp trong lát cắt này (cả hai đều là lỗi TRA CỨU/CỦA TÔI)**
+
+| # | Lỗi | Thông báo | Sửa |
+|---|---|---|---|
+**1** | Dùng `Channel` từ `eCommerce.ChannelHub` (sai namespace — thật ra là **`.Channels`**) | **`CS0234`** | `using ChannelEntity = eCommerce.ChannelHub.Channels.Channel;` |
+**2** | Dùng `AsyncExecuter` trong lớp **không** kế thừa `ApplicationService` | **`CS0103`** *"The name 'AsyncExecuter' does not exist"* | **Tiêm** `IAsyncQueryableExecuter` |
+
+📌 **Và cả hai là cùng một họ với các lỗi trước:** `DataFilter` trong `Controller` (§22.3) · `ProductMedia.DoDaiAltToiDa` trong DTO (§20.3).
+🔑 **Quy tắc rút ra:** **thuộc tính của lớp cha KHÔNG có ở lớp không kế thừa nó** ⇒ phải **tiêm**;
+và **hằng số của entity KHÔNG đọc được từ DTO** (`Application.Contracts` không tham chiếu `Domain`) ⇒ để ở `CatalogLimits`.
+⚠️ **Lần này tôi vấp lần THỨ HAI** ở hằng số DTO (`MaKenhHienThiToiDa`) — nên đã ghi ngay vào chú thích
+`CatalogLimits` để **lần sau nghĩ tới nó TRƯỚC**.
+
+### 24.5 ✅ **KIỂM CHỨNG — 23/23 CA HTTP + DB THẬT** (Host :5000 + PostgreSQL 17)
+
+| Nhóm | Ca **ĐẠT** |
+|---|---|
+**Tiền đề** | A1: 2 sản phẩm (**1 publish**, **1 draft**) + 2 kênh (**1 hoạt động**, **1 ngừng**) + 1 biến thể |
+**`0207`** | **C1** kênh **đã ngừng** ⇒ **`403` + `0207`** · **C2 🚨 `0` dòng ghi** · C3 kênh **không tồn tại** ⇒ `403` + `0207` |
+**Chưa publish** | **D1** ⇒ **`403` + `0205`** · **D2 `0` dòng ghi** |
+**Ghi thật** | **E1** `200` · **E2 🚨 DB = `1` (`HienThi`)** · **E3 DTO trả TÊN kênh** (`Shopee`, tra qua `IChannelDirectory`) |
+**Thiếu lý do** | **F1** ẩn không lý do ⇒ **`403` + `0205`** · **F2 trạng thái KHÔNG đổi** |
+**`0209`** | **G1** còn listing `Synced` ⇒ **`403` + `0209`** · **G2 🚨 lỗi MANG `soListing`** · **G3 trạng thái KHÔNG đổi** |
+**Gỡ listing** | **H1** ngừng bán **thành công** `200` · **H2 DB = `3` (`NgungBan`)** |
+**Hấp thụ** | **I** `NgungBan ⇒ HienThi` và `⇒ An` **đều `403` + `0205`** · **I3 trạng thái vẫn `3`** |
+**`KeThua`** | **J1** `204` (**không ném**, dù đang `NgungBan`) · **J2 🚨 bản ghi BỊ XOÁ** · **J4 🚨 xoá MỀM** (`IsDeleted = true`, dòng vẫn còn) · **J3 gọi lại idempotent** `204` |
+**Log** | neo `HTK-DAT` = **1** · `HTK-DOI` = **1** · `HTK-XOA` = **1** |
+
+📌 **Ca `C2`/`D2`/`G3`/`I3` (trạng thái/số dòng KHÔNG đổi sau khi guard ném) là ca quan trọng nhất về mặt
+kỹ thuật:** chúng chứng minh guard **NÉM TRƯỚC** khi ghi, **không** để lại dữ liệu nửa vời.
+
+### 24.6 🐞 **Bộ đo lại sai — lần thứ NĂM** (nhưng lần này có **hai** lớp bắt)
+
+**Lớp 1 — TIỀN ĐỀ bắt được:** `INSERT` biến thể **thất bại** vì `CatProductVariants` **không có** cột
+`ExtraProperties` ⇒ probe **`throw` DỪNG NGAY** ở `A1`. 📌 Đúng bài học `REC-001` §17.7 — *"bước gieo thất bại
+im lặng"* là dạng nguy hiểm nhất; nay nó **không** im lặng.
+
+**Lớp 2 — ca `J2` đỏ vì kỳ vọng của BỘ ĐO sai:** `DeleteAsync` là **XOÁ MỀM** ⇒ dòng **vẫn còn** với
+`IsDeleted = true`; tôi đếm **cả** dòng đã xoá ⇒ `soDong=1` trong khi sản phẩm **đúng**.
+🔒 **Sửa:** lọc `not "IsDeleted"`, **và** thêm ca **`J4`** khẳng định **chính** `IsDeleted = true` — biến
+lỗi đo thành **một ca kiểm mới có giá trị** (chứng minh xoá mềm, không xoá cứng).
+📌 **Bài học:** khi một ca đỏ, **kiểm kỳ vọng của bộ đo TRƯỚC** khi kết luận sản phẩm sai — nhưng **đừng**
+chỉ sửa kỳ vọng: hãy **thêm ca** khoá lại sự thật vừa học.
+
+### 24.7 ⏳ NỢ (KHÔNG phải tính năng đã có)
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+| **1** | 🚨 **CHƯA có `IChannelVisibilityResolver`** (`LEFT JOIN` + `COALESCE`) | 🔒 **Điều nguy hiểm nhất còn lại** (§23.1): người viết truy vấn storefront đầu tiên rất dễ dùng `INNER JOIN` ⇒ **mất** sản phẩm **im lặng** |
+| **2** | 🚨 **Chưa kiểm `ChannelListing` khi `KeThua`** | `KeThua` ⇒ xoá bản ghi ⇒ **không** kiểm listing đồng bộ. ⚠️ Xoá bản ghi **không** chặn bán trên sàn (sàn vẫn bán) ⇒ **có thể** để lại tình trạng *"hệ thống không còn cấu hình nhưng sàn vẫn bán"*. 📌 Cần **quyết định nghiệp vụ**: hoặc chặn (như `NgungBan`), hoặc ghi log cảnh báo |
+| **3** | **`ListingDangDongBo = 2` là hằng số CỤC BỘ** | 📌 Enum thật ở assembly khác. ⚠️ Nếu `ChannelHub` đổi số thì phải đổi **cả đây** — **không** có gì bắt lỗi. 🔒 Cần một hằng số **dùng chung** hoặc test đối chiếu |
+| **4** | **CHƯA có job đối chiếu `F10`** | Bản ghi trỏ tới kênh **đã ngừng** **không** được tự chuyển trạng thái + **không** có log/metric |
+| **5** | **CHƯA có UI** | Chưa trang, chưa menu |
+| **6** | **`DanhSachKenhHoatDongAsync` CHƯA có chỗ dùng** | Đã làm cho UI chọn kênh + job `F10` — ⚠️ hiện **chưa** ai gọi ⇒ hoặc dùng, hoặc gỡ |
+| **7** | **`GetDanhSachAsync` gọi `_kenh` trong vòng lặp** | ⚠️ N+1: với 50 dòng thì **100** truy vấn cho một màn hình. 📌 Chấp nhận được ở quy mô hiện tại, **nhưng** phải sửa trước khi bảng lớn |
+| **8** | **Quyền dùng `Products.Edit`** | 📌 Cố ý (đặt hiển thị là một phần của việc sửa sản phẩm). ⚠️ Nếu cần tách *"chỉ marketing được ẩn/hiện"* thì phải thêm **cả** hằng số **và** provider |
+
+### 24.8 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.0 | 16/10/2026 | *(agent, session GĐ1)* | **§24 — LÁT CẮT 6: `IChannelDirectory` + API HIỂN THỊ THEO KÊNH** (đóng nợ §23.7 #1/#2/#3): `IChannelDirectory` (**chỉ đọc** · `ITransientDependency` **không** app service ⇒ không mở API không review · **không** tự kiểm `IsDeleted`) · `ChannelDirectory` · `IHienThiKenhAppService`/`HienThiKenhAppService` (**2 endpoint**) · `HienThiKenhDtos` · mã `0207`/`0209` · hằng số ở `CatalogLimits` (Contracts **không** tham chiếu Domain). 🔑 **QUY ƯỚC**: `KeThua` ⇒ **XOÁ BẢN GHI** (không lưu `KeThua`) — tránh **hai cách biểu diễn** cùng trạng thái **và** tránh **bế tắc** (`ChuyenSang(KeThua)` **NÉM**). 🚨 **GUARD `0209` phải đi qua DANH SÁCH BIẾN THỂ** (`ChannelListing` trỏ `ProductVariantId` — so `ProductId` làm guard **mất tác dụng im lặng**). ✅ **23/23 ca HTTP + DB thật**: `0207` (kênh ngừng/không tồn tại, **0 dòng ghi**) · chưa publish `0205` · ghi thật (DB = `1`, **tên kênh** tra qua directory) · thiếu lý do `0205` · `0209` **kèm `soListing`** · gỡ listing ⇒ ngừng bán được (DB = `3`) · **hấp thụ** · `KeThua` ⇒ `204` + **xoá MỀM** (`IsDeleted = true`). 🐞 **Bộ đo sai lần thứ NĂM**, hai lớp bắt: **tiền đề** (`ExtraProperties` không tồn tại ⇒ **dừng ngay**) và **kỳ vọng sai** (đếm cả dòng xoá mềm ⇒ sửa **và** thêm ca `J4` khoá sự thật). Ghi **§24.4** (hai lỗi tra cứu: namespace `.Channels` · `AsyncExecuter` phải **tiêm**) · **§24.7** (nợ: **chưa có `LEFT JOIN` resolver** · **`KeThua` không kiểm listing** · `ListingDangDongBo` hằng số cục bộ · chưa job `F10` · chưa UI · N+1 · quyền) |
