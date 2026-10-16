@@ -53,3 +53,6 @@ media-noi-bo/
 
 # Moc build tam (tools\kiem-moc-build.ps1) - chi la cong cu kiem chung, khong phai ma nguon.
 .moc-build.json
+
+# Log tam cua script kiem chung trong tools\ (dang _ten.txt) - KHONG phai ma nguon.
+tools/_*.txt
