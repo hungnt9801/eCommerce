@@ -2856,3 +2856,49 @@ chứng minh server **không ném** và **kẹp đúng** — nếu không, ngư�
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.0-p | 15/10/2026 | *(agent, session GĐ1)* | ✅ **SỐ DÒNG SỐNG QUA PHIÊN**: cookie `so-dong` (`HttpOnly`, 2 giờ), đọc theo thứ tự **`?soDong` → cookie → 3**, ghi ở **cả GET và POST**; 🔒 `TryParse` + `Clamp` chịu **rác/ngoài biên**. **Kiểm chứng**: `?soDong=5` rồi GET không query ⇒ **`5`** ô; `?soDong=2` ⇒ **`2`**; cookie `abc` ⇒ **`3`** (200, không ném); cookie `99` ⇒ **`5`** (kẹp); POST lỗi rồi GET ⇒ **`5`**; build **3/3**; **`fail: 0`** |
+
+---
+
+## 91. ✅ **CHI TIẾT SẢN PHẨM + SEO (CAT-003 / nợ WEB-002) — ĐÃ KIỂM CHỨNG** (15/10/2026)
+
+### 91.1 Đã làm
+
+| # | Nội dung |
+|---|---|
+| 1 | `GET /SanPham/ChiTiet/{sku}` — lọc SKU (**OrdinalIgnoreCase**) trên **cùng `IPriceListAppService`** như `/SanPham` ⇒ **KHÔNG** tự tính giá ở UI (PRC-001 Q1) |
+| 2 | 🔎 **SEO:** `<title>` (`SKU — giá thấp nhất`) · `<meta name="description">` · `<link rel="canonical">` |
+| 3 | 🚨 **Không có giá niêm yết ⇒ `404`** (không trả trang rỗng ⇒ không bị **đánh chỉ mục trang rỗng**) |
+| 4 | 🔒 **`HtmlEncode` mọi giá trị** vào HTML · ⚠️ trang **chỉ đọc** ⇒ **không** form ⇒ **không** cần token (§73 · §86) |
+| 5 | 🐛 **FIX LỖI ROUTE (phát hiện bằng ĐO):** thêm `[HttpGet("SanPham/ChiTiet/{sku}")]` |
+
+### 91.2 🐛 Lỗi **thật** tìm ra — và **vì sao ca DƯƠNG mới phát hiện được**
+
+Route **mặc định** của MVC là `{controller}/{action}/{id?}` ⇒ đoạn thứ ba gán cho **`id`**, nên tham số tên **`sku` KHÔNG** được bind ⇒ `sku = null`
+⇒ `NotFound()` ⇒ **`404` dù SKU CÓ giá**. 📌 Và ca **âm** (SKU lạ) **cũng** trả `404` ⇒ **"đạt" vì LÝ DO SAI**.
+⇒ Nếu chỉ kiểm ca âm (như thói quen "kiểm 404 là đủ"), tính năng sẽ được coi là **xong** trong khi **luôn 404**.
+📌 **Quy tắc:** trang theo **định danh** ⇒ **LUÔN kiểm CA DƯƠNG trước** (`200` + **nội dung khớp nguồn dữ liệu**), rồi mới kiểm ca âm.
+
+### 91.3 ✅ BẰNG CHỨNG (sau khi sửa route)
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | **Đối chứng chéo API** `items/{id}` | **`123456.0000`** ✅ *(cùng nguồn dữ liệu)* |
+| 2 | 🔥 `GET /SanPham/ChiTiet/{sku}` | HTTP **`200`** ✅ |
+| 3 | 🔥 **`<title>`** | **`GGSKU-084536 — 123,456 VND`** — có SKU **`True`** · có giá **`True`** ✅ |
+| 4 | 🔥 **Giá thấp nhất** | **`True`** ✅ *(khớp đúng giá từ API)* |
+| 5 | **Bảng giá** · **canonical** | **`True`** · **`True`** ✅ |
+| 6 | **SKU không có giá** | HTTP **`404`** ✅ |
+| 7 | `fail:` · tiến trình treo | **`0`** ✅ · **0** ✅ |
+
+### 91.4 ⚠️ Nợ ghi rõ (KHÔNG đưa vào phép kiểm trên — đúng phạm vi)
+
+| # | Việc |
+|---|---|
+| 1 | **Liên kết từ danh sách `/SanPham` sang trang chi tiết** (hiện chỉ vào được **bằng URL**) |
+| 2 | **Slug thay SKU** + `sitemap.xml`/`robots.txt` (phần còn lại của CAT-003) |
+
+### 91.5 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.0-q | 15/10/2026 | *(agent, session GĐ1)* | ✅ **CHI TIẾT SẢN PHẨM + SEO**: `GET /SanPham/ChiTiet/{sku}` (**route tường minh**), cùng `IPriceListAppService`, `title`/`meta description`/`canonical`, **`404`** khi không có giá, `HtmlEncode`. **Kiểm chứng**: đối chứng chéo API **`123456.0000`**; trang **`200`**, `<title>` **`GGSKU-084536 — 123,456 VND`**, giá thấp nhất **khớp**; SKU lạ ⇒ **`404`**; build **3/3**; **`fail: 0`**. 🐛 **Lỗi route** (`sku` không bind vì route mặc định dùng `id`) — **ca DƯƠNG** phát hiện, ca âm đã "đạt" vì **lý do sai** |

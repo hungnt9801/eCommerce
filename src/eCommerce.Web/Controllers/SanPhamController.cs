@@ -51,6 +51,69 @@ public class SanPhamController : Controller
 
         return View(dong);
     }
+
+    /// <summary>`GET /SanPham/ChiTiet/{sku}` — **CHI TIẾT SẢN PHẨM + SEO** (`CAT-003` · nợ của `WEB-002`).
+    ///
+    /// 📌 **Một nguồn sự thật:** dữ liệu lấy từ **cùng `IPriceListAppService`** như `/SanPham` — **KHÔNG** tự tính giá ở tầng UI
+    /// (giá **phải** đến từ `Pricing`, `PRC-001` Q1).
+    /// 🔎 **SEO:** `<title>` · `<meta name="description">` · `<link rel="canonical">`.
+    ///    📌 Slug thay SKU là **bước sau của `CAT-003`** — hiện dùng SKU làm định danh URL (đã **duy nhất** theo nghiệp vụ).
+    /// ⚠️ Trang **CHỈ ĐỌC** ⇒ **không** có form ⇒ **không** cần token chống giả mạo (bài học vòng 73 · 86).
+    /// 🚨 **Không có giá niêm yết ⇒ `404`** — **KHÔNG** trả trang rỗng (tránh máy tìm kiếm **đánh chỉ mục trang rỗng**).
+    /// 🔒 Mọi giá trị đưa vào HTML đều qua `HtmlEncode` (SKU do người dùng nhập ⇒ **không** nối chuỗi thô).</summary>
+    /// ⚠️ **BẮT BUỘC có route TƯỜNG MINH:** route mặc định là `{controller}/{action}/{id?}` ⇒ đoạn thứ ba gán cho **`id`**,
+    /// nên tham số tên `sku` **KHÔNG** được bind từ URL ⇒ `sku = null` ⇒ **`404` dù SKU có giá** (đã ĐO được ở vòng 108).
+    /// 📌 Đây là lỗi **chỉ lộ ra khi chạy**, và **ca DƯƠNG** mới phát hiện được — ca âm (`404`) đã "đạt" vì **lý do sai**.
+    [HttpGet("SanPham/ChiTiet/{sku}")]
+    public async Task<IActionResult> ChiTiet(string sku)
+    {
+        if (string.IsNullOrWhiteSpace(sku)) { return NotFound(); }
+
+        var bangGiaList = await _bangGia.GetListAsync();
+
+        var dong = new List<(string MaBangGia, string TenBangGia, decimal DonGia)>();
+
+        foreach (var bg in bangGiaList.OrderBy(x => x.Code, StringComparer.Ordinal))
+        {
+            var items = await _bangGia.GetItemsAsync(bg.Id);
+
+            dong.AddRange(items
+                .Where(x => string.Equals(x.Sku, sku, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(x => x.Amount)
+                .Select(x => (bg.Code, bg.Name, x.Amount)));
+        }
+
+        if (dong.Count == 0) { return NotFound(); }
+
+        var giaThapNhat = dong.Min(x => x.DonGia);
+        var tieuDe = $"{sku} — {giaThapNhat:N0} VND";
+        var moTa = $"Giá niêm yết cho {sku}: từ {giaThapNhat:N0} VND ({dong.Count} danh sách giá).";
+
+        var than = new System.Text.StringBuilder();
+        than.Append($"<h1 id=\"ten-san-pham\">{System.Net.WebUtility.HtmlEncode(sku)}</h1>");
+        than.Append($"<p id=\"gia-thap-nhat\">Giá từ <strong>{giaThapNhat:N0}</strong> VND</p>");
+        than.Append("<table id=\"bang-gia-chi-tiet\"><tr><th>Danh sách giá</th><th>Tên</th><th>Đơn giá</th></tr>");
+
+        foreach (var d in dong)
+        {
+            than.Append($"<tr class=\"dong-gia\"><td>{System.Net.WebUtility.HtmlEncode(d.MaBangGia)}</td><td>{System.Net.WebUtility.HtmlEncode(d.TenBangGia)}</td><td>{d.DonGia:N0}</td></tr>");
+        }
+
+        than.Append("</table>");
+        than.Append("<p><a id=\"quay-lai\" href=\"/SanPham\">← Danh sách hàng đang bán</a></p>");
+
+        var html = "<!DOCTYPE html><html lang=\"vi\"><head><meta charset=\"utf-8\"><title>"
+                 + System.Net.WebUtility.HtmlEncode(tieuDe)
+                 + "</title><meta name=\"description\" content=\""
+                 + System.Net.WebUtility.HtmlEncode(moTa)
+                 + "\"><link rel=\"canonical\" href=\"/SanPham/ChiTiet/"
+                 + System.Net.WebUtility.HtmlEncode(sku)
+                 + "\"></head><body>"
+                 + than
+                 + "</body></html>";
+
+        return Content(html, "text/html; charset=utf-8");
+    }
 }
 
 /// <summary>Một dòng hiển thị: **danh sách giá** nào đang niêm yết **SKU** này với **đơn giá** bao nhiêu.</summary>
