@@ -1,8 +1,10 @@
 using eCommerce.Inventory;
+using eCommerce.Settings;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Volo.Abp.BackgroundWorkers;
 using Volo.Abp.DistributedLocking;
+using Volo.Abp.Settings;
 using Volo.Abp.Threading;
 using Volo.Abp.Uow;
 
@@ -68,6 +70,32 @@ public class InventoryReconciliationWorker : AsyncPeriodicBackgroundWorkerBase
         using var uow = uowManager.Begin(requiresNew: true, isTransactional: false);
 
         var service = scope.ServiceProvider.GetRequiredService<InventoryReconciliationService>();
+
+        // 🚨 `REC-001` — **CHÍNH SÁCH CHO PHÉP CHỌN** (§93): chính sách nay là **DỮ LIỆU CẤU HÌNH**, nên phải **ĐỌC RA VÀ LOG**
+        // *"đang chạy theo chính sách nào"*. 📌 Không có dòng này thì `Warn` và `RequireConfirmation` **giống hệt nhau** khi nhìn log
+        // ⇒ người vận hành **không biết** cấu hình của mình có hiệu lực hay không (đúng loại "im lặng" mà các cơ chế tồn tại để chặn).
+        // 🔒 Giá trị lạ ⇒ hàm đọc trả **mặc định an toàn** + `hopLe = false` ⇒ ở đây **ghi cảnh báo** (không ném, không chết job).
+        var setting = scope.ServiceProvider.GetRequiredService<ISettingProvider>();
+
+        var donVi = ChinhSach.DocDonViNguong(await setting.GetOrNullAsync(TenChinhSach.NguongDoiSoat_DonVi), out var donViHopLe);
+        var giaTri = ChinhSach.DocSo(await setting.GetOrNullAsync(TenChinhSach.NguongDoiSoat_GiaTri), 0.5m, out var giaTriHopLe);
+        var hanhDong = ChinhSach.DocHanhDongLech(await setting.GetOrNullAsync(TenChinhSach.NguongDoiSoat_HanhDong), out var hanhDongHopLe);
+
+        Logger.LogInformation("JOB ĐỐI SOÁT: CHÍNH SÁCH đang áp dụng — ngưỡng {DonVi}({GiaTri}) · khi lệch thì {HanhDong}.",
+            donVi, giaTri, hanhDong);
+
+        if (!donViHopLe || !giaTriHopLe || !hanhDongHopLe)
+        {
+            Logger.LogWarning("JOB ĐỐI SOÁT: CẤU HÌNH CHÍNH SÁCH KHÔNG HỢP LỆ ở {Cho} ⇒ đã dùng MẶC ĐỊNH an toàn. " +
+                "Kiểm các setting: {S1} · {S2} · {S3}.",
+                string.Join(", ", new[]
+                {
+                    donViHopLe ? null : TenChinhSach.NguongDoiSoat_DonVi,
+                    giaTriHopLe ? null : TenChinhSach.NguongDoiSoat_GiaTri,
+                    hanhDongHopLe ? null : TenChinhSach.NguongDoiSoat_HanhDong
+                }.Where(x => x is not null)),
+                TenChinhSach.NguongDoiSoat_DonVi, TenChinhSach.NguongDoiSoat_GiaTri, TenChinhSach.NguongDoiSoat_HanhDong);
+        }
 
         var lech = await service.DoiSoatTonKhoAsync();
 

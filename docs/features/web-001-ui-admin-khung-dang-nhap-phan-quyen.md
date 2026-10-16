@@ -2935,3 +2935,63 @@ chỉ kiểm `href` thì link có thể **chết** (`404`). Đo **cả hai** ⇒
 |---|---|---|---|
 | v1.0-r | 16/10/2026 | *(agent, session GĐ1)* | ✅ **Liên kết `/SanPham` → `/SanPham/ChiTiet/{sku}`** (ô SKU, `Url.Action`, `class` không `id`). **Kiểm chứng**: `/SanPham` = **200** và có link **`True`**, `href` = **`/SanPham/ChiTiet/GHSKU-093002`** (**trỏ đúng**), **bấm ⇒ 200** với `<title>` chứa SKU + giá **khớp** API (`123456`); build **3/3**; **`fail: 0`**. ⚠️ **Nợ còn lại:** **slug thay SKU** + `sitemap.xml`/`robots.txt` (phần còn lại của `CAT-003`) |
 
+
+---
+
+## 93. ✅ **CHÍNH SÁCH "CHO PHÉP CHỌN" CHO `INV-003` + `REC-001` — ĐÃ KIỂM CHỨNG** (16/10/2026)
+
+### 93.1 Quyết định của người đặt yêu cầu → cách làm
+
+Người quyết định chọn **"option, cho phép chọn"** cho **cả hai** việc ⇒ chính sách trở thành **DỮ LIỆU CẤU HÌNH** thay vì hằng số trong mã.
+📌 **Vì sao quan trọng:** mã hoá **cứng** một lựa chọn buộc **sửa mã + deploy** mỗi lần đổi ý — mà đây là các **ngưỡng/chính sách nghiệp vụ**,
+loại thứ **sẽ** còn đổi. 🔒 Và hạ tầng đã có sẵn: `AbpSettings` + `AbpSettingDefinitions` **đã tồn tại** trong DB ⇒ **KHÔNG cần migration**.
+
+### 93.2 Đã làm
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| 1 | `eCommerce.Settings.TenChinhSach` | **7 tên setting** + **danh sách giá trị hợp lệ** |
+| 2 | 4 `enum` | `DonViNguong` · `HanhDongLech` · `DonViHanMuc` · `HanhDongHanMuc` · `PhamViHanMuc` |
+| 3 | `eCommerce.Settings.ChinhSach` | **5 hàm đọc THUẦN** (`DocDonViNguong` · `DocHanhDongLech` · `DocDonViHanMuc` · `DocHanhDongHanMuc` · `DocPhamViHanMuc` · `DocSo`) — **không DB, không side effect** |
+| 4 | `ChinhSachSettingDefinitionProvider` | khai báo 7 setting với **mặc định an toàn** (ABP **tự đăng ký** theo quy ước) |
+| 5 | `InventoryReconciliationWorker` | **đọc + LOG** chính sách đang áp dụng mỗi lượt; giá trị lạ ⇒ **cảnh báo** + dùng mặc định |
+| 6 | `ChinhSachTests` | **34 test** (lý thuyết + sự thật) |
+
+🔒 **Nguyên tắc "mặc định phải là lựa chọn ÍT RỦI RO NHẤT":** `Warn` (**không** tự sửa dữ liệu) · `Block` (**không** bán quá hạn mức) · số **âm bị từ chối**.
+📌 **Nguyên tắc "dữ liệu cấu hình cũng là dữ liệu VÀO":** giá trị lạ ⇒ **KHÔNG ném** ⇒ trả **mặc định** + cờ `hopLe = false` để **chỗ gọi ghi cảnh báo**.
+Nếu hàm đọc **ném**, một lỗi gõ trong cấu hình sẽ **làm chết job** thay vì chỉ dùng mặc định.
+
+### 93.3 ✅ BẰNG CHỨNG
+
+| # | Phép đo | Kết quả |
+|---|---|---|
+| 1 | **Unit test** khu `Settings` | **34/34 ĐẠT** ✅ |
+| 2 | 🔥 **Chạy thật (mặc định)** | log job: **`ngưỡng Percent(0.5) · khi lệch thì Warn`** ✅ *(đọc được chính sách lúc chạy)* |
+| 3 | 🔥 **Đổi lựa chọn trong DB** (`Absolute` · `5` · `RequireConfirmation`) **+ xoá cache** | log job: **`ngưỡng Absolute(5) · khi lệch thì RequireConfirmation`** ✅ ⇒ **chọn có hiệu lực, KHÔNG deploy** |
+
+### 93.4 🐛 **HAI phát hiện THẬT** (đều nhờ **đo**, không phải nhờ đọc mã)
+
+**(a) Test bắt được một lỗi SAI 10 LẦN.** `DocSo` ban đầu dùng `NumberStyles.Number` — kiểu này coi **dấu phẩy là dấu phân nhóm NGHÌN**
+⇒ `"0,5"` (người Việt gõ, ý **0,5 %**) bị đọc thành **`5`** — ngưỡng cảnh báo **sai 10 lần** mà **không** lỗi nào nổi lên.
+📌 Test `DocSo_dau_PHAY_thap_phan__KHONG_duoc_nhan__dung_mac_dinh` **ĐỎ** ngay lần chạy đầu ⇒ đã **siết** về `AllowDecimalPoint` + khoảng trắng
+⇒ `"1,5"` bị **từ chối** (dùng mặc định) thay vì bị **đoán** thành `15`.
+
+**(b) Ghi thẳng vào `AbpSettings` KHÔNG có tác dụng cho tới khi XOÁ CACHE.** Lần chạy thứ hai **vẫn** ra chính sách mặc định dù DB đã có 3 dòng.
+⇒ Truy Redis và thấy **cache của ABP**: `c:Volo.Abp.SettingManagement.Setting,k:ecommerce:pn:G,pk:,n:Recon.Threshold.Value` …
+📌 Cache này **sống qua cả restart Host** ⇒ đường ghi **chuẩn** của ABP (`ISettingManager.SetGlobalAsync` / API quản trị) **tự xoá cache**,
+còn ghi thẳng DB thì **không**. Sau khi `DEL` 3 key ⇒ chính sách **đổi đúng** (mục 93.3 #3).
+
+### 93.5 ⚠️ NỢ GHI RÕ (KHÔNG đưa vào phép kiểm §93.3 — đúng phạm vi)
+
+| # | Việc | Vì sao cần |
+|---|---|---|
+| 1 | **Đường GHI chuẩn cho admin:** nạp `Volo.Abp.SettingManagement.HttpApi` (+ Application) vào Host/Web **hoặc** một app service dùng `ISettingManager` | hiện **không** có cách đổi setting qua UI/API (swagger **không** có route `setting`) ⇒ phải sửa DB **và** xoá cache bằng tay (**dễ sai**) |
+| 2 | **CƯỠNG CHẾ `INV-003`:** đọc 4 setting hạn mức **trong đường giữ chỗ** và áp `Block`/`Warn` theo `PhamVi` | hiện **mới khai báo** setting + hàm đọc, **chưa** chặn ở checkout ⇒ *"cho phép chọn"* đã sẵn nhưng **chưa có gì để chọn** |
+| 3 | **Bảng hạn mức theo kênh** (giá trị riêng cho từng kênh) + migration | `Inv.ChannelLimit.DefaultValue` hiện là **giá trị dùng chung** |
+
+### 93.6 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.0-s | 16/10/2026 | *(agent, session GĐ1)* | ✅ **CHÍNH SÁCH CHO PHÉP CHỌN** cho `INV-003` + `REC-001`: 7 setting (ABP Settings, **không migration**), 4 enum + 6 hàm đọc **thuần**, provider khai báo mặc định **an toàn**, job đối soát **đọc + log** chính sách, **34 unit test**. **Kiểm chứng**: **34/34** test đạt; chạy thật ra **`Percent(0.5) · Warn`**; đặt `Absolute`/`5`/`RequireConfirmation` + **xoá cache** ⇒ ra **`Absolute(5) · RequireConfirmation`**. 🐛 **Hai phát hiện thật:** (a) `NumberStyles.Number` khiến `"0,5"` thành **`5`** (**sai 10 lần**) — test bắt được, đã siết; (b) ghi thẳng `AbpSettings` **không** có tác dụng cho tới khi xoá **cache Redis** của ABP |
+
