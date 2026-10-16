@@ -3491,6 +3491,9 @@ namespace eCommerce.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("DeletionTime");
 
+                    b.Property<int?>("DonVi")
+                        .HasColumnType("integer");
+
                     b.Property<string>("ExtraProperties")
                         .IsRequired()
                         .HasColumnType("text")

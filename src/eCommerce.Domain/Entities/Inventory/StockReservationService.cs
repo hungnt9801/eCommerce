@@ -127,7 +127,7 @@ public class StockReservationService : DomainService
         var cacDongHanMuc = kenhChuanHoa is null
             ? []
             : (await _hanMucKenhRepository.GetListAsync(x => x.ChannelCode == kenhChuanHoa))
-                .Select(x => new HanMucKenh.DongHanMuc(x.Id, x.WarehouseId, x.GiaTri, x.HanhDong))
+                .Select(x => new HanMucKenh.DongHanMuc(x.Id, x.WarehouseId, x.GiaTri, x.HanhDong, x.DonVi))
                 .ToList();
 
         var hanMucDangAp = HanMucKenh.ChonHanMuc(

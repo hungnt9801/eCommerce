@@ -1270,3 +1270,100 @@ thêm **ngay khi viết `Logger.*`** — không phải việc của probe. Bằn
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.3 | 16/10/2026 | *(agent, session GĐ1)* | **§17 — ĐƯỜNG GHI CHUẨN CHO ADMIN**: `ChinhSachHanMucAppService` (6 endpoint) + ghi qua **`ISettingManager`** (cache 2 tầng tự xoá) + UPSERT `(kênh, kho)` + validate kênh (`0046`) & hành động (`Settings:0001`) + cảnh báo tại chỗ ghi + xoá mềm + `GhichuNo()` + permission `eCommerce.ChannelLimits`. Nạp `Volo.Abp.SettingManagement.HttpApi` (**đo được: không đủ** — chỉ có `emailing`/`timezone`). **Kiểm chứng 11/11 ca**, then chốt là **E1** (hiệu lực **ngay**, không restart). Ghi **§17.4** (neo ASCII là việc của mã sản phẩm) |
+
+---
+
+## 18. ✅ **LÁT CẮT 3 — `DonVi` THEO TỪNG DÒNG HẠN MỨC** (17/10/2026) — *đóng nợ §16.8 #1 (nợ số 1 về nghiệp vụ)*
+
+### 18.1 🔑 **Vì sao đây là nợ SỐ 1, không phải chi tiết nhỏ**
+
+Nghiệp vụ thật dùng **hai đơn vị cho hai kênh khác nhau**:
+<list type="bullet">
+  <item>kênh **A** cam kết theo **`%` tồn khả dụng** (vì tồn biến động theo mùa);</item>
+  <item>kênh **B** cam kết theo **số lượng tuyệt đối** (vì hợp đồng ghi *"200 chiếc"*).</item>
+</list>
+
+⚠️ **Với MỘT đơn vị dùng chung**, người vận hành phải **chọn một trong hai** ⇒ kênh còn lại bị **diễn giải sai**.
+🚨 **Và sai IM LẶNG:** `100` đọc là `100%` thay vì `100 chiếc` ⇒ hạn mức **không chặn gì cả** —
+**không có lỗi nào, không log, không ném**. 🔑 Đây đúng loại hỏng mà cả dự án xoay quanh.
+
+### 18.2 ✅ **Quyết định thiết kế quan trọng nhất: `null` CÓ NGHĨA = "KHÔNG OVERRIDE"**
+
+| Phương án | Vì sao chọn / loại |
+|---|---|
+✅ **`DonVi` nullable; `null` = kế thừa setting** | 📌 **Dữ liệu cũ KHÔNG đổi hành vi** ⇒ migration **an toàn**. 🔑 Và *"không override"* là một **trạng thái thật** cần diễn đạt được |
+❌ Dùng `0`/giá trị "mặc định" làm cờ *"không override"* | ⚠️ `Percent` = `0` là một **đơn vị HỢP LỆ** ⇒ dùng nó làm cờ tạo **HAI cách diễn đạt cùng một ý** — đúng lỗi mà `GiaTri` đã tránh (xem cảnh báo về số âm ở hàm tạo `InvChannelLimit`) |
+❌ Bắt buộc mọi dòng phải khai `DonVi` | 🔒 Sẽ **đổi hành vi** mọi dòng cũ khi migration ⇒ nguy hiểm, và **không** cần thiết |
+
+➕ **Và `DonVi` gán ở CÙNG cửa vào với `GiaTri`/`HanhDong`** (`DatHanMuc`) — 🔒 nếu để đường ghi riêng thì có thể
+đổi **đơn vị** mà **quên** đổi **giá trị** ⇒ `100` đổi từ `%` sang `chiếc` **âm thầm** đổi ý nghĩa.
+
+### 18.3 🚨 **Điểm nguy hiểm nhất — và cách chặn: "LẤY LẪN ĐƠN VỊ"**
+
+`DongHanMuc` và `KetQuaHanMuc` là **HAI** chỗ chứa `DonVi` ⇒ có **HAI** đường để lấy sai.
+🚨 **Ca xấu nhất:** lấy `GiaTri` của **dòng theo kho** nhưng `DonVi` của **dòng cả kênh** (hoặc của setting)
+⇒ `30` (chiếc) bị đọc thành `30%`.
+
+🔒 **Cách chặn:** đặt việc trộn **ngay cạnh** việc chọn dòng — `ChonHanMuc` trả `chon.DonVi ?? donVi`:
+<list type="bullet">
+  <item>📌 Không có đường nào lấy `GiaTri` của dòng mà lấy `DonVi` của setting — vì cả hai **cùng một** phép gán;</item>
+  <item>➕ Và **`KetQuaHanMuc.DonVi` KHÔNG nullable** ⇒ chỗ gọi **luôn** in được *"vượt hạn mức 30 Absolute"* thay vì
+    *"vượt hạn mức 30"* (mà `30` một mình thì **vô nghĩa**). 🔑 Một kết quả *"đã chọn"* mà **thiếu** đơn vị thì
+    **không diễn đạt được** — chỗ gọi sẽ phải tự đoán.</item>
+</list>
+
+### 18.4 ✅ **Màn hình admin — cột "Đơn vị" là BẮT BUỘC, không phải trang trí**
+
+📌 Nếu màn hình hiện `GiaTri` mà **không** hiện đơn vị thì người vận hành **đọc sai cấu hình của chính mình**.
+🔒 Vì vậy:
+<list type="bullet">
+  <item>**Cột "Đơn vị"** trong bảng: dòng có override ⇒ hiện **tên đơn vị**; dòng `null` ⇒ hiện
+    **`(kế thừa: Percent)`** — ⚠️ **không** để trống (ô trống làm người dùng tưởng *"chưa đặt"* trong khi thực ra đang **kế thừa**);</item>
+  <item>**Ô chọn "Đơn vị"** trong form, với lựa chọn đầu là **`(kế thừa chung: …)`** — 🔑 để trống **là** một lựa chọn, và nó được **ghi rõ**.</item>
+</list>
+
+### 18.5 ✅ **KIỂM CHỨNG — 10 UNIT TEST + 7 CA DB/HTTP THẬT**
+
+**`HanMucKenhDonViTests` (10 ca)** — hàm thuần, không DB:
+| Nhóm | Bất biến |
+|---|---|
+**Override thắng** | Dòng có `DonVi` tường minh ⇒ **thắng** setting — 🔒 **kiểm CẢ HAI CHIỀU** (nếu chỉ một chiều thì một phép gán cứng vẫn xanh) |
+**Kế thừa** | `null` ⇒ kế thừa; 🔑 **`[Theory]` cả hai giá trị** — chống *"mặc định ngầm"* (`?? Percent` thay vì `?? donVi`) |
+🚨 **Không lấy lẫn** | Dòng theo kho **`Absolute`** + dòng cả kênh **`Percent`** ⇒ khi giữ chỗ ở kho, **cả** `GiaTri` **và** `DonVi` phải của **cùng một dòng** |
+**`null` ở dòng theo kho** | Kế thừa **setting** (⚠️ **không** kế thừa dòng cả kênh — nếu kế thừa từ dòng khác thì đổi dòng cả kênh sẽ **âm thầm** đổi đơn vị dòng theo kho) |
+**Không dòng nào** | `DonVi` = setting (nhất quán với `GiaTri` mặc định) |
+**Phạm vi `Channel`** | Dòng theo kho bị bỏ qua ⇒ `DonVi` **cũng** lấy từ dòng **cả kênh** |
+
+**Probe DB/HTTP thật (7/7 ca ĐẠT):**
+| Ca | Kết quả đo |
+|---|---|
+**A1** tiền đề | Gieo 1 dòng `DonVi = 0` + 1 dòng `DonVi = NULL` (kiểm bằng `select`) |
+**C1** | API trả `donVi = Percent` cho dòng **có** override |
+**C2** | API trả `donVi = null` cho dòng **kế thừa** |
+**D1** | `POST donVi=Percent` ⇒ **DB `DonVi = 0`** |
+**D2** | `POST donVi` **rỗng** ⇒ **DB `DonVi = NULL`** (quay về **kế thừa**) |
+**D3** | `donVi` **SAI** ⇒ **`403` + `eCommerce:Settings:0001`** (🔒 **không** im lặng bỏ qua) |
+**D4** | Ném mà **không** để lại rác: DB **vẫn** `NULL` |
+
+### 18.6 🐞 **Lỗi của tôi trong lượt này**
+
+| # | Lỗi | Bài học |
+|---|---|---|
+**1** | 🚨 **Kỳ vọng của probe ĐOÁN NGƯỢC thứ tự enum** (`DonVi = 0` tôi tưởng là `Absolute`, thật ra là **`Percent`**) ⇒ ca `C1` **ĐỎ** dù sản phẩm **ĐÚNG** | 🔑 **Đọc giá trị enum từ mã nguồn, không đoán.** 📌 Lần thứ **N** trong chuỗi lượt: một ca đỏ **không** tự động nghĩa là sản phẩm sai |
+**2** | Nhiều phép `String.Replace` **không khớp** (khoảng trắng/dấu khác) ⇒ tôi **tưởng** đã sửa nhưng file **không đổi** | ✅ Phải **kiểm lại** sau mỗi lần sửa (`Select-String` đếm số lần khớp), hoặc dùng **chỉ số dòng** |
+**3** | Chú thích **đã lỗi thời** trong `InvChannelLimit` vẫn nói *"`DonVi` vẫn là setting DÙNG CHUNG"* sau khi tôi thêm cột | 🚨 **Chú thích nói ngược sự thật thì tệ hơn không có chú thích** — đã sửa **trong cùng lượt** |
+
+### 18.7 ⏳ NỢ
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+**1** | 🚨 **`Percent` vẫn tính trên tồn khả dụng của TỪNG `(kho, SKU)`** | Tồn kho **chưa** mô hình hoá theo kênh (`docs/tiep-tuc-phien-moI.md` §5 việc 3) — 📌 **nợ riêng**, không thuộc lượt này |
+**2** | **`HanMucKenhDto.DonVi` là `string?`** (không phải enum) | ⚠️ Vì `Application.Contracts` **không** tham chiếu module `Domain` (layering — đã vấp **ba lần** trong dự án). 🔒 Đổi lại: chuỗi có thể **sai chính tả** ⇒ đã có ca `D3` khoá việc **NÉM** khi sai |
+**3** | **Chưa có UI chọn `DonVi` khi sửa dòng đã có** | 📌 Form hiện **thêm/cập nhật** theo khoá `(kênh, kho)`; nút "Sửa" điền sẵn giá trị **chưa** làm |
+**4** | **Chưa có test tích hợp cho `StockReservationService`** với `DonVi` theo dòng | 📌 Hàm **thuần** đã có 10 ca; đường **giữ chỗ thật** (đọc DB → chọn → áp) **chưa** đo |
+
+### 18.8 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.1 | 17/10/2026 | *(agent, session GĐ1)* | **§18 — LÁT CẮT 3: `DonVi` THEO TỪNG DÒNG** (đóng nợ §16.8 **#1 — nợ số 1 về nghiệp vụ**): thêm cột **`DonVi` (nullable)** vào `InvChannelLimits` + migration `20261016175736_Inv003_DonViTheoTungDong` (**áp lên DB thật**; NND **giữ 48** vì không thêm unique index) + `DongHanMuc.DonVi` + **`ChonHanMuc` trả `chon.DonVi ?? donVi`** + `KetQuaHanMuc.DonVi` (**không nullable**) + `StockReservationService` truyền `x.DonVi` + app service **đọc/ghi** `DonVi` (**chuỗi sai ⇒ NÉM**, không im lặng) + **cột & ô chọn "Đơn vị"** trên màn hình (`/HanMucKenh`). 🔑 **HAI QUYẾT ĐỊNH:** (①) **`null` = "không override"** — dùng `0`/giá trị mặc định làm cờ sẽ tạo **hai cách diễn đạt cùng một ý** (và `Percent = 0` là **đơn vị hợp lệ**); nhờ vậy **dữ liệu cũ không đổi hành vi** ⇒ migration **an toàn**; (②) **trộn `DonVi` NGAY CẠNH việc chọn dòng** — vì `DongHanMuc` **và** `KetQuaHanMuc` là hai chỗ chứa `DonVi`, nên có **hai** đường lấy sai; 🚨 ca xấu nhất là lấy `GiaTri` của dòng theo kho mà `DonVi` của dòng cả kênh ⇒ `30` (chiếc) đọc thành `30%` — **không lỗi nào**. ✅ **10 unit test** (`HanMucKenhDonViTests`) + **7/7 ca DB/HTTP thật**: `A1` tiền đề · `C1` API trả override · `C2` API trả `null` (kế thừa) · `D1` POST ⇒ DB `0` · `D2` POST rỗng ⇒ DB `NULL` · `D3` **sai ⇒ `403` + `Settings:0001`** · `D4` **không để lại rác**. 🐞 **Ba lỗi của tôi**: (1) 🚨 **kỳ vọng probe ĐOÁN NGƯỢC thứ tự enum** (`DonVi = 0` là **`Percent`**, không phải `Absolute`) ⇒ ca đỏ dù sản phẩm **ĐÚNG** — 🔑 **đọc enum từ mã nguồn, không đoán**; (2) nhiều `String.Replace` **không khớp** ⇒ tưởng đã sửa mà file **không đổi** (✅ kiểm lại bằng `Select-String`); (3) 🚨 **chú thích đã lỗi thời** trong `InvChannelLimit` vẫn nói *"`DonVi` vẫn là setting dùng chung"* — **chú thích nói ngược sự thật thì tệ hơn không có chú thích** (đã sửa cùng lượt). Ghi **§18.7** (nợ: 🚨 `Percent` vẫn tính trên tồn của **từng `(kho, SKU)`** — tồn **chưa** mô hình hoá theo kênh · `DonVi` là **chuỗi** ở DTO vì layering · chưa có nút **"Sửa"** điền sẵn · chưa có **test tích hợp** cho đường giữ chỗ thật) |

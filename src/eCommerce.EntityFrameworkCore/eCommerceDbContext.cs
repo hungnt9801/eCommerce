@@ -698,6 +698,13 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
             // Đọc bằng mắt trong DB là **số** — ghi rõ để không ai "sửa tay" sai (0=Block, 1=Warn).
             b.Property(x => x.HanhDong).HasConversion<int>();
 
+            // 🚨 `INV-003` muc 5 viec 2 — **DON VI CUA RIENG DONG NAY** (no muc 16.8 #1 DA DONG).
+            // 🔒 **NULLABLE la CO Y**: `null` = **khong override** => dung setting `Inv.ChannelLimit.Unit`.
+            // 📌 Nho vay COT MOI **KHONG DOI HANH VI** cua du lieu cu => migration nay AN TOAN.
+            // ⚠️ KHONG dung `0`/gia tri "mac dinh" lam dau "khong override": `Percent` = `0` la mot DON VI
+            // HOP LE => dung no lam co se tao HAI cach dien dat cung mot y (dung loi ma `GiaTri` da tranh).
+            b.Property(x => x.DonVi).HasConversion<int?>();
+
             b.Property(x => x.GiaTri).HasPrecision(18, 4);
 
             b.HasIndex(x => new { x.TenantId, x.ChannelCode, x.WarehouseId })

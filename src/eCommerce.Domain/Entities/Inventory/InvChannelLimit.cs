@@ -26,9 +26,13 @@ namespace eCommerce.Inventory;
 /// ⚠️ EF Core **không** sinh được mệnh đề đó ⇒ migration có **SQL thô** (mẫu: `Inv001_Fix_SoCai_Unique_ThemMovementType`).
 ///
 /// ⚠️ **PHẠM VI v2 (ghi rõ, không giấu lời hứa):**
-///   • **`DonVi` (`Percent`/`Absolute`) vẫn là setting DÙNG CHUNG** (`Inv.ChannelLimit.Unit`) — **không** đặt
-///     ở từng dòng, vì trộn hai đơn vị trong cùng một báo cáo là nguồn sai số khó thấy; đây là **nợ đã ghi**
-///     (`inv-003` §16.5), không phải tính năng đã có;
+///   • ✅ **`DonVi` ĐÃ CÓ Ở TỪNG DÒNG** (`DonVi`, nullable) — nợ `inv-003` §16.8 #1 **ĐÃ ĐÓNG**.
+///     📌 `null` = **kế thừa** setting `Inv.ChannelLimit.Unit`; có giá trị = **override** cho riêng dòng này.
+///     🔑 **VÌ SAO KHÔNG CÒN LÀ NỢ:** nghiệp vụ thật dùng **hai đơn vị cho hai kênh khác nhau** (kênh A theo
+///     `%` tồn khả dụng, kênh B theo số lượng tuyệt đối). ⚠️ Với **một** đơn vị dùng chung thì kênh còn lại
+///     bị **diễn giải sai** — 🚨 và sai **im lặng**: `100` đọc là `100%` thay vì `100 chiếc` thì hạn mức
+///     **không chặn gì cả**, **không có lỗi nào**. 📌 Lo ngại cũ (*"trộn hai đơn vị là nguồn sai số"*) được
+///     xử lý bằng **hiển thị đơn vị ở MỌI chỗ đọc** (`KetQuaHanMuc.DonVi` + cột `Đơn vị` trên màn hình),
 ///   • **`Percent` vẫn tính trên tồn khả dụng của TỪNG `(kho, SKU)`** — tồn kho **chưa** mô hình hoá theo kênh
 ///     (`docs/tiep-tuc-phien-moi.md` §5 việc 3);
 ///   • bảng này **KHÔNG** phải "ngân sách đã cấp" (`StockAllotment` của `inv-003` §5.2) — nó là **HẠN MỨC**
@@ -67,6 +71,32 @@ public class InvChannelLimit : FullAuditedAggregateRoot<Guid>, IMultiTenant
     /// </summary>
     public HanhDongHanMuc HanhDong { get; protected set; } = HanhDongHanMuc.Block;
 
+    /// <summary>
+    /// 🚨 **ĐƠN VỊ CỦA RIÊNG DÒNG NÀY** (`INV-003` mục 5 việc 2) — `null` = **kế thừa setting**
+    /// `Inv.ChannelLimit.Unit`.
+    ///
+    /// **VÌ SAO CẦN Ở TỪNG DÒNG (đây là nợ số 1 về nghiệp vụ, `inv-003` §16.8 nợ 1):**
+    /// nghiệp vụ thật dùng **hai đơn vị cho hai kênh khác nhau**: kênh A cam kết theo **`%` tồn khả dụng**
+    /// (vì tồn biến động), còn kênh B cam kết theo **số lượng tuyệt đối** (vì hợp đồng ghi *"200 chiếc"*).
+    /// ⚠️ Với **một** đơn vị dùng chung, người vận hành phải **chọn một trong hai** ⇒ kênh còn lại bị
+    /// **diễn giải sai** — 🚨 và sai **im lặng**: `100` đọc là `100%` thay vì `100 chiếc` thì hạn mức
+    /// **không** chặn gì cả, **không có lỗi nào**.
+    ///
+    /// 🔒 **`null` CÓ NGHĨA — và đó là lựa chọn thiết kế, không phải sơ suất:**
+    /// <list type="bullet">
+    ///   <item><c>null</c> = **KHÔNG override** ⇒ dùng setting chung. 📌 Nhờ vậy **dữ liệu cũ** (48 dòng tiềm
+    ///     năng) **không bị đổi hành vi** khi thêm cột — migration này **an toàn**;</item>
+    ///   <item>⚠️ **KHÔNG** dùng `0`/giá trị "mặc định" làm dấu *"không override"*: `Percent` = `0` là một
+    ///     **đơn vị hợp lệ**, nên dùng nó làm cờ sẽ tạo **hai cách diễn đạt cùng một ý** — đúng lỗi mà
+    ///     `GiaTri` đã tránh (xem `Tat()` và lời cảnh báo về số âm ở hàm tạo).</item>
+    /// </list>
+    ///
+    /// 📌 **VÌ SAO CHỌN ĐƯỢC Ở CẢ DÒNG `(kênh, kho)`:** hạn mức theo kho là **chặt hơn**; nếu nó bị **ép**
+    /// dùng đơn vị của dòng cả kênh thì người vận hành **không** diễn đạt được *"cả kênh 50%, nhưng riêng
+    /// kho Hà Nội 200 chiếc"* — một cấu hình **có thật** trong vận hành.
+    /// </summary>
+    public DonViHanMuc? DonVi { get; protected set; }
+
     protected InvChannelLimit() { }
 
     public InvChannelLimit(
@@ -74,7 +104,8 @@ public class InvChannelLimit : FullAuditedAggregateRoot<Guid>, IMultiTenant
         string channelCode,
         decimal giaTri,
         Guid? warehouseId = null,
-        HanhDongHanMuc hanhDong = HanhDongHanMuc.Block) : base(id)
+        HanhDongHanMuc hanhDong = HanhDongHanMuc.Block,
+        DonViHanMuc? donVi = null) : base(id)
     {
         if (string.IsNullOrWhiteSpace(channelCode))
         {
@@ -95,10 +126,11 @@ public class InvChannelLimit : FullAuditedAggregateRoot<Guid>, IMultiTenant
         WarehouseId = warehouseId;
         GiaTri = giaTri;
         HanhDong = hanhDong;
+        DonVi = donVi;
     }
 
     /// <summary>Đổi hạn mức (kèm hành động). 📌 Dùng chung một cửa vào để **không** có đường ghi tắt bỏ qua kiểm.</summary>
-    public void DatHanMuc(decimal giaTri, HanhDongHanMuc hanhDong)
+    public void DatHanMuc(decimal giaTri, HanhDongHanMuc hanhDong, DonViHanMuc? donVi = null)
     {
         if (giaTri < 0)
         {
@@ -110,6 +142,10 @@ public class InvChannelLimit : FullAuditedAggregateRoot<Guid>, IMultiTenant
 
         GiaTri = giaTri;
         HanhDong = hanhDong;
+
+        // 🔒 Gán `DonVi` ở **CÙNG cửa vào** với `GiaTri`/`HanhDong`: nếu để đường ghi riêng thì có thể
+        // đổi đơn vị mà **quên** đổi giá trị ⇒ `100` đổi từ `%` sang `chiếc` **âm thầm** đổi ý nghĩa.
+        DonVi = donVi;
     }
 
     /// <summary>Tắt hạn mức của dòng này (giữ dòng lại để còn **vết cấu hình** + xoá mềm được).</summary>

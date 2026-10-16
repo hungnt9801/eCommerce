@@ -81,7 +81,7 @@ public class HanMucKenhController : Controller
     /// </summary>
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> DatHanMuc(string channelCode, Guid? warehouseId, decimal giaTri, string? hanhDong)
+    public async Task<IActionResult> DatHanMuc(string channelCode, Guid? warehouseId, decimal giaTri, string? hanhDong, string? donVi)
     {
         try
         {
@@ -90,7 +90,10 @@ public class HanMucKenhController : Controller
                 ChannelCode = channelCode,
                 WarehouseId = warehouseId,
                 GiaTri = giaTri,
-                HanhDong = hanhDong
+                HanhDong = hanhDong,
+
+                // 🔑 `null`/rong = **ke thua** setting chung (KHONG phai mot gia tri thu ba).
+                DonVi = donVi
             });
 
             TempData["ThongBaoHanMuc"] = $"Đã lưu hạn mức cho kênh '{channelCode}'.";

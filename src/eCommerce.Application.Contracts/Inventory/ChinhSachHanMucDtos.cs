@@ -96,6 +96,17 @@ public class HanMucKenhDto
     /// <summary>`Block` | `Warn` — **hành động riêng của dòng này**.</summary>
     public string HanhDong { get; set; } = default!;
 
+    /// <summary>
+    /// 🚨 **ĐƠN VỊ HIỆU LỰC CỦA DÒNG NÀY** (`INV-003` mục 5 việc 2) — `Percent` | `Absolute` |
+    /// <c>null</c> = **kế thừa** setting dùng chung `Inv.ChannelLimit.Unit`.
+    ///
+    /// 🔑 **VÌ SAO TRẢ RA Ở ĐÂY, KHÔNG ĐỂ CLIENT TỰ TRA SETTING:** `GiaTri` **không có nghĩa** nếu thiếu đơn vị —
+    /// 📌 `100` là **100%** hay **100 chiếc**? ⚠️ Nếu màn hình hiện `GiaTri` mà **không** hiện đơn vị thì
+    /// người vận hành **đọc sai cấu hình của chính mình** — và đó là loại sai **không có triệu chứng**.
+    /// 🔒 Vì vậy app service trả **đơn vị hiệu lực** (đã trộn dòng + setting) chứ không trả "đơn vị thô của dòng".
+    /// </summary>
+    public string? DonVi { get; set; }
+
     /// <summary>`0` ⇒ dòng này **TẮT** (quy ước toàn hệ thống) — trả cờ sẵn để UI không phải tự suy.</summary>
     public bool DangTat => GiaTri <= 0m;
 
@@ -121,6 +132,13 @@ public class DatHanMucKenhInput
     /// <summary>`Block` | `Warn` — để trống = `Block` (**fail-closed**: không bán quá hạn mức).</summary>
     [StringLength(32)]
     public string? HanhDong { get; set; }
+
+    /// <summary>
+    /// `Percent` | `Absolute` — 🔑 **đơn vị của RIÊNG dòng này**. Để trống = **kế thừa** setting
+    /// `Inv.ChannelLimit.Unit` (⚠️ **không** gửi `null` để "xoá override" — xem `GhiChu` của `XoaHanMucAsync`).
+    /// </summary>
+    [StringLength(32)]
+    public string? DonVi { get; set; }
 }
 
 /// <summary>Một kênh **có thật** trong danh mục — dùng để màn hình admin chọn thay vì gõ tay (chống gõ sai mã).</summary>

@@ -258,6 +258,9 @@ public class ChinhSachHanMucAppService : ApplicationService, IChinhSachHanMucApp
                 WarehouseName = kho?.Name,
                 GiaTri = x.GiaTri,
                 HanhDong = x.HanhDong.ToString(),
+                // 🔑 `null` = KE THUA setting chung. DTO tra `string?` (khong phai enum) vi
+                // `HanMucKenhDto` nam o `Application.Contracts` — noi KHONG tham chieu module `Domain`.
+                DonVi = x.DonVi?.ToString(),
                 CreationTime = x.CreationTime,
                 LastModificationTime = x.LastModificationTime
             };
@@ -328,18 +331,33 @@ public class ChinhSachHanMucAppService : ApplicationService, IChinhSachHanMucApp
             }
         }
 
+        // 🚨 `INV-003` muc 5 viec 2 — **DON VI CUA RIENG DONG**. `null`/rong = **khong override**
+        // (dung setting chung). ⚠️ Chuoi SAI => NEM (khong im lang bo qua): neu im lang thi nguoi dung
+        // tuong da doi don vi, trong khi he thong van dung don vi cu => HAN MUC SAI IM LANG.
+        DonViHanMuc? donVi = null;
+
+        if (!string.IsNullOrWhiteSpace(input.DonVi))
+        {
+            donVi = ChinhSach.DocDonViHanMuc(input.DonVi, out var donViOk);
+
+            if (!donViOk)
+            {
+                Kiem(input.DonVi, donViOk, nameof(input.DonVi), TenChinhSach.DonViHopLe);
+            }
+        }
+
         var hienCo = await _hanMucRepository.FirstOrDefaultAsync(x => x.ChannelCode == kenh && x.WarehouseId == input.WarehouseId);
 
         if (hienCo is null)
         {
-            hienCo = new InvChannelLimit(GuidGenerator.Create(), kenh, input.GiaTri, input.WarehouseId, hanhDong);
+            hienCo = new InvChannelLimit(GuidGenerator.Create(), kenh, input.GiaTri, input.WarehouseId, hanhDong, donVi);
             await _hanMucRepository.InsertAsync(hienCo, autoSave: true);
             Logger.LogInformation("HẠN MỨC KÊNH: THÊM kênh {Kenh} kho {Kho} = {GiaTri} ({HanhDong}). [HANMUC-THEM]",
                 kenh, input.WarehouseId?.ToString() ?? "(cả kênh)", input.GiaTri, hanhDong);
         }
         else
         {
-            hienCo.DatHanMuc(input.GiaTri, hanhDong);
+            hienCo.DatHanMuc(input.GiaTri, hanhDong, donVi);
             await _hanMucRepository.UpdateAsync(hienCo, autoSave: true);
             Logger.LogInformation("HẠN MỨC KÊNH: SỬA kênh {Kenh} kho {Kho} = {GiaTri} ({HanhDong}). [HANMUC-SUA]",
                 kenh, input.WarehouseId?.ToString() ?? "(cả kênh)", input.GiaTri, hanhDong);

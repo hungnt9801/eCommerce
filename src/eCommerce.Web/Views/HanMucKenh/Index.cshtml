@@ -187,6 +187,10 @@
                         <th>Kênh</th>
                         <th>Kho</th>
                         <th class="text-end">Giá trị</th>
+                        @* 🚨 `INV-003` muc 5 viec 2 — COT DON VI LA BAT BUOC, khong phai trang tri.
+                           `GiaTri` KHONG CO NGHIA neu thieu don vi: `100` la 100% hay 100 chiec?
+                           Neu thieu cot nay thi nguoi van hanh DOC SAI cau hinh cua chinh minh. *@
+                        <th>Đơn vị</th>
                         <th>Hành động</th>
                         <th>Trạng thái</th>
                         <th>Cập nhật lần cuối</th>
@@ -209,6 +213,18 @@
                                 }
                             </td>
                             <td class="text-end">@d.GiaTri</td>
+                            <td>
+                                @if (string.IsNullOrWhiteSpace(d.DonVi))
+                                {
+                                    @* `null` = KE THUA setting chung — phai noi RO, khong de trong
+                                       (o trong lam nguoi dung tuong "chua dat" trong khi thuc ra dang ke thua). *@
+                                    <span class="text-muted" title="Không override ⇒ dùng đơn vị của chính sách chung">(kế thừa: @chinhSach.DonVi)</span>
+                                }
+                                else
+                                {
+                                    <strong>@d.DonVi</strong>
+                                }
+                            </td>
                             <td>@d.HanhDong</td>
                             <td>
                                 @if (d.DangTat)
@@ -263,7 +279,16 @@
                     <label class="form-label">Giá trị (0 = TẮT)</label>
                     <input class="form-control" type="number" step="any" min="0" name="giaTri" value="0" required />
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
+                    <label class="form-label">Đơn vị</label>
+                    @* 🔑 De TRONG = **ke thua** setting chung (KHONG phai mot gia tri thu ba). *@
+                    <select class="form-select" name="donVi">
+                        <option value="">(kế thừa chung: @chinhSach.DonVi)</option>
+                        <option value="Percent">Percent (%)</option>
+                        <option value="Absolute">Absolute (số lượng)</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
                     <label class="form-label">Hành động (trống = Block)</label>
                     <select class="form-select" name="hanhDong">
                         <option value="">(mặc định: Block — fail-closed)</option>
@@ -271,7 +296,7 @@
                         <option value="Warn">Warn</option>
                     </select>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <button class="btn btn-primary w-100" type="submit">Lưu hạn mức</button>
                 </div>
             </div>

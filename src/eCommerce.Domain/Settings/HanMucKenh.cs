@@ -72,7 +72,10 @@ public static class HanMucKenh
     // ── `INV-003` v2 — CHỌN HẠN MỨC TỪ BẢNG RIÊNG TỪNG KÊNH ────────────────────────────────────────
 
     /// <summary>Dòng hạn mức **đã đọc từ DB** (dạng rút gọn) để <see cref="ChonHanMuc"/> là **hàm THUẦN**.</summary>
-    public sealed record DongHanMuc(Guid Id, Guid? WarehouseId, decimal GiaTri, HanhDongHanMuc HanhDong);
+    /// <param name="DonVi">Đơn vị **của RIÊNG dòng này**; `null` = **kế thừa** setting dùng chung.
+    /// 📌 Đặt ở record này (chứ không tra DB lúc chạy) để `ChonHanMuc` vẫn là **hàm THUẦN** — cùng lý do
+    /// đã ghi ở chú thích `DongHanMuc` gốc.</param>
+    public sealed record DongHanMuc(Guid Id, Guid? WarehouseId, decimal GiaTri, HanhDongHanMuc HanhDong, DonViHanMuc? DonVi = null);
 
     /// <summary>Nguồn của hạn mức đang áp — 🔑 **phải ghi được vào log/DB**, nếu không thì *"vì sao đơn bị chặn"* không trả lời được.</summary>
     public enum NguonHanMuc
@@ -169,6 +172,9 @@ public static class HanMucKenh
 
         var nguon = chon.WarehouseId is null ? NguonHanMuc.BangTheoKenh : NguonHanMuc.BangTheoKenhVaKho;
 
-        return new KetQuaHanMuc(phamVi, nguon, chon.Id, chon.GiaTri, donVi, chon.HanhDong);
+        // 🔑 **ĐƠN VỊ HIỆU LỰC CỦA DÒNG = `DongVi` của dòng ĐÓ, rơi về setting chung khi `null`.**
+        // 📌 Đặt ngay cạnh việc chọn dòng (không ở chỗ gọi) để **không** có đường nào lấy `GiaTri` của dòng
+        // mà lại lấy `DonVi` của setting — 🚨 cặp sai đó đọc `100` (chiếc) thành `100%` và **không có lỗi nào**.
+        return new KetQuaHanMuc(phamVi, nguon, chon.Id, chon.GiaTri, chon.DonVi ?? donVi, chon.HanhDong);
     }
 }
