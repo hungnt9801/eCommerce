@@ -36,7 +36,7 @@ public class MetricsTests
     }
 
     [Fact]
-    public void TC06_phat_ra_DUNG_12_metric_da_dang_ky()
+    public void TC06_phat_ra_DUNG_bang_metric_da_dang_ky()
     {
         using var meter = new Meter("eCommerce-Test-" + Guid.NewGuid());
         var thucTe = LayTenInstrumentThat(meter);
@@ -58,11 +58,50 @@ public class MetricsTests
             "Metric phát ra nhưng CHƯA đăng ký ở XC-005 §5.1:\n" + string.Join("\n", ngoaiRegistry));
     }
 
+    /// <summary>
+    /// 🔒 **Bảng đăng ký KHÔNG trùng tên** — và ⚠️ **KHÔNG đếm cứng số lượng nữa**.
+    ///
+    /// 📌 **VÌ SAO BỎ `Assert.Equal(12, …)`:** nó biến **mỗi** lần thêm metric hợp lệ thành một ca **ĐỎ**
+    /// ⇒ 🔑 người sửa sẽ **đổi số** mà **không** suy nghĩ gì. 📌 Một con số cứng chỉ có giá trị **một lần**
+    /// (lúc viết), sau đó nó là **rào cản** chứ không phải **lưới an toàn**.
+    /// ✅ Thay bằng **bất biến thật**: **không trùng** + **không rỗng** + **đối chiếu CHIỀU NGƯỢC** (ca dưới).
+    /// </summary>
     [Fact]
-    public void Bang_dang_ky_co_du_12_ten_va_khong_trung()
+    public void Bang_dang_ky_KHONG_trung_ten_va_KHONG_rong()
     {
-        Assert.Equal(12, eCommerceMetricNames.All.Count);
+        Assert.NotEmpty(eCommerceMetricNames.All);
         Assert.Equal(eCommerceMetricNames.All.Count, eCommerceMetricNames.All.Distinct().Count());
+    }
+
+    /// <summary>
+    /// 🚨 **MỌI hằng số metric PHẢI có trong `All`** — chiều **NGƯỢC** mà trước 17/10/2026 **KHÔNG** ai kiểm.
+    ///
+    /// 🔑 **VÌ SAO CẦN CHIỀU NÀY (đây là lỗi THẬT đã đo được):** `InventoryReconMismatchSkus` **có** hằng số
+    /// nhưng **THIẾU** trong `All` ⇒ 🔒 chú thích của `All` (*"nguồn sự thật duy nhất"*) **SAI**, và
+    /// **không có test nào** phát hiện. 📌 Test cũ chỉ kiểm **một** chiều (*"mọi tên trong `All` đều hợp lệ"*)
+    /// ⇒ một hằng số **bị bỏ sót** không bao giờ lộ ra.
+    /// ⚠️ Hệ quả thật: metric vẫn **phát** được (vì nó được tạo bằng `CreateObservableGauge`), nhưng **không**
+    /// nằm trong bảng đăng ký ⇒ công cụ/kiểm toán đọc bảng đó sẽ **không biết** nó tồn tại.
+    /// </summary>
+    [Fact]
+    public void MOI_hang_so_metric_PHAI_co_trong_All__chieu_NGUOC()
+    {
+        var tatCaHangSo = typeof(eCommerceMetricNames)
+            .GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
+            .Where(f => f.IsLiteral && f.FieldType == typeof(string))
+            .Select(f => (string)f.GetRawConstantValue()!)
+            .ToList();
+
+        // 🛡️ Lưới an toàn cho CHÍNH lưới an toàn: nếu phép phản chiếu không thấy hằng số nào (đổi tên lớp,
+        // đổi kiểu trường) thì ca này sẽ XANH VÔ NGHĨA.
+        Assert.True(tatCaHangSo.Count >= 13,
+            $"Phép phản chiếu chỉ thấy {tatCaHangSo.Count} hằng số ⇒ phép quét HỎNG (test trên vô nghĩa).");
+
+        var thieu = tatCaHangSo.Except(eCommerceMetricNames.All, StringComparer.Ordinal).ToList();
+
+        Assert.True(thieu.Count == 0,
+            "Hằng số metric CÓ nhưng KHÔNG nằm trong `eCommerceMetricNames.All` ⇒ bảng đăng ký KHÔNG còn là "
+            + "*\"nguồn sự thật duy nhất\"*:\n  " + string.Join("\n  ", thieu));
     }
 
     [Fact]

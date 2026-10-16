@@ -7,6 +7,14 @@
 
   <ItemGroup>
     <PackageReference Include="Volo.Abp.Ddd.Domain" />
+    <!-- 🚨 `REC-001` mục 7 (17/10/2026) — `eCommerceMetrics` cho **đối soát thanh toán**.
+         📌 **VÌ SAO PHẢI Ở TẦNG DOMAIN (không phải Application):** hàm phát metric phải gọi được từ **CẢ**
+         `PaymentAppService` (`PaymentHub.Application`) **VÀ** `PaymentReconciliationWorker`
+         (`eCommerce.Application`). 🔑 `eCommerce.Application` **KHÔNG** tham chiếu `PaymentHub.Application`
+         (và **không nên** — đó sẽ là tham chiếu ngược tầng), còn `PaymentHub.Domain` thì **cả hai** đều thấy.
+         🔒 Và **KHÔNG** đặt hàm đó trong `LuatDoiSoatThanhToan`: lớp đó là **hàm THUẦN** (không I/O, không
+         side effect) — nhét metric vào sẽ **phá** đúng tính chất làm cho nó test được. -->
+    <ProjectReference Include="..\..\..\shared\eCommerce.Kernel\eCommerce.Kernel.csproj" />
   </ItemGroup>
 
 </Project>

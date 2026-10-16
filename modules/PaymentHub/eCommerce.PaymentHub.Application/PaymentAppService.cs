@@ -37,14 +37,23 @@ public class PaymentAppService : ApplicationService, IPaymentAppService
     private readonly Payments.IPaymentProvider _cong;
     private readonly Volo.Abp.DistributedLocking.IAbpDistributedLock _khoa;
 
+    /// <summary>
+    /// 📊 `REC-001` mục 7 — metric đối soát. ⚠️ **TUỲ CHỌN** (`= null`) cùng khuôn `VnPayPaymentProvider`:
+    /// 🔒 nếu bắt buộc thì thiếu đăng ký metric sẽ **NỔ** ở một chỗ **không liên quan** — đúng loại
+    /// `NullReferenceException` bị nuốt thành *"hoàn tiền thất bại"* chung chung rồi mất hàng giờ điều tra sai hướng.
+    /// </summary>
+    private readonly eCommerce.Kernel.Observability.eCommerceMetrics? _metrics;
+
     public PaymentAppService(
         IRepository<Payments.PaymentTransaction, Guid> giaoDich,
         Payments.IPaymentProvider cong,
-        Volo.Abp.DistributedLocking.IAbpDistributedLock khoa)
+        Volo.Abp.DistributedLocking.IAbpDistributedLock khoa,
+        eCommerce.Kernel.Observability.eCommerceMetrics? metrics = null)
     {
         _giaoDich = giaoDich;
         _cong = cong;
         _khoa = khoa;
+        _metrics = metrics;
     }
 
     // ── ĐỌC ─────────────────────────────────────────────────────────────────────────────────────
@@ -260,6 +269,10 @@ public class PaymentAppService : ApplicationService, IPaymentAppService
         // chúng sẽ **lệch** khi ai đó sửa một chỗ. ✅ Nên cả hai chỗ **gọi cùng một hàm**.
         var quyetDinh = Payments.LuatDoiSoatThanhToan.Quyet(gd.Status, trangThaiTuCong);
 
+        // 📊 **PHÁT METRIC** — dùng **CHUNG** hàm với job (`REC-001` mục 7). 📌 Đặt **trước** `switch` để
+        // **mọi** nhánh đều được đếm (⚠️ kể cả `KhongDoi` — hàm tự quyết định có phát hay không).
+        Payments.MetricDoiSoatThanhToan.Ghi(_metrics, quyetDinh);
+
         switch (quyetDinh)
         {
             case Payments.LuatDoiSoatThanhToan.QuyetDinh.GhiDaThuTien:
@@ -292,6 +305,12 @@ public class PaymentAppService : ApplicationService, IPaymentAppService
                 }
                 else
                 {
+                    // 🚨 **GAUGE "KHÔNG KIỂM ĐƯỢC"** — 🔑 con số mà biểu đồ dùng để **gắn cảnh báo**.
+                    // ⚠️ Với hàm MỘT (tra từng giao dịch) con số này là **1** hoặc **0**; 📌 với **job**
+                    // (`REC-001`) nó là **tổng của cả lượt** — và đó mới là con số có ý nghĩa **vận hành**.
+                    // 🔒 Vẫn ghi ở đây để **đường tra tay** không thành **điểm mù** về metric.
+                    _metrics?.SetPaymentReconUnresolved(1);
+
                     Logger.LogInformation(
                         "ĐỐI SOÁT `querydr`: cổng CHƯA xác nhận được giao dịch {MerchantReference} (trạng thái cổng={TuCong}) " +
                         "⇒ giữ nguyên {TrangThai}, sẽ thử lại lượt sau. [PAY-QUERYDR-CHUA-BIET]",
@@ -389,6 +408,11 @@ public class PaymentAppService : ApplicationService, IPaymentAppService
                 "ĐỐI SOÁT LÔ: xét {So} · đổi trạng thái {Doi} · thu được {Thu} · không xác định {KXD}. [PAY-DOISOAT-XONG]",
                 ketQua.SoDaXet, ketQua.SoDoiTrangThai, ketQua.SoThuDuoc, ketQua.SoKhongXacDinh);
         }
+
+        // 📊 **GAUGE "KHÔNG KIỂM ĐƯỢC"** cho CẢ LƯỢT — 🔑 đây là con số có ý nghĩa **vận hành** (hàm một chỉ
+        // ghi 1/0). ⚠️ **ĐỌC CHO ĐÚNG:** bằng `SoDaXet` nghĩa là lượt quét **KHÔNG mang lại thông tin nào**
+        // ⇒ **cấu hình sai hoặc cổng chết**, **KHÔNG PHẢI** *"hệ thống khoẻ"*.
+        _metrics?.SetPaymentReconUnresolved(ketQua.SoKhongXacDinh);
 
         return ketQua;
     }

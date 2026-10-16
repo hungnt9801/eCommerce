@@ -58,11 +58,21 @@ public class PaymentReconciliationWorker : AsyncPeriodicBackgroundWorkerBase
     /// <summary>Tên khoá phân tán (**không** tiền tố `ecommerce:` — `AbpDistributedLockOptions.KeyPrefix` đã thêm).</summary>
     public const string TenKhoa = "payment:reconciliation-rec001";
 
+    /// <summary>
+    /// 📊 `REC-001` mục 7 — metric đối soát. ⚠️ **TUỲ CHỌN** (`= null`) cùng khuôn `VnPayPaymentProvider`:
+    /// 🔒 nếu bắt buộc thì thiếu đăng ký metric sẽ **NỔ** ngay lúc **khởi động Host** ⇒ job **không bao giờ
+    /// chạy** mà lỗi lại trỏ vào chỗ **không liên quan**.
+    /// </summary>
+    private readonly eCommerce.Kernel.Observability.eCommerceMetrics? _metrics;
+
     public PaymentReconciliationWorker(
         AbpAsyncTimer timer,
-        IServiceScopeFactory serviceScopeFactory)
+        IServiceScopeFactory serviceScopeFactory,
+        eCommerce.Kernel.Observability.eCommerceMetrics? metrics = null)
         : base(timer, serviceScopeFactory)
     {
+        _metrics = metrics;
+
         Timer.Period = NhipMacDinhGiay * 1000;
 
         // 🚨 Chạy NGAY lần đầu: chờ hết nhịp 15 phút thì trong 15 phút đầu sau **mỗi lần deploy**, giao dịch
@@ -161,6 +171,11 @@ public class PaymentReconciliationWorker : AsyncPeriodicBackgroundWorkerBase
             // 🚨🔑 **LUẬT Ở MỘT CHỖ DUY NHẤT** — cùng hàm mà app service gọi.
             var quyetDinh = LuatDoiSoatThanhToan.Quyet(gd.Status, tuCong);
 
+            // 📊 **PHAT METRIC** — 🔑 dung **CHUNG** ham voi app service (`GhiMetricDoiSoat`): mot dinh nghia,
+            // hai cho goi. ⚠️ Neu chep thi metric se LECH khi ai do sua mot cho - va lech o metric thi AM THAM
+            // (bieu do van ve, chi SAI SO).
+            MetricDoiSoatThanhToan.Ghi(_metrics, quyetDinh);
+
             switch (quyetDinh)
             {
                 case LuatDoiSoatThanhToan.QuyetDinh.GhiDaThuTien:
@@ -203,6 +218,11 @@ public class PaymentReconciliationWorker : AsyncPeriodicBackgroundWorkerBase
         // 🚨 **CẢNH BÁO KHI LƯỢT QUÉT KHÔNG MANG LẠI THÔNG TIN NÀO** — 🔑 đây là dấu hiệu **cấu hình sai**
         // (hoặc cổng chết), **KHÔNG** phải *"hệ thống khoẻ"*. 📌 Nếu không log ca này thì người vận hành đọc
         // *"đã xét N giao dịch, 0 thay đổi"* và **tin** rằng mọi thứ ổn.
+        // 📊 **GAUGE "KHONG KIEM DUOC" cho CA LUOT** — 🔑 con so co y nghia VAN HANH.
+        // ⚠️ DOC CHO DUNG: bang so giao dich can doi soat nghia la luot quet KHONG mang lai thong tin nao
+        // => CAU HINH SAI hoac CONG CHET, KHONG PHAI "he thong khoe".
+        _metrics?.SetPaymentReconUnresolved(soKhongXacDinh);
+
         if (soKhongXacDinh == canXet.Count)
         {
             Logger.LogWarning(

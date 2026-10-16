@@ -50,3 +50,6 @@ docs/**/*.tmp.md
 # chung (S3/Azure) — xem giới hạn đã biết ở `MediaStorageNoiBo`.
 **/media-noi-bo/
 media-noi-bo/
+
+# Moc build tam (tools\kiem-moc-build.ps1) - chi la cong cu kiem chung, khong phai ma nguon.
+.moc-build.json

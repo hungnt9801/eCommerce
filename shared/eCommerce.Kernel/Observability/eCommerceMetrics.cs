@@ -35,6 +35,35 @@ public static class eCommerceMetricNames
     // ---- Nghiệp vụ thuế (XC-006) ----
     public const string TaxUnclassifiedSkus = "tax_unclassified_skus";
 
+    // ---- Nghiệp vụ THANH TOÁN / đối soát (`REC-001` mục 7, 17/10/2026) ----
+    /// <summary>
+    /// 🚨 **SỐ GIAO DỊCH ĐỐI SOÁT MÀ CỔNG KHÔNG XÁC NHẬN ĐƯỢC** — `Pending`/lỗi hạ tầng/**cổng chưa cấu hình**.
+    ///
+    /// 🔑 **VÌ SAO CẦN METRIC NÀY (không đủ log):** job đối soát đã **phát hiện** và **log** ca này
+    /// (`[PAY-JOB-KHONG-XAC-DINH]`), ⚠️ nhưng 📌 *"job phát hiện"* **KHÔNG PHẢI** *"có người biết"* —
+    /// log nằm trong tệp, còn metric mới **vẽ được biểu đồ** và **gắn được cảnh báo**.
+    ///
+    /// ⚠️ **VÀ ĐỌC CON SỐ NÀY CHO ĐÚNG — đây là lý do nó là GAUGE chứ không phải counter:**
+    /// 📌 Hậu tố `_total` là **quy ước đặt tên của dự án** (giống `payment_webhook_rejected_total` — cũng là
+    /// counter/gauge đếm sự kiện), **không** phải lời khai rằng nó là counter. 🔑 Công cụ thật là **kiểu
+    /// instrument** (`ObservableGauge`), không phải cái tên.
+    /// giá trị **BẰNG** số giao dịch cần đối soát nghĩa là lượt quét **KHÔNG mang lại thông tin nào**
+    /// ⇒ 🔑 **cấu hình sai hoặc cổng chết**, **KHÔNG PHẢI** *"hệ thống khoẻ"*.
+    /// 📌 Nếu để nó thành counter thì con số **tăng đều** trông như *"hoạt động bình thường"*
+    /// ⇒ đúng loại nói dối mà dự án đang chống.
+    /// </summary>
+    public const string PaymentReconUnresolved = "payment_recon_unresolved_total";
+
+    /// <summary>
+    /// Số lần lượt đối soát **ĐỔI trạng thái** một giao dịch — nhãn <c>result</c> cho biết **đổi thành gì**
+    /// (<c>succeeded</c> = tiền **đã vào** mà sổ chưa biết ⇒ 🔑 **lưới an toàn cho IPN mất**).
+    ///
+    /// 🔑 **VÌ SAO CẦN TÁCH KHỎI GAUGE TRÊN:** gauge trả lời *"còn bao nhiêu ca chưa ngã ngũ"*, còn counter
+    /// này trả lời *"đã **phát hiện và sửa** bao nhiêu ca"*. 📌 Hai câu hỏi **khác nhau**; gộp lại thì
+    /// *"không kiểm được"* và *"đã kiểm và sửa"* trông **giống hệt nhau**.
+    /// </summary>
+    public const string PaymentReconChangedTotal = "payment_recon_changed_total";
+
     // ---- Tự quan sát ----
     public const string LoggingFailuresTotal = "logging_failures_total";
 
@@ -51,7 +80,17 @@ public static class eCommerceMetricNames
         HttpRequestDurationSeconds,
         PaymentWebhookRejectedTotal,
         ChannelSyncFailedTotal,
+
+        // 🚨 **ĐÃ TỪNG THIẾU Ở ĐÂY** (phát hiện 17/10/2026): hằng số `InventoryReconMismatchSkus` **có**
+        // nhưng **không** nằm trong danh sách ⇒ 🔒 danh sách này **không còn** là *"nguồn sự thật duy nhất"*
+        // như chú thích của nó nói. ⚠️ Và **không có test nào bắt** điều đó (test chỉ kiểm chiều
+        // *"mọi tên trong `All` đều hợp lệ"*, **không** kiểm chiều *"mọi hằng số đều có trong `All`"*).
+        // 📌 Đây là **nợ thật** đã ghi ở §26.
+        InventoryReconMismatchSkus,
+
         TaxUnclassifiedSkus,
+        PaymentReconUnresolved,
+        PaymentReconChangedTotal,
         LoggingFailuresTotal
     ];
 }
@@ -116,6 +155,9 @@ public sealed class eCommerceMetrics : ISingletonDependency
     public Counter<long> ChannelSyncFailed { get; }
     public Counter<long> LoggingFailures { get; }
 
+    /// <summary>`REC-001` mục 7 — số lần lượt đối soát **đổi** trạng thái giao dịch (nhãn `result`).</summary>
+    public Counter<long> PaymentReconChanged { get; }
+
     // ---- Histogram ----
     public Histogram<double> HttpRequestDurationSeconds { get; }
 
@@ -125,9 +167,19 @@ public sealed class eCommerceMetrics : ISingletonDependency
     private long _inventoryReconMismatchSkus;
     private long _taxUnclassifiedSkus;
 
+    /// <summary>`REC-001` mục 7 — số giao dịch đối soát **cổng không xác nhận được** ở lượt gần nhất.</summary>
+    private long _paymentReconUnresolved;
+
     public void SetMessagingOutboxPending(long value) => Interlocked.Exchange(ref _messagingOutboxPending, value);
     public void SetMessagingDlqSize(long value) => Interlocked.Exchange(ref _messagingDlqSize, value);
     public void SetTaxUnclassifiedSkus(long value) => Interlocked.Exchange(ref _taxUnclassifiedSkus, value);
+
+    /// <summary>
+    /// Ghi số giao dịch đối soát **cổng không xác nhận được** (`REC-001` mục 7).
+    /// 🚨 **ĐỌC CHO ĐÚNG:** bằng **số giao dịch cần đối soát** ⇒ lượt quét **không mang lại thông tin nào**
+    /// ⇒ 🔑 **cấu hình sai hoặc cổng chết**, **KHÔNG PHẢI** *"hệ thống khoẻ"*.
+    /// </summary>
+    public void SetPaymentReconUnresolved(long value) => Interlocked.Exchange(ref _paymentReconUnresolved, value);
 
     /// <summary>Ghi số cặp `(kho, SKU)` đang LỆCH khi đối soát kho (`INV-001` ADR-10).</summary>
     public void SetInventoryReconMismatchSkus(long value) => Interlocked.Exchange(ref _inventoryReconMismatchSkus, value);
@@ -158,6 +210,8 @@ public sealed class eCommerceMetrics : ISingletonDependency
             unit: "{sync}", description: "Đồng bộ sàn thất bại.");
         LoggingFailures = _meter.CreateCounter<long>(eCommerceMetricNames.LoggingFailuresTotal,
             unit: "{failure}", description: "Ghi log thất bại (logger/sink hỏng) — log là best-effort.");
+        PaymentReconChanged = _meter.CreateCounter<long>(eCommerceMetricNames.PaymentReconChangedTotal,
+            unit: "{transaction}", description: "Số lần đối soát thanh toán ĐỔI trạng thái giao dịch (REC-001).");
 
         HttpRequestDurationSeconds = _meter.CreateHistogram<double>(eCommerceMetricNames.HttpRequestDurationSeconds,
             unit: "s", description: "Độ trễ xử lý request HTTP.");
@@ -168,8 +222,28 @@ public sealed class eCommerceMetrics : ISingletonDependency
         _meter.CreateObservableGauge(eCommerceMetricNames.MessagingDlqSize,
             () => Interlocked.Read(ref _messagingDlqSize),
             unit: "{event}", description: "Kích thước DLQ — > 0 thì phải cảnh báo (XC-002).");
+        // 🚨 **GAUGE NÀY ĐÃ TỪNG BỊ THIẾU HOÀN TOÀN** (phát hiện 17/10/2026 khi rà bảng đăng ký).
+        // 📌 Triệu chứng: `SetInventoryReconMismatchSkus(value)` **CÓ** `Interlocked.Exchange` vào biến
+        // `_inventoryReconMismatchSkus`, ⚠️ nhưng **KHÔNG có** `CreateObservableGauge` nào đọc biến đó
+        // ⇒ 🔒 giá trị ghi vào **MẤT**, và metric `inventory_recon_mismatch_skus` **KHÔNG BAO GIỜ phát**.
+        // 🚨 **Và đây là loại hỏng TỆ NHẤT:** job đối soát kho **vẫn chạy**, **vẫn ghi** giá trị, **không có
+        // lỗi nào** — chỉ là **không ai** nhận được con số. 🔑 Một gauge *"0 lệch"* trên biểu đồ khi ấy là
+        // **LỜI NÓI DỐI**: `0` vì **chưa ai ĐO**, không phải vì **không có lệch** — đúng cái mà chú thích
+        // `InventoryReconciliationWorker` nói nó sinh ra để chống.
+        // 📌 `TC06_phat_ra_DUNG_..._metric_da_dang_ky` **BẮT ĐƯỢC** điều này ngay khi tôi thêm hằng số vào
+        // `All` ⇒ lưới an toàn cũ **có** tác dụng, ⚠️ chỉ là trước đó **không ai** đưa hằng số vào `All`
+        // nên **cả hai** chiều đều không được kiểm (xem ca `MOI_hang_so_metric_PHAI_co_trong_All`).
+        _meter.CreateObservableGauge(eCommerceMetricNames.InventoryReconMismatchSkus,
+            () => Interlocked.Read(ref _inventoryReconMismatchSkus),
+            unit: "{pair}",
+            description: "Số cặp (kho, SKU) có OnHand LỆCH với SUM(sổ cái) — đối soát định kỳ (INV-001 ADR-10).");
         _meter.CreateObservableGauge(eCommerceMetricNames.TaxUnclassifiedSkus,
             () => Interlocked.Read(ref _taxUnclassifiedSkus),
             unit: "{sku}", description: "Số SKU chưa phân loại thuế — kế toán phải xử lý (XC-006).");
+        _meter.CreateObservableGauge(eCommerceMetricNames.PaymentReconUnresolved,
+            () => Interlocked.Read(ref _paymentReconUnresolved),
+            unit: "{transaction}",
+            description: "Số giao dịch đối soát CỔNG KHÔNG XÁC NHẬN ĐƯỢC. Bằng số giao dịch cần đối soát " +
+                "nghĩa là lượt quét KHÔNG mang lại thông tin (cấu hình sai / cổng chết) — KHÔNG PHẢI 'khoẻ' (REC-001).");
     }
 }

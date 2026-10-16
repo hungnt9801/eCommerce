@@ -1447,3 +1447,119 @@ cảnh báo **KHÔNG XÁC ĐỊNH** | ✅ phát hiện **1 giao dịch** nhưng 
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.2 | 17/10/2026 | *(agent, session GĐ1)* | **§21 — LÁT CẮT 4: JOB ĐỐI SOÁT THANH TOÁN ĐỊNH KỲ** (đóng nợ §20.7 #1): thêm **`LuatDoiSoatThanhToan`** (**hàm THUẦN tầng Domain** — 🔑 **vì sao ở Domain, không ở app service:** `PaymentAppService` mang `[Authorize]` cấp class (quy ước #4) ⇒ interceptor ABP kiểm quyền **ngay cả khi gọi trong tiến trình**, mà worker **không có principal** ⇒ **`AbpAuthorizationException`** — 📌 **lỗi ĐÃ XẢY RA THẬT** ở `SAL-005`; ⚠️ **hai lối sai:** *chép luật sang worker* ⇒ luật có **HAI** định nghĩa và sẽ **lệch**, *cho worker gọi app service* ⇒ **chết im lặng**; ✅ **lối đúng: một định nghĩa, hai chỗ gọi**) + **`PaymentReconciliationWorker`** (nhịp **15 phút** vì mỗi giao dịch là **một lời gọi HTTP ra cổng** — ⚠️ khác `MarketplaceReconciliationWorker` 10 phút chỉ **đọc**; trần **50/lượt**; 🔑 **CŨ NHẤT TRƯỚC** rồi mới cắt trần — nếu lấy **mới nhất** trước thì tồn đọng lớn khiến giao dịch cũ **không bao giờ** được xét ⇒ *"đói"* **im lặng**; ➕ chạm trần thì log **NÓI RÕ**; `isTransactional: true` vì job **GHI**) + đăng ký trong `OnPostApplicationInitializationAsync` + `ProjectReference` → `PaymentHub.Domain` + `PaymentReconciliationWorker` vào **danh sách BẮT BUỘC** của `BackgroundWorkerCoCheTests` (`>= 8`). 🔒 **LUẬT BỐN NHÁNH, THỨ TỰ QUAN TRỌNG:** ① trạng thái **cuối** ⇒ `KhongDoi` (**kể cả** khi cổng nói `Failed` — ghi `Failed` lên giao dịch **đã hoàn tiền** sẽ **xoá dấu vết dòng tiền**, kế toán **không đối chiếu được**); ② cổng nói `Succeeded` ⇒ `GhiDaThuTien` (**kể cả** khi đang `Failed` — 🔑 **lưới an toàn IPN mất**); ③ cổng nói `Failed`/`Cancelled` ⇒ `GhiThatBai`; ④ còn lại ⇒ **KHÔNG LÙI**. 🔑 **`Failed` KHÔNG phải trạng thái cuối — CỐ Ý.** 🔑 **`DaKetThuc` PHẢI KHỚP** danh sách của `MarkSucceeded`/`MarkFailed` — ⚠️ lệch thì hàm quyết định nói *"cứ ghi"*, entity **im lặng** `return`, chỗ gọi **đếm** là *"đã đổi"* mà **DB không đổi** ⇒ **báo cáo SAI**. ✅ **20 unit test** (gồm 🔒 **quét LƯỚI BAO PHỦ mọi cặp trạng thái** — bắt giá trị enum **mới** rơi vào `default` sai **và** bắt **hạ trạng thái**) + **JOB CHẠY THẬT**: `[PAY-JOB-BAT-DAU]` → cảnh báo **KHÔNG XÁC ĐỊNH** → `[PAY-JOB-XONG]`, và **DB `Status` vẫn `1`** (bất biến CHỈ TIẾN giữ **qua cả job**). 🐞 **Ba lỗi:** (1) 🚨 **BẪY CŨ TÁI DIỄN — LẦN THỨ BA**: lượt probe đầu job **không có neo nào** (3/6 đỏ); tôi tưởng **đăng ký hỏng** nhưng mã nguồn **và** DLL đều **đúng** — nguyên nhân thật là **`eCommerce.Application.dll` trong thư mục Host là bản CŨ** (Host đang chạy giữ tệp ⇒ build ghi hụt). 🔒 **Luật §97.6 đã có mà tôi vẫn suýt kết luận SAI về SẢN PHẨM** vì tôi kiểm mốc **tệp khác** (`PaymentHub.Application`) chứ **không** kiểm **bản copy trong `bin` của tiến trình sẽ chạy** ⇒ ✅ **siết luật: kiểm mốc của CHÍNH bản copy đó**; (2) tôi grep tên lớp trong DLL bằng **`Encoding.Unicode`** rồi kết luận *"DLL không có worker"* — ⚠️ .NET dùng **UTF-8** cho siêu dữ liệu chuỗi ⇒ 📌 **kết luận từ phép đo sai công cụ**; (3) log console **làm hỏng dấu tiếng Việt** ⇒ chỉ dùng **neo ASCII**. Ghi **§21.7** (nợ: chưa có **metric** · 🚨 cảnh báo vẫn **chỉ là LOG**, chưa có **alert rule** — *"job phát hiện"* **≠** *"có người biết"* · chưa kiểm luồng **THU ĐƯỢC TIỀN** thật (🔒 **cần credential sandbox** — **nợ chặn**) · nhịp/ngưỡng là **hằng số** chưa thành setting · chưa có **UI** kết quả lượt gần nhất · chưa có **test tích hợp cho worker**) |
+
+---
+
+## 22. ✅ **LÁT CẮT 5 — METRIC CHO ĐỐI SOÁT THANH TOÁN** (17/10/2026) — *đóng nợ §21.7 #1*
+
+### 22.1 🔑 **Vì sao cần metric khi ĐÃ có log — và câu trả lời không phải "cho đẹp"**
+
+Ở §21 job **đã** phát hiện và **đã** log ca *"cổng không xác nhận được"* (`[PAY-JOB-KHONG-XAC-DINH]`).
+⚠️ Nhưng 📌 **`"job phát hiện"` KHÔNG PHẢI `"có người biết"`** — log nằm trong **tệp**, và **không ai**
+mở tệp log của một job **không báo lỗi**.
+🔒 Metric mới **vẽ được biểu đồ** và **gắn được cảnh báo** ⇒ đó là khác biệt giữa *"có ghi lại"* và *"có người biết"*.
+
+### 22.2 ✅ **Hai metric, và vì sao là HAI (không gộp)**
+
+| Metric | Loại | Trả lời câu hỏi |
+|---|---|---|
+`payment_recon_changed_total` (nhãn `result` = `succeeded`/`failed`) | **Counter** | *"đã **phát hiện và sửa** bao nhiêu ca"* |
+`payment_recon_unresolved_total` | **Gauge** | *"còn bao nhiêu ca **chưa ngã ngũ**"* |
+
+🔑 **VÌ SAO PHẢI LÀ HAI:** hai câu hỏi **khác nhau**; gộp lại thì *"KHÔNG KIỂM ĐƯỢC"* và *"đã kiểm và sửa"*
+trông **giống hệt nhau** — đúng loại nói dối mà dự án đang chống.
+
+➕ **Và nhãn `result` phải TÁCH `succeeded` khỏi `failed`:** 🔑 *"phát hiện **TIỀN ĐÃ VÀO**"* (IPN mất —
+**đáng lo**) **khác hẳn** *"phát hiện giao dịch hỏng"* (bình thường). 📌 Gộp hai nhãn là mất khả năng phân biệt.
+
+🚨 **VÀ ĐỌC GAUGE CHO ĐÚNG:** giá trị **BẰNG** số giao dịch cần đối soát nghĩa là lượt quét **KHÔNG mang lại
+thông tin nào** ⇒ 🔑 **cấu hình sai hoặc cổng chết**, **KHÔNG PHẢI** *"hệ thống khoẻ"*.
+📌 Đó là lý do nó là **gauge** (trạng thái hiện tại) chứ **không** phải counter: counter **tăng đều** trông như
+*"hoạt động bình thường"*.
+
+### 22.3 ✅ **Nơi đặt hàm phát metric — ba quyết định, mỗi cái có lý do**
+
+**① VÌ SAO HÀM DÙNG CHUNG (không chép hai chỗ):** hàm được gọi từ **cả** `PaymentAppService`
+(`PaymentHub.Application`) **và** `PaymentReconciliationWorker` (`eCommerce.Application`).
+⚠️ Chép hai bản ⇒ chúng **lệch** khi ai đó sửa một chỗ — 🔒 và lệch ở **metric** thì **ÂM THẦM**:
+biểu đồ vẫn vẽ, chỉ **sai số**, và **không có lỗi nào**.
+
+**② VÌ SAO Ở TẦNG DOMAIN:** `eCommerce.Application` **KHÔNG** tham chiếu `PaymentHub.Application`
+(và **không nên** — đó là tham chiếu **ngược tầng**). 🔑 Còn `PaymentHub.Domain` thì **cả hai** đều thấy.
+📌 ➕ Nên phải thêm `ProjectReference` → `eCommerce.Kernel` cho `PaymentHub.Domain`.
+
+**③ VÌ SAO KHÔNG ĐẶT TRONG `LuatDoiSoatThanhToan`:** lớp đó là **hàm THUẦN** — không I/O, không side effect.
+🔒 Nhét metric vào sẽ **phá** đúng tính chất làm cho nó **test được** và **gọi được từ mọi nơi**.
+✅ Tách thành `MetricDoiSoatThanhToan` giữ được **cả hai**.
+
+### 22.4 🚨 **HAI LỖI THẬT TRONG BẢNG ĐĂNG KÝ METRIC — phát hiện khi làm lát cắt này**
+
+| # | Lỗi | Hậu quả thật |
+|---|---|---|
+🚨 **1** | `InventoryReconMismatchSkus` **có** hằng số nhưng **THIẾU** trong `eCommerceMetricNames.All` | 🔒 Chú thích của `All` (*"nguồn sự thật duy nhất"*) **SAI**, và công cụ/kiểm toán đọc bảng đó **không biết** metric tồn tại |
+🚨 **2** | **`SetInventoryReconMismatchSkus` ghi vào biến NHƯNG CHƯA BAO GIỜ CÓ GAUGE đọc nó** | 🚨 Giá trị ghi vào **MẤT**; metric `inventory_recon_mismatch_skus` **KHÔNG BAO GIỜ PHÁT**. 🔑 Và đây là loại hỏng **TỆ NHẤT**: job đối soát kho **vẫn chạy**, **vẫn ghi**, **không lỗi nào** — chỉ là **không ai** nhận được con số. 📌 Một gauge *"0 lệch"* trên biểu đồ khi ấy là **LỜI NÓI DỐI**: `0` vì **chưa ai ĐO**, không phải vì **không có lệch** — đúng cái mà `InventoryReconciliationWorker` nói nó sinh ra để chống |
+
+🔑 **VÌ SAO LỌT:** test cũ chỉ kiểm **MỘT CHIỀU** (*"mọi tên trong `All` đều hợp lệ"*).
+📌 Một hằng số **bị bỏ sót** không bao giờ lộ ra — vì chiều **ngược** (*"mọi hằng số phải có trong `All"`*)
+**không ai kiểm**.
+
+✅ **Đã sửa cả hai:** thêm hằng số vào `All`, thêm `CreateObservableGauge` cho `inventory_recon_mismatch_skus`,
+và thêm ca kiểm **chiều ngược** `MOI_hang_so_metric_PHAI_co_trong_All__chieu_NGUOC` (dùng **phản chiếu** để
+liệt kê mọi hằng số `string` của lớp tên).
+🚨 **Và ca đó BẮT ĐƯỢC lỗi #2 ngay lập tức:** vừa thêm hằng số vào `All` thì
+`TC06_phat_ra_DUNG_..._metric_da_dang_ky` **ĐỎ** ⇒ 🔑 lưới an toàn cũ **có** tác dụng, chỉ là trước đó
+**không ai** đưa hằng số vào `All` nên **cả hai** chiều đều không được kiểm.
+
+### 22.5 ✅ **Bỏ con số cứng `Assert.Equal(12, …)` — vì nó là RÀO CẢN, không phải lưới**
+
+🔑 **VÌ SAO:** nó biến **mỗi** lần thêm metric **hợp lệ** thành một ca **ĐỎ** ⇒ 📌 người sửa sẽ **đổi số**
+mà **không** suy nghĩ gì. 🔒 Một con số cứng chỉ có giá trị **một lần** (lúc viết), sau đó nó **cản** công việc
+đúng mà **không** bắt được lỗi nào.
+✅ Thay bằng **bất biến thật**: **không trùng** · **không rỗng** · **đối chiếu CHIỀU NGƯỢC**.
+📌 Tên ca `TC06_phat_ra_DUNG_12_metric_da_dang_ky` cũng đã bỏ số `12`.
+
+### 22.6 ✅ **KIỂM CHỨNG**
+
+**7 unit test mới (`MetricDoiSoatThanhToanTests`):**
+| Ca | Bất biến |
+|---|---|
+🚨 **`QuyetDinh_KHONG_DOI__KHONG_phat_counter`** | **Ca quan trọng nhất.** ⚠️ Phát counter cho `KhongDoi` ⇒ biểu đồ tăng đều dù **không có gì đổi** ⇒ trông như *"hoạt động bình thường"* |
+`QuyetDinh_CO_DOI__phat_counter_DUNG_nhan` (×2) | 🔑 Nhãn `result` **tách** `succeeded`/`failed` |
+**`MOI_quyet_dinh__deu_xu_ly_duoc`** | 🔒 Quét **mọi** giá trị enum — bắt giá trị **mới** rơi vào `default` |
+**`Moi_nhan_phat_ra__deu_nam_trong_danh_sach_CHO_PHEP`** | ⚠️ Nhãn ngoài `Allowed` vi phạm `XC-005` BR-009 |
+**`Gauge_KHONG_KIEM_DUOC__phat_DUNG_gia_tri`** | Kiểm **dây dẫn** gauge |
+**`Metrics_NULL__khong_nem`** | ⚠️ Nếu ném thì job nền **NỔ lúc khởi động** ⇒ **không bao giờ chạy** |
+
+**➕ Chuỗi lưới an toàn metric (`MetricsTests`):** sửa `Bang_dang_ky_co_du_12_ten` → `Bang_dang_ky_KHONG_trung_ten_va_KHONG_rong`,
+➕ **thêm ca CHIỀU NGƯỢC mới**, ➕ đổi tên `TC06_..._12_metric` → `TC06_phat_ra_DUNG_bang_metric_da_dang_ky`.
+
+**➕ JOB CHẠY THẬT với mã metric mới:** `[PAY-JOB-BAT-DAU]` → cảnh báo **KHÔNG XÁC ĐỊNH** → `[PAY-JOB-XONG]`,
+**DB `Status` vẫn `1`**.
+
+🚨 **VÀ ĐÃ TIÊM LẠI ĐÚNG LỖI** (bài học `CAT-003` §25.3 / `web-001` §98.5): bỏ `PaymentReconChangedTotal`
+khỏi `All` ⇒ ✅ **3 ca ĐỎ**, gồm ca **chiều ngược** mới. ✅ Khôi phục ⇒ **1155 unit test xanh** (+7).
+
+### 22.7 🐞 **Lỗi của tôi trong lượt này**
+
+| # | Lỗi | Bài học |
+|---|---|---|
+**1** | 🚨 **BẪY CŨ LẦN THỨ TƯ:** khôi phục mã xong, test **vẫn 3 ca đỏ** ⇒ tôi suýt kết luận *"khôi phục không sạch"*. 🔑 Sự thật: **binary cũ** — phải `--no-incremental` mới hết | 📌 **§97.6 đã ghi luật, §98.6/§21.6 đã ghi lại — và nó VẪN cắn.** 🔒 Đến lúc **đưa việc kiểm mốc DLL vào một script dùng chung** thay vì dựa vào trí nhớ (📌 xem §22.8 #3) |
+**2** | Tôi viết **overload `Quyet(_, hienTai, tuCong) => throw new NotSupportedException()`** — rác thuần tuý, phải xoá | 🔒 Mã **ném vô điều kiện** lọt vào commit là **bẫy cho người sau** |
+**3** | **Sửa mã theo CHỈ SỐ DÒNG** ⇒ xoá nhầm dòng phân cách `// ── CHUYỂN ĐỔI ──` | ⚠️ **Lần thứ hai** trong hai lượt (§20.6 #2). 🔒 Chỉ số dòng **đổi** khi thêm/xoá dòng ở trên ⇒ **luôn dùng `edit` với ngữ cảnh** |
+**4** | Tôi **chú thích sai kiểu** (`// ENUM` trong khi là **chuỗi**) ⇒ mất một vòng sửa | 🔑 Lại là bài học §20.6 #3: **DTO và ENTITY cùng tên trường, KHÁC kiểu** |
+
+### 22.8 ⏳ NỢ
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+**1** | 🚨 **Cảnh báo VẪN CHƯA có alert rule** | 📌 Nay đã có **số** để gắn cảnh báo, nhưng **chưa ai** gắn. 🔑 `"có metric"` **≠** `"có cảnh báo"` — đúng khoảng cách mà §22.1 nói |
+**2** | **Chưa có tầng XUẤT metric** (OpenTelemetry → Prometheus) | ⚠️ `Meter` chỉ **phát**; không có collector thì **không ai đọc**. 📌 Chú thích `eCommerceMetrics` nói việc này *"có thể thêm sau mà không phải sửa nơi phát"* — ✅ đúng, nhưng **chưa làm** |
+**3** | 🚨 **Việc kiểm mốc DLL vẫn là QUY TẮC TRONG ĐẦU, không phải script** | 🔑 Đã cắn **bốn lần** (`§97.6`, `§98.6`, `§21.6`, **§22.7**). 📌 Nên có `tools\build-va-kiem-moc.ps1` làm việc đó **một lần cho tất cả** |
+**4** | **Chưa có test tích hợp cho worker** | ⚠️ Vẫn kiểm bằng **probe** (script tay) — cùng nợ `web-001` §98.7 #1 |
+**5** | **Chưa kiểm luồng THU ĐƯỢC TIỀN thật** (`result="succeeded"` trên dữ liệu thật) | 🔒 Cần **credential sandbox VNPay** ⇒ **nợ chặn** |
+
+### 22.9 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.3 | 17/10/2026 | *(agent, session GĐ1)* | **§22 — LÁT CẮT 5: METRIC CHO ĐỐI SOÁT THANH TOÁN** (đóng nợ §21.7 #1): thêm **`payment_recon_changed_total`** (counter, nhãn `result`=`succeeded`/`failed`) + **`payment_recon_unresolved_total`** (gauge) + **`MetricDoiSoatThanhToan`** (🔑 **hàm phát metric DÙNG CHUNG** ở **tầng Domain** — ⚠️ *chép hai chỗ* ⇒ hai bản **lệch** khi ai đó sửa một chỗ, và 🔒 lệch ở **metric** thì **ÂM THẦM**: biểu đồ vẫn vẽ, chỉ **sai số**; ⚠️ *đặt ở `PaymentHub.Application`* ⇒ `eCommerce.Application` **không** thấy nó (tham chiếu **ngược tầng**); 🔒 *đặt trong `LuatDoiSoatThanhToan`* ⇒ **phá** tính **thuần** của luật — tách ra giữ được **cả hai**) + `ProjectReference` → `eCommerce.Kernel` cho `PaymentHub.Domain` + gọi từ **cả** app service **và** job. 🔑 **HAI metric vì HAI câu hỏi khác nhau:** counter = *"đã phát hiện và sửa bao nhiêu"*, gauge = *"còn bao nhiêu ca chưa ngã ngũ"*; 📌 gộp lại thì *"KHÔNG KIỂM ĐƯỢC"* và *"đã kiểm và sửa"* trông **giống hệt nhau**. 🚨 **PHÁT HIỆN HAI LỖI THẬT trong bảng đăng ký metric:** (①) `InventoryReconMismatchSkus` **có** hằng số nhưng **thiếu** trong `All` ⇒ chú thích *"nguồn sự thật duy nhất"* **SAI**; (②) **`SetInventoryReconMismatchSkus` ghi vào biến NHƯNG CHƯA BAO GIỜ CÓ GAUGE đọc nó** ⇒ 🚨 giá trị **MẤT**, metric **không bao giờ phát** — 🔑 và đây là loại hỏng **TỆ NHẤT**: job đối soát kho **vẫn chạy**, **vẫn ghi**, **không lỗi nào**, chỉ là **không ai** nhận được con số ⇒ một gauge *"0 lệch"* khi ấy là **LỜI NÓI DỐI** (`0` vì **chưa ai ĐO**). 🔑 **Vì sao lọt:** test cũ chỉ kiểm **MỘT CHIỀU** — ✅ nay thêm ca **chiều NGƯỢC** dùng **phản chiếu** (🚨 và nó **BẮT ĐƯỢC lỗi #2 ngay lập tức**). ✅ **Bỏ `Assert.Equal(12, …)`** — 🔑 con số cứng chỉ có giá trị **một lần** rồi thành **RÀO CẢN**: mỗi metric **hợp lệ** mới làm nó **ĐỎ** ⇒ người sửa **đổi số** mà **không suy nghĩ**; thay bằng bất biến thật (**không trùng** · **không rỗng** · **đối chiếu chiều ngược**). ✅ **7 unit test mới** + sửa bộ test metric **⇒ 1155 unit** (+7) · **38 integration** · mermaid **197/0**; ➕ **job chạy THẬT** với mã mới (`[PAY-JOB-BAT-DAU]` → cảnh báo → `[PAY-JOB-XONG]`, **DB không đổi**). 🚨 **ĐÃ TIÊM LẠI ĐÚNG LỖI:** bỏ `PaymentReconChangedTotal` khỏi `All` ⇒ **3 ca ĐỎ** (gồm ca **chiều ngược** mới). 🐞 **Bốn lỗi của tôi:** (1) 🚨 **BẪY CŨ LẦN THỨ TƯ** — khôi phục mã xong test **vẫn đỏ**, tôi suýt kết luận *"khôi phục không sạch"* nhưng sự thật là **binary cũ** ⇒ 🔒 **§97.6/§98.6/§21.6 đã ghi luật mà nó VẪN cắn** ⇒ 📌 phải đưa việc kiểm mốc DLL vào **script dùng chung**, không dựa vào trí nhớ; (2) viết **overload ném vô điều kiện** (`=> throw new NotSupportedException()`) — **rác**, 🔒 lọt vào commit là **bẫy cho người sau**; (3) **sửa mã theo CHỈ SỐ DÒNG** ⇒ xoá nhầm dòng phân cách — ⚠️ **lần thứ hai** trong hai lượt; (4) **chú thích sai kiểu** (`// ENUM` trong khi là **chuỗi**) ⇒ mất một vòng sửa. Ghi **§22.8** (nợ: 🚨 **cảnh báo vẫn CHƯA có alert rule** — *"có metric"* **≠** *"có cảnh báo"* · **chưa có tầng XUẤT metric** (OpenTelemetry → Prometheus) ⇒ `Meter` chỉ **phát**, không collector thì **không ai đọc** · 🚨 **việc kiểm mốc DLL vẫn là QUY TẮC TRONG ĐẦU** — đã cắn **bốn lần** ⇒ nên có `tools\build-va-kiem-moc.ps1` · chưa có **test tích hợp cho worker** · chưa kiểm luồng **THU ĐƯỢC TIỀN** thật (🔒 **cần credential sandbox** — **nợ chặn**)) |

@@ -151,3 +151,66 @@ Vòng 97 **không** commit gì cho tính năng (cây làm việc bị **hoàn ng
 2. Log nghiệp vụ ⇒ **neo ASCII trong chính câu log**, tìm bằng neo.
 3. Gieo dữ liệu ⇒ **đọc lại bằng `SELECT`** và **in điều kiện tiên quyết**; **tra `information_schema.columns`** trước khi `INSERT`.
 
+
+---
+
+## 🚨 `kiem-moc-build.ps1` — CHỐNG BẪY *"build `exit 0` mà binary KHÔNG ĐỔI"*
+
+### Vì sao có script này (nó **KHÔNG** phải tiện nghi — nó là **kết quả của BỐN LẦN TRẢ GIÁ**)
+
+`dotnet build` có thể trả **`exit 0`** + in **`Build succeeded.`** ⚠️ nhưng **KHÔNG ghi** nhi phân, vì một
+tiến trình (Host/Web) **đang chạy và đang giữ tệp**. 📌 Triệu chứng **duy nhất** là:
+**mã nguồn ĐÚNG, DLL CŨ** ⇒ test / phép kiểm **ĐỎ vì LÝ DO SAI** ⇒ 🔒 người sửa **kết luận sai về SẢN PHẨM**.
+
+| Lần | Ở đâu | Chuyện gì xảy ra |
+|---|---|---|
+**1** | `web-001` §97.6 | Build `exit 0`, **mốc DLL không đổi** |
+**2** | `web-001` §98.6 | Chạy test trên **binary cũ** ⇒ **7 ca đỏ** dù mã đã đúng |
+**3** | `sal-006` §21.6 | Job **không có neo nào**; tôi tưởng **đăng ký hỏng**, thật ra **Host giữ DLL cũ** |
+**4** | `sal-006` §22.7 | Khôi phục mã xong test **vẫn đỏ** ⇒ suýt kết luận *"khôi phục không sạch"* |
+
+➡️ 🔒 **Bốn lần.** Một **quy tắc trong đầu** không đủ ⇒ phải là **script**.
+
+### 🚨 Bài học quan trọng nhất — kiểm **BẢN COPY TRONG `bin` CỦA TIẾN TRÌNH SẼ CHẠY**
+
+```
+src\eCommerce.Application\bin\...\eCommerce.Application.dll          ← bản trong THƯ MỤC DỰ ÁN
+src\eCommerce.HttpApi.Host\bin\...\eCommerce.Application.dll         ← 🚨 BẢN ĐƯỢC NẠP (thường MỚI HƠN)
+src\eCommerce.Web\bin\...\eCommerce.Application.dll
+```
+📌 Kiểm mốc của bản **dự án** mà kết luận về bản **Host** là **sai công cụ** — đúng lỗi đã xảy ra ở `sal-006` §21.6.
+
+### Cách dùng — **ba bước**, và bước ① **phải trước** khi build
+
+```powershell
+# ① Ghi nhớ mốc TRƯỚC khi build
+pwsh -File tools\kiem-moc-build.ps1 -GhiNho
+
+# ② Build (nên có --no-incremental khi nghi ngờ)
+dotnet build eCommerce.slnx -v m --no-incremental /nodeReuse:false
+
+# ③ Kiểm mốc SAU khi build — THOÁT KHÁC 0 nếu binary KHÔNG đổi
+pwsh -File tools\kiem-moc-build.ps1 -Kiem
+```
+
+**Lọc theo tệp cụ thể** (nhanh hơn, ít nhiễu):
+```powershell
+pwsh -File tools\kiem-moc-build.ps1 -GhiNho -Ten 'eCommerce.Application.dll'
+# ... build ...
+pwsh -File tools\kiem-moc-build.ps1 -Kiem -Ten 'eCommerce.Application.dll'
+```
+
+### Mã thoát — 🔑 **HAI nguyên nhân KHÁC NHAU phải có HAI mã KHÁC NHAU**
+
+| Mã | Nghĩa | Phải làm gì |
+|---|---|---|
+**0** | ✅ **Mọi tệp đều ĐỔI mốc** ⇒ bản build **ĐÃ VÀO** | Tin test/kiểm chứng được |
+**1** | 🚨 **Có tệp KHÔNG ĐỔI** ⇒ bản build **KHÔNG VÀO** | **Dừng** Host/Web, chờ cổng `5000`/`5100` **TRỐNG**, build lại với `--no-incremental`, **kiểm mốc lại**. 🔒 **Đừng** kết luận gì về sản phẩm khi mốc chưa đổi |
+**2** | ⚠️ **Phép kiểm VÔ NGHĨA** (không tìm thấy tệp nào, hoặc chưa có mốc) | Sửa `-ThuMuc`/`-Ten`, hoặc chạy `-GhiNho` trước |
+
+🔒 **VÌ SAO TÁCH MÃ 1 VÀ 2:** gộp lại thì người đọc log **không phân biệt** *"bản build không vào"* với
+*"phép kiểm sai"* — ⇒ 📌 và sẽ đi **sửa SAI CHỖ**. (📌 Đây cũng là bài học của chính lượt viết script:
+`Write-Error` của PowerShell ép **exit 1** ⇒ tôi phải dùng `Write-Output` + `exit 2`.)
+
+➕ **Tệp mốc `.moc-build.json`** nằm ở **gốc repo** và **đã** vào `.gitignore` (nó là **công cụ kiểm chứng**,
+không phải mã nguồn).
