@@ -120,9 +120,22 @@ public class CustomerDataExportLogTests
         // ⚠️ `""` va `"   "` phai thanh `null` — 🔑 de **phan biet** *"khong co ly do"* voi
         // *"co ly do nhung rong"*; 📌 va tranh ghi mot chuoi **vo nghia** vao nhat ky.
         Assert.Null(Tao(lyDo: "").LyDo);
+        // ➕ **`"   "` CUNG thanh `null`, KHONG nem** — xem `CUS-001` §27.4: 🔑 day la **quyet dinh co do luong**,
+        // khong phai su thieu sot. 📌 Chinh sach *"phai co ly do"* duoc bao ve o **lop goi**
+        // (`CustomerAppService`: guard `IsNullOrWhiteSpace` ⇒ E2E `D9g` do duoc `HTTP 500`), 🔒 va 🚨
+        // **KHONG** nen chan o **entity** vi:
+        // <list type="number">
+        //   <item>`""` (o nhap **de trong**) va `"   "` (go **khoang trang**) deu nghia la *"khong co ly do"*
+        //     ⇒ 🔑 **nem** se lam **hong luong hop le** (📌 mot nguoi de trong o roi bam nut se nhan loi);</item>
+        //   <item>🚨 **TAO RA HAI NGUON SU THAT:** 🔒 luat *"phai co ly do"* chi nen o **mot cho** — 📌 hai cho
+        //     thi mot ngay nao do chung se **khac nhau** va ta khong biet cho nao dung;</item>
+        //   <item>⚠️ va no **khong** bao ve duoc gi them: 🔑 moi duong ghi trong san pham deu di qua
+        //     **app service** (📌 da co guard + test E2E).</item>
+        // </list>
+        // ✅ Vi vay entity **CHUAN HOA** gia tri vo nghia thanh `null` (📌 no van lam dung phan **du lieu**
+        // cua minh), con **CHINH SACH** nam o **lop goi** — 🔑 dung nguyen tac da ghi o §11.
         Assert.Null(Tao(lyDo: "   ").LyDo);
     }
-
     [Fact]
     public void TC07_Ly_do_binh_thuong_duoc_giu_NGUYEN__khong_tu_y_cat_trim()
     {

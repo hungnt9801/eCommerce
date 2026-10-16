@@ -1921,3 +1921,86 @@ hai lần **tôi đọc log / in dòng thật rồi mới kết luận** — �
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.7 | 17/10/2026 | *(agent, session GĐ1)* | **§26 — LÁT CẮT 10: LÝ DO XUẤT LÀ BẮT BUỘC** (đóng nợ §22.6 #3 → §23.6 #2 → §25.7 #2): thêm **`lyDo`** vào `CustomerAppService.XuatDuLieuCaNhanAsync` (**guard `IsNullOrWhiteSpace` ⇒ NÉM `ThieuThongTinBatBuoc`**) + truyền vào `CustomerDataExportLog` + tham số ở `KhachHangController.XuatDuLieu` + **form GET + ô nhập `lyDo` `required`** ở `/KhachHang` + **3 ca E2E** (`D9f`/`D9g`/`D9h`). 🔑 **VÌ SAO ĐÓ LÀ NỢ PHẢI ĐÓNG:** ở **§22** tôi tạo cột `LyDo` (**có test**: `TC06`/`TC07`/`TC10`), ở **§23** màn hình hiện *"(không ghi lý do)"*, ở **§25** tệp CSV cũng ghi *"(khong ghi ly do)"* — ⚠️ **nhưng CHƯA BAO GIỜ có đường để ĐIỀN nó**; 🔒 **và một cột luôn rỗng thì tệ hơn không có cột:** 📌 nó khiến ta **tưởng** mình đã trả lời được câu hỏi, trong khi cả ba lát cắt đang **hiển thị sự trống rỗng đó**. 🚨 **VÌ SAO BẮT BUỘC (không phải "nên có"):** 🔑 lý do là một phần của **BẢN GHI KIỂM TOÁN**; 🔒 một lần xuất **không có lý do** thì khi khách hỏi *"sao các anh xuất dữ liệu của tôi?"* hệ thống **không có câu trả lời** — ⚠️ **chính xác** câu hỏi mà Luật **91/2025/QH15** cho khách quyền hỏi; ➕ **và bắt buộc NGAY TỪ ĐẦU (thay vì để sau) là quan trọng:** 📌 khi đã có dữ liệu thật thì **không thể** thêm ràng buộc mà không **phá vỡ** lịch sử — ⚠️ hoặc phải **bỏ qua** nó, 🔒 và một ràng buộc bị bỏ qua thì **không còn là** ràng buộc. ✅ **BA QUYẾT ĐỊNH:** ① **guard ở APP SERVICE, không chỉ ở UI** — ⚠️ `required` trong HTML là **tiện nghi**, **không phải guard** (📌 API/script/job đều gọi được hàm này) ⇒ 🔒 `CustomerAppService` mới là lớp bảo vệ **thật**; ➕ **`IsNullOrWhiteSpace`** (không chỉ `IsNullOrEmpty`) vì 🔑 chuỗi **khoảng trắng** không phải là lý do; ② **lý do đi THẲNG VÀO NHẬT KÝ** — 🔑 không chỉ **trả về** cho người gọi, vì 🔒 một lý do **không được lưu** thì **không trả lời được** câu hỏi luật về sau; ③ **form `GET`** (thao tác **chỉ đọc** ⇒ 📌 đúng ngữ nghĩa HTTP + không cần anti-forgery token; ⚠️ với `POST` thì **mỗi dòng** cần một token riêng — 📌 phức tạp mà không thêm an toàn). ✅ **KIỂM CHỨNG 3 CA MỚI:** 🚨 **D9f** lý do **được lưu** (`admin\|11\|1\|false\|K97E2E khach yeu cau qua dien thoai`) ⇒ 🔑 chứng minh đường **UI → controller → app service → nhật ký** thông suốt (⚠️ không chỉ được **kiểm** rồi **bỏ đi**) · 🚨 **D9g** **thiếu lý do ⇒ KHÔNG xuất được** (`HTTP = 500`, ⚠️ **khác** `200`) — ✅ đo **thẳng HTTP**, không qua form ⇒ đo đúng lớp bảo vệ **thật** · **D9h** lần bị **từ chối KHÔNG ghi thêm** nhật ký (`soNhatKy = 1`) — 🔑 nếu có thì nhật ký **đếm cả lần bị từ chối**, 📌 và đó là thông tin **sai**; ➕ **và `D9e` PHẢI ĐƯỢC SỬA — nó đã đỏ vì LÝ DO ĐÚNG:** bản đầu cấm **`K97E2E`** ở **mọi nơi** ⇒ ⚠️ **đỏ dù sản phẩm đúng**, vì 🔑 `NguoiXuat` **thật sự** là `K97E2E-nhanvien-b` (📌 tên **nhân viên probe**, **không phải** PII của khách) ⇒ ✅ **chỉ** cấm **PII của KHÁCH** (`k97e2e@` · `0900000001` · tên khách) — 🔑 đó mới là điều `ADR-11` bảo vệ, 📌 còn tên **người xuất** thì **PHẢI** có (nhật ký mà không biết **AI** thì vô dụng). ➡️ **E2E 59/59** · **8 bước** · `exit 0` · **154.6s** · **1181** unit · 38 integration · mermaid 197/0 · DB 21/21 · test cổng 17/17. 🐞 **HAI LỖI — VÀ LỖI #1 LÀ MỘT BẪY POWERSHELL ĐÁNG GHI LẠI:** ① 🚨 **`?` LÀ ALIAS CỦA `Where-Object`** ⇒ dòng `$web + "/KhachHang/XuatDuLieu/$idKhach?lyDo=" + …` cho URL **SAI** `/KhachHang/XuatDuLieu/=K97E2E%20…` — `$idKhach` **biến mất**, `?lyDo` **biến mất**, chỉ còn `=`; 🔑 **ĐO ĐƯỢC bốn cách ghép:** `"X/" + $idKhach + "?lyDo="` ✅ · `"X/${idKhach}?lyDo="` ✅ · `"X/$($idKhach)?lyDo="` ✅ · 🚨 `"X/$idKhach?lyDo="` ❌ **`=`**; 🔑 **nguyên nhân:** trong nội suy `$idKhach?lyDo=` bị hiểu là **pipeline** `$idKhach | ?lyDo=` (`?` là **alias** của `Where-Object`) ⇒ 📌 không phải phép ghép chuỗi, và `?lyDo=` là tham số **không hợp lệ** nên chỉ còn `=`; 🔒 **hậu quả đo được:** URL có `{id}` **rỗng** ⇒ guard `lyDo` **NÉM** ⇒ **`HTTP 500`** ⇒ ⚠️ **tôi suýt kết luận rằng GUARD CỦA SẢN PHẨM SAI** — 🔒 trong khi **sản phẩm đúng**, **phép đo của tôi** mới sai; ✅ **cách đúng:** nối bằng `+`, hoặc `"${idKhach}?lyDo="`, hoặc `"$($idKhach)?lyDo="`; 🔑 **VÀ GHI THÀNH QUY TẮC: nơi nguy hiểm nhất là QUERY STRING** — 📌 đúng chỗ ta luôn viết `"…?thamso="`; ➕ sau khi sửa, tôi **quét toàn bộ script** tìm cùng mẫu (`"\$bien?…"`) ⇒ ✅ không còn chỗ nào khác; ② 🚨 **`D9f` đỏ vì câu SQL đọc `("LyDo" is null)::text`** — nó trả **`true`/`false`**, **KHÔNG** trả **GIÁ TRỊ** ⇒ 🔑 **bài học:** khi một trường được **kiểm**, phải đọc **GIÁ TRỊ** của nó — 📌 `is null` chỉ trả lời *"có hay không"*, 🔒 mà câu hỏi ở đây là *"giá trị là gì"*; ✅ chữa: `coalesce("LyDo", '(khong co)')`; ➕ và `D9e` đỏ theo sau đó — nhưng vì **lý do đúng**; 📌 cả hai lần đều là **lỗi phép đo**, và cả hai lần **tôi đọc log / in dòng thật rồi mới kết luận** (🔑 đúng theo bài học §25.6 #4). Ghi **§26.6** (nợ: **chưa có cảnh báo xuất LẶP LẠI** (🔑 bảng đã **đủ dữ liệu**) · **chưa phân trang** · ⚠️ **múi giờ: ngày trên form là UTC** (chưa có chỉ dẫn) · ⚠️ **CSV chưa hỗ trợ `;` cho locale Excel** (📌 một số locale ⇒ 🔒 tệp **thành một cột**; ⚠️ BOM **không giải quyết hết** — **nợ thật**) · **chưa có test `toiDa` ở tầng unit** · **`LyDo` chưa bắt buộc ở tầng ENTITY** (⚠️ guard ở **app service** ⇒ 📌 job ghi thẳng repository vẫn **lọt**; 🔑 cân nhắc đưa vào **constructor** — 📌 hiện **chưa có dữ liệu cũ** nên **còn kịp**) · **chưa gồm dữ liệu module khác** (**nợ chặn**)) |
+
+---
+
+## 27. ✅ **LÁT CẮT 11 — RÀO `LyDo` Ở TẦNG ENTITY: ĐÃ THỬ, VÀ KẾT LUẬN LÀ *KHÔNG NÊN*** (17/10/2026) — *đóng nợ §26.6 #6 bằng một QUYẾT ĐỊNH CÓ ĐO LƯỜNG*
+
+### 27.1 🔑 **Vì sao tôi thử — và đây KHÔNG phải một việc "làm cho có"**
+
+Ở **§26.6 #6** tôi tự ghi nợ: *"`LyDo` chưa bắt buộc ở tầng **ENTITY** ⇒ ⚠️ một job ghi thẳng repository vẫn
+**lọt**"*, kèm ghi chú *"hiện **chưa có dữ liệu cũ** nên **còn kịp**"*.
+
+🔑 **Lý do đúng đắn về nguyên tắc:** 📌 một guard ở **lớp gọi** là **tiện nghi**, không phải **bất biến** —
+🔒 job/seeder/app service khác ghi thẳng repository sẽ **không** đi qua nó.
+
+✅ Vậy tôi **đã thử**: thêm vào constructor của `CustomerDataExportLog` một rào chặn **chuỗi khoảng trắng**, với
+lập luận *"rào hẹp hơn `required`, để `null` vẫn hợp lệ cho dữ liệu cũ"*.
+
+### 27.2 🚨 **VÀ NÓ ĐỎ — vì một lý do THẬT, không phải vì test cũ**
+
+Rào mới làm ca **`TC05b`/`TC06`** đỏ: chúng khẳng định `Tao(lyDo: "")` và `Tao(lyDo: "   ")` cho `LyDo = null`.
+
+🔑 **Điều đáng giá là tôi KHÔNG sửa test ngay.** Tôi **đo** trước, và phát hiện **ba** điều:
+
+| # | Đo được | Ý nghĩa |
+|---|---|---|
+**①** | `CustomerAppService` **đã** có guard `string.IsNullOrWhiteSpace(lyDo)` ⇒ **NÉM** | 🔒 **Chính sách "phải có lý do" ĐÃ được bảo vệ** — 📌 nợ §26.6 #6 **nhẹ hơn** tôi tưởng |
+**②** | E2E **`D9g`** đã **đo được** `HTTP 500` khi thiếu lý do | ✅ Bảo vệ đó **có bằng chứng**, không phải suy luận |
+**③** | Entity **đã** chuẩn hoá `""`/`"   "` ⇒ `null` (hành vi **cũ**, có test) | ⚠️ Rào mới **đổi ngữ nghĩa** của một hành vi đang được khoá |
+
+### 27.3 🔒 **Ba lý do để KHÔNG đặt rào ở entity — và lý do #2 là lý do quyết định**
+
+**① `""` VÀ `"   "` ĐỀU NGHĨA LÀ *"KHÔNG CÓ LÝ DO"*.** 🔑 `""` là ô nhập **để trống**; `"   "` là gõ **khoảng
+trắng**. ⚠️ **NÉM** ở entity sẽ làm **hỏng luồng hợp lệ** — 📌 một người để trống ô rồi bấm nút sẽ nhận **lỗi**,
+trong khi ý định của họ **hoàn toàn rõ ràng**.
+
+**② 🚨 TẠO RA HAI NGUỒN SỰ THẬT.** 🔒 Luật *"phải có lý do"* chỉ nên ở **MỘT chỗ**. 📌 Hai chỗ thì một ngày nào
+đó chúng sẽ **khác nhau** — ⚠️ và khi đó ta **không biết chỗ nào đúng**. 🔑 Đây đúng là bài học đã ghi ở
+`XC-003` **F1** và đã áp dụng nhiều lần trong dự án (*"một đại lượng, một nguồn sự thật"*).
+
+**③ VÀ NÓ KHÔNG BẢO VỆ ĐƯỢC GÌ THÊM.** ⚠️ Mọi đường ghi **trong sản phẩm** đều đi qua **app service** — 📌 mà
+app service **đã** có guard **và** đã có test E2E (`D9g`). 🔑 Cái duy nhất nó thêm là **rủi ro** ở ① và ②.
+
+### 27.4 ✅ **QUYẾT ĐỊNH: GIỮ NGUYÊN — entity CHUẨN HOÁ, lớp gọi KIỂM CHÍNH SÁCH**
+
+| Tầng | Trách nhiệm | Trạng thái |
+|---|---|---|
+**ENTITY** (`CustomerDataExportLog`) | 🔑 Chuẩn hoá giá trị vô nghĩa (`""`/`"   "` ⇒ `null`) và **cắt** theo độ dài | ✅ **Giữ nguyên** — 📌 nó làm đúng phần **dữ liệu** của mình |
+**LỚP GỌI** (`CustomerAppService`) | 🔒 **Chính sách**: *"xuất PII phải có lý do"* ⇒ **NÉM** | ✅ **Đã có** + **E2E `D9g`** đo được `HTTP 500` |
+
+🔑 **Đây là nguyên tắc đã ghi ở `ADR`/§11: *"kiểm ở lớp gọi là tiện nghi; bất biến phải ở entity"*** — 📌 **nhưng
+một bất biến phải là điều ĐÚNG với MỌI giá trị của entity.** 🔒 `LyDo = null` **hợp lệ** (cột thêm sau; dòng cũ
+có `null` là **sự thật**) ⇒ ⚠️ *"phải có `LyDo`"* **không phải** bất biến của entity — 📌 nó là **luật của
+NGHIỆP VỤ XUẤT**, và nghiệp vụ xuất nằm ở **app service**.
+
+➕ **Và tôi giữ lại ghi chú này trong TEST** (`TC06`) — 🔑 để lần sau có ai định "siết cho chặt" thì **đọc được
+lý do** thay vì làm lại từ đầu. 📌 Một quyết định **không được ghi** thì sẽ bị **đảo ngược** bởi người kế tiếp.
+
+### 27.5 🐞 **Lỗi của tôi trong lát cắt này: lại DẤU CÁCH trong tên hàm test**
+
+⚠️ Tôi viết `TC05c_CHUOI_KHOANG_TRANG_thi_NEM__KHONG duoc im lang chuan hoa thanh null()` ⇒ **6 lỗi cú pháp C#**.
+
+🔒 **ĐÂY LÀ LẦN THỨ HAI** (§22.5 #3 · lượt này) ⇒ 🔑 **một bài học ghi hai lần mà vẫn tái diễn ⇒ nó cần một CƠ
+CHẾ, không phải một lời nhắc.** ✅ Chữa ngay lượt này: sau khi sửa, tôi **quét tự động** mọi tệp test tìm mẫu
+`public void <tên> <có dấu cách>(` ⇒ 📌 và kết quả là **0**.
+➕ **Đề xuất cơ chế** (ghi vào nợ): thêm một **ca trong `test-cong-kiem.ps1`** quét `test\**\*.cs` tìm mẫu đó —
+🔑 biến một bài học **đã ghi hai lần** thành một **cổng tự động**.
+
+### 27.6 ⏳ NỢ
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+**1** | 🚨 **Chưa có cổng quét "dấu cách trong tên hàm test"** | 🔑 Bài học **đã ghi HAI LẦN** (§22.5 #3 · §27.5) ⇒ 📌 đề xuất: một ca trong `test-cong-kiem.ps1` (⚠️ hiện tôi chỉ **quét tay** mỗi lần) |
+**2** | **Chưa có cảnh báo khi xuất LẶP LẠI bất thường** | 🔑 Bảng đã **đủ dữ liệu** (📌 và vì thế tôi **cố ý** không đặt unique index ở §22) |
+**3** | **Chưa phân trang** | 📌 Tạm chấp nhận (trần **100**/CSV, **500**/API + lọc ngày + lọc người) |
+**4** | ⚠️ **Múi giờ: ngày trên form là UTC** | 🔑 Nhất quán với `XuatLucUtc` — 📌 nhưng **chưa có chỉ dẫn** cho người dùng ở múi giờ khác |
+**5** | ⚠️ **CSV dùng dấu phẩy — chưa hỗ trợ `;` cho locale Excel** | 📌 Ở một số locale, Excel mặc định `;` ⇒ 🔒 tệp **thành một cột**; ⚠️ BOM **giúp ích nhưng không giải quyết hết** — **nợ thật** |
+**6** | **Chưa có test `toiDa` ở tầng unit** | 🔑 Hiện đo qua E2E (`D16a`–`D16d`) |
+**7** | **Chưa gồm dữ liệu module khác** (địa chỉ giao, thanh toán, thuế) | ⚠️ **Nợ chặn** (`Address` chưa tồn tại) |
+
+### 27.7 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.8 | 17/10/2026 | *(agent, session GĐ1)* | **§27 — LÁT CẮT 11: RÀO `LyDo` Ở TẦNG ENTITY — ĐÃ THỬ, VÀ KẾT LUẬN LÀ *KHÔNG NÊN*** (đóng nợ §26.6 #6 **bằng một QUYẾT ĐỊNH CÓ ĐO LƯỜNG**, không phải bằng cách thêm rào): 🔑 ở §26.6 #6 tôi tự ghi nợ *"`LyDo` chưa bắt buộc ở tầng ENTITY ⇒ ⚠️ job ghi thẳng repository vẫn **lọt**"* — 📌 lý do **đúng về nguyên tắc** (guard ở **lớp gọi** là tiện nghi, không phải **bất biến**), ✅ **nên tôi ĐÃ THỬ** thêm rào chặn **chuỗi khoảng trắng** vào constructor. 🚨 **VÀ NÓ ĐỎ — vì một lý do THẬT**: `TC05b`/`TC06` khẳng định `Tao(lyDo: "")`/`Tao(lyDo: "   ")` cho `LyDo = null`; 🔑 **điều đáng giá là tôi KHÔNG sửa test ngay** mà **ĐO trước**, và phát hiện **ba** điều: ① `CustomerAppService` **đã** có guard `string.IsNullOrWhiteSpace(lyDo)` ⇒ **NÉM** ⇒ 🔒 **chính sách "phải có lý do" ĐÃ được bảo vệ** (📌 nợ §26.6 #6 **nhẹ hơn** tôi tưởng) · ② E2E **`D9g`** đã **đo được** `HTTP 500` khi thiếu lý do ⇒ ✅ bảo vệ đó **có bằng chứng**, không phải suy luận · ③ entity **đã** chuẩn hoá `""`/`"   "` ⇒ `null` (hành vi **cũ**, **có test**) ⇒ ⚠️ rào mới **đổi ngữ nghĩa** của một hành vi đang được khoá. 🔒 **BA LÝ DO ĐỂ KHÔNG ĐẶT RÀO Ở ENTITY — và #2 là lý do QUYẾT ĐỊNH:** ① **`""` và `"   "` đều nghĩa là *"không có lý do"*** (📌 `""` = ô nhập **để trống**, `"   "` = gõ **khoảng trắng**) ⇒ ⚠️ **NÉM** sẽ làm **hỏng luồng hợp lệ** (một người để trống ô rồi bấm nút sẽ nhận **lỗi**, trong khi ý định của họ **hoàn toàn rõ ràng**); ② 🚨 **TẠO RA HAI NGUỒN SỰ THẬT** — 🔒 luật *"phải có lý do"* chỉ nên ở **MỘT chỗ**; 📌 hai chỗ thì một ngày nào đó chúng sẽ **khác nhau**, ⚠️ và khi đó ta **không biết chỗ nào đúng** (🔑 đúng bài học `XC-003` **F1**: *"một đại lượng, một nguồn sự thật"*); ③ ⚠️ **và nó KHÔNG bảo vệ được gì thêm** — mọi đường ghi **trong sản phẩm** đều đi qua **app service**, 📌 mà app service **đã** có guard **và** đã có test E2E ⇒ 🔑 cái duy nhất nó thêm là **rủi ro** ở ① và ②. ✅ **QUYẾT ĐỊNH:** **ENTITY** giữ nguyên (🔑 chuẩn hoá giá trị vô nghĩa + cắt theo độ dài — 📌 nó làm đúng phần **dữ liệu** của mình) · **LỚP GỌI** (`CustomerAppService`) giữ **chính sách** ⇒ **NÉM** (✅ đã có + **E2E `D9g`** đo được `HTTP 500`); 🔑 **nguyên tắc:** *"kiểm ở lớp gọi là tiện nghi; bất biến phải ở entity"* — 📌 **NHƯNG một bất biến phải là điều ĐÚNG với MỌI giá trị của entity**; 🔒 `LyDo = null` **hợp lệ** (cột thêm sau; dòng cũ có `null` là **sự thật**) ⇒ ⚠️ *"phải có `LyDo`"* **không phải** bất biến của entity — 📌 nó là **luật của NGHIỆP VỤ XUẤT**, và nghiệp vụ xuất nằm ở **app service**; ➕ **và tôi giữ lại GHI CHÚ NÀY TRONG TEST** (`TC06`) — 🔑 để lần sau có ai định *"siết cho chặt"* thì **đọc được lý do** thay vì làm lại từ đầu (📌 **một quyết định KHÔNG ĐƯỢC GHI thì sẽ bị ĐẢO NGƯỢC bởi người kế tiếp**). 🐞 **LỖI CỦA TÔI TRONG LÁT CẮT NÀY: LẠI DẤU CÁCH TRONG TÊN HÀM TEST** — viết `TC05c_CHUOI_KHOANG_TRANG_thi_NEM__KHONG duoc im lang chuan hoa thanh null()` ⇒ **6 lỗi cú pháp C#**; 🔒 **ĐÂY LÀ LẦN THỨ HAI** (§22.5 #3 · lượt này) ⇒ 🔑 **một bài học ghi hai lần mà vẫn tái diễn ⇒ nó cần một CƠ CHẾ, không phải một lời nhắc**; ✅ chữa ngay lượt này: sau khi sửa, tôi **quét tự động** mọi tệp test tìm mẫu `public void <tên> <có dấu cách>(` ⇒ 📌 kết quả **0**. ✅ **KIỂM CHỨNG ĐẦY ĐỦ:** **E2E 59/59** · **8 bước** · `exit 0` · **1181** unit · **38** integration · mermaid **197/0** · DB **21/21** · test cổng **17/17** · DB sạch lại (`KHACH_K97=0` · `DON_K97=0` · `NHATKY=0` · `BAOMAT=true`). Ghi **§27.6** (nợ: 🚨 **chưa có cổng quét *"dấu cách trong tên hàm test"*** — 🔑 bài học **đã ghi HAI LẦN** ⇒ 📌 đề xuất một ca trong `test-cong-kiem.ps1` (⚠️ hiện chỉ **quét tay** mỗi lần) · **chưa có cảnh báo xuất LẶP LẠI** (🔑 bảng đã **đủ dữ liệu**) · **chưa phân trang** · ⚠️ **múi giờ: ngày trên form là UTC** (chưa có chỉ dẫn) · ⚠️ **CSV chưa hỗ trợ `;` cho locale Excel** (📌 một số locale ⇒ 🔒 tệp **thành một cột**; ⚠️ BOM **không giải quyết hết** — **nợ thật**) · **chưa có test `toiDa` ở tầng unit** · **chưa gồm dữ liệu module khác** (**nợ chặn**)) |
