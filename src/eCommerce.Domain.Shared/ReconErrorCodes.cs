@@ -20,4 +20,21 @@ public static class ReconErrorCodes
     /// để người vận hành biết **không cần làm gì**, thay vì tưởng hệ thống hỏng và **chạy lại** (vòng lặp).
     /// </summary>
     public const string CapLechDaGhiTrongLuot = Nhom + "0001";
+
+    /// <summary>
+    /// 🚨 **XỬ LÝ LỆCH THIẾU LÝ DO (hoặc thiếu người xử lý)** — `ReconRunMismatch.DanhDauDaXuLy`.
+    ///
+    /// 📌 **VÌ SAO MÃ RIÊNG (không mượn `0001`):** `0001` nghĩa *"lượt này đã ghi cặp này rồi"* —
+    /// **chỉ dẫn hoàn toàn khác** (*"không cần làm gì"*), trong khi mã này nghĩa
+    /// *"điền lý do rồi gửi lại"*. Trả lẫn ⇒ người vận hành **tưởng đã xong** trong khi lệch **chưa** được xử lý.
+    /// 🔒 Và đây là **chênh lệch tài sản**: không có lý do thì không ai phân biệt được
+    /// *"đã kiểm kê và khớp lại"* với *"bấm nút cho hết danh sách"*.
+    /// 📌 Cùng khuôn `INV-003` **`0043`/`0044`**: mã **hẹp** cho ca **hẹp**, để `WithData` nói được
+    /// **cặp `(kho, SKU)` nào** và **lệch bao nhiêu**.
+    /// </summary>
+    public const string ThieuLyDoXuLyLech = Nhom + "0002";
+
+    /// <summary>**KHÔNG TÌM THẤY** lượt đối soát hoặc dòng lệch theo Id.
+    /// 📌 Chỉ dẫn khác hẳn *"điền lý do"*: *"kiểm lại Id / dữ liệu đã bị xoá"*.</summary>
+    public const string KhongTimThayBanGhiDoiSoat = Nhom + "0003";
 }

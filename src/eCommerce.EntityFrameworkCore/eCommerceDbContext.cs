@@ -649,6 +649,28 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
 
             b.Property(x => x.Sku).IsRequired().HasMaxLength(64);
 
+            // 🚨 `REC-001` — **TRẠNG THÁI XỬ LÝ LỆCH** (bổ sung 16/10/2026).
+            //
+            // **CẨN THẬN KHI SỬA KHỐI NÀY:** `b.Property(x => x.Sku).IsRequired().HasMaxLength(64);`
+            // xuất hiện ở **7 entity** trong tệp này. Lần đầu tôi sửa bằng `-replace` (khớp dòng **ĐẦU TIÊN**)
+            // ⇒ chèn nhầm vào `ProductVariant`/`InventoryItem` ⇒ **36 lỗi build**. 📌 Đúng cái bẫy đã ghi ở
+            // bàn giao (round 4): *"`^\| <MÃ> \|` khớp dòng đầu tiên, không phải dòng bạn đang nghĩ tới"*.
+            // 🔒 Sửa đúng cách: định vị **theo entity cha** (`builder.Entity<Inventory.ReconRunMismatch>`), không theo dòng.
+            //
+            // 📌 Trước lượt này bảng là **append-only, không trạng thái** ⇒ một dòng đã xử lý xong **trông
+            // y hệt** một dòng chưa ai đụng tới ⇒ người trực phải đọc lại **toàn bộ** danh sách mỗi nhịp job,
+            // và tới lúc danh sách dài thì **không ai đọc nữa**.
+            b.Property(x => x.NguoiXuLy).HasMaxLength(256);
+            b.Property(x => x.LyDoXuLy).HasMaxLength(1024);
+
+            // 📌 Index **có điều kiện** cho truy vấn nóng nhất: *"lượt này còn dòng nào CHƯA xử lý?"*.
+            // 🔒 Bộ lọc `WHERE NOT "DaXuLy"` giữ index **nhỏ**: sau vài tháng, **phần lớn** dòng đã xử lý
+            // ⇒ index chỉ còn chứa **việc còn lại**. Không lọc thì index phình theo **toàn bộ lịch sử**
+            // và chính truy vấn *"còn việc gì"* trở thành truy vấn nặng nhất — nghịch lý của báo cáo tồn đọng.
+            b.HasIndex(x => new { x.TenantId, x.ReconRunId })
+                .HasFilter("NOT \"DaXuLy\"")
+                .HasDatabaseName("IX_ReconRunMismatches_TenantId_Run_ChuaXuLy");
+
             // Một cặp `(kho, SKU)` chỉ xuất hiện **MỘT** lần trong một lượt quét ⇒ index này chống ghi trùng
             // khi job retry / hai luồng cùng ghi. Có `TenantId` ⇒ **BẮT BUỘC** `NULLS NOT DISTINCT` (SQL thô trong migration).
             b.HasIndex(x => new { x.TenantId, x.ReconRunId, x.WarehouseId, x.Sku })

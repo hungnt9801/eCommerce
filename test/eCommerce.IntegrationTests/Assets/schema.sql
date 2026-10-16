@@ -2120,3 +2120,19 @@ VALUES ('20261016084519_Sal005_Watermark_Intake', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+ALTER TABLE "ReconRunMismatches" ADD "DaXuLy" boolean NOT NULL DEFAULT FALSE;
+
+ALTER TABLE "ReconRunMismatches" ADD "LyDoXuLy" character varying(1024);
+
+ALTER TABLE "ReconRunMismatches" ADD "NguoiXuLy" character varying(256);
+
+ALTER TABLE "ReconRunMismatches" ADD "XuLyLucUtc" timestamp with time zone;
+
+CREATE INDEX "IX_ReconRunMismatches_TenantId_Run_ChuaXuLy" ON "ReconRunMismatches" ("TenantId", "ReconRunId") WHERE NOT "DaXuLy";
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261016104803_Rec001_XuLyLech', '10.0.11');
+
+COMMIT;
+

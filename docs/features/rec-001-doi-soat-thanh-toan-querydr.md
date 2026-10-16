@@ -1204,3 +1204,146 @@ Nguyên nhân **đo được**: cả 3 lệnh `UPDATE` in **`UPDATE 0`** ⇒ **4
 |---|---|---|---|
 | v0.2 | 16/10/2026 | *(agent, session GĐ1)* | **ĐỐI SOÁT TỒN KHO**: bảng `ReconRuns` (**kèm ẢNH CHỤP chính sách**: đơn vị/giá trị ngưỡng/hành động/cờ hợp lệ) + `ReconRunMismatches` (trần 10 000 dòng/lượt) · hàm thuần `NguongLech` (**cơ sở = sổ cái**, không phải `OnHand`) · mã lỗi dải riêng `eCommerce:Recon:0001` · job đổi sang `UoW` **transactional**. **Kiểm chứng thật:** ảnh chụp chính sách bất biến qua 6 lượt · ngưỡng **lọc được báo động giả** (`999` ⇒ `CoVuotNguong = false`) · **4 hàng rào DB nổ đúng mã** ở đường lỗi. Ghi **§16.1** (vấn đề) · **§16.6** (`UPDATE 0` là bằng chứng) · **§16.8** (nợ: API xem lịch sử · quy trình xử lý lệch · retention) |
 
+
+---
+
+## 17. ✅ **LÁT CẮT 2 — ĐƯỜNG ĐỌC + QUY TRÌNH XỬ LÝ LỆCH** (16/10/2026) — *đóng nợ §16.8*
+
+> ⚠️ **PHẠM VI NÓI RÕ:** lát cắt này làm **đường đọc cho người vận hành** (4 endpoint) + **quy trình xử lý lệch**
+> (trạng thái + lý do bắt buộc). 🚫 **CHƯA** làm: **retention** (dọn lượt cũ), **UI Web** cho màn hình đối soát,
+> và **job đối soát chủ động `D12` của `SAL-005`**. Nợ ghi ở **§17.7**.
+
+### 17.1 Vấn đề: **dữ liệu lệch có thật, mà không ai xem được**
+
+| # | Sự thật **đo được** | Cách đo |
+|---|---|---|
+| **1** | `ReconRuns` **đã có 12 lượt thật** trong DB | `select count(*) from "ReconRuns"` |
+| **2** | **KHÔNG có endpoint nào** để đọc chúng | `glob` trên `Application/` — chỉ có `InventoryReconciliationWorker` (job **ghi**) và `ChinhSachHanMucAppService` (đọc **chính sách**, không đọc **lượt**) |
+| **3** | 🚨 `ReconRunMismatches` **KHÔNG có cột trạng thái** | `information_schema.columns` — chỉ có `OnHand`/`TongSoCai`/`ChenhLech`/`VuotNguong` |
+
+⇒ Hệ quả **kép**: (a) lệch tồn kho **được phát hiện rồi nằm im**; (b) kể cả khi đọc được, một dòng **đã xử lý xong**
+**trông y hệt** một dòng **chưa ai đụng tới** ⇒ mỗi nhịp job người trực phải **đọc lại toàn bộ** danh sách cũ
+⇒ tới lúc danh sách dài thì **không ai đọc nữa**.
+📌 Đây **đúng** họ với `SAL-006`: *"đã cài nhưng không có đường gọi tới"* — và với `XC-002` §0:
+**báo thành công trong khi không ai nhận**.
+
+### 17.2 Đã làm gì
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| **1** | **`ReconRunMismatch.DanhDauDaXuLy(mốc, người, lý do)`** | Trạng thái xử lý **ở tầng domain**, **BA bất biến** (§17.3) |
+| **2** | **4 cột mới** trên `ReconRunMismatches` | `DaXuLy` · `XuLyLucUtc` · `NguoiXuLy` · `LyDoXuLy` (migration `20261016104803_Rec001_XuLyLech`) |
+| **3** | **Index CÓ ĐIỀU KIỆN** `IX_ReconRunMismatches_TenantId_Run_ChuaXuLy` (`WHERE NOT "DaXuLy"`) | Cho truy vấn nóng nhất: *"lượt này còn dòng nào chưa xử lý?"* — xem §17.4 |
+| **4** | **`IDoiSoatAppService` + `DoiSoatAppService`** | 4 endpoint: lịch sử lượt · chi tiết lượt · danh sách dòng lệch · xử lý lệch |
+| **5** | **`SoLechChuaXuLy`** trong DTO lượt | 🔑 Con số **HÀNH ĐỘNG ĐƯỢC** — xem §17.3 |
+| **6** | Mã lỗi `Recon:0002` (thiếu lý do) · `Recon:0003` (không tìm thấy) | §17.5 |
+| **7** | **`XuLyLechDoiSoatTests`** (15 ca) | Ba bất biến + biên |
+
+### 17.3 🚨 **BỐN QUYẾT ĐỊNH THIẾT KẾ** (mỗi cái chặn một kiểu hỏng)
+
+| # | Quyết định | Vì sao |
+|---|---|---|
+| **1** | 🔑 **`SoLechChuaXuLy` bên cạnh `SoLech`** | Nếu chỉ trả **tổng**, danh sách **mãi** hiện như cũ ⇒ **không ai đọc nữa** (số phận của mọi báo cáo **không có trạng thái**). Con số **giảm được** mới khiến người ta quay lại |
+| **2** | 🚨 **Xử lý lệch CHỈ ghi trạng thái — KHÔNG sửa SỐ ĐO** | `OnHand`/`TongSoCai`/`ChenhLech` là **ảnh chụp tại thời điểm quét**. Sửa chúng là **phá bằng chứng** ⇒ lịch sử đối soát thành vô nghĩa. 🔒 Kiểu `protected set` ⇒ **không có** đường ghi từ ngoài (test `F4` khoá điều này ở **đường chạy thật**) |
+| **3** | 🚨 **Lý do + người xử lý BẮT BUỘC** | Chênh lệch tồn kho là **chênh lệch TÀI SẢN**. Không có lý do thì 6 tháng sau **không ai** phân biệt được *"đã kiểm kê và khớp lại"* với *"ai đó bấm nút cho hết danh sách"* |
+| **4** | 🚨 **KHÔNG ghi đè bằng chứng khi gọi lại** | Lần xử lý **ĐẦU** là bằng chứng **ai đã chấp nhận** chênh lệch. Cho ghi đè ⇒ người sau **thay được bằng chứng** — và **không có lỗi nào** để lần ra |
+
+### 17.4 🚨 Index **CÓ ĐIỀU KIỆN** — nghịch lý của báo cáo tồn đọng
+
+`IX_ReconRunMismatches_TenantId_Run_ChuaXuLy` có bộ lọc `WHERE NOT "DaXuLy"`.
+
+📌 **Vì sao lọc (không phải tối ưu vặt):** sau vài tháng, **phần lớn** dòng lệch **đã xử lý** ⇒ index **có lọc**
+chỉ còn chứa **việc còn lại**. Không lọc thì index phình theo **toàn bộ lịch sử**, và chính truy vấn
+*"còn việc gì"* trở thành truy vấn **nặng nhất** — **nghịch lý**: báo cáo tồn đọng chậm dần cho tới khi
+**không ai chạy nó nữa**, đúng lúc nó cần nhất.
+
+🔎 **Ghi nhớ về cơ chế CI:** `RangBuocDbChuaAnhXaTests` **chỉ** quét `CREATE UNIQUE INDEX` + `CONSTRAINT … CHECK`
+(xem chú thích ở `RangBuocDbChuaAnhXaTests` dòng 99-108) ⇒ index **không unique** **không** bị đòi ánh xạ.
+📌 Điều này **đúng phạm vi**, không phải lỗ hổng: chỉ `UNIQUE` và `CHECK` mới **chặn một hành vi hợp lệ** và
+cần **mã lỗi** để client phân biệt. Đã kiểm: index mới **có** trong `schema.sql` và test vẫn xanh.
+
+### 17.5 Mã lỗi mới — vì sao **tách**
+
+| Mã | Nghĩa | Chỉ dẫn cho người vận hành |
+|---|---|---|
+| `Recon:0001` | *"lượt này ĐÃ ghi cặp `(kho, SKU)` này rồi"* | **Không cần làm gì** |
+| **`Recon:0002`** | *"xử lý lệch thiếu lý do / thiếu người xử lý"* | **Điền lý do rồi gửi lại** |
+| **`Recon:0003`** | *"không tìm thấy lượt/dòng lệch"* | **Kiểm lại Id / dữ liệu đã bị xoá** |
+
+📌 **Vì sao KHÔNG gộp `0002` vào `0001`:** `0001` dạy *"không cần làm gì"*, còn `0002` dạy *"phải làm gì đó"*.
+Trả lẫn ⇒ người vận hành **tưởng đã xong** trong khi lệch **chưa** được xử lý.
+🔒 `Recon:0002` còn mang `WithData` **`sku`** + **`chenhLech`** + `warehouseId` — vì danh sách có thể dài, và
+một lỗi *"thiếu lý do"* **không nói được đang xử lý dòng nào** thì người dùng phải tự đi tìm.
+
+### 17.6 ✅ Kiểm chứng
+
+**Unit test `XuLyLechDoiSoatTests` — 15 ca:**
+
+| Nhóm | Nội dung |
+|---|---|
+| Trạng thái mặc định | dòng **mới** ⇒ `DaXuLy = false`, không mốc/người/lý do |
+| Ghi đủ | người + lý do + mốc · **mốc do người gọi truyền** ⇒ hàm **TẤT ĐỊNH** |
+| **Bắt buộc lý do** | 3 dạng rỗng ⇒ **NÉM** `Recon:0002` + **entity nguyên vẹn** |
+| **Bắt buộc người xử lý** | 2 dạng rỗng ⇒ **NÉM** `Recon:0002` |
+| Lỗi mang đủ dữ liệu | có `sku` + `chenhLech` (**giữ dấu**: `96 − 100 = −4`) |
+| **Không ghi đè bằng chứng** | gọi lại ⇒ giữ nguyên **người + lý do + mốc** của lần đầu |
+| **Thứ tự kiểm (no-op trước)** | gọi lại với lý do rỗng ⇒ **KHÔNG ném** (nếu ném ⇒ consumer retry vô hạn) |
+| Không sửa số đo | `OnHand`/`TongSoCai`/`ChenhLech`/`VuotNguong` giữ nguyên |
+| Dấu của lệch | `−4` / `+4` / `0` — giữ dấu để biết **lệch về phía nào** |
+
+**Probe HTTP thật (`tools\_tam-rec\rec-001-kiem.ps1`) — 19/19 ca ĐẠT** (Host :5000 + PostgreSQL 17):
+
+| # | Ca | Kỳ vọng | **Đo được** |
+|---|---|---|---|
+| A1 | **Tiền đề**: gieo 1 kho + 3 dòng lệch | đúng số dòng | kho=**1** · lệch=**3** ✅ |
+| C1 | Lịch sử lượt quét | `200` + có dữ liệu **THẬT** | **`200`** · tổng=**15** ✅ |
+| C2 | Lượt trả kèm **ảnh chụp chính sách** | có ngưỡng + kết luận | `nguong=0.5` · `ketLuan=KhongVuot` ✅ |
+| C3 | **Ảnh chụp chính sách NHẤT QUÁN** | `RequireConfirmation` ⇒ `VuotCanXacNhan` | đúng ✅ |
+| D1 | Lọc *"còn việc chưa xử lý"* | tìm ra lượt đang có 3 dòng chưa xử lý | tổng=**1** ✅ |
+| D2 | **`soLechChuaXuLy`** | `3` | **`3`** ✅ |
+| E1 | Chi tiết lượt | 120 cặp · 3 lệch · 2 vượt ngưỡng | đúng ✅ |
+| E2 | Dòng lệch | 3 dòng + **MÃ KHO** (không GUID) | `kho=K97KHO` ✅ |
+| E3 | **Sắp xếp: vượt ngưỡng trước, rồi lệch LỚN trước** | dòng đầu vượt ngưỡng | `lech=-4` ✅ |
+| E4 | Lọc `ChiVuotNguong=true` | 2 dòng | **2** ✅ |
+| E5 | Lọc theo **một phần** SKU | 1 dòng | **1** ✅ |
+| **F1** | Xử lý lệch **thiếu lý do** | `403` · `Recon:0002` | **`403` · `eCommerce:Recon:0002`** ✅ |
+| F2 | Thiếu **người xử lý** | `403` · `Recon:0002` | **`403` · `0002`** ✅ |
+| F3 | Xử lý đủ | `200` + `daXuLy=true` + người + mốc | đúng ✅ |
+| **F4** | 🚨 **KHÔNG sửa số đo** | DB vẫn `96\|100\|-4` | **`96\|100\|-4`** ✅ |
+| **G1** | 🚨 **Gọi lại ⇒ giữ nguyên bằng chứng** | người/lý do của **lần đầu** | `nguyen.van.a` ✅ |
+| H1 | **`soLechChuaXuLy` GIẢM** sau xử lý 1 dòng | `2` | **`2`** ✅ |
+| H2 | Lọc `ChiChuaXuLy=true` | 2 dòng | **2** ✅ |
+| I1 | Lượt không tồn tại | `403` · `Recon:0003` (**không** `500`) | **`403` · `0003`** ✅ |
+| J | Neo log | `REC-DA-XU-LY` · `REC-DA-XU-LY-TRUOC-DO` | **2** · **1** ✅ |
+
+📌 **Ca H1 là phép đo cho thấy tính năng "có ích"**: con số **giảm** khi có người xử lý ⇒ báo cáo trở thành
+**danh sách việc cần làm**, không phải **bản ghi tĩnh**.
+
+### 17.7 🚨 **BỘ ĐO CŨNG CÓ LỖI — bắt được ngay trong lượt này**
+
+Lần chạy **đầu** của probe: `INSERT` kho **thất bại** (`null value in column "IsActive" … violates not-null
+constraint`) — nhưng probe **vẫn in "ĐẠT"** cho mọi bước sau, và tôi đọc kết quả như **kết quả đúng**
+(chỉ phát hiện vì `warehouseCode` **rỗng** ở bước E2 — một **triệu chứng ngẫu nhiên**).
+
+🔒 **Đã thêm vào probe: `A1` — KIỂM TIỀN ĐỀ CỦA BƯỚC GIEO.** Gieo xong **phải** `select` lại và **đếm số dòng**;
+sai ⇒ **`throw` DỪNG NGAY**, không chạy tiếp.
+📌 **Bài học:** *"bước gieo dữ liệu thất bại im lặng"* là **dạng nguy hiểm nhất** của lỗi bộ đo — nó biến
+**mọi** phép đo sau thành kết quả **vô nghĩa mà vẫn xanh**. Cùng họ với bài học `tools\README-probe.md`.
+🔑 Và cách duy nhất phát hiện được nó là **đọc giá trị cụ thể** (`warehouseCode`) chứ không chỉ đọc `ĐẠT/KHÔNG ĐẠT`.
+
+### 17.8 ⏳ NỢ (KHÔNG phải tính năng đã có)
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+| **1** | **Retention (dọn lượt cũ)** | Bảng `ReconRuns`/`ReconRunMismatches` **chỉ tăng**. Chưa có chính sách dọn ⇒ cần người quyết **giữ bao lâu** (đối soát là **chứng từ**, không được xoá tuỳ tiện) |
+| **2** | **UI Web cho màn hình đối soát** | API **đã có** (4 endpoint, đã kiểm); trang `/DoiSoat` **chưa làm** — và **chưa** thêm vào menu (`WEB-001` §95.5) |
+| **3** | **Job đối soát chủ động `D12` của `SAL-005`** | Vẫn **chưa có** — index cờ `GapSuspected` đã có nhưng **chưa có worker** ⇒ cờ tồn đọng |
+| **4** | **Chưa có metric cho đường xử lý lệch** | Có log `REC-DA-XU-LY` nhưng chưa có đếm theo thời gian ⇒ không dựng được biểu đồ *"tồn đọng lệch"* |
+| **5** | **`DoiSoatAppService` dùng quyền `Inventory` (đọc) cho cả thao tác xử lý** | 📌 **Có chủ ý** (xử lý lệch là **ghi chú vận hành**, không đổi tồn kho — khác hẳn `Inventory.Adjust`). ⚠️ Nếu sau này muốn tách quyền thì phải thêm permission **và** seed lại (đúng lỗi `F-403`) |
+| **6** | **Chưa có `số lần lệch` theo cặp `(kho, SKU)`** | Entity có `ReconRunMismatches` để trả lời *"cặp này lệch bao nhiêu lần?"* nhưng **chưa** có endpoint tổng hợp theo cặp |
+
+### 17.9 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.3 | 16/10/2026 | *(agent, session GĐ1)* | **§17 — LÁT CẮT 2: ĐƯỜNG ĐỌC + QUY TRÌNH XỬ LÝ LỆCH (đóng nợ §16.8)**: `ReconRunMismatch.DanhDauDaXuLy` (**3 bất biến** ở tầng domain) · **4 cột** + **index CÓ ĐIỀU KIỆN** (`WHERE NOT "DaXuLy"`) · `IDoiSoatAppService`/`DoiSoatAppService` (**4 endpoint**, đã đo swagger) · **`SoLechChuaXuLy`** (con số **hành động được**) · mã `Recon:0002`/`0003` · **+15 unit test** (975 tổng) · **19/19 ca HTTP thật**. 🚨 **Bộ đo cũng có lỗi** (§17.7): `INSERT` kho thất bại im lặng mà probe **vẫn in ĐẠT** — nay có **`A1` kiểm tiền đề của bước gieo** (sai ⇒ **dừng ngay**). Ghi **§17.3** (4 quyết định thiết kế) · **§17.4** (index có điều kiện — nghịch lý báo cáo tồn đọng) · **§17.8** (nợ: retention · UI Web · job `D12` · metric · số lần lệch theo cặp) |

@@ -2,6 +2,8 @@ using eCommerce.Settings;
 using Volo.Abp.Domain.Entities.Auditing;
 using Volo.Abp.MultiTenancy;
 
+using eCommerce.Reconciliation;
+
 namespace eCommerce.Inventory;
 
 /// <summary>
@@ -169,6 +171,39 @@ public class ReconRunMismatch : FullAuditedEntity<Guid>, IMultiTenant
     /// </summary>
     public bool VuotNguong { get; protected set; }
 
+    // ══════════════════════════════════════════════════════════════════════════════════════════════
+    // 🚨 `REC-001` — **QUY TRÌNH XỬ LÝ LỆCH** (bổ sung 16/10/2026).
+    //
+    // **VÌ SAO PHẢI CÓ (đây là điều kiện để dữ liệu lệch có ÍCH, không chỉ "ghi cho có"):**
+    // trước lượt này `ReconRunMismatch` là **append-only, không có trạng thái** ⇒ một dòng lệch đã được
+    // người vận hành **xử lý xong** vẫn **trông y hệt** một dòng **chưa ai đụng tới**. Hệ quả:
+    // <list type="bullet">
+    //   <item>mỗi nhịp job, người trực lại phải **đọc lại toàn bộ** danh sách cũ để tìm cái mới
+    //     ⇒ tới lúc danh sách dài thì **không ai đọc nữa** (đúng số phận của mọi báo cáo không có trạng thái);</item>
+    //   <item>**không trả lời được** câu hỏi kiểm toán duy nhất quan trọng: *"lệch này AI xử lý, LÚC NÀO,
+    //     và VÌ SAO chấp nhận?"* — mà lệch tồn kho là **chênh lệch tài sản**, không phải thông báo.</item>
+    // </list>
+    // 📌 Đây là **cùng khuôn** đã dùng cho `MarketplaceOrderIntake.DanhDauDaDoiSoat` và
+    // `Customer.Chan/MoChan`: **trạng thái + lý do bắt buộc** (audit), không có đường "im lặng bỏ qua".
+    // ══════════════════════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>`true` = **đã có người xử lý** dòng lệch này. 🔒 Mặc định `false` ⇒ mọi dòng **mới** đều
+    /// **chưa xử lý** ⇒ không có dòng nào "vô tình" được coi là xong.</summary>
+    public bool DaXuLy { get; protected set; }
+
+    /// <summary>Thời điểm xử lý (UTC) — `null` nếu chưa xử lý.</summary>
+    public DateTime? XuLyLucUtc { get; protected set; }
+
+    /// <summary>Ai xử lý (`NguoiXuLy`) — audit.</summary>
+    public string? NguoiXuLy { get; protected set; }
+
+    /// <summary>
+    /// **VÌ SAO chấp nhận/xử lý lệch này** — **BẮT BUỘC** khi đánh dấu đã xử lý (xem <see cref="DanhDauDaXuLy"/>).
+    /// 🚨 Không có lý do thì 6 tháng sau **không ai** phân biệt được *"đã kiểm kê và khớp lại"* với
+    /// *"ai đó bấm nút cho hết danh sách"* — và cả hai đều **xoá dấu vết chênh lệch tài sản**.
+    /// </summary>
+    public string? LyDoXuLy { get; protected set; }
+
     protected ReconRunMismatch() { }
 
     public ReconRunMismatch(
@@ -187,5 +222,63 @@ public class ReconRunMismatch : FullAuditedEntity<Guid>, IMultiTenant
         TongSoCai = tongSoCai;
         ChenhLech = onHand - tongSoCai;
         VuotNguong = vuotNguong;
+    }
+
+    /// <summary>
+    /// 🚨 **ĐÁNH DẤU ĐÃ XỬ LÝ** dòng lệch — `BR`: **BẮT BUỘC có lý do + người xử lý**.
+    ///
+    /// 🔒 **Bất biến (ba điều, mỗi điều chặn một kiểu lạm dụng):**
+    /// <list type="number">
+    ///   <item><b>Lý do và người xử lý KHÔNG được rỗng</b> ⇒ chặn *"bấm nút cho hết danh sách"*;</item>
+    ///   <item><b>Không ghi đè lần xử lý trước</b> ⇒ gọi lại là **no-op**, KHÔNG đổi lý do/người/thời điểm.
+    ///     📌 Vì sao: lần xử lý **đầu** là **bằng chứng** ai đã chấp nhận chênh lệch. Cho ghi đè thì
+    ///     người sau có thể **thay bằng chứng** — và **không có lỗi nào** để lần ra;</item>
+    ///   <item><b>Ghi lại thời điểm</b> do người gọi truyền vào (**không** đọc đồng hồ hệ thống bên trong)
+    ///     ⇒ hàm **tất định**, test được, và cùng một dòng luôn ghi cùng mốc dù gọi ở đâu.</item>
+    /// </list>
+    /// </summary>
+    /// <param name="thoiDiemUtc">Thời điểm xử lý (UTC).</param>
+    /// <param name="nguoiXuLy">Ai xử lý — **bắt buộc** (audit).</param>
+    /// <param name="lyDo">Vì sao chấp nhận/xử lý — **bắt buộc** (audit).</param>
+    /// <exception cref="Volo.Abp.BusinessException">`eCommerce:Recon:0002` khi thiếu lý do hoặc người xử lý.</exception>
+    public void DanhDauDaXuLy(DateTime thoiDiemUtc, string nguoiXuLy, string lyDo)
+    {
+        // ══════════════════════════════════════════════════════════════════════════════════════════
+        // 🚨 **THỨ TỰ KIỂM LÀ MỘT PHẦN CỦA ĐẶC TẢ — và tôi đã viết SAI lần đầu (TEST bắt được):**
+        //
+        // Phiên bản đầu kiểm **rỗng TRƯỚC**, rồi mới kiểm `DaXuLy`. Hệ quả: một **retry** (job phát lại,
+        // double-click, message replay) **không mang lý do** sẽ **NÉM** trên một dòng **đã xử lý xong**
+        // ⇒ consumer **retry vô hạn** vì một việc **không cần làm gì**.
+        // 🔑 Đúng thứ tự: **NO-OP TRƯỚC** (idempotent), **rồi mới** kiểm tham số cho lần xử lý **ĐẦU TIÊN**.
+        // 📌 Cùng khuôn `Customer.NangCapVangLai`: gọi lại **đúng** trạng thái ⇒ **không ném**, vì đó là
+        // *"đã ở trạng thái đích"*, **không** phải "chuyển sai".
+        // ══════════════════════════════════════════════════════════════════════════════════════════
+        if (DaXuLy)
+        {
+            // 🔒 **NO-OP** (không phải lỗi): gọi lại là retry/double-click ⇒ phải vô hại.
+            // ⚠️ Nhưng **KHÔNG** ghi đè bằng chứng của lần xử lý đầu — xem bất biến (2).
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(lyDo))
+        {
+            throw new Volo.Abp.BusinessException(ReconErrorCodes.ThieuLyDoXuLyLech)
+                .WithData("sku", Sku)
+                .WithData("warehouseId", WarehouseId)
+                .WithData("chenhLech", ChenhLech)
+                .WithData("lyDo", "Xử lý lệch tồn kho BẮT BUỘC có lý do (chênh lệch tài sản — cần audit).");
+        }
+
+        if (string.IsNullOrWhiteSpace(nguoiXuLy))
+        {
+            throw new Volo.Abp.BusinessException(ReconErrorCodes.ThieuLyDoXuLyLech)
+                .WithData("sku", Sku)
+                .WithData("lyDo", "Thiếu `NguoiXuLy` — cần biết AI chấp nhận chênh lệch này (audit).");
+        }
+
+        DaXuLy = true;
+        XuLyLucUtc = thoiDiemUtc;
+        NguoiXuLy = nguoiXuLy.Trim();
+        LyDoXuLy = lyDo.Trim();
     }
 }

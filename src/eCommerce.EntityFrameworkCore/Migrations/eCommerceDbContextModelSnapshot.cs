@@ -3558,6 +3558,9 @@ namespace eCommerce.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("CreatorId");
 
+                    b.Property<bool>("DaXuLy")
+                        .HasColumnType("boolean");
+
                     b.Property<Guid?>("DeleterId")
                         .HasColumnType("uuid")
                         .HasColumnName("DeleterId");
@@ -3579,6 +3582,14 @@ namespace eCommerce.Migrations
                     b.Property<Guid?>("LastModifierId")
                         .HasColumnType("uuid")
                         .HasColumnName("LastModifierId");
+
+                    b.Property<string>("LyDoXuLy")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
+
+                    b.Property<string>("NguoiXuLy")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
 
                     b.Property<int>("OnHand")
                         .HasColumnType("integer");
@@ -3604,9 +3615,16 @@ namespace eCommerce.Migrations
                     b.Property<Guid>("WarehouseId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime?>("XuLyLucUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.HasKey("Id");
 
                     b.HasIndex("ReconRunId");
+
+                    b.HasIndex("TenantId", "ReconRunId")
+                        .HasDatabaseName("IX_ReconRunMismatches_TenantId_Run_ChuaXuLy")
+                        .HasFilter("NOT \"DaXuLy\"");
 
                     b.HasIndex("TenantId", "ReconRunId", "WarehouseId", "Sku")
                         .IsUnique()
