@@ -1742,3 +1742,84 @@ rồi nhận **1** dù có nhiều kết quả ⇒ 📌 lại là **bài học v
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.5 | 17/10/2026 | *(agent, session GĐ1)* | **§24 — LÁT CẮT 7: BƯỚC ⑥ CỔNG BẤT BIẾN DB** (đóng nợ §23.6 #5): thêm **`tools\kiem-db.ps1`** + tích hợp thành **bước ⑥** của `kiem-tat-ca.ps1`. 🔑 **VÌ SAO CẦN:** đây là bước **dễ quên nhất** (tôi vẫn làm **bằng tay** mỗi vòng) — ⚠️ quên nó thì *"tất cả xanh"* nhưng **dữ liệu thử nghiệm còn trong DB** ⇒ lần sau một phép đo **đọc phải chúng** rồi **kết luận sai**; ➕ và nó là bước **DUY NHẤT** chạm **TRẠNG THÁI THẬT** (mermaid kiểm **tài liệu**, test kiểm **mã**). 🚨🚨 **RANH GIỚI BẤT BIẾN — BÀI HỌC LỚN NHẤT:** khảo sát thấy **`ReconRuns` = 55 dòng** và phản xạ đầu là *"rác, phải xoá"* — ⚠️ **SAI**: đó là **nhật ký lượt quét** do `InventoryReconciliationWorker` ghi **mỗi nhịp** ⇒ 🔑 **tăng dần là ĐÚNG**. 📌 Đặt phép kiểm *"phải rỗng"* lên nó sẽ **ĐỎ** sau vài giờ, rồi người ta **vô hiệu hoá phép kiểm** — hoặc **tệ hơn**: **xoá dữ liệu thật** để nó xanh (🔒 **xoá bằng chứng kiểm toán**). 🔑 **BÀI HỌC CHUNG:** phép kiểm *"bảng phải rỗng"* chỉ đúng với bảng **không có ý nghĩa nghiệp vụ**; áp lên bảng **có lịch sử** là **tự tạo cổng luôn đỏ** — và **cổng luôn đỏ thì người ta học cách bỏ qua** (đúng bài học **§23.4**!). ✅ **NĂM NHÓM:** ① **10 bảng phải rỗng** — ⚠️ đếm **CẢ bản ghi XOÁ MỀM** (📌 dòng xoá mềm **không** hiện trong truy vấn thường nhưng **vẫn chiếm** unique index `NULLS NOT DISTINCT` ⇒ lần gieo sau that bai **vì lý do khó hiểu**); ② **`ADMIN.ShouldChangePasswordOnNextLogin = true`** (🚨 probe tắt cờ này để đăng nhập ⇒ quên bật lại = commit một **admin không bị buộc đổi mật khẩu**); ③ số `NULLS NOT DISTINCT` — 🔑 đọc **TỪ CHÍNH TEST** (`F1_du_48…`), **không** viết cứng (⚠️ con số cứng sẽ **lệch** với test ⇒ **hai nguồn sự thật**); ④ **9 quyền bắt buộc** phải còn (🔑 cơ sở cho `WEB-001`: thiếu một quyền thì **cả một nhóm menu biến mất**, và biến mất **im lặng**); ⑤ 🔑 **MỌI tiền tố probe** (`K9`/`k9`/`K97`) — phép kiểm **MẠNH NHẤT** vì bắt rác ở **mọi** bảng có cột mã. 🔒 **Mã thoát tách hai nguyên nhân** (bài học §23.5 #4): **0** đạt · **1** hỏng · **2** ⚠️ **VÔ NGHĨA** (không kết nối được PostgreSQL, hoặc đọc được **0 quyền**) ⇒ **KHÔNG** coi là *"DB sạch"*. ✅ **ĐÃ TIÊM LỖI Ở CẢ BA NHÓM:** dòng **XOÁ MỀM** ⇒ **ĐỎ** (`TONG=1 · conSong=0 · xoaMem=1` — 🔑 một phép **đếm thường sẽ BỎ SÓT** ca này); `ShouldChangePasswordOnNextLogin=false` ⇒ **ĐỎ**; dòng `K97TIEM1` ⇒ **HAI** bất biến đỏ (nhóm ① **và** ⑤ — 🔑 đúng: một dòng rác vi phạm **hai** luật độc lập); ➕ **tiêm rác rồi chạy `kiem-tat-ca.ps1`** ⇒ **`exit 1`** — 🚨 **cả lượt bị chặn**, không chỉ script con. ✅ Trên DB sạch: **20/20 ĐẠT · `exit 0` · 6 bước 62–64s**. 🐞 **BA LỖI:** (1) 🚨 **đoán tên cột** (`MsgDeadLetters.EventName`) ⇒ **lỗi SQL**; tên thật là **`TenSuKien`** — 🔒 **lần thứ BA** của cùng lỗi (`CAT-003` §16.6 #2 · `REC-001` #14 · lượt này) ⇒ 📌 luôn tra `information_schema.columns` **trước** khi viết SQL; (2) 🚨 **đọc số `NND` từ test bằng lọc theo từ khoá `NND`** ⇒ **không khớp** (dòng số nằm cách xa dòng tên ca) ⇒ script **im lặng** chuyển sang chế độ *"chỉ in số, không kết luận"* — ⚠️ **đây là loại hỏng TỆ NHẤT: phép kiểm tự yếu đi mà không ai biết**, và nó **nguy hiểm hơn một ca ĐỎ** vì ca đỏ **buộc** người ta xem; ✅ chữa: đọc từ **dòng `Assert.Equal`** trong **cùng ca kiểm** + in rõ `thucTe=48 · tuTest=48`; (3) **`-Db` trùng alias của `-Debug`** ⇒ PowerShell **từ chối chạy cả script**; ✅ đổi thành **`-TenDb`** — 🔑 **tên tham số cũng có thể trùng**, không chỉ tên biến. ➕ **Và một quan sát về phép đo:** tôi nhiều lần viết `@(Select-String … \| Measure-Object).Count` rồi nhận **1** dù có nhiều kết quả ⇒ 📌 lại là **bài học về ống dẫn** (§23.5, lần thứ **hai**). Ghi **§24.6** (nợ: 🚨 **chưa có CI** — nay 6 bước là **nền** · 🚨 **probe E2E vẫn là SCRIPT TAY** ⇒ `web-001` §98.7 #1 **vẫn mở** · **danh sách "phải rỗng" phải cập nhật TAY** khi thêm bảng (⚠️ nhóm ⑤ không bắt được bảng **không có cột mã** — 🔑 nợ thật) · chưa kiểm `AbpPermissionGrants` có dòng **THỪA** · chưa kiểm `ReconRuns` **không giảm** (🔑 *"không giảm"* là bất biến **đúng**, *"phải tăng"* là **sai**)) |
+
+---
+
+## 25. ✅ **LÁT CẮT 8 — NHÓM ⑥: TỰ DÒ DẤU VẾT PROBE** (17/10/2026) — *đóng nợ §24.6 #3*
+
+### 25.1 🔑 **Vấn đề: danh sách VIẾT TAY sẽ lệch, và lệch thì IM LẶNG**
+
+Nhóm ⑤ ở §24 quét một **danh sách viết tay** (7 cặp bảng/cột). ⚠️ Danh sách đó **lệch** khi schema đổi:
+🔑 bảng **mới** thêm sẽ **không** được quét, 📌 và **không ai biết** — phép kiểm vẫn **XANH**.
+
+📌 **Cùng một họ nợ** như con số `48` viết cứng (đã sửa ở nhóm ③) và danh sách *"phải rỗng"* (nhóm ①):
+🔒 **danh sách thủ công sẽ lệch, và lệch thì IM LẶNG.** — đúng họ hỏng mà cả dự án đang chống.
+
+### 25.2 ✅ **Cách sửa — TỰ DÒ thay vì LIỆT KÊ**
+
+🔑 **Dấu hiệu chung tìm được:** mọi dòng probe đều được gieo bằng một **GUID trong khối dành riêng**
+`e0000000-0000-0000-0000-0000000000XX` ⇒ 📌 đó là dấu hiệu **KHÔNG phụ thuộc tên bảng/cột**.
+✅ Nên: **đọc metadata** để lấy **MỌI** cột khoá chính kiểu `uuid`, rồi ghép **MỘT** câu `UNION ALL`
+⇒ 📌 **một** lần đi-vòng qua DB thay vì 80 lần.
+
+➕ **Và in ra số chỗ đã quét** (`daQuet=81 cho`) — 🔑 một phép kiểm mà **không nói nó quét bao nhiêu** thì
+không ai biết nó có **thật sự chạy** hay không.
+
+### 25.3 🔒 **Vì sao quét CỘT KHOÁ CHÍNH (không phải mọi cột `uuid`)**
+
+| Lý do | Giải thích |
+|---|---|
+**Rẻ** | Mọi bảng có PK `uuid` ⇒ một lần quét **index** |
+**Đúng** | Dòng probe **luôn** được gieo bằng `Id` **tường minh** (xem mọi probe PowerShell) ⇒ PK là dấu hiệu **đúng** |
+**Không nhiễu** | Quét **mọi** cột `uuid` (FK, `CreatorId`, `TenantId`…) sẽ bắt cả dòng **thật** trỏ tới dòng probe ⇒ ⚠️ nhiễu và chậm |
+
+⚠️ **Đánh đổi đã biết:** một dòng probe gieo **không** có `Id` tường minh (để DB sinh) sẽ **không** bị bắt bởi
+nhóm này — 📌 nhưng nhóm ⑤ (tiền tố mã) vẫn bắt nó **nếu** bảng đó có cột mã.
+
+### 25.4 ✅ **KIỂM CHỨNG — VÀ ĐÃ KIỂM GIÁ TRỊ THẬT CỦA NÓ**
+
+| Ca | Kết quả đo |
+|---|---|
+🚨 Tiêm dòng probe GUID vào **`AbpAuditLogs`** — bảng **KHÔNG có** trong danh sách viết tay | ✅ **BẮT** — *"🚨 AbpAuditLogs.Id = 1 dong ⇒ RAC TU PROBE (phat hien TU DONG, khong co trong danh sach viet tay)"* ⇒ 🔑 **đúng thứ mà danh sách viết tay SẼ BỎ SÓT** |
+🚨 Tiêm *"metadata trả về 0 dòng"* (sửa câu metadata thành `and 1 = 0`) | ✅ **BẮT** — *"🚨 Phep do metadata tra ve 0 cot ⇒ PHEP KIEM VO NGHIA"* ⇒ 🔒 *"0 tìm thấy"* **KHÔNG** bị coi là *"sạch"* |
+➕ DB sạch | ✅ *"Khong bang nao con dong mang GUID probe (da quet **81** cho)"* · **21/21 bất biến ĐẠT** · `exit 0` · **6 bước 62.5s** |
+
+### 25.5 🐞 **Lỗi của tôi — và lần này là bài học quan trọng nhất về CÁCH KẾT LUẬN**
+
+🚨 **Lần chạy đầu của ca tiêm BÁO `exit 0` (KHÔNG bắt).** 📌 Phản xạ **suýt** là *"cơ chế tự dò không hoạt
+động"*. ⚠️ **Nhưng tôi đã ĐO trạng thái thật trước khi kết luận** — và sự thật là:
+
+> **Dòng tiêm KHÔNG HỀ TỒN TẠI trong DB** (`so dong = 0`).
+
+🔑 **Nguyên nhân:** tôi viết `INSERT` với **thoát nháy** (`''...''`) **bên trong một chuỗi có nháy** ⇒ câu SQL
+bị **sai cú pháp**, `psql` báo lỗi, và ⚠️ **tôi đã bỏ qua output của `INSERT`**.
+📌 Tức: **"cổng không bắt"** thực ra là **"tôi không hề tiêm"**.
+
+✅ **Chữa:** dùng **here-string** (`@' … '@`) cho SQL — 🔑 **không thoát nháy nào cả**.
+
+🔒 **BÀI HỌC (áp dụng cho MỌI lần tiêm lỗi từ nay):**
+<list type="number">
+  <item>**Sau khi tiêm, PHẢI KHUẲNG ĐỊNH dòng đã vào** bằng một `SELECT` **độc lập** — 📌 nếu không thì
+    *"cổng không bắt"* và *"tiêm không thành"* **trông GIỐNG HỆT NHAU**;</item>
+  <item>**Và phải KIỂM exit code / output của chính lệnh tiêm** — ⚠️ tôi đã bỏ qua nó.</item>
+</list>
+
+📌 **Đây cùng một họ với bài học ở `web-001` §97:** *"một ca đỏ có thể đỏ vì TẦNG KHÁC từ chối trước"* —
+🔑 và ở đây là mặt **ngược lại**: *"một ca XANH có thể xanh vì **PHÉP TIÊM không xảy ra**"*.
+
+### 25.6 ⏳ NỢ
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+**1** | 🚨 **Chưa có CI** | 📌 Nay **6 bước** là nền: thêm CI thì **chỉ cần gọi** `kiem-tat-ca.ps1` |
+**2** | 🚨 **Probe E2E vẫn là SCRIPT TAY** | 🔒 `-DayDu` **báo lỗi** thay vì bỏ qua, nhưng `web-001` §98.7 #1 **vẫn mở** |
+**3** | **Danh sách "phải rỗng" (nhóm ①) VẪN viết tay** | 🔑 Nhóm ⑥ **không** thay thế được nó: 📌 nhóm ⑥ bắt dòng **do probe gieo**, còn nhóm ① bắt bảng **lẽ ra phải trống** kể cả khi dòng đó do **đường khác** tạo ra. 🔒 Hai phép kiểm **bổ sung**, không thay thế |
+**4** | **Chưa kiểm `AbpPermissionGrants` có dòng THỪA** | 📌 Hiện chỉ kiểm **thiếu** |
+**5** | **Chưa kiểm `ReconRuns` không GIẢM** | 🔑 *"không giảm"* là bất biến **đúng**; *"phải tăng"* là **SAI** |
+**6** | 🚨 **Chính tôi vẫn viết SQL tiêm bằng cách thoát nháy** | 📌 §25.5 — 🔑 nên có **ghi chú trong `README-probe.md`**: *"dùng here-string cho SQL"* |
+
+### 25.7 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.6 | 17/10/2026 | *(agent, session GĐ1)* | **§25 — LÁT CẮT 8: NHÓM ⑥ TỰ DÒ DẤU VẾT PROBE** (đóng nợ §24.6 #3): thay **danh sách viết tay** (7 cặp bảng/cột) bằng **TỰ DÒ**. 🔑 **VẤN ĐỀ:** danh sách viết tay **lệch** khi schema đổi — bảng **mới** thêm **không** được quét và 📌 **không ai biết** (phép kiểm vẫn **XANH**); 📌 **cùng một họ nợ** như con số `48` viết cứng (đã sửa ở nhóm ③) và danh sách *"phải rỗng"* (nhóm ①) ⇒ 🔒 **danh sách thủ công sẽ lệch, và lệch thì IM LẶNG**. ✅ **CÁCH SỬA:** 🔑 **dấu hiệu chung** — mọi dòng probe đều dùng **GUID trong khối dành riêng** `e0000000-0000-0000-0000-0000000000XX` ⇒ **KHÔNG phụ thuộc tên bảng/cột**; đọc **metadata** lấy **MỌI** cột khoá chính kiểu `uuid` (`information_schema` + `table_constraints` + `key_column_usage`) rồi ghép **MỘT** câu `UNION ALL` ⇒ 📌 **một** lần đi-vòng qua DB thay vì 80 lần; ➕ **in số chỗ đã quét** (`daQuet=81 cho`) — 🔑 phép kiểm **không nói nó quét bao nhiêu** thì không ai biết nó có **thật sự chạy**. 🔒 **VÌ SAO QUÉT CỘT KHOÁ CHÍNH** (không phải mọi cột `uuid`): **rẻ** (một lần quét index) · **đúng** (dòng probe **luôn** gieo bằng `Id` **tường minh**) · **không nhiễu** (quét mọi cột `uuid` sẽ bắt cả dòng **thật** trỏ tới dòng probe); ⚠️ **đánh đổi:** dòng probe gieo **không** có `Id` tường minh sẽ **không** bị bắt ở đây — 📌 nhưng nhóm ⑤ vẫn bắt **nếu** bảng có cột mã. ✅ **KIỂM CHỨNG GIÁ TRỊ THẬT:** tiêm dòng probe GUID vào **`AbpAuditLogs`** — bảng **KHÔNG có** trong danh sách viết tay ⇒ ✅ **BẮT** (*"phat hien TU DONG, khong co trong danh sach viet tay"*) ⇒ 🔑 **đúng thứ danh sách viết tay SẼ BỎ SÓT**; tiêm *"metadata trả 0 dòng"* ⇒ ✅ **BẮT** (*"PHEP KIEM VO NGHIA"*) ⇒ 🔒 *"0 tìm thấy"* **KHÔNG** bị coi là *"sạch"*; DB sạch ⇒ **21/21 ĐẠT · `exit 0` · 6 bước 62.5s**. 🐞 **LỖI CỦA TÔI — VÀ LÀ BÀI HỌC QUAN TRỌNG NHẤT VỀ CÁCH KẾT LUẬN:** lần chạy đầu của ca tiêm báo **`exit 0`** (không bắt) ⇒ 📌 phản xạ **suýt** là *"cơ chế tự dò không hoạt động"*; ⚠️ **nhưng tôi đã ĐO trạng thái thật trước khi kết luận** và sự thật là **dòng tiêm KHÔNG HỀ TỒN TẠI** (`so dong = 0`) — 🔑 nguyên nhân: tôi viết `INSERT` với **thoát nháy** (`''...''`) **bên trong một chuỗi có nháy** ⇒ **sai cú pháp SQL**, `psql` báo lỗi, và ⚠️ **tôi đã bỏ qua output của `INSERT`** ⇒ *"cổng không bắt"* thực ra là *"tôi không hề tiêm"*; ✅ chữa: dùng **here-string** (`@' … '@`) — **không thoát nháy nào**. 🔒 **BÀI HỌC (cho MỌI lần tiêm lỗi từ nay):** ① sau khi tiêm **PHẢI KHUẲNG ĐỊNH** dòng đã vào bằng một `SELECT` **độc lập** (📌 nếu không thì *"cổng không bắt"* và *"tiêm không thành"* **trông GIỐNG HỆT NHAU**); ② **phải kiểm exit code/output của chính lệnh tiêm**. 📌 **Cùng họ với `web-001` §97** (*"một ca đỏ có thể đỏ vì TẦNG KHÁC từ chối trước"*) — 🔑 và đây là mặt **ngược lại**: *"một ca XANH có thể xanh vì **PHÉP TIÊM không xảy ra**"*. Ghi **§25.6** (nợ: 🚨 **chưa có CI** · 🚨 **probe E2E vẫn SCRIPT TAY** · **danh sách "phải rỗng" VẪN viết tay** — 🔑 nhóm ⑥ **không thay thế** được: nhóm ⑥ bắt dòng **do probe gieo**, nhóm ① bắt bảng **lẽ ra phải trống** kể cả khi dòng do **đường khác** tạo (🔒 hai phép kiểm **bổ sung**) · chưa kiểm quyền **THỪA** · chưa kiểm `ReconRuns` **không giảm** · 🚨 **chính tôi vẫn viết SQL tiêm bằng thoát nháy** ⇒ nên có ghi chú trong `README-probe.md`) |

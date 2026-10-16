@@ -320,3 +320,103 @@ thất bại. 📌 Dùng khi chạy trên DB **đang phát triển**.
 Dòng **XOÁ MỀM** trong `InvChannelLimits` | ✅ ĐỎ — `TONG=1 · conSong=0 · xoaMem=1` ⇒ 🔑 **đếm thường sẽ bỏ sót ca này** |
 `ShouldChangePasswordOnNextLogin = false` | ✅ ĐỎ + nhắc rõ *"Probe TẮT cờ này để đăng nhập"* |
 Dòng `K97TIEM1` trong `PayTransactions` | ✅ **2** bất biến đỏ (nhóm ① **và** nhóm ⑤) |
+
+---
+
+## 🚨 NHÓM ⑥ CỦA `kiem-db.ps1` — **TỰ DÒ** dấu vết probe (thay danh sách viết tay)
+
+### Vấn đề nó sửa
+
+Nhóm ⑤ quét một **DANH SÁCH VIẾT TAY** (7 cặp bảng/cột). ⚠️ Danh sách đó **lệch** khi schema đổi: 🔑 bảng
+**mới** thêm sẽ **không** được quét, và 📌 **không ai biết** — phép kiểm vẫn **XANH**.
+
+📌 **Cùng một họ nợ** như con số `48` viết cứng (đã sửa ở nhóm ③) và danh sách *"phải rỗng"* (nhóm ①):
+🔒 **danh sách thủ công sẽ lệch, và lệch thì IM LẶNG.**
+
+### ✅ Cách sửa — **tự dò** thay vì liệt kê
+
+🔑 **Dấu hiệu chung:** mọi dòng probe đều được gieo bằng một **GUID trong khối dành riêng**
+`e0000000-0000-0000-0000-0000000000XX`. 📌 Đó là dấu hiệu **không phụ thuộc tên bảng/cột**:
+
+```sql
+-- Lấy MỌI cột khoá chính kiểu uuid
+select c.table_name || '|' || c.column_name
+from information_schema.columns c
+join information_schema.table_constraints tc
+  on tc.table_schema = c.table_schema and tc.table_name = c.table_name and tc.constraint_type = 'PRIMARY KEY'
+join information_schema.key_column_usage kcu
+  on kcu.constraint_schema = tc.constraint_schema
+ and kcu.constraint_name = tc.constraint_name and kcu.column_name = c.column_name
+where c.table_schema = 'public' and c.data_type = 'uuid';
+```
+
+Rồi ghép **MỘT** câu `UNION ALL` (`select '<bảng>.<cột>' as cho, count(*) … where "<cột>"::text like 'e0000000-%'`)
+⇒ 📌 **một** lần đi-vòng qua DB thay vì 80 lần.
+➕ **Và in ra số chỗ đã quét** (`daQuet=81 cho`) — 🔑 một phép kiểm mà **không nói nó quét bao nhiêu** thì
+không ai biết nó có thật sự chạy hay không.
+
+### 🔒 Vì sao quét **CỘT KHOÁ CHÍNH** (không phải mọi cột `uuid`)
+
+| Lý do | Giải thích |
+|---|---|
+**Rẻ** | Mọi bảng có PK `uuid` ⇒ một lần quét **index** |
+**Đúng** | Dòng probe **luôn** được gieo bằng `Id` **tường minh** (xem mọi probe PowerShell) ⇒ PK là dấu hiệu **đúng** |
+**Không nhiễu** | Quét **mọi** cột `uuid` (FK, `CreatorId`, `TenantId`…) sẽ bắt cả dòng **thật** trỏ tới dòng probe ⇒ ⚠️ nhiễu và chậm |
+
+⚠️ **Đánh đổi đã biết:** một dòng probe gieo **không** có `Id` tường minh (để DB sinh) sẽ **không** bị bắt bởi
+nhóm này — 📌 nhưng nhóm ⑤ (tiền tố mã) vẫn bắt nó **nếu** bảng đó có cột mã.
+
+### ✅ Đã kiểm chứng **giá trị thật** của nó
+
+| Ca | Kết quả đo |
+|---|---|
+🚨 Tiêm dòng probe GUID vào **`AbpAuditLogs`** — bảng **KHÔNG có** trong danh sách viết tay | ✅ **BẮT** — `🚨 AbpAuditLogs.Id = 1 dong ⇒ RAC TU PROBE (phat hien TU DONG)` ⇒ 🔑 **đúng thứ mà danh sách viết tay SẼ BỎ SÓT** |
+🚨 Tiêm *"metadata trả về 0 dòng"* (sửa câu metadata thành `and 1 = 0`) | ✅ **BẮT** — `🚨 Phep do metadata tra ve 0 cot ⇒ PHEP KIEM VO NGHIA` ⇒ 🔒 *"0 tìm thấy"* **KHÔNG** bị coi là *"sạch"* |
+➕ DB sạch | ✅ `✅ Khong bang nao con dong mang GUID probe (da quet 81 cho)` · **21/21 bất biến ĐẠT** · `exit 0` |
+
+---
+
+## 🚨 QUY TẮC: DÙNG **HERE-STRING** CHO MỌI CÂU SQL — KHÔNG THOÁT NHÁY
+
+### Vì sao (đo được 17/10/2026, `sal-006` §25.5)
+
+Khi tiêm một dòng probe để kiểm cổng, tôi viết:
+
+```powershell
+# ❌ SAI — thoát nháy ('') BÊN TRONG một chuỗi có nháy
+Psql "insert into ""AbpAuditLogs"" (""Id"",""ApplicationName"") values (''e0000000-...'',''eCommerce'');"
+```
+
+⚠️ Câu SQL bị **sai cú pháp**, `psql` báo lỗi — 📌 **và tôi đã bỏ qua output của `INSERT`**.
+🔑 Kết quả: cổng kiểm tra báo **`exit 0`** (không bắt), và tôi **suýt kết luận** *"cơ chế tự dò không hoạt động"*.
+
+🚨 **Sự thật:** **dòng tiêm KHÔNG HỀ TỒN TẠI** (`so dong = 0`).
+📌 Tức *"cổng không bắt"* thực ra là ***"tôi không hề tiêm"***.
+
+### ✅ Cách đúng
+
+```powershell
+# ✅ ĐÚNG — here-string (nháy đơn rồi a-còng), KHÔNG thoát nháy nào
+Psql @'
+insert into "AbpAuditLogs" ("Id","ApplicationName","ExecutionTime","ExecutionDuration","ExtraProperties","ConcurrencyStamp")
+values ('e0000000-0000-0000-0000-0000000000aa','eCommerce',now(),1,'{}','k97x1');
+'@
+```
+
+🔒 **Vì sao here-string giải quyết triệt để:** nó là **chuỗi nguyên văn** — 📌 không có phép thay thế biến,
+không có xử lý thoát ⇒ câu SQL đi tới `psql` **đúng như ta viết**.
+
+🚨 **CẢNH BÁO KÈM THEO (đã vấp ngay khi viết chính mục này):** **KHÔNG** đặt here-string **lồng trong**
+here-string khác — 📌 dấu kết thúc của khối trong sẽ **kết thúc khối ngoài** ⇒ `ParserError`. 🔑 Muốn ghi một
+tệp có chứa here-string thì dùng **công cụ sửa tệp** (`edit`), **không** dùng here-string của PowerShell.
+
+### 🚨 HAI QUY TẮC KÈM THEO — quan trọng không kém
+
+1. **Sau khi tiêm, PHẢI KHUẲNG ĐỊNH dòng đã vào** bằng một `SELECT` **độc lập**.
+   📌 Nếu không thì *"cổng không bắt"* và *"tiêm không thành"* **trông GIỐNG HỆT NHAU** —
+   🔒 và bạn sẽ đi **sửa cổng** trong khi lỗi ở **phép tiêm**.
+2. **Phải KIỂM output/exit code của chính lệnh tiêm.** ⚠️ `psql` in `INSERT 0 1` khi thành công và
+   **lỗi rõ ràng** khi hỏng — 📌 nhưng chỉ khi ta **đọc** nó.
+
+📌 **Đây là mặt NGƯỢC LẠI của bài học `web-001` §97** (*"một ca ĐỎ có thể đỏ vì **TẦNG KHÁC** từ chối trước"*):
+🔑 ở đây là *"một ca **XANH** có thể xanh vì **PHÉP TIÊM không xảy ra**"*.

@@ -314,6 +314,96 @@ if ($tongDauVet -eq 0) {
     Write-Output '   ✅ Khong con dong nao mang tien to probe (K9/k9).'
 }
 
+# ── ⑥ TU DO DAU VET PROBE — QUET MOI BANG CO KHOA CHINH `uuid` ──────────────────────────────
+Write-Output ''
+Write-Output '── ⑥ Tu do dau vet probe (moi bang co PK uuid) ──'
+
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# 🔑 **VI SAO CO NHOM NAY — VA NO SUA MOT NO THAT CUA CHINH SCRIPT NAY:**
+#
+# Nhom ⑤ o tren quet mot **DANH SACH VIET TAY** (7 cap bang/cot). ⚠️ Danh sach do **lech** khi schema
+# doi: 🔑 bang **moi** them se **khong** duoc quet, va 📌 **khong ai biet** — phep kiem van XANH.
+# 📌 Cung **mot ho no** nhu con so `48` viet cung (da sua o nhom ③) va danh sach "phai rong" (nhom ①):
+# **danh sach thu cong se lech, va lech thi IM LANG.**
+#
+# ✅ **CACH SUA — TU DO thay vi liet ke:** moi dong probe deu duoc gieo bang mot **GUID trong khoi danh rieng**
+# `e0000000-0000-0000-0000-0000000000XX` (xem `tools\README-probe.md`). 🔑 Do la **dau hieu chung** khong
+# phu thuoc ten bang/cot ⇒ quet **MOI** cot khoa chinh kieu `uuid` la bat duoc **tat ca**.
+#
+# 📌 **VI SAO QUET COT KHOA CHINH (khong quet moi cot uuid):**
+#   • **Re:** moi bang co PK uuid deu nam trong mot lan quet index ⇒ **re**;
+#   • **Dung:** dong probe **luon** duoc gieo bang `Id` tuong minh (xem cac probe PowerShell) ⇒ PK la
+#     **dau hieu dung**;
+#   • **Khong nhieu:** quet **moi** cot uuid (FK, `CreatorId`, `TenantId`…) se bat ca dong **that** tro toi
+#     dong probe (⚠️ nhieu gia) va lam cham.
+#   ⚠️ **Danh doi da biet:** mot dong probe gieo **khong** co `Id` tuong minh (de DB sinh) se **khong** bi
+#   bat boi nhom nay — 📌 nhung nhom ⑤ (tien to ma) van bat no **neu** bang do co cot ma.
+# ══════════════════════════════════════════════════════════════════════════════════════════════════
+
+# 📌 Dung **chinh `Psql`** (khong phai `docker exec` truc tiep) ⇒ 🔒 cung mot duong ong dan, cung mot quy tac
+# "ghi ra tep tam roi doc" — ⚠️ ong danh se che mat `exit code`.
+$cotPkUuid = @(Psql @'
+select c.table_name || '|' || c.column_name
+from information_schema.columns c
+join information_schema.table_constraints tc
+  on tc.table_schema = c.table_schema and tc.table_name = c.table_name and tc.constraint_type = 'PRIMARY KEY'
+join information_schema.key_column_usage kcu
+  on kcu.constraint_schema = tc.constraint_schema
+ and kcu.constraint_name = tc.constraint_name
+ and kcu.column_name = c.column_name
+where c.table_schema = 'public' and c.data_type = 'uuid'
+order by c.table_name;
+'@ | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' })
+
+# 🛡️ LUOI AN TOAN CHO CHINH PHEP KIEM: neu phep do metadata tra ve **0** dong thi phep kiem VO NGHIA.
+# ⚠️ **KHONG** duoc im lang coi la *"khong co dau vet"* — 🔑 do dung la cach mot phep kiem **tu chet**.
+if ($cotPkUuid.Count -eq 0) {
+    Write-Output '   🚨 Phep do metadata tra ve 0 cot PK uuid ⇒ PHEP KIEM VO NGHIA.'
+    ThemKq '⑥ tu do' 'Metadata PK uuid' $false 'doc duoc 0 cot'
+}
+else {
+    Write-Output ("   Phep do: {0} cot khoa chinh kieu uuid (quet MOI bang)." -f $cotPkUuid.Count)
+
+    # 🔒 Ghep **MOT** cau UNION ALL: 📌 mot lan di-vong qua DB thay vi 80 lan ⇒ nhanh hon nhieu.
+    # ⚠️ Ten bang/cot o day den tu **metadata cua chinh DB** (khong phai input nguoi dung) ⇒ khong phai
+    # duong tiem SQL. 🔒 Van boc `""` de an toan voi ten co ky tu dac biet.
+    $manh = foreach ($m in $cotPkUuid) {
+        $phan = $m.Split('|')
+        'select ''{0}.{1}'' as cho, count(*)::text as so from "{0}" where "{1}"::text like ''e0000000-%''' -f $phan[0], $phan[1]
+    }
+
+    $sqlTuDo = ($manh -join "`nunion all`n") + "`norder by cho;"
+
+    $dongTuDo = @(Psql $sqlTuDo)
+
+    $coDauVet = @()
+    $soCho = 0
+
+    foreach ($d in $dongTuDo) {
+        $phan = $d.Trim().Split('|')
+        if ($phan.Count -ne 2) { continue }
+        $soCho++
+        if ([int]$phan[1] -ne 0) { $coDauVet += [pscustomobject]@{ Cho = $phan[0]; So = [int]$phan[1] } }
+    }
+
+    # 🛡️ Luoi an toan thu hai: neu cau UNION tra ve **it** dong hon so cot thi co gi do sai ⇒ phai NOI RO.
+    if ($soCho -lt $cotPkUuid.Count) {
+        Write-Output ("   ⚠️ Cau quet tra ve {0}/{1} cho ⇒ co the thieu ⇒ 📌 doc ket qua DUOI day voi gian doan." -f $soCho, $cotPkUuid.Count)
+    }
+
+    if ($coDauVet.Count -eq 0) {
+        Write-Output ("   ✅ Khong bang nao con dong mang GUID probe (da quet {0} cho)." -f $soCho)
+        ThemKq '⑥ tu do' 'Dau vet GUID probe (moi bang PK uuid)' $true ("daQuet={0} cho" -f $soCho)
+    }
+    else {
+        $tong = ($coDauVet | Measure-Object -Property So -Sum).Sum
+        foreach ($v in $coDauVet) {
+            Write-Output ("   🚨 {0} = {1} dong ⇒ RAC TU PROBE (phat hien TU DONG, khong co trong danh sach viet tay)." -f $v.Cho, $v.So)
+        }
+        ThemKq '⑥ tu do' 'Dau vet GUID probe (moi bang PK uuid)' $false ("{0} cho co rac · tong {1} dong" -f $coDauVet.Count, $tong)
+    }
+}
+
 # ── GHI RO NHOM ② DE KHONG AI TUONG LA BO SOT ──────────────────────────────────────────────
 Write-Output ''
 Write-Output '── ② (ghi chu) Bang GIU LICH SU — CO Y khong kiem "phai rong" ──'
