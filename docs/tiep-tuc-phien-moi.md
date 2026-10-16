@@ -142,3 +142,24 @@ Tệp lớn nhất về mặt tiến độ GĐ1: `web-001-…` (270 KB — chứ
 ## 8. PROMPT GỢI Ý ĐỂ DÁN VÀO PHIÊN MỚI
 
 > Tiếp tục GĐ1 của `D:\Projects\Tools\eCommerce`. **Đọc `docs\tiep-tuc-phien-moi.md` trước**, rồi tự kiểm trạng thái bằng 3 lệnh ở mục 1. Làm **việc 1 ở mục 5** (bảng hạn mức riêng từng kênh `InvChannelLimits` + bảng `ReconRuns`, cùng một migration), tuân thủ **mục 4** (đặc biệt 4.1 về schema và 4.3 về cách đo), rồi **kiểm chứng bằng trạng thái THẬT** (DB/log/route) và **ghi tài liệu bằng tiếng Việt** vào `docs\features\inv-003-…md` và `docs\features\rec-001-…md`. Trả lời bằng tiếng Việt; commit message ASCII không dấu; **chỉ commit khi phép kiểm đã đạt**.
+
+---
+
+## ⚠️ BÀI HỌC QUY TRÌNH (16/10/2026) — **KIỂM LẠI LỊCH SỬ TRƯỚC KHI "SỬA" TÀI LIỆU**
+
+Trong phiên này tôi **suýt báo động sai**: thấy `docs/implementation-plan.md` có dòng
+`| SAL-006 | Trả hàng / **RMA** & hoàn tiền (một phần / toàn bộ) |` chỉ dài **65 ký tự** ⇒ kết luận
+*"regex của tôi đã xoá mất nội dung"*. **Sai.** Kiểm lịch sử (`git show <commit>:docs/implementation-plan.md`
+cho **6** commit liên tiếp) ⇒ dòng đó **giống hệt ở MỌI commit** ⇒ **không có gì bị mất**.
+
+📌 **Sự thật:** `SAL-006` thuộc **GĐ2**, mà bảng chi tiết trong `implementation-plan.md` **chỉ liệt kê GĐ1**
+⇒ nó **chưa từng** có dòng chi tiết ở đó. Dòng tôi thấy là dòng **3 cột** của bảng "GĐ2 — Vận hành VN".
+
+🔒 **Quy tắc rút ra (áp dụng cho mọi lần sửa tài liệu):**
+1. **Trước khi kết luận "mất nội dung"**, chạy `git diff` / `git show <commit>:<file>` để so với **trước**.
+   Cảm giác *"dòng này ngắn quá"* **không** phải bằng chứng.
+2. **Regex `^\| <MÃ> \|` là NGUY HIỂM** khi cùng mã xuất hiện ở **nhiều bảng** (GĐ1/GĐ2/GĐ3): nó khớp
+   **dòng đầu tiên**, không phải dòng bạn đang nghĩ tới. ⇒ **In ra dòng trước khi thay**, và kiểm **độ dài**
+   sau khi thay.
+3. **`-replace` không báo lỗi khi không khớp** ⇒ phải **in kết quả** để xác nhận (đúng bài học
+   `tools\README-probe.md`: *"đo lại sau khi ghi"*).

@@ -427,7 +427,7 @@ một khuyến mãi phức tạp (nhiều điều kiện AND/OR) tính đúng ti
 | SHP-004 | Adapter **GHTK** (⚠️ xác minh địa chỉ 2 cấp trước) |
 | REC-002 | **Settlement sàn** (phí sàn, tiền phải trả, chênh lệch) |
 | REC-003 | **Đối soát COD** — ⚠️ không có API, import file Excel theo "phiên" |
-| SAL-006 | Trả hàng / **RMA** & hoàn tiền (một phần / toàn bộ) |
+| SAL-006 | Trả hàng / **RMA** & hoàn tiền (một phần / toàn bộ) | 🟡 **ĐANG LÀM SỚM (dù thuộc GĐ2)** — vì `SAL-006` là **cổng kiểm soát "KHÔNG MẤT TIỀN"** và `GOAL` hiện tại yêu cầu nó. **Tiến độ chi tiết KHÔNG nằm ở bảng này** (bảng này chỉ liệt kê **GĐ1**) — xem `docs/tiep-tuc-phien-moi.md` dòng **7a** và `docs/features/sal-006-tra-hang-rma-hoan-tien.md` **§16/§17**. 📌 **ĐÃ XONG**: bất biến hoàn tiền ở tầng domain (§16) · **`RefundAsync`/`QueryStatusAsync` VNPAY cài THẬT** + API hoàn tiền 4 endpoint (§17). ⏳ **CÒN**: 🚨 **chưa kiểm chứng được TIỀN THẬT RA** (không có credential sandbox) · **chưa có phiếu RMA** · chưa có webhook controller · chưa có job đối soát `querydr` định kỳ |
 
 ### GĐ3 — Điều hành (6 tài liệu)
 
