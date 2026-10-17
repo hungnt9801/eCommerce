@@ -1,5 +1,19 @@
 # 🚩 BẮT ĐẦU Ở ĐÂY — GÓI BÀN GIAO CHO PHIÊN MỚI
 
+> 🚨 **CẬP NHẬT 17/10/2026 — ĐỌC TỆP NÀY TRƯỚC: [`docs/handover/BAN-GIAO-GD1-2026-10-17.md`](handover/BAN-GIAO-GD1-2026-10-17.md)**
+>
+> Tệp bàn giao **mới nhất và ngắn hơn** (~10 phút). Nó ghi rõ:
+> * ✅ **8 việc đã xong** + cách kiểm chứng bằng **một lệnh**;
+> * 🚨 **phần GĐ1 CÒN DANG DỞ** — **vận chuyển** (`SHP-001…004`) và **khuyến mãi** (`PRO-001/002`) **CHƯA CÓ CODE**
+>   (đo bằng tên tệp: **0 tệp** cho mỗi tính năng, dù tài liệu đã có 100–142 KB);
+> * ⛔ **hai nợ CHẶN**: entity `Address` **không tồn tại** · `TmnCode`/`HashSecret` VNPay **rỗng**;
+> * 🔒 **ràng buộc bắt buộc** (NND, phân tầng, 4 bẫy ABP) và **7 bẫy PowerShell/C#** đã cắn nhiều lần;
+> * 🛠️ **9 công cụ kiểm** — **dùng, đừng viết lại**;
+> * thứ tự việc nên làm tiếp.
+>
+> 📌 **Tệp dưới đây vẫn hữu ích** làm **bảng bàn giao chi tiết 7a–7w**, nhưng **số liệu của nó đã cũ**
+> (197 commit · 746 unit) — 🔑 **đừng tin số trong tệp này**, hãy chạy lệnh ở §1 của tệp bàn giao mới.
+
 > **Tệp này dành cho phiên làm việc MỚI.** Đọc hết tệp này (~5 phút) rồi mới làm việc — nó thay cho việc đọc lại ~197 commit.
 > 📌 Gói này được viết ở **cuối phiên 108 vòng** (16/10/2026) khi context gần cạn.
 
