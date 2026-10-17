@@ -1,6 +1,8 @@
 # `<MÃ>` — `<Tên feature>`
 
-> **Mẫu tài liệu thiết kế feature.** Copy file này thành `docs/features/<mã>-<slug>.md` rồi điền.
+> **Mẫu tài liệu thiết kế feature.** Copy file này thành `docs/features/<module>/<mã>-<slug>.md` rồi điền —
+> 🚨 **mỗi module MỘT thư mục riêng**, tên thư mục theo bảng ở `docs/design-doc-guidelines.md` §3.1
+> (ví dụ `docs/features/shipping/shp-001-adapter-ghn-tinh-phi-van-don.md`).
 > Hướng dẫn & quy ước: `docs/design-doc-guidelines.md`. Xoá các dòng *in nghiêng* là ghi chú hướng dẫn.
 
 | Thuộc tính | Nội dung |

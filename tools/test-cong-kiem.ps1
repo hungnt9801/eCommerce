@@ -252,6 +252,89 @@ if (-not $ChiKiemDb) {
 }
 
 # ══════════════════════════════════════════════════════════════════════════════════════════════
+# NHOM 1b — `kiem-link-tai-lieu.ps1` (📌 nhanh, KHONG cham DB)
+#
+# 🔑 VI SAO CO NHOM NAY: ngay 17/10/2026 tai lieu duoc to chuc lai thanh **mot thu muc cho moi module**
+# (`docs/features/<module>/`). 📌 Moi duong dan tuong doi **sau them mot cap** — va mot tham chieu chet
+# **KHONG lam do `dotnet build`**. 🚨 Do dung la loai loi **hong am tham** ma §7 cua
+# `docs/design-doc-guidelines.md` da canh bao voi Mermaid.
+# 🔒 Va mot cong **chi chay bang tay** thi khong phai cong ⇒ no phai co ca **DO** lan ca **XANH**.
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+if (-not $ChiKiemDb) {
+    $scriptLink = Join-Path $PSScriptRoot 'kiem-link-tai-lieu.ps1'
+
+    Describe 'kiem-link-tai-lieu.ps1 — cong chong tai lieu tro toi tep KHONG TON TAI' {
+
+        It 'R) Tai lieu SACH (link tro toi tep CO THAT) ⇒ exit 0 (🛡️ chong cong LUON DO)' {
+            $tam = Join-Path $thuMucTam ('link-xanh-' + [Guid]::NewGuid().ToString('N'))
+            New-Item -ItemType Directory -Force -Path $tam | Out-Null
+            [IO.File]::WriteAllText((Join-Path $tam 'a.md'), ('# A' + "`n`n" + 'Xem [B](b.md).' + "`n"))
+            [IO.File]::WriteAllText((Join-Path $tam 'b.md'), ('# B' + "`n"))
+
+            $k = ChayScript $scriptLink @('-Goc', $tam)
+            BangNhau $k.Ma 0 'Tai lieu sach phai exit 0'
+        }
+
+        It 'S) Mot LINK MARKDOWN chet ⇒ exit 1 (🛡️ chong cong LUON XANH)' {
+            $tam = Join-Path $thuMucTam ('link-do-' + [Guid]::NewGuid().ToString('N'))
+            New-Item -ItemType Directory -Force -Path $tam | Out-Null
+            [IO.File]::WriteAllText((Join-Path $tam 'a.md'), ('# A' + "`n`n" + 'Xem [B](thieu.md).' + "`n"))
+
+            $k = ChayScript $scriptLink @('-Goc', $tam)
+            BangNhau $k.Ma 1 'Link markdown chet phai exit 1'
+
+            # 🔑 **CHUNG MINH no do vi LY DO DUNG** — 📌 neu khong, *"cong bat duoc"* va *"cong hong vi
+            # ly do khac"* trong giong het nhau (bai hoc §25.5: phep tiem khong xay ra ma cong van bao).
+            $noiDung = Get-Content $k.Log -Raw
+            KhangDinh ($noiDung -match 'thieu\.md') "Log KHONG nhac toi 'thieu.md' ⇒ do vi ly do khac. Log:`n$noiDung"
+            KhangDinh ($noiDung -match 'FAIL') "Log thieu neo 'FAIL'. Log:`n$noiDung"
+        }
+
+        It 'T) Mot duong dan trong BACKTICK chet ⇒ exit 1 — 🔑 luat (B) KHAC luat (A), phai kiem RIENG' {
+            # 📌 Luat (A) la `[chu](duong/dan)`; luat (B) la `` `docs/...md` `` trong backtick.
+            # 🔒 Chi kiem (A) thi mot tep chi co duong dan kieu (B) se **lot luoi** — ma trong repo nay
+            #    kieu (B) la **kieu pho bien nhat** (280 lan so voi 195 lan kieu A).
+            $tam = Join-Path $thuMucTam ('link-do-bt-' + [Guid]::NewGuid().ToString('N'))
+            New-Item -ItemType Directory -Force -Path $tam | Out-Null
+            # ⚠️ Chuoi NHÁY DON: dau backtick la ky tu THUONG, khong phai ky tu escape.
+            [IO.File]::WriteAllText((Join-Path $tam 'a.md'), ('# A' + "`n`n" + 'Xem `docs/thieu.md` de biet.' + "`n"))
+
+            $k = ChayScript $scriptLink @('-Goc', $tam)
+            BangNhau $k.Ma 1 'Duong dan backtick chet phai exit 1'
+
+            $noiDung = Get-Content $k.Log -Raw
+            KhangDinh ($noiDung -match 'thieu\.md') "Log KHONG nhac toi 'thieu.md'. Log:`n$noiDung"
+        }
+
+        It 'U) Duong dan backtick CO THAT nhung KHONG phai duong dan (vi du minh hoa) ⇒ KHONG bao sai' {
+            # 🔒 **CA CHONG DUONG TINH GIA** (false positive): 📌 mot cong bao sai se bi nguoi ta bo qua.
+            # `src/khong/co/duong/dan.cs` KHONG ket thuc bang `.md` ⇒ luat (B) **khong** kiem ⇒ exit 0.
+            $tam = Join-Path $thuMucTam ('link-bt-xanh-' + [Guid]::NewGuid().ToString('N'))
+            New-Item -ItemType Directory -Force -Path $tam | Out-Null
+            [IO.File]::WriteAllText((Join-Path $tam 'a.md'), ('# A' + "`n`n" + 'Vi du: `src/khong/co/duong/dan.cs` va `https://example.com/x.md`.' + "`n"))
+
+            $k = ChayScript $scriptLink @('-Goc', $tam)
+            BangNhau $k.Ma 0 'Tep khong co tham chieu .md that phai exit 0'
+        }
+
+        It 'V) LINK nam TRONG code span (backtick) ⇒ KHONG phai lien ket ⇒ exit 0' {
+            # 🚨 **CA NAY SINH RA TU MOT LOI THAT**, ngay khi viet `tools/README-probe.md` (17/10/2026):
+            # tai lieu do mo ta *"dinh dang link markdown"* bang cach **viet chinh link do trong backtick**
+            # ⇒ luat (A) quet tho van thay `](…)` ⇒ 🔒 bao chet MOT MINH HOA DUNG.
+            # ⚠️ Va ban sua dau tien (`'`[^`]+`'`) **ghep SAI** khi delimiter la HAI backtick
+            # (`` `x` ``) — no ghep vao cap ngoai cung ⇒ noi dung ben trong **lot luoi**.
+            # ✅ Luat dung: run N backtick mo, va run **N** backtick tiep theo dong (Markdown).
+            $tam = Join-Path $thuMucTam ('link-codespan-' + [Guid]::NewGuid().ToString('N'))
+            New-Item -ItemType Directory -Force -Path $tam | Out-Null
+            [IO.File]::WriteAllText((Join-Path $tam 'a.md'), ('# A' + "`n`n" + 'Cach mo ta: `` `[chu](duong/dan.md)` `` trong backtick.' + "`n"))
+
+            $k = ChayScript $scriptLink @('-Goc', $tam)
+            BangNhau $k.Ma 0 'Link nam trong code span KHONG duoc coi la lien ket'
+        }
+    }
+}
+
+# ══════════════════════════════════════════════════════════════════════════════════════════════
 # NHOM 2 — `ham-tiem.ps1` (📌 nhanh, KHONG cham DB)
 # ══════════════════════════════════════════════════════════════════════════════════════════════
 if (-not $ChiKiemDb) {

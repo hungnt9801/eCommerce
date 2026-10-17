@@ -4,7 +4,7 @@ using Volo.Abp.DependencyInjection;
 namespace eCommerce.Kernel.Observability;
 
 /// <summary>
-/// **BẢNG ĐĂNG KÝ TÊN METRIC** — hợp đồng dùng chung, khớp 1-1 với `docs/features/XC-005-observability-log-metric.md` §5.1.
+/// **BẢNG ĐĂNG KÝ TÊN METRIC** — hợp đồng dùng chung, khớp 1-1 với `docs/features/cross-cutting/XC-005-observability-log-metric.md` §5.1.
 ///
 /// 🎯 VÌ SAO CHỈ LÀ HẰNG SỐ CHUỖI MÀ KHÔNG PHẢI ENUM:
 ///   có test tự động (`TC-06`) đối chiếu **tên phát ra thật** với danh sách này ⇒ không thể lệch.

@@ -107,17 +107,17 @@ Hai việc này **không chặn** GĐ1 về mặt kỹ thuật, nhưng **phải 
 
 | Giai đoạn | Tài liệu phải **Approved** trước khi bắt đầu code giai đoạn đó | Số lượng | Danh sách |
 |---|---|:--:|---|
-| **Nền (trước GĐ1)** | `XC-001`…`XC-006` | **6** | Phụ lục A.3 |
-| **GĐ0** — Pháp lý | `ADDR-001`…`003` · `EINV-001`…`003` · `SIGN-001` | **7** | Phụ lục A.3 |
-| **GĐ1** — Bán được | `CAT-001`…`003` · `PRC-001`…`002` · `INV-001`…`003` · `SAL-001`…`005` · `CUS-001` · `REC-001` · `WEB-001`…`003` | **18** | Phụ lục A.3 |
+| **Nền (trước GĐ1)** | `XC-001`…`XC-007` | **7** | Phụ lục A.3 |
+| **GĐ0** — Pháp lý | `ADDR-001`…`004` · `EINV-001`…`003` · `SIGN-001` | **8** | Phụ lục A.3 |
+| **GĐ1** — Bán được | `CAT-001`…`003` · `PRC-001`…`002` · `INV-001`…`003` · `SAL-001`…`005` · `CUS-001` · `REC-001` · `PAY-001` · `WEB-001`…`003` | **19** | Phụ lục A.3 |
 | **GĐ2** — Vận hành VN | `PRO-001`…`002` · `SHP-001`…`004` · `REC-002`…`003` · `SAL-006` | **9** | Phụ lục A.3 |
 | **GĐ3** — Điều hành | `REP-001`…`003` · `NOT-001`…`002` · `ACC-001` | **6** | Phụ lục A.3 |
 | **GĐ4** — Tăng trưởng | `CHN-001`…`004` · `LOY-001` · `REV-001` | **6** | Phụ lục A.3 |
-| | | **52** | |
+| | | **55** | |
 
 > **Cách áp dụng thực tế:** không cần Approved cả 18 tài liệu GĐ1 trong một ngày. Nguyên tắc là
 > **mỗi feature phải Approved trước khi code feature đó** — nên có thể duyệt theo từng đợt nhỏ,
-> miễn là **5 tài liệu nền (`XC-*`) xong trước tất cả** (mọi module đều phụ thuộc chúng).
+> miễn là **7 tài liệu nền (`XC-001`…`XC-007`) xong trước tất cả** (mọi module đều phụ thuộc chúng).
 
 ## 6. GIAI ĐOẠN 0 — Pháp lý (AddressHub · EInvoiceHub · DigitalSigningHub)
 
@@ -125,7 +125,7 @@ Hai việc này **không chặn** GĐ1 về mặt kỹ thuật, nhưng **phải 
 
 | Hạng mục | Nội dung |
 |---|---|
-| **Entity** | `Province` (2 cấp mới), `Ward`, `District` (chỉ để tương thích 3 cấp cũ), `AddressLevelPolicy`, `CarrierAddressCode` (mã địa chỉ theo từng hãng) |
+| **Entity** | `Province` (2 cấp mới), `Ward`, `District` (chỉ để tương thích 3 cấp cũ), `AddressLevelPolicy`, `CarrierAddressCode` (mã địa chỉ theo từng hãng), 🆕 **`Address`** (sổ địa chỉ dùng chung — 🚨 **thuộc AddressHub, KHÔNG thuộc Customers**; chốt tại [`ADDR-004`](features/address/addr-004-so-dia-chi-khach.md), sửa mâu thuẫn với §7.1 bên dưới) |
 | **API** | tra cứu tỉnh/xã (2 cấp) · tra cứu 3 cấp cũ · map địa chỉ nội bộ ↔ mã của hãng vận chuyển |
 | **Quy tắc** | `Address` hỗ trợ **cả hai cấu trúc**; "địa chỉ gửi đối tác" là **dữ liệu đồng bộ**, không phải master data |
 | **Nguồn dữ liệu** | `provinces.open-api.vn` (v1 = 63 tỉnh có huyện; v2 = 34 tỉnh không huyện) — ⚠️ `wards` trả rỗng khi test, **phải kiểm tra lại**; hoặc import từ file chính thức |
@@ -154,8 +154,8 @@ Hai việc này **không chặn** GĐ1 về mặt kỹ thuật, nhưng **phải 
 
 ### 7.0 Hạ tầng nền (làm trước, 1 tuần)
 
-> 📄 **Bắt buộc trước tiên:** 6 tài liệu nền **`XC-001`…`XC-006`** phải **Approved** (Phụ lục A.3) —
-> vì **mọi module GĐ1 trở đi đều phụ thuộc chúng** (Money/làm tròn, outbox/inbox, lock, phân quyền, observability).
+> 📄 **Bắt buộc trước tiên:** 7 tài liệu nền **`XC-001`…`XC-007`** phải **Approved** (Phụ lục A.3) —
+> vì **mọi module GĐ1 trở đi đều phụ thuộc chúng** (Money/làm tròn, outbox/inbox, lock, phân quyền, observability, CI).
 > Sau đó mới tạo code hạ tầng dưới đây.
 
 | # | Việc | DoD |
@@ -178,11 +178,11 @@ Hai việc này **không chặn** GĐ1 về mặt kỹ thuật, nhưng **phải 
 | **Pricing** | `PriceList`, `PriceListItem`, `ChannelPrice`, `TierPrice`, `CostPrice` | tính giá theo (SKU, kênh, số lượng, thời điểm); CRUD bảng giá | `PriceCalculatedEto` | Catalog, Kernel | 🟡 **lát cắt 1 XONG (15/10/2026)** — module `Pricing` + `PriceList`/`PriceListItem`/`ChannelPrice` + **`GiaCoSoResolver` hàm thuần 4 cấp** (thứ tự cố định, NÉM khi cùng cấp+cùng priority) + bậc số lượng + **3 unique index `NULLS NOT DISTINCT`**; **còn**: app service/API + `IPriceResolver` (nạp DB), import idempotent, `CostPrice`, job theo ngày, `RowVersion`, audit (`prc-001-…md` §16.4) |
 | **Inventory** | `Warehouse`, `StockItem`, `StockLedgerEntry`(đã có), **`StockReservation`**, `StockAllotment` | nhập/chuyển/kiểm kê; tra tồn khả dụng **theo kênh**; giữ chỗ/nhả chỗ | `StockChangedEto`, `StockReservedEto`, `StockReservationExpiredEto` | Catalog, Kernel | **Test chống oversell 2 luồng đồng thời** (integration, PostgreSQL thật + lock); ledger append-only không có UPDATE; reservation có TTL + job nhả |
 | **Sales** | `Cart`, `CartItem`, `CheckoutSession`, `Order`, `OrderLine`, `OrderStatusHistory`, `OrderReturn` | giỏ hàng; checkout; đặt hàng; huỷ; trả hàng; lịch sử trạng thái | `OrderPlacedEto`, `OrderPaidEto`, `OrderCancelledEto`, `OrderReturnedEto` | Catalog, Pricing, Inventory, Customers, PaymentHub | **State machine 4 trục** (thực hiện/tài chính/đối soát/phụ) + **ném lỗi** khi chuyển sai; tính lại giá tại checkout; idempotent theo `ExternalOrderId`; test: webhook gửi trùng không tạo 2 đơn |
-| **Customers** | `Customer`, `Address`(sổ địa chỉ), `CustomerGroup` | hồ sơ; sổ địa chỉ (dùng AddressHub); nhóm khách | `CustomerRegisteredEto` | Kernel, AddressHub, Identity | Không có mô hình địa chỉ hai nguồn sự thật; customer gắn `IdentityUser` |
+| **Customers** | `Customer`, **`CustomerAddressLink`** (bảng LIÊN KẾT của sổ địa chỉ — 🚨 **`Address` do `AddressHub` sở hữu**, không phải Customers: xem [`ADDR-004`](features/address/addr-004-so-dia-chi-khach.md) · `CUS-001` **ADR-01**), `CustomerGroup` | hồ sơ; sổ địa chỉ (dùng AddressHub); nhóm khách | `CustomerRegisteredEto` | Kernel, AddressHub, Identity | Không có mô hình địa chỉ hai nguồn sự thật; customer gắn `IdentityUser` |
 | **đối soát thanh toán** (trong `Reconciliation`) | `PaymentReconciliationRun`, `PaymentReconciliationLine`, `Discrepancy` | job định kỳ `querydr` với cổng; báo cáo lệch | `PaymentDiscrepancyFoundEto` | PaymentHub | Có job chạy định kỳ; phát hiện được ca "đã trừ tiền mà đơn chưa `Paid`" |
 
 **Cổng kiểm soát GĐ1 (Definition of Done cấp giai đoạn):**
-0. 📄 **Tài liệu GĐ1 đã Approved** (`CAT-*`, `PRC-*`, `INV-*`, `SAL-001…005`, `CUS-001`, `REC-001`, `WEB-*`) và 5 tài liệu nền `XC-*`.
+0. 📄 **Tài liệu GĐ1 đã Approved** (`CAT-*`, `PRC-*`, `INV-*`, `SAL-001…005`, `CUS-001`, `REC-001`, `PAY-001`, `WEB-*`) và 7 tài liệu nền `XC-001…007`.
 1. Một khách **đặt được đơn trên website**, thanh toán qua **1 cổng VN**, đơn chuyển đúng trạng thái.
 2. Bán **vượt tồn kho là không thể** — có test integration chứng minh (2 request đồng thời, 2 instance).
 3. **Không mất tiền**: có job đối soát phát hiện giao dịch lệch.
@@ -270,7 +270,7 @@ một khuyến mãi phức tạp (nhiều điều kiện AND/OR) tính đúng ti
 | GĐ3 | Reporting · Notifications · AccountingHub | **18 – 30** |
 | GĐ4 | Đấu sàn Shopee/Lazada · Loyalty/Reviews · SaaS hoá | **40 – 65** |
 | **Tổng (code)** | | **172 – 275 person-day** (≈ **9–14 tháng** cho 1 dev; **5–7 tháng** cho 2–3 dev) |
-| **Tài liệu thiết kế** | 52 tài liệu feature (Phụ lục A), ~0.5–2 pd/tài liệu | **+27 – 62 person-day** (~15% tổng công) |
+| **Tài liệu thiết kế** | 55 tài liệu feature (Phụ lục A), ~0.5–2 pd/tài liệu | **+28 – 65 person-day** (~15% tổng công) |
 | **TỔNG CỘNG** | code + tài liệu | **199 – 337 person-day** (≈ **10–17 tháng** cho 1 dev) |
 
 > **Vì sao vẫn nên làm tài liệu dù tốn ~15%?** Vì tài liệu thiết kế **chặn được loại lỗi đắt nhất**:
@@ -364,10 +364,15 @@ một khuyến mãi phức tạp (nhiều điều kiện AND/OR) tính đúng ti
 | Mục | Quy ước |
 |---|---|
 | Mã | `<MODULE>-<3 chữ số>` (`SAL-003`, `INV-002`…) |
-| Vị trí | `docs/features/<mã>-<slug>.md` |
+| Vị trí | 🚨 **MỖI MODULE MỘT THƯ MỤC**: `docs/features/<module>/<mã>-<slug>.md` (bảng thư mục: `design-doc-guidelines.md` §3.1) |
 | Trạng thái | `Draft → In review → Approved → Implementing → Implemented → Changed` |
 
-## A.3 Danh sách tài liệu cần viết (52 tài liệu)
+## A.3 Danh sách tài liệu cần viết (**55** tài liệu — cập nhật 17/10/2026)
+
+> 📌 **17/10/2026 — thêm 3 tài liệu** so với danh sách 52 ban đầu, sau khi đối chiếu **code thật**:
+> **`ADDR-004`** (nợ CHẶN: entity `Address` của sổ địa chỉ **chưa từng tồn tại**, trong khi `CUS-001` ADR-01 và `implementation-plan` §7.1 **mâu thuẫn nhau** về chủ sở hữu) ·
+> **`PAY-001`** (module `PaymentHub` **đã có code** — `PayTransactions`, `VnPayPaymentProvider` — nhưng **không tài liệu nào sở hữu**; `SAL-002` ghi rõ *"Thanh toán/IPN thuộc `PaymentHub`"* ) ·
+> **`XC-007`** (nợ *"chưa có CI"* — `handover` §7 việc #2, `web-001` §99.5).
 
 ### Chuẩn bị (cross-cutting) — **viết TRƯỚC GĐ1**
 
@@ -379,20 +384,24 @@ một khuyến mãi phức tạp (nhiều điều kiện AND/OR) tính đúng ti
 | XC-004 | Xác thực, phân quyền & định nghĩa permission | 1 pd |
 | XC-005 | Observability: log có cấu trúc, `CorrelationId`, metric | 1 pd |
 | XC-006 | **Phân loại thuế GTGT theo SKU & mức thuế suất theo thời gian** (danh mục luật là **dữ liệu**, không hard-code) | 2 pd |
+| **XC-007** | 🆕 **CI/CD: cổng kiểm tự động & quy trình phát hành** (`.github/workflows` gọi `tools\kiem-tat-ca.ps1 -DayDu`) | 1 pd |
 
-### GĐ0 — Pháp lý (7 tài liệu)
+### GĐ0 — Pháp lý (8 tài liệu)
 
 | Mã | Tên tài liệu |
 |---|---|
 | ADDR-001 | Tra cứu đơn vị hành chính **2 cấp** (tỉnh + xã) và **3 cấp** cũ |
 | ADDR-002 | Đồng bộ **mã địa chỉ theo từng hãng vận chuyển** (dữ liệu đồng bộ, không phải master) |
 | ADDR-003 | Chuẩn hoá địa chỉ khách hàng: convert 3 cấp ↔ 2 cấp, xử lý **ca sáp nhập tỉnh** |
+| **ADDR-004** | 🆕 **Sổ địa chỉ khách: entity `Address` (AddressHub) + `CustomerAddressLink`** — 🔑 **giải quyết nợ CHẶN #1** |
 | EINV-001 | Phát hành hoá đơn điện tử (**NĐ 254/2026/NĐ-CP** + **TT 91/2026/TT-BTC**) |
 | EINV-002 | Gửi cơ quan thuế & nhận kết quả (SOAP/XML, parse `OK:`/`ERR:`) |
 | EINV-003 | Điều chỉnh / thay thế / **huỷ** hoá đơn |
 | SIGN-001 | Quy trình **ký 2 bước thủ công** + quản lý chứng thư số |
 
-### GĐ1 — Bán được trên website (18 tài liệu)
+## A.3.1 Danh sách theo giai đoạn
+
+### GĐ1 — Bán được trên website (19 tài liệu)
 
 | Mã | Tên tài liệu | Module |
 |---|---|---|
@@ -414,6 +423,7 @@ một khuyến mãi phức tạp (nhiều điều kiện AND/OR) tính đúng ti
 | WEB-001 | UI admin: khung, đăng nhập, menu, phân quyền | Web | ✅ **XONG + kiểm chứng (15/10/2026)**: khung MVC + theme · **cổng đăng nhập** (state machine 7 bước, **`BR-009` kiểm chứng**: `ReturnUrl` ngoài ⇒ `/`, nội bộ ⇒ giữ nguyên, `web-001` §49) · **harness đăng nhập** (mở khoá mọi kiểm chứng trang Web có dữ liệu) · **điểm đo thống nhất `/health-status`** cho **cả** Host (:5000) **và** Web (:5100) · **`/DonHang` đủ BA hành động** (xác nhận · huỷ · trả hàng — đo tới **tồn kho + chứng từ**, `web-001` §65/§69) · **lối vào `/DonHang`** từ trang kết quả · **chi tiết SP + SEO** (`/SanPham/ChiTiet/{sku}` — `<title>`/`meta description`/`canonical`). ⏳ **CÒN**: **menu/điều hướng theo permission** + `[AllowAnonymous]` allowlist + ma trận quyền tự động cho UI (`web-001` §16.6) |
 | WEB-002 | Storefront: duyệt & chi tiết sản phẩm (SEO) | Web | ✅ **một phần**: `/SanPham` (hàng đang bán × đơn giá, **đối chứng chéo API**, `web-001` §54). ⏳ **CÒN**: **chi tiết sản phẩm** + **SEO** (slug/meta — `CAT-003`) |
 | WEB-003 | Storefront: giỏ hàng & checkout | Web | ✅ **XONG phần cốt lõi + kiểm chứng (15/10/2026)**: `/DatHang` — **khoá checkout sinh ở GET** (bấm hai lần ⇒ **1 đơn**, `web-001` §56) · **giỏ nhiều dòng** (`SKU:SL,…`, **gộp SKU trùng**) · **CA BIÊN đã đo** (`SKU:0`/`SKU:abc` ⇒ mặc định · trùng ⇒ gộp · **SKU lạ ⇒ không tạo đơn** + mã `Pricing:0004` kèm dữ liệu, §72) · **thông điệp lỗi kèm mã + dữ liệu** (§59) · **đường nối UI→API đủ BA chuyển trạng thái**: xác nhận (§65) · huỷ (§69) · trả hàng (§69) · **giỏ tới 5 dòng** (chọn số dòng 1..5 · ca biên · giữ dòng **cả hai đường**) · **giỏ SỐNG QUA PHIÊN** bằng cookie · nút xoá giỏ. ⏳ **CÒN**: **`CAT-003`** (slug thay SKU + `sitemap.xml`/`robots.txt`) · thanh toán/hoàn tiền trên UI |
+| **PAY-001** | 🆕 **Cổng thanh toán VNPay: tạo giao dịch, IPN/webhook, hoàn tiền & đối soát** | **PaymentHub** | 🟡 **ĐÃ CÓ CODE, MỚI CÓ TÀI LIỆU (17/10/2026)**: module `PaymentHub` có `PaymentTransaction` (bảng `PayTransactions`, 3 index), `IPaymentProvider`/`VnPayPaymentProvider`/`VnPayRequestBuilder`, `PaymentAppService`, `LuatDoiSoatThanhToan`, `MetricDoiSoatThanhToan` — nhưng **không tài liệu nào sở hữu** (Phụ lục A cũ không có mã `PAY-*`; `SAL-002` ghi rõ *"Thanh toán/IPN thuộc `PaymentHub` + `REC-001`"*). 🚨 **Nợ chặn #2 KHÔNG phải tài liệu mà là CREDENTIAL**: `"TmnCode": ""` và `"HashSecret": ""` **rỗng** ⇒ **chưa kiểm chứng được tiền thật ra** (`handover` §3.1). Chi tiết: `docs/features/payment/pay-001-cong-thanh-toan-vnpay.md` |
 
 ### GĐ2 — Vận hành & tuân thủ VN (9 tài liệu)
 
@@ -427,7 +437,7 @@ một khuyến mãi phức tạp (nhiều điều kiện AND/OR) tính đúng ti
 | SHP-004 | Adapter **GHTK** (⚠️ xác minh địa chỉ 2 cấp trước) |
 | REC-002 | **Settlement sàn** (phí sàn, tiền phải trả, chênh lệch) |
 | REC-003 | **Đối soát COD** — ⚠️ không có API, import file Excel theo "phiên" |
-| SAL-006 | Trả hàng / **RMA** & hoàn tiền (một phần / toàn bộ) | 🟡 **ĐANG LÀM SỚM (dù thuộc GĐ2)** — vì `SAL-006` là **cổng kiểm soát "KHÔNG MẤT TIỀN"** và `GOAL` hiện tại yêu cầu nó. **Tiến độ chi tiết KHÔNG nằm ở bảng này** (bảng này chỉ liệt kê **GĐ1**) — xem `docs/tiep-tuc-phien-moi.md` dòng **7a** và `docs/features/sal-006-tra-hang-rma-hoan-tien.md` **§16/§17**. 📌 **ĐÃ XONG**: bất biến hoàn tiền ở tầng domain (§16) · **`RefundAsync`/`QueryStatusAsync` VNPAY cài THẬT** + API hoàn tiền 4 endpoint (§17). ⏳ **CÒN**: 🚨 **chưa kiểm chứng được TIỀN THẬT RA** (không có credential sandbox) · **chưa có phiếu RMA** · chưa có webhook controller · chưa có job đối soát `querydr` định kỳ |
+| SAL-006 | Trả hàng / **RMA** & hoàn tiền (một phần / toàn bộ) | 🟡 **ĐANG LÀM SỚM (dù thuộc GĐ2)** — vì `SAL-006` là **cổng kiểm soát "KHÔNG MẤT TIỀN"** và `GOAL` hiện tại yêu cầu nó. **Tiến độ chi tiết KHÔNG nằm ở bảng này** (bảng này chỉ liệt kê **GĐ1**) — xem `docs/tiep-tuc-phien-moi.md` dòng **7a** và `docs/features/sales/sal-006-tra-hang-rma-hoan-tien.md` **§16/§17**. 📌 **ĐÃ XONG**: bất biến hoàn tiền ở tầng domain (§16) · **`RefundAsync`/`QueryStatusAsync` VNPAY cài THẬT** + API hoàn tiền 4 endpoint (§17). ⏳ **CÒN**: 🚨 **chưa kiểm chứng được TIỀN THẬT RA** (không có credential sandbox) · **chưa có phiếu RMA** · chưa có webhook controller · chưa có job đối soát `querydr` định kỳ |
 
 ### GĐ3 — Điều hành (6 tài liệu)
 
@@ -463,7 +473,7 @@ một khuyến mãi phức tạp (nhiều điều kiện AND/OR) tính đúng ti
 | Feature có state machine **hoặc** tích hợp NCC | **1.5–2 ngày** |
 | Feature có **cả** state machine **và** NCC **và** pháp lý (EINV-*, SHP-*) | **2–3 ngày** |
 
-**Tổng: ~27–62 person-day** cho 52 tài liệu (đã cộng vào §13).
+**Tổng: ~28–65 person-day** cho 55 tài liệu (đã cộng vào §13).
 
 ## A.5 Điều kiện để một giai đoạn được coi là "bắt đầu"
 
@@ -474,8 +484,8 @@ Một giai đoạn **chỉ được bắt đầu code** khi:
 ## A.6 Việc cần làm ngay khi bắt đầu
 
 1. Nhóm **review mẫu** `templates/feature-design-template.md` — đặc biệt 4 mục mới so với tài liệu gốc: state machine · sự kiện/idempotency · bất biến & đồng thời · migration.
-2. Viết **XC-001…XC-006** (6 tài liệu nền) — vì mọi module phụ thuộc chúng.
-3. Viết **ADDR-001…003 + EINV-001** (GĐ0) — vì đây là nghĩa vụ pháp lý và chặn thiết kế địa chỉ/hoá đơn.
+2. Viết **XC-001…XC-007** (7 tài liệu nền) — vì mọi module phụ thuộc chúng.
+3. Viết **ADDR-001…004 + EINV-001** (GĐ0) — vì đây là nghĩa vụ pháp lý và chặn thiết kế địa chỉ/hoá đơn.
 4. Song song: gửi email hỏi NCC (§16) để có thông số thật điền vào tài liệu.
 
 ## A.7 Trạng thái
@@ -484,39 +494,42 @@ Một giai đoạn **chỉ được bắt đầu code** khi:
 |---|---|
 | Mẫu tài liệu | ✅ đã viết — **chờ nhóm review** |
 | Hướng dẫn + bảng sửa đổi so với tài liệu tham khảo | ✅ đã viết |
-| Danh sách 52 tài liệu | ✅ đã liệt kê (A.3) |
-| Script kiểm tra Mermaid | ✅ `npm --prefix tools run check:mermaid` — 7/7 khối PASS |
-| **Tài liệu thực tế** | 🟡 **6/52** — `XC-001` + `XC-002` + `XC-003` + `XC-004` + `XC-005` + `XC-006` (**Draft**, chờ review) |
-| **Nhóm nền `XC-*`** | ✅ **ĐÃ VIẾT ĐỦ 6/6** — sẵn sàng review để chốt trước khi vào GĐ1 |
+| Danh sách 55 tài liệu | ✅ đã liệt kê (A.3) — **52 bản gốc + 3 bổ sung 17/10/2026** (`ADDR-004`, `PAY-001`, `XC-007`) |
+| Script kiểm tra Mermaid | ✅ `npm --prefix tools run check:mermaid` |
+| Script kiểm tra **tham chiếu chết** | ✅ `pwsh -File tools\kiem-link-tai-lieu.ps1` (thêm 17/10/2026 — sau khi tài liệu được tổ chức lại theo module) |
+| **Tài liệu thực tế** | 🟢 **55/55 đã có tệp** — nhưng **tất cả vẫn ở trạng thái `Draft`**, chưa có tệp nào được con người review |
+| **Nhóm nền `XC-*`** | ✅ **ĐÃ VIẾT ĐỦ 7/7** — sẵn sàng review để chốt trước khi vào GĐ1 |
 
 ### A.8 Tài liệu đã viết
 
 | Mã | Tài liệu | Trạng thái | Ghi chú |
 |---|---|---|---|
-| `XC-001` | [Money, Currency & chính sách làm tròn](features/XC-001-money-currency-lam-tron.md) | 🟡 `Draft` | 630 dòng · 7 quyết định thiết kế (ADR) · 12 BR · 6 NFR · 15 test case · **6/6 câu hỏi đã đóng** |
-| `XC-002` | [Outbox/Inbox & chống trùng sự kiện](features/XC-002-outbox-inbox-chong-trung-su-kien.md) | 🟡 `Draft` | **1196 dòng** · 12 ADR · **21 BR** · 13 NFR · **38 test case** · 2 state machine · 4 bảng trong data dictionary · ✅ **4 câu hỏi đã chốt 13/10/2026**: transport **in-process** · module **`Messaging`** · ngưỡng thử **5** · job DLQ **1 phút** · 🔍 đã **xác minh độc lập bằng quét 424 DLL ABP 10.7** (xác nhận **không** có `IsEventOrderingEnabled`) |
-| `XC-005` | [Observability: log, CorrelationId & metric](features/XC-005-observability-log-metric.md) | 🟡 `Draft` | **13 BR** · 8 NFR · 12 test case · **bảng đăng ký metric** gom **7 metric** đang bị `XC-002`/`XC-003` yêu cầu mà **chưa có nơi phát** · 🚨 **phát hiện F1: hạ tầng quan sát gần như TRỐNG** — **0** gói Serilog/OpenTelemetry/HealthCheck; `CorrelationId` chỉ là **cột trong bảng ABP** (12/12 chỗ nằm trong `Migrations/`), **chưa** wire middleware ⇒ giá trị **rỗng** · F2: payload webhook lưu thô 8.000 ký tự |
-| `XC-004` | [Xác thực, phân quyền & chiều tenant](features/XC-004-xac-thuc-phan-quyen-tenant.md) | 🟡 `Draft` | **14 BR** · 8 NFR · **14 test case** · 🚨 **2 test reflection chặn tái phát lỗi Phase 0** (`TC-01` mọi app service phải có `[Authorize]`; `TC-02` mọi permission dùng phải được **định nghĩa**) · 🚨 **phát hiện F1: unique index mất tác dụng khi `TenantId` NULL** (PostgreSQL `NULLS DISTINCT`) ⇒ **chưa sửa được** (cần PostgreSQL) · F2 multi-tenancy chưa bật · F3/F4 password grant + mật khẩu seed trong tài liệu |
-| `XC-003` | [Khoá phân tán: quy ước & phạm vi](features/XC-003-khoa-phan-tan-quy-uoc.md) | 🟡 `Draft` | **bảng đăng ký khoá lập từ CODE THẬT** (8 khoá + 2 khoá ABP) · 10 ADR · 10 BR · 7 NFR · 14 test case · 🚨 **phát hiện F1: khoá kênh định nghĩa 2 nơi cho ra 2 CHUỖI KHÁC NHAU** (`ecommerce:channel:…` vs `channel:…`) ⇒ dùng lẫn là **khoá không bảo vệ gì** — **đã sửa**; **F3** (khoá Messaging thiếu tiền tố) **đã sửa**; **F2/F4** ghi nhận |
-| `XC-006` | [Phân loại thuế GTGT theo SKU](features/XC-006-phan-loai-thue-gtgt.md) | 🟡 `Draft` → 🚀 **đang triển khai** | **11 BR** · 8 NFR · **22 test case** · **7/9 câu hỏi đã đóng** · đặc tả **Mẫu 01 (Phụ lục III)** từ **file gốc** · danh mục Phụ lục I/II là **dữ liệu**, không hard-code · ✅ **code lõi xong**: module `Tax` (Domain+EFCore), migration + `EXCLUDE USING gist`, seed 4 mức thuế, **17 unit test** (⚠️ chưa chạy trên PostgreSQL thật) |
+| `XC-001` | [Money, Currency & chính sách làm tròn](features/cross-cutting/XC-001-money-currency-lam-tron.md) | 🟡 `Draft` | 630 dòng · 7 quyết định thiết kế (ADR) · 12 BR · 6 NFR · 15 test case · **6/6 câu hỏi đã đóng** |
+| `XC-002` | [Outbox/Inbox & chống trùng sự kiện](features/cross-cutting/XC-002-outbox-inbox-chong-trung-su-kien.md) | 🟡 `Draft` | **1196 dòng** · 12 ADR · **21 BR** · 13 NFR · **38 test case** · 2 state machine · 4 bảng trong data dictionary · ✅ **4 câu hỏi đã chốt 13/10/2026**: transport **in-process** · module **`Messaging`** · ngưỡng thử **5** · job DLQ **1 phút** · 🔍 đã **xác minh độc lập bằng quét 424 DLL ABP 10.7** (xác nhận **không** có `IsEventOrderingEnabled`) |
+| `XC-005` | [Observability: log, CorrelationId & metric](features/cross-cutting/XC-005-observability-log-metric.md) | 🟡 `Draft` | **13 BR** · 8 NFR · 12 test case · **bảng đăng ký metric** gom **7 metric** đang bị `XC-002`/`XC-003` yêu cầu mà **chưa có nơi phát** · 🚨 **phát hiện F1: hạ tầng quan sát gần như TRỐNG** — **0** gói Serilog/OpenTelemetry/HealthCheck; `CorrelationId` chỉ là **cột trong bảng ABP** (12/12 chỗ nằm trong `Migrations/`), **chưa** wire middleware ⇒ giá trị **rỗng** · F2: payload webhook lưu thô 8.000 ký tự |
+| `XC-004` | [Xác thực, phân quyền & chiều tenant](features/cross-cutting/XC-004-xac-thuc-phan-quyen-tenant.md) | 🟡 `Draft` | **14 BR** · 8 NFR · **14 test case** · 🚨 **2 test reflection chặn tái phát lỗi Phase 0** (`TC-01` mọi app service phải có `[Authorize]`; `TC-02` mọi permission dùng phải được **định nghĩa**) · 🚨 **phát hiện F1: unique index mất tác dụng khi `TenantId` NULL** (PostgreSQL `NULLS DISTINCT`) ⇒ **chưa sửa được** (cần PostgreSQL) · F2 multi-tenancy chưa bật · F3/F4 password grant + mật khẩu seed trong tài liệu |
+| `XC-003` | [Khoá phân tán: quy ước & phạm vi](features/cross-cutting/XC-003-khoa-phan-tan-quy-uoc.md) | 🟡 `Draft` | **bảng đăng ký khoá lập từ CODE THẬT** (8 khoá + 2 khoá ABP) · 10 ADR · 10 BR · 7 NFR · 14 test case · 🚨 **phát hiện F1: khoá kênh định nghĩa 2 nơi cho ra 2 CHUỖI KHÁC NHAU** (`ecommerce:channel:…` vs `channel:…`) ⇒ dùng lẫn là **khoá không bảo vệ gì** — **đã sửa**; **F3** (khoá Messaging thiếu tiền tố) **đã sửa**; **F2/F4** ghi nhận |
+| `XC-006` | [Phân loại thuế GTGT theo SKU](features/cross-cutting/XC-006-phan-loai-thue-gtgt.md) | 🟡 `Draft` → 🚀 **đang triển khai** | **11 BR** · 8 NFR · **22 test case** · **7/9 câu hỏi đã đóng** · đặc tả **Mẫu 01 (Phụ lục III)** từ **file gốc** · danh mục Phụ lục I/II là **dữ liệu**, không hard-code · ✅ **code lõi xong**: module `Tax` (Domain+EFCore), migration + `EXCLUDE USING gist`, seed 4 mức thuế, **17 unit test** (⚠️ chưa chạy trên PostgreSQL thật) |
 
 ---
 
-## A.9 Tài liệu FEATURE — ✅ **46/46 đã viết** (13/10/2026)
+## A.9 Tài liệu thiết kế — ✅ **55/55 đã có tệp** (cập nhật 17/10/2026; bản gốc 46/46 ngày 13/10/2026)
 
-Toàn bộ 46 tài liệu feature của **A.3** đã viết xong. **Kiểm chứng tập trung (chạy máy, không phải tự khai):**
+Toàn bộ tài liệu thiết kế của **A.3** đã có tệp. **Kiểm chứng tập trung (chạy máy, không phải tự khai):**
 
 | Kiểm chứng | Kết quả |
 |---|---|
-| Đủ **16/16 mục** theo mẫu `XC-003` (§0, §0.1 ADR, §1..§15) | ✅ **cả 46 tài liệu** |
-| Mermaid hợp lệ (parser thật) | ✅ **197 khối · 0 lỗi** |
+| Đủ **16/16 mục** theo mẫu (§0, §0.1 ADR, §1..§15) | ✅ **cả 55 tài liệu** (trừ `XC-006-phieu-hoi-ke-toan.md` — đó là **phiếu hỏi kế toán**, không phải tài liệu thiết kế) |
+| Mermaid hợp lệ (parser thật) | ✅ chạy `npm --prefix tools run check:mermaid` |
+| **Tham chiếu chết** trong tài liệu | ✅ chạy `pwsh -File tools\kiem-link-tai-lieu.ps1` — 0 tham chiếu chết |
 | Neo vào code thật (kèm `file:dòng`) | ✅ có — mỗi tài liệu ghi rõ phần **"chưa có trong code — kế hoạch GĐx"** và **"chưa kiểm chứng"** |
-| Tổng dung lượng tài liệu | **~4,8 MB** (riêng 46 tài liệu feature) |
+| 🚨 **Trạng thái review** | 🔴 **0/55 đã được con người `Approved`** — đây là **cổng thật** của A.5, xem ghi chú dưới |
 
 | GĐ | SL | Mã tài liệu |
 |---|---|---|
-| **GĐ0** Pháp lý | 7 | `ADDR-001` `ADDR-002` `ADDR-003` `EINV-001` `EINV-002` `EINV-003` `SIGN-001` |
-| **GĐ1** Bán trên website | 18 | `CAT-001` `CAT-002` `CAT-003` `PRC-001` `PRC-002` `INV-001` `INV-002` `INV-003` `SAL-001` `SAL-002` `SAL-003` `SAL-004` `SAL-005` `CUS-001` `REC-001` `WEB-001` `WEB-002` `WEB-003` |
+| **Nền** `XC-*` | 7 | `XC-001` `XC-002` `XC-003` `XC-004` `XC-005` `XC-006` `XC-007` |
+| **GĐ0** Pháp lý | 8 | `ADDR-001` `ADDR-002` `ADDR-003` `ADDR-004` `EINV-001` `EINV-002` `EINV-003` `SIGN-001` |
+| **GĐ1** Bán trên website | 19 | `CAT-001` `CAT-002` `CAT-003` `PRC-001` `PRC-002` `INV-001` `INV-002` `INV-003` `SAL-001` `SAL-002` `SAL-003` `SAL-004` `SAL-005` `CUS-001` `REC-001` `PAY-001` `WEB-001` `WEB-002` `WEB-003` |
 | **GĐ2** Vận hành & tuân thủ VN | 9 | `PRO-001` `PRO-002` `SHP-001` `SHP-002` `SHP-003` `SHP-004` `REC-002` `REC-003` `SAL-006` |
 | **GĐ3** Điều hành | 6 | `REP-001` `REP-002` `REP-003` `NOT-001` `NOT-002` `ACC-001` |
 | **GĐ4** Tăng trưởng | 6 | `CHN-001` `CHN-002` `CHN-003` `CHN-004` `LOY-001` `REV-001` |
@@ -577,7 +590,7 @@ trong GĐ1. Và: **làm hạ tầng nền §7.0 trước khi vào các module G�
 | **Biến thể thứ HAI của #22** (phát hiện mới) | ✅ **XONG** — nút *"Đồng bộ ngay"* (`ChannelAppService.SyncNowAsync`) trước đây **tự kéo đơn + tự tiến con trỏ + không phát sự kiện cho ai** ⇒ nay đi qua **cùng một cổng** `IChannelShopSyncService` (đóng luôn **F3** của `CHN-002`) |
 | **Một nguồn sự thật** cho *"sự kiện có người nhận chưa?"* | ✅ `EventCoverageScan` + `IEventCoverageProbe` (Messaging) dùng **chung** cho cảnh báo lúc boot **và** quyết định lúc đồng bộ ⇒ hai nơi **không thể lệch nhau** |
 | Kiểm chứng | Build **0/0** · **383 unit** + **20 integration** · Host thật `health 200` · **DB thật**: con trỏ **không tiến** + `LastError` `eCommerce:Channel:0005` · log **Error** thật · **ma trận quyền đo lại đầy đủ** (`401`/`403`/`200` trên endpoint **gắn quyền**) |
-| Bằng chứng chi tiết | `docs/runtime-verification-report.md` §9bis · `docs/features/chn-002-connector-shopee.md` §16 |
+| Bằng chứng chi tiết | `docs/runtime-verification-report.md` §9bis · `docs/features/channel/chn-002-connector-shopee.md` §16 |
 
 ### 🚨 `F-403` — **ĐÃ SỬA** (cùng lượt): mọi API gắn quyền trả `403` dù đã cấp quyền
 
@@ -596,7 +609,7 @@ Log chẩn đoán thật: `claim vai trò: …/claims/role=admin` nhưng `ABP cu
 ghi một dòng `Warning` kèm đủ dữ kiện chẩn đoán).
 
 **Ma trận đã đo lại (Host thật):** không token → **401** · `client_credentials` (không quyền) → **403** ·
-admin có quyền → **200**. Chi tiết: `docs/features/XC-004-xac-thuc-phan-quyen-tenant.md` **§15.2 F6 + §15.6**.
+admin có quyền → **200**. Chi tiết: `docs/features/cross-cutting/XC-004-xac-thuc-phan-quyen-tenant.md` **§15.2 F6 + §15.6**.
 
 > ⚠️ **ĐÍNH CHÍNH:** dòng *"ma trận `401`/`403`/`200` đúng"* ở `docs/handover-gd1.md` §1 dựa trên ca `200`
 > đo **nhầm endpoint** (chỉ cần đăng nhập, **không** gắn quyền) ⇒ **không** chứng minh được máy phân quyền
@@ -615,7 +628,7 @@ khi Order intake đăng ký handler cho `ChannelOrderPulledEto`, fail-closed **t
 |---|---|---|
 | 0 | Viết & duyệt `XC-001`…`XC-006` | 🟡 **đã viết đủ 6/6** nhưng **chưa có tài liệu nào được con người review** (đang `Draft`) |
 | 1 | `shared/eCommerce.Kernel` (Money, Currency, mã lỗi, lock key, metrics) | ✅ **có** — `Money`/`Currency`/`RoundingPolicy`/`MoneyAllocator` + `Observability` + test `MoneyTests` |
-| 2 | `eCommerce.Web` + `Volo.Account` + theme + màn hình login | ✅ **XONG (15/10/2026)** — `src/eCommerce.Web` (cổng **5100**), theme **Basic** miễn phí + `Volo.Abp.Account.Web`. **Đăng nhập THẬT đã kiểm chứng** (vào được trang chủ quản trị). Chi tiết + bằng chứng: `docs/features/web-001-…md` **§16** |
+| 2 | `eCommerce.Web` + `Volo.Account` + theme + màn hình login | ✅ **XONG (15/10/2026)** — `src/eCommerce.Web` (cổng **5100**), theme **Basic** miễn phí + `Volo.Abp.Account.Web`. **Đăng nhập THẬT đã kiểm chứng** (vào được trang chủ quản trị). Chi tiết + bằng chứng: `docs/features/web/web-001-ui-admin-khung-dang-nhap-phan-quyen.md` **§16** |
 | 3 | Outbox/Inbox + DLQ | ⬜ **cố ý hoãn** — xem cảnh báo dưới |
 | 4 | `test/eCommerce.IntegrationTests` + Testcontainers PostgreSQL | ✅ **có** — **20** integration test chạy trên PostgreSQL 17 thật |
 | 5 | `docs/coding-conventions.md` + `.editorconfig` | ✅ **XONG (14/10/2026)** |

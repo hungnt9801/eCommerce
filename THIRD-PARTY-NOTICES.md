@@ -65,7 +65,7 @@ nhánh bàn giao source chính là nhánh phá vỡ mô hình đóng. **Với d�
 
 ## 3. ⚠️ Ngoại lệ nguy hiểm: ABP application modules là LGPL, KHÔNG phải MIT
 
-**Tài liệu ABP nói sai.** `docs/en/modules/identity.md` và `openiddict.md` ghi:
+**Tài liệu ABP nói sai.** `en/modules/identity.md` và `en/modules/openiddict.md` ghi:
 *"The source code is licensed with **MIT**, so you can freely use and customize it."*
 
 Nhưng bằng chứng thực tế (tôi đọc trực tiếp):

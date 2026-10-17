@@ -18,7 +18,7 @@ namespace eCommerce.Orders;
 ///
 /// ⚠️ **CHƯA làm ở lượt này (ghi rõ, không giả vờ):** xử lý **cập nhật** đơn (so watermark theo `update_time`);
 /// hiện theo hướng **tạo-một-lần** — đơn đã có thì **không** sửa nữa. Xem ghi chú ở
-/// <see cref="MarketplaceOrderIntakeHandler"/> và `docs/features/sal-005-webhook-don-tu-san.md` §16.
+/// <see cref="MarketplaceOrderIntakeHandler"/> và `docs/features/sales/sal-005-webhook-don-tu-san.md` §16.
 /// </summary>
 public class MarketplaceOrderIntake : FullAuditedAggregateRoot<Guid>, IMultiTenant
 {

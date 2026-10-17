@@ -277,14 +277,14 @@ Lượt trước **chặn** mất đơn (fail-closed). Lượt này **xây nơi 
 phát hoàn tất ⇒ `DbContext` đã dispose ⇒ `ObjectDisposedException` — sửa bằng **UoW riêng**
 (`requiresNew: true`), quy tắc đã ghi vào `docs/coding-conventions.md` **§6.1**;
 (2) connector PoC sinh `PlacedAtUtc` **mới mỗi lần kéo** ⇒ không thể kiểm chứng đường "sàn gửi lại".
-Chi tiết + giới hạn còn lại: `docs/features/sal-005-webhook-don-tu-san.md` **§16**.
+Chi tiết + giới hạn còn lại: `docs/features/sales/sal-005-webhook-don-tu-san.md` **§16**.
 
 ---
 
 ## 10. `F-403` (14/10/2026 — lộ ra khi kiểm chứng #22) — **MỌI API CÓ `[Authorize(permission)]` TRẢ `403` DÙ ĐÃ ĐƯỢC CẤP QUYỀN** → ✅ **ĐÃ SỬA**
 
 > 📌 **Tên gọi:** gọi là **`F-403`** ở đây, và là **`F6`** trong
-> `docs/features/XC-004-xac-thuc-phan-quyen-tenant.md` §15.2/§15.6 (nơi có đặc tả đầy đủ).
+> `docs/features/cross-cutting/XC-004-xac-thuc-phan-quyen-tenant.md` §15.2/§15.6 (nơi có đặc tả đầy đủ).
 > Không gán số thứ tự lỗi mới vì `docs/handover-gd1.md` ghi *"24 lỗi thật"* nhưng tài liệu **chỉ đánh số
 > tới #23** ⇒ gán số lúc này sẽ **trùng hoặc nhảy cóc**.
 
@@ -339,7 +339,7 @@ trong `AddJwtBearer`. Kèm **bất biến lúc khởi động** `KiemTraBatBienT
 | `client_credentials` (không quyền) | `POST /api/app/channel/{id}/sync-now` | `403` | **`403`** ✅ |
 | admin **có** `eCommerce.Channels.Sync` | `POST /api/app/channel/{id}/sync-now` | ❌ `403` | **`200`** ✅ |
 
-> 📄 **Chi tiết đầy đủ + đính chính ma trận cũ:** `docs/features/XC-004-xac-thuc-phan-quyen-tenant.md`
+> 📄 **Chi tiết đầy đủ + đính chính ma trận cũ:** `docs/features/cross-cutting/XC-004-xac-thuc-phan-quyen-tenant.md`
 > **§15.2 F6** và **§15.6**. 📌 **Bài học:** ma trận cũ đo ca `200` trên endpoint **chỉ cần đăng nhập**,
 > nên **không** chứng minh được máy phân quyền hoạt động — lỗi nằm **đúng** trong khoảng trống đó.
 > **Một ca kiểm thử đo trên "đối tượng gần giống" thì không phải là kiểm chứng.**

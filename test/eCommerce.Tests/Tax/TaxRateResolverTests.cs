@@ -13,7 +13,7 @@ namespace eCommerce.Tests.Tax;
 ///   (<c>at</c>) ⇒ kiểm thử được mốc chuyển mức thuế **31/12/2026 → 01/01/2027** ngay hôm nay,
 ///   không phải chờ tới năm 2027 (NFR-XC-006-004).
 ///
-/// Mã test (TC-xx) khớp với bảng test case trong docs/features/XC-006-phan-loai-thue-gtgt.md.
+/// Mã test (TC-xx) khớp với bảng test case trong docs/features/cross-cutting/XC-006-phan-loai-thue-gtgt.md.
 /// </summary>
 public class TaxRateResolverTests
 {

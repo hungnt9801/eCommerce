@@ -39,7 +39,7 @@ Tax/Invoice, không có Customer/Address, không có Return/RMA, không có đ�
 
 ### 🚨 Điểm mâu thuẫn quan trọng: tài liệu ABP nói MIT, metadata nói LGPL-3.0
 
-Tài liệu ABP (ví dụ `docs/en/modules/identity.md`, `openiddict.md`) ghi: *"The source code is licensed with
+Tài liệu ABP (ví dụ `en/modules/identity.md`, `en/modules/openiddict.md`) ghi: *"The source code is licensed with
 **MIT**, so you can freely use and customize it."* — **nhưng đó không phải giấy phép thực tế của gói**:
 
 | Bằng chứng (tôi đọc trực tiếp) | Nội dung |

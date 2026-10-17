@@ -147,7 +147,7 @@ Host cổng **5000**. DB: `docker exec -i ecommerce-postgres psql -U ecommerce -
 > ⇒ `RolePermissionValueProvider` không thấy vai trò nào ⇒ từ chối tất cả. **Đã sửa:**
 > `MapInboundClaims = false` + `NameClaimType = "preferred_username"`, kèm **bất biến lúc khởi động**
 > `KiemTraBatBienTenClaim` (ghi **Error** nếu ai bật lại). Ma trận `401`/`403`/`200` **đã đo lại đầy đủ**
-> trên **endpoint GẮN QUYỀN** — xem `docs/features/XC-004-xac-thuc-phan-quyen-tenant.md` **§15.2 F6 + §15.6**.
+> trên **endpoint GẮN QUYỀN** — xem `docs/features/cross-cutting/XC-004-xac-thuc-phan-quyen-tenant.md` **§15.2 F6 + §15.6**.
 >
 > ⚠️ **ĐÍNH CHÍNH dòng ở §1:** *"ma trận `401`/`403`/`200` đúng"* — ca `200` của lượt trước được đo trên
 > endpoint **chỉ cần đăng nhập**, **không** phải endpoint gắn quyền ⇒ **không** chứng minh được máy phân
@@ -206,7 +206,7 @@ Không chạy ⇒ trang vẫn trả **`200`** nhưng **thiếu toàn bộ CSS/JS
 | **Lỗi thật đã gặp** (24 lỗi, 16 im lặng) | `docs/runtime-verification-report.md` |
 | Thiết kế từng feature (52 doc, mỗi doc 16 mục) | `docs/features/` — mỗi doc có mục **cuối** ghi trạng thái triển khai + việc còn lại |
 | Quy ước bất biến của dự án | `docs/features/XC-001…XC-006*.md` |
-| Quan sát/log/metric | `docs/features/XC-005-observability-log-metric.md` (§16–18: lỗi tầng + 7/12 điểm phát) |
+| Quan sát/log/metric | `docs/features/cross-cutting/XC-005-observability-log-metric.md` (§16–18: lỗi tầng + 7/12 điểm phát) |
 
 ---
 

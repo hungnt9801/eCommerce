@@ -79,11 +79,47 @@ lệch với kiến trúc của ta. Bảng dưới đây nêu rõ từng thay đ
 | Mục | Quy ước |
 |---|---|
 | **Mã feature** | `<MODULE>-<3 chữ số>` — ví dụ `SAL-003`, `INV-002`, `EINV-001` |
-| **Tiền tố module** | `XC` (cross-cutting) · `CAT` Catalog · `PRC` Pricing · `INV` Inventory · `SAL` Sales · `CUS` Customers · `PRO` Promotions · `ADDR` AddressHub · `EINV` EInvoiceHub · `SIGN` DigitalSigningHub · `SHP` ShippingHub · `REC` Reconciliation · `ACC` AccountingHub · `REP` Reporting · `NOT` Notifications · `CHN` ChannelHub |
-| **Đường dẫn** | `docs/features/<mã>-<slug>.md` — ví dụ `docs/features/SAL-003-dat-hang.md` |
+| **Tiền tố module** | `XC` (cross-cutting) · `CAT` Catalog · `PRC` Pricing · `INV` Inventory · `SAL` Sales · `CUS` Customers · `PRO` Promotions · `ADDR` AddressHub · `EINV` EInvoiceHub · `SIGN` DigitalSigningHub · `SHP` ShippingHub · `PAY` PaymentHub · `REC` Reconciliation · `ACC` AccountingHub · `REP` Reporting · `NOT` Notifications · `CHN` ChannelHub · `LOY` Loyalty · `REV` Reviews · `WEB` Web |
+| **Đường dẫn** | 🚨 **MỖI MODULE MỘT THƯ MỤC RIÊNG**: `docs/features/<module>/<mã>-<slug>.md` — ví dụ `docs/features/sales/sal-003-state-machine-4-truc.md`. **Tên thư mục = tên module, viết thường, tiếng Anh**, khớp với `modules/<Module>/` khi module đã tách (xem bảng dưới) |
 | **Ngôn ngữ** | Tiếng Việt; thuật ngữ kỹ thuật giữ tiếng Anh (entity, aggregate, outbox…) |
 | **Sơ đồ** | Mermaid trực tiếp trong file (không ảnh, không PlantUML song song) |
 | **Độ dài** | 2–8 trang. Feature nhỏ thì ngắn, nhưng **không được bỏ mục nào** — mục không áp dụng ghi "Không áp dụng + lý do" |
+
+### 3.1 Bảng thư mục module (nguồn sự thật cho đường dẫn)
+
+| Thư mục | Tiền tố mã | Module | Tách thành `modules/<X>`? |
+|---|---|---|---|
+| `cross-cutting/` | `XC` | Nền tảng (Money, outbox, lock, auth, log/metric, CI) | — (dùng chung `shared/eCommerce.Kernel`) |
+| `catalog/` | `CAT` | Catalog | ✖ còn trong `src/` |
+| `pricing/` | `PRC` | Pricing | ✅ `modules/Pricing` |
+| `inventory/` | `INV` | Inventory | ✖ còn trong `src/` |
+| `sales/` | `SAL` | Sales | ✖ còn trong `src/` |
+| `customers/` | `CUS` | Customers | ✅ `modules/Customers` |
+| `promotions/` | `PRO` | Promotions | ✖ chưa có code |
+| `address/` | `ADDR` | AddressHub | ✅ `modules/Address` |
+| `einvoice/` | `EINV` | EInvoiceHub | ✅ `modules/EInvoice` |
+| `signing/` | `SIGN` | DigitalSigningHub | ✅ `modules/Signing` |
+| `shipping/` | `SHP` | ShippingHub | ✖ chưa có code |
+| `payment/` | `PAY` | PaymentHub | ✅ `modules/PaymentHub` |
+| `reconciliation/` | `REC` | Reconciliation | ✖ nằm trong app |
+| `accounting/` | `ACC` | AccountingHub | ✖ chưa có code |
+| `reporting/` | `REP` | Reporting | ✖ chưa có code |
+| `notifications/` | `NOT` | Notifications | ✅ `modules/Messaging` |
+| `channel/` | `CHN` | ChannelHub | ✅ `modules/ChannelHub` |
+| `loyalty/` | `LOY` | Loyalty | ✖ chưa có code |
+| `reviews/` | `REV` | Reviews | ✖ chưa có code |
+| `web/` | `WEB` | Web (storefront + admin) | — (`src/eCommerce.Web`) |
+
+📌 **Nhánh `Tax`** không có tài liệu riêng — nó thuộc `cross-cutting/XC-006` (phân loại thuế GTGT).
+
+### 3.2 Cổng kiểm cho tài liệu
+
+| Cổng | Lệnh | Kiểm gì |
+|---|---|---|
+| Sơ đồ | `npm --prefix tools run check:mermaid` | Mọi khối Mermaid phải **parse được** bằng parser thật của Mermaid |
+| Tham chiếu | `pwsh -File tools\kiem-link-tai-lieu.ps1` | Mọi link `[…]` và mọi đường dẫn `docs/…`, `src/…` trong backtick **phải trỏ tới tệp CÓ THẬT**; thoát `1` nếu có tham chiếu chết |
+
+> 🔑 **Vì sao cần cổng tham chiếu:** khi tài liệu được tổ chức lại theo module (`docs/features/<module>/`), mọi đường dẫn tương đối **sâu thêm một cấp** — và một tham chiếu chết **không làm đỏ `dotnet build`**, đúng cùng loại lỗi hỏng-âm-thầm như Mermaid (§7).
 
 ---
 

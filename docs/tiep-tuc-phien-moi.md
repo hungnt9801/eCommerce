@@ -176,7 +176,7 @@ Tệp lớn nhất về mặt tiến độ GĐ1: `web-001-…` (270 KB — chứ
 
 ## 8. PROMPT GỢI Ý ĐỂ DÁN VÀO PHIÊN MỚI
 
-> Tiếp tục GĐ1 của `D:\Projects\Tools\eCommerce`. **Đọc `docs\tiep-tuc-phien-moi.md` trước**, rồi tự kiểm trạng thái bằng 3 lệnh ở mục 1. Làm **việc 1 ở mục 5** (bảng hạn mức riêng từng kênh `InvChannelLimits` + bảng `ReconRuns`, cùng một migration), tuân thủ **mục 4** (đặc biệt 4.1 về schema và 4.3 về cách đo), rồi **kiểm chứng bằng trạng thái THẬT** (DB/log/route) và **ghi tài liệu bằng tiếng Việt** vào `docs\features\inv-003-…md` và `docs\features\rec-001-…md`. Trả lời bằng tiếng Việt; commit message ASCII không dấu; **chỉ commit khi phép kiểm đã đạt**.
+> Tiếp tục GĐ1 của `D:\Projects\Tools\eCommerce`. **Đọc `docs\tiep-tuc-phien-moi.md` trước**, rồi tự kiểm trạng thái bằng 3 lệnh ở mục 1. Làm **việc 1 ở mục 5** (bảng hạn mức riêng từng kênh `InvChannelLimits` + bảng `ReconRuns`, cùng một migration), tuân thủ **mục 4** (đặc biệt 4.1 về schema và 4.3 về cách đo), rồi **kiểm chứng bằng trạng thái THẬT** (DB/log/route) và **ghi tài liệu bằng tiếng Việt** vào `docs\features\inventory\inv-003-phan-bo-ton-theo-kenh.md` và `docs\features\reconciliation\rec-001-doi-soat-thanh-toan-querydr.md`. Trả lời bằng tiếng Việt; commit message ASCII không dấu; **chỉ commit khi phép kiểm đã đạt**.
 
 ---
 

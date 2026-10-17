@@ -180,12 +180,12 @@ dotnet test test\eCommerce.Tests\eCommerce.Tests.csproj
 - **PaymentHub**: `PaymentTransaction` (idempotent), `IPaymentProvider`, `VnPayPaymentProvider` (**ký + xác thực IPN thật**).
 - EF Core/PostgreSQL: DbContext hợp nhất, mapping theo module, index unique chống trùng, migration đã sinh.
 - Hạ tầng: Redis cache + **Redis distributed lock** (bắt buộc khi chạy nhiều instance), Swagger, seed dữ liệu.
-- **UI quản trị (`eCommerce.Web`, cổng 5100)**: theme Basic (miễn phí) + **màn hình đăng nhập ABP Identity** — **đã kiểm chứng đăng nhập thật** (xem `docs/features/web-001-…md` §16).
+- **UI quản trị (`eCommerce.Web`, cổng 5100)**: theme Basic (miễn phí) + **màn hình đăng nhập ABP Identity** — **đã kiểm chứng đăng nhập thật** (xem `docs/features/web/web-001-ui-admin-khung-dang-nhap-phan-quyen.md` §16).
 
 ### ❌ Chưa có (cố ý để lại, có ghi chú trong code)
 - ✅ ~~**UI đăng nhập & trang quản trị**~~ → **ĐÃ CÓ (15/10/2026)**: `src/eCommerce.Web` (cổng **5100**),
   theme Basic miễn phí + màn hình đăng nhập ABP Identity; **đăng nhập thật đã kiểm chứng**
-  ([docs/features/web-001-…md](docs/features/web-001-ui-admin-khung-dang-nhap-phan-quyen.md) §16).
+  ([docs/features/web/web-001-ui-admin-khung-dang-nhap-phan-quyen.md](docs/features/web/web-001-ui-admin-khung-dang-nhap-phan-quyen.md) §16).
   ⚠️ Màn hình **nghiệp vụ** (sản phẩm/tồn kho/đơn hàng) **chưa có** — sẽ thêm cùng các module GĐ1.
 - **`TenantManagement`, CMS Kit, Docs, Blogging** — chưa thêm (chưa cần ở Phase 0).
 - ✅ ~~**Luồng cần database chưa được kiểm chứng**~~ → **ĐÃ kiểm chứng**: cấp token thật, ma trận

@@ -444,7 +444,14 @@ sinh ra để chống. ⇒ **Phải có test TỰ ĐỘNG, không phụ thuộc 
    không dọn thì lần chạy sau **hỏng vì dữ liệu ca trước còn lại** ⇒ 🔑 một test **tự làm hỏng chính nó**.
    ✅ `try/finally` cho **mọi** ca có side effect.
 
-### 12 ca — chia hai nhóm
+### 22 ca — chia bốn nhóm
+
+| Nhóm | Số ca | Chạm DB? |
+|---|:--:|---|
+| `kiem-moc-build.ps1` | 7 (`A`, `A2`, `B`…`F`) | ✖ |
+| `kiem-link-tai-lieu.ps1` | 5 (`R`…`V`) — thêm 17/10/2026 | ✖ |
+| `ham-tiem.ps1` | 5 (`L`…`P`) | ✖ |
+| `kiem-db.ps1` | 5 (`G`…`K`) | ✅ cần Docker + PostgreSQL |
 
 **Nhóm `kiem-moc-build.ps1` (7 ca, 📌 không chạm DB):**
 
@@ -457,6 +464,16 @@ sinh ra để chống. ⇒ **Phải có test TỰ ĐỘNG, không phụ thuộc 
 **D** | Mốc **sai định dạng** (object đơn) ⇒ `exit 2` — 🚨 khóa đúng bẫy *"`foreach` duyệt thuộc tính ⇒ bảng tra cứu rỗng ⇒ mọi tệp thành MỚI ⇒ cổng XANH dù binary không đổi"* |
 **E** | **Chưa có** mốc ⇒ `exit 2` |
 **F** | **Lọc rỗng** (không tệp nào khớp) ⇒ `exit 2` — 🛡️ *"không tìm thấy tệp nào"* **KHÔNG** được coi là *"mọi tệp đều đổi"* |
+
+**Nhóm `kiem-link-tai-lieu.ps1` (5 ca, 📌 không chạm DB — thêm 17/10/2026):**
+
+| Ca | Bất biến |
+|---|---|
+**R** | Tài liệu **sạch** (link trỏ tới tệp **có thật**) ⇒ `exit 0` ⇒ 🛡️ chống **cổng luôn đỏ** |
+🚨 **S** | Một link markdown **chết** ⇒ `exit 1` ⇒ 🛡️ chống **cổng luôn xanh**. 🔑 Ca này **còn khẳng định log NHẮC TỚI đúng tên tệp chết** — vì *"cổng bắt được"* và *"cổng đỏ vì lý do khác"* **trông giống hệt nhau** (bài học §25.5) |
+🚨 **T** | Một đường dẫn trong **backtick** chết (`` `docs/….md` ``) ⇒ `exit 1` — 🔒 **luật (B) KHÁC luật (A)**: trong repo này backtick là kiểu **phổ biến nhất** ⇒ chỉ kiểm link markdown là **lọt lưới** |
+**U** | Chuỗi trông giống đường dẫn nhưng **không phải** (ví dụ minh hoạ `src/…/x.cs`, URL `https://…/x.md`) ⇒ **KHÔNG** báo sai — 🔒 **ca chống DƯƠNG TÍNH GIẢ**: một cổng báo sai sẽ bị người ta **bỏ qua** |
+🚨 **V** | **Link nằm TRONG code span** (dạng `` `` `[chữ](…)` `` ``) ⇒ **KHÔNG** phải liên kết ⇒ `exit 0` — 📌 **ca này sinh ra từ MỘT LỖI THẬT** ngay khi viết chính tệp `README` này: tài liệu mô tả *"định dạng link"* bằng cách **viết link trong backtick**, và bản sửa đầu (regex một-backtick) **ghép SAI** khi delimiter là **hai** backtick ⇒ nội dung bên trong **lọt lưới** |
 
 **Nhóm `kiem-db.ps1` (5 ca, ⚠️ cần Docker + PostgreSQL):**
 
@@ -608,3 +625,47 @@ sai** (lần thứ **BA** của họ lỗi này!).
 **in rõ nó kiểm GÌ** — 📌 *"im lặng bỏ qua"* nguy hiểm hơn *"báo rõ"*.
 ➕ **Chạy đầy đủ 8 bước:** ✅ `exit 0` · **147.4s** · **1155 unit** · **38 integration** · mermaid **197/0** ·
 **DB 21/21** · **test cổng 17/17** · **E2E 11/11**.
+
+---
+
+## 🚨 `kiem-link-tai-lieu.ps1` — **CỔNG THAM CHIẾU CHẾT TRONG TÀI LIỆU** (thêm 17/10/2026)
+
+### Vì sao có — **cùng loại lỗi hỏng-âm-thầm với Mermaid**
+
+📌 Ngày **17/10/2026** tài liệu được tổ chức lại thành **một thư mục cho mỗi module**
+(`docs/features/<module>/` — xem `docs/design-doc-guidelines.md` §3.1). Hệ quả **cơ học**: **mọi** đường dẫn
+tương đối trong 53 tệp **sâu thêm một cấp**.
+
+🚨 Và một tham chiếu chết **KHÔNG làm đỏ `dotnet build`** — đúng như lỗi cú pháp Mermaid (§7 của
+`design-doc-guidelines.md`). 🔑 Phép đo ban đầu **tìm ra 175 tham chiếu chết** ngay sau khi di chuyển, trong đó
+có **một sai lệch CÓ TỪ TRƯỚC** mà không ai biết: **~100 chỗ** trỏ tới
+`src/eCommerce.Domain.Shared/Observability/eCommerceMetrics.cs` — tệp đã được **di chuyển** (commit `5902724`)
+sang `shared/eCommerce.Kernel/Observability/` và **bản cũ đã bị xoá**.
+
+### Nó kiểm GÌ — **hai luật, và luật (B) mới là luật phổ biến**
+
+| Luật | Dạng | Cách giải |
+|---|---|---|
+**(A)** Link markdown | dạng `` `[chữ](duong/dan.md)` `` | giải theo **thư mục của tệp chứa nó** |
+**(B)** Đường dẫn trong backtick | `` `docs/features/…md` ``, `` `src/…/X.cs` `` | giải theo **GỐC REPO**, rồi thử **tương đối** |
+
+➕ **Bỏ qua có chủ ý** (để **không** báo sai — ca **P**): URL `http(s)://`, `mailto:`, neo `#…`, và mọi chuỗi
+có `*`/`?`/`<`/`>`/`|` (đó là **mẫu/glob**, không phải đường dẫn cụ thể).
+
+### Cách dùng
+
+```powershell
+pwsh -File tools\kiem-link-tai-lieu.ps1     # exit 0 = sạch, exit 1 = có tham chiếu chết
+```
+
+➕ **Đã tích hợp test:** `tools\test-cong-kiem.ps1` **nhóm 1b** — 5 ca **R/S/T/U/V** (cả chiều ĐỎ lẫn chiều XANH,
+cả hai luật A và B, và ca chống dương tính giả). 📌 Một cổng **không có ca ĐỎ** thì không chứng minh được nó **bắt** gì.
+
+### 🚨 Bài học ĐO ĐƯỢC khi viết chính script này
+
+| # | Bẫy | Hậu quả thật |
+|---|---|---|
+**1** | 🔒 **Regex thay thế hàng loạt cho ra "254 tham chiếu đã sửa"** nhưng cổng vẫn **ĐỎ 175 chỗ** | 📌 Đếm số lần thay thế **KHÔNG** phải bằng chứng đã đúng — phải **chạy cổng kiểm lại** |
+**2** | 🚨 **`@(@('a','b'))` bị PowerShell LÀM PHẲNG** khi chỉ có **một** phần tử | ⇒ `$cap[0]` thành **KÝ TỰ ĐẦU** của chuỗi ⇒ một script sửa link **đã thay `d` → `o`** trong bộ nhớ. ✅ Dùng `[pscustomobject]`; và **luôn `throw` khi không tìm thấy chuỗi cần thay** (bài học `ham-tiem.ps1`) |
+**3** | ⚠️ **Đường dẫn tương đối phụ thuộc nơi CHẠY script**, không phải nơi đặt script | 🔑 Một lệnh `cd` trong cùng khối lệnh có thể **không** áp dụng cho `[IO.File]::ReadAllText` ⇒ dùng **đường dẫn tuyệt đối** khi xử lý hàng loạt |
+

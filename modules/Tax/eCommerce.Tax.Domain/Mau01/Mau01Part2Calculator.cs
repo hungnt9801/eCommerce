@@ -53,7 +53,7 @@ public sealed record Mau01Part2Result(
 /// và **dùng chung** cho mọi định dạng xuất (bảng số liệu, HTKK, eTax). Nhờ vậy đổi **định dạng xuất**
 /// không đụng tới **số liệu**.
 ///
-/// 📌 Căn cứ pháp lý & quyết định: xem `docs/features/XC-006-phan-loai-thue-gtgt.md` §6.3 và §15.1.5.
+/// 📌 Căn cứ pháp lý & quyết định: xem `docs/features/cross-cutting/XC-006-phan-loai-thue-gtgt.md` §6.3 và §15.1.5.
 /// </summary>
 public static class Mau01Part2Calculator
 {
