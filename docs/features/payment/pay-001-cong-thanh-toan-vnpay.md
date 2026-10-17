@@ -806,6 +806,73 @@ Trạng thái hiện tại trong code:
 > 🔒 **Vận hành:** `HashSecret` **không** được commit; phải đọc từ **biến môi trường/secret store** khi triển khai
 > (`REC-001` §9, `appsettings.json` chỉ giữ giá trị rỗng).
 
+### 7.7 🔑 Đường kiểm chứng khi **CHƯA có credential** — ba lớp TÁCH RỜI (chốt 17/10/2026)
+
+> 🎯 **Câu hỏi của chủ dự án:** *"chưa có credential sandbox VNPay — đề xuất cách bypass"*.
+> 🔑 **Trả lời ngắn: bypass được HAI lớp, KHÔNG được bypass lớp thứ ba.**
+> Nếu chỉ nhớ một câu: **bypass *nhà cung cấp*, KHÔNG bypass *chữ ký*.**
+
+| Lớp | Bản chất | Bypass được? | Cách làm |
+|---|---|---|---|
+| **① Ra ngoài** — gọi `paymentv2/vpcpay.html`, `merchant_webapi` | **Phụ thuộc NCC** | ✅ **ĐƯỢC** | `IPaymentProvider` **đã là interface** (`IPaymentProvider.cs:58-108`) ⇒ thêm implementation `FakePaymentProvider` (§7.7.2) |
+| **② Vào trong** — VNPay gọi **IPN** về ta | **Phụ thuộc mạng** | ✅ **ĐƯỢC** — và **BẮT BUỘC phải bypass** ngay cả khi **có** credential | Trang giả lập nội bộ tự sinh IPN (§7.7.2) · hoặc tunnel khi cần IPN thật (§7.7.1) |
+| **③ Xác thực `HMAC-SHA512` + ý nghĩa "đã thu tiền"** | **KIỂM SOÁT BẢO MẬT** | 🔴 **TUYỆT ĐỐI KHÔNG** | Xem §7.7.4 — bypass lớp này biến IPN thành **cửa mở đánh dấu đơn đã trả tiền** |
+
+#### 7.7.1 📌 Sự thật ĐO ĐƯỢC từ tài liệu VNPay (có nguồn, không suy đoán)
+
+| # | Sự thật | Nguồn |
+|---|---|---|
+| 1 | ✅ **Tự đăng ký merchant test ĐƯỢC** — VNPay có form tự phục vụ, **không cần hợp đồng**: *"Nếu chưa có thông tin `vnp_TmnCode`, `vnp_HashSecret`: vui lòng đăng ký thông tin kết nối CTT VNPAY"* | [sandbox.vnpayment.vn/apis/docs/gioi-thieu](https://sandbox.vnpayment.vn/apis/docs/gioi-thieu/) · form: [sandbox.vnpayment.vn/devreg](https://sandbox.vnpayment.vn/devreg/) (*"Đăng ký Merchant môi trường test"*) |
+| 2 | ✅ **Thẻ test dùng ngay được** | cùng nguồn: `NCB` · `9704198526191432198` · `NGUYEN VAN A` · `07/15` · OTP `123456` |
+| 3 | 🚨 **KHÔNG cần** đợi hợp đồng để có `TmnCode`/`HashSecret` — chỉ cần **đăng ký form** | cùng nguồn |
+| 4 | 🚨 **IPN cần site MỞ RA INTERNET**: *"Website tích hợp cần được mở ra internet để máy chủ của VNPAY có thể gửi yêu cầu cập nhật kết quả thanh toán"* | cùng nguồn, mục *Chú ý* |
+| 5 | ⚠️ **VNPay ghi `API Hoàn trả` = `/merchant_webapi/merchant.html`**, còn `appsettings.json:26` của ta là `/merchant_webapi/api/transaction` | cùng nguồn, mục *Thông tin cấu hình* — 📌 **lệch cần xác nhận** khi có credential (§15.3) |
+
+🔑 **Hệ quả quan trọng nhất của sự thật #3: nợ chặn #2 đang bị đánh giá sai mức.**
+Nó **không** phải *"chờ đối tác cấp credential"* — nó là **một tờ khai đăng ký 5–10 phút**. ⇒ **`S4`/`S5` KHÔNG bị chặn** như `handover` §3.1 ngụ ý.
+🔑 Và sự thật #4 giải thích vì sao lớp ② **phải** bypass: trên `localhost` thì **kể cả có credential**, VNPay **không gọi được** IPN về.
+
+#### 7.7.2 Thiết kế `FakePaymentProvider` — "cổng giả lập" chạy **offline**, chữ ký **THẬT**
+
+| Thành phần | Quyết định | Vì sao |
+|---|---|---|
+| Vị trí | `modules/PaymentHub/eCommerce.PaymentHub.Application/Providers/FakePaymentProvider.cs` | Cạnh `VnPayPaymentProvider.cs` — cùng một abstraction, **không** nhánh `if` rải rác |
+| Đăng ký | `Payments:Provider` = `VnPay` \| `Fake`; chọn tại `PaymentHubApplicationModule.cs:32-34` (nơi **đã** đăng ký `IPaymentProvider`) | Chỉ **một** điểm quyết định, dễ audit |
+| 🚨 Chốt an toàn | `Fake` **chỉ** đăng ký khi `IHostEnvironment.IsDevelopment()`; `Payments:Provider=Fake` ở môi trường khác ⇒ **NÉM NGAY lúc khởi động** | Một cấu hình sai **không** được phép thành cửa mở ở production |
+| Trang giả lập | `GET /pay-gia-lap/{txnRef}` → HTML 3 nút **Thành công / Thất bại / Huỷ**; `POST` → dựng query `vnp_*` rồi **gọi IPN của CHÍNH TA** | Kiểm được **cả** lớp ② mà không cần internet |
+| 🔑 Chữ ký | Trang giả lập **DÙNG LẠI** `VnPayRequestBuilder.DungChuoiKy` + `Ky` (`VnPayRequestBuilder.cs:38-48`) với `Payments:Fake:HashSecret` (**dev-only**) | 📌 **Không** viết lại thuật toán ký — viết lại thì ta kiểm **bản sao**, không kiểm **code thật** |
+| Sinh IPN | `FakePaymentProvider` trả URL trỏ trang giả lập; `VerifyWebhookAsync` của **VNPay** vẫn là đường xử lý **duy nhất** | ⇒ đường xác thực chữ ký **luôn** được chạy thật |
+| Dùng cho unit test | Cùng lớp, đăng ký trong test module | 🔎 Hiện **0** tệp test có `IPaymentProvider` ⇒ đây là **test double đầu tiên** |
+
+**Bật/tắt bằng cấu hình, không sửa code:**
+
+```json
+"Payments": { "Provider": "Fake", "Fake": { "HashSecret": "<dev-only>", "SimulatorBaseUrl": "https://localhost:5000" } }
+```
+
+⚠️ `Payments:Fake:HashSecret` là **hằng dev**, **KHÔNG** phải `HashSecret` của VNPay, **không** dùng cho production, **không** cần giữ bí mật — nhưng **phải** khác rỗng để `KiemChuKy` chạy thật.
+
+#### 7.7.3 Ba cách — và cách nào dùng khi nào
+
+| Cách | Mở khoá được gì | Chi phí | Khi nào dùng |
+|---|---|---|---|
+| **C1. Đăng ký merchant test** (khuyến nghị **làm NGAY**) | `TmnCode`+`HashSecret` thật · tạo URL thanh toán · **gọi được `refund`/`querydr`** | **5–10 phút** (form + captcha + email) | Luôn — để đóng **nợ chặn #2** một cách thật |
+| **C2. Tunnel** (`cloudflared`/`ngrok`) trỏ về `:5000` | **IPN thật** trên máy local (VNPay gọi vào được) | ~10 phút | Chỉ cho **lần nghiệm thu cuối** (`DoD-tiền-thật`) |
+| **C3. `FakePaymentProvider` + trang giả lập** | Toàn bộ đường tiền **offline** · **chạy được trong CI** · tất định | ~0.5–1 phiên | **Mặc định** cho dev + CI. 📌 Cũng là cách **duy nhất** kiểm IPN trùng/sai chữ ký **tất định** |
+
+🔑 **C1 và C3 không thay thế nhau:** C1 cho *"tiền thật đã ra"*, C3 cho *"hành vi đúng và lặp lại được"*.
+📌 C2 là **điều kiện** của C1 khi chạy local — nên **C1 + C2** mới đóng được `DoD-tiền-thật`.
+
+#### 7.7.4 🔴 Ba thứ **CẤM** (bypass sai chỗ = mất tiền hoặc mất bảo mật)
+
+| # | Cấm | Hậu quả cụ thể |
+|---|---|---|
+| 1 | 🚫 **Bỏ / vô hiệu `KiemChuKy`** (`VnPayRequestBuilder.cs:234-268`) hoặc bỏ `VerifyWebhookAsync` (`VnPayPaymentProvider.cs:131-197`) | Bất kỳ ai **tự gửi** `POST` `vnp_ResponseCode=00` ⇒ ta đánh dấu **đơn đã trả tiền** ⇒ **giao hàng miễn phí**. Đây là **IPN spoofing**, không phải "tuỳ chọn môi trường" |
+| 2 | 🚫 **Hard-code `TmnCode`/`HashSecret`** vào `appsettings.json` rồi commit | Lộ secret ⇒ người khác ký được IPN **thay** VNPay. 🔒 Phải đọc từ **biến môi trường/secret store** |
+| 3 | 🚫 **Đặt `Payments:Provider=Fake` mặc định** ở `appsettings.json` (không phải `.Development.json`) | Quên đổi khi deploy ⇒ production **nhận thanh toán giả** ⇒ sổ sách **sai mà không có lỗi nào**. Đây là lý do có **fail-fast** ở §7.7.2 |
+
+➕ Ghi chú cho người review: cách "bypass" **đúng** là **thay nhà cung cấp** (lớp ①/②) — **không** phải **nới lỏng kiểm tra** (lớp ③).
+
 ---
 
 ## 8. Bất biến & xử lý đồng thời
@@ -1176,7 +1243,7 @@ public class Pay001Tests : eCommerceTestBase<eCommerceEntityFrameworkCoreTestMod
 |---|---|---|---|---|
 | **Q1** | 🚨 **Ai ghi `Order.PaymentStatus`?** `SAL-003` **BR-013** nói *"chỉ `PaymentHub`/IPN ghi"*, nhưng `PaymentHub` **không** tham chiếu `Order`, và `eCommerce.Application` **không được** tham chiếu `PaymentHub.Application` (`handover:134-135`). Cầu nối đặt ở đâu: outbox ETO (`XC-002`) hay một `IPaymentOutcomeSink` ở Domain? | **Kiến trúc trưởng + BA** | `Open` | 🔴 **Chặn**: đơn đã trả tiền vẫn `Unpaid` ⇒ giao hàng/không giao sai; **không có lỗi nào** |
 | **Q2** | Đường nhận **IPN** đặt ở đâu: `src/eCommerce.Web/Controllers` (MVC, không cần token) hay `HttpApi.Host` (controller riêng)? Có phải thêm vào **allowlist công khai** theo `XC-004` **BR-004**? | Kiến trúc trưởng | `Open` | 🔴 **Chặn**: không có endpoint ⇒ `MarkSucceeded` **không bao giờ** chạy ở đường thật; `querydr` là lưới **duy nhất** |
-| **Q3** | 🔑 **Có cung cấp `TmnCode` + `HashSecret` sandbox không?** (nợ chặn #2 — `handover:74`) | **VNPay** (qua người đã liên hệ) + chủ dự án | `Open` | 🔴 **Chặn**: **không** kiểm chứng được tiền thật ra; mọi tuyên bố *"hoàn tiền hoạt động"* là **chưa có cơ sở** |
+| **Q3** | 🔑 **Có cung cấp `TmnCode` + `HashSecret` sandbox không?** (nợ chặn #2 — `handover:74`) | **chủ dự án** (tự đăng ký form) | ✅ **ĐÃ TRẢ LỜI 17/10/2026** | ✅ **KHÔNG còn là chặn kỹ thuật**: VNPay cho **tự đăng ký merchant test** ([devreg](https://sandbox.vnpayment.vn/devreg/)) ⇒ `TmnCode`/`HashSecret` lấy trong **5–10 phút**, không cần hợp đồng — xem **§7.7.1 #3**. 🔑 Và `S4`/`S5` được mở khoá **ngay** bằng `FakePaymentProvider` (§7.7.2) dù **chưa** đăng ký. ⚠️ Chỉ `DoD-tiền-thật` (một giao dịch + IPN **thật**) mới cần credential **+ tunnel** (§7.7.3 C1+C2) |
 | **Q4** | Có cần **phân biệt** *"khách cố ý huỷ"* (`Cancelled`) với *"giao dịch lỗi"* (`Failed`) trong DB không? (F-PAY-11) | **BA** | `Open` | 🟠 Báo cáo *"tỉ lệ khách huỷ"* **không làm được**; CSKH đọc `FailureReason` (chuỗi) để đoán |
 | **Q5** | Có cần đo **thời gian chờ thanh toán** (từ lúc tạo tới lúc IPN) không? (F-PAY-11 — thiếu trạng thái `Pending`) | **BA** | `Open` | 🟡 Không có số liệu để tối ưu tỉ lệ chuyển đổi |
 | **Q6** | Ai xác nhận các yêu cầu hoàn tiền đang `ChoXacNhan`? Cần **job riêng** hay dùng job `REC-001` hiện có? (D5 — hiện **không ai**) | **Kế toán + Kiến trúc trưởng** | `Open` | 🔴 Tiền **đã ra** ở cổng mà sổ **chưa** ghi ⇒ đối soát lệch vĩnh viễn; khách khiếu nại |

@@ -125,7 +125,7 @@ Hai việc này **không chặn** GĐ1 về mặt kỹ thuật, nhưng **phải 
 
 | Hạng mục | Nội dung |
 |---|---|
-| **Entity** | `Province` (2 cấp mới), `Ward`, `District` (chỉ để tương thích 3 cấp cũ), `AddressLevelPolicy`, `CarrierAddressCode` (mã địa chỉ theo từng hãng), 🆕 **`Address`** (sổ địa chỉ dùng chung — 🚨 **thuộc AddressHub, KHÔNG thuộc Customers**; chốt tại [`ADDR-004`](features/address/addr-004-so-dia-chi-khach.md), sửa mâu thuẫn với §7.1 bên dưới) |
+| **Entity** | **`AdministrativeUnit`** (**MỘT** bảng, phân cấp bằng `Level` — thay cho `Province`/`Ward`/`District`) · **`CarrierAddressMapping`** (thay `CarrierAddressCode`) · 🆕 **`Address`** (sổ địa chỉ dùng chung — 🚨 **thuộc AddressHub, KHÔNG thuộc Customers**; [`ADDR-004`](features/address/addr-004-so-dia-chi-khach.md) 🟢 **Approved 17/10/2026**) · 📌 `AddressLevelPolicy` **không có trong code** — chính sách cấp hành chính nằm ở cấu hình (chốt tại `ADDR-004` **ADR-12**: theo hiện trạng code) |
 | **API** | tra cứu tỉnh/xã (2 cấp) · tra cứu 3 cấp cũ · map địa chỉ nội bộ ↔ mã của hãng vận chuyển |
 | **Quy tắc** | `Address` hỗ trợ **cả hai cấu trúc**; "địa chỉ gửi đối tác" là **dữ liệu đồng bộ**, không phải master data |
 | **Nguồn dữ liệu** | `provinces.open-api.vn` (v1 = 63 tỉnh có huyện; v2 = 34 tỉnh không huyện) — ⚠️ `wards` trả rỗng khi test, **phải kiểm tra lại**; hoặc import từ file chính thức |
@@ -161,7 +161,7 @@ Hai việc này **không chặn** GĐ1 về mặt kỹ thuật, nhưng **phải 
 | # | Việc | DoD |
 |---|---|---|
 | 0 | ✍️ Viết & duyệt **`XC-001`…`XC-006`** (tài liệu, không phải code) | 6 tài liệu ở trạng thái **Approved** |
-| 1 | Tạo `shared/eCommerce.Kernel` (Money, Currency, Address, enum, mã lỗi, lock key) | Build sạch; mọi module tham chiếu được; có unit test cho `Money` (cộng/trừ khác tiền tệ ⇒ ném lỗi; VND dùng điểm cố định 0 chữ số thập phân) |
+| 1 | Tạo `shared/eCommerce.Kernel` (Money, Currency, enum, mã lỗi, lock key — 🚨 **KHÔNG** có `Address`: `Address` là **entity** thuộc module `Address`, xem `ADDR-004` **ADR-02**) | Build sạch; mọi module tham chiếu được; có unit test cho `Money` (cộng/trừ khác tiền tệ ⇒ ném lỗi; VND dùng điểm cố định 0 chữ số thập phân) |
 | 2 | Tạo `eCommerce.Web` + `Volo.Account` + theme miễn phí | Có màn hình login; vào được trang chủ admin |
 | 3 | Thêm **Outbox/Inbox** của ABP + **DLQ** | Có test chứng minh event không mất khi giả lập publish lỗi |
 | 4 | Tạo `test/eCommerce.IntegrationTests` + Testcontainers PostgreSQL | 1 test mẫu chạy được trong CI |
@@ -370,7 +370,7 @@ một khuyến mãi phức tạp (nhiều điều kiện AND/OR) tính đúng ti
 ## A.3 Danh sách tài liệu cần viết (**55** tài liệu — cập nhật 17/10/2026)
 
 > 📌 **17/10/2026 — thêm 3 tài liệu** so với danh sách 52 ban đầu, sau khi đối chiếu **code thật**:
-> **`ADDR-004`** (nợ CHẶN: entity `Address` của sổ địa chỉ **chưa từng tồn tại**, trong khi `CUS-001` ADR-01 và `implementation-plan` §7.1 **mâu thuẫn nhau** về chủ sở hữu) ·
+> **`ADDR-004`** (nợ CHẶN: entity `Address` của sổ địa chỉ **chưa từng tồn tại**, trong khi `CUS-001` ADR-01 và `implementation-plan` §7.1 **mâu thuẫn nhau** về chủ sở hữu — ✅ **đã có tài liệu và đã DUYỆT 17/10/2026**; ⏳ còn **code**, là việc `S1`/`S2`) ·
 > **`PAY-001`** (module `PaymentHub` **đã có code** — `PayTransactions`, `VnPayPaymentProvider` — nhưng **không tài liệu nào sở hữu**; `SAL-002` ghi rõ *"Thanh toán/IPN thuộc `PaymentHub`"* ) ·
 > **`XC-007`** (nợ *"chưa có CI"* — `handover` §7 việc #2, `web-001` §99.5).
 
@@ -393,7 +393,7 @@ một khuyến mãi phức tạp (nhiều điều kiện AND/OR) tính đúng ti
 | ADDR-001 | Tra cứu đơn vị hành chính **2 cấp** (tỉnh + xã) và **3 cấp** cũ |
 | ADDR-002 | Đồng bộ **mã địa chỉ theo từng hãng vận chuyển** (dữ liệu đồng bộ, không phải master) |
 | ADDR-003 | Chuẩn hoá địa chỉ khách hàng: convert 3 cấp ↔ 2 cấp, xử lý **ca sáp nhập tỉnh** |
-| **ADDR-004** | 🆕 **Sổ địa chỉ khách: entity `Address` (AddressHub) + `CustomerAddressLink`** — 🔑 **giải quyết nợ CHẶN #1** |
+| **ADDR-004** | 🆕 **Sổ địa chỉ khách: entity `Address` (AddressHub) + `CustomerAddressLink`** — 🟢 **Approved 17/10/2026** · ⏳ **chờ code** (`S1`/`S2`) — 🔑 **nợ CHẶN #1 đã có quyết định** |
 | EINV-001 | Phát hành hoá đơn điện tử (**NĐ 254/2026/NĐ-CP** + **TT 91/2026/TT-BTC**) |
 | EINV-002 | Gửi cơ quan thuế & nhận kết quả (SOAP/XML, parse `OK:`/`ERR:`) |
 | EINV-003 | Điều chỉnh / thay thế / **huỷ** hoá đơn |
@@ -497,7 +497,7 @@ Một giai đoạn **chỉ được bắt đầu code** khi:
 | Danh sách 55 tài liệu | ✅ đã liệt kê (A.3) — **52 bản gốc + 3 bổ sung 17/10/2026** (`ADDR-004`, `PAY-001`, `XC-007`) |
 | Script kiểm tra Mermaid | ✅ `npm --prefix tools run check:mermaid` |
 | Script kiểm tra **tham chiếu chết** | ✅ `pwsh -File tools\kiem-link-tai-lieu.ps1` (thêm 17/10/2026 — sau khi tài liệu được tổ chức lại theo module) |
-| **Tài liệu thực tế** | 🟢 **55/55 đã có tệp** — nhưng **tất cả vẫn ở trạng thái `Draft`**, chưa có tệp nào được con người review |
+| **Tài liệu thực tế** | 🟢 **55/55 đã có tệp** — trong đó 🟡 **1/55 đã `Approved`** (`ADDR-004`, 17/10/2026); **54** còn lại vẫn `Draft` |
 | **Nhóm nền `XC-*`** | ✅ **ĐÃ VIẾT ĐỦ 7/7** — sẵn sàng review để chốt trước khi vào GĐ1 |
 
 ### A.8 Tài liệu đã viết
@@ -523,7 +523,7 @@ Toàn bộ tài liệu thiết kế của **A.3** đã có tệp. **Kiểm chứ
 | Mermaid hợp lệ (parser thật) | ✅ chạy `npm --prefix tools run check:mermaid` |
 | **Tham chiếu chết** trong tài liệu | ✅ chạy `pwsh -File tools\kiem-link-tai-lieu.ps1` — 0 tham chiếu chết |
 | Neo vào code thật (kèm `file:dòng`) | ✅ có — mỗi tài liệu ghi rõ phần **"chưa có trong code — kế hoạch GĐx"** và **"chưa kiểm chứng"** |
-| 🚨 **Trạng thái review** | 🔴 **0/55 đã được con người `Approved`** — đây là **cổng thật** của A.5, xem ghi chú dưới |
+| 🚨 **Trạng thái review** | 🟡 **1/55 đã được `Approved`** — **`ADDR-004`** (duyệt 17/10/2026) · 🔴 **54/55 vẫn `Draft`**. Đây là **cổng thật** của A.5, xem ghi chú dưới |
 
 | GĐ | SL | Mã tài liệu |
 |---|---|---|

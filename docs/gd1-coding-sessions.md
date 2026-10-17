@@ -13,7 +13,7 @@
 |---|---|---|
 | 1 | **Mỗi phiên phải kết thúc bằng cổng XANH, và cổng rất đắt** | `tools\kiem-tat-ca.ps1 -DayDu` = **8 bước · ~145–155 giây** (② build + kiểm mốc · ③ **1181** unit · ④ **38** integration · ⑤ mermaid · ⑥ **21** bất biến DB · ⑦ **22** ca test cổng — 17 gốc + 5 ca `R`…`V` mới · ⑧ **59** ca E2E). 📌 Một phiên ôm 3 feature ⇒ cổng đỏ ở đâu **không biết quy cho feature nào** |
 | 2 | **Mỗi tài liệu thiết kế là một "cửa vào" rất lớn** | 19 tài liệu GĐ1, **~100–240 KB/tài liệu** (lớn nhất `inv-001` 2.843 dòng, `web-001` 3.538 dòng). 📌 Một phiên đọc **1–2** tài liệu + code + tự kiểm là **vừa hết ngân sách ngữ cảnh**; đọc 4 tài liệu là **chắc chắn quên chi tiết** — và quên chi tiết ở đây là **sai bất biến** |
-| 3 | **Có 6 quyết định CHẶN chưa có câu trả lời** (§3) | 🔑 Nếu gộp vào phiên code, phiên đó **dừng giữa đường** hoặc tệ hơn: **tự chọn** một đáp án rồi code 2.000 dòng theo nó. 📌 Tách `S0` (chỉ chốt quyết định, **0 dòng code**) là cách rẻ nhất để không lặp lại lỗi "nói quá" của phiên trước |
+| 3 | **Có 6 quyết định CHẶN** — 🔑 **2 đã chốt 17/10/2026** (`Q1` VNPay, `Q2` `ADDR-004`), 4 còn lại (§3) | 🔑 Nếu gộp vào phiên code, phiên đó **dừng giữa đường** hoặc tệ hơn: **tự chọn** một đáp án rồi code 2.000 dòng theo nó. 📌 Tách `S0` (chỉ chốt quyết định, **0 dòng code**) là cách rẻ nhất để không lặp lại lỗi "nói quá" của phiên trước |
 
 **Quy mô hiện tại (đo 17/10/2026):** **292 tệp · ~39.800 dòng** code sản phẩm · **89 tệp · ~17.900 dòng** test ·
 **36 migration**. ⇒ Đây không phải dự án nhỏ; GĐ1 còn lại **không** gói vừa một phiên.
@@ -66,8 +66,8 @@
 
 | # | Câu hỏi | Ai trả lời | Chặn việc gì | Nếu không trả lời thì sao |
 |---|---|---|---|---|
-| Q1 | **Credential sandbox VNPay** (`TmnCode`, `HashSecret` — hiện **rỗng** trong `src/eCommerce.HttpApi.Host/appsettings.json`) | bạn / kế toán | **Kiểm chứng tiền thật** của `PAY-001` + `SAL-006` | Code được nhưng **không được coi là xong**: đúng cái nợ cũ, và lặp lại lỗi "nói quá" |
-| Q2 | **Sổ địa chỉ: duyệt `ADDR-004`** rồi code? | kiến trúc trưởng + BA | `S1`, `S2`, và **bản xuất PII có "giao tới đâu"** | Vẫn chặn `CUS-001` — nợ đã treo **từ GĐ0** |
+| Q1 | **Credential sandbox VNPay** | chủ dự án | ✅ **ĐÃ CHỐT 17/10/2026** | ✅ **KHÔNG còn chặn `S4`/`S5`**: VNPay cho **tự đăng ký merchant test** ([devreg](https://sandbox.vnpayment.vn/devreg/), **5–10 phút**, không cần hợp đồng) — và bypass hợp lệ bằng **`FakePaymentProvider`** (chữ ký HMAC **vẫn thật**). 📄 Thiết kế: [`PAY-001` §7.7](features/payment/pay-001-cong-thanh-toan-vnpay.md). ⚠️ Chỉ `DoD-tiền-thật` cần credential + tunnel |
+| Q2 | **Sổ địa chỉ: duyệt `ADDR-004`** | chủ dự án | ✅ **ĐÃ DUYỆT 17/10/2026** — [`ADDR-004` v1.0](features/address/addr-004-so-dia-chi-khach.md), **10/10 câu hỏi đã chốt** | ✅ **`S1`/`S2` MỞ KHOÁ**. 📌 6 dòng đồng bộ tài liệu còn lại (§15.3 #9/#11/#12) + code/test (#15–#18) **là điều kiện của `S1`** |
 | Q3 | **Giỏ hàng: entity `Cart`/`CartItem` hay giỏ-cookie?** | bạn | `SAL-001` đóng hay không | Tài liệu thiết kế `Cart` + `CartToken` (`eCommerce:Sales:0013`) nhưng code dùng **cookie** trong `DatHangController` ⇒ **hai nguồn sự thật** |
 | Q4 | **`DonVi` hạn mức theo TỪNG DÒNG** (`Percent`/`Absolute`) | bạn | `INV-003` phần cuối | Hiện **dùng chung một `DonVi`**; `Percent` tính trên từng `(kho, SKU)` — có thể **sai nghiệp vụ** |
 | Q5 | **Ai xác nhận lệch đối soát** (`RequireConfirmation`) | kế toán | `REC-001` quy trình xử lý lệch | Job phát hiện lệch nhưng **không có đường đóng** ⇒ cảnh báo tồn đọng |

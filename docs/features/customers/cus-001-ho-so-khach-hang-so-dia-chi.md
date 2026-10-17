@@ -1216,7 +1216,7 @@ phép tiêm đã xảy ra** (`ham-tiem.ps1`) ⇒ 📌 nhờ vậy tôi **không*
 **2** | **Chưa có XOÁ dữ liệu** (quyền được xoá) | ⚠️ Luật cũng có quyền này. 📌 Xoá khó hơn xuất: **sổ cái append-only** và **chứng từ kế toán** có nghĩa vụ lưu ⇒ 🔒 cần **thiết kế** (xoá gì, giữ gì, ẩn danh hoá ra sao), **không** thể làm vội |
 **3** | **Bản xuất chưa gồm dữ liệu từ MODULE KHÁC** | 🚨 Chưa gồm **đơn hàng**, **địa chỉ giao**, **lịch sử thanh toán** — 🔑 mà đó là **phần lớn** dữ liệu cá nhân thật. 📌 Nợ **lớn** đã ghi |
 **4** | **Chưa có bản ghi kiểm toán RIÊNG cho mỗi lần xuất** | ⚠️ Hiện chỉ có **dòng log** (`Warning`). 🔑 *"ai đã xuất dữ liệu của tôi"* là câu hỏi luật ⇒ 📌 nên là **bảng** (tra được), không phải **log** (đọc bằng mắt) |
-**5** | **Chưa có sổ địa chỉ** (`CUS-001`) | Entity `Address` **không tồn tại** — **nợ chặn** |
+**5** | **Chưa có sổ địa chỉ** (`CUS-001`) | Entity `Address` **chưa có trong code**, nhưng 🟢 **đã có thiết kế + đã duyệt**: [`ADDR-004`](../address/addr-004-so-dia-chi-khach.md) (17/10/2026) ⇒ nợ chặn đã **có quyết định**, còn **code** là việc `S1`/`S2` |
 
 ### 20.8 Lịch sử thay đổi (bổ sung)
 
@@ -1455,7 +1455,7 @@ diện** của `IsDeleted`/`DeletionTime`/`DeleterId`. 🔑 Cách này không qu
 **3** | **`LyDo` chưa được điền từ UI** | ⚠️ Luôn `null` hiện tại ⇒ 📌 *"vì sao xuất"* chưa trả lời được |
 **4** | 🚨 **Bảng KHÔNG nằm trong `kiem-db.ps1`** | 🔒 **Cố ý** (đây là **dữ liệu thật**, không phải bảng phải-rỗng) — ⚠️ nhưng nghĩa là **không có cổng** nào kiểm nó **tăng đúng** khi xuất |
 **5** | **Chưa có chính sách LƯU TRỮ** (bao lâu thì xóa nhật ký) | 📌 Luật yêu cầu **giới hạn thời gian lưu** — ⚠️ nhưng xóa nhật ký kiểm toán lại **mâu thuẫn** với mục đích của nó ⇒ 🔒 cần **thiết kế**, không thể làm vội |
-**6** | **Chưa gồm dữ liệu module khác** (địa chỉ giao, thanh toán, thuế) | ⚠️ Vẫn là **nợ chặn** (`Address` chưa tồn tại) |
+**6** | **Chưa gồm dữ liệu module khác** (địa chỉ giao, thanh toán, thuế) | ⚠️ Vẫn là **nợ** nhưng **không còn bị chặn về thiết kế**: địa chỉ giao nay có `ADDR-004` (🟢 Approved 17/10/2026); thanh toán xem `PAY-001`; thuế xem `XC-006` |
 
 ### 22.7 Lịch sử thay đổi (bổ sung)
 

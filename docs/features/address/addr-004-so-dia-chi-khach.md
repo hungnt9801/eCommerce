@@ -6,9 +6,9 @@
 | **Module** | **AddressHub** — thư mục **thật** trong repo là `modules/Address/` (namespace `eCommerce.Address`) ⇒ sở hữu entity `Address` (bảng `AddrAddresses`). **Customers** (`modules/Customers/`) sở hữu bảng liên kết `CustomerAddressLink` (bảng `CusAddressLinks`). ⚠️ `modules/AddressHub/` **không tồn tại** — tên trong tài liệu cũ (`implementation-plan.md:128`, `addr-003` ADR-09) là **tên kế hoạch**, không phải tên thư mục thật. |
 | **Giai đoạn** | **GĐ0** (tài liệu + entity `Address`) → **GĐ1** (bảng liên kết, khi module `Customers` đã có). Căn cứ: `docs/implementation-plan.md:396` xếp `ADDR-004` vào khối **GĐ0 — Pháp lý**; `docs/implementation-plan.md:181` xếp `CustomerAddressLink` vào `Customers` (GĐ1). |
 | **Ưu tiên** | **Must have** — 🚨 **nợ CHẶN số 1** của dự án: `docs/handover/BAN-GIAO-GD1-2026-10-17.md:73` (*"entity `Address` KHÔNG TỒN TẠI"*) và `:216` (việc #1 *"Quyết định về sổ địa chỉ"*). |
-| **Trạng thái** | 🟡 `Draft` — chờ review · 🚧 **0 dòng code của feature này** (đã kiểm: `modules/Address` chỉ có `AdministrativeUnit` + `CarrierAddressMapping`; **không** có `Address`, **không** có `CustomerAddressLink`). |
-| **Người viết / người review** | agent (phiên 17/10/2026) / Kiến trúc trưởng + BA + Pháp chế dữ liệu cá nhân |
-| **Phiên bản / ngày** | v0.1 — 17/10/2026 |
+| **Trạng thái** | 🟢 **`Approved`** — duyệt **17/10/2026** · 🚧 **0 dòng code** (code là việc **`S1`/`S2`** của `docs/gd1-coding-sessions.md`) · ✅ **10/10 câu hỏi mở đã chốt** (§15.1) |
+| **Người viết / người review** | agent (phiên 17/10/2026) / ✅ **chủ dự án (duyệt 17/10/2026)** — phê duyệt kèm 10 quyết định ở §15.1 |
+| **Phiên bản / ngày** | **v1.0 — 17/10/2026** (duyệt + chốt Q1…Q10; trước: v0.1) |
 | **Tài liệu liên quan** | `ADDR-001` (tra cứu ĐVHC 2 cấp/3 cấp — `docs/features/address/addr-001-tra-cuu-don-vi-hanh-chinh-2-cap.md`) · `ADDR-002` (mã địa chỉ theo hãng vận chuyển — `docs/features/address/addr-002-dong-bo-ma-dia-chi-theo-hang-van-chuyen.md`) · `ADDR-003` (chuẩn hoá 3 cấp ↔ 2 cấp — `docs/features/address/addr-003-chuan-hoa-dia-chi-3-cap-2-cap.md`) · `CUS-001` (hồ sơ khách — `docs/features/customers/cus-001-ho-so-khach-hang-so-dia-chi.md`) · `SAL-002` (checkout — `docs/features/sales/sal-002-checkout-va-dat-hang.md`) · **`XC-002`** (outbox/inbox + chống trùng) · **`XC-003`** (khoá phân tán) · **`XC-004`** (xác thực/phân quyền/tenant) · **`XC-005`** (observability) · `docs/implementation-plan.md` §6.1, §7.0, §7.1, Phụ lục A.3 · `docs/structure-and-techstack.md` · `docs/design-doc-guidelines.md` §5 |
 
 > 📌 **Quy ước mã trong tài liệu này:** `ADR-nn` (quyết định) · `BR-ADDR-004-0nn` (quy tắc nghiệp vụ) ·
@@ -940,31 +940,31 @@ public class AddressBookTests : eCommerceTestBase<eCommerceEntityFrameworkCoreTe
 
 ### 14.4 Definition of Ready (trước khi bắt đầu code)
 
-- [ ] Tài liệu đã **review và Approved**
-- [ ] Mọi **câu hỏi mở (§15.1)** đã trả lời — tối thiểu **Q1, Q2, Q4, Q9**
-- [ ] Không còn phụ thuộc quyết định chưa chốt (đặc biệt: **có/không** dùng value object `Address` ở Kernel — ADR-02 đã chốt **KHÔNG**)
-- [ ] **Đã chứng minh biên dịch** type `Address` trong namespace `eCommerce.Address` (ADR-14) — 🚨 **chưa kiểm chứng**
-- [ ] `BR`/`NFR` đã có mã và kiểm chứng được
-- [ ] Đã sửa xong các dòng tài liệu ở §15.3 (hoặc có PR riêng đang mở)
+- [x] Tài liệu đã **review và Approved** — ✅ **17/10/2026**
+- [x] Mọi **câu hỏi mở (§15.1)** đã trả lời — ✅ **10/10** (`Q1`…`Q10`)
+- [x] Không còn phụ thuộc quyết định chưa chốt — ✅ ADR-02 chốt **KHÔNG** value object ở Kernel; ADR-01 chốt `Address` thuộc module `Address`
+- [x] **Biên dịch** type `Address` trong namespace `eCommerce.Address` (ADR-14) — ✅ **chứng minh bằng TIỀN LỆ trong repo**: `eCommerce.Orders.Order` (`src/eCommerce.Domain/Entities/Orders/MarketplaceOrderIntake.cs:18`). ⚠️ Vẫn kiểm lại bằng **build đầu tiên của `S1`**; **fallback** đã định nghĩa: đổi tên lớp → `PostalAddress`, **giữ bảng** `AddrAddresses` ⇒ 0 ảnh hưởng migration (Q10)
+- [x] `BR`/`NFR` đã có mã và kiểm chứng được — 16 BR · 11 NFR
+- [~] Đã sửa xong các dòng tài liệu ở §15.3 — ✅ **10/18 đã sửa**; ⏳ **#9, #11, #12** = điều kiện `S1` · **#15–#18** = code/test của `S1` · **#14** cố ý giữ (ảnh chụp handover). Xem ghi chú đầu §15.3
 
 ---
 
 ## 15. Câu hỏi mở, giả định & lịch sử thay đổi
 
-### 15.1 Câu hỏi mở
+### 15.1 Câu hỏi mở — ✅ ĐÃ CHỐT TOÀN BỘ 17/10/2026
 
-| # | Câu hỏi | Cần ai trả lời | Trạng thái | Ảnh hưởng nếu chưa trả lời |
+| # | Câu hỏi | Cần ai trả lời | Trạng thái | Quyết định (17/10/2026) |
 |---|---|---|---|---|
-| **Q1** | Trần **20** địa chỉ/khách có đúng nghiệp vụ? (khách doanh nghiệp có thể cần 50 kho/giao điểm) | **BA** | ⬜ `Open` | Đặt sai ⇒ khách doanh nghiệp **không dùng được** sổ; sửa sau là **thay đổi cấu hình**, không phải migration ⇒ **rủi ro thấp**, nhưng UI phải biết |
-| **Q2** | Có cần lưu **họ tên + SĐT người nhận theo từng địa chỉ** (giao cho người khác tại cùng địa chỉ)? | **BA** + **Pháp chế dữ liệu cá nhân** | ⬜ `Open` | Nếu CÓ ⇒ thêm cột vào **bảng liên kết** (không vào `Address` — ADR-03); nếu KHÔNG ⇒ ghi rõ để không ai tự thêm |
-| **Q3** | Ai được quyền **`eCommerce.Addresses.Verify`**? (vận hành? CSKH trưởng?) | **BA** | ⬜ `Open` | Cấp quá rộng ⇒ `DaXacMinh` mất nghĩa (mọi người tự xác minh); quá hẹp ⇒ hàng đợi **không ai xử lý** |
-| **Q4** | Khi chủ thể yêu cầu **xoá dữ liệu**, `Address` **dùng chung** với khách khác thì xử lý sao? | **Pháp chế dữ liệu cá nhân** | ⬜ `Open` | 🔒 Đây là **điểm nghẽn pháp lý** của cả `ADR-03` và ADR-11. Luật **91/2025/QH15** Điều 4 cho quyền *"yêu cầu xóa"* — nhưng xoá một bản ghi **dùng chung** sẽ **phá dữ liệu của người khác** |
-| **Q5** | Khử trùng lặp theo **nội dung** có được chấp nhận về mặt nghiệp vụ? (hai khách cùng toà nhà ⇒ **một** bản ghi) | **BA** + **Kiến trúc trưởng** | ⬜ `Open` | Nếu KHÔNG ⇒ bỏ ADR-04, phải dùng `Idempotency-Key`, và **mất** tính chất *"cùng địa chỉ ⇒ cùng `Id`"* (ảnh hưởng báo cáo "giao bao nhiêu điểm") |
-| **Q6** | `Order` **có** cần cột `ShippingAddressSnapshot` (text) — và ai làm? | **BA** + dev `SAL-002` | ⬜ `Open` (nợ `SAL-002`) | 🚨 Nếu không có ⇒ **đơn đã giao không có địa chỉ lịch sử**; `ADDR-004` **không** tự thêm cột vào `Order` (§0) |
-| **Q7** | Có bán cho khách **nước ngoài** (địa chỉ ngoài VN)? | **BA** | ⬜ `Open` (kéo `ADDR-003` **Q3**) | Nếu CÓ ⇒ `TinhCode`/`XaCode` phải nullable **ở mọi trạng thái** + thêm `CountryCode` ⇒ **sửa mô hình TRƯỚC migration** |
-| **Q8** | `AddressHub` có tách thành **service riêng** trong GĐ2? | **Kiến trúc trưởng** | ⬜ `Open` | Nếu CÓ ⇒ mất tính *"cùng transaction"* (§12) ⇒ **phải** đổi sang saga/bù trừ; chi phí **lớn** ⇒ cần biết **trước** khi viết `IAddressDirectory` |
-| **Q9** | 🚨 Hàng đợi chuẩn hoá nằm ở **`Address.TrangThai`** (tài liệu này) hay ở bảng **`AddrNormalizationReviews`** (`ADDR-003` §5.2, ADR-05)? | **Kiến trúc trưởng** | ⬜ `Open` | 🔒 **Hai nguồn sự thật** cho *"địa chỉ nào cần xem lại"* — đúng loại lỗi tài liệu này được viết ra để chặn. **Phải chốt trước khi code** |
-| **Q10** | Chấp nhận tên lớp `Address` trong namespace `eCommerce.Address` (cần alias) hay đổi tên? | **Kiến trúc trưởng** | ⬜ `Open` | Nếu C# **từ chối** (⚠️ **chưa kiểm chứng**) ⇒ phải đổi tên **trước** khi viết 20 tệp |
+| **Q1** | Trần **20** địa chỉ/khách có đúng nghiệp vụ? | **BA** | ✅ `Closed` | **Cấu hình, không phải hằng số**: `Addresses:MaxPerCustomer`, **mặc định 20**. Đổi trần = đổi setting, **không** migration. ⇒ rủi ro **thấp**, BA đổi được mà không cần dev |
+| **Q2** | Có cần **họ tên + SĐT người nhận theo từng địa chỉ**? | **BA** + **Pháp chế** | ✅ `Closed` — **CÓ** | Thêm **2 cột nullable** `NguoiNhanTen` + `NguoiNhanDienThoai` vào **bảng liên kết** `CusAddressLinks` (**không** vào `Address` — ADR-03), và thêm **ngay trong migration đầu** để **khỏi** migration thứ hai. 🔒 Hai cột này là **dữ liệu cá nhân** ⇒ **bắt buộc** có trong bản xuất PII và bị gọt khi xoá liên kết |
+| **Q3** | Ai được quyền **`eCommerce.Addresses.Verify`**? | **BA** | ✅ `Closed` | **Quản trị tenant** giữ `Verify`; **CSKH chỉ `Manage`** (không tự xác minh). Lý do: `DaXacMinh` là **kết luận địa chỉ đúng** — nếu ai cũng làm được thì trường này **mất nghĩa** |
+| **Q4** | Chủ thể yêu cầu **xoá dữ liệu** thì `Address` **dùng chung** xử lý sao? | **Pháp chế** | ✅ `Closed` (có điều kiện) | **Xoá = xoá LIÊN KẾT** (`CusAddressLinks` → xoá mềm + `AnonymizedAtUtc`), **không** xoá `Address` dùng chung. 🔑 Căn cứ: `Address` **không chứa dữ liệu định danh** (tên/SĐT người nhận nằm ở **bảng liên kết** — Q2) ⇒ xoá liên kết **không** phá dữ liệu của khách khác. `Address` **riêng của một khách** (không dùng chung) thì xoá mềm. ⚠️ **Rủi ro tồn dư:** cách diễn giải này **phải được pháp chế xác nhận** trước khi mở cổng khách tự phục vụ |
+| **Q5** | **Khử trùng lặp theo nội dung** có được chấp nhận? | **BA** + **Kiến trúc trưởng** | ✅ `Closed` — **ĐỒNG Ý** (ADR-04) | Hai khách cùng một toà nhà ⇒ **một** bản ghi `Address`. 🔑 **An toàn vì** `Address` **không** mang dữ liệu định danh (Q2 ở bảng liên kết) ⇒ dùng chung **không** làm lộ thông tin của nhau. Giữ được tính *"cùng địa chỉ ⇒ cùng `Id`"* cho báo cáo điểm giao |
+| **Q6** | `Order` có cần cột `ShippingAddressSnapshot`? | **BA** + dev `SAL-002` | ✅ `Closed` — **CÓ**, thuộc **`SAL-002`** | `ADDR-004` **cấp** `DiaChiSnapshotDto`; `SAL-002` **phải** thêm cột snapshot trên `Order` **trước khi bán thật** (`Order.cs:10-62` hiện **0** trường địa chỉ — F9). 🚨 Điều kiện vào GĐ1: đơn đã giao **phải** có địa chỉ lịch sử |
+| **Q7** | Có bán cho khách **nước ngoài**? | **BA** | ✅ `Closed` — GĐ1 **KHÔNG** | Nhưng **mở đường với chi phí ~0 ngay từ migration đầu**: `TinhCode`/`XaCode` **nullable ở mọi trạng thái** + thêm `CountryCode` (mặc định `VN`). ⇒ nếu sau này bán quốc tế thì **không** phải migrate đau |
+| **Q8** | `AddressHub` có tách **service riêng** trong GĐ2? | **Kiến trúc trưởng** | ✅ `Closed` — GĐ1 **KHÔNG** | `IAddressDirectory` được thiết kế **không lộ chi tiết transaction** ⇒ nếu tách sau thì **chỉ đổi implementation**, không đổi nơi gọi. ⚠️ Nếu tách **trong GĐ1** ⇒ mất *"cùng transaction"* (§12) ⇒ phải chuyển sang saga/bù trừ — **chi phí lớn**, không làm bây giờ |
+| **Q9** | 🚨 Hàng đợi chuẩn hoá ở **`Address.TrangThai`** hay bảng **`AddrNormalizationReviews`** (`ADDR-003` §5.2)? | **Kiến trúc trưởng** | ✅ `Closed` — **`Address.TrangThai`** | **MỘT nguồn sự thật.** `ADDR-003` §5.2 **phải** bỏ bảng `AddrNormalizationReviews` (hoặc ghi rõ là *"phương án bị loại"*) — xem §15.3 #13. 🔑 Hai bảng cho *"địa chỉ nào cần xem lại"* **chính là** lỗi mà tài liệu này sinh ra để chặn |
+| **Q10** | Tên lớp `Address` trong namespace `eCommerce.Address` — giữ hay đổi? | **Kiến trúc trưởng** | ✅ `Closed` — **GIỮ** `Address` | **Tiền lệ ĐÃ biên dịch trong chính repo**: `eCommerce.Orders.Order` (`src/eCommerce.Domain/Entities/Orders/MarketplaceOrderIntake.cs:18` — `namespace eCommerce.Orders;` + lớp `Order` trong `Order.cs`) ⇒ cùng dạng *"namespace trùng tên thực thể"* đang chạy. 📌 **Fallback rẻ nếu build đỏ:** đổi **tên lớp** → `PostalAddress`, **giữ nguyên** bảng `AddrAddresses` ⇒ **không** ảnh hưởng migration, **không** ảnh hưởng DB. ✅ **Kiểm bằng bước build ĐẦU TIÊN của `S1`** (5 giây), không phải bằng suy đoán |
 
 ### 15.2 🚨 Sai lệch, rủi ro & khoảng trống phát hiện được **từ code thật**
 
@@ -982,6 +982,12 @@ public class AddressBookTests : eCommerceTestBase<eCommerceEntityFrameworkCoreTe
 | **F10** | **`addr-001` §15.2 F1 nói module "hoàn toàn CHƯA TỒN TẠI"** — **đã lỗi thời**: `modules/Address` **có** code + **có** test (`test/eCommerce.Tests/Address/AdministrativeUnitTests.cs`) + **có** migration (`20261013093715_Add_Address_AdministrativeUnits.cs`, `20261014042922_Add_Addr002_CarrierMappings.cs`) | `.../addr-001-...md:758` **vs** danh sách tệp `modules/Address/**` + `src/eCommerce.EntityFrameworkCore/Migrations/` | 🟡 **Thấp** (nhưng gây **kết luận sai** cho phiên sau) | ⬜ Sửa `addr-001` §15.2 F1 (§15.3 #10) |
 
 ### 15.3 🚨 Hệ quả lên tài liệu khác — **sửa dòng nào** (làm **cùng** PR với code)
+> 📌 **TRẠNG THÁI 17/10/2026 (sau khi duyệt) — đo lại, không suy đoán:**
+> ✅ **ĐÃ SỬA (10/18):** **#1, #2, #3, #4, #5** (`implementation-plan.md`) · **#6, #7** (`addr-003`) · **#8, #10** (`addr-001`) · **#13** (`cus-001`).
+> ⏳ **CÒN LẠI (8/18)** — và **phân loại rõ**, vì chúng **không** cùng loại:
+> • **#9, #11, #12** — *đồng bộ nội dung tài liệu khác* (viết lại **bảng schema 5→2** ở `addr-001` §5.2/§11; căn lại **bảng mã lỗi** và **danh sách permission** ở `cus-001`) ⇒ **điều kiện của `S1`**, 📌 **không** chặn duyệt vì không đổi thiết kế.
+> • **#14** — cập nhật `docs/handover/BAN-GIAO-GD1-2026-10-17.md`: 📌 **cố ý KHÔNG sửa** — đó là **ảnh chụp có ngày** của phiên trước; sửa nó là **viết lại lịch sử**. Sẽ cập nhật ở **bàn giao kế tiếp**.
+> • **#15, #16** (`PostgreSqlSchemaTests`: 48→**51** + 3 tên index) và **#17, #18** (`kiem-db.ps1`; 2 `DbSet`) — 🚨 **đây là CODE/TEST, không phải tài liệu** ⇒ **bắt buộc cùng PR của `S1`**. Nếu tách ra thì cổng xanh **giả** (một index hỏng + một index mới **bù** nhau — đúng lý do đã ghi ở `:172-175`).
 
 | # | Tệp : dòng | Phải sửa thành | Vì sao **bắt buộc** |
 |---|---|---|---|
@@ -1021,3 +1027,4 @@ public class AddressBookTests : eCommerceTestBase<eCommerceEntityFrameworkCoreTe
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.1 | 17/10/2026 | agent (phiên 17/10/2026) | Bản nháp đầu — lập **từ code thật** + 6 tài liệu liên quan: **14 ADR** · **16 BR** · **11 NFR** · **28 ca test** (mã `TC-01`…`TC-24`, gồm `TC-02b/02c/04b/06b`) · **2 bảng dữ liệu**. 🔑 **Chốt mâu thuẫn trung tâm**: `Address` **thuộc `AddressHub`** (ADR-01), `Customers` giữ `CustomerAddressLink`; **loại bỏ** phương án `Address` ở `Customers` (`implementation-plan.md:181`) và phương án **value object `Address` ở `eCommerce.Kernel`** (`implementation-plan.md:164`, `addr-003` ADR-08). 🚨 **Mười sai lệch phát hiện được (F1–F10)**, trong đó **hai lỗi có thể gây 403/500 toàn hệ thống**: ① `cus-001` §9 liệt kê **9 permission không tồn tại** (F7) — gõ đúng theo tài liệu là **403 cho mọi người**; ② `AdministrativeUnitAppService` có `[Authorize]` nhưng **không** permission (F8) — mẫu sai dễ bị chép. ➕ **Ba điểm im lặng được chặn bằng DB**: ① `(TenantId, ContentHash)` duy nhất; ② **partial unique index** cho *"một mặc định"*; ③ **CHECK** *"đã chuẩn hoá ⇒ BẮT BUỘC có mã + `NormalizedAtUtc`"* — biến **fail-closed** thành **hàng rào DB** thay vì quy ước. ➕ **Số unique index 48 → 51** và chỉ rõ **4 chỗ** phải sửa trong `PostgreSqlSchemaTests` (§11, §15.3 #15-16). ⚠️ **Chưa kiểm chứng**: ① biên dịch type `Address` trong namespace `eCommerce.Address` (ADR-14, Q10); ② PostgreSQL kiểm unique index **ngay từng câu lệnh** khiến đặt-trước-đặt-sau thành `23505` (ADR-06, `TC-06b`); ③ mọi ngưỡng hiệu năng (NFR-01/02) — **chưa có code**. |
+| **v1.0** | **17/10/2026** | chủ dự án duyệt | 🟢 **APPROVED.** Chốt **10/10 câu hỏi mở** (§15.1): trần địa chỉ thành **cấu hình** · thêm **người nhận** vào bảng liên kết · Verify thuộc quản trị tenant · **xoá = xoá liên kết** (không xoá địa chỉ dùng chung) · chấp nhận **khử trùng theo nội dung** · snapshot địa chỉ là việc của **SAL-002** · CountryCode + mã nullable **ngay từ migration đầu** · **không** tách service trong GĐ1 · hàng đợi chuẩn hoá ở **Address.TrangThai** · **giữ** tên lớp Address (tiền lệ Commerce.Orders.Order). ✅ Tick **Definition of Ready** (§14.4). 📌 Việc còn lại: **6 dòng đồng bộ tài liệu** (§15.3 #9/#11/#12/#14–#16) → điều kiện của S1. |

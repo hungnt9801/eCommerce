@@ -10,7 +10,7 @@
 | Tài liệu thiết kế | **55** (khớp danh sách `implementation-plan.md` Phụ lục A.3) |
 | Tệp khác trong cây | **1** — [`XC-006-phieu-hoi-ke-toan.md`](cross-cutting/XC-006-phieu-hoi-ke-toan.md) là **phiếu hỏi kế toán**, không phải tài liệu thiết kế |
 | Đủ **16/16 mục** theo mẫu | ✅ **55/55** |
-| 🚨 **Đã được con người `Approved`** | 🔴 **0/55** — xem §"Trạng thái thật" bên dưới |
+| 🚨 **Đã được con người `Approved`** | 🟡 **1/55** (`ADDR-004`, 17/10/2026) — xem §"Trạng thái thật" bên dưới |
 
 ---
 
@@ -43,7 +43,7 @@ xanh, và ca chống dương tính giả).
 | Sự thật | Bằng chứng |
 |---|---|
 | Cả **55** tài liệu đã **có tệp**, đủ 16/16 mục | đo bằng `grep '^## N\.'` cho N=0..15 |
-| 🔴 **0** tài liệu đã được **con người review** — mọi tệp vẫn `Draft` | đọc dòng `**Trạng thái**` của từng tệp |
+| 🟡 **1/55** tài liệu đã được **con người duyệt** — `ADDR-004` (17/10/2026); **54** tệp vẫn `Draft` | đọc dòng `**Trạng thái**` của từng tệp |
 | Vì vậy **cổng Definition of Ready** của `implementation-plan.md` §A.5 **CHƯA đạt** | §A.5: *"toàn bộ tài liệu của giai đoạn đó đã Approved"* |
 
 🔑 **Hệ quả cần nói thẳng:** về **số lượng tệp** thì giai đoạn tài liệu đã xong, nhưng về **cổng chất lượng**
@@ -112,7 +112,7 @@ Trước phiên này danh sách là **52**; đối chiếu **code thật** thì 
 | `ADDR-001` | [Tra cứu đơn vị hành chính 2 cấp (tỉnh + xã) và 3 cấp cũ](address/addr-001-tra-cuu-don-vi-hanh-chinh-2-cap.md) | 833 | 🟡 Draft · 16/16 mục |
 | `ADDR-002` | [Đồng bộ mã địa chỉ theo từng hãng vận chuyển](address/addr-002-dong-bo-ma-dia-chi-theo-hang-van-chuyen.md) | 928 | 🟡 Draft · 16/16 mục |
 | `ADDR-003` | [Chuẩn hoá địa chỉ khách hàng: convert 3 cấp ↔ 2 cấp, xử lý ca sáp nhập tỉnh](address/addr-003-chuan-hoa-dia-chi-3-cap-2-cap.md) | 1013 | 🟡 Draft · 16/16 mục |
-| `ADDR-004` | [Sổ địa chỉ khách: entity `Address` (AddressHub) + `CustomerAddressLink`](address/addr-004-so-dia-chi-khach.md) | 1023 | 🟡 Draft · 16/16 mục |
+| `ADDR-004` | [Sổ địa chỉ khách: entity `Address` (AddressHub) + `CustomerAddressLink`](address/addr-004-so-dia-chi-khach.md) | 1030 | 🟢 Approved · 16/16 mục |
 
 ### `catalog/` — Catalog — sản phẩm, biến thể, danh mục, media/SEO
 
