@@ -1,0 +1,150 @@
+# GĐ1 — CHIA PHIÊN CODING (viết 17/10/2026)
+
+> **Câu hỏi:** *"Giai đoạn 1 phần coding có cần chia thành nhiều session không?"*
+> **Trả lời: CÓ — 11 phiên** (`S0`…`S10`). Lý do ở §1, danh sách ở §4.
+> Đọc kèm: [`handover/BAN-GIAO-GD1-2026-10-17.md`](handover/BAN-GIAO-GD1-2026-10-17.md) ·
+> [`implementation-plan.md`](implementation-plan.md) §7 / Phụ lục A · [`features/README.md`](features/README.md).
+
+---
+
+## 1. Vì sao PHẢI chia — ba lý do ĐO ĐƯỢC, không phải khẩu vị
+
+| # | Lý do | Số đo |
+|---|---|---|
+| 1 | **Mỗi phiên phải kết thúc bằng cổng XANH, và cổng rất đắt** | `tools\kiem-tat-ca.ps1 -DayDu` = **8 bước · ~145–155 giây** (② build + kiểm mốc · ③ **1181** unit · ④ **38** integration · ⑤ mermaid · ⑥ **21** bất biến DB · ⑦ **22** ca test cổng — 17 gốc + 5 ca `R`…`V` mới · ⑧ **59** ca E2E). 📌 Một phiên ôm 3 feature ⇒ cổng đỏ ở đâu **không biết quy cho feature nào** |
+| 2 | **Mỗi tài liệu thiết kế là một "cửa vào" rất lớn** | 19 tài liệu GĐ1, **~100–240 KB/tài liệu** (lớn nhất `inv-001` 2.843 dòng, `web-001` 3.538 dòng). 📌 Một phiên đọc **1–2** tài liệu + code + tự kiểm là **vừa hết ngân sách ngữ cảnh**; đọc 4 tài liệu là **chắc chắn quên chi tiết** — và quên chi tiết ở đây là **sai bất biến** |
+| 3 | **Có 6 quyết định CHẶN chưa có câu trả lời** (§3) | 🔑 Nếu gộp vào phiên code, phiên đó **dừng giữa đường** hoặc tệ hơn: **tự chọn** một đáp án rồi code 2.000 dòng theo nó. 📌 Tách `S0` (chỉ chốt quyết định, **0 dòng code**) là cách rẻ nhất để không lặp lại lỗi "nói quá" của phiên trước |
+
+**Quy mô hiện tại (đo 17/10/2026):** **292 tệp · ~39.800 dòng** code sản phẩm · **89 tệp · ~17.900 dòng** test ·
+**36 migration**. ⇒ Đây không phải dự án nhỏ; GĐ1 còn lại **không** gói vừa một phiên.
+
+---
+
+## 2. Hiện trạng GĐ1 — đo lại, và **sửa con số đã trôi**
+
+🚨 **Bảng "⏳ CÒN" trong `implementation-plan.md` §7.1 đã LỖI THỜI** ở nhiều dòng. Đo lại bằng `grep`/`Test-Path`:
+
+| Hạng mục | Plan ghi "CÒN" | Đo được hôm nay | Kết luận |
+|---|---|---|---|
+| `CAT-003` media | *"0 dòng code"* | ✅ `ProductMedia` + `ProductChannelVisibilities` (**DbSet** `eCommerceDbContext.cs:43,50`) + **2 migration** (`20261016112214_Cat003_ProductMedia`, `20261016135724_Cat003_ProductChannelVisibility`) + `ProductMediaAppService` | ✅ **XONG** — không làm lại |
+| `CAT-003` slug/SEO | *"chưa tự sinh khi publish"* | ✅ migration `20261016070004_Cat003_ProductSlug_Unique` | 🟡 chỉ còn **quyết định** mở storefront công khai |
+| `SAL-005` watermark | *"handler CHƯA nối luật watermark"* | ✅ `ApDungWatermark` **có** trong `MarketplaceOrderIntakeHandler.cs` | ✅ **XONG** |
+| `WEB-001` menu/quyền | *"CÒN menu theo permission"* | ✅ `MenuViewComponent.cs` + `MenuRenderTests` (10 ca) | ✅ **XONG** |
+| `REC-001` `querydr` | *"đối soát thanh toán chưa làm"* | ✅ `PaymentReconciliationWorker.cs` **tồn tại** | ✅ **XONG** (còn API/UI lịch sử) |
+| `CUS-001` xuất PII | *"chưa xuất dữ liệu cá nhân"* | ✅ `CustomerDataExportLog` + `CsvNhatKy` | ✅ **XONG** |
+| `SAL-006` webhook/job | *"chưa có webhook controller, chưa có job querydr"* | ✅ worker có; còn phiếu RMA | 🟡 còn nhỏ |
+
+### 2.1 Việc THẬT SỰ còn lại của GĐ1 (có bằng chứng)
+
+| # | Việc | Bằng chứng "chưa có" | Cỡ |
+|---|---|---|---|
+| 1 | **`Address` (sổ địa chỉ)** | `grep 'class Address'` = **0 tệp**; `git log --all` = 0 ⇒ nợ CHẶN #1, nay có thiết kế [`ADDR-004`](features/address/addr-004-so-dia-chi-khach.md) | **LỚN** (2 phiên) |
+| 2 | **`CustomerAddressLink` + API + quyền** | chỉ là **comment** trong `Customer.cs`, chưa có entity/bảng | LỚN (chung `ADDR-004`) |
+| 3 | 🚨 **Cổng khách bị chặn KHÔNG được gọi** | `ChoPhepGiaoDichAsync` **định nghĩa 1 nơi, gọi 0 nơi** (chỉ 3 tệp: khai báo + DTO + comment) ⇒ **khách `Blocked` VẪN đặt được hàng** | NHỎ nhưng **là lỗi thật** |
+| 4 | **Đường TẠO giao dịch thanh toán** | `new PaymentTransaction` chỉ có trong **test** (3 tệp, 0 tệp sản phẩm) | LỚN |
+| 5 | **Endpoint IPN/webhook** | `PaymentHub` **0 controller** (`[Route(` = 0) ⇒ VNPay gọi vào **không có cửa** | LỚN |
+| 6 | **Cầu nối `Order.PaymentStatus`** | `Order.cs` có trường; **không nơi nào** cập nhật từ thanh toán ⇒ *"đơn đã trả vẫn `Unpaid`"* | VỪA |
+| 7 | **ETO/outbox cho thanh toán** | `IHasEventOutbox` không có trong `PaymentHub` | VỪA |
+| 8 | **Sổ hoàn tiền + `CHECK`** | `RegisterRefund` có ở entity; **không** có bảng dòng hoàn tiền, **không** có `CHECK RefundedAmount <= Amount` | VỪA |
+| 9 | **DLQ + `SalMarketplaceEventLogs` (D7) + job `D12`** | `grep SalMarketplaceEventLogs` = **0** | VỪA |
+| 10 | **UI/API còn thiếu**: hạn mức kênh (Web), `/KhachHang` phân trang, lịch sử lượt quét đối soát | handover §7 việc #6 | NHỎ |
+| 11 | **Thanh toán trên UI** (checkout → cổng → kết quả) | `PaymentHub` không có controller; `/DatHang` chưa có bước thanh toán | VỪA |
+| 12 | **CI (`.github`)** | `Test-Path .github` = **False**; `git remote -v` = **0 dòng** | VỪA |
+| 13 | **Nợ nhỏ**: CSV `;` · 5/12 metric chưa có nơi phát · `CHN-002` supervisor `Timer.RunOnStart` · xác nhận outbox/relay | handover §7 việc #5,#7 · §8 | NHỎ |
+
+📌 **Ước lượng:** ~**8–12 phiên-la-động** (person-session) cho §2.1 — chưa tính GĐ2.
+
+### 2.2 KHÔNG thuộc GĐ1 (đừng gộp vào)
+
+`SHP-001…004` (vận chuyển) và `PRO-001…002` (khuyến mãi) là **GĐ2**, và **0 dòng code**
+(`grep ShippingHub` = 0 · `grep eCommerce.Promotions` = 0). 🔑 Đây là **phần lớn nhất còn lại của dự án**
+(`handover` §3.2) ⇒ **một chuỗi phiên riêng**, không nhồi vào GĐ1.
+
+---
+
+## 3. Sáu quyết định CHẶN — phải trả lời ở `S0`
+
+| # | Câu hỏi | Ai trả lời | Chặn việc gì | Nếu không trả lời thì sao |
+|---|---|---|---|---|
+| Q1 | **Credential sandbox VNPay** (`TmnCode`, `HashSecret` — hiện **rỗng** trong `src/eCommerce.HttpApi.Host/appsettings.json`) | bạn / kế toán | **Kiểm chứng tiền thật** của `PAY-001` + `SAL-006` | Code được nhưng **không được coi là xong**: đúng cái nợ cũ, và lặp lại lỗi "nói quá" |
+| Q2 | **Sổ địa chỉ: duyệt `ADDR-004`** rồi code? | kiến trúc trưởng + BA | `S1`, `S2`, và **bản xuất PII có "giao tới đâu"** | Vẫn chặn `CUS-001` — nợ đã treo **từ GĐ0** |
+| Q3 | **Giỏ hàng: entity `Cart`/`CartItem` hay giỏ-cookie?** | bạn | `SAL-001` đóng hay không | Tài liệu thiết kế `Cart` + `CartToken` (`eCommerce:Sales:0013`) nhưng code dùng **cookie** trong `DatHangController` ⇒ **hai nguồn sự thật** |
+| Q4 | **`DonVi` hạn mức theo TỪNG DÒNG** (`Percent`/`Absolute`) | bạn | `INV-003` phần cuối | Hiện **dùng chung một `DonVi`**; `Percent` tính trên từng `(kho, SKU)` — có thể **sai nghiệp vụ** |
+| Q5 | **Ai xác nhận lệch đối soát** (`RequireConfirmation`) | kế toán | `REC-001` quy trình xử lý lệch | Job phát hiện lệch nhưng **không có đường đóng** ⇒ cảnh báo tồn đọng |
+| Q6 | **Mở storefront công khai?** (`/SanPham*` đang `[Authorize]` ⇒ `302` tới login) | bạn | `WEB-002` SEO | SEO **không phát huy** dù slug/sitemap đã xong |
+
+➕ **Q7 (không chặn nhưng nên chốt):** nơi đặt repo từ xa — `git remote -v` **trống** ⇒ **không tạo được**
+`.github/workflows` có ý nghĩa (xem `XC-007` **Q1**).
+
+---
+
+## 4. CHIA PHIÊN — 11 phiên
+
+**Luật của cách chia này** (mỗi luật ứng với một lần đã trả giá):
+
+1. 🔒 **Mỗi phiên kết thúc bằng `kiem-tat-ca.ps1 -DayDu` XANH.** Không mang cổng đỏ sang phiên sau.
+2. 🔒 **Migration + cập nhật con số unique index (48 → 49 → 51) trong CÙNG phiên** — `PostgreSqlSchemaTests` khoá con số này; quên là phiên sau mở màn bằng đỏ.
+3. 🔒 **Tài liệu trước, code sau** (quy tắc vàng): lệch ⇒ sửa tài liệu **trong cùng PR**.
+4. 🔒 **Mỗi phiên đo lại baseline trước khi sửa** — số trong tài liệu **trôi** (xem §2).
+
+| Phiên | Tên | Phạm vi (làm gì) | Cổng ra (Definition of Done) | Chặn bởi |
+|---|---|---|---|---|
+| **S0** | **Baseline + chốt quyết định** | ⛔ **0 dòng code.** Chạy `-DayDu` và **ghi lại số thật** (8 bước · unit/integration/E2E/DB · giây). Trả lời **Q1–Q6**. Chốt phiên nào làm trước | Có **một tệp baseline** với số đo + 6 câu trả lời | — |
+| **S1** | **`ADDR-004` phần A — entity `Address`** | `Address` trong `modules/Address` (+`ContentHash`, trạng thái chuẩn hoá) · **`DbSet`** · migration **`Addr004_Address`** + SQL thô `NULLS NOT DISTINCT` · **48 → 49** | Unit test cho bất biến `(TenantId, ContentHash)` · `kiem-db.ps1` **xanh** · `PostgreSqlSchemaTests` cập nhật | Q2 |
+| **S2** | **`ADDR-004` phần B — sổ địa chỉ của khách** | `CustomerAddressLink` (`CusAddressLinks`) · **partial unique** "một mặc định / `(CustomerId, AddressType)`" · đổi mặc định **trong MỘT transaction** (bỏ-trước-đặt-sau) · API + `IAddressDirectory` · **quyền `eCommerce.Addresses.*`** · ETO · **49 → 51** · **bản xuất PII thêm "giao tới đâu"** | E2E có ca *"hai luồng cùng đặt mặc định ⇒ chỉ 1 thắng"* · kiểm HTTP thật · cập nhật `ADDR-004` §16 | S1 |
+| **S3** | **`CUS-001` đóng lại** | 🚨 **Nối `ChoPhepGiaoDichAsync` vào đường bán hàng** (lỗi thật: khách `Blocked` vẫn đặt được) · `CustomerGroup` API + seed · phân trang `/KhachHang` · kiểm HTTP (mới đo route) | E2E **1 ca mới**: *"khách `Blocked` ⇒ KHÔNG tạo được đơn"* · gate xanh | S2 |
+| **S4** | **`PAY-001` phần A — đường TẠO + cầu nối** | Tạo `PaymentTransaction` từ checkout/xác nhận đơn · **`MerchantReference` ỔN ĐỊNH** (cấm `Guid.NewGuid()` mỗi lần) · cập nhật **`Order.PaymentStatus`** khi `Succeeded/Failed` · **ETO + outbox** | Integration: *"IPN gửi trùng ⇒ 1 giao dịch"* · đơn chuyển `Paid` · gate xanh | S0 |
+| **S5** | **`PAY-001` phần B — IPN/webhook + hoàn tiền** | Endpoint **IPN `[AllowAnonymous]`** + `HMAC-SHA512` · idempotency · 🚨 **vá F-PAY-1** (`VerifyWebhookAsync` không bỏ tham số rỗng ⇒ có thể **từ chối IPN THẬT**) · bảng dòng hoàn tiền + **`CHECK RefundedAmount <= Amount`** · 🚨 **vá F-PAY-7** (UoW cả lô ⇒ rollback mất bằng chứng) | E2E: IPN trùng · **sai chữ ký ⇒ 400** · hoàn vượt ⇒ **ném lỗi** · gate xanh | S4 |
+| **S6** | **`SAL-005` — DLQ + D7 + D12** | Bảng **DLQ** (`XC-002`) · `SalMarketplaceEventLogs` (**D7**) · worker **`D12`** đối soát để cờ `GapSuspected` **không tồn đọng** · connector trả **`update_time`** ⇒ `AggregateVersion` ≠ `null` | Integration: *"event lỗi ⇒ vào DLQ, không mất"* · job D12 chạy · gate xanh | S0 |
+| **S7** | **UI/API còn thiếu của Inventory + Reconciliation** | Màn hình **hạn mức kênh** (API đã có) · lọc theo kho · phân trang · **API/UI lịch sử lượt quét** đối soát · **retention** dòng lệch | E2E trên HTML thật · gate xanh | Q4 (chỉ phần `DonVi`), Q5 |
+| **S8** | **Thanh toán trên UI + đóng `WEB-002`** | `/DatHang` → tạo giao dịch → chuyển cổng → trang kết quả · chi tiết sản phẩm + SEO còn lại | E2E end-to-end tới trang kết quả (⚠️ tiền thật vẫn **chờ Q1**) | S5, Q6 |
+| **S9** | **`XC-007` — CI thật** | `.github/workflows` gọi `-DayDu` · **vá khả chuyển Linux P-01…P-06** (6 điểm Windows-only) · **build làm nóng** để vá **F2** (`-GhiNho` trả `exit 2` trên runner sạch ⇒ **CI đỏ ngày đầu**) · thêm cổng ⑨ `kiem-link-tai-lieu.ps1` · `commit package-lock.json` (**F4**) | Pipeline xanh **trên Linux** (⚠️ cần Q7) · `test-cong-kiem.ps1` xanh trên Linux | Q7 |
+| **S10** | **Đóng GĐ1** | Nợ nhỏ: CSV `;` · **5/12 metric** chưa có nơi phát · `CHN-002` `Timer.RunOnStart` · xác nhận outbox/relay · **chạy `-DayDu` cuối** + cập nhật bàn giao (⚠️ ghi đúng "còn gì", **không nói quá**) | `-DayDu` xanh với **số đo mới** · tệp bàn giao GĐ1→GĐ2 | S1–S9 |
+
+### 4.1 Thứ tự & phụ thuộc
+
+```
+S0 (quyết định) ──┬─► S1 ► S2 ► S3            ← nợ CHẶN #1, mở khoá PII
+                  ├─► S4 ► S5 ─────► S8        ← dòng tiền
+                  ├─► S6                       ← không mất event
+                  ├─► S7                       ← UI/API còn thiếu
+                  └─► S9 (cần Q7)
+                                     S1..S9 ──► S10
+```
+
+📌 **Có thể chạy song song** `S6` ‖ `S1` ‖ `S4` (khác tệp, khác bảng) — nhưng **KHÔNG** song song `S1`‖`S2`
+(cùng bảng `Addr*`) và **KHÔNG** song song hai phiên nào **cùng sửa một migration** (migration chồng nhau ⇒
+`PostgreSqlSchemaTests` + `schema.sql` đỏ, và **rất khó** biết phiên nào gây ra).
+
+---
+
+## 5. Hai việc PHẢI làm trong MỌI phiên (đừng để phiên sau gánh)
+
+| # | Việc | Vì sao |
+|---|---|---|
+| 1 | **Đo lại baseline trước khi sửa** (`-DayDu`, ghi số) | 🔑 Phiên trước **nói quá "GĐ1 hoàn thành"** đúng vì đã **không** đo lại; và §2 ở trên chứng minh **6 dòng "CÒN" đã lỗi thời** |
+| 2 | **Cập nhật tài liệu feature TRONG CÙNG phiên** (§16 "đã xong / còn lại") | Quy tắc vàng `design-doc-guidelines.md` §4: lệch ⇒ sửa tài liệu **trước**, cùng PR |
+
+➕ **Khi một phiên bị chặn bởi Q1–Q7:** ghi vào **§15.1 câu hỏi mở** của tài liệu feature và **đóng phiên**
+với gate xanh. 🚨 **Không** code tiếp bằng một giả định chưa chốt — đó chính là cách sinh ra "hai nguồn sự thật".
+
+---
+
+## 6. GĐ2 — chuỗi phiên RIÊNG (chưa lên lịch ở đây)
+
+| Nhóm | Tài liệu | Code hiện tại | Gợi ý chia |
+|---|---|---|---|
+| **Vận chuyển** | `SHP-001`…`SHP-004` | **0** | `SHP-001` (adapter GHN) → `SHP-002` (webhook) → `SHP-003` (COD) → `SHP-004` (GHTK) — **4 phiên**, mỗi phiên 1 adapter |
+| **Khuyến mãi** | `PRO-001`, `PRO-002` | **0** | `PRO-001` (voucher) → `PRO-002` (engine cây AND/OR + **guard bùng nổ tổ hợp**) — **2–3 phiên**; 📌 `PRO-002` **phức tạp nhất**, làm **sau** `PRO-001` |
+| **Điều kiện vào GĐ2** | — | — | 🔒 Tài liệu `SHP-*`/`PRO-*` phải **Approved** (`implementation-plan` §A.5); ⚠️ hiện **0/55 đã duyệt** |
+
+📌 **Trước khi mở GĐ2**, hai câu hỏi NCC vẫn treo và **chặn thiết kế**: GHTK **xác minh địa chỉ 2 cấp**
+(`SHP-004`, fail-closed) và GHN **đổi COD cần OTP** (`SHP-003`, phải có bước thủ công).
+
+---
+
+## 7. Lịch sử
+
+| Ngày | Thay đổi |
+|---|---|
+| 17/10/2026 | Bản đầu. Đo lại toàn bộ GĐ1 bằng `grep`/`Test-Path`: **6 dòng "CÒN" trong `implementation-plan.md` đã lỗi thời** (CAT-003 media, SAL-005 watermark, WEB-001 menu, REC-001 querydr, CUS-001 PII, SAL-006 webhook/job đã xong). Chia **11 phiên**; 6 quyết định chặn ở `S0` |
