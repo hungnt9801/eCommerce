@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>eCommerce.Address</RootNamespace>
+    <AssemblyName>eCommerce.Address.Application.Contracts</AssemblyName>
+  </PropertyGroup>
+
+  <!-- 🚨 `ADDR-004` **ADR-08** — `S2` (18/10/2026): project này tồn tại vì `Customers` **CẤM**
+       tham chiếu `eCommerce.Address.Application` (module → module Application là phụ thuộc NGƯỢC).
+       🔒 Vì vậy nó **KHÔNG** tham chiếu `eCommerce.Address.Domain`: hợp đồng chỉ dùng kiểu nguyên thuỷ
+       (string/int/bool/DateTime) ⇒ `Customers.Domain` không kéo theo domain của `Address`. -->
+  <ItemGroup>
+    <PackageReference Include="Volo.Abp.Ddd.Application.Contracts" />
+  </ItemGroup>
+
+</Project>

@@ -182,6 +182,10 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
     //    Lưới an toàn: `test/eCommerce.Tests/EfCoreRegistration/DbSetRegistrationTests.cs`.
     public DbSet<Address.Address> Addresses { get; set; } = default!;
 
+    // ── Customers (ADDR-004 phần B): SỔ ĐỊA CHỈ CỦA KHÁCH — liên kết khách ↔ địa chỉ ──
+    // 🔒 `AddressId` là **tham chiếu MỀM** (KHÔNG FK): `Address` thuộc module `Address` (`ADR-01`).
+    public DbSet<Customers.CustomerAddressLink> CustomerAddressLinks { get; set; } = default!;
+
     // ── EInvoice (EINV-001): hoá đơn điện tử ──
     public DbSet<EInvoice.EInvoice> Invoices { get; set; } = default!;
 

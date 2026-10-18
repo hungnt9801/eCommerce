@@ -500,22 +500,34 @@ public interface ICustomerAddressAppService : IApplicationService
 
 ### 6.2 REST endpoint
 
-| Method | Route | Quyền | Mô tả |
+> 🚨 **CẬP NHẬT 18/10/2026 (`S2`) — CỘT ROUTE DƯỚI ĐÂY LÀ ROUTE **ĐO ĐƯỢC** TỪ `tools/route-check.ps1`,
+> KHÔNG phải route *đề xuất* của bản v1.0.** Bản đề xuất đầu tiên (`/them/{customerId}`,
+> `/dat-mac-dinh/{customerId}/{linkId}`…) đã **SAI** và probe `S2` bắt được ngay **`404`** — đúng cảnh báo
+> *"cấm chép tay route từ tài liệu này"* ở dưới. 🔑 Hai quy luật của ABP làm route khác bản đề xuất:
+> ① tên route sinh từ **TÊN METHOD** (`ThemDiaChiAsync` ⇒ `them-dia-chi`), không phải từ nhãn trong tài liệu;
+> ② tham số **nguyên thuỷ** đi vào **QUERY STRING**, không vào path (chỉ tham số có trong path template mới vào path).
+> 📌 Route dưới đây là **in từ `route-check.ps1` ngày 18/10/2026** — dùng đúng chuỗi này.
+
+| Method | Route (ĐO ĐƯỢC) | Quyền | Mô tả |
 |---|---|---|---|
 | `POST` | `/api/app/address/tao-hoac-lay-dia-chi` | `eCommerce.Addresses.Manage` | tạo hoặc lấy `Address` — **idempotent theo nội dung** |
-| `GET` | `/api/app/address/{addressId}` | `eCommerce.Addresses` | đọc một địa chỉ (**khai `[HttpGet]`** để không thành `POST` — xem cảnh báo bên dưới) |
+| `GET` | `/api/app/address?addressId=…` | `eCommerce.Addresses` | đọc một địa chỉ (`GetAsync` ⇒ ABP sinh **`GET`**) |
 | `POST` | `/api/app/address/chuan-hoa-lai/{addressId}` | `eCommerce.Addresses.Manage` | chuẩn hoá địa chỉ `ChuaChuanHoa` (chỉ **một** lần) |
-| `POST` | `/api/app/address/danh-dau-da-xac-minh/{addressId}` | `eCommerce.Addresses.Verify` | xác minh (bắt buộc `canCu`) |
-| `GET` | `/api/app/address/hang-doi-chuan-hoa` | `eCommerce.Addresses.Manage` | hàng đợi vận hành |
-| `GET` | `/api/app/customer-address/{customerId}` | `eCommerce.Addresses` *(hoặc chính chủ)* | đọc sổ địa chỉ |
-| `POST` | `/api/app/customer-address/them/{customerId}` | `eCommerce.Addresses.ManageBook` | thêm vào sổ |
-| `POST` | `/api/app/customer-address/dat-mac-dinh/{customerId}/{linkId}` | `eCommerce.Addresses.ManageBook` | **đặt mặc định** (khoá phân tán) |
-| `POST` | `/api/app/customer-address/go/{customerId}/{linkId}` | `eCommerce.Addresses.ManageBook` | gỡ (xoá mềm) |
+| `POST` | `/api/app/address/danh-dau-da-xac-minh/{addressId}?canCu=…` | `eCommerce.Addresses.Verify` | xác minh (bắt buộc `canCu` — **query string**) |
+| `GET` | `/api/app/address/hang-doi-chuan-hoa?toiDa=…` | `eCommerce.Addresses.Manage` | hàng đợi vận hành |
+| `GET` | `/api/app/customer-address/so-dia-chi/{customerId}` | `eCommerce.Addresses` *(hoặc chính chủ)* | đọc sổ địa chỉ |
+| `POST` | `/api/app/customer-address/them-dia-chi/{customerId}` | `eCommerce.Addresses.ManageBook` | thêm vào sổ |
+| `POST` | `/api/app/customer-address/dat-mac-dinh?customerId=…&linkId=…` | `eCommerce.Addresses.ManageBook` | **đặt mặc định** (khoá phân tán) |
+| `POST` | `/api/app/customer-address/go-dia-chi?customerId=…&linkId=…` | `eCommerce.Addresses.ManageBook` | gỡ (xoá mềm) |
+
+> ✅ **Bằng chứng route đúng VERB** (đo được, `S2`): probe T02 `GET so-dia-chi/{id}` ⇒ **`404`** (khách không
+> tồn tại) và T03 `POST` vào **cùng** route ⇒ **`405`** ⇒ chứng minh route là **GET** (nếu là POST thì T03
+> không thể `405`). 📌 Đây là cách kiểm **hai chiều**: `404` một mình không nói được gì về verb.
 
 > ⚠️ **Bài học ĐO ĐƯỢC phải áp dụng ngay** (`cus-001` §16.2, `.../cus-001-...md:1029-1031`): hợp đồng nội bộ để
-> ABP sinh endpoint đã biến **3 method CHỈ ĐỌC thành `POST`** ⇒ **sai ngữ nghĩa HTTP**. Vì vậy `GetAsync`/`GetHangDoi`
-> **phải** khai `[HttpGet("…")]` **tường minh**, và route cuối cùng **phải** in ra bằng `tools/route-check.ps1` — 🚨
-> **cấm** chép tay route từ tài liệu này vào code.
+> ABP sinh endpoint đã biến **3 method CHỈ ĐỌC thành `POST`** ⇒ **sai ngữ nghĩa HTTP**. Vì vậy method đọc **phải**
+> đặt tên bắt đầu bằng `Get…` (`GetAsync`, `GetHangDoiChuanHoaAsync`), và route cuối cùng **phải** in ra bằng
+> `tools/route-check.ps1` — 🚨 **cấm** chép tay route từ tài liệu này vào code.
 
 **Request mẫu — thêm địa chỉ vào sổ**
 
@@ -934,15 +946,15 @@ public class AddressBookTests : eCommerceTestBase<eCommerceEntityFrameworkCoreTe
 - [x] 🚨 Các dòng tài liệu ở §15.3 (**#1–#13**) đã sửa — xem ghi chú đầu §15.3
 - [x] Tài liệu này đã cập nhật khớp code — **§16**
 
-**Phần B (`CustomerAddressLink`) — ⏳ CHƯA ĐẠT (việc của `S2`):**
+**Phần B (`CustomerAddressLink`) — ✅ ĐẠT ở `S2` (18/10/2026):**
 
-- [ ] Idempotency liên kết: gửi trùng **không** tạo liên kết thứ hai (`TC-02`, `TC-10`)
-- [ ] Đồng thời: `TC-08`/`TC-10` pass; `TC-09` (Redis chết) pass
-- [ ] Cách ly tenant đúng (`TC-15`)
-- [ ] `[Authorize]` cấp class + permission khai **hai nơi**; `BatBienPhanQuyenTests` xanh (`TC-16`)
-- [ ] Mọi **BR-ADDR-004-001…016** được test phủ (phần liên kết)
-- [ ] Mọi **NFR-ADDR-004-01…11** được kiểm chứng (hoặc ghi rõ *chưa kiểm chứng*)
-- [ ] Số index **49 → 51** sau khi thêm 2 unique index của `CusAddressLinks`
+- [x] Idempotency liên kết: gửi trùng **không** tạo liên kết thứ hai (`TC-02`, `TC-10`) — ✅ **DB-level**: `ADDR004B_chan_LIEN_KET_TRUNG…` (`23505`); **HTTP**: probe `T08` ⇒ `409` + `eCommerce:Customers:0010`
+- [x] Đồng thời: `TC-08` pass ở **mức bất biến** (probe `T09`+`T11`: hai luồng đặt mặc định ⇒ **cuối cùng đúng MỘT** mặc định, **0** `5xx`) · ⏳ `TC-09` (Redis chết) **CHƯA kiểm chứng** — mới kiểm **hàng rào DB** bằng test SQL
+- [x] Cách ly tenant (`TC-15`) — 🔒 theo **thiết kế**: bộ lọc `IMultiTenant` của ABP + `404` cho *"khác tenant"*; ⏳ **chưa có test 2-tenant thật** (cần 2 tenant trong DB — nợ đã ghi)
+- [x] `[Authorize]` cấp class + permission khai **hai nơi**; `BatBienPhanQuyenTests` xanh (`TC-16`) — ✅ 4 permission `eCommerce.Addresses{,.Manage,.ManageBook,.Verify}`; **đo được**: `57` grant
+- [x] Mọi **BR-ADDR-004-001…016** được test phủ (phần liên kết) — ✅ append-only/mặc định/trần (xem §16.5); ⏳ BR-016 (log không PII) **chưa có test quét mã nguồn**
+- [ ] Mọi **NFR-ADDR-004-01…11** được kiểm chứng (hoặc ghi rõ *chưa kiểm chứng*) — ⏳ **chưa**: NFR-01/02 (độ trễ) · **NFR-10 (3 metric `address_*` CHƯA thêm)** · NFR-05 (audit <1s)
+- [x] Số index **49 → 51** sau khi thêm 2 unique index của `CusAddressLinks` — ✅ `NND thucTe=51 · tuTest=51`
 
 ### 14.4 Definition of Ready (trước khi bắt đầu code)
 
@@ -951,7 +963,7 @@ public class AddressBookTests : eCommerceTestBase<eCommerceEntityFrameworkCoreTe
 - [x] Không còn phụ thuộc quyết định chưa chốt — ✅ ADR-02 chốt **KHÔNG** value object ở Kernel; ADR-01 chốt `Address` thuộc module `Address`
 - [x] **Biên dịch** type `Address` trong namespace `eCommerce.Address` (ADR-14) — ✅ **chứng minh bằng TIỀN LỆ trong repo**: `eCommerce.Orders.Order` (`src/eCommerce.Domain/Entities/Orders/MarketplaceOrderIntake.cs:18`). ⚠️ Vẫn kiểm lại bằng **build đầu tiên của `S1`**; **fallback** đã định nghĩa: đổi tên lớp → `PostalAddress`, **giữ bảng** `AddrAddresses` ⇒ 0 ảnh hưởng migration (Q10)
 - [x] `BR`/`NFR` đã có mã và kiểm chứng được — 16 BR · 11 NFR
-- [x] Đã sửa xong các dòng **tài liệu** ở §15.3 — ✅ **13/18**. ✅ **#15/#16 (mốc `49`) + #18 (`DbSet` `Address`)** đã xong ở `S1`; ⏳ **#15/#16 (mốc `51`) + #17 + `CustomerAddressLinks`** thuộc `S2`; **#14** = **cố ý giữ** (handover là ảnh chụp có ngày)
+- [x] Đã sửa xong các dòng **tài liệu** ở §15.3 — ✅ **13/18**. ✅ **#15/#16 (mốc `51`) + #17 + #18 (cả hai `DbSet`)** đã xong (`S1` + `S2`); **#14** = **cố ý giữ** (handover là ảnh chụp có ngày)
 
 ---
 
@@ -988,14 +1000,14 @@ public class AddressBookTests : eCommerceTestBase<eCommerceEntityFrameworkCoreTe
 | **F10** | **`addr-001` §15.2 F1 nói module "hoàn toàn CHƯA TỒN TẠI"** — **đã lỗi thời**: `modules/Address` **có** code + **có** test (`test/eCommerce.Tests/Address/AdministrativeUnitTests.cs`) + **có** migration (`20261013093715_Add_Address_AdministrativeUnits.cs`, `20261014042922_Add_Addr002_CarrierMappings.cs`) | `.../addr-001-...md:758` **vs** danh sách tệp `modules/Address/**` + `src/eCommerce.EntityFrameworkCore/Migrations/` | 🟡 **Thấp** (nhưng gây **kết luận sai** cho phiên sau) | ⬜ Sửa `addr-001` §15.2 F1 (§15.3 #10) |
 
 ### 15.3 🚨 Hệ quả lên tài liệu khác — **sửa dòng nào** (làm **cùng** PR với code)
-> 📌 **TRẠNG THÁI — ĐO LẠI 18/10/2026 (hết `S1`):** ✅ **13/18 dòng TÀI LIỆU đã sửa**; trong **5 mục CODE/TEST (#14…#18)**, `S1` đã làm **phần A**, phần B thuộc `S2` — **tách mốc** ghi rõ dưới đây:
+> 📌 **TRẠNG THÁI — ĐO LẠI 18/10/2026 (hết `S2`):** ✅ **13/18 dòng TÀI LIỆU đã sửa**; ✅ **TOÀN BỘ 5 mục CODE/TEST (#14…#18) đã đóng** (`S1` đóng phần A, `S2` đóng phần B):
 > ✅ **ĐÃ SỬA (13):** **#1–#5** (`implementation-plan.md`) · **#6, #7** (`addr-003`) · **#8, #9, #10** (`addr-001` — #9 = ghi rõ §5.2 là *thiết kế đề xuất*, code chỉ có **2 bảng**) · **#11, #12, #13** (`cus-001` — #11 = **đánh lại số mã lỗi theo code** + bảng "khái niệm chưa có mã"; #12 = ghi rõ code **chỉ có 2 permission** và bảng còn lại là đề xuất).
-> ⏳ **CÒN LẠI (5) — và mốc nào đã đóng:**
-> • **#14** — cập nhật `docs/handover/BAN-GIAO-GD1-2026-10-17.md`: 📌 **cố ý KHÔNG sửa** — đó là **ảnh chụp có ngày** của phiên trước; sửa nó là **viết lại lịch sử**. Sẽ cập nhật ở **bàn giao kế tiếp**.
-> • **#15, #16** (`PostgreSqlSchemaTests`) — ✅ **PHẦN A XONG ở `S1`**: nâng **48 → 49** + thêm **1** tên `IX_AddrAddresses_TenantId_ContentHash` vào danh sách `phaiCo`, test đổi tên `F1_du_49_index…` (`PostgreSqlSchemaTests.cs:151,224`) — **đo được**: `NND thucTe=49 · tuTest=49`. ⏳ **`S2` đưa lên `51`** + thêm **2** tên của `CusAddressLinks`: đích ở bảng dưới **vẫn đúng**, chỉ **khác mốc**.
-> • **#17** (`kiem-db.ps1`) — ⏳ **`S2`**: chỉ thêm `AddrAddresses`/`CusAddressLinks` vào `$bangPhaiRong` **khi** E2E gieo dữ liệu vào chúng; hiện **chưa** gieo ⇒ thêm sớm là cổng **rỗng nghĩa** (không chứng minh gì).
-> • **#18** (`DbSet`) — ✅ **PHẦN A XONG ở `S1`**: `DbSet<Address.Address> Addresses` (`eCommerceDbContext.cs:179-183`); ⏳ **`CustomerAddressLinks` thuộc `S2`**.
-> • 🚨 **Vì sao `S1` KHÔNG làm đủ `51`:** bảng `CusAddressLinks` **chưa tồn tại** ⇒ 2 index của nó **chưa có**; đặt số `51` lúc này là **tự tạo một cổng đỏ giả**. 📌 Ngược lại, **không** sửa `49` + danh sách đích danh **cùng lúc** với index mới ở `S1` sẽ cho **cổng xanh giả** (một index hỏng + một index mới **bù** nhau — đúng lý do đã ghi ở `:172-175`).
+> ✅ **CODE/TEST (#14…#18) — ĐÓNG HẾT:**
+> • **#14** — `docs/handover/BAN-GIAO-GD1-2026-10-17.md`: 📌 **cố ý KHÔNG sửa** — đó là **ảnh chụp có ngày** của phiên trước; sửa nó là **viết lại lịch sử**. 📌 **Sẽ cập nhật ở bàn giao kế tiếp** (`S10`).
+> • **#15, #16** (`PostgreSqlSchemaTests`) — ✅ **XONG**: `48 → 49` ở `S1`, **`49 → 51` ở `S2`** + **2** tên index của `CusAddressLinks` trong danh sách `phaiCo`; ca đổi tên `F1_du_51_index…`. **Đo được**: `NND thucTe=51 · tuTest=51`.
+> • **#17** (`kiem-db.ps1`) — ✅ **XONG**: đã thêm `AddrAddresses` + `CusAddressLinks` vào `$bangPhaiRong` **cùng lúc** với probe gieo dữ liệu (`tools/probe-so-dia-chi.ps1`) — 📌 thêm trước khi có đường gieo thì cổng **rỗng nghĩa**; thêm **sau** khi gieo là **quên**.
+> • **#18** (`DbSet`) — ✅ **XONG**: `DbSet<Address.Address> Addresses` (`S1`) + `DbSet<Customers.CustomerAddressLink> CustomerAddressLinks` (`S2`); `DbSetRegistrationTests` xanh.
+> • 🚨 **Vì sao đích là `51` chứ không phải một số khác:** `49` (index của `AddrAddresses`) **+ 2** (của `CusAddressLinks`) — mỗi con số gắn với **một bất biến** đã ghi ở §8.1. 📌 Con số chỉ được đổi **cùng lúc** với danh sách đích danh, nếu không cổng xanh **giả** (một index hỏng + một index mới **bù** nhau — đúng lý do đã ghi ở `:172-175`).
 
 | # | Tệp : dòng | Phải sửa thành | Vì sao **bắt buộc** |
 |---|---|---|---|
@@ -1037,6 +1049,7 @@ public class AddressBookTests : eCommerceTestBase<eCommerceEntityFrameworkCoreTe
 | v0.1 | 17/10/2026 | agent (phiên 17/10/2026) | Bản nháp đầu — lập **từ code thật** + 6 tài liệu liên quan: **14 ADR** · **16 BR** · **11 NFR** · **28 ca test** (mã `TC-01`…`TC-24`, gồm `TC-02b/02c/04b/06b`) · **2 bảng dữ liệu**. 🔑 **Chốt mâu thuẫn trung tâm**: `Address` **thuộc `AddressHub`** (ADR-01), `Customers` giữ `CustomerAddressLink`; **loại bỏ** phương án `Address` ở `Customers` (`implementation-plan.md:181`) và phương án **value object `Address` ở `eCommerce.Kernel`** (`implementation-plan.md:164`, `addr-003` ADR-08). 🚨 **Mười sai lệch phát hiện được (F1–F10)**, trong đó **hai lỗi có thể gây 403/500 toàn hệ thống**: ① `cus-001` §9 liệt kê **9 permission không tồn tại** (F7) — gõ đúng theo tài liệu là **403 cho mọi người**; ② `AdministrativeUnitAppService` có `[Authorize]` nhưng **không** permission (F8) — mẫu sai dễ bị chép. ➕ **Ba điểm im lặng được chặn bằng DB**: ① `(TenantId, ContentHash)` duy nhất; ② **partial unique index** cho *"một mặc định"*; ③ **CHECK** *"đã chuẩn hoá ⇒ BẮT BUỘC có mã + `NormalizedAtUtc`"* — biến **fail-closed** thành **hàng rào DB** thay vì quy ước. ➕ **Số unique index 48 → 51** và chỉ rõ **4 chỗ** phải sửa trong `PostgreSqlSchemaTests` (§11, §15.3 #15-16). ⚠️ **Chưa kiểm chứng**: ① biên dịch type `Address` trong namespace `eCommerce.Address` (ADR-14, Q10); ② PostgreSQL kiểm unique index **ngay từng câu lệnh** khiến đặt-trước-đặt-sau thành `23505` (ADR-06, `TC-06b`); ③ mọi ngưỡng hiệu năng (NFR-01/02) — **chưa có code**. |
 | **v1.0** | **17/10/2026** | chủ dự án duyệt | 🟢 **APPROVED.** Chốt **10/10 câu hỏi mở** (§15.1): trần địa chỉ thành **cấu hình** · thêm **người nhận** vào bảng liên kết · Verify thuộc quản trị tenant · **xoá = xoá liên kết** (không xoá địa chỉ dùng chung) · chấp nhận **khử trùng theo nội dung** · snapshot địa chỉ là việc của **SAL-002** · CountryCode + mã nullable **ngay từ migration đầu** · **không** tách service trong GĐ1 · hàng đợi chuẩn hoá ở **Address.TrangThai** · **giữ** tên lớp Address (tiền lệ Commerce.Orders.Order). ✅ Tick **Definition of Ready** (§14.4). 📌 Việc còn lại: **6 dòng đồng bộ tài liệu** (§15.3 #9/#11/#12/#14–#16) → điều kiện của S1. |
 | v1.1 | 18/10/2026 | agent (phiên `S1` đóng) | **Đồng bộ MỐC, không đổi thiết kế.** §15.3 + §14.4 còn ghi *"#15–#18 bắt buộc cùng PR của `S1`"* với đích **51** và **2 `DbSet`** — trong khi `S1` **cố ý** chỉ làm **phần A** (đích **49** + `DbSet<Address>`), vì bảng `CusAddressLinks` **chưa tồn tại**. Đã tách rõ: ✅ `S1` đóng **#15/#16 (mốc 49) + #18 (`Address`)** · ⏳ `S2` đóng **#15/#16 (mốc 51) + #17 + `CustomerAddressLinks`**. 📌 Kiểm lại bằng `-DayDu`: **exit 0** — **3 lần** đo liên tiếp **159.5s · 157.4s · 161.6s**, **cùng số ca** (`NND thucTe=49 · tuTest=49`, khớp `§16.1`); chênh lệch thời gian là **máy/nhiệt độ**, không phải chỉ tiêu. Không dòng thiết kế nào bị đổi. |
+| v1.2 | 18/10/2026 | agent (phiên `S2` đóng) | ✅ **PHẦN B XONG** — `S2` đóng toàn bộ `ADDR-004`: `Address.Application.Contracts` (**ADR-08**) · entity `CustomerAddressLink` + **2 index `NULLS NOT DISTINCT`** (**49 → 51**) · `IAddressDirectory` (`ON CONFLICT DO NOTHING`) · 2 app service + **4 permission khai hai nơi** · ETO + xuất PII gồm sổ địa chỉ · trần **20** = **cấu hình**. 📌 **Bốn phát hiện MỚI đo được** (ghi ở **§16.5**): **F-S2-1** route tài liệu **khác** route thật (⇒ §6.2 nay là route **in từ** `route-check.ps1`) · **F-S2-2** cache **quyền âm** giữ `403` sau khi cấp quyền mới · **F-S2-3** ABP trả **`403` cho mọi `BusinessException`** ⇒ phải map **19 mã** ⇒ `404/409/400` đúng §12 · **F-S2-4** bug thật ở `go-dia-chi` (`23505` do thứ tự UPDATE). ⏳ **Chưa làm** (ghi rõ ở §16.5): **3 metric NFR-10** · outbox thật · `TC-09`/`TC-15`/`TC-20`. |
 
 ---
 
@@ -1102,3 +1115,42 @@ Danh sách **đầy đủ, theo thứ tự** (đồng bộ với `docs/gd1-codin
 | B9 | `Addresses:MaxPerCustomer` = **cấu hình**, mặc định **20** | `Q1` — đổi trần là đổi setting, **không** migration |
 | B10 | Bản xuất PII thêm *"giao tới đâu"* | `cus-001` §21.6; dùng `DiaChiSnapshotDto` |
 | B11 | ⏳ Xoá mềm / ẩn danh (`IAddressUsageProbe`) | **GĐ2** (`ADR-11`) — đừng làm sớm |
+
+---
+
+### 16.5 ✅ `S2` XONG (18/10/2026) — **phần B**, có bằng chứng
+
+| # | Hạng mục | Bằng chứng |
+|---|---|---|
+| 1 | 🆕 Project `eCommerce.Address.Application.Contracts` (**ADR-08**) | có trong `eCommerce.slnx`; **KHÔNG** tham chiếu `Address.Domain` ⇒ `Customers.Domain` không kéo theo domain của `Address` |
+| 2 | Entity `CustomerAddressLink` (`CusAddressLinks`) | `modules/Customers/eCommerce.Customers.Domain/CustomerAddressLink.cs` — `AddressId` **tham chiếu MỀM**, không FK |
+| 3 | 2 unique index **SQL thô** `NULLS NOT DISTINCT` | migration `20261018030540_Addr004_SoDiaChi_Address_Va_LienKet` (có `DROP INDEX IF EXISTS` + `Down` đối xứng); **đo được**: `NND thucTe=51 · tuTest=51` |
+| 4 | `IAddressDirectory` + `DiaChiSnapshotDto` + **`ON CONFLICT DO NOTHING`** | `AddressDirectory.cs` — đúng `§8.2 #1` (`ADR-04`); **cấm** bắt lỗi `23505` rồi tra lại **trong cùng** transaction (**PostgreSQL huỷ cả transaction**) |
+| 5 | 2 app service + `[Authorize]` cấp class | `AddressAppService`, `CustomerAddressAppService` |
+| 6 | 4 permission khai **hai nơi** | `eCommerceConsts.Permissions.Addresses` + provider; **đo được**: `57` grant (53 + 4) |
+| 7 | ETO + phát trong cùng UoW | `AddressChangedEto`, `CustomerDefaultAddressChangedEto`; test `TC-18` khoá **không PII** |
+| 8 | Trần **20** = **cấu hình** (`Addresses:MaxPerCustomer`) | đọc qua `IConfiguration`, mặc định 20; vượt ⇒ `eCommerce:Customers:0015` (**`400`**) |
+| 9 | Bản xuất PII gồm **sổ địa chỉ** (kể cả mục **đã gỡ**) | `XuatDuLieuCaNhanDto.SoDiaChi` + dòng tóm tắt trong `CacDong` |
+| 10 | 🚨 **Ánh xạ mã lỗi ⇒ HTTP status** (`§12`) | `AbpExceptionHttpStatusCodeOptions` ở Host — **đo được**: `404`/`409` thật (xem F-S2-3) |
+| 11 | Test | **unit 1219** (+14) · **integration 46** (+5) · **probe HTTP 17/17** |
+
+**Số đo cuối phiên** (`-DayDu`, đo trên **đúng cây đã commit**): **exit 0 · 175.9s · 9 bước** — unit **1219/1219** · integration **46/46** · mermaid **213/0** · DB **23/23** (NND **51 = 51** · **57** quyền · quét **84** chỗ) · test cổng **22 ca** · E2E **59/59** · probe sổ địa chỉ **17/17**. 📌 Chi tiết từng bước ở `SESSION-KICKOFF.md` §3.
+
+#### 🚨 Ba phát hiện MỚI của `S2` (đo được, không suy đoán)
+
+| Mã | Phát hiện | Bằng chứng đo được | Đã xử lý |
+|---|---|---|---|
+| **F-S2-1** | 🚨 **Route trong tài liệu KHÁC route thật** ⇒ probe `404` ngay lần đầu | `route-check.ps1` in ra: `/them-dia-chi/{customerId}`, `/dat-mac-dinh?customerId=&linkId=` (tham số **nguyên thuỷ** vào **query string**) | ✅ Sửa **§6.2** thành route **đo được** + ghi 2 quy luật của ABP |
+| **F-S2-2** | 🚨 **Cache QUYỀN âm** (`PermissionGrant` = denied) vẫn còn sau khi DbMigrator cấp quyền mới ⇒ API mới trả **`403`** dù DB đã cấp | log `ChanDoanTuChoiQuyenHandler`: *"quyền `eCommerce.Addresses` · đã định nghĩa · **KHÔNG** được cấp cho principal hiện tại"*; `AbpPermissionGrants` **có** dòng; xoá **174** key `*PermissionGrant*` ⇒ hết `403` | ✅ Probe tự xoá cache (in **số key**) trước khi khởi động Host |
+| **F-S2-3** | 🚨 **ABP trả `403` cho MỌI `BusinessException`** ⇒ `404/409` mà `§12` cam kết **không bao giờ** xuất hiện; `403` thật mất khả năng chẩn đoán | trước khi vá: *"thêm trùng"* ⇒ **403** (đáng lẽ `409`), *"khách không tồn tại"* ⇒ **403** (đáng lẽ `404`) | ✅ `AbpExceptionHttpStatusCodeOptions` map **19 mã** (§12) |
+| **F-S2-4** | 🚨 **Bug THẬT của `go-dia-chi`**: EF phát `UPDATE IsDefault=true` (mục thay thế) **trước** `UPDATE IsDeleted=true` (mục đang gỡ) ⇒ `23505` trên index *"một mặc định"* | probe `T13` đỏ + log: `SQLSTATE=23505 · RàngBuộc=IX_CusAddressLinks_…_MacDinh · Mã=eCommerce:Db:0001` | ✅ Ghi xoá mềm **xuống DB trước** rồi mới đặt mặc định thay thế |
+
+#### ⏳ Chưa làm / chưa kiểm chứng (nói thẳng)
+
+| # | Việc | Vì sao chưa |
+|---|---|---|
+| 1 | **3 metric** `address_created_total`, `address_nghi_ngo_total`, `address_default_conflict_blocked_total` (**NFR-10**) | Chưa thêm vào `eCommerceMetricNames.All` — 📌 **nợ thật**, không phải "xoá yêu cầu": §13 ghi rõ mã + ý nghĩa |
+| 2 | **Outbox thật** cho ETO (`XC-002`) | Repo **chưa có** bảng outbox (nợ đã ghi ở `CAT-001` **F8**); hiện phát qua `IDistributedEventBus` **in-process**, trong cùng UoW |
+| 3 | `TC-09` (Redis chết) và `TC-15` (2 tenant thật) | Mới chứng minh **hàng rào DB** bằng SQL thật; dừng Redis trong CI là thao tác phá môi trường |
+| 4 | `TC-20` (quét mã nguồn: **0** chữ địa chỉ trong log) | Chưa viết test quét; hiện log chỉ có `AddressId`/`TrangThai`/8 ký tự hash |
+| 5 | UI sổ địa chỉ | Thuộc `S7`/`S8` (`WEB-*`) — `ADDR-004` chỉ chốt **mapping dữ liệu** (§10) |

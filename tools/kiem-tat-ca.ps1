@@ -325,6 +325,29 @@ if ($DayDu -and -not $BoQuaE2E) {
             throw "E2E DO (exit $($e.Ma)) — xem log: $($e.Log). 🔒 DUNG ket luan gi ve SAN PHAM truoc khi doc tung ca."
         }
     }
+
+    # ── BUOC 9: SỔ ĐỊA CHỈ — HTTP THẬT (ADDR-004 phần B) ────────────────────────────────────
+    Buoc 'So dia chi: HTTP THAT (ADDR-004 — 2 luong cung dat mac dinh)' {
+        # 🔑 **VÌ SAO PHẢI LÀ BƯỚC CỦA CỔNG (không phải probe tay):** ba câu hỏi sống còn của `ADDR-004` phần B
+        # **chỉ** HTTP thật trả lời được —
+        #   ① endpoint có tồn tại + đúng VERB (bài học `CUS-001` §16.2: đọc thành `POST`; và module chưa khai
+        #      `ConventionalControllers` ⇒ `404` body RỖNG);
+        #   ② "bỏ-trước-đặt-sau" đúng thứ tự trong MỘT transaction (PostgreSQL kiểm index **ngay từng câu lệnh**);
+        #   ③ 🚨 **hai luồng cùng đặt mặc định ⇒ KHÔNG bao giờ có hai mặc định** (DoD của `S2`).
+        # 📌 Một probe **tay** thì lần sau không ai chạy ⇒ đó đúng là nợ đã ghi ở `web-001` §98.7 #1.
+        $p = ChayLenh 'pwsh' @('-NoProfile', '-File', (Join-Path $PSScriptRoot 'probe-so-dia-chi.ps1')) 'diachi.log'
+
+        Get-Content $p.Log | Where-Object { $_ -match 'DAT|KHONG DAT|PROBE SO DIA CHI|Xoa cache quyen|DON DEP' } |
+            Select-Object -First 24 | ForEach-Object { "   $_" }
+
+        if ($p.Ma -ne 0) {
+            Get-Content $p.Log | Select-String 'CAC CA KHONG DAT' -Context 0,8 |
+                ForEach-Object { $_.Context.PostContext | ForEach-Object { "   $_" } }
+            throw "PROBE SO DIA CHI DO (exit $($p.Ma)) — xem log: $($p.Log)."
+        }
+
+        Write-Output '   ✅ HTTP THAT: moi ca so dia chi DAT.'
+    }
 }
 elseif (-not $BoQuaE2E -and -not $DayDu) {
     Write-Output ""

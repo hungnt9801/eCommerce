@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Volo.Abp;
 using Volo.Abp.Application.Services;
@@ -39,13 +40,25 @@ public class CustomerAppService : ApplicationService
     /// <summary>🔒 De mo **UoW RIENG** cho nhat ky — xem `XuatDuLieuCaNhanAsync`.</summary>
     private readonly IUnitOfWorkManager _unitOfWorkManager;
 
+    /// <summary>
+    /// 🔑 `ADDR-004` **B10** — **sổ địa chỉ là dữ liệu CÁ NHÂN** (`Luật 91/2025/QH15`): *"tôi đang được giao
+    /// tới đâu"* là câu hỏi **chính** của chủ thể dữ liệu. 📌 Bản xuất thiếu nó là **thiếu hụt pháp lý**,
+    /// không phải thiếu tính năng.
+    /// </summary>
+    private readonly IRepository<CustomerAddressLink, Guid> _lienKetDiaChiRepository;
+
+    /// <summary>Hợp đồng đọc snapshot địa chỉ (chỉ **Contracts** — không phụ thuộc tầng Application của `Address`).</summary>
+    private readonly eCommerce.Address.IAddressDirectory _diaChiDirectory;
+
     public CustomerAppService(
         IRepository<Customer, Guid> khachRepository,
         IAbpDistributedLock khoa,
         IRepository<Orders.Order, Guid> donHangRepository,
         IRepository<Orders.OrderLine, Guid> dongHangRepository,
         IRepository<CustomerDataExportLog, Guid> nhatKyXuatRepository,
-        IUnitOfWorkManager unitOfWorkManager)
+        IUnitOfWorkManager unitOfWorkManager,
+        IRepository<CustomerAddressLink, Guid> lienKetDiaChiRepository,
+        eCommerce.Address.IAddressDirectory diaChiDirectory)
     {
         _khachRepository = khachRepository;
         _khoa = khoa;
@@ -53,6 +66,8 @@ public class CustomerAppService : ApplicationService
         _dongHangRepository = dongHangRepository;
         _nhatKyXuatRepository = nhatKyXuatRepository;
         _unitOfWorkManager = unitOfWorkManager;
+        _lienKetDiaChiRepository = lienKetDiaChiRepository;
+        _diaChiDirectory = diaChiDirectory;
     }
 
     /// <summary>
@@ -502,6 +517,64 @@ public class CustomerAppService : ApplicationService
                 });
             }
         }
+
+        // ══════════════════════════════════════════════════════════════════════════════════════════
+        // 🚨 `ADDR-004` **B10** — **SỔ ĐỊA CHỈ** trong bản xuất dữ liệu cá nhân.
+        //
+        // 🔑 VÌ SAO PHẢI GOM CẢ MỤC **ĐÃ GỠ**: *"dữ liệu của tôi"* **không** chỉ là dữ liệu **đang dùng**.
+        // 📌 Ẩn mục đã gỡ đi = nói dối chủ thể dữ liệu về việc hệ thống **vẫn còn** lưu địa chỉ cũ của họ
+        // (Luật 91/2025/QH15 cho họ quyền **xem** dữ liệu được lưu). Vì vậy dùng `IgnoreQueryFilters()` và
+        // đánh cờ `DaGo` cho từng dòng.
+        // ══════════════════════════════════════════════════════════════════════════════════════════
+
+        var truyVanLienKet = await _lienKetDiaChiRepository.GetQueryableAsync();
+
+        var tatCaLienKet = await AsyncExecuter.ToListAsync(
+            truyVanLienKet
+                .IgnoreQueryFilters()
+                .Where(x => x.CustomerId == khach.Id)
+                // ⚠️ Sắp xếp TẤT ĐỊNH (như khối đơn hàng): bản xuất phải **tái lập được**.
+                .OrderBy(x => x.CreationTime)
+                .ThenBy(x => x.Id));
+
+        if (tatCaLienKet.Count > 0)
+        {
+            var snapshotDiaChi = await _diaChiDirectory.TimNhieuTheoIdAsync(
+                tatCaLienKet.Select(x => x.AddressId).ToHashSet());
+
+            var theoId = snapshotDiaChi.ToDictionary(x => x.AddressId);
+
+            foreach (var lk in tatCaLienKet)
+            {
+                var snap = theoId.GetValueOrDefault(lk.AddressId);
+
+                dto.SoDiaChi.Add(new DiaChiCaNhanDto
+                {
+                    LinkId = lk.Id,
+                    AddressId = lk.AddressId,
+                    AddressType = lk.AddressType.ToString(),
+                    Label = lk.Label,
+                    IsDefault = lk.IsDefault,
+                    DaGo = lk.IsDeleted,
+                    LastUsedAtUtc = lk.LastUsedAtUtc,
+                    DiaChiDayDu = snap?.DiaChiDayDu,
+                    TrangThai = snap?.TrangThai,
+                    CoDungDuoc = snap?.CoDungDuoc ?? false,
+                    Nguon = "CusAddressLinks + AddrAddresses (DiaChiDayDu là SNAPSHOT chữ lúc tạo — ADR-10)"
+                });
+            }
+        }
+
+        // 📌 Dòng tóm tắt — 🔑 cùng lý do với dòng *"số đơn hàng"*: người đọc thấy **quy mô** mà không phải
+        // đếm từng mục, và thấy rõ **có bao nhiêu mục đã gỡ** (thông tin họ có quyền biết).
+        dto.CacDong.Add(new DongDuLieuCaNhanDto
+        {
+            Truong = "So dia chi trong so",
+            GiaTri = $"{dto.SoDiaChi.Count(x => !x.DaGo)} dang dung · {dto.SoDiaChi.Count(x => x.DaGo)} da go",
+            Nguon = "CusAddressLinks.CustomerId",
+            LyDo = "Cho biet khach da luu bao nhieu dia chi, va bao nhieu dia chi da go (van con luu de doi soat).",
+            LaDuLieuCaNhan = false
+        });
 
         // 📌 **THEM DONG TOM TAT vao `CacDong`** — 🔑 de nguoi doc ban xuat thay **ngay** quy mo mua hang,
         // ngay ca khi ho **khong** doc het danh sach don.

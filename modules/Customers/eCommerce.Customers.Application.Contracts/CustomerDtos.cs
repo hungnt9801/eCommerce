@@ -159,6 +159,48 @@ public class XuatDuLieuCaNhanDto
 
     /// <summary>Tong so don cua khach (🔑 ke ca khi bi cat) — de nguoi doc biet **quy mo that**.</summary>
     public int TongSoDon { get; set; }
+
+    /// <summary>
+    /// 🚨 `ADDR-004` **B10** — **SỔ ĐỊA CHỈ** trong bản xuất (kể cả mục **đã gỡ**).
+    /// 🔑 *"tôi đang được giao tới đâu"* là câu hỏi **chính** của chủ thể dữ liệu; và mục đã gỡ **vẫn** là
+    /// dữ liệu hệ thống còn lưu ⇒ phải hiện, có cờ `DaGo` (Luật 91/2025/QH15).
+    /// </summary>
+    public List<DiaChiCaNhanDto> SoDiaChi { get; set; } = [];
+}
+
+/// <summary>
+/// Một mục trong **sổ địa chỉ** của bản xuất dữ liệu cá nhân (`ADDR-004` B10).
+/// 🔒 Có `Nguon` (bảng/cột) cho từng khối — cùng khuôn `DongDuLieuCaNhanDto`.
+/// </summary>
+public class DiaChiCaNhanDto
+{
+    public Guid LinkId { get; set; }
+
+    public Guid AddressId { get; set; }
+
+    /// <summary>`Shipping` / `Billing`.</summary>
+    public string AddressType { get; set; } = default!;
+
+    public string? Label { get; set; }
+
+    public bool IsDefault { get; set; }
+
+    /// <summary>🔑 `true` = mục **đã gỡ** (xoá mềm) nhưng hệ thống **vẫn lưu** — chủ thể dữ liệu phải thấy.</summary>
+    public bool DaGo { get; set; }
+
+    public DateTime? LastUsedAtUtc { get; set; }
+
+    /// <summary>🔒 **SNAPSHOT CHỮ** lúc tạo (`ADR-10`) — không phải tên ĐVHC hiện tại.</summary>
+    public string? DiaChiDayDu { get; set; }
+
+    /// <summary>`ChuaChuanHoa` / `DaChuanHoa` / `DaXacMinh` / `NghiNgo`.</summary>
+    public string? TrangThai { get; set; }
+
+    /// <summary>`false` ⇔ địa chỉ chưa chuẩn hoá (không dùng được cho vận đơn).</summary>
+    public bool CoDungDuoc { get; set; }
+
+    /// <summary>Nguồn của khối dữ liệu này — 🔑 để người đọc **kiểm chứng** được (cùng tinh thần `CacDong`).</summary>
+    public string Nguon { get; set; } = default!;
 }
 
 /// <summary>Mot don hang trong ban xuat du lieu ca nhan.</summary>

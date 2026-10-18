@@ -745,3 +745,79 @@ Trong môi trường **chặn capture**, quy tắc đó **không thực hiện �
 ✅ **Số đo THẬT khi chạy được** (đo lại `S1`, 18/10/2026 — **3 lần**: **159.5s · 157.4s · 161.6s**, cùng số ca):
 `exit 0` · build 40.2–45.7s · unit **1205** · integration **41** · mermaid **213/0** ·
 DB **21/21** (`NND thucTe=49 · tuTest=49` · quét **83** chỗ) · test cổng **20/20** hiển thị · E2E **59/59**.
+
+---
+
+## 🚨 NĂM CÁI BẪY MỚI — **`S2` (`ADDR-004` phần B), 18/10/2026**
+
+> 🚨 Cả năm đều **KHÔNG có lỗi biên dịch** và **KHÔNG** làm cổng nào đỏ ngay: chúng chỉ lộ ra khi **gọi HTTP
+> thật**. 📌 Vì vậy `S2` thêm **bước ⑨** (`tools\probe-so-dia-chi.ps1`) vào `kiem-tat-ca.ps1 -DayDu`.
+
+### S2-1. Route trong **tài liệu** ≠ route **thật** ⇒ probe `404` ngay lần chạy đầu
+
+**Chuyện thật:** `ADDR-004` §6.2 v1.0 đề xuất `/api/app/customer-address/them/{customerId}`,
+`/dat-mac-dinh/{customerId}/{linkId}`. Probe gọi đúng theo tài liệu ⇒ **`404`** cả 4 route.
+🔑 **Hai quy luật ABP** làm route khác: ① tên route sinh từ **TÊN METHOD** (`ThemDiaChiAsync` ⇒ `them-dia-chi`);
+② tham số **nguyên thuỷ** vào **QUERY STRING**, không vào path ⇒ `/dat-mac-dinh?customerId=…&linkId=…`.
+
+✅ **Luật:** in route **THẬT** bằng `tools/route-check.ps1 -Match '…'` rồi **sửa tài liệu** — 🚨 **cấm** chép
+route từ tài liệu vào probe. ➕ Và kiểm **hai chiều**: `GET` ⇒ `404` (không có dữ liệu) **và** `POST` vào cùng
+route ⇒ **`405`** (chứng minh route là `GET`). 📌 `404` một mình **không** nói gì về verb.
+
+### S2-2. 🚨 **Cache QUYỀN âm** giữ `403` sau khi cấp quyền mới (permission mới ⇒ API mới `403`)
+
+**Chuyện thật:** thêm **4** permission `eCommerce.Addresses.*`, chạy `DbMigrator` (DB **có** `AbpPermissionGrants`:
+57 grant) ⇒ API mới vẫn **`403`**. Log `ChanDoanTuChoiQuyenHandler` nói **đúng nguyên nhân**:
+*"quyền `eCommerce.Addresses` · đã định nghĩa · **KHÔNG được cấp cho principal hiện tại**"*.
+🔑 ABP cache **kết quả ÂM** (`KHÔNG được cấp`) theo `(provider, key, permission)`; các bản ghi âm này **không**
+tự mất khi grant mới được thêm.
+
+✅ **Luật:** sau khi cấp permission mới, **xoá cache quyền** rồi mới khởi động lại tiến trình:
+
+```powershell
+docker exec ecommerce-redis sh -c "redis-cli --scan --pattern '*PermissionGrant*' | wc -l"       # IN ra số key
+docker exec ecommerce-redis sh -c 'redis-cli --scan --pattern "*PermissionGrant*" | while read k; do redis-cli DEL "$k" > /dev/null; done'
+```
+
+📌 Đo được: **174 key** ⇒ xoá xong, API hết `403` **ngay** (không cần đổi mã). ➕ `probe-so-dia-chi.ps1` **tự** làm
+việc này (và **in số key**) để lần sau không phải nhớ.
+
+### S2-3. 🚨 ABP trả **`403` cho MỌI `BusinessException`** ⇒ `404`/`409` trong tài liệu **không bao giờ** xuất hiện
+
+**Chuyện thật:** "thêm trùng địa chỉ" (`0010`) ⇒ **`403`**; "khách không tồn tại" (`0001`) ⇒ **`403`**;
+"vượt trần" (`0015`) ⇒ **`403`**. Hệ quả **kép**: ① client tưởng lỗi **phân quyền** trong khi là lỗi **dữ liệu**;
+② `403` thật mất khả năng chẩn đoán (đúng thứ `ChanDoanTuChoiQuyenHandler` sinh ra để bảo vệ).
+
+✅ **Luật:** ánh xạ **mã nghiệp vụ ⇒ HTTP status** bằng chính API của ABP (giữ nguyên payload `{error:{code,…}}`):
+
+```csharp
+Configure<Volo.Abp.AspNetCore.ExceptionHandling.AbpExceptionHttpStatusCodeOptions>(options =>
+{
+    options.Map("eCommerce:Customers:0010", HttpStatusCode.Conflict);   // 409
+    options.Map("eCommerce:Customers:0011", HttpStatusCode.NotFound);   // 404
+    // … 19 mã của ADDR-004 (§12)
+});
+```
+
+📌 Ghi ở `eCommerceHttpApiHostModule.cs`; nếu quên thì **mọi mã 4xx nghiệp vụ thành 403** và **không** test nào đỏ.
+
+### S2-4. 🚨 **Thứ tự UPDATE** với **partial unique index**: xoá mềm phải GHI XUỐNG DB trước
+
+**Chuyện thật:** `go-dia-chi` (gỡ mục đang mặc định) ⇒ **`23505`** trên
+`IX_CusAddressLinks_TenantId_CustomerId_AddressType_MacDinh`. Nguyên nhân: EF phát
+`UPDATE … IsDefault = true` (mục **thay thế**) **trước** `UPDATE … IsDeleted = true` (mục đang gỡ) ⇒ tại thời
+điểm đó **hai** dòng cùng `(khách, loại)` đều là mặc định.
+
+✅ **Luật:** mọi thao tác đổi mặc định phải **bỏ trước — đặt sau**, và **bỏ** phải **đã xuống DB**:
+`await CurrentUnitOfWork.SaveChangesAsync()` **giữa** hai bước. 📌 PostgreSQL kiểm unique index **ngay từng
+câu lệnh** (không phải cuối transaction) — đúng gốc của `TC-06b`.
+
+### S2-5. 🚨 Thiếu `DependsOn`/`ProjectReference` ở **Web** ⇒ `/KhachHang` trả **500**, build vẫn XANH
+
+**Chuyện thật:** `CustomerAppService` được thêm phụ thuộc `IAddressDirectory`. **Host** đã có
+`AddressApplicationModule`; **Web** thì **chưa** ⇒ `/KhachHang` **500**, và cổng E2E báo
+*"DANG NHAP THAT BAI ⇒ PHEP KIEM VO NGHIA"* — 📌 một thông điệp **trỏ sai chỗ** (lỗi DI, không phải mật khẩu).
+
+✅ **Luật:** thêm phụ thuộc vào một app service **đang được dùng ở cả hai tiến trình** ⇒ kiểm **cả hai** đồ thị
+module (`DependsOn` **và** `ProjectReference`). 📌 Đây là bẫy #4 của dự án, lặp lại ở tầng **module**:
+`DbSet` thiếu ⇒ DI nổ; `DependsOn` thiếu ⇒ **cũng** DI nổ, cùng triệu chứng `500`.

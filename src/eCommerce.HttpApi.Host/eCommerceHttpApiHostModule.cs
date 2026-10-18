@@ -273,6 +273,47 @@ public class eCommerceHttpApiHostModule : AbpModule
             options.Filters.Add<HttpApi.Host.Filters.BoLocViPhamRangBuocDb>();
         });
 
+        // 🚨 `ADDR-004` **§12** — **ÁNH XẠ MÃ LỖI NGHIỆP VỤ ⇒ HTTP STATUS** (18/10/2026, `S2`).
+        //
+        // 🔑 VÌ SAO PHẢI CÓ (đo được, không phải suy đoán): ABP mặc định trả **`403` cho MỌI `BusinessException`**
+        // — kể cả *"không tìm thấy"*, *"liên kết trùng"* hay *"vượt trần"*. Hệ quả đo được ở probe `S2`:
+        // ① client tưởng lỗi **phân quyền** trong khi thật ra **dữ liệu không tồn tại**;
+        // ② mã `409`/`404` mà tài liệu cam kết **không bao giờ xuất hiện** ⇒ UI không phân biệt được
+        //    *"thử lại được"* với *"phải sửa dữ liệu"*;
+        // ③ trùng với `403` thật ⇒ mất khả năng chẩn đoán `F-403` (đúng thứ `ChanDoanTuChoiQuyenHandler` sinh ra để chống).
+        // 📌 Dùng `AbpExceptionHttpStatusCodeOptions` của chính ABP thay vì tự viết exception filter: nó giữ
+        // **nguyên payload** `{ error: { code, message, data } }` mà client đang dựa vào (`code` là nguồn sự thật — `D6`).
+        Configure<Volo.Abp.AspNetCore.ExceptionHandling.AbpExceptionHttpStatusCodeOptions>(options =>
+        {
+            // ── Miền ĐỊA CHỈ (`ADDR-004` §12) ────────────────────────────────────────────────────
+            options.Map(eCommerce.Address.AddressErrorCodes.KhongTimThayDiaChi, System.Net.HttpStatusCode.NotFound);          // 0101
+            options.Map(eCommerce.Address.AddressErrorCodes.KhongTimThayDonVi, System.Net.HttpStatusCode.BadRequest);        // 0001
+            options.Map(eCommerce.Address.AddressErrorCodes.XaKhongThuocTinh, System.Net.HttpStatusCode.BadRequest);         // 0003
+            options.Map(eCommerce.Address.AddressErrorCodes.HuyenKhongDuocPhepOCap2, System.Net.HttpStatusCode.BadRequest);  // 0004
+            options.Map(eCommerce.Address.AddressErrorCodes.PhienBanKhongHopLe, System.Net.HttpStatusCode.BadRequest);       // 0005
+            options.Map(eCommerce.Address.AddressErrorCodes.MaDaDong, System.Net.HttpStatusCode.BadRequest);                 // 0006
+            options.Map(eCommerce.Address.AddressErrorCodes.DaCoNoiDungDiaLy, System.Net.HttpStatusCode.Conflict);           // 0102
+            options.Map(eCommerce.Address.AddressErrorCodes.ChuyenTrangThaiKhongHopLe, System.Net.HttpStatusCode.Conflict);  // 0103
+            options.Map(eCommerce.Address.AddressErrorCodes.KhongXacDinhDuocDonVi, System.Net.HttpStatusCode.Conflict);      // 0104
+            options.Map(eCommerce.Address.AddressErrorCodes.ThieuNoiDung, System.Net.HttpStatusCode.BadRequest);             // 0105
+            options.Map(eCommerce.Address.AddressErrorCodes.ThieuCanCuXacMinh, System.Net.HttpStatusCode.BadRequest);        // 0106
+            options.Map(eCommerce.Address.AddressErrorCodes.ConLienKetHieuLuc, System.Net.HttpStatusCode.Conflict);          // 0107
+
+            // ── SỔ ĐỊA CHỈ (`ADDR-004` phần B) ──────────────────────────────────────────────────
+            options.Map(eCommerce.Customers.CustomerErrorCodes.LienKetDiaChiDaTonTai, System.Net.HttpStatusCode.Conflict);     // 0010
+            options.Map(eCommerce.Customers.CustomerErrorCodes.KhongTimThayLienKet, System.Net.HttpStatusCode.NotFound);       // 0011
+            options.Map(eCommerce.Customers.CustomerErrorCodes.MacDinhKhongHopLe, System.Net.HttpStatusCode.Conflict);         // 0012
+            options.Map(eCommerce.Customers.CustomerErrorCodes.KhongSuaDuocLienKet, System.Net.HttpStatusCode.BadRequest);     // 0013
+            options.Map(eCommerce.Customers.CustomerErrorCodes.KhongPhucHoiDuocLienKet, System.Net.HttpStatusCode.Conflict);   // 0014
+            options.Map(eCommerce.Customers.CustomerErrorCodes.VuotTranDiaChi, System.Net.HttpStatusCode.BadRequest);          // 0015
+            options.Map(eCommerce.Customers.CustomerErrorCodes.DiaChiKhongDungDuoc, System.Net.HttpStatusCode.BadRequest);     // 0016
+            options.Map(eCommerce.Customers.CustomerErrorCodes.KhongTimThayKhach, System.Net.HttpStatusCode.NotFound);         // 0001
+
+            // ── Hạ tầng chung ──────────────────────────────────────────────────────────────────
+            // Không giành được khoá phân tán ⇒ **409** (client thử lại được) — `ADDR-004` §12 ghi rõ.
+            options.Map(eCommerceConsts.ErrorCodes.KhongGianhDuocKhoa, System.Net.HttpStatusCode.Conflict);
+        });
+
         Configure<AbpAspNetCoreMvcOptions>(options =>
         {
             options.ConventionalControllers.Create(typeof(eCommerceApplicationModule).Assembly);

@@ -56,3 +56,8 @@ media-noi-bo/
 
 # Log tam cua script kiem chung trong tools\ (dang _ten.txt) - KHONG phai ma nguon.
 tools/_*.txt
+
+# 🚨 Thư mục TẠM của công cụ kiểm chứng trong tools\ (`_tam-kiem`, `_tam-e2e`, `_tam-diachi`):
+# log, file SQL tạm, cookie jar… 🔒 KHÔNG phải mã nguồn và KHÔNG được commit — chúng chứa
+# **cookie phiên** và **dữ liệu probe** (có thể có PII giả lập).
+tools/_tam-*/

@@ -141,7 +141,7 @@ public class PostgreSqlSchemaTests
     }
 
     [Fact]
-    public async Task F1_du_49_index_deu_dung_NULLS_NOT_DISTINCT()
+    public async Task F1_du_51_index_deu_dung_NULLS_NOT_DISTINCT()
     {
         // 🔒 BẤT BIẾN (ghi ở XC-004 Q6): mọi unique index trên entity IMultiTenant PHẢI có
         // `NULLS NOT DISTINCT`. Ai tạo migration mới mà quên ⇒ test này đỏ.
@@ -149,9 +149,11 @@ public class PostgreSqlSchemaTests
         //    → **46** (16/10/2026, `Cus001_Customers_CustomerGroups`: 3 unique index — nhóm khách,
         //    một-tài-khoản-một-khách, khoá idempotency).
         //    → **49** (18/10/2026, `Addr004_SoDiaChi_Address`: `IX_AddrAddresses_TenantId_ContentHash`
-        //      — khoá tự nhiên "một NỘI DUNG ⇒ một bản ghi". 📌 `CustomerAddressLink` (2 index còn lại
-        //      của `ADDR-004`) là phần B — **chưa** làm, nên 49 chứ **chưa** phải 51).
-        Assert.Equal(49L, await DemAsync(
+        //      — khoá tự nhiên "một NỘI DUNG ⇒ một bản ghi").
+        //    → **51** (18/10/2026, `Addr004_SoDiaChi_Address_Va_LienKet` — **2** index của
+        //      `CusAddressLinks`: bất biến *"một mặc định / (khách, loại)"* + chống liên kết trùng.
+        //      📌 Đây là **đích cuối** của `ADDR-004`; `S1` dừng ở 49 vì bảng liên kết **chưa** tồn tại).
+        Assert.Equal(51L, await DemAsync(
             "select count(*) from pg_indexes where schemaname = 'public' and indexdef like '%NULLS NOT DISTINCT%'"));
 
         // Kiểm tra ĐÍCH DANH để thông báo lỗi có ý nghĩa (tên index dài có thể bị PostgreSQL cắt ⇒ so theo tiền tố).
@@ -221,7 +223,17 @@ public class PostgreSqlSchemaTests
             //    địa chỉ ⇒ cả hai INSERT đều "thấy chưa có" ⇒ hai bản ghi. Mất `NULLS NOT DISTINCT`
             //    thì khi `TenantId = NULL` (tình trạng hiện nay — chạy 1 tenant) index MẤT TÁC DỤNG
             //    hoàn toàn ⇒ trùng địa chỉ **im lặng**, và báo cáo "giao bao nhiêu điểm" đếm SAI.
-            "IX_AddrAddresses_TenantId_ContentHash"
+            "IX_AddrAddresses_TenantId_ContentHash",
+            // 🚨 ADDR-004 phần B (18/10/2026) — **SỔ ĐỊA CHỈ CỦA KHÁCH**: hai bất biến mà tầng ứng dụng
+            //    không đủ sức giữ khi `TenantId = NULL`.
+            //   • `…_AddressType_MacDinh`: **tối đa MỘT mặc định cho mỗi (khách, loại)**. Mất mệnh đề ⇒
+            //     hai mặc định cùng loại LỌT ⇒ đơn giao tới địa chỉ nào là **KHÔNG XÁC ĐỊNH**, và không
+            //     lỗi nào nổi lên. ⚠️ Đây là **partial unique** (bộ lọc `IsDefault AND NOT IsDeleted`) —
+            //     EF không sinh được `NULLS NOT DISTINCT` kèm bộ lọc ⇒ SQL thô trong migration.
+            //   • `…_AddressId_AddressType`: chống **liên kết trùng** (hai luồng cùng thêm một địa chỉ).
+            //     Mất mệnh đề ⇒ sổ địa chỉ có hai dòng cho cùng một địa chỉ ⇒ UI hiện trùng, `TC-10` hỏng.
+            "IX_CusAddressLinks_TenantId_CustomerId_AddressType_MacDinh",
+            "IX_CusAddressLinks_TenantId_CustomerId_AddressId_AddressType"
         ];
 
         foreach (var ten in phaiCo)
@@ -311,6 +323,129 @@ public class PostgreSqlSchemaTests
 
         var soDong = await DemAsync(
             $"select count(*) from \"AddrAddresses\" where \"ContentHash\" = '{hash}'");
+
+        Assert.Equal(2L, soDong);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════════════════════
+    // ADDR-004 PHẦN B — SỔ ĐỊA CHỈ: bất biến *"tối đa MỘT mặc định / (khách, loại)"* (`ADR-06`)
+    // ══════════════════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Chèn một **liên kết sổ địa chỉ**. 📌 `AddressId` là tham chiếu MỀM ⇒ **không** cần dòng `AddrAddresses`
+    /// tương ứng (đó chính là điều được kiểm: không có FK thì DB vẫn phải giữ được bất biến của sổ).
+    /// </summary>
+    private async Task ChenLienKetAsync(
+        Guid? tenantId,
+        Guid customerId,
+        Guid addressId,
+        int addressType,
+        bool isDefault,
+        bool isDeleted,
+        string stamp)
+    {
+        await using var cmd = _fixture.DataSource.CreateCommand("""
+            insert into "CusAddressLinks"
+                ("Id","TenantId","CustomerId","AddressId","AddressType","Label","IsDefault","LastUsedAtUtc",
+                 "ExtraProperties","ConcurrencyStamp","CreationTime","IsDeleted")
+            values ($1, $2, $3, $4, $5, $6, $7, null,
+                    '{}', $8, now(), $9)
+            """);
+
+        cmd.Parameters.AddWithValue(Guid.NewGuid());
+        cmd.Parameters.AddWithValue((object?)tenantId ?? DBNull.Value);
+        cmd.Parameters.AddWithValue(customerId);
+        cmd.Parameters.AddWithValue(addressId);
+        cmd.Parameters.AddWithValue(addressType);
+        cmd.Parameters.AddWithValue($"Nha [{stamp}]");
+        cmd.Parameters.AddWithValue(isDefault);
+        cmd.Parameters.AddWithValue(stamp);
+        cmd.Parameters.AddWithValue(isDeleted);
+
+        await cmd.ExecuteNonQueryAsync();
+    }
+
+    [Fact]
+    public async Task ADDR004B_chan_HAI_mac_dinh_cung_loai_khi_TenantId_NULL()
+    {
+        // 🚨 BẤT BIẾN 3 của `ADDR-004` (§8.1). Đây là bất biến **tầng ứng dụng KHÔNG giữ được** khi hai luồng
+        // cùng đặt mặc định: cả hai đều thấy "chưa có mặc định" ⇒ cả hai UPDATE. Thiếu `NULLS NOT DISTINCT`
+        // thì khi `TenantId = NULL` (đang chạy 1 tenant) index MẤT TÁC DỤNG ⇒ **hai mặc định cùng loại**,
+        // và đơn hàng giao tới địa chỉ nào là **KHÔNG XÁC ĐỊNH** — không lỗi nào nổi lên.
+        var khachId = Guid.NewGuid();
+
+        await ChenLienKetAsync(null, khachId, Guid.NewGuid(), addressType: 0, isDefault: true, isDeleted: false, "md-a");
+
+        var ex = await Assert.ThrowsAsync<PostgresException>(() => ChenLienKetAsync(
+            null, khachId, Guid.NewGuid(), addressType: 0, isDefault: true, isDeleted: false, "md-b"));
+
+        Assert.Equal(PostgresErrorCodes.UniqueViolation, ex.SqlState);   // 23505
+    }
+
+    [Fact]
+    public async Task ADDR004B_CHO_PHEP_mot_mac_dinh_cho_MOI_LOAI()
+    {
+        // 🔒 Chiều NGƯỢC LẠI — bất biến tính **theo từng loại** (`BR-ADDR-004-006`): một khách **được** có
+        // đồng thời 1 mặc định giao hàng + 1 mặc định hoá đơn. Nếu index không có `AddressType` trong khoá
+        // thì ca HỢP LỆ này sẽ bị chặn — và người dùng nhận lỗi ở một thao tác đúng.
+        var khachId = Guid.NewGuid();
+
+        await ChenLienKetAsync(null, khachId, Guid.NewGuid(), addressType: 0, isDefault: true, isDeleted: false, "loai-a");
+        await ChenLienKetAsync(null, khachId, Guid.NewGuid(), addressType: 1, isDefault: true, isDeleted: false, "loai-b");
+
+        var soDong = await DemAsync(
+            $"select count(*) from \"CusAddressLinks\" where \"CustomerId\" = '{khachId}' and \"IsDefault\"");
+
+        Assert.Equal(2L, soDong);
+    }
+
+    [Fact]
+    public async Task ADDR004B_mac_dinh_DA_XOA_MEM_khong_chieM_cho()
+    {
+        // 🔒 Index có bộ lọc `WHERE "IsDefault" AND NOT "IsDeleted"`: mục đã gỡ KHÔNG được chiếm chỗ của
+        // mặc định mới — nếu không, khách gỡ mặc định rồi đặt mặc định khác sẽ bị chặn bởi **một dòng
+        // mà họ không còn nhìn thấy** (lỗi cực khó truy).
+        var khachId = Guid.NewGuid();
+
+        await ChenLienKetAsync(null, khachId, Guid.NewGuid(), addressType: 0, isDefault: true, isDeleted: true, "go-a");
+        await ChenLienKetAsync(null, khachId, Guid.NewGuid(), addressType: 0, isDefault: true, isDeleted: false, "go-b");
+
+        var soDong = await DemAsync(
+            $"select count(*) from \"CusAddressLinks\" where \"CustomerId\" = '{khachId}' and \"IsDefault\" and not \"IsDeleted\"");
+
+        Assert.Equal(1L, soDong);
+    }
+
+    [Fact]
+    public async Task ADDR004B_chan_LIEN_KET_TRUNG_khi_TenantId_NULL()
+    {
+        // 🚨 `TC-10` — hai luồng cùng thêm MỘT địa chỉ vào sổ của cùng khách. Thiếu index này thì sổ có hai
+        // dòng cho cùng địa chỉ ⇒ UI hiện trùng và `DatMacDinh` trở nên **không tất định**.
+        var khachId = Guid.NewGuid();
+        var diaChiId = Guid.NewGuid();
+
+        await ChenLienKetAsync(null, khachId, diaChiId, addressType: 0, isDefault: false, isDeleted: false, "trung-a");
+
+        var ex = await Assert.ThrowsAsync<PostgresException>(() => ChenLienKetAsync(
+            null, khachId, diaChiId, addressType: 0, isDefault: false, isDeleted: false, "trung-b"));
+
+        Assert.Equal(PostgresErrorCodes.UniqueViolation, ex.SqlState);   // 23505
+    }
+
+    [Fact]
+    public async Task ADDR004B_lien_ket_DA_XOA_MEM_thi_them_LAI_duoc()
+    {
+        // 🔒 APPEND-ONLY + dùng lại: gỡ một mục rồi **thêm lại cùng địa chỉ** là thao tác HỢP LỆ
+        // (`ADDR-004` §12: *"dùng lại ⇒ liên kết mới (được phép)"*). Bộ lọc `NOT "IsDeleted"` là thứ cho phép
+        // điều đó; thiếu nó ⇒ đường "gỡ rồi thêm lại" **hỏng vĩnh viễn** và không ai hiểu vì sao.
+        var khachId = Guid.NewGuid();
+        var diaChiId = Guid.NewGuid();
+
+        await ChenLienKetAsync(null, khachId, diaChiId, addressType: 0, isDefault: false, isDeleted: true, "lai-a");
+        await ChenLienKetAsync(null, khachId, diaChiId, addressType: 0, isDefault: false, isDeleted: false, "lai-b");
+
+        var soDong = await DemAsync(
+            $"select count(*) from \"CusAddressLinks\" where \"CustomerId\" = '{khachId}' and \"AddressId\" = '{diaChiId}'");
 
         Assert.Equal(2L, soDong);
     }

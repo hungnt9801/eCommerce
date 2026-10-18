@@ -6,11 +6,21 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- 🚨 `ADDR-004` **ADR-08** — hợp đồng (DTO + interface + ETO) ở project riêng để module khác
+         (`Customers`) dùng được mà **không** phải tham chiếu tầng Application của module này. -->
+    <ProjectReference Include="..\eCommerce.Address.Application.Contracts\eCommerce.Address.Application.Contracts.csproj" />
     <ProjectReference Include="..\eCommerce.Address.Domain\eCommerce.Address.Domain.csproj" />
+    <!-- 🔒 Cần `eCommerceConsts` (permission `eCommerce.Addresses.*` + mã lỗi khoá phân tán).
+         📌 Cùng hướng đã có: `Customers.Application` → `eCommerce.Domain.Shared` (module → shared: HỢP LỆ). -->
+    <ProjectReference Include="..\..\..\src\eCommerce.Domain.Shared\eCommerce.Domain.Shared.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Volo.Abp.Ddd.Application" />
+    <!-- 🔑 Cần `Database.ExecuteSqlInterpolatedAsync` cho **đúng một** lệnh `INSERT … ON CONFLICT DO NOTHING`
+         (`ADDR-004` §8.2 #1). 📌 Đây là **package** (không phải project ref) nên KHÔNG tạo phụ thuộc vòng;
+         và nó không kéo theo `eCommerce.EntityFrameworkCore`. -->
+    <PackageReference Include="Volo.Abp.EntityFrameworkCore" />
   </ItemGroup>
 
 </Project>

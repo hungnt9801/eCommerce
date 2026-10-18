@@ -165,6 +165,35 @@ public static class eCommerceConsts
             /// <summary>Tạo/nâng cấp/chặn/gỡ chặn hồ sơ khách.</summary>
             public const string Manage = Default + ".Manage";
         }
+
+        /// <summary>
+        /// 🚨 **SỔ ĐỊA CHỈ** (`ADDR-004` phần B — `S2`, 18/10/2026).
+        ///
+        /// 🔒 **BẮT BUỘC khai ở CẢ HAI NƠI** (hằng số này **và** `eCommercePermissionDefinitionProvider`):
+        /// thiếu một nơi ⇒ ABP coi permission là **luôn bị từ chối** ⇒ `403` cho **MỌI người** kể cả `admin`
+        /// (`XC-004` **D2**; 🛡️ lưới an toàn `BatBienPhanQuyenTests.TC02b`) — đây là lỗi **im lặng** vì
+        /// build, migration và unit test khác đều **xanh**.
+        ///
+        /// 🔑 **BA mức đặc quyền, không phải một** — vì ba thao tác ảnh hưởng **phạm vi khác nhau**:
+        ///   • `Manage` — sửa **`Address` dùng chung trong tenant** ⇒ ảnh hưởng **khách KHÁC** (mức cao nhất);
+        ///   • `ManageBook` — chỉ sửa **sổ của MỘT khách** ⇒ mức thấp hơn hẳn;
+        ///   • `Verify` — **xác minh** địa chỉ (cần căn cứ): *người xác minh ≠ người nhập* (cùng nguyên tắc
+        ///     `CarrierMappingStatus.DaXacMinh`).
+        /// </summary>
+        public static class Addresses
+        {
+            /// <summary>Xem địa chỉ + sổ địa chỉ (theo khuôn `Customers.Default`).</summary>
+            public const string Default = GroupName + ".Addresses";
+
+            /// <summary>Tạo/chuẩn hoá/xác minh **`Address` dùng chung** — 🔑 ảnh hưởng khách khác.</summary>
+            public const string Manage = Default + ".Manage";
+
+            /// <summary>Thêm/đặt mặc định/gỡ địa chỉ **trong sổ của một khách**.</summary>
+            public const string ManageBook = Default + ".ManageBook";
+
+            /// <summary>Xác minh địa chỉ (bắt buộc căn cứ) — tách khỏi `Manage`.</summary>
+            public const string Verify = Default + ".Verify";
+        }
     }
 
     /// <summary>

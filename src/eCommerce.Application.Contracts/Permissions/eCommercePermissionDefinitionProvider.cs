@@ -103,5 +103,15 @@ public class eCommercePermissionDefinitionProvider : PermissionDefinitionProvide
         operations.AddChild(eCommerceConsts.Permissions.Operations.DeadLetters);
         var customers = group.AddPermission(eCommerceConsts.Permissions.Customers.Default);
         customers.AddChild(eCommerceConsts.Permissions.Customers.Manage);
+
+        // ---- Sổ địa chỉ (`ADDR-004` phần B) ----
+        // 🚨 BẮT BUỘC khai ở CẢ HAI NƠI (hằng số + ở đây): thiếu một nơi ⇒ `403` cho MỌI người kể cả `admin`.
+        // 🔑 BA mức: `Manage` (sửa `Address` DÙNG CHUNG — ảnh hưởng khách khác) · `ManageBook` (chỉ sổ của
+        //    MỘT khách) · `Verify` (xác minh, cần căn cứ — người xác minh ≠ người nhập).
+        // 🛡️ Lưới an toàn: `BatBienPhanQuyenTests.TC02b` khoá bất biến "hằng số ↔ định nghĩa khớp 2 CHIỀU".
+        var addresses = group.AddPermission(eCommerceConsts.Permissions.Addresses.Default);
+        addresses.AddChild(eCommerceConsts.Permissions.Addresses.Manage);
+        addresses.AddChild(eCommerceConsts.Permissions.Addresses.ManageBook);
+        addresses.AddChild(eCommerceConsts.Permissions.Addresses.Verify);
     }
 }

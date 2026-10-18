@@ -77,3 +77,13 @@ CK_AddrAddresses_SchemaVersion|ADDR-004: chỉ 2 phiên bản schema (1 = 3 cấ
 CK_AddrAddresses_V2KhongCoHuyen|ADDR-004: quy tắc PHÁP LÝ (Luật 72/2025/QH15) — schema 2 cấp không có huyện; entity ném `eCommerce:Address:0004` trước khi tới DB
 CK_AddrAddresses_DinhDangMa|ADDR-004: độ dài + chỉ chữ số của mã theo cấp — entity dùng `AdministrativeUnit.ChuanHoaMa` (ném `0002`)
 CK_AddrAddresses_ContentHashHex|ADDR-004: `ContentHash` phải là hex thường 64 ký tự (chặn base64/bytea/hex HOA); chỉ `DiaChiCanonical` sinh ra được
+
+# ── ADDR-004 PHẦN B (18/10/2026) — SỔ ĐỊA CHỈ: entity `CustomerAddressLink` (`CusAddressLinks`) ─────
+# 📌 CẢ 4 ràng buộc dưới đây là **BẤT BIẾN CẤU TRÚC** (hình dạng dữ liệu của sổ), KHÔNG phải ca nghiệp vụ
+#    mà client cần phân biệt bằng mã lỗi: app service đã **tiền kiểm** và ném mã riêng TRƯỚC khi chạm DB
+#    (`0010` liên kết trùng · `0012` tranh chấp mặc định · `0015` vượt trần), nên các ràng buộc này chỉ còn
+#    là **lưới cuối** cho dữ liệu vào từ SQL tay/import và cho **race** khi khoá phân tán mất tác dụng.
+IX_CusAddressLinks_TenantId_CustomerId_AddressType_MacDinh|ADDR-004: bất biến *"tối đa MỘT mặc định / (khách, loại)"* — ca HỢP LỆ "khách thứ hai cùng toà nhà" KHÔNG chạm index này; app service trả `0012` khi DB chặn (Redis chết), nên không có ca nào cần `23505` lộ ra client
+IX_CusAddressLinks_TenantId_CustomerId_AddressId_AddressType|ADDR-004: chống **liên kết trùng** — lưới an toàn cho hai luồng cùng thêm (`TC-10`); app service đã tiền kiểm và trả `0010` kèm `linkId`
+CK_CusAddressLinks_AddressType|ADDR-004: `AddressType` chỉ nhận 2 giá trị (0 Shipping · 1 Billing) — bất biến cấu trúc; entity có `Enum.IsDefined` + không có setter công khai
+CK_CusAddressLinks_NhanDoDai|ADDR-004: nhãn dài tối đa 128 ký tự — đã có `HasMaxLength` + guard `DoDaiNhanToiDa` ở entity; CHECK giữ để DB tự đứng được khi dữ liệu vào từ SQL tay

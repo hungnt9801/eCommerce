@@ -3382,6 +3382,102 @@ namespace eCommerce.Migrations
                     b.ToTable("CusCustomers", (string)null);
                 });
 
+            modelBuilder.Entity("eCommerce.Customers.CustomerAddressLink", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AddressId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AddressType")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("ConcurrencyStamp");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("DeleterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("DeleterId");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("DeletionTime");
+
+                    b.Property<string>("ExtraProperties")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("ExtraProperties");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("IsDeleted");
+
+                    b.Property<string>("Label")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<DateTime?>("LastUsedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "AddressId")
+                        .HasDatabaseName("IX_CusAddressLinks_TenantId_AddressId");
+
+                    b.HasIndex("TenantId", "CustomerId", "AddressType")
+                        .IsUnique()
+                        .HasDatabaseName("IX_CusAddressLinks_TenantId_CustomerId_AddressType_MacDinh")
+                        .HasFilter("\"IsDefault\" AND NOT \"IsDeleted\"");
+
+                    b.HasIndex("TenantId", "CustomerId", "AddressId", "AddressType")
+                        .IsUnique()
+                        .HasDatabaseName("IX_CusAddressLinks_TenantId_CustomerId_AddressId_AddressType")
+                        .HasFilter("NOT \"IsDeleted\"");
+
+                    b.HasIndex("TenantId", "CustomerId", "IsDeleted", "AddressType")
+                        .HasDatabaseName("IX_CusAddressLinks_TenantId_CustomerId_IsDeleted_AddressType");
+
+                    b.ToTable("CusAddressLinks", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_CusAddressLinks_AddressType", "\"AddressType\" in (0, 1)");
+
+                            t.HasCheckConstraint("CK_CusAddressLinks_NhanDoDai", "char_length(\"Label\") <= 128");
+                        });
+                });
+
             modelBuilder.Entity("eCommerce.Customers.CustomerDataExportLog", b =>
                 {
                     b.Property<Guid>("Id")

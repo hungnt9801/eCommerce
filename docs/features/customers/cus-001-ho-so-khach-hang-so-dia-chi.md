@@ -1128,7 +1128,7 @@ Phiên bản đầu: `CustomerAppService` **hiện thực luôn** `ICustomerDire
 | **2** | **Chưa có `CustomerGroup` API/seed** | Entity + mapping + ràng buộc DB **đã có**; **chưa** có endpoint CRUD và **chưa** seed nhóm mặc định (`RETAIL`/`WHOLESALE`/`VIP`) ⇒ hiện phải ghi DB tay |
 | **3** | **Chưa kiểm chứng HTTP** cho lát cắt này | ✅ **ĐÃ KIỂM CHỨNG 16/10/2026 — 15/15 ca** (xem **§16.6**): nay **đã gọi API thật** + **đọc lại DB** + **kiểm log không chứa PII thô** |
 | **4** | **Chưa nối đường bán hàng với `ChoPhepGiaoDichAsync`** | `SAL-002`/`SAL-001` **chưa** gọi ⇒ khách `Blocked` **vẫn đặt được hàng** ở đường thật. 📌 Đây là **cổng nghiệp vụ còn trống** (rủi ro: khách chây nợ vẫn mua) |
-| **5** | **Chưa có xuất dữ liệu cá nhân** (quyền *"yêu cầu cung cấp"*) và **chưa có đường xoá mềm có kiểm** | Luật 91/2025/QH15 đã nêu ở §0; hiện mới có `IsDeleted` (hạ tầng `FullAudited`) |
+| **5** | ~~**Chưa có xuất dữ liệu cá nhân**~~ | ✅ **ĐÃ CÓ** (`XuatDuLieuCaNhanAsync` + `CusDataExportLogs`, 16/10/2026). ➕ **`ADDR-004` B10 (18/10/2026): bản xuất GỒM SỔ ĐỊA CHỈ**, kể cả mục **đã gỡ** (có cờ `DaGo`) ⇒ đóng **một phần** `NFR-CUS-0010`/`TC-16` — ⏳ còn **đường xoá mềm có kiểm** (quyền *"yêu cầu xóa"*) |
 | **6** | **Chưa có `TenantId` filter test** + chưa có ETO `CustomerChangedEto` | Module khác (`LOY-001` D8) sẽ cần **ETO**; nay chưa phát sự kiện nào |
 | **7** | `GetDanhSachAsync` **chưa phân trang** (có **trần** `toiDa ≤ 500`) | Cần `PagedResultDto` trước khi có UI thật |
 

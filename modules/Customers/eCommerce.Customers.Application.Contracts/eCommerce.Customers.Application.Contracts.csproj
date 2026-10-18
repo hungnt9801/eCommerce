@@ -7,6 +7,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\eCommerce.Customers.Domain\eCommerce.Customers.Domain.csproj" />
+    <!-- 🚨 `ADDR-004` **ADR-08** (`S2`): sổ địa chỉ dùng `DiaChiSnapshotDto` của miền `Address`.
+         🔒 Chỉ tham chiếu project **Contracts** (KHÔNG phải `Address.Application`) ⇒ không tạo
+         phụ thuộc ngược module → Application, và `Customers.Domain` **không** kéo theo `Address.Domain`. -->
+    <ProjectReference Include="..\..\Address\eCommerce.Address.Application.Contracts\eCommerce.Address.Application.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -20,6 +20,10 @@
   <ItemGroup>
     <PackageReference Include="Volo.Abp.Ddd.Application" />
     <PackageReference Include="Volo.Abp.DistributedLocking" />
+    <!-- 🔑 Cần `DbUpdateException` để nhận diện `23505` của partial unique index *"một mặc định"* và trả
+         mã nghiệp vụ `eCommerce:Customers:0012` thay vì `500` (`ADDR-004` §12). 📌 Package (không phải
+         project ref) ⇒ không phụ thuộc `eCommerce.EntityFrameworkCore`. -->
+    <PackageReference Include="Volo.Abp.EntityFrameworkCore" />
   </ItemGroup>
 
 </Project>

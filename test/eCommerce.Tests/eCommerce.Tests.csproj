@@ -28,6 +28,10 @@
     <ProjectReference Include="..\..\shared\eCommerce.Kernel\eCommerce.Kernel.csproj" />
     <ProjectReference Include="..\..\modules\Messaging\eCommerce.Messaging.Domain\eCommerce.Messaging.Domain.csproj" />
     <ProjectReference Include="..\..\modules\Address\eCommerce.Address.Domain\eCommerce.Address.Domain.csproj" />
+    <!-- 🔑 `ADDR-004` phần B (`S2`): hợp đồng của miền địa chỉ (DTO snapshot + ETO) và entity sổ địa chỉ
+         của khách — cần cho test bất biến của sổ + test `TC-18` (ETO không chứa PII). -->
+    <ProjectReference Include="..\..\modules\Address\eCommerce.Address.Application.Contracts\eCommerce.Address.Application.Contracts.csproj" />
+    <ProjectReference Include="..\..\modules\Customers\eCommerce.Customers.Domain\eCommerce.Customers.Domain.csproj" />
     <ProjectReference Include="..\..\modules\EInvoice\eCommerce.EInvoice.Domain\eCommerce.EInvoice.Domain.csproj" />
     <ProjectReference Include="..\..\modules\EInvoice\eCommerce.EInvoice.Application\eCommerce.EInvoice.Application.csproj" />
     <ProjectReference Include="..\..\modules\Signing\eCommerce.Signing.Domain\eCommerce.Signing.Domain.csproj" />

@@ -23,6 +23,11 @@
          📌 Trước lượt 19, `eCommerce.Web` CHƯA tham chiếu hai module này ⇒ hai trang đó chưa làm được
          (đã ghi ở `web-001` §95.4 như một nợ CÓ LÝ DO, không phải bỏ sót). -->
     <ProjectReference Include="..\..\modules\Customers\eCommerce.Customers.Application\eCommerce.Customers.Application.csproj" />
+    <!-- 🚨 `ADDR-004` (`S2`, 18/10/2026) — **DI SỐNG Ở ĐÂY, KHÔNG Ở HOST.**
+         `CustomerAppService` nay cần `IAddressDirectory` (sổ địa chỉ) ⇒ tiến trình **Web** phải nạp
+         `AddressApplicationModule`, nếu không `/KhachHang` trả **`500`** ngay (đo được: E2E `B1` đỏ ~4 phút).
+         📌 Đúng bẫy #4 của dự án: thiếu đăng ký module **không** có lỗi biên dịch — chỉ nổ lúc chạy. -->
+    <ProjectReference Include="..\..\modules\Address\eCommerce.Address.Application\eCommerce.Address.Application.csproj" />
     <ProjectReference Include="..\..\modules\PaymentHub\eCommerce.PaymentHub.Application\eCommerce.PaymentHub.Application.csproj" />
     <ProjectReference Include="..\eCommerce.EntityFrameworkCore\eCommerce.EntityFrameworkCore.csproj" />
     <ProjectReference Include="..\..\shared\eCommerce.Kernel\eCommerce.Kernel.csproj" />

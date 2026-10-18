@@ -70,7 +70,10 @@ namespace eCommerce.Web;
         // chỉ thêm `ProjectReference` mà **không** thêm `DependsOn` thì DI **không** đăng ký app service của
         // module ⇒ lỗi chỉ lộ ra **lúc chạy** (`Could not resolve IChinhSach...`), ⚠️ không phải lúc build.
         typeof(Customers.CustomersApplicationModule),
-        typeof(PaymentHub.PaymentHubApplicationModule)
+        typeof(PaymentHub.PaymentHubApplicationModule),
+        // 🚨 `ADDR-004` (`S2`) — sổ địa chỉ. `CustomerAppService` cần `IAddressDirectory` ⇒ **thiếu dòng này**
+        // thì `/KhachHang` trả `500` (DI không dựng được controller) mà **build vẫn xanh**.
+        typeof(Address.Application.AddressApplicationModule)
 )]
 public class eCommerceWebModule : AbpModule
 {

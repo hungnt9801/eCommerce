@@ -91,6 +91,11 @@ $bangPhaiRong = @(
     'InvChannelLimits',                # probe INV-003 gieo han muc
     'PayTransactions',                 # probe REC-001 gieo giao dich
     'ReconRunMismatches'               # dong lech cua luot quet
+    # 🚨 ADDR-004 phần B (18/10/2026) — `tools/probe-so-dia-chi.ps1` gieo rồi DỌN hai bảng này. 📌 Đưa vào
+    # danh sách là cách duy nhất phát hiện probe **gieo mà không dọn** (nếu không, rác ở lại vĩnh viễn và lần
+    # đo sau đọc phải ⇒ kết luận sai). ⚠️ Chỉ thêm khi CÓ đường gieo thật (`ADDR-004` §11 ④).
+    'AddrAddresses',                   # probe S2 gieo dia chi (S2PROBE…)
+    'CusAddressLinks'                  # probe S2 gieo lien ket so dia chi
 )
 
 # 📌 Nhom ②: bang GIU LICH SU ⇒ 🚨 **KHONG** kiem "phai rong". 📌 Liet ke ra day de **ghi ro y dinh**.

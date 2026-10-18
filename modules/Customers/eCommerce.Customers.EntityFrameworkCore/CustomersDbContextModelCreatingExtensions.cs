@@ -78,6 +78,49 @@ public static class CustomersDbContextModelCreatingExtensions
                 .HasDatabaseName("IX_CusCustomers_TenantId_Status");
         });
 
+        // ── SỔ ĐỊA CHỈ CỦA KHÁCH (`ADDR-004` phần B) ──────────────────────────────────────────────
+        // 🚨 `AddressId` là **tham chiếu MỀM** (KHÔNG FK): `Address` thuộc module `Address`.
+        // 🔒 HAI unique index dưới đây **phải** có `NULLS NOT DISTINCT` ⇒ migration thay bằng SQL thô
+        //    (EF không mô hình hoá được mệnh đề này). Tên index đặt TƯỜNG MINH vì tên EF tự sinh dài
+        //    quá 63 ký tự sẽ bị PostgreSQL **CẮT** (`PostgreSqlSchemaTests` ghi lỗi này ở `:185`).
+        builder.Entity<CustomerAddressLink>(b =>
+        {
+            b.ToTable("CusAddressLinks");
+            b.ConfigureByConvention();
+
+            b.Property(x => x.Label).HasMaxLength(CustomerAddressLink.DoDaiNhanToiDa);
+            b.Property(x => x.AddressType).HasConversion<int>();
+
+            // 🚨 BẤT BIẾN "MỘT MẶC ĐỊNH / (khách, loại)" — partial unique (BR-ADDR-004-006).
+            b.HasIndex(x => new { x.TenantId, x.CustomerId, x.AddressType })
+                .IsUnique()
+                .HasFilter("\"IsDefault\" AND NOT \"IsDeleted\"")
+                .HasDatabaseName("IX_CusAddressLinks_TenantId_CustomerId_AddressType_MacDinh");
+
+            // 🚨 CHỐNG LIÊN KẾT TRÙNG — lưới an toàn cho hai luồng cùng thêm (`TC-10`).
+            b.HasIndex(x => new { x.TenantId, x.CustomerId, x.AddressId, x.AddressType })
+                .IsUnique()
+                .HasFilter("NOT \"IsDeleted\"")
+                .HasDatabaseName("IX_CusAddressLinks_TenantId_CustomerId_AddressId_AddressType");
+
+            // 📌 Index đọc sổ (nóng nhất): theo khách + loại + còn hiệu lực.
+            b.HasIndex(x => new { x.TenantId, x.CustomerId, x.IsDeleted, x.AddressType })
+                .HasDatabaseName("IX_CusAddressLinks_TenantId_CustomerId_IsDeleted_AddressType");
+
+            // 📌 *"địa chỉ này đang được khách nào dùng"* — cần khi ẩn danh hoá (§3.1 #7) và khi debug.
+            b.HasIndex(x => new { x.TenantId, x.AddressId })
+                .HasDatabaseName("IX_CusAddressLinks_TenantId_AddressId");
+
+            // 🔒 Hàng rào DB cho dữ liệu vào từ SQL tay/import (không qua entity).
+            b.ToTable(t => t.HasCheckConstraint(
+                "CK_CusAddressLinks_AddressType",
+                "\"AddressType\" in (0, 1)"));
+
+            b.ToTable(t => t.HasCheckConstraint(
+                "CK_CusAddressLinks_NhanDoDai",
+                "char_length(\"Label\") <= 128"));
+        });
+
         // ── NHẬT KÝ KIỂM TOÁN XUẤT DỮ LIỆU CÁ NHÂN (`CUS-001` §22) ────────────────────────────────
         // 🚨 Bảng này trả lời **AI / KHI NÀO / BAO NHIÊU LẦN** đã xuất PII của một khách — 🔒 ba câu hỏi
         // mà **log KHÔNG trả lời được** (log bị xoay vòng, không tra cứu được, và nằm ngoài giao dịch).

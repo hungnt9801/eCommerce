@@ -2327,3 +2327,48 @@ VALUES ('20261018023611_Addr004_SoDiaChi_Address', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE TABLE "CusAddressLinks" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "CustomerId" uuid NOT NULL,
+    "AddressId" uuid NOT NULL,
+    "AddressType" integer NOT NULL,
+    "Label" character varying(128),
+    "IsDefault" boolean NOT NULL,
+    "LastUsedAtUtc" timestamp with time zone,
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_CusAddressLinks" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_CusAddressLinks_AddressType" CHECK ("AddressType" in (0, 1)),
+    CONSTRAINT "CK_CusAddressLinks_NhanDoDai" CHECK (char_length("Label") <= 128)
+);
+
+CREATE INDEX "IX_CusAddressLinks_TenantId_AddressId" ON "CusAddressLinks" ("TenantId", "AddressId");
+
+CREATE INDEX "IX_CusAddressLinks_TenantId_CustomerId_IsDeleted_AddressType" ON "CusAddressLinks" ("TenantId", "CustomerId", "IsDeleted", "AddressType");
+
+DROP INDEX IF EXISTS "IX_CusAddressLinks_TenantId_CustomerId_AddressType_MacDinh";
+
+CREATE UNIQUE INDEX "IX_CusAddressLinks_TenantId_CustomerId_AddressType_MacDinh"
+                    ON "CusAddressLinks" ("TenantId", "CustomerId", "AddressType") NULLS NOT DISTINCT
+                    WHERE "IsDefault" AND NOT "IsDeleted";
+
+DROP INDEX IF EXISTS "IX_CusAddressLinks_TenantId_CustomerId_AddressId_AddressType";
+
+CREATE UNIQUE INDEX "IX_CusAddressLinks_TenantId_CustomerId_AddressId_AddressType"
+                    ON "CusAddressLinks" ("TenantId", "CustomerId", "AddressId", "AddressType") NULLS NOT DISTINCT
+                    WHERE NOT "IsDeleted";
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261018030540_Addr004_SoDiaChi_Address_Va_LienKet', '10.0.11');
+
+COMMIT;
+
