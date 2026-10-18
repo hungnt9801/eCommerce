@@ -269,10 +269,13 @@ public class DoiSoatAppService : ApplicationService, IDoiSoatAppService
 
         // 🔒 **Ai xác nhận lấy từ PRINCIPAL, không từ input:** người gõ tay tên không đối chiếu được với
         // tài khoản nào ⇒ không phải audit (`Q5` yêu cầu `ConfirmedByUserId`).
+        // 🚨 **Ném `AbpAuthorizationException`, KHÔNG ném một mã nghiệp vụ** (bản đầu ném `0005` = *"thiếu ghi
+        // chú"* — 📌 **sai nghĩa**: người nhận sẽ đi điền ghi chú trong khi vấn đề là **không có chủ thể**).
+        // Trạng thái này **không tới được** qua UI/API (đã có `[Authorize]` cấp class + quyền) — đây là hàng
+        // rào cho ca principal méo mó, và `403` là mã đúng nghĩa cho nó.
         var nguoiXacNhan = CurrentUser.Id
-            ?? throw new BusinessException(ReconErrorCodes.ThieuGhiChuXacNhan)
-                .WithData("reconRunId", reconRunId)
-                .WithData("lyDo", "Không xác định được người dùng hiện tại ⇒ không ghi được audit. Đăng nhập lại.");
+            ?? throw new Volo.Abp.Authorization.AbpAuthorizationException(
+                "Không xác định được người dùng hiện tại ⇒ không ghi được audit cho việc xác nhận lệch.");
 
         var daXacNhanTruocDo = luot.ConfirmedAtUtc is not null;
 
