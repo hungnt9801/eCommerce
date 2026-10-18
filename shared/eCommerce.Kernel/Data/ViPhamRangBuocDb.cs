@@ -167,7 +167,49 @@ public static class ViPhamRangBuocDb
         ["IX_CatProducts_TenantId_Sku"] =
             new("eCommerce:Catalog:0004", "SKU đã tồn tại.", true),
         ["IX_CatCategories_TenantId_ParentId_Slug"] =
-            new("eCommerce:Catalog:0020", "Danh mục trùng `Slug` trong cùng danh mục cha.", true)
+            new("eCommerce:Catalog:0020", "Danh mục trùng `Slug` trong cùng danh mục cha.", true),
+
+        // ── THANH TOÁN: `PayTransactions` + `PayRefunds` (`S5` — `PAY-001` **F-PAY-4** + §11 #2) ──────────
+        // 🚨 **ĐÂY LÀ NỢ `F-PAY-4` ĐƯỢC TRẢ MỘT PHẦN, VÀ LÝ DO PHẢI TRẢ NGAY Ở `S5` CHỨ KHÔNG PHẢI SAU:**
+        // trước `S5` hai index đầu **nằm trong danh sách trắng** với lý do *"chưa có đường ghi GĐ1 chạm tới"*.
+        // 📌 Lý do đó **hết đúng** ngay khi `S5` dựng endpoint IPN: IPN gửi **trùng/song song** là **hành vi
+        // bình thường của cổng** (at-least-once), và trước đây nó rơi về mã chung `eCommerce:Db:0001` ⇒ CSKH
+        // đọc *"dữ liệu vi phạm ràng buộc"* thay vì *"giao dịch này đã được ghi rồi"*. 🔒 **Một lý do sai trong
+        // danh sách trắng làm cả cơ chế mất giá trị** — nên nó phải được sửa **trong cùng PR** đã làm lý do đó sai.
+        //
+        // ⚠️ **Mã vẫn là `MaChung` (QUYẾT ĐỊNH CÓ Ý THỨC, KHÔNG PHẢI BỎ DỞ):** `D6` nói *"code là nguồn sự thật"*
+        // ⇒ đặt mã nghiệp vụ mới (`0011`…) là **thay đổi hợp đồng với client**, việc của **BA** — không phải
+        // việc mà một phiên code tự quyết (đúng `PAY-001` §16.3 #6, cùng họ). ✅ Cái **được** sửa ngay là
+        // **thông điệp**: nó nói đúng chuyện gì xảy ra và phải làm gì, thay vì câu chung chung.
+        // 📌 Nợ còn lại ghi ở `PAY-001` §16.4: *"cấp mã riêng cho 2 index của `PayTransactions`"*.
+        ["IX_PayTransactions_TenantId_ProviderCode_MerchantReference"] =
+            new(MaChung,
+                "Mã tham chiếu (vnp_TxnRef) này ĐÃ có giao dịch trong cùng tenant + cổng ⇒ KHÔNG tạo giao dịch " +
+                "thứ hai. Nếu đây là lần thử lại: dùng lại giao dịch đang có (`TaoGiaoDichAsync` làm việc đó).", true),
+        ["IX_PayTransactions_TenantId_ProviderCode_IdempotencyKey"] =
+            new(MaChung,
+                "Giao dịch này của cổng ĐÃ được ghi nhận rồi (trùng `IdempotencyKey`) ⇒ IPN gửi lặp, KHÔNG ghi " +
+                "lần hai. 📌 Đây là hành vi ĐÚNG của chống trùng, không phải lỗi cần sửa.", true),
+        ["IX_PayRefunds_TenantId_PaymentTransactionId_RefundRequestId"] =
+            new("eCommerce:Payment:0010",
+                "Đã có DÒNG HOÀN TIỀN cho đúng lần thứ tự này của giao dịch ⇒ KHÔNG tạo lần hoàn thứ hai " +
+                "(hoàn trùng là mất tiền thật). Kiểm `PayRefunds` của giao dịch trước khi gửi lại.", true),
+        // 🚨 **Ba `CHECK` về TIỀN** — hàng rào phòng vệ chiều sâu (`PAY-001` §5.3 + §11 #2). Tầng domain **đã**
+        // ném mã riêng (`0002` hoàn vượt, `0004` số tiền ≤ 0) ⇒ để DB nổ nghĩa là có **đường ghi TẮT** qua
+        // domain, tức là **bug**, không phải một hành vi nghiệp vụ cần mã riêng. 🔑 Nhưng vẫn **phải** ánh xạ:
+        // có ánh xạ thì ca đó trả **403 kèm SQLSTATE + tên ràng buộc** (tra được ngay) thay vì `500` mù.
+        ["CK_PayTransactions_RefundedAmount_KhongAm"] =
+            new(MaChung,
+                "Tổng đã hoàn của giao dịch sẽ bị ÂM ⇒ dữ liệu tiền không hợp lệ (số âm còn GIẢM tổng đã hoàn " +
+                "⇒ che mất một lần hoàn đã xảy ra).", false),
+        ["CK_PayTransactions_RefundedAmount_KhongVuotAmount"] =
+            new(MaChung,
+                "Tổng đã hoàn VƯỢT số tiền đã thu của giao dịch ⇒ vi phạm bất biến tiền (hoàn nhiều hơn nhận). " +
+                "📌 Bất biến này cũng được kiểm ở `PaymentTransaction.RegisterRefund`; tới được DB nghĩa là có " +
+                "đường ghi tắt qua domain.", false),
+        ["CK_PayRefunds_Amount_Duong"] =
+            new(MaChung,
+                "Dòng hoàn tiền có số tiền ≤ 0 ⇒ vô nghĩa (và số âm sẽ làm giảm tổng đã hoàn).", false)
     };
 
     /// <summary>Mã SQLSTATE của PostgreSQL mà ta xử lý.</summary>

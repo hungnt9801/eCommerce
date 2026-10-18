@@ -141,7 +141,7 @@ public class PostgreSqlSchemaTests
     }
 
     [Fact]
-    public async Task F1_du_51_index_deu_dung_NULLS_NOT_DISTINCT()
+    public async Task F1_du_52_index_deu_dung_NULLS_NOT_DISTINCT()
     {
         // 🔒 BẤT BIẾN (ghi ở XC-004 Q6): mọi unique index trên entity IMultiTenant PHẢI có
         // `NULLS NOT DISTINCT`. Ai tạo migration mới mà quên ⇒ test này đỏ.
@@ -153,7 +153,12 @@ public class PostgreSqlSchemaTests
         //    → **51** (18/10/2026, `Addr004_SoDiaChi_Address_Va_LienKet` — **2** index của
         //      `CusAddressLinks`: bất biến *"một mặc định / (khách, loại)"* + chống liên kết trùng.
         //      📌 Đây là **đích cuối** của `ADDR-004`; `S1` dừng ở 49 vì bảng liên kết **chưa** tồn tại).
-        Assert.Equal(51L, await DemAsync(
+        //    → **52** (18/10/2026, `S5_PayRefunds_VaRangBuocHoanTien` — `IX_PayRefunds_TenantId_
+        //      PaymentTransactionId_RefundRequestId`: chống ghi trùng **một lần hoàn tiền**. 🔑 Khoá là
+        //      **số thứ tự lần hoàn** (`RF001`), không phải `Guid` — xem `PaymentRefund` §"vì sao có
+        //      `RefundRequestId`"). 📌 `S5` **không** đổi index nào khác; 2 `CHECK` mới của
+        //      `PayTransactions` là **ràng buộc TIỀN**, không phải index.
+        Assert.Equal(52L, await DemAsync(
             "select count(*) from pg_indexes where schemaname = 'public' and indexdef like '%NULLS NOT DISTINCT%'"));
 
         // Kiểm tra ĐÍCH DANH để thông báo lỗi có ý nghĩa (tên index dài có thể bị PostgreSQL cắt ⇒ so theo tiền tố).
@@ -168,6 +173,10 @@ public class PostgreSqlSchemaTests
             "IX_OrdOrders_TenantId_Number",
             "IX_PayTransactions_TenantId_ProviderCode_IdempotencyKey",
             "IX_PayTransactions_TenantId_ProviderCode_MerchantReference",
+            // 🆕 `S5` — chống ghi trùng MỘT lần hoàn tiền (`PayRefunds`). 📌 Thêm vào danh sách ĐÍCH DANH, không
+            // chỉ tăng tổng: nếu ai đó thêm index khác mà làm **mất** `NULLS NOT DISTINCT` của index này thì
+            // tổng số **không đổi** ⇒ chỉ có danh sách này bắt được (đúng lý do danh sách tồn tại).
+            "IX_PayRefunds_TenantId_PaymentTransactionId_RefundRequestId",
             "IX_ChnChannelShops_TenantId_ChannelCode_ExternalShopId",
             "IX_ChnChannelListings_TenantId_ChannelShopId_ProductVariantId",
             // XC-002 — hàng rào CUỐI chống trùng ở biên vào (13/10/2026).

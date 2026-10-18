@@ -127,6 +127,17 @@ public class VnPayPaymentProvider : IPaymentProvider
 
     /// <summary>
     /// Xác thực IPN. Chạy được độc lập với DB: chỉ nhận payload thô + headers.
+    ///
+    /// ══════════════════════════════════════════════════════════════════════════════════════════════════
+    /// 🚨 **SỬA `S5` (18/10/2026) — `F-PAY-1`: HÀM NÀY TỪNG TỰ DỰNG CHUỖI KÝ THEO MỘT LUẬT KHÁC.**
+    /// Bản trước **giữ** tham số rỗng và **giải mã rồi encode lại** từng giá trị, trong khi `KiemChuKy` (cùng
+    /// tệp ý niệm, khác tệp vật lý) **bỏ** tham số rỗng. Hệ quả **đo được bằng lý luận, không phải suy đoán**:
+    /// IPN thật có `vnp_BankCode=` (rỗng) ⇒ ta tính hash **khác** ⇒ `SignatureValid = false` ⇒ **không ghi nhận
+    /// tiền đã vào** ⇒ **mất tiền im lặng**; lưới an toàn duy nhất còn lại là job `querydr`.
+    ///
+    /// ✅ **Nay chỉ còn MỘT luật:** gọi <see cref="VnPayRequestBuilder.KiemChuKyTuQueryTho"/> — hàm dựng chuỗi ký
+    /// từ **query THÔ** (byte của cổng), bỏ tham số rỗng, sắp xếp `Ordinal`. 📌 Không còn bản sao thứ hai của
+    /// thuật toán trong lớp này, nên **không còn chỗ** để hai luật lệch nhau.
     /// </summary>
     public Task<WebhookVerificationResult> VerifyWebhookAsync(
         string rawBody,
@@ -136,41 +147,15 @@ public class VnPayPaymentProvider : IPaymentProvider
         // VNPay gửi IPN dạng query string (GET). Hỗ trợ cả trường hợp body chứa query string.
         var parameters = ParseQueryString(rawBody);
 
-        var result = new WebhookVerificationResult { RawPayload = rawBody };
-
-        if (!parameters.TryGetValue("vnp_SecureHash", out var receivedHash))
+        // 📌 Điền **tham số dữ kiện** TRƯỚC khi kiểm chữ ký: khi từ chối, log/metric vẫn phải nói được
+        // *"IPN của giao dịch nào"* — thiếu chúng thì ca "sai chữ ký" là một dòng vô nghĩa.
+        var result = new WebhookVerificationResult
         {
-            GhiMetricTuChoi("thieu-chu-ky");
-            result.SignatureValid = false;
-            result.IsSuccess = false;
-            result.FailureReason = "Thiếu vnp_SecureHash.";
-            return Task.FromResult(result);
-        }
-
-        // Bỏ các tham số hash trước khi tính lại chữ ký.
-        var toSign = new SortedDictionary<string, string>(StringComparer.Ordinal);
-        foreach (var kv in parameters)
-        {
-            if (kv.Key is "vnp_SecureHash" or "vnp_SecureHashType")
-            {
-                continue;
-            }
-
-            toSign[kv.Key] = kv.Value;
-        }
-
-        var expectedHash = HmacSha512(_options.HashSecret, BuildQueryString(toSign));
-
-        result.SignatureValid = string.Equals(expectedHash, receivedHash, StringComparison.OrdinalIgnoreCase);
-
-        if (!result.SignatureValid)
-        {
-            GhiMetricTuChoi("chu-ky-sai");
-        }
-        result.MerchantReference = parameters.GetValueOrDefault("vnp_TxnRef") ?? string.Empty;
-        result.ProviderTransactionId = parameters.GetValueOrDefault("vnp_TransactionNo");
-        result.Currency = parameters.GetValueOrDefault("vnp_CurrCode") ?? "VND";
-        result.RawPayload = rawBody;
+            RawPayload = rawBody,
+            MerchantReference = parameters.GetValueOrDefault("vnp_TxnRef") ?? string.Empty,
+            ProviderTransactionId = parameters.GetValueOrDefault("vnp_TransactionNo"),
+            Currency = parameters.GetValueOrDefault("vnp_CurrCode") ?? "VND"
+        };
 
         if (decimal.TryParse(parameters.GetValueOrDefault("vnp_Amount"), out var amountX100))
         {
@@ -178,12 +163,42 @@ public class VnPayPaymentProvider : IPaymentProvider
             result.Amount = amountX100 / 100m;
         }
 
+        // 🚨 **FAIL-CLOSED KHI CHƯA CẤU HÌNH KHOÁ KÝ** (`S5` — phát hiện trong chính phiên này).
+        // Trước `S5` nhánh này **không tồn tại**: `HashSecret` rỗng ⇒ `HMACSHA512` vẫn chạy với **khoá rỗng** ⇒
+        // người ngoài tính được hash bằng khoá rỗng ⇒ **ký được IPN giả** ⇒ `MarkSucceeded` ⇒ *"đơn đã trả tiền"*
+        // ⇒ **giao hàng miễn phí** (`PAY-001` §7.7.4 #1). 📌 Đúng trạng thái repo hôm nay (`appsettings.json` để
+        // `HashSecret: ""`), nên nếu endpoint IPN lên mà thiếu nhánh này thì **lỗ hổng thành hiện thực**.
+        if (string.IsNullOrWhiteSpace(_options.HashSecret))
+        {
+            GhiMetricTuChoi("thieu-hashsecret");
+
+            result.SignatureValid = false;
+            result.IsSuccess = false;
+            result.FailureReason =
+                "CHƯA cấu hình `PaymentHub:VnPay:HashSecret` ⇒ KHÔNG kiểm được chữ ký ⇒ từ chối IPN (fail-closed).";
+            result.AckResponseBody =
+                "{\"RspCode\":\"97\",\"Message\":\"Invalid Checksum\"}";
+
+            return Task.FromResult(result);
+        }
+
+        // 🔑 MỘT luật duy nhất cho chữ ký IPN (xem chú thích hàm).
+        result.SignatureValid = VnPayRequestBuilder.KiemChuKyTuQueryTho(rawBody, _options.HashSecret, out var lyDo);
+
+        if (!result.SignatureValid)
+        {
+            GhiMetricTuChoi(lyDo ?? VnPayRequestBuilder.LyDoTuChoiChuKy.ChuKySai);
+
+            result.IsSuccess = false;
+            result.FailureReason = $"Chữ ký KHÔNG hợp lệ ({lyDo}).";
+        }
+
         // Thành công phải thoả CẢ HAI mã.
         var responseCode = parameters.GetValueOrDefault("vnp_ResponseCode");
         var transactionStatus = parameters.GetValueOrDefault("vnp_TransactionStatus");
         result.IsSuccess = result.SignatureValid && responseCode == "00" && transactionStatus == "00";
 
-        if (!result.IsSuccess)
+        if (!result.IsSuccess && result.FailureReason is null)
         {
             result.FailureReason = $"vnp_ResponseCode={responseCode}, vnp_TransactionStatus={transactionStatus}";
         }

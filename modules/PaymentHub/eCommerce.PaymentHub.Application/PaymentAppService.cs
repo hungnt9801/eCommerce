@@ -37,7 +37,16 @@ public class PaymentAppService : ApplicationService, IPaymentAppService
     private readonly Payments.IPaymentProvider _cong;
     private readonly Volo.Abp.DistributedLocking.IAbpDistributedLock _khoa;
 
-    /// <summary>🔗 **CẦU NỐI SANG ĐƠN** (`S4`) — phát `PaymentSucceededEto`/`PaymentFailedEto`.
+    /// <summary>🆕 `S5` — **DÒNG HOÀN TIỀN** (`PayRefunds`). 🔑 Không có nó thì câu hỏi *"hoàn lúc nào, bao nhiêu,
+    /// vì sao, ai duyệt"* vẫn chỉ trả lời được bằng **log** — tức là **không** trả lời được (`PAY-001` §5.6 #1).
+    /// </summary>
+    private readonly IRepository<Payments.PaymentRefund, Guid> _dongHoanTien;
+
+    /// <summary>🆕 `S5` — **UoW theo TỪNG giao dịch** cho lô đối soát (vá `F-PAY-7`).</summary>
+    private readonly Volo.Abp.Uow.IUnitOfWorkManager _uow;
+
+    /// <summary>🔗 **CẦU NỐI SANG ĐƠN** (`S4`/`S5`) — phát
+    /// `PaymentSucceededEto`/`PaymentFailedEto`/`PaymentRefundedEto`.
     /// 📌 Gom một chỗ (`PaymentEventPublisher`) để **mọi** đường ghi đều phát **giống nhau** — thiếu một đường
     /// là đơn đã trả **vẫn** `Unpaid` (`PAY-001` §3.5), đúng lỗi mà `S4` sinh ra để đóng.</summary>
     private readonly Events.PaymentEventPublisher _suKien;
@@ -51,14 +60,18 @@ public class PaymentAppService : ApplicationService, IPaymentAppService
 
     public PaymentAppService(
         IRepository<Payments.PaymentTransaction, Guid> giaoDich,
+        IRepository<Payments.PaymentRefund, Guid> dongHoanTien,
         Payments.IPaymentProvider cong,
         Volo.Abp.DistributedLocking.IAbpDistributedLock khoa,
+        Volo.Abp.Uow.IUnitOfWorkManager uow,
         Events.PaymentEventPublisher suKien,
         eCommerce.Kernel.Observability.eCommerceMetrics? metrics = null)
     {
         _giaoDich = giaoDich;
+        _dongHoanTien = dongHoanTien;
         _cong = cong;
         _khoa = khoa;
+        _uow = uow;
         _suKien = suKien;
         _metrics = metrics;
     }
@@ -345,7 +358,40 @@ public class PaymentAppService : ApplicationService, IPaymentAppService
         // ⇒ Khi `ChoXacNhan`, trả về **nguyên trạng** và **KHÔNG** tăng `RefundedAmount`.
         //    Hành vi này là **ĐÚNG**, không phải "chưa xong": đường xác nhận là `PostTruyVanTrangThaiAsync`.
         // ══════════════════════════════════════════════════════════════════════════════════════════
-        if (kq.DaHoanThat)
+        // 🔑 `S5` — luật quyết định nay nằm **một chỗ** (`LuatGhiNhanHoanTien`, hàm thuần, có test):
+        // trước đó chuỗi `if/else` này sống **chỉ** ở đây, nên đường xác nhận bằng `querydr` **không dùng lại
+        // được** ⇒ hai bản sao sẽ lệch nhau ngay khi thêm nhánh (đúng họ lỗi "hai nguồn sự thật").
+        var quyetDinh = Payments.LuatGhiNhanHoanTien.Quyet(kq);
+
+        // ── 🧾 GHI **DÒNG HOÀN TIỀN** (`S5`, `PAY-001` §5.6 #1) — làm cho **MỌI** kết quả, kể cả ca
+        // *"cổng đã nhận nhưng tiền chưa ra"* và *"không xác định"*. 📌 Vì sao cố ý ghi cả ca thất bại:
+        // ba câu hỏi của kế toán (*"hoàn lúc nào / bao nhiêu / vì sao, ai duyệt"*) phải trả lời được **cả** khi
+        // lần hoàn đó **không** thành — đặc biệt ca `KhongXacDinh`, nơi **cấm** thử lại mù (`Q6`/`F-PAY-…`):
+        // không có dòng ghi thì lần sau **không ai biết** đã từng gửi yêu cầu, và người vận hành sẽ gửi lại.
+        var soLanDaHoan = (int)await AsyncExecuter.CountAsync(
+            (await _dongHoanTien.GetQueryableAsync()).Where(x => x.PaymentTransactionId == gd.Id));
+
+        var dongHoan = new Payments.PaymentRefund(
+            GuidGenerator.Create(),
+            gd.Id,
+            Payments.PaymentRefund.SinhMaYeuCauHoan(soLanDaHoan + 1),
+            input.SoTien,
+            input.LyDo,
+            input.NguoiThucHien);
+
+        dongHoan.GhiKetQua(
+            Payments.LuatGhiNhanHoanTien.SangTrangThaiDong(quyetDinh),
+            kq.MaPhanHoi,
+            kq.MaGiaoDichHoan,
+            kq.LoiHaTang ?? kq.LyDoThatBai);
+
+        await _dongHoanTien.InsertAsync(dongHoan, autoSave: true);
+
+        dto.PaymentRefundId = dongHoan.Id;
+        dto.MaYeuCauHoan = dongHoan.RefundRequestId;
+        dto.TrangThaiDongHoan = dongHoan.Status.ToString();
+
+        if (quyetDinh == Payments.LuatGhiNhanHoanTien.QuyetDinh.GhiDaHoan)
         {
             gd.RegisterRefund(input.SoTien);   // ⇐ entity **tự** chặn hoàn vượt (bất biến tầng domain)
             await _giaoDich.UpdateAsync(gd, autoSave: true);
@@ -353,22 +399,30 @@ public class PaymentAppService : ApplicationService, IPaymentAppService
             dto.DaHoanThat = true;
             dto.ChoXacNhan = false;
 
+            // 🔗 **CẦU NỐI SANG ĐƠN** (`S5`) — chỉ phát khi **sổ đã ghi** (`RegisterRefund` vừa chạy xong):
+            // phát sớm cho một dòng `ChoXacNhan` sẽ làm đơn sang `PartiallyRefunded` trong khi khách **chưa**
+            // nhận được tiền.
+            await _suKien.PhatDaHoanTienAsync(gd, dongHoan);
+
             Logger.LogWarning(
                 "ĐÃ HOÀN TIỀN và ĐÃ GHI SỔ: giao dịch={MerchantReference} · số tiền={SoTien} · đã hoàn tổng={DaHoan} " +
-                "· trạng thái={TrangThai} · người yêu cầu={NguoiThucHien} · lý do={LyDo}. " +
+                "· trạng thái={TrangThai} · người yêu cầu={NguoiThucHien} · lý do={LyDo} · dòng hoàn={MaYeuCau}. " +
                 "[PAY-DA-HOAN]",
-                gd.MerchantReference, input.SoTien, gd.RefundedAmount, gd.Status, input.NguoiThucHien, input.LyDo);
+                gd.MerchantReference, input.SoTien, gd.RefundedAmount, gd.Status, input.NguoiThucHien, input.LyDo,
+                dongHoan.RefundRequestId);
         }
-        else if (kq.DaNhanYeuCau)
+        else if (quyetDinh == Payments.LuatGhiNhanHoanTien.QuyetDinh.ChoXacNhan)
         {
             // 🔔 Yêu cầu **đã gửi** nhưng **chưa** xác nhận tiền ra ⇒ đây là ca **BÌNH THƯỜNG** của VNPay.
             // Ghi log mức **Warning** (không phải Information) vì cần người/job **theo dõi** — nếu không ai
             // đối soát thì tiền **không** bao giờ được xác nhận.
             Logger.LogWarning(
                 "CỔNG ĐÃ NHẬN yêu cầu hoàn tiền nhưng CHƯA xác nhận tiền ra: giao dịch={MerchantReference} · " +
-                "số tiền={SoTien} · mã phản hồi={MaPhanHoi} · mã giao dịch hoàn={MaHoan} · người yêu cầu={NguoiThucHien}. " +
+                "số tiền={SoTien} · mã phản hồi={MaPhanHoi} · mã giao dịch hoàn={MaHoan} · người yêu cầu={NguoiThucHien} " +
+                "· dòng hoàn={MaYeuCau}. " +
                 "⇒ KHÔNG ghi sổ; PHẢI đối soát bằng `querydr` trước khi coi là đã hoàn. [PAY-CHO-XAC-NHAN]",
-                gd.MerchantReference, input.SoTien, kq.MaPhanHoi, kq.MaGiaoDichHoan, input.NguoiThucHien);
+                gd.MerchantReference, input.SoTien, kq.MaPhanHoi, kq.MaGiaoDichHoan, input.NguoiThucHien,
+                dongHoan.RefundRequestId);
         }
         else
         {
@@ -379,23 +433,24 @@ public class PaymentAppService : ApplicationService, IPaymentAppService
             //   • **CỔNG TỪ CHỐI** (đọc được phản hồi, mã khác `00`) ⇒ **biết chắc** cổng đã xử lý và không hoàn
             //     ⇒ `ChoXacNhan = false` là **đúng** (không cần đối soát; người dùng sửa tham số rồi gửi lại).
             // 📌 `LoiHaTang` chính là cờ phân biệt hai ca này — nó **không** chỉ để ghi log.
-            if (!string.IsNullOrWhiteSpace(kq.LoiHaTang))
+            if (quyetDinh == Payments.LuatGhiNhanHoanTien.QuyetDinh.KhongXacDinh)
             {
                 dto.ChoXacNhan = true;
 
                 Logger.LogError(
                     "KHÔNG XÁC ĐỊNH ĐƯỢC kết quả yêu cầu hoàn tiền (lỗi hạ tầng / không đọc được phản hồi): " +
-                    "giao dịch={MerchantReference} · số tiền={SoTien} · lỗi={LoiHaTang} · chi tiết={LyDo}. " +
+                    "giao dịch={MerchantReference} · số tiền={SoTien} · lỗi={LoiHaTang} · chi tiết={LyDo} " +
+                    "· dòng hoàn={MaYeuCau}. " +
                     "🚨 KHÔNG BIẾT cổng đã nhận yêu cầu hay chưa ⇒ CẤM thử lại mù (có thể hoàn HAI LẦN); " +
                     "PHẢI tra `querydr` trước. [PAY-KHONG-XAC-DINH]",
-                    gd.MerchantReference, input.SoTien, kq.LoiHaTang, kq.LyDoThatBai);
+                    gd.MerchantReference, input.SoTien, kq.LoiHaTang, kq.LyDoThatBai, dongHoan.RefundRequestId);
             }
             else
             {
                 Logger.LogError(
                     "CỔNG TỪ CHỐI yêu cầu hoàn tiền: giao dịch={MerchantReference} · số tiền={SoTien} · " +
-                    "mã phản hồi={MaPhanHoi} · lý do={LyDo}. [PAY-TU-CHOI-HOAN]",
-                    gd.MerchantReference, input.SoTien, kq.MaPhanHoi, kq.LyDoThatBai);
+                    "mã phản hồi={MaPhanHoi} · lý do={LyDo} · dòng hoàn={MaYeuCau}. [PAY-TU-CHOI-HOAN]",
+                    gd.MerchantReference, input.SoTien, kq.MaPhanHoi, kq.LyDoThatBai, dongHoan.RefundRequestId);
             }
         }
 
@@ -498,6 +553,12 @@ public class PaymentAppService : ApplicationService, IPaymentAppService
     }
 
     /// <inheritdoc />
+    // 🚨 **`S5` — `[UnitOfWork(isTransactional: false)]` LÀ MỘT PHẦN CỦA VIỆC VÁ `F-PAY-7`, KHÔNG PHẢI TRANG TRÍ:**
+    // nếu để UoW mặc định (transactional) thì **cả lô** lại nằm trong **một** transaction, và mọi UoW con
+    // `requiresNew` sẽ commit **bên trong** nó — nhưng một exception ở **vòng lặp** vẫn có thể đánh sập transaction
+    // ngoài. 🔒 Ghi tường minh *"lô này KHÔNG cần transaction"* + mỗi giao dịch tự mở transaction riêng là cách
+    // duy nhất để câu *"đã ghi thì còn"* trở thành **sự thật của DB**, không phải lời hứa của comment.
+    [Volo.Abp.Uow.UnitOfWork(isTransactional: false)]
     public async Task<KetQuaDoiSoatThanhToanDto> PostDoiSoatLoatAsync(int toiDa = 50)
     {
         // 📌 Trần: mỗi giao dịch là **một lời gọi HTTP ra ngoài** ⇒ quét vô hạn sẽ **treo** request và
@@ -539,11 +600,56 @@ public class PaymentAppService : ApplicationService, IPaymentAppService
             // có thể đặt **cùng tên trường** với **kiểu khác nhau** ⇒ phải đọc kiểu **từ entity**.
             var truoc = gd.Status.ToString();
 
-            // 🔑 **GỌI LẠI CHÍNH HÀM MỘT — KHÔNG tự cập nhật DB ở đây.**
-            // 📌 Lý do: hàm một đã bảo đảm bất biến **CHỈ TIẾN, KHÔNG LÙI** (không hạ trạng thái khi cổng nói
-            // *"chưa biết"*). ⚠️ Nếu hàm lô tự viết lại việc cập nhật thì bất biến đó có **HAI** chỗ phải
-            // đúng — và chỗ thứ hai sẽ **lệch** khi ai đó sửa chỗ thứ nhất.
-            var sau = (await PostTruyVanTrangThaiAsync(gd.Id)).Status;
+            // ══════════════════════════════════════════════════════════════════════════════════════════
+            // 🚨🚨 **`S5` — VÁ `F-PAY-7`: MỖI GIAO DỊCH MỘT UoW, VÀ MỘT LỖI KHÔNG ĐƯỢC KÉO THEO CẢ LƯỢT.**
+            //
+            // **Lỗi cũ (mức 🔴 Cao, đã ghi từ 17/10/2026):** cả lô nằm trong **MỘT** UoW transactional ⇒ giao
+            // dịch #37 ném (`23505`/`23514`/`DbUpdateException`) ⇒ **rollback TOÀN BỘ** ⇒ 36 lần ghi đã xong
+            // **mất sạch**, trong khi **quota cổng đã tiêu**. 📌 Tệ nhất: kết quả đối soát là **BẰNG CHỨNG về
+            // tiền**; mất nó nghĩa là *"đã xác nhận với cổng mà sổ không biết"*. Nếu `querydr` sau đó không trả
+            // lời được nữa (cổng chết hẳn) thì các giao dịch đó **mất dấu vĩnh viễn**.
+            //
+            // ✅ **Nay:** mỗi giao dịch một UoW (`requiresNew` ⇒ **transaction riêng**) ⇒ *"đã ghi thì còn"*.
+            // ⚠️ **Vẫn phải `try/catch` từng vòng:** nếu không, một lỗi sẽ **dừng cả vòng lặp** — tức là các giao
+            // dịch **sau** nó không được xét, và đó lại là *"im lặng cắt bớt"* (khác hẳn *"đã xét hết"*).
+            // 🔒 Và **đếm** lỗi vào `SoLoi`: 📌 một lượt có lỗi mà không có con số thì trông y như
+            // *"không có gì để đổi"*.
+            // ══════════════════════════════════════════════════════════════════════════════════════════
+            string sau;
+
+            try
+            {
+                // ⚠️ Dùng overload `Begin(UnitOfWorkOptions, requiresNew)` **tường minh** (không dựa vào
+                // extension method `Begin(bool, bool)` của `Volo.Abp.Uow`): tệp này **không** `using Volo.Abp.Uow`
+                // nên overload theo tên tham số **không** có trong tầm — 📌 đây là lỗi biên dịch `CS1739` **đã
+                // gặp thật** ngay lượt đầu của `S5` (*"best overload for 'Begin' does not have a parameter named
+                // 'isTransactional'"*), và thông điệp đó **không** nói rằng thiếu `using`.
+                using var uowTungGiaoDich = _uow.Begin(
+                    new Volo.Abp.Uow.AbpUnitOfWorkOptions { IsTransactional = true },
+                    requiresNew: true);
+
+                // 🔑 **GỌI LẠI CHÍNH HÀM MỘT — KHÔNG tự cập nhật DB ở đây.**
+                // 📌 Lý do: hàm một đã bảo đảm bất biến **CHỈ TIẾN, KHÔNG LÙI** (không hạ trạng thái khi cổng nói
+                // *"chưa biết"*). ⚠️ Nếu hàm lô tự viết lại việc cập nhật thì bất biến đó có **HAI** chỗ phải
+                // đúng — và chỗ thứ hai sẽ **lệch** khi ai đó sửa chỗ thứ nhất.
+                sau = (await PostTruyVanTrangThaiAsync(gd.Id)).Status;
+
+                await uowTungGiaoDich.CompleteAsync();
+            }
+            catch (Exception ex)
+            {
+                // ⚠️ Bắt **mọi** exception ở đây là **có chủ ý**: mục tiêu của `F-PAY-7` là *"một giao dịch hỏng
+                // không được làm mất bằng chứng của 49 giao dịch còn lại"*. 📌 Nhưng **không nuốt**: log `Error`
+                // kèm mã giao dịch + đếm vào `SoLoi` ⇒ người vận hành vẫn thấy (và không phải đoán).
+                ketQua.SoLoi++;
+
+                Logger.LogError(ex,
+                    "ĐỐI SOÁT LÔ: LỖI khi xử lý giao dịch {Ma} ({Id}) ⇒ chỉ giao dịch này bị bỏ (các giao dịch " +
+                    "khác trong lượt VẪN được ghi). [PAY-DOISOAT-LOI]",
+                    gd.MerchantReference, gd.Id);
+
+                continue;
+            }
 
             if (string.Equals(sau, truoc, StringComparison.Ordinal))
             {
@@ -579,8 +685,20 @@ public class PaymentAppService : ApplicationService, IPaymentAppService
         else
         {
             Logger.LogInformation(
-                "ĐỐI SOÁT LÔ: xét {So} · đổi trạng thái {Doi} · thu được {Thu} · không xác định {KXD}. [PAY-DOISOAT-XONG]",
-                ketQua.SoDaXet, ketQua.SoDoiTrangThai, ketQua.SoThuDuoc, ketQua.SoKhongXacDinh);
+                "ĐỐI SOÁT LÔ: xét {So} · đổi trạng thái {Doi} · thu được {Thu} · không xác định {KXD} · lỗi {Loi}. " +
+                "[PAY-DOISOAT-XONG]",
+                ketQua.SoDaXet, ketQua.SoDoiTrangThai, ketQua.SoThuDuoc, ketQua.SoKhongXacDinh, ketQua.SoLoi);
+        }
+
+        // 🚨 **CÓ GIAO DỊCH XỬ LÝ LỖI ⇒ NÓI RÕ.** 📌 Không có dòng này thì `SoLoi > 0` chỉ hiện trong body JSON
+        // (mà endpoint lô là đường **phụ** — job mới là đường chạy thật), và lượt quét trông "bình thường".
+        if (ketQua.SoLoi > 0)
+        {
+            Logger.LogError(
+                "ĐỐI SOÁT LÔ: {Loi}/{So} giao dịch XỬ LÝ LỖI ⇒ các giao dịch đó KHÔNG được đối soát lượt này " +
+                "(nhưng các giao dịch khác ĐÃ được ghi — `F-PAY-7`). Xem log `[PAY-DOISOAT-LOI]` để biết từng mã. " +
+                "[PAY-DOISOAT-CO-LOI]",
+                ketQua.SoLoi, ketQua.SoDaXet);
         }
 
         // 📊 **GAUGE "KHÔNG KIỂM ĐƯỢC"** cho CẢ LƯỢT — 🔑 đây là con số có ý nghĩa **vận hành** (hàm một chỉ

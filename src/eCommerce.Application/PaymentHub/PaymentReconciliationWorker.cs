@@ -99,15 +99,16 @@ public class PaymentReconciliationWorker : AsyncPeriodicBackgroundWorkerBase
 
         using var scope = workerContext.ServiceProvider.CreateScope();
 
-        var uowManager = scope.ServiceProvider.GetRequiredService<IUnitOfWorkManager>();
-
-        // ⚠️ **`isTransactional: true`** — khác `MarketplaceReconciliationWorker` (chỉ **đọc**): job này
-        // **GHI** trạng thái giao dịch ⇒ 🔒 phải nguyên tử, không để nửa lượt quét được ghi.
-        using var uow = uowManager.Begin(requiresNew: true, isTransactional: true);
-
+        // 🚨 **`S5` — VÁ `F-PAY-7`: BỎ UoW BAO CẢ LƯỢT.**
+        //
+        // **Lỗi cũ (mức 🔴 Cao):** `uowManager.Begin(requiresNew: true, isTransactional: true)` bọc **toàn bộ**
+        // lượt quét ⇒ một giao dịch ném (`23505`/`23514`/`DbUpdateException`) ở giữa ⇒ **rollback cả 50** lần ghi
+        // đã xong, trong khi **quota cổng đã tiêu** ⇒ *"đã xác nhận với cổng mà sổ không biết"*. 📌 Kết quả đối
+        // soát là **bằng chứng về tiền**; mất nó là mất bằng chứng (và nếu cổng chết hẳn thì mất **vĩnh viễn**).
+        //
+        // ✅ **Nay:** mỗi giao dịch tự mở UoW **riêng** trong <see cref="DoiSoatAsync"/> ⇒ *"đã ghi thì còn"*.
+        // ⚠️ Vì vậy chỗ này **không** mở UoW nữa — mở ở đây là quay lại đúng lỗi vừa vá.
         await DoiSoatAsync(scope.ServiceProvider);
-
-        await uow.CompleteAsync();
 
         // 🚨 **NEO KẾT THÚC** — 🔑 bắt buộc để phân biệt *"job chạy XONG"* với *"job chạy rồi NÉM"*.
         // 📌 Bài học **ĐO ĐƯỢC** ở `SAL-005`: lượt chạy đầu chỉ có neo mở đầu mà **không** có neo kết thúc
@@ -123,6 +124,13 @@ public class PaymentReconciliationWorker : AsyncPeriodicBackgroundWorkerBase
     {
         var giaoDich = services.GetRequiredService<IRepository<PaymentTransaction, Guid>>();
         var cong = services.GetRequiredService<IPaymentProvider>();
+        var uowManager = services.GetRequiredService<IUnitOfWorkManager>();
+
+        // 🆕 `S5` — **CẦU NỐI SANG ĐƠN** (`IPaymentEventPublisher` ở `Application.Contracts`, hiện thực ở
+        // `PaymentHub.Application`). 🔑 Trước `S5`, job này **không** phát sự kiện (không với tới được lớp phát
+        // vì luật phân tầng) ⇒ job phát hiện *"khách đã trả"*, ghi `Succeeded`, mà **đơn vẫn `Unpaid`**.
+        // 📌 Không phải app service ⇒ **không** có `[Authorize]` ⇒ gọi an toàn từ worker (bài học `SAL-005`).
+        var suKien = services.GetRequiredService<eCommerce.PaymentHub.Events.IPaymentEventPublisher>();
 
         // 🔒 **CHỈ xét giao dịch CHƯA ở trạng thái CUỐI.** ⚠️ Gọi cổng cho giao dịch `Succeeded`/`Refunded`
         // là **lãng phí quota** — tài nguyên **có giới hạn** của cổng.
@@ -163,6 +171,7 @@ public class PaymentReconciliationWorker : AsyncPeriodicBackgroundWorkerBase
         var soDoi = 0;
         var soThuDuoc = 0;
         var soKhongXacDinh = 0;
+        var soLoi = 0;
 
         foreach (var gd in canXet)
         {
@@ -176,42 +185,84 @@ public class PaymentReconciliationWorker : AsyncPeriodicBackgroundWorkerBase
             // (bieu do van ve, chi SAI SO).
             MetricDoiSoatThanhToan.Ghi(_metrics, quyetDinh);
 
-            switch (quyetDinh)
+            // ══════════════════════════════════════════════════════════════════════════════════════════════
+            // 🚨🚨 **`S5` — MỖI GIAO DỊCH MỘT UoW (`F-PAY-7`) + ĐỌC GIÁ TRỊ `bool` (`F-PAY-9` đóng NỐT).**
+            //
+            // ① **Một UoW cho TỪNG giao dịch:** lỗi ở giao dịch này không rollback 49 giao dịch đã ghi.
+            // ② 🚨 **`MarkSucceeded`/`MarkFailed` TRẢ `bool`** (từ `S4`) — trước `S5` chỗ này **bỏ qua** giá trị
+            //    đó và `soDoi++` **vô điều kiện** ⇒ job báo *"đã đổi 5 trạng thái"* trong khi DB **không đổi
+            //    dòng nào** (ca thật: cổng trả `Failed` **lặp lại** cho một giao dịch đã `Failed` — `MarkFailed`
+            //    trả `false` nhưng vẫn bị đếm). 📌 Con số đó là thứ người vận hành dùng để quyết định *"có sự cố
+            //    không"*, nên sai ở đây là **báo cáo sai**, đúng `F-PAY-9`.
+            // ══════════════════════════════════════════════════════════════════════════════════════════════
+            try
             {
-                case LuatDoiSoatThanhToan.QuyetDinh.GhiDaThuTien:
-                    gd.MarkSucceeded(null, null, "{\"nguon\":\"querydr-job\"}", null);
-                    await giaoDich.UpdateAsync(gd, autoSave: true);
+                using var uowTungGiaoDich = uowManager.Begin(requiresNew: true, isTransactional: true);
 
-                    soDoi++;
-                    soThuDuoc++;
+                switch (quyetDinh)
+                {
+                    case LuatDoiSoatThanhToan.QuyetDinh.GhiDaThuTien:
+                        var daGhiThu = gd.MarkSucceeded(null, null, "{\"nguon\":\"querydr-job\"}", null);
+                        await giaoDich.UpdateAsync(gd, autoSave: true);
 
-                    // `Warning` (không `Information`): đây là **bất thường thật** — IPN đã mất, hoặc cổng
-                    // chậm. 🔑 Một dòng log ở mức `Information` giữa hàng nghìn dòng khác thì **không ai thấy**.
-                    Logger.LogWarning(
-                        "JOB REC-001: PHÁT HIỆN giao dịch ĐÃ THU TIỀN nhưng chưa ghi nhận (IPN có thể đã mất): " +
-                        "giao dịch={MerchantReference} · số tiền={SoTien}. [PAY-JOB-THU-DUOC]",
-                        gd.MerchantReference, gd.Amount);
-                    break;
+                        if (daGhiThu)
+                        {
+                            soDoi++;
+                            soThuDuoc++;
 
-                case LuatDoiSoatThanhToan.QuyetDinh.GhiThatBai:
-                    gd.MarkFailed(tuCong == PaymentTransactionStatus.Cancelled
-                        ? "Cổng xác nhận khách ĐÃ HUỶ giao dịch (nguồn: job đối soát)."
-                        : "Cổng xác nhận giao dịch không thành công (nguồn: job đối soát).");
-                    await giaoDich.UpdateAsync(gd, autoSave: true);
+                            // 🔗 **`S5`** — phát sự kiện **trong cùng UoW** với lần ghi ⇒ *"không ghi được đơn
+                            // thì cũng không phát"* (nhất quán), và đơn **được** đánh dấu đã trả.
+                            await suKien.PhatDaThuTienAsync(gd);
+                        }
 
-                    soDoi++;
-                    break;
+                        // `Warning` (không `Information`): đây là **bất thường thật** — IPN đã mất, hoặc cổng
+                        // chậm. 🔑 Một dòng log ở mức `Information` giữa hàng nghìn dòng khác thì **không ai thấy**.
+                        Logger.LogWarning(
+                            "JOB REC-001: PHÁT HIỆN giao dịch ĐÃ THU TIỀN nhưng chưa ghi nhận (IPN có thể đã mất): " +
+                            "giao dịch={MerchantReference} · số tiền={SoTien} · đã ghi={DaGhi}. [PAY-JOB-THU-DUOC]",
+                            gd.MerchantReference, gd.Amount, daGhiThu);
+                        break;
 
-                default:
-                    // 🔒 `KhongDoi` gồm **HAI** ca **rất khác nhau** — phải **phân biệt**:
-                    //   (a) đã ở trạng thái cuối ⇒ **KHÔNG CẦN** kiểm (bình thường);
-                    //   (b) cổng nói *"chưa biết"* ⇒ **KHÔNG KIỂM ĐƯỢC** (⚠️ **KHÔNG** phải "đã kiểm và ổn").
-                    if (!LuatDoiSoatThanhToan.DaKetThuc(gd.Status))
-                    {
-                        soKhongXacDinh++;
-                    }
+                    case LuatDoiSoatThanhToan.QuyetDinh.GhiThatBai:
+                        var daGhiHong = gd.MarkFailed(tuCong == PaymentTransactionStatus.Cancelled
+                            ? "Cổng xác nhận khách ĐÃ HUỶ giao dịch (nguồn: job đối soát)."
+                            : "Cổng xác nhận giao dịch không thành công (nguồn: job đối soát).");
+                        await giaoDich.UpdateAsync(gd, autoSave: true);
 
-                    break;
+                        // 🔒 `S5`: **chỉ** đếm + phát khi **thật sự** đổi trạng thái. 📌 Cổng trả `Failed` lặp lại
+                        // là ca **có thật** (IPN retry, hoặc giao dịch `Failed` từ lâu vẫn nằm trong lô đối soát).
+                        if (daGhiHong)
+                        {
+                            soDoi++;
+                            await suKien.PhatThatBaiAsync(gd, tuCong.ToString());
+                        }
+
+                        break;
+
+                    default:
+                        // 🔒 `KhongDoi` gồm **HAI** ca **rất khác nhau** — phải **phân biệt**:
+                        //   (a) đã ở trạng thái cuối ⇒ **KHÔNG CẦN** kiểm (bình thường);
+                        //   (b) cổng nói *"chưa biết"* ⇒ **KHÔNG KIỂM ĐƯỢC** (⚠️ **KHÔNG** phải "đã kiểm và ổn").
+                        if (!LuatDoiSoatThanhToan.DaKetThuc(gd.Status))
+                        {
+                            soKhongXacDinh++;
+                        }
+
+                        break;
+                }
+
+                await uowTungGiaoDich.CompleteAsync();
+            }
+            catch (Exception ex)
+            {
+                // ⚠️ Bắt **mọi** exception là **có chủ ý** (`F-PAY-7`: một giao dịch hỏng không được làm mất bằng
+                // chứng của các giao dịch khác) — nhưng **không nuốt**: log `Error` + đếm, để người vận hành thấy.
+                soLoi++;
+
+                Logger.LogError(ex,
+                    "JOB REC-001: LỖI khi đối soát giao dịch {MerchantReference} ({Id}) ⇒ bỏ qua giao dịch này, " +
+                    "các giao dịch khác trong lượt VẪN được ghi. [PAY-JOB-LOI]",
+                    gd.MerchantReference, gd.Id);
             }
         }
 
@@ -234,8 +285,21 @@ public class PaymentReconciliationWorker : AsyncPeriodicBackgroundWorkerBase
         else
         {
             Logger.LogInformation(
-                "JOB REC-001: xét {Xet} · đổi trạng thái {Doi} · thu được {Thu} · không xác định {KXD}. [PAY-JOB-KET-QUA]",
-                canXet.Count, soDoi, soThuDuoc, soKhongXacDinh);
+                "JOB REC-001: xét {Xet} · đổi trạng thái {Doi} · thu được {Thu} · không xác định {KXD} · lỗi {Loi}. " +
+                "[PAY-JOB-KET-QUA]",
+                canXet.Count, soDoi, soThuDuoc, soKhongXacDinh, soLoi);
+        }
+
+        // 🚨 **`S5` — CÓ GIAO DỊCH XỬ LÝ LỖI THÌ PHẢI LA.** 📌 Trước `S5`, một giao dịch hỏng làm **rollback cả
+        // lượt** ⇒ triệu chứng là *"job chạy xong mà không đổi gì"* — **không ai** biết đã mất 49 lần ghi.
+        // Nay lỗi **cô lập** (đúng `F-PAY-7`) ⇒ nhưng nếu **không đếm/không log** thì nó lại **im lặng**:
+        // lượt vẫn "xong", chỉ có ít thay đổi hơn mong đợi. 🔒 Neo ASCII để tìm được trong log (bài học `I4`).
+        if (soLoi > 0)
+        {
+            Logger.LogError(
+                "JOB REC-001: {Loi}/{Xet} giao dịch XỬ LÝ LỖI ⇒ các giao dịch đó KHÔNG được đối soát lượt này " +
+                "(các giao dịch khác ĐÃ được ghi). Xem dòng `[PAY-JOB-LOI]` để biết từng mã. [PAY-JOB-CO-LOI]",
+                soLoi, canXet.Count);
         }
     }
 }

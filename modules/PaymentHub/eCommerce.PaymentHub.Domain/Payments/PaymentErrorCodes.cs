@@ -68,6 +68,17 @@ public static class PaymentErrorCodes
     /// `INV-003` **`0042`**: mượn mã chung ⇒ CSKH nhận chỉ dẫn sai).</summary>
     public const string ThieuThamSoTaoGiaoDich = Nhom + "0009";
 
+    /// <summary>🆕 (`S5`) **DÒNG HOÀN TIỀN KHÔNG HỢP LỆ** — thiếu `PaymentTransactionId`/`RefundRequestId`, số thứ
+    /// tự lần hoàn `≤ 0`, **hoặc** đã tồn tại dòng hoàn cho đúng lần thứ tự đó (unique index
+    /// `IX_PayRefunds_TenantId_PaymentTransactionId_RefundRequestId`).
+    /// 🎯 Hành động: **kiểm `PayRefunds` của giao dịch** rồi mới gửi lại — **không** phải sửa số tiền (`0004`),
+    /// **không** phải đối chiếu cổng (`0002`).
+    /// 📌 **Vì sao cần mã riêng:** mã này chỉ xuất hiện khi có **đường ghi tắt** (job/seed/test dựng tay), khi
+    /// hai luồng cùng tính ra một số thứ tự, hoặc do lỗi lập trình ở chỗ gọi — nó **không** phải ca nghiệp vụ
+    /// bình thường như `0002`/`0003`/`0004`. Gộp vào `0004` sẽ khiến CSKH đọc *"sửa số tiền"* trong khi lỗi
+    /// thật là *"thiếu/trùng mã yêu cầu"* (bài học `INV-003` **`0042`**: mượn mã chung ⇒ chỉ dẫn sai).</summary>
+    public const string DongHoanTienKhongHopLe = Nhom + "0010";
+
     // ⚠️ **`eCommerce:Payment:0001` (`PaymentSignatureInvalid`) CỐ Ý KHÔNG KHAI LẠI Ở ĐÂY.**
     // Bản chuẩn của nó nằm ở `eCommerceConsts.ErrorCodes.PaymentSignatureInvalid`
     // (`src/eCommerce.Domain.Shared/eCommerceConsts.cs:324`) và **tầng Application** dùng được nó

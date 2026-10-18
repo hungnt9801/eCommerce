@@ -821,3 +821,43 @@ câu lệnh** (không phải cuối transaction) — đúng gốc của `TC-06b`
 ✅ **Luật:** thêm phụ thuộc vào một app service **đang được dùng ở cả hai tiến trình** ⇒ kiểm **cả hai** đồ thị
 module (`DependsOn` **và** `ProjectReference`). 📌 Đây là bẫy #4 của dự án, lặp lại ở tầng **module**:
 `DbSet` thiếu ⇒ DI nổ; `DependsOn` thiếu ⇒ **cũng** DI nổ, cùng triệu chứng `500`.
+
+---
+
+## 🚨 BA CÁI BẪY MỚI — **`S5` (`PAY-001` phần B), 18/10/2026**
+
+> 📌 Cả ba đều nằm ở **công cụ ĐO**, không ở sản phẩm — đúng loại đã ngốn trọn vòng ở các lượt trước.
+
+### S5-1. 🚨 Mã probe nằm **Ở GIỮA** chuỗi ⇒ `like 'K9S5%'` **không khớp** dòng nào
+
+**Chuyện thật:** `probe-thanh-toan.ps1` dọn bằng `where "MerchantReference" like 'K9S5%'`. Nhưng
+`MerchantReference` do `SinhMaThamChieu` sinh ra có dạng **`PAY<ngày>-<số đơn>-<lần thử>`** ⇒ mã probe nằm **ở
+giữa**: `PAY20261018-K9S5-DON-01-1`. 🔑 Kết quả: phép dọn **không xoá gì**, rác ở lại, và ca **`T03`** (*"mã ổn
+định"*) **ĐỎ** vì `lần thử = 3` — 📌 **trông y như sản phẩm sai**.
+
+✅ **Luật:** khi dọn theo **mã do sản phẩm sinh**, phải biết mã đó **nằm ở đâu** trong chuỗi ⇒ dùng
+**`like '%<mã>%'`**, hoặc khai **tiền tố thật** (`PAY%`). ➕ Và **in số dòng đã xoá** — *"dọn không khớp"* và
+*"không có gì để dọn"* **trông giống hệt nhau** (bài học §25.5, lần thứ **N**).
+
+### S5-2. 🚨 `-StatusCodeVariable` **chỉ** có trên `Invoke-RestMethod`, **KHÔNG** có trên `Invoke-WebRequest`
+
+**Chuyện thật:** `Goi-Ipn` dùng `Invoke-WebRequest -StatusCodeVariable 'maHttp'` ⇒
+`A parameter cannot be found that matches parameter name 'StatusCodeVariable'` ⇒ probe **chết** ở ca IPN đầu
+tiên. 📌 (PowerShell **7.5.1**: `Invoke-RestMethod` **có**, `Invoke-WebRequest` **không**.)
+
+✅ **Luật:** với `Invoke-WebRequest`, đọc **`$tra.StatusCode`** trực tiếp (nhớ `-SkipHttpErrorCheck`, nếu không
+thì chính `400` — ca ta cần đo — sẽ **ném** và ta không đọc được body). ➕ Kiểm bằng **một lệnh**:
+`(Get-Command Invoke-WebRequest).Parameters.Keys -contains 'StatusCodeVariable'`.
+
+### S5-3. 🚨 `Environment` **KHÔNG** có route = `404`, nhưng DI thiếu = **`500` kèm stack trace**
+
+**Chuyện thật:** lần đầu gọi `GET /api/webhooks/vnpay`, phản hồi là **`HTTP 500`** với
+`Cannot resolve parameter 'eCommerce.PaymentHub.IXuLyKetQuaCong xuLy'`. 🔑 Nguyên nhân **không** phải thiếu đăng
+ký: ABP đăng ký `ITransientDependency` theo **TÊN LỚP** (`XuLyKetQuaCongService` ⇒ `IXuLyKetQuaCongService`),
+**không** theo `IXuLyKetQuaCong` ⇒ phải có `[ExposeServices(typeof(IXuLyKetQuaCong))]`.
+
+✅ **Luật:** một interface **không** theo quy ước `I<TênLớp>` thì **phải** khai `[ExposeServices]`, và **phải** có
+test reflection khoá lại (`HoanTienS5Tests.IXuLyKetQuaCong_PHAI_duoc_ExposeServices`). 📌 Và bài học đo: **`500` ở
+một endpoint mới thường là DI**, không phải routing — 🔑 phân biệt bằng **`404`** (route sai) với **`500` +
+"None of the constructors … can be invoked"** (DI).
+

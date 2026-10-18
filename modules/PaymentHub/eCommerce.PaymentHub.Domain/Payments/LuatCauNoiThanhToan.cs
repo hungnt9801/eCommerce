@@ -64,6 +64,36 @@ public static class LuatCauNoiThanhToan
             : KetQuaDoiChieu.LechSoTien;
     }
 
+    /// <summary>
+    /// 🚨 **MỨC HOÀN** — đơn phải sang `PartiallyRefunded` hay `Refunded` (`S5`, `PaymentRefundedEto`).
+    ///
+    /// **VÌ SAO PHẢI LÀ LUẬT THUẦN Ở ĐÂY (không tính trong handler):** `PaymentStatus` (trục tài chính của
+    /// **đơn**) nằm ở `eCommerce.Domain.Shared`, mà `PaymentHub.Domain` **cố ý không** tham chiếu nó
+    /// (quy tắc phân tầng #8). ⇒ Module chỉ được trả lời **câu nghiệp vụ trung tính** (*"hoàn một phần"* hay
+    /// *"hoàn toàn phần"*), còn ánh xạ sang enum của đơn là việc của tầng Sales.
+    /// 📌 Nhờ vậy luật **"khi nào là toàn phần"** có **một** định nghĩa và **một** bộ test, không phải một
+    /// biểu thức `>=` nằm rải trong handler nơi không ai test được nó.
+    ///
+    /// 🔒 **So sánh bằng `decimal.Compare`, KHÔNG `==`** (`XC-001` **BR-003** — bất biến #3 của dự án).
+    /// ⚠️ **Ca biên đáng chú ý:** hoàn **vượt** tổng đã thu **không thể** xảy ra qua đường chuẩn
+    /// (`RegisterRefund` chặn), nhưng vẫn phải trả `ToanPhan` nếu ai đó đưa vào số liệu đã hỏng — 📌 nếu trả
+    /// `MotPhan` thì đơn sẽ kẹt ở `PartiallyRefunded` **vĩnh viễn** trong khi sổ nói đã hoàn hết.
+    /// </summary>
+    /// <param name="soDaThu">`PaymentTransaction.Amount` — tổng đã thu.</param>
+    /// <param name="daHoanTong">`PaymentTransaction.RefundedAmount` **sau** lần hoàn này.</param>
+    public static MucHoan PhanLoaiHoan(decimal soDaThu, decimal daHoanTong)
+        => decimal.Compare(daHoanTong, soDaThu) >= 0 ? MucHoan.ToanPhan : MucHoan.MotPhan;
+
     private static string ChuanHoaTienTe(string? tienTe)
         => string.IsNullOrWhiteSpace(tienTe) ? TienTeMacDinh : tienTe.Trim();
+}
+
+/// <summary>Mức hoàn của một giao dịch — kết quả **trung tính** của <see cref="LuatCauNoiThanhToan.PhanLoaiHoan"/>.</summary>
+public enum MucHoan
+{
+    /// <summary>Đã hoàn **một phần** ⇒ đơn sang `PartiallyRefunded`.</summary>
+    MotPhan = 0,
+
+    /// <summary>Đã hoàn **hết** (hoặc hơn) số đã thu ⇒ đơn sang `Refunded`.</summary>
+    ToanPhan = 1
 }

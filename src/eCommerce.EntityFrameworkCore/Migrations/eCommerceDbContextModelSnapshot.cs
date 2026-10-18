@@ -5050,6 +5050,107 @@ namespace eCommerce.Migrations
                     b.ToTable("OrdOrderLines", (string)null);
                 });
 
+            modelBuilder.Entity("eCommerce.PaymentHub.Payments.PaymentRefund", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("ConcurrencyStamp");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<Guid?>("DeleterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("DeleterId");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("DeletionTime");
+
+                    b.Property<string>("ExtraProperties")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("ExtraProperties");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("IsDeleted");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<Guid>("PaymentTransactionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PerformedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("ProviderRefundTransactionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("ProviderResponseCode")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("RefundRequestId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PaymentTransactionId");
+
+                    b.HasIndex("TenantId", "PaymentTransactionId", "RefundRequestId")
+                        .IsUnique();
+
+                    b.ToTable("PayRefunds", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_PayRefunds_Amount_Duong", "\"Amount\" > 0");
+                        });
+                });
+
             modelBuilder.Entity("eCommerce.PaymentHub.Payments.PaymentTransaction", b =>
                 {
                     b.Property<Guid>("Id")
@@ -5162,7 +5263,12 @@ namespace eCommerce.Migrations
                     b.HasIndex("TenantId", "ProviderCode", "MerchantReference")
                         .IsUnique();
 
-                    b.ToTable("PayTransactions", (string)null);
+                    b.ToTable("PayTransactions", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_PayTransactions_RefundedAmount_KhongAm", "\"RefundedAmount\" >= 0");
+
+                            t.HasCheckConstraint("CK_PayTransactions_RefundedAmount_KhongVuotAmount", "\"RefundedAmount\" <= \"Amount\"");
+                        });
                 });
 
             modelBuilder.Entity("eCommerce.Pricing.ChannelPrice", b =>

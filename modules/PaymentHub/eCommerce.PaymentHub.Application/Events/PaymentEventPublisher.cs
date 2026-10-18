@@ -20,8 +20,15 @@ namespace eCommerce.PaymentHub.Events;
 /// endpoint) và `PaymentAppService.PostTruyVanTrangThaiAsync` (`querydr`) — 🔑 đường thứ hai **bắt buộc** phải
 /// phát: `querydr` là **lưới an toàn khi IPN mất**; nếu nó ghi `Succeeded` mà **không** phát sự kiện thì đơn của
 /// đúng những giao dịch bị mất IPN sẽ **vĩnh viễn** `Unpaid`.
+///
+/// 🆕 **`S5` — LỚP NÀY NAY HIỆN THỰC <see cref="IPaymentEventPublisher"/>** (hợp đồng ở
+/// `Application.Contracts`) để đường **thứ ba** — job `PaymentReconciliationWorker` ở
+/// `src/eCommerce.Application` — cũng phát được **cùng** sự kiện. 🔒 Trước `S5`, `eCommerce.Application`
+/// **không tham chiếu được** lớp này (luật phân tầng #8) ⇒ job ghi `Succeeded` mà **không** phát sự kiện ⇒
+/// *"lưới an toàn cứu được TIỀN, không cứu được ĐƠN"*. 📌 Đây là phát hiện **mới của `S5`**, ghi ở `PAY-001`
+/// §16.6 #1 — và nó **không** làm đỏ cổng nào trước đó, đúng họ lỗi *"hỏng âm thầm"*.
 /// </summary>
-public class PaymentEventPublisher : ITransientDependency
+public class PaymentEventPublisher : IPaymentEventPublisher, ITransientDependency
 {
     private readonly IDistributedEventBus _eventBus;
 
@@ -61,5 +68,35 @@ public class PaymentEventPublisher : ITransientDependency
             Currency = giaoDich.Currency,
             FailureReason = giaoDich.FailureReason,
             ProviderResponseCode = maPhanHoiCuaCong
+        });
+
+    /// <summary>
+    /// Phát `PaymentRefundedEto` (`S5`) — **chỉ** gọi khi `RegisterRefund` **đã** chạy (tiền **thật sự** ra và
+    /// sổ **đã** ghi).
+    ///
+    /// 🔒 **CẤM gọi hàm này cho một dòng hoàn tiền ở `ChoXacNhan`/`KhongXacDinh`:** sự kiện này làm **đơn**
+    /// chuyển sang `PartiallyRefunded`/`Refunded` ⇒ phát sớm nghĩa là *"đơn đã hoàn tiền"* trong khi khách
+    /// **chưa** nhận được đồng nào — 📌 đúng lỗi *"báo thành công khi chưa làm xong"* mà `RefundResult` sinh ra
+    /// để chống. 🔑 **Điều kiện gọi:** `LuatGhiNhanHoanTien.PhaiGhiSo(...)` là `true` **và** `RegisterRefund`
+    /// đã chạy **không ném** (`RegisterRefund` trả `void`; nó ném khi hoàn vượt ⇒ khi đó **không** phát).
+    /// </summary>
+    public Task PhatDaHoanTienAsync(PaymentTransaction giaoDich, PaymentRefund dongHoan)
+        => _eventBus.PublishAsync(new PaymentRefundedEto
+        {
+            TenantId = giaoDich.TenantId,
+            AggregateId = giaoDich.Id,
+            PaymentTransactionId = giaoDich.Id,
+            PaymentRefundId = dongHoan.Id,
+            OrderId = giaoDich.OrderId,
+            ProviderCode = giaoDich.ProviderCode,
+            MerchantReference = giaoDich.MerchantReference,
+            ProviderTransactionId = giaoDich.ProviderTransactionId,
+            Amount = giaoDich.Amount,
+            RefundedAmount = giaoDich.RefundedAmount,
+            SoTienLanNay = dongHoan.Amount,
+            Currency = giaoDich.Currency,
+            RefundReason = dongHoan.Reason,
+            NguoiThucHien = dongHoan.PerformedBy,
+            RefundRequestId = dongHoan.RefundRequestId
         });
 }

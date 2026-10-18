@@ -5,7 +5,6 @@ using Volo.Abp;
 using Volo.Abp.DependencyInjection;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Uow;
-
 namespace eCommerce.PaymentHub;
 
 /// <summary>
@@ -34,7 +33,25 @@ namespace eCommerce.PaymentHub;
 /// 🔒 **CỐ Ý KHÔNG PHẢI `ApplicationService`** (và **không** phải `IApplicationService`) ⇒ ABP **không** sinh
 /// controller cho nó ⇒ **không** có endpoint HTTP nào đánh dấu *"đã trả tiền"* được gọi bằng tay. 📌 Endpoint
 /// IPN thật (`S5`) gọi vào lớp này **sau khi** đã xác thực chữ ký — xem `IPaymentProvider.VerifyWebhookAsync`.
+///
+/// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+/// 🚨 **`S5` — `[ExposeServices(typeof(IXuLyKetQuaCong))]` LÀ BẮT BUỘC, VÀ ĐÂY LÀ MỘT LỖI THẬT ĐÃ ĐO ĐƯỢC.**
+///
+/// **Chuyện gì xảy ra:** `S4` khai hợp đồng `IXuLyKetQuaCong` và viết lớp này, nhưng **không ai resolve
+/// `IXuLyKetQuaCong`** trong suốt `S4` ⇒ lỗi **không lộ ra**. Khi `S5` dựng endpoint IPN và **inject** hợp đồng
+/// đó, request IPN đầu tiên trả **`HTTP 500`** với thông điệp:
+/// <c>Cannot resolve parameter 'eCommerce.PaymentHub.IXuLyKetQuaCong xuLy' of constructor '…VnPayIpnController'</c>
+///
+/// **Nguyên nhân (quy ước ĐẶT TÊN của ABP, không phải thiếu đăng ký):** `ITransientDependency` khiến ABP đăng ký
+/// lớp theo **tên của chính nó** — `XuLyKetQuaCongService` ⇒ `IXuLyKetQuaCongService` — **không** phải
+/// `IXuLyKetQuaCong`. Tên hợp đồng **không** theo quy ước `I<TênLớp>` nên **không** được ánh xạ tự động.
+///
+/// 📌 **Đây đúng họ bẫy #4 của dự án** (*"thiếu đăng ký ⇒ DI nổ lúc chạy ⇒ `HTTP 500`, triệu chứng không trỏ
+/// tới chỗ sai"*), chỉ khác lớp: lần này là **tên interface**, không phải `DbSet`. 🔑 Và nó **cũng không** làm
+/// đỏ một cổng nào trước `S5` vì **chưa có ai gọi**. ✅ Nay có test khoá lại
+/// (`HoanTienS5Tests.IXuLyKetQuaCong_PHAI_duoc_ExposeServices`) để lần sau đổi tên/đổi lớp là **đỏ ngay**.
 /// </summary>
+[ExposeServices(typeof(IXuLyKetQuaCong))]
 [UnitOfWork]
 public class XuLyKetQuaCongService : IXuLyKetQuaCong, ITransientDependency
 {

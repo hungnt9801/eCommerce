@@ -2372,3 +2372,46 @@ VALUES ('20261018030540_Addr004_SoDiaChi_Address_Va_LienKet', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE TABLE "PayRefunds" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "PaymentTransactionId" uuid NOT NULL,
+    "RefundRequestId" character varying(64) NOT NULL,
+    "Amount" numeric(18,4) NOT NULL,
+    "Reason" character varying(2000) NOT NULL,
+    "PerformedBy" character varying(256) NOT NULL,
+    "Status" integer NOT NULL,
+    "ProviderResponseCode" character varying(32),
+    "ProviderRefundTransactionId" character varying(128),
+    "FailureReason" character varying(2000),
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_PayRefunds" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_PayRefunds_Amount_Duong" CHECK ("Amount" > 0)
+);
+
+ALTER TABLE "PayTransactions" ADD CONSTRAINT "CK_PayTransactions_RefundedAmount_KhongAm" CHECK ("RefundedAmount" >= 0);
+
+ALTER TABLE "PayTransactions" ADD CONSTRAINT "CK_PayTransactions_RefundedAmount_KhongVuotAmount" CHECK ("RefundedAmount" <= "Amount");
+
+CREATE INDEX "IX_PayRefunds_PaymentTransactionId" ON "PayRefunds" ("PaymentTransactionId");
+
+CREATE UNIQUE INDEX "IX_PayRefunds_TenantId_PaymentTransactionId_RefundRequestId" ON "PayRefunds" ("TenantId", "PaymentTransactionId", "RefundRequestId");
+
+DROP INDEX IF EXISTS "IX_PayRefunds_TenantId_PaymentTransactionId_RefundRequestId";
+CREATE UNIQUE INDEX "IX_PayRefunds_TenantId_PaymentTransactionId_RefundRequestId"
+    ON "PayRefunds" ("TenantId", "PaymentTransactionId", "RefundRequestId") NULLS NOT DISTINCT;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261018052714_S5_PayRefunds_VaRangBuocHoanTien', '10.0.11');
+
+COMMIT;
+

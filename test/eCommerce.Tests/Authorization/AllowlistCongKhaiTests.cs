@@ -82,7 +82,24 @@ public class AllowlistCongKhaiTests
         //  • `duongDan` chỉ được render qua Razor (`@duongDan`) ⇒ **escape** tự động, không có XSS phản chiếu;
         //  • Trả **đúng mã trạng thái** (`403`/`404`) chứ **không** trả `200` — ⚠️ một trang `403` trả `200`
         //    sẽ làm **mọi** phép kiểm HTTP và **mọi** công cụ giám sát hiểu sai.
-        "eCommerce.Web.Controllers.LoiController"
+        "eCommerce.Web.Controllers.LoiController",
+
+        // 🚨 `S5` (`PAY-001` §7.2) — **IPN CỦA VNPAY** (`GET /api/webhooks/vnpay`).
+        //
+        // 🔑 **VÌ SAO BẮT BUỘC CÔNG KHAI:** VNPay gọi từ **Internet**, không có token của ta. 📌 Nếu endpoint này
+        // cần Bearer thì **không có IPN nào vào được** ⇒ `MarkSucceeded` **không bao giờ** chạy ở đường thật ⇒
+        // đơn đã trả vẫn `Unpaid` (đúng nợ §15.3 #2 mà `S5` đóng).
+        //
+        // 🔒 **RỦI RO ĐÃ GIẢM THIỂU — VÀ ĐÂY LÀ CHỖ QUAN TRỌNG NHẤT CỦA DÒNG NÀY:** endpoint **KHÔNG** đọc/ghi
+        // gì trước khi qua **HMAC-SHA512**; chữ ký sai ⇒ `400` + **không** đổi trạng thái
+        // (`VnPayRequestBuilder.KiemChuKyTuQueryTho`, fail-closed **kể cả** khi `HashSecret` rỗng — nhánh đó được
+        // thêm chính trong `S5` vì trước đó HMAC với khoá rỗng nghĩa là **ai cũng ký được** ⇒ giao hàng miễn phí).
+        //  • **KHÔNG** trả dữ liệu nghiệp vụ nào ra ngoài: body chỉ là `{"RspCode":"00"|"97","Message":"…"}`;
+        //  • **KHÔNG** nhận tham số điều khiển nào ngoài các `vnp_*` mà cổng tự ký ⇒ không có đường dò dữ liệu;
+        //  • **Chỉ `GET`** ⇒ không có bề mặt `POST` (và không kéo theo chống giả mạo của MVC).
+        // ⚠️ **Đây là cửa công khai DUY NHẤT trên `HttpApi.Host`** (host còn lại là API + auth server) ⇒ người
+        // review dòng này nên đọc `src/eCommerce.HttpApi.Host/Controllers/VnPayIpnController.cs` cùng lúc.
+        "eCommerce.HttpApi.Host.Controllers.VnPayIpnController"
     ];
 
     /// <summary>Cửa công khai map TAY (không có `[AllowAnonymous]`) — cũng phải khai tường minh.</summary>

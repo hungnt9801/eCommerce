@@ -153,6 +153,14 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
     // ---- PaymentHub (module) ----
     public DbSet<PaymentTransaction> PaymentTransactions { get; set; } = default!;
 
+    /// <summary>
+    /// 🚨 **DÒNG HOÀN TIỀN** (`S5` — `PAY-001` §5.6 #1). **BẮT BUỘC có `DbSet`** — cùng lý do khối ChannelHub
+    /// ở trên: ABP đăng ký `IRepository<T>` bằng cách **quét `DbSet`**, nên thiếu nó thì
+    /// `IRepository&lt;PaymentRefund, Guid&gt;` **không resolve được** ⇒ **`HTTP 500`** ngay lần hoàn tiền đầu
+    /// tiên, ⚠️ dù build/migration **đều xanh**. Lưới an toàn CI: `DbSetRegistrationTests`.
+    /// </summary>
+    public DbSet<PaymentRefund> PaymentRefunds { get; set; } = default!;
+
     // ---- Tax (module) — XC-006 ----
     // ⚠️ Phải khai báo DbSet, nếu không IRepository<TaxClassification, Guid> KHÔNG được đăng ký
     //    (xem ghi chú dài ở khối ChannelHub phía trên).

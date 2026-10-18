@@ -425,6 +425,9 @@ public class eCommerceHttpApiHostModule : AbpModule
         // KHÔNG có lỗi biên dịch và KHÔNG exception — đúng loại lỗi im lặng cần chặn.
         KiemTraBatBienTenClaim(context);
 
+        // 🚨 `S5` — CẢNH BÁO KHI CHƯA CẤU HÌNH KHOÁ KÝ CỦA IPN (lỗi im lặng nguy hiểm: xem chú thích hàm).
+        KiemTraCauHinhIpn(context);
+
         // 📊 Đo độ trễ request và phát http_request_duration_seconds (XC-005).
         // Đặt sớm để bao được cả thời gian xác thực/phân quyền.
         app.UseMiddleware<Observability.HttpRequestDurationMiddleware>();
@@ -512,6 +515,44 @@ public class eCommerceHttpApiHostModule : AbpModule
             logger.LogInformation(
                 "Độ phủ sự kiện OK: {SoSuKien} hợp đồng sự kiện, tất cả đều có người nhận (đã quét {SoAssembly} assembly).",
                 ketQua.SuKienCoNguoiNhan.Count, soAssembly);
+        }
+    }
+
+    /// <summary>
+    /// 🚨 **`S5` — CẢNH BÁO KHI CHƯA CẤU HÌNH `PaymentHub:VnPay:HashSecret`.**
+    ///
+    /// **VÌ SAO PHẢI LA LÊN (lỗi im lặng, mức 🔴):** `appsettings.json` của repo để `HashSecret: ""`. Với
+    /// `HMACSHA512` thì **khoá rỗng vẫn tính ra hash** ⇒ nếu mã không kiểm, bất kỳ ai cũng **tự ký** được một
+    /// IPN `vnp_ResponseCode=00` ⇒ hệ thống đánh dấu **đơn đã trả tiền** ⇒ **giao hàng miễn phí**
+    /// (`PAY-001` §7.7.4 #1). 🔒 Guard thật nằm ở `VnPayPaymentProvider.VerifyWebhookAsync` (fail-closed);
+    /// dòng log này chỉ để người vận hành **thấy ngay lúc khởi động** thay vì phát hiện qua *"IPN luôn bị từ chối"*.
+    ///
+    /// 📌 Ở `Development`, dòng này sẽ **luôn** xuất hiện nếu chưa đặt biến môi trường — và đó là **đúng**:
+    /// `Warning` không phải lỗi, nhưng **im lặng** thì là.
+    /// </summary>
+    private static void KiemTraCauHinhIpn(ApplicationInitializationContext context)
+    {
+        var logger = context.ServiceProvider.GetRequiredService<ILogger<eCommerceHttpApiHostModule>>();
+        var cauHinh = context.ServiceProvider
+            .GetRequiredService<Microsoft.Extensions.Configuration.IConfiguration>();
+
+        var biMat = cauHinh["PaymentHub:VnPay:HashSecret"];
+        var tmnCode = cauHinh["PaymentHub:VnPay:TmnCode"];
+
+        if (string.IsNullOrWhiteSpace(biMat))
+        {
+            logger.LogWarning(
+                "CHƯA CẤU HÌNH `PaymentHub:VnPay:HashSecret` ⇒ endpoint IPN `/api/webhooks/vnpay` sẽ TỪ CHỐI " +
+                "MỌI IPN (fail-closed, đúng thiết kế) và KHÔNG giao dịch thật nào được ghi nhận từ cổng. " +
+                "📌 Đặt biến môi trường `PaymentHub__VnPay__HashSecret` (KHÔNG commit giá trị thật). [PAY-IPN-CHUA-CAU-HINH]");
+        }
+        else
+        {
+            // 🔑 KHÔNG in giá trị — chỉ in **độ dài** (đủ để phân biệt "rỗng" với "đã đặt", không đủ để lộ khoá).
+            logger.LogInformation(
+                "Cấu hình IPN: HashSecret đã đặt (độ dài {DoDai}) · TmnCode {TrangThaiTmn}. [PAY-IPN-DA-CAU-HINH]",
+                biMat.Length,
+                string.IsNullOrWhiteSpace(tmnCode) ? "RỖNG (không dựng được URL thanh toán)" : "đã đặt");
         }
     }
 

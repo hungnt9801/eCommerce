@@ -16,7 +16,7 @@
     **CO nhung bang PHAI RONG** (chung la **dau vet thu nghiem**):
       `AbpSettings` · `CusCustomers` · `CusGroups` · `CatProductMedia` · `CatProductChannelVisibilities` ·
       `MsgDeadLetters` · `SalMarketplaceOrderIntakes` · `InvChannelLimits` · `PayTransactions` ·
-      `ReconRunMismatches`
+      `ReconRunMismatches` · `PayRefunds`
 
     **CO nhung bang PHAI GIU LICH SU** (🚨 **KHONG** duoc coi la rac):
       `ReconRuns` — **nhat ky luot quet doi soat**. 📌 Job `InventoryReconciliationWorker` ghi **mot dong
@@ -96,6 +96,11 @@ $bangPhaiRong = @(
     # đo sau đọc phải ⇒ kết luận sai). ⚠️ Chỉ thêm khi CÓ đường gieo thật (`ADDR-004` §11 ④).
     'AddrAddresses',                   # probe S2 gieo dia chi (S2PROBE…)
     'CusAddressLinks'                  # probe S2 gieo lien ket so dia chi
+    # 🚨 `S5` (18/10/2026) — `tools/probe-thanh-toan.ps1` gieo giao dich + DONG HOAN TIEN roi DON. 📌 Dua vao
+    # danh sach la cach duy nhat phat hien probe **gieo ma khong don**: neu con rac, lan do sau se doc phai va
+    # ket luan sai. 🔑 Va `PayRefunds` la bang **tien** — rac o day khong chi lam nhieu phep do, no con lam
+    # `RefundedAmount`/bao cao doi soat **sai** (mot dong hoan "that" khong ai tao).
+    , 'PayRefunds'                     # probe S5 (PAY-001 phan B) gieo dong hoan tien
 )
 
 # 📌 Nhom ②: bang GIU LICH SU / DU LIEU THAM CHIEU ⇒ 🚨 **KHONG** kiem "phai rong". 📌 Liet ke ra day de **ghi ro y dinh**.

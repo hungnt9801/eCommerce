@@ -9,9 +9,9 @@
 | **Module** | `PaymentHub` |
 | **Giai đoạn** | **GĐ1** — *thanh toán là điều kiện "bán được"; code đã có từ trước* |
 | **Ưu tiên** | `Must have` |
-| **Trạng thái** | 🟡 `Draft` — chờ review |
+| **Trạng thái** | 🟡 `Draft` — chờ review (⚠️ **vẫn KHÔNG** `Implemented`: chưa kiểm chứng **tiền thật**, chưa có outbox — xem §16.3/§16.4) |
 | **Người viết / người review** | `agent (phiên 17/10/2026)` / `Kiến trúc trưởng + BA + Kế toán` |
-| **Phiên bản / ngày** | `v0.1 — 17/10/2026` |
+| **Phiên bản / ngày** | `v0.3 — 18/10/2026` (phiên code `S5`: IPN + hoàn tiền) |
 | **Tài liệu liên quan** | `SAL-002` · `SAL-003` (trục **tài chính**) · `SAL-006` (hoàn tiền) · `REC-001` (đối soát `querydr`) · `XC-001` · `XC-002` · `XC-003` · `XC-004` · `XC-005` · [`docs/implementation-plan.md`](../../implementation-plan.md) · [`docs/structure-and-techstack.md`](../../structure-and-techstack.md) |
 
 ---
@@ -332,29 +332,34 @@ Bảng ánh xạ **phải** là:
 
 ### 4.1 Sequence — nhận IPN và chuyển `Succeeded` (**ĐÍCH — chưa có trong code**)
 
-> ⚠️ **Đây là luồng THIẾT KẾ, không phải luồng đang chạy.** Bước ① ② ③ (endpoint) **chưa có**
-> (`src/eCommerce.Web/Controllers` chỉ có `DoiSoatThanhToanController`; grep `Ipn|ipn|webhook` trong `src/`
-> **không** có controller nào). Các bước ④→⑧ **đã có code** (`VerifyWebhookAsync`, `MarkSucceeded`,
-> `AckResponseBody`). Kế hoạch: GĐ1, xem §15.1 **Q2**.
+> 🆕 **`S5` (18/10/2026): LUỒNG NÀY ĐÃ CÓ TRONG CODE.** Endpoint `GET /api/webhooks/vnpay`
+> (`src/eCommerce.HttpApi.Host/Controllers/VnPayIpnController.cs`) đã tồn tại, có `[AllowAnonymous]`, nằm trong
+> allowlist (`AllowlistCongKhaiTests`) và **đã được đo qua HTTP thật** (`tools/probe-thanh-toan.ps1`, 26/26 ca).
+> 📌 Phần dưới đây **giữ nguyên như thiết kế gốc**, với hai khác biệt **đã chốt**:
+> ① **sai chữ ký ⇒ `HTTP 400`** (không phải `200` + `RspCode 97`) — xem §7.2; ② chữ ký được kiểm trên **query
+> THÔ** (`KiemChuKyTuQueryTho`) — vá `F-PAY-1` + lỗi encode lại, xem §7.2.1.
+>
+> ⚠️ **Đọc đúng mức độ:** luồng đúng **ở mức mã + HTTP giả lập có chữ ký THẬT**; 🔒 **chưa** có một IPN nào từ
+> **VNPay thật** đi vào (credential rỗng — §7.6). Đó là lý do tài liệu **vẫn** `Draft`.
 
 ```mermaid
 sequenceDiagram
     actor VNP as VNPay
     participant API as HttpApi.Host
-    participant CTRL as IPN controller (CHƯA CÓ)
+    participant CTRL as VnPayIpnController «S5»
     participant PRV as VnPayPaymentProvider
-    participant APP as PaymentAppService (hoặc handler)
+    participant APP as XuLyKetQuaCongService
     participant DOM as PaymentTransaction
     participant DB as PostgreSQL
 
-    VNP->>API: GET /api/webhooks/vnpay?«vnp_*» (CHƯA CÓ ROUTE)
+    VNP->>API: GET /api/webhooks/vnpay?«vnp_*»
     API->>CTRL: chuyển raw query string + headers
-    CTRL->>PRV: VerifyWebhookAsync(rawBody, headers)
-    Note over PRV: bỏ vnp_SecureHash và vnp_SecureHashType · sắp xếp Ordinal · URL-encode · HMAC-SHA512
+    CTRL->>PRV: VerifyWebhookAsync(rawQuery, headers)
+    Note over PRV: bỏ vnp_SecureHash và vnp_SecureHashType · bỏ tham số RỖNG · sắp xếp Ordinal · KHÔNG decode/encode lại · HMAC-SHA512
     PRV-->>CTRL: WebhookVerificationResult (SignatureValid · IsSuccess · Amount · MerchantReference · AckResponseBody)
     alt «chữ ký SAI hoặc thiếu»
-        CTRL-->>VNP: 200 + RspCode 97 Invalid Checksum
-        Note over CTRL: ghi metric payment_webhook_rejected_total (reason)
+        CTRL-->>VNP: 400 + RspCode 97 Invalid Checksum
+        Note over CTRL: ghi metric payment_webhook_rejected_total (reason) · KHÔNG chạm DB
     else «chữ ký ĐÚNG»
         CTRL->>APP: tra giao dịch theo MerchantReference + đối chiếu Amount
         APP->>DB: đọc PayTransactions (lọc tenant tự động)
@@ -362,6 +367,7 @@ sequenceDiagram
         Note over DOM: guard trạng thái cuối — nếu đã Succeeded/Refunded thì chỉ tăng bộ đếm
         DOM-->>APP: true (ghi mới) hoặc false (đã xử lý)
         APP->>DB: UPDATE + SaveChanges (cùng Unit of Work)
+        APP->>DB: phát PaymentSucceededEto (in-process, cùng UoW) → cầu nối ghi đơn
         CTRL-->>VNP: 200 + RspCode 00 Confirm Success
     end
 ```
@@ -535,13 +541,13 @@ erDiagram
 
 | Thiếu gì | Hệ quả | Có phải nợ? |
 |---|---|---|
-| **Không** `CHECK (RefundedAmount >= 0)` | Ghi tay/nhánh lỗi có thể tạo số âm; entity đã chặn (`amount > 0` + cộng dồn) nhưng **DB không** chặn | 🟡 Nên thêm khi làm migration hoàn tiền (§11) |
-| **Không** `CHECK (RefundedAmount <= Amount)` | Tầng domain **đã** chặn (`PaymentTransaction.cs:189-199`) nhưng **đường ghi tắt** (SQL/sửa nóng) không bị chặn | 🔴 **Nên thêm** — đây là bất biến **tiền**, xứng đáng hàng rào DB |
+| ~~**Không** `CHECK (RefundedAmount >= 0)`~~ ✅ **ĐÃ THÊM `S5`** — `CK_PayTransactions_RefundedAmount_KhongAm` | Ghi tay/nhánh lỗi có thể tạo số âm; entity đã chặn (`amount > 0` + cộng dồn) nhưng **DB không** chặn | ✅ Đã đóng (migration `S5_PayRefunds_VaRangBuocHoanTien`) |
+| ~~**Không** `CHECK (RefundedAmount <= Amount)`~~ ✅ **ĐÃ THÊM `S5`** — `CK_PayTransactions_RefundedAmount_KhongVuotAmount` | Tầng domain **đã** chặn (`PaymentTransaction.RegisterRefund`) nhưng **đường ghi tắt** (SQL/sửa nóng) không bị chặn | ✅ Đã đóng — chứng minh `23514` trên PostgreSQL thật (`TC-45`) |
 | **Không** FK `OrderId → OrdOrders` | Có thể trỏ tới đơn không tồn tại | 🟡 Cố ý (nạp ví); **phải** ghi trong tài liệu, đã ghi |
 | **Không** index trên `(TenantId, Status, CreationTime)` | Truy vấn của job (`Status IN (…)`) và của UI (`ORDER BY CreationTime DESC LIMIT 50`) đều **quét bảng** | 🟠 **Nợ hiệu năng thật** — xem NFR-PAY-001 |
-| **Không** bảng dòng hoàn tiền | Không trả lời được *"hoàn lúc nào, vì sao, ai duyệt"* bằng **dữ liệu** (chỉ có log) | 🔴 **Nợ** (`SAL-006` §17.8 #6) |
+| ~~**Không** bảng dòng hoàn tiền~~ ✅ **ĐÃ CÓ `S5`** — `PayRefunds` (§5.7) | Không trả lời được *"hoàn lúc nào, vì sao, ai duyệt"* bằng **dữ liệu** (chỉ có log) | ✅ Đã đóng |
 
-### 5.4 ⚠️ `NULLS NOT DISTINCT` — ràng buộc dự án, và **con số 48**
+### 5.4 ⚠️ `NULLS NOT DISTINCT` — ràng buộc dự án, và **con số 52**
 
 **Luật (bất di bất dịch):** *mọi unique index trên entity `IMultiTenant` **phải** có `NULLS NOT DISTINCT`, viết
 bằng **SQL thô** trong migration* (`handover:120-124`; `XC-004` **F1**; `XC-003` §5.4).
@@ -549,15 +555,16 @@ bằng **SQL thô** trong migration* (`handover:120-124`; `XC-004` **F1**; `XC-0
 | Mục | Giá trị **đo được** | Nguồn |
 |---|---|---|
 | Hiện trạng 2 index của `PayTransactions` | **Đã** có `NULLS NOT DISTINCT` cho **cả hai** index unique | `20261013024226_Fix_NullableTenantId_UniqueIndexes.cs:61-68` |
-| Tổng số unique index có `NULLS NOT DISTINCT` | **48** | `PostgreSqlSchemaTests.cs:144-152` — `Assert.Equal(48L, …)` |
-| Tài liệu này có làm **tăng** con số đó không? | **KHÔNG.** `PAY-001` **không** tạo index mới, **không** sửa index hiện có | — |
-| Khi nào con số **sẽ** phải đổi | Nếu làm theo §5.6 (*bảng dòng hoàn tiền* với unique `(TenantId, PaymentTransactionId, RefundRequestId)`) ⇒ **49**, và **phải** sửa `PostgreSqlSchemaTests` **trong cùng PR** | `handover:123` (*"Thêm index mới ⇒ cập nhật cả test"*) |
+| Tổng số unique index có `NULLS NOT DISTINCT` (đo 18/10/2026, cuối `S4`) | **51** | `PostgreSqlSchemaTests.cs` — `F1_du_51_index…` (`Assert.Equal(51L, …)`); 48 → 49 (`S1`) → 51 (`S2`) |
+| 🆕 **`S5` làm con số đó đổi thành bao nhiêu?** | **52** — thêm **đúng MỘT**: `IX_PayRefunds_TenantId_PaymentTransactionId_RefundRequestId` (`0` → `1`, không thay) | `S5_PayRefunds_VaRangBuocHoanTien` — SQL thô `NULLS NOT DISTINCT`; test đổi tên `F1_du_52_index…` + thêm tên index vào **danh sách đích danh** |
+| `S5` có sửa index nào khác không? | **KHÔNG.** Hai `CHECK` mới của `PayTransactions` **không** phải index | — |
 
-> 🚨 **Vì sao phải nói rõ "48 không đổi":** test `F1_du_48_index_deu_dung_NULLS_NOT_DISTINCT` khẳng định **cả
+> 🚨 **Vì sao phải nói rõ "con số đổi thành 52":** test `F1_du_52_index_deu_dung_NULLS_NOT_DISTINCT` khẳng định **cả
 > tổng số** lẫn **danh sách đích danh** (2 index của `PayTransactions` nằm trong danh sách — `PostgreSqlSchemaTests.cs:164-165`).
 > Nếu ai đó thêm index mà quên `NULLS NOT DISTINCT` **đồng thời** vô tình làm mất thuộc tính của index khác thì
 > **tổng số không đổi** ⇒ test **vẫn xanh** trong khi một index đã mất tác dụng. Đó là lý do danh sách đích danh tồn tại
-> (`PostgreSqlSchemaTests.cs:172-175`).
+> (`PostgreSqlSchemaTests.cs:172-175`). 📌 `S5` **thêm tên index mới vào danh sách đó**, không chỉ tăng tổng.
+
 
 **SQL thô thật (trích nguyên văn):**
 
@@ -592,12 +599,52 @@ CREATE UNIQUE INDEX "IX_PayTransactions_TenantId_ProviderCode_IdempotencyKey"
 
 | # | Thiếu gì | Vì sao cần | Ảnh hưởng nếu để nguyên |
 |---|---|---|---|
-| 1 | **Bảng dòng hoàn tiền** (`PayRefunds`: `Id`, `TenantId`, `PaymentTransactionId`, `SoTien`, `LyDo`, `NguoiThucHien`, `MaPhanHoi`, `MaGiaoDichHoan`, `TrangThai`, `CreationTime`) | `RefundedAmount` chỉ là **tổng** ⇒ câu hỏi *"hoàn lúc nào, bao nhiêu, vì sao, ai duyệt"* **không trả lời được bằng dữ liệu** | Khi khách khiếu nại, kế toán **chỉ** có log để tra; 🔒 và **không** có ràng buộc DB cho *"tổng ≤ đã thu"* |
+| 1 | ~~**Bảng dòng hoàn tiền**~~ ✅ **ĐÓNG `S5`** — bảng `PayRefunds` (**§5.7**) | `RefundedAmount` chỉ là **tổng** ⇒ câu hỏi *"hoàn lúc nào, bao nhiêu, vì sao, ai duyệt"* **không trả lời được bằng dữ liệu** | — |
 | 2 | Cột `ProviderCreateDateGmt7` | `querydr`/`refund` bắt buộc `vnp_TransactionDate` = thời điểm giao dịch **tại cổng**, GMT+7 (`REC-001` **H2**) | Hiện dùng `DateTime.UtcNow.AddHours(7)` **tại lúc gọi** (`VnPayRequestBuilder.cs:78`) ⇒ gửi **sai ngày** cho giao dịch cũ ⇒ cổng trả *"không tìm thấy giao dịch"* |
-| 3 | Liên kết giao dịch ↔ **đơn** ở phía đơn | `Order.PaymentStatus` **không** được ghi (§3.5) | Đơn đã trả tiền vẫn `Unpaid` ⇒ **giao hàng/không giao** sai |
+| 3 | ~~Liên kết giao dịch ↔ **đơn** ở phía đơn~~ ✅ **ĐÓNG `S4` + `S5`** (`PaymentSucceededEto` từ `S4`; `PaymentRefundedEto` từ `S5` ⇒ đơn sang `PartiallyRefunded`/`Refunded`) | — | — |
 | 4 | `PaymentTransaction` **không** lưu mã `vnp_BankCode`/`vnp_CardType` | Đối soát theo ngân hàng/phương thức, báo cáo phí | Không đối chiếu được sao kê theo kênh thanh toán |
 
 ---
+
+### 5.7 🆕 Bảng `PayRefunds` (`S5`) — **dòng hoàn tiền**
+
+> 📌 **VÌ SAO BẢNG NÀY TỒN TẠI:** `PaymentTransaction.RefundedAmount` chỉ là **MỘT TỔNG**, nên ba câu hỏi kế
+> toán luôn hỏi khi khách khiếu nại — *hoàn **lúc nào**, **bao nhiêu mỗi lần**, **vì sao + ai duyệt*** — **không
+> trả lời được bằng dữ liệu**, chỉ bằng **log** (mà log thì bị xoay vòng). 🔒 Với dòng tiền, *"chỉ có log"*
+> nghĩa là **không có bằng chứng**.
+
+| Cột | Kiểu | Null? | Ý nghĩa |
+|---|---|---|---|
+| `Id` | `uuid` | ✖ | PK |
+| `TenantId` | `uuid` | ✔ | tenant sở hữu (`IMultiTenant` ⇒ unique index **bắt buộc** `NULLS NOT DISTINCT`) |
+| `PaymentTransactionId` | `uuid` | ✖ | giao dịch gốc — 🔒 **tham chiếu MỀM** (không FK), cùng quy ước `PayTransactions.OrderId`: dòng hoàn giữ được bằng chứng **kể cả khi** bản ghi giao dịch bị xoá mềm nhầm |
+| `RefundRequestId` | `varchar(64)` | ✖ | **số thứ tự lần hoàn** (`RF001`, `RF002`…) — 🔑 **ổn định, đọc được** (xem bảng quyết định dưới) |
+| `Amount` | `numeric(18,4)` | ✖ | số tiền **của lần hoàn này** — 🔒 `decimal`, **cấm** `double` |
+| `Reason` | `varchar(2000)` | ✖ | lý do (audit + `vnp_OrderInfo`) |
+| `PerformedBy` | `varchar(256)` | ✖ | **ai** yêu cầu hoàn |
+| `Status` | `integer` | ✖ | `TrangThaiDongHoanTien`: `ChoXacNhan(0)` · `DaHoan(1)` · `TuChoi(2)` · `KhongXacDinh(3)` |
+| `ProviderResponseCode` | `varchar(32)` | ✔ | `vnp_ResponseCode` — giữ **nguyên văn** để điều tra |
+| `ProviderRefundTransactionId` | `varchar(128)` | ✔ | mã giao dịch hoàn do cổng cấp — tra chéo sao kê |
+| `FailureReason` | `varchar(2000)` | ✔ | lý do thất bại / **lỗi hạ tầng** |
+| `ExtraProperties` · `ConcurrencyStamp` · `CreationTime` · … | | | chuẩn ABP (`FullAuditedAggregateRoot`) |
+
+**Ba quyết định — mỗi cái đều có lý do, không phải sở thích:**
+
+| # | Quyết định | Vì sao **không** làm cách khác |
+|---|---|---|
+| 1 | 🚨 **Ghi dòng cho MỌI kết quả** — kể cả `ChoXacNhan`/`TuChoi`/`KhongXacDinh` | Ba câu hỏi của kế toán phải trả lời được **cả** khi lần hoàn **không** thành — đặc biệt ca `KhongXacDinh`, nơi **cấm** thử lại mù: không có dòng ghi thì lần sau **không ai biết** đã từng gửi yêu cầu, và người vận hành **sẽ gửi lại** (⇒ hoàn hai lần) |
+| 2 | 🔒 **Dòng `DaHoan` KHÔNG tự làm `RefundedAmount` tăng** | `RefundedAmount` **chỉ** tăng khi `LuatGhiNhanHoanTien.PhaiGhiSo` = `true` **và** `RegisterRefund` đã chạy. 📌 Gộp hai thứ đó là đúng lỗi §4.2 đã phải sửa: ghi sổ theo mã `00` ⇒ *"sổ sách nói dối"* |
+| 3 | 🚨 **`RefundRequestId` là SỐ THỨ TỰ, KHÔNG phải `Guid` ngẫu nhiên** | Unique index `(TenantId, PaymentTransactionId, RefundRequestId)` chỉ có giá trị khi nó **chặn được**: hai luồng cùng tính ra *"lần hoàn thứ 2"* ⇒ dòng thứ hai nhận `23505` thay vì **âm thầm** thành hai dòng cùng số thứ tự. ⚠️ `Guid` mỗi lần một giá trị ⇒ index thành **trang trí** và **không lỗi nào nổi lên** (bài học `BR-PAY-002`) |
+
+**Bất biến ở tầng DB — đã CHỨNG MINH trên PostgreSQL thật** (`test/eCommerce.IntegrationTests/PayRefundsVaRangBuocTienTests.cs`):
+
+| Ràng buộc | Nội dung | Nếu thiếu |
+|---|---|---|
+| `IX_PayRefunds_TenantId_PaymentTransactionId_RefundRequestId` | UNIQUE **`NULLS NOT DISTINCT`** (SQL thô) | ở `TenantId = NULL` hai dòng cùng lần hoàn **lọt im lặng** ⇒ `RefundedAmount` cộng hai lần cho **một** lệnh |
+| `CK_PayRefunds_Amount_Duong` | `"Amount" > 0` | dòng hoàn 0 đồng (vô nghĩa) hoặc **âm** (làm **giảm** tổng đã hoàn ⇒ **che** một lần hoàn đã xảy ra) |
+| `CK_PayTransactions_RefundedAmount_KhongAm` | `"RefundedAmount" >= 0` | như trên, ở bảng tổng |
+| `CK_PayTransactions_RefundedAmount_KhongVuotAmount` | `"RefundedAmount" <= "Amount"` | 🚨 **bất biến TIỀN**: hoàn nhiều hơn nhận — tầng domain đã chặn, nhưng **đường ghi tắt** thì không |
+
 
 ## 6. Hợp đồng API
 
@@ -632,8 +679,8 @@ CREATE UNIQUE INDEX "IX_PayTransactions_TenantId_ProviderCode_IdempotencyKey"
 | `POST` | `/api/app/payment/hoan-tien/{paymentTransactionId}` | `eCommerce.Payments.Refund` | body `HoanTienInput` |
 | `POST` | `/api/app/payment/truy-van-trang-thai/{paymentTransactionId}` | `eCommerce.Payments.Refund` | body rỗng |
 | `POST` | `/api/app/payment/doi-soat-loat` | `eCommerce.Payments` | query `toiDa` |
-| 🆕 `POST` | `/api/app/payment/tao-giao-dich` | `eCommerce.Payments` | **`S4`** — body `TaoGiaoDichInput`; trả `CheckoutUrl` + `laGiaoDichDaCo`. ⚠️ **Đường dẫn suy ra từ quy ước ABP** (`tao-giao-dich`) — 📌 **CHƯA đo bằng `tools\route-check.ps1`** (nợ §16.4 #3) |
-| `GET` | `/api/webhooks/vnpay` | **không tồn tại** | 🚨 **chưa có trong code — `S5`** (§7.2) |
+| 🆕 `POST` | `/api/app/payment/tao-giao-dich` | `eCommerce.Payments` | **`S4`** — body `TaoGiaoDichInput`; trả `CheckoutUrl` + `laGiaoDichDaCo`. ✅ **`S5` ĐÃ ĐO HTTP THẬT = `200`** (probe `T15`… — xem §16.2) |
+| 🆕 `GET` | **`/api/webhooks/vnpay`** | **KHÔNG** (allowlist) | ✅ **`S5` — ĐÃ CÓ VÀ ĐÃ ĐO**: `VnPayIpnController` (`src/eCommerce.HttpApi.Host/Controllers`), `[AllowAnonymous]`, đã duyệt trong `AllowlistCongKhaiTests`. **Đo được** (`probe-thanh-toan.ps1`): chữ ký đúng ⇒ **`200`** + `{"RspCode":"00"}`; **sai chữ ký ⇒ `400`** + `{"RspCode":"97"}` và **DB không đổi**; lệch số tiền ⇒ **`400`** + `{"RspCode":"99","Message":"eCommerce:Payment:0008"}` |
 | ⚠️ | *(không có route nào cho `IXuLyKetQuaCong`)* | — | 🔒 **CỐ Ý**: đường ghi nhận kết quả cổng **không phải** `IApplicationService` ⇒ ABP **không** sinh controller ⇒ **không** có endpoint *"đánh dấu đã trả tiền"* (`D3`/§7.7.4 #1). Có test khoá (`OrderPaymentStatusHandlerBatBienTests`) |
 
 **Authentication:** `Bearer` (OpenIddict) cho `/api/app/*`; IPN **không** dùng Bearer (VNPay gọi trực tiếp) ⇒
@@ -707,7 +754,7 @@ của máy này ⇒ **không thể** cài outbox trong `S4` mà không đổi c�
 |---|---|---|---|---|---|
 | `PaymentSucceededEto` | Trong **cùng UoW** với `MarkSucceeded` trả `true` | `PaymentTransactionId`, `AggregateId`, `OrderId?`, `TenantId`, `ProviderCode`, `MerchantReference`, `ProviderTransactionId`, `Amount` (**decimal**), `Currency`, `PaidAtUtc`, `EventId`, `OccurredOn` | `Sales` (ghi `Order.PaymentStatus = Paid`) | ✅ theo `(TenantId, ProviderTransactionId)` — ⚠️ chống trùng **thật** hiện dựa vào `MarkSucceeded` trả `false` (nên ETO **không** phát lần hai) | ✅ **`S4`** |
 | `PaymentFailedEto` | Khi `MarkFailed` trả `true` (**thật sự** đổi trạng thái) | như trên + `FailureReason`, `ProviderResponseCode` | `Sales` (`PaymentStatus = Failed`), `Notifications` | ✅ như trên | ✅ **`S4`** |
-| `PaymentRefundedEto` | Khi `RegisterRefund` thành công | như trên + `RefundedAmount`, `RefundReason`, `NguoiThucHien` | `Sales` (`PartiallyRefunded`/`Refunded`), `EInvoice` (điều chỉnh hoá đơn), `Reporting` | ✅ theo `(TenantId, PaymentTransactionId, RefundSequence)` | ❌ **chưa có** — `S5`/`SAL-006` (§16.3) |
+| `PaymentRefundedEto` | Khi `RegisterRefund` thành công (**chỉ** khi tiền **đã ra**) | `PaymentTransactionId`, `PaymentRefundId` (**khoá chống trùng**), `OrderId?`, `TenantId`, `ProviderCode`, `MerchantReference`, `ProviderTransactionId`, `Amount` (**tổng đã thu**), `RefundedAmount` (**tổng đã hoàn sau lần này**), `SoTienLanNay`, `Currency`, `RefundReason`, `NguoiThucHien`, `RefundRequestId`, `EventId`, `OccurredOn` | `Sales` (`PartiallyRefunded`/`Refunded` — luật thuần `PhanLoaiHoan`), `EInvoice`, `Reporting` | ✅ theo `PaymentRefundId` (Guid duy nhất) | ✅ **`S5`** — `PaymentEventPublisher.PhatDaHoanTienAsync`; handler `OrderPaymentStatusHandler.HandleEventAsync(PaymentRefundedEto)` |
 
 > ⚠️ **Phụ thuộc chưa có:** ETO chỉ **không mất** nếu đi qua outbox của ABP (`XC-002` D1). Hiện transport là
 > in-process (`LocalDistributedEventBus`, chưa có gói RabbitMQ trong `Directory.Packages.props`) ⇒ `MessageId` **đổi
@@ -722,7 +769,7 @@ của máy này ⇒ **không thể** cài outbox trong `S4` mà không đổi c�
 
 | Nguồn | Loại | Xác thực | Chống trùng bằng | Nếu xử lý lỗi? | Thứ tự đến |
 |---|---|---|---|---|---|
-| **VNPay** | `IPN` (GET, query string `vnp_*`) | **HMAC-SHA512** trên chuỗi tham số đã **sắp xếp `Ordinal`** + **URL-encode**, **bỏ** `vnp_SecureHash` + `vnp_SecureHashType` (`VnPayPaymentProvider.cs:151-164`) | ① UNIQUE `(TenantId, ProviderCode, IdempotencyKey)` ② `MarkSucceeded` trả `false` khi đã ở trạng thái cuối ③ `WebhookReceivedCount` | Trả **`RspCode 97`** khi sai chữ ký; trả **`RspCode 00`** khi hợp lệ ⇒ **VNPay dừng retry** (`VnPayPaymentProvider.cs:191-194`) | ⚠️ **CÓ THỂ SAI** — at-least-once, có thể đến **sau** IPN khác hoặc sau khi đã hoàn tiền ⇒ §7.2.3 |
+| **VNPay** | `IPN` (GET, query string `vnp_*`) | **HMAC-SHA512** trên chuỗi tham số **sắp xếp `Ordinal`**, **bỏ** `vnp_SecureHash` + `vnp_SecureHashType` **và bỏ tham số RỖNG**, dựng từ **query THÔ** (`VnPayRequestBuilder.KiemChuKyTuQueryTho` — `S5`) | ① UNIQUE `(TenantId, ProviderCode, IdempotencyKey)` ② `MarkSucceeded` trả `false` khi đã ở trạng thái cuối ③ `WebhookReceivedCount` | 🆕 **`S5`:** chữ ký sai ⇒ **`HTTP 400`** + `RspCode 97` (**không** đổi DB); hợp lệ ⇒ **`200`** + `RspCode 00` ⇒ **VNPay dừng retry** | ⚠️ **CÓ THỂ SAI** — at-least-once, có thể đến **sau** IPN khác hoặc sau khi đã hoàn tiền ⇒ §7.2.3 |
 
 **Nguồn thông số (bắt buộc trích dẫn, không được bịa):**
 
@@ -745,11 +792,52 @@ của máy này ⇒ **không thể** cài outbox trong `S4` mà không đổi c�
 
 #### 7.2.1 🚨 Ba phát hiện trong chính đoạn xác thực IPN (đọc dòng, không suy đoán)
 
+> 🆕 **`S5`: `F-PAY-1` ĐÃ ĐÓNG — và khi sửa thì phát hiện thêm MỘT lớp nữa của cùng lỗi.** Xem dòng đầu bảng
+> và **§7.2.4**.
+
 | # | Phát hiện | Bằng chứng | Rủi ro |
 |---|---|---|---|
-| **F-PAY-1** | **`VerifyWebhookAsync` KHÔNG bỏ tham số rỗng**, còn `KiemChuKy` **CÓ bỏ** — hai quy tắc khác nhau trong **cùng một tệp** | `VnPayPaymentProvider.cs:151-162` (chỉ bỏ `vnp_SecureHash*`) **so với** `VnPayRequestBuilder.cs:254-259` (*"VNPay **bỏ** tham số rỗng khỏi chuỗi ký ⇒ phải bỏ ở đây cho khớp"*) | 🔴 **Từ chối IPN THẬT** khi cổng gửi tham số rỗng (ví dụ `vnp_BankCode=`): ta tính hash **khác** ⇒ `SignatureValid = false` ⇒ **không ghi nhận tiền đã vào** ⇒ **mất tiền im lặng** (job `querydr` là lưới an toàn **duy nhất**). 📌 Phải thống nhất **một** quy tắc và viết test đối chứng |
-| **F-PAY-2** | **Không có bước đối chiếu số tiền với DB.** `WebhookVerificationResult.Amount` được **parse** nhưng **không** so với `PaymentTransaction.Amount` ở bất kỳ đâu trong code | `VnPayPaymentProvider.cs:175-179` (chỉ gán), grep `Amount` trong `modules/PaymentHub` không có phép so | 🟠 Về lý thuyết chữ ký đã bảo vệ (sửa `vnp_Amount` ⇒ sai chữ ký — test `VnPayWebhookTests.cs:82-96`), **nhưng**: (a) nếu `HashSecret` **lệch** giữa hai môi trường thì có thể nhận IPN của **đơn khác số tiền**; (b) `SAL-003` **#12** yêu cầu **khớp số tiền** mới được `Paid` ⇒ **bắt buộc** phải có phép so ở tầng gọi |
-| **F-PAY-3** | `MerchantReference` có thể **rỗng** mà không phải lỗi | `VnPayPaymentProvider.cs:170` — `GetValueOrDefault("vnp_TxnRef") ?? string.Empty` | 🟠 Chỗ gọi **phải** coi chuỗi rỗng là **lỗi dữ liệu** (không được tra DB bằng `""` rồi ghi nhầm) |
+| **F-PAY-1** | **`VerifyWebhookAsync` KHÔNG bỏ tham số rỗng**, còn `KiemChuKy` **CÓ bỏ** — hai quy tắc khác nhau trong **cùng một ý niệm** | `VnPayPaymentProvider.cs:151-162` (bản cũ) **so với** `VnPayRequestBuilder.KiemChuKy` | 🔴 **Từ chối IPN THẬT** khi cổng gửi tham số rỗng (ví dụ `vnp_BankCode=`) ⇒ **mất tiền im lặng**. ✅ **ĐÃ SỬA `S5`:** chỉ còn **một** luật — `KiemChuKyTuQueryTho`; `TC-07` (3 ca, **cả hai chiều**) + probe HTTP `T16`/`T18` |
+| **F-PAY-2** | ~~**Không có bước đối chiếu số tiền với DB**~~ | ✅ **ĐÓNG `S4`** — `LuatCauNoiThanhToan.DoiChieu` + ép ở **hai** chỗ; `S5` đo thêm **qua HTTP** (`T19`/`T20`: lệch tiền ⇒ `400` + `0008`, DB không đổi) | — |
+| **F-PAY-3** | `MerchantReference` có thể **rỗng** mà không phải lỗi | `VnPayPaymentProvider.cs:170` — `GetValueOrDefault("vnp_TxnRef") ?? string.Empty` | ✅ **ĐÓNG `S4`** — `XuLyKetQuaCongService` **NÉM** `0006` khi `vnp_TxnRef` rỗng |
+
+#### 7.2.4 🆕 Lớp thứ hai của `F-PAY-1` — **byte của chuỗi ký** (`S5`)
+
+**Phát hiện khi sửa:** cùng một chỗ, còn **một** cách làm sai nữa mà bản cũ mắc **cùng lúc** — và nó **không** nằm
+trong bất kỳ tài liệu nào trước `S5`:
+
+| Điều | Bản cũ (`S4`) | Vì sao **sai** | Nay (`S5`) |
+|---|---|---|---|
+| Nguồn chuỗi ký | **Giải mã** từng tham số rồi **encode lại** bằng `WebUtility.UrlEncode` | `WebUtility.UrlEncode(' ')` = `%20`, còn `application/x-www-form-urlencoded` (nhiều thư viện HTTP dùng) gửi `+` ⇒ **cùng nội dung, khác byte** ⇒ hash lệch ⇒ **từ chối IPN thật** | Dựng từ **query THÔ** (`Request.QueryString`) — byte **của cổng**, không phải byte ta sinh lại |
+| Tham số rỗng | **Giữ** trong chuỗi ký | VNPay **bỏ** (đúng như `KiemChuKy`) ⇒ hash lệch | **Bỏ** (drop) |
+| Nơi chứa thuật toán | **Hai bản** (provider + builder) | Hai luật trong một hệ thống ⇒ chúng **đã** lệch | **Một** hàm duy nhất: `VnPayRequestBuilder.KiemChuKyTuQueryTho` |
+
+📌 **Cả ba dòng cùng một họ lỗi:** *"hai định nghĩa của một luật"* — đúng thứ `F-PAY-1` mô tả, nhưng bản mô tả
+cũ chỉ thấy **một** trong ba biểu hiện. 🔑 Đây là lý do `S5` **không** chỉ "bỏ tham số rỗng" mà **gộp thuật toán
+về một chỗ**: sửa từng biểu hiện thì biểu hiện thứ tư **sẽ** xuất hiện.
+
+**Test khoá lại** (`test/eCommerce.Tests/PaymentHub/VnPayIpnChuKyTests.cs`):
+
+| Ca | Bất biến |
+|---|---|
+| `TC07` | IPN có `vnp_BankCode=` (rỗng), ký theo luật VNPay ⇒ **hợp lệ** |
+| `TC07b` | **Chiều NGƯỢC** — ký theo cách **cũ** (giữ tham số rỗng) ⇒ **bị từ chối** (chống bản sửa "quá tay" làm cổng luôn xanh) |
+| `TC07c` | **Bằng chứng phép tiêm đã xảy ra**: hai cách ký cho ra **hash KHÁC nhau** |
+| `+`-thay-khoảng-trắng | Query có `Thanh+toan` ⇒ **hợp lệ** (không decode/encode lại) |
+| query méo / khoá trùng / thiếu hash | `false` + **lý do có mã** (`query-khong-hop-le` / `thieu-chu-ky`) — không đoán |
+| **`HashSecret` RỖNG** | **`false`** + metric `thieu-hashsecret` — xem §7.2.5 |
+
+#### 7.2.5 🆕 Lỗ hổng **chỉ trở thành hiện thực khi có endpoint**: `HashSecret` rỗng (`S5`)
+
+**Đo được:** `appsettings.json` của repo để `PaymentHub:VnPay:HashSecret = ""`. Trước `S5`, `VerifyWebhookAsync`
+tính `HMACSHA512` với **khoá rỗng** — không có nhánh nào kiểm khoá. 📌 Điều đó **vô hại khi chưa có endpoint**
+(không ai gọi được), nhưng **thành lỗ hổng thật** ngay khi `/api/webhooks/vnpay` lên sóng:
+người ngoài tính được cùng hash (khoá rỗng ai cũng biết) ⇒ **ký được IPN giả** `vnp_ResponseCode=00` ⇒
+`MarkSucceeded` ⇒ đơn "đã trả tiền" ⇒ **giao hàng miễn phí** — đúng `PAY-001` §7.7.4 #1.
+
+✅ **Đã sửa:** fail-closed **ngay trong provider** (metric `thieu-hashsecret`, `SignatureValid = false`) **+
+cảnh báo lúc khởi động** (`[PAY-IPN-CHUA-CAU-HINH]`). 🔑 Hai lớp vì hai mục đích khác nhau: guard bảo vệ **tiền**,
+log bảo vệ **người vận hành** khỏi phát hiện muộn.
 
 #### 7.2.2 Chống trùng IPN — ba lớp và **thứ tự đúng**
 
@@ -977,10 +1065,10 @@ Nó **không** phải *"chờ đối tác cấp credential"* — nó là **một
 
 | Đường | UoW | Ghi chú |
 |---|---|---|
-| `HoanTienAsync` | ABP mở **một** UoW cho cả method; `UpdateAsync(autoSave: true)` ghi **ngay trong** UoW | ⚠️ Lời gọi cổng nằm **trong** UoW ⇒ nếu cổng chậm **30 s**, transaction DB **giữ lâu**; 📌 chấp nhận vì `RegisterRefund` phải cùng UoW với lần đọc `ConHoanDuoc` |
+| `HoanTienAsync` | ABP mở **một** UoW cho cả method; `UpdateAsync(autoSave: true)` ghi **ngay trong** UoW | ⚠️ Lời gọi cổng nằm **trong** UoW ⇒ nếu cổng chậm **30 s**, transaction DB **giữ lâu**; 📌 chấp nhận vì `RegisterRefund` phải cùng UoW với lần đọc `ConHoanDuoc`. 🆕 **`S5`:** dòng hoàn tiền được ghi **trong cùng** UoW đó ⇒ *"có dòng `DaHoan`"* và *"`RefundedAmount` đã tăng"* **không thể** lệch nhau |
 | `PostTruyVanTrangThaiAsync` | một UoW | Ghi **chỉ** khi `Quyet` nói ghi |
-| `PostDoiSoatLoatAsync` | một UoW cho **cả lô** (gọi lại hàm một cho từng giao dịch — `PaymentAppService.cs:368-372`) | 🚨 **Rủi ro**: nếu một giao dịch ném ở cuối lô (ví dụ `23505`), **toàn bộ** 100 lần ghi có thể bị **rollback** ⇒ công đối soát **mất**, và **quota cổng đã tiêu**. 📌 Đây đúng là ca *"NCC timeout KHÔNG được rollback dữ liệu đã ghi"* — xem §12 **F-PAY-7** |
-| `PaymentReconciliationWorker` | `uowManager.Begin(requiresNew: true, isTransactional: true)` (`PaymentReconciliationWorker.cs:106`) | Cùng rủi ro như trên, nhưng **đã** giảm vì `QueryStatusAsync` **không ném** (`VnPayPaymentProvider.cs:279-300`) |
+| 🆕 `PostDoiSoatLoatAsync` (**`S5`**) | `[UnitOfWork(isTransactional: false)]` + **mỗi giao dịch một UoW** (`Begin(options{IsTransactional}, requiresNew: true)`) | ✅ **Vá `F-PAY-7`:** lỗi ở giao dịch #37 **không** rollback 36 lần ghi đã xong. ➕ `try/catch` từng vòng + **đếm `SoLoi`** (nếu không đếm thì lỗi lại **im lặng** — lượt "xong" mà ít thay đổi hơn mong đợi). 📌 `Q10` đã chốt |
+| 🆕 `PaymentReconciliationWorker` (**`S5`**) | **BỎ** UoW bao cả lượt; mỗi giao dịch `Begin(requiresNew: true, isTransactional: true)` | Cùng lý do trên. 🔒 Và **neo kết thúc vẫn được ghi** kể cả khi một giao dịch lỗi — 📌 trước `S5` một lỗi làm **mất cả lượt** ⇒ log chỉ có neo mở đầu, đúng lỗi *"job chạy rồi NÉM"* đã trả giá ở `SAL-005` |
 
 ---
 
@@ -1040,16 +1128,22 @@ gồm **2 hành động**: `Index` (danh sách) và `TruyVanTrangThai` (POST, g�
 | **Seed** | **Không có.** `PaymentHub` không cần dữ liệu nền: không có danh mục, không có cấu hình trong DB (cấu hình cổng nằm ở `appsettings`/secret store) |
 | **Ảnh hưởng dữ liệu cũ** | **Không cần backfill.** Tại thời điểm viết tài liệu, **chưa từng** có giao dịch thật nào đi qua cổng (credential rỗng — §7.6) ⇒ không có dữ liệu lịch sử phải chuyển đổi. ⚠️ **Nhưng nếu** đã có dòng dữ liệu thử: việc thêm `NULLS NOT DISTINCT` **có thể NỔ** nếu tồn tại bản ghi trùng `(TenantId, ProviderCode, MerchantReference)` với `TenantId = NULL` — migration `20261013024226` **không** có bước dọn trùng trước `CREATE UNIQUE INDEX` |
 | **Rollback** | `Down` của `20261013024226` tạo lại index **KHÔNG** có `NULLS NOT DISTINCT` (`:114-121`) ⇒ 🚨 **rollback làm MẤT hàng rào chống trùng** ở chế độ 1 tenant. 🔒 Nếu buộc phải rollback: **phải** chạy lại SQL `Up` ngay sau, hoặc chấp nhận rủi ro **có ghi nhận bằng văn bản** |
-| **Quy trình (đã trả giá, đừng tự nghĩ lại)** | `handover:259-268`: `dotnet ef migrations add` → **thêm tay** SQL thô `NULLS NOT DISTINCT` (kèm `DROP INDEX IF EXISTS`) nếu có unique index trên `IMultiTenant` → build `DbMigrator` → chạy → **regenerate** `test/eCommerce.IntegrationTests/Assets/schema.sql` → **cập nhật con số 48** trong `PostgreSqlSchemaTests` |
+| **Quy trình (đã trả giá, đừng tự nghĩ lại)** | `handover:259-268`: `dotnet ef migrations add` → **thêm tay** SQL thô `NULLS NOT DISTINCT` (kèm `DROP INDEX IF EXISTS`) nếu có unique index trên `IMultiTenant` → build `DbMigrator` → chạy → **regenerate** `test/eCommerce.IntegrationTests/Assets/schema.sql` → **cập nhật con số `NND`** (nay là **52**) trong `PostgreSqlSchemaTests` |
 
-**Migration cần thêm cho các nợ của tài liệu này (kế hoạch GĐ1 — CHƯA có):**
+**Migration cần thêm cho các nợ của tài liệu này:**
 
 | # | Thay đổi | Vì sao | Ảnh hưởng `NULLS NOT DISTINCT` |
 |---|---|---|---|
-| 1 | Bảng `PayRefunds` (dòng hoàn tiền) + UNIQUE `(TenantId, PaymentTransactionId, RefundRequestId)` | Trả lời *"hoàn lúc nào, vì sao, ai"* bằng dữ liệu (§5.6 #1) | 🚨 **TĂNG** số index NND **48 → 49** ⇒ **phải** sửa `PostgreSqlSchemaTests.cs:151` **và** thêm tên index vào danh sách đích danh (`:155-216`) **trong cùng PR** |
-| 2 | `CHECK (RefundedAmount >= 0)` + `CHECK (RefundedAmount <= Amount)` | Bất biến **tiền** ở tầng DB (§5.3) | Không đổi (không phải index) — 🔒 nhưng **phải** thêm ánh xạ `23514` vào `ViPhamRangBuocDb` |
+| 1 | ✅ **`S5` — ĐÃ LÀM:** `S5_PayRefunds_VaRangBuocHoanTien` — bảng `PayRefunds` + UNIQUE `(TenantId, PaymentTransactionId, RefundRequestId)` | Trả lời *"hoàn lúc nào, vì sao, ai"* bằng dữ liệu (§5.6 #1) | ✅ Đã tăng **51 → 52** (con số ở thời `S5`, không phải `48`); `PostgreSqlSchemaTests` đổi tên `F1_du_52_…` **và** thêm tên index vào danh sách đích danh **trong cùng PR** |
+| 2 | ✅ **`S5` — ĐÃ LÀM:** `CK_PayTransactions_RefundedAmount_KhongAm` + `…_KhongVuotAmount` + `CK_PayRefunds_Amount_Duong` | Bất biến **tiền** ở tầng DB (§5.3) | Không đổi (không phải index) — ✅ **đã** thêm ánh xạ `23514` vào `ViPhamRangBuocDb` |
 | 3 | Cột `ProviderCreateDateGmt7` | `querydr`/`refund` cần **ngày giao dịch gốc** (`REC-001` **H2**) | Không đổi |
 | 4 | INDEX `(TenantId, Status, CreationTime)` | NFR-PAY-001 (job + UI đều quét bảng) | Không đổi (index **không** unique) |
+
+> 🆕 **`S5` cũng đã regenerate `test/eCommerce.IntegrationTests/Assets/schema.sql`** bằng
+> `dotnet ef migrations script` (39 mục lịch sử, trước là 38) — 📌 và **kiểm bằng `Compare-Object`**: diff **chỉ**
+> thêm phần của migration mới, **không** xoá/sửa dòng nào (nếu regenerate mà lệch phần cũ thì nguyên nhân là
+> **bản build cũ** — bẫy `B1`/`B2` của `tools/README-probe.md`).
+
 
 ---
 
@@ -1082,10 +1176,10 @@ gồm **2 hành động**: `Index` (danh sách) và `TruyVanTrangThai` (POST, g�
 
 | Đường | Dữ liệu ghi **trước** lời gọi cổng? | Nếu cổng timeout thì sao? | Có rollback oan không? |
 |---|---|---|---|
-| `HoanTienAsync` | **Không** — chỉ **đọc** trước, ghi **sau khi** `DaHoanThat = true` (`PaymentAppService.cs:189-192`) | Không ghi gì ⇒ **không** có gì để rollback ✅ | ✅ **Đúng** |
+| `HoanTienAsync` | **Không** — chỉ **đọc** trước, ghi **sau khi** `DaHoanThat = true`. 🆕 `S5`: dòng hoàn tiền cũng ghi **sau** lời gọi cổng | Không ghi gì ⇒ **không** có gì để rollback ✅ | ✅ **Đúng** |
 | `PostTruyVanTrangThaiAsync` | Không ghi trước; `QueryStatusAsync` **không ném** khi lỗi (trả `Pending`) ⇒ `KhongDoi` | Không đổi gì ✅ | ✅ **Đúng** |
-| `PostDoiSoatLoatAsync` (lô, **một UoW**) | **Có** — ghi từng giao dịch trong lô (`:372`) | Giao dịch #37 ném ⇒ **toàn bộ** UoW rollback ⇒ **36** lần ghi đã xong **bị mất**, trong khi **quota cổng đã tiêu** | 🚨 **F-PAY-7: CÓ rollback oan** |
-| `PaymentReconciliationWorker` (`isTransactional: true`) | **Có** — như trên, trần 50/lượt | Cùng rủi ro. 📌 Hiện **giảm** vì `QueryStatusAsync` nuốt lỗi hạ tầng; ⚠️ nhưng `23505`/`23514`/`DbUpdateException` **vẫn** ném ⇒ **mất cả lượt** | 🚨 **F-PAY-7** |
+| 🆕 `PostDoiSoatLoatAsync` (lô, **mỗi giao dịch một UoW** — `S5`) | **Có** — ghi từng giao dịch | Giao dịch #37 ném ⇒ **chỉ** #37 bị bỏ; **36** lần ghi trước đó **VẪN CÒN** (đã commit). 📌 `SoLoi` tăng + log `[PAY-DOISOAT-LOI]`/`[PAY-DOISOAT-CO-LOI]` | ✅ **ĐÃ VÁ `F-PAY-7`** |
+| 🆕 `PaymentReconciliationWorker` (**mỗi giao dịch một UoW** — `S5`) | **Có** — như trên, trần 50/lượt | Cùng cơ chế. 📌 `23505`/`23514`/`DbUpdateException` **chỉ** làm hỏng giao dịch đó; ➕ neo `[PAY-JOB-CO-LOI]` để người vận hành **thấy** thay vì đọc *"lượt xong, 0 thay đổi"* | ✅ **ĐÃ VÁ `F-PAY-7`** |
 
 > 🔑 **Vì sao F-PAY-7 quan trọng:** kết quả đối soát là **bằng chứng về tiền**. Mất một lượt ghi nghĩa là 36 giao
 > dịch **đã** được xác nhận với cổng nhưng **DB không biết** ⇒ lượt sau quét lại (đúng) — **nhưng** nếu `querydr`
@@ -1096,15 +1190,15 @@ gồm **2 hành động**: `Index` (danh sách) và `TruyVanTrangThai` (POST, g�
 
 | Mã | Phát hiện | Bằng chứng | Mức | Trạng thái sau `S4` |
 |---|---|---|---|---|
-| **F-PAY-1** | Xác thực IPN **không bỏ tham số rỗng**, `KiemChuKy` **có bỏ** ⇒ có thể **từ chối IPN thật** | `VnPayPaymentProvider.cs:151-162` vs `VnPayRequestBuilder.cs:254-259` | 🔴 Cao (mất tiền im lặng) | ❌ **chưa sửa — `S5`** (kèm `TC-07`) |
+| **F-PAY-1** | Xác thực IPN **không bỏ tham số rỗng**, `KiemChuKy` **có bỏ** ⇒ có thể **từ chối IPN thật** | `VnPayPaymentProvider.cs` (bản cũ) vs `VnPayRequestBuilder.KiemChuKy` | 🔴 Cao (mất tiền im lặng) | ✅ **ĐÃ ĐÓNG `S5`** — một luật duy nhất `KiemChuKyTuQueryTho` (bỏ tham số rỗng + dựng từ **query THÔ**); `TC-07/07b/07c` + probe HTTP `T16`/`T18` đo **cả hai chiều**. 🔑 Sửa xong lộ ra **lớp thứ hai** (byte của chuỗi ký) — §7.2.4 |
 | **F-PAY-2** | **Không** đối chiếu `Amount` của IPN với DB (§7.2.1) | không có phép so trong module | 🟠 Trung bình | ✅ **ĐÃ ĐÓNG `S4`** — `LuatCauNoiThanhToan.DoiChieu` + ép ở **hai** chỗ: `XuLyKetQuaCongService` (so với `PaymentTransaction.Amount`) và `OrderPaymentStatusHandler` (so với `Order.GrandTotal`) |
 | **F-PAY-3** | `MerchantReference` có thể rỗng mà **không** phải lỗi | `VnPayPaymentProvider.cs:170` | 🟠 Trung bình | ✅ **ĐÃ ĐÓNG `S4`** — `XuLyKetQuaCongService` **NÉM** `0006` khi `vnp_TxnRef` rỗng (không tra DB bằng `""`) |
-| **F-PAY-4** | 2 unique index của `PayTransactions` **không có ánh xạ** trong `ViPhamRangBuocDb` ⇒ `23505` rơi về mã chung | grep `PayTransactions` trong `shared/eCommerce.Kernel/Data/ViPhamRangBuocDb.cs` = **0** | 🟠 Trung bình (CSKH nhận chỉ dẫn sai) | ❌ **chưa sửa** — 📌 nay **quan trọng hơn**: đường tạo giao dịch có thể đụng `23505` khi hai request vào **khác** đường khoá (khác `OrderId` nhưng cùng số đơn) |
+| **F-PAY-4** | 2 unique index của `PayTransactions` **không có ánh xạ** trong `ViPhamRangBuocDb` ⇒ `23505` rơi về mã chung | grep `PayTransactions` trong `shared/eCommerce.Kernel/Data/ViPhamRangBuocDb.cs` = **0** | 🟠 Trung bình (CSKH nhận chỉ dẫn sai) | 🟡 **`S5` — ĐÓNG MỘT PHẦN**: đã thêm **ánh xạ** cho cả 2 index (+ 1 index của `PayRefunds` + 3 `CHECK`), và **xoá** 2 dòng khỏi danh sách trắng (lý do *"chưa có đường ghi GĐ1 chạm tới"* **hết đúng** khi có IPN). 🔒 **Mã vẫn là `eCommerce:Db:0001`** — cấp mã nghiệp vụ riêng là **thay đổi hợp đồng** ⇒ **BA** quyết (§16.4 #5) |
 | **F-PAY-5** | Khoá phân tán **lệch quy ước** (`payments:` vs `payment:`) + **không** có `{tenantId}` | `PaymentAppService.cs:126` vs `PaymentReconciliationWorker.cs:59`; `XC-003` §5 | 🟠 Trung bình (vận hành) | 🟠 **nặng thêm `S4`**: khoá **mới** `payment:create:` theo đúng quy ước ⇒ nay module có **cả hai** kiểu tiền tố (2 khoá `payment*`, 1 khoá `payments*`) |
 | **F-PAY-6** | Khoá job **không** theo tenant ⇒ một tenant tồn đọng chặn tenant khác | `PaymentReconciliationWorker.cs:59,91` | 🟡 Thấp (hiện 1 tenant) | ❌ chưa sửa — 📌 khoá `payment:create:` **cũng** không có `{tenantId}` (dùng `Guid`/số đơn, vốn đã duy nhất toàn hệ thống) |
-| **F-PAY-7** | Lô đối soát dùng **một** UoW transactional ⇒ lỗi một giao dịch **rollback cả lượt** | `PaymentAppService.cs:368-372`; `PaymentReconciliationWorker.cs:106` | 🔴 Cao (mất bằng chứng) | ❌ **chưa sửa** — `S5`/`S10` (§15.1 **Q10**) |
+| **F-PAY-7** | Lô đối soát dùng **một** UoW transactional ⇒ lỗi một giao dịch **rollback cả lượt** | `PaymentAppService` (bản cũ); `PaymentReconciliationWorker.cs:106` (bản cũ) | 🔴 Cao (mất bằng chứng) | ✅ **ĐÃ SỬA `S5`** — **mỗi giao dịch một UoW** (`requiresNew` + `isTransactional`) + `try/catch` từng vòng + **đếm `SoLoi`** ở **cả** app service lô **và** job; `Q10` đã trả lời. ⚠️ **CHƯA CÓ PHÉP ĐO:** không test/probe nào **chạy** lô đối soát với một giao dịch **cố ý hỏng** ⇒ *"đã ghi thì còn"* hiện là **code đúng theo thiết kế**, **chưa** là **số đo**. 📌 Ghi ở §16.9 #10 |
 | **F-PAY-8** | `PostDoiSoatLoatAsync` chỉ cần quyền **đọc** dù **gọi cổng 100 lần** và **có thể ghi** trạng thái | `PaymentAppService.cs:327` | 🟠 Trung bình (quyền) | ❌ chưa sửa — ⚠️ **cùng họ với `TaoGiaoDichAsync`** (cũng chỉ cần `Payments` — xem §16.3 #6) |
-| **F-PAY-9** | `MarkFailed` **không** trả kết quả ⇒ job **đếm sai** *"đã đổi trạng thái"* | `PaymentTransaction.cs:120-139`; `PaymentReconciliationWorker.cs:196-203` | 🔴 Cao (báo cáo sai) | ✅ **ĐÃ ĐÓNG `S4`** — trả `bool` (`true` chỉ khi **thật sự** chuyển sang `Failed`); 3 test khoá **cả hai chiều**; ⚠️ **chỗ đếm trong job vẫn chưa đọc giá trị** ⇒ đóng nốt ở `S5`/`S7` (§16.3 #7) |
+| **F-PAY-9** | `MarkFailed` **không** trả kết quả ⇒ job **đếm sai** *"đã đổi trạng thái"* | `PaymentTransaction.cs`; `PaymentReconciliationWorker.cs` | 🔴 Cao (báo cáo sai) | ✅ **ĐÓNG HOÀN TOÀN `S5`** — `S4` sửa **hàm** (trả `bool`); **`S5` sửa chỗ ĐẾM**: job chỉ `soDoi++` **và** phát ETO khi giá trị trả về là `true` (trước đó `soDoi++` vô điều kiện) |
 | **F-PAY-10** | `vnp_RequestId` sinh **mới** mỗi lần (`Guid.NewGuid`) ⇒ vi phạm tinh thần **BR-007** | `VnPayRequestBuilder.cs:82,118` | 🟠 Trung bình | ❌ chưa sửa |
 | **F-PAY-11** | `Cancelled` **không ghi được** vào DB; `Pending` **không ghi được** (§3.4) | §3.4 F1/F2 | 🟠 Trung bình (mất khả năng phân tích) | ❌ chưa sửa — 📌 `S4` **cố ý không** thêm hàm `MarkPending` (cần BA trả lời `Q4`/`Q5` trước) |
 | **F-PAY-12** | `PaymentAppService` **không** đối chiếu `Amount` IPN với `PaymentTransaction.Amount` — *(trùng F-PAY-2, giữ để truy vết review)* | — | — | ✅ **đóng cùng F-PAY-2** |
@@ -1162,8 +1256,8 @@ gồm **2 hành động**: `Index` (danh sách) và `TruyVanTrangThai` (POST, g�
 | **TC-04** | Thiếu `vnp_SecureHash` | Unit | không có hash | `SignatureValid = false` + metric `thieu-chu-ky` | BR-PAY-013 | ✅ `VnPayWebhookTests.cs:114,197` |
 | **TC-05** | Chữ ký sai | Unit | hash sai | `SignatureValid = false` + metric `chu-ky-sai` | BR-PAY-013 | ✅ `VnPayWebhookTests.cs:212` |
 | **TC-06** | Chữ ký đúng + giao dịch thất bại ⇒ **KHÔNG** tính là từ chối | Unit | như TC-03 | **0** metric tăng | BR-PAY-013 | ✅ `VnPayWebhookTests.cs:243` |
-| **TC-07** | 🚨 **IPN có tham số RỖNG** (`vnp_BankCode=`) | Unit | query string có `=` rỗng | Chữ ký **phải** hợp lệ (nếu VNPay bỏ tham số rỗng) | **F-PAY-1** | ❌ **CHƯA CÓ — phải viết** |
-| **TC-08** | **IPN gửi TRÙNG** cùng payload 3 lần | **Integration** | cùng IPN × 3 | **1** lần ghi; `WebhookReceivedCount = 3`; `Status` không đổi | BR-PAY-003 | ❌ **CHƯA CÓ** (chỉ có test entity) |
+| **TC-07** | 🚨 **IPN có tham số RỖNG** (`vnp_BankCode=`) | Unit | query string có `=` rỗng | Chữ ký **phải** hợp lệ (VNPay bỏ tham số rỗng) | **F-PAY-1** | ✅ **`S5`** — `VnPayIpnChuKyTests.TC07` (**+ `TC07b` chiều NGƯỢC** và **`TC07c`** chứng minh hai cách ký cho hash khác nhau) + ✅ **probe HTTP `T16`/`T18`** |
+| **TC-08** | **IPN gửi TRÙNG** cùng payload 3 lần | **Integration** | cùng IPN × 3 | **1** lần ghi; `WebhookReceivedCount = 3`; `Status` không đổi | BR-PAY-003 | ✅ **`S5` — QUA ĐƯỜNG HTTP THẬT** (`probe-thanh-toan.ps1` `T10`/`T11`/`T12`) |
 | **TC-09** | IPN gửi lại **sau khi đã `Refunded`** | Unit | `RegisterRefund` 100 % rồi `MarkSucceeded` | **`false`**, `Status` vẫn `Refunded` | BR-PAY-004 | ✅ `PaymentRefundTests.cs:146` |
 | **TC-10** | `MarkFailed` trên giao dịch đã `Succeeded` | Unit | — | **không** đổi trạng thái, `FailureReason` **không** ghi | BR-PAY-004 | ✅ `architecture.md:156-157` (đo được) + `PaymentTransaction.cs:129-135` |
 | **TC-11** | Hoàn **vượt** số đã thu | Unit | `RefundedAmount=100`, hoàn `50`, `Amount=120` | **NÉM** `0002`, `RefundedAmount` **không** đổi | BR-PAY-007/020 | ✅ `PaymentRefundTests.cs:32` |
@@ -1198,13 +1292,19 @@ gồm **2 hành động**: `Index` (danh sách) và `TruyVanTrangThai` (POST, g�
 | 🆕 **TC-40** | **Luật hấp thụ của trục tài chính trên đơn** (`Paid → Failed` **bị chặn**; `Refunded` hấp thụ; `Failed → Paid` cho phép) | Unit | 9 ca | trạng thái **đúng** + giá trị trả về **đúng** | BR-PAY-004 | ✅ **`S4`** — `OrderTrangThaiThanhToanTests` |
 | 🆕 **TC-41** | **Cầu nối có người nhận** (reflection): handler tồn tại · ETO mang đủ trường · ETO **không** là sự kiện thông báo · setter `Order.PaymentStatus` **kín** · `IXuLyKetQuaCong` **không** phải app service · **không** tham chiếu ngược tầng | Unit (reflection) | 6 nhóm ca | tất cả ĐẠT | BR incidental (#22) | ✅ **`S4`** — `OrderPaymentStatusHandlerBatBienTests` |
 | 🆕 **TC-42** | **Đối chiếu số tiền/tiền tệ** (F-PAY-2) | Unit | 7 ca | lệch 1 đồng **cả hai chiều** ⇒ `LechSoTien`; khác tiền tệ ⇒ `LechTienTe`; rỗng ⇒ VND | BR-PAY-… (§3.5) | ✅ **`S4`** — `LuatCauNoiThanhToanTests` |
+| 🆕 **TC-43** | **Luật ghi nhận hoàn tiền** — 4 nhánh + **thứ tự kiểm** | Unit | 6 ca | `DaHoanThat` ⇒ `GhiDaHoan` (thắng **cả** `LoiHaTang`); `LoiHaTang` ⇒ `KhongXacDinh` (thắng `DaNhanYeuCau`); `DaNhanYeuCau` ⇒ `ChoXacNhan`; còn lại ⇒ `TuChoi`; `null` ⇒ `KhongXacDinh` | BR-PAY-008/009 | ✅ **`S5`** — `HoanTienS5Tests` |
+| 🆕 **TC-44** | **Dòng hoàn tiền — entity chặn dữ liệu vô nghĩa** | Unit | 9 ca | `amount ≤ 0` ⇒ `0004`; thiếu mã/giao dịch ⇒ `0010`; thiếu lý do/người ⇒ `0004`; **chiều ngược**: dữ liệu hợp lệ **phải tạo được** và ở `ChoXacNhan`; `GhiKetQua` trả `true`/`false` đúng; **trạng thái cuối hấp thụ**; `ChoXacNhan` **không** phải cuối | BR-PAY-007/020 | ✅ **`S5`** — `HoanTienS5Tests` |
+| 🆕 **TC-45** | **Hàng rào TIỀN ở DB** | **Integration** | 6 ca | trùng `(TenantId=NULL, giao dịch, RF001)` ⇒ **`23505`**; **chiều ngược** (khác giao dịch / khác số thứ tự) ⇒ **cho phép**; hoàn vượt ⇒ **`23514`**; hoàn âm ⇒ `23514`; dòng hoàn `≤ 0` ⇒ `23514`; hoàn **đúng bằng** ⇒ ghi được | BR-PAY-007, `F-PAY-7` | ✅ **`S5`** — `PayRefundsVaRangBuocTienTests` |
+| 🆕 **TC-46** | **`IXuLyKetQuaCong` phải resolve được từ DI** | Unit (reflection) | 1 ca | `ExposeServices(typeof(IXuLyKetQuaCong))` **phải** có | §16.6 #2 | ✅ **`S5`** — `HoanTienS5Tests` |
 
-**Tổng kết coverage:** **32** ca đã có (§14.1) · **6** ca **còn thiếu** — trong đó **3** ca thuộc loại **bắt buộc**
-trước khi tuyên bố `Implemented`: **TC-07** (`F-PAY-1`), **TC-08** (IPN trùng **qua đường HTTP/endpoint**), **TC-14**
-(hai luồng đồng thời hoàn tiền). ✅ `TC-29` **đóng ở `S4`**; 🟡 `TC-31` có code nhưng chưa có test.
-📌 **Đọc cho đúng:** `TC-08` (*"IPN gửi trùng ⇒ 1 lần ghi"*) đã được chứng minh ở **hai tầng** (`MarkSucceeded`
-trả `false` — unit; unique index `23505` — integration DB) nhưng **chưa** qua **endpoint IPN** (chưa tồn tại) ⇒
-vẫn tính là **thiếu** cho tới `S5`. 🔑 Đây đúng loại *"nói quá"* mà bảng này sinh ra để chặn.
+**Tổng kết coverage:** **38** ca đã có (§14.1) · **6** ca **còn thiếu**: `TC-14` (hai luồng đồng thời hoàn tiền),
+`TC-18` (thiếu `lyDo` ở tầng app service), `TC-30` (cách ly tenant), `TC-31` (code có, test chưa), `TC-33`
+(quét mã nguồn: `0` phép so tiền bằng `==`), `TC-35` (không có dữ liệu ⇒ không ném) · `TC-36` (sai quyền).
+🆕 **`S5` đóng `TC-07` + `TC-08`** — hai trong **ba** ca *"bắt buộc trước khi tuyên bố `Implemented`"*.
+📌 **Ca thứ ba (`TC-14`)** vẫn mở: nó cần **hai request song song** trên PostgreSQL thật **+** một cổng giả có
+độ trễ — tức là cần `FakePaymentProvider` (§7.7.2, đã chốt **dời sang `S8`**).
+🔒 **Và điều kiện `Implemented` còn lại KHÔNG phải test:** `TmnCode`/`HashSecret` thật + một giao dịch thật
+(§7.6). 📌 Đừng đọc *"38 ca xanh"* thành *"tiền thật đã kiểm"* — hai chuyện khác nhau.
 
 ### 14.2 Fixture skeleton (xUnit + ABP)
 
@@ -1288,7 +1388,7 @@ public class Pay001Tests : eCommerceTestBase<eCommerceEntityFrameworkCoreTestMod
 | # | Câu hỏi | Cần ai trả lời | Trạng thái | Ảnh hưởng nếu chưa trả lời |
 |---|---|---|---|---|
 | **Q1** | 🚨 **Ai ghi `Order.PaymentStatus`?** `SAL-003` **BR-013** nói *"chỉ `PaymentHub`/IPN ghi"*, nhưng `PaymentHub` **không** tham chiếu `Order`, và `eCommerce.Application` **không được** tham chiếu `PaymentHub.Application` (`handover:134-135`). Cầu nối đặt ở đâu: outbox ETO (`XC-002`) hay một `IPaymentOutcomeSink` ở Domain? | **Kiến trúc trưởng + BA** | ✅ **ĐÃ TRẢ LỜI `S4` (18/10/2026) — chọn ETO** | ✅ **KHÔNG còn chặn.** Quyết định: **sự kiện phân tán** (`PaymentSucceededEto`/`PaymentFailedEto` trong `PaymentHub.Application.Contracts`) phát từ module, nhận bởi `OrderPaymentStatusHandler` ở `eCommerce.Application` ⇒ **không** tham chiếu vòng, **không** tạo nguồn sự thật thứ hai. 📌 Phương án `IPaymentOutcomeSink` ở Domain **bị loại**: nó buộc `PaymentHub.Domain` biết khái niệm *"đơn"*, hoặc buộc `eCommerce.Domain` biết khái niệm *"giao dịch"* — cả hai đều là **phụ thuộc ngược**. ⚠️ **Outbox bền vững** (phần `XC-002` của câu hỏi) **chưa làm** — xem §16.4 #1 (chủ dự án chốt: hoãn) |
-| **Q2** | Đường nhận **IPN** đặt ở đâu: `src/eCommerce.Web/Controllers` (MVC, không cần token) hay `HttpApi.Host` (controller riêng)? Có phải thêm vào **allowlist công khai** theo `XC-004` **BR-004**? | Kiến trúc trưởng | `Open` | 🔴 **Chặn**: không có endpoint ⇒ `MarkSucceeded` **không bao giờ** chạy ở đường thật; `querydr` là lưới **duy nhất** |
+| **Q2** | Đường nhận **IPN** đặt ở đâu: `src/eCommerce.Web/Controllers` (MVC, không cần token) hay `HttpApi.Host` (controller riêng)? Có phải thêm vào **allowlist công khai** theo `XC-004` **BR-004**? | Kiến trúc trưởng | ✅ **ĐÃ TRẢ LỜI `S5` (18/10/2026) — `HttpApi.Host`** | ✅ **KHÔNG còn chặn.** Đặt ở `src/eCommerce.HttpApi.Host/Controllers/VnPayIpnController.cs`, route `GET /api/webhooks/vnpay`, `[AllowAnonymous]` **cấp class** + đã duyệt trong `AllowlistCongKhaiTests`. 📌 **Lý do chọn Host** (không phải Web): ① Host là **API + auth server** — nơi đã có `PaymentHub.Application` trong đồ thị module và là **tiến trình chạy worker**; ② route trong thiết kế **đã** là `/api/webhooks/vnpay` (§4.1 + §6.2) và sequence ghi `participant API as HttpApi.Host`; ③ Web là **UI cookie-auth** — thêm một endpoint **công khai** ở đó là mở cửa ra Internet ở đúng tiến trình đang render HTML, không có lợi ích nào bù lại |
 | **Q3** | 🔑 **Có cung cấp `TmnCode` + `HashSecret` sandbox không?** (nợ chặn #2 — `handover:74`) | **chủ dự án** (tự đăng ký form) | ✅ **ĐÃ TRẢ LỜI 17/10/2026** | ✅ **KHÔNG còn là chặn kỹ thuật**: VNPay cho **tự đăng ký merchant test** ([devreg](https://sandbox.vnpayment.vn/devreg/)) ⇒ `TmnCode`/`HashSecret` lấy trong **5–10 phút**, không cần hợp đồng — xem **§7.7.1 #3**. 🔑 Và `S4`/`S5` được mở khoá **ngay** bằng `FakePaymentProvider` (§7.7.2) dù **chưa** đăng ký. ⚠️ Chỉ `DoD-tiền-thật` (một giao dịch + IPN **thật**) mới cần credential **+ tunnel** (§7.7.3 C1+C2) |
 | **Q4** | Có cần **phân biệt** *"khách cố ý huỷ"* (`Cancelled`) với *"giao dịch lỗi"* (`Failed`) trong DB không? (F-PAY-11) | **BA** | `Open` | 🟠 Báo cáo *"tỉ lệ khách huỷ"* **không làm được**; CSKH đọc `FailureReason` (chuỗi) để đoán |
 | **Q5** | Có cần đo **thời gian chờ thanh toán** (từ lúc tạo tới lúc IPN) không? (F-PAY-11 — thiếu trạng thái `Pending`) | **BA** | `Open` | 🟡 Không có số liệu để tối ưu tỉ lệ chuyển đổi |
@@ -1296,7 +1396,7 @@ public class Pay001Tests : eCommerceTestBase<eCommerceEntityFrameworkCoreTestMod
 | **Q7** | Ngưỡng cảnh báo khi `WebhookReceivedCount > N`? Có cần metric riêng không? | **Dev + vận hành** | `Open` | 🟡 IPN lặp **im lặng** (chỉ thấy khi mở bảng) |
 | **Q8** | Chốt tên khoá: đổi `payments:refund:` → `payment:refund:` và **thêm `{tenantId}`**? (F-PAY-5/6) | **Kiến trúc trưởng** (theo `XC-003`) | `Open` | 🟡 Vận hành gỡ khoá tay **dễ sai**; đa tenant bị chặn chéo |
 | **Q9** | `PostDoiSoatLoatAsync` cần quyền gì? `Payments.Refund` hay **thêm** `Payments.Reconcile`? (F-PAY-8) | **BA + Kiến trúc trưởng** | `Open` | 🟠 Người chỉ *"xem"* có thể **tiêu quota cổng** và **ghi trạng thái** |
-| **Q10** | Lô đối soát: **mỗi giao dịch một UoW** hay giữ **một** UoW cho cả lượt? (F-PAY-7) | **Kiến trúc trưởng** | `Open` | 🔴 Lỗi một giao dịch ⇒ **rollback cả lượt** ⇒ mất bằng chứng đã xác nhận với cổng |
+| **Q10** | Lô đối soát: **mỗi giao dịch một UoW** hay giữ **một** UoW cho cả lượt? (F-PAY-7) | **Kiến trúc trưởng** | ✅ **ĐÃ TRẢ LỜI `S5` (18/10/2026) — MỖI GIAO DỊCH MỘT UoW** (chủ dự án chốt trong phiên) | ✅ **KHÔNG còn chặn.** Áp ở **cả hai** đường: `PostDoiSoatLoatAsync` (`[UnitOfWork(isTransactional: false)]` + `requiresNew` từng vòng) và `PaymentReconciliationWorker` (bỏ UoW bao cả lượt). ➕ `try/catch` **từng vòng** + **đếm `SoLoi`** ở cả hai — 📌 nếu không đếm thì lỗi lại **im lặng**: lượt "xong", chỉ có ít thay đổi hơn mong đợi. 🔒 Giá trị đạt được: câu *"đã ghi thì còn"* trở thành **sự thật của DB**, không phải lời hứa của comment |
 | **Q11** | `vnp_TransactionDate` gửi **ngày giao dịch gốc** hay *"now"*? Có thêm cột `ProviderCreateDateGmt7` (H2 của `REC-001`) ngay trong `PAY-001` không? | **VNPay** (xác nhận) + Dev | `Open` | 🔴 Hoàn tiền giao dịch cũ có thể bị cổng từ chối *"không tìm thấy giao dịch"* |
 | **Q12** | Chuỗi ký của API giao dịch (`refund`/`querydr`) dùng **`&` + URL-encode** (code) hay **`\|` không encode** (`REC-001` §7.3 dẫn tài liệu)? | **VNPay** + Dev | `Open` | 🔴 Nếu code sai ⇒ **mọi** lệnh hoàn tiền/truy vấn bị `Invalid Checksum`; **chưa kiểm chứng được** vì thiếu credential |
 
@@ -1316,16 +1416,16 @@ public class Pay001Tests : eCommerceTestBase<eCommerceEntityFrameworkCoreTestMod
 | # | Nợ | Ảnh hưởng |
 |---|---|---|
 | 1 | ~~**Không có đường TẠO `PaymentTransaction`**~~ | ✅ **ĐÓNG `S4`** — `PaymentAppService.TaoGiaoDichAsync` + HTTP `POST /api/app/payment/tao-giao-dich` |
-| 2 | **Không có endpoint IPN** | `MarkSucceeded` **chưa** được gọi từ **cổng thật**; ✅ `S4` đã có **đường xử lý** (`IXuLyKetQuaCong`) để `S5` chỉ còn nối controller + vá `F-PAY-1` |
-| 3 | ~~**Không có cầu nối `PaymentTransaction` → `Order.PaymentStatus`**~~ | ✅ **ĐÓNG `S4`** — ETO + `OrderPaymentStatusHandler` + `Order.DatTrangThaiThanhToan` |
-| 4 | **Không có bảng dòng hoàn tiền** | Không truy vấn *"hoàn lúc nào, vì sao, ai duyệt"* — `S5`/`SAL-006` |
+| 2 | ~~**Không có endpoint IPN**~~ | ✅ **ĐÓNG `S5`** — `GET /api/webhooks/vnpay` (`VnPayIpnController`, `[AllowAnonymous]` + allowlist). 🚨 **Lỗi THẬT tìm thấy khi nối:** `IXuLyKetQuaCong` **không resolve được từ DI** (ABP đăng ký `XuLyKetQuaCongService` theo **tên lớp**, không theo hợp đồng) ⇒ request IPN đầu tiên trả **`HTTP 500`** — xem §16.6 #2 |
+| 3 | ~~**Không có cầu nối `PaymentTransaction` → `Order.PaymentStatus`**~~ | ✅ **ĐÓNG `S4`** — ETO + `OrderPaymentStatusHandler` + `Order.DatTrangThaiThanhToan`; ➕ **`S5`** thêm nhánh **hoàn tiền** (`PaymentRefundedEto`) |
+| 4 | ~~**Không có bảng dòng hoàn tiền**~~ | ✅ **ĐÓNG `S5`** — bảng `PayRefunds` (§5.7) + ghi dòng cho **mọi** kết quả + `CHECK`/unique index trên PostgreSQL thật |
 | 5 | **ETO đã có, OUTBOX thì CHƯA** | Sự kiện phát **in-process trong cùng UoW**; mất sự kiện nếu tiến trình chết **sau** commit (§16.4 #1) |
-| 6 | **Chưa kiểm chứng tiền thật ra** (credential rỗng) | Mọi tuyên bố "hoàn tiền hoạt động" **chưa có cơ sở** |
-| 7 | **Chưa đo mã HTTP thật** của `/api/app/payment/*` | Cột HTTP ở §6.2 là **dự kiến**; 🆕 route `tao-giao-dich` cũng **chưa đo** |
-| 8 | **Chưa có test** cho `TC-07, TC-08, TC-14, TC-18, TC-30, TC-31, TC-33, TC-35, TC-36` | 9 khoảng trống (`TC-29` ✅ **đã có** ở `S4` — test DB thật) |
-| 9 | **Chưa có metric cảnh báo** khi `WebhookReceivedCount` cao | IPN lặp im lặng |
+| 6 | **Chưa kiểm chứng tiền thật ra** (credential rỗng) | Mọi tuyên bố "hoàn tiền hoạt động" **chưa có cơ sở**. 🔒 `S5` kiểm được **HMAC-SHA512 thật** và **đường IPN thật**, nhưng **không** kiểm được *"tiền đã ra"* — hai thứ khác nhau |
+| 7 | ~~**Chưa đo mã HTTP thật** của `/api/app/payment/*`~~ | ✅ **ĐÓNG `S5`** cho 3 route đo được: `tao-giao-dich` = `200`; `hoan-tien` khi hoàn vượt = **`403`** + `0002` (**không** phải `400` — ABP mặc định `403` cho `BusinessException`); `/api/webhooks/vnpay` = `200`/`400`/`400`. ⚠️ **Chưa** đo `theo-ma`, `danh-sach`, `truy-van-trang-thai`, `doi-soat-loat` (không nằm trong phạm vi `S5`) |
+| 8 | **Chưa có test** cho `TC-14, TC-18, TC-30, TC-31, TC-33, TC-35, TC-36` | ✅ **`S5` đóng `TC-07`, `TC-08`** (+ `TC-07b/07c`) ⇒ còn **6** khoảng trống (`TC-11/12/13` đã có từ trước) |
+| 9 | **Chưa có metric cảnh báo** khi `WebhookReceivedCount` cao | IPN lặp im lặng (vẫn mở — `Q7`) |
 | 10 | **Chưa có nơi thu metric** (OTel → Prometheus) | 3 metric phát ra **không ai đọc** |
-| 11 | 🆕 **`PaymentRefundedEto` chưa có** ⇒ đơn **chưa** nhận `PartiallyRefunded`/`Refunded` | Luật hấp thụ ở `Order` đã sẵn sàng; thiếu **nguồn phát** ⇒ hoàn tiền xong **đơn vẫn `Paid`** (§16.3 #1) |
+| 11 | ~~**`PaymentRefundedEto` chưa có** ⇒ đơn **chưa** nhận `PartiallyRefunded`/`Refunded`~~ | ✅ **ĐÓNG `S5`** — `PaymentRefundedEto` + handler + luật thuần `PhanLoaiHoan`. ⚠️ **Chưa** chạy **end-to-end với đơn thật** (cần hoàn tiền **thật** ⇒ cùng nợ #6) |
 
 ### 15.4 Lịch sử thay đổi
 
@@ -1333,15 +1433,88 @@ public class Pay001Tests : eCommerceTestBase<eCommerceEntityFrameworkCoreTestMod
 |---|---|---|---|
 | v0.1 | 17/10/2026 | *agent (phiên 17/10/2026)* | **Bản nháp đầu — tài liệu ĐẦU TIÊN sở hữu module `PaymentHub`**. Nội dung: đọc **14 tệp** code thật của module + `eCommerceDbContext`, migration, test, `appsettings`, Host module, permission provider ⇒ **mô tả đúng code**; **state machine 12 dòng** với **`Cancelled`/`Pending` là trạng thái CHẾT** (§3.4); Data Dictionary **bảng thật `PayTransactions`** (24 cột, **3 index thật**, cả 2 unique index có **`NULLS NOT DISTINCT`** — khẳng định **con số 48 KHÔNG đổi**); **§7** IPN: HMAC-SHA512 + **11 phát hiện** (F-PAY-1…12, nổi bật **F-PAY-1** *từ chối IPN thật khi có tham số rỗng* và **F-PAY-7** *rollback cả lô đối soát*); **§8** *tổng hoàn ≤ đã thu* + **2 khoá phân tán** nêu **tên thật** (`ecommerce:payments:refund:{guid}`, `ecommerce:payment:reconciliation-rec001`) kèm phát hiện **lệch quy ước `XC-003`**; **§12** phân biệt **(a) không có dữ liệu** với **(b) lỗi thật** + phân tích *NCC timeout **không** rollback dữ liệu đã ghi*; **§14** **36 test case** (26 đã có, 10 còn thiếu); **§15** **12 câu hỏi mở** (Q1–Q3 **chặn**). 🚨 **Ghi rõ: đường tiền thật CHƯA kiểm chứng** (`TmnCode`/`HashSecret` **rỗng**). **Không sửa một dòng code nào** — phiên này chỉ tạo tài liệu |
 | **v0.2** | **18/10/2026** | *agent (phiên `S4`)* | **CẬP NHẬT THEO CODE THẬT SAU `S4`** (phiên code, không phải phiên tài liệu). Đóng **3 phát hiện** (`F-PAY-2` đối chiếu số tiền · `F-PAY-3` mã rỗng · `F-PAY-9` `MarkFailed` trả `bool`), đóng **2 nợ** (§15.3 #1 đường tạo giao dịch · #3 cầu nối `Order.PaymentStatus`), **trả lời `Q1`** (cầu nối đi qua **ETO**, không `IPaymentOutcomeSink`). Thêm **§16** — *bản đồ triển khai* gồm số đo thật + danh sách việc **CHƯA làm**. ➕ `NND` **51 không đổi** (không thêm index/bảng ⇒ **không** có migration ở `S4`). ⚠️ **Vẫn KHÔNG đánh dấu `Implemented`**: chưa có endpoint IPN, chưa kiểm chứng tiền thật, outbox chưa có |
+| **v0.3** | **18/10/2026** | *agent (phiên `S5`)* | **PHẦN B: IPN + HOÀN TIỀN — CẬP NHẬT THEO CODE THẬT.** ✅ Endpoint **`GET /api/webhooks/vnpay`** (`[AllowAnonymous]` + allowlist); ✅ **vá `F-PAY-1`** và phát hiện **lớp thứ hai** của nó (**byte chuỗi ký** — §7.2.4); ✅ **fail-closed khi `HashSecret` rỗng** (§7.2.5); ✅ **bảng `PayRefunds`** (§5.7) + **3 `CHECK` bất biến TIỀN**; ✅ **`PaymentRefundedEto`** + handler; ✅ **vá `F-PAY-7`** (**mỗi giao dịch một UoW**, `Q10` đã chốt); ✅ **đóng nốt `F-PAY-9`** (phía **đếm** của job); ✅ **`F-PAY-4` một phần**. ➕ **`Q2` trả lời** (`HttpApi.Host`). ➕ `NND` **51 → 52**, **1 migration**, `schema.sql` regenerate. ➕ **5 phát hiện mới** (§16.6) — nặng nhất: **`IXuLyKetQuaCong` không resolve được từ DI** ⇒ IPN trả `500`. ➕ Cổng **⑪** mới (probe HTTP **26 ca**). ⚠️ **Vẫn KHÔNG `Implemented`**: chưa kiểm chứng **tiền thật**, outbox chưa có, `Q6` (ai xác nhận dòng `ChoXacNhan`) còn mở |
 
 ---
 
-## 16. TIẾN ĐỘ TRIỂN KHAI — phiên `S4` (18/10/2026)
+## 16. TIẾN ĐỘ TRIỂN KHAI — phiên `S4` (18/10/2026) và `S5` (18/10/2026)
 
 > 📌 Mục này **chỉ** ghi cái **đã đo được** và cái **còn thiếu**. 🔒 Nó **không** nói *"PAY-001 xong"*: tài liệu
-> này vẫn **KHÔNG** được đánh dấu `Implemented` — lý do ở §16.3/#2, §16.4/#1 và §7.6 (chưa kiểm chứng tiền thật).
+> này vẫn **KHÔNG** được đánh dấu `Implemented` — lý do ở §16.4 #1 (outbox) và §7.6 (**chưa kiểm chứng tiền thật**).
+> 📌 `S5` = **phần B** (IPN + hoàn tiền); phần `S4` (đường TẠO + cầu nối) giữ nguyên bên dưới làm mốc.
 
-### 16.1 Đã làm (kèm bằng chứng)
+### 16.6 🆕 Năm phát hiện của `S5` — cả năm đều **không** làm đỏ cổng nào trước đó
+
+| # | Phát hiện | Bằng chứng (đo được) | Vì sao đáng ghi |
+|---|---|---|---|
+| **S5-1** | 🚨 **Job đối soát phát hiện tiền đã vào nhưng KHÔNG phát sự kiện** ⇒ *"lưới an toàn cứu được TIỀN, không cứu được ĐƠN"* | `grep PaymentEventPublisher` trong `src/eCommerce.Application` = **0** (trước `S5`); worker ghi `MarkSucceeded` rồi **thôi** | Đúng câu §7.1 cảnh báo, nhưng ở **chính đường lưới an toàn**. ✅ Sửa: hợp đồng `IPaymentEventPublisher` ở `Application.Contracts` (luật phân tầng #8 **cấm** `eCommerce.Application` tham chiếu `PaymentHub.Application`) ⇒ job phát được **cùng** sự kiện |
+| **S5-2** | 🚨 **`IXuLyKetQuaCong` KHÔNG resolve được từ DI** ⇒ request IPN đầu tiên trả **`HTTP 500`** | `Cannot resolve parameter 'eCommerce.PaymentHub.IXuLyKetQuaCong xuLy'` — đo ở lượt chạy **đầu** của `probe-thanh-toan.ps1` | Nguyên nhân: ABP đăng ký `ITransientDependency` theo **tên lớp** (`IXuLyKetQuaCongService`), **không** theo `IXuLyKetQuaCong`. 📌 `S4` khai hợp đồng mà **không ai gọi** ⇒ lỗi **không lộ**. ✅ `[ExposeServices(typeof(IXuLyKetQuaCong))]` + **test reflection** khoá lại |
+| **S5-3** | 🚨 **`HashSecret` rỗng vẫn tính HMAC** (khoá rỗng) ⇒ ai cũng **ký được** IPN giả | `appsettings.json:24` = `""`; trước `S5` `VerifyWebhookAsync` **không** có nhánh kiểm khoá | Chỉ **vô hại khi chưa có endpoint**; thành **lỗ hổng thật** ngay khi `/api/webhooks/vnpay` lên sóng ⇒ **giao hàng miễn phí**. ✅ fail-closed + cảnh báo lúc khởi động (§7.2.5) |
+| **S5-4** | **`F-PAY-1` có HAI lớp, không một** — lớp thứ hai là **byte của chuỗi ký** (decode rồi encode lại ⇒ `+` ⇒ `%20`) | §7.2.4 + test `IPN_co_dau_CONG_thay_cho_khoang_trang__van_hop_le` | Bản mô tả cũ chỉ thấy **tham số rỗng** ⇒ nếu chỉ sửa biểu hiện đó thì **biểu hiện thứ ba** sẽ xuất hiện. ✅ Gộp thuật toán về **một** hàm |
+| **S5-5** | **Dọn probe `like 'K9S5%'` KHÔNG khớp** dòng nào (mã probe nằm **giữa** `MerchantReference`) ⇒ rác ở lại ⇒ ca *"mã ổn định"* ĐỎ vì **lần thử = 3** | Lượt chạy đầu: `MA = PAY20261018-K9S5-DON-01-3` | 📌 Bài học `README-probe` §25.5 lần thứ **N**: *"dọn không thành"* và *"sản phẩm sai"* **trông giống hệt nhau**. ✅ `like '%K9S5%'` |
+
+> 🔑 **Cách đọc mục này:** **không** phát hiện nào làm đỏ build, đỏ unit test hay đỏ cổng DB. Hai cái đầu chỉ lộ
+> khi **gọi HTTP thật**; cái thứ ba lộ khi **đọc cấu hình**; cái thứ tư lộ khi **viết test đối chứng**; cái thứ năm
+> lộ khi **phép dọn dẹp không khớp**. ⇒ Đúng lý do `S5` thêm **bước ⑪** (probe HTTP) vào cổng.
+
+### 16.7 Đã làm ở `S5` (kèm bằng chứng)
+
+| # | Việc | Tệp | Bằng chứng |
+|---|---|---|---|
+| 1 | **Endpoint IPN `[AllowAnonymous]`** (nợ §15.3 #2, `Q2`) | `src/eCommerce.HttpApi.Host/Controllers/VnPayIpnController.cs` + allowlist | ✅ **HTTP THẬT** (`probe-thanh-toan.ps1`): chữ ký đúng ⇒ `200`/`RspCode 00`; **sai chữ ký ⇒ `400`**/`RspCode 97` **và DB không đổi** (`T13`–`T15`); sai chữ ký **không** chạm DB ⇒ `WebhookReceivedCount` giữ nguyên |
+| 2 | **Idempotency qua HTTP** (`TC-08`) | `XuLyKetQuaCongService` (đã có từ `S4`) + endpoint | ✅ IPN gửi **3 lần** ⇒ **1** dòng, `Status` không đổi, `WebhookReceivedCount = 3` (`T10`–`T12`) |
+| 3 | 🚨 **Vá `F-PAY-1`** + lớp thứ hai | `VnPayRequestBuilder.KiemChuKyTuQueryTho` (**một** luật) | ✅ `TC07`/`TC07b`/`TC07c` (unit, **cả hai chiều** + bằng chứng hash khác nhau) + **HTTP**: `T16` (có tham số rỗng ⇒ `200`) và `T18` (ký kiểu cũ ⇒ `400`) |
+| 4 | 🚨 **Fail-closed khi `HashSecret` rỗng** (`S5-3`) | `VnPayPaymentProvider.VerifyWebhookAsync` + `eCommerceHttpApiHostModule.KiemTraCauHinhIpn` | ✅ unit (metric `thieu-hashsecret` + `SignatureValid = false`) + `Warning` khởi động `[PAY-IPN-CHUA-CAU-HINH]` |
+| 5 | **Bảng dòng hoàn tiền** (nợ §15.3 #4) | `PaymentRefund` + migration `S5_PayRefunds_VaRangBuocHoanTien` | ✅ **6 ca** integration trên PostgreSQL thật (`TC-45`) + `PayRefunds` vào nhóm ① của `kiem-db.ps1` |
+| 6 | **`CHECK` bất biến TIỀN** | `CK_PayTransactions_RefundedAmount_KhongAm` / `…_KhongVuotAmount` / `CK_PayRefunds_Amount_Duong` | ✅ `23514` **đo được** (`TC-45`), cả **chiều ngược** (hoàn đúng bằng ⇒ ghi được) |
+| 7 | **Luật ghi nhận hoàn tiền (hàm thuần)** | `LuatGhiNhanHoanTien` + `LuatCauNoiThanhToan.PhanLoaiHoan` | ✅ **11 ca** — 4 nhánh + **thứ tự kiểm** (`DaHoanThat` thắng `LoiHaTang`; `LoiHaTang` thắng `DaNhanYeuCau`) |
+| 8 | **`PaymentRefundedEto` + cầu nối** (nợ §15.3 #11) | `PaymentRefundedEto` · `PaymentRefundedEto` handler ở `OrderPaymentStatusHandler` | ✅ **7 ca** (handler tồn tại · không phải `INotificationEvent` · ETO mang đủ trường · **decimal** cho tiền · khoá chống trùng riêng); ⚠️ **chưa** end-to-end với đơn thật (§16.4 #2) |
+| 9 | 🚨 **Vá `F-PAY-7`** (`Q10`) | `PostDoiSoatLoatAsync` + `PaymentReconciliationWorker` | ⚠️ **code đã sửa, CHƯA đo:** **mỗi giao dịch một UoW** + `try/catch` + **đếm `SoLoi`**; log `[PAY-DOISOAT-CO-LOI]` / `[PAY-JOB-CO-LOI]`. 🔒 **Không có phép đo nào chạy lô đối soát với giao dịch cố ý hỏng** ⇒ xem §16.9 #10 — 📌 *"sửa xong"* và *"chứng minh xong"* là **hai** việc |
+| 10 | **Đóng nốt `F-PAY-9`** (phía **đếm**) | `PaymentReconciliationWorker` | ✅ chỉ `soDoi++` **và** phát ETO khi `MarkSucceeded`/`MarkFailed` trả `true` |
+| 11 | **Job đối soát phát sự kiện** (`S5-1`) | `IPaymentEventPublisher` (Contracts) + worker | ✅ hợp đồng ở tầng thấp ⇒ `eCommerce.Application` dùng được **mà không** vi phạm luật phân tầng #8 |
+| 12 | **`F-PAY-4` (một phần)** | `ViPhamRangBuocDb` + danh sách trắng | ✅ 2 index của `PayTransactions` (+`PayRefunds`+3 `CHECK`) **đã ánh xạ**; **xoá** 2 dòng khỏi danh sách trắng vì lý do cũ đã sai |
+| 13 | **Bước ⑪ của cổng** | `tools/probe-thanh-toan.ps1` (26 ca) + `kiem-tat-ca.ps1` | ✅ `-DayDu` chạy bước này; `PayRefunds` thêm vào bất biến "phải rỗng" |
+
+### 16.8 Số đo thật — TRƯỚC và SAU `S5`
+
+| Chỉ số | Trước `S5` (đo 18/10/2026 đầu phiên) | Sau `S5` | Δ |
+|---|---:|---:|---|
+| Unit test (`eCommerce.Tests`) | **1294** | **1347** | **+53** |
+| Integration test (PostgreSQL thật) | **51** | **57** | **+6** |
+| Khối mermaid | 213 · 0 lỗi | 213 · 0 lỗi | 0 (sửa nội dung, **không** thêm sơ đồ) |
+| Unique index `NULLS NOT DISTINCT` | **51** | **52** | **+1** (`IX_PayRefunds_…`) |
+| `CHECK` có tên trên 2 bảng thanh toán | 0 | **3** | +3 |
+| Migration | 38 | **39** | +1 (`S5_PayRefunds_VaRangBuocHoanTien`) |
+| Probe HTTP thật của thanh toán | 0 ca | **26 ca** | +26 (bước ⑪) |
+| Cổng `-DayDu` | `exit 0` · **204.4s** | xem `SESSION-KICKOFF` §3 (ghi sau khi chạy cuối phiên) | — |
+
+### 16.9 Việc CÒN LẠI của `PAY-001` (sau `S5` — ghi để phiên sau không phải đoán)
+
+| # | Việc còn lại | Vì sao chưa làm | Phiên |
+|---|---|---|---|
+| 1 | 🚨 **Kiểm chứng tiền THẬT** — `TmnCode`+`HashSecret` sandbox, một giao dịch và một IPN **thật** | Cần **credential** + tunnel (C1+C2 của §7.7.3). 🔒 `S5` kiểm được **HMAC thật** nhưng **không** kiểm được *"tiền đã ra"* | chủ dự án |
+| 2 | **`FakePaymentProvider` + trang giả lập** (§7.7.2) | 🔑 Chủ dự án chốt trong `S5`: **dời sang `S8`** — probe tự ký HMAC bằng **biến môi trường** nên cổng ra của `S5` **không** cần nó; trang giả lập chỉ cần khi có **UI checkout** | `S8` |
+| 3 | **Xác nhận các dòng hoàn tiền `ChoXacNhan`** (`Q6`) | VNPay hoàn tiền **bất đồng bộ** ⇒ *"cổng đã nhận"* **≠** *"tiền đã ra"*. `S5` **ghi được** dòng chờ xác nhận nhưng **chưa có đường** xác nhận bằng `querydr` (cần **BA** chốt ai xác nhận — `Q6` vẫn `Open`) | `S7` + BA |
+| 4 | **Outbox bền vững** (`XC-002`) | Nợ đã ghi từ `S4` (chủ dự án chốt hoãn) | `S10` |
+| 5 | **Cấp mã nghiệp vụ riêng** cho 2 index của `PayTransactions` (`F-PAY-4` phần còn lại) | Là **thay đổi hợp đồng** với client ⇒ BA quyết (`D6`: code là nguồn sự thật) | BA |
+| 6 | **Quyền cho `TaoGiaoDichAsync`** (chỉ cần quyền **đọc** mà lại **tạo giao dịch**) | Cùng họ `F-PAY-8`; thêm permission = đổi hợp đồng quyền ⇒ **không tự chọn** | `S7` + BA |
+| 7 | **Test còn thiếu**: `TC-14` (hai luồng hoàn tiền song song), `TC-18`, `TC-30`, `TC-31`, `TC-33`, `TC-35`, `TC-36` | `TC-14` cần `FakePaymentProvider` (dời `S8`); `TC-30` cần hạ tầng 2 tenant | `S8`/`S10` |
+| 8 | **UI thanh toán** (`/DatHang` → cổng → trang kết quả) | Phạm vi `S8` | `S8` |
+| 9 | **Cột `ProviderCreateDateGmt7`** + `vnp_RequestId` **ổn định** (§5.6 #2, `F-PAY-10`) | Không có credential ⇒ **không kiểm chứng được**; sửa mù là đổi hành vi tiền mà không đo được | khi có credential |
+| 10 | 🚨 **`F-PAY-7` CHƯA CÓ PHÉP ĐO** — code đã sửa nhưng **không** có test/probe nào chạy lô đối soát với một giao dịch **cố ý hỏng** | Cần dựng một tình huống lỗi DB **giữa lô** (ví dụ chèn trước một dòng vi phạm `CHECK` để `SaveChanges` ném ở giao dịch #k) — 📌 khả thi nhưng **ngoài** 3 cổng ra của `S5`; và làm ẩu thì phép đo **không chứng minh** được gì (`README-probe` §C: *tách phép đo nhỏ nhất*) | `S10` (hoặc `S7` khi làm UI đối soát) |
+
+### 16.10 Nợ kỹ thuật ĐÃ GHI (không phải tính năng đã có)
+
+| # | Nợ | Vì sao chọn thế | Hệ quả nếu để lâu |
+|---|---|---|---|
+| 1 | 🚨 **Outbox bền vững (`XC-002`) CHƯA có** — sự kiện phát **in-process, trong cùng UoW** | 📌 Đo được: `eCommerceDbContext` **không** implement `IHasEventOutbox`; gói `Volo.Abp.EventBus.EntityFrameworkCore` **KHÔNG có** trong cache NuGet của máy ⇒ cài outbox sẽ **đổi cách phân phối MỌI sự kiện** của hệ thống (rủi ro làm đỏ E2E/probe của `S1`–`S4`) — **chủ dự án chốt: hoãn** | Tiến trình chết **sau** commit ⇒ sự kiện mất ⇒ **đơn `Unpaid` trong khi tiền đã vào**. 🔑 Giảm nhẹ: `querydr` (job 15 phút) phát lại sự kiện khi phát hiện tiền đã vào — ✅ **`S5` đã nối** đường này (`S5-1`), ⚠️ nhưng chỉ khi việc đối soát **chạy** |
+| 2 | **Chưa chạy end-to-end `PaymentRefundedEto → handler → Order.PartiallyRefunded/Refunded` với đơn THẬT** | Sự kiện chỉ phát khi `RegisterRefund` chạy ⇒ cần **hoàn tiền thật** (credential) | Luật thuần (`PhanLoaiHoan`) + handler đã có test reflection; ⚠️ **"keo dính"** (nạp đơn → so tiền → ghi) **chưa** được máy kiểm ⇒ 📌 đây là giới hạn **phải nói rõ**, không được đọc thành *"đã kiểm"* |
+| 3 | **`XuLyKetQuaCongService` chưa có unit test trực tiếp** (cần `IRepository` thật) | Test của dự án là **thuần**; đường HTTP thật đã phủ (probe) nhưng **không** phủ nhánh `MarkFailed` (IPN thất bại) | 🔒 Rủi ro thật: nhánh *"cổng báo thất bại"* **chưa** được đo qua HTTP. 📌 Đường ghi đã được tách ra hàm thuần có test (`MarkFailed`), chỉ **thứ tự gọi** là chưa |
+| 4 | **`Q6` — không ai xác nhận dòng hoàn tiền `ChoXacNhan`** | Cần BA (ai xác nhận: kế toán? job?) | Tiền **đã ra** ở cổng mà sổ vẫn `ChoXacNhan` ⇒ đối soát lệch **vĩnh viễn** cho tới khi có người xác nhận. ➕ `S5` **đã** để lại **bằng chứng dữ liệu** (dòng hoàn + trạng thái) nên câu hỏi *"có bao nhiêu lần hoàn đang chờ"* **trả lời được** bằng SQL — đó là điều kiện **cần** để xử lý |
+| 5 | **Mã lỗi chung `eCommerce:Db:0001`** cho 2 index của `PayTransactions` (`F-PAY-4` phần còn lại) | Cấp mã riêng = đổi **hợp đồng** với client ⇒ **BA** quyết | CSKH đọc *"dữ liệu vi phạm ràng buộc"* thay vì *"giao dịch này đã được ghi rồi"*. ✅ `S5` **đã** thay bằng thông điệp **đúng chuyện gì xảy ra** + chỉ dẫn |
+
+### 16.1…16.5 (mốc `S4` — giữ nguyên để đối chiếu)
+
 
 | # | Việc | Tệp | Bằng chứng |
 |---|---|---|---|
@@ -1367,6 +1540,11 @@ public class Pay001Tests : eCommerceTestBase<eCommerceEntityFrameworkCoreTestMod
 | Cổng `-DayDu` | `exit 0` · **217.1s** | xem `SESSION-KICKOFF` §3 (ghi sau khi chạy cuối phiên) | — |
 
 ### 16.3 Việc CÒN LẠI (không thuộc `S4` — ghi để phiên sau không phải đoán)
+
+> 🆕 **ĐỌC KÈM §16.9 (trạng thái SAU `S5`):** các mục **#1, #2, #4, #5, #7** dưới đây **ĐÃ ĐÓNG ở `S5`**;
+> **#3** (`FakePaymentProvider`) **dời sang `S8`**; **#6** (quyền `TaoGiaoDichAsync`), **#8** (test còn thiếu),
+> **#9** (UI) **vẫn mở**. 📌 Bảng dưới giữ nguyên nội dung `S4` làm **mốc lịch sử** — 🔑 đừng đọc nó như danh sách
+> việc hiện tại.
 
 | # | Việc còn lại | Vì sao chưa làm | Phiên |
 |---|---|---|---|

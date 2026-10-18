@@ -97,6 +97,19 @@ public class HoanTienKetQuaDto
 
     /// <summary>Trạng thái giao dịch **sau** thao tác (đọc từ DB thật, không phải suy diễn).</summary>
     public string TrangThaiSau { get; set; } = default!;
+
+    /// <summary>🆕 (`S5`) Id của **dòng hoàn tiền** vừa ghi (`PayRefunds.Id`).
+    /// 🔑 Đây là **bằng chứng dữ liệu** thay cho log: mọi lần hoàn — kể cả lần **cổng đã nhận nhưng tiền chưa
+    /// ra** — đều để lại một dòng tra được (`PAY-001` §5.6 #1). `Guid.Empty` **chỉ** khi không ghi được dòng nào.</summary>
+    public Guid PaymentRefundId { get; set; }
+
+    /// <summary>🆕 (`S5`) Mã yêu cầu hoàn **ổn định, đọc được** (`RF001`, `RF002`…) — tra chéo với sao kê.</summary>
+    public string? MaYeuCauHoan { get; set; }
+
+    /// <summary>🆕 (`S5`) Trạng thái **của dòng hoàn tiền** (`ChoXacNhan`/`DaHoan`/`TuChoi`/`KhongXacDinh`).
+    /// 📌 Khác `TrangThaiSau` (trạng thái **giao dịch**): một giao dịch vẫn `Succeeded` trong khi dòng hoàn
+    /// đang `ChoXacNhan` — 🔑 và chính sự khác nhau đó là thứ người vận hành cần thấy.</summary>
+    public string? TrangThaiDongHoan { get; set; }
 }
 
 /// <summary>
@@ -209,6 +222,18 @@ public class KetQuaDoiSoatThanhToanDto
 
     /// <summary>Số giao dịch cổng xác nhận **đã thu tiền** trong lượt này — 🔑 lưới an toàn cho **IPN mất**.</summary>
     public int SoThuDuoc { get; set; }
+
+    /// <summary>
+    /// 🆕 (`S5`) Số giao dịch **xử lý LỖI** trong lượt — vá `F-PAY-7`.
+    ///
+    /// **VÌ SAO PHẢI CÓ CON SỐ NÀY (không thể suy ra từ ba con số kia):** trước `S5`, cả lượt dùng **MỘT** UoW
+    /// ⇒ một giao dịch ném ở giữa (ví dụ `23505`/`23514`) làm **rollback TOÀN BỘ** lượt ⇒ 36 lần ghi đã xong
+    /// **biến mất** trong khi **quota cổng đã tiêu** ⇒ *"đã xác nhận với cổng mà sổ không biết"*.
+    /// Nay mỗi giao dịch một UoW ⇒ lỗi **chỉ** mất phần của nó, và 📌 nếu không **đếm** thì lỗi đó **im lặng**
+    /// (lượt vẫn "xanh", chỉ có ít thay đổi hơn mong đợi — trông y như *"không có gì để đổi"*).
+    /// 🔒 `SoLoi > 0` là **bất thường cần người xem log**, **KHÔNG** phải *"đã kiểm và ổn"*.
+    /// </summary>
+    public int SoLoi { get; set; }
 
     /// <summary>Danh sách ngắn `merchantReference` **đã đổi trạng thái** — để người vận hành **tra tiếp**
     /// mà không phải quét log. 🔒 Có trần (do chỗ gọi áp) để một lượt lớn không trả về hàng nghìn dòng.</summary>

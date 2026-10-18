@@ -373,6 +373,34 @@ if ($DayDu -and -not $BoQuaE2E) {
 
         Write-Output '   ✅ HTTP THAT: moi ca khach hang DAT.'
     }
+
+    # ── BUOC 11: THANH TOAN — HTTP THẬT (`PAY-001` phần B, `S5`) ──────────────────────────────
+    Buoc 'Thanh toan: HTTP THAT (PAY-001 — IPN trung · sai chu ky ⇒ 400 · hoan vuot ⇒ 0002)' {
+        # 🔑 **VÌ SAO PHẢI LÀ BƯỚC CỦA CỔNG (không phải probe tay):** ba câu hỏi sống còn của `S5` **chỉ** HTTP
+        # thật trả lời được —
+        #   ① **IPN gửi trùng ⇒ chỉ ghi MỘT lần** — `TC-08` đã được chứng minh ở **hai tầng** (unit: `MarkSucceeded`
+        #      trả `false`; integration: unique index `23505`) nhưng **chưa** qua **đường HTTP** — và đó là đường
+        #      duy nhất cổng thật đi qua. 📌 Nếu controller trả `500`/`404`, mọi tầng dưới đúng cũng **vô nghĩa**;
+        #   ② **sai chữ ký ⇒ 400 VÀ DB KHÔNG đổi** (đo **cả hai chiều**) — hàng rào chống **IPN giả**
+        #      (`PAY-001` §7.7.4 #1); 📌 bỏ nó là **giao hàng miễn phí**;
+        #   ③ 🚨 **vá `F-PAY-1`** (mức 🔴 Cao): IPN có **tham số RỖNG** phải được CHẤP NHẬN — bản trước **giữ**
+        #      tham số rỗng ⇒ **từ chối IPN THẬT** ⇒ mất tiền im lặng. 📌 Đo được **cả hai chiều** (cách mới ⇒
+        #      `200`, cách cũ ⇒ `400`).
+        # 🔒 Khoá ký HMAC được đặt bằng **biến môi trường** trong probe ⇒ kiểm **chữ ký THẬT** mà **không** commit
+        # bí mật nào.
+        $p = ChayLenh 'pwsh' @('-NoProfile', '-File', (Join-Path $PSScriptRoot 'probe-thanh-toan.ps1')) 'thanhtoan.log'
+
+        Get-Content $p.Log | Where-Object { $_ -match 'DAT|KHONG DAT|PROBE THANH TOAN|DON DEP' } |
+            Select-Object -First 34 | ForEach-Object { "   $_" }
+
+        if ($p.Ma -ne 0) {
+            Get-Content $p.Log | Select-String 'CAC CA KHONG DAT' -Context 0,10 |
+                ForEach-Object { $_.Context.PostContext | ForEach-Object { "   $_" } }
+            throw "PROBE THANH TOAN DO (exit $($p.Ma)) — xem log: $($p.Log)."
+        }
+
+        Write-Output '   ✅ HTTP THAT: moi ca thanh toan DAT.'
+    }
 }
 elseif (-not $BoQuaE2E -and -not $DayDu) {
     Write-Output ""

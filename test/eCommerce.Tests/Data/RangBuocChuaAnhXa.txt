@@ -45,8 +45,6 @@ IX_MsgIdempotencyRecords_TenantId_Scope_KeyValue|XC-002 — hạ tầng outbox/i
 IX_OrdOrderLines_OrderId_ExternalLineId|Đơn hàng: đã có tiền kiểm ở tầng app (`DonHangAppService`) cho ca thường
 IX_OrdOrders_TenantId_ChannelCode_ExternalOrderId|Đơn hàng: đã có tiền kiểm ở tầng app (`DonHangAppService`) cho ca thường
 IX_OrdOrders_TenantId_Number|Đơn hàng: đã có tiền kiểm ở tầng app (`DonHangAppService`) cho ca thường
-IX_PayTransactions_TenantId_ProviderCode_IdempotencyKey|PaymentHub — thanh toán: chưa có đường ghi GĐ1 chạm tới
-IX_PayTransactions_TenantId_ProviderCode_MerchantReference|PaymentHub — thanh toán: chưa có đường ghi GĐ1 chạm tới
 IX_PrcChannelPrices_TenantId_Kenh_Shop_Sku_MinQty|CHƯA PHÂN LOẠI — cần người xem: map hay thêm lý do
 IX_PrcPriceListItems_TenantId_PriceListId_Sku|CHƯA PHÂN LOẠI — cần người xem: map hay thêm lý do
 IX_SalMktIntakes_TenantId_ChannelCode_ExternalOrderId|Đơn hàng: đã có tiền kiểm ở tầng app (`DonHangAppService`) cho ca thường

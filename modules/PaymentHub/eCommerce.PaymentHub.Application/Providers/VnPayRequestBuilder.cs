@@ -21,9 +21,19 @@ namespace eCommerce.PaymentHub.Providers;
 /// <list type="number">
 ///   <item>sắp xếp khóa bằng **`StringComparer.Ordinal`** (không theo culture — culture đổi theo máy);</item>
 ///   <item>**bỏ** `vnp_SecureHash`/`vnp_SecureHashType` **trước khi** ký (ký cả chính chữ ký là vô nghĩa);</item>
-///   <item>giá trị rỗng **vẫn** phải có trong chuỗi ký (VNPay không bỏ tham số rỗng) — trừ khi ta **cố ý**
-///     không truyền tham số đó.</item>
+///   <item>🚨 **giá trị RỖNG bị BỎ khỏi chuỗi ký** — VNPay làm đúng như vậy khi sinh chữ ký. 📌 Dòng này đã
+///     từng **mâu thuẫn với chính bộ luật của tệp này** (bản trước ghi *"giá trị rỗng vẫn phải có"*, trong khi
+///     `KiemChuKy` bỏ chúng) — đó chính là `F-PAY-1`: **hai quy tắc trong cùng một tệp**, và quy tắc sai nằm
+///     ở `VerifyWebhookAsync` ⇒ **từ chối IPN THẬT** ⇒ **mất tiền im lặng**. Nay **một** luật, xem
+///     <see cref="KiemChuKyTuQueryTho"/>.</item>
 /// </list>
+///
+/// 🚨 **VÀ MỘT QUY TẮC THỨ TƯ, CHỈ PHÁT HIỆN KHI LÀM `S5`:** với **IPN** (query string đến từ Internet), chuỗi
+/// ký **phải** được dựng từ **query THÔ** (`vnp_…=…` **đã encode đúng như cổng gửi**), **KHÔNG** được
+/// giải mã rồi encode lại. Lý do: `WebUtility.UrlEncode` biến khoảng trắng thành `%20`, còn cổng có thể gửi
+/// `+` (một số thư viện dùng `application/x-www-form-urlencoded`); giải mã rồi encode lại **đổi byte** ⇒ chữ ký
+/// lệch ⇒ lại **từ chối IPN thật**. 📌 Đây **cùng một họ lỗi** với `F-PAY-1`, chỉ khác lớp: **byte của chuỗi ký**
+/// phải là byte của **cổng**, không phải byte do `WebUtility` sinh lại.
 /// </summary>
 public static class VnPayRequestBuilder
 {
@@ -265,6 +275,134 @@ public static class VnPayRequestBuilder
 
         // 🔒 So sánh **Ordinal** (không culture) và **không** dùng `==` trên chuỗi do máy sinh ở chỗ khác.
         return string.Equals(mongDoi, nhan, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Lý do **ĐÓNG** (tập hữu hạn) khi từ chối chữ ký — dùng làm nhãn metric (`NFR-PAY-010`).</summary>
+    public static class LyDoTuChoiChuKy
+    {
+        /// <summary>IPN không có `vnp_SecureHash`.</summary>
+        public const string ThieuChuKy = "thieu-chu-ky";
+
+        /// <summary>Query string méo (phần tử không phải `key=value`, hoặc có khoá trùng).</summary>
+        public const string QueryKhongHopLe = "query-khong-hop-le";
+
+        /// <summary>Đủ tham số nhưng HMAC tính lại **khác** chữ ký nhận được.</summary>
+        public const string ChuKySai = "chu-ky-sai";
+    }
+
+    /// <summary>
+    /// 🚨 **KIỂM CHỮ KÝ CỦA MỘT IPN — DỰNG CHUỖI KÝ TỪ QUERY **THÔ** (đóng `F-PAY-1`, `S5`).**
+    ///
+    /// **VÌ SAO PHẢI CÓ HÀM NÀY (và vì sao `VerifyWebhookAsync` cũ SAI):** bản trước của
+    /// `VerifyWebhookAsync` tự dựng chuỗi ký bằng cách **giải mã** tham số rồi **encode lại** bằng
+    /// `WebUtility.UrlEncode`, và **giữ cả tham số rỗng**. Hai khác biệt so với cách VNPay ký:
+    /// <list type="number">
+    ///   <item>🚨 **tham số rỗng**: VNPay **bỏ** (đúng như `KiemChuKy` của chính tệp này) ⇒ ta **giữ** ⇒ hash
+    ///     khác ⇒ **từ chối IPN THẬT** ⇒ *"tiền đã vào mà sổ không biết"*. 📌 Đây là `F-PAY-1`, mức 🔴 Cao;</item>
+    ///   <item>⚠️ **byte của giá trị**: `WebUtility.UrlEncode(' ') = "%20"`, còn cổng gửi `"+"` (hoặc ngược
+    ///     lại) ⇒ hash khác dù **nội dung giống hệt**.</item>
+    /// </list>
+    /// ✅ **Cách đúng:** dùng **nguyên văn** `key=value` mà cổng gửi, chỉ **bỏ** các cặp có giá trị rỗng và hai
+    /// khoá `vnp_SecureHash*`, rồi sắp xếp theo **tên khoá** `Ordinal`. Không giải mã, không encode lại.
+    ///
+    /// 🔒 **Vẫn là FAIL-CLOSED:** thiếu chữ ký, query méo, hoặc `biMat` rỗng ⇒ **`false`** (không bao giờ
+    /// "cho qua khi không kiểm được"). 📌 `biMat` rỗng là ca **thật** ở repo này (`HashSecret` = `""`): nếu
+    /// vẫn tính HMAC với khoá rỗng thì **bất kỳ ai** cũng ký được một IPN giả ⇒ **giao hàng miễn phí**
+    /// (`PAY-001` §7.7.4 #1).
+    /// </summary>
+    /// <param name="queryTho">Query string **nguyên văn** của IPN (có hoặc không có `?` ở đầu).</param>
+    /// <param name="biMat">`HashSecret`. ⚠️ Rỗng ⇒ trả `false` (không thể kiểm thì không tin).</param>
+    /// <param name="lyDo">Lý do từ chối (một trong <see cref="LyDoTuChoiChuKy"/>) — `null` khi hợp lệ.</param>
+    public static bool KiemChuKyTuQueryTho(string? queryTho, string biMat, out string? lyDo)
+    {
+        lyDo = null;
+
+        if (string.IsNullOrWhiteSpace(biMat))
+        {
+            lyDo = LyDoTuChoiChuKy.ChuKySai;
+
+            return false;
+        }
+
+        var cap = new List<KeyValuePair<string, string>>();
+        string? nhan = null;
+
+        var tho = (queryTho ?? string.Empty).Trim().TrimStart('?');
+
+        if (tho.Length == 0)
+        {
+            lyDo = LyDoTuChoiChuKy.ThieuChuKy;
+
+            return false;
+        }
+
+        foreach (var phan in tho.Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var viTriBang = phan.IndexOf('=');
+
+            if (viTriBang <= 0)
+            {
+                // 🚨 **Không đoán**: một phần tử không phải `key=value` nghĩa là query KHÔNG như cổng gửi ⇒
+                // không có cơ sở nào để kết luận chữ ký đúng. Bỏ qua nó là **âm thầm** kiểm một chuỗi khác.
+                lyDo = LyDoTuChoiChuKy.QueryKhongHopLe;
+
+                return false;
+            }
+
+            var khoaTho = phan[..viTriBang];
+            var giaTriTho = phan[(viTriBang + 1)..];
+
+            if (string.Equals(khoaTho, "vnp_SecureHash", StringComparison.Ordinal))
+            {
+                nhan = WebUtility.UrlDecode(giaTriTho);
+
+                continue;
+            }
+
+            if (string.Equals(khoaTho, "vnp_SecureHashType", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            // 🔒 Tham số **RỖNG** bị VNPay bỏ khỏi chuỗi ký ⇒ bỏ ở đây (chính là `F-PAY-1`).
+            if (giaTriTho.Length == 0)
+            {
+                continue;
+            }
+
+            cap.Add(new KeyValuePair<string, string>(khoaTho, giaTriTho));
+        }
+
+        if (string.IsNullOrWhiteSpace(nhan))
+        {
+            lyDo = LyDoTuChoiChuKy.ThieuChuKy;
+
+            return false;
+        }
+
+        // ⚠️ Khoá trùng trong một query string: hành vi "lấy cái cuối" của mọi bộ parse là **không tất định**
+        // giữa các tầng ⇒ từ chối thay vì để tầng này đọc khoá đầu còn tầng kia đọc khoá cuối.
+        var soKhoa = cap.Select(x => x.Key).Distinct(StringComparer.Ordinal).Count();
+
+        if (soKhoa != cap.Count)
+        {
+            lyDo = LyDoTuChoiChuKy.QueryKhongHopLe;
+
+            return false;
+        }
+
+        var chuoiKy = string.Join("&", cap
+            .OrderBy(x => x.Key, StringComparer.Ordinal)
+            .Select(x => x.Key + "=" + x.Value));
+
+        var hopLe = string.Equals(Ky(biMat, chuoiKy), nhan, StringComparison.OrdinalIgnoreCase);
+
+        if (!hopLe)
+        {
+            lyDo = LyDoTuChoiChuKy.ChuKySai;
+        }
+
+        return hopLe;
     }
 
     /// <summary>

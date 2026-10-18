@@ -47,6 +47,7 @@ namespace eCommerce.Application.Sales;
 public class OrderPaymentStatusHandler :
     IDistributedEventHandler<PaymentSucceededEto>,
     IDistributedEventHandler<PaymentFailedEto>,
+    IDistributedEventHandler<PaymentRefundedEto>,
     ITransientDependency
 {
     private readonly IRepository<Order, Guid> _donHang;
@@ -84,6 +85,45 @@ public class OrderPaymentStatusHandler :
         suKien.Currency,
         PaymentStatus.Failed,
         "Failed");
+
+    /// <summary>
+    /// 🆕 **`S5` — TIỀN ĐÃ HOÀN ⇒ đơn sang `PartiallyRefunded`/`Refunded`.**
+    ///
+    /// **VÌ SAO PHẢI CÓ (nợ §16.3 #1 của `PAY-001`):** `S4` đã dựng **luật hấp thụ** của đơn
+    /// (`Order.DatTrangThaiThanhToan`) và **đã cho phép** `Paid → PartiallyRefunded/Refunded`, nhưng **không có
+    /// nguồn phát** ⇒ hệ quả là *"hoàn tiền xong mà đơn vẫn `Paid`"* ⇒ 📌 hệ thống tưởng khách **còn nợ** /
+    /// **còn phải giao hàng** trong khi tiền **đã trả lại** — và không có lỗi nào nổi lên.
+    ///
+    /// 🔒 **Mức hoàn (`một phần` hay `toàn phần`) do LUẬT THUẦN quyết** —
+    /// <see cref="LuatCauNoiThanhToan.PhanLoaiHoan"/>, dùng **hai con số của chính sự kiện**
+    /// (`Amount` = tổng đã thu, `RefundedAmount` = tổng đã hoàn **sau** lần này). 📌 Không tin một cờ do nơi
+    /// phát tính sẵn: nếu nơi phát tính sai thì consumer **không có cách nào** phát hiện, còn ở đây consumer
+    /// **tự** tính từ dữ liệu ⇒ hai bên không thể lệch.
+    ///
+    /// ⚠️ **Không hạ đơn về `Paid`/`Unpaid`:** đi qua `Order.DatTrangThaiThanhToan` (luật hấp thụ) như mọi
+    /// đường khác — 🔒 một IPN `Succeeded` đến **sau** khi đã hoàn sẽ **không** "hồi sinh" đơn.
+    /// </summary>
+    public Task HandleEventAsync(PaymentRefundedEto suKien)
+    {
+        var mucHoan = LuatCauNoiThanhToan.PhanLoaiHoan(suKien.Amount, suKien.RefundedAmount);
+
+        var trangThaiMoi = mucHoan == MucHoan.ToanPhan
+            ? PaymentStatus.Refunded
+            : PaymentStatus.PartiallyRefunded;
+
+        return GhiNhanAsync(
+            suKien.TenantId,
+            suKien.OrderId,
+            suKien.MerchantReference,
+            suKien.PaymentTransactionId,
+            // 🔒 **Số tiền ĐỐI CHIẾU vẫn là `Amount` (tổng đã THU)**, không phải số vừa hoàn: bất biến `F-PAY-2`
+            // là *"số tiền cổng báo đã thu phải khớp tổng đơn"*. 📌 Đưa `SoTienLanNay` vào đây sẽ làm **mọi** lần
+            // hoàn một phần bị coi là *"lệch tiền"* và **không** cập nhật đơn — lỗi im lặng đúng nghĩa.
+            suKien.Amount,
+            suKien.Currency,
+            trangThaiMoi,
+            mucHoan == MucHoan.ToanPhan ? "Refunded" : "PartiallyRefunded");
+    }
 
     private async Task GhiNhanAsync(
         Guid? tenantId,

@@ -31,52 +31,62 @@ và phiên trước từng **nói quá "GĐ1 hoàn thành"** vì **không đo l�
 
 ---
 
-## 3. Trạng thái ĐO ĐƯỢC — baseline chuẩn (đo lại **18/10/2026** cuối `S4`, `-DayDu` exit 0)
+## 3. Trạng thái ĐO ĐƯỢC — baseline chuẩn (đo lại **18/10/2026** cuối `S5`, `-DayDu` exit 0)
 
 ```
-[B1] dọn tiến trình + cổng trống      1.0s
-[B2] build + KIỂM MỐC nhị phân       41.5s   · 71 tệp DLL/EXE đổi mốc
-[B3] unit test                        3.1s   · 1294/1294
-[B4] integration (PostgreSQL thật)    8.1s   ·   51/51
-[B5] mermaid (parser thật)            4.4s   ·  213 khối · 0 lỗi
-[B6] bất biến DB                      6.4s   ·   23/23 · NND = 51 · 58 quyền · quét 84 vị trí probe
-[B7] test cho chính các cổng         78.2s   ·   22 ca (A…F · R…V · L…P · G…K)
-[B8] E2E có phiên đăng nhập          21.7s   ·   67/67
-[B9] sổ địa chỉ HTTP thật            15.6s   ·   17/17
-[B10] khách hàng HTTP thật           16.0s   ·   26/26
+[B1] dọn tiến trình + cổng trống      1.1s
+[B2] build + KIỂM MỐC nhị phân       44.0s   · 71 tệp DLL/EXE đổi mốc
+[B3] unit test                        3.7s   · 1347/1347
+[B4] integration (PostgreSQL thật)    8.7s   ·   57/57
+[B5] mermaid (parser thật)            5.3s   ·  213 khối · 0 lỗi
+[B6] bất biến DB                      6.5s   ·   23/23 · NND = 52 · 58 quyền · quét 85 vị trí probe
+[B7] test cho chính các cổng         81.3s   ·   22 ca (A…I hiển thị 20 dòng)
+[B8] E2E có phiên đăng nhập          22.6s   ·   67/67
+[B9] sổ địa chỉ HTTP thật            13.2s   ·   17/17
+[B10] khách hàng HTTP thật           15.6s   ·   26/26
+[B11] thanh toán HTTP thật           12.7s   ·   26/26   ← 🆕 `S5`
       ─────────────────────────────────────
-      TỔNG                           196.0s
+      TỔNG                           214.8s
 ```
 
-📌 **Đo ĐẦU phiên `S4` (trước khi sửa) cũng `exit 0` · 217.1s** với unit **1228** / integration **46** — tức **mọi
-số khớp bảng dưới** (thời gian chênh ~10 % là **máy/nhiệt độ**, không phải sản phẩm: §3 cũ ghi rõ điều này).
-**Code:** **336 tệp · 40.291 dòng** — 📌 **phương pháp (ghi rõ để không trôi, đã KIỂM LẠI khớp số cũ):**
+📌 **Đo HAI lần ở cuối `S5`** (cùng 11 bước, cùng số ca): **214.8s** và **211.1s** — chênh **1,7 %**, đúng
+mức máy/nhiệt độ. 🔑 Ghi **cả hai** để phiên sau không đọc một con số là **chỉ tiêu**.
+📌 **Đo ĐẦU phiên `S5` (trước khi sửa) cũng `exit 0` · 204.4s** với unit **1294** / integration **51** /
+NND **51** / **84** chỗ quét — tức **mọi số khớp `S4`** (thời gian chênh ~5 % là **máy/nhiệt độ**, không phải
+sản phẩm). 🔑 **Đây là bằng chứng baseline `S4` vẫn đúng**, không phải suy đoán từ tài liệu.
+**Code:** **341 tệp · 41.414 dòng** — 📌 **phương pháp (ghi rõ để không trôi):**
 `Get-ChildItem src, modules, shared -Recurse -Filter *.cs`, **loại** `\bin\`, `\obj\`, `*.Designer.cs`,
-`*Snapshot.cs`, rồi đếm bằng **`| Measure-Object -Line`** (tức **bỏ dòng RỖNG**) · đo 18/10/2026 cuối `S4` ·
-**98+6 = 104 tệp test · 16.428 dòng** (cùng phương pháp, trên `test/`) · **38 migration** (76 tệp = 38 `X.cs` +
-38 `X.Designer.cs`).
-🔑 **Vì sao phải ghi thêm `Measure-Object -Line`:** lần đo này tôi đếm bằng `.Count` (mọi dòng) ⇒ ra **47.191**,
-lệch **7.967** so với số cũ ⇒ suýt kết luận *"code phình 20 %"*. ✅ Dùng `Measure-Object -Line` thì ra **40.291**,
-và **40.291 − (dòng của 7 tệp mới ở `S4`) ≈ 39.224** = đúng số cũ ⇒ **hai phép đo khớp nhau**. 📌 Đây lại đúng
-bài học §1: *"một phép đo bất ngờ thường là phép đo SAI"*.
+`*Snapshot.cs`, rồi đếm bằng **`| Measure-Object -Line`** (tức **bỏ dòng RỖNG**) · đo 18/10/2026 cuối `S5` ·
+**107 tệp test · 17.255 dòng** (cùng phương pháp, trên `test/`) · **39 migration** (78 tệp = 39 `X.cs` +
+39 `X.Designer.cs`).
+🔑 **Vì sao phải ghi thêm `Measure-Object -Line`:** ở `S4` tôi đếm bằng `.Count` (mọi dòng) ⇒ ra **47.191**,
+lệch **7.967** ⇒ suýt kết luận *"code phình 20 %"*. ✅ Dùng `Measure-Object -Line`: `S4` = **40.291**,
+`S5` = **41.414** ⇒ **+1.123 dòng cho 4 tệp sản phẩm mới** (≈ 280 dòng/tệp — hợp lý vì chú thích chiếm phần lớn,
+đúng quy ước dự án). 📌 Đây lại đúng bài học §1: *"một phép đo bất ngờ thường là phép đo SAI"*.
 ⚠️ **Số cũ (`324/38.460` · `95/15.115` · `47.191`) KHÔNG đối chiếu lại được** với phương pháp này — 🔑 đừng cộng trừ
 với chúng; chênh lệch **không** phải "code phình" mà là **hai phép đo khác nhau**.
-**Git:** nhánh `main` · **280 commit** (⚠️ **cây CHƯA sạch** — 23 tệp của `S4` chưa commit) · **`origin` =
-`https://github.com/hungnt9801/eCommerce`** · ⚠️ repo đang **PUBLIC** · 📌 **remote `refs/heads/main` = `ab9a7ff`**
-(lần push cuối 17/10/2026) — các phiên `S1`/`S2`/`S3`/`S4` **chưa push** ⇒ **cần push** trước khi mở `S9` (CI).
+**Git:** nhánh `main` · **282 commit** · ✅ **cây SẠCH** (đã commit — xem `git rev-parse --short HEAD`) · **`origin` =
+`https://github.com/hungnt9801/eCommerce`** · ⚠️ repo đang **PUBLIC**.
+📌 **`refs/heads/main` trên remote = `551c7b0`** — 🚨 **ĐO LẠI 18/10/2026 (cuối `S5`) và con số CŨ ĐÃ TRÔI:**
+bản trước ghi `ab9a7ff` + *"`S1`/`S2`/`S3`/`S4` chưa push"*. Sự thật đo được: `origin/main` **đã chứa `S1`**
+(`ab3cfc7`) và **2 commit tài liệu** ⇒ **chỉ `S2`…`S5` chưa push**, cụ thể **5 commit**:
+`4a1095d` (tài liệu `S1`) · `e43bf76` (`S2`) · `6495835` (`S3`) · `d6d7eca` (`S4`) · `82bfb4d` (`S5`).
+⇒ **cần push trước khi mở `S9`** (CI). 🔑 Đây đúng bài học §1: *con số ghi trong tài liệu cũng TRÔI*, nên phép
+`git rev-list --count origin/main..HEAD` là **nguồn sự thật**, không phải dòng chữ này.
 📌 Con số commit **không tự khớp** với chính commit ghi nó (commit đó làm số tăng 1) — 🔑 nên mốc đúng là
-*"sau `S4`, 18/10/2026"*.
+*"sau `S5`, 18/10/2026"*.
 
 🚨 **Các con số ĐÃ TRÔI — dùng số ở trên, đừng dùng số cũ:**
-| Số cũ (handover / `S2` / `S3`) | Số đo 18/10/2026 (cuối `S4`) | Vì sao |
+| Số cũ (handover / `S2` / `S3` / `S4`) | Số đo 18/10/2026 (cuối `S5`) | Vì sao |
 |---|---|---|
-| ~145–155s / 175.9s / **203.2s** | **196.0s** | cùng **10** bước; 📌 đổi theo máy/nhiệt độ, **không** phải chỉ tiêu (`S4` đo đầu phiên = **217.1s**) |
-| 17 ca / 22 ca test cổng | **22 ca** | không đổi (`S4` không thêm ca cổng cho chính các cổng) |
-| 1181 / 1219 / **1228** unit · 38 / **46** integration | **1294 / 51** | `S4` **+66 unit** (mã ổn định · guard · luật hấp thụ · luật đối chiếu · 6 ca reflection cầu nối) và **+5 integration** (chặn trùng `PayTransactions` trên PostgreSQL thật) |
-| 48 / 51 index `NND` · 53 / 57 / **58** quyền | **51 · 58 quyền** | `S4` **không** thêm index/bảng ⇒ **không có migration**; cũng **không** thêm permission |
-| 197 / **213** khối mermaid | **213 khối** | không đổi ở `S4` (không thêm sơ đồ) |
-| 59 / **67** ca E2E | **67 ca** | `S4` không thêm ca E2E (thanh toán **chưa** lên UI — `S8`) |
-| 84 vị trí quét probe (KHÔNG đổi) | **84** | `S4` không thêm bảng |
+| ~145–155s / 175.9s / 203.2s / **196.0s** | **214.8s** | **11** bước (thêm ⑪); 📌 đổi theo máy/nhiệt độ, **không** phải chỉ tiêu (`S5` đo đầu phiên = **204.4s**, cũng `exit 0`) |
+| 17 ca / 22 ca test cổng | **22 ca** (hiển thị 20 dòng ✅ A…I) | không đổi (`S5` không thêm ca cho chính các cổng) |
+| 1181 / 1219 / 1228 / **1294** unit · 38 / 46 / **51** integration | **1347 / 57** | `S5` **+53 unit** (chữ ký IPN cả hai chiều · luật ghi nhận hoàn tiền · entity dòng hoàn · ETO/handler · reflection DI) và **+6 integration** (dòng hoàn + 3 `CHECK` TIỀN trên PostgreSQL thật) |
+| 48 / 51 index `NND` · 53 / 57 / **58** quyền | **52 · 58 quyền** | `S5` thêm **1** unique index (`IX_PayRefunds_…`) ⇒ **1 migration**; **không** thêm permission |
+| 197 / **213** khối mermaid | **213 khối** | không đổi ở `S5` (sửa **nội dung** một sơ đồ, **không** thêm khối) |
+| 59 / **67** ca E2E | **67 ca** | `S5` không thêm ca E2E (thanh toán **chưa** lên UI — `S8`); thay vào đó là **bước ⑪** với **26 ca HTTP thật** |
+| 84 vị trí quét probe | **85** | `S5` thêm bảng `PayRefunds` (PK `uuid`) ⇒ phép **tự dò** quét thêm **1** chỗ — 📌 con số **tăng là ĐÚNG**, không phải lỗi |
+| — (chưa từng có) | **26 ca** probe thanh toán HTTP thật | 🆕 bước ⑪ của `S5` |
 
 🔑 **Vì vậy bước ĐẦU TIÊN của mọi phiên là ĐO LẠI** (mục 6) — nếu số khác bảng trên thì **dừng, tìm hiểu trước khi sửa**.
 
@@ -170,7 +180,7 @@ pwsh -File tools\kiem-link-tai-lieu.ps1       # 0 tham chiếu chết (thoát 1 
 | `S2` | ✅ **XONG 18/10/2026** — `ADDR-004` phần B: `CustomerAddressLink` + API + 4 quyền + PII (**49→51**) · ➕ **bước ⑨ mới**: `probe-so-dia-chi.ps1` (17/17 ca HTTP thật) |
 | `S3` | ✅ **XONG 18/10/2026** — `CUS-001` **ĐÓNG**: nối `ChoPhepGiaoDichAsync` (🚨 **LỖI THẬT**: khách `Blocked` vẫn đặt được) + `CustomerGroup` API/seed + phân trang · ➕ **bước ⑩ mới**: `probe-khach-hang.ps1` (26/26 ca HTTP thật) |
 | `S4` | ✅ **XONG 18/10/2026** — **`PAY-001` phần A: đường TẠO + cầu nối** (📄 `PAY-001` **§16**): tạo `PaymentTransaction` từ đơn/checkout (`TaoGiaoDichAsync`) · **`MerchantReference` ỔN ĐỊNH** (`SinhMaThamChieu`, cấm `Guid.NewGuid()` mỗi lần) · cập nhật **`Order.PaymentStatus`** qua **ETO** + luật hấp thụ · ⚠️ **outbox bền vững = NỢ** (chủ dự án chốt hoãn) · ➕ đóng `F-PAY-2/3/9`. Cổng ra: cöng "IPN gửi trùng ⇒ 1 giao dịch" ✅ **2 tầng** (domain + unique index **PostgreSQL thật**) · đơn chuyển `Paid` ✅ · unit **+66** · integration **+5** · `-DayDu` **exit 0** |
-| `S5` | **`PAY-001` phần B — IPN/webhook + hoàn tiền**: endpoint **IPN `[AllowAnonymous]`** + `HMAC-SHA512` · idempotency · 🚨 **vá F-PAY-1** (`VerifyWebhookAsync` không bỏ tham số rỗng ⇒ có thể **từ chối IPN THẬT**) · bảng dòng hoàn tiền + **`CHECK RefundedAmount <= Amount`** · 🚨 **vá F-PAY-7** (UoW cả lô ⇒ rollback mất bằng chứng) · ➕ **`PaymentRefundedEto`** + job **đọc** giá trị `MarkFailed` trả về (đóng nốt `F-PAY-9`) · cổng ra: E2E IPN trùng · **sai chữ ký ⇒ 400** · hoàn vượt ⇒ **ném lỗi** |
+| `S5` | ✅ **XONG 18/10/2026** — **`PAY-001` phần B: IPN/webhook + hoàn tiền** (📄 `PAY-001` **§16.7**): endpoint **`GET /api/webhooks/vnpay`** `[AllowAnonymous]` + allowlist (ở `HttpApi.Host` — trả lời `Q2`) · **HMAC-SHA512** kiểm trên **query THÔ** ⇒ 🚨 **vá `F-PAY-1`** + phát hiện **lớp thứ hai** (byte chuỗi ký: `+` ↔ `%20`) + **fail-closed khi `HashSecret` rỗng** · **idempotency** (bảng `PayRefunds` + `CHECK` TIỀN: `RefundedAmount ≤ Amount`, `≥ 0`, `Amount > 0`) ⇒ 🚨 **vá `F-PAY-7`** (**mỗi giao dịch một UoW**) · **`PaymentRefundedEto`** ⇒ đơn sang `PartiallyRefunded`/`Refunded` · **job đọc** giá trị `MarkFailed` trả về (đóng nốt `F-PAY-9`) · **job đối soát phát sự kiện** · ➕ **bước ⑪ mới**: `probe-thanh-toan.ps1` (**26 ca HTTP thật**). Cổng ra: **IPN trùng ⇒ 1 lần ghi + bộ đếm 3** ✅ · **sai chữ ký ⇒ `400` + DB không đổi** ✅ · **hoàn vượt ⇒ `0002`** ✅ · unit **+53** · integration **+6** · `-DayDu` **exit 0 · 214.8s**. ⚠️ **Vẫn KHÔNG `Implemented`**: chưa kiểm chứng **tiền thật**, outbox chưa có, `Q6` còn mở |
 | `S6` | `SAL-005` — DLQ + `SalMarketplaceEventLogs` + worker `D12` + `update_time` |
 | `S7` | UI/API còn thiếu — hạn mức kênh · lịch sử đối soát · retention |
 | `S8` | Thanh toán trên UI + đóng `WEB-002` |
@@ -190,3 +200,4 @@ pwsh -File tools\kiem-link-tai-lieu.ps1       # 0 tham chiếu chết (thoát 1 
 | 18/10/2026 | Cập nhật sau `S1` + `S2`: baseline **175.9s · 9 bước** (1219 unit · 46 integration · 213 mermaid · **23/23** DB · **NND 51** · **57** quyền · **84** chỗ quét · 22 ca cổng · 59/59 E2E · **17/17** sổ địa chỉ). `S2` ✅ XONG ⇒ **`S3` là phiên kế tiếp**. Ghi rõ **phương pháp đo** kích thước mã (vì số cũ không ghi cách đo) |
 | 18/10/2026 (sau) | Cập nhật sau `S3`: baseline **203.2s · 10 bước** (1228 unit · 46 integration · 213 mermaid · **23/23** DB · **NND 51** · **58** quyền · **84** chỗ quét · 22 ca cổng · **67/67** E2E · **17/17** sổ địa chỉ · **26/26** khách hàng). `S3` ✅ XONG ⇒ **`S4` là phiên kế tiếp** (`PAY-001` phần A). ➕ Bất biến DB mới: *`CusGroups` = đúng 3 nhóm seed* (thay *"phải rỗng"* sai) · 📌 kích thước mã **đo lại bằng phương pháp ghi rõ** và **cảnh báo không cộng trừ với số cũ** |
 | 18/10/2026 (sau nữa) | Cập nhật sau `S4`: baseline **196.0s · 10 bước** (**1294** unit · **51** integration · 213 mermaid · **23/23** DB · **NND 51** · **58** quyền · **84** chỗ quét · 22 ca cổng · **67/67** E2E · **17/17** sổ địa chỉ · **26/26** khách hàng). `S4` ✅ XONG ⇒ **`S5` là phiên kế tiếp** (`PAY-001` phần B). ➕ **Phương pháp đo kích thước mã nay ghi ĐỦ** (thêm `Measure-Object -Line` = **bỏ dòng rỗng**) — nếu thiếu chi tiết đó thì lần đo `.Count` cho **47.191** dòng, lệch **7.967** ⇒ **suýt kết luận sai "code phình 20 %"**; ✅ với phương pháp đúng: **40.291** dòng, và **40.291 − dòng 7 tệp mới ≈ 39.224** = khớp số cũ. 📌 Ghi lại **3 việc còn nợ của `PAY-001`**: endpoint IPN (`S5`) · outbox bền vững (`XC-002`) · **chưa kiểm chứng tiền thật** |
+| 18/10/2026 (cuối) | Cập nhật sau `S5`: baseline **214.8s · 11 bước** (**1347** unit · **57** integration · 213 mermaid · **23/23** DB · **NND 52** · **58** quyền · **85** chỗ quét · 22 ca cổng · **67/67** E2E · **17/17** sổ địa chỉ · **26/26** khách hàng · 🆕 **26/26 thanh toán**). `S5` ✅ XONG ⇒ **`S6`/`S7`/`S8` là các phiên kế tiếp** (độc lập nhau). ➕ **Bước ⑪ mới** (`probe-thanh-toan.ps1` — **HTTP thật**, tự ký HMAC bằng **biến môi trường**, **không** commit bí mật). ➕ `PayRefunds` vào nhóm ① của `kiem-db.ps1` (bảng TIỀN ⇒ rác ở đó làm **báo cáo đối soát sai**). 📌 Ghi rõ: **1 migration** (38 → 39) · `schema.sql` regenerate và **kiểm bằng `Compare-Object`** (diff **chỉ** thêm) · **85 chỗ quét là TĂNG ĐÚNG** (bảng mới có PK `uuid`). 🔑 `PAY-001` vẫn **KHÔNG** `Implemented`: **chưa kiểm chứng tiền thật** + **outbox chưa có** + **`Q6`** (ai xác nhận dòng hoàn `ChoXacNhan`) còn mở |

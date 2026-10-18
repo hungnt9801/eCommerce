@@ -100,3 +100,72 @@ public class PaymentFailedEto
     /// <summary>Mã phản hồi của cổng (VNPay: `vnp_ResponseCode`) — giữ nguyên văn để điều tra.</summary>
     public string? ProviderResponseCode { get; set; }
 }
+
+/// <summary>
+/// 🚨 **SỰ KIỆN: TIỀN ĐÃ HOÀN VÀ SỔ ĐÃ GHI** (`S5`) — `PaymentRefundedEto`.
+///
+/// **ĐÂY LÀ MẢNH CUỐI CỦA CẦU NỐI TRỤC TÀI CHÍNH.** `S4` đã có `PaymentSucceededEto`/`PaymentFailedEto` ⇒ đơn
+/// chuyển `Paid`/`Failed`. ⚠️ Nhưng **hoàn tiền xong thì đơn vẫn `Paid`** — nợ §16.3 #1 của `PAY-001`, và hệ
+/// quả là **sổ sách nói dối theo hướng nguy hiểm nhất**: hệ thống tưởng khách còn nợ / đơn còn phải giao
+/// **trong khi tiền đã trả lại**. 📌 Luật hấp thụ của `Order.DatTrangThaiThanhToan` **đã sẵn sàng** từ `S4`;
+/// thiếu đúng **nguồn phát**.
+///
+/// ⚠️ **KHÔNG phải `INotificationEvent`** — cùng lý do `PaymentSucceededEto`: mất sự kiện này thì **tiền đã
+/// hoàn** mà đơn vẫn `Paid` ⇒ giao hàng cho đơn đã hoàn. Đây là sự kiện **MANG DỮ LIỆU**; `EventCoverageChecker`
+/// **phải** báo `Error` nếu không có người nhận.
+///
+/// 🔑 **KHOÁ CHỐNG TRÙNG = `PaymentRefundId`** (một `Guid` **duy nhất** cho mỗi dòng hoàn tiền), **không**
+/// phải `(PaymentTransactionId, RefundSequence)` như §7.1 dự phóng: `Guid` là khoá **chặt hơn** một số thứ tự
+/// (số thứ tự có thể bị tính lại sai; `Guid` thì không), và nó **đã** được unique index của `PayRefunds`
+/// bảo vệ. 📌 Nếu transport là outbox/at-least-once thì consumer chỉ cần so `PaymentRefundId` đã thấy.
+///
+/// 🔒 **KHÔNG chứa dữ liệu nhạy cảm**: không số thẻ, không payload thô (`XC-005` **BR-005**). `RefundReason`
+/// là lý do **nghiệp vụ** do người dùng nhập (ví dụ *"khách trả hàng theo RMA-…"*), không phải dữ liệu thẻ.
+/// </summary>
+[Serializable]
+public class PaymentRefundedEto
+{
+    public Guid EventId { get; set; } = Guid.NewGuid();
+
+    public DateTime OccurredOn { get; set; } = DateTime.UtcNow;
+
+    public Guid? TenantId { get; set; }
+
+    /// <summary>Khoá giao dịch thanh toán (giữ tên chuẩn `AggregateId` của `XC-002` **D6**).</summary>
+    public Guid AggregateId { get; set; }
+
+    public Guid PaymentTransactionId { get; set; }
+
+    /// <summary>🔑 **Khoá chống trùng của chính sự kiện này** — Id dòng hoàn tiền (`PayRefunds.Id`).</summary>
+    public Guid PaymentRefundId { get; set; }
+
+    /// <summary>Đơn liên quan. `null` = giao dịch không gắn đơn ⇒ handler **bỏ qua**, không phải lỗi.</summary>
+    public Guid? OrderId { get; set; }
+
+    public string ProviderCode { get; set; } = default!;
+
+    public string MerchantReference { get; set; } = default!;
+
+    public string? ProviderTransactionId { get; set; }
+
+    /// <summary>**Tổng đã thu** (`PaymentTransaction.Amount`) — 🔑 cần để consumer tự tính *"hoàn một phần hay
+    /// toàn phần"* bằng **luật thuần**, thay vì tin một cờ do nơi phát tính sẵn.</summary>
+    public decimal Amount { get; set; }
+
+    /// <summary>**Tổng đã hoàn SAU lần này** (`PaymentTransaction.RefundedAmount`).</summary>
+    public decimal RefundedAmount { get; set; }
+
+    /// <summary>Số tiền **của lần hoàn này**.</summary>
+    public decimal SoTienLanNay { get; set; }
+
+    public string Currency { get; set; } = "VND";
+
+    /// <summary>Lý do hoàn (audit) — **không** phải dữ liệu nhạy cảm.</summary>
+    public string? RefundReason { get; set; }
+
+    /// <summary>Người/lệnh yêu cầu hoàn (audit) — *"ai duyệt lần hoàn này"*.</summary>
+    public string? NguoiThucHien { get; set; }
+
+    /// <summary>Mã yêu cầu hoàn ổn định (`RF001`, `RF002`…) — đọc được bằng mắt khi đối chiếu sao kê.</summary>
+    public string? RefundRequestId { get; set; }
+}
