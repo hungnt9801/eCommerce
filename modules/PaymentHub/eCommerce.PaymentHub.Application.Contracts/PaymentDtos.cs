@@ -116,6 +116,28 @@ public interface IPaymentAppService
     Task<List<PaymentTransactionDto>> GetDanhSachAsync(string? merchantReference = null, string? trangThai = null, int toiDa = 50);
 
     /// <summary>
+    /// 🆕 (`S4`) 🚨 **TẠO GIAO DỊCH THANH TOÁN** — đường vào **DUY NHẤT** của `PayTransactions` ở tầng sản phẩm,
+    /// và là **điều kiện** để ipn/webhook (`S5`) có thứ để tra.
+    ///
+    /// 🔑 **Idempotent theo ĐƠN:** nếu đơn đã có giao dịch **đang mở** (`Initiated`/`Pending`) thì **dùng lại** —
+    /// trả **cùng** `MerchantReference`, `LaGiaoDichDaCo = true`, **không** tạo dòng thứ hai. 📌 Nếu không,
+    /// khách bấm *"Thanh toán"* hai lần (hoặc client retry sau timeout) sẽ tạo **hai** `vnp_TxnRef` ⇒ hệ thống
+    /// **không** nhận ra chúng là cùng một ý định thu tiền ⇒ nguy cơ **thu hai lần**; và VNPay có thể từ chối mã
+    /// thứ hai vì trùng trong ngày.
+    ///
+    /// 🔒 **Hai bất biến:**
+    /// <list type="number">
+    ///   <item>**Mã ổn định** — sinh từ `SoDon` + ngày + **số lần thử** (`SinhMaThamChieu`), **không** ngẫu nhiên
+    ///     (`BR-PAY-002`, `XC-002` **BR-007**);</item>
+    ///   <item>**Khoá phân tán theo đơn** trong suốt thao tác — hai request đồng thời **không** cùng tạo giao dịch
+    ///     (request sau nhận `eCommerce:Lock:0001`, **không** phải `23505` khó hiểu).</item>
+    /// </list>
+    /// ⚠️ Trả về cả `CheckoutUrl` — nếu cổng **chưa cấu hình**, giao dịch **vẫn** được tạo (bằng chứng ý định thu
+    /// tiền) và `LoiTaoUrl` nói rõ lý do; gọi lại API sau khi cấu hình sẽ **dùng lại** đúng giao dịch đó.
+    /// </summary>
+    Task<TaoGiaoDichKetQuaDto> TaoGiaoDichAsync(TaoGiaoDichInput input);
+
+    /// <summary>
     /// 🚨 **YÊU CẦU HOÀN TIỀN** — gọi cổng, rồi **chỉ ghi sổ** khi <c>DaHoanThat = true</c>.
     /// ⚠️ Trả ba trạng thái tách biệt; xem <see cref="HoanTienKetQuaDto"/>.
     /// </summary>

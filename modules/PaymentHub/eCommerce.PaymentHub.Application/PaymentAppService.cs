@@ -37,6 +37,11 @@ public class PaymentAppService : ApplicationService, IPaymentAppService
     private readonly Payments.IPaymentProvider _cong;
     private readonly Volo.Abp.DistributedLocking.IAbpDistributedLock _khoa;
 
+    /// <summary>🔗 **CẦU NỐI SANG ĐƠN** (`S4`) — phát `PaymentSucceededEto`/`PaymentFailedEto`.
+    /// 📌 Gom một chỗ (`PaymentEventPublisher`) để **mọi** đường ghi đều phát **giống nhau** — thiếu một đường
+    /// là đơn đã trả **vẫn** `Unpaid` (`PAY-001` §3.5), đúng lỗi mà `S4` sinh ra để đóng.</summary>
+    private readonly Events.PaymentEventPublisher _suKien;
+
     /// <summary>
     /// 📊 `REC-001` mục 7 — metric đối soát. ⚠️ **TUỲ CHỌN** (`= null`) cùng khuôn `VnPayPaymentProvider`:
     /// 🔒 nếu bắt buộc thì thiếu đăng ký metric sẽ **NỔ** ở một chỗ **không liên quan** — đúng loại
@@ -48,11 +53,13 @@ public class PaymentAppService : ApplicationService, IPaymentAppService
         IRepository<Payments.PaymentTransaction, Guid> giaoDich,
         Payments.IPaymentProvider cong,
         Volo.Abp.DistributedLocking.IAbpDistributedLock khoa,
+        Events.PaymentEventPublisher suKien,
         eCommerce.Kernel.Observability.eCommerceMetrics? metrics = null)
     {
         _giaoDich = giaoDich;
         _cong = cong;
         _khoa = khoa;
+        _suKien = suKien;
         _metrics = metrics;
     }
 
@@ -95,6 +102,158 @@ public class PaymentAppService : ApplicationService, IPaymentAppService
             truyVan.OrderByDescending(x => x.CreationTime).Take(soLuong));
 
         return ds.Select(ChuyenDto).ToList();
+    }
+
+    // ── GHI: TẠO GIAO DỊCH ──────────────────────────────────────────────────────────────────────
+
+    /// <inheritdoc />
+    public async Task<TaoGiaoDichKetQuaDto> TaoGiaoDichAsync(TaoGiaoDichInput input)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+
+        // ── ⓪ KIỂM ĐẦU VÀO — TRƯỚC khi chạm DB/khoá (`PAY-001` §12: *kiểm đầu vào trước, diễn giải sau*) ──
+        if (input.SoTien <= 0m)
+        {
+            throw new BusinessException(Payments.PaymentErrorCodes.SoTienGiaoDichKhongHopLe)
+                .WithData("soTien", input.SoTien)
+                .WithData("soDon", input.SoDon)
+                .WithData("lyDo", "Số tiền phải LỚN HƠN 0.");
+        }
+
+        if (string.IsNullOrWhiteSpace(input.SoDon))
+        {
+            throw new BusinessException(Payments.PaymentErrorCodes.MaThamChieuKhongHopLe)
+                .WithData("lyDo", "Thiếu số đơn ⇒ không sinh được mã tham chiếu ỔN ĐỊNH (BR-PAY-002).");
+        }
+
+        if (string.IsNullOrWhiteSpace(input.ReturnUrl) || string.IsNullOrWhiteSpace(input.IpnUrl))
+        {
+            throw new BusinessException(Payments.PaymentErrorCodes.ThieuThamSoTaoGiaoDich)
+                .WithData("coReturnUrl", !string.IsNullOrWhiteSpace(input.ReturnUrl))
+                .WithData("coIpnUrl", !string.IsNullOrWhiteSpace(input.IpnUrl))
+                .WithData("lyDo", "Cổng BẮT BUỘC `ReturnUrl` và `IpnUrl` (VNPay: IPN phải HTTPS).");
+        }
+
+        // 🔒 **KHOÁ PHÂN TÁN THEO ĐƠN** — hai request đồng thời (double-click / retry) **KHÔNG** cùng tạo giao dịch.
+        // 📌 Vì sao cần khoá dù DB đã có unique `(TenantId, ProviderCode, MerchantReference)`: nếu chỉ dựa vào DB
+        // thì request thứ hai nhận `23505` — một lỗi **hạ tầng** khó hiểu với người dùng, trong khi sự thật là
+        // *"có người vừa tạo giao dịch cho đơn này"*. Khoá biến nó thành `eCommerce:Lock:0001` (`409`-nghĩa).
+        // ⚠️ Tên khoá theo quy ước `XC-003` §5: module `PaymentHub` ⇒ đoạn `payment`, **có** định danh đối tượng.
+        var khoaThe = input.OrderId?.ToString("N") ?? input.SoDon.Trim();
+
+        await using var giuCho = await _khoa.TryAcquireAsync(
+            $"payment:create:{khoaThe}", TimeSpan.FromSeconds(10))
+            ?? throw new BusinessException(eCommerceConsts.ErrorCodes.KhongGianhDuocKhoa)
+                .WithData("khoa", "payment:create").WithData("choGiay", 10);
+
+        var thoiDiem = DateTime.UtcNow;
+
+        // ── ① DÙNG LẠI giao dịch ĐANG MỞ của đơn (idempotent theo Ý ĐỊNH thu tiền) ───────────────────────
+        // 🚨 ĐÂY LÀ BẤT BIẾN `BR-PAY-002` Ở DẠNG THỰC THI: retry của **cùng một ý định** phải trả **cùng**
+        // `MerchantReference`. Nếu tạo giao dịch mới mỗi lần, khách bấm hai lần ⇒ **hai** `vnp_TxnRef` ⇒ hệ thống
+        // không nhận ra chúng là một ⇒ nguy cơ **thu hai lần**, và VNPay có thể từ chối mã trùng trong ngày.
+        if (input.OrderId is { } orderId)
+        {
+            var dangMo = await _giaoDich.FirstOrDefaultAsync(x => x.OrderId == orderId
+                && (x.Status == Payments.PaymentTransactionStatus.Initiated
+                    || x.Status == Payments.PaymentTransactionStatus.Pending));
+
+            if (dangMo is not null)
+            {
+                // ⚠️ Nếu số tiền **khác** thì KHÔNG dùng lại: đơn đã đổi tiền (thêm/bớt dòng) ⇒ giao dịch cũ là
+                // bằng chứng của một ý định **khác** — tạo lần thử mới, và ghi log để người vận hành thấy.
+                if (decimal.Compare(dangMo.Amount, input.SoTien) == 0)
+                {
+                    Logger.LogInformation(
+                        "TẠO GIAO DỊCH: đơn {OrderId} đã có giao dịch ĐANG MỞ {Ma} ⇒ DÙNG LẠI (không tạo mới). [PAY-TAO-DUNG-LAI]",
+                        orderId, dangMo.MerchantReference);
+
+                    return await DungKetQuaAsync(dangMo, laDaCo: true, input);
+                }
+
+                Logger.LogWarning(
+                    "TẠO GIAO DỊCH: đơn {OrderId} đang có giao dịch mở {Ma} với số tiền {Cu}, nhưng yêu cầu là {Moi} " +
+                    "⇒ tạo LẦN THỬ MỚI. [PAY-TAO-LECH-TIEN]",
+                    orderId, dangMo.MerchantReference, dangMo.Amount, input.SoTien);
+            }
+        }
+
+        // ── ② SINH MÃ ỔN ĐỊNH theo (số đơn, ngày GMT+7, số lần thử) ─────────────────────────────────────
+        // 📌 Số lần thử = số giao dịch **đã có cùng gốc** + 1. Không cần cột mới: mã đã mang gốc ổn định
+        // (`SinhMaThamChieu.Goc`), và unique index `(TenantId, ProviderCode, MerchantReference)` là hàng rào cuối.
+        var goc = Payments.SinhMaThamChieu.Goc(input.SoDon, thoiDiem);
+        // ⚠️ Đếm bằng `AsyncExecuter.CountAsync(IQueryable)` — ⚠️ **KHÔNG** dùng `IRepository.GetCountAsync(predicate)`
+        // ở đây: `IRepository<TEntity, TKey>` của ABP **không** có overload nhận predicate (lỗi `CS1660` đã gặp
+        // ngay lượt này: lambda bị hiểu là `CancellationToken`).
+        var truyVanGoc = await _giaoDich.GetQueryableAsync();
+        var soLanThu = (int)await AsyncExecuter.CountAsync(
+            truyVanGoc.Where(x => x.MerchantReference.StartsWith(goc))) + 1;
+        var maThamChieu = Payments.SinhMaThamChieu.Sinh(input.SoDon, thoiDiem, soLanThu);
+
+        var giaoDich = new Payments.PaymentTransaction(
+            GuidGenerator.Create(), _cong.ProviderCode, maThamChieu, input.SoTien)
+        {
+            OrderId = input.OrderId,
+            Currency = string.IsNullOrWhiteSpace(input.TienTe) ? "VND" : input.TienTe.Trim()
+        };
+
+        await _giaoDich.InsertAsync(giaoDich, autoSave: true);
+
+        Logger.LogInformation(
+            "TẠO GIAO DỊCH {Ma}: đơn {SoDon} · {SoTien} {TienTe} · lần thử {LanThu} · cổng {Cong}. [PAY-TAO-MOI]",
+            maThamChieu, input.SoDon, giaoDich.Amount, giaoDich.Currency, soLanThu, giaoDich.ProviderCode);
+
+        return await DungKetQuaAsync(giaoDich, laDaCo: false, input);
+    }
+
+    /// <summary>
+    /// Dựng URL thanh toán cho một giao dịch **đã nằm trong DB** và gói kết quả trả ra.
+    /// 🔑 Tách riêng để đường *"tạo mới"* và đường *"dùng lại"* trả về **cùng một hình dạng** — hai bản viết tay
+    /// sẽ lệch nhau đúng ở trường mà người dùng đọc (`LaGiaoDichDaCo`).
+    /// </summary>
+    private async Task<TaoGiaoDichKetQuaDto> DungKetQuaAsync(
+        Payments.PaymentTransaction giaoDich,
+        bool laDaCo,
+        TaoGiaoDichInput input)
+    {
+        var ketQua = new TaoGiaoDichKetQuaDto
+        {
+            PaymentTransactionId = giaoDich.Id,
+            MerchantReference = giaoDich.MerchantReference,
+            ProviderCode = giaoDich.ProviderCode,
+            Amount = giaoDich.Amount,
+            Currency = giaoDich.Currency,
+            TrangThai = giaoDich.Status.ToString(),
+            LaGiaoDichDaCo = laDaCo
+        };
+
+        var kq = await _cong.CreatePaymentAsync(new Payments.CreatePaymentRequest
+        {
+            PaymentTransactionId = giaoDich.Id,
+            MerchantReference = giaoDich.MerchantReference,
+            Amount = giaoDich.Amount,
+            Currency = giaoDich.Currency,
+            OrderInfo = string.IsNullOrWhiteSpace(input.NoiDung) ? $"Thanh toan don {input.SoDon}" : input.NoiDung!,
+            ReturnUrl = input.ReturnUrl.Trim(),
+            IpnUrl = input.IpnUrl.Trim(),
+            ClientIp = input.ClientIp
+        });
+
+        ketQua.CheckoutUrl = kq.CheckoutUrl;
+
+        if (!kq.Success)
+        {
+            // ⚠️ **Không** ném lỗi và **không** xoá giao dịch: giao dịch đã tạo là **bằng chứng ý định thu tiền**
+            // (và là thứ IPN sẽ tra). Gọi lại API sau khi sửa cấu hình sẽ **dùng lại** đúng giao dịch đó
+            // (`LaGiaoDichDaCo = true`).
+            ketQua.LoiTaoUrl = kq.Error ?? "Cổng không trả URL thanh toán.";
+
+            Logger.LogWarning(
+                "TẠO URL THANH TOÁN THẤT BẠI cho giao dịch {Ma}: {Loi} — giao dịch VẪN tồn tại. [PAY-TAO-URL-LOI]",
+                giaoDich.MerchantReference, ketQua.LoiTaoUrl);
+        }
+
+        return ketQua;
     }
 
     // ── GHI: HOÀN TIỀN ──────────────────────────────────────────────────────────────────────────
@@ -277,20 +436,35 @@ public class PaymentAppService : ApplicationService, IPaymentAppService
         {
             case Payments.LuatDoiSoatThanhToan.QuyetDinh.GhiDaThuTien:
                 // Cổng xác nhận đã thu tiền ⇒ đây **chính là** lưới an toàn khi IPN **mất** (`REC-001`).
-                gd.MarkSucceeded(null, null, "{\"nguon\":\"querydr\"}", null);
+                var daGhiThu = gd.MarkSucceeded(null, null, "{\"nguon\":\"querydr\"}", null);
                 await _giaoDich.UpdateAsync(gd, autoSave: true);
+
+                // 🔗 `S4` — **CẦU NỐI SANG ĐƠN**: `querydr` cũng phải phát sự kiện, nếu không thì đơn của đúng những
+                // giao dịch **bị mất IPN** (lý do tồn tại của `querydr`) sẽ **vĩnh viễn** `Unpaid` — tức lưới an
+                // toàn cứu được **tiền** nhưng không cứu được **đơn**.
+                if (daGhiThu)
+                {
+                    await _suKien.PhatDaThuTienAsync(gd);
+                }
 
                 Logger.LogWarning(
                     "ĐỐI SOÁT `querydr` PHÁT HIỆN giao dịch ĐÃ THU TIỀN nhưng chưa được ghi nhận (IPN có thể đã mất): " +
-                    "giao dịch={MerchantReference} · số tiền={SoTien}. [PAY-QUERYDR-THU-DUOC]",
-                    gd.MerchantReference, gd.Amount);
+                    "giao dịch={MerchantReference} · số tiền={SoTien} · đã phát sự kiện={DaPhat}. [PAY-QUERYDR-THU-DUOC]",
+                    gd.MerchantReference, gd.Amount, daGhiThu);
                 break;
 
             case Payments.LuatDoiSoatThanhToan.QuyetDinh.GhiThatBai:
-                gd.MarkFailed(trangThaiTuCong == Payments.PaymentTransactionStatus.Cancelled
+                // 🚨 `MarkFailed` nay **trả `bool`** (`S4`, đóng một phần `F-PAY-9`) ⇒ đếm/sự kiện chỉ khi **thật sự**
+                // đổi trạng thái; trước đây hàm `void` nên chỗ gọi **không thể biết** đã ghi hay bị bỏ.
+                var daGhiHong = gd.MarkFailed(trangThaiTuCong == Payments.PaymentTransactionStatus.Cancelled
                     ? "Cổng xác nhận khách ĐÃ HUỶ giao dịch (nguồn: querydr)."
                     : "Cổng xác nhận giao dịch không thành công (nguồn: querydr).");
                 await _giaoDich.UpdateAsync(gd, autoSave: true);
+
+                if (daGhiHong)
+                {
+                    await _suKien.PhatThatBaiAsync(gd, trangThaiTuCong.ToString());
+                }
                 break;
 
             default:

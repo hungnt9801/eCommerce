@@ -39,6 +39,14 @@
          ⇒ 🔑 **một định nghĩa, hai chỗ gọi**.
          📌 app → module là **HỢP LỆ** (module → app mới bị cấm) — cùng khuôn hai tham chiếu ở trên. -->
     <ProjectReference Include="..\..\modules\PaymentHub\eCommerce.PaymentHub.Domain\eCommerce.PaymentHub.Domain.csproj" />
+    <!-- 🔑 `S4` (18/10/2026) — **CẦU NỐI `Payment` → `Order`** (`OrderPaymentStatusHandler`): handler nhận
+         `PaymentSucceededEto`/`PaymentFailedEto` rồi ghi `Order.PaymentStatus`.
+         📌 **CHỈ tham chiếu tầng CONTRACTS**, không phải `PaymentHub.Application` — tham chiếu tầng Application
+         của module là **ngược tầng** (`handover` §4.2). ✅ Tiền lệ trong chính tệp này: `ChannelHub.Application.
+         Contracts` + `Customers.Application.Contracts`.
+         🔑 Nếu `PaymentHub` tham chiếu `Order` thay vì phát sự kiện thì vừa sai phân tầng vừa tạo **hai** nơi
+         cùng ghi trục tài chính — đúng họ lỗi "hai nguồn sự thật". -->
+    <ProjectReference Include="..\..\modules\PaymentHub\eCommerce.PaymentHub.Application.Contracts\eCommerce.PaymentHub.Application.Contracts.csproj" />
     <!-- 🚨 `S3` — **CỔNG KHÁCH BỊ CHẶN TRÊN ĐƯỜNG BÁN HÀNG** (`CUS-001` `ADR-04`, nợ §16.4 #4).
          `CuaKiemKhachGiaoDich` gọi `ICustomerDirectory.ChoPhepGiaoDichAsync` — hợp đồng **CHỈ ĐỌC** của module
          `Customers` (`ADR-12`), nằm ở `…Application.Contracts`. 📌 app → module là **HỢP LỆ** (module → app mới

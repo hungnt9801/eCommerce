@@ -40,4 +40,39 @@ public static class PaymentErrorCodes
     /// **không** phải *"sửa số tiền"* và **không** phải *"gỡ chặn"*.
     /// ⚠️ Trả `404`-nghĩa (không phải `400`) để client phân biệt *"sai tham số"* với *"không có đối tượng"*.</summary>
     public const string KhongTimThayGiaoDich = Nhom + "0005";
+
+    /// <summary>🆕 (`S4`) **MÃ THAM CHIẾU KHÔNG HỢP LỆ** — rỗng, hoặc sau khi chuẩn hoá không còn ký tự dùng được.
+    /// 🎯 Hành động: **sửa `Order.Number`/số đơn đầu vào** rồi tạo lại — **không** được tự sinh mã ngẫu nhiên
+    /// để "cho chạy" (vi phạm `BR-PAY-002`: mã phải **ỔN ĐỊNH** qua mọi lần thử).
+    /// 🚨 Vì sao phải chặn Ở ĐÂY (entity + hàm sinh mã): mã rỗng **lọt** xuống cổng nghĩa là ta gửi
+    /// `vnp_TxnRef=""` — VNPay **không** từ chối rõ ràng, còn ta thì **không tra lại được** giao dịch.</summary>
+    public const string MaThamChieuKhongHopLe = Nhom + "0006";
+
+    /// <summary>🆕 (`S4`) **SỐ TIỀN GIAO DỊCH KHÔNG HỢP LỆ** — `≤ 0`.
+    /// 🎯 Hành động: **kiểm lại số tiền của đơn**; số 0/âm gửi sang cổng là **lỗi dữ liệu**, không phải ca biên.
+    /// 📌 Trước `S4`, constructor **không** kiểm ⇒ `amount ≤ 0` **lọt** (nợ đã ghi ở `PAY-001` §3.1 dòng 1).</summary>
+    public const string SoTienGiaoDichKhongHopLe = Nhom + "0007";
+
+    /// <summary>🆕 (`S4`) **SỐ TIỀN CỦA CỔNG LỆCH SỐ TIỀN ĐÃ LẬP GIAO DỊCH** — đóng `F-PAY-2`.
+    /// 🎯 Hành động: **đối chiếu với cổng** (sao kê) trước khi làm gì tiếp; **KHÔNG** đánh dấu đơn đã trả.
+    /// 🔒 Chỗ gọi **không** được ném lỗi làm rollback bản ghi giao dịch: tiền **đã** vào, xoá dấu vết là
+    /// mất bằng chứng. 📌 Log `Error` có neo ASCII + giữ giao dịch, để người vận hành xử lý.</summary>
+    public const string LechSoTienVoiDon = Nhom + "0008";
+
+    /// <summary>🆕 (`S4`) **THIẾU THAM SỐ BẮT BUỘC KHI TẠO GIAO DỊCH** — `ReturnUrl`/`IpnUrl` rỗng, hoặc số tiền
+    /// không phải `decimal` hữu hạn.
+    /// 🎯 Hành động: **sửa tham số rồi gửi lại** (khác hẳn `0006`/`0007` — hai mã kia nói *dữ liệu ĐƠN sai*,
+    /// mã này nói *yêu cầu gọi API thiếu thứ cổng bắt buộc*).
+    /// 📌 Vì sao cần mã riêng: `vnp_ReturnUrl`/`vnp_IpnUrl` **rỗng** thì cổng trả *"URL không hợp lệ"* — người
+    /// vận hành sẽ đi kiểm cấu hình cổng, trong khi lỗi thật là **nơi gọi quên truyền** (đúng bài học
+    /// `INV-003` **`0042`**: mượn mã chung ⇒ CSKH nhận chỉ dẫn sai).</summary>
+    public const string ThieuThamSoTaoGiaoDich = Nhom + "0009";
+
+    // ⚠️ **`eCommerce:Payment:0001` (`PaymentSignatureInvalid`) CỐ Ý KHÔNG KHAI LẠI Ở ĐÂY.**
+    // Bản chuẩn của nó nằm ở `eCommerceConsts.ErrorCodes.PaymentSignatureInvalid`
+    // (`src/eCommerce.Domain.Shared/eCommerceConsts.cs:324`) và **tầng Application** dùng được nó
+    // (`eCommerce.PaymentHub.Application` **có** tham chiếu `eCommerce.Domain.Shared`; tầng **Domain** thì không).
+    // 📌 Khai lại ở đây là **HAI nguồn sự thật** cho cùng một mã — đúng họ lỗi `XC-003` **F2**.
+    // 🔑 Ghi nhận đáng chú ý: tính tới `S4`, mã `0001` **chưa từng được dùng ở đâu** (grep = 1 kết quả, chính là
+    // chỗ khai báo). Nay `XuLyKetQuaCongService` dùng nó cho ca **từ chối payload chưa qua xác thực chữ ký**.
 }

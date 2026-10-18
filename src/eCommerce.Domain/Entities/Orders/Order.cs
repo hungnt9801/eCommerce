@@ -30,7 +30,18 @@ public class Order : FullAuditedAggregateRoot<Guid>, IMultiTenant
 
     public OrderStatus Status { get; protected set; } = OrderStatus.Pending;
 
-    public PaymentStatus PaymentStatus { get; set; } = PaymentStatus.Unpaid;
+    /// <summary>
+    /// **TRỤC TÀI CHÍNH CỦA ĐƠN** (`SAL-003` trục 2) — *"khách đã trả tiền chưa"*.
+    ///
+    /// 🚨 **`S4` (18/10/2026) — KHÔNG GÁN TRỰC TIẾP ĐƯỢC NỮA.** Trước đó trường này có **setter công khai** và
+    /// **không một dòng nào** trong toàn repo gán nó (grep: chỉ đọc để hiển thị) ⇒ *"khách trả tiền xong thì đơn
+    /// vẫn `Unpaid`"* (`PAY-001` §3.5 — nợ #1 của tài liệu đó). Nay đường ghi **duy nhất** là
+    /// <see cref="DatTrangThaiThanhToan"/> — hàm có **luật hấp thụ**, gọi từ cầu nối
+    /// `OrderPaymentStatusHandler` (nhận `PaymentSucceededEto`/`PaymentFailedEto`).
+    /// 🔒 Giữ setter **kín** là có chủ ý: `SAL-003` **BR-013** nói trục tài chính **chỉ** `PaymentHub`/IPN ghi —
+    /// một setter công khai cho phép *"ai cũng ghi"*, và đó là cách hai nguồn sự thật sinh ra.
+    /// </summary>
+    public PaymentStatus PaymentStatus { get; private set; } = PaymentStatus.Unpaid;
 
     /// <summary>Mã tiền tệ ISO-4217 (VND, USD...).</summary>
     public string Currency { get; set; } = "VND";
@@ -132,6 +143,58 @@ public class Order : FullAuditedAggregateRoot<Guid>, IMultiTenant
     }
 
     public void SetStatus(OrderStatus status) => Status = status;
+
+    /// <summary>
+    /// 🚨 **GHI TRỤC TÀI CHÍNH — ĐƯỜNG DUY NHẤT, CÓ LUẬT HẤP THỤ** (`S4`).
+    ///
+    /// **VÌ SAO PHẢI LÀ MỘT HÀM (không phải setter):** `PaymentStatus` là *"sự thật về tiền"*; nếu chỗ gọi được
+    /// gán tự do thì một IPN thất bại đến **sau** IPN thành công (at-least-once, hoặc hai luồng song song) sẽ
+    /// **hạ** đơn từ `Paid` về `Failed` ⇒ hệ thống **tưởng khách chưa trả** ⇒ **thu tiền lần hai** hoặc **không
+    /// giao hàng** — đúng họ lỗi mà `PaymentTransaction.MarkSucceeded`/`MarkFailed` đã phải sửa ngày 16/10/2026,
+    /// chỉ là ở phía **đơn**.
+    ///
+    /// 🔒 **Luật (giống bên giao dịch, hai phía phải NHẤT QUÁN — lệch nhau là mầm sổ sách tự mâu thuẫn):**
+    /// <list type="bullet">
+    ///   <item>`Refunded` là trạng thái **HẤP THỤ** — không đi đâu được nữa (kể cả về `Paid`);</item>
+    ///   <item>Đã có tiền (`Paid`/`PartiallyRefunded`) ⇒ **cấm** hạ về `Failed`/`Pending`/`Unpaid`; chỉ được
+    ///     **tiến** sang `PartiallyRefunded`/`Refunded`;</item>
+    ///   <item>Trước khi có tiền (`Unpaid`/`Pending`/`Failed`) ⇒ đi đâu cũng được — 🔑 kể cả `Failed → Paid`
+    ///     (`querydr` xác nhận tiền **đã** vào, lưới an toàn khi IPN mất).</item>
+    /// </list>
+    /// </summary>
+    /// <returns>`true` = trạng thái **thực sự** đổi (đã ghi); `false` = **không đổi** (đã ở đúng trạng thái đó,
+    /// hoặc bị luật hấp thụ chặn). 📌 Giá trị này là **bắt buộc** đọc: nếu chỗ gọi bỏ qua thì không phân biệt
+    /// được *"đã ghi"* với *"bị chặn"* — đúng lỗi `F-PAY-9` mà `MarkFailed` vừa sửa bên phía giao dịch.
+    /// </returns>
+    public bool DatTrangThaiThanhToan(PaymentStatus moi)
+    {
+        if (PaymentStatus == moi)
+        {
+            return false;
+        }
+
+        if (LaDaThuTien(PaymentStatus))
+        {
+            // Hấp thụ: đã hoàn đủ thì **không** có đường ra (kể cả "hồi sinh" về Paid).
+            if (PaymentStatus == PaymentStatus.Refunded)
+            {
+                return false;
+            }
+
+            // Đang có tiền ⇒ chỉ được TIẾN sang trạng thái vẫn phản ánh "đã thu / đã hoàn".
+            if (moi is not (PaymentStatus.Paid or PaymentStatus.PartiallyRefunded or PaymentStatus.Refunded))
+            {
+                return false;
+            }
+        }
+
+        PaymentStatus = moi;
+        return true;
+    }
+
+    /// <summary>Đơn **đã từng** thu được tiền (`Paid`/`PartiallyRefunded`/`Refunded`).</summary>
+    private static bool LaDaThuTien(PaymentStatus trangThai)
+        => trangThai is PaymentStatus.Paid or PaymentStatus.PartiallyRefunded or PaymentStatus.Refunded;
 }
 
 /// <summary>

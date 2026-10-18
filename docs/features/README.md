@@ -186,7 +186,7 @@ Trước phiên này danh sách là **52**; đối chiếu **code thật** thì 
 
 | Mã | Tài liệu | Dòng | Trạng thái |
 |---|---|---:|---|
-| `PAY-001` | [Cổng thanh toán VNPay: tạo giao dịch, IPN/webhook, hoàn tiền & đối soát](payment/pay-001-cong-thanh-toan-vnpay.md) | 1229 | 🟡 Draft · 16/16 mục |
+| `PAY-001` | [Cổng thanh toán VNPay: tạo giao dịch, IPN/webhook, hoàn tiền & đối soát](payment/pay-001-cong-thanh-toan-vnpay.md) | 1412 | 🟡 Draft · 16/16 mục + **§16** · 🟢 **phần A ĐÃ CÓ CODE** (`S4` 18/10/2026: tạo giao dịch · mã ổn định · cầu nối `Order.PaymentStatus` qua ETO) — ⚠️ **phần B còn thiếu** (endpoint IPN · `PaymentRefundedEto` · outbox) |
 
 ### `pricing/` — Pricing — bảng giá, giá theo kênh, giá bậc thang
 

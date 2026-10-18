@@ -25,6 +25,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- 🔑 `S4` — `PayTransactionsChanTrungTests` khoá **định dạng `MerchantReference`** (`SinhMaThamChieu`) vào
+         **độ dài cột thật** (64). 📌 Chỉ cần tầng **Domain** của module thanh toán (hàm sinh mã là **hàm thuần**),
+         không cần DbContext/Host ⇒ nhóm test này vẫn nhẹ (raw SQL + hàm thuần). -->
+    <ProjectReference Include="..\..\modules\PaymentHub\eCommerce.PaymentHub.Domain\eCommerce.PaymentHub.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Schema sinh từ CHÍNH migration thật:
            dotnet ef migrations script -p src\eCommerce.EntityFrameworkCore -s src\eCommerce.DbMigrator -o test\eCommerce.IntegrationTests\Assets\schema.sql
          ⇒ test chạy trên ĐÚNG schema sẽ triển khai, không phải schema tự viết lại. -->

@@ -78,10 +78,50 @@ public class PaymentTransaction : FullAuditedAggregateRoot<Guid>, IMultiTenant
 
     protected PaymentTransaction() { }
 
+    /// <summary>
+    /// Tạo giao dịch ở trạng thái `Initiated`.
+    ///
+    /// 🚨 **SỬA `S4` (18/10/2026) — CONSTRUCTOR NAY KIỂM ĐẦU VÀO.** Trước đó nó **không** kiểm gì (nợ đã ghi ở
+    /// `PAY-001` §3.1 dòng 1): `amount ≤ 0` và `merchantReference` rỗng **lọt** vào DB và xuống tới cổng.
+    /// Hệ quả của từng ca, để thấy đây **không** phải kiểm cho đẹp:
+    /// <list type="bullet">
+    ///   <item>`amount = 0` ⇒ cổng từ chối hoặc (tệ hơn) tạo một giao dịch "thu 0 đồng" mà
+    ///     `MarkSucceeded` sẽ chấp nhận ⇒ đơn thật **không được** đánh dấu đã trả nhưng giao dịch lại `Succeeded`
+    ///     ⇒ **đối soát lệch vĩnh viễn**, không có lỗi nào;</item>
+    ///   <item>`amount &lt; 0` ⇒ số âm đi vào `vnp_Amount` sau khi ×100 ⇒ cổng trả *"số tiền không hợp lệ"*,
+    ///     người vận hành đọc thành *"lỗi cổng"* thay vì *"lỗi dữ liệu của ta"*;</item>
+    ///   <item>`merchantReference` rỗng ⇒ **unique index không chặn được** (một rỗng vẫn là một giá trị!) và
+    ///     IPN về sau **không tra lại được** giao dịch ⇒ **tiền vào mà sổ không biết**.</item>
+    /// </list>
+    /// 🔒 **Chặn Ở ENTITY, không chỉ ở app service** — cùng lý do `RegisterRefund` đã làm: đường ghi tắt
+    /// (job, seed, test dựng tay) **không** đi qua app service, và bất biến *"tiền > 0, mã khác rỗng"* đúng với
+    /// **mọi** giá trị của entity.
+    /// </summary>
+    /// <exception cref="Volo.Abp.BusinessException">`eCommerce:Payment:0007` khi `amount ≤ 0`;
+    /// `eCommerce:Payment:0006` khi mã cổng/mã tham chiếu rỗng.</exception>
     public PaymentTransaction(Guid id, string providerCode, string merchantReference, decimal amount) : base(id)
     {
-        ProviderCode = providerCode;
-        MerchantReference = merchantReference;
+        if (amount <= 0m)
+        {
+            throw new BusinessException(PaymentErrorCodes.SoTienGiaoDichKhongHopLe)
+                .WithData("soTien", amount)
+                .WithData("lyDo", "Số tiền giao dịch phải LỚN HƠN 0.");
+        }
+
+        if (string.IsNullOrWhiteSpace(merchantReference))
+        {
+            throw new BusinessException(PaymentErrorCodes.MaThamChieuKhongHopLe)
+                .WithData("lyDo", "Mã tham chiếu rỗng ⇒ IPN về sau KHÔNG tra lại được giao dịch.");
+        }
+
+        if (string.IsNullOrWhiteSpace(providerCode))
+        {
+            throw new BusinessException(PaymentErrorCodes.MaThamChieuKhongHopLe)
+                .WithData("lyDo", "Mã cổng rỗng ⇒ không biết gọi cổng nào để đối soát/hoàn tiền.");
+        }
+
+        ProviderCode = providerCode.Trim();
+        MerchantReference = merchantReference.Trim();
         Amount = amount;
     }
 
@@ -117,7 +157,23 @@ public class PaymentTransaction : FullAuditedAggregateRoot<Guid>, IMultiTenant
         return true;
     }
 
-    public void MarkFailed(string reason, string? rawPayload = null)
+    /// <summary>
+    /// 🚨 **ĐÁNH DẤU THẤT BẠI — TRẢ `bool` VỀ VIỆC ĐÃ GHI THẬT HAY KHÔNG** (`S4`, đóng một phần `F-PAY-9`).
+    ///
+    /// **VÌ SAO ĐỔI TỪ `void` SANG `bool` (ĐÂY LÀ SỬA NỢ ĐÃ GHI, KHÔNG PHẢI SỞ THÍCH):**
+    /// bản trước là `void` và **return im lặng** khi giao dịch đã ở trạng thái cuối. Chỗ gọi **không thể biết**
+    /// đã ghi hay bị bỏ ⇒ `PaymentReconciliationWorker` **đếm** `soDoi++` sau khi gọi (`F-PAY-9`) ⇒ job báo
+    /// *"đã đổi 5 trạng thái"* trong khi DB **không đổi dòng nào** ⇒ **báo cáo đối soát SAI** — và từ đó
+    /// *"đã kiểm và ổn"* trộn lẫn với *"không ghi được"*.
+    /// 📌 Nay chỗ gọi **buộc** phân biệt; `S4` dùng giá trị này để chỉ phát `PaymentFailedEto` khi **thật sự**
+    /// đổi trạng thái (nếu không, một IPN thất bại gửi lại 5 lần sẽ phát 5 sự kiện cho cùng một chuyện).
+    /// ⚠️ Không ném lỗi: IPN là **at-least-once** ⇒ gửi trùng là **bình thường**, không phải guard sai
+    /// (`PAY-001` §3.2).
+    /// </summary>
+    /// <returns>`true` = **vừa** chuyển sang `Failed` (trước đó **chưa** phải `Failed`); `false` = **không** đổi
+    /// trạng thái — hoặc vì giao dịch đã ở trạng thái **CUỐI** (đã có tiền), hoặc vì nó **đã** `Failed` từ trước
+    /// (chỉ `WebhookReceivedCount`/payload/lý do cập nhật).</returns>
+    public bool MarkFailed(string reason, string? rawPayload = null)
     {
         WebhookReceivedCount++;
         LastWebhookPayload = Truncate(MaskSensitiveData(rawPayload ?? LastWebhookPayload), 8000);
@@ -131,11 +187,19 @@ public class PaymentTransaction : FullAuditedAggregateRoot<Guid>, IMultiTenant
             // (`RefundedAmount` vẫn còn nhưng `Status` nói "chưa từng thu") ⇒ kế toán **không đối chiếu được**.
             // 📌 Cùng lý do với `MarkSucceeded` (xem chú thích ở đó) — hai hàm phải **nhất quán** về
             // *"trạng thái nào là CUỐI"*; lệch nhau là mầm của sổ sách tự mâu thuẫn.
-            return;
+            return false;
         }
+
+        // 🔑 Trả `true` **chỉ khi trạng thái THẬT SỰ đổi** (chưa là `Failed`). 📌 Nếu trả `true` cho lần `Failed`
+        // lặp lại thì con số *"đã đổi trạng thái"* của job lại **sai** — đúng lỗi `F-PAY-9` mà hàm này vừa sửa,
+        // chỉ ở dạng tinh vi hơn: *"ghi lại cùng một giá trị"* trông y như một chuyển dịch.
+        // ⚠️ `FailureReason` **vẫn cập nhật** ở mọi lần (lý do **mới nhất** là lý do cần đọc khi CSKH tra).
+        var daDoi = Status != PaymentTransactionStatus.Failed;
 
         Status = PaymentTransactionStatus.Failed;
         FailureReason = Truncate(reason, 2000);
+
+        return daDoi;
     }
 
     /// <summary>
