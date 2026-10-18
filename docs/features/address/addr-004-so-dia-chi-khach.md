@@ -1083,6 +1083,18 @@ public class AddressBookTests : eCommerceTestBase<eCommerceEntityFrameworkCoreTe
 
 ### 16.4 ⏳ Còn lại cho `S2` (không nằm trong `S1`)
 
-`CustomerAddressLink` (`CusAddressLinks`) + **2 unique index** (⇒ **49 → 51**) · API app service · `IAddressDirectory` ·
-`AddressChangedEto` + outbox · permission `eCommerce.Addresses.*` khai **hai nơi** · bản xuất PII thêm *"giao tới đâu"* ·
-xoá mềm/ẩn danh (`IAddressUsageProbe`).
+Danh sách **đầy đủ, theo thứ tự** (đồng bộ với `docs/gd1-coding-sessions.md` §4 dòng `S2`):
+
+| # | Việc | Ghi chú |
+|---|---|---|
+| B1 | 🆕 **Tạo project `modules/Address/eCommerce.Address.Application.Contracts`** | **ADR-08** — vì `Customers` **cấm** tham chiếu `Address.Application`. ➕ thêm vào `eCommerce.slnx` (`:3-6` đang chỉ có 3 project Address) ➕ `eCommerce.Address.Application` tham chiếu project mới |
+| B2 | Entity `CustomerAddressLink` (bảng `CusAddressLinks`) | thuộc `modules/Customers`; `AddressId` là **tham chiếu MỀM**, **không** FK (§5.1) |
+| B3 | **2 unique index** ⇒ **49 → 51** | partial "một mặc định" + chống liên kết trùng; cả hai `NULLS NOT DISTINCT` **SQL thô** (§11 khối SQL ②③) |
+| B4 | Đổi mặc định trong **MỘT transaction** (bỏ-trước–đặt-sau) | `ADR-06`; khoá `CustomersConsts.LockKeys.TheoKhach(customerId)` |
+| B5 | `IAddressDirectory` + **DTO snapshot** (`DiaChiSnapshotDto`) ở Contracts | **cấm** module khác đọc DB của `Address` |
+| B6 | API: `IAddressAppService` + `ICustomerAddressAppService` | `[Authorize]` **cấp class** |
+| B7 | Permission `eCommerce.Addresses.{,Manage,ManageBook,Verify}` khai **HAI nơi** | `eCommerceConsts` **và** `eCommercePermissionDefinitionProvider` **cùng PR** — thiếu ⇒ `403` cho mọi người |
+| B8 | `AddressChangedEto` (+ `CustomerDefaultAddressChangedEto`) + outbox | chống trùng theo `XC-002` |
+| B9 | `Addresses:MaxPerCustomer` = **cấu hình**, mặc định **20** | `Q1` — đổi trần là đổi setting, **không** migration |
+| B10 | Bản xuất PII thêm *"giao tới đâu"* | `cus-001` §21.6; dùng `DiaChiSnapshotDto` |
+| B11 | ⏳ Xoá mềm / ẩn danh (`IAddressUsageProbe`) | **GĐ2** (`ADR-11`) — đừng làm sớm |
