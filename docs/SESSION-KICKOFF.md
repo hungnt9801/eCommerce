@@ -65,7 +65,8 @@ lệch **7.967** ⇒ suýt kết luận *"code phình 20 %"*. ✅ Dùng `Measure
 đúng quy ước dự án). 📌 Đây lại đúng bài học §1: *"một phép đo bất ngờ thường là phép đo SAI"*.
 ⚠️ **Số cũ (`324/38.460` · `95/15.115` · `47.191`) KHÔNG đối chiếu lại được** với phương pháp này — 🔑 đừng cộng trừ
 với chúng; chênh lệch **không** phải "code phình" mà là **hai phép đo khác nhau**.
-**Git:** nhánh `main` · **282 commit** · ✅ **cây SẠCH** · **`origin` =
+**Git:** nhánh `main` · **số commit TĂNG mỗi lần sửa tệp này** ⇒ đọc `git rev-list --count HEAD`
+(đo lúc **kết thúc `S5`, trước commit sửa chính dòng này**: **283**) · ✅ **cây SẠCH** · **`origin` =
 `https://github.com/hungnt9801/eCommerce`** · ⚠️ repo đang **PUBLIC**.
 ✅ **ĐÃ PUSH 18/10/2026 (cuối `S5`):** `551c7b0..40defa3` ⇒ **`S1`…`S5` đều có trên remote**, **0 commit chưa push**.
 🔒 **NGUỒN SỰ THẬT LÀ LỆNH, KHÔNG PHẢI DÒNG CHỮ NÀY:**
