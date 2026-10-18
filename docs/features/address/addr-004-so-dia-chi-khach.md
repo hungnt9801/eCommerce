@@ -922,21 +922,27 @@ public class AddressBookTests : eCommerceTestBase<eCommerceEntityFrameworkCoreTe
 
 ### 14.3 Acceptance Criteria (Definition of Done)
 
-- [ ] Happy path trả đúng kết quả; `DiaChiDayDu` ghép đúng thứ tự
-- [ ] **Mọi nhánh của 2 state machine (§3) đều có test** — kể cả nhánh guard sai
-- [ ] Mọi **BR-ADDR-004-001…016** được test phủ
-- [ ] Mọi **NFR-ADDR-004-01…11** được kiểm chứng (hoặc ghi rõ *chưa kiểm chứng*)
-- [ ] Idempotency: gửi trùng **không** tạo bản ghi thứ hai (`TC-02`, `TC-10`)
+**Phần A (`Address`) — ✅ ĐẠT ở `S1` (18/10/2026):**
+
+- [x] Happy path: `Address.TaoDaChuanHoa` + `ChuanHoa` cho đúng nội dung và **hash đổi sang đường `n…`** (`TC13`, `TC24`)
+- [x] **Mọi nhánh state machine của `Address` (§3.1) có test — kể cả nhánh guard sai** (`TC13`–`TC21`)
+- [x] `DbSet<Address.Address>` đã có (`eCommerceDbContext.cs`) — `DbSetRegistrationTests` xanh trong `-DayDu`
+- [x] Migration chạy được trên DB **đã có dữ liệu** thật (đã chạy `DbMigrator`, kiểm `pg_indexes`); số index **48 → 49** đã cập nhật `PostgreSqlSchemaTests`
+- [x] `Assets/schema.sql` đã regenerate (`:2315-2319`)
+- [x] Không seed dữ liệu PII (không có seed nào)
+- [x] Toàn bộ test pass: `kiem-tat-ca.ps1 -DayDu` **exit 0 · 198.7s** (unit 1205 · integration 41 · DB 21/21 · E2E 59/59)
+- [x] 🚨 Các dòng tài liệu ở §15.3 (**#1–#13**) đã sửa — xem ghi chú đầu §15.3
+- [x] Tài liệu này đã cập nhật khớp code — **§16**
+
+**Phần B (`CustomerAddressLink`) — ⏳ CHƯA ĐẠT (việc của `S2`):**
+
+- [ ] Idempotency liên kết: gửi trùng **không** tạo liên kết thứ hai (`TC-02`, `TC-10`)
 - [ ] Đồng thời: `TC-08`/`TC-10` pass; `TC-09` (Redis chết) pass
 - [ ] Cách ly tenant đúng (`TC-15`)
 - [ ] `[Authorize]` cấp class + permission khai **hai nơi**; `BatBienPhanQuyenTests` xanh (`TC-16`)
-- [ ] **`DbSet`** của cả hai entity đã có; `DbSetRegistrationTests` xanh
-- [ ] Migration chạy được từ **DB trống** **và** trên DB **đã có dữ liệu**; `48 → 51` đã cập nhật trong `PostgreSqlSchemaTests`
-- [ ] `Assets/schema.sql` đã regenerate
-- [ ] Không seed dữ liệu PII
-- [ ] Toàn bộ test pass trong CI (`tools/kiem-tat-ca.ps1`)
-- [ ] 🚨 **Đã sửa các dòng tài liệu ở §15.3** (nếu không, tài liệu và code lại lệch ngay từ ngày đầu)
-- [ ] **Tài liệu này đã cập nhật khớp với code thực tế**
+- [ ] Mọi **BR-ADDR-004-001…016** được test phủ (phần liên kết)
+- [ ] Mọi **NFR-ADDR-004-01…11** được kiểm chứng (hoặc ghi rõ *chưa kiểm chứng*)
+- [ ] Số index **49 → 51** sau khi thêm 2 unique index của `CusAddressLinks`
 
 ### 14.4 Definition of Ready (trước khi bắt đầu code)
 
@@ -964,7 +970,7 @@ public class AddressBookTests : eCommerceTestBase<eCommerceEntityFrameworkCoreTe
 | **Q7** | Có bán cho khách **nước ngoài**? | **BA** | ✅ `Closed` — GĐ1 **KHÔNG** | Nhưng **mở đường với chi phí ~0 ngay từ migration đầu**: `TinhCode`/`XaCode` **nullable ở mọi trạng thái** + thêm `CountryCode` (mặc định `VN`). ⇒ nếu sau này bán quốc tế thì **không** phải migrate đau |
 | **Q8** | `AddressHub` có tách **service riêng** trong GĐ2? | **Kiến trúc trưởng** | ✅ `Closed` — GĐ1 **KHÔNG** | `IAddressDirectory` được thiết kế **không lộ chi tiết transaction** ⇒ nếu tách sau thì **chỉ đổi implementation**, không đổi nơi gọi. ⚠️ Nếu tách **trong GĐ1** ⇒ mất *"cùng transaction"* (§12) ⇒ phải chuyển sang saga/bù trừ — **chi phí lớn**, không làm bây giờ |
 | **Q9** | 🚨 Hàng đợi chuẩn hoá ở **`Address.TrangThai`** hay bảng **`AddrNormalizationReviews`** (`ADDR-003` §5.2)? | **Kiến trúc trưởng** | ✅ `Closed` — **`Address.TrangThai`** | **MỘT nguồn sự thật.** `ADDR-003` §5.2 **phải** bỏ bảng `AddrNormalizationReviews` (hoặc ghi rõ là *"phương án bị loại"*) — xem §15.3 #13. 🔑 Hai bảng cho *"địa chỉ nào cần xem lại"* **chính là** lỗi mà tài liệu này sinh ra để chặn |
-| **Q10** | Tên lớp `Address` trong namespace `eCommerce.Address` — giữ hay đổi? | **Kiến trúc trưởng** | ✅ `Closed` — **GIỮ** `Address` | **Tiền lệ ĐÃ biên dịch trong chính repo**: `eCommerce.Orders.Order` (`src/eCommerce.Domain/Entities/Orders/MarketplaceOrderIntake.cs:18` — `namespace eCommerce.Orders;` + lớp `Order` trong `Order.cs`) ⇒ cùng dạng *"namespace trùng tên thực thể"* đang chạy. 📌 **Fallback rẻ nếu build đỏ:** đổi **tên lớp** → `PostalAddress`, **giữ nguyên** bảng `AddrAddresses` ⇒ **không** ảnh hưởng migration, **không** ảnh hưởng DB. ✅ **Kiểm bằng bước build ĐẦU TIÊN của `S1`** (5 giây), không phải bằng suy đoán |
+| **Q10** | Tên lớp `Address` trong namespace `eCommerce.Address` — giữ hay đổi? | **Kiến trúc trưởng** | ✅ `Closed` — **GIỮ** `Address`, **đã kiểm bằng BIÊN DỊCH** (18/10/2026) | ✅ **ĐO ĐƯỢC ở `S1`** — không còn là suy đoán: ① trong `namespace eCommerce.Address` → `Address` = **type** ✓; ② `eCommerce.EntityFrameworkCore` dùng `Address.Address` → biên dịch ✓; ③ 🚨 trong `namespace` có **đuôi `.Address`** (thử `eCommerce.Tests.Address`) → **`CS0118: 'Address' is a namespace but is used like a type`**. ⇒ **KHÔNG phải đổi tên entity** (3 ngữ cảnh sản phẩm đều đúng) — nhưng sinh **luật mới**: 🔒 **CẤM đặt namespace có đuôi `.Address`**; test đã đổi sang `eCommerce.Tests.DiaChi` + alias `using AddressEntity = eCommerce.Address.Address;`. 📌 Chi tiết: **§16.2 F11** |
 
 ### 15.2 🚨 Sai lệch, rủi ro & khoảng trống phát hiện được **từ code thật**
 

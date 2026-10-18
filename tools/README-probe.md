@@ -669,3 +669,46 @@ cả hai luật A và B, và ca chống dương tính giả). 📌 Một cổng 
 **2** | 🚨 **`@(@('a','b'))` bị PowerShell LÀM PHẲNG** khi chỉ có **một** phần tử | ⇒ `$cap[0]` thành **KÝ TỰ ĐẦU** của chuỗi ⇒ một script sửa link **đã thay `d` → `o`** trong bộ nhớ. ✅ Dùng `[pscustomobject]`; và **luôn `throw` khi không tìm thấy chuỗi cần thay** (bài học `ham-tiem.ps1`) |
 **3** | ⚠️ **Đường dẫn tương đối phụ thuộc nơi CHẠY script**, không phải nơi đặt script | 🔑 Một lệnh `cd` trong cùng khối lệnh có thể **không** áp dụng cho `[IO.File]::ReadAllText` ⇒ dùng **đường dẫn tuyệt đối** khi xử lý hàng loạt |
 
+
+---
+
+## 🚨 HAI CÁI BẪY MỚI — **`S1` (`ADDR-004`), 18/10/2026**
+
+> Cả hai đều **hỏng ÂM THẦM**: lệnh báo thành công, hoặc test xanh/đỏ vì lý do **không phải** điều mình tưởng.
+
+### B1. `dotnet ef migrations add … --no-build` ⇒ **MIGRATION RỖNG** (mà vẫn báo `Done.`)
+
+**Chuyện thật:** chạy `dotnet ef migrations add Addr004_SoDiaChi_Address --no-build` **sau khi chỉ build
+`eCommerce.EntityFrameworkCore`** ⇒ EF **không thấy entity mới** ⇒ sinh migration **`Up()` rỗng**, rồi in
+`Done. To undo this action, use 'ef migrations remove'`. Nếu không mở tệp ra đọc thì **không phát hiện gì**.
+
+**Nguyên nhân:** `--no-build` dùng **bản build của STARTUP project** (`src/eCommerce.DbMigrator`), không phải
+project bạn vừa build. `DbMigrator` cũ ⇒ assembly mô hình cũ ⇒ diff rỗng.
+
+✅ **Luật:** build **startup project** trước, rồi mới `migrations add --no-build`:
+
+```powershell
+dotnet build src/eCommerce.DbMigrator            # BẮT BUỘC — không phải project EFCore
+dotnet ef migrations add <Ten> --project src/eCommerce.EntityFrameworkCore --startup-project src/eCommerce.DbMigrator --no-build
+# ✅ MỞ TỆP MIGRATION RA ĐỌC: Up() phải có CreateTable/CreateIndex. Rỗng ⇒ DỮNG, không đi tiếp.
+```
+
+➕ **Hệ quả kéo theo:** xoá tệp migration rỗng **không đủ** — assembly vẫn còn class đó ⇒ `migrations add`
+báo *"The name ''<Ten>'' is used by an existing migration"*. Phải **`dotnet build` lại** rồi mới add lần nữa.
+➕ Và `migrations remove` có thể **từ chối** (`… has already been applied to the database`). Khi đó:
+xoá tay 2 tệp (`<Ten>.cs` + `<Ten>.Designer.cs`) + `git checkout -- …/eCommerceDbContextModelSnapshot.cs`.
+
+### B2. Tệp trong `Data/` được **COPY VÀO OUTPUT** ⇒ sửa nguồn xong chạy `--no-build` là đọc bản CŨ
+
+**Chuyện thật:** thêm 8 dòng vào `test/eCommerce.Tests/Data/RangBuocChuaAnhXa.txt` rồi chạy
+`dotnet test --no-build` ⇒ cổng `RangBuocDbChuaAnhXaTests` **vẫn ĐỎ** với đúng 8 tên vừa thêm. Không phải
+cổng sai — nó đọc bản **copy cũ** trong `bin/`.
+
+**Nguyên nhân:** test tìm tệp bằng cách đi ngược từ `AppContext.BaseDirectory`, nên **bản copy trong `bin/`
+được tìm thấy TRƯỚC** bản nguồn trong repo.
+
+✅ **Luật:** sửa **bất kỳ tệp dữ liệu nào** (`Data/*.txt`, `Assets/*.sql`, `appsettings*.json`…) mà test đọc
+⇒ **PHẢI `dotnet build` lại** project test đó rồi mới chạy. `--no-build` chỉ an toàn khi bạn **chỉ** sửa `.cs`.
+
+➕ **Điều này cũng đúng với `Assets/schema.sql`**: regenerate xong mà chạy `--no-build` thì integration test
+vẫn dùng **schema cũ** ⇒ kết quả vô nghĩa (có thể xanh **giả**).
