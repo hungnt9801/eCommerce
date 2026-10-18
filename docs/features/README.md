@@ -24,7 +24,7 @@ npm --prefix tools run check:mermaid
 pwsh -File tools\kiem-link-tai-lieu.ps1
 ```
 
-📌 Đo ngay 17/10/2026: Mermaid **0 lỗi** · tham chiếu **0 chết** (176 link markdown + 298 đường dẫn backtick).
+📌 Đo ngay 17/10/2026 (sau khi thêm cổng): Mermaid **213 khối · 0 lỗi** · tham chiếu **0 chết** (249 link markdown + 298 đường dẫn backtick).
 
 🔑 **Vì sao phải là cổng:** một tham chiếu chết **không làm đỏ `dotnet build`** — đúng cùng loại lỗi
 hỏng-âm-thầm như Mermaid. Khi tài liệu được dồn vào thư mục module, **mọi** đường dẫn tương đối **sâu thêm một

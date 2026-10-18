@@ -945,7 +945,7 @@ public class AddressBookTests : eCommerceTestBase<eCommerceEntityFrameworkCoreTe
 - [x] Không còn phụ thuộc quyết định chưa chốt — ✅ ADR-02 chốt **KHÔNG** value object ở Kernel; ADR-01 chốt `Address` thuộc module `Address`
 - [x] **Biên dịch** type `Address` trong namespace `eCommerce.Address` (ADR-14) — ✅ **chứng minh bằng TIỀN LỆ trong repo**: `eCommerce.Orders.Order` (`src/eCommerce.Domain/Entities/Orders/MarketplaceOrderIntake.cs:18`). ⚠️ Vẫn kiểm lại bằng **build đầu tiên của `S1`**; **fallback** đã định nghĩa: đổi tên lớp → `PostalAddress`, **giữ bảng** `AddrAddresses` ⇒ 0 ảnh hưởng migration (Q10)
 - [x] `BR`/`NFR` đã có mã và kiểm chứng được — 16 BR · 11 NFR
-- [~] Đã sửa xong các dòng tài liệu ở §15.3 — ✅ **10/18 đã sửa**; ⏳ **#9, #11, #12** = điều kiện `S1` · **#15–#18** = code/test của `S1` · **#14** cố ý giữ (ảnh chụp handover). Xem ghi chú đầu §15.3
+- [x] Đã sửa xong các dòng **tài liệu** ở §15.3 — ✅ **13/18**. ⏳ Còn **#15–#18** = **code/test của `S1`** (bắt buộc cùng PR) và **#14** = **cố ý giữ** (handover là ảnh chụp có ngày)
 
 ---
 
@@ -982,10 +982,9 @@ public class AddressBookTests : eCommerceTestBase<eCommerceEntityFrameworkCoreTe
 | **F10** | **`addr-001` §15.2 F1 nói module "hoàn toàn CHƯA TỒN TẠI"** — **đã lỗi thời**: `modules/Address` **có** code + **có** test (`test/eCommerce.Tests/Address/AdministrativeUnitTests.cs`) + **có** migration (`20261013093715_Add_Address_AdministrativeUnits.cs`, `20261014042922_Add_Addr002_CarrierMappings.cs`) | `.../addr-001-...md:758` **vs** danh sách tệp `modules/Address/**` + `src/eCommerce.EntityFrameworkCore/Migrations/` | 🟡 **Thấp** (nhưng gây **kết luận sai** cho phiên sau) | ⬜ Sửa `addr-001` §15.2 F1 (§15.3 #10) |
 
 ### 15.3 🚨 Hệ quả lên tài liệu khác — **sửa dòng nào** (làm **cùng** PR với code)
-> 📌 **TRẠNG THÁI 17/10/2026 (sau khi duyệt) — đo lại, không suy đoán:**
-> ✅ **ĐÃ SỬA (10/18):** **#1, #2, #3, #4, #5** (`implementation-plan.md`) · **#6, #7** (`addr-003`) · **#8, #10** (`addr-001`) · **#13** (`cus-001`).
-> ⏳ **CÒN LẠI (8/18)** — và **phân loại rõ**, vì chúng **không** cùng loại:
-> • **#9, #11, #12** — *đồng bộ nội dung tài liệu khác* (viết lại **bảng schema 5→2** ở `addr-001` §5.2/§11; căn lại **bảng mã lỗi** và **danh sách permission** ở `cus-001`) ⇒ **điều kiện của `S1`**, 📌 **không** chặn duyệt vì không đổi thiết kế.
+> 📌 **TRẠNG THÁI — ĐO LẠI 17/10/2026 (cuối phiên):** ✅ **13/18 đã sửa**, ⏳ **5/18** còn lại và **phân loại rõ**:
+> ✅ **ĐÃ SỬA (13):** **#1–#5** (`implementation-plan.md`) · **#6, #7** (`addr-003`) · **#8, #9, #10** (`addr-001` — #9 = ghi rõ §5.2 là *thiết kế đề xuất*, code chỉ có **2 bảng**) · **#11, #12, #13** (`cus-001` — #11 = **đánh lại số mã lỗi theo code** + bảng "khái niệm chưa có mã"; #12 = ghi rõ code **chỉ có 2 permission** và bảng còn lại là đề xuất).
+> ⏳ **CÒN LẠI (5):**
 > • **#14** — cập nhật `docs/handover/BAN-GIAO-GD1-2026-10-17.md`: 📌 **cố ý KHÔNG sửa** — đó là **ảnh chụp có ngày** của phiên trước; sửa nó là **viết lại lịch sử**. Sẽ cập nhật ở **bàn giao kế tiếp**.
 > • **#15, #16** (`PostgreSqlSchemaTests`: 48→**51** + 3 tên index) và **#17, #18** (`kiem-db.ps1`; 2 `DbSet`) — 🚨 **đây là CODE/TEST, không phải tài liệu** ⇒ **bắt buộc cùng PR của `S1`**. Nếu tách ra thì cổng xanh **giả** (một index hỏng + một index mới **bù** nhau — đúng lý do đã ghi ở `:172-175`).
 

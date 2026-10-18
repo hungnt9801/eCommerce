@@ -235,6 +235,14 @@ sequenceDiagram
 
 ### 5.2 Bảng & cột (Data Dictionary)
 
+> 🚨 **ĐỌC TRƯỚC — mục này là THIẾT KẾ ĐỀ XUẤT, KHÔNG phải hiện trạng code** (đo lại **17/10/2026**):
+> code **chỉ có 2 bảng** — `AddrAdministrativeUnits` và `AddrCarrierMappings`
+> (`modules/Address/eCommerce.Address.EntityFrameworkCore/AddressDbContextModelCreatingExtensions.cs:13,19`),
+> tương ứng entity **`AdministrativeUnit`** (MỘT bảng, phân cấp bằng cột `Level`) và **`CarrierAddressMapping`**.
+> ⇒ Ba bảng `AddrProvinces` / `AddrWards` / `AddrDistricts` / `AddrLevelPolicies` / `AddrCarrierCodes` mô tả dưới đây
+> **chưa tồn tại** và **không** nên tạo: `ADDR-004` **ADR-12** đã chốt **theo hiện trạng code** (một bảng phân cấp
+> thay vì 5 bảng), để tránh **hai mô tả schema cùng tồn tại**. Xem thêm `addr-004` **F5**.
+
 **Bảng `AddrProvinces`** — *danh mục tỉnh/thành phố, **cả hai** bộ dữ liệu*
 
 | Cột | Kiểu | Null? | Nguồn / ý nghĩa | Ghi chú |

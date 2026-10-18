@@ -85,8 +85,8 @@
 | **Post-Condition(s)** | • Mỗi khách có **đúng một** `Customer` trong tenant; `Email`/`Phone` chuẩn hoá là **duy nhất** trong tenant (trừ bản ghi đã xoá mềm).<br>• Sổ địa chỉ có **tối đa một** địa chỉ mặc định cho mỗi `(CustomerId, AddressType)` — **bảo đảm bởi DB**, không chỉ bởi code.<br>• Bản ghi liên kết địa chỉ **không bị xoá cứng**; gỡ địa chỉ ⇒ `IsDeleted = true` + bản ghi audit.<br>• Mọi lần nâng cấp vãng lai **idempotent**: cùng khoá ⇒ **0** khách mới.<br>• Mọi thay đổi hồ sơ/địa chỉ **có bản ghi audit** của ABP (`FullAuditedAggregateRoot` sẵn có — xem cách dùng ở `src/eCommerce.Domain/Entities/Orders/Order.cs:10`).<br>• Log **không** chứa PII thô. |
 | **Basic Flow** | 1. **Tạo khách mới** (đăng ký trên web **hoặc** hệ thống tạo từ webhook sàn): app service gọi `IIdempotencyGuard.AcquireAsync(khoá ổn định)` — `AlreadyProcessed` ⇒ **trả kết quả cũ, kết thúc**.<br>2. Chuẩn hoá `Email` (trim + lowercase) và `Phone` (E.164 `+84…`), kiểm trùng trong tenant.<br>3. Tạo `Customer` ở trạng thái `Inactive` (chưa xác thực liên hệ) **hoặc** `Active` nếu có `IdentityUserId` hợp lệ; ghi trong **một Unit of Work**.<br>4. Phát `CustomerRegisteredEto` qua **outbox** (cùng transaction — `XC-002` BR-001).<br>5. **Thêm địa chỉ**: app service gọi `AddressHub` để **tra/tạo** `Address` ⇒ nhận `addressId` ⇒ ghi `CustomerAddressLink` (nhãn, `AddressType`, `IsDefault`, `LastUsedAtUtc`).<br>6. Nếu `IsDefault = true` ⇒ giành khoá `CustomersConsts.LockKeys.DefaultAddress(tenantId, customerId)` **trước** khi bỏ cờ mặc định của địa chỉ cũ và đặt cờ cho địa chỉ mới (bên trong khoá — `XC-003` **D6**: lock **không reentrant** ⇒ **cấm** acquire lồng).<br>7. **Nâng cấp vãng lai** (`ClaimAsync`): kiểm guard (ADR-07) ⇒ gán `IdentityUserId`, chuyển `Inactive → Active`, giữ **nguyên** `CustomerId` ⇒ lịch sử đơn/điểm/đánh giá **không phân mảnh**.<br>8. Kết thúc: ghi audit, phát ETO tương ứng, ghi metric. |
 | **Alternative Flow** | **A1: Khách vãng lai mua không cần hồ sơ** — `Order.CustomerId = null`; đơn **vẫn hợp lệ** (`src/eCommerce.Domain/Entities/Orders/Order.cs:29`). Hệ thống **không** tạo `Customer` rỗng; chỉ tạo khi khách đăng ký hoặc khi có yêu cầu nghiệp vụ rõ (hoá đơn cần MST, hoặc chăm sóc khách).<br>**A2: Webhook sàn cho khách chưa có** — tạo hồ sơ **vãng lai có nguồn** (`Source = Marketplace`, `SourceKey = {channelCode}:{externalBuyerId}`) và ghi `CustomerAddressLink` trỏ tới `Address` được tạo từ địa chỉ giao của đơn; **khoá idempotency** `Customer:{tenantId}:{channelCode}:{externalBuyerId}` ⇒ webhook gửi lại **không** tạo khách thứ hai.<br>**A3: Địa chỉ sửa sai** — **KHÔNG** sửa `Address` tại chỗ nếu đã dùng cho đơn đã phát hành. Tạo **bản ghi `Address` mới** ở `AddressHub` + `CustomerAddressLink` mới, link cũ `IsDeleted = true`. (Đây là hệ quả trực tiếp của ADR-02 và của nguyên tắc snapshot `XC-006` **BR-002**: thay đổi cấu hình **không** làm đổi chứng từ cũ.)<br>**A4: Gỡ địa chỉ đang là mặc định** — hệ thống **tự** chọn địa chỉ còn lại **dùng gần nhất** làm mặc định; **0** địa chỉ còn lại ⇒ **không** có mặc định (hợp lệ, không phải lỗi).<br>**A5: Khách trùng (2 hồ sơ cho 1 người)** — nhân viên dùng `POST /merge` với `Idempotency-Key`; hệ thống **gộp** theo hướng dẫn §6.1: đơn/điểm/đánh giá **giữ nguyên** `CustomerId` cũ ⇒ **gộp bằng alias** (`CustomerMergeAlias`), **cấm** UPDATE hàng loạt `Order.CustomerId` (sẽ chạm DB của module `Sales`). |
-| **Exception Flow** | **E1:** `Email`/`Phone` đã tồn tại trong tenant ⇒ **NÉM** `eCommerce:Customers:0002` (kèm `customerId` hiện có để UI gợi ý "đăng nhập / gộp").<br>**E2:** cùng `IdempotencyKey` nhưng **`PayloadHash` khác** ⇒ **NÉM** `eCommerce:Messaging:0002` (theo `XC-002` **BR-006**) — **cấm** coi là bản ghi trùng.<br>**E3:** chuyển trạng thái sai (ví dụ `Blocked → Inactive`, `Deleted → Active`) ⇒ **NÉM** `eCommerce:Customers:0001` — **cấm** no-op im lặng (quy ước #11).<br>**E4:** claim khi khách **đã có** `IdentityUserId` ⇒ **NÉM** `eCommerce:Customers:0004`.<br>**E5:** `AddressHub` không tìm thấy/không tạo được `Address` (mã tỉnh/xã không hợp lệ, hoặc `AddressHub` chưa sẵn sàng) ⇒ **NÉM** `eCommerce:Customers:0003` + **giữ nguyên** dữ liệu đã ghi trong transaction (rollback toàn bộ UoW).<br>**E6:** xoá khách **đã có đơn** ⇒ **NÉM** `eCommerce:Customers:0005`: khách **phải** được xoá mềm (§9/§10), **cấm** hard-delete — đây là **bất biến chứng từ** (hoá đơn đã phát hành phải tra được người mua).<br>**E7:** thao tác lên khách **thuộc tenant khác** ⇒ trả **`404`** (**không** `403`) — `XC-004` **BR-008**, không tiết lộ sự tồn tại.<br>**E8:** `UPDATE … WHERE Status = @expected` ảnh hưởng **0 dòng** (luồng khác đã đổi) ⇒ **NÉM** `eCommerce:Customers:0006`, **không** coi là thành công (`XC-002` **BR-008**). |
-| **Business Rules** | • **BR-CUS-0001**: `Customer` **KHÔNG** chứa bất kỳ trường địa chỉ nào (`Street`/`Ward`/`District`/`Province`/`FullAddress`). Mọi địa chỉ là `Address` của `AddressHub`, tham chiếu qua `CustomerAddressLink`. **Cấm** hai nguồn sự thật về địa chỉ.<br>• **BR-CUS-0002**: Mỗi `(TenantId, CustomerId, AddressType)` có **tối đa MỘT** địa chỉ mặc định; bảo đảm bằng **partial unique index** ở DB (ADR-06) — **không** chỉ bằng kiểm tra trong domain.<br>• **BR-CUS-0003**: `CustomerAddressLink` là **APPEND-ONLY + xoá mềm**; **CẤM** `DELETE` cứng và **CẤM** sửa `AddressId` của một liên kết đã tồn tại (sửa địa chỉ = tạo liên kết mới).<br>• **BR-CUS-0004**: `Email`/`Phone` **bắt buộc chuẩn hoá** (trim; email lowercase; phone E.164) trước khi lưu và **duy nhất trong tenant** với các bản ghi `NOT IsDeleted` (`NULLS NOT DISTINCT`).<br>• **BR-CUS-0005**: Mọi chuyển trạng thái `Customer` **phải** có guard và **phải NÉM** `BusinessException` có mã khi sai; **cấm** no-op im lặng (quy ước #11).<br>• **BR-CUS-0006**: Mọi **biên vào** (HTTP tạo/sửa khách, webhook sàn, job nâng cấp/đối soát) **phải** idempotent qua `IIdempotencyGuard` **trước** mọi side effect (`XC-002` **BR-004**).<br>• **BR-CUS-0007**: Idempotency key **ổn định** và **sinh từ dữ liệu nghiệp vụ**; **CẤM** `Guid.NewGuid()` cho mỗi lần gọi (`XC-002` **BR-007**, **D7**).<br>• **BR-CUS-0008**: Giá trị tiền (giá trị vòng đời, hạn mức) là **`decimal` + `Currency` cột rời**; **CẤM** `double`/`float` (`XC-001` **BR-008**); **CẤM** so sánh tiền bằng `==` — dùng `>=`/`<=`/`decimal.Compare` (`XC-001` **BR-003**).<br>• **BR-CUS-0009**: Mọi thao tác ghi đi qua **Unit of Work**; dữ liệu nghiệp vụ + bản ghi **outbox** + **audit** ghi trong **cùng** transaction (`XC-002` **BR-001**, quy ước #13 ở `docs/structure-and-techstack.md:145`).<br>• **BR-CUS-0010**: Khoá phân tán **chỉ** dùng cho tài nguyên chia sẻ: **đổi địa chỉ mặc định** (khoá theo khách) và **claim/merge** (khoá theo khách). Khoá **phải** sinh từ `CustomersConsts.LockKeys`; **CẤM** literal khoá trong code nghiệp vụ (`XC-003` **BR-001/BR-002**).<br>• **BR-CUS-0011**: **CẤM** hard-delete `Customer` khi đã có `OrdersCount > 0` **hoặc** đã gắn `IdentityUserId`; xoá là **xoá mềm + ẩn khỏi mọi truy vấn**. Vi phạm ⇒ `eCommerce:Customers:0005`.<br>• **BR-CUS-0012**: **CẤM** đưa PII thô (email, số điện thoại, địa chỉ đầy đủ, `IdentityUserId`) vào **log** ở mức `Information` trở lên; mọi log PII **phải** đi qua hàm mask (ADR-11).<br>• **BR-CUS-0013**: **CẤM** trả PII của khách khác; truy vấn danh sách **luôn** lọc theo tenant + theo quyền; lỗi truy cập chéo tenant ⇒ **`404`** (`XC-004` **BR-008**).<br>• **BR-CUS-0014**: Mọi thay đổi hồ sơ/địa chỉ **phải** có **audit** truy được *ai · khi nào · cũ → mới*; đổi **địa chỉ mặc định** và **chặn/mở chặn** khách **bắt buộc** có lý do (`Reason`).<br>• **BR-CUS-0015**: `CustomerGroup` là **dữ liệu** (không hard-code); đổi nhóm khách **không** hồi tố giá/chứng từ đã phát sinh (đơn cũ giữ snapshot giá — `SAL-002` ADR-02).<br>• **BR-CUS-0016**: Module khác **CẤM** đọc bảng `Cus*`; **chỉ** đọc qua `ICustomerDirectory` ở `.Contracts` (ADR-12).<br>• **BR-CUS-0017**: Tuân thủ **Luật BVDLCN 91/2025/QH15** khoản 1 Điều 4 (hiệu lực **01/01/2026**): hệ thống **phải** có đường (a) **cung cấp** dữ liệu khách (quyền *"yêu cầu cung cấp"*), (b) **xoá** dữ liệu khách (quyền *"yêu cầu xóa"*) — cả hai **có dấu vết audit** và **không** phá bất biến chứng từ. |
+| **Exception Flow** | **E1:** `Email`/`Phone` đã tồn tại trong tenant ⇒ **NÉM** `eCommerce:Customers:0003` (kèm `customerId` hiện có để UI gợi ý "đăng nhập / gộp").<br>**E2:** cùng `IdempotencyKey` nhưng **`PayloadHash` khác** ⇒ **NÉM** `eCommerce:Messaging:0002` (theo `XC-002` **BR-006**) — **cấm** coi là bản ghi trùng.<br>**E3:** chuyển trạng thái sai (ví dụ `Blocked → Inactive`, `Deleted → Active`) ⇒ **NÉM** `eCommerce:Customers:0002` — **cấm** no-op im lặng (quy ước #11).<br>**E4:** claim khi khách **đã có** `IdentityUserId` ⇒ **NÉM** `eCommerce:Customers:0004`.<br>**E5:** `AddressHub` không tìm thấy/không tạo được `Address` (mã tỉnh/xã không hợp lệ, hoặc `AddressHub` chưa sẵn sàng) ⇒ **NÉM** `eCommerce:Customers:0016` + **giữ nguyên** dữ liệu đã ghi trong transaction (rollback toàn bộ UoW).<br>**E6:** xoá khách **đã có đơn** ⇒ **NÉM** `eCommerce:Customers:00xx`: khách **phải** được xoá mềm (§9/§10), **cấm** hard-delete — đây là **bất biến chứng từ** (hoá đơn đã phát hành phải tra được người mua).<br>**E7:** thao tác lên khách **thuộc tenant khác** ⇒ trả **`404`** (**không** `403`) — `XC-004` **BR-008**, không tiết lộ sự tồn tại.<br>**E8:** `UPDATE … WHERE Status = @expected` ảnh hưởng **0 dòng** (luồng khác đã đổi) ⇒ **NÉM** `eCommerce:Customers:00xx`, **không** coi là thành công (`XC-002` **BR-008**). |
+| **Business Rules** | • **BR-CUS-0001**: `Customer` **KHÔNG** chứa bất kỳ trường địa chỉ nào (`Street`/`Ward`/`District`/`Province`/`FullAddress`). Mọi địa chỉ là `Address` của `AddressHub`, tham chiếu qua `CustomerAddressLink`. **Cấm** hai nguồn sự thật về địa chỉ.<br>• **BR-CUS-0002**: Mỗi `(TenantId, CustomerId, AddressType)` có **tối đa MỘT** địa chỉ mặc định; bảo đảm bằng **partial unique index** ở DB (ADR-06) — **không** chỉ bằng kiểm tra trong domain.<br>• **BR-CUS-0003**: `CustomerAddressLink` là **APPEND-ONLY + xoá mềm**; **CẤM** `DELETE` cứng và **CẤM** sửa `AddressId` của một liên kết đã tồn tại (sửa địa chỉ = tạo liên kết mới).<br>• **BR-CUS-0004**: `Email`/`Phone` **bắt buộc chuẩn hoá** (trim; email lowercase; phone E.164) trước khi lưu và **duy nhất trong tenant** với các bản ghi `NOT IsDeleted` (`NULLS NOT DISTINCT`).<br>• **BR-CUS-0005**: Mọi chuyển trạng thái `Customer` **phải** có guard và **phải NÉM** `BusinessException` có mã khi sai; **cấm** no-op im lặng (quy ước #11).<br>• **BR-CUS-0006**: Mọi **biên vào** (HTTP tạo/sửa khách, webhook sàn, job nâng cấp/đối soát) **phải** idempotent qua `IIdempotencyGuard` **trước** mọi side effect (`XC-002` **BR-004**).<br>• **BR-CUS-0007**: Idempotency key **ổn định** và **sinh từ dữ liệu nghiệp vụ**; **CẤM** `Guid.NewGuid()` cho mỗi lần gọi (`XC-002` **BR-007**, **D7**).<br>• **BR-CUS-0008**: Giá trị tiền (giá trị vòng đời, hạn mức) là **`decimal` + `Currency` cột rời**; **CẤM** `double`/`float` (`XC-001` **BR-008**); **CẤM** so sánh tiền bằng `==` — dùng `>=`/`<=`/`decimal.Compare` (`XC-001` **BR-003**).<br>• **BR-CUS-0009**: Mọi thao tác ghi đi qua **Unit of Work**; dữ liệu nghiệp vụ + bản ghi **outbox** + **audit** ghi trong **cùng** transaction (`XC-002` **BR-001**, quy ước #13 ở `docs/structure-and-techstack.md:145`).<br>• **BR-CUS-0010**: Khoá phân tán **chỉ** dùng cho tài nguyên chia sẻ: **đổi địa chỉ mặc định** (khoá theo khách) và **claim/merge** (khoá theo khách). Khoá **phải** sinh từ `CustomersConsts.LockKeys`; **CẤM** literal khoá trong code nghiệp vụ (`XC-003` **BR-001/BR-002**).<br>• **BR-CUS-0011**: **CẤM** hard-delete `Customer` khi đã có `OrdersCount > 0` **hoặc** đã gắn `IdentityUserId`; xoá là **xoá mềm + ẩn khỏi mọi truy vấn**. Vi phạm ⇒ `eCommerce:Customers:00xx`.<br>• **BR-CUS-0012**: **CẤM** đưa PII thô (email, số điện thoại, địa chỉ đầy đủ, `IdentityUserId`) vào **log** ở mức `Information` trở lên; mọi log PII **phải** đi qua hàm mask (ADR-11).<br>• **BR-CUS-0013**: **CẤM** trả PII của khách khác; truy vấn danh sách **luôn** lọc theo tenant + theo quyền; lỗi truy cập chéo tenant ⇒ **`404`** (`XC-004` **BR-008**).<br>• **BR-CUS-0014**: Mọi thay đổi hồ sơ/địa chỉ **phải** có **audit** truy được *ai · khi nào · cũ → mới*; đổi **địa chỉ mặc định** và **chặn/mở chặn** khách **bắt buộc** có lý do (`Reason`).<br>• **BR-CUS-0015**: `CustomerGroup` là **dữ liệu** (không hard-code); đổi nhóm khách **không** hồi tố giá/chứng từ đã phát sinh (đơn cũ giữ snapshot giá — `SAL-002` ADR-02).<br>• **BR-CUS-0016**: Module khác **CẤM** đọc bảng `Cus*`; **chỉ** đọc qua `ICustomerDirectory` ở `.Contracts` (ADR-12).<br>• **BR-CUS-0017**: Tuân thủ **Luật BVDLCN 91/2025/QH15** khoản 1 Điều 4 (hiệu lực **01/01/2026**): hệ thống **phải** có đường (a) **cung cấp** dữ liệu khách (quyền *"yêu cầu cung cấp"*), (b) **xoá** dữ liệu khách (quyền *"yêu cầu xóa"*) — cả hai **có dấu vết audit** và **không** phá bất biến chứng từ. |
 | **Non-Functional Requirement** | • **NFR-CUS-0001**: `GET /api/app/customers/{id}` p95 **< 150 ms** với 50.000 khách/tenant (⚠️ **chưa kiểm chứng** — chưa có code).<br>• **NFR-CUS-0002**: Danh sách khách (phân trang 20) p95 **< 300 ms**.<br>• **NFR-CUS-0003**: Nâng cấp vãng lai gửi **100 lần** ⇒ **đúng 1** khách (NFR idempotency).<br>• **NFR-CUS-0004**: **0** PII thô trong log — test quét mã nguồn + test log thật.<br>• **NFR-CUS-0005**: **100 %** thay đổi hồ sơ/địa chỉ có bản ghi audit trong **< 1 s**.<br>• **NFR-CUS-0006**: Cách ly tenant: tenant A **không** đọc/ghi được dữ liệu tenant B — **0** rò rỉ (integration test 2 tenant).<br>• **NFR-CUS-0007**: **100 %** app service có `[Authorize]` ở **cấp class**; **0** permission dùng mà chưa định nghĩa (`XC-004` **BR-001/BR-002** + test reflection **TC-01/TC-02** của `XC-004`).<br>• **NFR-CUS-0008**: **0** unique index nào của module thiếu `NULLS NOT DISTINCT` (test schema — mở rộng `test/eCommerce.IntegrationTests/PostgreSqlSchemaTests.cs:144`).<br>• **NFR-CUS-0009**: Bất biến "một địa chỉ mặc định" **đúng khi Redis chết**: dừng Redis ⇒ DB vẫn chặn (integration test, cùng tinh thần `XC-003` **TC-11**).<br>• **NFR-CUS-0010**: API **cung cấp** dữ liệu khách trả **đầy đủ** hồ sơ + sổ địa chỉ + lịch sử liên kết trong **1** lần gọi (không phân trang cắt cụt) — phục vụ nghĩa vụ *"yêu cầu cung cấp"*. |
 
 ---
@@ -175,15 +175,15 @@ stateDiagram-v2
 
 | # | Từ → Sang | Guard (điều kiện cho phép) | Ai được phép chuyển | Side effect kèm theo | Nếu guard sai thì? |
 |---|---|---|---|---|---|
-| 1 | `[*]` → `Inactive` | Có `Contact` (email **hoặc** phone) chuẩn hoá hợp lệ **và** chưa trùng trong tenant | Khách (tự đăng ký) · Hệ thống (`Sales`, webhook sàn) | Ghi `Customer` + outbox `CustomerRegisteredEto` **cùng UoW** | **NÉM** `eCommerce:Customers:0002` (trùng) / `eCommerce:Customers:0007` (contact không hợp lệ) |
+| 1 | `[*]` → `Inactive` | Có `Contact` (email **hoặc** phone) chuẩn hoá hợp lệ **và** chưa trùng trong tenant | Khách (tự đăng ký) · Hệ thống (`Sales`, webhook sàn) | Ghi `Customer` + outbox `CustomerRegisteredEto` **cùng UoW** | **NÉM** `eCommerce:Customers:0003` (trùng) / `eCommerce:Customers:0007` (contact không hợp lệ) |
 | 2 | `[*]` → `Active` | Có `IdentityUserId` hợp lệ **và** user thuộc tenant hiện tại | Hệ thống (sau khi IdentityUser được tạo) | Outbox `CustomerRegisteredEto` | **NÉM** `eCommerce:Customers:0007` |
-| 3 | `Inactive` → `Active` | (`IdentityUserId` được gán) **hoặc** (liên hệ đã xác thực) | Khách · CSKH | Outbox `CustomerActivatedEto` | **NÉM** `eCommerce:Customers:0001` |
-| 4 | `Active` → `Blocked` | Người gọi có `eCommerce.Customers.Block` **và** `Reason` không rỗng | CSKH · Quản trị tenant | Outbox `CustomerBlockedEto` + audit (`Reason`) + metric | **NÉM** `eCommerce:Customers:0001` / `403` |
-| 5 | `Inactive` → `Blocked` | như trên | CSKH · Quản trị tenant | như trên | **NÉM** `eCommerce:Customers:0001` |
-| 6 | `Blocked` → `Active` | Người gọi có `eCommerce.Customers.Block` **và** `Reason` không rỗng (lý do mở chặn) | CSKH · Quản trị tenant | Outbox `CustomerUnblockedEto` + audit + metric | **NÉM** `eCommerce:Customers:0001` |
-| 7 | `{Inactive, Active, Blocked}` → `Deleted` | Người gọi có `eCommerce.Customers.Delete` **và** (`OrdersCount <= 0` **hoặc** đã xác nhận giữ chứng từ) | CSKH · Quản trị tenant | **XOÁ MỀM** + ẩn toàn bộ `CustomerAddressLink` (kể cả `IsDefault`) + audit | **NÉM** `eCommerce:Customers:0005` nếu cố hard-delete; `eCommerce:Customers:0001` nếu `Deleted → *` |
-| 8 | `Deleted` → bất kỳ | **KHÔNG** có guard nào cho phép | — | — | **Trạng thái HẤP THỤ**: mọi chuyển dịch khỏi `Deleted` ⇒ **NÉM** `eCommerce:Customers:0001`. Muốn "khôi phục" ⇒ **tạo hồ sơ mới** (không tái sinh bản ghi đã xoá) |
-| 9 | chuyển **lùi** bất kỳ (`Blocked → Inactive`, `Active → Inactive`) | **KHÔNG** có guard nào cho phép | — | — | **NÉM** `eCommerce:Customers:0001` — **cấm** tuyệt đối (đồng quy tắc `NOT-002` **BR-004**) |
+| 3 | `Inactive` → `Active` | (`IdentityUserId` được gán) **hoặc** (liên hệ đã xác thực) | Khách · CSKH | Outbox `CustomerActivatedEto` | **NÉM** `eCommerce:Customers:0002` |
+| 4 | `Active` → `Blocked` | Người gọi có `eCommerce.Customers.Block` **và** `Reason` không rỗng | CSKH · Quản trị tenant | Outbox `CustomerBlockedEto` + audit (`Reason`) + metric | **NÉM** `eCommerce:Customers:0002` / `403` |
+| 5 | `Inactive` → `Blocked` | như trên | CSKH · Quản trị tenant | như trên | **NÉM** `eCommerce:Customers:0002` |
+| 6 | `Blocked` → `Active` | Người gọi có `eCommerce.Customers.Block` **và** `Reason` không rỗng (lý do mở chặn) | CSKH · Quản trị tenant | Outbox `CustomerUnblockedEto` + audit + metric | **NÉM** `eCommerce:Customers:0002` |
+| 7 | `{Inactive, Active, Blocked}` → `Deleted` | Người gọi có `eCommerce.Customers.Delete` **và** (`OrdersCount <= 0` **hoặc** đã xác nhận giữ chứng từ) | CSKH · Quản trị tenant | **XOÁ MỀM** + ẩn toàn bộ `CustomerAddressLink` (kể cả `IsDefault`) + audit | **NÉM** `eCommerce:Customers:00xx` nếu cố hard-delete; `eCommerce:Customers:0002` nếu `Deleted → *` |
+| 8 | `Deleted` → bất kỳ | **KHÔNG** có guard nào cho phép | — | — | **Trạng thái HẤP THỤ**: mọi chuyển dịch khỏi `Deleted` ⇒ **NÉM** `eCommerce:Customers:0002`. Muốn "khôi phục" ⇒ **tạo hồ sơ mới** (không tái sinh bản ghi đã xoá) |
+| 9 | chuyển **lùi** bất kỳ (`Blocked → Inactive`, `Active → Inactive`) | **KHÔNG** có guard nào cho phép | — | — | **NÉM** `eCommerce:Customers:0002` — **cấm** tuyệt đối (đồng quy tắc `NOT-002` **BR-004**) |
 
 > ⚠️ **Quy tắc bất di bất dịch #11** (`docs/structure-and-techstack.md:143`): guard sai **phải NÉM LỖI** (hoặc ghi log có cấu trúc), **không** im lặng.
 > **Trạng thái hấp thụ (absorbing):** `Deleted`. `Blocked` **không** hấp thụ vì còn đường `Unblock` **có kiểm soát**.
@@ -193,12 +193,12 @@ stateDiagram-v2
 
 | # | Từ → Sang | Guard | Side effect | Nếu guard sai thì? |
 |---|---|---|---|---|
-| 1 | `[*]` → `Liên kết thường` | `Address` tồn tại **và** thuộc tenant hiện tại/địa chỉ dùng chung; `Label` ≤ 128 ký tự; chưa có liên kết **trùng** `(CustomerId, AddressId, AddressType)` còn hiệu lực | Ghi `CustomerAddressLink` (`IsDefault = false`, `IsDeleted = false`) | **NÉM** `eCommerce:Customers:0003` (không có address) / `eCommerce:Customers:0008` (liên kết trùng) |
+| 1 | `[*]` → `Liên kết thường` | `Address` tồn tại **và** thuộc tenant hiện tại/địa chỉ dùng chung; `Label` ≤ 128 ký tự; chưa có liên kết **trùng** `(CustomerId, AddressId, AddressType)` còn hiệu lực | Ghi `CustomerAddressLink` (`IsDefault = false`, `IsDeleted = false`) | **NÉM** `eCommerce:Customers:0016` (không có address) / `eCommerce:Customers:0010` (liên kết trùng) |
 | 2 | `Liên kết thường` → `Mặc định` | Giành được khoá `CustomersConsts.LockKeys.DefaultAddress(tenantId, customerId)` **và** `AddressType` khớp **và** `Customer.Status <> Deleted` | Trong **cùng** UoW: bỏ cờ mặc định của địa chỉ cũ **cùng `AddressType`** + đặt cờ cho liên kết này + audit `Reason` (nếu do nhân viên) + outbox `CustomerDefaultAddressChangedEto` | Không giành được khoá ⇒ **NÉM** `eCommerce:Lock:0001` (`XC-003` **BR-010**) — **cấm** bỏ qua im lặng |
-| 3 | `Mặc định` → `Liên kết thường` | Bỏ cờ mặc định tường minh | Ghi audit | **NÉM** `eCommerce:Customers:0001` nếu liên kết không ở trạng thái `Mặc định` |
-| 4 | `bất kỳ (còn hiệu lực)` → `Đã gỡ` | Người gọi có quyền trên sổ địa chỉ của khách (khách tự gỡ **hoặc** CSKH) | `IsDeleted = true` (+ `DeletedAtUtc` do ABP cung cấp); nếu liên kết đang là **mặc định** ⇒ chạy **A4** (tự chọn địa chỉ dùng gần nhất) | — (thao tác hợp lệ); nếu liên kết **đã** ở `Đã gỡ` ⇒ **NÉM** `eCommerce:Customers:0001` |
-| 5 | `Đã gỡ` → `bất kỳ` | **KHÔNG** cho phép "bỏ xoá" (un-delete) | — | **NÉM** `eCommerce:Customers:0001`. Muốn dùng lại ⇒ tạo **liên kết mới** trỏ cùng `Address` (được phép, xem bất biến 5 ở §8.1) |
-| 6 | `sửa AddressId của liên kết đã tồn tại` | **KHÔNG** cho phép | — | **NÉM** `eCommerce:Customers:0009` (**BR-CUS-0003** — append-only) |
+| 3 | `Mặc định` → `Liên kết thường` | Bỏ cờ mặc định tường minh | Ghi audit | **NÉM** `eCommerce:Customers:0002` nếu liên kết không ở trạng thái `Mặc định` |
+| 4 | `bất kỳ (còn hiệu lực)` → `Đã gỡ` | Người gọi có quyền trên sổ địa chỉ của khách (khách tự gỡ **hoặc** CSKH) | `IsDeleted = true` (+ `DeletedAtUtc` do ABP cung cấp); nếu liên kết đang là **mặc định** ⇒ chạy **A4** (tự chọn địa chỉ dùng gần nhất) | — (thao tác hợp lệ); nếu liên kết **đã** ở `Đã gỡ` ⇒ **NÉM** `eCommerce:Customers:0002` |
+| 5 | `Đã gỡ` → `bất kỳ` | **KHÔNG** cho phép "bỏ xoá" (un-delete) | — | **NÉM** `eCommerce:Customers:0002`. Muốn dùng lại ⇒ tạo **liên kết mới** trỏ cùng `Address` (được phép, xem bất biến 5 ở §8.1) |
+| 6 | `sửa AddressId của liên kết đã tồn tại` | **KHÔNG** cho phép | — | **NÉM** `eCommerce:Customers:0013` (**BR-CUS-0003** — append-only) |
 
 ---
 
@@ -523,23 +523,61 @@ public interface ICustomerDirectory
 
 **Mã lỗi nghiệp vụ**
 
-| Mã | HTTP | Khi nào | Thông điệp |
-|---|---|---|---|
-| `eCommerce:Customers:0001` | `409` | Chuyển trạng thái không hợp lệ (kể cả chuyển **lùi**) | `Không thể chuyển hồ sơ khách từ {currentStatus} sang {targetStatus}.` |
-| `eCommerce:Customers:0002` | `409` | Email/SĐT đã tồn tại trong tenant | `Liên hệ này đã thuộc một hồ sơ khách khác ({customerId}).` |
-| `eCommerce:Customers:0003` | `400` | Không tìm thấy/tạo được `Address` ở `AddressHub` | `Địa chỉ không hợp lệ hoặc không tồn tại.` |
-| `eCommerce:Customers:0004` | `409` | Nâng cấp khách đã có tài khoản | `Hồ sơ khách đã gắn tài khoản; không thể nâng cấp lần hai.` |
-| `eCommerce:Customers:0005` | `409` | Cố **hard-delete** khách đã có đơn | `Không thể xoá vĩnh viễn khách đã phát sinh đơn hàng; hãy dùng xoá mềm.` |
-| `eCommerce:Customers:0006` | `409` | `UPDATE … WHERE Status = @expected` ảnh hưởng 0 dòng | `Hồ sơ khách đã bị thay đổi bởi tiến trình khác, vui lòng tải lại.` |
-| `eCommerce:Customers:0007` | `400` | Contact không hợp lệ / thiếu trường bắt buộc theo `ContactType` | `Dữ liệu liên hệ không hợp lệ: {reason}.` |
-| `eCommerce:Customers:0008` | `409` | Liên kết địa chỉ trùng (cùng địa chỉ + cùng loại, còn hiệu lực) | `Địa chỉ này đã có trong sổ địa chỉ của khách.` |
-| `eCommerce:Customers:0009` | `400` | Cố sửa `AddressId`/`AddressType` của liên kết đã tồn tại | `Không thể sửa địa chỉ của một mục đã có trong sổ; hãy thêm mục mới.` |
-| `eCommerce:Customers:0010` | `400` | Gộp vào chính mình, hoặc 2 hồ sơ **khác tenant** | `Không thể gộp hai hồ sơ khách này.` |
-| `eCommerce:Messaging:0002` | `409` | Cùng `IdempotencyKey` nhưng `PayloadHash` khác (`XC-002` **BR-006**) | `Khoá chống trùng đã dùng cho dữ liệu khác.` |
-| `eCommerce:Lock:0001` | `409` | Không giành được khoá đổi địa chỉ mặc định trong timeout (`XC-003`) | `Tài nguyên đang được xử lý bởi tiến trình khác, vui lòng thử lại.` |
-| *(không có mã riêng)* | `401` | Không token / sai chữ ký / hết hạn | `XC-004` **BR-007** |
-| *(không có mã riêng)* | `403` | Thiếu permission, **hoặc** permission chưa định nghĩa | `XC-004` **BR-002/E3** |
-| *(không có mã riêng)* | `404` | Khách thuộc **tenant khác** | `XC-004` **BR-008** — cố ý, **không** tiết lộ sự tồn tại |
+> 🚨 **MÃ LỖI: CODE LÀ NGUỒN SỰ THẬT.** Đo trực tiếp **17/10/2026** từ
+> `modules/Customers/eCommerce.Customers.Domain/CustomerErrorCodes.cs:15-50` — code **chỉ có 8 mã**,
+> và **nghĩa của chúng KHÁC** bảng đề xuất cũ của tài liệu này (đã sửa: xem ghi chú ⚠️ cuối mục).
+> 📌 Trong **thân bài** ở trên, các mã `eCommerce:Customers:00xx` đã được **đánh lại số theo code**;
+> chỗ nào code **chưa có mã** thì ghi **`00xx`** — đó **không phải** mã thật.
+
+**Nhóm `eCommerce:Customers:*` — 8 mã CÓ THẬT trong code**
+
+| Mã | Hằng số | HTTP (đề xuất) | Khi nào | Thông điệp |
+|---|---|---|---|---|
+| `0001` | `KhongTimThayKhach` | `404` | Không thấy khách — **kể cả** khách thuộc tenant khác (cố ý không tiết lộ, `XC-004` **BR-008**) | `Không tìm thấy hồ sơ khách.` |
+| `0002` | `ChuyenTrangThaiKhongHopLe` | `409` | Chuyển trạng thái không hợp lệ: chuyển **lùi**, khỏi **`Deleted`** (hấp thụ), hoặc guard sai | `Không thể chuyển hồ sơ khách từ {currentStatus} sang {targetStatus}.` |
+| `0003` | `LienHeDaTonTai` | `409` | `Email`/`SĐT` đã thuộc **một khách khác** trong cùng tenant | `Liên hệ này đã thuộc một hồ sơ khách khác ({customerId}).` |
+| `0004` | `KhachDaCoChu` | `409` | Nâng cấp (claim) khách **đã** gắn tài khoản, hoặc gán tài khoản đã có khách | `Hồ sơ khách đã gắn tài khoản; không thể nâng cấp lần hai.` |
+| `0005` | `KhachDangBiChan` | `409` | Khách đang `Blocked` mà vẫn cố giao dịch | `Hồ sơ khách đang bị chặn.` |
+| `0006` | `ThieuThongTinBatBuoc` | `400` | Thiếu trường bắt buộc theo `ContactType` | `Thiếu thông tin bắt buộc: {reason}.` |
+| `0007` | `LienHeKhongHopLe` | `400` | Liên hệ sai định dạng / không chuẩn hoá được | `Dữ liệu liên hệ không hợp lệ: {reason}.` |
+| `0008` | `MaNhomDaTonTai` | `409` | `CustomerGroup` trùng **mã** trong tenant | `Mã nhóm khách đã tồn tại.` |
+
+> 📌 Cột **HTTP** là **đề xuất của tài liệu**, **chưa** kiểm chứng — code hiện chưa gắn HTTP status vào từng mã.
+
+**Khái niệm của tài liệu mà code CHƯA CÓ MÃ** — 🚨 **phải cấp mã ở `S3`** trước khi code chúng
+
+| Khái niệm | Ghi chú |
+|---|---|
+| Cố **hard-delete** khách đã có đơn | `00xx`. ⚠️ **Không** dùng lại `0005` — số đó **đã** là `KhachDangBiChan` |
+| `UPDATE … WHERE Status = @expected` ảnh hưởng **0 dòng** (hồ sơ khách) | `00xx`. Với **liên kết địa chỉ** thì đã có `0012` (`ADDR-004`) |
+| Gộp 2 hồ sơ: gộp vào chính mình / **khác tenant** | `00xx`. 📌 Code hiện **chưa có** `MergeAsync` ⇒ có thể khái niệm này **không cần** |
+
+**Dải mã của `ADDR-004` — ĐÃ CÓ, dùng cho sổ địa chỉ** (`eCommerce:Customers:0010…0016`)
+
+| Mã | Khi nào |
+|---|---|
+| `0010` | Liên kết trùng (`AddressId` + `AddressType` còn hiệu lực) |
+| `0011` | Không có liên kết / đã gỡ |
+| `0012` | Chuyển trạng thái mặc định sai; `UPDATE` ảnh hưởng **0 dòng** |
+| `0013` | Cố sửa `AddressId`/`AddressType` của liên kết đã có |
+| `0014` | Cố "bỏ xoá" liên kết đã gỡ |
+| `0015` | Vượt trần địa chỉ/khách |
+| `0016` | `AddressId` không tồn tại / `CoDungDuoc = false` |
+
+**Mã dùng chung từ module khác**
+
+| Mã | HTTP | Khi nào |
+|---|---|---|
+| `eCommerce:Messaging:0002` | `409` | Cùng `IdempotencyKey` nhưng `PayloadHash` khác (`XC-002` **BR-006**) |
+| `eCommerce:Lock:0001` | `409` | Không giành được khoá đổi địa chỉ mặc định trong timeout (`XC-003`) |
+| *(không có mã riêng)* | `401` | Không token / sai chữ ký / hết hạn — `XC-004` **BR-007** |
+| *(không có mã riêng)* | `403` | Thiếu permission, **hoặc** permission **chưa định nghĩa** — `XC-004` **BR-002/E3** |
+| *(không có mã riêng)* | `404` | Khách thuộc **tenant khác** — `XC-004` **BR-008** (cố ý không tiết lộ; trùng `0001`) |
+
+> ⚠️ **ĐÃ SỬA 17/10/2026 (nợ §15.3 #11 của `ADDR-004`):** bảng đề xuất cũ ghi
+> `0001` = *"chuyển trạng thái không hợp lệ"* và `0008` = *"liên kết trùng"* — **SAI với code**
+> (code: `0001` = `KhongTimThayKhach`, `0008` = `MaNhomDaTonTai`). Nay toàn bộ thân bài đã
+> đánh lại số theo **code**; khái niệm chưa có mã ghi `00xx`.
 
 > ⚠️ **Ba tiền tố mã lỗi đang tồn tại SONG SONG trong repo — cần một quyết định trước khi code `Customers`:**
 > `eCommerce:Customers:*` (mã mới của feature này) · `eCommerce:Tax:*` (`modules/Tax/eCommerce.Tax.Domain/TaxErrorCodes.cs:13-34`) ·
@@ -598,7 +636,7 @@ Không có xác thực chữ ký, không có retry qua mạng, không có IP all
 | `POST /api/app/customers` | `Idempotency-Key` do client gửi (header) → lưu vào `Customer.IdempotencyKey` | **thiếu** header ⇒ **NÉM** `eCommerce:Customers:0007`; **cấm** tự sinh khoá mới (ADR-05) |
 | Webhook sàn tạo khách vãng lai | `Customer:{tenantId}:{channelCode}:{externalBuyerId}` | `externalBuyerId` do sàn cấp ⇒ **ổn định**; **cấm** dùng `ExternalOrderId` (một người mua có thể có nhiều đơn ⇒ sẽ tạo nhiều khách) |
 | Nâng cấp vãng lai (`claim`) | `Customer:{tenantId}:{customerId}:Claim` | `customerId` do **ta** sở hữu ⇒ ổn định |
-| Gộp hồ sơ (`merge`) | `Idempotency-Key` do client gửi + unique `(TenantId, MergedCustomerId)` | gộp lại cùng cặp ⇒ **NÉM** `eCommerce:Customers:0010` (đã gộp) chứ **không** gộp lần hai |
+| Gộp hồ sơ (`merge`) | `Idempotency-Key` do client gửi + unique `(TenantId, MergedCustomerId)` | gộp lại cùng cặp ⇒ **NÉM** `eCommerce:Customers:00xx` (đã gộp) chứ **không** gộp lần hai |
 | ETO nhận vào (`OrderPlaced`/`OrderCompleted`) | `Order:{orderId}:{EventType}:{aggregateVersion}` | theo `XC-002` **D6/BR-014**: `aggregateVersion` chống áp dụng bản cũ |
 
 ---
@@ -612,23 +650,23 @@ Không có xác thực chữ ký, không có retry qua mạng, không có IP all
 | 1 | `Customer` **không** chứa trường địa chỉ nào | **Test reflection** `TC-14` + review; vi phạm ⇒ đỏ CI (`ADR-01`, **BR-CUS-0001**) |
 | 2 | Mỗi `(TenantId, CustomerId, AddressType)` có **tối đa một** địa chỉ mặc định | **Partial unique index** `(TenantId, CustomerId, AddressType) WHERE IsDefault AND NOT IsDeleted NULLS NOT DISTINCT` — **DB là hàng rào cuối** (**BR-CUS-0002**, ADR-06) |
 | 3 | `Email`/`Phone` **duy nhất** trong tenant (trừ bản ghi xoá mềm) | 2 unique index có filter `NOT IsDeleted` + `NULLS NOT DISTINCT` (**BR-CUS-0004**) |
-| 4 | `CustomerAddressLink` **append-only**; gỡ = xoá mềm; **cấm** đổi `AddressId`/`AddressType` | Guard ném `eCommerce:Customers:0009`; **test** chứng minh không có đường UPDATE (**BR-CUS-0003**, `TC-15`) |
-| 5 | Liên kết **đã gỡ** không thể "bỏ xoá" | Guard ném `eCommerce:Customers:0001`; dùng lại địa chỉ ⇒ tạo **liên kết mới** (được phép) |
+| 4 | `CustomerAddressLink` **append-only**; gỡ = xoá mềm; **cấm** đổi `AddressId`/`AddressType` | Guard ném `eCommerce:Customers:0013`; **test** chứng minh không có đường UPDATE (**BR-CUS-0003**, `TC-15`) |
+| 5 | Liên kết **đã gỡ** không thể "bỏ xoá" | Guard ném `eCommerce:Customers:0002`; dùng lại địa chỉ ⇒ tạo **liên kết mới** (được phép) |
 | 6 | Một hồ sơ cho **một** tài khoản | **unique** `(TenantId, IdentityUserId) WHERE NOT NULL NULLS NOT DISTINCT` |
 | 7 | Một hồ sơ chỉ bị **gộp một lần** | **unique** `(TenantId, MergedCustomerId)` + CHECK `<>` target |
-| 8 | Trạng thái khách **không** chuyển lùi, `Deleted` là **hấp thụ** | State machine §3.1 — mọi đường sai **NÉM** `eCommerce:Customers:0001` (**BR-CUS-0005**) |
+| 8 | Trạng thái khách **không** chuyển lùi, `Deleted` là **hấp thụ** | State machine §3.1 — mọi đường sai **NÉM** `eCommerce:Customers:0002` (**BR-CUS-0005**) |
 | 9 | Bất biến 2 **vẫn đúng khi Redis chết** | DB constraint (ADR-06) + integration test `TC-13` (dừng Redis) — cùng tinh thần `XC-003` **TC-11** |
 | 10 | **0** PII thô trong log | Hàm mask **bắt buộc** + test quét mã nguồn `TC-11` (**BR-CUS-0012**) |
 | 11 | Mọi tạo/nâng cấp khách **idempotent** | unique `(TenantId, IdempotencyKey)` + `(TenantId, Source, SourceKey)` + `IIdempotencyGuard` (**BR-CUS-0006/0007**) |
-| 12 | Không hard-delete khách đã có đơn | Guard ném `eCommerce:Customers:0005` (**BR-CUS-0011**) |
+| 12 | Không hard-delete khách đã có đơn | Guard ném `eCommerce:Customers:00xx` (**BR-CUS-0011**) |
 
 ### 8.2 Xử lý đồng thời
 
 | # | Tình huống | Cơ chế |
 |---|---|---|
 | 1 | Hai instance cùng **đặt mặc định** 2 địa chỉ khác nhau của cùng khách | Khoá `CustomersConsts.LockKeys.DefaultAddress(tenantId, customerId)` (**bao ngoài** UoW — `XC-003` §12) + **partial unique index** làm chốt cuối ⇒ nếu lock vô hiệu (Redis chết) thì **DB chặn**, không có "2 mặc định" |
-| 2 | Hai luồng cùng **nâng cấp** một hồ sơ vãng lai | `RowVersion`/`ConcurrencyStamp` + `UPDATE … WHERE Status = @expected AND IdentityUserId IS NULL`; **0 dòng** ⇒ **NÉM** `eCommerce:Customers:0006` (`XC-002` **BR-008**) |
-| 3 | Hai luồng cùng **tạo** khách bằng cùng email | unique `(TenantId, EmailNormalized) WHERE NOT IsDeleted` ⇒ luồng thứ hai nhận lỗi DB ⇒ ánh xạ `eCommerce:Customers:0002` (**lưới an toàn**, không phải luồng bình thường) |
+| 2 | Hai luồng cùng **nâng cấp** một hồ sơ vãng lai | `RowVersion`/`ConcurrencyStamp` + `UPDATE … WHERE Status = @expected AND IdentityUserId IS NULL`; **0 dòng** ⇒ **NÉM** `eCommerce:Customers:00xx` (`XC-002` **BR-008**) |
+| 3 | Hai luồng cùng **tạo** khách bằng cùng email | unique `(TenantId, EmailNormalized) WHERE NOT IsDeleted` ⇒ luồng thứ hai nhận lỗi DB ⇒ ánh xạ `eCommerce:Customers:0003` (**lưới an toàn**, không phải luồng bình thường) |
 | 4 | Webhook sàn gửi **trùng** cho cùng người mua | khoá idempotency + unique `(TenantId, Source, SourceKey)` + `IIdempotencyGuard` ⇒ **đúng 1** khách |
 | 5 | Hai nhân viên cùng **gộp** hai hồ sơ (ngược chiều nhau) | Khoá theo **cặp đã sắp xếp** (nhỏ trước) `CustomersConsts.LockKeys.Merge(tenantId, min, max)` ⇒ hai chiều **cùng một khoá**; unique `(TenantId, MergedCustomerId)` chặn gộp lần hai |
 | 6 | Job **đối soát `OrdersCount`/`LifetimeValue`** chạy trên nhiều instance | Khoá `CustomersConsts.LockKeys.StatsJob(tenantId, ky)` + chế độ **`SkipIfBusy`** **bắt buộc** log + metric (`XC-003` **D10**/A1) |
@@ -654,7 +692,26 @@ Không có xác thực chữ ký, không có retry qua mạng, không có IP all
 > khai báo trong `eCommercePermissionDefinitionProvider` (`src/eCommerce.Application.Contracts/Permissions/eCommercePermissionDefinitionProvider.cs:23-60`)
 > **trong cùng một PR** — nếu không, `TC-02` của `XC-004` sẽ đỏ (và production trả `403` cho tất cả).
 
-| Permission (đề xuất) | Nhóm | Method được gán | Vai trò mặc định | Ghi chú |
+> 🚨 **TRẠNG THÁI CODE (đo 17/10/2026):** code **CHỈ CÓ 2** permission cho module này —
+> `eCommerce.Customers` (`.Default`) và `eCommerce.Customers.Manage`
+> (`src/eCommerce.Domain.Shared/eCommerceConsts.cs:160-167`; đăng ký tại
+> `.../eCommercePermissionDefinitionProvider.cs:104-105`).
+> 🔒 **Bảng dưới là ĐỀ XUẤT, CHƯA có trong code.** Dùng các tên `.View`/`.Block`/`.Delete`/`.ManageGroups`/…
+> **hôm nay** ⇒ `403` cho **mọi** người, kể cả admin (đúng lỗi Phase 0 — `XC-004` **E3**).
+> ⚠️ Ngoài ra `ADDR-004` yêu cầu thêm nhóm **`eCommerce.Addresses.*`** (`.Manage`, `.ManageBook`, `.Verify`)
+> — cũng **chưa có**.
+
+| Permission | Nhóm | Có trong code? | Method được gán | Vai trò mặc định |
+|---|---|---|---|---|
+| ✅ `eCommerce.Customers` (`.Default`) | `Customers` | ✅ **CÓ** | `GetAsync`, `GetListAsync` | CSKH · quản trị tenant |
+| ✅ `eCommerce.Customers.Manage` | `Customers` | ✅ **CÓ** | `CreateAsync`, `UpdateAsync`, `ClaimAsync`, `BlockAsync`, `UnblockAsync`, `DeleteAsync` | CSKH |
+| ⏳ `eCommerce.Customers.View` | `Customers` | ❌ **chưa** | tách `View` khỏi `Manage` | CSKH |
+| ⏳ `eCommerce.Customers.Block` | `Customers` | ❌ **chưa** | `BlockAsync`, `UnblockAsync` | quản trị tenant |
+| ⏳ `eCommerce.Customers.Delete` | `Customers` | ❌ **chưa** | `DeleteAsync` | quản trị tenant |
+| ⏳ `eCommerce.Addresses.ManageBook` | `Addresses` | ❌ **chưa** | `AddAddressAsync`, `SetDefaultAsync`, `RemoveAddressAsync` | khách (của mình) · CSKH |
+| ⏳ `eCommerce.Customers.Merge` | `Customers` | ❌ **chưa** | `MergeAsync` | quản trị tenant |
+| ⏳ `eCommerce.Customers.ManageGroups` | `Customers` | ❌ **chưa** | `CustomerGroupAppService.*` | quản trị tenant |
+| ⏳ `eCommerce.Customers.ExportPersonalData` | `Customers` | ❌ **chưa** | `ExportPersonalDataAsync` | quản trị tenant + CSKH có uỷ quyền |
 |---|---|---|---|---|
 | `eCommerce.Customers.Default` | `Customers` | *(nhóm cha)* | — | hằng số nhóm cha, theo mẫu `Products.Default` (`src/eCommerce.Domain.Shared/eCommerceConsts.cs:21`) |
 | `eCommerce.Customers.View` | `Customers` | `GetAsync`, `GetListAsync`, `GetAddressBookAsync`, `GetUnlinkedAsync` | CSKH · quản trị tenant | — |
@@ -732,18 +789,18 @@ Không có xác thực chữ ký, không có retry qua mạng, không có IP all
 |---|---|---|---|
 | Khách **không có** địa chỉ nào | khách mới | trả sổ địa chỉ **rỗng** — **không phải lỗi** | `200` + mảng rỗng + hướng dẫn UI |
 | Khách **chưa** gắn tài khoản (`IdentityUserId = null`) | khách vãng lai/webhook | **hợp lệ** — `OrdersCount` vẫn tăng; hiện trong báo cáo *"khách chưa gắn tài khoản"* | `200` |
-| Email/SĐT trùng | khách đăng ký lại | **NÉM** `eCommerce:Customers:0002` kèm `customerId` hiện có ⇒ UI gợi ý **đăng nhập** hoặc **gộp** | `409` |
+| Email/SĐT trùng | khách đăng ký lại | **NÉM** `eCommerce:Customers:0003` kèm `customerId` hiện có ⇒ UI gợi ý **đăng nhập** hoặc **gộp** | `409` |
 | Contact không hợp lệ (email sai định dạng, SĐT không phải số VN) | dữ liệu vào sai | **NÉM** `eCommerce:Customers:0007` — **không** tự "sửa" dữ liệu | `400` |
-| **Chuyển trạng thái sai / lùi** | thao tác sai hoặc 2 luồng đua | **NÉM** `eCommerce:Customers:0001` — **cấm** no-op im lặng | `409` |
-| `UPDATE … WHERE Status = @expected` ảnh hưởng **0 dòng** | luồng khác đã đổi | **NÉM** `eCommerce:Customers:0006` — **không** coi là thành công | `409` |
+| **Chuyển trạng thái sai / lùi** | thao tác sai hoặc 2 luồng đua | **NÉM** `eCommerce:Customers:0002` — **cấm** no-op im lặng | `409` |
+| `UPDATE … WHERE Status = @expected` ảnh hưởng **0 dòng** | luồng khác đã đổi | **NÉM** `eCommerce:Customers:00xx` — **không** coi là thành công | `409` |
 | Hai luồng cùng **đặt mặc định** | tranh chấp | lock ⇒ luồng sau **chờ tới timeout** rồi `eCommerce:Lock:0001`; nếu **Redis chết** ⇒ **DB chặn** (partial unique index) ⇒ ánh xạ `0006` + metric | `409` |
-| `AddressHub` không tìm thấy địa chỉ | mã tỉnh/xã sai hoặc `AddressHub` chưa sẵn sàng | **NÉM** `eCommerce:Customers:0003`; **rollback** toàn bộ UoW (không ghi liên kết "treo") | `400` |
+| `AddressHub` không tìm thấy địa chỉ | mã tỉnh/xã sai hoặc `AddressHub` chưa sẵn sàng | **NÉM** `eCommerce:Customers:0016`; **rollback** toàn bộ UoW (không ghi liên kết "treo") | `400` |
 | `AddressHub` **chưa tồn tại** (GĐ1 sớm) | phụ thuộc chưa xong | 🚨 **KHÔNG** được "tạm" copy cột địa chỉ vào `Customer` (phá ADR-01) ⇒ **chặn feature**, không có đường vòng | — |
-| Liên kết địa chỉ đã tồn tại | khách thêm trùng | **NÉM** `eCommerce:Customers:0008` | `409` |
-| Cố sửa `AddressId` của liên kết cũ | thao tác sai | **NÉM** `eCommerce:Customers:0009` — hướng dẫn *"thêm mục mới"* | `400` |
+| Liên kết địa chỉ đã tồn tại | khách thêm trùng | **NÉM** `eCommerce:Customers:0010` | `409` |
+| Cố sửa `AddressId` của liên kết cũ | thao tác sai | **NÉM** `eCommerce:Customers:0013` — hướng dẫn *"thêm mục mới"* | `400` |
 | Gỡ địa chỉ **đang là mặc định** | khách gỡ | **Không** lỗi: tự chọn địa chỉ còn lại **dùng gần nhất** làm mặc định (**A4**); **0** địa chỉ còn lại ⇒ **không** có mặc định | `200` |
-| Cố **hard-delete** khách đã có đơn | thao tác sai | **NÉM** `eCommerce:Customers:0005` ⇒ hướng dẫn **xoá mềm** | `409` |
-| Gộp hồ sơ **khác tenant** / gộp vào chính mình | tấn công hoặc lỗi | **NÉM** `eCommerce:Customers:0010`; **`404`** nếu hồ sơ kia thuộc tenant khác (`XC-004` **BR-008**) | `400`/`404` |
+| Cố **hard-delete** khách đã có đơn | thao tác sai | **NÉM** `eCommerce:Customers:00xx` ⇒ hướng dẫn **xoá mềm** | `409` |
+| Gộp hồ sơ **khác tenant** / gộp vào chính mình | tấn công hoặc lỗi | **NÉM** `eCommerce:Customers:00xx`; **`404`** nếu hồ sơ kia thuộc tenant khác (`XC-004` **BR-008**) | `400`/`404` |
 | Truy cập khách **tenant khác** | cố truy cập | **`404`** — **không** tiết lộ sự tồn tại | `404` |
 | Cùng `IdempotencyKey` + `PayloadHash` **khác** | xung đột khoá | **NÉM** `eCommerce:Messaging:0002` (**`XC-002` BR-006**) — **cấm** ghi đè | `409` |
 | Webhook sàn gửi trùng | at-least-once | **0** khách mới; trả kết quả cũ | `200` |
@@ -789,7 +846,7 @@ Không có xác thực chữ ký, không có retry qua mạng, không có IP all
 
 | ID | Mục tiêu | Loại | Input chính | Expected | Phủ |
 |---|---|---|---|---|---|
-| **TC-01** | Mọi chuyển trạng thái **sai** đều **NÉM LỖI** | Unit | `Deleted → Active`, `Blocked → Inactive`, `Active → Inactive` | `BusinessException` `eCommerce:Customers:0001` | **BR-CUS-0005** |
+| **TC-01** | Mọi chuyển trạng thái **sai** đều **NÉM LỖI** | Unit | `Deleted → Active`, `Blocked → Inactive`, `Active → Inactive` | `BusinessException` `eCommerce:Customers:0002` | **BR-CUS-0005** |
 | **TC-02** | Chặn/mở chặn cần **lý do** | Unit | `BlockAsync` không `Reason` | `BusinessException` `0007` | **BR-CUS-0014** |
 | **TC-03** | `Blocked` chặn đặt hàng | **Integration** | khách `Blocked` gọi API checkout của `Sales` | **từ chối** (theo hợp đồng `ICustomerDirectory.IsBlockedAsync`) | BR-CUS-0005 |
 | **TC-04** | **Idempotency** nâng cấp vãng lai | **Integration** | gửi 100 lần cùng khoá claim | **đúng 1** khách; `IdentityUserId` gán **một** lần | **BR-CUS-0006/0007**, NFR-0003 |
@@ -806,8 +863,8 @@ Không có xác thực chữ ký, không có retry qua mạng, không có IP all
 | **TC-15** | `CustomerAddressLink` **append-only** | **Integration** | cố `UPDATE` `AddressId` của liên kết đã tồn tại; cố `DELETE` cứng | `0009`; bản ghi vẫn còn (xoá mềm) | **BR-CUS-0003** |
 | **TC-16** | **Xuất dữ liệu cá nhân** đầy đủ | **Integration** | khách có 3 địa chỉ (1 đã gỡ) + 2 đơn | trả hồ sơ + **toàn bộ** liên kết (kể cả đã gỡ, có cờ) trong **1** response; có audit | **BR-CUS-0017**, NFR-0010 |
 | TC-17 | **Xoá mềm** rồi đăng ký lại cùng email | **Integration** | xoá khách A (email X) → tạo khách mới email X | **thành công** (index có filter `NOT IsDeleted`) | **BR-CUS-0004**, §5.2 |
-| TC-18 | Trùng email/SĐT còn hiệu lực ⇒ ném | **Integration** | 2 khách cùng email (chưa xoá) | `BusinessException` `eCommerce:Customers:0002` + `UniqueViolation` nếu chèn thẳng SQL | **BR-CUS-0004** |
-| TC-19 | Không hard-delete khách đã có đơn | **Integration** | khách `OrdersCount = 3`, gọi delete cứng | `BusinessException` `eCommerce:Customers:0005` | **BR-CUS-0011** |
+| TC-18 | Trùng email/SĐT còn hiệu lực ⇒ ném | **Integration** | 2 khách cùng email (chưa xoá) | `BusinessException` `eCommerce:Customers:0003` + `UniqueViolation` nếu chèn thẳng SQL | **BR-CUS-0004** |
+| TC-19 | Không hard-delete khách đã có đơn | **Integration** | khách `OrdersCount = 3`, gọi delete cứng | `BusinessException` `eCommerce:Customers:00xx` | **BR-CUS-0011** |
 | TC-20 | Gộp 2 hồ sơ: **không** phân mảnh lịch sử | **Integration** | gộp A vào B (A có 2 đơn) | `CusMergeAliases` có 1 dòng; A `Deleted`; **0** UPDATE trên bảng `Ord*` | **BR-CUS-0015**, A5 |
 | TC-21 | Không **hard-code** nhóm khách | Unit (reflection/grep) | quét assembly nghiệp vụ tìm chuỗi `"RETAIL"`/`"VIP"` trong code (không phải seed) | **0** match | **BR-CUS-0015**, ADR-09 |
 | TC-22 | Module khác **không** đọc bảng `Cus*` | Unit (quét mã nguồn) | grep `DbSet<Customer>`/`CusCustomers` trong `modules/**` khác | **0** match ngoài module `Customers` | **BR-CUS-0016**, ADR-12 |
@@ -831,7 +888,7 @@ public class CustomerStateMachineTests
 
         var ex = Assert.Throws<BusinessException>(() => ChuyenTrangThai(khach, sang));
 
-        Assert.Equal("eCommerce:Customers:0001", ex.Code);
+        Assert.Equal("eCommerce:Customers:0002", ex.Code);
     }
 
     /// TC-14 — ADR-01/BR-CUS-0001: CẤM Customer có trường địa chỉ (chống anti-pattern nopCommerce).
@@ -1017,7 +1074,7 @@ public class CustomerAddressInvariantTests
 | **6** | **`PiiMasker`** (`ADR-11`) | Che email/SĐT **giữ đủ để đối chiếu, không đủ để dùng**; có `CheTrongChuoi` cho payload thô |
 | **7** | **`ICustomerDirectory`** (hợp đồng đọc cho module khác — `ADR-12`) | CHỈ ĐỌC. Hiện thực ở lớp nội bộ **`CustomerDirectory`** (`ITransientDependency`, **không** phải application service) |
 | **8** | **3 unique index `NULLS NOT DISTINCT`** (SQL thô) | nhóm khách · **một-tài-khoản-một-khách** · **khoá idempotency** — vì `TenantId` có thể `NULL` |
-| **9** | Mã lỗi riêng `eCommerce:Customers:0001…0008` · permission `eCommerce.Customers`(`.Manage`) | 8 mã, mỗi mã một **hành động khác nhau** cho CSKH |
+| **9** | Mã lỗi riêng `eCommerce:Customers:0002…0008` · permission `eCommerce.Customers`(`.Manage`) | 8 mã, mỗi mã một **hành động khác nhau** cho CSKH |
 | **10** | API **5 endpoint** (đo bằng swagger thật) | `danh-sach` (**GET**) · `tao-khach` · `nang-cap-khach-vang-lai/{id}` · `chan-khach/{id}` · `mo-chan-khach/{id}` |
 
 ### 16.2 🚨 Bài học ĐO ĐƯỢC: **hợp đồng nội bộ KHÔNG được để ABP sinh thành endpoint**
@@ -1083,7 +1140,7 @@ Phiên bản đầu: `CustomerAppService` **hiện thực luôn** `ICustomerDire
 |---|---|---|---|
 | C1 | `POST tao-khach` (khách mới + khoá idempotency) | `200` · `Inactive` · **là khách vãng lai** | **`200`** · `Inactive` · `laKhachVangLai=true` ✅ |
 | C2 | **Gửi lại CÙNG khoá idempotency** | trả **CÙNG** khách, không tạo thứ hai | **`200`** · **cùng `id`** (`3a2455fd-…`) ✅ |
-| D1 | Trùng **email** với khoá idempotency **khác** | `403` · `Customers:0003` | **`403` · `eCommerce:Customers:0003`** ✅ |
+| D1 | Trùng **email** với khoá idempotency **khác** | `403` · `Customers:0003` | **`403` · `eCommerce:Customers:0016`** ✅ |
 | E1 | Nâng cấp khách vãng lai | hết vãng lai · tự `Active` | **`200`** · `laKhachVangLai=false` · `Active` ✅ |
 | E2 | **Gọi LẠI** cùng tài khoản | idempotent (`200`, **không** ném) | **`200`** ✅ |
 | E3 | Nâng cấp sang tài khoản **KHÁC** | `403` · `Customers:0004` | **`403` · `0004`** ✅ (đổi chủ sở hữu ⇒ chặn) |
