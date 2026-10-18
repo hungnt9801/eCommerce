@@ -323,7 +323,13 @@ $quyenPhaiCon = @(
     'eCommerce.Customers.ManageGroups',
     'eCommerce.Payments',           # REC-001 / SAL-006
     'eCommerce.Payments.Refund',
-    'eCommerce.Inventory'           # INV-001/002/003
+    'eCommerce.Inventory',           # INV-001/002/003
+    # 🚨 `S6` (18/10/2026) — **cổng vận hành của đơn sàn** (`sal-005` §21). 📌 Đưa vào danh sách này vì:
+    # (a) thiếu ở provider ⇒ `403` cho MỌI người kể cả admin; (b) đây là đường DUY NHẤT hạ cờ `GapSuspected`
+    # sau khi job `D12` báo động ⇒ nếu nó chết thì cờ **tồn đọng vĩnh viễn** và không ai biết ngoài việc đọc log.
+    'eCommerce.Sales.MarketplaceIntake',
+    'eCommerce.Sales.MarketplaceIntake.View',
+    'eCommerce.Sales.MarketplaceIntake.Reprocess'
 )
 
 $granted = @(Psql 'select "Name" from "AbpPermissionGrants" order by "Name";' | ForEach-Object { $_.Trim() })

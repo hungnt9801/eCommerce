@@ -335,6 +335,85 @@ if (-not $ChiKiemDb) {
 }
 
 # ══════════════════════════════════════════════════════════════════════════════════════════════
+# NHOM 1c — `kiem-tat-ca.ps1` phai CHAY DU cac buoc (📌 nhanh, KHONG cham DB)
+#
+# 🔑 VI SAO CO NHOM NAY (`S6`, 18/10/2026): mot buoc cua cong la **mot khoi `Buoc '...'`** trong
+# `kiem-tat-ca.ps1`. 📌 Neu ai do **xoa/doi ten** mot buoc (hoac gop no vao buoc khac) thi `-DayDu`
+# van **XANH** — ⚠️ va **khong ai biet** rang phan kiem do **da ngung chay**.
+# 🔒 Dung cau cua ca du an: *"cong khong chay tu dong thi khong phai cong"* ⇒ phai co **ca DO**
+# (buoc bi xoa ⇒ bao do) chu khong chi co ca XANH (tep that ⇒ bao xanh).
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+if (-not $ChiKiemDb) {
+    # 🔑 Chup lai **danh muc buoc bat buoc** — them mot buoc moi thi them mot dong o day.
+    $buocBatBuoc = [ordered]@{
+        'kiem-moc-build.ps1'   = 'buoc ② build + KIEM MOC nhi phan'
+        'kiem-db.ps1'          = 'buoc ⑥ bat bien DB'
+        'test-cong-kiem.ps1'   = 'buoc ⑦ test cho chinh cac cong'
+        'kiem-e2e.ps1'         = 'buoc ⑧ E2E co phien (HTML that)'
+        'probe-so-dia-chi.ps1' = 'buoc ⑨ so dia chi'
+        'probe-khach-hang.ps1' = 'buoc ⑩ khach hang'
+        'probe-thanh-toan.ps1' = 'buoc ⑪ thanh toan'
+        'probe-don-san.ps1'    = 'buoc ⑫ don san (duong chay that)'
+    }
+
+    <#
+        🔒 **HAM THUAN**: tra ve danh sach buoc **BI THIEU**. 📌 Khong doc tep, khong cham DB ⇒ ca kiem
+        chi phu thuoc **noi dung chuoi** ⇒ ca DO va ca XANH chi khac nhau o **du lieu vao**.
+    #>
+    function BuocBiThieu {
+        param([string]$NoiDung, $DanhMuc)
+
+        $thieu = @()
+
+        foreach ($ten in $DanhMuc.Keys) {
+            if (-not $NoiDung.Contains("'$ten'")) {
+                $thieu += $ten
+            }
+        }
+
+        return $thieu
+    }
+
+    Describe 'kiem-tat-ca.ps1 — cong phai CHAY DU cac buoc (chong "buoc bi xoa ma cong van xanh")' {
+
+        It 'W1) moi buoc BAT BUOC deu co mat trong kiem-tat-ca.ps1 (🛡️ chong cong LUON DO... va chong buoc bi xoa)' {
+            $tepCong = Join-Path $PSScriptRoot 'kiem-tat-ca.ps1'
+            $noiDung = [IO.File]::ReadAllText($tepCong)
+
+            $thieu = @(BuocBiThieu -NoiDung $noiDung -DanhMuc $buocBatBuoc)
+
+            KhangDinh ($thieu.Count -eq 0) (
+                "🚨 Buoc cua cong BI THIEU khoi kiem-tat-ca.ps1 (⇒ phan kiem do KHONG chay ma cong van xanh):`n  " +
+                (($thieu | ForEach-Object { "$_  ($($buocBatBuoc[$_]))" }) -join "`n  ")
+            )
+
+            # 🛡️ Chong "ca kiem rong": danh muc phai co that va tep phai co it nhat 1 khoi `Buoc '...'`.
+            KhangDinh ($buocBatBuoc.Count -ge 8) "Danh muc buoc bat buoc chi co $($buocBatBuoc.Count) muc ⇒ phep kiem thieu."
+            KhangDinh ($noiDung.Contains("Buoc 'Don san")) 'Khong thay khoi Buoc cua don san ⇒ phep kiem doc sai tep.'
+        }
+
+        It 'W2) XOA mot buoc ⇒ phep kiem PHAI BAO DO (🛡️ chieu nguoc: chong "kiem luon xanh")' {
+            # 🔒 Chieu nguoc la **bat buoc**: mot phep kiem khong bao gio do thi khong phai phep kiem.
+            # 📌 Dung chinh noi dung that roi **cat** dong cua buoc ⑫ ⇒ ham phai tra ve **dung** ten do.
+            $tepCong = Join-Path $PSScriptRoot 'kiem-tat-ca.ps1'
+            $noiDung = [IO.File]::ReadAllText($tepCong)
+
+            $dongGoc = "probe-don-san.ps1"
+            KhangDinh ($noiDung.Contains($dongGoc)) 'Tep that khong chua buoc ⑫ ⇒ khong the lam ca chieu nguoc.'
+
+            # ⚠️ Thay TEN BUOC bang mot chuoi khac (khong xoa ca khoi) — du de ham thuan bao thieu.
+            $noiDungDaXoa = $noiDung.Replace("'probe-don-san.ps1'", "'probe-don-san-DA-BI-XOA.ps1'")
+            KhangDinh ($noiDungDaXoa -ne $noiDung) 'Phep thay KHONG xay ra ⇒ ca chieu nguoc VO NGHIA (§26.5 #1).'
+
+            $thieu = @(BuocBiThieu -NoiDung $noiDungDaXoa -DanhMuc $buocBatBuoc)
+
+            BangNhau $thieu.Count 1 'Xoa dung mot buoc thi phai bao thieu dung mot buoc'
+            BangNhau $thieu[0] 'probe-don-san.ps1' 'Phai bao thieu DUNG buoc vua bi xoa'
+        }
+    }
+}
+
+# ══════════════════════════════════════════════════════════════════════════════════════════════
 # NHOM 2 — `ham-tiem.ps1` (📌 nhanh, KHONG cham DB)
 # ══════════════════════════════════════════════════════════════════════════════════════════════
 if (-not $ChiKiemDb) {

@@ -222,7 +222,7 @@ function Cho-DieuKien {
 }
 
 function Goi-Api {
-    param([string]$PhuongThuc, [string]$DuongDan, [string]$Token)
+    param([string]$PhuongThuc, [string]$DuongDan, [string]$Token, [object]$Body = $null)
 
     $thamSo = @{
         Method             = $PhuongThuc
@@ -233,11 +233,43 @@ function Goi-Api {
         ContentType        = 'application/json'
     }
 
+    if ($null -ne $Body) {
+        $thamSo.Body = ($Body | ConvertTo-Json -Depth 8 -Compress)
+    }
+
     $tra = Invoke-RestMethod @thamSo
     $ma = [int]$maHttp
 
     return [pscustomobject]@{ Ma = $ma; DuLieu = $tra; Than = ($tra | ConvertTo-Json -Depth 8 -Compress) }
 }
+
+<#
+    🔒 **XOÁ CACHE QUYỀN TRƯỚC KHI KHỞI ĐỘNG HOST** (`ADDR-004`/`S2` đo được 18/10/2026, lặp lại ở `S6`):
+    ABP cache **kết quả ÂM** (`KHÔNG được cấp`) của `AbpPermissionGrants`. Khi permission **mới** được cấp
+    (DbMigrator), bản ghi "denied" cũ vẫn nằm trong Redis ⇒ API mới trả **`403`** dù DB **đã** cấp.
+    📌 Và `0 key` là **dấu hiệu MẪU SAI**, không phải *"không có gì để xoá"* (`README-probe` **I1**) ⇒ phải **in** số key.
+    ⚠️ **`S6` cũng đo được bẫy liền kề:** thêm permission vào provider **KHÔNG** tự cấp cho `admin` —
+    phải chạy **DbMigrator** (seeder `IdentityDataSeedContributor`) thì `AbpPermissionGrants` mới có dòng.
+    Thiếu bước đó ⇒ `403` **cho chính admin**, triệu chứng **không trỏ** tới chỗ sai (`XC-004` D2).
+#>
+function Xoa-CacheQuyen {
+    $soKey = 0
+
+    try {
+        $dem = & docker exec ecommerce-redis sh -c "redis-cli --scan --pattern '*PermissionGrant*' | wc -l" 2>$null
+
+        if ($null -ne $dem) { $soKey = [int](("$dem").Trim()) }
+
+        & docker exec ecommerce-redis sh -c 'redis-cli --scan --pattern "*PermissionGrant*" | while read k; do redis-cli DEL "$k" > /dev/null; done' 2>$null | Out-Null
+    }
+    catch {
+        # 📌 Không xoá được cache KHÔNG phải lỗi sản phẩm — nhưng phải NÓI RA (không im lặng).
+        Write-Output ("   ⚠️ Không xoá được cache quyền trong Redis: {0}" -f $_.Exception.Message)
+    }
+
+    return $soKey
+}
+
 
 function Dem-SuKien {
     param([string]$MaDon)
@@ -376,6 +408,11 @@ select count(*)::text from "SalMarketplaceOrderIntakes" where "ExternalOrderId" 
     }
 
     Start-Sleep -Seconds 1
+
+    # 🔒 Xoá cache quyền **trước** khi Host lên (xem chú thích `Xoa-CacheQuyen`) — 📌 và **in số key**:
+    # `0 key` là dấu hiệu **mẫu sai**, không phải "không có gì để xoá".
+    $soKeyQuyen = Xoa-CacheQuyen
+    Write-Output ("   Xoa cache quyen: {0} key (mau *PermissionGrant*)" -f $soKeyQuyen)
 
     $tienTrinh = Start-Process dotnet -ArgumentList 'eCommerce.HttpApi.Host.dll' -WorkingDirectory $binHost `
         -PassThru -WindowStyle Hidden -RedirectStandardOutput $logHost `
@@ -624,6 +661,82 @@ select count(*)::text from (
     Kq 'C35 log co neo duong ghi nhat ky su kien' $coNeoGhi '[MP-EVENTLOG-DA-GHI]'
     Kq 'C36 log co neo day DLQ' $coNeoDlq '[DLQ-DA-DAY]'
     Kq 'C37 log co neo ap watermark' $coNeoWm '[WM-DA-AP]'
+
+    # ── ⑪ 🚨 CỔNG VẬN HÀNH: ĐỌC WATERMARK + **HẠ CỜ** `GapSuspected` (`SAL-005` §21) ─────────────
+    # 🔑 **VÌ SAO PHẢI ĐO Ở ĐÂY:** job `D12` phát hiện cờ nhưng **cố ý không tự hạ** (§19.2). Trước `S6`,
+    # `DanhDauDaDoiSoat` **không có người gọi nào** ⇒ cờ chỉ hạ được bằng **SQL tay** ⇒ vế *"để cờ không tồn
+    # đọng"* của `S6` mới đúng **một nửa**. Ba câu hỏi chỉ HTTP thật trả lời được:
+    #   ① route + verb + **permission mới** có thật không (thiếu định nghĩa ⇒ `403` cho MỌI người kể cả admin);
+    #   ② **thiếu lý do ⇒ bị chặn** và cờ **KHÔNG** đổi (đo **cả hai chiều**);
+    #   ③ hạ cờ **KHÔNG** được đụng **watermark** (BR-008: watermark chỉ tiến qua luật 4 nhánh).
+    $duongIntake = '/api/app/marketplace-intake/intake?ChannelCode=shopee&ExternalOrderId='
+    $duongDoiSoat = '/api/app/marketplace-intake/mark-reconciled'
+
+    $kqKhongToken = Goi-Api -PhuongThuc 'Get' -DuongDan ($duongIntake + $donD.ExternalOrderId) -Token ''
+
+    Kq 'C38 GET intake KHONG token => 401 (cong duoc bao ve)' ($kqKhongToken.Ma -eq 401) `
+        ('HTTP {0}' -f $kqKhongToken.Ma)
+
+    $kqGetD = Goi-Api -PhuongThuc 'Get' -DuongDan ($duongIntake + $donD.ExternalOrderId) -Token $token
+
+    $gapApi = $kqGetD.DuLieu.gapSuspected
+    $wmApi = $kqGetD.DuLieu.appliedSourceVersion
+
+    Kq 'C39 GET intake => 200 + tra DUNG co gap va watermark' `
+        ($kqGetD.Ma -eq 200 -and $gapApi -eq $true -and [long]$wmApi -eq $donD.PhienBan) `
+        ('HTTP {0} · gap={1} · wm={2} (mong doi {3})' -f $kqGetD.Ma, $gapApi, $wmApi, $donD.PhienBan)
+
+    # 🚨 **THIẾU LÝ DO ⇒ bị chặn.** ⚠️ ABP biến `BusinessException` thành **`403`** (không phải `400`) —
+    # bài học `S2-3`; 📌 nếu probe kỳ vọng `400` thì nó sẽ **KHÔNG BAO GIỜ** xanh, hoặc tệ hơn: ai đó "sửa"
+    # sản phẩm cho ra `400` để chiều phép đo.
+    $kqThieuLyDo = Goi-Api -PhuongThuc 'Post' -DuongDan $duongDoiSoat -Token $token `
+        -Body @{ ChannelCode = 'shopee'; ExternalOrderId = $donD.ExternalOrderId; Reason = '   ' }
+
+    $maLoiThieuLyDo = $kqThieuLyDo.Than -match 'eCommerce:Marketplace:0005'
+    $gapSauThieuLyDo = So-Db ($mauDemGap -f $donD.ExternalOrderId)
+
+    Kq 'C40 🚨 ha co THIEU ly do => 403 + ma 0005' ($kqThieuLyDo.Ma -eq 403 -and $maLoiThieuLyDo) `
+        ('HTTP {0} · co ma 0005 = {1}' -f $kqThieuLyDo.Ma, $maLoiThieuLyDo)
+
+    Kq 'C41 🚨 thieu ly do thi co VAN BAT (khong ha trom)' ($gapSauThieuLyDo -eq 1) ('co = {0}' -f $gapSauThieuLyDo)
+
+    $kqDoiSoat = Goi-Api -PhuongThuc 'Post' -DuongDan $duongDoiSoat -Token $token `
+        -Body @{
+            ChannelCode     = 'shopee'
+            ExternalOrderId = $donD.ExternalOrderId
+            Reason          = 'K9S6 probe: da doi chieu don nay voi san, khop'
+        }
+
+    Kq 'C42 POST mark-reconciled (co ly do) => 200 + gap = false' `
+        ($kqDoiSoat.Ma -eq 200 -and $kqDoiSoat.DuLieu.gapSuspected -eq $false) `
+        ('HTTP {0} · gap={1}' -f $kqDoiSoat.Ma, $kqDoiSoat.DuLieu.gapSuspected)
+
+    $wmSauDoiSoat = Lay-Watermark $donD.ExternalOrderId
+    $gapSauDoiSoat = So-Db ($mauDemGap -f $donD.ExternalOrderId)
+    $coMocDoiSoat = So-Db (@'
+select count(*)::text from "SalMarketplaceOrderIntakes" where "ExternalOrderId" = '{0}' and "LastReconciledAtUtc" is not null;
+'@ -f $donD.ExternalOrderId)
+
+    Kq 'C43 🚨 ha co KHONG dung toi WATERMARK (BR-008)' ($wmSauDoiSoat -eq $donD.PhienBan) `
+        ('wm = {0} · truoc = {1}' -f $wmSauDoiSoat, $donD.PhienBan)
+    Kq 'C44 ha co that: co = false + co moc doi soat (audit)' ($gapSauDoiSoat -eq 0 -and $coMocDoiSoat -eq 1) `
+        ('co = {0} · moc doi soat = {1}' -f $gapSauDoiSoat, $coMocDoiSoat)
+
+    $kqGetLai = Goi-Api -PhuongThuc 'Get' -DuongDan ($duongIntake + $donD.ExternalOrderId) -Token $token
+
+    Kq 'C45 GET lai => 200 + gap = false (da luu that)' `
+        ($kqGetLai.Ma -eq 200 -and $kqGetLai.DuLieu.gapSuspected -eq $false) `
+        ('HTTP {0} · gap={1} · moc doi soat={2}' -f $kqGetLai.Ma, $kqGetLai.DuLieu.gapSuspected, $kqGetLai.DuLieu.lastReconciledAtUtc)
+
+    # 📌 `404` cho đơn **chưa từng** được nhận — *"không có"* KHÁC *"có và đang chờ đối soát"*.
+    $kqKhongCo = Goi-Api -PhuongThuc 'Get' -DuongDan ($duongIntake + 'K9S6-KHONG-CO-DON-NAY') -Token $token
+
+    Kq 'C46 GET don chua tung nhan => 404 (khong nhao 200 + rong)' ($kqKhongCo.Ma -eq 404) `
+        ('HTTP {0}' -f $kqKhongCo.Ma)
+
+    $coNeoDoiSoat = Select-String -Path $logHost -Pattern '[MP-DA-DOI-SOAT]' -SimpleMatch -Quiet
+
+    Kq 'C47 log co neo doi soat (duong ha co chay that)' $coNeoDoiSoat '[MP-DA-DOI-SOAT]'
 }
 finally {
     # ── DỌN DẸP — kể cả khi một ca trên đã ném ────────────────────────────────────────────────
@@ -661,11 +774,11 @@ select count(*)::text from "AbpUsers" where "NormalizedUserName" = 'ADMIN' and "
     Write-Output ('   DON DEP: host da dung · don={0} · nhatky={1} · sukien={2} · dlq={3} · chongtrung={4} · shop={5} · co bao mat={6}' -f `
             $sau.Don, $sau.NhatKy, $sau.SuKien, $sau.Dlq, $sau.ChongTrung, $sau.Shop, $coBaoMat)
 
-    Kq 'C38 DON DEP: khong con du lieu probe' ($tongSau -eq 0) (
+    Kq 'C48 DON DEP: khong con du lieu probe' ($tongSau -eq 0) (
         'don={0} · nhatky={1} · sukien={2} · dlq={3} · chongtrung={4} · shop={5}' -f `
             $sau.Don, $sau.NhatKy, $sau.SuKien, $sau.Dlq, $sau.ChongTrung, $sau.Shop)
 
-    Kq 'C39 DON DEP: da BAT LAI co ShouldChangePasswordOnNextLogin' ($coBaoMat -eq 1) ('co = {0}' -f $coBaoMat)
+    Kq 'C49 DON DEP: da BAT LAI co ShouldChangePasswordOnNextLogin' ($coBaoMat -eq 1) ('co = {0}' -f $coBaoMat)
 
     # 📌 Xoá biến môi trường của probe để không ảnh hưởng tiến trình khác trong cùng phiên PowerShell.
     Remove-Item Env:ChannelHub__Shopee__PocOrdersPerPull -ErrorAction SilentlyContinue

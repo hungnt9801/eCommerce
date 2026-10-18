@@ -882,7 +882,7 @@ gieo 4 shop (SQL)  →  Host thật (PocOrdersPerPull=1, Supervisor=3600s)
    →  đo DB thật: OrdOrders · SalMarketplaceOrderIntakes · SalMarketplaceEventLogs · MsgDeadLetters
 ```
 
-📌 **Bốn câu hỏi nó trả lời** (39 ca): event lỗi ⇒ DLQ **và payload còn nguyên** · watermark chạy **trên dữ
+📌 **Năm câu hỏi nó trả lời** (**49 ca**): event lỗi ⇒ DLQ **và payload còn nguyên** · watermark chạy **trên dữ liệu thật** (`AppliedSourceVersion ≠ null`) · **gửi lại không DLQ giả** · job `D12` chạy **xong** · **cổng hạ cờ `GapSuspected`** bảo vệ đúng (`401`/`403`/`404`/`200` — `C38`…`C47`).
 liệu thật** (`AppliedSourceVersion ≠ null`) · **gửi lại không DLQ giả** · job `D12` chạy **xong**.
 
 ### 🚨 BA CÁI BẪY MỚI — `S6`, 18/10/2026
@@ -917,3 +917,14 @@ trùng** (`MsgIdempotencyRecords.KeyValue` = `ExternalOrderId`) quên xoá ⇒ l
 `ChannelHub:Shopee:PocOrdersPerPull` = `1` ⇒ connector PoC trả **đúng 1** đơn giả **tất định** (cùng con trỏ ⇒
 cùng đơn, cùng `update_time`). Nhịp supervisor = `3600` ⇒ **không** có nhịp nền nào chen vào giữa phép đo.
 📌 Cả hai **chỉ** đặt trong tiến trình Host của probe ⇒ **không** commit cấu hình dev vào `appsettings.json`.
+
+#### S6-4. 🚨 Thêm **permission** vào provider **KHÔNG** tự cấp cho `admin` ⇒ `403` dù code đúng
+
+| | |
+|---|---|
+**Triệu chứng** | API mới trả **`403`** ngay cả với `admin`, trong khi hằng số **và** định nghĩa permission **đã có đủ** (`BatBienPhanQuyenTests` xanh). `select count(*) from "AbpPermissionGrants"` vẫn là con số **cũ** |
+**Nguyên nhân** | Định nghĩa permission (trong `eCommercePermissionDefinitionProvider`) chỉ nói *"quyền này tồn tại"*. Việc **cấp** cho vai trò `admin` do **seeder** (`IdentityDataSeedContributor`) làm khi chạy **`eCommerce.DbMigrator`** — mà chạy Host (`dotnet run`) **không** chạy seeder |
+**Cách tránh** | Sau khi thêm permission: chạy **`dotnet eCommerce.DbMigrator.dll`** ⇒ kiểm **số dòng** `AbpPermissionGrants` **tăng đúng** (58 → **61**). ➕ Xoá **cache quyền** (`*PermissionGrant*`) **trước** khi khởi động Host — ABP cache **kết quả ÂM**, nên `403` cũ vẫn nằm đó dù DB đã cấp (`README-probe` **I1**, `ADR-004`/`S2`) |
+**Bài học** | 📌 *"đã định nghĩa"* và *"đã cấp"* là **hai** chuyện khác nhau. 🔑 Và triệu chứng của cả hai **giống hệt nhau**: `403`. ⇒ Luôn in **số dòng** của `AbpPermissionGrants` **trước** khi kết luận về code |
+
+📌 **Cùng họ với `S6-1`:** cả hai đều là *"phép đo của tôi nói sai về sản phẩm"* — không phải sản phẩm sai.

@@ -75,6 +75,16 @@ public class eCommercePermissionDefinitionProvider : PermissionDefinitionProvide
         var payments = group.AddPermission(eCommerceConsts.Permissions.Payments.Default);
         payments.AddChild(eCommerceConsts.Permissions.Payments.Refund);
 
+        // ---- Đơn sàn: cổng vận hành (`SAL-005`, `S6`) ----
+        // 🚨 BẮT BUỘC khai ở CẢ HAI NƠI (hằng số + ở đây): thiếu một nơi ⇒ `403` cho MỌI người kể cả `admin`.
+        // 🔒 Tách `View` khỏi `Reprocess`: **hạ cờ `GapSuspected`** là **KHẲNG ĐỊNH** *"đã kiểm và dữ liệu khớp"*
+        // ⇒ nó **xoá một cảnh báo** (khả năng mất dữ liệu) ⇒ **không** gán cho vai trò chỉ-xem.
+        // 📌 Nếu job `D12` phát hiện cờ mà **không ai** hạ được bằng đường chính thức thì cờ **tồn đọng**
+        // — đúng vế còn thiếu của `S6` (xem `sal-005` §21).
+        var marketplaceIntake = group.AddPermission(eCommerceConsts.Permissions.MarketplaceIntake.Default);
+        marketplaceIntake.AddChild(eCommerceConsts.Permissions.MarketplaceIntake.View);
+        marketplaceIntake.AddChild(eCommerceConsts.Permissions.MarketplaceIntake.Reprocess);
+
         // ---- Thuế (XC-006) ----
         var tax = group.AddPermission(eCommerceConsts.Permissions.TaxClassification.Default);
         tax.AddChild(eCommerceConsts.Permissions.TaxClassification.View);

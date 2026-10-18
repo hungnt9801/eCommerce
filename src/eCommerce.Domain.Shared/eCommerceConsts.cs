@@ -90,6 +90,33 @@ public static class eCommerceConsts
         }
 
         /// <summary>
+        /// 🆕 `S6` — **cổng vận hành của đơn sàn** (`SAL-005` §9): đọc watermark và **hạ cờ `GapSuspected`**.
+        ///
+        /// 📌 **HAI QUYỀN TÁCH BIỆT CÓ CHỦ Ý:**
+        /// <list type="bullet">
+        ///   <item><see cref="View"/> — chỉ **đọc** trạng thái (nhân viên vận hành);</item>
+        ///   <item><see cref="Reprocess"/> — **hạ cờ**, tức **khẳng định** *"đã kiểm và dữ liệu khớp"*
+        ///     ⇒ ảnh hưởng **tính đúng** của danh sách cảnh báo ⇒ 🔒 **không** gán cho vai trò chỉ-xem
+        ///     (`SAL-005` §9: *"thao tác này đóng cờ đối soát ⇒ ảnh hưởng tính đúng của báo cáo"*).</item>
+        /// </list>
+        ///
+        /// 🚨 **BẮT BUỘC khai ở CẢ HAI NƠI** (hằng số ở đây + `eCommercePermissionDefinitionProvider`):
+        /// thiếu ở provider ⇒ ABP coi là **luôn bị từ chối** ⇒ **`403` cho MỌI người, kể cả admin**
+        /// (`XC-004` D2/E3 — lỗi Phase 0). 🛡️ Lưới an toàn: `BatBienPhanQuyenTests.TC02/TC02b` (hai chiều).
+        ///
+        /// ⚠️ **Vì sao `Sales` chứ không `Orders`:** đây là **cổng NHẬN đơn sàn** (watermark/đối soát), không
+        /// phải nghiệp vụ đơn nội bộ của `SAL-003`. 📌 `SAL-005` §6.2 đã cảnh báo rủi ro **hai tiền tố**
+        /// (`eCommerce:Sales:*` vs `eCommerce:Order:*`) — ở **tầng permission** thì tách là **đúng**, vì hai
+        /// quyền này bảo vệ **hai việc khác nhau**; còn ở **tầng mã lỗi** thì vẫn giữ một tiền tố `Marketplace`.
+        /// </summary>
+        public static class MarketplaceIntake
+        {
+            public const string Default = GroupName + ".Sales.MarketplaceIntake";
+            public const string View = Default + ".View";
+            public const string Reprocess = Default + ".Reprocess";
+        }
+
+        /// <summary>
         /// Quyền của module <b>Tax</b> (XC-006). Ba việc tách biệt có chủ ý:
         /// kế toán nhập liệu — kế toán trưởng duyệt — kế toán trưởng xuất Mẫu 01.
         /// </summary>

@@ -441,9 +441,9 @@ im lặng mà `XC-002` D4/D5 cảnh báo.
 | Method | Input (DTO) | Output (DTO) | Permission | Ghi chú |
 |---|---|---|---|---|
 | `GetIntakesAsync` | `GetIntakeInput` (`Status`/`ChannelCode`/`GapSuspected`/khoảng ngày + phân trang) | `PagedResultDto<MarketplaceIntakeDto>` | `eCommerce.Sales.MarketplaceIntake.View` | ⬜ **đề xuất — chưa có trong code** |
-| `GetIntakeAsync` | `channelCode` + `externalOrderId` | `MarketplaceIntakeDto` | `eCommerce.Sales.MarketplaceIntake.View` | trả **cả** watermark + cờ `GapSuspected` ⇒ Ops biết ngay vì sao đơn không cập nhật |
+| `GetIntakeAsync` | `GetIntakeInput` (kênh + mã đơn sàn) | `MarketplaceIntakeDto` | `eCommerce.Sales.MarketplaceIntake.View` | ✅ **ĐÃ CÓ CODE 18/10/2026 (§21)** — trả **cả** watermark + cờ `GapSuspected` ⇒ Ops biết ngay vì sao đơn không cập nhật. 📌 `404` nếu đơn **chưa từng** được nhận (khác *"có và đang chờ"*) |
 | `GetEventLogAsync` | `channelCode` + `externalOrderId` + phân trang | `PagedResultDto<MarketplaceEventLogDto>` | `eCommerce.Sales.MarketplaceIntake.View` | mới nhất trước; **không** trả `FailureMessage` thô nếu chưa che PII |
-| `MarkReconciledAsync` | `channelCode` + `externalOrderId` + `reason` | `MarketplaceIntakeDto` | `eCommerce.Sales.MarketplaceIntake.Reprocess` | **chỉ** Ops; **bắt buộc** lý do (audit). **Không** cho sửa watermark bằng tay |
+| `MarkReconciledAsync` | `MarkReconciledInput` (kênh + mã đơn sàn + **lý do**) | `MarketplaceIntakeDto` | `eCommerce.Sales.MarketplaceIntake.Reprocess` | ✅ **ĐÃ CÓ CODE 18/10/2026 (§21)** — **chỉ** Ops; **bắt buộc** lý do (audit) ⇒ thiếu ⇒ **`403` + `0005`** và cờ **KHÔNG** đổi. **Không** cho sửa watermark |
 | ~~`SetWatermarkAsync`~~ | — | — | — | 🚫 **KHÔNG TỒN TẠI** — BR-008: watermark **chỉ** tiến qua luật 4 nhánh; sửa tay = mở đường cho ghi đè trạng thái mới hơn |
 
 ### 6.2 REST endpoint
@@ -451,9 +451,9 @@ im lặng mà `XC-002` D4/D5 cảnh báo.
 | Method / Route | Permission | Mô tả | Trạng thái |
 |---|---|---|---|
 | `GET /api/app/sales/marketplace-intakes` | `eCommerce.Sales.MarketplaceIntake.View` | danh sách đơn sàn + watermark + cờ | ⬜ **chưa có trong code - kế hoạch GĐ1** |
-| `GET /api/app/sales/marketplace-intakes/{channelCode}/{externalOrderId}` | `eCommerce.Sales.MarketplaceIntake.View` | chi tiết một đơn sàn | ⬜ kế hoạch GĐ1 |
+| ✅ **THẬT:** `GET /api/app/marketplace-intake/intake?ChannelCode={kênh}&ExternalOrderId={mã}` | `eCommerce.Sales.MarketplaceIntake.View` | chi tiết một đơn sàn (watermark + cờ) | ✅ **đã có** — 📌 route **thật** đọc từ `swagger.json`; route viết trong tài liệu bản trước (`/api/app/sales/marketplace-intakes/…`) **KHÔNG TỒN TẠI** (lần thứ **5** của bẫy `S2-1`) |
 | `GET /api/app/sales/marketplace-intakes/{channelCode}/{externalOrderId}/events` | `eCommerce.Sales.MarketplaceIntake.View` | nhật ký sự kiện (append-only) | ⬜ kế hoạch GĐ1 |
-| `POST /api/app/sales/marketplace-intakes/{channelCode}/{externalOrderId}/mark-reconciled` | `eCommerce.Sales.MarketplaceIntake.Reprocess` | Ops xác nhận đã đối soát | ⬜ kế hoạch GĐ1 |
+| ✅ **THẬT:** `POST /api/app/marketplace-intake/mark-reconciled` (body `MarkReconciledInput`) | `eCommerce.Sales.MarketplaceIntake.Reprocess` | Ops xác nhận đã đối soát ⇒ **hạ cờ** `GapSuspected` | ✅ **đã có** — 📌 `403` khi thiếu lý do (**ABP biến `BusinessException` thành `403`**, không phải `400` — `S2-3`), `404` khi đơn không có |
 | ~~`POST /api/webhooks/...`~~ | — | — | 🚫 **KHÔNG THUỘC `SAL-005`** — endpoint webhook do `CHN-002` §6.3 sở hữu (`POST /api/webhooks/shopee/order`), và **phải** là `[AllowAnonymous]` **có** trong allowlist `XC-004` Q1 (xem **F6** §15.2) |
 
 | Mục | Giá trị |
@@ -493,6 +493,7 @@ hiện chỉ có `InsufficientStock` và `PaymentSignatureInvalid`.
 | `eCommerce:Sales:0004` | `409` | `ChannelShop` không tồn tại / không hoạt động | `Shop của kênh không tồn tại hoặc đã ngắt kết nối.` | ⬜ kế hoạch GĐ1 |
 | `eCommerce:Sales:0005` | `400` | Giảm giá ghi **cả hai** nơi (line + order) — BR-011 | `Giảm giá của sàn bị ghi trùng ở hai cấp.` | ⬜ kế hoạch GĐ1 |
 | `eCommerce:Sales:0006` | `409` | Không giành được khoá `mp-intake` trong timeout | `Đơn sàn đang được xử lý bởi tiến trình khác, vui lòng thử lại.` | ⬜ kế hoạch GĐ1 |
+| `eCommerce:Marketplace:0005` | `403` | 🆕 `S6`: **hạ cờ `GapSuspected` mà thiếu lý do** | `Hạ cờ đối soát BẮT BUỘC có lý do (audit).` | ✅ **đã có** (§21) — 📌 ABP trả **`403`** cho `BusinessException` (`S2-3`) |
 | `eCommerce:Messaging:0002` | `409` | Cùng khoá + **khác** `PayloadHash` | *(đã định nghĩa ở `XC-002` §6.2)* | ⚠️ phụ thuộc nền `XC-002` (chưa có trong code) |
 | `eCommerce:Order:0001` / `:0006` | `409` | Chuyển trạng thái sai / đơn ở trạng thái hấp thụ | *(đã định nghĩa ở `SAL-003` §6.2)* | ⚠️ phụ thuộc `SAL-003` (chưa có trong code) |
 
@@ -675,8 +676,8 @@ hiện chỉ có `InsufficientStock` và `PaymentSignatureInvalid`.
 | Permission | Nhóm | Method được gán | Vai trò mặc định | Trạng thái |
 |---|---|---|---|---|
 | `eCommerce.Orders.Default` | `Orders` | `[Authorize]` cấp class | admin | ✅ **đã có** (`eCommercePermissionDefinitionProvider.cs:43`) |
-| `eCommerce.Sales.MarketplaceIntake.View` | `Sales` | `GetIntakesAsync`, `GetIntakeAsync`, `GetEventLogAsync` | admin · nhân viên vận hành | ⬜ **đề xuất — chưa có trong code** (kế hoạch GĐ1) |
-| `eCommerce.Sales.MarketplaceIntake.Reprocess` | `Sales` | `MarkReconciledAsync` | **chỉ** quản trị/kế toán | ⬜ **đề xuất** — thao tác này **đóng cờ đối soát** ⇒ ảnh hưởng tính đúng của báo cáo, **không** gán cho vai trò chỉ-xem |
+| `eCommerce.Sales.MarketplaceIntake.View` | `Sales` | `GetIntakeAsync` | admin · nhân viên vận hành | ✅ **ĐÃ ĐỊNH NGHĨA 18/10/2026 (§21)** — hằng số `eCommerceConsts.Permissions.MarketplaceIntake.View` (**hai nơi**) |
+| `eCommerce.Sales.MarketplaceIntake.Reprocess` | `Sales` | `MarkReconciledAsync` | **chỉ** quản trị/kế toán | ✅ **ĐÃ ĐỊNH NGHĨA 18/10/2026 (§21)** — thao tác này **đóng cờ đối soát** ⇒ ảnh hưởng tính đúng của báo cáo, **không** gán cho vai trò chỉ-xem |
 | `eCommerce.Messaging.DeadLetter.View` / `.Replay` | `Messaging` | xem/phát lại DLQ xung đột (A3) | admin tenant | ⬜ **đề xuất của `XC-002` §9** — `SAL-005` **dùng lại**, **không** định nghĩa permission riêng cho phát lại |
 
 > ⚠️ **Bắt buộc theo `XC-004`:** mọi permission dùng trong `[Authorize]` **phải** được định nghĩa trong
@@ -1488,3 +1489,72 @@ Hệ quả: một bản **cũ hơn** đến sau được coi là *"chưa có wat
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.2 | 18/10/2026 | *(agent, phiên `S6`)* | **§20 — LÁT CẮT 5**: **`SalMarketplaceEventLogs`** (append-only, 7 kết cục) + **`MarketplaceEventLogWriter`** (UoW riêng, nhận biết trùng bằng **đọc lại DB**) + handler ghi **đúng một dòng ở MỌI nhánh** + **ghi watermark ngay lần đầu** + migration (`NND 52→53`, 3 index, 2 `CHECK`) + **connector PoC trả `update_time`** + **`MarketplacePayloadHash`** + **bước ⑫** của cổng (`probe-don-san.ps1`, **39 ca**). 🚨 **HAI LỖI THẬT:** (#1) **hash chống trùng băm cả `CorrelationId`** ⇒ **DLQ GIẢ ở mọi lần kéo lại** — 1358 test cũ **không** thấy vì cần **hai** lần gửi khác `CorrelationId`; **đo hai chiều**: tiêm lại mã cũ ⇒ `C31`/`C32` **ĐỎ** (DLQ **2 → 3**), mã đã sửa ⇒ **39/39**; (#2) **dòng intake mới không ghi watermark** ⇒ bản **cũ hơn** đến sau vẫn **ghi đè**. 🔑 **HAI QUYẾT ĐỊNH:** (①) khoá unique **có `Outcome`** — thiếu nó thì `Duplicate` là **giá trị CHẾT**; (②) `ThieuWatermark` là **giá trị riêng** (không dùng `Late`). 📊 **Số đo:** unit **1347 → 1363** · integration **57 → 67** · NND **52 → 53** · migration **39 → 40** · bất biến DB **24 → 25** · quét GUID **85 → 86** · cổng **11 → 12 bước**. 🐞 **Ba bẫy của phép đo:** `-SimpleMatch` coi `\` là ký tự thật ⇒ **6 ca ĐỎ GIẢ** · route thật là `/channel/{id}/sync-now` (**404** ngay lần đầu) · dọn probe **phải** xoá `MsgIdempotencyRecords`. ⚠️ **VẪN KHÔNG `Implemented`** (§20.7): **`Order` nội bộ chưa cập nhật khi áp watermark** · chưa có UI nhật ký · hai định nghĩa hash · `Q5` mở · chưa retention · chưa kiểm tiền thật |
+
+---
+
+## 21. ✅ **LÁT CẮT 5b — CỔNG VẬN HÀNH: ĐỌC WATERMARK + HẠ CỜ `GapSuspected`** (18/10/2026) — *phiên `S6`*
+
+> ⚠️ **VÌ SAO CÓ LÁT CẮT NÀY (một vế của `S6` còn thiếu):** câu chữ của `S6` là *"worker `D12` đối soát để cờ
+> `GapSuspected` **không tồn đọng**"*. Đo lại thì job `D12` **phát hiện + cảnh báo** rất tốt (§19), nhưng
+> **`DanhDauDaDoiSoat` không có NGƯỜI GỌI NÀO** — chỉ có trong chú thích + unit test. ⇒ Cờ chỉ hạ được bằng
+> **SQL tay**, và *"cờ tồn đọng"* được **nhìn thấy** nhưng **không ai xử lý được** bằng đường chính thức.
+> 🔑 Lát cắt này đóng nốt nửa còn lại — theo đúng ý §19.2 (*"job CỐ Ý không tự hạ cờ"* ⇒ phải có **người** hạ).
+
+### 21.1 Đã làm
+
+| # | Thành phần | Tệp | Nội dung |
+|---|---|---|---|
+| **1** | `MarketplaceIntakeAppService` + `IMarketplaceIntakeAppService` | `src/eCommerce.Application/Sales/`, `src/eCommerce.Application.Contracts/Sales/` | `GetIntakeAsync` (đọc watermark + cờ) · `MarkReconciledAsync` (**hạ cờ**, **bắt buộc lý do**, **giữ nguyên watermark**) |
+| **2** | **2 permission** khai **HAI NƠI** | `eCommerceConsts.Permissions.MarketplaceIntake` + `eCommercePermissionDefinitionProvider` | `…MarketplaceIntake.View` (đọc) · `…Reprocess` (**hạ cờ** — tách khỏi `View` vì đây là **xoá một cảnh báo**) |
+| **3** | Mã lỗi `eCommerce:Marketplace:0005` | `MarketplaceErrorCodes` | Hạ cờ **thiếu lý do** ⇒ `BusinessException` ⇒ HTTP **`403`** (ABP — xem §21.3 ②) |
+| **4** | Bước ⑫ mở rộng **+8 ca** (`C38`…`C47`) | `tools\probe-don-san.ps1` | `401` (không token) · `200` + đúng `gap`/`watermark` · **thiếu lý do ⇒ `403` + `0005` VÀ cờ không đổi** · có lý do ⇒ `200` + `gap=false` · **watermark KHÔNG đổi** · `404` đơn chưa từng nhận · neo log `[MP-DA-DOI-SOAT]` |
+| **5** | **4 unit test reflection** | `test/eCommerce.Tests/Marketplace/MarketplaceIntakeCongVanHanhTests.cs` | `[Authorize]` cấp class · mỗi method có permission **riêng** + hai quyền **khác nhau** · **KHÔNG có đường đặt watermark** (BR-008) + hợp đồng **đúng 2** method · DTO **không** lộ `PayloadHash` (chỉ `AppliedPayloadHash`) |
+| **6** | `kiem-db.ps1` nhóm ④ yêu cầu 3 quyền mới | `tools\kiem-db.ps1` | 🔑 Nếu cổng hạ cờ **chết** thì cờ tồn đọng **vĩnh viễn** — và triệu chứng (`403` cho mọi người) **không trỏ** tới chỗ sai (`XC-004` D2) |
+
+### 21.2 ✅ Kiểm chứng
+
+| Hạng mục | Trước lát cắt | Sau |
+|---|---|---|
+| Unit test | 1363 | **1367** (+4) |
+| Ca của bước ⑫ | 39 | **49** (+10: 8 ca API + 2 ca dọn dẹp đổi số hiệu) |
+| `AbpPermissionGrants` (DB thật) | 58 | **61** (+3) |
+| Ca `test-cong-kiem.ps1` | 22 | **24** (+2: nhóm mới `W` — xem §21.4) |
+
+🔒 **Bất biến của cổng này (đo được trên HTTP thật):**
+`C40` thiếu lý do ⇒ **`403` + `0005`** · `C41` **cờ VẪN `true`** (không "hạ trộm") · `C43` **watermark KHÔNG đổi**
+(BR-008) · `C44` cờ `false` + **có mốc đối soát** (audit) · `C46` **`404`** cho đơn chưa từng nhận.
+
+### 21.3 Ba cái bẫy — cả ba đều **không** lộ ra ở unit test
+
+| # | Bẫy | Triệu chứng **đo được** | Cách tránh |
+|---|---|---|---|
+| ① | 🚨 **Thêm permission vào provider KHÔNG tự cấp cho `admin`** | API mới trả **`403`** dù hằng số + định nghĩa **đã có**; `AbpPermissionGrants` = **58** (không có dòng mới) | 🔒 Phải chạy **`eCommerce.DbMigrator`** (seeder `IdentityDataSeedContributor` cấp **mọi** permission đã định nghĩa cho `ADMIN`) ⇒ **61**. 📌 *"Đã định nghĩa"* và *"đã cấp"* là **hai** chuyện — đúng họ lỗi Phase 0 (`XC-004` D2) |
+| ② | **ABP trả `403` cho MỌI `BusinessException`** (không phải `400`/`409`) | Nếu probe kỳ vọng `400` thì nó **KHÔNG BAO GIỜ** xanh — hoặc tệ hơn: ai đó "sửa" sản phẩm cho ra `400` để **chiều phép đo** | `C40` khẳng định **`403`** + mã `0005`; bài học `S2-3` |
+| ③ | **Cache QUYỀN âm trong Redis** giữ `403` sau khi cấp quyền | `403` dù DB **đã** cấp; log chẩn đoán nói đúng *"đã định nghĩa · KHÔNG được cấp cho principal"* | Xoá `*PermissionGrant*` **trước** khi Host lên + **in số key đã xoá** (`0 key` = **mẫu sai**, không phải "không có gì để xoá" — `README-probe` **I1**) |
+
+### 21.4 Ca `W` — chống *"bước của cổng bị xoá mà cổng vẫn xanh"* (thêm vào `test-cong-kiem.ps1`)
+
+🔑 **Vấn đề đo được:** *"cổng 12 bước"* từng chỉ là **con số trong tài liệu**. 📌 Ai xoá/đổi tên một khối
+`Buoc '…'` trong `kiem-tat-ca.ps1` thì `-DayDu` vẫn **XANH**, và **không ai biết** rằng phần kiểm đó đã **ngừng chạy**.
+
+✅ **Cách chặn — hai ca, đo cả hai chiều:**
+• **`W1`** — danh mục **8 bước bắt buộc** (`kiem-moc-build` · `kiem-db` · `test-cong-kiem` · `kiem-e2e` ·
+`probe-so-dia-chi` · `probe-khach-hang` · `probe-thanh-toan` · **`probe-don-san`**) phải có **đủ** trong
+`kiem-tat-ca.ps1`;
+• **`W2`** — **cắt** tên bước ⑫ khỏi bản sao nội dung ⇒ hàm kiểm **phải** báo thiếu **đúng** bước đó
+(🛡️ chống "cổng kiểm luôn xanh").
+
+### 21.5 ⏳ Nợ còn lại (thuộc `S7`)
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+| **1** | Chưa có **danh sách** đơn bị đánh cờ (`GetIntakesAsync`: lọc theo kênh/cờ/khoảng ngày + phân trang) | Đường dùng hiện tại: log `[D12-GAP-TON-DONG]` in **khoá nghiệp vụ** của tối đa 20 đơn cũ nhất |
+| **2** | Chưa có API đọc **nhật ký sự kiện** (`GetEventLogAsync`) | Bảng đã có dữ liệu đúng; chưa có cửa đọc |
+| **3** | Chưa có **UI** cho cả hai | `S7` (cùng DLQ UI) |
+| **4** | Chưa có retention/dọn dữ liệu | Cả `SalMarketplaceEventLogs` và `MsgDeadLetters` **chỉ tăng** |
+
+### 21.6 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.3 | 18/10/2026 | *(agent, phiên `S6`)* | **§21 — CỔNG VẬN HÀNH** (đóng nốt vế *"cờ `GapSuspected` không tồn đọng"*): `MarketplaceIntakeAppService` (`GetIntakeAsync` + `MarkReconciledAsync`) · **2 permission khai hai nơi** (`View` tách khỏi `Reprocess`) · mã `eCommerce:Marketplace:0005` · **+8 ca** bước ⑫ (**49**) · **+4 unit test reflection** (**1367**) · **+2 ca `W`** cho `test-cong-kiem.ps1` (**24**) · `AbpPermissionGrants` **58 → 61**. 🐞 **Ba bẫy không lộ ở unit test:** ① permission **định nghĩa nhưng chưa CẤP** ⇒ `403` dù code đúng (phải chạy **DbMigrator**); ② ABP trả **`403`** cho `BusinessException` (không phải `400`); ③ **cache quyền âm** trong Redis giữ `403`. 🔒 **Đo hai chiều:** thiếu lý do ⇒ `403` + `0005` **và cờ KHÔNG đổi**; hạ cờ ⇒ **watermark KHÔNG đổi** (BR-008); đơn chưa từng nhận ⇒ **`404`**. ⚠️ Nợ `S7`: danh sách + nhật ký sự kiện + UI + retention |
