@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Volo.Abp;
+using Volo.Abp.Application.Dtos;
 using Volo.Abp.Application.Services;
 using Volo.Abp.DistributedLocking;
 using Volo.Abp.Domain.Repositories;
@@ -87,10 +88,30 @@ public class CustomerAppService : ApplicationService
     // 🚨 Ba method ĐỌC của hợp đồng `ICustomerDirectory` **KHÔNG** còn ở đây — chúng đã chuyển sang lớp
     // `CustomerDirectory` (xem chú thích ở đó: để ở đây thì swagger sinh `POST` cho method chỉ-đọc).
 
-    /// <summary>Danh sách khách (đọc cho UI vận hành). ⚠️ Có **trần** — chưa phân trang (nợ đã ghi).</summary>
-    public async Task<List<CustomerDto>> GetDanhSachAsync(string? keyword = null, int toiDa = 100)
+    /// <summary>
+    /// 🚨 **DANH SÁCH KHÁCH — CÓ PHÂN TRANG** (đóng nợ `CUS-001` **§16.4 #7** ở `S3`).
+    ///
+    /// **VÌ SAO PHẢI PHÂN TRANG (không phải "cho đẹp"):** trước `S3` hàm này trả **top N** với trần cứng 500 và
+    /// **không có tổng số** ⇒ màn hình `/KhachHang` **không thể** nói được *"còn bao nhiêu hồ sơ nữa"*.
+    /// 📌 Với dữ liệu cá nhân, *"không biết còn bao nhiêu"* dẫn tới hai hành vi đều sai: người vận hành
+    /// **tưởng đã xem hết** (bỏ sót khách đang bị chặn), hoặc **nâng trần** để lấy cả bảng (kéo toàn bộ PII về
+    /// một trang — đúng thứ `KhachHangController` cố ý chặn).
+    /// 🔑 Phân trang + `totalCount` biến câu hỏi *"còn ai nữa không"* thành **một con số**.
+    ///
+    /// 🔒 **TRẦN `maxResultCount` VẪN GIỮ NGHĨA "KHÔNG KÉO CẢ BẢNG"** (`Clamp(1, 200)`): phân trang **không**
+    /// phải giấy phép tải tất cả — 📌 nó chỉ đổi *"không lấy được dòng thứ 101"* thành
+    /// *"lấy được dòng thứ 101 ở **trang sau**"*.
+    /// </summary>
+    /// <param name="keyword">Lọc theo tên/email/SĐT (⚠️ **KHÔNG** log từ khoá — nó **chính là** PII nếu là email/SĐT).</param>
+    /// <param name="skipCount">Số dòng bỏ qua (⚠️ âm ⇒ coi như 0, không ném: một tham số URL sai **không** được làm sập màn hình).</param>
+    /// <param name="maxResultCount">Số dòng một trang — kẹp `1..200`.</param>
+    public async Task<PagedResultDto<CustomerDto>> GetDanhSachPhanTrangAsync(
+        string? keyword = null,
+        int skipCount = 0,
+        int maxResultCount = 20)
     {
-        var soLuong = Math.Clamp(toiDa, 1, 500);
+        var soLuong = Math.Clamp(maxResultCount, 1, 200);
+        var bo = Math.Max(0, skipCount);
 
         var truyVan = await _khachRepository.GetQueryableAsync();
 
@@ -102,9 +123,17 @@ public class CustomerAppService : ApplicationService
                 || (x.Phone != null && x.Phone.Contains(tu)));
         }
 
-        var ds = await AsyncExecuter.ToListAsync(truyVan.OrderByDescending(x => x.CreationTime).Take(soLuong));
+        // ⚠️ **ĐẾM TRƯỚC `Skip/Take`** — 📌 nếu đếm sau khi cắt trang thì `totalCount` = số dòng của trang
+        // ⇒ pager **không bao giờ** hiện trang 2, và 🔑 người dùng tin rằng **chỉ có** ngần ấy hồ sơ.
+        var tongSo = await AsyncExecuter.CountAsync(truyVan);
 
-        return ds.Select(ToDto).ToList();
+        // 📌 `ThenBy(Id)` — sắp xếp **tất định**: hai hồ sơ cùng `CreationTime` mà không có khoá phụ thì
+        // thứ tự giữa hai trang **có thể đổi** ⇒ cùng một hồ sơ **hiện ở hai trang** hoặc **không hiện ở đâu**
+        // (đúng loại lỗi *"mất dòng khi phân trang"* — im lặng, không ai báo).
+        var ds = await AsyncExecuter.ToListAsync(
+            truyVan.OrderByDescending(x => x.CreationTime).ThenBy(x => x.Id).Skip(bo).Take(soLuong));
+
+        return new PagedResultDto<CustomerDto>(tongSo, ds.Select(ToDto).ToList());
     }
 
     // ── GHI ─────────────────────────────────────────────────────────────────────────────────────

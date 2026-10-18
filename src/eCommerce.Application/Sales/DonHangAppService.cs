@@ -1,4 +1,5 @@
 using eCommerce.Application.Contracts.Sales;
+using eCommerce.Customers;
 using eCommerce.Inventory;
 using eCommerce.Orders;
 using eCommerce.Pricing;
@@ -14,6 +15,7 @@ namespace eCommerce.Application.Sales;
 /// 🚨 **TẠO ĐƠN HÀNG TỪ CHECKOUT** (`SAL-001`) — nguồn số tiền là **SỔ GIẢI TRÌNH**, **KHÔNG** phải tính lại.
 ///
 /// **TRÌNH TỰ:**
+///   0. 🚨 **CỔNG KHÁCH BỊ CHẶN** (`CUS-001` `ADR-04`) — `eCommerce:Customers:0005`, **trước** mọi thao tác ghi.
 ///   1. Đọc **sổ giải trình** theo `CheckoutIdempotencyKey` ⇒ **số tiền đã báo khách** (bằng chứng).
 ///   2. Đọc **lượt giữ chỗ** theo cùng nguồn (`Checkout:{khoá}`) ⇒ **hàng đã được giữ**; không có ⇒ **NÉM**
 ///      (đơn mà không giữ được hàng là **đơn không có hàng** ⇒ sẽ phải xin lỗi khách).
@@ -35,6 +37,11 @@ public class DonHangAppService : ApplicationService, IDonHangAppService
     private readonly StockReservationService _giuChoService;
     private readonly eCommerce.Application.Contracts.Inventory.IStockDocumentAppService _phieuKho;
 
+    /// <summary>🚨 **CỔNG KHÁCH BỊ CHẶN** — cùng cổng với checkout (`CuaKiemKhachGiaoDich`), 📌 vì đây là
+    /// **đường vào thứ hai**: `TaoTuCheckoutAsync` là API công khai cho module/đối tác, ⚠️ nên *"checkout đã
+    /// kiểm"* **KHÔNG** suy ra *"đường tạo đơn đã kiểm"*. Kiểm ở **cả hai** biên là chủ ý, không phải trùng lặp.</summary>
+    private readonly ICustomerDirectory _thuMucKhach;
+
     public DonHangAppService(
         IRepository<Order, Guid> donRepository,
         IRepository<OrderLine, Guid> dongDonRepository,
@@ -42,7 +49,8 @@ public class DonHangAppService : ApplicationService, IDonHangAppService
         IPriceCalculationAppService tinhGia,
         ChotGiuChoService chotGiuCho,
         StockReservationService giuChoService,
-        eCommerce.Application.Contracts.Inventory.IStockDocumentAppService phieuKho)
+        eCommerce.Application.Contracts.Inventory.IStockDocumentAppService phieuKho,
+        ICustomerDirectory thuMucKhach)
     {
         _donRepository = donRepository;
         _dongDonRepository = dongDonRepository;
@@ -51,11 +59,17 @@ public class DonHangAppService : ApplicationService, IDonHangAppService
         _chotGiuCho = chotGiuCho;
         _giuChoService = giuChoService;
         _phieuKho = phieuKho;
+        _thuMucKhach = thuMucKhach;
     }
 
     [Authorize(eCommerceConsts.Permissions.Orders.Manage)]
     public async Task<DonHangDto> TaoTuCheckoutAsync(TaoDonTuCheckoutInput input)
     {
+        // ── ⓪ CỔNG KHÁCH BỊ CHẶN (`CUS-001` `ADR-04` / §28) — TRƯỚC mọi tác dụng phụ ───────────────
+        // 📌 Đặt TRƯỚC bước ① vì bước ① chỉ là phép ĐỌC, nhưng bước ③ **GHI ĐƠN**: khách bị chặn phải bị
+        // chặn ở đây, và **không** được nhận một `DonHangDto` trông như đơn hợp lệ.
+        await CuaKiemKhachGiaoDich.DamBaoDuocGiaoDichAsync(_thuMucKhach, input.CustomerId);
+
         var khoa = input.CheckoutIdempotencyKey.Trim();
         var thamChieu = $"Checkout:{khoa}";
 

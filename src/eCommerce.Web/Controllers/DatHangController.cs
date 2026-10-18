@@ -1,8 +1,10 @@
 using eCommerce.Application.Contracts.Checkout;
 using eCommerce.Application.Contracts.Inventory;
 using eCommerce.Application.Contracts.Sales;
+using eCommerce.Customers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Volo.Abp.Authorization.Permissions;
 
 namespace eCommerce.Web.Controllers;
 
@@ -31,14 +33,70 @@ public class DatHangController : Controller
     private readonly IDonHangAppService _donHang;
     private readonly IWarehouseAppService _kho;
 
+    /// <summary>
+    /// 🚨 **CHỌN KHÁCH CHO ĐƠN** (`CUS-001` `ADR-04` — `S3`) — trước `S3` đường web **không** hề đặt
+    /// `CustomerId` cho đơn ⇒ 📌 trên thực tế *"đơn web không thuộc về ai"*, và cổng *"khách bị chặn không được
+    /// mua"* **không thể** phát huy tác dụng ở đường này (không có khách để kiểm).
+    /// 🔑 Nối khách vào đơn là điều kiện **cần**; cổng ở `CuaKiemKhachGiaoDich` là điều kiện **đủ**.
+    /// </summary>
+    private readonly CustomerAppService _khachHang;
+
+    /// <summary>
+    /// 🔐 **KIỂM QUYỀN ĐỌC DANH SÁCH KHÁCH** — ⚠️ **KHÔNG** dùng `try/catch` quanh lời gọi app service để
+    /// *"thử xem có quyền không"*: 📌 một lần ném bị nuốt ở đây sẽ **che** cả lỗi thật khác.
+    /// 🔑 Hỏi thẳng `IPermissionChecker` là hỏi **đúng câu hỏi** (*"người này có được xem hồ sơ khách không"*),
+    /// và nếu **không** ⇒ trang vẫn chạy ở chế độ **khách vãng lai** thay vì `403` cả trang đặt hàng.
+    /// 📌 Lý do phải cẩn thận: `/DatHang` là màn hình của người **bán hàng** (quyền `Orders.Manage`), còn hồ sơ
+    /// khách là **dữ liệu cá nhân** (quyền `Customers.Default`) — hai quyền **khác nhau**, và không được giả định
+    /// người bán hàng có quyền đọc PII.
+    /// </summary>
+    private readonly IPermissionChecker _quyen;
+
     public DatHangController(
         ICheckoutAppService checkout,
         IDonHangAppService donHang,
-        IWarehouseAppService kho)
+        IWarehouseAppService kho,
+        CustomerAppService khachHang,
+        IPermissionChecker quyen)
     {
         _checkout = checkout;
         _donHang = donHang;
         _kho = kho;
+        _khachHang = khachHang;
+        _quyen = quyen;
+    }
+
+    /// <summary>
+    /// 🔑 **NẠP DANH SÁCH KHÁCH CHO Ô CHỌN** — chỉ khi người dùng có `Customers.Default`.
+    /// ⚠️ **Ô CHỌN KHÁCH KHÔNG PHẢI LÀ CỔNG:** khách `Blocked` **vẫn hiện** trong danh sách (có nhãn *"đang chặn"*)
+    /// và 🔒 nếu ai đó gửi thẳng `KhachId` của khách bị chặn thì **app service vẫn ném** `0005`.
+    /// 📌 Lọc khách bị chặn **ở UI** sẽ là *"cổng đặt ở chỗ dễ đi vòng nhất"* — đúng lỗi quy ước #7 cảnh báo.
+    /// </summary>
+    private async Task NapKhachAsync(DatHangTrangDto trang)
+    {
+        trang.CoQuyenChonKhach = await _quyen.IsGrantedAsync(eCommerceConsts.Permissions.Customers.Default);
+
+        if (!trang.CoQuyenChonKhach)
+        {
+            return;
+        }
+
+        // 📌 `maxResultCount: 100` — ô chọn là để **tra nhanh**, không phải màn hình quản trị: một danh sách
+        // 5.000 dòng trong `<select>` là vô dụng. ⚠️ Muốn tìm khách thứ 101 trở đi thì dùng `/KhachHang` (có
+        // phân trang + lọc) rồi quay lại — 📌 ghi rõ giới hạn thay vì im lặng cắt bớt.
+        var ds = await _khachHang.GetDanhSachPhanTrangAsync(maxResultCount: 100);
+
+        trang.KhachList = ds.Items.Select(x => new KhachChonDto
+        {
+            Id = x.Id,
+            Ten = x.Name,
+            DungDuoc = x.DungDuoc,
+            TrangThai = x.Status
+        }).ToList();
+        // ⚠️ `PagedResultDto.TotalCount` là `long` ⇒ phải ép **tường minh**. 📌 Nếu để `long` chảy vào
+        // `ViewBag` thì `ViewBag.TongSo is int` trong view sẽ là `false` ⇒ view hiện **0 khách** trong khi
+        // thật ra có — 🔑 một lỗi im lặng đúng kiểu "phép đo sai, không phải sản phẩm sai".
+        trang.TongSoKhach = (int)ds.TotalCount;
     }
 
     /// <summary>🚨 **GIỎ GIỮ QUA PHIÊN** (`web-001` §86) — ghi dòng hàng vào cookie `gio-web` (HttpOnly, 2 giờ).
@@ -154,6 +212,9 @@ public class DatHangController : Controller
         // 🚨 §87: mô tả giỏ đang lưu để view hiển thị kèm nút "Xoá giỏ" (rỗng ⇒ không hiện).
         trang.TomTatGio = MoTaGio(Request.Cookies["gio-web"]);
 
+        // 🚨 `S3` — nạp danh sách khách cho ô chọn (chỉ khi có `Customers.Default`; xem `NapKhachAsync`).
+        await NapKhachAsync(trang);
+
         return View(trang);
     }
 
@@ -175,8 +236,14 @@ public class DatHangController : Controller
             Thue = form.Thue,
             SoDong = form.SoDong,   // 🚨 §89: giữ SỐ DÒNG người dùng đang thấy qua các lần render lại
             KhoaCheckout = form.KhoaCheckout,   // 🚨 GIỮ NGUYÊN khoá của form (không sinh lại) — xem bất biến ở doc lớp
-            TokenChongGiaMa = Guid.NewGuid().ToString("N")
+            TokenChongGiaMa = Guid.NewGuid().ToString("N"),
+            // 🚨 `S3`: GIỮ khách đã chọn qua mọi lần render lại (kể cả đường LỖI) — 📌 nếu mất, người dùng
+            // tưởng mình đặt cho khách vãng lai và **đơn gắn sai người** (không có lỗi nào báo).
+            KhachId = form.KhachId
         };
+
+        // 🚨 `S3` — nạp danh sách khách TRƯỚC mọi nhánh return (kể cả nhánh lỗi) ⇒ ô chọn luôn có dữ liệu.
+        await NapKhachAsync(trang);
 
         // 🚨 GIỎ GIỮ QUA PHIÊN (§86): ghi giỏ NGAY TẠI ĐÂY ⇒ mọi đường render lại (kể cả đường LỖI) đều còn dòng đã nhập.
         LuuGio(Response, form);
@@ -227,6 +294,10 @@ public class DatHangController : Controller
             {
                 ChannelCode = string.IsNullOrWhiteSpace(form.Kenh) ? "web" : form.Kenh,
                 WarehouseId = form.KhoId,
+                // 🚨 `S3` — **KHÁCH CỦA ĐƠN** (rỗng = khách vãng lai). 🔒 Đây là đầu vào của **cổng**
+                // `CuaKiemKhachGiaoDich`: khách `Blocked` ⇒ checkout ném `eCommerce:Customers:0005`
+                // **TRƯỚC** khi giữ chỗ ⇒ không có hàng nào bị giam.
+                CustomerId = form.KhachId,
                 OrderDiscount = 0,
                 OrderFee = 0,
                 IdempotencyKey = form.KhoaCheckout,
@@ -242,7 +313,11 @@ public class DatHangController : Controller
             {
                 CheckoutIdempotencyKey = form.KhoaCheckout,
                 Number = $"WEB-{form.KhoaCheckout}",
-                ChannelCode = string.IsNullOrWhiteSpace(form.Kenh) ? "web" : form.Kenh
+                ChannelCode = string.IsNullOrWhiteSpace(form.Kenh) ? "web" : form.Kenh,
+                // 🚨 `S3` — **ĐƠN PHẢI BIẾT CỦA KHÁCH NÀO**: trước `S3` đường web **không** đặt trường này
+                // ⇒ đơn web tồn tại mà **không thuộc về ai** (bản xuất dữ liệu cá nhân của khách **thiếu** đúng
+                // những đơn đó — lỗ hổng pháp lý, không chỉ là thiếu tính năng).
+                CustomerId = form.KhachId
             });
 
             trang.DaDat = true;
@@ -313,6 +388,25 @@ public class DatHangTrangDto
     /// <summary>🚨 Sinh ở `GET`, **mang theo** trong form — xem bất biến ở doc của `DatHangController`.</summary>
     public string KhoaCheckout { get; set; } = string.Empty;
 
+    /// <summary>
+    /// 🚨 **KHÁCH CỦA ĐƠN** (`S3`) — `null` = **khách vãng lai** (`CUS-001` `ADR-03`).
+    /// 📌 Một `Guid?` chứ không phải chuỗi: ô chọn gửi `Id` của khách, và giá trị rỗng (`""`) bind thành `null`
+    /// ⇒ *"khách vãng lai"* là **trạng thái mặc định**, không phải một lựa chọn đặc biệt.
+    /// </summary>
+    public Guid? KhachId { get; set; }
+
+    /// <summary>
+    /// Danh sách khách cho ô chọn — 🔑 chỉ nạp khi người dùng có `Customers.Default`.
+    /// ⚠️ **Rỗng KHÔNG có nghĩa "không có khách"**: nó có thể là *"không có quyền xem"* ⇒ view phải nói rõ
+    /// trạng thái (`CoQuyenChonKhach`), 📌 không để người dùng hiểu nhầm hệ thống **không có khách nào**.
+    /// </summary>
+    public List<KhachChonDto> KhachList { get; set; } = new();
+
+    public bool CoQuyenChonKhach { get; set; }
+
+    /// <summary>Tổng số khách trong hệ thống — 📌 để nói rõ khi danh sách ô chọn bị giới hạn 100 dòng.</summary>
+    public int TongSoKhach { get; set; }
+
     public string TokenChongGiaMa { get; set; } = string.Empty;
 
     public bool DaDat { get; set; }
@@ -369,6 +463,24 @@ public class KhoChonDto
     public string Code { get; set; } = default!;
 
     public string Name { get; set; } = default!;
+}
+
+/// <summary>
+/// Một khách trong **ô chọn khách** của `/DatHang` (`S3`).
+/// 🔑 Có `DungDuoc` để nhãn nói rõ *"đang chặn"* — 📌 nhưng khách **vẫn chọn được**: việc chặn là của
+/// **app service** (guard thật), không phải của `disabled` trong HTML (thuộc tính đó sửa được bằng tay).
+/// </summary>
+public class KhachChonDto
+{
+    public Guid Id { get; set; }
+
+    public string Ten { get; set; } = default!;
+
+    /// <summary>`true` = khách **KHÔNG** bị chặn (`ADR-04`).</summary>
+    public bool DungDuoc { get; set; }
+
+    /// <summary>`Inactive` / `Active` / `Blocked` — để nhãn hiển thị đúng trạng thái thật.</summary>
+    public string TrangThai { get; set; } = default!;
 }
 
 /// <summary>
@@ -447,4 +559,12 @@ public class DatHangInput
     public string Thue { get; set; } = "0.1";
 
     public string KhoaCheckout { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 🚨 **KHÁCH CỦA ĐƠN** (`S3`) — tên trường `<select name="KhachId">` trong view.
+    /// 📌 **Để trống = khách vãng lai.** ⚠️ Bind `Guid?` (không phải `Guid`): một `""` từ ô chọn rỗng phải
+    /// thành `null`, 🔑 nếu bind `Guid` thì model binder cho ra `Guid.Empty` ⇒ mọi đơn vãng lai sẽ gắn
+    /// **một id khách không tồn tại** ⇒ `0005` chặn **tất cả** đơn vãng lai (lỗi im lặng, rất khó tìm).
+    /// </summary>
+    public Guid? KhachId { get; set; }
 }

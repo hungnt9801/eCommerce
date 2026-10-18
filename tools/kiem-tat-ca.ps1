@@ -348,6 +348,31 @@ if ($DayDu -and -not $BoQuaE2E) {
 
         Write-Output '   ✅ HTTP THAT: moi ca so dia chi DAT.'
     }
+
+    # ── BUOC 10: KHÁCH HÀNG — HTTP THẬT (`CUS-001`, `S3`) ─────────────────────────────────────
+    Buoc 'Khach hang: HTTP THAT (CUS-001 — cong chan khach Blocked + phan trang + nhom khach)' {
+        # 🔑 **VÌ SAO PHẢI LÀ BƯỚC CỦA CỔNG:** ba câu hỏi của `S3` **chỉ** HTTP thật trả lời được —
+        #   ① 🚨 **khách `Blocked` có THẬT SỰ bị chặn ở đường bán hàng không** (lỗi ĐÃ XẢY RA: cổng
+        #      `ChoPhepGiaoDichAsync` tồn tại mà **gọi 0 nơi** ⇒ khách bị chặn vẫn đặt được hàng). 📌 Unit test
+        #      chỉ chứng minh *"lời gọi có mặt trong tệp"* — **không** chứng minh nó chạy, và **không** chứng minh
+        #      *"không có tác dụng phụ"* (hàng vẫn bị giữ / sổ giá vẫn bị ghi);
+        #   ② phân trang: `totalCount` phải là **tổng**, và trang 2 phải **khác** trang 1 (đếm-sau-khi-cắt là lỗi
+        #      im lặng kinh điển);
+        #   ③ API nhóm khách: route + verb + mã `0008` khi trùng mã (nợ `CUS-001` §16.4 #2).
+        # 📌 Một probe **tay** thì lần sau không ai chạy ⇒ đúng nợ đã ghi ở `web-001` §98.7 #1.
+        $p = ChayLenh 'pwsh' @('-NoProfile', '-File', (Join-Path $PSScriptRoot 'probe-khach-hang.ps1')) 'khachhang.log'
+
+        Get-Content $p.Log | Where-Object { $_ -match 'DAT|KHONG DAT|PROBE KHACH HANG|Xoa cache quyen|DON DEP' } |
+            Select-Object -First 34 | ForEach-Object { "   $_" }
+
+        if ($p.Ma -ne 0) {
+            Get-Content $p.Log | Select-String 'CAC CA KHONG DAT' -Context 0,10 |
+                ForEach-Object { $_.Context.PostContext | ForEach-Object { "   $_" } }
+            throw "PROBE KHACH HANG DO (exit $($p.Ma)) — xem log: $($p.Log)."
+        }
+
+        Write-Output '   ✅ HTTP THAT: moi ca khach hang DAT.'
+    }
 }
 elseif (-not $BoQuaE2E -and -not $DayDu) {
     Write-Output ""

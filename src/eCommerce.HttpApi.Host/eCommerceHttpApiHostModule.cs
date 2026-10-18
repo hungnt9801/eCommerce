@@ -309,6 +309,14 @@ public class eCommerceHttpApiHostModule : AbpModule
             options.Map(eCommerce.Customers.CustomerErrorCodes.DiaChiKhongDungDuoc, System.Net.HttpStatusCode.BadRequest);     // 0016
             options.Map(eCommerce.Customers.CustomerErrorCodes.KhongTimThayKhach, System.Net.HttpStatusCode.NotFound);         // 0001
 
+            // ── NHÓM KHÁCH (`CUS-001` `ADR-09` — `S3`) ─────────────────────────────────────────
+            // 🚨 Đo được ngay ở probe `S3` (T14): thiếu dòng này thì "tạo trùng MÃ NHÓM" trả **`403`** —
+            // 📌 client đọc thành *"tôi không có quyền"* trong khi thật ra **cần chọn mã khác**.
+            // 🔑 `409` là ngữ nghĩa đúng: yêu cầu **hợp lệ về cú pháp** nhưng **xung đột dữ liệu hiện có**
+            // (cùng họ với `0010` liên kết trùng ở trên). 📌 Mã vẫn là nguồn sự thật (`D6`): `0008` nói
+            // *"chọn mã khác"*, `0003` nói *"người này đã là khách"* — hai việc khác nhau, hai chỉ dẫn khác nhau.
+            options.Map(eCommerce.Customers.CustomerErrorCodes.MaNhomDaTonTai, System.Net.HttpStatusCode.Conflict);          // 0008
+
             // ── Hạ tầng chung ──────────────────────────────────────────────────────────────────
             // Không giành được khoá phân tán ⇒ **409** (client thử lại được) — `ADDR-004` §12 ghi rõ.
             options.Map(eCommerceConsts.ErrorCodes.KhongGianhDuocKhoa, System.Net.HttpStatusCode.Conflict);

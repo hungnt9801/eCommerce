@@ -31,6 +31,16 @@ public class CheckoutInput
 
     public Guid? ChannelShopId { get; set; }
 
+    /// <summary>
+    /// 🚨 **KHÁCH MUA** — `null` = **khách vãng lai** (`CUS-001` `ADR-03`: vãng lai là **hạng nhất**, được mua).
+    /// 🔒 **CỔNG NGHIỆP VỤ:** khách đang bị **chặn** (`Blocked`) ⇒ `TinhVaGiuChoAsync` **NÉM**
+    /// `eCommerce:Customers:0005` **TRƯỚC** khi tính tiền và **trước** khi giữ chỗ (`CUS-001` §28).
+    /// 📌 Vì sao phải kiểm **ở đây** (không chỉ ở lúc tạo đơn): bước này **giữ hàng trong kho** — nếu để
+    /// khách bị chặn đi qua, đơn không được tạo nhưng **hàng vẫn bị giữ** (hết TTL mới nhả), tức
+    /// *"cổng chặn đơn"* lại **làm hại kho**.
+    /// </summary>
+    public Guid? CustomerId { get; set; }
+
     /// <summary>Kho để giữ chỗ. ⚠️ Hiện **một** kho cho cả đơn; phân bổ nhiều kho là việc của `INV-003`.</summary>
     [Required]
     public Guid WarehouseId { get; set; }

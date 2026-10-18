@@ -164,6 +164,21 @@ public static class eCommerceConsts
 
             /// <summary>Tạo/nâng cấp/chặn/gỡ chặn hồ sơ khách.</summary>
             public const string Manage = Default + ".Manage";
+
+            /// <summary>
+            /// 🚨 **QUẢN TRỊ NHÓM KHÁCH** (`CUS-001` `ADR-09` — `S3`).
+            ///
+            /// 🔑 **VÌ SAO TÁCH RIÊNG KHỎI `Manage` (không phải "thêm cho đủ"):** nhóm khách là **ĐẦU VÀO CỦA
+            /// BẢNG GIÁ** (`PRC-001` Q5) ⇒ sửa nhóm là sửa **giá bán cho cả một tập khách**, không phải sửa
+            /// *"thông tin liên hệ của một người"*. 📌 Người trực CSKH cần `Manage` (chặn khách chây nợ) **không**
+            /// đương nhiên được đổi thứ **ảnh hưởng doanh thu**. Đây là **đặc quyền tối thiểu**, cùng lý do
+            /// `Addresses.Manage` tách khỏi `Addresses.ManageBook`.
+            ///
+            /// 🔒 **BẮT BUỘC khai ở CẢ HAI NƠI** (hằng số này **và** `eCommercePermissionDefinitionProvider`):
+            /// thiếu một nơi ⇒ permission **luôn bị từ chối** ⇒ `403` cho **mọi người** kể cả `admin`
+            /// (`XC-004` **D2**; 🛡️ lưới an toàn `BatBienPhanQuyenTests.TC02b`).
+            /// </summary>
+            public const string ManageGroups = Default + ".ManageGroups";
         }
 
         /// <summary>

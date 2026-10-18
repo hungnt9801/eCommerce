@@ -31,33 +31,36 @@ và phiên trước từng **nói quá "GĐ1 hoàn thành"** vì **không đo l�
 
 ---
 
-## 3. Trạng thái ĐO ĐƯỢC — baseline chuẩn (đo lại **18/10/2026** cuối `S2`, `-DayDu` exit 0)
+## 3. Trạng thái ĐO ĐƯỢC — baseline chuẩn (đo lại **18/10/2026** cuối `S3`, `-DayDu` exit 0)
 
 ```
 [B1] dọn tiến trình + cổng trống      1.1s
-[B2] build + KIỂM MỐC nhị phân       41.2s   · 68 tệp DLL/EXE đổi mốc
-[B3] unit test                        7.9s   · 1219/1219
-[B4] integration (PostgreSQL thật)    7.2s   ·   46/46
-[B5] mermaid (parser thật)            4.1s   ·  213 khối · 0 lỗi
-[B6] bất biến DB                      5.9s   ·   23/23 · NND = 51 · 57 quyền · quét 84 vị trí probe
-[B7] test cho chính các cổng         76.0s   ·   22 ca (A…F · R…V · L…P · G…K)
-[B8] E2E có phiên đăng nhập          18.0s   ·   59/59
-[B9] sổ địa chỉ HTTP thật            14.6s   ·   17/17  ← MỚI ở `S2` (2 luồng cùng đặt mặc định)
-     ─────────────────────────────────────
-     TỔNG                            175.9s
+[B2] build + KIỂM MỐC nhị phân       43.5s   · 71 tệp DLL/EXE đổi mốc
+[B3] unit test                        7.4s   · 1228/1228
+[B4] integration (PostgreSQL thật)    7.6s   ·   46/46
+[B5] mermaid (parser thật)            4.2s   ·  213 khối · 0 lỗi
+[B6] bất biến DB                      6.5s   ·   23/23 · NND = 51 · 58 quyền · quét 84 vị trí probe
+[B7] test cho chính các cổng         81.7s   ·   22 ca (A…F · R…V · L…P · G…K)
+[B8] E2E có phiên đăng nhập          21.6s   ·   67/67
+[B9] sổ địa chỉ HTTP thật            13.8s   ·   17/17
+[B10] khách hàng HTTP thật           15.9s   ·   26/26  ← MỚI ở `S3` (cổng `Blocked` · phân trang · nhóm khách)
+      ─────────────────────────────────────
+      TỔNG                           203.2s
 ```
 
-**Code:** **324 tệp · ~38.460 dòng** (không tính `Tệp.Designer.cs`/`*Snapshot.cs` của migration; đo 18/10/2026) · **95 tệp test · ~15.115 dòng** · **38 migration**.
-📌 **Vì sao số tệp/dòng KHÁC bảng cũ** (`295/40.350/94/18.340/37`): lần này đo bằng `Get-ChildItem` + đếm dòng **có ghi rõ phương pháp** (loại designer/snapshot); bảng cũ không ghi phương pháp ⇒ 🔑 **con số nào cũng phải kèm cách đo**, nếu không thì lần sau lại *"trôi"* mà không biết vì sao.
-**Git:** nhánh `main` · **279 commit** · **cây sạch** · **`origin` = `https://github.com/hungnt9801/eCommerce`** · ⚠️ repo đang **PUBLIC** · 📌 **remote `refs/heads/main` = `ab9a7ff`** (lần push cuối 17/10/2026) — các phiên `S1`/`S2` **chưa push** ⇒ **cần push** trước khi mở `S9` (CI).
+**Code:** **329 tệp · 39.224 dòng** — 📌 **phương pháp (ghi rõ để không trôi):** `Get-ChildItem src, modules, shared -Recurse -Filter *.cs`, **loại** `\bin\`, `\obj\`, `*.Designer.cs`, `*Snapshot.cs`; đo 18/10/2026 cuối `S3` · **98 tệp test · 15.717 dòng** (cùng phương pháp, trên `test/`) · **38 migration**.
+⚠️ **Số cũ (`324/38.460` · `95/15.115`) KHÔNG đối chiếu lại được** — lần đó **không ghi lại tập loại trừ** nào được dùng ⇒ 🔑 dùng **số ở trên** (có phương pháp), đừng cộng trừ với số cũ: chênh lệch **không** phải "code phình" mà là **hai phép đo khác nhau**. 📌 Đây đúng là lý do dòng này tồn tại: *"con số nào cũng phải kèm cách đo"*.
+**Git:** nhánh `main` · **280 commit** (sau commit `S3`) · **cây sạch** · **`origin` = `https://github.com/hungnt9801/eCommerce`** · ⚠️ repo đang **PUBLIC** · 📌 **remote `refs/heads/main` = `ab9a7ff`** (lần push cuối 17/10/2026) — các phiên `S1`/`S2`/`S3` **chưa push** ⇒ **cần push** trước khi mở `S9` (CI). 📌 Con số commit **không tự khớp** với chính commit ghi nó (commit đó làm số tăng 1) — 🔑 nên mốc đúng là *"sau `S3`, 18/10/2026"*.
 
-🚨 **Bốn con số ĐÃ TRÔI — dùng số ở trên, đừng dùng số cũ:**
-| Số cũ (handover) | Số đo 18/10/2026 | Vì sao |
+🚨 **Năm con số ĐÃ TRÔI — dùng số ở trên, đừng dùng số cũ:**
+| Số cũ (handover / `S2`) | Số đo 18/10/2026 (cuối `S3`) | Vì sao |
 |---|---|---|
-| ~145–155s | **175.9s** | thêm **bước ⑨** (`S2`) · 📌 đổi theo máy/nhiệt độ, **không** phải chỉ tiêu |
-| 17 ca test cổng | **22 ca** | +5 ca cho cổng tham chiếu tài liệu |
-| 1181 unit / 38 integration / NND 48 | **1219 / 46 / 51** | `S1` +24 unit +3 integration +1 index · `S2` +14 unit +5 integration +2 index |
-| 197 khối mermaid | **213 khối** | +16 từ 3 tài liệu mới (`ADDR-004`, `PAY-001`, `XC-007`) |
+| ~145–155s / 175.9s | **203.2s** | thêm bước **⑩** (`S3`) · 📌 đổi theo máy/nhiệt độ, **không** phải chỉ tiêu |
+| 17 ca / 22 ca test cổng | **22 ca** | không đổi (`S3` không thêm ca cổng cho chính các cổng) |
+| 1181 / 1219 unit · 38 / 46 integration | **1228 / 46** | `S1` +24 · `S2` +14 · `S3` **+9** (`CuaKiemKhachBiChanTests`) |
+| 48 / 51 index `NND` · 53 / 57 quyền | **51 · 58 quyền** | `S3` thêm permission `eCommerce.Customers.ManageGroups` (**không** thêm index) |
+| 197 / 213 khối mermaid | **213 khối** | không đổi ở `S3` (không thêm sơ đồ) |
+| 59 ca E2E | **67 ca** | `S3` +8 (`S1`…`S8`: khách bị chặn trên HTML thật + **2 chiều ngược**) |
 
 🔑 **Vì vậy bước ĐẦU TIÊN của mọi phiên là ĐO LẠI** (mục 6) — nếu số khác bảng trên thì **dừng, tìm hiểu trước khi sửa**.
 
@@ -149,7 +152,7 @@ pwsh -File tools\kiem-link-tai-lieu.ps1       # 0 tham chiếu chết (thoát 1 
 |---|---|
 | `S1` | ✅ **XONG 18/10/2026** — `ADDR-004` phần A: entity `Address` + migration (**48→49**) |
 | `S2` | ✅ **XONG 18/10/2026** — `ADDR-004` phần B: `CustomerAddressLink` + API + 4 quyền + PII (**49→51**) · ➕ **bước ⑨ mới**: `probe-so-dia-chi.ps1` (17/17 ca HTTP thật) |
-| `S3` | `CUS-001` đóng — **nối `ChoPhepGiaoDichAsync`** (lỗi thật: khách `Blocked` vẫn đặt được) + `CustomerGroup` + phân trang |
+| `S3` | ✅ **XONG 18/10/2026** — `CUS-001` **ĐÓNG**: nối `ChoPhepGiaoDichAsync` (🚨 **LỖI THẬT**: khách `Blocked` vẫn đặt được) + `CustomerGroup` API/seed + phân trang · ➕ **bước ⑩ mới**: `probe-khach-hang.ps1` (26/26 ca HTTP thật) |
 | `S4` | `PAY-001` A — đường **TẠO** giao dịch + cầu nối `Order.PaymentStatus` + ETO |
 | `S5` | `PAY-001` B — **IPN/HMAC** + hoàn tiền + vá **F-PAY-1** và **F-PAY-7** |
 | `S6` | `SAL-005` — DLQ + `SalMarketplaceEventLogs` + worker `D12` + `update_time` |
@@ -169,3 +172,4 @@ pwsh -File tools\kiem-link-tai-lieu.ps1       # 0 tham chiếu chết (thoát 1 
 |---|---|
 | 17/10/2026 | Bản đầu. Baseline `-DayDu` **exit 0 · 228.9s** (1181 unit · 38 integration · 213 mermaid · 21/21 DB · 22 ca cổng · 59/59 E2E). Ghi rõ **3 con số đã trôi**. 6 quyết định đã chốt + 5 chưa chốt |
 | 18/10/2026 | Cập nhật sau `S1` + `S2`: baseline **175.9s · 9 bước** (1219 unit · 46 integration · 213 mermaid · **23/23** DB · **NND 51** · **57** quyền · **84** chỗ quét · 22 ca cổng · 59/59 E2E · **17/17** sổ địa chỉ). `S2` ✅ XONG ⇒ **`S3` là phiên kế tiếp**. Ghi rõ **phương pháp đo** kích thước mã (vì số cũ không ghi cách đo) |
+| 18/10/2026 (sau) | Cập nhật sau `S3`: baseline **203.2s · 10 bước** (1228 unit · 46 integration · 213 mermaid · **23/23** DB · **NND 51** · **58** quyền · **84** chỗ quét · 22 ca cổng · **67/67** E2E · **17/17** sổ địa chỉ · **26/26** khách hàng). `S3` ✅ XONG ⇒ **`S4` là phiên kế tiếp** (`PAY-001` phần A). ➕ Bất biến DB mới: *`CusGroups` = đúng 3 nhóm seed* (thay *"phải rỗng"* sai) · 📌 kích thước mã **đo lại bằng phương pháp ghi rõ** và **cảnh báo không cộng trừ với số cũ** |

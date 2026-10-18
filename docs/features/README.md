@@ -112,7 +112,7 @@ Trước phiên này danh sách là **52**; đối chiếu **code thật** thì 
 | `ADDR-001` | [Tra cứu đơn vị hành chính 2 cấp (tỉnh + xã) và 3 cấp cũ](address/addr-001-tra-cuu-don-vi-hanh-chinh-2-cap.md) | 833 | 🟡 Draft · 16/16 mục |
 | `ADDR-002` | [Đồng bộ mã địa chỉ theo từng hãng vận chuyển](address/addr-002-dong-bo-ma-dia-chi-theo-hang-van-chuyen.md) | 928 | 🟡 Draft · 16/16 mục |
 | `ADDR-003` | [Chuẩn hoá địa chỉ khách hàng: convert 3 cấp ↔ 2 cấp, xử lý ca sáp nhập tỉnh](address/addr-003-chuan-hoa-dia-chi-3-cap-2-cap.md) | 1013 | 🟡 Draft · 16/16 mục |
-| `ADDR-004` | [Sổ địa chỉ khách: entity `Address` (AddressHub) + `CustomerAddressLink`](address/addr-004-so-dia-chi-khach.md) | 1088 | 🟢 Approved · 🔨 **đang triển khai** (phần A xong ở `S1`) |
+| `ADDR-004` | [Sổ địa chỉ khách: entity `Address` (AddressHub) + `CustomerAddressLink`](address/addr-004-so-dia-chi-khach.md) | 1088 | 🟢 Approved · ✅ **ĐÃ TRIỂN KHAI XONG** (phần A `S1` · phần B `S2` · 18/10/2026) |
 
 ### `catalog/` — Catalog — sản phẩm, biến thể, danh mục, media/SEO
 
@@ -148,7 +148,7 @@ Trước phiên này danh sách là **52**; đối chiếu **code thật** thì 
 
 | Mã | Tài liệu | Dòng | Trạng thái |
 |---|---|---:|---|
-| `CUS-001` | [Hồ sơ khách hàng và sổ địa chỉ](customers/cus-001-ho-so-khach-hang-so-dia-chi.md) | 2007 | 🟡 Draft · 16/16 mục |
+| `CUS-001` | [Hồ sơ khách hàng và sổ địa chỉ](customers/cus-001-ho-so-khach-hang-so-dia-chi.md) | 2007 | 🟡 Draft · 16/16 mục · ✅ **ĐỦ 12 LÁT CẮT ĐÃ CÓ CODE** (§16 · §20–§28 — `S1`/`S2`/`S3`) |
 
 > 🚨 Sổ địa chỉ **không** thuộc module này: `Address` do **AddressHub** sở hữu, `Customers` giữ bảng liên kết
 > `CustomerAddressLink` — chốt tại [`ADDR-004`](address/addr-004-so-dia-chi-khach.md).

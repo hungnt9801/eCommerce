@@ -83,7 +83,7 @@ $goc = Split-Path -Parent $PSScriptRoot
 $bangPhaiRong = @(
     'AbpSettings',                     # setting doi trong probe (doi chinh sach) ⇒ phai xoa
     'CusCustomers',                    # probe CUS-001 gieo khach
-    'CusGroups',
+    # ⚠️ `CusGroups` DA CHUYEN sang nhom ② o `S3` (18/10/2026) — xem ly do ngay duoi.
     'CatProductMedia',                 # probe CAT-003 gieo media
     'CatProductChannelVisibilities',   # probe CAT-003 gieu hien thi theo kenh
     'MsgDeadLetters',                  # probe XC-002 day vao DLQ
@@ -98,9 +98,18 @@ $bangPhaiRong = @(
     'CusAddressLinks'                  # probe S2 gieo lien ket so dia chi
 )
 
-# 📌 Nhom ②: bang GIU LICH SU ⇒ 🚨 **KHONG** kiem "phai rong". 📌 Liet ke ra day de **ghi ro y dinh**.
+# 📌 Nhom ②: bang GIU LICH SU / DU LIEU THAM CHIEU ⇒ 🚨 **KHONG** kiem "phai rong". 📌 Liet ke ra day de **ghi ro y dinh**.
 $bangGiuLichSu = @(
     'ReconRuns'    # 🔑 nhat ky luot quet doi soat — CON SO TANG DAN LA DUNG
+    # 🚨 **`CusGroups` CHUYEN TU NHOM ① SANG DAY O `S3` (18/10/2026)** — va day la mot **SUA PHEP KIEM**,
+    # khong phai "noi long cong":
+    #   • `S3` lam **seed bat buoc** `RETAIL`/`WHOLESALE`/`VIP` (`CUS-001` §11, `ADR-09`) ⇒ tu nay bang **PHAI
+    #     CO** du lieu tham chieu;
+    #   • 📌 Truoc `S3`, `CusGroups` rong **khong phai vi sach** — ma vi **chua co duong ghi nao** (dung cai no
+    #     `CUS-001` §16.4 #2 ghi). 🔑 Mot bat bien "phai rong" mo ta sai su that thi **khong phai** bat bien.
+    #   ✅ Thay bang mot bat bien **MANH HON** (nhom ②): *"phai co DUNG 3 nhom chuan, va khong co nhom probe"* —
+    #      xem khoi `KIEM SEED NHOM KHACH` ngay sau vong lap nhom ①.
+    'CusGroups'
 )
 
 $ketQua = [System.Collections.Generic.List[object]]::new()
@@ -180,10 +189,44 @@ foreach ($bang in $bangPhaiRong) {
     Write-Output ("   {0} {1,-32} {2}" -f $nhan, $bang, $chiTiet)
 }
 
+# ── ①b SEED NHÓM KHÁCH — BẤT BIẾN **MẠNH HƠN** "PHẢI RỖNG" (`CUS-001` `ADR-09`, `S3`) ────────
+# 🔑 **VI SAO DOI TU "PHAI RONG" SANG "PHAI CO DUNG 3 NHOM":**
+#   • Truoc `S3`, `CusGroups` rong **khong phai vi sach** — ma vi **chua co duong ghi nao** (dung cai no
+#     `CUS-001` §16.4 #2 ghi). ⚠️ Mot bat bien mo ta sai su that thi **khong phai** bat bien.
+#   • Tu `S3`, `CustomerGroupDataSeedContributor` **BAT BUOC** gieo `RETAIL`/`WHOLESALE`/`VIP` (`CUS-001` §11).
+#     ⇒ neu bang rong thi **seed chua chay** — va 📌 do la mot **loi that** (moi luat gia theo nhom se khong
+#     dien dat duoc), khong phai "sach".
+#   ✅ Kiem **ca ba**: (a) du 3 ma chuan, (b) khong co nhom probe `k9%`, (c) khong co ban ghi xoa mem.
+# 📌 Cach nay **manh hon** "phai rong": no bat duoc ca **thieu seed** lan **rac probe**.
+Write-Output ''
+Write-Output '── ①b Seed nhom khach (CusGroups — du lieu tham chieu, KHONG phai rac) ──'
+
+$nhomChuan = @('RETAIL', 'WHOLESALE', 'VIP')
+
+$soNhomSong = [int](((Psql 'select count(*)::text from "CusGroups" where not "IsDeleted";') -join '').Trim())
+$soNhomXoaMem = [int](((Psql 'select count(*)::text from "CusGroups" where "IsDeleted";') -join '').Trim())
+$soNhomProbe = [int](((Psql 'select count(*)::text from "CusGroups" where lower("Code") like ''k9%'';') -join '').Trim())
+
+$maDangCo = @(Psql ('select "Code" from "CusGroups" where not "IsDeleted" and "Code" in ({0});' -f (($nhomChuan | ForEach-Object { "'$_'" }) -join ',')) | ForEach-Object { $_.Trim() })
+$thieuNhom = @($nhomChuan | Where-Object { $_ -notin $maDangCo })
+
+# 🛡️ Luoi an toan: doc duoc 0 dong metadata ⇒ phep kiem VO NGHIA (khong phai "thieu seed").
+if ($soNhomSong -eq 0) {
+    Write-Output '   🚨 CusGroups RONG ⇒ seed nhom khach CHUA CHAY (`CustomerGroupDataSeedContributor`).'
+    Write-Output '      📌 Chay `src\eCommerce.DbMigrator` roi do lai — day la loi THAT (CUS-001 §11), khong phai "sach".'
+}
+
+$seedDat = ($thieuNhom.Count -eq 0 -and $soNhomProbe -eq 0 -and $soNhomXoaMem -eq 0)
+ThemKq '①b seed nhom khach' 'Du 3 nhom chuan + khong rac probe' $seedDat `
+    ("conSong={0} · xoaMem={1} · thieu={2} · nhomProbe={3}" -f $soNhomSong, $soNhomXoaMem, ($(if ($thieuNhom.Count -eq 0) { 'khong' } else { $thieuNhom -join ',' })), $soNhomProbe)
+
+Write-Output ("   {0} CusGroups: conSong={1} · xoaMem={2} · thieu={3} · nhomProbe={4}" -f `
+        $(if ($seedDat) { '✅' } else { '🚨' }), $soNhomSong, $soNhomXoaMem, `
+        $(if ($thieuNhom.Count -eq 0) { 'khong' } else { $thieuNhom -join ',' }), $soNhomProbe)
+
 # ── ② CO BAO MAT CUA ADMIN ─────────────────────────────────────────────────────────────────
 Write-Output ''
 Write-Output '── ② Co bao mat cua admin ──'
-
 $admin = (Psql 'select "NormalizedUserName" || ''|'' || "ShouldChangePasswordOnNextLogin"::text from "AbpUsers" where "NormalizedUserName" = ''ADMIN'';') -join ''
 $adminDat = ($admin -eq 'ADMIN|true')
 
@@ -261,6 +304,10 @@ $quyenPhaiCon = @(
     'eCommerce.ChannelLimits',      # INV-003 (muc 1 cua goi ban giao)
     'eCommerce.ChannelLimits.Manage',
     'eCommerce.Customers',          # CUS-001
+    # 🔑 `S3` (18/10/2026): quyen **MỚI** cho nhom khach (`CUS-001` `ADR-09`). 📌 Dua vao danh sach nay vi
+    # hai ly do: (a) no la quyen **anh huong GIA** ⇒ phai co that; (b) neu thieu thi API nhom khach tra `403`
+    # cho **moi nguoi** ke ca admin — va 📌 trieu chung do **khong tro** toi cho sai (`XC-004` D2).
+    'eCommerce.Customers.ManageGroups',
     'eCommerce.Payments',           # REC-001 / SAL-006
     'eCommerce.Payments.Refund',
     'eCommerce.Inventory'           # INV-001/002/003
@@ -411,10 +458,23 @@ else {
 
 # ── GHI RO NHOM ② DE KHONG AI TUONG LA BO SOT ──────────────────────────────────────────────
 Write-Output ''
-Write-Output '── ② (ghi chu) Bang GIU LICH SU — CO Y khong kiem "phai rong" ──'
+Write-Output '── ② (ghi chu) Bang GIU LICH SU / DU LIEU THAM CHIEU — CO Y khong kiem "phai rong" ──'
+
+# 🔑 **LY DO PHAI RIENG CHO TUNG BANG** — 📌 mot cau chung ("nhat ky luot quet cua job") gan cho ca bang
+# KHONG phai nhat ky se **noi sai su that** ngay tren man hinh cua nguoi doc (bai hoc: *"mot chu thich noi
+# nguoc su thuc la mot chu thich gay hai"*).
+$lyDoGiuLichSu = @{
+    # 🔑 `ReconRuns`: MỖI LƯỢT QUÉT là một dòng ⇒ con số TĂNG là ĐÚNG.
+    'ReconRuns' = 'nhat ky luot quet doi soat — moi luot mot dong, con so TANG la DUNG'
+    # 🔑 `CusGroups`: DỮ LIỆU THAM CHIẾU được seed (`ADR-09`) ⇒ phải CÓ, và số dòng đổi khi người vận hành
+    # thêm nhóm. 📌 Bat bien that cua no nam o nhom ①b (đúng 3 nhóm chuẩn + không rác probe), KHÔNG phải ở đây.
+    'CusGroups' = 'du lieu tham chieu duoc seed (ADR-09) — bat bien that o nhom (1b)'
+}
+
 foreach ($b in $bangGiuLichSu) {
     $so = [int](((Psql ('select count(*)::text from "{0}";' -f $b)) -join '').Trim())
-    Write-Output ("   📌 {0,-32} {1} dong — 🔑 CON SO TANG DAN LA DUNG (nhat ky luot quet cua job)." -f $b, $so)
+    $lyDo = if ($lyDoGiuLichSu.ContainsKey($b)) { $lyDoGiuLichSu[$b] } else { 'CO Y giu lich su (xem chu thich trong script)' }
+    Write-Output ("   📌 {0,-32} {1} dong — 🔑 {2}." -f $b, $so, $lyDo)
 }
 
 # ── TONG KET ───────────────────────────────────────────────────────────────────────────────

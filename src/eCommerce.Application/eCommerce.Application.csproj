@@ -39,6 +39,13 @@
          ⇒ 🔑 **một định nghĩa, hai chỗ gọi**.
          📌 app → module là **HỢP LỆ** (module → app mới bị cấm) — cùng khuôn hai tham chiếu ở trên. -->
     <ProjectReference Include="..\..\modules\PaymentHub\eCommerce.PaymentHub.Domain\eCommerce.PaymentHub.Domain.csproj" />
+    <!-- 🚨 `S3` — **CỔNG KHÁCH BỊ CHẶN TRÊN ĐƯỜNG BÁN HÀNG** (`CUS-001` `ADR-04`, nợ §16.4 #4).
+         `CuaKiemKhachGiaoDich` gọi `ICustomerDirectory.ChoPhepGiaoDichAsync` — hợp đồng **CHỈ ĐỌC** của module
+         `Customers` (`ADR-12`), nằm ở `…Application.Contracts`. 📌 app → module là **HỢP LỆ** (module → app mới
+         bị cấm). 🔒 Chỉ tham chiếu tầng **Contracts**: đường bán hàng **không** được đọc thẳng `CusCustomers`
+         (nếu đọc thẳng thì mỗi lần đổi cấu trúc bảng khách sẽ vỡ miền bán hàng mà **không có lỗi biên dịch**).
+         📌 `CustomerErrorCodes` (mã `0005`) nằm ở `…Customers.Domain` và đi kèm theo tham chiếu này. -->
+    <ProjectReference Include="..\..\modules\Customers\eCommerce.Customers.Application.Contracts\eCommerce.Customers.Application.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>

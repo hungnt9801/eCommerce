@@ -103,6 +103,10 @@ public class eCommercePermissionDefinitionProvider : PermissionDefinitionProvide
         operations.AddChild(eCommerceConsts.Permissions.Operations.DeadLetters);
         var customers = group.AddPermission(eCommerceConsts.Permissions.Customers.Default);
         customers.AddChild(eCommerceConsts.Permissions.Customers.Manage);
+        // 🚨 `S3` (`CUS-001` ADR-09): nhóm khách là ĐẦU VÀO CỦA BẢNG GIÁ (`PRC-001` Q5) ⇒ đổi nhóm là đổi
+        // giá bán cho cả một tập khách ⇒ **quyền riêng**, không gộp vào `Manage` (đặc quyền tối thiểu).
+        // 🔒 Thiếu dòng này ⇒ `403` cho MỌI người kể cả `admin` (lỗi im lặng, `XC-004` D2).
+        customers.AddChild(eCommerceConsts.Permissions.Customers.ManageGroups);
 
         // ---- Sổ địa chỉ (`ADDR-004` phần B) ----
         // 🚨 BẮT BUỘC khai ở CẢ HAI NƠI (hằng số + ở đây): thiếu một nơi ⇒ `403` cho MỌI người kể cả `admin`.

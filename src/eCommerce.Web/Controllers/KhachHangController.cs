@@ -40,20 +40,57 @@ public class KhachHangController : Controller
         _khachHang = khachHang;
     }
 
-    /// <summary>`GET /KhachHang` — danh sách hồ sơ, lọc **tuỳ chọn** theo từ khoá.</summary>
-    public async Task<IActionResult> Index(string? tuKhoa = null)
+    /// <summary>
+    /// `GET /KhachHang` — danh sách hồ sơ, lọc **tuỳ chọn** theo từ khoá, **có phân trang** (`S3`).
+    ///
+    /// 🔑 **VÌ SAO PHÂN TRANG LÀ VIỆC CỦA DỮ LIỆU CÁ NHÂN, KHÔNG CHỈ CỦA HIỆU NĂNG:** trước `S3`, trang này
+    /// hiện **top 100** và **không có tổng số** ⇒ 📌 người vận hành **không biết** còn hồ sơ nào nữa; cách duy
+    /// nhất để chắc là **nâng trần** (kéo cả bảng PII về một trang). ✅ Nay mỗi trang **20** hồ sơ và có
+    /// *"trang X / Y · tổng N"* ⇒ câu hỏi *"còn ai không"* có **một con số** trả lời.
+    ///
+    /// 🔒 **`trang` được KẸP, không ném:** một URL sửa tay (`?trang=0`, `?trang=-5`, `?trang=99999`) phải
+    /// cho ra **một trang hợp lệ**, ⚠️ không phải `500`. 📌 Riêng `trang` vượt quá số trang: trả **trang cuối**
+    /// chứ không trả bảng rỗng — một bảng rỗng trông y như *"đã xoá hết khách"*.
+    /// </summary>
+    public async Task<IActionResult> Index(string? tuKhoa = null, int trang = 1)
     {
-        // ⚠️ `toiDa: 100` là **trần có chủ ý**: hồ sơ khách là dữ liệu cá nhân ⇒ 🔒 **không** kéo cả bảng
-        // về một trang. 📌 Người vận hành cần **tra cứu**, không cần **xuất toàn bộ** — muốn xuất thì phải
-        // đi qua **một hồ sơ cụ thể** (xem `XuatDuLieu` ngay dưới): 🔑 xuất **từng người** là việc luật cho
-        // phép và có kiểm soát; xuất **cả bảng** thì **không** ai kiểm soát được.
-        var ds = await _khachHang.GetDanhSachAsync(
-            keyword: string.IsNullOrWhiteSpace(tuKhoa) ? null : tuKhoa.Trim(),
-            toiDa: 100);
+        // 📌 20 dòng/trang: đủ để **rà** mà không kéo cả bảng. ⚠️ Đây là **trần hiển thị**, không phải trần API
+        // (`CustomerAppService.GetDanhSachPhanTrangAsync` tự kẹp `1..200`).
+        const int SoDongMotTrang = 20;
+
+        var tuKhoaDaChuanHoa = string.IsNullOrWhiteSpace(tuKhoa) ? null : tuKhoa.Trim();
+
+        // 🔑 Lần đọc ĐẦU để biết `totalCount` ⇒ mới biết số trang ⇒ mới kẹp được `trang`.
+        var ketQua = await _khachHang.GetDanhSachPhanTrangAsync(
+            keyword: tuKhoaDaChuanHoa,
+            skipCount: 0,
+            maxResultCount: SoDongMotTrang);
+
+        var soTrang = ketQua.TotalCount == 0
+            ? 1
+            // ⚠️ `Math.Max(1, …)`: `TotalCount > 0` mà phép chia ra 0 thì không xảy ra, nhưng giữ `Max` để
+            // **không** bao giờ có *"trang 0"* trong HTML (một liên kết `?trang=0` là liên kết sai).
+            : Math.Max(1, (int)Math.Ceiling(ketQua.TotalCount / (double)SoDongMotTrang));
+
+        var trangHienTai = Math.Clamp(trang, 1, soTrang);
+
+        if (trangHienTai != 1)
+        {
+            ketQua = await _khachHang.GetDanhSachPhanTrangAsync(
+                keyword: tuKhoaDaChuanHoa,
+                skipCount: (trangHienTai - 1) * SoDongMotTrang,
+                maxResultCount: SoDongMotTrang);
+        }
 
         ViewBag.TuKhoa = tuKhoa;
+        ViewBag.Trang = trangHienTai;
+        ViewBag.SoTrang = soTrang;
+        // ⚠️ `PagedResultDto.TotalCount` là `long` ⇒ ép **tường minh** xuống `int`: 📌 nếu để `long`, phép
+        // `ViewBag.TongSo is int` trong view trả `false` ⇒ màn hình hiện **0 hồ sơ** (lỗi im lặng).
+        ViewBag.TongSo = (int)ketQua.TotalCount;
+        ViewBag.SoDongMotTrang = SoDongMotTrang;
 
-        return View(ds);
+        return View(ketQua.Items);
     }
 
     /// <summary>

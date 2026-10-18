@@ -82,6 +82,51 @@
                 </select>
             </div>
             <div><label for="Kenh">Kênh</label><input id="Kenh" name="Kenh" value="@Model.Kenh" /></div>
+            @* 🚨 **KHÁCH CỦA ĐƠN** (`CUS-001` ADR-04 — `S3`).
+               🔑 VI SAO O CHON NAY TON TAI: truoc `S3` duong web KHONG dat `CustomerId` cho don
+               ⇒ don web "khong thuoc ve ai", va 🔒 cua "khach bi chan khong duoc mua" KHONG THE phat huy
+               tac dung o day (khong co khach de kiem).
+               ⚠️ O CHON NAY KHONG PHAI LA CUA: khach dang CHAN van hien (co nhan) va van gui duoc
+               ⇒ 🔒 guard THAT nam o `CuaKiemKhachGiaoDich` (app service) — thuoc tinh `disabled` trong HTML
+               thi ai cung sua duoc bang tay.
+               📌 Chon TRONG = khach vang lai (mac dinh, hop le — ADR-03). *@
+            @if (Model.CoQuyenChonKhach)
+            {
+                <div>
+                    <label for="KhachId">Khách</label>
+                    <select id="KhachId" name="KhachId">
+                        <option value="">— Khách vãng lai —</option>
+                        @foreach (var k in Model.KhachList)
+                        {
+                            if (Model.KhachId == k.Id)
+                            {
+                                <option value="@k.Id" selected>@k.Ten@(k.DungDuoc ? "" : " (ĐANG CHẶN)")</option>
+                            }
+                            else
+                            {
+                                <option value="@k.Id">@k.Ten@(k.DungDuoc ? "" : " (ĐANG CHẶN)")</option>
+                            }
+                        }
+                    </select>
+                    @if (Model.TongSoKhach > Model.KhachList.Count)
+                    {
+                        <span class="ghichu" id="gioi-han-o-chon-khach">
+                            (chỉ hiện @Model.KhachList.Count / @Model.TongSoKhach khách — tra đủ ở mục Khách hàng)
+                        </span>
+                    }
+                </div>
+            }
+            else
+            {
+                @* ⚠️ KHONG im lang: neu nguoi dung khong co quyen xem ho so khach thi phai NOI RO, 📌 neu khong
+                   ho se tuong he thong "khong co khach nao" va dat don cho khach vang lai ma khong biet. *@
+                <div>
+                    <label>Khách</label>
+                    <span class="ghichu" id="khong-co-quyen-chon-khach">
+                        Không có quyền xem hồ sơ khách ⇒ đơn sẽ là <strong>khách vãng lai</strong>.
+                    </span>
+                </div>
+            }
                             @* 🚨 §87: giỏ ĐANG LƯU (cookie) — chỉ hiện khi có dữ liệu; kèm nút XOÁ GIỎ (GET /DatHang/XoaGio). *@
                 @if (!string.IsNullOrWhiteSpace(Model.TomTatGio))
                 {

@@ -1,5 +1,7 @@
 using eCommerce.Application.Contracts.Checkout;
 using eCommerce.Application.Contracts.Inventory;
+using eCommerce.Application.Sales;
+using eCommerce.Customers;
 using eCommerce.Inventory;
 using eCommerce.Pricing;
 using eCommerce.Pricing.Dtos;
@@ -14,6 +16,8 @@ namespace eCommerce.Application.Checkout;
 /// 🚨 **CHECKOUT MỘT BƯỚC** (`SAL-002`) — **tính tiền RỒI giữ chỗ**, tất cả trong **một transaction**.
 ///
 /// **THỨ TỰ VÀ LÝ DO:**
+///   0. 🚨 **CỔNG KHÁCH BỊ CHẶN** (`CUS-001` `ADR-04`) — gọi `ICustomerDirectory.ChoPhepGiaoDichAsync` **trước
+///      mọi tác dụng phụ**. Khách `Blocked` ⇒ `eCommerce:Customers:0005`, **không** giữ chỗ, **không** ghi sổ giá.
 ///   1. **Tra sổ giải trình theo `IdempotencyKey` TRƯỚC** ⇒ nếu đã có ⇒ **trả lại kết quả cũ** (kèm lượt giữ chỗ cũ)
 ///      và **thoát ngay**, **không** tính lại, **không** giữ chỗ thêm. 📌 Đây là điều kiện để *"khách bấm Đặt hàng
 ///      hai lần"* và *"client retry sau timeout"* **không** tạo hai lượt giữ chỗ / hai lần trừ kho.
@@ -37,14 +41,33 @@ public class CheckoutAppService : ApplicationService, ICheckoutAppService
     private readonly IPriceCalculationAppService _tinhGia;
     private readonly IStockReservationAppService _giuCho;
 
-    public CheckoutAppService(IPriceCalculationAppService tinhGia, IStockReservationAppService giuCho)
+    /// <summary>🚨 **CỔNG KHÁCH BỊ CHẶN** (`CUS-001` `ADR-04`, nợ §16.4 #4 đóng ở `S3`) — hợp đồng **CHỈ ĐỌC**
+    /// của module `Customers` (`ADR-12`). 📌 Trước `S3` cổng này **tồn tại nhưng không ai gọi** ⇒ khách `Blocked`
+    /// **vẫn đặt được hàng** ở đường thật.</summary>
+    private readonly ICustomerDirectory _thuMucKhach;
+
+    public CheckoutAppService(
+        IPriceCalculationAppService tinhGia,
+        IStockReservationAppService giuCho,
+        ICustomerDirectory thuMucKhach)
     {
         _tinhGia = tinhGia;
         _giuCho = giuCho;
+        _thuMucKhach = thuMucKhach;
     }
 
     public async Task<KetQuaCheckoutDto> TinhVaGiuChoAsync(CheckoutInput input)
     {
+        // ── ⓪ CỔNG KHÁCH BỊ CHẶN — TRƯỚC MỌI TÁC DỤNG PHỤ (`CUS-001` §28) ─────────────────────────
+        // 🔑 **VÌ SAO LÀ BƯỚC ĐẦU TIÊN, KHÔNG PHẢI BƯỚC SAU `ThuKetQuaCuAsync`:** bước ① có thể **trả lại**
+        // một kết quả cũ ⇒ nếu đặt cổng sau nó, khách vừa bị chặn mà **vẫn nhận được** *"đã giữ chỗ"* của lần
+        // trước ⇒ đọc như *"vẫn mua được"*. 📌 Và nếu đặt cổng **sau** bước ③, hàng đã bị **giữ** rồi mới
+        // bị chặn ⇒ đơn không tạo nhưng **kho vẫn bị giam** tới hết TTL (15 phút) — cổng chặn đơn lại
+        // **làm hại kho**, đúng loại *"sửa một chỗ, hỏng chỗ khác"*.
+        // ⚠️ Cố ý **KHÔNG** bọc `try/catch`: `0005` phải nổi lên thành lỗi nghiệp vụ cho bên gọi
+        // (controller `DatHang` bắt `BusinessException` để hiện mã — xem quy ước #7).
+        await CuaKiemKhachGiaoDich.DamBaoDuocGiaoDichAsync(_thuMucKhach, input.CustomerId);
+
         if (input.Items.Count == 0)
         {
             throw new BusinessException(InventoryErrorCodes.SoLuongPhaiDuong)

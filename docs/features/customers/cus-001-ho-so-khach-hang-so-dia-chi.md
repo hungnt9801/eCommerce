@@ -6,7 +6,7 @@
 | **Module** | **Customers** — ✅ **ĐÃ TỒN TẠI** tại `modules/Customers/eCommerce.Customers.{Domain,Application,Application.Contracts,EntityFrameworkCore}` (kiểm 17/10/2026: `Customer.cs`, `CustomerGroup.cs`, `CustomerAppService.cs`, `CustomerDirectory.cs`). 📌 Dòng này trước đây ghi *"module CHƯA tồn tại"* — **đã lỗi thời** |
 | **Giai đoạn** | **GĐ1** — `docs/implementation-plan.md:412` (bảng `CUS-001` → `Customers`); danh sách GĐ1 ở `docs/implementation-plan.md:112` |
 | **Ưu tiên** | **Must have** |
-| **Trạng thái** | 🟡 `Draft` — chờ review · ✅ **lát cắt 1 ĐÃ CÓ CODE** (`modules/Customers/eCommerce.Customers.Domain/Customer.cs`, `CustomerAppService.cs`, migration `20261016081435_Cus001_Customers_CustomerGroups`) · 🚨 **sổ địa chỉ VẪN BỊ CHẶN** — entity `Address` chưa tồn tại, xem [`ADDR-004`](../address/addr-004-so-dia-chi-khach.md) |
+| **Trạng thái** | 🟡 `Draft` — chờ review · ✅ **ĐỦ 12 LÁT CẮT ĐÃ CÓ CODE** (§16 · §20–§27 · **§28 = `S3`**) · ✅ **sổ địa chỉ ĐÃ XONG** (`ADDR-004` phần A+B, `S1`/`S2`) · ✅ **cổng khách bị chặn ĐÃ NỐI** vào đường bán hàng (`S3` — trước đó **khách `Blocked` vẫn đặt được hàng**) · ⏳ còn **UI nhóm khách** + **gán khách vào nhóm** (§28.6) |
 | **Người viết / người review** | *(điền)* / **Kiến trúc trưởng + BA + Pháp chế dữ liệu cá nhân** |
 | **Phiên bản / ngày** | `v0.2 — 17/10/2026` (sửa dòng *"0 dòng code"* đã sai + đường dẫn theo cấu trúc `docs/features/<module>/`; trước: `v0.1 — 13/10/2026`) |
 | **Tài liệu liên quan** | `XC-001` (Money/làm tròn) · `XC-002` (outbox/inbox + idempotency) · `XC-003` (khoá phân tán) · `XC-004` (xác thực/phân quyền/tenant) · `XC-005` (observability) · `XC-006` (thuế GTGT) · **`ADDR-001`/`ADDR-002`/`ADDR-003` (AddressHub)** · ⭐ **`ADDR-004` (sổ địa chỉ: `Address` + `CustomerAddressLink` — tài liệu CHỦ SỞ HỮU của nợ chặn này)** · `SAL-002` (đặt hàng — tạo khách vãng lai) · `SAL-003` (state machine đơn) · `EINV-001` (hoá đơn — đọc tên/MST/địa chỉ người mua) · `PRC-001` (nhóm khách ảnh hưởng giá) · `LOY-001` · `REV-001` · `WEB-001` (UI đăng nhập) · `docs/implementation-plan.md` · `docs/structure-and-techstack.md` |
@@ -490,7 +490,7 @@ public interface ICustomerDirectory
 | `POST` | `/api/app/customers/{id}/addresses` | `.ManageAddress` | thêm địa chỉ |
 | `POST` | `/api/app/customers/{id}/addresses/{linkId}/default` | `.ManageAddress` | **đặt mặc định** (khoá phân tán) |
 | `DELETE` | `/api/app/customers/{id}/addresses/{linkId}` | `.ManageAddress` | gỡ (xoá mềm) |
-| `GET`/`POST`/`PUT` | `/api/app/customer-groups` | `.ManageGroups` | nhóm khách (dữ liệu, ADR-09) |
+| `GET`/`POST`/`PUT` | `/api/app/customer-groups` | `.ManageGroups` | nhóm khách (dữ liệu, ADR-09) — ⚠️ **route THẬT** (`S3`) là `/api/app/customer-group/danh-sach` (**GET**) · `/tao-nhom` (**POST**) · `/{id}/cap-nhat-nhom` (**POST**); xem **§28.4** |
 
 **Request mẫu — tạo khách**
 
@@ -1125,12 +1125,12 @@ Phiên bản đầu: `CustomerAppService` **hiện thực luôn** `ICustomerDire
 | # | Nợ | Ghi chú |
 |---|---|---|
 | **1** | 🚨 **SỔ ĐỊA CHỈ CHƯA LÀM** (`CustomerAddressLink` + `AddressType` + cờ mặc định) | **BỊ CHẶN CÓ THẬT**: `Address` **chưa tồn tại** trong `AddressHub`. Bất biến *"tối đa MỘT địa chỉ mặc định cho mỗi (khách, loại)"* ở DB **chưa** viết được (partial unique index cần bảng đích tồn tại) |
-| **2** | **Chưa có `CustomerGroup` API/seed** | Entity + mapping + ràng buộc DB **đã có**; **chưa** có endpoint CRUD và **chưa** seed nhóm mặc định (`RETAIL`/`WHOLESALE`/`VIP`) ⇒ hiện phải ghi DB tay |
+| **2** | ~~**Chưa có `CustomerGroup` API/seed**~~ | ✅ **ĐÃ CÓ (`S3`, 18/10/2026)** — `CustomerGroupAppService` + `ICustomerGroupAppService` (3 method: danh sách **có phân trang** + `SoKhach` · tạo · sửa) · seed `RETAIL`/`WHOLESALE`/`VIP` (idempotent **theo TỪNG MÃ**) · quyền `Customers.ManageGroups` (**hai nơi**) · `0008` ⇒ **`409`**. 📄 **§28** · ⏳ còn: **UI** + **gán** khách vào nhóm (§28.6) |
 | **3** | **Chưa kiểm chứng HTTP** cho lát cắt này | ✅ **ĐÃ KIỂM CHỨNG 16/10/2026 — 15/15 ca** (xem **§16.6**): nay **đã gọi API thật** + **đọc lại DB** + **kiểm log không chứa PII thô** |
-| **4** | **Chưa nối đường bán hàng với `ChoPhepGiaoDichAsync`** | `SAL-002`/`SAL-001` **chưa** gọi ⇒ khách `Blocked` **vẫn đặt được hàng** ở đường thật. 📌 Đây là **cổng nghiệp vụ còn trống** (rủi ro: khách chây nợ vẫn mua) |
+| **4** | ~~**Chưa nối đường bán hàng với `ChoPhepGiaoDichAsync`**~~ | ✅ **ĐÃ NỐI (`S3`, 18/10/2026)** — cổng `CuaKiemKhachGiaoDich` (**một** định nghĩa, **hai** chỗ gọi: `CheckoutAppService` + `DonHangAppService`), ném `0005` **TRƯỚC** mọi tác dụng phụ. 🔒 Chứng minh bằng **HTTP thật**: khách `Blocked` ⇒ `403` + `0005` · **0 lượt giữ chỗ · 0 sổ giải trình · 0 đơn**; **và** hai chiều ngược (khách thường / khách vãng lai **KHÔNG** bị `0005`). 📄 **§28** |
 | **5** | ~~**Chưa có xuất dữ liệu cá nhân**~~ | ✅ **ĐÃ CÓ** (`XuatDuLieuCaNhanAsync` + `CusDataExportLogs`, 16/10/2026). ➕ **`ADDR-004` B10 (18/10/2026): bản xuất GỒM SỔ ĐỊA CHỈ**, kể cả mục **đã gỡ** (có cờ `DaGo`) ⇒ đóng **một phần** `NFR-CUS-0010`/`TC-16` — ⏳ còn **đường xoá mềm có kiểm** (quyền *"yêu cầu xóa"*) |
 | **6** | **Chưa có `TenantId` filter test** + chưa có ETO `CustomerChangedEto` | Module khác (`LOY-001` D8) sẽ cần **ETO**; nay chưa phát sự kiện nào |
-| **7** | `GetDanhSachAsync` **chưa phân trang** (có **trần** `toiDa ≤ 500`) | Cần `PagedResultDto` trước khi có UI thật |
+| **7** | ~~`GetDanhSachAsync` **chưa phân trang**~~ | ✅ **ĐÃ PHÂN TRANG (`S3`, 18/10/2026)** — `GetDanhSachPhanTrangAsync` → `PagedResultDto` (đếm **TRƯỚC** khi cắt trang · `ThenBy(Id)` để **tất định** · trần `1..200` giữ nguyên nghĩa *"không kéo cả bảng"*) · `/KhachHang?trang=N` hiện *"trang X / Y · tổng N"*. 📄 **§28** |
 
 ### 16.6 ✅ **KIỂM CHỨNG HTTP THẬT — 15/15 ca ĐẠT** (16/10/2026, Host :5000 + PostgreSQL 17)
 
@@ -2061,3 +2061,157 @@ CHẾ, không phải một lời nhắc.** ✅ Chữa ngay lượt này: sau khi
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.8 | 17/10/2026 | *(agent, session GĐ1)* | **§27 — LÁT CẮT 11: RÀO `LyDo` Ở TẦNG ENTITY — ĐÃ THỬ, VÀ KẾT LUẬN LÀ *KHÔNG NÊN*** (đóng nợ §26.6 #6 **bằng một QUYẾT ĐỊNH CÓ ĐO LƯỜNG**, không phải bằng cách thêm rào): 🔑 ở §26.6 #6 tôi tự ghi nợ *"`LyDo` chưa bắt buộc ở tầng ENTITY ⇒ ⚠️ job ghi thẳng repository vẫn **lọt**"* — 📌 lý do **đúng về nguyên tắc** (guard ở **lớp gọi** là tiện nghi, không phải **bất biến**), ✅ **nên tôi ĐÃ THỬ** thêm rào chặn **chuỗi khoảng trắng** vào constructor. 🚨 **VÀ NÓ ĐỎ — vì một lý do THẬT**: `TC05b`/`TC06` khẳng định `Tao(lyDo: "")`/`Tao(lyDo: "   ")` cho `LyDo = null`; 🔑 **điều đáng giá là tôi KHÔNG sửa test ngay** mà **ĐO trước**, và phát hiện **ba** điều: ① `CustomerAppService` **đã** có guard `string.IsNullOrWhiteSpace(lyDo)` ⇒ **NÉM** ⇒ 🔒 **chính sách "phải có lý do" ĐÃ được bảo vệ** (📌 nợ §26.6 #6 **nhẹ hơn** tôi tưởng) · ② E2E **`D9g`** đã **đo được** `HTTP 500` khi thiếu lý do ⇒ ✅ bảo vệ đó **có bằng chứng**, không phải suy luận · ③ entity **đã** chuẩn hoá `""`/`"   "` ⇒ `null` (hành vi **cũ**, **có test**) ⇒ ⚠️ rào mới **đổi ngữ nghĩa** của một hành vi đang được khoá. 🔒 **BA LÝ DO ĐỂ KHÔNG ĐẶT RÀO Ở ENTITY — và #2 là lý do QUYẾT ĐỊNH:** ① **`""` và `"   "` đều nghĩa là *"không có lý do"*** (📌 `""` = ô nhập **để trống**, `"   "` = gõ **khoảng trắng**) ⇒ ⚠️ **NÉM** sẽ làm **hỏng luồng hợp lệ** (một người để trống ô rồi bấm nút sẽ nhận **lỗi**, trong khi ý định của họ **hoàn toàn rõ ràng**); ② 🚨 **TẠO RA HAI NGUỒN SỰ THẬT** — 🔒 luật *"phải có lý do"* chỉ nên ở **MỘT chỗ**; 📌 hai chỗ thì một ngày nào đó chúng sẽ **khác nhau**, ⚠️ và khi đó ta **không biết chỗ nào đúng** (🔑 đúng bài học `XC-003` **F1**: *"một đại lượng, một nguồn sự thật"*); ③ ⚠️ **và nó KHÔNG bảo vệ được gì thêm** — mọi đường ghi **trong sản phẩm** đều đi qua **app service**, 📌 mà app service **đã** có guard **và** đã có test E2E ⇒ 🔑 cái duy nhất nó thêm là **rủi ro** ở ① và ②. ✅ **QUYẾT ĐỊNH:** **ENTITY** giữ nguyên (🔑 chuẩn hoá giá trị vô nghĩa + cắt theo độ dài — 📌 nó làm đúng phần **dữ liệu** của mình) · **LỚP GỌI** (`CustomerAppService`) giữ **chính sách** ⇒ **NÉM** (✅ đã có + **E2E `D9g`** đo được `HTTP 500`); 🔑 **nguyên tắc:** *"kiểm ở lớp gọi là tiện nghi; bất biến phải ở entity"* — 📌 **NHƯNG một bất biến phải là điều ĐÚNG với MỌI giá trị của entity**; 🔒 `LyDo = null` **hợp lệ** (cột thêm sau; dòng cũ có `null` là **sự thật**) ⇒ ⚠️ *"phải có `LyDo`"* **không phải** bất biến của entity — 📌 nó là **luật của NGHIỆP VỤ XUẤT**, và nghiệp vụ xuất nằm ở **app service**; ➕ **và tôi giữ lại GHI CHÚ NÀY TRONG TEST** (`TC06`) — 🔑 để lần sau có ai định *"siết cho chặt"* thì **đọc được lý do** thay vì làm lại từ đầu (📌 **một quyết định KHÔNG ĐƯỢC GHI thì sẽ bị ĐẢO NGƯỢC bởi người kế tiếp**). 🐞 **LỖI CỦA TÔI TRONG LÁT CẮT NÀY: LẠI DẤU CÁCH TRONG TÊN HÀM TEST** — viết `TC05c_CHUOI_KHOANG_TRANG_thi_NEM__KHONG duoc im lang chuan hoa thanh null()` ⇒ **6 lỗi cú pháp C#**; 🔒 **ĐÂY LÀ LẦN THỨ HAI** (§22.5 #3 · lượt này) ⇒ 🔑 **một bài học ghi hai lần mà vẫn tái diễn ⇒ nó cần một CƠ CHẾ, không phải một lời nhắc**; ✅ chữa ngay lượt này: sau khi sửa, tôi **quét tự động** mọi tệp test tìm mẫu `public void <tên> <có dấu cách>(` ⇒ 📌 kết quả **0**. ✅ **KIỂM CHỨNG ĐẦY ĐỦ:** **E2E 59/59** · **8 bước** · `exit 0` · **1181** unit · **38** integration · mermaid **197/0** · DB **21/21** · test cổng **17/17** · DB sạch lại (`KHACH_K97=0` · `DON_K97=0` · `NHATKY=0` · `BAOMAT=true`). Ghi **§27.6** (nợ: 🚨 **chưa có cổng quét *"dấu cách trong tên hàm test"*** — 🔑 bài học **đã ghi HAI LẦN** ⇒ 📌 đề xuất một ca trong `test-cong-kiem.ps1` (⚠️ hiện chỉ **quét tay** mỗi lần) · **chưa có cảnh báo xuất LẶP LẠI** (🔑 bảng đã **đủ dữ liệu**) · **chưa phân trang** · ⚠️ **múi giờ: ngày trên form là UTC** (chưa có chỉ dẫn) · ⚠️ **CSV chưa hỗ trợ `;` cho locale Excel** (📌 một số locale ⇒ 🔒 tệp **thành một cột**; ⚠️ BOM **không giải quyết hết** — **nợ thật**) · **chưa có test `toiDa` ở tầng unit** · **chưa gồm dữ liệu module khác** (**nợ chặn**)) |
+
+
+---
+
+## 28. ✅ **LÁT CẮT 12 — `S3`: ĐÓNG `CUS-001`** (18/10/2026)
+
+> 🎯 **PHẠM VI PHIÊN:** đóng **ba nợ** của `CUS-001` — §16.4 **#2** (`CustomerGroup` API + seed), **#4**
+> (**nối `ChoPhepGiaoDichAsync` vào đường bán hàng**) và **#7** (phân trang). 📌 Hai trong ba là **tính năng
+> thiếu**; một là **LỖI THẬT** đang chạy.
+
+### 28.1 🔑 Vì sao — và vì sao nợ #4 là **LỖI**, không phải "thiếu sót"
+
+| # | Nợ (trước `S3`) | Sự thật **đo được** | Hậu quả |
+|---|---|---|---|
+| **#4** | Chưa nối `ChoPhepGiaoDichAsync` vào đường bán hàng | Hàm **được định nghĩa 1 nơi, gọi 0 nơi** (`gd1-coding-sessions.md` §2.1 #3) | 🚨 **Khách đang bị CHẶN vẫn đặt được hàng** — đúng nghiệp vụ `ADR-04` muốn chặn (khách chây nợ / gian lận COD) |
+| **#2** | Chưa có `CustomerGroup` API + seed | Entity + bảng + **3 unique index** đã có từ 16/10/2026, **0 endpoint** | 🔑 Bảng **không có đường ghi** = *"hard-code nằm trong DB"* ⇒ trái `ADR-09` |
+| **#7** | `GetDanhSachAsync` chưa phân trang | Trả **top N** (trần `toiDa ≤ 500`), **không** có `totalCount` | ⚠️ Người vận hành **không biết còn ai nữa**; cách duy nhất để chắc là **nâng trần** ⇒ kéo cả bảng PII về một trang |
+
+🔑 **Bài học lớn nhất:** *một cổng được **định nghĩa** mà **không ai gọi** thì **không phải** cổng* — cùng họ với
+*"cổng không chạy tự động thì không phải cổng"*. 📌 Và lỗi này **không có triệu chứng nào**: build xanh, **1219**
+unit test xanh, E2E xanh (vì **không ca nào hỏi** *"khách bị chặn thì sao"*).
+
+### 28.2 🔒 Năm quyết định thiết kế (mỗi cái có lý do, không phải phong cách)
+
+**① CỔNG GOM VỀ **MỘT** CHỖ — `CuaKiemKhachGiaoDich.DamBaoDuocGiaoDichAsync`.**
+📌 Hai đường bán hàng (`CheckoutAppService.TinhVaGiuChoAsync` + `DonHangAppService.TaoTuCheckoutAsync`) cần **cùng**
+một luật ⇒ nếu mỗi nơi tự viết `if`, ta có **hai bản sao** của *"thế nào là bị chặn"* và **hai câu thông điệp**
+khác nhau cho CSKH. 🔒 Và cổng **NÉM**, không trả `bool`: `bool` là *"một nhánh code mà ai đó có thể quên kiểm"*.
+
+**② CỔNG ĐẶT **TRƯỚC MỌI TÁC DỤNG PHỤ** — không chỉ trước khi ghi đơn.**
+🚨 Nếu cổng đặt **sau** bước giữ chỗ: đơn không được tạo **nhưng hàng vẫn bị giam 15 phút** ⇒ *"sửa một chỗ, hậu
+quả ở chỗ khác"*, ⚠️ và **không có lỗi nào** để lần ra. 📌 Probe có **ca riêng** cho việc này (`T20`: 0 lượt giữ
+chỗ · 0 sổ giải trình · 0 đơn).
+
+**③ CỔNG KIỂM Ở **CẢ HAI** BIÊN (checkout **và** tạo đơn) — có chủ ý, không phải trùng lặp.**
+📌 `TaoTuCheckoutAsync` là **API công khai** (`SAL-001`) cho module/đối tác ⇒ *"checkout đã kiểm"* **KHÔNG** suy ra
+*"đường tạo đơn đã kiểm"*. 🔑 Nguyên tắc: **mỗi biên vào tự chịu trách nhiệm về cổng của nó**.
+
+**④ `CustomerId` ĐƯỢC ĐƯA VÀO ĐƯỜNG WEB — trước `S3`, đơn web **không thuộc về ai**.**
+🔒 Đây không chỉ là "thêm ô chọn": `TaoDonTuCheckoutInput.CustomerId` **đã có** nhưng `DatHangController` **không
+truyền** ⇒ 📌 bản xuất dữ liệu cá nhân của khách **thiếu đúng những đơn web** (`ADR-10` / Luật 91/2025/QH15).
+➕ Ô chọn khách **chỉ render khi người dùng có `Customers.Default`** (`IPermissionChecker`) — 🔑 `/DatHang` là màn
+hình của **người bán hàng** (`Orders.Manage`), hai quyền **khác nhau**, không được giả định.
+⚠️ Khách **bị chặn vẫn HIỆN** trong ô chọn (có nhãn *"ĐANG CHẶN"*): 📌 lọc ở UI là *"đặt cổng ở chỗ dễ đi vòng
+nhất"* — `disabled` trong HTML thì ai cũng sửa được.
+
+**⑤ NHÓM KHÁCH = QUYỀN RIÊNG `Customers.ManageGroups`.**
+🔑 Nhóm là **đầu vào của bảng giá** (`PRC-001` Q5) ⇒ đổi nhóm là đổi **giá cho cả một tập khách**. 📌 Người trực
+CSKH cần `Manage` (chặn khách chây nợ) **không** đương nhiên được đổi thứ ảnh hưởng **doanh thu** (đặc quyền tối
+thiểu — cùng nguyên tắc `Addresses.Manage` vs `Addresses.ManageBook`). 📌 Khai **HAI NƠI** (hằng số + provider),
+thiếu một nơi ⇒ `403` cho **mọi người** kể cả `admin`.
+
+### 28.3 ✅ Đã làm gì
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| **1** | 🚨 **Cổng khách bị chặn** (`src/eCommerce.Application/Sales/CuaKiemKhachGiaoDich.cs`) | gọi `ICustomerDirectory.ChoPhepGiaoDichAsync` (`ADR-12`: **hỏi** module sở hữu, **không** đọc thẳng bảng) · `0005` + `customerId` + `lyDo` · vãng lai (`null`) **luôn được mua** (`ADR-03`) |
+| **2** | **Nối vào 2 đường bán hàng** | `CheckoutInput.CustomerId` (**mới**) + cổng **bước ⓪** của `TinhVaGiuChoAsync`; `TaoTuCheckoutAsync` cũng có cổng ⓪ (trước `new Order`) |
+| **3** | **Đường web mang khách** | `DatHangInput.KhachId` (`Guid?`) · ô chọn khách ở `/DatHang` (kèm nhãn *"ĐANG CHẶN"*, giới hạn 100 dòng **có nói rõ**) · `CustomerId` đi vào **cả** checkout **và** đơn |
+| **4** | **Phân trang** | `CustomerAppService.GetDanhSachPhanTrangAsync` → `PagedResultDto<CustomerDto>` (đếm **TRƯỚC** khi cắt trang, `ThenBy(Id)` để sắp xếp **tất định**) · `/KhachHang?trang=N` hiện *"trang X / Y · tổng N"* + liên kết **thuần server** |
+| **5** | **API nhóm khách** | `ICustomerGroupAppService` + `CustomerGroupAppService`: `GetDanhSachAsync` (kèm `SoKhach` — **một** truy vấn gom nhóm, không N+1) · `TaoNhomAsync` (trùng mã ⇒ `0008`) · `CapNhatNhomAsync` (🔒 **`Code` bất biến**) |
+| **6** | **Seed nhóm khách** | `CustomerGroupDataSeedContributor` (`RETAIL`/`WHOLESALE`/`VIP`) — 🔑 idempotent **theo TỪNG MÃ**, **không** theo `count() > 0` (📌 nếu theo `count` thì một DB đã có nhóm khác sẽ **không bao giờ** được thêm `VIP`) |
+| **7** | **Quyền `eCommerce.Customers.ManageGroups`** | khai **hai nơi** (`eCommerceConsts` + `eCommercePermissionDefinitionProvider`); DB: `AbpPermissionGrants` **57 → 58** |
+| **8** | **Ánh xạ `0008` ⇒ HTTP `409`** | 📌 thiếu nó thì "trùng mã nhóm" trả **`403`** ⇒ client đọc thành *"tôi không có quyền"* (đo được: probe `T14` đỏ ở lần chạy đầu) |
+| **9** | **Ba cổng kiểm mới/sửa** | ① `tools/probe-khach-hang.ps1` (**26 ca HTTP thật**, bước ⑩ của `-DayDu`) · ② `kiem-e2e.ps1` + **8 ca HTML thật** (`S1`…`S8`) · ③ `kiem-db.ps1`: `CusGroups` chuyển từ *"phải RỖNG"* sang **①b** — *"đúng 3 nhóm chuẩn + không rác probe"* (**mạnh hơn**, xem §28.5 ⑤) |
+| **10** | **Test hồi quy mới** | `CuaKiemKhachBiChanTests` (**9 ca**): khoá *"mỗi đường bán hàng **PHẢI** gọi cổng"* + *"cổng phải đi **TRƯỚC** tính tiền / giữ chỗ / ghi đơn"* + **4 ca cho chính phép quét**; `NhomKhachKhongHardCodeTests` (**TC-21** / `BR-CUS-0015`) |
+
+### 28.4 ✅ Kiểm chứng — số đo THẬT (18/10/2026)
+
+| Cổng | Trước `S3` | Sau `S3` | Ghi chú |
+|---|---|---|---|
+| Unit test | **1219** | **1228** (+9) | `CuaKiemKhachBiChanTests` 9 ca |
+| Integration test | 46 | 46 | **không** migration mới ⇒ NND giữ **51** |
+| E2E HTML thật | 59 | **67** (+8) | `S1`…`S8` — gồm **ca chặn** (`S5`,`S6`) và **hai ca chiều ngược** (`S7`,`S8`) |
+| Probe HTTP thật (mới) | — | **26/26** | `tools/probe-khach-hang.ps1` — bước ⑩ của `-DayDu` |
+| Bất biến DB | 23/23 | **23/23** | `CusGroups`: ① → **①b** (đúng 3 nhóm chuẩn, 0 rác probe) · quyền `cần`: 9 → **10** |
+| Mermaid | 213 · 0 lỗi | 213 · 0 lỗi | **không** thêm sơ đồ (không cần) |
+
+**Đo được trên dữ liệu THẬT (trích log probe — `T19`…`T24`):**
+
+| Đo | Kết quả |
+|---|---|
+| Khách `Blocked` ⇒ checkout | `403` · `eCommerce:Customers:0005` · **giuCho=0 · soGia=0 · don=0** |
+| Khách `Blocked` ⇒ tạo đơn (`SAL-001`) | `403` · `0005` · **0 đơn** |
+| Khách **không** bị chặn ⇒ checkout | `403` (**KHÔNG** phải `0005` — hỏng ở bước giá vì SKU probe không có giá) |
+| Khách **vãng lai** (không `customerId`) | `403` (**KHÔNG** phải `0005`) |
+| E2E `/DatHang` với khách bị chặn | HTTP `200` (trang lỗi) · HTML có `eCommerce:Customers:0005` · `OrdOrders` **0** dòng |
+| Phân trang | trang 1 = 2 dòng · trang 2 = 1 dòng · **trùng id = 0** · `totalCount = 3` ở **cả hai** trang |
+| Nhóm khách | `GET` 200 (3 nhóm seed) · `POST` 200 · trùng mã ⇒ **409 + `0008`** · sửa tên ⇒ DB **đã đổi** (đọc lại) · `Code` **bất biến** |
+
+**Route THẬT (đo bằng `tools/route-check.ps1` — không đoán):**
+
+```
+GET    /api/app/customer/danh-sach-phan-trang            keyword · skipCount · maxResultCount
+GET    /api/app/customer-group/danh-sach                 skipCount · maxResultCount
+POST   /api/app/customer-group/tao-nhom
+POST   /api/app/customer-group/{id}/cap-nhat-nhom
+```
+
+⚠️ **Sai lệch tài liệu — ghi TẠI ĐÂY thay vì viết lại cả §6.2:** §6.2 (bản **Draft**) ghi
+`GET`/`POST`/`PUT /api/app/customer-groups`; **thật** là `/api/app/customer-group/...` và **cập nhật là `POST`**
+(ABP conventional controller sinh `POST` cho method ghi). 📌 §6.2 là **bảng thiết kế của cả tính năng** (còn
+`/api/app/customers/{id}`, `.merge`, `.Delete`… **chưa có** trong code) ⇒ 📌 viết lại nó thành *"route thật"* sẽ
+**XÓA mất thiết kế chưa làm**; ✅ nên sai lệch được ghi **ở đây** (đúng tiền lệ `ADDR-004` §16.5 **F1**: *"route tài
+liệu ≠ thật"*), §6.2 giữ nguyên trạng thái **Draft**.
+
+### 28.5 🐞 **NĂM lỗi của tôi trong phiên này — cả năm đều là lỗi của PHÉP ĐO, không phải của sản phẩm**
+
+**① 🚨 TÔI TỰ LÀM HỎNG PHÉP ĐO CỦA CHÍNH MÌNH — phép tiêm để lại DLL CŨ.**
+Để chứng minh test "bắt được lỗi", tôi **tiêm** (xoá lời gọi cổng) ⇒ chạy test ⇒ **ĐỎ** ✅ ⇒ khôi phục tệp. 📌 Nhưng
+tôi **không build lại** sau khi khôi phục, và bước tiêm đã sinh ra `eCommerce.Application.dll` **KHÔNG có cổng**
+trong `src\eCommerce.Web\bin\`. 🔒 Kết quả: **E2E đỏ** ở ca `S5` với triệu chứng **y hệt sản phẩm hỏng** — trong
+khi sản phẩm **đúng**. 🔑 **Đây là bẫy #14 của `SESSION-KICKOFF` §4, đúng nguyên văn** (*"sửa nguồn rồi chạy
+`--no-build` là đọc bản CŨ"*) — 📌 chỉ khác là lần này nó xảy ra với **thư mục `bin` của app**, không phải project
+test. ✅ **Chữa:** build lại **toàn solution** trước khi tin bất kỳ kết quả E2E nào.
+
+**② 🚨 VÀ PHÉP ĐO "KIỂM DLL" CỦA TÔI KHÔNG PHÂN BIỆT ĐƯỢC HAI BẢN.**
+Tôi kiểm *"DLL có chứa chuỗi `CuaKiemKhachGiaoDich` không"* ⇒ **True** cho **cả hai** bản (bản có cổng và bản bị
+tiêm) — vì **tên lớp vẫn tồn tại** dù **lời gọi** bị gỡ. 🔒 Một phép kiểm **luôn XANH** là phép kiểm **vô dụng**;
+📌 nó chỉ *"có vẻ"* đúng. ✅ Phép đo **đúng** là **hành vi** (gọi thật ⇒ `0005`), không phải **chuỗi trong tệp**.
+
+**③ `IndexOf` khớp CHUỖI CON — test báo sai thứ tự.**
+Test *"cổng phải trước bước giữ chỗ"* dùng neo `GiuChoAsync` ⇒ khớp **`TimGiuChoAsync`** (hàm **CHỈ ĐỌC**, chạy
+trước cổng) ⇒ test **ĐỎ**, báo *"cổng ở SAU bước giữ chỗ"* — ⚠️ **sai**. 📌 Sản phẩm đúng, **phép đo** sai.
+✅ Chữa: neo theo **tên biến** (`_giuCho.GiuChoAsync(`) để chỉ khớp lời gọi **ghi thật**.
+
+**④ 🚨 `DungDuoc` KHÔNG PHẢI CỘT DB.**
+Probe viết `where not "DungDuoc"` ⇒ PostgreSQL **lỗi cột không tồn tại**. 🔒 Nếu tôi bọc trong `try/catch` thì
+*"0 dòng"* sẽ được đọc thành *"chưa chặn"* ⇒ **kết luận sai hoàn toàn**. ✅ `DungDuoc` là **thuộc tính tính toán**
+(`Status != Blocked`) ⇒ SQL phải dùng **`"Status" = 2`**. 📌 Đã kiểm bằng `information_schema.columns` **trước**
+khi sửa.
+
+**⑤ `CusGroups` "PHẢI RỖNG" LÀ BẤT BIẾN SAI — và phát hiện này đến từ việc ĐỌC LẠI con số.**
+Sau khi thêm seed, `kiem-db.ps1` **ĐỎ** ở `CusGroups` — và đó là **đúng**: bất biến cũ nói *"bảng phải rỗng"*.
+📌 Nhưng bảng rỗng **trước `S3`** không phải vì "sạch" — mà vì **chưa có đường ghi nào** (đúng cái nợ §16.4 #2
+ghi). 🔑 **Một bất biến mô tả sai sự thật thì không phải bất biến**; ✅ thay bằng bất biến **MẠNH HƠN** (nhóm ①b:
+*đúng 3 nhóm chuẩn **và** không rác probe*) — 📌 nó bắt được **cả** *thiếu seed* **lẫn** *rác probe*, hai thứ mà
+"phải rỗng" **không** bắt được cái nào.
+
+### 28.6 ⏳ NỢ còn lại (sau `S3` — `CUS-001` **đóng**, đây là nợ của GĐ1 nói chung)
+
+| # | Nợ | Vì sao chưa làm |
+|---|---|---|
+| **1** | ⚠️ **Màn hình UI quản trị nhóm khách** | `S3` làm **API + seed** (đúng phạm vi). 📌 Hiện quản trị nhóm qua API; 🔑 chưa có `/NhomKhach` trên Web |
+| **2** | ⚠️ **Gán khách vào nhóm qua API** | `Customer.CustomerGroupId` **có** cột + `ADR-09`, nhưng **chưa** có method gán ⇒ 📌 hiện phải ghi DB. ⚠️ Nợ **mới** phát sinh khi nhóm có đường ghi (§16.4 #2 đóng **một nửa**) |
+| **3** | ⚠️ **Xoá nhóm** | **Cố ý** không làm: xoá một nhóm đang được dùng sẽ làm `CustomerGroupId` trỏ vào **mã không còn tồn tại** ⇒ giá cũ mất căn cứ. 📌 Cần người quyết: **chặn xoá** hay **chuyển khách sang nhóm khác** trước |
+| **4** | ⚠️ **Cổng chỉ kiểm `Blocked`** | `ADR-04` chỉ chặn `Blocked`; 📌 **hạn mức tín dụng** / nợ xấu theo số tiền **chưa** có luật ⇒ 🔑 cần người quyết (không tự thêm) |
+| **5** | ⚠️ **`/DatHang` vẫn cho chọn khách không có địa chỉ giao** | `ADDR-004` B11 (chọn địa chỉ khi đặt) **hoãn đúng hạn** ở `S2` — 📌 nợ **chuyển** sang `S8` |
+
+### 28.7 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.9 | 18/10/2026 | *(agent, session `S3`)* | **§28 — LÁT CẮT 12: `S3` ĐÓNG `CUS-001`**: ✅ **nối cổng `ChoPhepGiaoDichAsync` vào đường bán hàng** (🚨 **LỖI THẬT**: hàm định nghĩa 1 nơi, gọi 0 nơi ⇒ **khách `Blocked` vẫn đặt được hàng**) — cổng gom về `CuaKiemKhachGiaoDich` (**một** định nghĩa, **hai** chỗ gọi: checkout + tạo đơn), **NÉM** (`0005`) thay vì trả `bool`, đặt **TRƯỚC mọi tác dụng phụ** ⇒ probe chứng minh **0 lượt giữ chỗ · 0 sổ giải trình · 0 đơn** · **`CustomerGroup` API + seed** (3 nhóm, idempotent **theo mã**) + quyền mới `Customers.ManageGroups` (**hai nơi**, grants **57 → 58**) + ánh xạ `0008` ⇒ **`409`** · **phân trang** `PagedResultDto` (đếm **trước** khi cắt trang) + `/KhachHang?trang=N` có **tổng số** · **đường web mang khách vào đơn** (`KhachId` — trước đó đơn web **không thuộc về ai**, lỗ hổng bản xuất PII). 📊 **Test:** unit **1219 → 1228** · E2E **59 → 67** · probe mới **26/26** · DB **23/23** (bất biến `CusGroups`: ① → **①b**, **mạnh hơn**). 🐞 **5 lỗi của tôi — cả 5 là lỗi PHÉP ĐO** (DLL cũ do phép tiêm để lại · kiểm DLL bằng chuỗi **không phân biệt được** hai bản · `IndexOf` khớp **chuỗi con** `TimGiuChoAsync` · `DungDuoc` **không phải cột** · bất biến *"`CusGroups` phải rỗng"* **mô tả sai sự thật**). ⏳ Nợ mới: UI nhóm khách · **gán** khách vào nhóm · **xoá** nhóm (cần người quyết) |

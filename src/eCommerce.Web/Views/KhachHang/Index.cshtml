@@ -9,6 +9,12 @@
     var tuKhoa = ViewBag.TuKhoa as string;
     var thongBao = TempData["ThongBaoKhach"] as string;
     var loi = TempData["LoiKhach"] as string;
+    // 🔑 PHÂN TRANG (`S3`) — bốn con số này do controller tính (kẹp `trang` theo `tongSo`), view **không** tự suy:
+    // 📌 nếu view tự chia trang thì hai nơi có thể lệch nhau, và lệch ở đây nghĩa là **liên kết trang trỏ sai**.
+    var trang = ViewBag.Trang is int t ? t : 1;
+    var soTrang = ViewBag.SoTrang is int s ? s : 1;
+    var tongSo = ViewBag.TongSo is int n ? n : 0;
+    var soDongMotTrang = ViewBag.SoDongMotTrang is int d ? d : 20;
 }
 
 @*
@@ -26,7 +32,7 @@
     NO DA GHI (CUS-001) - man hinh KHONG gia vo co:
       - CHUA co xuat du lieu ca nhan cho chinh chu (quyen truy cap/xoa theo Luat 91/2025/QH15);
       - CHUA co so dia chi (entity Address KHONG TON TAI trong AddressHub);
-      - CHUA phan trang - tran cung 100 ho so/lan.
+      - DA co phan trang o S3 (truoc do: tran cung 100 ho so/lan va KHONG co tong so).
 
     GHI CHU KY THUAT: KHONG duoc viet ky hieu mo/dong chu thich Razor LONG NHAU trong khoi nay.
     Razor khong ho tro long nhau: no ket thuc o ky hieu dong DAU TIEN va phan con lai thanh MA.
@@ -66,15 +72,19 @@
 
 <div class="card mb-3">
     <div class="card-header d-flex justify-content-between align-items-center">
-        <strong>Hồ sơ khách (@Model.Count)</strong>
-        @* Tran 100 la CO CHU Y: ho so khach la du lieu ca nhan nen KHONG keo ca bang ve mot trang.
-           Nguoi van hanh can TRA CUU, khong can XUAT TOAN BO. *@
-        <span class="text-muted small">tối đa 100 hồ sơ / lần</span>
+        @* 🔑 TONG SO + TRANG HIEN TAI (`S3`) — 📌 mot man hinh *"khong biet con bao nhieu"* voi du lieu ca nhan
+           dan toi hai hanh vi deu sai: tuong da xem het (bo sot khach dang bi chan), hoac nang tran de keo ca bang.
+           ✅ Mot con so la du de tra loi cau hoi do. *@
+        <strong>Hồ sơ khách (<span id="tong-so-khach">@tongSo</span>)</strong>
+        <span class="text-muted small">
+            <span id="trang-hien-tai">trang @trang / @soTrang</span>
+            · @soDongMotTrang hồ sơ / trang
+        </span>
     </div>
     <div class="card-body p-0">
         @if (Model.Count == 0)
         {
-            <p class="p-3 mb-0 text-muted">
+            <p class="p-3 mb-0 text-muted" id="khong-co-ho-so">
                 Không có hồ sơ nào khớp.
                 @if (!string.IsNullOrWhiteSpace(tuKhoa))
                 {
@@ -162,6 +172,39 @@
             </table>
         }
     </div>
+    @* 🔑 THANH PHAN TRANG (`S3`) — 📌 **liên kết thuần server** (`?trang=N` + `?tuKhoa=`), KHÔNG JavaScript:
+       🔒 nhờ vậy probe HTTP kiểm được *"trang 2 có dữ liệu KHÁC trang 1"* — nếu phân trang bằng JS thì cổng
+       E2E (đọc HTML thật) **không bao giờ** thấy được hành vi đó.
+       ⚠️ `tuKhoa` phải mang theo: bỏ nó là **mất bộ lọc khi bấm sang trang** (người dùng thấy khách khác với
+       từ khoá mình vừa gõ — im lặng, không lỗi). *@
+    @if (soTrang > 1)
+    {
+        <div class="card-footer d-flex justify-content-between align-items-center" id="thanh-phan-trang">
+            <div>
+                @if (trang > 1)
+                {
+                    <a id="lien-ket-trang-truoc" class="btn btn-sm btn-outline-secondary"
+                       asp-action="Index" asp-route-trang="@(trang - 1)" asp-route-tuKhoa="@tuKhoa">‹ Trang trước</a>
+                }
+                else
+                {
+                    <span id="lien-ket-trang-truoc" class="btn btn-sm btn-outline-secondary disabled">‹ Trang trước</span>
+                }
+            </div>
+            <span class="text-muted small">Trang @trang / @soTrang</span>
+            <div>
+                @if (trang < soTrang)
+                {
+                    <a id="lien-ket-trang-sau" class="btn btn-sm btn-outline-secondary"
+                       asp-action="Index" asp-route-trang="@(trang + 1)" asp-route-tuKhoa="@tuKhoa">Trang sau ›</a>
+                }
+                else
+                {
+                    <span id="lien-ket-trang-sau" class="btn btn-sm btn-outline-secondary disabled">Trang sau ›</span>
+                }
+            </div>
+        </div>
+    }
 </div>
 
 <div class="card">

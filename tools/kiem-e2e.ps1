@@ -142,12 +142,19 @@ select count(*)::text from "OrdOrders" where "Number" like 'K97E2E-%';
 select count(*)::text from "CusDataExportLogs" where "CustomerId" = 'e0000000-0000-0000-0000-0000000000e1';
 '@) -join '').Trim()
 
-        if ($dem -ne '0' -or $demDon -ne '0' -or $demNhatKy -ne '0') {
-            throw ("TIEN DE: con {0} khach 'K97E2E%', {1} don 'K97E2E-%', {2} nhat ky xuat trong DB ⇒ lan chay truoc KHONG don dep.`n" +
-                "🚨 Dung lai va don truoc — ⚠️ neu khong thi cac ca 'co form hanh dong' se XANH VI DU LIEU CU." -f $dem, $demDon, $demNhatKy)
+        # 🔑 **KIEM CA KHO PROBE SOT** (`S3`) — 📌 kho probe ma con lai thi:
+        #   • `/DatHang` render form ⇒ ca `S1` co the **XANH vi du lieu CU**;
+        #   • `kiem-db.ps1` nhom ⑥ (tu do quet GUID `e0000000-…`) se **DO** ⇒ lan sau do vi ly do vo hinh.
+        $demKho = (@(Invoke-Psql -Sql @'
+select count(*)::text from "InvWarehouses" where "Id" = 'e0000000-0000-0000-0000-0000000000e6';
+'@) -join '').Trim()
+
+        if ($dem -ne '0' -or $demDon -ne '0' -or $demNhatKy -ne '0' -or $demKho -ne '0') {
+            throw ("TIEN DE: con {0} khach 'K97E2E%', {1} don 'K97E2E-%', {2} nhat ky xuat, {3} kho probe trong DB ⇒ lan chay truoc KHONG don dep.`n" +
+                "🚨 Dung lai va don truoc — ⚠️ neu khong thi cac ca 'co form hanh dong' se XANH VI DU LIEU CU." -f $dem, $demDon, $demNhatKy, $demKho)
         }
 
-        Write-Output '   ✅ Tien de: khong con du lieu probe cu (khach + don + nhat ky xuat).'
+        Write-Output '   ✅ Tien de: khong con du lieu probe cu (khach + don + nhat ky xuat + kho).'
     }
 
     # ── ① DUNG WEB CU (neu co) + CHO CONG TRONG ─────────────────────────────────────────────
@@ -212,6 +219,38 @@ select count(*)::text from "OrdOrderLines" where "Id" = 'e0000000-0000-0000-0000
 '@ -SoDongMongDoi 1 | Out-Null
 
         Write-Output '   ✅ Da gieo 1 khach probe (K97E2E) + 1 don hang (K97E2E-DON-001) + tat co bao mat de dang nhap.'
+
+        # ── 🚨 `S3`: KHACH BI CHAN + 1 KHO (de trang /DatHang render duoc BIEU MAU that) ──────────
+        # 🔑 **VI SAO PHAI Gieo CA KHO:** `/DatHang` chi render `<form>` khi co it nhat mot kho dang hoat
+        # dong. 📌 Khong co kho thi trang hien *"Chua co kho nao"* va ta **khong** kiem duoc duong dat hang
+        # that — ma do chinh la duong can kiem (`CUS-001` ADR-04: khach `Blocked` khong duoc dat).
+        # ⚠️ Kho probe dung GUID trong khoi `e0000000-…` ⇒ `kiem-db.ps1` nhom ⑥ (tu do quet MOI bang PK uuid)
+        # se tu bat neu con sot. ✅ Nho vay khong phai them ten bang vao danh sach viet tay nao.
+        TiemVaoDb -Sql @'
+delete from "InvWarehouses" where "Id" = 'e0000000-0000-0000-0000-0000000000e6';
+'@ -KhongNemKhiThieuKiem | Out-Null
+
+        TiemVaoDb -Sql @'
+insert into "InvWarehouses" ("Id","TenantId","Code","Name","Address","IsActive","ExtraProperties","ConcurrencyStamp","CreationTime","IsDeleted")
+values ('e0000000-0000-0000-0000-0000000000e6',null,'K97E2E-KHO','K97E2E Kho Probe','(probe)',true,'{}','k97e2e6',now(),false);
+'@ -KiemSql @'
+select count(*)::text from "InvWarehouses" where "Id" = 'e0000000-0000-0000-0000-0000000000e6';
+'@ -SoDongMongDoi 1 | Out-Null
+
+        # 🚨 **KHACH DANG BI CHAN** (`Status = 2`) — tiền đề của ca "không đặt được đơn".
+        # 📌 `Status` là cột **có thật**; `DungDuoc` **không** phải cột (nó là thuộc tính tính toán ở entity).
+        TiemVaoDb -Sql @'
+delete from "CusCustomers" where "Id" = 'e0000000-0000-0000-0000-0000000000e5';
+'@ -KhongNemKhiThieuKiem | Out-Null
+
+        TiemVaoDb -Sql @'
+insert into "CusCustomers" ("Id","TenantId","Name","Email","Phone","Status","ExtraProperties","ConcurrencyStamp","CreationTime","IsDeleted")
+values ('e0000000-0000-0000-0000-0000000000e5',null,'K97E2E Khach Bi Chan','k97e2e-chan@example.invalid','0900000002',2,'{}','k97e2e5',now(),false);
+'@ -KiemSql @'
+select count(*)::text from "CusCustomers" where "Id" = 'e0000000-0000-0000-0000-0000000000e5' and "Status" = 2;
+'@ -SoDongMongDoi 1 | Out-Null
+
+        Write-Output '   ✅ Da gieo them: 1 kho probe (K97E2E-KHO) + 1 khach DANG BI CHAN (K97E2E-CHAN).'
     }
 
     # ── ③ KHOI DONG WEB + CHO LEN ───────────────────────────────────────────────────────────
@@ -293,6 +332,116 @@ select count(*)::text from "OrdOrderLines" where "Id" = 'e0000000-0000-0000-0000
     # 🔑 **D5 — FORM HANH DONG voi DU LIEU THAT.** ⚠️ Chi render khi co dong ⇒ 🔑 day la ly do phai **gieo
     # du lieu TRUOC** (quy tac ③).
     Kq 'D5 /KhachHang co NUT HANH DONG (voi du lieu that)' ($htmlKh -match 'Chan|MoChan') 'nut chan/go chan'
+
+    # ── 🚨 `S3` — KHACH BI CHAN KHONG DUOC DAT HANG, DO TREN HTML THAT ───────────────────────────
+    # 🔑 **VI SAO CA NAY LA CA QUAN TRONG NHAT CUA `S3`:** loi that (17/10/2026) la
+    # `ChoPhepGiaoDichAsync` duoc dinh nghia ma **goi 0 noi** ⇒ 📌 khach `Blocked` **van dat duoc hang**.
+    # Unit test chi chung minh *"loi goi CO MAT trong tep"*; 🔒 chi duong HTTP THAT tra loi duoc
+    # *"no co CHAN that khong"* — va quan trong hon: *"co TAC DUNG PHU nao khong"* (don / luot giu cho).
+    $idKhachChan = 'e0000000-0000-0000-0000-0000000000e5'
+
+    # ① `GET /DatHang` phai render **O CHON KHACH** (tien de: kho probe da gieo o buoc ②).
+    $datHang = TaiTrang -DuongDan '/DatHang' -TepLuu (Join-Path $thuMucTam 'dathang.html')
+    $htmlDatHang = GiaiMaHtml $datHang.Html
+
+    Kq 'S1 GET /DatHang = 200 VA co O CHON KHACH (name=KhachId)' `
+        ($datHang.Ma -eq '200' -and $datHang.Html -match 'name="KhachId"') `
+        ("HTTP {0}" -f $datHang.Ma)
+
+    # ② Khach DANG BI CHAN phai HIEN trong o chon va duoc danh dau — 🔑 *"van hien"* la CO Y: loc o UI
+    # khong phai guard, va 📌 mot khach bien mat khoi danh sach se khien nguoi van hanh tuong da xoa.
+    Kq 'S2 o chon khach CO khach dang bi chan (co nhan DANG CHAN)' `
+        ($htmlDatHang -match 'K97E2E Khach Bi Chan') `
+        'khach bi chan van hien (guard that nam o app service)'
+
+    # ③ Token chong gia mao lay tu CHINH trang do (khong doan, khong dung lai token trang khac).
+    $mToken = [regex]::Match($datHang.Html, 'name="__RequestVerificationToken"[^>]*value="(?<t>[^"]+)"')
+
+    if (-not $mToken.Success) {
+        Kq 'S3 co __RequestVerificationToken tren /DatHang' $false 'KHONG co token ⇒ khong POST duoc'
+    }
+    else {
+        Kq 'S3 co __RequestVerificationToken tren /DatHang' $true 'token that tu trang'
+
+        $tokenDh = $mToken.Groups['t'].Value
+        $khoaBiChan = 'K97E2E-CHAN-1'
+
+        # 🚨 **POST THAT voi khach dang bi chan.**
+        $postBiChan = & curl.exe -s -b $jar -c $jar -o (Join-Path $thuMucTam 'dathang-chan.html') -w '%{http_code}' `
+            --data-urlencode ("__RequestVerificationToken=" + $tokenDh) `
+            --data-urlencode 'KhoId=e0000000-0000-0000-0000-0000000000e6' `
+            --data-urlencode 'Kenh=web' `
+            --data-urlencode 'Sku=K97E2E-SKU-01' `
+            --data-urlencode 'SoLuong=1' `
+            --data-urlencode 'Thue=0.1' `
+            --data-urlencode ("KhoaCheckout=" + $khoaBiChan) `
+            --data-urlencode ("KhachId=" + $idKhachChan) `
+            ($web + '/DatHang')
+
+        $htmlChan = GiaiMaHtml ([System.IO.File]::ReadAllText((Join-Path $thuMucTam 'dathang-chan.html'), [Text.Encoding]::UTF8))
+
+        # 🔑 Neu POST bi `400` thi do la **token/anti-forgery**, KHONG phai san pham ⇒ phai noi ro.
+        Kq 'S4 POST /DatHang (khach BI CHAN) => KHONG bi 400 (token hop le)' ("$postBiChan".Trim() -ne '400') ("HTTP {0}" -f "$postBiChan".Trim())
+
+        # 🚨 **BAT BIEN CHINH:** trang phai hien **DUNG MA** `0005` (khach dang bi chan).
+        Kq 'S5 🚨 khach BI CHAN dat hang => trang loi co ma eCommerce:Customers:0005' `
+            ($htmlChan -match 'eCommerce:Customers:0005') `
+            'guard THAT o app service (khong phai required o HTML)'
+
+        # 🔒 **VA KHONG DUOC TAO DON** — day moi la dieu khach hang quan tam.
+        $donCuaChan = @(Invoke-Psql -Sql @'
+select count(*)::text from "OrdOrders" where "Number" like 'WEB-K97E2E-CHAN%';
+'@)
+
+        $soDonChan = if ($donCuaChan.Count -gt 0) { [int]($donCuaChan[0]) } else { -1 }
+
+        Kq 'S6 🚨 KHONG co don nao duoc tao cho khach bi chan' ($soDonChan -eq 0) ("so don = {0}" -f $soDonChan)
+
+        # ── 🔑 CHIEU NGUOC LAI (chong "chan TAT CA" trong giong "chan DUNG") ──────────────────
+        # 📌 Mot guard **luon nem** cung cho ra `0005` o ca tren. Chi chieu nguoc moi phan biet duoc.
+        $khoaChoPhep = 'K97E2E-CHOPHEP-1'
+
+        $postChoPhep = & curl.exe -s -b $jar -c $jar -o (Join-Path $thuMucTam 'dathang-chophep.html') -w '%{http_code}' `
+            --data-urlencode ("__RequestVerificationToken=" + $tokenDh) `
+            --data-urlencode 'KhoId=e0000000-0000-0000-0000-0000000000e6' `
+            --data-urlencode 'Kenh=web' `
+            --data-urlencode 'Sku=K97E2E-SKU-01' `
+            --data-urlencode 'SoLuong=1' `
+            --data-urlencode 'Thue=0.1' `
+            --data-urlencode ("KhoaCheckout=" + $khoaChoPhep) `
+            --data-urlencode ("KhachId=" + $idKhach) `
+            ($web + '/DatHang')
+
+        $htmlChoPhep = GiaiMaHtml ([System.IO.File]::ReadAllText((Join-Path $thuMucTam 'dathang-chophep.html'), [Text.Encoding]::UTF8))
+
+        # 📌 Khach **khong** bi chan se di tiep va hong o buoc khac (SKU khong co gia/kho) — 🔑 do KHONG phai
+        # dieu dang kiem; dieu dang kiem la **no KHONG bi chan o cong `0005`**.
+        Kq 'S7 chieu nguoc: khach KHONG bi chan => KHONG phai 0005 (cong khong chan bua)' `
+            ($htmlChoPhep -notmatch 'eCommerce:Customers:0005') `
+            ("HTTP {0}" -f "$postChoPhep".Trim())
+
+        # ── 🔑 VA KHACH VANG LAI phai di qua duoc cong (`ADR-03`: vang lai la hang nhat) ───────
+        $khoaVangLai = 'K97E2E-VANGLAI-1'
+
+        $postVangLai = & curl.exe -s -b $jar -c $jar -o (Join-Path $thuMucTam 'dathang-vanglai.html') -w '%{http_code}' `
+            --data-urlencode ("__RequestVerificationToken=" + $tokenDh) `
+            --data-urlencode 'KhoId=e0000000-0000-0000-0000-0000000000e6' `
+            --data-urlencode 'Kenh=web' `
+            --data-urlencode 'Sku=K97E2E-SKU-01' `
+            --data-urlencode 'SoLuong=1' `
+            --data-urlencode 'Thue=0.1' `
+            --data-urlencode ("KhoaCheckout=" + $khoaVangLai) `
+            --data-urlencode 'KhachId=' `
+            ($web + '/DatHang')
+
+        $htmlVangLai = GiaiMaHtml ([System.IO.File]::ReadAllText((Join-Path $thuMucTam 'dathang-vanglai.html'), [Text.Encoding]::UTF8))
+
+        # 🚨 Ca nay chan dung loi de nhat khi viet cong: bind `""` thanh `Guid.Empty` ⇒ tra DB khong thay
+        # ⇒ **chan TAT CA don vang lai** ⇒ trieu chung *"web khong ban duoc cho khach moi"*.
+        Kq 'S8 🚨 khach VANG LAI khong bi 0005 chan (ADR-03)' `
+            ($htmlVangLai -notmatch 'eCommerce:Customers:0005') `
+            ("HTTP {0}" -f "$postVangLai".Trim())
+    }
 
     # 🚨 **D7 — XUAT DU LIEU CA NHAN (Luat 91/2025/QH15).** 🔑 Quyen **TRUY CAP** cua chu the — neu nut nay
     # khong co thi tinh nang **khong ton tai** doi voi nguoi dung (📌 *"co API"* KHONG phai *"co tinh nang"*).
@@ -806,6 +955,20 @@ delete from "OrdOrders" where "Id" = 'e0000000-0000-0000-0000-0000000000e2';
         # THAT** (khong phai bang trong nhu `CusCustomers`), nen ⚠️ no **KHONG** nam trong danh sach
         # *"phai rong"* cua `kiem-db.ps1` ⇒ 🔑 neu khong don thi no **tich luy** qua moi lan chay
         # (📌 va do la **dung** voi bang that — nhung **sai** voi mot lan chay probe).
+        # ── 🚨 `S3`: don DON probe SINH TỪ `/DatHang` — 🔒 PHAI XOÁ **TRƯỚC** khi xoá khách ──────────
+        # 📌 `OrdOrders.CustomerId` trỏ tới `CusCustomers` ⇒ xoá khách trước sẽ **vi phạm khoá ngoại**
+        # (hoặc để lại đơn mồ côi) ⇒ lần sau ca `S6`/`D8` đỏ vì **lý do vô hình**.
+        # 🔑 Hôm nay các lần POST đó **không** tạo được đơn (SKU probe không có giá) — 📌 nhưng đơn dọn dẹp
+        # phải đúng **kể cả khi hành vi đổi** (nếu sau này có bảng giá cho SKU đó, ca "khách không bị chặn"
+        # sẽ **tạo đơn thật**).
+        Invoke-Psql -Sql @'
+delete from "OrdOrderLines" where "OrderId" in (select "Id" from "OrdOrders" where "Number" like 'WEB-K97E2E%');
+'@ | Out-Null
+
+        Invoke-Psql -Sql @'
+delete from "OrdOrders" where "Number" like 'WEB-K97E2E%';
+'@ | Out-Null
+
         Invoke-Psql -Sql @'
 delete from "CusDataExportLogs" where "CustomerId" = 'e0000000-0000-0000-0000-0000000000e1';
 '@ | Out-Null
@@ -816,6 +979,22 @@ delete from "CusCustomers" where "Id" = 'e0000000-0000-0000-0000-0000000000e1';
 
         Invoke-Psql -Sql @'
 delete from "CusCustomers" where "Name" like 'K97E2E%';
+'@ | Out-Null
+
+        # ── 🚨 `S3`: don DON + KHO probe ─────────────────────────────────────────────────────────
+        # 🔒 Luot giu cho / so giai trinh sinh ra boi cac lan POST /DatHang (neu co) — 📌 de lai thi
+        # `kiem-db.ps1` se do o nhom ⑤/⑥ vi ly do VO HINH.
+        Invoke-Psql -Sql @'
+delete from "InvStockReservations" where "ReferenceId" like 'Checkout:K97E2E%';
+'@ | Out-Null
+
+        Invoke-Psql -Sql @'
+delete from "PrcPriceCalculationRecords" where "IdempotencyKey" like 'K97E2E%';
+'@ | Out-Null
+
+        # ⚠️ Kho probe: xoa SAU CUNG (khong co FK tu dong nao, nhung giu thu tu cho de doc).
+        Invoke-Psql -Sql @'
+delete from "InvWarehouses" where "Id" = 'e0000000-0000-0000-0000-0000000000e6';
 '@ | Out-Null
 
         # 🚨 **BAT LAI CO BAO MAT** — 🔑 quen buoc nay nghia la **commit mot admin KHONG bi buoc doi mat khau**.
@@ -833,10 +1012,16 @@ select count(*)::text from "CusCustomers" where "Name" like 'K97E2E%';
 select "ShouldChangePasswordOnNextLogin"::text from "AbpUsers" where "NormalizedUserName" = 'ADMIN';
 '@) -join '').Trim()
 
-        Write-Output ''
-        Write-Output ("   DON DEP: khach probe con={0} (mong doi 0) · co bao mat={1} (mong doi True)" -f $con, $baoMat)
+        # 🔑 `S3`: don ca KHO probe — 📌 neu con lai thi `kiem-db.ps1` nhom ⑥ (tu do quet GUID `e0000000-…`)
+        # se DO o lan chay sau, va ta se di tim mot loi **khong lien quan** (đúng loại "dữ liệu ma").
+        $conKho = (@(Invoke-Psql -Sql @'
+select count(*)::text from "InvWarehouses" where "Id" = 'e0000000-0000-0000-0000-0000000000e6';
+'@) -join '').Trim()
 
-        if ($con -ne '0' -or $baoMat -ne 'True') {
+        Write-Output ''
+        Write-Output ("   DON DEP: khach probe con={0} (mong doi 0) · kho probe con={1} (mong doi 0) · co bao mat={2} (mong doi True)" -f $con, $conKho, $baoMat)
+
+        if ($con -ne '0' -or $conKho -ne '0' -or $baoMat -ne 'True') {
             Write-Output '   🚨 DON DEP KHONG DAY DU ⇒ lan chay sau co the XANH VI DU LIEU CU.'
         }
     }
