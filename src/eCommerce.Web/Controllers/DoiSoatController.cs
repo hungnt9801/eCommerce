@@ -35,28 +35,40 @@ public class DoiSoatController : Controller
     /// đang chạy hay không. Nếu mặc định chỉ hiện *"còn việc"* thì một hệ thống **khoẻ mạnh** sẽ hiện
     /// **danh sách rỗng** — và người dùng tưởng **tính năng hỏng**.
     /// </summary>
-    public async Task<IActionResult> Index(bool chiConViec = false, int trang = 1)
+    public async Task<IActionResult> Index(bool chiConViec = false, bool chiChoXacNhan = false, int trang = 1)
     {
         var soMoiTrang = 20;
 
         var ketQua = await _doiSoat.GetDanhSachLuotAsync(new LocLuotDoiSoatInput
         {
             ChiConViecChuaXuLy = chiConViec ? true : null,
+            // 🆕 `S7` — *"hộp việc"* của người có quyền xác nhận (`Reconciliation.Confirm`).
+            ChiChoXacNhan = chiChoXacNhan ? true : null,
             SkipCount = Math.Max(0, trang - 1) * soMoiTrang,
             MaxResultCount = soMoiTrang
         });
 
         ViewBag.ChiConViec = chiConViec;
+        ViewBag.ChiChoXacNhan = chiChoXacNhan;
         ViewBag.Trang = trang;
+        ViewBag.SoMoiTrang = soMoiTrang;
 
         return View(ketQua);
     }
 
-    /// <summary>`GET /DoiSoat/ChiTiet/{id}` — các dòng lệch của **một** lượt, kèm ô nhập để **xử lý lệch**.</summary>
-    public async Task<IActionResult> ChiTiet(Guid id, bool chiChuaXuLy = true)
+    /// <summary>`GET /DoiSoat/ChiTiet/{id}` — các dòng lệch của **một** lượt, kèm ô nhập để **xử lý lệch**.
+    ///
+    /// 🆕 `S7` — **PHÂN TRANG** (nợ `rec-001` §18.7 #2: trước đây `MaxResultCount = 200` ⇒ lượt có hơn 200
+    /// dòng lệch bị **cắt bớt mà không nói**). 🔒 Nay `TotalCount` là **tổng thật** và view in *"trang x/y"*.
+    /// </summary>
+    public async Task<IActionResult> ChiTiet(Guid id, bool chiChuaXuLy = true, int trang = 1)
     {
+        const int soMoiTrang = 50;
+
         // ⚠️ `GetLuotAsync` ném `Recon:0003` nếu không có ⇒ ABP chuyển thành lỗi nghiệp vụ (không phải `500`).
         var luot = await _doiSoat.GetLuotAsync(id);
+
+        var trangHopLe = Math.Max(1, trang);
 
         var dongLech = await _doiSoat.GetDanhSachDongLechAsync(new LocDongLechInput
         {
@@ -65,10 +77,13 @@ public class DoiSoatController : Controller
             // 📌 Lý do khác nhau là **mục đích khác nhau**: trang danh sách để **nhìn tổng thể**;
             // trang chi tiết để **làm việc**. Hiện cả dòng đã xong sẽ chôn việc cần làm.
             ChiChuaXuLy = chiChuaXuLy ? true : null,
-            MaxResultCount = 200
+            SkipCount = (trangHopLe - 1) * soMoiTrang,
+            MaxResultCount = soMoiTrang
         });
 
         ViewBag.ChiChuaXuLy = chiChuaXuLy;
+        ViewBag.Trang = trangHopLe;
+        ViewBag.SoMoiTrang = soMoiTrang;
 
         return View(new DoiSoatChiTietDto { Luot = luot, DongLech = dongLech });
     }
@@ -114,6 +129,66 @@ public class DoiSoatController : Controller
         }
 
         return RedirectToAction(nameof(ChiTiet), new { id = reconRunId });
+    }
+
+    /// <summary>
+    /// `POST /DoiSoat/XacNhan` — 🆕 `S7`: **xác nhận lượt đang chờ xác nhận** (quyết định `Q5` = **A**).
+    ///
+    /// 🔒 Nhận **chỉ `ghiChu`** từ form: **ai** xác nhận lấy từ principal ở app service (`ConfirmedByUserId`).
+    /// 📌 Nếu để người dùng gõ tên thì bằng chứng **không đối chiếu được với tài khoản nào** — và đó chính là
+    /// thứ audit cần.
+    /// ⚠️ Bắt `BusinessException` để người dùng **thấy mã lỗi** (`0004`/`0005`) thay vì `500` + "lỗi nội bộ"
+    /// — bài học `rec-001` §18.4. **KHÔNG** nuốt: lỗi vẫn dừng thao tác và **không ghi gì**.
+    /// </summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> XacNhan(Guid reconRunId, string? ghiChu)
+    {
+        try
+        {
+            await _doiSoat.PostXacNhanLuotAsync(reconRunId, new XacNhanLuotInput { GhiChu = ghiChu ?? string.Empty });
+            TempData["ThongBaoDoiSoat"] = "Đã xác nhận lượt — cảnh báo đã đóng (KHÔNG sửa tồn kho/sổ cái).";
+        }
+        catch (Volo.Abp.BusinessException ex)
+        {
+            TempData["LoiXacNhan"] = $"Không xác nhận được: [{ex.Code}] " +
+                $"{(ex.Message is "An internal error occurred during your request!" or null ? "Lượt không ở trạng thái chờ xác nhận, hoặc thiếu ghi chú." : ex.Message)}";
+        }
+
+        return RedirectToAction(nameof(ChiTiet), new { id = reconRunId });
+    }
+
+    /// <summary>
+    /// `POST /DoiSoat/DonDep` — 🆕 `S7`: **chạy dọn lịch sử theo retention** (`REC-001` §17.8 #1).
+    ///
+    /// 🔒 Hai chế độ trên **cùng một** form: **xem trước** (mặc định — không xoá) và **xoá thật**
+    /// (`chiXemTruoc = false`). 📌 Thao tác này **không hoàn tác được** trên dữ liệu là **chứng từ**
+    /// ⇒ mặc định phải là *chỉ đếm*, và nút xoá thật có `confirm` ở view.
+    /// </summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DonDep(int? soNgay, bool chiXemTruoc = true)
+    {
+        try
+        {
+            var kq = await _doiSoat.PostDonDepAsync(new DonDepDoiSoatInput
+            {
+                SoNgay = soNgay,
+                ChiXemTruoc = chiXemTruoc
+            });
+
+            TempData["ThongBaoDoiSoat"] =
+                $"{(kq.ChiXemTruoc ? "XEM TRƯỚC" : "ĐÃ XOÁ")} · {kq.SoNgay} ngày · mốc {kq.MocUtc:yyyy-MM-dd HH:mm} UTC · " +
+                $"đủ điều kiện {kq.SoDongDuDieuKien} dòng · đã xoá {kq.SoDongDaXoa} · " +
+                $"giữ lại: {kq.SoDongGiuLaiChuaXuLy} chưa xử lý + {kq.SoDongGiuLaiChoXacNhan} chờ xác nhận.";
+        }
+        catch (Volo.Abp.BusinessException ex)
+        {
+            TempData["LoiXacNhan"] = $"Không dọn được: [{ex.Code}] " +
+                $"{(ex.Message is "An internal error occurred during your request!" or null ? "Số ngày phải > 0 (0 = TẮT retention, không phải \"xoá hết\")." : ex.Message)}";
+        }
+
+        return RedirectToAction(nameof(Index));
     }
 }
 

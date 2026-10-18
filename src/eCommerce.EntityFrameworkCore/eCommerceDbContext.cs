@@ -768,6 +768,10 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
             b.Property(x => x.KetLuan).HasConversion<int>();
             b.Property(x => x.GiaTriNguong).HasPrecision(18, 4);
 
+            // 🆕 `S7` — **XÁC NHẬN LỆCH** (`Q5` = A): ghi ai/khi nào/vì sao rồi ĐÓNG cảnh báo.
+            // 🔒 KHÔNG sửa `SoLech*` khi xác nhận (xem chú thích `ReconRun.XacNhan`).
+            b.Property(x => x.ConfirmNote).HasMaxLength(1024);
+
             // 📌 KHÔNG unique index: **cố ý** — hai lượt quét trong cùng một giây là **hợp lệ**
             // (job chạy `RunOnStart` ngay sau khởi động + nhịp quét đến hạn cùng lúc; hoặc API gọi tay).
             // Đặt unique ở đây sẽ **chặn oan** một lượt quét thật ⇒ mất lịch sử, đúng thứ bảng này chống.
@@ -787,6 +791,14 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
                     "\"SoLechVuotNguong\" >= 0 AND \"SoLech\" >= 0 AND \"SoLechVuotNguong\" <= \"SoLech\"");
                 t.HasCheckConstraint("CK_ReconRuns_SoCapDaDo_KhongAm", "\"SoCapDaDo\" >= 0");
                 t.HasCheckConstraint("CK_ReconRuns_MocThoiGian_HopLe", "\"KetThucUtc\" >= \"BatDauUtc\"");
+
+                // 🆕 `S7` — **KHÔNG THỂ "XÁC NHẬN MỘT NỬA"**: hoặc cả ba trường có, hoặc cả ba `NULL`.
+                // 📌 Vì sao chặn ở DB: một dòng `ConfirmedAtUtc` có mà `ConfirmedByUserId` rỗng là
+                // **bằng chứng vô chủ** (ai đóng cảnh báo? không trả lời được) — và nó chỉ lọt vào qua
+                // đường ghi tắt (SQL/hàng đợi import), tức đúng chỗ tầng domain không đi qua.
+                t.HasCheckConstraint("CK_ReconRuns_XacNhan_DuBo",
+                    "(\"ConfirmedAtUtc\" IS NULL) = (\"ConfirmedByUserId\" IS NULL) AND " +
+                    "(\"ConfirmedAtUtc\" IS NULL OR \"ConfirmNote\" IS NOT NULL)");
             });
         });
 
@@ -824,6 +836,13 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
             b.HasIndex(x => new { x.TenantId, x.ReconRunId, x.WarehouseId, x.Sku })
                 .IsUnique()
                 .HasDatabaseName("IX_ReconRunMismatches_TenantId_Run_Kho_Sku");
+
+            // 🆕 `S7` — index cho truy vấn **RETENTION** (`Recon.Retention.Days`):
+            // *"các dòng lệch ĐÃ XỬ LÝ và cũ hơn mốc"*. 📌 Không unique ⇒ **không** ảnh hưởng con số
+            // `NULLS NOT DISTINCT` (53). Nếu không có index này thì mỗi lượt dọn là **quét cả bảng** —
+            // và nó chạy hằng ngày, trên đúng cái bảng đang phình (lý do retention tồn tại).
+            b.HasIndex(x => new { x.TenantId, x.DaXuLy, x.CreationTime })
+                .HasDatabaseName("IX_ReconRunMismatches_TenantId_DaXuLy_CreationTime");
 
             // 📌 FK `Restrict` (không `Cascade`): lịch sử đối soát là **bằng chứng**; xoá cứng một lượt
             // **không** được phép kéo mất các dòng lệch của nó một cách âm thầm.

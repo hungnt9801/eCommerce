@@ -5,6 +5,7 @@ using eCommerce.Settings;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Logging;
 using Volo.Abp;
+using Volo.Abp.Application.Dtos;
 using Volo.Abp.Application.Services;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.SettingManagement;
@@ -33,6 +34,9 @@ namespace eCommerce.Application.Inventory;
 [Authorize(eCommerceConsts.Permissions.ChannelLimits.Default)]
 public class ChinhSachHanMucAppService : ApplicationService, IChinhSachHanMucAppService
 {
+    /// <summary>Trần số dòng một trang hạn mức — chặn client xin cả bảng trong một lời gọi.</summary>
+    private const int TranDongMotTrang = 200;
+
     private readonly IRepository<InvChannelLimit, Guid> _hanMucRepository;
     private readonly IRepository<Warehouse, Guid> _khoRepository;
     private readonly IRepository<Channel, Guid> _kenhRepository;
@@ -70,6 +74,7 @@ public class ChinhSachHanMucAppService : ApplicationService, IChinhSachHanMucApp
         var ngDonVi = ChinhSach.DocDonViNguong(await _settingProvider.GetOrNullAsync(TenChinhSach.NguongDoiSoat_DonVi), out var ngDonViOk);
         var ngGiaTri = ChinhSach.DocSo(await _settingProvider.GetOrNullAsync(TenChinhSach.NguongDoiSoat_GiaTri), 0.5m, out var ngGiaTriOk);
         var ngHanhDong = ChinhSach.DocHanhDongLech(await _settingProvider.GetOrNullAsync(TenChinhSach.NguongDoiSoat_HanhDong), out var ngHanhDongOk);
+        var luuTru = ChinhSach.DocSoNgayLuuTru(await _settingProvider.GetOrNullAsync(TenChinhSach.LuuTruDoiSoat_SoNgay), out var luuTruOk);
 
         return new ChinhSachHanMucDto
         {
@@ -80,6 +85,8 @@ public class ChinhSachHanMucAppService : ApplicationService, IChinhSachHanMucApp
             NguongDoiSoatDonVi = ngDonVi.ToString(),
             NguongDoiSoatGiaTri = ngGiaTri,
             NguongDoiSoatHanhDong = ngHanhDong.ToString(),
+            LuuTruDoiSoatSoNgay = luuTru,
+            LuuTruDoiSoatHopLe = luuTruOk,
             // 🚨 Trả ra **tên setting nào đang bị giá trị lạ** để màn hình admin nói thẳng, thay vì để người
             // vận hành **tin** cấu hình có hiệu lực (hàm đọc im lặng dùng mặc định an toàn khi gặp giá trị lạ).
             SettingKhongHopLe =
@@ -92,7 +99,8 @@ public class ChinhSachHanMucAppService : ApplicationService, IChinhSachHanMucApp
                     giaTriOk ? null : TenChinhSach.HanMuc_GiaTriMacDinh,
                     ngDonViOk ? null : TenChinhSach.NguongDoiSoat_DonVi,
                     ngGiaTriOk ? null : TenChinhSach.NguongDoiSoat_GiaTri,
-                    ngHanhDongOk ? null : TenChinhSach.NguongDoiSoat_HanhDong
+                    ngHanhDongOk ? null : TenChinhSach.NguongDoiSoat_HanhDong,
+                    luuTruOk ? null : TenChinhSach.LuuTruDoiSoat_SoNgay
                 }
                 .Where(x => x is not null)
                 .Select(x => x!)
@@ -173,6 +181,25 @@ public class ChinhSachHanMucAppService : ApplicationService, IChinhSachHanMucApp
             thayDoi.Add($"{TenChinhSach.NguongDoiSoat_HanhDong}={input.NguongDoiSoatHanhDong.Trim()}");
         }
 
+        // 🆕 `S7` — số ngày lưu trữ dòng lệch. 🔒 Ghi bằng `InvariantCulture` (cùng lý do như `GiaTriMacDinh`).
+        // 📌 `0` = **TẮT** và là giá trị **hợp lệ** ở đây (khác đường DỌN — xem `DoiSoatRetention`).
+        if (input.LuuTruDoiSoatSoNgay is { } soNgayLuuTru)
+        {
+            if (soNgayLuuTru < 0)
+            {
+                throw new BusinessException(eCommerceConsts.ErrorCodes.GiaTriSettingKhongHopLe)
+                    .WithData("setting", TenChinhSach.LuuTruDoiSoat_SoNgay)
+                    .WithData("giaTriNhan", soNgayLuuTru)
+                    .WithData("giaTriHopLe", "0 (TẮT) hoặc số ngày > 0")
+                    .WithData("lyDo", "Số ngày lưu trữ không được âm.");
+            }
+
+            await _settingManager.SetGlobalAsync(
+                TenChinhSach.LuuTruDoiSoat_SoNgay,
+                soNgayLuuTru.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            thayDoi.Add($"{TenChinhSach.LuuTruDoiSoat_SoNgay}={soNgayLuuTru}");
+        }
+
         if (thayDoi.Count == 0)
         {
             // 📌 Không phải lỗi: *"gọi đổi mà không gửi trường nào"* là ca hợp lệ (màn hình chỉ gửi ô đã sửa).
@@ -214,7 +241,11 @@ public class ChinhSachHanMucAppService : ApplicationService, IChinhSachHanMucApp
     private static List<string> GhichuNo() =>
     [
         "`Inv.ChannelLimit.Unit` (Percent/Absolute) là setting DÙNG CHUNG — chưa đặt được riêng từng kênh.",
-        "`Percent` đang tính trên tồn khả dụng của TỪNG `(kho, SKU)`, không phải tổng của cả kênh.",
+        // 🚨 `S7` — ĐỔI NHÃN THEO QUYẾT ĐỊNH `Q4` = A (`inv-003`, `gd1-coding-sessions` §3):
+        // `Percent` KHÔNG phải ngân sách của cả kênh — nó là **trần an toàn theo TỪNG kho**.
+        // 📌 Nhãn cũ (*"tỉ lệ tồn khả dụng"*) đọc lên vẫn hiểu sai được ⇒ người vận hành đặt 30 (%) tưởng là
+        // *"kênh được bán 30 % tổng tồn"*, trong khi hệ thống áp 30 % **của từng cặp (kho, SKU)**.
+        "Hạn mức là **TRẦN AN TOÀN của kênh theo từng kho** — `Percent` tính trên tồn khả dụng của TỪNG `(kho, SKU)`, KHÔNG phải ngân sách/định mức của cả kênh.",
         "Hạn mức là TRẦN đọc lúc chạy, KHÔNG trừ dần — không phải \"ngân sách đã cấp\"."
     ];
 
@@ -235,6 +266,51 @@ public class ChinhSachHanMucAppService : ApplicationService, IChinhSachHanMucApp
 
         var cacDong = await AsyncExecuter.ToListAsync(truyVan.OrderBy(x => x.ChannelCode).ThenBy(x => x.WarehouseId));
 
+        return await ChuyenDanhSachAsync(cacDong);
+    }
+
+    /// <summary>
+    /// 🆕 `S7` — **LỌC THEO KÊNH + KHO, PHÂN TRANG** (`INV-003`; bàn giao §7 việc 6).
+    ///
+    /// 🔒 **`TotalCount` được đếm TRƯỚC khi cắt trang** — 📌 đếm-sau-khi-cắt là lỗi im lặng kinh điển
+    /// (`CUS-001` §28: `totalCount` trả số của trang thay vì tổng ⇒ phân trang "chạy" mà **trang 2 luôn rỗng**).
+    /// ⚠️ **Trần `MaxResultCount`** chặn client xin cả bảng trong một lời gọi (cùng khuôn `DoiSoatAppService`).
+    /// </summary>
+    public async Task<PagedResultDto<HanMucKenhDto>> GetDanhSachPhanTrangAsync(LocHanMucKenhInput input)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+
+        var truyVan = await _hanMucRepository.GetQueryableAsync();
+
+        if (!string.IsNullOrWhiteSpace(input.ChannelCode))
+        {
+            var kenh = InvChannelLimit.ChuẩnHoáKenh(input.ChannelCode);
+            truyVan = truyVan.Where(x => x.ChannelCode == kenh);
+        }
+
+        if (input.WarehouseId is { } khoId)
+        {
+            // 🔑 `Guid.Empty` = **chỉ dòng "cả kênh"** (`WarehouseId IS NULL`) — một lựa chọn THẬT, không phải lỗi gõ.
+            truyVan = khoId == Guid.Empty
+                ? truyVan.Where(x => x.WarehouseId == null)
+                : truyVan.Where(x => x.WarehouseId == khoId);
+        }
+
+        // 🚨 ĐẾM TRƯỚC KHI CẮT TRANG.
+        var tong = await AsyncExecuter.CountAsync(truyVan);
+
+        var soLuong = Math.Clamp(input.MaxResultCount, 1, TranDongMotTrang);
+        var boQua = Math.Max(0, input.SkipCount);
+
+        var cacDong = await AsyncExecuter.ToListAsync(
+            truyVan.OrderBy(x => x.ChannelCode).ThenBy(x => x.WarehouseId).Skip(boQua).Take(soLuong));
+
+        return new PagedResultDto<HanMucKenhDto>(tong, await ChuyenDanhSachAsync(cacDong));
+    }
+
+    /// <summary>Chiếu entity → DTO, nạp **tên kho bằng MỘT truy vấn** (không N+1).</summary>
+    private async Task<List<HanMucKenhDto>> ChuyenDanhSachAsync(List<InvChannelLimit> cacDong)
+    {
         // 📌 Nạp tên kho theo **một** truy vấn (không N+1) để màn hình không hiện GUID "trần".
         var cacKhoId = cacDong.Where(x => x.WarehouseId is not null).Select(x => x.WarehouseId!.Value).Distinct().ToList();
         var tenKho = cacKhoId.Count == 0
@@ -285,6 +361,35 @@ public class ChinhSachHanMucAppService : ApplicationService, IChinhSachHanMucApp
                 HoldsInventory = x.HoldsInventory,
                 IsActive = x.IsActive,
                 SoDongHanMuc = demTheoKenh.TryGetValue(InvChannelLimit.ChuẩnHoáKenh(x.Code), out var n) ? n : 0
+            })
+            .ToList();
+    }
+
+    /// <summary>
+    /// 🆕 `S7` — **DANH MỤC KHO** cho ô chọn *"kho"* (nợ: bàn giao §7 việc 6 — *"`/HanMucKenh` chọn kho"*).
+    /// 📌 Kèm `SoDongHanMuc` để người vận hành thấy **kho nào chưa được cấu hình riêng** (0 dòng) —
+    /// nếu không, một kho bị bỏ sót **trông y hệt** một kho đã được đặt đúng bằng giá trị dùng chung.
+    /// </summary>
+    public async Task<List<KhoKhaDungDto>> GetKhoKhaDungAsync()
+    {
+        var cacKho = await _khoRepository.GetListAsync();
+
+        var hanMuc = await _hanMucRepository.GetListAsync();
+
+        var demTheoKho = hanMuc
+            .Where(x => x.WarehouseId is not null)
+            .GroupBy(x => x.WarehouseId!.Value)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        return cacKho
+            .OrderBy(x => x.Code, StringComparer.Ordinal)
+            .Select(x => new KhoKhaDungDto
+            {
+                Id = x.Id,
+                Code = x.Code,
+                Name = x.Name,
+                IsActive = x.IsActive,
+                SoDongHanMuc = demTheoKho.TryGetValue(x.Id, out var n) ? n : 0
             })
             .ToList();
     }

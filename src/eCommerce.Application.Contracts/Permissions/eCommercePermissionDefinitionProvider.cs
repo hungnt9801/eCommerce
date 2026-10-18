@@ -103,6 +103,14 @@ public class eCommercePermissionDefinitionProvider : PermissionDefinitionProvide
         var channelLimits = group.AddPermission(eCommerceConsts.Permissions.ChannelLimits.Default);
         channelLimits.AddChild(eCommerceConsts.Permissions.ChannelLimits.Manage);
 
+        // ---- Xác nhận lệch đối soát (`REC-001` · `Q5` = A · `S7`) ----
+        // 🚨 BẮT BUỘC khai ở **CẢ HAI NƠI** (hằng số + ở đây): thiếu một nơi ⇒ `403` cho MỌI người kể cả `admin`.
+        // 🔒 Quyền này **đóng cảnh báo** (làm nó biến mất khỏi danh sách cần xem) ⇒ tách khỏi `Inventory.Default`
+        // (quyền xem/đánh dấu từng dòng). 📌 `S6` đã trả giá đúng hình mẫu này: thêm permission vào provider
+        // mà **không** chạy `DbMigrator` ⇒ role `admin` **không** được cấp ⇒ `403` dù mã đúng.
+        // 🛡️ Lưới an toàn: `BatBienPhanQuyenTests.TC02b` khoá bất biến "hằng số ↔ định nghĩa khớp 2 CHIỀU".
+        group.AddPermission(eCommerceConsts.Permissions.Reconciliation.Confirm);
+
         // ---- Hồ sơ khách hàng (`CUS-001`) ----
         // 🚨 BẮT BUỘC khai ở CẢ HAI NƠI (hằng số + ở đây): thiếu một nơi ⇒ `403` cho MỌI người kể cả `admin`.
         // 🔒 Tách `View` (`Customers.Default`) khỏi `Manage`: hồ sơ khách là **dữ liệu cá nhân** (Luật 91/2025/QH15)

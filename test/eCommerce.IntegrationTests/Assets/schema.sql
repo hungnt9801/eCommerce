@@ -2455,3 +2455,19 @@ VALUES ('20261018082801_Sal005_MarketplaceEventLogs', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+ALTER TABLE "ReconRuns" ADD "ConfirmNote" character varying(1024);
+
+ALTER TABLE "ReconRuns" ADD "ConfirmedAtUtc" timestamp with time zone;
+
+ALTER TABLE "ReconRuns" ADD "ConfirmedByUserId" uuid;
+
+ALTER TABLE "ReconRuns" ADD CONSTRAINT "CK_ReconRuns_XacNhan_DuBo" CHECK (("ConfirmedAtUtc" IS NULL) = ("ConfirmedByUserId" IS NULL) AND ("ConfirmedAtUtc" IS NULL OR "ConfirmNote" IS NOT NULL));
+
+CREATE INDEX "IX_ReconRunMismatches_TenantId_DaXuLy_CreationTime" ON "ReconRunMismatches" ("TenantId", "DaXuLy", "CreationTime");
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261018104518_S7_XacNhanVaRetentionDoiSoat', '10.0.11');
+
+COMMIT;
+

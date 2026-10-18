@@ -23,6 +23,15 @@ public static class TenChinhSach
     /// <summary>Khi phát hiện lệch thì làm gì: `Warn` (chỉ cảnh báo) hay `RequireConfirmation` (chờ người xác nhận).</summary>
     public const string NguongDoiSoat_HanhDong = "Recon.Mismatch.Action";
 
+    /// <summary>
+    /// 🆕 `S7` — **SỐ NGÀY LƯU TRỮ dòng lệch đã xử lý** (`REC-001` §17.8 #1 — nợ *"bảng chỉ tăng"*).
+    ///
+    /// 🔒 **`0` = TẮT retention** (giữ tất cả). 📌 Và **đường dọn NÉM** khi nhận `<= 0` — vì *"giữ 0 ngày"*
+    /// nếu hiểu theo nghĩa đen là **xoá sạch bằng chứng đối soát**, và nó **không có triệu chứng** nào ngoài
+    /// việc lịch sử biến mất (xem `DoiSoatRetention`).
+    /// </summary>
+    public const string LuuTruDoiSoat_SoNgay = "Recon.Retention.Days";
+
     // ── INV-003: HẠN MỨC CỨNG THEO KÊNH ─────────────────────────────────────────────────────────
     /// <summary>Hạn mức theo kênh tính theo gì: `Percent` (phần trăm tồn khả dụng) hay `Absolute` (số tuyệt đối).</summary>
     public const string HanMuc_DonVi = "Inv.ChannelLimit.Unit";
@@ -183,6 +192,21 @@ public static class ChinhSach
         hopLe = false;
         return macDinh;
     }
+
+    /// <summary>
+    /// 🆕 `S7` — đọc **số ngày lưu trữ** (`Recon.Retention.Days`). `0` = **TẮT** (giữ tất cả) và **hợp lệ**.
+    /// 📌 Giá trị lạ/âm/rỗng ⇒ `macDinh` + `hopLe = false` (không ném — cùng nguyên tắc *"dữ liệu cấu hình cũng là
+    /// dữ liệu vào"*: một setting gõ sai **không** được làm chết job dọn).
+    /// 🔒 Nhưng lưu ý **khác biệt có chủ ý**: hàm này **không** dùng cho *lệnh dọn tay* —
+    /// `DoiSoatRetention.TinhMocUtc` **NÉM** khi `<= 0` (ở đó `0` nghĩa *"xoá hết"*, vô nghĩa).
+    /// </summary>
+    public static int DocSoNgayLuuTru(string? giaTriTho, out bool hopLe)
+    {
+        var so = DocSo(giaTriTho, eCommerce.Inventory.DoiSoatRetention.SoNgayMacDinh, out hopLe);
+
+        // `DocSo` đã loại số âm/không phải số. Cắt phần thập phân: "180.9 ngày" là 180 ngày.
+        return (int)Math.Floor(so);
+    }
 }
 
 /// <summary>
@@ -205,6 +229,8 @@ public class ChinhSachSettingDefinitionProvider : SettingDefinitionProvider
             new SettingDefinition(TenChinhSach.NguongDoiSoat_GiaTri, "0.5"),
             // Khi phát hiện lệch (Warn|RequireConfirmation)
             new SettingDefinition(TenChinhSach.NguongDoiSoat_HanhDong, "Warn"),
+            // Số ngày lưu trữ dòng lệch ĐÃ XỬ LÝ (0 = tắt retention). Mặc định 180.
+            new SettingDefinition(TenChinhSach.LuuTruDoiSoat_SoNgay, "180"),
             // Đơn vị hạn mức theo kênh (Percent|Absolute)
             new SettingDefinition(TenChinhSach.HanMuc_DonVi, "Percent"),
             // Khi vượt hạn mức kênh (Block|Warn)

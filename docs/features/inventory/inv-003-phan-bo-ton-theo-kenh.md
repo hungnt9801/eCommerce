@@ -1462,3 +1462,79 @@ có **nhiều** ca cho **nhiều** hình dạng lỗi.
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.2 | 17/10/2026 | *(agent, session GĐ1)* | **§19 — LÁT CẮT 4: TÁCH PHÉP CHIẾU + KHOÁ CHỖ `DonVi` BỊ ĐÁNH RƠI** (đóng nợ §18.7 #4 một phần): thêm **`IDongHanMucNguon`** (giao diện **5 thuộc tính** — 🔑 vì `eCommerce.Tests` **không** tham chiếu `Domain`, nhận **entity** thì hàm thuần **không test được**) · `InvChannelLimit` cài đặt nó · **`HanMucKenh.ChieuDongHanMuc`** (**hàm THUẦN**) · `StockReservationService` gọi hàm đó thay vì `.Select(...)` inline · **+4 unit test ⇒ 1127**. 🚨 **CHỖ YẾU NHẤT CỦA CHUỖI `DonVi` NẰM Ở GIỮA:** §18 đã khoá **luật chọn** (10 ca) và probe đã đo **entity**, nhưng **phép chiếu entity → `DongHanMuc`** — chỗ `DonVi` **có thể bị đánh rơi** — **KHÔNG có test nào**, vì nó nằm **inline trong một hàm `async` chạm 4 repository + khoá phân tán**. ⚠️ Và hậu quả nếu đánh rơi: **mọi** dòng thành *"kế thừa setting"* ⇒ `200 chiếc` đọc thành `200%` ⇒ **không chặn gì cả**, **không lỗi nào**. 🚨 **ĐÃ TIÊM LẠI ĐÚNG LỖI để chắc lưới bắt** (bỏ `x.DonVi` khỏi phép chiếu ⇒ **3 ca ĐỎ**); ✅ khôi phục ⇒ **1127 unit + 38 integration + mermaid 197/0**. 📌 **Và một quan sát có giá trị:** ca `DonVi_null__GIU_null` **vẫn XANH** khi tiêm — 🔑 **đúng**, vì bỏ `x.DonVi` làm mọi dòng thành `null` nên ca đó **không phân biệt được** ⇒ 📌 **một ca không bắt được lỗi nào trong lượt tiêm thì không sai — nó chỉ không phải ca bắt lỗi đó** ⇒ phải có **nhiều ca cho nhiều hình dạng lỗi**. 🐞 **Hai lỗi của tôi:** (1) `using eCommerce.Inventory;` **không** thêm được vì tệp dùng **file-scoped namespace** (`namespace X;` — **không** có dòng `using` nào) ⇒ sửa bằng cách đổi hướng sang **giao diện tối thiểu** (tốt hơn cho **test**); (2) sao lưu `.k97bak` **sau khi** tiêm ⇒ khôi phục lại **đúng bản đã tiêm** — 🔑 **phải sao lưu TRƯỚC khi sửa, không phải sau**. Ghi **§19.4** (nợ: 🚨 **vẫn chưa có test tích hợp đầu-cuối thật** cho `GiuChoAsync` — cả ba chặng đã có test **thành phần** nhưng **đường thật** chưa chạy liền mạch · 🚨 `eCommerce.Tests` **không có thư viện mock** (**cố ý** không thêm vì CPM) · 🚨 **chưa có fixture DB** trong `eCommerce.Tests` · `IDongHanMucNguon` có **một** người cài đặt — **đánh đổi có chủ ý**) |
+
+---
+
+## 20. ✅ **`S7` — MÀN HÌNH HẠN MỨC: LỌC THEO KHO + PHÂN TRANG + NHÃN THEO `Q4`** (18/10/2026)
+
+> **Phạm vi nói rõ:** lát cắt này đóng **ba** nợ: **§18.7 #3** (*"chưa có UI chọn `DonVi` khi sửa dòng đã có"* —
+> một phần, xem §20.5), nợ **bàn giao §7 việc 6** (*"`/HanMucKenh` chọn kho"*) và **quyết định `Q4` = A**
+> (*"`S7` phải đổi nhãn UI"* — `gd1-coding-sessions.md:73`).
+> 🚫 **CHƯA** làm: *"nút Sửa điền sẵn giá trị"* (§18.7 #3 **phần còn lại**) · kiểm vai trò **chỉ-đọc** · test tích hợp `GiuChoAsync` (§19.4).
+
+### 20.1 Vấn đề thật (đo được trước khi sửa)
+
+| # | Hiện trạng | Hệ quả |
+|---|---|---|
+| 1 | `Index(string? kenh = null)` + `GetDanhSachAsync(channelCode)` | 🔒 Màn hình **chỉ lọc theo kênh** ⇒ muốn biết *"kho Hà Nội đang bị siết bao nhiêu"* phải **đọc cả bảng** |
+| 2 | Không có phân trang; view gọi `Model.DanhSach` (List) | Bảng dài theo **số kênh × số kho** ⇒ tải hết, người dùng cuộn — 📌 cách một bảng cấu hình trở nên **không ai dùng** |
+| 3 | Form *"Đặt / cập nhật"* **không có ô chọn kho** (tự ghi chú *"chưa hỗ trợ chọn kho"*) | Hạn mức **theo kho** chỉ đặt được bằng **API/SQL** ⇒ người vận hành **không đặt được** thứ nghiệp vụ cần nhất (`Q4` nói hạn mức là **theo từng kho**) |
+| 4 | Nhãn `Percent` chỉ là *"tỉ lệ tồn khả dụng"* | 🚨 Đọc lên vẫn hiểu thành *"kênh được bán 30 % tổng tồn"*, trong khi hệ thống áp **30 % của TỪNG cặp `(kho, SKU)`** ⇒ **sai im lặng** (quyết định `Q4` = A yêu cầu đổi nhãn) |
+
+### 20.2 Đã làm gì
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| **1** | `LocHanMucKenhInput` + `GetDanhSachPhanTrangAsync` | lọc `ChannelCode` (chuẩn hoá **cùng hàm** `InvChannelLimit.ChuẩnHoáKenh`) · lọc `WarehouseId` (**`Guid.Empty` = chỉ dòng "cả kênh"**) · `TotalCount` **đếm TRƯỚC khi cắt trang** · trần **200** dòng/trang |
+| **2** | `GetKhoKhaDungAsync` + `KhoKhaDungDto` | danh mục kho **có thật** + `SoDongHanMuc` mỗi kho ⇒ thấy **kho nào chưa được cấu hình riêng** (0 dòng) |
+| **3** | View `/HanMucKenh` | ô lọc **kho** (kèm lựa chọn `(không gắn kho — hạn mức cả kênh)`) trong **cùng** form với ô kênh + nút **"Bỏ lọc"** · **phân trang** (giữ **cả hai** bộ lọc trên liên kết) · ô **chọn kho** trong form đặt hạn mức · nhãn **"trần an toàn của kênh theo từng kho"** + nhãn `Percent` = *"% tồn khả dụng của TỪNG (kho, SKU)"* |
+| **4** | `GhichuNo()` | ghi chú *"giới hạn đã biết"* đổi sang nhãn của `Q4` — 📌 màn hình **không hứa quá** điều hệ thống làm được |
+| **5** | Chống tham số lạ | `?kho=<không phải GUID>` ⇒ **bỏ lọc + HIỆN cảnh báo** (⚠️ không `500`, và **không** im lặng mất bộ lọc) |
+
+🔑 **`Guid.Empty` là một LỰA CHỌN THẬT, không phải lỗi gõ:** *"những hạn mức **không gắn kho**"* là một câu hỏi vận hành
+hợp lệ (`WarehouseId IS NULL` = hạn mức cả kênh) ⇒ biểu diễn bằng `Guid.Empty` thay vì thêm tham số thứ tư.
+📌 Nếu gộp nó với *"mọi kho"* thì người dùng **không có cách nào** tách hai loại dòng ra để so.
+
+### 20.3 ✅ Kiểm chứng — đo trên HTML THẬT + DB THẬT
+
+**`tools/kiem-e2e.ps1`, mục `S7` (8 ca) — dữ liệu gieo: 1 dòng theo `kho` (giá trị `7`) + 1 dòng `cả kênh` (giá trị `13`):**
+
+| Ca | Đo được |
+|---|---|
+| `S7-H1` | `/HanMucKenh` **in đúng câu** *"trần an toàn của kênh theo từng kho"* ⇒ đổi nhãn theo `Q4` **có hiệu lực** |
+| `S7-H2` | có ô lọc `name="kho"` |
+| `S7-H3` | có ô chọn `warehouseId` trong form đặt hạn mức |
+| `S7-H4` | `[HANMUCKENH-PHAN-TRANG]` + `Tổng **2** dòng` ⇒ `TotalCount` là **tổng**, không phải số của trang |
+| 🔑 `S7-H5` | `?kho=<kho>` ⇒ **HIỆN** dòng của kho đó |
+| 🚨 `S7-H6` | **chiều ngược:** `?kho=<kho>` ⇒ **ẨN** dòng "cả kênh" |
+| 🚨 `S7-H7` | `?kho=ca-kenh` ⇒ hiện dòng **không gắn kho** **và** ẩn dòng theo kho |
+| 🔑 `S7-H8` | `?kenh=web&kho=<kho>` ⇒ **hai** bộ lọc cùng tác dụng (📌 nếu mỗi ô nằm trong một form riêng thì bấm Lọc sẽ **xoá** điều kiện kia) |
+
+➕ **Unit test không đổi** cho màn hình (logic lọc nằm ở app service, đo bằng HTTP thật ở trên).
+
+### 20.4 🚨 Lỗi của CHÍNH BỘ ĐO (lần thứ **N** trong dự án — và lần này nguy hiểm hơn)
+
+Lần chạy E2E **đầu tiên**: `S7-H5/H7/H8` **ĐỎ** dù sản phẩm **ĐÚNG**. Nguyên nhân: tôi viết neo
+`<td class="text-end">7</td>`, nhưng cột `GiaTri` khai `HasPrecision(18,4)` ⇒ PostgreSQL trả `7.0000` và
+Razor in **`7.0000`** ⇒ neo **không bao giờ khớp**.
+
+🔑 **Vì sao ca này đáng ghi hơn một ca đỏ thường:** các ca **chiều ngược** (`S7-H6`: *"phải ẨN giá trị 13"*)
+**XANH vì lý do SAI** — chúng xanh chỉ vì `13` cũng in thành `13.0000`, tức là **cùng một lỗi đo** làm
+ca "chặn đúng" và ca "chặn bừa" **trông giống hệt nhau**. 📌 Đúng bài học trung tâm của dự án, ở dạng mới:
+*"một phép đo bất ngờ thường là phép đo SAI"* — và **đo hai chiều chỉ có giá trị khi cả hai chiều dùng đúng neo**.
+✅ Neo nay chịu được phần thập phân: `text-end">\s*7(?:\.0+)?\s*</td>`.
+
+### 20.5 ⏳ NỢ (KHÔNG phải tính năng đã có)
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+| **1** | **Chưa có nút "Sửa" điền sẵn giá trị** | §18.7 #3 **phần còn lại**: form hiện **upsert theo `(kênh, kho)`**. 📌 Nay đã **chọn được kho** nên việc sửa một dòng có sẵn **khả thi** — chỉ còn thiếu nút điền sẵn |
+| **2** | **Chưa có test tích hợp cho `GiuChoAsync` với `DonVi` theo dòng** | Như §19.4 #1 (cần fixture DB trong `eCommerce.Tests`) |
+| **3** | **`eCommerce.Tests` vẫn KHÔNG có thư viện mock** | Như §19.4 #2 — **cố ý** |
+| **4** | **`Percent` vẫn tính trên tồn của TỪNG `(kho, SKU)`** | Ý nghĩa **đã đổi nhãn cho đúng** (`Q4`), nhưng **mô hình tồn theo kênh** thì vẫn chưa có (§18.7 #1) — 📌 đổi nhãn **không** thay đổi hành vi |
+
+### 20.6 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.3 | 18/10/2026 | *(agent, session `S7`)* | **§20 — `S7`: LỌC THEO KHO + PHÂN TRANG + NHÃN `Q4`**: `LocHanMucKenhInput` + `GetDanhSachPhanTrangAsync` (**đếm TRƯỚC khi cắt trang**, trần 200) · `GetKhoKhaDungAsync`/`KhoKhaDungDto` · view: ô lọc **kho** (kèm `(không gắn kho)`) **trong cùng form** với ô kênh · **phân trang** giữ **cả hai** bộ lọc · ô **chọn kho** khi đặt hạn mức · **nhãn** *"trần an toàn của kênh theo từng kho"* + `Percent` = *"% tồn khả dụng của TỪNG (kho, SKU)"* · `GhichuNo()` đổi theo `Q4` · tham số `kho` lạ ⇒ **bỏ lọc + cảnh báo** (không `500`, không im lặng). ✅ **8 ca E2E trên HTML thật + DB thật** (**đo hai chiều** cho mỗi bộ lọc). 🚨 **Lỗi của BỘ ĐO** (§20.4): neo HTML giả định `7` trong khi cột `numeric` in **`7.0000`** ⇒ **3 ca ĐỎ GIẢ**, và các ca **chiều ngược XANH vì lý do sai**. Ghi **§20.5** (nợ: nút Sửa điền sẵn · test tích hợp `GiuChoAsync` · mock · mô hình tồn theo kênh) |

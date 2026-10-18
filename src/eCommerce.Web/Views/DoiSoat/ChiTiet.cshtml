@@ -9,6 +9,9 @@
     PageLayout.Content.BreadCrumb.Add("Dòng lệch");
 
     bool chiChuaXuLy = ViewBag.ChiChuaXuLy ?? true;
+    int trang = ViewBag.Trang ?? 1;
+    int soMoiTrang = ViewBag.SoMoiTrang ?? 50;
+    var thongBaoDoiSoat = TempData["ThongBaoDoiSoat"] as string;
 }
 
 @* 🚨 `REC-001` — DÒNG LỆCH CỦA MỘT LƯỢT + Ô XỬ LÝ.
@@ -54,6 +57,51 @@
 {
     <div class="alert alert-danger">
         <strong>Không xử lý được lệch.</strong> @loiXuLy
+    </div>
+}
+@if (TempData["LoiXacNhan"] is string loiXacNhan && !string.IsNullOrWhiteSpace(loiXacNhan))
+{
+    <div class="alert alert-danger">
+        <strong>Không xác nhận được lượt.</strong> @loiXacNhan
+    </div>
+}
+@if (!string.IsNullOrWhiteSpace(thongBaoDoiSoat))
+{
+    <div class="alert alert-success">@thongBaoDoiSoat</div>
+}
+
+@* 🆕 `S7` — KHỐI XÁC NHẬN LƯỢT (quyết định `Q5` = A).
+   🔒 Chỉ hiện khi lượt **ĐANG CHỜ** xác nhận (`VuotCanXacNhan` + chưa xác nhận). Ba trạng thái phải
+   **phân biệt được**, vì *"không cần xác nhận"* và *"đã xác nhận"* dẫn tới hai hành động khác nhau.
+   📌 Ở đây ghi rõ **xác nhận KHÔNG sửa tồn kho** — nếu không, người dùng tưởng bấm nút là hệ thống tự
+   điều chỉnh lệch (đúng phương án đã **BỊ LOẠI** ở `Q5`). *@
+@if (Model.Luot.DaXacNhan)
+{
+    <div class="alert alert-success" id="doisoat-xac-nhan">
+        <strong>Đã xác nhận</strong> lúc @Model.Luot.ConfirmedAtUtc?.ToString("yyyy-MM-dd HH:mm:ss") UTC
+        (người xác nhận: <code>@Model.Luot.ConfirmedByUserId</code>).
+        <div>Ghi chú: @Model.Luot.ConfirmNote</div>
+        <div class="small text-muted">Cảnh báo đã đóng. Tồn kho/sổ cái <strong>KHÔNG</strong> bị sửa — các dòng lệch vẫn phải xử lý riêng.</div>
+    </div>
+}
+else if (Model.Luot.ChoXacNhan)
+{
+    <div class="alert alert-warning" id="doisoat-xac-nhan">
+        <strong>Lượt này ĐANG CHỜ XÁC NHẬN.</strong>
+        Chính sách `Recon.Mismatch.Action = RequireConfirmation` ⇒ cần người có quyền
+        <code>eCommerce.Reconciliation.Confirm</code> xác nhận để <strong>đóng cảnh báo</strong>.
+        🔒 Xác nhận <strong>KHÔNG</strong> sửa tồn kho và <strong>KHÔNG</strong> sinh bút toán điều chỉnh.
+        <form method="post" asp-action="XacNhan" class="row g-1 mt-2">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="reconRunId" value="@Model.Luot.Id" />
+            <div class="col-12 col-md-8">
+                <input class="form-control form-control-sm" name="ghiChu" required maxlength="1024"
+                       placeholder="Vì sao chấp nhận lệch này (BẮT BUỘC — audit)" />
+            </div>
+            <div class="col-12 col-md-4">
+                <button type="submit" class="btn btn-sm btn-danger w-100">Xác nhận &amp; đóng cảnh báo</button>
+            </div>
+        </form>
     </div>
 }
 
@@ -143,8 +191,27 @@ else
         </table>
     </div>
     <p class="text-muted small">
-        Tổng @Model.DongLech.TotalCount dòng.
+        Tổng @Model.DongLech.TotalCount dòng · trang @trang.
         @* 🔒 Nói RÕ vì sao không có ô sửa số đo — nếu không, người dùng sẽ đi tìm và tự sửa DB. *@
         <em>Tồn/Sổ cái/Lệch là <strong>ảnh chụp tại thời điểm quét</strong> nên không sửa được: sửa là phá bằng chứng đối soát.</em>
     </p>
+
+    @* 🆕 `S7` — PHÂN TRANG (nợ `rec-001` §18.7 #2: trước đây trần 200 dòng **cắt bớt mà không nói**).
+       📌 `TotalCount` là **tổng thật** ⇒ khi tổng > một trang, người dùng **thấy** là còn dòng khác. *@
+    var tongTrang = (int)Math.Ceiling(Model.DongLech.TotalCount / (double)soMoiTrang);
+    <div class="d-flex justify-content-between align-items-center">
+        <span class="text-muted small">[DOISOAT-PHAN-TRANG] Tổng <strong>@Model.DongLech.TotalCount</strong> dòng · trang @trang/@(Math.Max(1, tongTrang))</span>
+        <div>
+            @if (trang > 1)
+            {
+                <a class="btn btn-sm btn-outline-secondary" asp-action="ChiTiet"
+                   asp-route-id="@Model.Luot.Id" asp-route-chiChuaXuLy="@chiChuaXuLy" asp-route-trang="@(trang - 1)">« Trước</a>
+            }
+            @if (trang < tongTrang)
+            {
+                <a class="btn btn-sm btn-outline-secondary" asp-action="ChiTiet"
+                   asp-route-id="@Model.Luot.Id" asp-route-chiChuaXuLy="@chiChuaXuLy" asp-route-trang="@(trang + 1)">Sau »</a>
+            }
+        </div>
+    </div>
 }

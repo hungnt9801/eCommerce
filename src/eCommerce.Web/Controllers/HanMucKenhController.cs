@@ -41,23 +41,62 @@ public class HanMucKenhController : Controller
     }
 
     /// <summary>
-    /// `GET /HanMucKenh` — **chính sách đang áp** + **bảng hạn mức** + **catalog kênh**.
+    /// `GET /HanMucKenh` — **chính sách đang áp** + **bảng hạn mức** + **catalog kênh** + **catalog kho**.
     ///
     /// 📌 **VÌ SAO TRẢ CẢ CHÍNH SÁCH LẪN BẢNG TRÊN MỘT TRANG:** hạn mức của một dòng **không có nghĩa**
     /// nếu không biết **đơn vị** (`Percent` hay `Absolute`) — 📌 *"100"* là **100%** hay **100 chiếc**?
     /// 🔒 Tách hai trang ⇒ người dùng đọc một con số **mà không biết đơn vị** ⇒ **hiểu sai** cấu hình của chính mình.
+    ///
+    /// 🆕 `S7` — **LỌC THEO KHO + PHÂN TRANG** (bàn giao §7 việc 6). 🔒 `trang` là **1-based** ở URL;
+    /// `SkipCount` tính ở đây (📌 để view không phải biết API dùng 0-based — chỗ dễ lệch một đơn vị).
     /// </summary>
-    public async Task<IActionResult> Index(string? kenh = null)
+    public async Task<IActionResult> Index(string? kenh = null, string? kho = null, int trang = 1)
     {
+        const int soMoiTrang = 20;
+
         // ⚠️ Gọi **tuần tự, KHÔNG `Task.WhenAll`**: hai lời gọi dùng **cùng `DbContext` scoped** của request
         // ⇒ chạy song song trên một `DbContext` là **lỗi** (`A second operation started on this context`).
         // 📌 Đây là bẫy đã gặp thật trong dự án (đã ghi ở `tools\README-probe.md`), nên ghi lại ở đây.
         var chinhSach = await _hanMuc.GetChinhSachAsync();
-        var danhSach = await _hanMuc.GetDanhSachAsync(kenh);
+
+        Guid? khoId = null;
+        if (!string.IsNullOrWhiteSpace(kho) && !string.Equals(kho, "ca-kenh", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!Guid.TryParse(kho, out var parsed))
+            {
+                // 📌 Tham số lạ trên URL **không** được biến thành 500: bỏ lọc và **nói ra** (view đọc cờ này).
+                ViewBag.LocKhoSai = true;
+            }
+            else
+            {
+                khoId = parsed;
+            }
+        }
+        else if (string.Equals(kho, "ca-kenh", StringComparison.OrdinalIgnoreCase))
+        {
+            // 🔑 `Guid.Empty` = **chỉ những dòng KHÔNG gắn kho** (`WarehouseId IS NULL`) — một lựa chọn THẬT.
+            khoId = Guid.Empty;
+        }
+
+        var trangHopLe = Math.Max(1, trang);
+
+        var danhSach = await _hanMuc.GetDanhSachPhanTrangAsync(new LocHanMucKenhInput
+        {
+            ChannelCode = kenh,
+            WarehouseId = khoId,
+            SkipCount = (trangHopLe - 1) * soMoiTrang,
+            MaxResultCount = soMoiTrang
+        });
+
         var ken = await _hanMuc.GetKenhKhaDungAsync();
+        var cacKho = await _hanMuc.GetKhoKhaDungAsync();
 
         ViewBag.KenhDangLoc = kenh;
+        ViewBag.KhoDangLoc = kho;
         ViewBag.KenhKhaDung = ken;
+        ViewBag.KhoKhaDung = cacKho;
+        ViewBag.Trang = trangHopLe;
+        ViewBag.SoMoiTrang = soMoiTrang;
 
         return View(new HanMucKenhManHinhDto
         {
@@ -142,7 +181,8 @@ public class HanMucKenhController : Controller
         decimal? giaTriMacDinh,
         string? nguongDoiSoatDonVi,
         decimal? nguongDoiSoatGiaTri,
-        string? nguongDoiSoatHanhDong)
+        string? nguongDoiSoatHanhDong,
+        int? luuTruDoiSoatSoNgay)
     {
         try
         {
@@ -154,7 +194,8 @@ public class HanMucKenhController : Controller
                 GiaTriMacDinh = giaTriMacDinh,
                 NguongDoiSoatDonVi = nguongDoiSoatDonVi,
                 NguongDoiSoatGiaTri = nguongDoiSoatGiaTri,
-                NguongDoiSoatHanhDong = nguongDoiSoatHanhDong
+                NguongDoiSoatHanhDong = nguongDoiSoatHanhDong,
+                LuuTruDoiSoatSoNgay = luuTruDoiSoatSoNgay
             });
 
             TempData["ThongBaoHanMuc"] = "Đã đổi chính sách (cache setting đã tự xoá).";
@@ -173,5 +214,6 @@ public class HanMucKenhManHinhDto
 {
     public ChinhSachHanMucDto ChinhSach { get; set; } = default!;
 
-    public List<HanMucKenhDto> DanhSach { get; set; } = [];
+    /// <summary>🆕 `S7` — danh sách nay **phân trang** (giữ `TotalCount` thật để view in *"trang x/y"*).</summary>
+    public Volo.Abp.Application.Dtos.PagedResultDto<HanMucKenhDto> DanhSach { get; set; } = default!;
 }

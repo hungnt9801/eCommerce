@@ -9,7 +9,11 @@
     PageLayout.Content.BreadCrumb.Add("Hạn mức kênh");
 
     var kenhDangLoc = ViewBag.KenhDangLoc as string;
+    var khoDangLoc = ViewBag.KhoDangLoc as string;
     var kenhKhaDung = ViewBag.KenhKhaDung as List<KenhKhaDungDto> ?? [];
+    var khoKhaDung = ViewBag.KhoKhaDung as List<KhoKhaDungDto> ?? [];
+    var trang = (int)(ViewBag.Trang ?? 1);
+    var soMoiTrang = (int)(ViewBag.SoMoiTrang ?? 20);
     var chinhSach = Model.ChinhSach;
     var thongBao = TempData["ThongBaoHanMuc"] as string;
     var loi = TempData["LoiHanMuc"] as string;
@@ -29,6 +33,13 @@
      ② **Cột "Đang tắt" hiện RÕ.** Quy ước toàn hệ thống: `GiaTri <= 0` nghĩa là **TẮT** hạn mức.
         ⚠️ Nếu chỉ hiện số `0`, người vận hành dễ tưởng *"hạn mức = 0 ⇒ chặn hết"* — **ngược hẳn** sự thật.
 *@
+
+@if (ViewBag.LocKhoSai is true)
+{
+    @* 🔒 Tham số lạ trên URL KHÔNG được biến thành `500`, nhưng cũng **không** được im lặng:
+       📌 người dùng thấy "không lọc gì" mà không biết mình vừa mất bộ lọc. *@
+    <div class="alert alert-warning">Tham số <code>kho</code> không hợp lệ ⇒ đã bỏ lọc kho (hiện tất cả kho).</div>
+}
 
 @if (!string.IsNullOrWhiteSpace(thongBao))
 {
@@ -128,6 +139,17 @@
                     </select>
                 </div>
                 <div class="col-md-3">
+                    @* 🆕 `S7` — RETENTION (`REC-001` §17.8 #1). 📌 Nói RÕ `0` = TẮT, vì "0 ngày" đọc theo
+                       nghĩa đen là "xoá sạch" — và đó là cách một ô cấu hình gây mất dữ liệu. *@
+                    <label class="form-label">Lưu trữ dòng lệch đã xử lý (ngày · 0 = TẮT)</label>
+                    <input class="form-control" type="number" min="0" max="36500" step="1" name="luuTruDoiSoatSoNgay"
+                           value="@chinhSach.LuuTruDoiSoatSoNgay" />
+                    @if (!chinhSach.LuuTruDoiSoatHopLe)
+                    {
+                        <div class="form-text text-danger">Giá trị setting không hợp lệ ⇒ đang dùng mặc định an toàn.</div>
+                    }
+                </div>
+                <div class="col-md-3">
                     <button class="btn btn-primary w-100" type="submit">Lưu chính sách</button>
                 </div>
             </div>
@@ -154,9 +176,13 @@
 }
 
 <div class="card mb-3">
-    <div class="card-header d-flex justify-content-between align-items-center">
+    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
         <strong>Hạn mức riêng từng kênh</strong>
-        <form method="get" asp-action="Index" class="d-flex gap-2">
+        @* 🆕 `S7` — LỌC THEO KÊNH **VÀ** KHO (bàn giao §7 việc 6).
+           🔒 Cả hai ô đều nằm trong **cùng một** form GET ⇒ hai bộ lọc **không xoá nhau** khi bấm Lọc.
+           📌 Đây là lỗi hay gặp: thêm ô thứ hai bằng một form riêng ⇒ mỗi lần lọc chỉ còn một điều kiện,
+           và người dùng tưởng dữ liệu "mất". *@
+        <form method="get" asp-action="Index" class="d-flex gap-2 flex-wrap">
             <select class="form-select form-select-sm" name="kenh" style="min-width: 220px;">
                 <option value="">— tất cả kênh —</option>
                 @foreach (var k in kenhKhaDung)
@@ -166,16 +192,45 @@
                     </option>
                 }
             </select>
+            <select class="form-select form-select-sm" name="kho" style="min-width: 220px;">
+                <option value="">— tất cả kho —</option>
+                @* `ca-kenh` = dòng **KHÔNG gắn kho** (`WarehouseId IS NULL`) — một lựa chọn THẬT. *@
+                <option value="ca-kenh" selected="@(khoDangLoc == "ca-kenh")">(không gắn kho — hạn mức cả kênh)</option>
+                @foreach (var kh in khoKhaDung)
+                {
+                    <option value="@kh.Id" selected="@(khoDangLoc == kh.Id.ToString())">
+                        @kh.Code — @kh.Name (@kh.SoDongHanMuc dòng@(kh.IsActive ? "" : " · NGỪNG dùng"))
+                    </option>
+                }
+            </select>
             <button class="btn btn-sm btn-outline-secondary" type="submit">Lọc</button>
+            @if (!string.IsNullOrWhiteSpace(kenhDangLoc) || !string.IsNullOrWhiteSpace(khoDangLoc))
+            {
+                <a class="btn btn-sm btn-outline-secondary" asp-action="Index">Bỏ lọc</a>
+            }
         </form>
     </div>
     <div class="card-body p-0">
-        @if (Model.DanhSach.Count == 0)
+        @* 🚨 `S7` — NHÃN THEO QUYẾT ĐỊNH `Q4` = A: `Percent` KHÔNG phải ngân sách của kênh.
+           📌 Nhãn cũ đọc lên vẫn hiểu sai được ⇒ người vận hành đặt 30 (%) tưởng *"kênh được bán 30 % tổng tồn"*,
+           trong khi hệ thống áp **30 % của TỪNG cặp (kho, SKU)** — tức là **trần an toàn theo kho**. *@
+        <div class="px-3 pt-3" id="hanmuc-tran-an-toan">
+            <p class="text-muted small mb-2">
+                <span class="badge bg-info text-dark">Cách hiểu</span>
+                <strong>Hạn mức = trần an toàn của kênh theo từng kho.</strong>
+                `Percent` tính trên tồn khả dụng của <strong>từng cặp (kho, SKU)</strong> — KHÔNG phải tổng/ngân sách của cả kênh.
+                <span class="text-muted">[HANMUCKENH-TRAN-AN-TOAN]</span>
+            </p>
+        </div>
+        @if (Model.DanhSach.TotalCount == 0)
         {
             @* 🔑 Nói RÕ "chưa cấu hình riêng" thay vì để bảng trống: bảng trống làm người dùng tưởng
                "tính năng hỏng", trong khi sự thật là "kênh đang dùng giá trị dùng chung" — một trạng thái HỢP LỆ. *@
             <p class="p-3 mb-0 text-muted">
-                Chưa có hạn mức riêng nào cho kênh này ⇒ đang dùng <strong>giá trị dùng chung</strong>
+                Không có dòng hạn mức nào khớp bộ lọc
+                (@(string.IsNullOrWhiteSpace(kenhDangLoc) ? "mọi kênh" : "kênh " + kenhDangLoc) ·
+                @(string.IsNullOrWhiteSpace(khoDangLoc) ? "mọi kho" : "một kho đã chọn"))
+                ⇒ kênh đang dùng <strong>giá trị dùng chung</strong>
                 (@chinhSach.GiaTriMacDinh · @chinhSach.DonVi).
             </p>
         }
@@ -198,7 +253,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var d in Model.DanhSach)
+                    @foreach (var d in Model.DanhSach.Items)
                     {
                         <tr>
                             <td><code>@d.ChannelCode</code></td>
@@ -252,6 +307,26 @@
                     }
                 </tbody>
             </table>
+
+            @* 🆕 `S7` — PHÂN TRANG (nợ: bảng dài theo **số kênh × số kho**; tải hết là cách bảng cấu hình
+               trở nên không ai dùng). 🔑 Mọi liên kết phải **giữ cả hai bộ lọc** `kenh` + `kho` — nếu không,
+               bấm "Sau" sẽ âm thầm **bỏ lọc** và người dùng tưởng dữ liệu nhảy. *@
+            var tongTrang = (int)Math.Ceiling(Model.DanhSach.TotalCount / (double)soMoiTrang);
+            <div class="d-flex justify-content-between align-items-center px-3 py-2">
+                <span class="text-muted small">[HANMUCKENH-PHAN-TRANG] Tổng <strong>@Model.DanhSach.TotalCount</strong> dòng · trang @trang/@(Math.Max(1, tongTrang))</span>
+                <div>
+                    @if (trang > 1)
+                    {
+                        <a class="btn btn-sm btn-outline-secondary" asp-action="Index"
+                           asp-route-kenh="@kenhDangLoc" asp-route-kho="@khoDangLoc" asp-route-trang="@(trang - 1)">« Trước</a>
+                    }
+                    @if (trang < tongTrang)
+                    {
+                        <a class="btn btn-sm btn-outline-secondary" asp-action="Index"
+                           asp-route-kenh="@kenhDangLoc" asp-route-kho="@khoDangLoc" asp-route-trang="@(trang + 1)">Sau »</a>
+                    }
+                </div>
+            </div>
         }
     </div>
 </div>
@@ -276,6 +351,19 @@
                     </select>
                 </div>
                 <div class="col-md-3">
+                    @* 🆕 `S7` — **CHỌN KHO** (trước đây màn hình KHÔNG chọn được kho ⇒ hạn mức theo kho chỉ
+                       đặt được bằng API/SQL). 🔑 Để trống = hạn mức **cả kênh** — đúng khoá nghiệp vụ
+                       `(kênh, kho)` với `WarehouseId NULL`. *@
+                    <label class="form-label">Kho (trống = hạn mức cả kênh)</label>
+                    <select class="form-select" name="warehouseId">
+                        <option value="">(cả kênh — WarehouseId NULL)</option>
+                        @foreach (var kh in khoKhaDung)
+                        {
+                            <option value="@kh.Id">@kh.Code — @kh.Name@(kh.IsActive ? "" : " (NGỪNG dùng)")</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-2">
                     <label class="form-label">Giá trị (0 = TẮT)</label>
                     <input class="form-control" type="number" step="any" min="0" name="giaTri" value="0" required />
                 </div>
@@ -284,8 +372,8 @@
                     @* 🔑 De TRONG = **ke thua** setting chung (KHONG phai mot gia tri thu ba). *@
                     <select class="form-select" name="donVi">
                         <option value="">(kế thừa chung: @chinhSach.DonVi)</option>
-                        <option value="Percent">Percent (%)</option>
-                        <option value="Absolute">Absolute (số lượng)</option>
+                        <option value="Percent">Percent — % tồn khả dụng của TỪNG (kho, SKU)</option>
+                        <option value="Absolute">Absolute — số lượng tuyệt đối</option>
                     </select>
                 </div>
                 <div class="col-md-2">
@@ -302,8 +390,9 @@
             </div>
 
             <p class="text-muted small mt-2 mb-0">
-                Hạn mức là theo cặp <strong>(kênh, kho)</strong>. Màn hình này đặt hạn mức
-                <strong>cả kênh</strong> (chưa hỗ trợ chọn kho — nợ đã ghi ở <code>INV-003</code>).
+                Hạn mức là theo cặp <strong>(kênh, kho)</strong>; để trống ô <em>Kho</em> là hạn mức
+                <strong>cả kênh</strong>. 🔒 Hệ thống **upsert** theo khoá `(kênh, kho)` — lưu lại là **sửa**,
+                không tạo dòng trùng. <span class="text-muted">[HANMUCKENH-CHON-KHO]</span>
             </p>
         </form>
     </div>

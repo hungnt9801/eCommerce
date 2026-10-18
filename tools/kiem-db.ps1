@@ -329,7 +329,11 @@ $quyenPhaiCon = @(
     # sau khi job `D12` báo động ⇒ nếu nó chết thì cờ **tồn đọng vĩnh viễn** và không ai biết ngoài việc đọc log.
     'eCommerce.Sales.MarketplaceIntake',
     'eCommerce.Sales.MarketplaceIntake.View',
-    'eCommerce.Sales.MarketplaceIntake.Reprocess'
+    'eCommerce.Sales.MarketplaceIntake.Reprocess',
+    # 🆕 `S7` (18/10/2026) — **xác nhận lệch đối soát** (`rec-001` · `Q5` = A). 📌 Vào danh sách này vì:
+    # (a) thiếu ở provider ⇒ `403` cho MỌI người kể cả admin; (b) đây là đường DUY NHẤT đóng cảnh báo
+    # `VuotCanXacNhan` ⇒ nếu nó chết thì lượt quét nằm ở trạng thái 2 **vĩnh viễn** (đúng hiện trạng trước `S7`).
+    'eCommerce.Reconciliation.Confirm'
 )
 
 $granted = @(Psql 'select "Name" from "AbpPermissionGrants" order by "Name";' | ForEach-Object { $_.Trim() })

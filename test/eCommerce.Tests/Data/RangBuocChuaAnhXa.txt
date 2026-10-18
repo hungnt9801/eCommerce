@@ -93,3 +93,9 @@ CK_CusAddressLinks_NhanDoDai|ADDR-004: nhãn dài tối đa 128 ký tự — đ�
 IX_SalMktEventLogs_TenantId_Channel_Order_Ver_Hash_Outcome|SAL-005 D7: *một SỰ KIỆN ⇒ một dòng* — ca "trùng" là **kết quả mong muốn** (writer coi việc đã có dòng là thành công), nên KHÔNG có ca nào cần `23505` lộ ra client; index chỉ là hàng rào cuối cho hai luồng song song (dual-path webhook+pull)
 CK_SalMktEventLogs_SourceVersion|SAL-005 D7: `SourceVersion` là epoch giây của `update_time` sàn ⇒ luôn dương khi CÓ; `NULL` hợp lệ (sự kiện thiếu watermark). Entity ném `ArgumentOutOfRangeException` trước khi chạm DB; CHECK chỉ để DB tự đứng được với đường ghi tắt (script/phát lại)
 CK_SalMktEventLogs_PayloadHash_Hex|SAL-005 D7: `PayloadHash` phải là SHA-256 hex **chữ thường** (cùng chuẩn với `SalMarketplaceOrderIntakes`). Hash HOA/base64 trông vẫn như hash nhưng làm nhánh C/D (trùng/xung đột) so SAI ⇒ DLQ giả — chỉ `CanonicalJsonHasher` sinh ra được
+# 🆕 `S7` (`REC-001` · `Q5` = A): xác nhận lệch = ĐÓNG CẢNH BÁO + audit, KHÔNG sửa tồn/sổ cái.
+# 📌 Đây là BẤT BIẾN CẤU TRÚC (hình dạng của một dòng xác nhận), KHÔNG phải ca nghiệp vụ cần mã lỗi riêng:
+#    người ghi là `ReconRun.XacNhan` (đã tự chặn "nửa xác nhận" trước khi chạm DB, và NÉM `Recon:0004/0005`),
+#    nên `23514` ở đây chỉ xảy ra với đường ghi TẮT (SQL tay / phát lại) ⇒ trả mã chung `eCommerce:Db:0001`
+#    là đúng: client không có hành động nghiệp vụ nào để làm khác.
+CK_ReconRuns_XacNhan_DuBo|S7: "xác nhận một nửa" (có `ConfirmedAtUtc` mà không có `ConfirmedByUserId`, hoặc thiếu `ConfirmNote`) là bằng chứng VÔ CHỦ — domain đã chặn; CHECK là hàng rào cuối cho đường ghi tắt, không có ca nào cần mã lỗi riêng

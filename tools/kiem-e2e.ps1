@@ -154,6 +154,25 @@ select count(*)::text from "InvWarehouses" where "Id" = 'e0000000-0000-0000-0000
                 "🚨 Dung lai va don truoc — ⚠️ neu khong thi cac ca 'co form hanh dong' se XANH VI DU LIEU CU." -f $dem, $demDon, $demNhatKy, $demKho)
         }
 
+        # 🆕 `S7` — TIEN DE cho du lieu probe cua han muc / doi soat. 📌 Neu con lai tu lan truoc thi:
+        #   • ca `S7-H4` (tong = 2 dong) se **do vi ly do vo hinh** (no la 3/4, khong phai phan trang hong);
+        #   • `kiem-db.ps1` nhom ① (`InvChannelLimits` phai RONG) se **do** ⇒ lan sau di tim mot loi khong lien quan.
+        $demHanMuc = (@(Invoke-Psql -Sql @'
+select count(*)::text from "InvChannelLimits" where "Id" in ('e0000000-0000-0000-0000-0000000000ea','e0000000-0000-0000-0000-0000000000eb');
+'@) -join '').Trim()
+
+        $demLuot = (@(Invoke-Psql -Sql @'
+select count(*)::text from "ReconRuns" where "Id" = 'e0000000-0000-0000-0000-0000000000e7';
+'@) -join '').Trim()
+
+        $demDongLech = (@(Invoke-Psql -Sql @'
+select count(*)::text from "ReconRunMismatches" where "ReconRunId" = 'e0000000-0000-0000-0000-0000000000e7';
+'@) -join '').Trim()
+
+        if ($demHanMuc -ne '0' -or $demLuot -ne '0' -or $demDongLech -ne '0') {
+            throw ("TIEN DE (`S7`): con {0} dong han muc probe, {1} luot doi soat probe, {2} dong lech probe ⇒ lan chay truoc KHONG don dep." -f $demHanMuc, $demLuot, $demDongLech)
+        }
+
         Write-Output '   ✅ Tien de: khong con du lieu probe cu (khach + don + nhat ky xuat + kho).'
     }
 
@@ -921,6 +940,285 @@ select count(*)::text from "CusDataExportLogs" where "Id" = 'e0000000-0000-0000-
         Kq 'E5 TRONG KHOI MENU khong co lien ket chet href=hash' (-not $coHash) 'chong lien ket chet'
     }
 
+    # ══════════════════════════════════════════════════════════════════════════════════════════
+    # ⑥ 🆕 `S7` — HẠN MỨC KÊNH (LỌC KHO + PHÂN TRANG) VÀ ĐỐI SOÁT (XÁC NHẬN + RETENTION)
+    #
+    # 🔑 **VÌ SAO PHẢI ĐO TRÊN HTML THẬT (không phải chỉ unit test):** bốn câu hỏi của `S7` **chỉ** HTML
+    # thật + DB thật trả lời được —
+    #   ① **lọc theo kho có TÁC DỤNG không** và **có lọc SAI không** (đo **CẢ HAI CHIỀU**: kho A hiện, kho B
+    #     ẩn) — 📌 một bộ lọc "luôn ẩn hết" và một bộ lọc đúng **trông giống hệt nhau** nếu chỉ đo một phía;
+    #   ② **xác nhận lệch** có đi qua **đúng cổng quyền** và có **ghi audit thật** (ai/khi nào/vì sao) không;
+    #   ③ 🚨 **thiếu ghi chú ⇒ KHÔNG được ghi gì** (guard thật, không phải `required` của HTML) — 📌 đây đúng
+    #     lỗi `rec-001` §18.4: guard đúng mà UI hiện "lỗi nội bộ" thì người dùng thử lại y hệt;
+    #   ④ **retention xoá ĐÚNG dòng** (đã xử lý + cũ) và **GIỮ đúng dòng** (chưa xử lý · đang chờ xác nhận ·
+    #     và `ReconRuns` KHÔNG BAO GIỜ bị xoá) — 📌 luật xoá dữ liệu mà chỉ kiểm một chiều là luật **mất dữ liệu**.
+    #
+    # 🔒 Mọi dữ liệu gieo ở đây dùng GUID `e0000000-…-ea/eb/ec…` (cùng dải với các ca khác) và được dọn trong
+    # `finally` — nếu không, `kiem-db.ps1` nhóm ①/⑥ sẽ đỏ ở lượt sau **vì lý do vô hình**.
+    # ══════════════════════════════════════════════════════════════════════════════════════════
+    Write-Output ''
+    Write-Output '── S7: HẠN MỨC KÊNH (lọc kho + phân trang) · ĐỐI SOÁT (xác nhận + retention) ──'
+
+    $idHanMucKho = 'e0000000-0000-0000-0000-0000000000ea'
+    $idHanMucCaKenh = 'e0000000-0000-0000-0000-0000000000eb'
+    $idKhoProbe = 'e0000000-0000-0000-0000-0000000000e6'
+
+    # ── ① GIEO 2 DÒNG HẠN MỨC: một theo KHO, một CẢ KÊNH ──────────────────────────────────────
+    # 📌 Hai dòng **cùng kênh** nhưng khác `WarehouseId` ⇒ ca lọc kho phân biệt được **đúng** với **sai**
+    # (nếu hai dòng khác kênh thì một bộ lọc hỏng vẫn có thể "trông đúng").
+    TiemVaoDb -Sql @'
+insert into "InvChannelLimits" ("Id","TenantId","ChannelCode","WarehouseId","GiaTri","HanhDong","DonVi","ExtraProperties","ConcurrencyStamp","CreationTime","IsDeleted")
+values ('e0000000-0000-0000-0000-0000000000ea',null,'web','e0000000-0000-0000-0000-0000000000e6',7,0,1,'{}','k97ea',now(),false),
+       ('e0000000-0000-0000-0000-0000000000eb',null,'web',null,13,0,null,'{}','k97eb',now(),false);
+'@ -KiemSql @'
+select count(*)::text from "InvChannelLimits" where "Id" in ('e0000000-0000-0000-0000-0000000000ea','e0000000-0000-0000-0000-0000000000eb');
+'@ -SoDongMongDoi 2 | Out-Null
+
+    # ── ② TRANG HẠN MỨC: Ô LỌC KHO + NHÃN "TRẦN AN TOÀN" + PHÂN TRANG ─────────────────────────
+    $dsHanMuc = TaiTrang -DuongDan '/HanMucKenh' -TepLuu (Join-Path $thuMucTam 'hanmuc-s7.html')
+    $htmlHanMuc = GiaiMaHtml $dsHanMuc.Html
+
+    # 🚨 Nhãn theo `Q4` = A: `Percent` là **trần an toàn theo từng kho**, KHÔNG phải ngân sách của kênh.
+    Kq 'S7-H1 /HanMucKenh NOI RO "tran an toan ... theo tung kho" (Q4 = A)' `
+        ($htmlHanMuc -match 'trần an toàn của kênh theo từng kho') 'doi nhan UI theo quyet dinh Q4'
+
+    Kq 'S7-H2 /HanMucKenh co O LOC KHO (name="kho")' ($htmlHanMuc -match 'name="kho"') 'o loc theo kho'
+
+    Kq 'S7-H3 /HanMucKenh co O CHON KHO khi dat han muc (name="warehouseId")' `
+        ($htmlHanMuc -match 'name="warehouseId"') 'truoc day man hinh KHONG chon duoc kho'
+
+    Kq 'S7-H4 /HanMucKenh co PHAN TRANG (tong so dong)' `
+        (($htmlHanMuc -match '\[HANMUCKENH-PHAN-TRANG\]') -and ($htmlHanMuc -match 'Tổng\s*<strong>2</strong>')) `
+        'tong = 2 dong (dem TRUOC khi cat trang)'
+
+    # ── ③ LỌC THEO KHO — ĐO **CẢ HAI CHIỀU** ──────────────────────────────────────────────────
+    $locKho = TaiTrang -DuongDan ('/HanMucKenh?kho=' + $idKhoProbe) -TepLuu (Join-Path $thuMucTam 'hanmuc-loc-kho.html')
+    $htmlLocKho = GiaiMaHtml $locKho.Html
+
+    # `7` = dòng theo kho; `13` = dòng cả kênh.
+    # 🚨 **NEO PHẢI CHỊU ĐƯỢC SỐ THẬP PHÂN CỦA DB** — 📌 lần chạy đầu tôi viết neo `<td class="text-end">7</td>`
+    # và nó **KHÔNG BAO GIỜ khớp**: cột `GiaTri numeric` khai `HasPrecision(18,4)` ⇒ Razor in `7.0000`.
+    # 🔑 Đó là **phép đo SAI**, không phải sản phẩm sai (bài học trung tâm của dự án) — ⚠️ và nó **nguy hiểm**
+    # hơn một ca đỏ bình thường: ca "chiều ngược" (`-notmatch`) sẽ **XANH vì lý do sai**.
+    $mau7 = 'text-end">\s*7(?:\.0+)?\s*</td>'
+    $mau13 = 'text-end">\s*13(?:\.0+)?\s*</td>'
+
+    Kq 'S7-H5 loc theo KHO => HIEN dong cua kho do' `
+        ($htmlLocKho -match $mau7) 'dong theo kho (gia tri 7) PHai hien'
+
+    Kq 'S7-H6 🚨 loc theo KHO => AN dong "ca kenh" (chieu nguoc)' `
+        ($htmlLocKho -notmatch $mau13) 'neu van hien ⇒ bo loc KHONG co tac dung'
+
+    $locCaKenh = TaiTrang -DuongDan '/HanMucKenh?kho=ca-kenh' -TepLuu (Join-Path $thuMucTam 'hanmuc-loc-cakkenh.html')
+    $htmlLocCaKenh = GiaiMaHtml $locCaKenh.Html
+
+    Kq 'S7-H7 🚨 loc "ca-kenh" => HIEN dong KHONG gan kho VA AN dong theo kho' `
+        (($htmlLocCaKenh -match $mau13) -and ($htmlLocCaKenh -notmatch $mau7)) `
+        'chon duoc "chi dong khong gan kho" (= mot trang thai THAT)'
+
+    # 🔑 Hai bộ lọc phải **cùng tồn tại**: nếu form thứ hai thay form thứ nhất thì bấm Lọc sẽ **mất** điều kiện kia.
+    $locHai = TaiTrang -DuongDan ('/HanMucKenh?kenh=web&kho=' + $idKhoProbe) -TepLuu (Join-Path $thuMucTam 'hanmuc-loc-hai.html')
+    $htmlLocHai = GiaiMaHtml $locHai.Html
+
+    Kq 'S7-H8 loc KENH + KHO cung luc => van dung (hai bo loc khong xoa nhau)' `
+        (($htmlLocHai -match $mau7) -and ($htmlLocHai -notmatch $mau13)) `
+        'kenh=web&kho=<kho>'
+
+    # ── ④ GIEO MỘT LƯỢT ĐỐI SOÁT **ĐANG CHỜ XÁC NHẬN** + 3 DÒNG LỆCH ────────────────────────
+    # 🔒 Ba dòng được chọn để **phân biệt được luật retention**:
+    #   • `ec` = CHƯA xử lý, **cũ** 400 ngày  ⇒ 🔒 phải GIỮ (việc còn nợ);
+    #   • `ed` = ĐÃ xử lý, **cũ** 400 ngày    ⇒ 🔒 phải XOÁ (đúng đối tượng của retention);
+    #   • `ee` = ĐÃ xử lý, **mới**            ⇒ 🔒 phải GIỮ (chưa tới mốc).
+    $idLuot = 'e0000000-0000-0000-0000-0000000000e7'
+
+    TiemVaoDb -Sql @'
+insert into "ReconRuns" ("Id","TenantId","BatDauUtc","KetThucUtc","SoCapDaDo","SoLech","DonViNguong","GiaTriNguong","HanhDong","NguongHopLe","SoLechVuotNguong","CoVuotNguong","KetLuan","ExtraProperties","ConcurrencyStamp","CreationTime","IsDeleted")
+values ('e0000000-0000-0000-0000-0000000000e7',null,now() - interval '2 seconds',now(),10,2,0,0.5,1,true,1,true,2,'{}','k97e7',now(),false);
+'@ -KiemSql @'
+select count(*)::text from "ReconRuns" where "Id" = 'e0000000-0000-0000-0000-0000000000e7';
+'@ -SoDongMongDoi 1 | Out-Null
+
+    TiemVaoDb -Sql @'
+insert into "ReconRunMismatches" ("Id","TenantId","ReconRunId","WarehouseId","Sku","OnHand","TongSoCai","ChenhLech","VuotNguong","DaXuLy","XuLyLucUtc","NguoiXuLy","LyDoXuLy","CreationTime","IsDeleted")
+values ('e0000000-0000-0000-0000-0000000000ec',null,'e0000000-0000-0000-0000-0000000000e7','e0000000-0000-0000-0000-0000000000e6','K97S7-CHUA-XU-LY',90,100,-10,true,false,null,null,null,now() - interval '400 days',false),
+       ('e0000000-0000-0000-0000-0000000000ed',null,'e0000000-0000-0000-0000-0000000000e7','e0000000-0000-0000-0000-0000000000e6','K97S7-DA-XU-LY-CU',50,60,-10,true,true,now() - interval '400 days','probe.s7','kiem ke cu',now() - interval '400 days',false),
+       ('e0000000-0000-0000-0000-0000000000ee',null,'e0000000-0000-0000-0000-0000000000e7','e0000000-0000-0000-0000-0000000000e6','K97S7-DA-XU-LY-MOI',30,33,-3,true,true,now(),'probe.s7','kiem ke moi',now(),false);
+'@ -KiemSql @'
+select count(*)::text from "ReconRunMismatches" where "ReconRunId" = 'e0000000-0000-0000-0000-0000000000e7';
+'@ -SoDongMongDoi 3 | Out-Null
+
+    # ── ⑤ TRANG ĐỐI SOÁT: LƯỢT ĐANG CHỜ XÁC NHẬN + KHỐI RETENTION ────────────────────────────
+    $dsDoiSoat = TaiTrang -DuongDan '/DoiSoat' -TepLuu (Join-Path $thuMucTam 'doisoat.html')
+    $htmlDoiSoat = GiaiMaHtml $dsDoiSoat.Html
+
+    Kq 'S7-D1 GET /DoiSoat = 200' ($dsDoiSoat.Ma -eq '200') ("HTTP " + $dsDoiSoat.Ma)
+
+    Kq 'S7-D2 /DoiSoat co KHONG RETENTION (noi ro cai gi KHONG bi xoa)' `
+        ($htmlDoiSoat -match '\[DOISOAT-RETENTION\]') 'khong xoa luot / dong chua xu ly / dang cho xac nhan'
+
+    Kq 'S7-D3 /DoiSoat hien luot DANG CHO XAC NHAN' `
+        ($htmlDoiSoat -match 'chờ xác nhận') 'badge "cho xac nhan"'
+
+    $chiTiet = TaiTrang -DuongDan ('/DoiSoat/ChiTiet/' + $idLuot) -TepLuu (Join-Path $thuMucTam 'doisoat-chitiet.html')
+    $htmlChiTiet = GiaiMaHtml $chiTiet.Html
+
+    Kq 'S7-D4 GET /DoiSoat/ChiTiet/{id} = 200' ($chiTiet.Ma -eq '200') ("HTTP " + $chiTiet.Ma)
+
+    Kq 'S7-D5 ChiTiet co FORM XAC NHAN (name="ghiChu") + noi ro KHONG sua ton kho' `
+        (($htmlChiTiet -match 'name="ghiChu"') -and ($htmlChiTiet -match 'KHÔNG.{0,40}sửa tồn kho')) `
+        'xac nhan = dong canh bao + audit (Q5 = A)'
+
+    Kq 'S7-D6 ChiTiet co NEO PHAN TRANG dong lech' `
+        ($htmlChiTiet -match '\[DOISOAT-PHAN-TRANG\]') 'no phan trang §18.7 #2'
+
+    $mTokenXacNhan = [regex]::Match($chiTiet.Html, 'name="__RequestVerificationToken"[^>]*value="(?<t>[^"]+)"')
+
+    if (-not $mTokenXacNhan.Success) {
+        Kq 'S7-D7 co token chong gia mao tren trang chi tiet' $false 'KHONG co token ⇒ khong POST duoc'
+    }
+    else {
+        Kq 'S7-D7 co token chong gia mao tren trang chi tiet' $true 'token that tu trang'
+        $tokenDs = $mTokenXacNhan.Groups['t'].Value
+
+        # 🚨 **THIẾU GHI CHÚ ⇒ KHÔNG ĐƯỢC GHI GÌ** (guard THẬT ở domain, không phải `required` của HTML).
+        $postThieu = & curl.exe -s -b $jar -c $jar -L -o (Join-Path $thuMucTam 'xacnhan-thieu.html') -w '%{http_code}' `
+            --data-urlencode ("__RequestVerificationToken=" + $tokenDs) `
+            --data-urlencode ("reconRunId=" + $idLuot) `
+            --data-urlencode 'ghiChu=' `
+            ($web + '/DoiSoat/XacNhan')
+
+        $htmlThieu = GiaiMaHtml ([System.IO.File]::ReadAllText((Join-Path $thuMucTam 'xacnhan-thieu.html'), [Text.Encoding]::UTF8))
+
+        $conXacNhanSauThieu = (@(Invoke-Psql -Sql @'
+select count(*)::text from "ReconRuns" where "Id" = 'e0000000-0000-0000-0000-0000000000e7' and "ConfirmedAtUtc" is not null;
+'@) -join '').Trim()
+
+        Kq 'S7-D8 🚨 xac nhan THIEU ghi chu => HIEN ma eCommerce:Recon:0005 (khong phai 500)' `
+            ($htmlThieu -match 'eCommerce:Recon:0005') ("HTTP " + "$postThieu".Trim())
+
+        Kq 'S7-D9 🚨 va KHONG ghi gi vao DB (guard that, khong phai required o HTML)' `
+            ($conXacNhanSauThieu -eq '0') ("dong da xac nhan = " + $conXacNhanSauThieu + " (mong doi 0)")
+
+        # ✅ XÁC NHẬN ĐỦ: ghi chú + đúng người dùng hiện tại (lấy từ principal, KHÔNG từ form).
+        $postDu = & curl.exe -s -b $jar -c $jar -L -o (Join-Path $thuMucTam 'xacnhan-du.html') -w '%{http_code}' `
+            --data-urlencode ("__RequestVerificationToken=" + $tokenDs) `
+            --data-urlencode ("reconRunId=" + $idLuot) `
+            --data-urlencode 'ghiChu=K97S7 da kiem ke kho va khop lai so (E2E)' `
+            ($web + '/DoiSoat/XacNhan')
+
+        $dongSauXacNhan = (@(Invoke-Psql -Sql @'
+select "ConfirmedByUserId"::text || '|' || coalesce("ConfirmNote",'') from "ReconRuns" where "Id" = 'e0000000-0000-0000-0000-0000000000e7' and "ConfirmedAtUtc" is not null;
+'@) -join '').Trim()
+
+        $idAdmin = (@(Invoke-Psql -Sql @'
+select "Id"::text from "AbpUsers" where "NormalizedUserName" = 'ADMIN';
+'@) -join '').Trim()
+
+        Kq 'S7-D10 🚨 xac nhan DU => DB ghi THAT: nguoi xac nhan = admin + ghi chu' `
+            ($dongSauXacNhan -eq ($idAdmin + '|K97S7 da kiem ke kho va khop lai so (E2E)')) `
+            ("DB = " + $dongSauXacNhan)
+
+        # 🔒 Chiều ngược: sau khi xác nhận, màn hình KHÔNG còn form xác nhận (không cho "xác nhận lại").
+        $chiTietSau = TaiTrang -DuongDan ('/DoiSoat/ChiTiet/' + $idLuot) -TepLuu (Join-Path $thuMucTam 'doisoat-sau.html')
+        $htmlSau = GiaiMaHtml $chiTietSau.Html
+
+        Kq 'S7-D11 sau khi xac nhan => hien "Da xac nhan" va KHONG con form' `
+            (($htmlSau -match 'Đã xác nhận') -and ($htmlSau -notmatch 'name="ghiChu"')) `
+            'chong xac nhan lap vo ich'
+    }
+
+    # ── ⑥ RETENTION: XEM TRƯỚC **KHÔNG XOÁ**, DỌN THẬT **XOÁ ĐÚNG DÒNG** ──────────────────────
+    $mTokenDon = [regex]::Match($dsDoiSoat.Html, 'name="__RequestVerificationToken"[^>]*value="(?<t>[^"]+)"')
+
+    if (-not $mTokenDon.Success) {
+        Kq 'S7-R1 co token tren form don dep' $false 'KHONG co token ⇒ khong POST duoc'
+    }
+    else {
+        Kq 'S7-R1 co token tren form don dep' $true 'token that tu /DoiSoat'
+        $tokenDon = $mTokenDon.Groups['t'].Value
+
+        $demCuTruoc = (@(Invoke-Psql -Sql @'
+select count(*)::text from "ReconRunMismatches" where "ReconRunId" = 'e0000000-0000-0000-0000-0000000000e7';
+'@) -join '').Trim()
+
+        # ① XEM TRƯỚC — 🔒 mặc định `true`: một lời gọi thiếu tham số KHÔNG được xoá dữ liệu.
+        $postXemTruoc = & curl.exe -s -b $jar -c $jar -L -o (Join-Path $thuMucTam 'don-xemtruoc.html') -w '%{http_code}' `
+            --data-urlencode ("__RequestVerificationToken=" + $tokenDon) `
+            --data-urlencode 'soNgay=180' `
+            --data-urlencode 'chiXemTruoc=true' `
+            ($web + '/DoiSoat/DonDep')
+
+        $htmlXemTruoc = GiaiMaHtml ([System.IO.File]::ReadAllText((Join-Path $thuMucTam 'don-xemtruoc.html'), [Text.Encoding]::UTF8))
+
+        $demSauXemTruoc = (@(Invoke-Psql -Sql @'
+select count(*)::text from "ReconRunMismatches" where "ReconRunId" = 'e0000000-0000-0000-0000-0000000000e7';
+'@) -join '').Trim()
+
+        Kq 'S7-R2 XEM TRUOC => bao dung che do va so dong du dieu kien' `
+            (($htmlXemTruoc -match 'XEM TRƯỚC') -and ($htmlXemTruoc -match 'đủ điều kiện')) `
+            ("HTTP " + "$postXemTruoc".Trim())
+
+        Kq 'S7-R3 🚨 XEM TRUOC => KHONG xoa dong nao (kiem tra DB, khong tin thong bao)' `
+            ($demSauXemTruoc -eq $demCuTruoc) ("truoc = {0} · sau = {1}" -f $demCuTruoc, $demSauXemTruoc)
+
+        # ② DỌN THẬT.
+        $postDonThat = & curl.exe -s -b $jar -c $jar -L -o (Join-Path $thuMucTam 'don-that.html') -w '%{http_code}' `
+            --data-urlencode ("__RequestVerificationToken=" + $tokenDon) `
+            --data-urlencode 'soNgay=180' `
+            --data-urlencode 'chiXemTruoc=false' `
+            ($web + '/DoiSoat/DonDep')
+
+        $htmlDonThat = GiaiMaHtml ([System.IO.File]::ReadAllText((Join-Path $thuMucTam 'don-that.html'), [Text.Encoding]::UTF8))
+
+        # 🚨 ĐO **CẢ HAI CHIỀU** trên dữ liệu thật: dòng cũ-đã-xử-lý MẤT, hai dòng còn lại PHẢI CÒN.
+        $conDongCuDaXuLy = (@(Invoke-Psql -Sql @'
+select count(*)::text from "ReconRunMismatches" where "Id" = 'e0000000-0000-0000-0000-0000000000ed';
+'@) -join '').Trim()
+
+        $conDongCuChuaXuLy = (@(Invoke-Psql -Sql @'
+select count(*)::text from "ReconRunMismatches" where "Id" = 'e0000000-0000-0000-0000-0000000000ec';
+'@) -join '').Trim()
+
+        $conDongMoiDaXuLy = (@(Invoke-Psql -Sql @'
+select count(*)::text from "ReconRunMismatches" where "Id" = 'e0000000-0000-0000-0000-0000000000ee';
+'@) -join '').Trim()
+
+        $conLuot = (@(Invoke-Psql -Sql @'
+select count(*)::text from "ReconRuns" where "Id" = 'e0000000-0000-0000-0000-0000000000e7';
+'@) -join '').Trim()
+
+        Kq 'S7-R4 🚨 DON THAT => XOA dong DA XU LY va CU hon moc' `
+            ($conDongCuDaXuLy -eq '0') ("con = " + $conDongCuDaXuLy + " (mong doi 0)")
+
+        Kq 'S7-R5 🚨 DON THAT => GIU dong CHUA XU LY (du cu hon moc) — viec con no' `
+            ($conDongCuChuaXuLy -eq '1') ("con = " + $conDongCuChuaXuLy + " (mong doi 1)")
+
+        Kq 'S7-R6 🚨 DON THAT => GIU dong MOI hon moc' `
+            ($conDongMoiDaXuLy -eq '1') ("con = " + $conDongMoiDaXuLy + " (mong doi 1)")
+
+        Kq 'S7-R7 🚨 DON THAT => KHONG dung toi LUOT QUET (ReconRuns la ban tong hop)' `
+            ($conLuot -eq '1') ("con = " + $conLuot + " (mong doi 1)")
+
+        # ③ `soNgay = 0` ⇒ 🔒 NÉM `0006` (0 = TẮT, KHÔNG phải "xoá hết") và KHÔNG xoá gì thêm.
+        $postKhongHopLe = & curl.exe -s -b $jar -c $jar -L -o (Join-Path $thuMucTam 'don-0.html') -w '%{http_code}' `
+            --data-urlencode ("__RequestVerificationToken=" + $tokenDon) `
+            --data-urlencode 'soNgay=0' `
+            --data-urlencode 'chiXemTruoc=false' `
+            ($web + '/DoiSoat/DonDep')
+
+        $htmlKhongHopLe = GiaiMaHtml ([System.IO.File]::ReadAllText((Join-Path $thuMucTam 'don-0.html'), [Text.Encoding]::UTF8))
+
+        $conDongCuChuaXuLy2 = (@(Invoke-Psql -Sql @'
+select count(*)::text from "ReconRunMismatches" where "Id" = 'e0000000-0000-0000-0000-0000000000ec';
+'@) -join '').Trim()
+
+        Kq 'S7-R8 🚨 soNgay = 0 => HIEN ma eCommerce:Recon:0006 (0 = TAT, khong phai "xoa het")' `
+            ($htmlKhongHopLe -match 'eCommerce:Recon:0006') ("HTTP " + "$postKhongHopLe".Trim())
+
+        Kq 'S7-R9 va KHONG xoa them dong nao' `
+            ($conDongCuChuaXuLy2 -eq '1') ("con = " + $conDongCuChuaXuLy2 + " (mong doi 1)")
+    }
+
     # ── ⑦ TONG KET ──────────────────────────────────────────────────────────────────────────
     $soDat = @($ketQua | Where-Object { $_.Dat }).Count
 
@@ -997,6 +1295,22 @@ delete from "PrcPriceCalculationRecords" where "IdempotencyKey" like 'K97E2E%';
 delete from "InvWarehouses" where "Id" = 'e0000000-0000-0000-0000-0000000000e6';
 '@ | Out-Null
 
+        # 🆕 `S7` — don du lieu probe cua HAN MUC + DOI SOAT.
+        # 🔑 **THU TU: DONG LECH TRUOC, LUOT SAU** — `ReconRunMismatches.ReconRunId` -> `ReconRuns` la FK
+        # `Restrict` ⇒ xoa luot truoc se **vi pham khoa ngoai** (hoac de lai dong mo coi). 📌 Chinh quy tac
+        # nay da bi ghi o `handover` §4 nhung van la cho de sai nhat khi viet cleanup.
+        Invoke-Psql -Sql @'
+delete from "ReconRunMismatches" where "ReconRunId" = 'e0000000-0000-0000-0000-0000000000e7';
+'@ | Out-Null
+
+        Invoke-Psql -Sql @'
+delete from "ReconRuns" where "Id" = 'e0000000-0000-0000-0000-0000000000e7';
+'@ | Out-Null
+
+        Invoke-Psql -Sql @'
+delete from "InvChannelLimits" where "Id" in ('e0000000-0000-0000-0000-0000000000ea','e0000000-0000-0000-0000-0000000000eb');
+'@ | Out-Null
+
         # 🚨 **BAT LAI CO BAO MAT** — 🔑 quen buoc nay nghia la **commit mot admin KHONG bi buoc doi mat khau**.
         Invoke-Psql -Sql @'
 update "AbpUsers" set "ShouldChangePasswordOnNextLogin" = true where "NormalizedUserName" = 'ADMIN';
@@ -1018,10 +1332,24 @@ select "ShouldChangePasswordOnNextLogin"::text from "AbpUsers" where "Normalized
 select count(*)::text from "InvWarehouses" where "Id" = 'e0000000-0000-0000-0000-0000000000e6';
 '@) -join '').Trim()
 
+        # 🆕 `S7` — khang dinh da don sach han muc + doi soat (📌 "tin la da don" la dung loai loi dang chong).
+        $conHanMuc = (@(Invoke-Psql -Sql @'
+select count(*)::text from "InvChannelLimits" where "Id" in ('e0000000-0000-0000-0000-0000000000ea','e0000000-0000-0000-0000-0000000000eb');
+'@) -join '').Trim()
+
+        $conLuot = (@(Invoke-Psql -Sql @'
+select count(*)::text from "ReconRuns" where "Id" = 'e0000000-0000-0000-0000-0000000000e7';
+'@) -join '').Trim()
+
+        $conDongLech = (@(Invoke-Psql -Sql @'
+select count(*)::text from "ReconRunMismatches" where "ReconRunId" = 'e0000000-0000-0000-0000-0000000000e7';
+'@) -join '').Trim()
+
         Write-Output ''
         Write-Output ("   DON DEP: khach probe con={0} (mong doi 0) · kho probe con={1} (mong doi 0) · co bao mat={2} (mong doi True)" -f $con, $conKho, $baoMat)
+        Write-Output ("   DON DEP (S7): han muc probe con={0} (0) · luot doi soat probe con={1} (0) · dong lech probe con={2} (0)" -f $conHanMuc, $conLuot, $conDongLech)
 
-        if ($con -ne '0' -or $conKho -ne '0' -or $baoMat -ne 'True') {
+        if ($con -ne '0' -or $conKho -ne '0' -or $baoMat -ne 'True' -or $conHanMuc -ne '0' -or $conLuot -ne '0' -or $conDongLech -ne '0') {
             Write-Output '   🚨 DON DEP KHONG DAY DU ⇒ lan chay sau co the XANH VI DU LIEU CU.'
         }
     }

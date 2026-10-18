@@ -9,7 +9,20 @@
     PageLayout.Content.BreadCrumb.Add("Đối soát tồn kho");
 
     bool chiConViec = ViewBag.ChiConViec ?? false;
+    bool chiChoXacNhan = ViewBag.ChiChoXacNhan ?? false;
     int trang = ViewBag.Trang ?? 1;
+    int soMoiTrang = ViewBag.SoMoiTrang ?? 20;
+    var thongBaoDoiSoat = TempData["ThongBaoDoiSoat"] as string;
+    var loiDoiSoat = TempData["LoiXacNhan"] as string;
+}
+
+@if (!string.IsNullOrWhiteSpace(thongBaoDoiSoat))
+{
+    <div class="alert alert-success">@thongBaoDoiSoat</div>
+}
+@if (!string.IsNullOrWhiteSpace(loiDoiSoat))
+{
+    <div class="alert alert-danger">@loiDoiSoat</div>
 }
 
 @* 🚨 `REC-001` — LỊCH SỬ LƯỢT QUÉT ĐỐI SOÁT.
@@ -20,16 +33,25 @@
    🔒 Điểm quan trọng nhất của màn hình: **`SoLechChuaXuLy`** — con số **HÀNH ĐỘNG ĐƯỢC**.
    Nếu chỉ hiện tổng `SoLech`, danh sách **mãi** hiện như cũ và **không ai đọc nữa**. *@
 
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
     <h4 class="mb-0">Lịch sử lượt quét đối soát</h4>
-    <div>
+    <div class="d-flex gap-2 flex-wrap">
         @if (chiConViec)
         {
-            <a class="btn btn-sm btn-outline-secondary" asp-action="Index">Hiện tất cả</a>
+            <a class="btn btn-sm btn-outline-secondary" asp-action="Index" asp-route-chiChoXacNhan="@chiChoXacNhan">Hiện tất cả</a>
         }
         else
         {
-            <a class="btn btn-sm btn-outline-warning" asp-action="Index" asp-route-chiConViec="true">Chỉ lượt còn việc</a>
+            <a class="btn btn-sm btn-outline-warning" asp-action="Index" asp-route-chiConViec="true" asp-route-chiChoXacNhan="@chiChoXacNhan">Chỉ lượt còn việc</a>
+        }
+        @* 🆕 `S7` — *"hộp việc"* của người có quyền `eCommerce.Reconciliation.Confirm`. *@
+        @if (chiChoXacNhan)
+        {
+            <a class="btn btn-sm btn-outline-secondary" asp-action="Index" asp-route-chiConViec="@chiConViec">Bỏ lọc chờ xác nhận</a>
+        }
+        else
+        {
+            <a class="btn btn-sm btn-outline-danger" asp-action="Index" asp-route-chiChoXacNhan="true" asp-route-chiConViec="@chiConViec">Chỉ lượt CHỜ XÁC NHẬN</a>
         }
     </div>
 </div>
@@ -65,6 +87,7 @@ else
                     <th class="text-end">Chưa xử lý</th>
                     <th>Chính sách (ngưỡng)</th>
                     <th>Kết luận</th>
+                    <th>Xác nhận</th>
                     <th></th>
                 </tr>
             </thead>
@@ -105,6 +128,26 @@ else
                             }
                         </td>
                         <td class="small">@luot.KetLuan</td>
+                        @* 🆕 `S7` — TRẠNG THÁI XÁC NHẬN. 🔒 Ba trạng thái **phân biệt được**:
+                           *chờ xác nhận* (việc cần làm) · *đã xác nhận* (bằng chứng: ai + khi nào) · *không cần*. *@
+                        <td class="small">
+                            @if (luot.DaXacNhan)
+                            {
+                                <span class="badge bg-success">đã xác nhận</span>
+                                <div class="text-muted">
+                                    @luot.ConfirmedAtUtc?.ToString("yyyy-MM-dd HH:mm") UTC
+                                </div>
+                                <div class="text-muted">@luot.ConfirmNote</div>
+                            }
+                            else if (luot.ChoXacNhan)
+                            {
+                                <span class="badge bg-danger">chờ xác nhận</span>
+                            }
+                            else
+                            {
+                                <span class="text-muted">— không cần</span>
+                            }
+                        </td>
                         <td class="text-end">
                             <a class="btn btn-sm btn-outline-primary" asp-action="ChiTiet" asp-route-id="@luot.Id">Xem lệch</a>
                         </td>
@@ -119,12 +162,46 @@ else
         <div>
             @if (trang > 1)
             {
-                <a class="btn btn-sm btn-outline-secondary" asp-action="Index" asp-route-chiConViec="@chiConViec" asp-route-trang="@(trang - 1)">« Trước</a>
+                <a class="btn btn-sm btn-outline-secondary" asp-action="Index"
+                   asp-route-chiConViec="@chiConViec" asp-route-chiChoXacNhan="@chiChoXacNhan" asp-route-trang="@(trang - 1)">« Trước</a>
             }
-            @if (trang * 20 < Model.TotalCount)
+            @if (trang * soMoiTrang < Model.TotalCount)
             {
-                <a class="btn btn-sm btn-outline-secondary" asp-action="Index" asp-route-chiConViec="@chiConViec" asp-route-trang="@(trang + 1)">Sau »</a>
+                <a class="btn btn-sm btn-outline-secondary" asp-action="Index"
+                   asp-route-chiConViec="@chiConViec" asp-route-chiChoXacNhan="@chiChoXacNhan" asp-route-trang="@(trang + 1)">Sau »</a>
             }
         </div>
     </div>
 }
+
+@* 🆕 `S7` — **RETENTION** (`REC-001` §17.8 #1: *"bảng chỉ tăng"*).
+   🔒 Thao tác này **KHÔNG hoàn tác được** trên dữ liệu là **chứng từ** ⇒ mặc định là **XEM TRƯỚC**,
+   nút xoá thật có `confirm`, và luật *cái gì không bao giờ bị xoá* được **in ngay trên màn hình**
+   (📌 người bấm phải biết trước, không phải đọc mã nguồn).
+   📌 Số ngày lấy từ setting `Recon.Retention.Days` (cấu hình ở `/HanMucKenh`); ô ở đây chỉ **ghi đè một lần**. *@
+<div class="card mt-3">
+    <div class="card-header"><strong>Dọn lịch sử theo chính sách lưu trữ (retention)</strong></div>
+    <div class="card-body">
+        <p class="text-muted small mb-2">
+            🔒 <strong>Không bao giờ bị xoá:</strong> lượt quét (<code>ReconRuns</code>) · dòng lệch <strong>chưa xử lý</strong> ·
+            dòng lệch của lượt <strong>đang chờ xác nhận</strong>. Chỉ dòng lệch <strong>đã xử lý</strong> và cũ hơn mốc mới bị dọn.
+            <span class="text-muted">[DOISOAT-RETENTION]</span>
+        </p>
+        <form method="post" asp-action="DonDep" class="row g-2 align-items-end">
+            @Html.AntiForgeryToken()
+            <div class="col-md-3">
+                <label class="form-label">Số ngày lưu trữ (trống = theo chính sách)</label>
+                <input class="form-control form-control-sm" type="number" min="1" max="36500" name="soNgay" placeholder="(theo setting)" />
+            </div>
+            <div class="col-md-3">
+                <button class="btn btn-sm btn-outline-secondary w-100" type="submit" name="chiXemTruoc" value="true">Xem trước (không xoá)</button>
+            </div>
+            <div class="col-md-3">
+                <button class="btn btn-sm btn-outline-danger w-100" type="submit" name="chiXemTruoc" value="false"
+                        onclick="return confirm('XOÁ THẬT các dòng lệch ĐÃ XỬ LÝ cũ hơn mốc. Không hoàn tác được. Tiếp tục?');">
+                    Dọn thật
+                </button>
+            </div>
+        </form>
+    </div>
+</div>

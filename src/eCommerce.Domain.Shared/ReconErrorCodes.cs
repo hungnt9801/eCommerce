@@ -37,4 +37,28 @@ public static class ReconErrorCodes
     /// <summary>**KHÔNG TÌM THẤY** lượt đối soát hoặc dòng lệch theo Id.
     /// 📌 Chỉ dẫn khác hẳn *"điền lý do"*: *"kiểm lại Id / dữ liệu đã bị xoá"*.</summary>
     public const string KhongTimThayBanGhiDoiSoat = Nhom + "0003";
+
+    /// <summary>
+    /// 🚨 **LƯỢT KHÔNG Ở TRẠNG THÁI CHỜ XÁC NHẬN** (`S7` — quyết định `Q5` = **A**).
+    ///
+    /// 📌 **VÌ SAO MÃ RIÊNG:** chỉ dẫn là *"lượt này không cần xác nhận"* — **khác hẳn** `0002`
+    /// (*"điền lý do rồi gửi lại"*) và `0005` (*"điền ghi chú"*). Trả lẫn ⇒ người vận hành **điền ghi chú
+    /// rồi gửi lại mãi** trong khi việc cần làm là **không bấm nút**.
+    /// 🔒 Đây là **ca thật**: nút xác nhận chỉ hiện cho lượt `VuotCanXacNhan`, nhưng **API thì ai cũng gọi được**
+    /// ⇒ nếu im lặng bỏ qua thì hệ thống ghi *"đã xác nhận"* cho một lượt **chưa từng cần** xác nhận.
+    /// </summary>
+    public const string LuotKhongChoXacNhan = Nhom + "0004";
+
+    /// <summary>**XÁC NHẬN LƯỢT THIẾU GHI CHÚ** — `ReconRun.XacNhan`.
+    /// 📌 Lý do bắt buộc: xác nhận lệch = **chấp nhận chênh lệch tài sản**; không có lý do thì không ai
+    /// phân biệt được *"đã kiểm và khớp lại"* với *"bấm nút cho hết danh sách"*.</summary>
+    public const string ThieuGhiChuXacNhan = Nhom + "0005";
+
+    /// <summary>
+    /// 🚨 **CHÍNH SÁCH LƯU TRỮ (RETENTION) KHÔNG HỢP LỆ** (`S7`).
+    /// 📌 **VÌ SAO PHẢI CÓ MÃ RIÊNG CHO CA NÀY:** `0` (hoặc âm) nghĩa là **TẮT retention** — không phải
+    /// *"giữ 0 ngày"* (mà nếu hiểu vậy thì **một lần gõ sai xoá sạch bằng chứng đối soát**).
+    /// 🔒 Vì vậy đường dọn **NÉM** khi nhận `<= 0` thay vì lặng lẽ coi là "xoá hết".
+    /// </summary>
+    public const string ChinhSachLuuTruKhongHopLe = Nhom + "0006";
 }

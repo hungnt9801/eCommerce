@@ -1,10 +1,12 @@
 using eCommerce.Reconciliation;
+using eCommerce.Settings;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Logging;
 using Volo.Abp;
 using Volo.Abp.Application.Dtos;
 using Volo.Abp.Application.Services;
 using Volo.Abp.Domain.Repositories;
+using Volo.Abp.Settings;
 
 namespace eCommerce.Inventory;
 
@@ -42,15 +44,21 @@ public class DoiSoatAppService : ApplicationService, IDoiSoatAppService
     private readonly IRepository<ReconRun, Guid> _luotDoiSoat;
     private readonly IRepository<ReconRunMismatch, Guid> _dongLech;
     private readonly IRepository<Warehouse, Guid> _kho;
+    private readonly DoiSoatRetentionService _luuTru;
+    private readonly ISettingProvider _settingProvider;
 
     public DoiSoatAppService(
         IRepository<ReconRun, Guid> luotDoiSoat,
         IRepository<ReconRunMismatch, Guid> dongLech,
-        IRepository<Warehouse, Guid> kho)
+        IRepository<Warehouse, Guid> kho,
+        DoiSoatRetentionService luuTru,
+        ISettingProvider settingProvider)
     {
         _luotDoiSoat = luotDoiSoat;
         _dongLech = dongLech;
         _kho = kho;
+        _luuTru = luuTru;
+        _settingProvider = settingProvider;
     }
 
     // ── LƯỢT ĐỐI SOÁT ───────────────────────────────────────────────────────────────────────────
@@ -80,6 +88,15 @@ public class DoiSoatAppService : ApplicationService, IDoiSoatAppService
         if (input.ChiVuotNguong == true)
         {
             truyVan = truyVan.Where(x => x.CoVuotNguong);
+        }
+
+        // 🆕 `S7` — *"hộp việc"* của người có quyền `eCommerce.Reconciliation.Confirm`.
+        // 📌 Điều kiện viết **y hệt** `ReconRun.ChoXacNhan` và `DoiSoatRetention` (giữ bằng chứng khi chờ
+        // xác nhận) ⇒ một định nghĩa *"đang chờ"* cho cả ba chỗ; lệch một chỗ là màn hình / dọn dữ liệu
+        // **nói khác nhau** về cùng một lượt.
+        if (input.ChiChoXacNhan == true)
+        {
+            truyVan = truyVan.Where(x => x.KetLuan == KetLuanDoiSoat.VuotCanXacNhan && x.ConfirmedAtUtc == null);
         }
 
         // ⚠️ Lọc theo *"còn việc chưa xử lý"* phải hỏi bảng **dòng lệch** ⇒ cần truy vấn con.
@@ -231,6 +248,99 @@ public class DoiSoatAppService : ApplicationService, IDoiSoatAppService
         return ChuyenDto(dong, tenKho.GetValueOrDefault(dong.WarehouseId));
     }
 
+    // ── 🆕 `S7`: XÁC NHẬN LƯỢT + RETENTION ──────────────────────────────────────────────────────
+
+    /// <summary>
+    /// 🚨 **XÁC NHẬN một lượt đang chờ xác nhận** — quyết định `Q5` = **A**: ghi `ai / khi nào / vì sao`
+    /// rồi **đóng cảnh báo**. 🔒 **KHÔNG** sửa tồn kho, **KHÔNG** sinh bút toán, **KHÔNG** đụng các dòng lệch.
+    ///
+    /// 🔐 Quyền riêng `eCommerce.Reconciliation.Confirm` — 📌 khác `Inventory.Default` (xem/đánh dấu dòng lệch)
+    /// vì xác nhận làm cảnh báo **biến mất** khỏi danh sách cần xem.
+    /// </summary>
+    [Authorize(eCommerceConsts.Permissions.Reconciliation.Confirm)]
+    public async Task<LuotDoiSoatDto> PostXacNhanLuotAsync(Guid reconRunId, XacNhanLuotInput input)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+
+        var luot = await _luotDoiSoat.FindAsync(reconRunId)
+            ?? throw new BusinessException(ReconErrorCodes.KhongTimThayBanGhiDoiSoat)
+                .WithData("reconRunId", reconRunId)
+                .WithData("loai", "luot-doi-soat");
+
+        // 🔒 **Ai xác nhận lấy từ PRINCIPAL, không từ input:** người gõ tay tên không đối chiếu được với
+        // tài khoản nào ⇒ không phải audit (`Q5` yêu cầu `ConfirmedByUserId`).
+        var nguoiXacNhan = CurrentUser.Id
+            ?? throw new BusinessException(ReconErrorCodes.ThieuGhiChuXacNhan)
+                .WithData("reconRunId", reconRunId)
+                .WithData("lyDo", "Không xác định được người dùng hiện tại ⇒ không ghi được audit. Đăng nhập lại.");
+
+        var daXacNhanTruocDo = luot.ConfirmedAtUtc is not null;
+
+        // 🚨 Domain **NÉM** `0004`/`0005` và **no-op** nếu đã xác nhận — app service KHÔNG bọc `try/catch`
+        // để "cho qua" (quy ước #11: bọc lại là biến guard ném lỗi thành guard im lặng).
+        luot.XacNhan(nguoiXacNhan, Clock.Now, input.GhiChu);
+
+        if (!daXacNhanTruocDo)
+        {
+            await _luotDoiSoat.UpdateAsync(luot, autoSave: true);
+
+            Logger.LogWarning(
+                "ĐÃ XÁC NHẬN LỆCH ĐỐI SOÁT: lượt={ReconRunId} · người xác nhận={NguoiDung} · " +
+                "số lệch vượt ngưỡng={SoVuot} · ghi chú={GhiChu}. KHÔNG sửa tồn/sổ cái (Q5 = A). [REC-DA-XAC-NHAN]",
+                luot.Id, nguoiXacNhan, luot.SoLechVuotNguong, luot.ConfirmNote);
+        }
+        else
+        {
+            // 🔔 Gọi lại (double-click/retry) ⇒ **vô hại**, nhưng ghi log để không im lặng hoàn toàn: người
+            // muốn **đổi** ghi chú cần biết là **không đổi được** (bằng chứng của lần đầu được giữ).
+            Logger.LogInformation(
+                "LƯỢT ĐÃ XÁC NHẬN TRƯỚC ĐÓ ⇒ không ghi đè bằng chứng (no-op): lượt={ReconRunId} · " +
+                "người xác nhận đầu={NguoiDung}. [REC-DA-XAC-NHAN-TRUOC-DO]",
+                luot.Id, luot.ConfirmedByUserId);
+        }
+
+        var conLai = await AsyncExecuter.CountAsync(
+            (await _dongLech.GetQueryableAsync()).Where(x => x.ReconRunId == reconRunId && !x.DaXuLy));
+
+        return ChuyenDto(luot, conLai);
+    }
+
+    /// <summary>
+    /// 🆕 **DỌN LỊCH SỬ THEO RETENTION** (`REC-001` §17.8 #1) — gọi `DoiSoatRetentionService` (**cùng luật**
+    /// với job định kỳ, không có bản thứ hai).
+    ///
+    /// 🔒 `ChiXemTruoc` mặc định **`true`** ở DTO ⇒ một lời gọi thiếu tham số **không** xoá gì.
+    /// </summary>
+    [Authorize(eCommerceConsts.Permissions.Reconciliation.Confirm)]
+    public async Task<KetQuaDonDepDoiSoatDto> PostDonDepAsync(DonDepDoiSoatInput input)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+
+        var soNgay = input.SoNgay
+            ?? ChinhSach.DocSoNgayLuuTru(await _settingProvider.GetOrNullAsync(TenChinhSach.LuuTruDoiSoat_SoNgay), out _);
+
+        // 🚨 `soNgay <= 0` ⇒ domain **NÉM** `Recon:0006` (xem `DoiSoatRetention`: `0` = TẮT, không phải "xoá hết").
+        var ketQua = await _luuTru.DonDepAsync(Clock.Now, soNgay, input.ChiXemTruoc);
+
+        Logger.LogWarning(
+            "DỌN LỊCH SỬ ĐỐI SOÁT: {CheDo} · số ngày={SoNgay} · mốc={Moc:O} · đủ điều kiện={DuDieuKien} · " +
+            "đã xoá={DaXoa} · giữ lại (chưa xử lý)={ChuaXuLy} · giữ lại (chờ xác nhận)={ChoXacNhan}. [REC-DON-DEP]",
+            input.ChiXemTruoc ? "XEM TRƯỚC" : "XOÁ THẬT",
+            ketQua.SoNgay, ketQua.MocUtc, ketQua.SoDongDuDieuKien, ketQua.SoDongDaXoa,
+            ketQua.SoDongGiuLaiChuaXuLy, ketQua.SoDongGiuLaiChoXacNhan);
+
+        return new KetQuaDonDepDoiSoatDto
+        {
+            SoNgay = ketQua.SoNgay,
+            MocUtc = ketQua.MocUtc,
+            ChiXemTruoc = ketQua.ChiXemTruoc,
+            SoDongDuDieuKien = ketQua.SoDongDuDieuKien,
+            SoDongDaXoa = ketQua.SoDongDaXoa,
+            SoDongGiuLaiChuaXuLy = ketQua.SoDongGiuLaiChuaXuLy,
+            SoDongGiuLaiChoXacNhan = ketQua.SoDongGiuLaiChoXacNhan
+        };
+    }
+
     // ── CHUYỂN ĐỔI ──────────────────────────────────────────────────────────────────────────────
 
     private async Task<Dictionary<Guid, string>> LayTenKhoAsync(List<Guid> idKho)
@@ -263,7 +373,12 @@ public class DoiSoatAppService : ApplicationService, IDoiSoatAppService
         HanhDong = x.HanhDong.ToString(),
         NguongHopLe = x.NguongHopLe,
         KetLuan = x.KetLuan.ToString(),
-        SoLechChuaXuLy = soLechChuaXuLy
+        SoLechChuaXuLy = soLechChuaXuLy,
+        ChoXacNhan = x.ChoXacNhan,
+        DaXacNhan = x.ConfirmedAtUtc is not null,
+        ConfirmedByUserId = x.ConfirmedByUserId,
+        ConfirmedAtUtc = x.ConfirmedAtUtc,
+        ConfirmNote = x.ConfirmNote
     };
 
     private static DongLechDto ChuyenDto(ReconRunMismatch x, string? maKho) => new()

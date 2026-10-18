@@ -68,6 +68,28 @@ public class ReconRun : FullAuditedAggregateRoot<Guid>, IMultiTenant
     /// </summary>
     public KetLuanDoiSoat KetLuan { get; protected set; }
 
+    // ══════════════════════════════════════════════════════════════════════════════════════════════
+    // 🚨 `S7` — **XÁC NHẬN LỆCH = ĐÓNG CẢNH BÁO + AUDIT** (quyết định `Q5` = **A**, `rec-001` §0).
+    //
+    // **VÌ SAO PHẢI CÓ (hiện trạng ĐO ĐƯỢC trước lượt này):** `RequireConfirmation` ghi được trạng thái
+    // `2` (`VuotCanXacNhan`), nhưng **KHÔNG có đường nào để xác nhận** ⇒ lượt quét nằm ở trạng thái `2`
+    // **VĨNH VIỄN**, cảnh báo **tồn đọng**, và người vận hành chỉ còn cách sửa DB tay (⇒ mất audit).
+    //
+    // 🔒 **Xác nhận TUYỆT ĐỐI KHÔNG sửa tồn/sổ cái** — phương án *"xác nhận ⇒ tự sinh bút toán điều chỉnh"*
+    // đã **BỊ LOẠI** (job không được sửa sổ cái append-only; chứng từ do người tạo). Ở đây nó chỉ ghi
+    // **ai / khi nào / vì sao** rồi **đóng cảnh báo**.
+    // ══════════════════════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>Ai xác nhận (`AbpUsers.Id`) — `null` = **chưa xác nhận**. 📌 Lưu ID, **không** lưu tên gõ tay:
+    /// tên gõ tay không đối chiếu được với tài khoản nào ⇒ không phải audit.</summary>
+    public Guid? ConfirmedByUserId { get; protected set; }
+
+    /// <summary>Thời điểm xác nhận (UTC) — `null` = **chưa xác nhận**.</summary>
+    public DateTime? ConfirmedAtUtc { get; protected set; }
+
+    /// <summary>Vì sao chấp nhận lệch — **BẮT BUỘC** khi xác nhận (xem <see cref="XacNhan"/>).</summary>
+    public string? ConfirmNote { get; protected set; }
+
     protected ReconRun() { }
 
     public ReconRun(
@@ -119,6 +141,60 @@ public class ReconRun : FullAuditedAggregateRoot<Guid>, IMultiTenant
             : HanhDong == HanhDongLech.RequireConfirmation
                 ? KetLuanDoiSoat.VuotCanXacNhan
                 : KetLuanDoiSoat.VuotCanhBao;
+    }
+
+    /// <summary>Lượt này **đang chờ người xác nhận** hay không (`Q5`: chính sách `RequireConfirmation`).</summary>
+    public bool ChoXacNhan => KetLuan == KetLuanDoiSoat.VuotCanXacNhan && ConfirmedAtUtc is null;
+
+    /// <summary>
+    /// 🚨 **XÁC NHẬN LỆCH CỦA LƯỢT** — ghi `ai / khi nào / vì sao` rồi **đóng cảnh báo** (`rec-001` §0).
+    ///
+    /// 🔒 **Ba bất biến (mỗi điều chặn một kiểu lạm dụng):**
+    /// <list type="number">
+    ///   <item><b>Chỉ xác nhận được lượt ĐANG CHỜ xác nhận</b> (`KetLuan = VuotCanXacNhan`) — xác nhận một
+    ///     lượt `KhongVuot` hay `VuotCanhBao` là **đóng một cảnh báo không tồn tại** ⇒ người đọc sau hiểu
+    ///     *"đã có người xem"* trong khi **chưa ai xem**;</item>
+    ///   <item><b>Ghi chú BẮT BUỘC</b> — không có lý do thì 6 tháng sau không ai phân biệt được
+    ///     *"đã kiểm kê và khớp lại"* với *"ai đó bấm nút cho hết danh sách"*;</item>
+    ///   <item><b>Không ghi đè lần xác nhận trước</b> — gọi lại là **no-op**, và **kiểm no-op TRƯỚC** khi kiểm
+    ///     tham số (📌 đúng thứ tự đã trả giá ở `ReconRunMismatch.DanhDauDaXuLy`: nếu kiểm tham số trước thì một
+    ///     **retry** không mang ghi chú sẽ **NÉM** trên một lượt đã xác nhận xong).</item>
+    /// </list>
+    ///
+    /// ⚠️ **KHÔNG** đụng tới `SoLech`/`SoLechVuotNguong`/các dòng lệch: xác nhận là **ghi chú vận hành**,
+    /// không phải sửa số đo (xem chú thích đầu lớp về `Q5`).
+    /// </summary>
+    /// <param name="nguoiXacNhanId">`AbpUsers.Id` của người xác nhận — **bắt buộc**.</param>
+    /// <param name="thoiDiemUtc">Thời điểm xác nhận (UTC) — do chỗ gọi truyền vào (hàm **tất định**).</param>
+    /// <param name="ghiChu">Vì sao chấp nhận lệch — **bắt buộc**.</param>
+    /// <exception cref="Volo.Abp.BusinessException">`Recon:0004` khi lượt không ở trạng thái chờ xác nhận;
+    /// `Recon:0005` khi thiếu ghi chú.</exception>
+    public void XacNhan(Guid nguoiXacNhanId, DateTime thoiDiemUtc, string ghiChu)
+    {
+        // 🔒 NO-OP TRƯỚC (idempotent) — lý do ở bất biến (3).
+        if (ConfirmedAtUtc is not null)
+        {
+            return;
+        }
+
+        if (KetLuan != KetLuanDoiSoat.VuotCanXacNhan)
+        {
+            throw new Volo.Abp.BusinessException(ReconErrorCodes.LuotKhongChoXacNhan)
+                .WithData("reconRunId", Id)
+                .WithData("ketLuan", KetLuan.ToString())
+                .WithData("lyDo", "Chỉ lượt có kết luận `VuotCanXacNhan` (đang chờ người xác nhận) mới xác nhận được.");
+        }
+
+        if (string.IsNullOrWhiteSpace(ghiChu))
+        {
+            throw new Volo.Abp.BusinessException(ReconErrorCodes.ThieuGhiChuXacNhan)
+                .WithData("reconRunId", Id)
+                .WithData("lyDo", "Xác nhận lệch tồn kho BẮT BUỘC có ghi chú (chênh lệch tài sản — cần audit).");
+        }
+
+        ConfirmedByUserId = nguoiXacNhanId;
+        ConfirmedAtUtc = thoiDiemUtc;
+        ConfirmNote = ghiChu.Trim();
     }
 }
 

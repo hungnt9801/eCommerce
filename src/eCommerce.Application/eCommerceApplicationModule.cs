@@ -65,6 +65,12 @@ namespace eCommerce;
         // **luôn chạy** (và chạy **ngay** sau restart nhờ `Timer.RunOnStart`).
         await context.AddBackgroundWorkerAsync<eCommerce.Application.Inventory.InventoryReconciliationWorker>();
 
+        // 🆕 `S7` — **JOB DỌN LỊCH SỬ ĐỐI SOÁT THEO RETENTION** (`REC-001` §17.8 #1 — nợ *"bảng chỉ tăng"*).
+        // 📌 Không có dòng này thì `ReconRuns`/`ReconRunMismatches` **chỉ tăng mãi** và **không có lỗi nào**:
+        // bảng phình làm truy vấn *"còn việc gì"* chậm dần, và không ai quy được cho bảng nào.
+        // 🔒 Đăng ký là **điều kiện** để `BackgroundWorkerCoCheTests` xanh (nó quét mã nguồn tìm dòng này).
+        await context.AddBackgroundWorkerAsync<eCommerce.Application.Inventory.ReconRetentionWorker>();
+
             // 🚨 `SAL-005` **D12** + `XC-002` — đối soát sàn + cảnh báo DLQ. 📌 **BẮT BUỘC đăng ký**:
             // thiếu dòng này thì worker **KHÔNG BAO GIỜ CHẠY** mà **không có lỗi nào** (đã trả giá thật ở
             // vòng 35 với `StockReservationExpiryWorker` — `inv-001` §27 **NN1**).

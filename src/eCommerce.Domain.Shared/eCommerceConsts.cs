@@ -159,6 +159,28 @@ public static class eCommerceConsts
         }
 
         /// <summary>
+        /// 🆕 `S7` — **XÁC NHẬN LỆCH ĐỐI SOÁT TỒN KHO** (`REC-001` · quyết định chủ dự án `Q5` = **A**, 17/10/2026).
+        ///
+        /// 🔒 **VÌ SAO PHẢI LÀ QUYỀN RIÊNG (không mượn `Inventory.Default` hay `.Manage`):** *xác nhận lệch*
+        /// = **đóng một cảnh báo về chênh lệch tài sản** và ghi tên người chịu trách nhiệm. 📌 Người trực kho
+        /// **phát hiện** lệch (`Inventory.Default`, đủ để xem + đánh dấu từng dòng) **không đương nhiên** được
+        /// **đóng cảnh báo của cả lượt** — việc đó làm cảnh báo **biến mất** khỏi danh sách cần xem, tức là
+        /// **xoá tín hiệu** mà cả feature sinh ra để tạo. Cùng nguyên tắc đặc quyền tối thiểu với
+        /// `MarketplaceIntake.Reprocess` (`S6`) và `Customers.ManageGroups` (`S3`).
+        ///
+        /// 🚨 **BẮT BUỘC khai ở CẢ HAI NƠI** (hằng số này **và** `eCommercePermissionDefinitionProvider`):
+        /// thiếu ở provider ⇒ ABP coi là **luôn bị từ chối** ⇒ `403` cho **MỌI người, kể cả admin**
+        /// (`XC-004` D2/E3). 🛡️ Lưới an toàn: `BatBienPhanQuyenTests.TC02`/`TC02b` (**hai chiều**).
+        /// ⚠️ Và: thêm permission vào provider **KHÔNG** tự cấp cho role `admin` — phải chạy `DbMigrator`
+        /// (bài học đo được ở `S6`: `AbpPermissionGrants` **58 → 61**), nếu không thì `403` **dù mã đúng**.
+        /// </summary>
+        public static class Reconciliation
+        {
+            /// <summary>Xác nhận một lượt đang chờ xác nhận (`VuotCanXacNhan`) ⇒ đóng cảnh báo + audit.</summary>
+            public const string Confirm = GroupName + ".Reconciliation.Confirm";
+        }
+
+        /// <summary>
         /// 🚨 **`CUS-001` — HỒ SƠ KHÁCH HÀNG.**
         ///
         /// 📌 **VÌ SAO TÁCH `View` VÀ `Manage` (không gộp một quyền):** hồ sơ khách là **dữ liệu CÁ NHÂN**

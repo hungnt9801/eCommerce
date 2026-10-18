@@ -1473,3 +1473,102 @@ về dữ liệu.
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.4 | 16/10/2026 | *(agent, session GĐ1)* | **§18 — LÁT CẮT 3: UI ĐỐI SOÁT (`/DoiSoat`)** (đóng nợ §17.8 #2): `DoiSoatController` (**3 route**) · `Views/DoiSoat/Index.cshtml` (**bảng lượt, tô đậm dòng còn việc**) · `Views/DoiSoat/ChiTiet.cshtml` (**form xử lý có token**) · **mục menu `/DoiSoat`** (thêm **sau khi** trang tồn tại) · **+1 ca menu guard vẫn xanh** · **22/22 ca probe HTML thật**. 🚨 **PHÁT HIỆN**: `AbpExceptionFilter` biến `BusinessException` thành **`500` + "An internal error occurred…"** ⇒ người dùng không biết thiếu gì; đã **bắt `BusinessException` ở controller** và **hiện mã + thông điệp** — kèm phân biệt rõ với *"nuốt guard"*. Ghi **§18.3** (hai mặc định **ngược nhau** của hai trang) · **§18.6** (bộ đo lại sai: giả định `t` vs `true`) · **§18.7** (nợ: retention · **chưa phân trang chi tiết** · chưa có xử lý hàng loạt · chưa Việt hoá `KetLuan`) |
+
+---
+
+## 19. ✅ **`S7` — XÁC NHẬN LỆCH (`Q5` = A), PHÂN TRANG, VÀ RETENTION** (18/10/2026)
+
+> **Phạm vi nói rõ:** lát cắt này đóng **ba** nợ của tài liệu: **§0/Q5** (xác nhận lệch — *"chỉ thiếu đường đóng"*),
+> **§18.7 #1** (retention — *"bảng chỉ tăng"*) và **§18.7 #2** (chưa phân trang ở trang chi tiết).
+> 🚫 **CHƯA** làm: metric cho đường xử lý lệch (§17.8 #4) · endpoint tổng hợp *"số lần lệch theo cặp"* (§17.8 #6) ·
+> xử lý hàng loạt (§18.7 #4) · Việt hoá `KetLuan` (§18.7 #5).
+
+### 19.1 Vấn đề thật (đo được trước khi sửa)
+
+| # | Hiện trạng đo được | Hệ quả |
+|---|---|---|
+| 1 | `grep -i "xacnhan\|confirm"` trong `Recon*` = **0** | `RequireConfirmation` ghi được `KetLuan = 2` nhưng **không có đường đóng** ⇒ lượt quét nằm ở trạng thái `2` **vĩnh viễn**, cảnh báo **tồn đọng** |
+| 2 | `ReconRunMismatches` **chỉ tăng**; không có chính sách dọn | Job quét **15 phút/lần** ⇒ ~35 000 lượt/năm; bảng phình ⇒ truy vấn *"còn việc gì"* chậm dần, **không ai quy được cho bảng nào** |
+| 3 | `Views/DoiSoat/ChiTiet.cshtml` gọi API với `MaxResultCount = 200` (trần) | Lượt có **> 200** dòng lệch bị **cắt bớt mà không nói** — 📌 đúng loại "tải hết rồi im lặng" |
+
+### 19.2 Đã làm gì
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| **1** | `ReconRun` + **3 cột** | `ConfirmedByUserId` (`uuid?`) · `ConfirmedAtUtc` (`timestamptz?`) · `ConfirmNote` (`varchar(1024)?`) + `XacNhan(nguoiDungId, thoiDiemUtc, ghiChu)` + **`ChoXacNhan`** (cờ suy ra) |
+| **2** | **`CHECK` ở DB** | `CK_ReconRuns_XacNhan_DuBo`: *hoặc cả ba trường có, hoặc cả ba `NULL`* ⇒ **không thể "xác nhận một nửa"** (bằng chứng vô chủ) |
+| **3** | **Quyền mới** | `eCommerce.Reconciliation.Confirm` — khai **HAI NƠI** (`eCommerceConsts.Permissions.Reconciliation` + `eCommercePermissionDefinitionProvider`) |
+| **4** | **Endpoint** | `IDoiSoatAppService.PostXacNhanLuotAsync` (`[Authorize(Reconciliation.Confirm)]`) — **ai** xác nhận lấy từ `CurrentUser.Id`, **KHÔNG** từ input |
+| **5** | **Retention** | setting **`Recon.Retention.Days`** (mặc định **180**, `0` = TẮT) · luật **THUẦN** `DoiSoatRetention.DuocDonDep` · `DoiSoatRetentionService.DonDepAsync` (**dùng chung** cho job và nút bấm) · **job `ReconRetentionWorker`** (6 giờ/lượt, `Timer.RunOnStart`) · **đường bấm tay** `PostDonDepAsync` với **XEM TRƯỚC mặc định** |
+| **6** | **Phân trang** | `ChiTiet` phân trang **50 dòng/trang**; `TotalCount` là **tổng thật** ⇒ view in *"trang x/y"* |
+| **7** | **Lọc + phân trang hạn mức** | (thuộc `INV-003` §20) — cùng lát cắt vì cùng màn hình vận hành |
+
+🔒 **Ba bất biến của `XacNhan` (mỗi điều chặn một kiểu lạm dụng):**
+1. **Chỉ lượt `VuotCanXacNhan`** mới xác nhận được (`Recon:0004`) — xác nhận lượt `Warn`/`KhongVuot` là **đóng một cảnh báo không tồn tại**;
+2. **Ghi chú BẮT BUỘC** (`Recon:0005`) — 📌 *chênh lệch tài sản*, không có lý do thì 6 tháng sau không ai phân biệt *"đã kiểm kê"* với *"bấm nút cho hết danh sách"*;
+3. **No-op khi đã xác nhận**, và **kiểm no-op TRƯỚC** khi kiểm tham số — 📌 đúng thứ tự đã trả giá ở `ReconRunMismatch.DanhDauDaXuLy` (retry không mang ghi chú **không** được ném).
+
+### 19.3 Luật retention — ranh giới được vẽ **rất hẹp** (đây là chứng từ, không phải log)
+
+| Đối tượng | Có bị dọn không | Vì sao |
+|---|---|---|
+| **`ReconRuns`** (lượt quét) | 🔒 **KHÔNG BAO GIỜ** | Đó là **bản tổng hợp** trả lời *"job có chạy"* và *"lượt đó chấm theo ngưỡng nào"*. Xoá nó là **xoá câu trả lời** cho câu hỏi duy nhất mà bảng sinh ra để trả lời |
+| Dòng lệch **CHƯA xử lý** | 🔒 **KHÔNG** | **Việc còn nợ**. Dọn nó = **dọn mất việc** (màn hình *"sạch"* trong khi lệch **vẫn còn**) |
+| Dòng lệch của lượt **ĐANG CHỜ XÁC NHẬN** | 🔒 **KHÔNG** | Cảnh báo chưa được người có quyền đóng ⇒ xoá bằng chứng là **đóng cảnh báo bằng cách im lặng** |
+| Dòng lệch **mới hơn mốc** | **KHÔNG** | Chưa tới hạn |
+| Dòng lệch **đã xử lý + cũ hơn mốc** | ✅ **XOÁ CỨNG** | Đúng đối tượng của retention |
+
+📌 **`0` là TẮT, không phải "giữ 0 ngày":** `DoiSoatRetention.TinhMocUtc` **NÉM** `Recon:0006` khi `soNgay <= 0`
+hoặc `> 36500`. 🔑 Lý do: *"giữ 0 ngày"* đọc theo nghĩa đen là **xoá sạch bằng chứng đối soát** — và **không có
+triệu chứng nào** ngoài việc lịch sử biến mất.
+
+### 19.4 🚨 BA LỖI THẬT — **chỉ lộ ra khi đo trên HTML/DB thật** (không unit test nào thấy)
+
+| # | Lỗi | Vì sao nó im lặng | Sửa |
+|---|---|---|---|
+| **1** | 🚨 **Xoá MỀM thay vì xoá CỨNG** — `ReconRunMismatch` là `FullAuditedEntity` (có `ISoftDelete`) ⇒ `DeleteManyAsync` chỉ **đặt `IsDeleted`** và **dòng vẫn nằm trong bảng** | 📌 Retention *"trông chạy"* (màn hình sạch, API không trả dòng đó) nhưng **bảng vẫn phình mãi** = **đúng cái nợ** mà feature sinh ra để đóng. 🔑 Và nó **ngược** với kỳ vọng của người đọc SQL trực tiếp | `HardDeleteAsync` trong vòng lặp + **một** `SaveChangesAsync` (⚠️ ABP **không** có `HardDeleteManyAsync` — đo được: `CS1061`) |
+| **2** | 🚨 **`[Required]` trên DTO chặn TRƯỚC guard của domain** ⇒ người dùng nhận thông điệp **tiếng Anh của framework** (*"The GhiChu field is required."*) thay vì mã `Recon:0005` | 📌 Đúng lỗi `rec-001` §18.4 mà màn hình này được làm để chống — và nó **tái xuất** ở dạng khác (validation thay vì `500`) | Bỏ attribute khỏi DTO ⇒ **domain là nơi DUY NHẤT** quyết định (cùng khuôn `XuLyLechInput`); giữ `[StringLength]` để chuỗi quá dài không thành `500` |
+| **3** | 🚨 **`[Range(1, 36500)]` trên `SoNgay`** ⇒ `POST soNgay=0` trả **validation error** và **không bao giờ** tới `Recon:0006` | 📌 Mã lỗi **đã ghi trong tài liệu** không phải mã **thực tế** trả ra ⇒ tài liệu và sản phẩm lệch nhau **mà cổng vẫn xanh** | Bỏ `[Range]`, thêm **trần trong domain** (`> 36500` ⇒ `0006`) |
+
+➕ **Hai lỗi nữa của CHÍNH BỘ ĐO** (cùng họ, đáng ghi vì đã lặp lại nhiều lần trong dự án):
+- **Neo HTML giả định sai định dạng số:** tôi viết neo `<td class="text-end">7</td>`, nhưng cột `GiaTri` khai
+  `HasPrecision(18,4)` ⇒ Razor in **`7.0000`** ⇒ **3 ca ĐỎ GIẢ** (`S7-H5/H7/H8`). 🚨 Nguy hiểm hơn ca đỏ thường:
+  các ca **chiều ngược** (`-notmatch`) **XANH vì lý do sai** (giá trị 13 cũng in `13.0000`).
+  ✅ Sửa bằng neo chịu được phần thập phân: `text-end">\s*7(?:\.0+)?\s*</td>`.
+- **Gộp nhóm trong báo cáo:** bản đầu tính `soChoXacNhan = dòng đã xử lý − đủ điều kiện` ⇒ **mọi** dòng *"mới hơn
+  mốc"* bị báo là *"giữ lại vì chờ xác nhận"*. 📌 Người vận hành sẽ đi **xác nhận những lượt không tồn tại**.
+  ✅ Nay tách **ba** con số (`SoDongGiuLaiChuaXuLy` · `SoDongGiuLaiChoXacNhan` · `SoDongGiuLaiMoiHonMoc`).
+
+### 19.5 ✅ Kiểm chứng
+
+**Unit + integration (bước ③/④ của cổng):**
+
+| Tệp | Số ca | Bất biến được khoá |
+|---|---|---|
+| `test/eCommerce.Tests/Inventory/ReconRunXacNhanTests.cs` | **10** | ghi đủ 3 trường · **không đụng số đo** · no-op khi đã xác nhận · **kiểm no-op TRƯỚC** · thiếu ghi chú ⇒ `0005` + **không ghi gì** · lượt `Warn`/`KhongVuot` ⇒ `0004` |
+| `test/eCommerce.Tests/Inventory/DoiSoatRetentionTests.cs` | **13** | mốc cắt · `0`/âm ⇒ `0006` · **chưa xử lý ⇒ giữ** · **chờ xác nhận ⇒ giữ** · **mới hơn mốc ⇒ giữ** · đúng mốc ⇒ giữ (`<`, không `<=`) · hằng số trá hình (30 vs 180 ngày) · đọc setting |
+| `test/eCommerce.IntegrationTests/ReconRunXacNhanRangBuocDbTests.cs` | **4** | `CK_ReconRuns_XacNhan_DuBo` **hai chiều**: xác nhận **đủ** ⇒ ghi được · thiếu **người** ⇒ `23514` + **không có dòng** · thiếu **ghi chú** ⇒ `23514` · lượt **chưa xác nhận** (3 trường `NULL`) ⇒ hợp lệ |
+
+**E2E trên HTML thật + DB thật (`tools/kiem-e2e.ps1`, mục `S7`) — 23 ca:**
+
+| Nhóm | Ca | Đo được |
+|---|---|---|
+| `/HanMucKenh` | `S7-H1…H8` | nhãn *"trần an toàn … theo từng kho"* render · ô lọc `kho` · ô chọn `warehouseId` · `Tổng **2** dòng` · **lọc kho hiện đúng dòng và ẩn dòng kia** · `kho=ca-kenh` hiện dòng **không gắn kho** · **hai bộ lọc cùng tồn tại** |
+| `/DoiSoat` + xác nhận | `S7-D1…D11` | 200 · khối retention · badge **chờ xác nhận** · form `ghiChu` + **nói rõ KHÔNG sửa tồn kho** · token · 🚨 thiếu ghi chú ⇒ **`0005` hiện trên trang** + **DB không đổi** · xác nhận đủ ⇒ **DB ghi `admin` + ghi chú** · sau đó **không còn form** |
+| Retention | `S7-R1…R9` | token · **XEM TRƯỚC không xoá dòng nào** (3 → 3) · **DỌN THẬT xoá đúng dòng cũ-đã-xử-lý** (1 → 0) · **giữ dòng chưa xử lý** · **giữ dòng mới** · **`ReconRuns` còn nguyên** · 🚨 `soNgay=0` ⇒ **`0006` hiện trên trang** + **không xoá thêm** |
+
+### 19.6 ⏳ NỢ (KHÔNG phải tính năng đã có)
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+| **1** | **Chưa có metric cho retention** | Chỉ có log `[REC-RETENTION-XONG]`. 📌 Muốn biểu đồ *"dòng đã dọn theo thời gian"* thì phải thêm metric vào bảng đăng ký (12 metric) — **cố ý** không làm trong lượt này để không mở rộng phạm vi |
+| **2** | **Retention nạp ứng viên vào bộ nhớ** | Đánh đổi **có chủ ý** (xem `DoiSoatRetentionService`): một luật, test được, không hai nguồn sự thật. ⚠️ Nếu dữ liệu lớn tới mức phải `DELETE … WHERE` thì **phải** kèm test đối chiếu hai bản |
+| **3** | **Chưa có "xử lý hàng loạt"** | Vẫn như §18.7 #4 (📌 giữ **lý do bắt buộc**) |
+| **4** | **`ConfirmedByUserId` hiện GUID trên UI** | 📌 Trung thực nhưng **khó đọc**; cần tra tên người dùng (cùng họ với §18.7 #3) |
+| **5** | **Metric đường xử lý lệch + `KetLuan` tiếng Việt** | Vẫn như §17.8 #4, §18.7 #5 |
+
+### 19.7 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.5 | 18/10/2026 | *(agent, session `S7`)* | **§19 — `S7`: XÁC NHẬN LỆCH (`Q5` = A) + PHÂN TRANG + RETENTION**: **3 cột** `ConfirmedByUserId`/`ConfirmedAtUtc`/`ConfirmNote` + `ReconRun.XacNhan` + **`CHECK` `CK_ReconRuns_XacNhan_DuBo`** · **quyền `eCommerce.Reconciliation.Confirm`** (hai nơi) · endpoint `PostXacNhanLuotAsync` (**ai** lấy từ principal) · **setting `Recon.Retention.Days`** (180, `0` = TẮT) + luật **THUẦN** `DoiSoatRetention` + `DoiSoatRetentionService` (**dùng chung** job & nút bấm) + job **`ReconRetentionWorker`** + đường bấm tay có **XEM TRƯỚC** · **phân trang** trang chi tiết (50 dòng, `TotalCount` thật) · **+27 unit test** (1367 → 1395) · **+4 integration** (67 → 71) · **+23 ca E2E** (67 → 95, **95/95**). 🚨 **BA LỖI THẬT** chỉ lộ khi đo HTML/DB: (①) **xoá MỀM** thay vì cứng ⇒ retention **không** làm bảng nhỏ đi (`ISoftDelete` của `FullAuditedEntity`); (②) **`[Required]` trên DTO** chặn trước domain ⇒ người dùng thấy thông điệp **tiếng Anh** thay vì `0005` — 📌 đúng lỗi §18.4 tái xuất ở dạng khác; (③) **`[Range]` trên `SoNgay`** làm `0` **không bao giờ** trả `0006` ⇒ tài liệu và sản phẩm **lệch nhau mà cổng vẫn xanh**. ➕ **hai lỗi của chính BỘ ĐO**: neo HTML giả định `7` trong khi DB in `7.0000` (**3 ca ĐỎ GIẢ**, và các ca chiều ngược **XANH vì lý do sai**) · **gộp nhóm** *"mới hơn mốc"* vào *"chờ xác nhận"* ⇒ báo cáo **nói sai lý do giữ lại**. Ghi **§19.6** (nợ: metric retention · nạp ứng viên vào bộ nhớ · xử lý hàng loạt · GUID trên UI) |

@@ -3904,6 +3904,16 @@ namespace eCommerce.Migrations
                         .HasColumnType("character varying(40)")
                         .HasColumnName("ConcurrencyStamp");
 
+                    b.Property<string>("ConfirmNote")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
+
+                    b.Property<DateTime?>("ConfirmedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ConfirmedByUserId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreationTime")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("CreationTime");
@@ -3986,6 +3996,8 @@ namespace eCommerce.Migrations
                             t.HasCheckConstraint("CK_ReconRuns_SoCapDaDo_KhongAm", "\"SoCapDaDo\" >= 0");
 
                             t.HasCheckConstraint("CK_ReconRuns_SoLechVuot_KhongVuotTong", "\"SoLechVuotNguong\" >= 0 AND \"SoLech\" >= 0 AND \"SoLechVuotNguong\" <= \"SoLech\"");
+
+                            t.HasCheckConstraint("CK_ReconRuns_XacNhan_DuBo", "(\"ConfirmedAtUtc\" IS NULL) = (\"ConfirmedByUserId\" IS NULL) AND (\"ConfirmedAtUtc\" IS NULL OR \"ConfirmNote\" IS NOT NULL)");
                         });
                 });
 
@@ -4072,6 +4084,9 @@ namespace eCommerce.Migrations
                     b.HasIndex("TenantId", "ReconRunId")
                         .HasDatabaseName("IX_ReconRunMismatches_TenantId_Run_ChuaXuLy")
                         .HasFilter("NOT \"DaXuLy\"");
+
+                    b.HasIndex("TenantId", "DaXuLy", "CreationTime")
+                        .HasDatabaseName("IX_ReconRunMismatches_TenantId_DaXuLy_CreationTime");
 
                     b.HasIndex("TenantId", "ReconRunId", "WarehouseId", "Sku")
                         .IsUnique()

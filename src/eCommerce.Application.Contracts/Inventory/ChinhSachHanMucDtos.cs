@@ -44,6 +44,18 @@ public class ChinhSachHanMucDto
 
     /// <summary>Ghi chú **giới hạn đã biết** để màn hình admin không hứa quá (nợ đang mở của `INV-003`).</summary>
     public List<string> GhiChu { get; set; } = [];
+
+    /// <summary>
+    /// 🆕 `S7` — **SỐ NGÀY LƯU TRỮ dòng lệch đã xử lý** (`Recon.Retention.Days`, `REC-001` §17.8 #1).
+    /// 🔒 **`0` = TẮT** (giữ tất cả). 📌 Hiện ở **cùng** màn hình với các chính sách khác vì đây là
+    /// *"chính sách cho phép chọn"* — và vì tách màn hình thì người vận hành **không biết** lịch sử đang
+    /// bị dọn theo mức nào.
+    /// </summary>
+    public int LuuTruDoiSoatSoNgay { get; set; }
+
+    /// <summary>`false` = giá trị setting **không hợp lệ** ⇒ hệ thống đang dùng **mặc định an toàn**
+    /// (xem `SettingKhongHopLe`).</summary>
+    public bool LuuTruDoiSoatHopLe { get; set; }
 }
 
 /// <summary>Đổi chính sách (`Inv.ChannelLimit.*` / `Recon.*`) — ghi qua `ISettingManager` (tự xoá cache 2 tầng).</summary>
@@ -76,6 +88,14 @@ public class DoiChinhSachInput
     /// <summary>`Warn` | `RequireConfirmation`.</summary>
     [StringLength(32)]
     public string? NguongDoiSoatHanhDong { get; set; }
+
+    /// <summary>
+    /// 🆕 `S7` — số ngày lưu trữ dòng lệch **đã xử lý** (`Recon.Retention.Days`).
+    /// 🔒 Gửi `0` = **TẮT** retention (hợp lệ, có chủ ý). ⚠️ Còn **đường DỌN** nhận `0` thì **NÉM** —
+    /// hai ngữ nghĩa khác nhau: `0` ở *cấu hình* là *"không dọn"*, `0` ở *lệnh dọn* là *"xoá hết"* (vô nghĩa).
+    /// </summary>
+    [Range(0, 36_500)]
+    public int? LuuTruDoiSoatSoNgay { get; set; }
 }
 
 /// <summary>Một dòng hạn mức phân bổ của kênh (`InvChannelLimits`).</summary>
@@ -156,6 +176,53 @@ public class KenhKhaDungDto
     public int SoDongHanMuc { get; set; }
 }
 
+/// <summary>
+/// 🆕 `S7` — **MỘT KHO CÓ THẬT** trong danh mục — cho ô chọn *"kho"* ở màn hình hạn mức.
+/// 📌 Trước lượt này màn hình **không chọn được kho** ⇒ hạn mức theo kho chỉ đặt được bằng API/SQL, và
+/// người vận hành **không thấy được** dòng nào đang áp cho kho nào (nợ đã ghi ở `INV-003` §18.7 + bàn giao §7 việc 6).
+/// </summary>
+public class KhoKhaDungDto
+{
+    public Guid Id { get; set; }
+    public string Code { get; set; } = default!;
+    public string Name { get; set; } = default!;
+
+    /// <summary>Kho **ngừng dùng** — vẫn cho chọn (dòng hạn mức cũ còn đó) nhưng UI phải **nói rõ**.</summary>
+    public bool IsActive { get; set; }
+
+    /// <summary>Số dòng hạn mức đang gắn với kho này (để UI gợi ý *"kho chưa cấu hình"*).</summary>
+    public int SoDongHanMuc { get; set; }
+}
+
+/// <summary>
+/// 🆕 `S7` — **BỘ LỌC + PHÂN TRANG danh sách hạn mức** (`INV-003`).
+///
+/// 🔒 **HAI LÝ DO PHẢI CÓ (đều là nợ đã ghi, không phải "cho đẹp"):**
+/// <list type="number">
+///   <item><b>Lọc theo KHO</b> — bàn giao §7 việc 6: *"`/HanMucKenh` chọn kho"*. Trước lượt này màn hình
+///     chỉ lọc theo **kênh** ⇒ muốn biết *"kho Hà Nội đang bị siết bao nhiêu"* phải đọc cả bảng;</item>
+///   <item><b>Phân trang</b> — bảng hạn mức dài theo **số kênh × số kho**. 📌 Không phân trang thì màn hình
+///     **tải hết** rồi người dùng cuộn — và đó là cách một bảng cấu hình trở nên **không ai dùng**.</item>
+/// </list>
+/// </summary>
+public class LocHanMucKenhInput
+{
+    /// <summary>Mã kênh (`null` = mọi kênh) — chuẩn hoá **cùng hàm** với lúc ghi (`InvChannelLimit.ChuẩnHoáKenh`).</summary>
+    public string? ChannelCode { get; set; }
+
+    /// <summary>
+    /// `null` = **mọi kho** · `Guid.Empty` = **chỉ dòng "cả kênh"** (`WarehouseId IS NULL`) ·
+    /// một `Guid` cụ thể = **chỉ dòng của kho đó**.
+    /// 📌 `Guid.Empty` là một lựa chọn **thật** cần diễn đạt được: *"những hạn mức không gắn kho"*.
+    /// </summary>
+    public Guid? WarehouseId { get; set; }
+
+    public int SkipCount { get; set; }
+
+    /// <summary>Số dòng một trang (mặc định 20; app service **chặn trần**).</summary>
+    public int MaxResultCount { get; set; } = 20;
+}
+
 /// <summary>Đọc/ghi chính sách + hạn mức phân bổ theo kênh (`INV-003` · `REC-001`).</summary>
 public interface IChinhSachHanMucAppService : IApplicationService
 {
@@ -165,11 +232,18 @@ public interface IChinhSachHanMucAppService : IApplicationService
     /// <summary>Đổi chính sách. 🔒 Ghi qua `ISettingManager` ⇒ **cache tự xoá** (không cần sửa DB + xoá cache tay).</summary>
     Task<ChinhSachHanMucDto> DoiChinhSachAsync(DoiChinhSachInput input);
 
-    /// <summary>Danh sách hạn mức (lọc theo kênh nếu truyền).</summary>
+    /// <summary>Danh sách hạn mức (lọc theo kênh nếu truyền). 📌 Giữ nguyên chữ ký cũ cho tương thích;
+    /// màn hình dùng bản **có phân trang** bên dưới.</summary>
     Task<List<HanMucKenhDto>> GetDanhSachAsync(string? channelCode = null);
+
+    /// <summary>🆕 `S7` — danh sách hạn mức **lọc theo kênh + kho** và **phân trang** (trả `TotalCount` thật).</summary>
+    Task<Volo.Abp.Application.Dtos.PagedResultDto<HanMucKenhDto>> GetDanhSachPhanTrangAsync(LocHanMucKenhInput input);
 
     /// <summary>Danh mục kênh **có thật** + số dòng hạn mức đã cấu hình.</summary>
     Task<List<KenhKhaDungDto>> GetKenhKhaDungAsync();
+
+    /// <summary>🆕 `S7` — danh mục **kho** có thật (cho ô chọn kho) + số dòng hạn mức mỗi kho.</summary>
+    Task<List<KhoKhaDungDto>> GetKhoKhaDungAsync();
 
     /// <summary>
     /// Thêm **hoặc** cập nhật hạn mức cho `(kênh, kho)`.
