@@ -65,16 +65,18 @@ lệch **7.967** ⇒ suýt kết luận *"code phình 20 %"*. ✅ Dùng `Measure
 đúng quy ước dự án). 📌 Đây lại đúng bài học §1: *"một phép đo bất ngờ thường là phép đo SAI"*.
 ⚠️ **Số cũ (`324/38.460` · `95/15.115` · `47.191`) KHÔNG đối chiếu lại được** với phương pháp này — 🔑 đừng cộng trừ
 với chúng; chênh lệch **không** phải "code phình" mà là **hai phép đo khác nhau**.
-**Git:** nhánh `main` · **282 commit** · ✅ **cây SẠCH** (đã commit — xem `git rev-parse --short HEAD`) · **`origin` =
+**Git:** nhánh `main` · **282 commit** · ✅ **cây SẠCH** · **`origin` =
 `https://github.com/hungnt9801/eCommerce`** · ⚠️ repo đang **PUBLIC**.
-📌 **`refs/heads/main` trên remote = `551c7b0`** — 🚨 **ĐO LẠI 18/10/2026 (cuối `S5`) và con số CŨ ĐÃ TRÔI:**
-bản trước ghi `ab9a7ff` + *"`S1`/`S2`/`S3`/`S4` chưa push"*. Sự thật đo được: `origin/main` **đã chứa `S1`**
-(`ab3cfc7`) và **2 commit tài liệu** ⇒ **chỉ `S2`…`S5` chưa push**, cụ thể **5 commit**:
-`4a1095d` (tài liệu `S1`) · `e43bf76` (`S2`) · `6495835` (`S3`) · `d6d7eca` (`S4`) · `82bfb4d` (`S5`).
-⇒ **cần push trước khi mở `S9`** (CI). 🔑 Đây đúng bài học §1: *con số ghi trong tài liệu cũng TRÔI*, nên phép
-`git rev-list --count origin/main..HEAD` là **nguồn sự thật**, không phải dòng chữ này.
-📌 Con số commit **không tự khớp** với chính commit ghi nó (commit đó làm số tăng 1) — 🔑 nên mốc đúng là
-*"sau `S5`, 18/10/2026"*.
+✅ **ĐÃ PUSH 18/10/2026 (cuối `S5`):** `551c7b0..40defa3` ⇒ **`S1`…`S5` đều có trên remote**, **0 commit chưa push**.
+🔒 **NGUỒN SỰ THẬT LÀ LỆNH, KHÔNG PHẢI DÒNG CHỮ NÀY:**
+`git rev-parse --short origin/main` · `git rev-list --count origin/main..HEAD` (mong đợi **0**).
+📌 **Vì sao KHÔNG ghi hash chính xác:** commit **sửa chính dòng này** làm hash đổi ⇒ một con số hash ở đây
+**không bao giờ** tự khớp (`40defa3` là hash **trước** lần sửa này). 🔑 Đây là *"con số commit không tự khớp với
+chính commit ghi nó"* — bài học đã ghi ở bản `S4`, nay áp cho cả **hash**.
+🚨 **Một con số CŨ đã trôi và đã sửa:** bản trước ghi *"remote `main` = `ab9a7ff`, `S1`/`S2`/`S3`/`S4` chưa push"*.
+Đo lại (18/10/2026) thì `origin/main` là **`551c7b0`** và **đã chứa `S1`** (`ab3cfc7`) + 2 commit tài liệu ⇒ lúc đó
+**chỉ `S2`…`S5` chưa push** (**5** commit: `4a1095d` · `e43bf76` · `6495835` · `d6d7eca` · `82bfb4d`).
+⇒ **`S9` (CI) KHÔNG còn bị chặn bởi push.**
 
 🚨 **Các con số ĐÃ TRÔI — dùng số ở trên, đừng dùng số cũ:**
 | Số cũ (handover / `S2` / `S3` / `S4`) | Số đo 18/10/2026 (cuối `S5`) | Vì sao |
