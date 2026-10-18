@@ -58,7 +58,14 @@ NND **52** / bất biến DB **24/24** / **85** chỗ quét ⇒ **mọi số kh�
 • **CUỐI phiên** (**12 bước**, bước ⑫ có **49 ca** — thêm cổng hạ cờ): **290.8s**.
 • 🆕 **`S7` đo HAI lần**: **ĐẦU phiên** (**12 bước**, `exit 0`): **301.5s** với unit **1367** / integration **67** /
 NND **53** / DB **25/25** / **61** quyền / E2E **67/67** ⇒ **mọi số khớp bảng `S6`** ở trên (⚠️ riêng **thời gian
-cao hơn ~11 %** — máy, không phải sản phẩm). **CUỐI phiên**: **241.8s** như bảng trên.
+cao hơn ~11 %** — máy, không phải sản phẩm). **CUỐI phiên**: **241.8s** như bảng trên, và **lần chạy lại trên
+cây ĐÃ COMMIT: 250.4s · `exit 0`** — 📌 **cùng số ca** (1395 · 71 · **95/95** · 25/25 · NND 53 · 62 quyền),
+chỉ khác **thời gian** ⇒ dao động của **máy**.
+📌 **Và một lần cổng ĐỎ THẬT giữa phiên `S7`** (đáng ghi vì nó là *bài học của chính bước ⑥*): lần chạy thứ hai
+bị **huỷ giữa bước ⑪** ⇒ để lại **1 dòng `PayTransactions`** + **cờ `ShouldChangePasswordOnNextLogin = false`**
+⇒ lần chạy kế tiếp **ĐỎ ở bước ⑥** (2 bất biến: *"① phải rỗng"* và *"② bảo mật"*). ✅ Dọn tay rồi đo lại ⇒ **xanh**.
+🔑 Đây đúng lý do **bước ⑥ tồn tại**: *"quên kiểm DB"* là bước **dễ quên nhất**, và hậu quả của một lần **huỷ
+giữa đường** *không* tự biến mất.
 🔑 **Vì vậy bước ĐẦU TIÊN của mọi phiên là ĐO LẠI** (mục 6) — nếu số khác bảng trên thì **dừng, tìm hiểu trước khi sửa**.
 📌 **Cái ĐO ĐƯỢC phải khớp; cái KHÔNG khớp thời gian là máy** — nhưng ⚠️ **thời gian vẫn phải ghi**:
 `B5` lệch **46.5s** so với **5.1s** ở đầu phiên `S6` (cùng mã, cùng tài liệu) và **4.2s** ở cuối `S7` ⇒
