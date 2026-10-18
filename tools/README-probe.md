@@ -712,3 +712,36 @@ cổng sai — nó đọc bản **copy cũ** trong `bin/`.
 
 ➕ **Điều này cũng đúng với `Assets/schema.sql`**: regenerate xong mà chạy `--no-build` thì integration test
 vẫn dùng **schema cũ** ⇒ kết quả vô nghĩa (có thể xanh **giả**).
+
+---
+
+## 🚨 BẪY MÔI TRƯỜNG — **chặn `capture` stdio của tiến trình con ⇒ CỔNG ĐỎ GIẢ** (18/10/2026)
+
+> 🚨 **Đây là bẫy ĐO, không phải lỗi SẢN PHẨM.** Nó làm `kiem-tat-ca.ps1` chết ở **bước ②** và trả `exit 1`
+> — nhìn **giống hệt** *"build hỏng"*. Toàn bộ **mã nguồn** có thể đúng 100% trong khi cổng báo đỏ.
+
+**Triệu chứng đo được:** chạy `pwsh -File tools\kiem-tat-ca.ps1 -DayDu` ⇒ dừng ở bước ② với
+`Program 'pwsh.exe' failed to run: StandardOutputEncoding is only supported when standard output is redirected`
+(cùng họ: `Access is denied` · `EPERM` khi `node` dùng `stdio: 'pipe'`). Log **không** có dòng lỗi biên dịch nào.
+
+**Đo để tách nguyên nhân — 4 cách ĐỀU hỏng, chỉ cách KHÔNG capture là chạy:**
+
+| Cách | Kết quả |
+|---|---|
+| `& dotnet --version` (**không** redirect) | ✅ chạy, `$LASTEXITCODE = 0` |
+| `& dotnet --version \| …` · `> file` · `*> file` · `2>&1` | 🚨 `StandardOutputEncoding …` ⇒ **lệnh KHÔNG chạy** |
+
+🔑 **Vì sao chí mạng:** hàm `ChayLenh` của `tools/kiem-tat-ca.ps1` (và của mọi công cụ trong `tools/`) dùng
+**`*>`** để *"không ống dẫn output của lệnh mà ta cần exit code"* — đúng quy tắc ① của chính bộ công cụ.
+Trong môi trường **chặn capture**, quy tắc đó **không thực hiện được** ⇒ cổng **không thể** chạy.
+
+✅ **Luật — trước khi kết luận về SẢN PHẨM:**
+1. Thấy `StandardOutputEncoding` / `Access is denied` ở bước ② ⇒ **KHÔNG** đọc là *"build hỏng"*;
+   đó là **môi trường chặn capture**. Kiểm bằng **một** lệnh: `& dotnet --version > $null` (hỏng ⇒ đúng bẫy).
+2. Chạy cổng ở môi trường **cho phép capture** (terminal thường / phiên có toàn quyền) rồi **mới** ghi số.
+3. 📌 **Đừng** "chữa" bằng cách bỏ `*>` trong công cụ — làm thế là **gỡ đúng cái chặn** mà quy tắc ① sinh ra
+   để chống (exit code bị `Select-String`/`Tee` che).
+
+✅ **Số đo THẬT khi chạy được** (đo lại `S1`, 18/10/2026 — **3 lần**: **159.5s · 157.4s · 161.6s**, cùng số ca):
+`exit 0` · build 40.2–45.7s · unit **1205** · integration **41** · mermaid **213/0** ·
+DB **21/21** (`NND thucTe=49 · tuTest=49` · quét **83** chỗ) · test cổng **20/20** hiển thị · E2E **59/59**.
