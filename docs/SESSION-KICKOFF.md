@@ -35,25 +35,26 @@ và phiên trước từng **nói quá "GĐ1 hoàn thành"** vì **không đo l�
 
 ```
 [B1] dọn tiến trình + cổng trống      2.0s
-[B2] build + KIỂM MỐC nhị phân       73.8s   · 68 tệp DLL/EXE đổi mốc
-[B3] unit test                        6.6s   · 1181/1181
-[B4] integration (PostgreSQL thật)    8.1s   ·   38/38
-[B5] mermaid (parser thật)           34.3s   ·  213 khối · 0 lỗi
-[B6] bất biến DB                      5.5s   ·   21/21 · NND = 48 · 53 quyền · quét 82 vị trí probe
-[B7] test cho chính các cổng         77.2s   ·   22 ca (A…F · R…V · L…P · G…K)
-[B8] E2E có phiên đăng nhập          21.3s   ·   59/59
+[B2] build + KIỂM MỐC nhị phân       55.0s   · 68 tệp DLL/EXE đổi mốc
+[B3] unit test                        3.3s   · 1205/1205
+[B4] integration (PostgreSQL thật)    7.2s   ·   41/41
+[B5] mermaid (parser thật)           32.4s   ·  213 khối · 0 lỗi
+[B6] bất biến DB                      5.4s   ·   21/21 · NND = 49 · 53 quyền · quét 83 vị trí probe
+[B7] test cho chính các cổng         74.9s   ·   22 ca (A…F · R…V · L…P · G…K)
+[B8] E2E có phiên đăng nhập          19.1s   ·   59/59
      ─────────────────────────────────────
-     TỔNG                            228.9s
+     TỔNG                            198.7s
 ```
 
-**Code:** 292 tệp · ~39.800 dòng (chưa tính test) · 89 tệp test · ~17.900 dòng · **36 migration**.
+**Code:** 295 tệp · ~40.350 dòng (chưa tính test) · 94 tệp test · ~18.340 dòng · **37 migration** (đo lại cuối `S1`, 18/10/2026).
 **Git:** nhánh `main` · **273 commit** · **cây sạch** · **`origin` = `https://github.com/hungnt9801/eCommerce`** (đã push, `refs/heads/main` = `ab9a7ff`) · ⚠️ repo đang **PUBLIC**.
 
 🚨 **Ba con số ĐÃ TRÔI so với bàn giao — dùng số ở trên, đừng dùng số cũ:**
 | Số cũ (handover) | Số đo 17/10/2026 | Vì sao |
 |---|---|---|
-| ~145–155s | **228.9s** | cổng ⑦ thêm 5 ca `R…V` (link) · ⑤ mermaid 213 khối |
+| ~145–155s | **198.7s** | cổng ⑦ thêm 5 ca `R…V` (link) · ⑤ mermaid 213 khối · 📌 đổi theo máy/nhiệt độ, **không** phải chỉ tiêu |
 | 17 ca test cổng | **22 ca** | +5 ca cho cổng tham chiếu tài liệu |
+| 1181 unit / 38 integration / NND 48 | **1205 / 41 / 49** | `S1` thêm 24 unit + 3 integration + 1 unique index |
 | 197 khối mermaid | **213 khối** | +16 từ 3 tài liệu mới (`ADDR-004`, `PAY-001`, `XC-007`) |
 
 🔑 **Vì vậy bước ĐẦU TIÊN của mọi phiên là ĐO LẠI** (mục 6) — nếu số khác bảng trên thì **dừng, tìm hiểu trước khi sửa**.
@@ -141,7 +142,7 @@ pwsh -File tools\kiem-link-tai-lieu.ps1       # 0 tham chiếu chết (thoát 1 
 
 | Phiên | Việc |
 |---|---|
-| `S1` | `ADDR-004` phần A — entity `Address` + migration (48→49) |
+| `S1` | ✅ **XONG 18/10/2026** — `ADDR-004` phần A: entity `Address` + migration (**48→49**) |
 | `S2` | `ADDR-004` phần B — `CustomerAddressLink` + API + quyền + PII (49→51) |
 | `S3` | `CUS-001` đóng — **nối `ChoPhepGiaoDichAsync`** (lỗi thật: khách `Blocked` vẫn đặt được) + `CustomerGroup` + phân trang |
 | `S4` | `PAY-001` A — đường **TẠO** giao dịch + cầu nối `Order.PaymentStatus` + ETO |

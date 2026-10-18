@@ -1027,3 +1027,56 @@ public class AddressBookTests : eCommerceTestBase<eCommerceEntityFrameworkCoreTe
 |---|---|---|---|
 | v0.1 | 17/10/2026 | agent (phiên 17/10/2026) | Bản nháp đầu — lập **từ code thật** + 6 tài liệu liên quan: **14 ADR** · **16 BR** · **11 NFR** · **28 ca test** (mã `TC-01`…`TC-24`, gồm `TC-02b/02c/04b/06b`) · **2 bảng dữ liệu**. 🔑 **Chốt mâu thuẫn trung tâm**: `Address` **thuộc `AddressHub`** (ADR-01), `Customers` giữ `CustomerAddressLink`; **loại bỏ** phương án `Address` ở `Customers` (`implementation-plan.md:181`) và phương án **value object `Address` ở `eCommerce.Kernel`** (`implementation-plan.md:164`, `addr-003` ADR-08). 🚨 **Mười sai lệch phát hiện được (F1–F10)**, trong đó **hai lỗi có thể gây 403/500 toàn hệ thống**: ① `cus-001` §9 liệt kê **9 permission không tồn tại** (F7) — gõ đúng theo tài liệu là **403 cho mọi người**; ② `AdministrativeUnitAppService` có `[Authorize]` nhưng **không** permission (F8) — mẫu sai dễ bị chép. ➕ **Ba điểm im lặng được chặn bằng DB**: ① `(TenantId, ContentHash)` duy nhất; ② **partial unique index** cho *"một mặc định"*; ③ **CHECK** *"đã chuẩn hoá ⇒ BẮT BUỘC có mã + `NormalizedAtUtc`"* — biến **fail-closed** thành **hàng rào DB** thay vì quy ước. ➕ **Số unique index 48 → 51** và chỉ rõ **4 chỗ** phải sửa trong `PostgreSqlSchemaTests` (§11, §15.3 #15-16). ⚠️ **Chưa kiểm chứng**: ① biên dịch type `Address` trong namespace `eCommerce.Address` (ADR-14, Q10); ② PostgreSQL kiểm unique index **ngay từng câu lệnh** khiến đặt-trước-đặt-sau thành `23505` (ADR-06, `TC-06b`); ③ mọi ngưỡng hiệu năng (NFR-01/02) — **chưa có code**. |
 | **v1.0** | **17/10/2026** | chủ dự án duyệt | 🟢 **APPROVED.** Chốt **10/10 câu hỏi mở** (§15.1): trần địa chỉ thành **cấu hình** · thêm **người nhận** vào bảng liên kết · Verify thuộc quản trị tenant · **xoá = xoá liên kết** (không xoá địa chỉ dùng chung) · chấp nhận **khử trùng theo nội dung** · snapshot địa chỉ là việc của **SAL-002** · CountryCode + mã nullable **ngay từ migration đầu** · **không** tách service trong GĐ1 · hàng đợi chuẩn hoá ở **Address.TrangThai** · **giữ** tên lớp Address (tiền lệ Commerce.Orders.Order). ✅ Tick **Definition of Ready** (§14.4). 📌 Việc còn lại: **6 dòng đồng bộ tài liệu** (§15.3 #9/#11/#12/#14–#16) → điều kiện của S1. |
+
+---
+
+## 16. 💻 Tiến độ triển khai — **`S1` XONG (18/10/2026)**
+
+> Phiên `S1` theo `docs/gd1-coding-sessions.md`. Phạm vi: **phần A** — entity `Address` + migration + `DbSet` + test.
+> ⏳ **Phần B** (`CustomerAddressLink`, API, `IAddressDirectory`, ETO, permission, PII) là việc của **`S2`** — **CHƯA làm**.
+
+### 16.1 Đã làm (có bằng chứng)
+
+| # | Hạng mục | Bằng chứng |
+|---|---|---|
+| 1 | Entity `Address` (`AddrAddresses`) + máy trạng thái 4 trạng thái | `modules/Address/eCommerce.Address.Domain/Address.cs` — mọi guard **NÉM** `BusinessException`, không im lặng |
+| 2 | Enum `TrangThaiDiaChi` / `NguonTaoDiaChi` | `.../AddressModels.cs` — lưu **số** khớp `CK_AddrAddresses_TrangThai` |
+| 3 | **Canonical hoá + băm `ContentHash`** (một nguồn duy nhất) | `.../DiaChiCanonical.cs` — `Normalize(FormC)` → gộp khoảng trắng → `ToLowerInvariant`; **KHÔNG** bỏ dấu; hex thường 64 ký tự |
+| 4 | Mã lỗi dải `01xx` | `.../AddressErrorCodes.cs` — `0101…0107` (không đụng `0001…0007` đã có nghĩa khác) |
+| 5 | Cấu hình EF: 7 `CHECK` + 3 index | `.../AddressDbContextModelCreatingExtensions.cs:63-…` |
+| 6 | 🚨 `DbSet<Address.Address> Addresses` | `src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs:179-183` |
+| 7 | Migration + **SQL thô** `NULLS NOT DISTINCT` | `Migrations/20261018023611_Addr004_SoDiaChi_Address.cs` |
+| 8 | **Đo DB thật:** index đúng như thiết kế | `pg_indexes` = `CREATE UNIQUE INDEX "IX_AddrAddresses_TenantId_ContentHash" … NULLS NOT DISTINCT WHERE (NOT "IsDeleted")` |
+| 9 | `schema.sql` regenerate | `test/eCommerce.IntegrationTests/Assets/schema.sql:2315-2319` |
+| 10 | Số unique index **48 → 49** | `PostgreSqlSchemaTests.cs:151` + test đổi tên `F1_du_49_index…`; ➕ 3 test hành vi mới cho khoá tự nhiên |
+| 11 | Khai báo **8 ràng buộc mới** cho cơ chế chống bỏ sót | `test/eCommerce.Tests/Data/RangBuocChuaAnhXa.txt` (kèm lý do từng cái) |
+| 12 | 24 unit test | `test/eCommerce.Tests/Address/AddressTests.cs` — canonical, fail-closed, **mọi nhánh guard** |
+
+**Số đo:** unit **1205/1205** (1181 + 24) · integration **41/41** (38 + 3) · `RangBuocDbChuaAnhXaTests` xanh.
+
+### 16.2 🚨 Phát hiện MỚI (đo được, không suy đoán) — `F11`: tên `Address` **va chạm** ở namespace kết thúc bằng `.Address`
+
+`Q10` đã chốt *"giữ tên `Address`"* dựa trên **tiền lệ** `eCommerce.Orders.Order`. Hôm nay đo được **giới hạn thật** của quyết định đó:
+
+| Ngữ cảnh | Kết quả |
+|---|---|
+| Trong `namespace eCommerce.Address` | ✅ `Address` phân giải đúng là **type** |
+| Trong `eCommerce.EntityFrameworkCore`, dùng `Address.Address` | ✅ biên dịch |
+| 🚨 Trong `namespace eCommerce.Tests.Address` (đuôi trùng tên) | 🔴 **`CS0118: 'Address' is a namespace but is used like a type`** |
+
+⇒ **Không phải đổi tên entity** (đã kiểm: 3 ngữ cảnh sản phẩm đều đúng), nhưng **luật mới**:
+🔒 **CẤM đặt namespace có đuôi `.Address`** ở project khác. Test đã đổi sang `eCommerce.Tests.DiaChi` + alias
+`using AddressEntity = eCommerce.Address.Address;`. 📌 Ghi lại để phiên sau **không** tái phát rồi tưởng entity sai.
+
+### 16.3 Hai điều chỉnh nhỏ so với đặc tả (có lý do)
+
+| # | Điểm | Đặc tả gốc | Đã làm | Vì sao |
+|---|---|---|---|---|
+| 1 | Huyện rỗng trong canonical | `(HuyenCode ?? "-")` | khoảng trắng **cũng** quy về `"-"` | Nếu không: cùng một địa chỉ đi qua hai đường (entity đã `Trim` vs nơi gọi truyền `"   "`) cho **hai hash** ⇒ khử trùng lặp hỏng âm thầm. 📌 Phòng thủ **hai lớp** (canonical + entity) |
+| 2 | `SchemaVersion` của địa chỉ THÔ | *bắt buộc 1\|2* | tạm ghi phiên bản **hiện hành (2)**, ghi đè khi `ChuanHoa` | Canonical của địa chỉ thô **không** chứa `SchemaVersion` (`"r|…"`) nên không ảnh hưởng hash; vẫn thoả `CHECK "SchemaVersion" in (1,2)` |
+
+### 16.4 ⏳ Còn lại cho `S2` (không nằm trong `S1`)
+
+`CustomerAddressLink` (`CusAddressLinks`) + **2 unique index** (⇒ **49 → 51**) · API app service · `IAddressDirectory` ·
+`AddressChangedEto` + outbox · permission `eCommerce.Addresses.*` khai **hai nơi** · bản xuất PII thêm *"giao tới đâu"* ·
+xoá mềm/ẩn danh (`IAddressUsageProbe`).

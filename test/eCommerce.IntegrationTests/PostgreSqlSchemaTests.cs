@@ -141,14 +141,17 @@ public class PostgreSqlSchemaTests
     }
 
     [Fact]
-    public async Task F1_du_48_index_deu_dung_NULLS_NOT_DISTINCT()
+    public async Task F1_du_49_index_deu_dung_NULLS_NOT_DISTINCT()
     {
         // 🔒 BẤT BIẾN (ghi ở XC-004 Q6): mọi unique index trên entity IMultiTenant PHẢI có
         // `NULLS NOT DISTINCT`. Ai tạo migration mới mà quên ⇒ test này đỏ.
         // 📌 40 → 42 (`Inv003_ChannelLimits_Rec001_ReconRuns`) → 43 (`Cat003_ProductSlug_Unique`)
         //    → **46** (16/10/2026, `Cus001_Customers_CustomerGroups`: 3 unique index — nhóm khách,
         //    một-tài-khoản-một-khách, khoá idempotency).
-        Assert.Equal(48L, await DemAsync(
+        //    → **49** (18/10/2026, `Addr004_SoDiaChi_Address`: `IX_AddrAddresses_TenantId_ContentHash`
+        //      — khoá tự nhiên "một NỘI DUNG ⇒ một bản ghi". 📌 `CustomerAddressLink` (2 index còn lại
+        //      của `ADDR-004`) là phần B — **chưa** làm, nên 49 chứ **chưa** phải 51).
+        Assert.Equal(49L, await DemAsync(
             "select count(*) from pg_indexes where schemaname = 'public' and indexdef like '%NULLS NOT DISTINCT%'"));
 
         // Kiểm tra ĐÍCH DANH để thông báo lỗi có ý nghĩa (tên index dài có thể bị PostgreSQL cắt ⇒ so theo tiền tố).
@@ -212,7 +215,13 @@ public class PostgreSqlSchemaTests
             //     (`ADR-05`) — thiếu mệnh đề ⇒ webhook gửi lại tạo khách thứ hai.
             "IX_CusGroups_TenantId_Code",
             "IX_CusCustomers_TenantId_IdentityUserId",
-            "IX_CusCustomers_TenantId_IdempotencyKey"
+            "IX_CusCustomers_TenantId_IdempotencyKey",
+            // 🚨 ADDR-004 (18/10/2026) — **KHOÁ TỰ NHIÊN của địa chỉ**: một NỘI DUNG ⇒ một bản ghi.
+            //    Đây là bất biến mà **tầng ứng dụng không đủ sức giữ**: hai request đồng thời cùng một
+            //    địa chỉ ⇒ cả hai INSERT đều "thấy chưa có" ⇒ hai bản ghi. Mất `NULLS NOT DISTINCT`
+            //    thì khi `TenantId = NULL` (tình trạng hiện nay — chạy 1 tenant) index MẤT TÁC DỤNG
+            //    hoàn toàn ⇒ trùng địa chỉ **im lặng**, và báo cáo "giao bao nhiêu điểm" đếm SAI.
+            "IX_AddrAddresses_TenantId_ContentHash"
         ];
 
         foreach (var ten in phaiCo)
@@ -225,6 +234,86 @@ public class PostgreSqlSchemaTests
     }
 
     // ── 2b. XC-002 — chống trùng ở BIÊN VÀO (hàng rào cuối) ────────────────
+
+    // ══════════════════════════════════════════════════════════════════════════════════════════
+    // ADDR-004 — KHOÁ TỰ NHIÊN của `Address`: một NỘI DUNG ⇒ một bản ghi (`ADR-04`)
+    // ══════════════════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Chèn một địa chỉ **THÔ** (`TrangThai = 0`). 📌 Trạng thái này buộc mã ĐVHC `NULL` và
+    /// `NormalizedAtUtc` `NULL` — đó chính là điều kiện của `CK_AddrAddresses_ThoKhongCoMa`.
+    /// </summary>
+    private async Task ChenDiaChiAsync(Guid? tenantId, string contentHash, bool isDeleted, string stamp)
+    {
+        await using var cmd = _fixture.DataSource.CreateCommand("""
+            insert into "AddrAddresses"
+                ("Id","TenantId","TrangThai","NguonTao","SchemaVersion","TinhCode","HuyenCode","XaCode",
+                 "SoNhaDuong","DiaChiDayDu","ContentHash","NormalizedAtUtc",
+                 "ExtraProperties","ConcurrencyStamp","CreationTime","IsDeleted")
+            values ($1, $2, 0, 2, 2, null, null, null,
+                    '12 Le Loi', $3, $4, null,
+                    '{}', $5, now(), $6)
+            """);
+
+        cmd.Parameters.AddWithValue(Guid.NewGuid());
+        cmd.Parameters.AddWithValue((object?)tenantId ?? DBNull.Value);
+        cmd.Parameters.AddWithValue($"12 Lê Lợi, Phường X, Tỉnh Y [{stamp}]");
+        cmd.Parameters.AddWithValue(contentHash);
+        cmd.Parameters.AddWithValue(stamp);
+        cmd.Parameters.AddWithValue(isDeleted);
+
+        await cmd.ExecuteNonQueryAsync();
+    }
+
+    [Fact]
+    public async Task ADDR004_chan_trung_hai_dia_chi_cung_noi_dung_khi_TenantId_NULL()
+    {
+        // 🚨 ADR-04 — "một NỘI DUNG ⇒ một bản ghi". Đây là bất biến **tầng ứng dụng KHÔNG giữ được**:
+        // hai request đồng thời cùng một địa chỉ đều "thấy chưa có" ⇒ hai INSERT. Thiếu
+        // `NULLS NOT DISTINCT` thì khi `TenantId = NULL` (đang chạy 1 tenant) index MẤT TÁC DỤNG ⇒
+        // trùng lặp IM LẶNG, và báo cáo "giao tới bao nhiêu điểm" đếm SAI.
+        var hash = DiaChiHashThu.Bam("12 Le Loi - chan-trung");
+
+        await ChenDiaChiAsync(null, hash, isDeleted: false, "addr-a");
+
+        var ex = await Assert.ThrowsAsync<PostgresException>(
+            () => ChenDiaChiAsync(null, hash, isDeleted: false, "addr-b"));
+
+        Assert.Equal(PostgresErrorCodes.UniqueViolation, ex.SqlState);   // 23505
+    }
+
+    [Fact]
+    public async Task ADDR004_cung_noi_dung_nhung_KHAC_tenant_thi_duoc_phep()
+    {
+        // 🔒 Chiều NGƯỢC LẠI: khử trùng lặp **không** được vượt ranh giới tenant — hai tenant có thể
+        // cùng một địa chỉ vật lý, và gộp chúng lại là RÒ RỈ dữ liệu giữa tenant.
+        var hash = DiaChiHashThu.Bam("12 Le Loi - khac-tenant");
+
+        await ChenDiaChiAsync(Guid.NewGuid(), hash, isDeleted: false, "addr-c");
+        await ChenDiaChiAsync(Guid.NewGuid(), hash, isDeleted: false, "addr-d");
+
+        var soDong = await DemAsync(
+            $"select count(*) from \"AddrAddresses\" where \"ContentHash\" = '{hash}'");
+
+        Assert.Equal(2L, soDong);
+    }
+
+    [Fact]
+    public async Task ADDR004_ban_ghi_DA_XOA_MEM_khong_chiem_khoa_tu_nhien()
+    {
+        // 🔒 Vì index có bộ lọc `WHERE NOT "IsDeleted"`: địa chỉ đã xoá mềm KHÔNG được chiếm khoá —
+        // nếu không, "tạo lại cùng nội dung" (ca HỢP LỆ: ADR-11 giữ dòng cũ để không phá vết lịch sử)
+        // sẽ bị chặn bởi một dòng mà người dùng không còn nhìn thấy. Đây là ca dễ hỏng IM LẶNG nhất.
+        var hash = DiaChiHashThu.Bam("12 Le Loi - xoa-mem");
+
+        await ChenDiaChiAsync(null, hash, isDeleted: true, "addr-e");
+        await ChenDiaChiAsync(null, hash, isDeleted: false, "addr-f");
+
+        var soDong = await DemAsync(
+            $"select count(*) from \"AddrAddresses\" where \"ContentHash\" = '{hash}'");
+
+        Assert.Equal(2L, soDong);
+    }
 
     /// <summary>Chèn một bản ghi idempotency. Cặp (TenantId, Scope, KeyValue) là ràng buộc unique.</summary>
     private async Task ChenIdempotencyAsync(Guid? tenantId, string scope, string keyValue, string stamp)

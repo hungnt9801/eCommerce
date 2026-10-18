@@ -38,8 +38,8 @@
 
 | # | Việc | Bằng chứng "chưa có" | Cỡ |
 |---|---|---|---|
-| 1 | **`Address` (sổ địa chỉ)** | `grep 'class Address'` = **0 tệp**; `git log --all` = 0 ⇒ nợ CHẶN #1, nay có thiết kế [`ADDR-004`](features/address/addr-004-so-dia-chi-khach.md) | **LỚN** (2 phiên) |
-| 2 | **`CustomerAddressLink` + API + quyền** | chỉ là **comment** trong `Customer.cs`, chưa có entity/bảng | LỚN (chung `ADDR-004`) |
+| 1 | **`Address` (sổ địa chỉ)** | ✅ **XONG `S1` (18/10/2026)** — entity + migration + index `NULLS NOT DISTINCT` + 27 test. 📄 [`ADDR-004`](features/address/addr-004-so-dia-chi-khach.md) §16 | ✅ XONG |
+| 2 | **`CustomerAddressLink` + API + quyền** | chỉ là **comment** trong `Customer.cs`, chưa có entity/bảng | LỚN — **việc của `S2`** (⇒ NND 49 → 51) |
 | 3 | 🚨 **Cổng khách bị chặn KHÔNG được gọi** | `ChoPhepGiaoDichAsync` **định nghĩa 1 nơi, gọi 0 nơi** (chỉ 3 tệp: khai báo + DTO + comment) ⇒ **khách `Blocked` VẪN đặt được hàng** | NHỎ nhưng **là lỗi thật** |
 | 4 | **Đường TẠO giao dịch thanh toán** | `new PaymentTransaction` chỉ có trong **test** (3 tệp, 0 tệp sản phẩm) | LỚN |
 | 5 | **Endpoint IPN/webhook** | `PaymentHub` **0 controller** (`[Route(` = 0) ⇒ VNPay gọi vào **không có cửa** | LỚN |
@@ -87,7 +87,7 @@
 | Phiên | Tên | Phạm vi (làm gì) | Cổng ra (Definition of Done) | Chặn bởi |
 |---|---|---|---|---|
 | **S0** | **Baseline + chốt quyết định** ✅ **XONG 17/10/2026** | ⛔ **0 dòng code.** ✅ Đã chạy `-DayDu` **exit 0** và ghi số thật vào [`SESSION-KICKOFF.md`](SESSION-KICKOFF.md) §3: **228.9s** · build 73.8s · **1181** unit · **38** integration · **213** mermaid/0 · **21/21** DB (`NND=48`, 53 quyền) · **22** ca cổng · **59/59** E2E. ✅ Đã chốt **Q1** (VNPay) và **Q2** (`ADDR-004`) | ✅ Có baseline trong `SESSION-KICKOFF.md` §3 | — |
-| **S1** | **`ADDR-004` phần A — entity `Address`** | `Address` trong `modules/Address` (+`ContentHash`, trạng thái chuẩn hoá) · **`DbSet`** · migration **`Addr004_Address`** + SQL thô `NULLS NOT DISTINCT` · **48 → 49** | Unit test cho bất biến `(TenantId, ContentHash)` · `kiem-db.ps1` **xanh** · `PostgreSqlSchemaTests` cập nhật | Q2 |
+| **S1** | ✅ **XONG 18/10/2026** — **`ADDR-004` phần A: entity `Address`** | `Address` + `DiaChiCanonical` + `AddressModels` · 7 CHECK + 3 index · **`DbSet`** · migration `20261018023611_Addr004_SoDiaChi_Address` + **SQL thô `NULLS NOT DISTINCT`** · **48 → 49** · `schema.sql` regenerate · 8 ràng buộc khai báo ở `RangBuocChuaAnhXa.txt` | ✅ **24 unit + 3 integration mới** · `-DayDu` **exit 0 · 198.7s** · NND **49 = 49** · 📌 phát hiện **F11** (tên `Address` va chạm khi namespace đuôi `.Address`) | ✅ `Q2` đã chốt |
 | **S2** | **`ADDR-004` phần B — sổ địa chỉ của khách** | `CustomerAddressLink` (`CusAddressLinks`) · **partial unique** "một mặc định / `(CustomerId, AddressType)`" · đổi mặc định **trong MỘT transaction** (bỏ-trước-đặt-sau) · API + `IAddressDirectory` · **quyền `eCommerce.Addresses.*`** · ETO · **49 → 51** · **bản xuất PII thêm "giao tới đâu"** | E2E có ca *"hai luồng cùng đặt mặc định ⇒ chỉ 1 thắng"* · kiểm HTTP thật · cập nhật `ADDR-004` §16 | S1 |
 | **S3** | **`CUS-001` đóng lại** | 🚨 **Nối `ChoPhepGiaoDichAsync` vào đường bán hàng** (lỗi thật: khách `Blocked` vẫn đặt được) · `CustomerGroup` API + seed · phân trang `/KhachHang` · kiểm HTTP (mới đo route) | E2E **1 ca mới**: *"khách `Blocked` ⇒ KHÔNG tạo được đơn"* · gate xanh | S2 |
 | **S4** | **`PAY-001` phần A — đường TẠO + cầu nối** | Tạo `PaymentTransaction` từ checkout/xác nhận đơn · **`MerchantReference` ỔN ĐỊNH** (cấm `Guid.NewGuid()` mỗi lần) · cập nhật **`Order.PaymentStatus`** khi `Succeeded/Failed` · **ETO + outbox** | Integration: *"IPN gửi trùng ⇒ 1 giao dịch"* · đơn chuyển `Paid` · gate xanh | S0 |

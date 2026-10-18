@@ -2207,3 +2207,123 @@ VALUES ('20261016135724_Cat003_ProductChannelVisibility', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE TABLE "MsgDeadLetters" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "TenSuKien" character varying(512) NOT NULL,
+    "KhoaNghiepVu" character varying(256) NOT NULL,
+    "PayloadJson" text NOT NULL,
+    "PayloadHash" character varying(64) NOT NULL,
+    "LyDo" integer NOT NULL,
+    "MoTaLyDo" character varying(2000) NOT NULL,
+    "Loi" text,
+    "VaoDlqLucUtc" timestamp with time zone NOT NULL,
+    "CorrelationId" character varying(128),
+    "DaXuLy" boolean NOT NULL,
+    "XuLyLucUtc" timestamp with time zone,
+    "NguoiXuLy" character varying(256),
+    "LyDoXuLy" character varying(2000),
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_MsgDeadLetters" PRIMARY KEY ("Id")
+);
+
+CREATE INDEX "IX_MsgDeadLetters_TenantId_ChuaXuLy" ON "MsgDeadLetters" ("TenantId", "VaoDlqLucUtc") WHERE NOT "DaXuLy";
+
+CREATE INDEX "IX_MsgDeadLetters_TenantId_Khoa" ON "MsgDeadLetters" ("TenantId", "KhoaNghiepVu");
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261016145709_Xc002_DeadLetterQueue', '10.0.11');
+
+COMMIT;
+
+START TRANSACTION;
+ALTER TABLE "InvChannelLimits" ADD "DonVi" integer;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261016175736_Inv003_DonViTheoTungDong', '10.0.11');
+
+COMMIT;
+
+START TRANSACTION;
+CREATE TABLE "CusDataExportLogs" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "CustomerId" uuid NOT NULL,
+    "NguoiXuat" character varying(256) NOT NULL,
+    "XuatLucUtc" timestamp with time zone NOT NULL,
+    "SoDongHoSo" integer NOT NULL,
+    "SoDonHang" integer NOT NULL,
+    "DonHangBiCat" boolean NOT NULL,
+    "LyDo" character varying(512),
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    CONSTRAINT "PK_CusDataExportLogs" PRIMARY KEY ("Id")
+);
+
+CREATE INDEX "IX_CusDataExportLogs_TenantId_CustomerId" ON "CusDataExportLogs" ("TenantId", "CustomerId");
+
+CREATE INDEX "IX_CusDataExportLogs_TenantId_XuatLucUtc" ON "CusDataExportLogs" ("TenantId", "XuatLucUtc");
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261016204226_Cus001_NhatKyXuatDuLieuCaNhan', '10.0.11');
+
+COMMIT;
+
+START TRANSACTION;
+CREATE TABLE "AddrAddresses" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "TrangThai" integer NOT NULL,
+    "NguonTao" integer NOT NULL,
+    "SchemaVersion" integer NOT NULL,
+    "TinhCode" character(2),
+    "HuyenCode" character(3),
+    "XaCode" character(5),
+    "SoNhaDuong" character varying(256),
+    "DiaChiDayDu" character varying(512) NOT NULL,
+    "ContentHash" character(64) NOT NULL,
+    "NormalizedAtUtc" timestamp with time zone,
+    "XacMinhLucUtc" timestamp with time zone,
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_AddrAddresses" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_AddrAddresses_ContentHashHex" CHECK ("ContentHash" ~ '^[0-9a-f]{64}$'),
+    CONSTRAINT "CK_AddrAddresses_DaChuanHoaCoMa" CHECK (("TrangThai" = 0) OR ("TinhCode" IS NOT NULL AND "XaCode" IS NOT NULL AND "NormalizedAtUtc" IS NOT NULL)),
+    CONSTRAINT "CK_AddrAddresses_DinhDangMa" CHECK (("TinhCode" IS NULL OR "TinhCode" ~ '^[0-9]{2}$') AND ("XaCode" IS NULL OR "XaCode" ~ '^[0-9]{5}$') AND ("HuyenCode" IS NULL OR "HuyenCode" ~ '^[0-9]{3}$')),
+    CONSTRAINT "CK_AddrAddresses_SchemaVersion" CHECK ("SchemaVersion" in (1, 2)),
+    CONSTRAINT "CK_AddrAddresses_ThoKhongCoMa" CHECK (("TrangThai" <> 0) OR ("TinhCode" IS NULL AND "HuyenCode" IS NULL AND "XaCode" IS NULL AND "NormalizedAtUtc" IS NULL)),
+    CONSTRAINT "CK_AddrAddresses_TrangThai" CHECK ("TrangThai" in (0, 1, 2, 3)),
+    CONSTRAINT "CK_AddrAddresses_V2KhongCoHuyen" CHECK ("SchemaVersion" <> 2 OR "HuyenCode" IS NULL)
+);
+
+DROP INDEX IF EXISTS "IX_AddrAddresses_TenantId_ContentHash";
+
+CREATE UNIQUE INDEX "IX_AddrAddresses_TenantId_ContentHash"
+                    ON "AddrAddresses" ("TenantId", "ContentHash") NULLS NOT DISTINCT
+                    WHERE NOT "IsDeleted";
+
+CREATE INDEX "IX_AddrAddresses_TenantId_TinhCode_XaCode" ON "AddrAddresses" ("TenantId", "TinhCode", "XaCode");
+
+CREATE INDEX "IX_AddrAddresses_TenantId_TrangThai" ON "AddrAddresses" ("TenantId", "TrangThai");
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261018023611_Addr004_SoDiaChi_Address', '10.0.11');
+
+COMMIT;
+

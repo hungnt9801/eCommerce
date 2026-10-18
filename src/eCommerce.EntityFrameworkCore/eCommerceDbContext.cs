@@ -176,6 +176,12 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
     // ── Address (ADDR-002): ánh xạ mã địa chỉ theo hãng vận chuyển ──
     public DbSet<Address.Carrier.CarrierAddressMapping> CarrierAddressMappings { get; set; } = default!;
 
+    // ── Address (ADDR-004): SỔ ĐỊA CHỈ — địa chỉ VẬT LÝ dùng chung trong tenant ──
+    // 🚨 BẮT BUỘC có DbSet cho MỌI entity: ABP đăng ký `IRepository<T>` bằng cách **quét DbSet**,
+    //    KHÔNG quét model. Thiếu ⇒ DI nổ lúc chạy ⇒ HTTP 500, dù build và migration đều XANH.
+    //    Lưới an toàn: `test/eCommerce.Tests/EfCoreRegistration/DbSetRegistrationTests.cs`.
+    public DbSet<Address.Address> Addresses { get; set; } = default!;
+
     // ── EInvoice (EINV-001): hoá đơn điện tử ──
     public DbSet<EInvoice.EInvoice> Invoices { get; set; } = default!;
 

@@ -64,3 +64,16 @@ CK_SigSigningRequests_DaKyPhaiCoDuBangChung|CHECK của GĐ0 ngoài miền KHO: 
 CK_TaxClassifications_EffectiveRange|CHECK của GĐ0 ngoài miền KHO: chưa có đường ghi GĐ1 chạm tới
 CK_TaxRateSchedules_EffectiveRange|CHECK của GĐ0 ngoài miền KHO: chưa có đường ghi GĐ1 chạm tới
 CK_TaxRateSchedules_Rate|CHECK của GĐ0 ngoài miền KHO: chưa có đường ghi GĐ1 chạm tới
+
+# ── ADDR-004 (18/10/2026) — SỔ ĐỊA CHỈ: entity `Address` (`AddrAddresses`) ──────────────────────────
+# 📌 CẢ 8 ràng buộc dưới đây là **BẤT BIẾN CẤU TRÚC** (hình dạng dữ liệu), KHÔNG phải ca nghiệp vụ mà
+#    client cần phân biệt bằng mã lỗi: tầng entity đã NÉM BusinessException TRƯỚC khi chạm DB, nên các
+#    CHECK này chỉ còn là **lưới cuối** cho dữ liệu vào từ webhook/import/SQL tay.
+IX_AddrAddresses_TenantId_ContentHash|ADDR-004: ca HỢP LỆ "khách thứ hai ở cùng toà nhà" ⇒ `S2` xử lý bằng ON CONFLICT rồi DÙNG LẠI `Id` cũ (ADR-04/A1), KHÔNG trả lỗi cho client; `S1` chưa có đường ghi nào chạm tới
+CK_AddrAddresses_TrangThai|ADDR-004: trạng thái chỉ nhận 4 giá trị (0..3) — bất biến cấu trúc; entity không có setter công khai
+CK_AddrAddresses_ThoKhongCoMa|ADDR-004: hàng rào DB cho fail-closed — địa chỉ THÔ không được có mã ĐVHC (chống trạng thái "nửa vời")
+CK_AddrAddresses_DaChuanHoaCoMa|ADDR-004: hàng rào DB của fail-closed — đã chuẩn hoá thì BẮT BUỘC có `TinhCode`+`XaCode`+`NormalizedAtUtc`
+CK_AddrAddresses_SchemaVersion|ADDR-004: chỉ 2 phiên bản schema (1 = 3 cấp lịch sử, 2 = 2 cấp hiện hành)
+CK_AddrAddresses_V2KhongCoHuyen|ADDR-004: quy tắc PHÁP LÝ (Luật 72/2025/QH15) — schema 2 cấp không có huyện; entity ném `eCommerce:Address:0004` trước khi tới DB
+CK_AddrAddresses_DinhDangMa|ADDR-004: độ dài + chỉ chữ số của mã theo cấp — entity dùng `AdministrativeUnit.ChuanHoaMa` (ném `0002`)
+CK_AddrAddresses_ContentHashHex|ADDR-004: `ContentHash` phải là hex thường 64 ký tự (chặn base64/bytea/hex HOA); chỉ `DiaChiCanonical` sinh ra được

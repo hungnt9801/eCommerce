@@ -1826,6 +1826,132 @@ namespace eCommerce.Migrations
                     b.ToTable("AbpSettingDefinitions", (string)null);
                 });
 
+            modelBuilder.Entity("eCommerce.Address.Address", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("ConcurrencyStamp");
+
+                    b.Property<string>("ContentHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character(64)")
+                        .IsFixedLength();
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<Guid?>("DeleterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("DeleterId");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("DeletionTime");
+
+                    b.Property<string>("DiaChiDayDu")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<string>("ExtraProperties")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("ExtraProperties");
+
+                    b.Property<string>("HuyenCode")
+                        .HasMaxLength(3)
+                        .HasColumnType("character(3)")
+                        .IsFixedLength();
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("IsDeleted");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<int>("NguonTao")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("NormalizedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("SchemaVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("SoNhaDuong")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.Property<string>("TinhCode")
+                        .HasMaxLength(2)
+                        .HasColumnType("character(2)")
+                        .IsFixedLength();
+
+                    b.Property<int>("TrangThai")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("XaCode")
+                        .HasMaxLength(5)
+                        .HasColumnType("character(5)")
+                        .IsFixedLength();
+
+                    b.Property<DateTime?>("XacMinhLucUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "ContentHash")
+                        .IsUnique()
+                        .HasDatabaseName("IX_AddrAddresses_TenantId_ContentHash");
+
+                    b.HasIndex("TenantId", "TrangThai")
+                        .HasDatabaseName("IX_AddrAddresses_TenantId_TrangThai");
+
+                    b.HasIndex("TenantId", "TinhCode", "XaCode")
+                        .HasDatabaseName("IX_AddrAddresses_TenantId_TinhCode_XaCode");
+
+                    b.ToTable("AddrAddresses", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_AddrAddresses_ContentHashHex", "\"ContentHash\" ~ '^[0-9a-f]{64}$'");
+
+                            t.HasCheckConstraint("CK_AddrAddresses_DaChuanHoaCoMa", "(\"TrangThai\" = 0) OR (\"TinhCode\" IS NOT NULL AND \"XaCode\" IS NOT NULL AND \"NormalizedAtUtc\" IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_AddrAddresses_DinhDangMa", "(\"TinhCode\" IS NULL OR \"TinhCode\" ~ '^[0-9]{2}$') AND (\"XaCode\" IS NULL OR \"XaCode\" ~ '^[0-9]{5}$') AND (\"HuyenCode\" IS NULL OR \"HuyenCode\" ~ '^[0-9]{3}$')");
+
+                            t.HasCheckConstraint("CK_AddrAddresses_SchemaVersion", "\"SchemaVersion\" in (1, 2)");
+
+                            t.HasCheckConstraint("CK_AddrAddresses_ThoKhongCoMa", "(\"TrangThai\" <> 0) OR (\"TinhCode\" IS NULL AND \"HuyenCode\" IS NULL AND \"XaCode\" IS NULL AND \"NormalizedAtUtc\" IS NULL)");
+
+                            t.HasCheckConstraint("CK_AddrAddresses_TrangThai", "\"TrangThai\" in (0, 1, 2, 3)");
+
+                            t.HasCheckConstraint("CK_AddrAddresses_V2KhongCoHuyen", "\"SchemaVersion\" <> 2 OR \"HuyenCode\" IS NULL");
+                        });
+                });
+
             modelBuilder.Entity("eCommerce.Address.AdministrativeUnit", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3259,7 +3385,6 @@ namespace eCommerce.Migrations
             modelBuilder.Entity("eCommerce.Customers.CustomerDataExportLog", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreationTime")
