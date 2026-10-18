@@ -1516,7 +1516,7 @@ Hệ quả: một bản **cũ hơn** đến sau được coi là *"chưa có wat
 | Hạng mục | Trước lát cắt | Sau |
 |---|---|---|
 | Unit test | 1363 | **1367** (+4) |
-| Ca của bước ⑫ | 39 | **49** (+10: 8 ca API + 2 ca dọn dẹp đổi số hiệu) |
+| Ca của bước ⑫ | 39 | **49** (+**10**: `C38`…`C47` — 8 ca HTTP + 2 ca log/dọn dẹp đánh số lại) |
 | `AbpPermissionGrants` (DB thật) | 58 | **61** (+3) |
 | Ca `test-cong-kiem.ps1` | 22 | **24** (+2: nhóm mới `W` — xem §21.4) |
 
