@@ -62,19 +62,17 @@
 
 ---
 
-## 3. Sáu quyết định CHẶN — phải trả lời ở `S0`
+## 3. Quyết định — ✅ **2 đã chốt** · ⏳ **5 chờ bạn** (`Q3`…`Q7`)
 
 | # | Câu hỏi | Ai trả lời | Chặn việc gì | Nếu không trả lời thì sao |
 |---|---|---|---|---|
 | Q1 | **Credential sandbox VNPay** | chủ dự án | ✅ **ĐÃ CHỐT 17/10/2026** | ✅ **KHÔNG còn chặn `S4`/`S5`**: VNPay cho **tự đăng ký merchant test** ([devreg](https://sandbox.vnpayment.vn/devreg/), **5–10 phút**, không cần hợp đồng) — và bypass hợp lệ bằng **`FakePaymentProvider`** (chữ ký HMAC **vẫn thật**). 📄 Thiết kế: [`PAY-001` §7.7](features/payment/pay-001-cong-thanh-toan-vnpay.md). ⚠️ Chỉ `DoD-tiền-thật` cần credential + tunnel |
 | Q2 | **Sổ địa chỉ: duyệt `ADDR-004`** | chủ dự án | ✅ **ĐÃ DUYỆT 17/10/2026** — [`ADDR-004` v1.0](features/address/addr-004-so-dia-chi-khach.md), **10/10 câu hỏi đã chốt** | ✅ **`S1`/`S2` MỞ KHOÁ**. 📌 6 dòng đồng bộ tài liệu còn lại (§15.3 #9/#11/#12) + code/test (#15–#18) **là điều kiện của `S1`** |
-| Q3 | **Giỏ hàng: entity `Cart`/`CartItem` hay giỏ-cookie?** | bạn | `SAL-001` đóng hay không | Tài liệu thiết kế `Cart` + `CartToken` (`eCommerce:Sales:0013`) nhưng code dùng **cookie** trong `DatHangController` ⇒ **hai nguồn sự thật** |
-| Q4 | **`DonVi` hạn mức theo TỪNG DÒNG** (`Percent`/`Absolute`) | bạn | `INV-003` phần cuối | Hiện **dùng chung một `DonVi`**; `Percent` tính trên từng `(kho, SKU)` — có thể **sai nghiệp vụ** |
-| Q5 | **Ai xác nhận lệch đối soát** (`RequireConfirmation`) | kế toán | `REC-001` quy trình xử lý lệch | Job phát hiện lệch nhưng **không có đường đóng** ⇒ cảnh báo tồn đọng |
-| Q6 | **Mở storefront công khai?** (`/SanPham*` đang `[Authorize]` ⇒ `302` tới login) | bạn | `WEB-002` SEO | SEO **không phát huy** dù slug/sitemap đã xong |
-
-➕ **Q7 (không chặn nhưng nên chốt):** nơi đặt repo từ xa — `git remote -v` **trống** ⇒ **không tạo được**
-`.github/workflows` có ý nghĩa (xem `XC-007` **Q1**).
+| Q3 | **Giỏ hàng: entity `OrdCarts` hay giỏ-cookie?** | bạn (BA) | `SAL-001` đóng hay không; `S8` (thanh toán trên UI) | 🟡 **Đo 17/10/2026:** code **KHÔNG** có `class Cart`/`CartItem`/`GioHang` (**0 tệp**), nhưng giỏ **có thật** và **được chủ ý**: cookie `gio-web` (HttpOnly, **2 giờ**) trong `src/eCommerce.Web/Controllers/DatHangController.cs:44-48` — ghi rõ *"chọn cookie thay vì `ISession` để không phải đổi cấu hình module"*. `SAL-001` §5.2 lại thiết kế **bảng `OrdCarts`** + `MaxLines` = **100** (`sal-001:269,350,383`), trong khi UI chỉ cho **5 dòng**. ⇒ lệch **tài liệu ↔ code**, **không** phải lỗi chạy |
+| Q4 | 🚨 **`Percent` hạn mức kênh tính trên CÁI GÌ?** (~~`DonVi` theo dòng~~ — **đã xong**) | bạn (BA) | `INV-003` phần cuối · độ đúng của chặn bán vượt hạn mức | ✅ **`DonVi` theo TỪNG DÒNG ĐÃ CÓ** (`InvChannelLimit.DonVi` nullable — `src/eCommerce.Domain/Entities/Inventory/InvChannelLimit.cs:29,98` ghi *"nợ `inv-003` §16.8 #1 ĐÃ ĐÓNG"*). ❓ **Câu còn mở**: `HanMucKenh.TinhHanMuc` tính `floor(tồnKhảDụng × giáTrị / 100)` trên tồn của **TỪNG `(kho, SKU)`** (`src/eCommerce.Domain/Settings/HanMucKenh.cs:13,45`) — **không** phải tổng của cả kênh. Muốn tính theo tổng kênh thì phải có **tồn mô hình hoá theo kênh** (`StockAllotment`, `inv-003` §5.2) — **chưa có trong code** ⇒ chi phí **lớn** |
+| Q5 | **Ai xác nhận lệch đối soát, và "xác nhận" thì LÀM GÌ?** (`RequireConfirmation`) | bạn (kế toán) | `REC-001` · `S7` · vận hành kho | 🟡 **Đo:** `RequireConfirmation` **có** trong chính sách và **ghi được** trạng thái `KetLuanDoiSoat.VuotCanXacNhan = 2` (`ReconRun.cs:119,134`; `ChinhSachDoiSoatVaHanMuc.cs:23,40`). 🚨 **Nhưng KHÔNG có API/bước "xác nhận" nào** (grep `XacNhan|Confirm` trong `Recon*` = **0 chỗ gọi**) ⇒ lượt quét nằm ở trạng thái **2 vĩnh viễn**, cảnh báo **tồn đọng**. ❓ Cần chốt: **ai** (quyền nào) · xác nhận ghi vào đâu · xác nhận xong thì có **tự điều chỉnh tồn** hay chỉ **đóng cảnh báo** |
+| Q6 | **Mở storefront công khai?** (`/SanPham*` đang `[Authorize]` ⇒ `302` tới login) | bạn | `WEB-002` SEO · `CAT-003` slug/sitemap | 🟡 **Đo:** **cả 9** controller của Web đều `[Authorize]` cấp class, gồm `SanPhamController.cs:21` ⇒ khách **chưa đăng nhập không xem được** sản phẩm ⇒ SEO **không phát huy** dù slug + `sitemap.xml` đã xong |
+| Q7 | **Nơi đặt repo từ xa** (GitHub / Azure Repos / GitLab / tự dựng) | bạn (chủ repo) | `S9` (CI) toàn bộ | 🔴 **Đo:** `git remote -v` = **0 dòng**; `.github`/`azure-pipelines.yml`/`Jenkinsfile` **đều không tồn tại** ⇒ **không tạo được** CI có nghĩa. ⚠️ `XC-007` đã xác định: **không dùng được `windows-latest`** (integration test ghim `postgres:17-alpine`, Linux) ⇒ phải **`ubuntu-latest`** + vá **6 điểm Windows-only** (P-01…P-06) trước khi bật required check |
 
 ---
 
