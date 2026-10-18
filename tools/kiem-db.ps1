@@ -101,6 +101,14 @@ $bangPhaiRong = @(
     # ket luan sai. 🔑 Va `PayRefunds` la bang **tien** — rac o day khong chi lam nhieu phep do, no con lam
     # `RefundedAmount`/bao cao doi soat **sai** (mot dong hoan "that" khong ai tao).
     , 'PayRefunds'                     # probe S5 (PAY-001 phan B) gieo dong hoan tien
+    # 🚨 `S6` (18/10/2026) — `tools\probe-don-san.ps1` gieo SHOP + don san qua DUONG THAT (ChannelShopSyncer
+    # ⇒ `ChannelOrderPulledEto` ⇒ handler) ⇒ sinh ra nhat ky nhan don VA nhat ky su kien. 📌 Dua vao day la
+    # cach duy nhat phat hien probe **gieo ma khong don**: neu con rac, lan sau do se doc phai va ket luan sai.
+    # 🔑 Va voi bang nay, rac con lai con **lam sai MOI con so van hanh** doc tu no ("san gui lai bao nhieu lan",
+    # "co dual-path khong") — sai dan len vi bang CHI TANG.
+    # ⚠️ Vi sao duoc phep kiem "phai rong" (khac `ReconRuns`): bang nay **chi** co dong khi co duong NHAN DON
+    # SAN chay (khong co job nen nao ghi vao) ⇒ rong la trang thai dung cua may dev.
+    , 'SalMarketplaceEventLogs'
 )
 
 # 📌 Nhom ②: bang GIU LICH SU / DU LIEU THAM CHIEU ⇒ 🚨 **KHONG** kiem "phai rong". 📌 Liet ke ra day de **ghi ro y dinh**.

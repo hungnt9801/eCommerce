@@ -218,7 +218,7 @@ stateDiagram-v2
 
 ### 3.2 Vòng đời **một sự kiện nhận được** (mỗi dòng `SalMarketplaceEventLogs`)
 
-Vòng đời này **không** cần sơ đồ riêng: nó là **5 giá trị** của cột `Outcome` (`Applied`, `Duplicate`, `Late`,
+Vòng đời này **không** cần sơ đồ riêng: nó là **6+1 giá trị** của cột `Outcome` (`Applied`, `Duplicate`, `Late`,
 `Conflict`, `GapSuspected`) + `Failed` khi có exception. Bất biến: **một sự kiện ⇒ đúng một dòng, ghi một lần,
 không sửa** (BR-013).
 
@@ -386,7 +386,7 @@ im lặng mà `XC-002` D4/D5 cảnh báo.
 | `ExternalOrderId` | `varchar(64)` | ✖ | mã đơn của sàn | |
 | `SourceVersion` | `bigint` | ✖ | epoch giây của `update_time` **của sự kiện này** | nằm trong khoá unique |
 | `PayloadHash` | `char(64)` | ✖ | SHA-256 canonical JSON **của sự kiện này** | nằm trong khoá unique |
-| `Outcome` | `int` | ✖ | `Applied=0` · `Duplicate=1` · `Late=2` · `Conflict=3` · `GapSuspected=4` · `Failed=5` | **5+1** giá trị — khớp §3.2 |
+| `Outcome` | `int` | ✖ | `Applied=0` · `Duplicate=1` · `Late=2` · `Conflict=3` · `GapSuspected=4` · `Failed=5` · `ThieuWatermark=6` | **6+1** giá trị — khớp §3.2. 📌 `ThieuWatermark` thêm ở `S6` (§20.4 ②): `Late` là **kết luận** dựa trên dữ liệu, còn *"thiếu watermark"* là **không có** dữ liệu để kết luận |
 | `EventKind` | `varchar(24)` | ✔ | `Created` · `Updated` · `Cancelled` (nếu sàn cung cấp) | nullable vì không phải sàn nào cũng phân loại |
 | `MarketplaceStatusRaw` | `varchar(64)` | ✔ | **trạng thái thô** của sàn (`order_status`) | giữ nguyên văn để điều tra/đối soát; **cấm** diễn giải ở tầng này (ánh xạ thuộc `SAL-003`) |
 | `IsFromWebhook` | `bool` | ✖ | `true` = đường webhook, `false` = đường pull | cho phép đo **hiệu quả** webhook và phát hiện dual-path |
@@ -402,7 +402,7 @@ im lặng mà `XC-002` D4/D5 cảnh báo.
 
 | Loại | Cột | Mục đích |
 |---|---|---|
-| **UNIQUE** | `(TenantId, ChannelCode, ExternalOrderId, SourceVersion, PayloadHash)` **`NULLS NOT DISTINCT`** | ⭐ **hàng rào chống ghi 2 dòng cho CÙNG một sự kiện** — kể cả khi tầng ứng dụng sai (2 luồng song song). Đây là câu trả lời cho `XC-003` D2: *"bỏ lock đi, DB có chặn không?"* ⇒ **CÓ** |
+| **UNIQUE** | `(TenantId, ChannelCode, ExternalOrderId, SourceVersion, PayloadHash, **`Outcome`**)` **`NULLS NOT DISTINCT`** | ⭐ **hàng rào chống ghi 2 dòng cho CÙNG một kết cục của CÙNG một sự kiện** — kể cả khi tầng ứng dụng sai (2 luồng song song). Đây là câu trả lời cho `XC-003` D2: *"bỏ lock đi, DB có chặn không?"* ⇒ **CÓ**. 🚨 **`Outcome` PHẢI nằm trong khoá** — thiếu nó thì dòng `Duplicate` (cùng phiên bản + cùng hash) trùng **toàn bộ** khoá với dòng `Applied` ⇒ **không bao giờ** ghi được ⇒ `Duplicate` thành **giá trị chết** (phát hiện ở `S6`, §20.4 ①) |
 | INDEX | `(TenantId, ChannelCode, ExternalOrderId, ReceivedAtUtc)` | dựng lại "lịch sử nhận" của một đơn sàn |
 | INDEX | `(TenantId, Outcome, ReceivedAtUtc)` | dashboard vận hành: tỉ lệ `Late`/`Conflict` |
 | INDEX | `(TenantId, IsFromWebhook, ReceivedAtUtc)` | đo hiệu quả đường webhook (webhook bật ở GĐ4) |
@@ -602,7 +602,7 @@ hiện chỉ có `InsufficientStock` và `PaymentSignatureInvalid`.
 | 2 | **Đúng một** `SalMarketplaceOrderIntakes` cho mỗi đơn sàn | UNIQUE `(TenantId, ChannelCode, ExternalOrderId)` **`NULLS NOT DISTINCT`** trên bảng mới |
 | 3 | `AppliedSourceVersion` **chỉ tăng**, **không** giảm | `UPDATE … WHERE AppliedSourceVersion < @v_in` + kiểm số dòng (0 dòng ⇒ **NÉM** `eCommerce:Sales:0003`) + `RowVersion` |
 | 4 | `AppliedSourceUpdatedAtUtc` **khớp** `AppliedSourceVersion` | Gán trong **cùng** phương thức domain + test `TC-17` (bất biến **không** diễn đạt được bằng CHECK constraint — ghi rõ để không ai tưởng DB đang bảo vệ) |
-| 5 | Mỗi sự kiện nhận được ⇒ **đúng một** dòng `SalMarketplaceEventLogs` | UNIQUE `(TenantId, ChannelCode, ExternalOrderId, SourceVersion, PayloadHash)` + ghi trong **mọi** nhánh (kể cả bỏ qua) + test `TC-14` |
+| 5 | Mỗi sự kiện nhận được ⇒ **đúng một** dòng `SalMarketplaceEventLogs` | UNIQUE `(TenantId, ChannelCode, ExternalOrderId, SourceVersion, PayloadHash, Outcome)` + ghi trong **mọi** nhánh (kể cả bỏ qua và `Failed`) + test `TC-14` + bước ⑫ `C34` (5 lần nhận ⇒ đúng 5 dòng, 0 cặp trùng) |
 | 6 | `SalMarketplaceEventLogs` là **APPEND-ONLY** | Không có phương thức sửa/xoá trong domain + **test reflection** `TC-20` + review |
 | 7 | Một sự kiện **không** gây side effect 2 lần | `IIdempotencyGuard` (`XC-002`) + khoá **D4** + event log |
 | 8 | Cùng khoá + khác nội dung ⇒ **không** im lặng | `BusinessException` `eCommerce:Messaging:0002` (`XC-002` BR-006) |
@@ -722,8 +722,8 @@ chốt **hợp đồng dữ liệu và quy tắc hiển thị** để `WEB-001` 
 
 | Mục | Nội dung |
 |---|---|
-| Migration **1** | **`Add_Sales_MarketplaceOrderIntake`** ⬜ **chưa viết — kế hoạch GĐ1**: tạo `SalMarketplaceOrderIntakes` (§5.2.2) + `SalMarketplaceEventLogs` (§5.2.3) + toàn bộ index/CHECK ở §5.2.2/§5.2.3; thêm **2 cột** vào `OrdOrders` (§5.2.1) + index `(TenantId, ChannelCode, MarketplaceUpdatedAtUtc)` |
-| Migration **2** (SQL thô — **bắt buộc**) | `UNIQUE INDEX … NULLS NOT DISTINCT` cho **3** unique index mới (`SalMarketplaceOrderIntakes`, `SalMarketplaceEventLogs`). **EF Core không khai báo được** ⇒ phải SQL thô trong migration, đúng khuôn đã dùng ở `src/eCommerce.EntityFrameworkCore/Migrations/20261013024226_Fix_NullableTenantId_UniqueIndexes.cs` (xem các dòng `56-68`) |
+| Migration **1** | ✅ **ĐÃ LÀM**: `Add_Sal005_MarketplaceOrderIntake` (`20261015082700`, `S1`-time) tạo `SalMarketplaceOrderIntakes`; **`20261018082801_Sal005_MarketplaceEventLogs`** (`S6`, §20) tạo `SalMarketplaceEventLogs` + 3 index + 2 `CHECK`. ⚠️ **Còn nợ**: **2 cột** của `OrdOrders` (§5.2.1 — `PlacedAtUtc`, `MarketplaceUpdatedAtUtc`) + index `(TenantId, ChannelCode, MarketplaceUpdatedAtUtc)` **chưa** thêm (thuộc `SAL-003`) |
+| Migration **2** (SQL thô — **bắt buộc**) | ✅ **ĐÃ LÀM**: mỗi unique index mới đều có **SQL thô** `… NULLS NOT DISTINCT` (bảng intake: `20261015082700`; bảng nhật ký sự kiện: `20261018082801`). **EF Core không khai báo được** ⇒ đúng khuôn `20261013024226_Fix_NullableTenantId_UniqueIndexes.cs`. 🔑 Lưới an toàn: `PostgreSqlSchemaTests` khẳng định **đích danh** tên index (**53** index — `S6`) |
 | ⚠️ **Rủi ro đã ghi nhận** | Migration do EF sinh **sau này** có thể **ghi đè** và làm **mất** `NULLS NOT DISTINCT` (rủi ro đã ghi ở `20261013024226_...cs`). ⇒ **Bắt buộc** thêm 3 index mới vào danh sách đích danh trong `test/eCommerce.IntegrationTests/PostgreSqlSchemaTests.cs` (danh sách hiện có **11** index ở dòng `152-165`) ⇒ thành **14** |
 | **DbSet bắt buộc** | Thêm `DbSet<SalMarketplaceOrderIntake>` + `DbSet<SalMarketplaceEventLog>`. ⚠️ **Thiếu `DbSet` ⇒ `IRepository<T>` KHÔNG được đăng ký** — lỗi đã gặp thật ở Phase 0, ghi rõ ngay trong `src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs:48-52` |
 | **Phối hợp với `SAL-003`** | `SAL-003` §11 cũng sửa `OrdOrders` (**9 cột**) ⇒ **bắt buộc** chốt thứ tự: **một** migration gộp, **hoặc** `SAL-003` trước rồi `SAL-005` sau. **Cấm** hai migration cùng `ALTER TABLE "OrdOrders"` chạy song song trên môi trường có dữ liệu |
@@ -1054,7 +1054,7 @@ trùng báo **XUNG ĐỘT PAYLOAD** (đúng thiết kế) và **không thể ki�
 | # | Nội dung | Trạng thái |
 |---|---|---|
 | 1 | **Xử lý CẬP NHẬT đơn sàn theo watermark** (`update_time`) — D5 + **luật 4 nhánh** (§3.3) | 🟡 **LÕI XONG 16/10/2026** (§17): `PayloadCanonicalizer` + `LuatWatermark` + 5 cột watermark + 8 trường ETO + 3 trường model. ⏳ **Handler CHƯA nối** ⇒ hành vi chạy **vẫn** tạo-một-lần |. Hiện **tạo-một-lần**: đơn đã nhận thì **không sửa**. ⇒ **không mất đơn**, nhưng đơn có thể **cũ** so với sàn. ⚠️ Phụ thuộc **F2/F3** (ETO + `ChannelOrderModel` thiếu `UpdatedAtUtc`) — **vẫn còn** |
-| 2 | **`SalMarketplaceEventLogs`** (nhật ký append-only theo SỰ KIỆN — D7) | ⬜ **CHƯA LÀM**. Mới có nhật ký theo **ĐƠN**. Sự kiện trùng vẫn được chặn (khoá idempotency) nhưng **không** có vết từng lần nhận |
+| 2 | **`SalMarketplaceEventLogs`** (nhật ký append-only theo SỰ KIỆN — D7) | ✅ **ĐÃ LÀM 18/10/2026 — xem §20** (bảng + entity + writer; ghi **đúng một dòng** ở **mọi** nhánh) |
 | 3 | 🚨 **Xung đột payload: KHÔNG ném lỗi, mà GHI VẾT rồi đi tiếp** (khác D6 nguyên bản "đẩy DLQ") | ✅ **Có chủ ý, đã đo lý do:** ném lỗi ⇒ `PublishAsync` ném ⇒ **con trỏ không tiến** ⇒ sàn gửi lại đúng đơn đó ⇒ **lặp vô hạn + CHẶN CẢ KÊNH** (đã đo: con trỏ kẹt `NULL` qua nhiều nhịp). Nay: **giữ bản đầu** (không ghi đè ⇒ không mất dữ liệu; **tất định**: không instance nào ghi đè) + `SkipReason` + log **Error**. 📌 Khi `XC-002` có **DLQ**, nhánh này **PHẢI** chuyển sang đẩy DLQ (**việc còn lại**) |
 | 4 | **Cột `Order.PlacedAtUtc`** (**F8**) | 🟡 **Giảm nhẹ**: mốc đặt hàng của sàn nay được lưu ở **nhật ký nhận đơn** (`MarketplacePlacedAtUtc`) ⇒ **không còn mất**; nhưng `Order` vẫn chưa có cột ⇒ báo cáo theo kênh phải JOIN |
 | 5 | **9 trường còn thiếu của ETO** (**F2**) | 🟡 **7/9 XONG 16/10/2026** (§17): watermark + truy vết. **2 trường `EventId`/`OccurredOn` CỐ Ý KHÔNG THÊM** — ABP cấp ở envelope; thêm là **nguồn sự thật thứ hai** (§17.5) | — không cần cho đường pull tạo-một-lần, nhưng **chặn** phần cập nhật/webhook |
@@ -1148,11 +1148,11 @@ lần phát lại**"*.
 |---|---|---|
 | **1** | 🚨 **Handler CHƯA dùng luật watermark** | `MarketplaceOrderIntakeHandler` vẫn **tạo-một-lần** ⇒ cập nhật của sàn **vẫn bị bỏ**. Lõi + cột + ETO **đã sẵn**, nhưng **chưa nối**. ⚠️ Đọc *"928 test xanh"* **KHÔNG** có nghĩa *"đơn sàn cập nhật được"* |
 | **2** | 🚨 **CHƯA có DLQ** (`XC-002` chưa có bảng `DeadLetterEvents`) | Nhánh **XUNG ĐỘT** hiện **tính ra** `PhaiDayDlq = true` nhưng **không có nơi nhận** ⇒ GĐ1 giữ nguyên hành vi cũ: **giữ bản đầu + `SkipReason` + log Error** (`sal-005` §16.4 #3) |
-| **3** | **`SalMarketplaceEventLogs` (D7) CHƯA LÀM** | Append-only theo **SỰ KIỆN**; hiện mới có nhật ký theo **ĐƠN** ⇒ sự kiện trùng **không có vết từng lần nhận** |
+| **3** | **`SalMarketplaceEventLogs` (D7)** | ✅ **ĐÃ LÀM 18/10/2026 — §20**: append-only theo **SỰ KIỆN**, ghi **đúng một dòng** ở **mọi** nhánh kể cả `Failed` |
 | **4** | **`GapThresholdSeconds` chưa cấu hình được** | Hiện là **tham số** của hàm thuần (mặc định **3600**); chưa đọc từ `SettingManagement` ⇒ chưa đổi được bằng vận hành |
-| **5** | **Job đối soát chủ động (D12) CHƯA có** | Đã có **index** cho cờ `GapSuspected`, nhưng **chưa** có worker nào quét cờ đó ⇒ cờ sẽ **tồn đọng** (rủi ro đã ghi ở chú thích index) |
+| **5** | **Job đối soát chủ động (D12)** | ✅ **ĐÃ LÀM 16/10/2026 — §19** (`MarketplaceReconciliationWorker`); **`S6` đo runtime**: `C06`/`C07`/`C08` của bước ⑫ |
 | **6** | **`Order.PlacedAtUtc` (F8) vẫn thiếu** | Giảm nhẹ: mốc đặt hàng của sàn **đã** lưu ở intake (`MarketplacePlacedAtUtc`) |
-| **7** | **Connector CHƯA trả `UpdatedAtUtc`** | 📌 Đây là **chặn thật** cho đường chạy: mọi ETO hiện có `AggregateVersion = null` ⇒ khi consumer được nối, nó sẽ **NÉM `eCommerce:Sales:0001`**. Cảnh báo `[MP-THIEU-UPDATE-TIME]` **đã có** để lộ ra ngay |
+| **7** | **Connector CHƯA trả `UpdatedAtUtc`** | ✅ **ĐÃ SỬA 18/10/2026 — §20** (connector PoC trả `update_time` **tất định**) ⇒ `AggregateVersion ≠ null`; **đo runtime**: `C21` của bước ⑫ |
 
 ### 17.7 Lịch sử thay đổi (bổ sung)
 
@@ -1366,3 +1366,125 @@ log ⇒ **mọi** ca kiểm job đều **vô nghĩa**. 🔑 Đây là bài học
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.5 | 16/10/2026 | *(agent, session GĐ1)* | **§19 — LÁT CẮT 4: JOB `D12` + CẢNH BÁO DLQ** (đóng nợ §18.7 #1 một phần + #2 + #3): `MarketplaceReconciliationWorker` (**nhịp 10 phút**, `RunOnStart`, **khoá phân tán**, **UoW chỉ-đọc**) + **đăng ký** trong `eCommerceApplicationModule` + **+1 luật cơ chế** (1101 test). 🔑 **HAI QUYẾT ĐỊNH LỚN:** (①) 🚨 **job CỐ Ý KHÔNG tự hạ cờ `GapSuspected`** — hạ cờ là **KHẲNG ĐỊNH** đã kiểm khớp, mà job **không gọi được sàn**; tự hạ ⇒ **xoá bằng chứng mà không kiểm gì** ⇒ **dấu vết giả**; (②) 🚨 **cảnh báo theo TUỔI (ngưỡng 24 giờ), không chỉ theo SỐ LƯỢNG** — *"5 dòng mới trong 1 giờ"* là **bình thường** còn *"5 dòng từ 3 tuần"* là **báo động**; cùng con số, **hai ý nghĩa trái ngược**. ✅ **13/13 ca trên LOG + DB THẬT**: có neo **mở đầu** *và* **kết thúc** · **không** `AbpAuthorizationException` · **cảnh báo DLQ + GAP bật** · log in **khoá nghiệp vụ** + **tuổi** · **nói rõ job cố ý không tự hạ cờ** · 🚨 **cờ `GapSuspected` VẪN `true`** + **DLQ VẪN chưa xử lý** (job **không** tự sửa dữ liệu). 🐞 **BA lỗi của tôi, hai loại nguy hiểm:** (1) 🚨 **`AbpAuthorizationException`** — worker gọi app service `[Authorize]` ⇒ **job chết giữa đường mà không báo cho ai**; ⚠️ **và các ca *"job không ghi gì"* vẫn XANH vì lý do SAI** ⇒ sửa bằng **đọc repository trực tiếp** + **neo kết thúc** + **luật mới** `Worker_KHONG_duoc_goi_APP_SERVICE_co_Authorize`; (2) 🚨 **neo "chạy xong" là điều kiện để phép đo có nghĩa** — không có nó thì job chết vẫn *"có chạy"* theo log (bài học `inv-001` §27 NN2 ở dạng mới); (3) **so khớp dấu tiếng Việt sai hai lần** — console logger làm hỏng dấu ⇒ sửa bằng **chuẩn hoá bỏ dấu** + **vân tay số**. Ghi **§19.6** (nợ: **chưa tự đối soát được** — cần connector trả `update_time` + credential sandbox · chưa UI DLQ · chưa dọn DLQ · chưa phát lại · cảnh báo mới ở mức **log + metric**, chưa có alert rule · **ngưỡng 24 giờ là hằng số** · chưa có metric cho `GapSuspected`) |
+
+---
+
+## 20. ✅ **LÁT CẮT 5 — NHẬT KÝ SỰ KIỆN `D7` + CONNECTOR TRẢ `update_time` + ĐO RUNTIME** (18/10/2026) — *phiên `S6`*
+
+> ⚠️ **PHẠM VI NÓI RÕ:** lát cắt này đóng **ba nợ** đã ghi (§17.6 #3, §17.6 #7, §18.7 #1) và sửa **một lỗi
+> thật** phát hiện được **chỉ vì lần đầu đo runtime**. 🚨 **Nhưng `SAL-005` vẫn KHÔNG `Implemented`**:
+> đơn nội bộ **vẫn chưa** được cập nhật khi áp watermark (§20.7) — xem lý do, **đừng** đọc *"39/39 ca xanh"*
+> thành *"đơn sàn đã đồng bộ xong"*.
+
+### 20.1 Ba nợ, một lát cắt
+
+| Nợ (ghi ở) | Trước lát cắt này | Sau lát cắt này |
+|---|---|---|
+**#3** — `SalMarketplaceEventLogs` (`D7`) *chưa làm* (§17.6 #3, §18.7 #3) | Chỉ có nhật ký theo **ĐƠN** ⇒ sự kiện **trùng/đến muộn** bị chặn nhưng **không có vết từng lần nhận** | ✅ Bảng **append-only** theo **SỰ KIỆN** + ghi **đúng một dòng** ở **mọi** nhánh (kể cả bỏ qua và **thất bại**) |
+**#7** — connector **chưa trả `update_time`** (§17.6 #7, §18.7 #7) | `AggregateVersion = null` ở **mọi** ETO ⇒ luật 4 nhánh **chưa từng chạy** trên dữ liệu thật; log `[MP-THIEU-UPDATE-TIME]` cảnh báo mỗi nhịp | ✅ Connector PoC trả `UpdatedAtUtc` (**tất định**) ⇒ `AggregateVersion ≠ null` ⇒ **watermark chạy thật** (đo được: §20.3) |
+**§18.7 #1** — *"CHƯA đo được runtime của watermark + DLQ"* | Probe cũ **từ chối kết luận** (ca `C1` ĐỎ **đúng thiết kế**) vì **không có đường nào phát `ChannelOrderPulledEto`** | ✅ **Bước ⑫** của cổng: gieo shop → kéo đơn **qua đúng nút "Đồng bộ ngay"** → handler thật → đo **DB thật** (39 ca) |
+
+📌 **Vì sao gộp ba việc vào một lát cắt:** cả ba **cùng một đường gọi**. Nếu làm event log mà **không** có
+`update_time` thì nhánh `Applied`/`Late` **không bao giờ** xuất hiện (chỉ có `ThieuWatermark`) ⇒ bảng mới
+**không kiểm được**. 🔑 Và nếu làm cả hai mà **không đo runtime** thì lặp lại đúng trạng thái §18.6:
+*"xanh mà không biết mình vừa đo cái gì"*.
+
+### 20.2 Đã làm
+
+| # | Thành phần | Tệp | Nội dung |
+|---|---|---|---|
+| **1** | `MarketplaceEventLog` (entity **append-only**) + enum `MarketplaceIntakeOutcome` | `src/eCommerce.Domain/Entities/Orders/MarketplaceEventLog.cs` | 7 kết cục: `Applied` · `Duplicate` · `Late` · `Conflict` · `GapSuspected` · `Failed` · **`ThieuWatermark`** (xem §20.4 ②). 🔒 **Không** có phương thức công khai nào ⇒ **sửa được dấu vết là không thể** (kiểm bằng reflection) |
+| **2** | `MarketplaceEventLogWriter` (hạ tầng nội bộ) | `src/eCommerce.Application/Marketplace/MarketplaceEventLogWriter.cs` | Mở **UoW riêng** (`requiresNew`) cho **mọi** lần ghi ⇒ dấu vết **không bị rollback theo** transaction đã hỏng. Nhận biết **trùng** bằng **ĐỌC LẠI DB**, **không** đoán theo chuỗi lỗi |
+| **3** | Handler ghi **đúng MỘT dòng** ở **mọi** nhánh | `MarketplaceOrderIntakeHandler.cs` | `ApDung`→`Applied`/`GapSuspected` · `Trung`→`Duplicate` · `DenMuon`→`Late` · `XungDot`→`Conflict` · thiếu watermark→`ThieuWatermark` · ném lỗi→`Failed` (best-effort, **không** che lỗi gốc) |
+| **4** | 🚨 **Ghi watermark NGAY LẦN NHẬN ĐẦU TIÊN** | `MarketplaceOrderIntakeHandler.cs` | **Lỗ hổng thật** (xem §20.5 #2): dòng intake mới để `AppliedSourceVersion = null` ⇒ bản **CŨ HƠN** đến sau được coi là *"chưa có watermark"* ⇒ **áp dụng** ⇒ **ghi đè trạng thái mới** |
+| **5** | Migration `20261018082801_Sal005_MarketplaceEventLogs` | `src/eCommerce.EntityFrameworkCore/Migrations/` | Bảng + **3 index** + **2 `CHECK`** + **`UNIQUE … NULLS NOT DISTINCT`** (SQL thô) ⇒ **NND 52 → 53** |
+| **6** | Connector PoC trả `update_time` + trạng thái thô | `modules/ChannelHub/…/Connectors/ShopeeConnector.cs` | `UpdatedAtUtc = PlacedAtUtc + 1 phút` (**tất định** — cùng con trỏ ⇒ cùng phiên bản), `StatusRaw = READY_TO_SHIP`, `EventKind = Created` |
+| **7** | `MarketplacePayloadHash` — hash **nội dung nghiệp vụ** | `src/eCommerce.Application/Marketplace/MarketplacePayloadHash.cs` | Loại **toàn bộ** trường vận chuyển (`TenantId`, `ChannelShopId`, `CorrelationId`, `IsFromWebhook`, `PayloadHash`) ⇒ sửa **lỗi thật** §20.5 #1 |
+| **8** | **Bước ⑫** của cổng — `tools\probe-don-san.ps1` | `tools/` | **39 ca** trên **đường chạy thật + DB thật** (xem §20.3) |
+
+### 20.3 ✅ Kiểm chứng — số đo THẬT
+
+| Hạng mục | Trước `S6` (baseline 18/10/2026) | Sau `S6` |
+|---|---|---|
+| Unit test | **1347** | **1363** (+16) |
+| Integration test (PostgreSQL thật) | **57** | **67** (+10) |
+| Số `unique index` có `NULLS NOT DISTINCT` | **52** | **53** (+1) |
+| Số migration | **39** | **40** (+1) |
+| Bất biến DB (`kiem-db.ps1`) | **24/24** | **25/25** (+1: `SalMarketplaceEventLogs` vào nhóm ①) |
+| Vị trí quét tự dò GUID probe | **85** | **86** (+1: bảng mới có PK `uuid`) |
+| Bước của cổng `-DayDu` | **11** | **12** (+⑫) |
+| **Probe ⑫** (đường chạy thật) | *(chưa có)* | **39/39 ĐẠT** |
+
+📌 `schema.sql` regenerate từ **chính migration** (`dotnet ef migrations script`) và kiểm bằng
+`Compare-Object`: diff **chỉ thêm** — **40 dòng** (bảng + 3 index + 2 `CHECK` + dòng `__EFMigrationsHistory`).
+
+**Probe ⑫ chứng minh 4 điều (mỗi điều là một câu hỏi chỉ đường chạy thật trả lời được):**
+
+| Nhóm | Ca đo được |
+|---|---|
+**Event lỗi ⇒ DLQ, KHÔNG mất** | `C13` đến muộn ⇒ DLQ `HaWatermark` · `C14` DLQ giữ **payload gốc** (> 100 ký tự) ⇒ phát lại được · `C18` xung đột cùng mốc ⇒ DLQ `XungDotPayload` · `C11`/`C17` **KHÔNG ghi đè** watermark |
+**Watermark chạy trên dữ liệu thật** | `C21` `AppliedSourceVersion` = **epoch(`update_time`)** (khác `null` — trước `S6` luôn `null`) · `C25` nhảy mốc **vẫn áp dụng** · `C26` cờ `GapSuspected` **bật** · `C27` `Outcome = GapSuspected` |
+**Gửi lại KHÔNG DLQ giả** | `C29` không tạo đơn thứ hai · `C30` không tạo nhật ký thứ hai · `C31` **có vết `Duplicate`** · `C32` **DLQ KHÔNG tăng** · `C33` watermark không đổi |
+**Nhật ký + job `D12`** | `C34` 5 lần nhận ⇒ **đúng 5 dòng**, **0** cặp trùng · `C06`+`C07` job `D12` có **cả** neo mở đầu **và** kết thúc · `C08` cảnh báo cờ gap **in ra khoá nghiệp vụ** · `C35`–`C37` neo đường ghi nhật ký / DLQ / watermark **có trong log** |
+
+### 20.4 Hai quyết định thiết kế (kèm cái giá)
+
+| # | Quyết định | Vì sao | Cái giá / ghi chú |
+|---|---|---|---|
+| ① | **Khoá unique CÓ `Outcome`**: `(TenantId, ChannelCode, ExternalOrderId, SourceVersion, PayloadHash, Outcome)` | 🚨 **Phát hiện khi viết test:** khoá 5 cột (như §5.2.3 mô tả) khiến một sự kiện **giao lại** trùng **toàn bộ** khoá với dòng `Applied` ⇒ dòng `Duplicate` **KHÔNG BAO GIỜ** ghi được ⇒ `Outcome = Duplicate` thành **giá trị CHẾT**, và câu hỏi *"sàn có gửi lại không?"* — mục đích của `D7` — **không trả lời được** | Vẫn chặn được ca thật của hàng rào: *"cùng một kết cục ghi hai lần do bug/hai luồng"*. ⚠️ Đổi lại: khoá **6 cột** dài hơn, tên index phải đặt tường minh (`…_Ver_Hash_Outcome`, **58 ký tự** — tên EF tự sinh 94 > 63 ⇒ PostgreSQL **cắt**) |
+| ② | **`ThieuWatermark` là giá trị RIÊNG** (không dùng `Late`) | `Late` là **kết luận** *"bản này cũ hơn"* **dựa trên dữ liệu**; ở ca thiếu watermark ta **không có** dữ liệu để kết luận. 📌 Gộp hai thứ là đúng loại *"hai nguyên nhân, một mã"* đã làm hỏng phép đo trước đây (`kiem-moc-build.ps1`) | Enum **7** giá trị (không phải 5+1 như §5.2.3). 🔑 Nhờ nó, cột `Outcome` **đo được** nợ connector: một lần connector quên `update_time` là thấy ngay **dòng `ThieuWatermark`**, không phải đọc log |
+
+### 20.5 🚨 HAI LỖI THẬT phát hiện ở `S6` — **cả hai đều "không làm đỏ test nào" trước đó**
+
+**#1 — Hash chống trùng băm CẢ `CorrelationId` ⇒ DLQ GIẢ ở mọi lần kéo lại (ĐÃ SỬA, đo hai chiều).**
+
+Handler từng băm `JsonSerializer.Serialize(eventData)` — tức băm **cả ETO**, gồm `CorrelationId` mà
+`ChannelShopSyncer` sinh **mới cho mỗi lần kéo**, cộng `TenantId`/`ChannelShopId`/`IsFromWebhook`/`PayloadHash`.
+⇒ cùng một đơn, cùng nội dung, lần kéo sau vẫn ra **hash khác** ⇒ tầng chống trùng kết luận **XUNG ĐỘT
+PAYLOAD** ⇒ **DLQ giả** + `SkipReason` bị ghi đè — đúng thứ `PayloadCanonicalizer` đã cảnh báo:
+*"sau vài lần DLQ giả, người trực bắt đầu bỏ qua cảnh báo — và đó là lúc xung đột THẬT bị bỏ qua"*.
+
+🔒 **Vì sao 1358 test cũ KHÔNG thấy:** mọi test đều dựng **một** ETO rồi xử lý **một** lần. Lỗi chỉ hiện khi
+**cùng một đơn được gửi HAI lần với `CorrelationId` khác nhau** — đúng ca *"sàn gửi lại"* mà `SAL-005` sinh ra để phục vụ.
+
+✅ **Sửa:** tách **hai payload** — `payloadJsonDayDu` (nguyên vẹn, cho **DLQ**: cắt/chuẩn hoá lại là **không phát lại được**)
+và `MarketplacePayloadHash` (nội dung nghiệp vụ, cho **khoá chống trùng** + **hash**).
+
+📌 **ĐO HAI CHIỀU (đã làm, không phải suy đoán):**
+
+| Trạng thái mã | Probe ⑫ | Bằng chứng |
+|---|---|---|
+| **Tiêm lại mã CŨ** (dùng payload đầy đủ cho khoá chống trùng) | **37/39** — `C31` **ĐỎ** (`Duplicate = 0`), `C32` **ĐỎ** (**DLQ 2 → 3**) | Ca `C28` vẫn `200` ⇒ *"đơn không tạo lại"* **không đủ** để kết luận; phải đo **DLQ** và **vết `Duplicate`** |
+| **Mã đã sửa** | **39/39** | `C31` = 1 dòng `Duplicate`, `C32` **DLQ không tăng** |
+
+**#2 — Dòng intake MỚI không ghi watermark ⇒ bản CŨ đến sau vẫn được áp (ĐÃ SỬA).**
+
+Nhánh *"chưa có bản ghi ⇒ tạo đơn"* **không** đặt `AppliedSourceVersion` ⇒ nó ở `null` cho tới **sự kiện thứ hai**.
+Hệ quả: một bản **cũ hơn** đến sau được coi là *"chưa có watermark"* ⇒ **áp dụng** ⇒ **ghi đè trạng thái mới hơn** —
+đúng điều `D5`/`D6` cấm. 📌 Không lỗi biên dịch, không test nào đỏ (chưa có test hai sự kiện trên **một** đơn ở tầng này).
+✅ Nay ghi watermark **trước khi `INSERT`** ⇒ bất biến *"watermark chỉ tăng"* có hiệu lực **ngay từ bản đầu**.
+
+### 20.6 🐞 Ba cái bẫy của CHÍNH PHÉP ĐO (ghi để lần sau không vấp)
+
+| # | Bẫy | Triệu chứng **đo được** | Cách chặn |
+|---|---|---|---|
+| **S6-1** | 🚨 `Select-String -SimpleMatch '\[D12-JOB-BAT-DAU\]'` | **0 khớp** dù log **CÓ** neo ⇒ **6 ca ĐỎ GIẢ** (suýt kết luận *"job `D12` không chạy"* trong khi nó chạy đúng, in cả khoá nghiệp vụ) | 🔑 Với `-SimpleMatch` thì `\` là **ký tự THẬT** ⇒ viết `-SimpleMatch '[D12-…]'`. 📌 Chính lỗi này đã làm 6 ca ĐỎ ở lần chạy đầu |
+| **S6-2** | **Route thật ≠ route trong tài liệu** (lần thứ **4** của dự án) | `POST /api/app/channel/sync-now/{id}` ⇒ **`404`**; route thật là `POST /api/app/channel/{id}/sync-now` (đọc từ `swagger.json`) | **In `HTTP STATUS` trước body** + đọc route từ swagger (`README-probe` **S2-1**, **A6**) |
+| **S6-3** | **Dọn probe thiếu bảng `MsgIdempotencyRecords`** | Lần chạy sau handler **không chạy** (`TraVeKetQuaCu`) ⇒ mọi ca **XANH vì lý do SAI** | Xoá **cả** bản ghi chống trùng theo tiền tố mã đơn (§D của `README-probe`; quy tắc ⑤ của probe) |
+
+### 20.7 ⏳ NỢ CÒN LẠI — **`SAL-005` vẫn KHÔNG `Implemented`**
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+| **1** | 🚨 **`Order` nội bộ CHƯA được cập nhật khi `ApDung`** | Watermark **đúng**, nhật ký **đủ**, DLQ **có bằng chứng** — nhưng **trạng thái/địa chỉ/tiền của đơn vẫn CŨ**. 📌 Đó là phần `SAL-003` (guard chuyển trạng thái) + `SAL-006`. 🔑 Vì nợ này, `SAL-005` **không** được đánh dấu `Implemented` |
+| **2** | **Chưa có API/UI đọc `SalMarketplaceEventLogs`** | Bảng đã có dữ liệu đúng, **chưa có màn hình** ⇒ thuộc `S7` (cùng DLQ UI) |
+| **3** | **Hai định nghĩa hash** (`ETO.PayloadHash` phía phát · `MarketplacePayloadHash` phía nhận) | Đã khoá bằng test `Producer_bam_model_va_consumer_bam_ETO__cho_CUNG_hash`, nhưng vẫn là **hai nơi**. 📌 Hợp nhất = nợ kỹ thuật (đổi một nơi là đổi hash ⇒ phải có kế hoạch) |
+| **4** | **`Q5` (REVOKE append-only ở tầng DB) còn mở** | Append-only hiện chỉ ở **tầng ứng dụng** (reflection test). SQL tay vẫn sửa được dấu vết |
+| **5** | **Chưa có retention/dọn DLQ + dọn event log** | Hai bảng **chỉ tăng**. 📌 Cần chính sách trước khi chạy thật lâu dài |
+| **6** | **Chưa kiểm chứng TIỀN THẬT** | Giữ nguyên từ `S4`/`S5` (`TmnCode`/`HashSecret` rỗng) — **không** liên quan `S6` nhưng vẫn là điều kiện `Implemented` của cả cụm |
+
+### 20.8 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.2 | 18/10/2026 | *(agent, phiên `S6`)* | **§20 — LÁT CẮT 5**: **`SalMarketplaceEventLogs`** (append-only, 7 kết cục) + **`MarketplaceEventLogWriter`** (UoW riêng, nhận biết trùng bằng **đọc lại DB**) + handler ghi **đúng một dòng ở MỌI nhánh** + **ghi watermark ngay lần đầu** + migration (`NND 52→53`, 3 index, 2 `CHECK`) + **connector PoC trả `update_time`** + **`MarketplacePayloadHash`** + **bước ⑫** của cổng (`probe-don-san.ps1`, **39 ca**). 🚨 **HAI LỖI THẬT:** (#1) **hash chống trùng băm cả `CorrelationId`** ⇒ **DLQ GIẢ ở mọi lần kéo lại** — 1358 test cũ **không** thấy vì cần **hai** lần gửi khác `CorrelationId`; **đo hai chiều**: tiêm lại mã cũ ⇒ `C31`/`C32` **ĐỎ** (DLQ **2 → 3**), mã đã sửa ⇒ **39/39**; (#2) **dòng intake mới không ghi watermark** ⇒ bản **cũ hơn** đến sau vẫn **ghi đè**. 🔑 **HAI QUYẾT ĐỊNH:** (①) khoá unique **có `Outcome`** — thiếu nó thì `Duplicate` là **giá trị CHẾT**; (②) `ThieuWatermark` là **giá trị riêng** (không dùng `Late`). 📊 **Số đo:** unit **1347 → 1363** · integration **57 → 67** · NND **52 → 53** · migration **39 → 40** · bất biến DB **24 → 25** · quét GUID **85 → 86** · cổng **11 → 12 bước**. 🐞 **Ba bẫy của phép đo:** `-SimpleMatch` coi `\` là ký tự thật ⇒ **6 ca ĐỎ GIẢ** · route thật là `/channel/{id}/sync-now` (**404** ngay lần đầu) · dọn probe **phải** xoá `MsgIdempotencyRecords`. ⚠️ **VẪN KHÔNG `Implemented`** (§20.7): **`Order` nội bộ chưa cập nhật khi áp watermark** · chưa có UI nhật ký · hai định nghĩa hash · `Q5` mở · chưa retention · chưa kiểm tiền thật |

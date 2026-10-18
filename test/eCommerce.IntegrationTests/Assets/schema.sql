@@ -2415,3 +2415,43 @@ VALUES ('20261018052714_S5_PayRefunds_VaRangBuocHoanTien', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE TABLE "SalMarketplaceEventLogs" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "ChannelCode" character varying(32) NOT NULL,
+    "ChannelShopId" uuid,
+    "ExternalOrderId" character varying(64) NOT NULL,
+    "SourceVersion" bigint,
+    "PayloadHash" character varying(64) NOT NULL,
+    "Outcome" integer NOT NULL,
+    "EventKind" character varying(24),
+    "MarketplaceStatusRaw" character varying(64),
+    "IsFromWebhook" boolean NOT NULL,
+    "SourceUpdatedAtUtc" timestamp with time zone,
+    "ReceivedAtUtc" timestamp with time zone NOT NULL,
+    "FailureCode" character varying(64),
+    "FailureMessage" character varying(2000),
+    "CorrelationId" character varying(64),
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    CONSTRAINT "PK_SalMarketplaceEventLogs" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_SalMktEventLogs_PayloadHash_Hex" CHECK ("PayloadHash" ~ '^[0-9a-f]{64}$'),
+    CONSTRAINT "CK_SalMktEventLogs_SourceVersion" CHECK ("SourceVersion" IS NULL OR "SourceVersion" > 0)
+);
+
+CREATE INDEX "IX_SalMktEventLogs_TenantId_Channel_Order_Received" ON "SalMarketplaceEventLogs" ("TenantId", "ChannelCode", "ExternalOrderId", "ReceivedAtUtc");
+
+DROP INDEX IF EXISTS "IX_SalMktEventLogs_TenantId_Channel_Order_Ver_Hash_Outcome";
+
+CREATE UNIQUE INDEX "IX_SalMktEventLogs_TenantId_Channel_Order_Ver_Hash_Outcome" ON "SalMarketplaceEventLogs" ("TenantId", "ChannelCode", "ExternalOrderId", "SourceVersion", "PayloadHash", "Outcome") NULLS NOT DISTINCT;
+
+CREATE INDEX "IX_SalMktEventLogs_TenantId_Outcome_Received" ON "SalMarketplaceEventLogs" ("TenantId", "Outcome", "ReceivedAtUtc");
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261018082801_Sal005_MarketplaceEventLogs', '10.0.11');
+
+COMMIT;
+

@@ -232,7 +232,7 @@ Trước phiên này danh sách là **52**; đối chiếu **code thật** thì 
 | `SAL-002` | [Checkout và đặt hàng (tính lại giá + giữ kho)](sales/sal-002-checkout-va-dat-hang.md) | 1014 | 🟡 Draft · 16/16 mục |
 | `SAL-003` | [State machine 4 trục và lịch sử trạng thái](sales/sal-003-state-machine-4-truc.md) | 998 | 🟡 Draft · 16/16 mục |
 | `SAL-004` | [Huỷ đơn và compensation (bù trừ)](sales/sal-004-huy-don-va-compensation.md) | 892 | 🟡 Draft · 16/16 mục |
-| `SAL-005` | [Webhook đơn từ sàn (idempotent, chịu được sai thứ tự)](sales/sal-005-webhook-don-tu-san.md) | 1369 | 🟡 Draft · 16/16 mục |
+| `SAL-005` | [Webhook đơn từ sàn (idempotent, chịu được sai thứ tự)](sales/sal-005-webhook-don-tu-san.md) | 1490 | 🟡 Draft · 16/16 mục + **§16–§20** (5 lát cắt) · 🟢 **ĐÃ CÓ CODE** (18/10/2026): `S4`/`S5` = thanh toán · **`S6` = nhật ký sự kiện `SalMarketplaceEventLogs` (D7) + connector trả `update_time` + bước ⑫ đo runtime (39 ca)** — ⚠️ **chưa `Implemented`**: **`Order` nội bộ chưa cập nhật khi áp watermark** · chưa có UI nhật ký · `Q5` mở · chưa kiểm tiền thật |
 | `SAL-006` | [Trả hàng / RMA và hoàn tiền (một phần / toàn bộ)](sales/sal-006-tra-hang-rma-hoan-tien.md) | 1988 | 🟡 Draft · 16/16 mục |
 
 ### `shipping/` — ShippingHub — GHN, GHTK, webhook vận đơn, COD

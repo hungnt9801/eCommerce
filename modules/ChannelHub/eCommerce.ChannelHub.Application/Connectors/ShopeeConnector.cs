@@ -118,19 +118,43 @@ public class ShopeeConnector : IChannelConnector
 
         for (var i = 0; i < soDon; i++)
         {
+            // 🔒 `PlacedAtUtc` và `UpdatedAtUtc` phải **TẤT ĐỊNH** theo (shop, con trỏ, chỉ số) —
+            // **KHÔNG** dùng `DateTime.UtcNow`.
+            // 🚨 Vì sao: khi con trỏ không tiến (đúng ca fail-closed) hoặc khi sàn **gửi lại** cùng một đơn,
+            //    connector phải trả về **CÙNG nội dung**. Nếu mốc đổi mỗi lần kéo thì "cùng một đơn"
+            //    lại có payload khác ⇒ tầng chống trùng báo **XUNG ĐỘT PAYLOAD** (đúng theo thiết kế) và
+            //    **không thể kiểm chứng** đường "sàn gửi lại" — đã gặp thật khi kiểm chứng E2E 15/10/2026.
+            var placedAt = new DateTime(conTro, DateTimeKind.Utc).AddMinutes(i);
+
             danhSach.Add(new ChannelOrderModel
             {
                 ExternalOrderId = $"POC-{shop.ExternalShopId}-{conTro}-{i}",
-                // ⚠️ `PlacedAtUtc` phải TẤT ĐỊNH theo (shop, con trỏ, chỉ số) — KHÔNG dùng `DateTime.UtcNow`.
-                // 🚨 Vì sao: khi con trỏ không tiến (đúng ca fail-closed) hoặc khi sàn **gửi lại** cùng một đơn,
-                //    connector phải trả về **CÙNG nội dung**. Nếu `PlacedAtUtc` đổi mỗi lần kéo thì "cùng một đơn"
-                //    lại có payload khác ⇒ tầng chống trùng báo **XUNG ĐỘT PAYLOAD** (đúng theo thiết kế) và
-                //    **không thể kiểm chứng** đường "sàn gửi lại" — đã gặp thật khi kiểm chứng E2E 15/10/2026.
-                PlacedAtUtc = new DateTime(conTro, DateTimeKind.Utc).AddMinutes(i),
+                PlacedAtUtc = placedAt,
                 Currency = "VND",
                 ShippingFee = 30_000m,
                 ChannelDiscount = 0m,
                 BuyerNote = "Đơn GIẢ do PoC sinh ra (ChannelHub:Shopee:PocOrdersPerPull).",
+
+                // ══════════════════════════════════════════════════════════════════════════════════════════
+                // 🆕 `S6` — **`update_time` CỦA SÀN** (`SAL-005` **F3** / nợ §17.6 #7). ĐÂY LÀ ĐIỀU KIỆN ĐỂ
+                // TOÀN BỘ LUẬT WATERMARK **CHẠY ĐƯỢC TRÊN DỮ LIỆU THẬT**:
+                // trước lượt này connector **không** trả `UpdatedAtUtc` ⇒ `AggregateVersion = null` ở **mọi**
+                // ETO ⇒ nhánh `ApDung`/`Trung`/`XungDot`/`DenMuon` **chưa từng** chạy ở runtime, và handler
+                // rơi vào nhánh *"thiếu phiên bản"* ⇒ **sàn có đổi đơn thì hệ thống cũng không biết**.
+                //
+                // 📌 `update_time` **LUÔN ≥** `placed_at` (đơn được sửa **sau** khi đặt) — ở đây +1 phút.
+                // 🔒 Vẫn **tất định** như `PlacedAtUtc` ⇒ kéo lại cùng con trỏ cho ra **cùng** phiên bản
+                // ⇒ nhánh `Trung` (trùng) kiểm được **thật**, không thành `XungDot` giả.
+                // ⚠️ Cố ý **KHÔNG** dùng `DateTime.UtcNow`: nó làm mỗi lần kéo ra một phiên bản mới ⇒ mọi
+                //    lần kéo đều thành "cập nhật mới" ⇒ **không** kiểm được ca then chốt *"sàn gửi lại"*.
+                // ══════════════════════════════════════════════════════════════════════════════════════════
+                UpdatedAtUtc = placedAt.AddMinutes(1),
+
+                // Trạng thái **THÔ** của sàn — bắt buộc có để handler ghi được `MarketplaceStatusRaw`
+                // (điều tra/đối soát). 🔒 Ánh xạ sang trạng thái nội bộ thuộc `SAL-003`, KHÔNG ở đây.
+                StatusRaw = "READY_TO_SHIP",
+                EventKind = "Created",
+
                 Lines =
                 [
                     new ChannelOrderLineModel

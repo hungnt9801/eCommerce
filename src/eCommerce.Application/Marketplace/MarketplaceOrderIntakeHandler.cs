@@ -50,6 +50,7 @@ public class MarketplaceOrderIntakeHandler : IDistributedEventHandler<ChannelOrd
     private readonly ICorrelationIdProvider _correlationIdProvider;
     private readonly ILogger<MarketplaceOrderIntakeHandler> _logger;
     private readonly DeadLetterWriter _dlq;
+    private readonly MarketplaceEventLogWriter _eventLog;
 
     public MarketplaceOrderIntakeHandler(
         IRepository<Orders.Order, Guid> orderRepository,
@@ -59,7 +60,8 @@ public class MarketplaceOrderIntakeHandler : IDistributedEventHandler<ChannelOrd
         IUnitOfWorkManager unitOfWorkManager,
         ICorrelationIdProvider correlationIdProvider,
         ILogger<MarketplaceOrderIntakeHandler> logger,
-        DeadLetterWriter dlq)
+        DeadLetterWriter dlq,
+        MarketplaceEventLogWriter eventLog)
     {
         _orderRepository = orderRepository;
         _intakeRepository = intakeRepository;
@@ -69,7 +71,9 @@ public class MarketplaceOrderIntakeHandler : IDistributedEventHandler<ChannelOrd
         _correlationIdProvider = correlationIdProvider;
         _logger = logger;
         _dlq = dlq;
+        _eventLog = eventLog;
     }
+
 
     public async Task HandleEventAsync(ChannelOrderPulledEto eventData)
     {
@@ -83,108 +87,166 @@ public class MarketplaceOrderIntakeHandler : IDistributedEventHandler<ChannelOrd
                 .WithData("externalOrderId", eventData.ExternalOrderId);
         }
 
-        // Payload chuẩn hoá để (a) băm chống trùng, (b) phát hiện "cùng đơn nhưng nội dung khác".
-        var payloadJson = JsonSerializer.Serialize(eventData);
-        var payloadHash = CanonicalJsonHasher.Bam(payloadJson);
+        // ══════════════════════════════════════════════════════════════════════════════════════════════
+        // 🚨 **HAI PAYLOAD, HAI MỤC ĐÍCH KHÁC NHAU — đừng gộp (lỗi THẬT, sửa ở `S6`):**
+        //
+        //   • `payloadJsonDayDu` = `Serialize(eventData)` — **payload GỐC nguyên vẹn**, dùng cho **DLQ**
+        //     (bất biến 1 của DLQ: cắt/chuẩn hoá lại ⇒ **không phát lại được**);
+        //   • `payloadJsonNghiepVu` = **nội dung NGHIỆP VỤ** (không có `CorrelationId`/`TenantId`/
+        //     `ChannelShopId`/`IsFromWebhook`) — dùng cho **khoá chống trùng** và **hash**.
+        //
+        // 🔑 **VÌ SAO PHẢI TÁCH (đo được):** trước `S6` cả hai dùng chung `payloadJson` ⇒ hash **có**
+        // `CorrelationId` — mà trường đó **đổi mỗi lần kéo** ⇒ cùng một đơn, cùng nội dung, lần kéo sau vẫn
+        // ra **hash khác** ⇒ tầng chống trùng kết luận **XUNG ĐỘT PAYLOAD** ⇒ **DLQ GIẢ ở MỌI lần kéo lại**
+        // + `SkipReason` bị ghi đè. 📌 Sau vài lần DLQ giả thì người trực **bỏ qua cảnh báo** — và đó là lúc
+        // xung đột **THẬT** bị bỏ qua (`PayloadCanonicalizer` đã cảnh báo đúng điều này).
+        // ══════════════════════════════════════════════════════════════════════════════════════════════
+        var payloadJsonDayDu = JsonSerializer.Serialize(eventData);
+        var payloadJsonNghiepVu = MarketplacePayloadHash.ChuoiChuanHoa(eventData);
+        var payloadHash = MarketplacePayloadHash.Tinh(eventData);
 
         var khoa = IdempotencyKey.Cua($"{eventData.ChannelCode}:order", eventData.ExternalOrderId);
-
-        // 🚨🚨 BẮT BUỘC MỞ **UoW RIÊNG** — BÀI HỌC ĐO ĐƯỢC 15/10/2026 (không phải suy luận).
-        //
-        // ABP giao sự kiện của `IDistributedEventBus` (transport **in-process**, `XC-002` Q1) **SAU KHI
-        // UoW của NƠI PHÁT hoàn tất** — để người nhận không đọc phải dữ liệu chưa commit. Hệ quả:
-        // `eCommerceDbContext` của UoW đó **ĐÃ BỊ DISPOSE**. Nếu handler dùng repository ngay thì:
-        //
-        //     System.ObjectDisposedException: Cannot access a disposed context instance.
-        //     Object name: 'eCommerceDbContext'.
-        //        at eCommerce.Messaging.EntityFrameworkCore.EfCoreIdempotencyStore.TimAsync(...)
-        //        at eCommerce.Messaging.Idempotency.IdempotencyGuard.ThucThiAsync(...)
-        //        at eCommerce.Marketplace.MarketplaceOrderIntakeHandler.HandleEventAsync(...)
-        //
-        // ⇒ Đo được thật khi chạy Host (không lỗi biên dịch, **không** lỗi khi build/test).
-        // Cách sửa ĐÚNG: mở UoW **mới** (`requiresNew: true`) cho toàn bộ phần ghi của handler.
-        // ⚠️ **KHÔNG** dùng `[UnitOfWork]`/`IUnitOfWorkEnabled` trần: interceptor của ABP mặc định
-        //    `requiresNew = false` ⇒ nó **tái dùng** UoW đã dispose ⇒ vẫn lỗi y nguyên.
-        using var uow = _unitOfWorkManager.Begin(requiresNew: true, isTransactional: true);
 
         // `IDistributedEventHandler<T>` (ABP 10.7) không truyền `CancellationToken` vào handler ⇒ dùng token
         // mặc định cho cả lần gọi guard và lần ghi vết, để hai chỗ **cùng một token**.
         var ct = CancellationToken.None;
 
-        var ketQua = await _idempotencyGuard.ThucThiAsync(
-            khoa,
-            payloadJson,
-            token => NhanDonAsync(eventData, payloadHash, token),
-            ct);
-
-        switch (ketQua.Kind)
+        try
         {
-            case IdempotencyOutcomeKind.DaThucThi:
-                _logger.LogInformation(
-                    "Đã nhận đơn sàn {ChannelCode}/{ExternalOrderId} ⇒ tạo đơn nội bộ {OrderId}.",
-                    eventData.ChannelCode, eventData.ExternalOrderId, ketQua.Result);
-                break;
+            // 🚨🚨 BẮT BUỘC MỞ **UoW RIÊNG** — BÀI HỌC ĐO ĐƯỢC 15/10/2026 (không phải suy luận).
+            //
+            // ABP giao sự kiện của `IDistributedEventBus` (transport **in-process**, `XC-002` Q1) **SAU KHI
+            // UoW của NƠI PHÁT hoàn tất** — để người nhận không đọc phải dữ liệu chưa commit. Hệ quả:
+            // `eCommerceDbContext` của UoW đó **ĐÃ BỊ DISPOSE**. Nếu handler dùng repository ngay thì:
+            //
+            //     System.ObjectDisposedException: Cannot access a disposed context instance.
+            //     Object name: 'eCommerceDbContext'.
+            //        at eCommerce.Messaging.EntityFrameworkCore.EfCoreIdempotencyStore.TimAsync(...)
+            //        at eCommerce.Messaging.Idempotency.IdempotencyGuard.ThucThiAsync(...)
+            //        at eCommerce.Marketplace.MarketplaceOrderIntakeHandler.HandleEventAsync(...)
+            //
+            // ⇒ Đo được thật khi chạy Host (không lỗi biên dịch, **không** lỗi khi build/test).
+            // Cách sửa ĐÚNG: mở UoW **mới** (`requiresNew: true`) cho toàn bộ phần ghi của handler.
+            // ⚠️ **KHÔNG** dùng `[UnitOfWork]`/`IUnitOfWorkEnabled` trần: interceptor của ABP mặc định
+            //    `requiresNew = false` ⇒ nó **tái dùng** UoW đã dispose ⇒ vẫn lỗi y nguyên.
+            using var uow = _unitOfWorkManager.Begin(requiresNew: true, isTransactional: true);
 
-            case IdempotencyOutcomeKind.TraVeKetQuaCu:
-                // Sàn gửi lại / worker pull lại cùng đơn: KHÔNG tạo đơn thứ hai — đúng thiết kế.
-                _logger.LogInformation(
-                    "Đơn sàn {ChannelCode}/{ExternalOrderId} đã xử lý trước đó (đơn nội bộ {OrderId}) — bỏ qua, không tạo trùng.",
-                    eventData.ChannelCode, eventData.ExternalOrderId, ketQua.Result);
-                break;
+            var ketQua = await _idempotencyGuard.ThucThiAsync(
+                khoa,
+                payloadJsonNghiepVu,
+                token => NhanDonAsync(eventData, payloadHash, token),
+                ct);
 
-            case IdempotencyOutcomeKind.XungDotPayload:
-                // 🚨 Cùng khoá đơn nhưng nội dung KHÁC ⇒ **KHÔNG đoán bản nào đúng** (`SAL-005` D6):
-                //    KHÔNG ghi đè, GIỮ bản đã nhận đầu tiên (không mất dữ liệu).
-                //
-                // ⚠️ QUYẾT ĐỊNH CÓ CHỦ Ý — **KHÔNG ném lỗi** ở đây (khác D6 nguyên bản "đẩy DLQ"):
-                //    • Ném lỗi ⇒ `PublishAsync` ném ⇒ `ChannelShopSyncer` **KHÔNG tiến con trỏ** ⇒ sàn gửi lại
-                //      đúng đơn đó ở nhịp sau ⇒ **lặp vô hạn** và **CHẶN CẢ KÊNH**: mọi đơn phía sau cũng không
-                //      vào được. Một đơn nghi vấn làm **sập luồng bán hàng** — hỏng nặng hơn nhiều.
-                //      *(Đã đo được thật 15/10/2026: con trỏ kẹt ở NULL qua nhiều nhịp.)*
-                //    • Nay: GIỮ bản đầu (không ghi đè ⇒ **không mất dữ liệu**, và **tất định**: không instance
-                //      nào ghi đè, nên kết quả không phụ thuộc thứ tự đến), **GHI VẾT** vào nhật ký nhận đơn
-                //      (`SkipReason`) + log **Error** ⇒ **không im lặng**.
-                //    • 📌 Khi `XC-002` có **DLQ** (đã cố ý hoãn), nhánh này PHẢI chuyển sang **đẩy DLQ**.
-                _logger.LogError(
-                    "🚨 XUNG ĐỘT PAYLOAD cho đơn sàn {ChannelCode}/{ExternalOrderId}: cùng khoá nhưng nội dung khác. " +
-                    "GIỮ NGUYÊN bản đã nhận đầu tiên (không ghi đè, không đoán) và GHI VẾT để xử lý thủ công. " +
-                    "KHÔNG chặn kênh — nếu chặn thì một đơn nghi vấn sẽ làm kẹt toàn bộ đơn phía sau.",
-                    eventData.ChannelCode, eventData.ExternalOrderId);
+            switch (ketQua.Kind)
+            {
+                case IdempotencyOutcomeKind.DaThucThi:
+                    // 📌 Dấu vết của nhánh này (`Applied`/`GapSuspected`) được ghi **bên trong**
+                    // `NhanDonAsync` — nơi **biết** kết cục thật. Ghi thêm ở đây là **hai dòng cho một sự kiện**.
+                    _logger.LogInformation(
+                        "Đã nhận đơn sàn {ChannelCode}/{ExternalOrderId} ⇒ tạo đơn nội bộ {OrderId}.",
+                        eventData.ChannelCode, eventData.ExternalOrderId, ketQua.Result);
+                    break;
 
-                await GhiVetXungDotPayloadAsync(eventData, ct);
+                case IdempotencyOutcomeKind.TraVeKetQuaCu:
+                    // Sàn gửi lại / worker pull lại cùng đơn: KHÔNG tạo đơn thứ hai — đúng thiết kế.
+                    _logger.LogInformation(
+                        "Đơn sàn {ChannelCode}/{ExternalOrderId} đã xử lý trước đó (đơn nội bộ {OrderId}) — bỏ qua, không tạo trùng.",
+                        eventData.ChannelCode, eventData.ExternalOrderId, ketQua.Result);
 
-                // 🚨 `XC-002` — **ĐẨY DLQ** (nợ §17.8 #3 của `sal-005` ĐÃ ĐÓNG ở đây).
-                // 📌 Trước lượt này chỉ có `LogError`, và chính chú thích cũ ghi rõ: *"khi `XC-002` có DLQ thì
-                // nhánh này PHẢI chuyển sang đẩy DLQ"*. 🔒 Nay DLQ **đã có** ⇒ thực hiện đúng điều đã hứa.
-                // 🔑 Vì sao `LogError` **KHÔNG đủ**: log bị **xoay vòng** (retention vài ngày), **không** tra cứu
-                // được theo khoá nghiệp vụ, và **không ai** biết còn tồn bao nhiêu ⇒ **mất dữ liệu nhưng có vẻ
-                // như đã xử lý**.
-                // 📌 Dùng chế độ **chung UoW** (không phải UoW riêng): việc xử lý **không** hỏng — ta **quyết định**
-                // đẩy DLQ, và bản ghi DLQ **phải** cùng transaction với vết `SkipReason` ở trên.
-                await _dlq.DayVaoDlqAsync(
-                    tenSuKien: nameof(ChannelOrderPulledEto),
-                    khoaNghiepVu: $"{eventData.ChannelCode}:order:{eventData.ExternalOrderId}",
-                    payloadJson: payloadJson,
-                    payloadHash: payloadHash,
-                    lyDo: Messaging.DeadLetter.LyDoVaoDlq.XungDotPayload,
-                    moTaLyDo:
-                        "Cùng khoá đơn nhưng NỘI DUNG KHÁC bản đã nhận. GIỮ bản đầu (không đoán bản nào đúng) "
-                        + "và đẩy DLQ để người xử lý quyết định.",
-                    tenantId: eventData.TenantId,
-                    cancellationToken: ct);
+                    // 🆕 `D7` — ca BỎ QUA **cũng** phải có dấu vết (§8.1 bất biến 5). 📌 Nếu thiếu, câu hỏi
+                    // *"sàn đã gửi lại bao nhiêu lần?"* **không trả lời được** — và đó chính là thông tin
+                    // dùng để phát hiện dual-path (webhook + pull cùng đơn).
+                    await _eventLog.GhiAsync(
+                        eventData,
+                        Orders.MarketplaceIntakeOutcome.Duplicate,
+                        payloadHash,
+                        eventData.AggregateVersion,
+                        cancellationToken: ct);
+                    break;
 
-                break;
+                case IdempotencyOutcomeKind.XungDotPayload:
+                    // 🚨 Cùng khoá đơn nhưng nội dung KHÁC ⇒ **KHÔNG đoán bản nào đúng** (`SAL-005` D6):
+                    //    KHÔNG ghi đè, GIỮ bản đã nhận đầu tiên (không mất dữ liệu).
+                    //
+                    // ⚠️ QUYẾT ĐỊNH CÓ CHỦ Ý — **KHÔNG ném lỗi** ở đây:
+                    //    • Ném lỗi ⇒ `PublishAsync` ném ⇒ `ChannelShopSyncer` **KHÔNG tiến con trỏ** ⇒ sàn gửi lại
+                    //      đúng đơn đó ở nhịp sau ⇒ **lặp vô hạn** và **CHẶN CẢ KÊNH**: mọi đơn phía sau cũng không
+                    //      vào được. Một đơn nghi vấn làm **sập luồng bán hàng** — hỏng nặng hơn nhiều.
+                    //      *(Đã đo được thật 15/10/2026: con trỏ kẹt ở NULL qua nhiều nhịp.)*
+                    //    • Nay: GIỮ bản đầu (không ghi đè ⇒ **không mất dữ liệu**, và **tất định**: không instance
+                    //      nào ghi đè, nên kết quả không phụ thuộc thứ tự đến), **GHI VẾT** vào nhật ký nhận đơn
+                    //      (`SkipReason`) + **DLQ** + nhật ký sự kiện ⇒ **không im lặng**.
+                    _logger.LogError(
+                        "🚨 XUNG ĐỘT PAYLOAD cho đơn sàn {ChannelCode}/{ExternalOrderId}: cùng khoá nhưng nội dung khác. " +
+                        "GIỮ NGUYÊN bản đã nhận đầu tiên (không ghi đè, không đoán) và GHI VẾT để xử lý thủ công. " +
+                        "KHÔNG chặn kênh — nếu chặn thì một đơn nghi vấn sẽ làm kẹt toàn bộ đơn phía sau.",
+                        eventData.ChannelCode, eventData.ExternalOrderId);
 
-            case IdempotencyOutcomeKind.DangXuLy:
-                _logger.LogWarning(
-                    "Đơn sàn {ChannelCode}/{ExternalOrderId} ĐANG được xử lý ở nơi khác ⇒ bỏ lượt này; " +
-                    "sàn/worker sẽ gửi lại (con trỏ đồng bộ chỉ tiến khi xử lý xong).",
-                    eventData.ChannelCode, eventData.ExternalOrderId);
-                break;
+                    await GhiVetXungDotPayloadAsync(eventData, ct);
+
+                    // 🚨 `XC-002` — **ĐẨY DLQ**.
+                    // 🔑 Vì sao `LogError` **KHÔNG đủ**: log bị **xoay vòng** (retention vài ngày), **không** tra cứu
+                    // được theo khoá nghiệp vụ, và **không ai** biết còn tồn bao nhiêu ⇒ **mất dữ liệu nhưng có vẻ
+                    // như đã xử lý**.
+                    // 📌 Dùng chế độ **chung UoW** (không phải UoW riêng): việc xử lý **không** hỏng — ta **quyết định**
+                    // đẩy DLQ, và bản ghi DLQ **phải** cùng transaction với vết `SkipReason` ở trên.
+                    await _dlq.DayVaoDlqAsync(
+                        tenSuKien: nameof(ChannelOrderPulledEto),
+                        khoaNghiepVu: $"{eventData.ChannelCode}:order:{eventData.ExternalOrderId}",
+                        payloadJson: payloadJsonDayDu,
+                        payloadHash: payloadHash,
+                        lyDo: Messaging.DeadLetter.LyDoVaoDlq.XungDotPayload,
+                        moTaLyDo:
+                            "Cùng khoá đơn nhưng NỘI DUNG KHÁC bản đã nhận. GIỮ bản đầu (không đoán bản nào đúng) "
+                            + "và đẩy DLQ để người xử lý quyết định.",
+                        tenantId: eventData.TenantId,
+                        cancellationToken: ct);
+
+                    await _eventLog.GhiAsync(
+                        eventData,
+                        Orders.MarketplaceIntakeOutcome.Conflict,
+                        payloadHash,
+                        eventData.AggregateVersion,
+                        cancellationToken: ct);
+                    break;
+
+                case IdempotencyOutcomeKind.DangXuLy:
+                    _logger.LogWarning(
+                        "Đơn sàn {ChannelCode}/{ExternalOrderId} ĐANG được xử lý ở nơi khác ⇒ bỏ lượt này; " +
+                        "sàn/worker sẽ gửi lại (con trỏ đồng bộ chỉ tiến khi xử lý xong).",
+                        eventData.ChannelCode, eventData.ExternalOrderId);
+
+                    // 📌 Vẫn ghi dấu vết: đây **là** một lần nhận sự kiện, chỉ là lần nhận **không được xử lý**
+                    // vì cùng sự kiện đang bay ở luồng khác ⇒ xếp vào `Duplicate` (cùng sự kiện, giao lại).
+                    await _eventLog.GhiAsync(
+                        eventData,
+                        Orders.MarketplaceIntakeOutcome.Duplicate,
+                        payloadHash,
+                        eventData.AggregateVersion,
+                        cancellationToken: ct);
+                    break;
+            }
+
+            // Chốt transaction CỦA HANDLER (mọi nhánh đều ghi vết rồi mới tới đây ⇒ KHÔNG rollback oan).
+            await uow.CompleteAsync();
         }
+        catch (Exception ex)
+        {
+            // 🆕 `D7`/§8.1 bất biến 5 — **sự kiện hỏng VẪN phải có dòng**. 📌 Không có nó thì
+            // *"không có dòng nào"* và *"chưa từng nhận sự kiện này"* **trông giống hệt nhau** khi điều tra.
+            // 🔒 `GhiThatBaiAsync` tự mở UoW riêng ⇒ dòng `Failed` **không** bị rollback theo transaction vừa hỏng.
+            await _eventLog.GhiThatBaiAsync(
+                eventData,
+                eventData.ChannelCode,
+                eventData.ExternalOrderId,
+                payloadHash,
+                eventData.AggregateVersion,
+                failureCode: (ex as BusinessException)?.Code ?? ex.GetType().Name,
+                failureMessage: ex.Message,
+                cancellationToken: ct);
 
-        // Chốt transaction CỦA HANDLER (mọi nhánh đều ghi vết rồi mới tới đây ⇒ KHÔNG rollback oan).
-        await uow.CompleteAsync();
+            throw;
+        }
     }
 
     /// <summary>
@@ -276,6 +338,18 @@ public class MarketplaceOrderIntakeHandler : IDistributedEventHandler<ChannelOrd
                             "ĐÃ ÁP WATERMARK cho đơn sàn {ChannelCode}/{ExternalOrderId}: phiên bản {PhienBan} " +
                             "(nghiNgoThieuBan={NghiNgo}). [WM-DA-AP]",
                             suKien.ChannelCode, suKien.ExternalOrderId, vVao, quyetDinh.NghiNgoThieuBanTrungGian);
+
+                        // 🆕 `D7` — dấu vết cho nhánh **ÁP DỤNG**. 📌 Tách `GapSuspected` khỏi `Applied`:
+                        // nếu gộp thì *"có bao nhiêu lần nghi mất bản"* chỉ còn đọc được qua cột cờ — mà cột cờ
+                        // bị Ops hạ sau khi đối soát ⇒ **con số biến mất khỏi nhật ký**.
+                        await _eventLog.GhiAsync(
+                            suKien,
+                            quyetDinh.NghiNgoThieuBanTrungGian
+                                ? Orders.MarketplaceIntakeOutcome.GapSuspected
+                                : Orders.MarketplaceIntakeOutcome.Applied,
+                            payloadHash,
+                            vVao,
+                            cancellationToken: cancellationToken);
                         break;
 
                     case KetLuanWatermark.Trung:
@@ -284,6 +358,13 @@ public class MarketplaceOrderIntakeHandler : IDistributedEventHandler<ChannelOrd
                         _logger.LogDebug(
                             "Đơn sàn {ChannelCode}/{ExternalOrderId} TRÙNG (cùng phiên bản + cùng hash) — bỏ qua. [WM-TRUNG]",
                             suKien.ChannelCode, suKien.ExternalOrderId);
+
+                        await _eventLog.GhiAsync(
+                            suKien,
+                            Orders.MarketplaceIntakeOutcome.Duplicate,
+                            payloadHash,
+                            vVao,
+                            cancellationToken: cancellationToken);
                         break;
 
                     case KetLuanWatermark.XungDot:
@@ -302,6 +383,13 @@ public class MarketplaceOrderIntakeHandler : IDistributedEventHandler<ChannelOrd
                                 $"Cùng phiên bản {vVao} nhưng PayloadHash KHÁC bản đã áp "
                                 + $"({daNhan.AppliedPayloadHash}). KHÔNG đoán bản nào đúng — giữ bản đầu.",
                             tenantId: suKien.TenantId,
+                            cancellationToken: cancellationToken);
+
+                        await _eventLog.GhiAsync(
+                            suKien,
+                            Orders.MarketplaceIntakeOutcome.Conflict,
+                            payloadHash,
+                            vVao,
                             cancellationToken: cancellationToken);
                         break;
 
@@ -324,6 +412,13 @@ public class MarketplaceOrderIntakeHandler : IDistributedEventHandler<ChannelOrd
                                 + "Đây KHÔNG phải lỗi hệ thống.",
                             tenantId: suKien.TenantId,
                             cancellationToken: cancellationToken);
+
+                        await _eventLog.GhiAsync(
+                            suKien,
+                            Orders.MarketplaceIntakeOutcome.Late,
+                            payloadHash,
+                            vVao,
+                            cancellationToken: cancellationToken);
                         break;
                 }
 
@@ -343,6 +438,26 @@ public class MarketplaceOrderIntakeHandler : IDistributedEventHandler<ChannelOrd
                     "🚨 Đơn sàn {ChannelCode}/{ExternalOrderId}: nội dung KHÁC nhưng KHÔNG có `AggregateVersion` " +
                     "⇒ không thể áp watermark ⇒ giữ bản cũ + GHI VẾT. [WM-THIEU-PHIEN-BAN]",
                     suKien.ChannelCode, suKien.ExternalOrderId);
+
+                // 🆕 `D7` — `ThieuWatermark` (KHÔNG phải `Late`): `Late` là **kết luận** *"bản này cũ hơn"*
+                // dựa trên dữ liệu; ở đây ta **không có** dữ liệu để kết luận. 📌 Gộp hai thứ đó là đúng loại
+                // "hai nguyên nhân, một mã" đã làm hỏng phép đo trước đây.
+                await _eventLog.GhiAsync(
+                    suKien,
+                    Orders.MarketplaceIntakeOutcome.ThieuWatermark,
+                    payloadHash,
+                    sourceVersion: null,
+                    cancellationToken: cancellationToken);
+            }
+            else
+            {
+                // Cùng hash ⇒ đúng là **cùng một sự kiện** được giao lại (at-least-once) — ca bình thường.
+                await _eventLog.GhiAsync(
+                    suKien,
+                    Orders.MarketplaceIntakeOutcome.Duplicate,
+                    payloadHash,
+                    sourceVersion: null,
+                    cancellationToken: cancellationToken);
             }
 
             return daNhan.OrderId?.ToString();
@@ -367,7 +482,27 @@ public class MarketplaceOrderIntakeHandler : IDistributedEventHandler<ChannelOrd
 
         nhatKy.GanOrder(order.Id);
 
+        // 🆕 `D7`/§3.1 dòng 2 — **GHI WATERMARK NGAY LẦN ĐẦU** (`ChuaCoBanGhi → DaApDung`).
+        //
+        // 🚨 ĐÂY LÀ MỘT LỖ HỔNG THẬT CỦA LƯỢT TRƯỚC (đóng ở `S6`): trước đây dòng intake mới **không** được
+        // ghi `AppliedSourceVersion` ⇒ nó ở `null` cho tới **sự kiện thứ hai**. Hệ quả: một bản **CŨ HƠN**
+        // đến sau lại được coi là *"chưa có watermark"* ⇒ **áp dụng** ⇒ **ghi đè trạng thái mới hơn** — đúng
+        // điều `D5`/`D6` cấm. 📌 Không lỗi biên dịch, không test nào đỏ (vì chưa có test hai sự kiện trên
+        // một đơn ở tầng này). Ghi trước khi `INSERT` để giữ **một** lần ghi.
+        if (suKien.AggregateVersion is { } vDauTien)
+        {
+            nhatKy.ApDungWatermark(vDauTien, payloadHash, suKien.SourceUpdatedAtUtc);
+        }
+
         await _intakeRepository.InsertAsync(nhatKy, autoSave: true, cancellationToken: cancellationToken);
+
+        // 🆕 `D7` — dấu vết cho **sự kiện ĐẦU TIÊN** của đơn sàn.
+        await _eventLog.GhiAsync(
+            suKien,
+            Orders.MarketplaceIntakeOutcome.Applied,
+            payloadHash,
+            suKien.AggregateVersion,
+            cancellationToken: cancellationToken);
 
         _logger.LogInformation(
             "Đã nhận và lưu đơn sàn {ChannelCode}/{ExternalOrderId}: đơn nội bộ {SoDon}, {SoDong} dòng, " +

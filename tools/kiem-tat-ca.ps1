@@ -401,6 +401,35 @@ if ($DayDu -and -not $BoQuaE2E) {
 
         Write-Output '   ✅ HTTP THAT: moi ca thanh toan DAT.'
     }
+
+    # ── BUOC 12: DON SAN — DUONG CHAY THAT (`SAL-005`, `S6`) ──────────────────────────────────
+    Buoc 'Don san: DUONG CHAY THAT (SAL-005 — event loi ⇒ DLQ · watermark · nhat ky su kien · job D12)' {
+        # 🔑 **VÌ SAO PHẢI LÀ BƯỚC CỦA CỔNG (không phải probe tay):** `sal-005` **§18.6** ghi thẳng
+        # *"CHƯA ĐO ĐƯỢC RUNTIME"* và **từ chối kết luận** vì không có đường nào phát `ChannelOrderPulledEto`.
+        # 📌 `S6` **làm đường gọi đó** (đúng cách §18.7 #1 đã chỉ) và biến nó thành **bước của cổng**:
+        #   ① **event lỗi ⇒ DLQ, KHÔNG mất** — đến muộn + xung đột cùng mốc phải có dòng DLQ **chứa payload gốc**;
+        #   ② **watermark chạy trên dữ liệu THẬT** — trước `S6` connector không trả `update_time` ⇒
+        #      `AppliedSourceVersion` **luôn `null`** ⇒ luật 4 nhánh **chưa từng** chạy ở runtime;
+        #   ③ 🚨 **gửi lại KHÔNG DLQ giả** — ca **đo được** một lỗi thật: hash chống trùng từng băm cả
+        #      `CorrelationId` (đổi mỗi lần kéo) ⇒ mọi lần kéo lại thành "xung đột payload" ⇒ DLQ giả. 📌 Unit
+        #      test **không** thấy ca này (cần **hai** lần gửi với `CorrelationId` khác nhau);
+        #   ④ **job `D12` chạy XONG** — có **cả** neo mở đầu **và** kết thúc (`[D12-JOB-XONG]`); ⚠️ bài học
+        #      `sal-005` §19.5 #2: *"job chết"* và *"job xong"* **trông giống hệt nhau** nếu chỉ có neo mở đầu.
+        # 🔒 Không commit bí mật/khoá nào: `PocOrdersPerPull` + nhịp supervisor đặt bằng **biến môi trường**
+        #    cho tiến trình Host.
+        $p = ChayLenh 'pwsh' @('-NoProfile', '-File', (Join-Path $PSScriptRoot 'probe-don-san.ps1')) 'donsan.log'
+
+        Get-Content $p.Log | Where-Object { $_ -match 'DAT|KHONG DAT|PROBE DON SAN|DON DEP' } |
+            Select-Object -First 44 | ForEach-Object { "   $_" }
+
+        if ($p.Ma -ne 0) {
+            Get-Content $p.Log | Select-String 'CAC CA KHONG DAT' -Context 0,10 |
+                ForEach-Object { $_.Context.PostContext | ForEach-Object { "   $_" } }
+            throw "PROBE DON SAN DO (exit $($p.Ma)) — xem log: $($p.Log)."
+        }
+
+        Write-Output '   ✅ DUONG CHAY THAT: moi ca don san DAT.'
+    }
 }
 elseif (-not $BoQuaE2E -and -not $DayDu) {
     Write-Output ""

@@ -861,3 +861,59 @@ test reflection khoá lại (`HoanTienS5Tests.IXuLyKetQuaCong_PHAI_duoc_ExposeSe
 một endpoint mới thường là DI**, không phải routing — 🔑 phân biệt bằng **`404`** (route sai) với **`500` +
 "None of the constructors … can be invoked"** (DI).
 
+
+---
+
+## 🚨 `probe-don-san.ps1` — **ĐƯỜNG CHẠY THẬT** CỦA ĐƠN SÀN (`SAL-005` · `S6`) — **bước ⑫**
+
+### Vì sao có nó — và nó khác gì `probe-thanh-toan.ps1`
+
+`probe-thanh-toan.ps1` đo **đường HTTP** (endpoint có thật, controller trả gì). **Probe này đo một thứ khác:
+một `IDistributedEventHandler` có THẬT SỰ CHẠY và ghi đúng dữ liệu hay không** — vì `sal-005` **§18.6** đã
+từ chối kết luận đúng ở điểm này: *"CHƯA ĐO ĐƯỢC RUNTIME … không có đường nào phát `ChannelOrderPulledEto`"*.
+
+✅ **Đường gọi** (đúng cách §18.7 #1 đã chỉ — *"làm đường gọi, đừng tìm cách đo khác"*):
+
+```
+gieo 4 shop (SQL)  →  Host thật (PocOrdersPerPull=1, Supervisor=3600s)
+   →  POST /api/app/channel/{id}/sync-now   (đúng nút "Đồng bộ ngay")
+   →  ChannelShopSyncer phát ChannelOrderPulledEto
+   →  MarketplaceOrderIntakeHandler (handler THẬT)
+   →  đo DB thật: OrdOrders · SalMarketplaceOrderIntakes · SalMarketplaceEventLogs · MsgDeadLetters
+```
+
+📌 **Bốn câu hỏi nó trả lời** (39 ca): event lỗi ⇒ DLQ **và payload còn nguyên** · watermark chạy **trên dữ
+liệu thật** (`AppliedSourceVersion ≠ null`) · **gửi lại không DLQ giả** · job `D12` chạy **xong**.
+
+### 🚨 BA CÁI BẪY MỚI — `S6`, 18/10/2026
+
+#### S6-1. 🚨 `Select-String -SimpleMatch '\[D12-JOB-BAT-DAU\]'` ⇒ **0 khớp** dù log **CÓ** neo
+
+| | |
+|---|---|
+**Triệu chứng** | **6 ca ĐỎ GIẢ** ở lần chạy đầu. Trong đó có ca nói *"job `D12` KHÔNG chạy"* — **trong khi job đã chạy đúng** và in cả **khoá nghiệp vụ** của đơn bị đánh cờ |
+**Nguyên nhân** | Với `-SimpleMatch`, chuỗi mẫu được so **nguyên văn** ⇒ `\[` là **hai ký tự `\` và `[`**, không phải *"dấu `[` đã thoát"*. 🔑 Tôi viết mẫu theo thói quen **regex** nên **không khớp gì cả** |
+**Cách tránh** | Dùng `-SimpleMatch` thì viết **neo trần**: `-SimpleMatch '[D12-JOB-BAT-DAU]'`. 📌 Nếu muốn regex thật thì **bỏ** `-SimpleMatch`. 🔒 Và khi một ca *"log phải có X"* ĐỎ, **mở tệp log ra grep bằng tay** trước khi kết luận về sản phẩm — `grep '[D12' host.log` (regex) sẽ thấy ngay |
+
+📌 **Bài học:** đây **chính là** §1 của tệp này (*"một phép đo bất ngờ thường là phép đo SAI"*) ở dạng mới:
+một **công cụ so khớp** sai đã tạo ra **6 phán quyết sai về sản phẩm** trong **một** lần chạy.
+
+#### S6-2. **Route thật** là `/api/app/channel/{id}/sync-now` (lần thứ **4**)
+
+Tôi dùng `/api/app/channel/sync-now/{id}` (thứ tự **ngược**) ⇒ **`404`** ngay lần chạy đầu. 🔒 Route thật đọc
+từ `swagger.json`:
+`/api/app/channel/{id}/sync-now`. 📌 Bài học **S2-1** vẫn cần nhắc lại vì **đã tái phạm**: *in `HTTP STATUS`
+trước body*, và **đọc route từ swagger** thay vì viết theo trí nhớ.
+
+#### S6-3. Dọn probe **phải** xoá `MsgIdempotencyRecords`
+
+Dòng nhật ký nhận đơn/đơn nội bộ đều xoá được theo **tiền tố mã đơn** (`POC-K9S6-%`), nhưng **bản ghi chống
+trùng** (`MsgIdempotencyRecords.KeyValue` = `ExternalOrderId`) quên xoá ⇒ lần chạy sau handler rơi vào
+`TraVeKetQuaCu` ⇒ **không chạy** ⇒ mọi ca sau **XANH vì lý do SAI**. 🔑 Đúng loại lỗi **§25.5**:
+*"tiêm không thành"* và *"cổng không bắt"* **trông giống hệt nhau**.
+
+### 🔒 Vì sao `PocOrdersPerPull` và nhịp supervisor đặt bằng **biến môi trường**
+
+`ChannelHub:Shopee:PocOrdersPerPull` = `1` ⇒ connector PoC trả **đúng 1** đơn giả **tất định** (cùng con trỏ ⇒
+cùng đơn, cùng `update_time`). Nhịp supervisor = `3600` ⇒ **không** có nhịp nền nào chen vào giữa phép đo.
+📌 Cả hai **chỉ** đặt trong tiến trình Host của probe ⇒ **không** commit cấu hình dev vào `appsettings.json`.

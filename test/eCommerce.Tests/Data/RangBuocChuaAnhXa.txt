@@ -85,3 +85,11 @@ IX_CusAddressLinks_TenantId_CustomerId_AddressType_MacDinh|ADDR-004: bất biế
 IX_CusAddressLinks_TenantId_CustomerId_AddressId_AddressType|ADDR-004: chống **liên kết trùng** — lưới an toàn cho hai luồng cùng thêm (`TC-10`); app service đã tiền kiểm và trả `0010` kèm `linkId`
 CK_CusAddressLinks_AddressType|ADDR-004: `AddressType` chỉ nhận 2 giá trị (0 Shipping · 1 Billing) — bất biến cấu trúc; entity có `Enum.IsDefined` + không có setter công khai
 CK_CusAddressLinks_NhanDoDai|ADDR-004: nhãn dài tối đa 128 ký tự — đã có `HasMaxLength` + guard `DoDaiNhanToiDa` ở entity; CHECK giữ để DB tự đứng được khi dữ liệu vào từ SQL tay
+
+# ── SAL-005 D7 (`S6`, 18/10/2026) — NHẬT KÝ SỰ KIỆN ĐƠN SÀN: entity `MarketplaceEventLog` (`SalMarketplaceEventLogs`) ──
+# 📌 CẢ 3 ràng buộc dưới đây là **BẤT BIẾN CẤU TRÚC** (hình dạng của một dòng nhật ký), KHÔNG phải ca nghiệp vụ
+#    mà client cần phân biệt bằng mã lỗi: người ghi duy nhất là `MarketplaceEventLogWriter` (nội bộ, không có
+#    khách gọi), và nó **đã** xử lý ca trùng bằng cách đọc lại DB (idempotent) chứ **không** trả lỗi cho ai.
+IX_SalMktEventLogs_TenantId_Channel_Order_Ver_Hash_Outcome|SAL-005 D7: *một SỰ KIỆN ⇒ một dòng* — ca "trùng" là **kết quả mong muốn** (writer coi việc đã có dòng là thành công), nên KHÔNG có ca nào cần `23505` lộ ra client; index chỉ là hàng rào cuối cho hai luồng song song (dual-path webhook+pull)
+CK_SalMktEventLogs_SourceVersion|SAL-005 D7: `SourceVersion` là epoch giây của `update_time` sàn ⇒ luôn dương khi CÓ; `NULL` hợp lệ (sự kiện thiếu watermark). Entity ném `ArgumentOutOfRangeException` trước khi chạm DB; CHECK chỉ để DB tự đứng được với đường ghi tắt (script/phát lại)
+CK_SalMktEventLogs_PayloadHash_Hex|SAL-005 D7: `PayloadHash` phải là SHA-256 hex **chữ thường** (cùng chuẩn với `SalMarketplaceOrderIntakes`). Hash HOA/base64 trông vẫn như hash nhưng làm nhánh C/D (trùng/xung đột) so SAI ⇒ DLQ giả — chỉ `CanonicalJsonHasher` sinh ra được

@@ -141,7 +141,7 @@ public class PostgreSqlSchemaTests
     }
 
     [Fact]
-    public async Task F1_du_52_index_deu_dung_NULLS_NOT_DISTINCT()
+    public async Task F1_du_53_index_deu_dung_NULLS_NOT_DISTINCT()
     {
         // 🔒 BẤT BIẾN (ghi ở XC-004 Q6): mọi unique index trên entity IMultiTenant PHẢI có
         // `NULLS NOT DISTINCT`. Ai tạo migration mới mà quên ⇒ test này đỏ.
@@ -158,7 +158,11 @@ public class PostgreSqlSchemaTests
         //      **số thứ tự lần hoàn** (`RF001`), không phải `Guid` — xem `PaymentRefund` §"vì sao có
         //      `RefundRequestId`"). 📌 `S5` **không** đổi index nào khác; 2 `CHECK` mới của
         //      `PayTransactions` là **ràng buộc TIỀN**, không phải index.
-        Assert.Equal(52L, await DemAsync(
+        //    → **53** (18/10/2026, `Sal005_MarketplaceEventLogs` — `IX_SalMktEventLogs_TenantId_Channel_
+        //      Order_Ver_Hash_Outcome`: **một sự kiện ⇒ một dòng nhật ký**. 📌 Đây là câu trả lời cho `XC-003` D2
+        //      (*"bỏ lock đi, DB có chặn không?"*) ⇒ **CÓ**. ⚠️ Tên index **57 ký tự** (do EF tự sinh là
+        //      **94** ⇒ PostgreSQL **cắt** ở 63 ⇒ test đối chiếu đích danh không tìm thấy).
+        Assert.Equal(53L, await DemAsync(
             "select count(*) from pg_indexes where schemaname = 'public' and indexdef like '%NULLS NOT DISTINCT%'"));
 
         // Kiểm tra ĐÍCH DANH để thông báo lỗi có ý nghĩa (tên index dài có thể bị PostgreSQL cắt ⇒ so theo tiền tố).
@@ -198,6 +202,12 @@ public class PostgreSqlSchemaTests
             //    thật**; mất `NULLS NOT DISTINCT` ⇒ khi `TenantId = NULL` index mất tác dụng IM LẶNG.
             //    ⚠️ Tên đặt TƯỜNG MINH trong DbContext vì tên EF tự sinh dài 67 ký tự > 63 ⇒ bị PostgreSQL CẮT.
             "IX_SalMktIntakes_TenantId_ChannelCode_ExternalOrderId",
+            // 🚨 `SAL-005` **D7** (18/10/2026) — **NHẬT KÝ SỰ KIỆN**: *một SỰ KIỆN ⇒ một dòng*.
+            //    Mất `NULLS NOT DISTINCT` ⇒ khi `TenantId = NULL` (đang chạy 1 tenant) index MẤT TÁC DỤNG
+            //    ⇒ cùng một sự kiện ghi được **hai dòng** ⇒ mọi con số vận hành đọc từ bảng này
+            //    (*"sàn gửi lại bao nhiêu lần", "có dual-path không", "bao nhiêu xung đột"*) đều **SAI**
+            //    — và ⚠️ **không có lỗi nào** để lần ra. 📌 Bảng càng chỉ tăng thì sai số càng lớn dần.
+            "IX_SalMktEventLogs_TenantId_Channel_Order_Ver_Hash_Outcome",
             // 🚨 CAT-002 — mã danh mục duy nhất trong tenant (15/10/2026). EF sinh index này **KHÔNG** kèm
             //    `NULLS NOT DISTINCT` ⇒ đã sửa tay ngay trong migration `Cat002_CategoryTree`.
             //    Mất nó ⇒ khi `TenantId = NULL` (tình trạng hiện nay) hai danh mục cùng `Code` LỌT VÀO DB **im lặng**.

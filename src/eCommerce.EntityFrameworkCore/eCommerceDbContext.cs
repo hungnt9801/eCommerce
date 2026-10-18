@@ -140,6 +140,14 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
     /// </summary>
     public DbSet<Orders.MarketplaceOrderIntake> MarketplaceOrderIntakes { get; set; } = default!;
 
+    /// <summary>
+    /// 🚨 **NHẬT KÝ SỰ KIỆN ĐƠN SÀN** (`SAL-005` D7). **BẮT BUỘC có `DbSet`** — cùng lý do khối trên:
+    /// thiếu `DbSet` ⇒ `IRepository&lt;MarketplaceEventLog, Guid&gt;` **không được đăng ký** ⇒ `HTTP 500`
+    /// ngay sự kiện đầu tiên, ⚠️ dù build/migration đều xanh. Lưới an toàn CI: `DbSetRegistrationTests`
+    /// + `MarketplaceEventLogBatBienTests`.
+    /// </summary>
+    public DbSet<Orders.MarketplaceEventLog> MarketplaceEventLogs { get; set; } = default!;
+
     // ---- ChannelHub (module) ----
     // 🚨 VÌ SAO PHẢI KHAI BÁO DbSet Ở ĐÂY:
     // AddDefaultRepositories(includeAllEntities: true) chỉ tạo IRepository<T> cho entity
@@ -955,5 +963,82 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
             b.HasIndex(x => new { x.TenantId, x.GapSuspected })
                 .HasDatabaseName("IX_SalMktIntakes_TenantId_GapSuspected");
         });
+
+        // ---- Nhật ký SỰ KIỆN đơn sàn (`SAL-005` D7) — APPEND-ONLY ----
+        //
+        // 📌 `SalMarketplaceOrderIntakes` = *"đơn này đang ở đâu"* (MỘT dòng/đơn).
+        //    Bảng này = *"sàn gửi gì, lúc nào, ta đã làm gì"* (MỘT dòng/SỰ KIỆN) — hai câu hỏi KHÁC nhau.
+        // 🔒 Không FK tới `OrdOrders`/`SalMarketplaceOrderIntakes`: nhật ký phải sống được kể cả khi đơn/intake
+        //    chưa tồn tại (sự kiện `Failed` đầu tiên) — FK ở đây sẽ chặn đúng lúc cần dấu vết nhất.
+        builder.Entity<Orders.MarketplaceEventLog>(b =>
+        {
+            b.ToTable("SalMarketplaceEventLogs", t =>
+            {
+                // 📌 `SourceVersion` = epoch giây của `update_time` sàn ⇒ **luôn dương** khi CÓ.
+                //    `NULL` được phép (sự kiện thiếu watermark — `Outcome = ThieuWatermark`), nhưng `0`/âm
+                //    là dấu hiệu **map sai** (ví dụ map `PlacedAtUtc` hoặc số dòng vào watermark).
+                t.HasCheckConstraint(
+                    "CK_SalMktEventLogs_SourceVersion",
+                    "\"SourceVersion\" IS NULL OR \"SourceVersion\" > 0");
+
+                // 📌 Bắt buộc là SHA-256 hex **chữ thường** — cùng chuẩn với `SalMarketplaceOrderIntakes`.
+                //    Hash HOA/base64 vẫn "trông như hash" nhưng làm nhánh C/D (trùng/xung đột) **so sai**.
+                t.HasCheckConstraint(
+                    "CK_SalMktEventLogs_PayloadHash_Hex",
+                    "\"PayloadHash\" ~ '^[0-9a-f]{64}$'");
+            });
+
+            b.ConfigureByConvention();
+
+            b.Property(x => x.ChannelCode).IsRequired().HasMaxLength(global::eCommerce.Orders.MarketplaceEventLog.DoDaiChannelCode);
+            b.Property(x => x.ExternalOrderId).IsRequired().HasMaxLength(global::eCommerce.Orders.MarketplaceEventLog.DoDaiExternalOrderId);
+            b.Property(x => x.PayloadHash).IsRequired().HasMaxLength(global::eCommerce.Orders.MarketplaceEventLog.DoDaiPayloadHash);
+            b.Property(x => x.EventKind).HasMaxLength(global::eCommerce.Orders.MarketplaceEventLog.DoDaiEventKind);
+            b.Property(x => x.MarketplaceStatusRaw).HasMaxLength(global::eCommerce.Orders.MarketplaceEventLog.DoDaiTrangThaiTho);
+            b.Property(x => x.FailureCode).HasMaxLength(global::eCommerce.Orders.MarketplaceEventLog.DoDaiFailureCode);
+            b.Property(x => x.FailureMessage).HasMaxLength(global::eCommerce.Orders.MarketplaceEventLog.DoDaiFailureMessage);
+            b.Property(x => x.CorrelationId).HasMaxLength(global::eCommerce.Orders.MarketplaceEventLog.DoDaiCorrelationId);
+
+            b.Property(x => x.Outcome).HasConversion<int>();
+
+            // 🚨 **HÀNG RÀO CHỐNG GHI HAI DÒNG CHO CÙNG MỘT KẾT CỤC CỦA CÙNG MỘT SỰ KIỆN.**
+            // 📌 Đây là câu trả lời cho `XC-003` D2 (*"bỏ lock đi, DB có chặn không?"*) ⇒ **CÓ**.
+            //
+            // 🚨 **VÌ SAO KHOÁ CÓ CẢ `Outcome` (phát hiện ĐO ĐƯỢC ở `S6` — `sal-005` §20.5 #1):**
+            // bản đầu của index chỉ có 5 cột `(TenantId, ChannelCode, ExternalOrderId, SourceVersion, PayloadHash)`
+            // ⇒ một sự kiện **giao lại** (cùng phiên bản + cùng hash) trùng **toàn bộ** khoá với dòng đã có
+            // ⇒ dòng `Duplicate` **KHÔNG BAO GIỜ** ghi được (INSERT vi phạm index ⇒ writer coi là trùng ⇒ bỏ).
+            // 🔑 Hệ quả: `Outcome = Duplicate` là **giá trị CHẾT**, và câu hỏi vận hành *"sàn có gửi lại không?"*
+            // **không trả lời được** — đúng thứ `D7` sinh ra để trả lời. 📌 Thêm `Outcome` vào khoá ⇒ ghi được
+            // **một** dòng đánh dấu *"lần giao lại đầu tiên"*, mà vẫn chặn ca *"cùng kết cục ghi hai lần do
+            // bug/hai luồng"* (mục đích thật của hàng rào).
+            //
+            // ⚠️ Tên đặt TƯỜNG MINH vì tên EF tự sinh (94+ ký tự) vượt giới hạn **63** của PostgreSQL ⇒ bị **cắt**
+            // ⇒ test đối chiếu **đích danh tên index** không tìm thấy (bẫy đã gặp với bảng intake).
+            // ⚠️ `NULLS NOT DISTINCT` phải bổ sung bằng **SQL thô** trong migration (EF không khai báo được),
+            // nếu không thì với `TenantId = NULL` (đang chạy 1 tenant) index **mất tác dụng im lặng**.
+            b.HasIndex(x => new
+                {
+                    x.TenantId,
+                    x.ChannelCode,
+                    x.ExternalOrderId,
+                    x.SourceVersion,
+                    x.PayloadHash,
+                    x.Outcome
+                })
+                .IsUnique()
+                .HasDatabaseName("IX_SalMktEventLogs_TenantId_Channel_Order_Ver_Hash_Outcome");
+
+            // 📌 Truy vấn NÓNG NHẤT của Ops: *"lịch sử nhận của MỘT đơn sàn"* (mới nhất trước).
+            b.HasIndex(x => new { x.TenantId, x.ChannelCode, x.ExternalOrderId, x.ReceivedAtUtc })
+                .HasDatabaseName("IX_SalMktEventLogs_TenantId_Channel_Order_Received");
+
+            // 📌 Dashboard vận hành: tỉ lệ `Late`/`Conflict` theo thời gian — *"hệ thống có đang nhận sự kiện
+            //    lộn xộn không"*. 🔑 Không có index này thì bảng **chỉ tăng** (append-only) làm câu đó chậm dần
+            //    ⇒ tới lúc **không ai xem** — đúng cái chết của mọi bảng nhật ký.
+            b.HasIndex(x => new { x.TenantId, x.Outcome, x.ReceivedAtUtc })
+                .HasDatabaseName("IX_SalMktEventLogs_TenantId_Outcome_Received");
+        });
+
     }
 }

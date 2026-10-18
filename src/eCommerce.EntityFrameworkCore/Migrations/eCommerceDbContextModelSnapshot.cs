@@ -4726,6 +4726,108 @@ namespace eCommerce.Migrations
                         });
                 });
 
+            modelBuilder.Entity("eCommerce.Orders.MarketplaceEventLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ChannelCode")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<Guid?>("ChannelShopId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("ConcurrencyStamp");
+
+                    b.Property<string>("CorrelationId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<string>("EventKind")
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<string>("ExternalOrderId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ExtraProperties")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("ExtraProperties");
+
+                    b.Property<string>("FailureCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("FailureMessage")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<bool>("IsFromWebhook")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("MarketplaceStatusRaw")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("Outcome")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("PayloadHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("ReceivedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("SourceUpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("SourceVersion")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Outcome", "ReceivedAtUtc")
+                        .HasDatabaseName("IX_SalMktEventLogs_TenantId_Outcome_Received");
+
+                    b.HasIndex("TenantId", "ChannelCode", "ExternalOrderId", "ReceivedAtUtc")
+                        .HasDatabaseName("IX_SalMktEventLogs_TenantId_Channel_Order_Received");
+
+                    b.HasIndex("TenantId", "ChannelCode", "ExternalOrderId", "SourceVersion", "PayloadHash", "Outcome")
+                        .IsUnique()
+                        .HasDatabaseName("IX_SalMktEventLogs_TenantId_Channel_Order_Ver_Hash_Outcome");
+
+                    b.ToTable("SalMarketplaceEventLogs", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_SalMktEventLogs_PayloadHash_Hex", "\"PayloadHash\" ~ '^[0-9a-f]{64}$'");
+
+                            t.HasCheckConstraint("CK_SalMktEventLogs_SourceVersion", "\"SourceVersion\" IS NULL OR \"SourceVersion\" > 0");
+                        });
+                });
+
             modelBuilder.Entity("eCommerce.Orders.MarketplaceOrderIntake", b =>
                 {
                     b.Property<Guid>("Id")
