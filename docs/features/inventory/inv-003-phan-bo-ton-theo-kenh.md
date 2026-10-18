@@ -13,6 +13,20 @@
 
 ---
 
+## 📌 QUYẾT ĐỊNH CHỦ DỰ ÁN — 17/10/2026 (`Q4` = **A**)
+
+> **`Percent` của hạn mức kênh tính trên tồn khả dụng của TỪNG `(kho, SKU)` — GIỮ NGUYÊN như code.**
+
+| Mục | Nội dung |
+|---|---|
+| **Chốt** | `HanMucKenh.TinhHanMuc` = `floor(tồnKhảDụng × giaTri / 100)` trên tồn của **từng `(kho, SKU)`** (`src/eCommerce.Domain/Settings/HanMucKenh.cs:13,45`) — **không** phải tổng của cả kênh |
+| **Phương án BỊ LOẠI** | Tính trên **tổng tồn của cả kênh** — muốn thế phải có **tồn mô hình hoá theo kênh** (`StockAllotment`, §5.2) mà **code chưa có** ⇒ chi phí lớn, không làm ở GĐ1 |
+| **Vì sao** | Hạn mức là **trần an toàn theo từng kho**, **không** phải "ngân sách đã cấp cho kênh" ⇒ 📌 đây là **đọc lại nghĩa**, **không** đổi hành vi |
+| **⚠️ Hệ quả bắt buộc — ĐỔI NHÃN UI (việc của `S7`)** | Nhãn *"hạn mức kênh"* dễ bị hiểu là ngân sách kênh ⇒ đổi thành **"trần an toàn của kênh theo từng kho"**, ghi rõ **% tính trên tồn của từng `(kho, SKU)`** trên màn hình + help text |
+| **Ghi chú** | ✅ `DonVi` (`Percent`/`Absolute`) **ĐÃ có ở từng dòng** — nợ §16.8 #1 **đã đóng** |
+
+---
+
 ## 0. Tóm tắt & quyết định thiết kế
 
 **Tóm tắt:** `INV-003` chốt **phân bổ tồn kho theo kênh** (ngân sách tồn cấp cho từng `ChannelCode`) và **công thức duy nhất

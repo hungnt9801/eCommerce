@@ -13,6 +13,21 @@
 
 ---
 
+## 📌 QUYẾT ĐỊNH CHỦ DỰ ÁN — 17/10/2026 (`Q3` = **A**)
+
+> **Giỏ hàng của GĐ1 là GIỎ-COOKIE. Bảng `OrdCarts` / `CartItem` BỊ LOẠI khỏi GĐ1.**
+
+| Mục | Nội dung |
+|---|---|
+| **Chốt** | Hiện thực chính thức = **cookie `gio-web`** (HttpOnly, **2 giờ**) trong `src/eCommerce.Web/Controllers/DatHangController.cs:44-48` — nguồn sự thật về **hành vi** là `web-001` §86–§88 |
+| **Phương án BỊ LOẠI** | Bảng `OrdCarts` (§5.2) + `CartItem` + `CartToken` + API §6.1 — **không làm ở GĐ1**; giữ trong tài liệu như **dự phòng** cho GĐ2 |
+| **Vì sao** | GĐ1 = *"bán được trên website"*; giỏ cookie đã đủ và **đã có ca E2E**. 📌 Bảng thật chỉ đáng làm khi có **khuyến mãi** (`PRO-*`, GĐ2) hoặc cần **giỏ đa thiết bị** |
+| **Đánh đổi ĐÃ CHẤP NHẬN** | ❌ không giỏ đa thiết bị · ❌ không khôi phục giỏ bỏ quên · ❌ không áp khuyến mãi/tính giá ở **bước giỏ** · ⚠️ cookie **sửa được** ⇒ chỉ dùng để **HIỂN THỊ**, **cấm** dùng để tính tiền (code đã đúng) |
+| **Hệ quả lên tài liệu này** | 📌 §5.2/§6.1/§9 là **thiết kế của phương án B — KHÔNG phải hiện trạng**. Mã lỗi `eCommerce:Sales:0010…0013` (`MaxLines`, `MaxLineQuantity`, chuyển trạng thái giỏ, `CartToken`) **chưa có trong code** và **không** cần cho GĐ1 |
+| **Khác biệt số đo** | Thiết kế ghi `MaxLines` = **100**; UI thật cho **5 dòng** (`web-001` §88) ⇒ 📌 lấy **5** làm chuẩn GĐ1 |
+
+---
+
 ## 0. Tóm tắt & quyết định thiết kế
 
 **Tóm tắt:** `SAL-001` là **bộ đệm ý định mua** của khách: nơi khách gom SKU + số lượng **trước** khi có bất kỳ
@@ -267,6 +282,8 @@ sequenceDiagram
 | `OrdCarts` → `OrdOrders` (bảng **đã có**) | 1 → 0..1 | **Luận lý**: `SAL-002` ghi `OrderId` khi đặt hàng; `SAL-001` **không** sở hữu `Orders` |
 
 ### 5.2 Bảng `OrdCarts` — **MỚI** (chưa có trong code — kế hoạch GĐ1)
+
+> 🚨 **MỤC NÀY KHÔNG ĐƯỢC THI HÀNH Ở GĐ1** — `Q3` = **A** (17/10/2026): giỏ hàng GĐ1 là **cookie `gio-web`**, bảng `OrdCarts` **bị loại** (xem khối quyết định ở đầu tài liệu). Giữ mục này để **không mất thiết kế** nếu GĐ2 cần giỏ server-side.
 
 | Cột | Kiểu | Null? | Ý nghĩa | Ghi chú |
 |---|---|---|---|---|

@@ -17,6 +17,20 @@
 
 ---
 
+## 📌 QUYẾT ĐỊNH CHỦ DỰ ÁN — 17/10/2026 (`Q5` = **A**)
+
+> **"Xác nhận lệch" = ĐÓNG CẢNH BÁO có audit. TUYỆT ĐỐI KHÔNG tự điều chỉnh tồn/sổ cái.**
+
+| Mục | Nội dung |
+|---|---|
+| **Chốt** | Khi chính sách là `RequireConfirmation`, lượt quét dừng ở `KetLuanDoiSoat.VuotCanXacNhan` (**đã có**: `ReconRun.cs:119,134`). Người có quyền **xác nhận** ⇒ ghi **ai / khi nào / ghi chú** rồi **đóng cảnh báo** |
+| **Phương án BỊ LOẠI** | Xác nhận ⇒ **tự sinh bút toán điều chỉnh tồn** — 🔒 job **không được** tự sửa sổ cái (sổ cái append-only; chứng từ do người tạo) |
+| **Cần THÊM (việc của `S7`, chưa có trong code)** | ① cột `ConfirmedByUserId?` · `ConfirmedAtUtc?` · `ConfirmNote?` (**bắt buộc** khi xác nhận) trên `ReconRuns` · ② permission **`eCommerce.Reconciliation.Confirm`** — chưa tồn tại, phải khai ở `eCommerceConsts` **và** `eCommercePermissionDefinitionProvider` **cùng PR** · ③ endpoint xác nhận + audit · ④ **không** ghi bút toán |
+| **🚨 Hiện trạng đo được** | `RequireConfirmation` **ghi được** trạng thái **2**, nhưng **KHÔNG có API/bước xác nhận nào** (grep `XacNhan\|Confirm` trong `Recon*` = **0**) ⇒ lượt quét nằm ở trạng thái **2 vĩnh viễn**, cảnh báo **tồn đọng** |
+| **Truy vết** | Lịch sử lượt quét **đã có** (`ReconRuns` + `ReconRunMismatches`, trần 10 000 dòng/lượt) ⇒ chỉ thiếu **đường đóng** |
+
+---
+
 ## 0. Tóm tắt & quyết định thiết kế
 
 **Tóm tắt:** `REC-001` là **job định kỳ gọi API `querydr` của cổng thanh toán** để **tự đi tìm** những giao dịch mà

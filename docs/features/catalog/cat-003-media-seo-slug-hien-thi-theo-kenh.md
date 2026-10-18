@@ -13,6 +13,18 @@
 
 ---
 
+## 📌 QUYẾT ĐỊNH CHỦ DỰ ÁN — 17/10/2026 (`Q6` = **A** — liên quan trực tiếp tài liệu này)
+
+> **Storefront ĐƯỢC MỞ CÔNG KHAI** ⇒ nợ *"storefront CHƯA công khai"* ghi ở §16 **nay có quyết định**, và **hai** việc dưới đây trở thành **bắt buộc**:
+
+| # | Việc | Vì sao |
+|---|---|---|
+| 1 | `sitemap.xml` phải dùng **slug** thay vì **SKU** làm URL | Chỉ khi URL công khai thì URL trong sitemap mới là thứ Google thu thập — SKU là URL **thay thế**, không phải chuẩn |
+| 2 | Thêm `/SanPham` + `/SanPham/ChiTiet/{slugOrSku}` vào **allowlist** `[AllowAnonymous]` (việc của `S8`) | Hiện `SanPhamController` có `[Authorize]` ⇒ slug/`canonical` **không phát huy** |
+| 3 | 🔒 Giữ nguyên hai bất biến của `CAT-003`: URL cũ dạng SKU **vẫn phải** trả `200` (`canonical` = slug) · chỉ hiện sản phẩm **đang bán** | Bảo toàn liên kết cũ + không lộ hàng ngừng bán |
+
+---
+
 ## 0. Tóm tắt & quyết định thiết kế
 
 **Tóm tắt:** `CAT-003` chốt **ba thứ mà `CAT-001`/`CAT-002` cố ý để lại**: (1) **media** — ảnh/video của sản phẩm,

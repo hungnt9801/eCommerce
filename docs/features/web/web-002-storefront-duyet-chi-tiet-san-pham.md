@@ -17,6 +17,20 @@
 
 ---
 
+## 📌 QUYẾT ĐỊNH CHỦ DỰ ÁN — 17/10/2026 (`Q6` = **A**)
+
+> **Storefront ĐƯỢC MỞ CÔNG KHAI** — khách **chưa đăng nhập** xem được danh sách + chi tiết sản phẩm.
+
+| Mục | Nội dung |
+|---|---|
+| **Chốt** | `/SanPham` và `/SanPham/ChiTiet/{slugOrSku}` **bỏ khỏi yêu cầu đăng nhập** (thêm vào **allowlist** `[AllowAnonymous]` của `XC-004`), cùng `/sitemap.xml` + `/robots.txt` (đã công khai) |
+| **🚨 Hiện trạng** | **CẢ 9** controller của Web đều `[Authorize]` **cấp class**, gồm `src/eCommerce.Web/Controllers/SanPhamController.cs:21` ⇒ khách chưa đăng nhập bị `302` tới `/Account/Login` ⇒ **SEO không phát huy** dù slug + sitemap đã xong (`CAT-003`) |
+| **Ràng buộc BẮT BUỘC khi mở (không được hở dữ liệu)** | ① chỉ hiện sản phẩm **đang bán** · ② **cấm** lộ **giá vốn** (`CostPrice`) và **tồn chi tiết theo kho** · ③ nếu hiện tồn thì chỉ dạng **bậc** (còn/hết) · ④ allowlist **phải có test** (`AllowlistCongKhaiTests` đã có từ `CAT-003`) |
+| **Việc của `S8`** | thêm 2 route vào allowlist + ca E2E **"khách CHƯA đăng nhập xem được chi tiết"** và ca **"không lộ `CostPrice`"** |
+| **Phụ thuộc** | `CAT-003`: slug là URL chuẩn; `sitemap.xml` phải dùng **slug** thay vì SKU (nợ đã ghi ở `CAT-003` §16) |
+
+---
+
 ## 0. Tóm tắt & quyết định thiết kế
 
 **Tóm tắt:** `WEB-002` là **tầng đọc công khai (public read layer)** của website bán hàng: trang **duyệt sản phẩm

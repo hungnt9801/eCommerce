@@ -13,6 +13,19 @@
 
 ---
 
+## 📌 QUYẾT ĐỊNH CHỦ DỰ ÁN — 17/10/2026 (`Q7` = **GitHub**)
+
+> **Repo từ xa sẽ đặt trên GitHub** ⇒ nền CI là **GitHub Actions** (`ubuntu-latest`).
+
+| Mục | Nội dung |
+|---|---|
+| **Chốt** | Nền tảng **GitHub** · workflow `.github/workflows/ci.yml` gọi `pwsh -File tools/kiem-tat-ca.ps1 -DayDu` · runner **`ubuntu-latest`** + bản vá khả chuyển **P-01…P-06** |
+| **Trạng thái hạ tầng (đo 17/10/2026)** | `git remote -v` = **0 dòng**; `.github` / `azure-pipelines.yml` / `Jenkinsfile` **đều không tồn tại** ⇒ 📌 việc còn lại là **thao tác của chủ dự án**: tạo repo GitHub rồi `git remote add origin …` và `git push -u origin main`. Sau đó `S9` mới có đất chạy |
+| **Không đổi** | ⚠️ Vẫn **KHÔNG** dùng `windows-latest` (integration test ghim `postgres:17-alpine` = Linux) · 🚨 vẫn phải **build làm nóng** trước để vá **F2** (`-GhiNho` trả `exit 2` trên runner sạch ⇒ **CI đỏ ngay ngày đầu**) · vẫn phải `commit tools/package-lock.json` (**F4**) |
+| **Điều kiện bật required check** | Chỉ bật khi `tools/test-cong-kiem.ps1` **xanh trên Linux** — chưa có bằng chứng thì **chưa** bật (tránh required check flaky) |
+
+---
+
 ## 0. Tóm tắt & quyết định thiết kế
 
 ### Bối cảnh — vì sao tài liệu này tồn tại (đo lại, không suy đoán)
