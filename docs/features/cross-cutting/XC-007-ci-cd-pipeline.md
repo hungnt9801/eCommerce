@@ -20,7 +20,7 @@
 | Mục | Nội dung |
 |---|---|
 | **Chốt** | Nền tảng **GitHub** · workflow `.github/workflows/ci.yml` gọi `pwsh -File tools/kiem-tat-ca.ps1 -DayDu` · runner **`ubuntu-latest`** + bản vá khả chuyển **P-01…P-06** |
-| **Trạng thái hạ tầng (đo 17/10/2026)** | `git remote -v` = **0 dòng**; `.github` / `azure-pipelines.yml` / `Jenkinsfile` **đều không tồn tại** ⇒ 📌 việc còn lại là **thao tác của chủ dự án**: tạo repo GitHub rồi `git remote add origin …` và `git push -u origin main`. Sau đó `S9` mới có đất chạy |
+| **Trạng thái hạ tầng (đo 17/10/2026)** | ✅ **ĐÃ CÓ repo từ xa**: `origin` = `https://github.com/hungnt9801/eCommerce` · đã push **273 commit**, `refs/heads/main` = `ab9a7ff` (khẳng định lại bằng `git ls-remote`). ❌ `.github` / `azure-pipelines.yml` / `Jenkinsfile` **vẫn chưa tồn tại** ⇒ 📌 **`S9` chạy được ngay**; việc còn lại là tạo workflow. ⚠️ Repo đang **PUBLIC** — bí mật thật phải đi qua **GitHub Secrets**, không commit |
 | **Không đổi** | ⚠️ Vẫn **KHÔNG** dùng `windows-latest` (integration test ghim `postgres:17-alpine` = Linux) · 🚨 vẫn phải **build làm nóng** trước để vá **F2** (`-GhiNho` trả `exit 2` trên runner sạch ⇒ **CI đỏ ngay ngày đầu**) · vẫn phải `commit tools/package-lock.json` (**F4**) |
 | **Điều kiện bật required check** | Chỉ bật khi `tools/test-cong-kiem.ps1` **xanh trên Linux** — chưa có bằng chứng thì **chưa** bật (tránh required check flaky) |
 
@@ -52,7 +52,7 @@ deploy → rollback) để không ai phải "tự nghĩ lại" mỗi lần lên 
 |---|---|---|
 | `.github/` | ❌ **KHÔNG tồn tại** | `Test-Path .github` = `False`; liệt kê thư mục gốc chỉ có: `.git` `.vs` `docs` `modules` `shared` `src` `test` `tools` + 8 tệp (`.editorconfig` `.gitignore` `Directory.Build.props` `Directory.Packages.props` `docker-compose.yml` `eCommerce.slnx` `global.json` `README.md` `THIRD-PARTY-NOTICES.md`) |
 | `azure-pipelines.yml` / `Jenkinsfile` / `.gitlab-ci.yml` | ❌ **KHÔNG có** | cùng phép liệt kê thư mục gốc |
-| **Git remote** | ❌ **TRỐNG** | `git remote -v` **không in gì** ⇒ chưa có repo từ xa ⇒ **nơi đặt CI là quyết định chưa chốt** (§15.1 Q1) |
+| **Git remote** | ✅ **CÓ** (`origin`) | `origin` = `https://github.com/hungnt9801/eCommerce` · `git ls-remote` trả `refs/heads/main = ab9a7ff` (đo lại 17/10/2026 sau khi push) |
 | Nhánh hiện tại | `main` | `git branch --show-current` = `main`; HEAD = `83fb4e6 docs: ban giao GD1 cho phien moi` |
 | Hook commit | ⚠️ **Chưa kích hoạt** | `tools/git-hooks/commit-msg` **có** (47 dòng, chặn message ngoài ASCII) nhưng `git config core.hooksPath` **trả rỗng** ⇒ hook **không chạy**; hook nhắc `tools/commit-msg-kiem.ps1` — tệp này **KHÔNG tồn tại** (`Test-Path` = `False`) |
 | Cổng 8 bước | ✅ **Có** | `tools/kiem-tat-ca.ps1` (356 dòng), tham số `-BoQuaIntegration` / `-BoQuaE2E` / `-DayDu` (`:52`–`:56`) |
@@ -1039,7 +1039,7 @@ public class CiWorkflowTests
 
 ### 14.4 Definition of Ready (trước khi viết workflow)
 
-- [x] ✅ Đã **đo** hiện trạng: `.github` **không tồn tại**; `git remote` **trống**; `core.hooksPath` **chưa đặt**;
+- [x] ✅ Đã **đo** hiện trạng (17/10/2026): `.github` **không tồn tại**; ✅ `git remote` **ĐÃ CÓ** (`origin` = GitHub, đã push 273 commit); `core.hooksPath` **chưa đặt**;
       8 bước cổng **có**; cổng ⑨ **có nhưng chưa nối**; `package-lock.json` **bị ignore**
 - [x] ✅ Đã **đọc** mọi script cổng và ghi `đường/dẫn:dòng` cho từng khẳng định
 - [x] ✅ Đã xác định **ràng buộc cứng** (Docker Linux) và **hệ quả** (P-01…P-06)
@@ -1056,7 +1056,7 @@ public class CiWorkflowTests
 
 | # | Câu hỏi | Cần ai trả lời | Trạng thái | Ảnh hưởng nếu chưa trả lời |
 |---|---|---|---|---|
-| **Q1** | **Repo từ xa đặt ở đâu**? (`git remote -v` đang **TRỐNG**.) GitHub tổ chức/tài khoản nào, private hay public? | **Chủ repo** | `Open` | 🚨 **Chặn mọi thứ** — không có remote thì không có Actions (§0.1 D1) |
+| **Q1** | **Repo từ xa đặt ở đâu**? | **Chủ repo** | ✅ **ĐÃ TRẢ LỜI 17/10/2026** | ✅ **GitHub**: `https://github.com/hungnt9801/eCommerce` — đã push **273 commit**, `refs/heads/main` = `ab9a7ff` (§0.1 D1) |
 | **Q2** | Runner: **`ubuntu-latest` + vá P-01…P-06** hay **self-hosted Windows + Docker Desktop**? | **Kiến trúc trưởng + DevOps** | `Open` (tài liệu này **đề xuất** `ubuntu-latest`, §0.1 D2) | Nếu chọn self-hosted ⇒ cần máy, bí mật trên máy, và **không** cần port; nếu chọn ubuntu ⇒ cần 1 việc port + chứng minh lại cổng |
 | **Q3** | **Credential VNPay sandbox** (`TmnCode`/`HashSecret`) khi nào có? | **Chủ repo** (liên hệ VNPay) | `Open` — hiện **rỗng** | Bước ⑩ **đỏ** ⇒ không phát hành được bản có thanh toán; E2E không kiểm được "tiền thật" (`BAN-GIAO-GD1` §3.1) |
 | **Q4** | **Môi trường staging** có chưa (host/DB), hay CI chỉ kiểm rồi dừng? | **DevOps + chủ repo** | `Open` | Không có staging ⇒ không diễn tập rollback (§11.5) ⇒ NFR-010 **không đo được** |

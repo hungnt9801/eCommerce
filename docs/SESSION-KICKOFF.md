@@ -47,7 +47,7 @@ và phiên trước từng **nói quá "GĐ1 hoàn thành"** vì **không đo l�
 ```
 
 **Code:** 292 tệp · ~39.800 dòng (chưa tính test) · 89 tệp test · ~17.900 dòng · **36 migration**.
-**Git:** nhánh `main` · 268 commit · **cây sạch** · **`git remote` TRỐNG** (chưa có repo từ xa ⇒ chưa làm CI được).
+**Git:** nhánh `main` · **273 commit** · **cây sạch** · **`origin` = `https://github.com/hungnt9801/eCommerce`** (đã push, `refs/heads/main` = `ab9a7ff`) · ⚠️ repo đang **PUBLIC**.
 
 🚨 **Ba con số ĐÃ TRÔI so với bàn giao — dùng số ở trên, đừng dùng số cũ:**
 | Số cũ (handover) | Số đo 17/10/2026 | Vì sao |
@@ -121,7 +121,7 @@ pwsh -File tools\kiem-link-tai-lieu.ps1       # 0 tham chiếu chết (thoát 1 
 | D8 | 🔒 **`Percent` hạn mức kênh tính trên tồn TỪNG `(kho, SKU)`** — là *trần an toàn theo kho*, không phải ngân sách kênh | `inv-003` · ⚠️ `S7` phải **đổi nhãn UI** |
 | D9 | 🔒 **Xác nhận lệch đối soát = ĐÓNG CẢNH BÁO + audit**, **KHÔNG** tự sinh bút toán điều chỉnh tồn | `rec-001` · `S7` thêm permission `eCommerce.Reconciliation.Confirm` |
 | D10 | 🔒 **Storefront MỞ CÔNG KHAI** (`/SanPham*` vào allowlist). Cấm lộ `CostPrice` + tồn chi tiết; allowlist phải có test | `web-002` · `cat-003` · `S8` |
-| D11 | 🔒 **CI = GitHub Actions · `ubuntu-latest`** + vá `P-01…P-06`. 📌 `git remote` **vẫn trống** — tạo repo là việc của chủ dự án | `XC-007` · `S9` |
+| D11 | 🔒 **CI = GitHub Actions · `ubuntu-latest`** + vá `P-01…P-06`. ✅ Repo **đã có** + đã push: `https://github.com/hungnt9801/eCommerce` (17/10/2026) — ⚠️ **PUBLIC** ⇒ bí mật thật phải vào **GitHub Secrets** | `XC-007` · `S9` |
 
 ✅ **KHÔNG còn quyết định nào chờ** (17/10/2026: `Q1`…`Q7` đã chốt — xem D1…D11 ở trên). 🔒 **Không mở lại** các quyết định này; nếu buộc phải lệch, sửa tài liệu tương ứng **trước**.
 
@@ -152,7 +152,7 @@ pwsh -File tools\kiem-link-tai-lieu.ps1       # 0 tham chiếu chết (thoát 1 
 | `S9` | `XC-007` — CI thật (`.github` + khả chuyển Linux + vá F2) |
 | `S10` | Đóng GĐ1 — nợ nhỏ + `-DayDu` cuối + bàn giao |
 
-🚨 **`S9` đang bị chặn bởi `Q7`** (`git remote` trống). **`S7`/`S8` bị chặn một phần** bởi `Q4`/`Q5`/`Q6`.
+✅ **Không phiên nào còn bị chặn**: `Q7` xong (repo + push, 17/10/2026) ⇒ `S9` chạy được ngay; `Q3`…`Q6` đã chốt ⇒ `S7`/`S8` chỉ còn việc của phiên.
 📌 **GĐ2** (`SHP-001…004`, `PRO-001…002`) **không** thuộc GĐ1 — cả 6 **0 dòng code**, là chuỗi phiên riêng.
 
 ---

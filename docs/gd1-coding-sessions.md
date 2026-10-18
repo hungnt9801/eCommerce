@@ -49,7 +49,7 @@
 | 9 | **DLQ + `SalMarketplaceEventLogs` (D7) + job `D12`** | `grep SalMarketplaceEventLogs` = **0** | VỪA |
 | 10 | **UI/API còn thiếu**: hạn mức kênh (Web), `/KhachHang` phân trang, lịch sử lượt quét đối soát | handover §7 việc #6 | NHỎ |
 | 11 | **Thanh toán trên UI** (checkout → cổng → kết quả) | `PaymentHub` không có controller; `/DatHang` chưa có bước thanh toán | VỪA |
-| 12 | **CI (`.github`)** | `Test-Path .github` = **False**; `git remote -v` = **0 dòng** | VỪA |
+| 12 | **CI (`.github`)** | ✅ repo từ xa **đã có** (`https://github.com/hungnt9801/eCommerce`, đã push) nhưng `Test-Path .github` = **False** | VỪA |
 | 13 | **Nợ nhỏ**: CSV `;` · 5/12 metric chưa có nơi phát · `CHN-002` supervisor `Timer.RunOnStart` · xác nhận outbox/relay | handover §7 việc #5,#7 · §8 | NHỎ |
 
 📌 **Ước lượng:** ~**8–12 phiên-la-động** (person-session) cho §2.1 — chưa tính GĐ2.
@@ -72,7 +72,7 @@
 | Q4 | 🚨 **`Percent` hạn mức kênh tính trên CÁI GÌ?** (~~`DonVi` theo dòng~~ — đã xong) | chủ dự án | ✅ **`A` — GIỮ per `(kho, SKU)`** (17/10/2026) | 🔒 **Chốt:** `floor(tồnKhảDụng × giaTri/100)` trên tồn **từng `(kho, SKU)`** (`HanMucKenh.cs:13,45`) — nó là **trần an toàn theo kho**, **không** phải ngân sách kênh. ❌ Bị loại: tính trên tổng kênh (cần `StockAllotment` — code chưa có). ⚠️ **`S7` phải đổi nhãn UI** thành *"trần an toàn của kênh theo từng kho"*. 📄 [`inv-003`](features/inventory/inv-003-phan-bo-ton-theo-kenh.md) |
 | Q5 | **Ai xác nhận lệch đối soát, và xác nhận thì LÀM GÌ?** | chủ dự án | ✅ **`A` — ĐÓNG CẢNH BÁO + audit, KHÔNG tự sửa tồn** (17/10/2026) | 🔒 **Chốt:** xác nhận ⇒ ghi `ConfirmedByUserId/ConfirmedAtUtc/ConfirmNote` rồi **đóng cảnh báo**; ❌ **bị loại** phương án tự sinh bút toán điều chỉnh tồn (job không được sửa sổ cái). 📌 `S7` phải thêm: 3 cột + permission **`eCommerce.Reconciliation.Confirm`** (chưa tồn tại) + endpoint + audit. 📄 [`rec-001`](features/reconciliation/rec-001-doi-soat-thanh-toan-querydr.md) |
 | Q6 | **Mở storefront công khai?** | chủ dự án | ✅ **`A` — MỞ CÔNG KHAI** (17/10/2026) | 🔒 **Chốt:** `/SanPham` + `/SanPham/ChiTiet/{slugOrSku}` vào **allowlist** `[AllowAnonymous]`. ⚠️ Ràng buộc: chỉ hàng **đang bán** · **cấm** lộ `CostPrice` + tồn chi tiết · allowlist **phải có test**. 📌 `S8` làm + 2 ca E2E. 📄 [`web-002`](features/web/web-002-storefront-duyet-chi-tiet-san-pham.md) · [`cat-003`](features/catalog/cat-003-media-seo-slug-hien-thi-theo-kenh.md) (sitemap dùng **slug**) |
-| Q7 | **Nơi đặt repo từ xa** | chủ dự án | ✅ **`GitHub`** (17/10/2026) | 🔒 **Chốt:** **GitHub Actions** · runner **`ubuntu-latest`** (vì integration test ghim `postgres:17-alpine` = Linux) + vá **P-01…P-06**. 📌 **Việc của chủ dự án:** tạo repo GitHub rồi `git remote add origin … && git push -u origin main` — **hiện `git remote` vẫn TRỐNG**. 📄 [`XC-007`](features/cross-cutting/XC-007-ci-cd-pipeline.md) |
+| Q7 | **Nơi đặt repo từ xa** | chủ dự án | ✅ **`GitHub`** (17/10/2026) | 🔒 **Chốt:** **GitHub Actions** · runner **`ubuntu-latest`** (vì integration test ghim `postgres:17-alpine` = Linux) + vá **P-01…P-06**. ✅ **ĐÃ LÀM 17/10/2026:** `origin` = `https://github.com/hungnt9801/eCommerce`, đã push **273 commit** (`refs/heads/main` = `ab9a7ff`). ⚠️ Repo đang **PUBLIC**. 📄 [`XC-007`](features/cross-cutting/XC-007-ci-cd-pipeline.md) |
 ---
 
 ## 4. CHIA PHIÊN — 11 phiên
@@ -95,7 +95,7 @@
 | **S6** | **`SAL-005` — DLQ + D7 + D12** | Bảng **DLQ** (`XC-002`) · `SalMarketplaceEventLogs` (**D7**) · worker **`D12`** đối soát để cờ `GapSuspected` **không tồn đọng** · connector trả **`update_time`** ⇒ `AggregateVersion` ≠ `null` | Integration: *"event lỗi ⇒ vào DLQ, không mất"* · job D12 chạy · gate xanh | S0 |
 | **S7** | **UI/API còn thiếu của Inventory + Reconciliation** | Màn hình **hạn mức kênh** (API đã có) · lọc theo kho · phân trang · **API/UI lịch sử lượt quét** đối soát · **retention** dòng lệch | E2E trên HTML thật · gate xanh | ✅ `Q4`/`Q5` đã chốt — chỉ còn việc của phiên |
 | **S8** | **Thanh toán trên UI + đóng `WEB-002`** | `/DatHang` → tạo giao dịch → chuyển cổng → trang kết quả · chi tiết sản phẩm + SEO còn lại | E2E end-to-end tới trang kết quả | `S5` · ✅ `Q6` đã chốt (mở công khai) |
-| **S9** | **`XC-007` — CI thật** | `.github/workflows` gọi `-DayDu` · **vá khả chuyển Linux P-01…P-06** (6 điểm Windows-only) · **build làm nóng** để vá **F2** (`-GhiNho` trả `exit 2` trên runner sạch ⇒ **CI đỏ ngày đầu**) · thêm cổng ⑨ `kiem-link-tai-lieu.ps1` · `commit package-lock.json` (**F4**) | Pipeline xanh **trên Linux** · `test-cong-kiem.ps1` xanh trên Linux | ✅ `Q7` = GitHub — ⚠️ **cần chủ dự án tạo repo + push trước** |
+| **S9** | **`XC-007` — CI thật** | `.github/workflows` gọi `-DayDu` · **vá khả chuyển Linux P-01…P-06** (6 điểm Windows-only) · **build làm nóng** để vá **F2** (`-GhiNho` trả `exit 2` trên runner sạch ⇒ **CI đỏ ngày đầu**) · thêm cổng ⑨ `kiem-link-tai-lieu.ps1` · `commit package-lock.json` (**F4**) | Pipeline xanh **trên Linux** · `test-cong-kiem.ps1` xanh trên Linux | ✅ repo + remote **đã sẵn** (17/10/2026) — 📌 chỉ còn thiếu workflow |
 | **S10** | **Đóng GĐ1** | Nợ nhỏ: CSV `;` · **5/12 metric** chưa có nơi phát · `CHN-002` `Timer.RunOnStart` · xác nhận outbox/relay · **chạy `-DayDu` cuối** + cập nhật bàn giao (⚠️ ghi đúng "còn gì", **không nói quá**) | `-DayDu` xanh với **số đo mới** · tệp bàn giao GĐ1→GĐ2 | S1–S9 |
 
 ### 4.1 Thứ tự & phụ thuộc
