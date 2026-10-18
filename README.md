@@ -214,6 +214,13 @@ dotnet test test\eCommerce.Tests\eCommerce.Tests.csproj
 
 ## 7. Bước tiếp theo đề xuất
 
+> 🚀 **BẮT ĐẦU MỘT PHIÊN LÀM VIỆC MỚI:** đọc [`docs/SESSION-KICKOFF.md`](docs/SESSION-KICKOFF.md) **trước tiên** —
+> đó là **cửa vào** cho mỗi phiên: đọc gì theo thứ tự nào · 12 **luật không thương lượng** · **baseline đo được**
+> (`-DayDu` exit 0 · 228.9s · 1181 unit · 38 integration · 21/21 bất biến DB · 59/59 E2E) · 6 quyết định **đã chốt** ·
+> 5 quyết định **chưa chốt**.
+> 📌 Kế hoạch chia phiên + cổng ra từng phiên: [`docs/gd1-coding-sessions.md`](docs/gd1-coding-sessions.md).
+> 📌 Danh mục tài liệu thiết kế (55 tệp / 20 module): [`docs/features/README.md`](docs/features/README.md).
+
 | Giai đoạn | Nội dung | Thời lượng ước tính |
 |---|---|---|
 | **P0** | Chạy end-to-end (Docker + migration + host), xác nhận worker động hoạt động; thêm Identity/OpenIddict | 3–5 ngày |

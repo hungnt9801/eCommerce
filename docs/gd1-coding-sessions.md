@@ -148,3 +148,4 @@ với gate xanh. 🚨 **Không** code tiếp bằng một giả định chưa ch
 | Ngày | Thay đổi |
 |---|---|
 | 17/10/2026 | Bản đầu. Đo lại toàn bộ GĐ1 bằng `grep`/`Test-Path`: **6 dòng "CÒN" trong `implementation-plan.md` đã lỗi thời** (CAT-003 media, SAL-005 watermark, WEB-001 menu, REC-001 querydr, CUS-001 PII, SAL-006 webhook/job đã xong). Chia **11 phiên**; 6 quyết định chặn ở `S0` |
+| 17/10/2026 (sau) | ✅ **`S0` XONG**: `-DayDu` **exit 0 · 228.9s** — baseline ghi ở [`SESSION-KICKOFF.md`](SESSION-KICKOFF.md) §3. ✅ Chốt **`Q1`** (VNPay: tự đăng ký merchant test + `FakePaymentProvider`) và **`Q2`** (`ADDR-004` 🟢 Approved, 10/10 câu hỏi). ✅ Dọn nốt 3 nợ tài liệu của `ADDR-004` §15.3: **#9** (schema `addr-001`), **#11** (bảng mã lỗi) và **#12** (permission) của `cus-001`. ⏳ Còn **4 quyết định** (`Q3`…`Q6`) + **`Q7`** (repo từ xa) |
