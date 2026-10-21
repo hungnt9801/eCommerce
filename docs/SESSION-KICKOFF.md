@@ -61,8 +61,9 @@ NND **53** / DB **25/25** / **61** quyền / E2E **67/67** ⇒ **mọi số kh�
 cao hơn ~11 %** — máy, không phải sản phẩm). **CUỐI phiên**: **241.8s** như bảng trên.
 • 🆕 **`S8` đo HAI lần**: **ĐẦU phiên** (**12 bước**, `exit 0`): **260.3s** với unit **1395** / integration **71** /
 NND **53** / DB **25/25** / **62** quyền / **86** chỗ quét / E2E **102/102** ⇒ **mọi số khớp bảng `S7`** (⚠️ thời
-gian cao hơn ~8 % — máy). **CUỐI phiên**: **258.8s** như bảng trên, **cùng 12 bước**, chỉ **+1 bước mới bên
-trong** (E2E nay khởi động **cả** `HttpApi.Host`).
+gian cao hơn ~8 % — máy). **CUỐI phiên**: **258.8s** như bảng trên, **cùng 12 bước**; **lần chạy lại trên cây ĐÃ COMMIT: 274.2s · `exit 0`**
+— 📌 **cùng số ca** ở cả ba lần (1399 · 71 · **123/123** · 25/25 · NND 53 · 62 quyền), chỉ khác **thời gian** ⇒ dao động của **máy**.
+📌 E2E nay khởi động **cả** `HttpApi.Host` (:5000) — xem bài học `S8` ngay dưới.
 📌 **`S7`/`S8` còn một lần dừng vì MÔI TRƯỜNG (không phải mã):** Docker Desktop đã tắt sau khi máy khởi động lại ⇒
 `docker compose up -d` lại `ecommerce-postgres` + `ecommerce-redis` rồi mới chạy được probe. 🔑 **Triệu chứng**
 là `psql THAT BAI … failed to connect to the docker API` — 📌 dừng lại và **đọc thông điệp** là đủ để không đi
