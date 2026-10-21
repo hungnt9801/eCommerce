@@ -1205,7 +1205,7 @@ kiểm soát, một khoá như `../../appsettings.json` hoặc `../../wwwroot/x.
 nếu ném ở đây thì dòng DB **không** bị xoá và người dùng **mãi** thấy ảnh đó. Tệp còn lại chỉ là **rác**
 (dọn được bằng job), còn dòng DB còn lại là **sai dữ liệu**.
 
-### 18.4 ✅ Kiểm chứng — **21 unit test**
+### 18.4 ✅ Kiểm chứng — **23 unit test** (21 ca gốc + **2** ca thêm ở `S11`, xem §18.8)
 
 | Nhóm | Nội dung |
 |---|---|
@@ -1213,7 +1213,7 @@ nếu ném ở đây thì dòng DB **không** bị xoá và người dùng **mã
 | **Xoá** | xoá rồi đọc ⇒ `null` · **xoá hai lần ⇒ không ném** · xoá khoá không tồn tại ⇒ không ném |
 | **Nội dung rỗng** | ⇒ **NÉM** `TepKhongPhaiAnh` (không tạo tệp rác 0 byte) |
 | 🚨 **CHỐNG THOÁT THƯ MỤC (ĐỌC)** | **6 dạng** khoá `..` (gồm `\` Windows) — mỗi ca **ghi một tệp BÍ MẬT ngay cạnh** thư mục kho rồi thử đọc nó ⇒ **NÉM** `KhongTimThayAnh` |
-| 🚨 **CHỐNG THOÁT THƯ MỤC (GHI TUYỆT ĐỐI)** | `/etc/passwd` · `C:\Windows\…` ⇒ **NÉM** |
+| 🚨 **CHỐNG THOÁT THƯ MỤC (GHI TUYỆT ĐỐI)** | `/etc/passwd` · `C:\Windows\…` · `C:/Windows/…` · `\\server\share\…` ⇒ **NÉM** — thêm **2 dạng** ở `S11` để hành vi **giống nhau trên mọi hệ điều hành** (xem §18.8) |
 | 🚨 **CHỐNG THOÁT THƯ MỤC (XOÁ)** | khoá `../` ⇒ **NÉM**, và **tệp NGOÀI vẫn còn nguyên** — 📌 đường **xoá** nguy hiểm hơn đường **đọc** |
 | 🚨 **ĐỐI CHỨNG** | đường **hợp lệ** phải nằm **trong** thư mục kho — nếu test này đỏ thì các test chặn kia có thể **xanh vì lý do sai** (chặn tất cả) |
 | **Tách tenant** | có/không `tenantId` ⇒ khoá ở **thư mục khác** nhau |
@@ -1255,10 +1255,30 @@ về **dữ liệu** — và cách phát hiện **luôn** là *"in giá trị TH
 | **6** | **Chưa cấu hình được thư mục gốc** | `MediaStorageNoiBo` dùng `ContentRootPath/media-noi-bo` **cố định**; kế hoạch ghi ở doc comment là `MediaStorage:ThuMucGoc` nhưng **chưa** đọc configuration |
 | **7** | 🚨 **HIỂN THỊ THEO KÊNH vẫn 0 dòng code** | Phần **thứ ba** của `CAT-003` (§16.8 nợ 2) |
 
-### 18.8 Lịch sử thay đổi (bổ sung)
+### 18.8 🚨 `S11` — VÁ TÍNH KHẢ CHUYỂN: KHOÁ KIỂU WINDOWS LÀ ĐƯỜNG DẪN TUYỆT ĐỐI TRÊN **MỌI** HỆ ĐIỀU HÀNH (21/10/2026)
+
+> 📌 Phát hiện ở **lần chạy GitHub Actions ĐẦU TIÊN** (`S11`): unit test
+> `TU_CHOI__khoa_la_DUONG_DAN_TUYET_DOI("C:\\Windows\\System32\\drivers\\etc\\hosts")` **ĐỎ trên Linux**.
+> ✅ Đây là **lỗi thật** (không phải lỗi bộ đo): `Path.IsPathRooted("C:\\Windows\\…")` trả **`false`** trên
+> Linux vì `\` **không phải** dấu phân cách ở đó.
+
+| | |
+|---|---|
+| **Hệ quả trước khi vá** | Khoá kiểu Windows **lọt** lớp 2 (*"không tuyệt đối"*). Trên Linux nó thành một **tên tệp** trong kho ⇒ trả `null` (không ném). Trên Windows nó **bỏ qua gốc kho** ⇒ thoát thư mục. 🔑 **Cùng một khoá trong DB cho hai hành vi khác nhau tuỳ máy** — loại lỗi không thể thấy khi chỉ chạy một hệ điều hành |
+| **Vì sao không lộ trên Windows** | Test xanh **đúng** trên Windows (đường dẫn thật sự tuyệt đối ở đó) ⇒ 1.419 test cũ **không** phát hiện. Chỉ CI Linux phát hiện |
+| **Cách vá** | Hàm `LaDuongDanTuyetDoi` chặn **tường minh** cả `C:\…`, `C:/…` (ổ đĩa) và `\\server\share` (UNC) trên **mọi** hệ điều hành — không dựa vào `Path.IsPathRooted` một mình |
+| **Không nới lỏng** | Giữ nguyên **hai** ca cũ và thêm **hai** ca mới (`C:/…`, UNC) ⇒ khoá **cả hai chiều** của hàm mới; test xanh trên **cả Windows lẫn Linux** |
+| **Số đo** | unit **1.419 → 1.421** (+2 ca) ở `MediaStorageNoiBoTests`; `S11` cộng thêm **+1** ca CI (`DbMigrator` trước cổng) ⇒ **1.422** |
+
+🔑 **Bài học:** *"kiểm bằng một hệ điều hành"* là **một phép đo chưa đủ**, và nó **im lặng** — khác với
+cổng đỏ. Đúng họ *"một phép đo bất ngờ thường là phép đo SAI"* nhưng ở **chiều ngược**: ở đây phép đo
+**xanh** mới là thứ sai, vì nó chỉ đo **một nửa** không gian.
+
+### 18.9 Lịch sử thay đổi (bổ sung)
 
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
+| v0.5 | 21/10/2026 | *(agent, `S11`)* | **§18.8 — vá tính khả chuyển của khoá lưu trữ**: `C:\…` · `C:/…` · `\\server\share` bị từ chối trên **mọi** hệ điều hành (trước đó chỉ Windows); +2 ca test; lộ ra ở **lần chạy CI Linux đầu tiên** |
 | v0.4 | 16/10/2026 | *(agent, session GĐ1)* | **§18 — LÁT CẮT 3: KHO TỆP CỤC BỘ** (đóng nợ §17.8 #1): `MediaStorageNoiBo` hiện thực `IMediaStorage` trên đĩa · 🚨 **CHỐNG THOÁT THƯ MỤC 4 lớp** (rỗng · tuyệt đối · `..` theo **đoạn** · **lưới an toàn tiền tố có dấu phân cách**) · khoá do **hệ thống** sinh (`guid`, không tên tệp client) · `XoaAsync` **idempotent** + lỗi I/O **không ném** (chỉ log) · **+21 unit test** (1037 tổng) · `.gitignore` `media-noi-bo`. Ghi **§18.2** (chi tiết dễ sai ở lớp 4: `StartsWith` trần cho qua thư mục **anh em**) · **§18.6** (bộ đo sai lần thứ **ba** liên tiếp: giả định cấu trúc thư mục) · **§18.7** (nợ: **chưa có app service/endpoint**, chưa UI, chưa job dọn tệp mồ côi, chưa tầng phục vụ tệp, chưa trần dung lượng, chưa cấu hình thư mục gốc, **hiển thị theo kênh vẫn 0 dòng code**) |
 
 ---

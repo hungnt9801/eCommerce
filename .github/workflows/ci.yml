@@ -151,6 +151,16 @@ jobs:
         run: |
           dotnet run --no-build -c Debug
 
+      - name: '8c. Gieo danh muc DVHC toi thieu (probe (9) can 01/00004 - CI KHONG goi mang ngoai)'
+        shell: pwsh
+        run: |
+          # 🚨 `S11` (21/10/2026): danh muc DVHC tren runner SACH la RONG (job sync mac dinh TAT va goi
+          #    API ngoai). Probe (9) dung o T00 - va dung khi dung: thieu danh muc thi moi phep do sau VO NGHIA.
+          # 🔒 Cong KHONG duoc phu thuoc API cong cong (XC-007 NFR-011) ⇒ gieo 2 dong tham chieu toi thieu,
+          #    dung ma/ten that cua schema v2. 📌 Day KHONG phai danh muc that (3.321 xa) - xem header script.
+          & pwsh -NoProfile -File tools/gieo-danh-muc-dvhc.ps1
+          exit $LASTEXITCODE
+
       - name: '9. Xoa log cu - bang chung PHAI la cua lan chay NAY'
         shell: pwsh
         run: |

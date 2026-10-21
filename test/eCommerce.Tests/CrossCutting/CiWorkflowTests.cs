@@ -177,12 +177,19 @@ public class CiWorkflowTests
         Assert.Contains("working-directory: src/eCommerce.DbMigrator", vanBan);
         Assert.Contains("dotnet run --no-build -c Debug", vanBan);
 
+        // 🚨 `S11`: runner sạch KHÔNG có danh mục ĐVHC (job sync mặc định TẮT + gọi API ngoài) ⇒ probe ⑨
+        //    dừng ở T00. Phải gieo **dữ liệu tham chiếu tối thiểu** TRƯỚC cổng — không gọi mạng ngoài.
+        Assert.Contains("gieo-danh-muc-dvhc.ps1", vanBan);
+
         var viTriMigrate = vanBan.IndexOf("working-directory: src/eCommerce.DbMigrator", StringComparison.Ordinal);
+        var viTriSeed = vanBan.IndexOf("gieo-danh-muc-dvhc.ps1", StringComparison.Ordinal);
         var viTriCong = vanBan.IndexOf("kiem-tat-ca.ps1", StringComparison.Ordinal);
 
         Assert.True(viTriCong >= 0, "Workflow KHÔNG gọi cổng.");
         Assert.True(viTriMigrate < viTriCong,
             "🚨 DbMigrator phải đứng TRƯỚC bước cổng (runner sạch có PostgreSQL TRỐNG).");
+        Assert.True(viTriSeed < viTriCong,
+            "🚨 Gieo danh mục ĐVHC tối thiểu phải đứng TRƯỚC bước cổng (probe ⑨ dừng ở T00 nếu thiếu).");
     }
 
     /// <summary>
