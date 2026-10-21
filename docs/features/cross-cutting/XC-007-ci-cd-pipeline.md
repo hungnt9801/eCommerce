@@ -129,7 +129,7 @@ deploy → rollback) để không ai phải "tự nghĩ lại" mỗi lần lên 
 | **Basic Flow** | 1. Lập trình viên mở PR ⇒ GitHub phát `pull_request`.<br>2. Workflow **`ci.yml`** cấp quyền tối thiểu, đặt `concurrency: ci-«ref»`.<br>3. Bước chuẩn bị: checkout (`fetch-depth: 1`), cache NuGet/npm, `docker compose up -d` (Postgres 17 + Redis 7) + chờ healthcheck.<br>4. **Build làm nóng** (bắt buộc — xem §12 E-03) rồi chạy `pwsh -NoProfile -File tools/kiem-tat-ca.ps1 -DayDu`.<br>5. Cổng chạy **8 bước theo thứ tự cố định**, **dừng ngay** khi một bước hỏng.<br>6. Chạy **bước ⑨** `tools/kiem-link-tai-lieu.ps1` (tham chiếu tài liệu).<br>7. CI **khẳng định** đầu ra: có `E2E: N/N`, **0** dòng `[BO QUA]`, exit code `0` (§6.2).<br>8. Upload artifact bằng chứng + ghi `$GITHUB_STEP_SUMMARY`.<br>9. Required check xanh ⇒ nút merge mở. Đỏ ⇒ **chặn merge** (BR-004). |
 | **Alternative Flow** | **A1: `push` lên `main`** (sau merge) — chạy **cùng** cổng trên `main` + upload bằng chứng; **không** chạy deploy.<br>**A2: chạy hằng đêm (`schedule`)** — chạy lại cổng trên `main` để phát hiện **trôi môi trường** (image/tool mới) — đây là cách duy nhất phát hiện "cổng xanh vì cache cũ".<br>**A3: chạy tay (`workflow_dispatch`)** — **bắt buộc** nhập `lyDo`; bằng chứng ghi `lyDo` + người kích (BR-015).<br>**A4: phát hành (tag `v*`)** — workflow `release.yml`: tải artifact đã qua cổng (§5) → **duyệt** → migrate → deploy → smoke (§11). |
 | **Exception Flow** | **E1: một bước `exit 1`** ⇒ pipeline **Failed**; **không** chạy bước sau; artifact **vẫn** upload (bằng chứng của cái ĐỎ cũng là bằng chứng).<br>**E2: `exit 2`** ("PHEP KIEM VO NGHIA" / không kết nối DB) ⇒ trạng thái **Inconclusive**, **không** phải `Failed`; người trực phải **sửa môi trường** — cấm đổi thành xanh (BR-006).<br>**E3: vượt `timeout-minutes`** ⇒ `TimedOut`, job bị kill; coi như **đỏ** (không được "treo rồi xanh").<br>**E4: mất bí mật / bí mật rỗng** ⇒ bước ⑩ **đỏ**, ghi rõ *"chưa đủ điều kiện phát hành"* (D9).<br>**E5: PR từ fork** ⇒ **không** có secrets ⇒ chỉ chạy cổng **không** cần bí mật; nếu cổng cần bí mật ⇒ **đỏ có thông điệp** (không im lặng). |
-| **Business Rules** | • **BR-XC-007-001**: Mọi commit vào `main` **PHẢI** có một lần chạy cổng **xanh** trên **chính** `commitSha` đó; required check tên **`cong-8-buoc`** phải xanh trước khi merge.<br>• **BR-XC-007-002**: 🚨 CI **CẤM** gọi `tools/kiem-tat-ca.ps1` mà thiếu **`-DayDu`**, **CẤM** `-BoQuaIntegration`, **CẤM** `-BoQuaE2E`, **CẤM** `-ChoPhepRong`.<br>• **BR-XC-007-003**: Mọi lần chạy phải **chứng minh bước ⑧ đã chạy**: log có dòng khớp `E2E: ` **và** tổng số ca `N/N` với `N > 0`; log **0** dòng `[BO QUA]`.<br>• **BR-XC-007-004**: Cổng **đỏ** ⇒ **không merge** (branch protection + required status check; cấm `continue-on-error` cho step cổng).<br>• **BR-XC-007-005**: Cổng chỉ được tính cho commit **sẽ merge** — dùng `github.event.pull_request.head.sha`; nếu nhánh bị rebase/force-push ⇒ **chạy lại** (cấm tái dùng kết quả cũ).<br>• **BR-XC-007-006**: **Phân biệt** `exit 1` (sản phẩm) với `exit 2` (môi trường/vô nghĩa); cấm đổi `2` thành xanh, cấm nuốt.<br>• **BR-XC-007-007**: Thay đổi `tools/**` **PHẢI** kèm lần chạy `tools/test-cong-kiem.ps1` **xanh** (bước ⑦) trong **cùng** lần chạy cổng.<br>• **BR-XC-007-008**: **Không bước nào được bỏ qua im lặng** — trên CI **0** bước bị bỏ; mọi lần bỏ phải in lý do (script đã làm: `:218`, `:331`) **và** CI phải khẳng định là **không có**.<br>• **BR-XC-007-009**: Giá trị bí mật **KHÔNG** được xuất hiện trong log/artifact/`STEP_SUMMARY`; cấm `echo $env:*SECRET*`, cấm `set -x` với biến bí mật.<br>• **BR-XC-007-010**: **Một** pipeline được deploy/phát hành một môi trường tại một thời điểm (D8); **cấm** huỷ giữa lúc migrate.<br>• **BR-XC-007-011**: Phát hành **KHÔNG rebuild**; digest artifact phát hành **phải khớp** digest trong bằng chứng (D6).<br>• **BR-XC-007-012**: Migration chạy **TRƯỚC** app; deploy **dừng** nếu `eCommerce.DbMigrator` trả `exit ≠ 0` (D7).<br>• **BR-XC-007-013**: Mọi migration làm đổi schema **PHẢI** regenerate `test/eCommerce.IntegrationTests/Assets/schema.sql` **và** cập nhật con số **48** (`PostgreSqlSchemaTests.cs:151`) **trong cùng PR** — nếu không, bước ④ hoặc ⑥ sẽ đỏ.<br>• **BR-XC-007-014**: Deploy production **chỉ** từ tag `v*` trên `main`, qua environment **`production`** có **≥ 1 người duyệt**.<br>• **BR-XC-007-015**: Mọi lần **chạy lại** phải ghi lý do; tối đa **2** lần; nếu xanh sau khi đỏ ⇒ **phải** mở ticket `flaky` **kèm 2 URL run** (cấm im lặng — §12).<br>• **BR-XC-007-016**: Cổng ⑨ phải thoát `0` và **không** có tham chiếu chết **mới**; số tham chiếu chết đã biết **phải** giữ nguyên hoặc giảm (không được tăng).<br>• **BR-XC-007-017**: Cache **không** được là nguồn sự thật của kết quả: mọi lần chạy phải **tự build lại** (`--no-incremental`, `/nodeReuse:false` — `kiem-tat-ca.ps1:148`) và **kiểm mốc** (bước ②). |
+| **Business Rules** | • **BR-XC-007-001**: Mọi commit vào `main` **PHẢI** có một lần chạy cổng **xanh** trên **chính** `commitSha` đó; required check tên **`cong-12-buoc`** phải xanh trước khi merge.<br>• **BR-XC-007-002**: 🚨 CI **CẤM** gọi `tools/kiem-tat-ca.ps1` mà thiếu **`-DayDu`**, **CẤM** `-BoQuaIntegration`, **CẤM** `-BoQuaE2E`, **CẤM** `-ChoPhepRong`.<br>• **BR-XC-007-003**: Mọi lần chạy phải **chứng minh bước ⑧ đã chạy**: log có dòng khớp `E2E: ` **và** tổng số ca `N/N` với `N > 0`; log **0** dòng `[BO QUA]`.<br>• **BR-XC-007-004**: Cổng **đỏ** ⇒ **không merge** (branch protection + required status check; cấm `continue-on-error` cho step cổng).<br>• **BR-XC-007-005**: Cổng chỉ được tính cho commit **sẽ merge** — dùng `github.event.pull_request.head.sha`; nếu nhánh bị rebase/force-push ⇒ **chạy lại** (cấm tái dùng kết quả cũ).<br>• **BR-XC-007-006**: **Phân biệt** `exit 1` (sản phẩm) với `exit 2` (môi trường/vô nghĩa); cấm đổi `2` thành xanh, cấm nuốt.<br>• **BR-XC-007-007**: Thay đổi `tools/**` **PHẢI** kèm lần chạy `tools/test-cong-kiem.ps1` **xanh** (bước ⑦) trong **cùng** lần chạy cổng.<br>• **BR-XC-007-008**: **Không bước nào được bỏ qua im lặng** — trên CI **0** bước bị bỏ; mọi lần bỏ phải in lý do (script đã làm: `:218`, `:331`) **và** CI phải khẳng định là **không có**.<br>• **BR-XC-007-009**: Giá trị bí mật **KHÔNG** được xuất hiện trong log/artifact/`STEP_SUMMARY`; cấm `echo $env:*SECRET*`, cấm `set -x` với biến bí mật.<br>• **BR-XC-007-010**: **Một** pipeline được deploy/phát hành một môi trường tại một thời điểm (D8); **cấm** huỷ giữa lúc migrate.<br>• **BR-XC-007-011**: Phát hành **KHÔNG rebuild**; digest artifact phát hành **phải khớp** digest trong bằng chứng (D6).<br>• **BR-XC-007-012**: Migration chạy **TRƯỚC** app; deploy **dừng** nếu `eCommerce.DbMigrator` trả `exit ≠ 0` (D7).<br>• **BR-XC-007-013**: Mọi migration làm đổi schema **PHẢI** regenerate `test/eCommerce.IntegrationTests/Assets/schema.sql` **và** cập nhật con số **48** (`PostgreSqlSchemaTests.cs:151`) **trong cùng PR** — nếu không, bước ④ hoặc ⑥ sẽ đỏ.<br>• **BR-XC-007-014**: Deploy production **chỉ** từ tag `v*` trên `main`, qua environment **`production`** có **≥ 1 người duyệt**.<br>• **BR-XC-007-015**: Mọi lần **chạy lại** phải ghi lý do; tối đa **2** lần; nếu xanh sau khi đỏ ⇒ **phải** mở ticket `flaky` **kèm 2 URL run** (cấm im lặng — §12).<br>• **BR-XC-007-016**: Cổng ⑨ phải thoát `0` và **không** có tham chiếu chết **mới**; số tham chiếu chết đã biết **phải** giữ nguyên hoặc giảm (không được tăng).<br>• **BR-XC-007-017**: Cache **không** được là nguồn sự thật của kết quả: mọi lần chạy phải **tự build lại** (`--no-incremental`, `/nodeReuse:false` — `kiem-tat-ca.ps1:148`) và **kiểm mốc** (bước ②). |
 | **Non-Functional Requirement** | • **NFR-XC-007-001**: Pipeline **đầy đủ (8+1 cổng) ≤ 10 phút** wall-clock trên runner; riêng `kiem-tat-ca.ps1 -DayDu` **≤ 4 phút** (máy dev đo **145–155 s** — `BAN-GIAO-GD1` §1 dòng 31).<br>• **NFR-XC-007-002**: **0** bước bị bỏ qua im lặng trên `main` (đo bằng §6.2).<br>• **NFR-XC-007-003**: **100 %** commit trên `main` có bằng chứng cổng xanh gắn đúng `commitSha`.<br>• **NFR-XC-007-004**: Tỉ lệ **flaky < 2 %** (≤ 1 lần đỏ-không-do-commit trên **50** lần chạy).<br>• **NFR-XC-007-005**: **0** chuỗi bí mật trong log (quét tự động §14 TC-17).<br>• **NFR-XC-007-006**: Phản hồi đầu tiên (đến hết bước ③ unit test) **≤ 4 phút**.<br>• **NFR-XC-007-007**: Restore NuGet khi cache hit **≤ 45 s**, tỉ lệ hit **≥ 80 %**.<br>• **NFR-XC-007-008**: Lưu bằng chứng **≥ 90 ngày** (khớp `XC-005` Q4: log 90 ngày).<br>• **NFR-XC-007-009**: **Tái lập**: cùng `commitSha` chạy 2 lần ⇒ **cùng phán quyết** và **cùng số đếm** (2/2).<br>• **NFR-XC-007-010**: Rollback app **≤ 15 phút**, đo bằng diễn tập (§11.5).<br>• **NFR-XC-007-011**: Cổng **không** phụ thuộc dịch vụ ngoài có phí/không ổn định — chỉ GH runner + Docker + Postgres/Redis container + npm registry + NuGet.<br>• **NFR-XC-007-012**: Chi phí mỗi lần chạy — **chưa đo** (§15.1 Q6). |
 
 ---
@@ -303,7 +303,7 @@ sequenceDiagram
     RUN->>RUN: «khang dinh log: co E2E N/N, 0 dong [BO QUA]»
     alt «du 9 cong va du bang chung»
         RUN->>ART: «upload log + Evidence.json»
-        RUN-->>GH: «check cong-8-buoc = success»
+        RUN-->>GH: «check cong-12-buoc = success»
         GH-->>DEV: «nut merge MO»
         DEV->>GH: «merge (squash)»
     else «mot cong exit 1»
@@ -578,7 +578,7 @@ pwsh -NoProfile -File tools/kiem-link-tai-lieu.ps1    # buoc 9 (chua noi vao scr
 
 | # | Bất biến | Cơ chế bảo vệ | Kiểm bằng |
 |---|---|---|---|
-| 1 | **Không merge được khi cổng đỏ** | branch protection: required status check **`cong-8-buoc`** + **`cong-tham-chieu`**; `enforce_admins: true` | TC-13 (thử merge khi đỏ) |
+| 1 | **Không merge được khi cổng đỏ** | branch protection: required status check **`cong-12-buoc`**; `enforce_admins: true`. 📌 Cổng ⑨ (`kiem-link-tai-lieu.ps1`) là **step 11 trong CÙNG job** ⇒ một check là đủ (xem §16.7 **S11-1**) | TC-13 (thử merge khi đỏ) |
 | 2 | **Không bước nào bị bỏ qua im lặng** | `-DayDu` + A2/A3/A5 (§6.2) | TC-15 |
 | 3 | **Cổng phải chạy trên đúng commit sẽ merge** | dùng `head.sha`; cấm tái dùng kết quả cũ sau rebase | TC-14 |
 | 4 | **Migration chạy TRƯỚC app** | `release.yml` tuần tự; deploy chặn nếu migrator exit ≠ 0 (D7) | TC-21 |
@@ -643,7 +643,7 @@ pwsh -NoProfile -File tools/kiem-link-tai-lieu.ps1    # buoc 9 (chua noi vao scr
 | Thiết lập | Giá trị | Vì sao |
 |---|---|---|
 | Require PR before merging | ✅ | Cổng chạy ở PR |
-| Required status checks | **`cong-8-buoc`**, **`cong-tham-chieu`** | BR-001/BR-004. Tên **phải** khớp `jobs.<id>.name` trong workflow (chưa tạo) |
+| Required status checks | **`cong-12-buoc`** | BR-001/BR-004. Tên **phải** khớp `jobs.<id>.name` trong workflow. 📌 Một check vì cổng ⑨ là step 11 **trong cùng job** — `CiWorkflowTests.Ten_job_phai_khop_required_check` khoá **chéo** tên này với mục §9.2 |
 | Require branches up to date | ✅ | Chống "xanh trên base cũ" (BR-005) |
 | Require conversation resolution | ✅ | Câu hỏi review không bị bỏ qua |
 | Dismiss stale approvals khi push | ✅ | Duyệt lại sau thay đổi |
@@ -674,7 +674,7 @@ pwsh -NoProfile -File tools/kiem-link-tai-lieu.ps1    # buoc 9 (chua noi vao scr
 
 | Vùng UI | Dữ liệu hiển thị | Nguồn (trường) | Hành động |
 |---|---|---|---|
-| **PR → tab Checks** | tên check `cong-8-buoc`, `cong-tham-chieu`, thời lượng | `CI_RUN.Verdict`, `CI_STEP.DurationSeconds` | Bấm vào xem log; nút merge **mờ** khi đỏ |
+| **PR → tab Checks** | tên check `cong-12-buoc`, thời lượng | `CI_RUN.Verdict`, `CI_STEP.DurationSeconds` | Bấm vào xem log; nút merge **mờ** khi đỏ |
 | **Actions → run summary** (`$GITHUB_STEP_SUMMARY`) | bảng 9 bước: `exitCode` · giây · số đếm | §5.2 mục 3+5 | Đọc nhanh, không cần tải log |
 | **Actions → Artifacts** | `Evidence.json`, 9 tệp log | §5.2 mục 4 | Tải về làm bằng chứng kiểm toán |
 | **Environments → production** | ai duyệt, lúc nào, tag, digest | `RELEASE.ApprovedBy/ApprovedAt/ArtifactSha256` | Duyệt / xem lịch sử |
@@ -878,7 +878,7 @@ không chạy"*).
 > ([`design-doc-guidelines.md`](../../design-doc-guidelines.md) §4 dòng 138).
 
 ```yaml
-# ĐẶC TẢ (chưa có trong repo) — .github/workflows/ci.yml
+# ĐẶC TẢ TỐI THIỂU — bản thật: .github/workflows/ci.yml (đã có trong repo từ `S9`, xem §16)
 name: ci
 on:
   pull_request:
@@ -894,10 +894,10 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  cong-8-buoc:
-    name: cong-8-buoc          # <-- TEN NAY phai khop required status check (§9.2)
+  cong-12-buoc:
+    name: cong-12-buoc          # <-- TEN NAY phai khop required status check (§9.2)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
@@ -1139,13 +1139,11 @@ public class CiWorkflowTests
 
 ## 16. TIẾN ĐỘ TRIỂN KHAI — phiên `S9` (21/10/2026): CI THẬT + VÁ KHẢ CHUYỂN LINUX
 
-> 🟡 **Trạng thái: MỘT PHẦN — và phần còn thiếu là phần quan trọng nhất.** Pipeline **đã có trong repo**,
+> 🟡 **Trạng thái của `S9`: MỘT PHẦN — và phần còn thiếu là phần quan trọng nhất.** Pipeline **đã có trong repo**,
 > vá khả chuyển **đã xong**, "cổng của cổng" **đã có test hai chiều**; **nhưng:**
-> ❌ **CHƯA có lần chạy nào trên GitHub Actions** — phiên này **không có quyền `git push`**
-> (`git push --dry-run` trả *"could not read Username"*), nên **required check CHƯA được bật**.
-> 📌 Đó đúng là điều kiện ở đầu tài liệu: *"Chỉ bật required check khi `test-cong-kiem.ps1` xanh trên Linux —
-> chưa có bằng chứng thì **chưa** bật"*.
-> ✅ **Bù lại**, vá khả chuyển đã được kiểm chứng trên **Linux thật** (container Ubuntu), ghi ở §16.2.
+> ❌ **`S9` CHƯA có lần chạy nào trên GitHub Actions** — phiên đó **không có quyền `git push`**.
+> ✅ **`S11` (21/10/2026) ĐÃ CHẠY TRÊN GITHUB ACTIONS THẬT** — xem **§17** (bằng chứng: URL lần chạy + số ca
+> đọc từ log). 📌 Đoạn §16.1–§16.6 dưới đây giữ nguyên làm **nhật ký của `S9`**, không sửa lại cho "đẹp".
 
 ### 16.1 Đã làm (kèm bằng chứng)
 
@@ -1153,7 +1151,7 @@ public class CiWorkflowTests
 |---|---|---|---|
 | 1 | **Workflow CI thật**: `pull_request` · `push main` · `schedule` · `workflow_dispatch` (bắt buộc `lyDo`) | `.github/workflows/ci.yml` | YAML hợp lệ (parse bằng thư viện `yaml`: 15 step) · `CiWorkflowTests` **10 ca** |
 | 2 | 🚨 **BUILD LÀM NÓNG trước cổng** — vá **F2** | bước 8 của workflow | `CiWorkflowTests.F2_build_lam_nong_phai_dung_TRUOC_buoc_cong` (kiểm **thứ tự**, không chỉ kiểm có mặt) |
-| 3 | **Cổng ⑨** (`kiem-link-tai-lieu.ps1`) là **step riêng** của workflow | bước 11 | CI **đỏ** khi có tham chiếu chết; `link.log` vào artifact |
+| 3 | **Cổng ⑨** (`kiem-link-tai-lieu.ps1`) là **step riêng** của workflow | bước 11 (trong **cùng** job `cong-12-buoc`) | CI **đỏ** khi có tham chiếu chết; `link.log` vào artifact |
 | 4 | **Cổng của cổng** (`§6.2` A1…A7) + `Evidence.json` | `tools/ci-khang-dinh.ps1` (**mới**) | `test-cong-kiem.ps1` nhóm **`X1…X8`**: **2 ca xanh** (log đầy đủ · **tên ca chứa `[BO QUA]`**) + **6 ca đỏ** (A2 thiếu log · A2 `2/3` · A3 bỏ bước · A4 thiếu `Build DA VAO` · A5 11 bước · A6 dòng `🚨`) |
 | 5 | **Thư viện một chỗ cho khác biệt Windows/Linux** | `tools/nen-tang.ps1` (**mới**) | `test-cong-kiem.ps1` nhóm **`Y1…Y5`**: quét **mọi** script (**hai chiều**), cổng **hai chiều** thật, đường dẫn `bin`, `curl` |
 | 6 | **Vá khả chuyển P-01…P-06** — 📌 **thực tế là 8 tệp, không phải 6 điểm** (xem §16.3 **S9-C**) | `kiem-tat-ca` · `kiem-e2e` · `kiem-moc-build` · `kiem-link-tai-lieu` · `probe-so-dia-chi` · `probe-khach-hang` · `probe-thanh-toan` · `probe-don-san` · `route-check` | `Y1` (quét: cấm tái xuất hiện) + `Y3/Y4/Y5` (hành vi thật) + **chạy lại toàn bộ cổng trên Windows vẫn xanh** |

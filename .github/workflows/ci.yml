@@ -50,9 +50,11 @@ env:
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
 
 jobs:
-  cong-8-buoc:
+  cong-12-buoc:
     # 🚨 TEN NAY PHAI KHOP required status check tren GitHub (§9.2) - doi ten la required check mat hieu luc.
-    name: cong-8-buoc
+    # 📌 `S11` (21/10/2026): doi tu `cong-8-buoc` -> `cong-12-buoc`. Ten cu noi SAI ve cong (12 buoc tu `S5`/`S6`).
+    #    Doi TRUOC lan chay dau tien vi required check chua bat ⇒ doi bay gio la RẺ, sau khi bat la dat.
+    name: cong-12-buoc
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:

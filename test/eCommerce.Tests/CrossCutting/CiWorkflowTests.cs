@@ -61,7 +61,7 @@ public class CiWorkflowTests
 
         // 🔒 Neo nội dung: đây phải là workflow **của dự án này**, không phải một tệp mẫu cùng tên.
         Assert.Contains("kiem-tat-ca.ps1", NoiDungKhongChuThich(tep));
-        Assert.Contains("cong-8-buoc", NoiDungKhongChuThich(tep));
+        Assert.Contains("cong-12-buoc", NoiDungKhongChuThich(tep));
     }
 
     /// <summary>
@@ -193,16 +193,35 @@ public class CiWorkflowTests
     }
 
     /// <summary>
-    /// 🚨 **Tên job phải khớp required status check** (`cong-8-buoc`) — đổi tên là **required check mất
+    /// 🚨 **Tên job phải khớp required status check** (`cong-12-buoc`) — đổi tên là **required check mất
     /// hiệu lực** mà không ai thấy (nút merge lại mở dù cổng đỏ; `XC-007` §9.2).
+    ///
+    /// 📌 **`S11` (21/10/2026):** tên cũ `cong-8-buoc` **nói sai** về cổng (đã 12 bước từ `S5`/`S6`). Đổi tên
+    /// **trước** lần chạy CI đầu tiên ⇒ rẻ; sau khi bật required check thì phải sửa **cả** thiết lập GitHub.
+    /// 🔑 Và tên trong **tài liệu** cũng là một nguồn sự thật (người trực đọc §9.2 để bật required check) ⇒
+    /// phép kiểm này đọc **§9.2** và đòi **đúng** tên của job; hai nơi lệch nhau là **ĐỎ**, không phải "chỉ là chữ".
     /// </summary>
     [Fact]
     public void Ten_job_phai_khop_required_check()
     {
-        var vanBan = NoiDungKhongChuThich(DocTatCaWorkflow(TimGocRepo()));
+        var goc = TimGocRepo();
+        var vanBan = NoiDungKhongChuThich(DocTatCaWorkflow(goc));
 
-        Assert.Matches(new Regex(@"(?m)^\s{2}cong-8-buoc:\s*$"), vanBan);
-        Assert.Matches(new Regex(@"(?m)^\s{4}name:\s*cong-8-buoc\s*$"), vanBan);
+        Assert.Matches(new Regex(@"(?m)^\s{2}cong-12-buoc:\s*$"), vanBan);
+        Assert.Matches(new Regex(@"(?m)^\s{4}name:\s*cong-12-buoc\s*$"), vanBan);
+
+        // 🔒 Nguồn sự thật thứ hai: mục §9.2 của `XC-007` (chỗ người trực đọc để bật required check).
+        var duongDanTaiLieu = Path.Combine(goc, "docs", "features", "cross-cutting", "XC-007-ci-cd-pipeline.md");
+        Assert.True(File.Exists(duongDanTaiLieu), $"KHÔNG TÌM THẤY tài liệu `{duongDanTaiLieu}` ⇒ phép kiểm chéo VO NGHIA.");
+
+        var taiLieu = File.ReadAllText(duongDanTaiLieu);
+        var dau = taiLieu.IndexOf("### 9.2", StringComparison.Ordinal);
+        var cuoi = taiLieu.IndexOf("### 9.3", StringComparison.Ordinal);
+        Assert.True(dau >= 0 && cuoi > dau, "KHÔNG TÌM THẤY mục `### 9.2` … `### 9.3` trong `XC-007` ⇒ phép kiểm chéo VO NGHIA.");
+
+        var muc92 = taiLieu[dau..cuoi];
+        Assert.Contains("`cong-12-buoc`", muc92);
+        Assert.DoesNotContain("cong-8-buoc", muc92);
     }
 
     /// <summary>
