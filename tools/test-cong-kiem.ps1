@@ -414,6 +414,308 @@ if (-not $ChiKiemDb) {
 }
 
 # ══════════════════════════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# NHOM 1d — `ci-khang-dinh.ps1` (📌 nhanh, KHONG cham DB)
+#
+# 🔑 VI SAO CO NHOM NAY (`XC-007` §6.2, `S9` 21/10/2026): `ci-khang-dinh.ps1` la **cong cua chinh cong** —
+# no ton tai de bat *"exit 0 ma buoc ⑧ khong chay"*. 📌 Neu chinh no **luon xanh** thi no chi tao cam giac
+# an toan: `kiem-tat-ca.ps1` van xanh, CI van xanh, ma buoc ⑧ van co the im lang khong chay.
+# ⇒ 🔒 Phai co **ca DO** cho tung dieu kien A2…A6, va mot ca XANH co **dong ten ca chua 🚨** (do la dang
+#    cua mot lan chay TOT — xem ghi chu A6 trong `ci-khang-dinh.ps1`).
+# ══════════════════════════════════════════════════════════════════════════════════════════════════
+if (-not $ChiKiemDb) {
+    $scriptKd = Join-Path $PSScriptRoot 'ci-khang-dinh.ps1'
+
+    <#
+        🔒 **HAM THUAN dung log gia LAP** (khong doc log that): 📌 ca kiem phai **tat dinh** — neu no doc
+        log cua lan chay hien tai thi hom nay xanh, mai do vi mot ly do khong lien quan.
+    #>
+    function Tao-NoiDungLogCong {
+        param(
+            [int]$SoBuoc = 12,
+            [bool]$BuildDaVao = $true,
+            [bool]$KetLuan = $true,
+            [bool]$BoQua = $false,
+            [string]$DongThem = ''
+        )
+
+        $dong = @()
+
+        for ($i = 0; $i -lt $SoBuoc; $i++) {
+            $dong += ('── [{0}] buoc gia' -f ($i + 1))
+            $dong += '   ✅ XONG (1s)'
+        }
+
+        if ($BuildDaVao) { $dong += '   ✅ Build DA VAO (moi moc deu doi).' }
+        if ($BoQua) { $dong += '── [BO QUA] E2E co phien (them -DayDu de chay).' }
+        if (-not [string]::IsNullOrEmpty($DongThem)) { $dong += $DongThem }
+        if ($KetLuan) { $dong += '════════ TAT CA PHEP KIEM DAT (1s) ════════' }
+        $dong += ('TONG SO BUOC DAT: {0}' -f $SoBuoc)
+
+        return ($dong -join "`n")
+    }
+
+    function Tao-ThuMucLogGia {
+        param([string]$TienTo, [string]$NoiDungE2e)
+
+        $tm = Join-Path $thuMucTam ('kd-' + $TienTo + '-' + [Guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Force -Path $tm | Out-Null
+
+        if (-not [string]::IsNullOrEmpty($NoiDungE2e)) {
+            [IO.File]::WriteAllText((Join-Path $tm 'e2e.log'), $NoiDungE2e)
+        }
+
+        return $tm
+    }
+
+    function Chay-KhangDinh {
+        param([string]$NoiDungLog, [string]$ThuMucLog)
+
+        $tep = Join-Path $thuMucTam ('gate-' + [Guid]::NewGuid().ToString('N') + '.log')
+        [IO.File]::WriteAllText($tep, $NoiDungLog)
+
+        return ChayScript $scriptKd @('-Log', $tep, '-ThuMucLog', $ThuMucLog, '-SoBuocToiThieu', '12')
+    }
+
+    Describe 'ci-khang-dinh.ps1 — cong cua chinh cong (exit 0 KHONG duoc tin)' {
+
+        It 'X1) Log day du ⇒ exit 0 — 🔑 va dong ten ca CO chua 🚨 van KHONG lam do (do la lan chay TOT)' {
+            # 🚨 **CA NAY SINH RA TU MOT PHEP DO SAI CUA BAN DAC TA.** §6.2 A6 viet *"log khong co 🚨"*.
+            #    ⚠️ Nhung do lai mot lan chay XANH that (21/10/2026): co **39** dong chua 🚨, vi ten ca kiem
+            #    **dung 🚨 lam neo** (`[S5 🚨 khach BI CHAN dat hang => ...] DAT`). 📌 Cam 🚨 = cam chinh
+            #    ten ca ⇒ mot cong **luon do** tren moi lan chay tot.
+            # ✅ Dang dung: chi dong **BAT DAU** bang 🚨 moi la bao dong (ca X7 kiem chieu do).
+            $log = Tao-NoiDungLogCong -DongThem '      [S5 🚨 khach BI CHAN dat hang => 403] DAT | guard that'
+            $tm = Tao-ThuMucLogGia -TienTo 'xanh' -NoiDungE2e ("   [W1] DAT`nE2E: 3/3 ca DAT`n")
+
+            $k = Chay-KhangDinh -NoiDungLog $log -ThuMucLog $tm
+            BangNhau $k.Ma 0 'Log day du phai exit 0'
+        }
+
+        It 'X2) THIEU log buoc ⑧ ⇒ exit 1 (A2 — 🛡️ chong "exit 0 ma E2E khong chay")' {
+            $log = Tao-NoiDungLogCong
+            $tm = Tao-ThuMucLogGia -TienTo 'thieu-e2e' -NoiDungE2e ''
+
+            $k = Chay-KhangDinh -NoiDungLog $log -ThuMucLog $tm
+            BangNhau $k.Ma 1 'Thieu log E2E phai exit 1'
+
+            $noiDung = Get-Content $k.Log -Raw
+            KhangDinh ($noiDung -match 'A2') "Thieu neo 'A2'. Log:`n$noiDung"
+            KhangDinh ($noiDung -match 'CHUA CHAY') "Thieu 'CHUA CHAY'. Log:`n$noiDung"
+        }
+
+        It 'X3) E2E chi DAT 2/3 ⇒ exit 1 (A2 — chay nhung co ca do)' {
+            $log = Tao-NoiDungLogCong
+            $tm = Tao-ThuMucLogGia -TienTo 'e2e-do' -NoiDungE2e ("E2E: 2/3 ca DAT`n")
+
+            $k = Chay-KhangDinh -NoiDungLog $log -ThuMucLog $tm
+            BangNhau $k.Ma 1 'E2E 2/3 phai exit 1'
+
+            $noiDung = Get-Content $k.Log -Raw
+            KhangDinh ($noiDung -match '2/3') "Log khong nhac '2/3'. Log:`n$noiDung"
+        }
+
+        It 'X4) Log co [BO QUA] ⇒ exit 1 (A3 — khong phai lan chay day du)' {
+            $log = Tao-NoiDungLogCong -BoQua $true
+            $tm = Tao-ThuMucLogGia -TienTo 'boqua' -NoiDungE2e ("E2E: 3/3 ca DAT`n")
+
+            $k = Chay-KhangDinh -NoiDungLog $log -ThuMucLog $tm
+            BangNhau $k.Ma 1 'Co [BO QUA] phai exit 1'
+
+            $noiDung = Get-Content $k.Log -Raw
+            KhangDinh ($noiDung -match 'A3') "Thieu neo 'A3'. Log:`n$noiDung"
+        }
+
+        It 'X5) Log thieu "Build DA VAO" ⇒ exit 1 (A4 — exit 0 khong chung minh binary da doi)' {
+            $log = Tao-NoiDungLogCong -BuildDaVao $false
+            $tm = Tao-ThuMucLogGia -TienTo 'khongbuild' -NoiDungE2e ("E2E: 3/3 ca DAT`n")
+
+            $k = Chay-KhangDinh -NoiDungLog $log -ThuMucLog $tm
+            BangNhau $k.Ma 1 'Thieu "Build DA VAO" phai exit 1'
+
+            $noiDung = Get-Content $k.Log -Raw
+            KhangDinh ($noiDung -match 'A4') "Thieu neo 'A4'. Log:`n$noiDung"
+        }
+
+        It 'X6) Chi 11 buoc (mot buoc bi XOA) ⇒ exit 1 (A5 — 🛡️ chong buoc bi xoa ma cong van xanh)' {
+            $log = Tao-NoiDungLogCong -SoBuoc 11
+            $tm = Tao-ThuMucLogGia -TienTo 'thieubuoc' -NoiDungE2e ("E2E: 3/3 ca DAT`n")
+
+            $k = Chay-KhangDinh -NoiDungLog $log -ThuMucLog $tm
+            BangNhau $k.Ma 1 'Chi 11 buoc phai exit 1'
+
+            $noiDung = Get-Content $k.Log -Raw
+            KhangDinh ($noiDung -match 'A5') "Thieu neo 'A5'. Log:`n$noiDung"
+            KhangDinh ($noiDung -match 'san la 12') "Log khong nhac 'san la 12'. Log:`n$noiDung"
+        }
+
+        It 'X7) Log co mot DONG BAT DAU bang 🚨 ⇒ exit 1 (A6 — chieu nguoc cua X1)' {
+            $log = Tao-NoiDungLogCong -DongThem '🚨 mot loi that'
+            $tm = Tao-ThuMucLogGia -TienTo 'baodong' -NoiDungE2e ("E2E: 3/3 ca DAT`n")
+
+            $k = Chay-KhangDinh -NoiDungLog $log -ThuMucLog $tm
+            BangNhau $k.Ma 1 'Co dong bao dong phai exit 1'
+
+            $noiDung = Get-Content $k.Log -Raw
+            KhangDinh ($noiDung -match 'A6') "Thieu neo 'A6'. Log:`n$noiDung"
+        }
+
+        It 'X8) TEN CA kiem co chua chuoi "[BO QUA]" ⇒ van exit 0 (A3 chi bat DONG CUA CONG)' {
+            # 🚨 **CA NAY SINH RA TU MOT LAN DO THUC TE (21/10/2026):** `A3` ban dau kiem *"log co chua
+            #    `[BO QUA]`"* ⇒ mot lan chay **XANH** bi bao **DO**, vi **ten ca kiem** cua buoc ⑦ (chinh ca
+            #    `X4`) co chuoi do. 📌 Neu tin phép kiem do, CI se do **ngay ngay dau** — va cach "sua" nhanh
+            #    nhat cua nguoi vội la **bo A3 di**, tuc la bo dung cai cong phat hien buoc bi bo.
+            # ✅ Dang dung: chi dong **cua cong** (bat dau bang `── [BO QUA]`) moi tinh.
+            $log = Tao-NoiDungLogCong -DongThem '      ✅ X4) Log co [BO QUA] ⇒ exit 1 (A3 — khong phai lan chay day du)'
+            $tm = Tao-ThuMucLogGia -TienTo 'ten-ca-bo-qua' -NoiDungE2e ("E2E: 3/3 ca DAT`n")
+
+            $k = Chay-KhangDinh -NoiDungLog $log -ThuMucLog $tm
+            BangNhau $k.Ma 0 'Ten ca co chuoi [BO QUA] KHONG duoc lam do'
+        }
+    }
+}
+
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# NHOM 1e — `nen-tang.ps1` va LUAT "khong con API chi-Windows" (`XC-007` P-01…P-06, `S9`)
+#
+# 🔑 VI SAO CO NHOM NAY: sua cac diem Windows-only **mot lan** thi lan sau **them mot probe** lai sao chep
+# dung khuon cu (`Get-NetTCPConnection`, `bin\Debug`, `-WindowStyle Hidden`). 📌 Va khi do cong do **tren
+# runner Linux** — noi duy nhat phep do nay co y nghia — chu khong do o may dev.
+# ⇒ 🔒 Phai co ca QUET (**hai chieu**) va ca HANH VI that (cong, duong dan, curl).
+# ══════════════════════════════════════════════════════════════════════════════════════════════════
+if (-not $ChiKiemDb) {
+    $scriptNenTang = Join-Path $PSScriptRoot 'nen-tang.ps1'
+
+    # 🔑 Nap that: cac ca duoi day goi HAM THAT, khong quet chuoi.
+    . $scriptNenTang
+
+    <#
+        🔒 **HAM THUAN**: tra ve danh sach vi pham cua MOT tep script. 📌 Khong doc dia ⇒ ca DO va ca XANH
+        chi khac nhau o **du lieu vao**.
+
+        🚨 **BAY TU THAM CHIEU (do duoc 21/10/2026, ngay lan dau chay ca Y1):** phep quet chay tren **MOI**
+        tep trong `tools/` — **ke ca tep nay**. 📌 Neu mau bi cam duoc viet **lien** thi chinh **nguon cua
+        mau** khop voi mau ⇒ Y1 bao do **tep cua no**. ✅ Ghep mau tu nhieu manh (`'Get-NetTCP' + 'Connection'`)
+        — bieu thuc cuoi **giong het**, nhung khong manh nao tu khop.
+    #>
+    function Lay-MauApiChiWindows {
+        return 'Get-NetTCP' + 'Connection|Win32' + '_Process|curl' + '\.exe|-Window' + 'Style\s|\bbin' + '\\Debug'
+    }
+
+    function Lay-MauHamNenTang {
+        return 'Lay-Curl|Lay-DuongDanBin|Lay-PidDangNghe|Test-CongDangMo|Start-' + 'TienTrinhAn'
+    }
+
+    function Tim-ViPhamNapThuVien {
+        param([string]$Ten, [string]$NoiDung)
+
+        if ($Ten -eq 'nen-tang.ps1') { return @() }
+
+        # 📌 Bo **chu thich** (`<# … #>` va `#…`): chu thich KHONG chay. ⚠️ Bai hoc `S8`: quet tho thi
+        #    chinh dong chu thich giai thich loi cu se **tu to cao** va lam ca kiem do vi ly do sai.
+        $ma = [regex]::Replace($NoiDung, '(?s)<#.*?#>', '')
+        $ma = (($ma -split "`n") | Where-Object { -not $_.TrimStart().StartsWith('#') }) -join "`n"
+
+        $viPham = @()
+
+        # (1) API/dang viet chi-Windows.
+        if ($ma -match (Lay-MauApiChiWindows)) {
+            $viPham += 'dung API chi-Windows'
+        }
+
+        # (2) Dung ham cua nen-tang.ps1 ma KHONG nap thu vien ⇒ `CommandNotFoundException` o dong dau tien.
+        if ($ma -match (Lay-MauHamNenTang)) {
+            if ($NoiDung -notmatch 'nen-tang\.ps1') { $viPham += 'dung ham nen-tang nhung KHONG nap thu vien' }
+        }
+
+        return @($viPham)
+    }
+
+    Describe 'nen-tang.ps1 — khong con API chi-Windows, va ham chay DUNG tren he dieu hanh nay' {
+
+        It 'Y1) MOI script cua cong khong con API chi-Windows va nap thu vien khi can (🛡️ chong sao chep khuon cu)' {
+            $viPham = @()
+
+            foreach ($t in (Get-ChildItem $PSScriptRoot -Filter *.ps1 -File)) {
+                $noiDung = [IO.File]::ReadAllText($t.FullName)
+                foreach ($v in (Tim-ViPhamNapThuVien -Ten $t.Name -NoiDung $noiDung)) {
+                    $viPham += ("{0}: {1}" -f $t.Name, $v)
+                }
+            }
+
+            KhangDinh ($viPham.Count -eq 0) ("🚨 Script cua cong con phu thuoc Windows (`XC-007` P-01…P-06):`n  " + ($viPham -join "`n  "))
+
+            # 🛡️ Chong "ca kiem rong": neu khong quet duoc tep nao thi phep kiem vo nghia.
+            KhangDinh ((Get-ChildItem $PSScriptRoot -Filter *.ps1 -File).Count -ge 10) 'So tep quet qua it ⇒ phep kiem vo nghia.'
+        }
+
+        It 'Y2) Dua lai khuon CU (goi curl cua Windows, khong nap thu vien) ⇒ phep quet PHAI BAO (🛡️ chieu nguoc)' {
+            # 🚨 **KHONG duoc viet thang chuoi bi cam trong chinh tep nay** — ke ca trong **TEN CA**.
+            #    📌 Do la bay TU THAM CHIEU (do duoc 21/10/2026, hai lan lien tiep): phep quet Y1 quet moi
+            #    tep trong `tools/`, va ten ca cung nam trong tep ⇒ ten ca lam Y1 do.
+            # ✅ Ghep chuoi (`"curl" + ".exe"`) — y nghia khong doi, phep quet van bat duoc khuon cu o tep khac.
+            $gia = "`$x = & curl" + ".exe -s http://localhost:5000`n"
+            $viPham = @(Tim-ViPhamNapThuVien -Ten 'gia.ps1' -NoiDung $gia)
+
+            KhangDinh ($viPham.Count -ge 1) 'Phep quet KHONG bat duoc khuon cu ⇒ no vo dung.'
+
+            # Va chieu con lai: cung noi dung do, sau khi thay bang ham cua thu vien + nap thu vien ⇒ sach.
+            $sach = ". (Join-Path `$PSScriptRoot 'nen-tang.ps1')`n`$x = & (Lay-Curl) -s http://localhost:5000`n"
+            $viPhamSach = @(Tim-ViPhamNapThuVien -Ten 'gia.ps1' -NoiDung $sach)
+            KhangDinh ($viPhamSach.Count -eq 0) ("Phep quet bao SAI cho tep da sua: " + ($viPhamSach -join ' | '))
+        }
+
+        It 'Y3) Test-CongDangMo: cong DANG NGHE ⇒ true, cong DA DONG ⇒ false (va doc duoc PID)' {
+            # 🔒 **CA NAY DO P-02 TREN CHINH HE DIEU HANH DANG CHAY.** 📌 Tren Windows duong cu
+            #    `Get-NetTCPConnection` chay duoc, nen neu chi kiem tren may dev thi **khong chung minh** duoc
+            #    no chay tren Linux — 🔑 phai la ca kiem co that mot listener va **ca hai chieu**.
+            $nghe = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+            $cong = 0
+
+            try {
+                $nghe.Start()
+                $cong = $nghe.LocalEndpoint.Port
+
+                KhangDinh (Test-CongDangMo -Cong $cong) 'Test-CongDangMo tra FALSE cho mot cong DANG NGHE.'
+
+                $pids = @(Lay-PidDangNghe -Cong $cong)
+                KhangDinh ($pids -contains $PID) ("Lay-PidDangNghe khong tra ve PID cua chinh tien trinh nay (do duoc: [{0}], can co {1})." -f ($pids -join ','), $PID)
+            }
+            finally {
+                $nghe.Stop()
+            }
+
+            # ⚠️ Cho he dieu hanh nha cong. 📌 Neu bo qua buoc nay, ca kiem se **do ngau nhien** (va mot ca
+            #    khong tat dinh thi khong phai luoi an toan).
+            Start-Sleep -Milliseconds 300
+            KhangDinh (-not (Test-CongDangMo -Cong $cong)) 'Test-CongDangMo VAN tra TRUE sau khi da dong cong.'
+        }
+
+        It 'Y4) P-04: duong dan `bin` mac dinh cua kiem-moc-build PHAI tim thay tep (hoa theo he dieu hanh)' {
+            # 🚨 Day la ca bat dung loi F2/P-04: tren Linux, gia tri mac dinh viet cung `src\...\bin\Debug\net10.0`
+            #    lam `Test-Path` = false ⇒ `exit 2` ⇒ cong do o buoc ②, va thong diep noi ve *"loc tep"*.
+            $k = ChayScript (Join-Path $PSScriptRoot 'kiem-moc-build.ps1') @('-Ten', 'eCommerce.Application.dll')
+
+            if ($k.Ma -eq 2) {
+                $noiDung = Get-Content $k.Log -Raw
+                KhangDinh $false ("kiem-moc-build exit 2: duong dan mac dinh KHONG tim thay tep tren he dieu hanh nay. Log:`n$noiDung")
+            }
+
+            BangNhau $k.Ma 0 'kiem-moc-build voi duong dan mac dinh'
+
+            $noiDung = Get-Content $k.Log -Raw
+            KhangDinh ($noiDung -match 'Tong: \d+ tep') "Log thieu dong 'Tong: N tep'. Log:`n$noiDung"
+        }
+
+        It 'Y5) Lay-Curl tra ve lenh CO THAT tren he dieu hanh nay (P-03)' {
+            $curl = Lay-Curl
+
+            KhangDinh (-not [string]::IsNullOrWhiteSpace($curl)) 'Lay-Curl tra ve rong.'
+            KhangDinh ($null -ne (Get-Command $curl -ErrorAction SilentlyContinue)) ("Lenh '{0}' KHONG ton tai tren may nay (P-03)." -f $curl)
+        }
+    }
+}
+
 # NHOM 2 — `ham-tiem.ps1` (📌 nhanh, KHONG cham DB)
 # ══════════════════════════════════════════════════════════════════════════════════════════════
 if (-not $ChiKiemDb) {

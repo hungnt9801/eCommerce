@@ -75,6 +75,9 @@ New-Item -ItemType Directory -Force -Path $thuMucTam | Out-Null
 # 🔑 Nạp thư viện tiêm: file này chỉ có HÀM, không có `param` cấp tệp ⇒ nạp an toàn.
 . (Join-Path $PSScriptRoot 'ham-tiem.ps1')
 
+# 🔑 Thư viện "một chỗ" cho các khác biệt Windows/Linux (`XC-007` P-02/P-04/P-05 — `S9` 21/10/2026).
+. (Join-Path $PSScriptRoot 'nen-tang.ps1')
+
 $host_ = 'http://localhost:5000'
 $tienTrinh = $null
 $ketQua = [System.Collections.Generic.List[object]]::new()
@@ -396,14 +399,14 @@ select count(*)::text from "SalMarketplaceOrderIntakes" where "ExternalOrderId" 
     $env:ChannelHub__Shopee__PocOrdersPerPull = '1'
     $env:ChannelHub__SupervisorPeriodSeconds = '3600'
 
-    $binHost = Join-Path $goc 'src\eCommerce.HttpApi.Host\bin\Debug\net10.0'
+    $binHost = Lay-DuongDanBin -TenDuAn 'eCommerce.HttpApi.Host'
     $logHost = Join-Path $thuMucTam 'host.log'
 
     Remove-Item $logHost -Force -ErrorAction SilentlyContinue
 
     foreach ($cong in @(5000)) {
-        foreach ($k in @(Get-NetTCPConnection -LocalPort $cong -State Listen -ErrorAction SilentlyContinue)) {
-            Stop-Process -Id $k.OwningProcess -Force -ErrorAction SilentlyContinue
+        foreach ($k in @(Lay-PidDangNghe -Cong $cong)) {
+            Stop-Process -Id $k -Force -ErrorAction SilentlyContinue
         }
     }
 
@@ -414,9 +417,8 @@ select count(*)::text from "SalMarketplaceOrderIntakes" where "ExternalOrderId" 
     $soKeyQuyen = Xoa-CacheQuyen
     Write-Output ("   Xoa cache quyen: {0} key (mau *PermissionGrant*)" -f $soKeyQuyen)
 
-    $tienTrinh = Start-Process dotnet -ArgumentList 'eCommerce.HttpApi.Host.dll' -WorkingDirectory $binHost `
-        -PassThru -WindowStyle Hidden -RedirectStandardOutput $logHost `
-        -RedirectStandardError (Join-Path $thuMucTam 'host.err')
+    $tienTrinh = Start-TienTrinhAn -Tep 'dotnet' -ThamSo 'eCommerce.HttpApi.Host.dll' -ThuMucLamViec $binHost `
+        -TepLogRa $logHost -TepLogLoi (Join-Path $thuMucTam 'host.err')
 
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'wait-host.ps1') -Url $host_ -LogFile $logHost `
         -TimeoutSeconds $TimeoutGiay -ProcessId $tienTrinh.Id | Select-Object -Last 1 | ForEach-Object { Write-Output ("   $_") }
@@ -746,8 +748,8 @@ finally {
     }
 
     foreach ($cong in @(5000)) {
-        foreach ($k in @(Get-NetTCPConnection -LocalPort $cong -State Listen -ErrorAction SilentlyContinue)) {
-            Stop-Process -Id $k.OwningProcess -Force -ErrorAction SilentlyContinue
+        foreach ($k in @(Lay-PidDangNghe -Cong $cong)) {
+            Stop-Process -Id $k -Force -ErrorAction SilentlyContinue
         }
     }
 

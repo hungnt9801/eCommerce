@@ -57,6 +57,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# 🔑 Thu vien "mot cho" cho moi thu khac nhau giua Windows va Linux (`XC-007` P-01/P-02, `S9` 21/10/2026).
+#    ⚠️ Chi co HAM ⇒ nap an toan (khong co `param` cap tep de ghi de tham so cua script nay).
+. (Join-Path $PSScriptRoot 'nen-tang.ps1')
+
 $goc = Split-Path -Parent $PSScriptRoot
 $thuMucTam = Join-Path $goc 'tools\_tam-kiem'
 New-Item -ItemType Directory -Force -Path $thuMucTam | Out-Null
@@ -99,23 +103,28 @@ function ChayLenh {
 Buoc 'Don tien trinh eCommerce cu + cho cong TRONG' {
     # 🚨 PHAI lam TRUOC khi build: mot tien trinh dang chay **giu tep** ⇒ build ghi hut ma van `exit 0`.
     # 📌 Day chinh la nguyen nhan cua **BON LAN** tra gia (xem `.DESCRIPTION`).
-    $cacTienTrinh = @(Get-CimInstance Win32_Process -Filter "Name='dotnet.exe'" -ErrorAction SilentlyContinue |
-        Where-Object { $_.CommandLine -like '*eCommerce*' })
+    #
+    # 🚨 **`XC-007` P-01/P-02 — DO LA KHONG DUOC PHA THUOC HE DIEU HANH** (`S9`, 21/10/2026):
+    #    ban cu dung `Get-CimInstance Win32_Process` + `Get-NetTCPConnection`. Ca hai **chi co tren Windows**;
+    #    tren Linux chung **im lang tra rong** ⇒ 🔑 buoc nay bao *"0 tien trinh, cong TRONG"* trong khi su that
+    #    nguoc lai ⇒ bay "build ghi hut" quay lai, va te hon la **cong bao XANH** cho mot phep kiem khong chay.
+    #    ✅ Nay dung `tools/nen-tang.ps1` (thuan .NET + `ps`/`ss`) — cung mot phep do, hai he dieu hanh.
+    $cacPid = @(Lay-TienTrinhECommerce)
 
-    Write-Output ("   Tim thay {0} tien trinh eCommerce dang chay." -f $cacTienTrinh.Count)
+    Write-Output ("   Tim thay {0} tien trinh eCommerce dang chay." -f $cacPid.Count)
 
-    foreach ($p in $cacTienTrinh) {
-        Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue
+    foreach ($p in $cacPid) {
+        Stop-Process -Id $p -Force -ErrorAction SilentlyContinue
     }
 
-    if ($cacTienTrinh.Count -gt 0) {
+    if ($cacPid.Count -gt 0) {
         Write-Output "   Da dung. Cho cong 5000/5100 TRONG..."
         $hetHan = (Get-Date).AddSeconds(60)
 
         while ((Get-Date) -lt $hetHan) {
             $biChiem = @()
             foreach ($cong in @(5000, 5100)) {
-                $biChiem += @(Get-NetTCPConnection -LocalPort $cong -State Listen -ErrorAction SilentlyContinue)
+                if (Test-CongDangMo -Cong $cong) { $biChiem += $cong }
             }
 
             if ($biChiem.Count -eq 0) { break }
@@ -124,8 +133,19 @@ Buoc 'Don tien trinh eCommerce cu + cho cong TRONG' {
     }
 
     foreach ($c in @(5000, 5100)) {
-        if (Get-NetTCPConnection -LocalPort $c -State Listen -ErrorAction SilentlyContinue) {
+        if (Test-CongDangMo -Cong $c) {
             Write-Output ("   🚨 CONG {0} VAN BI CHIEM ⇒ build se ghi hut (binary khong doi)." -f $c)
+
+            # 📌 Tren Linux co the **khong doc duoc PID** (`ss -ltnp` can quyen cua tien trinh do) ⇒ neu
+            #    khong noi ro thi nguoi doc log se tuong *"khong co tien trinh nao"* trong khi cong **van bi chiem**.
+            $pidChiem = @(Lay-PidDangNghe -Cong $c)
+            if ($pidChiem.Count -eq 0) {
+                Write-Output "      (khong doc duoc PID dang giu cong — tren Linux can quyen cua tien trinh do)"
+            }
+            else {
+                Write-Output ("      PID dang giu cong: {0}" -f ($pidChiem -join ', '))
+            }
+
             throw "Cong $c bi chiem."
         }
     }
@@ -141,6 +161,16 @@ Buoc 'Build (va KIEM MOC nhi phan)' {
 
     if ($g.Ma -ne 0) {
         Get-Content $g.Log | Select-Object -Last 5 | ForEach-Object { "   $_" }
+
+        # 🚨 `XC-007` **F2** / P-04 (do lai o `S9` 21/10/2026): `exit 2` tu buoc GHI NHO nghia la
+        # **MOI TRUONG**, khong phai ma nguon — tren runner **SACH** thuc ra chua co `bin/` nao de ghi moc.
+        # 📌 Tach thong diep nay ra vi neu gop chung, nguoi doc log se **di sua ma nguon** trong khi viec can
+        # lam la **build lam nong truoc** (hoac sua duong dan `-ThuMuc` — P-04).
+        if ($g.Ma -eq 2) {
+            throw ("GHI NHO MOC VO NGHIA (exit 2) ⇒ MOI TRUONG, khong phai ma nguon: chua co thu muc output nao " +
+                "(runner sach?) — hoac duong dan -ThuMuc sai (P-04). 🔒 CI phai BUILD LAM NONG truoc khi goi cong.")
+        }
+
         throw "Ghi nho moc THAT BAI (exit $($g.Ma))."
     }
 
@@ -454,6 +484,12 @@ if ($BoQuaIntegration) {
     Write-Output ""
     Write-Output '⚠️ DA BO QUA integration test ⇒ 🔒 DUNG commit voi ket qua nay.'
 }
+
+# 🔒 **DONG MAY DOC DUOC** (`XC-007` §6.2 khoan A5 — `S9` 21/10/2026).
+# 📌 Vi sao them: `tools/ci-khang-dinh.ps1` phai khang dinh *"khong buoc nao bi bo qua"*. Truoc day no buoc
+# phai **dem chuoi** `'✅ XONG'` — mot phep do **gian tiep**, va no vo dung neu ai doi nhan cua dong do.
+# ✅ Con so do chinh script in ra la **TRUC TIEP**: *"toi da chay N buoc"* ≠ *"toi dem duoc N chuoi"*.
+Write-Output ("TONG SO BUOC DAT: {0}" -f $ketQua.Count)
 
 Write-Output ""
 Write-Output "Log day du: $thuMucTam"

@@ -31,24 +31,38 @@ và phiên trước từng **nói quá "GĐ1 hoàn thành"** vì **không đo l�
 
 ---
 
-## 3. Trạng thái ĐO ĐƯỢC — baseline chuẩn (đo lại **21/10/2026** cuối `S8`, `-DayDu` exit 0)
+## 3. Trạng thái ĐO ĐƯỢC — baseline chuẩn (đo lại **21/10/2026** cuối `S9`, `-DayDu` exit 0)
 
 ```
-[B1]  dọn tiến trình + cổng trống      1.2s     ← nay kiểm CẢ 5000 và 5100
-[B2]  build + KIỂM MỐC nhị phân       44.3s   · 71 tệp DLL/EXE đổi mốc
-[B3]  unit test                        3.5s   · 1399/1399
-[B4]  integration (PostgreSQL thật)    8.7s   ·   71/71
-[B5]  mermaid (parser thật)            4.9s   ·  213 khối · 0 lỗi
-[B6]  bất biến DB                      6.8s   ·   25/25 · NND = 53 · 62 quyền · quét 86 vị trí probe
-[B7]  test cho chính các cổng         84.6s   ·   24 ca (A…I + R…V + L…P + W)
-[B8]  E2E có phiên đăng nhập          39.1s   ·  123/123   ← 🆕 `S8` +21 ca (7 storefront CÔNG KHAI + 14 thanh toán end-to-end) · ➕ KHỞI ĐỘNG CẢ `HttpApi.Host`
-[B9]  sổ địa chỉ HTTP thật            12.9s   ·   17/17
-[B10] khách hàng HTTP thật            16.2s   ·   26/26
-[B11] thanh toán HTTP thật            13.9s   ·   26/26
-[B12] đơn sàn — ĐƯỜNG CHẠY THẬT       22.7s   ·   49/49
+[B1]  dọn tiến trình + cổng trống      1.3s     ← nay kiểm CẢ 5000 và 5100
+[B2]  build + KIỂM MỐC nhị phân       41.6s   · 71 tệp DLL/EXE đổi mốc
+[B3]  unit test                        3.6s   · 1409/1409
+[B4]  integration (PostgreSQL thật)     8.8s   ·   71/71
+[B5]  mermaid (parser thật)            3.7s   ·  213 khối · 0 lỗi
+[B6]  bất biến DB                      6.3s   ·   25/25 · NND = 53 · 62 quyền · quét 86 vị trí probe
+[B7]  test cho chính các cổng          83.0s   ·   37 ca (A…I + R…V + L…P + W + X + Y)   ← 🆕 `S9` +13
+[B8]  E2E có phiên đăng nhập           39.1s   ·  123/123   ← khởi động CẢ `HttpApi.Host`
+[B9]  sổ địa chỉ HTTP thật             13.4s   ·   17/17
+[B10] khách hàng HTTP thật             15.4s   ·   26/26
+[B11] thanh toán HTTP thật             13.2s   ·   26/26
+[B12] đơn sàn — ĐƯỜNG CHẠY THẬT       20.1s   ·   49/49
       ─────────────────────────────────────
-      TỔNG                           258.8s
+      TỔNG                           249.6s
 ```
+
+🆕 **`S9` — CI thật: các con số MỚI (dùng bảng trên, đọc thêm dòng này để biết cái gì đã đổi):**
+
+| Số cũ (cuối `S8`) | Số đo 21/10/2026 (cuối `S9`) | Vì sao |
+|---|---|---|
+| **1399** unit | **1409** | `S9` **+10** (`CiWorkflowTests`: cấm tham số làm yếu cổng · cấm ống dẫn output · `-DayDu` · **F2 thứ tự build làm nóng** · tên job = required check · `docker compose` · `TC-12`) |
+| **71** integration | **71** | **không đổi** — `S9` không có migration/cột/bảng nào |
+| **41** migration · **53** `NND` · **62** quyền · **25** bất biến DB · **86** chỗ quét | **41 · 53 · 62 · 25 · 86** | **không đổi** — `S9` chỉ sửa `tools/`, `.github/`, `test/` + tài liệu |
+| **24** ca test cổng | **37** | `S9` **+13**: **8** ca `X1…X8` cho `ci-khang-dinh.ps1` (cổng của cổng) + **5** ca `Y1…Y5` cho `nen-tang.ps1` (khả chuyển Linux) |
+| **123** ca E2E | **123** | **không đổi** — `S9` không thêm ca E2E (CI **gọi** cổng, không mở rộng cổng) |
+| **354** tệp · **44.288** dòng · test **115** tệp / **18.540** dòng | **354 tệp · 44.288 dòng** · test **116 tệp / 18.809 dòng** | **code sản phẩm KHÔNG đổi** (0 tệp) · test **+1 tệp / +269 dòng** (`CiWorkflowTests`). 📌 `tools/` là **công cụ**, không tính vào dòng code sản phẩm |
+| **258.8s** | **249.6s** | ⚠️ **đổi theo máy** — 📌 đầu phiên `S9` đo **266.1s** (cùng mã **trước** khi sửa, `exit 0`) ⇒ **không** phải chỉ tiêu |
+| — (chưa từng có) | 🆕 **`.github/workflows/ci.yml`** + `tools/nen-tang.ps1` + `tools/ci-khang-dinh.ps1` | `S9`: workflow **15 step** (build làm nóng → `-DayDu` → cổng ⑨ → khẳng định đầu ra → artifact 90 ngày) · **một chỗ** cho mọi khác biệt Windows/Linux (**8 tệp** đã vá) · **cổng của cổng** (A1…A7) + `Evidence.json` |
+| — | ✅ **Linux thật**: `test-cong-kiem.ps1` **31/31** | Container **Ubuntu 24.04** + SDK 10.0.402 + pwsh 7.6.7 (**không** phải Windows) · nhóm chạm DB (`G…K`) **chưa chạy** (không mount được Docker socket) · 🔑 **F2 tái hiện được**: trên cây **sạch** chưa build, **6 ca ĐỎ** — đúng như dự đoán, và xanh hết sau `dotnet build` |
 
 📌 **Đo BA lần trong phiên `S6`** — và **ba lần KHÁC số bước/số ca**, nên đừng so tổng:
 • **ĐẦU phiên** (trước khi sửa, **11 bước**, `exit 0`): **259.0s** với unit **1347** / integration **57** /
@@ -132,7 +146,7 @@ loại lỗi, hai dạng khác nhau**. ✅ Dùng **đúng** phương pháp: `S4`
 | **347** tệp · **42.437** dòng · test **111** tệp / **17.940** dòng | **350 tệp · 43.380 dòng** · test **114** tệp / **18.317** dòng | `S7` **+3 tệp sản phẩm** (`DoiSoatRetention` + `ReconRetentionWorker` + migration `Up()`) · **+3 tệp test** |
 | **290.8s** | **241.8s** | ⚠️ **đổi theo máy** — 📌 đầu phiên `S7` đo **301.5s** (cùng mã **trước** khi sửa, `exit 0`) ⇒ **không** phải chỉ tiêu |
 
-🆕 **`S8` — các con số MỚI (dùng bảng trên, đọc thêm dòng này để biết cái gì đã đổi):**
+🆕 **`S8` — các con số MỚI** 📌 **BẢNG LỊCH SỬ** (số chuẩn hiện hành là bảng `S9` ngay trên):
 
 | Số cũ (cuối `S7`) | Số đo 21/10/2026 (cuối `S8`) | Vì sao |
 |---|---|---|
@@ -238,10 +252,10 @@ pwsh -File tools\kiem-link-tai-lieu.ps1       # 0 tham chiếu chết (thoát 1 
 | `S6` | ✅ **XONG 18/10/2026** — **`SAL-005` phần C: nhật ký sự kiện + `update_time` + ĐO RUNTIME** (📄 `SAL-005` **§20**): bảng **`SalMarketplaceEventLogs`** (append-only, **7 kết cục**) · **`MarketplaceEventLogWriter`** (**UoW riêng**, nhận biết trùng bằng **đọc lại DB**) · handler ghi **ĐÚNG MỘT dòng ở MỌI nhánh** · 🚨 **ghi watermark ngay lần nhận đầu** · **connector PoC trả `update_time` tất định** ⇒ `AggregateVersion ≠ null` · **`MarketplacePayloadHash`** · ➕ **bước ⑫ mới** (`probe-don-san.ps1`, **49 ca**) · ➕ **cổng vận hành hạ cờ** (`MarketplaceIntakeAppService` + **2 permission** + mã `0005` — 📄 `SAL-005` **§21**). Gate: **`-DayDu` exit 0 · 290.8s** · unit **1347 → 1367** · integration **57 → 67** · **NND 53 = 53** · bất biến DB **25/25** · quét **86** · **quyền 58 → 61** · **ca cổng 22 → 24** · 🚨 **2 lỗi thật**: **hash chống trùng băm cả `CorrelationId`** ⇒ **DLQ giả ở MỌI lần kéo lại** (**1358 test cũ không thấy**; **đo hai chiều**: tiêm mã cũ ⇒ `C31`/`C32` **ĐỎ**, DLQ **2 → 3**) + **intake mới không ghi watermark** ⇒ bản **cũ hơn** vẫn **ghi đè**. ⚠️ **Vẫn KHÔNG `Implemented`**: `Order` nội bộ **chưa cập nhật** khi áp watermark · chưa UI nhật ký · `Q5` mở · chưa kiểm tiền thật |
 | `S7` | ✅ **XONG 18/10/2026** — **UI/API còn thiếu của Inventory + Reconciliation** (📄 `inv-003` **§20** · `rec-001` **§19**): `/HanMucKenh` **lọc theo KHO** (kèm *"(không gắn kho)"*) + **phân trang** + **ô chọn kho** khi đặt hạn mức + **đổi nhãn theo `Q4`** (*"trần an toàn của kênh theo từng kho"*) · 🚨 **xác nhận lệch = ĐÓNG CẢNH BÁO + audit** (`Q5` = A): **3 cột** + `ReconRun.XacNhan` + `CHECK` *"không xác nhận một nửa"* + permission **`eCommerce.Reconciliation.Confirm`** · **RETENTION**: setting `Recon.Retention.Days` (180, `0` = TẮT) + luật **THUẦN** + service **dùng chung** cho job `ReconRetentionWorker` và nút bấm (**XEM TRƯỚC** mặc định · **xoá CỨNG** · **không bao giờ** xoá `ReconRuns`/dòng chưa xử lý/dòng đang chờ xác nhận) · **phân trang** trang chi tiết. Gate: **`-DayDu` exit 0 · 241.8s** · unit **1367 → 1395** · integration **67 → 71** · **NND 53 = 53** · **quyền 61 → 62** · **E2E 67 → 95 ca** · 🚨 **3 lỗi thật** chỉ lộ khi đo HTML/DB: **xoá MỀM** thay vì cứng (retention **không** làm bảng nhỏ đi) · **`[Required]` trên DTO** chặn trước domain ⇒ người dùng thấy **tiếng Anh** thay vì `0005` · **`[Range]` trên `SoNgay`** làm `0` **không bao giờ** trả `0006`. ⚠️ **Còn nợ**: metric retention · GUID người xác nhận trên UI · chưa có nút "Sửa" điền sẵn |
 | `S8` | ✅ **XONG 18/10/2026** — **Thanh toán trên UI + mở công khai `WEB-002`** (📄 `PAY-001` **§16.11** · `web-002` **§16**): `/DatHang` **tạo giao dịch** ⇒ `302` sang **cổng** ⇒ **trang kết quả** (`/DatHang/KetQua`, đọc trạng thái **từ DB**) · **`FakePaymentProvider`** (dev-only, **fail-fast**) + **trang giả lập `/pay-gia-lap`** (**ký HMAC-SHA512 thật**, gọi **IPN thật**) · mở **CÔNG KHAI** `/SanPham` + `/SanPham/ChiTiet/{slugOrSku}` qua **đường đọc công khai** (repository, **không** app service `[Authorize]`) · **`sitemap.xml` dùng SLUG**. Gate: **`-DayDu` exit 0** · unit **1395 → 1399** · integration **71 = 71** · **NND 53 = 53** · **quyền 62 = 62** · **migration 41 = 41** (không đổi lược đồ) · **E2E 102 → 123** · 📌 **4 phát hiện**: **`Payments:Fake:HashSecret` trong tài liệu KHÔNG THỂ CHẠY** (✅ đo **chiều ngược**: đổi khoá ⇒ 6 ca **ĐỎ**) · **`CostPrice` KHÔNG tồn tại trong lược đồ** · **bộ lọc `Published` viết 3 chỗ ⇒ tiêm 1 chỗ không làm test đỏ** · **`canonical` viết cứng làm test menu đỏ** (chú thích **cũng** bị quét). ⚠️ **Còn nợ**: **301 khi đổi slug** · read-model/cache · JSON-LD/OG · mức tồn kho · UI **hoàn tiền** · **chưa kiểm tiền thật** |
-| `S9` | `XC-007` — CI thật (`.github` + khả chuyển Linux + vá F2) |
-| `S10` | Đóng GĐ1 — nợ nhỏ + `-DayDu` cuối + bàn giao |
+| `S9` | ✅ **XONG 21/10/2026** — **`XC-007` CI thật + khả chuyển Linux** (`.github/workflows/ci.yml` **15 step** · `tools/nen-tang.ps1` (**một chỗ** cho khác biệt Windows/Linux — vá **8 tệp**) · `tools/ci-khang-dinh.ps1` (**cổng của cổng** A1…A7 + `Evidence.json`) · **build làm nóng** vá **F2** · **cổng ⑨** · `package-lock.json` (**F4**) · **+10 unit** + **+13 ca cổng**) · ⚠️ **CHƯA có lần chạy GitHub Actions** (không có quyền `push`) ⇒ **required check CHƯA bật** |
+| `S10` | Đóng GĐ1 — nợ nhỏ + `-DayDu` cuối + bàn giao. 🚨 **Việc đầu tiên của phiên sau (trước `S10`):** `git push` → xem **một** lần chạy CI xanh → **rồi mới** bật branch protection + required checks (`XC-007` §9.2/§9.3) |
 
-✅ **Không phiên nào còn bị chặn**: `Q7` xong (repo + push, 17/10/2026) ⇒ `S9` chạy được ngay; `Q3`…`Q6` đã chốt ⇒ `S7` ✅ **đã xong** (18/10/2026), `S8` ✅ **đã xong** (18/10/2026) ⇒ **`S9` / `S10` là các phiên còn lại**. 📌 `S9` cần `Q7` (đã có) nên **chạy được ngay**.
+✅ **Không phiên nào còn bị chặn**: `Q7` xong (repo + push, 17/10/2026) ⇒ `S9` chạy được ngay; `Q3`…`Q6` đã chốt ⇒ `S7` ✅ **đã xong** (18/10/2026), `S8` ✅ **đã xong** (18/10/2026), `S9` ✅ **đã xong phần code** (21/10/2026) ⇒ **chỉ còn `S10`**. 🚨 **Nhưng `S9` còn một việc CHƯA làm được vì môi trường:** phiên đó **không có quyền `git push`** ⇒ **chưa có lần chạy CI nào trên GitHub Actions** ⇒ `required check` **chưa bật**. 📌 Việc đó **phải xong trước `S10`**, nếu không thì *"cổng không chạy tự động thì không phải cổng"* vẫn còn đúng.
 📌 **GĐ2** (`SHP-001…004`, `PRO-001…002`) **không** thuộc GĐ1 — cả 6 **0 dòng code**, là chuỗi phiên riêng.
 
 ---
@@ -260,3 +274,5 @@ pwsh -File tools\kiem-link-tai-lieu.ps1       # 0 tham chiếu chết (thoát 1 
 | 18/10/2026 (sau `S7`) | Cập nhật sau `S7`: baseline **241.8s · 12 bước** (**1395** unit · **71** integration · 213 mermaid · **25/25** DB · **NND 53** · **62 quyền** · **86** chỗ quét · **24** ca cổng · 🆕 **95/95** E2E · 17/17 sổ địa chỉ · 26/26 khách hàng · 26/26 thanh toán · 49/49 đơn sàn). `S7` ✅ XONG ⇒ **`S8`/`S9`/`S10` là các phiên còn lại**. ➕ `/HanMucKenh`: **lọc theo kho** + **phân trang** + ô chọn kho + **nhãn theo `Q4`** (`inv-003` §20) · **xác nhận lệch** (`Q5` = A: 3 cột + `CHECK` + permission `eCommerce.Reconciliation.Confirm` + endpoint) · **retention** (`Recon.Retention.Days` 180, `0` = TẮT; luật THUẦN; job `ReconRetentionWorker`; nút bấm có **XEM TRƯỚC**; **xoá CỨNG**) · **phân trang** trang chi tiết (`rec-001` §19). 🚨 **3 lỗi thật** chỉ lộ khi đo HTML/DB: **xoá MỀM** thay vì cứng ⇒ retention **không** làm bảng nhỏ đi · **`[Required]`/`[Range]` trên DTO** chặn **TRƯỚC** guard của domain ⇒ người dùng thấy thông điệp **tiếng Anh** thay vì `0005`/`0006` (📌 đúng lỗi `rec-001` §18.4 tái xuất ở dạng khác) · **gộp nhóm** trong báo cáo retention ⇒ nói **sai lý do giữ lại**. ➕ **2 lỗi của BỘ ĐO**: neo HTML giả định `7` trong khi cột `numeric` in **`7.0000`** (**3 ca ĐỎ GIẢ** + các ca **chiều ngược XANH vì lý do sai**) · gộp *"mới hơn mốc"* vào *"chờ xác nhận"*. 📌 **Đo đầu phiên `S7`: 301.5s, `exit 0`, unit 1367 / integration 67 / E2E 67 / quyền 61** = khớp bảng `S6` — tức **baseline `S6` vẫn đúng** |
 
 | 21/10/2026 (sau `S8`) | Cập nhật sau `S8`: baseline **258.8s · 12 bước** (**1399** unit · **71** integration · 213 mermaid · **25/25** DB · **NND 53** · **62 quyền** · **86** chỗ quét · **24** ca cổng · 🆕 **123/123** E2E · 17/17 sổ địa chỉ · 26/26 khách hàng · 26/26 thanh toán · 49/49 đơn sàn). `S8` ✅ XONG ⇒ **`S9`/`S10` là các phiên còn lại**. ➕ **THANH TOÁN TRÊN UI** (`PAY-001` §16.11): `/DatHang` tạo giao dịch ⇒ `302` sang cổng ⇒ **trang kết quả** đọc trạng thái **từ DB** · **`FakePaymentProvider`** (dev-only, fail-fast) + **trang giả lập `/pay-gia-lap`** (**ký HMAC thật**, gọi **IPN thật**) · **MỞ CÔNG KHAI** `/SanPham` + `/SanPham/ChiTiet/{slugOrSku}` qua **đường đọc công khai** (repository — **không** app service `[Authorize]`) · **`sitemap.xml` dùng SLUG**. 🚨 **4 lỗi thật** (`web-002` §16.3 + `PAY-001` §16.11): **`Payments:Fake:HashSecret` trong tài liệu là KHÔNG THỂ CHẠY** (bên kiểm đọc `PaymentHub:VnPay:HashSecret` ⇒ ký khoá khác ⇒ **mọi IPN bị 400**; ✅ **đo chiều ngược**: đổi khoá ⇒ 6 ca **ĐỎ**) · **`CostPrice` KHÔNG tồn tại trong lược đồ** (ràng buộc `D10` hiện được bảo đảm bằng **sự vắng mặt**; lớp bảo vệ thật là **danh sách trắng thuộc tính DTO**) · **bộ lọc `Published` viết 3 chỗ ⇒ phép tiêm vào 1 chỗ KHÔNG làm test đỏ** (✅ gom về MỘT biểu thức + đếm = 1) · **`canonical` viết cứng làm `MenuDieuHuongTests` ĐỎ** (⚠️ **chú thích cũng bị quét**). ➕ **1 lỗi của BỘ ĐO** (bước ⑥ ĐỎ THẬT): khởi động Host trong E2E ⇒ `InventoryReconciliationWorker` (`RunOnStart`) **ghi dòng lệch THẬT** cho tồn kho probe ⇒ 📌 **thêm tiến trình vào phép đo = thêm nguồn dữ liệu**, phải hỏi *"job nào chạy khi nó lên, và nó ghi cái gì?"*. 📌 **Đo đầu phiên `S8`: 260.3s, `exit 0`, unit 1395 / integration 71 / E2E 102 / quyền 62** = khớp bảng `S7` — tức **baseline `S7` vẫn đúng** |
+
+| 21/10/2026 (sau `S9`) | Cập nhật sau `S9`: baseline **249.6s · 12 bước** (**1409** unit · **71** integration · 213 mermaid · **25/25** DB · **NND 53** · **62** quyền · **86** chỗ quét · 🆕 **37** ca cổng · **123/123** E2E · 17/17 sổ địa chỉ · 26/26 khách hàng · 26/26 thanh toán · 49/49 đơn sàn). `S9` ✅ **XONG phần code** ⇒ **chỉ còn `S10`**. ➕ **CI THẬT** (`XC-007` §16): `.github/workflows/ci.yml` (**15 step**, `ubuntu-latest`) · **`tools/nen-tang.ps1`** (thư viện **một chỗ** cho khác biệt Windows/Linux — 🚨 **vá 8 tệp, không phải 6 điểm**: 4 probe `S2`…`S6` đã sao lại 3 khuôn) · **`tools/ci-khang-dinh.ps1`** (**cổng của cổng** A1…A7 + `Evidence.json`) · **build làm nóng** vá **F2** · **cổng ⑨** là step riêng · `tools/package-lock.json` **đã commit** (vá **F4**). ✅ **Kiểm chứng trên LINUX THẬT** (container Ubuntu 24.04, SDK 10.0.402, pwsh 7.6.7): build **0 error** + `test-cong-kiem.ps1` **31/31** (nhóm chạm DB **chưa chạy** — không mount được Docker socket trong môi trường này). 🚨 **5 phát hiện** — nặng nhất: **BA phép khẳng định của §6.2 làm cổng LUÔN ĐỎ trên một lần chạy XANH** (**A2** vì dòng `E2E:` bị `-First 26` cắt; **A3/A6** vì **tên ca kiểm** chứa chính chuỗi bị cấm) ⇒ 🔑 *"phép đo bất ngờ thường là phép đo SAI"*, và **`ss`/`lsof` không có** trong container tối giản ⇒ `Lay-PidDangNghe` trả **rỗng im lặng** (nay đọc `/proc/net/tcp`). ⚠️ **CHƯA kiểm chứng được:** lần chạy **GitHub Actions** (không có credential `push`), **branch protection/CODEOWNERS** (thiết lập trên GitHub), **`release.yml`** (cần staging + secrets), **thời gian pipeline trên runner** (NFR-001). 📌 **Việc đầu tiên của phiên sau:** `git push` → 1 lần chạy xanh → **rồi mới** bật required check |

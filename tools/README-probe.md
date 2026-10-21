@@ -444,14 +444,21 @@ sinh ra để chống. ⇒ **Phải có test TỰ ĐỘNG, không phụ thuộc 
    không dọn thì lần chạy sau **hỏng vì dữ liệu ca trước còn lại** ⇒ 🔑 một test **tự làm hỏng chính nó**.
    ✅ `try/finally` cho **mọi** ca có side effect.
 
-### 22 ca — chia bốn nhóm
+### 36 ca — chia sáu nhóm (cập nhật `S9`, 21/10/2026)
 
 | Nhóm | Số ca | Chạm DB? |
 |---|:--:|---|
 | `kiem-moc-build.ps1` | 7 (`A`, `A2`, `B`…`F`) | ✖ |
 | `kiem-link-tai-lieu.ps1` | 5 (`R`…`V`) — thêm 17/10/2026 | ✖ |
+| `kiem-tat-ca.ps1` (đủ bước) | 2 (`W1`, `W2`) — thêm `S6` | ✖ |
+| `ci-khang-dinh.ps1` (cổng của cổng) | 7 (`X1`…`X7`) — thêm `S9` | ✖ |
+| `nen-tang.ps1` (khả chuyển Linux) | 5 (`Y1`…`Y5`) — thêm `S9` | ✖ |
 | `ham-tiem.ps1` | 5 (`L`…`P`) | ✖ |
 | `kiem-db.ps1` | 5 (`G`…`K`) | ✅ cần Docker + PostgreSQL |
+
+> ⚠️ **Nhóm `A`/`A2`/`B` và `Y4` cần đã có `bin/`** (chúng build/kiểm mốc tệp nhị phân). Trên máy **sạch**
+> phải `dotnet build` **trước** — 📌 đúng thứ tự CI (`XC-007` bước 8 → bước 10). Không build trước thì
+> **7 ca ĐỎ vì môi trường** (cộng **1 lỗi thật** `Y3`), không phải vì mã nguồn.
 
 **Nhóm `kiem-moc-build.ps1` (7 ca, 📌 không chạm DB):**
 

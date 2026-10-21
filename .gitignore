@@ -33,6 +33,13 @@ Thumbs.db
 node_modules/
 package-lock.json
 
+## 🚨 NGOẠI LỆ của dòng trên — `XC-007` **F4** / D10 (`S9`, 21/10/2026).
+## 🔑 VÌ SAO PHẢI COMMIT LOCK: `tools/package.json` khai `mermaid: ^12.1.0` (một RANGE). Không có lock thì
+##    hai máy — hoặc hai lần chạy CI — có thể cài **hai phiên bản khác nhau** ⇒ cùng một commit cho **phán
+##    quyết khác nhau** ở cổng ⑤ (mermaid). 📌 Đó là **flaky ngẫu nhiên**, loại đỏ tệ nhất vì không truy được
+##    về commit nào. ✅ Có lock thì CI dùng `npm ci` = **tất định**.
+!tools/package-lock.json
+
 ## GĐ1 §7.0 #2 — thư viện client của theme MVC UI (`eCommerce.Web`).
 ## Đây là thư mục SINH RA, không commit: tái tạo được từ `src/eCommerce.Web/package.json` + `yarn.lock`
 ## bằng lệnh:  abp install-libs -wd src/eCommerce.Web
@@ -42,6 +49,14 @@ src/eCommerce.Web/wwwroot/libs/
 
 ## Tài liệu: ảnh/export tạm
 docs/**/*.tmp.md
+
+## ĐẦU RA của cổng CI — KHÔNG commit (`XC-007` §5.2, `S9` 21/10/2026).
+## 📌 `Evidence.json` + `gate.log`/`link.log` là **bằng chứng của MỘT lần chạy**; commit chúng sẽ tạo
+##    "bằng chứng" không gắn với `commitSha` nào — đúng thứ §5.2 cấm. CI upload chúng thành artifact 90 ngày.
+Evidence.json
+.bat-dau.txt
+gate.log
+link.log
 
 # 🚨 `CAT-003` — KHO TỆP MEDIA CỤC BỘ (`MediaStorageNoiBo`).
 # 📌 VÌ SAO PHẢI BỎ QUA: đây là **nội dung người dùng tải lên** (ảnh sản phẩm) — **không** phải mã nguồn.

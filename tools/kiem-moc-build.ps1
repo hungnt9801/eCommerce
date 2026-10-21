@@ -28,6 +28,9 @@
 .PARAMETER ThuMuc
     Cac thu muc output can kiem. Mac dinh: `bin` cua Host + Web (hai tien trinh hay chay).
     ⚠️ Truyen **duong dan TUONG DOI tu goc repo**.
+    🚨 **DAU PHAN CACH LA CUA HE DIEU HANH** (`XC-007` **P-04**): tren Linux `\` **khong phai** dau phan
+    cach ⇒ gia tri mac dinh kieu `src\...\bin\Debug\net10.0` lam `Test-Path` = false ⇒ script bao *"KHONG
+    thay tep nao"* va `exit 2` **ngay tren runner sach** (`S9`, 21/10/2026).
 
 .PARAMETER GhiNho
     Ghi moc hien tai vao `.moc-build.json` (o goc repo) lam **moc so sanh** cho lan sau.
@@ -51,8 +54,8 @@
 param(
     [string]$Ten = '*.dll',
     [string[]]$ThuMuc = @(
-        'src\eCommerce.HttpApi.Host\bin\Debug\net10.0',
-        'src\eCommerce.Web\bin\Debug\net10.0'
+        [IO.Path]::Combine('src', 'eCommerce.HttpApi.Host', 'bin', 'Debug', 'net10.0'),
+        [IO.Path]::Combine('src', 'eCommerce.Web', 'bin', 'Debug', 'net10.0')
     ),
     [switch]$GhiNho,
     [switch]$Kiem
@@ -97,7 +100,23 @@ if ($thay.Count -eq 0) {
     # 🔒 Hai nguyen nhan KHAC NHAU phai co HAI ma KHAC NHAU, neu khong thi nguoi doc log khong phan biet duoc
     # "ban build khong vao" voi "phep kiem sai" — va se di sua SAI CHO.
     Write-Output ("🚨 KHONG thay tep nao khop '{0}' trong: {1}" -f $Ten, ($ThuMuc -join ' | '))
-    Write-Output "⇒ PHEP KIEM VO NGHIA. Kiem lai -ThuMuc/-Ten."
+
+    # 🚨 **HAI NGUYEN NHAN NAY KHAC NHAU — VA MOT TRONG HAI LA "MOI TRUONG", KHONG PHAI SAN PHAM.**
+    # 📌 Do duoc o `S9` (21/10/2026, `XC-007` **F2**): tren **runner SACH** (chua tung build) thi
+    # `bin/` **chua ton tai** ⇒ `-GhiNho` roi vao nhanh nay ⇒ `exit 2` ⇒ `kiem-tat-ca.ps1` **nem** o buoc ②
+    # ⇒ 🔑 **lan chay DAU TIEN tren CI luon DO**, va do la **moi truong**, khong phai ma nguon.
+    # ✅ Cach chua **da chon**: CI **BUILD LAM NONG** truoc khi goi cong (`XC-007` §6.1 / §14.2).
+    # 🚨 Cach chua **bi loai**: cho `-GhiNho` "bo qua khi chua co bin" ⇒ khi do `-Kiem` thay **MOI** tep la
+    # *"MOI (chua co trong moc)"* ⇒ `$khongDoi` rong ⇒ script in **"DA VAO"** du **khong co bang chung nao**
+    # ⇒ 📌 mot phep kiem **XANH vi LY DO SAI** — dung loai hong ma script nay sinh ra de chong.
+    if ($thieu.Count -eq $ThuMuc.Count) {
+        Write-Output "⇒ MOI TRUONG: CHUA CO BAN BUILD NAO (khong thu muc output nao ton tai)."
+        Write-Output "   🔒 CI phai BUILD LAM NONG truoc khi goi cong — ⚠️ KHONG phai loi ma nguon."
+    }
+    else {
+        Write-Output "⇒ PHEP KIEM VO NGHIA. Kiem lai -ThuMuc/-Ten."
+    }
+
     exit 2
 }
 

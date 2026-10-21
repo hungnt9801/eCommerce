@@ -54,7 +54,14 @@ function Do-Body([object]$PhanHoi) {
 }
 
 $goc = Lay-GocRepo
-$binHost = Join-Path $goc 'src\eCommerce.HttpApi.Host\bin\Debug\net10.0'
+
+# 🔑 `XC-007` P-02/P-04/P-05 (`S9` 21/10/2026): cong cu nay cung phai chay tren Linux.
+. (Join-Path $PSScriptRoot 'nen-tang.ps1')
+
+$binHost = Lay-DuongDanBin -TenDuAn 'eCommerce.HttpApi.Host'
+
+# 📌 `$env:TEMP` **khong ton tai tren Linux** ⇒ `Join-Path` se nhan `$null`; dung API cua .NET.
+$thuMucTam = [IO.Path]::GetTempPath()
 $tienTrinh = $null
 $tuKhoiDong = $false
 
@@ -75,10 +82,10 @@ try {
     if (-not $song) {
         Write-Host "Host chưa chạy ⇒ khởi động từ $binHost" -ForegroundColor Yellow
         [Environment]::SetEnvironmentVariable('ASPNETCORE_ENVIRONMENT', 'Development', 'Process')
-        $tienTrinh = Start-Process dotnet -ArgumentList 'eCommerce.HttpApi.Host.dll' -WorkingDirectory $binHost -PassThru -WindowStyle Hidden `
-            -RedirectStandardOutput (Join-Path $env:TEMP 'route-check-host.log') -RedirectStandardError (Join-Path $env:TEMP 'route-check-host.err')
+        $tienTrinh = Start-TienTrinhAn -Tep 'dotnet' -ThamSo 'eCommerce.HttpApi.Host.dll' -ThuMucLamViec $binHost `
+            -TepLogRa (Join-Path $thuMucTam 'route-check-host.log') -TepLogLoi (Join-Path $thuMucTam 'route-check-host.err')
         $tuKhoiDong = $true
-        if (-not (Cho-Host)) { throw "Host KHÔNG lên trong $WaitSeconds giây — xem $(Join-Path $env:TEMP 'route-check-host.log')." }
+        if (-not (Cho-Host)) { throw "Host KHÔNG lên trong $WaitSeconds giây — xem $(Join-Path $thuMucTam 'route-check-host.log')." }
     }
     else {
         Write-Host "Host đang chạy sẵn tại $HostUrl" -ForegroundColor DarkGray

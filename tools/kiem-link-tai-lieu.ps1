@@ -17,7 +17,12 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$boQua = '\\node_modules\\|\\bin\\|\\obj\\|\\.git\\|\\artifacts\\|\\node_modules/'
+# 🚨 **DAU PHAN CACH PHAI LA CUA HE DIEU HANH** (`XC-007` **P-06**, do lai o `S9` 21/10/2026).
+# 📌 Ban cu viet `'\\node_modules\\|\\bin\\|...'` — tren Linux duong dan dung `/` ⇒ **KHONG** loai truoc duoc
+#    gi ⇒ script **quet ca `node_modules/` va `.git/`** (hang chuc nghin tep `.md`) ⇒ cham, va tep .md trong
+#    `node_modules/` tro toi duong dan khong ton tai ⇒ 🔑 **bao chet GIA** ⇒ nguoi ta bo qua cong.
+# ✅ Dung lop ky tu `[\\/]` = **chap nhan ca hai** — mot bieu thuc chay dung tren ca hai he dieu hanh.
+$boQua = '[\\/](node_modules|bin|obj|\.git|artifacts)[\\/]'
 $tepTaiLieu = Get-ChildItem $Goc -Recurse -File -Filter *.md |
     Where-Object { $_.FullName -notmatch $boQua }
 
@@ -34,7 +39,11 @@ $loi = New-Object System.Collections.Generic.List[object]
 foreach ($t in $tepTaiLieu) {
     $noiDung = [IO.File]::ReadAllText($t.FullName, [Text.Encoding]::UTF8)
     $thuMuc = Split-Path $t.FullName -Parent
-    $tuongDoi = $t.FullName.Replace("$Goc\", '')
+
+    # 📌 `Replace("$Goc\")` chi dung tren Windows (`XC-007` **P-06**): tren Linux khong co `\` sau `$Goc`
+    # ⇒ phep thay **khong xay ra** ⇒ bao cao in **duong dan TUYET DOI** (khong lam sai ket luan, nhung kho doc
+    # va kho so sanh giua hai may). ✅ `GetRelativePath` dung **dau phan cach cua he dieu hanh**.
+    $tuongDoi = [IO.Path]::GetRelativePath($Goc, $t.FullName)
     $soDong = 0
 
     # Khối CODE SPAN — 🔑 mot LINK viet TRONG backtick la VAN BAN MINH HOA, khong phai lien ket that

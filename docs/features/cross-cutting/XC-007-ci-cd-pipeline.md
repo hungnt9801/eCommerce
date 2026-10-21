@@ -481,11 +481,11 @@ pwsh -NoProfile -File tools/kiem-link-tai-lieu.ps1    # buoc 9 (chua noi vao scr
 | # | Phép khẳng định | Cách kiểm (đo được) | Nếu sai |
 |---|---|---|---|
 | A1 | `exit code` của lệnh cổng = **0** | `$LASTEXITCODE` của `pwsh -File ...` | Đỏ, in 15 dòng cuối log |
-| A2 | Bước ⑧ **đã chạy** | log khớp `^E2E: \d+/\d+ ca DAT$` (`kiem-e2e.ps1:779`) **và** `N > 0` | **Đỏ**: "thiếu dòng E2E ⇒ cổng bị bỏ bước ⑧" |
-| A3 | **Không** bước nào bị bỏ | `Select-String -Pattern '\[BO QUA\]'` ra **0** dòng (`:218`, `:331`) | **Đỏ** |
+| A2 | Bước ⑧ **đã chạy** | 🚨 **Đọc `E2E: N/N` từ `tools/_tam-kiem/e2e.log`** (log **của bước**), **và** `e2e.log` phải **MỚI** (mtime ≥ lúc bắt đầu chạy). 📌 **KHÔNG** đọc từ log của cổng: dòng tổng kết nằm ở **cuối** `e2e.log` mà `kiem-tat-ca.ps1` chỉ in **26 dòng đầu** khớp mẫu (§16.3 **S9-A**) | **Đỏ**: "thiếu dòng E2E ⇒ cổng bị bỏ bước ⑧" |
+| A3 | **Không** bước nào bị bỏ | 🚨 **Neo theo ĐẦU DÒNG**: `^\s*──\s*\[BO QUA\]` ra **0** dòng. 📌 **KHÔNG** được kiem chữ `[BO QUA]` trơn: tên ca kiểm của bước ⑦ **có chứa** chuỗi đó (`X4) Log co [BO QUA] …`) ⇒ một lần chạy **XANH** cũng bị báo **ĐỎ** (§16.3 **S9-A**) | **Đỏ** |
 | A4 | Bước ② **chứng minh build đã vào** | log của cổng có `Build DA VAO` (`kiem-tat-ca.ps1:180`) **hoặc** `moc-kiem.log` có `MOI tep deu DOI moc` (`kiem-moc-build.ps1:205`). 🚨 **Hai chuỗi KHÁC nhau** — khẳng định sai chuỗi sẽ cho đỏ giả | **Đỏ**: "binary không đổi" |
 | A5 | **Đủ 8 dòng** kết quả bước | đếm `✅ XONG` trong log = **8** (mỗi `Buoc` in `:79`) | **Đỏ**: "có bước không chạy" |
-| A6 | Không có `🚨` trong log | `Select-String '🚨'` — cho phép **0** | **Đỏ** (kể cả khi exit 0) |
+| A6 | Không có **dòng báo động** | dòng **BẮT ĐẦU** bằng `🚨` sau `Trim()` = **0**. 🚨 **KHÔNG** được cấm ký tự `🚨` nói chung: **tên ca kiểm** dùng chính `🚨` làm neo (*"[S5 🚨 khach BI CHAN dat hang => …] DAT"*) ⇒ một lần chạy **XANH** có **39** dòng như vậy (§16.3 **S9-B**) | **Đỏ** (kể cả khi exit 0) |
 | A7 | Cổng ⑨: **số tham chiếu chết không tăng** | so với baseline đã ghi trong bằng chứng lần trước | **Đỏ** nếu tăng |
 | A8 | **0** chuỗi bí mật trong log | quét §14 TC-17 | **Đỏ** + coi là **sự cố bảo mật** |
 
@@ -549,7 +549,7 @@ pwsh -NoProfile -File tools/kiem-link-tai-lieu.ps1    # buoc 9 (chua noi vao scr
 4. 🔒 **Kiểm chứng bằng máy:** TC-17 quét log/artifact tìm giá trị bí mật (lấy từ chính secret store trong job, **so
    khớp mà không in ra**).
 
-### 7.4 Bản vá khả chuyển **P-01…P-06** (điều kiện của D2 — 🚨 **CHƯA THỰC HIỆN**)
+### 7.4 Bản vá khả chuyển **P-01…P-06** (điều kiện của D2 — ✅ **ĐÃ THỰC HIỆN ở `S9`, 21/10/2026** — xem §16)
 
 | # | Vị trí | Hiện tại (Windows-only) | Cần thành | Ảnh hưởng nếu bỏ qua |
 |---|---|---|---|---|
@@ -559,6 +559,12 @@ pwsh -NoProfile -File tools/kiem-link-tai-lieu.ps1    # buoc 9 (chua noi vao scr
 | **P-04** | `tools/kiem-e2e.ps1:219`; `tools/kiem-moc-build.ps1:53`–`:56` | đường dẫn ghim `src\...\bin\Debug\net10.0` | `Join-Path` từng đoạn / `-ThuMuc` truyền từ CI | ⑧ không tìm thấy `bin`; ② trả **`exit 2`** (`thay.Count -eq 0`, `:95`) |
 | **P-05** | `tools/kiem-e2e.ps1:223` | `Start-Process ... -WindowStyle Hidden` | bỏ `-WindowStyle` khi `$IsWindows` = false | ⑧ **nổ** khi khởi động Web |
 | **P-06** | `tools/kiem-link-tai-lieu.ps1:20`, `:37` | regex/`Replace` dùng `\\` | dùng `[IO.Path]::DirectorySeparatorChar` | Tên tệp trong báo cáo sai (không làm sai kết luận) — **ưu tiên thấp** |
+
+> ✅ **`S9` ĐÃ VÁ CẢ SÁU — nhưng thực tế là 8 tệp, không phải 6 điểm** (§16.3 **S9-C**): bốn `probe-*.ps1`
+> (`S2`…`S6`) **sao lại** đúng 3 khuôn trên. ⇒ Toàn bộ logic hệ điều hành nay nằm ở **một tệp**
+> `tools/nen-tang.ps1` (`La-Windows` · `Lay-Curl` · `Lay-DuongDanBin` · `Test-CongDangMo` ·
+> `Lay-PidDangNghe` · `Lay-TienTrinhECommerce` · `Start-TienTrinhAn`), và `test-cong-kiem.ps1` nhóm **`Y`**
+> **quét mọi script** để khuôn cũ **không thể quay lại**.
 
 > 🔒 **Điều kiện để tin CI xanh sau khi vá:** chạy `tools/test-cong-kiem.ps1` **trên Linux** và thấy **22/22**
 > (hiện chỉ chứng minh trên **Windows**). Nếu chưa có bước này ⇒ mọi màu xanh trên CI là **chưa được kiểm chứng**
@@ -1128,3 +1134,96 @@ public class CiWorkflowTests
 | Testcontainers ghim `postgres:17-alpine` | `test/eCommerce.IntegrationTests/PostgreSqlSchemaFixture.cs:26`; `eCommerce.IntegrationTests.csproj:19` |
 | .NET SDK 10.0.400 | `global.json:3`–`:4`; `Directory.Build.props:3` (`net10.0`) |
 | `services:`/`container:` + Docker Linux-container của Windows runner | [Testcontainers CI](https://dotnet.testcontainers.org/cicd/) · [GitHub workflow syntax](https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions) |
+
+---
+
+## 16. TIẾN ĐỘ TRIỂN KHAI — phiên `S9` (21/10/2026): CI THẬT + VÁ KHẢ CHUYỂN LINUX
+
+> 🟡 **Trạng thái: MỘT PHẦN — và phần còn thiếu là phần quan trọng nhất.** Pipeline **đã có trong repo**,
+> vá khả chuyển **đã xong**, "cổng của cổng" **đã có test hai chiều**; **nhưng:**
+> ❌ **CHƯA có lần chạy nào trên GitHub Actions** — phiên này **không có quyền `git push`**
+> (`git push --dry-run` trả *"could not read Username"*), nên **required check CHƯA được bật**.
+> 📌 Đó đúng là điều kiện ở đầu tài liệu: *"Chỉ bật required check khi `test-cong-kiem.ps1` xanh trên Linux —
+> chưa có bằng chứng thì **chưa** bật"*.
+> ✅ **Bù lại**, vá khả chuyển đã được kiểm chứng trên **Linux thật** (container Ubuntu), ghi ở §16.2.
+
+### 16.1 Đã làm (kèm bằng chứng)
+
+| # | Việc | Tệp | Bằng chứng |
+|---|---|---|---|
+| 1 | **Workflow CI thật**: `pull_request` · `push main` · `schedule` · `workflow_dispatch` (bắt buộc `lyDo`) | `.github/workflows/ci.yml` | YAML hợp lệ (parse bằng thư viện `yaml`: 15 step) · `CiWorkflowTests` **10 ca** |
+| 2 | 🚨 **BUILD LÀM NÓNG trước cổng** — vá **F2** | bước 8 của workflow | `CiWorkflowTests.F2_build_lam_nong_phai_dung_TRUOC_buoc_cong` (kiểm **thứ tự**, không chỉ kiểm có mặt) |
+| 3 | **Cổng ⑨** (`kiem-link-tai-lieu.ps1`) là **step riêng** của workflow | bước 11 | CI **đỏ** khi có tham chiếu chết; `link.log` vào artifact |
+| 4 | **Cổng của cổng** (`§6.2` A1…A7) + `Evidence.json` | `tools/ci-khang-dinh.ps1` (**mới**) | `test-cong-kiem.ps1` nhóm **`X1…X8`**: **2 ca xanh** (log đầy đủ · **tên ca chứa `[BO QUA]`**) + **6 ca đỏ** (A2 thiếu log · A2 `2/3` · A3 bỏ bước · A4 thiếu `Build DA VAO` · A5 11 bước · A6 dòng `🚨`) |
+| 5 | **Thư viện một chỗ cho khác biệt Windows/Linux** | `tools/nen-tang.ps1` (**mới**) | `test-cong-kiem.ps1` nhóm **`Y1…Y5`**: quét **mọi** script (**hai chiều**), cổng **hai chiều** thật, đường dẫn `bin`, `curl` |
+| 6 | **Vá khả chuyển P-01…P-06** — 📌 **thực tế là 8 tệp, không phải 6 điểm** (xem §16.3 **S9-C**) | `kiem-tat-ca` · `kiem-e2e` · `kiem-moc-build` · `kiem-link-tai-lieu` · `probe-so-dia-chi` · `probe-khach-hang` · `probe-thanh-toan` · `probe-don-san` · `route-check` | `Y1` (quét: cấm tái xuất hiện) + `Y3/Y4/Y5` (hành vi thật) + **chạy lại toàn bộ cổng trên Windows vẫn xanh** |
+| 7 | **`tools/package-lock.json` được commit** — vá **F4** | `.gitignore` thêm `!tools/package-lock.json` | `git status` thấy `?? tools/package-lock.json` · `npm ci --dry-run` = *"up to date"* (lock **đồng bộ**) |
+| 8 | **Cấm tham số làm yếu cổng BẰNG MÁY** | `CiWorkflowTests` (TC-18/TC-25/TC-12/`-DayDu`/F2/tên job) | ✅ **Đo chiều ngược**: tiêm `continue-on-error` ⇒ 1 ca ĐỎ; bỏ `-DayDu` ⇒ 1 ca ĐỎ; thêm ống dẫn ⇒ 1 ca ĐỎ; khôi phục ⇒ **10/10 xanh** |
+| 9 | **Dòng máy đọc được cho số bước** | `kiem-tat-ca.ps1` in `TONG SO BUOC DAT: N` | `ci-khang-dinh.ps1` khẳng định `N` = số dòng `✅ XONG` **và** `N ≥ 12` |
+
+### 16.2 Số đo thật
+
+**Trên Linux thật** — container `mcr.microsoft.com/dotnet/sdk:10.0` = **Ubuntu 24.04.5 LTS**, kernel WSL2,
+`pwsh` **7.6.7** (cài bằng `dotnet tool install --global PowerShell`), SDK **10.0.402** (thỏa `global.json`
+10.0.400 + `rollForward: latestFeature`). 📌 **Không dùng Windows ở bất kỳ bước nào** — cây nguồn được
+copy **sạch** (không `bin/`, không `obj/`, không `.git`) đúng như một runner vừa checkout.
+
+| Phép đo | Kết quả |
+|---|---|
+| `dotnet build eCommerce.slnx -v m --no-incremental -nodeReuse:false` (**đúng lệnh build làm nóng của CI**) | ✅ **thành công** · **0 error** · 8 warning (`CS8604` — có sẵn từ trước) · **60.52s** |
+| `test-cong-kiem.ps1 -ChiKiemMoc` (nhóm **không** chạm DB: `A…F` · `R…V` · `W1/W2` · `X1…X7` · `Y1…Y5` · `L…P`) | ✅ **31/31 DAT · 0 HỎNG** |
+| Nhóm `G…K` (chạm DB, cần `docker exec`) | ⚠️ **CHƯA CHẠY được trong môi trường này** — không mount được Docker socket của Docker Desktop vào container (`docker version` ⇒ `server=` rỗng). 📌 Nhóm này **không chứa mã phụ thuộc hệ điều hành** (chỉ `docker exec … psql`); trên runner GitHub thì `docker` **có sẵn** |
+| 🔑 **F2 tái hiện được bằng đo, không phải suy đoán** | Lần chạy **ĐẦU TIÊN** (trước khi build làm nóng) trên cây **sạch**: `kiem-moc-build.ps1 -GhiNho` trả **`exit 2`** ⇒ **`A`, `A2`, `B`, `C`, `D`, `F`, `Y4`** = **7 ca ĐỎ vì MÔI TRƯỜNG** — 📌 và một ca **ĐỎ vì LỖI THẬT** (`Y3`, xem **S9-5**). ✅ Sau `dotnet build`: **31/31** |
+
+**Windows (máy dev, `-DayDu`)**: xem §16.6.
+
+### 16.3 🚨 Ba điều chỉnh so với bản ĐẶC TẢ — cả ba đều DO ĐƯỢC, không phải suy đoán
+
+| # | Bản đặc tả viết | Đo được (21/10/2026) | Cách sửa |
+|---|---|---|---|
+| **S9-A** | §6.2 **A2**: *"log khớp `^E2E: \d+/\d+ ca DAT$`"* | 🚨 **Không bao giờ khớp — kể cả lần chạy XANH.** `kiem-tat-ca.ps1` chỉ in **26 dòng đầu** khớp `✅\|🚨\|E2E:` của log E2E (`Select-Object -First 26`), mà dòng tổng kết `E2E:` nằm ở **cuối** tệp (`e2e.log` = 12.934 byte) | ✅ Đọc `E2E: N/N` từ **chính** `tools/_tam-kiem/e2e.log` **và** kiểm **mtime** để loại log của lần chạy trước |
+| **S9-B** | §6.2 **A6**: *"Không có `🚨` trong log"* | 🚨 Một lần chạy **XANH** có **39** dòng chứa `🚨` — vì **tên ca kiểm** dùng `🚨` làm neo (`[S5 🚨 khach BI CHAN dat hang => …] DAT`) | ✅ Chỉ cấm dòng **BẮT ĐẦU** bằng `🚨` sau `Trim()` — đúng dạng của *dòng báo động* |
+| **S9-C** | §7.4: **P-01…P-06 = "6 điểm Windows-only"** | 🚨 **8 tệp.** Bốn `probe-*.ps1` (`S2`/`S3`/`S5`/`S6`) **sao lại** đúng 3 khuôn: `Get-NetTCPConnection`, `bin\Debug\net10.0`, `-WindowStyle Hidden` | ✅ Sửa **một chỗ** (`tools/nen-tang.ps1`) + thêm **cổng quét**: thêm probe mà sao chép khuôn cũ ⇒ **ĐỎ** |
+
+**Về F2 — cách chữa đã chọn và cách chữa bị LOẠI (ghi để phiên sau không mở lại):**
+
+- ✅ **Đã chọn (a):** CI **build làm nóng** trước khi gọi cổng. Rẻ nhất, không đổi ngữ nghĩa cổng.
+- ❌ **Bị loại (b):** cho `-GhiNho` *"bỏ qua khi chưa có `bin/`"*. 📌 Khi đó `-Kiem` thấy **mọi** tệp là
+  *"MỚI (chưa có trong mốc)"* ⇒ `$khongDoi` rỗng ⇒ script in **"✅ MOI tep deu DOI moc ⇒ ban build DA VAO"**
+  **mà không có một bằng chứng nào**. 🔒 Đó là *"cổng xanh vì lý do sai"* — đúng loại hỏng mà chính
+  `kiem-moc-build.ps1` sinh ra để chống.
+- ➕ **Đã thêm (b'):** thông điệp `exit 2` nay **phân biệt** *"chưa có bản build nào"* (môi trường) với
+  *"lọc tệp sai"* — 📌 trước đó cả hai in **cùng một câu**, và người đọc log sẽ **đi sửa mã nguồn** trong khi
+  việc cần làm là **build làm nóng**.
+
+### 16.4 ⏳ CÒN LẠI / CHƯA KIỂM CHỨNG (ghi rõ, không nói quá)
+
+| # | Việc | Vì sao chưa xong | Hệ quả |
+|---|---|---|---|
+| 1 | 🚨 **Chưa có lần chạy GitHub Actions nào** | Phiên này **không có credential push** (`git push --dry-run` ⇒ *"could not read Username"*). Repo **công khai** nhưng push cần token | ❗ **Required check `cong-8-buoc` CHƯA bật** ⇒ *"cổng không chạy tự động thì không phải cổng"* **vẫn còn đúng**. Việc đầu tiên của phiên sau: `git push` → xem **một** lần chạy xanh → **rồi mới** bật branch protection (§9.2) |
+| 2 | **Branch protection + CODEOWNERS + environment `production`** | Là **thiết lập trên GitHub**, không phải tệp trong repo (và cần quyền admin) | Cần đặt: §9.2 (8 mục) + §9.3 (4 mục) + CODEOWNERS cho `.github/**`, `tools/**` |
+| 3 | **`release.yml`** (migrate → kiểm NND → deploy → health → smoke) | Cần **staging** + **secrets**; `Q3`/`Q4`/`Q5` còn `Open` ⇒ viết bây giờ là **viết một kịch bản không chạy được** | Bước ⑩ *"đủ điều kiện phát hành"* **chưa có**; D6/D7 **chưa kiểm chứng** |
+| 4 | **Thời gian pipeline trên runner (NFR-001 ≤ 10 phút)** | Chưa chạy được trên CI | Máy dev: cổng `-DayDu` **266.1s**; **chưa đo** phần `abp install-libs` (E-07) và build làm nóng **trên runner** |
+| 5 | **`abp install-libs` chạy được trên `ubuntu-latest`?** | Chưa có runner | Nếu hỏng ⇒ bước ⑧ vẫn có thể xanh nhưng **UI thiếu CSS/JS** (E-07 — điểm mù **đã biết**) |
+| 6 | **A7 (số tham chiếu chết "không tăng")** | Hiện chỉ khẳng định **= 0** (baseline hôm nay là 0) | Nếu sau này chấp nhận nợ > 0 thì phải đổi thành **so với baseline ghi trong bằng chứng** |
+| 7 | **§5.2 "12 trường" bằng chứng** | `Evidence.json` sinh **19 khóa đo được**; 3 trường **không đo được ở CI** (người duyệt, thời điểm deploy, `deploymentId`) | Thiếu là **thiếu** — không điền giá trị giả |
+| 8 | **`Q2` (self-hosted vs ubuntu) chính thức** | Tài liệu **đề xuất** ubuntu + vá; chủ dự án **chưa ký** | Nếu chọn self-hosted thì **bỏ** được vá — nhưng mất tính *"cổng đã chứng minh trên máy người khác"* |
+
+### 16.5 Phát hiện của `S9` (cả năm đều *"không làm đỏ cổng nào trước đó"*)
+
+| # | Phát hiện | Bằng chứng | Vì sao đáng ghi |
+|---|---|---|---|
+| **S9-1** | 🚨 **BA phép khẳng định của §6.2 sẽ làm cổng LUÔN ĐỎ trên một lần chạy XANH** | **A2**: chuỗi `E2E: N/N` **không có** trong log cổng (bị `-First 26` cắt) · **A3**: tên ca kiểm của bước ⑦ **chứa** `[BO QUA]` ⇒ `A3` báo đỏ trên log xanh · **A6**: lần chạy xanh có **39** dòng `🚨` | 🔑 Bài học trung tâm của dự án, lần thứ **N**: *"một phép đo bất ngờ thường là phép đo SAI"*. 📌 Cả ba đều **không phải** lỗi sản phẩm, và cả ba đều dẫn tới **cùng một hành động sai**: ai đó **bỏ A2/A3/A6** cho CI xanh — tức là **bỏ đúng cái cổng** bảo vệ bước ⑧. ✅ Sửa: neo **đúng dạng dòng**, và đọc từ **log của bước** thay vì log tóm tắt |
+| **S9-2** | **Bẫy TỰ THAM CHIẾU của cổng quét** — xuất hiện **BA lần** trong cùng một phiên: (①) **mã của cổng quét** chứa mẫu nó cấm; (②) **tên ca kiểm** chứa mẫu đó; (③) **tên ca kiểm** chứa `[BO QUA]` làm `A3` báo đỏ trên **log xanh thật** | ① và ② đo được **2 lần đỏ liên tiếp** của `Y1` khi viết nhóm `Y`; ③ đo được khi chạy `ci-khang-dinh.ps1` trên **`_s9-final.log`** (log của một lần chạy **XANH**, `exit 0`) ⇒ `A3` báo **ĐỎ** | ✅ Sửa: **ghép chuỗi** (`'Get-NetTCP' + 'Connection'`) và **neo theo dạng dòng** (`^\s*──\s*\[BO QUA\]`) — 📌 cùng họ với `S8`: *phép quét văn bản thô không phân biệt mã với chú thích / tên ca*. 🔑 Quy tắc: **cổng không được chứa nguyên văn thứ nó cấm**, và nếu buộc phải có thì **neo chặt hơn** chứ đừng bỏ phép kiểm |
+| **S9-3** | 🚨 **P-01…P-06 (6 điểm) đã trôi thành 8 tệp** — 4 probe mới đều **sao chép** khuôn Windows-only | `grep` trước khi vá: `Get-NetTCPConnection` ở **6** tệp · `bin\Debug` ở **6** tệp · `-WindowStyle` ở **5** tệp | 🔑 Sửa từng chỗ ⇒ lần sau thêm probe lại sai. ✅ Gom về `nen-tang.ps1` + **cổng quét** ⇒ tái phạm là **ĐỎ**. 📌 *"Nợ kỹ thuật sinh ra theo mẫu"*: người ta sao chép **cái đang có**, không sao chép **cái đúng** |
+| **S9-4** | **`tools/package-lock.json` bị `.gitignore` che bằng mẫu KHÔNG có `/`** ⇒ ngoại lệ `!tools/package-lock.json` **phải đặt SAU** dòng ignore | `git check-ignore` trước/sau; `git status` thấy `??` chỉ sau khi thêm ngoại lệ | 📌 Nếu đặt ngoại lệ **trước**, git vẫn ignore (dòng sau thắng) — triệu chứng là *"đã sửa mà lock vẫn không được commit"*, **không có lỗi nào** |
+| **S9-5** | 🚨 **`Lay-PidDangNghe` trả RỖNG *im lặng* trên container tối giản** — bản đầu chỉ dùng `ss`/`lsof`, mà image `dotnet/sdk` **không có cả hai** | Đo trên Linux thật: ca `Y3` **ĐỎ** với *"do duoc: [], can co 43"* — tức phép dò **không tìm thấy** listener **đang tồn tại** | 🔑 Đúng họ *"kiểm không chạy mà báo ĐẠT"*: hàm trả rỗng, nơi gọi tưởng *"không có tiến trình nào"* ⇒ 🔒 hàng rào chống *"build ghi hụt"* **mất tác dụng mà không có lỗi nào**. ✅ Sửa: đọc `/proc/net/tcp` lấy **inode** rồi quét `/proc/*/fd` tìm `socket:[inode]` — **không cần cài gì**; `ss`/`lsof` chỉ còn là lớp dự phòng |
+
+### 16.6 Nhật ký đo của `S9`
+
+| Lúc | Phép đo | Kết quả |
+|---|---|---|
+| **ĐẦU phiên** (trước khi sửa, `-DayDu`, **12 bước**) | `exit 0 · 266.1s` · unit **1399** · integration **71** · mermaid **213/0** · DB **25/25** · NND **53 = 53** · **62** quyền · **86** chỗ quét · cổng **24/24** · E2E **123/123** · probe **17/26/26/49** | ✅ **Khớp bảng `S8`** ở **mọi** số đếm (thời gian **+2.8 %** — máy) ⇒ *baseline `S8` vẫn đúng*, không suy đoán từ tài liệu |
+| **Linux thật** (container Ubuntu 24.04) | build làm nóng + `test-cong-kiem.ps1 -ChiKiemMoc` | ✅ build **0 error · 60.52s** · **31/31 DAT** (chi tiết §16.2) |
+| **CUỐI phiên** (`-DayDu`, 12 bước, **cây đã sửa xong**) | `exit 0 · 249.6s` · unit **1409** · integration **71** · mermaid **213/0** · DB **25/25** · NND **53 = 53** · **62** quyền · **86** chỗ quét · cổng **37/37** · E2E **123/123** · probe **17/26/26/49** · `TONG SO BUOC DAT: 12` | ✅ **Mọi cổng xanh.** ➕ `ci-khang-dinh.ps1` chạy trên **chính** log này ⇒ `exit 0` + `Evidence.json` (đọc được `E2E: 123/123`, `NND thucTe=53 · tuTest=53`, `37/37` ca cổng, sha256 của **9 script** + **2 DLL**) |
+

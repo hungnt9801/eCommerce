@@ -73,6 +73,13 @@ New-Item -ItemType Directory -Force -Path $thuMucTam | Out-Null
 # 🔑 Nap thu vien tiem: 🔒 no chi co **ham**, khong co `param` cap tep ⇒ nap an toan.
 . (Join-Path $PSScriptRoot 'ham-tiem.ps1')
 
+# 🔑 Nap thu vien "mot cho" cho cac khac biet Windows/Linux (`XC-007` P-02…P-05, `S9` 21/10/2026).
+. (Join-Path $PSScriptRoot 'nen-tang.ps1')
+
+# 📌 P-03: tren Windows phai la `curl.exe` (vi `curl` tran bi dat lam alias cua `Invoke-WebRequest`);
+#    tren Linux la `curl`. 🔒 Mot bien, dung o **moi** cho goi — de khong con cho nao viet cung.
+$curl = Lay-Curl
+
 $ketQua = [System.Collections.Generic.List[object]]::new()
 $web = 'http://localhost:5100'
 $jar = Join-Path $thuMucTam 'cookie.txt'
@@ -107,14 +114,14 @@ function GiaiMaHtml {
 }
 
 <#
-    🔒 **TAI TRANG VA TRA VE HTML DA GIAI MA** — dung `curl.exe` voi **cookie jar**.
+    🔒 **TAI TRANG VA TRA VE HTML DA GIAI MA** — dung `curl` (`curl.exe` tren Windows) voi **cookie jar**.
     ⚠️ **KHONG** dung `Invoke-WebRequest -MaximumRedirection 0`: 📌 no **nem** va **khong** lo `StatusCode`
     (bai hoc probe cu).
 #>
 function TaiTrang {
     param([string]$DuongDan, [string]$TepLuu)
 
-    $ma = & curl.exe -s -b $jar -c $jar -o $TepLuu -w '%{http_code}' ($web + $DuongDan)
+    $ma = & $curl -s -b $jar -c $jar -o $TepLuu -w '%{http_code}' ($web + $DuongDan)
     $html = if (Test-Path $TepLuu) { [System.IO.File]::ReadAllText($TepLuu, [Text.Encoding]::UTF8) } else { '' }
 
     return [pscustomobject]@{ Ma = ([string]$ma).Trim(); Html = $html; HtmlGoc = $html }
@@ -183,8 +190,8 @@ select count(*)::text from "ReconRunMismatches" where "ReconRunId" = 'e0000000-0
     # ➕ `S8`: cong **5000** cung phai trong — vi `S8` khoi dong ca **HttpApi.Host** (trang gia lap gui IPN
     # THAT toi do). 📌 Mot Host cu con song ⇒ ta do mot **ban build CU** va ca "end-to-end" thanh **gia**.
     foreach ($cong in @(5100, 5000)) {
-        foreach ($k in @(Get-NetTCPConnection -LocalPort $cong -State Listen -ErrorAction SilentlyContinue)) {
-            Stop-Process -Id $k.OwningProcess -Force -ErrorAction SilentlyContinue
+        foreach ($k in @(Lay-PidDangNghe -Cong $cong)) {
+            Stop-Process -Id $k -Force -ErrorAction SilentlyContinue
         }
     }
     Start-Sleep -Seconds 2
@@ -356,12 +363,16 @@ select count(*)::text from "InvItems" where "Id" = 'e0000000-0000-0000-0000-0000
 
     # ── ③ KHOI DONG WEB + CHO LEN ───────────────────────────────────────────────────────────
     $env:ASPNETCORE_ENVIRONMENT = 'Development'
-    $binWeb = Join-Path $goc 'src\eCommerce.Web\bin\Debug\net10.0'
+
+    # 🚨 `XC-007` **P-04**: duong dan `bin` phai dung **dau phan cach cua he dieu hanh** — viet cung
+    # `src\...\bin\Debug\net10.0` thi tren Linux `Test-Path` = false ⇒ `Start-Process` **nem** ⇒ buoc ⑧ do
+    # ngay tu buoc khoi dong, va thong diep noi ve *"thu muc lam viec"*, khong noi ve *"he dieu hanh"*.
+    $binWeb = Lay-DuongDanBin -TenDuAn 'eCommerce.Web'
     $logWeb = Join-Path $thuMucTam 'web.log'
 
-    $tienTrinh = Start-Process dotnet -ArgumentList 'eCommerce.Web.dll' -WorkingDirectory $binWeb `
-        -PassThru -WindowStyle Hidden -RedirectStandardOutput $logWeb `
-        -RedirectStandardError (Join-Path $thuMucTam 'web.err')
+    # 🚨 `XC-007` **P-05**: `-WindowStyle` **chi co tren Windows** ⇒ dung `Start-TienTrinhAn`.
+    $tienTrinh = Start-TienTrinhAn -Tep 'dotnet' -ThamSo 'eCommerce.Web.dll' -ThuMucLamViec $binWeb `
+        -TepLogRa $logWeb -TepLogLoi (Join-Path $thuMucTam 'web.err')
 
     $cho = Join-Path $PSScriptRoot 'wait-host.ps1'
     & pwsh -NoProfile -File $cho -Url $web -LogFile $logWeb -TimeoutSeconds $TimeoutGiay -ProcessId $tienTrinh.Id |
@@ -376,12 +387,11 @@ select count(*)::text from "InvItems" where "Id" = 'e0000000-0000-0000-0000-0000
     # va endpoint do nam o **tien trinh Host**, khong phai Web. 📌 Neu chi chay Web thi IPN khong toi noi
     # ⇒ trang ket qua se noi "chua thanh toan" **dung** — va ta rat de ket luan sai la *"san pham hong"*.
     # 🔒 Do do ta **khang dinh Host len** truoc khi do (wait-host), va **tat** no trong `finally`.
-    $binHost = Join-Path $goc 'src\eCommerce.HttpApi.Host\bin\Debug\net10.0'
+    $binHost = Lay-DuongDanBin -TenDuAn 'eCommerce.HttpApi.Host'
     $logHost = Join-Path $thuMucTam 'host.log'
 
-    $tienTrinhHost = Start-Process dotnet -ArgumentList 'eCommerce.HttpApi.Host.dll' -WorkingDirectory $binHost `
-        -PassThru -WindowStyle Hidden -RedirectStandardOutput $logHost `
-        -RedirectStandardError (Join-Path $thuMucTam 'host.err')
+    $tienTrinhHost = Start-TienTrinhAn -Tep 'dotnet' -ThamSo 'eCommerce.HttpApi.Host.dll' -ThuMucLamViec $binHost `
+        -TepLogRa $logHost -TepLogLoi (Join-Path $thuMucTam 'host.err')
 
     & pwsh -NoProfile -File $cho -Url 'http://localhost:5000' -LogFile $logHost -TimeoutSeconds $TimeoutGiay -ProcessId $tienTrinhHost.Id |
         Select-Object -Last 1 | ForEach-Object { Write-Output ("   $_") }
@@ -392,7 +402,7 @@ select count(*)::text from "InvItems" where "Id" = 'e0000000-0000-0000-0000-0000
 
     # ── ④ DANG NHAP THAT (form + cookie) ────────────────────────────────────────────────────
     $trangLogin = Join-Path $thuMucTam 'login.html'
-    & curl.exe -s -c $jar -o $trangLogin ($web + '/Account/Login') | Out-Null
+    & $curl -s -c $jar -o $trangLogin ($web + '/Account/Login') | Out-Null
 
     $htmlLogin = [System.IO.File]::ReadAllText($trangLogin, [Text.Encoding]::UTF8)
 
@@ -407,7 +417,7 @@ select count(*)::text from "InvItems" where "Id" = 'e0000000-0000-0000-0000-0000
 
     $token = $m.Groups['t'].Value
 
-    & curl.exe -s -b $jar -c $jar -o (Join-Path $thuMucTam 'login-post.html') -w '%{http_code}' -L `
+    & $curl -s -b $jar -c $jar -o (Join-Path $thuMucTam 'login-post.html') -w '%{http_code}' -L `
         --data-urlencode ("__RequestVerificationToken=" + $token) `
         --data-urlencode 'LoginInput.UserNameOrEmailAddress=admin@abp.io' `
         --data-urlencode 'LoginInput.Password=1q2w3E*' `
@@ -487,7 +497,7 @@ select count(*)::text from "InvItems" where "Id" = 'e0000000-0000-0000-0000-0000
         $khoaBiChan = 'K97E2E-CHAN-1'
 
         # 🚨 **POST THAT voi khach dang bi chan.**
-        $postBiChan = & curl.exe -s -b $jar -c $jar -o (Join-Path $thuMucTam 'dathang-chan.html') -w '%{http_code}' `
+        $postBiChan = & $curl -s -b $jar -c $jar -o (Join-Path $thuMucTam 'dathang-chan.html') -w '%{http_code}' `
             --data-urlencode ("__RequestVerificationToken=" + $tokenDh) `
             --data-urlencode 'KhoId=e0000000-0000-0000-0000-0000000000e6' `
             --data-urlencode 'Kenh=web' `
@@ -521,7 +531,7 @@ select count(*)::text from "OrdOrders" where "Number" like 'WEB-K97E2E-CHAN%';
         # 📌 Mot guard **luon nem** cung cho ra `0005` o ca tren. Chi chieu nguoc moi phan biet duoc.
         $khoaChoPhep = 'K97E2E-CHOPHEP-1'
 
-        $postChoPhep = & curl.exe -s -b $jar -c $jar -o (Join-Path $thuMucTam 'dathang-chophep.html') -w '%{http_code}' `
+        $postChoPhep = & $curl -s -b $jar -c $jar -o (Join-Path $thuMucTam 'dathang-chophep.html') -w '%{http_code}' `
             --data-urlencode ("__RequestVerificationToken=" + $tokenDh) `
             --data-urlencode 'KhoId=e0000000-0000-0000-0000-0000000000e6' `
             --data-urlencode 'Kenh=web' `
@@ -543,7 +553,7 @@ select count(*)::text from "OrdOrders" where "Number" like 'WEB-K97E2E-CHAN%';
         # ── 🔑 VA KHACH VANG LAI phai di qua duoc cong (`ADR-03`: vang lai la hang nhat) ───────
         $khoaVangLai = 'K97E2E-VANGLAI-1'
 
-        $postVangLai = & curl.exe -s -b $jar -c $jar -o (Join-Path $thuMucTam 'dathang-vanglai.html') -w '%{http_code}' `
+        $postVangLai = & $curl -s -b $jar -c $jar -o (Join-Path $thuMucTam 'dathang-vanglai.html') -w '%{http_code}' `
             --data-urlencode ("__RequestVerificationToken=" + $tokenDh) `
             --data-urlencode 'KhoId=e0000000-0000-0000-0000-0000000000e6' `
             --data-urlencode 'Kenh=web' `
@@ -587,7 +597,7 @@ select count(*)::text from "OrdOrders" where "Number" like 'WEB-K97E2E-CHAN%';
         # hoac `"$($idKhach)?lyDo="`. ➕ Va **tranh** `"?..."` ngay sau mot bien trong ngoi suy.
         # 📌 Ghi lai o day vi 🔑 **nơi nguy hiem nhat la query string** — dung cho moi URL co tham so.
 
-        $maXuat = ([string](& curl.exe -s -b $jar -c $jar -o $tepXuat -w '%{http_code}' $urlXuat)).Trim()
+        $maXuat = ([string](& $curl -s -b $jar -c $jar -o $tepXuat -w '%{http_code}' $urlXuat)).Trim()
 
         $jsonXuat = if (Test-Path $tepXuat) { [System.IO.File]::ReadAllText($tepXuat, [Text.Encoding]::UTF8) } else { '' }
 
@@ -679,7 +689,7 @@ select "NguoiXuat" || '|' || "SoDongHoSo"::text || '|' || "SoDonHang"::text || '
             # 🔑 **CA QUAN TRONG NHAT CUA §26:** ⚠️ neu thieu ly do ma **van xuat duoc** thi rang buoc
             # **khong ton tai** — 📌 va `required` o HTML chi la **tien nghi** (🔒 script/API khong biet no).
             # ✅ Do **THANG HTTP**, khong qua form ⇒ 📌 do dung lop bao ve **that**.
-            $maKhongLyDo = ([string](& curl.exe -s -b $jar -c $jar -o (Join-Path $thuMucTam 'khong-ly-do.txt') -w '%{http_code}' ($web + "/KhachHang/XuatDuLieu/$idKhach"))).Trim()
+            $maKhongLyDo = ([string](& $curl -s -b $jar -c $jar -o (Join-Path $thuMucTam 'khong-ly-do.txt') -w '%{http_code}' ($web + "/KhachHang/XuatDuLieu/$idKhach"))).Trim()
 
             Kq 'D9g 🚨 THIEU ly do ⇒ KHONG xuat duoc (guard that, khong chi required o HTML)' `
                 ($maKhongLyDo -ne '200') `
@@ -845,7 +855,7 @@ select count(*)::text from "CusDataExportLogs" where "Id" = 'e0000000-0000-0000-
 
             # 📌 **KHONG** dung `Invoke-WebRequest`: no **giai ma** noi dung ⇒ 🔒 se **an mat BOM**
             # (⚠️ chinh thu ta can kiem). ✅ Dung `curl.exe -D` de lay header + ghi byte tho.
-            & curl.exe -s -b $jar -c $jar -D $hdrCsv -o $tepCsv ($web + "/KhachHang/NhatKyCsv?customerId=$idKhach") | Out-Null
+            & $curl -s -b $jar -c $jar -D $hdrCsv -o $tepCsv ($web + "/KhachHang/NhatKyCsv?customerId=$idKhach") | Out-Null
 
             Kq 'D15a tai duoc tep CSV (tep co du lieu)' ((Test-Path $tepCsv) -and ((Get-Item $tepCsv).Length -gt 50)) `
                 ("bytes = " + (Get-Item $tepCsv -ErrorAction SilentlyContinue).Length)
@@ -905,7 +915,7 @@ select count(*)::text from "CusDataExportLogs" where "Id" = 'e0000000-0000-0000-
                 # 📌 `toiDa=1` trong khi co **2** dong ⇒ 🔒 buoc phai bi cat ⇒ ⛔ phai co dong canh bao.
                 # ══════════════════════════════════════════════════════════════════════════════════
                 $tepCat = Join-Path $thuMucTam 'nhatky-cat.csv'
-                & curl.exe -s -b $jar -c $jar -o $tepCat ($web + "/KhachHang/NhatKyCsv?customerId=$idKhach&toiDa=1") | Out-Null
+                & $curl -s -b $jar -c $jar -o $tepCat ($web + "/KhachHang/NhatKyCsv?customerId=$idKhach&toiDa=1") | Out-Null
 
                 $csvCat = if (Test-Path $tepCat) { [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes($tepCat)) } else { '' }
 
@@ -1207,7 +1217,7 @@ select count(*)::text from "ReconRunMismatches" where "ReconRunId" = 'e0000000-0
         $tokenDs = $mTokenXacNhan.Groups['t'].Value
 
         # 🚨 **THIẾU GHI CHÚ ⇒ KHÔNG ĐƯỢC GHI GÌ** (guard THẬT ở domain, không phải `required` của HTML).
-        $postThieu = & curl.exe -s -b $jar -c $jar -L -o (Join-Path $thuMucTam 'xacnhan-thieu.html') -w '%{http_code}' `
+        $postThieu = & $curl -s -b $jar -c $jar -L -o (Join-Path $thuMucTam 'xacnhan-thieu.html') -w '%{http_code}' `
             --data-urlencode ("__RequestVerificationToken=" + $tokenDs) `
             --data-urlencode ("reconRunId=" + $idLuot) `
             --data-urlencode 'ghiChu=' `
@@ -1226,7 +1236,7 @@ select count(*)::text from "ReconRuns" where "Id" = 'e0000000-0000-0000-0000-000
             ($conXacNhanSauThieu -eq '0') ("dong da xac nhan = " + $conXacNhanSauThieu + " (mong doi 0)")
 
         # ✅ XÁC NHẬN ĐỦ: ghi chú + đúng người dùng hiện tại (lấy từ principal, KHÔNG từ form).
-        $postDu = & curl.exe -s -b $jar -c $jar -L -o (Join-Path $thuMucTam 'xacnhan-du.html') -w '%{http_code}' `
+        $postDu = & $curl -s -b $jar -c $jar -L -o (Join-Path $thuMucTam 'xacnhan-du.html') -w '%{http_code}' `
             --data-urlencode ("__RequestVerificationToken=" + $tokenDs) `
             --data-urlencode ("reconRunId=" + $idLuot) `
             --data-urlencode 'ghiChu=K97S7 da kiem ke kho va khop lai so (E2E)' `
@@ -1282,7 +1292,7 @@ select count(*)::text from "ReconRunMismatches" where "ReconRunId" = 'e0000000-0
 '@) -join '').Trim()
 
         # ① XEM TRƯỚC — 🔒 mặc định `true`: một lời gọi thiếu tham số KHÔNG được xoá dữ liệu.
-        $postXemTruoc = & curl.exe -s -b $jar -c $jar -L -o (Join-Path $thuMucTam 'don-xemtruoc.html') -w '%{http_code}' `
+        $postXemTruoc = & $curl -s -b $jar -c $jar -L -o (Join-Path $thuMucTam 'don-xemtruoc.html') -w '%{http_code}' `
             --data-urlencode ("__RequestVerificationToken=" + $tokenDon) `
             --data-urlencode 'soNgay=180' `
             --data-urlencode 'chiXemTruoc=true' `
@@ -1302,7 +1312,7 @@ select count(*)::text from "ReconRunMismatches" where "ReconRunId" = 'e0000000-0
             ($demSauXemTruoc -eq $demCuTruoc) ("truoc = {0} · sau = {1}" -f $demCuTruoc, $demSauXemTruoc)
 
         # ② DỌN THẬT.
-        $postDonThat = & curl.exe -s -b $jar -c $jar -L -o (Join-Path $thuMucTam 'don-that.html') -w '%{http_code}' `
+        $postDonThat = & $curl -s -b $jar -c $jar -L -o (Join-Path $thuMucTam 'don-that.html') -w '%{http_code}' `
             --data-urlencode ("__RequestVerificationToken=" + $tokenDon) `
             --data-urlencode 'soNgay=180' `
             --data-urlencode 'chiXemTruoc=false' `
@@ -1340,7 +1350,7 @@ select count(*)::text from "ReconRuns" where "Id" = 'e0000000-0000-0000-0000-000
             ($conLuot -eq '1') ("con = " + $conLuot + " (mong doi 1)")
 
         # ③ `soNgay = 0` ⇒ 🔒 NÉM `0006` (0 = TẮT, KHÔNG phải "xoá hết") và KHÔNG xoá gì thêm.
-        $postKhongHopLe = & curl.exe -s -b $jar -c $jar -L -o (Join-Path $thuMucTam 'don-0.html') -w '%{http_code}' `
+        $postKhongHopLe = & $curl -s -b $jar -c $jar -L -o (Join-Path $thuMucTam 'don-0.html') -w '%{http_code}' `
             --data-urlencode ("__RequestVerificationToken=" + $tokenDon) `
             --data-urlencode 'soNgay=0' `
             --data-urlencode 'chiXemTruoc=false' `
@@ -1367,7 +1377,7 @@ select count(*)::text from "ReconRunMismatches" where "Id" = 'e0000000-0000-0000
     # DA DANG NHAP, dung thu ta can loai bo. 📌 Day la khac biet duy nhat giua *"xong"* va *"trong nhu xong"*
     # cua `Q6`/`D10`.
     $tepSpAnon = Join-Path $thuMucTam 'sanpham-anon.html'
-    $maSpAnon = ([string](& curl.exe -s -o $tepSpAnon -w '%{http_code}' ($web + '/SanPham'))).Trim()
+    $maSpAnon = ([string](& $curl -s -o $tepSpAnon -w '%{http_code}' ($web + '/SanPham'))).Trim()
     $htmlSpAnon = GiaiMaHtml ([System.IO.File]::ReadAllText($tepSpAnon, [Text.Encoding]::UTF8))
 
     Kq 'S8-W1 🚨 KHÁCH CHƯA ĐĂNG NHẬP vào /SanPham => 200 (không bị đá về /Account/Login)' `
@@ -1375,7 +1385,7 @@ select count(*)::text from "ReconRunMismatches" where "Id" = 'e0000000-0000-0000
         ("HTTP " + $maSpAnon)
 
     $tepCtAnon = Join-Path $thuMucTam 'sanpham-chitiet-anon.html'
-    $maCtAnon = ([string](& curl.exe -s -o $tepCtAnon -w '%{http_code}' ($web + '/SanPham/ChiTiet/k97e2e-ao-thun'))).Trim()
+    $maCtAnon = ([string](& $curl -s -o $tepCtAnon -w '%{http_code}' ($web + '/SanPham/ChiTiet/k97e2e-ao-thun'))).Trim()
     $htmlCtAnon = GiaiMaHtml ([System.IO.File]::ReadAllText($tepCtAnon, [Text.Encoding]::UTF8))
 
     Kq 'S8-W2 🚨 KHÁCH CHƯA ĐĂNG NHẬP xem CHI TIẾT theo SLUG => 200 + đúng sản phẩm' `
@@ -1396,7 +1406,7 @@ select count(*)::text from "ReconRunMismatches" where "Id" = 'e0000000-0000-0000
         ($htmlCtAnon -match '100[,.]000') 'gia niem yet tu bang gia Active'
 
     $tepNgungBan = Join-Path $thuMucTam 'sanpham-ngungban.html'
-    $maNgungBan = ([string](& curl.exe -s -o $tepNgungBan -w '%{http_code}' ($web + '/SanPham/ChiTiet/k97e2e-ngung-ban'))).Trim()
+    $maNgungBan = ([string](& $curl -s -o $tepNgungBan -w '%{http_code}' ($web + '/SanPham/ChiTiet/k97e2e-ngung-ban'))).Trim()
 
     Kq 'S8-W4 🚨 hàng ĐÃ NGỪNG BÁN => 404 (bộ lọc Published có tác dụng THẬT)' `
         ($maNgungBan -eq '404') ("HTTP " + $maNgungBan)
@@ -1404,7 +1414,7 @@ select count(*)::text from "ReconRunMismatches" where "Id" = 'e0000000-0000-0000
     # 🔑 URL CU theo SKU van phai `200` (`CAT-003` ADR-05) — neu khong thi moi link da chia se/index thanh 404
     # va `canonical` khong con duong don tin hieu ve slug.
     $tepSkuAnon = Join-Path $thuMucTam 'sanpham-sku-anon.html'
-    $maSkuAnon = ([string](& curl.exe -s -o $tepSkuAnon -w '%{http_code}' ($web + '/SanPham/ChiTiet/K97E2E-SKU-P1'))).Trim()
+    $maSkuAnon = ([string](& $curl -s -o $tepSkuAnon -w '%{http_code}' ($web + '/SanPham/ChiTiet/K97E2E-SKU-P1'))).Trim()
     $htmlSkuAnon = GiaiMaHtml ([System.IO.File]::ReadAllText($tepSkuAnon, [Text.Encoding]::UTF8))
 
     Kq 'S8-W5 🚨 URL cũ theo SKU vẫn 200 + canonical trỏ về SLUG (ADR-05)' `
@@ -1412,7 +1422,7 @@ select count(*)::text from "ReconRunMismatches" where "Id" = 'e0000000-0000-0000
         ("HTTP " + $maSkuAnon)
 
     $tepSitemap = Join-Path $thuMucTam 'sitemap-anon.xml'
-    $maSitemap = ([string](& curl.exe -s -o $tepSitemap -w '%{http_code}' ($web + '/sitemap.xml'))).Trim()
+    $maSitemap = ([string](& $curl -s -o $tepSitemap -w '%{http_code}' ($web + '/sitemap.xml'))).Trim()
     $xmlSitemap = [System.IO.File]::ReadAllText($tepSitemap, [Text.Encoding]::UTF8)
 
     Kq 'S8-W6 🚨 sitemap dùng SLUG của hàng ĐANG BÁN và KHÔNG chứa hàng ngừng bán' `
@@ -1444,7 +1454,7 @@ select count(*)::text from "ReconRunMismatches" where "Id" = 'e0000000-0000-0000
 
         # ── ① DAT HANG + THANH TOAN NGAY ⇒ phai `302` sang CONG (khong render lai trang dat hang) ──
         $khoaP1 = 'K97E2E-P1'
-        $kqPostP1 = ([string](& curl.exe -s -b $jar -c $jar -o (Join-Path $thuMucTam 'dathang-p1.html') -w '%{http_code}|%{redirect_url}' `
+        $kqPostP1 = ([string](& $curl -s -b $jar -c $jar -o (Join-Path $thuMucTam 'dathang-p1.html') -w '%{http_code}|%{redirect_url}' `
             --data-urlencode ("__RequestVerificationToken=" + $tokenTt) `
             --data-urlencode 'KhoId=e0000000-0000-0000-0000-0000000000e6' `
             --data-urlencode 'Kenh=web' `
@@ -1469,7 +1479,7 @@ select count(*)::text from "ReconRunMismatches" where "Id" = 'e0000000-0000-0000
         # 🔑 Dinh dang `N0` theo culture may chu (en-US) ⇒ `110,000`; viet `110.000` se la **phep do sai**
         # (bai hoc `S7` §: cot `numeric` in `7.0000` khien 3 ca DO GIA).
         $tepCong = Join-Path $thuMucTam 'pay-gia-lap.html'
-        $maCong = ([string](& curl.exe -s -b $jar -c $jar -o $tepCong -w '%{http_code}' $urlCongP1)).Trim()
+        $maCong = ([string](& $curl -s -b $jar -c $jar -o $tepCong -w '%{http_code}' $urlCongP1)).Trim()
         $htmlCongTho = if (Test-Path $tepCong) { [System.IO.File]::ReadAllText($tepCong, [Text.Encoding]::UTF8) } else { '' }
         $htmlCong = GiaiMaHtml $htmlCongTho
 
@@ -1505,7 +1515,7 @@ select "Status"::text from "PayTransactions" where "MerchantReference" = '{0}';
             $tokenCong = $mTokenCong.Groups['t'].Value
 
             $tepKetQuaP1 = Join-Path $thuMucTam 'ketqua-p1.html'
-            $maKetQuaP1 = ([string](& curl.exe -s -L -b $jar -c $jar -o $tepKetQuaP1 -w '%{http_code}' `
+            $maKetQuaP1 = ([string](& $curl -s -L -b $jar -c $jar -o $tepKetQuaP1 -w '%{http_code}' `
                 --data-urlencode ("__RequestVerificationToken=" + $tokenCong) `
                 --data-urlencode ("returnUrl=" + $returnUrlP1) `
                 --data-urlencode 'ketQua=thanh-cong' `
@@ -1549,7 +1559,7 @@ select "PaymentStatus"::text from "OrdOrders" where "Number" = '{0}';
             # 🔑 Day la bat bien `PAY-001` D2. 📌 Neu trang tin query string thi bat ky ai go mot URL cung
             # "thanh toan xong" trong mat nguoi van hanh ⇒ **giao hang mien phi**.
             $khoaP2 = 'K97E2E-P2'
-            $kqPostP2 = ([string](& curl.exe -s -b $jar -c $jar -o (Join-Path $thuMucTam 'dathang-p2.html') -w '%{http_code}|%{redirect_url}' `
+            $kqPostP2 = ([string](& $curl -s -b $jar -c $jar -o (Join-Path $thuMucTam 'dathang-p2.html') -w '%{http_code}|%{redirect_url}' `
                 --data-urlencode ("__RequestVerificationToken=" + $tokenTt) `
                 --data-urlencode 'KhoId=e0000000-0000-0000-0000-0000000000e6' `
                 --data-urlencode 'Kenh=web' `
@@ -1564,13 +1574,13 @@ select "PaymentStatus"::text from "OrdOrders" where "Number" = '{0}';
             $urlCongP2 = $kqPostP2.Split('|')[1]
 
             $tepCongP2 = Join-Path $thuMucTam 'pay-gia-lap-2.html'
-            & curl.exe -s -b $jar -c $jar -o $tepCongP2 -w '%{http_code}' $urlCongP2 | Out-Null
+            & $curl -s -b $jar -c $jar -o $tepCongP2 -w '%{http_code}' $urlCongP2 | Out-Null
             $htmlCongP2Tho = [System.IO.File]::ReadAllText($tepCongP2, [Text.Encoding]::UTF8)
             $maThamChieuP2 = [regex]::Match($htmlCongP2Tho, 'id="ma-tham-chieu">(?<m>[^<]+)<').Groups['m'].Value.Trim()
 
             # 🚨 Go thang URL kem `vnp_ResponseCode=00` — **nhu ke tan cong** (chua co IPN nao duoc gui).
             $tepGiaP2 = Join-Path $thuMucTam 'ketqua-p2-gia.html'
-            & curl.exe -s -b $jar -c $jar -o $tepGiaP2 -w '%{http_code}' `
+            & $curl -s -b $jar -c $jar -o $tepGiaP2 -w '%{http_code}' `
                 ($web + '/DatHang/KetQua?ma=' + [uri]::EscapeDataString($maThamChieuP2) + '&vnp_ResponseCode=00&vnp_TransactionStatus=00') | Out-Null
             $htmlGiaP2 = GiaiMaHtml ([System.IO.File]::ReadAllText($tepGiaP2, [Text.Encoding]::UTF8))
 
@@ -1587,7 +1597,7 @@ select "PaymentStatus"::text from "OrdOrders" where "Number" = '{0}';
             $mTokenCong2 = [regex]::Match($htmlCongP2Tho, 'name="__RequestVerificationToken"[^>]*value="(?<t>[^"]+)"')
 
             $tepKetQuaP2 = Join-Path $thuMucTam 'ketqua-p2.html'
-            & curl.exe -s -L -b $jar -c $jar -o $tepKetQuaP2 -w '%{http_code}' `
+            & $curl -s -L -b $jar -c $jar -o $tepKetQuaP2 -w '%{http_code}' `
                 --data-urlencode ("__RequestVerificationToken=" + $mTokenCong2.Groups['t'].Value) `
                 --data-urlencode 'returnUrl=' `
                 --data-urlencode 'ketQua=that-bai' `

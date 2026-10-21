@@ -1,0 +1,205 @@
+# CI THAT (`XC-007`) - cong kiem chay TU DONG, khong phai "khi co nguoi nho go lenh".
+#
+# 🔑 VI SAO TEP NAY TON TAI: `tools/kiem-tat-ca.ps1` da la MOT lenh dung, nhung no chi chay khi co nguoi
+#    go. 📌 *"Cong khong chay tu dong thi khong phai cong"* (`BAN-GIAO-GD1` §10).
+#
+# 🚨 BON DIEU KHONG DUOC DOI TRONG TEP NAY (moi cai ung voi mot lan da tra gia):
+#    1. `-DayDu` BAT BUOC, va **KHONG** duoc ong danh output (`| Tee-Object`, `| Select-String`) - vi khi do
+#       `$LASTEXITCODE` la cua lenh cuoi trong ong danh (thuong LUON 0) ⇒ *"tat ca xanh"* tren mot lan DO
+#       (quy tac (1) cua chinh `kiem-tat-ca.ps1`).
+#    2. **KHONG** `continue-on-error` tren buoc cong (bien do thanh xanh ma khong ai thay).
+#    3. **BUILD LAM NONG** truoc khi goi cong - 🚨 `kiem-moc-build.ps1 -GhiNho` tra `exit 2` tren runner
+#       SACH (chua co `bin/`) ⇒ lan chay DAU TIEN luon do, va do la MOI TRUONG khong phai san pham
+#       (`XC-007` **F2**, do lai o `S9` 21/10/2026).
+#    4. Sau khi goi cong, phai **KHANG DINH DAU RA** (`tools/ci-khang-dinh.ps1`): `exit 0` khong chung minh
+#       buoc ⑧ da chay (`-DayDu` thieu ⇒ cung `exit 0`).
+#
+# 📌 Cac buoc danh so o day la so BUOC CUA WORKFLOW; con so buoc cua CONG la 12 (xem `XC-007` §6.1).
+
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    # 📌 Chay hang dem tren `main` de phat hien "troi moi truong" (image/tool moi) - day la cach DUY NHAT
+    #    phat hien "cong xanh vi cache cu" (`XC-007` §1 A2).
+    - cron: '0 18 * * *'
+  workflow_dispatch:
+    inputs:
+      lyDo:
+        description: 'Ly do chay tay (BAT BUOC - BR-015: bang chung phai ghi duoc ly do)'
+        required: true
+        type: string
+
+# 🔒 Quyen toi thieu (`XC-007` §7.3): cam `write-all`.
+permissions:
+  contents: read
+  actions: read
+
+# 📌 PR: huy lan chay cu khi co commit moi. `main`: XEP HANG, khong huy (bang chung cua main phai du
+#    tung commit) - `XC-007` §8.2.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
+
+jobs:
+  cong-8-buoc:
+    # 🚨 TEN NAY PHAI KHOP required status check tren GitHub (§9.2) - doi ten la required check mat hieu luc.
+    name: cong-8-buoc
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: '0. Checkout dung commit SE MERGE (BR-005)'
+        uses: actions/checkout@v4
+        with:
+          # 📌 `head.sha` (khong phai `sha` cua merge commit): cong phai gan voi commit that se vao `main`.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          # 📌 Can lich su de `git log -1 -- tools/` (GateVersionSha trong bang chung) tim dung commit.
+          fetch-depth: 0
+
+      - name: '0b. workflow_dispatch phai co lyDo (BR-015)'
+        if: github.event_name == 'workflow_dispatch'
+        shell: pwsh
+        env:
+          LY_DO: ${{ inputs.lyDo }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:LY_DO)) {
+            Write-Output '🚨 Chay tay PHAI co lyDo (BR-015).'
+            exit 1
+          }
+          Write-Output ("Ly do chay tay: {0}" -f $env:LY_DO)
+          # 📌 Ghi vao bang chung: `ci-khang-dinh.ps1` doc bien nay (`XC-007` §5.2).
+          ("LY_DO_CHAY_TAY={0}" -f $env:LY_DO) | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: '1. .NET SDK theo global.json (10.0.400)'
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: '2. Node 20 + cache npm (D10: can tools/package-lock.json DA COMMIT)'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: tools/package-lock.json
+
+      - name: '3. Cache NuGet'
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props', 'Directory.Build.props') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: '4. Tien de - Docker phai la LINUX engine (E-05)'
+        run: |
+          # 🚨 Day la ly do KHONG dung `windows-latest`: integration test ghim `postgres:17-alpine` (Linux).
+          ostype=$(docker info --format '{{.OSType}}')
+          echo "Docker OSType = $ostype"
+          test "$ostype" = "linux"
+          docker compose version
+
+      - name: '5. Ha tang (PostgreSQL 17 + Redis 7) theo docker-compose.yml'
+        run: |
+          # 📌 Phai la `docker compose` (khong phai `services:`): buoc ⑥ goi `docker exec ecommerce-postgres`
+          #    ⇒ container PHAI co DUNG TEN do `docker-compose.yml` dat; ten do nen tang sinh thi khong dat duoc.
+          docker compose up -d --wait
+          docker compose ps
+
+      - name: '6. Thu vien npm cua tools (mermaid) - npm ci tu lock DA COMMIT (F4)'
+        run: npm ci --prefix tools
+
+      - name: '7. Thu vien client cua Web (E2E can CSS/JS - E-07)'
+        run: |
+          dotnet tool install --global Volo.Abp.Cli
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+          export PATH="$HOME/.dotnet/tools:$PATH"
+          command -v yarn > /dev/null 2>&1 || npm install --global yarn
+          abp install-libs -wd src/eCommerce.Web
+
+      - name: '8. BUILD LAM NONG (bat buoc - vap F2)'
+        run: |
+          # 🚨 KHONG bo buoc nay: tren runner sach `bin/` chua ton tai ⇒ `-GhiNho` cua cong tra `exit 2`
+          #    ⇒ CI do NGAY NGAY DAU, va do la moi truong khong phai ma nguon.
+          # 📌 `--no-incremental`: buoc kiem moc can nhi phan duoc GHI LAI (mtime doi) de phep kiem co nghia.
+          dotnet build eCommerce.slnx -v m --no-incremental -nodeReuse:false
+
+      - name: '9. Xoa log cu - bang chung PHAI la cua lan chay NAY'
+        shell: pwsh
+        run: |
+          # 🚨 Neu khong xoa, mot lan chay hong tu buoc ② van thay `e2e.log` CU cua lan truoc ⇒ phep khang
+          #    dinh A2 se XANH vi LY DO SAI (`ci-khang-dinh.ps1` cung kiem mtime, day la lop thu hai).
+          Remove-Item -Recurse -Force tools/_tam-kiem -ErrorAction SilentlyContinue
+          (Get-Date).ToUniversalTime().ToString('o') | Out-File -FilePath .bat-dau.txt -Encoding utf8 -NoNewline
+          Write-Output ("Bat dau luc (UTC): {0}" -f (Get-Content .bat-dau.txt -Raw))
+
+      - name: '10. CONG 1..12 - MOT lenh, -DayDu BAT BUOC, KHONG ong danh'
+        shell: pwsh
+        run: |
+          # 🚨 KHONG duoc: `pwsh ... -DayDu | Tee-Object gate.log` hoac `| Select-String` - khi do
+          #    `$LASTEXITCODE` la cua lenh CUOI trong ong danh (thuong 0) ⇒ "xanh" tren mot lan DO.
+          #    Dung `*>` ghi ra tep (quy tac (1) cua chinh kiem-tat-ca.ps1).
+          & pwsh -NoProfile -File tools/kiem-tat-ca.ps1 -DayDu *> gate.log
+          $ma = $LASTEXITCODE
+          "MA_CONG=$ma" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Get-Content gate.log -Tail 60
+          exit $ma
+
+      - name: '11. CONG 13 - tham chieu tai lieu (buoc (9) cua XC-007, chua noi vao script tren)'
+        shell: pwsh
+        run: |
+          & pwsh -NoProfile -File tools/kiem-link-tai-lieu.ps1 *> link.log
+          $ma = $LASTEXITCODE
+          Get-Content link.log -Tail 20
+          exit $ma
+
+      - name: '12. KHANG DINH DAU RA + Evidence.json (cong cua cong - §6.2)'
+        if: always()
+        shell: pwsh
+        run: |
+          $batDau = if (Test-Path .bat-dau.txt) { (Get-Content .bat-dau.txt -Raw).Trim() } else { '' }
+          $link = if (Test-Path link.log) { 'link.log' } else { '' }
+          $ma = if ($env:MA_CONG) { [int]$env:MA_CONG } else { 99 }
+
+          & pwsh -NoProfile -File tools/ci-khang-dinh.ps1 `
+            -Log gate.log -ThuMucLog tools/_tam-kiem -BatDauUtc $batDau -MaCong $ma -LinkLog $link `
+            -SoBuocToiThieu 12 -XuatBangChung Evidence.json
+          $kq = $LASTEXITCODE
+
+          # 📌 Tom tat cho STEP_SUMMARY + phan loai `2` = MOI TRUONG (khac `1` = san pham, BR-006).
+          $kichBan = @()
+          $kichBan += '## CI - cong 12 buoc + cong tham chieu'
+          $kichBan += ''
+          $kichBan += ("- commit: ``{0}``" -f $env:GITHUB_SHA)
+          $kichBan += ("- ma thoat cua cong: **{0}**" -f $ma)
+          if ($ma -eq 2) { $kichBan += '- 🔶 phan loai: **MOI TRUONG** (phep kiem vo nghia) - KHONG phai san pham hong' }
+          elseif ($ma -ne 0) { $kichBan += '- 🔴 phan loai: **SAN PHAM** (mot buoc cua cong that bai)' }
+          $kichBan += ''
+          if (Test-Path gate.log) {
+            $kichBan += '```'
+            $kichBan += (Get-Content gate.log -Tail 25)
+            $kichBan += '```'
+          }
+          $kichBan -join "`n" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+
+          exit $kq
+
+      - name: '13. Bang chung (artifact 90 ngay - NFR-008)'
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bang-chung-${{ github.sha }}
+          retention-days: 90
+          if-no-files-found: warn
+          path: |
+            gate.log
+            link.log
+            Evidence.json
+            .bat-dau.txt
+            tools/_tam-kiem/*.log
