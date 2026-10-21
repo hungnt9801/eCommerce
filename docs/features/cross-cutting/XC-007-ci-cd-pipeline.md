@@ -513,7 +513,7 @@ pwsh -NoProfile -File tools/kiem-link-tai-lieu.ps1    # buoc 9 (chua noi vao scr
 | **Redis** | **7** (`redis:7-alpine` — `docker-compose.yml:24`) | ⑦⑧ (app cần cache + **distributed lock**) | ✅ compose | Thiếu Redis ⇒ app **sập lúc khởi động** (bài học Phase 0 — `design-doc-guidelines.md` §1 dòng 15) |
 | **Docker** | Linux engine | ③④⑤⑥⑦⑧ | ✅ có sẵn trên `ubuntu-latest` | 🚨 **Đây là lý do loại `windows-latest`** (§0.1 D2): Windows runner chỉ có Docker **Windows container** ⇒ `postgres:17-alpine` (Linux) **không chạy được**; `services:`/`container:` cũng **chỉ-Linux**. Nguồn: [dotnet.testcontainers.org/cicd](https://dotnet.testcontainers.org/cicd/) + [workflow syntax](https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions) |
 | **.NET SDK** | **10.0.400** (`global.json:3`, `rollForward: latestFeature`) | ②③④⑦ | ✅ `actions/setup-dotnet` | Lệch SDK ⇒ test có thể đỏ vì **lý do khác** — ghim đúng `global.json` |
-| **Node + npm** | Node 20+ (chưa ghim — §15.2 F4) | ⑤ | ✅ | `tools/package.json:16` là range `^12.1.0` ⇒ cần lock (D10) |
+| **Node + npm** | Node 24 (ghim trong CI; ✅ `S11` nâng từ 20 — xem §16.7 **S11-2**) | ⑤ | ✅ | `tools/package.json:16` là range `^12.1.0` ⇒ cần lock (D10) |
 | **yarn** | 1.x (chưa ghim) | ⑧ (chuẩn bị `wwwroot/libs`) | ✅ | `abp install-libs -wd src/eCommerce.Web` **bắt buộc** trước E2E — `BAN-GIAO-GD1` §6 dòng 203 |
 | **NuGet** | cache `~/.nuget/packages` | ②③④ | ✅ `actions/cache` | Khoá cache = hash `Directory.Packages.props` + `Directory.Build.props` |
 | **npm cache** | `~/.npm` | ⑤ | ✅ | ⚠️ Chỉ tất định **sau** khi commit lock (D10) |
@@ -910,7 +910,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
           cache-dependency-path: tools/package-lock.json   # D10: phai commit lock
 

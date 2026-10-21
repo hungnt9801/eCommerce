@@ -85,10 +85,15 @@ jobs:
         with:
           global-json-file: global.json
 
-      - name: '2. Node 20 + cache npm (D10: can tools/package-lock.json DA COMMIT)'
+      - name: '2. Node 24 + cache npm (D10: can tools/package-lock.json DA COMMIT)'
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # 🚨 `S11` (21/10/2026) - do TU Node 20 -> 24 sau lan chay CI DAU TIEN:
+          #    `jsdom@30` keo `undici` moi, ma `undici` goi `webidl.util.markAsUncloneable` - API KHONG co
+          #    tren Node 20 ⇒ buoc (5) mermaid NEM ngay khi `require('jsdom')`, TRUOC khi kiem duoc khoi nao.
+          #    📌 Node 20 da HET HO TRO (EOL 4/2026); may dev chay Node 24 va buoc (5) xanh o do.
+          #    🔒 Khong ha cap `jsdom`/`undici`: do la cach "sua" bang cach dung do cu hon.
+          node-version: '24'
           cache: npm
           cache-dependency-path: tools/package-lock.json
 
