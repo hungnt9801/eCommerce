@@ -49,6 +49,8 @@ và phiên trước từng **nói quá "GĐ1 hoàn thành"** vì **không đo l�
       ─────────────────────────────────────
       TỔNG                           249.6s
 ```
+📌 **Lần chạy lại trên cây ĐÃ COMMIT** (commit `S9` đầu tiên = `b1e7c63`): **251.6s · `exit 0` · CÙNG mọi số ca**
+(1409 · 71 · 37 · 123) ⇒ chênh **≈ 0,8 %** là **máy**, không phải sản phẩm.
 
 🆕 **`S9` — CI thật: các con số MỚI (dùng bảng trên, đọc thêm dòng này để biết cái gì đã đổi):**
 
