@@ -59,9 +59,9 @@ NND **52** / bất biến DB **24/24** / **85** chỗ quét ⇒ **mọi số kh�
 • 🆕 **`S7` đo HAI lần**: **ĐẦU phiên** (**12 bước**, `exit 0`): **301.5s** với unit **1367** / integration **67** /
 NND **53** / DB **25/25** / **61** quyền / E2E **67/67** ⇒ **mọi số khớp bảng `S6`** ở trên (⚠️ riêng **thời gian
 cao hơn ~11 %** — máy, không phải sản phẩm). **CUỐI phiên**: **241.8s** như bảng trên, **lần chạy lại trên
-cây ĐÃ COMMIT: 250.4s · `exit 0`**, và **lần chạy CUỐI (sau khi đóng hai nợ UI: tên người xác nhận + nút
-"Sửa" điền sẵn): 289.2s · `exit 0`** — 📌 **cùng số ca** ở cả ba lần (1395 · 71 · **102/102** · 25/25 ·
-NND 53 · 62 quyền), chỉ khác **thời gian** ⇒ dao động của **máy**.
+cây ĐÃ COMMIT: 250.4s · `exit 0`**, **lần chạy sau khi đóng hai nợ UI: 289.2s · `exit 0`**, và **lần CUỐI trên
+cây SẠCH (đã commit hết): 235.4s · `exit 0`** — 📌 **cùng số ca** ở cả bốn lần (1395 · 71 · **102/102** ·
+25/25 · NND 53 · 62 quyền), chỉ khác **thời gian** ⇒ dao động của **máy**.
 📌 **`S7` còn một lần dừng vì MÔI TRƯỜNG (không phải mã):** Docker Desktop đã tắt sau khi máy khởi động lại ⇒
 `docker compose up -d` lại `ecommerce-postgres` + `ecommerce-redis` rồi mới chạy được probe. 🔑 **Triệu chứng**
 là `psql THAT BAI … failed to connect to the docker API` — 📌 dừng lại và **đọc thông điệp** là đủ để không đi
