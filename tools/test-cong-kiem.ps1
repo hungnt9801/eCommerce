@@ -331,6 +331,23 @@ if (-not $ChiKiemDb) {
             $k = ChayScript $scriptLink @('-Goc', $tam)
             BangNhau $k.Ma 0 'Link nam trong code span KHONG duoc coi la lien ket'
         }
+
+        It 'V2) Link dung SAI HOA/THUONG ⇒ exit 1 — 🔑 Windows KHONG duoc che loi nay (`S11`)' {
+            # 🚨 **CA NAY SINH RA TU MOT LOI THAT (21/10/2026, lan chay CI Linux DAU TIEN):**
+            # `inv-003` tro toi `docs/tiep-tuc-phien-moI.md` trong khi tep that la `…-moi.md`.
+            # Tren Windows `Test-Path` **khong phan biet** hoa/thuong ⇒ cong XANH o may dev, DO tren Linux.
+            # 🔑 *"phep do xanh vi he dieu hanh"* — cung ho voi `Path.IsPathRooted` cua kho tep media.
+            $tam = Join-Path $thuMucTam ('link-sai-hoa-' + [Guid]::NewGuid().ToString('N'))
+            New-Item -ItemType Directory -Force -Path $tam | Out-Null
+            [IO.File]::WriteAllText((Join-Path $tam 'a.md'), ('# A' + "`n`n" + 'Xem [B](B.md).' + "`n"))
+            [IO.File]::WriteAllText((Join-Path $tam 'b.md'), ('# B' + "`n"))
+
+            $k = ChayScript $scriptLink @('-Goc', $tam)
+            BangNhau $k.Ma 1 'Link sai hoa/thuong phai exit 1 (ca tren Windows)'
+
+            $noiDung = Get-Content $k.Log -Raw
+            KhangDinh ($noiDung -match 'B\.md') "Log KHONG nhac toi 'B.md' ⇒ do vi ly do khac. Log:`n$noiDung"
+        }
     }
 }
 

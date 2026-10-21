@@ -1371,7 +1371,7 @@ Nghiệp vụ thật dùng **hai đơn vị cho hai kênh khác nhau**:
 
 | # | Nợ | Ghi chú |
 |---|---|---|
-**1** | 🚨 **`Percent` vẫn tính trên tồn khả dụng của TỪNG `(kho, SKU)`** | Tồn kho **chưa** mô hình hoá theo kênh (`docs/tiep-tuc-phien-moI.md` §5 việc 3) — 📌 **nợ riêng**, không thuộc lượt này |
+**1** | 🚨 **`Percent` vẫn tính trên tồn khả dụng của TỪNG `(kho, SKU)`** | Tồn kho **chưa** mô hình hoá theo kênh (`docs/tiep-tuc-phien-moi.md` §5 việc 3) — 📌 **nợ riêng**, không thuộc lượt này |
 **2** | **`HanMucKenhDto.DonVi` là `string?`** (không phải enum) | ⚠️ Vì `Application.Contracts` **không** tham chiếu module `Domain` (layering — đã vấp **ba lần** trong dự án). 🔒 Đổi lại: chuỗi có thể **sai chính tả** ⇒ đã có ca `D3` khoá việc **NÉM** khi sai |
 **3** | **Chưa có UI chọn `DonVi` khi sửa dòng đã có** | 📌 Form hiện **thêm/cập nhật** theo khoá `(kênh, kho)`; nút "Sửa" điền sẵn giá trị **chưa** làm |
 **4** | **Chưa có test tích hợp cho `StockReservationService`** với `DonVi` theo dòng | 📌 Hàm **thuần** đã có 10 ca; đường **giữ chỗ thật** (đọc DB → chọn → áp) **chưa** đo |

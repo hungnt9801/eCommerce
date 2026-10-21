@@ -36,6 +36,46 @@ $tongLink = 0
 $tongPath = 0
 $loi = New-Object System.Collections.Generic.List[object]
 
+# 🚨 **TỒN TẠI PHẢI PHÂN BIỆT HOA/THƯỜNG** (`S11`, 21/10/2026 — đo được trên CI Linux):
+# trên Windows `Test-Path 'docs/tiep-tuc-phien-moI.md'` trả **TRUE** dù tệp thật là `…-moi.md`
+# ⇒ cổng **XANH trên máy dev** nhưng **ĐỎ trên Linux**. 🔑 Đó là *"phép đo xanh vì hệ điều hành"* —
+# cùng họ với lỗi `Path.IsPathRooted` của kho tệp media (`CAT-003` §18.8).
+# ✅ Đi từng ĐOẠN đường dẫn và so **`-ceq`** ⇒ bắt được cả trên Windows; trên Linux kết quả không đổi.
+function Test-DuongDanTonTai {
+    param([Parameter(Mandatory)][string]$DuongDan)
+
+    if (-not (Test-Path -LiteralPath $DuongDan)) { return $false }
+
+    $dayDay = [IO.Path]::GetFullPath($DuongDan)
+    $gocDay = [IO.Path]::GetFullPath($Goc)
+
+    # 📌 Ngoài gốc repo (hiếm): tin `Test-Path` — không có "cây thật" để so từng đoạn.
+    if (-not $dayDay.StartsWith($gocDay, [StringComparison]::OrdinalIgnoreCase)) { return $true }
+
+    $tuongDoi = [IO.Path]::GetRelativePath($gocDay, $dayDay)
+    $hienTai = $gocDay
+
+    foreach ($doan in ($tuongDoi -split '[\\/]' | Where-Object { $_ -ne '' })) {
+        $khop = $null
+
+        # 🛡️ Lưới an toàn: không đọc được thư mục ⇒ KHÔNG kết luận "chết" (báo sai làm người ta bỏ cổng).
+        try {
+            foreach ($e in [IO.Directory]::EnumerateFileSystemEntries($hienTai)) {
+                if ([IO.Path]::GetFileName($e) -ceq $doan) { $khop = $e; break }
+            }
+        }
+        catch {
+            return $true
+        }
+
+        if (-not $khop) { return $false }
+
+        $hienTai = $khop
+    }
+
+    return $true
+}
+
 foreach ($t in $tepTaiLieu) {
     $noiDung = [IO.File]::ReadAllText($t.FullName, [Text.Encoding]::UTF8)
     $thuMuc = Split-Path $t.FullName -Parent
@@ -81,7 +121,7 @@ foreach ($t in $tepTaiLieu) {
         $tongLink++
         $soDong++
         $day = if ($duongDan.StartsWith('/')) { Join-Path $Goc $duongDan.TrimStart('/') } else { Join-Path $thuMuc $duongDan }
-        if (-not (Test-Path $day)) {
+        if (-not (Test-DuongDanTonTai -DuongDan $day)) {
             $loi.Add([pscustomobject]@{ Loai = 'LINK'; Tep = $tuongDoi; Dong = $soDong; Dich = $dich })
         }
     }
@@ -100,7 +140,7 @@ foreach ($t in $tepTaiLieu) {
         $tongPath++
         $dayGoc = Join-Path $Goc $dich
         $dayTuongDoi = Join-Path $thuMuc $dich
-        if (-not (Test-Path $dayGoc) -and -not (Test-Path $dayTuongDoi)) {
+        if (-not (Test-DuongDanTonTai -DuongDan $dayGoc) -and -not (Test-DuongDanTonTai -DuongDan $dayTuongDoi)) {
             $loi.Add([pscustomobject]@{ Loai = 'PATH'; Tep = $tuongDoi; Dong = 0; Dich = $dich })
         }
     }
