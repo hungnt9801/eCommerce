@@ -6,6 +6,7 @@ using Volo.Abp;
 using Volo.Abp.Application.Dtos;
 using Volo.Abp.Application.Services;
 using Volo.Abp.Domain.Repositories;
+using Volo.Abp.Identity;
 using Volo.Abp.Settings;
 
 namespace eCommerce.Inventory;
@@ -46,19 +47,67 @@ public class DoiSoatAppService : ApplicationService, IDoiSoatAppService
     private readonly IRepository<Warehouse, Guid> _kho;
     private readonly DoiSoatRetentionService _luuTru;
     private readonly ISettingProvider _settingProvider;
+    private readonly IRepository<IdentityUser, Guid> _nguoiDung;
 
     public DoiSoatAppService(
         IRepository<ReconRun, Guid> luotDoiSoat,
         IRepository<ReconRunMismatch, Guid> dongLech,
         IRepository<Warehouse, Guid> kho,
         DoiSoatRetentionService luuTru,
-        ISettingProvider settingProvider)
-    {
+        ISettingProvider settingProvider,
+        IRepository<IdentityUser, Guid> nguoiDung)    {
         _luotDoiSoat = luotDoiSoat;
         _dongLech = dongLech;
         _kho = kho;
         _luuTru = luuTru;
         _settingProvider = settingProvider;
+        _nguoiDung = nguoiDung;
+    }
+
+    /// <summary>
+    /// 🆕 Tra **tên** người xác nhận cho một tập DTO — **một** truy vấn cho cả trang (không N+1).
+    ///
+    /// 🔒 **VÌ SAO PHẢI TRA TÊN Ở ĐÂY (không để UI tự tra):** UI Web chạy in-process và **không** nạp module
+    /// Identity của ABP ⇒ nếu để view tự tra thì **nó không có** repository người dùng. 📌 Và nếu mỗi
+    /// dòng tự gọi API thì thành N+1 trên đúng cái màn hình liệt kê lịch sử.
+    ///
+    /// ⚠️ **KHÔNG tra được tên KHÔNG phải lỗi:** `ConfirmedByName` để `null` ⇒ UI rơi về **GUID rút gọn** và
+    /// nói rõ *"không tra được tên"*. 📌 Ghi đè bằng *"(không rõ)"* sẽ làm người kiểm toán **không phân biệt**
+    /// được *"tài khoản đã bị xoá cứng"* với *"lỗi tra cứu"*.
+    ///
+    /// 📌 **Vì sao `IRepository<IdentityUser, Guid>` chứ không `IIdentityUserRepository`:** bản thứ hai
+    /// **không** phơi `GetQueryableAsync` (đã đo: `CS1061`) — nó là repository **tuỳ biến** của module
+    /// Identity. ✅ `IRepository<…>` là hợp đồng chuẩn của ABP nên **lọc được ngay trong SQL**.
+    /// </summary>
+    private async Task GanTenNguoiXacNhanAsync(List<LuotDoiSoatDto> cacLuot)
+    {
+        var idCanTra = cacLuot
+            .Where(x => x.ConfirmedByUserId is not null)
+            .Select(x => x.ConfirmedByUserId!.Value)
+            .Distinct()
+            .ToList();
+
+        if (idCanTra.Count == 0)
+        {
+            return;
+        }
+
+        var nguoiDung = await AsyncExecuter.ToListAsync(
+            (await _nguoiDung.GetQueryableAsync()).Where(x => idCanTra.Contains(x.Id)));
+
+        var tenTheoId = nguoiDung.ToDictionary(
+            x => x.Id,
+            x => string.IsNullOrWhiteSpace(x.Name)
+                ? x.UserName
+                : (string.IsNullOrWhiteSpace(x.Surname) ? $"{x.Name}" : $"{x.Name} {x.Surname}"));
+
+        foreach (var luot in cacLuot)
+        {
+            if (luot.ConfirmedByUserId is { } id && tenTheoId.TryGetValue(id, out var ten))
+            {
+                luot.ConfirmedByName = ten;
+            }
+        }
     }
 
     // ── LƯỢT ĐỐI SOÁT ───────────────────────────────────────────────────────────────────────────
@@ -132,6 +181,10 @@ public class DoiSoatAppService : ApplicationService, IDoiSoatAppService
 
         var ketQua = ds.Select(x => ChuyenDto(x, demTheoLuot.GetValueOrDefault(x.Id))).ToList();
 
+        // 🆕 Tra **tên** người xác nhận cho cả trang bằng MỘT truy vấn (không N+1) — 📌 màn hình không
+        // phải hiện GUID. Tên chỉ để **đọc**; `ConfirmedByUserId` vẫn là nguồn sự thật (audit).
+        await GanTenNguoiXacNhanAsync(ketQua);
+
         return new PagedResultDto<LuotDoiSoatDto>(tong, ketQua);
     }
 
@@ -146,7 +199,10 @@ public class DoiSoatAppService : ApplicationService, IDoiSoatAppService
         var conLai = await AsyncExecuter.CountAsync(
             (await _dongLech.GetQueryableAsync()).Where(x => x.ReconRunId == reconRunId && !x.DaXuLy));
 
-        return ChuyenDto(luot, conLai);
+        var dto = ChuyenDto(luot, conLai);
+        await GanTenNguoiXacNhanAsync([dto]);
+
+        return dto;
     }
 
     // ── DÒNG LỆCH ───────────────────────────────────────────────────────────────────────────────
@@ -305,7 +361,10 @@ public class DoiSoatAppService : ApplicationService, IDoiSoatAppService
         var conLai = await AsyncExecuter.CountAsync(
             (await _dongLech.GetQueryableAsync()).Where(x => x.ReconRunId == reconRunId && !x.DaXuLy));
 
-        return ChuyenDto(luot, conLai);
+        var ketQua = ChuyenDto(luot, conLai);
+        await GanTenNguoiXacNhanAsync([ketQua]);
+
+        return ketQua;
     }
 
     /// <summary>

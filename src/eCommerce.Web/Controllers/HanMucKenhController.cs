@@ -49,8 +49,11 @@ public class HanMucKenhController : Controller
     ///
     /// 🆕 `S7` — **LỌC THEO KHO + PHÂN TRANG** (bàn giao §7 việc 6). 🔒 `trang` là **1-based** ở URL;
     /// `SkipCount` tính ở đây (📌 để view không phải biết API dùng 0-based — chỗ dễ lệch một đơn vị).
+    /// 🆕 **`sua`** = Id dòng cần **ĐIỀN SẴN** vào form (nút *"Sửa"* trong bảng, đóng nợ §18.7 #3).
+    /// 🔒 Nó **chỉ điền sẵn** — đường ghi vẫn là **một** (`POST DatHanMuc`, upsert theo `(kênh, kho)`)
+    /// ⇒ không sinh ra "hai đường ghi" cho cùng một khoá nghiệp vụ.
     /// </summary>
-    public async Task<IActionResult> Index(string? kenh = null, string? kho = null, int trang = 1)
+    public async Task<IActionResult> Index(string? kenh = null, string? kho = null, int trang = 1, Guid? sua = null)
     {
         const int soMoiTrang = 20;
 
@@ -97,6 +100,7 @@ public class HanMucKenhController : Controller
         ViewBag.KhoKhaDung = cacKho;
         ViewBag.Trang = trangHopLe;
         ViewBag.SoMoiTrang = soMoiTrang;
+        ViewBag.SuaId = sua;
 
         return View(new HanMucKenhManHinhDto
         {

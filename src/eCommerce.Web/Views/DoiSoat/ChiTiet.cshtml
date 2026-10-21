@@ -79,7 +79,20 @@
 {
     <div class="alert alert-success" id="doisoat-xac-nhan">
         <strong>Đã xác nhận</strong> lúc @Model.Luot.ConfirmedAtUtc?.ToString("yyyy-MM-dd HH:mm:ss") UTC
-        (người xác nhận: <code>@Model.Luot.ConfirmedByUserId</code>).
+        (người xác nhận:
+        @* 🔒 TÊN (tra ở app service) thay vì GUID; không tra được ⇒ nói RÕ, không đoán.
+           📌 Neo ASCII `[DOISOAT-NGUOI-XAC-NHAN]` để bộ đo khẳng định **ĐÚNG người** — không đo bằng
+           chuỗi "admin" trần (⛔ bài học §5.2: `>admin<` còn khớp `<option>` của dropdown tài khoản). *@
+        <code class="text-muted">[DOISOAT-NGUOI-XAC-NHAN]</code>
+        @if (!string.IsNullOrWhiteSpace(Model.Luot.ConfirmedByName))
+        {
+            <strong>@Model.Luot.ConfirmedByName</strong>
+        }
+        else
+        {
+            <code title="Không tra được tên từ AbpUsers — GUID vẫn là nguồn sự thật">@Model.Luot.ConfirmedByUserId</code>
+            <span class="small">(không tra được tên)</span>
+        }).
         <div>Ghi chú: @Model.Luot.ConfirmNote</div>
         <div class="small text-muted">Cảnh báo đã đóng. Tồn kho/sổ cái <strong>KHÔNG</strong> bị sửa — các dòng lệch vẫn phải xử lý riêng.</div>
     </div>

@@ -135,7 +135,20 @@ else
                             {
                                 <span class="badge bg-success">đã xác nhận</span>
                                 <div class="text-muted">
-                                    @luot.ConfirmedAtUtc?.ToString("yyyy-MM-dd HH:mm") UTC
+                                    @* 🔒 TÊN người xác nhận (tra ở app service) — 📌 nếu không tra được thì hiện
+                                       GUID rút gọn + nói RÕ "không tra được tên", KHÔNG hiện "(không rõ)"
+                                       (mất khả năng phân biệt *"tài khoản đã bị xoá cứng"* với *"lỗi tra cứu"*). *@
+                                    <code class="text-muted">[DOISOAT-NGUOI-XAC-NHAN]</code>
+                                    @if (!string.IsNullOrWhiteSpace(luot.ConfirmedByName))
+                                    {
+                                        <strong>@luot.ConfirmedByName</strong>
+                                    }
+                                    else
+                                    {
+                                        <code title="Không tra được tên từ AbpUsers — GUID vẫn là nguồn sự thật">@(luot.ConfirmedByUserId?.ToString("N").Substring(0, 8))…</code>
+                                        <span class="small">(không tra được tên)</span>
+                                    }
+                                    · @luot.ConfirmedAtUtc?.ToString("yyyy-MM-dd HH:mm") UTC
                                 </div>
                                 <div class="text-muted">@luot.ConfirmNote</div>
                             }

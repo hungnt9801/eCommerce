@@ -1024,6 +1024,31 @@ select count(*)::text from "InvChannelLimits" where "Id" in ('e0000000-0000-0000
         (($htmlLocHai -match $mau7) -and ($htmlLocHai -notmatch $mau13)) `
         'kenh=web&kho=<kho>'
 
+    # ── ③b NÚT "SỬA" ĐIỀN SẴN (nợ `INV-003` §18.7 #3) ─────────────────────────────────────────
+    # 🔒 Neo ASCII: `[HANMUCKENH-SUA]` (chú thích dưới bảng) + `sua=<id>` trên liên kết.
+    Kq 'S7-H9 /HanMucKenh co NUT SUA (lien ket `sua=<id>`)' `
+        (($htmlLocKho -match '\[HANMUCKENH-SUA\]') -and ($htmlLocKho -match ('sua=' + $idHanMucKho))) `
+        'nut Sua tro toi dung dong'
+
+    # 🚨 **ĐO CẢ HAI CHIỀU cho form điền sẵn:** mở `?sua=<id>` ⇒ form **CÓ** giá trị của dòng đó;
+    # ⚠️ và mở trang **không** `sua` ⇒ form **KHÔNG** mang giá trị đó (nếu không, "luôn điền 7" cũng xanh).
+    $suaTrang = TaiTrang -DuongDan ('/HanMucKenh?kho=' + $idKhoProbe + '&sua=' + $idHanMucKho) -TepLuu (Join-Path $thuMucTam 'hanmuc-sua.html')
+    $htmlSua = GiaiMaHtml $suaTrang.Html
+
+    $mauGiaTri7 = 'name="giaTri"[^>]*value="7"'
+
+    Kq 'S7-H10 🚨 mo ?sua=<id> => form DIEN SAN gia tri cua dong (7)' `
+        ($suaTrang.Ma -eq '200' -and $htmlSua -match $mauGiaTri7) ("HTTP " + $suaTrang.Ma)
+
+    Kq 'S7-H11 🚨 form dien san DUNG DON VI cua dong (Absolute)' `
+        ($htmlSua -match 'value="Absolute"\s+selected') 'o chon don vi duoc chon san'
+
+    Kq 'S7-H12 🚨 form dien san DUNG KHO cua dong' `
+        ($htmlSua -match ('value="' + $idKhoProbe + '"\s+selected')) 'o chon kho duoc chon san'
+
+    Kq 'S7-H13 chieu nguoc: KHONG co ?sua => form KHONG dien san 7 (khong "luon dien")' `
+        ($htmlLocKho -notmatch $mauGiaTri7) 'trang thuong: value="0"'
+
     # ── ④ GIEO MỘT LƯỢT ĐỐI SOÁT **ĐANG CHỜ XÁC NHẬN** + 3 DÒNG LỆCH ────────────────────────
     # 🔒 Ba dòng được chọn để **phân biệt được luật retention**:
     #   • `ec` = CHƯA xử lý, **cũ** 400 ngày  ⇒ 🔒 phải GIỮ (việc còn nợ);
@@ -1125,6 +1150,20 @@ select "Id"::text from "AbpUsers" where "NormalizedUserName" = 'ADMIN';
         Kq 'S7-D11 sau khi xac nhan => hien "Da xac nhan" va KHONG con form' `
             (($htmlSau -match 'Đã xác nhận') -and ($htmlSau -notmatch 'name="ghiChu"')) `
             'chong xac nhan lap vo ich'
+
+        # 🆕 TÊN người xác nhận (thay GUID) — 📌 neo ASCII để **không** đo bằng chuỗi "admin" trần
+        # (⛔ `>admin<` còn khớp `<option>` của dropdown tài khoản ở layout — bài học §5.2).
+        Kq 'S7-D12 🚨 hien TEN nguoi xac nhan (admin) thay vi chi GUID' `
+            ($htmlSau -match '\[DOISOAT-NGUOI-XAC-NHAN\][\s\S]{0,120}?<strong>admin</strong>') `
+            'tra ten tu AbpUsers o app service'
+
+        # 🔒 Và **trang danh sách** cũng phải hiện tên (nếu chỉ trang chi tiết có thì người trực vẫn phải bấm vào).
+        $dsSau = TaiTrang -DuongDan '/DoiSoat?chiChoXacNhan=false' -TepLuu (Join-Path $thuMucTam 'doisoat-ds-sau.html')
+        $htmlDsSau = GiaiMaHtml $dsSau.Html
+
+        Kq 'S7-D13 🚨 trang DANH SACH cung hien TEN nguoi xac nhan' `
+            ($htmlDsSau -match '\[DOISOAT-NGUOI-XAC-NHAN\][\s\S]{0,120}?<strong>admin</strong>') `
+            ("HTTP " + $dsSau.Ma)
     }
 
     # ── ⑥ RETENTION: XEM TRƯỚC **KHÔNG XOÁ**, DỌN THẬT **XOÁ ĐÚNG DÒNG** ──────────────────────

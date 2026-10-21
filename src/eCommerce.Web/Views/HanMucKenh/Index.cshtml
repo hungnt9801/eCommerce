@@ -14,6 +14,10 @@
     var khoKhaDung = ViewBag.KhoKhaDung as List<KhoKhaDungDto> ?? [];
     var trang = (int)(ViewBag.Trang ?? 1);
     var soMoiTrang = (int)(ViewBag.SoMoiTrang ?? 20);
+    var suaId = ViewBag.SuaId as Guid?;
+    // 🔒 Dòng cần sửa **nằm ngay trên trang đang xem** (liên kết sinh từ chính bảng) ⇒ không cần gọi API riêng.
+    //    ⚠️ Nếu không thấy (bookmark cũ / đã đổi trang) thì view **nói rõ** và KHÔNG điền sẵn gì.
+    var dongSua = suaId is null ? null : Model.DanhSach.Items.FirstOrDefault(x => x.Id == suaId);
     var chinhSach = Model.ChinhSach;
     var thongBao = TempData["ThongBaoHanMuc"] as string;
     var loi = TempData["LoiHanMuc"] as string;
@@ -295,6 +299,13 @@
                             </td>
                             <td class="text-muted small">@((d.LastModificationTime ?? d.CreationTime).ToString("yyyy-MM-dd HH:mm"))</td>
                             <td class="text-end">
+                                @* 🆕 `S7` — **SỬA**: đóng nợ `INV-003` §18.7 #3 (*"chưa có UI chọn `DonVi` khi
+                                   sửa dòng đã có"*). 🔒 Nút này **chỉ ĐIỀN SẴN** form bên dưới — nó **không** có
+                                   đường ghi riêng: lưu vẫn đi qua **cùng** `DatHanMuc` (upsert theo `(kênh, kho)`).
+                                   📌 Nhờ vậy không sinh ra "hai đường ghi" cho cùng một khoá nghiệp vụ. *@
+                                <a class="btn btn-sm btn-outline-secondary" asp-action="Index"
+                                   asp-route-kenh="@kenhDangLoc" asp-route-kho="@khoDangLoc" asp-route-sua="@d.Id"
+                                   title="Điền sẵn dòng này vào form bên dưới">Sửa</a>
                                 <form method="post" asp-action="XoaHanMuc" class="d-inline"
                                       onsubmit="return confirm('Xoá hạn mức này? Kênh sẽ quay về dùng giá trị dùng chung.');">
                                     @Html.AntiForgeryToken()
@@ -307,6 +318,7 @@
                     }
                 </tbody>
             </table>
+            <p class="px-3 pt-2 mb-0 small text-muted">[HANMUCKENH-SUA] Mỗi dòng có nút <em>Sửa</em> để điền sẵn form bên dưới.</p>
 
             @* 🆕 `S7` — PHÂN TRANG (nợ: bảng dài theo **số kênh × số kho**; tải hết là cách bảng cấu hình
                trở nên không ai dùng). 🔑 Mọi liên kết phải **giữ cả hai bộ lọc** `kenh` + `kho` — nếu không,
@@ -332,8 +344,27 @@
 </div>
 
 <div class="card">
-    <div class="card-header"><strong>Đặt / cập nhật hạn mức</strong></div>
+    <div class="card-header"><strong>@(dongSua is null ? "Đặt / cập nhật hạn mức" : "Sửa hạn mức")</strong></div>
     <div class="card-body">
+        @if (suaId is not null && dongSua is null)
+        {
+            @* ⚠️ Liên kết cũ/bookmark: dòng cần sửa **không có trên trang này** ⇒ nói RÕ thay vì hiện form trống
+               (📌 form trống mà người dùng tưởng "đã nạp dòng đó" ⇒ ghi đè một dòng khác bằng giá trị mặc định). *@
+            <div class="alert alert-warning">
+                Không tìm thấy dòng cần sửa trên trang hiện tại (có thể do bộ lọc/ trang đã đổi) ⇒
+                <a asp-action="Index" asp-route-kenh="@kenhDangLoc" asp-route-kho="@khoDangLoc">bỏ chế độ sửa</a>.
+            </div>
+        }
+        else if (dongSua is not null)
+        {
+            <div class="alert alert-info py-2">
+                Đang sửa <strong>@dongSua.ChannelCode</strong> ·
+                @(dongSua.WarehouseId is null ? "(cả kênh)" : (dongSua.WarehouseCode + " — " + dongSua.WarehouseName))
+                — 🔒 lưu là **upsert** theo khoá `(kênh, kho)`, không tạo dòng mới.
+                <a asp-action="Index" asp-route-kenh="@kenhDangLoc" asp-route-kho="@khoDangLoc">Huỷ</a>
+            </div>
+        }
+
         <form method="post" asp-action="DatHanMuc">
             @Html.AntiForgeryToken()
 
@@ -346,7 +377,7 @@
                         <option value="">— chọn kênh —</option>
                         @foreach (var k in kenhKhaDung)
                         {
-                            <option value="@k.Code">@k.Code — @k.Name@(k.IsActive ? "" : " (NGỪNG hoạt động)")</option>
+                            <option value="@k.Code" selected="@(dongSua?.ChannelCode == k.Code)">@k.Code — @k.Name@(k.IsActive ? "" : " (NGỪNG hoạt động)")</option>
                         }
                     </select>
                 </div>
@@ -356,32 +387,35 @@
                        `(kênh, kho)` với `WarehouseId NULL`. *@
                     <label class="form-label">Kho (trống = hạn mức cả kênh)</label>
                     <select class="form-select" name="warehouseId">
-                        <option value="">(cả kênh — WarehouseId NULL)</option>
+                        <option value="" selected="@(dongSua is not null && dongSua.WarehouseId is null)">(cả kênh — WarehouseId NULL)</option>
                         @foreach (var kh in khoKhaDung)
                         {
-                            <option value="@kh.Id">@kh.Code — @kh.Name@(kh.IsActive ? "" : " (NGỪNG dùng)")</option>
+                            <option value="@kh.Id" selected="@(dongSua?.WarehouseId == kh.Id)">@kh.Code — @kh.Name@(kh.IsActive ? "" : " (NGỪNG dùng)")</option>
                         }
                     </select>
                 </div>
                 <div class="col-md-2">
                     <label class="form-label">Giá trị (0 = TẮT)</label>
-                    <input class="form-control" type="number" step="any" min="0" name="giaTri" value="0" required />
+                    @* 🔒 Định dạng **InvariantCulture** + bỏ số 0 thừa (`7.0000` ⇒ `7`) — nếu không, ô số hiện
+                       "7.0000" và người dùng tưởng phải gõ phần thập phân. *@
+                    <input class="form-control" type="number" step="any" min="0" name="giaTri"
+                           value="@((dongSua?.GiaTri ?? 0m).ToString("0.####", System.Globalization.CultureInfo.InvariantCulture))" required />
                 </div>
                 <div class="col-md-2">
                     <label class="form-label">Đơn vị</label>
                     @* 🔑 De TRONG = **ke thua** setting chung (KHONG phai mot gia tri thu ba). *@
                     <select class="form-select" name="donVi">
-                        <option value="">(kế thừa chung: @chinhSach.DonVi)</option>
-                        <option value="Percent">Percent — % tồn khả dụng của TỪNG (kho, SKU)</option>
-                        <option value="Absolute">Absolute — số lượng tuyệt đối</option>
+                        <option value="" selected="@(dongSua is not null && string.IsNullOrWhiteSpace(dongSua.DonVi))">(kế thừa chung: @chinhSach.DonVi)</option>
+                        <option value="Percent" selected="@(dongSua?.DonVi == "Percent")">Percent — % tồn khả dụng của TỪNG (kho, SKU)</option>
+                        <option value="Absolute" selected="@(dongSua?.DonVi == "Absolute")">Absolute — số lượng tuyệt đối</option>
                     </select>
                 </div>
                 <div class="col-md-2">
                     <label class="form-label">Hành động (trống = Block)</label>
                     <select class="form-select" name="hanhDong">
-                        <option value="">(mặc định: Block — fail-closed)</option>
-                        <option value="Block">Block</option>
-                        <option value="Warn">Warn</option>
+                        <option value="" selected="@(dongSua is null)">(mặc định: Block — fail-closed)</option>
+                        <option value="Block" selected="@(dongSua?.HanhDong == "Block")">Block</option>
+                        <option value="Warn" selected="@(dongSua?.HanhDong == "Warn")">Warn</option>
                     </select>
                 </div>
                 <div class="col-md-2">

@@ -54,6 +54,15 @@ public class LuotDoiSoatDto
     /// <summary>Ai xác nhận (`AbpUsers.Id`) — `null` khi chưa xác nhận.</summary>
     public Guid? ConfirmedByUserId { get; set; }
 
+    /// <summary>
+    /// 🆕 Tên người xác nhận (tra từ `AbpUsers`) — 📌 **để màn hình không hiện GUID**.
+    ///
+    /// 🔒 **`null` có nghĩa là "KHÔNG TRA ĐƯỢC", và UI phải nói rõ như vậy** (rơi về GUID rút gọn) —
+    /// ⚠️ nếu UI hiện *"(không rõ)"* thì người kiểm toán **không phân biệt** được *"tài khoản đã bị xoá cứng"*
+    /// với *"lỗi tra cứu"*. 📌 `ConfirmedByUserId` vẫn là **nguồn sự thật**; tên chỉ để **đọc**.
+    /// </summary>
+    public string? ConfirmedByName { get; set; }
+
     public DateTime? ConfirmedAtUtc { get; set; }
 
     /// <summary>Vì sao chấp nhận lệch — **bắt buộc** khi xác nhận (audit).</summary>

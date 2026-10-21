@@ -41,7 +41,7 @@ và phiên trước từng **nói quá "GĐ1 hoàn thành"** vì **không đo l�
 [B5]  mermaid (parser thật)            4.2s   ·  213 khối · 0 lỗi
 [B6]  bất biến DB                      6.6s   ·   25/25 · NND = 53 · 62 quyền · quét 86 vị trí probe
 [B7]  test cho chính các cổng         82.1s   ·   24 ca (A…I + R…V + L…P + W)
-[B8]  E2E có phiên đăng nhập          27.4s   ·   95/95   ← 🆕 `S7` +28 ca (hạn mức + đối soát)
+[B8]  E2E có phiên đăng nhập          26.7s   ·  102/102   ← 🆕 `S7` +35 ca (hạn mức + đối soát)
 [B9]  sổ địa chỉ HTTP thật            14.6s   ·   17/17
 [B10] khách hàng HTTP thật            15.5s   ·   26/26
 [B11] thanh toán HTTP thật            13.1s   ·   26/26
@@ -58,9 +58,14 @@ NND **52** / bất biến DB **24/24** / **85** chỗ quét ⇒ **mọi số kh�
 • **CUỐI phiên** (**12 bước**, bước ⑫ có **49 ca** — thêm cổng hạ cờ): **290.8s**.
 • 🆕 **`S7` đo HAI lần**: **ĐẦU phiên** (**12 bước**, `exit 0`): **301.5s** với unit **1367** / integration **67** /
 NND **53** / DB **25/25** / **61** quyền / E2E **67/67** ⇒ **mọi số khớp bảng `S6`** ở trên (⚠️ riêng **thời gian
-cao hơn ~11 %** — máy, không phải sản phẩm). **CUỐI phiên**: **241.8s** như bảng trên, và **lần chạy lại trên
-cây ĐÃ COMMIT: 250.4s · `exit 0`** — 📌 **cùng số ca** (1395 · 71 · **95/95** · 25/25 · NND 53 · 62 quyền),
-chỉ khác **thời gian** ⇒ dao động của **máy**.
+cao hơn ~11 %** — máy, không phải sản phẩm). **CUỐI phiên**: **241.8s** như bảng trên, **lần chạy lại trên
+cây ĐÃ COMMIT: 250.4s · `exit 0`**, và **lần chạy CUỐI (sau khi đóng hai nợ UI: tên người xác nhận + nút
+"Sửa" điền sẵn): 289.2s · `exit 0`** — 📌 **cùng số ca** ở cả ba lần (1395 · 71 · **102/102** · 25/25 ·
+NND 53 · 62 quyền), chỉ khác **thời gian** ⇒ dao động của **máy**.
+📌 **`S7` còn một lần dừng vì MÔI TRƯỜNG (không phải mã):** Docker Desktop đã tắt sau khi máy khởi động lại ⇒
+`docker compose up -d` lại `ecommerce-postgres` + `ecommerce-redis` rồi mới chạy được probe. 🔑 **Triệu chứng**
+là `psql THAT BAI … failed to connect to the docker API` — 📌 dừng lại và **đọc thông điệp** là đủ để không đi
+sửa mã nguồn.
 📌 **Và một lần cổng ĐỎ THẬT giữa phiên `S7`** (đáng ghi vì nó là *bài học của chính bước ⑥*): lần chạy thứ hai
 bị **huỷ giữa bước ⑪** ⇒ để lại **1 dòng `PayTransactions`** + **cờ `ShouldChangePasswordOnNextLogin = false`**
 ⇒ lần chạy kế tiếp **ĐỎ ở bước ⑥** (2 bất biến: *"① phải rỗng"* và *"② bảo mật"*). ✅ Dọn tay rồi đo lại ⇒ **xanh**.
@@ -117,7 +122,7 @@ dùng chung luật + `ReconRetentionWorker` + migration `Up()` — phần lớn 
 | **67** integration | **71** | `S7` **+4** — `CK_ReconRuns_XacNhan_DuBo` đo **HAI CHIỀU** trên PostgreSQL thật |
 | **53** `NND` · **61** quyền | **53 · 62 quyền** | `S7` **+1 permission** (`eCommerce.Reconciliation.Confirm`, khai **hai nơi**) ⇒ `AbpPermissionGrants` **61 → 62**; **NND giữ 53** (chỉ thêm **1 index THƯỜNG** cho retention, không thêm unique) |
 | **40** migration | **41** | `S7` **+1** (`20261018104518_S7_XacNhanVaRetentionDoiSoat`): **3 cột** + **1 `CHECK`** + **1 index thường** |
-| **67** ca E2E | **95** | `S7` **+28 ca** (mục `S7` của `kiem-e2e.ps1`: **8** hạn mức · **11** xác nhận · **9** retention) |
+| **67** ca E2E | **102** | `S7` **+35 ca** (mục `S7` của `kiem-e2e.ps1`: **13** hạn mức · **13** xác nhận · **9** retention) |
 | **25** bất biến DB · **86** chỗ quét | **25 · 86** | **không đổi** — `S7` chỉ thêm **cột** (không thêm bảng), và thêm **1 dòng** vào danh sách **quyền bắt buộc** của `kiem-db.ps1` |
 | **347** tệp · **42.437** dòng · test **111** tệp / **17.940** dòng | **350 tệp · 43.380 dòng** · test **114** tệp / **18.317** dòng | `S7` **+3 tệp sản phẩm** (`DoiSoatRetention` + `ReconRetentionWorker` + migration `Up()`) · **+3 tệp test** |
 | **290.8s** | **241.8s** | ⚠️ **đổi theo máy** — 📌 đầu phiên `S7` đo **301.5s** (cùng mã **trước** khi sửa, `exit 0`) ⇒ **không** phải chỉ tiêu |
