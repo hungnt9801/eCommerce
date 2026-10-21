@@ -161,6 +161,30 @@ public class CiWorkflowTests
     }
 
     /// <summary>
+    /// 🚨 **`DbMigrator` phải chạy TRƯỚC bước cổng** (`S11`, đo được ở lần chạy GitHub Actions **đầu tiên**).
+    ///
+    /// 📌 Runner **sạch** có PostgreSQL **TRỐNG**. Bước ⑥ (`kiem-db.ps1`) chết ngay với
+    /// `relation "AbpSettings" does not exist`, và E2E/probe không có bảng/quyền. 🔑 Máy dev **không** lộ ra
+    /// vì DB đã được migrate từ trước — đúng loại *"phụ thuộc đã có sẵn trên máy"* mà đọc mã không thấy.
+    /// 🔒 Đòi **`DbMigrator`** (không phải `dotnet ef database update`): thiếu **seed** thì probe nhận
+    /// `401`/`403` dù schema đúng.
+    /// </summary>
+    [Fact]
+    public void DbMigrator_phai_chay_truoc_buoc_cong()
+    {
+        var vanBan = NoiDungKhongChuThich(DocTatCaWorkflow(TimGocRepo()));
+
+        Assert.Contains("dotnet run --project src/eCommerce.DbMigrator", vanBan);
+
+        var viTriMigrate = vanBan.IndexOf("src/eCommerce.DbMigrator", StringComparison.Ordinal);
+        var viTriCong = vanBan.IndexOf("kiem-tat-ca.ps1", StringComparison.Ordinal);
+
+        Assert.True(viTriCong >= 0, "Workflow KHÔNG gọi cổng.");
+        Assert.True(viTriMigrate < viTriCong,
+            "🚨 DbMigrator phải đứng TRƯỚC bước cổng (runner sạch có PostgreSQL TRỐNG).");
+    }
+
+    /// <summary>
     /// 🚨 **Sau khi cổng chạy, PHẢI khẳng định đầu ra** (`ci-khang-dinh.ps1`) — `exit 0` không chứng minh
     /// bước ⑧ đã chạy (`XC-007` D4/BR-003).
     /// </summary>

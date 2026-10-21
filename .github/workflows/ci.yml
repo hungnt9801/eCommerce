@@ -137,6 +137,16 @@ jobs:
           # 📌 `--no-incremental`: buoc kiem moc can nhi phan duoc GHI LAI (mtime doi) de phep kiem co nghia.
           dotnet build eCommerce.slnx -v m --no-incremental -nodeReuse:false
 
+      - name: '8b. Migrate + seed (DB TRONG tren runner - dieu kien cua buoc (6) va E2E)'
+        run: |
+          # 🚨 `S11` (21/10/2026) - LO RA O LAN CHAY THAT DAU TIEN: runner SACH co PostgreSQL TRONG
+          #    ⇒ buoc (6) chet voi `relation "AbpSettings" does not exist`, va E2E/probe cung khong co
+          #    bang/quyen. May dev KHONG lo ra vi DB da duoc migrate tu truoc.
+          #    🔑 *"mot phu thuoc da co san tren may"* la loai loi khong the thay bang cach doc ma.
+          # 📌 Dung `DbMigrator` (migration + seed quyen/admin), KHONG dung `dotnet ef database update`:
+          #    chi update schema thi thieu seed ⇒ probe nhan 401/403 du schema dung.
+          dotnet run --project src/eCommerce.DbMigrator --no-build -c Debug
+
       - name: '9. Xoa log cu - bang chung PHAI la cua lan chay NAY'
         shell: pwsh
         run: |
