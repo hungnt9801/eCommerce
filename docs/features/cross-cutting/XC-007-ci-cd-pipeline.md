@@ -1235,9 +1235,11 @@ copy **sạch** (không `bin/`, không `obj/`, không `.git`) đúng như một 
 
 ## 17. TIẾN ĐỘ TRIỂN KHAI — phiên `S11` (21/10/2026): CỔNG CI CHẠY THẬT LẦN ĐẦU
 
-> ✅ **ĐÃ CÓ MỘT LẦN CHẠY XANH TRÊN GITHUB ACTIONS.**
+> ✅ **ĐÃ CÓ HAI LẦN CHẠY XANH LIÊN TIẾP TRÊN GITHUB ACTIONS** — cùng phán quyết, cùng số ca (**NFR-009**).
 > [`actions/runs/39584055189`](https://github.com/hungnt9801/eCommerce/actions/runs/39584055189) · commit
-> `d6df51f` · `verdict = Passed` · **5 phút 56 giây** (workflow) · cổng `-DayDu` **216.7 s** · **12/12 bước**.
+> `d6df51f` · **5m56s** · cổng **216.7 s** · **12/12 bước**.
+> [`actions/runs/39585851870`](https://github.com/hungnt9801/eCommerce/actions/runs/39585851870) · commit
+> `df83392` (**chỉ tài liệu**) · **5m59s** · cùng **1422 · 71 · 213 · 25/25 · 38/38 · 133** · `verdict = Passed`.
 > ⚠️ **NHƯNG required check + branch protection VẪN CHƯA BẬT** (chủ dự án chọn hoãn ngày 21/10/2026) ⇒
 > *"cổng không chạy tự động thì không phải cổng"* nay chỉ còn **một nửa**: cổng **chạy** mỗi lần push,
 > nhưng **không chặn** merge. 📌 Xem §17.4 — **không** được nói *"cổng đã bảo vệ `main`"*.
@@ -1298,7 +1300,7 @@ DB **4.3 s** · cổng-của-cổng **60.3 s** · E2E **36.9 s** · 4 probe **14
 | 3 | **Environment `production`** + `release.yml` | Cần staging + secrets; `Q3`/`Q4`/`Q5` còn `Open` | Chưa có bước phát hành |
 | 4 | **Sự kiện `pull_request` / `schedule` / `workflow_dispatch`** | Lần chạy xanh là `push` lên `main` | Chưa chứng minh cổng trên PR (nơi required check sẽ dùng) |
 | 5 | **`abp install-libs` trên runner** | Bước 7 **xanh** trong lần chạy này | ✅ Đã trả lời câu hỏi §16.4 #5 (không còn `chưa kiểm chứng`) |
-| 6 | **Release/rollback + NFR-009 (2/2 lần cùng phán quyết)** | Mới có **1** lần CI xanh + **2** lần local xanh cùng số ca. Lần chạy thứ hai trên `main` sẽ là commit tài liệu (mã không đổi) | 📌 Cần thêm một lần chạy trên **mã khác** để nói "tái lập" |
+| 6 | **Release/rollback + NFR-009 (2/2 lần cùng phán quyết)** | ✅ **ĐÃ ĐO:** 2 lần CI xanh liên tiếp (`d6df51f` mã + `df83392` tài liệu) **cùng** `verdict` và **cùng** số ca (1422 · 71 · 213 · 25/25 · 38/38 · 133) · ➕ 2 lần local (`247.3s` / `248.1s`) | ⚠️ Lần thứ hai là **commit tài liệu** ⇒ **chưa** chứng minh tái lập trên **mã khác** |
 
 ### 17.5 Bài học của `S11`
 
