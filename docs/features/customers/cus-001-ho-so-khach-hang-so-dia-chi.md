@@ -2052,7 +2052,7 @@ CHẾ, không phải một lời nhắc.** ✅ Chữa ngay lượt này: sau khi
 **2** | **Chưa có cảnh báo khi xuất LẶP LẠI bất thường** | 🔑 Bảng đã **đủ dữ liệu** (📌 và vì thế tôi **cố ý** không đặt unique index ở §22) |
 **3** | **Chưa phân trang** | 📌 Tạm chấp nhận (trần **100**/CSV, **500**/API + lọc ngày + lọc người) |
 **4** | ⚠️ **Múi giờ: ngày trên form là UTC** | 🔑 Nhất quán với `XuatLucUtc` — 📌 nhưng **chưa có chỉ dẫn** cho người dùng ở múi giờ khác |
-**5** | ⚠️ **CSV dùng dấu phẩy — chưa hỗ trợ `;` cho locale Excel** | 📌 Ở một số locale, Excel mặc định `;` ⇒ 🔒 tệp **thành một cột**; ⚠️ BOM **giúp ích nhưng không giải quyết hết** — **nợ thật** |
+**5** | ✅ **ĐÃ ĐÓNG — `S10` (21/10/2026)**: **CSV CÓ hỗ trợ `;`** cho locale Excel dùng `,` làm dấu thập phân | 📌 `CsvNhatKy.PhanCachChamPhay` + `DongVoi` + `DocPhanCach`; `/KhachHang/NhatKyCsv?phanCach=cham-phay`; **hai liên kết** trên màn hình; tệp **tự khai** dấu phân cách. 📄 **§29** — 📌 nợ `Mau01CsvExporter` (tờ khai thuế) **vẫn mở**, xem §29.4 |
 **6** | **Chưa có test `toiDa` ở tầng unit** | 🔑 Hiện đo qua E2E (`D16a`–`D16d`) |
 **7** | **Chưa gồm dữ liệu module khác** (địa chỉ giao, thanh toán, thuế) | ⚠️ **Nợ chặn** (`Address` chưa tồn tại) |
 
@@ -2215,3 +2215,51 @@ ghi). 🔑 **Một bất biến mô tả sai sự thật thì không phải bấ
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.9 | 18/10/2026 | *(agent, session `S3`)* | **§28 — LÁT CẮT 12: `S3` ĐÓNG `CUS-001`**: ✅ **nối cổng `ChoPhepGiaoDichAsync` vào đường bán hàng** (🚨 **LỖI THẬT**: hàm định nghĩa 1 nơi, gọi 0 nơi ⇒ **khách `Blocked` vẫn đặt được hàng**) — cổng gom về `CuaKiemKhachGiaoDich` (**một** định nghĩa, **hai** chỗ gọi: checkout + tạo đơn), **NÉM** (`0005`) thay vì trả `bool`, đặt **TRƯỚC mọi tác dụng phụ** ⇒ probe chứng minh **0 lượt giữ chỗ · 0 sổ giải trình · 0 đơn** · **`CustomerGroup` API + seed** (3 nhóm, idempotent **theo mã**) + quyền mới `Customers.ManageGroups` (**hai nơi**, grants **57 → 58**) + ánh xạ `0008` ⇒ **`409`** · **phân trang** `PagedResultDto` (đếm **trước** khi cắt trang) + `/KhachHang?trang=N` có **tổng số** · **đường web mang khách vào đơn** (`KhachId` — trước đó đơn web **không thuộc về ai**, lỗ hổng bản xuất PII). 📊 **Test:** unit **1219 → 1228** · E2E **59 → 67** · probe mới **26/26** · DB **23/23** (bất biến `CusGroups`: ① → **①b**, **mạnh hơn**). 🐞 **5 lỗi của tôi — cả 5 là lỗi PHÉP ĐO** (DLL cũ do phép tiêm để lại · kiểm DLL bằng chuỗi **không phân biệt được** hai bản · `IndexOf` khớp **chuỗi con** `TimGiuChoAsync` · `DungDuoc` **không phải cột** · bất biến *"`CusGroups` phải rỗng"* **mô tả sai sự thật**). ⏳ Nợ mới: UI nhóm khách · **gán** khách vào nhóm · **xoá** nhóm (cần người quyết) |
+| v1.10 | 21/10/2026 | *(agent, session `S10`)* | **§29 — LÁT CẮT 13: DẤU PHÂN CÁCH `;` CHO EXCEL LOCALE VIỆT** — 🚨 **đóng nợ §27.6 #5**, một nợ **đã đi qua 4 lát cắt** mà không ai đóng (vì nó *"không làm đỏ cổng nào"*). ✅ `CsvNhatKy` nay có **`PhanCachChamPhay`** + `DongVoi(phanCach, …)` (**một** quy tắc bọc cho **cả hai** chế độ) · `DocPhanCach` (giá trị **lạ ⇒ `null`**) · tệp **tự khai** dấu phân cách · tên tệp có **hậu tố `-cham-phay`** · `/KhachHang/NhatKyCsv?phanCach=phay\|cham-phay` (**giá trị lạ ⇒ `400`**) · **hai liên kết** trên màn hình. 📊 unit **+6** (`TC12`…`TC17`) · E2E **+10** (`D17a`…`D17j`, **đo hai chiều**). 🔑 **BOM không cứu được dấu phân cách** — hai việc khác nhau. ⏳ Còn: `Mau01CsvExporter` (tờ khai thuế) vẫn dấu phẩy — **nợ riêng của `TAX`, không đóng ở đây** |
+
+---
+
+## 29. ✅ **LÁT CẮT 13 — `S10`: DẤU PHÂN CÁCH `;` CHO EXCEL LOCALE VIỆT** (21/10/2026) — *đóng nợ §27.6 #5*
+
+### 29.1 🔑 Vì sao — và một câu dễ tưởng đã hiểu
+
+Nợ **§27.6 #5** nói: *"CSV dùng dấu phẩy — chưa hỗ trợ `;` cho locale Excel"*. Nó **đúng**, và nó **đã nằm đó
+qua §27 → §28** mà không đóng — 📌 lý do: **nó không làm đỏ cổng nào** (một tệp bằng chứng đọc sai **vẫn trả
+`HTTP 200`**).
+
+🔒 **Và đây là chỗ dễ hiểu sai nhất, nên ghi thành một câu:**
+
+> **BOM và dấu phân cách là hai việc KHÁC NHAU.** `BOM` nói *"tệp này là UTF-8"*; **dấu phân cách** nói
+> *"cột ngăn nhau bằng ký tự nào"*. Ở locale dùng `,` làm **dấu thập phân** (tiếng Việt, Đức, Pháp…), Excel
+> coi `;` là dấu ngăn danh sách ⇒ 🔒 một tệp `,` được mở thành **ĐÚNG MỘT CỘT** — **dù có BOM**.
+
+### 29.2 🔒 Ba quyết định (mỗi cái chặn một cách hỏng)
+
+| # | Quyết định | Vì sao (không phải phong cách) |
+|---|---|---|
+| **1** | **HAI liên kết trên UI** — `phay` và `cham-phay`; **KHÔNG đổi ngầm định** | 🔒 Đổi ngầm định thành `;` sẽ **phá** mọi trình đọc đang đúng (RFC 4180) và **đổi nghĩa** các tệp đã xuất. ✅ Người dùng **chọn**, và 📌 họ **thấy** mình đang chọn bản nào |
+| **2** | Tham số URL là **chuỗi chữ** (`phay`/`cham-phay`), ⚠️ **không** phải ký tự `;`; 🚨 **giá trị lạ ⇒ `400`** | `;` trong query string bị một số tầng (proxy/bộ định tuyến) cắt thành **dấu ngăn tham số** ⇒ 🔒 tham số **mất im lặng**. ➕ Và **rơi im lặng về dấu phẩy** khi gõ sai (`?phanCach=champhay`) ⇒ 📌 người kiểm toán nhận **tệp SAI** mà **tưởng** đang cầm bản `;` — đúng loại lỗi của tệp bằng chứng |
+| **3** | Tệp **tự khai** dấu phân cách (`Dau phan cach (delimiter): …`) **và** tên tệp có hậu tố `-cham-phay` | 🔑 Tệp **rời khỏi hệ thống** ⇒ người nhận phải biết đọc bằng dấu nào. 📌 Và hai bản khác dấu mà **cùng tên** thì tải về cùng thư mục trình duyệt thêm `(1)` ⇒ **không còn biết bản nào là bản nào** |
+
+➕ **Một quy tắc bọc DUY NHẤT cho cả hai chế độ** (`Boc` luôn bọc): ⚠️ nếu mỗi chế độ có cách bọc riêng thì
+*"luật chỉ một chỗ"* của `CsvNhatKy` **mất hiệu lực**, và 📌 lỗi chỉ hiện ở **một** trong hai chế độ — đúng loại
+lỗi **không tái hiện được**.
+
+### 29.3 ✅ Kiểm chứng — và chứng minh cổng **ĐỎ được**
+
+| Tầng | Ca | Đo được |
+|---|---|---|
+| Unit | `TC12`…`TC17` (**+6**) | `;` là phân cách **thật** (không chỉ đổi tên) · dữ liệu chứa dấu phân cách vẫn **một trường** (**cả hai chế độ**) · dấu lạ ⇒ **NÉM** · tiền đề **tự khai** dấu phân cách · `DocPhanCach`: `""`/`phay`/`cham-phay`/`CHAM-PHAY` hợp lệ, **`champhay`/`;`/`dau-cham-phay` ⇒ `null`** · tên tệp **khác nhau** |
+| E2E | `D17a`…`D17j` (**+10**) | tệp `;` có thật + **BOM** · tên tệp `-cham-phay` · tiêu đề **8 trường** với `;` · **tự khai** · escape RFC 4180 **giống hệt** bản `,` · 🚨 **CHIỀU NGƯỢC**: tệp `;` **không** dùng `,` **và** tệp `,` **không** dùng `;` · `phanCach=sai` ⇒ **`400`** · UI **có** liên kết |
+
+🚨 **Phép tiêm (mutation) — để chứng minh ca kiểm KHÔNG luôn xanh:** đổi `DongVoi` thành
+`string.Join(PhanCachPhay, …)` (bỏ qua tham số) ⇒ **`TC12`/`TC13`/`TC15` ĐỎ**; hoàn nguyên ⇒ xanh.
+📌 *"Luôn đúng"* và *"không hoạt động"* **trông giống hệt nhau** nếu không tiêm.
+
+### 29.4 ⏳ Nợ còn lại (ghi rõ để không ai tưởng đã xong)
+
+| # | Nợ | Ghi chú |
+|---|---|---|
+| **1** | ⚠️ **`Mau01CsvExporter` (tờ khai thuế) vẫn dùng `,`** | 📌 **Nợ riêng của `TAX`**, không đóng ở đây: nó là tệp **kê khai**, đầu ra có thể được **nạp vào hệ thống khác** ⇒ 🔒 đổi dấu phân cách cần **người quyết** (đúng luật §15.1: không tự chọn đáp án) |
+| **2** | ⚠️ **Người dùng vẫn phải BIẾT chọn bản nào** | 📌 Nhãn ghi *"Excel tiếng Việt"* — ✅ đủ cho người quen Excel; ⚠️ chưa có **chỉ dẫn theo locale** trong tài liệu người dùng |
+

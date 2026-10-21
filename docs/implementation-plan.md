@@ -634,7 +634,7 @@ khi Order intake đăng ký handler cho `ChannelOrderPulledEto`, fail-closed **t
 | 5 | `docs/coding-conventions.md` + `.editorconfig` | ✅ **XONG (14/10/2026)** |
 | 6 | Migration `NULLS NOT DISTINCT` cho mọi unique index có `TenantId` | ✅ **XONG** — **19** index `NULLS NOT DISTINCT`, có test đối chiếu **đích danh tên index** |
 | 7 | 2 test reflection `XC-004` TC-01/TC-02 trong CI | ✅ **XONG (14/10/2026)** — `BatBienPhanQuyenTests` (**5** test) + **kiểm chứng ngược bằng đột biến** |
-| 8 | Observability (JSON console, `CorrelationId`, `/health-status`, mức log production) | 🟡 **một phần** — đã wire `UseCorrelationId` + `/health-status` + middleware đo độ trễ; **5/12 metric chưa có nơi phát** |
+| 8 | Observability (JSON console, `CorrelationId`, `/health-status`, mức log production) | 🟡 **một phần** — đã wire `UseCorrelationId` + `/health-status` + middleware đo độ trễ. ✅ **`S10` (21/10/2026) ĐO LẠI thay vì khai báo:** **11/15** metric **có** nơi phát · **4/15** **chưa** (`messaging_outbox_pending` · `messaging_dlq_replayed_total` · `lock_ttl_exceeded_total` · `logging_failures_total`) — 📌 cả 4 cần **hạ tầng mới**. 🔒 Từ nay con số này **có phép kiểm hai chiều** (`MetricEmitterTests`) ⇒ không thể trôi. 📄 `XC-005` **§19** |
 
 > 🚨 **Vì sao #3 (Outbox/Inbox + DLQ) vẫn HOÃN:** **không có message broker** (chỉ PostgreSQL + Redis).
 > Outbox bảo đảm *giao tin cậy* — nhưng giao **cho không ai** thì dữ liệu **vẫn mất**. **Thứ tự đúng:

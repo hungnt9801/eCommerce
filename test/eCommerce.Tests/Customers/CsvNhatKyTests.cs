@@ -163,14 +163,121 @@ public class CsvNhatKyTests
         Assert.All(truong, t => Assert.DoesNotContain("\"", t, StringComparison.Ordinal));
     }
 
+    // ── ⑤ DẤU PHÂN CÁCH `;` CHO EXCEL LOCALE VIỆT (`S10`, nợ §27.6 #5) ───────────────────────
+
+    [Fact]
+    public void TC12_cham_phay_la_dau_phan_cach_THAT__khong_chi_doi_ten()
+    {
+        // 🚨 **NỢ §27.6 #5:** ở locale dùng `,` làm **dấu thập phân** (tiếng Việt), Excel coi `;` là
+        // **dấu ngăn cách danh sách** ⇒ 🔒 tệp `,` mở ra thành **ĐÚNG MỘT CỘT**.
+        // ⚠️ **BOM không cứu được** — BOM là **bảng mã**, không phải **dấu phân cách** (hai việc khác nhau;
+        // 📌 đây chính là chỗ dễ kết luận sai: *"đã có BOM nên Excel đọc được"* — không đúng).
+        var dong = CsvNhatKy.DongVoi(CsvNhatKy.PhanCachChamPhay, "a", "b,c", "d");
+
+        Assert.Equal("\"a\";\"b,c\";\"d\"", dong);
+
+        // 🔑 Và **đếm bằng bộ đọc thật** (không đếm dấu `;`): 3 trường, trường 2 giữ nguyên `b,c`.
+        var truong = DocDongCsv(dong, CsvNhatKy.PhanCachChamPhay);
+        Assert.Equal(3, truong.Count);
+        Assert.Equal("b,c", truong[1]);
+
+        // ➕ Và **cùng dữ liệu, hai dấu khác nhau ⇒ đầu ra PHẢI khác nhau.** 📌 Nếu không kiểm phép này thì
+        // một `DongVoi` **bỏ qua tham số** (luôn dùng `,`) vẫn cho kết quả "trông đúng" ở mọi ca khác.
+        Assert.NotEqual(CsvNhatKy.Dong("a", "b"), CsvNhatKy.DongVoi(CsvNhatKy.PhanCachChamPhay, "a", "b"));
+    }
+
+    [Fact]
+    public void TC13_gia_tri_CHUA_dau_phan_cach_dang_dung_van_duoc_boc__ca_HAI_che_do()
+    {
+        // 🔑 **ĐO HAI CHIỀU:** một tệp `;` mà dữ liệu có `;` thì phải bọc — nếu không, cột bị **lệch**.
+        // 📌 Và luật bọc là **MỘT** (`Boc` luôn bọc) cho cả hai chế độ, nên ca này phải xanh ở **cả hai**.
+        // ⚠️ Nếu ai "tối ưu" bằng cách chỉ bọc khi **thấy** dấu phân cách của chế độ hiện tại thì dữ liệu
+        // chứa `;` trong tệp `,` sẽ **không** được bọc ⇒ 🔒 cột lệch, và người đọc **không hề biết**.
+        var coChamPhay = "a;b";
+        var coPhay = "a,b";
+
+        Assert.Equal("\"a;b\"", CsvNhatKy.Boc(coChamPhay));
+        Assert.Equal("\"a,b\"", CsvNhatKy.Boc(coPhay));
+
+        // Trong tệp `;`, trường chứa `;` vẫn là **MỘT** trường.
+        var dongChamPhay = CsvNhatKy.DongVoi(CsvNhatKy.PhanCachChamPhay, coChamPhay, "x");
+        Assert.Equal(2, DocDongCsv(dongChamPhay, CsvNhatKy.PhanCachChamPhay).Count);
+
+        // ➕ **Chiều ngược lại:** trong tệp `,`, trường chứa `,` cũng là **MỘT** trường (hành vi cũ, không bị
+        // hồi quy bởi thay đổi `S10`).
+        var dongPhay = CsvNhatKy.Dong(coPhay, "x");
+        Assert.Equal(2, DocDongCsv(dongPhay, CsvNhatKy.PhanCachPhay).Count);
+    }
+
+    [Fact]
+    public void TC14_dau_phan_cach_LA_thi_NEM__de_tep_muon_khong_bao_gio_duoc_tao()
+    {
+        // ⚠️ Một dấu lạ (vd `|`) tạo ra tệp **hợp lệ về cú pháp** mà **không trình đọc nào** hiểu
+        // ⇒ 📌 cùng họ với "tệp bằng chứng đọc sai": người nhận tưởng dữ liệu có 1 cột.
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => CsvNhatKy.DongVoi('|', "a", "b"));
+    }
+
+    [Fact]
+    public void TC15_dong_tien_de_TU_KHAI_dau_phan_cach__vi_tep_roi_khoi_he_thong()
+    {
+        var luc = new DateTime(2026, 10, 21, 2, 3, 4, DateTimeKind.Utc);
+
+        var tienDePhay = CsvNhatKy.DongTienDe("admin", luc, 2, 2);
+        var tienDeChamPhay = CsvNhatKy.DongTienDe("admin", luc, 2, 2, CsvNhatKy.PhanCachChamPhay);
+
+        Assert.Contains("dau-phay", tienDePhay, StringComparison.Ordinal);
+        Assert.Contains("cham-phay", tienDeChamPhay, StringComparison.Ordinal);
+
+        // 🔑 Dòng tiền đề của tệp `;` phải **thực sự** dùng `;` — 📌 nếu không thì chính dòng mô tả cũng
+        // bị đọc thành một cột trong Excel, và lời mô tả trở nên vô dụng.
+        Assert.Contains("\";\"", tienDeChamPhay, StringComparison.Ordinal);
+        Assert.DoesNotContain("\";\"", tienDePhay, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TC16_doc_tham_so_phan_cach__va_gia_tri_LA_tra_NULL__khong_im_lang_roi_ve_phay()
+    {
+        // 📌 Không truyền ⇒ **dấu phẩy** (tương thích ngược với 11 ca E2E `D15*` và mọi tệp đã xuất).
+        Assert.Equal(CsvNhatKy.PhanCachPhay, CsvNhatKy.DocPhanCach(null));
+        Assert.Equal(CsvNhatKy.PhanCachPhay, CsvNhatKy.DocPhanCach(""));
+        Assert.Equal(CsvNhatKy.PhanCachPhay, CsvNhatKy.DocPhanCach("phay"));
+        Assert.Equal(CsvNhatKy.PhanCachChamPhay, CsvNhatKy.DocPhanCach("cham-phay"));
+
+        // 🔑 Không phân biệt hoa/thường — 📌 người dùng gõ tay trên URL.
+        Assert.Equal(CsvNhatKy.PhanCachChamPhay, CsvNhatKy.DocPhanCach("CHAM-PHAY"));
+
+        // 🚨 **CHIỀU QUAN TRỌNG NHẤT:** giá trị **lạ** ⇒ `null` (controller trả **400**).
+        // ⚠️ Nếu rơi im lặng về dấu phẩy thì một lần gõ sai (`champhay`) tạo ra **tệp SAI** mà **không ai
+        // biết** — 📌 và người kiểm toán sẽ **tin** rằng họ đang cầm bản `;`.
+        Assert.Null(CsvNhatKy.DocPhanCach("champhay"));
+        Assert.Null(CsvNhatKy.DocPhanCach(";"));
+        Assert.Null(CsvNhatKy.DocPhanCach("dau-cham-phay"));
+    }
+
+    [Fact]
+    public void TC17_ten_tep_PHAI_khac_nhau_giua_hai_dau_phan_cach()
+    {
+        // 🔒 Hai bản khác dấu phân cách mà **cùng tên** ⇒ tải về cùng thư mục thì trình duyệt thêm `(1)`
+        // ⇒ 📌 không còn cách nào biết **bản nào là bản nào** (đúng loại lỗi bằng chứng).
+        Assert.Equal(string.Empty, CsvNhatKy.HauToTenTep(CsvNhatKy.PhanCachPhay));
+        Assert.Equal("-cham-phay", CsvNhatKy.HauToTenTep(CsvNhatKy.PhanCachChamPhay));
+
+        // 📌 Và **giữ nguyên** tên tệp cũ cho dấu phẩy (neo E2E `D15d` đang khẳng định chuỗi đó).
+        Assert.DoesNotContain("-cham-phay", "nhat-ky-xuat-du-lieu-ca-nhan-20261021-120000"
+            + CsvNhatKy.HauToTenTep(CsvNhatKy.PhanCachPhay), StringComparison.Ordinal);
+    }
+
     // ── BO DOC CSV TOI GIAN (chi de KIEM, khong phai san pham) ────────────────────────────────
 
     /// <summary>
     /// 🔑 **BO DOC CSV TOI GIAN** theo RFC 4180 — 📌 chi de **kiem**, khong phai ma san pham.
     /// 🔒 **VI SAO CAN:** neu test chi **dem dau phay** thi no se **dem sai** khi du lieu co dau phay
     /// trong `"…"` ⇒ ⚠️ tuc la test **tu vo hieu** dung o cho no can nhat (`TC07`).
+    /// ➕ `S10`: nhận **dấu phân cách** — ⚠️ nếu bộ đọc luôn tách theo `,` thì các ca dấu `;` sẽ **xanh giả**
+    /// (chúng sẽ "thấy" một trường duy nhất và mọi phép đếm đều bằng 1).
     /// </summary>
-    private static List<string> DocDongCsv(string dong)
+    private static List<string> DocDongCsv(string dong, char phanCach = ',')
     {
         var ketQua = new List<string>();
         var sb = new StringBuilder();
@@ -204,7 +311,7 @@ public class CsvNhatKyTests
             {
                 trongBoc = true;
             }
-            else if (c == ',')
+            else if (c == phanCach)
             {
                 ketQua.Add(sb.ToString());
                 sb.Clear();

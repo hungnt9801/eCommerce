@@ -956,6 +956,77 @@ select count(*)::text from "CusDataExportLogs" where "Id" = 'e0000000-0000-0000-
 
                 $giuMoiNhat = $dongDuLieu.Count -gt 0 -and $dongDuLieu[0] -match '","admin",'
                 Kq 'D16d dong duoc giu la dong MOI NHAT (admin hom nay)' $giuMoiNhat 'giu dong moi nhat'
+
+                # ══════════════════════════════════════════════════════════════════════════════════
+                # ➕ **D17 — DAU PHAN CACH `;` CHO EXCEL LOCALE VIET** (`S10` 21/10/2026, no `CUS-001` §27.6 #5).
+                #
+                # 🔑 **VI SAO PHAI DO BANG TEP THAT:** o locale dung `,` lam **dau thap phan** (tieng Viet),
+                # Excel doc tep `,` thanh **DUNG MOT COT**. ⚠️ Va `HTTP 200` mot minh se bao **DAT** cho ca
+                # truong hop **van la dau phay** (📌 dung loai *"XANH vi LY DO SAI"*).
+                # 🔒 Vi vay phai do: (a) tep co that + BOM; (b) dau phan cach **THAT SU** doi; (c) **CHIEU
+                # NGUOC** — tep dau phay **khong** duoc dung `;`; (d) gia tri la ⇒ **400** (khong im lang).
+                # ══════════════════════════════════════════════════════════════════════════════════
+                $tepChamPhay = Join-Path $thuMucTam 'nhatky-cham-phay.csv'
+                $hdrChamPhay = Join-Path $thuMucTam 'nhatky-cham-phay-hdr.txt'
+
+                & $curl -s -b $jar -c $jar -D $hdrChamPhay -o $tepChamPhay ($web + "/KhachHang/NhatKyCsv?customerId=$idKhach&phanCach=cham-phay") | Out-Null
+
+                Kq 'D17a tai duoc tep CSV dau CHAM PHAY (tep co du lieu)' `
+                    ((Test-Path $tepChamPhay) -and ((Get-Item $tepChamPhay).Length -gt 50)) `
+                    ("bytes = " + (Get-Item $tepChamPhay -ErrorAction SilentlyContinue).Length)
+
+                if (Test-Path $tepChamPhay) {
+                    $bCP = [IO.File]::ReadAllBytes($tepChamPhay)
+
+                    # 🔑 BOM van phai co: dau phan cach **khong** thay the viec Excel can BOM (hai viec khac nhau).
+                    Kq 'D17b tep `;` VAN co BOM UTF-8 (doi dau phan cach khong lam mat BOM)' `
+                        ($bCP.Length -ge 3 -and $bCP[0] -eq 0xEF -and $bCP[1] -eq 0xBB -and $bCP[2] -eq 0xBF) `
+                        ("3 byte dau = {0:X2} {1:X2} {2:X2}" -f $bCP[0], $bCP[1], $bCP[2])
+
+                    $hdrCP = if (Test-Path $hdrChamPhay) { [IO.File]::ReadAllText($hdrChamPhay) } else { '' }
+
+                    # 🔒 Ten tep PHAI khac ⇒ 📌 tai hai ban ve cung thu muc thi biet **ban nao la ban nao**.
+                    Kq 'D17c ten tep co hau to -cham-phay (khong lan voi ban dau phay)' `
+                        ($hdrCP -match 'nhat-ky-xuat-du-lieu-ca-nhan-\d{8}-\d{6}-cham-phay\.csv') 'content-disposition'
+
+                    $csvCP = [Text.Encoding]::UTF8.GetString($bCP)
+
+                    $dongTieuDeCP = @($csvCP -split "`r`n" | Where-Object { $_ -match '^"LucUtc"' } | Select-Object -First 1)
+                    $soTruongCP = if ($dongTieuDeCP.Count -gt 0) { (@([regex]::Matches($dongTieuDeCP[0], '";"')).Count + 1) } else { 0 }
+
+                    # 🚨 **CA QUAN TRONG NHAT CUA D17:** tieu de phai phan cach bang `;` va **VAN DU 8 truong**.
+                    Kq 'D17d 🚨 tieu de tep `;` phan cach bang `;` va DU 8 truong' ($soTruongCP -eq 8) ("soTruong = " + $soTruongCP)
+
+                    # 🔑 Tep TU KHAI dau phan cach — 📌 vi no **roi khoi he thong** (nguoi nhan phai biet doc bang gi).
+                    Kq 'D17e tep tu khai dau phan cach (delimiter = cham-phay)' `
+                        ($csvCP -match 'Dau phan cach \(delimiter\): cham-phay') 'dong tien de'
+
+                    # 🔒 Escape RFC 4180 phai **giong het** ban dau phay: 🔑 chi **mot** quy tac boc cho ca hai che do.
+                    Kq 'D17f escape RFC 4180 van dung trong tep `;` (dau phay + nhay kep trong du lieu)' `
+                        ($csvCP -match '"K97E2E ly do, co ""nhay kep"" trong do"') 'truong duoc boc'
+
+                    # 🚨 **CHIEU NGUOC (bat buoc):** tep `;` **KHONG** duoc phan cach bang `,`, va tep `,` (D15)
+                    # **KHONG** duoc phan cach bang `;`. 📌 Neu chi kiem mot phia thi mot tham so **bi bo qua**
+                    # (ca hai tep deu la dau phay) van **XANH o moi ca khac**.
+                    Kq 'D17g 🚨 CHIEU NGUOC: tep `;` KHONG dung `,` lam phan cach tieu de' `
+                        (-not ($csvCP -match '(?m)^"LucUtc",')) 'khong co dau phay o tieu de'
+
+                    Kq 'D17h 🚨 CHIEU NGUOC: tep dau phay (D15) KHONG dung `;` lam phan cach tieu de' `
+                        (-not ($csv -match '(?m)^"LucUtc";')) 'khong co cham phay o tieu de'
+                }
+
+                # 🚨 **GIA TRI LA ⇒ 400** — ⚠️ **KHONG** im lang roi ve dau phay: 📌 mot lan go sai
+                # (`?phanCach=champhay`) ma nhan tep **SAI** thi khong ai biet, va 🔒 nguoi kiem toan se
+                # **tin** rang ho dang cam ban `;`.
+                $tepSai = Join-Path $thuMucTam 'nhatky-phancach-sai.csv'
+                $maSai = "$(& $curl -s -o $tepSai -w '%{http_code}' -b $jar -c $jar ($web + "/KhachHang/NhatKyCsv?customerId=$idKhach&phanCach=sai"))".Trim()
+
+                Kq 'D17i 🚨 phanCach LA => 400 (khong im lang roi ve dau phay)' `
+                    ($maSai -eq '400') ("HTTP " + $maSai)
+
+                # 🔑 **UI PHAI CO LIEN KET** — 📌 neu khong, nguoi dung khong biet tinh nang ton tai
+                # (🔒 va mot tinh nang khong ai tim thay thi **khong phai** tinh nang).
+                Kq 'D17j man hinh nhat ky CO lien ket xuat kieu `;`' ($htmlNk -match 'phanCach=cham-phay') 'lien ket tren UI'
             }
         }
     }

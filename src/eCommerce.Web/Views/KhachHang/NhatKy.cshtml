@@ -195,11 +195,23 @@ else
        asp-route-tuNgay="@tuNgay"
        asp-route-denNgay="@denNgay"
        asp-route-nguoiXuat="@nguoiXuat"
+       asp-route-phanCach="phay"
        class="btn btn-sm btn-outline-primary">
-        Xuất tệp CSV (theo bộ lọc đang xem)
+        Xuất tệp CSV — dấu phẩy (theo bộ lọc đang xem)
+    </a>
+    @* ➕ `S10` — DẤU `;` CHO EXCEL LOCALE TIẾNG VIỆT. 🔒 Hai liên kết (không phải một ô chọn ngầm):
+       người dùng **thấy** mình đang chọn bản nào, và **tên tệp** cũng ghi rõ ⇒ không có tệp "không biết là bản nào". *@
+    <a asp-action="NhatKyCsv"
+       asp-route-customerId="@ViewBag.CustomerId"
+       asp-route-tuNgay="@tuNgay"
+       asp-route-denNgay="@denNgay"
+       asp-route-nguoiXuat="@nguoiXuat"
+       asp-route-phanCach="cham-phay"
+       class="btn btn-sm btn-outline-secondary ms-1">
+        Xuất tệp CSV — dấu <code>;</code> (Excel tiếng Việt)
     </a>
     <span class="text-muted small ms-2">
-        ⚠️ Tệp có BOM UTF-8 (Excel mở đúng tiếng Việt) và tự ghi rõ nếu bị cắt bớt
+        ⚠️ Tệp có BOM UTF-8 (Excel mở đúng tiếng Việt), tự ghi rõ dấu phân cách và tự ghi nếu bị cắt bớt
     </span>
 </p>
 

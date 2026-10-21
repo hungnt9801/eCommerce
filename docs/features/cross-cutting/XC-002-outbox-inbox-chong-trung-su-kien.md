@@ -1324,12 +1324,12 @@ trong mã** (như tôi đã mất nhiều lượt) trong khi **mã đúng** — 
 
 | # | Nợ | Ghi chú |
 |---|---|---|
-**1** | 🚨 **Xác nhận outbox/inbox có bật không** | §16.4 (1). 📌 Nếu **không**: mọi publish hiện **không** nằm trong transaction nghiệp vụ ⇒ **mất sự kiện** khi tiến trình chết |
-**2** | 🚨 **Chưa có job phát lại** (`XC-002` mục (a) phần *"job phát lại"*) | Nay có **đường đọc** + **đánh dấu**, nhưng **phát lại vẫn thủ công**. 🔒 Cố ý: phát lại tự động **có thể gây hỏng lần nữa** ⇒ phải **có người** + audit |
+**1** | ✅ **ĐÃ XÁC NHẬN — `S10` (21/10/2026): OUTBOX/RELAY KHÔNG CÓ** (nợ này **đóng ở dạng "đã xác nhận"**, không phải "đã làm") | 📌 Bằng chứng đo được: **0** bảng `AbpEvent*`/`*Outbox*`/`*Inbox*` (85 bảng, `psql` trên PostgreSQL 17) · **0** worker relay trong **10** worker đã đăng ký · sự kiện đi qua `IDistributedEventBus` với transport **in-process** (chính chỗ gọi đã ghi: `MarketplaceOrderIntakeHandler`). ⚠️ **Hệ quả (giữ nguyên, không được quên):** publish **KHÔNG** nằm trong transaction nghiệp vụ ⇒ 🔒 tiến trình chết giữa chừng là **mất sự kiện**; ➕ `messaging_outbox_pending` **vì vậy chưa thể có nơi phát** (`XC-005` §19.3). 📌 Đóng **thật** nợ này = một feature riêng (outbox + relay), **không** phải việc của phiên đóng GĐ1 |
+**2** | 🚨 **Chưa có job phát lại** (`XC-002` mục (a) phần *"job phát lại"*) | Nay có **đường đọc** + **đánh dấu**, nhưng **phát lại vẫn thủ công**. 🔒 Cố ý: phát lại tự động **có thể gây hỏng lần nữa** ⇒ phải **có người** + audit. ➕ `S10`: chính vì thế `messaging_dlq_replayed_total` **chưa có nơi phát** — đếm *"đánh dấu"* thành *"phát lại"* là **nói dối** (`XC-005` §19.3) |
 **3** | 🚨 **Chưa có cảnh báo khi có bản ghi DLQ mới** (`XC-002` mục (a)) | `thong-ke` **đã có** `cuNhatChuaXuLyUtc` ⇒ 🔑 **đủ dữ kiện** để làm cảnh báo, nhưng **chưa ai gọi định kỳ** |
 **4** | **Chưa có UI** cho DLQ | Endpoint **đã có**; trang `/VanHanh/Dlq` **chưa** làm |
 **5** | **Chưa có job dọn DLQ theo thời hạn** | Bảng **chỉ tăng** |
-**6** | **Chưa có job đối soát `D12`** | Cờ `GapSuspected` của `SAL-005` **tồn đọng** — 📌 `DanhDauDaDoiSoat` **đã có** nhưng **chưa ai gọi** |
+**6** | 🟡 **JOB ĐỐI SOÁT `D12` ĐÃ CÓ (`S6`) — nhưng nó CỐ Ý không hạ cờ** | ✅ `MarketplaceReconciliationWorker` (`Timer.RunOnStart`) liệt kê + đếm cờ `GapSuspected` tồn đọng (đo ở bước ⑫, `S6`). 🚨 **Nó KHÔNG gọi `DanhDauDaDoiSoat`** — 🔑 vì hạ cờ là **khẳng định** *"đã kiểm và dữ liệu khớp"*, mà job **không gọi được sàn** (`EnableLiveCalls = false`) ⇒ 📌 job tự hạ cờ = **xoá bằng chứng** về khả năng mất dữ liệu. ✅ Đường hạ cờ là **vận hành có người**: `MarkReconciledAsync` + **2 quyền** + lý do bắt buộc (mã `0005`, `SAL-005` §21). 📌 **Nợ còn lại thật sự:** chưa có ai **gọi định kỳ** con số đó thành **cảnh báo** (xem nợ #3) |
 
 ### 16.6 Lịch sử thay đổi (bổ sung)
 

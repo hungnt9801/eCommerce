@@ -93,6 +93,86 @@ public static class eCommerceMetricNames
         PaymentReconChangedTotal,
         LoggingFailuresTotal
     ];
+
+    /// <summary>
+    /// 🚨 **BẢNG "KÝ HIỆU NÀO ĐƯỢC GỌI Ở NƠI PHÁT" — có đủ cho MỌI tên đã đăng ký, kể cả tên CHƯA có nơi phát.**
+    ///
+    /// 🔑 **VÌ SAO CẦN (đo được, `S10` 21/10/2026):** từ 13/10/2026 tài liệu nói *"12 metric ĐÃ CÓ NƠI PHÁT"*,
+    /// ⚠️ nhưng **chưa bao giờ** có phép kiểm nào đối chiếu *"đã đăng ký"* với *"có chỗ gọi thật"*.
+    /// 📌 Đo lại bằng cách quét `src/` + `modules/` + `shared/`: **11/15** tên có điểm phát, **4/15** **KHÔNG**
+    /// (`messaging_outbox_pending` · `messaging_dlq_replayed_total` · `lock_ttl_exceeded_total` ·
+    /// `logging_failures_total`). ⇒ 🔒 Con số *"12/12"* trong tài liệu là **nói quá**, và nó tồn tại được
+    /// **chính vì** không có phép kiểm nào.
+    ///
+    /// ✅ **CÁCH ĐÓNG NỢ (không phải bằng cách thêm chữ vào tài liệu):** mỗi tên metric có **ký hiệu** để tìm,
+    /// và `MetricEmitterTests` khẳng định **CẢ HAI CHIỀU** bằng cách quét mã nguồn:
+    /// <list type="number">
+    ///   <item>tên **KHÔNG** nằm trong <see cref="ChuaCoNoiPhat"/> ⇒ **phải** tìm thấy lời gọi thật
+    ///     (`.<ký hiệu>.Add(`, `.<ký hiệu>.Record(`, hoặc `.<ký hiệu>(`) ở `src`/`modules`/`shared`;</item>
+    ///   <item>tên **nằm trong** <see cref="ChuaCoNoiPhat"/> ⇒ **KHÔNG** được có lời gọi nào (nếu có ⇒ khai báo
+    ///     **đã cũ** ⇒ phải xoá khỏi danh sách nợ);</item>
+    ///   <item>bảng này phủ **đúng** `All` — không thiếu, không thừa.</item>
+    /// </list>
+    /// 🔑 Nhờ vậy con số *"có nơi phát"* **không thể trôi** nữa: nó là **kết quả của một phép đo trong CI**,
+    /// không phải một câu trong tài liệu.
+    ///
+    /// ⚠️ **Ký hiệu dùng `nameof(...)`** ⇒ 🔒 đổi tên thành viên trong `eCommerceMetrics` là **lỗi build**,
+    /// không phải một bảng lặng lẽ sai (bảng viết bằng chuỗi thì `nameof` mới là nguồn sự thật).
+    /// </summary>
+    public static readonly IReadOnlyDictionary<string, string> KyHieuMetric =
+        new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            [MessagingOutboxPending] = nameof(eCommerceMetrics.SetMessagingOutboxPending),
+            [MessagingInboxFailedTotal] = nameof(eCommerceMetrics.MessagingInboxFailed),
+            [MessagingDlqSize] = nameof(eCommerceMetrics.SetMessagingDlqSize),
+            [MessagingDlqReplayedTotal] = nameof(eCommerceMetrics.MessagingDlqReplayed),
+            [LockTimeoutTotal] = nameof(eCommerceMetrics.LockTimeout),
+            [LockSkippedTotal] = nameof(eCommerceMetrics.LockSkipped),
+            [LockTtlExceededTotal] = nameof(eCommerceMetrics.LockTtlExceeded),
+            [HttpRequestDurationSeconds] = nameof(eCommerceMetrics.HttpRequestDurationSeconds),
+            [PaymentWebhookRejectedTotal] = nameof(eCommerceMetrics.PaymentWebhookRejected),
+            [ChannelSyncFailedTotal] = nameof(eCommerceMetrics.ChannelSyncFailed),
+            [InventoryReconMismatchSkus] = nameof(eCommerceMetrics.SetInventoryReconMismatchSkus),
+            [TaxUnclassifiedSkus] = nameof(eCommerceMetrics.SetTaxUnclassifiedSkus),
+            [PaymentReconUnresolved] = nameof(eCommerceMetrics.SetPaymentReconUnresolved),
+            [PaymentReconChangedTotal] = nameof(eCommerceMetrics.PaymentReconChanged),
+            [LoggingFailuresTotal] = nameof(eCommerceMetrics.LoggingFailures)
+        };
+
+    /// <summary>
+    /// 🚨 **CÁC METRIC ĐÃ ĐĂNG KÝ NHƯNG CHƯA CÓ ĐIỂM PHÁT** — mỗi dòng ghi **vì sao** và **cần gì** để đóng.
+    ///
+    /// 📌 **Đây là nợ THẬT, không phải danh sách cho vui:** metric đã khai báo mà không ai phát là
+    /// **nói dối** (`coding-conventions`: *"Mọi metric phải có nơi phát"*). 🔑 Danh sách này tồn tại
+    /// **để con số không bị nói quá** — và `MetricEmitterTests` khoá nó **hai chiều**.
+    ///
+    /// 🔒 **Đây là TẬP CON của <see cref="KyHieuMetric"/>** (bảng ký hiệu phủ **mọi** tên, kể cả tên chưa
+    /// có nơi phát — vì vẫn cần ký hiệu để **chứng minh** là chúng chưa hề được gọi).
+    ///
+    /// ⚠️ **KHÔNG thêm tên vào đây để làm test xanh** khi lẽ ra chỉ cần thêm **một dòng gọi**:
+    /// mỗi mục ở đây phải có **hạ tầng còn thiếu** nêu rõ (nếu không có lý do đó, hãy **phát metric**).
+    /// </summary>
+    public static readonly IReadOnlyDictionary<string, string> ChuaCoNoiPhat =
+        new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            [MessagingOutboxPending] =
+                "CAN HA TANG: chua co outbox/relay. Su kien hien di in-process (ABP local event bus), "
+                + "khong co bang outbox nao de dem ⇒ moi con so se la BIA. Cho `XC-002` (outbox + relay): "
+                + "relay dem so ban ghi ton dong roi goi `SetMessagingOutboxPending`.",
+
+            [MessagingDlqReplayedTotal] =
+                "CAN TINH NANG: DLQ co chu y KHONG co phat lai TU DONG (`DeadLetterAppService` chi doc + "
+                + "danh dau). Danh dau 'da xu ly' KHONG phai 'da phat lai' ⇒ phat metric nay luc danh dau la "
+                + "NOI DOI. Cho luong phat lai thu cong co that (roi moi dem tai noi phat lai).",
+
+            [LockTtlExceededTotal] =
+                "CAN NOI PHAT HIEN: khoa di qua `IAbpDistributedLock` cua ABP (Redis), TTL do thu vien giu va "
+                + "KHONG lo ra ngoai ⇒ khong co cho nao biet 'thao tac vuot TTL'. Cho wrapper lock co doc TTL.",
+
+            [LoggingFailuresTotal] =
+                "CAN HA TANG: chua co logger provider boc sink de bat loi ghi log. Logging hien dung provider "
+                + "mac dinh cua ABP/ASP.NET ⇒ khong co diem bat 'logger/sink hong'."
+        };
 }
 
 /// <summary>

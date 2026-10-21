@@ -128,6 +128,49 @@ public class BackgroundWorkerCoCheTests
     }
 
     [Fact]
+    public void MOI_worker_dinh_ky_PHAI_co_Timer_RunOnStart__neu_khong_thi_tre_MOT_NHIP_sau_moi_lan_deploy()
+    {
+        // 🚨 **LUẬT RÚT TỪ `CHN-002` §16.5 #5 — và từ một lần ĐO LẠI của `S10` (21/10/2026).**
+        //
+        // **Sự thật đo được:** `ChannelSyncSupervisorWorker` **THIẾU** `Timer.RunOnStart` cho tới
+        // **15/10/2026** (sửa ở commit `aa4cd4a`). Hệ quả: sau **mỗi lần deploy/restart**, việc của job
+        // **trễ tối đa MỘT nhịp** — ⚠️ mà **không có lỗi nào** để lần ra (📌 đúng loại "im lặng" mà cả
+        // lớp test này tồn tại để chặn).
+        //
+        // 📌 **VÌ SAO `S10` mới thêm LUẬT (thay vì chỉ sửa một chỗ):** sửa một worker là sửa **triệu chứng**;
+        // 🔒 bài học `CHN-002` đã ghi **nhiều lần** trong mã (mỗi lần ở một worker khác) ⇒ 📌 người sau vẫn
+        // quên được. Một luật văn bản nguồn thì **không quên**.
+        //
+        // ⚠️ **Đánh đổi đã biết:** không phải mọi worker **đều** cần chạy ngay (một job quét nặng định kỳ
+        // 1 giờ có thể muốn chờ). Vì vậy luật này **cố ý** không có ngoại lệ **ngầm**: muốn miễn thì phải
+        // **thêm ngoại lệ tường minh** ở đây — 📌 nhưng hiện tại **10/10** worker đều đặt `RunOnStart`
+        // (`S10` đo được), nên **không có ngoại lệ nào** là trung thực với mã hiện tại.
+        var tatCaMa = DocTatCaMaNguon();
+        var viPham = new List<string>();
+
+        foreach (var (tenTep, noiDung) in tatCaMa)
+        {
+            if (!noiDung.Contains(TenLopCoSo, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (!Regex.IsMatch(noiDung, @"Timer\.RunOnStart\s*=\s*true"))
+            {
+                viPham.Add($"{LayTenLop(noiDung) ?? tenTep} (khai ở {tenTep})");
+            }
+        }
+
+        Assert.True(viPham.Count == 0,
+            "🚨 WORKER ĐỊNH KỲ KHÔNG ĐẶT `Timer.RunOnStart = true` ⇒ sau MỖI lần deploy/restart, việc của job "
+            + "**trễ tối đa MỘT NHỊP** và **không có lỗi nào** để lần ra (bài học `CHN-002`):\n  "
+            + string.Join("\n  ", viPham)
+            + "\n\n⇒ Thêm `Timer.RunOnStart = true;` trong constructor (cạnh `Timer.Period = …`)."
+            + "\n📌 Nếu worker này THẬT SỰ không nên chạy ngay, hãy thêm ngoại lệ **tường minh** vào test này "
+            + "kèm lý do — ⚠️ đừng xoá luật.");
+    }
+
+    [Fact]
     public void Worker_KHONG_duoc_goi_APP_SERVICE_co_Authorize__se_nem_AbpAuthorizationException()
     {
         // 🚨 **LUẬT NÀY RÚT TỪ MỘT LỖI ĐO ĐƯỢC NGÀY 16/10/2026** — khi xây job `D12`

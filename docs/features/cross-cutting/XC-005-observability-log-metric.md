@@ -180,20 +180,33 @@ graph LR
 
 ### 5.1 Bảng đăng ký metric
 
-| Tên metric | Loại | Nhãn (hữu hạn) | Nguồn yêu cầu | Ý nghĩa / ngưỡng |
+> 🚨 **ĐỌC KÈM §19 — bảng này ĐÃ TỪNG LỆCH 12 ↔ 15 TÊN so với mã.**
+> Từ 21/10/2026 (`S10`), bảng dưới đây **được máy đối chiếu**: `test/eCommerce.Tests/Observability/MetricEmitterTests.cs`
+> khoá **ba chiều** — (①) `eCommerceMetricNames.All` ⇒ **mọi tên phải có điểm phát thật** trong `src/`/`modules`/`shared`,
+> trừ những tên **khai báo tường minh** là *chưa có* (`eCommerceMetricNames.ChuaCoNoiPhat`); (②) tên **khai chưa có**
+> thì **không được** có lời gọi nào (khai báo cũ ⇒ ĐỎ); (③) bảng ký hiệu phủ **đúng** `All`.
+> ⇒ 📌 Cột **"Nơi phát"** không còn là lời khai: **sai ⇒ CI đỏ**.
+
+| Tên metric | Loại | Nhãn (hữu hạn) | Nguồn yêu cầu | Nơi phát (`S10` đo) |
 |---|---|---|---|---|
-| `messaging_outbox_pending` | Gauge | — | **`XC-002` NFR-003** | Tồn đọng outbox; **p99 < 1000**; cảnh báo nếu chạm trần liên tục 5 phút |
-| `messaging_inbox_failed_total` | Counter | `eventName` | **`XC-002` NFR-009** | Số lần xử lý inbox thất bại |
-| `messaging_dlq_size` | Gauge | — | **`XC-002` NFR-009** | Kích thước DLQ; **> 0 ⇒ cảnh báo** |
-| `messaging_dlq_replayed_total` | Counter | `result` (`ok`/`fail`) | **`XC-002` NFR-009** | Số lần phát lại DLQ |
-| `lock_timeout_total` | Counter | `module` | **`XC-003` NFR-003** | Số lần không giành được khoá; tỉ lệ **< 1 %** |
-| `lock_skipped_total` | Counter | `module` | **`XC-003` A1** | Job định kỳ bỏ qua vì đang bận |
-| `lock_ttl_exceeded_total` | Counter | `module` | **`XC-003` NFR-007** | 🚨 **Số lần thao tác vượt TTL** (2 chủ thể cùng chạy) — kỳ vọng **0** |
-| `http_request_duration_seconds` | Histogram | `method`, `route`, `status` | `XC-005` | Độ trễ API |
-| `payment_webhook_rejected_total` | Counter | `provider`, `reason` | `XC-005` (`PaymentHub`) | Webhook bị từ chối (chữ ký sai, sai số tiền) |
-| `tax_unclassified_skus` | Gauge | — | `XC-006` §10 | Số SKU chưa phân loại thuế (kế toán phải xử lý) |
-| `channel_sync_failed_total` | Counter | `channel`, `kind` | `XC-005` (`ChannelHub`) | Đồng bộ sàn thất bại |
-| `logging_failures_total` | Counter | — | `XC-005` D10 | Số lần ghi log thất bại (logger/sink hỏng) |
+| `messaging_outbox_pending` | Gauge | — | **`XC-002` NFR-003** | ❌ **CHƯA CÓ** — không có outbox/relay (xác nhận `S10`, xem `XC-002` §16.5) |
+| `messaging_inbox_failed_total` | Counter | `eventName` | **`XC-002` NFR-009** | ✅ `IdempotencyGuard` |
+| `messaging_dlq_size` | Gauge | — | **`XC-002` NFR-009** | ✅ `MarketplaceReconciliationWorker` |
+| `messaging_dlq_replayed_total` | Counter | `result` (`ok`/`fail`) | **`XC-002` NFR-009** | ❌ **CHƯA CÓ** — DLQ **cố ý** không phát lại tự động |
+| `lock_timeout_total` | Counter | `module` | **`XC-003` NFR-003** | ✅ `ChannelTokenManager` |
+| `lock_skipped_total` | Counter | `module` | **`XC-003` A1** | ✅ `TaxUnclassifiedSkusWorker` |
+| `lock_ttl_exceeded_total` | Counter | `module` | **`XC-003` NFR-007** | ❌ **CHƯA CÓ** — TTL do `IAbpDistributedLock` giữ, không lộ ra ngoài |
+| `http_request_duration_seconds` | Histogram | `method`, `route`, `status` | `XC-005` | ✅ `RequestDurationRecorder` (`shared/`) |
+| `payment_webhook_rejected_total` | Counter | `provider`, `reason` | `XC-005` (`PaymentHub`) | ✅ `VnPayPaymentProvider` |
+| `channel_sync_failed_total` | Counter | `channel`, `kind` | `XC-005` (`ChannelHub`) | ✅ `ChannelShopSyncer` |
+| `inventory_recon_mismatch_skus` | Gauge | — | `INV-001` ADR-10 | ✅ `InventoryReconciliationService` |
+| `tax_unclassified_skus` | Gauge | — | `XC-006` §10 | ✅ `TaxUnclassifiedSkusWorker` |
+| `payment_recon_unresolved_total` | Gauge | — | `REC-001` §7 | ✅ `PaymentReconciliationWorker` + `PaymentAppService` |
+| `payment_recon_changed_total` | Counter | `result` | `REC-001` §7 | ✅ `MetricDoiSoatThanhToan` |
+| `logging_failures_total` | Counter | — | `XC-005` D10 | ❌ **CHƯA CÓ** — chưa có logger provider bọc sink |
+
+> 📌 **ĐẾM ĐƯỢC (21/10/2026): 11/15 có nơi phát · 4/15 chưa.** 🔒 **KHÔNG** ghi *"12/12"* hay *"15/15"* nữa —
+> con số đó chỉ đúng khi **có phép đo**, và §19 là phép đo.
 
 > 🚨 **Quy tắc nhãn (BR-009):** nhãn **chỉ** lấy từ tập hữu hạn. **Cấm** `orderId`, `sku`, `userId`, `correlationId`,
 > `email`, `phone`. Cần truy vết theo các giá trị đó ⇒ **dùng log** (đã có `CorrelationId`), **không** dùng metric.
@@ -596,8 +609,59 @@ Khi danh mục được thêm vào, **con số này sẽ GIẢM** vì nhiều SK
 | Dọn dẹp | `CatProductVariants` = 0, `CatProducts` = 0 |
 
 ### CÒN LẠI 5/12
+
+> 🚨 **ĐÍNH CHÍNH 21/10/2026 (`S10`):** bảng dưới đây **đã lỗi thời** — `messaging_dlq_size` **đã** có nơi phát
+> (`S6`: `MarketplaceReconciliationWorker`), và con số đúng là **11/15**. 📌 Đọc **§19** (đo lại + cơ chế).
+> 🔒 Giữ nguyên bảng cũ ở đây **có chủ ý**: xoá nó đi thì mất dấu vết rằng tài liệu này **đã từng tuyên bố một
+> con số không ai kiểm** trong **7 ngày**.
+
 | Metric | Cần gì |
 |---|---|
 | `messaging_outbox_pending` · `messaging_dlq_size` · `messaging_dlq_replayed_total` | 🏗️ Outbox + DLQ (**chưa có**) |
 | `logging_failures_total` | 🏗️ Logger provider bắt lỗi sink |
 | `lock_ttl_exceeded_total` | ⬜ Chưa có chỗ phát (cần nơi phát hiện vượt TTL khoá) |
+
+---
+
+## 19. 🚨 ĐÍNH CHÍNH + CƠ CHẾ: **11/15** metric có nơi phát (21/10/2026, `S10`)
+
+### 19.1 Con số cũ SAI ở đâu — và vì sao nó sống được 7 ngày
+
+| | Tài liệu nói (13/10/2026 → 21/10/2026) | Đo được (21/10/2026) |
+|---|---|---|
+| Metric **đăng ký** | 12 | **15** (`inventory_recon_mismatch_skus`, `payment_recon_unresolved_total`, `payment_recon_changed_total` được thêm sau mà §5.1 **không** cập nhật) |
+| Metric **có nơi phát** | "12/12 — ĐÃ CÓ NƠI PHÁT" | **11/15** |
+| Phép kiểm đối chiếu *"đăng ký ↔ có chỗ gọi"* | ❌ **KHÔNG CÓ** | ✅ `MetricEmitterTests` (3 ca) |
+
+🔑 **Vì sao nó sống được:** `MetricsTests.TC06` chỉ chứng minh **instrument được TẠO** (constructor của
+`eCommerceMetrics`) — 📌 nó **không** và **không thể** chứng minh *"có luồng nghiệp vụ nào gọi"*. 🔒 Và vì
+**một phép kiểm dễ** đã xanh, người ta **tưởng** câu hỏi khó đã được trả lời.
+⚠️ Đây đúng là điều `NOT-002` **F3** đã cảnh báo: *"đã đăng ký & đã có nơi phát (constructor) nhưng CHƯA được
+gọi ở luồng nghiệp vụ nào"* — 📌 cảnh báo đó **đúng**, và nó **không được đo** cho tới `S10`.
+
+### 19.2 ✅ Cách đóng — bằng **mã**, không bằng chữ
+
+| Thành phần | Ở đâu | Khoá điều gì |
+|---|---|---|
+| `eCommerceMetricNames.KyHieuMetric` | `shared/eCommerce.Kernel/Observability/eCommerceMetrics.cs` | **Ký hiệu** phải tìm ở nơi phát — dùng `nameof(...)` ⇒ 🔒 đổi tên thành viên là **lỗi build** |
+| `eCommerceMetricNames.ChuaCoNoiPhat` | cùng tệp | **Danh sách nợ TƯỜNG MINH** + **lý do** + **hạ tầng còn thiếu** |
+| `MetricEmitterTests` | `test/eCommerce.Tests/Observability/` | ① metric **không khai nợ** mà **không** có lời gọi ⇒ ĐỎ · ② khai nợ mà **có** lời gọi ⇒ ĐỎ (khai cũ) · ③ bảng ký hiệu phủ **đúng** `All` · ④ phép quét phải thấy **≥ 11** điểm phát (chống "phạm vi quét bị thu hẹp") |
+
+🚨 **HAI CHIỀU đã được TIÊM để chứng minh (không tin "test xanh"):**
+① bỏ `metric.SetMessagingDlqSize(...)` ⇒ **2 ca ĐỎ**, thông điệp nêu đúng `messaging_dlq_size`;
+② khai `lock_timeout_total` vào bảng nợ ⇒ **1 ca ĐỎ**, thông điệp *"Khai 'CHUA CO NOI PHAT' nhung DA CO loi goi"*;
+③ hoàn nguyên **cả hai** ⇒ xanh. 📌 Đây là lần thứ **N** của bài học: *"luôn đúng" và "không hoạt động" trông
+giống hệt nhau*.
+
+### 19.3 🔒 4 nợ còn lại — nêu rõ **cần gì**, không giả vờ
+
+| Metric | Hạ tầng còn thiếu | Thuộc về |
+|---|---|---|
+| `messaging_outbox_pending` | **Outbox + relay** (`XC-002`): hiện sự kiện đi **in-process**, **không có bảng outbox** ⇒ 📌 mọi con số sẽ là **BỊA** | `XC-002` |
+| `messaging_dlq_replayed_total` | **Luồng phát lại thủ công** có thật. `DeadLetterAppService` **cố ý** chỉ đọc + đánh dấu ⇒ 🔒 đếm *"đánh dấu"* thành *"phát lại"* là **nói dối** | `XC-002` |
+| `lock_ttl_exceeded_total` | **Wrapper khoá** đọc được **TTL**; `IAbpDistributedLock` không lộ TTL ra ngoài | `XC-003` |
+| `logging_failures_total` | **Logger provider** bọc sink để bắt lỗi ghi log | `XC-005` §6.2 |
+
+📌 **Vì sao `S10` không "làm cho xong" 4 mục này:** cả bốn đòi **hạ tầng mới** (outbox/relay · luồng phát lại ·
+wrapper khoá · logging provider) ⇒ 🔒 làm gấp trong một phiên đóng nợ là cách tạo **hai nguồn sự thật**.
+✅ Thay vào đó: **đo được · khai báo được · khoá được** ⇒ 📌 con số *"11/15"* **không thể trôi** nữa.

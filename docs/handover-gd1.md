@@ -155,7 +155,16 @@ Host cổng **5000**. DB: `docker exec -i ecommerce-postgres psql -U ecommerce -
 > "đối tượng gần giống" thì KHÔNG phải là kiểm chứng.**
 
 ### Phạm vi GĐ1 (theo kế hoạch)
-Đơn hàng · tồn kho · vận chuyển · khuyến mãi. Đọc `docs/implementation-plan.md` §A.9 để biết danh sách feature theo giai đoạn.
+~~Đơn hàng · tồn kho · vận chuyển · khuyến mãi.~~
+
+> 🚨 **ĐÍNH CHÍNH 21/10/2026 (`S10`): DÒNG TRÊN SAI.** Nguồn sự thật là
+> [`implementation-plan.md`](implementation-plan.md) **§8 / Phụ lục A.3**: **GĐ2** = `PRO-001…002` ·
+> `SHP-001…004` · `REC-002…003` · `SAL-006`. ⇒ 🔒 **GĐ1 KHÔNG gồm vận chuyển và khuyến mãi.**
+> 📌 Dòng cũ giữ lại (gạch ngang) vì nó là **bằng chứng** của một lần *"một câu trong tài liệu làm người đọc
+> tưởng GĐ1 còn 6 feature"* — đúng họ lỗi mà phiên `S9`/`S10` đang đóng.
+> ✅ Phạm vi **GĐ1 thật** = *"bán được trên website"*: danh mục · tồn kho · giỏ/đơn · thanh toán · đối soát ·
+> sổ địa chỉ · khách hàng · storefront · CI. Xem
+> [`handover/BAN-GIAO-GD1-GD2-2026-10-21.md`](handover/BAN-GIAO-GD1-GD2-2026-10-21.md).
 
 ### Việc tiếp theo, theo thứ tự đề xuất
 | # | Việc | Ghi chú |

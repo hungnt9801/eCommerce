@@ -221,10 +221,36 @@ public class KhachHangController : Controller
     /// 🔒 mot phep kiem co the **luon xanh** vi no **khong bao gio** chay).
     /// 📌 App service da `Clamp(1..500)` ⇒ 🔑 duong nay **khong** mo them kha nang lay qua nhieu.
     /// </param>
-    public async Task<IActionResult> NhatKyCsv(Guid? customerId = null, string? tuNgay = null, string? denNgay = null, string? nguoiXuat = null, int toiDa = 100)
+    /// <param name="phanCach">
+    /// 🔑 **Dấu phân cách của tệp** (`S10`, đóng nợ `CUS-001` §27.6 #5): `phay` (mặc định, **RFC 4180**) hoặc
+    /// `cham-phay` (**Excel locale dùng `,` làm dấu thập phân**, vd tiếng Việt).
+    /// 🚨 **VÌ SAO PHẢI CHỌN ĐƯỢC (không phải tiện nghi):** ở locale đó Excel đọc tệp `,` thành **ĐÚNG MỘT
+    /// CỘT** — ⚠️ và BOM **không cứu được** (BOM là bảng mã, không phải dấu phân cách). 📌 Với tệp **bằng
+    /// chứng kiểm toán**, "thành một cột" nghĩa là người đọc **kết luận sai về bằng chứng**.
+    /// 🔒 **KHÔNG đổi ngầm định:** đổi ngầm định sẽ phá mọi trình đọc đang đúng ⇒ người dùng **chọn**, và
+    /// **tên tệp + dòng tiền đề** ghi rõ bản nào.
+    /// 🚨 Giá trị **lạ** ⇒ **`400`** (⚠️ **không** im lặng rơi về dấu phẩy: gõ sai một lần mà nhận tệp **SAI**
+    /// thì không ai biết — đúng loại lỗi của tệp bằng chứng).
+    /// </param>
+    public async Task<IActionResult> NhatKyCsv(Guid? customerId = null, string? tuNgay = null, string? denNgay = null, string? nguoiXuat = null, int toiDa = 100, string? phanCach = null)
     {
         // 🔑 Cung `KieuUtc` nhu `NhatKy` — ⚠️ lech mot lan nua o day thi tep va man hinh **khong khop**.
         const DateTimeStyles KieuUtc = DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal;
+
+        // 🚨 **CHỌN DẤU PHÂN CÁCH TRƯỚC MỌI VIỆC KHÁC** — 🔒 để một giá trị sai **không** tiêu tốn một lượt
+        // truy vấn DB, và (quan trọng hơn) **không** tạo ra tệp nào.
+        var dauPhanCach = CsvNhatKy.DocPhanCach(phanCach);
+
+        if (dauPhanCach is null)
+        {
+            // 📌 Thông điệp **liệt kê giá trị hợp lệ** — người dùng sửa được ngay, không phải đoán.
+            return BadRequest(
+                "Tham so 'phanCach' khong hop le. Gia tri hop le: '"
+                + CsvNhatKy.ThamSoPhay + "' (mac dinh, RFC 4180) hoac '"
+                + CsvNhatKy.ThamSoChamPhay + "' (Excel locale dung ',' lam dau thap phan).");
+        }
+
+        var phanCachDung = dauPhanCach.Value;
 
         var tu = DateTime.TryParse(tuNgay, CultureInfo.InvariantCulture, KieuUtc, out var t) ? t : (DateTime?)null;
         var den = DateTime.TryParse(denNgay, CultureInfo.InvariantCulture, KieuUtc, out var d) ? d : (DateTime?)null;
@@ -250,23 +276,24 @@ public class KhachHangController : Controller
         var sb = new StringBuilder();
 
         // 🔑 Dong tien de (kem dong canh bao NGAY DUOI neu bi cat) — 📌 de nguoi doc **thay ngay**.
-        sb.Append(CsvNhatKy.DongTienDe(nguoiXuatTep, luc, ketQua.CacDong.Count, ketQua.TongSo)).Append(CsvNhatKy.XuongDong);
+        sb.Append(CsvNhatKy.DongTienDe(nguoiXuatTep, luc, ketQua.CacDong.Count, ketQua.TongSo, phanCachDung)).Append(CsvNhatKy.XuongDong);
 
         if (ketQua.BiCat)
         {
             // ⛔ **BAT BUOC** — xem ly do (3) o tren.
-            sb.Append(CsvNhatKy.DongCanhBaoCat(ketQua.CacDong.Count, ketQua.TongSo, luc)).Append(CsvNhatKy.XuongDong);
+            sb.Append(CsvNhatKy.DongCanhBaoCat(ketQua.CacDong.Count, ketQua.TongSo, luc, phanCachDung)).Append(CsvNhatKy.XuongDong);
         }
 
         sb.Append(CsvNhatKy.XuongDong);
 
         // 📌 Tieu de cot — 🔑 ASCII de **moi trinh doc** deu xu ly duoc, ⚠️ va de script kiem co neo on dinh.
-        sb.Append(CsvNhatKy.Dong("LucUtc", "NguoiXuat", "CustomerId", "TenKhach", "SoDongHoSo", "SoDonHang", "DonHangBiCat", "LyDo"))
+        sb.Append(CsvNhatKy.DongVoi(phanCachDung,
+            "LucUtc", "NguoiXuat", "CustomerId", "TenKhach", "SoDongHoSo", "SoDonHang", "DonHangBiCat", "LyDo"))
           .Append(CsvNhatKy.XuongDong);
 
         foreach (var nk in ketQua.CacDong)
         {
-            sb.Append(CsvNhatKy.Dong(
+            sb.Append(CsvNhatKy.DongVoi(phanCachDung,
                 nk.XuatLucUtc.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
                 nk.NguoiXuat,
                 nk.CustomerId.ToString(),
@@ -287,7 +314,9 @@ public class KhachHangController : Controller
 
         // 📌 Ten tep co **moc thoi gian UTC** ⇒ 🔑 xuat nhieu lan thi khong **ghi de** nhau, va
         // 📌 nguoi doc biet **ban nao la ban nao**.
-        var tenTep = $"nhat-ky-xuat-du-lieu-ca-nhan-{luc:yyyyMMdd-HHmmss}.csv";
+        // ➕ `S10`: **hau to theo dau phan cach** — 🔒 hai ban khac dau phan cach ma cung ten thi khi tai ve
+        // cung mot thu muc trinh duyet them `(1)` ⇒ 📌 khong con biet **ban nao la ban nao**.
+        var tenTep = $"nhat-ky-xuat-du-lieu-ca-nhan-{luc:yyyyMMdd-HHmmss}{CsvNhatKy.HauToTenTep(phanCachDung)}.csv";
 
         return File(bytes, "text/csv", tenTep);
     }
