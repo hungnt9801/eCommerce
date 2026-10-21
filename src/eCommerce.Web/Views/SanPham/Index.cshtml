@@ -1,13 +1,23 @@
-@using eCommerce.Web.Controllers
-@model List<SanPhamDongDto>
+@using eCommerce.Web.Storefront
+@model IReadOnlyList<SanPhamCongKhaiDto>
 @{
     Layout = null;
+
+    // 🔒 Slug công khai: ưu tiên `Slug` đã đăng ký; NULL là trạng thái BÌNH THƯỜNG (migration không backfill)
+    //    ⇒ sinh tại chỗ từ `Ten` bằng **cùng hàm** của đường ghi. 📌 Luật này lặp lại đúng luật của controller:
+    //    nếu hai chỗ lệch nhau thì link trên danh sách và `canonical` ở trang chi tiết trỏ **hai URL khác nhau**
+    //    ⇒ chính là "hai nguồn sự thật" mà `CAT-003` ADR-04 cấm.
+    string SlugCua(SanPhamCongKhaiDto sp)
+        => !string.IsNullOrWhiteSpace(sp.Slug)
+            ? sp.Slug!
+            : (eCommerce.Catalog.SinhSlug.Tu(sp.Ten) is { Length: > 0 } tam ? tam : sp.Gia[0].Sku);
 }
 @*
-    🚨 TRANG HÀNG ĐANG BÁN + ĐƠN GIÁ (WEB-001 — bước 2 của chuỗi mặt tiền).
-    📌 `Layout = null`: trang tự chứa ⇒ phép kiểm chứng tập trung vào ĐÚNG đường dữ liệu (xem ghi chú ở Views/PhanBo).
-    ⚠️ Mọi giá trị qua Razor `@` (tự HTML-encode). Giá định dạng bằng `ToString("N0")` + hậu tố đơn vị tiền tệ
-       — CHƯA đa tiền tệ ở tầng UI (inv-001 §42.1: giới hạn đã biết); ghi rõ ở chân trang thay vì im lặng.
+    🚨 `WEB-002` — TRANG DANH MỤC **CÔNG KHAI** (`S8`, quyết định `D10`/`Q6` = A). Khách CHƯA đăng nhập xem được.
+    🔒 KHÔNG hiển thị: giá vốn (`CostPrice`), tồn kho chi tiết, `Code` nội bộ, `Id`. DTO công khai KHÔNG có
+       chúng ⇒ việc "quên ẩn" là **KHÔNG THỂ**, chứ không phải "đã nhớ ẩn".
+    ✅ Danh mục rỗng ⇒ `200` + thông báo (`BR-012`), KHÔNG phải trang lỗi.
+    ⚠️ Mọi giá trị qua Razor `@` (tự HTML-encode). `Layout = null`: trang tự chứa (cùng quy ước các trang khác).
 *@
 <!DOCTYPE html>
 <html lang="vi">
@@ -15,6 +25,14 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Hàng đang bán</title>
+    <meta name="description" content="Danh sách sản phẩm đang bán kèm giá niêm yết." />
+    @* 🔑 `canonical` sinh bằng `Url.Action` (KHÔNG viết cứng đường dẫn): đường dẫn này là **URL của một mục
+       menu**, và `MenuDieuHuongTests` cấm mọi URL menu xuất hiện dưới dạng chuỗi cứng trong view (lý do: mục
+       menu viết cứng trong view sẽ **hiện cho mọi người**, bỏ qua lọc quyền). ⚠️ Ở đây nó là thẻ
+       `link rel=canonical` chứ không phải mục menu — nhưng dùng `Url.Action` vẫn đúng hơn: đổi route thì
+       `canonical` **tự đúng** (Phụ lục D). 📌 Chú thích này cố ý **không** chép lại đường dẫn dạng `href="…"`
+       — chính phép kiểm đó quét **văn bản thô**, kể cả chú thích. *@
+    <link rel="canonical" href="@Url.Action("Index", "SanPham")" />
     <style>
         body { font-family: system-ui, sans-serif; margin: 2rem; color: #222; }
         h1 { font-size: 1.3rem; }
@@ -27,14 +45,15 @@
     </style>
 </head>
 <body>
-    <h1>Hàng đang bán</h1>
+    <h1 id="ten-trang">Hàng đang bán</h1>
+    <p id="neo-man-hinh" class="ghichu">[SANPHAM-MAN-HINH] — trang công khai: khách CHƯA đăng nhập xem được.</p>
 
     @if (Model.Count == 0)
     {
         @* 🚨 CA RỖNG — bắt buộc: một trang chỉ đúng khi có dữ liệu là một trang CHƯA kiểm chứng. *@
         <div class="rong" id="trong">
-            <strong>Chưa có hàng nào được niêm yết giá.</strong>
-            <div>Chưa có danh sách giá nào có dòng SKU, hoặc chưa có danh sách giá nào được tạo.</div>
+            <strong>Chưa có sản phẩm nào đang bán.</strong>
+            <div>Chỉ sản phẩm <em>đang bán</em> và <em>đã niêm yết giá</em> mới xuất hiện ở đây.</div>
         </div>
     }
     else
@@ -42,36 +61,41 @@
         <table id="bang-san-pham">
             <thead>
                 <tr>
-                    <th>Danh sách giá</th>
+                    <th>Sản phẩm</th>
                     <th>SKU</th>
-                    <th class="so">Đơn giá</th>
+                    <th class="so">Giá từ</th>
                 </tr>
             </thead>
             <tbody>
-                @foreach (var dong in Model)
+                @foreach (var sp in Model)
                 {
-                    <tr>
-                        <td>@dong.MaBangGia — @dong.TenBangGia</td>
-                        @* 🚨 §92: LIÊN KẾT sang trang CHI TIẾT. Dùng `Url.Action` (không ghép URL) ⇒ route đổi thì link TỰ đúng
-                           (Phụ lục D) và SKU được URL-encode. `class` (không `id`) vì mỗi dòng một link — `id` phải DUY NHẤT. *@
-                        <td><a class="lien-ket-chi-tiet" href="@Url.Action("ChiTiet", "SanPham", new { sku = dong.Sku })">@dong.Sku</a></td>
-                        <td class="so">@dong.DonGia.ToString("N0")</td>
+                    <tr class="dong-san-pham">
+                        <td>
+                            @* 🚨 LIÊN KẾT sang trang CHI TIẾT theo **SLUG** (`WEB-002` ADR-03: URL công khai dùng slug,
+                               không lộ GUID; SKU chỉ là đường tương thích ngược). `class` (không `id`) vì mỗi dòng
+                               một link — `id` phải DUY NHẤT. *@
+                            <a class="lien-ket-san-pham" href="/SanPham/ChiTiet/@Uri.EscapeDataString(SlugCua(sp))">@sp.Ten</a>
+                        </td>
+                        <td>@string.Join(", ", sp.Gia.Select(x => x.Sku))</td>
+                        <td class="so">@sp.Gia.Min(x => x.DonGia).ToString("N0") VND</td>
                     </tr>
                 }
             </tbody>
             <tfoot>
                 <tr>
-                    <th colspan="2">TỔNG SỐ DÒNG</th>
+                    <th colspan="2">TỔNG SỐ SẢN PHẨM</th>
                     <th class="so" id="tong-dong">@Model.Count</th>
                 </tr>
             </tfoot>
         </table>
     }
 
-    <p class="ghichu">
-        Nguồn: <code>IPriceListAppService</code> (<code>GET /api/app/price-list</code> + <code>/item/{id}</code>) —
-        cùng app service với API (một nguồn sự thật). ⚠️ Giá hiển thị <strong>chưa</strong> kèm thuế/phí/khuyến mãi:
-        con số **cuối cùng** phải lấy từ <code>PriceCalculation</code> (sổ giải trình) — xem <code>PRC-002</code>.
+    <p class="ghichu" id="nguon-gia">
+        Nguồn: <code>DocSanPhamCongKhai</code> (đọc <code>CatProducts</code>/<code>CatProductVariants</code> +
+        dòng giá của bảng giá <strong>đang hiệu lực</strong>) — <strong>không</strong> gọi app service cần quyền,
+        vì trang này **công khai**. ⚠️ Giá hiển thị là <strong>giá niêm yết</strong> (`BR-WEB-002-008`), chưa kèm
+        thuế/phí/khuyến mãi: con số **cuối cùng** phải lấy từ sổ giải trình <code>PriceCalculation</code> (`PRC-002`).
+        ⚠️ Trang KHÔNG hiển thị tồn kho (kể cả mức "còn/hết") — chưa có đường đọc tồn **công khai** (`INV-003`).
     </p>
 </body>
 </html>

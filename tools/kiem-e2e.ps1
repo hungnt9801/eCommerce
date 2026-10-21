@@ -77,6 +77,7 @@ $ketQua = [System.Collections.Generic.List[object]]::new()
 $web = 'http://localhost:5100'
 $jar = Join-Path $thuMucTam 'cookie.txt'
 $tienTrinh = $null
+$tienTrinhHost = $null
 
 function Kq {
     param([string]$Ten, [bool]$Dat, [string]$ChiTiet = '')
@@ -179,7 +180,9 @@ select count(*)::text from "ReconRunMismatches" where "ReconRunId" = 'e0000000-0
     # ── ① DUNG WEB CU (neu co) + CHO CONG TRONG ─────────────────────────────────────────────
     # ⚠️ Phai lam TRUOC khi khoi dong: 🔑 mot tien trinh cu dang giu cong 5100 se lam `Start-Process` **that bai
     # im lang**, va ta se **do mot trang CU** (📌 bai hoc "doc ban CU" — `web-001` §97.6 #3).
-    foreach ($cong in @(5100)) {
+    # ➕ `S8`: cong **5000** cung phai trong — vi `S8` khoi dong ca **HttpApi.Host** (trang gia lap gui IPN
+    # THAT toi do). 📌 Mot Host cu con song ⇒ ta do mot **ban build CU** va ca "end-to-end" thanh **gia**.
+    foreach ($cong in @(5100, 5000)) {
         foreach ($k in @(Get-NetTCPConnection -LocalPort $cong -State Listen -ErrorAction SilentlyContinue)) {
             Stop-Process -Id $k.OwningProcess -Force -ErrorAction SilentlyContinue
         }
@@ -270,6 +273,85 @@ select count(*)::text from "CusCustomers" where "Id" = 'e0000000-0000-0000-0000-
 '@ -SoDongMongDoi 1 | Out-Null
 
         Write-Output '   ✅ Da gieo them: 1 kho probe (K97E2E-KHO) + 1 khach DANG BI CHAN (K97E2E-CHAN).'
+
+        # ══════════════════════════════════════════════════════════════════════════════════════
+        # 🆕 `S8` — DỮ LIỆU CHO **STOREFRONT CÔNG KHAI** + **THANH TOÁN END-TO-END**
+        # ══════════════════════════════════════════════════════════════════════════════════════
+        # 🔑 **VI SAO PHAI Gieo CATALOG/PRICE/STOCK:** trang chi tiet `200` chi khi san pham **Published**
+        # **VA** co dong gia dang hieu luc; con duong dat hang that (`TinhVaGiuChoAsync`) **NEM** khi khong co
+        # gia hoac khong du ton. 📌 Khong gieo thi ca "end-to-end toi trang ket qua" khong bao gio chay duoc —
+        # va te hon: no se **do vi ly do sai** (thieu du lieu) chu khong phai vi san pham hong.
+        # ⚠️ Moi GUID nam trong khoi `e0000000-…` ⇒ `kiem-db.ps1` nhom ⑥ **tu quet** neu con sot.
+        #
+        # 📌 HAI san pham, CO Y khac trang thai — de do **ca hai chieu**:
+        #    • `e8` = **Published** (phai HIEN, `200`) — SKU `K97E2E-SKU-P1`, gia niem yet 100.000;
+        #    • `ed` = **Unpublished** (phai AN, `404`) — cung co gia niem yet ⇒ 🔑 neu no van hien thi bo loc
+        #      `Published` **khong co tac dung** (mot san pham khong co gia cung 404, va ta se ket luan sai).
+        # 🚨 **`S8-W3` KHANG DINH DU LIEU NOI BO KHONG LOT RA HTML CONG KHAI.** 🔑 Ba gia tri duoc chon vi
+        # chung **CO THAT** trong luoc do va **khong duoc phep** xuat hien:
+        #    • `CatProducts.Code` = `K97E2E-SP-01` (ma noi bo — `WEB-002` ADR-03: URL cong khai dung slug);
+        #    • `CatProducts.Id` (GUID — cung ADR-03: **cam** lo GUID);
+        #    • chuoi `CostPrice` — ⚠️ **PHAT HIEN CUA `S8`: cot `CostPrice` KHONG TON TAI trong luoc do**
+        #      (`CatProductVariants` chi co `Price`/`CompareAtPrice`), nen rang buoc "cam lo gia von" cua `D10`
+        #      hien duoc bao dam **bang su VANG MAT** — ghi o `web-002` §16. 📌 Khi GĐ2 them gia von thi ca nay
+        #      **khong** tu bat; luc do phai dua vao danh sach trang cua DTO (`StorefrontCongKhaiTests`).
+        TiemVaoDb -Sql @'
+delete from "CatProductVariants" where "Id" in ('e0000000-0000-0000-0000-0000000000e9','e0000000-0000-0000-0000-0000000000ee');
+delete from "CatProducts" where "Id" in ('e0000000-0000-0000-0000-0000000000e8','e0000000-0000-0000-0000-0000000000ed');
+'@ -KhongNemKhiThieuKiem | Out-Null
+
+        TiemVaoDb -Sql @'
+insert into "CatProducts" ("Id","TenantId","Code","Name","Slug","Description","ExtraProperties","ConcurrencyStamp","CreationTime","IsDeleted","Status")
+values ('e0000000-0000-0000-0000-0000000000e8',null,'K97E2E-SP-01','K97E2E Ao Thun','k97e2e-ao-thun','Mo ta K97E2E (khong co HTML nguy hiem).','{}','k97e2e8',now(),false,1),
+       ('e0000000-0000-0000-0000-0000000000ed',null,'K97E2E-SP-02','K97E2E Hang Ngung Ban','k97e2e-ngung-ban','San pham DA NGUNG BAN.','{}','k97e2ed',now(),false,2);
+'@ -KiemSql @'
+select count(*)::text from "CatProducts" where "Id" in ('e0000000-0000-0000-0000-0000000000e8','e0000000-0000-0000-0000-0000000000ed');
+'@ -SoDongMongDoi 2 | Out-Null
+
+        TiemVaoDb -Sql @'
+insert into "CatProductVariants" ("Id","TenantId","ProductId","Sku","Price","IsActive","CreationTime","IsDeleted")
+values ('e0000000-0000-0000-0000-0000000000e9',null,'e0000000-0000-0000-0000-0000000000e8','K97E2E-SKU-P1',100000,true,now(),false),
+       ('e0000000-0000-0000-0000-0000000000ee',null,'e0000000-0000-0000-0000-0000000000ed','K97E2E-SKU-P2',100000,true,now(),false);
+'@ -KiemSql @'
+select count(*)::text from "CatProductVariants" where "Id" in ('e0000000-0000-0000-0000-0000000000e9','e0000000-0000-0000-0000-0000000000ee');
+'@ -SoDongMongDoi 2 | Out-Null
+
+        # 🔑 Bang gia **Active** (Status = 2) va hieu luc ⇒ dung nguon gia DUY NHAT cho ca storefront lan checkout
+        # (`PriceCalculationAppService` cung doc `PriceListStatus.Active`). 📌 Draft/het han thi khong tinh.
+        TiemVaoDb -Sql @'
+delete from "PrcPriceListItems" where "Id" in ('e0000000-0000-0000-0000-0000000000eb','e0000000-0000-0000-0000-0000000000ef');
+delete from "PrcPriceLists" where "Id" = 'e0000000-0000-0000-0000-0000000000ea';
+'@ -KhongNemKhiThieuKiem | Out-Null
+
+        TiemVaoDb -Sql @'
+insert into "PrcPriceLists" ("Id","TenantId","Code","Name","Scope","ChannelCode","ChannelShopId","Currency","EffectiveFrom","EffectiveTo","Priority","Status","ExtraProperties","ConcurrencyStamp","CreationTime","IsDeleted")
+values ('e0000000-0000-0000-0000-0000000000ea',null,'K97E2E-BG','K97E2E Bang gia probe',0,null,null,'VND',now() - interval '1 day',null,0,2,'{}','k97e2ea',now(),false);
+'@ -KiemSql @'
+select count(*)::text from "PrcPriceLists" where "Id" = 'e0000000-0000-0000-0000-0000000000ea' and "Status" = 2;
+'@ -SoDongMongDoi 1 | Out-Null
+
+        TiemVaoDb -Sql @'
+insert into "PrcPriceListItems" ("Id","TenantId","PriceListId","Sku","AmountValue","CurrencyCode","ExtraProperties","ConcurrencyStamp","CreationTime","IsDeleted")
+values ('e0000000-0000-0000-0000-0000000000eb',null,'e0000000-0000-0000-0000-0000000000ea','K97E2E-SKU-P1',100000,'VND','{}','k97e2eb',now(),false),
+       ('e0000000-0000-0000-0000-0000000000ef',null,'e0000000-0000-0000-0000-0000000000ea','K97E2E-SKU-P2',100000,'VND','{}','k97e2ef',now(),false);
+'@ -KiemSql @'
+select count(*)::text from "PrcPriceListItems" where "Id" in ('e0000000-0000-0000-0000-0000000000eb','e0000000-0000-0000-0000-0000000000ef');
+'@ -SoDongMongDoi 2 | Out-Null
+
+        # 🔑 TON KHO: `TinhVaGiuChoAsync` **giu cho** ⇒ khong du ton thi don khong tao duoc. 📌 `Reserved = 0`
+        # vi day la trang thai dau (chua ai giu).
+        TiemVaoDb -Sql @'
+delete from "InvItems" where "Id" = 'e0000000-0000-0000-0000-0000000000ec';
+'@ -KhongNemKhiThieuKiem | Out-Null
+
+        TiemVaoDb -Sql @'
+insert into "InvItems" ("Id","TenantId","WarehouseId","Sku","OnHand","Reserved","ExtraProperties","ConcurrencyStamp","CreationTime","IsDeleted")
+values ('e0000000-0000-0000-0000-0000000000ec',null,'e0000000-0000-0000-0000-0000000000e6','K97E2E-SKU-P1',100,0,'{}','k97e2ec',now(),false);
+'@ -KiemSql @'
+select count(*)::text from "InvItems" where "Id" = 'e0000000-0000-0000-0000-0000000000ec' and "OnHand" = 100;
+'@ -SoDongMongDoi 1 | Out-Null
+
+        Write-Output '   ✅ Da gieo catalog (1 Published + 1 Unpublished) + bang gia ACTIVE + ton kho cho SKU probe.'
     }
 
     # ── ③ KHOI DONG WEB + CHO LEN ───────────────────────────────────────────────────────────
@@ -287,6 +369,25 @@ select count(*)::text from "CusCustomers" where "Id" = 'e0000000-0000-0000-0000-
 
     if ($LASTEXITCODE -ne 0) {
         throw ("Web KHONG len trong {0}s. Xem log: {1}" -f $TimeoutGiay, $logWeb)
+    }
+
+    # ── ③b 🆕 `S8` KHOI DONG **HttpApi.Host** (:5000) — TIEN DE CUA CA "END-TO-END THANH TOAN" ─────────
+    # 🚨 **VI SAO BUOC NAY TON TAI:** trang gia lap ky IPN roi goi **endpoint THAT** `/api/webhooks/vnpay`,
+    # va endpoint do nam o **tien trinh Host**, khong phai Web. 📌 Neu chi chay Web thi IPN khong toi noi
+    # ⇒ trang ket qua se noi "chua thanh toan" **dung** — va ta rat de ket luan sai la *"san pham hong"*.
+    # 🔒 Do do ta **khang dinh Host len** truoc khi do (wait-host), va **tat** no trong `finally`.
+    $binHost = Join-Path $goc 'src\eCommerce.HttpApi.Host\bin\Debug\net10.0'
+    $logHost = Join-Path $thuMucTam 'host.log'
+
+    $tienTrinhHost = Start-Process dotnet -ArgumentList 'eCommerce.HttpApi.Host.dll' -WorkingDirectory $binHost `
+        -PassThru -WindowStyle Hidden -RedirectStandardOutput $logHost `
+        -RedirectStandardError (Join-Path $thuMucTam 'host.err')
+
+    & pwsh -NoProfile -File $cho -Url 'http://localhost:5000' -LogFile $logHost -TimeoutSeconds $TimeoutGiay -ProcessId $tienTrinhHost.Id |
+        Select-Object -Last 1 | ForEach-Object { Write-Output ("   $_") }
+
+    if ($LASTEXITCODE -ne 0) {
+        throw ("HttpApi.Host KHONG len trong {0}s ⇒ ca thanh toan end-to-end se VO NGHIA. Xem log: {1}" -f $TimeoutGiay, $logHost)
     }
 
     # ── ④ DANG NHAP THAT (form + cookie) ────────────────────────────────────────────────────
@@ -1258,6 +1359,255 @@ select count(*)::text from "ReconRunMismatches" where "Id" = 'e0000000-0000-0000
             ($conDongCuChuaXuLy2 -eq '1') ("con = " + $conDongCuChuaXuLy2 + " (mong doi 1)")
     }
 
+    # ══════════════════════════════════════════════════════════════════════════════════════════
+    # ⑧ 🆕 `S8` — STOREFRONT **CÔNG KHAI** (`WEB-002` · `D10`) — ĐO BẰNG **PHIÊN ẨN DANH**
+    # ══════════════════════════════════════════════════════════════════════════════════════════
+    # 🔑 **VI SAO PHAI DO BANG PHIEN AN DANH (khong dung `$jar`):** moi ca khac cua E2E nay chay bang
+    # **cookie admin**; dung cookie do de kiem "trang cong khai" la **tu lui minh** — trang se `200` vi
+    # DA DANG NHAP, dung thu ta can loai bo. 📌 Day la khac biet duy nhat giua *"xong"* va *"trong nhu xong"*
+    # cua `Q6`/`D10`.
+    $tepSpAnon = Join-Path $thuMucTam 'sanpham-anon.html'
+    $maSpAnon = ([string](& curl.exe -s -o $tepSpAnon -w '%{http_code}' ($web + '/SanPham'))).Trim()
+    $htmlSpAnon = GiaiMaHtml ([System.IO.File]::ReadAllText($tepSpAnon, [Text.Encoding]::UTF8))
+
+    Kq 'S8-W1 🚨 KHÁCH CHƯA ĐĂNG NHẬP vào /SanPham => 200 (không bị đá về /Account/Login)' `
+        (($maSpAnon -eq '200') -and ($htmlSpAnon -match '\[SANPHAM-MAN-HINH\]')) `
+        ("HTTP " + $maSpAnon)
+
+    $tepCtAnon = Join-Path $thuMucTam 'sanpham-chitiet-anon.html'
+    $maCtAnon = ([string](& curl.exe -s -o $tepCtAnon -w '%{http_code}' ($web + '/SanPham/ChiTiet/k97e2e-ao-thun'))).Trim()
+    $htmlCtAnon = GiaiMaHtml ([System.IO.File]::ReadAllText($tepCtAnon, [Text.Encoding]::UTF8))
+
+    Kq 'S8-W2 🚨 KHÁCH CHƯA ĐĂNG NHẬP xem CHI TIẾT theo SLUG => 200 + đúng sản phẩm' `
+        (($maCtAnon -eq '200') -and ($htmlCtAnon -match 'K97E2E Ao Thun') -and ($htmlCtAnon -match 'id="gia-thap-nhat"')) `
+        ("HTTP " + $maCtAnon)
+
+    # 🚨 **KHONG LO DU LIEU NOI BO** — do tren HTML THAT; hai gia tri duoi day deu **CO THAT** trong DB.
+    $loMaNoiBo = $htmlCtAnon -match 'K97E2E-SP-01'
+    $loGuid = $htmlCtAnon -match 'e0000000-0000-0000-0000-0000000000e8'
+    $loGiaVon = $htmlCtAnon -match 'CostPrice'
+
+    Kq 'S8-W3 🚨 HTML công khai KHÔNG lộ mã nội bộ / GUID / giá vốn' `
+        ((-not $loMaNoiBo) -and (-not $loGuid) -and (-not $loGiaVon)) `
+        ("maNoiBo=" + $loMaNoiBo + " guid=" + $loGuid + " giaVon=" + $loGiaVon)
+
+    # ✅ CHIEU NGUOC (chong "trang luon 404 cho chac"): san pham DANG BAN phai HIEN gia niem yet.
+    Kq 'S8-W3b 🚨 chiều ngược: trang chi tiết CÓ hiện giá niêm yết 100.000 (không phải trang rỗng)' `
+        ($htmlCtAnon -match '100[,.]000') 'gia niem yet tu bang gia Active'
+
+    $tepNgungBan = Join-Path $thuMucTam 'sanpham-ngungban.html'
+    $maNgungBan = ([string](& curl.exe -s -o $tepNgungBan -w '%{http_code}' ($web + '/SanPham/ChiTiet/k97e2e-ngung-ban'))).Trim()
+
+    Kq 'S8-W4 🚨 hàng ĐÃ NGỪNG BÁN => 404 (bộ lọc Published có tác dụng THẬT)' `
+        ($maNgungBan -eq '404') ("HTTP " + $maNgungBan)
+
+    # 🔑 URL CU theo SKU van phai `200` (`CAT-003` ADR-05) — neu khong thi moi link da chia se/index thanh 404
+    # va `canonical` khong con duong don tin hieu ve slug.
+    $tepSkuAnon = Join-Path $thuMucTam 'sanpham-sku-anon.html'
+    $maSkuAnon = ([string](& curl.exe -s -o $tepSkuAnon -w '%{http_code}' ($web + '/SanPham/ChiTiet/K97E2E-SKU-P1'))).Trim()
+    $htmlSkuAnon = GiaiMaHtml ([System.IO.File]::ReadAllText($tepSkuAnon, [Text.Encoding]::UTF8))
+
+    Kq 'S8-W5 🚨 URL cũ theo SKU vẫn 200 + canonical trỏ về SLUG (ADR-05)' `
+        (($maSkuAnon -eq '200') -and ($htmlSkuAnon -match 'rel="canonical" href="/SanPham/ChiTiet/k97e2e-ao-thun"')) `
+        ("HTTP " + $maSkuAnon)
+
+    $tepSitemap = Join-Path $thuMucTam 'sitemap-anon.xml'
+    $maSitemap = ([string](& curl.exe -s -o $tepSitemap -w '%{http_code}' ($web + '/sitemap.xml'))).Trim()
+    $xmlSitemap = [System.IO.File]::ReadAllText($tepSitemap, [Text.Encoding]::UTF8)
+
+    Kq 'S8-W6 🚨 sitemap dùng SLUG của hàng ĐANG BÁN và KHÔNG chứa hàng ngừng bán' `
+        (($maSitemap -eq '200') -and ($xmlSitemap -match 'k97e2e-ao-thun') -and ($xmlSitemap -notmatch 'k97e2e-ngung-ban')) `
+        ("HTTP " + $maSitemap)
+
+    # ══════════════════════════════════════════════════════════════════════════════════════════
+    # ⑨ 🆕 `S8` — THANH TOAN **END-TO-END** TOI TRANG KET QUA (don -> giao dich -> cong -> IPN -> ket qua)
+    # ══════════════════════════════════════════════════════════════════════════════════════════
+    # 🔒 Chuoi duoc do **dung nhu nguoi dung di**: POST form co token that → `302` sang **cong** →
+    # bam nut o cong → cong **ky HMAC that** roi goi **endpoint IPN that** (Host :5000) → chuyen ve
+    # **trang ket qua**. 📌 Khong buoc nao duoc bo qua: do la dieu kien de goi la *"end-to-end"*.
+    $dathangSp = TaiTrang -DuongDan '/DatHang' -TepLuu (Join-Path $thuMucTam 'dathang-thanhtoan.html')
+    $htmlDathangSp = GiaiMaHtml $dathangSp.Html
+
+    # 🔑 Tien de: o "Thanh toan ngay" chi render khi nguoi dung co `eCommerce.Payments.Default`.
+    # Neu khong co o nay thi moi ca sau **vo nghia** (`ThanhToanNgay` khong bao gio duoc gui).
+    Kq 'S8-P1 /DatHang có ô "Thanh toán ngay" (quyền Payments.Default)' `
+        ($htmlDathangSp -match 'id="ThanhToanNgay"') 'o chon chi hien khi co quyen'
+
+    $mTokenTt = [regex]::Match($dathangSp.Html, 'name="__RequestVerificationToken"[^>]*value="(?<t>[^"]+)"')
+
+    if (-not $mTokenTt.Success) {
+        Kq 'S8-P2 có token chống giả mạo trên /DatHang' $false 'KHONG co token ⇒ khong POST duoc'
+    }
+    else {
+        Kq 'S8-P2 có token chống giả mạo trên /DatHang' $true 'token that tu trang'
+        $tokenTt = $mTokenTt.Groups['t'].Value
+
+        # ── ① DAT HANG + THANH TOAN NGAY ⇒ phai `302` sang CONG (khong render lai trang dat hang) ──
+        $khoaP1 = 'K97E2E-P1'
+        $kqPostP1 = ([string](& curl.exe -s -b $jar -c $jar -o (Join-Path $thuMucTam 'dathang-p1.html') -w '%{http_code}|%{redirect_url}' `
+            --data-urlencode ("__RequestVerificationToken=" + $tokenTt) `
+            --data-urlencode 'KhoId=e0000000-0000-0000-0000-0000000000e6' `
+            --data-urlencode 'Kenh=web' `
+            --data-urlencode 'Sku=K97E2E-SKU-P1' `
+            --data-urlencode 'SoLuong=1' `
+            --data-urlencode 'Thue=0.1' `
+            --data-urlencode ("KhoaCheckout=" + $khoaP1) `
+            --data-urlencode 'KhachId=' `
+            --data-urlencode 'ThanhToanNgay=true' `
+            ($web + '/DatHang'))).Trim()
+
+        $phanP1 = $kqPostP1.Split('|')
+        $maPostP1 = $phanP1[0]
+        $urlCongP1 = if ($phanP1.Count -gt 1) { $phanP1[1] } else { '' }
+
+        Kq 'S8-P3 🚨 POST /DatHang (Thanh toán ngay) => 302 sang TRANG CỔNG' `
+            (($maPostP1 -eq '302') -and ($urlCongP1 -match '/pay-gia-lap/')) `
+            ("HTTP " + $maPostP1 + " · Location = " + $urlCongP1)
+
+        # ── ② TRANG CONG GIA LAP: phai render 3 nut + so tien DUNG (110.000 = 100.000 + thue 10%) ──
+        # 📌 `GrandTotal` chu khong phai gia niem yet: do la con so **that** cua don va cung la so gui len cong.
+        # 🔑 Dinh dang `N0` theo culture may chu (en-US) ⇒ `110,000`; viet `110.000` se la **phep do sai**
+        # (bai hoc `S7` §: cot `numeric` in `7.0000` khien 3 ca DO GIA).
+        $tepCong = Join-Path $thuMucTam 'pay-gia-lap.html'
+        $maCong = ([string](& curl.exe -s -b $jar -c $jar -o $tepCong -w '%{http_code}' $urlCongP1)).Trim()
+        $htmlCongTho = if (Test-Path $tepCong) { [System.IO.File]::ReadAllText($tepCong, [Text.Encoding]::UTF8) } else { '' }
+        $htmlCong = GiaiMaHtml $htmlCongTho
+
+        Kq 'S8-P4 trang CỔNG GIẢ LẬP: 200 + 3 nút + số tiền 110.000 (100.000 + thuế 10%)' `
+            (($maCong -eq '200') -and ($htmlCong -match '\[PAY-GIA-LAP\]') -and ($htmlCong -match 'nut-thanh-cong') -and ($htmlCong -match 'nut-that-bai') -and ($htmlCong -match '110[,.]000')) `
+            ("HTTP " + $maCong)
+
+        $maThamChieuP1 = [regex]::Match($htmlCongTho, 'id="ma-tham-chieu">(?<m>[^<]+)<').Groups['m'].Value.Trim()
+
+        # 🔑 Lay **dung** `returnUrl` ma trang cong phat ra (trong `<input name="returnUrl">`) — 📌 gui RONG thi
+        # simulator chuyen ve `/DatHang` (mac dinh an toan) va ca `P7` se do vi **phep do sai**, khong phai san pham sai.
+        $returnUrlP1 = [System.Net.WebUtility]::UrlDecode(
+            [regex]::Match($htmlCongTho, 'name="returnUrl" value="(?<u>[^"]*)"').Groups['u'].Value)
+
+        $sqlTrangThaiGd = @'
+select "Status"::text from "PayTransactions" where "MerchantReference" = '{0}';
+'@
+
+        # 🔑 TIEN DE (quy tac ③): giao dich phai **co that** trong DB va o `Initiated` TRUOC khi bam nut.
+        # 📌 Thieu buoc nay thi mot ca "da thanh toan" co the xanh vi ly do hoan toan khac.
+        $trangThaiGdTruoc = (@(Invoke-Psql -Sql ($sqlTrangThaiGd -f $maThamChieuP1)) -join '').Trim()
+
+        Kq 'S8-P5 tiền đề: giao dịch ở `Initiated` (0) trước khi bấm nút ở cổng' `
+            ($trangThaiGdTruoc -eq '0') ("Status = " + $trangThaiGdTruoc + " · ma = " + $maThamChieuP1)
+
+        $mTokenCong = [regex]::Match($htmlCongTho, 'name="__RequestVerificationToken"[^>]*value="(?<t>[^"]+)"')
+
+        if (-not $mTokenCong.Success) {
+            Kq 'S8-P6 có token chống giả mạo trên trang cổng' $false 'KHONG co token ⇒ khong POST duoc'
+        }
+        else {
+            Kq 'S8-P6 có token chống giả mạo trên trang cổng' $true 'token that tu trang'
+            $tokenCong = $mTokenCong.Groups['t'].Value
+
+            $tepKetQuaP1 = Join-Path $thuMucTam 'ketqua-p1.html'
+            $maKetQuaP1 = ([string](& curl.exe -s -L -b $jar -c $jar -o $tepKetQuaP1 -w '%{http_code}' `
+                --data-urlencode ("__RequestVerificationToken=" + $tokenCong) `
+                --data-urlencode ("returnUrl=" + $returnUrlP1) `
+                --data-urlencode 'ketQua=thanh-cong' `
+                ('http://localhost:5100/pay-gia-lap/' + [uri]::EscapeDataString($maThamChieuP1)))).Trim()
+
+            $htmlKetQuaP1 = GiaiMaHtml ([System.IO.File]::ReadAllText($tepKetQuaP1, [Text.Encoding]::UTF8))
+
+            Kq 'S8-P7 🚨 bấm "Thành công" ở cổng => TRANG KẾT QUẢ (200)' `
+                (($maKetQuaP1 -eq '200') -and ($htmlKetQuaP1 -match '\[DATHANG-KET-QUA\]')) `
+                ("HTTP " + $maKetQuaP1)
+
+            Kq 'S8-P8 🚨 trang kết quả nói "ĐÃ THANH TOÁN"' `
+                ($htmlKetQuaP1 -match 'ĐÃ THANH TOÁN') 'trang thai DOC TU DB, khong tu query string'
+
+            $sauIpn = (@(Invoke-Psql -Sql ($sqlTrangThaiGd -f $maThamChieuP1)) -join '').Trim()
+
+            Kq 'S8-P9 🚨 DB: giao dịch => Succeeded (2) — không tin HTTP 200 của trang' `
+                ($sauIpn -eq '2') ("Status = " + $sauIpn)
+
+            # 🚨 CAU NOI `Order.PaymentStatus` la **su kien**, khong phai cung transaction ⇒ 🔑 cho CO HAN
+            # (khong ngu mu): hoi DB toi da ~3s roi moi ket luan. 📌 Neu ket luan ngay thi ca nay DO **ngau nhien**
+            # va do se la mot ca "flaky" — thu te hon mot ca do that.
+            $sqlThanhToanDon = @'
+select "PaymentStatus"::text from "OrdOrders" where "Number" = '{0}';
+'@
+
+            $thanhToanDon = ''
+
+            for ($i = 0; $i -lt 15; $i++) {
+                $thanhToanDon = (@(Invoke-Psql -Sql ($sqlThanhToanDon -f 'WEB-K97E2E-P1')) -join '').Trim()
+
+                if ($thanhToanDon -eq '2') { break }
+
+                Start-Sleep -Milliseconds 200
+            }
+
+            Kq 'S8-P10 🚨 cầu nối: đơn => PaymentStatus = Paid (2) qua ETO' `
+                ($thanhToanDon -eq '2') ("PaymentStatus = " + $thanhToanDon)
+
+            # ── ③ CHIEU NGUOC QUAN TRONG NHAT: `vnp_ResponseCode=00` tren URL **KHONG** lam don thanh da tra ──
+            # 🔑 Day la bat bien `PAY-001` D2. 📌 Neu trang tin query string thi bat ky ai go mot URL cung
+            # "thanh toan xong" trong mat nguoi van hanh ⇒ **giao hang mien phi**.
+            $khoaP2 = 'K97E2E-P2'
+            $kqPostP2 = ([string](& curl.exe -s -b $jar -c $jar -o (Join-Path $thuMucTam 'dathang-p2.html') -w '%{http_code}|%{redirect_url}' `
+                --data-urlencode ("__RequestVerificationToken=" + $tokenTt) `
+                --data-urlencode 'KhoId=e0000000-0000-0000-0000-0000000000e6' `
+                --data-urlencode 'Kenh=web' `
+                --data-urlencode 'Sku=K97E2E-SKU-P1' `
+                --data-urlencode 'SoLuong=1' `
+                --data-urlencode 'Thue=0.1' `
+                --data-urlencode ("KhoaCheckout=" + $khoaP2) `
+                --data-urlencode 'KhachId=' `
+                --data-urlencode 'ThanhToanNgay=true' `
+                ($web + '/DatHang'))).Trim()
+
+            $urlCongP2 = $kqPostP2.Split('|')[1]
+
+            $tepCongP2 = Join-Path $thuMucTam 'pay-gia-lap-2.html'
+            & curl.exe -s -b $jar -c $jar -o $tepCongP2 -w '%{http_code}' $urlCongP2 | Out-Null
+            $htmlCongP2Tho = [System.IO.File]::ReadAllText($tepCongP2, [Text.Encoding]::UTF8)
+            $maThamChieuP2 = [regex]::Match($htmlCongP2Tho, 'id="ma-tham-chieu">(?<m>[^<]+)<').Groups['m'].Value.Trim()
+
+            # 🚨 Go thang URL kem `vnp_ResponseCode=00` — **nhu ke tan cong** (chua co IPN nao duoc gui).
+            $tepGiaP2 = Join-Path $thuMucTam 'ketqua-p2-gia.html'
+            & curl.exe -s -b $jar -c $jar -o $tepGiaP2 -w '%{http_code}' `
+                ($web + '/DatHang/KetQua?ma=' + [uri]::EscapeDataString($maThamChieuP2) + '&vnp_ResponseCode=00&vnp_TransactionStatus=00') | Out-Null
+            $htmlGiaP2 = GiaiMaHtml ([System.IO.File]::ReadAllText($tepGiaP2, [Text.Encoding]::UTF8))
+
+            Kq 'S8-P11 🚨 `?vnp_ResponseCode=00` trên URL KHÔNG làm đơn thành đã thanh toán (D2)' `
+                (($htmlGiaP2 -notmatch 'ĐÃ THANH TOÁN') -and ($htmlGiaP2 -match 'CHƯA thanh toán')) `
+                'trang thai doc tu DB, KHONG tu query string'
+
+            $trangThaiP2 = (@(Invoke-Psql -Sql ($sqlTrangThaiGd -f $maThamChieuP2)) -join '').Trim()
+
+            Kq 'S8-P12 và DB vẫn `Initiated` (không có đường nào khác ghi "đã trả")' `
+                ($trangThaiP2 -eq '0') ("Status = " + $trangThaiP2)
+
+            # ── ④ NHANH THAT BAI (do ca hai chieu: thanh cong o tren, that bai o day) ──────────────
+            $mTokenCong2 = [regex]::Match($htmlCongP2Tho, 'name="__RequestVerificationToken"[^>]*value="(?<t>[^"]+)"')
+
+            $tepKetQuaP2 = Join-Path $thuMucTam 'ketqua-p2.html'
+            & curl.exe -s -L -b $jar -c $jar -o $tepKetQuaP2 -w '%{http_code}' `
+                --data-urlencode ("__RequestVerificationToken=" + $mTokenCong2.Groups['t'].Value) `
+                --data-urlencode 'returnUrl=' `
+                --data-urlencode 'ketQua=that-bai' `
+                ('http://localhost:5100/pay-gia-lap/' + [uri]::EscapeDataString($maThamChieuP2)) | Out-Null
+
+            $trangThaiP2Sau = (@(Invoke-Psql -Sql ($sqlTrangThaiGd -f $maThamChieuP2)) -join '').Trim()
+
+            Kq 'S8-P13 🚨 cổng báo THẤT BẠI => DB Failed (3)' `
+                ($trangThaiP2Sau -eq '3') ("Status = " + $trangThaiP2Sau)
+
+            # 🔑 `PaymentStatus = 5` (Failed) la **thiet ke dung** cua cau noi: cong bao that bai ⇒ don sang
+            # `Failed`, **khong** phai `Paid`. 📌 `Unpaid (0)` moi la con so SAI o day — va do chinh la dieu
+            # ban dau toi ky vong (doan, khong doc `LuatCauNoiThanhToan`) ⇒ ca kiem do **vi phep do sai**.
+            $thanhToanDon2 = (@(Invoke-Psql -Sql ($sqlThanhToanDon -f 'WEB-K97E2E-P2')) -join '').Trim()
+
+            Kq 'S8-P14 cổng báo THẤT BẠI => đơn sang Failed (5), KHÔNG phải Paid (2)' `
+                ($thanhToanDon2 -eq '5') ("PaymentStatus = " + $thanhToanDon2 + " (mong doi 5 = Failed)")
+        }
+    }
+
     # ── ⑦ TONG KET ──────────────────────────────────────────────────────────────────────────
     $soDat = @($ketQua | Where-Object { $_.Dat }).Count
 
@@ -1350,6 +1700,45 @@ delete from "ReconRuns" where "Id" = 'e0000000-0000-0000-0000-0000000000e7';
 delete from "InvChannelLimits" where "Id" in ('e0000000-0000-0000-0000-0000000000ea','e0000000-0000-0000-0000-0000000000eb');
 '@ | Out-Null
 
+        # 🆕 `S8` — don du lieu **storefront + thanh toan**.
+        # 🔑 THU TU: giao dich TRUOC (khong co FK, nhung de doc), roi kho/ton/gia/catalog.
+        # 🚨 `PayTransactions.MerchantReference` = `PAY<ngay>-WEB-K97E2E-P1-1` ⇒ 🔑 tiền tố probe nằm **GIỮA**
+        # chuỗi, nên phải `like '%K97E2E%'` (bai hoc `S5-5`: `like 'K9S5%'` **khong khop** ⇒ rac o lai va
+        # lan sau ca "ma on dinh" do vi **ly do vo hinh**).
+        Invoke-Psql -Sql @'
+delete from "PayTransactions" where "MerchantReference" like '%K97E2E%';
+'@ | Out-Null
+
+        # 🚨 `S8` — **HẬU QUẢ CỦA VIỆC KHỞI ĐỘNG HOST TRONG E2E** (bai hoc do duoc ngay trong phien):
+        # `InventoryReconciliationWorker` có `Timer.RunOnStart = true` ⇒ **chạy đối soát NGAY khi Host lên**.
+        # Lúc đó dòng `InvItems` probe (`OnHand = 100`, sổ cái `0`) **đã được gieo** ⇒ job **ghi một dòng lệch
+        # THẬT** vào `ReconRunMismatches` (đúng nghiệp vụ: tồn ≠ sổ cái). 📌 Dòng đó **không** thuộc lượt `e7`
+        # nên phép dọn theo `e7` **không** chạm tới ⇒ `kiem-db.ps1` nhóm ① (`ReconRunMismatches` phải RỖNG)
+        # ĐỎ. ✅ Dọn theo **SKU probe** (dữ liệu thật, chỉ xoá dòng *nói về* dữ liệu probe).
+        Invoke-Psql -Sql @'
+delete from "ReconRunMismatches" where "Sku" like 'K97E2E%';
+'@ | Out-Null
+
+        Invoke-Psql -Sql @'
+delete from "InvItems" where "Id" = 'e0000000-0000-0000-0000-0000000000ec';
+'@ | Out-Null
+
+        Invoke-Psql -Sql @'
+delete from "PrcPriceListItems" where "Id" in ('e0000000-0000-0000-0000-0000000000eb','e0000000-0000-0000-0000-0000000000ef');
+'@ | Out-Null
+
+        Invoke-Psql -Sql @'
+delete from "PrcPriceLists" where "Id" = 'e0000000-0000-0000-0000-0000000000ea';
+'@ | Out-Null
+
+        Invoke-Psql -Sql @'
+delete from "CatProductVariants" where "Id" in ('e0000000-0000-0000-0000-0000000000e9','e0000000-0000-0000-0000-0000000000ee');
+'@ | Out-Null
+
+        Invoke-Psql -Sql @'
+delete from "CatProducts" where "Id" in ('e0000000-0000-0000-0000-0000000000e8','e0000000-0000-0000-0000-0000000000ed');
+'@ | Out-Null
+
         # 🚨 **BAT LAI CO BAO MAT** — 🔑 quen buoc nay nghia la **commit mot admin KHONG bi buoc doi mat khau**.
         Invoke-Psql -Sql @'
 update "AbpUsers" set "ShouldChangePasswordOnNextLogin" = true where "NormalizedUserName" = 'ADMIN';
@@ -1388,13 +1777,44 @@ select count(*)::text from "ReconRunMismatches" where "ReconRunId" = 'e0000000-0
         Write-Output ("   DON DEP: khach probe con={0} (mong doi 0) · kho probe con={1} (mong doi 0) · co bao mat={2} (mong doi True)" -f $con, $conKho, $baoMat)
         Write-Output ("   DON DEP (S7): han muc probe con={0} (0) · luot doi soat probe con={1} (0) · dong lech probe con={2} (0)" -f $conHanMuc, $conLuot, $conDongLech)
 
-        if ($con -ne '0' -or $conKho -ne '0' -or $baoMat -ne 'True' -or $conHanMuc -ne '0' -or $conLuot -ne '0' -or $conDongLech -ne '0') {
+        # 🆕 `S8` — dem lai du lieu probe cua storefront + thanh toan
+        # (📌 "tin la da don" la dung loai loi ma `ham-tiem.ps1` sinh ra de chong).
+        $conGiaoDich = (@(Invoke-Psql -Sql @'
+select count(*)::text from "PayTransactions" where "MerchantReference" like '%K97E2E%';
+'@) -join '').Trim()
+
+        $conCatalog = (@(Invoke-Psql -Sql @'
+select count(*)::text from "CatProducts" where "Code" like 'K97E2E%';
+'@) -join '').Trim()
+
+        $conTon = (@(Invoke-Psql -Sql @'
+select count(*)::text from "InvItems" where "Id" = 'e0000000-0000-0000-0000-0000000000ec';
+'@) -join '').Trim()
+
+        # 🚨 Dòng lệch do **job đối soát** sinh ra khi Host lên (xem chú thích ở phần dọn) — 📌 nếu còn thì
+        # `kiem-db.ps1` nhóm ① sẽ ĐỎ ở **lần chạy sau** vì lý do **vô hình**.
+        $conLechProbe = (@(Invoke-Psql -Sql @'
+select count(*)::text from "ReconRunMismatches" where "Sku" like 'K97E2E%';
+'@) -join '').Trim()
+
+        Write-Output ("   DON DEP (S8): giao dich probe con={0} (0) · catalog probe con={1} (0) · ton probe con={2} (0) · dong lech probe con={3} (0)" -f $conGiaoDich, $conCatalog, $conTon, $conLechProbe)
+
+        if ($con -ne '0' -or $conKho -ne '0' -or $baoMat -ne 'True' -or $conHanMuc -ne '0' -or $conLuot -ne '0' -or $conDongLech -ne '0' -or $conGiaoDich -ne '0' -or $conCatalog -ne '0' -or $conTon -ne '0' -or $conLechProbe -ne '0') {
             Write-Output '   🚨 DON DEP KHONG DAY DU ⇒ lan chay sau co the XANH VI DU LIEU CU.'
         }
     }
     catch {
         # ⚠️ Khong nem tiep: loi don dep **khong** duoc che loi cua ca kiem — nhung phai **noi len**.
         Write-Output ("   🚨 DON DEP THAT BAI: {0}" -f $_.Exception.Message)
+    }
+
+    # ② Dung Host + Web (🔑 mac dinh la dung — de cong TRONG cho lan sau).
+    # 🆕 `S8`: Host (:5000) duoc khoi dong o buoc ③b ⇒ **PHAI** tat o day, neu khong lan chay sau
+    # `kiem-tat-ca.ps1` buoc [1] se bao "cong 5000 dang bi giu" va **dung ca chuoi kiem**.
+    if ($null -ne $tienTrinhHost) {
+        Stop-Process -Id $tienTrinhHost.Id -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 1
+        Write-Output '   Da dung HttpApi.Host (cong 5000 TRONG).'
     }
 
     # ② Dung Web (🔑 mac dinh la dung — de cong 5100 TRONG cho lan sau).

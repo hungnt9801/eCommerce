@@ -54,6 +54,15 @@
                 <tr><th>Khoá checkout</th><td id="khoa-checkout">@Model.KhoaCheckout</td></tr>
             </table>
             <p class="ghichu">Số tiền lấy <strong>nguyên văn</strong> từ sổ giải trình — <em>không</em> tính lại ở tầng UI.</p>
+            @* 🔑 `S8`: nếu đã tạo giao dịch thì LUÔN có đường tra trạng thái — kể cả khi chưa lấy được URL cổng.
+               📌 "Không có nút" = "không có đường tra" = người dùng đặt lại đơn ⇒ đơn trùng. *@
+            @if (!string.IsNullOrWhiteSpace(Model.MaThamChieu))
+            {
+                <p id="lien-ket-ket-qua-thanh-toan">
+                    <a href="/DatHang/KetQua?ma=@Uri.EscapeDataString(Model.MaThamChieu)">Xem kết quả thanh toán</a>
+                    <span class="ghichu">(mã tham chiếu <code>@Model.MaThamChieu</code>)</span>
+                </p>
+            }
         </div>
     }
 
@@ -173,6 +182,30 @@
                 </p>
             <div><label for="SoLuong">Số lượng</label><input id="SoLuong" name="SoLuong" type="number" min="1" value="@Model.SoLuong" /></div>
             <div><label for="Thue">Thuế suất (0.1 = 10%)</label><input id="Thue" name="Thue" value="@Model.Thue" /></div>
+            @* 🚨 `S8` — THANH TOÁN TRÊN UI: tạo đơn xong ⇒ tạo GIAO DỊCH ⇒ chuyển sang CỔNG ⇒ trang kết quả.
+               🔑 Chỉ hiện khi người dùng có quyền TẠO GIAO DỊCH (`eCommerce.Payments.Default`) — nếu hiện mà
+               không có quyền thì **đơn đã tạo xong** mới nhận `403`, và người dùng tưởng "đặt hàng thất bại"
+               rồi đặt lại ⇒ **đơn trùng**. ⚠️ Ẩn ô chọn là TIỆN NGHI, **không** phải hàng rào: cổng thật nằm ở
+               app service (`[Authorize]` cấp class) và vẫn ném `AbpAuthorizationException` nếu gửi tay.
+               📌 Mặc định KHÔNG tick: người dùng chủ động chọn trả tiền. *@
+            @if (Model.CoQuyenThanhToan)
+            {
+                <div id="khoi-thanh-toan-ngay">
+                    <label for="ThanhToanNgay">Thanh toán ngay</label>
+                    <input id="ThanhToanNgay" name="ThanhToanNgay" type="checkbox" value="true"
+                           @(Model.ThanhToanNgay ? "checked" : "") />
+                    <span class="ghichu">Tạo đơn xong sẽ chuyển sang cổng thanh toán.</span>
+                </div>
+            }
+            else
+            {
+                @* ⚠️ KHÔNG im lặng: người dùng phải biết VÌ SAO không có ô thanh toán, 📌 nếu không họ sẽ
+                   đi tìm một nút không tồn tại. *@
+                <div class="ghichu" id="khong-co-quyen-thanh-toan">
+                    Bạn không có quyền tạo giao dịch thanh toán ⇒ trang này chỉ <strong>tạo đơn</strong>;
+                    thanh toán xử lý ở mục <code>/DoiSoatThanhToan</code>.
+                </div>
+            }
             <div style="margin-top:.6rem">
                 <button type="submit" id="nut-dat-hang">Đặt hàng</button>
                 <input type="hidden" name="KhoaCheckout" value="@Model.KhoaCheckout" />

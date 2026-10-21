@@ -2,6 +2,7 @@ using eCommerce.Application.Contracts.Checkout;
 using eCommerce.Application.Contracts.Inventory;
 using eCommerce.Application.Contracts.Sales;
 using eCommerce.Customers;
+using eCommerce.PaymentHub;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Volo.Abp.Authorization.Permissions;
@@ -52,18 +53,35 @@ public class DatHangController : Controller
     /// </summary>
     private readonly IPermissionChecker _quyen;
 
+    /// <summary>
+    /// 🚨 **THANH TOÁN TRÊN UI** (`S8` — nợ §16.9 #8 của `PAY-001`): sau khi đơn được tạo, tạo **giao dịch**
+    /// qua **đúng** app service đã kiểm chứng (`TaoGiaoDichAsync`, đường vào **duy nhất** của `PayTransactions`)
+    /// rồi chuyển khách sang **cổng**.
+    /// 📌 Tầng UI **không** tính tiền và **không** quyết định trạng thái: `SoTien` lấy **nguyên văn** từ đơn
+    /// (`don.GrandTotal` — chính con số đã đối chiếu với sổ giải trình ở trên).
+    /// </summary>
+    private readonly IPaymentAppService _thanhToan;
+
+    /// <summary>URL IPN cho đường dev — đọc từ **cấu hình** (`PaymentHub:Fake:IpnBaseUrl`), **không** hard-code:
+    /// một URL cứng sai cổng cho ra IPN gửi tới chỗ không có gì lắng nghe ⇒ đơn **không bao giờ** thành đã trả.</summary>
+    private readonly IConfiguration _cauHinh;
+
     public DatHangController(
         ICheckoutAppService checkout,
         IDonHangAppService donHang,
         IWarehouseAppService kho,
         CustomerAppService khachHang,
-        IPermissionChecker quyen)
+        IPermissionChecker quyen,
+        IPaymentAppService thanhToan,
+        IConfiguration cauHinh)
     {
         _checkout = checkout;
         _donHang = donHang;
         _kho = kho;
         _khachHang = khachHang;
         _quyen = quyen;
+        _thanhToan = thanhToan;
+        _cauHinh = cauHinh;
     }
 
     /// <summary>
@@ -75,6 +93,11 @@ public class DatHangController : Controller
     private async Task NapKhachAsync(DatHangTrangDto trang)
     {
         trang.CoQuyenChonKhach = await _quyen.IsGrantedAsync(eCommerceConsts.Permissions.Customers.Default);
+
+        // 🔑 `S8` — quyền **TẠO GIAO DỊCH** tách khỏi quyền **ĐẶT HÀNG**: ô "Thanh toán ngay" chỉ hiện khi
+        // người dùng thật sự tạo được giao dịch. 📌 Nếu hiện mà không có quyền thì đơn **đã tạo xong** mới
+        // nhận `403` ⇒ khách hiểu là *"đặt hàng thất bại"* trong khi hàng đã bị giữ chỗ.
+        trang.CoQuyenThanhToan = await _quyen.IsGrantedAsync(eCommerceConsts.Permissions.Payments.Default);
 
         if (!trang.CoQuyenChonKhach)
         {
@@ -336,6 +359,55 @@ public class DatHangController : Controller
             {
                 trang.Loi = $"CẢNH BÁO: tổng từ sổ giải trình ({ketQua.Tien.Total:N0}) KHÁC tổng của đơn ({don.GrandTotal:N0}).";
             }
+
+            // ── 🚨 `S8`: TẠO GIAO DỊCH + CHUYỂN CỔNG (nợ §16.9 #8 của `PAY-001`) ─────────────────────────
+            // 🔑 **THỨ TỰ KHÔNG ĐƯỢC ĐẢO:** đơn phải **đã có** (và đã giữ chỗ) rồi mới tạo giao dịch — ngược lại
+            // thì khách bị thu tiền cho một đơn **không tồn tại** (§12.2 `PAY-001`: *"NCC timeout không được
+            // rollback dữ liệu đã ghi"* ⇒ giao dịch là **bằng chứng ý định thu tiền**, phải giữ).
+            // 📌 Chỉ chuyển cổng khi **KHÔNG có cảnh báo lệch tiền**: chuyển sang cổng với một con số đang
+            // nghi ngờ là cách nhanh nhất để thu **sai tiền**.
+            if (form.ThanhToanNgay && trang.CoQuyenThanhToan && trang.Loi is null)
+            {
+                var giaoDich = await _thanhToan.TaoGiaoDichAsync(new TaoGiaoDichInput
+                {
+                    OrderId = don.Id,
+                    SoDon = don.Number,
+                    // 🔒 Số tiền lấy **nguyên văn** từ đơn đã ghi — không tính lại ở tầng UI.
+                    SoTien = don.GrandTotal,
+                    TienTe = string.IsNullOrWhiteSpace(ketQua.Tien?.CurrencyCode) ? "VND" : ketQua.Tien!.CurrencyCode,
+                    ReturnUrl = $"{Request.Scheme}://{Request.Host}/DatHang/KetQua",
+                    IpnUrl = IpnUrlCuaTienTrinh(),
+                    ClientIp = HttpContext.Connection.RemoteIpAddress?.ToString(),
+                    NoiDung = $"Thanh toan don {don.Number}"
+                });
+
+                trang.MaThamChieu = giaoDich.MerchantReference;
+
+                if (!string.IsNullOrWhiteSpace(giaoDich.CheckoutUrl))
+                {
+                    // 🔑 **PRG** (`Post/Redirect/Get`): chuyển sang **cổng**, không render HTML của trang đặt hàng
+                    // ⇒ tải lại trang (F5) **không** gửi lại form (nếu không: đơn thứ hai hoặc lỗi ảo).
+                    // 📌 Cookie giỏ đã bị xoá ở trên (đơn đã tạo) ⇒ quay lại không còn dòng cũ.
+                    return Redirect(giaoDich.CheckoutUrl!);
+                }
+
+                // ⚠️ **KHÔNG ném lỗi và KHÔNG nói "đặt hàng thất bại"**: đơn **đã tạo**, giao dịch **đã tạo**.
+                // Chỉ **chưa lấy được URL** thanh toán (thiếu cấu hình cổng / cổng lỗi) ⇒ nói đúng chuyện đó,
+                // và đưa đường tra trạng thái. 📌 `LaGiaoDichDaCo` được hiện để người dùng biết bấm lại
+                // không sinh giao dịch thứ hai.
+                trang.Loi = "Đơn ĐÃ được tạo nhưng CHƯA lấy được URL thanh toán: "
+                            + (string.IsNullOrWhiteSpace(giaoDich.LoiTaoUrl) ? "cổng không trả URL." : giaoDich.LoiTaoUrl)
+                            + (giaoDich.LaGiaoDichDaCo ? " (dùng lại giao dịch đã có — KHÔNG tạo thêm)" : string.Empty)
+                            + " — tra trạng thái ở mục \"Kết quả thanh toán\".";
+            }
+        }
+        catch (Volo.Abp.Authorization.AbpAuthorizationException)
+        {
+            // 🚨 `S8` — quyền **tạo giao dịch** thiếu (chỉ xảy ra khi form bị gửi tay vì ô chọn đã bị ẩn).
+            // 🔑 Nói **đúng** chuyện gì đã xảy ra: **đơn đã tạo**, chỉ giao dịch là chưa. Nếu hiện câu chung
+            // *"không đặt được"* thì người dùng sẽ đặt lại ⇒ **đơn trùng** (khoá checkout sinh mới ở GET).
+            trang.Loi = "ĐƠN ĐÃ ĐƯỢC TẠO, nhưng bạn KHÔNG có quyền tạo giao dịch thanh toán "
+                        + "(cần quyền `eCommerce.Payments.Default`). Đừng đặt lại — vào quản lý đơn để xử lý tiếp.";
         }
         catch (Volo.Abp.BusinessException be)
         {
@@ -370,6 +442,71 @@ public class DatHangController : Controller
 
         return View(trang);
     }
+
+    /// <summary>
+    /// 🚨 **TRANG KẾT QUẢ THANH TOÁN** (`S8`) — `GET /DatHang/KetQua?ma={mã tham chiếu}`.
+    ///
+    /// 🔒 **BẤT BIẾN QUAN TRỌNG NHẤT: TRẠNG THÁI ĐỌC TỪ DB, KHÔNG TỪ URL.**
+    /// `returnUrl` (và mọi tham số `vnp_*` mà cổng gắn vào) **không phải** bằng chứng thanh toán — `PAY-001`
+    /// **D2**. 📌 Nếu trang này tin `?vnp_ResponseCode=00` thì **bất kỳ ai** gõ URL cũng tự đánh dấu đơn đã trả
+    /// tiền trong mắt người dùng (và tệ hơn: người vận hành **giao hàng**). Tham số `ma` chỉ là **khoá tra cứu**.
+    /// ✅ Ca E2E `S8-P6` đo **chiều ngược**: một giao dịch CHƯA trả + `?vnp_ResponseCode=00` ⇒ trang **vẫn**
+    /// hiện *"chưa thanh toán"*.
+    /// </summary>
+    [HttpGet]
+    public async Task<IActionResult> KetQua(string? ma)
+    {
+        var trang = new DatHangKetQuaDto { MaThamChieu = ma?.Trim() };
+
+        if (string.IsNullOrWhiteSpace(ma))
+        {
+            trang.Loi = "Thiếu mã tham chiếu giao dịch (`?ma=`).";
+            return View(trang);
+        }
+
+        try
+        {
+            var giaoDich = await _thanhToan.GetTheoMaAsync(ma.Trim());
+
+            if (giaoDich is null)
+            {
+                // ⚠️ Không tìm thấy là ca **bình thường** (gõ sai mã / giao dịch của tenant khác) ⇒ thông báo,
+                // **không** phải `500` và cũng **không** được hiện *"đã thanh toán"*.
+                trang.Loi = "Không tìm thấy giao dịch với mã này.";
+                return View(trang);
+            }
+
+            trang.TimThay = true;
+            trang.TrangThai = giaoDich.Status;
+            trang.DaThanhToan = giaoDich.DaThuTien;
+            trang.SoTien = giaoDich.Amount;
+            trang.TienTe = giaoDich.Currency;
+            trang.DonId = giaoDich.OrderId;
+            trang.LanNhanWebhook = giaoDich.WebhookReceivedCount;
+            trang.ProviderTransactionId = giaoDich.ProviderTransactionId;
+        }
+        catch (Volo.Abp.Authorization.AbpAuthorizationException)
+        {
+            trang.Loi = "Bạn không có quyền xem trạng thái thanh toán (cần `eCommerce.Payments.Default`).";
+        }
+
+        return View(trang);
+    }
+
+    /// <summary>
+    /// URL **IPN** của tiến trình API — 📌 đọc từ **cấu hình** (`PaymentHub:Fake:IpnBaseUrl`), vì IPN nằm ở
+    /// **tiến trình khác** (`HttpApi.Host`, cổng 5000) chứ không ở tiến trình Web này.
+    /// ⚠️ Nếu thiếu cấu hình: dùng chính host hiện tại — sai trong dev, **nhưng** không im lặng: giá trị được
+    /// hiện ngay trên trang kết quả khi IPN không tới (nút "tra trạng thái" ở `/DoiSoatThanhToan`).
+    /// </summary>
+    private string IpnUrlCuaTienTrinh()
+    {
+        var goc = (_cauHinh["PaymentHub:Fake:IpnBaseUrl"] ?? string.Empty).Trim().TrimEnd('/');
+
+        return string.IsNullOrWhiteSpace(goc)
+            ? $"{Request.Scheme}://{Request.Host}/api/webhooks/vnpay"
+            : goc + "/api/webhooks/vnpay";
+    }
 }
 
 /// <summary>Dữ liệu trang `/DatHang` — phục vụ **cả** biểu mẫu **và** kết quả (một view, một đường render).</summary>
@@ -403,6 +540,24 @@ public class DatHangTrangDto
     public List<KhachChonDto> KhachList { get; set; } = new();
 
     public bool CoQuyenChonKhach { get; set; }
+
+    /// <summary>
+    /// 🚨 `S8` — có quyền **TẠO GIAO DỊCH** thanh toán không (`eCommerce.Payments.Default`).
+    /// 📌 Khác quyền đặt hàng: quyền đọc/tạo thanh toán là **quyền về TIỀN**, không phải quyền bán hàng.
+    /// ⚠️ Ô chọn "Thanh toán ngay" chỉ hiện khi có quyền — nhưng 🔒 **cổng thật** vẫn ở app service
+    /// (`[Authorize]` cấp class): ẩn ô chọn là **tiện nghi**, không phải hàng rào.
+    /// </summary>
+    public bool CoQuyenThanhToan { get; set; }
+
+    /// <summary>`S8` — giữ trạng thái ô "Thanh toán ngay" qua các lần render lại (đường LỖI).</summary>
+    public bool ThanhToanNgay { get; set; }
+
+    /// <summary>
+    /// 🚨 `S8` — **mã tham chiếu giao dịch** đã tạo (nếu có) — để trang kết quả tra được trạng thái.
+    /// 📌 Có mã này ngay cả khi **chưa** lấy được URL cổng: giao dịch **đã tồn tại** trong sổ, và người dùng
+    /// cần một đường tra cứu thay vì đặt lại đơn.
+    /// </summary>
+    public string? MaThamChieu { get; set; }
 
     /// <summary>Tổng số khách trong hệ thống — 📌 để nói rõ khi danh sách ô chọn bị giới hạn 100 dòng.</summary>
     public int TongSoKhach { get; set; }
@@ -456,9 +611,44 @@ public class DatHangTrangDto
     public string TomTatGio { get; set; } = string.Empty;
 }
 
-public class KhoChonDto
+/// <summary>
+/// 🚨 **DỮ LIỆU TRANG KẾT QUẢ THANH TOÁN** (`S8`) — `GET /DatHang/KetQua?ma=…`.
+///
+/// 🔒 **Mọi trường trạng thái ở đây đến từ DB** (`IPaymentAppService.GetTheoMaAsync`), KHÔNG từ query string.
+/// 📌 Vì vậy DTO **không có** trường nào kiểu `VnpResponseCode`: một trường như thế sẽ mời người sau
+/// *"tin tham số URL"* — đúng thứ `PAY-001` **D2** cấm.
+/// </summary>
+public class DatHangKetQuaDto
 {
-    public Guid Id { get; set; }
+    /// <summary>Mã tham chiếu (khoá tra cứu) — chỉ để **tra**, không phải bằng chứng.</summary>
+    public string? MaThamChieu { get; set; }
+
+    public bool TimThay { get; set; }
+
+    /// <summary>Trạng thái **trong sổ** (`Initiated`/`Pending`/`Succeeded`/`Failed`/`Cancelled`…).</summary>
+    public string? TrangThai { get; set; }
+
+    /// <summary>`true` = **đã thu tiền** (do IPN đã xác thực chữ ký ghi) — không phải "cổng nói thành công".</summary>
+    public bool DaThanhToan { get; set; }
+
+    public decimal SoTien { get; set; }
+
+    public string? TienTe { get; set; }
+
+    /// <summary>Đơn liên quan (nếu có) ⇒ link sang `/DonHang/ChiTiet/{id}`.</summary>
+    public Guid? DonId { get; set; }
+
+    /// <summary>🔑 **Bằng chứng IPN** — đếm **mọi** lần nhận (kể cả lần bị bỏ qua). `0` nghĩa là
+    /// **chưa từng** có IPN nào tới ⇒ nếu trang nói "đã thanh toán" mà số này là `0` thì có gì đó sai.</summary>
+    public int LanNhanWebhook { get; set; }
+
+    public string? ProviderTransactionId { get; set; }
+
+    public string? Loi { get; set; }
+}
+
+public class KhoChonDto
+{    public Guid Id { get; set; }
 
     public string Code { get; set; } = default!;
 
@@ -559,6 +749,14 @@ public class DatHangInput
     public string Thue { get; set; } = "0.1";
 
     public string KhoaCheckout { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 🚨 `S8` — **THANH TOÁN NGAY**: `true` ⇒ sau khi tạo đơn, tạo giao dịch và **chuyển sang cổng**.
+    /// 📌 Mặc định **`false`**: giữ nguyên hành vi "chỉ đặt đơn" cho mọi lời gọi đã có (E2E/probe cũ), và
+    /// người dùng **chủ động** chọn trả tiền — 🔑 không ai bị đẩy sang cổng thanh toán mà không biết.
+    /// ⚠️ Một checkbox HTML không gửi giá trị khi **không** được tick ⇒ `false` là giá trị **mặc định** đúng.
+    /// </summary>
+    public bool ThanhToanNgay { get; set; }
 
     /// <summary>
     /// 🚨 **KHÁCH CỦA ĐƠN** (`S3`) — tên trường `<select name="KhachId">` trong view.

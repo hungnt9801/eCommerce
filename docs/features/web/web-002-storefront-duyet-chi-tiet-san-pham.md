@@ -6,7 +6,7 @@
 | **Module** | **Web** — đề xuất module mới `modules/Web` (`eCommerce.Web.Domain` / `.Application` / `.Contracts`) + project render `src/eCommerce.Web` (Razor). ⚠️ **Cả hai đều CHƯA có trong code** — xem §15.2 **F1** |
 | **Giai đoạn** | **GĐ1 — Bán được trên website** (`docs/implementation-plan.md:415`) |
 | **Ưu tiên** | **Must have** — không có trang này thì GĐ1 **không bán được** |
-| **Trạng thái** | 🟡 `Draft` — chờ review |
+| **Trạng thái** | 🟡 `Draft` — chờ review · ⚠️ **GĐ1 đã làm MỘT PHẦN** (`S8`, 18/10/2026): trang **công khai** + chi tiết + sitemap theo slug đã có; **chưa** có read-model/cache/301/JSON-LD/OG — xem **§16** |
 | **Người viết / người review** | *(điền)* / **Kiến trúc trưởng + BA** (theo `docs/design-doc-guidelines.md` §6: feature có state machine ⇒ Kiến trúc trưởng review) |
 | **Phiên bản / ngày** | `v0.1 — 13/10/2026` |
 | **Tài liệu liên quan** | `XC-001` (Money/làm tròn/format) · `XC-002` (outbox/inbox/idempotency) · `XC-003` (khoá phân tán) · `XC-004` (auth/permission/allowlist/tenant) · `XC-005` (observability) · `XC-006` (thuế — ảnh hưởng hiển thị giá) · `CAT-001`…`003` · `PRC-001`…`002` · `INV-003` · `WEB-001` · `WEB-003` · `docs/structure-and-techstack.md` · `docs/implementation-plan.md` |
@@ -819,3 +819,52 @@ public class StorefrontSeoTests
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.1 | 13/10/2026 | *(điền)* | Bản nháp đầu — **lập từ code thật**: xác nhận feature **chưa có trong code** (F1); phát hiện **F2** (`Slug` thiếu unique index), **F3** (Catalog chưa tách module ⇒ chặn kiến trúc), **F4** (`Money` chưa có), **F6** (0 `[AllowAnonymous]`), **F7** (`Description` = `text` ⇒ rủi ro XSS), **F9** (ETO chưa có `EventId`), **F11** (chưa có hạ tầng integration test). 12 ADR · 18 BR · 12 NFR · 24 test case |
+| v0.2 | 18/10/2026 | *(agent, phiên `S8`)* | **§16 — TIẾN ĐỘ TRIỂN KHAI `S8`**: mở **công khai** `/SanPham` + `/SanPham/ChiTiet/{slugOrSku}` (`D10`/`Q6`=A) qua **đường đọc công khai** `DocSanPhamCongKhai`; `sitemap.xml` chuyển sang **slug**; **+4 unit test** (allowlist + ranh giới DTO) + **+7 ca E2E** (`S8-W1…W6`) đo bằng **phiên ẩn danh**. Ghi **4 nợ đã đóng** và **danh sách còn lại** (§16.2). Phát hiện: **`CostPrice` KHÔNG tồn tại** trong lược đồ ⇒ ràng buộc "cấm lộ giá vốn" hiện được bảo đảm bằng **sự vắng mặt** (§16.3 **S8-3**) |
+
+---
+
+## 16. TIẾN ĐỘ TRIỂN KHAI — phiên `S8` (18/10/2026): MỞ CÔNG KHAI + CHI TIẾT + SEO CƠ BẢN
+
+> 📌 Mục này ghi **cái đã đo được** và **cái còn thiếu**. 🔒 `WEB-002` **vẫn KHÔNG** `Implemented`:
+> thiếu **read-model/cache**, **301 khi đổi slug**, **JSON-LD/Open Graph**, **sanitize mô tả**, **mức tồn kho**,
+> và **chưa có** `WebSeoProducts`/`WebSlugRoutes` như §5.2.2/§5.2.3 thiết kế.
+
+### 16.1 Đã làm (kèm bằng chứng)
+
+| # | Việc | Tệp | Bằng chứng |
+|---|---|---|---|
+| 1 | **Mở công khai 2 route** (`D10`): `/SanPham` · `/SanPham/ChiTiet/{slugOrSku}` | `[AllowAnonymous]` cấp class ở `src/eCommerce.Web/Controllers/SanPhamController.cs` + **dòng allowlist có lý do** | `AllowlistCongKhaiTests` xanh (thêm dòng ⇒ phải review); ❌ **trước `S8`** khách bị `302` về `/Account/Login` |
+| 2 | 🚨 **Đường đọc CÔNG KHAI** — chỉ đọc repository, **không** gọi app service `[Authorize]` | `src/eCommerce.Web/Storefront/DocSanPhamCongKhai.cs` | `StorefrontCongKhaiTests` (quét nguồn: **cấm** `IPriceListAppService`/`IProductAppService` trong trang công khai) |
+| 3 | **Chỉ hàng ĐANG BÁN** — `ChiHangDangBan` (**một** biểu thức, dùng chung) | cùng tệp | `StorefrontCongKhaiTests` khẳng định **đếm = 1** định nghĩa + có dùng · E2E `S8-W4` (hàng `Unpublished` ⇒ **`404`**) |
+| 4 | **Ranh giới dữ liệu công khai**: DTO **không** có `Code`/`Id`/giá vốn/tồn; **không** đọc `InvItems`; **không** render `Description` (ADR-12) | `SanPhamCongKhaiDto` | E2E `S8-W3` (mã nội bộ, GUID, `CostPrice` **không** có trong HTML) · `S8-W3b` (**chiều ngược**: giá niêm yết **có** hiện) |
+| 5 | **`sitemap.xml` dùng SLUG** + chỉ hàng đang bán (đóng nợ `CAT-003` §16.8 #4) | `SitemapController` | E2E `S8-W6` (có slug của hàng bán, **không** có hàng ngừng bán) |
+| 6 | **`canonical` trỏ slug** kể cả khi vào bằng URL **SKU** (ADR-05: không phá link cũ) | `SanPhamController.ChiTiet` | E2E `S8-W5` (`200` + `canonical` = `/SanPham/ChiTiet/k97e2e-ao-thun`) |
+| 7 | **Nhãn nguồn giá** (`BR-008`) + nói rõ **không** hiển thị tồn kho | `Views/SanPham/Index.cshtml` · HTML chi tiết | E2E `S8-W1/W2` (trang render) |
+
+**Số đo thật:** unit **1395 → 1399** (+4) · integration **71 = 71** · E2E **102 → 123** (+21, trong đó **7** ca `S8-W*`) ·
+migration **41 = 41** · `NND` **53 = 53** · quyền **62 = 62** · bất biến DB **25/25** · tệp/dòng code **+4 / +908**
+(350/43.380 → 354/44.288) · test **+1 tệp / +223 dòng**.
+
+### 16.2 ⏳ CÒN LẠI của `WEB-002` (ghi để phiên sau không phải đoán)
+
+| # | Nợ | Hệ quả nếu để lâu |
+|---|---|---|
+| 1 | 🚨 **Chưa có read-model** `WebSeoProducts`/`WebSlugRoutes` (`§5.2.2`/`§5.2.3`) + ETO/outbox — hiện **đọc thẳng** `CatProducts`/`CatProductVariants`/`PrcPriceListItems` | Mỗi lượt xem là **một truy vấn**; NFR-001 (TTFB p95) **chưa đo được**. 📌 Đọc thẳng **vi phạm tinh thần** ADR-02 — chấp nhận **có ý thức** vì `Catalog` **chưa** tách module (F3) |
+| 2 | 🚨 **Chưa có 301 khi đổi slug** — `ProductSlugChangedEto` **đã** mang `OldSlug` nhưng **chưa có người nhận** (`CAT-003` §16.8 #5) | Link cũ ⇒ **`404`** ⇒ mất tín hiệu SEO đã tích luỹ. 📌 `canonical` **không** thay được `301` |
+| 3 | **Chưa có cache Redis + `ETag`/`304`** (ADR-07) | NFR-007 (cache hit ≥ 90 %) **không đạt**; chưa đo |
+| 4 | **Chưa có JSON-LD (`Product`/`Offer`/`BreadcrumbList`) + Open Graph** | NFR-004 **không đạt**; Google **không** hiện rich result |
+| 5 | **Chưa sanitize `Description`** — trang chi tiết **không render** mô tả (an toàn: không có `Html.Raw`) | Cần **chọn thư viện** (Q6) **trước** khi render mô tả; hiện **không** hiển thị ⇒ không có XSS |
+| 6 | **Chưa hiển thị mức tồn kho** (`ConHang`/`SapHet`/`HetHang`) | Cần **đường đọc tồn công khai** (`INV-003`) — chưa có; hiện **không** nói gì (tốt hơn nói sai) |
+| 7 | **Chưa có trang danh mục `/danh-muc/{slug}`**, phân trang, sắp xếp, `noindex` cho tổ hợp filter (ADR-06) | Chỉ có **danh sách phẳng** `/SanPham` |
+| 8 | **Chưa có `Q2/Q4/Q5/Q8/Q9/Q10/Q11`** (cache-warm, sitemap snapshot, ảnh/CDN, tìm kiếm, API sinh lại sitemap, slug theo biến thể, nhãn nguồn giá khi có pipeline) | Từng câu **chặn** một phần việc — không tự chọn đáp án |
+
+### 16.3 Phát hiện của `S8`
+
+| # | Phát hiện | Bằng chứng | Vì sao đáng ghi |
+|---|---|---|---|
+| **S8-A** | 🚨 **`CostPrice` KHÔNG TỒN TẠI trong lược đồ** — ràng buộc "cấm lộ giá vốn" (`D10` ②) hiện được bảo đảm bằng **SỰ VẮNG MẶT**, không bằng kiểm soát | `grep CostPrice` trong `src/`+`modules/` = **0 định nghĩa** (chỉ có trong **chú thích**); `information_schema.columns` của `CatProductVariants` **không có** cột đó | ✅ Hôm nay **không thể** lộ giá vốn. ⚠️ **Nhưng** nếu GĐ2 thêm cột giá vốn thì ca E2E `S8-W3` **không** tự bắt (nó kiểm **chuỗi** `CostPrice`). 🔑 Lớp bảo vệ thật là **danh sách trắng thuộc tính DTO** trong `StorefrontCongKhaiTests` — thêm bất kỳ trường nào vào DTO công khai **phải** sửa danh sách đó (hành động có ý thức, có review) |
+| **S8-B** | **Bộ lọc `Published` viết ở 3 chỗ ⇒ phép tiêm *"bỏ bộ lọc"* vào MỘT chỗ KHÔNG làm test đỏ** | Đo được: bản đầu viết `x.Status == Published` ở 3 truy vấn; tiêm `x => true` vào `GetListAsync` ⇒ test **vẫn xanh** (vì 2 chỗ kia còn chuỗi) | 🔑 *"Test kiểm chữ, không kiểm hành vi"* — đúng họ bài học trung tâm. ✅ Gom về **một** biểu thức `ChiHangDangBan` + test khẳng định **đếm = 1**; tiêm lại ⇒ **ĐỎ** |
+| **S8-C** | **Trang công khai cũ gọi app service `[Authorize]`** — `/sitemap.xml` đã từng trả `500` vì lý do này; `/SanPham` cũng **đang** gọi như vậy | Đọc code: `IPriceListAppService` (class-level `[Authorize(Pricing.Default)]`) được gọi từ `SanPhamController` **và** `SitemapController` | Nếu chỉ thêm `[AllowAnonymous]` mà **không** đổi nguồn dữ liệu thì khách nhận **`500`** — tức *"mở cửa"* mà cửa vẫn khoá. ✅ Test quét nguồn khoá lại (`Trang_cong_khai_KHONG_goi_app_service_can_quyen`) |
+| **S8-D** | **`canonical` viết cứng `href="/SanPham"` làm `MenuDieuHuongTests` ĐỎ** (URL menu xuất hiện dạng chuỗi cứng trong view) — và **chú thích cũng bị quét** | Đo được: 2 lần đỏ, lần 2 do **chính chú thích** chép lại chuỗi `href="/SanPham"` | ✅ Sửa bằng `Url.Action` (đổi route thì `canonical` **tự đúng**) — 📌 bài học: **phép quét văn bản thô** không phân biệt mã với chú thích; muốn ghi lại ví dụ thì **đừng chép nguyên chuỗi bị cấm** |
+
+

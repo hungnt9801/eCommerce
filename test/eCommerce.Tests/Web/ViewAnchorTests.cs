@@ -48,7 +48,14 @@ public class ViewAnchorTests
         ("Views/KhachHang/NhatKy.cshtml", "[NHATKYXUATDULIEU-MAN-HINH]"),
         ("Views/DoiSoatThanhToan/Index.cshtml", "[DOISOATTHANHTOAN-MAN-HINH]"),
         ("Views/Loi/ChanQuyen.cshtml", "[LOI-403-THIEP-QUYEN]"),
-        ("Views/Loi/KhongTimThay.cshtml", "[LOI-404-KHONG-CO-MAN-HINH]")
+        ("Views/Loi/KhongTimThay.cshtml", "[LOI-404-KHONG-CO-MAN-HINH]"),
+        // 🆕 `S8` — TRANG DANH MỤC **CÔNG KHAI** (`WEB-002`). 🔑 Neo này khẳng định trang **render được**
+        // cho khách chưa đăng nhập; 📌 còn *"chỉ hiện hàng Published"* và *"không lộ giá vốn"* do
+        // `StorefrontCongKhaiTests` (quét nguồn) + E2E `S8-W*` (HTML thật) đo.
+        ("Views/SanPham/Index.cshtml", "[SANPHAM-MAN-HINH]"),
+        // 🆕 `S8` — TRANG **KẾT QUẢ THANH TOÁN**. 🔑 Neo khẳng định đúng trang này đã render (E2E `S8-P7`
+        // dựa vào nó để phân biệt "trang kết quả" với một trang khác trả `200`).
+        ("Views/DatHang/KetQua.cshtml", "[DATHANG-KET-QUA]")
     ];
 
     [Fact]

@@ -30,6 +30,12 @@ public class VnPayOptions
 public class PaymentHubOptions
 {
     public VnPayOptions VnPay { get; set; } = new();
+
+    /// <summary>
+    /// Cấu hình **cổng giả lập** (`S8`). 🔒 **Chỉ dùng ở `Development`** — đăng ký có điều kiện ở
+    /// `PaymentHubApplicationModule` (đặt `PaymentHub:Provider = Fake` ngoài Development ⇒ **ném lúc khởi động**).
+    /// </summary>
+    public Providers.FakePaymentOptions Fake { get; set; } = new();
 }
 
 /// <summary>

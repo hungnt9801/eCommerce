@@ -1,0 +1,87 @@
+@using eCommerce.Web.Controllers
+@model DatHangKetQuaDto
+@{
+    Layout = null;
+}
+@*
+    🚨 `S8` — TRANG KẾT QUẢ THANH TOÁN (`/DatHang/KetQua?ma=…`).
+    🔒 BẤT BIẾN: trạng thái hiển thị ở đây đến từ **DB** (`IPaymentAppService.GetTheoMaAsync`), KHÔNG từ
+       query string. 📌 Tham số `?vnp_ResponseCode=00` KHÔNG được tin — `PAY-001` D2: `returnUrl` chỉ là
+       đường điều hướng, không phải bằng chứng thanh toán ⇒ đọc nó là tự cho phép giao hàng miễn phí.
+    📌 Trang cố ý hiển thị cả **số lần nhận IPN** (`LanNhanWebhook`): đó là bằng chứng DUY NHẤT phân biệt
+       *"cổng chưa gọi lại"* với *"cổng đã gọi và ta bỏ qua"* (bài học `PAY-001` §16.7 #2).
+*@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Kết quả thanh toán</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <style>
+        body { font-family: system-ui, sans-serif; margin: 2rem; color: #222; }
+        h1 { font-size: 1.3rem; }
+        table { border-collapse: collapse; max-width: 40rem; margin-top: .6rem; }
+        th, td { border: 1px solid #ccc; padding: .4rem .6rem; text-align: left; }
+        th { background: #f3f3f3; }
+        .so { text-align: right; }
+        .loi { padding: 1rem; background: #fdecea; border: 1px solid #e6a39a; max-width: 40rem; }
+        .ok { padding: 1rem; background: #eaf7ec; border: 1px solid #a3d8ae; max-width: 40rem; }
+        .cho { padding: 1rem; background: #fffbe6; border: 1px solid #e6d38a; max-width: 40rem; }
+        .ghichu { color: #666; font-size: .85rem; max-width: 40rem; }
+    </style>
+</head>
+<body>
+    <h1>Kết quả thanh toán</h1>
+    <p id="neo-man-hinh" class="ghichu">[DATHANG-KET-QUA] Trạng thái dưới đây đọc từ <strong>sổ giao dịch</strong>, không từ URL.</p>
+
+    @if (Model.Loi is not null)
+    {
+        <div class="loi" id="loi"><strong>Không xem được kết quả:</strong> @Model.Loi</div>
+    }
+
+    @if (Model.TimThay)
+    {
+        @* ✅ "ĐÃ THANH TOÁN" CHỈ khi DB nói `DaThuTien` (đã nhận IPN hợp lệ). 📌 Không suy ra từ mã phản hồi. *@
+        if (Model.DaThanhToan)
+        {
+            <div class="ok" id="ket-luan-dathanhtoan"><strong>ĐÃ THANH TOÁN.</strong> Cổng đã báo kết quả và chữ ký đã được kiểm.</div>
+        }
+        else if (Model.TrangThai == "Failed" || Model.TrangThai == "Cancelled")
+        {
+            <div class="loi" id="ket-luan-thatbai"><strong>Thanh toán KHÔNG thành công.</strong> Trạng thái trong sổ: @Model.TrangThai.</div>
+        }
+        else
+        {
+            <div class="cho" id="ket-luan-chothanhtoan"><strong>CHƯA thanh toán.</strong> Trạng thái trong sổ: @Model.TrangThai — đang chờ cổng báo kết quả.</div>
+        }
+
+        <table id="bang-ket-qua">
+            <tr><th>Mã tham chiếu</th><td id="ma-tham-chieu">@Model.MaThamChieu</td></tr>
+            <tr><th>Số tiền</th><td class="so" id="so-tien">@Model.SoTien.ToString("N0")</td></tr>
+            <tr><th>Tiền tệ</th><td id="tien-te">@Model.TienTe</td></tr>
+            <tr><th>Trạng thái (trong sổ)</th><td id="trang-thai">@Model.TrangThai</td></tr>
+            <tr><th>Số lần nhận IPN</th><td id="lan-nhan-webhook">@Model.LanNhanWebhook</td></tr>
+            @if (!string.IsNullOrWhiteSpace(Model.ProviderTransactionId))
+            {
+                <tr><th>Mã giao dịch của cổng</th><td id="ma-giao-dich-cong">@Model.ProviderTransactionId</td></tr>
+            }
+            @if (Model.DonId.HasValue)
+            {
+                <tr><th>Quản lý</th><td><a id="lien-ket-don" href="@Url.Action("ChiTiet", "DonHang", new { id = Model.DonId })">Xem đơn hàng</a></td></tr>
+            }
+        </table>
+
+        @if (!Model.DaThanhToan)
+        {
+            <p class="ghichu" id="huong-dan-cho">
+                Nếu khách đã trả ở cổng mà trang này vẫn nói chưa thanh toán: cổng <strong>chưa gọi IPN</strong>
+                tới máy chủ (hoặc IPN bị từ chối). 🔑 Đừng giao hàng dựa trên trang này — đối soát ở
+                <code>/DoiSoatThanhToan</code> (bấm "Truy vấn trạng thái" để hỏi thẳng cổng).
+            </p>
+        }
+    }
+
+    <p><a id="quay-lai-dat-hang" href="@Url.Action("Index", "DatHang")">← Về trang đặt hàng</a></p>
+</body>
+</html>

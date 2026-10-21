@@ -1,4 +1,5 @@
 using eCommerce.Catalog;
+using eCommerce.Web.Storefront;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -18,28 +19,28 @@ namespace eCommerce.Web.Controllers;
 ///
 /// ⚠️ **GIỚI HẠN ĐÃ BIẾT (ghi rõ, không hứa quá):**
 /// <list type="bullet">
-///   <item>Dữ liệu lấy từ **`IPriceListAppService`** — **cùng nguồn** với `/SanPham` — nên danh sách là
-///     *"SKU đang được niêm yết giá"*, **không** phải *"mọi sản phẩm Published"* (Catalog chưa có đường đọc
-///     công khai riêng cho storefront — nợ đã ghi ở `WEB-002` Q9).</item>
+///   <item>✅ **`S8` — ĐÃ ĐÓNG NỢ `Q9`/`CAT-003`:** danh sách nay lấy từ **đường đọc công khai**
+///     `DocSanPhamCongKhai` — tức *"sản phẩm **ĐANG BÁN** (Published) có giá đang hiệu lực"*, **không** còn
+///     phụ thuộc app service giá `[Authorize]`. 📌 Trước `S8`, endpoint này **rơi** về *"chỉ còn URL trang chủ"*
+///     (đã đo: `AbpAuthorizationException` khi khách ẩn danh gọi) ⇒ sitemap **thiếu** đúng thứ nó sinh ra để có.</item>
+///   <item>✅ **`S8` — URL dùng SLUG** (`/SanPham/ChiTiet/{slug}`), đúng `WEB-002` ADR-03. ⚠️ Sản phẩm **chưa đặt
+///     slug** vẫn dùng slug **sinh tại chỗ** từ tên (cùng hàm `SinhSlug.Tu` với đường ghi và trang chi tiết) —
+///     📌 nếu ba chỗ lệch nhau thì sitemap chỉ đường cho bot tới URL `404`, tệ hơn là không có sitemap.</item>
 ///   <item>Chưa có `<priority>`/`<changefreq>`/`hreflang` — chưa cần ở GĐ1.</item>
-///   <item>Slug **có thể** trùng SKU (**chưa** có bảng slug cho từng SKU — lát cắt sau của `CAT-003`):
-///     hiện dùng SKU làm định danh URL, và **ghi rõ** ra đây thay vì để người sau tưởng đã có slug.</item>
 /// </list>
 /// </summary>
 [AllowAnonymous]
 [Route("sitemap.xml")]
 public class SitemapController : Controller
 {
-    private readonly eCommerce.Pricing.IPriceListAppService _bangGia;
-    private readonly ILogger<SitemapController> _logger;
+    private readonly DocSanPhamCongKhai _doc;
 
-    public SitemapController(eCommerce.Pricing.IPriceListAppService bangGia, ILogger<SitemapController> logger)
+    public SitemapController(DocSanPhamCongKhai doc)
     {
-        _bangGia = bangGia;
-        _logger = logger;
+        _doc = doc;
     }
 
-    /// <summary>`GET /sitemap.xml` ⇒ `200` + `application/xml`. Danh sách URL sản phẩm đang bán.</summary>
+    /// <summary>`GET /sitemap.xml` ⇒ `200` + `application/xml`. Danh sách URL sản phẩm **đang bán** (theo slug).</summary>
     /// <remarks>
     /// 🚨 **BÀI HỌC ĐÃ TRẢ GIÁ (đo được 16/10/2026 — KHÔNG đoán):** phiên bản đầu gọi
     /// `IPriceListAppService.GetListAsync()` **trực tiếp** ⇒ app service đó có `[Authorize(...)]`
@@ -48,10 +49,9 @@ public class SitemapController : Controller
     /// 📌 **Vì sao đây là lỗi THIẾT KẾ, không phải lỗi nhỏ:** một endpoint *"công khai"* mà **gọi vào** một
     /// app service **cần quyền** thì **không bao giờ** phục vụ được đúng đối tượng của nó — mà nó vẫn
     /// **nằm trong allowlist công khai** ⇒ vừa **hỏng** vừa **mở cửa**. Đúng loại "trông như đã xong".
-    /// 🔒 Cách xử lý ở đây: coi **thiếu quyền** là ca **CÓ THỂ XẢY RA** ⇒ trả sitemap **tối thiểu** (chỉ trang chủ)
-    /// và ghi `Warning` nói rõ **vì sao** — **không** để lộ `500` ra ngoài, cũng **không** im lặng.
-    /// ⏳ **Nợ (ghi ở `cat-003` §16.8):** muốn liệt kê **đủ** sản phẩm cho máy tìm kiếm thì phải có **đường đọc
-    /// công khai** (projection) — hiện `Pricing`/`Catalog` **không** có ⇒ cùng nợ `Q9` của `WEB-002`.
+    /// ✅ **`S8` sửa tận gốc** (không chỉ bắt lỗi): dùng `DocSanPhamCongKhai` — lớp **chỉ đọc repository**,
+    /// không quyền ⇒ **không còn** nhánh `catch AbpAuthorizationException` nào (nhánh đó là bằng chứng
+    /// *"endpoint công khai đang gọi chỗ cần quyền"*, không phải một tính năng).
     /// </remarks>
     [HttpGet]
     public async Task<IActionResult> Get()
@@ -59,33 +59,23 @@ public class SitemapController : Controller
         var goc = $"{Request.Scheme}://{Request.Host}";
         var url = new List<(string DuongDan, DateTime? Sua)>();
 
-        List<eCommerce.Pricing.Dtos.PriceListDto> cacBangGia;
+        var sanPham = await _doc.GetDangBanAsync();
 
-        try
+        foreach (var sp in sanPham)
         {
-            cacBangGia = await _bangGia.GetListAsync();
-        }
-        catch (Volo.Abp.Authorization.AbpAuthorizationException ex)
-        {
-            // 🔒 KHÔNG nuốt lỗi: nói rõ nguyên nhân + hệ quả, để người vận hành biết sitemap **đang thiếu**.
-            _logger.LogWarning(ex,
-                "SITEMAP: KHÔNG đọc được danh sách bảng giá vì người gọi CHƯA đăng nhập mà app service giá cần quyền " +
-                "⇒ sitemap chỉ còn URL trang chủ. Đây là NỢ ĐÃ GHI (chưa có đường đọc công khai) — KHÔNG phải sự cố. [SITEMAP-THIEU-DOC-CONG-KHAI]");
+            var slug = string.IsNullOrWhiteSpace(sp.Slug) ? SinhSlug.Tu(sp.Ten) : sp.Slug!;
 
-            cacBangGia = [];
-        }
-
-        foreach (var bg in cacBangGia.OrderBy(x => x.Code, StringComparer.Ordinal))
-        {
-            foreach (var item in await _bangGia.GetItemsAsync(bg.Id))
+            if (string.IsNullOrWhiteSpace(slug))
             {
-                // ⚠️ Ghi rõ: **SKU** đang là định danh URL (chưa có slug cho từng biến thể).
-                var duongDan = "/SanPham/ChiTiet/" + Uri.EscapeDataString(item.Sku);
+                // ⚠️ Không sinh được slug (tên toàn ký tự đặc biệt) ⇒ **BỎ** khỏi sitemap thay vì phát URL 404.
+                continue;
+            }
 
-                if (!url.Any(x => string.Equals(x.DuongDan, duongDan, StringComparison.Ordinal)))
-                {
-                    url.Add((duongDan, null));
-                }
+            var duongDan = "/SanPham/ChiTiet/" + Uri.EscapeDataString(slug);
+
+            if (!url.Any(x => string.Equals(x.DuongDan, duongDan, StringComparison.Ordinal)))
+            {
+                url.Add((duongDan, null));
             }
         }
 
@@ -139,6 +129,9 @@ public class RobotsController : Controller
             "Disallow: /DonHang",
             "Disallow: /PhanBo",
             "Disallow: /DatHang",
+            // 🆕 `S8` — TRANG GIẢ LẬP CỔNG THANH TOÁN (chỉ Development). 📌 `Disallow` chỉ là yêu cầu lịch sự:
+            // lớp chặn THẬT là `[Authorize]` + `404` khi không phải Development (`PayGiaLapController`).
+            "Disallow: /pay-gia-lap",
             "Disallow: /Account",
             "Disallow: /api/",
             "",

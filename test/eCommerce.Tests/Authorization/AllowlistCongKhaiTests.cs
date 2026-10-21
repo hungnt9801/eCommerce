@@ -84,6 +84,27 @@ public class AllowlistCongKhaiTests
         //    sẽ làm **mọi** phép kiểm HTTP và **mọi** công cụ giám sát hiểu sai.
         "eCommerce.Web.Controllers.LoiController",
 
+        // 🚨 `S8` (`WEB-002` · quyết định `D10`/`Q6` = **A**, 17/10/2026) — **STOREFRONT CÔNG KHAI**:
+        // `GET /SanPham` + `GET /SanPham/ChiTiet/{slugOrSku}`.
+        //
+        // 🔑 **VÌ SAO BẮT BUỘC CÔNG KHAI:** đây là **mặt tiền** của việc bán hàng. Máy tìm kiếm **không đăng nhập**
+        // được, và khách mới **không có tài khoản** — một trang chỉ-đăng-nhập thì slug + `sitemap.xml` (đã xong ở
+        // `CAT-003`) **không phát huy tác dụng gì**. 📌 Trước `S8`, cả 9 controller của Web đều `[Authorize]`
+        // cấp class ⇒ khách nhận `302` về `/Account/Login` và **không có lỗi nào** hiện ra.
+        //
+        // 🔒 **RỦI RO ĐÃ GIẢM THIỂU — VÀ ĐÂY LÀ CHỖ NGƯỜI REVIEW NÊN ĐỌC:**
+        //  • Hai route **CHỈ ĐỌC**, không có `POST`/`PUT`/`DELETE` ⇒ không có bề mặt ghi nào để khai thác;
+        //  • Dữ liệu **chỉ** đến từ `DocSanPhamCongKhai` — lớp **chỉ đọc repository**, **KHÔNG** gọi app service
+        //    có `[Authorize]` (gọi vào đó ⇒ `AbpAuthorizationException` ⇒ `500` ở đúng trang cần công khai —
+        //    lỗi đã xảy ra thật với `/sitemap.xml`, `CAT-003`);
+        //  • Chỉ **sản phẩm `Published`** + **dòng giá của bảng giá đang hiệu lực** (`D10` ràng buộc ①);
+        //  • DTO công khai **KHÔNG CÓ** `CostPrice`, **không có** tồn kho, **không có** `Code`/`Id`
+        //    (`D10` ràng buộc ②③) — 📌 "quên ẩn" là **không thể** vì không có trường nào để ẩn;
+        //  • Không nhận tham số điều khiển (slug/SKU tra theo **đúng** khoá) ⇒ không có đường dò dữ liệu;
+        //  • `APPROVED BY`: chủ dự án (`D10`, `SESSION-KICKOFF` §7). ✅ Có test quét nguồn khoá lại phần trên
+        //    (`StorefrontCongKhaiTests`).
+        "eCommerce.Web.Controllers.SanPhamController",
+
         // 🚨 `S5` (`PAY-001` §7.2) — **IPN CỦA VNPAY** (`GET /api/webhooks/vnpay`).
         //
         // 🔑 **VÌ SAO BẮT BUỘC CÔNG KHAI:** VNPay gọi từ **Internet**, không có token của ta. 📌 Nếu endpoint này

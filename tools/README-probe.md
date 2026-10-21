@@ -626,6 +626,36 @@ sai** (lần thứ **BA** của họ lỗi này!).
 ➕ **Chạy đầy đủ 8 bước:** ✅ `exit 0` · **147.4s** · **1155 unit** · **38 integration** · mermaid **197/0** ·
 **DB 21/21** · **test cổng 17/17** · **E2E 11/11**.
 
+### 🆕 `S8` (18/10/2026) — bước ⑧ **KHỞI ĐỘNG THÊM `HttpApi.Host`** (:5000)
+
+🚨 **TIỀN ĐỀ MỚI, VÀ NÓ SẼ LÀM CỔNG ĐỎ NẾU BỊ BỎ QUA:** từ `S8`, bước ⑧ kiểm **thanh toán end-to-end**:
+trang giả lập (tiến trình **Web** :5100) **ký HMAC** rồi gọi **IPN THẬT** — mà endpoint IPN nằm ở
+**`eCommerce.HttpApi.Host`** (:5000). ⇒ Bước ⑧ nay **khởi động CẢ HAI tiến trình** (bước ③b) và **tắt cả hai
+trong `finally`**.
+
+🔒 **BA ĐIỀU PHẢI GIỮ (nếu không sẽ đo sai):**
+1. **Cổng 5000 phải TRỐNG trước khi chạy** (bước ① đã mở rộng từ `@(5100)` thành `@(5100, 5000)`) — 🔑 một Host
+   cũ còn sống ⇒ ta đo **bản build CŨ** và ca "end-to-end" thành **giả**.
+2. **Khẳng định Host LÊN** (`wait-host.ps1`) trước khi đo — 📌 nếu không, `S8-P7/P8` sẽ đỏ và rất dễ bị đọc thành
+   *"sản phẩm hỏng"* trong khi **phép đo thiếu một tiến trình**.
+3. **Tắt Host trong `finally`** — 📌 quên ⇒ lần chạy sau `kiem-tat-ca.ps1` **bước [1]** báo *"cổng 5000 bị giữ"* và
+   **dừng cả chuỗi kiểm** (đúng loại lỗi "lần sau đỏ vì lý do vô hình").
+
+➕ **Dữ liệu probe mới:** 1 sản phẩm `Published` (+1 `Unpublished` để đo **chiều ngược**), 1 bảng giá **Active**,
+1 dòng tồn kho, và **2 đơn** `WEB-K97E2E-P1/P2` + **2 giao dịch** — 🔑 **tất cả** được dọn trong `finally` và
+**đếm lại** (`conGiaoDich`/`conCatalog`/`conTon`). 📌 `PayTransactions.MerchantReference` có tiền tố probe nằm
+**GIỮA** chuỗi ⇒ dọn **phải** `like '%K97E2E%'` (bài học `S5-5`).
+
+➕ **Số ca:** **102 → 123** (`S8-W1…W6` = 7 ca **đo bằng phiên ẨN DANH** + `S8-P1…P14` = 14 ca end-to-end).
+
+🚨 **MỘT CÁI BẪY ĐÃ CẮN NGAY TRONG `S8` (ghi lại vì nó sẽ cắn lại):** khởi động `HttpApi.Host` cũng có nghĩa là
+**các job nền CỦA NÓ CHẠY NGAY** — `InventoryReconciliationWorker` có `Timer.RunOnStart = true` ⇒ nó **đối soát
+ngay khi Host lên** và **ghi dữ liệu THẬT** vào `ReconRunMismatches`. Trạng thái lúc đó có dòng tồn kho probe
+(`OnHand = 100`, sổ cái `0`) ⇒ job ghi **một dòng lệch đúng nghiệp vụ** ⇒ 📌 **bước ⑥ của `kiem-tat-ca.ps1` ĐỎ**
+(`TONG=5` sau **năm** lần chạy E2E) — và nó **không** thuộc lượt `e7` nên phép dọn cũ **không** chạm tới.
+✅ Cách đúng: dọn **theo SKU probe** (`Sku like 'K97E2E%'`) + **đếm lại** (`conLechProbe`).
+🔑 Câu hỏi phải hỏi mỗi khi thêm một tiến trình vào phép đo: ***"job nào chạy khi nó lên, và nó ghi cái gì?"***
+
 ---
 
 ## 🚨 `kiem-link-tai-lieu.ps1` — **CỔNG THAM CHIẾU CHẾT TRONG TÀI LIỆU** (thêm 17/10/2026)

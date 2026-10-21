@@ -31,23 +31,23 @@ và phiên trước từng **nói quá "GĐ1 hoàn thành"** vì **không đo l�
 
 ---
 
-## 3. Trạng thái ĐO ĐƯỢC — baseline chuẩn (đo lại **18/10/2026** cuối `S7`, `-DayDu` exit 0)
+## 3. Trạng thái ĐO ĐƯỢC — baseline chuẩn (đo lại **21/10/2026** cuối `S8`, `-DayDu` exit 0)
 
 ```
-[B1]  dọn tiến trình + cổng trống      1.0s
-[B2]  build + KIỂM MỐC nhị phân       44.6s   · 71 tệp DLL/EXE đổi mốc
-[B3]  unit test                        3.7s   · 1395/1395
-[B4]  integration (PostgreSQL thật)    8.6s   ·   71/71
-[B5]  mermaid (parser thật)            4.2s   ·  213 khối · 0 lỗi
-[B6]  bất biến DB                      6.6s   ·   25/25 · NND = 53 · 62 quyền · quét 86 vị trí probe
-[B7]  test cho chính các cổng         82.1s   ·   24 ca (A…I + R…V + L…P + W)
-[B8]  E2E có phiên đăng nhập          26.7s   ·  102/102   ← 🆕 `S7` +35 ca (hạn mức + đối soát)
-[B9]  sổ địa chỉ HTTP thật            14.6s   ·   17/17
-[B10] khách hàng HTTP thật            15.5s   ·   26/26
-[B11] thanh toán HTTP thật            13.1s   ·   26/26
-[B12] đơn sàn — ĐƯỜNG CHẠY THẬT       20.4s   ·   49/49
+[B1]  dọn tiến trình + cổng trống      1.2s     ← nay kiểm CẢ 5000 và 5100
+[B2]  build + KIỂM MỐC nhị phân       44.3s   · 71 tệp DLL/EXE đổi mốc
+[B3]  unit test                        3.5s   · 1399/1399
+[B4]  integration (PostgreSQL thật)    8.7s   ·   71/71
+[B5]  mermaid (parser thật)            4.9s   ·  213 khối · 0 lỗi
+[B6]  bất biến DB                      6.8s   ·   25/25 · NND = 53 · 62 quyền · quét 86 vị trí probe
+[B7]  test cho chính các cổng         84.6s   ·   24 ca (A…I + R…V + L…P + W)
+[B8]  E2E có phiên đăng nhập          39.1s   ·  123/123   ← 🆕 `S8` +21 ca (7 storefront CÔNG KHAI + 14 thanh toán end-to-end) · ➕ KHỞI ĐỘNG CẢ `HttpApi.Host`
+[B9]  sổ địa chỉ HTTP thật            12.9s   ·   17/17
+[B10] khách hàng HTTP thật            16.2s   ·   26/26
+[B11] thanh toán HTTP thật            13.9s   ·   26/26
+[B12] đơn sàn — ĐƯỜNG CHẠY THẬT       22.7s   ·   49/49
       ─────────────────────────────────────
-      TỔNG                           241.8s
+      TỔNG                           258.8s
 ```
 
 📌 **Đo BA lần trong phiên `S6`** — và **ba lần KHÁC số bước/số ca**, nên đừng so tổng:
@@ -58,38 +58,42 @@ NND **52** / bất biến DB **24/24** / **85** chỗ quét ⇒ **mọi số kh�
 • **CUỐI phiên** (**12 bước**, bước ⑫ có **49 ca** — thêm cổng hạ cờ): **290.8s**.
 • 🆕 **`S7` đo HAI lần**: **ĐẦU phiên** (**12 bước**, `exit 0`): **301.5s** với unit **1367** / integration **67** /
 NND **53** / DB **25/25** / **61** quyền / E2E **67/67** ⇒ **mọi số khớp bảng `S6`** ở trên (⚠️ riêng **thời gian
-cao hơn ~11 %** — máy, không phải sản phẩm). **CUỐI phiên**: **241.8s** như bảng trên, **lần chạy lại trên
-cây ĐÃ COMMIT: 250.4s · `exit 0`**, **lần chạy sau khi đóng hai nợ UI: 289.2s · `exit 0`**, và **lần CUỐI trên
-cây SẠCH (đã commit hết): 235.4s · `exit 0`** — 📌 **cùng số ca** ở cả bốn lần (1395 · 71 · **102/102** ·
-25/25 · NND 53 · 62 quyền), chỉ khác **thời gian** ⇒ dao động của **máy**.
-📌 **`S7` còn một lần dừng vì MÔI TRƯỜNG (không phải mã):** Docker Desktop đã tắt sau khi máy khởi động lại ⇒
+cao hơn ~11 %** — máy, không phải sản phẩm). **CUỐI phiên**: **241.8s** như bảng trên.
+• 🆕 **`S8` đo HAI lần**: **ĐẦU phiên** (**12 bước**, `exit 0`): **260.3s** với unit **1395** / integration **71** /
+NND **53** / DB **25/25** / **62** quyền / **86** chỗ quét / E2E **102/102** ⇒ **mọi số khớp bảng `S7`** (⚠️ thời
+gian cao hơn ~8 % — máy). **CUỐI phiên**: **258.8s** như bảng trên, **cùng 12 bước**, chỉ **+1 bước mới bên
+trong** (E2E nay khởi động **cả** `HttpApi.Host`).
+📌 **`S7`/`S8` còn một lần dừng vì MÔI TRƯỜNG (không phải mã):** Docker Desktop đã tắt sau khi máy khởi động lại ⇒
 `docker compose up -d` lại `ecommerce-postgres` + `ecommerce-redis` rồi mới chạy được probe. 🔑 **Triệu chứng**
 là `psql THAT BAI … failed to connect to the docker API` — 📌 dừng lại và **đọc thông điệp** là đủ để không đi
 sửa mã nguồn.
 📌 **Và một lần cổng ĐỎ THẬT giữa phiên `S7`** (đáng ghi vì nó là *bài học của chính bước ⑥*): lần chạy thứ hai
 bị **huỷ giữa bước ⑪** ⇒ để lại **1 dòng `PayTransactions`** + **cờ `ShouldChangePasswordOnNextLogin = false`**
 ⇒ lần chạy kế tiếp **ĐỎ ở bước ⑥** (2 bất biến: *"① phải rỗng"* và *"② bảo mật"*). ✅ Dọn tay rồi đo lại ⇒ **xanh**.
-🔑 Đây đúng lý do **bước ⑥ tồn tại**: *"quên kiểm DB"* là bước **dễ quên nhất**, và hậu quả của một lần **huỷ
-giữa đường** *không* tự biến mất.
+🆕 **`S8` cũng có một lần cổng ĐỎ THẬT — và nó là bài học MỚI:** thêm `HttpApi.Host` vào bước ⑧ nghĩa là **job nền
+của Host chạy ngay** (`InventoryReconciliationWorker`, `Timer.RunOnStart = true`) ⇒ job **ghi một dòng lệch THẬT**
+vào `ReconRunMismatches` cho **dòng tồn kho probe** (`OnHand=100`, sổ cái `0`) ⇒ **bước ⑥ ĐỎ** (`TONG=5` sau **5**
+lần chạy E2E). ✅ Dọn theo **SKU probe** + **đếm lại** (`conLechProbe`). 🔑 Câu phải hỏi mỗi lần thêm tiến trình
+vào phép đo: ***"job nào chạy khi nó lên, và nó ghi cái gì?"***
 🔑 **Vì vậy bước ĐẦU TIÊN của mọi phiên là ĐO LẠI** (mục 6) — nếu số khác bảng trên thì **dừng, tìm hiểu trước khi sửa**.
 📌 **Cái ĐO ĐƯỢC phải khớp; cái KHÔNG khớp thời gian là máy** — nhưng ⚠️ **thời gian vẫn phải ghi**:
 `B5` lệch **46.5s** so với **5.1s** ở đầu phiên `S6` (cùng mã, cùng tài liệu) và **4.2s** ở cuối `S7` ⇒
 nguyên nhân là **`npm`/máy**.
 
-**Code:** **350 tệp · 43.380 dòng** — 📌 **phương pháp (ghi rõ để không trôi):**
+**Code:** **354 tệp · 44.288 dòng** — 📌 **phương pháp (ghi rõ để không trôi):**
 `Get-ChildItem src, modules, shared -Recurse -Filter *.cs`, **loại** `\bin\`, `\obj\`, `*.Designer.cs`,
 `*Snapshot.cs`, rồi **đẩy NỘI DUNG qua** `| Measure-Object -Line` (tức **bỏ dòng RỖNG** — ⚠️ nếu đẩy
 **đối tượng tệp** vào `Measure-Object -Line` thì mỗi tệp chỉ được **1 dòng**, ra **345** và trông như *"code
 co lại 99 %"*; đó đúng là **cùng một bài học** ở dạng **mới**: *phép đo bất ngờ thường là phép đo SAI*) ·
-đo 18/10/2026 cuối `S7` · **114 tệp test · 18.317 dòng** (cùng phương pháp, trên `test/`) · **41 migration**
+đo 21/10/2026 cuối `S8` · **115 tệp test · 18.540 dòng** (cùng phương pháp, trên `test/`) · **41 migration**
 (82 tệp = 41 `X.cs` + 41 `X.Designer.cs`; ➕ tệp thứ 83 trong thư mục là `eCommerceDbContextModelSnapshot.cs`
 — **không** phải migration).
 🔑 **Vì sao phải ghi cả phương pháp:** ở `S4` tôi đếm bằng `.Count` (mọi dòng) ⇒ ra **47.191** (lệch **7.967**);
 ở `S6` tôi đẩy **đối tượng tệp** vào `Measure-Object -Line` ⇒ ra **345** (lệch **42.092**) — 📌 và **lệch số dòng** khi bỏ dòng rỗng — **hai lần cùng một
 loại lỗi, hai dạng khác nhau**. ✅ Dùng **đúng** phương pháp: `S4` = **40.291** · `S5` = **41.414** ·
-`S6` = **42.437** · `S7` = **43.380** ⇒ **+943 dòng cho 3 tệp sản phẩm mới** (`DoiSoatRetention` + service
-dùng chung luật + `ReconRetentionWorker` + migration `Up()` — phần lớn là **chú thích**, đúng quy ước dự án)
-+ **+377 dòng test cho 3 tệp test mới**.
+`S6` = **42.437** · `S7` = **43.380** · `S8` = **44.288** ⇒ **+908 dòng cho 4 tệp sản phẩm mới**
+(`DocSanPhamCongKhai` + `FakePaymentOptions` + `FakePaymentProvider` + `PayGiaLapController` — phần lớn là
+**chú thích**, đúng quy ước dự án) + **+223 dòng test cho 1 tệp test mới**.
 **Git:** nhánh `main` · **số commit TĂNG mỗi lần sửa tệp này** ⇒ đọc `git rev-list --count HEAD`
 (đo lúc **kết thúc `S6`, trước commit sửa chính dòng này**: **285** — 📌 commit `S6` đầu tiên là `e46460a`) ·
 ✅ **cây SẠCH** · **`origin` = `https://github.com/hungnt9801/eCommerce`** · ⚠️ repo đang **PUBLIC**.
@@ -126,6 +130,20 @@ dùng chung luật + `ReconRetentionWorker` + migration `Up()` — phần lớn 
 | **25** bất biến DB · **86** chỗ quét | **25 · 86** | **không đổi** — `S7` chỉ thêm **cột** (không thêm bảng), và thêm **1 dòng** vào danh sách **quyền bắt buộc** của `kiem-db.ps1` |
 | **347** tệp · **42.437** dòng · test **111** tệp / **17.940** dòng | **350 tệp · 43.380 dòng** · test **114** tệp / **18.317** dòng | `S7` **+3 tệp sản phẩm** (`DoiSoatRetention` + `ReconRetentionWorker` + migration `Up()`) · **+3 tệp test** |
 | **290.8s** | **241.8s** | ⚠️ **đổi theo máy** — 📌 đầu phiên `S7` đo **301.5s** (cùng mã **trước** khi sửa, `exit 0`) ⇒ **không** phải chỉ tiêu |
+
+🆕 **`S8` — các con số MỚI (dùng bảng trên, đọc thêm dòng này để biết cái gì đã đổi):**
+
+| Số cũ (cuối `S7`) | Số đo 21/10/2026 (cuối `S8`) | Vì sao |
+|---|---|---|
+| **1395** unit | **1399** | `S8` **+4** (`StorefrontCongKhaiTests`: ranh giới DTO công khai · bộ lọc `Published` **đếm = 1** · cấm app service cần quyền · sitemap dùng slug) |
+| **71** integration | **71** | **không đổi** — `S8` **không** thêm migration/cột/bảng nào |
+| **41** migration · **53** `NND` · **62** quyền | **41 · 53 · 62** | **không đổi** — không có thay đổi lược đồ, không thêm quyền (trang công khai **không** cần quyền) |
+| **25** bất biến DB · **86** chỗ quét | **25 · 86** | **không đổi** — không thêm bảng; 2 route mới **không** có PK nên phép quét GUID **không** tăng |
+| **102** ca E2E | **123** | `S8` **+21**: **7** ca storefront **CÔNG KHAI** (`S8-W1…W6`, đo bằng **phiên ẨN DANH**) + **14** ca thanh toán end-to-end (`S8-P1…P14`) |
+| **24** ca test cổng | **24** | **không đổi** — không thêm bước nào (E2E **mở rộng bên trong**, không thành bước mới) |
+| **350** tệp · **43.380** dòng · test **114** tệp / **18.317** dòng | **354 tệp · 44.288 dòng** · test **115** tệp / **18.540** dòng | `S8` **+4 tệp sản phẩm** (`DocSanPhamCongKhai` · `FakePaymentOptions` · `FakePaymentProvider` · `PayGiaLapController`) · **+1 tệp test** |
+| **241.8s** | **258.8s** | ⚠️ **đổi theo máy** — 📌 đầu phiên `S8` đo **260.3s** (cùng mã **trước** khi sửa, `exit 0`) ⇒ **không** phải chỉ tiêu. ➕ E2E **+12.4s** vì nay khởi động **thêm** `HttpApi.Host` (3s lên + tắt) |
+| — (chưa từng có) | **E2E khởi động `HttpApi.Host`** | 🆕 `S8`: thanh toán end-to-end **bắt buộc** hai tiến trình (Web :5100 + Host :5000) — 📌 và kéo theo **job nền của Host chạy ngay** (xem mục 3 phía trên, bài học `S8`) |
 
 ## 4. LUẬT KHÔNG THƯƠNG LƯỢNG — vi phạm là hỏng NGẦM
 
@@ -218,11 +236,11 @@ pwsh -File tools\kiem-link-tai-lieu.ps1       # 0 tham chiếu chết (thoát 1 
 | `S5` | ✅ **XONG 18/10/2026** — **`PAY-001` phần B: IPN/webhook + hoàn tiền** (📄 `PAY-001` **§16.7**): endpoint **`GET /api/webhooks/vnpay`** `[AllowAnonymous]` + allowlist (ở `HttpApi.Host` — trả lời `Q2`) · **HMAC-SHA512** kiểm trên **query THÔ** ⇒ 🚨 **vá `F-PAY-1`** + phát hiện **lớp thứ hai** (byte chuỗi ký: `+` ↔ `%20`) + **fail-closed khi `HashSecret` rỗng** · **idempotency** (bảng `PayRefunds` + `CHECK` TIỀN: `RefundedAmount ≤ Amount`, `≥ 0`, `Amount > 0`) ⇒ 🚨 **vá `F-PAY-7`** (**mỗi giao dịch một UoW**) · **`PaymentRefundedEto`** ⇒ đơn sang `PartiallyRefunded`/`Refunded` · **job đọc** giá trị `MarkFailed` trả về (đóng nốt `F-PAY-9`) · **job đối soát phát sự kiện** · ➕ **bước ⑪ mới**: `probe-thanh-toan.ps1` (**26 ca HTTP thật**). Cổng ra: **IPN trùng ⇒ 1 lần ghi + bộ đếm 3** ✅ · **sai chữ ký ⇒ `400` + DB không đổi** ✅ · **hoàn vượt ⇒ `0002`** ✅ · unit **+53** · integration **+6** · `-DayDu` **exit 0 · 214.8s**. ⚠️ **Vẫn KHÔNG `Implemented`**: chưa kiểm chứng **tiền thật**, outbox chưa có, `Q6` còn mở |
 | `S6` | ✅ **XONG 18/10/2026** — **`SAL-005` phần C: nhật ký sự kiện + `update_time` + ĐO RUNTIME** (📄 `SAL-005` **§20**): bảng **`SalMarketplaceEventLogs`** (append-only, **7 kết cục**) · **`MarketplaceEventLogWriter`** (**UoW riêng**, nhận biết trùng bằng **đọc lại DB**) · handler ghi **ĐÚNG MỘT dòng ở MỌI nhánh** · 🚨 **ghi watermark ngay lần nhận đầu** · **connector PoC trả `update_time` tất định** ⇒ `AggregateVersion ≠ null` · **`MarketplacePayloadHash`** · ➕ **bước ⑫ mới** (`probe-don-san.ps1`, **49 ca**) · ➕ **cổng vận hành hạ cờ** (`MarketplaceIntakeAppService` + **2 permission** + mã `0005` — 📄 `SAL-005` **§21**). Gate: **`-DayDu` exit 0 · 290.8s** · unit **1347 → 1367** · integration **57 → 67** · **NND 53 = 53** · bất biến DB **25/25** · quét **86** · **quyền 58 → 61** · **ca cổng 22 → 24** · 🚨 **2 lỗi thật**: **hash chống trùng băm cả `CorrelationId`** ⇒ **DLQ giả ở MỌI lần kéo lại** (**1358 test cũ không thấy**; **đo hai chiều**: tiêm mã cũ ⇒ `C31`/`C32` **ĐỎ**, DLQ **2 → 3**) + **intake mới không ghi watermark** ⇒ bản **cũ hơn** vẫn **ghi đè**. ⚠️ **Vẫn KHÔNG `Implemented`**: `Order` nội bộ **chưa cập nhật** khi áp watermark · chưa UI nhật ký · `Q5` mở · chưa kiểm tiền thật |
 | `S7` | ✅ **XONG 18/10/2026** — **UI/API còn thiếu của Inventory + Reconciliation** (📄 `inv-003` **§20** · `rec-001` **§19**): `/HanMucKenh` **lọc theo KHO** (kèm *"(không gắn kho)"*) + **phân trang** + **ô chọn kho** khi đặt hạn mức + **đổi nhãn theo `Q4`** (*"trần an toàn của kênh theo từng kho"*) · 🚨 **xác nhận lệch = ĐÓNG CẢNH BÁO + audit** (`Q5` = A): **3 cột** + `ReconRun.XacNhan` + `CHECK` *"không xác nhận một nửa"* + permission **`eCommerce.Reconciliation.Confirm`** · **RETENTION**: setting `Recon.Retention.Days` (180, `0` = TẮT) + luật **THUẦN** + service **dùng chung** cho job `ReconRetentionWorker` và nút bấm (**XEM TRƯỚC** mặc định · **xoá CỨNG** · **không bao giờ** xoá `ReconRuns`/dòng chưa xử lý/dòng đang chờ xác nhận) · **phân trang** trang chi tiết. Gate: **`-DayDu` exit 0 · 241.8s** · unit **1367 → 1395** · integration **67 → 71** · **NND 53 = 53** · **quyền 61 → 62** · **E2E 67 → 95 ca** · 🚨 **3 lỗi thật** chỉ lộ khi đo HTML/DB: **xoá MỀM** thay vì cứng (retention **không** làm bảng nhỏ đi) · **`[Required]` trên DTO** chặn trước domain ⇒ người dùng thấy **tiếng Anh** thay vì `0005` · **`[Range]` trên `SoNgay`** làm `0` **không bao giờ** trả `0006`. ⚠️ **Còn nợ**: metric retention · GUID người xác nhận trên UI · chưa có nút "Sửa" điền sẵn |
-| `S8` | Thanh toán trên UI + đóng `WEB-002` |
+| `S8` | ✅ **XONG 18/10/2026** — **Thanh toán trên UI + mở công khai `WEB-002`** (📄 `PAY-001` **§16.11** · `web-002` **§16**): `/DatHang` **tạo giao dịch** ⇒ `302` sang **cổng** ⇒ **trang kết quả** (`/DatHang/KetQua`, đọc trạng thái **từ DB**) · **`FakePaymentProvider`** (dev-only, **fail-fast**) + **trang giả lập `/pay-gia-lap`** (**ký HMAC-SHA512 thật**, gọi **IPN thật**) · mở **CÔNG KHAI** `/SanPham` + `/SanPham/ChiTiet/{slugOrSku}` qua **đường đọc công khai** (repository, **không** app service `[Authorize]`) · **`sitemap.xml` dùng SLUG**. Gate: **`-DayDu` exit 0** · unit **1395 → 1399** · integration **71 = 71** · **NND 53 = 53** · **quyền 62 = 62** · **migration 41 = 41** (không đổi lược đồ) · **E2E 102 → 123** · 📌 **4 phát hiện**: **`Payments:Fake:HashSecret` trong tài liệu KHÔNG THỂ CHẠY** (✅ đo **chiều ngược**: đổi khoá ⇒ 6 ca **ĐỎ**) · **`CostPrice` KHÔNG tồn tại trong lược đồ** · **bộ lọc `Published` viết 3 chỗ ⇒ tiêm 1 chỗ không làm test đỏ** · **`canonical` viết cứng làm test menu đỏ** (chú thích **cũng** bị quét). ⚠️ **Còn nợ**: **301 khi đổi slug** · read-model/cache · JSON-LD/OG · mức tồn kho · UI **hoàn tiền** · **chưa kiểm tiền thật** |
 | `S9` | `XC-007` — CI thật (`.github` + khả chuyển Linux + vá F2) |
 | `S10` | Đóng GĐ1 — nợ nhỏ + `-DayDu` cuối + bàn giao |
 
-✅ **Không phiên nào còn bị chặn**: `Q7` xong (repo + push, 17/10/2026) ⇒ `S9` chạy được ngay; `Q3`…`Q6` đã chốt ⇒ `S7` ✅ **đã xong** (18/10/2026) ⇒ **`S8` / `S9` / `S10` là các phiên còn lại**. 📌 `S8` cần `S5` (đã xong) nên **chạy được ngay**.
+✅ **Không phiên nào còn bị chặn**: `Q7` xong (repo + push, 17/10/2026) ⇒ `S9` chạy được ngay; `Q3`…`Q6` đã chốt ⇒ `S7` ✅ **đã xong** (18/10/2026), `S8` ✅ **đã xong** (18/10/2026) ⇒ **`S9` / `S10` là các phiên còn lại**. 📌 `S9` cần `Q7` (đã có) nên **chạy được ngay**.
 📌 **GĐ2** (`SHP-001…004`, `PRO-001…002`) **không** thuộc GĐ1 — cả 6 **0 dòng code**, là chuỗi phiên riêng.
 
 ---
@@ -239,3 +257,5 @@ pwsh -File tools\kiem-link-tai-lieu.ps1       # 0 tham chiếu chết (thoát 1 
 | 18/10/2026 (sau `S6`) | Cập nhật sau `S6`: baseline **290.8s · 12 bước** (**1367** unit · **67** integration · 213 mermaid · **25/25** DB · **NND 53** · **61 quyền** · **86** chỗ quét · **24** ca cổng · **67/67** E2E · 17/17 sổ địa chỉ · 26/26 khách hàng · 26/26 thanh toán · 🆕 **49/49 đơn sàn**). `S6` ✅ XONG ⇒ **`S7`/`S8`/`S9` là các phiên kế tiếp** (độc lập nhau). ➕ **Bước ⑫ mới** (`probe-don-san.ps1` — **đường chạy thật**: gieo shop bằng SQL → `POST /api/app/channel/{id}/sync-now` → `ChannelShopSyncer` → handler → đo **DB thật**) · ➕ **cổng vận hành hạ cờ `GapSuspected`** (`SAL-005` §21: `GetIntakeAsync`/`MarkReconciledAsync` + **2 permission** + mã `0005`). 🚨 **2 lỗi thật** phát hiện **chỉ vì lần đầu đo runtime** (`sal-005` §20.5): **hash chống trùng băm cả `CorrelationId`** ⇒ **DLQ giả ở MỌI lần kéo lại** (📌 **1358 test cũ không thấy** — cần **hai** lần gửi khác `CorrelationId`; **đo hai chiều**: tiêm mã cũ ⇒ `C31`/`C32` **ĐỎ**, DLQ **2 → 3**) + **dòng intake mới không ghi watermark** ⇒ bản **cũ hơn** đến sau vẫn **ghi đè**. ➕ **4 bẫy của phép đo** (§20.6 + §21.3): `-SimpleMatch` coi `\` là ký tự thật ⇒ **6 ca ĐỎ GIẢ** · route thật `/api/app/channel/{id}/sync-now` (**404** ngay lần đầu) · dọn probe **phải** xoá `MsgIdempotencyRecords` · **thêm permission vào provider KHÔNG tự cấp cho `admin`** ⇒ `403` dù code đúng (phải chạy **`DbMigrator`**: `AbpPermissionGrants` **58 → 61**). 📌 **Sửa 3 con số đã trôi:** bất biến DB **23/23 → 24/24** (thực đo đầu `S6`) · code **341/41.414 → 347/42.437** (phương pháp **đẩy NỘI DUNG** vào `Measure-Object -Line`; đẩy **đối tượng tệp** thì ra **345** — ⚠️ cùng một bài học, dạng mới) · **quyền 58 → 61**. ⚠️ `SAL-005` **vẫn KHÔNG `Implemented`**: `Order` nội bộ **chưa cập nhật** khi áp watermark |
 
 | 18/10/2026 (sau `S7`) | Cập nhật sau `S7`: baseline **241.8s · 12 bước** (**1395** unit · **71** integration · 213 mermaid · **25/25** DB · **NND 53** · **62 quyền** · **86** chỗ quét · **24** ca cổng · 🆕 **95/95** E2E · 17/17 sổ địa chỉ · 26/26 khách hàng · 26/26 thanh toán · 49/49 đơn sàn). `S7` ✅ XONG ⇒ **`S8`/`S9`/`S10` là các phiên còn lại**. ➕ `/HanMucKenh`: **lọc theo kho** + **phân trang** + ô chọn kho + **nhãn theo `Q4`** (`inv-003` §20) · **xác nhận lệch** (`Q5` = A: 3 cột + `CHECK` + permission `eCommerce.Reconciliation.Confirm` + endpoint) · **retention** (`Recon.Retention.Days` 180, `0` = TẮT; luật THUẦN; job `ReconRetentionWorker`; nút bấm có **XEM TRƯỚC**; **xoá CỨNG**) · **phân trang** trang chi tiết (`rec-001` §19). 🚨 **3 lỗi thật** chỉ lộ khi đo HTML/DB: **xoá MỀM** thay vì cứng ⇒ retention **không** làm bảng nhỏ đi · **`[Required]`/`[Range]` trên DTO** chặn **TRƯỚC** guard của domain ⇒ người dùng thấy thông điệp **tiếng Anh** thay vì `0005`/`0006` (📌 đúng lỗi `rec-001` §18.4 tái xuất ở dạng khác) · **gộp nhóm** trong báo cáo retention ⇒ nói **sai lý do giữ lại**. ➕ **2 lỗi của BỘ ĐO**: neo HTML giả định `7` trong khi cột `numeric` in **`7.0000`** (**3 ca ĐỎ GIẢ** + các ca **chiều ngược XANH vì lý do sai**) · gộp *"mới hơn mốc"* vào *"chờ xác nhận"*. 📌 **Đo đầu phiên `S7`: 301.5s, `exit 0`, unit 1367 / integration 67 / E2E 67 / quyền 61** = khớp bảng `S6` — tức **baseline `S6` vẫn đúng** |
+
+| 21/10/2026 (sau `S8`) | Cập nhật sau `S8`: baseline **258.8s · 12 bước** (**1399** unit · **71** integration · 213 mermaid · **25/25** DB · **NND 53** · **62 quyền** · **86** chỗ quét · **24** ca cổng · 🆕 **123/123** E2E · 17/17 sổ địa chỉ · 26/26 khách hàng · 26/26 thanh toán · 49/49 đơn sàn). `S8` ✅ XONG ⇒ **`S9`/`S10` là các phiên còn lại**. ➕ **THANH TOÁN TRÊN UI** (`PAY-001` §16.11): `/DatHang` tạo giao dịch ⇒ `302` sang cổng ⇒ **trang kết quả** đọc trạng thái **từ DB** · **`FakePaymentProvider`** (dev-only, fail-fast) + **trang giả lập `/pay-gia-lap`** (**ký HMAC thật**, gọi **IPN thật**) · **MỞ CÔNG KHAI** `/SanPham` + `/SanPham/ChiTiet/{slugOrSku}` qua **đường đọc công khai** (repository — **không** app service `[Authorize]`) · **`sitemap.xml` dùng SLUG**. 🚨 **4 lỗi thật** (`web-002` §16.3 + `PAY-001` §16.11): **`Payments:Fake:HashSecret` trong tài liệu là KHÔNG THỂ CHẠY** (bên kiểm đọc `PaymentHub:VnPay:HashSecret` ⇒ ký khoá khác ⇒ **mọi IPN bị 400**; ✅ **đo chiều ngược**: đổi khoá ⇒ 6 ca **ĐỎ**) · **`CostPrice` KHÔNG tồn tại trong lược đồ** (ràng buộc `D10` hiện được bảo đảm bằng **sự vắng mặt**; lớp bảo vệ thật là **danh sách trắng thuộc tính DTO**) · **bộ lọc `Published` viết 3 chỗ ⇒ phép tiêm vào 1 chỗ KHÔNG làm test đỏ** (✅ gom về MỘT biểu thức + đếm = 1) · **`canonical` viết cứng làm `MenuDieuHuongTests` ĐỎ** (⚠️ **chú thích cũng bị quét**). ➕ **1 lỗi của BỘ ĐO** (bước ⑥ ĐỎ THẬT): khởi động Host trong E2E ⇒ `InventoryReconciliationWorker` (`RunOnStart`) **ghi dòng lệch THẬT** cho tồn kho probe ⇒ 📌 **thêm tiến trình vào phép đo = thêm nguồn dữ liệu**, phải hỏi *"job nào chạy khi nó lên, và nó ghi cái gì?"*. 📌 **Đo đầu phiên `S8`: 260.3s, `exit 0`, unit 1395 / integration 71 / E2E 102 / quyền 62** = khớp bảng `S7` — tức **baseline `S7` vẫn đúng** |

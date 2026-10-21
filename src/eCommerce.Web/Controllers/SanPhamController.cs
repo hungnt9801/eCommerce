@@ -1,191 +1,153 @@
+using System.Net;
+using System.Text;
 using eCommerce.Catalog;
-using eCommerce.Pricing;
+using eCommerce.Web.Storefront;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace eCommerce.Web.Controllers;
 
 /// <summary>
-/// 🚨 **TRANG HÀNG ĐANG BÁN + ĐƠN GIÁ** (`WEB-001` — bước **2** của chuỗi mặt tiền, sau `GET /PhanBo`).
+/// 🚨 **TRANG HÀNG ĐANG BÁN + CHI TIẾT SẢN PHẨM** (`WEB-002` · `S8` — trước đó là `WEB-001` bước 2).
 ///
-/// **VÌ SAO TRANG NÀY:** đây là **điểm vào** của việc mua hàng — khách cần thấy *"có hàng gì, giá bao nhiêu"*
-/// **trước khi** giỏ hàng/đặt hàng có nghĩa. 📌 Dữ liệu lấy từ **cùng `IPriceListAppService`** mà API dùng
-/// ⇒ **một nguồn sự thật** (không tự tính giá ở tầng UI — giá **phải** đến từ `Pricing`, `PRC-001` Q1).
+/// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+/// 🔓 **CÔNG KHAI TỪ `S8` (quyết định `D10` / `Q6` = A, 17/10/2026):** khách **chưa đăng nhập** xem được
+/// `/SanPham` và `/SanPham/ChiTiet/{slugOrSku}`. 🔑 **Vì sao đây không phải "nới lỏng bảo mật":**
+/// storefront là **mặt tiền** — máy tìm kiếm **không đăng nhập** được, nên một trang chỉ-đăng-nhập thì
+/// slug + `sitemap.xml` (**đã xong** ở `CAT-003`) **không phát huy tác dụng gì**.
+/// 📌 Trước `S8`, cả 9 controller của Web đều `[Authorize]` cấp class ⇒ khách nhận `302` về `/Account/Login`.
 ///
-/// 🔐 `[Authorize]` **cấp class** — quy ước #4. ⚠️ **Không** phải bảo mật dữ liệu: app service vẫn tự kiểm quyền.
+/// 🔒 **BỐN RÀNG BUỘC KHI MỞ (mỗi cái có cơ chế, không chỉ là lời hứa):**
+/// <list type="number">
+///   <item>**Chỉ hàng ĐANG BÁN** — lọc `Status == Published` **trong truy vấn** ở `DocSanPhamCongKhai`
+///     (không lọc ở view). ✅ Ca E2E `S8-W4` đo **chiều ngược**: sản phẩm `Unpublished` ⇒ **`404`**.</item>
+///   <item>**KHÔNG lộ `CostPrice`** — DTO công khai **không có** trường đó, và tầng đọc **không** đọc cột đó.
+///     ✅ Ca E2E `S8-W3` gieo một giá vốn **có giá trị lạ** rồi khẳng định nó **KHÔNG** có trong HTML.</item>
+///   <item>**KHÔNG lộ tồn chi tiết** — tầng đọc **không** đọc `InvItems`; trang **không** hiển thị số tồn.
+///     📌 Mức *"còn/hết"* chỉ được thêm khi có đường đọc tồn công khai (`INV-003`) — hôm nay nói **không có**. </item>
+///   <item>**Allowlist phải có test** — `AllowlistCongKhaiTests` (đỏ nếu thêm `[AllowAnonymous]` mà không khai;
+///     đỏ nếu khai một dòng chết). Mỗi dòng allowlist là **một cửa ra Internet**.</item>
+/// </list>
 ///
-/// 📌 **`Pricing` đã được nạp ở Web** (vòng 58 — bài học *"dùng app service của module nào ⇒ phải nạp module đó ở Web"*)
-/// nên `IPriceListAppService` **dựng được** ở đây. Đây là **lần đầu quy tắc đó được áp dụng có chủ đích** thay vì
-/// phát hiện sau khi `HTTP 500`.
+/// 🚨 **BẪY ĐÃ TRẢ GIÁ (đo được 16/10/2026 — ghi lại vì `S8` suýt lặp lại):** gọi **app service có `[Authorize]`**
+/// (`IPriceListAppService` / `IProductAppService`) từ một hành động **công khai** ⇒ người gọi ẩn danh nhận
+/// `AbpAuthorizationException` ⇒ **`HTTP 500`** ở đúng trang cần công khai (xem `SitemapController`).
+/// 🔒 Vì vậy controller này **chỉ** dùng `DocSanPhamCongKhai` (đọc repository, không quyền).
+/// ✅ Có test quét nguồn khoá lại điều đó (`StorefrontCongKhaiTests`).
+///
+/// 📌 **Một nguồn sự thật:** giá lấy từ **dòng giá của bảng giá đang hiệu lực** (`PrcPriceListItems`) —
+/// **KHÔNG** tự tính ở tầng UI (giá **phải** đến từ `Pricing`, `PRC-001` Q1). Ghi rõ nhãn nguồn theo
+/// `BR-008` (chưa có pipeline giá kênh ⇒ hiển thị **giá niêm yết**, **không** trộn hai nguồn).
+/// ⚠️ **Trang CHỈ ĐỌC** ⇒ không form ⇒ không cần token chống giả mạo.
 /// </summary>
-[Authorize]
+[AllowAnonymous]
 public class SanPhamController : Controller
 {
-    private readonly IPriceListAppService _bangGia;
-    private readonly IProductAppService _sanPham;
-    private readonly ILogger<SanPhamController> _logger;
+    private readonly DocSanPhamCongKhai _doc;
 
-    public SanPhamController(IPriceListAppService bangGia, IProductAppService sanPham, ILogger<SanPhamController> logger)
+    public SanPhamController(DocSanPhamCongKhai doc)
     {
-        _bangGia = bangGia;
-        _sanPham = sanPham;
-        _logger = logger;
+        _doc = doc;
     }
 
-    /// <summary>`GET /SanPham` — bảng **(danh sách giá × SKU × đơn giá)**.</summary>
+    /// <summary>`GET /SanPham` — danh sách **sản phẩm đang bán** kèm giá niêm yết thấp nhất mỗi SKU.
+    /// 📌 Trả **view Razor** (không nối chuỗi HTML): mọi giá trị do người dùng nhập (tên sản phẩm, mã bảng giá)
+    /// được Razor **tự escape** ⇒ không có đường XSS do quên `HtmlEncode` ở từng dòng.</summary>
     public async Task<IActionResult> Index()
     {
-        var bangGiaList = await _bangGia.GetListAsync();
+        var danhSach = await _doc.GetDangBanAsync();
 
-        var dong = new List<SanPhamDongDto>();
-
-        foreach (var bg in bangGiaList.OrderBy(x => x.Code, StringComparer.Ordinal))
-        {
-            var items = await _bangGia.GetItemsAsync(bg.Id);
-
-            dong.AddRange(items
-                .OrderBy(x => x.Sku, StringComparer.Ordinal)
-                .Select(x => new SanPhamDongDto
-                {
-                    MaBangGia = bg.Code,
-                    TenBangGia = bg.Name,
-                    Sku = x.Sku,
-                    DonGia = x.Amount
-                }));
-        }
-
-        return View(dong);
+        return View(danhSach);
     }
 
-    /// <summary>`GET /SanPham/ChiTiet/{slugOrSku}` — **CHI TIẾT SẢN PHẨM + SEO** (`CAT-003` · nợ của `WEB-002`).
+    /// <summary>`GET /SanPham/ChiTiet/{slugOrSku}` — **CHI TIẾT SẢN PHẨM + SEO** (`CAT-003` · `WEB-002`).
     ///
-    /// 🚨 **`CAT-003` — HAI ĐƯỜNG ĐỊNH DANH, MỘT `canonical`:**
+    /// 🚨 **HAI ĐƯỜNG ĐỊNH DANH, MỘT `canonical`:**
     /// <list type="number">
     ///   <item><b>slug</b> (`/SanPham/ChiTiet/ao-thun-nam`) — URL **chuẩn**, `canonical` trỏ vào đây;</item>
     ///   <item><b>SKU</b> (`/SanPham/ChiTiet/SKU-001`) — URL **CŨ**, giữ để **không phá link đã chia sẻ/index**
-    ///     (`ADR-05`: bỏ đột ngột ⇒ mọi link cũ `404` + mất SEO đã tích luỹ). Vẫn trả `200`, nhưng `canonical`
-    ///     trỏ **slug** ⇒ máy tìm kiếm dần dồn tín hiệu về URL chuẩn (**không** tạo hai bản trùng nội dung).</item>
+    ///     (`ADR-05`). Vẫn trả `200`, nhưng `canonical` trỏ **slug** ⇒ máy tìm kiếm dồn tín hiệu về URL chuẩn.</item>
     /// </list>
-    /// 📌 **Một nguồn sự thật:** giá lấy từ **cùng `IPriceListAppService`** như `/SanPham` — **KHÔNG** tự tính ở tầng UI
-    /// (giá **phải** đến từ `Pricing`, `PRC-001` Q1). Tra slug/SKU qua `IProductAppService` của **Catalog**
-    /// (không tự truy vấn bảng `CatProducts` ⇒ không tạo nguồn sự thật thứ hai — `CAT-003` ADR-06).
-    /// 🔎 **SEO:** `<title>` · `<meta name="description">` · `<link rel="canonical">`.
-    /// ⚠️ Trang **CHỈ ĐỌC** ⇒ **không** có form ⇒ **không** cần token chống giả mạo (bài học vòng 73 · 86).
-    /// 🚨 **Không có giá niêm yết ⇒ `404`** — **KHÔNG** trả trang rỗng (tránh máy tìm kiếm **đánh chỉ mục trang rỗng**).
-    /// 🔒 Mọi giá trị đưa vào HTML đều qua `HtmlEncode` (giá trị do người dùng nhập ⇒ **không** nối chuỗi thô).</summary>
-    /// ⚠️ **BẮT BUỘC có route TƯỜNG MINH:** route mặc định là `{controller}/{action}/{id?}` ⇒ đoạn thứ ba gán cho **`id`**,
-    /// nên tham số tên khác **KHÔNG** được bind từ URL ⇒ **`404` dù dữ liệu có** (đã ĐO được ở vòng 108).
-    /// 📌 Đây là lỗi **chỉ lộ ra khi chạy**, và **ca DƯƠNG** mới phát hiện được — ca âm (`404`) đã "đạt" vì **lý do sai**.
+    /// 🚨 **Không tìm thấy / CHƯA publish / CHƯA có giá ⇒ `404`** — **KHÔNG** trả trang rỗng (máy tìm kiếm
+    /// sẽ **đánh chỉ mục trang rỗng**); và **không** trả `403`: khách không cần biết *"có sản phẩm nhưng bị ẩn"*.
+    /// 🔒 Mọi giá trị đưa vào HTML đều qua `HtmlEncode`; mô tả **KHÔNG** render (ADR-12 — cột `text` tự do
+    /// ⇒ render thô là **stored XSS**; muốn render phải có bộ lọc HTML được duyệt trước).
+    /// ⚠️ **BẮT BUỘC route TƯỜNG MINH:** route mặc định là `{controller}/{action}/{id?}` ⇒ đoạn thứ ba gán cho
+    /// **`id`**, nên tham số tên khác **KHÔNG** được bind từ URL ⇒ **`404` dù dữ liệu có** (đã ĐO được ở vòng 108).
+    /// 📌 Đây là lỗi **chỉ lộ ra khi chạy**, và **ca DƯƠNG** mới phát hiện được — ca âm (`404`) đã "đạt" vì lý do sai.
+    /// </summary>
     [HttpGet("SanPham/ChiTiet/{slugOrSku}")]
     public async Task<IActionResult> ChiTiet(string slugOrSku)
     {
-        if (string.IsNullOrWhiteSpace(slugOrSku)) { return NotFound(); }
-
-        // ① Thử SLUG trước (URL chuẩn), ② rồi mới thử SKU (URL cũ). Tra **sản phẩm TRƯỚC** rồi mới tra giá:
-        // nếu tra giá trước thì một SKU "trông hợp lệ" vẫn cho `200` dù **không** thuộc sản phẩm nào.
-        var sanPham = await _sanPham.GetBySlugAsync(slugOrSku);
-        var laSlug = sanPham is not null;
-
-        sanPham ??= await _sanPham.GetByVariantSkuAsync(slugOrSku);
-
-        // 🔑 `canonical`: ưu tiên SLUG khi sản phẩm CÓ slug (URL chuẩn đã được đăng ký).
-        // 🚨 **KHI SẢN PHẨM CHƯA CÓ SLUG (cột `Slug` là NULL — trạng thái hoàn toàn bình thường vì migration
-        // không backfill):** dùng **slug TẠO TẠI CHỖ** từ `Name` (`SinhSlug.Tu` — cùng hàm với đường ghi).
-        // 📌 VÌ SAO KHÔNG dùng thẳng SKU làm canonical: canonical là **lời khai URL CHUẨN**; trỏ vào SKU nghĩa là
-        // *"URL chuẩn là dạng SKU"* ⇒ máy tìm kiếm **không bao giờ** chuyển sang URL slug, trong khi slug mới là
-        // URL mà storefront/`sitemap` sẽ dùng ⇒ **hai dạng URL tranh nhau** đúng thứ `canonical` sinh ra để tránh.
-        // ⚠️ Slug tạo tại chỗ **có thể** trùng với sản phẩm khác (chưa được kiểm ở tầng ghi) — đây là **nợ đã ghi**
-        // (`CAT-003` §17.5): đường đúng là **đặt slug qua API** trước khi publish.
-        var slugChuan = sanPham?.Slug;
-
-        if (sanPham is not null && string.IsNullOrWhiteSpace(slugChuan))
+        if (string.IsNullOrWhiteSpace(slugOrSku))
         {
-            var slugTam = eCommerce.Catalog.SinhSlug.Tu(sanPham.Name);
-            slugChuan = slugTam.Length > 0 ? slugTam : null;
+            return NotFound();
         }
 
-        var bangGiaList = await _bangGia.GetListAsync();
+        var sanPham = await _doc.GetTheoSlugHoacSkuAsync(slugOrSku);
 
-        var dong = new List<(string MaBangGia, string TenBangGia, decimal DonGia)>();
-
-        foreach (var bg in bangGiaList.OrderBy(x => x.Code, StringComparer.Ordinal))
+        if (sanPham is null)
         {
-            var items = await _bangGia.GetItemsAsync(bg.Id);
-
-            // 📌 Khi đã nhận diện được SẢN PHẨM (qua slug) thì gom giá của **mọi SKU thuộc sản phẩm đó** —
-            // đó là ý nghĩa của "trang chi tiết sản phẩm" (một sản phẩm, nhiều biến thể).
-            // Khi **không** nhận diện được (chỉ có SKU trần) thì giữ đúng hành vi cũ: lọc theo chính SKU đó.
-            var cacSku = sanPham is null
-                ? [slugOrSku]
-                : sanPham.Variants.Select(v => v.Sku).ToArray();
-
-            dong.AddRange(items
-                .Where(x => cacSku.Contains(x.Sku, StringComparer.OrdinalIgnoreCase))
-                .OrderBy(x => x.Amount)
-                .Select(x => (bg.Code, bg.Name, x.Amount)));
+            return NotFound();
         }
 
-        if (dong.Count == 0) { return NotFound(); }
+        var giaThapNhat = sanPham.Gia.Min(x => x.DonGia);
+        var duongDanChuan = "/SanPham/ChiTiet/" + SlugCongKhai(sanPham);
 
-        var giaThapNhat = dong.Min(x => x.DonGia);
-        var tenHienThi = sanPham?.Name ?? slugOrSku;
-        var tieuDe = $"{tenHienThi} — {giaThapNhat:N0} VND";
-        var moTa = sanPham is null
-            ? $"Giá niêm yết cho {tenHienThi}: từ {giaThapNhat:N0} VND ({dong.Count} danh sách giá)."
-            : $"Giá niêm yết cho {tenHienThi}: từ {giaThapNhat:N0} VND ({dong.Count} dòng giá, {sanPham.Variants.Count} biến thể).";
+        var tieuDe = $"{sanPham.Ten} — {giaThapNhat:N0} VND";
+        var moTa = $"Giá niêm yết cho {sanPham.Ten}: từ {giaThapNhat:N0} VND ({sanPham.Gia.Count} dòng giá, "
+                   + $"{sanPham.Gia.Select(x => x.Sku).Distinct(StringComparer.OrdinalIgnoreCase).Count()} biến thể).";
 
-        // 🔑 `canonical`: ưu tiên SLUG (URL chuẩn) khi nhận diện được sản phẩm; ngược lại giữ chính tham số vào
-        // (để trang cũ vẫn có `canonical` hợp lệ thay vì rỗng).
-        var duongDanChuan = "/SanPham/ChiTiet/" + (slugChuan ?? slugOrSku);
+        var than = new StringBuilder();
+        than.Append("<h1 id=\"ten-san-pham\">").Append(WebUtility.HtmlEncode(sanPham.Ten)).Append("</h1>");
+        than.Append("<p id=\"gia-thap-nhat\">Giá từ <strong>").Append(giaThapNhat.ToString("N0"))
+            .Append("</strong> VND</p>");
+        than.Append("<p id=\"slug-san-pham\">Slug: ")
+            .Append(WebUtility.HtmlEncode(sanPham.Slug ?? "(chưa có)"))
+            .Append("</p>");
 
-        var than = new System.Text.StringBuilder();
-        than.Append($"<h1 id=\"ten-san-pham\">{System.Net.WebUtility.HtmlEncode(tenHienThi)}</h1>");
-        than.Append($"<p id=\"gia-thap-nhat\">Giá từ <strong>{giaThapNhat:N0}</strong> VND</p>");
+        than.Append("<table id=\"bang-gia-chi-tiet\"><tr><th>Danh sách giá</th><th>Tên</th><th>SKU</th><th>Đơn giá</th></tr>");
 
-        if (sanPham is not null)
+        foreach (var d in sanPham.Gia)
         {
-            than.Append($"<p id=\"slug-san-pham\">Slug: {System.Net.WebUtility.HtmlEncode(sanPham.Slug ?? "(chưa có)")}</p>");
-        }
-
-        than.Append("<table id=\"bang-gia-chi-tiet\"><tr><th>Danh sách giá</th><th>Tên</th><th>Đơn giá</th></tr>");
-
-        foreach (var d in dong)
-        {
-            than.Append($"<tr class=\"dong-gia\"><td>{System.Net.WebUtility.HtmlEncode(d.MaBangGia)}</td><td>{System.Net.WebUtility.HtmlEncode(d.TenBangGia)}</td><td>{d.DonGia:N0}</td></tr>");
+            than.Append("<tr class=\"dong-gia\"><td>").Append(WebUtility.HtmlEncode(d.MaBangGia))
+                .Append("</td><td>").Append(WebUtility.HtmlEncode(d.TenBangGia))
+                .Append("</td><td>").Append(WebUtility.HtmlEncode(d.Sku))
+                .Append("</td><td class=\"so\">").Append(d.DonGia.ToString("N0")).Append("</td></tr>");
         }
 
         than.Append("</table>");
+        than.Append("<p id=\"nguon-gia\">Giá hiển thị là <strong>giá niêm yết</strong> từ bảng giá đang hiệu lực.</p>");
         than.Append("<p><a id=\"quay-lai\" href=\"/SanPham\">← Danh sách hàng đang bán</a></p>");
 
-        var html = "<!DOCTYPE html><html lang=\"vi\"><head><meta charset=\"utf-8\"><title>"
-                 + System.Net.WebUtility.HtmlEncode(tieuDe)
-                 + "</title><meta name=\"description\" content=\""
-                 + System.Net.WebUtility.HtmlEncode(moTa)
-                 + "\"><link rel=\"canonical\" href=\""
-                 + System.Net.WebUtility.HtmlEncode(duongDanChuan)
-                 + "\"></head><body>"
-                 + than
-                 + "</body></html>";
-
-        // 📌 `laSlug` hiện chỉ dùng để ghi log chẩn đoán: phân biệt "khách vào bằng URL chuẩn" với
-        // "khách vào bằng URL cũ" là thông tin cần để biết **khi nào** bỏ được đường dự phòng SKU.
-        _logger.LogInformation("CHI TIẾT SẢN PHẨM: vào bằng {Loai} · sản phẩm {Code} · {So} dòng giá. [SP-CHITIET]",
-            laSlug ? "SLUG (URL chuẩn)" : "SKU (URL cũ)",
-            sanPham?.Code ?? "(không nhận diện được)",
-            dong.Count);
+        var html = "<!DOCTYPE html><html lang=\"vi\"><head><meta charset=\"utf-8\">"
+                   + "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
+                   + "<title>" + WebUtility.HtmlEncode(tieuDe) + "</title>"
+                   + "<meta name=\"description\" content=\"" + WebUtility.HtmlEncode(moTa) + "\">"
+                   + "<link rel=\"canonical\" href=\"" + WebUtility.HtmlEncode(duongDanChuan) + "\">"
+                   + "</head><body>" + than + "</body></html>";
 
         return Content(html, "text/html; charset=utf-8");
     }
-}
 
-/// <summary>Một dòng hiển thị: **danh sách giá** nào đang niêm yết **SKU** này với **đơn giá** bao nhiêu.</summary>
-public class SanPhamDongDto
-{
-    public string MaBangGia { get; set; } = default!;
+    /// <summary>
+    /// 🔑 **SLUG DÙNG LÀM URL** — ưu tiên `Product.Slug` (đã đăng ký, là URL chuẩn); nếu **cột `Slug` là NULL**
+    /// (trạng thái **bình thường**: migration không backfill) thì **sinh tại chỗ** từ `Name` bằng **cùng hàm**
+    /// của đường ghi (`SinhSlug.Tu`).
+    /// 📌 VÌ SAO KHÔNG dùng thẳng SKU làm canonical: `canonical` là **lời khai URL CHUẨN**; trỏ vào SKU nghĩa là
+    /// *"URL chuẩn là dạng SKU"* ⇒ máy tìm kiếm **không bao giờ** chuyển sang URL slug, trong khi slug mới là
+    /// URL mà storefront/`sitemap` sẽ dùng ⇒ **hai dạng URL tranh nhau** — đúng thứ `canonical` sinh ra để tránh.
+    /// ⚠️ Slug tạo tại chỗ **có thể** trùng với sản phẩm khác (chưa kiểm ở tầng ghi) — nợ đã ghi (`CAT-003` §17.5).
+    /// </summary>
+    private static string SlugCongKhai(SanPhamCongKhaiDto sanPham)
+    {
+        if (!string.IsNullOrWhiteSpace(sanPham.Slug))
+        {
+            return sanPham.Slug!;
+        }
 
-    public string TenBangGia { get; set; } = default!;
+        var tam = SinhSlug.Tu(sanPham.Ten);
 
-    public string Sku { get; set; } = default!;
-
-    public decimal DonGia { get; set; }
+        return tam.Length > 0 ? tam : sanPham.Gia[0].Sku;
+    }
 }

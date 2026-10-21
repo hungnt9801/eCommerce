@@ -958,20 +958,36 @@ Nó **không** phải *"chờ đối tác cấp credential"* — nó là **một
 | Thành phần | Quyết định | Vì sao |
 |---|---|---|
 | Vị trí | `modules/PaymentHub/eCommerce.PaymentHub.Application/Providers/FakePaymentProvider.cs` | Cạnh `VnPayPaymentProvider.cs` — cùng một abstraction, **không** nhánh `if` rải rác |
-| Đăng ký | `Payments:Provider` = `VnPay` \| `Fake`; chọn tại `PaymentHubApplicationModule.cs:32-34` (nơi **đã** đăng ký `IPaymentProvider`) | Chỉ **một** điểm quyết định, dễ audit |
-| 🚨 Chốt an toàn | `Fake` **chỉ** đăng ký khi `IHostEnvironment.IsDevelopment()`; `Payments:Provider=Fake` ở môi trường khác ⇒ **NÉM NGAY lúc khởi động** | Một cấu hình sai **không** được phép thành cửa mở ở production |
-| Trang giả lập | `GET /pay-gia-lap/{txnRef}` → HTML 3 nút **Thành công / Thất bại / Huỷ**; `POST` → dựng query `vnp_*` rồi **gọi IPN của CHÍNH TA** | Kiểm được **cả** lớp ② mà không cần internet |
-| 🔑 Chữ ký | Trang giả lập **DÙNG LẠI** `VnPayRequestBuilder.DungChuoiKy` + `Ky` (`VnPayRequestBuilder.cs:38-48`) với `Payments:Fake:HashSecret` (**dev-only**) | 📌 **Không** viết lại thuật toán ký — viết lại thì ta kiểm **bản sao**, không kiểm **code thật** |
-| Sinh IPN | `FakePaymentProvider` trả URL trỏ trang giả lập; `VerifyWebhookAsync` của **VNPay** vẫn là đường xử lý **duy nhất** | ⇒ đường xác thực chữ ký **luôn** được chạy thật |
+| Đăng ký | `PaymentHub:Provider` = `VnPay` \| `Fake`; chọn tại `PaymentHubApplicationModule.cs` (nơi **đã** đăng ký `IPaymentProvider`) | Chỉ **một** điểm quyết định, dễ audit |
+| 🚨 Chốt an toàn | `Fake` **chỉ** hợp lệ khi `IHostEnvironment.EnvironmentName = Development`; đặt `PaymentHub:Provider=Fake` ở môi trường khác ⇒ **NÉM NGAY lúc khởi động** (`OnApplicationInitialization`) | Một cấu hình sai **không** được phép thành cửa mở ở production |
+| Trang giả lập | `GET /pay-gia-lap/{txnRef}` → HTML 3 nút **Thành công / Thất bại / Huỷ**; `POST` → dựng query `vnp_*` rồi **gọi IPN của CHÍNH TA** bằng HTTP thật | Kiểm được **cả** lớp ② mà không cần internet |
+| 🔑 Chữ ký | Trang giả lập **DÙNG LẠI** `VnPayRequestBuilder.DungChuoiKy` + `Ky` với **cùng** khoá `PaymentHub:VnPay:HashSecret` (**dev-only**) | 📌 **Không** viết lại thuật toán ký — viết lại thì ta kiểm **bản sao**, không kiểm **code thật** |
+| Sinh IPN | `FakePaymentProvider` trả URL trỏ trang giả lập; `FakePaymentProvider.VerifyWebhookAsync` **uỷ quyền** cho `VnPayPaymentProvider` ⇒ đường xác thực chữ ký **luôn** được chạy thật | ⇒ **không** có bản kiểm chữ ký thứ hai để lệch nhau |
 | Dùng cho unit test | Cùng lớp, đăng ký trong test module | 🔎 Hiện **0** tệp test có `IPaymentProvider` ⇒ đây là **test double đầu tiên** |
 
-**Bật/tắt bằng cấu hình, không sửa code:**
+**Bật/tắt bằng cấu hình, không sửa code** (`S8` sửa lại **khoá cấu hình** cho khớp mã thật):
 
 ```json
-"Payments": { "Provider": "Fake", "Fake": { "HashSecret": "<dev-only>", "SimulatorBaseUrl": "https://localhost:5000" } }
+"PaymentHub": {
+  "Provider": "Fake",
+  "VnPay": { "TmnCode": "GIALAPDEV", "HashSecret": "<hằng DEV>" },
+  "Fake": { "SimulatorBaseUrl": "http://localhost:5100", "IpnBaseUrl": "http://localhost:5000" }
+}
 ```
 
-⚠️ `Payments:Fake:HashSecret` là **hằng dev**, **KHÔNG** phải `HashSecret` của VNPay, **không** dùng cho production, **không** cần giữ bí mật — nhưng **phải** khác rỗng để `KiemChuKy` chạy thật.
+🚨 **Bản `v0.1` của mục này ghi `Payments:Provider` + `Payments:Fake:HashSecret` — SAI HAI CHỖ, và `S8` sửa
+theo đúng quy tắc *"code lệch tài liệu ⇒ sửa tài liệu trước"*:**
+
+1. Khoá cấu hình thật là **`PaymentHub:*`** (`eCommerceHttpApiHostModule` bind `configuration.GetSection("PaymentHub")`).
+   Đặt `Payments:*` thì **không có gì đọc** ⇒ `Provider` luôn rỗng ⇒ **luôn** chạy VNPay, **im lặng**.
+2. **`Fake:HashSecret` riêng là KHÔNG THỂ CHẠY.** Bên **kiểm** chữ ký là `VnPayPaymentProvider`, nó đọc
+   **`PaymentHub:VnPay:HashSecret`**. Ký bằng khoá khác ⇒ **mọi** IPN giả lập bị `400 Invalid Checksum` — 📌 và
+   đó **không** phải lỗi cần *"nới lỏng kiểm tra"*, mà là **ta ký sai khoá**. ⇒ Dùng **một** khoá dev cho cả hai
+   phía, giữ nguyên bất biến §7.7.4 #1.
+
+⚠️ Hằng dev đó **KHÔNG** phải `HashSecret` của VNPay, **không** dùng cho production, **không** cần giữ bí mật —
+nhưng **phải** khác rỗng (rỗng ⇒ `fail-closed`, mọi chữ ký bị từ chối) và **chỉ** nằm trong
+`appsettings.Development.json` của **cả hai** tiến trình (`eCommerce.Web` ký, `eCommerce.HttpApi.Host` kiểm).
 
 #### 7.7.3 Ba cách — và cách nào dùng khi nào
 
@@ -1094,9 +1110,23 @@ Nó **không** phải *"chờ đối tác cấp credential"* — nó là **một
 
 ## 10. UI Mockup & mapping dữ liệu
 
-**UI hiện có:** đúng **một** màn hình — `/DoiSoatThanhToan` (`src/eCommerce.Web/Controllers/DoiSoatThanhToanController.cs`),
-gồm **2 hành động**: `Index` (danh sách) và `TruyVanTrangThai` (POST, gọi `querydr`).
-❌ **Không** có UI **tạo giao dịch**, ❌ **không** có UI **hoàn tiền** (đường gọi API đã có, **chưa** có nút).
+**UI hiện có (sau `S8` — 18/10/2026):**
+
+| Màn hình | Route | Trạng thái |
+|---|---|---|
+| **Đặt hàng + Thanh toán** | `GET/POST /DatHang` → `302` sang **cổng** | ✅ **`S8` mới**: ô *"Thanh toán ngay"* (chỉ hiện khi có `eCommerce.Payments.Default`) ⇒ tạo **giao dịch** rồi chuyển sang cổng |
+| **Cổng giả lập** (dev-only) | `GET/POST /pay-gia-lap/{maThamChieu}` | ✅ **`S8` mới** — 3 nút *Thành công / Thất bại / Huỷ*; **ký HMAC-SHA512 thật** rồi gọi **IPN thật** |
+| **Kết quả thanh toán** | `GET /DatHang/KetQua?ma=…` | ✅ **`S8` mới** — trạng thái **đọc từ DB**, KHÔNG từ query string |
+| **Đối soát** | `/DoiSoatThanhToan` (danh sách + nút *Truy vấn trạng thái*) | có từ trước |
+
+❌ Vẫn **chưa có** UI **hoàn tiền** (đường gọi API đã có, **chưa** có nút) — nợ §16.9 #3/#5.
+
+🚨 **BẤT BIẾN CỦA TRANG KẾT QUẢ (bài học `D2`, `S8` thi hành bằng mã):** `returnUrl` và mọi tham số `vnp_*`
+trên URL **KHÔNG phải** bằng chứng thanh toán. Trang đọc `PayTransactions.Status` từ DB — nơi **chỉ** IPN đã
+kiểm chữ ký mới ghi được. ✅ E2E `S8-P11` đo **chiều ngược**: một giao dịch chưa trả + `?vnp_ResponseCode=00`
+⇒ trang **vẫn** nói *"CHƯA thanh toán"* và DB **không** đổi (`S8-P12`).
+
+**Mapping dữ liệu của trang kết quả:**
 
 | Vùng UI | Dữ liệu hiển thị | Nguồn (DTO / trường) | Hành động |
 |---|---|---|---|
@@ -1493,13 +1523,13 @@ public class Pay001Tests : eCommerceTestBase<eCommerceEntityFrameworkCoreTestMod
 | # | Việc còn lại | Vì sao chưa làm | Phiên |
 |---|---|---|---|
 | 1 | 🚨 **Kiểm chứng tiền THẬT** — `TmnCode`+`HashSecret` sandbox, một giao dịch và một IPN **thật** | Cần **credential** + tunnel (C1+C2 của §7.7.3). 🔒 `S5` kiểm được **HMAC thật** nhưng **không** kiểm được *"tiền đã ra"* | chủ dự án |
-| 2 | **`FakePaymentProvider` + trang giả lập** (§7.7.2) | 🔑 Chủ dự án chốt trong `S5`: **dời sang `S8`** — probe tự ký HMAC bằng **biến môi trường** nên cổng ra của `S5` **không** cần nó; trang giả lập chỉ cần khi có **UI checkout** | `S8` |
+| 2 | ✅ **`S8` — ĐÃ LÀM:** `FakePaymentProvider` + trang giả lập `/pay-gia-lap` | 🔑 Chủ dự án chốt trong `S5`: **dời sang `S8`** — probe tự ký HMAC bằng **biến môi trường** nên cổng ra của `S5` **không** cần nó; trang giả lập chỉ cần khi có **UI checkout** | ✅ `S8` (xem §16.11) |
 | 3 | **Xác nhận các dòng hoàn tiền `ChoXacNhan`** (`Q6`) | VNPay hoàn tiền **bất đồng bộ** ⇒ *"cổng đã nhận"* **≠** *"tiền đã ra"*. `S5` **ghi được** dòng chờ xác nhận nhưng **chưa có đường** xác nhận bằng `querydr` (cần **BA** chốt ai xác nhận — `Q6` vẫn `Open`) | `S7` + BA |
 | 4 | **Outbox bền vững** (`XC-002`) | Nợ đã ghi từ `S4` (chủ dự án chốt hoãn) | `S10` |
 | 5 | **Cấp mã nghiệp vụ riêng** cho 2 index của `PayTransactions` (`F-PAY-4` phần còn lại) | Là **thay đổi hợp đồng** với client ⇒ BA quyết (`D6`: code là nguồn sự thật) | BA |
 | 6 | **Quyền cho `TaoGiaoDichAsync`** (chỉ cần quyền **đọc** mà lại **tạo giao dịch**) | Cùng họ `F-PAY-8`; thêm permission = đổi hợp đồng quyền ⇒ **không tự chọn** | `S7` + BA |
 | 7 | **Test còn thiếu**: `TC-14` (hai luồng hoàn tiền song song), `TC-18`, `TC-30`, `TC-31`, `TC-33`, `TC-35`, `TC-36` | `TC-14` cần `FakePaymentProvider` (dời `S8`); `TC-30` cần hạ tầng 2 tenant | `S8`/`S10` |
-| 8 | **UI thanh toán** (`/DatHang` → cổng → trang kết quả) | Phạm vi `S8` | `S8` |
+| 8 | ✅ **`S8` — ĐÃ LÀM:** UI thanh toán (`/DatHang` → tạo giao dịch → cổng → `/DatHang/KetQua`) | Phạm vi `S8` | ✅ `S8` (xem §16.11) · ⚠️ **chỉ** ở môi trường dev với cổng **giả lập** (chưa có credential) |
 | 9 | **Cột `ProviderCreateDateGmt7`** + `vnp_RequestId` **ổn định** (§5.6 #2, `F-PAY-10`) | Không có credential ⇒ **không kiểm chứng được**; sửa mù là đổi hành vi tiền mà không đo được | khi có credential |
 | 10 | 🚨 **`F-PAY-7` CHƯA CÓ PHÉP ĐO** — code đã sửa nhưng **không** có test/probe nào chạy lô đối soát với một giao dịch **cố ý hỏng** | Cần dựng một tình huống lỗi DB **giữa lô** (ví dụ chèn trước một dòng vi phạm `CHECK` để `SaveChanges` ném ở giao dịch #k) — 📌 khả thi nhưng **ngoài** 3 cổng ra của `S5`; và làm ẩu thì phép đo **không chứng minh** được gì (`README-probe` §C: *tách phép đo nhỏ nhất*) | `S10` (hoặc `S7` khi làm UI đối soát) |
 
@@ -1513,8 +1543,68 @@ public class Pay001Tests : eCommerceTestBase<eCommerceEntityFrameworkCoreTestMod
 | 4 | **`Q6` — không ai xác nhận dòng hoàn tiền `ChoXacNhan`** | Cần BA (ai xác nhận: kế toán? job?) | Tiền **đã ra** ở cổng mà sổ vẫn `ChoXacNhan` ⇒ đối soát lệch **vĩnh viễn** cho tới khi có người xác nhận. ➕ `S5` **đã** để lại **bằng chứng dữ liệu** (dòng hoàn + trạng thái) nên câu hỏi *"có bao nhiêu lần hoàn đang chờ"* **trả lời được** bằng SQL — đó là điều kiện **cần** để xử lý |
 | 5 | **Mã lỗi chung `eCommerce:Db:0001`** cho 2 index của `PayTransactions` (`F-PAY-4` phần còn lại) | Cấp mã riêng = đổi **hợp đồng** với client ⇒ **BA** quyết | CSKH đọc *"dữ liệu vi phạm ràng buộc"* thay vì *"giao dịch này đã được ghi rồi"*. ✅ `S5` **đã** thay bằng thông điệp **đúng chuyện gì xảy ra** + chỉ dẫn |
 
-### 16.1…16.5 (mốc `S4` — giữ nguyên để đối chiếu)
+### 16.11 🆕 `S8` (18/10/2026) — THANH TOÁN TRÊN UI + CỔNG GIẢ LẬP
 
+> 📌 Mục này **chỉ** ghi cái **đo được** và cái **còn thiếu**. 🔒 `PAY-001` **vẫn KHÔNG** `Implemented`:
+> **chưa kiểm chứng tiền thật** (§7.6) và **outbox bền vững chưa có** (§16.10 #1).
+> 📌 `S8` = **phần C** (UI + cổng giả lập); phần A (`S4`) và B (`S5`) giữ nguyên bên dưới làm mốc.
+
+**Chuỗi đo được (end-to-end, `kiem-e2e.ps1` ca `S8-P1…P14`):**
+
+```
+POST /DatHang (Thanh toán ngay)  → 302
+   → GET /pay-gia-lap/{maThamChieu}          (3 nút, số tiền = GrandTotal 110.000)
+   → POST /pay-gia-lap/{maThamChieu} ketQua=thanh-cong
+        · dựng query vnp_* · KÝ HMAC-SHA512 (VnPayRequestBuilder — code thật)
+        · GET http://localhost:5000/api/webhooks/vnpay?…   ← ENDPOINT THẬT, HTTP thật
+        · IPN 200 {"RspCode":"00"} → DB: PayTransactions.Status = Succeeded
+   → 302 /DatHang/KetQua?ma=…               (trạng thái ĐỌC TỪ DB)
+   → OrdOrders.PaymentStatus = Paid (2)        qua ETO (cầu nối, không cùng transaction)
+```
+
+| # | Việc | Tệp | Bằng chứng |
+|---|---|---|---|
+| 1 | **`FakePaymentProvider`** (dev-only, uỷ quyền kiểm chữ ký cho VNPay) + chọn provider theo `PaymentHub:Provider` + **fail-fast** khi `Fake` ngoài Development | `Providers/FakePaymentProvider.cs` · `Providers/FakePaymentOptions.cs` · `PaymentHubApplicationModule.cs` | unit (module vẫn dựng được) · E2E `S8-P3/P4` (đi qua cổng giả lập) |
+| 2 | **Trang giả lập `/pay-gia-lap/{ma}`** — 3 nút; **ký HMAC thật**; gọi **IPN thật**; hiện lỗi IPN thay vì "giả thành công" | `src/eCommerce.Web/Controllers/PayGiaLapController.cs` | E2E `S8-P4…P8` · 🔑 **đo chiều ngược**: đổi khoá ký ⇒ `P7`/`P8`/`P9`/`P10`/`P13`/`P14` **ĐỎ** (xem dưới) |
+| 3 | **`/DatHang` tạo giao dịch + chuyển cổng** (ô *Thanh toán ngay*, chỉ hiện khi có `Payments.Default`) | `Controllers/DatHangController.cs` + `Views/DatHang/Index.cshtml` | E2E `S8-P1` (ô hiện) · `S8-P3` (`302` sang cổng) · `S8-P5` (giao dịch `Initiated` **trước** khi bấm) |
+| 4 | **Trang kết quả `/DatHang/KetQua`** — trạng thái từ DB, hiện **số lần nhận IPN** | `Controllers/DatHangController.KetQua` + `Views/DatHang/KetQua.cshtml` | E2E `S8-P7/P8` (`ĐÃ THANH TOÁN`) · `S8-P11` (`?vnp_ResponseCode=00` **không** đánh lừa được) |
+| 5 | **Cấu hình dev** cho **cả hai** tiến trình (một khoá ký, hai phía) | `src/eCommerce.Web/appsettings.Development.json` · `src/eCommerce.HttpApi.Host/appsettings.Development.json` | E2E `S8-P9` (DB `Succeeded`) — chữ ký **khớp** giữa hai tiến trình |
+| 6 | **Bước E2E khởi động `HttpApi.Host`** (:5000) — tiền đề của end-to-end | `tools/kiem-e2e.ps1` (bước ③b) | Host lên + tắt trong `finally`; chạy lần 2 **không** bị "cổng 5000 bận" |
+
+**Số đo thật (`S8`):**
+
+| Chỉ số | Trước `S8` | Sau `S8` | Δ |
+|---|---:|---:|---|
+| Unit test | **1395** | **1399** | **+4** (`StorefrontCongKhaiTests`) |
+| Integration test | 71 | 71 | 0 (không đổi lược đồ) |
+| E2E (HTML thật) | **102** | **123** | **+21** (`S8-W1…W6` = 7 · `S8-P1…P14` = 14) |
+| Migration | 41 | **41** | 0 — 🚨 **không** có thay đổi lược đồ nào |
+| `NND` · quyền · bất biến DB | 53 · 62 · 25 | **53 · 62 · 25** | 0 |
+| Ca test cổng / probe HTTP | 24 · 86 chỗ quét | **24 · 86** | 0 (không thêm probe/route công khai nào) |
+| Tệp/dòng code | 350 / 43.380 | **354 / 44.288** | +4 tệp / +908 dòng (chủ yếu **chú thích**) |
+| Tệp/dòng test | 114 / 18.317 | **115 / 18.540** | +1 tệp / +223 dòng |
+
+**🚨 PHÁT HIỆN CỦA `S8` (năm cái, mỗi cái đều *"trông như đã xong"*):**
+
+| # | Phát hiện | Bằng chứng (đo được) | Vì sao đáng ghi |
+|---|---|---|---|
+| **S8-1** | **`PaymentHub:Fake:HashSecret` riêng là KHÔNG THỂ CHẠY** — tài liệu `v0.1` (§7.7.2) yêu cầu nó, nhưng bên **kiểm** là `VnPayPaymentProvider` đọc `PaymentHub:VnPay:HashSecret` ⇒ ký khoá khác ⇒ **mọi** IPN bị `400` | ✅ **Đo chiều ngược**: đặt khoá Web khác Host ⇒ E2E `S8-P7/P8/P9/P10/P13/P14` **ĐỎ**, `P1…P6` vẫn xanh | 📌 Nếu chỉ đọc tài liệu rồi tin, ta sẽ *"sửa"* bằng cách **bỏ kiểm chữ ký** — tức **giao hàng miễn phí**. ✅ Sửa **tài liệu trước**, rồi code: dùng **một** khoá dev, giữ nguyên lớp ③ |
+| **S8-2** | **Tài liệu ghi `Payments:Provider` — khoá THẬT là `PaymentHub:Provider`** | `eCommerceHttpApiHostModule` bind `GetSection("PaymentHub")`; đặt `Payments:*` thì **không có gì đọc** ⇒ **im lặng** chạy VNPay | Cùng họ với `S8-1`: cấu hình **sai tên** mà không có lỗi nào — chỉ thấy *"sao cổng giả lập không được dùng"* |
+| **S8-3** | **`Product.Code`, `Id` (GUID), `CostPrice` — ràng buộc `D10` "cấm lộ giá vốn" hiện được bảo đảm bằng SỰ VẮNG MẶT, không bằng kiểm soát** | `grep CostPrice` trong `src/`+`modules/` = **0** định nghĩa (chỉ có trong **chú thích**); bảng `CatProductVariants` **không có** cột giá vốn | ✅ E2E `S8-W3` khẳng định HTML công khai **không** chứa mã nội bộ / GUID / `CostPrice` ⇒ hôm nay **không thể** lộ. ⚠️ **Nhưng** khi GĐ2 thêm giá vốn thì ca đó **không** tự bắt: phải dựa vào **danh sách trắng thuộc tính DTO** (`StorefrontCongKhaiTests`) — đã dựng sẵn |
+| **S8-4** | **`/DatHang` + cổng + kết quả đều nằm ở tiến trình Web, còn IPN ở Host** ⇒ "end-to-end" **bắt buộc** cần **hai** tiến trình | E2E cũ chỉ chạy Web (:5100); nếu không khởi động Host thì IPN không tới nơi và **trang kết quả nói "chưa thanh toán" là ĐÚNG** | 📌 Đây là ca dễ kết luận sai nhất: *"sản phẩm hỏng"* trong khi **phép đo thiếu một tiến trình**. ✅ Bước ③b + `wait-host` + khẳng định Host lên trước khi đo |
+| **S8-5** | 🚨 **Khởi động Host trong E2E làm `InventoryReconciliationWorker` chạy NGAY** (`Timer.RunOnStart = true`) ⇒ nó **ghi một dòng lệch THẬT** vào `ReconRunMismatches` cho dòng tồn kho probe (`OnHand=100`, sổ cái `0`) | Đo được ngay: cổng cuối phiên **ĐỎ ở bước ⑥** (`[① phải rỗng] ReconRunMismatches :: TONG=5`) sau **5** lần chạy E2E — mỗi lần **một** dòng | 📌 Dòng lệch đó **không** thuộc lượt `e7` nên phép dọn cũ **không** chạm tới ⇒ **bước ⑥ bắt được**, đúng lý do bước ⑥ tồn tại. ✅ Dọn theo **SKU probe** (`Sku like 'K97E2E%'`) + **đếm lại** (`conLechProbe`). 🔑 Bài học: **một tiến trình mới trong phép đo = một nguồn dữ liệu mới**, phải hỏi *"job nào chạy khi nó lên?"* |
+
+**Còn lại của `PAY-001` sau `S8` (không đổi so với §16.9, trừ hai dòng đã đóng):**
+① kiểm chứng **tiền thật** · ③ xác nhận dòng hoàn `ChoXacNhan` (`Q6`) · ④ outbox bền vững · ⑤/⑥ mã + quyền cho
+`TaoGiaoDichAsync` · ⑦ `TC-14`/`TC-18`/`TC-30`/`TC-31`/`TC-33`/`TC-35`/`TC-36` · ⑨ `ProviderCreateDateGmt7` ·
+⑩ `F-PAY-7` **chưa có phép đo** (code đã sửa).
+➕ **Nợ mới của `S8`:** UI **hoàn tiền** (chưa có nút) · trang kết quả **chưa** hiện *"cổng đã nhận yêu cầu hoàn"* ·
+ô *"Thanh toán ngay"* **chưa** có trên storefront công khai (khách chưa tự đặt được — `WEB-003`).
+
+
+
+
+### 16.1…16.5 (mốc `S4` — giữ nguyên để đối chiếu)
 
 | # | Việc | Tệp | Bằng chứng |
 |---|---|---|---|

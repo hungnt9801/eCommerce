@@ -88,6 +88,18 @@ public class eCommerceWebModule : AbpModule
                 configuration.GetConnectionString(eCommerceConsts.DefaultConnectionStringName);
         });
 
+        // 🚨 `S8` — **BẮT BUỘC BIND `PaymentHub` Ở TIẾN TRÌNH WEB** (bẫy đã lường trước, không phải "cho đủ"):
+        // `VnPayPaymentProvider` được dựng **trong tiến trình Web** (trang giả lập + `/DatHang` gọi
+        // `IPaymentAppService`), và nó đọc **`PaymentHub:VnPay:HashSecret`**. Thiếu dòng này thì options là
+        // **mặc định rỗng** ⇒ (a) trang giả lập ký bằng khoá rỗng, (b) Host từ chối `400 Invalid Checksum`
+        // ⇒ 📌 triệu chứng là *"cổng luôn báo sai chữ ký"*, trỏ vào **sai chỗ** — y hệt họ lỗi `F-PAY-1`.
+        Configure<eCommerce.PaymentHub.Payments.PaymentHubOptions>(configuration.GetSection("PaymentHub"));
+
+        // 🔑 `HttpClient` cho **trang giả lập** (`/pay-gia-lap`) gọi **IPN THẬT** của Host bằng HTTP thật.
+        // 📌 Không dùng `new HttpClient()` trong controller: tạo client mỗi request là cách chắc chắn nhất để
+        // cạn socket, và nó **không có** chỗ nào để đặt timeout/đo đạc tập trung.
+        context.Services.AddHttpClient();
+
         // Mọi thao tác ghi đi qua Unit of Work (transaction tự động) — giống Host.
         Configure<Volo.Abp.Uow.AbpUnitOfWorkDefaultOptions>(options =>
         {
