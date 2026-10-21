@@ -183,6 +183,10 @@ public class MediaStorageNoiBoTests : IDisposable
     [Theory]
     [InlineData("/etc/passwd")]
     [InlineData("C:\\Windows\\System32\\drivers\\etc\\hosts")]
+    // 📌 `S11` (21/10/2026) — hai dạng nữa mà `Path.IsPathRooted` KHÔNG nhận ra trên Linux:
+    //    (a) ổ đĩa dùng `/`; (b) UNC `\\server\share`. Cả hai phải bị chặn trên MỌI hệ điều hành.
+    [InlineData("C:/Windows/System32/drivers/etc/hosts")]
+    [InlineData(@"\\server\share\bi-mat.txt")]
     public async Task TU_CHOI__khoa_la_DUONG_DAN_TUYET_DOI(string khoaTuyetDoi)
     {
         // 🔒 Đường dẫn **tuyệt đối** bỏ qua hoàn toàn gốc kho ⇒ phải chặn **trước** khi ghép.

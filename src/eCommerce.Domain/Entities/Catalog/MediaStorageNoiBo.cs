@@ -160,6 +160,39 @@ public class MediaStorageNoiBo : IMediaStorage
     ///     cuối** cho những cách viết `..` mà ba lớp trên chưa nghĩ tới (mã hoá, ký tự lạ, `.` lặp).</item>
     /// </list>
     /// </summary>
+    /// <summary>
+    /// 🚨 **KHOÁ TRÔNG NHƯ ĐƯỜNG DẪN TUYỆT ĐỐI CỦA *BẤT KỲ* HỆ ĐIỀU HÀNH NÀO** ⇒ từ chối.
+    ///
+    /// 📌 **VÌ SAO KHÔNG DÙNG `Path.IsPathRooted` MỘT MÌNH (`S11`, đo trên CI Linux 21/10/2026):**
+    /// trên Linux `Path.IsPathRooted("C:\\Windows\\System32\\…")` trả **`false`** — vì `\` **không phải**
+    /// dấu phân cách ở đó. Khoá kiểu Windows vì thế **lọt** qua lớp 2 và chỉ bị lớp 4 chặn **tình cờ**
+    /// (nó trở thành một *tên tệp* nằm trong kho, không phải đường dẫn thoát ra). Hệ quả:
+    /// cùng một khoá trong DB cho **hai hành vi khác nhau** tuỳ máy chạy — trên Windows là *"thoát thư mục"*,
+    /// trên Linux là *"không tìm thấy ảnh"*. 🔒 Nay chặn **tường minh** cả:
+    /// `C:\…` · `C:/…` (ổ đĩa) và `\\server\share` (UNC) trên **mọi** hệ điều hành.
+    /// ⚠️ Đây **không** phải nới lỏng phép kiểm: test `TU_CHOI__khoa_la_DUONG_DAN_TUYET_DOI` giữ nguyên
+    /// **hai** ca (`/etc/passwd` và `C:\Windows\…`) và nay **xanh trên cả Windows lẫn Linux**.
+    /// </summary>
+    private static bool LaDuongDanTuyetDoi(string khoa)
+    {
+        if (Path.IsPathRooted(khoa))
+        {
+            return true;
+        }
+
+        // Ổ đĩa kiểu Windows: `C:\…` hoặc `C:/…` — trên Linux hai chuỗi này KHÔNG "rooted".
+        if (khoa.Length >= 3
+            && char.IsAsciiLetter(khoa[0])
+            && khoa[1] == ':'
+            && (khoa[2] == '\\' || khoa[2] == '/'))
+        {
+            return true;
+        }
+
+        // UNC: `\\server\share` — cũng KHÔNG "rooted" khi chạy trên Linux.
+        return khoa.StartsWith(@"\\", StringComparison.Ordinal);
+    }
+
     private string DuongDanAnToan(string khoaLuuTru)
     {
         if (string.IsNullOrWhiteSpace(khoaLuuTru))
@@ -168,7 +201,7 @@ public class MediaStorageNoiBo : IMediaStorage
                 .WithData("lyDo", "Khoá lưu trữ rỗng.");
         }
 
-        if (Path.IsPathRooted(khoaLuuTru))
+        if (LaDuongDanTuyetDoi(khoaLuuTru))
         {
             throw new Volo.Abp.BusinessException(eCommerceConsts.ErrorCodes.Catalog.KhongTimThayAnh)
                 .WithData("khoa", khoaLuuTru)
