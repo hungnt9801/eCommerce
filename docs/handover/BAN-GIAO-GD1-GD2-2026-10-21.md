@@ -19,7 +19,7 @@ Phiên trước từng tuyên bố *"GĐ1 hoàn thành"* khi **chưa đo lại**
 |---|---|---|
 | **1** | ❌ *"Thanh toán đã kiểm chứng"* | **Chưa có lần thanh toán TIỀN THẬT nào.** `PaymentHub:VnPay:TmnCode` và `HashSecret` trong `appsettings.json` **rỗng**. Cái đã kiểm là **HMAC thật trên cổng giả lập** (`FakePaymentProvider`, dev-only) + **IPN thật**. ⇒ 📌 `PAY-001` **KHÔNG** ở trạng thái `Implemented` |
 | **2** | ❌ *"Sự kiện không bao giờ mất"* | **KHÔNG có outbox/relay.** Sự kiện đi qua `IDistributedEventBus` với transport **in-process**; không có bảng outbox, không có worker relay. ⇒ 🔒 tiến trình chết giữa chừng ⇒ **mất sự kiện** |
-| **3** | ❌ *"Đủ 15 metric"* | **11/15** metric có nơi phát; **4/15** **chưa** (`XC-005` §19.3). Con số cũ *"12/12"* là **nói quá** và đã sống **7 ngày** |
+| **3** | ❌ *"Đủ 15 metric"* | **11/15** metric có nơi phát; **4/15** **chưa** (`XC-005` §19.3). Con số cũ *"12/12"* là **nói quá** và đã sống **8 ngày** |
 | **4** | ❌ *"CI đã chạy trên GitHub Actions"* | Workflow **có trong repo LOCAL** (`.github/workflows/ci.yml`, commit `S9`) — ⚠️ nhưng **CHƯA BAO GIỜ CHẠY**. 🚨 Đo được: `GET /repos/hungnt9801/eCommerce/actions/runs` ⇒ **`total_count = 0`** · `GET …/contents/.github/workflows/ci.yml` ⇒ **`404`** (tệp **không** có trên `origin/main`) · `git rev-list --count origin/main..HEAD` = **11** commit chưa đẩy. 🔒 Nguyên nhân: **môi trường không có credential `push`** (Git Credential Manager đòi đăng nhập tương tác). ⇒ 📌 **"cổng không chạy tự động thì không phải cổng"** — câu này **vẫn còn đúng** cho tới khi **có một lần chạy xanh** |
 
 🔑 **Bài học xuyên suốt 10 phiên** (đã đúng trong **phần lớn** lỗi của dự án):
@@ -112,6 +112,7 @@ git rev-list --count HEAD ; git rev-list --count origin/main..HEAD   # mong đ�
 | 6 | **Cổng quét "dấu cách trong tên hàm test C#"** (bài học **đã ghi 2 lần**, vẫn chưa có cơ chế) | `cus-001` §27.6 #1 |
 | 7 | Test **xoá dữ liệu** (Luật 91/2025/QH15) + cảnh báo xuất PII lặp lại | `cus-001` §20.7 |
 | 8 | Test `toiDa` ở **tầng unit** (hiện chỉ đo qua E2E) | `cus-001` §27.6 #6 |
+| 9 | ⚠️ **Tên job CI là `cong-8-buoc` trong khi cổng nay có 12 bước** | 🚨 **BÂY GIỜ ĐỔI ĐƯỢC RẺ** (chưa có lần chạy nào, chưa bật required check) — sau khi bật thì **không đổi được** mà không sửa thiết lập GitHub. 📌 Sửa **cùng lúc** 3 tệp: `.github/workflows/ci.yml` (dòng 53/55) · `CiWorkflowTests` (3 chỗ khoá tên) · `XC-007` (mục §9.2 + §16). 🔑 Để nguyên thì tên job **nói sai** về cổng — đúng loại lỗi mà `S10` vừa đóng hai lần |
 
 ---
 

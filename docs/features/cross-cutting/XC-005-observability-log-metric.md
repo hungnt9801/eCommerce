@@ -613,7 +613,7 @@ Khi danh mục được thêm vào, **con số này sẽ GIẢM** vì nhiều SK
 > 🚨 **ĐÍNH CHÍNH 21/10/2026 (`S10`):** bảng dưới đây **đã lỗi thời** — `messaging_dlq_size` **đã** có nơi phát
 > (`S6`: `MarketplaceReconciliationWorker`), và con số đúng là **11/15**. 📌 Đọc **§19** (đo lại + cơ chế).
 > 🔒 Giữ nguyên bảng cũ ở đây **có chủ ý**: xoá nó đi thì mất dấu vết rằng tài liệu này **đã từng tuyên bố một
-> con số không ai kiểm** trong **7 ngày**.
+> con số không ai kiểm** trong **8 ngày**.
 
 | Metric | Cần gì |
 |---|---|
@@ -625,7 +625,7 @@ Khi danh mục được thêm vào, **con số này sẽ GIẢM** vì nhiều SK
 
 ## 19. 🚨 ĐÍNH CHÍNH + CƠ CHẾ: **11/15** metric có nơi phát (21/10/2026, `S10`)
 
-### 19.1 Con số cũ SAI ở đâu — và vì sao nó sống được 7 ngày
+### 19.1 Con số cũ SAI ở đâu — và vì sao nó sống được 8 ngày
 
 | | Tài liệu nói (13/10/2026 → 21/10/2026) | Đo được (21/10/2026) |
 |---|---|---|

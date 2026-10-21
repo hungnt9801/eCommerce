@@ -12,7 +12,7 @@ namespace eCommerce.Tests.Observability;
 ///   • 🔑 quét lại `src/` + `modules/` + `shared/` (21/10/2026): **11/15** có điểm phát, **4/15 KHÔNG**
 ///     (`messaging_outbox_pending` · `messaging_dlq_replayed_total` · `lock_ttl_exceeded_total` ·
 ///     `logging_failures_total`).
-/// ⇒ 🔒 **Con số trong tài liệu đã SAI ít nhất 7 ngày, và nó sai được vì không có cơ chế nào giữ nó đúng.**
+/// ⇒ 🔒 **Con số trong tài liệu đã SAI ít nhất 8 ngày, và nó sai được vì không có cơ chế nào giữ nó đúng.**
 /// 📌 Đây đúng là bài học của dự án ở dạng *"observability"*: **một danh sách khai báo không được đo thì
 /// là một lời tuyên bố, không phải một bất biến.**
 ///
@@ -66,7 +66,7 @@ public class MetricEmitterTests
         var khaiCu = coNoiPhat.Intersect(khaiBaoChuaCo, StringComparer.Ordinal).ToList();
 
         // 🚨 **CHIỀU 2:** KHÔNG khai "chưa có" mà mã cũng KHÔNG có lời gọi ⇒ 🔒 **metric ma** — đúng thứ
-        // tài liệu đã nói dối về nó trong 7 ngày.
+        // tài liệu đã nói dối về nó trong 8 ngày.
         var metricMa = eCommerceMetricNames.All
             .Where(ten => !coNoiPhat.Contains(ten, StringComparer.Ordinal))
             .Where(ten => !khaiBaoChuaCo.Contains(ten, StringComparer.Ordinal))

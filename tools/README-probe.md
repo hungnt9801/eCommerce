@@ -654,6 +654,10 @@ trong `finally`**.
 **GIỮA** chuỗi ⇒ dọn **phải** `like '%K97E2E%'` (bài học `S5-5`).
 
 ➕ **Số ca:** **102 → 123** (`S8-W1…W6` = 7 ca **đo bằng phiên ẨN DANH** + `S8-P1…P14` = 14 ca end-to-end).
+➕ **`S10`: 123 → 133** (`D17a`…`D17j` = 10 ca cho **dấu phân cách CSV `;`**) — 📌 và **hai** trong số đó là
+**CHIỀU NGƯỢC** (`D17g`/`D17h`: tệp `;` **không** dùng `,` **và** tệp `,` **không** dùng `;`). 🔑 **Vì sao phải có
+chiều ngược:** một tham số `phanCach` **bị bỏ qua** (luôn dùng `,`) thì mọi ca *"tệp `;` có 8 trường"* vẫn có thể
+**xanh** nếu phép đếm dùng nhầm dấu — 📌 *"luôn đúng"* và *"không hoạt động"* trông giống hệt nhau.
 
 🚨 **MỘT CÁI BẪY ĐÃ CẮN NGAY TRONG `S8` (ghi lại vì nó sẽ cắn lại):** khởi động `HttpApi.Host` cũng có nghĩa là
 **các job nền CỦA NÓ CHẠY NGAY** — `InventoryReconciliationWorker` có `Timer.RunOnStart = true` ⇒ nó **đối soát
