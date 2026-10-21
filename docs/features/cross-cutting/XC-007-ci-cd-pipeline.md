@@ -1171,9 +1171,9 @@ copy **sạch** (không `bin/`, không `obj/`, không `.git`) đúng như một 
 | Phép đo | Kết quả |
 |---|---|
 | `dotnet build eCommerce.slnx -v m --no-incremental -nodeReuse:false` (**đúng lệnh build làm nóng của CI**) | ✅ **thành công** · **0 error** · 8 warning (`CS8604` — có sẵn từ trước) · **60.52s** |
-| `test-cong-kiem.ps1 -ChiKiemMoc` (nhóm **không** chạm DB: `A…F` · `R…V` · `W1/W2` · `X1…X7` · `Y1…Y5` · `L…P`) | ✅ **31/31 DAT · 0 HỎNG** |
+| `test-cong-kiem.ps1 -ChiKiemMoc` (nhóm **không** chạm DB: `A…F` · `R…V` · `W1/W2` · `X1…X8` · `Y1…Y5` · `L…P`) | ✅ **32/32 DAT · 0 HỎNG** — 📌 chạy **HAI lần**: lần đầu **31/31** (trước khi thêm ca `X8`), lần sau **32/32** trên **mã CUỐI CÙNG đã commit** ⇒ *cùng một kết luận, không phải một lần may* |
 | Nhóm `G…K` (chạm DB, cần `docker exec`) | ⚠️ **CHƯA CHẠY được trong môi trường này** — không mount được Docker socket của Docker Desktop vào container (`docker version` ⇒ `server=` rỗng). 📌 Nhóm này **không chứa mã phụ thuộc hệ điều hành** (chỉ `docker exec … psql`); trên runner GitHub thì `docker` **có sẵn** |
-| 🔑 **F2 tái hiện được bằng đo, không phải suy đoán** | Lần chạy **ĐẦU TIÊN** (trước khi build làm nóng) trên cây **sạch**: `kiem-moc-build.ps1 -GhiNho` trả **`exit 2`** ⇒ **`A`, `A2`, `B`, `C`, `D`, `F`, `Y4`** = **7 ca ĐỎ vì MÔI TRƯỜNG** — 📌 và một ca **ĐỎ vì LỖI THẬT** (`Y3`, xem **S9-5**). ✅ Sau `dotnet build`: **31/31** |
+| 🔑 **F2 tái hiện được bằng đo, không phải suy đoán** | Lần chạy **ĐẦU TIÊN** (trước khi build làm nóng) trên cây **sạch**: `kiem-moc-build.ps1 -GhiNho` trả **`exit 2`** ⇒ **`A`, `A2`, `B`, `C`, `D`, `F`, `Y4`** = **7 ca ĐỎ vì MÔI TRƯỜNG** — 📌 và một ca **ĐỎ vì LỖI THẬT** (`Y3`, xem **S9-5**). ✅ Sau `dotnet build`: **32/32** |
 
 **Windows (máy dev, `-DayDu`)**: xem §16.6.
 
@@ -1224,7 +1224,7 @@ copy **sạch** (không `bin/`, không `obj/`, không `.git`) đúng như một 
 | Lúc | Phép đo | Kết quả |
 |---|---|---|
 | **ĐẦU phiên** (trước khi sửa, `-DayDu`, **12 bước**) | `exit 0 · 266.1s` · unit **1399** · integration **71** · mermaid **213/0** · DB **25/25** · NND **53 = 53** · **62** quyền · **86** chỗ quét · cổng **24/24** · E2E **123/123** · probe **17/26/26/49** | ✅ **Khớp bảng `S8`** ở **mọi** số đếm (thời gian **+2.8 %** — máy) ⇒ *baseline `S8` vẫn đúng*, không suy đoán từ tài liệu |
-| **Linux thật** (container Ubuntu 24.04) | build làm nóng + `test-cong-kiem.ps1 -ChiKiemMoc` | ✅ build **0 error · 60.52s** · **31/31 DAT** (chi tiết §16.2) |
+| **Linux thật** (container Ubuntu 24.04) | build làm nóng + `test-cong-kiem.ps1 -ChiKiemMoc` | ✅ build **0 error · 60.52s** · **32/32 DAT** (chi tiết §16.2) |
 | **CUỐI phiên** (`-DayDu`, 12 bước, **cây đã sửa xong**) | `exit 0 · 249.6s` · unit **1409** · integration **71** · mermaid **213/0** · DB **25/25** · NND **53 = 53** · **62** quyền · **86** chỗ quét · cổng **37/37** · E2E **123/123** · probe **17/26/26/49** · `TONG SO BUOC DAT: 12` | ✅ **Mọi cổng xanh.** ➕ `ci-khang-dinh.ps1` chạy trên **chính** log này ⇒ `exit 0` + `Evidence.json` (đọc được `E2E: 123/123`, `NND thucTe=53 · tuTest=53`, `37/37` ca cổng, sha256 của **9 script** + **2 DLL**) |
 | **Lần chạy lại trên cây ĐÃ COMMIT** (`b1e7c63`) | `exit 0 · 251.6s` · **cùng mọi số ca** (1409 · 71 · 37 · 123 · 25/25) | 📌 Chênh **0,8 %** = **máy** — 🔑 đúng cách đọc: *cái ĐO ĐƯỢC phải khớp; cái không khớp chỉ là thời gian* |
 
