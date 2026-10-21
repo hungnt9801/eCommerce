@@ -174,9 +174,10 @@ public class CiWorkflowTests
     {
         var vanBan = NoiDungKhongChuThich(DocTatCaWorkflow(TimGocRepo()));
 
-        Assert.Contains("dotnet run --project src/eCommerce.DbMigrator", vanBan);
+        Assert.Contains("working-directory: src/eCommerce.DbMigrator", vanBan);
+        Assert.Contains("dotnet run --no-build -c Debug", vanBan);
 
-        var viTriMigrate = vanBan.IndexOf("src/eCommerce.DbMigrator", StringComparison.Ordinal);
+        var viTriMigrate = vanBan.IndexOf("working-directory: src/eCommerce.DbMigrator", StringComparison.Ordinal);
         var viTriCong = vanBan.IndexOf("kiem-tat-ca.ps1", StringComparison.Ordinal);
 
         Assert.True(viTriCong >= 0, "Workflow KHÔNG gọi cổng.");
