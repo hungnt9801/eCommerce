@@ -1549,7 +1549,7 @@ triệu chứng nào** ngoài việc lịch sử biến mất.
 | `test/eCommerce.Tests/Inventory/DoiSoatRetentionTests.cs` | **13** | mốc cắt · `0`/âm ⇒ `0006` · **chưa xử lý ⇒ giữ** · **chờ xác nhận ⇒ giữ** · **mới hơn mốc ⇒ giữ** · đúng mốc ⇒ giữ (`<`, không `<=`) · hằng số trá hình (30 vs 180 ngày) · đọc setting |
 | `test/eCommerce.IntegrationTests/ReconRunXacNhanRangBuocDbTests.cs` | **4** | `CK_ReconRuns_XacNhan_DuBo` **hai chiều**: xác nhận **đủ** ⇒ ghi được · thiếu **người** ⇒ `23514` + **không có dòng** · thiếu **ghi chú** ⇒ `23514` · lượt **chưa xác nhận** (3 trường `NULL`) ⇒ hợp lệ |
 
-**E2E trên HTML thật + DB thật (`tools/kiem-e2e.ps1`, mục `S7`) — 30 ca:**
+**E2E trên HTML thật + DB thật (`tools/kiem-e2e.ps1`, mục `S7`) — 35 ca:**
 
 | Nhóm | Ca | Đo được |
 |---|---|---|

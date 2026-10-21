@@ -1497,7 +1497,7 @@ hợp lệ (`WarehouseId IS NULL` = hạn mức cả kênh) ⇒ biểu diễn b�
 
 ### 20.3 ✅ Kiểm chứng — đo trên HTML THẬT + DB THẬT
 
-**`tools/kiem-e2e.ps1`, mục `S7` (8 ca) — dữ liệu gieo: 1 dòng theo `kho` (giá trị `7`) + 1 dòng `cả kênh` (giá trị `13`):**
+**`tools/kiem-e2e.ps1`, mục `S7` (13 ca) — dữ liệu gieo: 1 dòng theo `kho` (giá trị `7`) + 1 dòng `cả kênh` (giá trị `13`):**
 
 | Ca | Đo được |
 |---|---|
