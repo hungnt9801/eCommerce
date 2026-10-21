@@ -1196,6 +1196,11 @@ copy **sạch** (không `bin/`, không `obj/`, không `.git`) đúng như một 
 
 ### 16.4 ⏳ CÒN LẠI / CHƯA KIỂM CHỨNG (ghi rõ, không nói quá)
 
+> 📌 **Cập nhật `S11` (21/10/2026):** bảng dưới là trạng thái **cuối `S9`/`S10`**, giữ nguyên làm nhật ký.
+> ✅ Dòng **#1** đã **ĐÓNG** — có **một lần chạy GitHub Actions XANH** (§17).
+> ✅ Dòng **#5** (`abp install-libs` trên `ubuntu-latest`) đã **trả lời**: bước 7 **xanh**.
+> ⚠️ Dòng **#2** (branch protection) **VẪN CHƯA LÀM** — chủ dự án chọn hoãn ⇒ **chưa** được nói *"cổng đã bảo vệ `main`"*.
+
 | # | Việc | Vì sao chưa xong | Hệ quả |
 |---|---|---|---|
 | 1 | 🚨 **Chưa có lần chạy GitHub Actions nào** | Phiên này **không có credential push** (`git push --dry-run` ⇒ *"could not read Username"*). Repo **công khai** nhưng push cần token | ❗ **Required check `cong-8-buoc` CHƯA bật** ⇒ *"cổng không chạy tự động thì không phải cổng"* **vẫn còn đúng**. Việc đầu tiên của phiên sau: `git push` → xem **một** lần chạy xanh → **rồi mới** bật branch protection (§9.2). 🚨 **`S10` ĐO LẠI 21/10/2026 — VẪN Y NGUYÊN, nay có bằng chứng mạnh hơn:** `GET /repos/hungnt9801/eCommerce/actions/runs` ⇒ **`total_count = 0`** (chưa **từng** có lần chạy nào) · `GET …/contents/.github/workflows/ci.yml` ⇒ **`404`** (workflow **không có** trên `origin/main`) · `git rev-list --count origin/main..HEAD` = **11** commit chưa đẩy · môi trường **vẫn không có** credential (`GITHUB_TOKEN`/`GH_TOKEN` **không đặt**; `credential.helper = manager` đòi đăng nhập tương tác ⇒ `git push` **treo**) ⇒ 📌 ghi thành **`Q-S10-5`** ở tệp bàn giao |
@@ -1225,4 +1230,85 @@ copy **sạch** (không `bin/`, không `obj/`, không `.git`) đúng như một 
 | **Linux thật** (container Ubuntu 24.04) | build làm nóng + `test-cong-kiem.ps1 -ChiKiemMoc` | ✅ build **0 error · 60.52s** · **32/32 DAT** (chi tiết §16.2) |
 | **CUỐI phiên** (`-DayDu`, 12 bước, **cây đã sửa xong**) | `exit 0 · 249.6s` · unit **1409** · integration **71** · mermaid **213/0** · DB **25/25** · NND **53 = 53** · **62** quyền · **86** chỗ quét · cổng **37/37** · E2E **123/123** · probe **17/26/26/49** · `TONG SO BUOC DAT: 12` | ✅ **Mọi cổng xanh.** ➕ `ci-khang-dinh.ps1` chạy trên **chính** log này ⇒ `exit 0` + `Evidence.json` (đọc được `E2E: 123/123`, `NND thucTe=53 · tuTest=53`, `37/37` ca cổng, sha256 của **9 script** + **2 DLL**) |
 | **Lần chạy lại trên cây ĐÃ COMMIT** (`b1e7c63`) | `exit 0 · 251.6s` · **cùng mọi số ca** (1409 · 71 · 37 · 123 · 25/25) | 📌 Chênh **0,8 %** = **máy** — 🔑 đúng cách đọc: *cái ĐO ĐƯỢC phải khớp; cái không khớp chỉ là thời gian* |
+
+---
+
+## 17. TIẾN ĐỘ TRIỂN KHAI — phiên `S11` (21/10/2026): CỔNG CI CHẠY THẬT LẦN ĐẦU
+
+> ✅ **ĐÃ CÓ MỘT LẦN CHẠY XANH TRÊN GITHUB ACTIONS.**
+> [`actions/runs/39584055189`](https://github.com/hungnt9801/eCommerce/actions/runs/39584055189) · commit
+> `d6df51f` · `verdict = Passed` · **5 phút 56 giây** (workflow) · cổng `-DayDu` **216.7 s** · **12/12 bước**.
+> ⚠️ **NHƯNG required check + branch protection VẪN CHƯA BẬT** (chủ dự án chọn hoãn ngày 21/10/2026) ⇒
+> *"cổng không chạy tự động thì không phải cổng"* nay chỉ còn **một nửa**: cổng **chạy** mỗi lần push,
+> nhưng **không chặn** merge. 📌 Xem §17.4 — **không** được nói *"cổng đã bảo vệ `main`"*.
+
+### 17.1 Sáu lần ĐỎ trước khi XANH — mỗi lần là một lỗ hổng THẬT
+
+> 🔑 **Đây là lý do `S11` không thể là "chỉ `git push`":** sáu lần chạy đầu tiên **đều đỏ**, và **không lần
+> nào** là "CI hỏng". Mỗi lần là một chỗ mà **máy dev đã che** — đúng họ *"một phép đo bất ngờ thường là
+> phép đo SAI"*, nhưng ở đây cái SAI là **môi trường đo**, không phải sản phẩm.
+
+| # | Commit | Đỏ ở | Nguyên nhân THẬT | Cách sửa |
+|---|---|---|---|---|
+| 1 | `4123543` | ③ unit | `Path.IsPathRooted("C:\\Windows\\…")` = **`false`** trên Linux ⇒ khoá kiểu Windows **lọt** lớp chặn tuyệt đối của kho media. Windows che mất vì ở đó nó **đúng là** tuyệt đối | hàm `LaDuongDanTuyetDoi` chặn `C:\` · `C:/` · `\\server\share` trên **mọi** OS + **2** ca test (`CAT-003` **§18.8**) |
+| 2 | `95a75b9` | ⑤ mermaid | `jsdom@30` kéo `undici` mới, gọi `webidl.util.markAsUncloneable` — API **không có** trên Node 20 ⇒ ném ngay khi `require('jsdom')` | Node **20 → 24** (Node 20 đã EOL 4/2026); **không** hạ cấp `jsdom`/`undici` |
+| 3 | `869c794` | ⑥ bất biến DB | runner **sạch** có PostgreSQL **TRỐNG** ⇒ `relation "AbpSettings" does not exist`. Trên dev DB đã migrate từ trước | thêm bước **8b**: chạy `DbMigrator` (migration **+ seed quyền**) trước cổng |
+| 4 | `d3fca35` | 8b migrate | `dotnet run --project src/..` từ **GỐC repo** **không** đọc `appsettings.json` của project ⇒ `The ConnectionString property has not been initialized` (📌 **tái hiện được trên máy dev**, không phải lỗi Linux) | đặt `working-directory: src/eCommerce.DbMigrator` |
+| 5 | `cdec39a` | ⑨ sổ địa chỉ | runner sạch **không có danh mục ĐVHC** — job sync **mặc định TẮT** và gọi **API ngoài** ⇒ probe dừng ở `T00` (đúng thiết kế: *"thiếu danh mục thì mọi phép đo sau vô nghĩa"*) | `tools/gieo-danh-muc-dvhc.ps1` — gieo **2 dòng** tham chiếu tối thiểu (01 + 00004), **không** gọi mạng ngoài (NFR-011) |
+| 6 | `0581436` | ⑪ cổng ⑨ | `inv-003` trỏ tới `…/tiep-tuc-phien-moI.md` trong khi tệp thật là `…-moi.md` (`I` hoa) — Windows **không phân biệt** hoa/thường ⇒ cổng **XANH trên máy dev** | sửa link **+** làm `kiem-link-tai-lieu.ps1` **phân biệt hoa/thường** (đi từng đoạn, so `-ceq`) **+** ca cổng `V2` (38 ca) |
+| 7 | `d6df51f` | — | **XANH** (12/12 bước · 38/38 ca cổng · Evidence `Passed`) | — |
+
+📌 **Hai lần đỏ là hệ quả của nhau** (#3 → #4): "thêm bước migrate" chưa đủ nếu **đường gọi** sai — 🔑 và lần
+#4 **tái hiện được trên Windows**, tức nó không phải "lỗi Linux" mà là **lỗi thật** của cách gọi.
+
+### 17.2 Số đo thật của lần chạy XANH
+
+| Phép đo | Giá trị đo được (CI, `ubuntu-latest`) |
+|---|---|
+| Tổng workflow | **5 phút 56 giây** (10:22:00 → 10:27:56 UTC) — ✅ **NFR-001 ≤ 10 phút** |
+| Cổng `-DayDu` | **216.7 s** · **12/12 bước** · `TONG SO BUOC DAT: 12` |
+| ③ unit | **1422 / 1422** (máy dev: **1422**) |
+| ④ integration (PostgreSQL 17 thật) | **71 / 71** |
+| ⑤ mermaid (parser thật) | **213 khối · 0 lỗi** |
+| ⑥ bất biến DB | **25 / 25** · `NND 53 = 53` · **62 quyền** · **86** chỗ quét GUID |
+| ⑦ test cho chính các cổng | **38 / 38** (thêm `V2`) |
+| ⑧ E2E (Web :5100 + Host :5000) | **133 / 133** |
+| ⑨–⑫ probe HTTP thật | **17/17** · **26/26** · **26/26** · **49/49** |
+| Môi trường | `runnerOs = Linux` · SDK **10.0.402** · Node **v24.21.0** |
+| Bằng chứng | `Evidence.json` + **13** tệp log · sha256 **9 script** + **2 DLL** · artifact **90 ngày** |
+
+📌 Thời gian từng bước (CI): build-mốc **31.1 s** · unit **5.4 s** · integration **11.3 s** · mermaid **5 s** ·
+DB **4.3 s** · cổng-của-cổng **60.3 s** · E2E **36.9 s** · 4 probe **14.4 / 15.3 / 13.5 / 17.7 s**.
+
+### 17.3 Việc đã làm (ngoài 6 lần sửa đỏ ở §17.1)
+
+| # | Việc | Bằng chứng |
+|---|---|---|
+| 1 | **Đổi tên job `cong-8-buoc` → `cong-12-buoc`** (tên cũ **nói sai** về cổng từ `S5`/`S6`) **TRƯỚC** khi bật required check | `CiWorkflowTests.Ten_job_phai_khop_required_check` đọc **`§9.2`** và đòi **đúng** tên ⇒ workflow ↔ tài liệu lệch là **ĐỎ** |
+| 2 | **Bỏ yêu cầu check `cong-tham-chieu`** trong §9.2: cổng ⑨ là **step 11 trong CÙNG job** ⇒ một required check là đủ. 🚨 Yêu cầu một check **không tồn tại** sẽ làm **mọi PR không bao giờ merge được** | §9.2 + §8.1 + §10 đã sửa; **không** đổi hành vi cổng (⑨ vẫn chạy, vẫn chặn job) |
+| 3 | **Push 13 commit** đang treo từ `S7`…`S10` (gồm cả workflow `S9`) | `git rev-list --count origin/main..HEAD` = **0**; `origin/main` = `d6df51f` |
+| 4 | **`Evidence.json`** dùng được làm bằng chứng kiểm toán | artifact `bang-chung-d6df51f…` (29 159 byte) |
+
+### 17.4 ⏳ CÒN LẠI — **không** được nói "cổng đã bảo vệ `main`"
+
+| # | Việc | Vì sao chưa xong | Hệ quả |
+|---|---|---|---|
+| 1 | 🚨 **Branch protection + required check `cong-12-buoc`** | **Chủ dự án chọn hoãn** ngày 21/10/2026 (`Q-S11-1`): bật "Require PR" sẽ **chặn push trực tiếp** — thay đổi quy trình làm việc. Credential hiện có (`PAT`, admin) **đủ** để bật, nhưng đó là quyết định của chủ repo | Cổng **chạy** nhưng **không chặn merge** ⇒ câu *"cổng không chạy tự động thì không phải cổng"* **mới đúng một nửa**. 📌 Khi bật: §9.2 (8 mục) — tên check **`cong-12-buoc`** |
+| 2 | **CODEOWNERS** (`.github/**`, `tools/**`, `Directory.*.props`, `global.json`) | Chưa có tệp | Không có người duyệt bắt buộc cho thay đổi cổng |
+| 3 | **Environment `production`** + `release.yml` | Cần staging + secrets; `Q3`/`Q4`/`Q5` còn `Open` | Chưa có bước phát hành |
+| 4 | **Sự kiện `pull_request` / `schedule` / `workflow_dispatch`** | Lần chạy xanh là `push` lên `main` | Chưa chứng minh cổng trên PR (nơi required check sẽ dùng) |
+| 5 | **`abp install-libs` trên runner** | Bước 7 **xanh** trong lần chạy này | ✅ Đã trả lời câu hỏi §16.4 #5 (không còn `chưa kiểm chứng`) |
+| 6 | **Release/rollback + NFR-009 (2/2 lần cùng phán quyết)** | Mới có **1** lần CI xanh + **2** lần local xanh cùng số ca. Lần chạy thứ hai trên `main` sẽ là commit tài liệu (mã không đổi) | 📌 Cần thêm một lần chạy trên **mã khác** để nói "tái lập" |
+
+### 17.5 Bài học của `S11`
+
+| # | Bài học | Bằng chứng |
+|---|---|---|
+| **S11-A** | 🔑 **"Máy dev đã có sẵn" là loại phụ thuộc vô hình lớn nhất.** DB đã migrate · danh mục ĐVHC đã sync · credential đã lưu · link đã đúng **theo Windows** — cả bốn **không** có trên runner | 4/6 lần đỏ (#3, #4, #5, #6) |
+| **S11-B** | 🚨 **Cổng chạy trên MỘT hệ điều hành là phép đo một nửa**: `Path.IsPathRooted` và `Test-Path` đều **khác ngữ nghĩa** giữa Windows/Linux, và cả hai đều **xanh trên Windows** | #1 và #6 |
+| **S11-C** | **Yêu cầu required check không tồn tại còn tệ hơn không bật** — nó làm mọi PR **kẹt vĩnh viễn** ở "Expected — Waiting". 📌 Phải sửa **trước** khi bật | §9.2 cũ: `cong-8-buoc` + `cong-tham-chieu` (check sau **không có**) |
+| **S11-D** | **Thêm bước migrate chưa đủ — đường gọi mới là chỗ sai.** `dotnet run --project` từ gốc repo không đọc `appsettings.json` của project; 📌 lỗi **tái hiện trên máy dev** nên không thể đổ cho Linux | #4 |
+| **S11-E** | 🔑 **Mỗi lần đỏ đều tìm ra một chỗ hỏng thật; không lần nào là "CI hỏng".** Ngược lại với phản xạ "chạy lại xem sao" — chạy lại 6 lần sẽ ra 6 lần đỏ | cả 6 |
+
+
 

@@ -20,7 +20,7 @@ Phiên trước từng tuyên bố *"GĐ1 hoàn thành"* khi **chưa đo lại**
 | **1** | ❌ *"Thanh toán đã kiểm chứng"* | **Chưa có lần thanh toán TIỀN THẬT nào.** `PaymentHub:VnPay:TmnCode` và `HashSecret` trong `appsettings.json` **rỗng**. Cái đã kiểm là **HMAC thật trên cổng giả lập** (`FakePaymentProvider`, dev-only) + **IPN thật**. ⇒ 📌 `PAY-001` **KHÔNG** ở trạng thái `Implemented` |
 | **2** | ❌ *"Sự kiện không bao giờ mất"* | **KHÔNG có outbox/relay.** Sự kiện đi qua `IDistributedEventBus` với transport **in-process**; không có bảng outbox, không có worker relay. ⇒ 🔒 tiến trình chết giữa chừng ⇒ **mất sự kiện** |
 | **3** | ❌ *"Đủ 15 metric"* | **11/15** metric có nơi phát; **4/15** **chưa** (`XC-005` §19.3). Con số cũ *"12/12"* là **nói quá** và đã sống **8 ngày** |
-| **4** | ❌ *"CI đã chạy trên GitHub Actions"* | Workflow **có trong repo LOCAL** (`.github/workflows/ci.yml`, commit `S9`) — ⚠️ nhưng **CHƯA BAO GIỜ CHẠY**. 🚨 Đo được: `GET /repos/hungnt9801/eCommerce/actions/runs` ⇒ **`total_count = 0`** · `GET …/contents/.github/workflows/ci.yml` ⇒ **`404`** (tệp **không** có trên `origin/main`) · `git rev-list --count origin/main..HEAD` = **11** commit chưa đẩy. 🔒 Nguyên nhân: **môi trường không có credential `push`** (Git Credential Manager đòi đăng nhập tương tác). ⇒ 📌 **"cổng không chạy tự động thì không phải cổng"** — câu này **vẫn còn đúng** cho tới khi **có một lần chạy xanh** |
+| **4** | ✅ *"CI đã chạy trên GitHub Actions"* — **NAY ĐÚNG** (nhưng ⚠️ **chưa chặn merge**) | ✅ **`S11` (21/10/2026):** credential **có sẵn** (Git Credential Manager) ⇒ **13 commit** đã đẩy ⇒ **lần chạy XANH**: [`run 39584055189`](https://github.com/hungnt9801/eCommerce/actions/runs/39584055189) · commit `d6df51f` · **5m56s** · **12/12** bước · **38/38** ca · `Evidence.json` `Passed` (`XC-007` §17). ⚠️ **VẪN CHƯA BẬT** **branch protection + required check `cong-12-buoc`** (`Q-S11-1` — chủ dự án chọn hoãn vì *"Require PR"* đổi quy trình push) ⇒ 📌 *"cổng không chạy tự động thì không phải cổng"* nay **mới đúng một nửa**: cổng **chạy** nhưng **chưa chặn merge** |
 
 🔑 **Bài học xuyên suốt 10 phiên** (đã đúng trong **phần lớn** lỗi của dự án):
 > **Một phép đo bất ngờ thường là phép đo SAI, không phải sản phẩm sai.**
@@ -35,22 +35,22 @@ cd D:\Projects\Tools\eCommerce
 pwsh -File tools\kiem-tat-ca.ps1 -DayDu
 ```
 
-**Số đo chuẩn (`S10`, 21/10/2026, 12 bước, `TONG = 269.7s`, `exit 0`):**
+**Số đo chuẩn (`S11`, 21/10/2026, 12 bước, `TONG = 247.3s`, `exit 0`):**
 
 | Bước | Nội dung | Số đo |
 |---|---|---|
 | ② | Build + **KIỂM MỐC NHỊ PHÂN** (`kiem-moc-build.ps1`) | ✅ **71 tệp DLL/EXE đổi mốc** — 🔒 `exit 0` **không** chứng minh build đã vào |
-| ③ | Unit test | **1419 / 1419** |
+| ③ | Unit test | **1422 / 1422** |
 | ④ | Integration test (PostgreSQL 17 **thật**) | **71 / 71** |
 | ⑤ | Khối mermaid (parser thật) | **213 · 0 lỗi** |
 | ⑥ | Bất biến DB (`kiem-db.ps1`, tự quét **86** vị trí GUID probe) | **25 / 25** · `NND = 53` · **62 quyền** |
-| ⑦ | Test cho **chính các cổng** (`test-cong-kiem.ps1`) | **37** ca (A…I · R…V · L…P · W · X · Y) |
+| ⑦ | Test cho **chính các cổng** (`test-cong-kiem.ps1`) | **38** ca (A…I · R…V · L…P · W · X · Y · **V2**) |
 | ⑧ | **E2E có phiên đăng nhập** (Web :5100 + **Host :5000**) | **133 / 133** — 📌 đọc dòng `E2E: N/N`, ⚠️ **đừng đếm** điểm gọi `Kq` |
 | ⑨–⑫ | Probe HTTP thật: sổ địa chỉ · khách hàng · thanh toán · đơn sàn | **17/17** · **26/26** · **26/26** · **49/49** |
 
-📌 **So với cuối `S9`:** 👉 **cùng** số ca ở mọi bước **trừ** hai thay đổi **có chủ ý** (unit **1409 → 1419**,
-E2E **123 → 133** — `S10` thêm 10 ca mỗi loại). ⏱ **Thời gian là thứ duy nhất KHÔNG phải chỉ tiêu**
-(máy/nhiệt độ; cùng mã số đo đã từng lệch **14 %**).
+📌 **So với cuối `S10`:** unit **1419 → 1422** (+2 media · +1 `DbMigrator`) · cổng **37 → 38** (`V2`) · E2E **133 = 133**.
+📌 **CI Linux (cùng mã `d6df51f`):** cổng **216.7s** · **12/12** · **38/38** · **1422** unit · **133/133** E2E
+⇒ ✅ **mọi số ca KHỚP** giữa hai hệ điều hành; thời gian là **thứ duy nhất KHÔNG phải chỉ tiêu**.
 
 **Git:** `main` · `origin` = `https://github.com/hungnt9801/eCommerce` (⚠️ **PUBLIC** ⇒ bí mật thật **chỉ** vào
 GitHub Secrets) · 🔒 **nguồn sự thật là LỆNH, không phải dòng chữ này**:
@@ -72,10 +72,11 @@ git rev-list --count HEAD ; git rev-list --count origin/main..HEAD   # mong đ�
 | `S8` | Thanh toán **trên UI** + **mở công khai** storefront + sitemap dùng slug | quyền **62 = 62** · E2E **+21** (gồm phiên **ẩn danh**) |
 | `S9` | `XC-007`: **CI thật** (`.github/workflows/ci.yml`) + khả chuyển **Linux** (`tools/nen-tang.ps1`) + **cổng của cổng** | cổng **24 → 37** ca · unit **+10** |
 | `S10` | **Đóng nợ nhỏ + bàn giao**: CSV `;` · metric (đo lại + cơ chế) · `RunOnStart` (cơ chế) · xác nhận outbox/relay | unit **+10** · E2E **+10** · 📄 tệp này |
+| `S11` | **Mở cổng CI**: push **13 commit** · sửa **6 lỗi thật** do lần chạy đầu tiên lộ ra · đổi tên job **`cong-12-buoc`** · **1 lần chạy XANH** | unit **+3** · cổng **+1** (`V2`) · CI **5m56s** · ⚠️ branch protection **chưa bật** |
 
-📌 **Nền đo (đừng làm lại):** **12 bước** · **37** ca test cổng · **4** probe HTTP thật · **25** bất biến DB ·
-**53** unique index `NULLS NOT DISTINCT` · **41** migration · **62** quyền · **354 tệp / 44.476 dòng** code sản phẩm ·
-**117 tệp / 19.148 dòng** test.
+📌 **Nền đo (đừng làm lại):** **12 bước** · **38** ca test cổng · **4** probe HTTP thật · **25** bất biến DB ·
+**53** unique index `NULLS NOT DISTINCT` · **41** migration · **62** quyền · **354 tệp / 44.506 dòng** code sản phẩm ·
+**117 tệp / 19.188 dòng** test · **1422** unit · **133** E2E — 📌 **cùng số ca trên Windows và Linux (CI)**.
 
 ---
 
@@ -87,7 +88,7 @@ git rev-list --count HEAD ; git rev-list --count origin/main..HEAD   # mong đ�
 |---|---|---|---|
 | 1 | **Thanh toán tiền THẬT** (`PAY-001`) | `"TmnCode": ""`, `"HashSecret": ""` trong `src/eCommerce.HttpApi.Host/appsettings.json` | **Credential sandbox VNPay** (tự đăng ký [devreg](https://sandbox.vnpayment.vn/devreg/), 5–10 phút) + **tunnel** HTTPS cho IPN |
 | 2 | **Điều kiện mở GĐ2** | `docs/features/README.md`: **1/55** tài liệu `Approved` (chỉ `ADDR-004`) | 🔒 Cổng vào GĐ2 (`implementation-plan.md` §8) đòi **9** tài liệu GĐ2 `Approved` — hiện **0/9** |
-| 3 | 🚨 **Push + một lần chạy CI xanh + branch protection** | `actions/runs` ⇒ **0** lần chạy; `ci.yml` **404** trên `origin/main`; **11** commit chưa đẩy | **Một máy có credential `git push`** (hoặc PAT trong `GITHUB_TOKEN`) → `git push origin main` → xem **một** lần chạy xanh → **rồi mới** bật branch protection + required checks (`XC-007` §9.2/§9.3) |
+| 3 | ✅ **Push + một lần chạy CI xanh** — **XONG `S11`**; 🚨 **branch protection** — **CHƯA** | ✅ **ĐÃ ĐÓNG:** `origin/main` = `d6df51f` · `actions/runs` có **1 lần XANH** (`39584055189`, 5m56s, 12/12, 38/38). ⚠️ **CÒN:** chưa bật branch protection + required check | **Chủ dự án quyết** (`Q-S11-1`): bật `XC-007` §9.2 — tên check **`cong-12-buoc`**; lưu ý *"Require PR"* sẽ **chặn push trực tiếp** |
 
 ### 3.2 Nợ **hạ tầng** — đã xác nhận, **chưa** làm (cố ý)
 
@@ -112,7 +113,7 @@ git rev-list --count HEAD ; git rev-list --count origin/main..HEAD   # mong đ�
 | 6 | **Cổng quét "dấu cách trong tên hàm test C#"** (bài học **đã ghi 2 lần**, vẫn chưa có cơ chế) | `cus-001` §27.6 #1 |
 | 7 | Test **xoá dữ liệu** (Luật 91/2025/QH15) + cảnh báo xuất PII lặp lại | `cus-001` §20.7 |
 | 8 | Test `toiDa` ở **tầng unit** (hiện chỉ đo qua E2E) | `cus-001` §27.6 #6 |
-| 9 | ⚠️ **Tên job CI là `cong-8-buoc` trong khi cổng nay có 12 bước** | 🚨 **BÂY GIỜ ĐỔI ĐƯỢC RẺ** (chưa có lần chạy nào, chưa bật required check) — sau khi bật thì **không đổi được** mà không sửa thiết lập GitHub. 📌 Sửa **cùng lúc** 3 tệp: `.github/workflows/ci.yml` (dòng 53/55) · `CiWorkflowTests` (3 chỗ khoá tên) · `XC-007` (mục §9.2 + §16). 🔑 Để nguyên thì tên job **nói sai** về cổng — đúng loại lỗi mà `S10` vừa đóng hai lần |
+| 9 | ✅ **Tên job CI `cong-8-buoc` → `cong-12-buoc`** — **ĐÃ SỬA `S11`** | ✅ Sửa **đúng lúc còn rẻ** (trước khi bật required check): `.github/workflows/ci.yml` · `CiWorkflowTests` (**khoá chéo với `XC-007` §9.2**) · `XC-007` (§8.1 · §9.2 · §10 · §17). 📌 Đồng thời **bỏ check `cong-tham-chieu`** — check đó **không tồn tại** (cổng ⑨ là step trong cùng job) ⇒ nếu bật sẽ làm **mọi PR kẹt** |
 
 ---
 
@@ -229,7 +230,8 @@ XML hoặc endpoint CQT sẽ tạo sản phẩm **trông như xong nhưng SAI V�
 | **Q-S10-2** | **Credential VNPay sandbox** (hoặc chỉ đạo *"chấp nhận GĐ1 không kiểm tiền thật"*) | `PAY-001` không thể `Implemented` nếu thiếu; 🔑 đây là **DoD** đang mở |
 | **Q-S10-3** | **GĐ2 mở khi 0/9 tài liệu `Approved`?** (duyệt nhanh 9 tài liệu, hay làm tiếp nợ GĐ1?) | 🔒 Cổng vào GĐ2 của `implementation-plan.md` §8 ⇒ nếu bỏ qua, phải ghi **lý do** vào tài liệu, không làm ngầm |
 | **Q-S10-4** | **`Mau01CsvExporter`: đổi dấu phân cách sang `;`?** | Tờ khai thuế có thể được **nạp vào hệ thống khác** — 📌 đổi sai là **sai về pháp lý** |
-| **Q-S10-5** | 🚨 **Ai/cấp nào được `git push`?** (PAT, SSH key, hay GitHub App) | 🔒 Hiện **không có** credential ⇒ CI **0 lần chạy** và **11** commit (gồm **cả** `.github/workflows/ci.yml`) **chưa lên `origin`**. 📌 Đây là **nợ duy nhất** của GĐ1 mà **máy này không thể đóng** |
+| **Q-S10-5** | ✅ **ĐÃ TRẢ LỜI (21/10/2026, `S11`):** credential **có sẵn** — Git Credential Manager giữ **PAT** (quyền **admin** trên repo) ⇒ `git push` **hoạt động** | ✅ **13 commit** đã đẩy; `origin/main` = `d6df51f`; **1 lần chạy XANH**. 📌 Nợ cũ *"máy này không thể đóng"* **không còn đúng** |
+| **Q-S11-1** | 🚨 **Bật branch protection + required check `cong-12-buoc`?** (và có bật *"Require PR"* — tức **chặn push trực tiếp** — hay không?) | 🔒 Cổng **chạy** nhưng **chưa chặn merge** ⇒ *"cổng không chạy tự động thì không phải cổng"* mới đúng **một nửa**. Chủ dự án chọn **hoãn** ngày 21/10/2026; cấu hình ở `XC-007` §9.2 (8 mục). 📌 **Không** tự bật: *"Require PR"* đổi quy trình push của cả dự án |
 
 ---
 
