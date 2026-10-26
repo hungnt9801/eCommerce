@@ -76,3 +76,8 @@ tools/_*.txt
 # log, file SQL tạm, cookie jar… 🔒 KHÔNG phải mã nguồn và KHÔNG được commit — chúng chứa
 # **cookie phiên** và **dữ liệu probe** (có thể có PII giả lập).
 tools/_tam-*/
+
+# Log tam cua probe (stdout/stderr) o goc repo - KHONG phai ma nguon.
+_probe-*.err
+_probe-*.log
+_gate-*.log
