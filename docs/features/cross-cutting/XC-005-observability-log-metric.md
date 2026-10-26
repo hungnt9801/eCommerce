@@ -656,7 +656,7 @@ gọi ở luồng nghiệp vụ nào"* — 📌 cảnh báo đó **đúng**, và
 ③ hoàn nguyên **cả hai** ⇒ xanh. 📌 Đây là lần thứ **N** của bài học: *"luôn đúng" và "không hoạt động" trông
 giống hệt nhau*.
 
-### 19.3 🔒 4 nợ còn lại — nêu rõ **cần gì**, không giả vờ
+### 19.3 🔒 3 nợ còn lại — nêu rõ **cần gì**, không giả vờ
 
 | Metric | Hạ tầng còn thiếu | Thuộc về |
 |---|---|---|

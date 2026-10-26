@@ -157,8 +157,8 @@ hay `SetStatus(Shipped)` trên đơn đã `Cancelled` — **không exception, kh
 
 | Yêu cầu plan | Thực đo | Kết quả |
 |---|---|---|
-| Test integration **2 request đồng thời** chống oversell | **0** `Task.WhenAll` / `Parallel.` / `Task.Run` / `Start-Job` trong `test/` và `tools/` | ❌ **không có bằng chứng** (cơ chế lock + unique index **có**, nhưng chưa được đo) |
-| Test **2 instance** + Redis thật | không có harness 2 tiến trình | ❌ |
+| Test integration **2 request đồng thời** chống oversell | ✅ **đo 24/10/2026** — `probe-oversell` (bước ⑬), 11/11 | ✅ |
+| Test **2 instance** + Redis thật | ✅ **đo 26/10/2026** — `probe-outbox-2instance` (bước ⑮), 9/9; hai Host 5000/5001, outbox 0, 1 dòng inbox | ✅ |
 | Thanh toán **tiền thật** | `PaymentHub:VnPay:TmnCode` = `""`, `HashSecret` = `""` | ❌ mới kiểm bằng `FakePaymentProvider` (dù HMAC thật) |
 | UI admin tối thiểu | 10 view: `DatHang` `DoiSoat` `DoiSoatThanhToan` `DonHang` `HanMucKenh` `Home` `KhachHang` `Loi` `PhanBo` `SanPham` | ❌ **không có** màn hình Catalog / Pricing / Kho |
 | API nào cũng cần xác thực | `BatBienPhanQuyenTests` + `AllowlistCongKhaiTests` | ✅ |
