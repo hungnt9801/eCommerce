@@ -87,7 +87,7 @@ deploy → rollback) để không ai phải "tự nghĩ lại" mỗi lần lên 
 
 | # | Quyết định | Phương án đã cân nhắc | Lý do chọn | Hệ quả |
 |---|---|---|---|---|
-| **D1** | **GitHub Actions** | (a) **GitHub Actions** · (b) Azure Pipelines · (c) Jenkins (tự dựng) · (d) GitLab CI | (a) **không cần hạ tầng riêng**, `pwsh`/`node`/`docker` có sẵn trên runner, `concurrency` + `environment` (người duyệt) + **required status checks** là **tính năng sẵn có** — đúng 3 thứ §8/§9 cần; pipeline là **YAML trong repo** ⇒ review được như code | Phụ thuộc GitHub ⇒ **`git remote` đang TRỐNG** (đo được) ⇒ phải tạo repo từ xa trước (Q1). **Bị loại (b)(c)(d):** xem ghi chú dưới | 📌 **24/10/2026:** cổng có **14 bước** (thêm ⑬ `probe-oversell.ps1` — GĐ1 #2) ⇒ job đổi tên `cong-14-buoc`.
+| **D1** | **GitHub Actions** | (a) **GitHub Actions** · (b) Azure Pipelines · (c) Jenkins (tự dựng) · (d) GitLab CI | (a) **không cần hạ tầng riêng**, `pwsh`/`node`/`docker` có sẵn trên runner, `concurrency` + `environment` (người duyệt) + **required status checks** là **tính năng sẵn có** — đúng 3 thứ §8/§9 cần; pipeline là **YAML trong repo** ⇒ review được như code | Phụ thuộc GitHub ⇒ **`git remote` đang TRỐNG** (đo được) ⇒ phải tạo repo từ xa trước (Q1). **Bị loại (b)(c)(d):** xem ghi chú dưới | 📌 **24/10/2026:** cổng có **15 bước** (thêm ⑬ `probe-oversell.ps1` — GĐ1 #2) ⇒ job đổi tên `cong-15-buoc`.
 | **D2** | Runner = **`ubuntu-latest`** + **bản vá khả chuyển P-01…P-06** cho 3 script cổng | (a) `windows-latest` · (b) **`ubuntu-latest` + vá** · (c) **self-hosted Windows + Docker Desktop** | 🚨 **Quyết định bị ép bởi một ràng buộc đo được**: runner Windows của GitHub **chỉ có Docker engine chế độ Windows container** ⇒ **không chạy được image Linux**, mà integration test **bắt buộc** `postgres:17-alpine` (**Linux**) — `PostgreSqlSchemaFixture.cs:26`. Ngoài ra `services:`/`container:` là **chỉ-Linux**. → (a) **loại** vì bước ③④⑤⑥⑧ **không chạy được** | ✅ `ubuntu-latest` có Docker Linux ⇒ Testcontainers + `docker compose` chạy được. ⚠️ **Đánh đổi:** phải sửa **6 điểm** Windows-only (§7.4) và **chứng minh lại cổng trên Linux** bằng `tools/test-cong-kiem.ps1` **trước khi tin màu xanh** — nếu không, ta chỉ đổi "cổng không chạy" thành "cổng chạy sai môi trường" |
 | **D2-b** | *(bị loại)* Self-hosted Windows + Docker Desktop | — | Giữ nguyên script, nhưng: phải có **máy luôn bật**, bí mật repo **nằm trên máy cá nhân**, và "cổng đã chứng minh" vẫn là **một máy của một người** — đúng thứ CI phải xoá bỏ | Dùng lại **chỉ khi** Q2 chốt rằng việc port tốn hơn vận hành runner riêng |
 | **D3** | Cổng là **MỘT lệnh duy nhất** (`-DayDu`), CI **không** gọi từng bước rời | (a) gọi 8 script riêng trong 8 step · (b) **một step gọi `kiem-tat-ca.ps1`** | (a) tái tạo đúng lỗi gốc: **quên một bước** ⇒ "tất cả xanh" mà bước đó **chưa chạy** (`kiem-tat-ca.ps1:16`). (b) thứ tự + dừng-ngay-khi-đỏ + exit code **do một chỗ** thi hành | Muốn thêm cổng mới (⑨) ⇒ thêm **step riêng** hoặc thêm **bước 9 trong script**; ghi ở §6.1 |
@@ -303,7 +303,7 @@ sequenceDiagram
     RUN->>RUN: «khang dinh log: co E2E N/N, 0 dong [BO QUA]»
     alt «du 9 cong va du bang chung»
         RUN->>ART: «upload log + Evidence.json»
-        RUN-->>GH: «check cong-14-buoc = success»
+        RUN-->>GH: «check cong-15-buoc = success»
         GH-->>DEV: «nut merge MO»
         DEV->>GH: «merge (squash)»
     else «mot cong exit 1»
@@ -578,7 +578,7 @@ pwsh -NoProfile -File tools/kiem-link-tai-lieu.ps1    # buoc 9 (chua noi vao scr
 
 | # | Bất biến | Cơ chế bảo vệ | Kiểm bằng |
 |---|---|---|---|
-| 1 | **Không merge được khi cổng đỏ** | branch protection: required status check **`cong-14-buoc`**; `enforce_admins: true`. 📌 Cổng ⑨ (`kiem-link-tai-lieu.ps1`) là **step 11 trong CÙNG job** ⇒ một check là đủ (xem §16.7 **S11-1**) | TC-13 (thử merge khi đỏ) |
+| 1 | **Không merge được khi cổng đỏ** | branch protection: required status check **`cong-15-buoc`**; `enforce_admins: true`. 📌 Cổng ⑨ (`kiem-link-tai-lieu.ps1`) là **step 11 trong CÙNG job** ⇒ một check là đủ (xem §16.7 **S11-1**) | TC-13 (thử merge khi đỏ) |
 | 2 | **Không bước nào bị bỏ qua im lặng** | `-DayDu` + A2/A3/A5 (§6.2) | TC-15 |
 | 3 | **Cổng phải chạy trên đúng commit sẽ merge** | dùng `head.sha`; cấm tái dùng kết quả cũ sau rebase | TC-14 |
 | 4 | **Migration chạy TRƯỚC app** | `release.yml` tuần tự; deploy chặn nếu migrator exit ≠ 0 (D7) | TC-21 |
@@ -643,7 +643,7 @@ pwsh -NoProfile -File tools/kiem-link-tai-lieu.ps1    # buoc 9 (chua noi vao scr
 | Thiết lập | Giá trị | Vì sao |
 |---|---|---|
 | Require PR before merging | ✅ | Cổng chạy ở PR |
-| Required status checks | **`cong-14-buoc`** | BR-001/BR-004. Tên **phải** khớp `jobs.<id>.name` trong workflow. 📌 Một check vì cổng ⑨ là step 11 **trong cùng job** — `CiWorkflowTests.Ten_job_phai_khop_required_check` khoá **chéo** tên này với mục §9.2 | 📌 **24/10/2026:** cổng có **14 bước** (thêm ⑬ `probe-oversell.ps1` — GĐ1 #2) ⇒ job đổi tên `cong-14-buoc`.
+| Required status checks | **`cong-15-buoc`** | BR-001/BR-004. Tên **phải** khớp `jobs.<id>.name` trong workflow. 📌 Một check vì cổng ⑨ là step 11 **trong cùng job** — `CiWorkflowTests.Ten_job_phai_khop_required_check` khoá **chéo** tên này với mục §9.2 | 📌 **24/10/2026:** cổng có **15 bước** (thêm ⑬ `probe-oversell.ps1` — GĐ1 #2) ⇒ job đổi tên `cong-15-buoc`.
 | Require branches up to date | ✅ | Chống "xanh trên base cũ" (BR-005) |
 | Require conversation resolution | ✅ | Câu hỏi review không bị bỏ qua |
 | Dismiss stale approvals khi push | ✅ | Duyệt lại sau thay đổi |
@@ -674,7 +674,7 @@ pwsh -NoProfile -File tools/kiem-link-tai-lieu.ps1    # buoc 9 (chua noi vao scr
 
 | Vùng UI | Dữ liệu hiển thị | Nguồn (trường) | Hành động |
 |---|---|---|---|
-| **PR → tab Checks** | tên check `cong-14-buoc`, thời lượng | `CI_RUN.Verdict`, `CI_STEP.DurationSeconds` | Bấm vào xem log; nút merge **mờ** khi đỏ |
+| **PR → tab Checks** | tên check `cong-15-buoc`, thời lượng | `CI_RUN.Verdict`, `CI_STEP.DurationSeconds` | Bấm vào xem log; nút merge **mờ** khi đỏ |
 | **Actions → run summary** (`$GITHUB_STEP_SUMMARY`) | bảng 9 bước: `exitCode` · giây · số đếm | §5.2 mục 3+5 | Đọc nhanh, không cần tải log |
 | **Actions → Artifacts** | `Evidence.json`, 9 tệp log | §5.2 mục 4 | Tải về làm bằng chứng kiểm toán |
 | **Environments → production** | ai duyệt, lúc nào, tag, digest | `RELEASE.ApprovedBy/ApprovedAt/ArtifactSha256` | Duyệt / xem lịch sử |
@@ -894,8 +894,8 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  cong-14-buoc:
-    name: cong-14-buoc          # <-- TEN NAY phai khop required status check (§9.2)
+  cong-15-buoc:
+    name: cong-15-buoc          # <-- TEN NAY phai khop required status check (§9.2)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -1151,7 +1151,7 @@ public class CiWorkflowTests
 |---|---|---|---|
 | 1 | **Workflow CI thật**: `pull_request` · `push main` · `schedule` · `workflow_dispatch` (bắt buộc `lyDo`) | `.github/workflows/ci.yml` | YAML hợp lệ (parse bằng thư viện `yaml`: 15 step) · `CiWorkflowTests` **10 ca** |
 | 2 | 🚨 **BUILD LÀM NÓNG trước cổng** — vá **F2** | bước 8 của workflow | `CiWorkflowTests.F2_build_lam_nong_phai_dung_TRUOC_buoc_cong` (kiểm **thứ tự**, không chỉ kiểm có mặt) |
-| 3 | **Cổng ⑨** (`kiem-link-tai-lieu.ps1`) là **step riêng** của workflow | bước 11 (trong **cùng** job `cong-14-buoc`) | CI **đỏ** khi có tham chiếu chết; `link.log` vào artifact |
+| 3 | **Cổng ⑨** (`kiem-link-tai-lieu.ps1`) là **step riêng** của workflow | bước 11 (trong **cùng** job `cong-15-buoc`) | CI **đỏ** khi có tham chiếu chết; `link.log` vào artifact |
 | 4 | **Cổng của cổng** (`§6.2` A1…A7) + `Evidence.json` | `tools/ci-khang-dinh.ps1` (**mới**) | `test-cong-kiem.ps1` nhóm **`X1…X8`**: **2 ca xanh** (log đầy đủ · **tên ca chứa `[BO QUA]`**) + **6 ca đỏ** (A2 thiếu log · A2 `2/3` · A3 bỏ bước · A4 thiếu `Build DA VAO` · A5 11 bước · A6 dòng `🚨`) |
 | 5 | **Thư viện một chỗ cho khác biệt Windows/Linux** | `tools/nen-tang.ps1` (**mới**) | `test-cong-kiem.ps1` nhóm **`Y1…Y5`**: quét **mọi** script (**hai chiều**), cổng **hai chiều** thật, đường dẫn `bin`, `curl` |
 | 6 | **Vá khả chuyển P-01…P-06** — 📌 **thực tế là 8 tệp, không phải 6 điểm** (xem §16.3 **S9-C**) | `kiem-tat-ca` · `kiem-e2e` · `kiem-moc-build` · `kiem-link-tai-lieu` · `probe-so-dia-chi` · `probe-khach-hang` · `probe-thanh-toan` · `probe-don-san` · `route-check` | `Y1` (quét: cấm tái xuất hiện) + `Y3/Y4/Y5` (hành vi thật) + **chạy lại toàn bộ cổng trên Windows vẫn xanh** |

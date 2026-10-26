@@ -50,12 +50,12 @@ env:
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
 
 jobs:
-  cong-14-buoc:
+  cong-15-buoc:
     # 🚨 TEN NAY PHAI KHOP required status check tren GitHub (§9.2) - doi ten la required check mat hieu luc.
 # 📌 `S11` (21/10/2026): doi tu `cong-8-buoc` -> `cong-12-buoc` (ten cu noi SAI ve cong).
-# 📌 24/10/2026: doi `cong-12-buoc` -> `cong-14-buoc` — THEM buoc 13 (probe oversell) va 14 (probe outbox replay).
+# 📌 24/10/2026: doi `cong-12-buoc` -> `cong-15-buoc` — THEM buoc 13 (oversell), 14 (outbox replay) va 15 (outbox 2 instance).
     #    Doi TRUOC lan chay dau tien vi required check chua bat ⇒ doi bay gio la RẺ, sau khi bat la dat.
-    name: cong-14-buoc
+    name: cong-15-buoc
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -171,7 +171,7 @@ jobs:
           (Get-Date).ToUniversalTime().ToString('o') | Out-File -FilePath .bat-dau.txt -Encoding utf8 -NoNewline
           Write-Output ("Bat dau luc (UTC): {0}" -f (Get-Content .bat-dau.txt -Raw))
 
-      - name: '10. CONG 1..14 - MOT lenh, -DayDu BAT BUOC, KHONG ong danh'
+      - name: '10. CONG 1..15 - MOT lenh, -DayDu BAT BUOC, KHONG ong danh'
         shell: pwsh
         run: |
           # 🚨 KHONG duoc: `pwsh ... -DayDu | Tee-Object gate.log` hoac `| Select-String` - khi do
@@ -206,7 +206,7 @@ jobs:
 
           # 📌 Tom tat cho STEP_SUMMARY + phan loai `2` = MOI TRUONG (khac `1` = san pham, BR-006).
           $kichBan = @()
-          $kichBan += '## CI - cong 14 buoc + cong tham chieu'
+          $kichBan += '## CI - cong 15 buoc + cong tham chieu'
           $kichBan += ''
           $kichBan += ("- commit: ``{0}``" -f $env:GITHUB_SHA)
           $kichBan += ("- ma thoat cua cong: **{0}**" -f $ma)

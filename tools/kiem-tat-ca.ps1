@@ -502,6 +502,26 @@ if ($DayDu -and -not $BoQuaE2E) {
 
         Write-Output '   ✅ KHONG MAT EVENT: process chet sau commit ⇒ event con ⇒ restart phat lai.'
     }
+
+    # ── BUOC 15: OUTBOX 2 INSTANCE — hai Host cùng DB/Redis, cùng relay ────────────────────────
+    Buoc 'Outbox 2 INSTANCE: hai Host cung relay ⇒ mot event, mot dong inbox' {
+        # 📌 Nợ cuối của P0 #3. Hai Host (5000 + 5001) cùng DB + Redis; tạo event bằng relay 600 s,
+        # rồi bật **cả hai** relay 2 s. Khẳng định: outbox dọn + event có **đúng một** dòng inbox.
+        # ⚠️ Giới hạn: "một dòng inbox" chứng minh hai relay **phối hợp**, không chứng minh handler
+        # chạy một lần nếu handler không ghi inbox — xem đầu tệp probe.
+        $p = ChayLenh 'pwsh' @('-NoProfile', '-File', (Join-Path $PSScriptRoot 'probe-outbox-2instance.ps1')) 'outbox2.log'
+
+        Get-Content $p.Log | Where-Object { $_ -match 'DAT|HONG|PROBE OUTBOX 2' } |
+            Select-Object -First 20 | ForEach-Object { "   $_" }
+
+        if ($p.Ma -ne 0) {
+            Get-Content $p.Log | Select-String 'HONG|NGOAI LE' -Context 0,3 |
+                ForEach-Object { $_.Context.PostContext | ForEach-Object { "   $_" } }
+            throw "PROBE OUTBOX 2 INSTANCE DO (exit $($p.Ma)) — xem log: $($p.Log)."
+        }
+
+        Write-Output '   ✅ HAI INSTANCE PHOI HOP: outbox don, mot event ⇒ mot dong inbox.'
+    }
 }
 elseif (-not $BoQuaE2E -and -not $DayDu) {
     Write-Output ""

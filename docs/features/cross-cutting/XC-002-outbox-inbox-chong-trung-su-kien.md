@@ -1376,6 +1376,6 @@ như `S8-P10` đã làm — **không** nới điều kiện, **không** ngủ m�
 | # | Nợ | Vì sao chưa làm |
 |---|---|---|
 | 1 | **Test "publish lỗi ⇒ event còn trong outbox ⇒ phát lại"** | ✅ **XONG 24/10/2026** — `tools/probe-outbox.ps1` (**bước ⑭**): relay tạm 600 s ⇒ commit ⇒ **giết Host** ⇒ `AbpEventOutbox = 1` (còn) ⇒ restart nhịp 2 s ⇒ **outbox = 0** + `AbpEventInbox` **tăng** (consumer nhận) · 9/9 ca |
-| 2 | **Relay 2 instance** | `OutboxSender` dùng khoá phân tán của ABP, nhưng **chưa** đo 2 process + Redis |
+| 2 | **Relay 2 instance** | ✅ **ĐÓNG 26/10/2026** — `probe-outbox-2instance.ps1` (**bước ⑮**): hai Host 5000/5001 cùng DB/Redis ⇒ outbox **0**, event **1** dòng inbox (`distinct MessageId=1`), 0 exception. ⚠️ Giới hạn: chứng minh hai relay **phối hợp**, không chứng minh handler chạy một lần nếu không ghi inbox |
 | 3 | **Inbox dọn theo thời gian** | `WaitTimeToDeleteProcessedInboxEvents = 2 h`; chưa có test chứng minh job dọn chạy (quan sát: bảng có dòng ⇒ **chưa** tới hạn) |
 | 4 | **Metric `messaging_outbox_pending`** | ✅ **ĐÓNG 24/10/2026** — `OutboxPendingWorker` (project EF) đếm `AbpEventOutbox` mỗi 60 s + gọi `SetMessagingOutboxPending`; `XC-005` §5.1 nay **13/16** |

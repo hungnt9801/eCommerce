@@ -1009,3 +1009,20 @@ mặc định 2 s. ⚠️ Production **không** được đặt lớn (relay ch�
 
 **Bẫy:** `O03` có thể thấy `outbox > 1` (event của đơn + event khác trong lúc chờ) ⇒ khẳng định là **`>= 1`**,
 không phải `== 1`. Nếu dọn chỉ xoá theo `EventName` của đơn mà quên các event khác thì **lần chạy sau đỏ**.
+
+---
+
+## M. 🆕 `probe-outbox-2instance.ps1` — HAI HOST CÙNG RELAY (26/10/2026, P0 #3)
+
+**Vì sao có:** nợ cuối của outbox — "2 instance" chưa từng đo. Hai Host (5000/5001) cùng PostgreSQL + Redis;
+tạo event bằng relay tạm 600 s, rồi bật **cả hai** relay 2 s.
+
+**Khẳng định (9/9):** outbox **về 0**; event có **đúng 1** dòng `AbpEventInbox` (`distinct MessageId = 1`);
+không exception thật ở log nào; đơn đổi trạng thái thật.
+
+⚠️ **GIỚI HẠN — đừng trích dẫn quá:** "một dòng inbox" chứng minh hai relay **phối hợp**, **không** chứng minh
+handler chỉ chạy một lần nếu handler **không** ghi inbox/idempotent. Muốn đo tuyệt đối cần handler có tác dụng phụ
+**không idempotent** — hiện hệ thống **không** có (mọi handler đều theo khoá).
+
+**Bẫy:** đừng đếm `fail:` trong log — self-check khởi động **cố ý** log `fail:` cho ETO chưa có người nhận
+(`AddressChangedEto`…). Chỉ tìm `Unhandled exception|OutOfMemoryException|AbpDbConcurrencyException`.
