@@ -32,10 +32,8 @@ public class DonHangAppService : ApplicationService, IDonHangAppService
 {
     private readonly IRepository<Order, Guid> _donRepository;
     private readonly IRepository<OrderLine, Guid> _dongDonRepository;
-    private readonly IRepository<StockReservation, Guid> _giuChoRepository;
+    private readonly IStockReservationGateway _giuCho;
     private readonly IPriceCalculationAppService _tinhGia;
-    private readonly ChotGiuChoService _chotGiuCho;
-    private readonly StockReservationService _giuChoService;
     private readonly eCommerce.Application.Contracts.Inventory.IStockDocumentAppService _phieuKho;
 
     /// <summary>🚨 **CỔNG KHÁCH BỊ CHẶN** — cùng cổng với checkout (`CuaKiemKhachGiaoDich`), 📌 vì đây là
@@ -46,19 +44,15 @@ public class DonHangAppService : ApplicationService, IDonHangAppService
     public DonHangAppService(
         IRepository<Order, Guid> donRepository,
         IRepository<OrderLine, Guid> dongDonRepository,
-        IRepository<StockReservation, Guid> giuChoRepository,
+        IStockReservationGateway giuCho,
         IPriceCalculationAppService tinhGia,
-        ChotGiuChoService chotGiuCho,
-        StockReservationService giuChoService,
         eCommerce.Application.Contracts.Inventory.IStockDocumentAppService phieuKho,
         ICustomerDirectory thuMucKhach)
     {
         _donRepository = donRepository;
         _dongDonRepository = dongDonRepository;
-        _giuChoRepository = giuChoRepository;
+        _giuCho = giuCho;
         _tinhGia = tinhGia;
-        _chotGiuCho = chotGiuCho;
-        _giuChoService = giuChoService;
         _phieuKho = phieuKho;
         _thuMucKhach = thuMucKhach;
     }
@@ -78,9 +72,7 @@ public class DonHangAppService : ApplicationService, IDonHangAppService
         var tien = await _tinhGia.GetSoGiaiTrinhAsync(khoa);
 
         // ② Phải CÓ hàng đang giữ cho nguồn này.
-        var giuCho = (await _giuChoRepository.GetListAsync(x => x.ReferenceId == thamChieu))
-            .Where(x => x.Status == ReservationStatus.Held)
-            .ToList();
+        var giuCho = await _giuCho.LayTheoNguonAsync(thamChieu);
 
         if (giuCho.Count == 0)
         {
@@ -167,7 +159,7 @@ public class DonHangAppService : ApplicationService, IDonHangAppService
         var thoiDiem = at ?? Clock.Now;
 
         // Chốt TOÀN BỘ lượt giữ chỗ của nguồn ⇒ `OnHand` và `Reserved` cùng giảm (bất biến `SAL-003`).
-        var soChot = await _chotGiuCho.ChotTheoNguonAsync($"Checkout:{don.CheckoutIdempotencyKey}", thoiDiem);
+        var soChot = await _giuCho.ChotTheoNguonAsync($"Checkout:{don.CheckoutIdempotencyKey}", thoiDiem);
 
         if (soChot == 0)
         {
@@ -229,7 +221,7 @@ public class DonHangAppService : ApplicationService, IDonHangAppService
 
         var soNha = string.IsNullOrWhiteSpace(don.CheckoutIdempotencyKey)
             ? 0
-            : await _giuChoService.NhaTheoNguonAsync(
+            : await _giuCho.NhaTheoNguonAsync(
                 $"Checkout:{don.CheckoutIdempotencyKey}", at ?? Clock.Now, ReservationStatus.Released);
 
         // 🚨 `SAL-003` — huỷ là chuyển trục **kết thúc** `Open → Cancelled` (hấp thụ), có lịch sử.
@@ -442,7 +434,7 @@ public class DonHangAppService : ApplicationService, IDonHangAppService
     {
         var donList = await _donRepository.GetListAsync();
         var dongList = await _dongDonRepository.GetListAsync();
-        var giuChoList = await _giuChoRepository.GetListAsync(x => x.Status == ReservationStatus.Held);
+        var giuChoList = await _giuCho.LayDangGiuAsync();
 
         var dongTheoDon = dongList.GroupBy(x => x.OrderId).ToDictionary(g => g.Key, g => g.ToList());
         var giuChoTheoNguon = giuChoList

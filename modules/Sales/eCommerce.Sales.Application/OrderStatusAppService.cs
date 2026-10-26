@@ -35,13 +35,13 @@ public class OrderStatusAppService : ApplicationService, IOrderStatusAppService
 {
     private readonly IRepository<Order, Guid> _donHang;
     private readonly IRepository<OrderStatusHistory, Guid> _lichSu;
-    private readonly StockReservationService _giuCho;
+    private readonly IStockReservationGateway _giuCho;
     private readonly ISettingProvider _settings;
 
     public OrderStatusAppService(
         IRepository<Order, Guid> donHang,
         IRepository<OrderStatusHistory, Guid> lichSu,
-        StockReservationService giuCho,
+        IStockReservationGateway giuCho,
         ISettingProvider settings)
     {
         _donHang = donHang;

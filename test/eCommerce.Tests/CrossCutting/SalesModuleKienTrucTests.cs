@@ -67,4 +67,23 @@ public class SalesModuleKienTrucTests
         Assert.DoesNotContain("builder.Entity<Orders.MarketplaceEventLog>", noiDung);
         Assert.Contains("ConfigureSales(builder)", noiDung);
     }
+
+    [Fact]
+    public void Module_Sales_KHONG_tham_chieu_Domain_module_khac()
+    {
+        // ✅ 26/10/2026 — đã gỡ nợ: dùng `IStockReservationGateway` + `IPriceCalculationAppService` (Contracts).
+        var thuMuc = Path.Combine(GocRepo(), "modules", "Sales");
+        var viPham = Directory.GetFiles(thuMuc, "*.csproj", SearchOption.AllDirectories)
+            .SelectMany(tep => Regex.Matches(File.ReadAllText(tep), "ProjectReference Include=\"([^\"]+)\"")
+                .Select(m => new { Tep = Path.GetFileName(tep), DuongDan = m.Groups[1].Value }))
+            .Where(x => x.DuongDan.Contains("Inventory.Domain", StringComparison.OrdinalIgnoreCase)
+                        || x.DuongDan.Contains("Pricing.Domain", StringComparison.OrdinalIgnoreCase)
+                        || x.DuongDan.Contains("Customers.Domain", StringComparison.OrdinalIgnoreCase)
+                        || x.DuongDan.Contains("ChannelHub.Domain", StringComparison.OrdinalIgnoreCase)
+                        || x.DuongDan.Contains("PaymentHub.Domain", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        Assert.True(viPham.Count == 0, "module Sales còn tham chiếu Domain module khác:\n  "
+            + string.Join("\n  ", viPham.Select(x => $"{x.Tep}: {x.DuongDan}")));
+    }
 }
