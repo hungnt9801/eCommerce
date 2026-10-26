@@ -67,7 +67,7 @@ modules/
 
 | Bước | Module | Vì sao thứ tự này | Ước lượng |
 |---|---|---|---|
-| **M1** | `Reconciliation` | Ít phụ thuộc nhất (chỉ đọc Inventory + PaymentHub qua hợp đồng); làm trước để **học quy trình** | **3–4 pd** — ✅ **XONG 24/10/2026** (4 project + mapping EF; ⚠️ đọc `Inventory.Domain` trực tiếp — hợp đồng là nợ) |
+| **M1** | `Reconciliation` | Ít phụ thuộc nhất (chỉ đọc Inventory + PaymentHub qua hợp đồng); làm trước để **học quy trình** | **3–4 pd** — ✅ **XONG 24/10/2026** (4 project + mapping EF; ✅ đã gỡ nợ đọc `Inventory.Domain` — dùng `IStockBalanceReader`/`IWarehouseDirectory`) |
 | **M2** | `Inventory` | Nền của Sales; có nhiều invariant + service thuần; chưa có `Contracts` ⇒ tạo mới | **5–7 pd** — ✅ **XONG 24/10/2026**: 4 project; Domain/Contracts/Application **và mapping EF** đã chuyển; recon còn host (sang Reconciliation); 2 app service host có lý do |
 | **M3** | `Catalog` | Nhiều entity nhưng **ít** phụ thuộc ra ngoài (Kernel + Domain.Shared) | **4–6 pd** — ✅ **XONG 24/10/2026**: 4 project; Domain/Contracts/Application **và mapping EF** đã chuyển (`ConfigureCatalog`, migration **RỖNG**); 2 tệp host (`ChannelDirectory`, `HienThiKenhAppService`) **cố ý** ở lại vì đọc ChannelHub |
 | **M4** | `Sales` | Nặng nhất: phụ thuộc **3** module (Catalog, Inventory, Pricing, Customers) + Marketplace + Checkout | **8–12 pd** — ✅ **XONG 24/10/2026**: 4 project; Domain/Contracts/Application **và mapping EF** đã chuyển; 1 worker host có lý do |

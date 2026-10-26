@@ -64,4 +64,18 @@ public class ReconciliationModuleKienTrucTests
         var duongDan = Path.Combine(GocRepo(), "src", "eCommerce.Domain", "Entities", "Inventory", ten);
         Assert.False(File.Exists(duongDan), $"`{ten}` vẫn ở host.");
     }
+
+    [Fact]
+    public void Module_Reconciliation_KHONG_tham_chieu_Inventory()
+    {
+        // ✅ 26/10/2026 — đã gỡ nợ: chỉ dùng `IStockBalanceReader`/`IWarehouseDirectory` (host hiện thực).
+        var thuMuc = Path.Combine(GocRepo(), "modules", "Reconciliation");
+        var viPham = Directory.GetFiles(thuMuc, "*.csproj", SearchOption.AllDirectories)
+            .Where(tep => File.ReadAllText(tep).Contains("Inventory", StringComparison.OrdinalIgnoreCase))
+            .Select(Path.GetFileName)
+            .ToList();
+
+        Assert.True(viPham.Count == 0,
+            "module Reconciliation còn tham chiếu Inventory:\n  " + string.Join("\n  ", viPham));
+    }
 }

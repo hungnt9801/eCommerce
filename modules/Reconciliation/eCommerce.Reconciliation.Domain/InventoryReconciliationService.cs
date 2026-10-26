@@ -1,4 +1,5 @@
 using eCommerce.Kernel.Observability;
+using eCommerce.Reconciliation;
 using eCommerce.Settings;
 using Microsoft.Extensions.Logging;
 using Volo.Abp.Domain.Repositories;
@@ -36,21 +37,18 @@ public class InventoryReconciliationService : DomainService
     /// </summary>
     public const int SoDongLechToiDaMoiLuot = 10_000;
 
-    private readonly IRepository<InventoryItem, Guid> _tonKhoRepository;
-    private readonly IRepository<StockLedgerEntry, Guid> _soCaiRepository;
+    private readonly IStockBalanceReader _doc;
     private readonly IRepository<ReconRun, Guid> _luotDoiSoatRepository;
     private readonly IRepository<ReconRunMismatch, Guid> _dongLechRepository;
     private readonly eCommerceMetrics _metrics;
 
     public InventoryReconciliationService(
-        IRepository<InventoryItem, Guid> tonKhoRepository,
-        IRepository<StockLedgerEntry, Guid> soCaiRepository,
+        IStockBalanceReader doc,
         IRepository<ReconRun, Guid> luotDoiSoatRepository,
         IRepository<ReconRunMismatch, Guid> dongLechRepository,
         eCommerceMetrics metrics)
     {
-        _tonKhoRepository = tonKhoRepository;
-        _soCaiRepository = soCaiRepository;
+        _doc = doc;
         _luotDoiSoatRepository = luotDoiSoatRepository;
         _dongLechRepository = dongLechRepository;
         _metrics = metrics;
@@ -82,8 +80,8 @@ public class InventoryReconciliationService : DomainService
 
         var batDauUtc = DateTime.UtcNow;
 
-        var cacTon = await _tonKhoRepository.GetListAsync();
-        var soCai = await _soCaiRepository.GetListAsync();
+        var cacTon = await _doc.LayTonKhoAsync();
+        var soCai = await _doc.LayButToanAsync();
 
         // Chỉ lấy bút toán **ảnh hưởng `OnHand`** — `Reservation`/`ReservationRelease` đổi `Reserved`
         // (nếu cộng cả chúng vào thì **báo lệch GIẢ** ngay khi có đơn giữ chỗ ⇒ đội vận hành mất tin vào cảnh báo).

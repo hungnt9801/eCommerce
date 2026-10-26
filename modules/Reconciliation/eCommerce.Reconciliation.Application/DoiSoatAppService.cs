@@ -44,7 +44,7 @@ public class DoiSoatAppService : ApplicationService, IDoiSoatAppService
 
     private readonly IRepository<ReconRun, Guid> _luotDoiSoat;
     private readonly IRepository<ReconRunMismatch, Guid> _dongLech;
-    private readonly IRepository<Warehouse, Guid> _kho;
+    private readonly IWarehouseDirectory _kho;
     private readonly DoiSoatRetentionService _luuTru;
     private readonly ISettingProvider _settingProvider;
     private readonly IRepository<IdentityUser, Guid> _nguoiDung;
@@ -52,7 +52,7 @@ public class DoiSoatAppService : ApplicationService, IDoiSoatAppService
     public DoiSoatAppService(
         IRepository<ReconRun, Guid> luotDoiSoat,
         IRepository<ReconRunMismatch, Guid> dongLech,
-        IRepository<Warehouse, Guid> kho,
+        IWarehouseDirectory kho,
         DoiSoatRetentionService luuTru,
         ISettingProvider settingProvider,
         IRepository<IdentityUser, Guid> nguoiDung)    {
@@ -412,12 +412,7 @@ public class DoiSoatAppService : ApplicationService, IDoiSoatAppService
             return [];
         }
 
-        var kho = await AsyncExecuter.ToListAsync(
-            (await _kho.GetQueryableAsync()).Where(x => idKho.Contains(x.Id)));
-
-        return kho
-            .GroupBy(x => x.Id)
-            .ToDictionary(g => g.Key, g => g.First().Code);
+        return await _kho.LayTenKhoAsync(idKho);
     }
 
     private static LuotDoiSoatDto ChuyenDto(ReconRun x, int soLechChuaXuLy) => new()

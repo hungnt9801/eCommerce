@@ -23,6 +23,7 @@
     <ProjectReference Include="..\..\modules\Inventory\eCommerce.Inventory.EntityFrameworkCore\eCommerce.Inventory.EntityFrameworkCore.csproj" />
     <!-- 🆕 `P0 #1` — module Reconciliation tự cung cấp mapping (`ConfigureReconciliation`). -->
     <ProjectReference Include="..\..\modules\Reconciliation\eCommerce.Reconciliation.EntityFrameworkCore\eCommerce.Reconciliation.EntityFrameworkCore.csproj" />
+    <ProjectReference Include="..\..\modules\Reconciliation\eCommerce.Reconciliation.Application.Contracts\eCommerce.Reconciliation.Application.Contracts.csproj" />
     <!-- 🆕 `P0 #1` — module Sales: mapping còn host nhưng cần entity `Order`/`Marketplace*`. -->
     <ProjectReference Include="..\..\modules\Sales\eCommerce.Sales.Domain\eCommerce.Sales.Domain.csproj" />
     <ProjectReference Include="..\..\modules\Sales\eCommerce.Sales.EntityFrameworkCore\eCommerce.Sales.EntityFrameworkCore.csproj" />
