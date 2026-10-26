@@ -39,7 +39,7 @@
     Log cua cong ⑨ (tham chieu tai lieu). Rong ⇒ bo qua phep khang dinh A7.
 
 .PARAMETER SoBuocToiThieu
-    San so buoc DAT. 📌 12 = so buoc hien tai cua `-DayDu` (`S8`). ⚠️ Them buoc thi phai nang so nay
+    San so buoc DAT. 📌 14 = so buoc hien tai cua `-DayDu` (`S8`; +1 bước ⑬ oversell ngày 24/10/2026). ⚠️ Them buoc thi phai nang so nay
     **cung luc** — day la **hop dong**, khong phai so trang tri.
 
 .PARAMETER BatDauUtc
@@ -63,7 +63,7 @@ param(
     [string]$Log = 'gate.log',
     [string]$ThuMucLog,
     [string]$LinkLog = '',
-    [int]$SoBuocToiThieu = 12,
+    [int]$SoBuocToiThieu = 14,
     [string]$BatDauUtc = '',
     [int]$MaCong = 0,
     [string]$XuatBangChung = ''

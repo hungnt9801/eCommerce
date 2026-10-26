@@ -141,7 +141,7 @@ public class PostgreSqlSchemaTests
     }
 
     [Fact]
-    public async Task F1_du_53_index_deu_dung_NULLS_NOT_DISTINCT()
+    public async Task F1_du_54_index_deu_dung_NULLS_NOT_DISTINCT()
     {
         // 🔒 BẤT BIẾN (ghi ở XC-004 Q6): mọi unique index trên entity IMultiTenant PHẢI có
         // `NULLS NOT DISTINCT`. Ai tạo migration mới mà quên ⇒ test này đỏ.
@@ -162,7 +162,12 @@ public class PostgreSqlSchemaTests
         //      Order_Ver_Hash_Outcome`: **một sự kiện ⇒ một dòng nhật ký**. 📌 Đây là câu trả lời cho `XC-003` D2
         //      (*"bỏ lock đi, DB có chặn không?"*) ⇒ **CÓ**. ⚠️ Tên index **57 ký tự** (do EF tự sinh là
         //      **94** ⇒ PostgreSQL **cắt** ở 63 ⇒ test đối chiếu đích danh không tìm thấy).
-        Assert.Equal(53L, await DemAsync(
+        //    → **54** (24/10/2026, `Sal003_OrderStateMachine_History` — `IX_OrdStatusHistory_TenantId_OrderId_
+        //      Axis_VersionAfter`: **mỗi PHIÊN BẢN của một TRỤC chỉ có đúng MỘT dòng lịch sử**. 📌 Đây là hàng rào
+        //      cuối cho bất biến *"không có chuyển trạng thái nào thiếu lịch sử"*; mất `NULLS NOT DISTINCT` ⇒
+        //      khi `TenantId = NULL` hai dòng cùng `(OrderId, Axis, VersionAfter)` LỌT ⇒ lịch sử có dòng trùng,
+        //      và câu hỏi *"ai đổi trạng thái"* trả lời **hai lần** cho một lần đổi.)
+        Assert.Equal(54L, await DemAsync(
             "select count(*) from pg_indexes where schemaname = 'public' and indexdef like '%NULLS NOT DISTINCT%'"));
 
         // Kiểm tra ĐÍCH DANH để thông báo lỗi có ý nghĩa (tên index dài có thể bị PostgreSQL cắt ⇒ so theo tiền tố).
@@ -208,6 +213,11 @@ public class PostgreSqlSchemaTests
             //    (*"sàn gửi lại bao nhiêu lần", "có dual-path không", "bao nhiêu xung đột"*) đều **SAI**
             //    — và ⚠️ **không có lỗi nào** để lần ra. 📌 Bảng càng chỉ tăng thì sai số càng lớn dần.
             "IX_SalMktEventLogs_TenantId_Channel_Order_Ver_Hash_Outcome",
+            // 🚨 SAL-003 (24/10/2026) — **NHẬT KÝ TRẠNG THÁI ĐƠN HÀNG**: *mỗi phiên bản của một TRỤC
+            //    chỉ có ĐÚNG MỘT dòng lịch sử*. Mất `NULLS NOT DISTINCT` ⇒ khi `TenantId = NULL` (đang chạy
+            //    1 tenant) hàng rào cuối mất tác dụng ⇒ tầng ứng dụng sai (race) sẽ ghi **hai** lịch sử cho
+            //    một lần đổi ⇒ câu hỏi *"ai đổi trạng thái, lúc nào"* trả lời **hai lần** — và không có lỗi nào.
+            "IX_OrdStatusHistory_TenantId_OrderId_Axis_VersionAfter",
             // 🚨 CAT-002 — mã danh mục duy nhất trong tenant (15/10/2026). EF sinh index này **KHÔNG** kèm
             //    `NULLS NOT DISTINCT` ⇒ đã sửa tay ngay trong migration `Cat002_CategoryTree`.
             //    Mất nó ⇒ khi `TenantId = NULL` (tình trạng hiện nay) hai danh mục cùng `Code` LỌT VÀO DB **im lặng**.

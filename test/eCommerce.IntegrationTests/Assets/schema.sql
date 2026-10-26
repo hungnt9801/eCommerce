@@ -2471,3 +2471,166 @@ VALUES ('20261018104518_S7_XacNhanVaRetentionDoiSoat', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+ALTER TABLE "OrdOrders" ADD "ClosureVersion" bigint NOT NULL DEFAULT 0;
+
+ALTER TABLE "OrdOrders" ADD "FulfillmentStatus" integer NOT NULL DEFAULT 0;
+
+ALTER TABLE "OrdOrders" ADD "FulfillmentVersion" bigint NOT NULL DEFAULT 0;
+
+ALTER TABLE "OrdOrders" ADD "IsCancelled" boolean NOT NULL DEFAULT FALSE;
+
+ALTER TABLE "OrdOrders" ADD "PaymentVersion" bigint NOT NULL DEFAULT 0;
+
+ALTER TABLE "OrdOrders" ADD "ReconciliationStatus" integer NOT NULL DEFAULT 0;
+
+ALTER TABLE "OrdOrders" ADD "ReconciliationVersion" bigint NOT NULL DEFAULT 0;
+
+ALTER TABLE "OrdOrders" ADD "ReturnStatus" integer NOT NULL DEFAULT 0;
+
+CREATE TABLE "OrdStatusHistory" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "OrderId" uuid NOT NULL,
+    "Axis" character varying(24) NOT NULL,
+    "FromStatus" integer NOT NULL,
+    "ToStatus" integer NOT NULL,
+    "ActorType" character varying(24) NOT NULL,
+    "ActorId" uuid,
+    "ReasonCode" character varying(64) NOT NULL,
+    "ReasonText" character varying(512),
+    "CorrelationId" character varying(64) NOT NULL,
+    "EventId" uuid NOT NULL,
+    "VersionAfter" bigint NOT NULL,
+    "OccurredAtUtc" timestamp with time zone NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_OrdStatusHistory" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_OrdStatusHistory_From_Khac_To" CHECK ("FromStatus" <> "ToStatus"),
+    CONSTRAINT "FK_OrdStatusHistory_OrdOrders_OrderId" FOREIGN KEY ("OrderId") REFERENCES "OrdOrders" ("Id") ON DELETE CASCADE
+);
+
+CREATE INDEX "IX_OrdOrders_TenantId_FulfillmentStatus_CreationTime" ON "OrdOrders" ("TenantId", "FulfillmentStatus", "CreationTime");
+
+CREATE INDEX "IX_OrdOrders_TenantId_PaymentStatus_CreationTime" ON "OrdOrders" ("TenantId", "PaymentStatus", "CreationTime");
+
+CREATE INDEX "IX_OrdOrders_TenantId_ReconciliationStatus_CreationTime" ON "OrdOrders" ("TenantId", "ReconciliationStatus", "CreationTime");
+
+CREATE INDEX "IX_OrdOrders_TenantId_ReturnStatus_CreationTime" ON "OrdOrders" ("TenantId", "ReturnStatus", "CreationTime");
+
+ALTER TABLE "OrdOrders" ADD CONSTRAINT "CK_OrdOrders_StatusVersions_KhongAm" CHECK ("FulfillmentVersion" >= 0 AND "PaymentVersion" >= 0 AND "ReconciliationVersion" >= 0 AND "ClosureVersion" >= 0);
+
+CREATE INDEX "IX_OrdStatusHistory_OrderId" ON "OrdStatusHistory" ("OrderId");
+
+CREATE INDEX "IX_OrdStatusHistory_TenantId_ActorType_OccurredAtUtc" ON "OrdStatusHistory" ("TenantId", "ActorType", "OccurredAtUtc");
+
+CREATE INDEX "IX_OrdStatusHistory_TenantId_Axis_OccurredAtUtc" ON "OrdStatusHistory" ("TenantId", "Axis", "OccurredAtUtc");
+
+CREATE UNIQUE INDEX "IX_OrdStatusHistory_TenantId_OrderId_Axis_VersionAfter" ON "OrdStatusHistory" ("TenantId", "OrderId", "Axis", "VersionAfter");
+
+CREATE INDEX "IX_OrdStatusHistory_TenantId_OrderId_OccurredAtUtc" ON "OrdStatusHistory" ("TenantId", "OrderId", "OccurredAtUtc");
+
+DROP INDEX IF EXISTS "IX_OrdStatusHistory_TenantId_OrderId_Axis_VersionAfter";
+
+CREATE UNIQUE INDEX "IX_OrdStatusHistory_TenantId_OrderId_Axis_VersionAfter"
+                  ON "OrdStatusHistory" ("TenantId", "OrderId", "Axis", "VersionAfter")
+                  NULLS NOT DISTINCT;
+
+UPDATE "OrdOrders" SET
+                    "FulfillmentStatus" = CASE "Status"
+                        WHEN 0 THEN 0 WHEN 1 THEN 1 WHEN 2 THEN 2 WHEN 3 THEN 4
+                        WHEN 4 THEN 5 WHEN 5 THEN 0 WHEN 6 THEN 8 ELSE 0 END,
+                    "ReturnStatus" = CASE "Status" WHEN 5 THEN 5 WHEN 6 THEN 4 ELSE 0 END,
+                    "IsCancelled" = ("Status" = 5),
+                    "ReconciliationStatus" = CASE WHEN "GrandTotal" > 0 THEN 1 ELSE 0 END;
+
+INSERT INTO "OrdStatusHistory"
+                    ("Id", "TenantId", "OrderId", "Axis", "FromStatus", "ToStatus",
+                     "ActorType", "ActorId", "ReasonCode", "ReasonText", "CorrelationId",
+                     "EventId", "VersionAfter", "OccurredAtUtc", "CreationTime", "IsDeleted")
+                  SELECT gen_random_uuid(), o."TenantId", o."Id", 'Fulfillment', 0, o."FulfillmentStatus",
+                         'SystemJob', NULL, 'BackfillMigration', 'Backfill SAL-003', 'migration-sal003',
+                         gen_random_uuid(), 1, now(), now(), false
+                  FROM "OrdOrders" o WHERE o."FulfillmentStatus" <> 0;
+
+INSERT INTO "OrdStatusHistory"
+                    ("Id", "TenantId", "OrderId", "Axis", "FromStatus", "ToStatus",
+                     "ActorType", "ActorId", "ReasonCode", "ReasonText", "CorrelationId",
+                     "EventId", "VersionAfter", "OccurredAtUtc", "CreationTime", "IsDeleted")
+                  SELECT gen_random_uuid(), o."TenantId", o."Id", 'Closure', 0, o."ReturnStatus",
+                         'SystemJob', NULL, 'BackfillMigration', 'Backfill SAL-003', 'migration-sal003',
+                         gen_random_uuid(), 1, now(), now(), false
+                  FROM "OrdOrders" o WHERE o."ReturnStatus" IN (4, 5);
+
+INSERT INTO "OrdStatusHistory"
+                    ("Id", "TenantId", "OrderId", "Axis", "FromStatus", "ToStatus",
+                     "ActorType", "ActorId", "ReasonCode", "ReasonText", "CorrelationId",
+                     "EventId", "VersionAfter", "OccurredAtUtc", "CreationTime", "IsDeleted")
+                  SELECT gen_random_uuid(), o."TenantId", o."Id", 'Payment', 0, o."PaymentStatus",
+                         'SystemJob', NULL, 'BackfillMigration', 'Backfill SAL-003', 'migration-sal003',
+                         gen_random_uuid(), 1, now(), now(), false
+                  FROM "OrdOrders" o WHERE o."PaymentStatus" <> 0;
+
+UPDATE "OrdOrders" SET "FulfillmentVersion" = 1 WHERE "FulfillmentStatus" <> 0;
+
+UPDATE "OrdOrders" SET "ClosureVersion" = 1 WHERE "ReturnStatus" IN (4, 5);
+
+UPDATE "OrdOrders" SET "PaymentVersion" = 1 WHERE "PaymentStatus" <> 0;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261024021355_Sal003_OrderStateMachine_History', '10.0.11');
+
+COMMIT;
+
+START TRANSACTION;
+CREATE TABLE "AbpEventInbox" (
+    "Id" uuid NOT NULL,
+    "ExtraProperties" text NOT NULL,
+    "MessageId" text NOT NULL,
+    "EventName" character varying(256) NOT NULL,
+    "EventData" bytea NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "Status" integer NOT NULL,
+    "HandledTime" timestamp with time zone,
+    "RetryCount" integer NOT NULL,
+    "NextRetryTime" timestamp with time zone,
+    CONSTRAINT "PK_AbpEventInbox" PRIMARY KEY ("Id")
+);
+
+CREATE TABLE "AbpEventOutbox" (
+    "Id" uuid NOT NULL,
+    "ExtraProperties" text NOT NULL,
+    "EventName" character varying(256) NOT NULL,
+    "EventData" bytea NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    CONSTRAINT "PK_AbpEventOutbox" PRIMARY KEY ("Id")
+);
+
+CREATE INDEX "IX_AbpEventInbox_MessageId" ON "AbpEventInbox" ("MessageId");
+
+CREATE INDEX "IX_AbpEventInbox_Status_CreationTime" ON "AbpEventInbox" ("Status", "CreationTime");
+
+CREATE INDEX "IX_AbpEventOutbox_CreationTime" ON "AbpEventOutbox" ("CreationTime");
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261024045237_AbpEventBusOutboxInbox', '10.0.11');
+
+COMMIT;
+
+START TRANSACTION;
+ALTER TABLE "OrdOrders" DROP CONSTRAINT "CK_OrdOrders_StatusVersions_KhongAm";
+
+ALTER TABLE "OrdOrders" ADD "RowVersion" bigint NOT NULL DEFAULT 0;
+
+ALTER TABLE "OrdOrders" ADD CONSTRAINT "CK_OrdOrders_StatusVersions_KhongAm" CHECK ("FulfillmentVersion" >= 0 AND "PaymentVersion" >= 0 AND "ReconciliationVersion" >= 0 AND "ClosureVersion" >= 0 AND "RowVersion" >= 0);
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261024053040_Sal003_RowVersion', '10.0.11');
+
+COMMIT;
+

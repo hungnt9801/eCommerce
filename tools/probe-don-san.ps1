@@ -483,7 +483,8 @@ select count(*)::text from "AbpUsers" where "NormalizedUserName" = 'ADMIN' and n
         throw ('Khong dong bo duoc shop A (HTTP {0}) ⇒ cac ca sau VO NGHIA: {1}' -f $kqA.Ma, $kqA.Than)
     }
 
-    Cho-DieuKien { (Dem-SuKien $donA.ExternalOrderId) -ge 1 } | Out-Null
+    # ⏱️ 24/10/2026 — OUTBOX: phải chờ ĐÚNG outcome `Late`, không phải "có bất kỳ dòng" (đã có từ sự kiện trước).
+    Cho-DieuKien { (Dem-SuKienTheoKetCuc $donA.ExternalOrderId 2) -ge 1 } | Out-Null
 
     $tongA = Dem-SuKien $donA.ExternalOrderId
     $lateA = Dem-SuKienTheoKetCuc $donA.ExternalOrderId 2
@@ -513,6 +514,8 @@ select count(*)::text from "MsgDeadLetters" where "KhoaNghiepVu" like '%{0}%' an
     Kq 'C12 ban den MUON KHONG tao don noi bo (khong co tac dung phu)' ($donNoiBoA -eq 0) ('so don = {0}' -f $donNoiBoA)
 
     $dlqA = So-Db ($mauDemDlqLyDo -f $donA.ExternalOrderId, 1)
+    Cho-DieuKien { (So-Db ($mauDemDlqLyDo -f $donA.ExternalOrderId, 1)) -ge 1 } | Out-Null
+    $dlqA = So-Db ($mauDemDlqLyDo -f $donA.ExternalOrderId, 1)
     $payloadDayDuA = So-Db ($mauDemDlqPayload -f $donA.ExternalOrderId)
 
     Kq 'C13 su kien DEN MUON VAO DLQ (LyDo = HaWatermark)' ($dlqA -eq 1) ('so dong DLQ = {0}' -f $dlqA)
@@ -528,11 +531,13 @@ select count(*)::text from "MsgDeadLetters" where "KhoaNghiepVu" like '%{0}%' an
         throw ('Khong dong bo duoc shop B (HTTP {0}).' -f $kqB.Ma)
     }
 
-    Cho-DieuKien { (Dem-SuKien $donB.ExternalOrderId) -ge 1 } | Out-Null
+    # ⏱️ 24/10/2026 — OUTBOX: chờ ĐÚNG `Conflict` (cùng mốc), không phải dòng cũ.
+    Cho-DieuKien { (Dem-SuKienTheoKetCuc $donB.ExternalOrderId 3) -ge 1 } | Out-Null
 
     $tongB = Dem-SuKien $donB.ExternalOrderId
     $xungDotB = Dem-SuKienTheoKetCuc $donB.ExternalOrderId 3
     $wmSauB = Lay-Watermark $donB.ExternalOrderId
+    Cho-DieuKien { (So-Db ($mauDemDlqLyDo -f $donB.ExternalOrderId, 0)) -ge 1 } | Out-Null
     $dlqB = So-Db ($mauDemDlqLyDo -f $donB.ExternalOrderId, 0)
 
     Kq 'C16 su kien XUNG DOT CUNG MOC => Outcome = Conflict (3)' ($tongB -eq 1 -and $xungDotB -eq 1) `

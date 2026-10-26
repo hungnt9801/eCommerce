@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>eCommerce.Reconciliation</RootNamespace>
+    <AssemblyName>eCommerce.Reconciliation.Application</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\eCommerce.Reconciliation.Application.Contracts\eCommerce.Reconciliation.Application.Contracts.csproj" />
+    <ProjectReference Include="..\eCommerce.Reconciliation.Domain\eCommerce.Reconciliation.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Volo.Abp.Ddd.Application" />
+    <PackageReference Include="Volo.Abp.BackgroundWorkers" />
+    <PackageReference Include="Volo.Abp.Identity.Domain" />
+  </ItemGroup>
+
+</Project>

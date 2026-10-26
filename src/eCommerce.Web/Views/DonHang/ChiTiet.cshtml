@@ -33,6 +33,56 @@
         <tr><th>Khoá checkout</th><td id="khoa">@(Model.CheckoutIdempotencyKey ?? "(không có)")</td></tr>
     </table>
 
+    @* 🆕 `SAL-003` #7 (24/10/2026) — **4 TRỤC + LỊCH SỬ**. 🔒 Chỉ ĐỌC: thay đổi trạng thái đi qua
+       `IOrderStatusAppService` (permission riêng theo trục). 📌 `trang-thai` ở bảng trên là giá trị SUY RA. *@
+    <h2>Trạng thái 4 trục</h2>
+    <table id="bang-truc">
+        <tr><th>Trục</th><th>Giá trị</th><th>Version</th></tr>
+        <tr><td>Thực hiện</td><td id="truc-thuc-hien">@Model.FulfillmentStatus</td><td id="v-thuc-hien">@Model.FulfillmentVersion</td></tr>
+        <tr><td>Tài chính</td><td id="truc-tai-chinh">@Model.PaymentStatus</td><td id="v-tai-chinh">@Model.PaymentVersion</td></tr>
+        <tr><td>Đối soát</td><td id="truc-doi-soat">@Model.ReconciliationStatus</td><td id="v-doi-soat">@Model.ReconciliationVersion</td></tr>
+        <tr><td>Kết thúc</td><td id="truc-ket-thuc">@Model.ReturnStatus</td><td id="v-ket-thuc">@Model.ClosureVersion</td></tr>
+        <tr><td>Đã huỷ</td><td id="truc-huy">@(Model.IsCancelled ? "Có" : "Không")</td><td id="v-dong">RowVersion @Model.RowVersion</td></tr>
+    </table>
+    <p class="ghichu">
+        Trạng thái ở bảng trên (<span id="trang-thai-suy-ra">@Model.Status</span>) được <strong>suy ra</strong> từ 4 trục
+        — không có cột nào cho phép sửa tay. Bốn trục <strong>trực giao</strong>: ví dụ đơn COD có
+        “Thực hiện = Delivered” mà “Tài chính = Unpaid”.
+    </p>
+
+    <h2>Lịch sử trạng thái</h2>
+    @if (ViewBag.CoQuyenLichSu == true)
+    {
+        var lichSu = (ViewBag.LichSu as IEnumerable<OrderStatusHistoryDto>) ?? Enumerable.Empty<OrderStatusHistoryDto>();
+
+        if (!lichSu.Any())
+        {
+            <p class="ghichu" id="lich-su-rong">Chưa có lần chuyển trạng thái nào.</p>
+        }
+        else
+        {
+            <table id="bang-lich-su">
+                <tr><th>Lúc (UTC)</th><th>Trục</th><th>Từ → Đến</th><th>Người</th><th>Lý do</th><th>Version</th></tr>
+                @foreach (var dong in lichSu)
+                {
+                    <tr>
+                        <td>@dong.OccurredAtUtc.ToString("u")</td>
+                        <td>@dong.Axis</td>
+                        <td>@dong.FromStatus → @dong.ToStatus</td>
+                        <td>@dong.ActorType</td>
+                        <td>@dong.ReasonCode</td>
+                        <td>@dong.VersionAfter</td>
+                    </tr>
+                }
+            </table>
+            <p class="ghichu">Nhật ký là <strong>append-only</strong> — không sửa/xoá được (chứng từ khi tranh chấp).</p>
+        }
+    }
+    else
+    {
+        <p class="ghichu" id="lich-su-khong-quyen">Bạn không có quyền xem lịch sử trạng thái (<code>eCommerce.Orders.History.View</code>).</p>
+    }
+
     @* Hai hành động đã ĐO chạy đúng trên đơn định dạng WEB-… (§65 · §69) *@
     <form method="post" action="/DonHang/XacNhan/@Model.Id">
         @Html.AntiForgeryToken()

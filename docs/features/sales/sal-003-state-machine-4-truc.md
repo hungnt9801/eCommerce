@@ -6,7 +6,7 @@
 | **Module** | **Sales** — hiện entity `Order`/`OrderLine` nằm ở app (`src/eCommerce.Domain/Entities/Orders/Order.cs`); kế hoạch tách sang `modules/Sales/eCommerce.Sales.Domain` ở GĐ1 |
 | **Giai đoạn** | **GĐ1 — Bán được trên website** (theo `docs/implementation-plan.md` Phụ lục A.3, dòng `SAL-003`) |
 | **Ưu tiên** | **Must have** — mọi thao tác đổi trạng thái đơn đều đi qua đây |
-| **Trạng thái** | 🟡 `Draft` — chờ review |
+| **Trạng thái** | 🟡 **ĐANG TRIỂN KHAI** — **lát cắt 1 + ETO xong 24/10/2026** (§16: 4 trục + guard + lịch sử + ETO/outbox + migration 42/43) · 🚧 **còn 6 nợ** ở §16.2 (`RowVersion`, ETO/outbox, API, setting, job, metric, UI) ⇒ **CHƯA** đủ DoD §14.3, **không** được nói "đã xong" |
 | **Người viết / người review** | *(điền)* / **Kiến trúc trưởng + BA vận hành** |
 | **Phiên bản / ngày** | `v0.1 — 14/10/2026` |
 | **Tài liệu liên quan** | `XC-001` (tiền, cấm `==` — §0.1 D3) · `XC-002` (`OrderStatusChangedEto`, `AggregateVersion`, idempotency 4 biên vào) · `XC-003` (khoá phân tán) · `XC-004` (`[Authorize]` cấp class, permission) · `XC-005` (metric/log) · `SAL-002` (đặt hàng) · `SAL-004` (huỷ đơn & compensation) · `SAL-005` (webhook đơn từ sàn) · `SAL-006` (RMA) · `REC-001`/`REC-002` (đối soát) · `SHP-003` (COD) · `docs/business-modules-proposal.md` §6.4 · `docs/templates/feature-design-template.md` |
@@ -553,7 +553,7 @@ public class ChangeFulfillmentStatusDto
 
 | Mục | Giá trị |
 |---|---|
-| Method / Route | `POST /api/app/order-status/{orderId}/fulfillment` · `POST .../reconciliation` · `POST .../return/request` · `POST .../return/approve` · `POST .../cancel` · `GET .../{orderId}/history` |
+| Method / Route | ✅ **ĐÃ TRIỂN KHAI 24/10/2026** (route thật do conventional controller sinh): `POST /api/app/order-status/change-fulfillment-status` · `.../change-reconciliation-status` · `.../request-return` · `.../approve-return` · `.../cancel-order` · `GET /api/app/order-status/status-history/{orderId}`. 📌 **L7**: route khác §6.2 dự thảo (`/{orderId}/fulfillment`) vì ABP conventional đặt tên theo **method**, không theo path tuỳ ý — chấp nhận để **không** tự viết controller (mất auto-API). |
 | Authentication | `Bearer` (OpenIddict — `XC-004` D1) |
 | Permission | xem bảng §6.1 |
 | Content-Type | `application/json` |
@@ -995,3 +995,64 @@ public class OrderStateMachineTests
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.1 | 14/10/2026 | *(điền)* | Bản nháp đầu — chốt **4 trục** + bảng chuyển + lịch sử append-only; phát hiện **F1** (`Order.SetStatus` không guard, `PaymentStatus` setter công khai), **F2** (guard im lặng ở `PaymentTransaction`), **F3** (tiền tố khoá ở `XC-002`), **F4/F5** (nền `XC-002`/`XC-005` chưa có trong code), **F6–F8** (chưa có tầng Application Sales, chưa có entity lịch sử) |
+
+---
+
+## 16. ĐÃ TRIỂN KHAI — **lát cắt 1** (24/10/2026)
+
+> **Trạng thái:** 🟡 **ĐANG TRIỂN KHAI** — **không** còn là `Draft` thuần, nhưng **chưa** đủ DoD §14.3.
+> **Bối cảnh:** phiên kiểm toán GĐ1 (`docs/audit-gd1.md`) phát hiện tài liệu `implementation-plan.md` ghi
+> `SAL-003` **"✅ XONG"** trong khi `Order.SetStatus` chỉ là **phép gán trần** và **không có** `OrderStatusHistory`.
+> Lát cắt này đóng đúng khoảng trống đó; các mục còn lại ghi rõ ở §16.2.
+
+### 16.1 Đã có trong code (đo được)
+
+| Hạng mục | Bằng chứng |
+|---|---|
+| **4 enum trục** + `OrderAxis` + `StatusActorType` | `src/eCommerce.Domain.Shared/Enums.cs` (`FulfillmentStatus`, `ReconciliationStatus`, `ReturnStatus`, `OrderAxis`, `StatusActorType`) |
+| **Bảng chuyển trạng thái** (dữ liệu, không `if` rải rác) | `src/eCommerce.Domain/Entities/Orders/OrderStateMachine.cs` — 30 cạnh; `CoCanh`/`LaHapThu`/`LaTrucHopLe` |
+| **`SetStatus` ĐÃ XOÁ**; 4 phương thức có guard + `HuyDon` | `src/eCommerce.Domain/Entities/Orders/Order.cs` — `ChuyenThucHien`/`ChuyenDoiSoat`/`ChuyenKetThuc`/`HuyDon`/`DatTrangThaiThanhToan` |
+| **`OrderStatusHistory`** (append-only, 15 cột) | `src/eCommerce.Domain/Entities/Orders/OrderStatusHistory.cs` + bảng `OrdStatusHistory` |
+| **Mã lỗi** `eCommerce:Order:0001…0008` | `src/eCommerce.Domain.Shared/Orders/OrderErrorCodes.cs` (khai một nơi; `0007` ánh xạ `ViPhamRangBuocDb`) |
+| **Migration 42** + backfill + `NULLS NOT DISTINCT` | `src/eCommerce.EntityFrameworkCore/Migrations/20261024021355_Sal003_OrderStateMachine_History.cs` — 9 cột + 1 bảng + 4 index tra cứu + 1 `CHECK` + backfill sinh lịch sử `BackfillMigration` |
+| **`schema.sql`** + `NND 53 → 54` | `test/eCommerce.IntegrationTests/Assets/schema.sql` (thêm 116 dòng) · `PostgreSqlSchemaTests.F1_du_54_...` |
+| **Nối vào đường đang chạy** | `DonHangAppService`: `XacNhanAsync` → `ChuyenThucHien(Confirmed)`; `HuyDonAsync` → `HuyDon`; `TraHangAsync` → `ChuyenKetThuc(Returned)` khi trả hết · `DatTrangThaiThanhToan` ghi lịch sử trục 2 |
+| **ETO trong cùng UoW** | `OrderStatusChangedEto` (Domain, gắn `INotificationEvent`) + `AddDistributedEvent` trong `Order.Chuyen` ⇒ outbox `XC-002` §17; test `Moi_lan_chuyen__dang_ky_DUNG_MOT_ETO_trong_cung_transaction` |
+| **API + 6 permission** | `IOrderStatusAppService`/`OrderStatusAppService` — 6 method, mỗi method **một permission** (`StatusChange`/`Reconciliation.Manage`/`Return.Request`/`Return.Approve`/`Cancel`/`History.View`); **KHÔNG** có `ChangePaymentStatus` (BR-013). 🚨 Đo HTTP thật: chuyển `Pending→Confirmed` **200** · version lệch **403 `0003`** · nhảy cóc **403 `0001`** · history `totalCount = 1` · quyền seed **62 → 68** |
+| **Chống ghi đè** | `Order.RowVersion` (`bigint`, concurrency token) + `LuuAsync`/`LuuDonAsync` map `DbUpdateConcurrencyException` ⇒ `0002`; test `OrderRowVersionModelTests` + ca tăng/không-tăng trong `OrderStateMachineTests` |
+| **UI 4 trục** | `/DonHang/ChiTiet`: bảng 4 trục + `RowVersion` + lịch sử; E2E `SAL-U1`/`SAL-U2` |
+| **Job quét + metric** | `OrderDerivedStatusScanWorker` (NFR-011) · `OrderStatusMetricHandler` (NFR-012) — đều đăng ký trong `eCommerceApplicationModule`; worker có log vô điều kiện + `RunOnStart` |
+| **Setting** | 3 setting trong `ChinhSachSettingDefinitionProvider`; `Orders.ReturnWindowDays` cưỡng chế ở `RequestReturnAsync` (`ChinhSach.DocSo` — giá trị lạ ⇒ mặc định 7 + Warning) |
+| **Test** | `test/eCommerce.Tests/Domain/OrderStateMachineTests.cs` — **36 ca** · `OrderStatusApiHopDongTests` — **8 ca** (cặp method ↔ permission, class `[Authorize]`, không có API ghi trục tài chính): mọi nhánh hợp lệ, **chiều ngược** (nhảy cốc/self/absorbing/thiếu lý do/thiếu `ActorId`), reflection chặn setter, payment giữ luật cũ |
+| **Đo lại** | unit **1422 → 1471** · E2E **133 → 135** · integration **71/71** · migration **41 → 44** (42 = state machine · 43 = outbox · 44 = RowVersion) · NND **53 → 54** · 2 `CHECK` mới vào danh sách trắng **có lý do** |
+
+### 16.2 CHƯA có (nợ có mã — đừng nói "SAL-003 xong")
+
+| # | Nợ | Vì sao chưa làm | Việc phải làm |
+|---|---|---|---|
+| 1 | **`RowVersion` + `UPDATE … WHERE`** (D5/BR-010) | ✅ **XONG 24/10/2026** | `Order.RowVersion` (`bigint`, tăng trong `Chuyen`) + `.IsConcurrencyToken()` ⇒ EF đưa **giá trị GỐC** vào `WHERE`; xung đột map **`eCommerce:Order:0002`** (cả `OrderStatusAppService` và `DonHangAppService`). Migration **44**. 📌 **L8**: dùng cột `bigint` do app quản lý thay `xid`/`xmin` — Npgsql 10 không còn helper `UseXminAsConcurrencyToken`, và shadow `xmin` sinh cột thật đụng cột hệ thống |
+| 2 | **`OrderStatusChangedEto` + outbox** (BR-017) | ✅ **XONG 24/10/2026** | `Order.Chuyen` gọi `AddDistributedEvent` ⇒ ABP ghi **cùng UoW** xuống `AbpEventOutbox` (`XC-002` §17), relay phát sau commit ≤2 s. Gắn `INotificationEvent` (dữ liệu đã ở `OrdStatusHistory`). Test `Moi_lan_chuyen__dang_ky_DUNG_MOT_ETO_trong_cung_transaction`. ⏳ **Còn**: **người nhận** (`NOT-*`/`CHN-*`) — hiện chưa ai consume |
+| 3 | **6 permission + API chuyển trạng thái** (§9) | ✅ **XONG 24/10/2026** | 6 permission + 6 method (`OrderStatusAppService`), seed **62 → 68**; route thật ghi ở §6.2 (**L7**) |
+| 4 | **3 setting** `Orders.MaxDeliveryAttempts` / `Orders.ReturnWindowDays` / `Orders.MaxPaymentAttempts` | ✅ **XONG 24/10/2026** | Khai trong `ChinhSachSettingDefinitionProvider` (mặc định 3 / 7 / 3). 🔒 `ReturnWindowDays` **đang cưỡng chế thật** ở `RequestReturnAsync` (guard: đã `Delivered` + trong cửa sổ, quá hạn ⇒ `0001`). 📌 Hai setting còn lại **mới khai báo** — bộ đếm số lần giao/thanh toán thuộc `SHP-002`/`PAY-001` (GĐ2) |
+| 5 | **Job quét `DerivedStatus`** (NFR-011) | ✅ **XONG 24/10/2026** | `OrderDerivedStatusScanWorker` — 24 h, `RunOnStart`, khoá phân tán, **chỉ ĐỌC**; dùng **chung** hàm thuần `OrderStateMachine.TinhTrangThaiSuyRa`. 7 ca theory cho hàm suy ra |
+| 6 | **Metric** `sales_order_transition_total` (NFR-012) | ✅ **XONG 24/10/2026** | `OrderStatusMetricHandler` nghe `OrderStatusChangedEto` ⇒ phủ **mọi** đường chuyển (API/IPN/webhook/job); nhãn `axis`/`from`/`to` hữu hạn; `XC-005` §5.1 nay **12/16** có nơi phát |
+| 7 | **UI 4 trục** (§10) | ✅ **XONG 24/10/2026** | `/DonHang/ChiTiet` thêm **bảng 4 trục** (giá trị + version theo trục + `RowVersion`) và **lịch sử trạng thái** (bảng, mới nhất trước); kiểm quyền `History.View` **trước** khi gọi (không có quyền ⇒ trang vẫn xem được, chỉ ẩn khối lịch sử). Đo HTML thật: `SAL-U1`/`SAL-U2` (E2E **133 → 135**) |
+
+### 16.3 Lệch có chủ ý so với §3 (ghi để không sửa một bên mà quên bên kia)
+
+| # | Lệch | Lý do | Ai chịu ảnh hưởng |
+|---|---|---|---|
+| **L1** | **Trục tài chính giữ luật CŨ**: trước khi có tiền (`Unpaid`/`Pending`/`Failed`) đi được **mọi hướng**, gồm `Failed → Paid` | ① đã có **test + hành vi đang chạy** (`OrderTrangThaiThanhToanTests`); ② là **lưới an toàn `querydr`** khi IPN mất — bỏ nó là **mất tiền đã thu** | §3 bảng cạnh 11–18 **chặt hơn**; nếu `PAY-001` đổi luật thì phải sửa **cả hai** |
+| **L2** | **Trục kết thúc có cạnh `Open → Returned`** | GĐ1 chưa có phiếu RMA (`SAL-006`); `TraHangAsync` hiện trả **toàn bộ** một đơn đã xác nhận | Khi `SAL-006` vào: đường này phải đi `ReturnRequested → ReturnApproved → Returned`; **xoá cạnh** đó và sửa `TraHangAsync` |
+| **L3** | **`ReturnStatus.Cancelled`** là một giá trị của trục 4 (+ cờ `IsCancelled` đồng bộ) | §3 mô tả `Open → Cancelled` nhưng enum không có giá trị `Cancelled`; thiếu nó thì **không có** giá trị `ToStatus` để ghi lịch sử (và `CHECK From <> To` sẽ chặn) | Không đổi hợp đồng nào; `IsCancelled` vẫn là cờ truy vấn |
+| **L4** | **`ReconciliationStatus` mặc định `AwaitingReconcile`** | `NotRequired` là **hấp thụ**; nếu mặc định nó thì trục 3 **không bao giờ** bắt đầu (đã tự phát hiện khi viết test) | §5.2 ghi "mặc định `AwaitingReconcile` cho đơn có tiền" — **khớp** |
+| **L5** | **`CorrelationId` = chuỗi rỗng khi caller không truyền** | `XC-005` chưa wire middleware ⇒ nếu bắt buộc non-empty thì **mọi** chuyển trạng thái sẽ nổ | NFR-006 chưa đạt; khi `XC-005` xong, truyền `ICorrelationIdProvider` vào app service |
+| **L6** | **Đơn đã kết thúc: trục 1/3/4 bị chặn, RIÊNG trục tài chính vẫn ghi được** | Tiền có thể về **sau** khi huỷ/trả (IPN muộn, chuyển khoản chậm, hoàn tiền sau trả hàng). Chặn trục tài chính = *"tiền đã vào mà sổ không biết"* — lỗi tệ nhất của miền thanh toán. Đơn **vẫn** `Cancelled`; việc hoàn tiền thuộc `SAL-006` | Test `Da_huy_nhung_TIEN_VAN_VE__truc_tai_chinh_VAN_ghi_duoc`; nếu ai "siết" guard toàn bộ ⇒ test **đỏ** |
+| **L7** | **Route API khác dự thảo §6.2**: `/api/app/order-status/change-fulfillment-status` … thay `/{orderId}/fulfillment` | ABP **conventional controller** đặt route theo **method name**; muốn route như dự thảo phải tự viết controller (mất auto-API + dễ lệch permission) | Đã ghi ở §6.2; client dùng route thật |
+| **L8** | **`RowVersion` là cột `bigint` do APP quản lý**, không phải `xid`/`xmin` hệ thống | Npgsql 10 **không còn** `UseXminAsConcurrencyToken`; shadow `xmin` khiến migration sinh **cột thật** đụng cột hệ thống. Cột app-managed là **tất định**, test được, EF vẫn dùng **giá trị gốc** trong `WHERE` | `Order.RowVersion` + `IsConcurrencyToken`; xung đột ⇒ `0002` (test `OrderRowVersionModelTests`) |
+
+### 16.4 Điều **KHÔNG** được nói
+
+- ❌ *"SAL-003 đã xong"* — §16.2 **đủ 7 hạng mục** — xem bảng trên.
+- ❌ *"Đã chống oversell"* — **không liên quan** feature này; xem `docs/audit-gd1.md` §6 (chưa có test đồng thời).
+- ✅ Được nói: *"Order đã có state machine 4 trục có guard, ném lỗi, ghi lịch sử; đường ghi cũ `SetStatus` đã bị xoá."*

@@ -1,8 +1,13 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Volo.Abp;
 using Volo.Abp.AuditLogging.EntityFrameworkCore;
 using Volo.Abp.BackgroundJobs.EntityFrameworkCore;
+using Volo.Abp.BackgroundWorkers;
 using Volo.Abp.EntityFrameworkCore;
+using Volo.Abp.EntityFrameworkCore.DistributedEvents;
 using Volo.Abp.EntityFrameworkCore.PostgreSql;
+using Volo.Abp.EventBus.Distributed;
 using Volo.Abp.FeatureManagement.EntityFrameworkCore;
 using Volo.Abp.Identity.EntityFrameworkCore;
 using Volo.Abp.Modularity;
@@ -62,5 +67,46 @@ public class eCommerceEntityFrameworkCoreModule : AbpModule
         {
             options.UseNpgsql();
         });
+
+        // ══════════════════════════════════════════════════════════════════════════════════════════════
+        // 🚨 **OUTBOX / INBOX — BẬT TƯỜNG MINH (`XC-002` D2, 24/10/2026).**
+        //
+        // 🔑 **VÌ SAO PHẢI BẬT TƯỜNG MINH:** nếu thiếu `Outboxes`, `AddToOutboxAsync` trả **false** và ABP
+        // **rơi im lặng** về *publish trực tiếp* — hệ thống chạy bình thường, test xanh, nhưng **không có**
+        // một dòng nào trong outbox ⇒ mất event khi process chết giữa lúc publish. 📌 Đây đúng loại lỗi
+        // *"có trên giấy, không có trong DB"* mà `S10` đã trả giá (4/15 metric).
+        //
+        // 🔒 `InboxProcessorFailurePolicy.Retry` — **CẤM** `RetryLater`/`Discard` (ABP sẽ
+        // `MarkAsDiscardAsync` + chỉ ghi log warning ⇒ event biến mất khỏi tầm quan sát).
+        // ══════════════════════════════════════════════════════════════════════════════════════════════
+        Configure<AbpDistributedEventBusOptions>(options =>
+        {
+            options.Outboxes.Configure(config => config.UseDbContext<eCommerceDbContext>());
+            options.Inboxes.Configure(config => config.UseDbContext<eCommerceDbContext>());
+        });
+
+        Configure<AbpEventBusBoxesOptions>(options =>
+        {
+            // 2 giây = mặc định ABP; ghi ra đây để **đọc được** (không phải giá trị ẩn).
+            // 🆕 `probe-outbox.ps1` (24/10/2026) cần **TẠM DỪNG relay** để tạo được một bản ghi outbox
+            // "chưa phát" rồi khẳng định: process chết ⇒ bản ghi **còn** ⇒ restart ⇒ **phát lại**. 📌 Núm
+            // cấu hình này chỉ để **kiểm chứng**, mặc định vẫn 2 s; production **không** được đặt lớn.
+            options.PeriodTimeSpan = TimeSpan.FromSeconds(
+                context.Services.GetConfiguration().GetValue("AbpEventBusBoxes:PeriodSeconds", 2));
+
+            options.InboxProcessorFailurePolicy = InboxProcessorFailurePolicy.Retry;
+            options.InboxProcessorMaxRetryCount = 10;
+            options.WaitTimeToDeleteProcessedInboxEvents = TimeSpan.FromHours(2);
+        });
+    }
+
+    /// <summary>
+    /// 🚨 **Đăng ký worker đếm outbox** (`XC-002` NFR-003 · `messaging_outbox_pending`).
+    /// 📌 Thiếu dòng này thì worker **không bao giờ chạy** mà **không có lỗi nào**
+    /// (`BackgroundWorkerCoCheTests` chặn bằng phép quét mã nguồn).
+    /// </summary>
+    public override async Task OnApplicationInitializationAsync(ApplicationInitializationContext context)
+    {
+        await context.AddBackgroundWorkerAsync<Workers.OutboxPendingWorker>();
     }
 }

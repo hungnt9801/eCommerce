@@ -1,6 +1,8 @@
 using eCommerce.Application.Contracts.Sales;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Volo.Abp.Application.Dtos;
+using Volo.Abp.Authorization.Permissions;
 
 namespace eCommerce.Web.Controllers;
 
@@ -20,10 +22,17 @@ namespace eCommerce.Web.Controllers;
 public class DonHangController : Controller
 {
     private readonly IDonHangAppService _donHang;
+    private readonly IOrderStatusAppService _trangThai;
+    private readonly IAuthorizationService _quyen;
 
-    public DonHangController(IDonHangAppService donHang)
+    public DonHangController(
+        IDonHangAppService donHang,
+        IOrderStatusAppService trangThai,
+        IAuthorizationService quyen)
     {
         _donHang = donHang;
+        _trangThai = trangThai;
+        _quyen = quyen;
     }
 
     /// <summary>`GET /DonHang/ChiTiet/{id}` — chi tiết đơn + hai nút. Đơn không tồn tại ⇒ **`404`** (ABP
@@ -32,6 +41,17 @@ public class DonHangController : Controller
     public async Task<IActionResult> ChiTiet(Guid id)
     {
         var don = await _donHang.GetAsync(id);
+
+        // 🆕 `SAL-003` #7 — **lịch sử trạng thái** trên UI. 🔒 Kiểm quyền **trước** khi gọi: người chỉ có
+        // quyền xem đơn (không có `History.View`) vẫn xem được trang, chỉ **không thấy** lịch sử
+        // — thay vì cả trang `403` vì một khối phụ.
+        var coQuyenLichSu = await _quyen.IsGrantedAsync(eCommerceConsts.Permissions.Orders.HistoryView);
+
+        ViewBag.CoQuyenLichSu = coQuyenLichSu;
+
+        ViewBag.LichSu = coQuyenLichSu
+            ? (await _trangThai.GetStatusHistoryAsync(id, new PagedResultRequestDto { MaxResultCount = 100 })).Items
+            : Array.Empty<OrderStatusHistoryDto>();
 
         return View(don);
     }

@@ -99,3 +99,10 @@ CK_SalMktEventLogs_PayloadHash_Hex|SAL-005 D7: `PayloadHash` phải là SHA-256 
 #    nên `23514` ở đây chỉ xảy ra với đường ghi TẮT (SQL tay / phát lại) ⇒ trả mã chung `eCommerce:Db:0001`
 #    là đúng: client không có hành động nghiệp vụ nào để làm khác.
 CK_ReconRuns_XacNhan_DuBo|S7: "xác nhận một nửa" (có `ConfirmedAtUtc` mà không có `ConfirmedByUserId`, hoặc thiếu `ConfirmNote`) là bằng chứng VÔ CHỦ — domain đã chặn; CHECK là hàng rào cuối cho đường ghi tắt, không có ca nào cần mã lỗi riêng
+
+# ── SAL-003 (24/10/2026) — STATE MACHINE ĐƠN HÀNG: entity `Order` (`OrdOrders`) + `OrderStatusHistory` (`OrdStatusHistory`) ──
+# 📌 CẢ 2 ràng buộc dưới đây là **BẤT BIẾN CẤU TRÚC**, KHÔNG phải ca nghiệp vụ cần mã lỗi riêng:
+#    người ghi duy nhất là entity `Order.Chuyen(...)` (đã tự chặn trước khi chạm DB và NÉM `eCommerce:Order:0001/0004/0006`),
+#    nên `23514` ở đây chỉ xảy ra với đường ghi TẮT (SQL tay / migration backfill) ⇒ trả mã chung `eCommerce:Db:0001` là đúng.
+CK_OrdOrders_StatusVersions_KhongAm|SAL-003: 4 bộ đếm `*Version` của 4 trục phải >= 0 — nếu âm thì mọi so sánh `VersionAfter` vô nghĩa và lịch sử không còn dùng được để phát hiện ghi trùng; domain chỉ tăng (+1), nên ca âm chỉ xảy ra với ghi tắt
+CK_OrdStatusHistory_From_Khac_To|SAL-003: một "chuyển dịch" mà `FromStatus = ToStatus` không phải chuyển dịch (mở đường cho lịch sử rác, làm `VersionAfter` nhảy vô nghĩa); domain đã NÉM `0001` cho self-transition trước khi chạm DB, CHECK là hàng rào cuối cho đường ghi tắt

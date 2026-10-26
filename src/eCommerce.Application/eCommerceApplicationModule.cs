@@ -34,7 +34,12 @@ namespace eCommerce;
     // 🚨 `SAL-005` — nơi nhận đơn sàn (`MarketplaceOrderIntakeHandler`) cần `IIdempotencyGuard`
     // của module Messaging (`XC-002`). Thiếu dòng này ⇒ handler không resolve được ⇒ đơn mất im lặng.
     typeof(Messaging.MessagingDomainModule),
-    typeof(Tax.TaxDomainModule)
+    typeof(Tax.TaxDomainModule),
+    // 🆕 `P0 #1` — module Catalog (Application + Contracts).
+    typeof(eCommerce.Catalog.CatalogApplicationModule),
+    typeof(eCommerce.Inventory.InventoryApplicationModule),
+    typeof(eCommerce.Reconciliation.ReconciliationApplicationModule),
+    typeof(eCommerce.Sales.SalesApplicationModule)
 )]
 [DependsOn(typeof(AbpAccountApplicationModule))]
     public class eCommerceApplicationModule : AbpModule
@@ -80,5 +85,9 @@ namespace eCommerce;
         // (phai BAM TAY) thanh co che TU CHAY: neu chi co endpoint thi **IPN mat** => giao dich ket `Pending`
         // => 🔑 **tien da vao ma he thong khong biet** cho toi khi **tinh co** co nguoi bam.
         await context.AddBackgroundWorkerAsync<eCommerce.Application.PaymentHub.PaymentReconciliationWorker>();
+
+        // 🚨 `SAL-003` **NFR-011** — **JOB QUÉT `DerivedStatus`** hằng ngày. 📌 Bắt buộc đăng ký: thiếu dòng
+        // này thì worker **KHÔNG BAO GIỜ CHẠY** mà không có lỗi nào (`BackgroundWorkerCoCheTests` chặn).
+        await context.AddBackgroundWorkerAsync<eCommerce.Application.Sales.OrderDerivedStatusScanWorker>();
     }
 }

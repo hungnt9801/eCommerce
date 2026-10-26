@@ -382,6 +382,84 @@ namespace eCommerce.Migrations
                     b.ToTable("AbpBackgroundJobs", (string)null);
                 });
 
+            modelBuilder.Entity("Volo.Abp.EntityFrameworkCore.DistributedEvents.IncomingEventRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<byte[]>("EventData")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.Property<string>("EventName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("ExtraProperties")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("ExtraProperties");
+
+                    b.Property<DateTime?>("HandledTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("MessageId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("NextRetryTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("RetryCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MessageId");
+
+                    b.HasIndex("Status", "CreationTime");
+
+                    b.ToTable("AbpEventInbox", (string)null);
+                });
+
+            modelBuilder.Entity("Volo.Abp.EntityFrameworkCore.DistributedEvents.OutgoingEventRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<byte[]>("EventData")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.Property<string>("EventName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("ExtraProperties")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("ExtraProperties");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreationTime");
+
+                    b.ToTable("AbpEventOutbox", (string)null);
+                });
+
             modelBuilder.Entity("Volo.Abp.FeatureManagement.FeatureDefinitionRecord", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4979,6 +5057,9 @@ namespace eCommerce.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
+                    b.Property<long>("ClosureVersion")
+                        .HasColumnType("bigint");
+
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .IsRequired()
@@ -5023,9 +5104,18 @@ namespace eCommerce.Migrations
                         .HasColumnType("text")
                         .HasColumnName("ExtraProperties");
 
+                    b.Property<int>("FulfillmentStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("FulfillmentVersion")
+                        .HasColumnType("bigint");
+
                     b.Property<decimal>("GrandTotal")
                         .HasPrecision(18, 4)
                         .HasColumnType("numeric(18,4)");
+
+                    b.Property<bool>("IsCancelled")
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
@@ -5052,6 +5142,22 @@ namespace eCommerce.Migrations
 
                     b.Property<int>("PaymentStatus")
                         .HasColumnType("integer");
+
+                    b.Property<long>("PaymentVersion")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("ReconciliationStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("ReconciliationVersion")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("ReturnStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("RowVersion")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
 
                     b.Property<decimal>("ShippingTotal")
                         .HasPrecision(18, 4)
@@ -5086,7 +5192,22 @@ namespace eCommerce.Migrations
                         .IsUnique()
                         .HasFilter("\"ExternalOrderId\" IS NOT NULL");
 
-                    b.ToTable("OrdOrders", (string)null);
+                    b.HasIndex("TenantId", "FulfillmentStatus", "CreationTime")
+                        .HasDatabaseName("IX_OrdOrders_TenantId_FulfillmentStatus_CreationTime");
+
+                    b.HasIndex("TenantId", "PaymentStatus", "CreationTime")
+                        .HasDatabaseName("IX_OrdOrders_TenantId_PaymentStatus_CreationTime");
+
+                    b.HasIndex("TenantId", "ReconciliationStatus", "CreationTime")
+                        .HasDatabaseName("IX_OrdOrders_TenantId_ReconciliationStatus_CreationTime");
+
+                    b.HasIndex("TenantId", "ReturnStatus", "CreationTime")
+                        .HasDatabaseName("IX_OrdOrders_TenantId_ReturnStatus_CreationTime");
+
+                    b.ToTable("OrdOrders", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_OrdOrders_StatusVersions_KhongAm", "\"FulfillmentVersion\" >= 0 AND \"PaymentVersion\" >= 0 AND \"ReconciliationVersion\" >= 0 AND \"ClosureVersion\" >= 0 AND \"RowVersion\" >= 0");
+                        });
                 });
 
             modelBuilder.Entity("eCommerce.Orders.OrderLine", b =>
@@ -5165,6 +5286,113 @@ namespace eCommerce.Migrations
                         .HasFilter("\"ExternalLineId\" IS NOT NULL");
 
                     b.ToTable("OrdOrderLines", (string)null);
+                });
+
+            modelBuilder.Entity("eCommerce.Orders.OrderStatusHistory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ActorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ActorType")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<string>("Axis")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<Guid?>("DeleterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("DeleterId");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("DeletionTime");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("FromStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("IsDeleted");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ReasonCode")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ReasonText")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.Property<int>("ToStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("VersionAfter")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderId");
+
+                    b.HasIndex("TenantId", "ActorType", "OccurredAtUtc")
+                        .HasDatabaseName("IX_OrdStatusHistory_TenantId_ActorType_OccurredAtUtc");
+
+                    b.HasIndex("TenantId", "Axis", "OccurredAtUtc")
+                        .HasDatabaseName("IX_OrdStatusHistory_TenantId_Axis_OccurredAtUtc");
+
+                    b.HasIndex("TenantId", "OrderId", "OccurredAtUtc")
+                        .HasDatabaseName("IX_OrdStatusHistory_TenantId_OrderId_OccurredAtUtc");
+
+                    b.HasIndex("TenantId", "OrderId", "Axis", "VersionAfter")
+                        .IsUnique()
+                        .HasDatabaseName("IX_OrdStatusHistory_TenantId_OrderId_Axis_VersionAfter");
+
+                    b.ToTable("OrdStatusHistory", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_OrdStatusHistory_From_Khac_To", "\"FromStatus\" <> \"ToStatus\"");
+                        });
                 });
 
             modelBuilder.Entity("eCommerce.PaymentHub.Payments.PaymentRefund", b =>
@@ -6447,7 +6675,7 @@ namespace eCommerce.Migrations
 
                             b1.HasKey("IdentityUserPasskeyCredentialId");
 
-                            b1.ToTable("AbpUserPasskeys");
+                            b1.ToTable("AbpUserPasskeys", (string)null);
 
                             b1
                                 .ToJson("Data")
@@ -6661,6 +6889,15 @@ namespace eCommerce.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("eCommerce.Orders.OrderStatusHistory", b =>
+                {
+                    b.HasOne("eCommerce.Orders.Order", null)
+                        .WithMany("StatusHistory")
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("eCommerce.Pricing.PriceListItem", b =>
                 {
                     b.HasOne("eCommerce.Pricing.PriceList", null)
@@ -6726,6 +6963,8 @@ namespace eCommerce.Migrations
             modelBuilder.Entity("eCommerce.Orders.Order", b =>
                 {
                     b.Navigation("Lines");
+
+                    b.Navigation("StatusHistory");
                 });
 #pragma warning restore 612, 618
         }

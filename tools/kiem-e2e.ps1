@@ -1682,12 +1682,36 @@ select "PaymentStatus"::text from "OrdOrders" where "Number" = '{0}';
             # 🔑 `PaymentStatus = 5` (Failed) la **thiet ke dung** cua cau noi: cong bao that bai ⇒ don sang
             # `Failed`, **khong** phai `Paid`. 📌 `Unpaid (0)` moi la con so SAI o day — va do chinh la dieu
             # ban dau toi ky vong (doan, khong doc `LuatCauNoiThanhToan`) ⇒ ca kiem do **vi phep do sai**.
-            $thanhToanDon2 = (@(Invoke-Psql -Sql ($sqlThanhToanDon -f 'WEB-K97E2E-P2')) -join '').Trim()
+            #
+            # ⏱️ **24/10/2026 — OUTBOX (P0 #3):** cau noi nay di qua `IDistributedEventBus` **có outbox**
+            # (`XC-002` D1) ⇒ handler chạy **SAU commit**, do `OutboxSender` relay (nhịp 2 s). 📌 Đọc DB ngay
+            # sau HTTP là **đọc trước khi event được phát** ⇒ `0 (Unpaid)` — đúng lỗi `S8-P14` gặp đầu tiên.
+            # ✅ Cách đúng: **hỏi DB có hạn** như `S8-P10` (đã làm từ trước) — không ngủ mù, không nới điều kiện.
+            $thanhToanDon2 = ''
+            for ($i = 0; $i -lt 25; $i++) {
+                $thanhToanDon2 = (@(Invoke-Psql -Sql ($sqlThanhToanDon -f 'WEB-K97E2E-P2')) -join '').Trim()
+                if ($thanhToanDon2 -eq '5') { break }
+                Start-Sleep -Milliseconds 200
+            }
 
             Kq 'S8-P14 cổng báo THẤT BẠI => đơn sang Failed (5), KHÔNG phải Paid (2)' `
                 ($thanhToanDon2 -eq '5') ("PaymentStatus = " + $thanhToanDon2 + " (mong doi 5 = Failed)")
         }
     }
+
+    # ── ⑥b `SAL-003` #7 — UI 4 TRỤC + LỊCH SỬ (`/DonHang/ChiTiet`) ─────────────────────────────
+    # 🔑 VÌ SAO PHẢI ĐO HTML: `OrderStatusAppService` có unit test, nhưng *"trang có hiện 4 trục"* là
+    # chuyện khác — Razor sai tên property / thiếu `using` thì **unit test không thấy** (bài học `web-001` #1).
+    $idDonUi = 'e0000000-0000-0000-0000-0000000000e2'
+    $htmlDonUi = GiaiMaHtml (TaiTrang -DuongDan ('/DonHang/ChiTiet/' + $idDonUi) -TepLuu (Join-Path $thuMucTam 'donhang-chitiet.html')).Html
+
+    Kq 'SAL-U1 🚨 trang chi tiết đơn có BẢNG 4 TRỤC (trạng thái suy ra, không sửa tay)' `
+        (($htmlDonUi -match 'id="bang-truc"') -and ($htmlDonUi -match 'id="truc-thuc-hien"') -and ($htmlDonUi -match 'id="trang-thai-suy-ra"')) `
+        'co bang-truc + truc-thuc-hien + trang-thai-suy-ra'
+
+    Kq 'SAL-U2 🚨 lịch sử trạng thái render (bảng hoặc thông báo rỗng)' `
+        (($htmlDonUi -match 'id="bang-lich-su"') -or ($htmlDonUi -match 'id="lich-su-rong"') -or ($htmlDonUi -match 'id="lich-su-khong-quyen"')) `
+        'co khoi lich su'
 
     # ── ⑦ TONG KET ──────────────────────────────────────────────────────────────────────────
     $soDat = @($ketQua | Where-Object { $_.Dat }).Count

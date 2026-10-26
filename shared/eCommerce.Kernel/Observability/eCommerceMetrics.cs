@@ -35,6 +35,16 @@ public static class eCommerceMetricNames
     // ---- Nghiệp vụ thuế (XC-006) ----
     public const string TaxUnclassifiedSkus = "tax_unclassified_skus";
 
+    // ---- Nghiệp vụ ĐƠN HÀNG (`SAL-003` NFR-012, 24/10/2026) ----
+    /// <summary>
+    /// **SỐ LẦN CHUYỂN TRẠNG THÁI ĐƠN** — nhãn `axis`/`from`/`to` (giá trị **hữu hạn**: 4 trục × ~10 giá trị).
+    ///
+    /// 🔑 **VÌ SAO PHẢI CÓ:** `SAL-003` NFR-012 yêu cầu *"mọi chuyển trạng thái có metric"*. 📌 Không có nó thì
+    /// câu hỏi vận hành *"đơn bị kẹt ở bước nào"* chỉ trả lời được bằng cách quét `OrdStatusHistory` — chậm và
+    /// không vẽ được biểu đồ. 🚨 **CẤM** gắn nhãn `orderId` (`XC-005` BR-009 — cardinality cao).
+    /// </summary>
+    public const string SalesOrderTransitionTotal = "sales_order_transition_total";
+
     // ---- Nghiệp vụ THANH TOÁN / đối soát (`REC-001` mục 7, 17/10/2026) ----
     /// <summary>
     /// 🚨 **SỐ GIAO DỊCH ĐỐI SOÁT MÀ CỔNG KHÔNG XÁC NHẬN ĐƯỢC** — `Pending`/lỗi hạ tầng/**cổng chưa cấu hình**.
@@ -91,7 +101,9 @@ public static class eCommerceMetricNames
         TaxUnclassifiedSkus,
         PaymentReconUnresolved,
         PaymentReconChangedTotal,
-        LoggingFailuresTotal
+        LoggingFailuresTotal,
+        // 🆕 `SAL-003` NFR-012 (24/10/2026)
+        SalesOrderTransitionTotal
     ];
 
     /// <summary>
@@ -136,7 +148,8 @@ public static class eCommerceMetricNames
             [TaxUnclassifiedSkus] = nameof(eCommerceMetrics.SetTaxUnclassifiedSkus),
             [PaymentReconUnresolved] = nameof(eCommerceMetrics.SetPaymentReconUnresolved),
             [PaymentReconChangedTotal] = nameof(eCommerceMetrics.PaymentReconChanged),
-            [LoggingFailuresTotal] = nameof(eCommerceMetrics.LoggingFailures)
+            [LoggingFailuresTotal] = nameof(eCommerceMetrics.LoggingFailures),
+            [SalesOrderTransitionTotal] = nameof(eCommerceMetrics.SalesOrderTransition)
         };
 
     /// <summary>
@@ -155,11 +168,9 @@ public static class eCommerceMetricNames
     public static readonly IReadOnlyDictionary<string, string> ChuaCoNoiPhat =
         new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            [MessagingOutboxPending] =
-                "CAN HA TANG: chua co outbox/relay. Su kien hien di in-process (ABP local event bus), "
-                + "khong co bang outbox nao de dem ⇒ moi con so se la BIA. Cho `XC-002` (outbox + relay): "
-                + "relay dem so ban ghi ton dong roi goi `SetMessagingOutboxPending`.",
-
+            // 📌 `MessagingOutboxPending` **ĐÃ ĐÓNG NỢ 24/10/2026** — outbox có thật (`XC-002` §17) và
+            // `OutboxPendingWorker` (project EF) đếm + gọi `SetMessagingOutboxPending` mỗi 60 s.
+            // 🔒 Không được thêm lại vào đây: `MetricEmitterTests` sẽ **đỏ** vì đã có lời gọi thật.
             [MessagingDlqReplayedTotal] =
                 "CAN TINH NANG: DLQ co chu y KHONG co phat lai TU DONG (`DeadLetterAppService` chi doc + "
                 + "danh dau). Danh dau 'da xu ly' KHONG phai 'da phat lai' ⇒ phat metric nay luc danh dau la "
@@ -195,9 +206,19 @@ public static class eCommerceMetricTags
     public const string Method = "method";
     public const string Route = "route";
 
+    /// <summary>`SAL-003` NFR-012 — nhãn **trục** (`Fulfillment`/`Payment`/`Reconciliation`/`Closure`).</summary>
+    public const string Axis = "axis";
+
+    /// <summary>`SAL-003` NFR-012 — trạng thái **trước** (số enum của trục; hữu hạn).</summary>
+    public const string FromStatus = "from";
+
+    /// <summary>`SAL-003` NFR-012 — trạng thái **sau** (số enum của trục; hữu hạn).</summary>
+    public const string ToStatus = "to";
+
     public static readonly IReadOnlyList<string> Allowed =
     [
-        Channel, Provider, EventName, Status, Reason, Kind, Module, Result, Method, Route
+        Channel, Provider, EventName, Status, Reason, Kind, Module, Result, Method, Route,
+        Axis, FromStatus, ToStatus
     ];
 
     /// <summary>Nhãn **BỊ CẤM** vì cardinality cao — test `TC-07` chặn nếu chúng lọt vào danh sách cho phép.</summary>
@@ -237,6 +258,9 @@ public sealed class eCommerceMetrics : ISingletonDependency
 
     /// <summary>`REC-001` mục 7 — số lần lượt đối soát **đổi** trạng thái giao dịch (nhãn `result`).</summary>
     public Counter<long> PaymentReconChanged { get; }
+
+    /// <summary>`SAL-003` NFR-012 — số lần chuyển trạng thái đơn, nhãn `axis`/`from`/`to`.</summary>
+    public Counter<long> SalesOrderTransition { get; }
 
     // ---- Histogram ----
     public Histogram<double> HttpRequestDurationSeconds { get; }
@@ -292,6 +316,9 @@ public sealed class eCommerceMetrics : ISingletonDependency
             unit: "{failure}", description: "Ghi log thất bại (logger/sink hỏng) — log là best-effort.");
         PaymentReconChanged = _meter.CreateCounter<long>(eCommerceMetricNames.PaymentReconChangedTotal,
             unit: "{transaction}", description: "Số lần đối soát thanh toán ĐỔI trạng thái giao dịch (REC-001).");
+        SalesOrderTransition = _meter.CreateCounter<long>(eCommerceMetricNames.SalesOrderTransitionTotal,
+            unit: "{transition}",
+            description: "Số lần chuyển trạng thái đơn (SAL-003 NFR-012) — nhãn axis/from/to, CẤM orderId.");
 
         HttpRequestDurationSeconds = _meter.CreateHistogram<double>(eCommerceMetricNames.HttpRequestDurationSeconds,
             unit: "s", description: "Độ trễ xử lý request HTTP.");

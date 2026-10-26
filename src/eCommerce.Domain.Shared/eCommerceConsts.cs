@@ -81,6 +81,17 @@ public static class eCommerceConsts
         {
             public const string Default = GroupName + ".Orders";
             public const string Manage = Default + ".Manage";
+
+            // 🆕 `SAL-003` §9 (24/10/2026) — 6 quyền của **state machine đơn hàng**.
+            // 🚨 BẮT BUỘC khai ở **CẢ HAI NƠI** (hằng số + `eCommercePermissionDefinitionProvider`):
+            // thiếu một nơi ⇒ `403` cho MỌI người kể cả `admin` (lỗi Phase 0, `XC-004` D2/E3).
+            // 📌 Tách theo **trục + hành động**: đổi trạng thái thực hiện ≠ đối soát ≠ duyệt trả ≠ huỷ.
+            public const string StatusChange = Default + ".StatusChange";
+            public const string ReconcileManage = Default + ".Reconciliation.Manage";
+            public const string ReturnRequest = Default + ".Return.Request";
+            public const string ReturnApprove = Default + ".Return.Approve";
+            public const string Cancel = Default + ".Cancel";
+            public const string HistoryView = Default + ".History.View";
         }
 
         public static class Payments

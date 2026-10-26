@@ -26,6 +26,20 @@
          `IChannelDirectory` (hợp đồng **đã** ở `Application.Contracts` nên **không** phải sửa chỗ gọi).
          📌 Ghi ở đây để người sau biết đây là **đánh đổi có ý thức**, không phải sơ suất. -->
     <ProjectReference Include="..\..\modules\ChannelHub\eCommerce.ChannelHub.EntityFrameworkCore\eCommerce.ChannelHub.EntityFrameworkCore.csproj" />
+    <!-- 🆕 `P0 #1` (24/10/2026) — module `Catalog` (Application + Contracts). 📌 `ChannelDirectory` (hiện thực
+         `IChannelDirectory`) **ở lại host** vì nó cần entity `Channel` của ChannelHub; module Catalog chỉ
+         thấy **hợp đồng** (trong `Catalog.Application.Contracts`) ⇒ không phụ thuộc host/ChannelHub. -->
+    <ProjectReference Include="..\..\modules\Catalog\eCommerce.Catalog.Application\eCommerce.Catalog.Application.csproj" />
+    <ProjectReference Include="..\..\modules\Catalog\eCommerce.Catalog.Application.Contracts\eCommerce.Catalog.Application.Contracts.csproj" />
+    <!-- 🆕 `P0 #1` — module Inventory (Application + Contracts). -->
+    <ProjectReference Include="..\..\modules\Inventory\eCommerce.Inventory.Application\eCommerce.Inventory.Application.csproj" />
+    <ProjectReference Include="..\..\modules\Inventory\eCommerce.Inventory.Application.Contracts\eCommerce.Inventory.Application.Contracts.csproj" />
+    <!-- 🆕 `P0 #1` — module Reconciliation (Application + Contracts). -->
+    <ProjectReference Include="..\..\modules\Reconciliation\eCommerce.Reconciliation.Application\eCommerce.Reconciliation.Application.csproj" />
+    <ProjectReference Include="..\..\modules\Reconciliation\eCommerce.Reconciliation.Application.Contracts\eCommerce.Reconciliation.Application.Contracts.csproj" />
+    <!-- 🆕 `P0 #1` — module Sales (Application + Contracts). -->
+    <ProjectReference Include="..\..\modules\Sales\eCommerce.Sales.Application\eCommerce.Sales.Application.csproj" />
+    <ProjectReference Include="..\..\modules\Sales\eCommerce.Sales.Application.Contracts\eCommerce.Sales.Application.Contracts.csproj" />
     <!-- 🚨 `SAL-005` — nơi nhận đơn sàn dùng `IIdempotencyGuard` của module Messaging (`XC-002`).
          app → module là HỢP LỆ (module → app mới bị cấm). -->
     <ProjectReference Include="..\..\modules\Messaging\eCommerce.Messaging.Domain\eCommerce.Messaging.Domain.csproj" />

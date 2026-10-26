@@ -11,6 +11,30 @@
     <Project Path="modules/Customers/eCommerce.Customers.Application.Contracts/eCommerce.Customers.Application.Contracts.csproj" />
     <Project Path="modules/Customers/eCommerce.Customers.Domain/eCommerce.Customers.Domain.csproj" />
     <Project Path="modules/Customers/eCommerce.Customers.EntityFrameworkCore/eCommerce.Customers.EntityFrameworkCore.csproj" />
+  </Folder>
+  <Folder Name="/modules/Sales/">
+    <Project Path="modules/Sales/eCommerce.Sales.Application/eCommerce.Sales.Application.csproj" />
+    <Project Path="modules/Sales/eCommerce.Sales.Application.Contracts/eCommerce.Sales.Application.Contracts.csproj" />
+    <Project Path="modules/Sales/eCommerce.Sales.Domain/eCommerce.Sales.Domain.csproj" />
+    <Project Path="modules/Sales/eCommerce.Sales.EntityFrameworkCore/eCommerce.Sales.EntityFrameworkCore.csproj" />
+  </Folder>
+  <Folder Name="/modules/Reconciliation/">
+    <Project Path="modules/Reconciliation/eCommerce.Reconciliation.Application/eCommerce.Reconciliation.Application.csproj" />
+    <Project Path="modules/Reconciliation/eCommerce.Reconciliation.Application.Contracts/eCommerce.Reconciliation.Application.Contracts.csproj" />
+    <Project Path="modules/Reconciliation/eCommerce.Reconciliation.Domain/eCommerce.Reconciliation.Domain.csproj" />
+    <Project Path="modules/Reconciliation/eCommerce.Reconciliation.EntityFrameworkCore/eCommerce.Reconciliation.EntityFrameworkCore.csproj" />
+  </Folder>
+  <Folder Name="/modules/Inventory/">
+    <Project Path="modules/Inventory/eCommerce.Inventory.Application/eCommerce.Inventory.Application.csproj" />
+    <Project Path="modules/Inventory/eCommerce.Inventory.Application.Contracts/eCommerce.Inventory.Application.Contracts.csproj" />
+    <Project Path="modules/Inventory/eCommerce.Inventory.Domain/eCommerce.Inventory.Domain.csproj" />
+    <Project Path="modules/Inventory/eCommerce.Inventory.EntityFrameworkCore/eCommerce.Inventory.EntityFrameworkCore.csproj" />
+  </Folder>
+  <Folder Name="/modules/Catalog/">
+    <Project Path="modules/Catalog/eCommerce.Catalog.Application/eCommerce.Catalog.Application.csproj" />
+    <Project Path="modules/Catalog/eCommerce.Catalog.Application.Contracts/eCommerce.Catalog.Application.Contracts.csproj" />
+    <Project Path="modules/Catalog/eCommerce.Catalog.Domain/eCommerce.Catalog.Domain.csproj" />
+    <Project Path="modules/Catalog/eCommerce.Catalog.EntityFrameworkCore/eCommerce.Catalog.EntityFrameworkCore.csproj" />
   </Folder>  <Folder Name="/modules/ChannelHub/">
     <Project Path="modules/ChannelHub/eCommerce.ChannelHub.Application.Contracts/eCommerce.ChannelHub.Application.Contracts.csproj" />
     <Project Path="modules/ChannelHub/eCommerce.ChannelHub.Application/eCommerce.ChannelHub.Application.csproj" />

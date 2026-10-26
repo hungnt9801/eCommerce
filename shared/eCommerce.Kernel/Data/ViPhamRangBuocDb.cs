@@ -58,6 +58,15 @@ public static class ViPhamRangBuocDb
             new("eCommerce:Orders:0002",
                 "Đã có ĐƠN cho lần checkout này rồi ⇒ không tạo đơn thứ hai.", true),
 
+        // ── ĐƠN HÀNG: NHẬT KÝ TRẠNG THÁI (`SAL-003`, 24/10/2026) ────────────────────────────────
+        // 📌 Ràng buộc này là **hàng rào CUỐI** cho bất biến *"mỗi phiên bản của một trục chỉ có ĐÚNG MỘT
+        // dòng lịch sử"*. Nếu nó nổ thì tầng ứng dụng đã sai (race/retry) ⇒ **không** được coi là thành công:
+        // trả `eCommerce:Order:0007` để cả transaction **rollback** (không có "trạng thái đã đổi mà thiếu
+        // lịch sử"), và người vận hành tra được ngay qua tên ràng buộc.
+        ["IX_OrdStatusHistory_TenantId_OrderId_Axis_VersionAfter"] =
+            new("eCommerce:Order:0007",
+                "Không ghi được NHẬT KÝ trạng thái (đã có dòng cho cùng phiên bản trục) ⇒ thao tác bị huỷ, KHÔNG có chuyển trạng thái nào được ghi.", true),
+
         // ── KHO: giữ chỗ (`INV-002`) ─────────────────────────────────────────────────────────────
         ["IX_InvStockReservations_TenantId_Ref_Sku_Kho"] =
             new("eCommerce:Inventory:0032",

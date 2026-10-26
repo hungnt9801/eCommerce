@@ -969,3 +969,43 @@ cùng đơn, cùng `update_time`). Nhịp supervisor = `3600` ⇒ **không** có
 **Bài học** | 📌 *"đã định nghĩa"* và *"đã cấp"* là **hai** chuyện khác nhau. 🔑 Và triệu chứng của cả hai **giống hệt nhau**: `403`. ⇒ Luôn in **số dòng** của `AbpPermissionGrants` **trước** khi kết luận về code |
 
 📌 **Cùng họ với `S6-1`:** cả hai đều là *"phép đo của tôi nói sai về sản phẩm"* — không phải sản phẩm sai.
+
+---
+
+## K. 🆕 `probe-oversell.ps1` — HAI REQUEST ĐỒNG THỜI (24/10/2026, GĐ1 #2)
+
+**Vì sao có:** cổng nghiệm thu GĐ1 #2 đòi *"bán vượt tồn kho là không thể — test **2 request đồng thời**"*.
+Trước 24/10/2026 `grep 'Task.WhenAll|Parallel\.|Start-Job' test/ tools/` = **0** ⇒ tuyên bố đó **chưa từng được đo**.
+
+**Cách đo:** seed `InvItems.OnHand = 1`, bắn **hai** `POST /api/app/checkout/tinh-va-giu-cho` **cùng lúc**
+(`HttpClient.PostAsync` ×2 rồi `Task.WhenAll` — **không** `Start-Job`), khác `IdempotencyKey`, rồi đọc DB.
+
+**Bất biến khẳng định:**
+1. đúng **MỘT** request `200`; request kia bị chặn bằng **mã nghiệp vụ** (không `5xx`);
+2. `InvStockReservations` của SKU = **1** — 🔑 nếu khoá phân tán bị gỡ, **hai** lượt giữ chỗ vẫn được tạo
+   (hai nguồn `Checkout:K9OV-A`/`-B` khác nhau), và ca này **ĐỎ**;
+3. `Reserved <= OnHand`, `Available = 0`.
+
+**Giới hạn đã biết (đừng nói quá):** probe chạy **một** Host ⇒ chứng minh khoá hoạt động **giữa hai request**,
+**chưa** chứng minh **hai instance** (2 process + Redis). Việc đó vẫn là nợ riêng (`audit-gd1.md` §12.1 bước 4).
+
+**Bẫy đã gặp:** `PrcPriceCalculationRecords` dùng cột `IdempotencyKey` (không phải `TuKhoa`/`TinhLuc`) — dọn probe
+phải xoá theo `IdempotencyKey like 'K9OV-%'`, nếu không lần chạy sau **trả kết quả cũ** và mọi ca **xanh vì lý do sai**.
+
+---
+
+## L. 🆕 `probe-outbox.ps1` — PROCESS CHẾT ⇒ EVENT CÒN ⇒ RESTART PHÁT LẠI (24/10/2026, GĐ1 #5)
+
+**Vì sao có:** cổng #5 *"không mất event"*. Có bảng outbox **chưa đủ** — phải đo đúng kịch bản commit-rồi-chết.
+
+**Cách đo:** bật Host với `AbpEventBusBoxes__PeriodSeconds=600` (relay **không** phát) ⇒ gọi API chuyển trạng
+thái (event ghi outbox cùng transaction) ⇒ **giết Host** ⇒ `AbpEventOutbox` **vẫn còn dòng** ⇒ bật lại Host nhịp
+2 s ⇒ outbox **về 0** + `AbpEventInbox` **tăng** ⇒ 9/9 ca. 📌 Đây là **phát lại thật**, không chỉ "không bị xoá".
+
+**Núm cấu hình:** `AbpEventBusBoxes:PeriodSeconds` (env `AbpEventBusBoxes__PeriodSeconds`) — **chỉ để kiểm chứng**;
+mặc định 2 s. ⚠️ Production **không** được đặt lớn (relay chậm = event đến muộn).
+
+**Giới hạn:** một Host; biến thể **2 instance** (2 process + Redis lock) vẫn là nợ riêng.
+
+**Bẫy:** `O03` có thể thấy `outbox > 1` (event của đơn + event khác trong lúc chờ) ⇒ khẳng định là **`>= 1`**,
+không phải `== 1`. Nếu dọn chỉ xoá theo `EventName` của đơn mà quên các event khác thì **lần chạy sau đỏ**.

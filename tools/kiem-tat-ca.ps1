@@ -460,6 +460,48 @@ if ($DayDu -and -not $BoQuaE2E) {
 
         Write-Output '   ✅ DUONG CHAY THAT: moi ca don san DAT.'
     }
+
+    # ── BUOC 13: OVERSELL — HAI REQUEST DONG THOI (GD1 #2) ─────────────────────────────────────
+    Buoc 'Oversell: HAI request DONG THOI (GD1 #2 — khong ban vuot ton)' {
+        # 🔑 **VÌ SAO BƯỚC NÀY TỒN TẠI:** cổng nghiệm thu GĐ1 #2 nói *"bán vượt tồn kho là không thể —
+        # có test **2 request đồng thời, 2 instance**"*. 📌 Trước 24/10/2026 **không có** phép đo nào
+        # (`grep Task.WhenAll|Parallel.|Start-Job` trong `test/`+`tools/` = **0**) ⇒ tuyên bố đó chỉ là
+        # **niềm tin**. `probe-oversell.ps1` bắn **hai** `POST tinh-va-giu-cho` **cùng lúc** trên SKU
+        # `OnHand = 1` và đọc DB: 🔒 đúng **MỘT** lượt giữ chỗ, `Reserved <= OnHand`, `Available = 0`.
+        # ⚠️ Chạy **sau** bước ⑫ để không tranh cổng 5000 với probe đơn sàn (mỗi probe tự bật/tắt Host).
+        $p = ChayLenh 'pwsh' @('-NoProfile', '-File', (Join-Path $PSScriptRoot 'probe-oversell.ps1')) 'oversell.log'
+
+        Get-Content $p.Log | Where-Object { $_ -match 'DAT|HONG|PROBE OVERSELL' } |
+            Select-Object -First 20 | ForEach-Object { "   $_" }
+
+        if ($p.Ma -ne 0) {
+            Get-Content $p.Log | Select-String 'HONG|NGOAI LE' -Context 0,3 |
+                ForEach-Object { $_.Context.PostContext | ForEach-Object { "   $_" } }
+            throw "PROBE OVERSELL DO (exit $($p.Ma)) — xem log: $($p.Log)."
+        }
+
+        Write-Output '   ✅ CHONG OVERSELL: hai request dong thoi ⇒ chi MOT giu duoc cho.'
+    }
+
+    # ── BUOC 14: OUTBOX — "process chet ⇒ event con ⇒ restart phat lai" ─────────────────────────
+    Buoc 'Outbox: process CHET sau commit ⇒ event CON ⇒ restart PHAT LAI (GD1 #5)' {
+        # 📌 Bằng chứng cho cổng #5 (*"không mất event"*): bảng outbox **có** chưa đủ — phải đo đúng kịch bản
+        # commit rồi process chết. Probe tạm đặt nhịp relay **600 s** (núm `AbpEventBusBoxes:PeriodSeconds`),
+        # tạo event, giết Host, khẳng định row **còn**, rồi restart nhịp 2 s và khẳng định row **biến mất**
+        # + `AbpEventInbox` tăng. ⚠️ Chạy sau ⑬ để không tranh cổng 5000.
+        $p = ChayLenh 'pwsh' @('-NoProfile', '-File', (Join-Path $PSScriptRoot 'probe-outbox.ps1')) 'outbox.log'
+
+        Get-Content $p.Log | Where-Object { $_ -match 'DAT|HONG|PROBE OUTBOX' } |
+            Select-Object -First 20 | ForEach-Object { "   $_" }
+
+        if ($p.Ma -ne 0) {
+            Get-Content $p.Log | Select-String 'HONG|NGOAI LE' -Context 0,3 |
+                ForEach-Object { $_.Context.PostContext | ForEach-Object { "   $_" } }
+            throw "PROBE OUTBOX DO (exit $($p.Ma)) — xem log: $($p.Log)."
+        }
+
+        Write-Output '   ✅ KHONG MAT EVENT: process chet sau commit ⇒ event con ⇒ restart phat lai.'
+    }
 }
 elseif (-not $BoQuaE2E -and -not $DayDu) {
     Write-Output ""

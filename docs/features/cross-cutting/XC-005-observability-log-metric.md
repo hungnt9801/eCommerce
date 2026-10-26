@@ -189,7 +189,7 @@ graph LR
 
 | Tên metric | Loại | Nhãn (hữu hạn) | Nguồn yêu cầu | Nơi phát (`S10` đo) |
 |---|---|---|---|---|
-| `messaging_outbox_pending` | Gauge | — | **`XC-002` NFR-003** | ❌ **CHƯA CÓ** — không có outbox/relay (xác nhận `S10`, xem `XC-002` §16.5) |
+| `messaging_outbox_pending` | Gauge | — | **`XC-002` NFR-003** | ✅ **24/10/2026** — `OutboxPendingWorker` (project EF; đếm `AbpEventOutbox` mỗi 60 s) |
 | `messaging_inbox_failed_total` | Counter | `eventName` | **`XC-002` NFR-009** | ✅ `IdempotencyGuard` |
 | `messaging_dlq_size` | Gauge | — | **`XC-002` NFR-009** | ✅ `MarketplaceReconciliationWorker` |
 | `messaging_dlq_replayed_total` | Counter | `result` (`ok`/`fail`) | **`XC-002` NFR-009** | ❌ **CHƯA CÓ** — DLQ **cố ý** không phát lại tự động |
@@ -203,10 +203,13 @@ graph LR
 | `tax_unclassified_skus` | Gauge | — | `XC-006` §10 | ✅ `TaxUnclassifiedSkusWorker` |
 | `payment_recon_unresolved_total` | Gauge | — | `REC-001` §7 | ✅ `PaymentReconciliationWorker` + `PaymentAppService` |
 | `payment_recon_changed_total` | Counter | `result` | `REC-001` §7 | ✅ `MetricDoiSoatThanhToan` |
+| `sales_order_transition_total` | Counter | `axis`, `from`, `to` | **`SAL-003` NFR-012** (24/10/2026) | ✅ `OrderStatusMetricHandler` (nghe `OrderStatusChangedEto`) |
 | `logging_failures_total` | Counter | — | `XC-005` D10 | ❌ **CHƯA CÓ** — chưa có logger provider bọc sink |
 
-> 📌 **ĐẾM ĐƯỢC (21/10/2026): 11/15 có nơi phát · 4/15 chưa.** 🔒 **KHÔNG** ghi *"12/12"* hay *"15/15"* nữa —
-> con số đó chỉ đúng khi **có phép đo**, và §19 là phép đo.
+> 📌 **ĐẾM ĐƯỢC (24/10/2026): 12/16 có nơi phát · 4/16 chưa.** 🔒 **KHÔNG** ghi *"12/12"* hay *"16/16"* nữa —
+> con số đó chỉ đúng khi **có phép đo**, và §19 là phép đo. 📌 4 nợ: `messaging_outbox_pending` (outbox **đã** bật
+> 24/10 nhưng **chưa** có worker đọc số đếm để phát) · `messaging_dlq_replayed_total` · `lock_ttl_exceeded_total` ·
+> `logging_failures_total`.
 
 > 🚨 **Quy tắc nhãn (BR-009):** nhãn **chỉ** lấy từ tập hữu hạn. **Cấm** `orderId`, `sku`, `userId`, `correlationId`,
 > `email`, `phone`. Cần truy vết theo các giá trị đó ⇒ **dùng log** (đã có `CorrelationId`), **không** dùng metric.

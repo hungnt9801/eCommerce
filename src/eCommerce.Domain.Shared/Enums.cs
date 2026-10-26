@@ -87,6 +87,134 @@ public enum PaymentStatus
     Failed = 5
 }
 
+/// <summary>
+/// **TRỤC 1 — THỰC HIỆN** của đơn (`SAL-003` D1/D3): *"hàng đang ở đâu trên đường tới khách"*.
+///
+/// 🚨 **VÌ SAO KHÔNG DÙNG LẠI `OrderStatus`:** enum cũ trộn **3 nghĩa** — `Shipped` (thực hiện),
+/// `Cancelled` (kết thúc), `Returned` (kết thúc) — nên không trả lời được câu hỏi vận hành
+/// *"đơn nào đã giao mà chưa thu tiền (COD)?"*. `OrderStatus` nay chỉ còn là **trạng thái SUY RA**
+/// (`Order.Status`) để hiển thị/tương thích ngược.
+/// ⚠️ **CHỈ THÊM GIÁ TRỊ Ở CUỐI, KHÔNG ĐỔI SỐ** — cột lưu dạng số.
+/// </summary>
+public enum FulfillmentStatus
+{
+    /// <summary>Mới tạo, chưa xác nhận.</summary>
+    Pending = 0,
+
+    /// <summary>Đã xác nhận (đã chốt giữ chỗ/xuất kho).</summary>
+    Confirmed = 1,
+
+    /// <summary>Đang đóng gói.</summary>
+    Packing = 2,
+
+    /// <summary>Chờ hãng vận chuyển lấy hàng.</summary>
+    AwaitingPickup = 3,
+
+    /// <summary>Đang giao.</summary>
+    OutForDelivery = 4,
+
+    /// <summary>Đã giao thành công.</summary>
+    Delivered = 5,
+
+    /// <summary>Giao thất bại (sẽ giao lại hoặc chuyển hoàn).</summary>
+    DeliveryFailed = 6,
+
+    /// <summary>Đang trên đường hoàn về kho.</summary>
+    Returning = 7,
+
+    /// <summary>Đã về kho — **hấp thụ**.</summary>
+    Returned = 8
+}
+
+/// <summary>
+/// **TRỤC 3 — ĐỐI SOÁT** (`SAL-003`): tiền từ sàn/COD về **sau** khi giao và **có thể lệch**.
+/// `NotRequired` dùng cho đơn không có tiền cần đối soát (0 đồng, huỷ trước khi thu).
+/// </summary>
+public enum ReconciliationStatus
+{
+    /// <summary>Không cần đối soát — **hấp thụ**.</summary>
+    NotRequired = 0,
+
+    /// <summary>Chờ đối soát kỳ này.</summary>
+    AwaitingReconcile = 1,
+
+    /// <summary>Đã khớp — **hấp thụ**.</summary>
+    Matched = 2,
+
+    /// <summary>Có lệch, chưa xử lý.</summary>
+    Mismatched = 3,
+
+    /// <summary>Đã xử lý lệch — **hấp thụ**.</summary>
+    Resolved = 4
+}
+
+/// <summary>
+/// **TRỤC 4 — KẾT THÚC** (`SAL-003`): trả hàng và huỷ. `Cancelled` là trạng thái **hấp thụ**;
+/// muốn bán lại phải **tạo đơn mới** (D10).
+/// 📌 `ReturnStatus.Cancelled` là giá trị của **trục kết thúc**, không phải trục thực hiện — nhờ vậy
+/// một đơn vừa "đã giao" vừa "đã huỷ" không thể tồn tại (mâu thuẫn bị chặn ngay ở dữ liệu).
+/// </summary>
+public enum ReturnStatus
+{
+    /// <summary>Chưa có yêu cầu trả.</summary>
+    Open = 0,
+
+    /// <summary>Khách/sàn yêu cầu trả.</summary>
+    ReturnRequested = 1,
+
+    /// <summary>Đã duyệt trả.</summary>
+    ReturnApproved = 2,
+
+    /// <summary>Từ chối trả — **hấp thụ**.</summary>
+    ReturnRejected = 3,
+
+    /// <summary>Đã trả xong — **hấp thụ**.</summary>
+    Returned = 4,
+
+    /// <summary>Đã huỷ đơn — **hấp thụ**.</summary>
+    Cancelled = 5
+}
+
+/// <summary>Bốn trục trạng thái của đơn (`SAL-003` BR-003). Cấm thêm trục thứ 5 khi chưa sửa tài liệu.</summary>
+public enum OrderAxis
+{
+    /// <summary>Trục 1 — thực hiện.</summary>
+    Fulfillment = 1,
+
+    /// <summary>Trục 2 — tài chính.</summary>
+    Payment = 2,
+
+    /// <summary>Trục 3 — đối soát.</summary>
+    Reconciliation = 3,
+
+    /// <summary>Trục 4 — kết thúc (trả/huỷ).</summary>
+    Closure = 4
+}
+
+/// <summary>
+/// **AI** đổi trạng thái (`SAL-003` BR-006). Ghi vào lịch sử dưới dạng chuỗi để đọc log/SQL dễ.
+/// </summary>
+public enum StatusActorType
+{
+    /// <summary>Khách hàng (tự huỷ/yêu cầu trả).</summary>
+    Customer = 1,
+
+    /// <summary>Nhân viên vận hành (qua UI/API có xác thực).</summary>
+    Staff = 2,
+
+    /// <summary>Job hệ thống (quá hạn, backfill, quét).</summary>
+    SystemJob = 3,
+
+    /// <summary>Webhook sàn TMĐT.</summary>
+    MarketplaceWebhook = 4,
+
+    /// <summary>IPN/`querydr` của cổng thanh toán.</summary>
+    PaymentGateway = 5,
+
+    /// <summary>Job đối soát.</summary>
+    Reconciliation = 6
+}
+
 /// <summary>Trạng thái đồng bộ của một listing trên sàn.</summary>
 public enum ChannelListingStatus
 {

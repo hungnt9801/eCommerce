@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>eCommerce.Reconciliation</RootNamespace>
+    <AssemblyName>eCommerce.Reconciliation.Domain</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\shared\eCommerce.Kernel\eCommerce.Kernel.csproj" />
+    <ProjectReference Include="..\..\..\src\eCommerce.Domain.Shared\eCommerce.Domain.Shared.csproj" />
+    <!-- ⚠️ ĐÁNH ĐỔI CÓ Ý THỨC: module → module Domain. Đối soát **đọc** `InventoryItem`/`StockLedgerEntry`;
+         kế hoạch L2 muốn một hợp đồng đọc (`IStockBalanceReader`). 📌 Chưa làm hợp đồng trong lát cắt này;
+         ghi ở `ke-hoach-tach-module.md` + `audit-gd1.md`. -->
+    <ProjectReference Include="..\..\Inventory\eCommerce.Inventory.Domain\eCommerce.Inventory.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Volo.Abp.Ddd.Domain" />
+    <PackageReference Include="Volo.Abp.SettingManagement.Domain" />
+  </ItemGroup>
+
+</Project>

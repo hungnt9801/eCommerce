@@ -58,7 +58,7 @@ public class ChannelVisibilityJoinGuardTests
     ];
 
     /// <summary>Tệp chứa **hợp đồng** — lưới này **phải** thấy `join` trong đó, nếu không nó vô nghĩa.</summary>
-    private const string TepHopDong = "src/eCommerce.Application/Catalog/ChannelVisibilityResolver.cs";
+    private const string TepHopDong = "modules/Catalog/eCommerce.Catalog.Application/ChannelVisibilityResolver.cs";
 
     [Fact]
     public void MOI_join_toi_bang_hien_thi_kenh__PHAI_dung_DefaultIfEmpty()

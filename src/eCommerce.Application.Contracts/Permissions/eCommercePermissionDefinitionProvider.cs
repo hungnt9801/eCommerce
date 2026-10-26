@@ -70,6 +70,14 @@ public class eCommercePermissionDefinitionProvider : PermissionDefinitionProvide
         // ---- Đơn hàng ----
         var orders = group.AddPermission(eCommerceConsts.Permissions.Orders.Default);
         orders.AddChild(eCommerceConsts.Permissions.Orders.Manage);
+        // 🆕 `SAL-003` §9 (24/10/2026) — 6 quyền của **state machine**. 🚨 Thiếu một dòng ⇒ `403` cho MỌI
+        // người kể cả `admin` (`XC-004` D2/E3); `BatBienPhanQuyenTests` khoá **hai chiều** hằng số ↔ định nghĩa.
+        orders.AddChild(eCommerceConsts.Permissions.Orders.StatusChange);
+        orders.AddChild(eCommerceConsts.Permissions.Orders.ReconcileManage);
+        orders.AddChild(eCommerceConsts.Permissions.Orders.ReturnRequest);
+        orders.AddChild(eCommerceConsts.Permissions.Orders.ReturnApprove);
+        orders.AddChild(eCommerceConsts.Permissions.Orders.Cancel);
+        orders.AddChild(eCommerceConsts.Permissions.Orders.HistoryView);
 
         // ---- Thanh toán ----
         var payments = group.AddPermission(eCommerceConsts.Permissions.Payments.Default);
