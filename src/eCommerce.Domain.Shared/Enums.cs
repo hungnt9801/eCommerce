@@ -266,3 +266,69 @@ public enum ProductStatus
     /// <summary>Lưu trữ — kết thúc vòng đời; **không** publish lại.</summary>
     Archived = 3
 }
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════
+// 🆕 `REC-001` — ĐỐI SOÁT THANH TOÁN (`PaymentReconciliation*`, 27/10/2026)
+// 📌 Đặt ở `Domain.Shared` vì entity (module Reconciliation), DTO (Contracts) và worker đều dùng;
+//    Contracts **không** được tham chiếu Domain.
+// ══════════════════════════════════════════════════════════════════════════════════════════════════
+
+/// <summary>Vòng đời **một lượt** đối soát thanh toán (`REC-001` §3.1).</summary>
+public enum PaymentReconciliationRunStatus
+{
+    DangChay = 0,
+    HoanTat = 1,
+    HoanTatCoLech = 2,
+    ThatBai = 3
+}
+
+/// <summary>Ai/kênh kích hoạt lượt chạy (`REC-001` §5.2.1).</summary>
+public enum PaymentReconciliationTrigger
+{
+    Schedule = 0,
+    Manual = 1
+}
+
+/// <summary>Vòng đời **một dòng** (một giao dịch) trong lượt (`REC-001` §3).</summary>
+public enum PaymentReconciliationLineStatus
+{
+    ChoDoiSoat = 0,
+    DangTruyVan = 1,
+    Khop = 2,
+    Lech = 3,
+    LoiNhaCungCap = 4,
+    ThieuDuLieu = 5,
+    BoQua = 6
+}
+
+/// <summary>Danh sách **ĐÓNG** loại sai lệch (`REC-001` §5.4 / BR-12).</summary>
+public enum PaymentDiscrepancyKind
+{
+    MoneyReceivedButNotRecorded = 0,
+    RecordedButMoneyNotReceived = 1,
+    AmountMismatch = 2,
+    ProviderFlagged = 3,
+    ProviderTransactionNotFound = 4,
+    ProviderTxnIdMismatch = 5,
+    RefundNotRecorded = 6,
+    ProviderUnreachable = 7,
+    MissingProviderCreateDate = 8,
+    StalePendingTransaction = 9
+}
+
+/// <summary>Mức nghiêm trọng của sai lệch (`REC-001` §5.4).</summary>
+public enum PaymentDiscrepancySeverity
+{
+    Cao = 0,
+    TrungBinh = 1,
+    Thap = 2
+}
+
+/// <summary>Vòng đời xử lý sai lệch (`REC-001` §3.2).</summary>
+public enum PaymentDiscrepancyStatus
+{
+    Moi = 0,
+    DaXacNhan = 1,
+    DaXuLy = 2,
+    BoQua = 3
+}

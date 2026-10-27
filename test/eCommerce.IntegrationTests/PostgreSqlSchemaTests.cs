@@ -141,7 +141,7 @@ public class PostgreSqlSchemaTests
     }
 
     [Fact]
-    public async Task F1_du_56_index_deu_dung_NULLS_NOT_DISTINCT()
+    public async Task F1_du_57_index_deu_dung_NULLS_NOT_DISTINCT()
     {
         // 🔒 BẤT BIẾN (ghi ở XC-004 Q6): mọi unique index trên entity IMultiTenant PHẢI có
         // `NULLS NOT DISTINCT`. Ai tạo migration mới mà quên ⇒ test này đỏ.
@@ -167,7 +167,7 @@ public class PostgreSqlSchemaTests
         //      cuối cho bất biến *"không có chuyển trạng thái nào thiếu lịch sử"*; mất `NULLS NOT DISTINCT` ⇒
         //      khi `TenantId = NULL` hai dòng cùng `(OrderId, Axis, VersionAfter)` LỌT ⇒ lịch sử có dòng trùng,
         //      và câu hỏi *"ai đổi trạng thái"* trả lời **hai lần** cho một lần đổi.)
-        Assert.Equal(56L, await DemAsync(
+        Assert.Equal(57L, await DemAsync(
             "select count(*) from pg_indexes where schemaname = 'public' and indexdef like '%NULLS NOT DISTINCT%'"));
 
         // Kiểm tra ĐÍCH DANH để thông báo lỗi có ý nghĩa (tên index dài có thể bị PostgreSQL cắt ⇒ so theo tiền tố).
@@ -178,6 +178,7 @@ public class PostgreSqlSchemaTests
             "IX_CatProducts_TenantId_Code",
             "IX_CatBrands_TenantId_Code",
             "IX_CatBrands_TenantId_Slug",
+            "IX_RecPayLines_TenantId_Run_GiaoDich",
             "IX_CatProductVariants_TenantId_Sku",
             "IX_InvItems_TenantId_WarehouseId_Sku",
             "IX_OrdOrders_TenantId_ChannelCode_ExternalOrderId",

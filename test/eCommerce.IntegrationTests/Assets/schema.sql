@@ -2682,3 +2682,134 @@ VALUES ('20261027023328_Brand_CatBrands', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+ALTER TABLE "PayTransactions" ADD "ProviderCreateDateGmt7" character(14);
+
+ALTER TABLE "PayTransactions" ADD "ProviderCreateDateUtc" timestamp with time zone;
+
+CREATE TABLE "RecPaymentReconciliationRuns" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "Status" integer NOT NULL,
+    "TriggeredBy" integer NOT NULL,
+    "TriggeredByUserId" uuid,
+    "PeriodFromUtc" timestamp with time zone NOT NULL,
+    "PeriodToUtc" timestamp with time zone NOT NULL,
+    "StartedAtUtc" timestamp with time zone NOT NULL,
+    "FinishedAtUtc" timestamp with time zone,
+    "LineTotal" integer NOT NULL,
+    "LineMatched" integer NOT NULL,
+    "LineSkipped" integer NOT NULL,
+    "DiscrepancyCount" integer NOT NULL,
+    "FailureCode" character varying(64),
+    "CorrelationId" character varying(128),
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_RecPaymentReconciliationRuns" PRIMARY KEY ("Id")
+);
+
+CREATE TABLE "RecPaymentDiscrepancies" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "RunId" uuid NOT NULL,
+    "LineId" uuid NOT NULL,
+    "PaymentTransactionId" uuid NOT NULL,
+    "OrderId" uuid,
+    "ProviderCode" character varying(32) NOT NULL,
+    "MerchantReference" character varying(64) NOT NULL,
+    "Kind" integer NOT NULL,
+    "Severity" integer NOT NULL,
+    "LocalAmountMinorUnits" bigint,
+    "ProviderAmountMinorUnits" bigint,
+    "Currency" character(3) NOT NULL,
+    "Status" integer NOT NULL,
+    "AcknowledgedBy" uuid,
+    "AcknowledgedAtUtc" timestamp with time zone,
+    "ResolvedBy" uuid,
+    "ResolvedAtUtc" timestamp with time zone,
+    "ResolutionNote" character varying(2048),
+    "IgnoreReason" character varying(64),
+    "DetectedAtUtc" timestamp with time zone NOT NULL,
+    "CorrelationId" character varying(128),
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_RecPaymentDiscrepancies" PRIMARY KEY ("Id"),
+    CONSTRAINT "FK_RecPaymentDiscrepancies_RecPaymentReconciliationRuns_RunId" FOREIGN KEY ("RunId") REFERENCES "RecPaymentReconciliationRuns" ("Id") ON DELETE RESTRICT
+);
+
+CREATE TABLE "RecPaymentReconciliationLines" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "RunId" uuid NOT NULL,
+    "PaymentTransactionId" uuid NOT NULL,
+    "ProviderCode" character varying(32) NOT NULL,
+    "MerchantReference" character varying(64) NOT NULL,
+    "RequestId" character varying(32) NOT NULL,
+    "Status" integer NOT NULL,
+    "SkipReason" character varying(64),
+    "AttemptCount" integer NOT NULL,
+    "LocalStatus" integer NOT NULL,
+    "LocalAmountMinorUnits" bigint NOT NULL,
+    "ProviderResponseCode" character varying(8),
+    "ProviderTransactionStatus" character varying(8),
+    "ProviderAmountMinorUnits" bigint,
+    "ProviderTransactionNo" character varying(32),
+    "ProviderPayDateUtc" timestamp with time zone,
+    "ProviderPayDateGmt7" character(14),
+    "ProviderTransactionType" character varying(8),
+    "FailureCode" character varying(64),
+    "FailureMessage" character varying(1024),
+    "DiscrepancyId" uuid,
+    "CheckedAtUtc" timestamp with time zone,
+    "CorrelationId" character varying(128),
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_RecPaymentReconciliationLines" PRIMARY KEY ("Id"),
+    CONSTRAINT "FK_RecPaymentReconciliationLines_RecPaymentReconciliationRuns_~" FOREIGN KEY ("RunId") REFERENCES "RecPaymentReconciliationRuns" ("Id") ON DELETE RESTRICT
+);
+
+CREATE INDEX "IX_RecPayDiscrepancies_TenantId_Run" ON "RecPaymentDiscrepancies" ("TenantId", "RunId");
+
+CREATE INDEX "IX_RecPayDiscrepancies_TenantId_Status_Severity" ON "RecPaymentDiscrepancies" ("TenantId", "Status", "Severity");
+
+CREATE INDEX "IX_RecPaymentDiscrepancies_RunId" ON "RecPaymentDiscrepancies" ("RunId");
+
+CREATE UNIQUE INDEX "IX_RecPayLines_TenantId_Run_GiaoDich" ON "RecPaymentReconciliationLines" ("TenantId", "RunId", "PaymentTransactionId");
+
+DROP INDEX "IX_RecPayLines_TenantId_Run_GiaoDich";
+
+CREATE UNIQUE INDEX "IX_RecPayLines_TenantId_Run_GiaoDich"
+ON "RecPaymentReconciliationLines" ("TenantId", "RunId", "PaymentTransactionId") NULLS NOT DISTINCT;
+
+CREATE INDEX "IX_RecPayLines_TenantId_Run_Status" ON "RecPaymentReconciliationLines" ("TenantId", "RunId", "Status");
+
+CREATE INDEX "IX_RecPaymentReconciliationLines_RunId" ON "RecPaymentReconciliationLines" ("RunId");
+
+CREATE INDEX "IX_RecPayRuns_TenantId_PeriodFrom" ON "RecPaymentReconciliationRuns" ("TenantId", "PeriodFromUtc");
+
+CREATE INDEX "IX_RecPayRuns_TenantId_Status_Started" ON "RecPaymentReconciliationRuns" ("TenantId", "Status", "StartedAtUtc");
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261027063648_Rec001_PaymentReconciliation', '10.0.11');
+
+COMMIT;
+

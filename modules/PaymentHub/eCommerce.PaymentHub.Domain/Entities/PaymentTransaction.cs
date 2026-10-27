@@ -60,6 +60,13 @@ public class PaymentTransaction : FullAuditedAggregateRoot<Guid>, IMultiTenant
     /// <summary>Thời điểm cổng xác nhận (KHÔNG phải thời điểm ta nhận webhook).</summary>
     public DateTime? PaidAtUtc { get; set; }
 
+    /// <summary>np_CreateDate NGUYÊN VĂN GMT+7 (yyyyMMddHHmmss) — querydr đòi **giống hệt** lúc tạo.
+    /// 📌 `REC-001` §5.2.4; giao dịch cũ có thể `NULL` ⇒ worker kết luận `ThieuDuLieu`, không đoán.</summary>
+    public string? ProviderCreateDateGmt7 { get; set; }
+
+    /// <summary>Cùng mốc ở UTC để truy vấn/lọc theo thời gian.</summary>
+    public DateTime? ProviderCreateDateUtc { get; set; }
+
     public decimal RefundedAmount { get; set; }
 
     /// <summary>Payload thô của IPN/webhook cuối cùng — giữ để đối soát và xử lý tranh chấp.</summary>

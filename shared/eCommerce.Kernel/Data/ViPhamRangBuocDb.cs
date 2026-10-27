@@ -68,6 +68,8 @@ public static class ViPhamRangBuocDb
         // "dữ liệu trùng" thì người dùng không biết đổi Code hay Slug.
         ["IX_CatBrands_TenantId_Code"] =
             new("eCommerce:Catalog:0030", "Mã thương hiệu đã tồn tại trong tenant.", true),
+        ["IX_RecPayLines_TenantId_Run_GiaoDich"] =
+            new("eCommerce:Recon:0011", "Giao dịch này ĐÃ có dòng trong lượt đối soát (BR-05).", true),
         ["IX_CatBrands_TenantId_Slug"] =
             new("eCommerce:Catalog:0031", "Slug thương hiệu đã tồn tại trong tenant.", true),
         ["IX_OrdStatusHistory_TenantId_OrderId_Axis_VersionAfter"] =

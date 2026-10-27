@@ -52,6 +52,11 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>, IHasEventOut
     // ---- Catalog ----
     public DbSet<Catalog.Product> Products { get; set; } = default!;
     public DbSet<Catalog.Brand> Brands { get; set; } = default!;
+
+    // 🆕 REC-001 — lịch sử đối soát thanh toán (27/10/2026).
+    public DbSet<eCommerce.Reconciliation.PaymentReconciliationRun> PaymentReconciliationRuns { get; set; } = default!;
+    public DbSet<eCommerce.Reconciliation.PaymentReconciliationLine> PaymentReconciliationLines { get; set; } = default!;
+    public DbSet<eCommerce.Reconciliation.PaymentDiscrepancy> PaymentDiscrepancies { get; set; } = default!;
     public DbSet<Catalog.ProductVariant> ProductVariants { get; set; } = default!;
     /// <summary>
     /// ẢNH SẢN PHẨM (`CAT-003`). 🚨 **BẮT BUỘC có `DbSet`** — thiếu ⇒ `IRepository&lt;ProductMedia, Guid&gt;`

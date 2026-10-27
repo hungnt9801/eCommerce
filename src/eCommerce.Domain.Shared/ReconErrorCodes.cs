@@ -61,4 +61,19 @@ public static class ReconErrorCodes
     /// 🔒 Vì vậy đường dọn **NÉM** khi nhận `<= 0` thay vì lặng lẽ coi là "xoá hết".
     /// </summary>
     public const string ChinhSachLuuTruKhongHopLe = Nhom + "0006";
+
+    /// <summary>Lượt đối soát **đã đóng** mà còn cố đóng/lỗi lần nữa — mọi chuyển sai phải NÉM (`REC-001` §3.1).</summary>
+    public const string LuotDaDong = Nhom + "0007";
+
+    /// <summary>Dòng đối soát **đã ở trạng thái cuối** mà còn chuyển tiếp (`REC-001` §3.2).</summary>
+    public const string DongDaKetThuc = Nhom + "0008";
+
+    /// <summary>Xử lý lệch thiếu ghi chú hoặc ghi chú &lt; 10 ký tự (`REC-001` §5.2.3).</summary>
+    public const string LyDoXuLyNgan = Nhom + "0009";
+
+    /// <summary>Bỏ qua lệch mà lý do rỗng/không thuộc danh sách ĐÓNG (`REC-001` §5.4).</summary>
+    public const string LyDoBoQuaKhongHopLe = Nhom + "0010";
+
+    /// <summary>Giao dịch **đã có dòng** trong cùng lượt đối soát (`REC-001` BR-05).</summary>
+    public const string DongDaGhiTrongLuot = Nhom + "0011";
 }

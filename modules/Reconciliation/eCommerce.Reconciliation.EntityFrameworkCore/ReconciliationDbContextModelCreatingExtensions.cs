@@ -103,5 +103,77 @@ public static class ReconciliationDbContextModelCreatingExtensions
                 .HasForeignKey(x => x.ReconRunId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
-    }
+        // ══════════════════════════════════════════════════════════════════════════════════════════
+        // 🆕 `REC-001` — ĐỐI SOÁT THANH TOÁN (27/10/2026): 3 bảng lịch sử lượt/dòng/lệch.
+        // ══════════════════════════════════════════════════════════════════════════════════════════
+        builder.Entity<eCommerce.Reconciliation.PaymentReconciliationRun>(b =>
+        {
+            b.ToTable("RecPaymentReconciliationRuns");
+            b.ConfigureByConvention();
+
+            b.Property(x => x.FailureCode).HasMaxLength(64);
+            b.Property(x => x.CorrelationId).HasMaxLength(128);
+
+            // Truy vấn Ops: lượt theo trạng thái trong khoảng thời gian.
+            b.HasIndex(x => new { x.TenantId, x.Status, x.StartedAtUtc })
+                .HasDatabaseName("IX_RecPayRuns_TenantId_Status_Started");
+            b.HasIndex(x => new { x.TenantId, x.PeriodFromUtc })
+                .HasDatabaseName("IX_RecPayRuns_TenantId_PeriodFrom");
+        });
+
+        builder.Entity<eCommerce.Reconciliation.PaymentReconciliationLine>(b =>
+        {
+            b.ToTable("RecPaymentReconciliationLines");
+            b.ConfigureByConvention();
+
+            b.Property(x => x.ProviderCode).IsRequired().HasMaxLength(32);
+            b.Property(x => x.MerchantReference).IsRequired().HasMaxLength(64);
+            b.Property(x => x.RequestId).IsRequired().HasMaxLength(32);
+            b.Property(x => x.SkipReason).HasMaxLength(64);
+            b.Property(x => x.ProviderResponseCode).HasMaxLength(8);
+            b.Property(x => x.ProviderTransactionStatus).HasMaxLength(8);
+            b.Property(x => x.ProviderTransactionNo).HasMaxLength(32);
+            b.Property(x => x.ProviderPayDateGmt7).HasMaxLength(14).IsFixedLength();
+            b.Property(x => x.ProviderTransactionType).HasMaxLength(8);
+            b.Property(x => x.FailureCode).HasMaxLength(64);
+            b.Property(x => x.FailureMessage).HasMaxLength(1024);
+            b.Property(x => x.CorrelationId).HasMaxLength(128);
+
+            // 🔒 BR-05: mỗi giao dịch có ĐÚNG MỘT dòng trong một lượt (NND bổ sung ở migration).
+            b.HasIndex(x => new { x.TenantId, x.RunId, x.PaymentTransactionId })
+                .IsUnique()
+                .HasDatabaseName("IX_RecPayLines_TenantId_Run_GiaoDich");
+
+            b.HasIndex(x => new { x.TenantId, x.RunId, x.Status })
+                .HasDatabaseName("IX_RecPayLines_TenantId_Run_Status");
+
+            b.HasOne<eCommerce.Reconciliation.PaymentReconciliationRun>()
+                .WithMany()
+                .HasForeignKey(x => x.RunId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<eCommerce.Reconciliation.PaymentDiscrepancy>(b =>
+        {
+            b.ToTable("RecPaymentDiscrepancies");
+            b.ConfigureByConvention();
+
+            b.Property(x => x.ProviderCode).IsRequired().HasMaxLength(32);
+            b.Property(x => x.MerchantReference).IsRequired().HasMaxLength(64);
+            b.Property(x => x.Currency).IsRequired().HasMaxLength(3).IsFixedLength();
+            b.Property(x => x.ResolutionNote).HasMaxLength(2048);
+            b.Property(x => x.IgnoreReason).HasMaxLength(64);
+            b.Property(x => x.CorrelationId).HasMaxLength(128);
+
+            // Hàng đợi Ops: lệch chưa xử lý, mức cao trước.
+            b.HasIndex(x => new { x.TenantId, x.Status, x.Severity })
+                .HasDatabaseName("IX_RecPayDiscrepancies_TenantId_Status_Severity");
+            b.HasIndex(x => new { x.TenantId, x.RunId })
+                .HasDatabaseName("IX_RecPayDiscrepancies_TenantId_Run");
+
+            b.HasOne<eCommerce.Reconciliation.PaymentReconciliationRun>()
+                .WithMany()
+                .HasForeignKey(x => x.RunId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });    }
 }

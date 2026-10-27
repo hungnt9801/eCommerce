@@ -312,7 +312,7 @@ sequenceDiagram
 
 #### 5.2.1 Bảng `RecPaymentReconciliationRuns` — một lượt chạy đối soát
 
-**Chưa có trong code — kế hoạch GĐ1.**
+**✅ CÓ trong code từ 27/10/2026** (`PaymentReconciliationRun`, migration 46).
 
 | Cột | Kiểu | Null? | Nguồn / ý nghĩa | Ghi chú |
 |---|---|---|---|---|
@@ -335,7 +335,7 @@ sequenceDiagram
 
 #### 5.2.2 Bảng `RecPaymentReconciliationLines` — một giao dịch trong một lượt chạy
 
-**Chưa có trong code — kế hoạch GĐ1.**
+**✅ CÓ trong code từ 27/10/2026** (`PaymentReconciliationLine`; unique NND `IX_RecPayLines_TenantId_Run_GiaoDich`).
 
 | Cột | Kiểu | Null? | Nguồn / ý nghĩa | Ghi chú |
 |---|---|---|---|---|
@@ -367,7 +367,7 @@ sequenceDiagram
 
 #### 5.2.3 Bảng `RecPaymentDiscrepancies` — sai lệch cần người xử lý
 
-**Chưa có trong code — kế hoạch GĐ1.**
+**✅ CÓ trong code từ 27/10/2026** (`PaymentDiscrepancy`, guard `Recon:0009/0010`).
 
 | Cột | Kiểu | Null? | Nguồn / ý nghĩa | Ghi chú |
 |---|---|---|---|---|
@@ -395,7 +395,7 @@ sequenceDiagram
 
 #### 5.2.4 ⚠️ Thay đổi **BẮT BUỘC** trên `PayTransactions` (module PaymentHub — D3)
 
-**Chưa có trong code — kế hoạch GĐ1.** Bảng `PayTransactions` hiện có 15 cột theo `…/PaymentTransaction.cs:33-76`;
+**✅ CÓ trong code từ 27/10/2026** (2 cột, migration 46). Bảng `PayTransactions` trước đó có 15 cột theo `…/PaymentTransaction.cs:33-76`;
 **thiếu** trường bắt buộc để gọi `querydr`:
 
 | Cột mới | Kiểu | Null? | Vì sao bắt buộc |
@@ -470,7 +470,7 @@ sequenceDiagram
 
 ### 6.1 Application Service
 
-**Chưa có trong code — kế hoạch GĐ1.** Vị trí đề xuất: `modules/Reconciliation/eCommerce.Reconciliation.Application.Contracts` (interface + DTO) và `…Application` (hiện thực).
+**🟡 ĐÃ CÓ bản ĐỌC (27/10/2026):** `IPaymentReconciliationAppService` (GetRuns/GetLines/GetDiscrepancies). `TriggerRunAsync` **chưa** (slice 2b). Vị trí: `modules/Reconciliation/eCommerce.Reconciliation.Application.Contracts` (interface + DTO) và `…Application` (hiện thực).
 
 | Mục | Giá trị |
 |---|---|

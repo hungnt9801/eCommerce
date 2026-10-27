@@ -107,7 +107,7 @@ modules/
 | `CheckoutSession` | `OrdCheckoutSessions` | **0** | Thay bằng `Order.CheckoutIdempotencyKey` + giỏ cookie (D7) — **quyết định đã chốt**, plan chưa sửa |
 | `OrderStatusHistory` | — | **0** | 🚨 Không có nhật ký chuyển trạng thái |
 | `OrderReturn`/`Line` | `OrdOrderReturns` | **0** | Trả hàng chỉ ghi phiếu kho `CustomerReturn`; code tự ghi *"chưa có `PartiallyReturned`"* |
-| `PaymentReconciliationRun`/`Line`/`Discrepancy` | — | **0** | Chỉ có job + log + metric; **không có báo cáo lệch lưu lại** |
+| `PaymentReconciliationRun`/`Line`/`Discrepancy` | `RecPaymentReconciliation*` | ✅ **3 bảng** (27/10/2026, `REC-001` 2a) | Entity + migration **46** + API đọc; ⏳ worker **chưa** ghi lượt (2b — cần mở rộng `IPaymentProvider.QueryStatusAsync`) |
 | `Cart`/`CartItem` | — | **0** | **Đúng theo D7** (giỏ cookie 2 giờ) — không tính là thiếu |
 
 Ngoài ra **`AbpEventOutbox` / `AbpEventInbox` = 0 bảng**, **0 worker relay**.
@@ -251,7 +251,7 @@ git rev-list --count HEAD; git status --porcelain                      # 310 · 
 | **(a) Báo cáo audit** | ✅ | chính tệp này |
 | **(b) Kế hoạch tách 4 module** | ✅ viết | `docs/ke-hoach-tach-module.md` — thứ tự lá→gốc (Reconciliation → Inventory → Catalog → Sales), giữ namespace/tên bảng, **0 migration**, test kiến trúc chặn tái phát; ước lượng **20–29 pd** |
 | **(c1) P0 #2 — state machine đơn hàng** | 🟡 **lát cắt 1 XONG** | 4 enum trục + `OrderStateMachine` (30 cạnh) + `OrderStatusHistory` (append-only) + **xoá `SetStatus`** + mã lỗi `eCommerce:Order:0001…0008` + migration **42** + **25 unit test**; unit **1422 → 1447**; NND **53 → 54**; `sal-003` §16 |
-| **Đo lại CUỐI (12 vòng)** | ✅ **`-DayDu` exit 0 · 404.4s** | **15/15** bước · **1516 unit** · **71/71** integration · **135/135** E2E · **25/25** DB · **NND 56** · **68** quyền · **44** migration · **89** chỗ quét · oversell **11/11** · outbox replay **9/9** |
+| **Đo lại CUỐI (12 vòng)** | ✅ **`-DayDu` exit 0 · 415.2s** | **15/15** bước · **1528 unit** · **71/71** integration · **135/135** E2E · **25/25** DB · **NND 57** · **68** quyền · **44** migration · **89** chỗ quét · oversell **11/11** · outbox replay **9/9** |
 | **Kiểm chứng HTTP THẬT (không chỉ unit test)** | ✅ | ① Seed đơn `Pending` → `POST /api/app/don-hang/{id}/huy-don` ⇒ **200**, DB có **đúng 1** dòng `OrdStatusHistory`: `Closure｜0→5｜Staff｜HuyDon｜v=1`, đơn `Status=5 · ReturnStatus=5 · IsCancelled=true`. ② Seed đơn **đã xuất kho** → cùng endpoint ⇒ **403 + `eCommerce:Order:0001`**, **0** dòng lịch sử, trạng thái **không đổi**. ③ Xoá đơn ⇒ lịch sử **cascade** sạch (không còn GUID probe). |
 | **(c2) P0 #4 — test oversell 2 luồng** | ✅ **XONG (24/10/2026)** | `tools/probe-oversell.ps1` = **bước ⑬** của cổng: seed `OnHand = 1`, bắn **hai** `POST tinh-va-giu-cho` **cùng lúc** (`HttpClient` + `Task.WhenAll`), **11/11 ca**: đúng 1 × `200` · 1 × `403 eCommerce:Inventory:0001` · `InvStockReservations = 1` · `Reserved = 1 ≤ OnHand` · `Available = 0`. ⏳ **Còn**: biến thể **2 instance** (2 process + Redis) — vẫn là nợ riêng |
 | **(c3) P0 #3 — outbox/relay** | ✅ **ĐÃ BẬT (24/10/2026)** — `XC-002` §17: `IHasEventOutbox`/`IHasEventInbox` + 2 `DbSet` + `UseDbContext` 2 chiều + migration **43**; đo được `AbpEventOutbox` **rỗng** sau relay, `AbpEventInbox` **có dòng**; E2E **133/133**. ⏳ **Còn**: test "publish lỗi ⇒ phát lại" + 2 instance + metric `messaging_outbox_pending` |
@@ -270,6 +270,7 @@ git rev-list --count HEAD; git status --porcelain                      # 310 · 
 
 | **(c16) Outbox 2 instance** | ✅ **ĐO ĐƯỢC (26/10/2026)** | `probe-outbox-2instance.ps1` = **bước ⑮**: hai Host 5000/5001 cùng DB/Redis; outbox **0**; event **1** dòng inbox (distinct MessageId=1); 0 exception. ⚠️ Giới hạn: không chứng minh handler chạy một lần nếu không ghi inbox |
 | **(c17) Brand / CatBrands** | ✅ **XONG (27/10/2026)** | Chốt CAT-002 Q3: entity riêng + FK; migration **45**; NND **56**; BrandTests (7 ca) + PostgreSqlSchemaTests.F1_du_56; tài liệu CAT-004 |
+| **(c18) REC-001 — 3 bảng đối soát thanh toán** | 🟡 **2a XONG (27/10/2026)** | PaymentReconciliationRun/Line/Discrepancy + enums + mapping + migration **46** + API đọc; NND **57**. ⏳ **2b**: worker ghi lượt/dòng/lệch — chặn bởi IPaymentProvider.QueryStatusAsync chỉ trả enum (không có response/amount) |
 
 ### 12.1 Kế hoạch P0 #4 — bằng chứng chống oversell (không thể "làm cho có")
 
