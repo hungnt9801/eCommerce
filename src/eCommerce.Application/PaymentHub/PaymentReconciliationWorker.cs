@@ -173,6 +173,9 @@ public class PaymentReconciliationWorker : AsyncPeriodicBackgroundWorkerBase
         var soKhongXacDinh = 0;
         var soLoi = 0;
 
+        // 🆕 `REC-001` 2b — thu kết quả để ghi lịch sử SAU khi xử lý xong (không đụng UoW tiền).
+        var ketQua = new List<KetQuaMotGiaoDich>();
+
         foreach (var gd in canXet)
         {
             var tuCong = await cong.QueryStatusAsync(gd.MerchantReference);
@@ -197,6 +200,7 @@ public class PaymentReconciliationWorker : AsyncPeriodicBackgroundWorkerBase
             // ══════════════════════════════════════════════════════════════════════════════════════════════
             try
             {
+                var daGhiNhan = false;
                 using var uowTungGiaoDich = uowManager.Begin(requiresNew: true, isTransactional: true);
 
                 switch (quyetDinh)
@@ -204,6 +208,7 @@ public class PaymentReconciliationWorker : AsyncPeriodicBackgroundWorkerBase
                     case LuatDoiSoatThanhToan.QuyetDinh.GhiDaThuTien:
                         var daGhiThu = gd.MarkSucceeded(null, null, "{\"nguon\":\"querydr-job\"}", null);
                         await giaoDich.UpdateAsync(gd, autoSave: true);
+                        daGhiNhan = daGhiThu;
 
                         if (daGhiThu)
                         {
@@ -228,6 +233,7 @@ public class PaymentReconciliationWorker : AsyncPeriodicBackgroundWorkerBase
                             ? "Cổng xác nhận khách ĐÃ HUỶ giao dịch (nguồn: job đối soát)."
                             : "Cổng xác nhận giao dịch không thành công (nguồn: job đối soát).");
                         await giaoDich.UpdateAsync(gd, autoSave: true);
+                        daGhiNhan = daGhiHong;
 
                         // 🔒 `S5`: **chỉ** đếm + phát khi **thật sự** đổi trạng thái. 📌 Cổng trả `Failed` lặp lại
                         // là ca **có thật** (IPN retry, hoặc giao dịch `Failed` từ lâu vẫn nằm trong lô đối soát).
@@ -252,12 +258,15 @@ public class PaymentReconciliationWorker : AsyncPeriodicBackgroundWorkerBase
                 }
 
                 await uowTungGiaoDich.CompleteAsync();
+
+                ketQua.Add(new KetQuaMotGiaoDich(gd, daGhiNhan, Loi: false, LoiMsg: null));
             }
             catch (Exception ex)
             {
                 // ⚠️ Bắt **mọi** exception là **có chủ ý** (`F-PAY-7`: một giao dịch hỏng không được làm mất bằng
                 // chứng của các giao dịch khác) — nhưng **không nuốt**: log `Error` + đếm, để người vận hành thấy.
                 soLoi++;
+                ketQua.Add(new KetQuaMotGiaoDich(gd, DaGhi: false, Loi: true, LoiMsg: ex.Message));
 
                 Logger.LogError(ex,
                     "JOB REC-001: LỖI khi đối soát giao dịch {MerchantReference} ({Id}) ⇒ bỏ qua giao dịch này, " +
@@ -272,6 +281,16 @@ public class PaymentReconciliationWorker : AsyncPeriodicBackgroundWorkerBase
         // 📊 **GAUGE "KHONG KIEM DUOC" cho CA LUOT** — 🔑 con so co y nghia VAN HANH.
         // ⚠️ DOC CHO DUNG: bang so giao dich can doi soat nghia la luot quet KHONG mang lai thong tin nao
         // => CAU HINH SAI hoac CONG CHET, KHONG PHAI "he thong khoe".
+        // 🆕 `REC-001` 2b — ghi lịch sử lượt/dòng/lệch. 🔒 Lỗi ghi lịch sử KHÔNG được làm job tiền chết.
+        try
+        {
+            await GhiLichSuAsync(services, canXet, ketQua, uowManager);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "JOB REC-001: KHÔNG ghi được lịch sử đối soát (lượt/dòng/lệch) — kết quả tiền vẫn đã ghi. [PAY-JOB-LICHSU-LOI]");
+        }
+
         _metrics?.SetPaymentReconUnresolved(soKhongXacDinh);
 
         if (soKhongXacDinh == canXet.Count)
@@ -302,4 +321,90 @@ public class PaymentReconciliationWorker : AsyncPeriodicBackgroundWorkerBase
                 soLoi, canXet.Count);
         }
     }
+
+    /// <summary>
+    /// 🆕 **GHI LỊCH SỬ ĐỐI SOÁT** (`REC-001` 2b, 27/10/2026) — một Run + mỗi giao dịch một Line; khi cổng báo
+    /// **đã thu tiền** mà sổ chưa ghi thì sinh `Discrepancy` `MoneyReceivedButNotRecorded` (mức Cao).
+    ///
+    /// 🔒 **Chạy SAU khi đã ghi tiền, trong UoW riêng:** lỗi ghi lịch sử **không** được rollback giao dịch tiền
+    /// (bài học `F-PAY-7`); ngược lại, lịch sử chỉ ghi khi kết quả tiền đã chốt.
+    /// ⚠️ **GIỚI HẠN ĐO:** `IPaymentProvider.QueryStatusAsync` hiện chỉ trả **enum** (không có response code /
+    /// amount) ⇒ chưa phân loại được `AmountMismatch`/`ProviderFlagged`. Ghi rõ ở `REC-001` §6.1; mở rộng hợp
+    /// đồng provider là slice kế tiếp.
+    /// </summary>
+    private async Task GhiLichSuAsync(
+        IServiceProvider services,
+        List<PaymentTransaction> canXet,
+        List<KetQuaMotGiaoDich> ketQua,
+        IUnitOfWorkManager uowManager)
+    {
+        if (ketQua.Count == 0)
+        {
+            return;
+        }
+
+        var runs = services.GetRequiredService<IRepository<eCommerce.Reconciliation.PaymentReconciliationRun, Guid>>();
+        var lines = services.GetRequiredService<IRepository<eCommerce.Reconciliation.PaymentReconciliationLine, Guid>>();
+        var discrepancies = services.GetRequiredService<IRepository<eCommerce.Reconciliation.PaymentDiscrepancy, Guid>>();
+
+        var tuUtc = canXet.Min(x => x.CreationTime);
+        var run = new eCommerce.Reconciliation.PaymentReconciliationRun(
+            Guid.NewGuid(), tuUtc, DateTime.UtcNow, PaymentReconciliationTrigger.Schedule);
+
+        using var uow = uowManager.Begin(requiresNew: true, isTransactional: true);
+
+        await runs.InsertAsync(run, autoSave: false);
+
+        var soKhop = 0;
+        var soLech = 0;
+
+        foreach (var k in ketQua)
+        {
+            var gd = k.Gd;
+
+            var line = new eCommerce.Reconciliation.PaymentReconciliationLine(
+                Guid.NewGuid(),
+                run.Id,
+                gd.Id,
+                gd.ProviderCode,
+                gd.MerchantReference,
+                ("RC" + gd.Id.ToString("N"))[..32],
+                (int)gd.Status,
+                (long)(gd.Amount * 100m));
+
+            if (k.Loi)
+            {
+                line.LoiNhaCungCap("ProviderUnavailable", k.LoiMsg);
+            }
+            else if (k.DaGhi)
+            {
+                // 🎯 Đúng ca DoD: cổng nói ĐÃ THU TIỀN mà sổ chưa ghi ⇒ bằng chứng phải nằm lại, không chỉ log.
+                var lech = new eCommerce.Reconciliation.PaymentDiscrepancy(
+                    Guid.NewGuid(), run.Id, line.Id, gd.Id, gd.OrderId, gd.ProviderCode, gd.MerchantReference,
+                    PaymentDiscrepancyKind.MoneyReceivedButNotRecorded,
+                    PaymentDiscrepancySeverity.Cao,
+                    localAmountMinorUnits: (long)(gd.Amount * 100m),
+                    providerAmountMinorUnits: null,
+                    currency: gd.Currency);
+
+                await discrepancies.InsertAsync(lech, autoSave: false);
+                line.Lech(lech.Id);
+                soLech++;
+            }
+            else
+            {
+                line.Khop();
+                soKhop++;
+            }
+
+            await lines.InsertAsync(line, autoSave: false);
+        }
+
+        run.KetThuc(ketQua.Count, soKhop, lineSkipped: 0, discrepancyCount: soLech);
+        await runs.UpdateAsync(run, autoSave: true);
+
+        await uow.CompleteAsync();
+    }
+
+    private readonly record struct KetQuaMotGiaoDich(PaymentTransaction Gd, bool DaGhi, bool Loi, string? LoiMsg);
 }
