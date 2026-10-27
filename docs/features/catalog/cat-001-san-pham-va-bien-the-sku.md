@@ -245,7 +245,7 @@ erDiagram
     }
 ```
 
-> 📌 Quan hệ với `CatBrands` **chưa có bảng trong code** — `Product.BrandId` hiện là `Guid?` **không khoá ngoại**
+> ✅ **Cập nhật 27/10/2026:** `CatBrands` **đã có** (entity `Brand`, FK `Product.BrandId → CatBrands.Id`, `Restrict`) — xem `CAT-004`. (Trước đó: `Guid?` **không khoá ngoại**
 > ([`Product.cs:23`](../../../modules/Catalog/eCommerce.Catalog.Domain/Product.cs#L23), DDL `Initial.cs:24`). Bảng `Brand`
 > thuộc `CAT-002`; ở đây ghi nhận để **không** bịa là đã có.
 
@@ -261,7 +261,7 @@ erDiagram
 | `Name` | `varchar(512)` | ✗ | tên hiển thị | |
 | `Slug` | `varchar(512)` | ✓ | slug SEO | **không unique** trong code hiện tại (xem **F5** §15.2) |
 | `Description` | `text` | ✓ | mô tả | |
-| `BrandId` | `uuid` | ✓ | brand | **không có FK** (chưa có bảng `Brand`) |
+| `BrandId` | `uuid` | ✓ | brand | ✅ FK → `CatBrands.Id` (`Restrict`, từ 27/10/2026 — `CAT-004`) |
 | `IsPublished` | `boolean` | ✗ | đã publish | 🚨 **`set` công khai** ⇒ không guard (**D5**) |
 | `ExtraProperties` / `ConcurrencyStamp` | `text` / `varchar(40)` | ✗ | ABP | |
 | `CreationTime` `CreatorId` `LastModificationTime` `LastModifierId` | `timestamptz`/`uuid` | ✗/✓ | audit | `FullAuditedAggregateRoot` |

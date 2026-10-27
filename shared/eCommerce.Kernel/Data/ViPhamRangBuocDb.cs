@@ -63,6 +63,13 @@ public static class ViPhamRangBuocDb
         // dòng lịch sử"*. Nếu nó nổ thì tầng ứng dụng đã sai (race/retry) ⇒ **không** được coi là thành công:
         // trả `eCommerce:Order:0007` để cả transaction **rollback** (không có "trạng thái đã đổi mà thiếu
         // lịch sử"), và người vận hành tra được ngay qua tên ràng buộc.
+        // ── CATALOG: THƯƠNG HIỆU (`CatBrands`, 27/10/2026 — CAT-002 Q3) ───────────────────────
+        // 📌 Hai mã riêng cho mã/slug: client phải biết **sửa trường nào**; gộp thành mã chung
+        // "dữ liệu trùng" thì người dùng không biết đổi Code hay Slug.
+        ["IX_CatBrands_TenantId_Code"] =
+            new("eCommerce:Catalog:0030", "Mã thương hiệu đã tồn tại trong tenant.", true),
+        ["IX_CatBrands_TenantId_Slug"] =
+            new("eCommerce:Catalog:0031", "Slug thương hiệu đã tồn tại trong tenant.", true),
         ["IX_OrdStatusHistory_TenantId_OrderId_Axis_VersionAfter"] =
             new("eCommerce:Order:0007",
                 "Không ghi được NHẬT KÝ trạng thái (đã có dòng cho cùng phiên bản trục) ⇒ thao tác bị huỷ, KHÔNG có chuyển trạng thái nào được ghi.", true),

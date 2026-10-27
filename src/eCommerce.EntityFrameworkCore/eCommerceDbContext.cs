@@ -51,6 +51,7 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>, IHasEventOut
 
     // ---- Catalog ----
     public DbSet<Catalog.Product> Products { get; set; } = default!;
+    public DbSet<Catalog.Brand> Brands { get; set; } = default!;
     public DbSet<Catalog.ProductVariant> ProductVariants { get; set; } = default!;
     /// <summary>
     /// ẢNH SẢN PHẨM (`CAT-003`). 🚨 **BẮT BUỘC có `DbSet`** — thiếu ⇒ `IRepository&lt;ProductMedia, Guid&gt;`

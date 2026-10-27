@@ -519,6 +519,16 @@ public static class eCommerceConsts
             /// </summary>
             public const string MaDanhMucKhongHopLe = "eCommerce:Catalog:0025";
 
+            // ── Dải 0030+: THƯƠNG HIỆU (Brand, 27/10/2026 — chốt CAT-002 Q3) ──────────────
+            /// <summary>`Code` thương hiệu đã tồn tại trong tenant (unique index `IX_CatBrands_TenantId_Code`).</summary>
+            public const string ThuongHieuDaTonTai = "eCommerce:Catalog:0030";
+
+            /// <summary>`Slug` thương hiệu đã tồn tại trong tenant (unique index `IX_CatBrands_TenantId_Slug`).</summary>
+            public const string SlugThuongHieuDaTonTai = "eCommerce:Catalog:0031";
+
+            /// <summary>Dữ liệu thương hiệu không hợp lệ (slug/mô tả/logo quá dài).</summary>
+            public const string ThuongHieuKhongHopLe = "eCommerce:Catalog:0032";
+
             /// <summary>
             /// 🚨 **SLUG TRÙNG trong tenant** (`CAT-003` **ADR-03**) — hàng rào DB
             /// `IX_CatProducts_TenantId_Slug` (`NULLS NOT DISTINCT`, filter `Slug IS NOT NULL`).

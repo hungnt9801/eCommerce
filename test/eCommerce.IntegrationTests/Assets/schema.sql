@@ -2634,3 +2634,51 @@ VALUES ('20261024053040_Sal003_RowVersion', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE TABLE "CatBrands" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "Code" character varying(64) NOT NULL,
+    "Name" character varying(256) NOT NULL,
+    "Slug" character varying(256) NOT NULL,
+    "Description" character varying(2048),
+    "LogoUrl" character varying(1024),
+    "IsActive" boolean NOT NULL,
+    "SortOrder" integer NOT NULL,
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_CatBrands" PRIMARY KEY ("Id")
+);
+
+CREATE INDEX "IX_CatProducts_BrandId" ON "CatProducts" ("BrandId");
+
+CREATE UNIQUE INDEX "IX_CatBrands_TenantId_Code" ON "CatBrands" ("TenantId", "Code");
+
+DROP INDEX "IX_CatBrands_TenantId_Code";
+
+CREATE UNIQUE INDEX "IX_CatBrands_TenantId_Code"
+ON "CatBrands" ("TenantId", "Code") NULLS NOT DISTINCT;
+
+CREATE INDEX "IX_CatBrands_TenantId_HoatDong_ThuTu" ON "CatBrands" ("TenantId", "IsActive", "SortOrder");
+
+CREATE UNIQUE INDEX "IX_CatBrands_TenantId_Slug" ON "CatBrands" ("TenantId", "Slug");
+
+DROP INDEX "IX_CatBrands_TenantId_Slug";
+
+CREATE UNIQUE INDEX "IX_CatBrands_TenantId_Slug"
+ON "CatBrands" ("TenantId", "Slug") NULLS NOT DISTINCT;
+
+ALTER TABLE "CatProducts" ADD CONSTRAINT "FK_CatProducts_CatBrands_BrandId" FOREIGN KEY ("BrandId") REFERENCES "CatBrands" ("Id") ON DELETE RESTRICT;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261027023328_Brand_CatBrands', '10.0.11');
+
+COMMIT;
+

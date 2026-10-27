@@ -18,6 +18,12 @@ public static class CatalogDbContextModelCreatingExtensions
             b.ToTable("CatProducts");
             b.ConfigureByConvention();
 
+            // 🔗 CatBrands (27/10/2026 — Q3): FK Restrict — xoá cứng thương hiệu KHÔNG kéo mất sản phẩm.
+            b.HasOne<Catalog.Brand>()
+                .WithMany()
+                .HasForeignKey(x => x.BrandId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             b.Property(x => x.Code).IsRequired().HasMaxLength(64);
             b.Property(x => x.Name).IsRequired().HasMaxLength(512);
             b.Property(x => x.Slug).HasMaxLength(512);
@@ -347,6 +353,28 @@ public static class CatalogDbContextModelCreatingExtensions
                 .WithMany()
                 .HasForeignKey(x => x.AttributeValueId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+        builder.Entity<Catalog.Brand>(b =>
+        {
+            b.ToTable("CatBrands");
+            b.ConfigureByConvention();
+
+            b.Property(x => x.Code).IsRequired().HasMaxLength(Catalog.Brand.DoDaiCodeToiDa);
+            b.Property(x => x.Name).IsRequired().HasMaxLength(Catalog.Brand.DoDaiTenToiDa);
+            b.Property(x => x.Slug).IsRequired().HasMaxLength(Catalog.Brand.DoDaiSlugToiDa);
+            b.Property(x => x.Description).HasMaxLength(Catalog.Brand.DoDaiMoTaToiDa);
+            b.Property(x => x.LogoUrl).HasMaxLength(Catalog.Brand.DoDaiLogoUrlToiDa);
+
+            // 🔒 Unique theo TENANT. `NULLS NOT DISTINCT` bổ sung bằng SQL thô trong migration
+            // (EF không khai báo được) — nếu thiếu, `TenantId = NULL` làm index mất tác dụng im lặng.
+            b.HasIndex(x => new { x.TenantId, x.Code }).IsUnique();
+            b.HasIndex(x => new { x.TenantId, x.Slug })
+                .IsUnique()
+                .HasDatabaseName("IX_CatBrands_TenantId_Slug");
+
+            // Truy vấn danh sách admin: lọc đang hoạt động + sắp theo thứ tự.
+            b.HasIndex(x => new { x.TenantId, x.IsActive, x.SortOrder })
+                .HasDatabaseName("IX_CatBrands_TenantId_HoatDong_ThuTu");
         });
     }
 }
