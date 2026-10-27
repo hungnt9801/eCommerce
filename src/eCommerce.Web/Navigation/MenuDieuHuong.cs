@@ -59,6 +59,14 @@ public static class MenuDieuHuong
         },
         new()
         {
+            Nhan = "Thương hiệu",
+            Url = "/Brands",
+            // `BrandsController` gọi `IBrandAppService` (`[Authorize(Products.Default)]`) — cùng quyền với trang Sản phẩm.
+            QuyenCanCo = eCommerceConsts.Permissions.Products.Default,
+            MoTa = "Danh sách thương hiệu (mã, slug, logo, trạng thái)"
+        },
+        new()
+        {
             Nhan = "Đối soát tồn kho",
             Url = "/DoiSoat",
             // `DoiSoatController` gọi `IDoiSoatAppService` (`[Authorize(Inventory.Default)]`).

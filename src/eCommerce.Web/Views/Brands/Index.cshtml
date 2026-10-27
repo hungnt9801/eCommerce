@@ -1,0 +1,82 @@
+@model Volo.Abp.Application.Dtos.PagedResultDto<eCommerce.Catalog.Dtos.BrandDto>
+@using eCommerce.Catalog.Dtos
+
+@{
+    ViewData["Title"] = "Thương hiệu";
+    var filter = ViewData["filter"] as string;
+    var isActive = ViewData["isActive"] as bool?;
+    var page = (int)(ViewData["page"] ?? 1);
+    var soDong = (int)(ViewData["soDongMotTrang"] ?? 50);
+}
+
+<h1>Thương hiệu</h1>
+
+<form method="get" class="row g-2 mb-3">
+    <div class="col-auto">
+        <input name="filter" value="@filter" class="form-control" placeholder="Mã / tên / slug" />
+    </div>
+    <div class="col-auto">
+        <select name="isActive" class="form-select">
+            <option value="">— Tất cả —</option>
+            <option value="true" selected="@(isActive == true)">Đang hoạt động</option>
+            <option value="false" selected="@(isActive == false)">Đã ngừng</option>
+        </select>
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-primary">Lọc</button>
+    </div>
+</form>
+
+<p class="text-muted">Tổng: <strong>@Model.TotalCount</strong> thương hiệu.</p>
+
+@if (Model.Items.Count == 0)
+{
+    <div class="alert alert-info">Không có thương hiệu nào khớp bộ lọc.</div>
+}
+else
+{
+    <table class="table table-sm table-striped">
+        <thead>
+            <tr>
+                <th>Mã</th>
+                <th>Tên</th>
+                <th>Slug</th>
+                <th>Logo</th>
+                <th>Thứ tự</th>
+                <th>Trạng thái</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var b in Model.Items)
+            {
+                <tr>
+                    <td><code>@b.Code</code></td>
+                    <td>@b.Name</td>
+                    <td>@b.Slug</td>
+                    <td>
+                        @if (!string.IsNullOrWhiteSpace(b.LogoUrl))
+                        {
+                            <a href="@b.LogoUrl" rel="noopener noreferrer" target="_blank">logo</a>
+                        }
+                    </td>
+                    <td>@b.SortOrder</td>
+                    <td>@(b.IsActive ? "Đang hoạt động" : "Đã ngừng")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <nav>
+        @if (page > 1)
+        {
+            <a class="btn btn-outline-secondary btn-sm"
+               href="@Url.Action("Index", new { filter, isActive, page = page - 1 })">‹ Trang trước</a>
+        }
+        <span class="mx-2">Trang @(page)</span>
+        @if (page * soDong < Model.TotalCount)
+        {
+            <a class="btn btn-outline-secondary btn-sm"
+               href="@Url.Action("Index", new { filter, isActive, page = page + 1 })">Trang sau ›</a>
+        }
+    </nav>
+}

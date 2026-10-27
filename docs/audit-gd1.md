@@ -160,7 +160,7 @@ hay `SetStatus(Shipped)` trên đơn đã `Cancelled` — **không exception, kh
 | Test integration **2 request đồng thời** chống oversell | ✅ **đo 24/10/2026** — `probe-oversell` (bước ⑬), 11/11 | ✅ |
 | Test **2 instance** + Redis thật | ✅ **đo 26/10/2026** — `probe-outbox-2instance` (bước ⑮), 9/9; hai Host 5000/5001, outbox 0, 1 dòng inbox | ✅ |
 | Thanh toán **tiền thật** | `PaymentHub:VnPay:TmnCode` = `""`, `HashSecret` = `""` | ❌ mới kiểm bằng `FakePaymentProvider` (dù HMAC thật) |
-| UI admin tối thiểu | 10 view: `DatHang` `DoiSoat` `DoiSoatThanhToan` `DonHang` `HanMucKenh` `Home` `KhachHang` `Loi` `PhanBo` `SanPham` | ❌ **không có** màn hình Catalog / Pricing / Kho |
+| UI admin tối thiểu | 11 view: thêm `Brands` (27/10/2026 — danh sách thương hiệu) | 🟡 **còn thiếu** form tạo/sửa Catalog, màn hình Pricing, Kho |
 | API nào cũng cần xác thực | `BatBienPhanQuyenTests` + `AllowlistCongKhaiTests` | ✅ |
 
 ---
@@ -251,7 +251,7 @@ git rev-list --count HEAD; git status --porcelain                      # 310 · 
 | **(a) Báo cáo audit** | ✅ | chính tệp này |
 | **(b) Kế hoạch tách 4 module** | ✅ viết | `docs/ke-hoach-tach-module.md` — thứ tự lá→gốc (Reconciliation → Inventory → Catalog → Sales), giữ namespace/tên bảng, **0 migration**, test kiến trúc chặn tái phát; ước lượng **20–29 pd** |
 | **(c1) P0 #2 — state machine đơn hàng** | 🟡 **lát cắt 1 XONG** | 4 enum trục + `OrderStateMachine` (30 cạnh) + `OrderStatusHistory` (append-only) + **xoá `SetStatus`** + mã lỗi `eCommerce:Order:0001…0008` + migration **42** + **25 unit test**; unit **1422 → 1447**; NND **53 → 54**; `sal-003` §16 |
-| **Đo lại CUỐI (12 vòng)** | ✅ **`-DayDu` exit 0 · 411.7s** | **15/15** bước · **1528 unit** · **71/71** integration · **135/135** E2E · **25/25** DB · **NND 57** · **68** quyền · **44** migration · **89** chỗ quét · oversell **11/11** · outbox replay **9/9** |
+| **Đo lại CUỐI (12 vòng)** | ✅ **`-DayDu` exit 0 · 380.1s** | **15/15** bước · **1528 unit** · **71/71** integration · **135/135** E2E · **25/25** DB · **NND 57** · **68** quyền · **44** migration · **89** chỗ quét · oversell **11/11** · outbox replay **9/9** |
 | **Kiểm chứng HTTP THẬT (không chỉ unit test)** | ✅ | ① Seed đơn `Pending` → `POST /api/app/don-hang/{id}/huy-don` ⇒ **200**, DB có **đúng 1** dòng `OrdStatusHistory`: `Closure｜0→5｜Staff｜HuyDon｜v=1`, đơn `Status=5 · ReturnStatus=5 · IsCancelled=true`. ② Seed đơn **đã xuất kho** → cùng endpoint ⇒ **403 + `eCommerce:Order:0001`**, **0** dòng lịch sử, trạng thái **không đổi**. ③ Xoá đơn ⇒ lịch sử **cascade** sạch (không còn GUID probe). |
 | **(c2) P0 #4 — test oversell 2 luồng** | ✅ **XONG (24/10/2026)** | `tools/probe-oversell.ps1` = **bước ⑬** của cổng: seed `OnHand = 1`, bắn **hai** `POST tinh-va-giu-cho` **cùng lúc** (`HttpClient` + `Task.WhenAll`), **11/11 ca**: đúng 1 × `200` · 1 × `403 eCommerce:Inventory:0001` · `InvStockReservations = 1` · `Reserved = 1 ≤ OnHand` · `Available = 0`. ⏳ **Còn**: biến thể **2 instance** (2 process + Redis) — vẫn là nợ riêng |
 | **(c3) P0 #3 — outbox/relay** | ✅ **ĐÃ BẬT (24/10/2026)** — `XC-002` §17: `IHasEventOutbox`/`IHasEventInbox` + 2 `DbSet` + `UseDbContext` 2 chiều + migration **43**; đo được `AbpEventOutbox` **rỗng** sau relay, `AbpEventInbox` **có dòng**; E2E **133/133**. ⏳ **Còn**: test "publish lỗi ⇒ phát lại" + 2 instance + metric `messaging_outbox_pending` |
