@@ -58,9 +58,11 @@ public static class OrderStateMachine
         (OrderAxis.Closure, (int)ReturnStatus.ReturnRequested, (int)ReturnStatus.ReturnApproved),
         (OrderAxis.Closure, (int)ReturnStatus.ReturnRequested, (int)ReturnStatus.ReturnRejected),
         (OrderAxis.Closure, (int)ReturnStatus.ReturnApproved, (int)ReturnStatus.Returned),
-        // 🔑 GĐ1: nhân viên ghi nhận **trả toàn bộ** một đơn đã xác nhận (chưa có phiếu RMA của `SAL-006`).
-        // 📌 Khi `SAL-006` vào, đường này phải đi qua `ReturnRequested → ReturnApproved → Returned`;
-        //    ghi ở `sal-003` §16 là **nợ có chủ ý**, KHÔNG phải cạnh lâu dài.
+        // ⚠️ **CẠNH TẮT CÒN LẠI — NỢ `SAL-006` (đã ghi ở `sal-003` §16):** `Open → Returned` cho phép đánh dấu
+        // *"đã trả"* **không có phiếu trả nào** (không dòng trả, không hàng về kho, không ai duyệt).
+        // 🆕 `S14` phần A (28/10/2026) **đã dựng** entity phiếu trả + bất biến `ReturnedQuantity`, nhưng **chưa**
+        // nối đường ghi ⇒ **cố ý GIỮ** cạnh này để `TraHangAsync` hiện có không gãy.
+        // 🔒 Khi `S14` phần B nối API + chứng từ kho: **XOÁ** cạnh này và cập nhật `OrderStateMachineTests`.
         (OrderAxis.Closure, (int)ReturnStatus.Open, (int)ReturnStatus.Returned),
         (OrderAxis.Closure, (int)ReturnStatus.Open, (int)ReturnStatus.Cancelled)
     };

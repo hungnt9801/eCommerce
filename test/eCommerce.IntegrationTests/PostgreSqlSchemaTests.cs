@@ -141,7 +141,7 @@ public class PostgreSqlSchemaTests
     }
 
     [Fact]
-    public async Task F1_du_60_index_deu_dung_NULLS_NOT_DISTINCT()
+    public async Task F1_du_64_index_deu_dung_NULLS_NOT_DISTINCT()
     {
         // 🔒 BẤT BIẾN (ghi ở XC-004 Q6): mọi unique index trên entity IMultiTenant PHẢI có
         // `NULLS NOT DISTINCT`. Ai tạo migration mới mà quên ⇒ test này đỏ.
@@ -175,7 +175,7 @@ public class PostgreSqlSchemaTests
         //      (`PrcPriceLists`/`PrcPriceListItems`/`PrcChannelPrices`/`PrcPriceCalculationRecords`) nằm trong
         //      migration `Pricing_PriceList_And_ChannelPrice`/`Prc002_PriceCalculationRecords` — 📌 chúng **chưa**
         //      có tên trong danh sách đích danh dưới đây (nợ của `PRC-001` §15.2, ghi ở `PRC-001` §16).
-        Assert.Equal(60L, await DemAsync(
+        Assert.Equal(64L, await DemAsync(
             "select count(*) from pg_indexes where schemaname = 'public' and indexdef like '%NULLS NOT DISTINCT%'"));
 
         // Kiểm tra ĐÍCH DANH để thông báo lỗi có ý nghĩa (tên index dài có thể bị PostgreSQL cắt ⇒ so theo tiền tố).
@@ -285,6 +285,13 @@ public class PostgreSqlSchemaTests
             // gọi lại một biên vào **nhân đôi ngân sách**.
             "IX_InvStockAllotments_TenantId_Kho_Sku_Kenh",
             "IX_InvStockAllotmentLedgers_TenantId_IdempotencyKey",
+            // 🆕 `S14` — **phiếu trả hàng**: mã phiếu + khoá idempotency + một dòng đơn một lần + một lịch sử/phiên bản.
+            // 📌 Thiếu `NULLS NOT DISTINCT` ⇒ `TenantId = NULL` làm cả bốn index vô hiệu ⇒ **trả hàng hai lần**
+            // (hoàn tiền/kho gấp đôi) mà không lỗi nào.
+            "IX_OrdReturns_TenantId_ReturnNumber",
+            "IX_OrdReturns_TenantId_IdempotencyKey",
+            "IX_OrdReturnLines_TenantId_ReturnId_OrderLineId",
+            "IX_OrdReturnHistory_TenantId_ReturnId_Axis_VersionAfter",
             // ⚠️ NỢ ĐÃ GHI (`PRC-001` §15.2): BỐN index `NULLS NOT DISTINCT` của module Pricing
             // (`PrcPriceLists`, `PrcPriceListItems`, `PrcChannelPrices`, `PrcPriceCalculationRecords`) hiện chỉ
             // được đếm qua **TỔNG**, chưa có tên ở đây ⇒ nếu một cái mất mệnh đề mà một cái khác thêm vào thì
@@ -1346,4 +1353,5 @@ public class PostgreSqlSchemaTests
         Assert.Equal(1L, so);
     }
 }
+
 

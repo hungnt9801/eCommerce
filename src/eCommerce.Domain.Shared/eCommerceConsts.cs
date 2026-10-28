@@ -407,6 +407,16 @@ public static class eCommerceConsts
         /// </summary>
         public const string SalesWatermarkKhongTien = "eCommerce:Sales:0003";
 
+        /// <summary>
+        /// 🆕 **`S14`** — **phiếu trả hàng không hợp lệ / sai guard** (`SAL-006`). 📌 Bản chuẩn ở **tầng app**
+        /// (`eCommerce.Kernel` cần đọc được mã này để ánh xạ ràng buộc DB — Kernel **không** tham chiếu module
+        /// `Sales`); module dùng **bí danh** `SalesErrorCodes.PhieuTraKhongHopLe` trỏ về đây (một nguồn sự thật).
+        /// </summary>
+        public const string PhieuTraKhongHopLe = "eCommerce:Sales:0010";
+
+        /// <summary>🆕 **`S14`** — **trả vượt số đã mua** của một dòng đơn (`SAL-006` ADR-11).</summary>
+        public const string TraVuotSoDaMua = "eCommerce:Sales:0011";
+
         // 📌 CÁC MÃ HOÀN TIỀN (`0002`/`0003`/`0004`) **CỐ Ý KHÔNG Ở ĐÂY** — chúng nằm ở
         // `modules/PaymentHub/eCommerce.PaymentHub.Domain/Payments/PaymentErrorCodes.cs`.
         // VÌ SAO: `PaymentHub.Domain` **KHÔNG** tham chiếu `eCommerce.Domain.Shared` (module tự chứa — quy ước #2
@@ -705,4 +715,5 @@ public static class eCommerceConsts
         // Không khai báo lại ở đây để tránh hai nguồn sự thật cho cùng một khoá lock.
     }
 }
+
 

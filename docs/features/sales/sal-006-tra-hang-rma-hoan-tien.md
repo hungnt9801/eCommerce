@@ -1985,3 +1985,62 @@ ta sẽ **gỡ nó ra** thay vì **sửa nó** (🔒 đúng số phận của m�
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.8 | 17/10/2026 | *(agent, session GĐ1)* | **§27 — LÁT CẮT 10: THƯ VIỆN TIÊM TỰ KHẲNG ĐỊNH** (đóng nợ §26.6 #5): thêm **`tools\ham-tiem.ps1`** (**dot-source**, 🔒 **không có `param` cấp tệp** — ⚠️ tệp có `[CmdletBinding()]` cấp cao nhất sẽ **đòi tham số** khi bị dot-source ⇒ treo/lỗi) gồm **5 hàm**. 🔑 **VÌ SAO:** **CÙNG MỘT LỖI, HAI VÒNG LIÊN TIẾP** — **§25.5** (tiêm có **thoát nháy** ⇒ **sai cú pháp SQL** ⇒ dòng probe **KHÔNG hề tồn tại** ⇒ suýt **kết luận sai về sản phẩm**) và **§26.5 #1** (tiêm lại bằng `String.Replace` và **phép thay KHÔNG khớp** ⇒ bộ test báo `exit 0` ⇒ suýt kết luận *"bộ test không bắt được gì"*); 🔒 **điểm chung: phép tiêm KHÔNG XẢY RA nhưng KHÔNG AI KIỂM** ⇒ *"cổng không bắt"* **trông giống hệt** *"tiêm không thành"* ⇒ 📌 một ca **XANH** có thể xanh **vì lý do sai**; 🔑 **và tôi đã ghi bài học này HAI LẦN rồi vẫn vấp lại** ⇒ **kỷ luật cá nhân không đủ, phải là CƠ CHẾ**. **`TiemVaoTep`** khẳng định: khối cũ khớp **ĐÚNG MỘT LẦN** (⚠️ **0** lần = tiêm không xảy ra; **>1** lần = `Replace` thay **hết** ⇒ vượt ý định) · nội dung **phải đổi** · `-NeoXacNhan` **phải có** · **đọc lại từ đĩa** (⚠️ tệp bị **khoá** có thể **ghi hụt im lặng** — cùng họ bẫy *"build `exit 0` mà binary không đổi"*). **`KhoiPhucTep`** khẳng định nội dung **về đúng bản gốc** và `-NeoDaTiem` **phải mất** (🔒 nếu không thì một phép khôi phục hỏng làm **các ca sau** đỏ vì **lý do vô hình**). **`TiemVaoDb`** 🚨 chặn câu SQL **không có nháy đơn nào** (dấu hiệu chuỗi đã bị **lớp gọi ăn mất**) **TRƯỚC** khi chạm DB, ➕ sau khi ghi **đọc lại** (`-KiemSql` + `-SoDongMongDoi`) và **NÉM** nếu lệch. **`Invoke-Psql`** ghi ra **tệp tạm rồi đọc**, **KHÔNG** ống dẫn (⚠️ ống dẫn **che mất exit code** ⇒ `docker` thất bại bị hiểu nhầm là *"0 dòng"*, và *"0 dòng"* lại bị hiểu nhầm là *"sạch"*). **`TrongKhiDonDep`** dọn dẹp **luôn** chạy kể cả khi ca kiểm **NÉM**. 🚨 **MỘT LỖI CỦA TÔI NGAY KHI VIẾT thư viện:** bản đầu chặn câu SQL chứa **`''`** — ⚠️ **SAI**, vì `''` là **cú pháp HỢP LỆ** (nháy đơn **bị thoát** trong literal) ⇒ phép chặn đó **cấm luôn** câu **đúng** như `where "Id" = ''x''`; 🔑 **bài học: một phép kiểm *"trông có vẻ chặt"* mà SAI NGỮ NGHĨA thì sẽ CHẶN VIỆC ĐÚNG — và người ta sẽ GỠ NÓ RA thay vì SỬA NÓ** (🔒 đúng số phận của một *"cổng luôn đỏ"*, §23.4); ✅ chữa: kiểm **sự VẮNG MẶT của nháy đơn** thay vì sự **có mặt của `''`**. ✅ **KIỂM CHỨNG — 5 ca mới:** 🚨 **L** khối cũ **không khớp** ⇒ **NÉM** (🔑 **chính là §26.5 #1**) · **M** khớp **>1 lần** ⇒ **NÉM** · **N** neo không có trong khối mới ⇒ **NÉM** · **O** tiêm **được** ⇒ neo **có** ⇒ khôi phục ⇒ neo **mất** (🔒 khép kín **cả hai chiều**) · 🚨 **P** SQL **không có nháy đơn** ⇒ **NÉM** kèm thông điệp trỏ tới **§25.5** (🔑 **chính là lỗi §25.5**). ➕ **SO SÁNH TRỰC TIẾP (đo được):** cách **cũ** (`String.Replace`, khối không khớp) ⇒ nội dung **KHÔNG đổi** và **KHÔNG ném** = 📌 **IM LẶNG**; cách **mới** ⇒ ✅ **NÉM** *"PHEP TIEM KHONG XAY RA"*. ➕ **Tổng bộ test cổng: 17/17 ĐẠT** (12 cũ + 5 mới) · **7 bước** · `exit 0` · **132s** · **1155 unit** · **38 integration** · mermaid **197/0** · **DB 21/21**. Ghi **§27.5** (nợ: 🚨 **chưa có CI** — nay **7 bước** là nền · 🚨 **probe E2E vẫn SCRIPT TAY** ⇒ `web-001` §98.7 #1 **vẫn mở** · **thư viện chưa được dùng ở các probe CŨ** (🔑 nên chuyển dần) · chưa test `route-check.ps1`/`wait-host.ps1` (⚠️ cũng là **cổng**) · **`TiemVaoDb` chưa có ca kiểm "đọc lại THẤY LỆCH thì ném"** — mới kiểm ca **chặn nháy đơn**)) |
+
+---
+
+## 28. TRẠNG THÁI TRIỂN KHAI — **`S14` PHẦN A: MÔ HÌNH DỮ LIỆU + BẤT BIẾN PHIẾU TRẢ** (28/10/2026)
+
+> 🎯 **Phạm vi phần A (cố ý hẹp):** dựng **đúng lược đồ** + **đúng bất biến** cho RMA để phần B (service/API +
+> chứng từ kho + ETO) **không phải sửa lược đồ lần hai**. 📌 Phần B **chưa** làm — ghi rõ ở §28.3.
+
+### 28.1 Đã làm
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| 1 | **`OrderReturn`** (`OrdReturns`) | `OrderId` · `ReturnNumber` · `ChannelCode` (copy từ đơn) · **hai trục**: `Lifecycle` (`Requested/Approved/Rejected/Cancelled/Received/Closed`) và `Goods` (`Awaiting/PartiallyReceived/Received/Waived/NotReturned`) · `ReasonCode` (mã đóng) · `WarehouseId` · `RefundMethod`/`RefundedAmount`/`RefundCurrency` · actor · `IdempotencyKey` + `PayloadHash` · `Version` · mốc `ReceivedAtUtc`/`ClosedAtUtc` |
+| 2 | **`OrderReturnLine`** (`OrdReturnLines`) | `OrderLineId` · `Sku` (snapshot) · `Quantity`/`ReceivedQuantity` · `Disposition` (`Unset/Restock/Damaged/ReturnToSupplier`) · **3 snapshot tiền** (giá/giảm/thuế) · `RefundAmount` · `LedgerEntryId` |
+| 3 | **`OrderReturnHistory`** (`OrdReturnHistory`) | **APPEND-ONLY**: `Axis` (`Lifecycle`/`Goods`) · `FromStatus`/`ToStatus` (CHECK **phải đổi**) · actor · `EventId` · `VersionAfter` · `OccurredAtUtc` |
+| 4 | **`OrderLine.ReturnedQuantity`** + `TangTra`/`GiamTra` | 🚨 **HÀNG RÀO NGHIỆP VỤ chống trả vượt số đã mua** (`ADR-11`): giữ chỗ trả **ngay khi tạo phiếu**; NÉM `Sales:0011` khi vượt; DB có `CHECK "ReturnedQuantity" BETWEEN 0 AND "Quantity"` |
+| 5 | **Migration 49** `Gd1S14_OrderReturn` | 3 bảng + cột `ReturnedQuantity` + **8 `CHECK`** + **4 unique `NULLS NOT DISTINCT`** (sửa tay: mã phiếu · idempotency · một dòng-đơn-một-lần · một lịch sử/phiên bản). **NND 60 → 64** |
+
+### 28.2 Quyết định `Q4` — hoàn tiền **tự động** hay **chỉ ghi nhận**?
+
+**Chốt: `Q4` = CHỈ GHI NHẬN (không tự gọi cổng trong `S14`).**
+
+| Lý do | Chi tiết |
+|---|---|
+| Tiền ra khỏi tài khoản là hành vi **không sửa được** | Gọi cổng hoàn tiền sai số/hoàn hai lần = **mất tiền thật**. 📌 `PAY-001` đã có đường `RefundAsync` **có duyệt + idempotency**; `S14` **không** được mở đường thứ hai tự động từ RMA |
+| Bảng `OrdRefunds` (append-only, từng lần thử) cần **thiết kế đối soát riêng** | Đó là lát cắt **`S14b`** cùng với `PaymentHub`; thêm bảng khi chưa có đường ghi là tạo **bảng rỗng** trông như đã xong |
+| Kế toán vẫn cần ghi nhận | `OrderReturn.GhiNhanHoanTien(soTien, Manual)` cộng dồn `RefundedAmount` + `RefundMethod`; mọi so sánh tiền qua `decimal`/`Money` (`BR-006`) |
+
+📌 **Hệ quả:** `RefundStatus` (đặc tả §5.1) **chưa** có cột — thay bằng `RefundMethod` + `RefundedAmount` (đủ cho
+*"đã ghi nhận bao nhiêu"*). Khi `S14b` mở đường gọi cổng, thêm cột/bảng **trong migration riêng**.
+
+### 28.3 🚨 Chưa làm — và **không** được nói là đã có
+
+| # | Thiếu | Hệ quả hiện tại |
+|---|---|---|
+| 1 | **Service + API** (`TaoPhieu/Duyet/NhanHang/Dong`) | Chưa có đường tạo phiếu; entity + guard đã sẵn sàng cho phần B |
+| 2 | **Sinh `ReturnNumber`** + idempotency theo `PayloadHash` | Cần service (phần B); unique index đã là hàng rào cuối |
+| 3 | **Chứng từ kho `CustomerReturn`** + ghi sổ | Hàng hoàn **chưa** nhập kho tự động; `LedgerEntryId` để trống |
+| 4 | **Ghi `OrderReturnHistory`** trong mọi chuyển trạng thái | Entity + unique + CHECK đã có; **chưa** có nơi ghi |
+| 5 | **ETO** (`OrderReturnRequestedEto`…) + outbox | Chưa phát sự kiện |
+| 6 | **Cạnh tắt `Open → Returned` trên trục kết thúc** | Vẫn còn (có ghi chú ngay trong `OrderStateMachine`): `TraHangAsync` cũ còn dùng; **phần B sẽ xoá** kèm cập nhật test |
+| 7 | **UI** | Không có màn hình RMA |
+
+### 28.4 ✅ Bằng chứng đo được
+
+| Phép đo | Kết quả |
+|---|---|
+| Unit | **1571 → 1585** (+14: `OrderReturnTests` — guard tạo phiếu, duyệt/từ chối/huỷ, hai trục nhận hàng, đóng phiếu, ghi nhận hoàn tiền, `ReturnedQuantity` hai chiều) |
+| Integration | **83 → 87** (+4: unique NND mã phiếu + idempotency · khác tenant được phép · lịch sử `from = to` bị chặn · `ReturnedQuantity` vượt bị chặn và **bằng đúng** thì lọt) |
+| Bất biến DB | **NND 60 → 64** · quyền **71** (không đổi — chưa có API) |
+| Migration | **48 → 49** |
+| Cổng đầy đủ | **exit 0 · 363.7s · 15/15 bước** (E2E **140/140**) |
+
+### 28.5 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.4 | 28/10/2026 | *(agent, session GĐ1 — `S14` phần A)* | **Mô hình RMA**: 3 bảng + cột `ReturnedQuantity` trên dòng đơn + 8 `CHECK` + 4 unique NND (**NND 64**), migration **49**. Chốt **`Q4` = chỉ ghi nhận hoàn tiền** (§28.2). **+14 unit · +4 integration**. Ghi rõ **7 việc chưa làm** (§28.3) — phần B mới là service/API/chứng từ kho/ETO |
+

@@ -2935,3 +2935,139 @@ VALUES ('20261028035801_Gd1S13_StockAllotment', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+ALTER TABLE "OrdOrderLines" ADD "ReturnedQuantity" integer NOT NULL DEFAULT 0;
+
+CREATE TABLE "OrdReturns" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "OrderId" uuid NOT NULL,
+    "ReturnNumber" character varying(64) NOT NULL,
+    "ChannelCode" character varying(32) NOT NULL,
+    "Status" integer NOT NULL,
+    "GoodsStatus" integer NOT NULL,
+    "ReasonCode" character varying(64) NOT NULL,
+    "ReasonText" character varying(512),
+    "WarehouseId" uuid NOT NULL,
+    "RefundMethod" integer NOT NULL,
+    "RefundedAmount" numeric(18,4) NOT NULL,
+    "RefundCurrency" character varying(8) NOT NULL,
+    "RequestedByActorType" character varying(24) NOT NULL,
+    "RequestedByActorId" uuid,
+    "IdempotencyKey" character varying(256) NOT NULL,
+    "PayloadHash" character varying(64) NOT NULL,
+    "Version" bigint NOT NULL,
+    "CorrelationId" character varying(64) NOT NULL,
+    "ReceivedAtUtc" timestamp with time zone,
+    "ClosedAtUtc" timestamp with time zone,
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_OrdReturns" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_OrdReturns_Dong_CoMoc" CHECK ("Status" <> 5 OR "ClosedAtUtc" IS NOT NULL),
+    CONSTRAINT "CK_OrdReturns_NhanHang_CoMoc" CHECK ("Status" <> 4 OR "ReceivedAtUtc" IS NOT NULL),
+    CONSTRAINT "CK_OrdReturns_RefundedAmount_KhongAm" CHECK ("RefundedAmount" >= 0)
+);
+
+CREATE TABLE "OrdReturnHistory" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "ReturnId" uuid NOT NULL,
+    "Axis" character varying(24) NOT NULL,
+    "FromStatus" integer NOT NULL,
+    "ToStatus" integer NOT NULL,
+    "ActorType" character varying(24) NOT NULL,
+    "ActorId" uuid,
+    "ReasonCode" character varying(64) NOT NULL,
+    "ReasonText" character varying(512),
+    "CorrelationId" character varying(64) NOT NULL,
+    "EventId" uuid NOT NULL,
+    "VersionAfter" bigint NOT NULL,
+    "OccurredAtUtc" timestamp with time zone NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_OrdReturnHistory" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_OrdReturnHistory_PhaiDoiTrangThai" CHECK ("FromStatus" <> "ToStatus"),
+    CONSTRAINT "FK_OrdReturnHistory_OrdReturns_ReturnId" FOREIGN KEY ("ReturnId") REFERENCES "OrdReturns" ("Id") ON DELETE RESTRICT
+);
+
+CREATE TABLE "OrdReturnLines" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "ReturnId" uuid NOT NULL,
+    "OrderLineId" uuid NOT NULL,
+    "Sku" character varying(64) NOT NULL,
+    "Quantity" integer NOT NULL,
+    "ReceivedQuantity" integer NOT NULL,
+    "Disposition" integer NOT NULL,
+    "UnitPriceSnapshot" numeric(18,4) NOT NULL,
+    "DiscountAmountSnapshot" numeric(18,4) NOT NULL,
+    "TaxAmountSnapshot" numeric(18,4) NOT NULL,
+    "RefundAmount" numeric(18,4) NOT NULL,
+    "LedgerEntryId" uuid,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_OrdReturnLines" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_OrdReturnLines_Disposition_ChiSauKhiNhan" CHECK ("Disposition" = 0 OR "ReceivedQuantity" > 0),
+    CONSTRAINT "CK_OrdReturnLines_Nhan_HopLe" CHECK ("ReceivedQuantity" >= 0 AND "ReceivedQuantity" <= "Quantity"),
+    CONSTRAINT "CK_OrdReturnLines_SoLuong_HopLe" CHECK ("Quantity" > 0),
+    CONSTRAINT "FK_OrdReturnLines_OrdReturns_ReturnId" FOREIGN KEY ("ReturnId") REFERENCES "OrdReturns" ("Id") ON DELETE RESTRICT
+);
+
+ALTER TABLE "OrdOrderLines" ADD CONSTRAINT "CK_OrdOrderLines_ReturnedQuantity_HopLe" CHECK ("ReturnedQuantity" >= 0 AND "ReturnedQuantity" <= "Quantity");
+
+CREATE INDEX "IX_OrdReturnHistory_ReturnId" ON "OrdReturnHistory" ("ReturnId");
+
+CREATE UNIQUE INDEX "IX_OrdReturnHistory_TenantId_ReturnId_Axis_VersionAfter" ON "OrdReturnHistory" ("TenantId", "ReturnId", "Axis", "VersionAfter");
+
+CREATE INDEX "IX_OrdReturnHistory_TenantId_ReturnId_OccurredAtUtc" ON "OrdReturnHistory" ("TenantId", "ReturnId", "OccurredAtUtc");
+
+CREATE INDEX "IX_OrdReturnLines_ReturnId" ON "OrdReturnLines" ("ReturnId");
+
+CREATE UNIQUE INDEX "IX_OrdReturnLines_TenantId_ReturnId_OrderLineId" ON "OrdReturnLines" ("TenantId", "ReturnId", "OrderLineId");
+
+CREATE UNIQUE INDEX "IX_OrdReturns_TenantId_IdempotencyKey" ON "OrdReturns" ("TenantId", "IdempotencyKey");
+
+CREATE INDEX "IX_OrdReturns_TenantId_OrderId_CreationTime" ON "OrdReturns" ("TenantId", "OrderId", "CreationTime");
+
+CREATE UNIQUE INDEX "IX_OrdReturns_TenantId_ReturnNumber" ON "OrdReturns" ("TenantId", "ReturnNumber");
+
+CREATE INDEX "IX_OrdReturns_TenantId_Status_GoodsStatus" ON "OrdReturns" ("TenantId", "Status", "GoodsStatus");
+
+DROP INDEX "IX_OrdReturns_TenantId_ReturnNumber";
+
+CREATE UNIQUE INDEX "IX_OrdReturns_TenantId_ReturnNumber" ON "OrdReturns" ("TenantId", "ReturnNumber") NULLS NOT DISTINCT;
+
+DROP INDEX "IX_OrdReturns_TenantId_IdempotencyKey";
+
+CREATE UNIQUE INDEX "IX_OrdReturns_TenantId_IdempotencyKey" ON "OrdReturns" ("TenantId", "IdempotencyKey") NULLS NOT DISTINCT;
+
+DROP INDEX "IX_OrdReturnLines_TenantId_ReturnId_OrderLineId";
+
+CREATE UNIQUE INDEX "IX_OrdReturnLines_TenantId_ReturnId_OrderLineId" ON "OrdReturnLines" ("TenantId", "ReturnId", "OrderLineId") NULLS NOT DISTINCT;
+
+DROP INDEX "IX_OrdReturnHistory_TenantId_ReturnId_Axis_VersionAfter";
+
+CREATE UNIQUE INDEX "IX_OrdReturnHistory_TenantId_ReturnId_Axis_VersionAfter" ON "OrdReturnHistory" ("TenantId", "ReturnId", "Axis", "VersionAfter") NULLS NOT DISTINCT;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261028041254_Gd1S14_OrderReturn', '10.0.11');
+
+COMMIT;
+

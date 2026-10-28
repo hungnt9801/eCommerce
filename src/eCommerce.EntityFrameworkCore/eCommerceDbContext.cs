@@ -177,6 +177,17 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>, IHasEventOut
     public DbSet<Orders.OrderStatusHistory> OrderStatusHistories { get; set; } = default!;
 
     /// <summary>
+    /// 🆕 `S14` — **PHIẾU TRẢ HÀNG (RMA)** (`SAL-006`). 🚨 Thiếu `DbSet` ⇒ `IRepository&lt;OrderReturn, Guid&gt;`
+    /// không được đăng ký ⇒ API RMA **`HTTP 500`** dù build xanh (quy ước #5; lưới an toàn `DbSetRegistrationTests`).
+    /// </summary>
+    public DbSet<Orders.OrderReturn> OrderReturns { get; set; } = default!;
+
+    public DbSet<Orders.OrderReturnLine> OrderReturnLines { get; set; } = default!;
+
+    /// <summary>`S14` — nhật ký chuyển trạng thái phiếu trả (**append-only**).</summary>
+    public DbSet<Orders.OrderReturnHistory> OrderReturnHistories { get; set; } = default!;
+
+    /// <summary>
     /// Nhật ký nhận đơn từ sàn (`SAL-005`). 🚨 **BẮT BUỘC có `DbSet`** — thiếu ⇒
     /// `IRepository&lt;MarketplaceOrderIntake, Guid&gt;` **không được đăng ký** (quy ước #3, lỗi Phase 0)
     /// ⇒ handler nhận đơn **không resolve được** ⇒ đơn lại mất.

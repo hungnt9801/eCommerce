@@ -151,6 +151,117 @@ public static class SalesDbContextModelCreatingExtensions
             b.HasIndex(x => new { x.OrderId, x.ExternalLineId })
                 .IsUnique()
                 .HasFilter("\"ExternalLineId\" IS NOT NULL");
+
+            // 🆕 `S14` — **HÀNG RÀO CUỐI chống trả vượt số đã mua** (`SAL-006` ADR-11).
+            // 📌 Kiểm ở domain (`OrderLine.TangTra`) là lớp **chính**; `CHECK` này chặn đường ghi tắt
+            // (SQL tay / job) — thiếu nó thì `ReturnedQuantity` có thể vượt `Quantity` mà **không lỗi nào**.
+            b.ToTable(t => t.HasCheckConstraint(
+                "CK_OrdOrderLines_ReturnedQuantity_HopLe",
+                "\"ReturnedQuantity\" >= 0 AND \"ReturnedQuantity\" <= \"Quantity\""));
+        });
+
+        // ══════════════════════════════════════════════════════════════════════════════════════════════
+        // 🆕 `S14` — PHIẾU TRẢ HÀNG (`SAL-006`): `OrdReturns` · `OrdReturnLines` · `OrdReturnHistory`
+        // ⚠️ **`OrdRefunds` CHƯA có** — `Q4` = *"chỉ ghi nhận"*: chưa có đường gọi cổng tự động.
+        // 📌 Vì vậy `RefundedAmount`/`RefundMethod` là **bản ghi tay** có chứng từ, không phải kết quả cổng.
+        // ══════════════════════════════════════════════════════════════════════════════════════════════
+        builder.Entity<Orders.OrderReturn>(b =>
+        {
+            b.ToTable("OrdReturns", t =>
+            {
+                t.HasCheckConstraint("CK_OrdReturns_RefundedAmount_KhongAm", "\"RefundedAmount\" >= 0");
+                t.HasCheckConstraint("CK_OrdReturns_NhanHang_CoMoc", "\"Status\" <> 4 OR \"ReceivedAtUtc\" IS NOT NULL");
+                t.HasCheckConstraint("CK_OrdReturns_Dong_CoMoc", "\"Status\" <> 5 OR \"ClosedAtUtc\" IS NOT NULL");
+            });
+            b.ConfigureByConvention();
+
+            b.Property(x => x.ReturnNumber).IsRequired().HasMaxLength(64);
+            b.Property(x => x.ChannelCode).IsRequired().HasMaxLength(32);
+            b.Property(x => x.ReasonCode).IsRequired().HasMaxLength(64);
+            b.Property(x => x.ReasonText).HasMaxLength(512);
+            b.Property(x => x.Status).HasConversion<int>();
+            b.Property(x => x.GoodsStatus).HasConversion<int>();
+            b.Property(x => x.RefundMethod).HasConversion<int>();
+            b.Property(x => x.RefundedAmount).HasPrecision(18, 4);
+            b.Property(x => x.RefundCurrency).IsRequired().HasMaxLength(8);
+            b.Property(x => x.RequestedByActorType).IsRequired().HasMaxLength(24);
+            b.Property(x => x.IdempotencyKey).IsRequired().HasMaxLength(256);
+            b.Property(x => x.PayloadHash).IsRequired().HasMaxLength(64);
+            b.Property(x => x.CorrelationId).IsRequired().HasMaxLength(64);
+            b.Ignore(x => x.ConMo);
+
+            // `SAL-006` §5.1 — **hai** unique NND; migration sửa tay.
+            b.HasIndex(x => new { x.TenantId, x.ReturnNumber })
+                .IsUnique()
+                .HasDatabaseName("IX_OrdReturns_TenantId_ReturnNumber");
+            b.HasIndex(x => new { x.TenantId, x.IdempotencyKey })
+                .IsUnique()
+                .HasDatabaseName("IX_OrdReturns_TenantId_IdempotencyKey");
+
+            b.HasIndex(x => new { x.TenantId, x.OrderId, x.CreationTime })
+                .HasDatabaseName("IX_OrdReturns_TenantId_OrderId_CreationTime");
+            b.HasIndex(x => new { x.TenantId, x.Status, x.GoodsStatus })
+                .HasDatabaseName("IX_OrdReturns_TenantId_Status_GoodsStatus");
+        });
+
+        builder.Entity<Orders.OrderReturnLine>(b =>
+        {
+            b.ToTable("OrdReturnLines", t =>
+            {
+                t.HasCheckConstraint("CK_OrdReturnLines_SoLuong_HopLe", "\"Quantity\" > 0");
+                t.HasCheckConstraint(
+                    "CK_OrdReturnLines_Nhan_HopLe",
+                    "\"ReceivedQuantity\" >= 0 AND \"ReceivedQuantity\" <= \"Quantity\"");
+                t.HasCheckConstraint(
+                    "CK_OrdReturnLines_Disposition_ChiSauKhiNhan",
+                    "\"Disposition\" = 0 OR \"ReceivedQuantity\" > 0");
+            });
+            b.ConfigureByConvention();
+
+            b.Property(x => x.Sku).IsRequired().HasMaxLength(64);
+            b.Property(x => x.Disposition).HasConversion<int>();
+            b.Property(x => x.UnitPriceSnapshot).HasPrecision(18, 4);
+            b.Property(x => x.DiscountAmountSnapshot).HasPrecision(18, 4);
+            b.Property(x => x.TaxAmountSnapshot).HasPrecision(18, 4);
+            b.Property(x => x.RefundAmount).HasPrecision(18, 4);
+
+            // Một dòng đơn chỉ xuất hiện **MỘT** lần trong một phiếu (chống trả trùng cùng dòng).
+            b.HasIndex(x => new { x.TenantId, x.ReturnId, x.OrderLineId })
+                .IsUnique()
+                .HasDatabaseName("IX_OrdReturnLines_TenantId_ReturnId_OrderLineId");
+
+            b.HasOne<Orders.OrderReturn>()
+                .WithMany()
+                .HasForeignKey(x => x.ReturnId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<Orders.OrderReturnHistory>(b =>
+        {
+            b.ToTable("OrdReturnHistory", t =>
+            {
+                t.HasCheckConstraint("CK_OrdReturnHistory_PhaiDoiTrangThai", "\"FromStatus\" <> \"ToStatus\"");
+            });
+            b.ConfigureByConvention();
+
+            b.Property(x => x.Axis).IsRequired().HasMaxLength(24);
+            b.Property(x => x.ActorType).IsRequired().HasMaxLength(24);
+            b.Property(x => x.ReasonCode).IsRequired().HasMaxLength(64);
+            b.Property(x => x.ReasonText).HasMaxLength(512);
+            b.Property(x => x.CorrelationId).IsRequired().HasMaxLength(64);
+
+            b.HasIndex(x => new { x.TenantId, x.ReturnId, x.OccurredAtUtc })
+                .HasDatabaseName("IX_OrdReturnHistory_TenantId_ReturnId_OccurredAtUtc");
+
+            // 🚨 *mỗi phiên bản của một trục chỉ có ĐÚNG MỘT dòng lịch sử* (`sal-003` cùng khuôn).
+            b.HasIndex(x => new { x.TenantId, x.ReturnId, x.Axis, x.VersionAfter })
+                .IsUnique()
+                .HasDatabaseName("IX_OrdReturnHistory_TenantId_ReturnId_Axis_VersionAfter");
+
+            b.HasOne<Orders.OrderReturn>()
+                .WithMany()
+                .HasForeignKey(x => x.ReturnId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         // ---- Nhật ký nhận đơn từ sàn (`SAL-005`) ----

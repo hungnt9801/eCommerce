@@ -232,6 +232,40 @@ public static class ViPhamRangBuocDb
         ["CK_InvStockAllotments_Nha_CoLyDo"] =
             new(MaChung,
                 "Ngân sách đã NHẢ mà thiếu lý do ⇒ không đối soát được vì sao kênh hết hàng.", false),
+        ["CK_OrdOrderLines_ReturnedQuantity_HopLe"] =
+            new(MaChung,
+                "Số lượng ĐÃ TRẢ của dòng đơn vượt số đã mua ⇒ dữ liệu trả hàng không hợp lệ.", false),
+        ["CK_OrdReturns_RefundedAmount_KhongAm"] =
+            new(MaChung, "Tiền hoàn của phiếu trả bị ÂM ⇒ dữ liệu tiền không hợp lệ.", false),
+        ["CK_OrdReturns_NhanHang_CoMoc"] =
+            new(MaChung, "Phiếu ở trạng thái ĐÃ NHẬN HÀNG mà thiếu mốc thời gian nhận.", false),
+        ["CK_OrdReturns_Dong_CoMoc"] =
+            new(MaChung, "Phiếu ĐÃ ĐÓNG mà thiếu mốc thời gian đóng.", false),
+        ["CK_OrdReturnLines_SoLuong_HopLe"] =
+            new(MaChung, "Dòng trả có số lượng ≤ 0 ⇒ vô nghĩa.", false),
+        ["CK_OrdReturnLines_Nhan_HopLe"] =
+            new(MaChung, "Số lượng ĐÃ NHẬN của dòng trả nằm ngoài [0, Quantity].", false),
+        ["CK_OrdReturnLines_Disposition_ChiSauKhiNhan"] =
+            new(MaChung, "Chọn cách xử lý hàng (Restock/Damaged) khi CHƯA nhận hàng.", false),
+        ["CK_OrdReturnHistory_PhaiDoiTrangThai"] =
+            new(MaChung, "Lịch sử phiếu trả ghi một chuyển dịch KHÔNG đổi trạng thái (from = to).", false),
+
+        // ── BÁN HÀNG: PHIẾU TRẢ HÀNG (`S14`, 28/10/2026 — `SAL-006`) ──────────────────────────────
+        // 🚨 Bốn unique index là **hàng rào chống trả trùng/trả hai lần**; mất mệnh đề `NULLS NOT DISTINCT` thì
+        // khi `TenantId = NULL` (1 tenant) chúng **vô hiệu im lặng** ⇒ cùng một yêu cầu tạo **hai phiếu trả**
+        // ⇒ hoàn tiền & nhập kho **gấp đôi**. 🔑 Mã `Sales:0010` (không mượn `Order:*` — aggregate khác).
+        ["IX_OrdReturns_TenantId_ReturnNumber"] =
+            new(eCommerceConsts.ErrorCodes.PhieuTraKhongHopLe,
+                "Mã phiếu trả đã tồn tại trong tenant ⇒ sinh mã khác.", true),
+        ["IX_OrdReturns_TenantId_IdempotencyKey"] =
+            new(eCommerceConsts.ErrorCodes.PhieuTraKhongHopLe,
+                "Yêu cầu trả hàng này ĐÃ được ghi nhận (trùng khoá idempotency) ⇒ không tạo phiếu thứ hai.", true),
+        ["IX_OrdReturnLines_TenantId_ReturnId_OrderLineId"] =
+            new(eCommerceConsts.ErrorCodes.PhieuTraKhongHopLe,
+                "Dòng đơn này ĐÃ có trong phiếu trả ⇒ sửa dòng đang có thay vì thêm dòng mới.", true),
+        ["IX_OrdReturnHistory_TenantId_ReturnId_Axis_VersionAfter"] =
+            new(MaChung,
+                "Đã có lịch sử cho đúng phiên bản này của trục ⇒ thao tác bị huỷ, KHÔNG chuyển trạng thái.", true),
 
         // ── CATALOG ──────────────────────────────────────────────────────────────────────────────
         ["IX_CatProducts_TenantId_Sku"] =
@@ -322,3 +356,5 @@ public static class ViPhamRangBuocDb
     /// <summary>Tên các ràng buộc **đã có ánh xạ** — dùng cho test bảo trì (phát hiện thiếu sót).</summary>
     public static IReadOnlyCollection<string> CacRangBuocDaAnhXa => TheoRangBuoc.Keys;
 }
+
+

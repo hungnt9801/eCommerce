@@ -583,6 +583,52 @@ public class OrderLine : FullAuditedEntity<Guid>, IMultiTenant
 
     public decimal LineTotal => (UnitPrice * Quantity) - DiscountAmount + TaxAmount;
 
+    /// <summary>
+    /// 🆕 **`S14`** — Σ số lượng **đã trả / đang yêu cầu trả** của dòng này (`SAL-006` §5.1, `ADR-11`).
+    /// 🚨 **HÀNG RÀO NGHIỆP VỤ** chống trả vượt số đã mua; DB có `CHECK`
+    /// `ReturnedQuantity >= 0 AND ReturnedQuantity <= Quantity` làm lớp cuối.
+    /// </summary>
+    public int ReturnedQuantity { get; protected set; }
+
+    /// <summary>
+    /// Giữ chỗ trả `q` cho dòng này. **NÉM** `Sales:0011` khi `ReturnedQuantity + q > Quantity`.
+    /// 📌 Đặt **ngay lúc tạo phiếu** (không phải lúc nhận hàng): hai phiếu đồng thời cùng một dòng đều thấy
+    /// *"chưa trả"* và cùng tạo được ⇒ **trả vượt** — đúng lỗi `ADR-11` sinh ra để chặn.
+    /// </summary>
+    public void TangTra(int q)
+    {
+        if (q < 1)
+        {
+            throw new BusinessException(SalesErrorCodes.PhieuTraKhongHopLe)
+                .WithData("lyDo", "Số lượng trả phải ≥ 1.").WithData("sku", Sku).WithData("soLuong", q);
+        }
+
+        if (ReturnedQuantity + q > Quantity)
+        {
+            throw new BusinessException(SalesErrorCodes.TraVuotSoDaMua)
+                .WithData("sku", Sku)
+                .WithData("daMua", Quantity)
+                .WithData("daTra", ReturnedQuantity)
+                .WithData("yeuCau", q)
+                .WithData("lyDo", "Trả VƯỢT số lượng đã mua của dòng này.");
+        }
+
+        ReturnedQuantity += q;
+    }
+
+    /// <summary>Trả lại chỗ trả (phiếu bị huỷ/từ chối) — **NÉM** nếu giảm quá số đang giữ.</summary>
+    public void GiamTra(int q)
+    {
+        if (q < 1 || q > ReturnedQuantity)
+        {
+            throw new BusinessException(SalesErrorCodes.PhieuTraKhongHopLe)
+                .WithData("lyDo", "Giảm số đã trả phải trong [1, daTra].")
+                .WithData("daTra", ReturnedQuantity).WithData("soLuong", q);
+        }
+
+        ReturnedQuantity -= q;
+    }
+
     protected OrderLine() { }
 
     public OrderLine(Guid id, string sku, int quantity, decimal unitPrice, string? externalLineId = null) : base(id)

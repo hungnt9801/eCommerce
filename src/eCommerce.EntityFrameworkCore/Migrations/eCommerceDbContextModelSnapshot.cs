@@ -5574,6 +5574,9 @@ namespace eCommerce.Migrations
                     b.Property<int>("Quantity")
                         .HasColumnType("integer");
 
+                    b.Property<int>("ReturnedQuantity")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Sku")
                         .IsRequired()
                         .HasMaxLength(64)
@@ -5597,7 +5600,359 @@ namespace eCommerce.Migrations
                         .IsUnique()
                         .HasFilter("\"ExternalLineId\" IS NOT NULL");
 
-                    b.ToTable("OrdOrderLines", (string)null);
+                    b.ToTable("OrdOrderLines", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_OrdOrderLines_ReturnedQuantity_HopLe", "\"ReturnedQuantity\" >= 0 AND \"ReturnedQuantity\" <= \"Quantity\"");
+                        });
+                });
+
+            modelBuilder.Entity("eCommerce.Orders.OrderReturn", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ChannelCode")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateTime?>("ClosedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("ConcurrencyStamp");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<Guid?>("DeleterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("DeleterId");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("DeletionTime");
+
+                    b.Property<string>("ExtraProperties")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("ExtraProperties");
+
+                    b.Property<int>("GoodsStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("IsDeleted");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PayloadHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ReasonCode")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ReasonText")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<DateTime?>("ReceivedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RefundCurrency")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)");
+
+                    b.Property<int>("RefundMethod")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("RefundedAmount")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<Guid?>("RequestedByActorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("RequestedByActorType")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<string>("ReturnNumber")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("WarehouseId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("IX_OrdReturns_TenantId_IdempotencyKey");
+
+                    b.HasIndex("TenantId", "ReturnNumber")
+                        .IsUnique()
+                        .HasDatabaseName("IX_OrdReturns_TenantId_ReturnNumber");
+
+                    b.HasIndex("TenantId", "OrderId", "CreationTime")
+                        .HasDatabaseName("IX_OrdReturns_TenantId_OrderId_CreationTime");
+
+                    b.HasIndex("TenantId", "Status", "GoodsStatus")
+                        .HasDatabaseName("IX_OrdReturns_TenantId_Status_GoodsStatus");
+
+                    b.ToTable("OrdReturns", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_OrdReturns_Dong_CoMoc", "\"Status\" <> 5 OR \"ClosedAtUtc\" IS NOT NULL");
+
+                            t.HasCheckConstraint("CK_OrdReturns_NhanHang_CoMoc", "\"Status\" <> 4 OR \"ReceivedAtUtc\" IS NOT NULL");
+
+                            t.HasCheckConstraint("CK_OrdReturns_RefundedAmount_KhongAm", "\"RefundedAmount\" >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("eCommerce.Orders.OrderReturnHistory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ActorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ActorType")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<string>("Axis")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<Guid?>("DeleterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("DeleterId");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("DeletionTime");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("FromStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("IsDeleted");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ReasonCode")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ReasonText")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<Guid>("ReturnId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.Property<int>("ToStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("VersionAfter")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReturnId");
+
+                    b.HasIndex("TenantId", "ReturnId", "OccurredAtUtc")
+                        .HasDatabaseName("IX_OrdReturnHistory_TenantId_ReturnId_OccurredAtUtc");
+
+                    b.HasIndex("TenantId", "ReturnId", "Axis", "VersionAfter")
+                        .IsUnique()
+                        .HasDatabaseName("IX_OrdReturnHistory_TenantId_ReturnId_Axis_VersionAfter");
+
+                    b.ToTable("OrdReturnHistory", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_OrdReturnHistory_PhaiDoiTrangThai", "\"FromStatus\" <> \"ToStatus\"");
+                        });
+                });
+
+            modelBuilder.Entity("eCommerce.Orders.OrderReturnLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<Guid?>("DeleterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("DeleterId");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("DeletionTime");
+
+                    b.Property<decimal>("DiscountAmountSnapshot")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<int>("Disposition")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("IsDeleted");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<Guid?>("LedgerEntryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OrderLineId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ReceivedQuantity")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("RefundAmount")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<Guid>("ReturnId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Sku")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<decimal>("TaxAmountSnapshot")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.Property<decimal>("UnitPriceSnapshot")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReturnId");
+
+                    b.HasIndex("TenantId", "ReturnId", "OrderLineId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_OrdReturnLines_TenantId_ReturnId_OrderLineId");
+
+                    b.ToTable("OrdReturnLines", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_OrdReturnLines_Disposition_ChiSauKhiNhan", "\"Disposition\" = 0 OR \"ReceivedQuantity\" > 0");
+
+                            t.HasCheckConstraint("CK_OrdReturnLines_Nhan_HopLe", "\"ReceivedQuantity\" >= 0 AND \"ReceivedQuantity\" <= \"Quantity\"");
+
+                            t.HasCheckConstraint("CK_OrdReturnLines_SoLuong_HopLe", "\"Quantity\" > 0");
+                        });
                 });
 
             modelBuilder.Entity("eCommerce.Orders.OrderStatusHistory", b =>
@@ -7682,6 +8037,24 @@ namespace eCommerce.Migrations
                         .WithMany("Lines")
                         .HasForeignKey("OrderId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("eCommerce.Orders.OrderReturnHistory", b =>
+                {
+                    b.HasOne("eCommerce.Orders.OrderReturn", null)
+                        .WithMany()
+                        .HasForeignKey("ReturnId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("eCommerce.Orders.OrderReturnLine", b =>
+                {
+                    b.HasOne("eCommerce.Orders.OrderReturn", null)
+                        .WithMany()
+                        .HasForeignKey("ReturnId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 

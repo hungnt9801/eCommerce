@@ -1,6 +1,6 @@
 # BÀN GIAO — Phần còn lại của GĐ1 (để mở session mới)
 
-> **Lập ngày:** 28/10/2026 · **Cập nhật:** 28/10/2026 (sau `S12` + `S13` + `S15`) · **Cây:** `main` (sạch) · **Người lập:** phiên tự động
+> **Lập ngày:** 28/10/2026 · **Cập nhật:** 28/10/2026 (sau `S12` + `S13` + `S14A` + `S15`) · **Cây:** `main` (sạch) · **Người lập:** phiên tự động
 >
 > 🔑 **Đọc mục 1 trước.** Tài liệu này **không** nói GĐ1 đã xong. Nó chốt **đang ở đâu**, **còn gì**, và
 > **làm theo thứ tự nào** để không phải đoán lại.
@@ -9,18 +9,18 @@
 
 ## 1. Ảnh chụp hiện tại (đo được, không phải lời khai)
 
-> 📌 **Số đo này là SAU `S13` + `S15`** (28/10/2026). Bảng cũ trước `S12` (unit **1528** · integration **71** · E2E
+> 📌 **Số đo này là SAU `S13` + `S14` phần A + `S15`** (28/10/2026). Bảng cũ trước `S12` (unit **1528** · integration **71** · E2E
 > **135** · NND **57** · **68** quyền · **89** chỗ quét · **46** migration) đã **trôi** — đừng dùng.
 
 | Hạng mục | Giá trị | Cách đo |
 |---|---|---|
 | Commit | `git log --oneline -1` | 🔒 **nguồn sự thật là lệnh**, không phải dòng trong tài liệu |
-| Cổng đầy đủ | **exit 0 · 348.1s · 15/15 bước** | `pwsh -File tools\kiem-tat-ca.ps1 -DayDu` |
-| Unit | **1571** | bước ③ |
-| Integration | **83/83** | bước ④ |
+| Cổng đầy đủ | **exit 0 · 363.7s · 15/15 bước** | `pwsh -File tools\kiem-tat-ca.ps1 -DayDu` |
+| Unit | **1585** | bước ③ |
+| Integration | **87/87** | bước ④ |
 | E2E (HTML thật) | **140/140** | bước ⑧ |
-| Bất biến DB | **25/25** · **NND 60** · **71 quyền** · **96** chỗ quét | bước ⑥ |
-| Migration | **48** | `src/eCommerce.EntityFrameworkCore/Migrations` |
+| Bất biến DB | **25/25** · **NND 64** · **71 quyền** · **99** chỗ quét | bước ⑥ |
+| Migration | **49** | `src/eCommerce.EntityFrameworkCore/Migrations` |
 | Oversell | **11/11** (bước ⑬) | `tools/probe-oversell.ps1` |
 | Outbox replay | **9/9** (bước ⑭) | `tools/probe-outbox.ps1` |
 | Outbox 2 instance | **9/9** (bước ⑮) | `tools/probe-outbox-2instance.ps1` |
@@ -54,7 +54,7 @@
 |---|---|---|---|---|
 | ~~**S12**~~ | ✅ **XONG 28/10/2026** — `CostPrice` (`PrcCostPrices`) | [`PRC-001` §20](features/pricing/prc-001-bang-gia-va-gia-theo-kenh.md) | migration **47** · NND **58** · quyền `eCommerce.Pricing.CostPrice.View` · `/GiaVon` (chỉ đọc) · **6 integration + 15 unit + 5 E2E**. ⚠️ **Chưa** có đường ghi (**`Q2`** chưa chốt) ⇒ đừng mở "tạm" |
 | ~~**S13**~~ | ✅ **XONG 28/10/2026** — `StockAllotment` + `StockAllotmentLedger` | [`INV-003` §21](features/inventory/inv-003-phan-bo-ton-theo-kenh.md) | migration **48** · NND **60** · **2 quyền** (seed **71**) · giữ chỗ **trừ ngân sách** kênh (tuỳ chọn theo dòng) · **+11 unit + 6 integration** · ⚠️ **chưa** có UI + **chưa** tự thu hồi khi tồn giảm (§21.5) |
-| **S14** | `OrderReturn` + `OrderReturnLine` | [`SAL-006`](features/sales/sal-006-tra-hang-rma-hoan-tien.md) | Trả hàng/RMA + hoàn tiền; trạng thái có guard; nối phiếu kho `CustomerReturn` qua `ReferenceType/Id` (không FK cứng); cập nhật `Order.ReturnStatus` | **49** |
+| 🟡 **S14** | `OrderReturn` + `OrderReturnLine` | [`SAL-006` §28](features/sales/sal-006-tra-hang-rma-hoan-tien.md) | ✅ **phần A (28/10/2026):** 3 bảng + `OrderLine.ReturnedQuantity` + 8 CHECK + 4 unique NND (NND **64**), migration **49**; `Q4` = **chỉ ghi nhận** · ❌ **phần B**: service/API + chứng từ kho `CustomerReturn` + ETO + xoá cạnh tắt `Open→Returned` + UI | **đã dùng 49** |
 | ~~**S15**~~ | ✅ **XONG 28/10/2026** — `StalePendingTransaction` + `TriggerRunAsync` | [`REC-001` §20](features/reconciliation/rec-001-doi-soat-thanh-toan-querydr.md) | ngưỡng **24 h** (cấu hình, `0` = TẮT) · `TriggerRunAsync` đi qua **cùng khoá** với job · **+17 unit** · **probe 30/30** (HTTP thật) | **không** (ngưỡng là cấu hình) |
 | **S16** | 3 metric còn nợ | [`XC-005` §5.1/§19.3](features/cross-cutting/XC-005-observability-log-metric.md) | `messaging_dlq_replayed_total` (cần luồng replay thật), `lock_ttl_exceeded_total` (cần wrapper TTL), `logging_failures_total` (logger provider) | không (trừ khi thêm wrapper) |
 | **S17** | Hợp đồng cho dịch vụ còn ở host | `ke-hoach-tach-module` L2 | `ChannelDirectory`, `HienThiKenhAppService`, `ChinhSachHanMucAppService`, `WarehouseAppService`, `MarketplaceReconciliationWorker` | không |
@@ -169,6 +169,8 @@ Sau đó đọc theo thứ tự:
 | S19 VNPay thật | 2–3 pd | Phụ thuộc Q6 |
 
 **Tổng còn lại ≈ 20–33 pd** — không phải một phiên. Làm **theo S14 → S19**, mỗi phiên **một** việc + gate.
+
+
 
 
 
