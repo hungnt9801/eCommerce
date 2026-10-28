@@ -116,11 +116,18 @@ public class OrderStateMachineTests
         var ai = NguoiDung();
 
         don.ChuyenThucHien(FulfillmentStatus.Confirmed, StatusActorType.Staff, ai, "XacNhanDon");
+        // 🆕 `S14` phần D — cạnh tắt `Open → Returned` đã bị xoá ⇒ gọi thẳng PHẢI ném lỗi.
+        Assert.Equal(OrderErrorCodes.ChuyenTrangThaiKhongHopLe,
+            Assert.Throws<Volo.Abp.BusinessException>(() =>
+                don.ChuyenKetThuc(ReturnStatus.Returned, StatusActorType.Staff, ai, "TraTat")).Code);
+
+        don.ChuyenKetThuc(ReturnStatus.ReturnRequested, StatusActorType.Staff, ai, "YeuCauTra");
+        don.ChuyenKetThuc(ReturnStatus.ReturnApproved, StatusActorType.Staff, ai, "DuyetTra");
         don.ChuyenKetThuc(ReturnStatus.Returned, StatusActorType.Staff, ai, "TraHangToanBo");
 
         Assert.Equal(OrderStatus.Returned, don.Status);
         Assert.Equal(ReturnStatus.Returned, don.ReturnStatus);
-        Assert.Equal(1, don.ClosureVersion);
+        Assert.Equal(3, don.ClosureVersion);
         // 🔑 Trả hàng KHÔNG được làm bẩn version của trục thực hiện.
         Assert.Equal(1, don.FulfillmentVersion);
     }
@@ -302,6 +309,8 @@ public class OrderStateMachineTests
     {
         var don = DonMoi();
         var ai = NguoiDung();
+        don.ChuyenKetThuc(ReturnStatus.ReturnRequested, StatusActorType.Staff, ai, "YeuCauTra");
+        don.ChuyenKetThuc(ReturnStatus.ReturnApproved, StatusActorType.Staff, ai, "DuyetTra");
         don.ChuyenKetThuc(ReturnStatus.Returned, StatusActorType.Staff, ai, "TraHangToanBo");
 
         var loi = Assert.Throws<Volo.Abp.BusinessException>(() =>
@@ -415,3 +424,5 @@ public class OrderStateMachineTests
         Assert.Equal(2, don.StatusHistory.Count);
     }
 }
+
+

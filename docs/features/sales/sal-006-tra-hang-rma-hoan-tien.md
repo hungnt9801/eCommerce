@@ -2132,3 +2132,40 @@ ta sẽ **gỡ nó ra** thay vì **sửa nó** (🔒 đúng số phận của m�
 |---|---|---|---|
 | v0.6 | 28/10/2026 | *(agent, session GĐ1 — `S14` phần C)* | **Nhập lại kho hàng hoàn**: gateway liên module + chứng từ `CustomerReturn` + ghi sổ ngay + idempotent theo số chứng từ; chỉ dòng `Restock`; gắn `LedgerEntryId` có guard. **+1 unit**; không đổi migration/NND/quyền. Ghi rõ 5 việc còn lại (§30.3) |
 
+
+---
+
+## 31. TRẠNG THÁI — **`S14` PHẦN D: XOÁ CẠNH TẮT `Open → Returned`** (28/10/2026)
+
+> 🎯 **Mục tiêu:** đóng **nợ `sal-003` §16** — *"khi `SAL-006` vào, đường `Open → Returned` phải đi qua
+> `ReturnRequested → ReturnApproved → Returned`"*.
+
+### 31.1 Đã làm
+
+| # | Việc | Chi tiết |
+|---|---|---|
+| 1 | **Xoá cạnh** `(Closure, Open → Returned)` | `OrderStateMachine` không còn cho phép *"đã trả"* mà **không có** phiếu trả/duyệt |
+| 2 | **Migrate `TraHangAsync`** (đường cũ) | Đi **đủ ba cạnh** trong cùng request: `ReturnRequested → ReturnApproved → Returned`. 🔑 Nhờ vậy `OrdStatusHistory` có **đủ** dấu vết cho **mọi** lần trả, kể cả đường cũ — không có ngoại lệ *"ghi tắt"* |
+| 3 | **Test hai chiều** | `OrderStateMachineTests`: (a) gọi thẳng `Open → Returned` ⇒ **NÉM** `Order:0002`; (b) đi đủ ba cạnh ⇒ `ClosureVersion = 3` (không còn `= 1`) |
+
+### 31.2 ✅ Bằng chứng
+
+| Phép đo | Kết quả |
+|---|---|
+| Unit | **1587** (số ca không đổi — sửa ca cũ thành **chặt hơn**: thêm khẳng định cạnh tắt bị chặn) |
+| Migration / NND / quyền | **49 · 64 · 71** — **không đổi** |
+| Cổng đầy đủ | **exit 0 · 347.4s · 15/15 bước** (E2E **145/145**) |
+
+### 31.3 ⚠️ Còn lại (S14)
+
+1. **ETO** (`OrderReturnRequestedEto`…) + outbox — **chưa** có consumer.
+2. **UI RMA** (trang đơn có nút yêu cầu trả; màn hình duyệt/nhận) — thuộc `S18`.
+3. **Probe/E2E cho API RMA** — API chưa có UI nên chưa đi qua HTTP thật.
+4. **Trạng thái `PartiallyReturned`** cho đơn trả một phần — nợ đã ghi ở `SAL-003`/§16, cần BA chốt hợp đồng API.
+
+### 31.4 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.7 | 28/10/2026 | *(agent, session GĐ1 — `S14` phần D)* | **Xoá cạnh tắt `Open → Returned`** + migrate `TraHangAsync` đi đủ ba cạnh; test khẳng định **hai chiều** (gọi tắt bị chặn · đi đủ ⇒ `ClosureVersion = 3`). Không đổi migration/NND/quyền |
+

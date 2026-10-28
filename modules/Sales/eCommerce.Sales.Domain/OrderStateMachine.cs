@@ -58,12 +58,10 @@ public static class OrderStateMachine
         (OrderAxis.Closure, (int)ReturnStatus.ReturnRequested, (int)ReturnStatus.ReturnApproved),
         (OrderAxis.Closure, (int)ReturnStatus.ReturnRequested, (int)ReturnStatus.ReturnRejected),
         (OrderAxis.Closure, (int)ReturnStatus.ReturnApproved, (int)ReturnStatus.Returned),
-        // ⚠️ **CẠNH TẮT CÒN LẠI — NỢ `SAL-006` (đã ghi ở `sal-003` §16):** `Open → Returned` cho phép đánh dấu
-        // *"đã trả"* **không có phiếu trả nào** (không dòng trả, không hàng về kho, không ai duyệt).
-        // 🆕 `S14` phần A (28/10/2026) **đã dựng** entity phiếu trả + bất biến `ReturnedQuantity`, nhưng **chưa**
-        // nối đường ghi ⇒ **cố ý GIỮ** cạnh này để `TraHangAsync` hiện có không gãy.
-        // 🔒 Khi `S14` phần B nối API + chứng từ kho: **XOÁ** cạnh này và cập nhật `OrderStateMachineTests`.
-        (OrderAxis.Closure, (int)ReturnStatus.Open, (int)ReturnStatus.Returned),
+        // 🆕 `S14` phần D (28/10/2026) — **ĐÃ XOÁ cạnh tắt `Open → Returned`** (nợ `sal-003` §16 đã đóng).
+        // 📌 Vì sao **phải** xoá: cạnh đó cho phép đánh dấu *"đã trả"* **không có phiếu trả nào** — không dòng
+        // trả, không hàng về kho, không ai duyệt — mà đơn vẫn `Returned`. 🔒 Nay **mọi** trả hàng đi qua
+        // `ReturnRequested → ReturnApproved → Returned`, kể cả đường cũ `TraHangAsync` (đã sửa cùng lượt).
         (OrderAxis.Closure, (int)ReturnStatus.Open, (int)ReturnStatus.Cancelled)
     };
 
@@ -133,3 +131,4 @@ public static class OrderStateMachine
         };
     }
 }
+

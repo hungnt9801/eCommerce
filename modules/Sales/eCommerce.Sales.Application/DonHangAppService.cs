@@ -385,6 +385,25 @@ public class DonHangAppService : ApplicationService, IDonHangAppService
         // chứng từ kho **vẫn** ghi đủ ⇒ sổ cái đúng; chỉ *giao diện* còn thiếu độ phân giải.
         if (!conLai)
         {
+            // 🆕 `S14` phần D — **đi ĐỦ BA CẠNH** của trục kết thúc: `Open → Returned` (cạnh tắt) **đã bị xoá**
+            // khỏi máy trạng thái. 📌 Lý do: cạnh tắt cho phép đánh dấu *"đã trả"* **không có phiếu trả**, không
+            // hàng về kho, không ai duyệt. 🔒 Nay chính đường cũ này cũng đi qua `ReturnRequested → ReturnApproved`
+            // ⇒ lịch sử đơn (`OrdStatusHistory`) trả lời được *"ai duyệt, lúc nào"* cho **mọi** lần trả.
+            // ⚠️ Đây là **đường cũ** (`TraHangAsync`); UI/API RMA là đường chuẩn và **không** gọi nó.
+            don.ChuyenKetThuc(
+                ReturnStatus.ReturnRequested,
+                StatusActorType.Staff,
+                CurrentUser.Id,
+                reasonCode: "TraHangToanBo",
+                reasonText: $"Phiếu nhập {phieu.Number} đã ghi sổ.");
+
+            don.ChuyenKetThuc(
+                ReturnStatus.ReturnApproved,
+                StatusActorType.Staff,
+                CurrentUser.Id,
+                reasonCode: "TraHangToanBo",
+                reasonText: "Nhân viên ghi nhận trả toàn bộ (đường cũ).");
+
             don.ChuyenKetThuc(
                 ReturnStatus.Returned,
                 StatusActorType.Staff,
@@ -551,3 +570,4 @@ public class DonHangAppService : ApplicationService, IDonHangAppService
         RowVersion = don.RowVersion
     };
 }
+
