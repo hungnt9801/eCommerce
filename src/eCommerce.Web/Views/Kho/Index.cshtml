@@ -1,0 +1,50 @@
+@model List<eCommerce.Application.Contracts.Inventory.TonKhoDto>
+@{
+    ViewData["Title"] = "Kho";
+    var khoId = ViewData["khoId"] as Guid?;
+    var sku = ViewData["sku"] as string;
+}
+
+<h1>Tồn kho</h1>
+
+<form method="get" class="row g-2 mb-3">
+    <div class="col-auto">
+        <input name="sku" value="@sku" class="form-control" placeholder="Mã SKU" />
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-primary">Lọc</button>
+    </div>
+</form>
+
+<p class="text-muted">Tổng: <strong>@Model.Count</strong> dòng tồn.</p>
+
+@if (Model.Count == 0)
+{
+    <div class="alert alert-info">Không có dòng tồn nào khớp bộ lọc.</div>
+}
+else
+{
+    <table class="table table-sm table-striped">
+        <thead>
+            <tr>
+                <th>Kho</th>
+                <th>SKU</th>
+                <th class="text-end">OnHand</th>
+                <th class="text-end">Reserved</th>
+                <th class="text-end">Available</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var t in Model)
+            {
+                <tr>
+                    <td><code>@t.WarehouseCode</code> — @t.WarehouseName</td>
+                    <td>@t.Sku</td>
+                    <td class="text-end">@t.OnHand</td>
+                    <td class="text-end">@t.Reserved</td>
+                    <td class="text-end">@t.Available</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}

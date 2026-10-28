@@ -1,0 +1,41 @@
+@model eCommerce.Catalog.Dtos.CreateBrandDto
+@{
+    ViewData["Title"] = "Tạo thương hiệu";
+}
+
+<h1>Tạo thương hiệu</h1>
+
+<form asp-action="Tao" method="post">
+    @Html.AntiForgeryToken()
+    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+    <div class="mb-3">
+        <label asp-for="Code" class="form-label">Mã</label>
+        <input asp-for="Code" class="form-control" />
+        <span asp-validation-for="Code" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="Name" class="form-label">Tên</label>
+        <input asp-for="Name" class="form-control" />
+        <span asp-validation-for="Name" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="Slug" class="form-label">Slug (bỏ trống ⇒ tự sinh)</label>
+        <input asp-for="Slug" class="form-control" />
+    </div>
+    <div class="mb-3">
+        <label asp-for="Description" class="form-label">Mô tả</label>
+        <textarea asp-for="Description" class="form-control" rows="3"></textarea>
+    </div>
+    <div class="mb-3">
+        <label asp-for="LogoUrl" class="form-label">Logo URL</label>
+        <input asp-for="LogoUrl" class="form-control" />
+    </div>
+    <div class="mb-3">
+        <label asp-for="SortOrder" class="form-label">Thứ tự</label>
+        <input asp-for="SortOrder" class="form-control" type="number" />
+    </div>
+
+    <button type="submit" class="btn btn-primary">Lưu</button>
+    <a asp-action="Index" class="btn btn-secondary">Huỷ</a>
+</form>

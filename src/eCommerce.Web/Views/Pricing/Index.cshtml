@@ -1,0 +1,71 @@
+@model (List<eCommerce.Pricing.Dtos.PriceListDto> DanhSach, List<eCommerce.Pricing.Dtos.PriceListItemDto> Dong)
+@{
+    ViewData["Title"] = "Bảng giá";
+    var id = ViewData["id"] as Guid?;
+}
+
+<h1>Bảng giá</h1>
+
+<table class="table table-sm table-striped">
+    <thead>
+        <tr>
+            <th>Mã</th>
+            <th>Tên</th>
+            <th>Phạm vi</th>
+            <th>Tiền tệ</th>
+            <th>Hiệu lực</th>
+            <th>Ưu tiên</th>
+            <th>Trạng thái</th>
+            <th class="text-end">Số dòng</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var b in Model.DanhSach)
+        {
+            <tr>
+                <td><code>@b.Code</code></td>
+                <td>@b.Name</td>
+                <td>@b.Scope@(string.IsNullOrWhiteSpace(b.ChannelCode) ? "" : $" · {b.ChannelCode}")</td>
+                <td>@b.CurrencyCode</td>
+                <td>@b.EffectiveFrom.ToString("yyyy-MM-dd")@(b.EffectiveTo is { } den ? $" → {den:yyyy-MM-dd}" : "")</td>
+                <td>@b.Priority</td>
+                <td>@b.Status</td>
+                <td class="text-end">@b.ItemCount</td>
+                <td><a href="@Url.Action("Index", new { id = b.Id })">Xem dòng</a></td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@if (id is not null)
+{
+    <h2>Dòng giá</h2>
+
+    @if (Model.Dong.Count == 0)
+    {
+        <div class="alert alert-info">Bảng giá này chưa có dòng giá.</div>
+    }
+    else
+    {
+        <table class="table table-sm">
+            <thead>
+                <tr>
+                    <th>SKU</th>
+                    <th class="text-end">Giá</th>
+                    <th>Tiền tệ</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var d in Model.Dong)
+                {
+                    <tr>
+                        <td>@d.Sku</td>
+                        <td class="text-end">@d.Amount.ToString("N2")</td>
+                        <td>@d.CurrencyCode</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+}

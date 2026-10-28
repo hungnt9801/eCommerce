@@ -27,6 +27,8 @@
     </div>
 </form>
 
+<p><a asp-action="Tao" class="btn btn-primary">Tạo thương hiệu</a></p>
+
 <p class="text-muted">Tổng: <strong>@Model.TotalCount</strong> thương hiệu.</p>
 
 @if (Model.Items.Count == 0)
@@ -60,7 +62,14 @@ else
                         }
                     </td>
                     <td>@b.SortOrder</td>
-                    <td>@(b.IsActive ? "Đang hoạt động" : "Đã ngừng")</td>
+                    <td>
+                        @(b.IsActive ? "Đang hoạt động" : "Đã ngừng")
+                        <a asp-action="Sua" asp-route-id="@b.Id" class="btn btn-sm btn-outline-secondary">Sửa</a>
+                        <form asp-action="@(b.IsActive ? "Ngung" : "KichHoat")" asp-route-id="@b.Id" method="post" class="d-inline">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-sm btn-outline-warning">@(b.IsActive ? "Ngừng" : "Kích hoạt")</button>
+                        </form>
+                    </td>
                 </tr>
             }
         </tbody>

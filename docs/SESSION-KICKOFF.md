@@ -72,7 +72,7 @@ cái không khớp chỉ là thời gian*).
 quyền **62** · migration **41** · chỗ quét **86** — **không đổi lược đồ**.
 
 📌 **24/10/2026 — KIỂM TOÁN GĐ1 + LÁT CẮT `SAL-003`:** baseline MỚI sau thay đổi = **1528 unit** · **71** integration ·
-**135/135** E2E · **25/25** DB · **NND 57** · **68** quyền · **44** migration · **89** chỗ quét · **15 bước** (thêm ⑬ oversell) — `-DayDu` **exit 0 · 396.7s**.
+**135/135** E2E · **25/25** DB · **NND 57** · **68** quyền · **44** migration · **89** chỗ quét · **15 bước** (thêm ⑬ oversell) — `-DayDu` **exit 0 · 365.0s**.
 📄 Báo cáo: [`audit-gd1.md`](audit-gd1.md) · kế hoạch tách module: [`ke-hoach-tach-module.md`](ke-hoach-tach-module.md).
 ⚠️ **Đừng dùng bảng `S11` ở trên để so drift** — nó là baseline **trước** lát cắt `SAL-003` (unit +24, NND +1, migration +1).
 📌 **Đo trên CI Linux (cùng mã `d6df51f`):** cổng **216.7s** · **12/12 bước** · **38/38 ca cổng** · unit **1422** ·

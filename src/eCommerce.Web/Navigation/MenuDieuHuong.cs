@@ -76,6 +76,22 @@ public static class MenuDieuHuong
             QuyenCanCo = eCommerceConsts.Permissions.Inventory.Default,
             MoTa = "Lịch sử lượt quét + dòng lệch cần xử lý"
         },
+        new()
+        {
+            Nhan = "Kho",
+            Url = "/Kho",
+            // `KhoController` gọi `ITonKhoAppService` (`[Authorize(Inventory.Default)]`) — cùng quyền với Đối soát.
+            QuyenCanCo = eCommerceConsts.Permissions.Inventory.Default,
+            MoTa = "Tồn theo kho/SKU (OnHand · Reserved · Available)"
+        },
+        new()
+        {
+            Nhan = "Bảng giá",
+            Url = "/Pricing",
+            // `PricingController` gọi `IPriceListAppService` (`[Authorize(PricingPermissions.Default)]`).
+            QuyenCanCo = eCommerce.Pricing.PricingPermissions.Default,
+            MoTa = "Bảng giá và dòng giá theo SKU (chỉ đọc)"
+        },
 
         // ══════════════════════════════════════════════════════════════════════════════════════════════
         // 🚨 **NHÓM CHA "VẬN HÀNH"** (`WEB-001` — menu **HAI TẦNG**) — lượt 19/40.
