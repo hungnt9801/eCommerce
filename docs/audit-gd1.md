@@ -189,10 +189,10 @@ không phải "cổng đã mở" — ghi ở đây để không ai trích dẫn 
 |---|---|---|---|
 | 0 | Tài liệu GĐ1 + `XC-001…007` đã `Approved` | ❌ **FAIL** | 1/55 |
 | 1 | Khách đặt được đơn trên web, thanh toán **1 cổng VN**, trạng thái đúng | 🟡 **PARTIAL** | E2E 133/133 với `FakePaymentProvider`; VNPay thật chưa kiểm (credential rỗng) |
-| 2 | Bán vượt tồn **không thể** — test 2 request đồng thời, 2 instance | ❌ **FAIL** | 0 test đồng thời |
-| 3 | **Không mất tiền** — job đối soát phát hiện lệch | 🟡 **PARTIAL** | job `querydr` + UI có; **không** lưu run/line/discrepancy; chưa tiền thật |
+| 2 | Bán vượt tồn **không thể** — test 2 request đồng thời, 2 instance | 🟡 **PARTIAL** | 2 luồng ✅ (`probe-oversell` 11/11); **2 instance cho giữ chỗ** ❌ (2 instance **outbox** đã đo, khác việc) |
+| 3 | **Không mất tiền** — job đối soát phát hiện lệch | 🟡 **PARTIAL** | Run/Line/Discrepancy **đã lưu**, phân loại **9/10**; VNPay thật chưa (credential rỗng) |
 | 4 | Mọi API cần xác thực + màn hình login | ✅ **PASS** | test reflection + allowlist |
-| 5 | **Không mất event** — outbox relay chạy | ❌ **FAIL** | 0 outbox, 0 relay |
+| 5 | **Không mất event** — outbox relay chạy | ✅ **PASS** | replay sau khi process chết **9/9** + 2 instance **9/9** |
 
 ---
 
@@ -272,6 +272,7 @@ git rev-list --count HEAD; git status --porcelain                      # 310 · 
 | **(c17) Brand / CatBrands** | ✅ **XONG (27/10/2026)** | Chốt CAT-002 Q3: entity riêng + FK; migration **45**; NND **56**; BrandTests (7 ca) + PostgreSqlSchemaTests.F1_du_56; tài liệu CAT-004 |
 | **(c18) REC-001 — 3 bảng đối soát thanh toán** | 🟡 **2a XONG (27/10/2026)** | PaymentReconciliationRun/Line/Discrepancy + enums + mapping + migration **46** + API đọc; NND **57**. ⏳ **2b**: worker ghi lượt/dòng/lệch — chặn bởi IPaymentProvider.QueryStatusAsync chỉ trả enum (không có response/amount) |
 | **(c19) UI Kho/Catalog/Pricing** | 🟡 **28/10/2026** | Brands (CRUD trừ xoá, antiforgery), Kho (read-only ITonKhoAppService), Pricing (read-only); menu 3 mục mới; web build + E2E xanh |
+| **(c20) Đóng gói bàn giao** | ✅ **28/10/2026** | [docs/ban-giao-gd1-con-lai.md](ban-giao-gd1-con-lai.md): snapshot, S12–S19, quyết định cần chốt, quy tắc, checklist 5 cổng |
 
 ### 12.1 Kế hoạch P0 #4 — bằng chứng chống oversell (không thể "làm cho có")
 

@@ -1,0 +1,164 @@
+# BÀN GIAO — Phần còn lại của GĐ1 (để mở session mới)
+
+> **Lập ngày:** 28/10/2026 · **Cây:** `main` @ `1a01f17` (sạch) · **Người lập:** phiên tự động 12→21
+>
+> 🔑 **Đọc mục 1 trước.** Tài liệu này **không** nói GĐ1 đã xong. Nó chốt **đang ở đâu**, **còn gì**, và
+> **làm theo thứ tự nào** để không phải đoán lại.
+
+---
+
+## 1. Ảnh chụp hiện tại (đo được, không phải lời khai)
+
+| Hạng mục | Giá trị | Cách đo |
+|---|---|---|
+| Commit | `1a01f17` | `git log --oneline -1` |
+| Cổng đầy đủ | **exit 0 · 365.0s · 15/15 bước** | `pwsh -File tools\kiem-tat-ca.ps1 -DayDu` |
+| Unit | **1528** | bước ③ |
+| Integration | **71/71** | bước ④ |
+| E2E (HTML thật) | **135/135** | bước ⑧ |
+| Bất biến DB | **25/25** · **NND 57** · **68 quyền** · **89** chỗ quét | bước ⑥ |
+| Migration | **46** | `src/eCommerce.EntityFrameworkCore/Migrations` |
+| Oversell | **11/11** (bước ⑬) | `tools/probe-oversell.ps1` |
+| Outbox replay | **9/9** (bước ⑭) | `tools/probe-outbox.ps1` |
+| Outbox 2 instance | **9/9** (bước ⑮) | `tools/probe-outbox-2instance.ps1` |
+| Đơn sàn | **49/49** | `tools/probe-don-san.ps1` |
+| Cây làm việc | **0 tệp** (sạch) | `git status --porcelain` |
+
+### Đã xong (đừng làm lại)
+
+| Việc | Bằng chứng |
+|---|---|
+| P0 #4 oversell 2 luồng | `probe-oversell` 11/11 + map concurrency → `Inventory:0001` |
+| SAL-003 — 7 nợ | `sal-003` §16: RowVersion, ETO/outbox, 6 API/quyền, setting, job 24 h, metric, UI 4 trục |
+| Outbox/inbox + relay + replay + 2 instance | `XC-002` §17; bước ⑭/⑮ |
+| Tách 4 module | `Catalog` · `Inventory` · `Reconciliation` · `Sales` — mỗi module 4 project + mapping EF; migration RỖNG; test kiến trúc |
+| Brand (`CatBrands`) | `CAT-004`, migration **45**, NND **56** |
+| REC-001 — 3 bảng + API đọc + worker ghi | migration **46**, NND **57**; worker phân loại **9/10** loại lệch |
+| UI đọc: `/Brands` (CRUD trừ xoá) · `/Kho` · `/Pricing` | menu + controller + view; E2E xanh |
+
+---
+
+## 2. Còn lại — bảng công việc (thứ tự làm)
+
+> Mỗi việc **bắt buộc** trong **cùng một thay đổi**: entity + mapping + **migration** + **`schema.sql` regenerate**
+> + test (domain + schema) + **tài liệu** + `-DayDu` xanh. Không tách PR.
+
+| # | Việc | Đặc tả (nguồn sự thật) | Phạm vi tối thiểu | Migration dự kiến |
+|---|---|---|---|---|
+| **S12** | `CostPrice` (`PrcCostPrices`) | [`PRC-001` §5.2](features/pricing/prc-001-bang-gia-va-gia-theo-kenh.md) | Entity `CostPrice` (Sku, Amount, Currency, EffectiveFrom/To, ApprovedBy/At) + unique **NND** `(TenantId, Sku, EffectiveFrom)` + CHECK `Amount >= 0`, `Currency ~ '^[A-Z]{3}$'`; app service **đọc** (cấm lộ ra API công khai — BR-013) + UI đọc | **47** · NND **58** |
+| **S13** | `StockAllotment` + `StockAllotmentLedger` | [`INV-003`](features/inventory/inv-003-phan-bo-ton-theo-kenh.md) | Ngân sách tồn theo `(WarehouseId, Sku, ChannelCode)` + sổ cái append-only; **cấm** thêm `StockMovementType`; event `StockAllotmentChangedEto`; hết hạn giữ chỗ theo ngân sách | **48** · NND **59** (hoặc 60 nếu ledger có unique) |
+| **S14** | `OrderReturn` + `OrderReturnLine` | [`SAL-006`](features/sales/sal-006-tra-hang-rma-hoan-tien.md) | Trả hàng/RMA + hoàn tiền; trạng thái có guard; nối phiếu kho `CustomerReturn` qua `ReferenceType/Id` (không FK cứng); cập nhật `Order.ReturnStatus` | **49** |
+| **S15** | `StalePendingTransaction` + `TriggerRunAsync` | [`REC-001` §5.4/§6.1](features/reconciliation/rec-001-doi-soat-thanh-toan-querydr.md) | Chốt **ngưỡng giờ** (setting); thêm kind khi giao dịch `Initiated/Pending` quá hạn mà cổng chưa có; API chạy tay qua **cùng khoá** | **50** (nếu thêm setting seed) |
+| **S16** | 3 metric còn nợ | [`XC-005` §5.1/§19.3](features/cross-cutting/XC-005-observability-log-metric.md) | `messaging_dlq_replayed_total` (cần luồng replay thật), `lock_ttl_exceeded_total` (cần wrapper TTL), `logging_failures_total` (logger provider) | không (trừ khi thêm wrapper) |
+| **S17** | Hợp đồng cho dịch vụ còn ở host | `ke-hoach-tach-module` L2 | `ChannelDirectory`, `HienThiKenhAppService`, `ChinhSachHanMucAppService`, `WarehouseAppService`, `MarketplaceReconciliationWorker` | không |
+| **S18** | UI còn thiếu + tài liệu | `WEB-001`, `§A.5` | Form Pricing/Kho (nếu cần quản trị); duyệt 7 `XC-*` + 19 tài liệu GĐ1 | không |
+| **S19** | VNPay sandbox thật | `PAY-001` | Điền `VnPay:TmnCode/HashSecret`, chạy 1 giao dịch thật | không |
+
+### Việc **không** nên làm lại (đã chốt)
+
+- `CheckoutSession`/`Cart`: **D7** đã chốt dùng giỏ cookie 2 h + `Order.CheckoutIdempotencyKey`; **chỉ cần sửa plan**
+  cho khớp, **không** tạo bảng.
+- `OrderStatusHistory`: **đã có** — đừng tạo lại.
+- Outbox/inbox: **đã có** — đừng tự viết bảng `MsgOutbox`.
+
+---
+
+## 3. Quyết định cần **chủ dự án** chốt trước khi code
+
+| # | Câu hỏi | Ảnh hưởng |
+|---|---|---|
+| Q1 | `StalePendingHours` = ? (gợi ý **24 h** cho VNPay) | S15 — nếu không chốt thì **không** được bịa ngưỡng |
+| Q2 | `CostPrice` lấy từ đâu (nhập tay / import NCC / giá vốn bình quân)? | S12 — quyết định API và job |
+| Q3 | `StockAllotment`: phân bổ theo **kênh** hay **kênh + shop**? | S13 — khác unique index |
+| Q4 | Trả hàng có **hoàn tiền tự động** hay chỉ ghi nhận? | S14 — ảnh hưởng `PaymentHub` |
+| Q5 | Duyệt tài liệu: duyệt thật hay **thoả thuận song song bằng văn bản** (`§A.5`)? | Cổng 0 |
+| Q6 | VNPay sandbox: cấp credential ở đâu, ai giữ? | S19 |
+
+---
+
+## 4. Quy tắc bắt buộc (đã trả giá — đừng bỏ)
+
+1. **Migration + `schema.sql` + test + tài liệu trong CÙNG thay đổi**:
+   `dotnet ef migrations add <Ten> --project src/eCommerce.EntityFrameworkCore --startup-project src/eCommerce.DbMigrator`
+   → `dotnet ef migrations script ... --output test/eCommerce.IntegrationTests/Assets/schema.sql`
+   → chạy `dotnet run --no-launch-profile` **trong** `src/eCommerce.DbMigrator` (chạy ở root sẽ lỗi connection string).
+2. **Mọi unique index trên entity `IMultiTenant` phải `NULLS NOT DISTINCT`.** EF không sinh được ⇒ thêm
+   `DropIndex` + `Sql(... NULLS NOT DISTINCT)` trong migration. **Cập nhật `PostgreSqlSchemaTests`** (số NND đọc
+   từ test — `kiem-db.ps1` lấy chính con số đó).
+3. **Mã lỗi mới** phải vào sổ đăng ký (`eCommerceConsts.ErrorCodes.*` / `ReconErrorCodes`) và **ánh xạ**
+   `ViPhamRangBuocDb` nếu là ràng buộc DB có nghĩa nghiệp vụ; nếu không test `RangBuocDbChuaAnhXa` sẽ đỏ.
+4. **Quyền mới** phải khai **cả hai nơi** (hằng số + `eCommercePermissionDefinitionProvider`) và seed lại
+   `DbMigrator`; cập nhật số quyền trong test/probe.
+5. **Commit message ASCII** (hook chặn dấu). Dùng `-F <tệp>` với message không dấu.
+6. **Cổng 15 bước**: thêm/bớt bước ⇒ đổi `ci-khang-dinh.ps1` (`$SoBuocToiThieu`), `CiWorkflowTests`,
+   `XC-007`, tên job CI `cong-15-buoc`, `SESSION-KICKOFF`.
+7. **Probe**: event bất đồng bộ (outbox ≤ 2 s) ⇒ phải **poll đúng outcome**, không đếm "có dòng".
+   Không đếm `fail:` trong log khởi động (self-check ETO cố ý log `fail:`).
+8. **Gate hay OOM MSBuild**: dọn `dotnet build-server shutdown`, `Get-Process dotnet | Stop-Process`, đặt
+   `MSBUILDDISABLENODEREUSE=1`. Nếu `bin/` rỗng ⇒ build lại trước khi gate (bước ② cần DLL).
+9. **Không tuyên bố "GĐ1 xong"** khi cổng 0 (tài liệu Approved) và VNPay thật còn đỏ.
+
+---
+
+## 5. Cách bắt đầu session mới (5 phút)
+
+```powershell
+cd D:\Projects\Tools\eCommerce
+git log --oneline -1                 # phải là 1a01f17 hoặc commit bàn giao mới hơn
+git status --porcelain               # phải rỗng
+pwsh -File tools\kiem-tat-ca.ps1 -DayDu   # phải exit 0, 15/15
+```
+
+Sau đó đọc theo thứ tự:
+1. **tài liệu này** (mục 2 → chọn S12);
+2. đặc tả của việc đó (`docs/features/...` — cột 3 bảng §2);
+3. [`docs/SESSION-KICKOFF.md`](SESSION-KICKOFF.md) — quy ước/kiến trúc;
+4. [`docs/ke-hoach-tach-module.md`](ke-hoach-tach-module.md) — L2 nếu đụng module;
+5. [`docs/audit-gd1.md`](audit-gd1.md) §0.1 + §12 — lịch sử đã đóng.
+
+---
+
+## 6. Checklist "GĐ1 hoàn tất" (5 cổng plan §7.1)
+
+| # | Cổng | Hiện tại | Cần để XANH |
+|---|---|---|---|
+| 0 | Tài liệu GĐ1 + `XC-001…007` Approved | ❌ 1/55 | Q5 — duyệt thật hoặc thoả thuận văn bản |
+| 1 | Đặt đơn + thanh toán **1 cổng VN thật** | 🟡 FakePaymentProvider | S19 — credential + 1 giao dịch sandbox |
+| 2 | Không bán vượt tồn (2 luồng + **2 instance**) | 🟡 2 luồng ✅; **2 instance kho** ❌ | S13 + probe 2 Host cho **giữ chỗ** (không phải outbox) |
+| 3 | Không mất tiền — job đối soát phát hiện lệch | 🟡 có Run/Line/lệch 9/10 | S15 + tiền thật (S19) |
+| 4 | Mọi API cần xác thực + login | ✅ | — |
+| 5 | Không mất event — outbox relay | ✅ replay + 2 instance | — |
+
+> 📌 Cổng 2 còn **một** phần chưa đo: **2 instance cho GIỮ CHỖ** (khoá phân tán + Redis), khác với 2 instance
+> **outbox** đã đo ở bước ⑮. Đừng đánh đồng hai việc.
+
+---
+
+## 7. Bản đồ tệp dễ sửa nhầm
+
+| Vùng | Tệp | Lưu ý |
+|---|---|---|
+| EF mapping module | `modules/*/eCommerce.*.EntityFrameworkCore/*Extensions.cs` | Host `eCommerceDbContext.ConfigureCommerce` **chỉ gọi** `ConfigureX`; **cấm** chép block về host (test kiến trúc đỏ) |
+| NND | migration mới + `PostgreSqlSchemaTests` | Số NND trong test là **nguồn sự thật** cho `kiem-db.ps1` |
+| Mã lỗi | `src/eCommerce.Domain.Shared/eCommerceConsts.cs`, `ReconErrorCodes.cs` | `CatalogErrorCodeRegistryTests` chặn trùng/định dạng |
+| Mapping lỗi DB | `shared/eCommerce.Kernel/Data/ViPhamRangBuocDb.cs` | Thiếu ⇒ test `RangBuocDbChuaAnhXa` đỏ |
+| Menu/UI | `src/eCommerce.Web/Navigation/MenuDieuHuong.cs` | `QuyenCanCo` **phải** khớp `[Authorize]` app service; URL phải có controller thật |
+| Quyền | `eCommercePermissionDefinitionProvider` | Thiếu ⇒ **403 cho mọi người** kể cả admin |
+| Probe | `tools/probe-*.ps1` + `tools/kiem-tat-ca.ps1` | Bước ⑬/⑭/⑮ dùng chung Host; dọn cổng 5000/5001/5100 |
+
+---
+
+## 8. Ước lượng
+
+| Việc | Ước lượng | Ghi chú |
+|---|---|---|
+| S12 CostPrice | 3–5 pd | Spec đầy đủ, rủi ro thấp |
+| S13 StockAllotment + ledger | 5–8 pd | Chạm kho + event + hết hạn |
+| S14 OrderReturn/RMA | 6–10 pd | Chạm Sales + Inventory + PaymentHub |
+| S15 StalePending + TriggerRun | 2–3 pd | Cần Q1 |
+| S16 3 metric | 3–5 pd | Cần hạ tầng mới |
+| S17 hợp đồng host | 4–6 pd | Chạm 3 module |
+| S18 UI + tài liệu | 3–6 pd | Phụ thuộc Q5 |
+| S19 VNPay thật | 2–3 pd | Phụ thuộc Q6 |
+
+**Tổng còn lại ≈ 28–46 pd** — không phải một phiên. Làm **theo S12 → S19**, mỗi phiên **một** việc + gate.
