@@ -215,6 +215,30 @@ public class OrderReturnTests
     }
 
     [Fact]
+    public void Gan_chung_tu_kho__chi_cho_dong_Restock__va_chi_khi_DA_nhan()
+    {
+        var phieu = Tao();
+        var dong = Dong(phieu);
+
+        // Chưa nhận hàng ⇒ `Disposition = Unset` ⇒ không được gắn chứng từ kho.
+        Assert.Equal(SalesErrorCodes.PhieuTraKhongHopLe,
+            Assert.Throws<BusinessException>(() => dong.GanChungTuKho(Guid.NewGuid())).Code);
+
+        dong.GhiNhanHang(2, ReturnDisposition.Damaged);
+
+        // Hàng hỏng/trả NCC ⇒ KHÔNG nhập kho ⇒ cấm gắn chứng từ.
+        Assert.Equal(SalesErrorCodes.PhieuTraKhongHopLe,
+            Assert.Throws<BusinessException>(() => dong.GanChungTuKho(Guid.NewGuid())).Code);
+
+        var dong2 = new OrderReturnLine(Guid.NewGuid(), phieu.Id, Guid.NewGuid(), "SKU-2", 1, 10_000m, 0m, 0m);
+        dong2.GhiNhanHang(1, ReturnDisposition.Restock);
+        var chungTu = Guid.NewGuid();
+        dong2.GanChungTuKho(chungTu);
+
+        Assert.Equal(chungTu, dong2.LedgerEntryId);
+    }
+
+    [Fact]
     public void Sinh_so_phieu__dung_dinh_dang_RT_yyyyMMdd_N__va_khong_bao_gio_nho_hon_1()
     {
         var luc = new DateTime(2026, 10, 28, 4, 0, 0, DateTimeKind.Utc);

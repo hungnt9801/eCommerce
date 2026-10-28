@@ -2090,3 +2090,45 @@ ta sẽ **gỡ nó ra** thay vì **sửa nó** (🔒 đúng số phận của m�
 |---|---|---|---|
 | v0.5 | 28/10/2026 | *(agent, session GĐ1 — `S14` phần B)* | **Service + API RMA**: tạo/duyệt/từ chối/huỷ/nhận/đóng/ghi nhận hoàn tiền; idempotency + `PayloadHash`; **giữ chỗ trả** có đối xứng; **máy trạng thái đơn** là nguồn sự thật duy nhất; nhật ký phiếu append-only; sinh mã phiếu thuần có test. **+1 unit**; **không** đổi migration/NND/quyền. Ghi rõ **5 việc còn lại** (§29.3) — phần C mới là chứng từ kho + ETO + UI |
 
+
+---
+
+## 30. TRẠNG THÁI TRIỂN KHAI — **`S14` PHẦN C: NHẬP LẠI KHO HÀNG HOÀN** (28/10/2026)
+
+> 🎯 **Phạm vi phần C:** hàng khách trả **về kho thật** qua **chứng từ `CustomerReturn` + ghi sổ**, và **chỉ** cho
+> dòng `Restock` — hàng hỏng/trả NCC **không** được nhập kho.
+
+### 30.1 Đã làm
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| 1 | **`ICustomerReturnGateway`** (`Inventory.Application.Contracts`) | Hợp đồng **liên module** *"nhập kho hàng khách trả"* — cùng khuôn `IStockReservationGateway`. 🔑 **Không** dùng `IStockDocumentAppService` vì nó có `[Authorize(Inventory.Default)]` cấp class ⇒ Sales gọi trong tiến trình sẽ **403** (lỗi đã đo ở `SAL-005`) |
+| 2 | **`CustomerReturnGateway`** (`Inventory.Application`) | Tạo `StockDocument(Type = CustomerReturn)` + dòng + **ghi sổ NGAY** bằng chính `StockPostingService` ⇒ **không** có đường ghi sổ thứ hai. 🔒 **Idempotent theo số chứng từ** (`TH-{ReturnNumber}`): gọi lại **không** nhập kho lần hai |
+| 3 | **Nối vào `NhanHangAsync`** (Sales) | Sau khi ghi nhận hàng về: các dòng `Disposition = Restock` & `ReceivedQuantity > 0` ⇒ gọi gateway ⇒ `OrderReturnLine.GanChungTuKho(id)` (guard: **chỉ** dòng `Restock`) |
+| 4 | **Bất biến mới** | `GanChungTuKho` **NÉM** nếu dòng chưa nhận hàng hoặc không phải `Restock` — 📌 ngăn *"đánh dấu đã nhập kho"* cho hàng hỏng (tồn kho ảo) |
+
+### 30.2 ✅ Bằng chứng
+
+| Phép đo | Kết quả |
+|---|---|
+| Unit | **1586 → 1587** (+1: `GanChungTuKho` chỉ cho `Restock`, cấm khi `Unset`/`Damaged`) |
+| Integration | **87** (không đổi — không đổi lược đồ; `CustomerReturn` + cột `LedgerEntryId` đã có) |
+| Migration / NND / quyền | **49 · 64 · 71** — **không đổi** |
+| Cổng đầy đủ | **exit 0 · 357.3s · 15/15 bước** (E2E **140/140**) |
+
+### 30.3 ⚠️ Còn lại
+
+| # | Thiếu | Ghi chú |
+|---|---|---|
+| 1 | **ETO** (`OrderReturnRequestedEto`…) + outbox | Chưa có consumer; thêm sự kiện không người nghe là tăng bề mặt vô ích |
+| 2 | **Xoá cạnh tắt `Open → Returned`** | `TraHangAsync` (đường cũ) còn dùng; phải chuyển nó sang quy trình RMA **trước** |
+| 3 | **UI RMA** | Thuộc `S18` |
+| 4 | **Probe/E2E cho API RMA** | Chưa có UI ⇒ chưa đi qua HTTP thật; hiện chỉ test entity + hợp đồng |
+| 5 | **Hoàn tiền tự động** | Cố ý **không** làm (`Q4` = chỉ ghi nhận) — `OrdRefunds` để dành cho lát cắt có duyệt |
+
+### 30.4 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.6 | 28/10/2026 | *(agent, session GĐ1 — `S14` phần C)* | **Nhập lại kho hàng hoàn**: gateway liên module + chứng từ `CustomerReturn` + ghi sổ ngay + idempotent theo số chứng từ; chỉ dòng `Restock`; gắn `LedgerEntryId` có guard. **+1 unit**; không đổi migration/NND/quyền. Ghi rõ 5 việc còn lại (§30.3) |
+

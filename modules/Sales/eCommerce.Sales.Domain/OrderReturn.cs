@@ -392,6 +392,28 @@ public class OrderReturnLine : FullAuditedEntity<Guid>, IMultiTenant
         ReceivedQuantity = soLuongNhan;
         Disposition = xuLy;
     }
+
+    /// <summary>
+    /// 🆕 **`S14` phần C** — gắn **chứng từ kho** đã sinh cho dòng này (nhập lại kho khi `Disposition = Restock`).
+    /// 📌 `null` = chưa nhập kho (hàng hỏng/trả NCC) — **không** được đóng phiếu như đã nhập.
+    /// </summary>
+    public void GanChungTuKho(Guid chungTuId)
+    {
+        if (chungTuId == Guid.Empty)
+        {
+            throw new BusinessException(SalesErrorCodes.PhieuTraKhongHopLe)
+                .WithData("lyDo", "Chứng từ kho rỗng.");
+        }
+
+        if (Disposition != ReturnDisposition.Restock)
+        {
+            throw new BusinessException(SalesErrorCodes.PhieuTraKhongHopLe)
+                .WithData("lyDo", "Chỉ dòng xử lý `Restock` mới được gắn chứng từ NHẬP KHO.")
+                .WithData("disposition", Disposition.ToString());
+        }
+
+        LedgerEntryId = chungTuId;
+    }
 }
 
 /// <summary>🆕 **`S14`** — **NHẬT KÝ CHUYỂN TRẠNG THÁI PHIẾU TRẢ** (`OrdReturnHistory`) — **APPEND-ONLY**.</summary>
@@ -461,5 +483,6 @@ public class OrderReturnHistory : FullAuditedEntity<Guid>, IMultiTenant
         CorrelationId = correlationId ?? string.Empty;
     }
 }
+
 
 

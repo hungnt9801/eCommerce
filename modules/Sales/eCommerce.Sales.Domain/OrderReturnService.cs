@@ -288,6 +288,28 @@ public class OrderReturnService : DomainService
         return await LuuAsync(phieu);
     }
 
+    /// <summary>
+    /// 🆕 **`S14` phần C** — gắn chứng từ **nhập kho hàng hoàn** cho các dòng `Restock` (sau khi gateway tạo+ghi sổ).
+    /// 🔒 Kiểm **thuộc phiếu** trước khi gán: hai phiếu khác nhau không được trỏ vào cùng một dòng.
+    /// </summary>
+    public async Task GanChungTuKhoAsync(Guid returnId, Guid chungTuId, IReadOnlyCollection<Guid> returnLineIds)
+    {
+        var dong = await _dongTra.GetListAsync(x => x.ReturnId == returnId);
+        var theoId = dong.ToDictionary(x => x.Id);
+
+        foreach (var id in returnLineIds)
+        {
+            if (!theoId.TryGetValue(id, out var d))
+            {
+                throw new BusinessException(SalesErrorCodes.PhieuTraKhongHopLe)
+                    .WithData("lyDo", "Dòng trả KHÔNG thuộc phiếu này.").WithData("returnLineId", id);
+            }
+
+            d.GanChungTuKho(chungTuId);
+            await _dongTra.UpdateAsync(d, autoSave: true);
+        }
+    }
+
     private async Task<OrderReturn> LayAsync(Guid id)
         => await _phieuTra.FindAsync(id)
            ?? throw new BusinessException(SalesErrorCodes.PhieuTraKhongHopLe)
@@ -353,4 +375,5 @@ public static class SinhSoPhieuTra
     public static string Sinh(DateTime atUtc, int soThuTu)
         => $"RT-{atUtc:yyyyMMdd}-{Math.Max(1, soThuTu)}";
 }
+
 

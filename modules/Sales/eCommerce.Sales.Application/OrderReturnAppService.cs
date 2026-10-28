@@ -18,15 +18,18 @@ public class OrderReturnAppService : ApplicationService, IOrderReturnAppService
     private readonly IRepository<OrderReturn, Guid> _phieuTra;
     private readonly IRepository<OrderReturnLine, Guid> _dongTra;
     private readonly OrderReturnService _xuLy;
+    private readonly eCommerce.Inventory.ICustomerReturnGateway _nhapKhoHangHoan;
 
     public OrderReturnAppService(
         IRepository<OrderReturn, Guid> phieuTra,
         IRepository<OrderReturnLine, Guid> dongTra,
-        OrderReturnService xuLy)
+        OrderReturnService xuLy,
+        eCommerce.Inventory.ICustomerReturnGateway nhapKhoHangHoan)
     {
         _phieuTra = phieuTra;
         _dongTra = dongTra;
         _xuLy = xuLy;
+        _nhapKhoHangHoan = nhapKhoHangHoan;
     }
 
     public async Task<List<OrderReturnDto>> GetListAsync(Guid? orderId = null)
@@ -94,7 +97,28 @@ public class OrderReturnAppService : ApplicationService, IOrderReturnAppService
             return (l.ReturnLineId, l.ReceivedQuantity, xuLy);
         }).ToList();
 
-        return await GetAsync((await _xuLy.NhanHangAsync(id, ketQua, StatusActorType.Staff, CurrentUser.Id)).Id);
+        var phieu = await _xuLy.NhanHangAsync(id, ketQua, StatusActorType.Staff, CurrentUser.Id);
+
+        // 🆕 `S14` phần C — **NHẬP LẠI KHO** cho các dòng `Restock` đã nhận (hàng về kho thật).
+        // 📌 `Damaged`/`ReturnToSupplier` **không** nhập kho ⇒ không có chứng từ, `LedgerEntryId` để trống.
+        var dong = await _dongTra.GetListAsync(x => x.ReturnId == id);
+        var canNhap = dong
+            .Where(x => x.Disposition == ReturnDisposition.Restock && x.ReceivedQuantity > 0)
+            .ToList();
+
+        if (canNhap.Count > 0)
+        {
+            var chungTuId = await _nhapKhoHangHoan.NhapHangKhachTraAsync(
+                phieu.WarehouseId,
+                $"TH-{phieu.ReturnNumber}",
+                canNhap.Select(x => (x.Sku, x.ReceivedQuantity)).ToList(),
+                DateTime.UtcNow,
+                note: $"Hàng khách trả · phiếu {phieu.ReturnNumber}");
+
+            await _xuLy.GanChungTuKhoAsync(id, chungTuId, canNhap.Select(x => x.Id).ToList());
+        }
+
+        return await GetAsync(phieu.Id);
     }
 
     [Authorize(eCommerceConsts.Permissions.Orders.Manage)]
@@ -136,3 +160,4 @@ public class OrderReturnAppService : ApplicationService, IOrderReturnAppService
             .ToList()
     };
 }
+
