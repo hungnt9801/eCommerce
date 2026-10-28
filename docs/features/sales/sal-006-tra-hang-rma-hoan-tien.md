@@ -2044,3 +2044,49 @@ ta sẽ **gỡ nó ra** thay vì **sửa nó** (🔒 đúng số phận của m�
 |---|---|---|---|
 | v0.4 | 28/10/2026 | *(agent, session GĐ1 — `S14` phần A)* | **Mô hình RMA**: 3 bảng + cột `ReturnedQuantity` trên dòng đơn + 8 `CHECK` + 4 unique NND (**NND 64**), migration **49**. Chốt **`Q4` = chỉ ghi nhận hoàn tiền** (§28.2). **+14 unit · +4 integration**. Ghi rõ **7 việc chưa làm** (§28.3) — phần B mới là service/API/chứng từ kho/ETO |
 
+
+---
+
+## 29. TRẠNG THÁI TRIỂN KHAI — **`S14` PHẦN B: DỊCH VỤ + API PHIẾU TRẢ** (28/10/2026)
+
+> 🎯 **Phạm vi phần B:** biến mô hình của phần A thành **đường chạy thật** — tạo phiếu, duyệt/từ chối/huỷ,
+> nhận hàng, đóng phiếu, ghi nhận hoàn tiền — với **máy trạng thái đơn** làm nguồn sự thật duy nhất.
+
+### 29.1 Đã làm
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| 1 | **`OrderReturnService`** (Domain) | `TaoPhieuAsync` · `DuyetAsync` · `TuChoiAsync` · `HuyAsync` · `NhanHangAsync` · `DongAsync` · `GhiNhanHoanTienAsync`. 🔒 **Cùng khoá** `sales:return:{tenant}:{orderId}` cho mọi thao tác tạo phiếu của một đơn |
+| 2 | **Idempotency** | `IdempotencyKey` tìm trước khi tạo; gọi lại **cùng khoá** ⇒ trả phiếu cũ, **không** ghi thêm. `PayloadHash` = SHA-256 của `(orderId + các dòng đã sắp xếp)` — sẵn cho bước kiểm *"dùng lại khoá với nội dung khác"* |
+| 3 | **Giữ chỗ trả** | `OrderLine.TangTra` khi tạo phiếu; **`GiamTra` khi phiếu bị từ chối/huỷ** ⇒ không khoá hàng vĩnh viễn |
+| 4 | **Trạng thái đơn** | Mọi chuyển dịch đi qua `Order.ChuyenKetThuc` (`SAL-003`): tạo ⇒ `ReturnRequested`; duyệt ⇒ `ReturnApproved`; từ chối ⇒ `ReturnRejected`; nhận **đủ** hàng ⇒ `Returned`. 🔑 **Không** gán `ReturnStatus` trực tiếp ở bất kỳ đâu |
+| 5 | **Nhật ký phiếu** | `OrderReturnHistory` ghi **mỗi** chuyển dịch (`Axis = Lifecycle/Goods`), `VersionAfter` = `phieu.Version`; **bỏ qua** khi `from = to` (không tạo dòng vô nghĩa) |
+| 6 | **API** `IOrderReturnAppService` | `GetListAsync` · `GetAsync` · `TaoPhieuAsync` · `DuyetAsync` · `TuChoiAsync` · `HuyAsync` · `NhanHangAsync` · `DongAsync` · `GhiNhanHoanTienAsync`. 🔐 Quyền: yêu cầu = `Orders.ReturnRequest`; duyệt/từ chối/hoàn tiền = `Orders.ReturnApprove`; nhận/đóng = `Orders.Manage` (tách **người yêu cầu ≠ người duyệt**) |
+| 7 | **Sinh mã phiếu** | `SinhSoPhieuTra.Sinh(at, seq)` → `RT-yyyyMMdd-N` (hàm thuần, test). ⚠️ Số thứ tự đếm theo **ngày tạo**; unique index `NULLS NOT DISTINCT` là hàng rào cuối khi hai phiếu cùng ngày tạo đồng thời |
+
+### 29.2 ✅ Bằng chứng đo được
+
+| Phép đo | Kết quả |
+|---|---|
+| Unit | **1585 → 1586** (+1: `SinhSoPhieuTra` — định dạng + không sinh `-0`) |
+| Integration | **87** (không đổi — phần B **không** đổi lược đồ) |
+| Migration / NND / quyền | **49 · 64 · 71** — **không đổi** (phần B dùng lược đồ + quyền đã có từ phần A) |
+| Cổng đầy đủ | **exit 0 · 356.4s · 15/15 bước** (E2E **140/140** — chưa có ca RMA vì API chưa có UI) |
+
+### 29.3 ⚠️ Vẫn còn (phần C — ghi rõ, **không** nói là đã xong)
+
+| # | Thiếu | Vì sao chưa làm |
+|---|---|---|
+| 1 | **Chứng từ kho `CustomerReturn` + ghi sổ** | Cần hợp đồng liên module (`ICustomerReturnGateway` — cùng khuôn `IStockReservationGateway`). 📌 Không dùng thẳng `IStockDocumentAppService` vì nó có `[Authorize(Inventory.Default)]` ⇒ Sales gọi trong tiến trình sẽ **403** (lỗi đã đo ở `SAL-005`) |
+| 2 | **ETO** (`OrderReturnRequestedEto`…) + outbox | Chưa có consumer nào; thêm sự kiện không có người nghe là tăng bề mặt mà **không** có giá trị |
+| 3 | **Xoá cạnh tắt `Open → Returned`** | `TraHangAsync` (đường cũ) còn dùng; phải chuyển nó sang quy trình RMA **trước** khi xoá |
+| 4 | **UI RMA** (trang đơn có nút “Yêu cầu trả”, màn hình duyệt/nhận) | Thuộc `S18` |
+| 5 | **Trả **một phần** rồi đóng, rồi trả tiếp** | Hiện phiếu đóng khi hàng về đủ; nhiều phiếu trên cùng đơn **được** phép (chưa chặn) — cần kiểm thêm nếu BA yêu cầu |
+| 6 | **Chưa có probe/E2E cho API RMA** | API chưa có UI nên chưa đi qua HTTP thật; hiện chỉ có test entity + hợp đồng (chính vì vậy **không** được nói là đã kiểm chứng end-to-end) |
+
+### 29.4 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.5 | 28/10/2026 | *(agent, session GĐ1 — `S14` phần B)* | **Service + API RMA**: tạo/duyệt/từ chối/huỷ/nhận/đóng/ghi nhận hoàn tiền; idempotency + `PayloadHash`; **giữ chỗ trả** có đối xứng; **máy trạng thái đơn** là nguồn sự thật duy nhất; nhật ký phiếu append-only; sinh mã phiếu thuần có test. **+1 unit**; **không** đổi migration/NND/quyền. Ghi rõ **5 việc còn lại** (§29.3) — phần C mới là chứng từ kho + ETO + UI |
+

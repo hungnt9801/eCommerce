@@ -213,4 +213,15 @@ public class OrderReturnTests
         Assert.Equal(SalesErrorCodes.PhieuTraKhongHopLe,
             Assert.Throws<BusinessException>(() => dong.GiamTra(1)).Code);
     }
+
+    [Fact]
+    public void Sinh_so_phieu__dung_dinh_dang_RT_yyyyMMdd_N__va_khong_bao_gio_nho_hon_1()
+    {
+        var luc = new DateTime(2026, 10, 28, 4, 0, 0, DateTimeKind.Utc);
+
+        Assert.Equal("RT-20261028-1", SinhSoPhieuTra.Sinh(luc, 1));
+        Assert.Equal("RT-20261028-7", SinhSoPhieuTra.Sinh(luc, 7));
+        Assert.Equal("RT-20261028-1", SinhSoPhieuTra.Sinh(luc, 0));    // 📌 không sinh `-0`/số âm
+    }
 }
+
