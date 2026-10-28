@@ -186,3 +186,36 @@ Sau đó đọc theo thứ tự:
 
 
 
+
+---
+
+## 9. NHẬT KÝ PHIÊN 28/10/2026 (đóng được gì — để phiên sau không đoán lại)
+
+| Hạng mục | Kết quả | Commit |
+|---|---|---|
+| `S12` — `CostPrice` (`PrcCostPrices`) | migration **47** · NND **58** · quyền `eCommerce.Pricing.CostPrice.View` (seed **69**) · `/GiaVon` (chỉ đọc) · 15 unit + 6 integration + 5 E2E | `acb6516` |
+| `S15` — `StalePendingTransaction` + `TriggerRunAsync` | **`Q1` = 24 h** (cấu hình, `0` = TẮT) · 10/10 loại lệch · chạy tay **cùng khoá** với job (`IPaymentReconciliationRunner`) · +17 unit · **probe thanh toán 26 → 30/30** | `95c04f8` |
+| `S13` — `StockAllotment` + sổ cái | **`Q3` = chỉ theo kênh** · migration **48** · NND **60** · 2 quyền · giữ chỗ **trừ/trả** ngân sách (tuỳ chọn theo dòng) · +11 unit + 6 integration | `cd6de05` |
+| `S14` A — lược đồ RMA | 3 bảng + `OrderLine.ReturnedQuantity` + 8 CHECK + 4 unique NND (NND **64**) · migration **49** · **`Q4` = chỉ ghi nhận hoàn tiền** · +14 unit + 4 integration | `9aa1293` |
+| `S14` B — service + API RMA | tạo/duyệt/từ chối/huỷ/nhận/đóng/hoàn tiền thủ công · idempotency + `PayloadHash` · giữ chỗ trả đối xứng · máy trạng thái đơn là nguồn sự thật · +1 unit | `c9e2155` |
+| `S14` C — nhập lại kho | `ICustomerReturnGateway` + chứng từ `CustomerReturn` + ghi sổ ngay, **chỉ** dòng `Restock` · +1 unit | `73bd907` |
+| `S14` D — xoá cạnh tắt | `Open → Returned` **đã xoá**; `TraHangAsync` đi đủ ba cạnh; test hai chiều | `2065c21` |
+| `S18` — UI | `/NganSach` (danh sách + ATP + cấp/sửa + đóng băng/mở/nhả, **chọn kho từ danh mục thật**) · nút “Chạy đối soát ngay” · **E2E 140 → 145** | `e3e7b77` · `2005cb4` |
+
+**Đo cuối phiên:** `-DayDu` **exit 0 · 345.2s · 15/15** · unit **1587** · integration **87** · **E2E 145/145** · DB **25/25** · NND **64** · **71** quyền · migration **49** · quét **99** chỗ · cây **0 tệp** · DB **0 rác probe**.
+
+**Còn lại (chưa làm — không được coi là xong):**
+
+1. `S16` — 3 metric: `messaging_dlq_replayed_total` (**cần luồng replay DLQ thật**), `lock_ttl_exceeded_total`
+   (**cần wrapper đọc TTL khoá** — `IAbpDistributedLock` không lộ TTL), `logging_failures_total`
+   (**cần logger provider bọc sink**). 🚨 `MetricEmitterTests` **ĐỎ** nếu khai báo mà không có điểm phát thật
+   ⇒ **không** được “đăng ký cho đủ số”.
+2. `S17` — hợp đồng cho 5 dịch vụ còn ở host (`ChannelDirectory`, `HienThiKenhAppService`,
+   `ChinhSachHanMucAppService`, `WarehouseAppService`, `MarketplaceReconciliationWorker`): refactor tách module L2.
+3. `S14` phần E — ETO, UI RMA, probe HTTP cho API RMA, trạng thái `PartiallyReturned` (cần BA chốt hợp đồng API).
+4. `S18` phần tài liệu — duyệt 7 `XC-*` + 19 tài liệu GĐ1: ⚠️ **`Q5` là quyết định của chủ dự án**.
+5. `S19` — VNPay sandbox thật: ⛔ **cần `VnPay:TmnCode` + `HashSecret`** (`Q6`). Không thể tự tạo credential;
+   **cấm** bịa “giao dịch thật”.
+
+📌 **Đọc `S13`/`S14` là hai hạng mục đã có đường chạy đầy đủ** (API + UI cho S13; API + chứng từ kho cho S14);
+`S16`/`S17` là **hạ tầng**, không phải màn hình — chúng **không** làm thay đổi hành vi người dùng cuối.
