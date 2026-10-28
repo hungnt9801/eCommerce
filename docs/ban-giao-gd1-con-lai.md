@@ -1,6 +1,6 @@
 # BÀN GIAO — Phần còn lại của GĐ1 (để mở session mới)
 
-> **Lập ngày:** 28/10/2026 · **Cập nhật:** 28/10/2026 (sau `S12` + `S15`) · **Cây:** `main` (sạch) · **Người lập:** phiên tự động
+> **Lập ngày:** 28/10/2026 · **Cập nhật:** 28/10/2026 (sau `S12` + `S13` + `S15`) · **Cây:** `main` (sạch) · **Người lập:** phiên tự động
 >
 > 🔑 **Đọc mục 1 trước.** Tài liệu này **không** nói GĐ1 đã xong. Nó chốt **đang ở đâu**, **còn gì**, và
 > **làm theo thứ tự nào** để không phải đoán lại.
@@ -9,18 +9,18 @@
 
 ## 1. Ảnh chụp hiện tại (đo được, không phải lời khai)
 
-> 📌 **Số đo này là SAU `S15`** (28/10/2026). Bảng cũ trước `S12` (unit **1528** · integration **71** · E2E
+> 📌 **Số đo này là SAU `S13` + `S15`** (28/10/2026). Bảng cũ trước `S12` (unit **1528** · integration **71** · E2E
 > **135** · NND **57** · **68** quyền · **89** chỗ quét · **46** migration) đã **trôi** — đừng dùng.
 
 | Hạng mục | Giá trị | Cách đo |
 |---|---|---|
 | Commit | `git log --oneline -1` | 🔒 **nguồn sự thật là lệnh**, không phải dòng trong tài liệu |
-| Cổng đầy đủ | **exit 0 · 341.4s · 15/15 bước** | `pwsh -File tools\kiem-tat-ca.ps1 -DayDu` |
-| Unit | **1560** | bước ③ |
-| Integration | **77/77** | bước ④ |
+| Cổng đầy đủ | **exit 0 · 348.1s · 15/15 bước** | `pwsh -File tools\kiem-tat-ca.ps1 -DayDu` |
+| Unit | **1571** | bước ③ |
+| Integration | **83/83** | bước ④ |
 | E2E (HTML thật) | **140/140** | bước ⑧ |
-| Bất biến DB | **25/25** · **NND 58** · **69 quyền** · **94** chỗ quét | bước ⑥ |
-| Migration | **47** | `src/eCommerce.EntityFrameworkCore/Migrations` |
+| Bất biến DB | **25/25** · **NND 60** · **71 quyền** · **96** chỗ quét | bước ⑥ |
+| Migration | **48** | `src/eCommerce.EntityFrameworkCore/Migrations` |
 | Oversell | **11/11** (bước ⑬) | `tools/probe-oversell.ps1` |
 | Outbox replay | **9/9** (bước ⑭) | `tools/probe-outbox.ps1` |
 | Outbox 2 instance | **9/9** (bước ⑮) | `tools/probe-outbox-2instance.ps1` |
@@ -39,6 +39,7 @@
 | Brand (`CatBrands`) | `CAT-004`, migration **45**, NND **56** |
 | REC-001 — 3 bảng + API đọc + worker ghi | migration **46**, NND **57**; worker phân loại **9/10** loại lệch |
 | UI đọc: `/Brands` (CRUD trừ xoá) · `/Kho` · `/Pricing` | menu + controller + view; E2E xanh |
+| **`S13` — `StockAllotment` + sổ cái ngân sách** | `INV-003` **§21**: migration **48** · NND **60** · quyền `Allotment.Manage`/`Allotment.Release` (seed **71**) · giữ chỗ/nhả/chốt **trừ & trả** ngân sách kênh · **+11 unit · +6 integration** · ⚠️ **chưa có UI**, **chưa tự thu hồi** |
 | **`S15` — `StalePendingTransaction` + `TriggerRunAsync`** | `REC-001` **§20**: ngưỡng `Reconciliation:StalePendingHours` = **24** (`0` = TẮT) · **10/10** loại lệch · `TriggerRunAsync` **cùng khoá** với job (`IPaymentReconciliationRunner`) · **+17 unit** · probe thanh toán **26 → 30/30** (HTTP + DB + dọn sạch) · **không** migration |
 | **`S12` — `CostPrice` (`PrcCostPrices`)** | `PRC-001` **§20**: migration **47** · NND **58** · quyền **`eCommerce.Pricing.CostPrice.View`** (seed **69**) · `/GiaVon` (chỉ đọc) · **15 unit** + **6 integration** + **5 E2E** (`S12-G1…G5`, đo cả **ẩn danh bị chặn** và **HTML công khai không lộ 777.777**) |
 
@@ -52,7 +53,7 @@
 | # | Việc | Đặc tả (nguồn sự thật) | Phạm vi tối thiểu | Migration dự kiến |
 |---|---|---|---|---|
 | ~~**S12**~~ | ✅ **XONG 28/10/2026** — `CostPrice` (`PrcCostPrices`) | [`PRC-001` §20](features/pricing/prc-001-bang-gia-va-gia-theo-kenh.md) | migration **47** · NND **58** · quyền `eCommerce.Pricing.CostPrice.View` · `/GiaVon` (chỉ đọc) · **6 integration + 15 unit + 5 E2E**. ⚠️ **Chưa** có đường ghi (**`Q2`** chưa chốt) ⇒ đừng mở "tạm" |
-| **S13** | `StockAllotment` + `StockAllotmentLedger` | [`INV-003`](features/inventory/inv-003-phan-bo-ton-theo-kenh.md) | Ngân sách tồn theo `(WarehouseId, Sku, ChannelCode)` + sổ cái append-only; **cấm** thêm `StockMovementType`; event `StockAllotmentChangedEto`; hết hạn giữ chỗ theo ngân sách | **48** · NND **59** (hoặc 60 nếu ledger có unique) |
+| ~~**S13**~~ | ✅ **XONG 28/10/2026** — `StockAllotment` + `StockAllotmentLedger` | [`INV-003` §21](features/inventory/inv-003-phan-bo-ton-theo-kenh.md) | migration **48** · NND **60** · **2 quyền** (seed **71**) · giữ chỗ **trừ ngân sách** kênh (tuỳ chọn theo dòng) · **+11 unit + 6 integration** · ⚠️ **chưa** có UI + **chưa** tự thu hồi khi tồn giảm (§21.5) |
 | **S14** | `OrderReturn` + `OrderReturnLine` | [`SAL-006`](features/sales/sal-006-tra-hang-rma-hoan-tien.md) | Trả hàng/RMA + hoàn tiền; trạng thái có guard; nối phiếu kho `CustomerReturn` qua `ReferenceType/Id` (không FK cứng); cập nhật `Order.ReturnStatus` | **49** |
 | ~~**S15**~~ | ✅ **XONG 28/10/2026** — `StalePendingTransaction` + `TriggerRunAsync` | [`REC-001` §20](features/reconciliation/rec-001-doi-soat-thanh-toan-querydr.md) | ngưỡng **24 h** (cấu hình, `0` = TẮT) · `TriggerRunAsync` đi qua **cùng khoá** với job · **+17 unit** · **probe 30/30** (HTTP thật) | **không** (ngưỡng là cấu hình) |
 | **S16** | 3 metric còn nợ | [`XC-005` §5.1/§19.3](features/cross-cutting/XC-005-observability-log-metric.md) | `messaging_dlq_replayed_total` (cần luồng replay thật), `lock_ttl_exceeded_total` (cần wrapper TTL), `logging_failures_total` (logger provider) | không (trừ khi thêm wrapper) |
@@ -75,7 +76,7 @@
 |---|---|---|
 | Q1 | `StalePendingHours` = ? | ✅ **đã chốt 24 h** (28/10/2026, `REC-001` §20.2) — đổi được bằng `appsettings.json` |
 | Q2 | `CostPrice` lấy từ đâu (nhập tay / import NCC / giá vốn bình quân)? | S12 — quyết định API và job |
-| Q3 | `StockAllotment`: phân bổ theo **kênh** hay **kênh + shop**? | S13 — khác unique index |
+| Q3 | `StockAllotment`: phân bổ theo **kênh** hay **kênh + shop**? | ✅ **đã chốt CHỈ theo kênh** (28/10/2026, `INV-003` §21.2) |
 | Q4 | Trả hàng có **hoàn tiền tự động** hay chỉ ghi nhận? | S14 — ảnh hưởng `PaymentHub` |
 | Q5 | Duyệt tài liệu: duyệt thật hay **thoả thuận song song bằng văn bản** (`§A.5`)? | Cổng 0 |
 | Q6 | VNPay sandbox: cấp credential ở đâu, ai giữ? | S19 |
@@ -116,7 +117,7 @@ pwsh -File tools\kiem-tat-ca.ps1 -DayDu   # phải exit 0, 15/15
 ```
 
 Sau đó đọc theo thứ tự:
-1. **tài liệu này** (mục 2 → việc kế tiếp là **S13**);
+1. **tài liệu này** (mục 2 → việc kế tiếp là **S14**);
 2. đặc tả của việc đó (`docs/features/...` — cột 3 bảng §2);
 3. [`docs/SESSION-KICKOFF.md`](SESSION-KICKOFF.md) — quy ước/kiến trúc;
 4. [`docs/ke-hoach-tach-module.md`](ke-hoach-tach-module.md) — L2 nếu đụng module;
@@ -130,7 +131,7 @@ Sau đó đọc theo thứ tự:
 |---|---|---|---|
 | 0 | Tài liệu GĐ1 + `XC-001…007` Approved | ❌ 1/55 | Q5 — duyệt thật hoặc thoả thuận văn bản |
 | 1 | Đặt đơn + thanh toán **1 cổng VN thật** | 🟡 FakePaymentProvider | S19 — credential + 1 giao dịch sandbox |
-| 2 | Không bán vượt tồn (2 luồng + **2 instance**) | 🟡 2 luồng ✅; **2 instance kho** ❌ | S13 + probe 2 Host cho **giữ chỗ** (không phải outbox) |
+| 2 | Không bán vượt tồn (2 luồng + **2 instance**) | 🟡 2 luồng ✅; **1 chốt ngân sách** ✅; **2 instance kho** ❌ | probe 2 Host cho **giữ chỗ** (không phải outbox) |
 | 3 | Không mất tiền — job đối soát phát hiện lệch | 🟢 có Run/Line/lệch **10/10** + chạy tay | tiền thật (S19) + cổng thật để đo `Stale` (`Q6`) |
 | 4 | Mọi API cần xác thực + login | ✅ | — |
 | 5 | Không mất event — outbox relay | ✅ replay + 2 instance | — |
@@ -159,7 +160,7 @@ Sau đó đọc theo thứ tự:
 | Việc | Ước lượng | Ghi chú |
 |---|---|---|
 | ~~S12 CostPrice~~ | ✅ **xong 28/10/2026** | `PRC-001` §20; phần **đường ghi** vẫn treo chờ **`Q2`** |
-| S13 StockAllotment + ledger | 5–8 pd | Chạm kho + event + hết hạn |
+| ~~S13 StockAllotment + ledger~~ | ✅ **xong 28/10/2026** | `INV-003` §21 (còn: UI + thu hồi tự động) |
 | S14 OrderReturn/RMA | 6–10 pd | Chạm Sales + Inventory + PaymentHub |
 | ~~S15 StalePending + TriggerRun~~ | ✅ **xong 28/10/2026** | `REC-001` §20 (ngưỡng 24 h + chạy tay qua cùng khoá) |
 | S16 3 metric | 3–5 pd | Cần hạ tầng mới |
@@ -167,7 +168,11 @@ Sau đó đọc theo thứ tự:
 | S18 UI + tài liệu | 3–6 pd | Phụ thuộc Q5 |
 | S19 VNPay thật | 2–3 pd | Phụ thuộc Q6 |
 
-**Tổng còn lại ≈ 25–41 pd** — không phải một phiên. Làm **theo S13 → S19**, mỗi phiên **một** việc + gate.
+**Tổng còn lại ≈ 20–33 pd** — không phải một phiên. Làm **theo S14 → S19**, mỗi phiên **một** việc + gate.
+
+
+
+
 
 
 

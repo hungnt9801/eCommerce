@@ -141,7 +141,7 @@ public class PostgreSqlSchemaTests
     }
 
     [Fact]
-    public async Task F1_du_58_index_deu_dung_NULLS_NOT_DISTINCT()
+    public async Task F1_du_60_index_deu_dung_NULLS_NOT_DISTINCT()
     {
         // 🔒 BẤT BIẾN (ghi ở XC-004 Q6): mọi unique index trên entity IMultiTenant PHẢI có
         // `NULLS NOT DISTINCT`. Ai tạo migration mới mà quên ⇒ test này đỏ.
@@ -175,7 +175,7 @@ public class PostgreSqlSchemaTests
         //      (`PrcPriceLists`/`PrcPriceListItems`/`PrcChannelPrices`/`PrcPriceCalculationRecords`) nằm trong
         //      migration `Pricing_PriceList_And_ChannelPrice`/`Prc002_PriceCalculationRecords` — 📌 chúng **chưa**
         //      có tên trong danh sách đích danh dưới đây (nợ của `PRC-001` §15.2, ghi ở `PRC-001` §16).
-        Assert.Equal(58L, await DemAsync(
+        Assert.Equal(60L, await DemAsync(
             "select count(*) from pg_indexes where schemaname = 'public' and indexdef like '%NULLS NOT DISTINCT%'"));
 
         // Kiểm tra ĐÍCH DANH để thông báo lỗi có ý nghĩa (tên index dài có thể bị PostgreSQL cắt ⇒ so theo tiền tố).
@@ -280,6 +280,11 @@ public class PostgreSqlSchemaTests
             //    📌 Thêm vào danh sách ĐÍCH DANH chứ không chỉ tăng tổng: ai đó thêm index khác mà làm hỏng index
             //    này thì **tổng không đổi** ⇒ chỉ danh sách này bắt được.
             "IX_PrcCostPrices_TenantId_Sku_EffectiveFrom",
+            // 🆕 `S13` — **ngân sách tồn theo kênh**. Mất `NULLS NOT DISTINCT` ⇒ hai ngân sách cho CÙNG
+            // `(kho, SKU, kênh)` lọt ⇒ ATP không tất định; và khoá idempotency của sổ cái mất tác dụng ⇒
+            // gọi lại một biên vào **nhân đôi ngân sách**.
+            "IX_InvStockAllotments_TenantId_Kho_Sku_Kenh",
+            "IX_InvStockAllotmentLedgers_TenantId_IdempotencyKey",
             // ⚠️ NỢ ĐÃ GHI (`PRC-001` §15.2): BỐN index `NULLS NOT DISTINCT` của module Pricing
             // (`PrcPriceLists`, `PrcPriceListItems`, `PrcChannelPrices`, `PrcPriceCalculationRecords`) hiện chỉ
             // được đếm qua **TỔNG**, chưa có tên ở đây ⇒ nếu một cái mất mệnh đề mà một cái khác thêm vào thì
@@ -1341,3 +1346,4 @@ public class PostgreSqlSchemaTests
         Assert.Equal(1L, so);
     }
 }
+

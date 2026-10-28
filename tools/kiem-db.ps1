@@ -324,6 +324,11 @@ $quyenPhaiCon = @(
     'eCommerce.Payments',           # REC-001 / SAL-006
     'eCommerce.Payments.Refund',
     'eCommerce.Inventory',           # INV-001/002/003
+    # 🆕 S13 — quyền của **ngân sách tồn theo kênh** (INV-003). 📌 Vào danh sách này vì: thiếu ở
+    # provider ⇒ 403 cho MỌI người kể cả admin; và thiếu AllotmentManage thì **không ai** cấp được ngân
+    # sách ⇒ kênh nào đã có ngân sách sẽ **không bao giờ** bán được thêm (ATP = 0).
+    'eCommerce.Inventory.Allotment.Manage',
+    'eCommerce.Inventory.Allotment.Release',
     # 🚨 `S6` (18/10/2026) — **cổng vận hành của đơn sàn** (`sal-005` §21). 📌 Đưa vào danh sách này vì:
     # (a) thiếu ở provider ⇒ `403` cho MỌI người kể cả admin; (b) đây là đường DUY NHẤT hạ cờ `GapSuspected`
     # sau khi job `D12` báo động ⇒ nếu nó chết thì cờ **tồn đọng vĩnh viễn** và không ai biết ngoài việc đọc log.
@@ -522,3 +527,4 @@ if ($ChoPhepRong -and $soHong -gt 0) {
 }
 
 exit $(if ($soHongNghiemTrong -gt 0) { 1 } else { 0 })
+

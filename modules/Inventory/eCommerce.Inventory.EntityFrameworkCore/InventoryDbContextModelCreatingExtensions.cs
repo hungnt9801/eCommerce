@@ -92,6 +92,10 @@ public static class InventoryDbContextModelCreatingExtensions
             b.Property(x => x.ReferenceType).HasMaxLength(64);
             b.Property(x => x.ReferenceId).HasMaxLength(128);
 
+            // 🆕 `S13` — kênh của lượt giữ chỗ (để nhả chỗ về ĐÚNG ngân sách kênh đã giữ).
+            // ⚠️ **NULLABLE có chủ ý**: lượt giữ chỗ cũ / không gắn kênh ⇒ không trừ ngân sách nào.
+            b.Property(x => x.ChannelCode).HasMaxLength(32);
+
             // Truy vấn của JOB nhả chỗ: các lượt `Held` đã quá hạn.
             b.HasIndex(x => new { x.TenantId, x.Status, x.ExpiresAtUtc })
                 .HasDatabaseName("IX_InvStockReservations_TenantId_Status_ExpiresAtUtc");
@@ -178,6 +182,77 @@ public static class InventoryDbContextModelCreatingExtensions
             {
                 t.HasCheckConstraint("CK_InvChannelLimits_GiaTri_KhongAm", "\"GiaTri\" >= 0");
             });
+        });
+
+        // ── 🆕 `S13` — NGÂN SÁCH TỒN THEO KÊNH (`INV-003`) ────────────────────────────────────────
+        // 🚨 `Allotted`/`Reserved` là **số lượng**, không phải tiền ⇒ `int` + `CHECK`, **cấm** `double`.
+        // 📌 `AvailableToPromise` là **computed** ⇒ **KHÔNG** map cột (một chiều dữ liệu — `INV-003` D5/BR-18).
+        builder.Entity<Inventory.StockAllotment>(b =>
+        {
+            b.ToTable("InvStockAllotments", t =>
+            {
+                t.HasCheckConstraint(
+                    "CK_InvStockAllotments_SoLuong_KhongAm",
+                    "\"AllottedQuantity\" >= 0 AND \"ReservedQuantity\" >= 0");
+                t.HasCheckConstraint(
+                    "CK_InvStockAllotments_Reserved_KhongVuotAllotted",
+                    "\"ReservedQuantity\" <= \"AllottedQuantity\"");
+                t.HasCheckConstraint(
+                    "CK_InvStockAllotments_DongBang_CoDauVet",
+                    "\"Status\" <> 1 OR (\"FrozenAtUtc\" IS NOT NULL AND \"FrozenByUserId\" IS NOT NULL)");
+                t.HasCheckConstraint(
+                    "CK_InvStockAllotments_Nha_CoLyDo",
+                    "\"Status\" <> 2 OR \"ReleaseReason\" IS NOT NULL");
+            });
+            b.ConfigureByConvention();
+
+            b.Property(x => x.Sku).IsRequired().HasMaxLength(64);
+            b.Property(x => x.ChannelCode).IsRequired().HasMaxLength(Inventory.InvChannelLimit.DoDaiMaKenhToiDa);
+            b.Property(x => x.Status).HasConversion<int>();
+            b.Property(x => x.ReleaseReason).HasMaxLength(512);
+            b.Ignore(x => x.AvailableToPromise);
+            b.Ignore(x => x.ConGiuNganSach);
+
+            // `INV-003` §5.3 — **MỘT** ngân sách cho mỗi (kho, SKU, kênh). 📌 EF sinh index **KHÔNG** kèm
+            // `NULLS NOT DISTINCT` ⇒ migration sửa tay; thiếu mệnh đề thì `TenantId = NULL` làm index vô hiệu.
+            b.HasIndex(x => new { x.TenantId, x.WarehouseId, x.Sku, x.ChannelCode })
+                .IsUnique()
+                .HasDatabaseName("IX_InvStockAllotments_TenantId_Kho_Sku_Kenh");
+
+            // Truy vấn bất biến tổng: `Σ Allotted` theo `(kho, SKU)`.
+            b.HasIndex(x => new { x.TenantId, x.WarehouseId, x.Sku })
+                .HasDatabaseName("IX_InvStockAllotments_TenantId_Kho_Sku");
+
+            // Màn hình vận hành + job quét kênh đang `Frozen`.
+            b.HasIndex(x => new { x.TenantId, x.ChannelCode, x.Status })
+                .HasDatabaseName("IX_InvStockAllotments_TenantId_Kenh_Status");
+        });
+
+        // 📌 SỔ CÁI NGÂN SÁCH — **APPEND-ONLY** (`BR-07`).
+        builder.Entity<Inventory.StockAllotmentLedger>(b =>
+        {
+            b.ToTable("InvStockAllotmentLedgers");
+            b.ConfigureByConvention();
+
+            b.Property(x => x.Sku).IsRequired().HasMaxLength(64);
+            b.Property(x => x.ChannelCode).IsRequired().HasMaxLength(Inventory.InvChannelLimit.DoDaiMaKenhToiDa);
+            b.Property(x => x.Reason).HasConversion<int>();
+            b.Property(x => x.ReferenceType).HasMaxLength(64);
+            b.Property(x => x.ReferenceId).HasMaxLength(128);
+            b.Property(x => x.IdempotencyKey).HasMaxLength(256);
+
+            // 🚨 Hàng rào CUỐI chống ghi trùng biên vào (`BR-09`). 📌 Có bộ lọc `IS NOT NULL` (bút toán hệ
+            // thống không có khoá) ⇒ migration phải viết SQL thô kèm `NULLS NOT DISTINCT`.
+            b.HasIndex(x => new { x.TenantId, x.IdempotencyKey })
+                .IsUnique()
+                .HasFilter("\"IdempotencyKey\" IS NOT NULL")
+                .HasDatabaseName("IX_InvStockAllotmentLedgers_TenantId_IdempotencyKey");
+
+            b.HasIndex(x => new { x.TenantId, x.WarehouseId, x.Sku, x.OccurredAtUtc })
+                .HasDatabaseName("IX_InvStockAllotmentLedgers_TenantId_Kho_Sku_OccurredAtUtc");
+
+            b.HasIndex(x => new { x.TenantId, x.ChannelCode, x.OccurredAtUtc })
+                .HasDatabaseName("IX_InvStockAllotmentLedgers_TenantId_Kenh_OccurredAtUtc");
         });
     }
 }

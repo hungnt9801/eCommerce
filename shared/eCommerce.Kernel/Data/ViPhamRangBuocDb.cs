@@ -206,6 +206,33 @@ public static class ViPhamRangBuocDb
             new(MaChung,
                 "Mã tiền tệ của giá vốn KHÔNG đúng ISO-4217 (3 ký tự HOA) ⇒ mọi phép so sánh tiền sẽ vô nghĩa.", false),
 
+        // ── KHO: NGÂN SÁCH TỒN THEO KÊNH (`S13`, 28/10/2026 — `INV-003` · `InvStockAllotments`) ────────────
+        // 📌 CHẶN một hành vi **hợp lệ về nghiệp vụ**: hai request đồng thời (hoặc hai tab) cùng cấp ngân sách
+        // cho một `(kho, SKU, kênh)` ⇒ trước đây là `500`; client **không phân biệt** *"đã có ngân sách"* với
+        // *"hệ thống hỏng"*. 🔑 Mã `0049` (KHÔNG mượn `0045` = *"hạn mức theo kênh đã tồn tại"* — đó là bảng
+        // `InvChannelLimits`, **trần bán**, khác **ngân sách tồn**).
+        ["IX_InvStockAllotments_TenantId_Kho_Sku_Kenh"] =
+            new("eCommerce:Inventory:0049",
+                "Đã có NGÂN SÁCH TỒN cho đúng (kho, SKU, kênh) này ⇒ sửa dòng đang có thay vì thêm dòng mới.", true),
+        // 🚨 Khoá idempotency của **sổ cái ngân sách** — chặn **nhân đôi ngân sách** khi import/retry.
+        ["IX_InvStockAllotmentLedgers_TenantId_IdempotencyKey"] =
+            new("eCommerce:Inventory:0049",
+                "Khoá idempotency này ĐÃ được dùng cho một lần thay đổi ngân sách ⇒ gọi lại KHÔNG ghi thêm.", true),
+        // 🚨 Bốn `CHECK` dưới đây là **hàng rào phòng vệ chiều sâu** (`INV-003` §5.3). Tầng domain đã ném
+        // `0049` trước ⇒ tới được DB nghĩa là có **đường ghi TẮT qua domain** (SQL tay), tức là **bug**.
+        // 🔒 Vẫn phải ánh xạ: trả 403 kèm tên ràng buộc thay vì `500` mù.
+        ["CK_InvStockAllotments_SoLuong_KhongAm"] =
+            new(MaChung, "Ngân sách tồn hoặc phần đang giữ chỗ bị ÂM ⇒ ATP không xác định.", false),
+        ["CK_InvStockAllotments_Reserved_KhongVuotAllotted"] =
+            new(MaChung,
+                "Phần đang giữ chỗ VƯỢT ngân sách ⇒ ATP âm (bán nhiều hơn kênh được cấp).", false),
+        ["CK_InvStockAllotments_DongBang_CoDauVet"] =
+            new(MaChung,
+                "Ngân sách ở trạng thái `Frozen` mà THIẾU người/thời điểm đóng băng ⇒ không trả lời được ai đã ngừng bán kênh.", false),
+        ["CK_InvStockAllotments_Nha_CoLyDo"] =
+            new(MaChung,
+                "Ngân sách đã NHẢ mà thiếu lý do ⇒ không đối soát được vì sao kênh hết hàng.", false),
+
         // ── CATALOG ──────────────────────────────────────────────────────────────────────────────
         ["IX_CatProducts_TenantId_Sku"] =
             new("eCommerce:Catalog:0004", "SKU đã tồn tại.", true),

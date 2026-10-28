@@ -36,13 +36,19 @@ public class StockReservation : FullAuditedAggregateRoot<Guid>, IMultiTenant
 
     public string? ReferenceId { get; protected set; }
 
+    /// <summary>
+    /// 🆕 `S13` — **kênh đã giữ chỗ** (nếu có). Dùng để nhả chỗ về **đúng** ngân sách kênh
+    /// (`InvStockAllotments.ReservedQuantity`) — 📌 không có cột này thì mỗi lần nhả phải *đoán* kênh.
+    /// </summary>
+    public string? ChannelCode { get; protected set; }
+
     public DateTime? ReleasedAtUtc { get; protected set; }
 
     protected StockReservation() { }
 
     public StockReservation(
         Guid id, Guid warehouseId, string sku, int quantity, DateTime expiresAtUtc,
-        string? referenceType = null, string? referenceId = null) : base(id)
+        string? referenceType = null, string? referenceId = null, string? channelCode = null) : base(id)
     {
         if (string.IsNullOrWhiteSpace(sku))
         {
@@ -61,6 +67,7 @@ public class StockReservation : FullAuditedAggregateRoot<Guid>, IMultiTenant
         ExpiresAtUtc = expiresAtUtc;
         ReferenceType = referenceType;
         ReferenceId = referenceId;
+        ChannelCode = string.IsNullOrWhiteSpace(channelCode) ? null : InvChannelLimit.ChuẩnHoáKenh(channelCode);
     }
 
     /// <summary>Đã quá hạn tại <paramref name="at"/>?</summary>

@@ -68,6 +68,12 @@ public class eCommercePermissionDefinitionProvider : PermissionDefinitionProvide
         var inventory = group.AddPermission(eCommerceConsts.Permissions.Inventory.Default);
         inventory.AddChild(eCommerceConsts.Permissions.Inventory.Adjust);
 
+        // 🆕 `S13` (`INV-003`) — **ngân sách tồn theo kênh**. 🚨 BẮT BUỘC ở **CẢ HAI NƠI** (hằng số + ở đây):
+        // thiếu một nơi ⇒ `403` cho MỌI người kể cả `admin`. 🔒 Tách `Release` khỏi `Manage`: nhả ngân sách làm
+        // kênh **hết hàng ngay** — đó là quyền của người vận hành, không phải của người cấu hình.
+        inventory.AddChild(eCommerceConsts.Permissions.Inventory.AllotmentManage);
+        inventory.AddChild(eCommerceConsts.Permissions.Inventory.AllotmentRelease);
+
         // ---- Kênh bán (ChannelHub) ----
         var channels = group.AddPermission(eCommerceConsts.Permissions.Channels.Default);
         channels.AddChild(eCommerceConsts.Permissions.Channels.Manage);

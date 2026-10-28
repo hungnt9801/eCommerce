@@ -128,4 +128,22 @@ public static class InventoryErrorCodes
     /// </summary>
     public const string HanMucKenhKhongTonTai = Nhom + "0046";
 
+    /// <summary>
+    /// 🆕 **`S13`** — **TỔNG NGÂN SÁCH KÊNH VƯỢT TỒN THỰC** (`INV-003` **BR-03**).
+    /// 📌 Ca này là **hành vi hợp lệ về nghiệp vụ**: người vận hành cấp ngân sách cho kênh thứ hai nhiều hơn
+    /// số hàng còn lại ⇒ phải **từ chối kèm số** (`OnHand`, `đã cấp`, `yêu cầu`) để họ sửa, **không** phải `500`.
+    /// 🔒 Không mượn `0042` (*"vượt hạn mức kênh"* — đó là **trần bán** theo chính sách, khác **ngân sách**).
+    /// </summary>
+    public const string NganSachTonVuotTon = Nhom + "0047";
+
+    /// <summary>🆕 **`S13`** — **KHÔNG CÓ ngân sách** cho `(kho, SKU, kênh)` khi cần đóng băng/nhả/sửa.</summary>
+    public const string NganSachTonKhongTonTai = Nhom + "0048";
+
+    /// <summary>
+    /// 🆕 **`S13`** — **NGÂN SÁCH TỒN KHÔNG HỢP LỆ / SAI GUARD** (`INV-003` BR-02/BR-05/BR-12):
+    /// số âm · đặt nhỏ hơn phần đang giữ chỗ · đóng băng/nhả sai trạng thái · nhả khi còn giữ chỗ · thiếu lý do.
+    /// 📌 Một mã cho nhóm *"dữ liệu/thao tác ngân sách sai"*; trường sai được chỉ qua `WithData("lyDo"/"status")`.
+    /// </summary>
+    public const string NganSachTonKhongHopLe = Nhom + "0049";
+
 }

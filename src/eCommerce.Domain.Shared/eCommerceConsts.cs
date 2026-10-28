@@ -66,6 +66,14 @@ public static class eCommerceConsts
         {
             public const string Default = GroupName + ".Inventory";
             public const string Adjust = Default + ".Adjust";
+
+            /// <summary>🆕 `S13` — **cấp/sửa ngân sách tồn theo kênh** (`INV-003`). Quyền riêng vì nó
+            /// quyết định **kênh được bán bao nhiêu**; tách khỏi `Adjust` (điều chỉnh tồn kho thật).</summary>
+            public const string AllotmentManage = Default + ".Allotment.Manage";
+
+            /// <summary>🆕 `S13` — **đóng băng / mở / nhả** ngân sách. 🔒 Nhả làm kênh **hết hàng ngay**
+            /// ⇒ không gộp vào `AllotmentManage` (đặc quyền tối thiểu).</summary>
+            public const string AllotmentRelease = Default + ".Allotment.Release";
         }
 
         public static class Channels
@@ -697,3 +705,4 @@ public static class eCommerceConsts
         // Không khai báo lại ở đây để tránh hai nguồn sự thật cho cùng một khoá lock.
     }
 }
+

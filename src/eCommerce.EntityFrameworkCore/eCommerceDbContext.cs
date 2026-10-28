@@ -136,6 +136,11 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>, IHasEventOut
     /// </summary>
     public DbSet<Inventory.InvChannelLimit> InvChannelLimits { get; set; } = default!;
 
+    /// <summary>🆕 `S13` — **ngân sách tồn theo kênh** + **sổ cái append-only** (`INV-003`).</summary>
+    public DbSet<Inventory.StockAllotment> StockAllotments { get; set; } = default!;
+
+    public DbSet<Inventory.StockAllotmentLedger> StockAllotmentLedgers { get; set; } = default!;
+
     /// <summary>`REC-001` — **lịch sử lượt quét đối soát tồn kho** (+ dòng lệch). Xem chú thích `DbSet` phía trên.</summary>
     public DbSet<Inventory.ReconRun> ReconRuns { get; set; } = default!;
 

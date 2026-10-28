@@ -2852,3 +2852,86 @@ VALUES ('20261028031842_Gd1S12_CostPrice', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+ALTER TABLE "InvStockReservations" ADD "ChannelCode" character varying(32);
+
+CREATE TABLE "InvStockAllotmentLedgers" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "StockAllotmentId" uuid NOT NULL,
+    "WarehouseId" uuid NOT NULL,
+    "Sku" character varying(64) NOT NULL,
+    "ChannelCode" character varying(32) NOT NULL,
+    "QuantityDelta" integer NOT NULL,
+    "AllottedAfter" integer NOT NULL,
+    "Reason" integer NOT NULL,
+    "ReferenceType" character varying(64),
+    "ReferenceId" character varying(128),
+    "IdempotencyKey" character varying(256),
+    "OccurredAtUtc" timestamp with time zone NOT NULL,
+    "PerformedByUserId" uuid,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_InvStockAllotmentLedgers" PRIMARY KEY ("Id")
+);
+
+CREATE TABLE "InvStockAllotments" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "WarehouseId" uuid NOT NULL,
+    "Sku" character varying(64) NOT NULL,
+    "ChannelCode" character varying(32) NOT NULL,
+    "AllottedQuantity" integer NOT NULL,
+    "ReservedQuantity" integer NOT NULL,
+    "Priority" integer NOT NULL,
+    "Status" integer NOT NULL,
+    "FrozenAtUtc" timestamp with time zone,
+    "FrozenByUserId" uuid,
+    "ReleasedAtUtc" timestamp with time zone,
+    "ReleaseReason" character varying(512),
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_InvStockAllotments" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_InvStockAllotments_DongBang_CoDauVet" CHECK ("Status" <> 1 OR ("FrozenAtUtc" IS NOT NULL AND "FrozenByUserId" IS NOT NULL)),
+    CONSTRAINT "CK_InvStockAllotments_Nha_CoLyDo" CHECK ("Status" <> 2 OR "ReleaseReason" IS NOT NULL),
+    CONSTRAINT "CK_InvStockAllotments_Reserved_KhongVuotAllotted" CHECK ("ReservedQuantity" <= "AllottedQuantity"),
+    CONSTRAINT "CK_InvStockAllotments_SoLuong_KhongAm" CHECK ("AllottedQuantity" >= 0 AND "ReservedQuantity" >= 0)
+);
+
+CREATE UNIQUE INDEX "IX_InvStockAllotmentLedgers_TenantId_IdempotencyKey" ON "InvStockAllotmentLedgers" ("TenantId", "IdempotencyKey") WHERE "IdempotencyKey" IS NOT NULL;
+
+CREATE INDEX "IX_InvStockAllotmentLedgers_TenantId_Kenh_OccurredAtUtc" ON "InvStockAllotmentLedgers" ("TenantId", "ChannelCode", "OccurredAtUtc");
+
+CREATE INDEX "IX_InvStockAllotmentLedgers_TenantId_Kho_Sku_OccurredAtUtc" ON "InvStockAllotmentLedgers" ("TenantId", "WarehouseId", "Sku", "OccurredAtUtc");
+
+CREATE INDEX "IX_InvStockAllotments_TenantId_Kenh_Status" ON "InvStockAllotments" ("TenantId", "ChannelCode", "Status");
+
+CREATE INDEX "IX_InvStockAllotments_TenantId_Kho_Sku" ON "InvStockAllotments" ("TenantId", "WarehouseId", "Sku");
+
+CREATE UNIQUE INDEX "IX_InvStockAllotments_TenantId_Kho_Sku_Kenh" ON "InvStockAllotments" ("TenantId", "WarehouseId", "Sku", "ChannelCode");
+
+DROP INDEX "IX_InvStockAllotments_TenantId_Kho_Sku_Kenh";
+
+CREATE UNIQUE INDEX "IX_InvStockAllotments_TenantId_Kho_Sku_Kenh" ON "InvStockAllotments" ("TenantId", "WarehouseId", "Sku", "ChannelCode") NULLS NOT DISTINCT;
+
+DROP INDEX "IX_InvStockAllotmentLedgers_TenantId_IdempotencyKey";
+
+CREATE UNIQUE INDEX "IX_InvStockAllotmentLedgers_TenantId_IdempotencyKey" ON "InvStockAllotmentLedgers" ("TenantId", "IdempotencyKey") NULLS NOT DISTINCT WHERE "IdempotencyKey" IS NOT NULL;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261028035801_Gd1S13_StockAllotment', '10.0.11');
+
+COMMIT;
+

@@ -42,6 +42,9 @@ public class StockReservationService : DomainService
     /// và **trước** khi tăng `Reserved`.</summary>
     private readonly IRepository<InvChannelLimit, Guid> _hanMucKenhRepository;
 
+    /// <summary>🆕 `S13` — **ngân sách tồn theo kênh** (`INV-003`). 📌 Cùng khoá `inventory:…:{kho}:{sku}`.</summary>
+    private readonly StockAllotmentService _nganSach;
+
     /// <summary>🚨 `INV-003` — **chính sách "cho phép chọn"** (`web-001` §93): đọc hạn mức theo kênh **lúc chạy**
     /// thay vì hằng số trong mã. 📌 Domain service **được phép** dùng `ISettingProvider` (ABP: settings là hạ tầng dùng chung).</summary>
     private readonly ISettingProvider _setting;
@@ -52,6 +55,7 @@ public class StockReservationService : DomainService
         IRepository<StockLedgerEntry, Guid> soCaiRepository,
         IRepository<Warehouse, Guid> khoRepository,
         IRepository<InvChannelLimit, Guid> hanMucKenhRepository,
+        StockAllotmentService nganSach,
         IAbpDistributedLock distributedLock,
         ICurrentTenant currentTenant,
         ISettingProvider setting)
@@ -61,6 +65,7 @@ public class StockReservationService : DomainService
         _soCaiRepository = soCaiRepository;
         _khoRepository = khoRepository;
         _hanMucKenhRepository = hanMucKenhRepository;
+        _nganSach = nganSach;
         _distributedLock = distributedLock;
         _currentTenant = currentTenant;
         _setting = setting;
@@ -227,7 +232,13 @@ public class StockReservationService : DomainService
         var hetHan = at.Add(ttl ?? TtlMacDinh);
 
         var giuCho = new StockReservation(
-            GuidGenerator.Create(), warehouseId, maSku, quantity, hetHan, referenceType, referenceId);
+            GuidGenerator.Create(), warehouseId, maSku, quantity, hetHan, referenceType, referenceId, channelCode);
+
+        // 🆕 `S13` — **TRỪ NGÂN SÁCH KÊNH NGAY khi giữ chỗ** (`INV-003` BR-16). 📌 Chỉ áp dụng khi
+        // `(kho, SKU, kênh)` **ĐÃ có** một dòng ngân sách — xem quyết định *"tuỳ chọn theo dòng"* ở
+        // `INV-003` §21.3 (mặc định **không** đổi hành vi của hệ thống đang chạy).
+        // 🚨 Đặt **TRƯỚC** khi ghi bất cứ thứ gì ⇒ vượt ngân sách thì **không có dòng rác nào** được tạo.
+        await _nganSach.TangGiuChoNeuCoNganSachAsync(warehouseId, maSku, channelCode, quantity, at);
 
         ton.ApplyMovement(StockMovementType.Reservation, quantity);
 
@@ -306,6 +317,10 @@ public class StockReservationService : DomainService
 
         giuCho.Nha(lyDo, at);
 
+        // 🆕 `S13` — trả phần giữ chỗ về **đúng** ngân sách kênh (đối xứng với lúc giữ).
+        await _nganSach.GiamGiuChoNeuCoNganSachAsync(
+            giuCho.WarehouseId, giuCho.Sku, giuCho.ChannelCode, giuCho.Quantity, at);
+
         var ton = await _tonKhoRepository.FirstOrDefaultAsync(
             x => x.WarehouseId == giuCho.WarehouseId && x.Sku == giuCho.Sku)
             ?? throw new BusinessException(InventoryErrorCodes.GiuChoKhongConGiu)
@@ -358,3 +373,4 @@ public class StockReservationService : DomainService
         return soNha;
     }
 }
+

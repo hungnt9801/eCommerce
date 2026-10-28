@@ -33,18 +33,23 @@ public class ChotGiuChoService : DomainService
     private readonly IAbpDistributedLock _distributedLock;
     private readonly ICurrentTenant _currentTenant;
 
+    /// <summary>🆕 `S13` — trả phần giữ chỗ về ngân sách kênh khi chốt đơn (`INV-003` BR-16).</summary>
+    private readonly StockAllotmentService _nganSach;
+
     public ChotGiuChoService(
         IRepository<StockReservation, Guid> giuChoRepository,
         IRepository<InventoryItem, Guid> tonKhoRepository,
         IRepository<StockLedgerEntry, Guid> soCaiRepository,
         IAbpDistributedLock distributedLock,
-        ICurrentTenant currentTenant)
+        ICurrentTenant currentTenant,
+        StockAllotmentService nganSach)
     {
         _giuChoRepository = giuChoRepository;
         _tonKhoRepository = tonKhoRepository;
         _soCaiRepository = soCaiRepository;
         _distributedLock = distributedLock;
         _currentTenant = currentTenant;
+        _nganSach = nganSach;
     }
 
     /// <summary>
@@ -108,6 +113,10 @@ public class ChotGiuChoService : DomainService
         ton.ApplyMovement(StockMovementType.ReservationRelease, giuCho.Quantity);
         await GhiSoCaiAsync(giuCho, StockMovementType.ReservationRelease, ton.OnHand, at);
 
+        // 🆕 `S13` — chốt đơn thì cam kết giữ chỗ HOÀN THÀNH ⇒ trả phần ngân sách kênh đã giữ.
+        await _nganSach.GiamGiuChoNeuCoNganSachAsync(
+            giuCho.WarehouseId, giuCho.Sku, giuCho.ChannelCode, giuCho.Quantity, at);
+
         await _tonKhoRepository.UpdateAsync(ton, autoSave: false);
         await _giuChoRepository.UpdateAsync(giuCho, autoSave: true);
 
@@ -131,3 +140,4 @@ public class ChotGiuChoService : DomainService
         await _soCaiRepository.InsertAsync(but, autoSave: false);
     }
 }
+
