@@ -32,6 +32,26 @@ public interface IPriceListAppService : IApplicationService
 }
 
 /// <summary>
+/// 🆕 **`S12` — ĐỌC GIÁ VỐN** (`PRC-001` §5.2/§6.1, bảng `PrcCostPrices`).
+///
+/// 🚨 **BR-013: chỉ đọc, và CHỈ cho người có `eCommerce.Pricing.CostPrice.View`.**
+/// 📌 **KHÔNG** có method ghi trong `S12` — nguồn giá vốn (nhập tay / import NCC / bình quân gia quyền) là
+/// **câu hỏi mở `Q2`** của bản bàn giao. Mở một đường ghi "tạm" rồi để đó chính là cách tạo ra **hai nguồn
+/// giá vốn** — và lãi gộp sẽ phụ thuộc *"lần cuối ai sửa"*.
+/// </summary>
+public interface ICostPriceAppService : IApplicationService
+{
+    /// <summary>
+    /// Liệt kê giá vốn. <paramref name="sku"/> lọc theo SKU (chuỗi con người gõ, **so khớp chính xác**);
+    /// <paramref name="at"/> lọc **giá vốn đang hiệu lực tại ngày đó** (`PRC-001` **BR-003**: cấm truy vấn giá
+    /// "mới nhất" không kèm ngày).
+    /// </summary>
+    Task<List<CostPriceDto>> GetListAsync(string? sku = null, DateOnly? at = null);
+
+    Task<CostPriceDto> GetAsync(Guid id);
+}
+
+/// <summary>
 /// 🚨 **BỘ TRA GIÁ** — điểm vào **DUY NHẤT** để lấy giá bán (`PRC-001` §6.1; `SAL-002` gọi khi dựng giỏ/checkout).
 ///
 /// 📌 **TÁCH 2 TẦNG CÓ CHỦ Ý** (`PRC-002` **ADR-04**): lớp này **nạp DB** rồi giao cho

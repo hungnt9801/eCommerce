@@ -55,7 +55,11 @@ public class ViewAnchorTests
         ("Views/SanPham/Index.cshtml", "[SANPHAM-MAN-HINH]"),
         // 🆕 `S8` — TRANG **KẾT QUẢ THANH TOÁN**. 🔑 Neo khẳng định đúng trang này đã render (E2E `S8-P7`
         // dựa vào nó để phân biệt "trang kết quả" với một trang khác trả `200`).
-        ("Views/DatHang/KetQua.cshtml", "[DATHANG-KET-QUA]")
+        ("Views/DatHang/KetQua.cshtml", "[DATHANG-KET-QUA]"),
+        // 🆕 `S12` — TRANG **GIÁ VỐN** (`PRC-001` BR-013). 🔑 Neo khẳng định đúng trang này render **và** là
+        // trang **nội bộ** (E2E `S12-G*` dựa vào nó). ⚠️ Đây là dữ liệu **nội bộ** ⇒ E2E còn phải đo
+        // **chiều ngược**: phiên ẩn danh **không** vào được, và HTML **công khai** không chứa giá trị giá vốn.
+        ("Views/GiaVon/Index.cshtml", "[GIAVON-MAN-HINH]")
     ];
 
     [Fact]

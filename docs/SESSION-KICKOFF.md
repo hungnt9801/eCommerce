@@ -73,7 +73,12 @@ quyền **62** · migration **41** · chỗ quét **86** — **không đổi lư
 
 📌 **24/10/2026 — KIỂM TOÁN GĐ1 + LÁT CẮT `SAL-003`:** baseline MỚI sau thay đổi = **1528 unit** · **71** integration ·
 **135/135** E2E · **25/25** DB · **NND 57** · **68** quyền · **44** migration · **89** chỗ quét · **15 bước** (thêm ⑬ oversell) — `-DayDu` **exit 0 · 365.0s**.
-📄 Báo cáo: [`audit-gd1.md`](audit-gd1.md) · kế hoạch tách module: [`ke-hoach-tach-module.md`](ke-hoach-tach-module.md).
+🆕 **28/10/2026 — `S12` (GIÁ VỐN, `PRC-001` §20): baseline MỚI NHẤT** = **1543 unit** · **77** integration ·
+**140/140** E2E · **25/25** DB · **NND 58** · **69** quyền · **47** migration · **94** chỗ quét · **15 bước** — `-DayDu` **exit 0 · 343.9s**.
+⚠️ **Đừng dùng dòng 24/10 ở trên để so drift:** từ đó đã có thêm **`CatBrands`** (migration **45**), **`Rec001`**
+(migration **46** — 📌 đó là lý do dòng cũ ghi **44** mà đếm thật hôm 28/10 là **46**, và **89 → 93** chỗ quét) và
+**`S12`** (migration **47** → **94**). 🔑 *Con số trong tài liệu trôi là chuyện bình thường; **dùng số cũ** mới là lỗi.*
+📄 Báo cáo: [`audit-gd1.md`](audit-gd1.md) · kế hoạch tách module: [`ke-hoach-tach-module.md`](ke-hoach-tach-module.md) · phần còn lại: [`ban-giao-gd1-con-lai.md`](ban-giao-gd1-con-lai.md).
 ⚠️ **Đừng dùng bảng `S11` ở trên để so drift** — nó là baseline **trước** lát cắt `SAL-003` (unit +24, NND +1, migration +1).
 📌 **Đo trên CI Linux (cùng mã `d6df51f`):** cổng **216.7s** · **12/12 bước** · **38/38 ca cổng** · unit **1422** ·
 integration **71** · E2E **133/133** · probe **17/26/26/49** ⇒ ✅ **cái ĐO ĐƯỢC khớp giữa hai hệ điều hành**;

@@ -2813,3 +2813,42 @@ VALUES ('20261027063648_Rec001_PaymentReconciliation', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE TABLE "PrcCostPrices" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "Sku" character varying(64) NOT NULL,
+    "AmountValue" numeric(18,4) NOT NULL,
+    "CurrencyCode" character varying(8) NOT NULL,
+    "EffectiveFrom" date NOT NULL,
+    "EffectiveTo" date,
+    "ApprovedBy" uuid,
+    "ApprovedAtUtc" timestamp with time zone,
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_PrcCostPrices" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_PrcCostPrices_Amount_KhongAm" CHECK ("AmountValue" >= 0),
+    CONSTRAINT "CK_PrcCostPrices_Currency_HopLe" CHECK ("CurrencyCode" ~ '^[A-Z]{3}$'),
+    CONSTRAINT "CK_PrcCostPrices_EffectiveRange" CHECK ("EffectiveTo" IS NULL OR "EffectiveTo" >= "EffectiveFrom")
+);
+
+CREATE UNIQUE INDEX "IX_PrcCostPrices_TenantId_Sku_EffectiveFrom" ON "PrcCostPrices" ("TenantId", "Sku", "EffectiveFrom");
+
+CREATE INDEX "IX_PrcCostPrices_TenantId_Sku_EffectiveTo" ON "PrcCostPrices" ("TenantId", "Sku", "EffectiveTo");
+
+DROP INDEX "IX_PrcCostPrices_TenantId_Sku_EffectiveFrom";
+
+CREATE UNIQUE INDEX "IX_PrcCostPrices_TenantId_Sku_EffectiveFrom" ON "PrcCostPrices" ("TenantId", "Sku", "EffectiveFrom") NULLS NOT DISTINCT;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261028031842_Gd1S12_CostPrice', '10.0.11');
+
+COMMIT;
+

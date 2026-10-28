@@ -181,6 +181,31 @@ public static class ViPhamRangBuocDb
         ["IX_PrcTierPrices_TenantId_SetId_Sku_MinQty"] =
             new("eCommerce:Pricing:0008", "Bậc thang TRÙNG `MinQuantity` cho SKU này.", true),
 
+        // ── PRICING: GIÁ VỐN (`S12`, 28/10/2026 — `PrcCostPrices`) ──────────────────────────────
+        // 📌 Ràng buộc này CHẶN MỘT HÀNH VI HỢP LỆ VỀ NGHIỆP VỤ: người nhập (hoặc job import NCC sau này)
+        // khai giá vốn cho cùng `(SKU, ngày bắt đầu)` **lần hai** — có thể chỉ là **bấm hai lần** / import lại
+        // cùng tệp. Trước đây là `500` ⇒ người dùng **không phân biệt** *"đã có giá vốn cho kỳ đó"* với
+        // *"hệ thống hỏng"* ⇒ **nhập lại** ⇒ vòng lặp. 🔑 Mã `0009` (KHÔNG mượn `0002` = *"bảng giá thiếu dòng"*):
+        // câu trả lời đúng là *"sửa dòng giá vốn đang có"*, không phải *"sửa bảng giá"*.
+        // ⚠️ Ca NẶNG của lỗi C4/F1: `TenantId` có thể `NULL` ⇒ thiếu `NULLS NOT DISTINCT` là index **mất tác
+        // dụng im lặng** (xem chú thích migration `Gd1S12_CostPrice`).
+        ["IX_PrcCostPrices_TenantId_Sku_EffectiveFrom"] =
+            new("eCommerce:Pricing:0009",
+                "Đã có GIÁ VỐN cho SKU này bắt đầu từ ngày đó ⇒ sửa dòng đang có thay vì thêm dòng thứ hai.", true),
+        // 🚨 Ba `CHECK` dưới đây là **hàng rào phòng vệ chiều sâu** (`PRC-001` §5.2). Tầng domain đã ném
+        // `Pricing:0009` trước ⇒ tới được DB nghĩa là có **đường ghi TẮT qua domain** (SQL tay, import sau này),
+        // tức là **bug**, không phải một hành vi nghiệp vụ cần mã riêng. 🔒 Vẫn **phải** ánh xạ: có ánh xạ thì
+        // ca đó trả **403 kèm SQLSTATE + tên ràng buộc** (tra được ngay) thay vì `500` mù.
+        ["CK_PrcCostPrices_Amount_KhongAm"] =
+            new(MaChung,
+                "Giá vốn sẽ bị ÂM ⇒ lãi gộp cao hơn sự thật. Chỉ đến được DB nếu có đường ghi bỏ qua tầng domain.", false),
+        ["CK_PrcCostPrices_EffectiveRange"] =
+            new(MaChung,
+                "Giá vốn có kỳ hiệu lực NGƯỢC (kết thúc trước khi bắt đầu) ⇒ dòng này không bao giờ có hiệu lực.", false),
+        ["CK_PrcCostPrices_Currency_HopLe"] =
+            new(MaChung,
+                "Mã tiền tệ của giá vốn KHÔNG đúng ISO-4217 (3 ký tự HOA) ⇒ mọi phép so sánh tiền sẽ vô nghĩa.", false),
+
         // ── CATALOG ──────────────────────────────────────────────────────────────────────────────
         ["IX_CatProducts_TenantId_Sku"] =
             new("eCommerce:Catalog:0004", "SKU đã tồn tại.", true),

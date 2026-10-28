@@ -298,10 +298,12 @@ select count(*)::text from "CusCustomers" where "Id" = 'e0000000-0000-0000-0000-
         # chung **CO THAT** trong luoc do va **khong duoc phep** xuat hien:
         #    • `CatProducts.Code` = `K97E2E-SP-01` (ma noi bo — `WEB-002` ADR-03: URL cong khai dung slug);
         #    • `CatProducts.Id` (GUID — cung ADR-03: **cam** lo GUID);
-        #    • chuoi `CostPrice` — ⚠️ **PHAT HIEN CUA `S8`: cot `CostPrice` KHONG TON TAI trong luoc do**
-        #      (`CatProductVariants` chi co `Price`/`CompareAtPrice`), nen rang buoc "cam lo gia von" cua `D10`
-        #      hien duoc bao dam **bang su VANG MAT** — ghi o `web-002` §16. 📌 Khi GĐ2 them gia von thi ca nay
-        #      **khong** tu bat; luc do phai dua vao danh sach trang cua DTO (`StorefrontCongKhaiTests`).
+        #    • chuoi `CostPrice` — 📌 `S8` ghi nhan: luc do `CostPrice` **KHONG TON TAI** trong luoc do nen
+        #      rang buoc "cam lo gia von" chi duoc bao dam **bang su VANG MAT**. 🆕 **`S12` (28/10/2026) DA THEM**
+        #      `PrcCostPrices` ⇒ su vang mat **khong con** bao dam gi. 🔑 Vi vay `S12-G5` **thay the** ca nay:
+        #      no gieo mot **con so gia von THAT** (`777777`) roi khang dinh con so do **khong** co trong HTML
+        #      cong khai — do la phep do **hai chieu** (du lieu co that ⇒ khong lot), manh hon nhieu so voi
+        #      "chuoi `CostPrice` khong xuat hien".
         TiemVaoDb -Sql @'
 delete from "CatProductVariants" where "Id" in ('e0000000-0000-0000-0000-0000000000e9','e0000000-0000-0000-0000-0000000000ee');
 delete from "CatProducts" where "Id" in ('e0000000-0000-0000-0000-0000000000e8','e0000000-0000-0000-0000-0000000000ed');
@@ -344,6 +346,25 @@ values ('e0000000-0000-0000-0000-0000000000eb',null,'e0000000-0000-0000-0000-000
 '@ -KiemSql @'
 select count(*)::text from "PrcPriceListItems" where "Id" in ('e0000000-0000-0000-0000-0000000000eb','e0000000-0000-0000-0000-0000000000ef');
 '@ -SoDongMongDoi 2 | Out-Null
+
+        # 🆕 `S12` — **GIÁ VỐN** cho SKU probe (`PRC-001` §5.2 · BR-013).
+        # 🔑 VÌ SAO PHẢI GIEO: (a) `/GiaVon` phải render **dữ liệu THẬT** — nếu không, `S12-G2` chỉ chứng minh
+        # *"trang 200"* chứ không chứng minh *"đọc được DB"*; (b) `S12-G5` khẳng định **đúng con số này**
+        # **KHÔNG** xuất hiện trong HTML công khai.
+        # 📌 Chọn `777777` — **không tròn, khác mọi giá bán** (100.000/110.000) ⇒ phép so khớp không thể
+        # "xanh vì trùng số" (một con số trùng giá bán sẽ làm ca kiểm chống lộ **luôn xanh** dù giá vốn thật
+        # sự bị lộ).
+        # ⚠️ GUID nằm trong khối `e0000000-…` ⇒ `kiem-db.ps1` nhóm ⑥ **tự quét** nếu còn sót.
+        TiemVaoDb -Sql @'
+delete from "PrcCostPrices" where "Id" = 'e0000000-0000-0000-0000-0000000000f0';
+'@ -KhongNemKhiThieuKiem | Out-Null
+
+        TiemVaoDb -Sql @'
+insert into "PrcCostPrices" ("Id","TenantId","Sku","AmountValue","CurrencyCode","EffectiveFrom","EffectiveTo","ExtraProperties","ConcurrencyStamp","CreationTime","IsDeleted")
+values ('e0000000-0000-0000-0000-0000000000f0',null,'K97E2E-SKU-P1',777777,'VND',(now() at time zone 'utc')::date - 1,null,'{}','k97e2ef0',now(),false);
+'@ -KiemSql @'
+select count(*)::text from "PrcCostPrices" where "Id" = 'e0000000-0000-0000-0000-0000000000f0' and "AmountValue" = 777777;
+'@ -SoDongMongDoi 1 | Out-Null
 
         # 🔑 TON KHO: `TinhVaGiuChoAsync` **giu cho** ⇒ khong du ton thi don khong tao duoc. 📌 `Reserved = 0`
         # vi day la trang thai dau (chua ai giu).
@@ -1501,6 +1522,56 @@ select count(*)::text from "ReconRunMismatches" where "Id" = 'e0000000-0000-0000
         ("HTTP " + $maSitemap)
 
     # ══════════════════════════════════════════════════════════════════════════════════════════
+    # ⑧b 🆕 `S12` — GIÁ VỐN: MÀN HÌNH NỘI BỘ MỞ ĐƯỢC · KHÔNG LỘ RA CÔNG KHAI (`PRC-001` BR-013)
+    # ══════════════════════════════════════════════════════════════════════════════════════════
+    # 🔒 **BỐN CÂU HỎI CHỈ HTML THẬT TRẢ LỜI ĐƯỢC:**
+    #   ① `/GiaVon` có render **dữ liệu THẬT** từ DB không — 📌 `200` + neo **không** chứng minh điều đó: một
+    #     view chỉ in tiêu đề vẫn `200`. Phải khẳng định **con số 777.777** (đã gieo ở bước ②) hiện ra.
+    #   ② **MENU** có lối vào không — nếu không, màn hình **vô hình** với người dùng (đúng nợ `web-001` §81.2 #7).
+    #   ③ 🚨 khách **ẨN DANH** có bị chặn không — 📌 nếu không, **cả thế giới** đọc được biên lợi nhuận của công ty.
+    #   ④ 🚨 **HTML CÔNG KHAI** có chứa **giá trị giá vốn THẬT** không — đây là câu hỏi của BR-013, và nó
+    #     **không** suy ra được từ ③: quyền đúng vẫn có thể rò qua DTO/danh mục/sitemap.
+    # 📌 Đo **CẢ HAI CHIỀU**: admin `200` (②③) **và** ẩn danh `302` (③); giá vốn hiện trên trang nội bộ (①)
+    # **và** không hiện trên trang công khai (④).
+    $tepGiaVon = Join-Path $thuMucTam 'giavon-admin.html'
+    $kqGiaVon = ([string](& $curl -s -b $jar -c $jar -o $tepGiaVon -w '%{http_code}' ($web + '/GiaVon'))).Trim()
+    $htmlGiaVon = if (Test-Path $tepGiaVon) {
+        GiaiMaHtml ([System.IO.File]::ReadAllText($tepGiaVon, [Text.Encoding]::UTF8))
+    } else { '' }
+
+    Kq 'S12-G1 /GiaVon (admin) => 200 + neo [GIAVON-MAN-HINH]' `
+        (($kqGiaVon -eq '200') -and ($htmlGiaVon -match '\[GIAVON-MAN-HINH\]')) `
+        ("HTTP " + $kqGiaVon)
+
+    Kq 'S12-G2 🚨 /GiaVon HIỆN giá vốn THẬT 777.777 (không phải trang rỗng)' `
+        ($htmlGiaVon -match '777[,.]777') 'con so gieo o buoc 2, doc tu PrcCostPrices'
+
+    # ✅ **② LỐI VÀO TỪ MENU.** 📌 Đo trên **KHỐI MENU CỦA TRANG CHỦ** (`$khoiMenu`, lấy ở mục ⑤) — **KHÔNG**
+    # đo trên HTML của `/GiaVon`: menu admin hiện chỉ render ở `Views/Home/Index.cshtml` (nợ `WEB-001`), nên
+    # trang `/GiaVon` **không có** menu. 🔑 Đo sai trang ⇒ ca kiểm ĐỎ vì lý do SAI, rồi người ta "sửa" bằng cách
+    # bỏ ca kiểm — đúng loại mất mát âm thầm mà `README-probe.md` cảnh báo.
+    Kq 'S12-G3 MENU (trang chủ) có lối vào /GiaVon (màn hình không vô hình)' `
+        ($khoiMenu -match '/GiaVon') ("khoi menu {0} ky tu" -f $khoiMenu.Length)
+
+    # 🚨 **③ CHIỀU NGƯỢC — KHÁCH ẨN DANH.** 📌 Dùng **KHÔNG** cookie (`-b $jar` **cố ý** vắng mặt): dùng cookie
+    # admin để kiểm "trang nội bộ có bị chặn không" là **tự lừa mình** — luôn `200`.
+    $tepGiaVonAnon = Join-Path $thuMucTam 'giavon-anon.html'
+    $kqGiaVonAnon = ([string](& $curl -s -o $tepGiaVonAnon -w '%{http_code}|%{redirect_url}' ($web + '/GiaVon'))).Trim()
+
+    $phanAnon = $kqGiaVonAnon.Split('|')
+    $maAnon = $phanAnon[0]
+    $urlAnon = if ($phanAnon.Count -gt 1) { $phanAnon[1] } else { '' }
+
+    Kq 'S12-G4 🚨 khách ẨN DANH vào /GiaVon => 302 về ĐĂNG NHẬP (không 200)' `
+        (($maAnon -eq '302') -and ($urlAnon -match '/Account/Login')) `
+        ("HTTP " + $maAnon + " · Location = " + $urlAnon)
+
+    # 🚨 **④ BR-013 TRÊN HTML CÔNG KHAI THẬT.** 📌 `$htmlCtAnon` lấy từ `S8-W3` (trang chi tiết sản phẩm của
+    # **chính SKU** đang có giá vốn 777.777) ⇒ nếu con số đó xuất hiện ở đây, giá vốn **đã lộ**.
+    Kq 'S12-G5 🚨 HTML CÔNG KHAI không chứa giá vốn 777.777 (BR-013)' `
+        (-not ($htmlCtAnon -match '777[,.]777')) 'do tren trang chi tiet san pham an danh'
+
+    # ══════════════════════════════════════════════════════════════════════════════════════════
     # ⑨ 🆕 `S8` — THANH TOAN **END-TO-END** TOI TRANG KET QUA (don -> giao dich -> cong -> IPN -> ket qua)
     # ══════════════════════════════════════════════════════════════════════════════════════════
     # 🔒 Chuoi duoc do **dung nhu nguoi dung di**: POST form co token that → `302` sang **cong** →
@@ -1836,6 +1907,12 @@ delete from "PrcPriceListItems" where "Id" in ('e0000000-0000-0000-0000-00000000
 delete from "PrcPriceLists" where "Id" = 'e0000000-0000-0000-0000-0000000000ea';
 '@ | Out-Null
 
+        # 🆕 `S12` — dọn **giá vốn probe** (📌 bảng TIỀN/BIÊN LỢI NHUẬN: rác ở đây làm báo cáo lãi gộp sai,
+        # và `kiem-db.ps1` nhóm ⑥ tự quét GUID `e0000000-…` ⇒ lần sau sẽ đỏ vì **lý do vô hình**).
+        Invoke-Psql -Sql @'
+delete from "PrcCostPrices" where "Id" = 'e0000000-0000-0000-0000-0000000000f0';
+'@ | Out-Null
+
         Invoke-Psql -Sql @'
 delete from "CatProductVariants" where "Id" in ('e0000000-0000-0000-0000-0000000000e9','e0000000-0000-0000-0000-0000000000ee');
 '@ | Out-Null
@@ -1904,7 +1981,14 @@ select count(*)::text from "ReconRunMismatches" where "Sku" like 'K97E2E%';
 
         Write-Output ("   DON DEP (S8): giao dich probe con={0} (0) · catalog probe con={1} (0) · ton probe con={2} (0) · dong lech probe con={3} (0)" -f $conGiaoDich, $conCatalog, $conTon, $conLechProbe)
 
-        if ($con -ne '0' -or $conKho -ne '0' -or $baoMat -ne 'True' -or $conHanMuc -ne '0' -or $conLuot -ne '0' -or $conDongLech -ne '0' -or $conGiaoDich -ne '0' -or $conCatalog -ne '0' -or $conTon -ne '0' -or $conLechProbe -ne '0') {
+        # 🆕 `S12` — giá vốn probe. 📌 "tin là đã dọn" là đúng loại lỗi mà `ham-tiem.ps1` sinh ra để chống.
+        $conGiaVon = (@(Invoke-Psql -Sql @'
+select count(*)::text from "PrcCostPrices" where "Id" = 'e0000000-0000-0000-0000-0000000000f0';
+'@) -join '').Trim()
+
+        Write-Output ("   DON DEP (S12): gia von probe con={0} (0)" -f $conGiaVon)
+
+        if ($con -ne '0' -or $conKho -ne '0' -or $baoMat -ne 'True' -or $conHanMuc -ne '0' -or $conLuot -ne '0' -or $conDongLech -ne '0' -or $conGiaoDich -ne '0' -or $conCatalog -ne '0' -or $conTon -ne '0' -or $conLechProbe -ne '0' -or $conGiaVon -ne '0') {
             Write-Output '   🚨 DON DEP KHONG DAY DU ⇒ lan chay sau co the XANH VI DU LIEU CU.'
         }
     }

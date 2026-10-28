@@ -131,6 +131,21 @@ public static class MenuDieuHuong
                     // `DoiSoatThanhToanController` gọi `IPaymentAppService` (`[Authorize(Payments.Default)]`).
                     QuyenCanCo = eCommerceConsts.Permissions.Payments.Default,
                     MoTa = "Tra cứu giao dịch + trạng thái truy vấn từ cổng thanh toán"
+                },
+                new()
+                {
+                    Nhan = "Giá vốn",
+                    Url = "/GiaVon",
+                    // `GiaVonController` gọi `ICostPriceAppService` — service đó `[Authorize]` cấp class
+                    // bằng `PricingPermissions.CostPrice.View` (`S12`, `PRC-001` BR-013).
+                    //
+                    // 🚨 **VÌ SAO MỤC NÀY NẰM TRONG NHÓM "VẬN HÀNH" CHỨ KHÔNG Ở CẤP 1:** giá vốn là
+                    // **dữ liệu nội bộ của kế toán**, KHÔNG phải việc hằng ngày của người bán hàng. Để nó
+                    // ngang hàng `Đơn hàng`/`Sản phẩm` là **mời** người không cần xem bấm vào — và
+                    // quyền `CostPrice.View` là thứ duy nhất chặn (xem `PricingPermissions.CostPriceView`).
+                    // 📌 Quyền hẹp hơn `Pricing.Default`: người chỉ có quyền xem giá bán **không** thấy mục này.
+                    QuyenCanCo = eCommerce.Pricing.PricingPermissions.CostPriceView,
+                    MoTa = "Giá vốn theo SKU và kỳ (chỉ đọc · không hiển thị cho người mua)"
                 }
             ]
         }

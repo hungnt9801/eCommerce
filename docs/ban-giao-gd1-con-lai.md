@@ -1,6 +1,6 @@
 # BÀN GIAO — Phần còn lại của GĐ1 (để mở session mới)
 
-> **Lập ngày:** 28/10/2026 · **Cây:** `main` @ `1a01f17` (sạch) · **Người lập:** phiên tự động 12→21
+> **Lập ngày:** 28/10/2026 · **Cập nhật:** 28/10/2026 (sau `S12`) · **Cây:** `main` (sạch) · **Người lập:** phiên tự động
 >
 > 🔑 **Đọc mục 1 trước.** Tài liệu này **không** nói GĐ1 đã xong. Nó chốt **đang ở đâu**, **còn gì**, và
 > **làm theo thứ tự nào** để không phải đoán lại.
@@ -9,15 +9,18 @@
 
 ## 1. Ảnh chụp hiện tại (đo được, không phải lời khai)
 
+> 📌 **Số đo này là SAU `S12`** (28/10/2026). Bảng cũ trước `S12` (unit **1528** · integration **71** · E2E
+> **135** · NND **57** · **68** quyền · **89** chỗ quét · **46** migration) đã **trôi** — đừng dùng.
+
 | Hạng mục | Giá trị | Cách đo |
 |---|---|---|
-| Commit | `1a01f17` | `git log --oneline -1` |
-| Cổng đầy đủ | **exit 0 · 365.0s · 15/15 bước** | `pwsh -File tools\kiem-tat-ca.ps1 -DayDu` |
-| Unit | **1528** | bước ③ |
-| Integration | **71/71** | bước ④ |
-| E2E (HTML thật) | **135/135** | bước ⑧ |
-| Bất biến DB | **25/25** · **NND 57** · **68 quyền** · **89** chỗ quét | bước ⑥ |
-| Migration | **46** | `src/eCommerce.EntityFrameworkCore/Migrations` |
+| Commit | `git log --oneline -1` | 🔒 **nguồn sự thật là lệnh**, không phải dòng trong tài liệu |
+| Cổng đầy đủ | **exit 0 · 343.9s · 15/15 bước** | `pwsh -File tools\kiem-tat-ca.ps1 -DayDu` |
+| Unit | **1543** | bước ③ |
+| Integration | **77/77** | bước ④ |
+| E2E (HTML thật) | **140/140** | bước ⑧ |
+| Bất biến DB | **25/25** · **NND 58** · **69 quyền** · **94** chỗ quét | bước ⑥ |
+| Migration | **47** | `src/eCommerce.EntityFrameworkCore/Migrations` |
 | Oversell | **11/11** (bước ⑬) | `tools/probe-oversell.ps1` |
 | Outbox replay | **9/9** (bước ⑭) | `tools/probe-outbox.ps1` |
 | Outbox 2 instance | **9/9** (bước ⑮) | `tools/probe-outbox-2instance.ps1` |
@@ -35,6 +38,7 @@
 | Brand (`CatBrands`) | `CAT-004`, migration **45**, NND **56** |
 | REC-001 — 3 bảng + API đọc + worker ghi | migration **46**, NND **57**; worker phân loại **9/10** loại lệch |
 | UI đọc: `/Brands` (CRUD trừ xoá) · `/Kho` · `/Pricing` | menu + controller + view; E2E xanh |
+| **`S12` — `CostPrice` (`PrcCostPrices`)** | `PRC-001` **§20**: migration **47** · NND **58** · quyền **`eCommerce.Pricing.CostPrice.View`** (seed **69**) · `/GiaVon` (chỉ đọc) · **15 unit** + **6 integration** + **5 E2E** (`S12-G1…G5`, đo cả **ẩn danh bị chặn** và **HTML công khai không lộ 777.777**) |
 
 ---
 
@@ -45,7 +49,7 @@
 
 | # | Việc | Đặc tả (nguồn sự thật) | Phạm vi tối thiểu | Migration dự kiến |
 |---|---|---|---|---|
-| **S12** | `CostPrice` (`PrcCostPrices`) | [`PRC-001` §5.2](features/pricing/prc-001-bang-gia-va-gia-theo-kenh.md) | Entity `CostPrice` (Sku, Amount, Currency, EffectiveFrom/To, ApprovedBy/At) + unique **NND** `(TenantId, Sku, EffectiveFrom)` + CHECK `Amount >= 0`, `Currency ~ '^[A-Z]{3}$'`; app service **đọc** (cấm lộ ra API công khai — BR-013) + UI đọc | **47** · NND **58** |
+| ~~**S12**~~ | ✅ **XONG 28/10/2026** — `CostPrice` (`PrcCostPrices`) | [`PRC-001` §20](features/pricing/prc-001-bang-gia-va-gia-theo-kenh.md) | migration **47** · NND **58** · quyền `eCommerce.Pricing.CostPrice.View` · `/GiaVon` (chỉ đọc) · **6 integration + 15 unit + 5 E2E**. ⚠️ **Chưa** có đường ghi (**`Q2`** chưa chốt) ⇒ đừng mở "tạm" |
 | **S13** | `StockAllotment` + `StockAllotmentLedger` | [`INV-003`](features/inventory/inv-003-phan-bo-ton-theo-kenh.md) | Ngân sách tồn theo `(WarehouseId, Sku, ChannelCode)` + sổ cái append-only; **cấm** thêm `StockMovementType`; event `StockAllotmentChangedEto`; hết hạn giữ chỗ theo ngân sách | **48** · NND **59** (hoặc 60 nếu ledger có unique) |
 | **S14** | `OrderReturn` + `OrderReturnLine` | [`SAL-006`](features/sales/sal-006-tra-hang-rma-hoan-tien.md) | Trả hàng/RMA + hoàn tiền; trạng thái có guard; nối phiếu kho `CustomerReturn` qua `ReferenceType/Id` (không FK cứng); cập nhật `Order.ReturnStatus` | **49** |
 | **S15** | `StalePendingTransaction` + `TriggerRunAsync` | [`REC-001` §5.4/§6.1](features/reconciliation/rec-001-doi-soat-thanh-toan-querydr.md) | Chốt **ngưỡng giờ** (setting); thêm kind khi giao dịch `Initiated/Pending` quá hạn mà cổng chưa có; API chạy tay qua **cùng khoá** | **50** (nếu thêm setting seed) |
@@ -104,13 +108,13 @@
 
 ```powershell
 cd D:\Projects\Tools\eCommerce
-git log --oneline -1                 # phải là 1a01f17 hoặc commit bàn giao mới hơn
+git log --oneline -1                 # 🔒 đọc hash THẬT ở đây; đừng tin một hash chép trong tài liệu
 git status --porcelain               # phải rỗng
 pwsh -File tools\kiem-tat-ca.ps1 -DayDu   # phải exit 0, 15/15
 ```
 
 Sau đó đọc theo thứ tự:
-1. **tài liệu này** (mục 2 → chọn S12);
+1. **tài liệu này** (mục 2 → việc kế tiếp là **S13**);
 2. đặc tả của việc đó (`docs/features/...` — cột 3 bảng §2);
 3. [`docs/SESSION-KICKOFF.md`](SESSION-KICKOFF.md) — quy ước/kiến trúc;
 4. [`docs/ke-hoach-tach-module.md`](ke-hoach-tach-module.md) — L2 nếu đụng module;
@@ -152,7 +156,7 @@ Sau đó đọc theo thứ tự:
 
 | Việc | Ước lượng | Ghi chú |
 |---|---|---|
-| S12 CostPrice | 3–5 pd | Spec đầy đủ, rủi ro thấp |
+| ~~S12 CostPrice~~ | ✅ **xong 28/10/2026** | `PRC-001` §20; phần **đường ghi** vẫn treo chờ **`Q2`** |
 | S13 StockAllotment + ledger | 5–8 pd | Chạm kho + event + hết hạn |
 | S14 OrderReturn/RMA | 6–10 pd | Chạm Sales + Inventory + PaymentHub |
 | S15 StalePending + TriggerRun | 2–3 pd | Cần Q1 |
@@ -161,4 +165,4 @@ Sau đó đọc theo thứ tự:
 | S18 UI + tài liệu | 3–6 pd | Phụ thuộc Q5 |
 | S19 VNPay thật | 2–3 pd | Phụ thuộc Q6 |
 
-**Tổng còn lại ≈ 28–46 pd** — không phải một phiên. Làm **theo S12 → S19**, mỗi phiên **một** việc + gate.
+**Tổng còn lại ≈ 25–41 pd** — không phải một phiên. Làm **theo S13 → S19**, mỗi phiên **một** việc + gate.

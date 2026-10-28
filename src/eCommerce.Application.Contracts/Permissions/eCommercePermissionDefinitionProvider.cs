@@ -58,6 +58,12 @@ public class eCommercePermissionDefinitionProvider : PermissionDefinitionProvide
         var pricing = group.AddPermission(eCommerce.Pricing.PricingPermissions.Default);
         pricing.AddChild(eCommerce.Pricing.PricingPermissions.Manage);
 
+        // 🆕 `S12` (`PRC-001` §6.1 · BR-013) — **XEM GIÁ VỐN**, tách khỏi `Pricing.Default`.
+        // 🚨 BẮT BUỘC ở **CẢ HAI NƠI** (hằng số `PricingPermissions` + ở đây): thiếu một nơi ⇒ `403` cho
+        // MỌI người kể cả `admin`. 📌 Và thiếu **dòng này** thì màn hình `/GiaVon` **không mở được** — nhưng
+        // triệu chứng là `403` trần, không trỏ tới chỗ sai (`XC-004` D2/E3).
+        pricing.AddChild(eCommerce.Pricing.PricingPermissions.CostPriceView);
+
         // ---- Kho ----
         var inventory = group.AddPermission(eCommerceConsts.Permissions.Inventory.Default);
         inventory.AddChild(eCommerceConsts.Permissions.Inventory.Adjust);

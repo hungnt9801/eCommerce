@@ -101,6 +101,14 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>, IHasEventOut
     public DbSet<Pricing.PriceListItem> PriceListItems { get; set; } = default!;
     public DbSet<Pricing.ChannelPrice> ChannelPrices { get; set; } = default!;
 
+    /// <summary>
+    /// 🆕 `S12` — **GIÁ VỐN** (`PRC-001` §5.2, `PrcCostPrices`). 🚨 **Dữ liệu NỘI BỘ** (BR-013): chỉ đọc qua
+    /// app service có quyền `eCommerce.Pricing.CostPrice.View`, **không** đường công khai.
+    /// 📌 Thiếu `DbSet` ⇒ ABP không đăng ký `IRepository&lt;CostPrice, Guid&gt;` ⇒ DI nổ (`HTTP 500`) đúng lúc
+    /// mở màn hình giá vốn — lưới an toàn: `DbSetRegistrationTests`.
+    /// </summary>
+    public DbSet<Pricing.CostPrice> CostPrices { get; set; } = default!;
+
     // PRC-002 — **bậc thang giá**: bảng RIÊNG vì `PriceListItem` duy nhất theo `(TenantId, PriceListId, Sku)`
     // (`PRC-001` BR-008) ⇒ **không chứa được nhiều bậc** cho cùng một SKU (`PRC-002` ADR-01).
     public DbSet<Pricing.TierPriceSet> TierPriceSets { get; set; } = default!;
