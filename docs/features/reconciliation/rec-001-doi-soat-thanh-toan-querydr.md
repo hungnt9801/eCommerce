@@ -470,7 +470,7 @@ sequenceDiagram
 
 ### 6.1 Application Service
 
-**🟡 ĐÃ CÓ bản ĐỌC (27/10/2026):** `IPaymentReconciliationAppService` (GetRuns/GetLines/GetDiscrepancies). Worker **đã ghi Run/Line** + `MoneyReceivedButNotRecorded`. `TriggerRunAsync` **chưa**; các loại lệch cần `amount/response` **chưa** (provider contract chỉ trả enum). Vị trí: `modules/Reconciliation/eCommerce.Reconciliation.Application.Contracts` (interface + DTO) và `…Application` (hiện thực).
+**🟡 ĐÃ CÓ bản ĐỌC (27/10/2026):** `IPaymentReconciliationAppService` (GetRuns/GetLines/GetDiscrepancies). Worker **đã ghi Run/Line** + `MoneyReceivedButNotRecorded`. `TriggerRunAsync` **chưa**; worker phân loại **9/10** loại lệch (còn `StalePendingTransaction` — cần ngưỡng tuổi) nhờ `QueryStatusDetailAsync`. Vị trí: `modules/Reconciliation/eCommerce.Reconciliation.Application.Contracts` (interface + DTO) và `…Application` (hiện thực).
 
 | Mục | Giá trị |
 |---|---|

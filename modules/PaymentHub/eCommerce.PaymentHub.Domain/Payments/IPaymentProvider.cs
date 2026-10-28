@@ -105,6 +105,18 @@ public interface IPaymentProvider
 
     /// <summary>Truy vấn trạng thái từ cổng — dùng cho job đối soát (webhook có thể mất).</summary>
     Task<PaymentTransactionStatus> QueryStatusAsync(string merchantReference, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 🆕 **TRUY VẤN CHI TIẾT** (`REC-001` 2b, 28/10/2026) — trả cả mã phản hồi/số tiền/mã giao dịch cổng/loại giao dịch
+    /// để đối soát phân loại được `AmountMismatch`, `ProviderFlagged`… (method cũ chỉ trả enum).
+    ///
+    /// 🔒 **Default implementation** gọi <see cref="QueryStatusAsync"/> và bọc enum ⇒ mọi provider hiện có **không
+    /// phải sửa**; provider nào hỗ trợ chi tiết thì override. 📌 Không phá hợp đồng cũ.
+    /// </summary>
+    async Task<PaymentStatusQueryResult> QueryStatusDetailAsync(
+        string merchantReference,
+        CancellationToken cancellationToken = default)
+        => new(await QueryStatusAsync(merchantReference, cancellationToken));
 }
 
 /// <summary>
@@ -156,4 +168,21 @@ public class RefundResult
     /// <summary>Lỗi **HẠ TẦNG** (timeout, không kết nối được) — ⚠️ **khác hẳn** mã lỗi nghiệp vụ của cổng:
     /// lỗi hạ tầng thì **KHÔNG BIẾT** cổng có nhận được yêu cầu hay không ⇒ **cấm retry mù** (`SAL-006` ADR).</summary>
     public string? LoiHaTang { get; set; }
+
+    // 🆕 REC-001 2b (28/10/2026) — các trường querydr cần để phân loại lệch.
+    public long? SoTienMinorUnits { get; set; }
+    public string? TrangThaiGiaoDich { get; set; }
+    public string? NgayGiaoDichGmt7 { get; set; }
+    public string? LoaiGiaoDich { get; set; }
 }
+
+/// <summary>Kết quả `querydr` chi tiết (`REC-001` §5.2.2) — trường nào cổng không trả thì `null`.</summary>
+public sealed record PaymentStatusQueryResult(
+    PaymentTransactionStatus Status,
+    string? ResponseCode = null,
+    string? TransactionStatus = null,
+    long? AmountMinorUnits = null,
+    string? TransactionNo = null,
+    DateTime? PayDateUtc = null,
+    string? PayDateGmt7 = null,
+    string? TransactionType = null);
