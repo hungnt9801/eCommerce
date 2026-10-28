@@ -470,7 +470,7 @@ sequenceDiagram
 
 ### 6.1 Application Service
 
-**🟡 ĐÃ CÓ bản ĐỌC (27/10/2026):** `IPaymentReconciliationAppService` (GetRuns/GetLines/GetDiscrepancies). Worker **đã ghi Run/Line** + `MoneyReceivedButNotRecorded`. `TriggerRunAsync` **chưa**; worker phân loại **9/10** loại lệch (còn `StalePendingTransaction` — cần ngưỡng tuổi) nhờ `QueryStatusDetailAsync`. Vị trí: `modules/Reconciliation/eCommerce.Reconciliation.Application.Contracts` (interface + DTO) và `…Application` (hiện thực).
+**🟡 ĐÃ CÓ bản ĐỌC (27/10/2026):** `IPaymentReconciliationAppService` (GetRuns/GetLines/GetDiscrepancies). Worker **đã ghi Run/Line** + `MoneyReceivedButNotRecorded`. 🆕 **`S15` (28/10/2026): `TriggerRunAsync` ĐÃ CÓ** — chạy tay **qua cùng khoá** với job (xem **§20**); worker nay phân loại **10/10** loại lệch (`StalePendingTransaction` bật khi cổng trả `91`). Vị trí: `modules/Reconciliation/eCommerce.Reconciliation.Application.Contracts` (interface + DTO) và `…Application` (hiện thực); vòng quét ở `src/eCommerce.Application/PaymentHub/PaymentReconciliationRunner.cs`.
 
 | Mục | Giá trị |
 |---|---|
@@ -1574,3 +1574,73 @@ triệu chứng nào** ngoài việc lịch sử biến mất.
 |---|---|---|---|
 | v0.5 | 18/10/2026 | *(agent, session `S7`)* | **§19 — `S7`: XÁC NHẬN LỆCH (`Q5` = A) + PHÂN TRANG + RETENTION**: **3 cột** `ConfirmedByUserId`/`ConfirmedAtUtc`/`ConfirmNote` + `ReconRun.XacNhan` + **`CHECK` `CK_ReconRuns_XacNhan_DuBo`** · **quyền `eCommerce.Reconciliation.Confirm`** (hai nơi) · endpoint `PostXacNhanLuotAsync` (**ai** lấy từ principal) · **setting `Recon.Retention.Days`** (180, `0` = TẮT) + luật **THUẦN** `DoiSoatRetention` + `DoiSoatRetentionService` (**dùng chung** job & nút bấm) + job **`ReconRetentionWorker`** + đường bấm tay có **XEM TRƯỚC** · **phân trang** trang chi tiết (50 dòng, `TotalCount` thật) · **+27 unit test** (1367 → 1395) · **+4 integration** (67 → 71) · **+23 ca E2E** (67 → 95, **95/95**). 🚨 **BA LỖI THẬT** chỉ lộ khi đo HTML/DB: (①) **xoá MỀM** thay vì cứng ⇒ retention **không** làm bảng nhỏ đi (`ISoftDelete` của `FullAuditedEntity`); (②) **`[Required]` trên DTO** chặn trước domain ⇒ người dùng thấy thông điệp **tiếng Anh** thay vì `0005` — 📌 đúng lỗi §18.4 tái xuất ở dạng khác; (③) **`[Range]` trên `SoNgay`** làm `0` **không bao giờ** trả `0006` ⇒ tài liệu và sản phẩm **lệch nhau mà cổng vẫn xanh**. ➕ **hai lỗi của chính BỘ ĐO**: neo HTML giả định `7` trong khi DB in `7.0000` (**3 ca ĐỎ GIẢ**, và các ca chiều ngược **XANH vì lý do sai**) · **gộp nhóm** *"mới hơn mốc"* vào *"chờ xác nhận"* ⇒ báo cáo **nói sai lý do giữ lại**. Ghi **§19.6** (nợ: metric retention · nạp ứng viên vào bộ nhớ · xử lý hàng loạt · GUID trên UI) |
 | v0.6 | 21/10/2026 | *(agent, tiếp phiên `S7`)* | **ĐÓNG NỢ §19.6 #4 — TÊN NGƯỜI XÁC NHẬN THAY GUID**: `LuotDoiSoatDto.ConfirmedByName` + `GanTenNguoiXacNhanAsync` (**một** truy vấn/trang, không N+1) · UI hiện **tên** ở **cả** trang danh sách và trang chi tiết; không tra được ⇒ **GUID rút gọn + nói rõ**, không hiện *"(không rõ)"* · **+2 ca E2E** (`S7-D12`/`D13`, neo ASCII `[DOISOAT-NGUOI-XAC-NHAN]` — ⛔ không đo bằng chuỗi `admin` trần vì `>admin<` còn khớp `<option>` ở layout). 🔑 **Hai phát hiện:** (①) `IIdentityUserRepository` **không** phơi `GetQueryableAsync` (`CS1061`) ⇒ dùng `IRepository<IdentityUser, Guid>`; (②) môi trường: Docker Desktop tắt sau restart ⇒ `docker compose up -d` trước khi đo. Ghi nợ mới **§19.6 #6** (đa tenant: tra tên theo `TenantId`) |
+
+---
+
+## 20. TRẠNG THÁI TRIỂN KHAI — **`S15`: GIAO DỊCH TREO QUÁ HẠN + CHẠY TAY QUA CÙNG KHOÁ** (28/10/2026)
+
+> Mục tiêu **hẹp**: chốt **ngưỡng giờ** cho `StalePendingTransaction` (đóng nợ "9/10 loại lệch") và mở
+> **đường chạy tay** của `REC-001` §6.1 **mà không chép luật** sang chỗ thứ hai.
+
+### 20.1 Đã làm
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| 1 | **Ngưỡng cấu hình** | `Reconciliation:StalePendingHours` (mặc định **24**), đọc qua `IConfiguration`; `0`/âm = **TẮT** (cùng quy ước `Recon.Retention.Days`) |
+| 2 | **Luật THUẦN** `LuatStalePending` (`Reconciliation.Domain`) | `LaStale(daKetThuc, taoLucUtc, bayGioUtc, responseCodeCong, nguongGio)` + `DocNguong(string?)`. 🚨 Chỉ kết luận **treo** khi cổng **xác nhận không có giao dịch** (`vnp_ResponseCode = 91`) — `null` (không truy vấn được) **không** phải treo |
+| 3 | **Phân loại trong lịch sử** | `PaymentReconciliationRunner` thêm `Discrepancy` `StalePendingTransaction` (mức **Thấp**) — đủ **10/10** loại lệch của §5.4 |
+| 4 | **MỘT hiện thực, HAI đường vào** | `IPaymentReconciliationRunner` (**contracts** của module) ← hiện thực `PaymentReconciliationRunner` (host). 🔒 **Khoá `payment:reconciliation-rec001` nằm BÊN TRONG runner** ⇒ job và chạy tay **loại trừ nhau** |
+| 5 | **`TriggerRunAsync`** | `IPaymentReconciliationAppService.TriggerRunAsync()` → `POST /api/app/payment-reconciliation/trigger-run`. Ghi `TriggeredBy = Manual` + `TriggeredByUserId`; đang bận khoá ⇒ **NÉM** `eCommerce:Lock:0001` (không im lặng) |
+| 6 | **Worker thành "vỏ nhịp"** | Chỉ còn: neo `[PAY-JOB-BAT-DAU]` → gọi runner → neo `[PAY-JOB-XONG]` (+ `[PAY-JOB-RONG]` khi `lineTotal = 0`). 🔒 Không còn `TryAcquireAsync`/`QueryStatusDetailAsync` trong worker |
+
+### 20.2 ✅ Quyết định `Q1` (chủ dự án chưa chốt — phiên này chốt **có ghi chép**, đổi được)
+
+**`StalePendingHours = 24`.** Lý do (đo được, không phải cảm tính):
+
+| Lý do | Chi tiết |
+|---|---|
+| VNPay tự đóng giao dịch ~15 phút | Sau 24 h mà chưa có kết quả ⇒ gần như chắc chắn **treo** (IPN mất/khách bỏ dở), không phải "đang xử lý" |
+| **Lớn hơn `DedupWindowHours` (20 h)** của cùng job | Sau khi đã đối soát một lần, lượt kế mới gắn cờ ⇒ **không** sinh một `Discrepancy` mỗi 15 phút (mỗi dòng là việc phải xử lý tay) |
+| Nhỏ hơn một ngày làm việc | Cờ xuất hiện **trong ngày làm việc kế tiếp** ⇒ còn người xử lý trước khi khách khiếu nại |
+
+📌 Đổi ngưỡng **không cần migration**: chỉ sửa `appsettings.json` (`Reconciliation:StalePendingHours`).
+🔒 Nếu chủ dự án chốt giá trị khác (ví dụ **6 h** theo đề xuất cũ ở §15.1 `Q4`), chỉ cần đổi cấu hình — luật và
+test **không** phụ thuộc con số 24 (test khoá tương quan *"> `DedupWindowHours`"*, không khoá "= 24").
+
+### 20.3 🚨 Sai lệch doc/code (ghi để không ai "sửa" nhầm)
+
+| # | Đặc tả nói | Code làm | Vì sao |
+|---|---|---|---|
+| 1 | `TriggerRunAsync` nhận `TriggerReconciliationDto(periodFromUtc, periodToUtc)` | **không** tham số; kỳ **suy ra** từ lô (`min(CreationTime)` → `now`) | 📌 Người bấm **không** được tự chọn kỳ: chọn kỳ hẹp là **giấu** giao dịch khỏi đối soát, và kỳ rộng là **đốt quota** cổng. Kỳ suy ra từ **dữ liệu thật** là thứ duy nhất trả lời được *"lượt này đã xét cái gì"* |
+| 2 | Quyền `…Reconciliation.Manage` | `Payments.Default` (class-level) | Đường chạy tay **đã có** (`IPaymentAppService.PostDoiSoatLoatAsync`) dùng đúng quyền này. Tách `Reconciliation.Manage` là **thay đổi hợp đồng phân quyền** (seed + UI + test) — chưa cần cho GĐ1, ghi vào nợ |
+| 3 | `StalePendingHours` mặc định **6** (§11 / §15.1 `Q4` đề xuất) | **24** (§20.2) | 6 h < `DedupWindowHours` 20 h ⇒ gắn cờ **lặp lại** cho cùng giao dịch, và 6 h là **giữa đêm** với phần lớn khách VN ⇒ cờ xuất hiện khi không ai xử lý |
+| 4 | `StalePendingTransaction` khi *"cổng chưa có giao dịch"* | chỉ khi `vnp_ResponseCode = 91` | `null` = **không truy vấn được** ⇒ đã có `ProviderUnreachable`; gộp hai ca là **hai cờ cho một nguyên nhân**, và cờ "treo" thì **không ai dọn được** |
+
+### 20.4 ✅ Bằng chứng đo được
+
+| Phép đo | Kết quả |
+|---|---|
+| Unit | **1543 → 1560** (+17: `StalePendingTests` — luật, biên ngưỡng, `0` = TẮT, tuổi âm, đọc cấu hình, **1 hiện thực**, **không chép luật**) |
+| Probe HTTP thật (`tools/probe-thanh-toan.ps1`) | **26 → 30/30**: `T26` chạy tay `200` · `T27` `triggeredBy = Manual` + `TriggeredByUserId` + `lineTotal = 0` · `T28` **DB** có đúng 1 lượt Manual (không tin body) · `T24b` dọn sạch lượt probe (**đếm lại = 0**) |
+| Migration / NND | **không đổi** (47 · 58) — `S15` chỉ thêm **cột không có**, bảng không đổi; ngưỡng là **cấu hình**, không phải seed DB |
+| E2E | **140/140** (không đổi — chưa có nút UI "chạy tay") |
+| Cổng đầy đủ | **exit 0 · 341.4s · 15/15 bước** (máy dev; baseline trước `S15` cùng máy: **343.9s**) |
+
+### 20.5 ⚠️ Giới hạn đã biết
+
+1. **`StalePendingTransaction` chưa được đo bằng cổng THẬT**: `VnPayPaymentProvider` trong môi trường dev trả
+   trạng thái giả lập, **không** trả `91` ⇒ chỉ có **luật** được test (đúng biên) + nhánh gọi luật được test
+   bằng quét nguồn. 🔒 Muốn đo thật cần **credential sandbox** (`Q6`, `S19`).
+2. **Chưa có UI** nút "Chạy đối soát ngay" — API đã có (`T26`), nút bấm thuộc `S18`.
+3. Đường chạy tay **gọi cổng đồng bộ trong request** (tối đa 50 giao dịch × 1 lời gọi HTTP) ⇒ với tồn đọng lớn,
+   HTTP request có thể dài. 📌 Cùng giới hạn với `PostDoiSoatLoatAsync` đã có; nếu cần, chuyển sang
+   "đặt lệnh rồi trả `202`" — **chưa** làm (đổi hợp đồng API).
+4. `TriggerRunAsync` **không** trả `202`: nó chạy xong rồi mới trả kết quả. Đây là lựa chọn **có chủ ý** —
+   người bấm cần biết **ngay** lượt đó có lệch hay không.
+
+### 20.6 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.6 | 28/10/2026 | *(agent, session GĐ1 — `S15`)* | **`StalePendingTransaction`** (ngưỡng `Reconciliation:StalePendingHours` = 24, `0` = TẮT) + **`TriggerRunAsync`** đi qua **cùng khoá** với job nhờ tách `IPaymentReconciliationRunner` (một hiện thực, hai đường vào). **+17 unit** · **probe thanh toán 26 → 30/30** (HTTP thật + DB thật + dọn sạch). Ghi rõ 4 sai lệch (§20.3) và 4 giới hạn (§20.5) |
+

@@ -1,11 +1,9 @@
 using eCommerce.PaymentHub.Payments;
+using eCommerce.Reconciliation;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Volo.Abp.BackgroundWorkers;
-using Volo.Abp.DistributedLocking;
-using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Threading;
-using Volo.Abp.Uow;
 
 namespace eCommerce.Application.PaymentHub;
 
@@ -14,28 +12,21 @@ namespace eCommerce.Application.PaymentHub;
 /// **cơ chế tự chạy**.
 ///
 /// ══════════════════════════════════════════════════════════════════════════════════════════════════
-/// 🔑 **VÌ SAO CẦN JOB NÀY (không đủ endpoint `doi-soat-loat`):**
+/// 🆕 **`S15` (28/10/2026) — LỚP NÀY THÀNH "VỎ NHỊP": toàn bộ vòng quét dời sang
+/// `PaymentReconciliationRunner`.**
+/// 🔑 **VÌ SAO PHẢI DỜI:** `REC-001` §6.1 yêu cầu `TriggerRunAsync` (chạy tay) **đi qua CÙNG khoá** với job.
+/// Nếu vòng quét nằm trong worker thì app service **phải chép** 250 dòng luật tiền — hai bản luật, và hai khoá
+/// khác tên ⇒ hai đường **chạy chồng**, cùng gọi cổng cho một giao dịch (đốt quota + hai `Run` cho cùng kỳ).
+/// ✅ Nay worker chỉ: theo nhịp → gọi runner → ghi neo log. Một luật, một khoá, hai đường vào.
 ///
-/// Ở lượt trước tôi đã thêm `IPaymentAppService.PostDoiSoatLoatAsync` — **đường gọi** đã có. ⚠️ Nhưng
-/// **vẫn phải có NGƯỜI bấm**. 📌 Và đối soát là công việc **ĐỊNH KỲ**, không phải việc ai đó **nhớ ra**.
-/// 🚨 Hệ quả nếu chỉ có endpoint: **IPN mất** ⇒ giao dịch kẹt `Pending` ⇒ 🔑 **tiền đã vào mà hệ thống không
-/// biết** — cho tới khi **tình cờ** có người mở trang và bấm. **Không có lỗi nào** để nhắc họ.
-///
-/// 🚨 **VÀ BÀI HỌC QUYẾT ĐỊNH CỦA LƯỢT NÀY — vì sao lớp này KHÔNG gọi `IPaymentAppService`:**
-/// `PaymentAppService` mang **`[Authorize]` ở cấp class** (quy ước #4 **bắt buộc** cho mọi app service) ⇒
-/// interceptor của ABP kiểm quyền **NGAY CẢ KHI GỌI TRONG TIẾN TRÌNH**, mà worker **KHÔNG có principal**
-/// ⇒ **`AbpAuthorizationException`**.
-/// 📌 **Lỗi này ĐÃ XẢY RA THẬT** ở `SAL-005`: `MarketplaceReconciliationWorker` gọi `IDeadLetterAppService`
-/// ⇒ job **chết giữa đường**, log chỉ có neo **mở đầu** và **không** có neo kết thúc — 🔒 và tệ hơn: các ca
-/// kiểm *"job không ghi gì"* **vẫn XANH** vì job **chết**, không phải vì job **cố ý** không ghi.
-///
-/// ⚠️ **VÀ LỐI SAI CÒN LẠI — chép luật sang đây:** nếu lớp này tự viết lại *"khi nào đổi trạng thái"* thì luật
-/// *"CHỈ TIẾN, KHÔNG LÙI"* có **HAI** định nghĩa ⇒ 🔒 chúng sẽ **lệch** khi ai đó sửa một chỗ.
-/// ✅ **LỐI ĐÚNG (lượt này):** cả app service **và** job gọi **cùng một hàm THUẦN** ở tầng Domain —
-/// <see cref="LuatDoiSoatThanhToan.Quyet"/> — 🔑 **một định nghĩa, hai chỗ gọi**.
-///
-/// 📌 **Và lớp này đọc `IRepository<PaymentTransaction, Guid>` TRỰC TIẾP** (không qua app service) — cùng
-/// khuôn `MarketplaceReconciliationWorker` ở `SAL-005` §19.
+/// 🚨 **VẪN GIỮ NGUYÊN BA ĐIỀU QUAN TRỌNG (đừng "dọn" khi sửa lớp này):**
+///   1. **Chạy NGAY lần đầu** (`Timer.RunOnStart`) — chờ 15 phút sau mỗi lần deploy thì giao dịch kẹt
+///      `Pending` **không có số liệu nào** trong đúng khoảng thời gian dễ xảy ra sự cố nhất.
+///   2. **Neo mở đầu `[PAY-JOB-BAT-DAU]` + neo kết thúc `[PAY-JOB-XONG]`** — 🔑 thiếu neo kết thúc thì
+///      *"job chạy xong"* và *"job ném giữa đường"* **không phân biệt được** từ log (bài học `SAL-005`).
+///   3. **KHÔNG gọi app service có `[Authorize]`** (bài học `SAL-005`: interceptor từ chối principal ẩn danh
+///      ⇒ job chết; và các ca kiểm *"job không ghi gì"* vẫn XANH vì job chết, không phải vì nó cố ý không ghi).
+///      📌 Runner **không** mang `[Authorize]` ⇒ gọi an toàn từ đây.
 /// ══════════════════════════════════════════════════════════════════════════════════════════════════
 /// </summary>
 public class PaymentReconciliationWorker : AsyncPeriodicBackgroundWorkerBase
@@ -48,31 +39,9 @@ public class PaymentReconciliationWorker : AsyncPeriodicBackgroundWorkerBase
     /// </summary>
     public const int NhipMacDinhGiay = 900;
 
-    /// <summary>
-    /// Trần số giao dịch **một lượt**. 📌 Mỗi giao dịch là **một lời gọi HTTP ra ngoài**: đặt trần để một
-    /// tồn đọng lớn **không** làm lượt quét chạy hàng giờ và **không** tiêu hết quota trong một lần.
-    /// 🔑 Giao dịch còn lại sẽ được xử lý ở **lượt sau** (truy vấn sắp xếp theo `CreationTime` **cũ nhất trước**).
-    /// </summary>
-    public const int TranMotLuot = 50;
-
-    /// <summary>Tên khoá phân tán (**không** tiền tố `ecommerce:` — `AbpDistributedLockOptions.KeyPrefix` đã thêm).</summary>
-    public const string TenKhoa = "payment:reconciliation-rec001";
-
-    /// <summary>
-    /// 📊 `REC-001` mục 7 — metric đối soát. ⚠️ **TUỲ CHỌN** (`= null`) cùng khuôn `VnPayPaymentProvider`:
-    /// 🔒 nếu bắt buộc thì thiếu đăng ký metric sẽ **NỔ** ngay lúc **khởi động Host** ⇒ job **không bao giờ
-    /// chạy** mà lỗi lại trỏ vào chỗ **không liên quan**.
-    /// </summary>
-    private readonly eCommerce.Kernel.Observability.eCommerceMetrics? _metrics;
-
-    public PaymentReconciliationWorker(
-        AbpAsyncTimer timer,
-        IServiceScopeFactory serviceScopeFactory,
-        eCommerce.Kernel.Observability.eCommerceMetrics? metrics = null)
+    public PaymentReconciliationWorker(AbpAsyncTimer timer, IServiceScopeFactory serviceScopeFactory)
         : base(timer, serviceScopeFactory)
     {
-        _metrics = metrics;
-
         Timer.Period = NhipMacDinhGiay * 1000;
 
         // 🚨 Chạy NGAY lần đầu: chờ hết nhịp 15 phút thì trong 15 phút đầu sau **mỗi lần deploy**, giao dịch
@@ -86,388 +55,24 @@ public class PaymentReconciliationWorker : AsyncPeriodicBackgroundWorkerBase
         // *"job im lặng"* **không phân biệt được** với *"job không chạy"*.
         Logger.LogInformation("JOB REC-001: bắt đầu lượt đối soát thanh toán (mốc {Moc}). [PAY-JOB-BAT-DAU]", DateTime.UtcNow);
 
-        var distributedLock = workerContext.ServiceProvider.GetRequiredService<IAbpDistributedLock>();
+        var runner = workerContext.ServiceProvider.GetRequiredService<IPaymentReconciliationRunner>();
 
-        await using var handle = await distributedLock.TryAcquireAsync(TenKhoa, TimeSpan.FromSeconds(120));
+        var run = await runner.ChayAsync(PaymentReconciliationTrigger.Schedule);
 
-        if (handle is null)
+        if (run is null)
         {
             // `Debug` (không `Warning`): instance khác đang chạy là **bình thường**, không phải sự cố.
-            Logger.LogDebug("JOB REC-001: instance khác đang giữ khoá {Khoa} ⇒ bỏ lượt này.", TenKhoa);
+            Logger.LogDebug("JOB REC-001: instance khác đang giữ khoá {Khoa} ⇒ bỏ lượt này.", PaymentReconciliationRunner.TenKhoa);
             return;
         }
 
-        using var scope = workerContext.ServiceProvider.CreateScope();
-
-        // 🚨 **`S5` — VÁ `F-PAY-7`: BỎ UoW BAO CẢ LƯỢT.**
-        //
-        // **Lỗi cũ (mức 🔴 Cao):** `uowManager.Begin(requiresNew: true, isTransactional: true)` bọc **toàn bộ**
-        // lượt quét ⇒ một giao dịch ném (`23505`/`23514`/`DbUpdateException`) ở giữa ⇒ **rollback cả 50** lần ghi
-        // đã xong, trong khi **quota cổng đã tiêu** ⇒ *"đã xác nhận với cổng mà sổ không biết"*. 📌 Kết quả đối
-        // soát là **bằng chứng về tiền**; mất nó là mất bằng chứng (và nếu cổng chết hẳn thì mất **vĩnh viễn**).
-        //
-        // ✅ **Nay:** mỗi giao dịch tự mở UoW **riêng** trong <see cref="DoiSoatAsync"/> ⇒ *"đã ghi thì còn"*.
-        // ⚠️ Vì vậy chỗ này **không** mở UoW nữa — mở ở đây là quay lại đúng lỗi vừa vá.
-        await DoiSoatAsync(scope.ServiceProvider);
+        // 📌 Neo `[PAY-JOB-RONG]` **do runner** ghi khi không có giao dịch (một chỗ, cả job lẫn chạy tay dùng
+        // chung câu chữ). 🔑 Worker **không** log lại — hai dòng cho một sự kiện làm log khó đọc và dễ bị
+        // đếm sai khi phân tích.
 
         // 🚨 **NEO KẾT THÚC** — 🔑 bắt buộc để phân biệt *"job chạy XONG"* với *"job chạy rồi NÉM"*.
         // 📌 Bài học **ĐO ĐƯỢC** ở `SAL-005`: lượt chạy đầu chỉ có neo mở đầu mà **không** có neo kết thúc
         // ⇒ job **ném giữa đường**, và 🔒 nếu không có neo này thì **không có cách nào** phân biệt hai ca đó từ log.
         Logger.LogInformation("JOB REC-001: xong lượt (mốc {Moc}). [PAY-JOB-XONG]", DateTime.UtcNow);
     }
-
-    /// <summary>
-    /// **MỘT LƯỢT ĐỐI SOÁT** — 🔑 **cùng luật** với `IPaymentAppService.PostTruyVanTrangThaiAsync`, nhưng
-    /// **không** đi qua app service (xem chú thích lớp để biết vì sao).
-    /// </summary>
-    private async Task DoiSoatAsync(IServiceProvider services)
-    {
-        var giaoDich = services.GetRequiredService<IRepository<PaymentTransaction, Guid>>();
-        var cong = services.GetRequiredService<IPaymentProvider>();
-        var uowManager = services.GetRequiredService<IUnitOfWorkManager>();
-
-        // 🆕 `S5` — **CẦU NỐI SANG ĐƠN** (`IPaymentEventPublisher` ở `Application.Contracts`, hiện thực ở
-        // `PaymentHub.Application`). 🔑 Trước `S5`, job này **không** phát sự kiện (không với tới được lớp phát
-        // vì luật phân tầng) ⇒ job phát hiện *"khách đã trả"*, ghi `Succeeded`, mà **đơn vẫn `Unpaid`**.
-        // 📌 Không phải app service ⇒ **không** có `[Authorize]` ⇒ gọi an toàn từ worker (bài học `SAL-005`).
-        var suKien = services.GetRequiredService<eCommerce.PaymentHub.Events.IPaymentEventPublisher>();
-
-        // 🔒 **CHỈ xét giao dịch CHƯA ở trạng thái CUỐI.** ⚠️ Gọi cổng cho giao dịch `Succeeded`/`Refunded`
-        // là **lãng phí quota** — tài nguyên **có giới hạn** của cổng.
-        // ⚠️ **KIỂU:** `PaymentTransaction.Status` là **ENUM** (entity) — 📌 **KHÁC** `PaymentTransactionDto.Status`
-        // (là **CHUỖI**). 🔑 Đây đúng chỗ tôi đã vấp ở lượt trước (`CS1503`/`CS0019`).
-        var trangThaiCoTheDoiSoat = new[]
-        {
-            PaymentTransactionStatus.Initiated,
-            PaymentTransactionStatus.Pending,
-            PaymentTransactionStatus.Failed
-        };
-
-        var danhSach = await giaoDich.GetListAsync(x => trangThaiCoTheDoiSoat.Contains(x.Status));
-
-        // 📌 **CŨ NHẤT TRƯỚC** rồi mới cắt trần: giao dịch kẹt **lâu nhất** là giao dịch **đáng lo nhất**
-        // (📌 nếu lấy mới nhất trước thì một tồn đọng lớn sẽ khiến giao dịch cũ **không bao giờ** được xét →
-        // 🔒 đó là *"đói"* (starvation) và nó **im lặng**).
-        var canXet = danhSach
-            .OrderBy(x => x.CreationTime)
-            .Take(TranMotLuot)
-            .ToList();
-
-        if (canXet.Count == 0)
-        {
-            Logger.LogInformation("JOB REC-001: không có giao dịch nào cần đối soát. [PAY-JOB-RONG]");
-            return;
-        }
-
-        if (danhSach.Count > TranMotLuot)
-        {
-            // 🚨 **NÓI RÕ LÀ ĐÃ CẮT BỚT** — ⚠️ im lặng cắt bớt sẽ khiến người đọc tưởng **đã** xét hết.
-            Logger.LogWarning(
-                "JOB REC-001: có {Tong} giao dịch cần đối soát nhưng trần một lượt là {Tran} ⇒ lượt này xét {Xet} " +
-                "(cũ nhất trước), phần còn lại ở lượt sau. [PAY-JOB-CAT-BOT]",
-                danhSach.Count, TranMotLuot, canXet.Count);
-        }
-
-        var soDoi = 0;
-        var soThuDuoc = 0;
-        var soKhongXacDinh = 0;
-        var soLoi = 0;
-
-        // 🆕 `REC-001` 2b — thu kết quả để ghi lịch sử SAU khi xử lý xong (không đụng UoW tiền).
-        var ketQua = new List<KetQuaMotGiaoDich>();
-
-        foreach (var gd in canXet)
-        {
-            var tuCong = await cong.QueryStatusDetailAsync(gd.MerchantReference);
-
-            // 🚨🔑 **LUẬT Ở MỘT CHỖ DUY NHẤT** — cùng hàm mà app service gọi.
-            var quyetDinh = LuatDoiSoatThanhToan.Quyet(gd.Status, tuCong.Status);
-
-            // 📊 **PHAT METRIC** — 🔑 dung **CHUNG** ham voi app service (`GhiMetricDoiSoat`): mot dinh nghia,
-            // hai cho goi. ⚠️ Neu chep thi metric se LECH khi ai do sua mot cho - va lech o metric thi AM THAM
-            // (bieu do van ve, chi SAI SO).
-            MetricDoiSoatThanhToan.Ghi(_metrics, quyetDinh);
-
-            // ══════════════════════════════════════════════════════════════════════════════════════════════
-            // 🚨🚨 **`S5` — MỖI GIAO DỊCH MỘT UoW (`F-PAY-7`) + ĐỌC GIÁ TRỊ `bool` (`F-PAY-9` đóng NỐT).**
-            //
-            // ① **Một UoW cho TỪNG giao dịch:** lỗi ở giao dịch này không rollback 49 giao dịch đã ghi.
-            // ② 🚨 **`MarkSucceeded`/`MarkFailed` TRẢ `bool`** (từ `S4`) — trước `S5` chỗ này **bỏ qua** giá trị
-            //    đó và `soDoi++` **vô điều kiện** ⇒ job báo *"đã đổi 5 trạng thái"* trong khi DB **không đổi
-            //    dòng nào** (ca thật: cổng trả `Failed` **lặp lại** cho một giao dịch đã `Failed` — `MarkFailed`
-            //    trả `false` nhưng vẫn bị đếm). 📌 Con số đó là thứ người vận hành dùng để quyết định *"có sự cố
-            //    không"*, nên sai ở đây là **báo cáo sai**, đúng `F-PAY-9`.
-            // ══════════════════════════════════════════════════════════════════════════════════════════════
-            try
-            {
-                var daGhiNhan = false;
-                using var uowTungGiaoDich = uowManager.Begin(requiresNew: true, isTransactional: true);
-
-                switch (quyetDinh)
-                {
-                    case LuatDoiSoatThanhToan.QuyetDinh.GhiDaThuTien:
-                        var daGhiThu = gd.MarkSucceeded(null, null, "{\"nguon\":\"querydr-job\"}", null);
-                        await giaoDich.UpdateAsync(gd, autoSave: true);
-                        daGhiNhan = daGhiThu;
-
-                        if (daGhiThu)
-                        {
-                            soDoi++;
-                            soThuDuoc++;
-
-                            // 🔗 **`S5`** — phát sự kiện **trong cùng UoW** với lần ghi ⇒ *"không ghi được đơn
-                            // thì cũng không phát"* (nhất quán), và đơn **được** đánh dấu đã trả.
-                            await suKien.PhatDaThuTienAsync(gd);
-                        }
-
-                        // `Warning` (không `Information`): đây là **bất thường thật** — IPN đã mất, hoặc cổng
-                        // chậm. 🔑 Một dòng log ở mức `Information` giữa hàng nghìn dòng khác thì **không ai thấy**.
-                        Logger.LogWarning(
-                            "JOB REC-001: PHÁT HIỆN giao dịch ĐÃ THU TIỀN nhưng chưa ghi nhận (IPN có thể đã mất): " +
-                            "giao dịch={MerchantReference} · số tiền={SoTien} · đã ghi={DaGhi}. [PAY-JOB-THU-DUOC]",
-                            gd.MerchantReference, gd.Amount, daGhiThu);
-                        break;
-
-                    case LuatDoiSoatThanhToan.QuyetDinh.GhiThatBai:
-                        var daGhiHong = gd.MarkFailed(tuCong.Status == PaymentTransactionStatus.Cancelled
-                            ? "Cổng xác nhận khách ĐÃ HUỶ giao dịch (nguồn: job đối soát)."
-                            : "Cổng xác nhận giao dịch không thành công (nguồn: job đối soát).");
-                        await giaoDich.UpdateAsync(gd, autoSave: true);
-                        daGhiNhan = daGhiHong;
-
-                        // 🔒 `S5`: **chỉ** đếm + phát khi **thật sự** đổi trạng thái. 📌 Cổng trả `Failed` lặp lại
-                        // là ca **có thật** (IPN retry, hoặc giao dịch `Failed` từ lâu vẫn nằm trong lô đối soát).
-                        if (daGhiHong)
-                        {
-                            soDoi++;
-                            await suKien.PhatThatBaiAsync(gd, tuCong.Status.ToString());
-                        }
-
-                        break;
-
-                    default:
-                        // 🔒 `KhongDoi` gồm **HAI** ca **rất khác nhau** — phải **phân biệt**:
-                        //   (a) đã ở trạng thái cuối ⇒ **KHÔNG CẦN** kiểm (bình thường);
-                        //   (b) cổng nói *"chưa biết"* ⇒ **KHÔNG KIỂM ĐƯỢC** (⚠️ **KHÔNG** phải "đã kiểm và ổn").
-                        if (!LuatDoiSoatThanhToan.DaKetThuc(gd.Status))
-                        {
-                            soKhongXacDinh++;
-                        }
-
-                        break;
-                }
-
-                await uowTungGiaoDich.CompleteAsync();
-
-                ketQua.Add(new KetQuaMotGiaoDich(gd, daGhiNhan, Loi: false, LoiMsg: null, tuCong));
-            }
-            catch (Exception ex)
-            {
-                // ⚠️ Bắt **mọi** exception là **có chủ ý** (`F-PAY-7`: một giao dịch hỏng không được làm mất bằng
-                // chứng của các giao dịch khác) — nhưng **không nuốt**: log `Error` + đếm, để người vận hành thấy.
-                soLoi++;
-                ketQua.Add(new KetQuaMotGiaoDich(gd, DaGhi: false, Loi: true, LoiMsg: ex.Message, Cong: null));
-
-                Logger.LogError(ex,
-                    "JOB REC-001: LỖI khi đối soát giao dịch {MerchantReference} ({Id}) ⇒ bỏ qua giao dịch này, " +
-                    "các giao dịch khác trong lượt VẪN được ghi. [PAY-JOB-LOI]",
-                    gd.MerchantReference, gd.Id);
-            }
-        }
-
-        // 🚨 **CẢNH BÁO KHI LƯỢT QUÉT KHÔNG MANG LẠI THÔNG TIN NÀO** — 🔑 đây là dấu hiệu **cấu hình sai**
-        // (hoặc cổng chết), **KHÔNG** phải *"hệ thống khoẻ"*. 📌 Nếu không log ca này thì người vận hành đọc
-        // *"đã xét N giao dịch, 0 thay đổi"* và **tin** rằng mọi thứ ổn.
-        // 📊 **GAUGE "KHONG KIEM DUOC" cho CA LUOT** — 🔑 con so co y nghia VAN HANH.
-        // ⚠️ DOC CHO DUNG: bang so giao dich can doi soat nghia la luot quet KHONG mang lai thong tin nao
-        // => CAU HINH SAI hoac CONG CHET, KHONG PHAI "he thong khoe".
-        // 🆕 `REC-001` 2b — ghi lịch sử lượt/dòng/lệch. 🔒 Lỗi ghi lịch sử KHÔNG được làm job tiền chết.
-        try
-        {
-            await GhiLichSuAsync(services, canXet, ketQua, uowManager);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "JOB REC-001: KHÔNG ghi được lịch sử đối soát (lượt/dòng/lệch) — kết quả tiền vẫn đã ghi. [PAY-JOB-LICHSU-LOI]");
-        }
-
-        _metrics?.SetPaymentReconUnresolved(soKhongXacDinh);
-
-        if (soKhongXacDinh == canXet.Count)
-        {
-            Logger.LogWarning(
-                "JOB REC-001: KHÔNG xác định được giao dịch nào trong {So} giao dịch ⇒ lượt quét KHÔNG mang lại " +
-                "thông tin. Nguyên nhân thường gặp: cổng CHƯA cấu hình (`PaymentHub:VnPay:TmnCode`/`HashSecret` " +
-                "rỗng) hoặc cổng không trả lời. [PAY-JOB-KHONG-XAC-DINH]",
-                canXet.Count);
-        }
-        else
-        {
-            Logger.LogInformation(
-                "JOB REC-001: xét {Xet} · đổi trạng thái {Doi} · thu được {Thu} · không xác định {KXD} · lỗi {Loi}. " +
-                "[PAY-JOB-KET-QUA]",
-                canXet.Count, soDoi, soThuDuoc, soKhongXacDinh, soLoi);
-        }
-
-        // 🚨 **`S5` — CÓ GIAO DỊCH XỬ LÝ LỖI THÌ PHẢI LA.** 📌 Trước `S5`, một giao dịch hỏng làm **rollback cả
-        // lượt** ⇒ triệu chứng là *"job chạy xong mà không đổi gì"* — **không ai** biết đã mất 49 lần ghi.
-        // Nay lỗi **cô lập** (đúng `F-PAY-7`) ⇒ nhưng nếu **không đếm/không log** thì nó lại **im lặng**:
-        // lượt vẫn "xong", chỉ có ít thay đổi hơn mong đợi. 🔒 Neo ASCII để tìm được trong log (bài học `I4`).
-        if (soLoi > 0)
-        {
-            Logger.LogError(
-                "JOB REC-001: {Loi}/{Xet} giao dịch XỬ LÝ LỖI ⇒ các giao dịch đó KHÔNG được đối soát lượt này " +
-                "(các giao dịch khác ĐÃ được ghi). Xem dòng `[PAY-JOB-LOI]` để biết từng mã. [PAY-JOB-CO-LOI]",
-                soLoi, canXet.Count);
-        }
-    }
-
-    /// <summary>
-    /// 🆕 **GHI LỊCH SỬ ĐỐI SOÁT** (`REC-001` 2b, 27/10/2026) — một Run + mỗi giao dịch một Line; khi cổng báo
-    /// **đã thu tiền** mà sổ chưa ghi thì sinh `Discrepancy` `MoneyReceivedButNotRecorded` (mức Cao).
-    ///
-    /// 🔒 **Chạy SAU khi đã ghi tiền, trong UoW riêng:** lỗi ghi lịch sử **không** được rollback giao dịch tiền
-    /// (bài học `F-PAY-7`); ngược lại, lịch sử chỉ ghi khi kết quả tiền đã chốt.
-    /// 📌 **28/10/2026 (2b b):** dùng `QueryStatusDetailAsync` ⇒ phân loại được thêm `AmountMismatch`,
-    /// `ProviderFlagged`, `ProviderTransactionNotFound`, `ProviderTxnIdMismatch`, `RefundNotRecorded`,
-    /// `RecordedButMoneyNotReceived`, `MissingProviderCreateDate`, `ProviderUnreachable`.
-    /// </summary>
-    private async Task GhiLichSuAsync(
-        IServiceProvider services,
-        List<PaymentTransaction> canXet,
-        List<KetQuaMotGiaoDich> ketQua,
-        IUnitOfWorkManager uowManager)
-    {
-        if (ketQua.Count == 0)
-        {
-            return;
-        }
-
-        var runs = services.GetRequiredService<IRepository<eCommerce.Reconciliation.PaymentReconciliationRun, Guid>>();
-        var lines = services.GetRequiredService<IRepository<eCommerce.Reconciliation.PaymentReconciliationLine, Guid>>();
-        var discrepancies = services.GetRequiredService<IRepository<eCommerce.Reconciliation.PaymentDiscrepancy, Guid>>();
-
-        var tuUtc = canXet.Min(x => x.CreationTime);
-        var run = new eCommerce.Reconciliation.PaymentReconciliationRun(
-            Guid.NewGuid(), tuUtc, DateTime.UtcNow, PaymentReconciliationTrigger.Schedule);
-
-        using var uow = uowManager.Begin(requiresNew: true, isTransactional: true);
-
-        await runs.InsertAsync(run, autoSave: false);
-
-        var soKhop = 0;
-        var soLech = 0;
-
-        foreach (var k in ketQua)
-        {
-            var gd = k.Gd;
-
-            var line = new eCommerce.Reconciliation.PaymentReconciliationLine(
-                Guid.NewGuid(),
-                run.Id,
-                gd.Id,
-                gd.ProviderCode,
-                gd.MerchantReference,
-                ("RC" + gd.Id.ToString("N"))[..32],
-                (int)gd.Status,
-                (long)(gd.Amount * 100m));
-
-            if (k.Loi)
-            {
-                line.LoiNhaCungCap("ProviderUnavailable", k.LoiMsg);
-            }
-            else
-            {
-                var localMinor = (long)(gd.Amount * 100m);
-                var dsLech = new List<eCommerce.Reconciliation.PaymentDiscrepancy>();
-
-                void Them(PaymentDiscrepancyKind kind, PaymentDiscrepancySeverity severity, long? providerMinor = null)
-                    => dsLech.Add(new eCommerce.Reconciliation.PaymentDiscrepancy(
-                        Guid.NewGuid(), run.Id, line.Id, gd.Id, gd.OrderId, gd.ProviderCode, gd.MerchantReference,
-                        kind, severity, localAmountMinorUnits: localMinor,
-                        providerAmountMinorUnits: providerMinor, currency: gd.Currency));
-
-                if (k.Cong is { } cong)
-                {
-                    line.GhiPhanHoiCong(
-                        cong.ResponseCode, cong.TransactionStatus, cong.AmountMinorUnits, cong.TransactionNo,
-                        cong.PayDateUtc, cong.PayDateGmt7, cong.TransactionType);
-
-                    if (cong.ResponseCode is null && cong.Status == PaymentTransactionStatus.Pending)
-                    {
-                        Them(PaymentDiscrepancyKind.ProviderUnreachable, PaymentDiscrepancySeverity.TrungBinh);
-                    }
-
-                    if (cong.ResponseCode == "91")
-                    {
-                        Them(PaymentDiscrepancyKind.ProviderTransactionNotFound, PaymentDiscrepancySeverity.TrungBinh);
-                    }
-
-                    if (cong.AmountMinorUnits is { } providerMinor && providerMinor != localMinor)
-                    {
-                        Them(PaymentDiscrepancyKind.AmountMismatch, PaymentDiscrepancySeverity.Cao, providerMinor);
-                    }
-
-                    if (cong.TransactionStatus is "04" or "07")
-                    {
-                        Them(PaymentDiscrepancyKind.ProviderFlagged, PaymentDiscrepancySeverity.Cao);
-                    }
-
-                    if (cong.TransactionNo is { } soCong && gd.ProviderTransactionId is { } soDaLuu && soCong != soDaLuu)
-                    {
-                        Them(PaymentDiscrepancyKind.ProviderTxnIdMismatch, PaymentDiscrepancySeverity.TrungBinh);
-                    }
-
-                    if (cong.TransactionType is "02" or "03"
-                        && cong.TransactionStatus is "05" or "06" or "09"
-                        && gd.Status is not (PaymentTransactionStatus.Refunded or PaymentTransactionStatus.PartiallyRefunded))
-                    {
-                        Them(PaymentDiscrepancyKind.RefundNotRecorded, PaymentDiscrepancySeverity.TrungBinh);
-                    }
-
-                    if (gd.Status == PaymentTransactionStatus.Succeeded
-                        && cong.TransactionStatus is not null and not "00")
-                    {
-                        Them(PaymentDiscrepancyKind.RecordedButMoneyNotReceived, PaymentDiscrepancySeverity.Cao);
-                    }
-
-                    if (string.IsNullOrWhiteSpace(gd.ProviderCreateDateGmt7))
-                    {
-                        Them(PaymentDiscrepancyKind.MissingProviderCreateDate, PaymentDiscrepancySeverity.TrungBinh);
-                    }
-                }
-
-                if (k.DaGhi)
-                {
-                    // 🎯 Đúng ca DoD: cổng nói ĐÃ THU TIỀN mà sổ chưa ghi ⇒ bằng chứng phải nằm lại, không chỉ log.
-                    Them(PaymentDiscrepancyKind.MoneyReceivedButNotRecorded, PaymentDiscrepancySeverity.Cao);
-                }
-
-                if (dsLech.Count == 0)
-                {
-                    line.Khop();
-                    soKhop++;
-                }
-                else
-                {
-                    foreach (var lech in dsLech)
-                    {
-                        await discrepancies.InsertAsync(lech, autoSave: false);
-                    }
-
-                    line.Lech(dsLech[0].Id);
-                    soLech++;
-                }
-            }
-
-            await lines.InsertAsync(line, autoSave: false);
-        }
-
-        run.KetThuc(ketQua.Count, soKhop, lineSkipped: 0, discrepancyCount: soLech);
-        await runs.UpdateAsync(run, autoSave: true);
-
-        await uow.CompleteAsync();
-    }
-
-    private readonly record struct KetQuaMotGiaoDich(PaymentTransaction Gd, bool DaGhi, bool Loi, string? LoiMsg, PaymentStatusQueryResult? Cong);
 }
