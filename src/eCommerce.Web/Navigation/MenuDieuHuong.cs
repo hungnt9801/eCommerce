@@ -126,6 +126,16 @@ public static class MenuDieuHuong
                 },
                 new()
                 {
+                    Nhan = "Ngân sách tồn",
+                    Url = "/NganSach",
+                    // `NganSachController` gọi `IStockAllotmentAppService` (`[Authorize(Inventory.Default)]` khi đọc,
+                    // `…Allotment.Manage`/`.Release` cho ghi) ⇒ mục menu khai quyền **đọc** để mở được trang;
+                    // nút ghi vẫn tự chặn nếu thiếu quyền (đúng quy tắc `web-001` §95.5).
+                    QuyenCanCo = eCommerceConsts.Permissions.Inventory.Default,
+                    MoTa = "Ngân sách tồn theo (kho, SKU, kênh): ATP, đóng băng, nhả"
+                },
+                new()
+                {
                     Nhan = "Đối soát thanh toán",
                     Url = "/DoiSoatThanhToan",
                     // `DoiSoatThanhToanController` gọi `IPaymentAppService` (`[Authorize(Payments.Default)]`).
@@ -168,3 +178,4 @@ public static class MenuDieuHuong
         // ══════════════════════════════════════════════════════════════════════════════════════════════
     ];
 }
+

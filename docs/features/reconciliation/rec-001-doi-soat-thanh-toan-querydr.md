@@ -1631,7 +1631,7 @@ test **không** phụ thuộc con số 24 (test khoá tương quan *"> `DedupWin
 1. **`StalePendingTransaction` chưa được đo bằng cổng THẬT**: `VnPayPaymentProvider` trong môi trường dev trả
    trạng thái giả lập, **không** trả `91` ⇒ chỉ có **luật** được test (đúng biên) + nhánh gọi luật được test
    bằng quét nguồn. 🔒 Muốn đo thật cần **credential sandbox** (`Q6`, `S19`).
-2. **Chưa có UI** nút "Chạy đối soát ngay" — API đã có (`T26`), nút bấm thuộc `S18`.
+2. ✅ **ĐÃ CÓ nút** "Chạy đối soát ngay" trên `/DoiSoatThanhToan` (`S18`, 28/10/2026) — gọi `TriggerRunAsync`, cùng khoá với job.
 3. Đường chạy tay **gọi cổng đồng bộ trong request** (tối đa 50 giao dịch × 1 lời gọi HTTP) ⇒ với tồn đọng lớn,
    HTTP request có thể dài. 📌 Cùng giới hạn với `PostDoiSoatLoatAsync` đã có; nếu cần, chuyển sang
    "đặt lệnh rồi trả `202`" — **chưa** làm (đổi hợp đồng API).
@@ -1643,4 +1643,5 @@ test **không** phụ thuộc con số 24 (test khoá tương quan *"> `DedupWin
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.6 | 28/10/2026 | *(agent, session GĐ1 — `S15`)* | **`StalePendingTransaction`** (ngưỡng `Reconciliation:StalePendingHours` = 24, `0` = TẮT) + **`TriggerRunAsync`** đi qua **cùng khoá** với job nhờ tách `IPaymentReconciliationRunner` (một hiện thực, hai đường vào). **+17 unit** · **probe thanh toán 26 → 30/30** (HTTP thật + DB thật + dọn sạch). Ghi rõ 4 sai lệch (§20.3) và 4 giới hạn (§20.5) |
+
 

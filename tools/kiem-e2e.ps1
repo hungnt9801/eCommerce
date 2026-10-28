@@ -1572,6 +1572,65 @@ select count(*)::text from "ReconRunMismatches" where "Id" = 'e0000000-0000-0000
         (-not ($htmlCtAnon -match '777[,.]777')) 'do tren trang chi tiet san pham an danh'
 
     # ══════════════════════════════════════════════════════════════════════════════════════════
+    # ⑧c 🆕 `S18` — MÀN HÌNH VẬN HÀNH: `/NganSach` (S13) + nút "Chạy đối soát ngay" (S15)
+    # ══════════════════════════════════════════════════════════════════════════════════════════
+    # 🔑 **VÌ SAO ĐO QUA HTML THẬT:** `S13`/`S15` đã có API + test nhưng trước `S18` **chưa có lối vào**
+    # ⇒ *"người vận hành bấm được và dữ liệu thật đổi"* là câu hỏi **khác** hẳn *"API trả 200"*.
+    $tepNganSach = Join-Path $thuMucTam 'ngansach-admin.html'
+    $maNganSach = ([string](& $curl -s -b $jar -c $jar -o $tepNganSach -w '%{http_code}' ($web + '/NganSach'))).Trim()
+    $htmlNganSach = if (Test-Path $tepNganSach) {
+        GiaiMaHtml ([System.IO.File]::ReadAllText($tepNganSach, [Text.Encoding]::UTF8))
+    } else { '' }
+
+    Kq 'S18-N1 /NganSach (admin) => 200 + neo [NGANSACH-MAN-HINH]' `
+        (($maNganSach -eq '200') -and ($htmlNganSach -match '\[NGANSACH-MAN-HINH\]')) ("HTTP " + $maNganSach)
+
+    $maNganSachAnon = ([string](& $curl -s -o (Join-Path $thuMucTam 'ngansach-anon.html') -w '%{http_code}|%{redirect_url}' ($web + '/NganSach'))).Trim()
+    $phanNsAnon = $maNganSachAnon.Split('|')
+    $maNsAnon = $phanNsAnon[0]
+    $urlNsAnon = if ($phanNsAnon.Count -gt 1) { $phanNsAnon[1] } else { '' }
+
+    Kq 'S18-N2 🚨 khách ẨN DANH vào /NganSach => 302 về ĐĂNG NHẬP (không 200)' `
+        (($maNsAnon -eq '302') -and ($urlNsAnon -match '/Account/Login')) ("HTTP " + $maNsAnon)
+
+    # ── CẤP NGÂN SÁCH QUA FORM THẬT (token thật) ───────────────────────────────────────────────
+    $mTokenNs = [regex]::Match($htmlNganSach, 'name="__RequestVerificationToken"[^>]*value="(?<t>[^"]+)"')
+
+    if (-not $mTokenNs.Success) {
+        Kq 'S18-N3 có token chống giả mạo trên /NganSach' $false 'KHONG co token ⇒ khong POST duoc'
+        Kq 'S18-N4 🚨 POST đặt ngân sách => hiện thông báo THÀNH CÔNG (đi qua app service)' $false 'bo qua vi thieu token'
+    }
+    else {
+        Kq 'S18-N3 có token chống giả mạo trên /NganSach' $true 'token that tu trang'
+
+        $maDatNs = ([string](& $curl -s -b $jar -c $jar -L -o (Join-Path $thuMucTam 'ngansach-dat.html') -w '%{http_code}' `
+            --data-urlencode ("__RequestVerificationToken=" + $mTokenNs.Groups['t'].Value) `
+            --data-urlencode 'warehouseId=e0000000-0000-0000-0000-0000000000e6' `
+            --data-urlencode 'sku=K97E2E-SKU-P1' `
+            --data-urlencode 'channelCode=web' `
+            --data-urlencode 'soLuong=10' `
+            ($web + '/NganSach/Dat'))).Trim()
+
+        $htmlDatNs = if (Test-Path (Join-Path $thuMucTam 'ngansach-dat.html')) {
+            GiaiMaHtml ([System.IO.File]::ReadAllText((Join-Path $thuMucTam 'ngansach-dat.html'), [Text.Encoding]::UTF8))
+        } else { '' }
+
+        Kq 'S18-N4 🚨 POST đặt ngân sách => thông báo THÀNH CÔNG + ATP 10 trên trang' `
+            (($maDatNs -eq '200') -and ($htmlDatNs -match 'Đã đặt ngân sách') -and ($htmlDatNs -match 'K97E2E-SKU-P1')) `
+            ("HTTP " + $maDatNs)
+    }
+
+    # ── NÚT "CHẠY ĐỐI SOÁT NGAY" TRÊN TRANG VẬN HÀNH ────────────────────────────────────────────
+    $tepDsTt = Join-Path $thuMucTam 'doisoat-tt-admin.html'
+    $maDsTt = ([string](& $curl -s -b $jar -c $jar -o $tepDsTt -w '%{http_code}' ($web + '/DoiSoatThanhToan'))).Trim()
+    $htmlDsTt = if (Test-Path $tepDsTt) {
+        GiaiMaHtml ([System.IO.File]::ReadAllText($tepDsTt, [Text.Encoding]::UTF8))
+    } else { '' }
+
+    Kq 'S18-N5 /DoiSoatThanhToan có nút "Chạy đối soát ngay" (lối vào của S15)' `
+        (($maDsTt -eq '200') -and ($htmlDsTt -match 'Chạy đối soát ngay')) ("HTTP " + $maDsTt)
+
+    # ══════════════════════════════════════════════════════════════════════════════════════════
     # ⑨ 🆕 `S8` — THANH TOAN **END-TO-END** TOI TRANG KET QUA (don -> giao dich -> cong -> IPN -> ket qua)
     # ══════════════════════════════════════════════════════════════════════════════════════════
     # 🔒 Chuoi duoc do **dung nhu nguoi dung di**: POST form co token that → `302` sang **cong** →
@@ -1911,6 +1970,15 @@ delete from "PrcPriceLists" where "Id" = 'e0000000-0000-0000-0000-0000000000ea';
         # và `kiem-db.ps1` nhóm ⑥ tự quét GUID `e0000000-…` ⇒ lần sau sẽ đỏ vì **lý do vô hình**).
         Invoke-Psql -Sql @'
 delete from "PrcCostPrices" where "Id" = 'e0000000-0000-0000-0000-0000000000f0';
+'@ | Out-Null
+
+        # 🆕 `S18` — dọn **ngân sách tồn** do ca `S18-N4` tạo (dòng sinh qua API có Id ngẫu nhiên ⇒ xoá theo SKU).
+        Invoke-Psql -Sql @'
+delete from "InvStockAllotmentLedgers" where "Sku" like 'K97E2E%';
+'@ | Out-Null
+
+        Invoke-Psql -Sql @'
+delete from "InvStockAllotments" where "Sku" like 'K97E2E%';
 '@ | Out-Null
 
         Invoke-Psql -Sql @'

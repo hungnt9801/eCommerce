@@ -1,0 +1,139 @@
+@using Volo.Abp.AspNetCore.Mvc.UI.Layout
+@inject IPageLayout PageLayout
+@model List<eCommerce.Inventory.Dtos.StockAllotmentDto>
+@{
+    PageLayout.Content.Title = "Ngân sách tồn theo kênh";
+    PageLayout.Content.BreadCrumb.Add("Trang chủ");
+    PageLayout.Content.BreadCrumb.Add("Vận hành");
+    PageLayout.Content.BreadCrumb.Add("Ngân sách tồn theo kênh");
+
+    var kenh = ViewBag.KenhDangLoc as string;
+    var sku = ViewBag.SkuDangLoc as string;
+    var thongBao = ViewBag.ThongBao as string;
+    var loi = ViewBag.Loi as string;
+}
+
+@* 🆕 `S18` — MÀN HÌNH NGÂN SÁCH TỒN THEO KÊNH (`INV-003` §21).
+
+   🔒 BỐN ĐIỀU NGƯỜI VẬN HÀNH PHẢI THẤY:
+     ① **ATP** (`Còn bán được`) — con số DUY NHẤT dùng để quyết định còn bán được hay không;
+     ② **Ngân sách vs Đang giữ** — để hiểu vì sao ATP = 0 dù ngân sách > 0;
+     ③ **Trạng thái** — `Frozen` nghĩa là ngừng bán nhưng **vẫn giữ** ngân sách (không ai lấy được);
+     ④ **Ba hành động có lý do** — đóng băng / mở / nhả, mỗi cái ghi `lyDo` (bắt buộc, `BR-12`).
+   📌 Không có nút "xoá": nhả ngân sách (`Released`) giữ lại dấu vết — xoá dòng là mất lịch sử ai đã cấp bao nhiêu.
+
+   ⚠️ Ô "Mã kho" hiện là **GUID dán tay**: danh mục kho chưa có endpoint đọc công khai cho Web
+   (`IWarehouseAppService` chưa nối) — ghi rõ là hạn chế của `S18`, không phải hành vi đúng. *@
+
+@if (!string.IsNullOrWhiteSpace(thongBao))
+{
+    <div class="alert alert-success">@thongBao</div>
+}
+@if (!string.IsNullOrWhiteSpace(loi))
+{
+    <div class="alert alert-danger">@loi</div>
+}
+
+<h1>Ngân sách tồn theo kênh</h1>
+
+<p class="text-muted">
+    <span class="badge bg-light text-dark">[NGANSACH-MAN-HINH]</span>
+    Ngân sách gắn theo <strong>(kho, SKU, kênh)</strong>. Kênh <strong>chưa</strong> được cấp ngân sách thì
+    giữ chỗ <strong>không</strong> bị chặn theo ATP (chế độ <em>tuỳ chọn theo dòng</em> — `INV-003` §21.2).
+</p>
+
+<form method="get" class="row g-2 mb-3">
+    <div class="col-auto">
+        <input name="kenh" value="@kenh" class="form-control" placeholder="Mã kênh" />
+    </div>
+    <div class="col-auto">
+        <input name="sku" value="@sku" class="form-control" placeholder="Mã SKU" />
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-primary">Lọc</button>
+    </div>
+</form>
+
+<div class="card mb-4">
+    <div class="card-header">Cấp / sửa ngân sách</div>
+    <div class="card-body">
+        <form method="post" asp-action="Dat" class="row g-2">
+            @Html.AntiForgeryToken()
+            <div class="col-md-4">
+                <label class="form-label">Mã kho (GUID)</label>
+                <input name="warehouseId" class="form-control" required placeholder="vd: e0000000-…" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">SKU</label>
+                <input name="sku" class="form-control" required value="@sku" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Kênh</label>
+                <input name="channelCode" class="form-control" required value="@kenh" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Ngân sách</label>
+                <input name="soLuong" type="number" min="0" class="form-control" required value="0" />
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-success w-100">Lưu</button>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Khoá chống trùng (tuỳ chọn)</label>
+                <input name="idempotencyKey" class="form-control" placeholder="Để trống nếu đây là ý định mới" />
+            </div>
+        </form>
+    </div>
+</div>
+
+<p class="text-muted">Tổng: <strong>@Model.Count</strong> dòng ngân sách.</p>
+
+@if (Model.Count == 0)
+{
+    <div class="alert alert-info">Chưa có ngân sách nào khớp bộ lọc.</div>
+}
+else
+{
+    <table class="table table-sm table-striped align-middle">
+        <thead>
+            <tr>
+                <th>Kênh</th>
+                <th>SKU</th>
+                <th class="text-end">Ngân sách</th>
+                <th class="text-end">Đang giữ</th>
+                <th class="text-end">Còn bán được (ATP)</th>
+                <th>Trạng thái</th>
+                <th>Hành động</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var ns in Model)
+            {
+                <tr>
+                    <td><code>@ns.ChannelCode</code></td>
+                    <td>@ns.Sku</td>
+                    <td class="text-end">@ns.AllottedQuantity</td>
+                    <td class="text-end">@ns.ReservedQuantity</td>
+                    <td class="text-end fw-semibold">@ns.AvailableToPromise</td>
+                    <td>
+                        @ns.Status
+                        @if (!string.IsNullOrWhiteSpace(ns.ReleaseReason))
+                        {
+                            <div class="small text-muted">@ns.ReleaseReason</div>
+                        }
+                    </td>
+                    <td>
+                        <form method="post" asp-action="DoiTrangThai" class="d-flex gap-1">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@ns.Id" />
+                            <input name="lyDo" class="form-control form-control-sm" placeholder="Lý do (bắt buộc)" required />
+                            <button name="hanhDong" value="dong-bang" class="btn btn-sm btn-outline-warning" @(ns.Status == "Active" ? "" : "disabled")>Đóng băng</button>
+                            <button name="hanhDong" value="mo-dong-bang" class="btn btn-sm btn-outline-info" @(ns.Status == "Frozen" ? "" : "disabled")>Mở</button>
+                            <button name="hanhDong" value="nha" class="btn btn-sm btn-outline-danger" @(ns.Status == "Released" ? "disabled" : "")>Nhả</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}

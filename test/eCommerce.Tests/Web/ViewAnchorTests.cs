@@ -59,7 +59,10 @@ public class ViewAnchorTests
         // 🆕 `S12` — TRANG **GIÁ VỐN** (`PRC-001` BR-013). 🔑 Neo khẳng định đúng trang này render **và** là
         // trang **nội bộ** (E2E `S12-G*` dựa vào nó). ⚠️ Đây là dữ liệu **nội bộ** ⇒ E2E còn phải đo
         // **chiều ngược**: phiên ẩn danh **không** vào được, và HTML **công khai** không chứa giá trị giá vốn.
-        ("Views/GiaVon/Index.cshtml", "[GIAVON-MAN-HINH]")
+        ("Views/GiaVon/Index.cshtml", "[GIAVON-MAN-HINH]"),
+        // 🆕 `S18` — TRANG **NGÂN SÁCH TỒN THEO KÊNH**. 🔑 Neo khẳng định trang **render**; E2E `S18-N1…N5`
+        // đo thêm: ẩn danh bị chặn, POST form ghi thật, và nút "Chạy đối soát ngay" có lối vào.
+        ("Views/NganSach/Index.cshtml", "[NGANSACH-MAN-HINH]")
     ];
 
     [Fact]
@@ -144,3 +147,4 @@ public class ViewAnchorTests
             "Không tìm thấy `src/eCommerce.Web` khi đi lên từ " + AppContext.BaseDirectory);
     }
 }
+

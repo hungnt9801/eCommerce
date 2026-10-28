@@ -1592,7 +1592,7 @@ ca "chặn đúng" và ca "chặn bừa" **trông giống hệt nhau**. 📌 Đ�
 
 ### 21.5 ⚠️ Giới hạn đã biết
 
-1. **Chưa có UI** (thuộc `S18`): API đã có, chưa có màn hình cấp ngân sách.
+1. ✅ **ĐÃ CÓ UI** (`S18`, 28/10/2026): `/NganSach` — danh sách + ATP + cấp/sửa ngân sách + đóng băng/mở/nhả. ⚠️ Ô **mã kho** hiện là GUID dán tay (danh mục kho chưa có endpoint đọc cho Web) — hạn chế đã ghi trong view.
 2. **Chưa thu hồi tự động** khi `OnHand` giảm (bán hàng làm tồn giảm) ⇒ `Σ Allotted` có thể **lớn hơn** `OnHand`
    sau khi bán. 📌 Bất biến `Σ ≤ OnHand` được kiểm **khi cấp/sửa**; để giữ nó **liên tục** cần slice
    *"Reclaim"* (job + duyệt) — **chưa** làm, và **không** được nói là đã có.
@@ -1607,4 +1607,5 @@ ca "chặn đúng" và ca "chặn bừa" **trông giống hệt nhau**. 📌 Đ�
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.7 | 28/10/2026 | *(agent, session GĐ1 — `S13`)* | **Ngân sách tồn theo kênh**: 2 entity + sổ cái append-only + **migration 48** (NND **60**) + dịch vụ (cấp/đóng băng/nhả + idempotency + bất biến tổng) + API + **2 quyền** (seed **71**) + nối vào giữ chỗ/nhả/chốt. **+11 unit · +6 integration**. Chốt `Q3` = **chỉ theo kênh** + quyết định *"tuỳ chọn theo dòng"* (§21.2) và ghi rõ 6 sai lệch + 4 giới hạn |
+
 

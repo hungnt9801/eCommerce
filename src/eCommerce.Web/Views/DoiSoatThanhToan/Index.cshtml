@@ -37,6 +37,15 @@
     <div class="alert alert-danger">@loi</div>
 }
 
+<form method="post" asp-action="ChayDoiSoat" class="mb-3">
+    @Html.AntiForgeryToken()
+    <button type="submit" class="btn btn-outline-primary"
+            title="Chạy một lượt đối soát ngay (cùng khoá với job định kỳ)">
+        Chạy đối soát ngay
+    </button>
+    <span class="text-muted ms-2">Dùng khi nghi IPN bị mất — lượt chạy ghi vào lịch sử đối soát.</span>
+</form>
+
 <div class="card mb-3">
     <div class="card-body">
         <form method="get" asp-action="Index" class="row g-2 align-items-end">
@@ -130,3 +139,4 @@
 </div>
 
 <p class="text-muted small mt-3 mb-0">[DOISOATTHANHTOAN-MAN-HINH]</p>
+

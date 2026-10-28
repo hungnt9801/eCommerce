@@ -15,10 +15,10 @@
 | Hạng mục | Giá trị | Cách đo |
 |---|---|---|
 | Commit | `git log --oneline -1` | 🔒 **nguồn sự thật là lệnh**, không phải dòng trong tài liệu |
-| Cổng đầy đủ | **exit 0 · 357.3s · 15/15 bước** | `pwsh -File tools\kiem-tat-ca.ps1 -DayDu` |
+| Cổng đầy đủ | **exit 0 · 347.5s · 15/15 bước** | `pwsh -File tools\kiem-tat-ca.ps1 -DayDu` |
 | Unit | **1587** | bước ③ |
 | Integration | **87/87** | bước ④ |
-| E2E (HTML thật) | **140/140** | bước ⑧ |
+| E2E (HTML thật) | **145/145** | bước ⑧ |
 | Bất biến DB | **25/25** · **NND 64** · **71 quyền** · **99** chỗ quét | bước ⑥ |
 | Migration | **49** | `src/eCommerce.EntityFrameworkCore/Migrations` |
 | Oversell | **11/11** (bước ⑬) | `tools/probe-oversell.ps1` |
@@ -58,7 +58,7 @@
 | ~~**S15**~~ | ✅ **XONG 28/10/2026** — `StalePendingTransaction` + `TriggerRunAsync` | [`REC-001` §20](features/reconciliation/rec-001-doi-soat-thanh-toan-querydr.md) | ngưỡng **24 h** (cấu hình, `0` = TẮT) · `TriggerRunAsync` đi qua **cùng khoá** với job · **+17 unit** · **probe 30/30** (HTTP thật) | **không** (ngưỡng là cấu hình) |
 | **S16** | 3 metric còn nợ | [`XC-005` §5.1/§19.3](features/cross-cutting/XC-005-observability-log-metric.md) | `messaging_dlq_replayed_total` (cần luồng replay thật), `lock_ttl_exceeded_total` (cần wrapper TTL), `logging_failures_total` (logger provider) | không (trừ khi thêm wrapper) |
 | **S17** | Hợp đồng cho dịch vụ còn ở host | `ke-hoach-tach-module` L2 | `ChannelDirectory`, `HienThiKenhAppService`, `ChinhSachHanMucAppService`, `WarehouseAppService`, `MarketplaceReconciliationWorker` | không |
-| **S18** | UI còn thiếu + tài liệu | `WEB-001`, `§A.5` | Form Pricing/Kho (nếu cần quản trị); duyệt 7 `XC-*` + 19 tài liệu GĐ1 | không |
+| 🟡 **S18** | UI còn thiếu + tài liệu | `WEB-001`, `§A.5` | ✅ **`/NganSach`** (S13) + nút “Chạy đối soát ngay” (S15) + `S18-N1…N5` (**E2E 145**) · ❌ còn: UI RMA (S14), form Pricing/Kho quản trị, **duyệt 7 `XC-*` + 19 tài liệu** (`Q5` — cần chủ dự án) | không |
 | **S19** | VNPay sandbox thật | `PAY-001` | Điền `VnPay:TmnCode/HashSecret`, chạy 1 giao dịch thật | không |
 
 ### Việc **không** nên làm lại (đã chốt)
@@ -169,6 +169,8 @@ Sau đó đọc theo thứ tự:
 | S19 VNPay thật | 2–3 pd | Phụ thuộc Q6 |
 
 **Tổng còn lại ≈ 20–33 pd** — không phải một phiên. Làm **theo S14 → S19**, mỗi phiên **một** việc + gate.
+
+
 
 
 
