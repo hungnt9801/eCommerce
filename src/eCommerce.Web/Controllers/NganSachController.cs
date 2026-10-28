@@ -1,3 +1,4 @@
+using eCommerce.Application.Contracts.Inventory;
 using eCommerce.Inventory;
 using eCommerce.Inventory.Dtos;
 using Microsoft.AspNetCore.Authorization;
@@ -20,10 +21,14 @@ namespace eCommerce.Web.Controllers;
 public class NganSachController : Controller
 {
     private readonly IStockAllotmentAppService _nganSach;
+    private readonly IChinhSachHanMucAppService _chinhSach;
 
-    public NganSachController(IStockAllotmentAppService nganSach)
+    public NganSachController(
+        IStockAllotmentAppService nganSach,
+        IChinhSachHanMucAppService chinhSach)
     {
         _nganSach = nganSach;
+        _chinhSach = chinhSach;
     }
 
     /// <summary>`GET /NganSach?kenh=&amp;sku=` — danh sách ngân sách (lọc tuỳ chọn).</summary>
@@ -34,6 +39,11 @@ public class NganSachController : Controller
             ChannelCode = string.IsNullOrWhiteSpace(kenh) ? null : kenh.Trim(),
             Sku = string.IsNullOrWhiteSpace(sku) ? null : sku.Trim()
         });
+
+        // 🆕 `S18` — danh mục **kho có thật** cho ô chọn (không bắt người dùng dán GUID).
+        // 📌 Dùng lại `IChinhSachHanMucAppService.GetKhoKhaDungAsync` — **một** nguồn danh mục kho cho cả
+        // `/HanMucKenh` và `/NganSach`; nếu làm endpoint thứ hai thì hai màn hình có thể lệch danh sách.
+        ViewBag.KhoKhaDung = await _chinhSach.GetKhoKhaDungAsync();
 
         ViewBag.KenhDangLoc = kenh;
         ViewBag.SkuDangLoc = sku;
@@ -117,3 +127,4 @@ public class NganSachController : Controller
         return RedirectToAction(nameof(Index));
     }
 }
+

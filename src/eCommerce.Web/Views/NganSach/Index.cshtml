@@ -11,6 +11,7 @@
     var sku = ViewBag.SkuDangLoc as string;
     var thongBao = ViewBag.ThongBao as string;
     var loi = ViewBag.Loi as string;
+    var khoKhaDung = ViewBag.KhoKhaDung as List<eCommerce.Application.Contracts.Inventory.KhoKhaDungDto> ?? [];
 }
 
 @* 🆕 `S18` — MÀN HÌNH NGÂN SÁCH TỒN THEO KÊNH (`INV-003` §21).
@@ -22,8 +23,8 @@
      ④ **Ba hành động có lý do** — đóng băng / mở / nhả, mỗi cái ghi `lyDo` (bắt buộc, `BR-12`).
    📌 Không có nút "xoá": nhả ngân sách (`Released`) giữ lại dấu vết — xoá dòng là mất lịch sử ai đã cấp bao nhiêu.
 
-   ⚠️ Ô "Mã kho" hiện là **GUID dán tay**: danh mục kho chưa có endpoint đọc công khai cho Web
-   (`IWarehouseAppService` chưa nối) — ghi rõ là hạn chế của `S18`, không phải hành vi đúng. *@
+   ✅ Ô chọn kho lấy từ `IChinhSachHanMucAppService.GetKhoKhaDungAsync()` — cùng nguồn danh mục với
+   `/HanMucKenh` (một nguồn sự thật, không có endpoint thứ hai). *@
 
 @if (!string.IsNullOrWhiteSpace(thongBao))
 {
@@ -60,8 +61,13 @@
         <form method="post" asp-action="Dat" class="row g-2">
             @Html.AntiForgeryToken()
             <div class="col-md-4">
-                <label class="form-label">Mã kho (GUID)</label>
-                <input name="warehouseId" class="form-control" required placeholder="vd: e0000000-…" />
+                <label class="form-label">Kho nhận hàng hoàn</label>
+                <select name="warehouseId" class="form-select" required>
+                    @foreach (var kh in khoKhaDung)
+                    {
+                        <option value="@kh.Id">@kh.Code — @kh.Name (@kh.SoDongHanMuc dòng@(kh.IsActive ? "" : " · NGỪNG dùng"))</option>
+                    }
+                </select>
             </div>
             <div class="col-md-2">
                 <label class="form-label">SKU</label>
@@ -137,3 +143,4 @@ else
         </tbody>
     </table>
 }
+
