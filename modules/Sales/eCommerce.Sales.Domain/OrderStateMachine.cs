@@ -58,6 +58,17 @@ public static class OrderStateMachine
         (OrderAxis.Closure, (int)ReturnStatus.ReturnRequested, (int)ReturnStatus.ReturnApproved),
         (OrderAxis.Closure, (int)ReturnStatus.ReturnRequested, (int)ReturnStatus.ReturnRejected),
         (OrderAxis.Closure, (int)ReturnStatus.ReturnApproved, (int)ReturnStatus.Returned),
+        // 🆕 `S14H` (BA chốt 29/10/2026) — nhận hàng hoàn **MỘT PHẦN** ⇒ trục kết thúc của ĐƠN là
+        // `PartiallyReturned`, rồi `Returned` khi nhận nốt phần còn lại.
+        // 🔒 **ĐÚNG 2 CẠNH, KHÔNG cạnh tắt:**
+        //   • KHÔNG `Open`/`ReturnRequested → PartiallyReturned`: chưa duyệt trả thì chưa thể có hàng về
+        //     (hàng về mà chưa duyệt = nhận sai quy trình, phải chặn chứ không hợp thức hoá);
+        //   • KHÔNG `PartiallyReturned → Cancelled`: **đã nhận hàng** thì không huỷ (`HuyDon` cũng chặn —
+        //     đã ra khỏi kho thì phải TRẢ HÀNG bằng chứng từ, cấm xoá bút toán);
+        //   • KHÔNG cạnh tự thân (`PartiallyReturned → PartiallyReturned`): nhận thêm một phần nữa **không**
+        //     đổi trạng thái đơn ⇒ máy trạng thái NÉM `0001` nếu ai gọi; chỗ gọi phải tự bỏ qua (`S14H`).
+        (OrderAxis.Closure, (int)ReturnStatus.ReturnApproved, (int)ReturnStatus.PartiallyReturned),
+        (OrderAxis.Closure, (int)ReturnStatus.PartiallyReturned, (int)ReturnStatus.Returned),
         // 🆕 `S14` phần D (28/10/2026) — **ĐÃ XOÁ cạnh tắt `Open → Returned`** (nợ `sal-003` §16 đã đóng).
         // 📌 Vì sao **phải** xoá: cạnh đó cho phép đánh dấu *"đã trả"* **không có phiếu trả nào** — không dòng
         // trả, không hàng về kho, không ai duyệt — mà đơn vẫn `Returned`. 🔒 Nay **mọi** trả hàng đi qua
@@ -72,6 +83,8 @@ public static class OrderStateMachine
     /// Trạng thái **hấp thụ** — không có đường ra. Cố chuyển tiếp ⇒ `eCommerce:Order:0006`.
     /// 📌 `Cancelled`/`Returned` của trục kết thúc và `Refunded` của trục tài chính là hấp thụ:
     /// mở lại đơn đã huỷ/đã trả sẽ làm **sai dữ liệu kho và tiền** (đã bù trừ) — muốn bán lại phải tạo đơn mới.
+    /// 📌 **`ReturnStatus.PartiallyReturned` KHÔNG hấp thụ** (`S14H`): nó là mốc *"đã về một phần"* và **còn
+    /// đi tiếp** sang `Returned`. Danh sách hấp thụ của trục kết thúc vì vậy **không đổi**.
     /// </summary>
     public static bool LaHapThu(OrderAxis truc, int trangThai) => truc switch
     {
@@ -99,6 +112,12 @@ public static class OrderStateMachine
     /// giá trị đúng từ dữ liệu DB để so với cột `Status` đã lưu. Nếu job **chép lại** luật thì hai bản sẽ lệch
     /// khi ai đó sửa một bên — và lệch ở đây nghĩa là job **báo động giả** hoặc **bỏ sót** đúng ca cần bắt.
     /// 📌 Cùng nguyên tắc *"một định nghĩa, hai chỗ gọi"* đã dùng cho `LuatDoiSoatThanhToan`.
+    ///
+    /// 🆕 **`S14H` — `ReturnStatus.PartiallyReturned` KHÔNG ánh xạ sang `OrderStatus` mới.** Đơn trả một phần
+    /// vẫn suy ra từ **trục thực hiện** (thường `Delivered` ⇒ `OrderStatus.Completed`): *"đơn vẫn `Completed`
+    /// nhưng trục kết thúc đã `PartiallyReturned`"*. 📌 Vì sao **không** thêm giá trị `OrderStatus`: nó là
+    /// **giá trị SUY RA** (D2) và chỉ có 1 enum cho 4 trục — thêm một giá trị cho *mức trả hàng* là **trục thứ
+    /// 5 trá hình** (BR-003 cấm). Ai cần biết *"đã trả một phần"* phải đọc **`ReturnStatus`**, không đọc `Status`.
     /// </summary>
     public static OrderStatus TinhTrangThaiSuyRa(
         FulfillmentStatus thucHien,

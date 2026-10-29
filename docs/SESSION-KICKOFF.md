@@ -100,6 +100,16 @@ huỷ ⇒ `OrdReturns.Status = 3` **và** `OrdOrderLines.ReturnedQuantity 2 → 
 `eCommerce:Sales:0010` + DB **không đổi**; phiếu **đã nhận hàng** (kể cả một phần) **không** có nút · unit
 **1627 = 1627** · integration **90 = 90** · NND **64** · **72** quyền · migration **50** · quét **99** chỗ —
 `-DayDu` **exit 0 · 397.2s · 15/15** (`SAL-006` §34).
+🆕 **29/10/2026 — `S14H` (TRẠNG THÁI `PartiallyReturned` — đóng nợ `SAL-006` §32.5 #1, BA chốt):**
+`ReturnStatus.PartiallyReturned = 6` **append ở cuối dải** (`0…5` **không** đổi số — cột `int`); **đúng 2 cạnh**
+`ReturnApproved → PartiallyReturned` và `PartiallyReturned → Returned` (❌ không `Open/ReturnRequested → …`, ❌ không
+`→ Cancelled`, ❌ không cạnh tự thân; **không hấp thụ**) · `NhanHangAsync` chuyển đơn **chỉ khi trạng thái thực sự
+đổi** (đủ ⇒ `Returned`; một phần khi đơn `ReturnApproved` ⇒ `PartiallyReturned`; nhận thêm một phần ⇒ **không gọi**)
+· **KHÔNG** thêm `OrderStatus`: đơn trả một phần **vẫn `Completed`**, *"đã trả một phần"* đọc ở `ReturnStatus` ·
+**+7 unit** hai chiều (`OrderStateMachineTests`) · **E2E 165 → 167**: đổi `S14-E12` (`6|3|4`) + `S14-E21` (UI in
+**chuỗi** `PartiallyReturned`) + `S14-E22` (nhận nốt ⇒ phiếu `4|2`, đơn `4|4|6`) — **đo DB, không tin HTML** ·
+**0** schema/migration/NND/quyền/route/DTO/ETO ⇒ unit **1634** · integration **90** · NND **64** · **72** quyền ·
+migration **50** · quét **99** chỗ — `-DayDu` **exit 0 · 389.7s · 15/15** (`SAL-006` §35).
 ⚠️ **Đừng dùng dòng 24/10 ở trên để so drift:** từ đó đã có thêm **`CatBrands`** (migration **45**), **`Rec001`**
 (migration **46** — 📌 đó là lý do dòng cũ ghi **44** mà đếm thật hôm 28/10 là **46**, và **89 → 93** chỗ quét) và
 **`S12`** (migration **47** → **94**). 🔑 *Con số trong tài liệu trôi là chuyện bình thường; **dùng số cũ** mới là lỗi.*

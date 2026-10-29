@@ -153,6 +153,8 @@ public enum ReconciliationStatus
 /// muốn bán lại phải **tạo đơn mới** (D10).
 /// 📌 `ReturnStatus.Cancelled` là giá trị của **trục kết thúc**, không phải trục thực hiện — nhờ vậy
 /// một đơn vừa "đã giao" vừa "đã huỷ" không thể tồn tại (mâu thuẫn bị chặn ngay ở dữ liệu).
+/// 🆕 **`S14H`** — `PartiallyReturned` = đã nhận hàng hoàn **MỘT PHẦN**; **không hấp thụ** (còn đi tiếp
+/// sang `Returned` khi nhận nốt). 📌 Nó **không** làm đổi `OrderStatus` tổng thể (xem ghi chú ở giá trị đó).
 /// </summary>
 public enum ReturnStatus
 {
@@ -172,7 +174,23 @@ public enum ReturnStatus
     Returned = 4,
 
     /// <summary>Đã huỷ đơn — **hấp thụ**.</summary>
-    Cancelled = 5
+    Cancelled = 5,
+
+    /// <summary>
+    /// 🆕 **`S14H` — TRẢ MỘT PHẦN (BA chốt 29/10/2026).** Đã nhận hàng hoàn **một phần**; **chưa hấp thụ**
+    /// (còn chuyển được sang `Returned` khi nhận nốt).
+    ///
+    /// 🚨 **CHỈ ĐƯỢC THÊM Ở CUỐI DẢI, KHÔNG BAO GIỜ ĐỔI SỐ CỦA GIÁ TRỊ CŨ.** `OrdOrders.ReturnStatus` lưu
+    /// **dạng số** (`int`) ⇒ đổi số của `Returned`/`Cancelled` là **diễn giải lại toàn bộ lịch sử**: một đơn
+    /// "đã trả xong" bỗng đọc thành "trả một phần" — **sai dữ liệu mà không có lỗi nào**. Vì vậy `Cancelled`
+    /// **vẫn** là `5`, giá trị mới nhận `6` (số kế tiếp, không tái dùng số của ai).
+    ///
+    /// 📌 **KHÔNG sinh `OrderStatus` mới:** đơn trả một phần vẫn suy ra `Completed` (từ trục thực hiện
+    /// `Delivered`) — người đọc phải hiểu *"đơn vẫn `Completed` nhưng trục kết thúc đã `PartiallyReturned`"*.
+    /// Thêm một `OrderStatus` cho mức trả hàng là **trục thứ 5 trá hình** (cấm — `SAL-003` BR-003); câu hỏi
+    /// *"đơn nào trả một phần?"* **phải** đọc `ReturnStatus`, không đọc `Status`.
+    /// </summary>
+    PartiallyReturned = 6
 }
 
 /// <summary>Bốn trục trạng thái của đơn (`SAL-003` BR-003). Cấm thêm trục thứ 5 khi chưa sửa tài liệu.</summary>

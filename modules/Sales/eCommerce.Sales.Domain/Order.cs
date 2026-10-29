@@ -253,8 +253,11 @@ public class Order : FullAuditedAggregateRoot<Guid>, IMultiTenant
             occurredAtUtc);
 
     /// <summary>
-    /// **TRỤC 4 — KẾT THÚC.** Yêu cầu trả / duyệt trả / từ chối / đã trả (`SAL-003` cạnh 25–28).
+    /// **TRỤC 4 — KẾT THÚC.** Yêu cầu trả / duyệt trả / từ chối / **trả một phần** / đã trả (`SAL-003` cạnh 25–28
+    /// + 2 cạnh `S14H`).
     /// ⚠️ Huỷ đơn **không** đi qua đây — dùng <see cref="HuyDon"/> (có guard "chưa xuất kho").
+    /// 📌 `PartiallyReturned` (`S14H`) **không** làm đổi `Status` tổng thể — xem chú thích ở
+    /// `OrderStateMachine.TinhTrangThaiSuyRa`.
     /// </summary>
     public OrderStatusHistory ChuyenKetThuc(
         ReturnStatus moi,

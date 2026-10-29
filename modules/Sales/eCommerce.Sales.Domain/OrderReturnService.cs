@@ -12,8 +12,9 @@ namespace eCommerce.Orders;
 ///
 /// 🔑 **MỘT chỗ quyết định** *"khi nào đơn chuyển trục kết thúc"*: mọi chuyển dịch đều gọi
 /// <see cref="Order.ChuyenKetThuc"/> (máy trạng thái `SAL-003`), **không** gán `ReturnStatus` trực tiếp.
-/// 📌 Nhờ vậy cạnh `ReturnRequested → ReturnApproved → Returned` được kiểm **một lần** và lịch sử đơn
-/// (`OrdStatusHistory`) vẫn do aggregate đơn ghi — **không** có bản sao thứ hai của luật.
+/// 📌 Nhờ vậy cạnh `ReturnRequested → ReturnApproved → Returned` (và 🆕 `S14H`: `ReturnApproved →
+/// PartiallyReturned → Returned`) được kiểm **một lần** và lịch sử đơn (`OrdStatusHistory`) vẫn do aggregate
+/// đơn ghi — **không** có bản sao thứ hai của luật.
 ///
 /// 🚨 **GIỮ CHỖ TRẢ NGAY KHI TẠO PHIẾU** (`OrderLine.TangTra`): phiếu bị **từ chối/huỷ** thì trả lại
 /// (`GiamTra`). Hai phiếu đồng thời cùng dòng đơn ⇒ chỉ một phiếu qua được (khoá + guard) ⇒ **không trả vượt**.
@@ -254,12 +255,20 @@ public class OrderReturnService : DomainService
             await _dongTra.UpdateAsync(d, autoSave: false);
         }
 
-        // Hàng đã về **đủ** ⇒ đơn sang `Returned` (qua máy trạng thái, chỉ khi đơn đang `ReturnApproved`).
+        // Hàng đã về **đủ** ⇒ đơn sang `Returned`; mới về **một phần** ⇒ đơn sang `PartiallyReturned`
+        // (qua máy trạng thái, **không** gán tay). 🆕 `S14H`.
+        //
+        // 🔒 **CHỈ CHUYỂN KHI TRẠNG THÁI ĐƠN THỰC SỰ ĐỔI** — `ChuyenDonAsync` tự bỏ qua khi đơn đã ở đúng
+        // trạng thái đích. 📌 Nếu không bỏ qua: nhận thêm một phần nữa khi đơn đã `PartiallyReturned` sẽ gọi
+        // cạnh tự thân (`from = to`) ⇒ máy trạng thái NÉM `0001` **dù nghiệp vụ hợp lệ**. Và "nhận một phần"
+        // **không** được kéo đơn lùi/xuống trạng thái khác.
         if (phieu.Status == ReturnLifecycleStatus.Received)
         {
-            var don = await _don.GetAsync(phieu.OrderId);
-            don.ChuyenKetThuc(ReturnStatus.Returned, actorType, actorId, "DA_TRA", occurredAtUtc: at);
-            await _don.UpdateAsync(don, autoSave: false);
+            await ChuyenDonAsync(phieu.OrderId, ReturnStatus.Returned, "DA_TRA", actorType, actorId, at);
+        }
+        else if (phieu.GoodsStatus == ReturnGoodsStatus.PartiallyReceived)
+        {
+            await ChuyenDonAsync(phieu.OrderId, ReturnStatus.PartiallyReturned, "NHAN_MOT_PHAN", actorType, actorId, at);
         }
 
         await _phieuTra.UpdateAsync(phieu, autoSave: false);
@@ -324,6 +333,36 @@ public class OrderReturnService : DomainService
             d.GanChungTuKho(chungTuId);
             await _dongTra.UpdateAsync(d, autoSave: true);
         }
+    }
+
+    /// <summary>
+    /// 🆕 **`S14H`** — đồng bộ **trục kết thúc của ĐƠN** với mức hàng hoàn đã nhận, **qua máy trạng thái**
+    /// (`Order.ChuyenKetThuc`) — không gán `ReturnStatus` trực tiếp, không tự ghi `OrdStatusHistory`
+    /// (aggregate đơn ghi lịch sử + phát ETO trong **cùng** transaction).
+    ///
+    /// 🔒 **KHÔNG chuyển khi trạng thái KHÔNG đổi:** đơn đã ở đúng trạng thái đích ⇒ trả về ngay. Hai lý do:
+    /// ① máy trạng thái **không có cạnh tự thân** (`from = to` ⇒ NÉM `0001`);
+    /// ② nhận thêm **một phần nữa** (đơn đã `PartiallyReturned`) là nghiệp vụ **hợp lệ** — không được biến
+    /// nó thành lỗi. Đây là điểm khác với `DatTrangThaiThanhToan` (trả `false`) — ở đây là nội bộ, không lộ API.
+    /// </summary>
+    private async Task ChuyenDonAsync(
+        Guid orderId,
+        ReturnStatus moi,
+        string reasonCode,
+        StatusActorType actorType,
+        Guid? actorId,
+        DateTime at)
+    {
+        var don = await _don.GetAsync(orderId);
+
+        if (don.ReturnStatus == moi)
+        {
+            return;
+        }
+
+        don.ChuyenKetThuc(moi, actorType, actorId, reasonCode, occurredAtUtc: at);
+
+        await _don.UpdateAsync(don, autoSave: false);
     }
 
     private async Task<OrderReturn> LayAsync(Guid id)

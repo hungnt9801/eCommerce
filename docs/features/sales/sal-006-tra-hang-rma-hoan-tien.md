@@ -2257,7 +2257,7 @@ lộ khi đi **thẳng API**. Đó là lý do §33 sửa ở **tầng domain** (
 
 | # | Thiếu | Ghi chú |
 |---|---|---|
-| 1 | **Trạng thái `PartiallyReturned`** ở cấp đơn | Vẫn là nợ **cần BA chốt hợp đồng API** (`SAL-003` §16 · §31.3 #4). 🚫 Không tự thêm |
+| ~~1~~ | ~~**Trạng thái `PartiallyReturned`** ở cấp đơn~~ ✅ **ĐÃ ĐÓNG 29/10/2026 — `S14H`, xem §35** | BA **đã chốt** (29/10/2026): thêm `ReturnStatus.PartiallyReturned = 6` (**append ở cuối dải**), đúng **2 cạnh** `ReturnApproved → PartiallyReturned → Returned`; **không** thêm `OrderStatus` mới. ✅ Đo hai chiều ở **§35.5/§35.6** (`S14-E12` đổi kỳ vọng + `S14-E21/E22` mới) |
 | 2 | **ETO phiếu trả** | Cố ý **không** làm (§32.3) — thêm khi có consumer thật |
 | 3 | ~~**Nút HUỶ phiếu trên UI**~~ ✅ **ĐÃ ĐÓNG 29/10/2026 — `S14G`, xem §34** | `HuyAsync` **đã có** trong API/service nhưng màn hình phần E chỉ có **5 hành động theo phạm vi** (duyệt/từ chối/nhận/đóng/hoàn tiền) ⇒ huỷ phiếu **không có lối vào**. ✅ Nay có `POST /TraHang/Huy` + nút **Huỷ phiếu** (ô lý do **bắt buộc**) — **không** đổi API/DTO/quyền |
 | 4 | **Hoàn tiền TỰ ĐỘNG** | Vẫn **`Q4` = chỉ ghi nhận** (§28.2); đường gọi cổng là `PAY-001` + lát cắt `S14b` |
@@ -2464,6 +2464,162 @@ thêm) · nút huỷ phiếu trên UI (`§32.5 #3` — ✅ **đóng ở §34**, 
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.0 | 29/10/2026 | *(agent, session GĐ1 — `S14G`)* | **Nút HUỶ phiếu trên UI** (đóng **§32.5 #3**): `POST /TraHang/Huy` (token chống giả mạo, bắt `BusinessException` ⇒ hiện **đúng mã**, không `500`, không ghi tiếp) + nút **Huỷ phiếu** chỉ hiện ở `Requested\|Approved` **và chưa nhận hàng**, kèm **ô lý do bắt buộc**; ẩn/hiện theo `Orders.ReturnRequest` nhưng **app service cưỡng chế**. **+6 ca E2E** (`S14-E15…E20`) đo **hai chiều**: huỷ ⇒ `OrdReturns.Status = 3` **và** `OrdOrderLines.ReturnedQuantity 2 → 0` (đối xứng `GiamTra`); huỷ lần hai ⇒ `eCommerce:Sales:0010` + DB **không đổi**; phiếu đã nhận hàng **không** có nút. **0** schema/migration/NND/quyền. |
+
+---
+
+## 35. `S14H` — TRẠNG THÁI `PartiallyReturned` (chốt BA 29/10/2026) — *đóng §32.5 #1*
+
+> 🎯 **Phạm vi — ĐÚNG MỘT VIỆC:** thêm trạng thái **trả một phần** cho **trục kết thúc của ĐƠN**
+> (`OrderStatus`? **không** — xem §35.4) khi phiếu trả mới nhận **một phần** hàng hoàn.
+>
+> 🔒 **Không đổi:** lược đồ · migration (**50**) · NND (**64**) · quyền (**72**) · route/DTO · ETO ·
+> bảng `OrderReturn`/`OrderReturnLine`/`GoodsStatus`. 🚫 **Không** thêm `OrderStatus` mới, **không** thêm cạnh
+> tắt, **không** nới `CHECK` DB.
+
+### 35.1 Quyết định của BA (29/10/2026)
+
+| # | Quyết định | Lý do (ghi để phiên sau không mở lại) |
+|---|---|---|
+| 1 | **Thêm** trạng thái `PartiallyReturned` cho trục kết thúc của đơn | Trước lát cắt này, **nhận một phần** để đơn đứng nguyên `ReturnApproved` ⇒ *"đã trả một phần"* **không đọc được ở đâu**; báo cáo và UI đều nói *"chưa trả gì"* — sai sự thật vận hành (nợ đã ghi ở `SAL-003`/`INV-001`) |
+| 2 | **Append ở CUỐI dải** (giá trị `6`), **không** đổi số giá trị cũ | `OrdOrders.ReturnStatus` lưu **số** (`int`). Đổi số của `Returned`/`Cancelled` = **diễn giải lại toàn bộ lịch sử** (đơn *"đã trả xong"* đọc thành *"trả một phần"*) — **sai dữ liệu không có lỗi nào**. Đây là luật đã có cho `StockMovementType` (`INV-001` ADR-04) |
+| 3 | **Không** thêm `OrderStatus` tổng thể | `OrderStatus` là **giá trị SUY RA** (`SAL-003` D2). Thêm một giá trị cho *mức trả hàng* là **trục thứ 5 trá hình** (BR-003 cấm). Chi tiết + hệ quả đọc: **§35.4** |
+| 4 | **Không** đổi `OrderReturn.GoodsStatus` | Nó **đã** có `PartiallyReceived` từ `S14` — hai trục khác nhau: `GoodsStatus` = *phiếu trả*, `ReturnStatus` = *đơn*. Gộp lại là lặp lỗi "một enum hai nghĩa" (`SAL-003` D3) |
+| 5 | **Không** migration | Cột đã là `int`; enum thêm giá trị **không** đổi kiểu, **không** đổi `CHECK` (DB không ràng buộc dải `ReturnStatus`) |
+
+**Giá trị enum sau `S14H`** (`src/eCommerce.Domain.Shared/Enums.cs`) — **cột số là bất biến:**
+
+| Tên | Số | Hấp thụ? | Ghi chú |
+|---|---|---|---|
+| `Open` | 0 | ✖ | chưa có yêu cầu trả |
+| `ReturnRequested` | 1 | ✖ | khách/sàn yêu cầu trả |
+| `ReturnApproved` | 2 | ✖ | đã duyệt trả |
+| `ReturnRejected` | 3 | ✅ | từ chối trả |
+| `Returned` | 4 | ✅ | **đã trả xong** |
+| `Cancelled` | 5 | ✅ | đã huỷ đơn |
+| 🆕 `PartiallyReturned` | **6** | ✖ | **đã nhận một phần** — còn đi tiếp được `→ Returned` |
+
+### 35.2 Hai cạnh thêm vào máy trạng thái — **đúng 2, không cạnh tắt**
+
+`OrderStateMachine.Canh` (`modules/Sales/eCommerce.Sales.Domain/OrderStateMachine.cs`):
+
+| # | Từ → Sang | Ai được chuyển | Guard (điều kiện cho phép) | Nếu sai |
+|---|---|---|---|---|
+| 31 | `ReturnApproved` → `PartiallyReturned` | Nhân viên kho (nhận hàng hoàn, qua `OrderReturnService`) | Phiếu `Approved` **và** `GoodsStatus = PartiallyReceived` **và** đơn đang `ReturnApproved` | **`0001`** |
+| 32 | `PartiallyReturned` → `Returned` | Nhân viên kho · Job | Phiếu `Received` (**đã nhận đủ toàn bộ dòng** của phiếu) | **`0001`** / **`0006`** nếu đơn đã kết thúc khác |
+
+**Cạnh CỐ Ý KHÔNG thêm (và vì sao):**
+
+| Cạnh bị loại | Vì sao |
+|---|---|
+| `Open` / `ReturnRequested` → `PartiallyReturned` | Chưa duyệt trả thì **chưa thể** có hàng về. Hàng về trước khi duyệt là **sai quy trình** ⇒ phải chặn, không hợp thức hoá bằng một cạnh |
+| `PartiallyReturned` → `Cancelled` | **Đã nhận hàng** thì không huỷ (hàng đã ra khỏi kho ⇒ phải TRẢ HÀNG bằng chứng từ, cấm xoá bút toán). `Order.HuyDon` cũng chặn vì `FulfillmentStatus ≠ Pending` |
+| `PartiallyReturned` → `PartiallyReturned` | **Cạnh tự thân là vô nghĩa** (`from = to`): `Order.Chuyen` ném **`0001`**; nhận thêm một phần nữa **không** làm trạng thái đơn đổi ⇒ chỗ gọi phải **bỏ qua**, không gọi |
+| `PartiallyReturned` → `Open`/`ReturnRequested` | **Chỉ tiến, không lùi** (`SAL-003` §3): lùi nghĩa là *"hàng đã về lại thành chưa về"* |
+
+### 35.3 `OrderReturnService.NhanHangAsync` — **một chỗ quyết định**
+
+Sau khi entity xác định `Status`/`GoodsStatus` của **phiếu**, tầng dịch vụ đồng bộ **trục kết thúc của đơn**
+qua `Order.ChuyenKetThuc` (máy trạng thái, **không** gán tay):
+
+| Phiếu sau khi nhận | Đơn trước | Hành vi (mã `ReasonCode`) |
+|---|---|---|
+| `Status = Received` (nhận **đủ**) | `ReturnApproved` | `ChuyenKetThuc(Returned)` — `DA_TRA` · `ClosureVersion +1` |
+| `Status = Received` (nhận **đủ**) | `PartiallyReturned` | `ChuyenKetThuc(Returned)` — `DA_TRA` (cạnh `S14H` thứ hai) |
+| `Status = Received` (nhận **đủ**) | đã `Returned` | **không gọi** — trạng thái **không đổi** (không có cạnh tự thân) |
+| `Status = Approved`, `GoodsStatus = PartiallyReceived` | `ReturnApproved` | `ChuyenKetThuc(PartiallyReturned)` — `NHAN_MOT_PHAN` · `ClosureVersion +1` |
+| `Status = Approved`, `GoodsStatus = PartiallyReceived` | `PartiallyReturned` | **không gọi** — nhận **thêm** một phần nữa **không** đổi trạng thái đơn |
+| bất kỳ | `Open`/`ReturnRequested`/`ReturnRejected`/`Cancelled` | **NÉM** `0001`/`0006` — dữ liệu lệch, **không nuốt** |
+
+🔒 **Không viết tay lịch sử:** `Order.ChuyenKetThuc` tự thêm **đúng một** `OrdStatusHistory` (`Axis = Closure`,
+`VersionAfter` của trục) **và** phát `OrderStatusChangedEto` qua **outbox cùng transaction** — lát cắt này
+**không** tạo bản ghi thứ hai, không thêm ETO mới.
+📌 **Chỉ chuyển khi trạng thái THỰC SỰ đổi:** hàm nội bộ `ChuyenDonAsync` trả về ngay khi `don.ReturnStatus`
+đã bằng trạng thái đích — nếu không, lần *"nhận thêm một phần"* thứ hai sẽ gọi cạnh tự thân và **NÉM `0001`**
+dù nghiệp vụ **hợp lệ**.
+
+### 35.4 Vì sao **KHÔNG** có `OrderStatus` mới — người đọc phải hiểu đúng
+
+`Order.Status` **không phải** nguồn sự thật: nó được **suy ra** từ 4 trục (`SAL-003` D2/§4.2,
+`OrderStateMachine.TinhTrangThaiSuyRa`). Với `S14H`:
+
+- Hàm suy ra **không đổi một dòng nào**; `PartiallyReturned` **không** phải nhánh mới.
+- Đơn đã `Delivered` + `ReturnStatus = PartiallyReturned` ⇒ `Status = Completed`.
+- 🔑 Câu đúng để đọc: **"đơn vẫn `Completed` nhưng trục kết thúc đã `PartiallyReturned`"** — *"đã trả một
+  phần"* **chỉ** đọc được ở `ReturnStatus` (và ở `OrderReturn.GoodsStatus` nếu nhìn phiếu), **không** đọc ở
+  `Status`.
+- 📌 Vì sao **không** thêm `OrderStatus.PartiallyReturned`: (a) nó phá luật *"`Status` là giá trị suy ra"*;
+  (b) `OrderStatus` gộp 4 trục ⇒ thêm giá trị là **trục thứ 5 trá hình** (BR-003); (c) client cũ đang so
+  `Status == Completed` để biết *"đơn đã giao"* sẽ **đỏ** nếu ta đổi nó.
+
+Bất biến này được khoá **hai chỗ**: unit test (bảng `InlineData` + ca `S14H` khẳng định `OrderStatus.Completed`)
+và **E2E đo cột `OrdOrders.Status` = `4`** ngay lúc `ReturnStatus = 6` (§35.6).
+
+### 35.5 Test hai chiều
+
+**`test/eCommerce.Tests/Domain/OrderStateMachineTests.cs` — +7 ca** (gồm 2 ca `[Theory]`):
+
+| Ca | Chiều | Khẳng định |
+|---|---|---|
+| `Tra_mot_phan__ReturnApproved_sang_PartiallyReturned__hop_le__va_KHONG_doi_OrderStatus_tong_the` | ✅ dương tính | đi đúng đường `Delivered → ReturnRequested → ReturnApproved → PartiallyReturned`; `ToStatus = 6`; `ClosureVersion = 3`; **đúng MỘT** dòng lịch sử `Closure`; `OrderStatus` **vẫn `Completed`**; `LaHapThu = false` |
+| `Tra_mot_phan__PartiallyReturned_sang_Returned__hop_le__roi_MOI_hap_thu` | ✅ dương tính | `PartiallyReturned → Returned` hợp lệ ⇒ `OrderStatus.Returned`, `ClosureVersion = 4`; **`Returned` mới hấp thụ** — lùi về `PartiallyReturned` ⇒ **`0006`** |
+| `Tra_mot_phan__KHONG_mo_tu_truoc_khi_duyet__NEM_0001` (2 ca: `Open`, `ReturnRequested`) | 🚫 âm tính | `Open`/`ReturnRequested → PartiallyReturned` **NÉM `0001`**; trạng thái + lịch sử **không đổi** |
+| `Tra_mot_phan__tu_chuyen_sang_chinh_minh__NEM_0001` | 🚫 âm tính | `PartiallyReturned → PartiallyReturned` **NÉM `0001`** (`from = to`); `ClosureVersion` + số dòng lịch sử **không đổi** |
+| `Tra_mot_phan__KHONG_huy_duoc__va_KHONG_phai_trang_thai_hap_thu` | 🚫 âm tính + phân biệt | `PartiallyReturned → Cancelled` **NÉM `0001`**, `IsCancelled = false`; `LaHapThu` = **false** cho `PartiallyReturned` và **true** cho `Returned`/`Cancelled` |
+| `Ham_suy_ra_DerivedStatus__dung_cho_moi_to_hop` **+1 `InlineData`** | ✅ dương tính | `(Delivered, PartiallyReturned, false) ⇒ OrderStatus.Completed` — khoá luật *"không có `OrderStatus` mới"* |
+
+**`test/eCommerce.Tests/Sales/OrderReturnTests.cs`** — **không đổi ca nào**; các ca **đã có** khoá đúng tầng entity
+(tầng này **không** biết `Order`):
+`NhanHang__chi_tu_Approved__va_hai_trang_thai_dung_dan` (nhận một phần ⇒ `GoodsStatus = PartiallyReceived`,
+phiếu **vẫn** `Approved`) · `NhanHang__du_hang__Received_va_co_moc` (nhận đủ ⇒ `Received` + `ReceivedAtUtc`) ·
+`NhanHang__tung_dong__chi_Received_khi_TOAN_BO_dong_da_ve` (`S14F`). 🔒 Việc **đơn chuyển `PartiallyReturned`**
+là hành vi **tầng dịch vụ** ⇒ đo ở **E2E** (§35.6), đúng chỗ nó xảy ra.
+
+### 35.6 E2E — đo **DB thật** (`tools/kiem-e2e.ps1`, khối `S14`)
+
+| Ca | Chiều | Đo cái gì | Kết quả |
+|---|---|---|---|
+| `S14-E11` | ✅ (giữ nguyên) | POST nhận 1/2 qua form thật ⇒ `OrdReturnLines` | `1\|2` |
+| `S14-E12` | ✅ **ĐỔI KỲ VỌNG** | Nhận **một phần** ⇒ `OrdReturns.Status\|GoodsStatus` **và** `OrdOrders.ReturnStatus\|ClosureVersion\|Status` | `1\|1` · đơn **`6\|3\|4`** — trước đây ca này khẳng định `2` (đơn đứng yên) |
+| `S14-E21` 🆕 | ✅ dương tính | **HTML thật** `/DonHang/ChiTiet/<đơn>` phải in **chuỗi** `PartiallyReturned` (không phải số `6`) | khớp |
+| `S14-E22` 🆕 | ✅ dương tính (nhận nốt) | POST nhận **nốt** 2/2 ⇒ phiếu `Status\|GoodsStatus` **và** đơn `ReturnStatus\|ClosureVersion\|Status` | phiếu `4\|2` · đơn **`4\|4\|6`** |
+
+🔒 **Đo bằng `Invoke-Psql`, KHÔNG tin HTML** cho các khẳng định trạng thái (HTML chỉ dùng cho ca `E21` về **cách
+in** giá trị). 📌 `S14-E22` khẳng định **cả hai** đầu: phiếu `Received` **và** đơn `Returned` — nếu ai sửa
+`NhanHangAsync` chỉ đổi phiếu mà quên đơn (hoặc ngược lại) thì ca này **đỏ**.
+📌 Dọn trong `finally`: `OrdReturnHistory` → `OrdReturnLines` → `OrdReturns` → outbox/inbox theo GUID đơn →
+`OrdOrderLines` → `OrdOrders`; **đếm lại = 0** (`DON DEP (S14)`) — gồm cả sự kiện outbox do hai chuyển dịch mới.
+
+### 35.7 Ảnh hưởng API/UI — **thêm ở cuối ⇒ tương thích ngược**
+
+| Bề mặt | Ảnh hưởng |
+|---|---|
+| `OrdOrders.ReturnStatus` (cột `int`) | Thêm **một** giá trị `6`. **Không** đổi số của `0…5` ⇒ dữ liệu lịch sử **đọc y hệt** trước |
+| Client cũ đọc **số** | Vẫn hiểu đủ `0…5`; gặp `6` thì rơi vào nhánh mặc định của họ — **không** có giá trị nào **đổi nghĩa**, nên không diễn giải sai dữ liệu cũ. Client mới thấy thêm **một** giá trị |
+| Client đọc **tên** (JSON enum-as-string / HTML) | Thấy thêm `PartiallyReturned`; không tên nào bị đổi |
+| `OrderReturnDto.Status`/`GoodsStatus` | **Không đổi** — là **chuỗi** của trạng thái **phiếu** (`Requested…Closed` / `Awaiting…NotReturned`), không phải trục đơn |
+| `OrderStatusDto` / `Order.Status` | **Không đổi** — xem §35.4: không có `OrderStatus` mới |
+| `/TraHang` (UI RMA) | In `Status`/`GoodsStatus` **dạng chuỗi** ⇒ **không** phải sửa mã. 🔒 Nút **Huỷ phiếu** giữ **đúng guard của entity** `OrderReturn.Huy`: `Status ∈ {Requested, Approved}` **và** `GoodsStatus ∉ {Received, PartiallyReceived}` ⇒ **không** mời bấm huỷ khi đã nhận một phần (đã kiểm ở `S14-E16`) |
+| `/DonHang/ChiTiet` | In `@Model.ReturnStatus` **dạng chuỗi** ⇒ giá trị mới **tự hiện** (đo ở `S14-E21`) |
+| Route / DTO / quyền / ETO | **0 thay đổi** |
+
+### 35.8 Đo cổng cuối (cây đã sửa)
+
+| Phép đo | Kết quả | Ghi chú |
+|---|---|---|
+| Unit | **1627 → 1634** (+7 ca `S14H`) | `OrderStateMachineTests`; `OrderReturnTests` **không đổi** |
+| Integration | **90** (không đổi) | không chạm lược đồ |
+| E2E (HTML thật) | **165 → 167** (`S14-E12` đổi kỳ vọng + `S14-E21/E22` mới) | `tools/kiem-e2e.ps1` |
+| Migration / NND / quyền / chỗ quét | **50 · 64 · 72 · 99** — **không đổi** | enum thêm giá trị, **không** migration |
+| Cổng đầy đủ | **exit 0 · 389.7s · 15/15 bước** | `pwsh -File tools\kiem-tat-ca.ps1 -DayDu` |
+| Hai cổng tài liệu | mermaid **0 lỗi** · link **0 chết** | chạy lại sau khi điền số |
+| Dọn dẹp probe | `DON DEP (S14)` + `DON DEP (S14G)` = **0** — gồm **outbox/inbox** của đơn probe | in ra ở cuối bước ⑧ |
+
+### 35.9 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.1 | 29/10/2026 | *(agent, session GĐ1 — `S14H`)* | **Trạng thái `PartiallyReturned`** cho trục kết thúc của ĐƠN (đóng **§32.5 #1**, BA chốt 29/10/2026): `ReturnStatus.PartiallyReturned = 6` (**append ở cuối dải**, số cũ **không** đổi) · **đúng 2 cạnh** `ReturnApproved → PartiallyReturned` và `PartiallyReturned → Returned` (không cạnh tắt, không cạnh tự thân, **không** hấp thụ) · `NhanHangAsync` chuyển đơn **chỉ khi trạng thái thực sự đổi** (nhận thêm một phần ⇒ không gọi; nhận đủ ⇒ `Returned`) · **KHÔNG** thêm `OrderStatus` (đơn vẫn `Completed` — ghi rõ trong mã + §35.4) · **+7 unit** (hai chiều) · **+2 E2E** (`S14-E21/E22`) + **đổi kỳ vọng `S14-E12`** ⇒ **167 ca** · **0** schema/migration/NND/quyền/route/DTO/ETO. |
+
 
 
 

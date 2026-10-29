@@ -132,6 +132,129 @@ public class OrderStateMachineTests
         Assert.Equal(1, don.FulfillmentVersion);
     }
 
+    // ════════════════════════════════════════════════════════════════════════════════════════════════
+    // ①b `S14H` — TRẢ MỘT PHẦN (`PartiallyReturned`, BA chốt 29/10/2026) — HAI CHIỀU
+    // ════════════════════════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>Đưa đơn tới `ReturnApproved` với trục thực hiện đã `Delivered` (đúng đường thật của RMA).</summary>
+    private static Order DonDaGiaoVaDaDuyetTra(out Guid ai)
+    {
+        var don = DonMoi();
+        ai = NguoiDung();
+
+        don.ChuyenThucHien(FulfillmentStatus.Confirmed, StatusActorType.Staff, ai, "XacNhanDon");
+        don.ChuyenThucHien(FulfillmentStatus.Packing, StatusActorType.Staff, ai, "DongGoi");
+        don.ChuyenThucHien(FulfillmentStatus.AwaitingPickup, StatusActorType.Staff, ai, "ChoLayHang");
+        don.ChuyenThucHien(FulfillmentStatus.OutForDelivery, StatusActorType.MarketplaceWebhook, null, "DangGiao");
+        don.ChuyenThucHien(FulfillmentStatus.Delivered, StatusActorType.MarketplaceWebhook, null, "DaGiao");
+        don.ChuyenKetThuc(ReturnStatus.ReturnRequested, StatusActorType.Staff, ai, "YeuCauTra");
+        don.ChuyenKetThuc(ReturnStatus.ReturnApproved, StatusActorType.Staff, ai, "DuyetTra");
+
+        return don;
+    }
+
+    [Fact]
+    public void Tra_mot_phan__ReturnApproved_sang_PartiallyReturned__hop_le__va_KHONG_doi_OrderStatus_tong_the()
+    {
+        var don = DonDaGiaoVaDaDuyetTra(out var ai);
+
+        var lichSu = don.ChuyenKetThuc(
+            ReturnStatus.PartiallyReturned, StatusActorType.Staff, ai, "NHAN_MOT_PHAN");
+
+        Assert.Equal(ReturnStatus.PartiallyReturned, don.ReturnStatus);
+        Assert.Equal("Closure", lichSu.Axis);
+        Assert.Equal((int)ReturnStatus.ReturnApproved, lichSu.FromStatus);
+        // 📌 `PartiallyReturned` ở CUỐI dải ⇒ số 6 là bất biến (cột DB lưu int). Đổi số ⇒ diễn giải lại lịch sử.
+        Assert.Equal(6, lichSu.ToStatus);
+        Assert.Equal(3, don.ClosureVersion);
+        // 🔑 Aggregate tự ghi ĐÚNG MỘT dòng lịch sử cho chuyển dịch này (không có bản sao thứ hai).
+        Assert.Single(don.StatusHistory, h => h.Axis == "Closure" && h.ToStatus == 6);
+        // 🚨 KHÔNG có `OrderStatus` mới: đơn VẪN `Completed` (suy từ trục thực hiện `Delivered`),
+        //    còn *"đã trả một phần"* chỉ đọc được ở `ReturnStatus`.
+        Assert.Equal(OrderStatus.Completed, don.Status);
+        // 🔒 Không hấp thụ ⇒ còn đi tiếp được.
+        Assert.False(OrderStateMachine.LaHapThu(OrderAxis.Closure, (int)ReturnStatus.PartiallyReturned));
+    }
+
+    [Fact]
+    public void Tra_mot_phan__PartiallyReturned_sang_Returned__hop_le__roi_MOI_hap_thu()
+    {
+        var don = DonDaGiaoVaDaDuyetTra(out var ai);
+        don.ChuyenKetThuc(ReturnStatus.PartiallyReturned, StatusActorType.Staff, ai, "NHAN_MOT_PHAN");
+
+        // Nhận nốt phần còn lại ⇒ cạnh thứ hai của `S14H`.
+        don.ChuyenKetThuc(ReturnStatus.Returned, StatusActorType.Staff, ai, "NHAN_NOT");
+
+        Assert.Equal(ReturnStatus.Returned, don.ReturnStatus);
+        Assert.Equal(OrderStatus.Returned, don.Status);
+        Assert.Equal(4, don.ClosureVersion);
+        // 🔑 `Returned` MỚI là hấp thụ — đó là điểm khác biệt với `PartiallyReturned`.
+        Assert.True(OrderStateMachine.LaHapThu(OrderAxis.Closure, (int)ReturnStatus.Returned));
+
+        var loi = Assert.Throws<Volo.Abp.BusinessException>(() =>
+            don.ChuyenKetThuc(ReturnStatus.PartiallyReturned, StatusActorType.Staff, ai, "LuiVeMotPhan"));
+
+        Assert.Equal(OrderErrorCodes.TrangThaiHapThu, loi.Code);
+        Assert.Equal(ReturnStatus.Returned, don.ReturnStatus);
+    }
+
+    [Theory]
+    [InlineData(ReturnStatus.Open)]                    // chưa có yêu cầu trả
+    [InlineData(ReturnStatus.ReturnRequested)]         // đã yêu cầu nhưng CHƯA duyệt
+    public void Tra_mot_phan__KHONG_mo_tu_truoc_khi_duyet__NEM_0001(ReturnStatus tu)
+    {
+        var don = DonMoi();
+        var ai = NguoiDung();
+
+        if (tu == ReturnStatus.ReturnRequested)
+        {
+            don.ChuyenKetThuc(ReturnStatus.ReturnRequested, StatusActorType.Staff, ai, "YeuCauTra");
+        }
+
+        var loi = Assert.Throws<Volo.Abp.BusinessException>(() =>
+            don.ChuyenKetThuc(ReturnStatus.PartiallyReturned, StatusActorType.Staff, ai, "NhanTruocKhiDuyet"));
+
+        Assert.Equal(OrderErrorCodes.ChuyenTrangThaiKhongHopLe, loi.Code);
+        Assert.Equal(tu, don.ReturnStatus);
+        Assert.DoesNotContain(don.StatusHistory, h => h.ToStatus == 6);
+    }
+
+    [Fact]
+    public void Tra_mot_phan__tu_chuyen_sang_chinh_minh__NEM_0001()
+    {
+        var don = DonDaGiaoVaDaDuyetTra(out var ai);
+        don.ChuyenKetThuc(ReturnStatus.PartiallyReturned, StatusActorType.Staff, ai, "NHAN_MOT_PHAN");
+        var soLichSu = don.StatusHistory.Count;
+
+        var loi = Assert.Throws<Volo.Abp.BusinessException>(() =>
+            don.ChuyenKetThuc(ReturnStatus.PartiallyReturned, StatusActorType.Staff, ai, "NhanThemMotPhan"));
+
+        Assert.Equal(OrderErrorCodes.ChuyenTrangThaiKhongHopLe, loi.Code);
+        Assert.Equal(ReturnStatus.PartiallyReturned, don.ReturnStatus);
+        Assert.Equal(3, don.ClosureVersion);
+        Assert.Equal(soLichSu, don.StatusHistory.Count);
+    }
+
+    [Fact]
+    public void Tra_mot_phan__KHONG_huy_duoc__va_KHONG_phai_trang_thai_hap_thu()
+    {
+        var don = DonDaGiaoVaDaDuyetTra(out var ai);
+        don.ChuyenKetThuc(ReturnStatus.PartiallyReturned, StatusActorType.Staff, ai, "NHAN_MOT_PHAN");
+
+        // 🚨 ĐÃ NHẬN HÀNG (một phần) ⇒ không có cạnh `PartiallyReturned → Cancelled`, và `HuyDon` cũng chặn
+        // vì hàng đã ra khỏi kho (phải TRẢ HÀNG bằng chứng từ, cấm xoá bút toán).
+        var loiHuy = Assert.Throws<Volo.Abp.BusinessException>(() =>
+            don.ChuyenKetThuc(ReturnStatus.Cancelled, StatusActorType.Staff, ai, "HuySauKhiNhanMotPhan"));
+
+        Assert.Equal(OrderErrorCodes.ChuyenTrangThaiKhongHopLe, loiHuy.Code);
+        Assert.False(don.IsCancelled);
+
+        // 🔑 Phân biệt với `Returned`: `PartiallyReturned` KHÔNG hấp thụ (còn đi tiếp), `Returned`/`Cancelled` thì có.
+        Assert.False(OrderStateMachine.LaHapThu(OrderAxis.Closure, (int)ReturnStatus.PartiallyReturned));
+        Assert.True(OrderStateMachine.LaHapThu(OrderAxis.Closure, (int)ReturnStatus.Returned));
+        Assert.True(OrderStateMachine.LaHapThu(OrderAxis.Closure, (int)ReturnStatus.Cancelled));
+    }
+
     [Fact]
     public void Huy_don__pending__duoc__va_hap_thu()
     {
@@ -213,6 +336,8 @@ public class OrderStateMachineTests
     [InlineData(FulfillmentStatus.Delivered, ReturnStatus.Open, false, OrderStatus.Completed)]
     [InlineData(FulfillmentStatus.Pending, ReturnStatus.Cancelled, true, OrderStatus.Cancelled)]
     [InlineData(FulfillmentStatus.Delivered, ReturnStatus.Returned, false, OrderStatus.Returned)]
+    // 🆕 `S14H` — trả MỘT PHẦN **không** đổi `OrderStatus` tổng thể: vẫn `Completed` từ trục thực hiện.
+    [InlineData(FulfillmentStatus.Delivered, ReturnStatus.PartiallyReturned, false, OrderStatus.Completed)]
     public void Ham_suy_ra_DerivedStatus__dung_cho_moi_to_hop(
         FulfillmentStatus thucHien, ReturnStatus ketThuc, bool daHuy, OrderStatus mongDoi)
     {

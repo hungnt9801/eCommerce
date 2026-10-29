@@ -1732,7 +1732,9 @@ select count(*)::text from "OrdReturnLines" where "Id" = 'e0000000-0000-0000-000
         Kq 'S14-E9 🚨 guard KHÔNG nuốt: DB vẫn 1|1 sau lần duyệt thứ hai' $false 'bo qua vi thieu token'
         Kq 'S14-E10 sau duyệt: form Nhận hàng hiện đủ 3 cách xử lý' $false 'bo qua vi thieu token'
         Kq 'S14-E11 POST nhận hàng => DB dòng trả đổi thật' $false 'bo qua vi thieu token'
-        Kq 'S14-E12 🚨 hàng CHƯA về đủ: đơn VẪN ReturnApproved' $false 'bo qua vi thieu token'
+        Kq 'S14-E12 🚨 hàng CHƯA về đủ: đơn PartiallyReturned (6|3|4)' $false 'bo qua vi thieu token'
+        Kq 'S14-E21 trang chi tiết đơn in `PartiallyReturned` dạng chuỗi' $false 'bo qua vi thieu token'
+        Kq 'S14-E22 nhận NỐT phần còn lại => phiếu Received · đơn Returned' $false 'bo qua vi thieu token'
     }
     else {
         Kq 'S14-E5 có token chống giả mạo trên /TraHang' $true 'token that tu trang'
@@ -1807,7 +1809,8 @@ select "Status"::text || '|' || "Version"::text from "OrdReturns" where "Id" = '
         #   ① `Damaged` **KHÔNG** nhập kho ⇒ ca kiểm không phụ thuộc `ICustomerReturnGateway`/tồn kho
         #      (đo đúng **đường UI → app service → entity**, không lẫn side effect kho);
         #   ② nhận **một phần** ⇒ khẳng định `GoodsStatus = PartiallyReceived (1)` và đơn **KHÔNG** sang
-        #      `Returned` — bất biến *"hàng chưa về đủ thì chưa phải đã trả"*.
+        #      `Returned` — bất biến *"hàng chưa về đủ thì chưa phải đã trả"*; 🆕 `S14H`: đơn sang
+        #      `PartiallyReturned (6)` (không phải đứng yên ở `ReturnApproved`).
         # 📌 Ca này cũng là phép đo **binding danh sách lặp** (`dongTraId`/`soLuongNhan`/`xuLy`) — 🔑 nếu
         # binder ghép lệch thứ tự thì DB sẽ cho `ReceivedQuantity`/`Disposition` sai và ca này ĐỎ.
         $tepNhan = Join-Path $thuMucTam 'trahang-nhan-hang.html'
@@ -1836,13 +1839,53 @@ select "ReceivedQuantity"::text || '|' || "Disposition"::text from "OrdReturnLin
 select "Status"::text || '|' || "GoodsStatus"::text from "OrdReturns" where "Id" = 'e0000000-0000-0000-0000-0000000000fd';
 '@) -join '').Trim()
 
+        # 🆕 `S14H` — đo **BA cột** của đơn: `ReturnStatus` (trục kết thúc), `ClosureVersion` (bộ đếm trục)
+        # và `Status` (giá trị SUY RA). 📌 Đo cả `Status` là có chủ ý: nó phải **VẪN = 4 (`Completed`)** —
+        # đó là bằng chứng `PartiallyReturned` **không** sinh thêm `OrderStatus` tổng thể.
         $donSauNhanMotPhan = (@(Invoke-Psql -Sql @'
-select "ReturnStatus"::text from "OrdOrders" where "Id" = 'e0000000-0000-0000-0000-0000000000f9';
+select "ReturnStatus"::text || '|' || "ClosureVersion"::text || '|' || "Status"::text from "OrdOrders" where "Id" = 'e0000000-0000-0000-0000-0000000000f9';
 '@) -join '').Trim()
 
-        Kq 'S14-E12 🚨 hàng CHƯA về đủ: phiếu Approved|PartiallyReceived, đơn VẪN ReturnApproved (2)' `
-            (($sauNhanMotPhan -eq '1|1') -and ($donSauNhanMotPhan -eq '2')) `
-            ("Status|Goods = " + $sauNhanMotPhan + " (mong doi 1|1) · don ReturnStatus = " + $donSauNhanMotPhan + " (2)")
+        Kq 'S14-E12 🚨 hàng CHƯA về đủ: phiếu Approved|PartiallyReceived · đơn PartiallyReturned (6|3|4)' `
+            (($sauNhanMotPhan -eq '1|1') -and ($donSauNhanMotPhan -eq '6|3|4')) `
+            ("Status|Goods = " + $sauNhanMotPhan + " (mong doi 1|1) · don ReturnStatus|ClosureVersion|Status = " + $donSauNhanMotPhan + " (6|3|4)")
+
+        # ── ⑤b 🆕 `S14H` — TRẢ MỘT PHẦN: UI IN CHUỖI + NHẬN NỐT ⇒ `Returned` ──────────────────────
+        # 🔑 Đo **HTML thật** của trang chi tiết đơn: giá trị mới phải hiện dạng **CHUỖI** `PartiallyReturned`
+        # (không phải số `6`) ⇒ client/người vận hành đọc được, không phải tra bảng mã.
+        $htmlDonTraMotPhan = GiaiMaHtml (TaiTrang -DuongDan ('/DonHang/ChiTiet/' + $idDonTra) `
+            -TepLuu (Join-Path $thuMucTam 'donhang-chitiet-s14h.html')).Html
+
+        Kq 'S14-E21 🆕 trang chi tiết đơn in `PartiallyReturned` dạng CHUỖI (không phải số 6)' `
+            ($htmlDonTraMotPhan -match 'PartiallyReturned') 'ten gia tri, khong phai so'
+
+        # 🔒 Nhận **nốt** phần còn lại (2/2) qua **form thật**. 📌 Vẫn chọn `Damaged` để **KHÔNG** chạm
+        # `ICustomerReturnGateway`/tồn kho — ca kiểm đo đúng máy trạng thái, không lẫn side effect kho.
+        $tepNhanNot = Join-Path $thuMucTam 'trahang-nhan-not.html'
+        $maNhanNot = ([string](& $curl -s -b $jar -c $jar -L -o $tepNhanNot -w '%{http_code}' `
+            --data-urlencode ("__RequestVerificationToken=" + $tokenTra) `
+            --data-urlencode ("id=" + $idPhieuTra) `
+            --data-urlencode ("donId=" + $idDonTra) `
+            --data-urlencode ("dongTraId=" + $idDongTra) `
+            --data-urlencode 'soLuongNhan=2' `
+            --data-urlencode 'xuLy=Damaged' `
+            ($web + '/TraHang/NhanHang'))).Trim()
+
+        $htmlNhanNot = if (Test-Path $tepNhanNot) {
+            GiaiMaHtml ([System.IO.File]::ReadAllText($tepNhanNot, [Text.Encoding]::UTF8))
+        } else { '' }
+
+        $phieuSauNhanNot = (@(Invoke-Psql -Sql @'
+select "Status"::text || '|' || "GoodsStatus"::text from "OrdReturns" where "Id" = 'e0000000-0000-0000-0000-0000000000fd';
+'@) -join '').Trim()
+
+        $donSauNhanNot = (@(Invoke-Psql -Sql @'
+select "ReturnStatus"::text || '|' || "ClosureVersion"::text || '|' || "Status"::text from "OrdOrders" where "Id" = 'e0000000-0000-0000-0000-0000000000f9';
+'@) -join '').Trim()
+
+        Kq 'S14-E22 🆕 nhận NỐT phần còn lại => phiếu Received (4|2) VA đơn Returned (4|4|6)' `
+            (($maNhanNot -eq '200') -and ($htmlNhanNot -match 'Đã NHẬN HÀNG phiếu K97E2E-RT-001') -and ($phieuSauNhanNot -eq '4|2') -and ($donSauNhanNot -eq '4|4|6')) `
+            ("HTTP " + $maNhanNot + " · Status|Goods = " + $phieuSauNhanNot + " (4|2) · don ReturnStatus|ClosureVersion|Status = " + $donSauNhanNot + " (4|4|6)")
     }
 
     # ── ⑤ LỐI VÀO TỪ TRANG ĐƠN + MỤC MENU (màn hình không vô hình) ──────────────────────────────
