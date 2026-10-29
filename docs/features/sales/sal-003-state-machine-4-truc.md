@@ -221,6 +221,8 @@ stateDiagram-v2
         E_ReturnRequested --> E_ReturnApproved : guard co quyen Orders.Return.Approve
         E_ReturnRequested --> E_ReturnRejected : guard khong du dieu kien tra
         E_ReturnApproved --> E_Returned : guard hang da ve va da hoan tien
+        E_ReturnApproved --> E_PartiallyReturned : guard nhan MOT PHAN hang hoan - SAL-006 35
+        E_PartiallyReturned --> E_Returned : guard nhan DU hang hoan - SAL-006 35
         E_Open --> E_Cancelled : guard duoc phep huy theo SAL-004
         E_ReturnRejected --> [*]
         E_Returned --> [*]
@@ -277,6 +279,8 @@ stateDiagram-v2
 | 28 | `ReturnApproved` → `Returned` | Job · Nhân viên | Hàng đã về kho **và** đã hoàn tiền (`PaymentStatus ∈ {PartiallyRefunded, Refunded}`) | — | **`0001`** |
 | 29 | `Open` → `Cancelled` | Khách (đơn chưa giao) · Nhân viên | Theo `SAL-004` (chưa giao được, đã bù trừ giữ chỗ kho) | **hấp thụ** từ đây | **`0001`** |
 | 30 | `Cancelled` / `Returned` / `ReturnRejected` → *bất kỳ* | — | **KHÔNG** — **hấp thụ** | **Bắt buộc** tạo đơn mới nếu bán lại (D10) | **`0006`** |
+| 🆕 31 | `ReturnApproved` → `PartiallyReturned` | Nhân viên kho (nhận hàng hoàn, qua `OrderReturnService`) | Phiếu trả `Approved` **và** `GoodsStatus = PartiallyReceived` (**dòng nhận một phần**) **và** đơn đang `ReturnApproved` | 🆕 `PartiallyReturned = 6` — **append ở CUỐI dải**, số `0…5` **không** đổi (`SAL-006` §35, 29/10/2026) | **`0001`** |
+| 🆕 32 | `PartiallyReturned` → `Returned` | Nhân viên kho · Job | Phiếu trả `Received` (**dòng nhận đủ** — đã nhận đủ **toàn bộ** dòng của phiếu) | `Returned` **mới** hấp thụ · `PartiallyReturned` **KHÔNG** hấp thụ · ❌ **không** huỷ được sau khi đã nhận hàng (`→ Cancelled` ⇒ `0001`) | **`0001`** / **`0006`** nếu đơn đã kết thúc khác |
 
 > ⚠️ **Trạng thái hấp thụ (absorbing):** `FulfillmentStatus.Returned`, `PaymentStatus.Refunded`,
 > `ReconciliationStatus.{Matched,Resolved,NotRequired}`, `ReturnStatus.{Returned,ReturnRejected}`,
@@ -285,6 +289,17 @@ stateDiagram-v2
 > **Quy tắc bất di bất dịch #11:** guard sai **phải NÉM LỖI có mã**, **không** no-op im lặng.
 > Ngoại lệ **duy nhất** được phép "không lỗi" là **A4** (yêu cầu trùng hợp lệ, cùng trục + cùng đích + cùng phiên bản)
 > — và khi đó **bắt buộc** có metric `sales_order_transition_duplicate_total`.
+
+> 🆕 **`S14H` (29/10/2026) — trục 4 có thêm `PartiallyReturned` (nguồn chuẩn: `SAL-006` §35).**
+> Enum `ReturnStatus.PartiallyReturned = 6` **append ở CUỐI dải** (`0…5` **không** đổi số — cột `OrdOrders.ReturnStatus`
+> lưu `int`, đổi số là **diễn giải lại lịch sử**), thêm **đúng 2 cạnh** (31, 32 ở bảng trên): **không** cạnh tắt,
+> **không** cạnh tự thân. `PartiallyReturned` **KHÔNG** phải trạng thái hấp thụ (còn đi tiếp được `→ Returned`)
+> và **không** huỷ được sau khi đã nhận hàng (đã nhận hàng thì phải TRẢ HÀNG bằng chứng từ).
+>
+> 🔑 **`OrderStatus` tổng thể KHÔNG có giá trị mới.** `Status` là **giá trị SUY RA** (D2/§4.2) ⇒ đơn đã `Delivered`
+> + `ReturnStatus = PartiallyReturned` **vẫn `Status = Completed`**. Vì vậy câu *"đã trả một phần?"* **phải** đọc ở
+> **`ReturnStatus`** (hoặc `OrderReturn.GoodsStatus` nếu nhìn phiếu) — **không** đọc ở `Status`; thêm một giá trị cho
+> *mức trả hàng* vào `OrderStatus` là **trục thứ 5 trá hình** (BR-003 cấm).
 
 ---
 

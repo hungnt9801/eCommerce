@@ -66,7 +66,7 @@
 | ~~**S15**~~ | ✅ **XONG 28/10/2026** — `StalePendingTransaction` + `TriggerRunAsync` | [`REC-001` §20](features/reconciliation/rec-001-doi-soat-thanh-toan-querydr.md) | ngưỡng **24 h** (cấu hình, `0` = TẮT) · `TriggerRunAsync` đi qua **cùng khoá** với job · **+17 unit** · **probe 30/30** (HTTP thật) | **không** (ngưỡng là cấu hình) |
 | 🟡 **S16** | **2/3 metric còn nợ** | [`XC-005` §5.1/§20](features/cross-cutting/XC-005-observability-log-metric.md) | ✅ `lock_ttl_exceeded_total` (decorator `IAbpDistributedLock` + `HandleLostToken`) · ✅ `logging_failures_total` (bọc `ILoggerProvider`) · ✅ **`messaging_dlq_replayed_total` ĐÃ ĐÓNG ở `S16b`** (replay thật, xem **§21**) | **1** (`S16b`: 3 cột + quyền mới) |
 | ~~**S17**~~ | ✅ **XONG 29/10/2026** — hợp đồng cho dịch vụ còn ở host | [`ke-hoach-tach-module` §3.1](ke-hoach-tach-module.md) | `IChannelDirectory`/`IHienThiKenhAppService` (Catalog) + `IChinhSachHanMucAppService`/`IWarehouseAppService` (Inventory) đã ở module Contracts; `WarehouseAppService` **chuyển vào module**, 3 hiện thực còn host + worker được ghim `[ExposeServices]`/lý do · **18 ca** `HopDongHostTests` · **+18 unit** | không |
-| 🟡 **S18** | UI còn thiếu + tài liệu | `WEB-001`, `§A.5` | ✅ **`/NganSach`** (S13) + nút “Chạy đối soát ngay” (S15) + `S18-N1…N5` (**E2E 145**) · ✅ **UI RMA `/TraHang`** đã xong ở `S14` phần E (`SAL-006` §32, **+14 E2E**) · ❌ còn: form Pricing/Kho quản trị, **duyệt 7 `XC-*` + 19 tài liệu** (`Q5` — cần chủ dự án) | không |
+| 🟡 **S18** | UI còn thiếu + tài liệu | `WEB-001`, `§A.5` | ✅ **`/NganSach`** (S13) + nút “Chạy đối soát ngay” (S15) + `S18-N1…N5` (**E2E 145**) · ✅ **UI RMA `/TraHang`** đã xong ở `S14` phần E (`SAL-006` §32, **+14 E2E**) · ❌ còn: form Pricing/Kho quản trị · ✅ **duyệt 7 `XC-*` + 19 tài liệu** (`Q5` — **đã duyệt 29/10/2026**, [biên bản](bien-ban-duyet-gd1-2026-10-29.md)) | không |
 | **S19** | VNPay sandbox thật | `PAY-001` | Điền `VnPay:TmnCode/HashSecret`, chạy 1 giao dịch thật | không |
 
 ### Việc **không** nên làm lại (đã chốt)
@@ -86,7 +86,7 @@
 | Q2 | `CostPrice` lấy từ đâu (nhập tay / import NCC / giá vốn bình quân)? | S12 — quyết định API và job |
 | Q3 | `StockAllotment`: phân bổ theo **kênh** hay **kênh + shop**? | ✅ **đã chốt CHỈ theo kênh** (28/10/2026, `INV-003` §21.2) |
 | Q4 | Trả hàng có **hoàn tiền tự động** hay chỉ ghi nhận? | S14 — ảnh hưởng `PaymentHub` |
-| Q5 | Duyệt tài liệu: duyệt thật hay **thoả thuận song song bằng văn bản** (`§A.5`)? | Cổng 0 |
+| Q5 | Duyệt tài liệu: duyệt thật hay **thoả thuận song song bằng văn bản** (`§A.5`)? | ✅ **đã chốt 29/10/2026: duyệt THẬT** — chủ dự án duyệt **26** tài liệu (`7` `XC-*` + `19` GĐ1): [biên bản](bien-ban-duyet-gd1-2026-10-29.md) · **Cổng 0** xanh phần tài liệu; ⚠️ **không** thay `Q6`, **không** làm `S19` xong |
 | Q6 | VNPay sandbox: cấp credential ở đâu, ai giữ? | S19 |
 
 ---
@@ -137,7 +137,7 @@ Sau đó đọc theo thứ tự:
 
 | # | Cổng | Hiện tại | Cần để XANH |
 |---|---|---|---|
-| 0 | Tài liệu GĐ1 + `XC-001…007` Approved | ❌ 1/55 | Q5 — duyệt thật hoặc thoả thuận văn bản |
+| 0 | Tài liệu GĐ1 + `XC-001…007` Approved | ✅ **26/26** trong phạm vi cổng (`27/55` toàn bộ) | **`Q5` đã chốt 29/10/2026** — chủ dự án **duyệt**: [biên bản](bien-ban-duyet-gd1-2026-10-29.md) |
 | 1 | Đặt đơn + thanh toán **1 cổng VN thật** | 🟡 FakePaymentProvider | S19 — credential + 1 giao dịch sandbox |
 | 2 | Không bán vượt tồn (2 luồng + **2 instance**) | 🟡 2 luồng ✅; **1 chốt ngân sách** ✅; **2 instance kho** ❌ | probe 2 Host cho **giữ chỗ** (không phải outbox) |
 | 3 | Không mất tiền — job đối soát phát hiện lệch | 🟢 có Run/Line/lệch **10/10** + chạy tay | tiền thật (S19) + cổng thật để đo `Stale` (`Q6`) |
@@ -235,7 +235,8 @@ Sau đó đọc theo thứ tự:
    29/10/2026** ở `S14H` (`SAL-006` **§35**, BA chốt, +7 unit + 2 E2E) ⇒ **§32.5 #1 đã đóng**. ⏳ **Còn nợ
    trong `S14`:** **ETO: cố ý không thêm** vì chưa có consumer (`§32.3`) · hoàn tiền **tự động** vẫn là `Q4`
    = *chỉ ghi nhận* (`§32.5 #4`).
-4. `S18` phần tài liệu — duyệt 7 `XC-*` + 19 tài liệu GĐ1: ⚠️ **`Q5` là quyết định của chủ dự án**.
+4. `S18` phần tài liệu — duyệt 7 `XC-*` + 19 tài liệu GĐ1: ✅ **XONG 29/10/2026** — chủ dự án
+   **duyệt** (`Q5`), xem [biên bản](bien-ban-duyet-gd1-2026-10-29.md).
 5. `S19` — VNPay sandbox thật: ⛔ **cần `VnPay:TmnCode` + `HashSecret`** (`Q6`). Không thể tự tạo credential;
    **cấm** bịa “giao dịch thật”.
 

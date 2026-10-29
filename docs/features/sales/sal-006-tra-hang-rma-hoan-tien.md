@@ -2459,6 +2459,10 @@ thêm) · nút huỷ phiếu trên UI (`§32.5 #3` — ✅ **đóng ở §34**, 
 | 4 | **`PartiallyReturned`** | 🚫 **Vẫn nợ** — cần BA chốt hợp đồng API (§32.5 #1, `SAL-003` §16) |
 | 5 | **Hoàn tiền tự động** | 🚫 **Vẫn nợ** — `Q4` = chỉ ghi nhận (§32.5 #4) |
 
+> 🆕 **Cập nhật 29/10/2026 — `S14H`, xem §35:** dòng **4** ở trên **ĐÃ ĐÓNG**. `ReturnStatus.PartiallyReturned = 6`
+> đã có (append ở cuối dải · **đúng 2 cạnh** `ReturnApproved → PartiallyReturned → Returned` · **không** `OrderStatus`
+> mới). 📌 Bảng này là **ảnh chụp `S14G`** — **giữ nguyên** để truy vết, không viết lại lịch sử; nguồn chuẩn là **§35**.
+
 ### 34.6 Lịch sử thay đổi (bổ sung)
 
 | Phiên bản | Ngày | Người | Thay đổi |
