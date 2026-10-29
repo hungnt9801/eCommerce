@@ -100,6 +100,15 @@
         <button type="submit" id="nut-tra-hang">Trả hàng</button>
     </form>
 
+    @* 🆕 `S14` phần E (`SAL-006` §32) — LỐI VÀO **MÀN HÌNH PHIẾU TRẢ (RMA)**.
+       🔑 Dùng `Url.Action` (KHÔNG viết cứng href): đổi route/controller thì link đổi theo, và `MenuDieuHuongTests`
+       cấm URL của menu bị viết cứng trong view. 📌 Nút POST ở trên là **đường cũ** (`TraHangAsync`, đi đủ ba cạnh
+       nhưng không có phiếu để duyệt/nhận/đóng); link này mở quy trình RMA **có phiếu** và có chứng từ kho. *@
+    <p class="ghichu">
+        <a id="lien-ket-phieu-tra" href="@Url.Action("Index", "TraHang", new { donId = Model.Id })">Trả hàng</a>
+        — mở <strong>phiếu trả (RMA)</strong> của đơn này: duyệt / từ chối / nhận hàng về kho / đóng / ghi nhận hoàn tiền.
+    </p>
+
     <p class="ghichu">
         Xác nhận ⇒ <strong>xuất kho</strong> (<code>OnHand</code> và <code>Reserved</code> cùng giảm, <code>Available</code> không đổi).
         Huỷ ⇒ <strong>nhả chỗ ngay</strong>. Cả hai dùng <code>IDonHangAppService</code> — cùng app service với API.

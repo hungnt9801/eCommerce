@@ -1631,6 +1631,233 @@ select count(*)::text from "ReconRunMismatches" where "Id" = 'e0000000-0000-0000
         (($maDsTt -eq '200') -and ($htmlDsTt -match 'Chạy đối soát ngay')) ("HTTP " + $maDsTt)
 
     # ══════════════════════════════════════════════════════════════════════════════════════════
+    # ⑧d 🆕 `S14` PHẦN E — MÀN HÌNH PHIẾU TRẢ HÀNG (RMA): HTTP THẬT + DB THẬT
+    # ══════════════════════════════════════════════════════════════════════════════════════════
+    # 🔑 **VÌ SAO ĐO QUA HTML + DB (không tin unit test):** `IOrderReturnAppService` đã có từ `S14B` và
+    # chứng từ kho từ `S14C`, nhưng **chưa có màn hình nào gọi nó** ⇒ *"người vận hành bấm được và trạng
+    # thái phiếu đổi THẬT"* chỉ HTTP + DB trả lời được. 📌 `200` một mình **không** chứng minh gì: phải
+    # khẳng định **neo**, **mã lỗi khi guard chặn**, và **cột `Status` trong `OrdReturns`**.
+    #
+    # 🚨 **DỮ LIỆU PROBE TẠO TRỰC TIẾP BẰNG SQL** (không qua API tạo phiếu) ⇒ ca kiểm đo **đúng** đường
+    # duyệt qua HTML, không phụ thuộc đường tạo phiếu. GUID nằm trong khối `e0000000-…` ⇒ `kiem-db.ps1`
+    # nhóm ⑥ (tự quét PK uuid) sẽ **bắt** nếu còn sót. 📌 `ReturnNumber` bắt đầu `K97E2E-RT-` để tiền đề
+    # đầu phiên (`OrdOrders.Number like 'K97E2E-%'`) cũng bắt được rác của lượt chạy trước.
+    $idDonTra = 'e0000000-0000-0000-0000-0000000000f9'
+    $idDongDonTra = 'e0000000-0000-0000-0000-0000000000fa'
+    $idPhieuTra = 'e0000000-0000-0000-0000-0000000000fd'
+    $idDongTra = 'e0000000-0000-0000-0000-0000000000fe'
+
+    # ⚠️ Dọn TRƯỚC (phòng lượt chạy trước bị kill giữa đường): thứ tự **history/lines → phiếu → đơn**;
+    # 🔒 `OrdReturnHistory` có FK `ON DELETE RESTRICT` tới `OrdReturns` ⇒ xoá phiếu trước sẽ **vi phạm FK**.
+    Invoke-Psql -Sql @'
+delete from "OrdReturnHistory" where "ReturnId" = 'e0000000-0000-0000-0000-0000000000fd';
+delete from "OrdReturnLines" where "ReturnId" = 'e0000000-0000-0000-0000-0000000000fd';
+'@ | Out-Null
+
+    Invoke-Psql -Sql @'
+delete from "OrdReturns" where "Id" = 'e0000000-0000-0000-0000-0000000000fd';
+'@ | Out-Null
+
+    Invoke-Psql -Sql @'
+delete from "OrdOrders" where "Id" = 'e0000000-0000-0000-0000-0000000000f9';
+'@ | Out-Null
+
+    # ── TIỀN ĐỀ: đơn `Delivered` + dòng đơn (đã giữ chỗ trả) + phiếu `Requested` ─────────────────
+    # 🔑 Trục kết thúc của đơn PHẢI là `ReturnRequested (1)` và `ClosureVersion = 1`: `DuyetAsync` đi qua
+    # `Order.ChuyenKetThuc` (máy trạng thái `SAL-003`) — 📌 nếu đặt `Open` thì ca `S14-E4` sẽ ĐỎ **vì tiền
+    # đề sai**, không phải vì sản phẩm hỏng.
+    TiemVaoDb -Sql @'
+insert into "OrdOrders" ("Id","TenantId","Number","ChannelCode","CustomerId","Status","PaymentStatus","Currency","Subtotal","DiscountTotal","TaxTotal","ShippingTotal","GrandTotal","ExtraProperties","ConcurrencyStamp","CreationTime","IsDeleted","FulfillmentStatus","FulfillmentVersion","PaymentVersion","ReconciliationStatus","ReconciliationVersion","ReturnStatus","ClosureVersion","IsCancelled","RowVersion")
+values ('e0000000-0000-0000-0000-0000000000f9',null,'K97E2E-RT-DON','web',null,4,2,'VND',250000,0,0,0,250000,'{}','k97e2ertdon',now(),false,5,1,0,0,0,1,1,false,0);
+'@ -KiemSql @'
+select count(*)::text from "OrdOrders" where "Id" = 'e0000000-0000-0000-0000-0000000000f9' and "ReturnStatus" = 1;
+'@ -SoDongMongDoi 1 | Out-Null
+
+    TiemVaoDb -Sql @'
+insert into "OrdOrderLines" ("Id","TenantId","OrderId","Sku","Quantity","UnitPrice","DiscountAmount","TaxAmount","CreationTime","IsDeleted","ReturnedQuantity")
+values ('e0000000-0000-0000-0000-0000000000fa',null,'e0000000-0000-0000-0000-0000000000f9','K97E2E-SKU-RT',2,125000,0,0,now(),false,2);
+'@ -KiemSql @'
+select count(*)::text from "OrdOrderLines" where "Id" = 'e0000000-0000-0000-0000-0000000000fa' and "ReturnedQuantity" = 2;
+'@ -SoDongMongDoi 1 | Out-Null
+
+    TiemVaoDb -Sql @'
+insert into "OrdReturns" ("Id","TenantId","OrderId","ReturnNumber","ChannelCode","Status","GoodsStatus","ReasonCode","ReasonText","WarehouseId","RefundMethod","RefundedAmount","RefundCurrency","RequestedByActorType","RequestedByActorId","IdempotencyKey","PayloadHash","Version","CorrelationId","ReceivedAtUtc","ClosedAtUtc","ExtraProperties","ConcurrencyStamp","CreationTime","IsDeleted")
+values ('e0000000-0000-0000-0000-0000000000fd',null,'e0000000-0000-0000-0000-0000000000f9','K97E2E-RT-001','web',0,0,'KHONG_HOP','K97E2E probe RMA','e0000000-0000-0000-0000-0000000000e6',2,0,'VND','Staff',null,'K97E2E-RT-1','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',0,'',null,null,'{}','k97e2ert',now(),false);
+'@ -KiemSql @'
+select count(*)::text from "OrdReturns" where "Id" = 'e0000000-0000-0000-0000-0000000000fd' and "Status" = 0;
+'@ -SoDongMongDoi 1 | Out-Null
+
+    TiemVaoDb -Sql @'
+insert into "OrdReturnLines" ("Id","TenantId","ReturnId","OrderLineId","Sku","Quantity","ReceivedQuantity","Disposition","UnitPriceSnapshot","DiscountAmountSnapshot","TaxAmountSnapshot","RefundAmount","LedgerEntryId","CreationTime","IsDeleted")
+values ('e0000000-0000-0000-0000-0000000000fe',null,'e0000000-0000-0000-0000-0000000000fd','e0000000-0000-0000-0000-0000000000fa','K97E2E-SKU-RT',2,0,0,125000,0,0,250000,null,now(),false);
+'@ -KiemSql @'
+select count(*)::text from "OrdReturnLines" where "Id" = 'e0000000-0000-0000-0000-0000000000fe';
+'@ -SoDongMongDoi 1 | Out-Null
+
+    # ── ① GET /TraHang (admin) ⇒ 200 + NEO + HAI form của trạng thái `Requested` ─────────────────
+    $tepTraHang = Join-Path $thuMucTam 'trahang-admin.html'
+    $maTraHang = ([string](& $curl -s -b $jar -c $jar -o $tepTraHang -w '%{http_code}' ($web + '/TraHang'))).Trim()
+    $htmlTraHang = if (Test-Path $tepTraHang) {
+        GiaiMaHtml ([System.IO.File]::ReadAllText($tepTraHang, [Text.Encoding]::UTF8))
+    } else { '' }
+
+    Kq 'S14-E1 /TraHang (admin) => 200 + neo [TRAHANG-MAN-HINH]' `
+        (($maTraHang -eq '200') -and ($htmlTraHang -match '\[TRAHANG-MAN-HINH\]')) ("HTTP " + $maTraHang)
+
+    # 🔑 Đọc **DỮ LIỆU THẬT** từ DB: mã phiếu + SỐ ĐƠN (đi qua `IDonHangAppService`, không phải GUID) ⇒
+    # chứng minh danh sách đọc `OrdReturns` + join số đơn, chứ không render trang rỗng.
+    Kq 'S14-E2 danh sách HIỆN phiếu + SỐ ĐƠN thật (đọc từ DB, không phải trang rỗng)' `
+        (($htmlTraHang -match 'K97E2E-RT-001') -and ($htmlTraHang -match 'K97E2E-RT-DON')) `
+        'ma phieu + so don deu co'
+
+    # 🚨 **HAI TRỤC PHẢI HIỆN RIÊNG** (`Status` và `GoodsStatus`) — gộp một cột là mất đúng trạng thái
+    # *"đã duyệt nhưng hàng chưa về"* (lý do tồn tại của `OrderReturn`).
+    Kq 'S14-E3 HIỆN HAI TRỤC riêng: Status = Requested · Hàng = Awaiting' `
+        (($htmlTraHang -match '>Requested<') -and ($htmlTraHang -match 'Awaiting')) `
+        'hai truc doc lap'
+
+    # 📌 Ở `Requested` chỉ có form Duyệt / Từ chối (và ghi nhận hoàn tiền) — **KHÔNG** có form Nhận hàng.
+    # 🔒 Ca này là **chiều ngược**: nếu form Nhận hàng hiện sớm thì người dùng bấm vào sẽ nhận `Sales:0010`.
+    Kq 'S14-E4 trạng thái Requested: có form Từ chối (lyDo) + hoàn tiền, CHƯA có form Nhận hàng (xuLy)' `
+        (($htmlTraHang -match 'name="lyDo"') -and ($htmlTraHang -match 'name="soTien"') -and (-not ($htmlTraHang -match 'name="xuLy"'))) `
+        'an nut theo trang thai'
+
+    $mTokenTra = [regex]::Match($htmlTraHang, 'name="__RequestVerificationToken"[^>]*value="(?<t>[^"]+)"')
+
+    if (-not $mTokenTra.Success) {
+        Kq 'S14-E5 có token chống giả mạo trên /TraHang' $false 'KHONG co token ⇒ khong POST duoc'
+        Kq 'S14-E6 POST duyệt => DB OrdReturns.Status = 1' $false 'bo qua vi thieu token'
+        Kq 'S14-E7 máy trạng thái đơn: ReturnStatus = 2 · ClosureVersion = 2' $false 'bo qua vi thieu token'
+        Kq 'S14-E8 POST duyệt LẦN HAI => hiện mã eCommerce:Sales:0010 (không 500)' $false 'bo qua vi thieu token'
+        Kq 'S14-E9 🚨 guard KHÔNG nuốt: DB vẫn 1|1 sau lần duyệt thứ hai' $false 'bo qua vi thieu token'
+        Kq 'S14-E10 sau duyệt: form Nhận hàng hiện đủ 3 cách xử lý' $false 'bo qua vi thieu token'
+        Kq 'S14-E11 POST nhận hàng => DB dòng trả đổi thật' $false 'bo qua vi thieu token'
+        Kq 'S14-E12 🚨 hàng CHƯA về đủ: đơn VẪN ReturnApproved' $false 'bo qua vi thieu token'
+    }
+    else {
+        Kq 'S14-E5 có token chống giả mạo trên /TraHang' $true 'token that tu trang'
+        $tokenTra = $mTokenTra.Groups['t'].Value
+
+        # ── ② POST DUYỆT QUA FORM THẬT ⇒ 200 sau redirect + DB ĐỔI THẬT ─────────────────────────
+        $tepDuyet = Join-Path $thuMucTam 'trahang-duyet.html'
+        $maDuyet = ([string](& $curl -s -b $jar -c $jar -L -o $tepDuyet -w '%{http_code}' `
+            --data-urlencode ("__RequestVerificationToken=" + $tokenTra) `
+            --data-urlencode ("id=" + $idPhieuTra) `
+            --data-urlencode ("donId=" + $idDonTra) `
+            ($web + '/TraHang/Duyet'))).Trim()
+
+        $htmlDuyet = if (Test-Path $tepDuyet) {
+            GiaiMaHtml ([System.IO.File]::ReadAllText($tepDuyet, [Text.Encoding]::UTF8))
+        } else { '' }
+
+        # 🔒 ĐO BẰNG DB, KHÔNG TIN HTML: `200` + thông báo chỉ chứng minh **trang chạy**.
+        $statusPhieu = (@(Invoke-Psql -Sql @'
+select "Status"::text || '|' || "Version"::text from "OrdReturns" where "Id" = 'e0000000-0000-0000-0000-0000000000fd';
+'@) -join '').Trim()
+
+        Kq 'S14-E6 POST duyệt => DB OrdReturns.Status = 1 · Version = 1' `
+            (($maDuyet -eq '200') -and ($htmlDuyet -match 'Đã DUYỆT phiếu K97E2E-RT-001') -and ($statusPhieu -eq '1|1')) `
+            ("HTTP " + $maDuyet + " · Status|Version = " + $statusPhieu + " (mong doi 1|1)")
+
+        # 🔑 **ĐO MÁY TRẠNG THÁI ĐƠN** — nếu `DuyetAsync` chỉ đổi phiếu mà không đi qua `Order.ChuyenKetThuc`
+        # thì `ReturnStatus`/`ClosureVersion` sẽ đứng yên ⇒ ca này ĐỎ (đúng thứ `SAL-003` muốn khoá).
+        $trucDon = (@(Invoke-Psql -Sql @'
+select "ReturnStatus"::text || '|' || "ClosureVersion"::text from "OrdOrders" where "Id" = 'e0000000-0000-0000-0000-0000000000f9';
+'@) -join '').Trim()
+
+        Kq 'S14-E7 máy trạng thái đơn: ReturnStatus = 2 (ReturnApproved) · ClosureVersion = 2' `
+            ($trucDon -eq '2|2') ("ReturnStatus|ClosureVersion = " + $trucDon + " (mong doi 2|2)")
+
+        # ── ③ CHIỀU NGƯỢC: DUYỆT LẦN HAI ⇒ HIỆN ĐÚNG MÃ, KHÔNG 500, KHÔNG GHI THÊM ──────────────
+        # 🚨 Đây là ca chứng minh **controller bắt `BusinessException`** (yêu cầu của `S14E`): cùng một POST
+        # lần hai ⇒ `OrderReturn.Duyet` ném `Sales:0010`; nếu controller **nuốt** thì status/version vẫn đổi,
+        # nếu để rơi thì `500`. 🔒 Ta khẳng định **cả hai**: HTML có mã, DB **không đổi**.
+        $tepDuyet2 = Join-Path $thuMucTam 'trahang-duyet-2.html'
+        $maDuyet2 = ([string](& $curl -s -b $jar -c $jar -L -o $tepDuyet2 -w '%{http_code}' `
+            --data-urlencode ("__RequestVerificationToken=" + $tokenTra) `
+            --data-urlencode ("id=" + $idPhieuTra) `
+            --data-urlencode ("donId=" + $idDonTra) `
+            ($web + '/TraHang/Duyet'))).Trim()
+
+        $htmlDuyet2 = if (Test-Path $tepDuyet2) {
+            GiaiMaHtml ([System.IO.File]::ReadAllText($tepDuyet2, [Text.Encoding]::UTF8))
+        } else { '' }
+
+        Kq 'S14-E8 POST duyệt LẦN HAI => hiện mã eCommerce:Sales:0010 (không 500)' `
+            (($maDuyet2 -eq '200') -and ($htmlDuyet2 -match 'eCommerce:Sales:0010')) `
+            ("HTTP " + $maDuyet2)
+
+        $statusPhieu2 = (@(Invoke-Psql -Sql @'
+select "Status"::text || '|' || "Version"::text from "OrdReturns" where "Id" = 'e0000000-0000-0000-0000-0000000000fd';
+'@) -join '').Trim()
+
+        Kq 'S14-E9 🚨 guard KHÔNG nuốt: DB vẫn 1|1 sau lần duyệt thứ hai' `
+            ($statusPhieu2 -eq '1|1') ("Status|Version = " + $statusPhieu2 + " (mong doi 1|1)")
+
+        # ── ④ SAU DUYỆT: form NHẬN HÀNG phải xuất hiện (đúng trạng thái) ─────────────────────────
+        $trangSauDuyet = TaiTrang -DuongDan ("/TraHang?donId=" + $idDonTra) -TepLuu (Join-Path $thuMucTam 'trahang-sau-duyet.html')
+        $htmlSauDuyet = GiaiMaHtml $trangSauDuyet.Html
+
+        Kq 'S14-E10 sau duyệt: form Nhận hàng hiện đủ 3 cách xử lý (Restock/Damaged/ReturnToSupplier)' `
+            (($trangSauDuyet.Ma -eq '200') -and ($htmlSauDuyet -match 'name="dongTraId"') -and ($htmlSauDuyet -match 'name="xuLy"') -and ($htmlSauDuyet -match 'value="Restock"') -and ($htmlSauDuyet -match 'value="Damaged"') -and ($htmlSauDuyet -match 'value="ReturnToSupplier"')) `
+            ("HTTP " + $trangSauDuyet.Ma)
+
+        # ── ⑤ POST NHẬN HÀNG QUA FORM THẬT (đường GHI thứ hai) ────────────────────────────────
+        # 🔒 Chọn `Damaged` + nhận **1/2** — hai lý do CÓ Ý:
+        #   ① `Damaged` **KHÔNG** nhập kho ⇒ ca kiểm không phụ thuộc `ICustomerReturnGateway`/tồn kho
+        #      (đo đúng **đường UI → app service → entity**, không lẫn side effect kho);
+        #   ② nhận **một phần** ⇒ khẳng định `GoodsStatus = PartiallyReceived (1)` và đơn **KHÔNG** sang
+        #      `Returned` — bất biến *"hàng chưa về đủ thì chưa phải đã trả"*.
+        # 📌 Ca này cũng là phép đo **binding danh sách lặp** (`dongTraId`/`soLuongNhan`/`xuLy`) — 🔑 nếu
+        # binder ghép lệch thứ tự thì DB sẽ cho `ReceivedQuantity`/`Disposition` sai và ca này ĐỎ.
+        $tepNhan = Join-Path $thuMucTam 'trahang-nhan-hang.html'
+        $maNhan = ([string](& $curl -s -b $jar -c $jar -L -o $tepNhan -w '%{http_code}' `
+            --data-urlencode ("__RequestVerificationToken=" + $tokenTra) `
+            --data-urlencode ("id=" + $idPhieuTra) `
+            --data-urlencode ("donId=" + $idDonTra) `
+            --data-urlencode ("dongTraId=" + $idDongTra) `
+            --data-urlencode 'soLuongNhan=1' `
+            --data-urlencode 'xuLy=Damaged' `
+            ($web + '/TraHang/NhanHang'))).Trim()
+
+        $htmlNhan = if (Test-Path $tepNhan) {
+            GiaiMaHtml ([System.IO.File]::ReadAllText($tepNhan, [Text.Encoding]::UTF8))
+        } else { '' }
+
+        $dongTraSau = (@(Invoke-Psql -Sql @'
+select "ReceivedQuantity"::text || '|' || "Disposition"::text from "OrdReturnLines" where "Id" = 'e0000000-0000-0000-0000-0000000000fe';
+'@) -join '').Trim()
+
+        Kq 'S14-E11 POST nhận hàng => DB dòng trả: ReceivedQuantity = 1 · Disposition = 2 (Damaged)' `
+            (($maNhan -eq '200') -and ($htmlNhan -match 'Đã NHẬN HÀNG phiếu K97E2E-RT-001') -and ($dongTraSau -eq '1|2')) `
+            ("HTTP " + $maNhan + " · ReceivedQuantity|Disposition = " + $dongTraSau + " (mong doi 1|2)")
+
+        $sauNhanMotPhan = (@(Invoke-Psql -Sql @'
+select "Status"::text || '|' || "GoodsStatus"::text from "OrdReturns" where "Id" = 'e0000000-0000-0000-0000-0000000000fd';
+'@) -join '').Trim()
+
+        $donSauNhanMotPhan = (@(Invoke-Psql -Sql @'
+select "ReturnStatus"::text from "OrdOrders" where "Id" = 'e0000000-0000-0000-0000-0000000000f9';
+'@) -join '').Trim()
+
+        Kq 'S14-E12 🚨 hàng CHƯA về đủ: phiếu Approved|PartiallyReceived, đơn VẪN ReturnApproved (2)' `
+            (($sauNhanMotPhan -eq '1|1') -and ($donSauNhanMotPhan -eq '2')) `
+            ("Status|Goods = " + $sauNhanMotPhan + " (mong doi 1|1) · don ReturnStatus = " + $donSauNhanMotPhan + " (2)")
+    }
+
+    # ── ⑤ LỐI VÀO TỪ TRANG ĐƠN + MỤC MENU (màn hình không vô hình) ──────────────────────────────
+    # 🔑 `Url.Action` sinh link ở **HTML thật**: đó là bằng chứng *"bấm được từ trang đơn"*, khác hẳn
+    # *"trong mã có chuỗi /TraHang"*. ⚠️ Đơn `e2` đã gieo ở bước ② và có sẵn trang chi tiết.
+    $idDonUiTra = 'e0000000-0000-0000-0000-0000000000e2'
+    $htmlDonCoLink = GiaiMaHtml (TaiTrang -DuongDan ('/DonHang/ChiTiet/' + $idDonUiTra) -TepLuu (Join-Path $thuMucTam 'donhang-chitiet-s14.html')).Html
+
+    Kq 'S14-E13 trang chi tiết đơn có LỐI VÀO /TraHang?donId=<đơn> (Url.Action, không href cứng)' `
+        ($htmlDonCoLink -match ('/TraHang\?donId=' + $idDonUiTra)) 'link sinh tu Url.Action'
+
+    Kq 'S14-E14 MENU (trang chủ) có mục /TraHang (màn hình không vô hình)' `
+        ($khoiMenu -match '/TraHang') ("khoi menu {0} ky tu" -f $khoiMenu.Length)
+
+    # ══════════════════════════════════════════════════════════════════════════════════════════
     # ⑨ 🆕 `S8` — THANH TOAN **END-TO-END** TOI TRANG KET QUA (don -> giao dich -> cong -> IPN -> ket qua)
     # ══════════════════════════════════════════════════════════════════════════════════════════
     # 🔒 Chuoi duoc do **dung nhu nguoi dung di**: POST form co token that → `302` sang **cong** →
@@ -1891,6 +2118,42 @@ delete from "OrdOrderLines" where "OrderId" in (select "Id" from "OrdOrders" whe
 delete from "OrdOrders" where "Number" like 'WEB-K97E2E%';
 '@ | Out-Null
 
+        # 🆕 `S14` — dọn **phiếu trả (RMA) probe**.
+        # 🔒 **THỨ TỰ KHOÁ BẮT BUỘC:** `OrdReturnHistory`/`OrdReturnLines` có FK `ON DELETE RESTRICT` tới
+        # `OrdReturns` ⇒ xoá phiếu trước sẽ **vi phạm khoá ngoại** (và bỏ lại rác làm `kiem-db.ps1` nhóm ⑥
+        # đỏ ở **lần chạy sau** vì lý do vô hình). 📌 Đơn probe xoá sau cùng (FK `CASCADE` từ đơn → dòng đơn).
+        Invoke-Psql -Sql @'
+delete from "OrdReturnHistory" where "ReturnId" = 'e0000000-0000-0000-0000-0000000000fd';
+'@ | Out-Null
+
+        Invoke-Psql -Sql @'
+delete from "OrdReturnLines" where "ReturnId" = 'e0000000-0000-0000-0000-0000000000fd';
+'@ | Out-Null
+
+        Invoke-Psql -Sql @'
+delete from "OrdReturns" where "Id" = 'e0000000-0000-0000-0000-0000000000fd';
+'@ | Out-Null
+
+        # 🚨 **SỰ KIỆN OUTBOX/INBOX DO `DuyetAsync` SINH RA** (`Order.ChuyenKetThuc` ⇒ `OrderStatusChangedEto`).
+        # 🔑 `EventData` là `bytea` ⇒ phải `encode(...,'escape')` mới đọc được GUID đơn probe bên trong.
+        # 📌 Không dọn thì `probe-outbox.ps1` (bước ⑭) có thể thấy `AbpEventOutbox > 0` ở **tiền đề O00**
+        # và đỏ vì một lý do **không liên quan** tới outbox.
+        Invoke-Psql -Sql @'
+delete from "AbpEventOutbox" where encode("EventData",'escape') like '%e0000000-0000-0000-0000-0000000000f9%';
+'@ | Out-Null
+
+        Invoke-Psql -Sql @'
+delete from "AbpEventInbox" where encode("EventData",'escape') like '%e0000000-0000-0000-0000-0000000000f9%';
+'@ | Out-Null
+
+        Invoke-Psql -Sql @'
+delete from "OrdOrderLines" where "OrderId" = 'e0000000-0000-0000-0000-0000000000f9';
+'@ | Out-Null
+
+        Invoke-Psql -Sql @'
+delete from "OrdOrders" where "Id" = 'e0000000-0000-0000-0000-0000000000f9';
+'@ | Out-Null
+
         Invoke-Psql -Sql @'
 delete from "CusDataExportLogs" where "CustomerId" = 'e0000000-0000-0000-0000-0000000000e1';
 '@ | Out-Null
@@ -2056,7 +2319,35 @@ select count(*)::text from "PrcCostPrices" where "Id" = 'e0000000-0000-0000-0000
 
         Write-Output ("   DON DEP (S12): gia von probe con={0} (0)" -f $conGiaVon)
 
-        if ($con -ne '0' -or $conKho -ne '0' -or $baoMat -ne 'True' -or $conHanMuc -ne '0' -or $conLuot -ne '0' -or $conDongLech -ne '0' -or $conGiaoDich -ne '0' -or $conCatalog -ne '0' -or $conTon -ne '0' -or $conLechProbe -ne '0' -or $conGiaVon -ne '0') {
+        # 🆕 `S14` — đếm lại **phiếu trả (RMA) probe** + sự kiện outbox/inbox của đơn probe.
+        # 🔒 "Tin là đã dọn" là đúng loại lỗi mà `ham-tiem.ps1` sinh ra để chống ⇒ **đếm lại = 0**.
+        $conPhieuTra = (@(Invoke-Psql -Sql @'
+select count(*)::text from "OrdReturns" where "Id" = 'e0000000-0000-0000-0000-0000000000fd';
+'@) -join '').Trim()
+
+        $conDongTra = (@(Invoke-Psql -Sql @'
+select count(*)::text from "OrdReturnLines" where "ReturnId" = 'e0000000-0000-0000-0000-0000000000fd';
+'@) -join '').Trim()
+
+        $conLichSuTra = (@(Invoke-Psql -Sql @'
+select count(*)::text from "OrdReturnHistory" where "ReturnId" = 'e0000000-0000-0000-0000-0000000000fd';
+'@) -join '').Trim()
+
+        $conDonTra = (@(Invoke-Psql -Sql @'
+select count(*)::text from "OrdOrders" where "Id" = 'e0000000-0000-0000-0000-0000000000f9';
+'@) -join '').Trim()
+
+        $conOutboxTra = (@(Invoke-Psql -Sql @'
+select count(*)::text from "AbpEventOutbox" where encode("EventData",'escape') like '%e0000000-0000-0000-0000-0000000000f9%';
+'@) -join '').Trim()
+
+        $conInboxTra = (@(Invoke-Psql -Sql @'
+select count(*)::text from "AbpEventInbox" where encode("EventData",'escape') like '%e0000000-0000-0000-0000-0000000000f9%';
+'@) -join '').Trim()
+
+        Write-Output ("   DON DEP (S14): phieu tra probe con={0} (0) · dong tra con={1} (0) · lich su tra con={2} (0) · don tra con={3} (0) · outbox/inbox cua don tra con={4}/{5} (0/0)" -f $conPhieuTra, $conDongTra, $conLichSuTra, $conDonTra, $conOutboxTra, $conInboxTra)
+
+        if ($con -ne '0' -or $conKho -ne '0' -or $baoMat -ne 'True' -or $conHanMuc -ne '0' -or $conLuot -ne '0' -or $conDongLech -ne '0' -or $conGiaoDich -ne '0' -or $conCatalog -ne '0' -or $conTon -ne '0' -or $conLechProbe -ne '0' -or $conGiaVon -ne '0' -or $conPhieuTra -ne '0' -or $conDongTra -ne '0' -or $conLichSuTra -ne '0' -or $conDonTra -ne '0' -or $conOutboxTra -ne '0' -or $conInboxTra -ne '0') {
             Write-Output '   🚨 DON DEP KHONG DAY DU ⇒ lan chay sau co the XANH VI DU LIEU CU.'
         }
     }

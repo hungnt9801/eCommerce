@@ -2169,3 +2169,101 @@ ta sẽ **gỡ nó ra** thay vì **sửa nó** (🔒 đúng số phận của m�
 |---|---|---|---|
 | v0.7 | 28/10/2026 | *(agent, session GĐ1 — `S14` phần D)* | **Xoá cạnh tắt `Open → Returned`** + migrate `TraHangAsync` đi đủ ba cạnh; test khẳng định **hai chiều** (gọi tắt bị chặn · đi đủ ⇒ `ClosureVersion = 3`). Không đổi migration/NND/quyền |
 
+---
+
+## 32. TRẠNG THÁI — **`S14` PHẦN E: UI RMA + ĐO HTTP THẬT** (29/10/2026)
+
+> 🎯 **Phạm vi phần E:** biến API của phần B/C thành **đường chạy có người bấm** — màn hình `/TraHang`,
+> lối vào từ trang đơn, mục menu — rồi **đo bằng HTTP + DB thật**, không bằng lời khai.
+>
+> 🔒 **Không đổi:** lược đồ · migration (**49**) · NND (**64**) · quyền (**71**) · route/DTO của API RMA.
+> 🚫 **Không** thêm trạng thái `PartiallyReturned` (cần BA chốt hợp đồng — xem §32.5).
+
+### 32.1 Đã làm
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| 1 | **`TraHangController`** (`src/eCommerce.Web/Controllers/`) | `GET /TraHang?donId=` qua `IOrderReturnAppService.GetListAsync`; 5 hành động `POST` (`Duyet`, `TuChoi`, `NhanHang`, `Dong`, `GhiNhanHoanTien`) đều có `[ValidateAntiForgeryToken]`. 🚨 **Bắt `BusinessException`** và hiện **đúng mã** (`eCommerce:Sales:0010/0011`, `eCommerce:Lock:0001`) — **không** để thành `500`, và **không** có nhánh bắt-rồi-ghi-tiếp (không nuốt guard) |
+| 2 | **`Views/TraHang/Index.cshtml`** | Danh sách: mã phiếu · **số đơn** (đọc qua `IDonHangAppService`, không phải GUID) · kênh · `Status` · `GoodsStatus` · tiền đã hoàn · số dòng. ➕ khối "Xử lý phiếu" theo **đúng trạng thái**: `Requested` ⇒ Duyệt/Từ chối (lý do **bắt buộc**); `Approved` ⇒ **Nhận hàng** (mỗi dòng: số nhận + `Restock\|Damaged\|ReturnToSupplier`); `Received` ⇒ Đóng; còn mở ⇒ Ghi nhận hoàn tiền. 🔒 Nút ẩn theo quyền (`IAuthorizationService`) — **không** phải lớp bảo vệ, app service vẫn cưỡng chế |
+| 3 | **Lối vào từ trang đơn** | `Views/DonHang/ChiTiet.cshtml`: link "Trả hàng" ⇒ `@Url.Action("Index", "TraHang", new { donId = Model.Id })` (**không** viết cứng `href` — `MenuDieuHuongTests` cấm URL menu viết cứng trong view) |
+| 4 | **Mục menu** "Phiếu trả hàng" trong nhóm **Vận hành** | `QuyenCanCo = eCommerceConsts.Permissions.Orders.Default` (quyền **đọc** đã có từ `SAL-003`) — **không** thêm quyền |
+| 5 | **Neo ASCII + lưới test** | `[TRAHANG-MAN-HINH]` nằm **ngoài** chú thích Razor; thêm vào `ViewAnchorTests.BangNeo` ⇒ thiếu neo là test **ĐỎ** |
+| 6 | **`S14` trong `tools/kiem-e2e.ps1`** | **14 ca** `S14-E1…E14` (xem §32.2), dựng dữ liệu probe **bằng SQL** (`e0000000-…-f9/fa/fd/fe`, `ReturnNumber = K97E2E-RT-001`) và dọn **đầy đủ** trong `finally` (dòng trả → phiếu trả → dòng đơn → đơn, ➕ nhật ký phiếu & outbox/inbox của đơn probe) |
+
+📌 **Vì sao UI là điều kiện để `S14` có nghĩa:** phần B/C đã có service + chứng từ kho, nhưng **chưa có màn hình nào gọi** ⇒
+không ai duyệt/nhận/đóng phiếu ⇒ *"trả hàng"* trên sản phẩm vẫn chỉ là **một nút POST cũ**. Cùng loại nợ đã gặp ở
+`INV-003` §16.6, `REC-001` §18 và `S13` — **đường ghi đúng mà không có lối vào thì không giải quyết được vấn đề
+mà nó sinh ra để giải quyết.**
+
+### 32.2 ✅ Bằng chứng đo được (HTTP thật + DB thật, không tin HTML)
+
+Chạy `pwsh -File tools\kiem-e2e.ps1` (admin `$jar` + token thật từ chính trang):
+
+| Ca | Đo cái gì | Kết quả |
+|---|---|---|
+| `S14-E1` | `GET /TraHang` (admin) | **`200`** + neo `[TRAHANG-MAN-HINH]` |
+| `S14-E2` | Danh sách đọc **DB thật** (mã phiếu + **số đơn** qua app service) | có `K97E2E-RT-001` · `K97E2E-RT-DON` |
+| `S14-E3` | **Hai trục hiện riêng** | `Status = Requested` · hàng `Awaiting` |
+| `S14-E4` | **Chiều ngược**: `Requested` **chưa** có form Nhận hàng (chỉ `lyDo`/`soTien`) | đúng — không mời bấm sai |
+| `S14-E5` | Token chống giả mạo đọc từ **chính trang** | có |
+| `S14-E6` | **`POST /TraHang/Duyet`** ⇒ `200` sau redirect **và DB** | `OrdReturns.Status = 1` · `Version = 1` |
+| `S14-E7` | **Máy trạng thái đơn** chạy thật (không gán tay) | `OrdOrders.ReturnStatus = 2` · `ClosureVersion = 2` |
+| `S14-E8` | **Duyệt lần hai** ⇒ hiện **đúng mã** thay vì `500` | HTML có `eCommerce:Sales:0010` |
+| `S14-E9` | 🚨 Guard **không bị nuốt**: lần hai **không ghi gì** | DB vẫn `1\|1` |
+| `S14-E10` | Sau duyệt: form Nhận hàng hiện **3 cách xử lý** | `Restock` · `Damaged` · `ReturnToSupplier` |
+| `S14-E11` | **`POST /TraHang/NhanHang`** (1/2, `Damaged`) ⇒ DB dòng trả | `ReceivedQuantity = 1` · `Disposition = 2` |
+| `S14-E12` | 🚨 Hàng **chưa về đủ** ⇒ phiếu `Approved\|PartiallyReceived`, đơn **vẫn** `ReturnApproved` | `1\|1` · đơn `2` |
+| `S14-E13` | Lối vào từ **trang đơn** | HTML có `/TraHang?donId=<guid>` (sinh từ `Url.Action`) |
+| `S14-E14` | **Mục menu** trên trang chủ | khối menu có `/TraHang` |
+
+| Phép đo | Kết quả |
+|---|---|
+| E2E (HTML thật) | **145 → 159** (+14 ca `S14-E*`) |
+| Unit | **1612** (không đổi — `ViewAnchorTests` thêm **một dòng** vào bảng neo, không thêm ca) |
+| Integration | **87** (không đổi — không chạm lược đồ) |
+| Bất biến DB | **25/25** · **NND 64** · **71** quyền · **99** chỗ quét — **không đổi** |
+| Migration | **49** (không đổi) |
+| Cổng đầy đủ | **exit 0 · 15/15 bước · 360.1s** |
+| Dọn dẹp probe | `OrdReturns/OrdReturnLines/OrdReturnHistory/OrdOrders` của probe = **0** · outbox/inbox của đơn probe = **0/0** |
+
+🔑 **Vì sao phải đo DB (không tin `200`):** một controller **nuốt** `BusinessException` vẫn trả `200` + thông báo;
+một controller **bỏ qua** app service vẫn trả `200`. Chỉ cột `Status`/`Version` trong `OrdReturns` và
+`ReturnStatus`/`ClosureVersion` trong `OrdOrders` mới trả lời *"lệnh bấm có tác dụng thật không"*.
+
+### 32.3 Quyết định **ETO**: **KHÔNG thêm** (`OrderReturnRequestedEto` …)
+
+| Câu hỏi | Trả lời đo được |
+|---|---|
+| Có ai **nghe** sự kiện của phiếu trả chưa? | **Không.** `grep` toàn repo: **0** khai báo `OrderReturn*Eto`, **0** handler cho phiếu trả. Consumer **duy nhất** liên quan trong `Sales` là `OrderStatusMetricHandler` — nó nghe `OrderStatusChangedEto` |
+| Vậy thay đổi trạng thái RMA có **được phát** đi không? | **Có, rồi.** Mọi chuyển dịch của phiếu đều đi qua `Order.ChuyenKetThuc` ⇒ `OrderStatusChangedEto` đã được phát **trong cùng transaction** (qua outbox), kèm `Axis = Closure`, `from/to` và `OrderId`. 📌 Thêm ETO riêng cho phiếu trả là **bản sao thứ hai** của cùng sự thật |
+| Thêm bây giờ thì được gì? | **Không gì.** Đúng lập luận đã ghi ở §29.3 #2/§30.3 #1: *sự kiện không có người nghe là tăng bề mặt vô ích* — nó còn **đánh lừa** người đọc tài liệu rằng đã có tích hợp |
+| Khi nào **phải** thêm? | Khi có **consumer thật** đầu tiên (email/thông báo khách, WMS, kế toán, `PaymentHub` hoàn tiền tự động). Lúc đó thêm ETO + outbox + inbox idempotent **trong cùng lát cắt với consumer** — không thêm trước |
+
+### 32.4 🐞 Hai phát hiện khi làm phần E — **ghi lại, CHƯA sửa** (đọc mã, chưa đo bằng HTTP)
+
+| # | Phát hiện | Hệ quả | Vì sao chưa sửa trong lát cắt này |
+|---|---|---|---|
+| 1 | `OrderReturnService.NhanHangAsync` tính `GoodsStatus` **chỉ trên các dòng có trong lần gọi** (`ketQua.All(...)`), không so với **toàn bộ** dòng của phiếu | Gọi **lẻ từng dòng** (đủ số cho dòng đó) có thể kết luận `Received` ⇒ phiếu `Received` ⇒ **đơn sang `Returned`** trong khi dòng khác **chưa về**. 📌 UI đã **gửi cả phiếu trong một lần** để không chạm lỗi này, nhưng **API** vẫn mở | Sửa là **đổi nghiệp vụ** (`GoodsStatus` phải tính trên toàn phiếu) + test + có thể chạm `PartiallyReturned` ⇒ cần BA chốt cùng §32.5 #1 |
+| 2 | `OrderReturnLine.GhiNhanHang` cho phép `ReceivedQuantity = 0` **kèm** `Disposition` khác `Unset`, nhưng DB có `CHECK CK_OrdReturnLines_Disposition_ChiSauKhiNhan ("Disposition" = 0 OR "ReceivedQuantity" > 0)` | Gọi API với `0` + `Restock` ⇒ entity **nhận**, DB **từ chối** ⇒ `DbUpdateException` → **`500`** (không phải mã nghiệp vụ) | UI đã **chặn ở biên** (`min=1` + pre-check, trả câu giải thích) ⇒ không lộ ra qua màn hình; sửa gốc (guard `Sales:0010` **hoặc** cho phép `0` + `Unset`) là quyết định nghiệp vụ, không phải sửa UI |
+
+📌 **Không** sửa test/guard để "cho xanh": cả hai đều **không** ảnh hưởng 14 ca `S14-E*` (chúng đi đúng đường
+*"cả phiếu, số nhận ≥ 1"*) và được ghi ở đây để phiên sau **không** tưởng đã xong.
+
+### 32.5 ⏳ Còn nợ
+
+| # | Thiếu | Ghi chú |
+|---|---|---|
+| 1 | **Trạng thái `PartiallyReturned`** ở cấp đơn | Vẫn là nợ **cần BA chốt hợp đồng API** (`SAL-003` §16 · §31.3 #4). 🚫 Không tự thêm |
+| 2 | **ETO phiếu trả** | Cố ý **không** làm (§32.3) — thêm khi có consumer thật |
+| 3 | **Nút HUỶ phiếu trên UI** | `HuyAsync` **đã có** trong API/service; màn hình phần E có **5 hành động theo phạm vi** (duyệt/từ chối/nhận/đóng/hoàn tiền) ⇒ huỷ phiếu **chưa có lối vào**. 📌 Nếu BA cần, thêm **một form** — không đổi API |
+| 4 | **Hoàn tiền TỰ ĐỘNG** | Vẫn **`Q4` = chỉ ghi nhận** (§28.2); đường gọi cổng là `PAY-001` + lát cắt `S14b` |
+| 5 | **Hai phát hiện §32.4** | Cần quyết định + lát cắt nhỏ (service + CHECK) — **không** gộp vào UI |
+| 6 | **Replay DLQ** | **Không liên quan** `S14`: replay là nợ của `Messaging`/`XC-005` (`messaging_dlq_replayed_total`), không có luồng RMA nào cần replay riêng |
+
+### 32.6 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.8 | 29/10/2026 | *(agent, session GĐ1 — `S14` phần E)* | **UI RMA**: `/TraHang` (danh sách + 5 hành động theo trạng thái), link từ trang đơn (`Url.Action`), mục menu nhóm Vận hành (`Orders` đọc), neo `[TRAHANG-MAN-HINH]` + `ViewAnchorTests`. **+14 ca E2E** (`S14-E1…E14`) đo HTTP + **DB**: duyệt ⇒ `OrdReturns.Status = 1`/`Version = 1` + đơn `ReturnStatus = 2`/`ClosureVersion = 2`; duyệt lần hai ⇒ `eCommerce:Sales:0010` + DB **không đổi**; nhận hàng 1/2 `Damaged` ⇒ dòng trả `1\|2`, đơn **vẫn** `ReturnApproved`. **ETO: KHÔNG thêm** (không có consumer — chuyển trạng thái RMA đã phát qua `OrderStatusChangedEto`). **0** schema/migration/quyền. Ghi **2 phát hiện** + **5 nợ** (§32.4/§32.5) |
+
+

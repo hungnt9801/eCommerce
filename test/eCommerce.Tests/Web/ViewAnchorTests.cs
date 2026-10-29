@@ -62,7 +62,12 @@ public class ViewAnchorTests
         ("Views/GiaVon/Index.cshtml", "[GIAVON-MAN-HINH]"),
         // 🆕 `S18` — TRANG **NGÂN SÁCH TỒN THEO KÊNH**. 🔑 Neo khẳng định trang **render**; E2E `S18-N1…N5`
         // đo thêm: ẩn danh bị chặn, POST form ghi thật, và nút "Chạy đối soát ngay" có lối vào.
-        ("Views/NganSach/Index.cshtml", "[NGANSACH-MAN-HINH]")
+        ("Views/NganSach/Index.cshtml", "[NGANSACH-MAN-HINH]"),
+        // 🆕 `S14` phần E (`SAL-006` §32) — MÀN HÌNH **PHIẾU TRẢ HÀNG (RMA)**. 🔑 Neo khẳng định trang render
+        // **và** là trang RMA (E2E `S14-E*` dựa vào nó để phân biệt với một trang khác trả `200`).
+        // ⚠️ Neo **phải** nằm ngoài `@* … *@` — nếu chỉ nằm trong chú thích thì Razor KHÔNG render và người
+        // dùng không thấy gì (đúng lỗi `91/2025/QH15` mà file này sinh ra để chặn).
+        ("Views/TraHang/Index.cshtml", "[TRAHANG-MAN-HINH]")
     ];
 
     [Fact]

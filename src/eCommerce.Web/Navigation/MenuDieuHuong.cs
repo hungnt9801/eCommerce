@@ -156,6 +156,18 @@ public static class MenuDieuHuong
                     // 📌 Quyền hẹp hơn `Pricing.Default`: người chỉ có quyền xem giá bán **không** thấy mục này.
                     QuyenCanCo = eCommerce.Pricing.PricingPermissions.CostPriceView,
                     MoTa = "Giá vốn theo SKU và kỳ (chỉ đọc · không hiển thị cho người mua)"
+                },
+                new()
+                {
+                    Nhan = "Phiếu trả hàng",
+                    Url = "/TraHang",
+                    // 🆕 `S14` phần E (`SAL-006` §32) — `TraHangController` gọi `IOrderReturnAppService`:
+                    // đọc `GetListAsync` = `[Authorize(Orders.Default)]` **cấp class**; duyệt/từ chối/hoàn tiền
+                    // = `Orders.Return.Approve`; nhận/đóng = `Orders.Manage`. ⇒ Menu khai quyền **đọc** (mở được
+                    // trang); nút ghi **tự chặn** nếu thiếu quyền, và **ẩn** theo `IAuthorizationService`.
+                    // ⚠️ Không có quyền mới: RMA dùng đúng 4 quyền đã seed từ `SAL-003`/`S14`.
+                    QuyenCanCo = eCommerceConsts.Permissions.Orders.Default,
+                    MoTa = "Phiếu trả (RMA): duyệt, nhận hàng về kho, đóng, ghi nhận hoàn tiền"
                 }
             ]
         }
