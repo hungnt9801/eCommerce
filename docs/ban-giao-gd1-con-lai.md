@@ -2,6 +2,8 @@
 
 > **Lập ngày:** 28/10/2026 · **Cập nhật:** 29/10/2026 (sau `S12` + `S13` + `S14` A–H + `S15` + `S17` + `S16` + `S16b`) · **Cây:** `main` (sạch) · **Người lập:** phiên tự động
 >
+> 📄 **BÀN GIAO HIỆN HÀNH (sau `S12…S18`):** [`ban-giao-s19-va-con-lai-2026-10-29.md`](ban-giao-s19-va-con-lai-2026-10-29.md) — dùng bản đó cho số đo + việc còn lại. Tài liệu này giữ **lịch sử quyết định**.
+>
 > 🔑 **Đọc mục 1 trước.** Tài liệu này **không** nói GĐ1 đã xong. Nó chốt **đang ở đâu**, **còn gì**, và
 > **làm theo thứ tự nào** để không phải đoán lại.
 
@@ -388,3 +390,4 @@ không có **UI** DLQ · không có job **dọn** DLQ theo thời hạn.
 
 **Đo cổng cuối:** `-DayDu` **exit 0 · 389.7s · 15/15** · unit **1634** · integration **90/90** · E2E **167/167** ·
 DB **25/25** · `check:mermaid` **0 lỗi** · `kiem-link-tai-lieu` **0 chết** · dọn probe **= 0** (gồm outbox/inbox).
+
