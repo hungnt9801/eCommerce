@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Volo.Abp;
 using Volo.Abp.Application.Dtos;
 using Volo.Abp.Application.Services;
+using Volo.Abp.DependencyInjection;
 using Volo.Abp.Domain.Repositories;
 using ChannelListingEntity = eCommerce.ChannelHub.Channels.ChannelListing;
 
@@ -33,6 +34,9 @@ namespace eCommerce.Catalog.Dtos;
 ///
 /// 🔐 `[Authorize]` cấp **CLASS** với `Products.Edit` — xem chú thích ở `IHienThiKenhAppService`.
 /// </summary>
+// 🔒 `S17` (29/10/2026) — **ĐĂNG KÝ DI TƯỜNG MINH**: hợp đồng ở `Catalog.Application.Contracts`, hiện thực ở
+// host (đọc `ChannelListing` của ChannelHub) ⇒ ghim cặp này thay vì dựa vào quy ước đặt tên của ABP.
+[ExposeServices(typeof(IHienThiKenhAppService))]
 [Authorize(eCommerceConsts.Permissions.Products.Edit)]
 public class HienThiKenhAppService : ApplicationService, IHienThiKenhAppService
 {

@@ -9,14 +9,15 @@
 
 ## 1. Ảnh chụp hiện tại (đo được, không phải lời khai)
 
-> 📌 **Số đo này là SAU `S13` + `S14` phần A + `S15`** (28/10/2026). Bảng cũ trước `S12` (unit **1528** · integration **71** · E2E
-> **135** · NND **57** · **68** quyền · **89** chỗ quét · **46** migration) đã **trôi** — đừng dùng.
+> 📌 **Số đo này là SAU `S13` + `S14` phần A + `S15` + `S17`** (29/10/2026). Bảng cũ trước `S12` (unit **1528** ·
+> integration **71** · E2E **135** · NND **57** · **68** quyền · **89** chỗ quét · **46** migration) đã **trôi** —
+> đừng dùng.
 
 | Hạng mục | Giá trị | Cách đo |
 |---|---|---|
 | Commit | `git log --oneline -1` | 🔒 **nguồn sự thật là lệnh**, không phải dòng trong tài liệu |
-| Cổng đầy đủ | **exit 0 · 347.4s · 15/15 bước** | `pwsh -File tools\kiem-tat-ca.ps1 -DayDu` |
-| Unit | **1587** | bước ③ |
+| Cổng đầy đủ | **exit 0 · 396.3s · 15/15 bước** | `pwsh -File tools\kiem-tat-ca.ps1 -DayDu` |
+| Unit | **1605** | bước ③ |
 | Integration | **87/87** | bước ④ |
 | E2E (HTML thật) | **145/145** | bước ⑧ |
 | Bất biến DB | **25/25** · **NND 64** · **71 quyền** · **99** chỗ quét | bước ⑥ |
@@ -57,7 +58,7 @@
 | 🟡 **S14** | `OrderReturn` + `OrderReturnLine` | [`SAL-006` §28–§29](features/sales/sal-006-tra-hang-rma-hoan-tien.md) | ✅ **phần A:** 3 bảng + `OrderLine.ReturnedQuantity` + 8 CHECK + 4 unique NND (NND **64**), migration **49** · ✅ **phần B:** service + API + idempotency + giữ chỗ trả + nhật ký · ✅ **phần C:** gateway `ICustomerReturnGateway` + chứng từ `CustomerReturn` + ghi sổ, chỉ dòng `Restock` · `Q4` = **chỉ ghi nhận** · ✅ **phần D:** đã **xoá cạnh tắt `Open→Returned`** + migrate `TraHangAsync` (§31) · ❌ còn: ETO, UI RMA, probe HTTP, `PartiallyReturned` | **đã dùng 49** |
 | ~~**S15**~~ | ✅ **XONG 28/10/2026** — `StalePendingTransaction` + `TriggerRunAsync` | [`REC-001` §20](features/reconciliation/rec-001-doi-soat-thanh-toan-querydr.md) | ngưỡng **24 h** (cấu hình, `0` = TẮT) · `TriggerRunAsync` đi qua **cùng khoá** với job · **+17 unit** · **probe 30/30** (HTTP thật) | **không** (ngưỡng là cấu hình) |
 | **S16** | 3 metric còn nợ | [`XC-005` §5.1/§19.3](features/cross-cutting/XC-005-observability-log-metric.md) | `messaging_dlq_replayed_total` (cần luồng replay thật), `lock_ttl_exceeded_total` (cần wrapper TTL), `logging_failures_total` (logger provider) | không (trừ khi thêm wrapper) |
-| **S17** | Hợp đồng cho dịch vụ còn ở host | `ke-hoach-tach-module` L2 | `ChannelDirectory`, `HienThiKenhAppService`, `ChinhSachHanMucAppService`, `WarehouseAppService`, `MarketplaceReconciliationWorker` | không |
+| ~~**S17**~~ | ✅ **XONG 29/10/2026** — hợp đồng cho dịch vụ còn ở host | [`ke-hoach-tach-module` §3.1](ke-hoach-tach-module.md) | `IChannelDirectory`/`IHienThiKenhAppService` (Catalog) + `IChinhSachHanMucAppService`/`IWarehouseAppService` (Inventory) đã ở module Contracts; `WarehouseAppService` **chuyển vào module**, 3 hiện thực còn host + worker được ghim `[ExposeServices]`/lý do · **18 ca** `HopDongHostTests` · **+18 unit** | không |
 | 🟡 **S18** | UI còn thiếu + tài liệu | `WEB-001`, `§A.5` | ✅ **`/NganSach`** (S13) + nút “Chạy đối soát ngay” (S15) + `S18-N1…N5` (**E2E 145**) · ❌ còn: UI RMA (S14), form Pricing/Kho quản trị, **duyệt 7 `XC-*` + 19 tài liệu** (`Q5` — cần chủ dự án) | không |
 | **S19** | VNPay sandbox thật | `PAY-001` | Điền `VnPay:TmnCode/HashSecret`, chạy 1 giao dịch thật | không |
 
@@ -164,7 +165,7 @@ Sau đó đọc theo thứ tự:
 | S14 OrderReturn/RMA | 6–10 pd | Chạm Sales + Inventory + PaymentHub |
 | ~~S15 StalePending + TriggerRun~~ | ✅ **xong 28/10/2026** | `REC-001` §20 (ngưỡng 24 h + chạy tay qua cùng khoá) |
 | S16 3 metric | 3–5 pd | Cần hạ tầng mới |
-| S17 hợp đồng host | 4–6 pd | Chạm 3 module |
+| ~~S17 hợp đồng host~~ | ✅ **xong 29/10/2026** | Chạm 3 module (Catalog/Inventory/Sales); **0 migration** |
 | S18 UI + tài liệu | 3–6 pd | Phụ thuộc Q5 |
 | S19 VNPay thật | 2–3 pd | Phụ thuộc Q6 |
 
@@ -210,8 +211,10 @@ Sau đó đọc theo thứ tự:
    (**cần wrapper đọc TTL khoá** — `IAbpDistributedLock` không lộ TTL), `logging_failures_total`
    (**cần logger provider bọc sink**). 🚨 `MetricEmitterTests` **ĐỎ** nếu khai báo mà không có điểm phát thật
    ⇒ **không** được “đăng ký cho đủ số”.
-2. `S17` — hợp đồng cho 5 dịch vụ còn ở host (`ChannelDirectory`, `HienThiKenhAppService`,
-   `ChinhSachHanMucAppService`, `WarehouseAppService`, `MarketplaceReconciliationWorker`): refactor tách module L2.
+2. ~~`S17` — hợp đồng cho 5 dịch vụ còn ở host~~ ✅ **XONG 29/10/2026** (xem **§10**): `WarehouseAppService`
+   về module; 3 hiện thực còn host + worker được ghim hợp đồng/DI/lý do; **+18 unit**. ⚠️ Còn **nợ riêng**
+   (không thuộc S17): hợp đồng đọc ChannelHub/Reconciliation để chuyển nốt 3 lớp; Sales/Reconciliation vẫn
+   đọc Domain module khác (`audit-gd1.md` §0.1 **b**).
 3. `S14` phần E — ETO, UI RMA, probe HTTP cho API RMA, trạng thái `PartiallyReturned` (cần BA chốt hợp đồng API).
 4. `S18` phần tài liệu — duyệt 7 `XC-*` + 19 tài liệu GĐ1: ⚠️ **`Q5` là quyết định của chủ dự án**.
 5. `S19` — VNPay sandbox thật: ⛔ **cần `VnPay:TmnCode` + `HashSecret`** (`Q6`). Không thể tự tạo credential;
@@ -219,3 +222,60 @@ Sau đó đọc theo thứ tự:
 
 📌 **Đọc `S13`/`S14` là hai hạng mục đã có đường chạy đầy đủ** (API + UI cho S13; API + chứng từ kho cho S14);
 `S16`/`S17` là **hạ tầng**, không phải màn hình — chúng **không** làm thay đổi hành vi người dùng cuối.
+
+---
+
+## 10. `S17` — HỢP ĐỒNG CHO DỊCH VỤ CÒN Ở HOST (29/10/2026)
+
+> **Mục tiêu (theo bàn giao §2):** 5 dịch vụ còn ở host phải có **hợp đồng** ở `Application.Contracts` của module
+> sở hữu, để module khác/host **chỉ** phụ thuộc hợp đồng — **không** phụ thuộc lớp hiện thực ở host.
+> 🔒 **Ràng buộc:** không đổi route/DTO/quyền/hành vi; **0 migration**.
+
+### 10.1 Đo được TRƯỚC khi sửa — tiền đề của S17 đã đúng một phần
+
+`grep` + `typeof(...).Assembly` (không tin csproj): **4/5 hợp đồng đã nằm trong module Contracts từ `e2c2785`
+(24/10/2026)** — `IChannelDirectory`, `IHienThiKenhAppService` (Catalog Contracts);
+`IChinhSachHanMucAppService`, `IWarehouseAppService` (Inventory Contracts). ⇒ `S17` **không** "chuyển hợp đồng
+lần nữa"; nó làm **phần còn thiếu**: hiện thực + DI tường minh + cổng chặn + tài liệu.
+
+### 10.2 Đã làm gì (4 việc, đúng phạm vi)
+
+| # | Việc | Bằng chứng |
+|---|---|---|
+| 1 | **`WarehouseAppService` → `modules/Inventory/eCommerce.Inventory.Application`** (tách khỏi tệp cũ; `InventoryReconciliationAppService` ở lại host vì đọc `ReconRun`/`InventoryReconciliationService`) | `git status` chỉ R/A trong phạm vi; build 0 warning; route `/api/app/warehouse*` **4 đường dẫn KHÔNG đổi** (`tools/route-check.ps1 -Match warehouse`) |
+| 2 | **4 hiện thực còn host** (`ChannelDirectory`, `HienThiKenhAppService`, `ChinhSachHanMucAppService`; worker riêng) — **ghim DI tường minh** bằng `[ExposeServices(typeof(I…))]` | 4 lớp có thuộc tính; test H5 đỏ nếu tháo; đúng khuôn `XuLyKetQuaCongService` (`S5`, lỗi thật `HTTP 500`) |
+| 3 | **Cổng chặn tái phát** `test/eCommerce.Tests/CrossCutting/HopDongHostTests.cs` — **18 ca** khoá 5 bất biến (xem `ke-hoach-tach-module` §3.1.1): hợp đồng đúng assembly module · hiện thực đúng assembly đã chốt · module **không** tham chiếu lớp hiện thực host (bỏ chú thích trước khi quét) · module **không** tham chiếu `src/eCommerce.Application` · `[ExposeServices]` có mặt | `dotnet test` **1605/1605** (unit **1587 → 1605**) |
+| 4 | **Tài liệu cùng commit**: `ke-hoach-tach-module` **§3.1** (bảng 5 dịch vụ + phần còn lại của L2) · `SESSION-KICKOFF` §3 · mục này | `check:mermaid` 0 lỗi · `kiem-link-tai-lieu` 0 chết |
+
+**Không** làm (cố ý): không mở hợp đồng đọc mới cho ChannelHub/Reconciliation; không đổi namespace legacy
+`eCommerce.Application.Contracts.Inventory`; không đổi route/DTO/quyền; không thêm migration.
+
+### 10.3 Vì sao 3 hiện thực + worker **còn ở host** (lý do đo được, không phải "chưa làm")
+
+| Dịch vụ | Lý do còn host |
+|---|---|
+| `ChannelDirectory` | đọc entity `Channel` của `ChannelHub.Domain` — module **cấm** tham chiếu Domain module khác (L2) |
+| `HienThiKenhAppService` | đọc `ChannelListing` của `ChannelHub.Domain` (guard `0209`); cần hợp đồng đọc của ChannelHub trước khi chuyển |
+| `ChinhSachHanMucAppService` | đọc `Channel` **và** `ReconRun` — điểm nối 3 module (Inventory/ChannelHub/Reconciliation) |
+| `MarketplaceReconciliationWorker` | **không module nào tham chiếu trực tiếp** (H3 khoá); là `AsyncPeriodicBackgroundWorkerBase` do host đăng ký. ⚠️ Thêm interface rỗng chỉ để "có hợp đồng" là **hợp đồng giả** — không ai resolve ⇒ không kiểm được gì |
+
+📌 **Vì sao dùng `[ExposeServices]` chứ không `services.AddTransient`:** descriptor thủ công là **đăng ký thứ hai**
+và có nguy cơ bỏ qua interceptor (`[Authorize]`/UoW) của ABP; `[ExposeServices]` đi qua **đúng** đường đăng ký
+của ABP. 📌 Hệ quả đã kiểm: E2E `/HanMucKenh` + `/NganSach` (resolve `IChinhSachHanMucAppService`) và
+`DatHangController` (resolve `IWarehouseAppService`) vẫn xanh ⇒ DI **thật sự** resolve sau khi đổi assembly.
+
+### 10.4 Đo cổng cuối (cây đã sửa)
+
+- `-DayDu`: **exit 0 · 396.3s · 15/15** · unit **1605** · integration **87/87** · E2E **145/145** ·
+  DB **25/25** · NND **64** · **71** quyền · migration **49** · quét **99** chỗ.
+- **Không** đổi lược đồ/NND/quyền/route ⇒ các số 64/71/49/99 **giữ nguyên** là đúng, không phải "quên đo".
+
+### 10.5 Việc còn lại (KHÔNG thuộc S17 — ghi để phiên sau không đoán)
+
+1. Hợp đồng **đọc** của `ChannelHub` (`IChannelListingReader`…) + của `Reconciliation` (`IReconRunReader`…) để
+   chuyển nốt 3 lớp host vào module — PR riêng, có hợp đồng mới.
+2. `MarketplaceReconciliationWorker` chỉ chuyển được khi `Messaging`/`Sales` có hợp đồng đọc phù hợp; hiện
+   **không** cần vì không ai tham chiếu (H3).
+3. Namespace legacy `eCommerce.Application.Contracts.Inventory` (của `IWarehouseAppService`/
+   `IChinhSachHanMucAppService`) — đổi là refactor lan sang Web/DTO; **không** cần cho biên assembly.
+4. Nợ **khác** của `audit-gd1.md` §0.1 **(b)** (Sales/Reconciliation đọc Domain module khác) — `S17` **không** sửa.

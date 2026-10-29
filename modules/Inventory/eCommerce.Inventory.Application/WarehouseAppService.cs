@@ -1,14 +1,26 @@
 using eCommerce.Application.Contracts.Inventory;
-using eCommerce.Inventory;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Logging;
 using Volo.Abp;
 using Volo.Abp.Application.Services;
+using Volo.Abp.DependencyInjection;
 using Volo.Abp.Domain.Repositories;
 
-namespace eCommerce.Application.Inventory;
+namespace eCommerce.Inventory;
 
-/// <summary>**API KHO** (`INV-001` ADR-01).</summary>
+/// <summary>
+/// **API KHO** (`INV-001` ADR-01) — tạo/liệt kê/ngừng dùng kho.
+///
+/// 📌 **`S17` (29/10/2026) — TẠI SAO LỚP NÀY NAY NẰM TRONG MODULE:** nó chỉ cần
+/// `IRepository<Warehouse>` (Domain của chính module), DTO ở `Inventory.Application.Contracts` và
+/// `eCommerceConsts` (Domain.Shared) ⇒ **không** có lý do gì để ở host. Trước `S17` nó nằm trong
+/// `src/eCommerce.Application/Inventory/` **cùng tệp** với `InventoryReconciliationAppService` (lớp đó
+/// đọc `ReconRun`/`InventoryReconciliationService` nên **cố ý** còn ở host).
+/// 🔒 **Không đổi hành vi:** cùng tên lớp ⇒ cùng route `/api/app/warehouse`; cùng `[Authorize]` cấp class
+/// + cấp method; cùng DTO; cùng mã lỗi. Hợp đồng `IWarehouseAppService` ở `Application.Contracts` của module
+/// (đã có từ đợt tách module 24/10/2026) nay do **chính module** hiện thực.
+/// </summary>
+[ExposeServices(typeof(IWarehouseAppService))]
 [Authorize(eCommerceConsts.Permissions.Inventory.Default)]
 public class WarehouseAppService : ApplicationService, IWarehouseAppService
 {
@@ -80,39 +92,4 @@ public class WarehouseAppService : ApplicationService, IWarehouseAppService
         Address = kho.Address,
         IsActive = kho.IsActive
     };
-}
-
-/// <summary>**API ĐỐI SOÁT KHO** (`INV-001` ADR-10) — chỉ đọc + phát metric.</summary>
-[Authorize(eCommerceConsts.Permissions.Inventory.Default)]
-public class InventoryReconciliationAppService : ApplicationService, IInventoryReconciliationAppService
-{
-    private readonly IRepository<InventoryItem, Guid> _tonKhoRepository;
-    private readonly InventoryReconciliationService _doiSoat;
-
-    public InventoryReconciliationAppService(
-        IRepository<InventoryItem, Guid> tonKhoRepository,
-        InventoryReconciliationService doiSoat)
-    {
-        _tonKhoRepository = tonKhoRepository;
-        _doiSoat = doiSoat;
-    }
-
-    public async Task<KetQuaDoiSoatDto> GetDoiSoatAsync()
-    {
-        var lech = await _doiSoat.DoiSoatTonKhoAsync();
-
-        return new KetQuaDoiSoatDto
-        {
-            SoCapDaKiem = (int)await _tonKhoRepository.GetCountAsync(),
-            SoCapLech = lech.Count,
-            CacLech = lech.Select(x => new LechTonKhoDto
-            {
-                WarehouseId = x.WarehouseId,
-                Sku = x.Sku,
-                OnHand = x.OnHand,
-                TongSoCai = x.TongSoCai,
-                ChenhLech = x.ChenhLech
-            }).ToList()
-        };
-    }
 }

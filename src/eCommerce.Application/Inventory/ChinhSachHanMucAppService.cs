@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Volo.Abp;
 using Volo.Abp.Application.Dtos;
 using Volo.Abp.Application.Services;
+using Volo.Abp.DependencyInjection;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.SettingManagement;
 using Volo.Abp.Settings;
@@ -31,6 +32,10 @@ namespace eCommerce.Application.Inventory;
 /// phơi `setting-management/emailing` + `setting-management/timezone` (**đo bằng swagger thật**) — **không** có
 /// route cho setting nghiệp vụ ⇒ **không thể** thay thế lớp này.
 /// </summary>
+// 🔒 `S17` (29/10/2026) — **ĐĂNG KÝ DI TƯỜNG MINH**: hợp đồng ở `Inventory.Application.Contracts`, hiện thực
+// ở host (đọc `Channel` của ChannelHub + `ReconRun` của Reconciliation) ⇒ ghim cặp này thay vì dựa vào quy ước
+// đặt tên của ABP. `HopDongHostTests` khoá lại.
+[ExposeServices(typeof(IChinhSachHanMucAppService))]
 [Authorize(eCommerceConsts.Permissions.ChannelLimits.Default)]
 public class ChinhSachHanMucAppService : ApplicationService, IChinhSachHanMucAppService
 {

@@ -1,7 +1,8 @@
 # KẾ HOẠCH TÁCH 4 MODULE GĐ1 — `Catalog` · `Inventory` · `Sales` · `Reconciliation`
 
-> **Trạng thái:** kế hoạch để review — **chưa di chuyển tệp nào**.
-> **Ngày:** 24/10/2026 · **Căn cứ:** `docs/audit-gd1.md` §2 (đo được: 9/16 module; 4 module GĐ1 nằm trong `src/`).
+> **Trạng thái:** 4 module GĐ1 **đã tách** (24/10/2026); `S17` (29/10/2026) **đóng nốt phần hợp đồng** —
+> xem §3.1 để biết dịch vụ nào còn ở host và **vì sao**.
+> **Ngày:** 24/10/2026 · **Cập nhật:** 29/10/2026 (`S17`) · **Căn cứ:** `docs/audit-gd1.md` §2 (đo được: 9/16 module; 4 module GĐ1 nằm trong `src/`).
 > **Mục tiêu:** đưa 4 bounded context GĐ1 ra `modules/` **không đổi hành vi, không đổi lược đồ, không đổi route**.
 
 ---
@@ -75,6 +76,61 @@ modules/
 
 > 🔑 **Vì sao Reconciliation trước:** nếu tách Sales trước, `Sales.Application` sẽ tham chiếu ngược vào `src` cho
 > Inventory/Catalog ⇒ tạo **nợ mới** đúng lúc đang trả nợ cũ. Làm theo thứ tự phụ thuộc: **lá → gốc**.
+
+### 3.1 Trạng thái L2 sau `S17` — hợp đồng cho dịch vụ còn ở host (29/10/2026)
+
+> **L2 của tài liệu này** = `Module.Application` → module của mình + `*.Application.Contracts` của module khác;
+> **cấm** → `src/eCommerce.Domain` / `src/eCommerce.Application`. `S17` kiểm đúng dòng L2 ở **chiều ngược**:
+> *dịch vụ chưa rời host được thì hợp đồng của nó **phải** nằm ở module sở hữu, và host phải ghim DI tường minh.*
+
+**Đo được trước `S17`** (không phải lời khai): 4/5 hợp đồng **đã** nằm trong `Application.Contracts` của module
+từ đợt tách module (commit `e2c2785`, 24/10/2026) — `IChannelDirectory`, `IHienThiKenhAppService` trong
+`eCommerce.Catalog.Application.Contracts`; `IChinhSachHanMucAppService`, `IWarehouseAppService` trong
+`eCommerce.Inventory.Application.Contracts`. ⇒ Việc còn lại của `S17` là **hiện thực + đăng ký DI + cổng chặn**,
+không phải "chuyển hợp đồng lần nữa".
+
+| Dịch vụ | Hợp đồng (assembly) | Hiện thực sau `S17` | Vì sao còn/đi |
+|---|---|---|---|
+| `WarehouseAppService` | `IWarehouseAppService` — Inventory Contracts | ✅ **module** `eCommerce.Inventory.Application` | Chỉ cần `IRepository<Warehouse>` + DTO + `eCommerceConsts` ⇒ **không** có lý do ở host. Đã tách khỏi tệp cũ; `InventoryReconciliationAppService` ở lại host |
+| `ChannelDirectory` | `IChannelDirectory` — Catalog Contracts | **host** (có `[ExposeServices]`) | Đọc entity `Channel` của `ChannelHub.Domain`; module **không được** tham chiếu Domain module khác |
+| `HienThiKenhAppService` | `IHienThiKenhAppService` — Catalog Contracts | **host** (có `[ExposeServices]`) | Đọc `ChannelListing` của `ChannelHub.Domain` (guard `0209`) |
+| `ChinhSachHanMucAppService` | `IChinhSachHanMucAppService` — Inventory Contracts | **host** (có `[ExposeServices]`) | Đọc `Channel` (ChannelHub) **và** `ReconRun` (Reconciliation) — là **điểm nối** giữa 3 module |
+| `MarketplaceReconciliationWorker` | *(không có hợp đồng — xem §3.1.2)* | **host** | Không module nào tham chiếu trực tiếp; nó đọc `DeadLetterMessage` (Messaging.Domain) + `MarketplaceOrderIntake` (Sales.Domain) |
+
+#### 3.1.1 Cổng chặn tái phát — `HopDongHostTests`
+
+`test/eCommerce.Tests/CrossCutting/HopDongHostTests.cs` (**18 ca**, thêm ở `S17`) khoá **bốn** bất biến đo được:
+
+| # | Bất biến | Cách kiểm |
+|---|---|---|
+| H1 | Hợp đồng nằm trong `Application.Contracts` của module sở hữu | `typeof(I*).Assembly.GetName().Name` |
+| H2 | Hiện thực ở đúng assembly đã chốt (`Warehouse` → module; 3 lớp + worker → host) | `typeof(lớp).Assembly` |
+| H3 | Không tệp `.cs` nào dưới `modules/` tham chiếu **lớp hiện thực** ở host (chỉ được dùng `I*`) | quét văn bản nguồn **sau khi bỏ chú thích** |
+| H4 | Không `.csproj` nào dưới `modules/` tham chiếu `src/eCommerce.Application` | quét csproj |
+| H5 | Cặp `I* → lớp hiện thực` có `[ExposeServices]` (DI **tường minh**) | reflection trên `ExposeServicesAttribute` |
+
+📌 **Vì sao H5 dùng `[ExposeServices]` chứ không `services.AddTransient`:** đăng ký thủ công tạo **descriptor thứ hai**
+và có nguy cơ bỏ qua interceptor của ABP; `[ExposeServices]` đi **qua đúng** đường đăng ký của ABP — cùng khuôn
+`XuLyKetQuaCongService` (`S5`, lỗi thật `HTTP 500` vì tên interface không theo quy ước). Đo được: route
+`/api/app/warehouse*` **không đổi** (4 đường dẫn); `-DayDu` xanh.
+
+#### 3.1.2 Vì sao `MarketplaceReconciliationWorker` **không** có hợp đồng
+
+Nó là `AsyncPeriodicBackgroundWorkerBase` — **không** phải dịch vụ được ai **gọi**; chỉ host đăng ký nó trong
+`eCommerceApplicationModule.OnPostApplicationInitializationAsync`. Thêm một interface rỗng chỉ để "có hợp đồng"
+sẽ là **hợp đồng giả** (không ai resolve ⇒ không kiểm được gì). 🔒 Điều `S17` cần — *"không module nào tham chiếu
+trực tiếp"* — được khoá bằng H3. Muốn chuyển nó vào `Sales.Application` thì phải mở hợp đồng đọc cho
+`Messaging`/`Sales` trước; **không** làm trong `S17` vì sẽ đổi phạm vi và không đổi hành vi nào.
+
+#### 3.1.3 Phần **còn lại** của L2 (không thuộc `S17`)
+
+1. **Hợp đồng đọc của `ChannelHub`** (`IChannelListingReader`…) để chuyển `ChannelDirectory`/`HienThiKenhAppService`
+   vào `Catalog.Application`; tương tự cần hợp đồng đọc `ReconRun` cho `ChinhSachHanMucAppService`.
+2. **`Sales`/`Reconciliation` vẫn đọc Domain module khác** (nợ có ý thức — `audit-gd1.md` §0.1 **(b)**); `S17`
+   **không** sửa nợ này (nó là hợp đồng **giữa các module**, không phải "dịch vụ còn ở host").
+3. **Namespace legacy** `eCommerce.Application.Contracts.Inventory` của `IWarehouseAppService`/
+   `IChinhSachHanMucAppService` **chưa đổi** — biên đúng là **assembly**, đổi namespace là refactor lan sang
+   Web/DTO mà không thêm giá trị; ghi nợ để PR riêng.
 
 ---
 
@@ -248,3 +304,4 @@ Mỗi PR độc lập ⇒ `git revert <commit>` là đủ. **Không có migratio
 | Ngày | Thay đổi |
 |---|---|
 | 24/10/2026 | Bản đầu — kế hoạch tách 4 module GĐ1 theo thứ tự lá→gốc, giữ namespace/tên bảng, 0 migration, có test kiến trúc chặn tái phát. |
+| 29/10/2026 | **`S17`** — đóng phần **hợp đồng** của L2: xác nhận 4 hợp đồng đã ở module Contracts từ `e2c2785`; chuyển `WarehouseAppService` vào `Inventory.Application`; 3 hiện thực còn host + 1 worker được ghim bằng `[ExposeServices]`/lý do và khoá bằng `HopDongHostTests` (**18 ca**). Không migration, không đổi route/quyền. |
