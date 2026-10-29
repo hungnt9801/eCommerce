@@ -1026,3 +1026,27 @@ handler chỉ chạy một lần nếu handler **không** ghi inbox/idempotent. 
 
 **Bẫy:** đừng đếm `fail:` trong log — self-check khởi động **cố ý** log `fail:` cho ETO chưa có người nhận
 (`AddressChangedEto`…). Chỉ tìm `Unhandled exception|OutOfMemoryException|AbpDbConcurrencyException`.
+
+---
+
+## N. 🆕 `probe-dlq-replay.ps1` — **PHÁT LẠI DLQ LÊN BUS** (29/10/2026, `S16b` · `XC-005` §21)
+
+**Vì sao có:** *"replay"* ở dự án này = **publish lại event gốc**, **KHÔNG** phải *"đánh dấu đã xử lý"*.
+Unit test dùng `IDistributedEventBus` **giả** ⇒ nó chứng minh **lời gọi**, **không** chứng minh **event đã đi**.
+Chuỗi thật dài hơn: `PhatLaiAsync` → dòng **outbox** (cùng transaction với dấu) → relay 2 s → consumer →
+**`AbpEventInbox` có dòng**. 🔑 **Chỉ dòng inbox mới là bằng chứng "đã phát lại".**
+
+**Cách đo (21 ca):** gieo 1 dòng `MsgDeadLetters` với `TenSuKien = 'OrderStatusChangedEto'` + payload thật ⇒
+`POST /api/app/dead-letter/{id}/phat-lai` (route **in từ swagger** trước khi gọi — luật A6) ⇒ `200` ·
+`daPhatLai = true` · DB `ReplayCount=1`/`ReplayedAtUtc`/`ReplayedBy=admin` · **`AbpEventInbox` +1** · outbox về 0.
+Gọi **lần hai** ⇒ `200` + `daPhatLai = false` + lý do *"BỎ QUA"* · **không** dòng inbox thứ hai · `ReplayCount` **vẫn 1**.
+➕ Ca **fail-closed**: dòng có `TenSuKien` **không tồn tại** ⇒ **409** (không phải `403`), **không** ghi dấu,
+outbox **0**, inbox mới **0**. Dọn sạch + khẳng định lại (`dlq=0 · outbox=0 · cờ bảo mật=true`).
+
+**Bẫy:**
+- **Đếm `AbpEventInbox` theo MỐC thời gian**, không đếm tổng — dòng cũ/dọn nền làm phép đếm sai.
+- Sau lần gọi **thứ hai** phải **chờ ≥ 3 s** (một nhịp relay) rồi mới khẳng định "không có event thứ hai":
+  📌 đọc ngay là **test flaky** theo hướng *"xanh vì chưa kịp"* (bài học `XC-002` §17.3).
+- `TenSuKien` **không** mang tiền tố `K9` (nó phải là **tên loại thật** để ánh xạ được) ⇒ dấu vết probe nằm ở
+  `KhoaNghiepVu` (`K9S16B%`) **và** ở GUID `e0000000-…-fd`/`…-fe` mà `kiem-db.ps1` nhóm ⑥ **tự dò**.
+- Đây là **probe CHẠY TAY** (đúng như ⑬/⑭/⑮ trước đây) — **không** thêm bước vào `kiem-tat-ca.ps1`.

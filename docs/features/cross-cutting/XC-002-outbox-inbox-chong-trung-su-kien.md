@@ -1325,7 +1325,7 @@ trong mã** (như tôi đã mất nhiều lượt) trong khi **mã đúng** — 
 | # | Nợ | Ghi chú |
 |---|---|---|
 **1** | ✅ **ĐÃ XÁC NHẬN — `S10` (21/10/2026): OUTBOX/RELAY KHÔNG CÓ** (nợ này **đóng ở dạng "đã xác nhận"**, không phải "đã làm") | 📌 Bằng chứng đo được: **0** bảng `AbpEvent*`/`*Outbox*`/`*Inbox*` (85 bảng, `psql` trên PostgreSQL 17) · **0** worker relay trong **10** worker đã đăng ký · sự kiện đi qua `IDistributedEventBus` với transport **in-process** (chính chỗ gọi đã ghi: `MarketplaceOrderIntakeHandler`). ⚠️ **Hệ quả (giữ nguyên, không được quên):** publish **KHÔNG** nằm trong transaction nghiệp vụ ⇒ 🔒 tiến trình chết giữa chừng là **mất sự kiện**; ➕ `messaging_outbox_pending` **vì vậy chưa thể có nơi phát** (`XC-005` §19.3). 📌 Đóng **thật** nợ này = một feature riêng (outbox + relay), **không** phải việc của phiên đóng GĐ1 |
-**2** | 🚨 **Chưa có job phát lại** (`XC-002` mục (a) phần *"job phát lại"*) | Nay có **đường đọc** + **đánh dấu**, nhưng **phát lại vẫn thủ công**. 🔒 Cố ý: phát lại tự động **có thể gây hỏng lần nữa** ⇒ phải **có người** + audit. ➕ `S10`: chính vì thế `messaging_dlq_replayed_total` **chưa có nơi phát** — đếm *"đánh dấu"* thành *"phát lại"* là **nói dối** (`XC-005` §19.3) |
+**2** | 🟡 **ĐÃ CÓ PHÁT LẠI THỦ CÔNG (29/10/2026, `S16b`) — CHƯA có job phát lại TỰ ĐỘNG** | `IDeadLetterAppService.PhatLaiAsync` **publish lại event gốc** lên `IDistributedEventBus` (`useOutbox: true`, **cùng UoW** với dấu `ReplayedAtUtc`) · idempotent **một dòng một lần** (`ReplayedAtUtc`/`ReplayCount`) · fail-closed khi `TenSuKien`/payload không ánh xạ được (`409`) · quyền **riêng** `eCommerce.Operations.DeadLetters.Replay` · metric `messaging_dlq_replayed_total` **+1 chỉ sau commit** ⇒ đóng nợ cuối của `XC-005` §19.3 (**§21** của tài liệu đó). 🔒 Vẫn **cố ý KHÔNG** tự động: phát lại một sự kiện đã hỏng **có thể hỏng lần nữa** ⇒ phải **có người** + audit |
 **3** | 🚨 **Chưa có cảnh báo khi có bản ghi DLQ mới** (`XC-002` mục (a)) | `thong-ke` **đã có** `cuNhatChuaXuLyUtc` ⇒ 🔑 **đủ dữ kiện** để làm cảnh báo, nhưng **chưa ai gọi định kỳ** |
 **4** | **Chưa có UI** cho DLQ | Endpoint **đã có**; trang `/VanHanh/Dlq` **chưa** làm |
 **5** | **Chưa có job dọn DLQ theo thời hạn** | Bảng **chỉ tăng** |
@@ -1379,3 +1379,27 @@ như `S8-P10` đã làm — **không** nới điều kiện, **không** ngủ m�
 | 2 | **Relay 2 instance** | ✅ **ĐÓNG 26/10/2026** — `probe-outbox-2instance.ps1` (**bước ⑮**): hai Host 5000/5001 cùng DB/Redis ⇒ outbox **0**, event **1** dòng inbox (`distinct MessageId=1`), 0 exception. ⚠️ Giới hạn: chứng minh hai relay **phối hợp**, không chứng minh handler chạy một lần nếu không ghi inbox |
 | 3 | **Inbox dọn theo thời gian** | `WaitTimeToDeleteProcessedInboxEvents = 2 h`; chưa có test chứng minh job dọn chạy (quan sát: bảng có dòng ⇒ **chưa** tới hạn) |
 | 4 | **Metric `messaging_outbox_pending`** | ✅ **ĐÓNG 24/10/2026** — `OutboxPendingWorker` (project EF) đếm `AbpEventOutbox` mỗi 60 s + gọi `SetMessagingOutboxPending`; `XC-005` §5.1 nay **13/16** |
+
+---
+
+## 18. ✅ `S16b` — **PHÁT LẠI DLQ = PUBLISH LẠI EVENT LÊN BUS** (29/10/2026)
+
+> 📌 **Chủ dự án chốt:** *"replay"* = **phát lại event lên bus**, **KHÔNG** phải *"đánh dấu đã xử lý"*.
+> 🔗 Chi tiết + bằng chứng đầy đủ ở **`XC-005` §21** (metric `messaging_dlq_replayed_total`).
+> Mục này chỉ ghi phần **thuộc `XC-002`** (DLQ + outbox).
+
+| Hạng mục | Giá trị |
+|---|---|
+| Đường gọi | `IDeadLetterAppService.PhatLaiAsync(Guid id)` → `POST /api/app/dead-letter/{id}/phat-lai` |
+| Nghĩa của "phát lại" | **deserialize payload gốc → `IDistributedEventBus.PublishAsync(type, event, onUnitOfWorkComplete: false, useOutbox: true)`** ⇒ event đi qua **outbox** như mọi event khác |
+| Vì sao `useOutbox: true` | 🔒 *"không mất event"*: dòng outbox **commit cùng transaction** với dấu `ReplayedAtUtc`; process chết ngay sau commit ⇒ relay vẫn phát |
+| Vì sao `onUnitOfWorkComplete: false` | 📌 để việc ghi outbox xảy ra **trong** UoW `requiresNew` của thao tác, **không** phải sau khi UoW đóng |
+| Idempotent | **một dòng DLQ — một lần phát lại** (`ReplayedAtUtc` + `ReplayCount`); gọi lại ⇒ **200 + `DaPhatLai = false`** + lý do |
+| Fail-closed | `TenSuKien` không ánh xạ được ⇒ `0009`; payload không khớp ⇒ `0010`; cả hai **không publish**, HTTP **409** |
+| Không xoá | Dòng DLQ **giữ nguyên** (bằng chứng); chỉ ghi dấu + `DaXuLy` |
+| Quyền | `eCommerce.Operations.DeadLetters.Replay` (seed **72**) |
+| Bằng chứng | unit **11** · integration **3** · probe `tools/probe-dlq-replay.ps1` **21/21** (đo `AbpEventInbox` **tăng** ⇒ event **đã đi thật**) |
+| Đo cổng | `-DayDu` **exit 0 · 377.4s · 15/15** · unit **1627** · integration **90** · E2E **159/159** · DB **25/25** · NND **64** · **72** quyền · migration **50** |
+
+⚠️ **Còn nợ (không được nói "DLQ xong"):** **không** có phát lại **tự động**; **không** có **lô**
+(`ReplayBatchAsync` trong §6.1 vẫn chỉ là đặc tả); **không** có UI; **không** có job dọn DLQ theo thời hạn (§16.5 #5).

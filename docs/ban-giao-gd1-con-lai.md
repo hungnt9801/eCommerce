@@ -1,6 +1,6 @@
 # BÀN GIAO — Phần còn lại của GĐ1 (để mở session mới)
 
-> **Lập ngày:** 28/10/2026 · **Cập nhật:** 29/10/2026 (sau `S12` + `S13` + `S14` A–F + `S15` + `S17` + `S16`) · **Cây:** `main` (sạch) · **Người lập:** phiên tự động
+> **Lập ngày:** 28/10/2026 · **Cập nhật:** 29/10/2026 (sau `S12` + `S13` + `S14` A–F + `S15` + `S17` + `S16` + `S16b`) · **Cây:** `main` (sạch) · **Người lập:** phiên tự động
 >
 > 🔑 **Đọc mục 1 trước.** Tài liệu này **không** nói GĐ1 đã xong. Nó chốt **đang ở đâu**, **còn gì**, và
 > **làm theo thứ tự nào** để không phải đoán lại.
@@ -9,25 +9,26 @@
 
 ## 1. Ảnh chụp hiện tại (đo được, không phải lời khai)
 
-> 📌 **Số đo này là SAU `S13` + `S14` phần A–F + `S15` + `S17` + `S16`** (29/10/2026). Bảng cũ trước `S12` (unit **1528** ·
+> 📌 **Số đo này là SAU `S13` + `S14` phần A–F + `S15` + `S17` + `S16` + `S16b`** (29/10/2026). Bảng cũ trước `S12` (unit **1528** ·
 > integration **71** · E2E **135** · NND **57** · **68** quyền · **89** chỗ quét · **46** migration) đã **trôi** —
 > đừng dùng.
 
 | Hạng mục | Giá trị | Cách đo |
 |---|---|---|
 | Commit | `git log --oneline -1` | 🔒 **nguồn sự thật là lệnh**, không phải dòng trong tài liệu |
-| Cổng đầy đủ | **exit 0 · 483.6s · 15/15 bước** | `pwsh -File tools\kiem-tat-ca.ps1 -DayDu` |
-| Unit | **1616** | bước ③ |
-| Integration | **87/87** | bước ④ |
+| Cổng đầy đủ | **exit 0 · 377.4s · 15/15 bước** | `pwsh -File tools\kiem-tat-ca.ps1 -DayDu` |
+| Unit | **1627** | bước ③ |
+| Integration | **90/90** | bước ④ |
 | E2E (HTML thật) | **159/159** | bước ⑧ |
-| Bất biến DB | **25/25** · **NND 64** · **71 quyền** · **99** chỗ quét | bước ⑥ |
-| Migration | **49** | `src/eCommerce.EntityFrameworkCore/Migrations` |
+| Bất biến DB | **25/25** · **NND 64** · **72 quyền** · **99** chỗ quét | bước ⑥ |
+| Migration | **50** | `src/eCommerce.EntityFrameworkCore/Migrations` |
 | Oversell | **11/11** (bước ⑬) | `tools/probe-oversell.ps1` |
 | Outbox replay | **9/9** (bước ⑭) | `tools/probe-outbox.ps1` |
 | Outbox 2 instance | **9/9** (bước ⑮) | `tools/probe-outbox-2instance.ps1` |
+| 🆕 **Replay DLQ (HTTP + DB)** | **21/21** (⚠️ **chạy tay**, không phải bước cổng) | `tools/probe-dlq-replay.ps1` |
 | Đơn sàn | **49/49** | `tools/probe-don-san.ps1` |
 | Thanh toán (HTTP thật) | **30/30** | `tools/probe-thanh-toan.ps1` |
-| Cây làm việc | **0 tệp** (sạch) | `git status --porcelain` |
+| Cây làm việc | **0 tệp của phiên này** (⚠️ vẫn còn tệp `?? tools/…` do **tiến trình KHÁC** tạo — không thuộc commit nào của phiên này) | `git status --porcelain` |
 
 ### Đã xong (đừng làm lại)
 
@@ -43,6 +44,7 @@
 | **`S13` — `StockAllotment` + sổ cái ngân sách** | `INV-003` **§21**: migration **48** · NND **60** · quyền `Allotment.Manage`/`Allotment.Release` (seed **71**) · giữ chỗ/nhả/chốt **trừ & trả** ngân sách kênh · **+11 unit · +6 integration** · ⚠️ **chưa có UI**, **chưa tự thu hồi** |
 | **`S15` — `StalePendingTransaction` + `TriggerRunAsync`** | `REC-001` **§20**: ngưỡng `Reconciliation:StalePendingHours` = **24** (`0` = TẮT) · **10/10** loại lệch · `TriggerRunAsync` **cùng khoá** với job (`IPaymentReconciliationRunner`) · **+17 unit** · probe thanh toán **26 → 30/30** (HTTP + DB + dọn sạch) · **không** migration |
 | **`S16` — 2/3 metric còn nợ** | `XC-005` **§20**: `lock_ttl_exceeded_total` (decorator `IAbpDistributedLock`, nghe `HandleLostToken`) + `logging_failures_total` (bọc `ILoggerProvider`, stderr + counter) · **+7 unit** · `MessagingDlqReplayedTotal` **vẫn nợ** vì chưa có luồng replay thật · **0** migration/schema/quyền/route |
+| 🆕 **`S16b` — replay DLQ THẬT** | `XC-005` **§21** + `XC-002` **§18**: *"replay"* = **publish lại event gốc** lên `IDistributedEventBus` (`useOutbox: true`, **cùng UoW** với dấu) · migration **50** (`ReplayedAtUtc`/`ReplayCount`/`ReplayedBy`) · idempotent **một dòng một lần** · fail-closed `0009`/`0010` ⇒ **409** · quyền **`eCommerce.Operations.DeadLetters.Replay`** (seed **72**) · metric `messaging_dlq_replayed_total` **+1 sau commit** · **+11 unit · +3 integration** · probe HTTP **21/21** (đo `AbpEventInbox` **tăng**) |
 | **`S12` — `CostPrice` (`PrcCostPrices`)** | `PRC-001` **§20**: migration **47** · NND **58** · quyền **`eCommerce.Pricing.CostPrice.View`** (seed **69**) · `/GiaVon` (chỉ đọc) · **15 unit** + **6 integration** + **5 E2E** (`S12-G1…G5`, đo cả **ẩn danh bị chặn** và **HTML công khai không lộ 777.777**) |
 | **`S14` phần E — UI RMA + đo HTTP** | `SAL-006` **§32**: `/TraHang` (danh sách + duyệt/từ chối/nhận/đóng/hoàn tiền, ẩn nút theo quyền) · link từ trang đơn (`Url.Action`) · menu nhóm Vận hành · neo `[TRAHANG-MAN-HINH]` · **+14 E2E** đo **DB thật** (`Status = 1`, `Version = 1`, đơn `ReturnStatus = 2`/`ClosureVersion = 2`; duyệt lần hai ⇒ `Sales:0010` + DB **không đổi**) · **ETO: KHÔNG thêm** (không có consumer) · **0** migration/quyền |
 | **`S14F` — sửa 2 lỗi nhận hàng** | `SAL-006` **§33**: (1) `NhanHang` nhận cờ `daNhanDuTatCaDong` do **service tính trên toàn bộ dòng** — `Status`/`ReceivedAtUtc` chỉ đổi khi đủ ⇒ đơn chỉ sang `Returned` khi phiếu `Received`; (2) `GhiNhanHang` **NÉM `Sales:0010`** khi `0` + disposition (**trước** DB, không còn `500`), `0` + `Unset` là **no-op** · **+4 unit** (hai chiều) · **0** schema/migration/NND/quyền, `CHECK` **không** nới · **§32.4 đã đóng** |
@@ -60,7 +62,7 @@
 | ~~**S13**~~ | ✅ **XONG 28/10/2026** — `StockAllotment` + `StockAllotmentLedger` | [`INV-003` §21](features/inventory/inv-003-phan-bo-ton-theo-kenh.md) | migration **48** · NND **60** · **2 quyền** (seed **71**) · giữ chỗ **trừ ngân sách** kênh (tuỳ chọn theo dòng) · **+11 unit + 6 integration** · ⚠️ **chưa** có UI + **chưa** tự thu hồi khi tồn giảm (§21.5) |
 | 🟡 **S14** | `OrderReturn` + `OrderReturnLine` | [`SAL-006` §28–§33](features/sales/sal-006-tra-hang-rma-hoan-tien.md) | ✅ **phần A:** 3 bảng + `OrderLine.ReturnedQuantity` + 8 CHECK + 4 unique NND (NND **64**), migration **49** · ✅ **phần B:** service + API + idempotency + giữ chỗ trả + nhật ký · ✅ **phần C:** gateway `ICustomerReturnGateway` + chứng từ `CustomerReturn` + ghi sổ, chỉ dòng `Restock` · `Q4` = **chỉ ghi nhận** · ✅ **phần D:** xoá cạnh tắt `Open→Returned` + migrate `TraHangAsync` (§31) · ✅ **phần E:** **UI `/TraHang` + 14 ca E2E đo HTTP/DB** (§32); **ETO = KHÔNG** (không có consumer) · ✅ **`S14F`:** sửa **2 lỗi nhận hàng** (§33), §32.4 **đã đóng** · ❌ còn: `PartiallyReturned` (**cần BA**) · nút huỷ phiếu trên UI | **đã dùng 49** |
 | ~~**S15**~~ | ✅ **XONG 28/10/2026** — `StalePendingTransaction` + `TriggerRunAsync` | [`REC-001` §20](features/reconciliation/rec-001-doi-soat-thanh-toan-querydr.md) | ngưỡng **24 h** (cấu hình, `0` = TẮT) · `TriggerRunAsync` đi qua **cùng khoá** với job · **+17 unit** · **probe 30/30** (HTTP thật) | **không** (ngưỡng là cấu hình) |
-| 🟡 **S16** | **2/3 metric còn nợ** | [`XC-005` §5.1/§20](features/cross-cutting/XC-005-observability-log-metric.md) | ✅ `lock_ttl_exceeded_total` (decorator `IAbpDistributedLock` + `HandleLostToken`) · ✅ `logging_failures_total` (bọc `ILoggerProvider`) · ❌ `messaging_dlq_replayed_total` **vẫn nợ** — chưa có luồng replay thật, xem **§20.3** | **0** (không schema/migration/quyền) |
+| 🟡 **S16** | **2/3 metric còn nợ** | [`XC-005` §5.1/§20](features/cross-cutting/XC-005-observability-log-metric.md) | ✅ `lock_ttl_exceeded_total` (decorator `IAbpDistributedLock` + `HandleLostToken`) · ✅ `logging_failures_total` (bọc `ILoggerProvider`) · ✅ **`messaging_dlq_replayed_total` ĐÃ ĐÓNG ở `S16b`** (replay thật, xem **§21**) | **1** (`S16b`: 3 cột + quyền mới) |
 | ~~**S17**~~ | ✅ **XONG 29/10/2026** — hợp đồng cho dịch vụ còn ở host | [`ke-hoach-tach-module` §3.1](ke-hoach-tach-module.md) | `IChannelDirectory`/`IHienThiKenhAppService` (Catalog) + `IChinhSachHanMucAppService`/`IWarehouseAppService` (Inventory) đã ở module Contracts; `WarehouseAppService` **chuyển vào module**, 3 hiện thực còn host + worker được ghim `[ExposeServices]`/lý do · **18 ca** `HopDongHostTests` · **+18 unit** | không |
 | 🟡 **S18** | UI còn thiếu + tài liệu | `WEB-001`, `§A.5` | ✅ **`/NganSach`** (S13) + nút “Chạy đối soát ngay” (S15) + `S18-N1…N5` (**E2E 145**) · ✅ **UI RMA `/TraHang`** đã xong ở `S14` phần E (`SAL-006` §32, **+14 E2E**) · ❌ còn: form Pricing/Kho quản trị, **duyệt 7 `XC-*` + 19 tài liệu** (`Q5` — cần chủ dự án) | không |
 | **S19** | VNPay sandbox thật | `PAY-001` | Điền `VnPay:TmnCode/HashSecret`, chạy 1 giao dịch thật | không |
@@ -208,16 +210,16 @@ Sau đó đọc theo thứ tự:
 | `S14` E — UI RMA + đo HTTP | `/TraHang` (duyệt/từ chối/nhận/đóng/hoàn tiền) · link từ trang đơn · menu Vận hành · **E2E 145 → 159** · DB `Status = 1`/`Version = 1` + đơn `2/2` · **ETO: không** | xem `git log` |
 | `S16` — 2/3 metric còn nợ | `lock_ttl_exceeded_total` + `logging_failures_total` có điểm phát thật; **+7 unit**; `messaging_dlq_replayed_total` vẫn nợ (chưa có replay) | `S16` — xem `git log` |
 | `S14F` — sửa 2 lỗi nhận hàng | `GoodsStatus` tính trên **toàn bộ** dòng (cờ `daNhanDuTatCaDong`) ⇒ không "nhận đủ" sai khi nhận lẻ · `0` + disposition ⇒ **`Sales:0010`** trước DB (hết `500`), `0` + `Unset` = no-op · **+4 unit** hai chiều · **0** schema/migration/NND/quyền · **§32.4 đã đóng** | xem `git log` |
+| 🆕 `S16b` — replay DLQ thật | *"replay"* = **publish lại event gốc** (không phải đánh dấu) · `PhatLaiAsync` + `PhatLaiDlqKetQuaDto` · migration **50** (3 cột `Replay*`) · idempotent **một dòng một lần** (lần hai ⇒ `200` + `DaPhatLai=false` + lý do) · fail-closed `0009`/`0010` ⇒ **409** · quyền **`eCommerce.Operations.DeadLetters.Replay`** (seed **72**) · metric **+1 chỉ sau commit** · **+11 unit · +3 integration** · probe HTTP **21/21** (đo `AbpEventInbox` **tăng**) | xem `git log` |
 
-**Đo cuối phiên (cập nhật 29/10/2026 sau `S14` E + `S14F`):** `-DayDu` **exit 0 · 483.6s · 15/15** · unit **1616** · integration **87** · **E2E 159/159** · DB **25/25** · NND **64** · **71** quyền · migration **49** · quét **99** chỗ · cây **0 tệp** · DB **0 rác probe**.
+**Đo cuối phiên (cập nhật 29/10/2026 sau `S16b`):** `-DayDu` **exit 0 · 377.4s · 15/15** · unit **1627** · integration **90** · **E2E 159/159** · DB **25/25** · NND **64** · **72** quyền · migration **50** · quét **99** chỗ · cây **0 tệp của phiên này** (⚠️ còn `?? tools/…` của tiến trình khác) · DB **0 rác probe**.
 
 **Còn lại (chưa làm — không được coi là xong):**
 
-1. `S16` — **còn đúng 1 metric nợ:** `messaging_dlq_replayed_total` (**cần luồng replay DLQ thật**:
-   đọc `MsgDeadLetters` → phát lại event qua outbox → đánh dấu đã replay → idempotent). ✅ Hai metric còn lại
-   **đã xong** ở §11: `lock_ttl_exceeded_total`, `logging_failures_total`. 🚨 `MetricEmitterTests` **ĐỎ** nếu
-   khai báo mà không có điểm phát thật ⇒ **không** được “đăng ký cho đủ số”; **cấm** đếm "đánh dấu đã xử lý"
-   thành "đã phát lại".
+1. ~~`S16` — **còn đúng 1 metric nợ:** `messaging_dlq_replayed_total`~~ ✅ **XONG 29/10/2026 (`S16b`, xem §11.5 và
+   `XC-005` §21):** đã có **luồng phát lại thật** (đọc `MsgDeadLetters` → phát lại event qua outbox → đánh dấu
+   `ReplayedAtUtc` → idempotent) ⇒ **16/16 metric có điểm phát**. ⏳ **Nợ riêng của `S16b` (không thuộc metric):**
+   **không** có phát lại **tự động**, **không** có phát lại **theo lô**, **không** có **UI** DLQ.
 2. ~~`S17` — hợp đồng cho 5 dịch vụ còn ở host~~ ✅ **XONG 29/10/2026** (xem **§10**): `WarehouseAppService`
    về module; 3 hiện thực còn host + worker được ghim hợp đồng/DI/lý do; **+18 unit**. ⚠️ Còn **nợ riêng**
    (không thuộc S17): hợp đồng đọc ChannelHub/Reconciliation để chuyển nốt 3 lớp; Sales/Reconciliation vẫn
@@ -332,3 +334,31 @@ token **chỉ huỷ khi lease đã mất thật**. Đây là cách duy nhất đ
 - `-DayDu`: **exit 0 · 370.7s · 15/15** · unit **1612** · integration **87/87** · E2E **145/145** ·
   DB **25/25** · NND **64** · **71** quyền · migration **49** · quét **99** chỗ.
 - `check:mermaid` **0 lỗi** · `kiem-link-tai-lieu` **0 chết**.
+
+### 11.5 🆕 `S16b` — metric THỨ 3 ĐÃ ĐÓNG: **replay DLQ = publish lại event** (29/10/2026)
+
+> **Chủ dự án chốt:** *"replay"* = **phát lại event lên bus**, **KHÔNG** phải *"đánh dấu đã xử lý"*.
+> 📄 Chi tiết đầy đủ: **`XC-005` §21** (metric) + **`XC-002` §18** (DLQ/outbox).
+
+| Việc | Kết quả |
+|---|---|
+| Đường phát lại | `IDeadLetterAppService.PhatLaiAsync(Guid id)` → `POST /api/app/dead-letter/{id}/phat-lai` — **deserialize payload gốc → `IDistributedEventBus.PublishAsync(type, event, onUnitOfWorkComplete: false, useOutbox: true)`** |
+| Cùng UoW | `Begin(requiresNew: true, isTransactional: true)` ⇒ dấu `ReplayedAtUtc` + dòng **outbox** **cùng transaction** (không mất event, không phát hai lần) |
+| Idempotent | `ReplayedAtUtc` + `ReplayCount` (cột **riêng**, **không** suy từ `DaXuLy`) · lần hai ⇒ **200 + `DaPhatLai=false`** + lý do · entity **NÉM `0008`** nếu bị gọi lần hai |
+| Fail-closed | `TenSuKien` không ánh xạ được ⇒ `0009` (kể cả **nhập nhằng** cùng tên ngắn); payload không khớp ⇒ `0010` · **không** publish · HTTP **409** (map ở host, không để ABP trả `403`) |
+| Không xoá | Dòng DLQ **giữ nguyên** làm bằng chứng; chỉ ghi dấu + `DaXuLy` |
+| Quyền | **`eCommerce.Operations.DeadLetters.Replay`** — khai **cả hai nơi** + `quyenPhaiCon` của `kiem-db.ps1` + **seed qua `DbMigrator`** (**71 → 72** quyền) |
+| Metric | `messaging_dlq_replayed_total` **+1 SAU commit** (nhãn `result=ok` · `eventName`) · xoá khỏi `ChuaCoNoiPhat` ⇒ **16/16** |
+
+**Bằng chứng HAI CHIỀU:** unit **11** ca (`DeadLetterPhatLaiTests` — publish đúng **1** lần/đúng dữ liệu, lần hai
+**không** publish + metric **không** tăng, 2 ca fail-closed **NÉM** + metric **0**, 2 ca bộ ánh xạ) ·
+integration **3** ca (đọc/ghi 3 cột + giới hạn 256) · probe HTTP **21/21** (`tools/probe-dlq-replay.ps1`):
+`200` → DB `1|true|true|admin` → **`AbpEventInbox` +1** (event **đã đi thật**) → lần hai **không** có inbox thứ hai →
+`TenSuKien` rác ⇒ **409**, không ghi dấu.
+
+**Đo cổng cuối:** `-DayDu` **exit 0 · 377.4s · 15/15** · unit **1627** · integration **90/90** · E2E **159/159** ·
+DB **25/25** · NND **64** · **72** quyền · migration **50** · quét **99** chỗ · `check:mermaid` **0 lỗi** ·
+`kiem-link-tai-lieu` **0 chết**.
+
+⚠️ **Còn nợ:** không phát lại **tự động** (cố ý) · không phát lại **theo lô** (`ReplayBatchAsync` vẫn là đặc tả) ·
+không có **UI** DLQ · không có job **dọn** DLQ theo thời hạn.

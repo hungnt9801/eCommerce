@@ -4997,6 +4997,16 @@ namespace eCommerce.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<int>("ReplayCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("ReplayedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ReplayedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
                     b.Property<string>("TenSuKien")
                         .IsRequired()
                         .HasMaxLength(512)

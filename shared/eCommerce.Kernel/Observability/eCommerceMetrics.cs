@@ -114,6 +114,8 @@ public static class eCommerceMetricNames
     /// 📌 Đo lại bằng cách quét `src/` + `modules/` + `shared/` (`S16`, 29/10/2026): **15/16** tên có điểm phát,
     /// **1/16 KHÔNG** (`messaging_dlq_replayed_total` — chưa có luồng phát lại thật). ⇒ 🔒 Con số *"12/12"*
     /// trong tài liệu cũ là **nói quá**, và nó tồn tại được **chính vì** không có phép kiểm nào.
+    /// ✅ **`S16b` (29/10/2026): 16/16** — `DeadLetterAppService.PhatLaiAsync` phát lại event thật lên bus
+    /// (qua outbox) và **chỉ** tăng counter **sau khi** commit; `ChuaCoNoiPhat` nay **rỗng**.
     ///
     /// ✅ **CÁCH ĐÓNG NỢ (không phải bằng cách thêm chữ vào tài liệu):** mỗi tên metric có **ký hiệu** để tìm,
     /// và `MetricEmitterTests` khẳng định **CẢ HAI CHIỀU** bằng cách quét mã nguồn:
@@ -167,13 +169,14 @@ public static class eCommerceMetricNames
     public static readonly IReadOnlyDictionary<string, string> ChuaCoNoiPhat =
         new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            // 📌 `MessagingOutboxPending` **ĐÃ ĐÓNG NỢ 24/10/2026** — outbox có thật (`XC-002` §17) và
-            // `OutboxPendingWorker` (project EF) đếm + gọi `SetMessagingOutboxPending` mỗi 60 s.
-            // 🔒 Không được thêm lại vào đây: `MetricEmitterTests` sẽ **đỏ** vì đã có lời gọi thật.
-            [MessagingDlqReplayedTotal] =
-                "CAN TINH NANG: DLQ co chu y KHONG co phat lai TU DONG (`DeadLetterAppService` chi doc + "
-                + "danh dau). Danh dau 'da xu ly' KHONG phai 'da phat lai' ⇒ phat metric nay luc danh dau la "
-                + "NOI DOI. Cho luong phat lai thu cong co that (roi moi dem tai noi phat lai)."
+            // ✅ **RỖNG TỪ 29/10/2026 (`S16b`)** — không còn metric nào đã đăng ký mà chưa có điểm phát.
+            // 📌 `MessagingDlqReplayedTotal` **ĐÃ ĐÓNG NỢ**: `DeadLetterAppService.PhatLaiAsync` **publish lại
+            // event gốc** lên `IDistributedEventBus` (`useOutbox: true`, cùng UoW với dấu `ReplayedAtUtc`) rồi
+            // mới tăng counter. 🔑 Điều kiện để xoá khỏi danh sách này **không** phải "đã có luồng đánh dấu" —
+            // mà là **đã có luồng PHÁT LẠI THẬT**; đếm *"đánh dấu đã xử lý"* thành *"đã phát lại"* là **nói dối**
+            // (`XC-005` §19.3/§20.3).
+            // 🔒 KHÔNG được thêm lại tên nào vào đây để làm test xanh — `MetricEmitterTests` kiểm **hai chiều**
+            // và sẽ ĐỎ nếu khai "chưa có" trong khi mã đã có lời gọi.
         };
 }
 
@@ -225,8 +228,9 @@ public static class eCommerceMetricTags
 /// 🎯 VÌ SAO CÁCH NÀY (chốt Q1 của `XC-005` theo hướng thực dụng):
 ///   `Meter`/`Counter`/`Histogram`/`ObservableGauge` nằm trong BCL (.NET 6+). Chọn công cụ thu thập
 ///   (OpenTelemetry → Prometheus/Grafana…) là việc của **tầng xuất**, có thể thêm **sau** mà **không phải
-///   sửa nơi phát metric**. 📌 `S16` (29/10/2026): **15/16** metric có điểm phát thật; riêng
-///   `messaging_dlq_replayed_total` còn nợ vì **chưa có luồng phát lại DLQ** (xem `ChuaCoNoiPhat`).
+///   sửa nơi phát metric**. 📌 `S16` (29/10/2026): **15/16** metric có điểm phát thật; `S16b` (cùng ngày):
+///   **16/16** — `messaging_dlq_replayed_total` có điểm phát ở `DeadLetterAppService.PhatLaiAsync`
+///   (xem `ChuaCoNoiPhat`, nay rỗng).
 ///
 /// 📌 Gauge dùng cơ chế "giá trị do nơi phát cập nhật" (`Set…`), vì ta không có nguồn pull định kỳ.
 /// </summary>
@@ -239,7 +243,16 @@ public sealed class eCommerceMetrics : ISingletonDependency
 
     // ---- Counter ----
     public Counter<long> MessagingInboxFailed { get; }
+
+    /// <summary>
+    /// 🚨 **SỐ LẦN PHÁT LẠI DLQ THÀNH CÔNG** (`XC-002` NFR-009).
+    /// 🔒 Chỉ tăng **sau khi** UoW (dấu `ReplayedAtUtc` + dòng outbox) đã **commit** ⇒ không đếm một lần
+    /// phát lại có thể bị rollback. 📌 Không tăng khi: dòng đã phát lại trước đó (idempotent), `TenSuKien`
+    /// không ánh xạ được (fail-closed), payload không deserialize được, hoặc publish/commit ném.
+    /// Nhãn: `eventName` (hữu hạn — số loại sự kiện) · `result` = `ok` (`XC-005` §5.1).
+    /// </summary>
     public Counter<long> MessagingDlqReplayed { get; }
+
     public Counter<long> LockTimeout { get; }
     public Counter<long> LockSkipped { get; }
     public Counter<long> LockTtlExceeded { get; }

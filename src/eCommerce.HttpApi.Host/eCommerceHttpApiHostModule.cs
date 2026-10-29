@@ -327,6 +327,18 @@ public class eCommerceHttpApiHostModule : AbpModule
             // *"chọn mã khác"*, `0003` nói *"người này đã là khách"* — hai việc khác nhau, hai chỉ dẫn khác nhau.
             options.Map(eCommerce.Customers.CustomerErrorCodes.MaNhomDaTonTai, System.Net.HttpStatusCode.Conflict);          // 0008
 
+            // ── PHÁT LẠI DLQ (`S16b`, `XC-002`) ────────────────────────────────────────────────
+            // 🔑 VÌ SAO PHẢI MAP (cùng lý do `ADDR-004` §12 ở trên): không map ⇒ ABP trả **`403`** cho
+            // `BusinessException` ⇒ client đọc thành *"tôi không có quyền"* trong khi thật ra
+            // **dữ liệu DLQ không cho phép phát lại**. 📌 Với thao tác nguy hiểm này, đọc sai nguyên nhân
+            // nghĩa là người trực **xin quyền** thay vì **sửa `TenSuKien`/payload** — và sự kiện **nằm đó mãi**.
+            // `409` = yêu cầu hợp lệ nhưng **trạng thái bản ghi** không cho phép (đã phát lại / không ánh xạ
+            // được loại / payload không khớp). 🔒 Mã lỗi vẫn là nguồn sự thật (`0008`/`0009`/`0010`).
+            options.Map(eCommerce.Messaging.MessagingErrorCodes.DaPhatLai, System.Net.HttpStatusCode.Conflict);                    // 0008
+            options.Map(eCommerce.Messaging.MessagingErrorCodes.KhongXacDinhDuocLoaiSuKien, System.Net.HttpStatusCode.Conflict);   // 0009
+            options.Map(eCommerce.Messaging.MessagingErrorCodes.PayloadKhongKhopLoaiSuKien, System.Net.HttpStatusCode.Conflict);   // 0010
+            options.Map(eCommerce.Messaging.MessagingErrorCodes.KhongTimThay, System.Net.HttpStatusCode.NotFound);                  // 0007
+
             // ── Hạ tầng chung ──────────────────────────────────────────────────────────────────
             // Không giành được khoá phân tán ⇒ **409** (client thử lại được) — `ADDR-004` §12 ghi rõ.
             options.Map(eCommerceConsts.ErrorCodes.KhongGianhDuocKhoa, System.Net.HttpStatusCode.Conflict);

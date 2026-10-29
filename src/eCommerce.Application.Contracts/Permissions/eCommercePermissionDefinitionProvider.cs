@@ -138,7 +138,11 @@ public class eCommercePermissionDefinitionProvider : PermissionDefinitionProvide
         // 🔐 `XC-002` — vận hành hàng đợi thư chết. 📌 Tách khỏi `Inventory` để giữ **đặc quyền tối thiểu**
         // (DLQ chứa payload sự kiện ⇒ đọc nó là một quyền **riêng**).
         var operations = group.AddPermission(eCommerceConsts.Permissions.Operations.Default);
-        operations.AddChild(eCommerceConsts.Permissions.Operations.DeadLetters);
+        var deadLetters = operations.AddChild(eCommerceConsts.Permissions.Operations.DeadLetters);
+        // 🆕 `S16b` — **PHÁT LẠI** DLQ là hành động **nguy hiểm** (gửi lại sự kiện vào hệ thống) ⇒ quyền RIÊNG,
+        // tách khỏi quyền đọc. 🔒 Thiếu dòng này ⇒ `403` cho MỌI người kể cả `admin` (`XC-004` D2) — và
+        // 📌 triệu chứng đó **không trỏ tới chỗ sai**; 🛡️ lưới an toàn `BatBienPhanQuyenTests.TC02b`.
+        deadLetters.AddChild(eCommerceConsts.Permissions.Operations.DeadLettersReplay);
         var customers = group.AddPermission(eCommerceConsts.Permissions.Customers.Default);
         customers.AddChild(eCommerceConsts.Permissions.Customers.Manage);
         // 🚨 `S3` (`CUS-001` ADR-09): nhóm khách là ĐẦU VÀO CỦA BẢNG GIÁ (`PRC-001` Q5) ⇒ đổi nhóm là đổi

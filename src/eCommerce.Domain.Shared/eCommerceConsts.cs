@@ -223,6 +223,22 @@ public static class eCommerceConsts
             /// <summary>Đọc + đánh dấu đã xử lý một dòng DLQ. 📌 Tách riêng khỏi `Default` khi nào có nhu cầu
             /// *"chỉ xem, không sửa"* — hiện **chưa** cần, nên **không** thêm (tránh quyền **chết**).</summary>
             public const string DeadLetters = Default + ".DeadLetters";
+
+            /// <summary>
+            /// 🚨 **PHÁT LẠI MỘT DÒNG DLQ LÊN BUS** (`S16b`) — tên đầy đủ `eCommerce.Operations.DeadLetters.Replay`.
+            ///
+            /// 🔑 **VÌ SAO PHẢI TÁCH KHỎI QUYỀN ĐỌC `DeadLetters`:** đọc DLQ là **xem bằng chứng**; phát lại là
+            /// **gửi lại một sự kiện vào hệ thống** — nó có thể **ghi dữ liệu** (tạo/đổi đơn, sổ cái, tiền) và
+            /// có thể **hỏng lại** rồi sinh DLQ mới. 📌 Gộp hai việc vào một quyền nghĩa là **ai xem được DLQ
+            /// cũng gửi lại được** — đúng kiểu mở quyền không cần thiết mà `XC-004` cấm.
+            ///
+            /// 🔒 **BẮT BUỘC khai ở CẢ HAI NƠI** (hằng số này **và** `eCommercePermissionDefinitionProvider`):
+            /// thiếu một nơi ⇒ permission **luôn bị từ chối** ⇒ `403` cho **mọi người** kể cả `admin`
+            /// (`XC-004` **D2**; 🛡️ lưới an toàn `BatBienPhanQuyenTests.TC02b`).
+            /// ➕ Phải có trong danh sách `quyenPhaiCon` của `tools/kiem-db.ps1` và **chạy `DbMigrator`** để
+            /// seed grant cho role `admin`.
+            /// </summary>
+            public const string DeadLettersReplay = DeadLetters + ".Replay";
         }
 
         public static class Customers

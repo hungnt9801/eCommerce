@@ -314,6 +314,10 @@ $quyenPhaiCon = @(
     'eCommerce.Pricing',            # 🔒 quyen goc — da tung bi mat va da co lan phai sua
     'eCommerce.Operations',         # XC-002 DLQ
     'eCommerce.Operations.DeadLetters',
+    # 🆕 `S16b` (29/10/2026) — quyen **PHAT LAI** DLQ (hanh dong nguy hiem: gui lai su kien vao he thong).
+    # 📌 Vao danh sach nay vi: (a) thieu o provider ⇒ `403` cho MOI nguoi ke ca admin; (b) neu grant khong
+    # duoc seed thi nut "phat lai" tren UI/API **khong bao gio** dung duoc va trieu chung khong tro toi cho sai.
+    'eCommerce.Operations.DeadLetters.Replay',
     'eCommerce.ChannelLimits',      # INV-003 (muc 1 cua goi ban giao)
     'eCommerce.ChannelLimits.Manage',
     'eCommerce.Customers',          # CUS-001

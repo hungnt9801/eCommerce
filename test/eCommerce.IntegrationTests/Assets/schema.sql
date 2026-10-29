@@ -3071,3 +3071,15 @@ VALUES ('20261028041254_Gd1S14_OrderReturn', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+ALTER TABLE "MsgDeadLetters" ADD "ReplayCount" integer NOT NULL DEFAULT 0;
+
+ALTER TABLE "MsgDeadLetters" ADD "ReplayedAtUtc" timestamp with time zone;
+
+ALTER TABLE "MsgDeadLetters" ADD "ReplayedBy" character varying(256);
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261029033402_Xc002_DlqReplay', '10.0.11');
+
+COMMIT;
+

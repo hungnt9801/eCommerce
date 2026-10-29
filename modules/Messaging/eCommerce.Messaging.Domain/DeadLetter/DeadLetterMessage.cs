@@ -51,9 +51,10 @@ public enum LyDoVaoDlq
 ///   <item>**Xử lý là XOÁ MỀM / đánh dấu**, KHÔNG xoá cứng — 📌 đây là **bằng chứng** về một sự kiện đã hỏng;
 ///     xoá đi thì lần sau gặp lại **không ai biết** nó từng xảy ra.</item>
 /// </list>
-/// ⚠️ **GIỚI HẠN ĐÃ BIẾT:** bảng này **chỉ** ghi lại; **chưa** có **phát lại tự động** và **chưa** có job dọn
-/// theo thời hạn. 📌 Nếu không dọn, DLQ **sẽ phình** — và một hàng đợi không bao giờ được đọc thì
-/// **tệ như không có**. Ghi ở `sal-005` §18.
+/// ⚠️ **GIỚI HẠN ĐÃ BIẾT:** bảng này **chỉ** ghi lại; **chưa** có **phát lại TỰ ĐỘNG** (replay *có người
+/// quyết định* đã có từ `S16b` — `IDeadLetterAppService.PhatLaiAsync`) và **chưa** có job dọn theo thời hạn.
+/// 📌 Nếu không dọn, DLQ **sẽ phình** — và một hàng đợi không bao giờ được đọc thì **tệ như không có**.
+/// Ghi ở `sal-005` §18.
 /// </summary>
 public class DeadLetterMessage : FullAuditedAggregateRoot<Guid>, IMultiTenant
 {
@@ -65,6 +66,9 @@ public class DeadLetterMessage : FullAuditedAggregateRoot<Guid>, IMultiTenant
 
     /// <summary>Độ dài tối đa của lý do dạng chữ — khớp `HasMaxLength(2000)`.</summary>
     public const int DoDaiLyDoToiDa = 2000;
+
+    /// <summary>Độ dài tối đa của người phát lại — khớp `HasMaxLength(256)`.</summary>
+    public const int DoDaiNguoiPhatLaiToiDa = 256;
 
     public Guid? TenantId { get; protected set; }
 
@@ -105,6 +109,34 @@ public class DeadLetterMessage : FullAuditedAggregateRoot<Guid>, IMultiTenant
 
     /// <summary>Lý do xử lý — 🔒 **BẮT BUỘC** khi đánh dấu đã xử lý (chênh lệch dữ liệu là **tài sản**, cần audit).</summary>
     public string? LyDoXuLy { get; protected set; }
+
+    // ── PHÁT LẠI LÊN BUS (`S16b`) — 🔒 bằng chứng của một lần **publish lại THẬT** ───────────────
+
+    /// <summary>
+    /// 🚨 **MỐC PHÁT LẠI THÀNH CÔNG** — `null` = **chưa từng** phát lại. 🔒 Đây là **khoá idempotency**
+    /// của thao tác replay: một dòng DLQ chỉ được phát lại **MỘT lần**.
+    ///
+    /// **VÌ SAO PHẢI LÀ CỘT RIÊNG (không suy từ `DaXuLy`):** `DaXuLy` = *"đã xử lý"* — người trực có thể
+    /// đánh dấu **bỏ qua có lý do** mà **không hề** phát lại. 🔑 Nếu dùng `DaXuLy` làm khoá chống phát trùng
+    /// thì hai **sự thật khác nhau** (*"đã bỏ qua"* vs *"đã phát lại"*) bị gộp làm một — và 📌 lần phát lại
+    /// **đầu tiên** của một dòng đã đánh dấu sẽ **bị chặn** (hoặc tệ hơn: một dòng đã phát lại bị coi như
+    /// chưa, rồi phát **hai lần** ⇒ consumer nhận trùng).
+    /// </summary>
+    public DateTime? ReplayedAtUtc { get; protected set; }
+
+    /// <summary>
+    /// Số lần **đã phát lại thành công**. 📌 Luật hiện hành: tối đa **1** (xem <see cref="DanhDauDaPhatLai"/>).
+    /// 🔑 Cột này **không** phải "cho đủ bộ": nó là **vết kiểm toán** độc lập với `ReplayedAtUtc` (một cột
+    /// thời điểm có thể bị ghi đè bởi một lần sửa tay; một bộ đếm thì **lộ** ra ngay). ➕ Nếu sau này chính
+    /// sách cho phép phát lại **sau khi sửa lỗi gốc**, bộ đếm đã sẵn — **không** phải migration mới.
+    /// </summary>
+    public int ReplayCount { get; protected set; }
+
+    /// <summary>Ai đã bấm phát lại — 🔒 audit: phát lại một sự kiện đã hỏng là **quyết định của con người**.</summary>
+    public string? ReplayedBy { get; protected set; }
+
+    /// <summary>Đã phát lại lên bus **thành công** chưa (🔒 đọc từ `ReplayedAtUtc`, không phải từ `DaXuLy`).</summary>
+    public bool DaPhatLai => ReplayedAtUtc.HasValue;
 
     protected DeadLetterMessage() { }
 
@@ -223,5 +255,50 @@ public class DeadLetterMessage : FullAuditedAggregateRoot<Guid>, IMultiTenant
         XuLyLucUtc = thoiDiemUtc;
         NguoiXuLy = nguoiXuLy.Trim();
         LyDoXuLy = lyDo;
+    }
+
+    /// <summary>
+    /// 🔒 **ĐÁNH DẤU ĐÃ PHÁT LẠI LÊN BUS** — bất biến **một lần duy nhất** cho mỗi dòng DLQ.
+    ///
+    /// 🚨 **VÌ SAO PHẢI CHẶN LẦN THỨ HAI (không phải "cho chắc"):** phát lại = **publish lại event gốc**.
+    /// Hai lần publish ⇒ consumer **nhận hai lần** cùng một sự kiện nghiệp vụ ⇒ với luồng nào **chưa**
+    /// idempotent ở phía nhận thì đó là **ghi trùng** (đơn/sổ cái/tiền). 🔑 Idempotency ở consumer là
+    /// **lưới thứ hai**, **không** phải lý do để bỏ lưới thứ nhất.
+    ///
+    /// 📌 **Thứ tự kiểm**: **CHẶN TRÙNG TRƯỚC**, rồi mới kiểm tham số — cùng lý do đã ghi ở
+    /// <see cref="DanhDauDaXuLy"/> (một retry không mang đủ tham số **không** được làm lộ ra như lỗi tham số
+    /// khi việc cần làm là *"không có gì để làm"*). ⚠️ Nhưng ở đây **vẫn NÉM** thay vì no-op: no-op sẽ khiến
+    /// nơi gọi **tưởng** đã phát lại thành công và 📌 **tăng metric** — đúng kiểu metric nói dối mà `XC-005`
+    /// cấm. Ở tầng app service, ca *"đã phát lại rồi"* được **kiểm trước** và trả DTO **bỏ qua** (không ném).
+    /// </summary>
+    public void DanhDauDaPhatLai(DateTime thoiDiemUtc, string nguoiPhatLai)
+    {
+        if (ReplayedAtUtc.HasValue)
+        {
+            throw new BusinessException(MessagingErrorCodes.DaPhatLai)
+                .WithData("khoa", KhoaNghiepVu)
+                .WithData("mocPhatLaiTruoc", ReplayedAtUtc.Value)
+                .WithData("lyDo", "Mỗi dòng DLQ chỉ được phát lại MỘT lần — phát lại lần hai là gửi trùng cho consumer.");
+        }
+
+        if (string.IsNullOrWhiteSpace(nguoiPhatLai))
+        {
+            throw new BusinessException(MessagingErrorCodes.ThieuThongTinBatBuoc)
+                .WithData("truong", nameof(nguoiPhatLai))
+                .WithData("khoa", KhoaNghiepVu)
+                .WithData("lyDo", "Thiếu người phát lại ⇒ không biết AI đã quyết định gửi lại sự kiện này.");
+        }
+
+        var nguoi = nguoiPhatLai.Trim();
+
+        if (nguoi.Length > DoDaiNguoiPhatLaiToiDa)
+        {
+            throw new BusinessException(MessagingErrorCodes.ThieuThongTinBatBuoc)
+                .WithData("truong", nameof(nguoiPhatLai)).WithData("toiDa", DoDaiNguoiPhatLaiToiDa);
+        }
+
+        ReplayedAtUtc = thoiDiemUtc;
+        ReplayCount += 1;
+        ReplayedBy = nguoi;
     }
 }

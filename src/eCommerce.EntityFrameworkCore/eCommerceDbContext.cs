@@ -345,6 +345,10 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>, IHasEventOut
             b.Property(x => x.LyDoXuLy).HasMaxLength(Messaging.DeadLetter.DeadLetterMessage.DoDaiLyDoToiDa);
             b.Property(x => x.CorrelationId).HasMaxLength(128);
 
+            // 🆕 `S16b` — **BẰNG CHỨNG PHÁT LẠI** (migration `Xc002_DlqReplay`).
+            // 🔒 Cột RIÊNG, không suy từ `DaXuLy`: *"đã bỏ qua"* ≠ *"đã phát lại"* (xem chú thích entity).
+            b.Property(x => x.ReplayedBy).HasMaxLength(Messaging.DeadLetter.DeadLetterMessage.DoDaiNguoiPhatLaiToiDa);
+
             // 📌 `PayloadJson` là `text` (không giới hạn độ dài): 🔒 **CẮT payload là không phát lại được** —
             // đúng bất biến (1) ở chú thích entity.
             b.Property(x => x.PayloadJson).IsRequired();
