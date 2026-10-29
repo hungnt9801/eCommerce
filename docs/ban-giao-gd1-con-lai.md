@@ -1,6 +1,6 @@
 # BÀN GIAO — Phần còn lại của GĐ1 (để mở session mới)
 
-> **Lập ngày:** 28/10/2026 · **Cập nhật:** 28/10/2026 (sau `S12` + `S13` + `S14A` + `S15`) · **Cây:** `main` (sạch) · **Người lập:** phiên tự động
+> **Lập ngày:** 28/10/2026 · **Cập nhật:** 29/10/2026 (sau `S12` + `S13` + `S14A` + `S15` + `S17` + `S16`) · **Cây:** `main` (sạch) · **Người lập:** phiên tự động
 >
 > 🔑 **Đọc mục 1 trước.** Tài liệu này **không** nói GĐ1 đã xong. Nó chốt **đang ở đâu**, **còn gì**, và
 > **làm theo thứ tự nào** để không phải đoán lại.
@@ -9,15 +9,15 @@
 
 ## 1. Ảnh chụp hiện tại (đo được, không phải lời khai)
 
-> 📌 **Số đo này là SAU `S13` + `S14` phần A + `S15` + `S17`** (29/10/2026). Bảng cũ trước `S12` (unit **1528** ·
+> 📌 **Số đo này là SAU `S13` + `S14` phần A + `S15` + `S17` + `S16`** (29/10/2026). Bảng cũ trước `S12` (unit **1528** ·
 > integration **71** · E2E **135** · NND **57** · **68** quyền · **89** chỗ quét · **46** migration) đã **trôi** —
 > đừng dùng.
 
 | Hạng mục | Giá trị | Cách đo |
 |---|---|---|
 | Commit | `git log --oneline -1` | 🔒 **nguồn sự thật là lệnh**, không phải dòng trong tài liệu |
-| Cổng đầy đủ | **exit 0 · 396.3s · 15/15 bước** | `pwsh -File tools\kiem-tat-ca.ps1 -DayDu` |
-| Unit | **1605** | bước ③ |
+| Cổng đầy đủ | **exit 0 · 370.7s · 15/15 bước** | `pwsh -File tools\kiem-tat-ca.ps1 -DayDu` |
+| Unit | **1612** | bước ③ |
 | Integration | **87/87** | bước ④ |
 | E2E (HTML thật) | **145/145** | bước ⑧ |
 | Bất biến DB | **25/25** · **NND 64** · **71 quyền** · **99** chỗ quét | bước ⑥ |
@@ -42,6 +42,7 @@
 | UI đọc: `/Brands` (CRUD trừ xoá) · `/Kho` · `/Pricing` | menu + controller + view; E2E xanh |
 | **`S13` — `StockAllotment` + sổ cái ngân sách** | `INV-003` **§21**: migration **48** · NND **60** · quyền `Allotment.Manage`/`Allotment.Release` (seed **71**) · giữ chỗ/nhả/chốt **trừ & trả** ngân sách kênh · **+11 unit · +6 integration** · ⚠️ **chưa có UI**, **chưa tự thu hồi** |
 | **`S15` — `StalePendingTransaction` + `TriggerRunAsync`** | `REC-001` **§20**: ngưỡng `Reconciliation:StalePendingHours` = **24** (`0` = TẮT) · **10/10** loại lệch · `TriggerRunAsync` **cùng khoá** với job (`IPaymentReconciliationRunner`) · **+17 unit** · probe thanh toán **26 → 30/30** (HTTP + DB + dọn sạch) · **không** migration |
+| **`S16` — 2/3 metric còn nợ** | `XC-005` **§20**: `lock_ttl_exceeded_total` (decorator `IAbpDistributedLock`, nghe `HandleLostToken`) + `logging_failures_total` (bọc `ILoggerProvider`, stderr + counter) · **+7 unit** · `MessagingDlqReplayedTotal` **vẫn nợ** vì chưa có luồng replay thật · **0** migration/schema/quyền/route |
 | **`S12` — `CostPrice` (`PrcCostPrices`)** | `PRC-001` **§20**: migration **47** · NND **58** · quyền **`eCommerce.Pricing.CostPrice.View`** (seed **69**) · `/GiaVon` (chỉ đọc) · **15 unit** + **6 integration** + **5 E2E** (`S12-G1…G5`, đo cả **ẩn danh bị chặn** và **HTML công khai không lộ 777.777**) |
 
 ---
@@ -57,7 +58,7 @@
 | ~~**S13**~~ | ✅ **XONG 28/10/2026** — `StockAllotment` + `StockAllotmentLedger` | [`INV-003` §21](features/inventory/inv-003-phan-bo-ton-theo-kenh.md) | migration **48** · NND **60** · **2 quyền** (seed **71**) · giữ chỗ **trừ ngân sách** kênh (tuỳ chọn theo dòng) · **+11 unit + 6 integration** · ⚠️ **chưa** có UI + **chưa** tự thu hồi khi tồn giảm (§21.5) |
 | 🟡 **S14** | `OrderReturn` + `OrderReturnLine` | [`SAL-006` §28–§29](features/sales/sal-006-tra-hang-rma-hoan-tien.md) | ✅ **phần A:** 3 bảng + `OrderLine.ReturnedQuantity` + 8 CHECK + 4 unique NND (NND **64**), migration **49** · ✅ **phần B:** service + API + idempotency + giữ chỗ trả + nhật ký · ✅ **phần C:** gateway `ICustomerReturnGateway` + chứng từ `CustomerReturn` + ghi sổ, chỉ dòng `Restock` · `Q4` = **chỉ ghi nhận** · ✅ **phần D:** đã **xoá cạnh tắt `Open→Returned`** + migrate `TraHangAsync` (§31) · ❌ còn: ETO, UI RMA, probe HTTP, `PartiallyReturned` | **đã dùng 49** |
 | ~~**S15**~~ | ✅ **XONG 28/10/2026** — `StalePendingTransaction` + `TriggerRunAsync` | [`REC-001` §20](features/reconciliation/rec-001-doi-soat-thanh-toan-querydr.md) | ngưỡng **24 h** (cấu hình, `0` = TẮT) · `TriggerRunAsync` đi qua **cùng khoá** với job · **+17 unit** · **probe 30/30** (HTTP thật) | **không** (ngưỡng là cấu hình) |
-| **S16** | 3 metric còn nợ | [`XC-005` §5.1/§19.3](features/cross-cutting/XC-005-observability-log-metric.md) | `messaging_dlq_replayed_total` (cần luồng replay thật), `lock_ttl_exceeded_total` (cần wrapper TTL), `logging_failures_total` (logger provider) | không (trừ khi thêm wrapper) |
+| 🟡 **S16** | **2/3 metric còn nợ** | [`XC-005` §5.1/§20](features/cross-cutting/XC-005-observability-log-metric.md) | ✅ `lock_ttl_exceeded_total` (decorator `IAbpDistributedLock` + `HandleLostToken`) · ✅ `logging_failures_total` (bọc `ILoggerProvider`) · ❌ `messaging_dlq_replayed_total` **vẫn nợ** — chưa có luồng replay thật, xem **§20.3** | **0** (không schema/migration/quyền) |
 | ~~**S17**~~ | ✅ **XONG 29/10/2026** — hợp đồng cho dịch vụ còn ở host | [`ke-hoach-tach-module` §3.1](ke-hoach-tach-module.md) | `IChannelDirectory`/`IHienThiKenhAppService` (Catalog) + `IChinhSachHanMucAppService`/`IWarehouseAppService` (Inventory) đã ở module Contracts; `WarehouseAppService` **chuyển vào module**, 3 hiện thực còn host + worker được ghim `[ExposeServices]`/lý do · **18 ca** `HopDongHostTests` · **+18 unit** | không |
 | 🟡 **S18** | UI còn thiếu + tài liệu | `WEB-001`, `§A.5` | ✅ **`/NganSach`** (S13) + nút “Chạy đối soát ngay” (S15) + `S18-N1…N5` (**E2E 145**) · ❌ còn: UI RMA (S14), form Pricing/Kho quản trị, **duyệt 7 `XC-*` + 19 tài liệu** (`Q5` — cần chủ dự án) | không |
 | **S19** | VNPay sandbox thật | `PAY-001` | Điền `VnPay:TmnCode/HashSecret`, chạy 1 giao dịch thật | không |
@@ -202,15 +203,17 @@ Sau đó đọc theo thứ tự:
 | `S14` C — nhập lại kho | `ICustomerReturnGateway` + chứng từ `CustomerReturn` + ghi sổ ngay, **chỉ** dòng `Restock` · +1 unit | `73bd907` |
 | `S14` D — xoá cạnh tắt | `Open → Returned` **đã xoá**; `TraHangAsync` đi đủ ba cạnh; test hai chiều | `2065c21` |
 | `S18` — UI | `/NganSach` (danh sách + ATP + cấp/sửa + đóng băng/mở/nhả, **chọn kho từ danh mục thật**) · nút “Chạy đối soát ngay” · **E2E 140 → 145** | `e3e7b77` · `2005cb4` |
+| `S16` — 2/3 metric còn nợ | `lock_ttl_exceeded_total` + `logging_failures_total` có điểm phát thật; **+7 unit**; `messaging_dlq_replayed_total` vẫn nợ (chưa có replay) | `S16` — xem `git log` |
 
-**Đo cuối phiên:** `-DayDu` **exit 0 · 345.2s · 15/15** · unit **1587** · integration **87** · **E2E 145/145** · DB **25/25** · NND **64** · **71** quyền · migration **49** · quét **99** chỗ · cây **0 tệp** · DB **0 rác probe**.
+**Đo cuối phiên:** `-DayDu` **exit 0 · 370.7s · 15/15** · unit **1612** · integration **87** · **E2E 145/145** · DB **25/25** · NND **64** · **71** quyền · migration **49** · quét **99** chỗ · cây **0 tệp** · DB **0 rác probe**.
 
 **Còn lại (chưa làm — không được coi là xong):**
 
-1. `S16` — 3 metric: `messaging_dlq_replayed_total` (**cần luồng replay DLQ thật**), `lock_ttl_exceeded_total`
-   (**cần wrapper đọc TTL khoá** — `IAbpDistributedLock` không lộ TTL), `logging_failures_total`
-   (**cần logger provider bọc sink**). 🚨 `MetricEmitterTests` **ĐỎ** nếu khai báo mà không có điểm phát thật
-   ⇒ **không** được “đăng ký cho đủ số”.
+1. `S16` — **còn đúng 1 metric nợ:** `messaging_dlq_replayed_total` (**cần luồng replay DLQ thật**:
+   đọc `MsgDeadLetters` → phát lại event qua outbox → đánh dấu đã replay → idempotent). ✅ Hai metric còn lại
+   **đã xong** ở §11: `lock_ttl_exceeded_total`, `logging_failures_total`. 🚨 `MetricEmitterTests` **ĐỎ** nếu
+   khai báo mà không có điểm phát thật ⇒ **không** được “đăng ký cho đủ số”; **cấm** đếm "đánh dấu đã xử lý"
+   thành "đã phát lại".
 2. ~~`S17` — hợp đồng cho 5 dịch vụ còn ở host~~ ✅ **XONG 29/10/2026** (xem **§10**): `WarehouseAppService`
    về module; 3 hiện thực còn host + worker được ghim hợp đồng/DI/lý do; **+18 unit**. ⚠️ Còn **nợ riêng**
    (không thuộc S17): hợp đồng đọc ChannelHub/Reconciliation để chuyển nốt 3 lớp; Sales/Reconciliation vẫn
@@ -279,3 +282,45 @@ của ABP. 📌 Hệ quả đã kiểm: E2E `/HanMucKenh` + `/NganSach` (resolve
 3. Namespace legacy `eCommerce.Application.Contracts.Inventory` (của `IWarehouseAppService`/
    `IChinhSachHanMucAppService`) — đổi là refactor lan sang Web/DTO; **không** cần cho biên assembly.
 4. Nợ **khác** của `audit-gd1.md` §0.1 **(b)** (Sales/Reconciliation đọc Domain module khác) — `S17` **không** sửa.
+
+---
+
+## 11. `S16` — 2/3 METRIC CÒN NỢ ĐÃ CÓ ĐIỂM PHÁT THẬT (29/10/2026)
+
+> **Mục tiêu (theo bàn giao §2):** đóng 3 metric nợ của `XC-005` §19.3 **bằng hạ tầng thật**. Kết quả trung thực:
+> **2 xong · 1 còn nợ**.
+
+| Metric | Kết quả | Điểm phát / lý do |
+|---|---|---|
+| `lock_ttl_exceeded_total` | ✅ **XONG** | `DoThoiGianGiuKhoa` ở `src/eCommerce.Application/Observability/` — decorator `IAbpDistributedLock`, nghe `IDistributedSynchronizationHandle.HandleLostToken` |
+| `logging_failures_total` | ✅ **XONG** | `DemLoiGhiLogProvider` — bọc **mọi** `ILoggerProvider` ở **Host + Web**; sink ném ⇒ `Console.Error` + counter; không nuốt log, không đệ quy |
+| `messaging_dlq_replayed_total` | ❌ **CÒN NỢ** | **Chưa có luồng phát lại DLQ.** `DeadLetterAppService` chỉ đọc + đánh dấu; đếm "đánh dấu" thành "phát lại" là nói dối ⇒ giữ trong `ChuaCoNoiPhat` |
+
+### 11.1 ĐÍNH CHÍNH: tham số `timeout` của `IAbpDistributedLock` KHÔNG phải TTL
+
+Đo từ mã ABP 10.7: `MedallionAbpDistributedLock.TryAcquireAsync(name, timeout, ct)` chuyển `timeout` xuống
+`IDistributedLockProvider.TryAcquireLockAsync(key, timeout, ct)` — đó là **thời gian CHỜ giành khoá**, không phải
+TTL lease. TTL thật do Medallion giữ (mặc định 30 s) và **tự gia hạn** khi handle còn sống. Vì vậy **không** so
+"thời gian giữ khoá > timeout" (sẽ báo động giả cho job quét hợp pháp); thay vào đó nghe `HandleLostToken` —
+token **chỉ huỷ khi lease đã mất thật**. Đây là cách duy nhất đo đúng mà không đổi hành vi khoá.
+
+### 11.2 Bằng chứng hai chiều (7 ca mới)
+
+`test/eCommerce.Tests/Observability/S16MetricTests.cs`:
+
+- **CÓ sự kiện:** mất lease ⇒ `lock_ttl_exceeded_total = 1` (nhãn `module` hữu hạn); sink ném ⇒
+  `logging_failures_total = 1` + dòng dự phòng chứa **nguyên** message/exception.
+- **KHÔNG có sự kiện:** trả khoá bình thường ⇒ 0; mất token **sau** khi trả ⇒ 0; sink bình thường ⇒ 0
+  và message vẫn đến sink; không giành được khoá ⇒ vẫn trả `null` như cũ.
+- **DI thật:** `LoggerFactory` + provider thật đi qua wrapper ⇒ sink ném vẫn phát metric.
+
+### 11.3 Không đổi gì ngoài phạm vi
+
+**0 migration · 0 thay đổi schema · 0 quyền mới · 0 route/DTO đổi.** Chỉ thêm 2 lớp decorator ở host/Application,
+đăng ký DI trong `eCommerceHttpApiHostModule`, cập nhật bảng nợ + tài liệu + test.
+
+### 11.4 Đo cổng cuối (cây đã sửa)
+
+- `-DayDu`: **exit 0 · 370.7s · 15/15** · unit **1612** · integration **87/87** · E2E **145/145** ·
+  DB **25/25** · NND **64** · **71** quyền · migration **49** · quét **99** chỗ.
+- `check:mermaid` **0 lỗi** · `kiem-link-tai-lieu` **0 chết**.

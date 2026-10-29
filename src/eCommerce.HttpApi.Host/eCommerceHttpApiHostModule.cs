@@ -1,5 +1,6 @@
 using System.Reflection;
 using eCommerce.EntityFrameworkCore;
+using eCommerce.Observability;
 using eCommerce.Messaging.EventCoverage;
 using Medallion.Threading;
 using Medallion.Threading.Redis;
@@ -153,6 +154,10 @@ public class eCommerceHttpApiHostModule : AbpModule
         context.Services.AddHealthChecks()
             .AddCheck<HealthChecks.DatabaseHealthCheck>("database");
 
+        // 🚨 `S16` — bọc MỌI logger provider để biến lỗi ghi log thành metric + dòng dự phòng ra stderr.
+        // 📌 Phải gọi Ở ĐÂY (sau khi WebApplicationBuilder đã thêm console/debug provider, trước khi build).
+        context.Services.ThemDemLoiGhiLog();
+
         // 🚨 MỤC (2) — HẠ TẦNG HTTP CHO CƠ QUAN THUẾ (EINV-002 phát hiện F3: trước đây repo
         // KHÔNG có IHttpClientFactory). `AddHttpClient` nằm trong shared framework của ứng dụng web
         // ⇒ KHÔNG cần thêm gói NuGet nào.
@@ -245,6 +250,11 @@ public class eCommerceHttpApiHostModule : AbpModule
             var connection = ConnectionMultiplexer.Connect(redisOptions);
             return new RedisDistributedSynchronizationProvider(connection.GetDatabase());
         });
+
+        // 🚨 `S16` — bọc `IAbpDistributedLock` để phát `lock_ttl_exceeded_total` KHI LEASE MẤT THẬT
+        // (qua `HandleLostToken` của Medallion), không so thời gian với tham số `timeout` của ABP
+        // (đó là thời gian CHỜ giành khoá, không phải TTL). Xem `DoThoiGianGiuKhoa`.
+        context.Services.ThemDoThoiGianGiuKhoa();
 
         // Cấu hình ChannelHub / PaymentHub từ appsettings.json.
         Configure<ChannelHub.ChannelHubOptions>(configuration.GetSection("ChannelHub"));

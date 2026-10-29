@@ -111,10 +111,9 @@ public static class eCommerceMetricNames
     ///
     /// 🔑 **VÌ SAO CẦN (đo được, `S10` 21/10/2026):** từ 13/10/2026 tài liệu nói *"12 metric ĐÃ CÓ NƠI PHÁT"*,
     /// ⚠️ nhưng **chưa bao giờ** có phép kiểm nào đối chiếu *"đã đăng ký"* với *"có chỗ gọi thật"*.
-    /// 📌 Đo lại bằng cách quét `src/` + `modules/` + `shared/`: **11/15** tên có điểm phát, **4/15** **KHÔNG**
-    /// (`messaging_outbox_pending` · `messaging_dlq_replayed_total` · `lock_ttl_exceeded_total` ·
-    /// `logging_failures_total`). ⇒ 🔒 Con số *"12/12"* trong tài liệu là **nói quá**, và nó tồn tại được
-    /// **chính vì** không có phép kiểm nào.
+    /// 📌 Đo lại bằng cách quét `src/` + `modules/` + `shared/` (`S16`, 29/10/2026): **15/16** tên có điểm phát,
+    /// **1/16 KHÔNG** (`messaging_dlq_replayed_total` — chưa có luồng phát lại thật). ⇒ 🔒 Con số *"12/12"*
+    /// trong tài liệu cũ là **nói quá**, và nó tồn tại được **chính vì** không có phép kiểm nào.
     ///
     /// ✅ **CÁCH ĐÓNG NỢ (không phải bằng cách thêm chữ vào tài liệu):** mỗi tên metric có **ký hiệu** để tìm,
     /// và `MetricEmitterTests` khẳng định **CẢ HAI CHIỀU** bằng cách quét mã nguồn:
@@ -174,15 +173,7 @@ public static class eCommerceMetricNames
             [MessagingDlqReplayedTotal] =
                 "CAN TINH NANG: DLQ co chu y KHONG co phat lai TU DONG (`DeadLetterAppService` chi doc + "
                 + "danh dau). Danh dau 'da xu ly' KHONG phai 'da phat lai' ⇒ phat metric nay luc danh dau la "
-                + "NOI DOI. Cho luong phat lai thu cong co that (roi moi dem tai noi phat lai).",
-
-            [LockTtlExceededTotal] =
-                "CAN NOI PHAT HIEN: khoa di qua `IAbpDistributedLock` cua ABP (Redis), TTL do thu vien giu va "
-                + "KHONG lo ra ngoai ⇒ khong co cho nao biet 'thao tac vuot TTL'. Cho wrapper lock co doc TTL.",
-
-            [LoggingFailuresTotal] =
-                "CAN HA TANG: chua co logger provider boc sink de bat loi ghi log. Logging hien dung provider "
-                + "mac dinh cua ABP/ASP.NET ⇒ khong co diem bat 'logger/sink hong'."
+                + "NOI DOI. Cho luong phat lai thu cong co that (roi moi dem tai noi phat lai)."
         };
 }
 
@@ -229,13 +220,13 @@ public static class eCommerceMetricTags
 }
 
 /// <summary>
-/// Phát **12 metric** bằng `System.Diagnostics.Metrics` **có sẵn trong .NET** — **KHÔNG thêm gói NuGet nào**.
+/// Phát **16 metric** bằng `System.Diagnostics.Metrics` **có sẵn trong .NET** — **KHÔNG thêm gói NuGet nào**.
 ///
 /// 🎯 VÌ SAO CÁCH NÀY (chốt Q1 của `XC-005` theo hướng thực dụng):
 ///   `Meter`/`Counter`/`Histogram`/`ObservableGauge` nằm trong BCL (.NET 6+). Chọn công cụ thu thập
 ///   (OpenTelemetry → Prometheus/Grafana…) là việc của **tầng xuất**, có thể thêm **sau** mà **không phải
-///   sửa nơi phát metric**. Nhờ vậy 12 metric đang bị "nợ" nay **đã có nơi phát thật** mà không kéo thêm
-///   dependency nào vào dự án.
+///   sửa nơi phát metric**. 📌 `S16` (29/10/2026): **15/16** metric có điểm phát thật; riêng
+///   `messaging_dlq_replayed_total` còn nợ vì **chưa có luồng phát lại DLQ** (xem `ChuaCoNoiPhat`).
 ///
 /// 📌 Gauge dùng cơ chế "giá trị do nơi phát cập nhật" (`Set…`), vì ta không có nguồn pull định kỳ.
 /// </summary>
@@ -307,7 +298,8 @@ public sealed class eCommerceMetrics : ISingletonDependency
         LockSkipped = _meter.CreateCounter<long>(eCommerceMetricNames.LockSkippedTotal,
             unit: "{attempt}", description: "Job định kỳ bỏ qua lượt vì khoá đang bận (XC-003).");
         LockTtlExceeded = _meter.CreateCounter<long>(eCommerceMetricNames.LockTtlExceededTotal,
-            unit: "{occurrence}", description: "Số lần thao tác VƯỢT TTL của khoá — kỳ vọng 0 (XC-003).");
+            unit: "{occurrence}",
+            description: "Số lần LEASE khoá phân tán bị MẤT (HandleLostToken) — tức vượt TTL, kỳ vọng 0 (XC-003).");
         PaymentWebhookRejected = _meter.CreateCounter<long>(eCommerceMetricNames.PaymentWebhookRejectedTotal,
             unit: "{webhook}", description: "Webhook thanh toán bị từ chối (sai chữ ký, sai số tiền).");
         ChannelSyncFailed = _meter.CreateCounter<long>(eCommerceMetricNames.ChannelSyncFailedTotal,

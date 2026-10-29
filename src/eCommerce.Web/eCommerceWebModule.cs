@@ -1,3 +1,4 @@
+using eCommerce.Observability;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -80,6 +81,11 @@ public class eCommerceWebModule : AbpModule
     public override void ConfigureServices(ServiceConfigurationContext context)
     {
         var configuration = context.Services.GetConfiguration();
+
+        // 🚨 `S16` — lỗi ghi log của **tiến trình Web** cũng phải đếm được. Host và Web là hai tiến trình
+        // riêng, cùng một `Meter` name nhưng khác bộ thu; thiếu dòng này thì UI gặp sink hỏng mà
+        // `logging_failures_total` vẫn 0 ⇒ "không có lỗi" và "không ai đo" trông giống nhau.
+        context.Services.ThemDemLoiGhiLog();
 
         // ── Cùng DB với Host (một nguồn dữ liệu duy nhất).
         Configure<AbpDbConnectionOptions>(options =>
