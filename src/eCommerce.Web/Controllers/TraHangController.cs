@@ -117,9 +117,9 @@ public class TraHangController : Controller
     /// <summary>
     /// `POST /TraHang/NhanHang` ⇒ `NhanHangAsync` (mỗi dòng: số nhận + `Restock|Damaged|ReturnToSupplier`).
     ///
-    /// 🚨 **GỬI CẢ PHIẾU TRONG MỘT LẦN** (không phải từng dòng một): `OrderReturn.NhanHang` chỉ xét các dòng
-    /// **có trong lần gọi** khi quyết định `GoodsStatus` ⇒ gọi lẻ từng dòng có thể đánh dấu *"đã nhận đủ"*
-    /// khi dòng khác **chưa về**. 📌 Giới hạn này đã ghi ở `SAL-006` §32.3 (nợ, không sửa trong lát cắt UI).
+    /// 📌 Màn hình gửi **cả phiếu** trong một lần (mỗi dòng đều có số nhận ≥ 1). Từ **`S14F`**, `GoodsStatus`
+    /// được tính trên **toàn bộ** dòng của phiếu ở tầng dịch vụ (`daNhanDuTatCaDong`) ⇒ gọi lẻ từng dòng **cũng**
+    /// không thể kết luận *"đã nhận đủ"* khi còn dòng chưa về (`SAL-006` §33.1).
     /// </summary>
     [HttpPost]
     [ValidateAntiForgeryToken]
@@ -134,9 +134,9 @@ public class TraHangController : Controller
             var soLuong = i < (soLuongNhan?.Count ?? 0) ? soLuongNhan![i] : 0;
             var cachXuLy = i < (xuLy?.Count ?? 0) ? xuLy![i] : string.Empty;
 
-            // 🚨 `ReceivedQuantity = 0` + `Disposition` khác `Unset` **vi phạm CHECK của DB**
-            // (`CK_OrdReturnLines_Disposition_ChiSauKhiNhan`) ⇒ nếu để lọt, người dùng nhận `500` thay vì
-            // câu giải thích. 📌 Chặn ở biên và **dừng** (không ghi gì).
+            // 📌 Chặn sớm ở biên để người dùng thấy câu giải thích ngay tại chỗ; 🚨 từ **`S14F`** tầng domain
+            // **cũng** ném `eCommerce:Sales:0010` cho `0` + disposition (`SAL-006` §33.2) ⇒ đây không còn là
+            // hàng rào duy nhất, và sẽ không thể lọt xuống `CHECK` của DB để thành `500`.
             if (soLuong < 1)
             {
                 TempData["LoiTraHang"] =

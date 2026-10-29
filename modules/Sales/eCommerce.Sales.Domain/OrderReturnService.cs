@@ -228,10 +228,26 @@ public class OrderReturnService : DomainService
             capNhat.Add((d, soLuong, xuLy));
         }
 
+        // 🚨 `S14F` — "nhận đủ" phải tính trên **TOÀN BỘ** dòng của phiếu, không phải tập con của lần gọi.
+        // 📌 Số nhận hiệu lực của một dòng sau lần gọi này = số sắp ghi (khi > 0); `0` + `Unset` là **no-op**
+        // nên giữ nguyên số đã có. Đây đúng là giá trị `GhiNhanHang` sẽ để lại trên dòng.
+        var soNhanSau = dong.ToDictionary(x => x.Id, x => x.ReceivedQuantity);
+
+        foreach (var (d, soLuong, _) in capNhat)
+        {
+            if (soLuong > 0)
+            {
+                soNhanSau[d.Id] = soLuong;
+            }
+        }
+
+        var daNhanDuTatCaDong = dong.Count > 0
+            && dong.All(x => soNhanSau[x.Id] >= x.Quantity);
+
         var truocLifecycle = phieu.Status;
         var truocGoods = phieu.GoodsStatus;
 
-        phieu.NhanHang(actorType.ToString(), actorId, capNhat, at);
+        phieu.NhanHang(actorType.ToString(), actorId, capNhat, daNhanDuTatCaDong, at);
 
         foreach (var (d, _, _) in capNhat)
         {

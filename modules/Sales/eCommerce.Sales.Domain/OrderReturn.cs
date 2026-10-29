@@ -230,6 +230,11 @@ public class OrderReturn : FullAuditedAggregateRoot<Guid>, IMultiTenant
     /// <summary>
     /// Ghi nhận **đã nhận hàng hoàn** và disposition cho từng dòng. **NÉM** nếu chưa `Approved`,
     /// số lượng nhận không hợp lệ, hoặc chưa chọn disposition.
+    ///
+    /// 🚨 **`S14F` — `GoodsStatus` KHÔNG được suy từ `ketQua`:** `ketQua` chỉ là **tập con** các dòng của lần gọi,
+    /// nên *"mọi dòng trong lần gọi đã đủ"* **không** đồng nghĩa *"cả phiếu đã về đủ"* (lỗi đã đo ở `SAL-006`
+    /// §32.4 #1). Người gọi **bắt buộc** truyền `daNhanDuTatCaDong` đã tính trên **toàn bộ** dòng của phiếu.
+    ///
     /// 📌 **Không** tự hoàn kho ở đây: bút toán kho do tầng dịch vụ tạo qua chứng từ `CustomerReturn`
     /// (slice riêng) — entity chỉ giữ **sự thật nghiệp vụ**.
     /// </summary>
@@ -237,6 +242,7 @@ public class OrderReturn : FullAuditedAggregateRoot<Guid>, IMultiTenant
         string actorType,
         Guid? actorId,
         IReadOnlyCollection<(OrderReturnLine Dong, int SoLuongNhan, ReturnDisposition XuLy)> ketQua,
+        bool daNhanDuTatCaDong,
         DateTime atUtc)
     {
         if (Status != ReturnLifecycleStatus.Approved)
@@ -254,14 +260,17 @@ public class OrderReturn : FullAuditedAggregateRoot<Guid>, IMultiTenant
             dong.GhiNhanHang(soLuongNhan, xuLy);
         }
 
-        GoodsStatus = ketQua.All(x => x.SoLuongNhan >= x.Dong.Quantity)
-            ? ReturnGoodsStatus.Received
-            : ReturnGoodsStatus.PartiallyReceived;
-
-        if (GoodsStatus == ReturnGoodsStatus.Received)
+        if (daNhanDuTatCaDong)
         {
+            GoodsStatus = ReturnGoodsStatus.Received;
             Status = ReturnLifecycleStatus.Received;
             ReceivedAtUtc = atUtc;
+        }
+        else if (ketQua.Any(x => x.SoLuongNhan > 0) || GoodsStatus == ReturnGoodsStatus.PartiallyReceived)
+        {
+            // 📌 Giữ **đơn điệu**: một lần gọi toàn số 0 (no-op hợp lệ) không được kéo phiếu từ
+            // `PartiallyReceived` về `Awaiting` — hàng đã về thì không "về lại".
+            GoodsStatus = ReturnGoodsStatus.PartiallyReceived;
         }
 
         Version++;
@@ -373,7 +382,14 @@ public class OrderReturnLine : FullAuditedEntity<Guid>, IMultiTenant
         RefundAmount = (unitPriceSnapshot - discountAmountSnapshot) * quantity;
     }
 
-    /// <summary>Ghi nhận hàng về cho dòng này. **NÉM** nếu vượt số yêu cầu hoặc disposition không hợp lệ.</summary>
+    /// <summary>
+    /// Ghi nhận hàng về cho dòng này. **NÉM** nếu vượt số yêu cầu hoặc disposition không hợp lệ.
+    ///
+    /// 🚨 **`S14F` — `ReceivedQuantity = 0` là NO-OP, không phải "đã nhận":** số `0` kèm `Disposition` khác
+    /// `Unset` **NÉM** `Sales:0010` **ngay tại đây** (trước khi chạm DB) — nếu để xuống DB, `CHECK`
+    /// `CK_OrdReturnLines_Disposition_ChiSauKhiNhan` sẽ ném `DbUpdateException` ⇒ API trả **`500`** thay vì mã
+    /// nghiệp vụ (`SAL-006` §32.4 #2). Số `0` + `Unset` là **no-op hợp lệ**: giữ nguyên số nhận/disposition đã có.
+    /// </summary>
     public void GhiNhanHang(int soLuongNhan, ReturnDisposition xuLy)
     {
         if (soLuongNhan < 0 || soLuongNhan > Quantity)
@@ -381,6 +397,18 @@ public class OrderReturnLine : FullAuditedEntity<Guid>, IMultiTenant
             throw new BusinessException(SalesErrorCodes.PhieuTraKhongHopLe)
                 .WithData("lyDo", "Số lượng nhận phải trong [0, Quantity].")
                 .WithData("soLuongNhan", soLuongNhan).WithData("quantity", Quantity);
+        }
+
+        if (soLuongNhan == 0)
+        {
+            if (xuLy != ReturnDisposition.Unset)
+            {
+                throw new BusinessException(SalesErrorCodes.PhieuTraKhongHopLe)
+                    .WithData("lyDo", "Nhận 0 thì KHÔNG được chọn cách xử lý (bỏ trống = không nhận dòng này).")
+                    .WithData("disposition", xuLy.ToString()).WithData("sku", Sku);
+            }
+
+            return;   // No-op: KHÔNG ghi đè số nhận/disposition đã có (có thể đã nhận ở lần trước).
         }
 
         if (xuLy == ReturnDisposition.Unset)

@@ -79,7 +79,7 @@ public class OrderReturnTests
         phieu.Duyet("Staff", Guid.NewGuid());
         var dong = Dong(phieu);
 
-        phieu.NhanHang("Staff", Guid.NewGuid(), [(dong, 2, ReturnDisposition.Restock)], DateTime.UtcNow);
+        phieu.NhanHang("Staff", Guid.NewGuid(), [(dong, 2, ReturnDisposition.Restock)], daNhanDuTatCaDong: true, DateTime.UtcNow);
 
         Assert.Equal(SalesErrorCodes.PhieuTraKhongHopLe,
             Assert.Throws<BusinessException>(() => phieu.Huy("Staff", Guid.NewGuid(), "Huỷ")).Code);
@@ -95,13 +95,14 @@ public class OrderReturnTests
         // Chưa duyệt ⇒ chưa được nhận hàng.
         Assert.Equal(SalesErrorCodes.PhieuTraKhongHopLe,
             Assert.Throws<BusinessException>(() =>
-                phieu.NhanHang("Staff", Guid.NewGuid(), [(dong1, 1, ReturnDisposition.Restock)], DateTime.UtcNow)).Code);
+                phieu.NhanHang("Staff", Guid.NewGuid(), [(dong1, 1, ReturnDisposition.Restock)], daNhanDuTatCaDong: false, DateTime.UtcNow)).Code);
 
         phieu.Duyet("Staff", Guid.NewGuid());
 
         // Nhận một phần ⇒ PartiallyReceived, phiếu vẫn `Approved` (chưa phải `Received`).
+        // 📌 Dòng chưa về dùng `0` + `Unset` (no-op hợp lệ) — `0` + disposition bị chặn (`S14F`).
         phieu.NhanHang("Staff", Guid.NewGuid(),
-            [(dong1, 1, ReturnDisposition.Restock), (dong2, 0, ReturnDisposition.Damaged)], DateTime.UtcNow);
+            [(dong1, 1, ReturnDisposition.Restock), (dong2, 0, ReturnDisposition.Unset)], daNhanDuTatCaDong: false, DateTime.UtcNow);
 
         Assert.Equal(ReturnGoodsStatus.PartiallyReceived, phieu.GoodsStatus);
         Assert.Equal(ReturnLifecycleStatus.Approved, phieu.Status);
@@ -116,7 +117,7 @@ public class OrderReturnTests
         var dong = Dong(phieu);
         var luc = new DateTime(2026, 10, 28, 4, 0, 0, DateTimeKind.Utc);
 
-        phieu.NhanHang("Staff", Guid.NewGuid(), [(dong, 2, ReturnDisposition.Restock)], luc);
+        phieu.NhanHang("Staff", Guid.NewGuid(), [(dong, 2, ReturnDisposition.Restock)], daNhanDuTatCaDong: true, luc);
 
         Assert.Equal(ReturnGoodsStatus.Received, phieu.GoodsStatus);
         Assert.Equal(ReturnLifecycleStatus.Received, phieu.Status);
@@ -132,11 +133,89 @@ public class OrderReturnTests
 
         Assert.Equal(SalesErrorCodes.PhieuTraKhongHopLe,
             Assert.Throws<BusinessException>(() =>
-                phieu.NhanHang("Staff", Guid.NewGuid(), [(dong, 2, ReturnDisposition.Unset)], DateTime.UtcNow)).Code);
+                phieu.NhanHang("Staff", Guid.NewGuid(), [(dong, 2, ReturnDisposition.Unset)], daNhanDuTatCaDong: false, DateTime.UtcNow)).Code);
 
         Assert.Equal(SalesErrorCodes.PhieuTraKhongHopLe,
             Assert.Throws<BusinessException>(() =>
-                phieu.NhanHang("Staff", Guid.NewGuid(), [(dong, 3, ReturnDisposition.Restock)], DateTime.UtcNow)).Code);
+                phieu.NhanHang("Staff", Guid.NewGuid(), [(dong, 3, ReturnDisposition.Restock)], daNhanDuTatCaDong: false, DateTime.UtcNow)).Code);
+    }
+
+    // ── `S14F` — hai lỗi nhận hàng (`SAL-006` §32.4 · §33) ─────────────────────────────────────
+
+    [Fact]
+    public void NhanHang__tung_dong__chi_Received_khi_TOAN_BO_dong_da_ve()
+    {
+        var phieu = Tao();
+        phieu.Duyet("Staff", Guid.NewGuid());
+        var dong1 = Dong(phieu);                 // 2
+        var dong2 = Dong(phieu);                 // 2
+        var luc = new DateTime(2026, 10, 29, 3, 0, 0, DateTimeKind.Utc);
+
+        phieu.NhanHang("Staff", Guid.NewGuid(), [(dong1, 2, ReturnDisposition.Restock)], daNhanDuTatCaDong: false, luc);
+
+        Assert.Equal(ReturnGoodsStatus.PartiallyReceived, phieu.GoodsStatus);
+        Assert.Equal(ReturnLifecycleStatus.Approved, phieu.Status);
+        Assert.Null(phieu.ReceivedAtUtc);
+        Assert.Equal(2, dong1.ReceivedQuantity);
+
+        phieu.NhanHang("Staff", Guid.NewGuid(), [(dong2, 2, ReturnDisposition.Restock)], daNhanDuTatCaDong: true, luc.AddHours(1));
+
+        Assert.Equal(ReturnGoodsStatus.Received, phieu.GoodsStatus);
+        Assert.Equal(ReturnLifecycleStatus.Received, phieu.Status);
+        Assert.Equal(luc.AddHours(1), phieu.ReceivedAtUtc);
+    }
+
+    [Fact]
+    public void NhanHang__KHONG_duoc_ket_luan_Received_khi_chi_nhan_lai_dong_da_du()
+    {
+        var phieu = Tao();
+        phieu.Duyet("Staff", Guid.NewGuid());
+        var dong1 = Dong(phieu);
+        _ = Dong(phieu);                          // dòng 2 **chưa** về
+
+        phieu.NhanHang("Staff", Guid.NewGuid(), [(dong1, 2, ReturnDisposition.Restock)], daNhanDuTatCaDong: false, DateTime.UtcNow);
+
+        // Lần 2 chỉ gửi dòng 1 (đã đủ 2/2): *"mọi dòng trong lần gọi đều đủ"* **KHÔNG** phải *"cả phiếu đủ"*.
+        phieu.NhanHang("Staff", Guid.NewGuid(), [(dong1, 2, ReturnDisposition.Restock)], daNhanDuTatCaDong: false, DateTime.UtcNow);
+
+        Assert.Equal(ReturnGoodsStatus.PartiallyReceived, phieu.GoodsStatus);
+        Assert.Equal(ReturnLifecycleStatus.Approved, phieu.Status);
+        Assert.Null(phieu.ReceivedAtUtc);
+    }
+
+    [Fact]
+    public void GhiNhanHang__nhan_0__kem_disposition_NEM_0010__truoc_khi_cham_DB()
+    {
+        foreach (var xuLy in new[]
+                 {
+                     ReturnDisposition.Restock, ReturnDisposition.Damaged, ReturnDisposition.ReturnToSupplier
+                 })
+        {
+            var dong = new OrderReturnLine(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "SKU-1", 2, 100_000m, 0m, 0m);
+
+            var loi = Assert.Throws<BusinessException>(() => dong.GhiNhanHang(0, xuLy));
+
+            Assert.Equal(SalesErrorCodes.PhieuTraKhongHopLe, loi.Code);
+            Assert.Equal(0, dong.ReceivedQuantity);
+            Assert.Equal(ReturnDisposition.Unset, dong.Disposition);
+        }
+    }
+
+    [Fact]
+    public void GhiNhanHang__nhan_0_va_Unset__no_op_hop_le__giu_nguyen_so_da_nhan()
+    {
+        var dong = new OrderReturnLine(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "SKU-1", 2, 100_000m, 0m, 0m);
+
+        dong.GhiNhanHang(0, ReturnDisposition.Unset);          // dòng chưa nhận ⇒ vẫn 0/Unset
+
+        Assert.Equal(0, dong.ReceivedQuantity);
+        Assert.Equal(ReturnDisposition.Unset, dong.Disposition);
+
+        dong.GhiNhanHang(1, ReturnDisposition.Restock);
+        dong.GhiNhanHang(0, ReturnDisposition.Unset);          // no-op ⇒ **KHÔNG** xoá số đã nhận
+
+        Assert.Equal(1, dong.ReceivedQuantity);
+        Assert.Equal(ReturnDisposition.Restock, dong.Disposition);
     }
 
     [Fact]
@@ -149,7 +228,7 @@ public class OrderReturnTests
             Assert.Throws<BusinessException>(() => phieu.Dong("Staff", Guid.NewGuid(), DateTime.UtcNow)).Code);
 
         var dong = Dong(phieu);
-        phieu.NhanHang("Staff", Guid.NewGuid(), [(dong, 2, ReturnDisposition.Restock)], DateTime.UtcNow);
+        phieu.NhanHang("Staff", Guid.NewGuid(), [(dong, 2, ReturnDisposition.Restock)], daNhanDuTatCaDong: true, DateTime.UtcNow);
         phieu.Dong("Staff", Guid.NewGuid(), DateTime.UtcNow);
 
         Assert.Equal(ReturnLifecycleStatus.Closed, phieu.Status);
