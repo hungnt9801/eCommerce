@@ -59,6 +59,11 @@ public class TraHangController : Controller
         ViewBag.CoQuyenDuyet = await _quyen.IsGrantedAsync(eCommerceConsts.Permissions.Orders.ReturnApprove);
         ViewBag.CoQuyenNhan = await _quyen.IsGrantedAsync(eCommerceConsts.Permissions.Orders.Manage);
 
+        // 🆕 `S14G` — HUỶ phiếu dùng **đúng quyền của người yêu cầu trả** (`Orders.ReturnRequest`), không phải
+        // quyền duyệt: huỷ là *"rút yêu cầu của mình"*, không phải *"quyết định thay khách"*.
+        // 🔒 Chỉ để **ẩn/hiện** nút — lớp cưỡng chế vẫn là `OrderReturnAppService.HuyAsync`.
+        ViewBag.CoQuyenHuy = await _quyen.IsGrantedAsync(eCommerceConsts.Permissions.Orders.ReturnRequest);
+
         ViewBag.DonId = donId;
         ViewBag.ThongBao = TempData["ThongBaoTraHang"] as string;
         ViewBag.Loi = TempData["LoiTraHang"] as string;
@@ -109,6 +114,51 @@ public class TraHangController : Controller
         catch (BusinessException ex)
         {
             GhiLoi(ex, "từ chối");
+        }
+
+        return QuayLai(donId);
+    }
+
+    /// <summary>
+    /// `POST /TraHang/Huy` ⇒ `HuyAsync` (`Requested|Approved → Cancelled`).
+    ///
+    /// 🆕 **`S14G` — ĐÓNG NỢ §32.5 #3:** `HuyAsync` đã có trong hợp đồng từ `S14B` nhưng **không có lối vào**
+    /// ⇒ người vận hành không huỷ được phiếu khi khách đổi ý, dù quy trình *"yêu cầu trả"* **bắt buộc** phải
+    /// rút lại được. 📌 Đúng loại nợ đã gặp ở phần E: **đường ghi đúng mà không có lối vào thì không giải
+    /// quyết được vấn đề nó sinh ra để giải quyết.**
+    ///
+    /// 🔒 **Guard thật KHÔNG ở đây:** `OrderReturn.Huy` chỉ cho huỷ khi phiếu **chưa kết thúc** và
+    /// **chưa nhận hàng** (`GoodsStatus` ∉ `Received|PartiallyReceived`), đồng thời **bắt buộc** có lý do
+    /// (`BR-008`). View chỉ **ẩn nút** theo trạng thái — ẩn nút **không phải** là bảo vệ.
+    ///
+    /// 🔑 **Đối xứng `GiamTra`:** huỷ đi qua `OrderReturnService.TraLaiDaGiuAsync` ⇒ `OrderLine.GiamTra` trả lại
+    /// phần **giữ chỗ trả** đã `TangTra` lúc tạo phiếu. 📌 Nếu controller chỉ đổi `Status` mà bỏ qua đường đó
+    /// thì hàng bị **khoá vĩnh viễn** — đúng thứ mà ca E2E `S14-E18` đo bằng DB.
+    /// </summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Huy(Guid id, string? lyDo, Guid? donId)
+    {
+        // 📌 Kiểm **cùng ngưỡng** với `LyDoTraHangInput` (`[Required]` + `[StringLength(512, MinimumLength = 3)]`)
+        // ⇒ người dùng nhận câu giải thích thay vì `500` của validation interceptor.
+        // 🔒 Guard thật vẫn ở entity: `Huy` ném `Sales:0010` khi lý do rỗng.
+        var lyDoSach = (lyDo ?? string.Empty).Trim();
+
+        if (lyDoSach.Length < 3 || lyDoSach.Length > 512)
+        {
+            TempData["LoiTraHang"] = "Lý do huỷ là BẮT BUỘC và phải từ 3 đến 512 ký tự (BR-008).";
+            return QuayLai(donId);
+        }
+
+        try
+        {
+            var kq = await _phieuTra.HuyAsync(id, new LyDoTraHangInput { LyDo = lyDoSach });
+
+            TempData["ThongBaoTraHang"] = $"Đã HUỶ phiếu {kq.ReturnNumber} và trả lại phần giữ chỗ trả.";
+        }
+        catch (BusinessException ex)
+        {
+            GhiLoi(ex, "huỷ");
         }
 
         return QuayLai(donId);

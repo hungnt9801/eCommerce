@@ -13,6 +13,7 @@
     var loi = ViewBag.Loi as string;
     var coQuyenDuyet = ViewBag.CoQuyenDuyet as bool? ?? false;
     var coQuyenNhan = ViewBag.CoQuyenNhan as bool? ?? false;
+    var coQuyenHuy = ViewBag.CoQuyenHuy as bool? ?? false;
     var soDon = ViewBag.SoDon as Dictionary<Guid, string> ?? new Dictionary<Guid, string>();
 
     bool DaKetThuc(string status) => status is "Closed" or "Rejected" or "Cancelled";
@@ -292,6 +293,31 @@ else
                                 </button>
                             </form>
                         }
+                    }
+
+                    @* 🆕 `S14G` — HUỶ PHIẾU (`SAL-006` §34; nợ §32.5 #3). 🔑 `HuyAsync` đã có từ `S14B` nhưng
+                       **không có lối vào** ⇒ khách đổi ý thì phiếu trả **không rút lại được**.
+
+                       🔒 Điều kiện hiện nút **chép đúng guard của entity** (`OrderReturn.Huy`): phiếu chưa kết
+                       thúc **và** `GoodsStatus` KHÔNG phải `Received`/`PartiallyReceived` — đã nhận hàng thì phải
+                       nhận đủ rồi đóng, **không** huỷ. 📌 `Requested` **và** `Approved` đều huỷ được (API cho
+                       phép); ẩn nút **không phải** là bảo vệ — `HuyAsync` mới là nơi cưỡng chế. *@
+                    @if (coQuyenHuy && (r.Status is "Requested" or "Approved")
+                         && r.GoodsStatus is not ("Received" or "PartiallyReceived"))
+                    {
+                        <form method="post" asp-action="Huy" class="border rounded p-2">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@r.Id" />
+                            @if (donId is { } locHuy)
+                            {
+                                <input type="hidden" name="donId" value="@locHuy" />
+                            }
+                            <label class="form-label small mb-1">Lý do huỷ (bắt buộc)</label>
+                            <input name="lyDo" class="form-control form-control-sm" required minlength="3" maxlength="512" />
+                            <button type="submit" class="btn btn-sm btn-outline-warning mt-1" id="nut-huy-@r.Id">
+                                Huỷ phiếu
+                            </button>
+                        </form>
                     }
 
                     @if (coQuyenDuyet)

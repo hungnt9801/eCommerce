@@ -1,6 +1,6 @@
 # BÀN GIAO — Phần còn lại của GĐ1 (để mở session mới)
 
-> **Lập ngày:** 28/10/2026 · **Cập nhật:** 29/10/2026 (sau `S12` + `S13` + `S14` A–F + `S15` + `S17` + `S16` + `S16b`) · **Cây:** `main` (sạch) · **Người lập:** phiên tự động
+> **Lập ngày:** 28/10/2026 · **Cập nhật:** 29/10/2026 (sau `S12` + `S13` + `S14` A–G + `S15` + `S17` + `S16` + `S16b`) · **Cây:** `main` (sạch) · **Người lập:** phiên tự động
 >
 > 🔑 **Đọc mục 1 trước.** Tài liệu này **không** nói GĐ1 đã xong. Nó chốt **đang ở đâu**, **còn gì**, và
 > **làm theo thứ tự nào** để không phải đoán lại.
@@ -9,17 +9,17 @@
 
 ## 1. Ảnh chụp hiện tại (đo được, không phải lời khai)
 
-> 📌 **Số đo này là SAU `S13` + `S14` phần A–F + `S15` + `S17` + `S16` + `S16b`** (29/10/2026). Bảng cũ trước `S12` (unit **1528** ·
+> 📌 **Số đo này là SAU `S13` + `S14` phần A–G + `S15` + `S17` + `S16` + `S16b`** (29/10/2026). Bảng cũ trước `S12` (unit **1528** ·
 > integration **71** · E2E **135** · NND **57** · **68** quyền · **89** chỗ quét · **46** migration) đã **trôi** —
 > đừng dùng.
 
 | Hạng mục | Giá trị | Cách đo |
 |---|---|---|
 | Commit | `git log --oneline -1` | 🔒 **nguồn sự thật là lệnh**, không phải dòng trong tài liệu |
-| Cổng đầy đủ | **exit 0 · 377.4s · 15/15 bước** | `pwsh -File tools\kiem-tat-ca.ps1 -DayDu` |
+| Cổng đầy đủ | **exit 0 · 397.2s · 15/15 bước** | `pwsh -File tools\kiem-tat-ca.ps1 -DayDu` |
 | Unit | **1627** | bước ③ |
 | Integration | **90/90** | bước ④ |
-| E2E (HTML thật) | **159/159** | bước ⑧ |
+| E2E (HTML thật) | **165/165** | bước ⑧ |
 | Bất biến DB | **25/25** · **NND 64** · **72 quyền** · **99** chỗ quét | bước ⑥ |
 | Migration | **50** | `src/eCommerce.EntityFrameworkCore/Migrations` |
 | Oversell | **11/11** (bước ⑬) | `tools/probe-oversell.ps1` |
@@ -48,6 +48,7 @@
 | **`S12` — `CostPrice` (`PrcCostPrices`)** | `PRC-001` **§20**: migration **47** · NND **58** · quyền **`eCommerce.Pricing.CostPrice.View`** (seed **69**) · `/GiaVon` (chỉ đọc) · **15 unit** + **6 integration** + **5 E2E** (`S12-G1…G5`, đo cả **ẩn danh bị chặn** và **HTML công khai không lộ 777.777**) |
 | **`S14` phần E — UI RMA + đo HTTP** | `SAL-006` **§32**: `/TraHang` (danh sách + duyệt/từ chối/nhận/đóng/hoàn tiền, ẩn nút theo quyền) · link từ trang đơn (`Url.Action`) · menu nhóm Vận hành · neo `[TRAHANG-MAN-HINH]` · **+14 E2E** đo **DB thật** (`Status = 1`, `Version = 1`, đơn `ReturnStatus = 2`/`ClosureVersion = 2`; duyệt lần hai ⇒ `Sales:0010` + DB **không đổi**) · **ETO: KHÔNG thêm** (không có consumer) · **0** migration/quyền |
 | **`S14F` — sửa 2 lỗi nhận hàng** | `SAL-006` **§33**: (1) `NhanHang` nhận cờ `daNhanDuTatCaDong` do **service tính trên toàn bộ dòng** — `Status`/`ReceivedAtUtc` chỉ đổi khi đủ ⇒ đơn chỉ sang `Returned` khi phiếu `Received`; (2) `GhiNhanHang` **NÉM `Sales:0010`** khi `0` + disposition (**trước** DB, không còn `500`), `0` + `Unset` là **no-op** · **+4 unit** (hai chiều) · **0** schema/migration/NND/quyền, `CHECK` **không** nới · **§32.4 đã đóng** |
+| 🆕 **`S14G` — nút HUỶ phiếu trên UI** | `SAL-006` **§34** (đóng nợ §32.5 #3): `POST /TraHang/Huy` (token chống giả mạo) + nút **Huỷ phiếu** chỉ ở `Requested\|Approved` **và chưa nhận hàng**, kèm **ô lý do bắt buộc**; ẩn/hiện theo `Orders.ReturnRequest`, **app service cưỡng chế** · **+6 E2E** (`S14-E15…E20`) đo **hai chiều**: huỷ ⇒ `OrdReturns.Status = 3` **và** `ReturnedQuantity 2 → 0` (đối xứng `GiamTra`); huỷ lần hai ⇒ `eCommerce:Sales:0010` + DB **không đổi**; phiếu đã nhận hàng **không** có nút · **0** migration/NND/quyền |
 
 ---
 
@@ -60,7 +61,7 @@
 |---|---|---|---|---|
 | ~~**S12**~~ | ✅ **XONG 28/10/2026** — `CostPrice` (`PrcCostPrices`) | [`PRC-001` §20](features/pricing/prc-001-bang-gia-va-gia-theo-kenh.md) | migration **47** · NND **58** · quyền `eCommerce.Pricing.CostPrice.View` · `/GiaVon` (chỉ đọc) · **6 integration + 15 unit + 5 E2E**. ⚠️ **Chưa** có đường ghi (**`Q2`** chưa chốt) ⇒ đừng mở "tạm" |
 | ~~**S13**~~ | ✅ **XONG 28/10/2026** — `StockAllotment` + `StockAllotmentLedger` | [`INV-003` §21](features/inventory/inv-003-phan-bo-ton-theo-kenh.md) | migration **48** · NND **60** · **2 quyền** (seed **71**) · giữ chỗ **trừ ngân sách** kênh (tuỳ chọn theo dòng) · **+11 unit + 6 integration** · ⚠️ **chưa** có UI + **chưa** tự thu hồi khi tồn giảm (§21.5) |
-| 🟡 **S14** | `OrderReturn` + `OrderReturnLine` | [`SAL-006` §28–§33](features/sales/sal-006-tra-hang-rma-hoan-tien.md) | ✅ **phần A:** 3 bảng + `OrderLine.ReturnedQuantity` + 8 CHECK + 4 unique NND (NND **64**), migration **49** · ✅ **phần B:** service + API + idempotency + giữ chỗ trả + nhật ký · ✅ **phần C:** gateway `ICustomerReturnGateway` + chứng từ `CustomerReturn` + ghi sổ, chỉ dòng `Restock` · `Q4` = **chỉ ghi nhận** · ✅ **phần D:** xoá cạnh tắt `Open→Returned` + migrate `TraHangAsync` (§31) · ✅ **phần E:** **UI `/TraHang` + 14 ca E2E đo HTTP/DB** (§32); **ETO = KHÔNG** (không có consumer) · ✅ **`S14F`:** sửa **2 lỗi nhận hàng** (§33), §32.4 **đã đóng** · ❌ còn: `PartiallyReturned` (**cần BA**) · nút huỷ phiếu trên UI | **đã dùng 49** |
+| 🟡 **S14** | `OrderReturn` + `OrderReturnLine` | [`SAL-006` §28–§33](features/sales/sal-006-tra-hang-rma-hoan-tien.md) | ✅ **phần A:** 3 bảng + `OrderLine.ReturnedQuantity` + 8 CHECK + 4 unique NND (NND **64**), migration **49** · ✅ **phần B:** service + API + idempotency + giữ chỗ trả + nhật ký · ✅ **phần C:** gateway `ICustomerReturnGateway` + chứng từ `CustomerReturn` + ghi sổ, chỉ dòng `Restock` · `Q4` = **chỉ ghi nhận** · ✅ **phần D:** xoá cạnh tắt `Open→Returned` + migrate `TraHangAsync` (§31) · ✅ **phần E:** **UI `/TraHang` + 14 ca E2E đo HTTP/DB** (§32); **ETO = KHÔNG** (không có consumer) · ✅ **`S14F`:** sửa **2 lỗi nhận hàng** (§33), §32.4 **đã đóng** · ✅ **`S14G`:** **nút HUỶ phiếu trên UI** (§34) + **6 ca E2E** đo DB · ❌ còn: `PartiallyReturned` (**cần BA**) | **đã dùng 49** |
 | ~~**S15**~~ | ✅ **XONG 28/10/2026** — `StalePendingTransaction` + `TriggerRunAsync` | [`REC-001` §20](features/reconciliation/rec-001-doi-soat-thanh-toan-querydr.md) | ngưỡng **24 h** (cấu hình, `0` = TẮT) · `TriggerRunAsync` đi qua **cùng khoá** với job · **+17 unit** · **probe 30/30** (HTTP thật) | **không** (ngưỡng là cấu hình) |
 | 🟡 **S16** | **2/3 metric còn nợ** | [`XC-005` §5.1/§20](features/cross-cutting/XC-005-observability-log-metric.md) | ✅ `lock_ttl_exceeded_total` (decorator `IAbpDistributedLock` + `HandleLostToken`) · ✅ `logging_failures_total` (bọc `ILoggerProvider`) · ✅ **`messaging_dlq_replayed_total` ĐÃ ĐÓNG ở `S16b`** (replay thật, xem **§21**) | **1** (`S16b`: 3 cột + quyền mới) |
 | ~~**S17**~~ | ✅ **XONG 29/10/2026** — hợp đồng cho dịch vụ còn ở host | [`ke-hoach-tach-module` §3.1](ke-hoach-tach-module.md) | `IChannelDirectory`/`IHienThiKenhAppService` (Catalog) + `IChinhSachHanMucAppService`/`IWarehouseAppService` (Inventory) đã ở module Contracts; `WarehouseAppService` **chuyển vào module**, 3 hiện thực còn host + worker được ghim `[ExposeServices]`/lý do · **18 ca** `HopDongHostTests` · **+18 unit** | không |
@@ -211,8 +212,9 @@ Sau đó đọc theo thứ tự:
 | `S16` — 2/3 metric còn nợ | `lock_ttl_exceeded_total` + `logging_failures_total` có điểm phát thật; **+7 unit**; `messaging_dlq_replayed_total` vẫn nợ (chưa có replay) | `S16` — xem `git log` |
 | `S14F` — sửa 2 lỗi nhận hàng | `GoodsStatus` tính trên **toàn bộ** dòng (cờ `daNhanDuTatCaDong`) ⇒ không "nhận đủ" sai khi nhận lẻ · `0` + disposition ⇒ **`Sales:0010`** trước DB (hết `500`), `0` + `Unset` = no-op · **+4 unit** hai chiều · **0** schema/migration/NND/quyền · **§32.4 đã đóng** | xem `git log` |
 | 🆕 `S16b` — replay DLQ thật | *"replay"* = **publish lại event gốc** (không phải đánh dấu) · `PhatLaiAsync` + `PhatLaiDlqKetQuaDto` · migration **50** (3 cột `Replay*`) · idempotent **một dòng một lần** (lần hai ⇒ `200` + `DaPhatLai=false` + lý do) · fail-closed `0009`/`0010` ⇒ **409** · quyền **`eCommerce.Operations.DeadLetters.Replay`** (seed **72**) · metric **+1 chỉ sau commit** · **+11 unit · +3 integration** · probe HTTP **21/21** (đo `AbpEventInbox` **tăng**) | xem `git log` |
+| 🆕 `S14G` — nút huỷ phiếu trả | `POST /TraHang/Huy` + nút **Huỷ phiếu** (ô lý do **bắt buộc**) chỉ hiện ở `Requested\|Approved` **và chưa nhận hàng** · **+6 E2E** (`S14-E15…E20`): huỷ ⇒ `OrdReturns.Status = 3` **và** `ReturnedQuantity 2 → 0` (đối xứng `GiamTra`); huỷ lần hai ⇒ `Sales:0010` + DB **không đổi**; phiếu đã nhận hàng **không** có nút · **0** schema/migration/NND/quyền · **§32.5 #3 đã đóng** | xem `git log` |
 
-**Đo cuối phiên (cập nhật 29/10/2026 sau `S16b`):** `-DayDu` **exit 0 · 377.4s · 15/15** · unit **1627** · integration **90** · **E2E 159/159** · DB **25/25** · NND **64** · **72** quyền · migration **50** · quét **99** chỗ · cây **0 tệp của phiên này** (⚠️ còn `?? tools/…` của tiến trình khác) · DB **0 rác probe**.
+**Đo cuối phiên (cập nhật 29/10/2026 sau `S14G`):** `-DayDu` **exit 0 · 397.2s · 15/15** · unit **1627** · integration **90** · **E2E 165/165** · DB **25/25** · NND **64** · **72** quyền · migration **50** · quét **99** chỗ · cây **0 tệp của phiên này** (⚠️ còn `?? tools/…` của tiến trình khác) · DB **0 rác probe**.
 
 **Còn lại (chưa làm — không được coi là xong):**
 
@@ -226,9 +228,9 @@ Sau đó đọc theo thứ tự:
    đọc Domain module khác (`audit-gd1.md` §0.1 **b**).
 3. `S14` phần E — ✅ **XONG 29/10/2026** (xem **§32** của `SAL-006`): **UI `/TraHang`** + lối vào + **14 ca E2E
    HTTP/DB**. ✅ **Hai phát hiện `§32.4` ĐÃ SỬA 29/10/2026** ở `S14F` (`SAL-006` **§33**): `GoodsStatus` tính
-   trên **toàn bộ** dòng + guard `Sales:0010` cho `0` + disposition. ⏳ **Còn nợ trong `S14`:** trạng thái
-   `PartiallyReturned` (cần BA chốt hợp đồng API) · nút **huỷ phiếu** trên UI (`HuyAsync` có API) ·
-   **ETO: cố ý không thêm** vì chưa có consumer (`§32.3`).
+   trên **toàn bộ** dòng + guard `Sales:0010` cho `0` + disposition. ✅ **Nút HUỶ phiếu ĐÃ CÓ 29/10/2026** ở
+   `S14G` (`SAL-006` **§34**, +6 E2E hai chiều) ⇒ **§32.5 #3 đã đóng**. ⏳ **Còn nợ trong `S14`:** trạng thái
+   `PartiallyReturned` (cần BA chốt hợp đồng API) · **ETO: cố ý không thêm** vì chưa có consumer (`§32.3`).
 4. `S18` phần tài liệu — duyệt 7 `XC-*` + 19 tài liệu GĐ1: ⚠️ **`Q5` là quyết định của chủ dự án**.
 5. `S19` — VNPay sandbox thật: ⛔ **cần `VnPay:TmnCode` + `HashSecret`** (`Q6`). Không thể tự tạo credential;
    **cấm** bịa “giao dịch thật”.

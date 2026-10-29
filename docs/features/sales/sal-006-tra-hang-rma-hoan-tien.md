@@ -2259,7 +2259,7 @@ lộ khi đi **thẳng API**. Đó là lý do §33 sửa ở **tầng domain** (
 |---|---|---|
 | 1 | **Trạng thái `PartiallyReturned`** ở cấp đơn | Vẫn là nợ **cần BA chốt hợp đồng API** (`SAL-003` §16 · §31.3 #4). 🚫 Không tự thêm |
 | 2 | **ETO phiếu trả** | Cố ý **không** làm (§32.3) — thêm khi có consumer thật |
-| 3 | **Nút HUỶ phiếu trên UI** | `HuyAsync` **đã có** trong API/service; màn hình phần E có **5 hành động theo phạm vi** (duyệt/từ chối/nhận/đóng/hoàn tiền) ⇒ huỷ phiếu **chưa có lối vào**. 📌 Nếu BA cần, thêm **một form** — không đổi API |
+| 3 | ~~**Nút HUỶ phiếu trên UI**~~ ✅ **ĐÃ ĐÓNG 29/10/2026 — `S14G`, xem §34** | `HuyAsync` **đã có** trong API/service nhưng màn hình phần E chỉ có **5 hành động theo phạm vi** (duyệt/từ chối/nhận/đóng/hoàn tiền) ⇒ huỷ phiếu **không có lối vào**. ✅ Nay có `POST /TraHang/Huy` + nút **Huỷ phiếu** (ô lý do **bắt buộc**) — **không** đổi API/DTO/quyền |
 | 4 | **Hoàn tiền TỰ ĐỘNG** | Vẫn **`Q4` = chỉ ghi nhận** (§28.2); đường gọi cổng là `PAY-001` + lát cắt `S14b` |
 | ~~5~~ | ~~**Hai phát hiện §32.4**~~ ✅ **đã sửa 29/10/2026** | `S14F` — xem **§33**: cờ `daNhanDuTatCaDong` tính trên toàn phiếu + guard `Sales:0010` cho `0` + disposition. **Không** đổi schema/`CHECK` |
 | 6 | **Replay DLQ** | **Không liên quan** `S14`: replay là nợ của `Messaging`/`XC-005` (`messaging_dlq_replayed_total`), không có luồng RMA nào cần replay riêng |
@@ -2386,12 +2386,84 @@ phải nới lỏng: chính ca âm tính mới khẳng định `0 + Damaged` b�
 
 📌 **Không** còn phát hiện nào trong §32.4 ở trạng thái "chưa sửa". Nợ **khác** của `S14` vẫn nguyên và
 **không** bị lát cắt này đóng: `PartiallyReturned` cấp đơn (`§32.5 #1`, cần BA) · ETO (`§32.5 #2`, cố ý không
-thêm) · nút huỷ phiếu trên UI (`§32.5 #3`) · hoàn tiền tự động (`§32.5 #4`).
+thêm) · nút huỷ phiếu trên UI (`§32.5 #3` — ✅ **đóng ở §34**, `S14G`, 29/10/2026) · hoàn tiền tự động (`§32.5 #4`).
 
 ### 33.6 Lịch sử thay đổi (bổ sung)
 
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.9 | 29/10/2026 | *(agent, session GĐ1 — `S14F`)* | **Sửa 2 lỗi nhận hàng** đã ghi ở §32.4: (1) `NhanHang` nhận cờ `daNhanDuTatCaDong` do service tính trên **toàn bộ** dòng của phiếu — `Status`/`ReceivedAtUtc` chỉ đổi khi đủ, đơn chỉ sang `Returned` khi phiếu `Received`; (2) `GhiNhanHang` **NÉM** `Sales:0010` khi `0` + disposition (trước DB), `0` + `Unset` là no-op. **+4 unit** (hai chiều); **0** schema/migration/NND/quyền; `CHECK` **không** nới. §32.4 **đã đóng** (§33.5) |
+
+---
+
+## 34. `S14G` — NÚT HUỶ PHIẾU TRẢ TRÊN UI (29/10/2026) — *đóng §32.5 #3*
+
+> 🎯 **Phạm vi — ĐÚNG MỘT VIỆC:** thêm **lối vào UI** cho hành động **HUỶ phiếu trả** (`HuyAsync` đã có trong
+> hợp đồng từ `S14B`, §29.1 #6) và **đo hai chiều bằng HTTP + DB**.
+>
+> 🔒 **Không đổi:** lược đồ · migration (**50**) · NND (**64**) · quyền (**72**) · route/DTO của API RMA ·
+> `HuyAsync`/`OrderReturn.Huy`. 🚫 **Không** thêm `PartiallyReturned` (vẫn là nợ cần BA — §32.5 #1).
+
+### 34.1 Đã làm
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| 1 | **`TraHangController.Huy`** (`src/eCommerce.Web/Controllers/`) | `POST /TraHang/Huy` với `[ValidateAntiForgeryToken]` ⇒ `IOrderReturnAppService.HuyAsync(id, LyDoTraHangInput)`. 🚨 Bắt `BusinessException` và hiện **đúng mã** (`eCommerce:Sales:0010` khi sai guard, `eCommerce:Lock:0001` khi quá hạn giành khoá) — **không** để thành `500`, và **không** có nhánh bắt-rồi-ghi-tiếp. 📌 Lý do kiểm **cùng ngưỡng** với DTO (`3…512`) ở biên UI để người dùng nhận câu giải thích, **không** nhận `500` từ validation interceptor |
+| 2 | **`Views/TraHang/Index.cshtml`** | Nút **Huỷ phiếu** + ô **lý do (bắt buộc, `minlength=3`)**. 🔒 Điều kiện hiện nút **chép đúng guard của entity**: `Status ∈ {Requested, Approved}` **và** `GoodsStatus ∉ {Received, PartiallyReceived}` — phiếu đã nhận hàng **không** huỷ được (phải nhận đủ rồi đóng). 📌 Nút ẩn theo `IAuthorizationService` với **đúng quyền của `HuyAsync`** (`Orders.ReturnRequest` — *rút yêu cầu của mình*, không phải quyền duyệt); **app service vẫn là nơi cưỡng chế**, ẩn nút không phải bảo vệ |
+| 3 | **Neo & lưới test** | `[TRAHANG-MAN-HINH]` **giữ nguyên** (không đổi anchor); view vẫn dùng `asp-action` (không `href` viết cứng — `MenuDieuHuongTests` cấm) |
+| 4 | **`S14` trong `tools/kiem-e2e.ps1`** | **+6 ca** `S14-E15…E20` + **bộ dữ liệu probe riêng** (`b0…b3`, `ReturnNumber = K97E2E-RT-HUY-001`) để **không** đụng 14 ca cũ (phiếu `fd` phải giữ `Approved|PartiallyReceived` cho `S14-E12`). 🔑 Gieo **đúng trạng thái sau khi tạo phiếu**: dòng đơn `ReturnedQuantity = 2` (**đã giữ chỗ** — `TaoPhieuAsync` gọi `OrderLine.TangTra`) ⇒ phép đo `GiamTra` mới có nghĩa. 🔒 Dọn trong `finally`: history → dòng trả → phiếu → dòng đơn → đơn, **đếm lại = 0** |
+
+### 34.2 ✅ Bằng chứng đo được — HAI CHIỀU (HTTP thật + DB thật)
+
+| Ca | Chiều | Đo cái gì | Kết quả |
+|---|---|---|---|
+| `S14-E15` | ✅ dương tính | Phiếu `Requested` ⇒ HTML có **nút Huỷ** + ô **lý do bắt buộc**; DB dòng đơn **đang giữ chỗ** | `HTTP 200` · `ReturnedQuantity = 2` |
+| `S14-E16` | 🚫 âm tính (guard UI) | Phiếu **đã nhận hàng** (`Approved\|PartiallyReceived`) ⇒ **KHÔNG** có nút Huỷ | nút vắng mặt — *không mời bấm vào chỗ chắc chắn lỗi* |
+| `S14-E17` | ✅ dương tính | `POST /TraHang/Huy` (token thật + lý do) ⇒ **DB** `OrdReturns.Status` | `3` (**Cancelled**) · `Version = 1` |
+| `S14-E18` | ✅ dương tính (đối xứng `GiamTra`) | Cùng lệnh ⇒ **DB dòng đơn** `OrdOrderLines.ReturnedQuantity` | `2 → 0` (**trả lại chỗ đã giữ**) |
+| `S14-E19` | 🚫 âm tính | Huỷ **lần hai** ⇒ trang hiện **đúng mã**, không `500` | HTML có `eCommerce:Sales:0010` · `HTTP 200` |
+| `S14-E20` | 🚫 âm tính | 🚨 Guard **không bị nuốt**: sau lần hai **không ghi gì** | `Status = 3` · `ReturnedQuantity = 0` (vẫn vậy) |
+
+### 34.3 🔑 Vì sao phải đo **cột dòng đơn**, không chỉ cột phiếu
+
+`HuyAsync` không chỉ đổi trạng thái: nó gọi `OrderReturnService.TraLaiDaGiuAsync` ⇒ `OrderLine.GiamTra(số lượng)`
+— **đối xứng** với `TangTra` lúc tạo phiếu (§29.1 #3). 🔒 Nếu controller (hoặc một bản sửa sau này) chỉ
+`UPDATE OrdReturns SET Status = 3` mà **bỏ qua** đường dịch vụ thì:
+
+- cột `Status` **vẫn đúng** ⇒ mọi ca chỉ đọc phiếu đều **XANH**;
+- nhưng `ReturnedQuantity` **vẫn = 2** ⇒ số hàng đó bị **khoá vĩnh viễn** khỏi mọi phiếu trả sau (trả vượt bị
+  chặn bởi `ADR-11` dù thực tế **chưa** trả) — một lỗi **im lặng** đúng loại đã gặp ở `SAL-005`/`S13`.
+
+📌 Vì vậy `S14-E18` khẳng định **cột dòng đơn** = `0`, và `S14-E20` khẳng định nó **không bị trừ hai lần** (nếu
+`GiamTra` chạy lại, `ReturnedQuantity` sẽ **âm** — `CHECK` của DB cũng chặn, nhưng ta không để chạm tới `500`).
+
+### 34.4 ✅ Đo cổng cuối (cây đã sửa)
+
+| Phép đo | Kết quả | Ghi chú |
+|---|---|---|
+| E2E (HTML thật) | **159 → 165** (+6 ca `S14-E15…E20`) | `tools/kiem-e2e.ps1` |
+| Unit | **1627** (không đổi) | view/controller **không** thêm unit — hành vi đo bằng HTTP như phần E |
+| Integration | **90** (không đổi) | không chạm lược đồ |
+| Migration / NND / quyền | **50 · 64 · 72** — **không đổi** | không thêm bảng/cột/quyền |
+| Cổng đầy đủ | **exit 0 · 397.2s · 15/15 bước** | `pwsh -File tools\kiem-tat-ca.ps1 -DayDu` |
+| Hai cổng tài liệu | mermaid **0 lỗi** · link **0 chết** | chạy lại sau khi điền số |
+| Dọn dẹp probe | `OrdReturns/OrdReturnLines/OrdReturnHistory/OrdOrders` của **cả hai** bộ GUID (`f9…fe` và `b0…b3`) = **0** | in ra ở `DON DEP (S14)` + `DON DEP (S14G)` |
+
+### 34.5 Quyết định & giới hạn (ghi rõ, **không** nói là đã xong)
+
+| # | Nội dung | Trạng thái |
+|---|---|---|
+| 1 | **Quyền của nút huỷ** | `Orders.ReturnRequest` — **không** thêm quyền mới, **không** dùng nhầm `ReturnApprove` (huỷ là *rút yêu cầu*, không phải *quyết định thay khách*). 📌 Hệ quả: người **duyệt** mà thiếu `ReturnRequest` sẽ **không** thấy nút — đúng ý đồ tách nhiệm (`BR-013`) |
+| 2 | **Huỷ khi đã duyệt** | **Cho phép** (`Huy` nhận `Requested` **và** `Approved`) — UI cũng hiện ở cả hai trạng thái, nhưng **chặn** khi đã nhận hàng (kể cả một phần) |
+| 3 | **Đơn hàng có đổi trục kết thúc không** | **Không** — `HuyAsync` không gọi `Order.ChuyenKetThuc` (chưa có cạnh `ReturnRequested → Open`); phiếu huỷ nghĩa là *"yêu cầu này không hiệu lực"*, đơn vẫn tạo được phiếu trả khác (§29 ghi rõ) |
+| 4 | **`PartiallyReturned`** | 🚫 **Vẫn nợ** — cần BA chốt hợp đồng API (§32.5 #1, `SAL-003` §16) |
+| 5 | **Hoàn tiền tự động** | 🚫 **Vẫn nợ** — `Q4` = chỉ ghi nhận (§32.5 #4) |
+
+### 34.6 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.0 | 29/10/2026 | *(agent, session GĐ1 — `S14G`)* | **Nút HUỶ phiếu trên UI** (đóng **§32.5 #3**): `POST /TraHang/Huy` (token chống giả mạo, bắt `BusinessException` ⇒ hiện **đúng mã**, không `500`, không ghi tiếp) + nút **Huỷ phiếu** chỉ hiện ở `Requested\|Approved` **và chưa nhận hàng**, kèm **ô lý do bắt buộc**; ẩn/hiện theo `Orders.ReturnRequest` nhưng **app service cưỡng chế**. **+6 ca E2E** (`S14-E15…E20`) đo **hai chiều**: huỷ ⇒ `OrdReturns.Status = 3` **và** `OrdOrderLines.ReturnedQuantity 2 → 0` (đối xứng `GiamTra`); huỷ lần hai ⇒ `eCommerce:Sales:0010` + DB **không đổi**; phiếu đã nhận hàng **không** có nút. **0** schema/migration/NND/quyền. |
+
 
 
