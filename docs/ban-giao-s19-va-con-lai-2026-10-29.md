@@ -47,6 +47,13 @@
 
 ### 2.1 🔴 `S19` — VNPay sandbox THẬT (**cổng bắt buộc của GĐ1**)
 
+> 📌 **TRẠNG THÁI 30/10/2026 (phiên `S19`):** **harness đã có** — `tools/probe-s19-vnpay-that.ps1` (chạy **tay**,
+> **không** thuộc cổng 15 bước vì cần credential + người thanh toán + Internet). 🔒 **Nhưng credential KHÔNG có**
+> trong môi trường đo: `Process`/`User`/`Machine` đều rỗng, không profile, không user-secrets, không `.env` ngoài
+> repo ⇒ probe **dừng ở bước ⓪** (`exit 2`, **không** tạo giao dịch, **không** ghi bằng chứng) ⇒ **`S19` CHƯA ĐẠT**.
+> 📄 Chi tiết + **bốn chướng ngại tĩnh** phải xử lý khi có credential: `PAY-001` **§16.12**.
+> ▶️ Chạy khi có credential: `pwsh -File tools\probe-s19-vnpay-that.ps1 -SoTien 10000`.
+
 **Điều kiện tiên quyết (chủ dự án cấp):** `PaymentHub:VnPay:TmnCode` + `PaymentHub:VnPay:HashSecret` của **merchant sandbox**.
 
 🔒 **CẤM** ghi credential vào `appsettings.json`/tệp trong repo. Dùng **biến môi trường** cho tiến trình (mẫu `__` = `:`), đúng khuôn đã dùng ở `probe-thanh-toan.ps1` (`PaymentHub__VnPay__TmnCode`, `PaymentHub__VnPay__HashSecret`).
@@ -82,7 +89,7 @@
 | `Q3` | Ngân sách tồn **chỉ theo kênh** (không theo shop) + **tuỳ chọn theo dòng** (chỉ áp khi đã có dòng ngân sách) | `INV-003` §21.2 |
 | `Q4` | Hoàn tiền **chỉ ghi nhận**, **không** tự gọi cổng | `SAL-006` §28.2 |
 | `Q5` | **Duyệt thật** 26 tài liệu GĐ1, ngày 29/10/2026 | [`bien-ban-duyet-gd1-2026-10-29.md`](bien-ban-duyet-gd1-2026-10-29.md) |
-| `Q6` | **Chưa có** credential VNPay sandbox ⇒ `S19` **chưa thể** làm | tài liệu này §2.1 |
+| `Q6` | **Chưa có** credential VNPay sandbox ⇒ `S19` **chưa thể** làm — 🔄 **đo lại 30/10/2026: vẫn 0** (Process/User/Machine) ⇒ `S19` **CHƯA ĐẠT**; harness đã sẵn (`PAY-001` §16.12) | tài liệu này §2.1 |
 
 ---
 
@@ -136,7 +143,7 @@ pwsh -File tools\kiem-tat-ca.ps1 -DayDu   # phải exit 0 · 15/15
 | # | Cổng | Hiện tại | Cần để xanh |
 |---|---|---|---|
 | 0 | Tài liệu GĐ1 + `XC-001…007` Approved | ✅ **26/26** (biên bản 29/10) | — |
-| 1 | Đặt đơn + thanh toán **1 cổng VN thật** | ⛔ Fake provider | **`S19` + `Q6` credential** |
+| 1 | Đặt đơn + thanh toán **1 cổng VN thật** | ⛔ **Chưa có credential** · 🟡 harness `probe-s19-vnpay-that.ps1` đã sẵn (30/10) | **`Q6` credential** ⇒ chạy 1 lệnh (`PAY-001` §16.12) |
 | 2 | Không bán vượt tồn (2 luồng + **2 instance kho**) | 🟡 2 luồng ✅ · ngân sách kênh ✅ · **2 instance kho** ❌ | probe 2 Host cho **giữ chỗ** (khác outbox 2 instance đã có) |
 | 3 | Không mất tiền — job đối soát phát hiện lệch | 🟢 10/10 loại lệch + chạy tay | tiền thật (`S19`) |
 | 4 | Mọi API cần xác thực + login | ✅ | — |
@@ -150,7 +157,7 @@ pwsh -File tools\kiem-tat-ca.ps1 -DayDu   # phải exit 0 · 15/15
 
 | Việc | Ước lượng | Phụ thuộc |
 |---|---|---|
-| **S19** (một giao dịch sandbox thật + bằng chứng + tài liệu) | **0,5–1 ngày** | `Q6` credential |
+| **S19** (một giao dịch sandbox thật + bằng chứng + tài liệu) | **0,5–1 ngày** — 🔄 **30/10: harness + tài liệu ĐÃ XONG**; còn lại **1 lệnh** khi có credential (+ xử lý `S19-1…4` nếu lần chạy chạm) | `Q6` credential |
 | Probe 2 instance cho giữ chỗ | 1–2 ngày | hạ tầng 2 Host + Redis (đã có) |
 | DLQ lô/UI/job dọn | 2–3 ngày | — |
 | Form quản trị Pricing/Kho | 1–2 ngày | — |
