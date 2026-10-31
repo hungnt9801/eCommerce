@@ -371,6 +371,10 @@ if (-not $ChiKiemDb) {
         'probe-khach-hang.ps1' = 'buoc ⑩ khach hang'
         'probe-thanh-toan.ps1' = 'buoc ⑪ thanh toan'
         'probe-don-san.ps1'    = 'buoc ⑫ don san (duong chay that)'
+        'probe-oversell.ps1'   = 'buoc ⑬ oversell (hai request dong thoi, MOT Host)'
+        'probe-outbox.ps1'     = 'buoc ⑭ outbox (process chet sau commit)'
+        'probe-outbox-2instance.ps1'      = 'buoc ⑮ outbox 2 instance'
+        'probe-giu-cho-2instance.ps1'     = 'buoc ⑯ giu cho 2 instance (cong #2: 2 instance kho)'
     }
 
     <#

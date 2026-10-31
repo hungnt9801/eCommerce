@@ -7,25 +7,26 @@
 
 ---
 
-## 1. Ảnh chụp hiện tại (đo lại 29/10/2026, không phải lời khai)
+## 1. Ảnh chụp hiện tại (đo lại **31/10/2026**, không phải lời khai)
 
 | Hạng mục | Giá trị | Cách đo |
 |---|---|---|
 | Commit | `7923376` | `git log --oneline -1` |
-| Cổng đầy đủ | **exit 0 · 348.7s · 15/15 bước** | `pwsh -File tools\kiem-tat-ca.ps1 -DayDu` |
+| Cổng đầy đủ | **exit 0 · 394s · 16/16 bước** (đo 31/10, sau khi thêm bước ⑯) | `pwsh -File tools\kiem-tat-ca.ps1 -DayDu` |
 | Unit | **1634** | bước ③ |
 | Integration | **90/90** | bước ④ |
 | E2E (HTML thật) | **167/167** | bước ⑧ |
 | Bất biến DB | **25/25** · **NND 64** · **72 quyền** · **99** chỗ quét | bước ⑥ |
 | Migration | **50** | `src/eCommerce.EntityFrameworkCore/Migrations` |
-| Oversell | **11/11** | `tools/probe-oversell.ps1` |
+| Oversell | **11/11** | `tools/probe-oversell.ps1` (bước ⑬) |
 | Outbox / 2 instance | **9/9 · 9/9** | `tools/probe-outbox*.ps1` |
+| **Giữ chỗ 2 instance** | **17/17** | `tools/probe-giu-cho-2instance.ps1` (**bước ⑯** — mới 31/10) |
 | Thanh toán | **30/30** | `tools/probe-thanh-toan.ps1` |
 | DLQ replay | **21/21** | `tools/probe-dlq-replay.ps1` |
 | Đơn sàn | **49/49** | `tools/probe-don-san.ps1` |
-| Cây làm việc | **0 tệp ` M `** · **38 tệp `??` đều trong `tools/`** | `git status --porcelain` — ⚠️ xem §6.2 |
+| Cây làm việc | **0 tệp ` M `** · **mọi tệp `??` đều trong `tools/`** (38 → ~45 trong 2 ngày) | `git status --porcelain` — ⚠️ xem §6.2 |
 
-> ⚠️ **38 tệp untracked KHÔNG phải của dự án**: chúng do **một tiến trình khác** (node/script cào catalog) ghi vào `tools/` trong lúc phiên chạy — tăng 7 → 38. Chủ dự án đã nói **sẽ tự xoá**. 📌 **Không** stage/commit/xoá chúng; **không** dùng `git add -A`.
+> ⚠️ **Các tệp untracked trong `tools/` KHÔNG phải của dự án**: chúng do **một tiến trình khác** (node/script cào catalog) ghi vào `tools/` trong lúc phiên chạy — tăng 7 → 38 → ~45 (đo 31/10). Chủ dự án đã nói **sẽ tự xoá**. 📌 **Không** stage/commit/xoá chúng; **không** dùng `git add -A`.
 
 ### Đã xong — đừng làm lại
 
@@ -48,11 +49,14 @@
 ### 2.1 🔴 `S19` — VNPay sandbox THẬT (**cổng bắt buộc của GĐ1**)
 
 > 📌 **TRẠNG THÁI 30/10/2026 (phiên `S19`):** **harness đã có** — `tools/probe-s19-vnpay-that.ps1` (chạy **tay**,
-> **không** thuộc cổng 15 bước vì cần credential + người thanh toán + Internet). 🔒 **Nhưng credential KHÔNG có**
+> **không** thuộc cổng 16 bước vì cần credential + người thanh toán + Internet). 🔒 **Nhưng credential KHÔNG có**
 > trong môi trường đo: `Process`/`User`/`Machine` đều rỗng, không profile, không user-secrets, không `.env` ngoài
 > repo ⇒ probe **dừng ở bước ⓪** (`exit 2`, **không** tạo giao dịch, **không** ghi bằng chứng) ⇒ **`S19` CHƯA ĐẠT**.
 > 📄 Chi tiết + **bốn chướng ngại tĩnh** phải xử lý khi có credential: `PAY-001` **§16.12**.
 > ▶️ Chạy khi có credential: `pwsh -File tools\probe-s19-vnpay-that.ps1 -SoTien 10000`.
+>
+> 🔁 **CẬP NHẬT 31/10/2026:** cổng 2 (**2 instance cho giữ chỗ**) **ĐÃ XANH** (bước ⑯, 17/17) ⇒ trong 5 cổng, **chỉ
+> còn cổng 1 = `S19`**. Credential vẫn **chưa có** (đo lại 31/10: 0 ở cả ba scope) nên `S19` **vẫn CHƯA ĐẠT**.
 
 **Điều kiện tiên quyết (chủ dự án cấp):** `PaymentHub:VnPay:TmnCode` + `PaymentHub:VnPay:HashSecret` của **merchant sandbox**.
 
@@ -62,7 +66,7 @@
 1. Một giao dịch **sandbox thật** đi qua cổng: tạo giao dịch → thanh toán trên cổng sandbox → nhận **IPN thật** (hoặc `querydr` trả `00`) → **DB** `PayTransactions.Status = Succeeded` **và** `OrdOrders.PaymentStatus = Paid`.
 2. Bằng chứng: `PaymentTransaction.ProviderTransactionId` (số giao dịch do **cổng** cấp), thời điểm, số tiền; **không** có trong repo bất kỳ `TmnCode`/`HashSecret` nào (`grep` = 0).
 3. Ghi vào `PAY-001` mục trạng thái mới + cập nhật bàn giao/gate; nếu **không** có credential thì **DỪNG** và ghi rõ — **cấm** bịa giao dịch hoặc dùng chữ ký giả rồi gọi là “thật”.
-4. Cổng đầy đủ **exit 0 · 15/15** sau khi thêm ca/bằng chứng.
+4. Cổng đầy đủ **exit 0 · 16/16** sau khi thêm ca/bằng chứng.
 
 **Bẫy đã biết khi làm S19:**
 - `ShouldChangePasswordOnNextLogin = true` chặn password grant khi lấy token ⇒ xem cách các probe đang xử lý (tắt cờ **trong lúc chạy**, bật lại trong `finally`, có khẳng định đã bật lại).
@@ -100,7 +104,7 @@ cd D:\Projects\Tools\eCommerce
 git log --oneline -1                 # phải là 7923376 hoặc mới hơn
 git status --porcelain               # chỉ được có ?? tools/… (38 tệp lạ); KHÔNG có ' M '
 docker ps                            # phải thấy ecommerce-postgres + ecommerce-redis
-pwsh -File tools\kiem-tat-ca.ps1 -DayDu   # phải exit 0 · 15/15
+pwsh -File tools\kiem-tat-ca.ps1 -DayDu   # phải exit 0 · 16/16
 ```
 
 Đọc theo thứ tự (đừng đọc cả 55 tài liệu):
@@ -144,12 +148,18 @@ pwsh -File tools\kiem-tat-ca.ps1 -DayDu   # phải exit 0 · 15/15
 |---|---|---|---|
 | 0 | Tài liệu GĐ1 + `XC-001…007` Approved | ✅ **26/26** (biên bản 29/10) | — |
 | 1 | Đặt đơn + thanh toán **1 cổng VN thật** | ⛔ **Chưa có credential** · 🟡 harness `probe-s19-vnpay-that.ps1` đã sẵn (30/10) | **`Q6` credential** ⇒ chạy 1 lệnh (`PAY-001` §16.12) |
-| 2 | Không bán vượt tồn (2 luồng + **2 instance kho**) | 🟡 2 luồng ✅ · ngân sách kênh ✅ · **2 instance kho** ❌ | probe 2 Host cho **giữ chỗ** (khác outbox 2 instance đã có) |
+| 2 | Không bán vượt tồn (2 luồng + **2 instance kho**) | ✅ **2 luồng** · ngân sách kênh · **2 instance kho 17/17** (bước ⑯ — mới 31/10) | — |
 | 3 | Không mất tiền — job đối soát phát hiện lệch | 🟢 10/10 loại lệch + chạy tay | tiền thật (`S19`) |
 | 4 | Mọi API cần xác thực + login | ✅ | — |
 | 5 | Không mất event — outbox relay | ✅ replay + 2 instance | — |
 
-> 📌 **Cổng 2** còn **một** phần chưa đo: **2 instance cho GIỮ CHỖ** (khoá phân tán + Redis). Đừng đánh đồng với 2 instance **outbox** (đã đo ở bước ⑮).
+> ✅ **Cổng 2 ĐÃ XANH 31/10/2026** — phần cuối của nó (**2 instance cho GIỮ CHỖ**) đã đo được:
+> `tools/probe-giu-cho-2instance.ps1` chạy **hai** Host (5000 + 5001) cùng DB/Redis, bắn 1 request vào **mỗi**
+> Host **cùng lúc** trên SKU `OnHand = 1` ⇒ **đúng MỘT** thắng, request kia `403` + `eCommerce:Inventory:0001`
+> (không 5xx), DB **một** dòng giữ chỗ, `Reserved <= OnHand`, `Available = 0`.
+> 🔑 **Có chiều ngược:** chỉ đổi `OnHand = 2` ⇒ **cả hai** phải 200 — nhờ vậy phép đo **không thể** xanh vì lý do
+> sai (mọi request đều bị chặn). **17/17 ca**, là **bước ⑯** của cổng.
+> 📌 Khác hẳn bước ⑬ (hai request trên **một** Host — ca dễ: một khoá in-memory cũng đủ xanh).
 
 ---
 
@@ -158,17 +168,17 @@ pwsh -File tools\kiem-tat-ca.ps1 -DayDu   # phải exit 0 · 15/15
 | Việc | Ước lượng | Phụ thuộc |
 |---|---|---|
 | **S19** (một giao dịch sandbox thật + bằng chứng + tài liệu) | **0,5–1 ngày** — 🔄 **30/10: harness + tài liệu ĐÃ XONG**; còn lại **1 lệnh** khi có credential (+ xử lý `S19-1…4` nếu lần chạy chạm) | `Q6` credential |
-| Probe 2 instance cho giữ chỗ | 1–2 ngày | hạ tầng 2 Host + Redis (đã có) |
+| Probe 2 instance cho giữ chỗ | ✅ **XONG 31/10** — bước ⑯, **17/17** (thực tế ~1 giờ, không phải 1–2 ngày) | — |
 | DLQ lô/UI/job dọn | 2–3 ngày | — |
 | Form quản trị Pricing/Kho | 1–2 ngày | — |
 
-**Tổng còn lại để “GĐ1 hoàn tất” theo 5 cổng: `S19` + probe 2 instance giữ chỗ ≈ 1,5–3 ngày** — không phải một phiên dài, nhưng **không thể** đóng bằng cách bịa giao dịch.
+**Tổng còn lại để “GĐ1 hoàn tất” theo 5 cổng: CHỈ còn `S19`** (1 lệnh khi có credential) — không phải một phiên dài, nhưng **không thể** đóng bằng cách bịa giao dịch.
 
 ---
 
 ## 9. Mẫu câu để dán vào session mới
 
-> *“Đọc `docs/ban-giao-s19-va-con-lai-2026-10-29.md` rồi làm `S19` theo §2.1. Credential VNPay sandbox đã có trong biến môi trường (không nằm trong repo). Giữ đúng kỷ luật §5: baseline xanh trước, một commit ASCII, cổng 15/15, không `git add -A`.”*
+> *“Đọc `docs/ban-giao-s19-va-con-lai-2026-10-29.md` rồi làm `S19` theo §2.1. Credential VNPay sandbox đã có trong biến môi trường (không nằm trong repo). Giữ đúng kỷ luật §5: baseline xanh trước, một commit ASCII, cổng 16/16, không `git add -A`.”*
 
 Nếu **chưa** có credential, câu thay thế:
 

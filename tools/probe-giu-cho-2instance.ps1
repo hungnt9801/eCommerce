@@ -1,0 +1,340 @@
+<#
+.SYNOPSIS
+    Probe GIU CHO 2 INSTANCE — hai Host cung DB/Redis, cung giu cho MOT SKU chi con 1 mon.
+
+.DESCRIPTION
+    No cuoi cua GD1 cung #2 (checklist §7 cua `ban-giao`): *"2 instance KHO"*.
+
+    ⚠️ **DOC KY TRUOC KHI TRICH DAN:** `probe-oversell.ps1` (buoc 13) do **hai request dong thoi tren
+    MOT Host**. No chung minh khoa phan tan hoat dong **trong mot tien trinh** — 🔑 do la ca DE nhat:
+    mot khoa `lock` kieu in-memory cung du de no xanh. Cau hoi cua cong #2 la cau khac:
+    *"hai TIEN TRINH khac nhau (2 instance) co cung ton trong mot cho khong?"*
+    => Probe nay chay **hai** `eCommerce.HttpApi.Host` (5000 + 5001) tren **cung** PostgreSQL + Redis,
+    ban 1 request vao MOI Host **cung luc**, roi doc DB.
+
+    Khang dinh (chieu DUONG):
+      ① dung MOT request 200, request kia bi chan bang MA NGHIEP VU (khong 5xx);
+      ② DB co dung MOT dong `InvStockReservations` cho SKU;
+      ③ `InvItems.Reserved <= OnHand` va `Available = 0` — bat bien cuoi.
+
+    Khang dinh (chieu NGUOC — 🔑 khong co no thi phep do co the xanh vi LY DO SAI):
+      ④ cung hai Host, cung dong thoi, chi doi `OnHand = 2` => **CA HAI** request phai 200 va
+         `Reserved = 2`. 📌 Neu buoc nay cung "mot thang", thi buoc ① do mot nguyen nhan KHAC
+         (vi du moi request luon bi tu choi) chu khong phai khoa phan tan.
+
+    Duong giu cho that: `POST /api/app/checkout/tinh-va-giu-cho` (Khoa: `InventoryLockKeys.TheoSku`
+    qua `IAbpDistributedLock` — Redis, `StockReservationService.GiuChoAsync`).
+
+    ⚠️ **GIOI HAN DO:** probe chung minh *"hai instance khong cung giu duoc mot mon hang"*.
+    No **KHONG** chung minh dieu do dung khi Redis chet (khi do `AbpDistributedLock` khong con bao dam —
+    viec cua mot ca rieng), va **khong** do hieu nang.
+
+.NOTES
+    Tien to du lieu: `K9HC` · GUID khoi `e0000000-...-d2..d7` (kiem-db nhom ⑤/⑥ bat duoc neu con sot).
+    Chay sau buoc 15 (khong tranh cong voi cac probe khac): moi probe tu bat/tat Host cua no.
+#>
+[CmdletBinding()]
+param(
+    [int]$CongA = 5000,
+    [int]$CongB = 5001,
+    [switch]$GiuDuLieu
+)
+
+$ErrorActionPreference = 'Stop'
+
+$goc = Split-Path -Parent $PSScriptRoot
+$urlA = "http://localhost:$CongA"
+$urlB = "http://localhost:$CongB"
+
+# 🔒 `XC-007` P-01…P-06: cung mot cho cho khac biet Windows/Linux.
+. (Join-Path $PSScriptRoot 'nen-tang.ps1')
+
+$GUID_KHO = 'e0000000-0000-0000-0000-0000000000d2'
+$GUID_SP = 'e0000000-0000-0000-0000-0000000000d3'
+$GUID_SKU = 'e0000000-0000-0000-0000-0000000000d4'
+$GUID_BG = 'e0000000-0000-0000-0000-0000000000d5'
+$GUID_DONG_BG = 'e0000000-0000-0000-0000-0000000000d6'
+$GUID_TON = 'e0000000-0000-0000-0000-0000000000d7'
+$SKU = 'K9HC-SKU-01'
+
+$script:soDat = 0
+$script:soHong = 0
+
+function Kq([string]$ten, [bool]$dat, [string]$chiTiet = '') {
+    if ($dat) {
+        $script:soDat++
+        Write-Host ("      [{0}] DAT | {1}" -f $ten, $chiTiet)
+    }
+    else {
+        $script:soHong++
+        Write-Host ("      [{0}] HONG | {1}" -f $ten, $chiTiet)
+    }
+}
+
+function Psql([string]$sql) {
+    $r = docker exec ecommerce-postgres psql -U ecommerce -d ecommerce -t -A -c $sql 2>&1
+
+    if ($LASTEXITCODE -ne 0) { throw "psql loi: $r" }
+
+    return ($r | Out-String).Trim()
+}
+
+<#
+    Don sach dau vet probe. 📌 Thu tu: giu cho → so cai → bang gia → ton → SKU → SP → kho.
+    🚨 `S8` bai hoc: bat Host lam `InventoryReconciliationWorker` (`RunOnStart`) chay NGAY ⇒ no ghi mot
+    dong lech THAT cho `InvItems` cua probe (OnHand ma so cai = 0). Xoa CA dong lech, neu khong buoc ⑥
+    cua cong se DO o lan chay sau.
+#>
+function DonDep {
+    Psql 'delete from "ReconRunMismatches" where "Sku" = ''K9HC-SKU-01'';' | Out-Null
+    Psql 'delete from "InvStockLedger" where "Sku" = ''K9HC-SKU-01'';' | Out-Null
+    Psql 'delete from "InvStockReservations" where "Sku" = ''K9HC-SKU-01'';' | Out-Null
+    Psql 'delete from "PrcPriceCalculationRecords" where "IdempotencyKey" like ''K9HC-%'';' | Out-Null
+    Psql 'delete from "PrcPriceListItems" where "Id" = ''e0000000-0000-0000-0000-0000000000d6'';' | Out-Null
+    Psql 'delete from "PrcPriceLists" where "Id" = ''e0000000-0000-0000-0000-0000000000d5'';' | Out-Null
+    Psql 'delete from "InvItems" where "Id" = ''e0000000-0000-0000-0000-0000000000d7'';' | Out-Null
+    Psql 'delete from "CatProductVariants" where "Id" = ''e0000000-0000-0000-0000-0000000000d4'';' | Out-Null
+    Psql 'delete from "CatProducts" where "Id" = ''e0000000-0000-0000-0000-0000000000d3'';' | Out-Null
+    Psql 'delete from "InvStockDocuments" where "Number" like ''K9HC-%'';' | Out-Null
+    Psql 'delete from "InvWarehouses" where "Id" = ''e0000000-0000-0000-0000-0000000000d2'';' | Out-Null
+}
+
+function TatTatCa {
+    foreach ($cong in @($CongA, $CongB)) {
+        foreach ($k in @(Lay-PidDangNghe -Cong $cong)) {
+            Stop-Process -Id $k -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    Start-Sleep -Seconds 1
+}
+
+function BatHost([int]$cong, [string]$hauTo) {
+    $env:ASPNETCORE_URLS = "http://localhost:$cong"
+    $env:ASPNETCORE_ENVIRONMENT = 'Development'
+
+    $binHost = Lay-DuongDanBin -TenDuAn 'eCommerce.HttpApi.Host'
+    $logHost = Join-Path $goc ("_probe-giu-cho-{0}.log" -f $hauTo)
+
+    $tienTrinh = Start-TienTrinhAn -Tep 'dotnet' -ThamSo 'eCommerce.HttpApi.Host.dll' -ThuMucLamViec $binHost `
+        -TepLogRa $logHost -TepLogLoi (Join-Path $goc ("_probe-giu-cho-{0}.err" -f $hauTo))
+
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'wait-host.ps1') -Url "http://localhost:$cong" -LogFile $logHost `
+        -TimeoutSeconds 150 -ProcessId $tienTrinh.Id | Select-Object -Last 1 | ForEach-Object { Write-Output ("   $_") }
+
+    if ($LASTEXITCODE -ne 0) { throw "Host $hauTo khong len" }
+
+    return $tienTrinh
+}
+
+function DatTon([int]$onHand) {
+    # 🚨 BAY DA VAP (lan chay dau): viet cau SQL nay trong chuoi **nhay kep** thi `''` la HAI dau nhay
+    #    (khong phai mot) ⇒ SQL nhan `''e0000000…''` = chuoi RONG roi toi dinh danh ⇒ `syntax error`.
+    #    📌 Dung chuoi **nhay don** (noi `''` = mot dau nhay) — dung khuon moi lenh SQL khac cua probe.
+    $sql = 'update "InvItems" set "OnHand" = {0}, "Reserved" = 0 where "Id" = ''e0000000-0000-0000-0000-0000000000d7'';' -f $onHand
+
+    Psql $sql | Out-Null
+    Psql 'delete from "InvStockReservations" where "Sku" = ''K9HC-SKU-01'';' | Out-Null
+}
+
+<#
+    Ban MOT request vao Host :cong va MOT request vao Host kia **cung luc**.
+    🔒 `PostAsync` KHONG await ngay ⇒ hai request nam cung luc tren duong; `WaitAll` moi cho ca hai.
+    📌 Tra ve mang 2 phan tu: status + body (body de doc MA NGHIEP VU, khong doan tu status).
+#>
+function BanHaiRequest([string]$url1, [string]$khoa1, [string]$url2, [string]$khoa2, [string]$token) {
+    $client = [System.Net.Http.HttpClient]::new()
+    $client.Timeout = [TimeSpan]::FromSeconds(90)
+
+    try {
+        $client.DefaultRequestHeaders.Authorization =
+            [System.Net.Http.Headers.AuthenticationHeaderValue]::new('Bearer', $token)
+
+        $urlGiuCho = '/api/app/checkout/tinh-va-giu-cho'
+
+        $body1 = (@{
+                channelCode    = 'web'
+                warehouseId    = $GUID_KHO
+                customerId     = $null
+                items          = @(@{ sku = $SKU; quantity = 1; taxRate = 0 })
+                orderDiscount  = 0
+                orderFee       = 0
+                ttlPhut        = 15
+                idempotencyKey = $khoa1
+            } | ConvertTo-Json -Depth 5)
+
+        $body2 = (@{
+                channelCode    = 'web'
+                warehouseId    = $GUID_KHO
+                customerId     = $null
+                items          = @(@{ sku = $SKU; quantity = 1; taxRate = 0 })
+                orderDiscount  = 0
+                orderFee       = 0
+                ttlPhut        = 15
+                idempotencyKey = $khoa2
+            } | ConvertTo-Json -Depth 5)
+
+        $nd1 = [System.Net.Http.StringContent]::new($body1, [System.Text.Encoding]::UTF8, 'application/json')
+        $nd2 = [System.Net.Http.StringContent]::new($body2, [System.Text.Encoding]::UTF8, 'application/json')
+
+        $t1 = $client.PostAsync(($url1 + $urlGiuCho), $nd1)
+        $t2 = $client.PostAsync(($url2 + $urlGiuCho), $nd2)
+
+        [System.Threading.Tasks.Task]::WaitAll([System.Threading.Tasks.Task[]]@($t1, $t2))
+
+        return @(
+            [pscustomobject]@{ Ma = [int]$t1.Result.StatusCode; Than = $t1.Result.Content.ReadAsStringAsync().Result }
+            [pscustomobject]@{ Ma = [int]$t2.Result.StatusCode; Than = $t2.Result.Content.ReadAsStringAsync().Result }
+        )
+    }
+    finally {
+        $client.Dispose()
+    }
+}
+
+Write-Host '════ PROBE GIU CHO 2 INSTANCE (hai Host, cung DB/Redis, cung mot mon hang) ════'
+
+$hostA = $null
+$hostB = $null
+
+try {
+    # ── ① TIEN DE ─────────────────────────────────────────────────────────────────────────────
+    TatTatCa
+    DonDep
+    Kq 'P00 tien de: da don du lieu probe cu' ((Psql 'select count(*) from "InvItems" where "Id" = ''e0000000-0000-0000-0000-0000000000d7'';') -eq '0') 'con ton = 0'
+
+    Psql @'
+insert into "InvWarehouses" ("Id","TenantId","Code","Name","Address","IsActive","ExtraProperties","ConcurrencyStamp","CreationTime","IsDeleted")
+values ('e0000000-0000-0000-0000-0000000000d2',null,'K9HC-KHO','K9HC Kho probe 2 instance','Ha Noi',true,'{}','k9hck',now(),false);
+'@ | Out-Null
+
+    Psql @'
+insert into "CatProducts" ("Id","TenantId","Code","Name","Slug","Description","ExtraProperties","ConcurrencyStamp","CreationTime","IsDeleted","Status")
+values ('e0000000-0000-0000-0000-0000000000d3',null,'K9HC-SP-01','K9HC San pham','k9hc-san-pham','Probe giu cho 2 instance.','{}','k9hcp',now(),false,1);
+insert into "CatProductVariants" ("Id","TenantId","ProductId","Sku","Price","IsActive","CreationTime","IsDeleted")
+values ('e0000000-0000-0000-0000-0000000000d4',null,'e0000000-0000-0000-0000-0000000000d3','K9HC-SKU-01',100000,true,now(),false);
+'@ | Out-Null
+
+    Psql @'
+insert into "PrcPriceLists" ("Id","TenantId","Code","Name","Scope","ChannelCode","ChannelShopId","Currency","EffectiveFrom","EffectiveTo","Priority","Status","ExtraProperties","ConcurrencyStamp","CreationTime","IsDeleted")
+values ('e0000000-0000-0000-0000-0000000000d5',null,'K9HC-BG','K9HC Bang gia','0',null,null,'VND',now() - interval '1 day',null,0,2,'{}','k9hcbg',now(),false);
+insert into "PrcPriceListItems" ("Id","TenantId","PriceListId","Sku","AmountValue","CurrencyCode","ExtraProperties","ConcurrencyStamp","CreationTime","IsDeleted")
+values ('e0000000-0000-0000-0000-0000000000d6',null,'e0000000-0000-0000-0000-0000000000d5','K9HC-SKU-01',100000,'VND','{}','k9hcd',now(),false);
+'@ | Out-Null
+
+    # 🔑 `OnHand = 1` — CHI du cho MOT luot giu cho. Dieu kien cua phan chieu DUONG.
+    Psql @'
+insert into "InvItems" ("Id","TenantId","WarehouseId","Sku","OnHand","Reserved","ExtraProperties","ConcurrencyStamp","CreationTime","IsDeleted")
+values ('e0000000-0000-0000-0000-0000000000d7',null,'e0000000-0000-0000-0000-0000000000d2','K9HC-SKU-01',1,0,'{}','k9hct',now(),false);
+'@ | Out-Null
+
+    Kq 'P01 seed: OnHand = 1 · Reserved = 0' `
+        ((Psql 'select "OnHand" || ''/'' || "Reserved" from "InvItems" where "Id" = ''e0000000-0000-0000-0000-0000000000d7'';') -eq '1/0') 'ton = 1/0'
+
+    Psql 'update "AbpUsers" set "ShouldChangePasswordOnNextLogin" = false where "NormalizedUserName" = ''ADMIN'';' | Out-Null
+
+    # ── ② HAI HOST CUNG SONG ──────────────────────────────────────────────────────────────────
+    $hostA = BatHost $CongA 'a'
+    $hostB = BatHost $CongB 'b'
+
+    Kq 'P02 HAI Host cung song (hai TIEN TRINH, cung DB/Redis)' ($null -ne $hostA -and $null -ne $hostB) ("$CongA + $CongB")
+
+    $than = @{
+        grant_type = 'password'; client_id = 'eCommerce_App'; client_secret = '1q2w3e*'
+        username   = 'admin@abp.io'; password = '1q2w3E*'; scope = 'eCommerce'
+    }
+    $jwt = Invoke-RestMethod -Method Post -Uri "$urlA/connect/token" -Body $than -ContentType 'application/x-www-form-urlencoded'
+    Kq 'P03 lay token admin tu Host A' (-not [string]::IsNullOrWhiteSpace($jwt.access_token)) 'password grant'
+
+    # ── ③ CHIEU DUONG: OnHand = 1 ⇒ DUNG MOT thang ─────────────────────────────────────────────
+    $kq1 = @(BanHaiRequest -url1 $urlA -khoa1 'K9HC-P1-A' -url2 $urlB -khoa2 'K9HC-P1-B' -token $jwt.access_token)
+
+    Kq 'P04 ca HAI Host deu TRA LOI (khong co loi ket noi ⇒ hai tien trinh that su phuc vu)' `
+        ($kq1.Count -eq 2 -and $kq1[0].Ma -gt 0 -and $kq1[1].Ma -gt 0) `
+        ("HTTP A = {0} · HTTP B = {1}" -f $kq1[0].Ma, $kq1[1].Ma)
+
+    $soThang = @($kq1 | Where-Object { $_.Ma -eq 200 }).Count
+    Kq 'P05 DUNG MOT request thanh cong (khong phai hai)' ($soThang -eq 1) `
+        ("thanh cong = {0} · HTTP = {1}/{2}" -f $soThang, $kq1[0].Ma, $kq1[1].Ma)
+
+    $hong = @($kq1 | Where-Object { $_.Ma -ne 200 })
+    $maHong = if ($hong.Count -gt 0) { [string]$hong[0].Ma } else { '(khong co)' }
+    $thanHong = if ($hong.Count -gt 0) { [string]$hong[0].Than } else { '' }
+
+    Kq 'P06 request bi chan = 4xx (KHONG phai 5xx, khong phai im lang)' `
+        ($hong.Count -eq 1 -and [int]$maHong -ge 400 -and [int]$maHong -lt 500) ("HTTP = $maHong")
+
+    # 🔒 Ma nghiep vu: `Inventory:0001` (doc lai ton sau khi co khoa). `Lock:0001` cung la "bi chan tu te"
+    #    (khong gianh duoc khoa trong thoi han) — nhung 📌 neu chi thay `Lock:0001` thi phai nghi ngo khoa
+    #    dang giu qua lau; ghi lai ma THUC TE de nguoi doc thay.
+    $bodyHongRutGon = if ($thanHong.Length -gt 200) { $thanHong.Substring(0, 200) } else { $thanHong }
+    Kq 'P07 bi chan bang MA NGHIEP VU (Inventory:0001 hoac Lock:0001)' `
+        ($thanHong -match 'eCommerce:(Inventory|Lock):\d+') $bodyHongRutGon
+
+    # ── ④ BAT BIEN CUOI (DB — khong tin HTTP) ──────────────────────────────────────────────────
+    $soGiuCho = Psql 'select count(*) from "InvStockReservations" where "Sku" = ''K9HC-SKU-01'';'
+    Kq 'P08 DB: DUNG MOT dong giu cho cho SKU (khong co luot thu hai)' ($soGiuCho -eq '1') ("so dong = $soGiuCho")
+
+    $ton = Psql 'select "OnHand" || ''/'' || "Reserved" || ''/'' || ("OnHand" - "Reserved") from "InvItems" where "Id" = ''e0000000-0000-0000-0000-0000000000d7'';'
+    $phan = $ton.Split('/')
+    Kq 'P09 DB: Reserved <= OnHand' ([int]$phan[1] -le [int]$phan[0]) ("OnHand/Reserved/Available = $ton")
+    Kq 'P10 DB: Available = 0 (da ban het)' ($phan[2] -eq '0') ("Available = $($phan[2])")
+
+    # ── ⑤ CHIEU NGUOC: OnHand = 2 ⇒ CA HAI thang ──────────────────────────────────────────────
+    # 🔑 Khong co buoc nay thi mot probe "luon bao mot thang" (vi du moi request deu bi tu choi vi ly do
+    #    khac — sai bang gia, thieu quyen…) van xanh o P05. Doi DUY NHAT so ton ⇒ ket qua phai doi.
+    DatTon 2
+    Kq 'P11 chieu nguoc — tien de: OnHand = 2 va da xoa giu cho cu' `
+        ((Psql 'select "OnHand" || ''/'' || "Reserved" from "InvItems" where "Id" = ''e0000000-0000-0000-0000-0000000000d7'';') -eq '2/0') 'ton = 2/0'
+
+    $kq2 = @(BanHaiRequest -url1 $urlA -khoa1 'K9HC-P2-A' -url2 $urlB -khoa2 'K9HC-P2-B' -token $jwt.access_token)
+
+    $soThang2 = @($kq2 | Where-Object { $_.Ma -eq 200 }).Count
+    Kq 'P12 chieu nguoc: du ton cho HAI ⇒ CA HAI request deu 200 (phep do KHONG luon bao mot thang)' `
+        ($soThang2 -eq 2) ("thanh cong = {0} · HTTP = {1}/{2}" -f $soThang2, $kq2[0].Ma, $kq2[1].Ma)
+
+    $soGiuCho2 = Psql 'select count(*) from "InvStockReservations" where "Sku" = ''K9HC-SKU-01'';'
+    Kq 'P13 chieu nguoc — DB: dung HAI dong giu cho' ($soGiuCho2 -eq '2') ("so dong = $soGiuCho2")
+
+    # ── ⑥ LOG: khong co exception THAT (🛡️ `AbpDbConcurrencyException` o day la loi THAT, khong phai flake) ──
+    $mauLoi = 'Unhandled exception|OutOfMemoryException|AbpDbConcurrencyException'
+    $loiA = @(Select-String -Path (Join-Path $goc '_probe-giu-cho-a.log') -Pattern $mauLoi -ErrorAction SilentlyContinue).Count
+    $loiB = @(Select-String -Path (Join-Path $goc '_probe-giu-cho-b.log') -Pattern $mauLoi -ErrorAction SilentlyContinue).Count
+
+    Kq 'P14 khong co exception THAT trong log hai Host' ($loiA -eq 0 -and $loiB -eq 0) ("exception A = $loiA · exception B = $loiB")
+}
+catch {
+    Write-Host ("   ❌ NGOAI LE: " + $_.Exception.Message)
+    $script:soHong++
+}
+finally {
+    if ($hostA) { Stop-Process -Id $hostA.Id -Force -ErrorAction SilentlyContinue }
+    if ($hostB) { Stop-Process -Id $hostB.Id -Force -ErrorAction SilentlyContinue }
+
+    TatTatCa
+
+    if ($GiuDuLieu) {
+        Write-Host '   ⚠️ -GiuDuLieu: KHONG xoa du lieu probe (cong se DO o buoc ⑥ cho toi khi don).'
+    }
+    else {
+        DonDep
+    }
+
+    Psql 'update "AbpUsers" set "ShouldChangePasswordOnNextLogin" = true where "NormalizedUserName" = ''ADMIN'';' | Out-Null
+
+    Kq 'P15 don dep: khong con giu cho / ton / don vi probe' `
+        ((Psql 'select count(*) from "InvStockReservations" where "Sku" = ''K9HC-SKU-01'';') -eq '0' -and
+         (Psql 'select count(*) from "InvItems" where "Id" = ''e0000000-0000-0000-0000-0000000000d7'';') -eq '0') `
+        'giu cho = 0 · ton = 0'
+
+    Kq 'P16 don dep: da BAT LAI co ShouldChangePasswordOnNextLogin' `
+        ((Psql 'select count(*) from "AbpUsers" where "NormalizedUserName" = ''ADMIN'' and "ShouldChangePasswordOnNextLogin";') -eq '1') 'co = 1'
+
+    Remove-Item Env:\ASPNETCORE_URLS -ErrorAction SilentlyContinue
+}
+
+Write-Host ("════ PROBE GIU CHO 2 INSTANCE: {0} DAT / {1} HONG ════" -f $script:soDat, $script:soHong)
+
+if ($script:soHong -gt 0) { exit 1 }
+
+exit 0

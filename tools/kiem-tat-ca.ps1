@@ -522,6 +522,29 @@ if ($DayDu -and -not $BoQuaE2E) {
 
         Write-Output '   ✅ HAI INSTANCE PHOI HOP: outbox don, mot event ⇒ mot dong inbox.'
     }
+
+    # ── BUOC 16: GIU CHO 2 INSTANCE — hai Host cùng giu MOT mon hang ───────────────────────────
+    Buoc 'Giu cho 2 INSTANCE: hai Host cung DB/Redis ⇒ khong ai giu duoc cung mot mon' {
+        # 📌 **NO CUOI CUA CONG #2** (checklist §7 cua ban giao): buoc ⑬ do hai request dong thoi tren
+        # **MOT** Host — 🔑 do la ca DE: mot khoa kieu in-memory cung du de no xanh. Cau hoi cua cong la
+        # *"hai TIEN TRINH co cung ton trong mot cho khong?"* ⇒ probe nay chay **hai** Host (5000+5001)
+        # va ban 1 request vao MOI Host cung luc.
+        # 🔒 Co ca CHIEU NGUOC: doi DUY NHAT `OnHand = 2` ⇒ **CA HAI** phai thanh cong. Khong co ca do thi
+        # mot probe "luon bao mot thang" (vi du moi request deu bi tu choi vi ly do khac) van XANH.
+        # ⚠️ Chay sau ⑮ de khong tranh cong 5000/5001 voi probe outbox 2 instance.
+        $p = ChayLenh 'pwsh' @('-NoProfile', '-File', (Join-Path $PSScriptRoot 'probe-giu-cho-2instance.ps1')) 'giu-cho-2inst.log'
+
+        Get-Content $p.Log | Where-Object { $_ -match 'DAT|HONG|PROBE GIU CHO 2' } |
+            Select-Object -First 24 | ForEach-Object { "   $_" }
+
+        if ($p.Ma -ne 0) {
+            Get-Content $p.Log | Select-String 'HONG|NGOAI LE' -Context 0,3 |
+                ForEach-Object { $_.Context.PostContext | ForEach-Object { "   $_" } }
+            throw "PROBE GIU CHO 2 INSTANCE DO (exit $($p.Ma)) — xem log: $($p.Log)."
+        }
+
+        Write-Output '   ✅ KHONG BAN VUOT TON XUYEN TIEN TRINH: hai instance, mot mon ⇒ dung MOT giu duoc cho.'
+    }
 }
 elseif (-not $BoQuaE2E -and -not $DayDu) {
     Write-Output ""

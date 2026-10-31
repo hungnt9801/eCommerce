@@ -10,7 +10,7 @@
 
     --- VI SAO PHAI LA PROBE CHAY TAY, KHONG PHAI MOT BUOC CUA CONG ---
     No can BA thu ma CI khong co: (1) credential merchant sandbox THAT, (2) mot NGUOI thanh toan tren
-    trang cua VNPay, (3) Internet. ⇒ No KHONG nam trong `kiem-tat-ca.ps1` (15 buoc van phai xanh ma
+    trang cua VNPay, (3) Internet. ⇒ No KHONG nam trong `kiem-tat-ca.ps1` (16 buoc van phai xanh ma
     khong can mang). `README-probe` §A9: mot muc dich, mot probe.
 
     --- DUONG XAC NHAN: `querydr`, KHONG phai IPN ---

@@ -1616,7 +1616,7 @@ POST /DatHang (Thanh toán ngay)  → 302
 | 1 | Một giao dịch sandbox **thật**: tạo → thanh toán trên cổng → `PayTransactions.Status = Succeeded` **và** `OrdOrders.PaymentStatus = Paid` | ⛔ **CHƯA** | Probe **DỪNG ở bước ⓪** (exit `2`): không có credential ⇒ **không** tạo giao dịch, **không** gọi cổng, **không** ghi bằng chứng |
 | 2 | Bằng chứng: `ProviderTransactionId` **do cổng cấp** + thời điểm + số tiền; **0** `TmnCode`/`HashSecret` trong repo | ⛔ **CHƯA** (điều kiện 1 chưa có ⇒ chưa có gì để chứng minh) — ⚠️ **và có chướng ngại TĨNH** `S19-1` dưới đây | ca `T10`–`T13` đo đúng ba thứ này; `T17`/`T18` đo `git grep -f` (mẫu qua **tệp tạm**, không qua argv) |
 | 3 | Ghi vào `PAY-001` + cập nhật bàn giao/gate; **không** credential ⇒ **DỪNG** và ghi rõ | ✅ **đã ghi** | mục này + `ban-giao` §2.1 |
-| 4 | Cổng đầy đủ **exit 0 · 15/15** | ✅ **exit 0 · 15/15** | `pwsh -File tools\kiem-tat-ca.ps1 -DayDu` (533.7s — máy đang tải, **số ca không đổi**) |
+| 4 | Cổng đầy đủ **exit 0 · 16/16** | ✅ **exit 0 · 16/16** (31/10) | `pwsh -File tools\kiem-tat-ca.ps1 -DayDu` · 📌 bước ⑯ là probe **2 instance giữ chỗ** (không phải `S19`) |
 
 > 📌 **Đọc dòng 2 cho đúng:** "`grep` = 0" nói về **credential merchant thật**. Hằng **dev** `GIALAPDEV` +
 > `gia-lap-dev-…` **có** trong `appsettings.Development.json` từ `S8` — đó là **thiết kế đã duyệt** (§7.7.2), không
