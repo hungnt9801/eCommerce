@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>eCommerce</RootNamespace>
+    <AssemblyName>eCommerce.HttpApi</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\eCommerce.Application.Contracts\eCommerce.Application.Contracts.csproj" />
+    <ProjectReference Include="..\..\modules\Catalog\eCommerce.Catalog.Application.Contracts\eCommerce.Catalog.Application.Contracts.csproj" />
+    <ProjectReference Include="..\..\modules\Inventory\eCommerce.Inventory.Application.Contracts\eCommerce.Inventory.Application.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Volo.Abp.AspNetCore.Mvc" />
+  </ItemGroup>
+
+</Project>

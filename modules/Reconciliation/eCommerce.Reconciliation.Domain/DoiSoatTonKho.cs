@@ -45,15 +45,30 @@ public static class DoiSoatTonKho
         StockMovementType.Reservation => 0,
         StockMovementType.ReservationRelease => 0,
 
+        // ── 🆕 `WP-04` (02/11/2026) — 11 loại mới. 🚨 THIẾU NHÁNH Ở ĐÂY THÌ JOB ĐỐI SOÁT **NÉM**
+        // `ArgumentOutOfRangeException` ngay khi có bút toán mới ⇒ **job chết**, mà nó chính là job phát hiện
+        // lệch ⇒ **không còn ai phát hiện** tồn kho sai. Đúng họ lỗi "thêm enum mà quên nơi tiêu thụ".
+        StockMovementType.ShippingOut => -1,
+        StockMovementType.ShippingReturn => +1,
+        StockMovementType.DamagedIn => 0,      // hàng lỗi VẪN trong kho ⇒ `OnHand` không đổi (chỉ loại khỏi Available)
+        StockMovementType.DamagedOut => -1,    // xuất huỷ ⇒ ra khỏi kho
+        StockMovementType.WarrantyHold => -1,  // gửi bảo hành ⇒ ra khỏi kho
+        StockMovementType.WarrantyRelease => +1,
+        StockMovementType.Hold => 0,           // tạm giữ thủ công ⇒ không đổi `OnHand`
+        StockMovementType.HoldRelease => 0,
+        StockMovementType.RetailSaleOut => -1,
+        StockMovementType.SupplierReturnOut => -1,
+        StockMovementType.OtherOut => -1,
+
         _ => throw new ArgumentOutOfRangeException(nameof(loai), loai, "Loại biến động kho không hỗ trợ.")
     };
 
     /// <summary>Tổng có dấu của **mọi** bút toán (bỏ qua loại không ảnh hưởng `OnHand`).</summary>
-    public static int Tong(IEnumerable<(StockMovementType Loai, int DoLon)> butToan)
+    public static decimal Tong(IEnumerable<(StockMovementType Loai, decimal DoLon)> butToan)
     {
         ArgumentNullException.ThrowIfNull(butToan);
 
-        var tong = 0;
+        var tong = 0m;
 
         foreach (var (loai, doLon) in butToan)
         {
@@ -64,8 +79,8 @@ public static class DoiSoatTonKho
     }
 
     /// <summary>Một cặp `(kho, SKU)` bị lệch giữa ảnh chụp và sổ cái.</summary>
-    public sealed record Lech(Guid WarehouseId, string Sku, int OnHand, int TongSoCai)
+    public sealed record Lech(Guid WarehouseId, string Sku, decimal OnHand, decimal TongSoCai)
     {
-        public int ChenhLech => OnHand - TongSoCai;
+        public decimal ChenhLech => OnHand - TongSoCai;
     }
 }

@@ -152,6 +152,12 @@ public static class SalesDbContextModelCreatingExtensions
                 .IsUnique()
                 .HasFilter("\"ExternalLineId\" IS NOT NULL");
 
+            // 🆕 WP-03 nửa sau — `ProductId` (sản phẩm theo mô hình Nhanh). Truy vấn nóng: *"doanh số theo
+            // sản phẩm"* (báo cáo `WP-08`) mà không phải join chuỗi SKU. ⚠️ KHÔNG unique: một sản phẩm nằm
+            // trên nhiều dòng đơn là chuyện bình thường.
+            b.HasIndex(x => new { x.TenantId, x.ProductId })
+                .HasDatabaseName("IX_OrdOrderLines_TenantId_ProductId");
+
             // 🆕 `S14` — **HÀNG RÀO CUỐI chống trả vượt số đã mua** (`SAL-006` ADR-11).
             // 📌 Kiểm ở domain (`OrderLine.TangTra`) là lớp **chính**; `CHECK` này chặn đường ghi tắt
             // (SQL tay / job) — thiếu nó thì `ReturnedQuantity` có thể vượt `Quantity` mà **không lỗi nào**.

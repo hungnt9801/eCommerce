@@ -3083,3 +3083,377 @@ VALUES ('20261029033402_Xc002_DlqReplay', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+ALTER TABLE "CatProducts" ADD "ExternalId" character varying(64);
+
+ALTER TABLE "CatProducts" ADD "IsHot" boolean NOT NULL DEFAULT FALSE;
+
+ALTER TABLE "CatProducts" ADD "IsNew" boolean NOT NULL DEFAULT FALSE;
+
+ALTER TABLE "CatProducts" ADD "ParentId" uuid;
+
+ALTER TABLE "CatProducts" ADD "StorageTimeDays" integer;
+
+ALTER TABLE "CatProducts" ADD "Type" integer NOT NULL DEFAULT 1;
+
+ALTER TABLE "CatProducts" ADD "VatMode" integer NOT NULL DEFAULT 2;
+
+ALTER TABLE "CatProducts" ADD "VatPercent" numeric(5,2);
+
+ALTER TABLE "CatProducts" ADD "WarrantyMonths" integer;
+
+ALTER TABLE "CatProducts" ADD "WeightGram" integer;
+
+CREATE TABLE "CatComboComponents" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "ComboProductId" uuid NOT NULL,
+    "ComponentProductId" uuid NOT NULL,
+    "Quantity" numeric(18,3) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_CatComboComponents" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_CatComboComponents_Quantity_Duong" CHECK ("Quantity" > 0),
+    CONSTRAINT "FK_CatComboComponents_CatProducts_ComboProductId" FOREIGN KEY ("ComboProductId") REFERENCES "CatProducts" ("Id") ON DELETE RESTRICT,
+    CONSTRAINT "FK_CatComboComponents_CatProducts_ComponentProductId" FOREIGN KEY ("ComponentProductId") REFERENCES "CatProducts" ("Id") ON DELETE RESTRICT
+);
+
+CREATE TABLE "CatPackageComponents" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "PackageProductId" uuid NOT NULL,
+    "ComponentProductId" uuid NOT NULL,
+    "Quantity" numeric(18,3) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_CatPackageComponents" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_CatPackageComponents_Quantity_Duong" CHECK ("Quantity" > 0),
+    CONSTRAINT "FK_CatPackageComponents_CatProducts_ComponentProductId" FOREIGN KEY ("ComponentProductId") REFERENCES "CatProducts" ("Id") ON DELETE RESTRICT,
+    CONSTRAINT "FK_CatPackageComponents_CatProducts_PackageProductId" FOREIGN KEY ("PackageProductId") REFERENCES "CatProducts" ("Id") ON DELETE RESTRICT
+);
+
+CREATE TABLE "CatProdBatches" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "ProductId" uuid NOT NULL,
+    "Code" character varying(64) NOT NULL,
+    "ManufactureDate" timestamp with time zone,
+    "ExpiredDate" timestamp with time zone,
+    "PriorWarningDays" integer,
+    "IsActive" boolean NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_CatProdBatches" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_CatProdBatches_Ngay_Khoang" CHECK ("ManufactureDate" IS NULL OR "ExpiredDate" IS NULL OR "ManufactureDate" <= "ExpiredDate"),
+    CONSTRAINT "FK_CatProdBatches_CatProducts_ProductId" FOREIGN KEY ("ProductId") REFERENCES "CatProducts" ("Id") ON DELETE RESTRICT
+);
+
+CREATE TABLE "CatProductTags" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "ProductId" uuid NOT NULL,
+    "Name" character varying(64) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_CatProductTags" PRIMARY KEY ("Id"),
+    CONSTRAINT "FK_CatProductTags_CatProducts_ProductId" FOREIGN KEY ("ProductId") REFERENCES "CatProducts" ("Id") ON DELETE RESTRICT
+);
+
+CREATE TABLE "CatProductUnits" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "ProductId" uuid NOT NULL,
+    "Name" character varying(64) NOT NULL,
+    "ConversionFactor" numeric(18,4) NOT NULL,
+    "Barcode" character varying(64),
+    "IsBase" boolean NOT NULL,
+    "SalePrice" numeric(18,4) NOT NULL,
+    "ImportPrice" numeric(18,4),
+    "WholesalePrice" numeric(18,4),
+    "OldPrice" numeric(18,4),
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_CatProductUnits" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_CatProdUnits_ConversionFactor_Duong" CHECK ("ConversionFactor" > 0),
+    CONSTRAINT "CK_CatProdUnits_SalePrice_KhongAm" CHECK ("SalePrice" >= 0),
+    CONSTRAINT "FK_CatProductUnits_CatProducts_ProductId" FOREIGN KEY ("ProductId") REFERENCES "CatProducts" ("Id") ON DELETE RESTRICT
+);
+
+CREATE TABLE "CatProductImeis" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "ProductId" uuid NOT NULL,
+    "Serial" character varying(64) NOT NULL,
+    "Status" integer NOT NULL,
+    "WarehouseId" uuid,
+    "BatchId" uuid,
+    "ImportBillId" uuid,
+    "SoldBillId" uuid,
+    "WarrantyUntil" timestamp with time zone,
+    "Note" character varying(512),
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_CatProductImeis" PRIMARY KEY ("Id"),
+    CONSTRAINT "FK_CatProductImeis_CatProdBatches_BatchId" FOREIGN KEY ("BatchId") REFERENCES "CatProdBatches" ("Id") ON DELETE RESTRICT,
+    CONSTRAINT "FK_CatProductImeis_CatProducts_ProductId" FOREIGN KEY ("ProductId") REFERENCES "CatProducts" ("Id") ON DELETE RESTRICT
+);
+
+CREATE INDEX "IX_CatProducts_ParentId" ON "CatProducts" ("ParentId");
+
+CREATE INDEX "IX_CatProducts_TenantId_ExternalId" ON "CatProducts" ("TenantId", "ExternalId");
+
+CREATE INDEX "IX_CatProducts_TenantId_ParentId" ON "CatProducts" ("TenantId", "ParentId");
+
+ALTER TABLE "CatProducts" ADD CONSTRAINT "CK_CatProducts_VatPercent_Khoang" CHECK ("VatPercent" IS NULL OR ("VatPercent" >= -100 AND "VatPercent" <= 100));
+
+CREATE INDEX "IX_CatComboComponents_ComboProductId" ON "CatComboComponents" ("ComboProductId");
+
+CREATE INDEX "IX_CatComboComponents_ComponentProductId" ON "CatComboComponents" ("ComponentProductId");
+
+CREATE UNIQUE INDEX "IX_CatComboComponents_TenantId_Combo_Component" ON "CatComboComponents" ("TenantId", "ComboProductId", "ComponentProductId");
+
+CREATE INDEX "IX_CatPackageComponents_ComponentProductId" ON "CatPackageComponents" ("ComponentProductId");
+
+CREATE INDEX "IX_CatPackageComponents_PackageProductId" ON "CatPackageComponents" ("PackageProductId");
+
+CREATE UNIQUE INDEX "IX_CatPackageComponents_TenantId_Package_Component" ON "CatPackageComponents" ("TenantId", "PackageProductId", "ComponentProductId");
+
+CREATE INDEX "IX_CatProdBatches_ProductId" ON "CatProdBatches" ("ProductId");
+
+CREATE INDEX "IX_CatProdBatches_TenantId_ExpiredDate" ON "CatProdBatches" ("TenantId", "ExpiredDate");
+
+CREATE UNIQUE INDEX "IX_CatProdBatches_TenantId_ProductId_Code" ON "CatProdBatches" ("TenantId", "ProductId", "Code");
+
+CREATE INDEX "IX_CatProdImeis_TenantId_ProductId_Status" ON "CatProductImeis" ("TenantId", "ProductId", "Status");
+
+CREATE UNIQUE INDEX "IX_CatProdImeis_TenantId_Serial" ON "CatProductImeis" ("TenantId", "Serial");
+
+CREATE INDEX "IX_CatProductImeis_BatchId" ON "CatProductImeis" ("BatchId");
+
+CREATE INDEX "IX_CatProductImeis_ProductId" ON "CatProductImeis" ("ProductId");
+
+CREATE INDEX "IX_CatProductTags_ProductId" ON "CatProductTags" ("ProductId");
+
+CREATE INDEX "IX_CatProductTags_TenantId_Name" ON "CatProductTags" ("TenantId", "Name");
+
+CREATE UNIQUE INDEX "IX_CatProductTags_TenantId_ProductId_Name" ON "CatProductTags" ("TenantId", "ProductId", "Name");
+
+CREATE INDEX "IX_CatProductUnits_ProductId" ON "CatProductUnits" ("ProductId");
+
+CREATE UNIQUE INDEX "IX_CatProdUnits_MotDonViGoc" ON "CatProductUnits" ("TenantId", "ProductId") WHERE "IsBase";
+
+CREATE UNIQUE INDEX "IX_CatProdUnits_TenantId_Barcode" ON "CatProductUnits" ("TenantId", "Barcode") WHERE "Barcode" IS NOT NULL;
+
+CREATE UNIQUE INDEX "IX_CatProdUnits_TenantId_ProductId_Name" ON "CatProductUnits" ("TenantId", "ProductId", "Name");
+
+ALTER TABLE "CatProducts" ADD CONSTRAINT "FK_CatProducts_CatProducts_ParentId" FOREIGN KEY ("ParentId") REFERENCES "CatProducts" ("Id") ON DELETE RESTRICT;
+
+DROP INDEX "IX_CatProdUnits_TenantId_ProductId_Name";
+
+CREATE UNIQUE INDEX "IX_CatProdUnits_TenantId_ProductId_Name" ON "CatProductUnits" ("TenantId", "ProductId", "Name") NULLS NOT DISTINCT;
+
+DROP INDEX "IX_CatProdUnits_TenantId_Barcode";
+
+CREATE UNIQUE INDEX "IX_CatProdUnits_TenantId_Barcode" ON "CatProductUnits" ("TenantId", "Barcode") NULLS NOT DISTINCT WHERE "Barcode" IS NOT NULL;
+
+DROP INDEX "IX_CatProdUnits_MotDonViGoc";
+
+CREATE UNIQUE INDEX "IX_CatProdUnits_MotDonViGoc" ON "CatProductUnits" ("TenantId", "ProductId") NULLS NOT DISTINCT WHERE "IsBase";
+
+DROP INDEX "IX_CatProdImeis_TenantId_Serial";
+
+CREATE UNIQUE INDEX "IX_CatProdImeis_TenantId_Serial" ON "CatProductImeis" ("TenantId", "Serial") NULLS NOT DISTINCT;
+
+DROP INDEX "IX_CatProdBatches_TenantId_ProductId_Code";
+
+CREATE UNIQUE INDEX "IX_CatProdBatches_TenantId_ProductId_Code" ON "CatProdBatches" ("TenantId", "ProductId", "Code") NULLS NOT DISTINCT;
+
+DROP INDEX "IX_CatComboComponents_TenantId_Combo_Component";
+
+CREATE UNIQUE INDEX "IX_CatComboComponents_TenantId_Combo_Component" ON "CatComboComponents" ("TenantId", "ComboProductId", "ComponentProductId") NULLS NOT DISTINCT;
+
+DROP INDEX "IX_CatPackageComponents_TenantId_Package_Component";
+
+CREATE UNIQUE INDEX "IX_CatPackageComponents_TenantId_Package_Component" ON "CatPackageComponents" ("TenantId", "PackageProductId", "ComponentProductId") NULLS NOT DISTINCT;
+
+DROP INDEX "IX_CatProductTags_TenantId_ProductId_Name";
+
+CREATE UNIQUE INDEX "IX_CatProductTags_TenantId_ProductId_Name" ON "CatProductTags" ("TenantId", "ProductId", "Name") NULLS NOT DISTINCT;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261102085805_Wp03_Catalog_NhanhModel', '10.0.11');
+
+COMMIT;
+
+START TRANSACTION;
+ALTER TABLE "OrdOrderLines" ADD "ProductId" uuid;
+
+CREATE TABLE "CatVariantMaps" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "VariantId" uuid NOT NULL,
+    "ProductId" uuid NOT NULL,
+    "UnitId" uuid NOT NULL,
+    "Sku" character varying(64) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_CatVariantMaps" PRIMARY KEY ("Id"),
+    CONSTRAINT "FK_CatVariantMaps_CatProducts_ProductId" FOREIGN KEY ("ProductId") REFERENCES "CatProducts" ("Id") ON DELETE RESTRICT
+);
+
+CREATE INDEX "IX_OrdOrderLines_TenantId_ProductId" ON "OrdOrderLines" ("TenantId", "ProductId");
+
+CREATE INDEX "IX_CatVariantMaps_ProductId" ON "CatVariantMaps" ("ProductId");
+
+CREATE INDEX "IX_CatVariantMaps_TenantId_ProductId" ON "CatVariantMaps" ("TenantId", "ProductId");
+
+CREATE INDEX "IX_CatVariantMaps_TenantId_Sku" ON "CatVariantMaps" ("TenantId", "Sku");
+
+CREATE UNIQUE INDEX "IX_CatVariantMaps_TenantId_VariantId" ON "CatVariantMaps" ("TenantId", "VariantId");
+
+DROP INDEX "IX_CatVariantMaps_TenantId_VariantId";
+
+CREATE UNIQUE INDEX "IX_CatVariantMaps_TenantId_VariantId" ON "CatVariantMaps" ("TenantId", "VariantId") NULLS NOT DISTINCT;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261102093528_Wp03_Catalog_Backfill_OrderLineProductId', '10.0.11');
+
+COMMIT;
+
+START TRANSACTION;
+ALTER TABLE "InvStockDocuments" ADD "CounterpartyId" uuid;
+
+ALTER TABLE "InvStockDocuments" ADD "CounterpartyType" integer;
+
+ALTER TABLE "InvStockDocuments" ADD "Direction" integer;
+
+ALTER TABLE "InvStockDocuments" ADD "DiscountAmount" numeric(18,4);
+
+ALTER TABLE "InvStockDocuments" ADD "Mode" integer;
+
+ALTER TABLE "InvStockDocuments" ADD "PaidAmount" numeric(18,4);
+
+ALTER TABLE "InvStockDocuments" ADD "RefId" character varying(128);
+
+ALTER TABLE "InvStockDocuments" ADD "RefType" character varying(64);
+
+ALTER TABLE "InvStockDocumentLines" ADD "BatchId" uuid;
+
+ALTER TABLE "InvStockDocumentLines" ADD "ImeiSerials" character varying(4000);
+
+ALTER TABLE "InvStockDocumentLines" ADD "UnitId" uuid;
+
+ALTER TABLE "InvStockDocumentLines" ADD "VatPercent" numeric(5,2);
+
+ALTER TABLE "InvItems" ADD "Damaged" integer NOT NULL DEFAULT 0;
+
+ALTER TABLE "InvItems" ADD "Holding" integer NOT NULL DEFAULT 0;
+
+ALTER TABLE "InvItems" ADD "PreOrder" integer NOT NULL DEFAULT 0;
+
+ALTER TABLE "InvItems" ADD "Shipping" integer NOT NULL DEFAULT 0;
+
+ALTER TABLE "InvItems" ADD "Transferring" integer NOT NULL DEFAULT 0;
+
+ALTER TABLE "InvItems" ADD "WaitingInbound" integer NOT NULL DEFAULT 0;
+
+ALTER TABLE "InvItems" ADD "Warranty" integer NOT NULL DEFAULT 0;
+
+ALTER TABLE "InvItems" ADD "WarrantyHolding" integer NOT NULL DEFAULT 0;
+
+CREATE INDEX "IX_InvStockDocuments_TenantId_Huong_Status_OccurredAtUtc" ON "InvStockDocuments" ("TenantId", "Direction", "Status", "OccurredAtUtc");
+
+CREATE UNIQUE INDEX "IX_InvStockDocuments_TenantId_IdempotencyKey" ON "InvStockDocuments" ("TenantId", "IdempotencyKey") WHERE "IdempotencyKey" IS NOT NULL;
+
+DROP INDEX IF EXISTS "IX_InvStockDocuments_TenantId_IdempotencyKey";
+
+CREATE UNIQUE INDEX "IX_InvStockDocuments_TenantId_IdempotencyKey" ON "InvStockDocuments" ("TenantId", "IdempotencyKey") NULLS NOT DISTINCT WHERE "IdempotencyKey" IS NOT NULL;
+
+ALTER TABLE "InvStockDocuments" ADD CONSTRAINT "CK_InvStockDocuments_Direction_HopLe" CHECK ("Direction" IS NULL OR "Direction" IN (1, 2));
+
+ALTER TABLE "InvStockDocuments" ADD CONSTRAINT "CK_InvStockDocuments_Mode_HopLe" CHECK ("Mode" IS NULL OR "Mode" IN (1, 2, 3, 4, 5, 6, 8, 10, 13, 14, 15, 16, 17, 18, 19));
+
+ALTER TABLE "InvStockDocuments" ADD CONSTRAINT "CK_InvStockDocuments_Tien_KhongAm" CHECK (("DiscountAmount" IS NULL OR "DiscountAmount" >= 0) AND ("PaidAmount" IS NULL OR "PaidAmount" >= 0));
+
+ALTER TABLE "InvStockDocumentLines" ADD CONSTRAINT "CK_InvStockDocumentLines_VatPercent_HopLe" CHECK ("VatPercent" IS NULL OR ("VatPercent" >= 0 AND "VatPercent" <= 100));
+
+ALTER TABLE "InvItems" ADD CONSTRAINT "CK_InvItems_Chieu_KhongAm" CHECK ("Transferring" >= 0 AND "Shipping" >= 0 AND "Holding" >= 0 AND "Damaged" >= 0 AND "Warranty" >= 0 AND "WarrantyHolding" >= 0 AND "PreOrder" >= 0 AND "WaitingInbound" >= 0);
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261102095854_Wp04_Inventory_Buckets_Mode', '10.0.11');
+
+COMMIT;
+
+START TRANSACTION;
+ALTER TABLE "ReconRunMismatches" ALTER COLUMN "TongSoCai" TYPE numeric(18,3);
+
+ALTER TABLE "ReconRunMismatches" ALTER COLUMN "OnHand" TYPE numeric(18,3);
+
+ALTER TABLE "ReconRunMismatches" ALTER COLUMN "ChenhLech" TYPE numeric(18,3);
+
+ALTER TABLE "InvStockLedger" ALTER COLUMN "QuantityDelta" TYPE numeric(18,3);
+
+ALTER TABLE "InvStockLedger" ALTER COLUMN "BalanceAfter" TYPE numeric(18,3);
+
+ALTER TABLE "InvStockDocumentLines" ALTER COLUMN "Quantity" TYPE numeric(18,3);
+
+ALTER TABLE "InvItems" ALTER COLUMN "WarrantyHolding" TYPE numeric(18,3);
+
+ALTER TABLE "InvItems" ALTER COLUMN "Warranty" TYPE numeric(18,3);
+
+ALTER TABLE "InvItems" ALTER COLUMN "WaitingInbound" TYPE numeric(18,3);
+
+ALTER TABLE "InvItems" ALTER COLUMN "Transferring" TYPE numeric(18,3);
+
+ALTER TABLE "InvItems" ALTER COLUMN "Shipping" TYPE numeric(18,3);
+
+ALTER TABLE "InvItems" ALTER COLUMN "Reserved" TYPE numeric(18,3);
+
+ALTER TABLE "InvItems" ALTER COLUMN "PreOrder" TYPE numeric(18,3);
+
+ALTER TABLE "InvItems" ALTER COLUMN "OnHand" TYPE numeric(18,3);
+
+ALTER TABLE "InvItems" ALTER COLUMN "Holding" TYPE numeric(18,3);
+
+ALTER TABLE "InvItems" ALTER COLUMN "Damaged" TYPE numeric(18,3);
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261102102215_Wp04b_SoLuong_Decimal', '10.0.11');
+
+COMMIT;
+

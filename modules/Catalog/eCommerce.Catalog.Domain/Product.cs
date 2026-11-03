@@ -45,6 +45,61 @@ public class Product : FullAuditedAggregateRoot<Guid>, IMultiTenant
 
     public Guid? BrandId { get; set; }
 
+    // ── WP-03 (02/11/2026) — mô hình Nhanh (`03 §3.1`, D-07) ─────────────────────────────────────────
+    // 📌 Tất cả là **CỘT MỚI NULLABLE/CÓ MẶC ĐỊNH** ⇒ migration additive, dữ liệu cũ không phải sửa.
+
+    /// <summary>
+    /// Loại sản phẩm (10 loại của Nhanh). Mặc định <see cref="ProductType.Standard"/> để sản phẩm cũ
+    /// (mọi sản phẩm đang có đều là "thường") **không phải backfill** ngay ở bước này.
+    /// ⚠️ Chưa có máy trạng thái cho việc đổi loại: đổi loại là thao tác quản trị, và luật chi tiết
+    /// (IMEI bắt buộc serial, combo bắt buộc thành phần…) thuộc nửa sau của WP-03.
+    /// </summary>
+    public ProductType Type { get; set; } = ProductType.Standard;
+
+    /// <summary>
+    /// Sản phẩm **CHA** (cha–con của Nhanh, thay cho mô hình "variant là nơi giữ tồn/giá" — D-07).
+    /// Cha **không có tồn**, con mới bán được. 🔒 Luật *"cha không bán được"* thi hành ở
+    /// `ProductAppService.PublishAsync` (phải hỏi repository *"có con không"* — aggregate không giữ collection con),
+    /// mã lỗi `0047`. Chu trình nhiều mức: <see cref="CaySanPham.KiemTraKhongChuTrinh"/> (mã `0048`).
+    /// 🔒 Chỉ đổi qua <see cref="DatCha"/> để chặn tự làm cha của chính mình.
+    /// </summary>
+    public Guid? ParentId { get; protected set; }
+
+    /// <summary>
+    /// % VAT: `-1` không chịu thuế · `-2` không kê khai · `-100` thuế 0% · `0..100` là % thường.
+    /// `null` = **chưa khai**. 🚨 Chỉ đổi qua <see cref="DatVatPercent"/> (guard khoảng) + `CHECK` ở DB.
+    /// </summary>
+    public decimal? VatPercent { get; protected set; }
+
+    /// <summary>Giá đã gồm hay chưa gồm VAT (xem <see cref="VatMode"/>). Mặc định **chưa gồm** như Nhanh.</summary>
+    public VatMode VatMode { get; set; } = VatMode.Excluded;
+
+    /// <summary>Khối lượng (gram) — dùng cho phí vận chuyển; ưu tiên hơn khối lượng của biến thể cũ.</summary>
+    public int? WeightGram { get; set; }
+
+    /// <summary>Số tháng bảo hành (0 = không bảo hành).</summary>
+    public int? WarrantyMonths { get; set; }
+
+    /// <summary>Số ngày lưu kho tối đa trước khi cảnh báo (hàng theo lô/hạn dùng).</summary>
+    public int? StorageTimeDays { get; set; }
+
+    /// <summary>Cờ "hàng hot" — chỉ phục vụ hiển thị/sắp xếp, không phải luật nghiệp vụ.</summary>
+    public bool IsHot { get; set; }
+
+    /// <summary>Cờ "hàng mới" — chỉ phục vụ hiển thị/sắp xếp, không phải luật nghiệp vụ.</summary>
+    public bool IsNew { get; set; }
+
+    /// <summary>Mã sản phẩm ở hệ thống ngoài (sàn/kho cũ) — dùng đối chiếu khi nhập dữ liệu.</summary>
+    public string? ExternalId { get; set; }
+
+    private readonly List<ProductUnit> _units = new();
+
+    /// <summary>
+    /// Các **đơn vị tính** của sản phẩm (1..n) — nơi giữ giá bán thay cho `ProductVariant` (D-07).
+    /// 🚨 Đúng **một** đơn vị là gốc (`IsBase`), và đơn vị **đầu tiên** tự thành gốc nếu chưa có.
+    /// </summary>
+    public IReadOnlyCollection<ProductUnit> Units => _units.AsReadOnly();
+
     /// <summary>
     /// Vòng đời hiển thị. 🚨 Chỉ đổi qua <see cref="Publish"/>/<see cref="Unpublish"/>/<see cref="Archive"/>
     /// ⇒ không có đường nào "set thẳng" bỏ qua guard.
@@ -175,9 +230,117 @@ public class Product : FullAuditedAggregateRoot<Guid>, IMultiTenant
     }
 
     /// <summary>
-    /// Bật hiển thị. 🚨 **NÉM LỖI** nếu: sản phẩm đã Lưu trữ, hoặc **không có biến thể đang hoạt động**
-    /// (`CAT-001` **D9**) — sản phẩm không có biến thể **không bán được**, cho publish sẽ chỉ đẩy
-    /// một trang rỗng ra storefront và bắt `Pricing`/`Inventory` xử lý ca rỗng ở mọi nơi.
+    /// Gán sản phẩm cha (`03 §3.1`). 🔒 Chặn **tự làm cha của chính mình** ngay tại aggregate; chu trình
+    /// nhiều mức (`A → B → A`) cần đọc cả chuỗi tổ tiên nên nằm ở <see cref="CaySanPham.KiemTraKhongChuTrinh"/>
+    /// (app service gọi trước khi gọi hàm này — WP-03 nửa sau).
+    /// ⚠️ `null` = sản phẩm độc lập (hợp lệ, idempotent).
+    /// </summary>
+    public void DatCha(Guid? parentId)
+    {
+        if (parentId == Id)
+        {
+            throw new BusinessException(eCommerceConsts.ErrorCodes.Catalog.SanPhamChaTrungChinhNo)
+                .WithData("productId", Id);
+        }
+
+        ParentId = parentId;
+    }
+
+    /// <summary>
+    /// Gán % VAT — **ĐƯỜNG DUY NHẤT** ghi `VatPercent` (`03 §3.1`: `-1`/`-2`/`-100` có nghĩa đặc biệt).
+    ///
+    /// 🚨 VÌ SAO PHẢI GUARD Ở ĐÂY: `-101` hay `101` vẫn là `decimal` hợp lệ với compiler và với DB kiểu
+    /// `numeric(5,2)`; chỉ `CHECK` của DB mới chặn. Không kiểm ở domain ⇒ người dùng nhận lỗi DB khó hiểu
+    /// và **transaction đã mở**, còn nếu ai bỏ `CHECK` thì **im lặng** ghi ra hoá đơn sai thuế.
+    /// </summary>
+    public void DatVatPercent(decimal? phanTram)
+    {
+        if (phanTram is < -100m or > 100m)
+        {
+            throw new BusinessException(eCommerceConsts.ErrorCodes.Catalog.VatPercentKhongHopLe)
+                .WithData("vatPercent", phanTram);
+        }
+
+        VatPercent = phanTram;
+    }
+
+    /// <summary>
+    /// Thêm **đơn vị tính** (D-07: nơi giữ giá bán thay cho `ProductVariant`).
+    ///
+    /// 🔒 Ba bất biến kiểm **trong phạm vi một sản phẩm** (DB giữ hàng rào cuối toàn tenant — xem mapping):
+    /// <list type="number">
+    ///   <item>Tên ĐVT **không trùng** (không phân biệt hoa/thường) — "thùng" và "Thùng" là một;</item>
+    ///   <item>Barcode **không trùng** trong cùng sản phẩm;</item>
+    ///   <item>**Đúng một** đơn vị gốc: đơn vị đầu tiên tự thành gốc; xin thêm gốc lần hai ⇒ **NÉM LỖI**.</item>
+    /// </list>
+    /// 📌 Vì sao đơn vị đầu tiên **tự** thành gốc: người dùng tạo sản phẩm một ĐVT là ca phổ biến nhất;
+    /// bắt họ gửi `isBase` cho mọi ca sẽ sinh lỗi "quên cờ" chứ không thêm thông tin.
+    /// </summary>
+    public ProductUnit AddUnit(
+        Guid id,
+        string name,
+        decimal conversionFactor,
+        decimal salePrice,
+        bool isBase = false,
+        string? barcode = null,
+        decimal? importPrice = null,
+        decimal? wholesalePrice = null,
+        decimal? oldPrice = null)
+    {
+        var ten = ProductUnit.ChuanHoaTen(name);
+
+        if (_units.Any(x => string.Equals(x.Name, ten, StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new BusinessException(eCommerceConsts.ErrorCodes.Catalog.DonViTinhKhongHopLe)
+                .WithData("truong", nameof(name))
+                .WithData("tenDonVi", ten)
+                .WithData("lyDo", "Tên đơn vị tính đã tồn tại trong sản phẩm này.");
+        }
+
+        var maVach = ProductUnit.ChuanHoaBarcode(barcode);
+
+        if (maVach is not null &&
+            _units.Any(x => string.Equals(x.Barcode, maVach, StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new BusinessException(eCommerceConsts.ErrorCodes.Catalog.BarcodeDaTonTai)
+                .WithData("barcode", maVach)
+                .WithData("phamVi", $"sản phẩm '{Code}'");
+        }
+
+        if (isBase && _units.Any(x => x.IsBase))
+        {
+            throw new BusinessException(eCommerceConsts.ErrorCodes.Catalog.NhieuHonMotDonViGoc)
+                .WithData("productId", Id)
+                .WithData("lyDo", "Sản phẩm đã có đơn vị gốc.");
+        }
+
+        var laGoc = isBase || _units.Count == 0;
+
+        var donVi = new ProductUnit(id, Id, ten, conversionFactor, laGoc, salePrice, maVach)
+        {
+            ImportPrice = importPrice,
+            WholesalePrice = wholesalePrice,
+            OldPrice = oldPrice
+        };
+
+        _units.Add(donVi);
+        return donVi;
+    }
+
+    /// <summary>
+    /// Bật hiển thị. 🚨 **NÉM LỖI** nếu: sản phẩm đã Lưu trữ, hoặc **không có nguồn bán nào**
+    /// (`CAT-001` **D9**; nới ở WP-03 nửa sau) — sản phẩm không có gì để bán **không publish được**, vì
+    /// publish sẽ chỉ đẩy một trang rỗng ra storefront và bắt `Pricing`/`Inventory` xử lý ca rỗng ở mọi nơi.
+    ///
+    /// 🆕 **WP-03 nửa sau (02/11/2026) — ĐIỀU KIỆN "CÓ GÌ ĐỂ BÁN" ĐỔI THEO MÔ HÌNH MỚI (D-07):**
+    /// <list type="bullet">
+    ///   <item>**Trước:** bắt buộc có **biến thể đang hoạt động** (`ProductVariant`) — nơi duy nhất giữ giá.</item>
+    ///   <item>**Nay:** đủ khi có **ĐVT gốc** (`ProductUnit.IsBase`) **HOẶC** còn biến thể cũ đang hoạt động.
+    ///     📌 Nếu vẫn đòi biến thể thì **mọi** sản phẩm tạo qua `POST /api/v1/products` (mô hình Nhanh: 3 ĐVT,
+    ///     0 biến thể) **vĩnh viễn không publish được** — đã ghi thành nợ bắt buộc ở `handover-n2` §2.8.</item>
+    /// </list>
+    /// 🔒 Vẫn **giữ mã lỗi cũ** `0003`: client đã đối soát theo mã này; nghĩa của nó chỉ **rộng hơn**
+    /// (*"không có nguồn bán"* thay vì *"không có biến thể"*), không đổi số (D-17).
     /// </summary>
     public void Publish()
     {
@@ -196,11 +359,16 @@ public class Product : FullAuditedAggregateRoot<Guid>, IMultiTenant
             return;
         }
 
-        if (!_variants.Any(v => v.IsActive))
+        var coDonViGoc = _units.Any(u => u.IsBase);
+        var coBienTheDangBan = _variants.Any(v => v.IsActive);
+
+        if (!coDonViGoc && !coBienTheDangBan)
         {
             throw new BusinessException(eCommerceConsts.ErrorCodes.Catalog.KhongCoBienTheHoatDong)
                 .WithData("ma", Code)
-                .WithData("soBienThe", _variants.Count);
+                .WithData("soBienThe", _variants.Count)
+                .WithData("soDonVi", _units.Count)
+                .WithData("lyDo", "Không có ĐVT gốc và cũng không có biến thể đang hoạt động ⇒ không có gì để bán.");
         }
 
         Status = ProductStatus.Published;

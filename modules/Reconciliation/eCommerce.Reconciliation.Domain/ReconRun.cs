@@ -232,13 +232,13 @@ public class ReconRunMismatch : FullAuditedEntity<Guid>, IMultiTenant
     public string Sku { get; protected set; } = default!;
 
     /// <summary>Ảnh chụp `InventoryItem.OnHand` tại thời điểm quét.</summary>
-    public int OnHand { get; protected set; }
+    public decimal OnHand { get; protected set; }
 
     /// <summary>Tổng **có dấu** của sổ cái (nguồn sự thật) tại thời điểm quét.</summary>
-    public int TongSoCai { get; protected set; }
+    public decimal TongSoCai { get; protected set; }
 
     /// <summary>Độ lệch = `OnHand − TongSoCai` (dấu giữ nguyên để đọc ra được **lệch về phía nào**).</summary>
-    public int ChenhLech { get; protected set; }
+    public decimal ChenhLech { get; protected set; }
 
     /// <summary>
     /// Dòng này có **VƯỢT NGƯỠNG** của lượt hay không.
@@ -287,8 +287,8 @@ public class ReconRunMismatch : FullAuditedEntity<Guid>, IMultiTenant
         Guid reconRunId,
         Guid warehouseId,
         string sku,
-        int onHand,
-        int tongSoCai,
+        decimal onHand,
+        decimal tongSoCai,
         bool vuotNguong) : base(id)
     {
         ReconRunId = reconRunId;

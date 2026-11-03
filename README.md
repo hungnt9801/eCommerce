@@ -230,7 +230,27 @@ dotnet test test\eCommerce.Tests\eCommerce.Tests.csproj
 
 ---
 
-## 8. Ghi chú giấy phép
+## 8. Định hướng Nhanh-hoá (02/11/2026)
+
+Sau khi khảo sát **Nhanh.vn** (QLBH đa kênh, 204 route, 180 mục menu) và đối chiếu repo này,
+phương án thiết kế lại + Web Admin Next.js nằm ở **[`docs/nhanh/`](docs/nhanh/README.md)**.
+
+| Tài liệu | Nội dung |
+|---|---|
+| [`docs/nhanh/README.md`](docs/nhanh/README.md) | Tóm tắt phương án + 6 quyết định cần chốt |
+| [`01-khao-sat-nhanh-vn.md`](docs/nhanh/01-khao-sat-nhanh-vn.md) | Bằng chứng khảo sát Nhanh (route, menu, token màu, cột bảng) |
+| [`02-hien-trang-va-doi-chieu.md`](docs/nhanh/02-hien-trang-va-doi-chieu.md) | Ma trận 16 module: giữ / tái cấu trúc / viết mới |
+| [`03-kien-truc-dich.md`](docs/nhanh/03-kien-truc-dich.md) | Kiến trúc đích: domain, state machine, API, POS offline |
+| [`04-web-admin-nextjs.md`](docs/nhanh/04-web-admin-nextjs.md) | Next.js: design system, 18 màn P0, auth BFF |
+| [`05-lo-trinh-rui-ro.md`](docs/nhanh/05-lo-trinh-rui-ro.md) | 6 giai đoạn, khối lượng, rủi ro |
+| [`06-phuong-phap-khao-sat-rea.md`](docs/nhanh/06-phuong-phap-khao-sat-rea.md) | Cách khảo sát bằng REA + CDP |
+
+> ⚠️ **Chưa có dòng code nào của phương án mới được viết.** Bước đầu tiên là chốt 6 quyết định ở
+> [`docs/nhanh/README.md` §5](docs/nhanh/README.md) — đặc biệt là **multi-tenant** và **kế toán**.
+
+---
+
+## 9. Ghi chú giấy phép
 
 - **ABP Framework: LGPL-3.0-only** — dùng trong sản phẩm đóng được; cần attribution và kèm bản sao GPL/LGPL.
 - Khung này **chỉ dùng module MIỄN PHÍ của ABP** ⇒ chưa cần license thương mại.

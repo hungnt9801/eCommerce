@@ -64,6 +64,48 @@ public static class InventoryErrorCodes
     /// <summary>Số lượng dòng chứng từ phải **≥ 1** (0 hoặc âm sẽ tạo bút toán vô nghĩa/đảo chiều ngầm).</summary>
     public const string SoLuongPhaiDuong = Nhom + "0023";
 
+    // ── 🆕 `WP-04` (02/11/2026) — PHIẾU KHO KIỂU NHANH: kiểu phiếu, đối tác, nguồn, tiền, VAT/serial ──
+    // 📌 Mỗi mã ứng với một **chỉ dẫn khác nhau** cho người dùng (bài học `0040`/`0042`: mã đúng kỹ thuật
+    // nhưng sai nghiệp vụ ⇒ người dùng đi sửa trường không sai).
+
+    /// <summary>**Kiểu phiếu (`mode`) KHÔNG khớp loại chứng từ** — ví dụ `Transfer` trên phiếu nhập.</summary>
+    public const string KieuPhieuKhongKhopLoai = Nhom + "0024";
+
+    /// <summary>Có `CounterpartyId` (hoặc ngược lại) mà **thiếu loại đối tượng** ⇒ không biết tra bảng nào.</summary>
+    public const string ThieuLoaiDoiTac = Nhom + "0025";
+
+    /// <summary>Có `RefId` mà **thiếu `RefType`** ⇒ không biết đối chiếu với chứng từ nào.</summary>
+    public const string ThieuLoaiNguon = Nhom + "0026";
+
+    /// <summary>**Chiết khấu / số đã trả trên phiếu ÂM** — tiền âm ở đây là dữ liệu hỏng, không phải "hoàn tiền".</summary>
+    public const string TienTrenPhieuKhongHopLe = Nhom + "0027";
+
+    /// <summary>**% VAT của dòng ngoài khoảng `0..100`.**</summary>
+    public const string VatPercentKhongHopLe = Nhom + "0028";
+
+    /// <summary>**Số serial/IMEI KHÁC số lượng dòng** ⇒ có đơn vị không truy vết được.</summary>
+    public const string SoSerialKhacSoLuong = Nhom + "0029";
+
+    /// <summary>**Serial trùng trong cùng một dòng** (cùng serial khai hai lần).</summary>
+    public const string SerialTrungTrongDong = Nhom + "0033";
+
+    /// <summary>Một dòng khai **cả lô VÀ serial** — WP-04 chưa có đường ghi lô nên dữ liệu sẽ không kiểm chứng được.</summary>
+    public const string LoVaSerialCungLuc = Nhom + "0034";
+
+    /// <summary>
+    /// **Phiếu kho đã được tạo cho cùng khoá chống trùng** (`IdempotencyKey` — D-04, POS `ClientBillId`).
+    /// 📌 Hàng rào thật là unique index `IX_InvStockDocuments_TenantId_IdempotencyKey`; mã này để client
+    /// **hiển thị phiếu cũ** thay vì báo "hệ thống hỏng" và retry vô hạn.
+    /// </summary>
+    public const string PhieuDaTonTaiTheoKhoa = Nhom + "0035";
+
+    /// <summary>
+    /// **Phiếu XUẤT kho thiếu `Mode`** (`WP-04`) — mode là thứ duy nhất quyết định bút toán của phiếu xuất
+    /// (`Retail ⇒ RetailSaleOut`, `Delivery ⇒ ShippingOut`, `Supplier ⇒ SupplierReturnOut`…).
+    /// 📌 Thiếu nó thì hệ thống phải **đoán** lý do xuất ⇒ sổ cái/báo cáo sai mà không có lỗi nào.
+    /// </summary>
+    public const string PhieuXuatThieuMode = Nhom + "0036";
+
     /// <summary>
     /// 🚨 **Khách trả NHIỀU HƠN số đã mua** (tính **luỹ kế** các lần trả trước) — `SAL-004`.
     /// 📌 **VÌ SAO CẦN MÃ RIÊNG (không mượn `0001`/`KhongDuTon`):** khi ca này trả `0001` (*"không đủ tồn"*),

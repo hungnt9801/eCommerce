@@ -77,7 +77,10 @@ namespace eCommerce;
     // 🚨 `CUS-001` — **BẮT BUỘC**: thiếu dòng này thì assembly `eCommerce.Customers.Application` **KHÔNG** nằm
     // trong đồ thị module ⇒ ABP không quét app service ⇒ **không tạo endpoint** ⇒ API trả **404 body rỗng**
     // dù build/test **xanh** (bài học C8/C16, đã trả giá).
-    typeof(Customers.CustomersApplicationModule)
+    typeof(Customers.CustomersApplicationModule),
+    // 🆕 `D-13`/`D-14` — tầng API **tường minh** `/api/v1/**` cho Web Admin Next.js.
+    // ⚠️ Thiếu dòng này thì controller v1 **KHÔNG** được nạp (không có lỗi biên dịch) — cùng họ lỗi C8/C16.
+    typeof(eCommerceHttpApiModule)
 )]
 public class eCommerceHttpApiHostModule : AbpModule
 {

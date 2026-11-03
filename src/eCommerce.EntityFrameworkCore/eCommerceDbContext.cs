@@ -58,6 +58,24 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>, IHasEventOut
     public DbSet<eCommerce.Reconciliation.PaymentReconciliationLine> PaymentReconciliationLines { get; set; } = default!;
     public DbSet<eCommerce.Reconciliation.PaymentDiscrepancy> PaymentDiscrepancies { get; set; } = default!;
     public DbSet<Catalog.ProductVariant> ProductVariants { get; set; } = default!;
+
+    // ── WP-03 (02/11/2026) — mô hình hàng hóa theo Nhanh (`03 §3.1`, D-07) ──────────────────────
+    // 🚨 Mỗi dòng là một entity THẬT trong model ⇒ thiếu `DbSet` là DI nổ (HTTP 500) dù build xanh —
+    // lưới an toàn: `DbSetRegistrationTests`.
+    public DbSet<Catalog.ProductUnit> ProductUnits { get; set; } = default!;
+    public DbSet<Catalog.ProductImei> ProductImeis { get; set; } = default!;
+    public DbSet<Catalog.ProductBatch> ProductBatches { get; set; } = default!;
+    public DbSet<Catalog.ComboComponent> ComboComponents { get; set; } = default!;
+    public DbSet<Catalog.PackageComponent> PackageComponents { get; set; } = default!;
+    public DbSet<Catalog.ProductTag> ProductTags { get; set; } = default!;
+
+    /// <summary>
+    /// 🆕 **WP-03 nửa sau** — bảng đối chiếu của backfill `CatProductVariants` → sản phẩm con
+    /// (`VariantId → ProductId`). 🚨 **BẮT BUỘC có `DbSet`**: thiếu ⇒ `IRepository&lt;ProductVariantMap, Guid&gt;`
+    /// **không được đăng ký** ⇒ `BackfillCatalogService` nổ ngay lần chạy đầu (quy ước #5; lưới an toàn
+    /// `DbSetRegistrationTests` quét model và khẳng định **mọi** entity `eCommerce.*` đều có `DbSet`).
+    /// </summary>
+    public DbSet<Catalog.ProductVariantMap> ProductVariantMaps { get; set; } = default!;
     /// <summary>
     /// ẢNH SẢN PHẨM (`CAT-003`). 🚨 **BẮT BUỘC có `DbSet`** — thiếu ⇒ `IRepository&lt;ProductMedia, Guid&gt;`
     /// **không được đăng ký** (quy ước #3, lỗi Phase 0) ⇒ app service **không resolve được** ⇒ `HTTP 500`

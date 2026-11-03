@@ -141,7 +141,7 @@ public class PostgreSqlSchemaTests
     }
 
     [Fact]
-    public async Task F1_du_64_index_deu_dung_NULLS_NOT_DISTINCT()
+    public async Task F1_du_73_index_deu_dung_NULLS_NOT_DISTINCT()
     {
         // 🔒 BẤT BIẾN (ghi ở XC-004 Q6): mọi unique index trên entity IMultiTenant PHẢI có
         // `NULLS NOT DISTINCT`. Ai tạo migration mới mà quên ⇒ test này đỏ.
@@ -175,7 +175,17 @@ public class PostgreSqlSchemaTests
         //      (`PrcPriceLists`/`PrcPriceListItems`/`PrcChannelPrices`/`PrcPriceCalculationRecords`) nằm trong
         //      migration `Pricing_PriceList_And_ChannelPrice`/`Prc002_PriceCalculationRecords` — 📌 chúng **chưa**
         //      có tên trong danh sách đích danh dưới đây (nợ của `PRC-001` §15.2, ghi ở `PRC-001` §16).
-        Assert.Equal(64L, await DemAsync(
+        //    → **64** (29/10/2026, `Xc002_DlqReplay` — **không** thêm unique index; con số giữ nguyên)
+        //    → **72** (02/11/2026, `Wp03_Catalog_NhanhModel` — **+8** index của mô hình hàng hóa Nhanh:
+        //    → **73** (02/11/2026, `Wp03_Catalog_Backfill_OrderLineProductId` — **+1**: bảng đối chiếu
+        //      `CatVariantMaps (TenantId, VariantId)`; một biến thể chỉ được chuyển MỘT lần ⇒ thiếu NND thì
+        //      backfill chạy hai lần tạo hai sản phẩm con cho cùng SKU, im lặng).
+        //      ĐVT/barcode/ĐVT gốc/IMEI/lô/combo/gói/nhãn; EF không sinh được `NULLS NOT DISTINCT` kèm bộ lọc
+        //      ⇒ đã sửa tay trong chính migration 51).
+        //    → **74** (02/11/2026, `Wp04_Inventory_Buckets_Mode` — **+1**: `IX_InvStockDocuments_TenantId_IdempotencyKey`
+        //      (chống tạo phiếu kho hai lần khi retry — D-29). Thiếu NND thì với `TenantId = NULL` index **mất
+        //      tác dụng** ⇒ hai phiếu cùng `IdempotencyKey` LỌT ⇒ **nhập kho hai lần**, im lặng).
+        Assert.Equal(74L, await DemAsync(
             "select count(*) from pg_indexes where schemaname = 'public' and indexdef like '%NULLS NOT DISTINCT%'"));
 
         // Kiểm tra ĐÍCH DANH để thông báo lỗi có ý nghĩa (tên index dài có thể bị PostgreSQL cắt ⇒ so theo tiền tố).
@@ -296,6 +306,31 @@ public class PostgreSqlSchemaTests
             // (`PrcPriceLists`, `PrcPriceListItems`, `PrcChannelPrices`, `PrcPriceCalculationRecords`) hiện chỉ
             // được đếm qua **TỔNG**, chưa có tên ở đây ⇒ nếu một cái mất mệnh đề mà một cái khác thêm vào thì
             // tổng không đổi và test **không** bắt được. 📌 Ghi nhận thay vì im lặng (xem `PRC-001` §16).
+            // 🆕 WP-03 (02/11/2026) — **8 index của mô hình hàng hóa Nhanh** (`03 §3.1`, D-07):
+            //   • `..._TenantId_Barcode`: barcode duy nhất toàn tenant ⇒ quét mã ở POS không bán **sai món**;
+            //   • `..._ProductId_Name`: một ĐVT một dòng giá (không có hai giá cho "thùng");
+            //   • `..._MotDonViGoc`: **đúng MỘT ĐVT gốc** (quy đổi tồn kho chỉ một hệ số);
+            //   • `..._TenantId_Serial`: IMEI duy nhất ⇒ một máy không bán **hai lần**;
+            //   • `..._ProductId_Code`: mã lô duy nhất trong (tenant, sản phẩm) ⇒ trừ tồn đúng lô;
+            //   • `..._Combo_Component` / `..._Package_Component`: một thành phần khai một lần ⇒ không xuất tồn gấp đôi;
+            //   • `..._ProductId_Name`: nhãn không trùng ⇒ bộ lọc đếm đúng.
+            // ⚠️ Thiếu `NULLS NOT DISTINCT` ⇒ khi `TenantId = NULL` (đang chạy 1 tenant) TẤT CẢ đều mất tác dụng
+            // IM LẶNG — và đây đúng là loại lỗi mà danh sách đích danh này sinh ra để chặn.
+            "IX_CatProdUnits_TenantId_Barcode",
+            "IX_CatProdUnits_TenantId_ProductId_Name",
+            "IX_CatProdUnits_MotDonViGoc",
+            "IX_CatProdImeis_TenantId_Serial",
+            "IX_CatProdBatches_TenantId_ProductId_Code",
+            "IX_CatComboComponents_TenantId_Combo_Component",
+            "IX_CatPackageComponents_TenantId_Package_Component",
+            "IX_CatProductTags_TenantId_ProductId_Name",
+            "IX_CatVariantMaps_TenantId_VariantId",
+            // 🚨 WP-04 (02/11/2026) — **CHỐNG TẠO PHIẾU KHO HAI LẦN KHI RETRY** (`IdempotencyKey` do client sinh,
+            //    ví dụ `ClientBillId` của POS — D-04/D-29). Mất `NULLS NOT DISTINCT` ⇒ khi `TenantId = NULL`
+            //    (đang chạy 1 tenant) index MẤT TÁC DỤNG ⇒ hai phiếu cùng khoá LỌT ⇒ **nhập kho hai lần**
+            //    (tồn tăng gấp đôi) mà không có lỗi nào. ⚠️ Index có **bộ lọc** `IdempotencyKey IS NOT NULL`
+            //    ⇒ EF không sinh được `NULLS NOT DISTINCT` kèm bộ lọc ⇒ đã viết SQL thô trong migration 53.
+            "IX_InvStockDocuments_TenantId_IdempotencyKey",
         ];
 
         foreach (var ten in phaiCo)

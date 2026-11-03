@@ -127,9 +127,13 @@ public class StockPostingService : DomainService
 
             foreach (var d in dongSapXep)
             {
+                // 🆕 `WP-04`: phiếu có `Mode` ⇒ bút toán do **bảng ánh xạ thuần** quyết định
+                // (`TinhButToanChungTu.ChonBienDongTheoMode`); phiếu không có `Mode` ⇒ **giữ nguyên** hành vi cũ.
                 var keHoach = chungTu.Type == StockDocumentType.Stocktake
                     ? await KeHoachKiemKeAsync(chungTu.WarehouseId, d)
-                    : TinhButToanChungTu.ChoTungDong(chungTu.Type, d.Quantity, chungTu.WarehouseId, chungTu.ToWarehouseId);
+                    : TinhButToanChungTu.ChoTungDongTheoMode(
+                        chungTu.Type, chungTu.Mode, chungTu.Direction, d.Quantity,
+                        chungTu.WarehouseId, chungTu.ToWarehouseId);
 
                 foreach (var but in keHoach)
                 {
@@ -181,8 +185,10 @@ public class StockPostingService : DomainService
 
         var but_ = new StockLedgerEntry(
             GuidGenerator.Create(), but.WarehouseId, d.Sku, but.Loai, but.DoLon, ton.OnHand, at,
-            referenceType: chungTu.Type.ToString(),
-            referenceId: chungTu.Number,
+            // 🆕 `WP-04`: nếu phiếu có **chứng từ nguồn** thì bút toán trỏ về nguồn đó (đơn bán/POS/chuyển kho)
+            // thay vì chỉ tên loại phiếu — nhờ vậy tra *"vì sao tồn đổi"* ra đúng chứng từ, không phải suy luận.
+            referenceType: chungTu.RefType ?? chungTu.Type.ToString(),
+            referenceId: chungTu.RefId ?? chungTu.Number,
             channelCode: null,
             referenceLineId: d.Id);
 

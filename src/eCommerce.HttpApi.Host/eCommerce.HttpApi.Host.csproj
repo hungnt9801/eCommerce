@@ -9,6 +9,7 @@
   <ItemGroup>
     <ProjectReference Include="..\eCommerce.EntityFrameworkCore\eCommerce.EntityFrameworkCore.csproj" />
     <ProjectReference Include="..\eCommerce.Application\eCommerce.Application.csproj" />
+    <ProjectReference Include="..\eCommerce.HttpApi\eCommerce.HttpApi.csproj" />
     <ProjectReference Include="..\..\modules\Address\eCommerce.Address.Application\eCommerce.Address.Application.csproj" />
     <ProjectReference Include="..\..\modules\EInvoice\eCommerce.EInvoice.Application\eCommerce.EInvoice.Application.csproj" />
     <ProjectReference Include="..\..\modules\Signing\eCommerce.Signing.Application\eCommerce.Signing.Application.csproj" />

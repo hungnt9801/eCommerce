@@ -106,3 +106,22 @@ CK_ReconRuns_XacNhan_DuBo|S7: "xác nhận một nửa" (có `ConfirmedAtUtc` m�
 #    nên `23514` ở đây chỉ xảy ra với đường ghi TẮT (SQL tay / migration backfill) ⇒ trả mã chung `eCommerce:Db:0001` là đúng.
 CK_OrdOrders_StatusVersions_KhongAm|SAL-003: 4 bộ đếm `*Version` của 4 trục phải >= 0 — nếu âm thì mọi so sánh `VersionAfter` vô nghĩa và lịch sử không còn dùng được để phát hiện ghi trùng; domain chỉ tăng (+1), nên ca âm chỉ xảy ra với ghi tắt
 CK_OrdStatusHistory_From_Khac_To|SAL-003: một "chuyển dịch" mà `FromStatus = ToStatus` không phải chuyển dịch (mở đường cho lịch sử rác, làm `VersionAfter` nhảy vô nghĩa); domain đã NÉM `0001` cho self-transition trước khi chạm DB, CHECK là hàng rào cuối cho đường ghi tắt
+
+# ── WP-03 (02/11/2026) — MÔ HÌNH HÀNG HÓA NHANH (`03 §3.1`, D-07) ──
+# 📌 NỬA ĐẦU WP-03 chỉ dựng SCHEMA + đường TẠO sản phẩm/ĐVT. Các bảng IMEI/lô/combo/gói/nhãn **chưa có đường ghi**
+#    nào (backfill + API tạo serial/lô thuộc nửa sau WP-03) ⇒ ràng buộc của chúng CHƯA cần mã lỗi riêng.
+#    ⚠️ Khi có đường ghi, mỗi dòng dưới đây PHẢI được thay bằng ánh xạ ở `ViPhamRangBuocDb` (quy tắc ở đầu tệp).
+IX_CatProdUnits_TenantId_ProductId_Name|WP-03: tên ĐVT trùng trong MỘT sản phẩm — domain `Product.AddUnit` đã NÉM `eCommerce:Catalog:0040` trước khi chạm DB; index là hàng rào cuối cho hai request đồng thời (mã riêng cho ca race sẽ thêm khi có yêu cầu đối soát)
+IX_CatProdImeis_TenantId_Serial|WP-03: serial IMEI trùng — CHƯA có đường ghi IMEI trong nửa đầu WP-03 (bảng dựng trước, API/backfill ở nửa sau) ⇒ chưa cần mã riêng
+IX_CatProdBatches_TenantId_ProductId_Code|WP-03: mã lô trùng — CHƯA có đường ghi lô trong nửa đầu WP-03 ⇒ chưa cần mã riêng
+IX_CatComboComponents_TenantId_Combo_Component|WP-03: một thành phần khai hai lần trong combo — CHƯA có đường ghi combo trong nửa đầu WP-03 ⇒ chưa cần mã riêng
+IX_CatPackageComponents_TenantId_Package_Component|WP-03: một thành phần khai hai lần trong gói — CHƯA có đường ghi gói trong nửa đầu WP-03 ⇒ chưa cần mã riêng
+IX_CatProductTags_TenantId_ProductId_Name|WP-03: một sản phẩm gắn trùng nhãn — CHƯA có đường ghi nhãn trong nửa đầu WP-03 ⇒ chưa cần mã riêng
+CK_CatProdBatches_Ngay_Khoang|WP-03: NSX sau HSD — CHƯA có đường ghi lô (nửa sau WP-03); domain sẽ NÉM khi có API ⇒ CHECK là hàng rào cuối cho đường ghi tắt/backfill
+
+# ── WP-03 NỬA SAU (02/11/2026) — BẢNG ĐỐI CHIẾU CỦA BACKFILL (`handover-n3`) ──
+# 📌 `CatVariantMaps` là bảng **nội bộ của một lần chuyển dữ liệu**, KHÔNG có đường ghi từ client:
+#    người ghi duy nhất là `BackfillCatalogService` (DbMigrator). Nó **tự đối soát trước khi ghi** và
+#    **dừng, không ghi gì** nếu thấy biến thể đã có bản đồ ⇒ mã `23505` ở index này chỉ xảy ra khi hai
+#    TIẾN TRÌNH backfill chạy song song (đã cấm bằng quy trình: chỉ một phiên được chạy migrator/backfill).
+IX_CatVariantMaps_TenantId_VariantId|WP-03 nửa sau: *một biến thể chỉ chuyển MỘT lần* — ca trùng là lỗi VẬN HÀNH (chạy backfill song song), không phải ca nghiệp vụ mà client cần phân biệt; service đã tiền kiểm bằng bảng đối chiếu và DỪNG trước khi ghi, nên chỉ còn race giữa hai tiến trình (không có mã riêng cần thiết)

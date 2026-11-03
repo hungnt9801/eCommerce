@@ -102,11 +102,46 @@ public class StockDocument : FullAuditedAggregateRoot<Guid>, IMultiTenant
     /// <summary>Khoá idempotency **ổn định** (`INV-001` ADR-07) — dùng khi ghi sổ.</summary>
     public string? IdempotencyKey { get; set; }
 
+    // ══════════════════════════════════════════════════════════════════════════════════════════════════
+    // 🆕 **`WP-04`** — các trường của **phiếu kho kiểu Nhanh** (`docs/nhanh/07` WP-04 việc 2).
+    // 📌 **TẤT CẢ NULLABLE**: phiếu cũ (tạo trước WP-04) không có những trường này ⇒ migration **additive**,
+    //    và màn DS phiếu cũ **không** bị đổi hành vi lọc.
+    // ══════════════════════════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// **Chiều** của phiếu (`In`/`Out`). **NULL = kiểm kê** (một phiếu có thể vừa thừa vừa thiếu).
+    /// 🔒 Suy ra từ `Type` **tại lúc tạo** và **không** cho đổi — đổi chiều của phiếu đã lập là **viết lại
+    /// lịch sử** (báo cáo nhập/xuất đã chạy sẽ không còn khớp).
+    /// </summary>
+    public StockDocumentDirection? Direction { get; protected set; }
+
+    /// <summary>**Kiểu phiếu** kiểu Nhanh (`bill.mode`) — xem `StockDocumentMode` (15 giá trị đo được).</summary>
+    public StockDocumentMode? Mode { get; protected set; }
+
+    /// <summary>Loại đối tượng của phiếu (KH/NCC/nhân viên/sàn…).</summary>
+    public StockCounterpartyType? CounterpartyType { get; protected set; }
+
+    /// <summary>`Id` đối tượng (khách/NCC/…) — **KHÔNG** FK cứng: phiếu cũ và dữ liệu nhập từ Nhanh có thể trỏ
+    /// tới đối tượng chưa được di trú; FK cứng sẽ **chặn nhập dữ liệu** (cùng lý do ADR-01 với `WarehouseId`).</summary>
+    public Guid? CounterpartyId { get; protected set; }
+
+    /// <summary>Loại chứng từ nguồn (`Order`, `RetailBill`, `StockTransfer`…) — chuỗi, không phải FK.</summary>
+    public string? RefType { get; protected set; }
+
+    /// <summary>Mã chứng từ nguồn (`OrdOrders.Number`, `PosRetailBills.Number`…) — chuỗi để truy vết chéo.</summary>
+    public string? RefId { get; protected set; }
+
+    /// <summary>Chiết khấu trên phiếu (tiền) — `null` nếu phiếu không có chiết khấu.</summary>
+    public decimal? DiscountAmount { get; protected set; }
+
+    /// <summary>Đã trả cho đối tác (tiền) — dùng cho phiếu nhập NCC.</summary>
+    public decimal? PaidAmount { get; protected set; }
+
     protected StockDocument() { }
 
     public StockDocument(
         Guid id, StockDocumentType type, string number, Guid warehouseId,
-        DateTime occurredAtUtc, Guid? toWarehouseId = null) : base(id)
+        DateTime occurredAtUtc, Guid? toWarehouseId = null, StockDocumentMode? mode = null) : base(id)
     {
         if (string.IsNullOrWhiteSpace(number))
         {
@@ -140,6 +175,110 @@ public class StockDocument : FullAuditedAggregateRoot<Guid>, IMultiTenant
         WarehouseId = warehouseId;
         ToWarehouseId = toWarehouseId;
         OccurredAtUtc = occurredAtUtc;
+        Mode = ChuanHoaMode(type, mode);
+        Direction = HuongMacDinh(type);
+    }
+
+    /// <summary>
+    /// **CHIỀU mặc định suy từ loại phiếu** (hàm **THUẦN** — test được không cần DB):
+    /// nhập/trả hàng ⇒ `In`; chuyển kho ⇒ `Out` (phiếu là *"xuất ở kho nguồn"*; bút toán `TransferIn` vẫn sinh
+    /// ở kho đích khi ghi sổ); kiểm kê ⇒ `null` (vừa thừa vừa thiếu).
+    /// </summary>
+    public static StockDocumentDirection? HuongMacDinh(StockDocumentType type) => type switch
+    {
+        StockDocumentType.GoodsReceipt => StockDocumentDirection.In,
+        StockDocumentType.CustomerReturn => StockDocumentDirection.In,
+        // 🆕 `WP-04` — phiếu XUẤT (Nhanh `bill.type = 2`): bán lẻ / giao hàng / trả NCC / xuất khác.
+        StockDocumentType.GoodsIssue => StockDocumentDirection.Out,
+        StockDocumentType.StockTransfer => StockDocumentDirection.Out,
+        StockDocumentType.Stocktake => null,
+        _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Loại chứng từ không hỗ trợ.")
+    };
+
+    /// <summary>
+    /// Kiểm **kiểu phiếu ↔ loại phiếu** (hàm **THUẦN**). Chỉ chặn **mâu thuẫn rõ ràng** — KHÔNG suy ra toàn bộ
+    /// ánh xạ `mode → type` vì Nhanh dùng **cùng một mode** cho cả nhập và xuất (`Supplier` 5, `Other` 10…):
+    /// suy rộng ra sẽ **chặn oan** dữ liệu hợp lệ.
+    /// </summary>
+    public static StockDocumentMode? ChuanHoaMode(StockDocumentType type, StockDocumentMode? mode)
+    {
+        if (mode is null)
+        {
+            // 🆕 `WP-04`: phiếu XUẤT **bắt buộc** có mode — mode là thứ duy nhất quyết định bút toán
+            // (`Retail ⇒ RetailSaleOut`, `Delivery ⇒ ShippingOut`, `Supplier ⇒ SupplierReturnOut`).
+            // 📌 Không có mode thì hệ thống **không biết** hàng đi vì lý do gì ⇒ ghi sổ sẽ phải đoán.
+            if (type == StockDocumentType.GoodsIssue)
+            {
+                throw new BusinessException(InventoryErrorCodes.PhieuXuatThieuMode)
+                    .WithData("type", type.ToString())
+                    .WithData("lyDo", "Phiếu XUẤT kho phải khai `Mode` (bán lẻ/giao hàng/trả NCC/xuất khác).");
+            }
+
+            return null;
+        }
+
+        var mauThuan =
+            (type == StockDocumentType.StockTransfer && mode != StockDocumentMode.Transfer)
+            || (mode == StockDocumentMode.Transfer && type != StockDocumentType.StockTransfer)
+            || (type == StockDocumentType.Stocktake && mode != StockDocumentMode.Stocktake)
+            || (mode == StockDocumentMode.Stocktake && type != StockDocumentType.Stocktake);
+
+        if (mauThuan)
+        {
+            throw new BusinessException(InventoryErrorCodes.KieuPhieuKhongKhopLoai)
+                .WithData("type", type.ToString())
+                .WithData("mode", mode.Value.ToString())
+                .WithData("lyDo", "Kiểu phiếu (mode) KHÔNG khớp loại chứng từ — ví dụ kiểu `Transfer` với phiếu nhập.");
+        }
+
+        return mode;
+    }
+
+    /// <summary>Gắn **đối tượng** của phiếu (KH/NCC/nhân viên/sàn). `CounterpartyId` là `Guid` **trần** (không FK).</summary>
+    public void DatDoiTac(StockCounterpartyType? loai, Guid? id)
+    {
+        if (loai is null && id is not null)
+        {
+            throw new BusinessException(InventoryErrorCodes.ThieuLoaiDoiTac)
+                .WithData("counterpartyId", id)
+                .WithData("lyDo", "Có `CounterpartyId` nhưng THIẾU loại đối tượng ⇒ không biết tra bảng nào.");
+        }
+
+        CounterpartyType = loai;
+        CounterpartyId = id;
+    }
+
+    /// <summary>Gắn **chứng từ nguồn** (đơn bán/POS/chuyển kho) — dùng để truy vết chéo và chống ghi trùng.</summary>
+    public void DatNguon(string? refType, string? refId)
+    {
+        RefType = string.IsNullOrWhiteSpace(refType) ? null : refType.Trim();
+        RefId = string.IsNullOrWhiteSpace(refId) ? null : refId.Trim();
+
+        if (RefId is not null && RefType is null)
+        {
+            throw new BusinessException(InventoryErrorCodes.ThieuLoaiNguon)
+                .WithData("refId", RefId)
+                .WithData("lyDo", "Có `RefId` nhưng THIẾU `RefType` ⇒ không biết đối chiếu với bảng nào.");
+        }
+    }
+
+    /// <summary>Gắn **tiền của phiếu** (chiết khấu / đã trả). **NÉM** nếu âm — tiền âm ở đây là dữ liệu hỏng.</summary>
+    public void DatTien(decimal? chietKhau, decimal? daTra)
+    {
+        if (chietKhau is < 0m)
+        {
+            throw new BusinessException(InventoryErrorCodes.TienTrenPhieuKhongHopLe)
+                .WithData("discountAmount", chietKhau).WithData("lyDo", "Chiết khấu trên phiếu KHÔNG được âm.");
+        }
+
+        if (daTra is < 0m)
+        {
+            throw new BusinessException(InventoryErrorCodes.TienTrenPhieuKhongHopLe)
+                .WithData("paidAmount", daTra).WithData("lyDo", "Số đã trả trên phiếu KHÔNG được âm.");
+        }
+
+        DiscountAmount = chietKhau;
+        PaidAmount = daTra;
     }
 
     /// <summary>`Draft → Posted`. **NÉM** nếu không ở `Draft` hoặc **chưa có dòng** nào.</summary>
@@ -199,11 +338,36 @@ public class StockDocumentLine : FullAuditedAggregateRoot<Guid>, IMultiTenant
     public string Sku { get; protected set; } = default!;
 
     /// <summary>Số lượng **luôn dương**; **chiều** do `StockDocumentType` + vị trí (nguồn/đích) quyết định.</summary>
-    public int Quantity { get; protected set; }
+    public decimal Quantity { get; protected set; }
+
+    // ══════════════════════════════════════════════════════════════════════════════════════════════════
+    // 🆕 **`WP-04`** — trường dòng phiếu kiểu Nhanh (`docs/nhanh/07` WP-04 việc 2).
+    // 📌 **NULLABLE hết** ⇒ phiếu/dòng cũ **không đổi hành vi**; migration additive.
+    // ══════════════════════════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// **Đơn vị tính** của dòng (`ProductUnit.Id` — `CAT-002`/`WP-03`).
+    /// ⚠️ **`Guid` TRẦN, KHÔNG FK**: `ProductUnit` mới có từ WP-03 và dòng phiếu cũ không có ĐVT ⇒ FK cứng sẽ
+    /// **chặn ghi** dữ liệu lịch sử. Tầng đọc kiểm sự tồn tại khi cần hiển thị tên ĐVT.
+    /// </summary>
+    public Guid? UnitId { get; protected set; }
+
+    /// <summary>**% VAT** của dòng (Nhanh: `vatPercent`) — `null` = không khai báo ở dòng, dùng mặc định phiếu.</summary>
+    public decimal? VatPercent { get; protected set; }
+
+    /// <summary>**Lô** của dòng (`ProductBatch.Id`) — `null` = hàng không theo lô. `Guid` trần (cùng lý do `UnitId`).</summary>
+    public Guid? BatchId { get; protected set; }
+
+    /// <summary>
+    /// **Danh sách serial/IMEI** của dòng, phân tách bằng dấu phẩy (Nhanh: `imexs`).
+    /// 📌 Lưu **chuỗi** ở WP-04 vì bảng `CatProductImeis` (WP-03) chưa có đường ghi; khi có, mỗi serial phải
+    /// trở thành **một dòng IMEI thật** (nửa sau WP-03) — ghi rõ để không ai tưởng cột này là nguồn sự thật.
+    /// </summary>
+    public string? ImeiSerials { get; protected set; }
 
     protected StockDocumentLine() { }
 
-    public StockDocumentLine(Guid id, Guid stockDocumentId, string sku, int quantity) : base(id)
+    public StockDocumentLine(Guid id, Guid stockDocumentId, string sku, decimal quantity) : base(id)
     {
         if (stockDocumentId == Guid.Empty)
         {
@@ -215,7 +379,7 @@ public class StockDocumentLine : FullAuditedAggregateRoot<Guid>, IMultiTenant
             throw new ArgumentException("`Sku` là BẮT BUỘC.", nameof(sku));
         }
 
-        if (quantity < 1)
+        if (quantity <= 0m)
         {
             // 🚨 Số lượng **0** hoặc **âm**: nếu cho phép, bút toán 0 lọt vào sổ cái (DB đã có CHECK chặn
             // `QuantityDelta <> 0`) hoặc **đảo chiều nghiệp vụ** (nhập âm = xuất) mà người nhập không biết.
@@ -227,5 +391,60 @@ public class StockDocumentLine : FullAuditedAggregateRoot<Guid>, IMultiTenant
         StockDocumentId = stockDocumentId;
         Sku = sku.Trim();
         Quantity = quantity;
+    }
+
+    /// <summary>
+    /// Gắn **ĐVT / VAT / lô / serial** cho dòng (Nhanh: `unitId`, `vatPercent`, `batch`, `imexs`).
+    ///
+    /// 🚨 **BẤT BIẾN SERIAL — số serial PHẢI bằng `Quantity`:** dòng 3 cái mà khai 2 serial nghĩa là một cái
+    /// **không truy vết được** ⇒ mất bảo hành/không đối soát được với hãng. Nếu **không** khai serial (hàng
+    /// không quản IMEI) thì để `null` — **không** được khai **rỗng** (`""`) vì hai cách diễn đạt cùng một ý.
+    /// </summary>
+    public void DatChiTiet(Guid? unitId = null, decimal? vatPercent = null, Guid? batchId = null,
+        string? imeiSerials = null)
+    {
+        if (vatPercent is < 0m or > 100m)
+        {
+            throw new BusinessException(InventoryErrorCodes.VatPercentKhongHopLe)
+                .WithData("sku", Sku)
+                .WithData("vatPercent", vatPercent);
+        }
+
+        var serials = (imeiSerials ?? string.Empty)
+            .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+
+        if (serials.Length > 0)
+        {
+            if (serials.Length != Quantity)
+            {
+                throw new BusinessException(InventoryErrorCodes.SoSerialKhacSoLuong)
+                    .WithData("sku", Sku)
+                    .WithData("quantity", Quantity)
+                    .WithData("serialCount", serials.Length)
+                    .WithData("lyDo", "Số serial/IMEI PHẢI bằng số lượng dòng — nếu không, có đơn vị KHÔNG truy vết được.");
+            }
+
+            if (serials.Distinct(StringComparer.Ordinal).Count() != serials.Length)
+            {
+                throw new BusinessException(InventoryErrorCodes.SerialTrungTrongDong)
+                    .WithData("sku", Sku)
+                    .WithData("imeiSerials", imeiSerials ?? string.Empty);
+            }
+        }
+
+        if (serials.Length > 0 && batchId is not null)
+        {
+            // 📌 Không phải luật tuyệt đối của Nhanh, nhưng trong WP-04 ta **chưa** có đường ghi lô/serial
+            // (nửa sau WP-03) ⇒ cho phép cả hai cùng lúc sẽ tạo ra dữ liệu **không kiểm chứng được**.
+            // Ghi rõ ở đây thay vì để người sau tự đoán.
+            throw new BusinessException(InventoryErrorCodes.LoVaSerialCungLuc)
+                .WithData("sku", Sku)
+                .WithData("lyDo", "Một dòng KHÔNG được khai CẢ lô VÀ serial trong WP-04 (chưa có đường ghi lô).");
+        }
+
+        UnitId = unitId;
+        VatPercent = vatPercent;
+        BatchId = batchId;
+        ImeiSerials = serials.Length == 0 ? null : string.Join(',', serials);
     }
 }

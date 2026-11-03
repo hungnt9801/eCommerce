@@ -89,13 +89,13 @@ public class PhanBoKenhDto
     public string Sku { get; set; } = default!;
 
     /// <summary>Số lượng **đã bán** (đơn **không** ở `Pending`/`Cancelled`).</summary>
-    public int DaBan { get; set; }
+    public decimal DaBan { get; set; }
 
     /// <summary>Số lượng **đang giữ chỗ** (`Held`) của các đơn thuộc kênh này.</summary>
-    public int DangGiu { get; set; }
+    public decimal DangGiu { get; set; }
 
     /// <summary>Số lượng **đã trả** (từ các phiếu `CustomerReturn` của đơn thuộc kênh).</summary>
-    public int DaTra { get; set; }
+    public decimal DaTra { get; set; }
 
     /// <summary>
     /// 🚨 **`DangGiu` tách theo TỪNG KHO** — khoá = `WarehouseId`, giá trị = số đang giữ.
@@ -106,7 +106,7 @@ public class PhanBoKenhDto
     /// **không lưu kho** (một đơn có thể giao từ nhiều kho). Đây là **lỗ hổng dữ liệu thật** của `INV-003`,
     /// **không** phải chi tiết bỏ sót: sửa nó cần **thêm cột kho vào dòng đơn ⇒ migration + người quyết**.
     /// </summary>
-    public Dictionary<string, int> DangGiuTheoKho { get; set; } = new();
+    public Dictionary<string, decimal> DangGiuTheoKho { get; set; } = new();
 }
 
 public class DonHangDto

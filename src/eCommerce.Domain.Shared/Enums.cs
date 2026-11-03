@@ -63,7 +63,59 @@ public enum StockMovementType
     TransferOut = 9,
 
     /// <summary>Chuyển kho — phần **ĐẾN** (kho đích) — `INV-001`.</summary>
-    TransferIn = 10
+    TransferIn = 10,
+
+    // ══════════════════════════════════════════════════════════════════════════════════════════════════
+    // 🆕 **`WP-04`** (02/11/2026) — 9 CHIỀU TỒN KHO kiểu Nhanh (`docs/nhanh/07` WP-04 việc 3).
+    // 📌 Mỗi giá trị ở đây có lý do tồn tại: **cột tồn tương ứng đã có** trên `InvItems`. Thiếu giá trị thì
+    // nghiệp vụ buộc phải **mượn** một giá trị khác ⇒ sổ cái **mất khả năng truy vết** (đúng lỗi đã xảy ra
+    // với kiểm kê/chuyển kho trước `INV-001` — xem chú thích ở `StocktakeGain`).
+    // 🚨 **CHỈ THÊM Ở CUỐI DẢI, KHÔNG ĐỔI SỐ CỦA GIÁ TRỊ CŨ (D-17).**
+    // ══════════════════════════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>Xuất kho để **giao hàng**: hàng rời kho (`OnHand` ↓) và vào chiều `Shipping`.</summary>
+    ShippingOut = 11,
+
+    /// <summary>Hàng **đang giao được trả lại kho**: chiều `Shipping` ↓ và `OnHand` ↑.</summary>
+    ShippingReturn = 12,
+
+    /// <summary>Đánh dấu hàng **hỏng/lỗi**: chiều `Damaged` ↑ (`OnHand` **KHÔNG** đổi — hàng vẫn nằm trong kho).</summary>
+    DamagedIn = 13,
+
+    /// <summary>Xuất **huỷ** hàng hỏng: chiều `Damaged` ↓ **và** `OnHand` ↓ (hàng ra khỏi kho hẳn).</summary>
+    DamagedOut = 14,
+
+    /// <summary>Gửi hàng đi **bảo hành**: `OnHand` ↓, chiều `Warranty` ↑.</summary>
+    WarrantyHold = 15,
+
+    /// <summary>Nhận lại hàng **từ bảo hành**: chiều `Warranty` ↓, `OnHand` ↑.</summary>
+    WarrantyRelease = 16,
+
+    /// <summary>**Tạm giữ thủ công** (giữ hàng cho khách/đơn chưa chốt): chiều `Holding` ↑.</summary>
+    Hold = 17,
+
+    /// <summary>**Nhả tạm giữ** thủ công: chiều `Holding` ↓.</summary>
+    HoldRelease = 18,
+
+    /// <summary>**Bán lẻ (POS)** xuất kho — tách khỏi `Sale` (đơn website) để báo cáo kênh bán **không lẫn**.</summary>
+    RetailSaleOut = 19,
+
+    /// <summary>
+    /// **Xuất trả nhà cung cấp** (Nhanh: phiếu *xuất* với `mode = 5 Nhà cung cấp`).
+    /// 📌 **VÌ SAO PHẢI THÊM (không mượn `TransferOut`/`Sale`):** `TransferOut` trong sổ cái nghĩa *"đi vì chuyển
+    /// kho"* và `Sale` nghĩa *"đi vì bán"* — mượn chúng thì báo cáo *"trả NCC"* **không tách được** khỏi bán/chuyển
+    /// kho, đúng họ lỗi mà `INV-001` đã sửa cho kiểm kê (`StocktakeGain`/`Loss`).
+    /// 🔒 Thêm ở CUỐI dải (D-17).
+    /// </summary>
+    SupplierReturnOut = 20,
+
+    /// <summary>
+    /// **Xuất khác** (Nhanh: phiếu *xuất* với `mode = 10 Khác`) — điều chỉnh giảm không thuộc loại nào.
+    /// 📌 **KHÔNG** dùng `Adjustment` vì `Adjustment` trong hệ thống này **tăng** `OnHand`; dùng nó cho phiếu
+    /// xuất sẽ **đảo chiều nghiệp vụ** (xuất 5 thành nhập 5) mà không có lỗi nào.
+    /// 🔒 Thêm ở CUỐI dải (D-17).
+    /// </summary>
+    OtherOut = 21
 }
 
 public enum OrderStatus
@@ -283,6 +335,113 @@ public enum ProductStatus
 
     /// <summary>Lưu trữ — kết thúc vòng đời; **không** publish lại.</summary>
     Archived = 3
+}
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════
+// 🆕 WP-03 (02/11/2026) — MÔ HÌNH HÀNG HÓA THEO NHANH (`03 §3.1`, D-07)
+//
+// 🚨 VÌ SAO ĐÁNH SỐ TƯỜNG MINH (1..10, 1..2, 1..11) THAY VÌ ĐỂ MẶC ĐỊNH 0..n:
+// đây là **giá trị của Nhanh** (`nhanh-pos-v3-api-inventory.md` §2.2) và sẽ được dùng để **đối chiếu dữ liệu
+// hai chiều** (`product.type`, `imei.status`). Nếu ta đánh số lại từ 0 thì mọi lần so sánh/import phải cộng trừ
+// bằng tay — và **sai một đơn vị là sai toàn bộ bản đồ**, không có lỗi biên dịch nào.
+// 🔒 Append-only (D-17): **chỉ thêm ở cuối**, không đổi số đã có.
+// 📌 Không có giá trị `4` cho IMEI là **đúng dữ liệu Nhanh đo được** — cố ý **giữ khoảng trống**, không lấp
+// bằng một giá trị tự chế (lấp vào là tự tạo nghĩa mới cho dữ liệu của hệ thống khác).
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════
+
+/// <summary>
+/// **LOẠI SẢN PHẨM** (`03 §3.1`, đúng số của Nhanh — `nhanh-pos-v3-api-inventory.md` §2.2 `type`).
+///
+/// 🚨 Loại quyết định **form nhập liệu và luật tồn kho**: IMEI quản theo serial, cân đo bán số thập phân,
+/// combo/gói là **cấu thành** (không tự có tồn), dịch vụ **không có tồn**. Vì vậy nó là **enum có số cố định**,
+/// không phải chuỗi tự do — chuỗi tự do sẽ khiến hai nơi hiểu "combo" theo hai kiểu.
+/// </summary>
+public enum ProductType
+{
+    /// <summary>1 — Thường (một ĐVT, không serial, không lô).</summary>
+    Standard = 1,
+
+    /// <summary>2 — Voucher (phiếu quà tặng; bán như hàng nhưng không tồn kho vật lý).</summary>
+    Voucher = 2,
+
+    /// <summary>3 — Cân đo (bán theo khối lượng, số lượng thập phân).</summary>
+    Weighed = 3,
+
+    /// <summary>4 — Theo IMEI (mỗi serial là một đơn vị tồn kho riêng).</summary>
+    Imei = 4,
+
+    /// <summary>5 — Gói sản phẩm (bán một gói = nhiều thành phần).</summary>
+    Package = 5,
+
+    /// <summary>6 — Dịch vụ (không có tồn kho).</summary>
+    Service = 6,
+
+    /// <summary>7 — Dụng cụ (thiết bị dùng nội bộ, không bán lẻ).</summary>
+    Tool = 7,
+
+    /// <summary>8 — Bán theo lô (quản tồn và hạn dùng theo lô).</summary>
+    BatchTracked = 8,
+
+    /// <summary>9 — Combo (bán một combo = nhiều sản phẩm thành phần).</summary>
+    Combo = 9,
+
+    /// <summary>10 — Nhiều đơn vị tính (lon/thùng/kiện… với hệ số quy đổi).</summary>
+    MultiUnit = 10
+}
+
+/// <summary>
+/// **CÁCH HIỂU GIÁ ĐỐI VỚI VAT** (`03 §3.1`; Nhanh gọi là `priceVatMode`).
+///
+/// 🚨 VÌ SAO PHẢI LƯU THÀNH ENUM (không suy ra từ `VatPercent`): cùng một con số giá `100.000` là
+/// **đã gồm** hay **chưa gồm** VAT cho ra **hai số tiền khác nhau** khi in hoá đơn. Không lưu mode thì
+/// kế toán phải hỏi lại người nhập — và **không có lỗi nào** để biết mình đoán sai.
+/// </summary>
+public enum VatMode
+{
+    /// <summary>1 — Giá **đã gồm** VAT ⇒ giữ nguyên khi tính tiền.</summary>
+    Included = 1,
+
+    /// <summary>2 — Giá **chưa gồm** VAT ⇒ giá bán = giá + VAT (mặc định của Nhanh).</summary>
+    Excluded = 2
+}
+
+/// <summary>
+/// **TRẠNG THÁI MỘT SERIAL IMEI** (`03 §3.1`; số đúng theo Nhanh — `nhanh-pos-v3-api-inventory.md` §2.2).
+///
+/// ⚠️ **KHÔNG có giá trị `4`** — đó là **khoảng trống trong dữ liệu Nhanh**, không phải thiếu sót của ta.
+/// 🔒 Serial chỉ đi qua các trạng thái này qua thao tác kho/bán/bảo hành; **cấm** sửa trực tiếp từ UI.
+/// </summary>
+public enum ProductImeiStatus
+{
+    /// <summary>1 — Mới (chưa bán, vừa nhập).</summary>
+    New = 1,
+
+    /// <summary>2 — Đã bán.</summary>
+    Sold = 2,
+
+    /// <summary>3 — Đang vận chuyển (đã xuất cho đơn vị giao hàng).</summary>
+    Shipping = 3,
+
+    /// <summary>5 — Lỗi (hỏng, chờ xử lý).</summary>
+    Faulty = 5,
+
+    /// <summary>6 — Đã trả nhà cung cấp.</summary>
+    ReturnedToSupplier = 6,
+
+    /// <summary>7 — Tồn trong cửa hàng.</summary>
+    InStore = 7,
+
+    /// <summary>8 — Đang chuyển kho.</summary>
+    Transferring = 8,
+
+    /// <summary>9 — Đang bảo hành.</summary>
+    InWarranty = 9,
+
+    /// <summary>10 — Đã trả bảo hành (nhận lại từ hãng/bảo hành).</summary>
+    ReturnedFromWarranty = 10,
+
+    /// <summary>11 — Hàng demo (trưng bày, không bán như hàng mới).</summary>
+    Demo = 11
 }
 
 // ══════════════════════════════════════════════════════════════════════════════════════════════════

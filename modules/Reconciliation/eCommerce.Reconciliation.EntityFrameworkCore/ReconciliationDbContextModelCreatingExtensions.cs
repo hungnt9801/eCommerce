@@ -61,6 +61,13 @@ public static class ReconciliationDbContextModelCreatingExtensions
 
             b.Property(x => x.Sku).IsRequired().HasMaxLength(64);
 
+            // 🆕 `WP-04b` — lịch sử lệch phải giữ **cùng độ chính xác** với `InvItems`/`InvStockLedger`
+            // (`numeric(18,3)`): nếu để `int` thì lệch 0,5 bị **ghi thành 0** ⇒ câu hỏi *"lệch này bao nhiêu"*
+            // trả lời **sai** ngay trong bảng dùng để điều tra.
+            b.Property(x => x.OnHand).HasPrecision(18, 3);
+            b.Property(x => x.TongSoCai).HasPrecision(18, 3);
+            b.Property(x => x.ChenhLech).HasPrecision(18, 3);
+
             // 🚨 `REC-001` — **TRẠNG THÁI XỬ LÝ LỆCH** (bổ sung 16/10/2026).
             //
             // **CẨN THẬN KHI SỬA KHỐI NÀY:** `b.Property(x => x.Sku).IsRequired().HasMaxLength(64);`

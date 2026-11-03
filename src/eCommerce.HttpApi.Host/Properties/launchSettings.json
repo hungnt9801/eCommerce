@@ -7,6 +7,15 @@
         "ASPNETCORE_ENVIRONMENT": "Development"
       },
       "applicationUrl": "https://localhost:54274;http://localhost:54275"
+    },
+    "eCommerce.HttpApi.Host (http 54275 - cho Web Admin Next.js)": {
+      "commandName": "Project",
+      "launchBrowser": false,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "AuthServer__Authority": "http://localhost:54275"
+      },
+      "applicationUrl": "http://localhost:54275"
     }
   }
 }

@@ -47,24 +47,24 @@ public static class HanMucKenh
     /// </list>
     /// 🔒 `giaTri &lt;= 0` ⇒ **0** ⇒ nghĩa là **KHÔNG áp hạn mức** (quy ước: `DefaultValue = 0` là **tắt**).
     /// </summary>
-    public static int TinhHanMuc(DonViHanMuc donVi, decimal giaTri, int tonKhaDung)
+    public static decimal TinhHanMuc(DonViHanMuc donVi, decimal giaTri, decimal tonKhaDung)
     {
         if (giaTri <= 0) { return 0; }
 
-        if (donVi == DonViHanMuc.Absolute) { return (int)decimal.Truncate(giaTri); }
+        if (donVi == DonViHanMuc.Absolute) { return decimal.Truncate(giaTri); }
 
         if (tonKhaDung <= 0) { return 0; }
 
         var hanMuc = decimal.Truncate(tonKhaDung * giaTri / 100m);
 
-        return (int)hanMuc;
+        return hanMuc;
     }
 
     /// <summary>
     /// Quyết định **có vượt hạn mức** không. 🔒 `hanMuc &lt;= 0` ⇒ **KHÔNG** áp hạn mức ⇒ **không** bao giờ vượt
     /// (đây là đường "tắt chính sách" **duy nhất**, để không ai tình cờ chặn hết hàng).
     /// </summary>
-    public static bool VuotHanMuc(int soLuongYeuCau, int hanMuc)
+    public static bool VuotHanMuc(decimal soLuongYeuCau, decimal hanMuc)
     {
         if (hanMuc <= 0) { return false; }
 
@@ -75,7 +75,7 @@ public static class HanMucKenh
     /// **Có nên CHẶN không** — kết hợp *vượt hạn mức* **và** *hành động đã chọn*.
     /// 🔒 `Warn` ⇒ **KHÔNG** chặn (cho qua + ghi cảnh báo) — theo đúng lựa chọn `Inv.ChannelLimit.Action`.
     /// </summary>
-    public static bool NenChan(HanhDongHanMuc hanhDong, int soLuongYeuCau, int hanMuc)
+    public static bool NenChan(HanhDongHanMuc hanhDong, decimal soLuongYeuCau, decimal hanMuc)
         => hanhDong == HanhDongHanMuc.Block && VuotHanMuc(soLuongYeuCau, hanMuc);
 
     /// <summary>
@@ -87,7 +87,7 @@ public static class HanMucKenh
     /// 🔒 Hàm này **không** đổi hành vi (vẫn `0` = tắt) — nó chỉ **nói ra** để chỗ gọi **ghi cảnh báo**;
     /// quyết định *"chặn hay không"* vẫn thuộc `Action`, **không** bị hàm này lén đổi.
     /// </summary>
-    public static bool HanMucVoNghia(DonViHanMuc donVi, decimal giaTri, int tonKhaDung)
+    public static bool HanMucVoNghia(DonViHanMuc donVi, decimal giaTri, decimal tonKhaDung)
         => giaTri > 0 && TinhHanMuc(donVi, giaTri, tonKhaDung) <= 0;
 
     // ── `INV-003` v2 — CHỌN HẠN MỨC TỪ BẢNG RIÊNG TỪNG KÊNH ────────────────────────────────────────

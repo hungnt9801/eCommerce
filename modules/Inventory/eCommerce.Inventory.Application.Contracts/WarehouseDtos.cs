@@ -32,11 +32,11 @@ public class LechTonKhoDto
 {
     public Guid WarehouseId { get; set; }
     public string Sku { get; set; } = default!;
-    public int OnHand { get; set; }
-    public int TongSoCai { get; set; }
+    public decimal OnHand { get; set; }
+    public decimal TongSoCai { get; set; }
 
     /// <summary>`OnHand − TổngSổCái`. Dương ⇒ ảnh chụp **thừa**; âm ⇒ ảnh chụp **thiếu**.</summary>
-    public int ChenhLech { get; set; }
+    public decimal ChenhLech { get; set; }
 }
 
 public class KetQuaDoiSoatDto

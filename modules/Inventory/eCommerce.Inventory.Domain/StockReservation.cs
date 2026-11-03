@@ -127,7 +127,7 @@ public class StockReservation : FullAuditedAggregateRoot<Guid>, IMultiTenant
 public static class QuyetDinhGiuCho
 {
     /// <summary>Hàng **có thể bán** = `OnHand − Reserved`. Âm ⇒ dữ liệu đã sai (xem `CHECK` `ADR-03`).</summary>
-    public static int CoTheBan(int onHand, int reserved) => onHand - reserved;
+    public static decimal CoTheBan(decimal onHand, decimal reserved) => onHand - reserved;
 
     /// <summary>
     /// Kiểm tra **một lượt** giữ chỗ. Trả **`null`** nếu được phép; ngược lại trả **lý do** (để tầng gọi quyết định
@@ -135,11 +135,11 @@ public static class QuyetDinhGiuCho
     /// ⚠️ Hàm **không** tự đọc DB: `onHand`/`reserved` do tầng gọi cung cấp **sau khi đã giành khoá**
     /// (đọc trước khi khoá là **vô nghĩa**: giá trị có thể đã đổi).
     /// </summary>
-    public static string? KiemTra(int onHand, int reserved, int yeuCau)
+    public static string? KiemTra(decimal onHand, decimal reserved, decimal yeuCau)
     {
-        if (yeuCau < 1)
+        if (yeuCau <= 0m)
         {
-            return "Số lượng giữ chỗ phải ≥ 1.";
+            return "Số lượng giữ chỗ phải > 0.";
         }
 
         var coTheBan = CoTheBan(onHand, reserved);

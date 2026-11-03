@@ -33,6 +33,13 @@ Thumbs.db
 node_modules/
 package-lock.json
 
+## Next.js / pnpm workspace (`apps/admin-web`, `packages/*`) — `D-15`
+.next/
+out/
+*.tsbuildinfo
+apps/admin-web/.env.local
+.env.local
+
 ## 🚨 NGOẠI LỆ của dòng trên — `XC-007` **F4** / D10 (`S9`, 21/10/2026).
 ## 🔑 VÌ SAO PHẢI COMMIT LOCK: `tools/package.json` khai `mermaid: ^12.1.0` (một RANGE). Không có lock thì
 ##    hai máy — hoặc hai lần chạy CI — có thể cài **hai phiên bản khác nhau** ⇒ cùng một commit cho **phán

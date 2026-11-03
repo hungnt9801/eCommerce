@@ -48,7 +48,7 @@ public class DoiSoatTonKhoTests
     [Fact]
     public void Tong_co_dau__nhap_100_xuat_30_chuyen_di_20_chuyen_den_20_thi_bang_70()
     {
-        var butToan = new List<(StockMovementType, int)>
+        var butToan = new List<(StockMovementType, decimal)>
         {
             (StockMovementType.Receipt, 100),
             (StockMovementType.Sale, 30),
@@ -56,7 +56,7 @@ public class DoiSoatTonKhoTests
             (StockMovementType.TransferIn, 20),    // kho đích:  +20  (khác kho ⇒ tính riêng từng kho)
         };
 
-        Assert.Equal(70, DoiSoatTonKho.Tong(butToan));
+        Assert.Equal(70m, DoiSoatTonKho.Tong(butToan));
     }
 
     [Fact]

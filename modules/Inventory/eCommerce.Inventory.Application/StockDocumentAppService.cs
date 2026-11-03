@@ -3,6 +3,7 @@ using eCommerce.Inventory;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Logging;
 using Volo.Abp;
+using Volo.Abp.Application.Dtos;
 using Volo.Abp.Application.Services;
 using Volo.Abp.Domain.Repositories;
 
@@ -66,7 +67,16 @@ public class StockDocumentAppService : ApplicationService, IStockDocumentAppServ
         var dong = await _dongRepository.GetListAsync(x => x.StockDocumentId == id);
 
         return dong.OrderBy(x => x.Sku, StringComparer.Ordinal)
-            .Select(x => new StockDocumentLineDto { Id = x.Id, Sku = x.Sku, Quantity = x.Quantity })
+            .Select(x => new StockDocumentLineDto
+            {
+                Id = x.Id,
+                Sku = x.Sku,
+                Quantity = x.Quantity,
+                UnitId = x.UnitId,
+                VatPercent = x.VatPercent,
+                BatchId = x.BatchId,
+                ImeiSerials = x.ImeiSerials
+            })
             .ToList();
     }
 
@@ -81,25 +91,133 @@ public class StockDocumentAppService : ApplicationService, IStockDocumentAppServ
         // 🚨 Kho ngừng dùng ⇒ **CẤM** tạo chứng từ (nhập hàng vào kho đã đóng ⇒ **tồn kho "ảo"** mà báo cáo vẫn tin).
         kho.YeuCauDangHoatDong();
 
+        if (input.ToWarehouseId is { } khoDichId)
+        {
+            var khoDich = await _khoRepository.FindAsync(khoDichId)
+                ?? throw new BusinessException(InventoryErrorCodes.KhoNgungHoatDong)
+                    .WithData("warehouseId", khoDichId)
+                    .WithData("lyDo", "Kho đích KHÔNG tồn tại.");
+
+            // 📌 Kho ĐÍCH cũng phải đang hoạt động: hàng chuyển vào kho đã đóng sẽ **kẹt vĩnh viễn** (không ai
+            // bán được, báo cáo vẫn thấy tồn). Kiểm ở đây vì đây là **đường tạo** duy nhất.
+            khoDich.YeuCauDangHoatDong();
+        }
+
         var ct = new StockDocument(
             GuidGenerator.Create(), input.Type, input.Number, input.WarehouseId,
-            input.OccurredAtUtc ?? Clock.Now, input.ToWarehouseId)
+            input.OccurredAtUtc ?? Clock.Now, input.ToWarehouseId, input.Mode)
         {
-            Note = input.Note
+            Note = input.Note,
+            // 🆕 `WP-04` — khoá chống tạo trùng (DB có unique index; đây là dữ liệu để index so).
+            IdempotencyKey = string.IsNullOrWhiteSpace(input.IdempotencyKey) ? null : input.IdempotencyKey.Trim()
         };
+
+        // 🆕 `WP-04` — các trường kiểu Nhanh đều đi qua **hàm kiểm của entity** (không set thuộc tính trần):
+        // nhờ vậy luật nằm một chỗ và test được không cần DB.
+        ct.DatDoiTac(input.CounterpartyType, input.CounterpartyId);
+        ct.DatNguon(input.RefType, input.RefId);
+        ct.DatTien(input.DiscountAmount, input.PaidAmount);
 
         await _chungTuRepository.InsertAsync(ct, autoSave: true);
 
-        var dong = input.Lines
-            .Select(x => new StockDocumentLine(GuidGenerator.Create(), ct.Id, x.Sku, x.Quantity))
-            .ToList();
+        var dong = input.Lines.Select(x =>
+        {
+            var d = new StockDocumentLine(GuidGenerator.Create(), ct.Id, x.Sku, x.Quantity);
+
+            d.DatChiTiet(x.UnitId, x.VatPercent, x.BatchId, x.ImeiSerials);
+
+            return d;
+        }).ToList();
 
         await _dongRepository.InsertManyAsync(dong, autoSave: true);
 
-        Logger.LogInformation("Đã tạo chứng từ kho {Number} ({Type}) ở trạng thái {Status} với {SoDong} dòng.",
-            ct.Number, ct.Type, ct.Status, dong.Count);
+        Logger.LogInformation("Đã tạo chứng từ kho {Number} ({Type}/{Mode}/{Direction}) ở trạng thái {Status} với {SoDong} dòng.",
+            ct.Number, ct.Type, ct.Mode?.ToString() ?? "(khong)", ct.Direction?.ToString() ?? "(khong)", ct.Status, dong.Count);
 
         return ToDto(ct, dong.Count);
+    }
+
+    /// <summary>Huỷ phiếu còn `Draft` (phiếu đã ghi sổ **KHÔNG** huỷ được — sổ cái append-only).</summary>
+    [Authorize(eCommerceConsts.Permissions.Inventory.Adjust)]
+    public async Task<StockDocumentDto> CancelAsync(Guid id)
+    {
+        var ct = await _chungTuRepository.GetAsync(id);
+
+        ct.Huy();
+
+        await _chungTuRepository.UpdateAsync(ct, autoSave: true);
+
+        Logger.LogInformation("Đã HUỶ chứng từ kho {Number} (trước đó {Status}).", ct.Number, ct.Status);
+
+        return ToDto(ct, (int)await _dongRepository.CountAsync(x => x.StockDocumentId == id));
+    }
+
+    /// <summary>
+    /// 🆕 **`WP-04`** — DS phiếu **có phân trang + lọc** cho màn #7.
+    /// 📌 Lọc ở **server**: bảng 20.000 phiếu không thể tải hết rồi lọc ở client (đúng lý do `04 §5` chọn DataTable
+    /// server-side). 📌 Sắp xếp **tất định** (ngày giảm dần, số phiếu tăng dần) để phân trang **không lặp/mất dòng**.
+    /// </summary>
+    public async Task<PagedResultDto<StockDocumentDto>> GetPagedAsync(
+        StockDocumentDirection? direction = null,
+        StockDocumentStatus? status = null,
+        StockDocumentMode? mode = null,
+        Guid? warehouseId = null,
+        DateTime? fromUtc = null,
+        DateTime? toUtc = null,
+        int skipCount = 0,
+        int maxResultCount = 50)
+    {
+        var q = await _chungTuRepository.GetQueryableAsync();
+
+        if (direction is { } huong)
+        {
+            q = q.Where(x => x.Direction == huong);
+        }
+
+        if (status is { } trangThai)
+        {
+            q = q.Where(x => x.Status == trangThai);
+        }
+
+        if (mode is { } kieu)
+        {
+            q = q.Where(x => x.Mode == kieu);
+        }
+
+        if (warehouseId is { } khoId)
+        {
+            q = q.Where(x => x.WarehouseId == khoId);
+        }
+
+        if (fromUtc is { } tu)
+        {
+            q = q.Where(x => x.OccurredAtUtc >= tu);
+        }
+
+        if (toUtc is { } den)
+        {
+            q = q.Where(x => x.OccurredAtUtc <= den);
+        }
+
+        var tong = await AsyncExecuter.CountAsync(q);
+
+        var trang = await AsyncExecuter.ToListAsync(
+            // ⚠️ **KHÔNG truyền `StringComparer.Ordinal` vào `ThenBy` trên `IQueryable`**: EF **không dịch được**
+            // comparer ra SQL ⇒ `500` (*"could not be translated"*). Đã đo thật bằng probe HTTP (`WP-04`).
+            q.OrderByDescending(x => x.OccurredAtUtc).ThenBy(x => x.Number)
+                .Skip(skipCount).Take(maxResultCount));
+
+        // Đếm dòng của **đúng trang này** (một truy vấn) — không nạp cả bảng dòng như `GetListAsync` cũ.
+        var ids = trang.Select(x => x.Id).ToList();
+        var demDong = ids.Count == 0
+            ? new Dictionary<Guid, int>()
+            : (await _dongRepository.GetListAsync(x => ids.Contains(x.StockDocumentId)))
+                .GroupBy(x => x.StockDocumentId)
+                .ToDictionary(g => g.Key, g => g.Count());
+
+        return new PagedResultDto<StockDocumentDto>(
+            tong,
+            trang.Select(x => ToDto(x, demDong.TryGetValue(x.Id, out var n) ? n : 0)).ToList());
     }
 
     [Authorize(eCommerceConsts.Permissions.Inventory.Adjust)]
@@ -128,6 +246,17 @@ public class StockDocumentAppService : ApplicationService, IStockDocumentAppServ
         ToWarehouseId = ct.ToWarehouseId,
         OccurredAtUtc = ct.OccurredAtUtc,
         Note = ct.Note,
-        LineCount = soDong
+        LineCount = soDong,
+
+        // 🆕 `WP-04` — trả **chuỗi** cho enum để client không phải biết số (và để thêm giá trị enum không breaking).
+        Direction = ct.Direction?.ToString(),
+        Mode = ct.Mode?.ToString(),
+        CounterpartyType = ct.CounterpartyType?.ToString(),
+        CounterpartyId = ct.CounterpartyId,
+        RefType = ct.RefType,
+        RefId = ct.RefId,
+        DiscountAmount = ct.DiscountAmount,
+        PaidAmount = ct.PaidAmount,
+        IdempotencyKey = ct.IdempotencyKey
     };
 }

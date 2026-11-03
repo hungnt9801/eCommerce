@@ -308,6 +308,16 @@ public static class eCommerceConsts
         /// <summary>Độ dài tối đa của SKU — khớp `HasMaxLength(64)` ở DbContext.</summary>
         public const int SkuToiDa = 64;
 
+        // ── WP-03 (02/11/2026) — ĐƠN VỊ TÍNH / BARCODE (`03 §3.1`) ────────────────────────────────
+        // 📌 Đặt ở `Domain.Shared` (không phải trong entity) vì **DTO ở `Application.Contracts` cũng cần** —
+        // tầng đó **không** được tham chiếu `Domain` (layering). Bài học `CAT-003` §20.3 đã trả giá 2 lần.
+
+        /// <summary>Độ dài tối đa của tên ĐVT — khớp `HasMaxLength(64)` ở DbContext (`ProductUnit.Name`).</summary>
+        public const int DonViTinhTenToiDa = 64;
+
+        /// <summary>Độ dài tối đa của barcode — khớp `HasMaxLength(64)` ở DbContext (`ProductUnit.Barcode`).</summary>
+        public const int BarcodeToiDa = 64;
+
         // ── ẢNH SẢN PHẨM (`CAT-003`) ──────────────────────────────────────────────────────────────
         // 📌 Đặt Ở ĐÂY (không ở entity `ProductMedia`) vì **`Application.Contracts` KHÔNG được tham chiếu
         // `Domain`** ⇒ DTO không đọc được hằng số trong entity. ⚠️ Đã **vấp thật** khi viết
@@ -562,6 +572,50 @@ public static class eCommerceConsts
 
             /// <summary>Dữ liệu thương hiệu không hợp lệ (slug/mô tả/logo quá dài).</summary>
             public const string ThuongHieuKhongHopLe = "eCommerce:Catalog:0032";
+
+            // ── Dải 0040+: WP-03 (02/11/2026) — MÔ HÌNH HÀNG HÓA THEO NHANH (`03 §3.1`, D-07) ──
+            // 📌 Dải RIÊNG (không dùng lại 0001–0012/0020–0025/0030–0032/0201–0212) vì mỗi mã là **hợp đồng
+            // với client**: trùng số cho nghĩa khác là đúng lỗi mà `CatalogErrorCodeRegistryTests` chặn.
+
+            /// <summary>
+            /// Tên/ĐVT không hợp lệ: rỗng, quá dài, trùng tên trong cùng sản phẩm, hoặc
+            /// `ConversionFactor <= 0` (WP-03). 🔒 Cũng là mã ánh xạ cho CHECK `CK_CatProdUnits_ConversionFactor_Duong`.
+            /// </summary>
+            public const string DonViTinhKhongHopLe = "eCommerce:Catalog:0040";
+
+            /// <summary>
+            /// Barcode đã được **sản phẩm/ĐVT khác** dùng trong tenant (WP-03). 🔒 Khoá đối chiếu khi quét mã:
+            /// trùng barcode ⇒ quét ra **hai món** và thu ngân bán sai món — không lỗi, không log.
+            /// </summary>
+            public const string BarcodeDaTonTai = "eCommerce:Catalog:0041";
+
+            /// <summary>Sản phẩm đã có ĐVT gốc ⇒ thêm gốc thứ hai bị từ chối (WP-03, bất biến "đúng một gốc").</summary>
+            public const string NhieuHonMotDonViGoc = "eCommerce:Catalog:0042";
+
+            /// <summary>Sản phẩm được gán làm cha của **chính nó** (WP-03). Chu trình nhiều mức do app service chặn.</summary>
+            public const string SanPhamChaTrungChinhNo = "eCommerce:Catalog:0043";
+
+            /// <summary>Số lượng thành phần combo/gói `<= 0` (WP-03). 🔒 Cũng ánh xạ cho 2 CHECK `...Quantity_Duong`.</summary>
+            public const string SoLuongKhongHopLe = "eCommerce:Catalog:0044";
+
+            /// <summary>`VatPercent` ngoài `-100..100` (WP-03). 🔒 Ánh xạ cho CHECK `CK_CatProducts_VatPercent_Khoang`.</summary>
+            public const string VatPercentKhongHopLe = "eCommerce:Catalog:0045";
+
+            /// <summary>Combo/gói chứa **chính nó** hoặc thành phần không hợp lệ (WP-03).</summary>
+            public const string ThanhPhanKhongHopLe = "eCommerce:Catalog:0046";
+
+            /// <summary>
+            /// Sản phẩm **cha** (đang có sản phẩm con) ⇒ **KHÔNG được bán/publish** (WP-03 nửa sau, `03 §3.1`).
+            /// 📌 Cha chỉ là **nhóm hiển thị**: giá và tồn nằm ở con. Cho publish cha ⇒ storefront có một mục
+            /// **không có giá/không có ĐVT** và mọi báo cáo bán hàng thấy một SKU không bao giờ bán được.
+            /// </summary>
+            public const string SanPhamChaKhongBanDuoc = "eCommerce:Catalog:0047";
+
+            /// <summary>
+            /// Gán cha tạo **chu trình nhiều mức** (`A → B → A`) — WP-03 nửa sau. `Product.DatCha` chỉ chặn
+            /// *"tự làm cha của chính mình"* (`0043`); chuỗi nhiều mức cần đọc cả cây ⇒ app service ném mã này.
+            /// </summary>
+            public const string ChuTrinhSanPhamChaCon = "eCommerce:Catalog:0048";
 
             /// <summary>
             /// 🚨 **SLUG TRÙNG trong tenant** (`CAT-003` **ADR-03**) — hàng rào DB

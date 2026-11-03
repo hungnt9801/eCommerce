@@ -82,14 +82,14 @@ public class DongLechDto
     public string Sku { get; set; } = default!;
 
     /// <summary>Ảnh chụp `OnHand` lúc quét.</summary>
-    public int OnHand { get; set; }
+    public decimal OnHand { get; set; }
 
     /// <summary>Tổng **có dấu** của sổ cái (nguồn sự thật) lúc quét.</summary>
-    public int TongSoCai { get; set; }
+    public decimal TongSoCai { get; set; }
 
     /// <summary>`OnHand − TongSoCai` — dấu giữ nguyên để biết **lệch về phía nào**
     /// (dương = hệ thống ghi **nhiều hơn** thực tế · âm = **thiếu** so với sổ).</summary>
-    public int ChenhLech { get; set; }
+    public decimal ChenhLech { get; set; }
 
     public bool VuotNguong { get; set; }
 

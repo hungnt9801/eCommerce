@@ -126,7 +126,7 @@ public class ChotGiuChoService : DomainService
     }
 
     private async Task GhiSoCaiAsync(
-        StockReservation giuCho, StockMovementType loai, int balanceAfter, DateTime at)
+        StockReservation giuCho, StockMovementType loai, decimal balanceAfter, DateTime at)
     {
         // Cùng `ReferenceLineId` = `Id` lượt giữ chỗ + **khác `MovementType`** ⇒ qua được unique index
         // `(TenantId, ReferenceLineId, MovementType)` (bài học `INV-001` §19.2 **L1**) mà **vẫn** chặn ghi trùng.

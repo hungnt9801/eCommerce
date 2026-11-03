@@ -39,17 +39,20 @@ public class ProductAppService : ApplicationService, IProductAppService
 
     private readonly IRepository<Product, Guid> _productRepository;
     private readonly IRepository<ProductVariant, Guid> _variantRepository;
+    private readonly IRepository<ProductUnit, Guid> _unitRepository;
     private readonly IAbpDistributedLock _distributedLock;
     private readonly IDistributedEventBus _eventBus;
 
     public ProductAppService(
         IRepository<Product, Guid> productRepository,
         IRepository<ProductVariant, Guid> variantRepository,
+        IRepository<ProductUnit, Guid> unitRepository,
         IAbpDistributedLock distributedLock,
         IDistributedEventBus eventBus)
     {
         _productRepository = productRepository;
         _variantRepository = variantRepository;
+        _unitRepository = unitRepository;
         _distributedLock = distributedLock;
         _eventBus = eventBus;
     }
@@ -88,8 +91,15 @@ public class ProductAppService : ApplicationService, IProductAppService
         var bienThe = await _variantRepository.GetListAsync(x => ids.Contains(x.ProductId));
         var theoSanPham = bienThe.GroupBy(x => x.ProductId).ToDictionary(g => g.Key, g => g.ToList());
 
+        // WP-03: cùng cách với ĐVT — một truy vấn cho cả trang (bảng danh sách cần cột giá/ĐVT).
+        var donVi = await _unitRepository.GetListAsync(x => ids.Contains(x.ProductId));
+        var donViTheoSanPham = donVi.GroupBy(x => x.ProductId).ToDictionary(g => g.Key, g => g.ToList());
+
         var items = danhSach
-            .Select(sp => ToDto(sp, theoSanPham.TryGetValue(sp.Id, out var ds) ? ds : []))
+            .Select(sp => ToDto(
+                sp,
+                theoSanPham.TryGetValue(sp.Id, out var ds) ? ds : [],
+                donViTheoSanPham.TryGetValue(sp.Id, out var dv) ? dv : []))
             .ToList();
 
         return new PagedResultDto<ProductDto>(tong, items);
@@ -99,7 +109,8 @@ public class ProductAppService : ApplicationService, IProductAppService
     {
         var sanPham = await _productRepository.GetAsync(id);
         var bienThe = await _variantRepository.GetListAsync(x => x.ProductId == id);
-        return ToDto(sanPham, bienThe);
+        var donVi = await _unitRepository.GetListAsync(x => x.ProductId == id);
+        return ToDto(sanPham, bienThe, donVi);
     }
 
     public async Task<ProductDto> GetByCodeAsync(string code)
@@ -117,7 +128,8 @@ public class ProductAppService : ApplicationService, IProductAppService
                 .WithData("code", ma);
 
         var bienThe = await _variantRepository.GetListAsync(x => x.ProductId == sanPham.Id);
-        return ToDto(sanPham, bienThe);
+        var donVi = await _unitRepository.GetListAsync(x => x.ProductId == sanPham.Id);
+        return ToDto(sanPham, bienThe, donVi);
     }
 
     // ── Ghi ───────────────────────────────────────────────────────────────────
@@ -154,8 +166,9 @@ public class ProductAppService : ApplicationService, IProductAppService
         }
 
         var bienThe = await _variantRepository.GetListAsync(x => x.ProductId == sanPham.Id);
+        var donVi = await _unitRepository.GetListAsync(x => x.ProductId == sanPham.Id);
 
-        return ToDto(sanPham, bienThe);
+        return ToDto(sanPham, bienThe, donVi);
     }
 
     /// <summary>
@@ -189,8 +202,9 @@ public class ProductAppService : ApplicationService, IProductAppService
         }
 
         var tatCaBienThe = await _variantRepository.GetListAsync(x => x.ProductId == sanPham.Id);
+        var donVi = await _unitRepository.GetListAsync(x => x.ProductId == sanPham.Id);
 
-        return ToDto(sanPham, tatCaBienThe);
+        return ToDto(sanPham, tatCaBienThe, donVi);
     }
 
     [Authorize(eCommerceConsts.Permissions.Products.Create)]
@@ -209,8 +223,31 @@ public class ProductAppService : ApplicationService, IProductAppService
         var sanPham = new Product(GuidGenerator.Create(), ma, input.Name)
         {
             Description = input.Description,
-            BrandId = input.BrandId
+            BrandId = input.BrandId,
+
+            // ── WP-03: mô hình Nhanh (`03 §3.1`, D-07) ──────────────────────────────────────────
+            Type = input.Type,
+            VatMode = input.VatMode,
+            WeightGram = input.WeightGram,
+            WarrantyMonths = input.WarrantyMonths,
+            StorageTimeDays = input.StorageTimeDays,
+            IsHot = input.IsHot,
+            IsNew = input.IsNew,
+            ExternalId = string.IsNullOrWhiteSpace(input.ExternalId) ? null : input.ExternalId.Trim()
         };
+
+        // 🚨 % VAT đi qua GUARD của domain (khoảng -100..100) — không gán thẳng thuộc tính: nếu gán thẳng,
+        // `-101` chỉ bị `CHECK` của DB chặn (khó hiểu) và nếu ai bỏ `CHECK` thì **im lặng** ghi sai thuế.
+        sanPham.DatVatPercent(input.VatPercent);
+
+        // Sản phẩm cha (nếu có) phải TỒN TẠI **và** không tạo chu trình. FK `Restrict` vẫn là hàng rào cuối,
+        // nhưng kiểm trước để trả mã nghiệp vụ thay vì lỗi ràng buộc DB (đúng quy ước `CAT-001` D3/F6).
+        if (input.ParentId is { } parentId)
+        {
+            await KiemTraChaHopLeAsync(sanPham.Id, parentId);
+
+            sanPham.DatCha(parentId);
+        }
 
         // 🔑 `CAT-003` ADR-04: slug **chuẩn hoá qua CÙNG một hàm** với đường tự sinh (`SinhSlug.Tu`) —
         // lần đầu code này tự `Trim().ToLowerInvariant()` (KHÔNG bỏ dấu) ⇒ hai đường cho ra hai dạng slug
@@ -238,11 +275,42 @@ public class ProductAppService : ApplicationService, IProductAppService
             sanPham.DatSlug(slugMoi);
         }
 
+        // ── ĐVT tạo kèm (WP-03) ──────────────────────────────────────────────────────────────────
+        // 🔒 Barcode duy nhất TOÀN TENANT: kiểm ở đây để trả `0041` (người dùng biết sửa mã vạch), còn
+        // `IX_CatProdUnits_TenantId_Barcode` là hàng rào cuối cho hai request đồng thời.
+        if (input.Units is { Count: > 0 })
+        {
+            foreach (var dto in input.Units)
+            {
+                var barcode = ProductUnit.ChuanHoaBarcode(dto.Barcode);
+
+                if (barcode is not null && await _unitRepository.AnyAsync(x => x.Barcode == barcode))
+                {
+                    throw new BusinessException(eCommerceConsts.ErrorCodes.Catalog.BarcodeDaTonTai)
+                        .WithData("barcode", barcode)
+                        .WithData("phamVi", "toàn tenant");
+                }
+
+                sanPham.AddUnit(
+                    GuidGenerator.Create(),
+                    dto.Name,
+                    dto.ConversionFactor,
+                    dto.SalePrice,
+                    dto.IsBase,
+                    barcode,
+                    dto.ImportPrice,
+                    dto.WholesalePrice,
+                    dto.OldPrice);
+            }
+        }
+
         await _productRepository.InsertAsync(sanPham, autoSave: true);
 
-        Logger.LogInformation("Đã tạo sản phẩm {Code} (trạng thái {Status}).", sanPham.Code, sanPham.Status);
+        Logger.LogInformation(
+            "Đã tạo sản phẩm {Code} (trạng thái {Status}, loại {Type}, {SoDvt} ĐVT).",
+            sanPham.Code, sanPham.Status, sanPham.Type, sanPham.Units.Count);
 
-        return ToDto(sanPham, []);
+        return ToDto(sanPham, [], sanPham.Units.ToList());
     }
 
     [Authorize(eCommerceConsts.Permissions.Products.Edit)]
@@ -254,6 +322,20 @@ public class ProductAppService : ApplicationService, IProductAppService
         sanPham.Name = input.Name;
         sanPham.Description = input.Description;
         sanPham.BrandId = input.BrandId;
+
+        // ── WP-03 nửa sau: ĐỔI CHA (có kiểm chu trình) ───────────────────────────────────────────
+        // 📌 `UpdateProductDto.ParentId` là `Guid?` nên **không phân biệt** *"không gửi"* với *"gửi null"*:
+        // hành vi chốt là **null = BỎ cha** (sản phẩm thành độc lập). Chỉ áp khi giá trị **khác** hiện tại,
+        // để request lặp (retry) không gọi guard vô ích.
+        if (input.ParentId != sanPham.ParentId)
+        {
+            if (input.ParentId is { } chaMoi)
+            {
+                await KiemTraChaHopLeAsync(sanPham.Id, chaMoi);
+            }
+
+            sanPham.DatCha(input.ParentId);
+        }
 
         // 🚨 `CAT-003` ADR-05: **ĐỔI `Name` KHÔNG tự đổi slug** (làm vậy sẽ phá URL đã được index ⇒ mất SEO
         // âm thầm). Nhưng nếu DTO **có** gửi slug thì đó là ý định **TƯỜNG MINH** của người dùng ⇒ áp dụng,
@@ -274,7 +356,8 @@ public class ProductAppService : ApplicationService, IProductAppService
         await _productRepository.UpdateAsync(sanPham, autoSave: true);
 
         var bienThe = await _variantRepository.GetListAsync(x => x.ProductId == id);
-        return ToDto(sanPham, bienThe);
+        var donVi = await _unitRepository.GetListAsync(x => x.ProductId == id);
+        return ToDto(sanPham, bienThe, donVi);
     }
 
     [Authorize(eCommerceConsts.Permissions.Products.Edit)]
@@ -440,6 +523,38 @@ public class ProductAppService : ApplicationService, IProductAppService
         => await _productRepository.AnyAsync(x => x.Slug == slug && x.Id != boQuaId);
 
     /// <summary>
+    /// 🆕 **WP-03 nửa sau — KIỂM CHA HỢP LỆ** (tồn tại + không tạo chu trình nhiều mức, mã `0048`).
+    ///
+    /// 📌 **VÌ SAO NẠP CẢ BẢNG (Id, ParentId) MỘT LẦN:** câu hỏi *"gán cha này có tạo vòng"* cần đi ngược cả
+    /// chuỗi tổ tiên; đi từng mức bằng `AnyAsync` là **N truy vấn** và vẫn phải chống vòng bằng bộ đếm.
+    /// Ở quy mô hiện tại (vài nghìn sản phẩm) một truy vấn chiếu **hai cột** rẻ hơn nhiều. ⚠️ Khi danh mục lên
+    /// ~100k dòng thì đổi sang **CTE đệ quy** (`WITH RECURSIVE`) — chiếu toàn bảng sẽ thành điểm nóng.
+    /// 🔒 Chiếu **ẩn danh** `{Id, ParentId}` (không nạp entity) để **không** kéo `AutoInclude` của
+    /// `Variants`/`Units` vào truy vấn này.
+    /// </summary>
+    private async Task KiemTraChaHopLeAsync(Guid productId, Guid parentId)
+    {
+        var query = await _productRepository.GetQueryableAsync();
+
+        var cay = await AsyncExecuter.ToListAsync(
+            query.Select(x => new { x.Id, x.ParentId }));
+
+        var chaTheoId = cay.ToDictionary(x => x.Id, x => x.ParentId);
+
+        if (!chaTheoId.ContainsKey(parentId))
+        {
+            throw new BusinessException(eCommerceConsts.ErrorCodes.Catalog.KhongTimThaySanPham)
+                .WithData("parentId", parentId)
+                .WithData("lyDo", "Sản phẩm cha không tồn tại.");
+        }
+
+        CaySanPham.KiemTraKhongChuTrinh(
+            productId,
+            parentId,
+            id => chaTheoId.TryGetValue(id, out var cha) ? cha : null);
+    }
+
+    /// <summary>
     /// 🔑 **ĐƯỜNG DUY NHẤT áp slug do NGƯỜI DÙNG gửi** (dùng chung cho `DatSlugAsync` và `UpdateAsync`):
     /// giành khoá phân tán → chuẩn hoá → kiểm trùng **trong cùng transaction** → `DatSlug` → **phát sự kiện**.
     ///
@@ -505,10 +620,24 @@ public class ProductAppService : ApplicationService, IProductAppService
     {
         var sanPham = await _productRepository.GetAsync(id);
 
-        // 🚨 Dùng ĐÚNG máy trạng thái của domain: không có biến thể đang hoạt động ⇒ **NÉM LỖI** (D9).
-        // ⚠️ Guard đọc `sanPham.Variants`; collection này được nạp nhờ **`AutoInclude`** khai trong
-        //    `eCommerceDbContext` (`CatProducts`). **Nếu ai bỏ `AutoInclude`** thì `Variants` sẽ rỗng
-        //    ⇒ **mọi lần publish đều ném lỗi** — ồn ào, KHÔNG im lặng (xem ghi chú ở mapping).
+        // 🚨 **WP-03 nửa sau — SẢN PHẨM CHA KHÔNG BÁN ĐƯỢC** (`03 §3.1`, mã `0047`).
+        // 📌 Phải hỏi **repository**: `Product` không giữ collection con (con trỏ lên cha bằng `ParentId`).
+        // 🔒 Bỏ qua khi sản phẩm **đã** Published: dữ liệu cũ (sản phẩm cha được tạo trước WP-03, hoặc cha vừa
+        // được backfill) đang Published — chặn ở đây sẽ làm `PublishAsync` (vốn idempotent) **đỏ** với dữ liệu
+        // hợp lệ lịch sử, và không sửa được gì. Luật áp cho **lần chuyển trạng thái mới**.
+        if (!sanPham.IsPublished && await _productRepository.AnyAsync(x => x.ParentId == sanPham.Id))
+        {
+            throw new BusinessException(eCommerceConsts.ErrorCodes.Catalog.SanPhamChaKhongBanDuoc)
+                .WithData("ma", sanPham.Code)
+                .WithData("productId", sanPham.Id)
+                .WithData("lyDo", "Sản phẩm đang có sản phẩm con ⇒ chỉ là nhóm hiển thị; bán ở sản phẩm CON.");
+        }
+
+        // 🚨 Dùng ĐÚNG máy trạng thái của domain: không có ĐVT gốc và không có biến thể đang hoạt động ⇒
+        // **NÉM LỖI** (D9, nới ở WP-03 nửa sau).
+        // ⚠️ Guard đọc `sanPham.Variants`/`sanPham.Units`; `Variants` được nạp nhờ **`AutoInclude`** khai trong
+        //    `eCommerceDbContext` (`CatProducts`), `Units` nhờ `AutoInclude` của WP-03. **Nếu ai bỏ `AutoInclude`**
+        //    thì hai collection này sẽ rỗng ⇒ **mọi lần publish đều ném lỗi** — ồn ào, KHÔNG im lặng.
         sanPham.Publish();
 
         await _productRepository.UpdateAsync(sanPham, autoSave: true);
@@ -581,7 +710,10 @@ public class ProductAppService : ApplicationService, IProductAppService
     // slug `đường-đi` trong khi đường "tự sinh" (`SinhSlug.Tu`) cho ra `duong-di` ⇒ **HAI dạng URL** cho cùng
     // một sản phẩm tuỳ theo đường ghi, và `canonical`/`sitemap` sẽ trỏ một dạng còn khách vào dạng kia.
     // 📌 Đây đúng họ lỗi "hai đường ghi cho cùng một đại lượng": để lại hàm cũ thì người sau **sẽ** dùng nó.
-    private static ProductDto ToDto(Product sp, IReadOnlyCollection<ProductVariant> bienThe) => new()
+    private static ProductDto ToDto(
+        Product sp,
+        IReadOnlyCollection<ProductVariant> bienThe,
+        IReadOnlyCollection<ProductUnit>? donVi = null) => new()
     {
         Id = sp.Id,
         Code = sp.Code,
@@ -591,8 +723,36 @@ public class ProductAppService : ApplicationService, IProductAppService
         BrandId = sp.BrandId,
         Status = sp.Status.ToString(),
         IsPublished = sp.IsPublished,
+
+        // ── WP-03: mô hình Nhanh ────────────────────────────────────────────────────────────────
+        Type = sp.Type,
+        ParentId = sp.ParentId,
+        VatPercent = sp.VatPercent,
+        VatMode = sp.VatMode,
+        WeightGram = sp.WeightGram,
+        WarrantyMonths = sp.WarrantyMonths,
+        StorageTimeDays = sp.StorageTimeDays,
+        IsHot = sp.IsHot,
+        IsNew = sp.IsNew,
+        ExternalId = sp.ExternalId,
+        Units = (donVi ?? []).Select(ToUnitDto).ToList(),
+
         Variants = bienThe.Select(ToVariantDto).ToList(),
         CreationTime = sp.CreationTime
+    };
+
+    private static ProductUnitDto ToUnitDto(ProductUnit dv) => new()
+    {
+        Id = dv.Id,
+        ProductId = dv.ProductId,
+        Name = dv.Name,
+        ConversionFactor = dv.ConversionFactor,
+        Barcode = dv.Barcode,
+        IsBase = dv.IsBase,
+        SalePrice = dv.SalePrice,
+        ImportPrice = dv.ImportPrice,
+        WholesalePrice = dv.WholesalePrice,
+        OldPrice = dv.OldPrice
     };
 
     private static ProductVariantDto ToVariantDto(ProductVariant bt) => new()

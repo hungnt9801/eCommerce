@@ -305,7 +305,7 @@ public class DonHangAppService : ApplicationService, IDonHangAppService
         var idPhieuTraCu = phieuTraCu.Where(x => x.Number.StartsWith(maTienTo, StringComparison.Ordinal))
             .Select(x => x.Id).ToList();
 
-        var daTraTheoSku = new Dictionary<string, int>(StringComparer.Ordinal);
+        var daTraTheoSku = new Dictionary<string, decimal>(StringComparer.Ordinal);
 
         foreach (var idPhieu in idPhieuTraCu)
         {

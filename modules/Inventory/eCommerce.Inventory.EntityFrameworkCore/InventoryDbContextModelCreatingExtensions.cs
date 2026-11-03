@@ -15,14 +15,43 @@ public static class InventoryDbContextModelCreatingExtensions
     public static void ConfigureInventory(this ModelBuilder builder)
     {        builder.Entity<Inventory.InventoryItem>(b =>
         {
-            b.ToTable("InvItems");
+            b.ToTable("InvItems", t =>
+            {
+                // 🆕 `WP-04` — **8 CHIỀU TỒN** không được âm. 📌 Một `CHECK` gộp thay vì 8 dòng: cùng một nghĩa
+                // ("chiều tồn không âm"), và test khoá tên ràng buộc chỉ cần một dòng trong danh sách trắng.
+                // ⚠️ `OnHand`/`Reserved` đã có `CHECK` riêng từ `INV-001` (migration `20261015111042`) — giữ nguyên.
+                t.HasCheckConstraint(
+                    "CK_InvItems_Chieu_KhongAm",
+                    "\"Transferring\" >= 0 AND \"Shipping\" >= 0 AND \"Holding\" >= 0 AND \"Damaged\" >= 0 "
+                    + "AND \"Warranty\" >= 0 AND \"WarrantyHolding\" >= 0 AND \"PreOrder\" >= 0 AND \"WaitingInbound\" >= 0");
+            });
             b.ConfigureByConvention();
 
             b.Property(x => x.Sku).IsRequired().HasMaxLength(64);
 
+            // 🆕 **`WP-04b`** — số lượng **`numeric(18,3)`** (D-31). Nhanh bán hàng theo **số lẻ** (cân đo, ĐVT quy
+            // đổi) ⇒ `int` cũ **không biểu diễn** được 1,5 kg, và còn **tròn âm thầm** khi quy đổi ĐVT.
+            // 📌 Ba chữ số thập phân đủ cho mọi ĐVT bán lẻ VN (gram/cm/ml); `ConversionFactor` của `ProductUnit`
+            // cần 4 số nên vẫn `numeric(18,4)` — **khác** độ chính xác là có chủ ý (hệ số ≠ số lượng).
+            b.Property(x => x.OnHand).HasPrecision(18, 3);
+            b.Property(x => x.Reserved).HasPrecision(18, 3);
+            b.Property(x => x.Transferring).HasPrecision(18, 3);
+            b.Property(x => x.Shipping).HasPrecision(18, 3);
+            b.Property(x => x.Holding).HasPrecision(18, 3);
+            b.Property(x => x.Damaged).HasPrecision(18, 3);
+            b.Property(x => x.Warranty).HasPrecision(18, 3);
+            b.Property(x => x.WarrantyHolding).HasPrecision(18, 3);
+            b.Property(x => x.PreOrder).HasPrecision(18, 3);
+            b.Property(x => x.WaitingInbound).HasPrecision(18, 3);
+
             // Một SKU chỉ có một bản ghi tồn kho cho mỗi kho trong mỗi tenant.
             // Index này là hàng rào cuối cùng chống ghi trùng khi có race condition.
             b.HasIndex(x => new { x.TenantId, x.WarehouseId, x.Sku }).IsUnique();
+
+            // `Available`/`InWarehouse` là **computed** ⇒ KHÔNG map cột (một chiều dữ liệu, cùng quy ước
+            // `StockAllotment.AvailableToPromise`). Nếu map, hai nguồn sự thật cho cùng một con số.
+            b.Ignore(x => x.Available);
+            b.Ignore(x => x.InWarehouse);
         });
 
         // ── INV-001 ADR-01: KHO ──────────────────────────────────────────────────────────────────
@@ -44,7 +73,22 @@ public static class InventoryDbContextModelCreatingExtensions
         // ── INV-001 ADR-02: CHỨNG TỪ KHO + DÒNG CHỨNG TỪ ─────────────────────────────────────────
         builder.Entity<Inventory.StockDocument>(b =>
         {
-            b.ToTable("InvStockDocuments");
+            b.ToTable("InvStockDocuments", t =>
+            {
+                // 🆕 `WP-04` — **kiểu phiếu** chỉ nhận đúng danh mục Nhanh (15 giá trị), **không** nhận số lạ.
+                // 📌 Vì sao `CHECK` chứ không chỉ enum ở code: dữ liệu nhập từ Nhanh/Open API và sửa SQL tay
+                // **không đi qua** constructor ⇒ số lạ (ví dụ 7) sẽ lọt và **mọi báo cáo lọc theo mode** sai.
+                t.HasCheckConstraint(
+                    "CK_InvStockDocuments_Mode_HopLe",
+                    "\"Mode\" IS NULL OR \"Mode\" IN (1, 2, 3, 4, 5, 6, 8, 10, 13, 14, 15, 16, 17, 18, 19)");
+                t.HasCheckConstraint(
+                    "CK_InvStockDocuments_Direction_HopLe",
+                    "\"Direction\" IS NULL OR \"Direction\" IN (1, 2)");
+                t.HasCheckConstraint(
+                    "CK_InvStockDocuments_Tien_KhongAm",
+                    "(\"DiscountAmount\" IS NULL OR \"DiscountAmount\" >= 0) "
+                    + "AND (\"PaidAmount\" IS NULL OR \"PaidAmount\" >= 0)");
+            });
             b.ConfigureByConvention();
 
             b.Property(x => x.Number).IsRequired().HasMaxLength(64);
@@ -53,6 +97,15 @@ public static class InventoryDbContextModelCreatingExtensions
             b.Property(x => x.Note).HasMaxLength(2048);
             b.Property(x => x.IdempotencyKey).HasMaxLength(128);
 
+            // ── 🆕 `WP-04` ────────────────────────────────────────────────────────────────────────────
+            b.Property(x => x.Direction).HasConversion<int>();
+            b.Property(x => x.Mode).HasConversion<int>();
+            b.Property(x => x.CounterpartyType).HasConversion<int>();
+            b.Property(x => x.RefType).HasMaxLength(64);
+            b.Property(x => x.RefId).HasMaxLength(128);
+            b.Property(x => x.DiscountAmount).HasPrecision(18, 4);
+            b.Property(x => x.PaidAmount).HasPrecision(18, 4);
+
             // Số chứng từ duy nhất trong tenant — chống tạo trùng khi retry/import.
             b.HasIndex(x => new { x.TenantId, x.Number })
                 .IsUnique()
@@ -60,14 +113,43 @@ public static class InventoryDbContextModelCreatingExtensions
 
             b.HasIndex(x => new { x.TenantId, x.Status, x.Type, x.OccurredAtUtc })
                 .HasDatabaseName("IX_InvStockDocuments_TenantId_Status_Type_OccurredAtUtc");
+
+            // Truy vấn của màn DS phiếu: tab Nhập/Xuất + lọc trạng thái, mới nhất trước.
+            b.HasIndex(x => new { x.TenantId, x.Direction, x.Status, x.OccurredAtUtc })
+                .HasDatabaseName("IX_InvStockDocuments_TenantId_Huong_Status_OccurredAtUtc");
+
+            // 🚨 **`WP-04` — HÀNG RÀO CHỐNG TẠO PHIẾU HAI LẦN KHI RETRY** (`IdempotencyKey` do client sinh,
+            // ví dụ `ClientBillId` của POS — D-04). 📌 Kiểm ở tầng app **KHÔNG đủ**: hai request đồng thời cùng
+            // thấy "chưa có" ⇒ cả hai tạo phiếu ⇒ **nhập kho hai lần** (tồn tăng gấp đôi) mà không lỗi nào.
+            // ⚠️ Có bộ lọc `IS NOT NULL` (phiếu không khai khoá thì không bị chặn) ⇒ migration phải viết **SQL
+            // thô** kèm `NULLS NOT DISTINCT` (đúng mẫu `Inv001_Fix_SoCai_Unique_ThemMovementType`).
+            b.HasIndex(x => new { x.TenantId, x.IdempotencyKey })
+                .IsUnique()
+                .HasFilter("\"IdempotencyKey\" IS NOT NULL")
+                .HasDatabaseName("IX_InvStockDocuments_TenantId_IdempotencyKey");
         });
 
         builder.Entity<Inventory.StockDocumentLine>(b =>
         {
-            b.ToTable("InvStockDocumentLines");
+            b.ToTable("InvStockDocumentLines", t =>
+            {
+                // 🆕 `WP-04` — VAT của dòng ngoài `0..100` là **dữ liệu hỏng**: in hoá đơn sai tiền nhưng
+                // không có lỗi nào (đường ghi tắt/import không đi qua `DatChiTiet`).
+                t.HasCheckConstraint(
+                    "CK_InvStockDocumentLines_VatPercent_HopLe",
+                    "\"VatPercent\" IS NULL OR (\"VatPercent\" >= 0 AND \"VatPercent\" <= 100)");
+            });
             b.ConfigureByConvention();
 
             b.Property(x => x.Sku).IsRequired().HasMaxLength(64);
+
+            // 🆕 `WP-04` — ĐVT/lô là `Guid` TRẦN (không FK): dòng phiếu cũ không có ĐVT, và cột này phải ghi
+            // được **trước** khi `ProductUnit`/`ProductBatch` (WP-03) có đường ghi.
+            b.Property(x => x.VatPercent).HasPrecision(5, 2);
+
+            // 🆕 `WP-04b` — số lượng dòng phiếu cũng `numeric(18,3)` (cùng lý do `InvItems`/sổ cái).
+            b.Property(x => x.Quantity).HasPrecision(18, 3);
+            b.Property(x => x.ImeiSerials).HasMaxLength(4000);
 
             // Một SKU chỉ xuất hiện MỘT lần trong một chứng từ: hai dòng cùng SKU trong cùng phiếu nhập
             // ⇒ người đọc phiếu thấy "nhập 5" nhưng sổ cái ghi hai bút toán ⇒ **cộng sai** mà không lỗi nào.
@@ -118,6 +200,11 @@ public static class InventoryDbContextModelCreatingExtensions
             b.Property(x => x.ReferenceId).HasMaxLength(128);
             b.Property(x => x.ChannelCode).HasMaxLength(32);
             b.Property(x => x.Note).HasMaxLength(2048);
+
+            // 🆕 `WP-04b` — bút toán cũng phải **`numeric(18,3)`**: nếu sổ cái vẫn `int` thì một phiếu 1,5 kg bị
+            // **làm tròn** ngay ở nguồn sự thật ⇒ snapshot và sổ cái lệch nhau **mà không có lỗi nào**.
+            b.Property(x => x.QuantityDelta).HasPrecision(18, 3);
+            b.Property(x => x.BalanceAfter).HasPrecision(18, 3);
 
             // Truy vấn thường gặp: lịch sử biến động của một SKU trong một kho, mới nhất trước.
             b.HasIndex(x => new { x.TenantId, x.WarehouseId, x.Sku, x.OccurredAtUtc });

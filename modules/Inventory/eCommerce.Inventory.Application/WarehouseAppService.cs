@@ -20,7 +20,13 @@ namespace eCommerce.Inventory;
 /// + cấp method; cùng DTO; cùng mã lỗi. Hợp đồng `IWarehouseAppService` ở `Application.Contracts` của module
 /// (đã có từ đợt tách module 24/10/2026) nay do **chính module** hiện thực.
 /// </summary>
-[ExposeServices(typeof(IWarehouseAppService))]
+// 🚨 **`WP-04` — SỬA LỖI 500 ĐÃ ĐO ĐƯỢC BẰNG PROBE HTTP:** trước đó thuộc tính này chỉ khai **interface**
+// ⇒ ABP chỉ đăng ký interface, còn controller quy ước lại resolve **lớp cụ thể** ⇒
+// `The requested service 'eCommerce.Inventory.WarehouseAppService' has not been registered` ⇒ **POST
+// `/api/app/warehouse` trả 500** (không tạo được kho ⇒ phiếu kho/POS bị chặn ngay từ bước đầu).
+// ✅ Khai **CẢ HAI** (`IWarehouseAppService` + chính lớp) như `TonKhoAppService`/`StockDocumentAppService`:
+// giữ đăng ký tường minh theo hợp đồng (test `HopDongHostTests` khoá điều này) **và** cho controller resolve được.
+[ExposeServices(typeof(IWarehouseAppService), typeof(WarehouseAppService))]
 [Authorize(eCommerceConsts.Permissions.Inventory.Default)]
 public class WarehouseAppService : ApplicationService, IWarehouseAppService
 {

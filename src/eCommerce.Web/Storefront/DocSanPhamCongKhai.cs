@@ -45,7 +45,7 @@ namespace eCommerce.Web.Storefront;
 public class DocSanPhamCongKhai : ITransientDependency
 {
     private readonly IRepository<Product, Guid> _sanPham;
-    private readonly IRepository<ProductVariant, Guid> _bienThe;
+    private readonly IProductLegacyReader _dongBan;
     private readonly IRepository<PriceList, Guid> _bangGia;
     private readonly IRepository<PriceListItem, Guid> _dongGia;
 
@@ -64,12 +64,12 @@ public class DocSanPhamCongKhai : ITransientDependency
 
     public DocSanPhamCongKhai(
         IRepository<Product, Guid> sanPham,
-        IRepository<ProductVariant, Guid> bienThe,
+        IProductLegacyReader dongBan,
         IRepository<PriceList, Guid> bangGia,
         IRepository<PriceListItem, Guid> dongGia)
     {
         _sanPham = sanPham;
-        _bienThe = bienThe;
+        _dongBan = dongBan;
         _bangGia = bangGia;
         _dongGia = dongGia;
     }
@@ -95,10 +95,13 @@ public class DocSanPhamCongKhai : ITransientDependency
         }
 
         var tapId = sanPham.Select(x => x.Id).ToList();
-        var bienThe = await _bienThe.GetListAsync(
-            x => tapId.Contains(x.ProductId) && x.IsActive, cancellationToken: cancellationToken);
 
-        var ketQua = await GhepGiaAsync(sanPham, bienThe, cancellationToken);
+        // 🔑 WP-03: "dòng bán được" **không** đọc thẳng bảng biến thể nữa mà qua **adapter đọc cũ**
+        // (`IProductLegacyReader`, không quyền, không phụ thuộc Host) ⇒ trang này **không phải biết**
+        // mô hình Nhanh (ĐVT) hay mô hình cũ (biến thể) đang giữ giá — xem `ProductLegacyAdapter`.
+        var dongBan = await _dongBan.GetSellableLinesAsync(tapId, cancellationToken);
+
+        var ketQua = await GhepGiaAsync(sanPham, dongBan, cancellationToken);
 
         // 📌 Sản phẩm chưa niêm yết giá bị **loại khỏi danh sách** (xem `<remarks>`), không trả về dòng rỗng.
         return ketQua.Where(x => x.Gia.Count > 0).OrderBy(x => x.Ten, StringComparer.Ordinal).ToList();
@@ -146,11 +149,14 @@ public class DocSanPhamCongKhai : ITransientDependency
         {
             // 🔑 URL cũ theo **SKU**: vẫn trả `200` nhưng `canonical` (do controller dựng) trỏ về slug —
             // bỏ đột ngột thì mọi link đã chia sẻ/index thành `404` và mất tín hiệu SEO đã tích luỹ.
-            var bienThe = await _bienThe.FirstOrDefaultAsync(x => x.Sku == dauVao, cancellationToken: cancellationToken);
+            // 🔑 WP-03: tra qua adapter (`FindProductIdByCodeOrSkuAsync`) — nó thử **SKU biến thể** rồi tới
+            // **mã sản phẩm**, nên sản phẩm CON sinh từ backfill (không có biến thể, `Code = SKU cũ`) vẫn
+            // tìm được bằng đúng URL cũ.
+            var productId = await _dongBan.FindProductIdByCodeOrSkuAsync(dauVao, cancellationToken);
 
-            if (bienThe is not null)
+            if (productId is { } idTimThay)
             {
-                sanPham = await _sanPham.FirstOrDefaultAsync(x => x.Id == bienThe.ProductId, cancellationToken: cancellationToken);
+                sanPham = await _sanPham.FirstOrDefaultAsync(x => x.Id == idTimThay, cancellationToken: cancellationToken);
 
                 if (sanPham is not null && !sanPham.IsPublished)
                 {
@@ -164,10 +170,9 @@ public class DocSanPhamCongKhai : ITransientDependency
             return null;
         }
 
-        var tatCaBienThe = await _bienThe.GetListAsync(
-            x => x.ProductId == sanPham.Id && x.IsActive, cancellationToken: cancellationToken);
+        var dongBanCuaSp = await _dongBan.GetSellableLinesAsync([sanPham.Id], cancellationToken);
 
-        var dong = await GhepGiaAsync([sanPham], tatCaBienThe, cancellationToken);
+        var dong = await GhepGiaAsync([sanPham], dongBanCuaSp, cancellationToken);
 
         return dong.Count == 0 ? null : dong[0];
     }
@@ -180,7 +185,7 @@ public class DocSanPhamCongKhai : ITransientDependency
     /// </summary>
     private async Task<List<SanPhamCongKhaiDto>> GhepGiaAsync(
         IReadOnlyCollection<Product> sanPham,
-        IReadOnlyCollection<ProductVariant> bienThe,
+        IReadOnlyCollection<LegacySellableLineDto> dongBan,
         CancellationToken cancellationToken)
     {
         var bayGio = DateTime.UtcNow;
@@ -201,7 +206,7 @@ public class DocSanPhamCongKhai : ITransientDependency
         }
 
         var idBangGia = bangGia.Select(x => x.Id).ToList();
-        var cacSku = bienThe.Select(x => x.Sku).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var cacSku = dongBan.Select(x => x.Sku).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var dongGia = await _dongGia.GetListAsync(
             x => idBangGia.Contains(x.PriceListId) && cacSku.Contains(x.Sku), cancellationToken: cancellationToken);
@@ -222,14 +227,14 @@ public class DocSanPhamCongKhai : ITransientDependency
 
         foreach (var sp in sanPham)
         {
-            var bienTheCuaSp = bienThe.Where(x => x.ProductId == sp.Id).ToList();
+            var dongBanCuaSp = dongBan.Where(x => x.ProductId == sp.Id).ToList();
 
-            if (bienTheCuaSp.Count == 0)
+            if (dongBanCuaSp.Count == 0)
             {
                 continue;
             }
 
-            var skuCuaSp = bienTheCuaSp.Select(x => x.Sku).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var skuCuaSp = dongBanCuaSp.Select(x => x.Sku).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
             var gia = new List<DongGiaCongKhaiDto>();
 

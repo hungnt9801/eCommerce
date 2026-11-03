@@ -46,9 +46,9 @@ public static class NguongLech
     /// 📌 Cố ý **không** lấy `0` làm *"bỏ qua mọi lệch"*: ngưỡng `0` mà hiểu là "không báo gì" sẽ là
     /// **tắt im lặng** — đúng thứ tài liệu này sinh ra để chặn.
     /// </summary>
-    public static KetQua Xet(DonViNguong donVi, decimal giaTri, int tongSoCai, int chenhLech)
+    public static KetQua Xet(DonViNguong donVi, decimal giaTri, decimal tongSoCai, decimal chenhLech)
     {
-        var doLon = Math.Abs((long)chenhLech);
+        var doLon = Math.Abs(chenhLech);
 
         if (giaTri <= 0m)
         {
@@ -57,22 +57,22 @@ public static class NguongLech
 
         if (donVi == DonViNguong.Absolute)
         {
-            return (decimal)doLon > giaTri ? KetQua.VuotNguong : KetQua.TrongNguong;
+            return doLon > giaTri ? KetQua.VuotNguong : KetQua.TrongNguong;
         }
 
         // `Percent`
-        if (tongSoCai == 0)
+        if (tongSoCai == 0m)
         {
             return doLon > 0 ? KetQua.VuotNguong : KetQua.TrongNguong;
         }
 
-        var coSo = Math.Abs((long)tongSoCai);
+        var coSo = Math.Abs(tongSoCai);
 
         // `|chenhLech| × 100 > giaTri × |cơ sở|` — không chia, không làm tròn ⇒ không mất độ chính xác.
-        return (decimal)doLon * 100m > giaTri * coSo ? KetQua.VuotNguong : KetQua.TrongNguong;
+        return doLon * 100m > giaTri * coSo ? KetQua.VuotNguong : KetQua.TrongNguong;
     }
 
     /// <summary>Tiện dụng: cặp lệch này có vượt ngưỡng không.</summary>
-    public static bool VuotNguong(DonViNguong donVi, decimal giaTri, int tongSoCai, int chenhLech)
+    public static bool VuotNguong(DonViNguong donVi, decimal giaTri, decimal tongSoCai, decimal chenhLech)
         => Xet(donVi, giaTri, tongSoCai, chenhLech) == KetQua.VuotNguong;
 }

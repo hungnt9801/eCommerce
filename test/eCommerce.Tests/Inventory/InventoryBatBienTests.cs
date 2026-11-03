@@ -26,6 +26,18 @@ public class StockMovementTypeTests
     [InlineData(StockMovementType.StocktakeLoss, 8)]
     [InlineData(StockMovementType.TransferOut, 9)]
     [InlineData(StockMovementType.TransferIn, 10)]
+    // 🆕 `WP-04` — 11 loại của tồn kho 9 chiều (append-only, D-17/D-28).
+    [InlineData(StockMovementType.ShippingOut, 11)]
+    [InlineData(StockMovementType.ShippingReturn, 12)]
+    [InlineData(StockMovementType.DamagedIn, 13)]
+    [InlineData(StockMovementType.DamagedOut, 14)]
+    [InlineData(StockMovementType.WarrantyHold, 15)]
+    [InlineData(StockMovementType.WarrantyRelease, 16)]
+    [InlineData(StockMovementType.Hold, 17)]
+    [InlineData(StockMovementType.HoldRelease, 18)]
+    [InlineData(StockMovementType.RetailSaleOut, 19)]
+    [InlineData(StockMovementType.SupplierReturnOut, 20)]
+    [InlineData(StockMovementType.OtherOut, 21)]
     public void Gia_tri_so_KHONG_duoc_doi(StockMovementType loai, int soMongDoi)
     {
         Assert.Equal(soMongDoi, (int)loai);
@@ -43,11 +55,13 @@ public class StockMovementTypeTests
     }
 
     [Fact]
-    public void So_luong_thanh_vien_dung_bang_11__them_loai_moi_thi_cap_nhat_test_nay()
+    public void So_luong_thanh_vien_dung_bang_22__them_loai_moi_thi_cap_nhat_test_nay()
     {
         // Chốt "có bao nhiêu loại" để việc thêm loại mới là hành động **có ý thức**: người thêm phải
-        // (a) thêm vào CUỐI, (b) cập nhật `ApplyMovement` trong `InventoryItem`, (c) cập nhật test này.
-        Assert.Equal(11, Enum.GetValues<StockMovementType>().Length);
+        // (a) thêm vào CUỐI, (b) cập nhật `ApplyMovement` trong `InventoryItem`, (c) cập nhật `DoiSoatTonKho.Dau`
+        // (nếu quên, **job đối soát NÉM** khi gặp loại mới), (d) cập nhật test này.
+        // 11 loại gốc (`INV-001`) + 11 loại của tồn kho 9 chiều (`WP-04`) = 22.
+        Assert.Equal(22, Enum.GetValues<StockMovementType>().Length);
     }
 }
 

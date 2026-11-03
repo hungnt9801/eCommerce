@@ -1,10 +1,10 @@
 namespace eCommerce.Reconciliation;
 
 /// <summary>Ảnh chụp tồn kho của **một** cặp `(kho, SKU)` — chỉ dữ liệu đối soát cần.</summary>
-public readonly record struct TonKhoDoc(Guid WarehouseId, string Sku, int OnHand);
+public readonly record struct TonKhoDoc(Guid WarehouseId, string Sku, decimal OnHand);
 
 /// <summary>Một bút toán sổ cái ảnh hưởng `OnHand` (đối soát tự lọc theo <c>MovementType</c>).</summary>
-public readonly record struct ButToanDoc(Guid WarehouseId, string Sku, StockMovementType MovementType, int QuantityDelta);
+public readonly record struct ButToanDoc(Guid WarehouseId, string Sku, StockMovementType MovementType, decimal QuantityDelta);
 
 /// <summary>
 /// 🚨 **HỢP ĐỒNG ĐỌC TỒN KHO** (`P0 #1`, 26/10/2026) — gỡ nợ *"module `Reconciliation` tham chiếu

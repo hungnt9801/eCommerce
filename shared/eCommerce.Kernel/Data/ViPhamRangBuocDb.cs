@@ -50,6 +50,27 @@ public static class ViPhamRangBuocDb
         ["IX_InvStockDocumentLines_TenantId_Doc_Sku"] =
             new("eCommerce:Inventory:0015", "SKU này đã có dòng trong chứng từ (gộp số lượng vào MỘT dòng).", true),
 
+        // ── 🆕 `WP-04` (02/11/2026) — PHIẾU KHO KIỂU NHANH ───────────────────────────────────────
+        // 📌 Ca **hợp lệ về nghiệp vụ** cần mã riêng: client gửi lại cùng `IdempotencyKey` (retry mạng, POS gửi
+        // hai lần — D-04). Nếu chỉ có `23505` thì client thấy "hệ thống hỏng" và **retry tiếp**; mã `0035` nói rõ
+        // *"phiếu đã được tạo rồi"* ⇒ client hiển thị phiếu cũ thay vì tạo phiếu thứ hai.
+        ["IX_InvStockDocuments_TenantId_IdempotencyKey"] =
+            new("eCommerce:Inventory:0035",
+                "Phiếu kho ĐÃ được tạo cho cùng khoá chống trùng (idempotency key) ⇒ không tạo phiếu thứ hai.", true),
+
+        // 📌 Các `CHECK` dưới đây là **hàng rào cuối** cho đường ghi tắt (SQL tay/import) — domain đã chặn trước
+        // với mã riêng. Ánh xạ để client **không** thấy `500` khi dữ liệu vào sai.
+        ["CK_InvItems_Chieu_KhongAm"] =
+            new(MaChung, "Một CHIỀU TỒN (đang chuyển/giao/tạm giữ/lỗi/bảo hành/đặt trước/chờ nhập) sẽ bị ÂM ⇒ từ chối.", false),
+        ["CK_InvStockDocuments_Mode_HopLe"] =
+            new(MaChung, "Kiểu phiếu (mode) KHÔNG thuộc danh mục Nhanh (1,2,3,4,5,6,8,10,13…19) ⇒ từ chối.", false),
+        ["CK_InvStockDocuments_Direction_HopLe"] =
+            new(MaChung, "Chiều phiếu phải là 1 (Nhập) hoặc 2 (Xuất) ⇒ từ chối.", false),
+        ["CK_InvStockDocuments_Tien_KhongAm"] =
+            new("eCommerce:Inventory:0027", "Chiết khấu/số đã trả trên phiếu KHÔNG được âm.", false),
+        ["CK_InvStockDocumentLines_VatPercent_HopLe"] =
+            new("eCommerce:Inventory:0028", "% VAT của dòng phải trong khoảng 0..100.", false),
+
         // ── ĐƠN HÀNG (`SAL-001`) ─────────────────────────────────────────────────────────────────
         // 📌 Dòng này được thêm vì CHÍNH lượt kiểm chứng đã phát hiện thiếu: tạo đơn lần hai từ cùng checkout
         // trả **mã chung** `eCommerce:Db:0001` thay vì mã nói rõ *"đã có đơn rồi"*. Đúng quy tắc bảo trì ở đầu
@@ -75,6 +96,29 @@ public static class ViPhamRangBuocDb
         ["IX_OrdStatusHistory_TenantId_OrderId_Axis_VersionAfter"] =
             new("eCommerce:Order:0007",
                 "Không ghi được NHẬT KÝ trạng thái (đã có dòng cho cùng phiên bản trục) ⇒ thao tác bị huỷ, KHÔNG có chuyển trạng thái nào được ghi.", true),
+
+        // ── CATALOG: MÔ HÌNH HÀNG HÓA NHANH (`CatProductUnits`, 02/11/2026 — WP-03) ─────────────
+        // 📌 Chỉ ánh xạ ràng buộc mà NGƯỜI DÙNG có thể gặp **hợp lệ** (nhập trùng/đồng thời) và cần mã để biết
+        // sửa trường nào. Các ràng buộc của IMEI/lô/combo/gói/tag **chưa có đường ghi** ⇒ để trong danh sách
+        // trắng có lý do (`RangBuocChuaAnhXa.txt`), KHÔNG ánh xạ một mã "cho đủ".
+        ["IX_CatProdUnits_TenantId_Barcode"] =
+            new("eCommerce:Catalog:0041",
+                "Barcode này đã được một ĐVT khác dùng ⇒ quét mã sẽ bán sai món; đổi barcode cho ĐVT này.", true),
+        ["IX_CatProdUnits_MotDonViGoc"] =
+            new("eCommerce:Catalog:0042",
+                "Sản phẩm đã có ĐVT gốc ⇒ chỉ được đánh dấu MỘT đơn vị là gốc.", true),
+        ["CK_CatProdUnits_ConversionFactor_Duong"] =
+            new("eCommerce:Catalog:0040",
+                "Hệ số quy đổi của ĐVT phải LỚN HƠN 0 (0 hoặc âm sẽ làm sai quy đổi tồn kho).", false),
+        ["CK_CatProdUnits_SalePrice_KhongAm"] =
+            new("eCommerce:Catalog:0007", "Giá bán của ĐVT không được ÂM.", false),
+        ["CK_CatProducts_VatPercent_Khoang"] =
+            new("eCommerce:Catalog:0045",
+                "% VAT phải trong khoảng -100..100 (-1 không chịu thuế, -2 không kê khai, -100 thuế 0%).", false),
+        ["CK_CatComboComponents_Quantity_Duong"] =
+            new("eCommerce:Catalog:0044", "Số lượng thành phần combo phải LỚN HƠN 0.", false),
+        ["CK_CatPackageComponents_Quantity_Duong"] =
+            new("eCommerce:Catalog:0044", "Số lượng thành phần gói phải LỚN HƠN 0.", false),
 
         // ── KHO: giữ chỗ (`INV-002`) ─────────────────────────────────────────────────────────────
         ["IX_InvStockReservations_TenantId_Ref_Sku_Kho"] =

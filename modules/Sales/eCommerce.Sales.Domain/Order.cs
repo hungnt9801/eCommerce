@@ -573,6 +573,17 @@ public class OrderLine : FullAuditedEntity<Guid>, IMultiTenant
 
     public Guid? ProductVariantId { get; set; }
 
+    /// <summary>
+    /// 🆕 **WP-03 nửa sau** — sản phẩm (`CatProducts`) của dòng đơn, thay cho việc chỉ dựa vào `Sku`.
+    ///
+    /// 📌 **VÌ SAO THÊM (D-07):** mô hình Nhanh bỏ *"variant là nơi giữ tồn/giá"*; báo cáo/đơn hàng phải
+    /// trỏ được về **sản phẩm** để gom theo hàng hoá, thay vì tra chuỗi SKU. `Sku` + `ProductVariantId` được
+    /// **giữ nguyên** (legacy) — dữ liệu lịch sử và đối soát cũ vẫn đọc được.
+    /// ⚠️ `null` = dòng đơn có **trước** backfill, hoặc SKU không khớp sản phẩm nào (dữ liệu ngoài).
+    /// Backfill theo `Sku` nằm trong `BackfillCatalogService` (chạy cùng lần với backfill biến thể).
+    /// </summary>
+    public Guid? ProductId { get; set; }
+
     /// <summary>ID dòng đơn do sàn cấp (<c>trade_order_line_id</c>) — dùng để chống trùng webhook.</summary>
     public string? ExternalLineId { get; set; }
 
