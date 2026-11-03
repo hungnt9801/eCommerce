@@ -138,6 +138,12 @@ public static class InventoryDbContextModelCreatingExtensions
                 t.HasCheckConstraint(
                     "CK_InvStockDocumentLines_VatPercent_HopLe",
                     "\"VatPercent\" IS NULL OR (\"VatPercent\" >= 0 AND \"VatPercent\" <= 100)");
+
+                // 🆕 `WP-04` (việc 8) — đơn giá âm là **dữ liệu hỏng** (tiền âm trên hoá đơn in ra).
+                // 📌 `DatChiTiet` đã NÉM, nhưng đường ghi tắt/import không đi qua nó ⇒ cần hàng rào DB.
+                t.HasCheckConstraint(
+                    "CK_InvStockDocumentLines_UnitPrice_KhongAm",
+                    "\"UnitPrice\" IS NULL OR \"UnitPrice\" >= 0");
             });
             b.ConfigureByConvention();
 
@@ -150,6 +156,10 @@ public static class InventoryDbContextModelCreatingExtensions
             // 🆕 `WP-04b` — số lượng dòng phiếu cũng `numeric(18,3)` (cùng lý do `InvItems`/sổ cái).
             b.Property(x => x.Quantity).HasPrecision(18, 3);
             b.Property(x => x.ImeiSerials).HasMaxLength(4000);
+
+            // 🆕 `WP-04` (việc 8) — TIỀN dùng `numeric(18,2)`: khác độ chính xác của số lượng (18,3) là
+            // **có chủ ý** — tiền Việt Nam không có đơn vị nhỏ hơn đồng, còn số lượng thì có (gram/ml).
+            b.Property(x => x.UnitPrice).HasPrecision(18, 2);
 
             // Một SKU chỉ xuất hiện MỘT lần trong một chứng từ: hai dòng cùng SKU trong cùng phiếu nhập
             // ⇒ người đọc phiếu thấy "nhập 5" nhưng sổ cái ghi hai bút toán ⇒ **cộng sai** mà không lỗi nào.

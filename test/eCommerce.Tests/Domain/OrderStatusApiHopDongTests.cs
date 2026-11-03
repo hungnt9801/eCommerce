@@ -24,6 +24,9 @@ public class OrderStatusApiHopDongTests
         { nameof(IOrderStatusAppService.RequestReturnAsync), eCommerceConsts.Permissions.Orders.ReturnRequest },
         { nameof(IOrderStatusAppService.ApproveReturnAsync), eCommerceConsts.Permissions.Orders.ReturnApprove },
         { nameof(IOrderStatusAppService.CancelOrderAsync), eCommerceConsts.Permissions.Orders.Cancel },
+        // 🆕 `WP-05` — huỷ kèm "AI huỷ" (Khách/Hệ thống/HVC). 📌 Vẫn là quyền `Cancel` (không phải
+        // `StatusChange`): cho huỷ đi qua cửa đổi-trạng-thái là **leo thang quyền im lặng**.
+        { nameof(IOrderStatusAppService.CancelOrderByStatusAsync), eCommerceConsts.Permissions.Orders.Cancel },
         { nameof(IOrderStatusAppService.GetStatusHistoryAsync), eCommerceConsts.Permissions.Orders.HistoryView }
     };
 

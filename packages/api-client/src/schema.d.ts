@@ -1,4 +1,273 @@
 export interface paths {
+    "/api/v1/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    Page?: number;
+                    PageSize?: number;
+                    SkipCount?: number;
+                    Tab?: string;
+                    Q?: string;
+                    FulfillmentStatus?: components["schemas"]["eCommerce.FulfillmentStatus"];
+                    Type?: components["schemas"]["eCommerce.OrderType"];
+                    Source?: components["schemas"]["eCommerce.OrderSource"];
+                    WarehouseId?: string;
+                    FromUtc?: string;
+                    ToUtc?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Application.Contracts.Sales.OrderListItemDto, eCommerce.Sales.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"];
+                        "application/json": components["schemas"]["Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Application.Contracts.Sales.OrderListItemDto, eCommerce.Sales.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"];
+                        "text/json": components["schemas"]["Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Application.Contracts.Sales.OrderListItemDto, eCommerce.Sales.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orders/tabs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    Page?: number;
+                    PageSize?: number;
+                    SkipCount?: number;
+                    Tab?: string;
+                    Q?: string;
+                    FulfillmentStatus?: components["schemas"]["eCommerce.FulfillmentStatus"];
+                    Type?: components["schemas"]["eCommerce.OrderType"];
+                    Source?: components["schemas"]["eCommerce.OrderSource"];
+                    WarehouseId?: string;
+                    FromUtc?: string;
+                    ToUtc?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Application.Contracts.Sales.OrderTabCountsDto"];
+                        "application/json": components["schemas"]["eCommerce.Application.Contracts.Sales.OrderTabCountsDto"];
+                        "text/json": components["schemas"]["eCommerce.Application.Contracts.Sales.OrderTabCountsDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orders/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Application.Contracts.Sales.OrderDetailDto"];
+                        "application/json": components["schemas"]["eCommerce.Application.Contracts.Sales.OrderDetailDto"];
+                        "text/json": components["schemas"]["eCommerce.Application.Contracts.Sales.OrderDetailDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orders/{id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    skipCount?: number;
+                    maxResultCount?: number;
+                };
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Application.Contracts.Sales.OrderStatusHistoryDto, eCommerce.Sales.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"];
+                        "application/json": components["schemas"]["Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Application.Contracts.Sales.OrderStatusHistoryDto, eCommerce.Sales.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"];
+                        "text/json": components["schemas"]["Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Application.Contracts.Sales.OrderStatusHistoryDto, eCommerce.Sales.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orders/{id}/transitions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["eCommerce.HttpApi.Controllers.ChangeOrderStatusBody"];
+                    "text/json": components["schemas"]["eCommerce.HttpApi.Controllers.ChangeOrderStatusBody"];
+                    "application/*+json": components["schemas"]["eCommerce.HttpApi.Controllers.ChangeOrderStatusBody"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Application.Contracts.Sales.OrderStatusDto"];
+                        "application/json": components["schemas"]["eCommerce.Application.Contracts.Sales.OrderStatusDto"];
+                        "text/json": components["schemas"]["eCommerce.Application.Contracts.Sales.OrderStatusDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orders/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["eCommerce.HttpApi.Controllers.CancelOrderBody"];
+                    "text/json": components["schemas"]["eCommerce.HttpApi.Controllers.CancelOrderBody"];
+                    "application/*+json": components["schemas"]["eCommerce.HttpApi.Controllers.CancelOrderBody"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Application.Contracts.Sales.OrderStatusDto"];
+                        "application/json": components["schemas"]["eCommerce.Application.Contracts.Sales.OrderStatusDto"];
+                        "text/json": components["schemas"]["eCommerce.Application.Contracts.Sales.OrderStatusDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/products": {
         parameters: {
             query?: never;
@@ -548,6 +817,11 @@ export interface components {
         };
         "Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Application.Contracts.Inventory.StockDocumentDto, eCommerce.Inventory.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]": {
             items?: components["schemas"]["eCommerce.Application.Contracts.Inventory.StockDocumentDto"][] | null;
+            /** Format: int64 */
+            totalCount?: number;
+        };
+        "Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Application.Contracts.Sales.OrderListItemDto, eCommerce.Sales.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]": {
+            items?: components["schemas"]["eCommerce.Application.Contracts.Sales.OrderListItemDto"][] | null;
             /** Format: int64 */
             totalCount?: number;
         };
@@ -1295,6 +1569,8 @@ export interface components {
             /** Format: uuid */
             batchId?: string | null;
             imeiSerials?: string | null;
+            /** Format: double */
+            unitPrice?: number | null;
         };
         "eCommerce.Application.Contracts.Inventory.CreateWarehouseDto": {
             code: string;
@@ -1465,6 +1741,12 @@ export interface components {
             idempotencyKey?: string | null;
             /** Format: int32 */
             lineCount?: number;
+            /** Format: double */
+            totalAmount?: number | null;
+            /** Format: double */
+            totalVat?: number | null;
+            /** Format: double */
+            totalPayment?: number | null;
         };
         "eCommerce.Application.Contracts.Inventory.StockDocumentLineDto": {
             /** Format: uuid */
@@ -1479,6 +1761,12 @@ export interface components {
             /** Format: uuid */
             batchId?: string | null;
             imeiSerials?: string | null;
+            /** Format: double */
+            unitPrice?: number | null;
+            /** Format: double */
+            amount?: number | null;
+            /** Format: double */
+            vatAmount?: number | null;
         };
         "eCommerce.Application.Contracts.Inventory.StockReservationDto": {
             /** Format: uuid */
@@ -1524,6 +1812,16 @@ export interface components {
             /** Format: int64 */
             expectedVersion?: number;
             reasonCode?: string | null;
+            reasonText?: string | null;
+        };
+        "eCommerce.Application.Contracts.Sales.CancelOrderByStatusDto": {
+            /** Format: uuid */
+            orderId?: string;
+            cancelledBy?: components["schemas"]["eCommerce.FulfillmentStatus"];
+            /** Format: int64 */
+            expectedVersion?: number;
+            reasonCode?: string | null;
+            businessReason?: components["schemas"]["eCommerce.OrderReasonCode"];
             reasonText?: string | null;
         };
         "eCommerce.Application.Contracts.Sales.CancelOrderDto": {
@@ -1590,6 +1888,118 @@ export interface components {
             /** Format: int64 */
             rowVersion?: number;
         };
+        "eCommerce.Application.Contracts.Sales.OrderDetailDto": {
+            /** Format: uuid */
+            id?: string;
+            number?: string | null;
+            channelCode?: string | null;
+            type?: components["schemas"]["eCommerce.OrderType"];
+            source?: components["schemas"]["eCommerce.OrderSource"];
+            fulfillmentStatus?: components["schemas"]["eCommerce.FulfillmentStatus"];
+            paymentStatus?: components["schemas"]["eCommerce.PaymentStatus"];
+            reconciliationStatus?: components["schemas"]["eCommerce.ReconciliationStatus"];
+            returnStatus?: components["schemas"]["eCommerce.ReturnStatus"];
+            derivedStatus?: components["schemas"]["eCommerce.OrderStatus"];
+            statusLabel?: string | null;
+            isCancelled?: boolean;
+            /** Format: double */
+            grandTotal?: number;
+            /** Format: double */
+            codAmount?: number | null;
+            /** Format: int32 */
+            lineCount?: number;
+            /** Format: uuid */
+            warehouseId?: string | null;
+            carrierCode?: string | null;
+            trackingNumber?: string | null;
+            reasonCode?: components["schemas"]["eCommerce.OrderReasonCode"];
+            /** Format: date-time */
+            creationTime?: string;
+            currency?: string | null;
+            /** Format: double */
+            subtotal?: number;
+            /** Format: double */
+            discountTotal?: number;
+            /** Format: double */
+            taxTotal?: number;
+            /** Format: double */
+            shippingTotal?: number;
+            /** Format: double */
+            shippingFeeCustomer?: number | null;
+            /** Format: double */
+            shippingFeeActual?: number | null;
+            /** Format: int32 */
+            weightGram?: number | null;
+            /** Format: uuid */
+            customerId?: string | null;
+            /** Format: uuid */
+            saleStaffId?: string | null;
+            /** Format: uuid */
+            packerId?: string | null;
+            externalOrderId?: string | null;
+            checkoutIdempotencyKey?: string | null;
+            note?: string | null;
+            /** Format: int64 */
+            rowVersion?: number;
+            /** Format: int64 */
+            fulfillmentVersion?: number;
+            /** Format: int64 */
+            paymentVersion?: number;
+            /** Format: int64 */
+            reconciliationVersion?: number;
+            /** Format: int64 */
+            closureVersion?: number;
+            allowedTransitions?: components["schemas"]["eCommerce.FulfillmentStatus"][] | null;
+            canCancel?: boolean;
+            lines?: components["schemas"]["eCommerce.Application.Contracts.Sales.OrderLineItemDto"][] | null;
+        };
+        "eCommerce.Application.Contracts.Sales.OrderLineItemDto": {
+            /** Format: uuid */
+            id?: string;
+            sku?: string | null;
+            /** Format: uuid */
+            productId?: string | null;
+            /** Format: int32 */
+            quantity?: number;
+            /** Format: int32 */
+            returnedQuantity?: number;
+            /** Format: double */
+            unitPrice?: number;
+            /** Format: double */
+            discountAmount?: number;
+            /** Format: double */
+            taxAmount?: number;
+            /** Format: double */
+            lineTotal?: number;
+        };
+        "eCommerce.Application.Contracts.Sales.OrderListItemDto": {
+            /** Format: uuid */
+            id?: string;
+            number?: string | null;
+            channelCode?: string | null;
+            type?: components["schemas"]["eCommerce.OrderType"];
+            source?: components["schemas"]["eCommerce.OrderSource"];
+            fulfillmentStatus?: components["schemas"]["eCommerce.FulfillmentStatus"];
+            paymentStatus?: components["schemas"]["eCommerce.PaymentStatus"];
+            reconciliationStatus?: components["schemas"]["eCommerce.ReconciliationStatus"];
+            returnStatus?: components["schemas"]["eCommerce.ReturnStatus"];
+            derivedStatus?: components["schemas"]["eCommerce.OrderStatus"];
+            statusLabel?: string | null;
+            isCancelled?: boolean;
+            /** Format: double */
+            grandTotal?: number;
+            /** Format: double */
+            codAmount?: number | null;
+            /** Format: int32 */
+            lineCount?: number;
+            /** Format: uuid */
+            warehouseId?: string | null;
+            carrierCode?: string | null;
+            trackingNumber?: string | null;
+            reasonCode?: components["schemas"]["eCommerce.OrderReasonCode"];
+            /** Format: date-time */
+            creationTime?: string;
+        };
         "eCommerce.Application.Contracts.Sales.OrderStatusDto": {
             /** Format: uuid */
             orderId?: string;
@@ -1599,6 +2009,11 @@ export interface components {
             returnStatus?: components["schemas"]["eCommerce.ReturnStatus"];
             isCancelled?: boolean;
             derivedStatus?: components["schemas"]["eCommerce.OrderStatus"];
+            statusLabel?: string | null;
+            stockEffect?: string | null;
+            /** Format: int32 */
+            stockAffectedLines?: number;
+            warning?: string | null;
             /** Format: int64 */
             fulfillmentVersion?: number;
             /** Format: int64 */
@@ -1630,6 +2045,17 @@ export interface components {
             versionAfter?: number;
             /** Format: date-time */
             occurredAtUtc?: string;
+        };
+        "eCommerce.Application.Contracts.Sales.OrderTabCountsDto": {
+            /** Format: int32 */
+            total?: number;
+            tabs?: components["schemas"]["eCommerce.Application.Contracts.Sales.OrderTabDto"][] | null;
+        };
+        "eCommerce.Application.Contracts.Sales.OrderTabDto": {
+            key?: string | null;
+            label?: string | null;
+            /** Format: int32 */
+            count?: number;
         };
         "eCommerce.Application.Contracts.Sales.PhanBoKenhDto": {
             channelCode?: string | null;
@@ -2307,7 +2733,22 @@ export interface components {
          * Format: int32
          * @enum {integer}
          */
-        "eCommerce.FulfillmentStatus": 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+        "eCommerce.FulfillmentStatus": 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17;
+        "eCommerce.HttpApi.Controllers.CancelOrderBody": {
+            cancelledBy?: components["schemas"]["eCommerce.FulfillmentStatus"];
+            /** Format: int64 */
+            expectedVersion?: number;
+            reasonCode?: string | null;
+            businessReason?: components["schemas"]["eCommerce.OrderReasonCode"];
+            reasonText?: string | null;
+        };
+        "eCommerce.HttpApi.Controllers.ChangeOrderStatusBody": {
+            toStatus?: components["schemas"]["eCommerce.FulfillmentStatus"];
+            /** Format: int64 */
+            expectedVersion?: number;
+            reasonCode?: string | null;
+            reasonText?: string | null;
+        };
         "eCommerce.HttpApi.Controllers.SystemController+MeResult": {
             /** Format: uuid */
             userId?: string | null;
@@ -2681,7 +3122,22 @@ export interface components {
          * Format: int32
          * @enum {integer}
          */
+        "eCommerce.OrderReasonCode": 1 | 2 | 3 | 4 | 5 | 6 | 8 | 9 | 10 | 11 | 12 | 14 | 16 | 18 | 19 | 20 | 22 | 23 | 24 | 25 | 26 | 29 | 30 | 35;
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        "eCommerce.OrderSource": 1 | 2 | 10 | 20 | 21 | 41 | 42 | 43 | 45 | 48 | 49 | 50 | 51 | 52;
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
         "eCommerce.OrderStatus": 0 | 1 | 2 | 3 | 4 | 5 | 6;
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        "eCommerce.OrderType": 1 | 2 | 3 | 5 | 10 | 12 | 14 | 15 | 16 | 17;
         /**
          * Format: int32
          * @enum {integer}

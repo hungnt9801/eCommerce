@@ -175,7 +175,231 @@ public enum FulfillmentStatus
     Returning = 7,
 
     /// <summary>Đã về kho — **hấp thụ**.</summary>
-    Returned = 8
+    Returned = 8,
+
+    // ══════════════════════════════════════════════════════════════════════════════════════════════════
+    // 🆕 **`WP-05`** (`N6`, 03/11/2026) — 9 giá trị còn lại của **18 trạng thái Nhanh** (`D-08`).
+    //
+    // 🔑 **VÌ SAO CHỈ 9 GIÁ TRỊ, KHÔNG PHẢI 18:** 9 giá trị `0…8` ở trên **đã phủ đúng 9** trong 18 trạng thái
+    // của Nhanh (Mới · Đã xác nhận · Đang đóng gói · Chờ thu gom · Đang chuyển · Thành công · Thất bại ·
+    // Đang hoàn · Đã hoàn). Đối chiếu từng dòng `docs/nhanh/nhanh-pos-module-map.md` §6.2 ⇒ còn thiếu **đúng 9**.
+    // 🚨 **CHỈ APPEND, KHÔNG ĐỔI SỐ CŨ (`D-17`)** — cột `OrdOrders.FulfillmentStatus` lưu **số**; đổi số của
+    // `Pending`/`Delivered` là **diễn giải lại toàn bộ lịch sử đơn**: một đơn "đã giao" bỗng đọc thành
+    // "chờ xác nhận" mà **không có lỗi nào**. Test `Wp05DonHangNhanhTests` khoá bất biến này.
+    //
+    // 📌 **BA trạng thái HUỶ (`CustomerCancelled`/`SystemCancelled`/`CarrierCancelled`) KHÔNG phải trục thứ 5:**
+    // chúng là **giá trị của trục thực hiện** để ghi **AI huỷ** (dữ liệu Nhanh trả về), còn *"đơn đã kết thúc"*
+    // vẫn là `ReturnStatus.Cancelled` — **một** nguồn sự thật cho câu hỏi *"đơn còn sống không"*.
+    // ➡️ Vì vậy `Order.HuyDonNhanh` ghi **cả hai** trục trong **một** lần gọi (2 dòng lịch sử), không có
+    // đường nào chỉ ghi một trục rồi để trục kia nói khác.
+    // ══════════════════════════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>**Chờ xác nhận** (Nhanh `57 Chờ khách xác nhận`) — đã gọi khách, chưa chốt.</summary>
+    PendingConfirm = 9,
+
+    /// <summary>**Đang xác nhận** (Nhanh `55`) — CSKH đang gọi/đang sửa đơn.</summary>
+    Confirming = 10,
+
+    /// <summary>**Hết hàng** (Nhanh `68`) — hàng khách đặt đã hết; **không** ghi nhận tồn.</summary>
+    OutOfStock = 11,
+
+    /// <summary>**Đổi kho hàng** (Nhanh `73`) — chuyển sang cửa hàng/kho còn tồn (vẫn tạm giữ).</summary>
+    WarehouseSwitched = 12,
+
+    /// <summary>**Đã đóng gói** (Nhanh `40`) — đóng gói xong, chờ bắn sang HVC.</summary>
+    Packed = 13,
+
+    /// <summary>**Khách huỷ** (Nhanh `63`) — khách không lấy hàng. Trục kết thúc **cũng** `Cancelled`.</summary>
+    CustomerCancelled = 14,
+
+    /// <summary>**Hệ thống huỷ** (Nhanh `64`) — job/hệ thống tự huỷ. Trục kết thúc **cũng** `Cancelled`.</summary>
+    SystemCancelled = 15,
+
+    /// <summary>**HVC huỷ** (Nhanh `58`) — hãng vận chuyển huỷ đơn. Trục kết thúc **cũng** `Cancelled`.</summary>
+    CarrierCancelled = 16,
+
+    /// <summary>**Xác nhận hoàn** (Nhanh `74`) — HVC báo đã hoàn; chờ kho đếm nhận (`Returned`).</summary>
+    ReturnConfirmed = 17
+}
+
+/// <summary>
+/// 🆕 **`WP-05`** — **LOẠI ĐƠN** (Nhanh `order.info.type`), **10 giá trị ĐO ĐƯỢC** từ Open API v3
+/// (`nhanh-pos-v3-api-inventory.md` §2.3 — Model Constant).
+///
+/// 🚨 **VÌ SAO 10 MÀ KHÔNG PHẢI 13:** [07 §WP-05](../../docs/nhanh/07-ke-hoach-trien-khai.md) ghi *"`OrderType` (13)"*,
+/// nhưng danh mục **đo được** chỉ có **10** giá trị (1, 2, 3, 5, 10, 12, 14, 15, 16, 17 — **không** có 4, 6–9,
+/// 11, 13). Theo đúng tiền lệ `D-20` (**không tự chế giá trị để "đủ số"**), ở đây dùng **danh mục đo được** và
+/// ghi lại con số lệch — xem `D-38`.
+/// 🔒 **Số là hợp đồng dữ liệu với Nhanh** ⇒ **KHÔNG đánh số lại** (khoảng trống giữ nguyên).
+/// </summary>
+public enum OrderType
+{
+    /// <summary>1 — Giao hàng tận nhà (mặc định).</summary>
+    Delivery = 1,
+
+    /// <summary>2 — Mua tại quầy (khách đến lấy).</summary>
+    BuyAtCounter = 2,
+
+    /// <summary>3 — Đặt trước.</summary>
+    PreOrder = 3,
+
+    /// <summary>5 — Đổi quà.</summary>
+    GiftExchange = 5,
+
+    /// <summary>10 — Xin báo giá.</summary>
+    QuoteRequest = 10,
+
+    /// <summary>12 — Đổi sản phẩm.</summary>
+    ProductExchange = 12,
+
+    /// <summary>14 — Khách trả lại hàng.</summary>
+    CustomerReturn = 14,
+
+    /// <summary>15 — Hàng chuyển kho.</summary>
+    WarehouseTransfer = 15,
+
+    /// <summary>16 — Đơn hoàn một phần.</summary>
+    PartialReturn = 16,
+
+    /// <summary>17 — Đền bù mất hàng.</summary>
+    LostGoodsCompensation = 17
+}
+
+/// <summary>
+/// 🆕 **`WP-05`** — **NGUỒN ĐƠN** (Nhanh `channel.saleChannel`), **14 giá trị ĐO ĐƯỢC**
+/// (`nhanh-pos-v3-api-inventory.md` §2.3 — Model Constant).
+/// 📌 [07 §WP-05](../../docs/nhanh/07-ke-hoach-trien-khai.md) ghi *"`OrderSource` (12)"*, đo được là **14**
+/// ⇒ dùng đo được, ghi ở `D-38` (cùng lý do `D-20`: không cắt bớt giá trị thật để khớp con số trong kế hoạch).
+/// 🔒 **KHÔNG đánh số lại** — số là hợp đồng dữ liệu với dữ liệu nhập từ Nhanh.
+/// </summary>
+public enum OrderSource
+{
+    /// <summary>1 — Admin (tự tạo trên phần mềm).</summary>
+    Admin = 1,
+
+    /// <summary>2 — Website.</summary>
+    Website = 2,
+
+    /// <summary>10 — API (bên thứ ba).</summary>
+    Api = 10,
+
+    /// <summary>20 — Facebook.</summary>
+    Facebook = 20,
+
+    /// <summary>21 — Instagram.</summary>
+    Instagram = 21,
+
+    /// <summary>41 — Lazada.</summary>
+    Lazada = 41,
+
+    /// <summary>42 — Shopee.</summary>
+    Shopee = 42,
+
+    /// <summary>43 — Sendo.</summary>
+    Sendo = 43,
+
+    /// <summary>45 — Tiki.</summary>
+    Tiki = 45,
+
+    /// <summary>48 — TikTok Shop.</summary>
+    TikTokShop = 48,
+
+    /// <summary>49 — Zalo OA.</summary>
+    ZaloOa = 49,
+
+    /// <summary>50 — Shopee chat.</summary>
+    ShopeeChat = 50,
+
+    /// <summary>51 — Lazada chat.</summary>
+    LazadaChat = 51,
+
+    /// <summary>52 — Zalo cá nhân.</summary>
+    ZaloPersonal = 52
+}
+
+/// <summary>
+/// 🆕 **`WP-05`** — **LÝ DO** của đơn (Nhanh `info.reason`), **24 giá trị ĐO ĐƯỢC**
+/// (`nhanh-pos-v3-api-inventory.md` §2.3 — Model Constant). Con số **24 khớp** kế hoạch 07 §WP-05.
+///
+/// 📌 **VÌ SAO LÀ ENUM MÀ `OrderStatusHistory.ReasonCode` VẪN LÀ CHUỖI:** `ReasonCode` trong lịch sử là
+/// **mã hành động** (`XacNhanDon`, `WebhookDaGiao`…) — do hệ thống sinh, **không** phải lý do nghiệp vụ của
+/// Nhanh. Trộn hai nghĩa vào một cột là **một cột hai nghĩa** ⇒ tách: `Order.ReasonCode` (enum này, `int?`)
+/// cho lý do nghiệp vụ; lịch sử giữ chuỗi hành động.
+/// 🔒 **KHÔNG đánh số lại** (dải có khoảng trống: 7, 13, 15, 17, 21, 27, 28, 31–34).
+/// </summary>
+public enum OrderReasonCode
+{
+    /// <summary>1 — Đặt nhầm.</summary>
+    DatNham = 1,
+
+    /// <summary>2 — Phí ship cao.</summary>
+    PhiShipCao = 2,
+
+    /// <summary>3 — Không muốn chuyển khoản.</summary>
+    KhongMuonChuyenKhoan = 3,
+
+    /// <summary>4 — Đơn trùng.</summary>
+    DonTrung = 4,
+
+    /// <summary>5 — Không gọi được khách.</summary>
+    KhongGoiDuocKhach = 5,
+
+    /// <summary>6 — Hết hàng.</summary>
+    HetHang = 6,
+
+    /// <summary>8 — Chờ chuyển khoản.</summary>
+    ChoChuyenKhoan = 8,
+
+    /// <summary>9 — Khách không thích.</summary>
+    KhachKhongThich = 9,
+
+    /// <summary>10 — Không hài lòng nhân viên vận chuyển.</summary>
+    KhongHaiLongNvVanChuyen = 10,
+
+    /// <summary>11 — Giao chậm.</summary>
+    GiaoCham = 11,
+
+    /// <summary>12 — Đã mua tại cửa hàng.</summary>
+    DaMuaTaiCuaHang = 12,
+
+    /// <summary>14 — Sai địa chỉ.</summary>
+    SaiDiaChi = 14,
+
+    /// <summary>16 — Không muốn mua nữa.</summary>
+    KhongMuonMuaNua = 16,
+
+    /// <summary>18 — Lý do khác.</summary>
+    LyDoKhac = 18,
+
+    /// <summary>19 — Không liên hệ được người gửi.</summary>
+    KhongLienHeDuocNguoiGui = 19,
+
+    /// <summary>20 — Người gửi không bán online/ngoại tỉnh.</summary>
+    NguoiGuiKhongBanOnline = 20,
+
+    /// <summary>22 — Không bàn giao cho HVC.</summary>
+    KhongBanGiaoChoHvc = 22,
+
+    /// <summary>23 — HVC lấy hàng muộn.</summary>
+    HvcLayHangMuon = 23,
+
+    /// <summary>24 — Sai địa chỉ kho lấy.</summary>
+    SaiDiaChiKhoLay = 24,
+
+    /// <summary>25 — HVC làm mất hàng.</summary>
+    HvcLamMatHang = 25,
+
+    /// <summary>26 — Người gửi tự vận chuyển.</summary>
+    NguoiGuiTuVanChuyen = 26,
+
+    /// <summary>29 — Người gửi không xử lý đơn.</summary>
+    NguoiGuiKhongXuLyDon = 29,
+
+    /// <summary>30 — Sai giá.</summary>
+    SaiGia = 30,
+
+    /// <summary>35 — Khách đi vắng.</summary>
+    KhachDiVang = 35
 }
 
 /// <summary>

@@ -145,6 +145,40 @@ Cập nhật NV đóng gói · Cập nhật NV bán hàng · Cập nhật trạn
 Gộp các đơn đã chọn · Tách đơn Mega Live · Xuất dữ liệu · Gửi đơn sang HVC · Xoá ·
 Tạo HĐĐT nháp · Phát hành HĐĐT`
 
+### 4.2b Phiếu xuất nhập kho — đo 03/11/2026 (bằng cầu CDP, tài khoản `businessId=230222`)
+
+Phục vụ `WP-04` (FE). Đo trên **bản Nhanh đang chạy của bạn**, không suy từ ảnh.
+
+**Route thật:** `/inventory/bill/index` (DS phiếu) · `/inventory/bill/import` + `/export` (nhập/xuất kho,
+bản v2 là `import2`/`export2`) · `/inventory/transfer/add2` (chuyển kho) · `/inventory/check/index` (kiểm kho).
+
+**Bộ lọc (một hàng, server-side):** `Kho hàng · ID · Loại · Kiểu · Ngày · Lọc`
+— **`Loại`** = nhập/xuất, **`Kiểu`** = mode (bán lẻ/giao hàng/NCC…), **`Ngày`** = khoảng ngày, **`ID`** = số phiếu.
+
+**Cột DS phiếu (7):** `ID | Ngày · Kho hàng · SP · SL · Tổng tiền thanh toán · Người tạo · Khách hàng`
+📌 Nhanh **gộp ID + Ngày vào một ô** (`72 31/10`) và **không có tab trạng thái** cho phiếu kho — phiếu kho
+của Nhanh **xác nhận ngay khi lưu**, khác đơn hàng (14 tab). Ta giữ `Draft/Posted` (ADR-02 của repo) nên
+**có thêm** tab trạng thái; đó là **khác biệt có chủ ý**, không phải thiếu sót.
+
+**`Thêm mới ▾`:** `Nhập kho · Xuất kho · Nhập từ excel`.
+**`Thao tác ▾` (bulk):** `Xuất dữ liệu · In các phiếu XNK đã chọn · Gắn nhãn, Gỡ nhãn ·
+Đổi ngày cho phiếu XNK · Xoá các dòng đã chọn` — có **checkbox từng dòng + chọn tất cả**.
+
+**Form Nhập kho:** đầu phiếu `Kho hàng* · Loại nhập hàng* · Nhà cung cấp · Nhãn`; bảng dòng 4 cột
+`Sản phẩm · Tồn · $/% · Thành tiền`, mỗi dòng có `SL · Giá · ĐVT · Chiết khấu · VAT · Lô hàng · Khối lượng`;
+cuối phiếu `Tổng tiền hàng · Chiết khấu ($ hoặc %) · VAT ($ hoặc %) · Số hoá đơn VAT · Ngày xuất hoá đơn ·
+Thanh toán (Tiền mặt / Chuyển khoản) · Ghi chú`; nút `Lưu (F9) · Lưu và in (F10) · Xem chi tiết phiếu ·
+Tiếp tục thêm`; checkbox `Cập nhật giá nhập sản phẩm theo giá nhập lần này`.
+**Form Xuất kho:** giống hệt nhưng nhãn là **`Loại trả hàng*`** (không phải "Loại nhập hàng").
+📌 Bảng dòng có **checkbox ẩn/hiện cột** (`isHideProductStt`, `isHideProductBatch`) — pattern ẩn/hiện cột
+áp **cả bảng dòng**, không chỉ bảng danh sách.
+
+> 💡 **Hệ quả cho ta:** mọi trường **tiền** của phiếu Nhanh (`Giá`, `Thành tiền`, `Tổng tiền hàng`,
+> `Chiết khấu`, `VAT`, `Thanh toán`) **trước đây không có** trong `StockDocumentLine` của repo (lý do `D-34`
+> hoãn). **Đã xử lý 03/11/2026:** thêm `UnitPrice` + `TinhTienChungTu` (migration **55**, `D-37`) ⇒ ta có
+> `Giá`/`Thành tiền`/`Tổng tiền hàng`/`VAT`; **chưa** có `Số hoá đơn VAT`, `Ngày xuất hoá đơn` và tách
+> `Thanh toán` theo phương thức (tiền mặt/chuyển khoản — thuộc POS/WP-06).
+
 ### 4.3 Bảy pattern phải clone (vì người dùng đã quen)
 
 1. **Tab có đếm số** — biến danh sách thành *hàng đợi công việc*, không phải bảng dữ liệu.

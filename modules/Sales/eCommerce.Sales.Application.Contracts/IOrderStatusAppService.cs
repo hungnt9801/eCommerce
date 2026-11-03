@@ -21,6 +21,12 @@ public interface IOrderStatusAppService : IApplicationService
 
     Task<OrderStatusDto> CancelOrderAsync(CancelOrderDto input);
 
+    /// <summary>
+    /// 🆕 **`WP-05`** — huỷ đơn **kèm AI huỷ** (Khách/Hệ thống/HVC) + **lý do nghiệp vụ** (24 lý do Nhanh).
+    /// 🔐 Quyền `eCommerce.Orders.Cancel` — **không** dùng cửa `ChangeFulfillmentStatusAsync` (quyền khác).
+    /// </summary>
+    Task<OrderStatusDto> CancelOrderByStatusAsync(CancelOrderByStatusDto input);
+
     /// <summary>Lịch sử trạng thái — **mới nhất trước** (`NFR-SAL-003-010`).</summary>
     Task<PagedResultDto<OrderStatusHistoryDto>> GetStatusHistoryAsync(Guid orderId, PagedResultRequestDto input);
 }

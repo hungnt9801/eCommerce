@@ -9,6 +9,9 @@
     <ProjectReference Include="..\eCommerce.Application.Contracts\eCommerce.Application.Contracts.csproj" />
     <ProjectReference Include="..\..\modules\Catalog\eCommerce.Catalog.Application.Contracts\eCommerce.Catalog.Application.Contracts.csproj" />
     <ProjectReference Include="..\..\modules\Inventory\eCommerce.Inventory.Application.Contracts\eCommerce.Inventory.Application.Contracts.csproj" />
+    <!-- 🆕 `WP-05` — controller `/api/v1/orders` cần hợp đồng của module `Sales`.
+         📌 Chỉ tham chiếu **Application.Contracts** (không `.Domain`) — đúng luật phụ thuộc `03 §2`. -->
+    <ProjectReference Include="..\..\modules\Sales\eCommerce.Sales.Application.Contracts\eCommerce.Sales.Application.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -71,6 +71,41 @@ public static class SalesDbContextModelCreatingExtensions
             b.HasIndex(x => new { x.TenantId, x.ReturnStatus, x.CreationTime })
                 .HasDatabaseName("IX_OrdOrders_TenantId_ReturnStatus_CreationTime");
 
+            // ══════════════════════════════════════════════════════════════════════════════════════════
+            // 🆕 **`WP-05`** (`N6`, 03/11/2026) — TRƯỜNG KIỂU NHANH (`07 §WP-05` việc 2).
+            // 📌 `Type`/`Source` **CÓ DEFAULT** (`1` = Giao hàng tận nhà / Admin): đơn cũ (trước migration 56)
+            // nhận giá trị **hợp lệ trong danh mục**, không phải `0` — `0` **không** có trong enum Nhanh ⇒ báo
+            // cáo "đơn theo loại" sẽ có một nhóm `(không rõ)`, đúng thứ `D-20` cấm.
+            // 🔒 Enum lưu **số** (hợp đồng dữ liệu với Nhanh — `D-33`).
+            // ══════════════════════════════════════════════════════════════════════════════════════════
+            b.Property(x => x.Type).HasConversion<int>().HasDefaultValue(OrderType.Delivery);
+            b.Property(x => x.Source).HasConversion<int>().HasDefaultValue(OrderSource.Admin);
+            b.Property(x => x.ReasonCode).HasConversion<int>();
+            b.Property(x => x.CarrierCode).HasMaxLength(32);
+            b.Property(x => x.TrackingNumber).HasMaxLength(64);
+            b.Property(x => x.CodAmount).HasPrecision(18, 4);
+            b.Property(x => x.ShippingFeeCustomer).HasPrecision(18, 4);
+            b.Property(x => x.ShippingFeeActual).HasPrecision(18, 4);
+
+            b.HasIndex(x => new { x.TenantId, x.WarehouseId, x.CreationTime })
+                .HasDatabaseName("IX_OrdOrders_TenantId_WarehouseId_CreationTime");
+
+            // 📌 Tra **mã vận đơn** là thao tác nóng của CSKH (*"đơn này đang ở đâu"*) — không có index thì
+            // mỗi lần tra quét cả bảng `OrdOrders`. Bộ lọc `IS NOT NULL` vì đa số đơn chưa có vận đơn.
+            b.HasIndex(x => new { x.TenantId, x.TrackingNumber })
+                .HasFilter("\"TrackingNumber\" IS NOT NULL")
+                .HasDatabaseName("IX_OrdOrders_TenantId_TrackingNumber");
+
+            // 🚨 **Hàng rào CUỐI cho TIỀN/KHỐI LƯỢNG không âm.** Domain đã ném `eCommerce:Order:0011` trước
+            // (`DatVanChuyen`); tới được DB nghĩa là có **đường ghi tắt** (SQL tay/import Nhanh) ⇒ vẫn phải
+            // có `CHECK` — và **phải ánh xạ** trong `ViPhamRangBuocDb` (nếu không `RangBuocDbChuaAnhXaTests` ĐỎ).
+            b.ToTable(tb => tb.HasCheckConstraint(
+                "CK_OrdOrders_TienVaKhoiLuong_KhongAm",
+                "(\"CodAmount\" IS NULL OR \"CodAmount\" >= 0) " +
+                "AND (\"ShippingFeeCustomer\" IS NULL OR \"ShippingFeeCustomer\" >= 0) " +
+                "AND (\"ShippingFeeActual\" IS NULL OR \"ShippingFeeActual\" >= 0) " +
+                "AND (\"WeightGram\" IS NULL OR \"WeightGram\" >= 0)"));
+
             // 🚨 Bộ đếm version **không được âm** — âm thì mọi so sánh `VersionAfter` vô nghĩa và
             // lịch sử không còn dùng được để phát hiện ghi trùng.
             b.ToTable(tb => tb.HasCheckConstraint(

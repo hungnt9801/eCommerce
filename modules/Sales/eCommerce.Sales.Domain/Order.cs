@@ -92,6 +92,63 @@ public class Order : FullAuditedAggregateRoot<Guid>, IMultiTenant
     /// </summary>
     public long RowVersion { get; private set; }
 
+    // ══════════════════════════════════════════════════════════════════════════════════════════════════
+    // 🆕 **`WP-05`** (`N6`, 03/11/2026) — các trường **kiểu Nhanh** (`docs/nhanh/07` WP-05 việc 2).
+    // 📌 **NULLABLE hết** (trừ `Type`/`Source` có mặc định) ⇒ migration **additive**: đơn cũ không có
+    //    những trường này, và màn DS đơn cũ **không** bị đổi hành vi lọc.
+    // 🚨 **KHÔNG dùng setter công khai cho `Type`/`Source`:** đổi loại đơn của đơn đã phát sinh là
+    //    **viết lại lịch sử** (báo cáo "đơn theo loại" đã chạy sẽ không còn khớp) ⇒ chỉ đặt qua
+    //    `DatLoaiVaNguon`, có kiểm giá trị.
+    // ══════════════════════════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>**Loại đơn** (Nhanh `info.type` — 10 giá trị đo được, xem `OrderType`). Mặc định `Delivery`.</summary>
+    public OrderType Type { get; private set; } = OrderType.Delivery;
+
+    /// <summary>**Nguồn đơn** (Nhanh `channel.saleChannel` — 13 giá trị đo được, xem `OrderSource`).</summary>
+    public OrderSource Source { get; private set; } = OrderSource.Admin;
+
+    /// <summary>Mã hãng vận chuyển (Nhanh `carrier.id`: 2 Viettel · 5 GHN · 8 GHTK · 12 Tự vận chuyển…).</summary>
+    public string? CarrierCode { get; private set; }
+
+    /// <summary>Mã vận đơn do HVC cấp (`carrierCode`).</summary>
+    public string? TrackingNumber { get; private set; }
+
+    /// <summary>
+    /// **Tiền thu hộ (COD)** — *"thu khách bao nhiêu khi giao"*.
+    /// 📌 Công thức Nhanh: `tổng tiền hàng + phí ship báo khách − chiết khấu − chuyển khoản − đặt cọc − tiêu điểm`.
+    /// ⚠️ Đây **không** phải `GrandTotal` (đơn chuyển khoản trước có COD = 0).
+    /// </summary>
+    public decimal? CodAmount { get; private set; }
+
+    /// <summary>**Phí ship BÁO KHÁCH** (Nhanh `customerShipFee`) — khác phí thực trả HVC.</summary>
+    public decimal? ShippingFeeCustomer { get; private set; }
+
+    /// <summary>**Phí ship THỰC TẾ** trả HVC (`shipFee`) — dùng để tính lãi/lỗ vận chuyển.</summary>
+    public decimal? ShippingFeeActual { get; private set; }
+
+    /// <summary>**Khối lượng đơn** (gram). Nhanh mặc định **500** khi trống — mặc định đó là của **tầng app**, không phải entity.</summary>
+    public int? WeightGram { get; private set; }
+
+    /// <summary>
+    /// **Kho xuất hàng** — cần cho hai việc: (a) nhập lại kho khi đơn **hoàn**; (b) phân quyền/báo cáo theo kho.
+    /// ⚠️ `Guid` **TRẦN, KHÔNG FK** (cùng lý do `StockDocument.WarehouseId`): đơn cũ và dữ liệu nhập từ Nhanh
+    /// có thể trỏ tới kho chưa di trú; FK cứng sẽ **chặn nhập dữ liệu**.
+    /// </summary>
+    public Guid? WarehouseId { get; private set; }
+
+    /// <summary>Nhân viên bán (`saleId`) — `Guid` trần.</summary>
+    public Guid? SaleStaffId { get; private set; }
+
+    /// <summary>Nhân viên đóng gói (`packedById`) — `Guid` trần.</summary>
+    public Guid? PackerId { get; private set; }
+
+    /// <summary>
+    /// **Lý do nghiệp vụ** của đơn (Nhanh `info.reason` — 24 giá trị, xem `OrderReasonCode`).
+    /// 📌 **Khác** `OrderStatusHistory.ReasonCode` (chuỗi **hành động**: `XacNhanDon`…): một là *"vì sao đơn
+    /// ra nông nỗi này"*, một là *"ai bấm gì"*. Gộp vào một cột là **một cột hai nghĩa**.
+    /// </summary>
+    public OrderReasonCode? ReasonCode { get; private set; }
+
     /// <summary>Mã tiền tệ ISO-4217 (VND, USD...).</summary>
     public string Currency { get; set; } = "VND";
 
@@ -198,6 +255,106 @@ public class Order : FullAuditedAggregateRoot<Guid>, IMultiTenant
         ShippingTotal = shippingTotal;
         Recalculate();
     }
+
+    // ══════════════════════════════════════════════════════════════════════════════════════════════════
+    // 🆕 **`WP-05`** — ghi các trường **kiểu Nhanh**. 📌 Mỗi hàm là **một nhóm nghĩa**, không phải một setter
+    // khổng lồ: người đọc thấy ngay *"đổi loại đơn"* khác *"gắn vận chuyển"* khác *"gán kho/nhân viên"*.
+    // 🔒 Tất cả **kiểm giá trị** — Nhanh gửi số enum từ ngoài vào, số lạ mà lọt xuống DB là dữ liệu không
+    // diễn giải được (báo cáo theo loại đơn sẽ có một nhóm tên `(không rõ)`).
+    // ══════════════════════════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>Đặt **loại đơn + nguồn đơn**. **NÉM** `0011` nếu giá trị không nằm trong danh mục đo được.</summary>
+    public void DatLoaiVaNguon(OrderType loai, OrderSource nguon)
+    {
+        if (!Enum.IsDefined(loai))
+        {
+            throw new BusinessException(OrderErrorCodes.DuLieuDonKhongHopLe)
+                .WithData("field", nameof(Type)).WithData("value", (int)loai)
+                .WithData("lyDo", "Loại đơn không nằm trong 10 giá trị của danh mục Nhanh.");
+        }
+
+        if (!Enum.IsDefined(nguon))
+        {
+            throw new BusinessException(OrderErrorCodes.DuLieuDonKhongHopLe)
+                .WithData("field", nameof(Source)).WithData("value", (int)nguon)
+                .WithData("lyDo", "Nguồn đơn không nằm trong 13 giá trị của danh mục Nhanh.");
+        }
+
+        Type = loai;
+        Source = nguon;
+    }
+
+    /// <summary>
+    /// Gắn **vận chuyển + tiền ship + COD + khối lượng** (`WP-05` việc 2).
+    /// 🚨 **KHÔNG cho số âm**: COD/phí ship âm nghĩa là *"shop trả tiền cho khách"* — nghiệp vụ đó đi qua
+    /// chiết khấu/hoàn tiền (`SAL-006`), không phải một con số âm trên đơn (báo cáo doanh thu sẽ trừ nhầm).
+    /// </summary>
+    public void DatVanChuyen(
+        string? carrierCode = null,
+        string? trackingNumber = null,
+        decimal? codAmount = null,
+        decimal? phiShipBaoKhach = null,
+        decimal? phiShipThucTe = null,
+        int? weightGram = null)
+    {
+        if (codAmount is < 0m)
+        {
+            throw new BusinessException(OrderErrorCodes.DuLieuDonKhongHopLe)
+                .WithData("field", nameof(CodAmount)).WithData("value", codAmount)
+                .WithData("lyDo", "Tiền thu hộ (COD) KHÔNG được âm.");
+        }
+
+        if (phiShipBaoKhach is < 0m)
+        {
+            throw new BusinessException(OrderErrorCodes.DuLieuDonKhongHopLe)
+                .WithData("field", nameof(ShippingFeeCustomer)).WithData("value", phiShipBaoKhach)
+                .WithData("lyDo", "Phí ship báo khách KHÔNG được âm.");
+        }
+
+        if (phiShipThucTe is < 0m)
+        {
+            throw new BusinessException(OrderErrorCodes.DuLieuDonKhongHopLe)
+                .WithData("field", nameof(ShippingFeeActual)).WithData("value", phiShipThucTe)
+                .WithData("lyDo", "Phí ship thực tế KHÔNG được âm.");
+        }
+
+        if (weightGram is < 0)
+        {
+            throw new BusinessException(OrderErrorCodes.DuLieuDonKhongHopLe)
+                .WithData("field", nameof(WeightGram)).WithData("value", weightGram)
+                .WithData("lyDo", "Khối lượng đơn KHÔNG được âm.");
+        }
+
+        CarrierCode = Chuoi(carrierCode);
+        TrackingNumber = Chuoi(trackingNumber);
+        CodAmount = codAmount;
+        ShippingFeeCustomer = phiShipBaoKhach;
+        ShippingFeeActual = phiShipThucTe;
+        WeightGram = weightGram;
+    }
+
+    /// <summary>Gán **kho xuất hàng + nhân viên bán/đóng gói** (`WP-05` việc 2).</summary>
+    public void DatKhoVaNhanVien(Guid? warehouseId, Guid? saleStaffId = null, Guid? packerId = null)
+    {
+        WarehouseId = warehouseId;
+        SaleStaffId = saleStaffId;
+        PackerId = packerId;
+    }
+
+    /// <summary>Ghi **lý do nghiệp vụ** (Nhanh `reason` — 24 giá trị). `null` = **xoá** lý do (không phải "0").</summary>
+    public void DanhDauLyDo(OrderReasonCode? lyDo)
+    {
+        if (lyDo is not null && !Enum.IsDefined(lyDo.Value))
+        {
+            throw new BusinessException(OrderErrorCodes.DuLieuDonKhongHopLe)
+                .WithData("field", nameof(ReasonCode)).WithData("value", (int)lyDo.Value)
+                .WithData("lyDo", "Lý do không nằm trong 24 giá trị của danh mục Nhanh.");
+        }
+
+        ReasonCode = lyDo;
+    }
+
+    private static string? Chuoi(string? giaTri) => string.IsNullOrWhiteSpace(giaTri) ? null : giaTri.Trim();
 
     // ══════════════════════════════════════════════════════════════════════════════════════════════════
     // 🚨 **ĐÃ XOÁ `SetStatus` (24/10/2026, `SAL-003` D4).** Trước đây là
@@ -325,6 +482,91 @@ public class Order : FullAuditedAggregateRoot<Guid>, IMultiTenant
         Status = TinhTrangThaiSuyRa();
 
         return lichSu;
+    }
+
+    /// <summary>
+    /// 🆕 **`WP-05`** — **HUỶ THEO 18 TRẠNG THÁI NHANH**: ghi **AI huỷ** (khách / hệ thống / HVC) lên trục
+    /// thực hiện **và** đóng trục kết thúc (`Cancelled`) trong **một** lần gọi.
+    ///
+    /// 🚨 **VÌ SAO CẦN (không dùng <see cref="HuyDon"/>):** `HuyDon` cũ chỉ ghi trục kết thúc với guard
+    /// *"`FulfillmentStatus == Pending`"* — đúng cho đường cũ, nhưng **18 trạng thái Nhanh** cần biết *"khách huỷ
+    /// hay HVC huỷ"* (báo cáo *"lý do huỷ"* của Nhanh là câu hỏi vận hành **khác** với *"đơn đã huỷ chưa"*).
+    /// 📌 **GIỮ NGUYÊN `HuyDon`** ⇒ 100% test cũ và đường `/api/app/**` không đổi hành vi.
+    ///
+    /// 🔒 **GUARD NGHIỆP VỤ (rộng hơn `HuyDon` nhưng KHÔNG rộng hơn sự thật kho):** chỉ huỷ được khi hàng
+    /// **CHƯA rời kho**. Trong mô hình này hàng rời kho ở bước `Confirmed` (chốt giữ chỗ ⇒ bút toán `Sale`) ⇒
+    /// nguồn hợp lệ = {`Pending`, `PendingConfirm`, `Confirming`, `OutOfStock`, `WarehouseSwitched`}.
+    /// Đơn đã `Confirmed` trở đi **phải TRẢ HÀNG** (chứng từ nhập) — cấm sửa bút toán (sổ cái append-only).
+    ///
+    /// 📌 Trả về **2 dòng lịch sử** (thực hiện + kết thúc) — người đọc log thấy đúng **hai** trục đã đổi.
+    /// </summary>
+    public IReadOnlyList<OrderStatusHistory> HuyDonNhanh(
+        FulfillmentStatus aiHuy,
+        StatusActorType actor,
+        Guid? actorId,
+        string reasonCode,
+        OrderReasonCode? lyDoNghiepVu = null,
+        string? correlationId = null,
+        string? reasonText = null,
+        DateTime? occurredAtUtc = null)
+    {
+        if (!OrderStateMachine.LaTrangThaiHuy(aiHuy))
+        {
+            throw new BusinessException(OrderErrorCodes.DuLieuDonKhongHopLe)
+                .WithData("field", "FulfillmentStatus").WithData("value", (int)aiHuy)
+                .WithData("lyDo", "Huỷ đơn phải nêu ĐÚNG một trong 3 trạng thái: Khách huỷ / Hệ thống huỷ / HVC huỷ.");
+        }
+
+        if (IsCancelled)
+        {
+            throw new BusinessException(OrderErrorCodes.TrangThaiHapThu)
+                .WithData("axis", OrderAxis.Closure.ToString())
+                .WithData("from", ReturnStatus.ToString())
+                .WithData("to", ReturnStatus.Cancelled.ToString());
+        }
+
+        if (!OrderStateMachine.CoTheHuy(FulfillmentStatus))
+        {
+            throw new BusinessException(OrderErrorCodes.ChuyenTrangThaiKhongHopLe)
+                .WithData("axis", OrderAxis.Fulfillment.ToString())
+                .WithData("from", FulfillmentStatus.ToString())
+                .WithData("to", aiHuy.ToString())
+                .WithData("lyDo", "Hàng ĐÃ rời kho ⇒ phải TRẢ HÀNG (chứng từ nhập), không được huỷ.");
+        }
+
+        // ① Ai huỷ (trục thực hiện) — ghi TRƯỚC để `IsCancelled` còn `false` (xem guard trong `Chuyen`).
+        var lichSuThucHien = Chuyen(
+            OrderAxis.Fulfillment,
+            (int)FulfillmentStatus,
+            (int)aiHuy,
+            actor,
+            actorId,
+            reasonCode,
+            correlationId,
+            reasonText,
+            occurredAtUtc);
+
+        // ② Đóng đơn (trục kết thúc) — hấp thụ.
+        var lichSuKetThuc = Chuyen(
+            OrderAxis.Closure,
+            (int)ReturnStatus,
+            (int)ReturnStatus.Cancelled,
+            actor,
+            actorId,
+            reasonCode,
+            correlationId,
+            reasonText,
+            occurredAtUtc);
+
+        IsCancelled = true;
+        Status = TinhTrangThaiSuyRa();
+
+        if (lyDoNghiepVu is not null)
+        {
+            DanhDauLyDo(lyDoNghiepVu);
+        }
+
+        return [lichSuThucHien, lichSuKetThuc];
     }
 
     /// <summary>

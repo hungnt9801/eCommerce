@@ -5297,6 +5297,10 @@ namespace eCommerce.Migrations
                     b.Property<Guid?>("UnitId")
                         .HasColumnType("uuid");
 
+                    b.Property<decimal?>("UnitPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
                     b.Property<decimal?>("VatPercent")
                         .HasPrecision(5, 2)
                         .HasColumnType("numeric(5,2)");
@@ -5311,6 +5315,8 @@ namespace eCommerce.Migrations
 
                     b.ToTable("InvStockDocumentLines", null, t =>
                         {
+                            t.HasCheckConstraint("CK_InvStockDocumentLines_UnitPrice_KhongAm", "\"UnitPrice\" IS NULL OR \"UnitPrice\" >= 0");
+
                             t.HasCheckConstraint("CK_InvStockDocumentLines_VatPercent_HopLe", "\"VatPercent\" IS NULL OR (\"VatPercent\" >= 0 AND \"VatPercent\" <= 100)");
                         });
                 });
@@ -6035,6 +6041,10 @@ namespace eCommerce.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("CarrierCode")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
                     b.Property<string>("ChannelCode")
                         .IsRequired()
                         .HasMaxLength(32)
@@ -6053,6 +6063,10 @@ namespace eCommerce.Migrations
 
                     b.Property<long>("ClosureVersion")
                         .HasColumnType("bigint");
+
+                    b.Property<decimal?>("CodAmount")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
@@ -6134,11 +6148,17 @@ namespace eCommerce.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
+                    b.Property<Guid?>("PackerId")
+                        .HasColumnType("uuid");
+
                     b.Property<int>("PaymentStatus")
                         .HasColumnType("integer");
 
                     b.Property<long>("PaymentVersion")
                         .HasColumnType("bigint");
+
+                    b.Property<int?>("ReasonCode")
+                        .HasColumnType("integer");
 
                     b.Property<int>("ReconciliationStatus")
                         .HasColumnType("integer");
@@ -6153,9 +6173,25 @@ namespace eCommerce.Migrations
                         .IsConcurrencyToken()
                         .HasColumnType("bigint");
 
+                    b.Property<Guid?>("SaleStaffId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("ShippingFeeActual")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<decimal?>("ShippingFeeCustomer")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
                     b.Property<decimal>("ShippingTotal")
                         .HasPrecision(18, 4)
                         .HasColumnType("numeric(18,4)");
+
+                    b.Property<int>("Source")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
 
                     b.Property<int>("Status")
                         .HasColumnType("integer");
@@ -6172,6 +6208,21 @@ namespace eCommerce.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("TenantId");
 
+                    b.Property<string>("TrackingNumber")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("Type")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
+
+                    b.Property<Guid?>("WarehouseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("WeightGram")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
 
                     b.HasIndex("TenantId", "CheckoutIdempotencyKey")
@@ -6181,6 +6232,10 @@ namespace eCommerce.Migrations
 
                     b.HasIndex("TenantId", "Number")
                         .IsUnique();
+
+                    b.HasIndex("TenantId", "TrackingNumber")
+                        .HasDatabaseName("IX_OrdOrders_TenantId_TrackingNumber")
+                        .HasFilter("\"TrackingNumber\" IS NOT NULL");
 
                     b.HasIndex("TenantId", "ChannelCode", "ExternalOrderId")
                         .IsUnique()
@@ -6198,9 +6253,14 @@ namespace eCommerce.Migrations
                     b.HasIndex("TenantId", "ReturnStatus", "CreationTime")
                         .HasDatabaseName("IX_OrdOrders_TenantId_ReturnStatus_CreationTime");
 
+                    b.HasIndex("TenantId", "WarehouseId", "CreationTime")
+                        .HasDatabaseName("IX_OrdOrders_TenantId_WarehouseId_CreationTime");
+
                     b.ToTable("OrdOrders", null, t =>
                         {
                             t.HasCheckConstraint("CK_OrdOrders_StatusVersions_KhongAm", "\"FulfillmentVersion\" >= 0 AND \"PaymentVersion\" >= 0 AND \"ReconciliationVersion\" >= 0 AND \"ClosureVersion\" >= 0 AND \"RowVersion\" >= 0");
+
+                            t.HasCheckConstraint("CK_OrdOrders_TienVaKhoiLuong_KhongAm", "(\"CodAmount\" IS NULL OR \"CodAmount\" >= 0) AND (\"ShippingFeeCustomer\" IS NULL OR \"ShippingFeeCustomer\" >= 0) AND (\"ShippingFeeActual\" IS NULL OR \"ShippingFeeActual\" >= 0) AND (\"WeightGram\" IS NULL OR \"WeightGram\" >= 0)");
                         });
                 });
 

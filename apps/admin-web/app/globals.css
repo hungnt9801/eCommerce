@@ -124,3 +124,27 @@ body {
 .tabular {
   font-variant-numeric: tabular-nums;
 }
+
+/* ── In phiếu (`/{business}/inventory/bill/print`) ───────────────────────────────────────────
+   🚨 In từ trong app shell ⇒ nếu không ẩn, mỗi trang giấy có thêm **sidebar + topbar** (Nhanh in
+   chỉ có phiếu). 📌 Chỉ ẩn 2 thẻ đó; `main` phải bỏ cuộn vì `overflow:auto` cắt trang khi in.
+   ⚠️ Không dùng selector `header` trần cho tiêu đề phiếu — tiêu đề in là `<div>` (đã đổi ở trang in). */
+@media print {
+  body {
+    background: #fff;
+  }
+  aside,
+  header {
+    display: none !important;
+  }
+  main {
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+  .nh-card {
+    border: none;
+  }
+  .nh-table tbody td {
+    height: auto;
+  }
+}

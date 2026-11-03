@@ -1,12 +1,30 @@
 import { auth } from "./auth";
 import { API_BASE_URL } from "./config";
+import { docLoiApi } from "./api-error";
 
 export class ApiError extends Error {
   constructor(
     public readonly status: number,
     message: string,
+    /**
+     * Mã lỗi ổn định (`eCommerce:Inventory:0010`) nếu body là JSON lỗi của API.
+     * 📌 Có mã thì UI mới hiển thị được **lý do** thay vì "403" — xem `lib/api-error.ts`.
+     */
+    public readonly code: string | null = null,
   ) {
     super(message);
+  }
+}
+
+/** Đọc body lỗi (JSON hoặc text) thành `ApiError` — không ném lỗi parse thêm lần nữa. */
+async function taoApiError(res: Response): Promise<ApiError> {
+  const raw = await res.text();
+
+  try {
+    const failure = docLoiApi(JSON.parse(raw), res.status);
+    return new ApiError(res.status, failure.message, failure.code);
+  } catch {
+    return new ApiError(res.status, raw || `HTTP ${res.status}`);
   }
 }
 
@@ -24,7 +42,7 @@ export async function apiGet<T>(path: string): Promise<T> {
   });
 
   if (!res.ok) {
-    throw new ApiError(res.status, await res.text());
+    throw await taoApiError(res);
   }
 
   return (await res.json()) as T;

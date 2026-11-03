@@ -203,10 +203,19 @@ Việc cụ thể:
 5. Migration `52_Inventory_Buckets_Mode` + backfill `InvItems` từ `InvStockLedger`
    (script SQL có kiểm `SUM(delta) = OnHand` trước/sau).
 6. API: `GET /stock/balances`, `GET/POST /stock/bills`, `POST /stock/bills/{id}/post|cancel`.
-7. FE: màn DS phiếu + tạo phiếu (chọn mode → form động), cột tồn 3 số.
+7. FE: màn DS phiếu + tạo phiếu (chọn mode → form động), cột tồn 3 số. ✅ **XONG ở `N5`** — 5 route
+   `/{business}/inventory/bill{,/new,/[id],/print}` + `/{business}/product/inventory`; **tiền** (đơn giá →
+   thành tiền → tổng) **đã làm** ở `N5` lượt 3 (`D-37`, migration **55**).
 
 **DoD:** nhập 10 → Post → `OnHand=10`; bán 3 → `Available` giảm đúng; Post lại → 409/không đổi;
 huỷ phiếu đã Post → bị chặn; test bất biến `tổng sổ cái = ảnh chụp` xanh.
+
+**Trạng thái DoD (đo lại ở `N5`, 03/11/2026):** nhập 10 → Post → **`OnHand=10` trên UI** (`Bán 10`) ✅ ·
+Post lại → **403 `0010`**, tồn **không đổi** ✅ · huỷ phiếu đã Post → **403 `0013`** ✅ · bất biến
+**10.000 = 10.000** ✅ · "bán 3 → `Available` giảm" **chưa** có màn bán (WP-06) nhưng probe BE đã đo bằng
+phiếu `GoodsIssue/Retail` (**⑩** `0001` khi bán 15 > tồn 10).
+➕ **AC của màn #8 giờ đo được:** *"tổng tiền = Σ(dòng) đúng VAT"* — form 3 × 25.000 + VAT 8% hiện
+**75.000 / 6.000 / 81.000**; lưu xong chi tiết phiếu vẫn **75.000 / 6.000 / 81.000** (server tính lại — `D-37`).
 
 **Rollback:** `Inventory:UseBuckets=false` → API đọc `OnHand/Reserved` cũ; migration `Down` xoá cột mới.
 
@@ -228,6 +237,21 @@ Việc cụ thể:
 
 **DoD:** đơn đi trọn `Mới → … → Thành công`; mỗi bước sinh đúng bút toán kho; tab "Cần xử lý"
 đúng định nghĩa; đơn tự vận chuyển ẩn 2 tab.
+
+**Trạng thái DoD (đo lại ở `N6`, 03/11/2026 — WP-05 ĐÓNG phần BE + FE chính):**
+- ✅ **18 trạng thái**: `FulfillmentStatus` **append 9** giá trị `9…17` (giữ nguyên `0…8`), tổng đúng **18**.
+- ✅ **Đơn đi trọn `Mới → … → Thành công`** trên **API thật** qua BFF: `Mới → Chờ xác nhận → Đang xác nhận →
+  Đã xác nhận → Đang đóng gói → Đã đóng gói → Chờ thu gom → Đang chuyển → Thành công` — **8 lời gọi 200**,
+  nhãn cuối **"Thành công"**, `FulfillmentVersion = 8`, **8 dòng** `OrdStatusHistory` (probe ⑤–⑯).
+- ✅ **Mỗi bước sinh đúng bút toán kho**: bước `Đã xác nhận` ⇒ **chốt giữ chỗ** (`Sale` + `ReservationRelease`):
+  `OnHand 10 → 8`, `Reserved 3 → 1`; bước `Đã hoàn` ⇒ **nhập lại kho** (`CustomerReturn`): `OnHand 7 → 8`
+  + phiếu `HOAN-…` (`Type=3`, `Status=1`). **Không** ghi `ShippingOut` (lý do: `D-39`).
+- ✅ **Tab "Cần xử lý" đúng định nghĩa**: **14 tab** có badge số, **đếm và lọc dùng CHUNG một `Expression`**
+  (`D-41`); đơn `Đang chuyển` **không** thuộc tab, đơn `Thất bại` **thuộc** tab (có người phải xử lý).
+- ⚠️ **"Đơn tự vận chuyển ẩn 2 tab"**: tab *Thanh toán* của đơn thuộc **WP-06** (chưa có) ⇒ DoD này
+  **chưa nghiệm thu được**; tab *Lịch trình* đã ẩn với đơn chưa gửi HVC. Ghi ở `handover-n6` §2.
+- 📌 **Số danh mục thực tế khác kế hoạch**: `OrderType` **10** (kế hoạch ghi 13), `OrderSource` **14**
+  (kế hoạch ghi 12), `OrderReasonCode` **24** (đúng) — dùng **số đo được** từ Open API v3 (`D-38`).
 
 ---
 
@@ -396,7 +420,7 @@ bảo hành · website builder · affiliate · báo cáo ngoài 3 cái · app mo
 
 ## 12. Checklist "được phép bắt đầu"
 
-- [x] D-01…D-18 đã chốt ([decisions.md](decisions.md))
+- [x] D-01…D-18 đã chốt ([decisions.md](decisions.md)); D-19…D-41 phát sinh trong thi công `N2…N6`
 - [x] Kiến trúc đích + thiết kế Web Admin đã viết ([03](03-kien-truc-dich.md), [04](04-web-admin-nextjs.md))
 - [x] Cổng tài liệu xanh (link + Mermaid)
 - [ ] **Bạn duyệt plan này** (mục 4–7)
@@ -417,6 +441,10 @@ bảo hành · website builder · affiliate · báo cáo ngoài 3 cái · app mo
 | 02/11/2026 | **WP-03 nửa sau (`N3`)** — backfill biến thể → sản phẩm con (**dry-run → thật**, bảng đối chiếu `CatVariantMaps`), `OrderLine.ProductId`, `Publish()` theo ĐVT gốc, luật *"cha không bán được"* + chống chu trình, adapter đọc cũ, **migration 52** | **1684/1684** test (+13) · build **0 error/9 warning có sẵn** · NND **73** · backfill: dev DB `0 variant → 0 child`; bản sao có 2 biến thể: dry-run **không ghi**, chạy thật `2 → 2`, **chạy lần 2 `2 → 0`** (idempotent), xung đột ⇒ **ABORT + exit 1** · `/SanPham` **200** cho cả mô hình cũ và mới · `schema.sql` +272 dòng (so `HEAD`) | Chi tiết + 9 nợ/rủi ro: [handover-n3.md](handover-n3.md). **Chưa** FE form, chưa API ghi IMEI/lô/combo/gói/nhãn |
 | 02/11/2026 | **WP-04 phần BE (`N4`)** — `InvItems` **+8 chiều tồn** + `Available`/`InWarehouse`; `StockDocument` `Direction`/`Mode`/đối tác/nguồn/tiền; dòng phiếu `UnitId`/`VatPercent`/`BatchId`/`ImeiSerials`; **11 loại biến động** mới (11…21); bút toán theo **`(mode, chiều)`**; unique **`IdempotencyKey` NND**; **migration 53**; API **`/api/v1/stock/{balances,bills}`** (6 đường); backfill `InvItems` từ sổ cái + probe 12 ca | **1768/1768** test (+84) · integration **90/90** · build **0 error/9 warning có sẵn** · NND **73 → 74** · probe HTTP: tạo phiếu 10 → post → `OnHand=10/Available=10`; post lại **403 `0010`** (tồn **không** đổi); huỷ phiếu đã ghi sổ **403 `0013`**; trùng `idempotencyKey` **403 `0035`**; bán 15 > tồn 10 **403 `0001`**; bất biến sổ cái **10 = 10** · backfill: mutation `OnHand += 5` ⇒ phát hiện **1 lệch**, `-Apply` ⇒ **0 lệch**, chạy lại **0** · `schema.sql` +336 dòng (0 xoá) · OpenAPI **12/12 path** | Chi tiết + 7 nợ/rủi ro: [handover-n4.md](handover-n4.md). **Chưa**: FE màn phiếu (`N5`), `decimal` hoá số lượng (D-25 → WP-04b), 4 chiều chưa có đường ghi (WP-05/POS) |
 | 02/11/2026 | **WP-04b (`N4b`) — HOÀN TẤT WP-04 (BE)**: `int → decimal(18,3)` cho **16 cột số lượng** (`InvItems` ×10, `InvStockLedger` ×2, `InvStockDocumentLines.Quantity`, `ReconRunMismatches` ×3) + toàn bộ entity/DTO/hàm thuần; **migration 54** | **1773/1773** test (+5 ca số lẻ) · integration **90/90** · build **0 error/9 warning có sẵn** · NND **74 (không đổi)** · `OnHand` thật trên DB = `numeric/18/3` · probe **12/12** (`onHand: 10.000`, bất biến **10.000 = 10.000**) · `schema.sql` **+374 dòng, 0 xoá** · `quantity?: number` trong `schema.d.ts` · backfill 0 lệch | **WP-04 (BE) ĐÓNG** (07 việc 1–6). `RowVersion` **loại có lý do** (D-32). Chi tiết: [handover-n4b.md](handover-n4b.md) |
+| 03/11/2026 | **WP-04 phần FE (`N5`) — HOÀN TẤT WP-04 (việc 7)**: 4 màn Next.js — `inventory/bill` (tab badge + lọc server-side), `inventory/bill/new` (chọn kiểu → form động, ProductPicker, `IdempotencyKey` client), `inventory/bill/[id]` (ghi sổ/huỷ + tồn hiện tại), `product/inventory` (tồn 9 chiều, cột tồn 3 số); type lấy từ `schema.d.ts` | **probe FE 11/11** (`tools/probe-kho-fe.ps1`, `exit 0`): đăng nhập NextAuth → trang **200** → `POST /api/proxy/v1/stock/bills` **201** → post **200** (`postedEntries=1`) → post lại **403 `0010`** → UI hiện *"Đã ghi sổ"* + **`Bán 10`** sau khi ghi (trước: *"chưa có dòng tồn"*) · `pnpm build` ✓ (4 route mới, First Load **106–112 kB**) · `tsc --noEmit` ✓ · unit **1773/1773** · integration **90/90** · build **0 error/9 warning có sẵn** · OpenAPI **12/12 path**, `schema.d.ts` **không đổi** (0 dòng diff) · probe BE **12/12** | **WP-04 ĐÓNG (BE + FE)**. Không migration mới. `D-33` (hợp đồng FE) + `D-34` (hoãn "thành tiền" — dòng phiếu không có đơn giá). Chi tiết: [handover-n5.md](handover-n5.md) |
+| 03/11/2026 | **WP-04 (FE) — TIỀN (`D-37`, thay thế `D-34`)**: `StockDocumentLine.UnitPrice numeric(18,2)` + hàm thuần `TinhTienChungTu` + DTO `Amount/VatAmount/TotalAmount/TotalVat/TotalPayment` + UI 4 màn (form · chi tiết · DS · in), **migration 55** | **1785/1785** test (+12) · integration **90/90** · build **0 error/9 warning có sẵn** · `schema.sql` **+10 dòng** · cột thật `numeric/18/2` + `CHECK` có trên DB (migration **55**) · NND **74 (không đổi)** · probe FE **19/19** (`exit 0`): `totalAmount 250.000`, `totalVat 20.000`, `totalPayment 270.000`; dòng **không giá ⇒ `null`**; đơn giá âm ⇒ **400** (lỗi tại `Lines[0].UnitPrice`) · **browser thật**: form 3 × 25.000 + 8% ⇒ **75.000 / 6.000 / 81.000**, lưu xong chi tiết y hệt | Luật 4 điểm ở `D-37`. VAT theo giả định **giá chưa gồm VAT** (`VatMode` là việc WP-06). Chi tiết: [handover-n5.md](handover-n5.md) |
+| 03/11/2026 | **WP-04 (FE) — phần còn lại**: **khảo sát Nhanh** (cầu CDP, `businessId=230222`) rồi bổ sung **(a) bulk** `Thao tác`: ghi sổ/huỷ nhiều phiếu · xuất CSV · in phiếu, **(b) ẩn/hiện cột** + **lưu bộ lọc** (localStorage), **(c) route in phiếu**, **(d) `?kind=`** cho form (chuyển kho/kiểm kho mở đúng kiểu), nhãn lọc theo Nhanh (`Kho hàng · Loại · Kiểu · Ngày · Lọc`) | Khảo sát đo được: **6 route**, DS **7 cột** (`ID|Ngày · Kho hàng · SP · SL · Tổng tiền thanh toán · Người tạo · Khách hàng`), `Thao tác ▾` **5 hành động**, form nhập/xuất **4 cột dòng + 7 trường tiền** ([01 §4.2b](01-khao-sat-nhanh-vn.md)) · **Browser thật (CDP)**: chọn 2 phiếu → **"2 thành công / 0 lỗi"** (mỗi phiếu *1 bút toán*), tab Nháp **6 → 4**; chọn phiếu đã ghi sổ → **"0 thành công / 1 bỏ qua"** (không gọi API) · CSV **5 dòng** (header + 4), `;`, có BOM · ẩn cột *"Chứng từ"* ⇒ header mất + `nh:bill-cols` ghi **7 khoá** · probe FE **15/15** (`exit 0`) · build ✓ **12 route** · unit **1773** · integration **90** | `D-35` (bulk gọi API tuần tự; `bỏ qua` ≠ `lỗi`) + `D-36` (in/cột/bộ lọc ở FE). **Chưa**: "thành tiền" (D-34 — cần cột giá ở BE), mẫu in cấu hình (#18), màn kiểm kho riêng (#9) |
+| 03/11/2026 | **WP-05 (`N6`) — Order 18 trạng thái**: append **9** `FulfillmentStatus` (→ **18**), enum `OrderType` **10** / `OrderSource` **14** / `OrderReasonCode` **24** (số đo được), 11 cột `Order` (loại/nguồn/vận chuyển/COD/phí ship/cân nặng/kho/NV), bảng cạnh **mở rộng theo Nhanh** + **15 cạnh huỷ**, nhãn hiển thị suy từ 4 trục, **`HuyDonNhanh`** (2 trục trong 1 lời gọi), API **`/api/v1/orders`** (DS + **14 tab đếm** + chi tiết + `transitions` + `cancel` + `history`), **migration 56**; FE 2 màn (DS 14 tab + grouped rows, chi tiết tab động + đổi trạng thái/huỷ) | **probe `tools/probe-don-hang.ps1` 29 lời gọi HTTP, `exit 0`**: `Mới → … → Thành công` **8/8 bước 200**; xác nhận ⇒ `stockEffect=ChotGiuCho`, `OnHand 10→8`, `Reserved 3→1`; hoàn ⇒ `NhapHangHoan`, `OnHand 7→8` + phiếu `HOAN-…` (`Type=3/Status=1`); 403 đúng mã: `0003` (phiên bản cũ), `0001` (nhảy cóc + huỷ sau xuất kho), `0010` (huỷ qua cửa transitions); huỷ đơn B **200** + **idempotent** lần 2; 14 tab; bất biến sổ cái **8 = 8** · unit **1855/1855** (+70) · integration **90/90** · build **0 error** / 9 warning có sẵn · `schema.sql` **+19 dòng** · NND **74 (không đổi)** · OpenAPI **18/18 path** (2 lần sinh cùng hash) · FE `typecheck` ✓ + `build` ✓ (14 route) | `D-38` (số đo được), `D-39` (tác động kho + lệch `03 §4`), `D-40` (huỷ 2 cửa quyền), `D-41` (14 tab = dữ liệu). **Chưa**: 4 bảng phụ (`OrderLabel/Packing/Handover/Complaint`), bulk đổi trạng thái, tab "Thanh toán". Chi tiết: [handover-n6.md](handover-n6.md) |
 
 **Ô checklist §12 cập nhật:** đội 3 người ✅ · dev transport **http 54275** ✅ · plan đã duyệt ✅ · baseline đã chạy ✅
 

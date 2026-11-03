@@ -6,6 +6,458 @@
     "version": "v1"
   },
   "paths": {
+    "/api/v1/orders": {
+      "get": {
+        "tags": [
+          "Orders"
+        ],
+        "parameters": [
+          {
+            "name": "Page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "PageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "SkipCount",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "Tab",
+            "in": "query",
+            "schema": {
+              "maxLength": 32,
+              "minLength": 0,
+              "type": "string"
+            }
+          },
+          {
+            "name": "Q",
+            "in": "query",
+            "schema": {
+              "maxLength": 64,
+              "minLength": 0,
+              "type": "string"
+            }
+          },
+          {
+            "name": "FulfillmentStatus",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/eCommerce.FulfillmentStatus"
+            }
+          },
+          {
+            "name": "Type",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/eCommerce.OrderType"
+            }
+          },
+          {
+            "name": "Source",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/eCommerce.OrderSource"
+            }
+          },
+          {
+            "name": "WarehouseId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "FromUtc",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "ToUtc",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Application.Contracts.Sales.OrderListItemDto, eCommerce.Sales.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Application.Contracts.Sales.OrderListItemDto, eCommerce.Sales.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Application.Contracts.Sales.OrderListItemDto, eCommerce.Sales.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/orders/tabs": {
+      "get": {
+        "tags": [
+          "Orders"
+        ],
+        "parameters": [
+          {
+            "name": "Page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "PageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "SkipCount",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "Tab",
+            "in": "query",
+            "schema": {
+              "maxLength": 32,
+              "minLength": 0,
+              "type": "string"
+            }
+          },
+          {
+            "name": "Q",
+            "in": "query",
+            "schema": {
+              "maxLength": 64,
+              "minLength": 0,
+              "type": "string"
+            }
+          },
+          {
+            "name": "FulfillmentStatus",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/eCommerce.FulfillmentStatus"
+            }
+          },
+          {
+            "name": "Type",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/eCommerce.OrderType"
+            }
+          },
+          {
+            "name": "Source",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/eCommerce.OrderSource"
+            }
+          },
+          {
+            "name": "WarehouseId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "FromUtc",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "ToUtc",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Application.Contracts.Sales.OrderTabCountsDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Application.Contracts.Sales.OrderTabCountsDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Application.Contracts.Sales.OrderTabCountsDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/orders/{id}": {
+      "get": {
+        "tags": [
+          "Orders"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Application.Contracts.Sales.OrderDetailDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Application.Contracts.Sales.OrderDetailDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Application.Contracts.Sales.OrderDetailDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/orders/{id}/history": {
+      "get": {
+        "tags": [
+          "Orders"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "skipCount",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0
+            }
+          },
+          {
+            "name": "maxResultCount",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Application.Contracts.Sales.OrderStatusHistoryDto, eCommerce.Sales.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Application.Contracts.Sales.OrderStatusHistoryDto, eCommerce.Sales.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Application.Contracts.Sales.OrderStatusHistoryDto, eCommerce.Sales.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/orders/{id}/transitions": {
+      "post": {
+        "tags": [
+          "Orders"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.HttpApi.Controllers.ChangeOrderStatusBody"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.HttpApi.Controllers.ChangeOrderStatusBody"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.HttpApi.Controllers.ChangeOrderStatusBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Application.Contracts.Sales.OrderStatusDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Application.Contracts.Sales.OrderStatusDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Application.Contracts.Sales.OrderStatusDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/orders/{id}/cancel": {
+      "post": {
+        "tags": [
+          "Orders"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.HttpApi.Controllers.CancelOrderBody"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.HttpApi.Controllers.CancelOrderBody"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.HttpApi.Controllers.CancelOrderBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Application.Contracts.Sales.OrderStatusDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Application.Contracts.Sales.OrderStatusDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Application.Contracts.Sales.OrderStatusDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/products": {
       "get": {
         "tags": [
@@ -715,6 +1167,23 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/eCommerce.Application.Contracts.Inventory.StockDocumentDto"
+            },
+            "nullable": true
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Application.Contracts.Sales.OrderListItemDto, eCommerce.Sales.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/eCommerce.Application.Contracts.Sales.OrderListItemDto"
             },
             "nullable": true
           },
@@ -3188,6 +3657,13 @@
             "minLength": 0,
             "type": "string",
             "nullable": true
+          },
+          "unitPrice": {
+            "maximum": 10000000000000000,
+            "minimum": 0,
+            "type": "number",
+            "format": "double",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -3709,6 +4185,21 @@
           "lineCount": {
             "type": "integer",
             "format": "int32"
+          },
+          "totalAmount": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "totalVat": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "totalPayment": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -3745,6 +4236,21 @@
           },
           "imeiSerials": {
             "type": "string",
+            "nullable": true
+          },
+          "unitPrice": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "amount": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "vatAmount": {
+            "type": "number",
+            "format": "double",
             "nullable": true
           }
         },
@@ -3869,6 +4375,34 @@
           "reasonCode": {
             "type": "string",
             "nullable": true
+          },
+          "reasonText": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Application.Contracts.Sales.CancelOrderByStatusDto": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cancelledBy": {
+            "$ref": "#/components/schemas/eCommerce.FulfillmentStatus"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reasonCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "businessReason": {
+            "$ref": "#/components/schemas/eCommerce.OrderReasonCode"
           },
           "reasonText": {
             "type": "string",
@@ -4042,6 +4576,306 @@
         },
         "additionalProperties": false
       },
+      "eCommerce.Application.Contracts.Sales.OrderDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "string",
+            "nullable": true
+          },
+          "channelCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "type": {
+            "$ref": "#/components/schemas/eCommerce.OrderType"
+          },
+          "source": {
+            "$ref": "#/components/schemas/eCommerce.OrderSource"
+          },
+          "fulfillmentStatus": {
+            "$ref": "#/components/schemas/eCommerce.FulfillmentStatus"
+          },
+          "paymentStatus": {
+            "$ref": "#/components/schemas/eCommerce.PaymentStatus"
+          },
+          "reconciliationStatus": {
+            "$ref": "#/components/schemas/eCommerce.ReconciliationStatus"
+          },
+          "returnStatus": {
+            "$ref": "#/components/schemas/eCommerce.ReturnStatus"
+          },
+          "derivedStatus": {
+            "$ref": "#/components/schemas/eCommerce.OrderStatus"
+          },
+          "statusLabel": {
+            "type": "string",
+            "nullable": true
+          },
+          "isCancelled": {
+            "type": "boolean"
+          },
+          "grandTotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "codAmount": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "lineCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "warehouseId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "carrierCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "trackingNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "reasonCode": {
+            "$ref": "#/components/schemas/eCommerce.OrderReasonCode"
+          },
+          "creationTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "currency": {
+            "type": "string",
+            "nullable": true
+          },
+          "subtotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "discountTotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "taxTotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "shippingTotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "shippingFeeCustomer": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "shippingFeeActual": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "weightGram": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "customerId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "saleStaffId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "packerId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "externalOrderId": {
+            "type": "string",
+            "nullable": true
+          },
+          "checkoutIdempotencyKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "rowVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "fulfillmentVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "paymentVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reconciliationVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "closureVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "allowedTransitions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/eCommerce.FulfillmentStatus"
+            },
+            "nullable": true
+          },
+          "canCancel": {
+            "type": "boolean"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/eCommerce.Application.Contracts.Sales.OrderLineItemDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Application.Contracts.Sales.OrderLineItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sku": {
+            "type": "string",
+            "nullable": true
+          },
+          "productId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "returnedQuantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unitPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "discountAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "taxAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "lineTotal": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Application.Contracts.Sales.OrderListItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "string",
+            "nullable": true
+          },
+          "channelCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "type": {
+            "$ref": "#/components/schemas/eCommerce.OrderType"
+          },
+          "source": {
+            "$ref": "#/components/schemas/eCommerce.OrderSource"
+          },
+          "fulfillmentStatus": {
+            "$ref": "#/components/schemas/eCommerce.FulfillmentStatus"
+          },
+          "paymentStatus": {
+            "$ref": "#/components/schemas/eCommerce.PaymentStatus"
+          },
+          "reconciliationStatus": {
+            "$ref": "#/components/schemas/eCommerce.ReconciliationStatus"
+          },
+          "returnStatus": {
+            "$ref": "#/components/schemas/eCommerce.ReturnStatus"
+          },
+          "derivedStatus": {
+            "$ref": "#/components/schemas/eCommerce.OrderStatus"
+          },
+          "statusLabel": {
+            "type": "string",
+            "nullable": true
+          },
+          "isCancelled": {
+            "type": "boolean"
+          },
+          "grandTotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "codAmount": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "lineCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "warehouseId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "carrierCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "trackingNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "reasonCode": {
+            "$ref": "#/components/schemas/eCommerce.OrderReasonCode"
+          },
+          "creationTime": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
       "eCommerce.Application.Contracts.Sales.OrderStatusDto": {
         "type": "object",
         "properties": {
@@ -4066,6 +4900,22 @@
           },
           "derivedStatus": {
             "$ref": "#/components/schemas/eCommerce.OrderStatus"
+          },
+          "statusLabel": {
+            "type": "string",
+            "nullable": true
+          },
+          "stockEffect": {
+            "type": "string",
+            "nullable": true
+          },
+          "stockAffectedLines": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "warning": {
+            "type": "string",
+            "nullable": true
           },
           "fulfillmentVersion": {
             "type": "integer",
@@ -4142,6 +4992,41 @@
           "occurredAtUtc": {
             "type": "string",
             "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Application.Contracts.Sales.OrderTabCountsDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "tabs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/eCommerce.Application.Contracts.Sales.OrderTabDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Application.Contracts.Sales.OrderTabDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "nullable": true
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
           }
         },
         "additionalProperties": false
@@ -6281,10 +7166,64 @@
           5,
           6,
           7,
-          8
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17
         ],
         "type": "integer",
         "format": "int32"
+      },
+      "eCommerce.HttpApi.Controllers.CancelOrderBody": {
+        "type": "object",
+        "properties": {
+          "cancelledBy": {
+            "$ref": "#/components/schemas/eCommerce.FulfillmentStatus"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reasonCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "businessReason": {
+            "$ref": "#/components/schemas/eCommerce.OrderReasonCode"
+          },
+          "reasonText": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.HttpApi.Controllers.ChangeOrderStatusBody": {
+        "type": "object",
+        "properties": {
+          "toStatus": {
+            "$ref": "#/components/schemas/eCommerce.FulfillmentStatus"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reasonCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "reasonText": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
       },
       "eCommerce.HttpApi.Controllers.SystemController+MeResult": {
         "type": "object",
@@ -7343,6 +8282,56 @@
         },
         "additionalProperties": false
       },
+      "eCommerce.OrderReasonCode": {
+        "enum": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          8,
+          9,
+          10,
+          11,
+          12,
+          14,
+          16,
+          18,
+          19,
+          20,
+          22,
+          23,
+          24,
+          25,
+          26,
+          29,
+          30,
+          35
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "eCommerce.OrderSource": {
+        "enum": [
+          1,
+          2,
+          10,
+          20,
+          21,
+          41,
+          42,
+          43,
+          45,
+          48,
+          49,
+          50,
+          51,
+          52
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
       "eCommerce.OrderStatus": {
         "enum": [
           0,
@@ -7352,6 +8341,22 @@
           4,
           5,
           6
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "eCommerce.OrderType": {
+        "enum": [
+          1,
+          2,
+          3,
+          5,
+          10,
+          12,
+          14,
+          15,
+          16,
+          17
         ],
         "type": "integer",
         "format": "int32"
@@ -9271,7 +10276,13 @@
       "name": "MarketplaceIntake"
     },
     {
+      "name": "Order"
+    },
+    {
       "name": "OrderReturn"
+    },
+    {
+      "name": "Orders"
     },
     {
       "name": "OrderStatus"

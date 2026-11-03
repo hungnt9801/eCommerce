@@ -157,10 +157,12 @@ Tóm tắt 6 quyết định gốc:
 | [handover-n3.md](handover-n3.md) | **Đã thi công**: WP-03 nửa sau — backfill biến thể → SP con (dry-run → thật, idempotent) + `OrderLine.ProductId` + luật cha–con + adapter đọc cũ, migration **52**, 1684 test |
 | [handover-n4.md](handover-n4.md) | **Đã thi công**: WP-04 (BE) — tồn kho **9 chiều** + phiếu kho kiểu Nhanh (`Mode`/chiều) + bút toán theo mode + API `/api/v1/stock/*`, migration **53**, 1768 test, probe HTTP 12 ca |
 | [handover-n4b.md](handover-n4b.md) | **Đã thi công**: WP-04b — **`decimal(18,3)`** cho 16 cột số lượng (migration **54**), WP-04 (BE) **đóng**; 1773 test, probe 12 ca vẫn xanh |
+| [handover-n5.md](handover-n5.md) | **Đã thi công**: WP-04 (FE) — 4 màn kho + **bulk · ẩn/hiện cột · lưu bộ lọc · in phiếu** + **tiền phiếu** (`UnitPrice`, migration **55**), **WP-04 ĐÓNG (BE+FE)**; probe FE **19/19** + kiểm browser thật |
+| [handover-n6.md](handover-n6.md) | **Đã thi công**: WP-05 — đơn hàng **18 trạng thái** + `OrderType/Source/ReasonCode` + bảng cạnh Nhanh + nhãn suy từ 4 trục + API `/api/v1/orders` (**14 tab đếm**, `transitions`, `cancel`, `history`) + 2 màn FE; migration **56**, **1855** test, probe **29 lời gọi HTTP** `exit 0` |
 | [08-session-protocol.md](08-session-protocol.md) | **Chia phiên**: 10 session cho GĐ0–GĐ2, mẫu kickoff/handover, khi nào dừng |
 | [09-parallel-sessions.md](09-parallel-sessions.md) | **Chạy song song**: worktree, cổng/DB riêng, contract-first, luật migration |
 | [baseline-2026-11-02.md](baseline-2026-11-02.md) | Baseline trước khi sửa (build/test/cổng) |
-| [decisions.md](decisions.md) | Biên bản quyết định D-01…D-18 (**đã chốt 02/11/2026**) |
+| [decisions.md](decisions.md) | Biên bản quyết định **D-01…D-41** (**D-01…D-18** chốt 02/11/2026; **D-19…D-41** phát sinh khi thi công `N2…N6`) |
 | [nhanh-pos-v3-api-inventory.md](nhanh-pos-v3-api-inventory.md) | **68 endpoint + 10 webhook** Open API v3, enum, shape, câu hỏi mở |
 | [nhanh-pos-module-map.md](nhanh-pos-module-map.md) | Bản đồ 12 module, 18 trạng thái đơn, 10 quy trình, 50 màn P0/P1/P2 |
 

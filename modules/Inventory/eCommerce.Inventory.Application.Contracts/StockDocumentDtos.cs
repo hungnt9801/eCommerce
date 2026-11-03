@@ -33,6 +33,19 @@ public class StockDocumentDto
 
     /// <summary>Số dòng **đếm từ DB** (không phải thuộc tính trên entity — bài học `PRC-001` §17.2 **L1**).</summary>
     public int LineCount { get; set; }
+
+    // 🆕 `WP-04` (việc 8) — tổng tiền của phiếu (số **suy ra** từ các dòng, tính bằng `TinhTienChungTu`).
+    /// <summary>
+    /// Tổng tiền hàng = Σ thành tiền dòng. `null` khi **có dòng chưa khai giá** (D-37: `0` sẽ là lời nói dối —
+    /// "miễn phí" khác "chưa khai"), hoặc phiếu chưa có dòng.
+    /// </summary>
+    public decimal? TotalAmount { get; set; }
+
+    /// <summary>Tổng VAT = Σ tiền VAT dòng; `null` khi **không dòng nào** khai %VAT.</summary>
+    public decimal? TotalVat { get; set; }
+
+    /// <summary>Tổng thanh toán = `TotalAmount + TotalVat − DiscountAmount`; `null` khi `TotalAmount` là `null`.</summary>
+    public decimal? TotalPayment { get; set; }
 }
 
 public class StockDocumentLineDto
@@ -46,6 +59,17 @@ public class StockDocumentLineDto
     public decimal? VatPercent { get; set; }
     public Guid? BatchId { get; set; }
     public string? ImeiSerials { get; set; }
+
+    // 🆕 `WP-04` (việc 8) — tiền của dòng. 📌 `Amount`/`VatAmount` là **số SUY RA** (tính bằng
+    // `TinhTienChungTu`) ⇒ client **không** tự nhân lại, tránh hai nơi ra hai kết quả.
+    /// <summary>Đơn giá tại thời điểm lập phiếu (`null` = chưa khai giá).</summary>
+    public decimal? UnitPrice { get; set; }
+
+    /// <summary>Thành tiền dòng = `Quantity × UnitPrice`; `null` nếu dòng không khai giá.</summary>
+    public decimal? Amount { get; set; }
+
+    /// <summary>Tiền VAT dòng = `Amount × VatPercent / 100`; `null` nếu thiếu giá hoặc thiếu %VAT.</summary>
+    public decimal? VatAmount { get; set; }
 }
 
 /// <summary>
@@ -152,6 +176,14 @@ public class CreateStockDocumentLineDto
     /// <summary>Serial/IMEI, phân tách bằng dấu phẩy. **Số serial PHẢI bằng `Quantity`** nếu khai.</summary>
     [StringLength(4000)]
     public string? ImeiSerials { get; set; }
+
+    /// <summary>
+    /// 🆕 **`WP-04` (việc 8)** — **Đơn giá** của dòng (VND). `null` = không khai giá (hàng biếu tặng/kiểm kê).
+    /// 📌 **>= 0** — tiền âm không có nghĩa; chiết khấu là `DiscountAmount` **của phiếu** (`D-37`).
+    /// 📌 Giới hạn trên `9999999999999999` = biên của `numeric(18,2)` ⇒ chặn ở DTO thay vì để DB ném `22003`.
+    /// </summary>
+    [Range(typeof(decimal), "0", "9999999999999999", ErrorMessage = "Đơn giá phải từ 0 đến 9999999999999999.")]
+    public decimal? UnitPrice { get; set; }
 }
 
 /// <summary>Kết quả ghi sổ — cho biết **bao nhiêu bút toán** đã sinh (0 ⇒ kiểm kê khớp, không có gì để ghi).</summary>

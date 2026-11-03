@@ -107,6 +107,14 @@ public static class InventoryErrorCodes
     public const string PhieuXuatThieuMode = Nhom + "0036";
 
     /// <summary>
+    /// 🆕 **`WP-04` (việc 8, 03/11/2026)** — **Đơn giá dòng phiếu ÂM**: tiền âm ở đây là **dữ liệu hỏng**,
+    /// không phải "chiết khấu" (chiết khấu đi đường `DiscountAmount`, có luật riêng `0027`).
+    /// 📌 Vì sao mã riêng chứ không mượn `0027`: `0027` nói về **tiền của phiếu** (chiết khấu/đã trả);
+    /// dùng nó cho **đơn giá dòng** làm client hiện sai chỗ cần sửa (sửa đầu phiếu thay vì sửa dòng).
+    /// </summary>
+    public const string DonGiaKhongHopLe = Nhom + "0050";
+
+    /// <summary>
     /// 🚨 **Khách trả NHIỀU HƠN số đã mua** (tính **luỹ kế** các lần trả trước) — `SAL-004`.
     /// 📌 **VÌ SAO CẦN MÃ RIÊNG (không mượn `0001`/`KhongDuTon`):** khi ca này trả `0001` (*"không đủ tồn"*),
     /// client hiển thị **SAI thông điệp** — *"hết hàng, chờ nhập"* — trong khi **tồn kho KHÔNG hề thiếu**:

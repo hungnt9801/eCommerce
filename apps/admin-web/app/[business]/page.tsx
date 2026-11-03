@@ -6,6 +6,7 @@ type ProductPage = { total: number };
 export default async function DashboardPage({ params }: { params: Promise<{ business: string }> }) {
   const { business } = await params;
   const products = await apiGetSafe<ProductPage>("/api/v1/products?page=1&pageSize=1", { total: 0 });
+  const tonKho = await apiGetSafe<{ total: number }>("/api/v1/stock/balances?page=1&pageSize=1", { total: 0 });
   const ping = await apiGetSafe<{ serverTimeUtc: string; service: string }>("/api/v1/system/ping", {
     serverTimeUtc: "",
     service: "?",
@@ -14,7 +15,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ busi
   const cards = [
     { label: "Sản phẩm", value: products.total, href: `/${business}/product/item`, hint: "đang quản lý" },
     { label: "Đơn hàng", value: "—", href: `/${business}/order/manage`, hint: "WP-05" },
-    { label: "Tồn kho", value: "—", href: `/${business}/product/inventory`, hint: "WP-04" },
+    { label: "Tồn kho", value: tonKho.total, href: `/${business}/product/inventory`, hint: "cặp kho – SKU" },
     { label: "Doanh thu hôm nay", value: "—", href: `/${business}/report/revenue`, hint: "WP-08" },
   ];
 
@@ -47,7 +48,8 @@ export default async function DashboardPage({ params }: { params: Promise<{ busi
           <li>Đăng nhập qua OpenIddict → token chỉ nằm ở server (cookie httpOnly).</li>
           <li>Menu lọc theo quyền **hỏi server** (`/api/v1/system/permissions`), không đọc token.</li>
           <li>Danh sách sản phẩm đọc `/api/v1/products` thật (chưa có dữ liệu ⇒ 0).</li>
-          <li>Kho/đơn/POS/báo cáo: chưa làm — hiện mờ trong menu, không phải link chết.</li>
+          <li>Kho: DS phiếu + tạo phiếu + tồn 9 chiều đọc `/api/v1/stock/*` (WP-04 FE).</li>
+          <li>Đơn/POS/báo cáo: chưa làm — hiện mờ trong menu, không phải link chết.</li>
         </ul>
       </div>
     </div>

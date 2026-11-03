@@ -37,4 +37,20 @@ public static class OrderErrorCodes
 
     /// <summary>Số tiền IPN lệch tổng đơn ⇒ **không** đánh dấu `Paid`.</summary>
     public const string TienKhongKhop = Nhom + "0008";
+
+    /// <summary>
+    /// 🆕 **`WP-05`** — đơn **không có kho xuất hàng** (`WarehouseId = null`) nhưng nghiệp vụ cần kho
+    /// (nhập lại hàng khi đơn **hoàn**). 📌 Mã riêng vì người dùng phải làm **một việc cụ thể**: gán kho cho
+    /// đơn rồi thao tác lại — không phải "thử lại" (0002) hay "bấm sai bước" (0001).
+    /// </summary>
+    public const string ThieuKhoKhiHoan = Nhom + "0009";
+
+    /// <summary>
+    /// 🆕 **`WP-05`** — trạng thái đích **không đi qua API chuyển trạng thái** (ví dụ 3 giá trị huỷ: phải
+    /// gọi đường **huỷ** `Orders.Cancel` — hai quyền khác nhau, không thể mượn một cửa).
+    /// </summary>
+    public const string TrangThaiCanDuongKhac = Nhom + "0010";
+
+    /// <summary>🆕 **`WP-05`** — dữ liệu đơn **không hợp lệ** (loại/nguồn/lý do ngoài danh mục, số âm…).</summary>
+    public const string DuLieuDonKhongHopLe = Nhom + "0011";
 }

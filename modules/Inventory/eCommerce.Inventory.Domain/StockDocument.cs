@@ -359,6 +359,14 @@ public class StockDocumentLine : FullAuditedAggregateRoot<Guid>, IMultiTenant
     public Guid? BatchId { get; protected set; }
 
     /// <summary>
+    /// 🆕 **`WP-04` (việc 8)** — **ĐƠN GIÁ** của dòng (Nhanh: `price`); `null` = **chưa khai giá**.
+    /// 🚨 **KHÔNG phải nguồn sự thật của giá bán:** giá bán nằm ở `ProductUnit.SalePrice`; cột này **ghi lại**
+    /// giá tại thời điểm lập phiếu (để in phiếu/tính thành tiền và **giữ nguyên lịch sử** khi bảng giá đổi).
+    /// 📌 `numeric(18,2)` — tiền, khác độ chính xác của `Quantity` (18,3) là **có chủ ý** (D-37).
+    /// </summary>
+    public decimal? UnitPrice { get; protected set; }
+
+    /// <summary>
     /// **Danh sách serial/IMEI** của dòng, phân tách bằng dấu phẩy (Nhanh: `imexs`).
     /// 📌 Lưu **chuỗi** ở WP-04 vì bảng `CatProductImeis` (WP-03) chưa có đường ghi; khi có, mỗi serial phải
     /// trở thành **một dòng IMEI thật** (nửa sau WP-03) — ghi rõ để không ai tưởng cột này là nguồn sự thật.
@@ -401,13 +409,22 @@ public class StockDocumentLine : FullAuditedAggregateRoot<Guid>, IMultiTenant
     /// không quản IMEI) thì để `null` — **không** được khai **rỗng** (`""`) vì hai cách diễn đạt cùng một ý.
     /// </summary>
     public void DatChiTiet(Guid? unitId = null, decimal? vatPercent = null, Guid? batchId = null,
-        string? imeiSerials = null)
+        string? imeiSerials = null, decimal? unitPrice = null)
     {
         if (vatPercent is < 0m or > 100m)
         {
             throw new BusinessException(InventoryErrorCodes.VatPercentKhongHopLe)
                 .WithData("sku", Sku)
                 .WithData("vatPercent", vatPercent);
+        }
+
+        // 🆕 `WP-04` (việc 8) — đơn giá âm: không có nghĩa nghiệp vụ nào (giảm giá đi đường `DiscountAmount`).
+        if (unitPrice is < 0m)
+        {
+            throw new BusinessException(InventoryErrorCodes.DonGiaKhongHopLe)
+                .WithData("sku", Sku)
+                .WithData("unitPrice", unitPrice)
+                .WithData("lyDo", "Đơn giá dòng KHÔNG được âm — chiết khấu là tiền của PHIẾU, không phải giá âm.");
         }
 
         var serials = (imeiSerials ?? string.Empty)
@@ -446,5 +463,6 @@ public class StockDocumentLine : FullAuditedAggregateRoot<Guid>, IMultiTenant
         VatPercent = vatPercent;
         BatchId = batchId;
         ImeiSerials = serials.Length == 0 ? null : string.Join(',', serials);
+        UnitPrice = unitPrice;
     }
 }

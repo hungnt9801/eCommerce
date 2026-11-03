@@ -38,8 +38,8 @@
 | **N2** ✅ đã xong | WP-03 (nửa đầu) | `ProductType/Unit/ParentId/VAT` + entity `ProductUnit`, migration **51** additive | build + test xanh (1671); tạo SP 3 ĐVT qua API — [handover](handover-n2.md) |
 | **N3** ✅ đã xong | WP-03 (nửa sau) | Backfill `ProductVariant → Product con` (dry-run → thật), luật cha–con + publish theo ĐVT gốc, `OrderLine.ProductId`, adapter đọc cũ | backfill **2 lần cùng kết quả** (2 → 2 rồi 2 → 0, DB y nguyên); `/SanPham` **200** cho cả hai mô hình; 1684 test — [handover](handover-n3.md) |
 | **N4** ✅ đã xong | WP-04 (BE) | 8 chiều tồn + `Mode` phiếu + bút toán theo `(mode, chiều)` + API `/api/v1/stock/*`, migration **53**; `N4b`: `decimal(18,3)` hoá 16 cột số lượng, migration **54** | bất biến `tổng sổ cái = ảnh chụp` **10 = 10**; nhập 10 → tồn 10; số lẻ sống sót (`1,5 kg`, 1000 × 0,001 = 1,000) — probe HTTP 12 ca `exit 0`; **1773** test — [handover N4](handover-n4.md) · [N4b](handover-n4b.md) |
-| **N5** | WP-04 (FE) | DS phiếu + tạo phiếu + cột tồn | Post → tồn đổi trên UI; Post lại bị chặn |
-| **N6** | WP-05 | 18 trạng thái + transition API + DS/chi tiết đơn | đơn đi trọn `Mới → Thành công` |
+| **N5** ✅ đã xong | WP-04 (FE) | DS phiếu (tab + bulk + cột) · tạo phiếu (form động) · chi tiết (ghi sổ/huỷ) · tồn 9 chiều · in phiếu · **tiền (đơn giá → thành tiền → tổng)** | Post → tồn đổi **trên UI** (`Bán 10`); Post lại **403 `0010`**; bulk **2 thành công / 0 lỗi**, skip **1 bỏ qua**; tiền **75.000/6.000/81.000**; probe FE **19/19** — [handover](handover-n5.md) |
+| **N6** ✅ đã xong | WP-05 | 18 trạng thái (append 9) · `OrderType/OrderSource/OrderReasonCode` · 11 cột đơn · bảng cạnh Nhanh + 15 cạnh huỷ · nhãn suy từ 4 trục · API `/api/v1/orders` (DS **14 tab** · chi tiết · `transitions` · `cancel` · `history`), migration **56** · FE 2 màn | đơn đi trọn `Mới → Thành công` (**8/8 lời gọi 200**); xác nhận ⇒ `OnHand 10→8` (`ChotGiuCho`); hoàn ⇒ `OnHand 7→8` + phiếu `HOAN-…`; **403 đúng mã** `0003`/`0001`/`0010`; probe **29 lời gọi** `exit 0`; **1855** test — [handover](handover-n6.md) |
 | **N7** | WP-06 (nửa đầu) | `RetailBill` + `CashSession` + thanh toán + in | bán 3 SP, chia 2 phương thức, in, kết ca |
 | **N8** | WP-06 (nửa sau) | Offline IndexedDB + `ClientBillId` idempotent | rớt mạng vẫn lưu; gửi 2 lần không tạo trùng |
 | **N9** | WP-07 + WP-08 | Khách/nhân viên + read-model + Dashboard | data scope lọc đúng; báo cáo khớp `SUM` |
@@ -113,10 +113,15 @@ Tạo tệp handover (đặt tên `handover-Nx.md`, cùng thư mục này) với
 
 - **Chia 10 session** (N1 đã xong) cho GĐ0–GĐ2, đúng bản đồ §3.
 - Session hiện tại nên **đóng sau khi commit** phần WP-01/02 — đã đủ lớn (khảo sát + 6 tài liệu + 2 project + build/login chạy thật).
-- **N2** (WP-03 nửa đầu), **N3** (WP-03 nửa sau) và **N4** (WP-04 BE) **đã xong** — đóng bằng số đo, xem
-  [handover-n2](handover-n2.md), [handover-n3](handover-n3.md), [handover-n4](handover-n4.md).
-  📌 `N3` **không** làm form sản phẩm FE (việc FE 3 ngày của WP-03) — nếu muốn làm, mở một session **FE độc lập** trên API đã có
-  (điều kiện §7: chạm file rời nhau với BE).
-- Session kế tiếp: **N5 — WP-04 (FE)**: màn DS phiếu + tạo phiếu + cột tồn, dùng `schema.d.ts` đã sinh
-  (**12 path `/api/v1`**). Mở bằng 6 lệnh ở §4 và câu mở đầu ở §4.
-- (Khuyến nghị, không chặn) **WP-04b** — `decimal` hoá số lượng (D-25) khi có nhu cầu số lẻ thật.
+- **N2** (WP-03 nửa đầu), **N3** (WP-03 nửa sau), **N4** + **N4b** (WP-04 BE), **N5** (WP-04 FE) và
+  **N6** (WP-05) **đã xong** — đóng bằng số đo, xem [handover-n2](handover-n2.md), [handover-n3](handover-n3.md),
+  [handover-n4](handover-n4.md), [handover-n4b](handover-n4b.md), [handover-n5](handover-n5.md),
+  [handover-n6](handover-n6.md).
+  📌 `N3` **không** làm form sản phẩm FE (việc FE 3 ngày của WP-03) — vẫn có thể mở một session **FE độc lập**
+  trên API đã có (điều kiện §7: chạm file rời nhau với BE). `N5` đã dựng sẵn `StockBadge`, `BalancesTable`,
+  `ProductPicker`, `lib/format.ts` (số 3 lẻ + `vi-VN`) ⇒ form sản phẩm dùng lại được, **đừng viết lại**.
+  📌 `N6` **chưa** làm 4 bảng phụ của WP-05 (`OrderLabel`/`OrderPacking`/`OrderHandover`/`OrderComplaint`),
+  **chưa** có bulk đổi trạng thái và tab **Thanh toán** của đơn (thuộc WP-06) — xem [handover-n6](handover-n6.md) §2.
+- Session kế tiếp: **N7 — WP-06 (nửa đầu)**: `RetailBill` + `CashSession` + thanh toán + in. Mở bằng 6 lệnh ở §4
+  và câu mở đầu ở §4. Phiên `N6` **đã commit** `N5` + `N6` thành **`e6076ce`** trên `feature/wp-03-catalog`
+  — phiên sau mở bằng `git switch` + 6 lệnh §4, **đừng** `git add -A` (còn 51 mục rác khảo sát Nhanh).

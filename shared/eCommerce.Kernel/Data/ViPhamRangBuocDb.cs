@@ -71,6 +71,11 @@ public static class ViPhamRangBuocDb
         ["CK_InvStockDocumentLines_VatPercent_HopLe"] =
             new("eCommerce:Inventory:0028", "% VAT của dòng phải trong khoảng 0..100.", false),
 
+        // 🆕 `WP-04` (việc 8) — đơn giá dòng âm. 📌 Map sang mã RIÊNG (`0050`) chứ không dùng mã chung:
+        // client cần biết **sửa ở DÒNG** (giá), không phải sửa đầu phiếu (chiết khấu — `0027`).
+        ["CK_InvStockDocumentLines_UnitPrice_KhongAm"] =
+            new("eCommerce:Inventory:0050", "Đơn giá dòng KHÔNG được âm ⇒ từ chối.", false),
+
         // ── ĐƠN HÀNG (`SAL-001`) ─────────────────────────────────────────────────────────────────
         // 📌 Dòng này được thêm vì CHÍNH lượt kiểm chứng đã phát hiện thiếu: tạo đơn lần hai từ cùng checkout
         // trả **mã chung** `eCommerce:Db:0001` thay vì mã nói rõ *"đã có đơn rồi"*. Đúng quy tắc bảo trì ở đầu
@@ -293,6 +298,14 @@ public static class ViPhamRangBuocDb
             new(MaChung, "Chọn cách xử lý hàng (Restock/Damaged) khi CHƯA nhận hàng.", false),
         ["CK_OrdReturnHistory_PhaiDoiTrangThai"] =
             new(MaChung, "Lịch sử phiếu trả ghi một chuyển dịch KHÔNG đổi trạng thái (from = to).", false),
+
+        // ── 🆕 `WP-05` (03/11/2026) — TIỀN/KHỐI LƯỢNG CỦA ĐƠN ──────────────────────────────────
+        // 📌 Hàng rào phòng vệ chiều sâu: `Order.DatVanChuyen` đã ném `eCommerce:Order:0011` trước ⇒ tới được
+        // DB nghĩa là có **đường ghi TẮT** qua domain (SQL tay / import Nhanh), tức là **bug** — không phải
+        // hành vi nghiệp vụ cần mã riêng. Vẫn **phải** ánh xạ: ca đó trả 403 kèm tên ràng buộc, không phải 500 mù.
+        ["CK_OrdOrders_TienVaKhoiLuong_KhongAm"] =
+            new(MaChung,
+                "COD / phí ship / khối lượng của đơn bị ÂM ⇒ dữ liệu tiền không hợp lệ. Chỉ đến được DB nếu có đường ghi bỏ qua tầng domain.", false),
 
         // ── BÁN HÀNG: PHIẾU TRẢ HÀNG (`S14`, 28/10/2026 — `SAL-006`) ──────────────────────────────
         // 🚨 Bốn unique index là **hàng rào chống trả trùng/trả hai lần**; mất mệnh đề `NULLS NOT DISTINCT` thì

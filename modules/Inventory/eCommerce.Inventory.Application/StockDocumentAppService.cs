@@ -43,21 +43,32 @@ public class StockDocumentAppService : ApplicationService, IStockDocumentAppServ
         var ds = await _chungTuRepository.GetListAsync();
         var tatCaDong = await _dongRepository.GetListAsync();
 
-        var dem = tatCaDong.GroupBy(x => x.StockDocumentId).ToDictionary(g => g.Key, g => g.Count());
+        var nhomDong = tatCaDong.GroupBy(x => x.StockDocumentId)
+            .ToDictionary(g => g.Key, g => g.ToList());
 
         return ds
             .Where(x => type is null || x.Type == type)
             .OrderByDescending(x => x.OccurredAtUtc)
             .ThenBy(x => x.Number, StringComparer.Ordinal)
-            .Select(x => ToDto(x, dem.TryGetValue(x.Id, out var n) ? n : 0))
+            .Select(x =>
+            {
+                var dong = nhomDong.TryGetValue(x.Id, out var dsDong) ? dsDong : [];
+
+                var (tienHang, vat) = TinhTong(dong);
+
+                return ToDto(x, dong.Count, tienHang, vat);
+            })
             .ToList();
     }
 
     public async Task<StockDocumentDto> GetAsync(Guid id)
     {
         var ct = await _chungTuRepository.GetAsync(id);
+        var dong = await _dongRepository.GetListAsync(x => x.StockDocumentId == id);
 
-        return ToDto(ct, (int)await _dongRepository.CountAsync(x => x.StockDocumentId == id));
+        var (tienHang, vat) = TinhTong(dong);
+
+        return ToDto(ct, dong.Count, tienHang, vat);
     }
 
     public async Task<List<StockDocumentLineDto>> GetLinesAsync(Guid id)
@@ -67,16 +78,7 @@ public class StockDocumentAppService : ApplicationService, IStockDocumentAppServ
         var dong = await _dongRepository.GetListAsync(x => x.StockDocumentId == id);
 
         return dong.OrderBy(x => x.Sku, StringComparer.Ordinal)
-            .Select(x => new StockDocumentLineDto
-            {
-                Id = x.Id,
-                Sku = x.Sku,
-                Quantity = x.Quantity,
-                UnitId = x.UnitId,
-                VatPercent = x.VatPercent,
-                BatchId = x.BatchId,
-                ImeiSerials = x.ImeiSerials
-            })
+            .Select(ToLineDto)
             .ToList();
     }
 
@@ -124,7 +126,7 @@ public class StockDocumentAppService : ApplicationService, IStockDocumentAppServ
         {
             var d = new StockDocumentLine(GuidGenerator.Create(), ct.Id, x.Sku, x.Quantity);
 
-            d.DatChiTiet(x.UnitId, x.VatPercent, x.BatchId, x.ImeiSerials);
+            d.DatChiTiet(x.UnitId, x.VatPercent, x.BatchId, x.ImeiSerials, x.UnitPrice);
 
             return d;
         }).ToList();
@@ -134,7 +136,9 @@ public class StockDocumentAppService : ApplicationService, IStockDocumentAppServ
         Logger.LogInformation("Đã tạo chứng từ kho {Number} ({Type}/{Mode}/{Direction}) ở trạng thái {Status} với {SoDong} dòng.",
             ct.Number, ct.Type, ct.Mode?.ToString() ?? "(khong)", ct.Direction?.ToString() ?? "(khong)", ct.Status, dong.Count);
 
-        return ToDto(ct, dong.Count);
+        var (tienHangTao, vatTao) = TinhTong(dong);
+
+        return ToDto(ct, dong.Count, tienHangTao, vatTao);
     }
 
     /// <summary>Huỷ phiếu còn `Draft` (phiếu đã ghi sổ **KHÔNG** huỷ được — sổ cái append-only).</summary>
@@ -149,7 +153,11 @@ public class StockDocumentAppService : ApplicationService, IStockDocumentAppServ
 
         Logger.LogInformation("Đã HUỶ chứng từ kho {Number} (trước đó {Status}).", ct.Number, ct.Status);
 
-        return ToDto(ct, (int)await _dongRepository.CountAsync(x => x.StockDocumentId == id));
+        var dongHuy = await _dongRepository.GetListAsync(x => x.StockDocumentId == id);
+
+        var (tienHangHuy, vatHuy) = TinhTong(dongHuy);
+
+        return ToDto(ct, dongHuy.Count, tienHangHuy, vatHuy);
     }
 
     /// <summary>
@@ -207,17 +215,24 @@ public class StockDocumentAppService : ApplicationService, IStockDocumentAppServ
             q.OrderByDescending(x => x.OccurredAtUtc).ThenBy(x => x.Number)
                 .Skip(skipCount).Take(maxResultCount));
 
-        // Đếm dòng của **đúng trang này** (một truy vấn) — không nạp cả bảng dòng như `GetListAsync` cũ.
+        // Đếm dòng + tính tiền của **đúng trang này** (một truy vấn) — không nạp cả bảng dòng như `GetListAsync` cũ.
         var ids = trang.Select(x => x.Id).ToList();
-        var demDong = ids.Count == 0
-            ? new Dictionary<Guid, int>()
+        var nhomDong = ids.Count == 0
+            ? new Dictionary<Guid, List<StockDocumentLine>>()
             : (await _dongRepository.GetListAsync(x => ids.Contains(x.StockDocumentId)))
                 .GroupBy(x => x.StockDocumentId)
-                .ToDictionary(g => g.Key, g => g.Count());
+                .ToDictionary(g => g.Key, g => g.ToList());
 
         return new PagedResultDto<StockDocumentDto>(
             tong,
-            trang.Select(x => ToDto(x, demDong.TryGetValue(x.Id, out var n) ? n : 0)).ToList());
+            trang.Select(x =>
+            {
+                var dong = nhomDong.TryGetValue(x.Id, out var dsDong) ? dsDong : [];
+
+                var (tienHang, vat) = TinhTong(dong);
+
+                return ToDto(x, dong.Count, tienHang, vat);
+            }).ToList());
     }
 
     [Authorize(eCommerceConsts.Permissions.Inventory.Adjust)]
@@ -236,7 +251,35 @@ public class StockDocumentAppService : ApplicationService, IStockDocumentAppServ
         };
     }
 
-    private static StockDocumentDto ToDto(StockDocument ct, int soDong) => new()
+    /// <summary>Map dòng + **tính tiền bằng hàm thuần** (một nguồn duy nhất — `TinhTienChungTu`).</summary>
+    private static StockDocumentLineDto ToLineDto(StockDocumentLine x)
+    {
+        var thanhTien = TinhTienChungTu.ThanhTien(x.Quantity, x.UnitPrice);
+
+        return new StockDocumentLineDto
+        {
+            Id = x.Id,
+            Sku = x.Sku,
+            Quantity = x.Quantity,
+            UnitId = x.UnitId,
+            VatPercent = x.VatPercent,
+            BatchId = x.BatchId,
+            ImeiSerials = x.ImeiSerials,
+            UnitPrice = x.UnitPrice,
+            Amount = thanhTien,
+            VatAmount = TinhTienChungTu.TienVat(thanhTien, x.VatPercent)
+        };
+    }
+
+    /// <summary>
+    /// Tổng tiền của một phiếu từ **đúng các dòng của nó**.
+    /// 📌 Dòng **thiếu đơn giá** ⇒ tổng là `null` (D-37), **không** cộng như `0`.
+    /// </summary>
+    private static (decimal? TienHang, decimal? Vat) TinhTong(IReadOnlyCollection<StockDocumentLine> dong)
+        => (TinhTienChungTu.TongTienHang(dong.Select(x => (x.Quantity, x.UnitPrice))),
+            TinhTienChungTu.TongVat(dong.Select(x => (x.Quantity, x.UnitPrice, x.VatPercent))));
+
+    private static StockDocumentDto ToDto(StockDocument ct, int soDong, decimal? tienHang = null, decimal? vat = null) => new()
     {
         Id = ct.Id,
         Number = ct.Number,
@@ -257,6 +300,11 @@ public class StockDocumentAppService : ApplicationService, IStockDocumentAppServ
         RefId = ct.RefId,
         DiscountAmount = ct.DiscountAmount,
         PaidAmount = ct.PaidAmount,
-        IdempotencyKey = ct.IdempotencyKey
+        IdempotencyKey = ct.IdempotencyKey,
+
+        // 🆕 `WP-04` (việc 8) — tiền của phiếu (suy ra từ dòng; `null` nếu có dòng chưa khai giá — D-37).
+        TotalAmount = tienHang,
+        TotalVat = vat,
+        TotalPayment = TinhTienChungTu.TongThanhToan(tienHang, vat, ct.DiscountAmount)
     };
 }

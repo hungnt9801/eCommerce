@@ -27,22 +27,27 @@ export const MENU: MenuGroup[] = [
       { label: "Sản phẩm", href: "product/item", permission: "eCommerce.Products", enabled: true },
       { label: "Thương hiệu", href: "product/brand", permission: "eCommerce.Products", enabled: false, note: "sắp có" },
       { label: "Danh mục", href: "product/category", permission: "eCommerce.Categories", enabled: false, note: "sắp có" },
-      { label: "Tồn kho", href: "product/inventory", permission: "eCommerce.Inventory", enabled: false, note: "WP-04" },
+      { label: "Tồn kho", href: "product/inventory", permission: "eCommerce.Inventory", enabled: true },
     ],
   },
   {
     label: "Kho",
     items: [
-      { label: "Xuất nhập kho", href: "inventory/bill", permission: "eCommerce.Inventory", enabled: false, note: "WP-04" },
-      { label: "Kiểm kho", href: "inventory/check", permission: "eCommerce.Inventory", enabled: false, note: "WP-04" },
-      { label: "Chuyển kho", href: "inventory/transfer", permission: "eCommerce.Inventory", enabled: false, note: "WP-04" },
+      { label: "Xuất nhập kho", href: "inventory/bill", permission: "eCommerce.Inventory", enabled: true },
+      { label: "Kiểm kho", href: "inventory/check", permission: "eCommerce.Inventory", enabled: false, note: "chưa làm" },
+      {
+        label: "Chuyển kho",
+        href: "inventory/bill/new?kind=transfer",
+        permission: "eCommerce.Inventory",
+        enabled: true,
+      },
     ],
   },
   {
     label: "Bán hàng",
     items: [
       { label: "Bán lẻ (POS)", href: "pos/bill", permission: "eCommerce.Orders", enabled: false, note: "WP-06" },
-      { label: "Đơn hàng", href: "order/manage", permission: "eCommerce.Orders", enabled: false, note: "WP-05" },
+      { label: "Đơn hàng", href: "order/manage", permission: "eCommerce.Orders", enabled: true },
       { label: "Trả hàng", href: "pos/return", permission: "eCommerce.Orders", enabled: false, note: "WP-06" },
     ],
   },

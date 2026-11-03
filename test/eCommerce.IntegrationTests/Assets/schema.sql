@@ -3457,3 +3457,49 @@ VALUES ('20261102102215_Wp04b_SoLuong_Decimal', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+ALTER TABLE "InvStockDocumentLines" ADD "UnitPrice" numeric(18,2);
+
+ALTER TABLE "InvStockDocumentLines" ADD CONSTRAINT "CK_InvStockDocumentLines_UnitPrice_KhongAm" CHECK ("UnitPrice" IS NULL OR "UnitPrice" >= 0);
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261103033818_Wp04c_Tien_PhieuKho', '10.0.11');
+
+COMMIT;
+
+START TRANSACTION;
+ALTER TABLE "OrdOrders" ADD "CarrierCode" character varying(32);
+
+ALTER TABLE "OrdOrders" ADD "CodAmount" numeric(18,4);
+
+ALTER TABLE "OrdOrders" ADD "PackerId" uuid;
+
+ALTER TABLE "OrdOrders" ADD "ReasonCode" integer;
+
+ALTER TABLE "OrdOrders" ADD "SaleStaffId" uuid;
+
+ALTER TABLE "OrdOrders" ADD "ShippingFeeActual" numeric(18,4);
+
+ALTER TABLE "OrdOrders" ADD "ShippingFeeCustomer" numeric(18,4);
+
+ALTER TABLE "OrdOrders" ADD "Source" integer NOT NULL DEFAULT 1;
+
+ALTER TABLE "OrdOrders" ADD "TrackingNumber" character varying(64);
+
+ALTER TABLE "OrdOrders" ADD "Type" integer NOT NULL DEFAULT 1;
+
+ALTER TABLE "OrdOrders" ADD "WarehouseId" uuid;
+
+ALTER TABLE "OrdOrders" ADD "WeightGram" integer;
+
+CREATE INDEX "IX_OrdOrders_TenantId_TrackingNumber" ON "OrdOrders" ("TenantId", "TrackingNumber") WHERE "TrackingNumber" IS NOT NULL;
+
+CREATE INDEX "IX_OrdOrders_TenantId_WarehouseId_CreationTime" ON "OrdOrders" ("TenantId", "WarehouseId", "CreationTime");
+
+ALTER TABLE "OrdOrders" ADD CONSTRAINT "CK_OrdOrders_TienVaKhoiLuong_KhongAm" CHECK (("CodAmount" IS NULL OR "CodAmount" >= 0) AND ("ShippingFeeCustomer" IS NULL OR "ShippingFeeCustomer" >= 0) AND ("ShippingFeeActual" IS NULL OR "ShippingFeeActual" >= 0) AND ("WeightGram" IS NULL OR "WeightGram" >= 0));
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261103040705_Wp05_DonHang_Nhanh', '10.0.11');
+
+COMMIT;
+
