@@ -23,7 +23,7 @@
 | — | Migration / NND | **55** / **74** |
 
 **Điểm lùi trước khi sửa:** commit **`505692a`**. 📌 `N5` **chưa commit** khi mở phiên ⇒ phiên này commit
-**một lần** cả `N5` + `N6` thành **`e6076ce`** (xem §7). Muốn dọn rác khảo sát: thêm mẫu vào `.gitignore`,
+**một lần** cả `N5` + `N6` thành **`036adb6`** (xem §7). Muốn dọn rác khảo sát: thêm mẫu vào `.gitignore`,
 **đừng** `git add -A`.
 
 ### 1.2 Đã thi công
@@ -183,7 +183,7 @@ không có link chết.
 
 ## 6. Việc đầu tiên của phiên sau
 
-1. ~~**Commit `N5` + `N6`**~~ ✅ **ĐÃ LÀM trong phiên này** — commit **`e6076ce`** trên `feature/wp-03-catalog`
+1. ~~**Commit `N5` + `N6`**~~ ✅ **ĐÃ LÀM trong phiên này** — commit **`036adb6`** trên `feature/wp-03-catalog`
    (gộp cả `N5` chưa commit của phiên trước). Lệnh đã dùng (giữ lại để phiên sau tái sử dụng khuôn, **không**
    `git add -A` vì còn 51 mục rác khảo sát Nhanh):
    ```powershell
@@ -218,6 +218,6 @@ pwsh -File .\tools\kiem-link-tai-lieu.ps1
 | Mục | Giá trị |
 |---|---|
 | Nhánh | `feature/wp-03-catalog` (tên **không còn khớp** phạm vi: đang chứa `N1…N4b` + `N5` + `N6`) |
-| Commit | **`e6076ce`** — gộp **`N5` + `N6`** (cha: `505692a` = checkpoint `N1…N4b`) |
+| Commit | **`036adb6`** — gộp **`N5` + `N6`** (cha: `505692a` = checkpoint `N1…N4b`). 📌 Commit **kế tiếp** chỉ sửa tài liệu (handover/decisions) — mã nguồn của `N6` là `036adb6` |
 | Push / PR | Chưa |
 | Tệp `N6` đã chạm | **BE:** `src/eCommerce.Domain.Shared/{Enums.cs,Orders/OrderErrorCodes.cs}` · `modules/Sales/eCommerce.Sales.Domain/{Order,OrderStateMachine}.cs` · `…Application.Contracts/{OrderDtos,OrderStatusDtos,IOrderStatusAppService}.cs` · `…Application/{OrderAppService,OrderStatusAppService}.cs` · `…EntityFrameworkCore/SalesDbContextModelCreatingExtensions.cs` · `src/eCommerce.HttpApi/{Controllers/OrdersController.cs,eCommerce.HttpApi.csproj}` · `shared/eCommerce.Kernel/Data/ViPhamRangBuocDb.cs` · `src/eCommerce.EntityFrameworkCore/{Migrations/*Wp05*,Migrations/eCommerceDbContextModelSnapshot.cs}` · `test/eCommerce.IntegrationTests/Assets/schema.sql` · `packages/api-client/{openapi.v1.json,src/schema.d.ts}` · `test/eCommerce.Tests/{Sales/Wp05DonHangNhanhTests.cs,Domain/OrderStatusApiHopDongTests.cs}`. **FE:** `lib/{order,menu}.ts` · `components/order/*` · `app/[business]/order/manage/{page,[id]/page}.tsx`. **Khác:** `tools/probe-don-hang.ps1` · docs (`decisions`, `07`, `08`, `handover này`) |

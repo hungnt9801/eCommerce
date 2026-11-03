@@ -123,5 +123,5 @@ Tạo tệp handover (đặt tên `handover-Nx.md`, cùng thư mục này) với
   📌 `N6` **chưa** làm 4 bảng phụ của WP-05 (`OrderLabel`/`OrderPacking`/`OrderHandover`/`OrderComplaint`),
   **chưa** có bulk đổi trạng thái và tab **Thanh toán** của đơn (thuộc WP-06) — xem [handover-n6](handover-n6.md) §2.
 - Session kế tiếp: **N7 — WP-06 (nửa đầu)**: `RetailBill` + `CashSession` + thanh toán + in. Mở bằng 6 lệnh ở §4
-  và câu mở đầu ở §4. Phiên `N6` **đã commit** `N5` + `N6` thành **`e6076ce`** trên `feature/wp-03-catalog`
+  và câu mở đầu ở §4. Phiên `N6` **đã commit** `N5` + `N6` thành **`036adb6`** trên `feature/wp-03-catalog`
   — phiên sau mở bằng `git switch` + 6 lệnh §4, **đừng** `git add -A` (còn 51 mục rác khảo sát Nhanh).
