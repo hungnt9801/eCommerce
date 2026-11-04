@@ -1,0 +1,120 @@
+# CI JOB `docker-build` (`WP-13` ②, `D-51` ⑦) — image PRODUCTION của Web Admin phải BUILD được trên runner SẠCH.
+#
+# 🔑 VÌ SAO JOB NÀY TỒN TẠI: `N11` đo được `docker build` xanh **trên máy dev** (image **354 MB**) nhưng
+#    `N12` → `N14` đều ghi nợ *"chưa thấy nó xanh một lần thật trên `ubuntu-latest`"* ⇒ nó bị giữ P1 suốt 3
+#    phiên. Một `Dockerfile` chỉ được coi là chạy được khi nó build trên runner **không có** `node_modules`,
+#    không có `.next`, không có `bin/` — đúng lớp lỗi `S11` (*"một phụ thuộc đã có sẵn trên máy"*).
+#
+# 📌 VÌ SAO LÀ WORKFLOW RIÊNG (không nhét job vào `ci.yml`): job này **không cần** .NET/PostgreSQL/Redis — chỉ
+#    cần Docker (có sẵn trên `ubuntu-latest`). Để riêng thì (a) nó có **status check riêng** để bật required
+#    mà không đụng `cong-15-buoc`, (b) nó **không** làm chậm cổng chính (~30 phút), (c) một lần đỏ của nó
+#    **không** che log của cổng chính. 📌 `D-50` ③ đã tách `openapi-drift` + `e2e-playwright` vì đúng lý do này.
+#
+# 🚨 BA ĐIỀU KHÔNG ĐƯỢC ĐỔI (mỗi điều ứng với một lần đã trả giá):
+#    1. **Build context = GỐC repo** (`D-51` ④): `pnpm-lock.yaml` + `packages/api-client` nằm ở gốc ⇒ context
+#       hẹp thì `pnpm install --frozen-lockfile` không chạy được; `.dockerignore` ở gốc lo phần "đừng gửi 1 GB".
+#    2. **`NEXT_PUBLIC_*` là BUILD ARG** (`D-52` ⑤) — đặt ở `environment:` lúc chạy là **no-op im lặng**.
+#    3. Sau khi build **phải BẬT THỬ image**: build xanh chỉ chứng minh các lớp `COPY` khớp; `CMD` sai hoặc
+#       `standalone` thiếu tệp vẫn xanh. Bước `/login` trả **200** trong khi API chết là bất biến của `D-52` ⑦.
+
+name: docker-build
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# 🔒 Quyền tối thiểu: job này chỉ đọc mã nguồn, không đẩy image lên registry nào.
+permissions:
+  contents: read
+
+concurrency:
+  group: docker-build-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  IMAGE: ecommerce-admin-web:ci
+
+jobs:
+  docker-build:
+    name: docker-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: '0. Checkout'
+        uses: actions/checkout@v4
+
+      - name: '1. Tiền đề — Docker phải là LINUX engine (E-05)'
+        run: |
+          # 🚨 Cùng lý do `ci.yml` bước 4: Dockerfile dùng `node:22-alpine` (Linux). Trên một engine Windows
+          #    thì bước build đỏ với thông điệp về "image OS" — MÔI TRƯỜNG, không phải sản phẩm.
+          ostype=$(docker info --format '{{.OSType}}')
+          echo "Docker OSType = $ostype"
+          test "$ostype" = "linux"
+          docker version --format '{{.Server.Version}} / BuildKit'
+
+      - name: '2. BUILD image (context = GỐC repo, NEXT_PUBLIC_* là build arg)'
+        run: |
+          # 📌 `--label ...revision` để image tự khai nó dựng từ commit nào (không đổi hành vi build).
+          docker build \
+            -f apps/admin-web/Dockerfile \
+            -t "$IMAGE" \
+            --build-arg NEXT_PUBLIC_APP_NAME=eCommerce \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            --label "org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
+            .
+          # 📌 In kích thước bằng **HAI cách đo trên CÙNG một image** — đo trên máy dev 04/11/2026:
+          #    `docker image inspect .Size` = **83 MB** nhưng cột `SIZE` của `docker images` = **354 MB**
+          #    (cùng image, cùng lúc). `N11` ghi **354 MB** ⇒ con số đó là cách đo của `docker images`;
+          #    in cả hai để phiên sau **không** tưởng image đã nhỏ đi 4 lần.
+          bytes=$(docker image inspect "$IMAGE" --format '{{.Size}}')
+          mb=$(( bytes / 1024 / 1024 ))
+          echo "IMAGE_SIZE_MB=$mb" >> "$GITHUB_ENV"
+          echo "Image: $IMAGE"
+          echo "  inspect .Size = ${bytes} bytes (~${mb} MB)"
+          echo "  docker images SIZE = $(docker images "$IMAGE" --format '{{.Size}}')"
+
+      - name: '3. Image phải chứa server standalone (engine `output: "standalone"`)'
+        run: |
+          # 🚨 `next.config.ts` bật `output: "standalone"`; sai đường dẫn `COPY --from=builder` thì tầng 2
+          #    vẫn build XANH nhưng container chết ngay khi `CMD ["node", "apps/admin-web/server.js"]`.
+          docker run --rm --entrypoint sh "$IMAGE" -c 'ls -l apps/admin-web/server.js && ls -d apps/admin-web/.next/static'
+
+      - name: '4. Image phải BẬT ĐƯỢC: `/login` = 200 khi API chết (D-52 ⑦)'
+        run: |
+          # 🚨 Đây là bước duy nhất chứng minh image **chạy** được, không chỉ build được.
+          # 📌 API trỏ vào cổng không có ai nghe (`127.0.0.1:9`) ⇒ mô phỏng "Host chết". BFF **phải** vẫn trả
+          #    `200` cho `/login` (`D-52` ⑦: BFF sống độc lập với API) — nếu bước này đỏ thì hoặc image hỏng,
+          #    hoặc bất biến đó đã bị phá.
+          docker run -d --name admin-web-ci -p 3000:3000 \
+            -e API_BASE_URL=http://127.0.0.1:9 \
+            -e AUTH_ISSUER=http://127.0.0.1:9 \
+            -e AUTH_SECRET=ci-only-secret-not-a-real-secret \
+            -e AUTH_TRUST_HOST=true \
+            "$IMAGE"
+          ok=0
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/login || true)
+            if [ "$code" = "200" ]; then
+              echo "La lan thu $i: /login = 200"
+              ok=1
+              break
+            fi
+            sleep 1
+          done
+          echo '── docker logs (luon in, de doc duoc nguyen nhan khi do) ──'
+          docker logs admin-web-ci || true
+          docker rm -f admin-web-ci
+          test "$ok" = "1" || { echo "🚨 /login KHONG tra 200 trong 60 s"; exit 1; }
+
+      - name: '5. Bằng chứng (kích thước image + log của lượt chạy này)'
+        if: always()
+        run: |
+          {
+            echo '## docker-build — image Web Admin'
+            echo ''
+            echo "- commit: \`$GITHUB_SHA\`"
+            echo "- image: \`$IMAGE\` — kích thước: **${IMAGE_SIZE_MB:-?} MB**"
+            echo "- môi trường: \`docker build\` trên **runner sạch** (không \`node_modules\`, không \`.next\`)"
+          } >> "$GITHUB_STEP_SUMMARY"
