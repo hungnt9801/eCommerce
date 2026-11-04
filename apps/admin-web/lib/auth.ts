@@ -1,6 +1,6 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-import { API_BASE_URL, OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET, OAUTH_SCOPE } from "./config";
+import { TOKEN_ENDPOINT, OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET, OAUTH_SCOPE } from "./config";
 
 type TokenResponse = {
   access_token: string;
@@ -20,7 +20,7 @@ type TokenResponse = {
  * (Authorization Code + PKCE) — không đổi gì phía API.
  */
 async function requestToken(body: Record<string, string>): Promise<TokenResponse | null> {
-  const res = await fetch(`${API_BASE_URL}/connect/token`, {
+  const res = await fetch(TOKEN_ENDPOINT, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams(body),

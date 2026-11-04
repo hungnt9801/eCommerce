@@ -7,6 +7,8 @@
     "build": "pnpm --filter @ecommerce/admin-web build",
     "lint": "pnpm --filter @ecommerce/admin-web lint",
     "gen:api": "pnpm --filter @ecommerce/api-client gen",
-    "spec:snapshot": "pnpm --filter @ecommerce/api-client spec:snapshot"
+    "spec:snapshot": "pnpm --filter @ecommerce/api-client spec:snapshot",
+    "test": "pnpm --filter @ecommerce/admin-web test",
+    "e2e": "pnpm --filter @ecommerce/admin-web e2e"
   }
 }

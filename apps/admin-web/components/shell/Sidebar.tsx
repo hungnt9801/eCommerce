@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { CaretDoubleLeft, CaretDoubleRight } from "@phosphor-icons/react";
 import type { MenuGroup } from "@/lib/menu";
+import { APP_NAME } from "@/lib/public-config";
 
 export function Sidebar({ business, menu }: { business: string; menu: MenuGroup[] }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -22,7 +23,7 @@ export function Sidebar({ business, menu }: { business: string; menu: MenuGroup[
       <div className="h-[52px] flex items-center justify-between px-4 border-b" style={{ borderColor: "var(--border)" }}>
         {!collapsed && (
           <span className="font-semibold tracking-tight" style={{ color: "var(--sidebar-text)" }}>
-            eCommerce
+            {APP_NAME}
           </span>
         )}
         <button

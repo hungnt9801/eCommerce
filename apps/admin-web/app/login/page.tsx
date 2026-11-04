@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { signIn, auth } from "@/lib/auth";
 import { DEFAULT_BUSINESS } from "@/lib/config";
+import { APP_NAME } from "@/lib/public-config";
 
 function isRedirectError(error: unknown): boolean {
   const digest = (error as { digest?: unknown } | null)?.digest;
@@ -48,7 +49,7 @@ export default async function LoginPage({
     <div className="min-h-screen flex items-center justify-center p-6">
       <div className="w-full max-w-[380px]">
         <div className="mb-6 text-center">
-          <div className="text-[22px] font-semibold">eCommerce Admin</div>
+          <div className="text-[22px] font-semibold">{APP_NAME} Admin</div>
           <div className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>
             Quản trị bán hàng đa kênh
           </div>

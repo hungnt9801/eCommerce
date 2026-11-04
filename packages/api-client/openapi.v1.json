@@ -6,6 +6,670 @@
     "version": "v1"
   },
   "paths": {
+    "/api/v1/customers": {
+      "get": {
+        "tags": [
+          "Customers"
+        ],
+        "parameters": [
+          {
+            "name": "Q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Tab",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Type",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/eCommerce.Customers.CustomerType"
+            }
+          },
+          {
+            "name": "LevelId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "ConNo",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "SkipCount",
+            "in": "query",
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 0,
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "MaxResultCount",
+            "in": "query",
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Customers.CustomerDto, eCommerce.Customers.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Customers.CustomerDto, eCommerce.Customers.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Customers.CustomerDto, eCommerce.Customers.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Customers"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Customers.TaoKhachInput"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Customers.TaoKhachInput"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Customers.TaoKhachInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.CustomerDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.CustomerDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.CustomerDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/customers/tabs": {
+      "get": {
+        "tags": [
+          "Customers"
+        ],
+        "parameters": [
+          {
+            "name": "Q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Tab",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Type",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/eCommerce.Customers.CustomerType"
+            }
+          },
+          {
+            "name": "LevelId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "ConNo",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "SkipCount",
+            "in": "query",
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 0,
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "MaxResultCount",
+            "in": "query",
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.CustomerTabCountsDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.CustomerTabCountsDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.CustomerTabCountsDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/customers/{id}": {
+      "get": {
+        "tags": [
+          "Customers"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.CustomerDetailDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.CustomerDetailDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.CustomerDetailDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/customers/{id}/segment": {
+      "put": {
+        "tags": [
+          "Customers"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Customers.CapNhatPhanKhachInput"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Customers.CapNhatPhanKhachInput"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Customers.CapNhatPhanKhachInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.CustomerDetailDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.CustomerDetailDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.CustomerDetailDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/customers/{id}/care": {
+      "get": {
+        "tags": [
+          "Customers"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/eCommerce.Customers.CustomerCareDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/eCommerce.Customers.CustomerCareDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/eCommerce.Customers.CustomerCareDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Customers"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Customers.TaoChamSocInput"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Customers.TaoChamSocInput"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Customers.TaoChamSocInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.CustomerCareDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.CustomerCareDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.CustomerCareDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/customers/{id}/balance": {
+      "get": {
+        "tags": [
+          "Customers"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.DoiChieuSoDuDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.DoiChieuSoDuDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.DoiChieuSoDuDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/customer-levels": {
+      "get": {
+        "tags": [
+          "Customers"
+        ],
+        "parameters": [
+          {
+            "name": "chiHoatDong",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/eCommerce.Customers.CustomerLevelDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/eCommerce.Customers.CustomerLevelDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/eCommerce.Customers.CustomerLevelDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Customers"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Customers.TaoCapKhachInput"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Customers.TaoCapKhachInput"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Customers.TaoCapKhachInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.CustomerLevelDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.CustomerLevelDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.CustomerLevelDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/customer-levels/{id}": {
+      "put": {
+        "tags": [
+          "Customers"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Customers.TaoCapKhachInput"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Customers.TaoCapKhachInput"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Customers.TaoCapKhachInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.CustomerLevelDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.CustomerLevelDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.CustomerLevelDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/customer-levels/{id}/active": {
+      "post": {
+        "tags": [
+          "Customers"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "isActive",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.CustomerLevelDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.CustomerLevelDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.CustomerLevelDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/orders": {
       "get": {
         "tags": [
@@ -77,6 +741,14 @@
           },
           {
             "name": "WarehouseId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "CustomerId",
             "in": "query",
             "schema": {
               "type": "string",
@@ -195,6 +867,14 @@
           },
           {
             "name": "WarehouseId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "CustomerId",
             "in": "query",
             "schema": {
               "type": "string",
@@ -458,6 +1138,684 @@
         }
       }
     },
+    "/api/v1/pos/bills": {
+      "get": {
+        "tags": [
+          "Pos"
+        ],
+        "parameters": [
+          {
+            "name": "Q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "WarehouseId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "CashSessionId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "CustomerId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Status",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/eCommerce.Pos.RetailBillStatus"
+            }
+          },
+          {
+            "name": "FromUtc",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "ToUtc",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "SkipCount",
+            "in": "query",
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 0,
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "MaxResultCount",
+            "in": "query",
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Application.Contracts.Pos.RetailBillDto, eCommerce.Pos.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Application.Contracts.Pos.RetailBillDto, eCommerce.Pos.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Application.Contracts.Pos.RetailBillDto, eCommerce.Pos.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Pos"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.CreateRetailBillDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.CreateRetailBillDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.CreateRetailBillDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.CreateRetailBillResultDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.CreateRetailBillResultDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.CreateRetailBillResultDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pos/bills/{id}": {
+      "get": {
+        "tags": [
+          "Pos"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.RetailBillDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.RetailBillDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.RetailBillDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pos/bills/{id}/void": {
+      "post": {
+        "tags": [
+          "Pos"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.VoidRetailBillDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.VoidRetailBillDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.VoidRetailBillDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.VoidRetailBillResultDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.VoidRetailBillResultDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.VoidRetailBillResultDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pos/sessions/current": {
+      "get": {
+        "tags": [
+          "Pos"
+        ],
+        "parameters": [
+          {
+            "name": "warehouseId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.CashSessionDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.CashSessionDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.CashSessionDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pos/sessions": {
+      "get": {
+        "tags": [
+          "Pos"
+        ],
+        "parameters": [
+          {
+            "name": "warehouseId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "fromUtc",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "toUtc",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Application.Contracts.Pos.CashSessionDto, eCommerce.Pos.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Application.Contracts.Pos.CashSessionDto, eCommerce.Pos.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Application.Contracts.Pos.CashSessionDto, eCommerce.Pos.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pos/sessions/{id}": {
+      "get": {
+        "tags": [
+          "Pos"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.CashSessionDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.CashSessionDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.CashSessionDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pos/sessions/open": {
+      "post": {
+        "tags": [
+          "Pos"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.OpenCashSessionDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.OpenCashSessionDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.OpenCashSessionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.CashSessionDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.CashSessionDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.CashSessionDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pos/sessions/{id}/close": {
+      "post": {
+        "tags": [
+          "Pos"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.CloseCashSessionDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.CloseCashSessionDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.CloseCashSessionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.CashSessionDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.CashSessionDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.CashSessionDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pos/returns": {
+      "get": {
+        "tags": [
+          "Pos"
+        ],
+        "parameters": [
+          {
+            "name": "RetailBillId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "WarehouseId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "FromUtc",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "ToUtc",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "SkipCount",
+            "in": "query",
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 0,
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "MaxResultCount",
+            "in": "query",
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Application.Contracts.Pos.RetailReturnDto, eCommerce.Pos.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Application.Contracts.Pos.RetailReturnDto, eCommerce.Pos.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Application.Contracts.Pos.RetailReturnDto, eCommerce.Pos.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Pos"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.CreateRetailReturnDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.CreateRetailReturnDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.CreateRetailReturnDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.RetailReturnDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.RetailReturnDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.RetailReturnDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pos/returns/{id}": {
+      "get": {
+        "tags": [
+          "Pos"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.RetailReturnDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.RetailReturnDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.RetailReturnDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/products": {
       "get": {
         "tags": [
@@ -643,6 +2001,847 @@
               "text/json": {
                 "schema": {
                   "$ref": "#/components/schemas/eCommerce.HttpApi.Dtos.ProductLookupResultDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/revenue": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "parameters": [
+          {
+            "name": "TuNgay",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "DenNgay",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "Nguon",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/eCommerce.Reporting.NguonBaoCao"
+            }
+          },
+          {
+            "name": "TheoThang",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Reporting.BaoCaoDoanhThuDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Reporting.BaoCaoDoanhThuDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Reporting.BaoCaoDoanhThuDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/orders/summary": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "parameters": [
+          {
+            "name": "TuNgay",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "DenNgay",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Reporting.TongQuanDonHangDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Reporting.TongQuanDonHangDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Reporting.TongQuanDonHangDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/inventory/summary": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "parameters": [
+          {
+            "name": "Ngay",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Reporting.TongQuanTonKhoDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Reporting.TongQuanTonKhoDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Reporting.TongQuanTonKhoDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/dashboard": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Reporting.TongQuanDashboardDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Reporting.TongQuanDashboardDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Reporting.TongQuanDashboardDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/aggregate": {
+      "post": {
+        "tags": [
+          "Reports"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Reporting.ChayTongHopInput"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Reporting.ChayTongHopInput"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Reporting.ChayTongHopInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Reporting.KetQuaTongHopDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Reporting.KetQuaTongHopDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Reporting.KetQuaTongHopDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/staff": {
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/eCommerce.Customers.StaffDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/eCommerce.Customers.StaffDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/eCommerce.Customers.StaffDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Settings"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Customers.TaoNhanVienInput"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Customers.TaoNhanVienInput"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Customers.TaoNhanVienInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.StaffDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.StaffDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.StaffDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/staff/{id}": {
+      "put": {
+        "tags": [
+          "Settings"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Customers.TaoNhanVienInput"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Customers.TaoNhanVienInput"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Customers.TaoNhanVienInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.StaffDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.StaffDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.StaffDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/stores": {
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/eCommerce.Customers.StoreDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/eCommerce.Customers.StoreDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/eCommerce.Customers.StoreDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Settings"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Customers.TaoCuaHangInput"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Customers.TaoCuaHangInput"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Customers.TaoCuaHangInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.StoreDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.StoreDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.StoreDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/stores/{id}": {
+      "put": {
+        "tags": [
+          "Settings"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Customers.TaoCuaHangInput"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Customers.TaoCuaHangInput"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Customers.TaoCuaHangInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.StoreDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.StoreDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.StoreDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/departments": {
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/eCommerce.Customers.DepartmentDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/eCommerce.Customers.DepartmentDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/eCommerce.Customers.DepartmentDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Settings"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Customers.TaoPhongBanInput"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Customers.TaoPhongBanInput"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Customers.TaoPhongBanInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.DepartmentDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.DepartmentDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.DepartmentDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/departments/{id}": {
+      "put": {
+        "tags": [
+          "Settings"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Customers.TaoPhongBanInput"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Customers.TaoPhongBanInput"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Customers.TaoPhongBanInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.DepartmentDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.DepartmentDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.DepartmentDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/data-scopes": {
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/eCommerce.Customers.RoleDataScopeDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/eCommerce.Customers.RoleDataScopeDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/eCommerce.Customers.RoleDataScopeDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Settings"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Customers.DatPhamViDuLieuInput"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Customers.DatPhamViDuLieuInput"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Customers.DatPhamViDuLieuInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.RoleDataScopeDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.RoleDataScopeDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.RoleDataScopeDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/data-scopes/me": {
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.PhamViCuaToiDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.PhamViCuaToiDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.PhamViCuaToiDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/permissions": {
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.PermissionMatrixDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.PermissionMatrixDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.PermissionMatrixDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Settings"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Customers.DatQuyenInput"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Customers.DatQuyenInput"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Customers.DatQuyenInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.DatQuyenKetQuaDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.DatQuyenKetQuaDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Customers.DatQuyenKetQuaDto"
                 }
               }
             }
@@ -1167,6 +3366,57 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/eCommerce.Application.Contracts.Inventory.StockDocumentDto"
+            },
+            "nullable": true
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Application.Contracts.Pos.CashSessionDto, eCommerce.Pos.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.CashSessionDto"
+            },
+            "nullable": true
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Application.Contracts.Pos.RetailBillDto, eCommerce.Pos.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.RetailBillDto"
+            },
+            "nullable": true
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Application.Contracts.Pos.RetailReturnDto, eCommerce.Pos.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.RetailReturnDto"
             },
             "nullable": true
           },
@@ -4358,6 +6608,688 @@
         },
         "additionalProperties": false
       },
+      "eCommerce.Application.Contracts.Pos.CashSessionDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "string",
+            "nullable": true
+          },
+          "warehouseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cashierId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "openingCash": {
+            "type": "number",
+            "format": "double"
+          },
+          "openedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "closedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "closedBy": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "cashRevenue": {
+            "type": "number",
+            "format": "double"
+          },
+          "cashRefund": {
+            "type": "number",
+            "format": "double"
+          },
+          "otherExpense": {
+            "type": "number",
+            "format": "double"
+          },
+          "expectedCash": {
+            "type": "number",
+            "format": "double"
+          },
+          "handoverCash": {
+            "type": "number",
+            "format": "double"
+          },
+          "variance": {
+            "type": "number",
+            "format": "double"
+          },
+          "billCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "creationTime": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Application.Contracts.Pos.CloseCashSessionDto": {
+        "type": "object",
+        "properties": {
+          "handoverCash": {
+            "type": "number",
+            "format": "double"
+          },
+          "otherExpense": {
+            "type": "number",
+            "format": "double"
+          },
+          "note": {
+            "maxLength": 1024,
+            "minLength": 0,
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Application.Contracts.Pos.CreateRetailBillDto": {
+        "required": [
+          "clientBillId",
+          "lines",
+          "warehouseId"
+        ],
+        "type": "object",
+        "properties": {
+          "clientBillId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "warehouseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cashSessionId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "customerId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "saleStaffId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "discountAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "pointsUsed": {
+            "type": "number",
+            "format": "double"
+          },
+          "pointsEarned": {
+            "type": "number",
+            "format": "double"
+          },
+          "customerGivenAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "dueDateUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "note": {
+            "maxLength": 2048,
+            "minLength": 0,
+            "type": "string",
+            "nullable": true
+          },
+          "lines": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.CreateRetailBillLineDto"
+            }
+          },
+          "payments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.CreateRetailBillPaymentDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Application.Contracts.Pos.CreateRetailBillLineDto": {
+        "required": [
+          "sku"
+        ],
+        "type": "object",
+        "properties": {
+          "sku": {
+            "maxLength": 64,
+            "minLength": 0,
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number",
+            "format": "double"
+          },
+          "unitPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "discountAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "vatPercent": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "productName": {
+            "maxLength": 256,
+            "minLength": 0,
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Application.Contracts.Pos.CreateRetailBillPaymentDto": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "$ref": "#/components/schemas/eCommerce.Pos.RetailPaymentMethod"
+          },
+          "amount": {
+            "type": "number",
+            "format": "double"
+          },
+          "referenceCode": {
+            "maxLength": 128,
+            "minLength": 0,
+            "type": "string",
+            "nullable": true
+          },
+          "note": {
+            "maxLength": 256,
+            "minLength": 0,
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Application.Contracts.Pos.CreateRetailBillResultDto": {
+        "type": "object",
+        "properties": {
+          "bill": {
+            "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.RetailBillDto"
+          },
+          "alreadyExisted": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Application.Contracts.Pos.CreateRetailReturnDto": {
+        "required": [
+          "lines",
+          "retailBillId"
+        ],
+        "type": "object",
+        "properties": {
+          "retailBillId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "returnFeeAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "refundMethod": {
+            "$ref": "#/components/schemas/eCommerce.Pos.RetailPaymentMethod"
+          },
+          "pointsReversed": {
+            "type": "number",
+            "format": "double"
+          },
+          "note": {
+            "maxLength": 1024,
+            "minLength": 0,
+            "type": "string",
+            "nullable": true
+          },
+          "lines": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.CreateRetailReturnLineDto"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Application.Contracts.Pos.CreateRetailReturnLineDto": {
+        "required": [
+          "sku"
+        ],
+        "type": "object",
+        "properties": {
+          "sku": {
+            "maxLength": 64,
+            "minLength": 0,
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Application.Contracts.Pos.OpenCashSessionDto": {
+        "required": [
+          "warehouseId"
+        ],
+        "type": "object",
+        "properties": {
+          "warehouseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "openingCash": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Application.Contracts.Pos.RetailBillDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "string",
+            "nullable": true
+          },
+          "clientBillId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "warehouseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cashSessionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "customerId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "saleStaffId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "subtotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "lineDiscountTotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "discountTotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "vatTotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "pointsUsed": {
+            "type": "number",
+            "format": "double"
+          },
+          "pointsUsedAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "pointsEarned": {
+            "type": "number",
+            "format": "double"
+          },
+          "totalPayment": {
+            "type": "number",
+            "format": "double"
+          },
+          "paidAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "changeAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "debtAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "customerGivenAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "dueDateUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "stockDocumentId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "voidedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "voidedBy": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "voidReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "voidStockDocumentId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "cashSessionClosed": {
+            "type": "boolean"
+          },
+          "creationTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.RetailBillLineDto"
+            },
+            "nullable": true
+          },
+          "payments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.RetailBillPaymentDto"
+            },
+            "nullable": true
+          },
+          "paymentMethods": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Application.Contracts.Pos.RetailBillLineDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sku": {
+            "type": "string",
+            "nullable": true
+          },
+          "productName": {
+            "type": "string",
+            "nullable": true
+          },
+          "quantity": {
+            "type": "number",
+            "format": "double"
+          },
+          "unitPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "discountAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "vatPercent": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "amount": {
+            "type": "number",
+            "format": "double"
+          },
+          "vatAmount": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "returnedQuantity": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Application.Contracts.Pos.RetailBillPaymentDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "method": {
+            "type": "string",
+            "nullable": true
+          },
+          "amount": {
+            "type": "number",
+            "format": "double"
+          },
+          "referenceCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Application.Contracts.Pos.RetailReturnDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "string",
+            "nullable": true
+          },
+          "retailBillId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "retailBillNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "warehouseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cashSessionId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "customerId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "goodsAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "returnFeeAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "debtReductionAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "refundAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "refundMethod": {
+            "type": "string",
+            "nullable": true
+          },
+          "pointsReversed": {
+            "type": "number",
+            "format": "double"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "stockDocumentId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "creationTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.RetailReturnLineDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Application.Contracts.Pos.RetailReturnLineDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sku": {
+            "type": "string",
+            "nullable": true
+          },
+          "quantity": {
+            "type": "number",
+            "format": "double"
+          },
+          "unitPriceSnapshot": {
+            "type": "number",
+            "format": "double"
+          },
+          "refundAmount": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Application.Contracts.Pos.VoidRetailBillDto": {
+        "required": [
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "reason": {
+            "maxLength": 512,
+            "minLength": 0,
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Application.Contracts.Pos.VoidRetailBillResultDto": {
+        "type": "object",
+        "properties": {
+          "bill": {
+            "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.RetailBillDto"
+          },
+          "voided": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
       "eCommerce.Application.Contracts.Sales.ApproveReturnDto": {
         "type": "object",
         "properties": {
@@ -6453,6 +9385,271 @@
         },
         "additionalProperties": false
       },
+      "eCommerce.Customers.CapNhatPhanKhachInput": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "$ref": "#/components/schemas/eCommerce.Customers.CustomerType"
+          },
+          "levelId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "debtLimit": {
+            "type": "number",
+            "format": "double"
+          },
+          "saleStaffId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "referrerId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "taxCode": {
+            "maxLength": 32,
+            "minLength": 0,
+            "type": "string",
+            "nullable": true
+          },
+          "birthday": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Customers.CongNoHoaDonDto": {
+        "type": "object",
+        "properties": {
+          "billId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "string",
+            "nullable": true
+          },
+          "totalPayment": {
+            "type": "number",
+            "format": "double"
+          },
+          "paidAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "debtAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "dueDateUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "quaHan": {
+            "type": "boolean"
+          },
+          "creationTime": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Customers.CustomerCareDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "customerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "type": {
+            "type": "string",
+            "nullable": true
+          },
+          "content": {
+            "type": "string",
+            "nullable": true
+          },
+          "staffId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "occurredAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "nextFollowUpAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "creationTime": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Customers.CustomerCareType": {
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "eCommerce.Customers.CustomerDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "identityUserId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "dungDuoc": {
+            "type": "boolean"
+          },
+          "laKhachVangLai": {
+            "type": "boolean"
+          },
+          "customerGroupId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "lifetimeValueAmount": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "lifetimeValueCurrency": {
+            "type": "string",
+            "nullable": true
+          },
+          "creationTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "type": {
+            "type": "string",
+            "nullable": true
+          },
+          "levelId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "levelName": {
+            "type": "string",
+            "nullable": true
+          },
+          "points": {
+            "type": "number",
+            "format": "double"
+          },
+          "accumulatedAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "debtLimit": {
+            "type": "number",
+            "format": "double"
+          },
+          "debtBalance": {
+            "type": "number",
+            "format": "double"
+          },
+          "vuotHanMucNo": {
+            "type": "boolean"
+          },
+          "saleStaffId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "referrerId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "taxCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "birthday": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "levelDiscountPercent": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "soDonHang": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "soHoaDonBanLe": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "tongBanLe": {
+            "type": "number",
+            "format": "double"
+          },
+          "tongDaTraHang": {
+            "type": "number",
+            "format": "double"
+          },
+          "coNoQuaHan": {
+            "type": "boolean"
+          },
+          "congNo": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/eCommerce.Customers.CongNoHoaDonDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "eCommerce.Customers.CustomerDto": {
         "type": "object",
         "properties": {
@@ -6504,6 +9701,57 @@
           "creationTime": {
             "type": "string",
             "format": "date-time"
+          },
+          "type": {
+            "type": "string",
+            "nullable": true
+          },
+          "levelId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "levelName": {
+            "type": "string",
+            "nullable": true
+          },
+          "points": {
+            "type": "number",
+            "format": "double"
+          },
+          "accumulatedAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "debtLimit": {
+            "type": "number",
+            "format": "double"
+          },
+          "debtBalance": {
+            "type": "number",
+            "format": "double"
+          },
+          "vuotHanMucNo": {
+            "type": "boolean"
+          },
+          "saleStaffId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "referrerId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "taxCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "birthday": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -6530,6 +9778,176 @@
           "soKhach": {
             "type": "integer",
             "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Customers.CustomerLevelDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "minAccumulatedAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "discountPercent": {
+            "type": "number",
+            "format": "double"
+          },
+          "sortOrder": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Customers.CustomerTabCountsDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "tabs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/eCommerce.Customers.CustomerTabDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Customers.CustomerTabDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "nullable": true
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Customers.CustomerType": {
+        "enum": [
+          0,
+          1,
+          2
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "eCommerce.Customers.DatPhamViDuLieuInput": {
+        "required": [
+          "roleName",
+          "scope"
+        ],
+        "type": "object",
+        "properties": {
+          "roleName": {
+            "maxLength": 256,
+            "minLength": 0,
+            "type": "string"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/eCommerce.Customers.PhamViDuLieu"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Customers.DatQuyenInput": {
+        "required": [
+          "permissionName",
+          "roleName"
+        ],
+        "type": "object",
+        "properties": {
+          "roleName": {
+            "maxLength": 256,
+            "minLength": 0,
+            "type": "string"
+          },
+          "permissionName": {
+            "maxLength": 256,
+            "minLength": 0,
+            "type": "string"
+          },
+          "isGranted": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Customers.DatQuyenKetQuaDto": {
+        "type": "object",
+        "properties": {
+          "roleName": {
+            "type": "string",
+            "nullable": true
+          },
+          "permissionName": {
+            "type": "string",
+            "nullable": true
+          },
+          "isGranted": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Customers.DepartmentDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "storeId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "parentId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -6614,6 +10032,50 @@
           },
           "diaChi": {
             "$ref": "#/components/schemas/eCommerce.Address.DiaChiSnapshotDto"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Customers.DoiChieuSoDuDto": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "points": {
+            "type": "number",
+            "format": "double"
+          },
+          "accumulatedAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "debtLimit": {
+            "type": "number",
+            "format": "double"
+          },
+          "debtBalance": {
+            "type": "number",
+            "format": "double"
+          },
+          "tongHoaDon": {
+            "type": "number",
+            "format": "double"
+          },
+          "tongTraHang": {
+            "type": "number",
+            "format": "double"
+          },
+          "tongNoHoaDon": {
+            "type": "number",
+            "format": "double"
+          },
+          "tienTichLuyKhop": {
+            "type": "boolean"
+          },
+          "congNoKhop": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -6781,6 +10243,129 @@
         },
         "additionalProperties": false
       },
+      "eCommerce.Customers.PermissionDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "displayName": {
+            "type": "string",
+            "nullable": true
+          },
+          "parentName": {
+            "type": "string",
+            "nullable": true
+          },
+          "laQuyenDoc": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Customers.PermissionGroupDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/eCommerce.Customers.PermissionDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Customers.PermissionMatrixDto": {
+        "type": "object",
+        "properties": {
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/eCommerce.Customers.PermissionGroupDto"
+            },
+            "nullable": true
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "grantedByRole": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Customers.PhamViCuaToiDto": {
+        "type": "object",
+        "properties": {
+          "phamVi": {
+            "type": "string",
+            "nullable": true
+          },
+          "lyDo": {
+            "type": "string",
+            "nullable": true
+          },
+          "nhanVienId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "khoCuaHangId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Customers.PhamViDuLieu": {
+        "enum": [
+          0,
+          1,
+          2
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "eCommerce.Customers.RoleDataScopeDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roleName": {
+            "type": "string",
+            "nullable": true
+          },
+          "scope": {
+            "type": "string",
+            "nullable": true
+          },
+          "scopeLabel": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "eCommerce.Customers.SoDiaChiDto": {
         "type": "object",
         "properties": {
@@ -6802,6 +10387,211 @@
           "soMacDinhHoaDon": {
             "type": "integer",
             "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Customers.StaffDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "identityUserId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "storeId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "storeName": {
+            "type": "string",
+            "nullable": true
+          },
+          "departmentId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "departmentName": {
+            "type": "string",
+            "nullable": true
+          },
+          "roleName": {
+            "type": "string",
+            "nullable": true
+          },
+          "phamViHieuLuc": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Customers.StoreDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "warehouseId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "addressText": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Customers.TaoCapKhachInput": {
+        "required": [
+          "code",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "maxLength": 32,
+            "minLength": 0,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 128,
+            "minLength": 0,
+            "type": "string"
+          },
+          "minAccumulatedAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "discountPercent": {
+            "type": "number",
+            "format": "double"
+          },
+          "sortOrder": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "note": {
+            "maxLength": 512,
+            "minLength": 0,
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Customers.TaoChamSocInput": {
+        "required": [
+          "content",
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "$ref": "#/components/schemas/eCommerce.Customers.CustomerCareType"
+          },
+          "content": {
+            "maxLength": 2048,
+            "minLength": 0,
+            "type": "string"
+          },
+          "occurredAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "staffId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "nextFollowUpAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Customers.TaoCuaHangInput": {
+        "required": [
+          "code",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "maxLength": 32,
+            "minLength": 0,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 128,
+            "minLength": 0,
+            "type": "string"
+          },
+          "warehouseId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "addressText": {
+            "maxLength": 512,
+            "minLength": 0,
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "maxLength": 32,
+            "minLength": 0,
+            "type": "string",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -6828,6 +10618,62 @@
         },
         "additionalProperties": false
       },
+      "eCommerce.Customers.TaoNhanVienInput": {
+        "required": [
+          "code",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "maxLength": 32,
+            "minLength": 0,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 128,
+            "minLength": 0,
+            "type": "string"
+          },
+          "identityUserId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "storeId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "departmentId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "roleName": {
+            "maxLength": 256,
+            "minLength": 0,
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "maxLength": 32,
+            "minLength": 0,
+            "type": "string",
+            "nullable": true
+          },
+          "note": {
+            "maxLength": 1024,
+            "minLength": 0,
+            "type": "string",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
       "eCommerce.Customers.TaoNhomKhachInput": {
         "required": [
           "code",
@@ -6850,6 +10696,39 @@
             "minLength": 0,
             "type": "string",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Customers.TaoPhongBanInput": {
+        "required": [
+          "code",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "maxLength": 32,
+            "minLength": 0,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 128,
+            "minLength": 0,
+            "type": "string"
+          },
+          "storeId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "parentId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -7326,6 +11205,31 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/eCommerce.Application.Contracts.Inventory.StockDocumentDto"
+            },
+            "nullable": true
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Application.Contracts.Pos.CashSessionDto, eCommerce.Pos.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/eCommerce.Application.Contracts.Pos.CashSessionDto"
             },
             "nullable": true
           },
@@ -7986,6 +11890,29 @@
           },
           "confirmNote": {
             "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Inventory.PosStockLine": {
+        "type": "object",
+        "properties": {
+          "sku": {
+            "type": "string",
+            "nullable": true
+          },
+          "quantity": {
+            "type": "number",
+            "format": "double"
+          },
+          "unitPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "vatPercent": {
+            "type": "number",
+            "format": "double",
             "nullable": true
           }
         },
@@ -8700,6 +12627,26 @@
           3,
           4,
           5
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "eCommerce.Pos.RetailBillStatus": {
+        "enum": [
+          0,
+          1
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "eCommerce.Pos.RetailPaymentMethod": {
+        "enum": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          20
         ],
         "type": "integer",
         "format": "int32"
@@ -9724,6 +13671,380 @@
         "type": "integer",
         "format": "int32"
       },
+      "eCommerce.Reporting.BaoCaoDoanhThuDto": {
+        "type": "object",
+        "properties": {
+          "tuNgay": {
+            "type": "string",
+            "format": "date"
+          },
+          "denNgay": {
+            "type": "string",
+            "format": "date"
+          },
+          "tongDoanhThu": {
+            "type": "number",
+            "format": "double"
+          },
+          "doanhThuBanLe": {
+            "type": "number",
+            "format": "double"
+          },
+          "doanhThuDonHang": {
+            "type": "number",
+            "format": "double"
+          },
+          "tongTienVat": {
+            "type": "number",
+            "format": "double"
+          },
+          "tongSoChungTu": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "daTongHop": {
+            "type": "boolean"
+          },
+          "ngayTongHopMoiNhat": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "dinhNghiaTien": {
+            "type": "string",
+            "nullable": true
+          },
+          "diem": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/eCommerce.Reporting.DiemDoanhThuDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Reporting.ChayTongHopInput": {
+        "type": "object",
+        "properties": {
+          "tuNgay": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "denNgay": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "ghiAnhTonKho": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Reporting.DiemDoanhThuDto": {
+        "type": "object",
+        "properties": {
+          "nhan": {
+            "type": "string",
+            "nullable": true
+          },
+          "tuNgay": {
+            "type": "string",
+            "format": "date"
+          },
+          "denNgay": {
+            "type": "string",
+            "format": "date"
+          },
+          "doanhThuBanLe": {
+            "type": "number",
+            "format": "double"
+          },
+          "doanhThuDonHang": {
+            "type": "number",
+            "format": "double"
+          },
+          "tongDoanhThu": {
+            "type": "number",
+            "format": "double"
+          },
+          "tienVat": {
+            "type": "number",
+            "format": "double"
+          },
+          "soChungTu": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Reporting.DongTonKhoDto": {
+        "type": "object",
+        "properties": {
+          "warehouseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kho": {
+            "type": "string",
+            "nullable": true
+          },
+          "soSku": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "onHand": {
+            "type": "number",
+            "format": "double"
+          },
+          "khaDung": {
+            "type": "number",
+            "format": "double"
+          },
+          "tamGiu": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Reporting.KetQuaTongHopDto": {
+        "type": "object",
+        "properties": {
+          "tuNgay": {
+            "type": "string",
+            "format": "date"
+          },
+          "denNgay": {
+            "type": "string",
+            "format": "date"
+          },
+          "soNgay": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "rong": {
+            "type": "boolean"
+          },
+          "soDongSuKien": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "soDongTongHop": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "soAnhTonKho": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "mocBanLe": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "mocDonHang": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "mocTonKho": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Reporting.MatHangSapHetDto": {
+        "type": "object",
+        "properties": {
+          "warehouseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kho": {
+            "type": "string",
+            "nullable": true
+          },
+          "sku": {
+            "type": "string",
+            "nullable": true
+          },
+          "onHand": {
+            "type": "number",
+            "format": "double"
+          },
+          "khaDung": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Reporting.NguonBaoCao": {
+        "enum": [
+          0,
+          1,
+          2
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "eCommerce.Reporting.NhomTrangThaiDonDto": {
+        "type": "object",
+        "properties": {
+          "trangThai": {
+            "type": "string",
+            "nullable": true
+          },
+          "soDon": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "giaTriDon": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Reporting.TongQuanDashboardDto": {
+        "type": "object",
+        "properties": {
+          "ngay": {
+            "type": "string",
+            "format": "date"
+          },
+          "doanhThuHomNay": {
+            "type": "number",
+            "format": "double"
+          },
+          "doanhThuBanLeHomNay": {
+            "type": "number",
+            "format": "double"
+          },
+          "doanhThuDonHangHomNay": {
+            "type": "number",
+            "format": "double"
+          },
+          "soHoaDonBanLeHomNay": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "soDonHangHomNay": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "tongKhaDung": {
+            "type": "number",
+            "format": "double"
+          },
+          "soSkuSapHet": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "ngayTonKhoMoiNhat": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "ngayTongHopMoiNhat": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "dinhNghiaTien": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Reporting.TongQuanDonHangDto": {
+        "type": "object",
+        "properties": {
+          "tuNgay": {
+            "type": "string",
+            "format": "date"
+          },
+          "denNgay": {
+            "type": "string",
+            "format": "date"
+          },
+          "tongDon": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "soDonHuy": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "giaTriDon": {
+            "type": "number",
+            "format": "double"
+          },
+          "theoTrangThai": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/eCommerce.Reporting.NhomTrangThaiDonDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Reporting.TongQuanTonKhoDto": {
+        "type": "object",
+        "properties": {
+          "ngayChup": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "daCoDuLieu": {
+            "type": "boolean"
+          },
+          "soKho": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "soSku": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "tongOnHand": {
+            "type": "number",
+            "format": "double"
+          },
+          "tongKhaDung": {
+            "type": "number",
+            "format": "double"
+          },
+          "tongTamGiu": {
+            "type": "number",
+            "format": "double"
+          },
+          "theoKho": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/eCommerce.Reporting.DongTonKhoDto"
+            },
+            "nullable": true
+          },
+          "sapHet": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/eCommerce.Reporting.MatHangSapHetDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "eCommerce.ReturnStatus": {
         "enum": [
           0,
@@ -10219,6 +14540,9 @@
       "name": "CarrierAddressMapping"
     },
     {
+      "name": "CashSession"
+    },
+    {
       "name": "CatalogAttribute"
     },
     {
@@ -10246,7 +14570,13 @@
       "name": "CustomerGroup"
     },
     {
+      "name": "CustomerLevel"
+    },
+    {
       "name": "CustomerReturnGateway"
+    },
+    {
+      "name": "Customers"
     },
     {
       "name": "DeadLetter"
@@ -10294,7 +14624,16 @@
       "name": "PaymentReconciliation"
     },
     {
+      "name": "PermissionMatrix"
+    },
+    {
       "name": "PhatHanhHoaDonGd0"
+    },
+    {
+      "name": "Pos"
+    },
+    {
+      "name": "PosStockGateway"
     },
     {
       "name": "PriceCalculation"
@@ -10315,7 +14654,25 @@
       "name": "Products"
     },
     {
+      "name": "Report"
+    },
+    {
+      "name": "Reports"
+    },
+    {
+      "name": "RetailBill"
+    },
+    {
+      "name": "RetailReturn"
+    },
+    {
+      "name": "Settings"
+    },
+    {
       "name": "Signing"
+    },
+    {
+      "name": "Staff"
     },
     {
       "name": "Stock"

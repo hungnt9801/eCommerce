@@ -46,20 +46,33 @@ export const MENU: MenuGroup[] = [
   {
     label: "Bán hàng",
     items: [
-      { label: "Bán lẻ (POS)", href: "pos/bill", permission: "eCommerce.Orders", enabled: false, note: "WP-06" },
+      // ✅ `WP-06` — POS + trả hàng đã có màn thật; quyền tách theo việc (`eCommerce.Pos.Sell`/`.Return`),
+      // nhưng **menu** chỉ cần quyền **đọc** (`eCommerce.Pos`) — thiếu quyền ghi thì nút trong màn báo mã lỗi.
+      { label: "Bán lẻ (POS)", href: "pos/bill", permission: "eCommerce.Pos", enabled: true },
       { label: "Đơn hàng", href: "order/manage", permission: "eCommerce.Orders", enabled: true },
-      { label: "Trả hàng", href: "pos/return", permission: "eCommerce.Orders", enabled: false, note: "WP-06" },
+      { label: "Trả hàng", href: "pos/return", permission: "eCommerce.Pos", enabled: true },
+      { label: "Hoá đơn bán lẻ", href: "pos/bill/list", permission: "eCommerce.Pos", enabled: true },
     ],
   },
   {
     label: "Khách hàng",
     items: [
-      { label: "Khách hàng", href: "customer/list", permission: "eCommerce.Customers", enabled: false, note: "WP-07" },
+      // ✅ `WP-07` — DS khách 5 tab phân khúc + chi tiết 5 tab.
+      { label: "Khách hàng", href: "customer/list", permission: "eCommerce.Customers", enabled: true },
+      // 🔒 Quyền **riêng** `eCommerce.Settings` (không dùng `eCommerce.Customers`): màn này đổi **phạm vi
+      // dữ liệu** và **cấp quyền** — người sửa hồ sơ khách không đương nhiên được nới quyền của mình.
+      { label: "Nhân viên & quyền", href: "settings/staff", permission: "eCommerce.Settings", enabled: true },
     ],
   },
   {
     label: "Báo cáo",
-    items: [{ label: "Doanh thu", href: "report/revenue", permission: "eCommerce.Reports", enabled: false, note: "WP-08" }],
+    items: [
+      // ✅ `WP-08` — doanh thu + tồn kho đọc read-model (`Rpt*`) do job tổng hợp ghi.
+      // 🔒 Quyền **riêng** `eCommerce.Reports` (không dùng `eCommerce.Pos`/`eCommerce.Orders`): báo cáo là số
+      // liệu **toàn tenant**, và người bán hàng không đương nhiên được xem doanh thu của cả cửa hàng.
+      { label: "Doanh thu", href: "report/revenue", permission: "eCommerce.Reports", enabled: true },
+      { label: "Tồn kho", href: "report/inventory", permission: "eCommerce.Reports", enabled: true },
+    ],
   },
 ];
 

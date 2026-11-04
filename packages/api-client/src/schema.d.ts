@@ -1,4 +1,464 @@
 export interface paths {
+    "/api/v1/customers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    Q?: string;
+                    Tab?: string;
+                    Type?: components["schemas"]["eCommerce.Customers.CustomerType"];
+                    LevelId?: string;
+                    ConNo?: boolean;
+                    SkipCount?: number;
+                    MaxResultCount?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Customers.CustomerDto, eCommerce.Customers.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"];
+                        "application/json": components["schemas"]["Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Customers.CustomerDto, eCommerce.Customers.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"];
+                        "text/json": components["schemas"]["Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Customers.CustomerDto, eCommerce.Customers.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["eCommerce.Customers.TaoKhachInput"];
+                    "text/json": components["schemas"]["eCommerce.Customers.TaoKhachInput"];
+                    "application/*+json": components["schemas"]["eCommerce.Customers.TaoKhachInput"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Customers.CustomerDto"];
+                        "application/json": components["schemas"]["eCommerce.Customers.CustomerDto"];
+                        "text/json": components["schemas"]["eCommerce.Customers.CustomerDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/tabs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    Q?: string;
+                    Tab?: string;
+                    Type?: components["schemas"]["eCommerce.Customers.CustomerType"];
+                    LevelId?: string;
+                    ConNo?: boolean;
+                    SkipCount?: number;
+                    MaxResultCount?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Customers.CustomerTabCountsDto"];
+                        "application/json": components["schemas"]["eCommerce.Customers.CustomerTabCountsDto"];
+                        "text/json": components["schemas"]["eCommerce.Customers.CustomerTabCountsDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Customers.CustomerDetailDto"];
+                        "application/json": components["schemas"]["eCommerce.Customers.CustomerDetailDto"];
+                        "text/json": components["schemas"]["eCommerce.Customers.CustomerDetailDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{id}/segment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["eCommerce.Customers.CapNhatPhanKhachInput"];
+                    "text/json": components["schemas"]["eCommerce.Customers.CapNhatPhanKhachInput"];
+                    "application/*+json": components["schemas"]["eCommerce.Customers.CapNhatPhanKhachInput"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Customers.CustomerDetailDto"];
+                        "application/json": components["schemas"]["eCommerce.Customers.CustomerDetailDto"];
+                        "text/json": components["schemas"]["eCommerce.Customers.CustomerDetailDto"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{id}/care": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Customers.CustomerCareDto"][];
+                        "application/json": components["schemas"]["eCommerce.Customers.CustomerCareDto"][];
+                        "text/json": components["schemas"]["eCommerce.Customers.CustomerCareDto"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["eCommerce.Customers.TaoChamSocInput"];
+                    "text/json": components["schemas"]["eCommerce.Customers.TaoChamSocInput"];
+                    "application/*+json": components["schemas"]["eCommerce.Customers.TaoChamSocInput"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Customers.CustomerCareDto"];
+                        "application/json": components["schemas"]["eCommerce.Customers.CustomerCareDto"];
+                        "text/json": components["schemas"]["eCommerce.Customers.CustomerCareDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{id}/balance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Customers.DoiChieuSoDuDto"];
+                        "application/json": components["schemas"]["eCommerce.Customers.DoiChieuSoDuDto"];
+                        "text/json": components["schemas"]["eCommerce.Customers.DoiChieuSoDuDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer-levels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    chiHoatDong?: boolean;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Customers.CustomerLevelDto"][];
+                        "application/json": components["schemas"]["eCommerce.Customers.CustomerLevelDto"][];
+                        "text/json": components["schemas"]["eCommerce.Customers.CustomerLevelDto"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["eCommerce.Customers.TaoCapKhachInput"];
+                    "text/json": components["schemas"]["eCommerce.Customers.TaoCapKhachInput"];
+                    "application/*+json": components["schemas"]["eCommerce.Customers.TaoCapKhachInput"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Customers.CustomerLevelDto"];
+                        "application/json": components["schemas"]["eCommerce.Customers.CustomerLevelDto"];
+                        "text/json": components["schemas"]["eCommerce.Customers.CustomerLevelDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer-levels/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["eCommerce.Customers.TaoCapKhachInput"];
+                    "text/json": components["schemas"]["eCommerce.Customers.TaoCapKhachInput"];
+                    "application/*+json": components["schemas"]["eCommerce.Customers.TaoCapKhachInput"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Customers.CustomerLevelDto"];
+                        "application/json": components["schemas"]["eCommerce.Customers.CustomerLevelDto"];
+                        "text/json": components["schemas"]["eCommerce.Customers.CustomerLevelDto"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer-levels/{id}/active": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: {
+                    isActive?: boolean;
+                };
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Customers.CustomerLevelDto"];
+                        "application/json": components["schemas"]["eCommerce.Customers.CustomerLevelDto"];
+                        "text/json": components["schemas"]["eCommerce.Customers.CustomerLevelDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orders": {
         parameters: {
             query?: never;
@@ -18,6 +478,7 @@ export interface paths {
                     Type?: components["schemas"]["eCommerce.OrderType"];
                     Source?: components["schemas"]["eCommerce.OrderSource"];
                     WarehouseId?: string;
+                    CustomerId?: string;
                     FromUtc?: string;
                     ToUtc?: string;
                 };
@@ -67,6 +528,7 @@ export interface paths {
                     Type?: components["schemas"]["eCommerce.OrderType"];
                     Source?: components["schemas"]["eCommerce.OrderSource"];
                     WarehouseId?: string;
+                    CustomerId?: string;
                     FromUtc?: string;
                     ToUtc?: string;
                 };
@@ -268,6 +730,483 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/pos/bills": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    Q?: string;
+                    WarehouseId?: string;
+                    CashSessionId?: string;
+                    CustomerId?: string;
+                    Status?: components["schemas"]["eCommerce.Pos.RetailBillStatus"];
+                    FromUtc?: string;
+                    ToUtc?: string;
+                    SkipCount?: number;
+                    MaxResultCount?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Application.Contracts.Pos.RetailBillDto, eCommerce.Pos.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"];
+                        "application/json": components["schemas"]["Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Application.Contracts.Pos.RetailBillDto, eCommerce.Pos.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"];
+                        "text/json": components["schemas"]["Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Application.Contracts.Pos.RetailBillDto, eCommerce.Pos.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["eCommerce.Application.Contracts.Pos.CreateRetailBillDto"];
+                    "text/json": components["schemas"]["eCommerce.Application.Contracts.Pos.CreateRetailBillDto"];
+                    "application/*+json": components["schemas"]["eCommerce.Application.Contracts.Pos.CreateRetailBillDto"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Application.Contracts.Pos.CreateRetailBillResultDto"];
+                        "application/json": components["schemas"]["eCommerce.Application.Contracts.Pos.CreateRetailBillResultDto"];
+                        "text/json": components["schemas"]["eCommerce.Application.Contracts.Pos.CreateRetailBillResultDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/bills/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Application.Contracts.Pos.RetailBillDto"];
+                        "application/json": components["schemas"]["eCommerce.Application.Contracts.Pos.RetailBillDto"];
+                        "text/json": components["schemas"]["eCommerce.Application.Contracts.Pos.RetailBillDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/bills/{id}/void": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["eCommerce.Application.Contracts.Pos.VoidRetailBillDto"];
+                    "text/json": components["schemas"]["eCommerce.Application.Contracts.Pos.VoidRetailBillDto"];
+                    "application/*+json": components["schemas"]["eCommerce.Application.Contracts.Pos.VoidRetailBillDto"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Application.Contracts.Pos.VoidRetailBillResultDto"];
+                        "application/json": components["schemas"]["eCommerce.Application.Contracts.Pos.VoidRetailBillResultDto"];
+                        "text/json": components["schemas"]["eCommerce.Application.Contracts.Pos.VoidRetailBillResultDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/sessions/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    warehouseId?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Application.Contracts.Pos.CashSessionDto"];
+                        "application/json": components["schemas"]["eCommerce.Application.Contracts.Pos.CashSessionDto"];
+                        "text/json": components["schemas"]["eCommerce.Application.Contracts.Pos.CashSessionDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    warehouseId?: string;
+                    fromUtc?: string;
+                    toUtc?: string;
+                    page?: number;
+                    pageSize?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Application.Contracts.Pos.CashSessionDto, eCommerce.Pos.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"];
+                        "application/json": components["schemas"]["eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Application.Contracts.Pos.CashSessionDto, eCommerce.Pos.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"];
+                        "text/json": components["schemas"]["eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Application.Contracts.Pos.CashSessionDto, eCommerce.Pos.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/sessions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Application.Contracts.Pos.CashSessionDto"];
+                        "application/json": components["schemas"]["eCommerce.Application.Contracts.Pos.CashSessionDto"];
+                        "text/json": components["schemas"]["eCommerce.Application.Contracts.Pos.CashSessionDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/sessions/open": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["eCommerce.Application.Contracts.Pos.OpenCashSessionDto"];
+                    "text/json": components["schemas"]["eCommerce.Application.Contracts.Pos.OpenCashSessionDto"];
+                    "application/*+json": components["schemas"]["eCommerce.Application.Contracts.Pos.OpenCashSessionDto"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Application.Contracts.Pos.CashSessionDto"];
+                        "application/json": components["schemas"]["eCommerce.Application.Contracts.Pos.CashSessionDto"];
+                        "text/json": components["schemas"]["eCommerce.Application.Contracts.Pos.CashSessionDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/sessions/{id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["eCommerce.Application.Contracts.Pos.CloseCashSessionDto"];
+                    "text/json": components["schemas"]["eCommerce.Application.Contracts.Pos.CloseCashSessionDto"];
+                    "application/*+json": components["schemas"]["eCommerce.Application.Contracts.Pos.CloseCashSessionDto"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Application.Contracts.Pos.CashSessionDto"];
+                        "application/json": components["schemas"]["eCommerce.Application.Contracts.Pos.CashSessionDto"];
+                        "text/json": components["schemas"]["eCommerce.Application.Contracts.Pos.CashSessionDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/returns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    RetailBillId?: string;
+                    WarehouseId?: string;
+                    FromUtc?: string;
+                    ToUtc?: string;
+                    SkipCount?: number;
+                    MaxResultCount?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Application.Contracts.Pos.RetailReturnDto, eCommerce.Pos.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"];
+                        "application/json": components["schemas"]["Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Application.Contracts.Pos.RetailReturnDto, eCommerce.Pos.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"];
+                        "text/json": components["schemas"]["Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Application.Contracts.Pos.RetailReturnDto, eCommerce.Pos.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["eCommerce.Application.Contracts.Pos.CreateRetailReturnDto"];
+                    "text/json": components["schemas"]["eCommerce.Application.Contracts.Pos.CreateRetailReturnDto"];
+                    "application/*+json": components["schemas"]["eCommerce.Application.Contracts.Pos.CreateRetailReturnDto"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Application.Contracts.Pos.RetailReturnDto"];
+                        "application/json": components["schemas"]["eCommerce.Application.Contracts.Pos.RetailReturnDto"];
+                        "text/json": components["schemas"]["eCommerce.Application.Contracts.Pos.RetailReturnDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/returns/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Application.Contracts.Pos.RetailReturnDto"];
+                        "application/json": components["schemas"]["eCommerce.Application.Contracts.Pos.RetailReturnDto"];
+                        "text/json": components["schemas"]["eCommerce.Application.Contracts.Pos.RetailReturnDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/products": {
         parameters: {
             query?: never;
@@ -409,6 +1348,699 @@ export interface paths {
             };
         };
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/revenue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    TuNgay?: string;
+                    DenNgay?: string;
+                    Nguon?: components["schemas"]["eCommerce.Reporting.NguonBaoCao"];
+                    TheoThang?: boolean;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Reporting.BaoCaoDoanhThuDto"];
+                        "application/json": components["schemas"]["eCommerce.Reporting.BaoCaoDoanhThuDto"];
+                        "text/json": components["schemas"]["eCommerce.Reporting.BaoCaoDoanhThuDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/orders/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    TuNgay?: string;
+                    DenNgay?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Reporting.TongQuanDonHangDto"];
+                        "application/json": components["schemas"]["eCommerce.Reporting.TongQuanDonHangDto"];
+                        "text/json": components["schemas"]["eCommerce.Reporting.TongQuanDonHangDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/inventory/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    Ngay?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Reporting.TongQuanTonKhoDto"];
+                        "application/json": components["schemas"]["eCommerce.Reporting.TongQuanTonKhoDto"];
+                        "text/json": components["schemas"]["eCommerce.Reporting.TongQuanTonKhoDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Reporting.TongQuanDashboardDto"];
+                        "application/json": components["schemas"]["eCommerce.Reporting.TongQuanDashboardDto"];
+                        "text/json": components["schemas"]["eCommerce.Reporting.TongQuanDashboardDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/aggregate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["eCommerce.Reporting.ChayTongHopInput"];
+                    "text/json": components["schemas"]["eCommerce.Reporting.ChayTongHopInput"];
+                    "application/*+json": components["schemas"]["eCommerce.Reporting.ChayTongHopInput"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Reporting.KetQuaTongHopDto"];
+                        "application/json": components["schemas"]["eCommerce.Reporting.KetQuaTongHopDto"];
+                        "text/json": components["schemas"]["eCommerce.Reporting.KetQuaTongHopDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settings/staff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Customers.StaffDto"][];
+                        "application/json": components["schemas"]["eCommerce.Customers.StaffDto"][];
+                        "text/json": components["schemas"]["eCommerce.Customers.StaffDto"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["eCommerce.Customers.TaoNhanVienInput"];
+                    "text/json": components["schemas"]["eCommerce.Customers.TaoNhanVienInput"];
+                    "application/*+json": components["schemas"]["eCommerce.Customers.TaoNhanVienInput"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Customers.StaffDto"];
+                        "application/json": components["schemas"]["eCommerce.Customers.StaffDto"];
+                        "text/json": components["schemas"]["eCommerce.Customers.StaffDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settings/staff/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["eCommerce.Customers.TaoNhanVienInput"];
+                    "text/json": components["schemas"]["eCommerce.Customers.TaoNhanVienInput"];
+                    "application/*+json": components["schemas"]["eCommerce.Customers.TaoNhanVienInput"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Customers.StaffDto"];
+                        "application/json": components["schemas"]["eCommerce.Customers.StaffDto"];
+                        "text/json": components["schemas"]["eCommerce.Customers.StaffDto"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settings/stores": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Customers.StoreDto"][];
+                        "application/json": components["schemas"]["eCommerce.Customers.StoreDto"][];
+                        "text/json": components["schemas"]["eCommerce.Customers.StoreDto"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["eCommerce.Customers.TaoCuaHangInput"];
+                    "text/json": components["schemas"]["eCommerce.Customers.TaoCuaHangInput"];
+                    "application/*+json": components["schemas"]["eCommerce.Customers.TaoCuaHangInput"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Customers.StoreDto"];
+                        "application/json": components["schemas"]["eCommerce.Customers.StoreDto"];
+                        "text/json": components["schemas"]["eCommerce.Customers.StoreDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settings/stores/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["eCommerce.Customers.TaoCuaHangInput"];
+                    "text/json": components["schemas"]["eCommerce.Customers.TaoCuaHangInput"];
+                    "application/*+json": components["schemas"]["eCommerce.Customers.TaoCuaHangInput"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Customers.StoreDto"];
+                        "application/json": components["schemas"]["eCommerce.Customers.StoreDto"];
+                        "text/json": components["schemas"]["eCommerce.Customers.StoreDto"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settings/departments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Customers.DepartmentDto"][];
+                        "application/json": components["schemas"]["eCommerce.Customers.DepartmentDto"][];
+                        "text/json": components["schemas"]["eCommerce.Customers.DepartmentDto"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["eCommerce.Customers.TaoPhongBanInput"];
+                    "text/json": components["schemas"]["eCommerce.Customers.TaoPhongBanInput"];
+                    "application/*+json": components["schemas"]["eCommerce.Customers.TaoPhongBanInput"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Customers.DepartmentDto"];
+                        "application/json": components["schemas"]["eCommerce.Customers.DepartmentDto"];
+                        "text/json": components["schemas"]["eCommerce.Customers.DepartmentDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settings/departments/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["eCommerce.Customers.TaoPhongBanInput"];
+                    "text/json": components["schemas"]["eCommerce.Customers.TaoPhongBanInput"];
+                    "application/*+json": components["schemas"]["eCommerce.Customers.TaoPhongBanInput"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Customers.DepartmentDto"];
+                        "application/json": components["schemas"]["eCommerce.Customers.DepartmentDto"];
+                        "text/json": components["schemas"]["eCommerce.Customers.DepartmentDto"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settings/data-scopes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Customers.RoleDataScopeDto"][];
+                        "application/json": components["schemas"]["eCommerce.Customers.RoleDataScopeDto"][];
+                        "text/json": components["schemas"]["eCommerce.Customers.RoleDataScopeDto"][];
+                    };
+                };
+            };
+        };
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["eCommerce.Customers.DatPhamViDuLieuInput"];
+                    "text/json": components["schemas"]["eCommerce.Customers.DatPhamViDuLieuInput"];
+                    "application/*+json": components["schemas"]["eCommerce.Customers.DatPhamViDuLieuInput"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Customers.RoleDataScopeDto"];
+                        "application/json": components["schemas"]["eCommerce.Customers.RoleDataScopeDto"];
+                        "text/json": components["schemas"]["eCommerce.Customers.RoleDataScopeDto"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settings/data-scopes/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Customers.PhamViCuaToiDto"];
+                        "application/json": components["schemas"]["eCommerce.Customers.PhamViCuaToiDto"];
+                        "text/json": components["schemas"]["eCommerce.Customers.PhamViCuaToiDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settings/permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Customers.PermissionMatrixDto"];
+                        "application/json": components["schemas"]["eCommerce.Customers.PermissionMatrixDto"];
+                        "text/json": components["schemas"]["eCommerce.Customers.PermissionMatrixDto"];
+                    };
+                };
+            };
+        };
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["eCommerce.Customers.DatQuyenInput"];
+                    "text/json": components["schemas"]["eCommerce.Customers.DatQuyenInput"];
+                    "application/*+json": components["schemas"]["eCommerce.Customers.DatQuyenInput"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Customers.DatQuyenKetQuaDto"];
+                        "application/json": components["schemas"]["eCommerce.Customers.DatQuyenKetQuaDto"];
+                        "text/json": components["schemas"]["eCommerce.Customers.DatQuyenKetQuaDto"];
+                    };
+                };
+            };
+        };
         post?: never;
         delete?: never;
         options?: never;
@@ -817,6 +2449,21 @@ export interface components {
         };
         "Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Application.Contracts.Inventory.StockDocumentDto, eCommerce.Inventory.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]": {
             items?: components["schemas"]["eCommerce.Application.Contracts.Inventory.StockDocumentDto"][] | null;
+            /** Format: int64 */
+            totalCount?: number;
+        };
+        "Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Application.Contracts.Pos.CashSessionDto, eCommerce.Pos.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]": {
+            items?: components["schemas"]["eCommerce.Application.Contracts.Pos.CashSessionDto"][] | null;
+            /** Format: int64 */
+            totalCount?: number;
+        };
+        "Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Application.Contracts.Pos.RetailBillDto, eCommerce.Pos.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]": {
+            items?: components["schemas"]["eCommerce.Application.Contracts.Pos.RetailBillDto"][] | null;
+            /** Format: int64 */
+            totalCount?: number;
+        };
+        "Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Application.Contracts.Pos.RetailReturnDto, eCommerce.Pos.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]": {
+            items?: components["schemas"]["eCommerce.Application.Contracts.Pos.RetailReturnDto"][] | null;
             /** Format: int64 */
             totalCount?: number;
         };
@@ -1805,6 +3452,255 @@ export interface components {
             address?: string | null;
             isActive?: boolean;
         };
+        "eCommerce.Application.Contracts.Pos.CashSessionDto": {
+            /** Format: uuid */
+            id?: string;
+            number?: string | null;
+            /** Format: uuid */
+            warehouseId?: string;
+            /** Format: uuid */
+            cashierId?: string | null;
+            status?: string | null;
+            /** Format: double */
+            openingCash?: number;
+            /** Format: date-time */
+            openedAtUtc?: string;
+            /** Format: date-time */
+            closedAtUtc?: string | null;
+            /** Format: uuid */
+            closedBy?: string | null;
+            /** Format: double */
+            cashRevenue?: number;
+            /** Format: double */
+            cashRefund?: number;
+            /** Format: double */
+            otherExpense?: number;
+            /** Format: double */
+            expectedCash?: number;
+            /** Format: double */
+            handoverCash?: number;
+            /** Format: double */
+            variance?: number;
+            /** Format: int32 */
+            billCount?: number;
+            note?: string | null;
+            /** Format: date-time */
+            creationTime?: string;
+        };
+        "eCommerce.Application.Contracts.Pos.CloseCashSessionDto": {
+            /** Format: double */
+            handoverCash?: number;
+            /** Format: double */
+            otherExpense?: number;
+            note?: string | null;
+        };
+        "eCommerce.Application.Contracts.Pos.CreateRetailBillDto": {
+            /** Format: uuid */
+            clientBillId: string;
+            /** Format: uuid */
+            warehouseId: string;
+            /** Format: uuid */
+            cashSessionId?: string | null;
+            /** Format: uuid */
+            customerId?: string | null;
+            /** Format: uuid */
+            saleStaffId?: string | null;
+            /** Format: double */
+            discountAmount?: number;
+            /** Format: double */
+            pointsUsed?: number;
+            /** Format: double */
+            pointsEarned?: number;
+            /** Format: double */
+            customerGivenAmount?: number;
+            /** Format: date-time */
+            dueDateUtc?: string | null;
+            note?: string | null;
+            lines: components["schemas"]["eCommerce.Application.Contracts.Pos.CreateRetailBillLineDto"][];
+            payments?: components["schemas"]["eCommerce.Application.Contracts.Pos.CreateRetailBillPaymentDto"][] | null;
+        };
+        "eCommerce.Application.Contracts.Pos.CreateRetailBillLineDto": {
+            sku: string;
+            /** Format: double */
+            quantity?: number;
+            /** Format: double */
+            unitPrice?: number;
+            /** Format: double */
+            discountAmount?: number;
+            /** Format: double */
+            vatPercent?: number | null;
+            productName?: string | null;
+        };
+        "eCommerce.Application.Contracts.Pos.CreateRetailBillPaymentDto": {
+            method?: components["schemas"]["eCommerce.Pos.RetailPaymentMethod"];
+            /** Format: double */
+            amount?: number;
+            referenceCode?: string | null;
+            note?: string | null;
+        };
+        "eCommerce.Application.Contracts.Pos.CreateRetailBillResultDto": {
+            bill?: components["schemas"]["eCommerce.Application.Contracts.Pos.RetailBillDto"];
+            alreadyExisted?: boolean;
+        };
+        "eCommerce.Application.Contracts.Pos.CreateRetailReturnDto": {
+            /** Format: uuid */
+            retailBillId: string;
+            /** Format: double */
+            returnFeeAmount?: number;
+            refundMethod?: components["schemas"]["eCommerce.Pos.RetailPaymentMethod"];
+            /** Format: double */
+            pointsReversed?: number;
+            note?: string | null;
+            lines: components["schemas"]["eCommerce.Application.Contracts.Pos.CreateRetailReturnLineDto"][];
+        };
+        "eCommerce.Application.Contracts.Pos.CreateRetailReturnLineDto": {
+            sku: string;
+            /** Format: double */
+            quantity?: number;
+        };
+        "eCommerce.Application.Contracts.Pos.OpenCashSessionDto": {
+            /** Format: uuid */
+            warehouseId: string;
+            /** Format: double */
+            openingCash?: number;
+        };
+        "eCommerce.Application.Contracts.Pos.RetailBillDto": {
+            /** Format: uuid */
+            id?: string;
+            number?: string | null;
+            /** Format: uuid */
+            clientBillId?: string;
+            /** Format: uuid */
+            warehouseId?: string;
+            /** Format: uuid */
+            cashSessionId?: string;
+            /** Format: uuid */
+            customerId?: string | null;
+            /** Format: uuid */
+            saleStaffId?: string | null;
+            status?: string | null;
+            /** Format: double */
+            subtotal?: number;
+            /** Format: double */
+            lineDiscountTotal?: number;
+            /** Format: double */
+            discountTotal?: number;
+            /** Format: double */
+            vatTotal?: number;
+            /** Format: double */
+            pointsUsed?: number;
+            /** Format: double */
+            pointsUsedAmount?: number;
+            /** Format: double */
+            pointsEarned?: number;
+            /** Format: double */
+            totalPayment?: number;
+            /** Format: double */
+            paidAmount?: number;
+            /** Format: double */
+            changeAmount?: number;
+            /** Format: double */
+            debtAmount?: number;
+            /** Format: double */
+            customerGivenAmount?: number;
+            /** Format: date-time */
+            dueDateUtc?: string | null;
+            note?: string | null;
+            /** Format: uuid */
+            stockDocumentId?: string | null;
+            /** Format: date-time */
+            voidedAtUtc?: string | null;
+            /** Format: uuid */
+            voidedBy?: string | null;
+            voidReason?: string | null;
+            /** Format: uuid */
+            voidStockDocumentId?: string | null;
+            cashSessionClosed?: boolean;
+            /** Format: date-time */
+            creationTime?: string;
+            lines?: components["schemas"]["eCommerce.Application.Contracts.Pos.RetailBillLineDto"][] | null;
+            payments?: components["schemas"]["eCommerce.Application.Contracts.Pos.RetailBillPaymentDto"][] | null;
+            paymentMethods?: string[] | null;
+        };
+        "eCommerce.Application.Contracts.Pos.RetailBillLineDto": {
+            /** Format: uuid */
+            id?: string;
+            sku?: string | null;
+            productName?: string | null;
+            /** Format: double */
+            quantity?: number;
+            /** Format: double */
+            unitPrice?: number;
+            /** Format: double */
+            discountAmount?: number;
+            /** Format: double */
+            vatPercent?: number | null;
+            /** Format: double */
+            amount?: number;
+            /** Format: double */
+            vatAmount?: number | null;
+            /** Format: double */
+            returnedQuantity?: number;
+        };
+        "eCommerce.Application.Contracts.Pos.RetailBillPaymentDto": {
+            /** Format: uuid */
+            id?: string;
+            method?: string | null;
+            /** Format: double */
+            amount?: number;
+            referenceCode?: string | null;
+            note?: string | null;
+        };
+        "eCommerce.Application.Contracts.Pos.RetailReturnDto": {
+            /** Format: uuid */
+            id?: string;
+            number?: string | null;
+            /** Format: uuid */
+            retailBillId?: string;
+            retailBillNumber?: string | null;
+            /** Format: uuid */
+            warehouseId?: string;
+            /** Format: uuid */
+            cashSessionId?: string | null;
+            /** Format: uuid */
+            customerId?: string | null;
+            status?: string | null;
+            /** Format: double */
+            goodsAmount?: number;
+            /** Format: double */
+            returnFeeAmount?: number;
+            /** Format: double */
+            debtReductionAmount?: number;
+            /** Format: double */
+            refundAmount?: number;
+            refundMethod?: string | null;
+            /** Format: double */
+            pointsReversed?: number;
+            note?: string | null;
+            /** Format: uuid */
+            stockDocumentId?: string | null;
+            /** Format: date-time */
+            creationTime?: string;
+            lines?: components["schemas"]["eCommerce.Application.Contracts.Pos.RetailReturnLineDto"][] | null;
+        };
+        "eCommerce.Application.Contracts.Pos.RetailReturnLineDto": {
+            /** Format: uuid */
+            id?: string;
+            sku?: string | null;
+            /** Format: double */
+            quantity?: number;
+            /** Format: double */
+            unitPriceSnapshot?: number;
+            /** Format: double */
+            refundAmount?: number;
+        };
+        "eCommerce.Application.Contracts.Pos.VoidRetailBillDto": {
+            reason: string;
+        };
+        "eCommerce.Application.Contracts.Pos.VoidRetailBillResultDto": {
+            bill?: components["schemas"]["eCommerce.Application.Contracts.Pos.RetailBillDto"];
+            voided?: boolean;
+        };
         "eCommerce.Application.Contracts.Sales.ApproveReturnDto": {
             /** Format: uuid */
             orderId?: string;
@@ -2498,6 +4394,108 @@ export interface components {
             name: string;
             description?: string | null;
         };
+        "eCommerce.Customers.CapNhatPhanKhachInput": {
+            type?: components["schemas"]["eCommerce.Customers.CustomerType"];
+            /** Format: uuid */
+            levelId?: string | null;
+            /** Format: double */
+            debtLimit?: number;
+            /** Format: uuid */
+            saleStaffId?: string | null;
+            /** Format: uuid */
+            referrerId?: string | null;
+            taxCode?: string | null;
+            /** Format: date-time */
+            birthday?: string | null;
+        };
+        "eCommerce.Customers.CongNoHoaDonDto": {
+            /** Format: uuid */
+            billId?: string;
+            number?: string | null;
+            /** Format: double */
+            totalPayment?: number;
+            /** Format: double */
+            paidAmount?: number;
+            /** Format: double */
+            debtAmount?: number;
+            /** Format: date-time */
+            dueDateUtc?: string | null;
+            quaHan?: boolean;
+            /** Format: date-time */
+            creationTime?: string;
+        };
+        "eCommerce.Customers.CustomerCareDto": {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            customerId?: string;
+            type?: string | null;
+            content?: string | null;
+            /** Format: uuid */
+            staffId?: string | null;
+            /** Format: date-time */
+            occurredAtUtc?: string;
+            /** Format: date-time */
+            nextFollowUpAtUtc?: string | null;
+            /** Format: date-time */
+            creationTime?: string;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        "eCommerce.Customers.CustomerCareType": 0 | 1 | 2 | 3 | 4;
+        "eCommerce.Customers.CustomerDetailDto": {
+            /** Format: uuid */
+            id?: string;
+            name?: string | null;
+            email?: string | null;
+            phone?: string | null;
+            /** Format: uuid */
+            identityUserId?: string | null;
+            status?: string | null;
+            dungDuoc?: boolean;
+            laKhachVangLai?: boolean;
+            /** Format: uuid */
+            customerGroupId?: string | null;
+            /** Format: double */
+            lifetimeValueAmount?: number | null;
+            lifetimeValueCurrency?: string | null;
+            /** Format: date-time */
+            creationTime?: string;
+            type?: string | null;
+            /** Format: uuid */
+            levelId?: string | null;
+            levelName?: string | null;
+            /** Format: double */
+            points?: number;
+            /** Format: double */
+            accumulatedAmount?: number;
+            /** Format: double */
+            debtLimit?: number;
+            /** Format: double */
+            debtBalance?: number;
+            vuotHanMucNo?: boolean;
+            /** Format: uuid */
+            saleStaffId?: string | null;
+            /** Format: uuid */
+            referrerId?: string | null;
+            taxCode?: string | null;
+            /** Format: date-time */
+            birthday?: string | null;
+            /** Format: double */
+            levelDiscountPercent?: number | null;
+            /** Format: int32 */
+            soDonHang?: number;
+            /** Format: int32 */
+            soHoaDonBanLe?: number;
+            /** Format: double */
+            tongBanLe?: number;
+            /** Format: double */
+            tongDaTraHang?: number;
+            coNoQuaHan?: boolean;
+            congNo?: components["schemas"]["eCommerce.Customers.CongNoHoaDonDto"][] | null;
+        };
         "eCommerce.Customers.CustomerDto": {
             /** Format: uuid */
             id?: string;
@@ -2516,6 +4514,26 @@ export interface components {
             lifetimeValueCurrency?: string | null;
             /** Format: date-time */
             creationTime?: string;
+            type?: string | null;
+            /** Format: uuid */
+            levelId?: string | null;
+            levelName?: string | null;
+            /** Format: double */
+            points?: number;
+            /** Format: double */
+            accumulatedAmount?: number;
+            /** Format: double */
+            debtLimit?: number;
+            /** Format: double */
+            debtBalance?: number;
+            vuotHanMucNo?: boolean;
+            /** Format: uuid */
+            saleStaffId?: string | null;
+            /** Format: uuid */
+            referrerId?: string | null;
+            taxCode?: string | null;
+            /** Format: date-time */
+            birthday?: string | null;
         };
         "eCommerce.Customers.CustomerGroupDto": {
             /** Format: uuid */
@@ -2525,6 +4543,61 @@ export interface components {
             description?: string | null;
             /** Format: int32 */
             soKhach?: number;
+        };
+        "eCommerce.Customers.CustomerLevelDto": {
+            /** Format: uuid */
+            id?: string;
+            code?: string | null;
+            name?: string | null;
+            /** Format: double */
+            minAccumulatedAmount?: number;
+            /** Format: double */
+            discountPercent?: number;
+            /** Format: int32 */
+            sortOrder?: number;
+            isActive?: boolean;
+            note?: string | null;
+        };
+        "eCommerce.Customers.CustomerTabCountsDto": {
+            /** Format: int32 */
+            total?: number;
+            tabs?: components["schemas"]["eCommerce.Customers.CustomerTabDto"][] | null;
+        };
+        "eCommerce.Customers.CustomerTabDto": {
+            key?: string | null;
+            label?: string | null;
+            /** Format: int32 */
+            count?: number;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        "eCommerce.Customers.CustomerType": 0 | 1 | 2;
+        "eCommerce.Customers.DatPhamViDuLieuInput": {
+            roleName: string;
+            scope: components["schemas"]["eCommerce.Customers.PhamViDuLieu"];
+        };
+        "eCommerce.Customers.DatQuyenInput": {
+            roleName: string;
+            permissionName: string;
+            isGranted?: boolean;
+        };
+        "eCommerce.Customers.DatQuyenKetQuaDto": {
+            roleName?: string | null;
+            permissionName?: string | null;
+            isGranted?: boolean;
+        };
+        "eCommerce.Customers.DepartmentDto": {
+            /** Format: uuid */
+            id?: string;
+            code?: string | null;
+            name?: string | null;
+            /** Format: uuid */
+            storeId?: string | null;
+            /** Format: uuid */
+            parentId?: string | null;
+            isActive?: boolean;
         };
         "eCommerce.Customers.DiaChiCaNhanDto": {
             /** Format: uuid */
@@ -2554,6 +4627,26 @@ export interface components {
             lastUsedAtUtc?: string | null;
             coDungDuoc?: boolean;
             diaChi?: components["schemas"]["eCommerce.Address.DiaChiSnapshotDto"];
+        };
+        "eCommerce.Customers.DoiChieuSoDuDto": {
+            /** Format: uuid */
+            customerId?: string;
+            /** Format: double */
+            points?: number;
+            /** Format: double */
+            accumulatedAmount?: number;
+            /** Format: double */
+            debtLimit?: number;
+            /** Format: double */
+            debtBalance?: number;
+            /** Format: double */
+            tongHoaDon?: number;
+            /** Format: double */
+            tongTraHang?: number;
+            /** Format: double */
+            tongNoHoaDon?: number;
+            tienTichLuyKhop?: boolean;
+            congNoKhop?: boolean;
         };
         "eCommerce.Customers.DonHangCaNhanDto": {
             /** Format: uuid */
@@ -2610,6 +4703,43 @@ export interface components {
             donHangBiCat?: boolean;
             lyDo?: string | null;
         };
+        "eCommerce.Customers.PermissionDto": {
+            name?: string | null;
+            displayName?: string | null;
+            parentName?: string | null;
+            laQuyenDoc?: boolean;
+        };
+        "eCommerce.Customers.PermissionGroupDto": {
+            name?: string | null;
+            permissions?: components["schemas"]["eCommerce.Customers.PermissionDto"][] | null;
+        };
+        "eCommerce.Customers.PermissionMatrixDto": {
+            groups?: components["schemas"]["eCommerce.Customers.PermissionGroupDto"][] | null;
+            roles?: string[] | null;
+            grantedByRole?: {
+                [key: string]: string[];
+            } | null;
+        };
+        "eCommerce.Customers.PhamViCuaToiDto": {
+            phamVi?: string | null;
+            lyDo?: string | null;
+            /** Format: uuid */
+            nhanVienId?: string | null;
+            /** Format: uuid */
+            khoCuaHangId?: string | null;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        "eCommerce.Customers.PhamViDuLieu": 0 | 1 | 2;
+        "eCommerce.Customers.RoleDataScopeDto": {
+            /** Format: uuid */
+            id?: string;
+            roleName?: string | null;
+            scope?: string | null;
+            scopeLabel?: string | null;
+        };
         "eCommerce.Customers.SoDiaChiDto": {
             /** Format: uuid */
             customerId?: string;
@@ -2619,16 +4749,99 @@ export interface components {
             /** Format: int32 */
             soMacDinhHoaDon?: number;
         };
+        "eCommerce.Customers.StaffDto": {
+            /** Format: uuid */
+            id?: string;
+            code?: string | null;
+            name?: string | null;
+            /** Format: uuid */
+            identityUserId?: string | null;
+            /** Format: uuid */
+            storeId?: string | null;
+            storeName?: string | null;
+            /** Format: uuid */
+            departmentId?: string | null;
+            departmentName?: string | null;
+            roleName?: string | null;
+            phamViHieuLuc?: string | null;
+            phone?: string | null;
+            note?: string | null;
+            isActive?: boolean;
+        };
+        "eCommerce.Customers.StoreDto": {
+            /** Format: uuid */
+            id?: string;
+            code?: string | null;
+            name?: string | null;
+            /** Format: uuid */
+            warehouseId?: string | null;
+            addressText?: string | null;
+            phone?: string | null;
+            isActive?: boolean;
+        };
+        "eCommerce.Customers.TaoCapKhachInput": {
+            code: string;
+            name: string;
+            /** Format: double */
+            minAccumulatedAmount?: number;
+            /** Format: double */
+            discountPercent?: number;
+            /** Format: int32 */
+            sortOrder?: number;
+            note?: string | null;
+        };
+        "eCommerce.Customers.TaoChamSocInput": {
+            type: components["schemas"]["eCommerce.Customers.CustomerCareType"];
+            content: string;
+            /** Format: date-time */
+            occurredAtUtc?: string | null;
+            /** Format: uuid */
+            staffId?: string | null;
+            /** Format: date-time */
+            nextFollowUpAtUtc?: string | null;
+        };
+        "eCommerce.Customers.TaoCuaHangInput": {
+            code: string;
+            name: string;
+            /** Format: uuid */
+            warehouseId?: string | null;
+            addressText?: string | null;
+            phone?: string | null;
+            isActive?: boolean;
+        };
         "eCommerce.Customers.TaoKhachInput": {
             name?: string | null;
             email?: string | null;
             phone?: string | null;
             idempotencyKey?: string | null;
         };
+        "eCommerce.Customers.TaoNhanVienInput": {
+            code: string;
+            name: string;
+            /** Format: uuid */
+            identityUserId?: string | null;
+            /** Format: uuid */
+            storeId?: string | null;
+            /** Format: uuid */
+            departmentId?: string | null;
+            roleName?: string | null;
+            phone?: string | null;
+            note?: string | null;
+            isActive?: boolean;
+        };
         "eCommerce.Customers.TaoNhomKhachInput": {
             code: string;
             name: string;
             description?: string | null;
+        };
+        "eCommerce.Customers.TaoPhongBanInput": {
+            code: string;
+            name: string;
+            /** Format: uuid */
+            storeId?: string | null;
+            /** Format: uuid */
+            parentId?: string | null;
+            isActive?: boolean;
         };
         "eCommerce.Customers.ThemDiaChiInput": {
             /** Format: int32 */
@@ -2782,6 +4995,15 @@ export interface components {
         };
         "eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Application.Contracts.Inventory.StockDocumentDto, eCommerce.Inventory.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]": {
             items?: components["schemas"]["eCommerce.Application.Contracts.Inventory.StockDocumentDto"][] | null;
+            /** Format: int64 */
+            total?: number;
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            pageSize?: number;
+        };
+        "eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Application.Contracts.Pos.CashSessionDto, eCommerce.Pos.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]": {
+            items?: components["schemas"]["eCommerce.Application.Contracts.Pos.CashSessionDto"][] | null;
             /** Format: int64 */
             total?: number;
             /** Format: int32 */
@@ -3017,6 +5239,15 @@ export interface components {
             /** Format: date-time */
             confirmedAtUtc?: string | null;
             confirmNote?: string | null;
+        };
+        "eCommerce.Inventory.PosStockLine": {
+            sku?: string | null;
+            /** Format: double */
+            quantity?: number;
+            /** Format: double */
+            unitPrice?: number;
+            /** Format: double */
+            vatPercent?: number | null;
         };
         /**
          * Format: int32
@@ -3264,6 +5495,16 @@ export interface components {
          * @enum {integer}
          */
         "eCommerce.PaymentStatus": 0 | 1 | 2 | 3 | 4 | 5;
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        "eCommerce.Pos.RetailBillStatus": 0 | 1;
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        "eCommerce.Pos.RetailPaymentMethod": 1 | 2 | 3 | 4 | 5 | 20;
         "eCommerce.Pricing.Dtos.AddPriceListItemDto": {
             sku: string;
             /** Format: double */
@@ -3614,6 +5855,160 @@ export interface components {
          * @enum {integer}
          */
         "eCommerce.ReconciliationStatus": 0 | 1 | 2 | 3 | 4;
+        "eCommerce.Reporting.BaoCaoDoanhThuDto": {
+            /** Format: date */
+            tuNgay?: string;
+            /** Format: date */
+            denNgay?: string;
+            /** Format: double */
+            tongDoanhThu?: number;
+            /** Format: double */
+            doanhThuBanLe?: number;
+            /** Format: double */
+            doanhThuDonHang?: number;
+            /** Format: double */
+            tongTienVat?: number;
+            /** Format: int32 */
+            tongSoChungTu?: number;
+            daTongHop?: boolean;
+            /** Format: date */
+            ngayTongHopMoiNhat?: string | null;
+            dinhNghiaTien?: string | null;
+            diem?: components["schemas"]["eCommerce.Reporting.DiemDoanhThuDto"][] | null;
+        };
+        "eCommerce.Reporting.ChayTongHopInput": {
+            /** Format: date */
+            tuNgay?: string | null;
+            /** Format: date */
+            denNgay?: string | null;
+            ghiAnhTonKho?: boolean;
+        };
+        "eCommerce.Reporting.DiemDoanhThuDto": {
+            nhan?: string | null;
+            /** Format: date */
+            tuNgay?: string;
+            /** Format: date */
+            denNgay?: string;
+            /** Format: double */
+            doanhThuBanLe?: number;
+            /** Format: double */
+            doanhThuDonHang?: number;
+            /** Format: double */
+            tongDoanhThu?: number;
+            /** Format: double */
+            tienVat?: number;
+            /** Format: int32 */
+            soChungTu?: number;
+        };
+        "eCommerce.Reporting.DongTonKhoDto": {
+            /** Format: uuid */
+            warehouseId?: string;
+            kho?: string | null;
+            /** Format: int32 */
+            soSku?: number;
+            /** Format: double */
+            onHand?: number;
+            /** Format: double */
+            khaDung?: number;
+            /** Format: double */
+            tamGiu?: number;
+        };
+        "eCommerce.Reporting.KetQuaTongHopDto": {
+            /** Format: date */
+            tuNgay?: string;
+            /** Format: date */
+            denNgay?: string;
+            /** Format: int32 */
+            soNgay?: number;
+            rong?: boolean;
+            /** Format: int32 */
+            soDongSuKien?: number;
+            /** Format: int32 */
+            soDongTongHop?: number;
+            /** Format: int32 */
+            soAnhTonKho?: number;
+            /** Format: date */
+            mocBanLe?: string | null;
+            /** Format: date */
+            mocDonHang?: string | null;
+            /** Format: date */
+            mocTonKho?: string | null;
+        };
+        "eCommerce.Reporting.MatHangSapHetDto": {
+            /** Format: uuid */
+            warehouseId?: string;
+            kho?: string | null;
+            sku?: string | null;
+            /** Format: double */
+            onHand?: number;
+            /** Format: double */
+            khaDung?: number;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        "eCommerce.Reporting.NguonBaoCao": 0 | 1 | 2;
+        "eCommerce.Reporting.NhomTrangThaiDonDto": {
+            trangThai?: string | null;
+            /** Format: int32 */
+            soDon?: number;
+            /** Format: double */
+            giaTriDon?: number;
+        };
+        "eCommerce.Reporting.TongQuanDashboardDto": {
+            /** Format: date */
+            ngay?: string;
+            /** Format: double */
+            doanhThuHomNay?: number;
+            /** Format: double */
+            doanhThuBanLeHomNay?: number;
+            /** Format: double */
+            doanhThuDonHangHomNay?: number;
+            /** Format: int32 */
+            soHoaDonBanLeHomNay?: number;
+            /** Format: int32 */
+            soDonHangHomNay?: number;
+            /** Format: double */
+            tongKhaDung?: number;
+            /** Format: int32 */
+            soSkuSapHet?: number;
+            /** Format: date */
+            ngayTonKhoMoiNhat?: string | null;
+            /** Format: date */
+            ngayTongHopMoiNhat?: string | null;
+            dinhNghiaTien?: string | null;
+        };
+        "eCommerce.Reporting.TongQuanDonHangDto": {
+            /** Format: date */
+            tuNgay?: string;
+            /** Format: date */
+            denNgay?: string;
+            /** Format: int32 */
+            tongDon?: number;
+            /** Format: int32 */
+            soDonHuy?: number;
+            /** Format: double */
+            giaTriDon?: number;
+            theoTrangThai?: components["schemas"]["eCommerce.Reporting.NhomTrangThaiDonDto"][] | null;
+        };
+        "eCommerce.Reporting.TongQuanTonKhoDto": {
+            /** Format: date */
+            ngayChup?: string | null;
+            daCoDuLieu?: boolean;
+            /** Format: int32 */
+            soKho?: number;
+            /** Format: int32 */
+            soSku?: number;
+            /** Format: double */
+            tongOnHand?: number;
+            /** Format: double */
+            tongKhaDung?: number;
+            /** Format: double */
+            tongTamGiu?: number;
+            theoKho?: components["schemas"]["eCommerce.Reporting.DongTonKhoDto"][] | null;
+            sapHet?: components["schemas"]["eCommerce.Reporting.MatHangSapHetDto"][] | null;
+        };
         /**
          * Format: int32
          * @enum {integer}
