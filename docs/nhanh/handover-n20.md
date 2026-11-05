@@ -97,6 +97,7 @@
 |---|---|
 | **5 lượt TRƯỚC khi sửa** | **17 DAT / 0 HONG × 5** (`tools/_tam-kiem/n20/lan-1…5.log`) · `P12 = 200/200` · `P14 exception A = 0 · B = 0` ⇒ ⚠️ **máy dev KHÔNG tái hiện được flake** (khe *nhả khoá → commit* rất hẹp; CI mới trúng — `D-64` ①: `17/17` vs `14/3`) |
 | **5 lượt SAU khi sửa** | **17 DAT / 0 HONG × 5** (`tools/_tam-kiem/n20/sau-lan-1…5.log`) · `ℹ️ THU LAI 409: 0 lan` (5/5) · `P12 = 200/200` · `P14 loi that A = 0 · B = 0` |
+| 🎯 **CI — lượt `ci` của PR #5** (run **`42002078789`**, head `6c1fb5c`) | **ĐÚNG CA `D-64` ĐÃ XẢY RA VÀ ĐÃ ĐƯỢC THỬ LẠI CỨU:** artifact `giu-cho-2inst.log` ⇒ **17 DAT / 0 HONG** · `P12 = 200/200` · `P13` = **2** dòng · `ℹ️ THU LAI 409 (D-66): **1** lan` · `P14: loi that A = 0 · B = 0 · xung dot trong log A = 0 · **B = 1** · 409 da thay = **1**` ⇒ 📌 Host B **thật sự** vấp `AbpDbConcurrencyException` đúng như `D-64` ① và probe **vẫn xanh** vì đã thử lại **1** lần. Cổng trên CI: **19/19 (293,9 s)** · ⑱ **17,4 s** · Playwright **8/8 (24,4 s)** · link **PASS** (456 backtick) · `docker-build` **success** (`42002078816`) |
 
 📌 Vì máy dev **không** tái hiện, bằng chứng "thử lại cứu được ca 409" là **hai** phép đo khác: repro tất định (§1.3:
 `409 → 200` với cùng khoá) và bản giả lập (§1.6: đường `ThuLaiNeu409` chạy thật). **Tỉ lệ thật trên CI** phải đọc ở
@@ -170,14 +171,15 @@ lượt `ci` của PR phiên này (§7).
 
 ## 6. Việc đầu tiên của phiên sau
 
-**Trạng thái phiên: XONG phạm vi `N20` (`D-64` đã chốt hướng + probe thử lại có giới hạn + ca `Y7`; 2 required check giữ nguyên cấu hình đã đo); `07` **chưa** có `§WP-14` ⇒ phiên `N21` **không** mở WP mới.**
+**Trạng thái phiên: XONG phạm vi `N20` — `D-64` đã chốt hướng + probe thử lại có giới hạn + ca `Y7`; **đo trên CI đúng ca `D-64` và probe vẫn xanh nhờ 1 lần thử lại** (`PR #5`, run `42002078789`: `B = 1` xung đột · `THU LAI 1 lan` · `17/0` · cổng `19/19`); 2 required check giữ nguyên cấu hình đã đo. `07` **chưa** có `§WP-14` ⇒ phiên `N21` **không** mở WP mới.**
 
 1. 🔑 Đọc **`D-66`** + **`D-64`** + §2 **trước** khi làm gì: nợ còn lại **duy nhất** là `409` `code = null` (cần `§WP-14`).
 2. Kiểm **cấu hình còn đúng** (không `PUT` nếu không có quyết định mới):
    `GET /repos/hungnt9801/eCommerce/branches/main/protection` ⇒ **2** context (`docker-build`, `cong-15-buoc`),
    `strict=false`, `enforce_admins=false`; và `ci` trên `main` **xanh** ở head mới nhất.
-3. **Đọc `ci` của lượt merge `N20`** (`cong-15-buoc` bước ⑱) để có **số đo tỉ lệ thật** của probe sau khi sửa:
-   `17/0` (kèm `ℹ️ THU LAI 409: n lan`) hay còn ĐỎ — nếu ĐỎ, ghi `D-67` + log Host (**đừng** nới probe).
+3. **Đọc `ci` của lượt merge `N20`** (`cong-15-buoc` bước ⑱) để có **thêm mẫu** tỉ lệ flaky của probe sau khi sửa —
+   chuẩn để nhìn: `17/0` + `ℹ️ THU LAI 409: n lan` (§1.7 đã có **1** mẫu CI: `B = 1` xung đột, thử lại **1** lần, xanh).
+   Nếu còn **ĐỎ** vì `P12`/`P13`/`P14`: ghi `D-67` + log Host (`%TEMP%` trên CI là artifact `bang-chung-*`) — ⛔ **đừng** tăng `$SoLanThuLai`.
 4. Nếu có `§WP-14` ⇒ làm đúng WP đó (nhánh mới từ `main`). Nếu **chưa** có: **không** tự đặt WP.
 5. Sau khi sửa bất cứ thứ gì: `pwsh -File .\tools\kiem-tat-ca.ps1` (**9/9**) · trước khi push `-DayDu`
    (**19/19**) · `test-cong-kiem.ps1 -ChiKiemMoc` (**37/37**) · `kiem-db.ps1` (**25/25**) · `kiem-link-tai-lieu.ps1` (**PASS**).
@@ -201,9 +203,9 @@ và giữ 2 required check đúng cấu hình đã đo. Không mở rộng phạ
 |---|---|
 | Nhánh làm việc | **`ops/n20-d64-reservation`** (tạo từ `main` = `25d2bd5`) |
 | `main` trước phiên | **`25d2bd5`** (*Merge pull request #4* — docs `N19`); `git log -1 --format=%H origin/main` là **nguồn sự thật** |
-| Commit của phiên | `cea04e8` *(probe thử lại 409 + ca `Y7` + comment `D-66` + docs)* — 📌 **không** chép SHA dài vào tài liệu |
-| PR | **#5** — `ops/n20-d64-reservation` → `main` (docs + probe + cổng; **không** migration) |
-| Run Actions | 📌 Đọc ở §1.8/§6 khi có kết quả; nguồn sự thật là `GET /actions/runs?head_sha=<SHA đầy đủ>` |
+| Commit của phiên | **`6c1fb5c`** (9 tệp · **+431 / −41**) — 📌 chỉ ghi SHA **ngắn**; nguồn sự thật là `git log -1 --format=%H` |
+| PR | [**#5**](https://github.com/hungnt9801/eCommerce/pull/5) — `ops/n20-d64-reservation` → `main` (docs + probe + cổng; **0** migration); `mergeable_state = blocked` khi 2 required check còn **pending** (đúng `D-65` ⑥) |
+| Run Actions | `ci` [**`42002078789`**](https://github.com/hungnt9801/eCommerce/actions/runs/42002078789) **SUCCESS** (head `6c1fb5c`; cổng **19/19, 293,9 s**; ⑱ **17/0** + `THU LAI 409: 1 lan`) · `docker-build` [**`42002078816`**](https://github.com/hungnt9801/eCommerce/actions/runs/42002078816) **success** · `mergeable_state = blocked` khi 2 check còn **pending** |
 | Branch protection `main` | required: **`docker-build`** · **`cong-15-buoc`** (`strict=false`, `enforce_admins=false`) — **không đổi** trong phiên này (`D-65`) |
 | Tệp `N20` đã tạo | `docs/nhanh/handover-n20.md` |
 | Tệp `N20` đã sửa | `docs/nhanh/decisions.md` · `docs/nhanh/07-ke-hoach-trien-khai.md` · `docs/nhanh/08-session-protocol.md` · `docs/nhanh/README.md` · `tools/probe-giu-cho-2instance.ps1` · `tools/test-cong-kiem.ps1` · `tools/kiem-tat-ca.ps1` (comment) · `modules/Inventory/eCommerce.Inventory.Domain/StockReservationService.cs` (**chỉ comment**) |

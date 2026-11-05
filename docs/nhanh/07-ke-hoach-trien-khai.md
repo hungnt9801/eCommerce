@@ -670,6 +670,10 @@ thái "đỏ mà không ai đọc".
 - ✅ **Đo lại tỉ lệ:** probe **5 lượt trước khi sửa `17/0 ×5`** (máy dev **không** tái hiện flake — khe rất hẹp) ·
   **5 lượt sau khi sửa `17/0 ×5`** · bản **giả lập 409** (`tools/_tam-kiem/n20/`, **không commit**) ⇒ **17/0** +
   `ℹ️ THU LAI 409: 1 lần` ⇒ đường thử lại **chạy thật** trên API (không chỉ đọc mã).
+- 🎯 **CI xác nhận ĐÚNG ca `D-64` — và đã được cứu:** lượt `ci` của PR **#5** (run **`42002078789`**, head `6c1fb5c`)
+  ⇒ artifact `giu-cho-2inst.log`: **`xung dot trong log A = 0 · B = 1`** · **`409 da thay = 1`** · `ℹ️ THU LAI 409:
+  **1** lan` · `P12 = 200/200` · `P13` **2** dòng · **17/0** ⇒ Host B **thật sự** vấp `AbpDbConcurrencyException`
+  đúng như `D-64` ①, probe vẫn **xanh** nhờ **1** lần thử lại. Cổng trên CI **19/19 (293,9 s)** · `docker-build` success.
 - ✅ **Giữ 2 required check đúng cấu hình đã đo:** `GET …/branches/main/protection` ⇒ `contexts =
   ["docker-build","cong-15-buoc"]`, `app_id` **15368**, `strict=false`, `enforce_admins=false`, 8 cờ còn lại
   `false`/`null`; `ci` trên `main` (head `25d2bd5`) **4/4 check success**. ⛔ **Không** `PUT`, không đổi cờ nào.
