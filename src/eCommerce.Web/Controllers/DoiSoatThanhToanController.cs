@@ -1,4 +1,5 @@
 using eCommerce.PaymentHub;
+using eCommerce.Reconciliation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -21,10 +22,40 @@ namespace eCommerce.Web.Controllers;
 public class DoiSoatThanhToanController : Controller
 {
     private readonly IPaymentAppService _thanhToan;
+    private readonly IPaymentReconciliationAppService _doiSoatLichSu;
 
-    public DoiSoatThanhToanController(IPaymentAppService thanhToan)
+    public DoiSoatThanhToanController(
+        IPaymentAppService thanhToan,
+        IPaymentReconciliationAppService doiSoatLichSu)
     {
         _thanhToan = thanhToan;
+        _doiSoatLichSu = doiSoatLichSu;
+    }
+
+    /// <summary>
+    /// 🆕 **`S18`** — `POST /DoiSoatThanhToan/ChayDoiSoat` — **chạy tay một lượt đối soát** (API `S15`,
+    /// `TriggerRunAsync`). 🔒 Đi qua **cùng khoá** với job ⇒ bấm trong lúc job đang chạy sẽ nhận `Lock:0001`
+    /// (**hiện lỗi**, không xếp hàng im lặng).
+    /// 📌 Bắt `BusinessException` để hiện mã thay vì `500` chung — **không** nuốt guard.
+    /// </summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ChayDoiSoat()
+    {
+        try
+        {
+            var run = await _doiSoatLichSu.TriggerRunAsync();
+
+            TempData["ThongBaoThanhToan"] =
+                $"Đã chạy đối soát: xét {run.LineTotal} giao dịch · lệch {run.DiscrepancyCount} · trạng thái {run.Status}.";
+        }
+        catch (Volo.Abp.BusinessException ex)
+        {
+            TempData["LoiThanhToan"] = $"Không chạy được đối soát: [{ex.Code}] " +
+                $"{(ex.Message is "An internal error occurred during your request!" or null ? "Một lượt đối soát khác đang chạy (cùng khoá với job)." : ex.Message)}";
+        }
+
+        return RedirectToAction(nameof(Index));
     }
 
     /// <summary>
@@ -84,3 +115,4 @@ public class DoiSoatThanhToanController : Controller
         return RedirectToAction(nameof(Index), new { maThamChieu = (string?)null });
     }
 }
+

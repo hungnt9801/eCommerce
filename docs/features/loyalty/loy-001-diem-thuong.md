@@ -24,12 +24,12 @@ tiêu điểm khi thanh toán, đảo điểm khi trả hàng, và **hết hạn
 
 1. **Sổ cái append-only là nguồn sự thật** — số dư trên `LoyaltyAccount` chỉ là **ảnh chụp** để đọc nhanh.
    Khuôn này **đã có tiền lệ thật trong repo**: `StockLedgerEntry` ở
-   [StockLedger.cs](../../../src/eCommerce.Domain/Entities/Inventory/StockLedger.cs) ghi rõ
+   [StockLedger.cs](../../../modules/Inventory/eCommerce.Inventory.Domain/StockLedger.cs) ghi rõ
    *“Sổ cái kho — APPEND-ONLY. Không bao giờ UPDATE/DELETE bản ghi ở bảng này”*, còn `InventoryItem.OnHand`
    chỉ là snapshot.
 2. **Điểm là `decimal`, không bao giờ `float`/`double`, và không bao giờ so bằng `==`** — theo quy ước bất biến
    của dự án. Hiện repo đã tuân thủ cho **tiền**: `Order.Subtotal/GrandTotal` là `decimal` ở
-   [Order.cs](../../../src/eCommerce.Domain/Entities/Orders/Order.cs), cấu hình `HasPrecision(18, 4)` ở
+   [Order.cs](../../../modules/Sales/eCommerce.Sales.Domain/Order.cs), cấu hình `HasPrecision(18, 4)` ở
    [eCommerceDbContext.cs](../../../src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs) — ⚠️ nhưng **loại `Money`
    vẫn CHƯA có trong code** (xem §0.2 và §15.2 **G1**).
 3. **Mọi biên vào idempotent + mọi chuyển trạng thái ném lỗi** — theo `XC-002` (`IIdempotencyGuard`) và quy ước #11.
@@ -70,7 +70,7 @@ tiêu điểm khi thanh toán, đảo điểm khi trả hàng, và **hết hạn
 
 | # | Quyết định | Phương án đã cân nhắc | Lý do chọn | Hệ quả |
 |---|---|---|---|---|
-| **D1** | **Sổ cái append-only là nguồn sự thật**; số dư chỉ là snapshot | (a) chỉ giữ `Balance` trên tài khoản · (b) chỉ giữ ledger, tính tổng mỗi lần đọc · (c) **ledger + snapshot** | Có **tiền lệ thật trong repo**: `StockLedgerEntry` + `InventoryItem.OnHand` ([StockLedger.cs](../../../src/eCommerce.Domain/Entities/Inventory/StockLedger.cs) dòng 8 và 97–98 ghi rõ *“nguồn sự thật là StockLedgerEntry”*, *“không dùng làm nguồn sự thật”*) | Phải có **job/kiểm tra đối soát** `Balance == SUM(ledger)` (NFR-003); mọi ghi phải qua 1 hàm duy nhất |
+| **D1** | **Sổ cái append-only là nguồn sự thật**; số dư chỉ là snapshot | (a) chỉ giữ `Balance` trên tài khoản · (b) chỉ giữ ledger, tính tổng mỗi lần đọc · (c) **ledger + snapshot** | Có **tiền lệ thật trong repo**: `StockLedgerEntry` + `InventoryItem.OnHand` ([StockLedger.cs](../../../modules/Inventory/eCommerce.Inventory.Domain/StockLedger.cs) dòng 8 và 97–98 ghi rõ *“nguồn sự thật là StockLedgerEntry”*, *“không dùng làm nguồn sự thật”*) | Phải có **job/kiểm tra đối soát** `Balance == SUM(ledger)` (NFR-003); mọi ghi phải qua 1 hàm duy nhất |
 | **D2** | **Điểm lưu `decimal(18,2)`**, không `float`/`double`; **cấm so bằng `==`** | (a) `int` điểm · (b) `double` · (c) **`decimal(18,2)`** | Quy ước #1/#2 của dự án (`docs/implementation-plan.md` §3) + tỷ lệ tích điểm có thể lẻ (ví dụ 1 điểm / 10.000 ₫ ⇒ đơn 25.000 ₫ = 2,5 điểm) | Không dùng `int`; mọi so sánh dùng `>=`/`<=`/`CompareTo`; có test reflection (TC-19) |
 | **D3** | **Hạn dùng điểm theo LÔ (FIFO)**, không theo số dư | (a) hết hạn toàn bộ điểm sau N tháng kể từ lần dùng cuối · (b) **lô theo bút toán cộng, FIFO** | (a) làm khách **mất oan** điểm cũ khi vừa phát sinh giao dịch mới và **không giải trình được** với khách; (b) truy vết được *“điểm nào hết hạn, vì sao”* — cần cho khiếu nại | Thêm bảng `LoyaltyPointCreditLot` + `LoyaltyPointConsumption`; tiêu điểm phức tạp hơn (phải phân bổ theo lô) |
 | **D4** | **Tiêu điểm = GHI NỢ NGAY khi áp dụng** (không tách “giữ chỗ” rồi “xác nhận”) | (a) giữ chỗ rồi xác nhận sau · (b) **trừ ngay, hoàn lại nếu đơn huỷ** | (a) cần thêm trạng thái treo + job nhả, và mở ra cửa sổ **tiêu vượt** giữa “đã giữ” và “đã xác nhận” khi nhiều lô tiêu song song; (b) luồng đơn hàng hiện tại đã có **huỷ/trả** ⇒ dùng lại đúng cơ chế compensation | Bắt buộc có `VoidAsync` (đảo lô tiêu) — xem D5 và BR-016 |
@@ -91,8 +91,8 @@ tiêu điểm khi thanh toán, đảo điểm khi trả hàng, và **hết hạn
 |---|---|---|
 | Module `Loyalty` | ❌ **Chưa có trong code — kế hoạch GĐ4** | `modules/` chỉ có `ChannelHub`, `PaymentHub`, `Tax` |
 | Loại `Money` (dùng chung) | ❌ **Chưa có trong code** — `grep "class Money|record Money|struct Money"` trên toàn repo: **0 kết quả**. Quyết định #5 của kế hoạch là “port theo thiết kế OCC” | `docs/implementation-plan.md` §2 dòng 31; `XC-001` |
-| Tiền là `decimal` | ✅ **Đã tuân thủ cho tiền** | `Order.Subtotal`/`GrandTotal`: [Order.cs](../../../src/eCommerce.Domain/Entities/Orders/Order.cs) dòng 38–47; `HasPrecision(18, 4)`: [eCommerceDbContext.cs](../../../src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs) dòng 173–178 |
-| Sổ cái append-only (khuôn để học) | ✅ **Đã có thật** | [StockLedger.cs](../../../src/eCommerce.Domain/Entities/Inventory/StockLedger.cs) dòng 80–136 |
+| Tiền là `decimal` | ✅ **Đã tuân thủ cho tiền** | `Order.Subtotal`/`GrandTotal`: [Order.cs](../../../modules/Sales/eCommerce.Sales.Domain/Order.cs) dòng 38–47; `HasPrecision(18, 4)`: [eCommerceDbContext.cs](../../../src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs) dòng 173–178 |
+| Sổ cái append-only (khuôn để học) | ✅ **Đã có thật** | [StockLedger.cs](../../../modules/Inventory/eCommerce.Inventory.Domain/StockLedger.cs) dòng 80–136 |
 | `CHECK` constraint ở EF Core | ❌ **Chưa dùng ở đâu trong repo** — chưa có `HasCheckConstraint`. Ràng buộc thật đang dùng là `unique index` + SQL thô `NULLS NOT DISTINCT` | [eCommerceDbContext.cs](../../../src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs) dòng 109–209; [20261013024226_Fix_NullableTenantId_UniqueIndexes.cs](../../../src/eCommerce.EntityFrameworkCore/Migrations/20261013024226_Fix_NullableTenantId_UniqueIndexes.cs) |
 | `RowVersion` (optimistic concurrency) | ❌ **Chưa có entity nào trong repo khai `RowVersion`** (chưa có `IsConcurrencyToken`) | grep `RowVersion` trên `src/` + `modules/`: 0 kết quả ngoài tài liệu `XC-002` D8 |
 | Permission `eCommerce.Loyalty.*` | ❌ **Chưa định nghĩa** | [eCommercePermissionDefinitionProvider.cs](../../../src/eCommerce.Application.Contracts/Permissions/eCommercePermissionDefinitionProvider.cs) có 6 nhóm: Products, Inventory, Channels, Orders, Payments, Tax.* |
@@ -296,7 +296,7 @@ erDiagram
 > 📌 **Không** vẽ khoá ngoại **bắt buộc** giữa `LoyaltyProgramRule` và ledger (rule có hiệu lực theo thời gian ⇒
 > chỉ **ghi lại** `RuleId` dạng tham chiếu mềm, **không** FK cứng, để rule cũ **không bao giờ** bị xoá mất lịch sử).
 > Đây là **cố ý**, giống cách `StockLedgerEntry.ReferenceId` là chuỗi tham chiếu mềm ở
-> [StockLedger.cs](../../../src/eCommerce.Domain/Entities/Inventory/StockLedger.cs) dòng 100–103.
+> [StockLedger.cs](../../../modules/Inventory/eCommerce.Inventory.Domain/StockLedger.cs) dòng 100–103.
 
 ### 5.2 Bảng & cột (Data Dictionary)
 
@@ -758,7 +758,7 @@ public class LoyaltyPointTests
 
 | # | Vấn đề | Bằng chứng | Mức độ | Xử lý |
 |---|---|---|---|---|
-| **G1** | **Loại `Money` CHƯA có trong code**, dù `LOY-001` cần nó cho mọi phép tính tiền (tổng đơn ⇒ điểm) | `grep "class Money\|record Money\|struct Money"` trên toàn repo: **0 kết quả**; `docs/implementation-plan.md` §2 dòng 31 chốt “port theo thiết kế OCC” và §7.0 xếp vào việc hạ tầng GĐ1 | 🟠 **Trung bình** (với `LOY-001`) | ⬜ **Phụ thuộc `XC-001`**: `LOY-001` **phải** dùng `Money` khi đã có. **Tạm thời** dùng `decimal` + `Currency` như `Order` đang làm ([Order.cs](../../../src/eCommerce.Domain/Entities/Orders/Order.cs) dòng 38–47) — ⚠️ nhưng **phải** chuyển sang `Money` khi có, trong **cùng** PR sửa tài liệu trước |
+| **G1** | **Loại `Money` CHƯA có trong code**, dù `LOY-001` cần nó cho mọi phép tính tiền (tổng đơn ⇒ điểm) | `grep "class Money\|record Money\|struct Money"` trên toàn repo: **0 kết quả**; `docs/implementation-plan.md` §2 dòng 31 chốt “port theo thiết kế OCC” và §7.0 xếp vào việc hạ tầng GĐ1 | 🟠 **Trung bình** (với `LOY-001`) | ⬜ **Phụ thuộc `XC-001`**: `LOY-001` **phải** dùng `Money` khi đã có. **Tạm thời** dùng `decimal` + `Currency` như `Order` đang làm ([Order.cs](../../../modules/Sales/eCommerce.Sales.Domain/Order.cs) dòng 38–47) — ⚠️ nhưng **phải** chuyển sang `Money` khi có, trong **cùng** PR sửa tài liệu trước |
 | **G2** | **Outbox/Inbox CHƯA bật** trong repo ⇒ mọi ETO hiện là **dual-write**. `LOY-001` BR-008/BR-012 phụ thuộc cơ chế này | `eCommerceDbContext` **không** implement `IHasEventOutbox`/`IHasEventInbox`, `OnModelCreating` **không** gọi `ConfigureEventOutbox()`/`ConfigureEventInbox()` — [eCommerceDbContext.cs](../../../src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs) dòng 33, 71–91 | 🔴 **Cao** (với mọi module phát ETO chạm tiền) | ⬜ **Chặn**: `LOY-001` **không** được code tới khi `XC-002` xong. Ghi vào DoD §14.3 |
 | **G3** | **Hai tiền tố Redis KHÁC nhau về hoa-thường** trong **cùng một file**: cache `"eCommerce:"` vs lock `"ecommerce:"` | [eCommerceHttpApiHostModule.cs](../../../src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs) dòng **112** và **127** | 🟡 **Thấp** (không sai chức năng, nhưng **gây nhầm khi grep/đối soát**) | ⬜ Đề xuất: chuẩn hoá **cả hai** về `"ecommerce:"` hoặc ghi rõ lý do khác nhau vào `coding-conventions.md`. ⚠️ Đổi tiền tố cache làm **mất hiệu lực cache cũ** ⇒ phải làm khi có cửa sổ bảo trì |
 | **G4** | **Chưa có `RowVersion`/`CHECK`/`HasCheckConstraint` ở bất kỳ entity nào** trong repo ⇒ `LOY-001` sẽ là **nơi đầu tiên** dùng 3 cơ chế này | grep `RowVersion`/`HasCheckConstraint` trên `src/` + `modules/`: 0 kết quả; ràng buộc mạnh nhất hiện có là unique index + `EXCLUDE` của Tax | 🟠 **Trung bình** | ⬜ **Phải** kiểm chứng trên **PostgreSQL thật** (không suy luận). Ghi vào DoD |

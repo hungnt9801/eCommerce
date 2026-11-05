@@ -1,0 +1,720 @@
+[
+  {
+    "t": "Báo cáo",
+    "h": "/report/revenue/index"
+  },
+  {
+    "t": "Theo thời gian",
+    "h": "/report/revenue/index"
+  },
+  {
+    "t": "Theo cửa hàng",
+    "h": "/report/revenue/depot"
+  },
+  {
+    "t": "Theo thương hiệu",
+    "h": "/report/revenue/brand"
+  },
+  {
+    "t": "Theo nhân viên",
+    "h": "/report/revenue/staff"
+  },
+  {
+    "t": "Theo phòng ban",
+    "h": "/report/revenue/department"
+  },
+  {
+    "t": "Theo danh mục sản phẩm",
+    "h": "/report/revenue/category"
+  },
+  {
+    "t": "Theo danh mục nội bộ",
+    "h": "/report/revenue/internalcategory"
+  },
+  {
+    "t": "Theo sản phẩm",
+    "h": "/report/revenue/product"
+  },
+  {
+    "t": "Theo nhà cung cấp",
+    "h": "/report/revenue/supplier"
+  },
+  {
+    "t": "Theo khách hàng",
+    "h": "/report/revenue/customer"
+  },
+  {
+    "t": "Tỷ suất doanh thu / tồn kho",
+    "h": "/report/revenue/inventoryrate"
+  },
+  {
+    "t": "Theo kênh bán",
+    "h": "/report/order/salechannel"
+  },
+  {
+    "t": "Đơn tạo",
+    "h": "/report/order/index"
+  },
+  {
+    "t": "Đơn thành công",
+    "h": "/report/order/success"
+  },
+  {
+    "t": "Theo giá trị đơn hàng",
+    "h": "/report/order/value"
+  },
+  {
+    "t": "Theo danh mục sản phẩm",
+    "h": "/report/order/category"
+  },
+  {
+    "t": "Theo sản phẩm",
+    "h": "/report/order/product"
+  },
+  {
+    "t": "Theo trạng thái",
+    "h": "/report/order/status"
+  },
+  {
+    "t": "Theo địa chỉ",
+    "h": "/report/order/location"
+  },
+  {
+    "t": "Lý do xử lý đơn hàng",
+    "h": "/report/order/cancel"
+  },
+  {
+    "t": "Nhân viên xử lý",
+    "h": "/report/order/create"
+  },
+  {
+    "t": "Theo quảng cáo",
+    "h": "/report/order/utm"
+  },
+  {
+    "t": "Tiền đối soát",
+    "h": "/report/order/verifyandtransfer"
+  },
+  {
+    "t": "Theo hãng vận chuyển",
+    "h": "/report/order/carrier"
+  },
+  {
+    "t": "Tổng quan",
+    "h": "/report/retail/index"
+  },
+  {
+    "t": "Theo nguồn khách hàng",
+    "h": "/report/retail/trafficsource"
+  },
+  {
+    "t": "Theo nhân viên",
+    "h": "/report/retail/cashier"
+  },
+  {
+    "t": "Theo cửa hàng",
+    "h": "/report/retail/depot"
+  },
+  {
+    "t": "Chi tiết quẹt thẻ",
+    "h": "/report/retail/creditmoney"
+  },
+  {
+    "t": "Theo giá trị hóa đơn",
+    "h": "/report/retail/billvalue"
+  },
+  {
+    "t": "Báo cáo tỷ lệ hóa đơn/ khách vào cửa hàng",
+    "h": "/report/retail/customerbillrate"
+  },
+  {
+    "t": "Báo cáo kết ca",
+    "h": "/report/retail/workshift"
+  },
+  {
+    "t": "Tổng quan",
+    "h": "/report/wholesale/index"
+  },
+  {
+    "t": "Theo nhân viên bán hàng",
+    "h": "/report/wholesale/storesale"
+  },
+  {
+    "t": "Xuất nhập tồn theo sản phẩm",
+    "h": "/report/inventory/index"
+  },
+  {
+    "t": "Chi tiết sản phẩm XNK",
+    "h": "/report/inventory/imex"
+  },
+  {
+    "t": "Tổng XNK",
+    "h": "/report/inventory/imextotal"
+  },
+  {
+    "t": "Tổng XNK theo cửa hàng",
+    "h": "/report/inventory/imexdepot"
+  },
+  {
+    "t": "Theo nhà cung cấp",
+    "h": "/report/inventory/supplier2"
+  },
+  {
+    "t": "Danh mục sản phẩm",
+    "h": "/report/inventory/category"
+  },
+  {
+    "t": "Số lượng hàng tồn kho",
+    "h": "/report/inventory/eachdepot"
+  },
+  {
+    "t": "Chuyển kho chưa xác nhận",
+    "h": "/report/inventory/transfer"
+  },
+  {
+    "t": "Theo trạng thái từng cửa hàng",
+    "h": "/report/inventory/depotinventorystatus"
+  },
+  {
+    "t": "Theo trạng thái từng sản phẩm",
+    "h": "/report/inventory/productinventorystatus"
+  },
+  {
+    "t": "Theo lô hàng",
+    "h": "/report/inventory/productbatchs"
+  },
+  {
+    "t": "Chuyển kho theo sản phẩm",
+    "h": "/report/inventory/producttransfer"
+  },
+  {
+    "t": "Bán chạy nhất",
+    "h": "/report/product/index"
+  },
+  {
+    "t": "Bán chạy theo cửa hàng",
+    "h": "/report/product/depot"
+  },
+  {
+    "t": "Tốc độ bán hàng",
+    "h": "/report/product/salespeed"
+  },
+  {
+    "t": "Theo kênh bán",
+    "h": "/report/product/salechannel"
+  },
+  {
+    "t": "Theo danh mục và cửa hàng",
+    "h": "/report/product/categorydetail"
+  },
+  {
+    "t": "Theo khoảng giá",
+    "h": "/report/product/value"
+  },
+  {
+    "t": "Theo ngày",
+    "h": "/report/product/date"
+  },
+  {
+    "t": "Bán hàng theo IMEI",
+    "h": "/report/product/salebyimei"
+  },
+  {
+    "t": "Theo thuộc tính",
+    "h": "/report/product/attribute"
+  },
+  {
+    "t": "Mẫu sổ S1a-HKD (Doanh thu từ 500 triệu trở xuống)",
+    "h": "/report/household/s1a"
+  },
+  {
+    "t": "Mẫu sổ S2a-HKD (Doanh thu trên 500 triệu đến 3 tỷ)",
+    "h": "/report/household/s2a"
+  },
+  {
+    "t": "Mẫu sổ S2b-HKD (Doanh thu trên 3 tỷ)",
+    "h": "/report/household/s2b"
+  },
+  {
+    "t": "Mẫu sổ S2b-HKD (Doanh thu trên 3 tỷ)",
+    "h": "/report/household/s2b"
+  },
+  {
+    "t": "Mẫu sổ S2c-HKD (Sổ chi tiết doanh thu, chi phí)",
+    "h": "/report/household/s2c"
+  },
+  {
+    "t": "Mẫu sổ S2d-HKD (Sổ chi tiết vật liệu, dụng cụ, sản phẩm, hàng hóa)",
+    "h": "/report/household/s2d"
+  },
+  {
+    "t": "Mẫu sổ S2e-HKD (Sổ chi tiết tiền)",
+    "h": "/report/household/s2e"
+  },
+  {
+    "t": "Tổng quan",
+    "h": "/report/customer/index"
+  },
+  {
+    "t": "Theo sản phẩm",
+    "h": "/report/customer/product"
+  },
+  {
+    "t": "Tỷ lệ khách quay lại",
+    "h": "/report/customer/total"
+  },
+  {
+    "t": "Cấp độ khách hàng",
+    "h": "/report/customer/level"
+  },
+  {
+    "t": "Nhóm khách hàng",
+    "h": "/report/customer/group"
+  },
+  {
+    "t": "Khách hàng tạo mới theo cửa hàng",
+    "h": "/report/customer/createnew"
+  },
+  {
+    "t": "Chu kỳ mua hàng",
+    "h": "/report/customer/frequencybought"
+  },
+  {
+    "t": "Sinh nhật khách hàng",
+    "h": "/report/customer/birthday"
+  },
+  {
+    "t": "Tỉ lệ với doanh thu",
+    "h": "/report/promotion/discountrate"
+  },
+  {
+    "t": "Quà tặng theo sản phẩm",
+    "h": "/report/promotion/productgift"
+  },
+  {
+    "t": "Theo sản phẩm",
+    "h": "/report/promotion/productdiscountrate"
+  },
+  {
+    "t": "Quà tặng theo cửa hàng",
+    "h": "/report/promotion/bonusbydepot"
+  },
+  {
+    "t": "Doanh thu theo bảng giá",
+    "h": "/report/promotion/pricelist"
+  },
+  {
+    "t": "Tin gửi theo ngày",
+    "h": "/report/zalo/historydate"
+  },
+  {
+    "t": "Tin gửi theo mẫu",
+    "h": "/report/zalo/template"
+  },
+  {
+    "t": "Đánh giá của khách hàng",
+    "h": "/report/zalo/rating"
+  },
+  {
+    "t": "Tin gửi theo ngày",
+    "h": "/report/sms/date"
+  },
+  {
+    "t": "Sản phẩm",
+    "h": "/product/item/index"
+  },
+  {
+    "t": "Sản phẩm",
+    "h": "/product/item/index"
+  },
+  {
+    "t": "Thương hiệu",
+    "h": "/product/brand/index"
+  },
+  {
+    "t": "Lô sản phẩm",
+    "h": "/product/batch/index"
+  },
+  {
+    "t": "Thời gian lưu kho",
+    "h": "/product/item/storagetime"
+  },
+  {
+    "t": "Tồn kho",
+    "h": "/product/item/inventory"
+  },
+  {
+    "t": "Danh mục",
+    "h": "/product/category/index"
+  },
+  {
+    "t": "Thuộc tính",
+    "h": "/product/variant/index"
+  },
+  {
+    "t": "Nhà cung cấp",
+    "h": "/supplier/manage/index"
+  },
+  {
+    "t": "Kho hàng",
+    "h": "/inventory/bill/index"
+  },
+  {
+    "t": "Xuất nhập kho",
+    "h": "/inventory/bill/index"
+  },
+  {
+    "t": "Chuyển kho",
+    "h": "/inventory/transfer/index"
+  },
+  {
+    "t": "Kiểm kho",
+    "h": "/inventory/check/index"
+  },
+  {
+    "t": "Phiếu nháp",
+    "h": "/inventory/requirement/bill"
+  },
+  {
+    "t": "Thêm gói sản phẩm",
+    "h": "/pos/bill/addpackage"
+  },
+  {
+    "t": "Bung gói sản phẩm",
+    "h": "/pos/bill/extractpackage"
+  },
+  {
+    "t": "Hạn mức tồn kho",
+    "h": "/inventory/archive/index"
+  },
+  {
+    "t": "Vị trí sản phẩm",
+    "h": "/inventory/position/index"
+  },
+  {
+    "t": "Vị trí sản phẩm",
+    "h": "/inventory/position/index"
+  },
+  {
+    "t": "Danh mục vị trí",
+    "h": "/inventory/position/category"
+  },
+  {
+    "t": "HĐXN vị trí",
+    "h": "/inventory/position/bill"
+  },
+  {
+    "t": "Sản phẩm xuất nhập vị trí",
+    "h": "/inventory/position/imex"
+  },
+  {
+    "t": "Dự báo nhập hàng",
+    "h": "/inventory/forecasting/movingaverage"
+  },
+  {
+    "t": "Tổng công ty",
+    "h": "/inventory/product/companyavailable"
+  },
+  {
+    "t": "Hàng lỗi",
+    "h": "/inventory/product/damaged"
+  },
+  {
+    "t": "Lịch sử sửa xóa",
+    "h": "/inventory/log/imexbill"
+  },
+  {
+    "t": "Khách hàng",
+    "h": "/customer/code/customerlist"
+  },
+  {
+    "t": "Danh sách khách hàng",
+    "h": "/customer/code/customerlist"
+  },
+  {
+    "t": "Thẻ khách hàng",
+    "h": "/customer/code/index"
+  },
+  {
+    "t": "Chăm sóc khách hàng",
+    "h": "/customer/care/index"
+  },
+  {
+    "t": "Cấp độ",
+    "h": "/customer/store/level"
+  },
+  {
+    "t": "Nhóm khách hàng",
+    "h": "/customer/group/index"
+  },
+  {
+    "t": "Hình thức chăm sóc",
+    "h": "/customer/type/index"
+  },
+  {
+    "t": "Lý do chăm sóc",
+    "h": "/customer/reason/index"
+  },
+  {
+    "group": "Kênh bán"
+  },
+  {
+    "t": "",
+    "h": "/ecommerce/manage/setting"
+  },
+  {
+    "t": "Cửa hàng",
+    "h": "/pos/bill/index"
+  },
+  {
+    "t": "Tìm hóa đơn",
+    "h": "/pos/bill/lookup"
+  },
+  {
+    "t": "Bán lẻ",
+    "h": "/pos/bill/index"
+  },
+  {
+    "t": "Bán sỉ",
+    "h": "/pos/bill/wholesale"
+  },
+  {
+    "t": "Hóa đơn nháp",
+    "h": "/pos/sale/index"
+  },
+  {
+    "t": "Hóa đơn điện tử",
+    "h": "/pos/invoice/index"
+  },
+  {
+    "t": "Trả hàng",
+    "h": "/pos/return/index"
+  },
+  {
+    "t": "Nợ quà tặng",
+    "h": "/pos/debt/bill"
+  },
+  {
+    "t": "Đơn hàng",
+    "h": "/order/manage/index"
+  },
+  {
+    "t": "Đơn hàng",
+    "h": "/order/manage/index"
+  },
+  {
+    "t": "Đơn trùng",
+    "h": "/order/manage/checkduplicate"
+  },
+  {
+    "t": "Đóng gói",
+    "h": "/order/manage/packing"
+  },
+  {
+    "t": "Biên bản bàn giao",
+    "h": "/shipping/handover/index"
+  },
+  {
+    "t": "Chờ gửi vận chuyển",
+    "h": "/order/manage/sendingcarrier"
+  },
+  {
+    "t": "Khiếu nại",
+    "h": "/order/manage/complain"
+  },
+  {
+    "t": "Đối soát",
+    "h": "/order/payment/index"
+  },
+  {
+    "t": "Đơn gửi qua Nhanh",
+    "h": "/order/payment/index"
+  },
+  {
+    "t": "Đơn tự kết nối",
+    "h": "/order/manage/payment"
+  },
+  {
+    "t": "Nguồn đơn hàng",
+    "h": "/store/traffic/source"
+  },
+  {
+    "t": "Lịch sử sửa xóa",
+    "h": "/order/manage/deleted"
+  },
+  {
+    "t": "Sản phẩm",
+    "h": "/ecommerce/shopee/product"
+  },
+  {
+    "t": "Đơn hàng",
+    "h": "/ecommerce/shopee/order"
+  },
+  {
+    "t": "Đánh giá",
+    "h": "/ecommerce/shopee/productreview"
+  },
+  {
+    "t": "Sản phẩm",
+    "h": "/ecommerce/tiktok/product"
+  },
+  {
+    "t": "Đơn hàng",
+    "h": "/ecommerce/tiktok/order"
+  },
+  {
+    "t": "Sản phẩm",
+    "h": "/ecommerce/lazada/product"
+  },
+  {
+    "t": "Đơn hàng",
+    "h": "/ecommerce/lazada/order"
+  },
+  {
+    "t": "Đánh giá",
+    "h": "/ecommerce/lazada/productreview"
+  },
+  {
+    "t": "Sản phẩm",
+    "h": "/ecommerce/tiki/product"
+  },
+  {
+    "t": "Đơn hàng",
+    "h": "/ecommerce/tiki/order"
+  },
+  {
+    "t": "Sản phẩm",
+    "h": "/ecommerce/meta/product"
+  },
+  {
+    "t": "Báo cáo tài chính",
+    "h": "/ecommerce/finance/dashboard"
+  },
+  {
+    "t": "Tiền quảng cáo",
+    "h": "/ecommerce/manage/reportads"
+  },
+  {
+    "t": "Đối soát COD",
+    "h": "/ecommerce/manage/index"
+  },
+  {
+    "t": "Trả hàng hoàn tiền",
+    "h": "/ecommerce/manage/return"
+  },
+  {
+    "t": "Cài đặt",
+    "h": "/invoice/setting/index"
+  },
+  {
+    "t": "Sản phẩm",
+    "h": "/invoice/product/index"
+  },
+  {
+    "t": "Hóa đơn",
+    "h": "/invoice/bill/index"
+  },
+  {
+    "t": "Website",
+    "h": "/website/content/index"
+  },
+  {
+    "t": "Menu",
+    "h": "/website/menu/index"
+  },
+  {
+    "t": "Tag",
+    "h": "/website/content/tags"
+  },
+  {
+    "group": "Cài đặt"
+  },
+  {
+    "t": "Khuyến mại",
+    "h": "/promotion/setting/discount"
+  },
+  {
+    "t": "Chiết khấu",
+    "h": "/promotion/setting/discount"
+  },
+  {
+    "t": "Thiết lập bảng giá",
+    "h": "/promotion/setting/pricelist"
+  },
+  {
+    "t": "Tích điểm",
+    "h": "/promotion/setting/point"
+  },
+  {
+    "t": "Mã giảm giá",
+    "h": "/promotion/setting/coupon"
+  },
+  {
+    "t": "Quà tặng",
+    "h": "/promotion/setting/gift"
+  },
+  {
+    "t": "Hoa hồng bán hàng",
+    "h": "/promotion/setting/commission"
+  },
+  {
+    "t": "Cài đặt",
+    "h": "/setting/store/index"
+  },
+  {
+    "t": "Nhân viên",
+    "h": "/store/user/index"
+  },
+  {
+    "t": "Cài đặt chung",
+    "h": "/setting/store/index"
+  },
+  {
+    "t": "Bán hàng và XNK",
+    "h": "/setting/store/sale"
+  },
+  {
+    "t": "Đơn hàng và vận chuyển",
+    "h": "/setting/order/index"
+  },
+  {
+    "t": "Cài đặt nhãn",
+    "h": "/setting/store/labels"
+  },
+  {
+    "t": "Mẫu in",
+    "h": "/store/template/design"
+  },
+  {
+    "t": "Gửi Zalo",
+    "h": "/setting/zalo/index"
+  },
+  {
+    "t": "Gửi email",
+    "h": "/setting/email/index"
+  },
+  {
+    "t": "Gửi SMS",
+    "h": "/setting/sms/index"
+  },
+  {
+    "t": "Thanh toán",
+    "h": "/setting/payment/index"
+  },
+  {
+    "t": "Chi nhánh",
+    "h": "/store/branch/index"
+  },
+  {
+    "t": "Đại lý",
+    "h": "/store/agency/index"
+  },
+  {
+    "t": "Hạn sử dụng",
+    "h": "/setting/expire/depot"
+  },
+  {
+    "t": "Business Tools",
+    "h": "/business/tool/index"
+  }
+]

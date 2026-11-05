@@ -35,6 +35,16 @@ public static class eCommerceMetricNames
     // ---- Nghiệp vụ thuế (XC-006) ----
     public const string TaxUnclassifiedSkus = "tax_unclassified_skus";
 
+    // ---- Nghiệp vụ ĐƠN HÀNG (`SAL-003` NFR-012, 24/10/2026) ----
+    /// <summary>
+    /// **SỐ LẦN CHUYỂN TRẠNG THÁI ĐƠN** — nhãn `axis`/`from`/`to` (giá trị **hữu hạn**: 4 trục × ~10 giá trị).
+    ///
+    /// 🔑 **VÌ SAO PHẢI CÓ:** `SAL-003` NFR-012 yêu cầu *"mọi chuyển trạng thái có metric"*. 📌 Không có nó thì
+    /// câu hỏi vận hành *"đơn bị kẹt ở bước nào"* chỉ trả lời được bằng cách quét `OrdStatusHistory` — chậm và
+    /// không vẽ được biểu đồ. 🚨 **CẤM** gắn nhãn `orderId` (`XC-005` BR-009 — cardinality cao).
+    /// </summary>
+    public const string SalesOrderTransitionTotal = "sales_order_transition_total";
+
     // ---- Nghiệp vụ THANH TOÁN / đối soát (`REC-001` mục 7, 17/10/2026) ----
     /// <summary>
     /// 🚨 **SỐ GIAO DỊCH ĐỐI SOÁT MÀ CỔNG KHÔNG XÁC NHẬN ĐƯỢC** — `Pending`/lỗi hạ tầng/**cổng chưa cấu hình**.
@@ -91,7 +101,9 @@ public static class eCommerceMetricNames
         TaxUnclassifiedSkus,
         PaymentReconUnresolved,
         PaymentReconChangedTotal,
-        LoggingFailuresTotal
+        LoggingFailuresTotal,
+        // 🆕 `SAL-003` NFR-012 (24/10/2026)
+        SalesOrderTransitionTotal
     ];
 
     /// <summary>
@@ -99,10 +111,11 @@ public static class eCommerceMetricNames
     ///
     /// 🔑 **VÌ SAO CẦN (đo được, `S10` 21/10/2026):** từ 13/10/2026 tài liệu nói *"12 metric ĐÃ CÓ NƠI PHÁT"*,
     /// ⚠️ nhưng **chưa bao giờ** có phép kiểm nào đối chiếu *"đã đăng ký"* với *"có chỗ gọi thật"*.
-    /// 📌 Đo lại bằng cách quét `src/` + `modules/` + `shared/`: **11/15** tên có điểm phát, **4/15** **KHÔNG**
-    /// (`messaging_outbox_pending` · `messaging_dlq_replayed_total` · `lock_ttl_exceeded_total` ·
-    /// `logging_failures_total`). ⇒ 🔒 Con số *"12/12"* trong tài liệu là **nói quá**, và nó tồn tại được
-    /// **chính vì** không có phép kiểm nào.
+    /// 📌 Đo lại bằng cách quét `src/` + `modules/` + `shared/` (`S16`, 29/10/2026): **15/16** tên có điểm phát,
+    /// **1/16 KHÔNG** (`messaging_dlq_replayed_total` — chưa có luồng phát lại thật). ⇒ 🔒 Con số *"12/12"*
+    /// trong tài liệu cũ là **nói quá**, và nó tồn tại được **chính vì** không có phép kiểm nào.
+    /// ✅ **`S16b` (29/10/2026): 16/16** — `DeadLetterAppService.PhatLaiAsync` phát lại event thật lên bus
+    /// (qua outbox) và **chỉ** tăng counter **sau khi** commit; `ChuaCoNoiPhat` nay **rỗng**.
     ///
     /// ✅ **CÁCH ĐÓNG NỢ (không phải bằng cách thêm chữ vào tài liệu):** mỗi tên metric có **ký hiệu** để tìm,
     /// và `MetricEmitterTests` khẳng định **CẢ HAI CHIỀU** bằng cách quét mã nguồn:
@@ -136,7 +149,8 @@ public static class eCommerceMetricNames
             [TaxUnclassifiedSkus] = nameof(eCommerceMetrics.SetTaxUnclassifiedSkus),
             [PaymentReconUnresolved] = nameof(eCommerceMetrics.SetPaymentReconUnresolved),
             [PaymentReconChangedTotal] = nameof(eCommerceMetrics.PaymentReconChanged),
-            [LoggingFailuresTotal] = nameof(eCommerceMetrics.LoggingFailures)
+            [LoggingFailuresTotal] = nameof(eCommerceMetrics.LoggingFailures),
+            [SalesOrderTransitionTotal] = nameof(eCommerceMetrics.SalesOrderTransition)
         };
 
     /// <summary>
@@ -155,23 +169,14 @@ public static class eCommerceMetricNames
     public static readonly IReadOnlyDictionary<string, string> ChuaCoNoiPhat =
         new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            [MessagingOutboxPending] =
-                "CAN HA TANG: chua co outbox/relay. Su kien hien di in-process (ABP local event bus), "
-                + "khong co bang outbox nao de dem ⇒ moi con so se la BIA. Cho `XC-002` (outbox + relay): "
-                + "relay dem so ban ghi ton dong roi goi `SetMessagingOutboxPending`.",
-
-            [MessagingDlqReplayedTotal] =
-                "CAN TINH NANG: DLQ co chu y KHONG co phat lai TU DONG (`DeadLetterAppService` chi doc + "
-                + "danh dau). Danh dau 'da xu ly' KHONG phai 'da phat lai' ⇒ phat metric nay luc danh dau la "
-                + "NOI DOI. Cho luong phat lai thu cong co that (roi moi dem tai noi phat lai).",
-
-            [LockTtlExceededTotal] =
-                "CAN NOI PHAT HIEN: khoa di qua `IAbpDistributedLock` cua ABP (Redis), TTL do thu vien giu va "
-                + "KHONG lo ra ngoai ⇒ khong co cho nao biet 'thao tac vuot TTL'. Cho wrapper lock co doc TTL.",
-
-            [LoggingFailuresTotal] =
-                "CAN HA TANG: chua co logger provider boc sink de bat loi ghi log. Logging hien dung provider "
-                + "mac dinh cua ABP/ASP.NET ⇒ khong co diem bat 'logger/sink hong'."
+            // ✅ **RỖNG TỪ 29/10/2026 (`S16b`)** — không còn metric nào đã đăng ký mà chưa có điểm phát.
+            // 📌 `MessagingDlqReplayedTotal` **ĐÃ ĐÓNG NỢ**: `DeadLetterAppService.PhatLaiAsync` **publish lại
+            // event gốc** lên `IDistributedEventBus` (`useOutbox: true`, cùng UoW với dấu `ReplayedAtUtc`) rồi
+            // mới tăng counter. 🔑 Điều kiện để xoá khỏi danh sách này **không** phải "đã có luồng đánh dấu" —
+            // mà là **đã có luồng PHÁT LẠI THẬT**; đếm *"đánh dấu đã xử lý"* thành *"đã phát lại"* là **nói dối**
+            // (`XC-005` §19.3/§20.3).
+            // 🔒 KHÔNG được thêm lại tên nào vào đây để làm test xanh — `MetricEmitterTests` kiểm **hai chiều**
+            // và sẽ ĐỎ nếu khai "chưa có" trong khi mã đã có lời gọi.
         };
 }
 
@@ -195,9 +200,19 @@ public static class eCommerceMetricTags
     public const string Method = "method";
     public const string Route = "route";
 
+    /// <summary>`SAL-003` NFR-012 — nhãn **trục** (`Fulfillment`/`Payment`/`Reconciliation`/`Closure`).</summary>
+    public const string Axis = "axis";
+
+    /// <summary>`SAL-003` NFR-012 — trạng thái **trước** (số enum của trục; hữu hạn).</summary>
+    public const string FromStatus = "from";
+
+    /// <summary>`SAL-003` NFR-012 — trạng thái **sau** (số enum của trục; hữu hạn).</summary>
+    public const string ToStatus = "to";
+
     public static readonly IReadOnlyList<string> Allowed =
     [
-        Channel, Provider, EventName, Status, Reason, Kind, Module, Result, Method, Route
+        Channel, Provider, EventName, Status, Reason, Kind, Module, Result, Method, Route,
+        Axis, FromStatus, ToStatus
     ];
 
     /// <summary>Nhãn **BỊ CẤM** vì cardinality cao — test `TC-07` chặn nếu chúng lọt vào danh sách cho phép.</summary>
@@ -208,13 +223,14 @@ public static class eCommerceMetricTags
 }
 
 /// <summary>
-/// Phát **12 metric** bằng `System.Diagnostics.Metrics` **có sẵn trong .NET** — **KHÔNG thêm gói NuGet nào**.
+/// Phát **16 metric** bằng `System.Diagnostics.Metrics` **có sẵn trong .NET** — **KHÔNG thêm gói NuGet nào**.
 ///
 /// 🎯 VÌ SAO CÁCH NÀY (chốt Q1 của `XC-005` theo hướng thực dụng):
 ///   `Meter`/`Counter`/`Histogram`/`ObservableGauge` nằm trong BCL (.NET 6+). Chọn công cụ thu thập
 ///   (OpenTelemetry → Prometheus/Grafana…) là việc của **tầng xuất**, có thể thêm **sau** mà **không phải
-///   sửa nơi phát metric**. Nhờ vậy 12 metric đang bị "nợ" nay **đã có nơi phát thật** mà không kéo thêm
-///   dependency nào vào dự án.
+///   sửa nơi phát metric**. 📌 `S16` (29/10/2026): **15/16** metric có điểm phát thật; `S16b` (cùng ngày):
+///   **16/16** — `messaging_dlq_replayed_total` có điểm phát ở `DeadLetterAppService.PhatLaiAsync`
+///   (xem `ChuaCoNoiPhat`, nay rỗng).
 ///
 /// 📌 Gauge dùng cơ chế "giá trị do nơi phát cập nhật" (`Set…`), vì ta không có nguồn pull định kỳ.
 /// </summary>
@@ -227,7 +243,16 @@ public sealed class eCommerceMetrics : ISingletonDependency
 
     // ---- Counter ----
     public Counter<long> MessagingInboxFailed { get; }
+
+    /// <summary>
+    /// 🚨 **SỐ LẦN PHÁT LẠI DLQ THÀNH CÔNG** (`XC-002` NFR-009).
+    /// 🔒 Chỉ tăng **sau khi** UoW (dấu `ReplayedAtUtc` + dòng outbox) đã **commit** ⇒ không đếm một lần
+    /// phát lại có thể bị rollback. 📌 Không tăng khi: dòng đã phát lại trước đó (idempotent), `TenSuKien`
+    /// không ánh xạ được (fail-closed), payload không deserialize được, hoặc publish/commit ném.
+    /// Nhãn: `eventName` (hữu hạn — số loại sự kiện) · `result` = `ok` (`XC-005` §5.1).
+    /// </summary>
     public Counter<long> MessagingDlqReplayed { get; }
+
     public Counter<long> LockTimeout { get; }
     public Counter<long> LockSkipped { get; }
     public Counter<long> LockTtlExceeded { get; }
@@ -237,6 +262,9 @@ public sealed class eCommerceMetrics : ISingletonDependency
 
     /// <summary>`REC-001` mục 7 — số lần lượt đối soát **đổi** trạng thái giao dịch (nhãn `result`).</summary>
     public Counter<long> PaymentReconChanged { get; }
+
+    /// <summary>`SAL-003` NFR-012 — số lần chuyển trạng thái đơn, nhãn `axis`/`from`/`to`.</summary>
+    public Counter<long> SalesOrderTransition { get; }
 
     // ---- Histogram ----
     public Histogram<double> HttpRequestDurationSeconds { get; }
@@ -283,7 +311,8 @@ public sealed class eCommerceMetrics : ISingletonDependency
         LockSkipped = _meter.CreateCounter<long>(eCommerceMetricNames.LockSkippedTotal,
             unit: "{attempt}", description: "Job định kỳ bỏ qua lượt vì khoá đang bận (XC-003).");
         LockTtlExceeded = _meter.CreateCounter<long>(eCommerceMetricNames.LockTtlExceededTotal,
-            unit: "{occurrence}", description: "Số lần thao tác VƯỢT TTL của khoá — kỳ vọng 0 (XC-003).");
+            unit: "{occurrence}",
+            description: "Số lần LEASE khoá phân tán bị MẤT (HandleLostToken) — tức vượt TTL, kỳ vọng 0 (XC-003).");
         PaymentWebhookRejected = _meter.CreateCounter<long>(eCommerceMetricNames.PaymentWebhookRejectedTotal,
             unit: "{webhook}", description: "Webhook thanh toán bị từ chối (sai chữ ký, sai số tiền).");
         ChannelSyncFailed = _meter.CreateCounter<long>(eCommerceMetricNames.ChannelSyncFailedTotal,
@@ -292,6 +321,9 @@ public sealed class eCommerceMetrics : ISingletonDependency
             unit: "{failure}", description: "Ghi log thất bại (logger/sink hỏng) — log là best-effort.");
         PaymentReconChanged = _meter.CreateCounter<long>(eCommerceMetricNames.PaymentReconChangedTotal,
             unit: "{transaction}", description: "Số lần đối soát thanh toán ĐỔI trạng thái giao dịch (REC-001).");
+        SalesOrderTransition = _meter.CreateCounter<long>(eCommerceMetricNames.SalesOrderTransitionTotal,
+            unit: "{transition}",
+            description: "Số lần chuyển trạng thái đơn (SAL-003 NFR-012) — nhãn axis/from/to, CẤM orderId.");
 
         HttpRequestDurationSeconds = _meter.CreateHistogram<double>(eCommerceMetricNames.HttpRequestDurationSeconds,
             unit: "s", description: "Độ trễ xử lý request HTTP.");

@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>eCommerce.Application.Contracts.Sales</RootNamespace>
+    <AssemblyName>eCommerce.Sales.Application.Contracts</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\eCommerce.Sales.Domain\eCommerce.Sales.Domain.csproj" />
+    <ProjectReference Include="..\..\Pricing\eCommerce.Pricing.Application.Contracts\eCommerce.Pricing.Application.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Volo.Abp.Ddd.Application.Contracts" />
+  </ItemGroup>
+
+</Project>

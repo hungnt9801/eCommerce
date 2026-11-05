@@ -189,13 +189,13 @@ graph LR
 
 | Tên metric | Loại | Nhãn (hữu hạn) | Nguồn yêu cầu | Nơi phát (`S10` đo) |
 |---|---|---|---|---|
-| `messaging_outbox_pending` | Gauge | — | **`XC-002` NFR-003** | ❌ **CHƯA CÓ** — không có outbox/relay (xác nhận `S10`, xem `XC-002` §16.5) |
+| `messaging_outbox_pending` | Gauge | — | **`XC-002` NFR-003** | ✅ **24/10/2026** — `OutboxPendingWorker` (project EF; đếm `AbpEventOutbox` mỗi 60 s) |
 | `messaging_inbox_failed_total` | Counter | `eventName` | **`XC-002` NFR-009** | ✅ `IdempotencyGuard` |
 | `messaging_dlq_size` | Gauge | — | **`XC-002` NFR-009** | ✅ `MarketplaceReconciliationWorker` |
-| `messaging_dlq_replayed_total` | Counter | `result` (`ok`/`fail`) | **`XC-002` NFR-009** | ❌ **CHƯA CÓ** — DLQ **cố ý** không phát lại tự động |
+| `messaging_dlq_replayed_total` | Counter | `result` (`ok`), `eventName` | **`XC-002` NFR-009** | ✅ **29/10/2026 (`S16b`)** — `DeadLetterAppService.PhatLaiAsync`: **publish lại event gốc** lên `IDistributedEventBus` (`useOutbox: true`, cùng UoW) rồi **mới** tăng counter (xem §21) |
 | `lock_timeout_total` | Counter | `module` | **`XC-003` NFR-003** | ✅ `ChannelTokenManager` |
 | `lock_skipped_total` | Counter | `module` | **`XC-003` A1** | ✅ `TaxUnclassifiedSkusWorker` |
-| `lock_ttl_exceeded_total` | Counter | `module` | **`XC-003` NFR-007** | ❌ **CHƯA CÓ** — TTL do `IAbpDistributedLock` giữ, không lộ ra ngoài |
+| `lock_ttl_exceeded_total` | Counter | `module` | **`XC-003` NFR-007** | ✅ **29/10/2026** — `DoThoiGianGiuKhoa` (decorator `IAbpDistributedLock`, nghe `HandleLostToken`) |
 | `http_request_duration_seconds` | Histogram | `method`, `route`, `status` | `XC-005` | ✅ `RequestDurationRecorder` (`shared/`) |
 | `payment_webhook_rejected_total` | Counter | `provider`, `reason` | `XC-005` (`PaymentHub`) | ✅ `VnPayPaymentProvider` |
 | `channel_sync_failed_total` | Counter | `channel`, `kind` | `XC-005` (`ChannelHub`) | ✅ `ChannelShopSyncer` |
@@ -203,10 +203,14 @@ graph LR
 | `tax_unclassified_skus` | Gauge | — | `XC-006` §10 | ✅ `TaxUnclassifiedSkusWorker` |
 | `payment_recon_unresolved_total` | Gauge | — | `REC-001` §7 | ✅ `PaymentReconciliationWorker` + `PaymentAppService` |
 | `payment_recon_changed_total` | Counter | `result` | `REC-001` §7 | ✅ `MetricDoiSoatThanhToan` |
-| `logging_failures_total` | Counter | — | `XC-005` D10 | ❌ **CHƯA CÓ** — chưa có logger provider bọc sink |
+| `sales_order_transition_total` | Counter | `axis`, `from`, `to` | **`SAL-003` NFR-012** (24/10/2026) | ✅ `OrderStatusMetricHandler` (nghe `OrderStatusChangedEto`) |
+| `logging_failures_total` | Counter | — | `XC-005` D10 | ✅ **29/10/2026** — `DemLoiGhiLogProvider` (bọc mọi `ILoggerProvider`; lỗi ⇒ stderr + counter) |
 
-> 📌 **ĐẾM ĐƯỢC (21/10/2026): 11/15 có nơi phát · 4/15 chưa.** 🔒 **KHÔNG** ghi *"12/12"* hay *"15/15"* nữa —
-> con số đó chỉ đúng khi **có phép đo**, và §19 là phép đo.
+> 📌 **ĐẾM ĐƯỢC (`S16`, 29/10/2026): 15/16 có nơi phát · 1/16 chưa.** 🔒 **KHÔNG** ghi *"16/16"* khi chưa có phép đo —
+> con số này khớp với `MetricEmitterTests` (quét mã **hai chiều**).
+> ✅ **`S16b` (29/10/2026): 16/16.** Nợ cuối cùng (`messaging_dlq_replayed_total`) **đã đóng bằng mã** —
+> `DeadLetterAppService.PhatLaiAsync` **publish lại event thật** rồi mới đếm (xem §21) ⇒
+> `eCommerceMetricNames.ChuaCoNoiPhat` nay **rỗng**, và `MetricEmitterTests` vẫn xanh **cả hai chiều**.
 
 > 🚨 **Quy tắc nhãn (BR-009):** nhãn **chỉ** lấy từ tập hữu hạn. **Cấm** `orderId`, `sku`, `userId`, `correlationId`,
 > `email`, `phone`. Cần truy vết theo các giá trị đó ⇒ **dùng log** (đã có `CorrelationId`), **không** dùng metric.
@@ -653,7 +657,7 @@ gọi ở luồng nghiệp vụ nào"* — 📌 cảnh báo đó **đúng**, và
 ③ hoàn nguyên **cả hai** ⇒ xanh. 📌 Đây là lần thứ **N** của bài học: *"luôn đúng" và "không hoạt động" trông
 giống hệt nhau*.
 
-### 19.3 🔒 4 nợ còn lại — nêu rõ **cần gì**, không giả vờ
+### 19.3 🔒 3 nợ còn lại — nêu rõ **cần gì**, không giả vờ
 
 | Metric | Hạ tầng còn thiếu | Thuộc về |
 |---|---|---|
@@ -665,3 +669,236 @@ giống hệt nhau*.
 📌 **Vì sao `S10` không "làm cho xong" 4 mục này:** cả bốn đòi **hạ tầng mới** (outbox/relay · luồng phát lại ·
 wrapper khoá · logging provider) ⇒ 🔒 làm gấp trong một phiên đóng nợ là cách tạo **hai nguồn sự thật**.
 ✅ Thay vào đó: **đo được · khai báo được · khoá được** ⇒ 📌 con số *"11/15"* **không thể trôi** nữa.
+
+> ⚠️ **CẬP NHẬT 29/10/2026:** bảng trên là **ảnh chụp `S10`**. `S16` (xem **§20**) đã đóng
+> `lock_ttl_exceeded_total` + `logging_failures_total`; `messaging_outbox_pending` đã đóng từ 24/10 (`XC-002` §17).
+> ✅ **`S16b` (xem §21) đã đóng nốt `messaging_dlq_replayed_total`** ⇒ **không còn nợ metric nào**.
+
+---
+
+## 20. `S16` — 2/3 metric còn nợ đã có ĐIỂM PHÁT THẬT (29/10/2026)
+
+> **Mục tiêu:** đóng các metric còn nợ ở §19.3 **bằng hạ tầng thật**, không bằng cách thêm tên vào bảng.
+> 🔒 Ràng buộc: `MetricEmitterTests` kiểm **hai chiều** — metric khai nợ mà có lời gọi ⇒ ĐỎ; metric không khai nợ
+> mà không có lời gọi ⇒ ĐỎ. Vì vậy mỗi mục dưới đây phải có **đường phát thật + test chứng minh cả hai chiều**.
+
+### 20.1 Kết quả đo được
+
+| Metric | Trạng thái `S16` | Điểm phát thật | Hạ tầng mới |
+|---|---|---|---|
+| `lock_ttl_exceeded_total` | ✅ **XONG** | `DoThoiGianGiuKhoa` — decorator `IAbpDistributedLock` | bọc descriptor + nghe `IDistributedSynchronizationHandle.HandleLostToken` |
+| `logging_failures_total` | ✅ **XONG** | `DemLoiGhiLogProvider` — bọc **mọi** `ILoggerProvider` ở **cả Host và Web** | provider/logger decorator + dòng dự phòng `Console.Error` |
+| `messaging_dlq_replayed_total` | ❌ **CÒN NỢ** | — | **chưa có luồng phát lại DLQ** (xem §20.3) |
+
+📌 **Đếm được sau `S16`: 15/16 metric có điểm phát · 1/16 còn nợ.** Con số này là kết quả của
+`MetricEmitterTests` (quét `src/` + `modules/` + `shared/`), không phải lời khai trong bảng.
+
+### 20.2 Hai metric đã đóng — và một ĐÍNH CHÍNH quan trọng
+
+#### (a) `lock_ttl_exceeded_total`
+
+🚨 **ĐÍNH CHÍNH KỸ THUẬT (đo từ mã ABP 10.7, không suy đoán):** tham số thứ hai của
+`IAbpDistributedLock.TryAcquireAsync(name, timeout, ct)` là **thời gian CHỜ giành khoá** —
+`MedallionAbpDistributedLock` chuyển thẳng nó xuống `IDistributedLockProvider.TryAcquireLockAsync(key, timeout, ct)`.
+**Nó KHÔNG phải TTL của lease.** TTL thật do Medallion giữ (mặc định 30 s) và **tự động gia hạn** khi handle còn sống.
+⇒ Nếu lấy `timeout` làm TTL và so "giữ lâu hơn" thì một job quét hợp pháp giữ khoá 60 s sẽ **báo động giả** —
+đúng loại metric nói dối mà tài liệu này cấm.
+
+✅ **Cách đo thật đã dùng:** Medallion phơi `IDistributedSynchronizationHandle.HandleLostToken`; token **chỉ bị huỷ
+khi lease đã mất** (hết TTL mà không gia hạn được: tiến trình treo, mất Redis, tranh chấp). ABP có hàm mở handle
+`AbpDistributedLockHandleExtensions.ToDistributedSynchronizationHandle()`. Decorator:
+
+1. chuyển tiếp **nguyên vẹn** `TryAcquireAsync` (kể cả `null` khi không giành được khoá);
+2. khi có handle, đăng ký `HandleLostToken` ⇒ tăng counter **đúng một lần** cho mỗi handle bị mất;
+3. khi handle được trả, **ngắt đăng ký trước** rồi mới dispose handle ⇒ mất khoá *sau khi đã trả* không bị đếm.
+
+📌 Nhãn `module` lấy từ **tiền tố hữu hạn** của tên khoá (`inventory`, `catalog`, `sales`, `payment`…);
+không gắn cả tên khoá vì nó chứa tenant/SKU/shopId (cardinality cao — BR-009).
+
+⚠️ **Giới hạn đã biết:** nếu provider không phải Medallion thì không có `HandleLostToken`; decorator vẫn chuyển
+tiếp handle như cũ nhưng **không quan sát được** metric. Đây là lý do nó được đăng ký ở host — nơi provider
+Medallion/Redis được chỉ định tường minh — chứ không bọc mù mọi môi trường.
+
+#### (b) `logging_failures_total`
+
+`DemLoiGhiLogProvider` bọc **từng** `ILoggerProvider` (console, debug, event source…) và trả một `ILogger` bọc.
+Nó được đăng ký ở **cả `eCommerceHttpApiHostModule` và `eCommerceWebModule`**: hai tiến trình có bộ provider
+riêng, nên chỉ bọc Host sẽ để lỗi ghi log của UI **vô hình** (counter = 0 vì không ai đo, không phải vì không lỗi).
+Mọi `IsEnabled` / `BeginScope` / `Log` được chuyển tiếp. Khi provider bên trong ném:
+
+1. **ghi ngay** một dòng dự phòng ra `Console.Error` (hoặc sink tiêm vào khi test) — **không nuốt log**;
+2. tăng `logging_failures_total` **một lần**.
+
+🔒 **Không đệ quy:** dòng dự phòng dùng `Console.Error` trực tiếp, **không** đi qua `ILogger`; nếu chính việc tăng
+metric ném thì exception bị chặn **sau khi** dòng dự phòng đã được ghi. Scope được chuyển tiếp qua
+`ISupportExternalScope` để không đổi hành vi log hiện có.
+
+### 20.3 Vì sao `messaging_dlq_replayed_total` VẪN còn nợ (ở `S16`) — ✅ **ĐÃ ĐÓNG Ở `S16b`, XEM §21**
+
+`DeadLetterAppService` hiện **chỉ đọc + đánh dấu đã xử lý**; **không có** đường phát lại nào:
+không endpoint replay, không deserialize payload thành event, không publish qua `IDistributedEventBus`, không có
+cờ/idempotency cho lần phát lại. 📌 Đếm "đã đánh dấu" thành "đã phát lại" là **nói dối** — đúng điều §19.3 đã chặn.
+⇒ `S16` **giữ nguyên** tên này trong `ChuaCoNoiPhat` kèm lý do; muốn đóng phải làm **một luồng replay thật**
+(đọc `MsgDeadLetters` → phát lại event qua outbox → đánh dấu đã replay → idempotent) và chỉ khi đó mới đặt lời gọi
+`MessagingDlqReplayed.Add(...)` tại **chính nơi phát lại**.
+
+> ✅ **`S16b` (29/10/2026) làm đúng 4 bước trên** — xem **§21**. Mục này giữ lại **nguyên văn** vì nó là
+> **lý do** (không phải mô tả trạng thái hiện tại): 🔒 đó cũng là điều kiện để lần sau không ai "đóng nợ"
+> bằng cách đếm lần **đánh dấu**.
+
+### 20.4 Bằng chứng HAI CHIỀU (test mới)
+
+`test/eCommerce.Tests/Observability/S16MetricTests.cs` — **7 ca**:
+
+| Ca | Chiều | Khẳng định |
+|---|---|---|
+| `Lock_ttl_exceeded_PHAT_khi_lease_MAT_THAT` | **CÓ** sự kiện | `HandleLostToken` huỷ ⇒ counter = 1 · nhãn `module=inventory` · huỷ lặp lại vẫn chỉ 1 |
+| `Lock_ttl_exceeded_KHONG_PHAT_khi_tra_khoa_binh_thuong` | **KHÔNG** có sự kiện | trả handle bình thường ⇒ counter = 0 |
+| `Lock_ttl_exceeded_KHONG_PHAT_neu_lease_mat_SAU_khi_da_tra` | **KHÔNG** có sự kiện | mất token sau khi dispose ⇒ counter = 0 (đã ngắt đăng ký) |
+| `Wrapper_lock_KHONG_doi_hanh_vi_khi_khong_gianh_duoc_khoa` | tương thích | `null` vẫn là `null`, tên khoá vẫn được chuyển tiếp |
+| `Logging_failures_PHAT_khi_sink_NEM__va_KHONG_mat_thong_diep` | **CÓ** sự kiện | sink ném ⇒ counter = 1 · dòng dự phòng chứa **nguyên** message + exception |
+| `Logging_failures_KHONG_PHAT_khi_sink_binh_thuong` | **KHÔNG** có sự kiện | sink bình thường ⇒ counter = 0 · message vẫn đến sink |
+| `Dang_ky_logger_boc_DUNG_provider_trong_DI__va_van_phat_metric` | hạ tầng DI | `LoggerFactory` thật + provider thật bị bọc ⇒ sink ném vẫn phát metric |
+
+📌 **Không** có ca nào "chỉ kiểm constructor": metric chỉ xanh khi **sự kiện chạy qua đường phát thật**, và
+**đỏ** (hoặc không đếm) khi sự kiện không xảy ra.
+
+### 20.5 Ảnh hưởng vận hành
+
+- **`lock_ttl_exceeded_total > 0`** = một tiến trình **đã thực sự mất lease** trước khi trả khoá. Đây là bất
+  thường thật (treo/GC dài/mất Redis), không phải "job chạy lâu". Khi thấy: kiểm tra Redis, thời gian GC/thread
+  pool của instance, và mức `ExtensionCadence` của Medallion.
+- **`logging_failures_total > 0`** = ít nhất một sink không ghi được. Dòng `[LOGGING-FAILURE]` ở `stderr` vẫn giữ
+  category/level/eventId/message gốc để không mất dấu; điều tra sink (đĩa đầy, collector chết, quyền ghi).
+- **Không đổi schema/migration/quyền/route/DTO.** Chỉ thêm hai decorator ở host + hai ca metric.
+
+### 20.6 Đo cổng cuối (cây đã sửa)
+
+- `pwsh -File tools\kiem-tat-ca.ps1 -DayDu`: **exit 0 · 370.7s · 15/15 bước**.
+- Unit **1612/1612** (tăng **7** từ 1605) · integration **87/87** · E2E **145/145** · DB **25/25** · NND **64** ·
+  **71** quyền · migration **49** · quét **99** chỗ.
+- `npm --prefix tools run check:mermaid`: **213 khối · 0 lỗi** · `pwsh -File tools\kiem-link-tai-lieu.ps1`:
+  **296 link + 325 đường dẫn backtick · 0 chết**.
+
+---
+
+## 21. `S16b` — REPLAY DLQ THẬT: metric **16/16** (29/10/2026)
+
+> **Mục tiêu:** đóng nợ **cuối cùng** của §19.3 — `messaging_dlq_replayed_total` — **bằng hạ tầng thật**.
+> 🔒 **Định nghĩa do chủ dự án chốt: "replay" = PHÁT LẠI EVENT LÊN BUS**, **KHÔNG** phải *"đánh dấu đã xử lý"*.
+> 📌 Vì vậy mọi thứ dưới đây xoay quanh **một** câu hỏi: *"event có thật sự đi không?"* — không phải *"cờ có bật không?"*.
+
+### 21.1 Vì sao "đánh dấu" không phải "phát lại" — và cái bẫy của nó
+
+`PostDanhDauDaXuLyAsync` đã tồn tại từ `XC-002` §16 và nó **ghi `DaXuLy = true`**. Nếu đặt lời gọi
+`MessagingDlqReplayed.Add(1)` **ngay tại đó** thì:
+
+- metric **tăng** — trông như *"đã phát lại"*;
+- nhưng **không có event nào đi** ⇒ consumer **không bao giờ** nhận;
+- 📌 và **không có lỗi nào** để lần ra: dòng DLQ *"đã xử lý"*, biểu đồ *"có phát lại"*, còn sự kiện **đã mất**.
+
+🔑 Đây đúng là kiểu **nói dối bằng observability** mà §19.3 đã chặn trước khi có luồng thật. `S16b` **không**
+đổi cách đánh dấu; nó thêm một **đường khác** — đường **publish**.
+
+### 21.2 Hợp đồng đã hiện thực
+
+| Hạng mục | Giá trị | Vì sao chốt như vậy |
+|---|---|---|
+| Entity | `DeadLetterMessage.ReplayedAtUtc` · `ReplayCount` · `ReplayedBy` (+ `DaPhatLai`) | 🔒 **cột RIÊNG**, không suy từ `DaXuLy`: *"đã bỏ qua"* ≠ *"đã phát lại"* |
+| Migration | `20261029033402_Xc002_DlqReplay` (**50**) — 3 `AddColumn`, **không** index/`CHECK` mới | NND **giữ 64**; bất biến idempotency nằm ở entity + app service |
+| `schema.sql` | **sinh lại**; diff **chỉ thêm** 3 cột | nếu quên ⇒ integration test đỏ vì cột **không tồn tại** |
+| API | `IDeadLetterAppService.PhatLaiAsync(Guid id)` → `PhatLaiDlqKetQuaDto` · route mới `POST /api/app/dead-letter/{id}/phat-lai` | **không** đổi route/DTO cũ; DTO trả **cả** *"đã phát"* và *"bỏ qua + lý do"* |
+| Quyền | **`eCommerce.Operations.DeadLetters.Replay`** (khai **cả hai nơi** + `quyenPhaiCon` + `DbMigrator`) | phát lại = **gửi sự kiện vào hệ thống** ⇒ tách khỏi quyền **đọc** (đặc quyền tối thiểu) |
+| Metric | `messaging_dlq_replayed_total` +1 **sau commit**, nhãn `result=ok` · `eventName` | tăng **trước** commit là đếm một lần có thể **rollback** |
+| UoW | `Begin(requiresNew: true, isTransactional: true)`; publish `useOutbox: true`, `onUnitOfWorkComplete: false` | dấu phát lại + dòng **outbox** cùng **một** transaction ⇒ không mất, không phát hai lần |
+| HTTP status | `0008`/`0009`/`0010` ⇒ **409**; `0007` ⇒ **404** | ABP mặc định trả **403** ⇒ client đọc thành *"thiếu quyền"* và **đi xin quyền** thay vì sửa dữ liệu |
+
+### 21.3 Idempotency: **một dòng DLQ — một lần phát lại**
+
+Thứ tự trong `PhatLaiAsync` (mỗi bước là một quyết định, không phải thứ tự tuỳ ý):
+
+1. **chặn trùng TRƯỚC** (`ban.DaPhatLai`) ⇒ trả DTO `DaPhatLai = false` + lý do. 📌 **Không ném**: bấm hai lần là
+   chuyện thường; ném sẽ khiến người dùng tưởng **hệ thống hỏng**;
+2. **ánh xạ `TenSuKien` → `Type`** (fail-closed `0009`);
+3. **deserialize payload** (fail-closed `0010`);
+4. **ghi dấu** (`DanhDauDaPhatLai` + `DanhDauDaXuLy`) — 🔒 *sau* khi biết chắc payload hợp lệ ⇒ không bao giờ có
+   dấu *"đã phát lại"* cho một event chưa đi;
+5. **publish** trong UoW (outbox);
+6. **commit**, rồi **mới** tăng metric.
+
+🔒 **Vì sao `DaXuLy` KHÔNG làm khoá idempotency:** một dòng có thể bị đánh dấu **bỏ qua có lý do** (không phát lại).
+Nếu dùng `DaXuLy` làm khoá thì lần phát lại **đầu tiên** của dòng đó **bị chặn** — hoặc tệ hơn: một dòng **đã**
+phát lại bị coi như chưa ⇒ phát **hai lần** ⇒ consumer nhận trùng.
+
+➕ **Hai lớp chặn:** app service kiểm trước (trả lý do) **và** entity `DanhDauDaPhatLai` **NÉM** `0008` nếu bị gọi
+lần hai. 🚨 Nếu hai request **đồng thời** cùng qua cửa trước, `ConcurrencyStamp` của aggregate làm **một** UoW
+rollback ⇒ dòng **outbox của nó cũng rollback** ⇒ chỉ **một** event đi. 📌 Đây là lý do phải publish **trong**
+UoW chứ không phải sau.
+
+### 21.4 Fail-closed: **hai cửa**, và cả hai đều **không** publish
+
+| Cửa | Ca | Kết quả |
+|---|---|---|
+| `IDeadLetterEventTypeResolver` | `TenSuKien` không khớp loại nào **hoặc** khớp **≥ 2** loại cùng tên ngắn | **NÉM** `eCommerce:Messaging:0009` (kèm danh sách ứng viên) |
+| Deserialize | payload không phải JSON object của loại đã ánh xạ (mảng, thiếu trường, sai kiểu) | **NÉM** `eCommerce:Messaging:0010` |
+
+🚨 **Vì sao không có "phương án dự phòng":** publish một `object` *"đoán"* nghĩa là consumer **không có handler**
+⇒ sự kiện **rơi vào khoảng không**, trong khi dấu `ReplayedAtUtc` đã ghi ⇒ **mất bằng chứng + mất sự kiện**.
+📌 Bộ ánh xạ chấp nhận **cả** tên ngắn (`nameof(...)` — dạng `DeadLetterWriter` đang ghi) **và** tên đầy đủ
+(dạng ABP dùng làm tên event), nhưng **chỉ khi khớp duy nhất**.
+
+### 21.5 Bằng chứng **HAI CHIỀU** (không chỉ "test xanh")
+
+**(a) Unit — `test/eCommerce.Tests/Messaging/DeadLetterPhatLaiTests.cs` · 11 ca.** Bus/UoW là **test double**,
+metric là `MeterListener` **thật**, entity là **thật**:
+
+| Ca | Chiều | Khẳng định |
+|---|---|---|
+| `Phat_lai_MOT_lan__…` | **CÓ** sự kiện | publish **đúng 1** lần, đúng `Type` + đúng **dữ liệu gốc**; `useOutbox = true`; `onUnitOfWorkComplete = false`; publish **TRƯỚC** `Complete`; `ReplayedAtUtc`/`ReplayCount = 1`/`ReplayedBy` được ghi; metric **+1** với `result=ok` |
+| `Goi_LAI_cung_dong__…` | **KHÔNG** có sự kiện | không publish lần hai; metric **không** tăng; dấu **không** bị ghi đè; DTO trả **lý do** *"BỎ QUA … MỘT lần"* |
+| `TenSuKien_khong_anh_xa_duoc__…` | **FAIL-CLOSED** | **NÉM** `0009`; **không** publish; metric **0**; **không** ghi dấu; UoW **không** complete |
+| `Payload_khong_khop_loai__…` | **FAIL-CLOSED** | **NÉM** `0010`; **không** publish; metric **0** |
+| `Dong_khong_ton_tai__…` | biên | **NÉM** `0007`; không publish |
+| `Bo_anh_xa_…` (5 dòng `Theory`) | hợp đồng tên | tên ngắn · tên đầy đủ · `"FullName, Assembly"` ⇒ tìm thấy; tên lạ/rỗng ⇒ **NÉM** |
+| `Ten_NGAN_nhap_nhang__…` | fail-closed | 2 loại **cùng tên ngắn** ⇒ **NÉM**; tên **đầy đủ** vẫn phân biệt được |
+
+**(b) Integration — `test/eCommerce.IntegrationTests/PostgreSqlS16bDlqReplayTests.cs` · 3 ca** (PostgreSQL 17 thật,
+schema sinh từ migration): dòng **chưa** phát lại ⇒ `ReplayCount = 0` + `NULL`; dòng **đã** phát lại ⇒ đọc lại
+**đúng** mốc (micro-giây, `Kind = Utc`)/người/bộ đếm; `ReplayedBy` **256 ký tự lọt**, **257 bị chặn**
+(`22001 StringDataRightTruncation`).
+
+**(c) Probe HTTP thật — `tools/probe-dlq-replay.ps1` · 21/21** (chạy tay; **không** thêm bước cổng mới):
+
+| Ca | Đo được |
+|---|---|
+| `D05` | route **thật** từ swagger: `POST /api/app/dead-letter/{id}/phat-lai` |
+| `D06`–`D08` | `200` · `daPhatLai = true` · DB `1|true|true|admin` |
+| 🚨 `D09` | **event ĐÃ ĐI THẬT**: `AbpEventInbox` có dòng **MỚI** cho event (outbox → relay 2 s → consumer) |
+| `D10` | outbox **về 0** (relay đã phát, không treo) |
+| `D11`–`D15` | lần hai: `200` + `daPhatLai = false` + lý do *"BỎ QUA"*; **không** dòng inbox thứ hai; `ReplayCount` **vẫn 1** |
+| 🚨 `D17`–`D20` | `TenSuKien` không ánh xạ được ⇒ **409** (không phải `403`), **không** ghi dấu, outbox **0**, inbox mới **0** |
+| `D16` | dọn sạch: DLQ probe **0** · outbox **0** · cờ bảo mật admin **true** |
+
+🔑 **`D09` là ca quan trọng nhất:** nó là **thứ duy nhất** phân biệt *"đã gọi publish"* với *"event đã đi"*.
+📌 Một unit test với bus giả **không thể** chứng minh điều đó — đúng bài học §19.1.
+
+### 21.6 Đo cổng cuối (cây đã sửa)
+
+- `pwsh -File tools\kiem-tat-ca.ps1 -DayDu`: **exit 0 · 377.4s · 15/15 bước**.
+- Unit **1627/1627** (tăng **11**) · integration **90/90** (tăng **3**) · E2E **159/159** · DB **25/25** ·
+  NND **64** (không đổi — không thêm unique index) · **72** quyền (tăng **1** — `…DeadLetters.Replay`) ·
+  migration **50** (tăng **1**) · quét **99** chỗ (không đổi — không bảng mới).
+- `check:mermaid` **213 khối · 0 lỗi** · `kiem-link-tai-lieu` **0 chết**.
+
+### 21.7 Giới hạn & phần còn nợ (nói rõ, không giấu)
+
+1. **KHÔNG có phát lại tự động** (job/retry) — cố ý: phát lại có thể **hỏng lại**. Đường gọi là **có người** +
+   quyền riêng + audit.
+2. **Phát lại không sửa dữ liệu gốc** ⇒ nếu nguyên nhân là dữ liệu sai thì nó **hỏng lại** và sinh **một dòng DLQ
+   MỚI** (dòng cũ **vẫn** giữ làm bằng chứng). 📌 Đây là hành vi đúng, nhưng người trực phải biết: *"phát lại"*
+   không phải *"sửa"*.
+3. **Bộ ánh xạ chỉ thấy assembly ĐÃ NẠP** (`eCommerce*`). Loại sự kiện thuộc assembly chưa nạp ⇒ **NÉM**
+   (hướng an toàn) — không publish sai.
+4. **Chưa có UI** cho nút phát lại (API + quyền đã có; `/VanHanh/Dlq` vẫn là nợ của `XC-002` §16.5 #4).
+5. **Chưa có phát lại theo LÔ** (spec `XC-002` §6.1 có `ReplayBatchAsync` — **chưa** hiện thực; làm lô cần
+   **giới hạn số dòng + báo cáo từng dòng**, không được "thử hết rồi kệ").

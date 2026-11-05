@@ -11,7 +11,7 @@
 | **Ưu tiên** | `Must have` |
 | **Trạng thái** | 🟡 `Draft` — chờ review (⚠️ **vẫn KHÔNG** `Implemented`: chưa kiểm chứng **tiền thật**, chưa có outbox — xem §16.3/§16.4) |
 | **Người viết / người review** | `agent (phiên 17/10/2026)` / `Kiến trúc trưởng + BA + Kế toán` |
-| **Phiên bản / ngày** | `v0.3 — 18/10/2026` (phiên code `S5`: IPN + hoàn tiền) |
+| **Phiên bản / ngày** | `v0.4 — 30/10/2026` (phiên `S19`: **harness đo tiền thật**; ⚠️ **chưa** có giao dịch thật — §16.12) |
 | **Tài liệu liên quan** | `SAL-002` · `SAL-003` (trục **tài chính**) · `SAL-006` (hoàn tiền) · `REC-001` (đối soát `querydr`) · `XC-001` · `XC-002` · `XC-003` · `XC-004` · `XC-005` · [`docs/implementation-plan.md`](../../implementation-plan.md) · [`docs/structure-and-techstack.md`](../../structure-and-techstack.md) |
 
 ---
@@ -919,7 +919,9 @@ Trạng thái hiện tại trong code:
 | `PaymentHub:VnPay:TmnCode` | `""` (**rỗng**) | `src/eCommerce.HttpApi.Host/appsettings.json:23` |
 | `PaymentHub:VnPay:HashSecret` | `""` (**rỗng**) | `src/eCommerce.HttpApi.Host/appsettings.json:24` |
 | `PaymentUrl` / `TransactionApiUrl` | **sandbox** URL có | `appsettings.json:25-26` |
+| 🆕 **Đường cấp credential** (30/10/2026) | `PaymentHub__VnPay__TmnCode` / `PaymentHub__VnPay__HashSecret` qua **biến môi trường** (mẫu `__` = `:`) — **không** tệp nào trong repo | `tools/probe-s19-vnpay-that.ps1` (xem §16.12) |
 | Kết luận | 🚨 **Chưa từng có một giao dịch thật nào đi qua cổng.** Mọi phép kiểm hiện có là **lõi thuần** (ký, đọc phản hồi, ánh xạ mã) + **nhánh lỗi hạ tầng** | `handover:74` (*nợ chặn #2*), `sal-006` §17.8 #1 |
+| Kết luận (đo lại **30/10/2026**) | 🚨 **Vẫn chưa** có credential trong môi trường đo (0 ở `Process`/`User`/`Machine`) ⇒ `S19` **dừng**, harness đã sẵn | §16.12 (bảng "Vì sao `S19` DỪNG") |
 
 > 📌 **Đọc kết quả test cho đúng:** *"20 + 7 unit test PASS"* (`handover:59`) **KHÔNG** có nghĩa *"hoàn được tiền"*.
 > Nó có nghĩa *"phần tính toán và phân nhánh đúng"*. Câu *"tiền đã ra chưa"* **chỉ** trả lời được bằng một giao dịch
@@ -1600,6 +1602,93 @@ POST /DatHang (Thanh toán ngay)  → 302
 ⑩ `F-PAY-7` **chưa có phép đo** (code đã sửa).
 ➕ **Nợ mới của `S8`:** UI **hoàn tiền** (chưa có nút) · trang kết quả **chưa** hiện *"cổng đã nhận yêu cầu hoàn"* ·
 ô *"Thanh toán ngay"* **chưa** có trên storefront công khai (khách chưa tự đặt được — `WEB-003`).
+
+### 16.12 🆕 `S19` (30/10/2026) — CÔNG CỤ ĐO **CÓ**, GIAO DỊCH THẬT **CHƯA ĐẠT**
+
+> 🔒 **Trạng thái `PAY-001` KHÔNG đổi: vẫn `Draft`, chưa `Implemented`.** Mục này **không** nói *"đã kiểm chứng
+> tiền thật"*; nó ghi đúng hai việc: (a) **công cụ đo của `S19` đã có** và đã chạy được **nhánh fail-closed**;
+> (b) **điều kiện ĐẠT chưa đạt** — vì **không có credential** trong môi trường đo (đo, không suy đoán).
+
+**Đối chiếu bốn điều kiện của `S19` (`ban-giao` §2.1):**
+
+| # | Điều kiện | 30/10/2026 | Bằng chứng |
+|---|---|---|---|
+| 1 | Một giao dịch sandbox **thật**: tạo → thanh toán trên cổng → `PayTransactions.Status = Succeeded` **và** `OrdOrders.PaymentStatus = Paid` | ⛔ **CHƯA** | Probe **DỪNG ở bước ⓪** (exit `2`): không có credential ⇒ **không** tạo giao dịch, **không** gọi cổng, **không** ghi bằng chứng |
+| 2 | Bằng chứng: `ProviderTransactionId` **do cổng cấp** + thời điểm + số tiền; **0** `TmnCode`/`HashSecret` trong repo | ⛔ **CHƯA** (điều kiện 1 chưa có ⇒ chưa có gì để chứng minh) — ⚠️ **và có chướng ngại TĨNH** `S19-1` dưới đây | ca `T10`–`T13` đo đúng ba thứ này; `T17`/`T18` đo `git grep -f` (mẫu qua **tệp tạm**, không qua argv) |
+| 3 | Ghi vào `PAY-001` + cập nhật bàn giao/gate; **không** credential ⇒ **DỪNG** và ghi rõ | ✅ **đã ghi** | mục này + `ban-giao` §2.1 |
+| 4 | Cổng đầy đủ **exit 0 · 16/16** | ✅ **exit 0 · 16/16** (31/10) | `pwsh -File tools\kiem-tat-ca.ps1 -DayDu` · 📌 bước ⑯ là probe **2 instance giữ chỗ** (không phải `S19`) |
+
+> 📌 **Đọc dòng 2 cho đúng:** "`grep` = 0" nói về **credential merchant thật**. Hằng **dev** `GIALAPDEV` +
+> `gia-lap-dev-…` **có** trong `appsettings.Development.json` từ `S8` — đó là **thiết kế đã duyệt** (§7.7.2), không
+> phải credential, và probe **từ chối** chạy nếu gặp chúng (`Fail-closed với khoá dev` ở bảng dưới).
+
+**Vì sao `S19` DỪNG — đo được, không phải "chưa thử":**
+
+| Phép đo | Kết quả |
+|---|---|
+| `Get-ChildItem env: \| ? Name -like '*PaymentHub*'` (tiến trình) | **0** dòng |
+| `[Environment]::GetEnvironmentVariables('User')` / `('Machine')` (registry) | **không** có `PaymentHub__VnPay__TmnCode` / `…__HashSecret` |
+| `$PROFILE` (4 đường dẫn) | **0** tệp tồn tại |
+| `%APPDATA%\Microsoft\UserSecrets` (.NET user-secrets) | **không** tồn tại |
+| `.env` / tệp cấu hình **ngoài** repo | **không** có |
+
+⇒ Đúng điều kiện 3 của §2.1. 🔒 Và probe **tự** dừng: thiếu biến ⇒ `exit 2`, **không** ghi tệp bằng chứng nào.
+📌 Nhờ vậy *"không đo được"* **không thể** bị đọc thành *"đã đo và đạt"*.
+
+**Đã làm — `tools/probe-s19-vnpay-that.ps1`** (chạy tay, **không** thuộc cổng 15 bước):
+
+| Tính chất | Cách làm | Vì sao (bẫy đã biết) |
+|---|---|---|
+| Đọc credential **không** từ repo | `Process → User → Machine`, đọc **thẳng registry** | `setx` ghi registry nhưng tiến trình đang chạy **không** thấy; nếu chỉ đọc `$env:` thì người vận hành tưởng *"đã đặt mà probe không thấy"* |
+| **Fail-closed** với khoá dev | Chặn `GIALAPDEV`, `K9S5TMN`, `gia-lap-dev*`, `k9s5-*`; `HashSecret < 16` ký tự ⇒ dừng | Khoá dev **nằm trong repo** ⇒ đo với nó là "giao dịch thật" **không có đồng tiền nào** |
+| Đúng **cổng thật** | `PaymentHub__Provider = VnPay` **tường minh**; ca `T04` khẳng định `providerCode = vnpay` | Một lần đổi `appsettings.Development.json` sang `Fake` sẽ khiến phép đo *"cổng thật"* chạy trên **cổng giả** — im lặng |
+| Đường xác nhận | `querydr` **qua chính API sản phẩm** (`POST /api/app/payment/truy-van-trang-thai/{id}`), không `curl` tự chế | VNPay chỉ gọi IPN tới URL **mở ra Internet** (§7.7.1 sự thật #4) ⇒ trên local **không thể** có IPN thật; §2.1 cho phép `querydr` |
+| So tiền | **minor units**: `("Amount"*100)::bigint` so `SoTien*100` | `D13`: cấm `decimal ==`; lệch 1 đồng là cổng từ chối |
+| Bằng chứng | Chỉ ghi tệp khi **đã ĐẠT**; nội dung **chỉ** từ DB + log Host; **tự chặn** nếu chứa `TmnCode`/`HashSecret` | *"Báo thành công trong khi chưa xong"* — cùng họ lỗi mà `RefundResult.DaHoanThat` sinh ra để chống |
+| Dọn dẹp | Xoá `%K9S9%` + đơn `e0000000-…c9` trong `finally`, **đếm lại = 0**; bật lại `ShouldChangePasswordOnNextLogin` + khẳng định | Bài học `S5-5` (mã probe nằm **giữa** `MerchantReference`) + nhóm ② của `kiem-db` |
+| Không vào cổng 15 bước | Cần **credential + người thanh toán + Internet** | Một bước *"luôn đỏ"* hoặc *"luôn xanh khi không chạy"* đều làm cổng mất giá trị |
+
+**⚠️ Bốn chướng ngại TĨNH — đọc mã, CHƯA đo với cổng thật.** 🔒 Không sửa mù (`§5.1`: *đo trước, sửa sau*).
+
+| # | Quan sát (nguồn) | Hệ quả NẾU đúng | Mức chắc chắn |
+|---|---|---|---|
+| **S19-1** | `PostTruyVanTrangThaiAsync` gọi `MarkSucceeded(null, null, "{\"nguon\":\"querydr\"}", null)` ⇒ `ProviderTransactionId` / `IdempotencyKey` **để rỗng** trên đường `querydr` | Điều kiện 2 **không đạt**: mã do cổng cấp **có** trong phản hồi (`vnp_TransactionNo` → `PaymentStatusQueryResult.TransactionNo`; `VnPayRequestBuilder.DocPhanHoi` dòng 199) nhưng **không chỗ nào dùng** | ⚠️ **dự đoán** — lần chạy đầu có credential sẽ đỏ ở `T10`/`T11` |
+| **S19-2** | `ProviderCreateDateGmt7` **không được ghi ở đâu** (grep: khai báo + migration + `PaymentReconciliationRunner` **đọc**), trong khi `ThamSoTruyVan` gửi `vnp_TransactionDate = now` | `querydr` cần **thời điểm giao dịch gốc**; gửi `now` ⇒ nguy cơ mã `91` *"không tìm thấy giao dịch"* ⇒ `S19` dừng ở `T08` **dù khách đã trả tiền** | ⚠️ **dự đoán** (nay có lý do cụ thể cho dòng nợ §16.9 #9) |
+| **S19-3** | `CreatePaymentRequest.IpnUrl` được **nhận** nhưng `CreatePaymentAsync` **không** đưa vào tham số ký (VNPay cấu hình IPN ở trang merchant) | *"Có `IpnUrl` trong cấu hình"* **không** có nghĩa *"sẽ nhận được IPN"* ⇒ muốn đo IPN thật phải đăng ký URL công khai (tunnel) — việc **riêng** | ✅ **chắc chắn** (đọc mã); **không** ảnh hưởng `querydr` |
+| **S19-4** | `PostTruyVanTrangThaiAsync` chỉ gọi `QueryStatusAsync` (mất `ResponseCode`), và nhánh `KhongDoi` log **ánh xạ enum** (`trang thai cong={TuCong}`) chứ **không** log mã phản hồi thô | Khi `querydr` trả mã lạ, vận hành thấy `Status = Initiated` mà **không biết mã nào** ⇒ *"khách chưa trả"* và *"`91` — không tìm thấy giao dịch"* **trông giống hệt nhau** | ✅ **đo được ngay trong lượt chạy thử 30/10/2026** (xem dưới) |
+
+> 🔑 **Vì sao ghi bốn dòng này thay vì sửa luôn:** mỗi dòng **đổi hành vi đường tiền** (ghi thêm trường, đổi tham
+> số gửi cổng, thêm log). Sửa khi **chưa đo được** là đúng thứ `§5.1` cấm — và nếu sửa sai thì **không phép đo nào**
+> phát hiện. 📌 Chúng là **đầu vào** của lần chạy `S19` kế tiếp, không phải kết luận.
+
+**Lượt chạy THỬ công cụ (30/10/2026)** — `TmnCode` giả `S19TESTX`, ⚠️ **không** phải credential merchant:
+
+| Việc chạy được | Kết quả đo |
+|---|---|
+| Khởi động Host với credential từ biến môi trường | `LÊN sau 2.5s` (`/health-status` = 200) |
+| Gieo **đơn thật** `K9S9-DON-01` (`PaymentStatus = 0`) | 1 dòng, `GrandTotal = 10000` |
+| `POST tao-giao-dich` ⇒ **cổng thật** | `providerCode = vnpay` · `MerchantReference = PAY20261030-K9S9-DON-01-1` · `CheckoutUrl` **đã ký** (541 ký tự) |
+| Tiền đề `Initiated` **trước** khi thanh toán | `Status = 0` |
+| `querydr` 3 lượt (10 s/lượt) với mã giả | `Status = Initiated` **không đổi** ⇒ `T08` **KHÔNG ĐẠT** và probe **tự dừng** |
+| Dọn dẹp + bật lại cờ bảo mật | `PayTransactions = 0` · `OrdOrders = 0` · `ShouldChangePasswordOnNextLogin = true` (1 dòng) |
+
+🔑 **Đây là điều lượt chạy thử chứng minh:** *công cụ đo* hoạt động (không phải *"tiền đã vào"*). Nó cũng chứng minh
+**chiều ngược**: khi cổng **không** xác nhận, probe **không** ghi bằng chứng và **không** báo ĐẠT — đúng thứ
+`S19` cần để *"không đo được"* không bị đọc thành *"đã đo và đạt"*. 📌 Và nó **lộ `S19-4`**: nhánh thất bại chỉ nói
+`Status = Initiated`, **không** nói cổng trả mã gì.
+
+**Cách chạy khi có credential (1 lệnh):**
+
+```powershell
+setx PaymentHub__VnPay__TmnCode   "<ma merchant sandbox>"   # scope User — KHONG nam trong repo
+setx PaymentHub__VnPay__HashSecret "<hash secret sandbox>"
+pwsh -File tools\probe-s19-vnpay-that.ps1 -SoTien 10000
+```
+
+📌 Probe in ra **URL đã ký** để người vận hành thanh toán bằng thẻ test (`NCB` · `9704198526191432198` ·
+`NGUYEN VAN A` · `07/15` · OTP `123456` — §7.7.1), rồi tự hỏi cổng bằng `querydr` và **chỉ** ghi bằng chứng khi
+`Succeeded` **và** đơn `Paid`. Tệp bằng chứng nằm trong thư mục con `bang-chung` của `docs`, tên
+`s19-vnpay-sandbox-<thời điểm>.md`.
 
 
 

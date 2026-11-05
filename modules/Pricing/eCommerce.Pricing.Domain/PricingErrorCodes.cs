@@ -33,6 +33,17 @@ public static class PricingErrorCodes
 
     /// <summary>Hai bậc thang **cùng `MinQuantity`** trên cùng SKU/khung (`PRC-002` ADR-02) — dữ liệu mâu thuẫn.</summary>
     public const string BacThangTrungMinQuantity = "eCommerce:Pricing:0008";
+
+    /// <summary>
+    /// **Giá vốn không hợp lệ** (`PRC-001` §5.2/`S12`): SKU rỗng · số tiền âm · khoảng hiệu lực ngược ·
+    /// duyệt thiếu người duyệt hoặc duyệt **hai lần**.
+    ///
+    /// 📌 **MỘT mã cho nhóm lỗi "dữ liệu giá vốn sai", KHÔNG tách mã riêng cho từng trường:** mọi nhánh dưới
+    /// đây đều là **cùng một câu trả lời cho người dùng** — *"dòng giá vốn này không dùng được, sửa lại"* —
+    /// và trường sai được chỉ đích danh qua `WithData("truong"/"lyDo")`. 🚨 Tách quá nhiều mã cho lỗi
+    /// **nhập liệu** làm sổ mã lỗi phình và client phải xử lý 5 nhánh giống nhau.
+    /// </summary>
+    public const string GiaVonKhongHopLe = "eCommerce:Pricing:0009";
 }
 
 /// <summary>

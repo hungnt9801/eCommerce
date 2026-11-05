@@ -1,0 +1,38 @@
+@model eCommerce.Catalog.Dtos.UpdateBrandDto
+@{
+    ViewData["Title"] = "Sửa thương hiệu";
+    var id = (Guid)ViewData["id"]!;
+}
+
+<h1>Sửa thương hiệu</h1>
+<p class="text-muted">Mã thương hiệu là <strong>bất biến</strong> — không sửa được sau khi tạo.</p>
+
+<form asp-action="Sua" asp-route-id="@id" method="post">
+    @Html.AntiForgeryToken()
+    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+    <div class="mb-3">
+        <label asp-for="Name" class="form-label">Tên</label>
+        <input asp-for="Name" class="form-control" />
+        <span asp-validation-for="Name" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="Slug" class="form-label">Slug</label>
+        <input asp-for="Slug" class="form-control" />
+    </div>
+    <div class="mb-3">
+        <label asp-for="Description" class="form-label">Mô tả</label>
+        <textarea asp-for="Description" class="form-control" rows="3"></textarea>
+    </div>
+    <div class="mb-3">
+        <label asp-for="LogoUrl" class="form-label">Logo URL</label>
+        <input asp-for="LogoUrl" class="form-control" />
+    </div>
+    <div class="mb-3">
+        <label asp-for="SortOrder" class="form-label">Thứ tự</label>
+        <input asp-for="SortOrder" class="form-control" type="number" />
+    </div>
+
+    <button type="submit" class="btn btn-primary">Lưu</button>
+    <a asp-action="Index" class="btn btn-secondary">Huỷ</a>
+</form>

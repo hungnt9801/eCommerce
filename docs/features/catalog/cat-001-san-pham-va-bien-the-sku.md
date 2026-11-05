@@ -3,7 +3,7 @@
 | Thuộc tính | Nội dung |
 |---|---|
 | **Mã** | `CAT-001` |
-| **Module** | **Catalog**. Hiện entity nằm trong app tại [`src/eCommerce.Domain/Entities/Catalog/Product.cs`](../../../src/eCommerce.Domain/Entities/Catalog/Product.cs) — chưa tách thành `modules/Catalog` (xem **D1** và §15.2 **F1**) |
+| **Module** | **Catalog**. Hiện entity nằm trong app tại [`src/eCommerce.Domain/Entities/Catalog/Product.cs`](../../../modules/Catalog/eCommerce.Catalog.Domain/Product.cs) — chưa tách thành `modules/Catalog` (xem **D1** và §15.2 **F1**) |
 | **Giai đoạn** | **GĐ1** — "Bán được trên website" (xem `docs/implementation-plan.md` §7.1 dòng `Catalog`) |
 | **Ưu tiên** | **Must have** — mọi module GĐ1 khác (`Pricing`, `Inventory`, `Sales`, `ChannelHub`) đều tham chiếu `SKU` |
 | **Trạng thái** | 🟡 `Draft` — chờ review |
@@ -124,7 +124,7 @@ flowchart LR
 ## 3. Vòng đời hiển thị của sản phẩm (state machine)
 
 > ℹ️ `Product` hiện **chưa có** trạng thái: nó chỉ có `bool IsPublished` với **`set` công khai**
-> ([`Product.cs:25`](../../../src/eCommerce.Domain/Entities/Catalog/Product.cs#L25)) ⇒ **không có guard nào**.
+> ([`Product.cs:25`](../../../modules/Catalog/eCommerce.Catalog.Domain/Product.cs#L25)) ⇒ **không có guard nào**.
 > Đây là **khoảng trống đã kiểm chứng trong code**, không phải suy đoán. Trạng thái dưới đây là **kế hoạch GĐ1**.
 
 ```mermaid
@@ -245,8 +245,8 @@ erDiagram
     }
 ```
 
-> 📌 Quan hệ với `CatBrands` **chưa có bảng trong code** — `Product.BrandId` hiện là `Guid?` **không khoá ngoại**
-> ([`Product.cs:23`](../../../src/eCommerce.Domain/Entities/Catalog/Product.cs#L23), DDL `Initial.cs:24`). Bảng `Brand`
+> ✅ **Cập nhật 27/10/2026:** `CatBrands` **đã có** (entity `Brand`, FK `Product.BrandId → CatBrands.Id`, `Restrict`) — xem `CAT-004`. (Trước đó: `Guid?` **không khoá ngoại**
+> ([`Product.cs:23`](../../../modules/Catalog/eCommerce.Catalog.Domain/Product.cs#L23), DDL `Initial.cs:24`). Bảng `Brand`
 > thuộc `CAT-002`; ở đây ghi nhận để **không** bịa là đã có.
 
 ### 5.2 Bảng `CatProducts` — **hiện trạng code thật** + phần bổ sung
@@ -261,7 +261,7 @@ erDiagram
 | `Name` | `varchar(512)` | ✗ | tên hiển thị | |
 | `Slug` | `varchar(512)` | ✓ | slug SEO | **không unique** trong code hiện tại (xem **F5** §15.2) |
 | `Description` | `text` | ✓ | mô tả | |
-| `BrandId` | `uuid` | ✓ | brand | **không có FK** (chưa có bảng `Brand`) |
+| `BrandId` | `uuid` | ✓ | brand | ✅ FK → `CatBrands.Id` (`Restrict`, từ 27/10/2026 — `CAT-004`) |
 | `IsPublished` | `boolean` | ✗ | đã publish | 🚨 **`set` công khai** ⇒ không guard (**D5**) |
 | `ExtraProperties` / `ConcurrencyStamp` | `text` / `varchar(40)` | ✗ | ABP | |
 | `CreationTime` `CreatorId` `LastModificationTime` `LastModifierId` | `timestamptz`/`uuid` | ✗/✓ | audit | `FullAuditedAggregateRoot` |
@@ -303,7 +303,7 @@ erDiagram
 | `ChnChannelListings.ProductVariantId` | [`ChannelEntities.cs:125`](../../../modules/ChannelHub/eCommerce.ChannelHub.Domain/Entities/ChannelEntities.cs#L125) | Xoá **cứng** `ProductVariant` sẽ treo tham chiếu ⇒ **cấm** (**BR-005**) |
 | `OrdOrderLines.Sku` / `ProductVariantId` | [`eCommerceDbContext.cs:199`](../../../src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs#L199) | Lịch sử bán giữ SKU; xoá cứng là **phá lịch sử** |
 | `InvItems.Sku` | [`eCommerceDbContext.cs:137`](../../../src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs#L137) | Tồn kho theo SKU; **UNIQUE `(TenantId, WarehouseId, Sku)`** là hàng rào chống bán vượt |
-| `InvStockLedger` (append-only) | [`StockLedger.cs:81-84`](../../../src/eCommerce.Domain/Entities/Inventory/StockLedger.cs#L81) | `CAT-001` **không** ghi vào đây (**NFR-010**) |
+| `InvStockLedger` (append-only) | [`StockLedger.cs:81-84`](../../../modules/Inventory/eCommerce.Inventory.Domain/StockLedger.cs#L81) | `CAT-001` **không** ghi vào đây (**NFR-010**) |
 | `TaxClassifications.TargetId` | [`TaxClassification.cs:25`](../../../modules/Tax/eCommerce.Tax.Domain/Classifications/TaxClassification.cs#L25) | `TargetType = Sku` trỏ tới `ProductVariantId` ⇒ xoá cứng là treo phân loại thuế |
 
 **Index & ràng buộc (đã kiểm bằng `grep` trong `Migrations/`)**
@@ -718,12 +718,12 @@ public class ProductCatalogTests
 
 | # | Phát hiện | Bằng chứng (file thật) | Mức độ | Xử lý |
 |---|---|---|---|---|
-| **F1** | **Catalog chưa tách thành module**: entity nằm ở `src/eCommerce.Domain`, mapping nằm trong `eCommerceDbContext.ConfigureCommerce` (app) — **khác** với `Tax`/`ChannelHub`/`PaymentHub` (đã là `modules/`) | [`src/eCommerce.Domain/Entities/Catalog/Product.cs`](../../../src/eCommerce.Domain/Entities/Catalog/Product.cs) · [`eCommerceDbContext.cs:97-130`](../../../src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs#L97) | 🟡 Thấp | ⬜ Theo **D1**: tách khi `CAT-002` thêm entity |
+| **F1** | **Catalog chưa tách thành module**: entity nằm ở `src/eCommerce.Domain`, mapping nằm trong `eCommerceDbContext.ConfigureCommerce` (app) — **khác** với `Tax`/`ChannelHub`/`PaymentHub` (đã là `modules/`) | [`src/eCommerce.Domain/Entities/Catalog/Product.cs`](../../../modules/Catalog/eCommerce.Catalog.Domain/Product.cs) · [`eCommerceDbContext.cs:97-130`](../../../src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs#L97) | 🟡 Thấp | ⬜ Theo **D1**: tách khi `CAT-002` thêm entity |
 | **F2** | **Chưa có khoá phân tán nào của Catalog** trong code — chỉ có 1 khoá Inventory ở app (`eCommerceConsts.LockKeys.InventorySku`) và 3 khoá kênh ở module ChannelHub | [`eCommerceConsts.cs:103`](../../../src/eCommerce.Domain.Shared/eCommerceConsts.cs#L103) · [`ChannelHubConsts.cs:19-32`](../../../modules/ChannelHub/eCommerce.ChannelHub.Domain/ChannelHubConsts.cs#L19) | 🟡 Thấp | ⬜ Thêm `CatalogLockKeys` (**D7**) khi code app service |
-| **F3** | **`IsPublished` là `set` công khai** ⇒ **không có guard** nào cho vòng đời sản phẩm; hiện **không thể** ném lỗi khi chuyển trạng thái sai | [`Product.cs:25`](../../../src/eCommerce.Domain/Entities/Catalog/Product.cs#L25) | 🟠 **Trung bình** | ⬜ Thêm `ProductStatus` + method có guard (**D5**, `TC-06`/`TC-07`) |
-| **F4** | **`eCommerce.Kernel` CHƯA tồn tại** ⇒ `Money`/`Currency` **chưa có** trong code; giá vẫn là `decimal` trần | `glob **/*Product*` + `Get-ChildItem src` ⇒ **không có** project Kernel; [`Product.cs:71`](../../../src/eCommerce.Domain/Entities/Catalog/Product.cs#L71) | 🟠 **Trung bình** | ⬜ Việc #1 của `implementation-plan.md` §7.0; tới đó **cấm** so sánh `==` trên tiền (**BR-011**) |
+| **F3** | **`IsPublished` là `set` công khai** ⇒ **không có guard** nào cho vòng đời sản phẩm; hiện **không thể** ném lỗi khi chuyển trạng thái sai | [`Product.cs:25`](../../../modules/Catalog/eCommerce.Catalog.Domain/Product.cs#L25) | 🟠 **Trung bình** | ⬜ Thêm `ProductStatus` + method có guard (**D5**, `TC-06`/`TC-07`) |
+| **F4** | **`eCommerce.Kernel` CHƯA tồn tại** ⇒ `Money`/`Currency` **chưa có** trong code; giá vẫn là `decimal` trần | `glob **/*Product*` + `Get-ChildItem src` ⇒ **không có** project Kernel; [`Product.cs:71`](../../../modules/Catalog/eCommerce.Catalog.Domain/Product.cs#L71) | 🟠 **Trung bình** | ⬜ Việc #1 của `implementation-plan.md` §7.0; tới đó **cấm** so sánh `==` trên tiền (**BR-011**) |
 | **F5** | `Product.Slug` **không có unique index** ⇒ **hai sản phẩm có thể trùng slug** ⇒ storefront route mơ hồ | [`eCommerceDbContext.cs:106`](../../../src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs#L106) (chỉ `HasMaxLength(512)`, **không** `HasIndex`) | 🟠 **Trung bình** | ⬜ Thuộc `CAT-003` — **ghi nhận ở đây** để không bỏ sót; cần unique `(TenantId, Slug)` + `NULLS NOT DISTINCT` |
-| **F6** | **`ProductVariant` chống trùng SKU chỉ trong bộ nhớ của MỘT sản phẩm** (`_variants.Any(...)`) ⇒ **yếu hơn** ràng buộc DB `(TenantId, Sku)`; va chạm thật sẽ nổi ở tầng DB với `DbUpdateException` | [`Product.cs:44`](../../../src/eCommerce.Domain/Entities/Catalog/Product.cs#L44) vs [`eCommerceDbContext.cs:129`](../../../src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs#L129) | 🟠 **Trung bình** | ⬜ Nâng kiểm tra lên **theo tenant** (repository) **+** map `DbUpdateException` ⇒ `Catalog:0002` (**D3**) |
+| **F6** | **`ProductVariant` chống trùng SKU chỉ trong bộ nhớ của MỘT sản phẩm** (`_variants.Any(...)`) ⇒ **yếu hơn** ràng buộc DB `(TenantId, Sku)`; va chạm thật sẽ nổi ở tầng DB với `DbUpdateException` | [`Product.cs:44`](../../../modules/Catalog/eCommerce.Catalog.Domain/Product.cs#L44) vs [`eCommerceDbContext.cs:129`](../../../src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs#L129) | 🟠 **Trung bình** | ⬜ Nâng kiểm tra lên **theo tenant** (repository) **+** map `DbUpdateException` ⇒ `Catalog:0002` (**D3**) |
 | **F7** | FK `FK_CatProductVariants_CatProducts_ProductId` là **`ON DELETE CASCADE`** ⇒ xoá cứng `Product` **xoá mọi biến thể**, phá lịch sử đã tham chiếu ở `OrdOrderLines`/`ChannelListings` | [`eCommerceDbContext.cs:111-114`](../../../src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs#L111) · [`Initial.cs:281-286`](../../../src/eCommerce.EntityFrameworkCore/Migrations/20261009070214_Initial.cs#L281) | 🔴 **Cao** | ⬜ Đổi sang `Restrict` + **cấm** xoá cứng ở app service (**D4**, `TC-09`/`TC-10`) |
 | **F8** | **Outbox chưa bật**: `eCommerceDbContext` **không** implement `IHasEventOutbox`/`IHasEventInbox` ⇒ sự kiện nghiệp vụ **chưa** được ghi cùng transaction | [`eCommerceDbContext.cs:33`](../../../src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs#L33) | 🔴 **Cao** (chặn `Publish`) | ⬜ Hạ tầng nền GĐ1 (`XC-002`; `implementation-plan.md` §7.0 việc 3) **trước** khi code `Publish` |
 | **F9** | **Permission `Products.View` và `Products.Publish` CHƯA tồn tại**, trong khi `Create`/`Edit`/`Delete` **đã** có | [`eCommerceConsts.cs:19-25`](../../../src/eCommerce.Domain.Shared/eCommerceConsts.cs#L19) · [`eCommercePermissionDefinitionProvider.cs:28-31`](../../../src/eCommerce.Application.Contracts/Permissions/eCommercePermissionDefinitionProvider.cs#L28) | 🟠 **Trung bình** | ⬜ Thêm **cả 2 nơi** (hằng số **và** provider) trước khi dùng (**D10**, `TC-15`) |

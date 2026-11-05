@@ -15,7 +15,10 @@ namespace eCommerce.Customers;
 [DependsOn(
     typeof(CustomersDomainModule),
     typeof(AbpDddApplicationModule),
-    typeof(AbpDddApplicationContractsModule)
+    typeof(AbpDddApplicationContractsModule),
+    // 🆕 `WP-07` — đọc `RetailBill`/`RetailReturn` để đối chiếu sổ điểm/công nợ của khách.
+    // 📌 Chỉ tầng Domain của `Pos` (không phải Application) ⇒ không kéo `[Authorize]`/phạm vi dữ liệu vào.
+    typeof(eCommerce.Pos.PosDomainModule)
 )]
 public class CustomersApplicationModule : AbpModule
 {

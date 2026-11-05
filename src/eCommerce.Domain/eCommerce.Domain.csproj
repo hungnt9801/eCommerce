@@ -11,6 +11,15 @@
          ⇒ tham chiếu từ Domain KHÔNG tạo vòng lặp. Cần cho `InventoryReconciliationService` phát metric
          `inventory_recon_mismatch_skus` (`INV-001` ADR-10). -->
     <ProjectReference Include="..\..\shared\eCommerce.Kernel\eCommerce.Kernel.csproj" />
+    <!-- 🆕 `P0 #1` (24/10/2026) — `Catalog` đã tách thành MODULE: host chỉ còn **dùng** nó (app → module).
+         📌 Domain của host KHÔNG còn entity Catalog; `Order`… không tham chiếu ngược module. -->
+    <ProjectReference Include="..\..\modules\Catalog\eCommerce.Catalog.Domain\eCommerce.Catalog.Domain.csproj" />
+    <!-- 🆕 `P0 #1` — module Inventory (Domain). -->
+    <ProjectReference Include="..\..\modules\Inventory\eCommerce.Inventory.Domain\eCommerce.Inventory.Domain.csproj" />
+    <!-- 🆕 `P0 #1` — module Reconciliation (Domain). -->
+    <ProjectReference Include="..\..\modules\Reconciliation\eCommerce.Reconciliation.Domain\eCommerce.Reconciliation.Domain.csproj" />
+    <!-- 🆕 `P0 #1` — module Sales (Domain). -->
+    <ProjectReference Include="..\..\modules\Sales\eCommerce.Sales.Domain\eCommerce.Sales.Domain.csproj" />
   </ItemGroup>
 
   <ItemGroup>

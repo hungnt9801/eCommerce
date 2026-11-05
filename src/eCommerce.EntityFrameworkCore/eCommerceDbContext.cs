@@ -15,6 +15,8 @@ using Volo.Abp.SettingManagement.EntityFrameworkCore;
 using Volo.Abp.FeatureManagement.EntityFrameworkCore;
 using Volo.Abp.AuditLogging.EntityFrameworkCore;
 using Volo.Abp.BackgroundJobs.EntityFrameworkCore;
+using Volo.Abp.EventBus.Distributed;
+using Volo.Abp.EntityFrameworkCore.DistributedEvents;
 using Volo.Abp.OpenIddict.EntityFrameworkCore;
 
 namespace eCommerce.EntityFrameworkCore;
@@ -30,11 +32,50 @@ namespace eCommerce.EntityFrameworkCore;
 /// Khi tách microservice: mỗi module đổi sang DbContext riêng + migration riêng.
 /// </summary>
 [ConnectionStringName(eCommerceConsts.DefaultConnectionStringName)]
-public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
+public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>, IHasEventOutbox, IHasEventInbox
 {
+    // ══════════════════════════════════════════════════════════════════════════════════════════════════
+    // 🚨 **OUTBOX / INBOX (P0 #3 — `XC-002` D1/D2, 24/10/2026).**
+    //
+    // 🔒 **BẮT BUỘC có 2 `DbSet` này** cùng 2 interface trên class: ABP chỉ ghi outbox/inbox khi DbContext
+    // khai `IHasEventOutbox`/`IHasEventInbox` **và** có `DbSet` tương ứng (quy ước #5 — thiếu `DbSet` thì
+    // `IRepository<T>` không đăng ký ⇒ lỗi Phase 0). 📌 Thiếu cấu hình này thì `AddToOutboxAsync` trả **false**
+    // và ABP **rơi im lặng** về publish trực tiếp ⇒ *"có outbox"* trên giấy nhưng **không có** trên DB.
+    // ══════════════════════════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>Sự kiện **đã ghi cùng transaction** với dữ liệu nghiệp vụ, chờ relay phát (`AbpEventOutbox`).</summary>
+    public DbSet<OutgoingEventRecord> OutgoingEvents { get; set; } = default!;
+
+    /// <summary>Sự kiện **đến** đã ghi nhận để xử lý idempotent (`AbpEventInbox`).</summary>
+    public DbSet<IncomingEventRecord> IncomingEvents { get; set; } = default!;
+
     // ---- Catalog ----
     public DbSet<Catalog.Product> Products { get; set; } = default!;
+    public DbSet<Catalog.Brand> Brands { get; set; } = default!;
+
+    // 🆕 REC-001 — lịch sử đối soát thanh toán (27/10/2026).
+    public DbSet<eCommerce.Reconciliation.PaymentReconciliationRun> PaymentReconciliationRuns { get; set; } = default!;
+    public DbSet<eCommerce.Reconciliation.PaymentReconciliationLine> PaymentReconciliationLines { get; set; } = default!;
+    public DbSet<eCommerce.Reconciliation.PaymentDiscrepancy> PaymentDiscrepancies { get; set; } = default!;
     public DbSet<Catalog.ProductVariant> ProductVariants { get; set; } = default!;
+
+    // ── WP-03 (02/11/2026) — mô hình hàng hóa theo Nhanh (`03 §3.1`, D-07) ──────────────────────
+    // 🚨 Mỗi dòng là một entity THẬT trong model ⇒ thiếu `DbSet` là DI nổ (HTTP 500) dù build xanh —
+    // lưới an toàn: `DbSetRegistrationTests`.
+    public DbSet<Catalog.ProductUnit> ProductUnits { get; set; } = default!;
+    public DbSet<Catalog.ProductImei> ProductImeis { get; set; } = default!;
+    public DbSet<Catalog.ProductBatch> ProductBatches { get; set; } = default!;
+    public DbSet<Catalog.ComboComponent> ComboComponents { get; set; } = default!;
+    public DbSet<Catalog.PackageComponent> PackageComponents { get; set; } = default!;
+    public DbSet<Catalog.ProductTag> ProductTags { get; set; } = default!;
+
+    /// <summary>
+    /// 🆕 **WP-03 nửa sau** — bảng đối chiếu của backfill `CatProductVariants` → sản phẩm con
+    /// (`VariantId → ProductId`). 🚨 **BẮT BUỘC có `DbSet`**: thiếu ⇒ `IRepository&lt;ProductVariantMap, Guid&gt;`
+    /// **không được đăng ký** ⇒ `BackfillCatalogService` nổ ngay lần chạy đầu (quy ước #5; lưới an toàn
+    /// `DbSetRegistrationTests` quét model và khẳng định **mọi** entity `eCommerce.*` đều có `DbSet`).
+    /// </summary>
+    public DbSet<Catalog.ProductVariantMap> ProductVariantMaps { get; set; } = default!;
     /// <summary>
     /// ẢNH SẢN PHẨM (`CAT-003`). 🚨 **BẮT BUỘC có `DbSet`** — thiếu ⇒ `IRepository&lt;ProductMedia, Guid&gt;`
     /// **không được đăng ký** (quy ước #3, lỗi Phase 0) ⇒ app service **không resolve được** ⇒ `HTTP 500`
@@ -78,6 +119,14 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
     public DbSet<Pricing.PriceListItem> PriceListItems { get; set; } = default!;
     public DbSet<Pricing.ChannelPrice> ChannelPrices { get; set; } = default!;
 
+    /// <summary>
+    /// 🆕 `S12` — **GIÁ VỐN** (`PRC-001` §5.2, `PrcCostPrices`). 🚨 **Dữ liệu NỘI BỘ** (BR-013): chỉ đọc qua
+    /// app service có quyền `eCommerce.Pricing.CostPrice.View`, **không** đường công khai.
+    /// 📌 Thiếu `DbSet` ⇒ ABP không đăng ký `IRepository&lt;CostPrice, Guid&gt;` ⇒ DI nổ (`HTTP 500`) đúng lúc
+    /// mở màn hình giá vốn — lưới an toàn: `DbSetRegistrationTests`.
+    /// </summary>
+    public DbSet<Pricing.CostPrice> CostPrices { get; set; } = default!;
+
     // PRC-002 — **bậc thang giá**: bảng RIÊNG vì `PriceListItem` duy nhất theo `(TenantId, PriceListId, Sku)`
     // (`PRC-001` BR-008) ⇒ **không chứa được nhiều bậc** cho cùng một SKU (`PRC-002` ADR-01).
     public DbSet<Pricing.TierPriceSet> TierPriceSets { get; set; } = default!;
@@ -105,6 +154,11 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
     /// </summary>
     public DbSet<Inventory.InvChannelLimit> InvChannelLimits { get; set; } = default!;
 
+    /// <summary>🆕 `S13` — **ngân sách tồn theo kênh** + **sổ cái append-only** (`INV-003`).</summary>
+    public DbSet<Inventory.StockAllotment> StockAllotments { get; set; } = default!;
+
+    public DbSet<Inventory.StockAllotmentLedger> StockAllotmentLedgers { get; set; } = default!;
+
     /// <summary>`REC-001` — **lịch sử lượt quét đối soát tồn kho** (+ dòng lệch). Xem chú thích `DbSet` phía trên.</summary>
     public DbSet<Inventory.ReconRun> ReconRuns { get; set; } = default!;
 
@@ -129,9 +183,46 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
     /// </summary>
     public DbSet<Customers.CustomerDataExportLog> CustomerDataExportLogs { get; set; } = default!;
 
+    // ---- `WP-07` — KHÁCH MỞ RỘNG + CẤU HÌNH TỔ CHỨC ----
+    /// <summary>
+    /// 🆕 `WP-07` — cấp khách · chăm sóc · cửa hàng · phòng ban · nhân viên · phạm vi dữ liệu theo vai trò.
+    /// 🚨 **MỖI DÒNG LÀ BẮT BUỘC** (quy ước #5): thiếu `DbSet` ⇒ `IRepository<T>` **không được đăng ký**
+    /// ⇒ app service không resolve được ⇒ **`HTTP 500`** dù build/migration **xanh**. 🛡️ Lưới an toàn CI:
+    /// `DbSetRegistrationTests`.
+    /// </summary>
+    public DbSet<Customers.CustomerLevel> CustomerLevels { get; set; } = default!;
+
+    public DbSet<Customers.CustomerCare> CustomerCares { get; set; } = default!;
+
+    public DbSet<Customers.Store> Stores { get; set; } = default!;
+
+    public DbSet<Customers.Department> Departments { get; set; } = default!;
+
+    public DbSet<Customers.Staff> Staffs { get; set; } = default!;
+
+    public DbSet<Customers.RoleDataScope> RoleDataScopes { get; set; } = default!;
+
     // ---- Orders ----
     public DbSet<Orders.Order> Orders { get; set; } = default!;
     public DbSet<Orders.OrderLine> OrderLines { get; set; } = default!;
+
+    /// <summary>
+    /// 🚨 **NHẬT KÝ TRẠNG THÁI ĐƠN HÀNG** (`SAL-003` D7) — **BẮT BUỘC có `DbSet`** (quy ước #5):
+    /// thiếu ⇒ `IRepository&lt;OrderStatusHistory, Guid&gt;` **không được đăng ký** ⇒ API đọc lịch sử
+    /// trả **`HTTP 500`** dù build/migration xanh. Lưới an toàn CI: `DbSetRegistrationTests`.
+    /// </summary>
+    public DbSet<Orders.OrderStatusHistory> OrderStatusHistories { get; set; } = default!;
+
+    /// <summary>
+    /// 🆕 `S14` — **PHIẾU TRẢ HÀNG (RMA)** (`SAL-006`). 🚨 Thiếu `DbSet` ⇒ `IRepository&lt;OrderReturn, Guid&gt;`
+    /// không được đăng ký ⇒ API RMA **`HTTP 500`** dù build xanh (quy ước #5; lưới an toàn `DbSetRegistrationTests`).
+    /// </summary>
+    public DbSet<Orders.OrderReturn> OrderReturns { get; set; } = default!;
+
+    public DbSet<Orders.OrderReturnLine> OrderReturnLines { get; set; } = default!;
+
+    /// <summary>`S14` — nhật ký chuyển trạng thái phiếu trả (**append-only**).</summary>
+    public DbSet<Orders.OrderReturnHistory> OrderReturnHistories { get; set; } = default!;
 
     /// <summary>
     /// Nhật ký nhận đơn từ sàn (`SAL-005`). 🚨 **BẮT BUỘC có `DbSet`** — thiếu ⇒
@@ -147,6 +238,40 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
     /// + `MarketplaceEventLogBatBienTests`.
     /// </summary>
     public DbSet<Orders.MarketplaceEventLog> MarketplaceEventLogs { get; set; } = default!;
+
+    // ---- POS (`WP-06`) ----
+    // 🚨 **BẮT BUỘC có `DbSet`** cho TỪNG entity: ABP đăng ký `IRepository<T>` bằng cách **quét `DbSet`**
+    // trên DbContext, KHÔNG quét model ⇒ thiếu một dòng là app service POS **không resolve được** ⇒
+    // **HTTP 500** ở request đầu tiên, dù build/migration xanh (quy ước #3; lưới an toàn `DbSetRegistrationTests`).
+    public DbSet<Pos.RetailBill> RetailBills { get; set; } = default!;
+    public DbSet<Pos.RetailBillLine> RetailBillLines { get; set; } = default!;
+    public DbSet<Pos.RetailBillPayment> RetailBillPayments { get; set; } = default!;
+    public DbSet<Pos.CashSession> CashSessions { get; set; } = default!;
+    public DbSet<Pos.RetailReturn> RetailReturns { get; set; } = default!;
+    public DbSet<Pos.RetailReturnLine> RetailReturnLines { get; set; } = default!;
+
+    // ---- Reporting (`WP-08`) — READ-MODEL BÁO CÁO ----
+    /// <summary>
+    /// 🆕 `WP-08` — **bảng chiều + sự kiện + tổng hợp + mốc** của read-model báo cáo.
+    /// 🚨 **MỖI DÒNG LÀ BẮT BUỘC** (quy ước #5): thiếu `DbSet` ⇒ `IRepository<T>` **không được đăng ký** ⇒
+    /// job tổng hợp hoặc màn báo cáo **không resolve được** ⇒ **`HTTP 500`** dù build/migration **xanh**.
+    /// 🛡️ Lưới an toàn CI: `DbSetRegistrationTests`.
+    /// </summary>
+    public DbSet<Reporting.RptDimDate> ReportDimDates { get; set; } = default!;
+
+    public DbSet<Reporting.RptDimProduct> ReportDimProducts { get; set; } = default!;
+
+    public DbSet<Reporting.RptDimStore> ReportDimStores { get; set; } = default!;
+
+    public DbSet<Reporting.RptDimStaff> ReportDimStaffs { get; set; } = default!;
+
+    public DbSet<Reporting.RptFactSalesLine> ReportFactSalesLines { get; set; } = default!;
+
+    public DbSet<Reporting.RptFactInventorySnapshot> ReportFactInventorySnapshots { get; set; } = default!;
+
+    public DbSet<Reporting.RptAggDailySales> ReportAggDailySales { get; set; } = default!;
+
+    public DbSet<Reporting.RptWatermark> ReportWatermarks { get; set; } = default!;
 
     // ---- ChannelHub (module) ----
     // 🚨 VÌ SAO PHẢI KHAI BÁO DbSet Ở ĐÂY:
@@ -246,6 +371,12 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
         builder.ConfigureAuditLogging();
         builder.ConfigureBackgroundJobs();
         builder.ConfigureOpenIddict();
+
+        // 🚨 **OUTBOX/INBOX** (`XC-002` §6.3) — hai hàm này map bảng `AbpEventOutbox`/`AbpEventInbox` từ
+        // `IHasEventOutbox`/`IHasEventInbox`. 📌 Thiếu chúng thì bảng **không tồn tại** và outbox **im lặng
+        // không ghi** (không có lỗi build/migration).
+        builder.ConfigureEventOutbox();
+        builder.ConfigureEventInbox();
     }
 
     /// <summary>
@@ -254,603 +385,20 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
     /// </summary>
     private static void ConfigureCommerce(ModelBuilder builder)
     {
-        builder.Entity<Catalog.Product>(b =>
-        {
-            b.ToTable("CatProducts");
-            b.ConfigureByConvention();
+        // 🆕 `P0 #1` (24/10/2026) — mapping Catalog đã chuyển sang MODULE (`Catalog.EntityFrameworkCore`).
+        // 🔒 Gọi **một chỗ**; migration phải **RỖNG** sau khi chuyển (đã kiểm).
+        Catalog.EntityFrameworkCore.CatalogDbContextModelCreatingExtensions.ConfigureCatalog(builder);
 
-            b.Property(x => x.Code).IsRequired().HasMaxLength(64);
-            b.Property(x => x.Name).IsRequired().HasMaxLength(512);
-            b.Property(x => x.Slug).HasMaxLength(512);
-            b.Property(x => x.Description).HasColumnType("text");
 
-            b.HasIndex(x => new { x.TenantId, x.Code }).IsUnique();
+        // 🆕 `P0 #1` (24/10/2026) — mapping tồn kho đã chuyển sang MODULE `Inventory.EntityFrameworkCore`.
+        // 🔒 Recon (`ReconRun`…) **vẫn ở host** cho tới khi tách `Reconciliation`.
+        Inventory.EntityFrameworkCore.InventoryDbContextModelCreatingExtensions.ConfigureInventory(builder);
 
-            // 🚨 **`CAT-003` ADR-03 — SLUG LÀ KHOÁ ĐỊNH DANH CÔNG KHAI TRÊN URL ⇒ PHẢI DUY NHẤT.**
-            // (`WEB-002` §11 đã giao việc này cho `CAT-003`; `CAT-001` F5 chuyển sang đây.)
-            // 📌 VÌ SAO KHÔNG CHỈ KIỂM Ở TẦNG APP: hai request đồng thời cùng thấy *"slug chưa ai dùng"*
-            // ⇒ **cả hai ghi** ⇒ hai sản phẩm cùng một URL ⇒ **một trong hai không bao giờ truy cập được**,
-            // và **máy tìm kiếm đánh chỉ mục SAI sản phẩm** — im lặng hoàn toàn (đúng họ lỗi `XC-003` F1).
-            // ⚠️ Bộ lọc `Slug IS NOT NULL` là **BẮT BUỘC** (không thì index vô hiệu vì mọi sản phẩm chưa có
-            // slug đều `NULL`), và **cần SQL thô** vì EF **không** sinh được `NULLS NOT DISTINCT` kèm bộ lọc
-            // (cùng cách `Inv001_Fix_SoCai_Unique_ThemMovementType` đã làm).
-            // 🔒 Tên đặt TƯỜNG MINH: tên EF tự sinh `IX_CatProducts_TenantId_Slug` là **33 ký tự** (an toàn),
-            // nhưng đặt tay để `PostgreSqlSchemaTests` đối chiếu **đích danh** được.
-            b.HasIndex(x => new { x.TenantId, x.Slug })
-                .IsUnique()
-                .HasFilter("\"Slug\" IS NOT NULL")
-                .HasDatabaseName("IX_CatProducts_TenantId_Slug");
-
-            // 🚨 `AutoInclude` — BẮT BUỘC để **máy trạng thái của domain nhìn thấy biến thể**.
-            // VÌ SAO: repository của ABP **không** tự nạp collection con. Nếu thiếu dòng này thì
-            // `Product.Variants` **luôn rỗng** khi đọc từ DB ⇒ `Publish()` (guard `CAT-001` D9) luôn thấy
-            // "0 biến thể đang hoạt động" ⇒ **mọi lần publish đều ném lỗi** — mà đó lại là hành vi
-            // **trông như hợp lý** ("chưa có biến thể thì không publish được") nên rất khó truy.
-            // ⇒ Nạp kèm để guard đọc **đúng trạng thái thật của aggregate**.
-            // ⚠️ Đánh đổi đã biết: mọi truy vấn `Product` đều join thêm biến thể. Với quy mô GĐ1 chấp nhận
-            //    được; nếu danh mục lớn lên thì cân nhắc bỏ `AutoInclude` và nạp tường minh theo từng ca.
-            b.Navigation(x => x.Variants).AutoInclude();
-
-            // 🚨 `CAT-001` **F7/D4** — ĐỔI TỪ `Cascade` SANG `Restrict` (15/10/2026).
-            // VÌ SAO: `Cascade` khiến xoá cứng một `Product` **XOÁ MỌI BIẾN THỂ** của nó. Biến thể là thứ
-            // được tham chiếu bởi **lịch sử bán** (`OrdOrderLines.ProductVariantId`) và **listing sàn**
-            // (`ChannelListings.ProductVariantId`) ⇒ xoá cascade **phá lịch sử** và để lại tham chiếu treo,
-            // **không có lỗi nào**. Nay DB **CHẶN** xoá cứng khi còn biến thể ⇒ buộc đi qua **xoá mềm**
-            // (`IsDeleted`, `CAT-001` D4) + unpublish ở tầng app service.
-            b.HasMany(x => x.Variants)
-                .WithOne()
-                .HasForeignKey(x => x.ProductId)
-                .OnDelete(DeleteBehavior.Restrict);
-        });
-
-        // 🚨 `CAT-003` — **ẢNH SẢN PHẨM**. Xem `ADR-02` (metadata ở DB, **bytes ở object storage**),
-        // `ADR-12` (tối đa MỘT ảnh chính/sản phẩm), `ADR-13` (định dạng do MÁY CHỦ kiểm bằng magic bytes).
-        // 🚨 `CAT-003` `ADR-08` — **HIỂN THỊ SẢN PHẨM THEO KÊNH**.
-        builder.Entity<Catalog.ProductChannelVisibility>(b =>
-        {
-            b.ToTable("CatProductChannelVisibilities");
-            b.ConfigureByConvention();
-
-            b.Property(x => x.ChannelCode).IsRequired().HasMaxLength(Catalog.ProductChannelVisibility.DoDaiMaKenhToiDa);
-            b.Property(x => x.LyDo).HasMaxLength(Catalog.ProductChannelVisibility.DoDaiLyDoToiDa);
-
-            // 🔒 Lưu **SỐ** (enum) ⇒ chỉ có MỘT nguồn quyết định nghĩa của trạng thái.
-            // 📌 Nếu lưu chuỗi thì đổi tên enum là sửa **dữ liệu**, không phải sửa **mã** — và dữ liệu cũ
-            // sẽ có giá trị không ai còn kiểm được.
-            b.Property(x => x.TrangThai).HasConversion<int>();
-
-            // Truy vấn nóng: "kênh này đang HIỂN THỊ gì / ẩn gì".
-            b.HasIndex(x => new { x.TenantId, x.ChannelCode, x.TrangThai })
-                .HasDatabaseName("IX_CatProductChannelVisibilities_TenantId_Kenh_TrangThai");
-
-            // 🚨🚨 **HÀNG RÀO CUỐI CHO BẤT BIẾN `(TenantId, ProductId, ChannelCode)` LÀ DUY NHẤT.**
-            //
-            // **VÌ SAO PHẢI Ở DB (không chỉ ở app service):** đặt trạng thái là thao tác *"đọc bản ghi hiện tại
-            // → quyết định → ghi"*. Hai request **ĐỒNG THỜI** (double-click, hai tab, hai nhân viên) **cùng**
-            // đọc thấy *"chưa có bản ghi"* ⇒ **cả hai** `INSERT` ⇒ **HAI bản ghi** cho cùng cặp
-            // `(sản phẩm, kênh)` ⇒ mọi truy vấn hiển thị trả **kết quả khác nhau tuỳ truy vấn** (kênh đọc cái
-            // này, báo cáo đọc cái kia) — và **không có lỗi nào nổi lên**.
-            // 📌 Đây **đúng** bài học `XC-003` D2: **"bỏ app đi, DB có chặn không?"**
-            // ⚠️ Cần **SQL thô** trong migration: EF Core 10 **không** sinh được `NULLS NOT DISTINCT`.
-            b.HasIndex(x => new { x.TenantId, x.ProductId, x.ChannelCode })
-                .IsUnique()
-                .HasDatabaseName("IX_CatProductChannelVisibilities_TenantId_SanPham_Kenh");
-
-            // 📌 FK `Restrict` (không `Cascade`): xoá cứng một sản phẩm **KHÔNG** được kéo mất cấu hình hiển thị
-            // theo kênh một cách âm thầm — đó là **quyết định kinh doanh** đã ghi (kèm lý do cho ca ẩn).
-            b.HasOne<Catalog.Product>()
-                .WithMany()
-                .HasForeignKey(x => x.ProductId)
-                .OnDelete(DeleteBehavior.Restrict);
-        });
-
-        builder.Entity<Catalog.ProductMedia>(b =>
-        {
-            b.ToTable("CatProductMedia");
-            b.ConfigureByConvention();
-
-            b.Property(x => x.KhoaLuuTru).IsRequired().HasMaxLength(Catalog.ProductMedia.DoDaiKhoaLuuTruToiDa);
-            b.Property(x => x.Alt).HasMaxLength(Catalog.ProductMedia.DoDaiAltToiDa);
-
-            // 🔒 `DinhDangDaKiem` lưu **SỐ** (enum) ⇒ chỉ có MỘT nguồn quyết định `Content-Type` khi phục vụ tệp.
-            // 📌 Nếu lưu chuỗi MIME thô thì thêm/đổi định dạng là sửa **dữ liệu**, không phải sửa **mã** —
-            // và dữ liệu cũ sẽ có giá trị không ai còn kiểm được.
-            b.Property(x => x.DinhDangDaKiem).HasConversion<int>();
-
-            // Truy vấn nóng: "ảnh của sản phẩm này, theo thứ tự hiển thị".
-            b.HasIndex(x => new { x.TenantId, x.ProductId, x.ThuTu })
-                .HasDatabaseName("IX_CatProductMedia_TenantId_ProductId_ThuTu");
-
-            // 🚨🚨 **HÀNG RÀO CUỐI CHO `ADR-12`: TỐI ĐA MỘT ẢNH CHÍNH MỖI SẢN PHẨM.**
-            //
-            // **VÌ SAO PHẢI Ở DB (không chỉ ở app service):** đặt ảnh chính là thao tác *"đọc ảnh chính hiện
-            // tại → bỏ đánh dấu → đánh dấu ảnh mới"*. Hai request **đồng thời** (double-click, hai tab, hai
-            // nhân viên) **cùng** đọc thấy *"chưa có ảnh chính"* ⇒ **cả hai** đánh dấu ⇒ **HAI ảnh chính**
-            // ⇒ mọi chỗ đọc *"ảnh chính là ảnh nào"* trả **kết quả khác nhau tuỳ truy vấn** (thẻ chia sẻ dùng
-            // một ảnh, danh sách dùng ảnh khác) — **không lỗi nào nổi lên**.
-            // 📌 Đây đúng bài học `XC-003` D2: **"bỏ app đi, DB có chặn không?"**
-            // ⚠️ Cần **SQL thô** trong migration: EF **không** sinh được unique index **có bộ lọc** này
-            // (và càng không sinh được `NULLS NOT DISTINCT` — dù index này **không** cần vì `TenantId` có
-            // `NULLS NOT DISTINCT` **không** áp dụng cho bộ lọc một phần tử… xem chú thích ở migration).
-            b.HasIndex(x => new { x.TenantId, x.ProductId })
-                .IsUnique()
-                .HasFilter("\"LaAnhChinh\"")
-                .HasDatabaseName("IX_CatProductMedia_MotAnhChinh");
-
-            // 📌 FK `Restrict` (không `Cascade`): xoá cứng một sản phẩm **KHÔNG** được kéo mất ảnh một cách
-            // âm thầm — ảnh là **tài sản** (đã tốn dung lượng lưu trữ và công nhập liệu).
-            // ⚠️ Nhưng ảnh **cũng** phải dọn theo sản phẩm ⇒ việc đó thuộc **app service** (xoá mềm sản phẩm
-            // + gọi `IMediaStorage.XoaAsync`), xem `CAT-003` §16.8.
-            b.HasOne<Catalog.Product>()
-                .WithMany()
-                .HasForeignKey(x => x.ProductId)
-                .OnDelete(DeleteBehavior.Restrict);
-        });
-
-        builder.Entity<Catalog.ProductVariant>(b =>
-        {
-            b.ToTable("CatProductVariants");
-            b.ConfigureByConvention();
-
-            b.Property(x => x.Sku).IsRequired().HasMaxLength(64);
-            b.Property(x => x.Barcode).HasMaxLength(64);
-
-            // decimal(18,4) — tiền tệ KHÔNG bao giờ dùng double.
-            b.Property(x => x.Price).HasPrecision(18, 4);
-            b.Property(x => x.CompareAtPrice).HasPrecision(18, 4);
-
-            b.HasIndex(x => new { x.TenantId, x.Sku }).IsUnique();
-
-            b.Property(x => x.AttributeHash).HasMaxLength(128);
-
-            // 🚨🚨 **HÀNG RÀO CUỐI CHO BẤT BIẾN "TỔ HỢP DUY NHẤT TRÊN MỖI SẢN PHẨM"** (`CAT-002` D7/BR-010).
-            //
-            // ⚠️ **LỆCH CÓ CHỦ Ý SO VỚI BẢNG INDEX CỦA TÀI LIỆU (§5.2)** — và đây là **sửa một lỗi trong tài liệu**:
-            // tài liệu ghi `UNIQUE (TenantId, ProductVariantId, AttributeHash)` **trên chính bảng `CatProductVariants`**.
-            // Nhưng trong bảng này `ProductVariantId` **chính là** khoá chính (`Id`) ⇒ index đó **luôn luôn đúng**
-            // và **KHÔNG chặn được gì** (vô nghĩa). Ý định thật của bất biến là *"tổ hợp duy nhất trên mỗi
-            // **SẢN PHẨM**"* ⇒ phải là `(TenantId, ProductId, AttributeHash)` — và bảng này **có** `ProductId`.
-            //
-            // 🎯 Vì sao phải có: `AttributeHash` là **khoá đối chiếu** khi sinh lại tổ hợp (BR-013). Không có
-            // hàng rào này thì 2 request đồng thời (hoặc Redis chết) tạo **hai biến thể cùng tổ hợp** ⇒
-            // storefront hiện 2 lựa chọn giống nhau và **không ai biết cái nào đúng**.
-            // Chỉ áp cho biến thể CÓ hash (biến thể thủ công của sản phẩm đơn giản có hash `NULL`).
-            b.HasIndex(x => new { x.TenantId, x.ProductId, x.AttributeHash })
-                .IsUnique()
-                .HasFilter("\"AttributeHash\" IS NOT NULL")
-                .HasDatabaseName("IX_CatProdVariants_TenantId_ProductId_AttributeHash");
-        });
-
-        // ── Cây danh mục (`CAT-002` D1/D2/D3/D9) ────────────────────────────────────────────────
-        builder.Entity<Catalog.Category>(b =>
-        {
-            b.ToTable("CatCategories");
-            b.ConfigureByConvention();
-
-            b.Property(x => x.Code).IsRequired().HasMaxLength(64);
-            b.Property(x => x.Name).IsRequired().HasMaxLength(256);
-            b.Property(x => x.Slug).HasMaxLength(256);
-
-            // `Path` = `/guid/guid/` — vật chất hoá để lấy cả cây bằng MỘT truy vấn tiền tố (D1).
-            b.Property(x => x.Path).IsRequired().HasMaxLength(Catalog.Category.DoDaiPathToiDa);
-
-            // `Code` duy nhất trong tenant. ⚠️ Unique index này **PHẢI** là `NULLS NOT DISTINCT`
-            // (hệ thống hiện 1 tenant ⇒ `TenantId` có thể NULL) — EF **không** sinh được, nên migration
-            // có bước SQL thô sửa lại (xem `Fix_NullableTenantId_UniqueIndexes` làm mẫu).
-            // Tên index đặt TƯỜNG MINH: tên tự sinh dài quá 63 ký tự sẽ bị PostgreSQL **cắt cụt**
-            // (đúng lỗi đã gặp ở `SalMarketplaceOrderIntakes`).
-            b.HasIndex(x => new { x.TenantId, x.Code })
-                .IsUnique()
-                .HasDatabaseName("IX_CatCategories_TenantId_Code");
-
-            // Truy vấn "các con của một nút" (dựng menu từng cấp) và truy vấn cây con theo tiền tố `Path`.
-            b.HasIndex(x => new { x.TenantId, x.ParentId })
-                .HasDatabaseName("IX_CatCategories_TenantId_ParentId");
-
-            b.HasIndex(x => new { x.TenantId, x.Path })
-                .HasDatabaseName("IX_CatCategories_TenantId_Path");
-
-            // 🚨 `Restrict` (`CAT-002` D9): xoá cứng một nút KHÔNG được kéo theo con (Cascade) và cũng
-            // không được để con **mồ côi**. DB chặn ở đây; app service đi đường **xoá mềm**.
-            b.HasOne<Catalog.Category>()
-                .WithMany()
-                .HasForeignKey(x => x.ParentId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            // 🚨 Hàng rào cuối cho 2 bất biến mà tầng domain cũng kiểm tra (CAT-002 §8.1 #2 và #3).
-            // ⚠️ Đây là CHECK **định dạng/khoảng**, KHÔNG phải ràng buộc ngữ nghĩa: nó **không** phát hiện
-            // được `Path` không khớp cây thật, và **không** phát hiện được chu trình (§8.1 #1) —
-            // phần ngữ nghĩa phải do `CategoryTreeService` + test lo.
-            b.ToTable(t =>
-            {
-                t.HasCheckConstraint("CK_CatCategories_Path_DinhDang", "\"Path\" LIKE '/%/'");
-                t.HasCheckConstraint("CK_CatCategories_Level_Khoang", "\"Level\" >= 0 AND \"Level\" <= 5");
-            });
-        });
-
-        // ── Liên kết sản phẩm ↔ danh mục (`CAT-002` BR-006) ──────────────────────────────────────
-        builder.Entity<Catalog.ProductCategory>(b =>
-        {
-            b.ToTable("CatProductCategories");
-            b.ConfigureByConvention();
-
-            // Chống GÁN TRÙNG cùng một cặp (sản phẩm, danh mục).
-            // ⚠️ Tên TƯỜNG MINH: tên EF tự sinh dài > 63 ký tự ⇒ PostgreSQL **cắt cụt** (lỗi đã gặp thật).
-            b.HasIndex(x => new { x.TenantId, x.ProductId, x.CategoryId })
-                .IsUnique()
-                .HasDatabaseName("IX_CatProdCats_TenantId_ProductId_CategoryId");
-
-            // Truy vấn "sản phẩm trong một danh mục" (storefront).
-            b.HasIndex(x => new { x.TenantId, x.CategoryId })
-                .HasDatabaseName("IX_CatProdCats_TenantId_CategoryId");
-
-            // 🚨 **TỐI ĐA MỘT danh mục CHÍNH cho mỗi sản phẩm** (BR-006) — unique index **CÓ FILTER**.
-            // Đây là hàng rào DUY NHẤT diễn đạt được bất biến này: unique index KHÔNG có điều kiện sẽ chặn
-            // luôn việc một sản phẩm nằm trong NHIỀU danh mục (điều hoàn toàn hợp lệ).
-            // ⚠️ EF không sinh được `NULLS NOT DISTINCT` cho index có filter ⇒ migration có bước SQL thô.
-            b.HasIndex(x => new { x.TenantId, x.ProductId })
-                .IsUnique()
-                .HasFilter("\"IsPrimary\"")
-                .HasDatabaseName("IX_CatProdCats_TenantId_ProductId_ChiMotChinh");
-
-            // FK `Restrict`: xoá cứng sản phẩm/danh mục KHÔNG được kéo mất liên kết ở đây.
-            b.HasOne<Catalog.Product>()
-                .WithMany()
-                .HasForeignKey(x => x.ProductId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            b.HasOne<Catalog.Category>()
-                .WithMany()
-                .HasForeignKey(x => x.CategoryId)
-                .OnDelete(DeleteBehavior.Restrict);
-        });
-
-        // ── Thuộc tính (`CAT-002` D4/BR-008) ──────────────────────────────────────────────────────
-        builder.Entity<Catalog.CatalogAttribute>(b =>
-        {
-            b.ToTable("CatAttributes");
-            b.ConfigureByConvention();
-
-            b.Property(x => x.Code).IsRequired().HasMaxLength(64);
-            b.Property(x => x.Name).IsRequired().HasMaxLength(256);
-
-            // `Usage` lưu dạng `int` (enum) — đọc bằng mắt trong DB là số, ghi rõ để không ai "sửa tay" sai.
-            b.Property(x => x.Usage).HasConversion<int>();
-
-            b.HasIndex(x => new { x.TenantId, x.Code })
-                .IsUnique()
-                .HasDatabaseName("IX_CatAttributes_TenantId_Code");
-        });
-
-        builder.Entity<Catalog.CatalogAttributeValue>(b =>
-        {
-            b.ToTable("CatAttributeValues");
-            b.ConfigureByConvention();
-
-            b.Property(x => x.Value).IsRequired().HasMaxLength(256);
-
-            b.HasIndex(x => new { x.TenantId, x.AttributeId, x.Value })
-                .IsUnique()
-                .HasDatabaseName("IX_CatAttrValues_TenantId_AttributeId_Value");
-
-            b.HasOne<Catalog.CatalogAttribute>()
-                .WithMany()
-                .HasForeignKey(x => x.AttributeId)
-                .OnDelete(DeleteBehavior.Restrict);
-        });
-
-        builder.Entity<Catalog.ProductAttributeSelection>(b =>
-        {
-            b.ToTable("CatProductAttributeSelections");
-            b.ConfigureByConvention();
-
-            b.HasIndex(x => new { x.TenantId, x.ProductId, x.AttributeId, x.AttributeValueId })
-                .IsUnique()
-                .HasDatabaseName("IX_CatProdAttrSel_TenantId_ProductId_AttributeId_ValueId");
-
-            b.HasOne<Catalog.Product>()
-                .WithMany()
-                .HasForeignKey(x => x.ProductId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            b.HasOne<Catalog.CatalogAttribute>()
-                .WithMany()
-                .HasForeignKey(x => x.AttributeId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            b.HasOne<Catalog.CatalogAttributeValue>()
-                .WithMany()
-                .HasForeignKey(x => x.AttributeValueId)
-                .OnDelete(DeleteBehavior.Restrict);
-        });
-
-        builder.Entity<Catalog.ProductVariantAttribute>(b =>
-        {
-            b.ToTable("CatProductVariantAttributes");
-            b.ConfigureByConvention();
-
-            // Mỗi biến thể có **ĐÚNG MỘT** giá trị cho mỗi thuộc tính (BR §8.1 #6).
-            b.HasIndex(x => new { x.TenantId, x.ProductVariantId, x.AttributeId })
-                .IsUnique()
-                .HasDatabaseName("IX_CatProdVarAttr_TenantId_VariantId_AttributeId");
-
-            b.HasOne<Catalog.ProductVariant>()
-                .WithMany()
-                .HasForeignKey(x => x.ProductVariantId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            b.HasOne<Catalog.CatalogAttribute>()
-                .WithMany()
-                .HasForeignKey(x => x.AttributeId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            b.HasOne<Catalog.CatalogAttributeValue>()
-                .WithMany()
-                .HasForeignKey(x => x.AttributeValueId)
-                .OnDelete(DeleteBehavior.Restrict);
-        });
-
-        builder.Entity<Inventory.InventoryItem>(b =>
-        {
-            b.ToTable("InvItems");
-            b.ConfigureByConvention();
-
-            b.Property(x => x.Sku).IsRequired().HasMaxLength(64);
-
-            // Một SKU chỉ có một bản ghi tồn kho cho mỗi kho trong mỗi tenant.
-            // Index này là hàng rào cuối cùng chống ghi trùng khi có race condition.
-            b.HasIndex(x => new { x.TenantId, x.WarehouseId, x.Sku }).IsUnique();
-        });
-
-        // ── INV-001 ADR-01: KHO ──────────────────────────────────────────────────────────────────
-        builder.Entity<Inventory.Warehouse>(b =>
-        {
-            b.ToTable("InvWarehouses");
-            b.ConfigureByConvention();
-
-            b.Property(x => x.Code).IsRequired().HasMaxLength(32);
-            b.Property(x => x.Name).IsRequired().HasMaxLength(256);
-            b.Property(x => x.Address).HasMaxLength(512);
-
-            // Mã kho duy nhất trong tenant — hàng rào DB (sửa tay NULLS NOT DISTINCT trong migration).
-            b.HasIndex(x => new { x.TenantId, x.Code })
-                .IsUnique()
-                .HasDatabaseName("IX_InvWarehouses_TenantId_Code");
-        });
-
-        // ── INV-001 ADR-02: CHỨNG TỪ KHO + DÒNG CHỨNG TỪ ─────────────────────────────────────────
-        builder.Entity<Inventory.StockDocument>(b =>
-        {
-            b.ToTable("InvStockDocuments");
-            b.ConfigureByConvention();
-
-            b.Property(x => x.Number).IsRequired().HasMaxLength(64);
-            b.Property(x => x.Type).HasConversion<int>();
-            b.Property(x => x.Status).HasConversion<int>();
-            b.Property(x => x.Note).HasMaxLength(2048);
-            b.Property(x => x.IdempotencyKey).HasMaxLength(128);
-
-            // Số chứng từ duy nhất trong tenant — chống tạo trùng khi retry/import.
-            b.HasIndex(x => new { x.TenantId, x.Number })
-                .IsUnique()
-                .HasDatabaseName("IX_InvStockDocuments_TenantId_Number");
-
-            b.HasIndex(x => new { x.TenantId, x.Status, x.Type, x.OccurredAtUtc })
-                .HasDatabaseName("IX_InvStockDocuments_TenantId_Status_Type_OccurredAtUtc");
-        });
-
-        builder.Entity<Inventory.StockDocumentLine>(b =>
-        {
-            b.ToTable("InvStockDocumentLines");
-            b.ConfigureByConvention();
-
-            b.Property(x => x.Sku).IsRequired().HasMaxLength(64);
-
-            // Một SKU chỉ xuất hiện MỘT lần trong một chứng từ: hai dòng cùng SKU trong cùng phiếu nhập
-            // ⇒ người đọc phiếu thấy "nhập 5" nhưng sổ cái ghi hai bút toán ⇒ **cộng sai** mà không lỗi nào.
-            b.HasIndex(x => new { x.TenantId, x.StockDocumentId, x.Sku })
-                .IsUnique()
-                .HasDatabaseName("IX_InvStockDocumentLines_TenantId_Doc_Sku");
-
-            b.HasOne<Inventory.StockDocument>()
-                .WithMany()
-                .HasForeignKey(x => x.StockDocumentId)
-                .OnDelete(DeleteBehavior.Restrict);
-        });
-
-        // ── INV-002: GIỮ CHỖ ─────────────────────────────────────────────────────────────────────
-        builder.Entity<Inventory.StockReservation>(b =>
-        {
-            b.ToTable("InvStockReservations");
-            b.ConfigureByConvention();
-
-            b.Property(x => x.Sku).IsRequired().HasMaxLength(64);
-            b.Property(x => x.Status).HasConversion<int>();
-            b.Property(x => x.ReferenceType).HasMaxLength(64);
-            b.Property(x => x.ReferenceId).HasMaxLength(128);
-
-            // Truy vấn của JOB nhả chỗ: các lượt `Held` đã quá hạn.
-            b.HasIndex(x => new { x.TenantId, x.Status, x.ExpiresAtUtc })
-                .HasDatabaseName("IX_InvStockReservations_TenantId_Status_ExpiresAtUtc");
-
-            // Một nguồn (giỏ/đơn) + một SKU chỉ giữ chỗ **MỘT** lần ⇒ chống tạo trùng khi retry.
-            // (Sửa tay `NULLS NOT DISTINCT` trong migration — nếu thiếu thì `TenantId = NULL` làm index vô hiệu.)
-            b.HasIndex(x => new { x.TenantId, x.ReferenceId, x.Sku, x.WarehouseId })
-                .IsUnique()
-                .HasFilter("\"ReferenceId\" IS NOT NULL")
-                .HasDatabaseName("IX_InvStockReservations_TenantId_Ref_Sku_Kho");
-        });
-
-        builder.Entity<Inventory.StockLedgerEntry>(b =>
-        {
-            b.ToTable("InvStockLedger");
-            b.ConfigureByConvention();
-
-            b.Property(x => x.Sku).IsRequired().HasMaxLength(64);
-            b.Property(x => x.ReferenceType).HasMaxLength(64);
-            b.Property(x => x.ReferenceId).HasMaxLength(128);
-            b.Property(x => x.ChannelCode).HasMaxLength(32);
-            b.Property(x => x.Note).HasMaxLength(2048);
-
-            // Truy vấn thường gặp: lịch sử biến động của một SKU trong một kho, mới nhất trước.
-            b.HasIndex(x => new { x.TenantId, x.WarehouseId, x.Sku, x.OccurredAtUtc });
-
-            // Đối soát theo kênh.
-            b.HasIndex(x => new { x.TenantId, x.ChannelCode, x.OccurredAtUtc });
-
-            // 🚨 **`INV-001` ADR-05 — HÀNG RÀO CHỐNG GHI TRÙNG SỔ CÁI.**
-            // Ghi sổ một dòng chứng từ HAI lần (retry · job chạy lại · người bấm hai lần) ⇒ lần hai **bị chặn**.
-            // 📌 Kiểm ở tầng app ("đã ghi chưa?") **KHÔNG đủ**: hai request **đồng thời** cùng thấy "chưa ghi"
-            // ⇒ ghi hai lần ⇒ **tồn kho tăng gấp đôi mà không có lỗi nào**.
-            // ⚠️ Bộ lọc `ReferenceLineId IS NOT NULL` là **BẮT BUỘC** (sửa tay trong migration —
-            // EF không sinh được `NULLS NOT DISTINCT` lẫn bộ lọc kèm nhau):
-            // bút toán điều chỉnh tay KHÔNG có dòng chứng từ; nếu unique **không** bộ lọc thì toàn hệ thống
-            // chỉ được phép có **MỘT** bút toán không tham chiếu.
-            // 🚨 **SỬA 15/10/2026 — LỖI THẬT DO KIỂM CHỨNG HTTP BẮT ĐƯỢC:** phiên bản đầu chỉ unique
-            // `(TenantId, ReferenceLineId)` ⇒ **CHẶN OAN** vế thứ hai của **phiếu chuyển kho** (một dòng chứng từ
-            // chuyển kho sinh **HAI** bút toán: `TransferOut` ở nguồn + `TransferIn` ở đích) ⇒ ghi sổ chuyển kho
-            // **luôn 500** (`23505`), tức là **tính năng chuyển kho không dùng được**.
-            // ✅ Nay unique theo **`(TenantId, ReferenceLineId, MovementType)`**: hai vế có **loại khác nhau**
-            // ⇒ qua được; còn **ghi sổ lại cùng một dòng cùng một loại** (retry / hai request đồng thời)
-            // vẫn **BỊ CHẶN** — giữ nguyên mục đích chống ghi trùng (ADR-05).
-            b.HasIndex(x => new { x.TenantId, x.ReferenceLineId, x.MovementType })
-                .IsUnique()
-                .HasFilter("\"ReferenceLineId\" IS NOT NULL")
-                .HasDatabaseName("IX_InvStockLedger_TenantId_ReferenceLineId");
-        });
-
-        // ── INV-003: HẠN MỨC PHÂN BỔ **RIÊNG TỪNG KÊNH** ────────────────────────────────────────────
-        // 📌 Thay cho "một giá trị dùng chung" trước đây: mỗi kênh một hạn mức, tuỳ chọn **theo kho**.
-        // ⚠️ Khoá nghiệp vụ `(TenantId, ChannelCode, WarehouseId)` với `WarehouseId` **NULLABLE**
-        // (`null` = hạn mức **cả kênh**) ⇒ unique index **BẮT BUỘC** `NULLS NOT DISTINCT`, mà EF **không**
-        // sinh được ⇒ migration có **SQL thô** (đúng mẫu `Inv001_Fix_SoCai_Unique_ThemMovementType`).
-        // 🚨 Thiếu `NULLS NOT DISTINCT`: PostgreSQL coi `NULL` là khác nhau ⇒ khai **hai** dòng
-        // *"hạn mức cả kênh"* cho cùng kênh **LỌT** ⇒ hai hạn mức cho một kênh, không lỗi nào.
-        builder.Entity<Inventory.InvChannelLimit>(b =>
-        {
-            b.ToTable("InvChannelLimits");
-            b.ConfigureByConvention();
-
-            b.Property(x => x.ChannelCode).IsRequired().HasMaxLength(Inventory.InvChannelLimit.DoDaiMaKenhToiDa);
-
-            // Đọc bằng mắt trong DB là **số** — ghi rõ để không ai "sửa tay" sai (0=Block, 1=Warn).
-            b.Property(x => x.HanhDong).HasConversion<int>();
-
-            // 🚨 `INV-003` muc 5 viec 2 — **DON VI CUA RIENG DONG NAY** (no muc 16.8 #1 DA DONG).
-            // 🔒 **NULLABLE la CO Y**: `null` = **khong override** => dung setting `Inv.ChannelLimit.Unit`.
-            // 📌 Nho vay COT MOI **KHONG DOI HANH VI** cua du lieu cu => migration nay AN TOAN.
-            // ⚠️ KHONG dung `0`/gia tri "mac dinh" lam dau "khong override": `Percent` = `0` la mot DON VI
-            // HOP LE => dung no lam co se tao HAI cach dien dat cung mot y (dung loi ma `GiaTri` da tranh).
-            b.Property(x => x.DonVi).HasConversion<int?>();
-
-            b.Property(x => x.GiaTri).HasPrecision(18, 4);
-
-            b.HasIndex(x => new { x.TenantId, x.ChannelCode, x.WarehouseId })
-                .IsUnique()
-                .HasDatabaseName("IX_InvChannelLimits_TenantId_ChannelCode_WarehouseId");
-
-            // 🔒 `GiaTri >= 0`: âm là **vô nghĩa** (quy ước `0` = TẮT) ⇒ chặn ở DB, không chỉ ở domain
-            // (đường ghi tắt bằng SQL/hàng đợi import sẽ không đi qua hàm tạo).
-            b.ToTable(t =>
-            {
-                t.HasCheckConstraint("CK_InvChannelLimits_GiaTri_KhongAm", "\"GiaTri\" >= 0");
-            });
-        });
 
         // ── REC-001: LỊCH SỬ LƯỢT QUÉT ĐỐI SOÁT TỒN KHO ────────────────────────────────────────────
-        builder.Entity<Inventory.ReconRun>(b =>
-        {
-            b.ToTable("ReconRuns");
-            b.ConfigureByConvention();
+        // 🆕 `P0 #1` (24/10/2026) — mapping đối soát kho đã chuyển sang MODULE `Reconciliation.EntityFrameworkCore`.
+        global::eCommerce.Reconciliation.EntityFrameworkCore.ReconciliationDbContextModelCreatingExtensions.ConfigureReconciliation(builder);
 
-            b.Property(x => x.DonViNguong).HasConversion<int>();
-            b.Property(x => x.HanhDong).HasConversion<int>();
-            b.Property(x => x.KetLuan).HasConversion<int>();
-            b.Property(x => x.GiaTriNguong).HasPrecision(18, 4);
-
-            // 🆕 `S7` — **XÁC NHẬN LỆCH** (`Q5` = A): ghi ai/khi nào/vì sao rồi ĐÓNG cảnh báo.
-            // 🔒 KHÔNG sửa `SoLech*` khi xác nhận (xem chú thích `ReconRun.XacNhan`).
-            b.Property(x => x.ConfirmNote).HasMaxLength(1024);
-
-            // 📌 KHÔNG unique index: **cố ý** — hai lượt quét trong cùng một giây là **hợp lệ**
-            // (job chạy `RunOnStart` ngay sau khởi động + nhịp quét đến hạn cùng lúc; hoặc API gọi tay).
-            // Đặt unique ở đây sẽ **chặn oan** một lượt quét thật ⇒ mất lịch sử, đúng thứ bảng này chống.
-
-            // Truy vấn vận hành hay dùng: *"các lượt quét gần đây của tenant"* và *"lượt nào có vượt ngưỡng"*.
-            b.HasIndex(x => new { x.TenantId, x.BatDauUtc })
-                .HasDatabaseName("IX_ReconRuns_TenantId_BatDauUtc");
-
-            b.HasIndex(x => new { x.TenantId, x.CoVuotNguong, x.BatDauUtc })
-                .HasDatabaseName("IX_ReconRuns_TenantId_CoVuotNguong_BatDauUtc");
-
-            b.ToTable(t =>
-            {
-                // 🔒 Bất biến "số VƯỢT NGƯỠNG không lớn hơn tổng số LỆCH" — chặn ở DB vì đây là số liệu
-                // người vận hành **dùng để quyết định**; một dòng vô lý làm hỏng cả báo cáo xu hướng.
-                t.HasCheckConstraint("CK_ReconRuns_SoLechVuot_KhongVuotTong",
-                    "\"SoLechVuotNguong\" >= 0 AND \"SoLech\" >= 0 AND \"SoLechVuotNguong\" <= \"SoLech\"");
-                t.HasCheckConstraint("CK_ReconRuns_SoCapDaDo_KhongAm", "\"SoCapDaDo\" >= 0");
-                t.HasCheckConstraint("CK_ReconRuns_MocThoiGian_HopLe", "\"KetThucUtc\" >= \"BatDauUtc\"");
-
-                // 🆕 `S7` — **KHÔNG THỂ "XÁC NHẬN MỘT NỬA"**: hoặc cả ba trường có, hoặc cả ba `NULL`.
-                // 📌 Vì sao chặn ở DB: một dòng `ConfirmedAtUtc` có mà `ConfirmedByUserId` rỗng là
-                // **bằng chứng vô chủ** (ai đóng cảnh báo? không trả lời được) — và nó chỉ lọt vào qua
-                // đường ghi tắt (SQL/hàng đợi import), tức đúng chỗ tầng domain không đi qua.
-                t.HasCheckConstraint("CK_ReconRuns_XacNhan_DuBo",
-                    "(\"ConfirmedAtUtc\" IS NULL) = (\"ConfirmedByUserId\" IS NULL) AND " +
-                    "(\"ConfirmedAtUtc\" IS NULL OR \"ConfirmNote\" IS NOT NULL)");
-            });
-        });
-
-        builder.Entity<Inventory.ReconRunMismatch>(b =>
-        {
-            b.ToTable("ReconRunMismatches");
-            b.ConfigureByConvention();
-
-            b.Property(x => x.Sku).IsRequired().HasMaxLength(64);
-
-            // 🚨 `REC-001` — **TRẠNG THÁI XỬ LÝ LỆCH** (bổ sung 16/10/2026).
-            //
-            // **CẨN THẬN KHI SỬA KHỐI NÀY:** `b.Property(x => x.Sku).IsRequired().HasMaxLength(64);`
-            // xuất hiện ở **7 entity** trong tệp này. Lần đầu tôi sửa bằng `-replace` (khớp dòng **ĐẦU TIÊN**)
-            // ⇒ chèn nhầm vào `ProductVariant`/`InventoryItem` ⇒ **36 lỗi build**. 📌 Đúng cái bẫy đã ghi ở
-            // bàn giao (round 4): *"`^\| <MÃ> \|` khớp dòng đầu tiên, không phải dòng bạn đang nghĩ tới"*.
-            // 🔒 Sửa đúng cách: định vị **theo entity cha** (`builder.Entity<Inventory.ReconRunMismatch>`), không theo dòng.
-            //
-            // 📌 Trước lượt này bảng là **append-only, không trạng thái** ⇒ một dòng đã xử lý xong **trông
-            // y hệt** một dòng chưa ai đụng tới ⇒ người trực phải đọc lại **toàn bộ** danh sách mỗi nhịp job,
-            // và tới lúc danh sách dài thì **không ai đọc nữa**.
-            b.Property(x => x.NguoiXuLy).HasMaxLength(256);
-            b.Property(x => x.LyDoXuLy).HasMaxLength(1024);
-
-            // 📌 Index **có điều kiện** cho truy vấn nóng nhất: *"lượt này còn dòng nào CHƯA xử lý?"*.
-            // 🔒 Bộ lọc `WHERE NOT "DaXuLy"` giữ index **nhỏ**: sau vài tháng, **phần lớn** dòng đã xử lý
-            // ⇒ index chỉ còn chứa **việc còn lại**. Không lọc thì index phình theo **toàn bộ lịch sử**
-            // và chính truy vấn *"còn việc gì"* trở thành truy vấn nặng nhất — nghịch lý của báo cáo tồn đọng.
-            b.HasIndex(x => new { x.TenantId, x.ReconRunId })
-                .HasFilter("NOT \"DaXuLy\"")
-                .HasDatabaseName("IX_ReconRunMismatches_TenantId_Run_ChuaXuLy");
-
-            // Một cặp `(kho, SKU)` chỉ xuất hiện **MỘT** lần trong một lượt quét ⇒ index này chống ghi trùng
-            // khi job retry / hai luồng cùng ghi. Có `TenantId` ⇒ **BẮT BUỘC** `NULLS NOT DISTINCT` (SQL thô trong migration).
-            b.HasIndex(x => new { x.TenantId, x.ReconRunId, x.WarehouseId, x.Sku })
-                .IsUnique()
-                .HasDatabaseName("IX_ReconRunMismatches_TenantId_Run_Kho_Sku");
-
-            // 🆕 `S7` — index cho truy vấn **RETENTION** (`Recon.Retention.Days`):
-            // *"các dòng lệch ĐÃ XỬ LÝ và cũ hơn mốc"*. 📌 Không unique ⇒ **không** ảnh hưởng con số
-            // `NULLS NOT DISTINCT` (53). Nếu không có index này thì mỗi lượt dọn là **quét cả bảng** —
-            // và nó chạy hằng ngày, trên đúng cái bảng đang phình (lý do retention tồn tại).
-            b.HasIndex(x => new { x.TenantId, x.DaXuLy, x.CreationTime })
-                .HasDatabaseName("IX_ReconRunMismatches_TenantId_DaXuLy_CreationTime");
-
-            // 📌 FK `Restrict` (không `Cascade`): lịch sử đối soát là **bằng chứng**; xoá cứng một lượt
-            // **không** được phép kéo mất các dòng lệch của nó một cách âm thầm.
-            b.HasOne<Inventory.ReconRun>()
-                .WithMany()
-                .HasForeignKey(x => x.ReconRunId)
-                .OnDelete(DeleteBehavior.Restrict);
-        });
 
         // 🚨 `XC-002` — **HÀNG ĐỢI THƯ CHẾT**. Xem chú thích entity để biết vì sao "chỉ ghi log" là KHÔNG ĐỦ
         // (log bị xoay vòng, không tra cứu theo khoá, không biết còn tồn bao nhiêu ⇒ **mất dữ liệu nhưng có vẻ
@@ -867,6 +415,10 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
             b.Property(x => x.NguoiXuLy).HasMaxLength(256);
             b.Property(x => x.LyDoXuLy).HasMaxLength(Messaging.DeadLetter.DeadLetterMessage.DoDaiLyDoToiDa);
             b.Property(x => x.CorrelationId).HasMaxLength(128);
+
+            // 🆕 `S16b` — **BẰNG CHỨNG PHÁT LẠI** (migration `Xc002_DlqReplay`).
+            // 🔒 Cột RIÊNG, không suy từ `DaXuLy`: *"đã bỏ qua"* ≠ *"đã phát lại"* (xem chú thích entity).
+            b.Property(x => x.ReplayedBy).HasMaxLength(Messaging.DeadLetter.DeadLetterMessage.DoDaiNguoiPhatLaiToiDa);
 
             // 📌 `PayloadJson` là `text` (không giới hạn độ dài): 🔒 **CẮT payload là không phát lại được** —
             // đúng bất biến (1) ở chú thích entity.
@@ -886,178 +438,14 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>
             b.HasIndex(x => new { x.TenantId, x.KhoaNghiepVu })
                 .HasDatabaseName("IX_MsgDeadLetters_TenantId_Khoa");
         });
-        builder.Entity<Orders.Order>(b =>
-        {
-            b.ToTable("OrdOrders");
-            b.ConfigureByConvention();
+        // 🆕 `P0 #1` (24/10/2026) — mapping đơn hàng/sàn đã chuyển sang MODULE `Sales.EntityFrameworkCore`.
+        global::eCommerce.Sales.EntityFrameworkCore.SalesDbContextModelCreatingExtensions.ConfigureSales(builder);
 
-            b.Property(x => x.Number).IsRequired().HasMaxLength(64);
-            b.Property(x => x.ChannelCode).IsRequired().HasMaxLength(32);
-            b.Property(x => x.ExternalOrderId).HasMaxLength(64);
-            b.Property(x => x.Currency).IsRequired().HasMaxLength(8);
-            b.Property(x => x.Note).HasMaxLength(2048);
-            b.Property(x => x.CheckoutIdempotencyKey).HasMaxLength(128);
+        // 🆕 `WP-06` — POS: hoá đơn bán lẻ + ca thu ngân + trả hàng (module tự cung cấp mapping).
+        global::eCommerce.Pos.EntityFrameworkCore.PosDbContextModelCreatingExtensions.ConfigurePos(builder);
 
-            // 🚨 **MỘT checkout chỉ được sinh MỘT đơn.** Không có index này thì khách bấm hai lần / client retry
-            // ⇒ **HAI ĐƠN** cho cùng một lần mua ⇒ giao hàng hai lần hoặc thu tiền hai lần.
-            // (Sửa tay `NULLS NOT DISTINCT` trong migration — nếu thiếu thì `TenantId = NULL` làm index VÔ HIỆU.)
-            b.HasIndex(x => new { x.TenantId, x.CheckoutIdempotencyKey })
-                .IsUnique()
-                .HasFilter("\"CheckoutIdempotencyKey\" IS NOT NULL")
-                .HasDatabaseName("IX_OrdOrders_TenantId_CheckoutIdempotencyKey");
-
-            b.Property(x => x.Subtotal).HasPrecision(18, 4);
-            b.Property(x => x.DiscountTotal).HasPrecision(18, 4);
-            b.Property(x => x.TaxTotal).HasPrecision(18, 4);
-            b.Property(x => x.ShippingTotal).HasPrecision(18, 4);
-            b.Property(x => x.GrandTotal).HasPrecision(18, 4);
-            b.Property(x => x.ChannelFeeAmount).HasPrecision(18, 4);
-
-            b.HasIndex(x => new { x.TenantId, x.Number }).IsUnique();
-
-            // 🎯 IDEMPOTENCY: webhook của sàn là at-least-once. Index unique này bảo đảm
-            // cùng một đơn của sàn không thể tạo hai lần trong cùng tenant.
-            b.HasIndex(x => new { x.TenantId, x.ChannelCode, x.ExternalOrderId })
-                .IsUnique()
-                .HasFilter("\"ExternalOrderId\" IS NOT NULL");
-
-            b.HasMany(x => x.Lines)
-                .WithOne()
-                .HasForeignKey(x => x.OrderId)
-                .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        builder.Entity<Orders.OrderLine>(b =>
-        {
-            b.ToTable("OrdOrderLines");
-            b.ConfigureByConvention();
-
-            b.Property(x => x.Sku).IsRequired().HasMaxLength(64);
-            b.Property(x => x.ExternalLineId).HasMaxLength(64);
-            b.Property(x => x.UnitPrice).HasPrecision(18, 4);
-            b.Property(x => x.DiscountAmount).HasPrecision(18, 4);
-            b.Property(x => x.TaxAmount).HasPrecision(18, 4);
-
-            // Chống trùng dòng đơn khi webhook gửi lại.
-            b.HasIndex(x => new { x.OrderId, x.ExternalLineId })
-                .IsUnique()
-                .HasFilter("\"ExternalLineId\" IS NOT NULL");
-        });
-
-        // ---- Nhật ký nhận đơn từ sàn (`SAL-005`) ----
-        builder.Entity<Orders.MarketplaceOrderIntake>(b =>
-        {
-            b.ToTable("SalMarketplaceOrderIntakes");
-            b.ConfigureByConvention();
-
-            b.Property(x => x.ChannelCode).IsRequired().HasMaxLength(32);
-            b.Property(x => x.ExternalShopId).IsRequired().HasMaxLength(64);
-            b.Property(x => x.ExternalOrderId).IsRequired().HasMaxLength(64);
-            b.Property(x => x.PayloadHash).IsRequired().HasMaxLength(64);
-            b.Property(x => x.CorrelationId).HasMaxLength(64);
-            b.Property(x => x.SkipReason).HasMaxLength(500);
-
-            // 🎯 Hàng rào chống trùng ở mức ĐƠN (khoá nghiệp vụ giống `OrdOrders`).
-            // ⚠️ EF **không** mô hình hoá được `NULLS NOT DISTINCT` ⇒ migration sinh ra phải được
-            //    bổ sung mệnh đề đó (xem migration `Add_Sal005_MarketplaceOrderIntake`), nếu không
-            //    index **mất tác dụng im lặng** khi `TenantId` NULL (lỗi C4/F1).
-            // ⚠️ ĐẶT TÊN TƯỜNG MINH: tên EF tự sinh là
-            //    `IX_SalMarketplaceOrderIntakes_TenantId_ChannelCode_ExternalOrderId` = **67 ký tự**,
-            //    vượt giới hạn **63** của PostgreSQL ⇒ bị **cắt** (kèm dấu `~`) ⇒ test bất biến index
-            //    (đối chiếu **đích danh tên**) sẽ không tìm thấy. Tên dưới đây = **52 ký tự**.
-            b.HasIndex(x => new { x.TenantId, x.ChannelCode, x.ExternalOrderId })
-                .IsUnique()
-                .HasDatabaseName("IX_SalMktIntakes_TenantId_ChannelCode_ExternalOrderId");
-
-            // 🚨 `SAL-005` **BR-SAL-005-009 / D12** — **INDEX CHO CỜ "NGHI NGỜ THIẾU BẢN TRUNG GIAN"**.
-            //
-            // **VÌ SAO BẮT BUỘC (đây là ĐIỀU KIỆN CHẠY của job đối soát, KHÔNG phải tối ưu):**
-            // job đối soát hằng ngày quét **đúng** tập `GapSuspected = true` để tự đi lấy lại đơn từ sàn
-            // (`D12`: *"job đối soát chủ động là BẮT BUỘC, không phải tuỳ chọn"* — vì sàn **không** đảm bảo
-            // giao webhook). Bảng intake **chỉ tăng** (mỗi đơn sàn một dòng, append-only theo thiết kế):
-            // không có index thì mỗi nhịp job quét **toàn bộ** bảng.
-            // 📌 Hệ quả nếu thiếu: job chậm dần ⇒ tới một lúc **vượt cửa sổ chạy** ⇒ **không hoàn thành**
-            // ⇒ cờ `GapSuspected` **tồn đọng** ⇒ đơn sai trạng thái **không ai phát hiện** — mà **không có
-            // lỗi nào** để lần ra (job chỉ *"chạy lâu hơn"*).
-            b.HasIndex(x => new { x.TenantId, x.GapSuspected })
-                .HasDatabaseName("IX_SalMktIntakes_TenantId_GapSuspected");
-        });
-
-        // ---- Nhật ký SỰ KIỆN đơn sàn (`SAL-005` D7) — APPEND-ONLY ----
-        //
-        // 📌 `SalMarketplaceOrderIntakes` = *"đơn này đang ở đâu"* (MỘT dòng/đơn).
-        //    Bảng này = *"sàn gửi gì, lúc nào, ta đã làm gì"* (MỘT dòng/SỰ KIỆN) — hai câu hỏi KHÁC nhau.
-        // 🔒 Không FK tới `OrdOrders`/`SalMarketplaceOrderIntakes`: nhật ký phải sống được kể cả khi đơn/intake
-        //    chưa tồn tại (sự kiện `Failed` đầu tiên) — FK ở đây sẽ chặn đúng lúc cần dấu vết nhất.
-        builder.Entity<Orders.MarketplaceEventLog>(b =>
-        {
-            b.ToTable("SalMarketplaceEventLogs", t =>
-            {
-                // 📌 `SourceVersion` = epoch giây của `update_time` sàn ⇒ **luôn dương** khi CÓ.
-                //    `NULL` được phép (sự kiện thiếu watermark — `Outcome = ThieuWatermark`), nhưng `0`/âm
-                //    là dấu hiệu **map sai** (ví dụ map `PlacedAtUtc` hoặc số dòng vào watermark).
-                t.HasCheckConstraint(
-                    "CK_SalMktEventLogs_SourceVersion",
-                    "\"SourceVersion\" IS NULL OR \"SourceVersion\" > 0");
-
-                // 📌 Bắt buộc là SHA-256 hex **chữ thường** — cùng chuẩn với `SalMarketplaceOrderIntakes`.
-                //    Hash HOA/base64 vẫn "trông như hash" nhưng làm nhánh C/D (trùng/xung đột) **so sai**.
-                t.HasCheckConstraint(
-                    "CK_SalMktEventLogs_PayloadHash_Hex",
-                    "\"PayloadHash\" ~ '^[0-9a-f]{64}$'");
-            });
-
-            b.ConfigureByConvention();
-
-            b.Property(x => x.ChannelCode).IsRequired().HasMaxLength(global::eCommerce.Orders.MarketplaceEventLog.DoDaiChannelCode);
-            b.Property(x => x.ExternalOrderId).IsRequired().HasMaxLength(global::eCommerce.Orders.MarketplaceEventLog.DoDaiExternalOrderId);
-            b.Property(x => x.PayloadHash).IsRequired().HasMaxLength(global::eCommerce.Orders.MarketplaceEventLog.DoDaiPayloadHash);
-            b.Property(x => x.EventKind).HasMaxLength(global::eCommerce.Orders.MarketplaceEventLog.DoDaiEventKind);
-            b.Property(x => x.MarketplaceStatusRaw).HasMaxLength(global::eCommerce.Orders.MarketplaceEventLog.DoDaiTrangThaiTho);
-            b.Property(x => x.FailureCode).HasMaxLength(global::eCommerce.Orders.MarketplaceEventLog.DoDaiFailureCode);
-            b.Property(x => x.FailureMessage).HasMaxLength(global::eCommerce.Orders.MarketplaceEventLog.DoDaiFailureMessage);
-            b.Property(x => x.CorrelationId).HasMaxLength(global::eCommerce.Orders.MarketplaceEventLog.DoDaiCorrelationId);
-
-            b.Property(x => x.Outcome).HasConversion<int>();
-
-            // 🚨 **HÀNG RÀO CHỐNG GHI HAI DÒNG CHO CÙNG MỘT KẾT CỤC CỦA CÙNG MỘT SỰ KIỆN.**
-            // 📌 Đây là câu trả lời cho `XC-003` D2 (*"bỏ lock đi, DB có chặn không?"*) ⇒ **CÓ**.
-            //
-            // 🚨 **VÌ SAO KHOÁ CÓ CẢ `Outcome` (phát hiện ĐO ĐƯỢC ở `S6` — `sal-005` §20.5 #1):**
-            // bản đầu của index chỉ có 5 cột `(TenantId, ChannelCode, ExternalOrderId, SourceVersion, PayloadHash)`
-            // ⇒ một sự kiện **giao lại** (cùng phiên bản + cùng hash) trùng **toàn bộ** khoá với dòng đã có
-            // ⇒ dòng `Duplicate` **KHÔNG BAO GIỜ** ghi được (INSERT vi phạm index ⇒ writer coi là trùng ⇒ bỏ).
-            // 🔑 Hệ quả: `Outcome = Duplicate` là **giá trị CHẾT**, và câu hỏi vận hành *"sàn có gửi lại không?"*
-            // **không trả lời được** — đúng thứ `D7` sinh ra để trả lời. 📌 Thêm `Outcome` vào khoá ⇒ ghi được
-            // **một** dòng đánh dấu *"lần giao lại đầu tiên"*, mà vẫn chặn ca *"cùng kết cục ghi hai lần do
-            // bug/hai luồng"* (mục đích thật của hàng rào).
-            //
-            // ⚠️ Tên đặt TƯỜNG MINH vì tên EF tự sinh (94+ ký tự) vượt giới hạn **63** của PostgreSQL ⇒ bị **cắt**
-            // ⇒ test đối chiếu **đích danh tên index** không tìm thấy (bẫy đã gặp với bảng intake).
-            // ⚠️ `NULLS NOT DISTINCT` phải bổ sung bằng **SQL thô** trong migration (EF không khai báo được),
-            // nếu không thì với `TenantId = NULL` (đang chạy 1 tenant) index **mất tác dụng im lặng**.
-            b.HasIndex(x => new
-                {
-                    x.TenantId,
-                    x.ChannelCode,
-                    x.ExternalOrderId,
-                    x.SourceVersion,
-                    x.PayloadHash,
-                    x.Outcome
-                })
-                .IsUnique()
-                .HasDatabaseName("IX_SalMktEventLogs_TenantId_Channel_Order_Ver_Hash_Outcome");
-
-            // 📌 Truy vấn NÓNG NHẤT của Ops: *"lịch sử nhận của MỘT đơn sàn"* (mới nhất trước).
-            b.HasIndex(x => new { x.TenantId, x.ChannelCode, x.ExternalOrderId, x.ReceivedAtUtc })
-                .HasDatabaseName("IX_SalMktEventLogs_TenantId_Channel_Order_Received");
-
-            // 📌 Dashboard vận hành: tỉ lệ `Late`/`Conflict` theo thời gian — *"hệ thống có đang nhận sự kiện
-            //    lộn xộn không"*. 🔑 Không có index này thì bảng **chỉ tăng** (append-only) làm câu đó chậm dần
-            //    ⇒ tới lúc **không ai xem** — đúng cái chết của mọi bảng nhật ký.
-            b.HasIndex(x => new { x.TenantId, x.Outcome, x.ReceivedAtUtc })
-                .HasDatabaseName("IX_SalMktEventLogs_TenantId_Outcome_Received");
-        });
+        // 🆕 `WP-08` — REPORTING: read-model báo cáo (chiều + sự kiện + tổng hợp + mốc).
+        global::eCommerce.Reporting.EntityFrameworkCore.ReportingDbContextModelCreatingExtensions.ConfigureReporting(builder);
 
     }
 }

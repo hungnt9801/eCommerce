@@ -24,7 +24,7 @@ namespace eCommerce.Customers;
 /// 🛡️ `BatBienPhanQuyenTests.TC-01` khoá bất biến này trong CI.
 /// </summary>
 [Authorize(eCommerceConsts.Permissions.Customers.Default)]
-public class CustomerAppService : ApplicationService
+public class CustomerAppService : ApplicationService, ICustomerAppService
 {
     private readonly IRepository<Customer, Guid> _khachRepository;
     private readonly IAbpDistributedLock _khoa;
@@ -51,6 +51,23 @@ public class CustomerAppService : ApplicationService
     /// <summary>Hợp đồng đọc snapshot địa chỉ (chỉ **Contracts** — không phụ thuộc tầng Application của `Address`).</summary>
     private readonly eCommerce.Address.IAddressDirectory _diaChiDirectory;
 
+    // ── `WP-07` — CẤP KHÁCH + CHĂM SÓC + SỔ ĐIỂM/CÔNG NỢ ─────────────────────────────────────────
+    private readonly IRepository<CustomerLevel, Guid> _capKhachRepository;
+    private readonly IRepository<CustomerCare, Guid> _chamSocRepository;
+
+    /// <summary>
+    /// 🔑 **ĐỌC HOÁ ĐƠN BÁN LẺ** để dựng tab *"Công nợ"* + đối chiếu sổ của khách (`WP-07`).
+    /// 🚨 **VÌ SAO ĐỌC QUA REPOSITORY (không gọi `IRetailBillAppService`):** app service đó có
+    /// `[Authorize]` và **áp phạm vi dữ liệu** — gọi nó từ đây sẽ khiến màn chi tiết khách **trả rỗng**
+    /// khi nhân viên bị giới hạn phạm vi, dù họ có quyền xem khách. 📌 Ta cần **số liệu đối chiếu**,
+    /// không phải "danh sách hoá đơn của tôi"; quyền xem khách đã được kiểm ở cấp class.
+    /// ⚠️ Đánh đổi có ý thức: `Customers.Application` nay biết tầng **Domain** của `Pos` (không phải tầng
+    /// Application của nó) — cùng khuôn với việc đọc `Order` của app chính đã có từ `CUS-001` §20.7 #3.
+    /// </summary>
+    private readonly IRepository<eCommerce.Pos.RetailBill, Guid> _hoaDonBanLeRepository;
+
+    private readonly IRepository<eCommerce.Pos.RetailReturn, Guid> _phieuTraRepository;
+
     public CustomerAppService(
         IRepository<Customer, Guid> khachRepository,
         IAbpDistributedLock khoa,
@@ -59,7 +76,11 @@ public class CustomerAppService : ApplicationService
         IRepository<CustomerDataExportLog, Guid> nhatKyXuatRepository,
         IUnitOfWorkManager unitOfWorkManager,
         IRepository<CustomerAddressLink, Guid> lienKetDiaChiRepository,
-        eCommerce.Address.IAddressDirectory diaChiDirectory)
+        eCommerce.Address.IAddressDirectory diaChiDirectory,
+        IRepository<CustomerLevel, Guid> capKhachRepository,
+        IRepository<CustomerCare, Guid> chamSocRepository,
+        IRepository<eCommerce.Pos.RetailBill, Guid> hoaDonBanLeRepository,
+        IRepository<eCommerce.Pos.RetailReturn, Guid> phieuTraRepository)
     {
         _khachRepository = khachRepository;
         _khoa = khoa;
@@ -69,6 +90,10 @@ public class CustomerAppService : ApplicationService
         _unitOfWorkManager = unitOfWorkManager;
         _lienKetDiaChiRepository = lienKetDiaChiRepository;
         _diaChiDirectory = diaChiDirectory;
+        _capKhachRepository = capKhachRepository;
+        _chamSocRepository = chamSocRepository;
+        _hoaDonBanLeRepository = hoaDonBanLeRepository;
+        _phieuTraRepository = phieuTraRepository;
     }
 
     /// <summary>
@@ -133,7 +158,7 @@ public class CustomerAppService : ApplicationService
         var ds = await AsyncExecuter.ToListAsync(
             truyVan.OrderByDescending(x => x.CreationTime).ThenBy(x => x.Id).Skip(bo).Take(soLuong));
 
-        return new PagedResultDto<CustomerDto>(tongSo, ds.Select(ToDto).ToList());
+        return new PagedResultDto<CustomerDto>(tongSo, ds.Select(x => ToDto(x)).ToList());
     }
 
     // ── GHI ─────────────────────────────────────────────────────────────────────────────────────
@@ -816,23 +841,403 @@ public class CustomerAppService : ApplicationService
             truyVan.Select(x => x.NguoiXuat).Distinct().OrderBy(x => x));
     }
 
+    // ── `WP-07`: DS 5 TAB PHÂN KHÚC · CHI TIẾT · PHÂN KHÁCH · CHĂM SÓC · ĐỐI CHIẾU SỔ ───────────
+
+    /// <summary>
+    /// 🗂️ **DS KHÁCH THEO TAB PHÂN KHÚC** (5 tab — `CustomerTabs`).
+    ///
+    /// 🔑 **Tab và bộ lọc dùng CHUNG một `Expression`** (`D-41` cho đơn hàng, áp lại ở đây): nếu mỗi bên
+    /// có định nghĩa riêng thì *"tab Còn nợ đếm 7, bấm vào ra 5"* và người dùng **mất tin** vào badge.
+    /// 🚨 **Khoá tab lạ ⇒ NÉM `Customers:0020`** (không im lặng trả "tất cả"): trả tất cả thì người dùng
+    /// tưởng tab đó rỗng/đầy trong khi bộ lọc **đã bị bỏ im lặng**.
+    /// </summary>
+    public async Task<PagedResultDto<CustomerDto>> GetDanhSachTheoPhanKhucAsync(CustomerListInput input)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+
+        var q = await ApDungBoLocKhachAsync(input);
+
+        // 🔒 Cùng trần `1..200` như `GetDanhSachPhanTrangAsync` — phân trang **không** phải giấy phép kéo cả bảng.
+        var soLuong = Math.Clamp(input.MaxResultCount, 1, 200);
+        var bo = Math.Max(0, input.SkipCount);
+
+        var caps = await LayTenCapAsync();
+        var trang = await AsyncExecuter.ToListAsync(
+            q.OrderByDescending(x => x.CreationTime).ThenBy(x => x.Id).Skip(bo).Take(soLuong));
+
+        // ⚠️ Đếm **trước** khi cắt trang (xem `GetDanhSachPhanTrangAsync`).
+        var tong = await AsyncExecuter.CountAsync(q);
+
+        return new PagedResultDto<CustomerDto>(
+            tong,
+            trang.Select(x => ToDto(x, caps)).ToList());
+    }
+
+    /// <summary>Bộ đếm của **5 tab** — cùng định nghĩa với <see cref="GetDanhSachTheoPhanKhucAsync"/>.</summary>
+    public async Task<CustomerTabCountsDto> GetTabCountsAsync(CustomerListInput input)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+
+        var q = await ApDungBoLocKhachAsync(input, boQuaTab: true);
+
+        var tabs = new List<CustomerTabDto>(CustomerTabs.DanhSach.Count);
+
+        foreach (var tab in CustomerTabs.DanhSach)
+        {
+            tabs.Add(new CustomerTabDto
+            {
+                Key = tab.Key,
+                Label = tab.Label,
+                Count = await AsyncExecuter.CountAsync(q.Where(tab.Loc))
+            });
+        }
+
+        return new CustomerTabCountsDto
+        {
+            Total = tabs.FirstOrDefault(x => x.Key == "all")?.Count ?? 0,
+            Tabs = tabs
+        };
+    }
+
+    /// <summary>
+    /// **CHI TIẾT KHÁCH** (5 tab của màn `customer/[id]`).
+    ///
+    /// 📌 **Số liệu được tính Ở SERVER** (không để FE tự cộng): *"đã mua bao nhiêu"* là **cùng một đại lượng**
+    /// với `AccumulatedAmount` — nếu FE tự cộng từ danh sách hoá đơn thì có **hai định nghĩa** và chúng sẽ
+    /// lệch ngay khi có phiếu trả/huỷ (`XC-003` F2).
+    /// </summary>
+    public async Task<CustomerDetailDto> GetChiTietAsync(Guid customerId)
+    {
+        var khach = await _khachRepository.FindAsync(customerId)
+            ?? throw new BusinessException(CustomerErrorCodes.KhongTimThayKhach).WithData("customerId", customerId);
+
+        var cap = khach.LevelId is { } capId ? await _capKhachRepository.FindAsync(capId) : null;
+
+        var dto = new CustomerDetailDto();
+        SaoChep(khach, dto);
+        dto.LevelName = cap?.Name;
+        dto.LevelDiscountPercent = cap?.DiscountPercent;
+
+        // ── Đơn online ──────────────────────────────────────────────────────────────────────────
+        var qDon = await _donHangRepository.GetQueryableAsync();
+        dto.SoDonHang = await AsyncExecuter.CountAsync(qDon.Where(x => x.CustomerId == customerId));
+
+        // ── Hoá đơn bán lẻ (KHÔNG tính hoá đơn đã huỷ — nhất quán với `AccumulatedAmount`) ───────
+        var qHoaDon = await _hoaDonBanLeRepository.GetQueryableAsync();
+        var hoaDonCuaKhach = qHoaDon.Where(
+            x => x.CustomerId == customerId && x.Status == eCommerce.Pos.RetailBillStatus.Completed);
+
+        var cacHoaDon = await AsyncExecuter.ToListAsync(
+            hoaDonCuaKhach.Select(x => new
+            {
+                x.Id, x.Number, x.Subtotal, x.DiscountTotal, x.TotalPayment, x.PaidAmount,
+                x.DebtAmount, x.DueDateUtc, x.CreationTime
+            }));
+
+        dto.SoHoaDonBanLe = cacHoaDon.Count;
+
+        // 🔑 **Tiền tích luỹ = giá trị HÀNG sau chiết khấu** (`Subtotal − DiscountTotal`), KHÔNG phải
+        // `TotalPayment`: `D-45` chốt xếp hạng khách theo doanh số hàng, không theo số tiền đã trả
+        // (VAT/điểm/chiết khấu tổng không làm khách "lên hạng" nhanh/chậm). 📌 Dùng `TotalPayment` ở đây
+        // sẽ làm `DoiChieuSoDu` **không bao giờ khớp** — chính probe `WP-07` bắt được lần chạy đầu.
+        dto.TongBanLe = NghiepVuKhach.LamTron(cacHoaDon.Sum(x => x.Subtotal - x.DiscountTotal));
+
+        // ── Phiếu trả ───────────────────────────────────────────────────────────────────────────
+        var qTra = await _phieuTraRepository.GetQueryableAsync();
+        var cacPhieuTra = await AsyncExecuter.ToListAsync(
+            qTra.Where(x => x.CustomerId == customerId).Select(x => new { x.GoodsAmount }));
+
+        dto.TongDaTraHang = NghiepVuKhach.LamTron(cacPhieuTra.Sum(x => x.GoodsAmount));
+
+        // ── Công nợ (tab "Công nợ") — tối đa 50 hoá đơn mới nhất còn nợ ─────────────────────────
+        var luc = Clock.Now;
+
+        dto.CongNo = cacHoaDon
+            .Where(x => x.DebtAmount > 0m)
+            .OrderByDescending(x => x.CreationTime)
+            .ThenByDescending(x => x.Number)
+            .Take(50)
+            .Select(x => new CongNoHoaDonDto
+            {
+                BillId = x.Id,
+                Number = x.Number,
+                TotalPayment = x.TotalPayment,
+                PaidAmount = x.PaidAmount,
+                DebtAmount = x.DebtAmount,
+                DueDateUtc = x.DueDateUtc,
+                QuaHan = x.DueDateUtc is { } han && han < luc,
+                CreationTime = x.CreationTime
+            })
+            .ToList();
+
+        dto.CoNoQuaHan = dto.CongNo.Any(x => x.QuaHan);
+
+        return dto;
+    }
+
+    /// <summary>
+    /// **CẬP NHẬT PHÂN KHÁCH** — loại/cấp/hạn mức nợ/nhân viên/người giới thiệu/MST/ngày sinh.
+    ///
+    /// 📌 **`LevelId = null` ⇒ TÍNH LẠI cấp theo ngưỡng** (không phải "bỏ cấp"): người dùng xoá ô chọn cấp
+    /// nghĩa là *"để hệ thống tự xếp"*, còn muốn hạ cấp thủ công thì **chọn cấp thấp hơn**.
+    /// 🔑 Cấp tự tính dùng **đúng** hàm của sổ khách (`NghiepVuKhach.ChonCapKhach`) — hai định nghĩa
+    /// *"khách thuộc cấp nào"* là mầm của màn hình hiện cấp A còn báo cáo đếm cấp B.
+    /// </summary>
+    [Authorize(eCommerceConsts.Permissions.Customers.Manage)]
+    public async Task<CustomerDetailDto> CapNhatPhanKhachAsync(Guid customerId, CapNhatPhanKhachInput input)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+
+        await using var giuCho = await _khoa.TryAcquireAsync(
+            CustomersConsts.LockKeys.TheoKhach(customerId),
+            TimeSpan.FromSeconds(CustomersConsts.ChoKhoaToiDaGiay))
+            ?? throw new BusinessException(eCommerceConsts.ErrorCodes.KhongGianhDuocKhoa)
+                .WithData("khoa", "customers:customer").WithData("choGiay", CustomersConsts.ChoKhoaToiDaGiay);
+
+        var khach = await _khachRepository.FindAsync(customerId)
+            ?? throw new BusinessException(CustomerErrorCodes.KhongTimThayKhach).WithData("customerId", customerId);
+
+        khach.DatPhanKhach(
+            input.Type, input.LevelId, input.DebtLimit, input.SaleStaffId, input.ReferrerId,
+            input.TaxCode, input.Birthday);
+
+        if (input.LevelId is null)
+        {
+            await XepLaiCapAsync(khach);
+        }
+
+        await _khachRepository.UpdateAsync(khach, autoSave: true);
+
+        Logger.LogInformation(
+            "ĐÃ CẬP NHẬT PHÂN KHÁCH: id={KhachId} · loại={Loai} · cấp={Cap} · hạn mức nợ={HanMuc} · " +
+            "nhân viên={NhanVien}. [WP07-PHAN-KHACH]",
+            khach.Id, khach.Type, khach.LevelId, khach.DebtLimit, khach.SaleStaffId);
+
+        return await GetChiTietAsync(customerId);
+    }
+
+    /// <summary>**LỊCH SỬ CHĂM SÓC** của khách — mới nhất trước (tab "Chăm sóc").</summary>
+    public async Task<List<CustomerCareDto>> GetLichSuChamSocAsync(Guid customerId)
+    {
+        var ds = await _chamSocRepository.GetListAsync(x => x.CustomerId == customerId);
+
+        return ds
+            .OrderByDescending(x => x.OccurredAtUtc)
+            .ThenByDescending(x => x.Id)
+            .Select(x => new CustomerCareDto
+            {
+                Id = x.Id,
+                CustomerId = x.CustomerId,
+                Type = x.Type.ToString(),
+                Content = x.Content,
+                StaffId = x.StaffId,
+                OccurredAtUtc = x.OccurredAtUtc,
+                NextFollowUpAtUtc = x.NextFollowUpAtUtc,
+                CreationTime = x.CreationTime
+            })
+            .ToList();
+    }
+
+    /// <summary>
+    /// **GHI MỘT LẦN CHĂM SÓC** — 🔑 append-only (xem `CustomerCare`): sửa biên bản = **làm lại lịch sử**,
+    /// nên muốn đính chính thì thêm bản ghi mới.
+    /// </summary>
+    [Authorize(eCommerceConsts.Permissions.Customers.Manage)]
+    public async Task<CustomerCareDto> TaoChamSocAsync(Guid customerId, TaoChamSocInput input)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+
+        var khach = await _khachRepository.FindAsync(customerId)
+            ?? throw new BusinessException(CustomerErrorCodes.KhongTimThayKhach).WithData("customerId", customerId);
+
+        var ban = new CustomerCare(
+            GuidGenerator.Create(),
+            khach.Id,
+            input.Type,
+            input.Content,
+            input.OccurredAtUtc ?? Clock.Now,
+            input.StaffId ?? CurrentUser.Id,
+            input.NextFollowUpAtUtc);
+
+        await _chamSocRepository.InsertAsync(ban, autoSave: true);
+
+        // 🔒 Nội dung chăm sóc **có thể là PII** (lời khách nói) ⇒ log chỉ ghi id + loại, KHÔNG ghi nội dung.
+        Logger.LogInformation(
+            "ĐÃ GHI CHĂM SÓC: khách={KhachId} · loại={Loai} · hẹn lại={Hen}. [WP07-CHAM-SOC]",
+            khach.Id, ban.Type, ban.NextFollowUpAtUtc);
+
+        return new CustomerCareDto
+        {
+            Id = ban.Id,
+            CustomerId = ban.CustomerId,
+            Type = ban.Type.ToString(),
+            Content = ban.Content,
+            StaffId = ban.StaffId,
+            OccurredAtUtc = ban.OccurredAtUtc,
+            NextFollowUpAtUtc = ban.NextFollowUpAtUtc,
+            CreationTime = ban.CreationTime
+        };
+    }
+
+    /// <summary>
+    /// 🧮 **ĐỐI CHIẾU SỔ ĐIỂM/CÔNG NỢ CỦA KHÁCH** — trả lời *"vì sao số dư này như vậy"*.
+    ///
+    /// 🚨 **VÌ SAO PHẢI CÓ (không phải màn hình cho đẹp):** `Points`/`AccumulatedAmount`/`DebtBalance` là
+    /// **số dư cộng dồn**. Khi khách khiếu nại *"tôi còn 120 điểm"* thì nhân viên **phải** chỉ ra được
+    /// chứng từ nào đã cộng/trừ. 🔒 Không có đường đối chiếu ⇒ người ta sẽ **sửa tay** số dư, và mất luôn
+    /// khả năng đối chiếu về sau.
+    /// 📌 Hai cờ `TienTichLuyKhop`/`CongNoKhop` là **kết quả kiểm** — 🔑 khi `false`, đó là **cảnh báo thật**
+    /// (dữ liệu lệch), không phải lỗi hiển thị.
+    /// </summary>
+    public async Task<DoiChieuSoDuDto> GetDoiChieuSoDuAsync(Guid customerId)
+    {
+        var khach = await _khachRepository.FindAsync(customerId)
+            ?? throw new BusinessException(CustomerErrorCodes.KhongTimThayKhach).WithData("customerId", customerId);
+
+        var qHoaDon = await _hoaDonBanLeRepository.GetQueryableAsync();
+        var hoaDon = await AsyncExecuter.ToListAsync(
+            qHoaDon.Where(x => x.CustomerId == customerId && x.Status == eCommerce.Pos.RetailBillStatus.Completed)
+                .Select(x => new { x.Subtotal, x.DiscountTotal, x.DebtAmount }));
+
+        var qTra = await _phieuTraRepository.GetQueryableAsync();
+        var tra = await AsyncExecuter.ToListAsync(
+            qTra.Where(x => x.CustomerId == customerId).Select(x => new { x.GoodsAmount }));
+
+        // 🔑 **CÙNG công thức với sổ khách** (`D-45`): `Subtotal − DiscountTotal`, không phải `TotalPayment`.
+        var tongHoaDon = NghiepVuKhach.LamTron(hoaDon.Sum(x => x.Subtotal - x.DiscountTotal));
+        var tongTra = NghiepVuKhach.LamTron(tra.Sum(x => x.GoodsAmount));
+        var tongNo = NghiepVuKhach.LamTron(hoaDon.Sum(x => x.DebtAmount));
+
+        return new DoiChieuSoDuDto
+        {
+            CustomerId = khach.Id,
+            Points = khach.Points,
+            AccumulatedAmount = khach.AccumulatedAmount,
+            DebtLimit = khach.DebtLimit,
+            DebtBalance = khach.DebtBalance,
+            TongHoaDon = tongHoaDon,
+            TongTraHang = tongTra,
+            TongNoHoaDon = tongNo,
+            TienTichLuyKhop = khach.AccumulatedAmount == NghiepVuKhach.LamTron(tongHoaDon - tongTra),
+            CongNoKhop = khach.DebtBalance == tongNo
+        };
+    }
+
+    /// <summary>Áp **mọi bộ lọc trừ tab** — dùng chung cho DS và bộ đếm ⇒ hai bên **không thể lệch**.</summary>
+    private async Task<IQueryable<Customer>> ApDungBoLocKhachAsync(CustomerListInput input, bool boQuaTab = false)
+    {
+        var q = await _khachRepository.GetQueryableAsync();
+
+        if (!string.IsNullOrWhiteSpace(input.Q))
+        {
+            var tu = input.Q.Trim();
+            // 🔒 Không log từ khoá: nó **chính là PII** nếu là email/SĐT (`ADR-11`).
+            q = q.Where(x => x.Name.Contains(tu)
+                             || (x.Email != null && x.Email.Contains(tu))
+                             || (x.Phone != null && x.Phone.Contains(tu))
+                             || (x.TaxCode != null && x.TaxCode.Contains(tu)));
+        }
+
+        if (input.Type is { } loai)
+        {
+            q = q.Where(x => x.Type == loai);
+        }
+
+        if (input.LevelId is { } capId)
+        {
+            q = q.Where(x => x.LevelId == capId);
+        }
+
+        if (input.ConNo == true)
+        {
+            q = q.Where(x => x.DebtBalance > 0m);
+        }
+
+        if (boQuaTab)
+        {
+            return q;
+        }
+
+        var tab = CustomerTabs.Tim(input.Tab);
+
+        if (tab is not null)
+        {
+            return q.Where(tab.Loc);
+        }
+
+        if (!string.IsNullOrWhiteSpace(input.Tab))
+        {
+            throw new BusinessException(CustomerErrorCodes.TabKhongHopLe)
+                .WithData("giaTri", input.Tab)
+                .WithData("lyDo", "Tab không tồn tại trong 5 tab phân khúc của màn khách hàng.");
+        }
+
+        return q;
+    }
+
+    /// <summary>Nạp **một lần** các cấp (bảng cấu hình nhỏ) ⇒ DS khách hiện đúng tên cấp, không N+1.</summary>
+    private async Task<Dictionary<Guid, CustomerLevel>> LayTenCapAsync()
+        => (await _capKhachRepository.GetListAsync()).ToDictionary(x => x.Id);
+
+    private async Task XepLaiCapAsync(Customer khach)
+    {
+        var caps = await LayTenCapAsync();
+
+        khach.XepCap(NghiepVuKhach.ChonCapKhach(
+            caps.Values
+                .Where(x => x.IsActive)
+                .Select(x => new NghiepVuKhach.NguongCapKhach(x.Id, x.MinAccumulatedAmount, x.SortOrder))
+                .ToList(),
+            khach.AccumulatedAmount));
+    }
+
     // ── CHUYỂN ĐỔI ──────────────────────────────────────────────────────────────────────────────
 
-    private static CustomerDto ToDto(Customer k) => new()
+    private static CustomerDto ToDto(Customer k, IReadOnlyDictionary<Guid, CustomerLevel>? caps = null)
     {
-        Id = k.Id,
-        Name = k.Name,
-        Email = k.Email,
-        Phone = k.Phone,
-        IdentityUserId = k.IdentityUserId,
-        Status = k.Status.ToString(),
-        DungDuoc = k.DungDuoc,
-        LaKhachVangLai = k.IdentityUserId is null,
-        CustomerGroupId = k.CustomerGroupId,
-        LifetimeValueAmount = k.LifetimeValueAmount,
-        LifetimeValueCurrency = k.LifetimeValueCurrency,
-        CreationTime = k.CreationTime
-    };
+        var dto = new CustomerDto();
+        SaoChep(k, dto, caps);
+        return dto;
+    }
+
+    /// <summary>
+    /// Chép **entity → DTO** (dùng chung cho `CustomerDto` và `CustomerDetailDto`).
+    /// 🚨 **MỘT chỗ chép**: hai hàm chép riêng là mầm của *"DS khách hiện hạn mức nợ, màn chi tiết thì không"*.
+    /// </summary>
+    private static void SaoChep(Customer k, CustomerDto dto, IReadOnlyDictionary<Guid, CustomerLevel>? caps = null)
+    {
+        dto.Id = k.Id;
+        dto.Name = k.Name;
+        dto.Email = k.Email;
+        dto.Phone = k.Phone;
+        dto.IdentityUserId = k.IdentityUserId;
+        dto.Status = k.Status.ToString();
+        dto.DungDuoc = k.DungDuoc;
+        dto.LaKhachVangLai = k.IdentityUserId is null;
+        dto.CustomerGroupId = k.CustomerGroupId;
+        dto.LifetimeValueAmount = k.LifetimeValueAmount;
+        dto.LifetimeValueCurrency = k.LifetimeValueCurrency;
+        dto.CreationTime = k.CreationTime;
+
+        dto.Type = k.Type.ToString();
+        dto.LevelId = k.LevelId;
+        dto.LevelName = k.LevelId is { } capId && caps is not null && caps.TryGetValue(capId, out var cap)
+            ? cap.Name
+            : null;
+        dto.Points = k.Points;
+        dto.AccumulatedAmount = k.AccumulatedAmount;
+        dto.DebtLimit = k.DebtLimit;
+        dto.DebtBalance = k.DebtBalance;
+
+        // 📌 Cảnh báo **hạ hạn mức sau khi đã nợ** — hợp lệ về nghiệp vụ nhưng phải nhìn thấy được,
+        // nếu không thì màn hình hiện một khoản nợ "bình thường" trong khi nó đã vượt cam kết.
+        dto.VuotHanMucNo = k.DebtLimit > 0m && k.DebtBalance > k.DebtLimit;
+
+        dto.SaleStaffId = k.SaleStaffId;
+        dto.ReferrerId = k.ReferrerId;
+        dto.TaxCode = k.TaxCode;
+        dto.Birthday = k.Birthday;
+    }
 
     /// <summary>Mô tả khách an toàn để ghi log — **CHỈ** qua <see cref="PiiMasker"/> (`ADR-11`).</summary>
     private static string MoTaAnToan(Customer k)

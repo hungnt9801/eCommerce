@@ -15,8 +15,16 @@
         ⇒ ket luan sai ve **SAN PHAM** (bai hoc §97.6 · §98.6 · `sal-006` §21.6 · §22.7 — **BON LAN**);
       • **quen mot buoc** ⇒ 📌 *"tat ca xanh"* nhung thuc ra **chua chay** buoc do — va **khong ai** biet.
 
-    ✅ Script nay gom lai: **mot lenh, nam buoc, exit code that, dung ngay khi hong.**
+    ✅ Script nay gom lai: **mot lenh, nhieu buoc, exit code that, dung ngay khi hong.**
     📌 Va no la **nen cua CI**: khi nao them CI thi chi can goi script nay.
+
+    🆕 **`N10` (`WP-09`) — CONG CO THEM 3 BUOC FE** (truoc do chi kiem .NET ⇒ *nua san pham* trong
+    `apps/admin-web` khong co luoi an toan nao):
+      • **typecheck + unit test (Vitest)** — ham thuan: dinh dang `vi-VN`, BOM/`;` cua CSV, cong thuc tien POS;
+      • **`gen:api` khong lam doi `schema.d.ts`** — hop dong OpenAPI bi sua tay / quen commit;
+      • *(chi voi `-DayDu`)* **Playwright 8 luong** — `tools/e2e.ps1`.
+    📌 Nua **nang** cua drift (controller → `openapi.v1.json`, can Host dang chay) o `tools/kiem-openapi-drift.ps1`
+    + job CI `openapi-drift`; dat o day se bien cong 40s thanh 3 phut moi lan chay.
 
     ══════════════════════════════════════════════════════════════════════════════════════════════════
     🔒 **HAI QUY TAC DO CHINH SCRIPT NAY THI HANH (khong phai loi khuyen):**
@@ -36,7 +44,8 @@
     vi buoc nay **khoi dong Web** (cham, va can cong 5100 trong).
 
 .PARAMETER DayDu
-    Chay **ca** buoc E2E (khoi dong Web + dang nhap that). ⚠️ Cham hon nhieu.
+    Chay **ca** buoc E2E: `kiem-e2e.ps1` (HTML that cua Razor) **va** `tools/e2e.ps1` (Playwright 8 luong Web
+    Admin — `WP-09`). ⚠️ Cham hon nhieu (phai bat Host + Next).
 
 .EXAMPLE
     # Vong lap nhanh trong luc sua
@@ -263,6 +272,73 @@ Buoc 'Tai lieu: kiem khoi mermaid' {
     if ($m.Ma -ne 0) { throw "KIEM MERMAID DO (exit $($m.Ma))." }
 }
 
+# ── BUOC 4b: FE — TYPECHECK + UNIT TEST (`WP-09`) ─────────────────────────────────────────
+Buoc 'FE: typecheck + unit test (Vitest)' {
+    # 🔑 **VI SAO BUOC NAY O DAY (khong phai "chay rieng khi nho"):** `apps/admin-web` la mot nua san pham.
+    # Truoc `N10`, cong chi kiem .NET ⇒ FE sai type hoac hong ham thuan (dinh dang `vi-VN`, BOM CSV, cong
+    # thuc tien POS) **khong** lam cong do. 📌 *"Cong khong chay tu dong thi khong phai cong"* (`XC-007`).
+    Push-Location (Join-Path $goc 'apps\admin-web')
+    try {
+        $tc = ChayLenh 'pnpm' @('run', 'typecheck') 'fe-typecheck.log'
+        if ($tc.Ma -ne 0) {
+            Get-Content $tc.Log | Select-Object -Last 8 | ForEach-Object { "   $_" }
+            throw "TYPECHECK FE DO (exit $($tc.Ma)) — xem $($tc.Log)"
+        }
+        Write-Output '   ✅ typecheck FE (tsc --noEmit): 0 loi.'
+
+        $ut = ChayLenh 'pnpm' @('run', 'test') 'fe-unit.log'
+        $tong = Select-String -Path $ut.Log -Pattern 'Tests\s+\d+ passed|Tests\s+\d+ failed' |
+            Select-Object -First 1
+
+        if ($tong) { Write-Output ("   {0}" -f $tong.Line.Trim()) }
+
+        if ($ut.Ma -ne 0) {
+            Select-String -Path $ut.Log -Pattern 'FAIL|AssertionError|Error' | Select-Object -First 10 |
+                ForEach-Object { "   $($_.Line.Trim())" }
+            throw "UNIT TEST FE DO (exit $($ut.Ma)) — xem $($ut.Log)"
+        }
+    }
+    finally {
+        Pop-Location
+    }
+}
+
+# ── BUOC 4c: FE — HOP DONG OPENAPI KHONG LECH (`WP-09`) ────────────────────────────────────
+Buoc 'FE: gen:api khong lam doi schema.d.ts (hop dong OpenAPI)' {
+    # 🚨 **VI SAO LA "SINH LAI ROI SO", KHONG PHAI `git diff`:** working tree co the dang co thay doi hop le
+    # **chua commit** ⇒ so voi `HEAD` se bao "lech" vo nghia. O day: sinh lai tu **snapshot da commit** roi so
+    # **truoc/sau** ⇒ chi bao khi `schema.d.ts` **khong khop** voi `openapi.v1.json`.
+    # 📌 Day la nua **re** cua cong drift (khong can Host). Nua **nang** (controller → snapshot can Host dang
+    # chay) nam o `tools/kiem-openapi-drift.ps1` + job CI `openapi-drift`.
+    $schema = Join-Path $goc 'packages\api-client\src\schema.d.ts'
+
+    if (-not (Test-Path $schema)) { throw "Thieu $schema — chay 'pnpm gen:api'." }
+
+    $truoc = (Get-FileHash -Path $schema -Algorithm SHA256).Hash
+
+    Push-Location $goc
+    try {
+        $g = ChayLenh 'pnpm' @('run', 'gen:api') 'fe-gen-api.log'
+    }
+    finally {
+        Pop-Location
+    }
+
+    $sau = (Get-FileHash -Path $schema -Algorithm SHA256).Hash
+
+    if ($g.Ma -ne 0) {
+        Get-Content $g.Log | Select-Object -Last 8 | ForEach-Object { "   $_" }
+        throw "GEN API DO (exit $($g.Ma)) — xem $($g.Log)"
+    }
+
+    if ($truoc -ne $sau) {
+        throw ('OPENAPI DRIFT: schema.d.ts DOI khi sinh lai tu openapi.v1.json ⇒ hop dong da bi sua tay ' +
+            'hoac chua commit. Chay lai roi COMMIT schema.d.ts (do la hop dong, khong phai rac build).')
+    }
+
+    Write-Output '   ✅ schema.d.ts khop openapi.v1.json (sinh lai: KHONG doi).'
+}
+
 # ── BUOC 5: BAT BIEN DB ────────────────────────────────────────────────────────────────────
 Buoc 'Bat bien DB (khong con dau vet thu nghiem)' {
     # 🔑 **BUOC NAY TON TAI VI "QUEN KIEM DB" LA BUOC DE QUEN NHAT.** Moi vong lam viec toi van kiem DB
@@ -459,6 +535,116 @@ if ($DayDu -and -not $BoQuaE2E) {
         }
 
         Write-Output '   ✅ DUONG CHAY THAT: moi ca don san DAT.'
+    }
+
+    # ── BUOC 13: OVERSELL — HAI REQUEST DONG THOI (GD1 #2) ─────────────────────────────────────
+    Buoc 'Oversell: HAI request DONG THOI (GD1 #2 — khong ban vuot ton)' {
+        # 🔑 **VÌ SAO BƯỚC NÀY TỒN TẠI:** cổng nghiệm thu GĐ1 #2 nói *"bán vượt tồn kho là không thể —
+        # có test **2 request đồng thời, 2 instance**"*. 📌 Trước 24/10/2026 **không có** phép đo nào
+        # (`grep Task.WhenAll|Parallel.|Start-Job` trong `test/`+`tools/` = **0**) ⇒ tuyên bố đó chỉ là
+        # **niềm tin**. `probe-oversell.ps1` bắn **hai** `POST tinh-va-giu-cho` **cùng lúc** trên SKU
+        # `OnHand = 1` và đọc DB: 🔒 đúng **MỘT** lượt giữ chỗ, `Reserved <= OnHand`, `Available = 0`.
+        # ⚠️ Chạy **sau** bước ⑫ để không tranh cổng 5000 với probe đơn sàn (mỗi probe tự bật/tắt Host).
+        $p = ChayLenh 'pwsh' @('-NoProfile', '-File', (Join-Path $PSScriptRoot 'probe-oversell.ps1')) 'oversell.log'
+
+        Get-Content $p.Log | Where-Object { $_ -match 'DAT|HONG|PROBE OVERSELL' } |
+            Select-Object -First 20 | ForEach-Object { "   $_" }
+
+        if ($p.Ma -ne 0) {
+            Get-Content $p.Log | Select-String 'HONG|NGOAI LE' -Context 0,3 |
+                ForEach-Object { $_.Context.PostContext | ForEach-Object { "   $_" } }
+            throw "PROBE OVERSELL DO (exit $($p.Ma)) — xem log: $($p.Log)."
+        }
+
+        Write-Output '   ✅ CHONG OVERSELL: hai request dong thoi ⇒ chi MOT giu duoc cho.'
+    }
+
+    # ── BUOC 14: OUTBOX — "process chet ⇒ event con ⇒ restart phat lai" ─────────────────────────
+    Buoc 'Outbox: process CHET sau commit ⇒ event CON ⇒ restart PHAT LAI (GD1 #5)' {
+        # 📌 Bằng chứng cho cổng #5 (*"không mất event"*): bảng outbox **có** chưa đủ — phải đo đúng kịch bản
+        # commit rồi process chết. Probe tạm đặt nhịp relay **600 s** (núm `AbpEventBusBoxes:PeriodSeconds`),
+        # tạo event, giết Host, khẳng định row **còn**, rồi restart nhịp 2 s và khẳng định row **biến mất**
+        # + `AbpEventInbox` tăng. ⚠️ Chạy sau ⑬ để không tranh cổng 5000.
+        $p = ChayLenh 'pwsh' @('-NoProfile', '-File', (Join-Path $PSScriptRoot 'probe-outbox.ps1')) 'outbox.log'
+
+        Get-Content $p.Log | Where-Object { $_ -match 'DAT|HONG|PROBE OUTBOX' } |
+            Select-Object -First 20 | ForEach-Object { "   $_" }
+
+        if ($p.Ma -ne 0) {
+            Get-Content $p.Log | Select-String 'HONG|NGOAI LE' -Context 0,3 |
+                ForEach-Object { $_.Context.PostContext | ForEach-Object { "   $_" } }
+            throw "PROBE OUTBOX DO (exit $($p.Ma)) — xem log: $($p.Log)."
+        }
+
+        Write-Output '   ✅ KHONG MAT EVENT: process chet sau commit ⇒ event con ⇒ restart phat lai.'
+    }
+
+    # ── BUOC 15: OUTBOX 2 INSTANCE — hai Host cùng DB/Redis, cùng relay ────────────────────────
+    Buoc 'Outbox 2 INSTANCE: hai Host cung relay ⇒ mot event, mot dong inbox' {
+        # 📌 Nợ cuối của P0 #3. Hai Host (5000 + 5001) cùng DB + Redis; tạo event bằng relay 600 s,
+        # rồi bật **cả hai** relay 2 s. Khẳng định: outbox dọn + event có **đúng một** dòng inbox.
+        # ⚠️ Giới hạn: "một dòng inbox" chứng minh hai relay **phối hợp**, không chứng minh handler
+        # chạy một lần nếu handler không ghi inbox — xem đầu tệp probe.
+        $p = ChayLenh 'pwsh' @('-NoProfile', '-File', (Join-Path $PSScriptRoot 'probe-outbox-2instance.ps1')) 'outbox2.log'
+
+        Get-Content $p.Log | Where-Object { $_ -match 'DAT|HONG|PROBE OUTBOX 2' } |
+            Select-Object -First 20 | ForEach-Object { "   $_" }
+
+        if ($p.Ma -ne 0) {
+            Get-Content $p.Log | Select-String 'HONG|NGOAI LE' -Context 0,3 |
+                ForEach-Object { $_.Context.PostContext | ForEach-Object { "   $_" } }
+            throw "PROBE OUTBOX 2 INSTANCE DO (exit $($p.Ma)) — xem log: $($p.Log)."
+        }
+
+        Write-Output '   ✅ HAI INSTANCE PHOI HOP: outbox don, mot event ⇒ mot dong inbox.'
+    }
+
+    # ── BUOC 16: GIU CHO 2 INSTANCE — hai Host cùng giu MOT mon hang ───────────────────────────
+    Buoc 'Giu cho 2 INSTANCE: hai Host cung DB/Redis ⇒ khong ai giu duoc cung mot mon' {
+        # 📌 **NO CUOI CUA CONG #2** (checklist §7 cua ban giao): buoc ⑬ do hai request dong thoi tren
+        # **MOT** Host — 🔑 do la ca DE: mot khoa kieu in-memory cung du de no xanh. Cau hoi cua cong la
+        # *"hai TIEN TRINH co cung ton trong mot cho khong?"* ⇒ probe nay chay **hai** Host (5000+5001)
+        # va ban 1 request vao MOI Host cung luc.
+        # 🔒 Co ca CHIEU NGUOC: doi DUY NHAT `OnHand = 2` ⇒ **CA HAI** phai thanh cong. Khong co ca do thi
+        # mot probe "luon bao mot thang" (vi du moi request deu bi tu choi vi ly do khac) van XANH.
+        # ⚠️ Chay sau ⑮ de khong tranh cong 5000/5001 voi probe outbox 2 instance.
+        $p = ChayLenh 'pwsh' @('-NoProfile', '-File', (Join-Path $PSScriptRoot 'probe-giu-cho-2instance.ps1')) 'giu-cho-2inst.log'
+
+        Get-Content $p.Log | Where-Object { $_ -match 'DAT|HONG|PROBE GIU CHO 2' } |
+            Select-Object -First 24 | ForEach-Object { "   $_" }
+
+        if ($p.Ma -ne 0) {
+            Get-Content $p.Log | Select-String 'HONG|NGOAI LE' -Context 0,3 |
+                ForEach-Object { $_.Context.PostContext | ForEach-Object { "   $_" } }
+            throw "PROBE GIU CHO 2 INSTANCE DO (exit $($p.Ma)) — xem log: $($p.Log)."
+        }
+
+        Write-Output '   ✅ KHONG BAN VUOT TON XUYEN TIEN TRINH: hai instance, mot mon ⇒ dung MOT giu duoc cho.'
+    }
+
+    # ── BUOC 17: WEB ADMIN E2E — PLAYWRIGHT 8 LUONG (`WP-09`) ────────────────────────────────────
+    Buoc 'Web Admin E2E: 8 luong Playwright (WP-09)' {
+        # 🔑 **VI SAO PHAI LA BUOC CUA CONG (khong phai "luc nao ranh thi chay"):** 8 luong nay do dung thu ma
+        # **khong lop test nao khac do duoc** — form dang nhap -> server action -> cookie httpOnly, POS mo ca
+        # -> ban -> in -> ket ca, doi trang thai don tren du lieu that, va CSV tai ve (BOM + dau `;`).
+        # 📌 `web-001` §97 da tra gia dung mot lan: *"probe tay thi lan sau khong ai chay"*.
+        # ⚠️ Chay CUOI CUNG: `tools/e2e.ps1` **giet** tien trinh tren cong 3000/54275 de bat build hien tai
+        # ⇒ khong duoc de no chay truoc cac probe dang dung Host.
+        $e = ChayLenh 'pwsh' @('-NoProfile', '-File', (Join-Path $PSScriptRoot 'e2e.ps1')) 'e2e-playwright.log'
+
+        # 🚨 `WP-12` (`N13`): `Get-Content` tra ve **CHUOI**, khong phai `MatchInfo` (nhu `Select-String`)
+        # ⇒ `$_.Line` la `$null` ⇒ `.Trim()` NEM. Loi nay **chua bao gio lo** vi truoc `N12` cong luon
+        # dung o buoc ⑧/⑭ ⇒ buoc ⑰ (Playwright) chua tung chay qua duong in nay.
+        Get-Content $e.Log | Where-Object { $_ -match '^\s+(ok|✘|×)\s+\d|passed|failed|✅ E2E|🚨' } |
+            Select-Object -First 30 | ForEach-Object { "   $($_.Trim())" }
+
+        if ($e.Ma -ne 0) {
+            Get-Content $e.Log | Select-String 'Error:|failed|✘|×' | Select-Object -First 12 |
+                ForEach-Object { "   $($_.Line.Trim())" }
+            throw "E2E PLAYWRIGHT DO (exit $($e.Ma)) — xem log: $($e.Log)."
+        }
+
+        Write-Output '   ✅ 8/8 luong E2E: dang nhap · tao SP · nhap kho · ban le · in · doi trang thai · ket ca · CSV.'
     }
 }
 elseif (-not $BoQuaE2E -and -not $DayDu) {

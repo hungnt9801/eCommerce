@@ -15,6 +15,12 @@
          cua app chinh (se la **vong**: `eCommerce.Application` **da** tham chieu `Customers.Application`).
          ➕ Va `XuatDuLieuCaNhanAsync` la ham **doc-thuan** — 📌 goi repo truc tiep la **dung muc**. -->
     <ProjectReference Include="..\..\..\src\eCommerce.Domain\eCommerce.Domain.csproj" />
+    <!-- 🆕 `WP-07` — **CHI TIẾT KHÁCH phải đối chiếu được với HOÁ ĐƠN BÁN LẺ** (tab *"Công nợ"* +
+         `DoiChieuSoDuDto`). 📌 Chỉ tham chiếu tầng **Domain** của `Pos` (entity `RetailBill`/`RetailReturn`),
+         **không** tham chiếu `Pos.Application` — gọi app service của module khác là đi qua `[Authorize]` +
+         phạm vi dữ liệu, và màn chi tiết khách sẽ **rỗng** với nhân viên bị giới hạn phạm vi.
+         🔒 **KHÔNG có vòng:** `Pos.Domain` chỉ trỏ `Domain.Shared` + `Kernel` (xem `PosDomainModule`). -->
+    <ProjectReference Include="..\..\Pos\eCommerce.Pos.Domain\eCommerce.Pos.Domain.csproj" />
   </ItemGroup>
 
   <ItemGroup>

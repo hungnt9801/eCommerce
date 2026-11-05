@@ -36,6 +36,24 @@ public interface IDeadLetterAppService
 
     /// <summary>Đếm nhanh theo lý do — 🔒 dùng cho **bảng điều khiển**: *"còn tồn bao nhiêu, vì sao"*.</summary>
     Task<ThongKeDlqDto> GetThongKeAsync();
+
+    /// <summary>
+    /// 🚨 **PHÁT LẠI SỰ KIỆN LÊN BUS** (`S16b`) — *"replay"* ở dự án này nghĩa là **publish lại event gốc**,
+    /// **KHÔNG** phải *"đánh dấu đã xử lý"*.
+    ///
+    /// 🔒 **Ba bất biến:**
+    /// <list type="number">
+    ///   <item>**Một lần duy nhất** cho mỗi dòng DLQ (`ReplayedAtUtc`); lần thứ hai trả DTO **bỏ qua**
+    ///     (`DaPhatLai = false` + lý do), **không** publish, **không** tăng metric;</item>
+    ///   <item>**Cùng UoW**: cập nhật dòng DLQ + ghi **outbox** nằm trong **một** transaction ⇒ 🔑 không
+    ///     *"đã đánh dấu nhưng event mất"* và không *"event đã đi mà dấu không có"*;</item>
+    ///   <item>**Fail-closed**: `TenSuKien` không ánh xạ được **hoặc** payload không deserialize được ⇒
+    ///     **NÉM** (`eCommerce:Messaging:0009`/`0010`), **không** publish một event *"đoán"*.</item>
+    /// </list>
+    /// ⚠️ **KHÔNG xoá dòng DLQ** sau khi phát lại — dòng đó là **bằng chứng** sự kiện từng hỏng.
+    /// 🔐 Quyền **riêng** `eCommerce.Operations.DeadLetters.Replay` (tách khỏi quyền đọc).
+    /// </summary>
+    Task<PhatLaiDlqKetQuaDto> PhatLaiAsync(Guid id);
 }
 
 /// <summary>Bộ lọc danh sách DLQ.</summary>
@@ -142,4 +160,33 @@ public class ThongKeDlqDto
 
     /// <summary>Số dòng **chưa xử lý** theo từng lý do.</summary>
     public Dictionary<string, int> TheoLyDo { get; set; } = [];
+}
+
+/// <summary>
+/// 🚨 **KẾT QUẢ PHÁT LẠI MỘT DÒNG DLQ** (`S16b`) — trả về **cả khi phát lại** và **cả khi bỏ qua**.
+///
+/// 🔑 **VÌ SAO PHẢI TRẢ KẾT QUẢ THAY VÌ `void`/`204`:** câu hỏi của người bấm là *"lần bấm này có gửi event
+/// đi không?"*. Nếu API trả rỗng thì hai tình huống **rất khác nhau** — *"đã gửi"* và *"đã gửi trước đó nên
+/// lần này không gửi"* — **trông giống hệt nhau** ⇒ 📌 người trực tưởng đã gửi hai lần (hoặc tưởng lần bấm
+/// hỏng) và **hành động sai**. Vì vậy <see cref="DaPhatLai"/> = *"lần gọi NÀY đã publish"*, còn
+/// <see cref="PhatLaiLucUtc"/> = *"mốc phát lại (duy nhất) của dòng"*.
+/// </summary>
+public class PhatLaiDlqKetQuaDto : EntityDto<Guid>
+{
+    public string TenSuKien { get; set; } = default!;
+
+    /// <summary>🔑 `true` = **lần gọi này** đã publish event lên bus; `false` = **bỏ qua** (xem <see cref="LyDo"/>).</summary>
+    public bool DaPhatLai { get; set; }
+
+    /// <summary>Lý do dạng chữ — 🔒 **luôn có**, kể cả khi thành công (để log/audit không phải suy diễn).</summary>
+    public string LyDo { get; set; } = default!;
+
+    /// <summary>Mốc phát lại **đã ghi trong DB** (`ReplayedAtUtc`) — `null` nếu chưa từng phát lại.</summary>
+    public DateTime? PhatLaiLucUtc { get; set; }
+
+    /// <summary>Số lần đã phát lại thành công (luật hiện hành: tối đa **1**).</summary>
+    public int SoLanPhatLai { get; set; }
+
+    /// <summary>Dòng DLQ đã được đánh dấu xử lý chưa (phát lại thành công ⇒ `true`).</summary>
+    public bool DaXuLy { get; set; }
 }

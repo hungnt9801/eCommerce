@@ -11,6 +11,42 @@
     <Project Path="modules/Customers/eCommerce.Customers.Application.Contracts/eCommerce.Customers.Application.Contracts.csproj" />
     <Project Path="modules/Customers/eCommerce.Customers.Domain/eCommerce.Customers.Domain.csproj" />
     <Project Path="modules/Customers/eCommerce.Customers.EntityFrameworkCore/eCommerce.Customers.EntityFrameworkCore.csproj" />
+  </Folder>
+  <Folder Name="/modules/Sales/">
+    <Project Path="modules/Sales/eCommerce.Sales.Application/eCommerce.Sales.Application.csproj" />
+    <Project Path="modules/Sales/eCommerce.Sales.Application.Contracts/eCommerce.Sales.Application.Contracts.csproj" />
+    <Project Path="modules/Sales/eCommerce.Sales.Domain/eCommerce.Sales.Domain.csproj" />
+    <Project Path="modules/Sales/eCommerce.Sales.EntityFrameworkCore/eCommerce.Sales.EntityFrameworkCore.csproj" />
+  </Folder>
+  <Folder Name="/modules/Pos/">
+    <Project Path="modules/Pos/eCommerce.Pos.Application.Contracts/eCommerce.Pos.Application.Contracts.csproj" />
+    <Project Path="modules/Pos/eCommerce.Pos.Application/eCommerce.Pos.Application.csproj" />
+    <Project Path="modules/Pos/eCommerce.Pos.Domain/eCommerce.Pos.Domain.csproj" />
+    <Project Path="modules/Pos/eCommerce.Pos.EntityFrameworkCore/eCommerce.Pos.EntityFrameworkCore.csproj" />
+  </Folder>
+  <Folder Name="/modules/Reporting/">
+    <Project Path="modules/Reporting/eCommerce.Reporting.Application/eCommerce.Reporting.Application.csproj" />
+    <Project Path="modules/Reporting/eCommerce.Reporting.Application.Contracts/eCommerce.Reporting.Application.Contracts.csproj" />
+    <Project Path="modules/Reporting/eCommerce.Reporting.Domain/eCommerce.Reporting.Domain.csproj" />
+    <Project Path="modules/Reporting/eCommerce.Reporting.EntityFrameworkCore/eCommerce.Reporting.EntityFrameworkCore.csproj" />
+  </Folder>
+  <Folder Name="/modules/Reconciliation/">
+    <Project Path="modules/Reconciliation/eCommerce.Reconciliation.Application/eCommerce.Reconciliation.Application.csproj" />
+    <Project Path="modules/Reconciliation/eCommerce.Reconciliation.Application.Contracts/eCommerce.Reconciliation.Application.Contracts.csproj" />
+    <Project Path="modules/Reconciliation/eCommerce.Reconciliation.Domain/eCommerce.Reconciliation.Domain.csproj" />
+    <Project Path="modules/Reconciliation/eCommerce.Reconciliation.EntityFrameworkCore/eCommerce.Reconciliation.EntityFrameworkCore.csproj" />
+  </Folder>
+  <Folder Name="/modules/Inventory/">
+    <Project Path="modules/Inventory/eCommerce.Inventory.Application/eCommerce.Inventory.Application.csproj" />
+    <Project Path="modules/Inventory/eCommerce.Inventory.Application.Contracts/eCommerce.Inventory.Application.Contracts.csproj" />
+    <Project Path="modules/Inventory/eCommerce.Inventory.Domain/eCommerce.Inventory.Domain.csproj" />
+    <Project Path="modules/Inventory/eCommerce.Inventory.EntityFrameworkCore/eCommerce.Inventory.EntityFrameworkCore.csproj" />
+  </Folder>
+  <Folder Name="/modules/Catalog/">
+    <Project Path="modules/Catalog/eCommerce.Catalog.Application/eCommerce.Catalog.Application.csproj" />
+    <Project Path="modules/Catalog/eCommerce.Catalog.Application.Contracts/eCommerce.Catalog.Application.Contracts.csproj" />
+    <Project Path="modules/Catalog/eCommerce.Catalog.Domain/eCommerce.Catalog.Domain.csproj" />
+    <Project Path="modules/Catalog/eCommerce.Catalog.EntityFrameworkCore/eCommerce.Catalog.EntityFrameworkCore.csproj" />
   </Folder>  <Folder Name="/modules/ChannelHub/">
     <Project Path="modules/ChannelHub/eCommerce.ChannelHub.Application.Contracts/eCommerce.ChannelHub.Application.Contracts.csproj" />
     <Project Path="modules/ChannelHub/eCommerce.ChannelHub.Application/eCommerce.ChannelHub.Application.csproj" />
@@ -57,6 +93,7 @@
     <Project Path="src/eCommerce.Domain.Shared/eCommerce.Domain.Shared.csproj" />
     <Project Path="src/eCommerce.Domain/eCommerce.Domain.csproj" />
     <Project Path="src/eCommerce.EntityFrameworkCore/eCommerce.EntityFrameworkCore.csproj" />
+    <Project Path="src/eCommerce.HttpApi/eCommerce.HttpApi.csproj" />
     <Project Path="src/eCommerce.HttpApi.Host/eCommerce.HttpApi.Host.csproj" />
     <Project Path="src/eCommerce.Web/eCommerce.Web.csproj" />
   </Folder>

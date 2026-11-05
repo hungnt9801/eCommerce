@@ -1,0 +1,54 @@
+# 🚨 `WP-10` — `.dockerignore` cho **CẢ repo** (vì build context của `apps/admin-web/Dockerfile` là gốc repo).
+#
+# 🔑 VÌ SAO PHẢI CÓ: không có tệp này, Docker gửi **toàn bộ** ngữ cảnh sang daemon mỗi lần build —
+# đo trên máy dev: `node_modules` 579 MB + `src` 261 MB + `test` 69 MB + `modules` 55 MB + `.git` 38 MB
+# ≈ **1 GB**. Build chậm, và tệ hơn: `node_modules` của **Windows** bị copy vào image Linux ⇒
+# `pnpm install` nhìn thấy `node_modules` có sẵn và bỏ qua ⇒ image thiếu binary Linux (`@next/swc-linux-*`).
+#
+# 📌 Image chỉ cần: `pnpm-workspace.yaml`, `pnpm-lock.yaml`, `package.json` gốc,
+#    `apps/admin-web/**`, `packages/api-client/**`. Mọi thứ khác là trọng lượng.
+
+# ── Dependency / output của mọi ngôn ngữ ────────────────────────────────────────────────────────────
+**/node_modules
+**/.next
+**/bin
+**/obj
+**/tsconfig.tsbuildinfo
+
+# ── Nguồn .NET (Host/Web/modules) — image Next không dùng ───────────────────────────────────────────
+src
+modules
+shared
+test
+eCommerce.slnx
+Directory.*.props
+Directory.*.targets
+NuGet.config
+*.sln
+*.slnx
+
+# ── Rác khảo sát / tài liệu / log ──────────────────────────────────────────────────────────────────
+.git
+.gitignore
+.vs
+.vscode
+.idea
+artifacts
+docs
+*.log
+_*.log
+.tmp*
+tools/_tam-kiem
+tools/_tam-e2e
+tools/_tam-diachi
+apps/admin-web/e2e/.run
+
+# ── BÍ MẬT: không bao giờ đưa `.env*` thật vào image ───────────────────────────────────────────────
+# 📌 `*.example` KHÔNG khớp mẫu dưới ⇒ `.env.example` vẫn được phép (nó không chứa bí mật thật).
+**/.env
+**/.env.*
+!**/.env.example
+
+# ── Git / editor / hệ điều hành ────────────────────────────────────────────────────────────────────
+**/.DS_Store
+**/Thumbs.db

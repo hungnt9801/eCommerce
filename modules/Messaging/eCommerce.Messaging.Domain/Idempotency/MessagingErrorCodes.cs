@@ -33,4 +33,23 @@ public static class MessagingErrorCodes
     /// <summary>🚨 **KHÔNG TÌM THẤY** bản ghi (DLQ / bản ghi idempotency) — `0007`.
     /// 📌 Tách khỏi `0006` vì chỉ dẫn khác hẳn: *"kiểm lại khoá / dữ liệu đã bị xoá"*.</summary>
     public const string KhongTimThay = "eCommerce:Messaging:0007";
+
+    /// <summary>🚨 **DÒNG DLQ ĐÃ ĐƯỢC PHÁT LẠI** — `0008`.
+    /// 🔑 Mỗi dòng chỉ được phát lại **một lần** (`ReplayedAtUtc`). 📌 Đây là **hàng rào cuối ở entity**:
+    /// app service đã kiểm trước và trả DTO *"bỏ qua"*; mã này chỉ nổ khi có **đường gọi khác** cố phát lại
+    /// lần hai ⇒ 🔒 không im lặng, vì im lặng ở đây nghĩa là **consumer nhận trùng**.</summary>
+    public const string DaPhatLai = "eCommerce:Messaging:0008";
+
+    /// <summary>🚨 **KHÔNG ÁNH XẠ ĐƯỢC `TenSuKien` SANG LOẠI THẬT** — `0009`.
+    /// 📌 Dùng chung cho *"không tìm thấy"* **và** *"nhập nhằng (≥ 2 loại cùng tên ngắn)"*: cả hai đều là
+    /// *"tôi KHÔNG biết chắc payload này là gì"* ⇒ 🔒 **FAIL-CLOSED**: **NÉM**, **không** publish một event
+    /// *"đoán"* (publish sai kiểu = consumer nhận dữ liệu vô nghĩa mà **không có lỗi nào** báo).</summary>
+    public const string KhongXacDinhDuocLoaiSuKien = "eCommerce:Messaging:0009";
+
+    /// <summary>🚨 **PAYLOAD KHÔNG DESERIALIZE ĐƯỢC VỀ LOẠI SỰ KIỆN** — `0010`.
+    /// 📌 Khác `0005` (*"payload không phải JSON"*): ở đây JSON **hợp lệ** nhưng **không khớp** loại đã ánh xạ
+    /// (ví dụ thiếu trường bắt buộc, sai kiểu). ⇒ 🔒 Vẫn **FAIL-CLOSED**, **không** publish.
+    /// 🔑 Vì sao không dùng `0005`: chỉ dẫn cho người trực **khác nhau** — *"sửa JSON"* vs *"kiểm lại
+    /// `TenSuKien`/hợp đồng ETO"*.</summary>
+    public const string PayloadKhongKhopLoaiSuKien = "eCommerce:Messaging:0010";
 }

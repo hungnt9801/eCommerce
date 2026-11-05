@@ -2047,8 +2047,9 @@ dữ liệu cũ (0/1/2) **không bị diễn giải lại**.
 - SKU **không thuộc đơn** ⇒ **NÉM** (nếu im lặng bỏ qua thì khách tưởng đã trả mà hệ thống **không ghi gì**).
 - **Trạng thái:** chỉ `Returned` khi **đã trả HẾT**; trả một phần **giữ `Confirmed`**.
 
-⚠️ **GHI NHẬN (chưa xử lý):** chưa có trạng thái `PartiallyReturned` ⇒ **đơn trả một phần trông NHƯ đơn chưa trả gì**.
-Cần trạng thái/cờ riêng — **không** tự bịa trạng thái mới vì nó **đổi hợp đồng API** (cần người quyết).
+✅ **ĐÃ XỬ LÝ (29/10/2026):** `PartiallyReturned` **đã có từ `SAL-006` §35 (29/10/2026)** —
+`ReturnStatus.PartiallyReturned = 6` **append ở cuối dải** ⇒ **đơn trả một phần KHÔNG còn trông NHƯ đơn chưa trả gì**;
+*"đã trả một phần"* đọc ở `ReturnStatus` (`OrderStatus` tổng thể vẫn `Completed` — xem `SAL-003` §3, cạnh 31/32).
 
 ### 32.2 ✅ Phần **ĐÃ** kiểm chứng (HTTP thật)
 

@@ -50,6 +50,11 @@
     <ProjectReference Include="..\..\modules\PaymentHub\eCommerce.PaymentHub.Application\eCommerce.PaymentHub.Application.csproj" />
     <ProjectReference Include="..\..\modules\Tax\eCommerce.Tax.Domain\eCommerce.Tax.Domain.csproj" />
     <ProjectReference Include="..\..\modules\Pricing\eCommerce.Pricing.Domain\eCommerce.Pricing.Domain.csproj" />
+    <!-- 🆕 `WP-08` — test **lõi báo cáo** dựng chứng từ THẬT (`RetailBill`, `Order`) rồi so tổng báo cáo với
+         tổng tính độc lập từ chứng từ (DoD `WP-08`). Cần tầng Application của `Reporting` (hàm ánh xạ) và
+         `eCommerce.HttpApi` (hợp đồng route/quyền của controller `/api/v1/reports`). -->
+    <ProjectReference Include="..\..\modules\Reporting\eCommerce.Reporting.Application\eCommerce.Reporting.Application.csproj" />
+    <ProjectReference Include="..\..\src\eCommerce.HttpApi\eCommerce.HttpApi.csproj" />
   </ItemGroup>
 
   <ItemGroup>

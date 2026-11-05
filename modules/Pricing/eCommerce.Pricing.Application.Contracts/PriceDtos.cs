@@ -182,3 +182,40 @@ public class ResolveManyInput
     [MinLength(1)]
     public List<ResolvePriceInput> Items { get; set; } = new();
 }
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════
+// `S12` — GIÁ VỐN (`PRC-001` §5.2/§6.1, `PrcCostPrices`)
+// ══════════════════════════════════════════════════════════════════════════════════════════════════
+
+/// <summary>
+/// 🚨 **GIÁ VỐN — DỮ LIỆU NỘI BỘ** (`PRC-001` **BR-013**).
+///
+/// 📌 **VÌ SAO KHÔNG đặt DTO này trong `PriceDtos` của luồng bán:** nó **không** được trả cho người mua.
+/// Quy tắc bảo vệ gồm ba lớp: (a) quyền riêng `eCommerce.Pricing.CostPrice.View`; (b) **không** app service
+/// công khai nào (storefront) tham chiếu tới nó — `StorefrontCongKhaiTests` quét nguồn; (c) E2E `S8-W3`
+/// khẳng định **giá trị giá vốn cụ thể** không xuất hiện trong HTML công khai.
+/// </summary>
+public class CostPriceDto
+{
+    public Guid Id { get; set; }
+
+    public string Sku { get; set; } = default!;
+
+    /// <summary>Giá vốn (đi kèm <see cref="CurrencyCode"/> — `PRC-001` **BR-001**).</summary>
+    public decimal Amount { get; set; }
+
+    public string CurrencyCode { get; set; } = default!;
+
+    /// <summary>Ngày bắt đầu hiệu lực (`date`, không phải thời điểm — `PRC-001` **D4**).</summary>
+    public DateOnly EffectiveFrom { get; set; }
+
+    /// <summary>`NULL` = vô thời hạn.</summary>
+    public DateOnly? EffectiveTo { get; set; }
+
+    /// <summary>Người duyệt (`NULL` = **chưa duyệt** — giá vốn chưa duyệt không dùng tính lãi gộp).</summary>
+    public Guid? ApprovedBy { get; set; }
+
+    public DateTime? ApprovedAtUtc { get; set; }
+
+    public bool DaDuyet { get; set; }
+}

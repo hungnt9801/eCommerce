@@ -66,6 +66,14 @@ public static class eCommerceConsts
         {
             public const string Default = GroupName + ".Inventory";
             public const string Adjust = Default + ".Adjust";
+
+            /// <summary>🆕 `S13` — **cấp/sửa ngân sách tồn theo kênh** (`INV-003`). Quyền riêng vì nó
+            /// quyết định **kênh được bán bao nhiêu**; tách khỏi `Adjust` (điều chỉnh tồn kho thật).</summary>
+            public const string AllotmentManage = Default + ".Allotment.Manage";
+
+            /// <summary>🆕 `S13` — **đóng băng / mở / nhả** ngân sách. 🔒 Nhả làm kênh **hết hàng ngay**
+            /// ⇒ không gộp vào `AllotmentManage` (đặc quyền tối thiểu).</summary>
+            public const string AllotmentRelease = Default + ".Allotment.Release";
         }
 
         public static class Channels
@@ -81,6 +89,17 @@ public static class eCommerceConsts
         {
             public const string Default = GroupName + ".Orders";
             public const string Manage = Default + ".Manage";
+
+            // 🆕 `SAL-003` §9 (24/10/2026) — 6 quyền của **state machine đơn hàng**.
+            // 🚨 BẮT BUỘC khai ở **CẢ HAI NƠI** (hằng số + `eCommercePermissionDefinitionProvider`):
+            // thiếu một nơi ⇒ `403` cho MỌI người kể cả `admin` (lỗi Phase 0, `XC-004` D2/E3).
+            // 📌 Tách theo **trục + hành động**: đổi trạng thái thực hiện ≠ đối soát ≠ duyệt trả ≠ huỷ.
+            public const string StatusChange = Default + ".StatusChange";
+            public const string ReconcileManage = Default + ".Reconciliation.Manage";
+            public const string ReturnRequest = Default + ".Return.Request";
+            public const string ReturnApprove = Default + ".Return.Approve";
+            public const string Cancel = Default + ".Cancel";
+            public const string HistoryView = Default + ".History.View";
         }
 
         public static class Payments
@@ -204,6 +223,22 @@ public static class eCommerceConsts
             /// <summary>Đọc + đánh dấu đã xử lý một dòng DLQ. 📌 Tách riêng khỏi `Default` khi nào có nhu cầu
             /// *"chỉ xem, không sửa"* — hiện **chưa** cần, nên **không** thêm (tránh quyền **chết**).</summary>
             public const string DeadLetters = Default + ".DeadLetters";
+
+            /// <summary>
+            /// 🚨 **PHÁT LẠI MỘT DÒNG DLQ LÊN BUS** (`S16b`) — tên đầy đủ `eCommerce.Operations.DeadLetters.Replay`.
+            ///
+            /// 🔑 **VÌ SAO PHẢI TÁCH KHỎI QUYỀN ĐỌC `DeadLetters`:** đọc DLQ là **xem bằng chứng**; phát lại là
+            /// **gửi lại một sự kiện vào hệ thống** — nó có thể **ghi dữ liệu** (tạo/đổi đơn, sổ cái, tiền) và
+            /// có thể **hỏng lại** rồi sinh DLQ mới. 📌 Gộp hai việc vào một quyền nghĩa là **ai xem được DLQ
+            /// cũng gửi lại được** — đúng kiểu mở quyền không cần thiết mà `XC-004` cấm.
+            ///
+            /// 🔒 **BẮT BUỘC khai ở CẢ HAI NƠI** (hằng số này **và** `eCommercePermissionDefinitionProvider`):
+            /// thiếu một nơi ⇒ permission **luôn bị từ chối** ⇒ `403` cho **mọi người** kể cả `admin`
+            /// (`XC-004` **D2**; 🛡️ lưới an toàn `BatBienPhanQuyenTests.TC02b`).
+            /// ➕ Phải có trong danh sách `quyenPhaiCon` của `tools/kiem-db.ps1` và **chạy `DbMigrator`** để
+            /// seed grant cho role `admin`.
+            /// </summary>
+            public const string DeadLettersReplay = DeadLetters + ".Replay";
         }
 
         public static class Customers
@@ -228,6 +263,87 @@ public static class eCommerceConsts
             /// (`XC-004` **D2**; 🛡️ lưới an toàn `BatBienPhanQuyenTests.TC02b`).
             /// </summary>
             public const string ManageGroups = Default + ".ManageGroups";
+        }
+
+        /// <summary>
+        /// 🆕 **`WP-07` — CẤU HÌNH TỔ CHỨC** (cửa hàng · phòng ban · nhân viên · **phạm vi dữ liệu**).
+        ///
+        /// 🔒 **VÌ SAO TÁCH KHỎI `Customers.Manage` (không phải "thêm cho đủ"):** đổi **phạm vi dữ liệu**
+        /// là đổi *ai thấy dữ liệu của ai* — một thay đổi **phân quyền**, không phải sửa hồ sơ khách. 📌 Nếu
+        /// gộp vào `Customers.Manage` thì người trực CSKH (cần chặn khách chây nợ) **cũng** nới được phạm vi
+        /// dữ liệu của chính mình ⇒ **leo thang quyền im lặng** (cùng lý do `Orders.Cancel` tách khỏi
+        /// `Orders.StatusChange`, D-40).
+        ///
+        /// 🚨 **BẮT BUỘC khai ở CẢ HAI NƠI** (hằng số này **và** `eCommercePermissionDefinitionProvider`):
+        /// thiếu một nơi ⇒ permission **luôn bị từ chối** ⇒ `403` cho **mọi người** kể cả `admin`
+        /// (`XC-004` D2/E3; 🛡️ lưới an toàn `BatBienPhanQuyenTests.TC02b`).
+        /// 📌 Và thêm permission **KHÔNG** tự cấp cho role `admin` — phải chạy `DbMigrator`.
+        /// </summary>
+        public static class Settings
+        {
+            /// <summary>Xem cấu hình tổ chức (cửa hàng/phòng ban/nhân viên/phạm vi dữ liệu).</summary>
+            public const string Default = GroupName + ".Settings";
+
+            /// <summary>Tạo/sửa cấu hình tổ chức **và đổi phạm vi dữ liệu** — quyền **riêng**.</summary>
+            public const string Manage = Default + ".Manage";
+        }
+
+        /// <summary>
+        /// 🆕 **`WP-06` — QUYỀN CỦA QUẦY BÁN LẺ (POS)**.
+        ///
+        /// 📌 **VÌ SAO TÁCH 4 QUYỀN, KHÔNG GỘP MỘT:**
+        /// <list type="bullet">
+        ///   <item><see cref="Sell"/> — bán (tạo hoá đơn, đẩy tồn kho + ghi tiền);</item>
+        ///   <item><see cref="Void"/> — **huỷ** hoá đơn: đảo tồn **và** đảo tiền ⇒ ảnh hưởng **doanh thu đã ghi**
+        ///     ⇒ không gán cho mọi thu ngân (đặc quyền tối thiểu, cùng lý do `Orders.Cancel` tách khỏi
+        ///     `Orders.StatusChange`);</item>
+        ///   <item><see cref="SessionManage"/> — **mở/kết ca**: chốt số tiền mặt **bàn giao thực tế** và
+        ///     **chênh lệch** — đây là **biên bản tiền**, không phải thao tác bán;</item>
+        ///   <item><see cref="Return"/> — **trả hàng**: nhập lại kho + đảo công nợ/điểm.</item>
+        /// </list>
+        /// 🚨 **BẮT BUỘC khai ở CẢ HAI NƠI** (hằng số này + `eCommercePermissionDefinitionProvider`):
+        /// thiếu một nơi ⇒ ABP coi là **luôn bị từ chối** ⇒ **`403` cho MỌI người kể cả `admin`**
+        /// (`XC-004` D2/E3). 🛡️ Lưới an toàn: `BatBienPhanQuyenTests.TC02/TC02b` (hai chiều).
+        /// 📌 Và: thêm permission **KHÔNG** tự cấp cho role `admin` — phải chạy `DbMigrator`.
+        /// </summary>
+        public static class Pos
+        {
+            /// <summary>Xem DS hoá đơn / chi tiết hoá đơn / ca (quyền **đọc**).</summary>
+            public const string Default = GroupName + ".Pos";
+
+            /// <summary>Tạo hoá đơn bán lẻ (bán tại quầy).</summary>
+            public const string Sell = Default + ".Sell";
+
+            /// <summary>Huỷ hoá đơn (đảo tồn + đảo tiền/điểm) — quyền **riêng**.</summary>
+            public const string Void = Default + ".Void";
+
+            /// <summary>Mở ca / kết ca (biên bản tiền mặt + chênh lệch).</summary>
+            public const string SessionManage = Default + ".Session.Manage";
+
+            /// <summary>Tạo phiếu trả hàng từ hoá đơn bán lẻ.</summary>
+            public const string Return = Default + ".Return";
+        }
+
+        /// <summary>
+        /// 🆕 **`WP-08` — QUYỀN CỦA BÁO CÁO**.
+        ///
+        /// 📌 **VÌ SAO TÁCH 2 QUYỀN, KHÔNG GỘP MỘT:** <see cref="Default"/> là **đọc** số liệu (mọi nhân viên
+        /// văn phòng cần); <see cref="Aggregate"/> là **ghi read-model** — chạy lại một khoảng sẽ **xoá và ghi
+        /// lại** số liệu của kỳ đó (nếu chọn sai khoảng thì báo cáo của kỳ khác **đổi số**). Gộp lại nghĩa là
+        /// người chỉ cần xem báo cáo lại có quyền **viết lại** số liệu, và không ai truy được ai đã làm.
+        ///
+        /// 🚨 **BẮT BUỘC khai ở CẢ HAI NƠI** (hằng số này + `eCommercePermissionDefinitionProvider`): thiếu một
+        /// nơi ⇒ ABP coi là **luôn bị từ chối** ⇒ **`403` cho MỌI người kể cả `admin`** (`XC-004` D2/E3).
+        /// 🛡️ Lưới an toàn: `BatBienPhanQuyenTests.TC02/TC02b`.
+        /// 📌 Thêm permission **KHÔNG** tự cấp cho role `admin` — phải chạy `DbMigrator`.
+        /// </summary>
+        public static class Reports
+        {
+            /// <summary>Xem Dashboard + các báo cáo (quyền **đọc**).</summary>
+            public const string Default = GroupName + ".Reports";
+
+            /// <summary>Chạy tổng hợp / backfill read-model (quyền **ghi**, tách riêng).</summary>
+            public const string Aggregate = Default + ".Aggregate";
         }
 
         /// <summary>
@@ -272,6 +388,16 @@ public static class eCommerceConsts
 
         /// <summary>Độ dài tối đa của SKU — khớp `HasMaxLength(64)` ở DbContext.</summary>
         public const int SkuToiDa = 64;
+
+        // ── WP-03 (02/11/2026) — ĐƠN VỊ TÍNH / BARCODE (`03 §3.1`) ────────────────────────────────
+        // 📌 Đặt ở `Domain.Shared` (không phải trong entity) vì **DTO ở `Application.Contracts` cũng cần** —
+        // tầng đó **không** được tham chiếu `Domain` (layering). Bài học `CAT-003` §20.3 đã trả giá 2 lần.
+
+        /// <summary>Độ dài tối đa của tên ĐVT — khớp `HasMaxLength(64)` ở DbContext (`ProductUnit.Name`).</summary>
+        public const int DonViTinhTenToiDa = 64;
+
+        /// <summary>Độ dài tối đa của barcode — khớp `HasMaxLength(64)` ở DbContext (`ProductUnit.Barcode`).</summary>
+        public const int BarcodeToiDa = 64;
 
         // ── ẢNH SẢN PHẨM (`CAT-003`) ──────────────────────────────────────────────────────────────
         // 📌 Đặt Ở ĐÂY (không ở entity `ProductMedia`) vì **`Application.Contracts` KHÔNG được tham chiếu
@@ -387,6 +513,16 @@ public static class eCommerceConsts
         /// để `WithData` nói được **ai thắng** (`phienBanHienTai` vs `phienBanMoi`).
         /// </summary>
         public const string SalesWatermarkKhongTien = "eCommerce:Sales:0003";
+
+        /// <summary>
+        /// 🆕 **`S14`** — **phiếu trả hàng không hợp lệ / sai guard** (`SAL-006`). 📌 Bản chuẩn ở **tầng app**
+        /// (`eCommerce.Kernel` cần đọc được mã này để ánh xạ ràng buộc DB — Kernel **không** tham chiếu module
+        /// `Sales`); module dùng **bí danh** `SalesErrorCodes.PhieuTraKhongHopLe` trỏ về đây (một nguồn sự thật).
+        /// </summary>
+        public const string PhieuTraKhongHopLe = "eCommerce:Sales:0010";
+
+        /// <summary>🆕 **`S14`** — **trả vượt số đã mua** của một dòng đơn (`SAL-006` ADR-11).</summary>
+        public const string TraVuotSoDaMua = "eCommerce:Sales:0011";
 
         // 📌 CÁC MÃ HOÀN TIỀN (`0002`/`0003`/`0004`) **CỐ Ý KHÔNG Ở ĐÂY** — chúng nằm ở
         // `modules/PaymentHub/eCommerce.PaymentHub.Domain/Payments/PaymentErrorCodes.cs`.
@@ -507,6 +643,60 @@ public static class eCommerceConsts
             /// thì client/đối soát không biết lỗi nằm ở **sản phẩm** hay ở **danh mục**.
             /// </summary>
             public const string MaDanhMucKhongHopLe = "eCommerce:Catalog:0025";
+
+            // ── Dải 0030+: THƯƠNG HIỆU (Brand, 27/10/2026 — chốt CAT-002 Q3) ──────────────
+            /// <summary>`Code` thương hiệu đã tồn tại trong tenant (unique index `IX_CatBrands_TenantId_Code`).</summary>
+            public const string ThuongHieuDaTonTai = "eCommerce:Catalog:0030";
+
+            /// <summary>`Slug` thương hiệu đã tồn tại trong tenant (unique index `IX_CatBrands_TenantId_Slug`).</summary>
+            public const string SlugThuongHieuDaTonTai = "eCommerce:Catalog:0031";
+
+            /// <summary>Dữ liệu thương hiệu không hợp lệ (slug/mô tả/logo quá dài).</summary>
+            public const string ThuongHieuKhongHopLe = "eCommerce:Catalog:0032";
+
+            // ── Dải 0040+: WP-03 (02/11/2026) — MÔ HÌNH HÀNG HÓA THEO NHANH (`03 §3.1`, D-07) ──
+            // 📌 Dải RIÊNG (không dùng lại 0001–0012/0020–0025/0030–0032/0201–0212) vì mỗi mã là **hợp đồng
+            // với client**: trùng số cho nghĩa khác là đúng lỗi mà `CatalogErrorCodeRegistryTests` chặn.
+
+            /// <summary>
+            /// Tên/ĐVT không hợp lệ: rỗng, quá dài, trùng tên trong cùng sản phẩm, hoặc
+            /// `ConversionFactor <= 0` (WP-03). 🔒 Cũng là mã ánh xạ cho CHECK `CK_CatProdUnits_ConversionFactor_Duong`.
+            /// </summary>
+            public const string DonViTinhKhongHopLe = "eCommerce:Catalog:0040";
+
+            /// <summary>
+            /// Barcode đã được **sản phẩm/ĐVT khác** dùng trong tenant (WP-03). 🔒 Khoá đối chiếu khi quét mã:
+            /// trùng barcode ⇒ quét ra **hai món** và thu ngân bán sai món — không lỗi, không log.
+            /// </summary>
+            public const string BarcodeDaTonTai = "eCommerce:Catalog:0041";
+
+            /// <summary>Sản phẩm đã có ĐVT gốc ⇒ thêm gốc thứ hai bị từ chối (WP-03, bất biến "đúng một gốc").</summary>
+            public const string NhieuHonMotDonViGoc = "eCommerce:Catalog:0042";
+
+            /// <summary>Sản phẩm được gán làm cha của **chính nó** (WP-03). Chu trình nhiều mức do app service chặn.</summary>
+            public const string SanPhamChaTrungChinhNo = "eCommerce:Catalog:0043";
+
+            /// <summary>Số lượng thành phần combo/gói `<= 0` (WP-03). 🔒 Cũng ánh xạ cho 2 CHECK `...Quantity_Duong`.</summary>
+            public const string SoLuongKhongHopLe = "eCommerce:Catalog:0044";
+
+            /// <summary>`VatPercent` ngoài `-100..100` (WP-03). 🔒 Ánh xạ cho CHECK `CK_CatProducts_VatPercent_Khoang`.</summary>
+            public const string VatPercentKhongHopLe = "eCommerce:Catalog:0045";
+
+            /// <summary>Combo/gói chứa **chính nó** hoặc thành phần không hợp lệ (WP-03).</summary>
+            public const string ThanhPhanKhongHopLe = "eCommerce:Catalog:0046";
+
+            /// <summary>
+            /// Sản phẩm **cha** (đang có sản phẩm con) ⇒ **KHÔNG được bán/publish** (WP-03 nửa sau, `03 §3.1`).
+            /// 📌 Cha chỉ là **nhóm hiển thị**: giá và tồn nằm ở con. Cho publish cha ⇒ storefront có một mục
+            /// **không có giá/không có ĐVT** và mọi báo cáo bán hàng thấy một SKU không bao giờ bán được.
+            /// </summary>
+            public const string SanPhamChaKhongBanDuoc = "eCommerce:Catalog:0047";
+
+            /// <summary>
+            /// Gán cha tạo **chu trình nhiều mức** (`A → B → A`) — WP-03 nửa sau. `Product.DatCha` chỉ chặn
+            /// *"tự làm cha của chính mình"* (`0043`); chuỗi nhiều mức cần đọc cả cây ⇒ app service ném mã này.
+            /// </summary>
+            public const string ChuTrinhSanPhamChaCon = "eCommerce:Catalog:0048";
 
             /// <summary>
             /// 🚨 **SLUG TRÙNG trong tenant** (`CAT-003` **ADR-03**) — hàng rào DB
@@ -676,3 +866,5 @@ public static class eCommerceConsts
         // Không khai báo lại ở đây để tránh hai nguồn sự thật cho cùng một khoá lock.
     }
 }
+
+

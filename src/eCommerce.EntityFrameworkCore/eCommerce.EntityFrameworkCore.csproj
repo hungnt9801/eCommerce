@@ -17,6 +17,20 @@
     <ProjectReference Include="..\..\modules\Pricing\eCommerce.Pricing.EntityFrameworkCore\eCommerce.Pricing.EntityFrameworkCore.csproj" />
     <!-- `CUS-001` — hồ sơ khách + nhóm khách (module tự cung cấp hàm mapping `ConfigureCustomers`). -->
     <ProjectReference Include="..\..\modules\Customers\eCommerce.Customers.EntityFrameworkCore\eCommerce.Customers.EntityFrameworkCore.csproj" />
+    <!-- 🆕 `P0 #1` (24/10/2026) — module Catalog tự cung cấp mapping (`ConfigureCatalog`). -->
+    <ProjectReference Include="..\..\modules\Catalog\eCommerce.Catalog.EntityFrameworkCore\eCommerce.Catalog.EntityFrameworkCore.csproj" />
+    <!-- 🆕 `P0 #1` — module Inventory tự cung cấp mapping (`ConfigureInventory`). -->
+    <ProjectReference Include="..\..\modules\Inventory\eCommerce.Inventory.EntityFrameworkCore\eCommerce.Inventory.EntityFrameworkCore.csproj" />
+    <!-- 🆕 `P0 #1` — module Reconciliation tự cung cấp mapping (`ConfigureReconciliation`). -->
+    <ProjectReference Include="..\..\modules\Reconciliation\eCommerce.Reconciliation.EntityFrameworkCore\eCommerce.Reconciliation.EntityFrameworkCore.csproj" />
+    <ProjectReference Include="..\..\modules\Reconciliation\eCommerce.Reconciliation.Application.Contracts\eCommerce.Reconciliation.Application.Contracts.csproj" />
+    <!-- 🆕 `P0 #1` — module Sales: mapping còn host nhưng cần entity `Order`/`Marketplace*`. -->
+    <ProjectReference Include="..\..\modules\Sales\eCommerce.Sales.Domain\eCommerce.Sales.Domain.csproj" />
+    <ProjectReference Include="..\..\modules\Sales\eCommerce.Sales.EntityFrameworkCore\eCommerce.Sales.EntityFrameworkCore.csproj" />
+    <!-- 🆕 `WP-06` — module POS tự cung cấp mapping (`ConfigurePos`): hoá đơn bán lẻ + ca thu ngân + trả hàng. -->
+    <ProjectReference Include="..\..\modules\Pos\eCommerce.Pos.EntityFrameworkCore\eCommerce.Pos.EntityFrameworkCore.csproj" />
+    <!-- 🆕 `WP-08` — module REPORTING tự cung cấp mapping (`ConfigureReporting`): read-model báo cáo. -->
+    <ProjectReference Include="..\..\modules\Reporting\eCommerce.Reporting.EntityFrameworkCore\eCommerce.Reporting.EntityFrameworkCore.csproj" />
   </ItemGroup>
 
   <ItemGroup>

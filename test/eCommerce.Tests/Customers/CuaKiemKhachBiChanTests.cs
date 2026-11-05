@@ -35,12 +35,12 @@ public class CuaKiemKhachBiChanTests
     /// <summary>Tệp **đường bán hàng** — mỗi tệp **PHẢI** gọi cổng. 📌 Thêm đường bán hàng mới ⇒ thêm vào đây.</summary>
     private static readonly string[] DuongBanHang =
     [
-        "src/eCommerce.Application/Checkout/CheckoutAppService.cs",
-        "src/eCommerce.Application/Sales/DonHangAppService.cs"
+        "modules/Sales/eCommerce.Sales.Application/CheckoutAppService.cs",
+        "modules/Sales/eCommerce.Sales.Application/DonHangAppService.cs"
     ];
 
     /// <summary>Tệp chứa **định nghĩa** cổng — nó phải gọi đúng hợp đồng của module `Customers`.</summary>
-    private const string TepCong = "src/eCommerce.Application/Sales/CuaKiemKhachGiaoDich.cs";
+    private const string TepCong = "modules/Sales/eCommerce.Sales.Application/CuaKiemKhachGiaoDich.cs";
 
     /// <summary>Tên lời gọi **của cổng** (một chỗ duy nhất) — dấu hiệu một tệp đi qua cổng.</summary>
     private const string LoiGoiCong = "CuaKiemKhachGiaoDich.DamBaoDuocGiaoDichAsync";

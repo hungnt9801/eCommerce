@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>eCommerce.Application.Sales</RootNamespace>
+    <AssemblyName>eCommerce.Sales.Application</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\eCommerce.Sales.Application.Contracts\eCommerce.Sales.Application.Contracts.csproj" />
+    <ProjectReference Include="..\eCommerce.Sales.Domain\eCommerce.Sales.Domain.csproj" />
+    <ProjectReference Include="..\..\Inventory\eCommerce.Inventory.Application.Contracts\eCommerce.Inventory.Application.Contracts.csproj" />
+    <ProjectReference Include="..\..\Pricing\eCommerce.Pricing.Application.Contracts\eCommerce.Pricing.Application.Contracts.csproj" />
+    <ProjectReference Include="..\..\Customers\eCommerce.Customers.Application.Contracts\eCommerce.Customers.Application.Contracts.csproj" />
+    <ProjectReference Include="..\..\ChannelHub\eCommerce.ChannelHub.Application.Contracts\eCommerce.ChannelHub.Application.Contracts.csproj" />
+    <ProjectReference Include="..\..\PaymentHub\eCommerce.PaymentHub.Application.Contracts\eCommerce.PaymentHub.Application.Contracts.csproj" />
+    <ProjectReference Include="..\..\Messaging\eCommerce.Messaging.Domain\eCommerce.Messaging.Domain.csproj" />
+    <ProjectReference Include="..\..\..\shared\eCommerce.Kernel\eCommerce.Kernel.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Volo.Abp.Ddd.Application" />
+    <PackageReference Include="Volo.Abp.BackgroundWorkers" />
+    <PackageReference Include="Volo.Abp.EntityFrameworkCore" />
+  </ItemGroup>
+
+</Project>

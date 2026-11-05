@@ -49,6 +49,8 @@ xanh, và ca chống dương tính giả).
 🔑 **Hệ quả cần nói thẳng:** về **số lượng tệp** thì giai đoạn tài liệu đã xong, nhưng về **cổng chất lượng**
 thì chưa có tài liệu nào được duyệt. Việc còn lại **không phải viết thêm**, mà là **review + Approved**.
 
+> 🆕 **29/10/2026 — `Q5` ĐÃ ĐƯỢC DUYỆT:** chủ dự án **duyệt** **26** tài liệu trong phạm vi cổng 0 (**7 `XC-*` + 19 GĐ1**) ⇒ **27/55** tài liệu đã Approved; các dòng `1/55` / `54 tệp vẫn Draft` / *"chưa có tài liệu nào được duyệt"* ở trên là **ảnh chụp 17/10/2026** — đọc kèm [**biên bản duyệt GĐ1 29/10/2026**](../bien-ban-duyet-gd1-2026-10-29.md).
+
 ---
 
 ## 3. Phân bố theo giai đoạn

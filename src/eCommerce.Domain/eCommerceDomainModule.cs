@@ -38,7 +38,11 @@ namespace eCommerce;
     typeof(AbpFeatureManagementDomainModule),
     typeof(AbpAuditLoggingDomainModule),
     typeof(AbpBackgroundJobsDomainModule),
-    typeof(AbpOpenIddictDomainModule)
+    typeof(AbpOpenIddictDomainModule),
+    // 🆕 `P0 #1` — module Catalog (Domain).
+    typeof(eCommerce.Catalog.CatalogDomainModule),
+    typeof(eCommerce.Inventory.InventoryDomainModule),
+    typeof(eCommerce.Reconciliation.ReconciliationDomainModule)
 )]
 public class eCommerceDomainModule : AbpModule
 {

@@ -382,6 +382,84 @@ namespace eCommerce.Migrations
                     b.ToTable("AbpBackgroundJobs", (string)null);
                 });
 
+            modelBuilder.Entity("Volo.Abp.EntityFrameworkCore.DistributedEvents.IncomingEventRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<byte[]>("EventData")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.Property<string>("EventName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("ExtraProperties")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("ExtraProperties");
+
+                    b.Property<DateTime?>("HandledTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("MessageId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("NextRetryTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("RetryCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MessageId");
+
+                    b.HasIndex("Status", "CreationTime");
+
+                    b.ToTable("AbpEventInbox", (string)null);
+                });
+
+            modelBuilder.Entity("Volo.Abp.EntityFrameworkCore.DistributedEvents.OutgoingEventRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<byte[]>("EventData")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.Property<string>("EventName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("ExtraProperties")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("ExtraProperties");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreationTime");
+
+                    b.ToTable("AbpEventOutbox", (string)null);
+                });
+
             modelBuilder.Entity("Volo.Abp.FeatureManagement.FeatureDefinitionRecord", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2150,6 +2228,101 @@ namespace eCommerce.Migrations
                         });
                 });
 
+            modelBuilder.Entity("eCommerce.Catalog.Brand", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("ConcurrencyStamp");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<Guid?>("DeleterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("DeleterId");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("DeletionTime");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<string>("ExtraProperties")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("ExtraProperties");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("IsDeleted");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<string>("LogoUrl")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Code")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "Slug")
+                        .IsUnique()
+                        .HasDatabaseName("IX_CatBrands_TenantId_Slug");
+
+                    b.HasIndex("TenantId", "IsActive", "SortOrder")
+                        .HasDatabaseName("IX_CatBrands_TenantId_HoatDong_ThuTu");
+
+                    b.ToTable("CatBrands", (string)null);
+                });
+
             modelBuilder.Entity("eCommerce.Catalog.CatalogAttribute", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2409,6 +2582,136 @@ namespace eCommerce.Migrations
                         });
                 });
 
+            modelBuilder.Entity("eCommerce.Catalog.ComboComponent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ComboProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ComponentProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<Guid?>("DeleterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("DeleterId");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("DeletionTime");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("IsDeleted");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ComboProductId");
+
+                    b.HasIndex("ComponentProductId");
+
+                    b.HasIndex("TenantId", "ComboProductId", "ComponentProductId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_CatComboComponents_TenantId_Combo_Component");
+
+                    b.ToTable("CatComboComponents", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_CatComboComponents_Quantity_Duong", "\"Quantity\" > 0");
+                        });
+                });
+
+            modelBuilder.Entity("eCommerce.Catalog.PackageComponent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ComponentProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<Guid?>("DeleterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("DeleterId");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("DeletionTime");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("IsDeleted");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<Guid>("PackageProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ComponentProductId");
+
+                    b.HasIndex("PackageProductId");
+
+                    b.HasIndex("TenantId", "PackageProductId", "ComponentProductId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_CatPackageComponents_TenantId_Package_Component");
+
+                    b.ToTable("CatPackageComponents", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_CatPackageComponents_Quantity_Duong", "\"Quantity\" > 0");
+                        });
+                });
+
             modelBuilder.Entity("eCommerce.Catalog.Product", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2448,6 +2751,10 @@ namespace eCommerce.Migrations
                     b.Property<string>("Description")
                         .HasColumnType("text");
 
+                    b.Property<string>("ExternalId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<string>("ExtraProperties")
                         .IsRequired()
                         .HasColumnType("text")
@@ -2458,6 +2765,12 @@ namespace eCommerce.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(false)
                         .HasColumnName("IsDeleted");
+
+                    b.Property<bool>("IsHot")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsNew")
+                        .HasColumnType("boolean");
 
                     b.Property<DateTime?>("LastModificationTime")
                         .HasColumnType("timestamp with time zone")
@@ -2472,6 +2785,9 @@ namespace eCommerce.Migrations
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)");
 
+                    b.Property<Guid?>("ParentId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Slug")
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)");
@@ -2479,21 +2795,57 @@ namespace eCommerce.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("StorageTimeDays")
+                        .HasColumnType("integer");
+
                     b.Property<Guid?>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("TenantId");
 
+                    b.Property<int>("Type")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
+
+                    b.Property<int>("VatMode")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(2);
+
+                    b.Property<decimal?>("VatPercent")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
+                    b.Property<int?>("WarrantyMonths")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("WeightGram")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("BrandId");
+
+                    b.HasIndex("ParentId");
 
                     b.HasIndex("TenantId", "Code")
                         .IsUnique();
+
+                    b.HasIndex("TenantId", "ExternalId")
+                        .HasDatabaseName("IX_CatProducts_TenantId_ExternalId");
+
+                    b.HasIndex("TenantId", "ParentId")
+                        .HasDatabaseName("IX_CatProducts_TenantId_ParentId");
 
                     b.HasIndex("TenantId", "Slug")
                         .IsUnique()
                         .HasDatabaseName("IX_CatProducts_TenantId_Slug")
                         .HasFilter("\"Slug\" IS NOT NULL");
 
-                    b.ToTable("CatProducts", (string)null);
+                    b.ToTable("CatProducts", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_CatProducts_VatPercent_Khoang", "\"VatPercent\" IS NULL OR (\"VatPercent\" >= -100 AND \"VatPercent\" <= 100)");
+                        });
                 });
 
             modelBuilder.Entity("eCommerce.Catalog.ProductAttributeSelection", b =>
@@ -2572,6 +2924,82 @@ namespace eCommerce.Migrations
                         .HasDatabaseName("IX_CatProdAttrSel_TenantId_ProductId_AttributeId_ValueId");
 
                     b.ToTable("CatProductAttributeSelections", (string)null);
+                });
+
+            modelBuilder.Entity("eCommerce.Catalog.ProductBatch", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<Guid?>("DeleterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("DeleterId");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("DeletionTime");
+
+                    b.Property<DateTime?>("ExpiredDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("IsDeleted");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<DateTime?>("ManufactureDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("PriorWarningDays")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("TenantId", "ExpiredDate")
+                        .HasDatabaseName("IX_CatProdBatches_TenantId_ExpiredDate");
+
+                    b.HasIndex("TenantId", "ProductId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("IX_CatProdBatches_TenantId_ProductId_Code");
+
+                    b.ToTable("CatProdBatches", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_CatProdBatches_Ngay_Khoang", "\"ManufactureDate\" IS NULL OR \"ExpiredDate\" IS NULL OR \"ManufactureDate\" <= \"ExpiredDate\"");
+                        });
                 });
 
             modelBuilder.Entity("eCommerce.Catalog.ProductCategory", b =>
@@ -2738,6 +3166,91 @@ namespace eCommerce.Migrations
                     b.ToTable("CatProductChannelVisibilities", (string)null);
                 });
 
+            modelBuilder.Entity("eCommerce.Catalog.ProductImei", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("BatchId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<Guid?>("DeleterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("DeleterId");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("DeletionTime");
+
+                    b.Property<Guid?>("ImportBillId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("IsDeleted");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Serial")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid?>("SoldBillId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.Property<Guid?>("WarehouseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("WarrantyUntil")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BatchId");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("TenantId", "Serial")
+                        .IsUnique()
+                        .HasDatabaseName("IX_CatProdImeis_TenantId_Serial");
+
+                    b.HasIndex("TenantId", "ProductId", "Status")
+                        .HasDatabaseName("IX_CatProdImeis_TenantId_ProductId_Status");
+
+                    b.ToTable("CatProductImeis", (string)null);
+                });
+
             modelBuilder.Entity("eCommerce.Catalog.ProductMedia", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2826,6 +3339,167 @@ namespace eCommerce.Migrations
                         .HasDatabaseName("IX_CatProductMedia_TenantId_ProductId_ThuTu");
 
                     b.ToTable("CatProductMedia", (string)null);
+                });
+
+            modelBuilder.Entity("eCommerce.Catalog.ProductTag", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<Guid?>("DeleterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("DeleterId");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("DeletionTime");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("IsDeleted");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("TenantId", "Name")
+                        .HasDatabaseName("IX_CatProductTags_TenantId_Name");
+
+                    b.HasIndex("TenantId", "ProductId", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("IX_CatProductTags_TenantId_ProductId_Name");
+
+                    b.ToTable("CatProductTags", (string)null);
+                });
+
+            modelBuilder.Entity("eCommerce.Catalog.ProductUnit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Barcode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<decimal>("ConversionFactor")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<Guid?>("DeleterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("DeleterId");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("DeletionTime");
+
+                    b.Property<decimal?>("ImportPrice")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<bool>("IsBase")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("IsDeleted");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<decimal?>("OldPrice")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("SalePrice")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.Property<decimal?>("WholesalePrice")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("TenantId", "Barcode")
+                        .IsUnique()
+                        .HasDatabaseName("IX_CatProdUnits_TenantId_Barcode")
+                        .HasFilter("\"Barcode\" IS NOT NULL");
+
+                    b.HasIndex("TenantId", "ProductId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_CatProdUnits_MotDonViGoc")
+                        .HasFilter("\"IsBase\"");
+
+                    b.HasIndex("TenantId", "ProductId", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("IX_CatProdUnits_TenantId_ProductId_Name");
+
+                    b.ToTable("CatProductUnits", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_CatProdUnits_ConversionFactor_Duong", "\"ConversionFactor\" > 0");
+
+                            t.HasCheckConstraint("CK_CatProdUnits_SalePrice_KhongAm", "\"SalePrice\" >= 0");
+                        });
                 });
 
             modelBuilder.Entity("eCommerce.Catalog.ProductVariant", b =>
@@ -2985,6 +3659,76 @@ namespace eCommerce.Migrations
                         .HasDatabaseName("IX_CatProdVarAttr_TenantId_VariantId_AttributeId");
 
                     b.ToTable("CatProductVariantAttributes", (string)null);
+                });
+
+            modelBuilder.Entity("eCommerce.Catalog.ProductVariantMap", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<Guid?>("DeleterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("DeleterId");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("DeletionTime");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("IsDeleted");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Sku")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.Property<Guid>("UnitId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("VariantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("TenantId", "ProductId")
+                        .HasDatabaseName("IX_CatVariantMaps_TenantId_ProductId");
+
+                    b.HasIndex("TenantId", "Sku")
+                        .HasDatabaseName("IX_CatVariantMaps_TenantId_Sku");
+
+                    b.HasIndex("TenantId", "VariantId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_CatVariantMaps_TenantId_VariantId");
+
+                    b.ToTable("CatVariantMaps", (string)null);
                 });
 
             modelBuilder.Entity("eCommerce.ChannelHub.Channels.Channel", b =>
@@ -3280,6 +4024,13 @@ namespace eCommerce.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
 
+                    b.Property<decimal>("AccumulatedAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime?>("Birthday")
+                        .HasColumnType("date");
+
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .IsRequired()
@@ -3297,6 +4048,14 @@ namespace eCommerce.Migrations
 
                     b.Property<Guid?>("CustomerGroupId")
                         .HasColumnType("uuid");
+
+                    b.Property<decimal>("DebtBalance")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("DebtLimit")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<Guid?>("DeleterId")
                         .HasColumnType("uuid")
@@ -3336,6 +4095,9 @@ namespace eCommerce.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("LastModifierId");
 
+                    b.Property<Guid?>("LevelId")
+                        .HasColumnType("uuid");
+
                     b.Property<decimal?>("LifetimeValueAmount")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
@@ -3357,12 +4119,29 @@ namespace eCommerce.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
+                    b.Property<decimal>("Points")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<Guid?>("ReferrerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("SaleStaffId")
+                        .HasColumnType("uuid");
+
                     b.Property<int>("Status")
                         .HasColumnType("integer");
+
+                    b.Property<string>("TaxCode")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
 
                     b.Property<Guid?>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("TenantId");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
@@ -3376,10 +4155,19 @@ namespace eCommerce.Migrations
                         .HasDatabaseName("IX_CusCustomers_TenantId_IdentityUserId")
                         .HasFilter("\"IdentityUserId\" IS NOT NULL");
 
+                    b.HasIndex("TenantId", "LevelId")
+                        .HasDatabaseName("IX_CusCustomers_TenantId_LevelId");
+
                     b.HasIndex("TenantId", "Status")
                         .HasDatabaseName("IX_CusCustomers_TenantId_Status");
 
-                    b.ToTable("CusCustomers", (string)null);
+                    b.HasIndex("TenantId", "Type")
+                        .HasDatabaseName("IX_CusCustomers_TenantId_Type");
+
+                    b.ToTable("CusCustomers", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_CusCustomers_SoDu_KhongAm", "\"Points\" >= 0 AND \"AccumulatedAmount\" >= 0 AND \"DebtBalance\" >= 0 AND \"DebtLimit\" >= 0");
+                        });
                 });
 
             modelBuilder.Entity("eCommerce.Customers.CustomerAddressLink", b =>
@@ -3476,6 +4264,55 @@ namespace eCommerce.Migrations
 
                             t.HasCheckConstraint("CK_CusAddressLinks_NhanDoDai", "char_length(\"Label\") <= 128");
                         });
+                });
+
+            modelBuilder.Entity("eCommerce.Customers.CustomerCare", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("NextFollowUpAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("StaffId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "NextFollowUpAtUtc")
+                        .HasDatabaseName("IX_CusCares_TenantId_NextFollowUpAtUtc")
+                        .HasFilter("\"NextFollowUpAtUtc\" IS NOT NULL");
+
+                    b.HasIndex("TenantId", "CustomerId", "OccurredAtUtc")
+                        .HasDatabaseName("IX_CusCares_TenantId_CustomerId_OccurredAtUtc");
+
+                    b.ToTable("CusCares", (string)null);
                 });
 
             modelBuilder.Entity("eCommerce.Customers.CustomerDataExportLog", b =>
@@ -3602,6 +4439,441 @@ namespace eCommerce.Migrations
                         .HasDatabaseName("IX_CusGroups_TenantId_Code");
 
                     b.ToTable("CusGroups", (string)null);
+                });
+
+            modelBuilder.Entity("eCommerce.Customers.CustomerLevel", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("ConcurrencyStamp");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<Guid?>("DeleterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("DeleterId");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("DeletionTime");
+
+                    b.Property<decimal>("DiscountPercent")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
+                    b.Property<string>("ExtraProperties")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("ExtraProperties");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("IsDeleted");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<decimal>("MinAccumulatedAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("IX_CusLevels_TenantId_Code");
+
+                    b.HasIndex("TenantId", "MinAccumulatedAmount")
+                        .HasDatabaseName("IX_CusLevels_TenantId_MinAccumulatedAmount");
+
+                    b.ToTable("CusLevels", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_CusLevels_ChietKhau_0_100", "\"DiscountPercent\" >= 0 AND \"DiscountPercent\" <= 100");
+
+                            t.HasCheckConstraint("CK_CusLevels_Nguong_KhongAm", "\"MinAccumulatedAmount\" >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("eCommerce.Customers.Department", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("ConcurrencyStamp");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<Guid?>("DeleterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("DeleterId");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("DeletionTime");
+
+                    b.Property<string>("ExtraProperties")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("ExtraProperties");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("IsDeleted");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<Guid?>("ParentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("StoreId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("IX_SetDepartments_TenantId_Code");
+
+                    b.HasIndex("TenantId", "StoreId")
+                        .HasDatabaseName("IX_SetDepartments_TenantId_StoreId");
+
+                    b.ToTable("SetDepartments", (string)null);
+                });
+
+            modelBuilder.Entity("eCommerce.Customers.RoleDataScope", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("ConcurrencyStamp");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<Guid?>("DeleterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("DeleterId");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("DeletionTime");
+
+                    b.Property<string>("ExtraProperties")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("ExtraProperties");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("IsDeleted");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<string>("RoleName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<int>("Scope")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "RoleName")
+                        .IsUnique()
+                        .HasDatabaseName("IX_SetRoleDataScopes_TenantId_RoleName");
+
+                    b.ToTable("SetRoleDataScopes", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_SetRoleDataScopes_PhamVi_HopLe", "\"Scope\" in (0, 1, 2)");
+                        });
+                });
+
+            modelBuilder.Entity("eCommerce.Customers.Staff", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("ConcurrencyStamp");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<Guid?>("DeleterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("DeleterId");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("DeletionTime");
+
+                    b.Property<Guid?>("DepartmentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ExtraProperties")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("ExtraProperties");
+
+                    b.Property<Guid?>("IdentityUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("IsDeleted");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("RoleName")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<Guid?>("StoreId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("IX_SetStaffs_TenantId_Code");
+
+                    b.HasIndex("TenantId", "IdentityUserId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_SetStaffs_TenantId_IdentityUserId")
+                        .HasFilter("\"IdentityUserId\" IS NOT NULL");
+
+                    b.HasIndex("TenantId", "StoreId")
+                        .HasDatabaseName("IX_SetStaffs_TenantId_StoreId");
+
+                    b.ToTable("SetStaffs", (string)null);
+                });
+
+            modelBuilder.Entity("eCommerce.Customers.Store", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AddressText")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("ConcurrencyStamp");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<Guid?>("DeleterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("DeleterId");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("DeletionTime");
+
+                    b.Property<string>("ExtraProperties")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("ExtraProperties");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("IsDeleted");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.Property<Guid?>("WarehouseId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("IX_SetStores_TenantId_Code");
+
+                    b.ToTable("SetStores", (string)null);
                 });
 
             modelBuilder.Entity("eCommerce.EInvoice.EInvoice", b =>
@@ -3833,6 +5105,10 @@ namespace eCommerce.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("CreatorId");
 
+                    b.Property<decimal>("Damaged")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
                     b.Property<Guid?>("DeleterId")
                         .HasColumnType("uuid")
                         .HasColumnName("DeleterId");
@@ -3845,6 +5121,10 @@ namespace eCommerce.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("ExtraProperties");
+
+                    b.Property<decimal>("Holding")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
@@ -3860,11 +5140,21 @@ namespace eCommerce.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("LastModifierId");
 
-                    b.Property<int>("OnHand")
-                        .HasColumnType("integer");
+                    b.Property<decimal>("OnHand")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
 
-                    b.Property<int>("Reserved")
-                        .HasColumnType("integer");
+                    b.Property<decimal>("PreOrder")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<decimal>("Reserved")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<decimal>("Shipping")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
 
                     b.Property<string>("Sku")
                         .IsRequired()
@@ -3875,15 +5165,34 @@ namespace eCommerce.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("TenantId");
 
+                    b.Property<decimal>("Transferring")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<decimal>("WaitingInbound")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
                     b.Property<Guid>("WarehouseId")
                         .HasColumnType("uuid");
+
+                    b.Property<decimal>("Warranty")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<decimal>("WarrantyHolding")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
 
                     b.HasKey("Id");
 
                     b.HasIndex("TenantId", "WarehouseId", "Sku")
                         .IsUnique();
 
-                    b.ToTable("InvItems", (string)null);
+                    b.ToTable("InvItems", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_InvItems_Chieu_KhongAm", "\"Transferring\" >= 0 AND \"Shipping\" >= 0 AND \"Holding\" >= 0 AND \"Damaged\" >= 0 AND \"Warranty\" >= 0 AND \"WarrantyHolding\" >= 0 AND \"PreOrder\" >= 0 AND \"WaitingInbound\" >= 0");
+                        });
                 });
 
             modelBuilder.Entity("eCommerce.Inventory.ReconRun", b =>
@@ -4006,8 +5315,9 @@ namespace eCommerce.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
 
-                    b.Property<int>("ChenhLech")
-                        .HasColumnType("integer");
+                    b.Property<decimal>("ChenhLech")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
 
                     b.Property<DateTime>("CreationTime")
                         .HasColumnType("timestamp with time zone")
@@ -4050,8 +5360,9 @@ namespace eCommerce.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
-                    b.Property<int>("OnHand")
-                        .HasColumnType("integer");
+                    b.Property<decimal>("OnHand")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
 
                     b.Property<Guid>("ReconRunId")
                         .HasColumnType("uuid");
@@ -4065,8 +5376,9 @@ namespace eCommerce.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("TenantId");
 
-                    b.Property<int>("TongSoCai")
-                        .HasColumnType("integer");
+                    b.Property<decimal>("TongSoCai")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
 
                     b.Property<bool>("VuotNguong")
                         .HasColumnType("boolean");
@@ -4095,10 +5407,18 @@ namespace eCommerce.Migrations
                     b.ToTable("ReconRunMismatches", (string)null);
                 });
 
-            modelBuilder.Entity("eCommerce.Inventory.StockDocument", b =>
+            modelBuilder.Entity("eCommerce.Inventory.StockAllotment", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
+
+                    b.Property<int>("AllottedQuantity")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ChannelCode")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
@@ -4122,6 +5442,222 @@ namespace eCommerce.Migrations
                     b.Property<DateTime?>("DeletionTime")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("DeletionTime");
+
+                    b.Property<string>("ExtraProperties")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("ExtraProperties");
+
+                    b.Property<DateTime?>("FrozenAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("FrozenByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("IsDeleted");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ReleaseReason")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<DateTime?>("ReleasedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("ReservedQuantity")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Sku")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.Property<Guid>("WarehouseId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "ChannelCode", "Status")
+                        .HasDatabaseName("IX_InvStockAllotments_TenantId_Kenh_Status");
+
+                    b.HasIndex("TenantId", "WarehouseId", "Sku")
+                        .HasDatabaseName("IX_InvStockAllotments_TenantId_Kho_Sku");
+
+                    b.HasIndex("TenantId", "WarehouseId", "Sku", "ChannelCode")
+                        .IsUnique()
+                        .HasDatabaseName("IX_InvStockAllotments_TenantId_Kho_Sku_Kenh");
+
+                    b.ToTable("InvStockAllotments", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_InvStockAllotments_DongBang_CoDauVet", "\"Status\" <> 1 OR (\"FrozenAtUtc\" IS NOT NULL AND \"FrozenByUserId\" IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_InvStockAllotments_Nha_CoLyDo", "\"Status\" <> 2 OR \"ReleaseReason\" IS NOT NULL");
+
+                            t.HasCheckConstraint("CK_InvStockAllotments_Reserved_KhongVuotAllotted", "\"ReservedQuantity\" <= \"AllottedQuantity\"");
+
+                            t.HasCheckConstraint("CK_InvStockAllotments_SoLuong_KhongAm", "\"AllottedQuantity\" >= 0 AND \"ReservedQuantity\" >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("eCommerce.Inventory.StockAllotmentLedger", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AllottedAfter")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ChannelCode")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<Guid?>("DeleterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("DeleterId");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("DeletionTime");
+
+                    b.Property<string>("IdempotencyKey")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("IsDeleted");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("PerformedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("QuantityDelta")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Reason")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ReferenceId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("ReferenceType")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Sku")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("StockAllotmentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.Property<Guid>("WarehouseId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("IX_InvStockAllotmentLedgers_TenantId_IdempotencyKey")
+                        .HasFilter("\"IdempotencyKey\" IS NOT NULL");
+
+                    b.HasIndex("TenantId", "ChannelCode", "OccurredAtUtc")
+                        .HasDatabaseName("IX_InvStockAllotmentLedgers_TenantId_Kenh_OccurredAtUtc");
+
+                    b.HasIndex("TenantId", "WarehouseId", "Sku", "OccurredAtUtc")
+                        .HasDatabaseName("IX_InvStockAllotmentLedgers_TenantId_Kho_Sku_OccurredAtUtc");
+
+                    b.ToTable("InvStockAllotmentLedgers", (string)null);
+                });
+
+            modelBuilder.Entity("eCommerce.Inventory.StockDocument", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("ConcurrencyStamp");
+
+                    b.Property<Guid?>("CounterpartyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("CounterpartyType")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<Guid?>("DeleterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("DeleterId");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("DeletionTime");
+
+                    b.Property<int?>("Direction")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal?>("DiscountAmount")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
 
                     b.Property<string>("ExtraProperties")
                         .IsRequired()
@@ -4146,6 +5682,9 @@ namespace eCommerce.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("LastModifierId");
 
+                    b.Property<int?>("Mode")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Note")
                         .HasMaxLength(2048)
                         .HasColumnType("character varying(2048)");
@@ -4157,6 +5696,18 @@ namespace eCommerce.Migrations
 
                     b.Property<DateTime>("OccurredAtUtc")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal?>("PaidAmount")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<string>("RefId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("RefType")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
 
                     b.Property<int>("Status")
                         .HasColumnType("integer");
@@ -4176,19 +5727,37 @@ namespace eCommerce.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("TenantId", "IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("IX_InvStockDocuments_TenantId_IdempotencyKey")
+                        .HasFilter("\"IdempotencyKey\" IS NOT NULL");
+
                     b.HasIndex("TenantId", "Number")
                         .IsUnique()
                         .HasDatabaseName("IX_InvStockDocuments_TenantId_Number");
 
+                    b.HasIndex("TenantId", "Direction", "Status", "OccurredAtUtc")
+                        .HasDatabaseName("IX_InvStockDocuments_TenantId_Huong_Status_OccurredAtUtc");
+
                     b.HasIndex("TenantId", "Status", "Type", "OccurredAtUtc")
                         .HasDatabaseName("IX_InvStockDocuments_TenantId_Status_Type_OccurredAtUtc");
 
-                    b.ToTable("InvStockDocuments", (string)null);
+                    b.ToTable("InvStockDocuments", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_InvStockDocuments_Direction_HopLe", "\"Direction\" IS NULL OR \"Direction\" IN (1, 2)");
+
+                            t.HasCheckConstraint("CK_InvStockDocuments_Mode_HopLe", "\"Mode\" IS NULL OR \"Mode\" IN (1, 2, 3, 4, 5, 6, 8, 10, 13, 14, 15, 16, 17, 18, 19)");
+
+                            t.HasCheckConstraint("CK_InvStockDocuments_Tien_KhongAm", "(\"DiscountAmount\" IS NULL OR \"DiscountAmount\" >= 0) AND (\"PaidAmount\" IS NULL OR \"PaidAmount\" >= 0)");
+                        });
                 });
 
             modelBuilder.Entity("eCommerce.Inventory.StockDocumentLine", b =>
                 {
                     b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("BatchId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("ConcurrencyStamp")
@@ -4219,6 +5788,10 @@ namespace eCommerce.Migrations
                         .HasColumnType("text")
                         .HasColumnName("ExtraProperties");
 
+                    b.Property<string>("ImeiSerials")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -4233,8 +5806,9 @@ namespace eCommerce.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("LastModifierId");
 
-                    b.Property<int>("Quantity")
-                        .HasColumnType("integer");
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
 
                     b.Property<string>("Sku")
                         .IsRequired()
@@ -4248,6 +5822,17 @@ namespace eCommerce.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("TenantId");
 
+                    b.Property<Guid?>("UnitId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("UnitPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal?>("VatPercent")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("StockDocumentId");
@@ -4256,7 +5841,12 @@ namespace eCommerce.Migrations
                         .IsUnique()
                         .HasDatabaseName("IX_InvStockDocumentLines_TenantId_Doc_Sku");
 
-                    b.ToTable("InvStockDocumentLines", (string)null);
+                    b.ToTable("InvStockDocumentLines", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_InvStockDocumentLines_UnitPrice_KhongAm", "\"UnitPrice\" IS NULL OR \"UnitPrice\" >= 0");
+
+                            t.HasCheckConstraint("CK_InvStockDocumentLines_VatPercent_HopLe", "\"VatPercent\" IS NULL OR (\"VatPercent\" >= 0 AND \"VatPercent\" <= 100)");
+                        });
                 });
 
             modelBuilder.Entity("eCommerce.Inventory.StockLedgerEntry", b =>
@@ -4264,8 +5854,9 @@ namespace eCommerce.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
 
-                    b.Property<int>("BalanceAfter")
-                        .HasColumnType("integer");
+                    b.Property<decimal>("BalanceAfter")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
 
                     b.Property<string>("ChannelCode")
                         .HasMaxLength(32)
@@ -4311,8 +5902,9 @@ namespace eCommerce.Migrations
                     b.Property<DateTime>("OccurredAtUtc")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<int>("QuantityDelta")
-                        .HasColumnType("integer");
+                    b.Property<decimal>("QuantityDelta")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
 
                     b.Property<string>("ReferenceId")
                         .HasMaxLength(128)
@@ -4355,6 +5947,10 @@ namespace eCommerce.Migrations
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("ChannelCode")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
@@ -4606,6 +6202,16 @@ namespace eCommerce.Migrations
                     b.Property<string>("PayloadJson")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<int>("ReplayCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("ReplayedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ReplayedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
 
                     b.Property<string>("TenSuKien")
                         .IsRequired()
@@ -4963,6 +6569,10 @@ namespace eCommerce.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("CarrierCode")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
                     b.Property<string>("ChannelCode")
                         .IsRequired()
                         .HasMaxLength(32)
@@ -4978,6 +6588,13 @@ namespace eCommerce.Migrations
                     b.Property<string>("CheckoutIdempotencyKey")
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
+
+                    b.Property<long>("ClosureVersion")
+                        .HasColumnType("bigint");
+
+                    b.Property<decimal?>("CodAmount")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
@@ -5023,9 +6640,18 @@ namespace eCommerce.Migrations
                         .HasColumnType("text")
                         .HasColumnName("ExtraProperties");
 
+                    b.Property<int>("FulfillmentStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("FulfillmentVersion")
+                        .HasColumnType("bigint");
+
                     b.Property<decimal>("GrandTotal")
                         .HasPrecision(18, 4)
                         .HasColumnType("numeric(18,4)");
+
+                    b.Property<bool>("IsCancelled")
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
@@ -5050,12 +6676,50 @@ namespace eCommerce.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
+                    b.Property<Guid?>("PackerId")
+                        .HasColumnType("uuid");
+
                     b.Property<int>("PaymentStatus")
                         .HasColumnType("integer");
+
+                    b.Property<long>("PaymentVersion")
+                        .HasColumnType("bigint");
+
+                    b.Property<int?>("ReasonCode")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ReconciliationStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("ReconciliationVersion")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("ReturnStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("RowVersion")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid?>("SaleStaffId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("ShippingFeeActual")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<decimal?>("ShippingFeeCustomer")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
 
                     b.Property<decimal>("ShippingTotal")
                         .HasPrecision(18, 4)
                         .HasColumnType("numeric(18,4)");
+
+                    b.Property<int>("Source")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
 
                     b.Property<int>("Status")
                         .HasColumnType("integer");
@@ -5072,6 +6736,21 @@ namespace eCommerce.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("TenantId");
 
+                    b.Property<string>("TrackingNumber")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("Type")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
+
+                    b.Property<Guid?>("WarehouseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("WeightGram")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
 
                     b.HasIndex("TenantId", "CheckoutIdempotencyKey")
@@ -5082,11 +6761,35 @@ namespace eCommerce.Migrations
                     b.HasIndex("TenantId", "Number")
                         .IsUnique();
 
+                    b.HasIndex("TenantId", "TrackingNumber")
+                        .HasDatabaseName("IX_OrdOrders_TenantId_TrackingNumber")
+                        .HasFilter("\"TrackingNumber\" IS NOT NULL");
+
                     b.HasIndex("TenantId", "ChannelCode", "ExternalOrderId")
                         .IsUnique()
                         .HasFilter("\"ExternalOrderId\" IS NOT NULL");
 
-                    b.ToTable("OrdOrders", (string)null);
+                    b.HasIndex("TenantId", "FulfillmentStatus", "CreationTime")
+                        .HasDatabaseName("IX_OrdOrders_TenantId_FulfillmentStatus_CreationTime");
+
+                    b.HasIndex("TenantId", "PaymentStatus", "CreationTime")
+                        .HasDatabaseName("IX_OrdOrders_TenantId_PaymentStatus_CreationTime");
+
+                    b.HasIndex("TenantId", "ReconciliationStatus", "CreationTime")
+                        .HasDatabaseName("IX_OrdOrders_TenantId_ReconciliationStatus_CreationTime");
+
+                    b.HasIndex("TenantId", "ReturnStatus", "CreationTime")
+                        .HasDatabaseName("IX_OrdOrders_TenantId_ReturnStatus_CreationTime");
+
+                    b.HasIndex("TenantId", "WarehouseId", "CreationTime")
+                        .HasDatabaseName("IX_OrdOrders_TenantId_WarehouseId_CreationTime");
+
+                    b.ToTable("OrdOrders", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_OrdOrders_StatusVersions_KhongAm", "\"FulfillmentVersion\" >= 0 AND \"PaymentVersion\" >= 0 AND \"ReconciliationVersion\" >= 0 AND \"ClosureVersion\" >= 0 AND \"RowVersion\" >= 0");
+
+                            t.HasCheckConstraint("CK_OrdOrders_TienVaKhoiLuong_KhongAm", "(\"CodAmount\" IS NULL OR \"CodAmount\" >= 0) AND (\"ShippingFeeCustomer\" IS NULL OR \"ShippingFeeCustomer\" >= 0) AND (\"ShippingFeeActual\" IS NULL OR \"ShippingFeeActual\" >= 0) AND (\"WeightGram\" IS NULL OR \"WeightGram\" >= 0)");
+                        });
                 });
 
             modelBuilder.Entity("eCommerce.Orders.OrderLine", b =>
@@ -5135,10 +6838,16 @@ namespace eCommerce.Migrations
                     b.Property<Guid>("OrderId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("ProductId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid?>("ProductVariantId")
                         .HasColumnType("uuid");
 
                     b.Property<int>("Quantity")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ReturnedQuantity")
                         .HasColumnType("integer");
 
                     b.Property<string>("Sku")
@@ -5164,7 +6873,469 @@ namespace eCommerce.Migrations
                         .IsUnique()
                         .HasFilter("\"ExternalLineId\" IS NOT NULL");
 
-                    b.ToTable("OrdOrderLines", (string)null);
+                    b.HasIndex("TenantId", "ProductId")
+                        .HasDatabaseName("IX_OrdOrderLines_TenantId_ProductId");
+
+                    b.ToTable("OrdOrderLines", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_OrdOrderLines_ReturnedQuantity_HopLe", "\"ReturnedQuantity\" >= 0 AND \"ReturnedQuantity\" <= \"Quantity\"");
+                        });
+                });
+
+            modelBuilder.Entity("eCommerce.Orders.OrderReturn", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ChannelCode")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateTime?>("ClosedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("ConcurrencyStamp");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<Guid?>("DeleterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("DeleterId");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("DeletionTime");
+
+                    b.Property<string>("ExtraProperties")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("ExtraProperties");
+
+                    b.Property<int>("GoodsStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("IsDeleted");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PayloadHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ReasonCode")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ReasonText")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<DateTime?>("ReceivedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RefundCurrency")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)");
+
+                    b.Property<int>("RefundMethod")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("RefundedAmount")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<Guid?>("RequestedByActorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("RequestedByActorType")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<string>("ReturnNumber")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("WarehouseId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("IX_OrdReturns_TenantId_IdempotencyKey");
+
+                    b.HasIndex("TenantId", "ReturnNumber")
+                        .IsUnique()
+                        .HasDatabaseName("IX_OrdReturns_TenantId_ReturnNumber");
+
+                    b.HasIndex("TenantId", "OrderId", "CreationTime")
+                        .HasDatabaseName("IX_OrdReturns_TenantId_OrderId_CreationTime");
+
+                    b.HasIndex("TenantId", "Status", "GoodsStatus")
+                        .HasDatabaseName("IX_OrdReturns_TenantId_Status_GoodsStatus");
+
+                    b.ToTable("OrdReturns", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_OrdReturns_Dong_CoMoc", "\"Status\" <> 5 OR \"ClosedAtUtc\" IS NOT NULL");
+
+                            t.HasCheckConstraint("CK_OrdReturns_NhanHang_CoMoc", "\"Status\" <> 4 OR \"ReceivedAtUtc\" IS NOT NULL");
+
+                            t.HasCheckConstraint("CK_OrdReturns_RefundedAmount_KhongAm", "\"RefundedAmount\" >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("eCommerce.Orders.OrderReturnHistory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ActorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ActorType")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<string>("Axis")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<Guid?>("DeleterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("DeleterId");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("DeletionTime");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("FromStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("IsDeleted");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ReasonCode")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ReasonText")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<Guid>("ReturnId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.Property<int>("ToStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("VersionAfter")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReturnId");
+
+                    b.HasIndex("TenantId", "ReturnId", "OccurredAtUtc")
+                        .HasDatabaseName("IX_OrdReturnHistory_TenantId_ReturnId_OccurredAtUtc");
+
+                    b.HasIndex("TenantId", "ReturnId", "Axis", "VersionAfter")
+                        .IsUnique()
+                        .HasDatabaseName("IX_OrdReturnHistory_TenantId_ReturnId_Axis_VersionAfter");
+
+                    b.ToTable("OrdReturnHistory", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_OrdReturnHistory_PhaiDoiTrangThai", "\"FromStatus\" <> \"ToStatus\"");
+                        });
+                });
+
+            modelBuilder.Entity("eCommerce.Orders.OrderReturnLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<Guid?>("DeleterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("DeleterId");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("DeletionTime");
+
+                    b.Property<decimal>("DiscountAmountSnapshot")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<int>("Disposition")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("IsDeleted");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<Guid?>("LedgerEntryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OrderLineId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ReceivedQuantity")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("RefundAmount")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<Guid>("ReturnId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Sku")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<decimal>("TaxAmountSnapshot")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.Property<decimal>("UnitPriceSnapshot")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReturnId");
+
+                    b.HasIndex("TenantId", "ReturnId", "OrderLineId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_OrdReturnLines_TenantId_ReturnId_OrderLineId");
+
+                    b.ToTable("OrdReturnLines", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_OrdReturnLines_Disposition_ChiSauKhiNhan", "\"Disposition\" = 0 OR \"ReceivedQuantity\" > 0");
+
+                            t.HasCheckConstraint("CK_OrdReturnLines_Nhan_HopLe", "\"ReceivedQuantity\" >= 0 AND \"ReceivedQuantity\" <= \"Quantity\"");
+
+                            t.HasCheckConstraint("CK_OrdReturnLines_SoLuong_HopLe", "\"Quantity\" > 0");
+                        });
+                });
+
+            modelBuilder.Entity("eCommerce.Orders.OrderStatusHistory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ActorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ActorType")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<string>("Axis")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<Guid?>("DeleterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("DeleterId");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("DeletionTime");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("FromStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("IsDeleted");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ReasonCode")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ReasonText")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.Property<int>("ToStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("VersionAfter")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderId");
+
+                    b.HasIndex("TenantId", "ActorType", "OccurredAtUtc")
+                        .HasDatabaseName("IX_OrdStatusHistory_TenantId_ActorType_OccurredAtUtc");
+
+                    b.HasIndex("TenantId", "Axis", "OccurredAtUtc")
+                        .HasDatabaseName("IX_OrdStatusHistory_TenantId_Axis_OccurredAtUtc");
+
+                    b.HasIndex("TenantId", "OrderId", "OccurredAtUtc")
+                        .HasDatabaseName("IX_OrdStatusHistory_TenantId_OrderId_OccurredAtUtc");
+
+                    b.HasIndex("TenantId", "OrderId", "Axis", "VersionAfter")
+                        .IsUnique()
+                        .HasDatabaseName("IX_OrdStatusHistory_TenantId_OrderId_Axis_VersionAfter");
+
+                    b.ToTable("OrdStatusHistory", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_OrdStatusHistory_From_Khac_To", "\"FromStatus\" <> \"ToStatus\"");
+                        });
                 });
 
             modelBuilder.Entity("eCommerce.PaymentHub.Payments.PaymentRefund", b =>
@@ -5351,6 +7522,14 @@ namespace eCommerce.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
+                    b.Property<string>("ProviderCreateDateGmt7")
+                        .HasMaxLength(14)
+                        .HasColumnType("character(14)")
+                        .IsFixedLength();
+
+                    b.Property<DateTime?>("ProviderCreateDateUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("ProviderTransactionId")
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
@@ -5385,6 +7564,678 @@ namespace eCommerce.Migrations
                             t.HasCheckConstraint("CK_PayTransactions_RefundedAmount_KhongAm", "\"RefundedAmount\" >= 0");
 
                             t.HasCheckConstraint("CK_PayTransactions_RefundedAmount_KhongVuotAmount", "\"RefundedAmount\" <= \"Amount\"");
+                        });
+                });
+
+            modelBuilder.Entity("eCommerce.Pos.CashSession", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("CashRefund")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("CashRevenue")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid?>("CashierId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ClosedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ClosedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("ConcurrencyStamp");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<Guid?>("DeleterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("DeleterId");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("DeletionTime");
+
+                    b.Property<decimal>("ExpectedCash")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("ExtraProperties")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("ExtraProperties");
+
+                    b.Property<decimal>("HandoverCash")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("IsDeleted");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
+
+                    b.Property<string>("Number")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("OpenedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("OpeningCash")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("OtherExpense")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.Property<decimal>("Variance")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid>("WarehouseId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Number")
+                        .IsUnique()
+                        .HasDatabaseName("IX_PosCashSessions_TenantId_Number");
+
+                    b.HasIndex("TenantId", "WarehouseId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_PosCashSessions_TenantId_WarehouseId_DangMo")
+                        .HasFilter("\"Status\" = 0");
+
+                    b.HasIndex("TenantId", "WarehouseId", "OpenedAtUtc")
+                        .HasDatabaseName("IX_PosCashSessions_TenantId_WarehouseId_OpenedAtUtc");
+
+                    b.ToTable("PosCashSessions", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_PosCashSessions_KetCa_CoMoc", "\"Status\" <> 1 OR (\"ClosedAtUtc\" IS NOT NULL AND \"ClosedBy\" IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_PosCashSessions_Tien_KhongAm", "\"OpeningCash\" >= 0 AND \"CashRevenue\" >= 0 AND \"CashRefund\" >= 0 AND \"OtherExpense\" >= 0 AND \"ExpectedCash\" >= 0 AND \"HandoverCash\" >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("eCommerce.Pos.RetailBill", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CashSessionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("ChangeAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid>("ClientBillId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("ConcurrencyStamp");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<decimal>("CustomerGivenAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid?>("CustomerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("DebtAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid?>("DeleterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("DeleterId");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("DeletionTime");
+
+                    b.Property<decimal>("DiscountTotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime?>("DueDateUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ExtraProperties")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("ExtraProperties");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("IsDeleted");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<decimal>("LineDiscountTotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<string>("Number")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<decimal>("PaidAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("PointsEarned")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<decimal>("PointsUsed")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<decimal>("PointsUsedAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid?>("SaleStaffId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("StockDocumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Subtotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.Property<decimal>("TotalPayment")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("VatTotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("VoidReason")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<Guid?>("VoidStockDocumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("VoidedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("VoidedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("WarehouseId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "CashSessionId")
+                        .HasDatabaseName("IX_PosRetailBills_TenantId_CashSessionId");
+
+                    b.HasIndex("TenantId", "ClientBillId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_PosRetailBills_TenantId_ClientBillId");
+
+                    b.HasIndex("TenantId", "Number")
+                        .IsUnique()
+                        .HasDatabaseName("IX_PosRetailBills_TenantId_Number");
+
+                    b.HasIndex("TenantId", "CustomerId", "DebtAmount")
+                        .HasDatabaseName("IX_PosRetailBills_TenantId_CustomerId_DebtAmount");
+
+                    b.HasIndex("TenantId", "WarehouseId", "CreationTime")
+                        .HasDatabaseName("IX_PosRetailBills_TenantId_WarehouseId_CreationTime");
+
+                    b.ToTable("PosRetailBills", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_PosRetailBills_ChietKhau_MotTang", "NOT (\"DiscountTotal\" > 0 AND \"LineDiscountTotal\" > 0)");
+
+                            t.HasCheckConstraint("CK_PosRetailBills_Huy_CoMoc", "\"Status\" <> 1 OR (\"VoidedAtUtc\" IS NOT NULL AND \"VoidReason\" IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_PosRetailBills_No_CoHan", "\"DebtAmount\" = 0 OR \"DueDateUtc\" IS NOT NULL");
+
+                            t.HasCheckConstraint("CK_PosRetailBills_Tien_KhongAm", "\"Subtotal\" >= 0 AND \"LineDiscountTotal\" >= 0 AND \"DiscountTotal\" >= 0 AND \"VatTotal\" >= 0 AND \"PointsUsed\" >= 0 AND \"PointsUsedAmount\" >= 0 AND \"PointsEarned\" >= 0 AND \"TotalPayment\" >= 0 AND \"PaidAmount\" >= 0 AND \"ChangeAmount\" >= 0 AND \"DebtAmount\" >= 0 AND \"CustomerGivenAmount\" >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("eCommerce.Pos.RetailBillLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<Guid?>("DeleterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("DeleterId");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("DeletionTime");
+
+                    b.Property<decimal>("DiscountAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("IsDeleted");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<string>("ProductName")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<Guid>("RetailBillId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("ReturnedQuantity")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<string>("Sku")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal?>("VatAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal?>("VatPercent")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RetailBillId");
+
+                    b.HasIndex("TenantId", "RetailBillId")
+                        .HasDatabaseName("IX_PosRetailBillLines_TenantId_RetailBillId");
+
+                    b.HasIndex("TenantId", "Sku")
+                        .HasDatabaseName("IX_PosRetailBillLines_TenantId_Sku");
+
+                    b.ToTable("PosRetailBillLines", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_PosRetailBillLines_DaTra_HopLe", "\"ReturnedQuantity\" >= 0 AND \"ReturnedQuantity\" <= \"Quantity\"");
+
+                            t.HasCheckConstraint("CK_PosRetailBillLines_SoLuong_Duong", "\"Quantity\" > 0");
+
+                            t.HasCheckConstraint("CK_PosRetailBillLines_Tien_KhongAm", "\"UnitPrice\" >= 0 AND \"DiscountAmount\" >= 0 AND \"Amount\" >= 0 AND (\"VatAmount\" IS NULL OR \"VatAmount\" >= 0)");
+                        });
+                });
+
+            modelBuilder.Entity("eCommerce.Pos.RetailBillPayment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<Guid?>("DeleterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("DeleterId");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("DeletionTime");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("IsDeleted");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<int>("Method")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("ReferenceCode")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<Guid>("RetailBillId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RetailBillId");
+
+                    b.HasIndex("TenantId", "ReferenceCode")
+                        .HasDatabaseName("IX_PosRetailBillPayments_TenantId_ReferenceCode")
+                        .HasFilter("\"ReferenceCode\" IS NOT NULL");
+
+                    b.HasIndex("TenantId", "RetailBillId")
+                        .HasDatabaseName("IX_PosRetailBillPayments_TenantId_RetailBillId");
+
+                    b.ToTable("PosRetailBillPayments", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_PosRetailBillPayments_Tien_KhongAm", "\"Amount\" >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("eCommerce.Pos.RetailReturn", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CashSessionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("ConcurrencyStamp");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<Guid?>("CustomerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("DebtReductionAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid?>("DeleterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("DeleterId");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("DeletionTime");
+
+                    b.Property<string>("ExtraProperties")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("ExtraProperties");
+
+                    b.Property<decimal>("GoodsAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("IsDeleted");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
+
+                    b.Property<string>("Number")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<decimal>("PointsReversed")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<decimal>("RefundAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<int>("RefundMethod")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("RetailBillId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("ReturnFeeAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("StockDocumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.Property<Guid>("WarehouseId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "CashSessionId")
+                        .HasDatabaseName("IX_PosRetailReturns_TenantId_CashSessionId");
+
+                    b.HasIndex("TenantId", "Number")
+                        .IsUnique()
+                        .HasDatabaseName("IX_PosRetailReturns_TenantId_Number");
+
+                    b.HasIndex("TenantId", "RetailBillId")
+                        .HasDatabaseName("IX_PosRetailReturns_TenantId_RetailBillId");
+
+                    b.ToTable("PosRetailReturns", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_PosRetailReturns_Tien_CanBang", "\"GoodsAmount\" = \"DebtReductionAmount\" + \"RefundAmount\" + \"ReturnFeeAmount\"");
+
+                            t.HasCheckConstraint("CK_PosRetailReturns_Tien_KhongAm", "\"GoodsAmount\" >= 0 AND \"ReturnFeeAmount\" >= 0 AND \"DebtReductionAmount\" >= 0 AND \"RefundAmount\" >= 0 AND \"PointsReversed\" >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("eCommerce.Pos.RetailReturnLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<Guid?>("DeleterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("DeleterId");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("DeletionTime");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("IsDeleted");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<decimal>("RefundAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid>("RetailReturnId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Sku")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.Property<decimal>("UnitPriceSnapshot")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RetailReturnId");
+
+                    b.HasIndex("TenantId", "RetailReturnId")
+                        .HasDatabaseName("IX_PosRetailReturnLines_TenantId_RetailReturnId");
+
+                    b.ToTable("PosRetailReturnLines", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_PosRetailReturnLines_SoLuong_Duong", "\"Quantity\" > 0");
+
+                            t.HasCheckConstraint("CK_PosRetailReturnLines_Tien_KhongAm", "\"UnitPriceSnapshot\" >= 0 AND \"RefundAmount\" >= 0");
                         });
                 });
 
@@ -5483,6 +8334,102 @@ namespace eCommerce.Migrations
                         .HasDatabaseName("IX_PrcChannelPrices_TenantId_Kenh_Shop_Sku_MinQty");
 
                     b.ToTable("PrcChannelPrices", (string)null);
+                });
+
+            modelBuilder.Entity("eCommerce.Pricing.CostPrice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("AmountValue")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<DateTime?>("ApprovedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ApprovedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("ConcurrencyStamp");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)");
+
+                    b.Property<Guid?>("DeleterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("DeleterId");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("DeletionTime");
+
+                    b.Property<DateOnly>("EffectiveFrom")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly?>("EffectiveTo")
+                        .HasColumnType("date");
+
+                    b.Property<string>("ExtraProperties")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("ExtraProperties");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("IsDeleted");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<string>("Sku")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Sku", "EffectiveFrom")
+                        .IsUnique()
+                        .HasDatabaseName("IX_PrcCostPrices_TenantId_Sku_EffectiveFrom");
+
+                    b.HasIndex("TenantId", "Sku", "EffectiveTo")
+                        .HasDatabaseName("IX_PrcCostPrices_TenantId_Sku_EffectiveTo");
+
+                    b.ToTable("PrcCostPrices", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_PrcCostPrices_Amount_KhongAm", "\"AmountValue\" >= 0");
+
+                            t.HasCheckConstraint("CK_PrcCostPrices_Currency_HopLe", "\"CurrencyCode\" ~ '^[A-Z]{3}$'");
+
+                            t.HasCheckConstraint("CK_PrcCostPrices_EffectiveRange", "\"EffectiveTo\" IS NULL OR \"EffectiveTo\" >= \"EffectiveFrom\"");
+                        });
                 });
 
             modelBuilder.Entity("eCommerce.Pricing.PriceCalculationRecord", b =>
@@ -5957,6 +8904,866 @@ namespace eCommerce.Migrations
                         .HasDatabaseName("IX_PrcTierPriceSets_TenantId_Status_Scope_ChannelCode");
 
                     b.ToTable("PrcTierPriceSets", (string)null);
+                });
+
+            modelBuilder.Entity("eCommerce.Reconciliation.PaymentDiscrepancy", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("AcknowledgedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("AcknowledgedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("ConcurrencyStamp");
+
+                    b.Property<string>("CorrelationId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character(3)")
+                        .IsFixedLength();
+
+                    b.Property<Guid?>("DeleterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("DeleterId");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("DeletionTime");
+
+                    b.Property<DateTime>("DetectedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ExtraProperties")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("ExtraProperties");
+
+                    b.Property<string>("IgnoreReason")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("IsDeleted");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<Guid>("LineId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long?>("LocalAmountMinorUnits")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("MerchantReference")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid?>("OrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PaymentTransactionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long?>("ProviderAmountMinorUnits")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("ProviderCode")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("ResolutionNote")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<DateTime?>("ResolvedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ResolvedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RunId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Severity")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RunId");
+
+                    b.HasIndex("TenantId", "RunId")
+                        .HasDatabaseName("IX_RecPayDiscrepancies_TenantId_Run");
+
+                    b.HasIndex("TenantId", "Status", "Severity")
+                        .HasDatabaseName("IX_RecPayDiscrepancies_TenantId_Status_Severity");
+
+                    b.ToTable("RecPaymentDiscrepancies", (string)null);
+                });
+
+            modelBuilder.Entity("eCommerce.Reconciliation.PaymentReconciliationLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("CheckedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CorrelationId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<Guid?>("DeleterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("DeleterId");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("DeletionTime");
+
+                    b.Property<Guid?>("DiscrepancyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("FailureCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("FailureMessage")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("IsDeleted");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<long>("LocalAmountMinorUnits")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("LocalStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("MerchantReference")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("PaymentTransactionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long?>("ProviderAmountMinorUnits")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("ProviderCode")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("ProviderPayDateGmt7")
+                        .HasMaxLength(14)
+                        .HasColumnType("character(14)")
+                        .IsFixedLength();
+
+                    b.Property<DateTime?>("ProviderPayDateUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ProviderResponseCode")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)");
+
+                    b.Property<string>("ProviderTransactionNo")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("ProviderTransactionStatus")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)");
+
+                    b.Property<string>("ProviderTransactionType")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)");
+
+                    b.Property<string>("RequestId")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<Guid>("RunId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SkipReason")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RunId");
+
+                    b.HasIndex("TenantId", "RunId", "PaymentTransactionId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_RecPayLines_TenantId_Run_GiaoDich");
+
+                    b.HasIndex("TenantId", "RunId", "Status")
+                        .HasDatabaseName("IX_RecPayLines_TenantId_Run_Status");
+
+                    b.ToTable("RecPaymentReconciliationLines", (string)null);
+                });
+
+            modelBuilder.Entity("eCommerce.Reconciliation.PaymentReconciliationRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("ConcurrencyStamp");
+
+                    b.Property<string>("CorrelationId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<Guid?>("DeleterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("DeleterId");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("DeletionTime");
+
+                    b.Property<int>("DiscrepancyCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ExtraProperties")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("ExtraProperties");
+
+                    b.Property<string>("FailureCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime?>("FinishedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("IsDeleted");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<int>("LineMatched")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("LineSkipped")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("LineTotal")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("PeriodFromUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("PeriodToUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("StartedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.Property<int>("TriggeredBy")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("TriggeredByUserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "PeriodFromUtc")
+                        .HasDatabaseName("IX_RecPayRuns_TenantId_PeriodFrom");
+
+                    b.HasIndex("TenantId", "Status", "StartedAtUtc")
+                        .HasDatabaseName("IX_RecPayRuns_TenantId_Status_Started");
+
+                    b.ToTable("RecPaymentReconciliationRuns", (string)null);
+                });
+
+            modelBuilder.Entity("eCommerce.Reporting.RptAggDailySales", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("AggregatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly>("BusinessDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<int>("DocumentCount")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("DocumentDiscountTotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("LineAmountTotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<int>("LineCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Nguon")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<decimal>("Revenue")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.Property<decimal>("VatTotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "BusinessDate", "Nguon")
+                        .IsUnique()
+                        .HasDatabaseName("IX_RptAggDailySales_TenantId_Ngay_Nguon");
+
+                    b.ToTable("RptAggDailySales", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_RptAggDailySales_Nguon_HopLe", "\"Nguon\" IN (0, 1)");
+
+                            t.HasCheckConstraint("CK_RptAggDailySales_Tien_KhongAm", "\"LineAmountTotal\" >= 0 AND \"DocumentDiscountTotal\" >= 0 AND \"Revenue\" >= 0 AND \"VatTotal\" >= 0 AND \"Quantity\" >= 0 AND \"DocumentCount\" >= 0 AND \"LineCount\" >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("eCommerce.Reporting.RptDimDate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly>("BusinessDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<int>("Day")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("DayOfWeek")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsWeekend")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("Month")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Quarter")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "BusinessDate")
+                        .IsUnique()
+                        .HasDatabaseName("IX_RptDimDates_TenantId_Ngay");
+
+                    b.ToTable("RptDimDates", (string)null);
+                });
+
+            modelBuilder.Entity("eCommerce.Reporting.RptDimProduct", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<string>("ProductName")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("Sku")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Sku")
+                        .IsUnique()
+                        .HasDatabaseName("IX_RptDimProducts_TenantId_Sku");
+
+                    b.ToTable("RptDimProducts", (string)null);
+                });
+
+            modelBuilder.Entity("eCommerce.Reporting.RptDimStaff", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<string>("DisplayName")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<Guid>("StaffId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "StaffId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_RptDimStaffs_TenantId_NhanVien");
+
+                    b.ToTable("RptDimStaffs", (string)null);
+                });
+
+            modelBuilder.Entity("eCommerce.Reporting.RptDimStore", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Code")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<string>("Name")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.Property<Guid>("WarehouseId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "WarehouseId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_RptDimStores_TenantId_Kho");
+
+                    b.ToTable("RptDimStores", (string)null);
+                });
+
+            modelBuilder.Entity("eCommerce.Reporting.RptFactInventorySnapshot", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Available")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<DateTime>("CapturedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<decimal>("Damaged")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<decimal>("Holding")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<decimal>("InWarehouse")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<decimal>("OnHand")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<decimal>("PreOrder")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<decimal>("Reserved")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<decimal>("Shipping")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<string>("Sku")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateOnly>("SnapshotDate")
+                        .HasColumnType("date");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.Property<decimal>("Transferring")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<decimal>("WaitingInbound")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<Guid>("WarehouseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Warranty")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<decimal>("WarrantyHolding")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "SnapshotDate")
+                        .HasDatabaseName("IX_RptFactInventorySnapshots_TenantId_Ngay");
+
+                    b.HasIndex("TenantId", "SnapshotDate", "WarehouseId", "Sku")
+                        .IsUnique()
+                        .HasDatabaseName("IX_RptFactInventorySnapshots_TenantId_Ngay_Kho_Sku");
+
+                    b.ToTable("RptFactInventorySnapshots", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_RptFactInventorySnapshots_Chieu_KhongAm", "\"OnHand\" >= 0 AND \"Reserved\" >= 0 AND \"Transferring\" >= 0 AND \"Shipping\" >= 0 AND \"Holding\" >= 0 AND \"Damaged\" >= 0 AND \"Warranty\" >= 0 AND \"WarrantyHolding\" >= 0 AND \"PreOrder\" >= 0 AND \"WaitingInbound\" >= 0 AND \"Available\" >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("eCommerce.Reporting.RptFactSalesLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly>("BusinessDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<Guid?>("CustomerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DocumentNumber")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<decimal>("LineAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("LineDiscount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<int>("Nguon")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ProductName")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<string>("Sku")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("SourceLineId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("StaffId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("VatAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal?>("VatPercent")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid?>("WarehouseId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Sku")
+                        .HasDatabaseName("IX_RptFactSalesLines_TenantId_Sku");
+
+                    b.HasIndex("TenantId", "BusinessDate", "Nguon")
+                        .HasDatabaseName("IX_RptFactSalesLines_TenantId_Ngay_Nguon");
+
+                    b.HasIndex("TenantId", "Nguon", "SourceLineId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_RptFactSalesLines_TenantId_Nguon_DongNguon");
+
+                    b.ToTable("RptFactSalesLines", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_RptFactSalesLines_Nguon_HopLe", "\"Nguon\" IN (0, 1)");
+
+                            t.HasCheckConstraint("CK_RptFactSalesLines_SoLuong_KhongAm", "\"Quantity\" >= 0");
+
+                            t.HasCheckConstraint("CK_RptFactSalesLines_Tien_KhongAm", "\"UnitPrice\" >= 0 AND \"LineDiscount\" >= 0 AND \"LineAmount\" >= 0 AND \"VatAmount\" >= 0 AND (\"VatPercent\" IS NULL OR \"VatPercent\" >= 0)");
+                        });
+                });
+
+            modelBuilder.Entity("eCommerce.Reporting.RptWatermark", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("ConcurrencyStamp");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<Guid?>("DeleterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("DeleterId");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("DeletionTime");
+
+                    b.Property<string>("ExtraProperties")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("ExtraProperties");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("IsDeleted");
+
+                    b.Property<DateOnly?>("LastAggregatedDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<long>("LastRowCount")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("LastRunAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Nguon")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Nguon")
+                        .IsUnique()
+                        .HasDatabaseName("IX_RptWatermarks_TenantId_Nguon");
+
+                    b.ToTable("RptWatermarks", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_RptWatermarks_SoDong_KhongAm", "\"LastRowCount\" >= 0");
+                        });
                 });
 
             modelBuilder.Entity("eCommerce.Signing.SigningCertificate", b =>
@@ -6550,6 +10357,49 @@ namespace eCommerce.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
+            modelBuilder.Entity("eCommerce.Catalog.ComboComponent", b =>
+                {
+                    b.HasOne("eCommerce.Catalog.Product", null)
+                        .WithMany()
+                        .HasForeignKey("ComboProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("eCommerce.Catalog.Product", null)
+                        .WithMany()
+                        .HasForeignKey("ComponentProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("eCommerce.Catalog.PackageComponent", b =>
+                {
+                    b.HasOne("eCommerce.Catalog.Product", null)
+                        .WithMany()
+                        .HasForeignKey("ComponentProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("eCommerce.Catalog.Product", null)
+                        .WithMany()
+                        .HasForeignKey("PackageProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("eCommerce.Catalog.Product", b =>
+                {
+                    b.HasOne("eCommerce.Catalog.Brand", null)
+                        .WithMany()
+                        .HasForeignKey("BrandId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("eCommerce.Catalog.Product", null)
+                        .WithMany()
+                        .HasForeignKey("ParentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
             modelBuilder.Entity("eCommerce.Catalog.ProductAttributeSelection", b =>
                 {
                     b.HasOne("eCommerce.Catalog.CatalogAttribute", null)
@@ -6564,6 +10414,15 @@ namespace eCommerce.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("eCommerce.Catalog.Product", null)
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("eCommerce.Catalog.ProductBatch", b =>
+                {
                     b.HasOne("eCommerce.Catalog.Product", null)
                         .WithMany()
                         .HasForeignKey("ProductId")
@@ -6595,10 +10454,42 @@ namespace eCommerce.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("eCommerce.Catalog.ProductImei", b =>
+                {
+                    b.HasOne("eCommerce.Catalog.ProductBatch", null)
+                        .WithMany()
+                        .HasForeignKey("BatchId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("eCommerce.Catalog.Product", null)
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("eCommerce.Catalog.ProductMedia", b =>
                 {
                     b.HasOne("eCommerce.Catalog.Product", null)
                         .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("eCommerce.Catalog.ProductTag", b =>
+                {
+                    b.HasOne("eCommerce.Catalog.Product", null)
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("eCommerce.Catalog.ProductUnit", b =>
+                {
+                    b.HasOne("eCommerce.Catalog.Product", null)
+                        .WithMany("Units")
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
@@ -6634,6 +10525,15 @@ namespace eCommerce.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("eCommerce.Catalog.ProductVariantMap", b =>
+                {
+                    b.HasOne("eCommerce.Catalog.Product", null)
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("eCommerce.Inventory.ReconRunMismatch", b =>
                 {
                     b.HasOne("eCommerce.Inventory.ReconRun", null)
@@ -6661,6 +10561,60 @@ namespace eCommerce.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("eCommerce.Orders.OrderReturnHistory", b =>
+                {
+                    b.HasOne("eCommerce.Orders.OrderReturn", null)
+                        .WithMany()
+                        .HasForeignKey("ReturnId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("eCommerce.Orders.OrderReturnLine", b =>
+                {
+                    b.HasOne("eCommerce.Orders.OrderReturn", null)
+                        .WithMany()
+                        .HasForeignKey("ReturnId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("eCommerce.Orders.OrderStatusHistory", b =>
+                {
+                    b.HasOne("eCommerce.Orders.Order", null)
+                        .WithMany("StatusHistory")
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("eCommerce.Pos.RetailBillLine", b =>
+                {
+                    b.HasOne("eCommerce.Pos.RetailBill", null)
+                        .WithMany()
+                        .HasForeignKey("RetailBillId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("eCommerce.Pos.RetailBillPayment", b =>
+                {
+                    b.HasOne("eCommerce.Pos.RetailBill", null)
+                        .WithMany()
+                        .HasForeignKey("RetailBillId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("eCommerce.Pos.RetailReturnLine", b =>
+                {
+                    b.HasOne("eCommerce.Pos.RetailReturn", null)
+                        .WithMany()
+                        .HasForeignKey("RetailReturnId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("eCommerce.Pricing.PriceListItem", b =>
                 {
                     b.HasOne("eCommerce.Pricing.PriceList", null)
@@ -6675,6 +10629,24 @@ namespace eCommerce.Migrations
                     b.HasOne("eCommerce.Pricing.TierPriceSet", null)
                         .WithMany()
                         .HasForeignKey("TierPriceSetId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("eCommerce.Reconciliation.PaymentDiscrepancy", b =>
+                {
+                    b.HasOne("eCommerce.Reconciliation.PaymentReconciliationRun", null)
+                        .WithMany()
+                        .HasForeignKey("RunId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("eCommerce.Reconciliation.PaymentReconciliationLine", b =>
+                {
+                    b.HasOne("eCommerce.Reconciliation.PaymentReconciliationRun", null)
+                        .WithMany()
+                        .HasForeignKey("RunId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
@@ -6720,12 +10692,16 @@ namespace eCommerce.Migrations
 
             modelBuilder.Entity("eCommerce.Catalog.Product", b =>
                 {
+                    b.Navigation("Units");
+
                     b.Navigation("Variants");
                 });
 
             modelBuilder.Entity("eCommerce.Orders.Order", b =>
                 {
                     b.Navigation("Lines");
+
+                    b.Navigation("StatusHistory");
                 });
 #pragma warning restore 612, 618
         }

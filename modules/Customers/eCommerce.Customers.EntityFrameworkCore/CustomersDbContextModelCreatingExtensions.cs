@@ -14,6 +14,10 @@ public static class CustomersDbContextModelCreatingExtensions
     {
         Check.NotNull(builder, nameof(builder));
 
+        // 🆕 `WP-07` — khách mở rộng (điểm/công nợ/cấp) + cấp khách + chăm sóc + cấu hình tổ chức.
+        // 📌 Gọi NGAY ĐẦU để phần `CUS-001` bên dưới (đã ổn định) không bị trộn thêm.
+        builder.ConfigureKhachHangWp07();
+
         // ── NHÓM KHÁCH ──────────────────────────────────────────────────────────────────────────
         builder.Entity<CustomerGroup>(b =>
         {

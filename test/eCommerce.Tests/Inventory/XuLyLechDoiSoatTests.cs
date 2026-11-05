@@ -116,7 +116,7 @@ public class XuLyLechDoiSoatTests
         Assert.True(loi.Data.Contains("sku"), "Lỗi phải mang `sku` để điều tra.");
         Assert.True(loi.Data.Contains("chenhLech"), "Lỗi phải mang `chenhLech` để biết lệch bao nhiêu.");
         Assert.Equal("SKU-001", loi.Data["sku"]);
-        Assert.Equal(-4, loi.Data["chenhLech"]);     // 96 − 100, GIỮ DẤU (âm = thiếu so với sổ)
+        Assert.Equal(-4m, loi.Data["chenhLech"]);     // 96 − 100, GIỮ DẤU (âm = thiếu so với sổ)
     }
 
     // ── (4) KHÔNG GHI ĐÈ BẰNG CHỨNG ────────────────────────────────────────────────────────────

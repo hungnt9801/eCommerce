@@ -26,6 +26,11 @@ namespace eCommerce.Catalog;
 /// phải endpoint. ⚠️ Nếu để nó thành app service thì ABP **tự sinh API controller** ⇒ **mở ra Internet** một
 /// đường tra kênh mà **không ai review** (`AllowlistCongKhaiTests` sẽ bắt — nhưng tốt hơn là **không tạo ra**).
 /// </summary>
+// 🔒 `S17` (29/10/2026) — **ĐĂNG KÝ DI TƯỜNG MINH** hợp đồng nằm ở `Catalog.Application.Contracts`:
+// lớp hiện thực vẫn ở host (đọc entity `Channel` của `ChannelHub.Domain`), nên dòng này **ghim** cặp
+// `IChannelDirectory → ChannelDirectory` thay vì dựa vào quy ước đặt tên của ABP. 📌 Nếu ai đổi tên lớp
+// mà quên sửa, test `HopDongHostTests` đỏ ngay thay vì `HTTP 500` lúc chạy (bài học `IXuLyKetQuaCong`).
+[ExposeServices(typeof(IChannelDirectory))]
 public class ChannelDirectory : IChannelDirectory, ITransientDependency
 {
     private readonly IRepository<ChannelEntity, Guid> _kenhRepository;

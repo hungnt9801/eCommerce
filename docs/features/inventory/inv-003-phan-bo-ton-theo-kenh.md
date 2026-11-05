@@ -1540,3 +1540,73 @@ ca "chặn đúng" và ca "chặn bừa" **trông giống hệt nhau**. 📌 Đ�
 |---|---|---|---|
 | v1.3 | 18/10/2026 | *(agent, session `S7`)* | **§20 — `S7`: LỌC THEO KHO + PHÂN TRANG + NHÃN `Q4`**: `LocHanMucKenhInput` + `GetDanhSachPhanTrangAsync` (**đếm TRƯỚC khi cắt trang**, trần 200) · `GetKhoKhaDungAsync`/`KhoKhaDungDto` · view: ô lọc **kho** (kèm `(không gắn kho)`) **trong cùng form** với ô kênh · **phân trang** giữ **cả hai** bộ lọc · ô **chọn kho** khi đặt hạn mức · **nhãn** *"trần an toàn của kênh theo từng kho"* + `Percent` = *"% tồn khả dụng của TỪNG (kho, SKU)"* · `GhichuNo()` đổi theo `Q4` · tham số `kho` lạ ⇒ **bỏ lọc + cảnh báo** (không `500`, không im lặng). ✅ **8 ca E2E trên HTML thật + DB thật** (**đo hai chiều** cho mỗi bộ lọc). 🚨 **Lỗi của BỘ ĐO** (§20.4): neo HTML giả định `7` trong khi cột `numeric` in **`7.0000`** ⇒ **3 ca ĐỎ GIẢ**, và các ca **chiều ngược XANH vì lý do sai**. Ghi **§20.5** (nợ: nút Sửa điền sẵn · test tích hợp `GiuChoAsync` · mock · mô hình tồn theo kênh) |
 | v1.4 | 21/10/2026 | *(agent, tiếp phiên `S7`)* | **ĐÓNG NỢ §20.5 #1 — NÚT "SỬA" ĐIỀN SẴN** (đóng nốt `INV-003` §18.7 #3): mỗi dòng có nút **Sửa** ⇒ `GET /HanMucKenh?…&sua=<id>` điền sẵn **kênh · kho · giá trị · đơn vị · hành động**; 🔒 **chỉ điền sẵn** (đường ghi vẫn là `POST DatHanMuc` upsert theo `(kênh, kho)`) · ô số dùng `InvariantCulture` + `0.####` (DB trả `7.0000` ⇒ ô hiện `7`) · `?sua=<id>` mà dòng **không có trên trang** ⇒ **nói rõ + không điền gì** (📌 tránh ghi đè một dòng khác bằng giá trị mặc định). **+5 ca E2E** (`S7-H9…H13`, gồm **chiều ngược**: trang không `?sua` **không** điền sẵn). Ghi nợ mới **§20.5 #5** (đổi khoá dòng = tạo dòng mới; màn hình chưa cảnh báo) |
+
+---
+
+## 21. TRẠNG THÁI TRIỂN KHAI — **`S13`: NGÂN SÁCH TỒN THEO KÊNH + SỔ CÁI + GIỮ CHỖ THEO NGÂN SÁCH** (28/10/2026)
+
+> 🎯 **Mục tiêu:** có **ngân sách tồn theo `(kho, SKU, kênh)`**, sổ cái **append-only**, **ATP** trả lời được
+> *"kênh này còn bán được bao nhiêu"*, và **giữ chỗ thật sự trừ ngân sách kênh**.
+
+### 21.1 Đã làm
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| 1 | **Entity `StockAllotment`** (`InvStockAllotments`) | `WarehouseId` · `Sku` · `ChannelCode` (đã chuẩn hoá) · `AllottedQuantity` · `ReservedQuantity` · `Priority` · `Status` (`Active/Frozen/Released`) · dấu vết đóng băng/nhả. **ATP là computed**, **không** lưu cột (`BR-18`) |
+| 2 | **Entity `StockAllotmentLedger`** (`InvStockAllotmentLedgers`) | **APPEND-ONLY** (`BR-07`): `QuantityDelta`, `AllottedAfter`, `Reason` (**enum đóng**), `ReferenceType/Id`, `IdempotencyKey`, `OccurredAtUtc`, `PerformedByUserId`. **Không** setter công khai |
+| 3 | **Bất biến** | `0 ≤ Reserved ≤ Allotted` (domain + 2 `CHECK`); `Σ Allotted (Active+Frozen) ≤ OnHand` (trong transaction, **sau khoá** — `CHECK` không diễn đạt được); `Frozen` phải có dấu vết; `Released` phải có lý do; **nhả khi còn giữ chỗ ⇒ NÉM** |
+| 4 | **Dịch vụ** `StockAllotmentService` | `DatNganSachAsync` (upsert + ledger + idempotency) · `DongBangAsync` · `MoDongBangAsync` · `NhaAsync` · **`TangGiuCho…`/`GiamGiuCho…`** cho luồng giữ chỗ. 🔒 **CÙNG khoá** `inventory:{tenant}:{kho}:{sku}` với `StockReservationService` |
+| 5 | **Nối vào giữ chỗ** | `GiuChoAsync` trừ ngân sách **trước khi ghi** bất cứ thứ gì; `NhaChoAsync` (huỷ/hết hạn) và `ChotMotAsync` (chốt đơn) **trả lại** phần đã giữ. `InvStockReservations` thêm cột `ChannelCode` (nullable) |
+| 6 | **API** `IStockAllotmentAppService` | `GetListAsync` · `GetAsync` · `DatNganSachAsync` · `DongBangAsync` · `MoDongBangAsync` · `NhaAsync` |
+| 7 | **Quyền mới** | `eCommerce.Inventory.Allotment.Manage` + `…Allotment.Release` (khai **hai nơi**; seed **69 → 71**) — đọc dùng `eCommerce.Inventory` |
+| 8 | **Sự kiện** | `StockAllotmentChangedEto` phát qua `IDistributedEventBus` với **outbox**, trong **cùng UoW** (`BR-15`) |
+| 9 | **DB** | **Migration 48** `Gd1S13_StockAllotment`; unique `(TenantId, Kho, Sku, Kênh)` **`NULLS NOT DISTINCT`**; unique **có bộ lọc** cho `IdempotencyKey`; **+4 `CHECK`**; cột `ChannelCode` trên `InvStockReservations`. **NND 58 → 60** |
+
+### 21.2 Quyết định `Q3` — và một quyết định **mới** phải ghi rõ
+
+| # | Câu hỏi | Chốt | Vì sao |
+|---|---|---|---|
+| `Q3` | Ngân sách theo **kênh** hay **kênh + shop**? | **CHỈ theo kênh** (`ChannelCode`) | 📌 Phân bổ theo **shop** là `CHN-004` (GĐ4) và **chưa có** nguồn dữ liệu shop trong luồng bán GĐ1. Thêm cột `ChannelShopId` bây giờ = **hai nơi** cùng định nghĩa ngân sách, và `CHN-004` sẽ phải chọn một — đúng họ lỗi hai nguồn sự thật. 🔑 Muốn theo shop ⇒ **mở rộng unique index** (migration riêng), không đổi nghĩa cột hiện có |
+| — | Có **bắt buộc** mọi kênh phải có ngân sách không (`D6` nói ATP = 0 khi chưa cấp)? | **Không** — *"tuỳ chọn theo dòng"*: chỉ khi `(kho, SKU, kênh)` **ĐÃ có** dòng ngân sách thì giữ chỗ mới bị chặn theo ATP | 🚨 Nếu áp **fail-closed toàn hệ thống** ngay bây giờ thì **mọi** đơn hiện có sẽ bị chặn (chưa ai cấu hình ngân sách) — một thay đổi **phá vỡ luồng bán** trong khi dữ liệu chưa sẵn sàng. 📌 Đây là **lựa chọn có ghi chép**, không phải bỏ sót: khi vận hành đã cấu hình đủ, có thể bật chế độ fail-closed bằng một slice riêng (thêm setting + kiểm tra "kênh chưa cấp ⇒ 0") |
+
+### 21.3 ✅ Bằng chứng đo được
+
+| Phép đo | Kết quả |
+|---|---|
+| Unit | **1560 → 1571** (+11: `StockAllotmentTests` — ATP, guard trạng thái, nhả khi còn giữ chỗ, giảm quá số giữ, sổ cái không setter) |
+| Integration | **77 → 83** (+6: unique NND · kênh khác/tenant khác **được phép** · `Reserved ≤ Allotted` **hai chiều** · đóng băng thiếu dấu vết · nhả thiếu lý do · idempotency **hai chiều**) |
+| Bất biến DB | **25/25** · **NND 58 → 60** · **quyền 69 → 71** |
+| Migration | **47 → 48** |
+| Cổng đầy đủ | **exit 0 · 348.1s · 15/15 bước** (máy dev; E2E **140/140**, oversell **11/11**, thanh toán **30/30**) |
+
+### 21.4 🚨 Sai lệch doc/code (phải biết trước khi sửa)
+
+| # | Đặc tả nói | Code làm | Vì sao |
+|---|---|---|---|
+| 1 | `RowVersion` (`xmin`) trên `StockAllotment` | **không** thêm | `D4` dùng khoá phân tán theo `(kho, SKU)` cho **mọi** đường ghi ngân sách + giữ chỗ ⇒ khoá đã tuần tự hoá; thêm `xmin` bây giờ là cơ chế **thứ hai** cho cùng mục đích |
+| 2 | `IIdempotencyGuard.AcquireAsync` + `InboxRecords` | **unique index** trên `(TenantId, IdempotencyKey)` của sổ cái + kiểm trước khi ghi | 📌 Cùng kết quả (gọi lại **không** ghi thêm) với **một** nguồn sự thật; `IIdempotencyGuard` là kế hoạch `XC-002` (xem `PRC-001` F3) |
+| 3 | `AllotAsync` + `ReclaimOnStockDecrease` + `Priority` dùng để **thu hồi** khi tồn giảm | **chưa** có đường tự thu hồi; `Priority` đã lưu nhưng **chưa** dùng | Thu hồi tự động cần luật *"thu hồi kênh nào trước"* + **duyệt** — thuộc slice sau; 📌 ghi ở §21.5 để không ai tưởng nó đã chạy |
+| 4 | `Freeze` khi kênh `IsActive = false` (job) | **chưa** có job | Phụ thuộc `ChannelHub` phát sự kiện kênh ngưng — chưa có trong GĐ1 |
+| 5 | `StockAllotmentChangedEto` phát khi **ngân sách** đổi | phát **cả khi `Reserved` đổi** (giữ/nhả chỗ) | ATP đổi ⇒ `CHN-004`/màn hình vận hành cần biết; 📌 nếu chỉ phát khi ngân sách đổi thì ATP hiển thị **cũ** mà không ai biết |
+| 6 | Chỉ `Manage`/`Release` | đọc bằng `eCommerce.Inventory` | Cùng quyền với màn hình `/Kho`; tách `View` riêng là thay đổi hợp đồng phân quyền chưa cần |
+
+### 21.5 ⚠️ Giới hạn đã biết
+
+1. ✅ **ĐÃ CÓ UI** (`S18`, 28/10/2026): `/NganSach` — danh sách + ATP + cấp/sửa ngân sách + đóng băng/mở/nhả. ✅ Ô **chọn kho** lấy từ `IChinhSachHanMucAppService.GetKhoKhaDungAsync()` — cùng nguồn danh mục với `/HanMucKenh` (không thêm endpoint thứ hai).
+2. **Chưa thu hồi tự động** khi `OnHand` giảm (bán hàng làm tồn giảm) ⇒ `Σ Allotted` có thể **lớn hơn** `OnHand`
+   sau khi bán. 📌 Bất biến `Σ ≤ OnHand` được kiểm **khi cấp/sửa**; để giữ nó **liên tục** cần slice
+   *"Reclaim"* (job + duyệt) — **chưa** làm, và **không** được nói là đã có.
+3. **Không có probe/E2E** cho đường cấp ngân sách (chưa có UI; gate hiện đo qua unit + integration). 📌 Đường
+   **giữ chỗ theo ngân sách** mặc định **không kích hoạt** vì chưa có dòng ngân sách nào trên dữ liệu gate ⇒
+   hành vi cũ **không đổi** (đó là lý do gate vẫn xanh).
+4. `StockAllotmentService` trả **`BusinessException`** `Inventory:0047` khi vượt `OnHand`; HTTP mapping là `400`
+   (qua filter hiện có). Chưa có mã riêng cho *"kênh chưa được cấp ngân sách"* vì chế độ fail-closed **chưa bật**.
+
+### 21.6 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.7 | 28/10/2026 | *(agent, session GĐ1 — `S13`)* | **Ngân sách tồn theo kênh**: 2 entity + sổ cái append-only + **migration 48** (NND **60**) + dịch vụ (cấp/đóng băng/nhả + idempotency + bất biến tổng) + API + **2 quyền** (seed **71**) + nối vào giữ chỗ/nhả/chốt. **+11 unit · +6 integration**. Chốt `Q3` = **chỉ theo kênh** + quyết định *"tuỳ chọn theo dòng"* (§21.2) và ghi rõ 6 sai lệch + 4 giới hạn |
+
+
+

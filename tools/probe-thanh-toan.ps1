@@ -58,6 +58,10 @@ $host_ = 'http://localhost:5000'
 $tienTrinh = $null
 $ketQua = [System.Collections.Generic.List[object]]::new()
 
+# 🆕 `S15` — id của **lượt đối soát chạy tay** do probe tạo (dọn trong `finally`). 📌 Khai ở đây (ngoài `try`)
+# để `finally` **luôn** thấy nó, kể cả khi probe ném trước khi gán xong.
+$idRunProbe = $null
+
 # 📌 Tiền tố `K9S5` cho MỌI dữ liệu probe: `kiem-db.ps1` nhóm ⑤ quét `like 'k9%'` trên tên/email/mã.
 $tienTo = 'K9S5'
 $maThamChieuDon1 = 'K9S5-DON-01'
@@ -273,6 +277,47 @@ select count(*)::text from "AbpUsers" where "NormalizedUserName" = 'ADMIN' and n
 
     $token = $jwt.access_token
     Kq 'T01 lay token admin (password grant)' (-not [string]::IsNullOrWhiteSpace($token)) ("do dai = {0}" -f ($token | Measure-Object -Character).Characters)
+
+    # ══════════════════════════════════════════════════════════════════════════════════════════
+    # 🆕 `S15` — **CHẠY TAY ĐỐI SOÁT** (`TriggerRunAsync`) — ĐO QUA HTTP THẬT, TRƯỚC KHI CÓ GIAO DỊCH
+    # ══════════════════════════════════════════════════════════════════════════════════════════════
+    # 🔑 **VÌ SAO ĐẶT Ở ĐÂY (ngay sau T01, TRƯỚC `tao-giao-dich`):** lúc này `PayTransactions` **rỗng** ⇒ lượt
+    # chạy tất định: `lineTotal = 0`, **không** gọi cổng (không có gì để truy vấn). 📌 Nếu đặt sau T02, runner
+    # sẽ gọi **cổng thật** cho một giao dịch ⇒ phép đo phụ thuộc mạng/quota và **không tất định**.
+    # 🚨 **VÀ VÌ SAO PHẢI THỬ LẠI KHI 409:** job `PaymentReconciliationWorker` có `RunOnStart = true` ⇒ nó
+    # **chạy ngay khi Host lên** và có thể đang giữ khoá. 📌 Gặp `409` là **hành vi ĐÚNG** (cùng khoá) chứ
+    # **không** phải lỗi — nên chờ rồi thử lại (tối đa 3 lần), thay vì báo ĐỎ vì lý do sai.
+    $kqChayTay = $null
+
+    for ($lan = 1; $lan -le 3; $lan++) {
+        $kqChayTay = Goi-Api -PhuongThuc 'Post' -DuongDan '/api/app/payment-reconciliation/trigger-run' -Token $token
+
+        if ($kqChayTay.Ma -ne 409) {
+            break
+        }
+
+        Start-Sleep -Seconds 2
+    }
+
+    Kq 'T26 🚨 chạy tay đối soát (TriggerRunAsync) => 200 (không phải 500/404)' `
+        ($kqChayTay.Ma -eq 200) ("HTTP {0} · body = {1}" -f $kqChayTay.Ma, $kqChayTay.Than)
+
+    $idRunProbe = [string]$kqChayTay.DuLieu.id
+
+    Kq 'T27 lượt chạy tay ghi TriggeredBy = Manual (1) + TriggeredByUserId + lineTotal = 0' `
+        (([string]$kqChayTay.DuLieu.triggeredBy -eq '1') -and
+         (-not [string]::IsNullOrWhiteSpace([string]$kqChayTay.DuLieu.triggeredByUserId)) -and
+         ([string]$kqChayTay.DuLieu.lineTotal -eq '0')) `
+        ("triggeredBy={0} · userId={1} · lineTotal={2}" -f $kqChayTay.DuLieu.triggeredBy, $kqChayTay.DuLieu.triggeredByUserId, $kqChayTay.DuLieu.lineTotal)
+
+    # 🚨 **KHẲNG ĐỊNH Ở DB** — không tin body HTTP: một API trả DTO "đẹp" mà **không ghi** thì vẫn `200`.
+    $runTrongDb = if ([string]::IsNullOrWhiteSpace($idRunProbe)) { -1 } else {
+        Dem-Db (@'
+select count(*)::text from "RecPaymentReconciliationRuns" where "Id" = '{0}'::uuid and "TriggeredBy" = 1 and "TriggeredByUserId" is not null;
+'@ -f $idRunProbe)
+    }
+
+    Kq 'T28 🚨 DB: có ĐÚNG MỘT lượt Manual + người chạy (không tin HTTP 200)' ($runTrongDb -eq 1) ("dong khop = {0}" -f $runTrongDb)
 
     # ── ③ TẠO GIAO DỊCH QUA API (đường vào DUY NHẤT của `PayTransactions`) ────────────────────
     $tao1 = Goi-Api -PhuongThuc 'Post' -DuongDan '/api/app/payment/tao-giao-dich' -Token $token -Body @{
@@ -493,6 +538,23 @@ finally {
     # ── DỌN DẸP (LUÔN chạy, kể cả khi ĐỎ) ────────────────────────────────────────────────────
     Xoa-DuLieuProbe
 
+    # 🆕 `S15` — dọn **lượt đối soát chạy tay** (xoá CON trước: dòng lệch → dòng → lượt).
+    # 📌 Chỉ xoá **đúng lượt do probe tạo** (`$idRunProbe`) — ⚠️ **cấm** xoá theo khoảng thời gian: lượt của job
+    # thật chạy cùng lúc sẽ bị xoá theo, và `REC-001` coi lịch sử đối soát là **bằng chứng về tiền**.
+    if (-not [string]::IsNullOrWhiteSpace($idRunProbe)) {
+        Invoke-Psql -Sql (@'
+delete from "RecPaymentDiscrepancies" where "RunId" = '{0}'::uuid;
+'@ -f $idRunProbe) | Out-Null
+
+        Invoke-Psql -Sql (@'
+delete from "RecPaymentReconciliationLines" where "RunId" = '{0}'::uuid;
+'@ -f $idRunProbe) | Out-Null
+
+        Invoke-Psql -Sql (@'
+delete from "RecPaymentReconciliationRuns" where "Id" = '{0}'::uuid;
+'@ -f $idRunProbe) | Out-Null
+    }
+
     # 🔒 BẬT LẠI cờ bảo mật của admin — quên là commit một **admin không bị buộc đổi mật khẩu**.
     Invoke-Psql -Sql @'
 update "AbpUsers" set "ShouldChangePasswordOnNextLogin" = true where "NormalizedUserName" = 'ADMIN';
@@ -524,6 +586,15 @@ select count(*)::text from "AbpUsers" where "NormalizedUserName" = 'ADMIN' and "
 
     Kq 'T24 DON DEP: khong con giao dich/dong hoan probe' ($conLai -eq 0 -and $conHoan -eq 0) `
         ("giao dich = {0} · dong hoan = {1}" -f $conLai, $conHoan)
+
+    # 🆕 `S15` — khẳng định lượt đối soát probe đã bị xoá (📌 "tin là đã dọn" là loại lỗi đang chống).
+    $runConLai = if ([string]::IsNullOrWhiteSpace($idRunProbe)) { 0 } else {
+        Dem-Db (@'
+select count(*)::text from "RecPaymentReconciliationRuns" where "Id" = '{0}'::uuid;
+'@ -f $idRunProbe)
+    }
+
+    Kq 'T24b DON DEP: khong con luot doi soat probe' ($runConLai -eq 0) ("luot con = {0}" -f $runConLai)
 
     Kq 'T25 DON DEP: da BAT LAI co ShouldChangePasswordOnNextLogin' ($coBaoMat -eq 1) ("co = {0}" -f $coBaoMat)
 }

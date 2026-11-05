@@ -42,8 +42,22 @@ public class eCommerceDbMigratorModule : AbpModule
 
 public class Program
 {
+    /// <summary>
+    /// Tham số CLI:
+    /// <list type="bullet">
+    ///   <item>*(không có)* — migration + seed (hành vi cũ, dùng cho CI/deploy);</item>
+    ///   <item><c>--backfill-catalog</c> — sau migration + seed, chạy backfill WP-03 (mục 5+6);</item>
+    ///   <item><c>--dry-run</c> — đi kèm <c>--backfill-catalog</c>: **chỉ đếm và in**, không ghi.</item>
+    /// </list>
+    /// 📌 **VÌ SAO DÙNG THAM SỐ CỦA CHÍNH MIGRATOR, không tách app riêng:** backfill cần **cùng** DbContext,
+    /// cùng cấu hình connection, cùng đồ thị module với bước migrate; tách app thứ hai là hai nguồn cấu hình
+    /// ⇒ có ngày backfill chạy vào DB khác với DB vừa migrate (im lặng).
+    /// </summary>
     public static async Task<int> Main(string[] args)
     {
+        var backfillCatalog = args.Any(a => string.Equals(a, "--backfill-catalog", StringComparison.OrdinalIgnoreCase));
+        var dryRun = args.Any(a => string.Equals(a, "--dry-run", StringComparison.OrdinalIgnoreCase));
+
         var application = await AbpApplicationFactory.CreateAsync<eCommerceDbMigratorModule>(options =>
         {
             options.UseAutofac();
@@ -60,6 +74,22 @@ public class Program
             await application.ServiceProvider
                 .GetRequiredService<IDataSeeder>()
                 .SeedAsync();
+
+            if (backfillCatalog)
+            {
+                var ketQua = await application.ServiceProvider
+                    .GetRequiredService<BackfillCatalogService>()
+                    .ChayAsync(dryRun);
+
+                // 🔒 Exit code phản ánh **kết quả đối soát**, không phải "đã chạy xong": script/CI phải phân biệt
+                // được *"chạy mà lệch"* với *"chạy và khớp"* — nếu chỉ dựa vào exception thì một lần dừng do
+                // xung đột vẫn trả 0 và không ai biết. 📌 Dùng **1** (lỗi sản phẩm/dữ liệu), **không** dùng 2 —
+                // quy ước cổng `XC-007` BR-006 dành số 2 cho lỗi **môi trường** (script hỏng/không chạy được).
+                if (!ketQua.ThanhCong || ketQua.XungDot.Count > 0)
+                {
+                    return 1;
+                }
+            }
 
             return 0;
         }

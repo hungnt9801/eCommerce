@@ -141,7 +141,7 @@ public class PostgreSqlSchemaTests
     }
 
     [Fact]
-    public async Task F1_du_53_index_deu_dung_NULLS_NOT_DISTINCT()
+    public async Task F1_du_73_index_deu_dung_NULLS_NOT_DISTINCT()
     {
         // 🔒 BẤT BIẾN (ghi ở XC-004 Q6): mọi unique index trên entity IMultiTenant PHẢI có
         // `NULLS NOT DISTINCT`. Ai tạo migration mới mà quên ⇒ test này đỏ.
@@ -162,7 +162,50 @@ public class PostgreSqlSchemaTests
         //      Order_Ver_Hash_Outcome`: **một sự kiện ⇒ một dòng nhật ký**. 📌 Đây là câu trả lời cho `XC-003` D2
         //      (*"bỏ lock đi, DB có chặn không?"*) ⇒ **CÓ**. ⚠️ Tên index **57 ký tự** (do EF tự sinh là
         //      **94** ⇒ PostgreSQL **cắt** ở 63 ⇒ test đối chiếu đích danh không tìm thấy).
-        Assert.Equal(53L, await DemAsync(
+        //    → **54** (24/10/2026, `Sal003_OrderStateMachine_History` — `IX_OrdStatusHistory_TenantId_OrderId_
+        //      Axis_VersionAfter`: **mỗi PHIÊN BẢN của một TRỤC chỉ có đúng MỘT dòng lịch sử**. 📌 Đây là hàng rào
+        //      cuối cho bất biến *"không có chuyển trạng thái nào thiếu lịch sử"*; mất `NULLS NOT DISTINCT` ⇒
+        //      khi `TenantId = NULL` hai dòng cùng `(OrderId, Axis, VersionAfter)` LỌT ⇒ lịch sử có dòng trùng,
+        //      và câu hỏi *"ai đổi trạng thái"* trả lời **hai lần** cho một lần đổi.)
+        //    → **58** (28/10/2026, `Gd1S12_CostPrice` — `IX_PrcCostPrices_TenantId_Sku_EffectiveFrom`: **một giá
+        //      vốn cho một SKU trong một kỳ** (`PRC-001` §5.2/BR-008). Mất `NULLS NOT DISTINCT` ⇒ khi
+        //      `TenantId = NULL` (đang chạy 1 tenant) hai dòng cùng `(Sku, EffectiveFrom)` LỌT ⇒ câu hỏi *"giá
+        //      vốn của SKU này ngày X là bao nhiêu"* có **hai đáp án** ⇒ lãi gộp **không tất định**, và
+        //      📌 **không có lỗi nào** để lần ra. ⚠️ Bốn index `NULLS NOT DISTINCT` trước đó của module Pricing
+        //      (`PrcPriceLists`/`PrcPriceListItems`/`PrcChannelPrices`/`PrcPriceCalculationRecords`) nằm trong
+        //      migration `Pricing_PriceList_And_ChannelPrice`/`Prc002_PriceCalculationRecords` — 📌 chúng **chưa**
+        //      có tên trong danh sách đích danh dưới đây (nợ của `PRC-001` §15.2, ghi ở `PRC-001` §16).
+        //    → **64** (29/10/2026, `Xc002_DlqReplay` — **không** thêm unique index; con số giữ nguyên)
+        //    → **72** (02/11/2026, `Wp03_Catalog_NhanhModel` — **+8** index của mô hình hàng hóa Nhanh:
+        //    → **73** (02/11/2026, `Wp03_Catalog_Backfill_OrderLineProductId` — **+1**: bảng đối chiếu
+        //      `CatVariantMaps (TenantId, VariantId)`; một biến thể chỉ được chuyển MỘT lần ⇒ thiếu NND thì
+        //      backfill chạy hai lần tạo hai sản phẩm con cho cùng SKU, im lặng).
+        //      ĐVT/barcode/ĐVT gốc/IMEI/lô/combo/gói/nhãn; EF không sinh được `NULLS NOT DISTINCT` kèm bộ lọc
+        //      ⇒ đã sửa tay trong chính migration 51).
+        //    → **74** (02/11/2026, `Wp04_Inventory_Buckets_Mode` — **+1**: `IX_InvStockDocuments_TenantId_IdempotencyKey`
+        //      (chống tạo phiếu kho hai lần khi retry — D-29). Thiếu NND thì với `TenantId = NULL` index **mất
+        //      tác dụng** ⇒ hai phiếu cùng `IdempotencyKey` LỌT ⇒ **nhập kho hai lần**, im lặng).
+        //    → **79** (04/11/2026, `Wp06_Pos_BanLe` — **+5** index của POS, TẤT CẢ đều viết tay `NULLS NOT DISTINCT`:
+        //      `IX_PosRetailBills_TenantId_ClientBillId` (chống hoá đơn trùng khi POS offline gửi lại ⇒ khách bị
+        //      tính tiền hai lần), `IX_PosRetailBills_TenantId_Number`, `IX_PosRetailReturns_TenantId_Number`,
+        //      `IX_PosCashSessions_TenantId_Number`, và `IX_PosCashSessions_TenantId_WarehouseId_DangMo`
+        //      (**kèm bộ lọc `Status = 0`** — một quầy một ca mở; hai ca cùng lúc ⇒ két không tách được).
+        //      Thiếu NND thì với `TenantId = NULL` cả năm index **mất tác dụng IM LẶNG**).
+        //    → **85** (04/11/2026, `Wp07_KhachHang_NhanVien` — **+6** index của `WP-07`, TẤT CẢ viết tay
+        //      `NULLS NOT DISTINCT`: `IX_CusLevels_TenantId_Code` · `IX_SetStores_TenantId_Code` ·
+        //      `IX_SetDepartments_TenantId_Code` · `IX_SetStaffs_TenantId_Code` ·
+        //      `IX_SetStaffs_TenantId_IdentityUserId` (**kèm bộ lọc `IS NOT NULL`** — một tài khoản một nhân
+        //      viên) · `IX_SetRoleDataScopes_TenantId_RoleName` (một vai trò một phạm vi dữ liệu).
+        //      Thiếu NND thì với `TenantId = NULL` cả sáu index **mất tác dụng IM LẶNG** ⇒ mã cấu hình trùng
+        //      LỌT ⇒ hai "cấp VIP" cùng mã, hai nhân viên cùng tài khoản, hai phạm vi cho một vai trò).
+        //    → **93** (04/11/2026, `Wp08_BaoCao_Reporting` — **+8** index của read-model báo cáo, TẤT CẢ viết tay
+        //      `NULLS NOT DISTINCT`: `IX_RptFactSalesLines_TenantId_Nguon_DongNguon` (**grain** = một dòng chứng
+        //      từ ⇒ một dòng sự kiện), `IX_RptAggDailySales_TenantId_Ngay_Nguon`, `IX_RptFactInventorySnapshots_
+        //      TenantId_Ngay_Kho_Sku`, `IX_RptWatermarks_TenantId_Nguon`, và 4 chiều `RptDim*`.
+        //      🔑 Thiếu NND thì với `TenantId = NULL` (đang chạy 1 tenant) index MẤT TÁC DỤNG IM LẶNG ⇒ chạy lại
+        //      job tổng hợp (hoặc hai lượt chồng nhau) ghi **hai dòng cho một dòng chứng từ** ⇒ **doanh thu nhân
+        //      đôi** — đúng ca DoD `WP-08` (*"job chạy lại 2 lần không nhân đôi dữ liệu"*) sinh ra để chặn.
+        Assert.Equal(93L, await DemAsync(
             "select count(*) from pg_indexes where schemaname = 'public' and indexdef like '%NULLS NOT DISTINCT%'"));
 
         // Kiểm tra ĐÍCH DANH để thông báo lỗi có ý nghĩa (tên index dài có thể bị PostgreSQL cắt ⇒ so theo tiền tố).
@@ -171,6 +214,9 @@ public class PostgreSqlSchemaTests
             "IX_TaxRateSchedules_TenantId_Code",
             "IX_TaxClassifications_TenantId_TargetType_TargetId_EffectiveFr",
             "IX_CatProducts_TenantId_Code",
+            "IX_CatBrands_TenantId_Code",
+            "IX_CatBrands_TenantId_Slug",
+            "IX_RecPayLines_TenantId_Run_GiaoDich",
             "IX_CatProductVariants_TenantId_Sku",
             "IX_InvItems_TenantId_WarehouseId_Sku",
             "IX_OrdOrders_TenantId_ChannelCode_ExternalOrderId",
@@ -208,6 +254,11 @@ public class PostgreSqlSchemaTests
             //    (*"sàn gửi lại bao nhiêu lần", "có dual-path không", "bao nhiêu xung đột"*) đều **SAI**
             //    — và ⚠️ **không có lỗi nào** để lần ra. 📌 Bảng càng chỉ tăng thì sai số càng lớn dần.
             "IX_SalMktEventLogs_TenantId_Channel_Order_Ver_Hash_Outcome",
+            // 🚨 SAL-003 (24/10/2026) — **NHẬT KÝ TRẠNG THÁI ĐƠN HÀNG**: *mỗi phiên bản của một TRỤC
+            //    chỉ có ĐÚNG MỘT dòng lịch sử*. Mất `NULLS NOT DISTINCT` ⇒ khi `TenantId = NULL` (đang chạy
+            //    1 tenant) hàng rào cuối mất tác dụng ⇒ tầng ứng dụng sai (race) sẽ ghi **hai** lịch sử cho
+            //    một lần đổi ⇒ câu hỏi *"ai đổi trạng thái, lúc nào"* trả lời **hai lần** — và không có lỗi nào.
+            "IX_OrdStatusHistory_TenantId_OrderId_Axis_VersionAfter",
             // 🚨 CAT-002 — mã danh mục duy nhất trong tenant (15/10/2026). EF sinh index này **KHÔNG** kèm
             //    `NULLS NOT DISTINCT` ⇒ đã sửa tay ngay trong migration `Cat002_CategoryTree`.
             //    Mất nó ⇒ khi `TenantId = NULL` (tình trạng hiện nay) hai danh mục cùng `Code` LỌT VÀO DB **im lặng**.
@@ -252,7 +303,92 @@ public class PostgreSqlSchemaTests
             //   • `…_AddressId_AddressType`: chống **liên kết trùng** (hai luồng cùng thêm một địa chỉ).
             //     Mất mệnh đề ⇒ sổ địa chỉ có hai dòng cho cùng một địa chỉ ⇒ UI hiện trùng, `TC-10` hỏng.
             "IX_CusAddressLinks_TenantId_CustomerId_AddressType_MacDinh",
-            "IX_CusAddressLinks_TenantId_CustomerId_AddressId_AddressType"
+            "IX_CusAddressLinks_TenantId_CustomerId_AddressId_AddressType",
+            // 🚨 `S12` (28/10/2026) — **GIÁ VỐN** (`PRC-001` §5.2 · BR-013): *một SKU một giá vốn trong một kỳ*.
+            //    Mất `NULLS NOT DISTINCT` ⇒ khi `TenantId = NULL` hai dòng cùng `(Sku, EffectiveFrom)` LỌT ⇒
+            //    lãi gộp tính bằng con số **không tất định** (thứ tự đọc quyết định kết quả) và **không lỗi nào**.
+            //    📌 Thêm vào danh sách ĐÍCH DANH chứ không chỉ tăng tổng: ai đó thêm index khác mà làm hỏng index
+            //    này thì **tổng không đổi** ⇒ chỉ danh sách này bắt được.
+            "IX_PrcCostPrices_TenantId_Sku_EffectiveFrom",
+            // 🆕 `S13` — **ngân sách tồn theo kênh**. Mất `NULLS NOT DISTINCT` ⇒ hai ngân sách cho CÙNG
+            // `(kho, SKU, kênh)` lọt ⇒ ATP không tất định; và khoá idempotency của sổ cái mất tác dụng ⇒
+            // gọi lại một biên vào **nhân đôi ngân sách**.
+            "IX_InvStockAllotments_TenantId_Kho_Sku_Kenh",
+            "IX_InvStockAllotmentLedgers_TenantId_IdempotencyKey",
+            // 🆕 `S14` — **phiếu trả hàng**: mã phiếu + khoá idempotency + một dòng đơn một lần + một lịch sử/phiên bản.
+            // 📌 Thiếu `NULLS NOT DISTINCT` ⇒ `TenantId = NULL` làm cả bốn index vô hiệu ⇒ **trả hàng hai lần**
+            // (hoàn tiền/kho gấp đôi) mà không lỗi nào.
+            "IX_OrdReturns_TenantId_ReturnNumber",
+            "IX_OrdReturns_TenantId_IdempotencyKey",
+            "IX_OrdReturnLines_TenantId_ReturnId_OrderLineId",
+            "IX_OrdReturnHistory_TenantId_ReturnId_Axis_VersionAfter",
+            // ⚠️ NỢ ĐÃ GHI (`PRC-001` §15.2): BỐN index `NULLS NOT DISTINCT` của module Pricing
+            // (`PrcPriceLists`, `PrcPriceListItems`, `PrcChannelPrices`, `PrcPriceCalculationRecords`) hiện chỉ
+            // được đếm qua **TỔNG**, chưa có tên ở đây ⇒ nếu một cái mất mệnh đề mà một cái khác thêm vào thì
+            // tổng không đổi và test **không** bắt được. 📌 Ghi nhận thay vì im lặng (xem `PRC-001` §16).
+            // 🆕 WP-03 (02/11/2026) — **8 index của mô hình hàng hóa Nhanh** (`03 §3.1`, D-07):
+            //   • `..._TenantId_Barcode`: barcode duy nhất toàn tenant ⇒ quét mã ở POS không bán **sai món**;
+            //   • `..._ProductId_Name`: một ĐVT một dòng giá (không có hai giá cho "thùng");
+            //   • `..._MotDonViGoc`: **đúng MỘT ĐVT gốc** (quy đổi tồn kho chỉ một hệ số);
+            //   • `..._TenantId_Serial`: IMEI duy nhất ⇒ một máy không bán **hai lần**;
+            //   • `..._ProductId_Code`: mã lô duy nhất trong (tenant, sản phẩm) ⇒ trừ tồn đúng lô;
+            //   • `..._Combo_Component` / `..._Package_Component`: một thành phần khai một lần ⇒ không xuất tồn gấp đôi;
+            //   • `..._ProductId_Name`: nhãn không trùng ⇒ bộ lọc đếm đúng.
+            // ⚠️ Thiếu `NULLS NOT DISTINCT` ⇒ khi `TenantId = NULL` (đang chạy 1 tenant) TẤT CẢ đều mất tác dụng
+            // IM LẶNG — và đây đúng là loại lỗi mà danh sách đích danh này sinh ra để chặn.
+            "IX_CatProdUnits_TenantId_Barcode",
+            "IX_CatProdUnits_TenantId_ProductId_Name",
+            "IX_CatProdUnits_MotDonViGoc",
+            "IX_CatProdImeis_TenantId_Serial",
+            "IX_CatProdBatches_TenantId_ProductId_Code",
+            "IX_CatComboComponents_TenantId_Combo_Component",
+            "IX_CatPackageComponents_TenantId_Package_Component",
+            "IX_CatProductTags_TenantId_ProductId_Name",
+            "IX_CatVariantMaps_TenantId_VariantId",
+            // 🚨 WP-04 (02/11/2026) — **CHỐNG TẠO PHIẾU KHO HAI LẦN KHI RETRY** (`IdempotencyKey` do client sinh,
+            //    ví dụ `ClientBillId` của POS — D-04/D-29). Mất `NULLS NOT DISTINCT` ⇒ khi `TenantId = NULL`
+            //    (đang chạy 1 tenant) index MẤT TÁC DỤNG ⇒ hai phiếu cùng khoá LỌT ⇒ **nhập kho hai lần**
+            //    (tồn tăng gấp đôi) mà không có lỗi nào. ⚠️ Index có **bộ lọc** `IdempotencyKey IS NOT NULL`
+            //    ⇒ EF không sinh được `NULLS NOT DISTINCT` kèm bộ lọc ⇒ đã viết SQL thô trong migration 53.
+            "IX_InvStockDocuments_TenantId_IdempotencyKey",
+            // 🆕 `WP-06` (04/11/2026) — **NĂM index của POS**, cả năm đều do migration `Wp06_Pos_BanLe` viết tay:
+            //   • `ClientBillId`: POS **offline gửi lại** ⇒ thiếu NND là khách bị tính tiền HAI LẦN;
+            //   • `Number` (hoá đơn / phiếu trả / ca): hai chứng từ cùng số ⇒ đối chiếu két sai;
+            //   • `..._DangMo` (**có bộ lọc** `Status = 0`): một quầy một ca mở ⇒ hai ca cùng lúc là
+            //     `ExpectedCash` của cả hai đều sai và không ai chịu trách nhiệm được.
+            "IX_PosRetailBills_TenantId_ClientBillId",
+            "IX_PosRetailBills_TenantId_Number",
+            "IX_PosRetailReturns_TenantId_Number",
+            "IX_PosCashSessions_TenantId_Number",
+            "IX_PosCashSessions_TenantId_WarehouseId_DangMo",
+            // 🆕 `WP-07` (04/11/2026) — **SÁU index của khách/cấu hình tổ chức**, đều viết tay trong migration
+            // `Wp07_KhachHang_NhanVien`:
+            //   • `CusLevels.Code` · `SetStores.Code` · `SetDepartments.Code` · `SetStaffs.Code`: mã danh mục
+            //     duy nhất ⇒ thiếu NND là hai "cấp VIP" / hai cửa hàng cùng mã LỌT (báo cáo gộp nhầm);
+            //   • `SetStaffs.IdentityUserId` (**có bộ lọc** `IS NOT NULL`): một tài khoản một nhân viên ⇒
+            //     thiếu là *"đơn của tôi"* có **hai** nghĩa ⇒ phạm vi dữ liệu lọc SAI mà không lỗi nào;
+            //   • `SetRoleDataScopes.RoleName`: một vai trò một phạm vi ⇒ hai dòng mâu thuẫn thì phép gộp
+            //     phải "đoán" — và người vận hành thấy cấu hình khác với phạm vi đang áp.
+            "IX_CusLevels_TenantId_Code",
+            "IX_SetStores_TenantId_Code",
+            "IX_SetDepartments_TenantId_Code",
+            "IX_SetStaffs_TenantId_Code",
+            "IX_SetStaffs_TenantId_IdentityUserId",
+            "IX_SetRoleDataScopes_TenantId_RoleName",
+            // 🆕 `WP-08` (04/11/2026) — **TÁM index của read-model báo cáo**; mất NND ở bất kỳ index nào thì:
+            //   • `FactSalesLines (Nguon, DongNguon)`: hai dòng sự kiện cho MỘT dòng chứng từ ⇒ **doanh thu nhân đôi**;
+            //   • `AggDailySales (Ngay, Nguon)`: hai dòng tổng hợp cho một ngày ⇒ biểu đồ nhân đôi;
+            //   • `FactInventorySnapshots (Ngay, Kho, Sku)`: hai ảnh tồn cho một cặp ⇒ tồn kho báo gấp đôi;
+            //   • `Watermarks (Nguon)`: hai mốc ⇒ job chạy lại từ đầu mỗi lượt (hoặc không bao giờ tiến);
+            //   • 4 chiều `RptDim*`: dòng chiều trùng ⇒ phép gộp theo SKU/kho/nhân viên đếm sai.
+            "IX_RptFactSalesLines_TenantId_Nguon_DongNguon",
+            "IX_RptAggDailySales_TenantId_Ngay_Nguon",
+            "IX_RptFactInventorySnapshots_TenantId_Ngay_Kho_Sku",
+            "IX_RptWatermarks_TenantId_Nguon",
+            "IX_RptDimDates_TenantId_Ngay",
+            "IX_RptDimProducts_TenantId_Sku",
+            "IX_RptDimStores_TenantId_Kho",
+            "IX_RptDimStaffs_TenantId_NhanVien",
         ];
 
         foreach (var ten in phaiCo)
@@ -1156,4 +1292,159 @@ public class PostgreSqlSchemaTests
 
         Assert.Equal(2L, so);
     }
+
+    // ══════════════════════════════════════════════════════════════════════════════════════════
+    // 2h. 🆕 `S12` — HÀNG RÀO DB CHO **GIÁ VỐN** (`PRC-001` §5.2 · `PrcCostPrices`)
+    // ══════════════════════════════════════════════════════════════════════════════════════════
+    // 📌 Đo **HAI CHIỀU** ở mọi bất biến (đúng kỷ luật dự án): (a) giá trị SAI phải bị DB chặn;
+    // (b) giá trị **HỢP LỆ** (kỳ khác, tenant khác, `EffectiveTo = NULL`, tiền tệ khác) phải **LỌT** —
+    // nếu không, "chặn được" chỉ là dấu hiệu của một index quá chặt làm hỏng nghiệp vụ.
+
+    /// <summary>Chèn một dòng **giá vốn** thô (đi qua đúng các cột thật của `PrcCostPrices`).</summary>
+    private async Task ChenGiaVonAsync(
+        Guid? tenantId,
+        string sku,
+        decimal amount,
+        DateOnly tu,
+        DateOnly? den,
+        string currency = "VND")
+    {
+        await using var cmd = _fixture.DataSource.CreateCommand("""
+            insert into "PrcCostPrices"
+                ("Id","TenantId","Sku","AmountValue","CurrencyCode","EffectiveFrom","EffectiveTo",
+                 "ExtraProperties","ConcurrencyStamp","CreationTime","IsDeleted")
+            values ($1, $2, $3, $4, $5, $6, $7, '{}', 'stamp-gia-von', now(), false)
+            """);
+
+        cmd.Parameters.AddWithValue(Guid.NewGuid());
+        cmd.Parameters.AddWithValue((object?)tenantId ?? DBNull.Value);
+        cmd.Parameters.AddWithValue(sku);
+        cmd.Parameters.AddWithValue(amount);
+        cmd.Parameters.AddWithValue(currency);
+        cmd.Parameters.AddWithValue(tu);
+        cmd.Parameters.AddWithValue((object?)den ?? DBNull.Value);
+
+        await cmd.ExecuteNonQueryAsync();
+    }
+
+    [Fact]
+    public async Task S12_chan_HAI_gia_von_CUNG_Sku_CUNG_ngay_khi_TenantId_NULL()
+    {
+        // 🚨 Bất biến *"một giá vốn cho một SKU trong một kỳ"* (`PRC-001` BR-008). Thiếu `NULLS NOT DISTINCT` thì
+        // khi `TenantId = NULL` hai dòng này **đều lọt** ⇒ câu hỏi *"giá vốn SKU này ngày 20/10"* có **hai đáp
+        // án** ⇒ lãi gộp **không tất định** (thứ tự đọc của DB quyết định). 📌 Không có lỗi nào để lần ra.
+        var duoi = Guid.NewGuid().ToString("N")[..6];
+        var sku = $"S12-CP-{duoi}";
+        var ngay = new DateOnly(2026, 1, 1);
+
+        await ChenGiaVonAsync(null, sku, 90_000m, ngay, null);
+
+        var ex = await Assert.ThrowsAsync<PostgresException>(
+            () => ChenGiaVonAsync(null, sku, 95_000m, ngay, null));
+
+        Assert.Equal(PostgresErrorCodes.UniqueViolation, ex.SqlState);   // 23505
+    }
+
+    [Fact]
+    public async Task S12_DOI_CHUNG_cung_Sku_nhung_KHAC_ky_thi_DUOC_PHEP()
+    {
+        // Đối chứng: index phải là `(TenantId, Sku, EffectiveFrom)` — nếu ai đó bỏ `EffectiveFrom` khỏi index
+        // thì **mỗi SKU chỉ giữ được MỘT dòng giá vốn vĩnh viễn** ⇒ không thể đổi giá vốn theo kỳ, và
+        // mọi dòng sau bị chặn bằng lỗi unique rất khó hiểu.
+        var duoi = Guid.NewGuid().ToString("N")[..6];
+        var sku = $"S12-CP2-{duoi}";
+
+        await ChenGiaVonAsync(null, sku, 90_000m, new DateOnly(2026, 1, 1), new DateOnly(2026, 1, 31));
+        await ChenGiaVonAsync(null, sku, 95_000m, new DateOnly(2026, 2, 1), null);
+
+        var so = await DemAsync($"select count(*) from \"PrcCostPrices\" where \"Sku\" = '{sku}'");
+
+        Assert.Equal(2L, so);
+    }
+
+    [Fact]
+    public async Task S12_cho_phep_CUNG_Sku_CUNG_ngay_nhung_KHAC_tenant()
+    {
+        // 🔒 Đối chứng quan trọng: `NULLS NOT DISTINCT` **không** được biến thành "cấm trùng toàn cục".
+        // Hai tenant được khai **cùng** giá vốn cho cùng SKU/ngày — gộp chúng là **rò rỉ dữ liệu giữa tenant**.
+        var duoi = Guid.NewGuid().ToString("N")[..6];
+        var sku = $"S12-CP3-{duoi}";
+        var ngay = new DateOnly(2026, 1, 1);
+
+        await ChenGiaVonAsync(Guid.NewGuid(), sku, 90_000m, ngay, null);
+        await ChenGiaVonAsync(Guid.NewGuid(), sku, 91_000m, ngay, null);
+
+        var so = await DemAsync($"select count(*) from \"PrcCostPrices\" where \"Sku\" = '{sku}'");
+
+        Assert.Equal(2L, so);
+    }
+
+    [Fact]
+    public async Task S12_CHECK_chan_gia_von_AM__va_cho_phep_gia_von_0()
+    {
+        // 🚨 `CK_PrcCostPrices_Amount_KhongAm`: giá vốn âm làm **lãi gộp cao hơn sự thật** ⇒ báo cáo đẹp,
+        // quyết định sai. 📌 Đo CẢ HAI CHIỀU: `0` **hợp lệ** (hàng tặng/hàng mẫu) — `CHECK (> 0)` sẽ chặn một
+        // ca nghiệp vụ có thật.
+        var duoi = Guid.NewGuid().ToString("N")[..6];
+
+        var ex = await Assert.ThrowsAsync<PostgresException>(
+            () => ChenGiaVonAsync(null, $"S12-CP-AM-{duoi}", -1m, new DateOnly(2026, 1, 1), null));
+
+        Assert.Equal(PostgresErrorCodes.CheckViolation, ex.SqlState);   // 23514
+
+        await ChenGiaVonAsync(null, $"S12-CP-0-{duoi}", 0m, new DateOnly(2026, 1, 1), null);
+
+        var so = await DemAsync($"select count(*) from \"PrcCostPrices\" where \"Sku\" = 'S12-CP-0-{duoi}'");
+
+        Assert.Equal(1L, so);
+    }
+
+    [Fact]
+    public async Task S12_CHECK_chan_tien_te_KHONG_dung_ISO__va_cho_phep_USD()
+    {
+        // 🚨 `CK_PrcCostPrices_Currency_HopLe`: mã tiền tệ sai (chữ thường/2 ký tự) sẽ làm mọi phép so sánh
+        // tiền **vô nghĩa** mà không lỗi nào. 📌 Chiều ngược: `USD` **phải** lọt (đa tiền tệ chưa bật nhưng
+        // cấu trúc phải giữ được — `PRC-001` D2/BR-001).
+        var duoi = Guid.NewGuid().ToString("N")[..6];
+
+        Assert.Equal(
+            PostgresErrorCodes.CheckViolation,
+            (await Assert.ThrowsAsync<PostgresException>(
+                () => ChenGiaVonAsync(null, $"S12-CP-TT1-{duoi}", 1m, new DateOnly(2026, 1, 1), null, "vnd"))).SqlState);
+
+        Assert.Equal(
+            PostgresErrorCodes.CheckViolation,
+            (await Assert.ThrowsAsync<PostgresException>(
+                () => ChenGiaVonAsync(null, $"S12-CP-TT2-{duoi}", 1m, new DateOnly(2026, 1, 1), null, "VN"))).SqlState);
+
+        await ChenGiaVonAsync(null, $"S12-CP-TT3-{duoi}", 1m, new DateOnly(2026, 1, 1), null, "USD");
+
+        var so = await DemAsync($"select count(*) from \"PrcCostPrices\" where \"Sku\" = 'S12-CP-TT3-{duoi}'");
+
+        Assert.Equal(1L, so);
+    }
+
+    [Fact]
+    public async Task S12_CHECK_chan_ky_hieu_luc_NGUOC__va_cho_phep_EffectiveTo_NULL()
+    {
+        // 🚨 `CK_PrcCostPrices_EffectiveRange`: kỳ ngược nghĩa là dòng giá vốn **không bao giờ** hiệu lực ⇒
+        // SKU đó **không có giá vốn** (báo cáo thiếu dòng, không phải báo lỗi). 📌 Chiều ngược: `EffectiveTo`
+        // `NULL` = vô thời hạn, **phải** lọt — nếu CHECK viết `"EffectiveTo" >= "EffectiveFrom"` mà không có
+        // nhánh `IS NULL` thì mọi dòng vô thời hạn bị chặn.
+        var duoi = Guid.NewGuid().ToString("N")[..6];
+
+        var ex = await Assert.ThrowsAsync<PostgresException>(
+            () => ChenGiaVonAsync(
+                null, $"S12-CP-KY-{duoi}", 1m, new DateOnly(2026, 5, 1), new DateOnly(2026, 4, 30)));
+
+        Assert.Equal(PostgresErrorCodes.CheckViolation, ex.SqlState);
+
+        await ChenGiaVonAsync(null, $"S12-CP-VO-{duoi}", 1m, new DateOnly(2026, 5, 1), null);
+
+        var so = await DemAsync($"select count(*) from \"PrcCostPrices\" where \"Sku\" = 'S12-CP-VO-{duoi}'");
+
+        Assert.Equal(1L, so);
+    }
 }
+
+

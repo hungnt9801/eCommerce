@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>eCommerce</RootNamespace>
+    <AssemblyName>eCommerce.HttpApi</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\eCommerce.Application.Contracts\eCommerce.Application.Contracts.csproj" />
+    <ProjectReference Include="..\..\modules\Catalog\eCommerce.Catalog.Application.Contracts\eCommerce.Catalog.Application.Contracts.csproj" />
+    <ProjectReference Include="..\..\modules\Inventory\eCommerce.Inventory.Application.Contracts\eCommerce.Inventory.Application.Contracts.csproj" />
+    <!-- 🆕 `WP-05` — controller `/api/v1/orders` cần hợp đồng của module `Sales`.
+         📌 Chỉ tham chiếu **Application.Contracts** (không `.Domain`) — đúng luật phụ thuộc `03 §2`. -->
+    <ProjectReference Include="..\..\modules\Sales\eCommerce.Sales.Application.Contracts\eCommerce.Sales.Application.Contracts.csproj" />
+    <!-- 🆕 `WP-06` — controller `/api/v1/pos` cần hợp đồng của module `Pos` (chỉ `Application.Contracts`). -->
+    <ProjectReference Include="..\..\modules\Pos\eCommerce.Pos.Application.Contracts\eCommerce.Pos.Application.Contracts.csproj" />
+    <!-- 🆕 `WP-07` — controller `/api/v1/customers` + `/api/v1/settings` cần hợp đồng của module `Customers`
+         (chỉ `Application.Contracts`) — không kéo tầng Application/EF vào project HTTP. -->
+    <ProjectReference Include="..\..\modules\Customers\eCommerce.Customers.Application.Contracts\eCommerce.Customers.Application.Contracts.csproj" />
+    <!-- 🆕 `WP-08` — controller `/api/v1/reports` cần hợp đồng của module `Reporting`
+         (chỉ `Application.Contracts`). -->
+    <ProjectReference Include="..\..\modules\Reporting\eCommerce.Reporting.Application.Contracts\eCommerce.Reporting.Application.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Volo.Abp.AspNetCore.Mvc" />
+  </ItemGroup>
+
+</Project>

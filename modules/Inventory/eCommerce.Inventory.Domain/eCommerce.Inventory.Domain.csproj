@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>eCommerce.Inventory</RootNamespace>
+    <AssemblyName>eCommerce.Inventory.Domain</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\shared\eCommerce.Kernel\eCommerce.Kernel.csproj" />
+    <ProjectReference Include="..\..\..\src\eCommerce.Domain.Shared\eCommerce.Domain.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Volo.Abp.Ddd.Domain" />
+    <PackageReference Include="Volo.Abp.DistributedLocking" />
+    <PackageReference Include="Volo.Abp.SettingManagement.Domain" />
+  </ItemGroup>
+
+</Project>

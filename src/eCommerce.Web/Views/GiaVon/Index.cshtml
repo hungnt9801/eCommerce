@@ -1,0 +1,83 @@
+@model List<eCommerce.Pricing.Dtos.CostPriceDto>
+@{
+    ViewData["Title"] = "Giá vốn";
+    var sku = ViewData["sku"] as string;
+    var at = ViewData["at"] as DateOnly?;
+}
+
+@* 🆕 `S12` — màn hình GIÁ VỐN (chỉ đọc). 🚨 BR-013: dữ liệu NỘI BỘ, quyền thật do
+   `ICostPriceAppService` cưỡng chế (`eCommerce.Pricing.CostPrice.View`).
+   🔑 NEO `[GIAVON-MAN-HINH]` là ASCII THUẦN và nằm NGOÀI chú thích Razor — `ViewAnchorTests` + E2E dùng nó để
+   phân biệt "trang giá vốn đã render" với một trang khác trả `200`. *@
+
+<h1>Giá vốn <span class="badge bg-secondary">nội bộ</span></h1>
+
+<p class="text-muted">
+    <span class="badge bg-light text-dark">[GIAVON-MAN-HINH]</span>
+    Giá vốn dùng để tính <strong>lãi gộp</strong>. 🔒 Dữ liệu này <strong>không</strong> được hiển thị cho người
+    mua ở bất kỳ màn hình công khai nào (<code>PRC-001</code> BR-013).
+</p>
+
+<form method="get" class="row g-2 mb-3">
+    <div class="col-auto">
+        <input name="sku" value="@sku" class="form-control" placeholder="Mã SKU" />
+    </div>
+    <div class="col-auto">
+        <input name="at" type="date" value="@(at?.ToString("yyyy-MM-dd"))" class="form-control" />
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-primary">Lọc</button>
+    </div>
+</form>
+
+<p class="text-muted">
+    Tổng: <strong>@Model.Count</strong> dòng giá vốn@(at is { } ngay ? $" đang hiệu lực tại {ngay:yyyy-MM-dd}" : "").
+</p>
+
+@if (Model.Count == 0)
+{
+    <div class="alert alert-info">
+        Không có dòng giá vốn nào khớp bộ lọc.
+        @if (!string.IsNullOrWhiteSpace(sku))
+        {
+            <span>SKU <code>@sku</code> chưa được khai giá vốn.</span>
+        }
+    </div>
+}
+else
+{
+    <table class="table table-sm table-striped">
+        <thead>
+            <tr>
+                <th>SKU</th>
+                <th class="text-end">Giá vốn</th>
+                <th>Tiền tệ</th>
+                <th>Hiệu lực</th>
+                <th>Duyệt</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var g in Model)
+            {
+                <tr>
+                    <td><code>@g.Sku</code></td>
+                    <td class="text-end">@g.Amount.ToString("N2")</td>
+                    <td>@g.CurrencyCode</td>
+                    <td>
+                        @g.EffectiveFrom.ToString("yyyy-MM-dd")@(g.EffectiveTo is { } den ? $" → {den:yyyy-MM-dd}" : " → (vô thời hạn)")
+                    </td>
+                    <td>
+                        @if (g.DaDuyet)
+                        {
+                            <span>đã duyệt @g.ApprovedAtUtc?.ToString("yyyy-MM-dd")</span>
+                        }
+                        else
+                        {
+                            <span class="text-warning">chưa duyệt</span>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}

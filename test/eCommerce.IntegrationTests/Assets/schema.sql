@@ -2471,3 +2471,1597 @@ VALUES ('20261018104518_S7_XacNhanVaRetentionDoiSoat', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+ALTER TABLE "OrdOrders" ADD "ClosureVersion" bigint NOT NULL DEFAULT 0;
+
+ALTER TABLE "OrdOrders" ADD "FulfillmentStatus" integer NOT NULL DEFAULT 0;
+
+ALTER TABLE "OrdOrders" ADD "FulfillmentVersion" bigint NOT NULL DEFAULT 0;
+
+ALTER TABLE "OrdOrders" ADD "IsCancelled" boolean NOT NULL DEFAULT FALSE;
+
+ALTER TABLE "OrdOrders" ADD "PaymentVersion" bigint NOT NULL DEFAULT 0;
+
+ALTER TABLE "OrdOrders" ADD "ReconciliationStatus" integer NOT NULL DEFAULT 0;
+
+ALTER TABLE "OrdOrders" ADD "ReconciliationVersion" bigint NOT NULL DEFAULT 0;
+
+ALTER TABLE "OrdOrders" ADD "ReturnStatus" integer NOT NULL DEFAULT 0;
+
+CREATE TABLE "OrdStatusHistory" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "OrderId" uuid NOT NULL,
+    "Axis" character varying(24) NOT NULL,
+    "FromStatus" integer NOT NULL,
+    "ToStatus" integer NOT NULL,
+    "ActorType" character varying(24) NOT NULL,
+    "ActorId" uuid,
+    "ReasonCode" character varying(64) NOT NULL,
+    "ReasonText" character varying(512),
+    "CorrelationId" character varying(64) NOT NULL,
+    "EventId" uuid NOT NULL,
+    "VersionAfter" bigint NOT NULL,
+    "OccurredAtUtc" timestamp with time zone NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_OrdStatusHistory" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_OrdStatusHistory_From_Khac_To" CHECK ("FromStatus" <> "ToStatus"),
+    CONSTRAINT "FK_OrdStatusHistory_OrdOrders_OrderId" FOREIGN KEY ("OrderId") REFERENCES "OrdOrders" ("Id") ON DELETE CASCADE
+);
+
+CREATE INDEX "IX_OrdOrders_TenantId_FulfillmentStatus_CreationTime" ON "OrdOrders" ("TenantId", "FulfillmentStatus", "CreationTime");
+
+CREATE INDEX "IX_OrdOrders_TenantId_PaymentStatus_CreationTime" ON "OrdOrders" ("TenantId", "PaymentStatus", "CreationTime");
+
+CREATE INDEX "IX_OrdOrders_TenantId_ReconciliationStatus_CreationTime" ON "OrdOrders" ("TenantId", "ReconciliationStatus", "CreationTime");
+
+CREATE INDEX "IX_OrdOrders_TenantId_ReturnStatus_CreationTime" ON "OrdOrders" ("TenantId", "ReturnStatus", "CreationTime");
+
+ALTER TABLE "OrdOrders" ADD CONSTRAINT "CK_OrdOrders_StatusVersions_KhongAm" CHECK ("FulfillmentVersion" >= 0 AND "PaymentVersion" >= 0 AND "ReconciliationVersion" >= 0 AND "ClosureVersion" >= 0);
+
+CREATE INDEX "IX_OrdStatusHistory_OrderId" ON "OrdStatusHistory" ("OrderId");
+
+CREATE INDEX "IX_OrdStatusHistory_TenantId_ActorType_OccurredAtUtc" ON "OrdStatusHistory" ("TenantId", "ActorType", "OccurredAtUtc");
+
+CREATE INDEX "IX_OrdStatusHistory_TenantId_Axis_OccurredAtUtc" ON "OrdStatusHistory" ("TenantId", "Axis", "OccurredAtUtc");
+
+CREATE UNIQUE INDEX "IX_OrdStatusHistory_TenantId_OrderId_Axis_VersionAfter" ON "OrdStatusHistory" ("TenantId", "OrderId", "Axis", "VersionAfter");
+
+CREATE INDEX "IX_OrdStatusHistory_TenantId_OrderId_OccurredAtUtc" ON "OrdStatusHistory" ("TenantId", "OrderId", "OccurredAtUtc");
+
+DROP INDEX IF EXISTS "IX_OrdStatusHistory_TenantId_OrderId_Axis_VersionAfter";
+
+CREATE UNIQUE INDEX "IX_OrdStatusHistory_TenantId_OrderId_Axis_VersionAfter"
+                  ON "OrdStatusHistory" ("TenantId", "OrderId", "Axis", "VersionAfter")
+                  NULLS NOT DISTINCT;
+
+UPDATE "OrdOrders" SET
+                    "FulfillmentStatus" = CASE "Status"
+                        WHEN 0 THEN 0 WHEN 1 THEN 1 WHEN 2 THEN 2 WHEN 3 THEN 4
+                        WHEN 4 THEN 5 WHEN 5 THEN 0 WHEN 6 THEN 8 ELSE 0 END,
+                    "ReturnStatus" = CASE "Status" WHEN 5 THEN 5 WHEN 6 THEN 4 ELSE 0 END,
+                    "IsCancelled" = ("Status" = 5),
+                    "ReconciliationStatus" = CASE WHEN "GrandTotal" > 0 THEN 1 ELSE 0 END;
+
+INSERT INTO "OrdStatusHistory"
+                    ("Id", "TenantId", "OrderId", "Axis", "FromStatus", "ToStatus",
+                     "ActorType", "ActorId", "ReasonCode", "ReasonText", "CorrelationId",
+                     "EventId", "VersionAfter", "OccurredAtUtc", "CreationTime", "IsDeleted")
+                  SELECT gen_random_uuid(), o."TenantId", o."Id", 'Fulfillment', 0, o."FulfillmentStatus",
+                         'SystemJob', NULL, 'BackfillMigration', 'Backfill SAL-003', 'migration-sal003',
+                         gen_random_uuid(), 1, now(), now(), false
+                  FROM "OrdOrders" o WHERE o."FulfillmentStatus" <> 0;
+
+INSERT INTO "OrdStatusHistory"
+                    ("Id", "TenantId", "OrderId", "Axis", "FromStatus", "ToStatus",
+                     "ActorType", "ActorId", "ReasonCode", "ReasonText", "CorrelationId",
+                     "EventId", "VersionAfter", "OccurredAtUtc", "CreationTime", "IsDeleted")
+                  SELECT gen_random_uuid(), o."TenantId", o."Id", 'Closure', 0, o."ReturnStatus",
+                         'SystemJob', NULL, 'BackfillMigration', 'Backfill SAL-003', 'migration-sal003',
+                         gen_random_uuid(), 1, now(), now(), false
+                  FROM "OrdOrders" o WHERE o."ReturnStatus" IN (4, 5);
+
+INSERT INTO "OrdStatusHistory"
+                    ("Id", "TenantId", "OrderId", "Axis", "FromStatus", "ToStatus",
+                     "ActorType", "ActorId", "ReasonCode", "ReasonText", "CorrelationId",
+                     "EventId", "VersionAfter", "OccurredAtUtc", "CreationTime", "IsDeleted")
+                  SELECT gen_random_uuid(), o."TenantId", o."Id", 'Payment', 0, o."PaymentStatus",
+                         'SystemJob', NULL, 'BackfillMigration', 'Backfill SAL-003', 'migration-sal003',
+                         gen_random_uuid(), 1, now(), now(), false
+                  FROM "OrdOrders" o WHERE o."PaymentStatus" <> 0;
+
+UPDATE "OrdOrders" SET "FulfillmentVersion" = 1 WHERE "FulfillmentStatus" <> 0;
+
+UPDATE "OrdOrders" SET "ClosureVersion" = 1 WHERE "ReturnStatus" IN (4, 5);
+
+UPDATE "OrdOrders" SET "PaymentVersion" = 1 WHERE "PaymentStatus" <> 0;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261024021355_Sal003_OrderStateMachine_History', '10.0.11');
+
+COMMIT;
+
+START TRANSACTION;
+CREATE TABLE "AbpEventInbox" (
+    "Id" uuid NOT NULL,
+    "ExtraProperties" text NOT NULL,
+    "MessageId" text NOT NULL,
+    "EventName" character varying(256) NOT NULL,
+    "EventData" bytea NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "Status" integer NOT NULL,
+    "HandledTime" timestamp with time zone,
+    "RetryCount" integer NOT NULL,
+    "NextRetryTime" timestamp with time zone,
+    CONSTRAINT "PK_AbpEventInbox" PRIMARY KEY ("Id")
+);
+
+CREATE TABLE "AbpEventOutbox" (
+    "Id" uuid NOT NULL,
+    "ExtraProperties" text NOT NULL,
+    "EventName" character varying(256) NOT NULL,
+    "EventData" bytea NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    CONSTRAINT "PK_AbpEventOutbox" PRIMARY KEY ("Id")
+);
+
+CREATE INDEX "IX_AbpEventInbox_MessageId" ON "AbpEventInbox" ("MessageId");
+
+CREATE INDEX "IX_AbpEventInbox_Status_CreationTime" ON "AbpEventInbox" ("Status", "CreationTime");
+
+CREATE INDEX "IX_AbpEventOutbox_CreationTime" ON "AbpEventOutbox" ("CreationTime");
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261024045237_AbpEventBusOutboxInbox', '10.0.11');
+
+COMMIT;
+
+START TRANSACTION;
+ALTER TABLE "OrdOrders" DROP CONSTRAINT "CK_OrdOrders_StatusVersions_KhongAm";
+
+ALTER TABLE "OrdOrders" ADD "RowVersion" bigint NOT NULL DEFAULT 0;
+
+ALTER TABLE "OrdOrders" ADD CONSTRAINT "CK_OrdOrders_StatusVersions_KhongAm" CHECK ("FulfillmentVersion" >= 0 AND "PaymentVersion" >= 0 AND "ReconciliationVersion" >= 0 AND "ClosureVersion" >= 0 AND "RowVersion" >= 0);
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261024053040_Sal003_RowVersion', '10.0.11');
+
+COMMIT;
+
+START TRANSACTION;
+CREATE TABLE "CatBrands" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "Code" character varying(64) NOT NULL,
+    "Name" character varying(256) NOT NULL,
+    "Slug" character varying(256) NOT NULL,
+    "Description" character varying(2048),
+    "LogoUrl" character varying(1024),
+    "IsActive" boolean NOT NULL,
+    "SortOrder" integer NOT NULL,
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_CatBrands" PRIMARY KEY ("Id")
+);
+
+CREATE INDEX "IX_CatProducts_BrandId" ON "CatProducts" ("BrandId");
+
+CREATE UNIQUE INDEX "IX_CatBrands_TenantId_Code" ON "CatBrands" ("TenantId", "Code");
+
+DROP INDEX "IX_CatBrands_TenantId_Code";
+
+CREATE UNIQUE INDEX "IX_CatBrands_TenantId_Code"
+ON "CatBrands" ("TenantId", "Code") NULLS NOT DISTINCT;
+
+CREATE INDEX "IX_CatBrands_TenantId_HoatDong_ThuTu" ON "CatBrands" ("TenantId", "IsActive", "SortOrder");
+
+CREATE UNIQUE INDEX "IX_CatBrands_TenantId_Slug" ON "CatBrands" ("TenantId", "Slug");
+
+DROP INDEX "IX_CatBrands_TenantId_Slug";
+
+CREATE UNIQUE INDEX "IX_CatBrands_TenantId_Slug"
+ON "CatBrands" ("TenantId", "Slug") NULLS NOT DISTINCT;
+
+ALTER TABLE "CatProducts" ADD CONSTRAINT "FK_CatProducts_CatBrands_BrandId" FOREIGN KEY ("BrandId") REFERENCES "CatBrands" ("Id") ON DELETE RESTRICT;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261027023328_Brand_CatBrands', '10.0.11');
+
+COMMIT;
+
+START TRANSACTION;
+ALTER TABLE "PayTransactions" ADD "ProviderCreateDateGmt7" character(14);
+
+ALTER TABLE "PayTransactions" ADD "ProviderCreateDateUtc" timestamp with time zone;
+
+CREATE TABLE "RecPaymentReconciliationRuns" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "Status" integer NOT NULL,
+    "TriggeredBy" integer NOT NULL,
+    "TriggeredByUserId" uuid,
+    "PeriodFromUtc" timestamp with time zone NOT NULL,
+    "PeriodToUtc" timestamp with time zone NOT NULL,
+    "StartedAtUtc" timestamp with time zone NOT NULL,
+    "FinishedAtUtc" timestamp with time zone,
+    "LineTotal" integer NOT NULL,
+    "LineMatched" integer NOT NULL,
+    "LineSkipped" integer NOT NULL,
+    "DiscrepancyCount" integer NOT NULL,
+    "FailureCode" character varying(64),
+    "CorrelationId" character varying(128),
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_RecPaymentReconciliationRuns" PRIMARY KEY ("Id")
+);
+
+CREATE TABLE "RecPaymentDiscrepancies" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "RunId" uuid NOT NULL,
+    "LineId" uuid NOT NULL,
+    "PaymentTransactionId" uuid NOT NULL,
+    "OrderId" uuid,
+    "ProviderCode" character varying(32) NOT NULL,
+    "MerchantReference" character varying(64) NOT NULL,
+    "Kind" integer NOT NULL,
+    "Severity" integer NOT NULL,
+    "LocalAmountMinorUnits" bigint,
+    "ProviderAmountMinorUnits" bigint,
+    "Currency" character(3) NOT NULL,
+    "Status" integer NOT NULL,
+    "AcknowledgedBy" uuid,
+    "AcknowledgedAtUtc" timestamp with time zone,
+    "ResolvedBy" uuid,
+    "ResolvedAtUtc" timestamp with time zone,
+    "ResolutionNote" character varying(2048),
+    "IgnoreReason" character varying(64),
+    "DetectedAtUtc" timestamp with time zone NOT NULL,
+    "CorrelationId" character varying(128),
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_RecPaymentDiscrepancies" PRIMARY KEY ("Id"),
+    CONSTRAINT "FK_RecPaymentDiscrepancies_RecPaymentReconciliationRuns_RunId" FOREIGN KEY ("RunId") REFERENCES "RecPaymentReconciliationRuns" ("Id") ON DELETE RESTRICT
+);
+
+CREATE TABLE "RecPaymentReconciliationLines" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "RunId" uuid NOT NULL,
+    "PaymentTransactionId" uuid NOT NULL,
+    "ProviderCode" character varying(32) NOT NULL,
+    "MerchantReference" character varying(64) NOT NULL,
+    "RequestId" character varying(32) NOT NULL,
+    "Status" integer NOT NULL,
+    "SkipReason" character varying(64),
+    "AttemptCount" integer NOT NULL,
+    "LocalStatus" integer NOT NULL,
+    "LocalAmountMinorUnits" bigint NOT NULL,
+    "ProviderResponseCode" character varying(8),
+    "ProviderTransactionStatus" character varying(8),
+    "ProviderAmountMinorUnits" bigint,
+    "ProviderTransactionNo" character varying(32),
+    "ProviderPayDateUtc" timestamp with time zone,
+    "ProviderPayDateGmt7" character(14),
+    "ProviderTransactionType" character varying(8),
+    "FailureCode" character varying(64),
+    "FailureMessage" character varying(1024),
+    "DiscrepancyId" uuid,
+    "CheckedAtUtc" timestamp with time zone,
+    "CorrelationId" character varying(128),
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_RecPaymentReconciliationLines" PRIMARY KEY ("Id"),
+    CONSTRAINT "FK_RecPaymentReconciliationLines_RecPaymentReconciliationRuns_~" FOREIGN KEY ("RunId") REFERENCES "RecPaymentReconciliationRuns" ("Id") ON DELETE RESTRICT
+);
+
+CREATE INDEX "IX_RecPayDiscrepancies_TenantId_Run" ON "RecPaymentDiscrepancies" ("TenantId", "RunId");
+
+CREATE INDEX "IX_RecPayDiscrepancies_TenantId_Status_Severity" ON "RecPaymentDiscrepancies" ("TenantId", "Status", "Severity");
+
+CREATE INDEX "IX_RecPaymentDiscrepancies_RunId" ON "RecPaymentDiscrepancies" ("RunId");
+
+CREATE UNIQUE INDEX "IX_RecPayLines_TenantId_Run_GiaoDich" ON "RecPaymentReconciliationLines" ("TenantId", "RunId", "PaymentTransactionId");
+
+DROP INDEX "IX_RecPayLines_TenantId_Run_GiaoDich";
+
+CREATE UNIQUE INDEX "IX_RecPayLines_TenantId_Run_GiaoDich"
+ON "RecPaymentReconciliationLines" ("TenantId", "RunId", "PaymentTransactionId") NULLS NOT DISTINCT;
+
+CREATE INDEX "IX_RecPayLines_TenantId_Run_Status" ON "RecPaymentReconciliationLines" ("TenantId", "RunId", "Status");
+
+CREATE INDEX "IX_RecPaymentReconciliationLines_RunId" ON "RecPaymentReconciliationLines" ("RunId");
+
+CREATE INDEX "IX_RecPayRuns_TenantId_PeriodFrom" ON "RecPaymentReconciliationRuns" ("TenantId", "PeriodFromUtc");
+
+CREATE INDEX "IX_RecPayRuns_TenantId_Status_Started" ON "RecPaymentReconciliationRuns" ("TenantId", "Status", "StartedAtUtc");
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261027063648_Rec001_PaymentReconciliation', '10.0.11');
+
+COMMIT;
+
+START TRANSACTION;
+CREATE TABLE "PrcCostPrices" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "Sku" character varying(64) NOT NULL,
+    "AmountValue" numeric(18,4) NOT NULL,
+    "CurrencyCode" character varying(8) NOT NULL,
+    "EffectiveFrom" date NOT NULL,
+    "EffectiveTo" date,
+    "ApprovedBy" uuid,
+    "ApprovedAtUtc" timestamp with time zone,
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_PrcCostPrices" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_PrcCostPrices_Amount_KhongAm" CHECK ("AmountValue" >= 0),
+    CONSTRAINT "CK_PrcCostPrices_Currency_HopLe" CHECK ("CurrencyCode" ~ '^[A-Z]{3}$'),
+    CONSTRAINT "CK_PrcCostPrices_EffectiveRange" CHECK ("EffectiveTo" IS NULL OR "EffectiveTo" >= "EffectiveFrom")
+);
+
+CREATE UNIQUE INDEX "IX_PrcCostPrices_TenantId_Sku_EffectiveFrom" ON "PrcCostPrices" ("TenantId", "Sku", "EffectiveFrom");
+
+CREATE INDEX "IX_PrcCostPrices_TenantId_Sku_EffectiveTo" ON "PrcCostPrices" ("TenantId", "Sku", "EffectiveTo");
+
+DROP INDEX "IX_PrcCostPrices_TenantId_Sku_EffectiveFrom";
+
+CREATE UNIQUE INDEX "IX_PrcCostPrices_TenantId_Sku_EffectiveFrom" ON "PrcCostPrices" ("TenantId", "Sku", "EffectiveFrom") NULLS NOT DISTINCT;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261028031842_Gd1S12_CostPrice', '10.0.11');
+
+COMMIT;
+
+START TRANSACTION;
+ALTER TABLE "InvStockReservations" ADD "ChannelCode" character varying(32);
+
+CREATE TABLE "InvStockAllotmentLedgers" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "StockAllotmentId" uuid NOT NULL,
+    "WarehouseId" uuid NOT NULL,
+    "Sku" character varying(64) NOT NULL,
+    "ChannelCode" character varying(32) NOT NULL,
+    "QuantityDelta" integer NOT NULL,
+    "AllottedAfter" integer NOT NULL,
+    "Reason" integer NOT NULL,
+    "ReferenceType" character varying(64),
+    "ReferenceId" character varying(128),
+    "IdempotencyKey" character varying(256),
+    "OccurredAtUtc" timestamp with time zone NOT NULL,
+    "PerformedByUserId" uuid,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_InvStockAllotmentLedgers" PRIMARY KEY ("Id")
+);
+
+CREATE TABLE "InvStockAllotments" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "WarehouseId" uuid NOT NULL,
+    "Sku" character varying(64) NOT NULL,
+    "ChannelCode" character varying(32) NOT NULL,
+    "AllottedQuantity" integer NOT NULL,
+    "ReservedQuantity" integer NOT NULL,
+    "Priority" integer NOT NULL,
+    "Status" integer NOT NULL,
+    "FrozenAtUtc" timestamp with time zone,
+    "FrozenByUserId" uuid,
+    "ReleasedAtUtc" timestamp with time zone,
+    "ReleaseReason" character varying(512),
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_InvStockAllotments" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_InvStockAllotments_DongBang_CoDauVet" CHECK ("Status" <> 1 OR ("FrozenAtUtc" IS NOT NULL AND "FrozenByUserId" IS NOT NULL)),
+    CONSTRAINT "CK_InvStockAllotments_Nha_CoLyDo" CHECK ("Status" <> 2 OR "ReleaseReason" IS NOT NULL),
+    CONSTRAINT "CK_InvStockAllotments_Reserved_KhongVuotAllotted" CHECK ("ReservedQuantity" <= "AllottedQuantity"),
+    CONSTRAINT "CK_InvStockAllotments_SoLuong_KhongAm" CHECK ("AllottedQuantity" >= 0 AND "ReservedQuantity" >= 0)
+);
+
+CREATE UNIQUE INDEX "IX_InvStockAllotmentLedgers_TenantId_IdempotencyKey" ON "InvStockAllotmentLedgers" ("TenantId", "IdempotencyKey") WHERE "IdempotencyKey" IS NOT NULL;
+
+CREATE INDEX "IX_InvStockAllotmentLedgers_TenantId_Kenh_OccurredAtUtc" ON "InvStockAllotmentLedgers" ("TenantId", "ChannelCode", "OccurredAtUtc");
+
+CREATE INDEX "IX_InvStockAllotmentLedgers_TenantId_Kho_Sku_OccurredAtUtc" ON "InvStockAllotmentLedgers" ("TenantId", "WarehouseId", "Sku", "OccurredAtUtc");
+
+CREATE INDEX "IX_InvStockAllotments_TenantId_Kenh_Status" ON "InvStockAllotments" ("TenantId", "ChannelCode", "Status");
+
+CREATE INDEX "IX_InvStockAllotments_TenantId_Kho_Sku" ON "InvStockAllotments" ("TenantId", "WarehouseId", "Sku");
+
+CREATE UNIQUE INDEX "IX_InvStockAllotments_TenantId_Kho_Sku_Kenh" ON "InvStockAllotments" ("TenantId", "WarehouseId", "Sku", "ChannelCode");
+
+DROP INDEX "IX_InvStockAllotments_TenantId_Kho_Sku_Kenh";
+
+CREATE UNIQUE INDEX "IX_InvStockAllotments_TenantId_Kho_Sku_Kenh" ON "InvStockAllotments" ("TenantId", "WarehouseId", "Sku", "ChannelCode") NULLS NOT DISTINCT;
+
+DROP INDEX "IX_InvStockAllotmentLedgers_TenantId_IdempotencyKey";
+
+CREATE UNIQUE INDEX "IX_InvStockAllotmentLedgers_TenantId_IdempotencyKey" ON "InvStockAllotmentLedgers" ("TenantId", "IdempotencyKey") NULLS NOT DISTINCT WHERE "IdempotencyKey" IS NOT NULL;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261028035801_Gd1S13_StockAllotment', '10.0.11');
+
+COMMIT;
+
+START TRANSACTION;
+ALTER TABLE "OrdOrderLines" ADD "ReturnedQuantity" integer NOT NULL DEFAULT 0;
+
+CREATE TABLE "OrdReturns" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "OrderId" uuid NOT NULL,
+    "ReturnNumber" character varying(64) NOT NULL,
+    "ChannelCode" character varying(32) NOT NULL,
+    "Status" integer NOT NULL,
+    "GoodsStatus" integer NOT NULL,
+    "ReasonCode" character varying(64) NOT NULL,
+    "ReasonText" character varying(512),
+    "WarehouseId" uuid NOT NULL,
+    "RefundMethod" integer NOT NULL,
+    "RefundedAmount" numeric(18,4) NOT NULL,
+    "RefundCurrency" character varying(8) NOT NULL,
+    "RequestedByActorType" character varying(24) NOT NULL,
+    "RequestedByActorId" uuid,
+    "IdempotencyKey" character varying(256) NOT NULL,
+    "PayloadHash" character varying(64) NOT NULL,
+    "Version" bigint NOT NULL,
+    "CorrelationId" character varying(64) NOT NULL,
+    "ReceivedAtUtc" timestamp with time zone,
+    "ClosedAtUtc" timestamp with time zone,
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_OrdReturns" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_OrdReturns_Dong_CoMoc" CHECK ("Status" <> 5 OR "ClosedAtUtc" IS NOT NULL),
+    CONSTRAINT "CK_OrdReturns_NhanHang_CoMoc" CHECK ("Status" <> 4 OR "ReceivedAtUtc" IS NOT NULL),
+    CONSTRAINT "CK_OrdReturns_RefundedAmount_KhongAm" CHECK ("RefundedAmount" >= 0)
+);
+
+CREATE TABLE "OrdReturnHistory" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "ReturnId" uuid NOT NULL,
+    "Axis" character varying(24) NOT NULL,
+    "FromStatus" integer NOT NULL,
+    "ToStatus" integer NOT NULL,
+    "ActorType" character varying(24) NOT NULL,
+    "ActorId" uuid,
+    "ReasonCode" character varying(64) NOT NULL,
+    "ReasonText" character varying(512),
+    "CorrelationId" character varying(64) NOT NULL,
+    "EventId" uuid NOT NULL,
+    "VersionAfter" bigint NOT NULL,
+    "OccurredAtUtc" timestamp with time zone NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_OrdReturnHistory" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_OrdReturnHistory_PhaiDoiTrangThai" CHECK ("FromStatus" <> "ToStatus"),
+    CONSTRAINT "FK_OrdReturnHistory_OrdReturns_ReturnId" FOREIGN KEY ("ReturnId") REFERENCES "OrdReturns" ("Id") ON DELETE RESTRICT
+);
+
+CREATE TABLE "OrdReturnLines" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "ReturnId" uuid NOT NULL,
+    "OrderLineId" uuid NOT NULL,
+    "Sku" character varying(64) NOT NULL,
+    "Quantity" integer NOT NULL,
+    "ReceivedQuantity" integer NOT NULL,
+    "Disposition" integer NOT NULL,
+    "UnitPriceSnapshot" numeric(18,4) NOT NULL,
+    "DiscountAmountSnapshot" numeric(18,4) NOT NULL,
+    "TaxAmountSnapshot" numeric(18,4) NOT NULL,
+    "RefundAmount" numeric(18,4) NOT NULL,
+    "LedgerEntryId" uuid,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_OrdReturnLines" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_OrdReturnLines_Disposition_ChiSauKhiNhan" CHECK ("Disposition" = 0 OR "ReceivedQuantity" > 0),
+    CONSTRAINT "CK_OrdReturnLines_Nhan_HopLe" CHECK ("ReceivedQuantity" >= 0 AND "ReceivedQuantity" <= "Quantity"),
+    CONSTRAINT "CK_OrdReturnLines_SoLuong_HopLe" CHECK ("Quantity" > 0),
+    CONSTRAINT "FK_OrdReturnLines_OrdReturns_ReturnId" FOREIGN KEY ("ReturnId") REFERENCES "OrdReturns" ("Id") ON DELETE RESTRICT
+);
+
+ALTER TABLE "OrdOrderLines" ADD CONSTRAINT "CK_OrdOrderLines_ReturnedQuantity_HopLe" CHECK ("ReturnedQuantity" >= 0 AND "ReturnedQuantity" <= "Quantity");
+
+CREATE INDEX "IX_OrdReturnHistory_ReturnId" ON "OrdReturnHistory" ("ReturnId");
+
+CREATE UNIQUE INDEX "IX_OrdReturnHistory_TenantId_ReturnId_Axis_VersionAfter" ON "OrdReturnHistory" ("TenantId", "ReturnId", "Axis", "VersionAfter");
+
+CREATE INDEX "IX_OrdReturnHistory_TenantId_ReturnId_OccurredAtUtc" ON "OrdReturnHistory" ("TenantId", "ReturnId", "OccurredAtUtc");
+
+CREATE INDEX "IX_OrdReturnLines_ReturnId" ON "OrdReturnLines" ("ReturnId");
+
+CREATE UNIQUE INDEX "IX_OrdReturnLines_TenantId_ReturnId_OrderLineId" ON "OrdReturnLines" ("TenantId", "ReturnId", "OrderLineId");
+
+CREATE UNIQUE INDEX "IX_OrdReturns_TenantId_IdempotencyKey" ON "OrdReturns" ("TenantId", "IdempotencyKey");
+
+CREATE INDEX "IX_OrdReturns_TenantId_OrderId_CreationTime" ON "OrdReturns" ("TenantId", "OrderId", "CreationTime");
+
+CREATE UNIQUE INDEX "IX_OrdReturns_TenantId_ReturnNumber" ON "OrdReturns" ("TenantId", "ReturnNumber");
+
+CREATE INDEX "IX_OrdReturns_TenantId_Status_GoodsStatus" ON "OrdReturns" ("TenantId", "Status", "GoodsStatus");
+
+DROP INDEX "IX_OrdReturns_TenantId_ReturnNumber";
+
+CREATE UNIQUE INDEX "IX_OrdReturns_TenantId_ReturnNumber" ON "OrdReturns" ("TenantId", "ReturnNumber") NULLS NOT DISTINCT;
+
+DROP INDEX "IX_OrdReturns_TenantId_IdempotencyKey";
+
+CREATE UNIQUE INDEX "IX_OrdReturns_TenantId_IdempotencyKey" ON "OrdReturns" ("TenantId", "IdempotencyKey") NULLS NOT DISTINCT;
+
+DROP INDEX "IX_OrdReturnLines_TenantId_ReturnId_OrderLineId";
+
+CREATE UNIQUE INDEX "IX_OrdReturnLines_TenantId_ReturnId_OrderLineId" ON "OrdReturnLines" ("TenantId", "ReturnId", "OrderLineId") NULLS NOT DISTINCT;
+
+DROP INDEX "IX_OrdReturnHistory_TenantId_ReturnId_Axis_VersionAfter";
+
+CREATE UNIQUE INDEX "IX_OrdReturnHistory_TenantId_ReturnId_Axis_VersionAfter" ON "OrdReturnHistory" ("TenantId", "ReturnId", "Axis", "VersionAfter") NULLS NOT DISTINCT;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261028041254_Gd1S14_OrderReturn', '10.0.11');
+
+COMMIT;
+
+START TRANSACTION;
+ALTER TABLE "MsgDeadLetters" ADD "ReplayCount" integer NOT NULL DEFAULT 0;
+
+ALTER TABLE "MsgDeadLetters" ADD "ReplayedAtUtc" timestamp with time zone;
+
+ALTER TABLE "MsgDeadLetters" ADD "ReplayedBy" character varying(256);
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261029033402_Xc002_DlqReplay', '10.0.11');
+
+COMMIT;
+
+START TRANSACTION;
+ALTER TABLE "CatProducts" ADD "ExternalId" character varying(64);
+
+ALTER TABLE "CatProducts" ADD "IsHot" boolean NOT NULL DEFAULT FALSE;
+
+ALTER TABLE "CatProducts" ADD "IsNew" boolean NOT NULL DEFAULT FALSE;
+
+ALTER TABLE "CatProducts" ADD "ParentId" uuid;
+
+ALTER TABLE "CatProducts" ADD "StorageTimeDays" integer;
+
+ALTER TABLE "CatProducts" ADD "Type" integer NOT NULL DEFAULT 1;
+
+ALTER TABLE "CatProducts" ADD "VatMode" integer NOT NULL DEFAULT 2;
+
+ALTER TABLE "CatProducts" ADD "VatPercent" numeric(5,2);
+
+ALTER TABLE "CatProducts" ADD "WarrantyMonths" integer;
+
+ALTER TABLE "CatProducts" ADD "WeightGram" integer;
+
+CREATE TABLE "CatComboComponents" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "ComboProductId" uuid NOT NULL,
+    "ComponentProductId" uuid NOT NULL,
+    "Quantity" numeric(18,3) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_CatComboComponents" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_CatComboComponents_Quantity_Duong" CHECK ("Quantity" > 0),
+    CONSTRAINT "FK_CatComboComponents_CatProducts_ComboProductId" FOREIGN KEY ("ComboProductId") REFERENCES "CatProducts" ("Id") ON DELETE RESTRICT,
+    CONSTRAINT "FK_CatComboComponents_CatProducts_ComponentProductId" FOREIGN KEY ("ComponentProductId") REFERENCES "CatProducts" ("Id") ON DELETE RESTRICT
+);
+
+CREATE TABLE "CatPackageComponents" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "PackageProductId" uuid NOT NULL,
+    "ComponentProductId" uuid NOT NULL,
+    "Quantity" numeric(18,3) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_CatPackageComponents" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_CatPackageComponents_Quantity_Duong" CHECK ("Quantity" > 0),
+    CONSTRAINT "FK_CatPackageComponents_CatProducts_ComponentProductId" FOREIGN KEY ("ComponentProductId") REFERENCES "CatProducts" ("Id") ON DELETE RESTRICT,
+    CONSTRAINT "FK_CatPackageComponents_CatProducts_PackageProductId" FOREIGN KEY ("PackageProductId") REFERENCES "CatProducts" ("Id") ON DELETE RESTRICT
+);
+
+CREATE TABLE "CatProdBatches" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "ProductId" uuid NOT NULL,
+    "Code" character varying(64) NOT NULL,
+    "ManufactureDate" timestamp with time zone,
+    "ExpiredDate" timestamp with time zone,
+    "PriorWarningDays" integer,
+    "IsActive" boolean NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_CatProdBatches" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_CatProdBatches_Ngay_Khoang" CHECK ("ManufactureDate" IS NULL OR "ExpiredDate" IS NULL OR "ManufactureDate" <= "ExpiredDate"),
+    CONSTRAINT "FK_CatProdBatches_CatProducts_ProductId" FOREIGN KEY ("ProductId") REFERENCES "CatProducts" ("Id") ON DELETE RESTRICT
+);
+
+CREATE TABLE "CatProductTags" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "ProductId" uuid NOT NULL,
+    "Name" character varying(64) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_CatProductTags" PRIMARY KEY ("Id"),
+    CONSTRAINT "FK_CatProductTags_CatProducts_ProductId" FOREIGN KEY ("ProductId") REFERENCES "CatProducts" ("Id") ON DELETE RESTRICT
+);
+
+CREATE TABLE "CatProductUnits" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "ProductId" uuid NOT NULL,
+    "Name" character varying(64) NOT NULL,
+    "ConversionFactor" numeric(18,4) NOT NULL,
+    "Barcode" character varying(64),
+    "IsBase" boolean NOT NULL,
+    "SalePrice" numeric(18,4) NOT NULL,
+    "ImportPrice" numeric(18,4),
+    "WholesalePrice" numeric(18,4),
+    "OldPrice" numeric(18,4),
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_CatProductUnits" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_CatProdUnits_ConversionFactor_Duong" CHECK ("ConversionFactor" > 0),
+    CONSTRAINT "CK_CatProdUnits_SalePrice_KhongAm" CHECK ("SalePrice" >= 0),
+    CONSTRAINT "FK_CatProductUnits_CatProducts_ProductId" FOREIGN KEY ("ProductId") REFERENCES "CatProducts" ("Id") ON DELETE RESTRICT
+);
+
+CREATE TABLE "CatProductImeis" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "ProductId" uuid NOT NULL,
+    "Serial" character varying(64) NOT NULL,
+    "Status" integer NOT NULL,
+    "WarehouseId" uuid,
+    "BatchId" uuid,
+    "ImportBillId" uuid,
+    "SoldBillId" uuid,
+    "WarrantyUntil" timestamp with time zone,
+    "Note" character varying(512),
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_CatProductImeis" PRIMARY KEY ("Id"),
+    CONSTRAINT "FK_CatProductImeis_CatProdBatches_BatchId" FOREIGN KEY ("BatchId") REFERENCES "CatProdBatches" ("Id") ON DELETE RESTRICT,
+    CONSTRAINT "FK_CatProductImeis_CatProducts_ProductId" FOREIGN KEY ("ProductId") REFERENCES "CatProducts" ("Id") ON DELETE RESTRICT
+);
+
+CREATE INDEX "IX_CatProducts_ParentId" ON "CatProducts" ("ParentId");
+
+CREATE INDEX "IX_CatProducts_TenantId_ExternalId" ON "CatProducts" ("TenantId", "ExternalId");
+
+CREATE INDEX "IX_CatProducts_TenantId_ParentId" ON "CatProducts" ("TenantId", "ParentId");
+
+ALTER TABLE "CatProducts" ADD CONSTRAINT "CK_CatProducts_VatPercent_Khoang" CHECK ("VatPercent" IS NULL OR ("VatPercent" >= -100 AND "VatPercent" <= 100));
+
+CREATE INDEX "IX_CatComboComponents_ComboProductId" ON "CatComboComponents" ("ComboProductId");
+
+CREATE INDEX "IX_CatComboComponents_ComponentProductId" ON "CatComboComponents" ("ComponentProductId");
+
+CREATE UNIQUE INDEX "IX_CatComboComponents_TenantId_Combo_Component" ON "CatComboComponents" ("TenantId", "ComboProductId", "ComponentProductId");
+
+CREATE INDEX "IX_CatPackageComponents_ComponentProductId" ON "CatPackageComponents" ("ComponentProductId");
+
+CREATE INDEX "IX_CatPackageComponents_PackageProductId" ON "CatPackageComponents" ("PackageProductId");
+
+CREATE UNIQUE INDEX "IX_CatPackageComponents_TenantId_Package_Component" ON "CatPackageComponents" ("TenantId", "PackageProductId", "ComponentProductId");
+
+CREATE INDEX "IX_CatProdBatches_ProductId" ON "CatProdBatches" ("ProductId");
+
+CREATE INDEX "IX_CatProdBatches_TenantId_ExpiredDate" ON "CatProdBatches" ("TenantId", "ExpiredDate");
+
+CREATE UNIQUE INDEX "IX_CatProdBatches_TenantId_ProductId_Code" ON "CatProdBatches" ("TenantId", "ProductId", "Code");
+
+CREATE INDEX "IX_CatProdImeis_TenantId_ProductId_Status" ON "CatProductImeis" ("TenantId", "ProductId", "Status");
+
+CREATE UNIQUE INDEX "IX_CatProdImeis_TenantId_Serial" ON "CatProductImeis" ("TenantId", "Serial");
+
+CREATE INDEX "IX_CatProductImeis_BatchId" ON "CatProductImeis" ("BatchId");
+
+CREATE INDEX "IX_CatProductImeis_ProductId" ON "CatProductImeis" ("ProductId");
+
+CREATE INDEX "IX_CatProductTags_ProductId" ON "CatProductTags" ("ProductId");
+
+CREATE INDEX "IX_CatProductTags_TenantId_Name" ON "CatProductTags" ("TenantId", "Name");
+
+CREATE UNIQUE INDEX "IX_CatProductTags_TenantId_ProductId_Name" ON "CatProductTags" ("TenantId", "ProductId", "Name");
+
+CREATE INDEX "IX_CatProductUnits_ProductId" ON "CatProductUnits" ("ProductId");
+
+CREATE UNIQUE INDEX "IX_CatProdUnits_MotDonViGoc" ON "CatProductUnits" ("TenantId", "ProductId") WHERE "IsBase";
+
+CREATE UNIQUE INDEX "IX_CatProdUnits_TenantId_Barcode" ON "CatProductUnits" ("TenantId", "Barcode") WHERE "Barcode" IS NOT NULL;
+
+CREATE UNIQUE INDEX "IX_CatProdUnits_TenantId_ProductId_Name" ON "CatProductUnits" ("TenantId", "ProductId", "Name");
+
+ALTER TABLE "CatProducts" ADD CONSTRAINT "FK_CatProducts_CatProducts_ParentId" FOREIGN KEY ("ParentId") REFERENCES "CatProducts" ("Id") ON DELETE RESTRICT;
+
+DROP INDEX "IX_CatProdUnits_TenantId_ProductId_Name";
+
+CREATE UNIQUE INDEX "IX_CatProdUnits_TenantId_ProductId_Name" ON "CatProductUnits" ("TenantId", "ProductId", "Name") NULLS NOT DISTINCT;
+
+DROP INDEX "IX_CatProdUnits_TenantId_Barcode";
+
+CREATE UNIQUE INDEX "IX_CatProdUnits_TenantId_Barcode" ON "CatProductUnits" ("TenantId", "Barcode") NULLS NOT DISTINCT WHERE "Barcode" IS NOT NULL;
+
+DROP INDEX "IX_CatProdUnits_MotDonViGoc";
+
+CREATE UNIQUE INDEX "IX_CatProdUnits_MotDonViGoc" ON "CatProductUnits" ("TenantId", "ProductId") NULLS NOT DISTINCT WHERE "IsBase";
+
+DROP INDEX "IX_CatProdImeis_TenantId_Serial";
+
+CREATE UNIQUE INDEX "IX_CatProdImeis_TenantId_Serial" ON "CatProductImeis" ("TenantId", "Serial") NULLS NOT DISTINCT;
+
+DROP INDEX "IX_CatProdBatches_TenantId_ProductId_Code";
+
+CREATE UNIQUE INDEX "IX_CatProdBatches_TenantId_ProductId_Code" ON "CatProdBatches" ("TenantId", "ProductId", "Code") NULLS NOT DISTINCT;
+
+DROP INDEX "IX_CatComboComponents_TenantId_Combo_Component";
+
+CREATE UNIQUE INDEX "IX_CatComboComponents_TenantId_Combo_Component" ON "CatComboComponents" ("TenantId", "ComboProductId", "ComponentProductId") NULLS NOT DISTINCT;
+
+DROP INDEX "IX_CatPackageComponents_TenantId_Package_Component";
+
+CREATE UNIQUE INDEX "IX_CatPackageComponents_TenantId_Package_Component" ON "CatPackageComponents" ("TenantId", "PackageProductId", "ComponentProductId") NULLS NOT DISTINCT;
+
+DROP INDEX "IX_CatProductTags_TenantId_ProductId_Name";
+
+CREATE UNIQUE INDEX "IX_CatProductTags_TenantId_ProductId_Name" ON "CatProductTags" ("TenantId", "ProductId", "Name") NULLS NOT DISTINCT;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261102085805_Wp03_Catalog_NhanhModel', '10.0.11');
+
+COMMIT;
+
+START TRANSACTION;
+ALTER TABLE "OrdOrderLines" ADD "ProductId" uuid;
+
+CREATE TABLE "CatVariantMaps" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "VariantId" uuid NOT NULL,
+    "ProductId" uuid NOT NULL,
+    "UnitId" uuid NOT NULL,
+    "Sku" character varying(64) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_CatVariantMaps" PRIMARY KEY ("Id"),
+    CONSTRAINT "FK_CatVariantMaps_CatProducts_ProductId" FOREIGN KEY ("ProductId") REFERENCES "CatProducts" ("Id") ON DELETE RESTRICT
+);
+
+CREATE INDEX "IX_OrdOrderLines_TenantId_ProductId" ON "OrdOrderLines" ("TenantId", "ProductId");
+
+CREATE INDEX "IX_CatVariantMaps_ProductId" ON "CatVariantMaps" ("ProductId");
+
+CREATE INDEX "IX_CatVariantMaps_TenantId_ProductId" ON "CatVariantMaps" ("TenantId", "ProductId");
+
+CREATE INDEX "IX_CatVariantMaps_TenantId_Sku" ON "CatVariantMaps" ("TenantId", "Sku");
+
+CREATE UNIQUE INDEX "IX_CatVariantMaps_TenantId_VariantId" ON "CatVariantMaps" ("TenantId", "VariantId");
+
+DROP INDEX "IX_CatVariantMaps_TenantId_VariantId";
+
+CREATE UNIQUE INDEX "IX_CatVariantMaps_TenantId_VariantId" ON "CatVariantMaps" ("TenantId", "VariantId") NULLS NOT DISTINCT;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261102093528_Wp03_Catalog_Backfill_OrderLineProductId', '10.0.11');
+
+COMMIT;
+
+START TRANSACTION;
+ALTER TABLE "InvStockDocuments" ADD "CounterpartyId" uuid;
+
+ALTER TABLE "InvStockDocuments" ADD "CounterpartyType" integer;
+
+ALTER TABLE "InvStockDocuments" ADD "Direction" integer;
+
+ALTER TABLE "InvStockDocuments" ADD "DiscountAmount" numeric(18,4);
+
+ALTER TABLE "InvStockDocuments" ADD "Mode" integer;
+
+ALTER TABLE "InvStockDocuments" ADD "PaidAmount" numeric(18,4);
+
+ALTER TABLE "InvStockDocuments" ADD "RefId" character varying(128);
+
+ALTER TABLE "InvStockDocuments" ADD "RefType" character varying(64);
+
+ALTER TABLE "InvStockDocumentLines" ADD "BatchId" uuid;
+
+ALTER TABLE "InvStockDocumentLines" ADD "ImeiSerials" character varying(4000);
+
+ALTER TABLE "InvStockDocumentLines" ADD "UnitId" uuid;
+
+ALTER TABLE "InvStockDocumentLines" ADD "VatPercent" numeric(5,2);
+
+ALTER TABLE "InvItems" ADD "Damaged" integer NOT NULL DEFAULT 0;
+
+ALTER TABLE "InvItems" ADD "Holding" integer NOT NULL DEFAULT 0;
+
+ALTER TABLE "InvItems" ADD "PreOrder" integer NOT NULL DEFAULT 0;
+
+ALTER TABLE "InvItems" ADD "Shipping" integer NOT NULL DEFAULT 0;
+
+ALTER TABLE "InvItems" ADD "Transferring" integer NOT NULL DEFAULT 0;
+
+ALTER TABLE "InvItems" ADD "WaitingInbound" integer NOT NULL DEFAULT 0;
+
+ALTER TABLE "InvItems" ADD "Warranty" integer NOT NULL DEFAULT 0;
+
+ALTER TABLE "InvItems" ADD "WarrantyHolding" integer NOT NULL DEFAULT 0;
+
+CREATE INDEX "IX_InvStockDocuments_TenantId_Huong_Status_OccurredAtUtc" ON "InvStockDocuments" ("TenantId", "Direction", "Status", "OccurredAtUtc");
+
+CREATE UNIQUE INDEX "IX_InvStockDocuments_TenantId_IdempotencyKey" ON "InvStockDocuments" ("TenantId", "IdempotencyKey") WHERE "IdempotencyKey" IS NOT NULL;
+
+DROP INDEX IF EXISTS "IX_InvStockDocuments_TenantId_IdempotencyKey";
+
+CREATE UNIQUE INDEX "IX_InvStockDocuments_TenantId_IdempotencyKey" ON "InvStockDocuments" ("TenantId", "IdempotencyKey") NULLS NOT DISTINCT WHERE "IdempotencyKey" IS NOT NULL;
+
+ALTER TABLE "InvStockDocuments" ADD CONSTRAINT "CK_InvStockDocuments_Direction_HopLe" CHECK ("Direction" IS NULL OR "Direction" IN (1, 2));
+
+ALTER TABLE "InvStockDocuments" ADD CONSTRAINT "CK_InvStockDocuments_Mode_HopLe" CHECK ("Mode" IS NULL OR "Mode" IN (1, 2, 3, 4, 5, 6, 8, 10, 13, 14, 15, 16, 17, 18, 19));
+
+ALTER TABLE "InvStockDocuments" ADD CONSTRAINT "CK_InvStockDocuments_Tien_KhongAm" CHECK (("DiscountAmount" IS NULL OR "DiscountAmount" >= 0) AND ("PaidAmount" IS NULL OR "PaidAmount" >= 0));
+
+ALTER TABLE "InvStockDocumentLines" ADD CONSTRAINT "CK_InvStockDocumentLines_VatPercent_HopLe" CHECK ("VatPercent" IS NULL OR ("VatPercent" >= 0 AND "VatPercent" <= 100));
+
+ALTER TABLE "InvItems" ADD CONSTRAINT "CK_InvItems_Chieu_KhongAm" CHECK ("Transferring" >= 0 AND "Shipping" >= 0 AND "Holding" >= 0 AND "Damaged" >= 0 AND "Warranty" >= 0 AND "WarrantyHolding" >= 0 AND "PreOrder" >= 0 AND "WaitingInbound" >= 0);
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261102095854_Wp04_Inventory_Buckets_Mode', '10.0.11');
+
+COMMIT;
+
+START TRANSACTION;
+ALTER TABLE "ReconRunMismatches" ALTER COLUMN "TongSoCai" TYPE numeric(18,3);
+
+ALTER TABLE "ReconRunMismatches" ALTER COLUMN "OnHand" TYPE numeric(18,3);
+
+ALTER TABLE "ReconRunMismatches" ALTER COLUMN "ChenhLech" TYPE numeric(18,3);
+
+ALTER TABLE "InvStockLedger" ALTER COLUMN "QuantityDelta" TYPE numeric(18,3);
+
+ALTER TABLE "InvStockLedger" ALTER COLUMN "BalanceAfter" TYPE numeric(18,3);
+
+ALTER TABLE "InvStockDocumentLines" ALTER COLUMN "Quantity" TYPE numeric(18,3);
+
+ALTER TABLE "InvItems" ALTER COLUMN "WarrantyHolding" TYPE numeric(18,3);
+
+ALTER TABLE "InvItems" ALTER COLUMN "Warranty" TYPE numeric(18,3);
+
+ALTER TABLE "InvItems" ALTER COLUMN "WaitingInbound" TYPE numeric(18,3);
+
+ALTER TABLE "InvItems" ALTER COLUMN "Transferring" TYPE numeric(18,3);
+
+ALTER TABLE "InvItems" ALTER COLUMN "Shipping" TYPE numeric(18,3);
+
+ALTER TABLE "InvItems" ALTER COLUMN "Reserved" TYPE numeric(18,3);
+
+ALTER TABLE "InvItems" ALTER COLUMN "PreOrder" TYPE numeric(18,3);
+
+ALTER TABLE "InvItems" ALTER COLUMN "OnHand" TYPE numeric(18,3);
+
+ALTER TABLE "InvItems" ALTER COLUMN "Holding" TYPE numeric(18,3);
+
+ALTER TABLE "InvItems" ALTER COLUMN "Damaged" TYPE numeric(18,3);
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261102102215_Wp04b_SoLuong_Decimal', '10.0.11');
+
+COMMIT;
+
+START TRANSACTION;
+ALTER TABLE "InvStockDocumentLines" ADD "UnitPrice" numeric(18,2);
+
+ALTER TABLE "InvStockDocumentLines" ADD CONSTRAINT "CK_InvStockDocumentLines_UnitPrice_KhongAm" CHECK ("UnitPrice" IS NULL OR "UnitPrice" >= 0);
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261103033818_Wp04c_Tien_PhieuKho', '10.0.11');
+
+COMMIT;
+
+START TRANSACTION;
+ALTER TABLE "OrdOrders" ADD "CarrierCode" character varying(32);
+
+ALTER TABLE "OrdOrders" ADD "CodAmount" numeric(18,4);
+
+ALTER TABLE "OrdOrders" ADD "PackerId" uuid;
+
+ALTER TABLE "OrdOrders" ADD "ReasonCode" integer;
+
+ALTER TABLE "OrdOrders" ADD "SaleStaffId" uuid;
+
+ALTER TABLE "OrdOrders" ADD "ShippingFeeActual" numeric(18,4);
+
+ALTER TABLE "OrdOrders" ADD "ShippingFeeCustomer" numeric(18,4);
+
+ALTER TABLE "OrdOrders" ADD "Source" integer NOT NULL DEFAULT 1;
+
+ALTER TABLE "OrdOrders" ADD "TrackingNumber" character varying(64);
+
+ALTER TABLE "OrdOrders" ADD "Type" integer NOT NULL DEFAULT 1;
+
+ALTER TABLE "OrdOrders" ADD "WarehouseId" uuid;
+
+ALTER TABLE "OrdOrders" ADD "WeightGram" integer;
+
+CREATE INDEX "IX_OrdOrders_TenantId_TrackingNumber" ON "OrdOrders" ("TenantId", "TrackingNumber") WHERE "TrackingNumber" IS NOT NULL;
+
+CREATE INDEX "IX_OrdOrders_TenantId_WarehouseId_CreationTime" ON "OrdOrders" ("TenantId", "WarehouseId", "CreationTime");
+
+ALTER TABLE "OrdOrders" ADD CONSTRAINT "CK_OrdOrders_TienVaKhoiLuong_KhongAm" CHECK (("CodAmount" IS NULL OR "CodAmount" >= 0) AND ("ShippingFeeCustomer" IS NULL OR "ShippingFeeCustomer" >= 0) AND ("ShippingFeeActual" IS NULL OR "ShippingFeeActual" >= 0) AND ("WeightGram" IS NULL OR "WeightGram" >= 0));
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261103040705_Wp05_DonHang_Nhanh', '10.0.11');
+
+COMMIT;
+
+START TRANSACTION;
+CREATE TABLE "PosCashSessions" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "Number" character varying(64) NOT NULL,
+    "WarehouseId" uuid NOT NULL,
+    "CashierId" uuid,
+    "Status" integer NOT NULL,
+    "OpeningCash" numeric(18,2) NOT NULL,
+    "OpenedAtUtc" timestamp with time zone NOT NULL,
+    "ClosedAtUtc" timestamp with time zone,
+    "ClosedBy" uuid,
+    "CashRevenue" numeric(18,2) NOT NULL,
+    "CashRefund" numeric(18,2) NOT NULL,
+    "OtherExpense" numeric(18,2) NOT NULL,
+    "ExpectedCash" numeric(18,2) NOT NULL,
+    "HandoverCash" numeric(18,2) NOT NULL,
+    "Variance" numeric(18,2) NOT NULL,
+    "Note" character varying(1024),
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_PosCashSessions" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_PosCashSessions_KetCa_CoMoc" CHECK ("Status" <> 1 OR ("ClosedAtUtc" IS NOT NULL AND "ClosedBy" IS NOT NULL)),
+    CONSTRAINT "CK_PosCashSessions_Tien_KhongAm" CHECK ("OpeningCash" >= 0 AND "CashRevenue" >= 0 AND "CashRefund" >= 0 AND "OtherExpense" >= 0 AND "ExpectedCash" >= 0 AND "HandoverCash" >= 0)
+);
+
+CREATE TABLE "PosRetailBills" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "Number" character varying(64) NOT NULL,
+    "ClientBillId" uuid NOT NULL,
+    "WarehouseId" uuid NOT NULL,
+    "CashSessionId" uuid NOT NULL,
+    "CustomerId" uuid,
+    "SaleStaffId" uuid,
+    "Status" integer NOT NULL,
+    "Subtotal" numeric(18,2) NOT NULL,
+    "LineDiscountTotal" numeric(18,2) NOT NULL,
+    "DiscountTotal" numeric(18,2) NOT NULL,
+    "VatTotal" numeric(18,2) NOT NULL,
+    "CustomerGivenAmount" numeric(18,2) NOT NULL,
+    "PointsUsed" numeric(18,3) NOT NULL,
+    "PointsUsedAmount" numeric(18,2) NOT NULL,
+    "PointsEarned" numeric(18,3) NOT NULL,
+    "TotalPayment" numeric(18,2) NOT NULL,
+    "PaidAmount" numeric(18,2) NOT NULL,
+    "ChangeAmount" numeric(18,2) NOT NULL,
+    "DebtAmount" numeric(18,2) NOT NULL,
+    "DueDateUtc" timestamp with time zone,
+    "Note" character varying(2048),
+    "StockDocumentId" uuid,
+    "VoidedAtUtc" timestamp with time zone,
+    "VoidedBy" uuid,
+    "VoidReason" character varying(512),
+    "VoidStockDocumentId" uuid,
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_PosRetailBills" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_PosRetailBills_ChietKhau_MotTang" CHECK (NOT ("DiscountTotal" > 0 AND "LineDiscountTotal" > 0)),
+    CONSTRAINT "CK_PosRetailBills_Huy_CoMoc" CHECK ("Status" <> 1 OR ("VoidedAtUtc" IS NOT NULL AND "VoidReason" IS NOT NULL)),
+    CONSTRAINT "CK_PosRetailBills_No_CoHan" CHECK ("DebtAmount" = 0 OR "DueDateUtc" IS NOT NULL),
+    CONSTRAINT "CK_PosRetailBills_Tien_KhongAm" CHECK ("Subtotal" >= 0 AND "LineDiscountTotal" >= 0 AND "DiscountTotal" >= 0 AND "VatTotal" >= 0 AND "PointsUsed" >= 0 AND "PointsUsedAmount" >= 0 AND "PointsEarned" >= 0 AND "TotalPayment" >= 0 AND "PaidAmount" >= 0 AND "ChangeAmount" >= 0 AND "DebtAmount" >= 0 AND "CustomerGivenAmount" >= 0)
+);
+
+CREATE TABLE "PosRetailReturns" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "Number" character varying(64) NOT NULL,
+    "RetailBillId" uuid NOT NULL,
+    "WarehouseId" uuid NOT NULL,
+    "CashSessionId" uuid,
+    "CustomerId" uuid,
+    "Status" integer NOT NULL,
+    "GoodsAmount" numeric(18,2) NOT NULL,
+    "ReturnFeeAmount" numeric(18,2) NOT NULL,
+    "DebtReductionAmount" numeric(18,2) NOT NULL,
+    "RefundAmount" numeric(18,2) NOT NULL,
+    "RefundMethod" integer NOT NULL,
+    "PointsReversed" numeric(18,3) NOT NULL,
+    "Note" character varying(1024),
+    "StockDocumentId" uuid,
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_PosRetailReturns" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_PosRetailReturns_Tien_CanBang" CHECK ("GoodsAmount" = "DebtReductionAmount" + "RefundAmount" + "ReturnFeeAmount"),
+    CONSTRAINT "CK_PosRetailReturns_Tien_KhongAm" CHECK ("GoodsAmount" >= 0 AND "ReturnFeeAmount" >= 0 AND "DebtReductionAmount" >= 0 AND "RefundAmount" >= 0 AND "PointsReversed" >= 0)
+);
+
+CREATE TABLE "PosRetailBillLines" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "RetailBillId" uuid NOT NULL,
+    "Sku" character varying(64) NOT NULL,
+    "Quantity" numeric(18,3) NOT NULL,
+    "UnitPrice" numeric(18,2) NOT NULL,
+    "DiscountAmount" numeric(18,2) NOT NULL,
+    "VatPercent" numeric(18,2),
+    "Amount" numeric(18,2) NOT NULL,
+    "VatAmount" numeric(18,2),
+    "ReturnedQuantity" numeric(18,3) NOT NULL,
+    "ProductName" character varying(256),
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_PosRetailBillLines" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_PosRetailBillLines_DaTra_HopLe" CHECK ("ReturnedQuantity" >= 0 AND "ReturnedQuantity" <= "Quantity"),
+    CONSTRAINT "CK_PosRetailBillLines_SoLuong_Duong" CHECK ("Quantity" > 0),
+    CONSTRAINT "CK_PosRetailBillLines_Tien_KhongAm" CHECK ("UnitPrice" >= 0 AND "DiscountAmount" >= 0 AND "Amount" >= 0 AND ("VatAmount" IS NULL OR "VatAmount" >= 0)),
+    CONSTRAINT "FK_PosRetailBillLines_PosRetailBills_RetailBillId" FOREIGN KEY ("RetailBillId") REFERENCES "PosRetailBills" ("Id") ON DELETE CASCADE
+);
+
+CREATE TABLE "PosRetailBillPayments" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "RetailBillId" uuid NOT NULL,
+    "Method" integer NOT NULL,
+    "Amount" numeric(18,2) NOT NULL,
+    "ReferenceCode" character varying(128),
+    "Note" character varying(256),
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_PosRetailBillPayments" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_PosRetailBillPayments_Tien_KhongAm" CHECK ("Amount" >= 0),
+    CONSTRAINT "FK_PosRetailBillPayments_PosRetailBills_RetailBillId" FOREIGN KEY ("RetailBillId") REFERENCES "PosRetailBills" ("Id") ON DELETE CASCADE
+);
+
+CREATE TABLE "PosRetailReturnLines" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "RetailReturnId" uuid NOT NULL,
+    "Sku" character varying(64) NOT NULL,
+    "Quantity" numeric(18,3) NOT NULL,
+    "UnitPriceSnapshot" numeric(18,2) NOT NULL,
+    "RefundAmount" numeric(18,2) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_PosRetailReturnLines" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_PosRetailReturnLines_SoLuong_Duong" CHECK ("Quantity" > 0),
+    CONSTRAINT "CK_PosRetailReturnLines_Tien_KhongAm" CHECK ("UnitPriceSnapshot" >= 0 AND "RefundAmount" >= 0),
+    CONSTRAINT "FK_PosRetailReturnLines_PosRetailReturns_RetailReturnId" FOREIGN KEY ("RetailReturnId") REFERENCES "PosRetailReturns" ("Id") ON DELETE CASCADE
+);
+
+CREATE UNIQUE INDEX "IX_PosCashSessions_TenantId_Number" ON "PosCashSessions" ("TenantId", "Number") NULLS NOT DISTINCT;
+
+CREATE UNIQUE INDEX "IX_PosCashSessions_TenantId_WarehouseId_DangMo" ON "PosCashSessions" ("TenantId", "WarehouseId") NULLS NOT DISTINCT WHERE "Status" = 0;
+
+CREATE INDEX "IX_PosCashSessions_TenantId_WarehouseId_OpenedAtUtc" ON "PosCashSessions" ("TenantId", "WarehouseId", "OpenedAtUtc");
+
+CREATE INDEX "IX_PosRetailBillLines_RetailBillId" ON "PosRetailBillLines" ("RetailBillId");
+
+CREATE INDEX "IX_PosRetailBillLines_TenantId_RetailBillId" ON "PosRetailBillLines" ("TenantId", "RetailBillId");
+
+CREATE INDEX "IX_PosRetailBillLines_TenantId_Sku" ON "PosRetailBillLines" ("TenantId", "Sku");
+
+CREATE INDEX "IX_PosRetailBillPayments_RetailBillId" ON "PosRetailBillPayments" ("RetailBillId");
+
+CREATE INDEX "IX_PosRetailBillPayments_TenantId_ReferenceCode" ON "PosRetailBillPayments" ("TenantId", "ReferenceCode") WHERE "ReferenceCode" IS NOT NULL;
+
+CREATE INDEX "IX_PosRetailBillPayments_TenantId_RetailBillId" ON "PosRetailBillPayments" ("TenantId", "RetailBillId");
+
+CREATE INDEX "IX_PosRetailBills_TenantId_CashSessionId" ON "PosRetailBills" ("TenantId", "CashSessionId");
+
+CREATE UNIQUE INDEX "IX_PosRetailBills_TenantId_ClientBillId" ON "PosRetailBills" ("TenantId", "ClientBillId") NULLS NOT DISTINCT;
+
+CREATE INDEX "IX_PosRetailBills_TenantId_CustomerId_DebtAmount" ON "PosRetailBills" ("TenantId", "CustomerId", "DebtAmount");
+
+CREATE UNIQUE INDEX "IX_PosRetailBills_TenantId_Number" ON "PosRetailBills" ("TenantId", "Number") NULLS NOT DISTINCT;
+
+CREATE INDEX "IX_PosRetailBills_TenantId_WarehouseId_CreationTime" ON "PosRetailBills" ("TenantId", "WarehouseId", "CreationTime");
+
+CREATE INDEX "IX_PosRetailReturnLines_RetailReturnId" ON "PosRetailReturnLines" ("RetailReturnId");
+
+CREATE INDEX "IX_PosRetailReturnLines_TenantId_RetailReturnId" ON "PosRetailReturnLines" ("TenantId", "RetailReturnId");
+
+CREATE INDEX "IX_PosRetailReturns_TenantId_CashSessionId" ON "PosRetailReturns" ("TenantId", "CashSessionId");
+
+CREATE UNIQUE INDEX "IX_PosRetailReturns_TenantId_Number" ON "PosRetailReturns" ("TenantId", "Number") NULLS NOT DISTINCT;
+
+CREATE INDEX "IX_PosRetailReturns_TenantId_RetailBillId" ON "PosRetailReturns" ("TenantId", "RetailBillId");
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261104015230_Wp06_Pos_BanLe', '10.0.11');
+
+COMMIT;
+
+START TRANSACTION;
+ALTER TABLE "CusCustomers" ADD "AccumulatedAmount" numeric(18,2) NOT NULL DEFAULT 0.0;
+
+ALTER TABLE "CusCustomers" ADD "Birthday" date;
+
+ALTER TABLE "CusCustomers" ADD "DebtBalance" numeric(18,2) NOT NULL DEFAULT 0.0;
+
+ALTER TABLE "CusCustomers" ADD "DebtLimit" numeric(18,2) NOT NULL DEFAULT 0.0;
+
+ALTER TABLE "CusCustomers" ADD "LevelId" uuid;
+
+ALTER TABLE "CusCustomers" ADD "Points" numeric(18,3) NOT NULL DEFAULT 0.0;
+
+ALTER TABLE "CusCustomers" ADD "ReferrerId" uuid;
+
+ALTER TABLE "CusCustomers" ADD "SaleStaffId" uuid;
+
+ALTER TABLE "CusCustomers" ADD "TaxCode" character varying(32);
+
+ALTER TABLE "CusCustomers" ADD "Type" integer NOT NULL DEFAULT 0;
+
+CREATE TABLE "CusCares" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "CustomerId" uuid NOT NULL,
+    "Type" integer NOT NULL,
+    "Content" character varying(2048) NOT NULL,
+    "StaffId" uuid,
+    "OccurredAtUtc" timestamp with time zone NOT NULL,
+    "NextFollowUpAtUtc" timestamp with time zone,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    CONSTRAINT "PK_CusCares" PRIMARY KEY ("Id")
+);
+
+CREATE TABLE "CusLevels" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "Code" character varying(32) NOT NULL,
+    "Name" character varying(128) NOT NULL,
+    "MinAccumulatedAmount" numeric(18,2) NOT NULL,
+    "DiscountPercent" numeric(5,2) NOT NULL,
+    "SortOrder" integer NOT NULL,
+    "IsActive" boolean NOT NULL,
+    "Note" character varying(512),
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_CusLevels" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_CusLevels_ChietKhau_0_100" CHECK ("DiscountPercent" >= 0 AND "DiscountPercent" <= 100),
+    CONSTRAINT "CK_CusLevels_Nguong_KhongAm" CHECK ("MinAccumulatedAmount" >= 0)
+);
+
+CREATE TABLE "SetDepartments" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "Code" character varying(32) NOT NULL,
+    "Name" character varying(128) NOT NULL,
+    "StoreId" uuid,
+    "ParentId" uuid,
+    "IsActive" boolean NOT NULL,
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_SetDepartments" PRIMARY KEY ("Id")
+);
+
+CREATE TABLE "SetRoleDataScopes" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "RoleName" character varying(256) NOT NULL,
+    "Scope" integer NOT NULL,
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_SetRoleDataScopes" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_SetRoleDataScopes_PhamVi_HopLe" CHECK ("Scope" in (0, 1, 2))
+);
+
+CREATE TABLE "SetStaffs" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "Code" character varying(32) NOT NULL,
+    "Name" character varying(128) NOT NULL,
+    "IdentityUserId" uuid,
+    "StoreId" uuid,
+    "DepartmentId" uuid,
+    "RoleName" character varying(256),
+    "Phone" character varying(32),
+    "Note" character varying(1024),
+    "IsActive" boolean NOT NULL,
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_SetStaffs" PRIMARY KEY ("Id")
+);
+
+CREATE TABLE "SetStores" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "Code" character varying(32) NOT NULL,
+    "Name" character varying(128) NOT NULL,
+    "WarehouseId" uuid,
+    "AddressText" character varying(512),
+    "Phone" character varying(32),
+    "IsActive" boolean NOT NULL,
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_SetStores" PRIMARY KEY ("Id")
+);
+
+CREATE INDEX "IX_CusCustomers_TenantId_LevelId" ON "CusCustomers" ("TenantId", "LevelId");
+
+CREATE INDEX "IX_CusCustomers_TenantId_Type" ON "CusCustomers" ("TenantId", "Type");
+
+ALTER TABLE "CusCustomers" ADD CONSTRAINT "CK_CusCustomers_SoDu_KhongAm" CHECK ("Points" >= 0 AND "AccumulatedAmount" >= 0 AND "DebtBalance" >= 0 AND "DebtLimit" >= 0);
+
+CREATE INDEX "IX_CusCares_TenantId_CustomerId_OccurredAtUtc" ON "CusCares" ("TenantId", "CustomerId", "OccurredAtUtc");
+
+CREATE INDEX "IX_CusCares_TenantId_NextFollowUpAtUtc" ON "CusCares" ("TenantId", "NextFollowUpAtUtc") WHERE "NextFollowUpAtUtc" IS NOT NULL;
+
+CREATE INDEX "IX_CusLevels_TenantId_MinAccumulatedAmount" ON "CusLevels" ("TenantId", "MinAccumulatedAmount");
+
+CREATE UNIQUE INDEX "IX_CusLevels_TenantId_Code" ON "CusLevels" ("TenantId", "Code") NULLS NOT DISTINCT;
+
+CREATE INDEX "IX_SetDepartments_TenantId_StoreId" ON "SetDepartments" ("TenantId", "StoreId");
+
+CREATE UNIQUE INDEX "IX_SetDepartments_TenantId_Code" ON "SetDepartments" ("TenantId", "Code") NULLS NOT DISTINCT;
+
+CREATE UNIQUE INDEX "IX_SetRoleDataScopes_TenantId_RoleName" ON "SetRoleDataScopes" ("TenantId", "RoleName") NULLS NOT DISTINCT;
+
+CREATE UNIQUE INDEX "IX_SetStaffs_TenantId_Code" ON "SetStaffs" ("TenantId", "Code") NULLS NOT DISTINCT;
+
+CREATE UNIQUE INDEX "IX_SetStaffs_TenantId_IdentityUserId" ON "SetStaffs" ("TenantId", "IdentityUserId") NULLS NOT DISTINCT WHERE "IdentityUserId" IS NOT NULL;
+
+CREATE INDEX "IX_SetStaffs_TenantId_StoreId" ON "SetStaffs" ("TenantId", "StoreId");
+
+CREATE UNIQUE INDEX "IX_SetStores_TenantId_Code" ON "SetStores" ("TenantId", "Code") NULLS NOT DISTINCT;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261104025249_Wp07_KhachHang_NhanVien', '10.0.11');
+
+COMMIT;
+
+START TRANSACTION;
+CREATE TABLE "RptAggDailySales" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "BusinessDate" date NOT NULL,
+    "Nguon" integer NOT NULL,
+    "DocumentCount" integer NOT NULL,
+    "LineCount" integer NOT NULL,
+    "Quantity" numeric(18,3) NOT NULL,
+    "LineAmountTotal" numeric(18,2) NOT NULL,
+    "DocumentDiscountTotal" numeric(18,2) NOT NULL,
+    "Revenue" numeric(18,2) NOT NULL,
+    "VatTotal" numeric(18,2) NOT NULL,
+    "AggregatedAtUtc" timestamp with time zone NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    CONSTRAINT "PK_RptAggDailySales" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_RptAggDailySales_Nguon_HopLe" CHECK ("Nguon" IN (0, 1)),
+    CONSTRAINT "CK_RptAggDailySales_Tien_KhongAm" CHECK ("LineAmountTotal" >= 0 AND "DocumentDiscountTotal" >= 0 AND "Revenue" >= 0 AND "VatTotal" >= 0 AND "Quantity" >= 0 AND "DocumentCount" >= 0 AND "LineCount" >= 0)
+);
+
+CREATE TABLE "RptDimDates" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "BusinessDate" date NOT NULL,
+    "Year" integer NOT NULL,
+    "Quarter" integer NOT NULL,
+    "Month" integer NOT NULL,
+    "Day" integer NOT NULL,
+    "DayOfWeek" integer NOT NULL,
+    "IsWeekend" boolean NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    CONSTRAINT "PK_RptDimDates" PRIMARY KEY ("Id")
+);
+
+CREATE TABLE "RptDimProducts" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "Sku" character varying(64) NOT NULL,
+    "ProductName" character varying(256),
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    CONSTRAINT "PK_RptDimProducts" PRIMARY KEY ("Id")
+);
+
+CREATE TABLE "RptDimStaffs" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "StaffId" uuid NOT NULL,
+    "DisplayName" character varying(256),
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    CONSTRAINT "PK_RptDimStaffs" PRIMARY KEY ("Id")
+);
+
+CREATE TABLE "RptDimStores" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "WarehouseId" uuid NOT NULL,
+    "Code" character varying(64),
+    "Name" character varying(256),
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    CONSTRAINT "PK_RptDimStores" PRIMARY KEY ("Id")
+);
+
+CREATE TABLE "RptFactInventorySnapshots" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "SnapshotDate" date NOT NULL,
+    "WarehouseId" uuid NOT NULL,
+    "Sku" character varying(64) NOT NULL,
+    "OnHand" numeric(18,3) NOT NULL,
+    "Reserved" numeric(18,3) NOT NULL,
+    "Transferring" numeric(18,3) NOT NULL,
+    "Shipping" numeric(18,3) NOT NULL,
+    "Holding" numeric(18,3) NOT NULL,
+    "Damaged" numeric(18,3) NOT NULL,
+    "Warranty" numeric(18,3) NOT NULL,
+    "WarrantyHolding" numeric(18,3) NOT NULL,
+    "PreOrder" numeric(18,3) NOT NULL,
+    "WaitingInbound" numeric(18,3) NOT NULL,
+    "InWarehouse" numeric(18,3) NOT NULL,
+    "Available" numeric(18,3) NOT NULL,
+    "CapturedAtUtc" timestamp with time zone NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    CONSTRAINT "PK_RptFactInventorySnapshots" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_RptFactInventorySnapshots_Chieu_KhongAm" CHECK ("OnHand" >= 0 AND "Reserved" >= 0 AND "Transferring" >= 0 AND "Shipping" >= 0 AND "Holding" >= 0 AND "Damaged" >= 0 AND "Warranty" >= 0 AND "WarrantyHolding" >= 0 AND "PreOrder" >= 0 AND "WaitingInbound" >= 0 AND "Available" >= 0)
+);
+
+CREATE TABLE "RptFactSalesLines" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "BusinessDate" date NOT NULL,
+    "Nguon" integer NOT NULL,
+    "DocumentId" uuid NOT NULL,
+    "SourceLineId" uuid NOT NULL,
+    "DocumentNumber" character varying(64) NOT NULL,
+    "WarehouseId" uuid,
+    "StaffId" uuid,
+    "CustomerId" uuid,
+    "Sku" character varying(64) NOT NULL,
+    "ProductName" character varying(256),
+    "Quantity" numeric(18,3) NOT NULL,
+    "UnitPrice" numeric(18,2) NOT NULL,
+    "LineDiscount" numeric(18,2) NOT NULL,
+    "LineAmount" numeric(18,2) NOT NULL,
+    "VatPercent" numeric(18,2),
+    "VatAmount" numeric(18,2) NOT NULL,
+    "OccurredAtUtc" timestamp with time zone NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    CONSTRAINT "PK_RptFactSalesLines" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_RptFactSalesLines_Nguon_HopLe" CHECK ("Nguon" IN (0, 1)),
+    CONSTRAINT "CK_RptFactSalesLines_SoLuong_KhongAm" CHECK ("Quantity" >= 0),
+    CONSTRAINT "CK_RptFactSalesLines_Tien_KhongAm" CHECK ("UnitPrice" >= 0 AND "LineDiscount" >= 0 AND "LineAmount" >= 0 AND "VatAmount" >= 0 AND ("VatPercent" IS NULL OR "VatPercent" >= 0))
+);
+
+CREATE TABLE "RptWatermarks" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "Nguon" integer NOT NULL,
+    "LastAggregatedDate" date,
+    "LastRunAtUtc" timestamp with time zone,
+    "LastRowCount" bigint NOT NULL,
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_RptWatermarks" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_RptWatermarks_SoDong_KhongAm" CHECK ("LastRowCount" >= 0)
+);
+
+CREATE UNIQUE INDEX "IX_RptFactSalesLines_TenantId_Nguon_DongNguon" ON "RptFactSalesLines" ("TenantId", "Nguon", "SourceLineId") NULLS NOT DISTINCT;
+
+CREATE UNIQUE INDEX "IX_RptAggDailySales_TenantId_Ngay_Nguon" ON "RptAggDailySales" ("TenantId", "BusinessDate", "Nguon") NULLS NOT DISTINCT;
+
+CREATE UNIQUE INDEX "IX_RptFactInventorySnapshots_TenantId_Ngay_Kho_Sku" ON "RptFactInventorySnapshots" ("TenantId", "SnapshotDate", "WarehouseId", "Sku") NULLS NOT DISTINCT;
+
+CREATE UNIQUE INDEX "IX_RptWatermarks_TenantId_Nguon" ON "RptWatermarks" ("TenantId", "Nguon") NULLS NOT DISTINCT;
+
+CREATE UNIQUE INDEX "IX_RptDimDates_TenantId_Ngay" ON "RptDimDates" ("TenantId", "BusinessDate") NULLS NOT DISTINCT;
+
+CREATE UNIQUE INDEX "IX_RptDimProducts_TenantId_Sku" ON "RptDimProducts" ("TenantId", "Sku") NULLS NOT DISTINCT;
+
+CREATE UNIQUE INDEX "IX_RptDimStores_TenantId_Kho" ON "RptDimStores" ("TenantId", "WarehouseId") NULLS NOT DISTINCT;
+
+CREATE UNIQUE INDEX "IX_RptDimStaffs_TenantId_NhanVien" ON "RptDimStaffs" ("TenantId", "StaffId") NULLS NOT DISTINCT;
+
+CREATE INDEX "IX_RptFactInventorySnapshots_TenantId_Ngay" ON "RptFactInventorySnapshots" ("TenantId", "SnapshotDate");
+
+CREATE INDEX "IX_RptFactSalesLines_TenantId_Ngay_Nguon" ON "RptFactSalesLines" ("TenantId", "BusinessDate", "Nguon");
+
+CREATE INDEX "IX_RptFactSalesLines_TenantId_Sku" ON "RptFactSalesLines" ("TenantId", "Sku");
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261104033300_Wp08_BaoCao_Reporting', '10.0.11');
+
+COMMIT;
+

@@ -19,6 +19,10 @@ public static class PaymentHubDbContextModelCreatingExtensions
             b.Property(x => x.ProviderCode).IsRequired().HasMaxLength(32);
             b.Property(x => x.MerchantReference).IsRequired().HasMaxLength(64);
             b.Property(x => x.ProviderTransactionId).HasMaxLength(128);
+
+            // 🆕 REC-001 §5.2.4 (27/10/2026) — mốc tạo yêu cầu để querydr gửi ĐÚNG np_CreateDate.
+            b.Property(x => x.ProviderCreateDateGmt7).HasMaxLength(14).IsFixedLength();
+            b.Property(x => x.ProviderCreateDateUtc);
             b.Property(x => x.Currency).IsRequired().HasMaxLength(8);
             b.Property(x => x.IdempotencyKey).HasMaxLength(256);
             b.Property(x => x.FailureReason).HasMaxLength(2000);

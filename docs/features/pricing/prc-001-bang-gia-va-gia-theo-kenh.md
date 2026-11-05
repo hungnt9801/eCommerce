@@ -395,9 +395,9 @@ erDiagram
 | `ChannelPrices` | UNIQUE **có filter** + `NULLS NOT DISTINCT` | `(TenantId, ChannelCode, ExternalRef) WHERE "ExternalRef" IS NOT NULL` | **idempotency import** (BR-012) — hàng rào cuối cùng khi tầng ứng dụng sai |
 | `ChannelPrices` | INDEX | `(TenantId, ChannelCode, Sku, MinQuantity)` | resolve giá kênh |
 | `CostPrices` | UNIQUE **`NULLS NOT DISTINCT`** | `(TenantId, Sku, EffectiveFrom)` | một giá vốn cho một kỳ |
-| `PriceLists` | CHECK | `"EffectiveTo" IS NULL OR "EffectiveTo" >= "EffectiveFrom"` | khung ngày hợp lệ (mô hình có sẵn: `modules/Tax/…/TaxDbContextModelCreatingExtensions.cs:23-25`) |
-| `PriceLists` / `PriceListItems` / `ChannelPrices` / `CostPrices` | CHECK | `"Currency" ~ '^[A-Z]{3}$'` | chặn mã tiền tệ sai (`XC-001` §5.2 khuyến nghị) |
-| `PriceListItems` / `ChannelPrices` / `CostPrices` | CHECK | `"Amount" >= 0` | giá bán/vốn **không âm**; điều chỉnh giảm dùng `PRO-001` (khuyến mãi), **không** dùng giá âm |
+| `PriceLists` / `CostPrices` | CHECK | `"EffectiveTo" IS NULL OR "EffectiveTo" >= "EffectiveFrom"` | khung ngày hợp lệ (mô hình có sẵn: `modules/Tax/…/TaxDbContextModelCreatingExtensions.cs:23-25`) |
+| `PriceLists` / `PriceListItems` / `ChannelPrices` / `CostPrices` | CHECK | `"Currency"` / `"CurrencyCode"` ~ `'^[A-Z]{3}$'` | chặn mã tiền tệ sai (`XC-001` §5.2 khuyến nghị). 📌 `PriceLists` dùng cột `"Currency"`; ba bảng còn lại dùng `"CurrencyCode"` (đi kèm `"AmountValue"`) — xem §20.3 |
+| `PriceListItems` / `ChannelPrices` / `CostPrices` | CHECK | `"Amount"` / `"AmountValue" >= 0` | giá bán/vốn **không âm**; điều chỉnh giảm dùng `PRO-001` (khuyến mãi), **không** dùng giá âm |
 
 > 📌 **Không** đặt `CHECK (Amount > 0)`: giá `0` là **hợp lệ** (hàng tặng, khuyến mãi 100 % qua bảng giá) —
 > bài học từ `XC-001` §5.2 (*"không đặt `CHECK (Amount > 0)` vì có số tiền hợp lệ âm"*).
@@ -716,6 +716,7 @@ public interface IPriceResolver
 | **Redis chết khi push giá** | sự cố hạ tầng | Lock **vô hiệu** nhưng app **vẫn chạy** (`AbortOnConnectFail=false`); ràng buộc DB vẫn bảo vệ | `409`/bình thường |
 | **Khoá `channel:…:stock-push` bận** | instance khác đang push | **NÉM** `eCommerce:Lock:0001` (`XC-003`), **không** bỏ qua im lặng | `409` |
 | **`Sku` không tồn tại trong Catalog** | gõ sai / SKU đã xoá | Ghi **cảnh báo** khi import (không FK — §15.1 Q1) + **đánh dấu** dòng là "SKU lạ"; **không** tự xoá dòng | dòng nằm trong `FailedRows` |
+| **Giá vốn không hợp lệ** (SKU rỗng · số tiền âm · kỳ hiệu lực ngược · duyệt lại lần hai) | dữ liệu nhập sai / bấm hai lần | **NÉM** `eCommerce:Pricing:0009` kèm `truong`/`lyDo` — **cấm** no-op im lặng (`D12`); DB có thêm 3 `CHECK` + unique index làm hàng rào cuối (§5.2) | `400` |
 | **Timing: job kích hoạt và resolve đồng thời** | hiếm | Resolve chỉ thấy trạng thái **đã commit**; nếu job chưa commit ⇒ resolve dùng bảng giá **cũ** — **chấp nhận** và ghi log `Warning` khi `EffectiveFrom` đã qua mà chưa `Active` | `200` |
 | **Lỗi runtime (DB timeout, deadlock)** | hạ tầng | **Rollback** + log có `CorrelationId` | lỗi chung (`500`) |
 
@@ -1164,3 +1165,67 @@ giỏ hàng**. Trên môi trường dev (1–2 dòng) nó **không nhìn thấy 
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.5 | 15/10/2026 | *(agent, session GĐ1)* | **Lát cắt 4**: thêm **cấp 4 giá niêm yết** (`ListPrice` do bên gọi truyền — **cấm Pricing tự bịa**) và **sửa N+1** trong bộ tra giá (nạp **theo lô: 3 truy vấn cho cả giỏ**). **Kiểm chứng HTTP 7 phép đo**, trong đó **đếm `Executed DbCommand` giữa hai marker ⇒ 3 lệnh** cho giỏ 3 dòng ⇒ **đạt NFR-002 (≤ 4)**. Ghi rõ giới hạn (§19.4) |
+
+---
+
+## 20. TRẠNG THÁI TRIỂN KHAI — **LÁT CẮT 5: GIÁ VỐN (`PrcCostPrices`) — `S12`** (28/10/2026)
+
+> 📌 Đây là lát cắt **đầu tiên** của phần *"còn lại"* trong bản bàn giao
+> [`docs/ban-giao-gd1-con-lai.md`](../../ban-giao-gd1-con-lai.md) **§2** (`S12`). Mục tiêu **hẹp có chủ ý**:
+> **dựng đúng cái bảng + đúng quyền + đúng đường đọc**, KHÔNG mở đường ghi (nguồn giá vốn là **`Q2`** chưa chốt).
+
+### 20.1 Đã làm
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| 1 | **Entity `CostPrice`** (Domain) | `Sku` · `AmountValue` + `CurrencyCode` (hai cột, BR-001) · `EffectiveFrom`/`EffectiveTo` kiểu **`date`** (`DateOnly`) · `ApprovedBy`/`ApprovedAtUtc` · `CoHieuLucTai(DateOnly)` · `Duyet(nguoiDuyet, atUtc)`. 🚨 **Guard NÉM `Pricing:0009`** (không no-op): SKU rỗng · tiền âm · kỳ ngược · duyệt thiếu người / **duyệt hai lần** |
+| 2 | **Mapping** `PricingDbContextModelCreatingExtensions` | `PrcCostPrices` + 3 `CHECK` (`CK_PrcCostPrices_Amount_KhongAm` · `..._EffectiveRange` · `..._Currency_HopLe`) + index nóng `(TenantId, Sku, EffectiveTo)` |
+| 3 | **`DbSet<CostPrice>`** trên `eCommerceDbContext` | Thiếu ⇒ ABP **không** đăng ký `IRepository<CostPrice, Guid>` ⇒ DI nổ (`HTTP 500`) đúng lúc mở màn hình; lưới an toàn `DbSetRegistrationTests` |
+| 4 | **Migration 47** `20261028031842_Gd1S12_CostPrice` | Tạo bảng + 3 `CHECK`; 🚨 unique `(TenantId, Sku, EffectiveFrom)` **sửa tay** thành `NULLS NOT DISTINCT` (EF không sinh được) ⇒ **NND 57 → 58** |
+| 5 | **Đường đọc** `ICostPriceAppService` / `CostPriceAppService` | `GetListAsync(sku?, at?)` + `GetAsync(id)` — **CHỈ ĐỌC**; `[Authorize(PricingPermissions.CostPriceView)]` **cấp class** |
+| 6 | **Quyền mới** `eCommerce.Pricing.CostPrice.View` | Khai **hai nơi** (`PricingPermissions` + `eCommercePermissionDefinitionProvider`); seed lại `DbMigrator` ⇒ `AbpPermissionGrants` **68 → 69** |
+| 7 | **UI `/GiaVon`** | `GiaVonController` + `Views/GiaVon/Index.cshtml` (lọc SKU/ngày, cảnh báo "nội bộ") + mục menu trong nhóm **Vận hành**; neo `[GIAVON-MAN-HINH]` (ASCII, ngoài chú thích Razor) |
+| 8 | **Test** | **15 unit** (`CostPriceTests` — guard + duyệt + `CurrencyCode` lấy từ `Money`) · **6 integration** (`S12_*`: NND, kỳ khác/tenant khác, 3 `CHECK` **hai chiều**) · `RangBuocDbChuaAnhXa` **không** phải nới danh sách trắng: cả 4 ràng buộc **có ánh xạ** |
+| 9 | **E2E `S12-G1…G5`** (HTML thật) | trang nội bộ `200` **+ hiện con số 777.777** · **menu có lối vào** · **ẩn danh `302` về `/Account/Login`** · 🚨 **HTML công khai KHÔNG chứa 777.777** (BR-013) · dọn sạch probe (đếm lại = 0) |
+
+### 20.2 ✅ BẰNG CHỨNG ĐO ĐƯỢC
+
+| Phép đo | Kết quả |
+|---|---|
+| `pwsh -File tools\kiem-tat-ca.ps1 -DayDu` | **exit 0 · 15/15 bước · 343.9s** (máy dev — ⚠️ thời gian là **máy**, không phải chỉ tiêu; baseline trước `S12` cùng máy: **367.1s**) |
+| Unit | **1528 → 1543** (+15: `CostPriceTests`) |
+| Integration | **71 → 77** (+6: `S12_*`) |
+| E2E (HTML thật) | **135 → 140/140** (+5: `S12-G1…G5`) |
+| Bất biến DB | **25/25** · **NND 57 → 58** · **quyền 68 → 69** · chỗ quét GUID **93 → 94** (bảng mới có PK `uuid` ⇒ phép tự dò quét thêm 1 chỗ — 📌 **tăng là ĐÚNG**) |
+| Migration | **46 → 47** |
+| `schema.sql` | sinh lại: **+39 dòng** (`PrcCostPrices` + 3 `CHECK` + 2 index + mệnh đề `NULLS NOT DISTINCT`) |
+
+### 20.3 🚨 Sai lệch doc/code (ghi để không ai "sửa" nhầm về sau)
+
+| # | Đặc tả nói | Code làm | Vì sao |
+|---|---|---|---|
+| 1 | `CostPrices` chỉ có `Sku, Amount, Currency, EffectiveFrom/To, ApprovedBy/At` | thêm **3 `CHECK`** (`Amount >= 0` · `EffectiveRange` · `Currency ~ '^[A-Z]{3}$'`) theo đúng bảng §5.2 (dòng `Amount`/`Currency` đã có `CostPrices`; dòng `EffectiveRange` **bổ sung** `CostPrices`) | §5.2 là **nguồn sự thật** về ràng buộc; `EffectiveRange` trước đây chỉ ghi `PriceLists` — nay sửa tài liệu cho khớp code (quy tắc *"sửa tài liệu TRƯỚC, cùng PR"*) |
+| 2 | Tên cột `"Amount"` / `"Currency"` | cột thật là `"AmountValue"` / `"CurrencyCode"` (trừ `PrcPriceLists.Currency`) | khuôn có sẵn của module: một cột số tiền **+ một cột tiền tệ đi kèm** (BR-001). 📌 Tên trong đặc tả là **khái niệm**, không phải DDL — đã ghi rõ ở §5.2 để lần sau không ai viết migration theo tên cũ |
+| 3 | `GetCostAsync` / `ApproveCostAsync` (§6.1) | `GetListAsync` + `GetAsync`; **KHÔNG** có `ApproveCostAsync` | `S12` chỉ mở **đường đọc**. Nguồn giá vốn là **`Q2`** chưa chốt ⇒ mở đường ghi là quyết định của chủ dự án. 🔒 Đường đọc vẫn giữ **quyền riêng** + **không** lộ ra công khai (BR-013) |
+| 4 | Nhóm quyền `eCommerce.Pricing.CostPrice` (cha) + `.View` + `.Approve` (§9) | chỉ thêm **một** quyền `eCommerce.Pricing.CostPrice.View` làm **con của `eCommerce.Pricing`** | 🚨 Thêm quyền **cha** `eCommerce.Pricing.CostPrice` mà **không** có method nào dùng ⇒ `BatBienPhanQuyenTests` vẫn xanh nhưng tạo **quyền rỗng** trong UI phân quyền. `.Approve` đi cùng `ApproveCostAsync` — chưa có đường ghi thì chưa cấp |
+| 5 | `CostPrices` dùng `Money` cho `Amount` | `decimal AmountValue` + `string CurrencyCode` + computed `Money Amount` | EF **không** value-convert `Money` sạch (ctor riêng) — cùng lựa chọn đã dùng cho `PriceListItem`/`ChannelPrice`/`TierPrice` |
+
+### 20.4 ⚠️ Giới hạn đã biết (KHÔNG được nói quá)
+
+1. **Không có đường ghi** (import / nhập tay / bình quân gia quyền) — chờ **`Q2`**. Hệ quả: bảng `PrcCostPrices`
+   hiện chỉ có dữ liệu do **seed/ngoài luồng** ghi; màn hình `/GiaVon` vì thế **rỗng** trên môi trường chưa có dữ liệu.
+2. **Chưa có job** tính lãi gộp / báo cáo dùng giá vốn. `CostPrice` mới là **nguồn dữ liệu**, chưa có nơi tiêu thụ.
+3. **`CostPrice` chưa nối vào `MissingPricePolicy`/`IPriceResolver`** — cố ý: giá vốn **không** tham gia chọn giá bán.
+4. **Bốn index `NULLS NOT DISTINCT` cũ của Pricing** (`PrcPriceLists` · `PrcPriceListItems` · `PrcChannelPrices` ·
+   `PrcPriceCalculationRecords`) hiện **chỉ** được đếm qua **TỔNG** trong `PostgreSqlSchemaTests`, **chưa** có tên
+   trong danh sách đích danh. 📌 Nợ này **đã ghi trong test** (chỗ dễ đọc nhất khi có người sửa index) — đóng nợ
+   bằng cách thêm 4 tên vào `phaiCo` là việc của lượt chạm Pricing kế tiếp.
+5. **Menu admin chỉ render ở trang chủ** (`Views/Home/Index.cshtml`) ⇒ `/GiaVon` **không** có menu. Đây là nợ
+   **`WEB-001`** (không phải của `S12`); E2E `S12-G3` vì vậy đo menu trên **khối menu của trang chủ**.
+6. **Chưa kiểm chứng trên CI Linux** cho lát cắt này (chỉ đo trên máy dev).
+
+### 20.5 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.6 | 28/10/2026 | *(agent, session GĐ1 — `S12`)* | **Lát cắt 5 — GIÁ VỐN**: entity `CostPrice` + mapping + **migration 47** (NND **58**) + `schema.sql`; app service **chỉ đọc** với quyền **riêng** `eCommerce.Pricing.CostPrice.View` (seed **69** quyền); màn hình `/GiaVon` + menu; **15 unit** + **6 integration** + **5 ca E2E** (trong đó **`S12-G5`** đo BR-013 trên HTML công khai bằng **con số giá vốn CÓ THẬT**). Ghi rõ 5 sai lệch doc/code (§20.3) và 6 giới hạn (§20.4) |

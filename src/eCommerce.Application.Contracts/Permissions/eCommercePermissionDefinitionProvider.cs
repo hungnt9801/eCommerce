@@ -58,9 +58,21 @@ public class eCommercePermissionDefinitionProvider : PermissionDefinitionProvide
         var pricing = group.AddPermission(eCommerce.Pricing.PricingPermissions.Default);
         pricing.AddChild(eCommerce.Pricing.PricingPermissions.Manage);
 
+        // 🆕 `S12` (`PRC-001` §6.1 · BR-013) — **XEM GIÁ VỐN**, tách khỏi `Pricing.Default`.
+        // 🚨 BẮT BUỘC ở **CẢ HAI NƠI** (hằng số `PricingPermissions` + ở đây): thiếu một nơi ⇒ `403` cho
+        // MỌI người kể cả `admin`. 📌 Và thiếu **dòng này** thì màn hình `/GiaVon` **không mở được** — nhưng
+        // triệu chứng là `403` trần, không trỏ tới chỗ sai (`XC-004` D2/E3).
+        pricing.AddChild(eCommerce.Pricing.PricingPermissions.CostPriceView);
+
         // ---- Kho ----
         var inventory = group.AddPermission(eCommerceConsts.Permissions.Inventory.Default);
         inventory.AddChild(eCommerceConsts.Permissions.Inventory.Adjust);
+
+        // 🆕 `S13` (`INV-003`) — **ngân sách tồn theo kênh**. 🚨 BẮT BUỘC ở **CẢ HAI NƠI** (hằng số + ở đây):
+        // thiếu một nơi ⇒ `403` cho MỌI người kể cả `admin`. 🔒 Tách `Release` khỏi `Manage`: nhả ngân sách làm
+        // kênh **hết hàng ngay** — đó là quyền của người vận hành, không phải của người cấu hình.
+        inventory.AddChild(eCommerceConsts.Permissions.Inventory.AllotmentManage);
+        inventory.AddChild(eCommerceConsts.Permissions.Inventory.AllotmentRelease);
 
         // ---- Kênh bán (ChannelHub) ----
         var channels = group.AddPermission(eCommerceConsts.Permissions.Channels.Default);
@@ -70,6 +82,14 @@ public class eCommercePermissionDefinitionProvider : PermissionDefinitionProvide
         // ---- Đơn hàng ----
         var orders = group.AddPermission(eCommerceConsts.Permissions.Orders.Default);
         orders.AddChild(eCommerceConsts.Permissions.Orders.Manage);
+        // 🆕 `SAL-003` §9 (24/10/2026) — 6 quyền của **state machine**. 🚨 Thiếu một dòng ⇒ `403` cho MỌI
+        // người kể cả `admin` (`XC-004` D2/E3); `BatBienPhanQuyenTests` khoá **hai chiều** hằng số ↔ định nghĩa.
+        orders.AddChild(eCommerceConsts.Permissions.Orders.StatusChange);
+        orders.AddChild(eCommerceConsts.Permissions.Orders.ReconcileManage);
+        orders.AddChild(eCommerceConsts.Permissions.Orders.ReturnRequest);
+        orders.AddChild(eCommerceConsts.Permissions.Orders.ReturnApprove);
+        orders.AddChild(eCommerceConsts.Permissions.Orders.Cancel);
+        orders.AddChild(eCommerceConsts.Permissions.Orders.HistoryView);
 
         // ---- Thanh toán ----
         var payments = group.AddPermission(eCommerceConsts.Permissions.Payments.Default);
@@ -118,13 +138,27 @@ public class eCommercePermissionDefinitionProvider : PermissionDefinitionProvide
         // 🔐 `XC-002` — vận hành hàng đợi thư chết. 📌 Tách khỏi `Inventory` để giữ **đặc quyền tối thiểu**
         // (DLQ chứa payload sự kiện ⇒ đọc nó là một quyền **riêng**).
         var operations = group.AddPermission(eCommerceConsts.Permissions.Operations.Default);
-        operations.AddChild(eCommerceConsts.Permissions.Operations.DeadLetters);
+        var deadLetters = operations.AddChild(eCommerceConsts.Permissions.Operations.DeadLetters);
+        // 🆕 `S16b` — **PHÁT LẠI** DLQ là hành động **nguy hiểm** (gửi lại sự kiện vào hệ thống) ⇒ quyền RIÊNG,
+        // tách khỏi quyền đọc. 🔒 Thiếu dòng này ⇒ `403` cho MỌI người kể cả `admin` (`XC-004` D2) — và
+        // 📌 triệu chứng đó **không trỏ tới chỗ sai**; 🛡️ lưới an toàn `BatBienPhanQuyenTests.TC02b`.
+        deadLetters.AddChild(eCommerceConsts.Permissions.Operations.DeadLettersReplay);
         var customers = group.AddPermission(eCommerceConsts.Permissions.Customers.Default);
         customers.AddChild(eCommerceConsts.Permissions.Customers.Manage);
         // 🚨 `S3` (`CUS-001` ADR-09): nhóm khách là ĐẦU VÀO CỦA BẢNG GIÁ (`PRC-001` Q5) ⇒ đổi nhóm là đổi
         // giá bán cho cả một tập khách ⇒ **quyền riêng**, không gộp vào `Manage` (đặc quyền tối thiểu).
         // 🔒 Thiếu dòng này ⇒ `403` cho MỌI người kể cả `admin` (lỗi im lặng, `XC-004` D2).
         customers.AddChild(eCommerceConsts.Permissions.Customers.ManageGroups);
+
+        // ---- Quầy bán lẻ (`WP-06`) ----
+        // 🚨 BẮT BUỘC khai ở CẢ HAI NƠI (hằng số `eCommerceConsts.Permissions.Pos` + ở đây): thiếu một nơi
+        // ⇒ `403` cho MỌI người kể cả `admin` (`XC-004` D2/E3). 🛡️ `BatBienPhanQuyenTests.TC02b` khoá hai chiều.
+        // 🔒 Bốn quyền **không thay thế nhau**: bán ≠ huỷ (đảo doanh thu) ≠ kết ca (biên bản tiền) ≠ trả hàng.
+        var pos = group.AddPermission(eCommerceConsts.Permissions.Pos.Default);
+        pos.AddChild(eCommerceConsts.Permissions.Pos.Sell);
+        pos.AddChild(eCommerceConsts.Permissions.Pos.Void);
+        pos.AddChild(eCommerceConsts.Permissions.Pos.SessionManage);
+        pos.AddChild(eCommerceConsts.Permissions.Pos.Return);
 
         // ---- Sổ địa chỉ (`ADDR-004` phần B) ----
         // 🚨 BẮT BUỘC khai ở CẢ HAI NƠI (hằng số + ở đây): thiếu một nơi ⇒ `403` cho MỌI người kể cả `admin`.
@@ -135,5 +169,21 @@ public class eCommercePermissionDefinitionProvider : PermissionDefinitionProvide
         addresses.AddChild(eCommerceConsts.Permissions.Addresses.Manage);
         addresses.AddChild(eCommerceConsts.Permissions.Addresses.ManageBook);
         addresses.AddChild(eCommerceConsts.Permissions.Addresses.Verify);
+
+        // ---- Cấu hình tổ chức (`WP-07`) ----
+        // 🚨 BẮT BUỘC khai ở CẢ HAI NƠI (hằng số `eCommerceConsts.Permissions.Settings` + ở đây): thiếu một
+        // nơi ⇒ `403` cho MỌI người kể cả `admin` (`XC-004` D2/E3). 🛡️ `BatBienPhanQuyenTests.TC02b`.
+        // 🔒 Tách `Manage` khỏi `Customers.Manage`: đổi **phạm vi dữ liệu** = đổi *ai thấy dữ liệu của ai*
+        // ⇒ quyền **phân quyền**, không phải quyền sửa hồ sơ khách.
+        var settings = group.AddPermission(eCommerceConsts.Permissions.Settings.Default);
+        settings.AddChild(eCommerceConsts.Permissions.Settings.Manage);
+
+        // ---- Báo cáo (`WP-08`) ----
+        // 🚨 BẮT BUỘC khai ở CẢ HAI NƠI (hằng số `eCommerceConsts.Permissions.Reports` + ở đây): thiếu một nơi
+        // ⇒ `403` cho MỌI người kể cả `admin` (`XC-004` D2/E3). 🛡️ `BatBienPhanQuyenTests.TC02b`.
+        // 🔒 `Aggregate` (backfill read-model) tách khỏi `Default` (xem): chạy `DELETE`+`INSERT` theo ngày nên
+        // một khoảng sai có thể **xoá** số liệu của kỳ khác — thao tác ghi phải có quyền riêng.
+        var reports = group.AddPermission(eCommerceConsts.Permissions.Reports.Default);
+        reports.AddChild(eCommerceConsts.Permissions.Reports.Aggregate);
     }
 }

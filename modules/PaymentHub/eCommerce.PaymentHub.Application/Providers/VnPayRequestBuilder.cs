@@ -197,6 +197,14 @@ public static class VnPayRequestBuilder
         kq.MaPhanHoi = truong.GetValueOrDefault("vnp_ResponseCode");
         kq.ThongDiep = truong.GetValueOrDefault("vnp_Message");
         kq.MaGiaoDichHoan = truong.GetValueOrDefault("vnp_TransactionNo");
+        kq.TrangThaiGiaoDich = truong.GetValueOrDefault("vnp_TransactionStatus");
+        kq.NgayGiaoDichGmt7 = truong.GetValueOrDefault("vnp_PayDate");
+        kq.LoaiGiaoDich = truong.GetValueOrDefault("vnp_TransactionType");
+
+        if (long.TryParse(truong.GetValueOrDefault("vnp_Amount"), out var soTien))
+        {
+            kq.SoTienMinorUnits = soTien;
+        }
 
         // ① KIỂM CHỮ KÝ TRƯỚC — không tin nội dung khi chữ ký không hợp lệ.
         if (string.IsNullOrWhiteSpace(biMat))

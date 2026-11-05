@@ -118,9 +118,19 @@ foreach ($t in $tepTaiLieu) {
         }
         if ($trongCode) { continue }
 
+        $day = if ($duongDan.StartsWith('/')) { Join-Path $Goc $duongDan.TrimStart('/') } else { Join-Path $thuMuc $duongDan }
+
+        # 🚨 **`N18` — BANG CHUNG KHONG NAM TRONG REPO THI KHONG PHAI "THAM CHIEU CHET" (do duoc tren CI):**
+        # `01-khao-sat-nhanh-vn.md` nhung 3 anh `../../artifacts/nhanh-survey/*.png`, va `README` §6 ghi ro
+        # *"`artifacts/` gitignore — KHONG commit"*. Tren may dev thu muc do **co** ⇒ cong XANH; tren ban
+        # clone sach (CI) no **khong co** ⇒ 3 tham chieu "chet" ⇒ buoc ⑪ cua `ci` DO. 📌 Cung mot ly do
+        # `$boQua` o tren da loai `artifacts` khoi danh sach tep .md duoc quet — đây la ve **doi xung** cua
+        # cung mot quy uoc, khong phai noi long phep kiem: duong dan **trong repo** van phai tro toi tep CO THAT.
+        $tuongDoiDich = [IO.Path]::GetRelativePath($Goc, [IO.Path]::GetFullPath($day))
+        if ($tuongDoiDich -match '^artifacts[\\/]') { continue }
+
         $tongLink++
         $soDong++
-        $day = if ($duongDan.StartsWith('/')) { Join-Path $Goc $duongDan.TrimStart('/') } else { Join-Path $thuMuc $duongDan }
         if (-not (Test-DuongDanTonTai -DuongDan $day)) {
             $loi.Add([pscustomobject]@{ Loai = 'LINK'; Tep = $tuongDoi; Dong = $soDong; Dich = $dich })
         }

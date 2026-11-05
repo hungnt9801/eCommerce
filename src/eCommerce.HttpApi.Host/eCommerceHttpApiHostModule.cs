@@ -1,5 +1,6 @@
 using System.Reflection;
 using eCommerce.EntityFrameworkCore;
+using eCommerce.Observability;
 using eCommerce.Messaging.EventCoverage;
 using Medallion.Threading;
 using Medallion.Threading.Redis;
@@ -76,7 +77,10 @@ namespace eCommerce;
     // 🚨 `CUS-001` — **BẮT BUỘC**: thiếu dòng này thì assembly `eCommerce.Customers.Application` **KHÔNG** nằm
     // trong đồ thị module ⇒ ABP không quét app service ⇒ **không tạo endpoint** ⇒ API trả **404 body rỗng**
     // dù build/test **xanh** (bài học C8/C16, đã trả giá).
-    typeof(Customers.CustomersApplicationModule)
+    typeof(Customers.CustomersApplicationModule),
+    // 🆕 `D-13`/`D-14` — tầng API **tường minh** `/api/v1/**` cho Web Admin Next.js.
+    // ⚠️ Thiếu dòng này thì controller v1 **KHÔNG** được nạp (không có lỗi biên dịch) — cùng họ lỗi C8/C16.
+    typeof(eCommerceHttpApiModule)
 )]
 public class eCommerceHttpApiHostModule : AbpModule
 {
@@ -152,6 +156,10 @@ public class eCommerceHttpApiHostModule : AbpModule
         // của ASP.NET Core + một check tự viết ⇒ KHÔNG thêm dependency nào.
         context.Services.AddHealthChecks()
             .AddCheck<HealthChecks.DatabaseHealthCheck>("database");
+
+        // 🚨 `S16` — bọc MỌI logger provider để biến lỗi ghi log thành metric + dòng dự phòng ra stderr.
+        // 📌 Phải gọi Ở ĐÂY (sau khi WebApplicationBuilder đã thêm console/debug provider, trước khi build).
+        context.Services.ThemDemLoiGhiLog();
 
         // 🚨 MỤC (2) — HẠ TẦNG HTTP CHO CƠ QUAN THUẾ (EINV-002 phát hiện F3: trước đây repo
         // KHÔNG có IHttpClientFactory). `AddHttpClient` nằm trong shared framework của ứng dụng web
@@ -246,6 +254,11 @@ public class eCommerceHttpApiHostModule : AbpModule
             return new RedisDistributedSynchronizationProvider(connection.GetDatabase());
         });
 
+        // 🚨 `S16` — bọc `IAbpDistributedLock` để phát `lock_ttl_exceeded_total` KHI LEASE MẤT THẬT
+        // (qua `HandleLostToken` của Medallion), không so thời gian với tham số `timeout` của ABP
+        // (đó là thời gian CHỜ giành khoá, không phải TTL). Xem `DoThoiGianGiuKhoa`.
+        context.Services.ThemDoThoiGianGiuKhoa();
+
         // Cấu hình ChannelHub / PaymentHub từ appsettings.json.
         Configure<ChannelHub.ChannelHubOptions>(configuration.GetSection("ChannelHub"));
         Configure<PaymentHub.Payments.PaymentHubOptions>(configuration.GetSection("PaymentHub"));
@@ -316,6 +329,48 @@ public class eCommerceHttpApiHostModule : AbpModule
             // (cùng họ với `0010` liên kết trùng ở trên). 📌 Mã vẫn là nguồn sự thật (`D6`): `0008` nói
             // *"chọn mã khác"*, `0003` nói *"người này đã là khách"* — hai việc khác nhau, hai chỉ dẫn khác nhau.
             options.Map(eCommerce.Customers.CustomerErrorCodes.MaNhomDaTonTai, System.Net.HttpStatusCode.Conflict);          // 0008
+
+            // ── 🆕 `WP-07` — CẤP KHÁCH / ĐIỂM / CÔNG NỢ / CẤU HÌNH ────────────────────────────
+            // 🔑 VÌ SAO PHẢI MAP: ABP trả **`403`** cho mọi `BusinessException` không được map ⇒ client đọc
+            // thành *"bạn không có quyền"* rồi **đi xin quyền**, trong khi lỗi thật là *"không đủ điểm"* /
+            // *"mã đã tồn tại"* — lỗi phân loại sai người dùng (bài học `INV-003` `0042`).
+            options.Map(eCommerce.Customers.CustomerErrorCodes.DiemKhongDu, System.Net.HttpStatusCode.Conflict);            // 0018
+            options.Map(eCommerce.Customers.CustomerErrorCodes.VuotHanMucNo, System.Net.HttpStatusCode.Conflict);           // 0019
+            options.Map(eCommerce.Customers.CustomerErrorCodes.DiemKhongHopLe, System.Net.HttpStatusCode.BadRequest);        // 0017
+            options.Map(eCommerce.Customers.CustomerErrorCodes.SoTienKhongHopLe, System.Net.HttpStatusCode.BadRequest);      // 0020
+            options.Map(eCommerce.Customers.CustomerErrorCodes.MaCapKhachDaTonTai, System.Net.HttpStatusCode.Conflict);      // 0021
+            options.Map(eCommerce.Customers.CustomerErrorCodes.KhongTimThayCapKhach, System.Net.HttpStatusCode.NotFound);    // 0022
+            options.Map(eCommerce.Customers.CustomerErrorCodes.MaCauHinhDaTonTai, System.Net.HttpStatusCode.Conflict);       // 0023
+            options.Map(eCommerce.Customers.CustomerErrorCodes.KhongTimThayCauHinh, System.Net.HttpStatusCode.NotFound);     // 0024
+            options.Map(eCommerce.Customers.CustomerErrorCodes.TabKhongHopLe, System.Net.HttpStatusCode.BadRequest);         // 0026
+            options.Map(eCommerce.Settings.SettingsErrorCodes.QuyenKhongTonTai, System.Net.HttpStatusCode.BadRequest);      // Settings 0001
+            options.Map(eCommerce.Settings.SettingsErrorCodes.VaiTroKhongTonTai, System.Net.HttpStatusCode.BadRequest);     // Settings 0002
+
+            // ── PHÁT LẠI DLQ (`S16b`, `XC-002`) ────────────────────────────────────────────────
+            // 🔑 VÌ SAO PHẢI MAP (cùng lý do `ADDR-004` §12 ở trên): không map ⇒ ABP trả **`403`** cho
+            // `BusinessException` ⇒ client đọc thành *"tôi không có quyền"* trong khi thật ra
+            // **dữ liệu DLQ không cho phép phát lại**. 📌 Với thao tác nguy hiểm này, đọc sai nguyên nhân
+            // nghĩa là người trực **xin quyền** thay vì **sửa `TenSuKien`/payload** — và sự kiện **nằm đó mãi**.
+            // `409` = yêu cầu hợp lệ nhưng **trạng thái bản ghi** không cho phép (đã phát lại / không ánh xạ
+            // được loại / payload không khớp). 🔒 Mã lỗi vẫn là nguồn sự thật (`0008`/`0009`/`0010`).
+            options.Map(eCommerce.Messaging.MessagingErrorCodes.DaPhatLai, System.Net.HttpStatusCode.Conflict);                    // 0008
+            options.Map(eCommerce.Messaging.MessagingErrorCodes.KhongXacDinhDuocLoaiSuKien, System.Net.HttpStatusCode.Conflict);   // 0009
+            options.Map(eCommerce.Messaging.MessagingErrorCodes.PayloadKhongKhopLoaiSuKien, System.Net.HttpStatusCode.Conflict);   // 0010
+            options.Map(eCommerce.Messaging.MessagingErrorCodes.KhongTimThay, System.Net.HttpStatusCode.NotFound);                  // 0007
+
+            // ── 🆕 `WP-08` — BÁO CÁO (read-model) ────────────────────────────────────────────
+            // 🔑 Cùng lý do các khối trên: không map ⇒ ABP trả **`403`** cho `BusinessException` ⇒ người dùng
+            // tưởng *"không có quyền xem báo cáo"* và **đi xin quyền**, trong khi lỗi thật là *"khoảng ngày
+            // sai"* / *"chứng từ có chiết khấu âm"*. 📌 Báo cáo là nơi ra quyết định ⇒ chẩn đoán sai ở đây
+            // tốn thời gian của người không sửa được gì.
+            options.Map(eCommerce.Reporting.ReportingErrorCodes.KhoangKhongHopLe, System.Net.HttpStatusCode.BadRequest);   // 0002
+            options.Map(eCommerce.Reporting.ReportingErrorCodes.KhoangQuaDai, System.Net.HttpStatusCode.BadRequest);       // 0003
+            options.Map(eCommerce.Reporting.ReportingErrorCodes.NguonKhongHopLe, System.Net.HttpStatusCode.BadRequest);    // 0001
+            options.Map(eCommerce.Reporting.ReportingErrorCodes.DoanhThuAm, System.Net.HttpStatusCode.Conflict);           // 0004
+            options.Map(eCommerce.Reporting.ReportingErrorCodes.DongMoCoi, System.Net.HttpStatusCode.Conflict);            // 0005
+            options.Map(eCommerce.Reporting.ReportingErrorCodes.TonKhoAm, System.Net.HttpStatusCode.Conflict);             // 0006
+            options.Map(eCommerce.Reporting.ReportingErrorCodes.DongTrung, System.Net.HttpStatusCode.Conflict);            // 0008
+            options.Map(eCommerce.Reporting.ReportingErrorCodes.ChungTuKhongCoDong, System.Net.HttpStatusCode.Conflict);   // 0009
 
             // ── Hạ tầng chung ──────────────────────────────────────────────────────────────────
             // Không giành được khoá phân tán ⇒ **409** (client thử lại được) — `ADDR-004` §12 ghi rõ.

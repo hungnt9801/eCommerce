@@ -28,6 +28,35 @@ public class CustomerDto
     public decimal? LifetimeValueAmount { get; set; }
     public string? LifetimeValueCurrency { get; set; }
     public DateTime CreationTime { get; set; }
+
+    // ── `WP-07` — PHÂN KHÁCH + SỔ ĐIỂM/CÔNG NỢ ─────────────────────────────────────────────────
+    // 📌 Chỉ **thêm trường ĐỌC** ⇒ không phá vỡ `ICustomerDirectory` (module khác vẫn dùng được).
+
+    /// <summary>`Retail` / `Wholesale` / `Agency` (chuỗi — client không phải biết số enum).</summary>
+    public string Type { get; set; } = default!;
+
+    public Guid? LevelId { get; set; }
+
+    /// <summary>Tên cấp — 📌 null = **chưa đạt cấp nào** (khác với *"cấp mặc định"*).</summary>
+    public string? LevelName { get; set; }
+
+    public decimal Points { get; set; }
+
+    /// <summary>Tiền tích luỹ (công thức `D-45`) — đầu vào của cấp khách.</summary>
+    public decimal AccumulatedAmount { get; set; }
+
+    /// <summary>`0` = **không đặt** hạn mức nợ (xem `NghiepVuKhach.NoSauGiaoDich`).</summary>
+    public decimal DebtLimit { get; set; }
+
+    public decimal DebtBalance { get; set; }
+
+    /// <summary>`true` = dư nợ **vượt** hạn mức đã đặt (hạ hạn mức sau khi đã nợ) ⇒ UI hiện cảnh báo.</summary>
+    public bool VuotHanMucNo { get; set; }
+
+    public Guid? SaleStaffId { get; set; }
+    public Guid? ReferrerId { get; set; }
+    public string? TaxCode { get; set; }
+    public DateTime? Birthday { get; set; }
 }
 
 /// <summary>Tạo khách mới (idempotent theo <see cref="IdempotencyKey"/>).</summary>

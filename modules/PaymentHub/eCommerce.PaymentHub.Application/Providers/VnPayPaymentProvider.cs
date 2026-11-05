@@ -296,28 +296,66 @@ public class VnPayPaymentProvider : IPaymentProvider
     public async Task<PaymentTransactionStatus> QueryStatusAsync(
         string merchantReference,
         CancellationToken cancellationToken = default)
+        => (await QueryStatusDetailAsync(merchantReference, cancellationToken)).Status;
+
+    /// <summary>
+    /// 🆕 `REC-001` 2b — trả **đủ** mã phản hồi/số tiền/mã giao dịch/loại giao dịch để đối soát phân loại lệch.
+    /// 🔒 `LoiHaTang` (timeout/không kết nối) ⇒ **chỉ** `Pending`, không bịa trường; còn phản hồi có mã (kể cả
+    /// `91` không tìm thấy) thì **giữ nguyên** để worker phân loại, không nuốt thành "chưa biết".
+    /// </summary>
+    public async Task<PaymentStatusQueryResult> QueryStatusDetailAsync(
+        string merchantReference,
+        CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(merchantReference) || _http is null)
         {
-            return PaymentTransactionStatus.Pending;
+            return new PaymentStatusQueryResult(PaymentTransactionStatus.Pending);
         }
 
         var thamSo = VnPayRequestBuilder.ThamSoTruyVan(_options.TmnCode, merchantReference);
         var kq = await GoiApiGiaoDichAsync(thamSo, cancellationToken);
 
-        if (kq.LoiHaTang is not null || !kq.DaNhanYeuCau)
+        if (kq.LoiHaTang is not null)
         {
-            // ⚠️ "Chưa biết" KHÁC "không thành công" — trả `Pending` để job còn gọi lại.
-            return PaymentTransactionStatus.Pending;
+            // "Chưa biết" KHÁC "không thành công" — không có dữ liệu phản hồi để phân loại.
+            return new PaymentStatusQueryResult(PaymentTransactionStatus.Pending);
         }
 
-        return kq.MaPhanHoi switch
+        var trangThai = kq.MaPhanHoi switch
         {
             VnPayRequestBuilder.MaThanhCong => PaymentTransactionStatus.Succeeded,
             "24" => PaymentTransactionStatus.Cancelled,
             "01" or "02" or "04" or "07" => PaymentTransactionStatus.Failed,
             _ => PaymentTransactionStatus.Pending
         };
+
+        return new PaymentStatusQueryResult(
+            trangThai,
+            kq.MaPhanHoi,
+            kq.TrangThaiGiaoDich,
+            kq.SoTienMinorUnits,
+            kq.MaGiaoDichHoan,
+            NgayGiaoDichUtc(kq.NgayGiaoDichGmt7),
+            kq.NgayGiaoDichGmt7,
+            kq.LoaiGiaoDich);
+    }
+
+    /// <summary>`vnp_PayDate` là `yyyyMMddHHmmss` **GMT+7** (VN không DST) ⇒ đổi sang UTC để lưu/lọc.</summary>
+    private static DateTime? NgayGiaoDichUtc(string? gmt7)
+    {
+        if (string.IsNullOrWhiteSpace(gmt7) || gmt7.Length != 14)
+        {
+            return null;
+        }
+
+        return DateTime.TryParseExact(
+            gmt7,
+            "yyyyMMddHHmmss",
+            System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.None,
+            out var gio)
+            ? DateTime.SpecifyKind(gio.AddHours(-7), DateTimeKind.Utc)
+            : null;
     }
 
     /// <summary>

@@ -69,6 +69,48 @@ public class Customer : FullAuditedAggregateRoot<Guid>, IMultiTenant
     /// <summary>Khoá idempotency **ỔN ĐỊNH** (`ADR-05`) — có unique index `(TenantId, IdempotencyKey)`.</summary>
     public string? IdempotencyKey { get; protected set; }
 
+    // ══════════════════════════════════════════════════════════════════════════════════════════
+    // `WP-07` — PHÂN KHÁCH + ĐIỂM + CÔNG NỢ (`07 §WP-07`). 🔑 Tất cả là **cột riêng** (`ADR-10`).
+    // 🚨 **ĐIỂM VÀ CÔNG NỢ LÀ SỐ DƯ CỦA MỘT SỔ** — chúng **chỉ** đổi qua `GhiNhanMuaHang`/`DaoGhiNhanMuaHang`
+    // (một cửa), không có `set` công khai: sửa tay một số dư là **mất dấu chứng từ** đã tạo ra nó.
+    // ══════════════════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>Loại khách (lẻ/buôn/đại lý) — số enum, 🔒 CHỈ APPEND (`D-17`).</summary>
+    public CustomerType Type { get; protected set; } = CustomerType.Retail;
+
+    /// <summary>Cấp khách (`CusLevels`) — `null` = chưa đạt cấp nào. 📌 **Không FK cứng** (cùng quy ước
+    /// `CustomerGroupId`: cấp là **dữ liệu tham chiếu**, không phải quan hệ vòng đời).</summary>
+    public Guid? LevelId { get; protected set; }
+
+    /// <summary>Điểm tích luỹ **còn dùng được** (đã trừ điểm đã tiêu, đã cộng/trừ khi trả/huỷ).</summary>
+    public decimal Points { get; protected set; }
+
+    /// <summary>
+    /// **TIỀN TÍCH LUỸ** — tổng giá trị hàng khách đã mua **thực tế** (đã trừ phần trả lại).
+    /// 🔑 Đây là **đầu vào của cấp khách** (`NghiepVuKhach.ChonCapKhach`), nên công thức của nó phải
+    /// **một** và được ghi ở `D-45`; 📌 không dùng `LifetimeValueAmount` (cột cũ, ý nghĩa khác) để xếp cấp.
+    /// </summary>
+    public decimal AccumulatedAmount { get; protected set; }
+
+    /// <summary>**Hạn mức nợ** — `0` = **KHÔNG đặt** hạn mức (không chặn), khác hẳn *"hạn mức 0 đồng"*.</summary>
+    public decimal DebtLimit { get; protected set; }
+
+    /// <summary>**Dư nợ hiện tại** — cộng khi bán ghi nợ, trừ khi khách trả nợ/trả hàng/huỷ hoá đơn.</summary>
+    public decimal DebtBalance { get; protected set; }
+
+    /// <summary>Nhân viên phụ trách bán hàng cho khách (tính doanh số/lương) — `null` = chưa gán.</summary>
+    public Guid? SaleStaffId { get; set; }
+
+    /// <summary>Người giới thiệu (khách khác) — `null` = không có. 📌 Không FK cứng: khách giới thiệu
+    /// có thể đã bị **xoá mềm** (`ADR-02`) mà hồ sơ bị giới thiệu vẫn phải giữ vết.</summary>
+    public Guid? ReferrerId { get; protected set; }
+
+    /// <summary>Mã số thuế (khách buôn/đại lý cần xuất hoá đơn) — `null` = khách lẻ không có MST.</summary>
+    public string? TaxCode { get; protected set; }
+
+    /// <summary>Ngày sinh (chăm sóc khách) — `null` = không khai. 📌 Lưu **ngày**, không phải giờ.</summary>
+    public DateTime? Birthday { get; protected set; }
+
     /// <summary>Ghi chú nội bộ (ví dụ **lý do chặn** — `ADR-04` yêu cầu `Unblock` có lý do).</summary>
     public string? Note { get; set; }
 
@@ -296,7 +338,7 @@ public class Customer : FullAuditedAggregateRoot<Guid>, IMultiTenant
     }
 
     /// <summary>
-    /// Gắn **khoá idempotency** nếu chưa có (`ADR-05`) — dùng ở biên vào (webhook/queue).
+    /// **GẮN KHOÁ IDEMPOTENCY** nếu chưa có (`ADR-05`) — dùng ở biên vào (webhook/queue).
     /// 🔒 **KHÔNG ghi đè khoá đã có**: khoá cũ là **bằng chứng** của lần tạo đầu; ghi đè ⇒ mất khả năng
     /// chống trùng cho các retry **đang bay**.
     /// </summary>
@@ -320,4 +362,165 @@ public class Customer : FullAuditedAggregateRoot<Guid>, IMultiTenant
 
         IdempotencyKey = khoa.Trim();
     }
+
+    // ══════════════════════════════════════════════════════════════════════════════════════════
+    // `WP-07` — PHÂN KHÁCH + SỔ ĐIỂM/CÔNG NỢ
+    // ══════════════════════════════════════════════════════════════════════════════════════════
+
+    public const int DoDaiMaSoThueToiDa = 32;
+
+    /// <summary>
+    /// **PHÂN KHÁCH** — loại khách + cấp + hạn mức nợ + nhân viên phụ trách + người giới thiệu + MST + ngày sinh.
+    ///
+    /// 🚨 **HAI GUARD Ở ĐÂY (cả hai đều là lỗi im lặng nếu bỏ):**
+    /// <list type="number">
+    ///   <item>**Hạn mức nợ &lt; dư nợ hiện tại ⇒ NÉM** — hạ hạn mức xuống dưới mức đang nợ là **hợp lệ về
+    ///     nghiệp vụ** (chủ doanh nghiệp siết tín dụng), nên **KHÔNG** chặn; 🔑 nhưng nếu chặn thì người
+    ///     dùng không siết được nợ xấu. ✅ Vì vậy chỉ kiểm **không âm**; việc vượt hạn mức đã có ở
+    ///     `NghiepVuKhach.NoSauGiaoDich` cho **giao dịch mới**, và màn hình phải hiện cảnh báo.</item>
+    ///   <item>**MST sai định dạng ⇒ NÉM:** MST đi vào **hoá đơn điện tử**; một MST sai làm hoá đơn bị cơ quan
+    ///     thuế **từ chối** — lỗi nổi lên ở nơi không liên quan (bài học *"kiểm định dạng ngay ở domain"*).</item>
+    /// </list>
+    /// </summary>
+    public void DatPhanKhach(
+        CustomerType loai,
+        Guid? levelId,
+        decimal hanMucNo,
+        Guid? nhanVienBan = null,
+        Guid? nguoiGioiThieu = null,
+        string? maSoThue = null,
+        DateTime? sinhNhat = null)
+    {
+        if (hanMucNo < 0m)
+        {
+            throw new BusinessException(CustomerErrorCodes.SoTienKhongHopLe)
+                .WithData("hanMucNo", hanMucNo)
+                .WithData("lyDo", "Hạn mức nợ KHÔNG được âm (0 = không đặt hạn mức).");
+        }
+
+        if (nguoiGioiThieu is { } gioiThieu && gioiThieu == Id)
+        {
+            throw new BusinessException(CustomerErrorCodes.ThieuThongTinBatBuoc)
+                .WithData("truong", nameof(nguoiGioiThieu))
+                .WithData("lyDo", "Khách KHÔNG thể tự giới thiệu chính mình.");
+        }
+
+        var mst = maSoThue?.Trim();
+
+        if (!string.IsNullOrEmpty(mst))
+        {
+            if (mst.Length > DoDaiMaSoThueToiDa || !KhuonMaSoThue.IsMatch(mst))
+            {
+                throw new BusinessException(CustomerErrorCodes.ThieuThongTinBatBuoc)
+                    .WithData("truong", nameof(maSoThue))
+                    .WithData("lyDo", "Mã số thuế chỉ gồm chữ số và dấu `-` (10 hoặc 13 ký tự).");
+            }
+        }
+
+        if (sinhNhat is { } ngay && ngay.Date > DateTime.UtcNow.Date)
+        {
+            throw new BusinessException(CustomerErrorCodes.ThieuThongTinBatBuoc)
+                .WithData("truong", nameof(sinhNhat))
+                .WithData("lyDo", "Ngày sinh không được ở TƯƠNG LAI.");
+        }
+
+        Type = loai;
+        LevelId = levelId;
+        DebtLimit = NghiepVuKhach.LamTron(hanMucNo);
+        SaleStaffId = nhanVienBan;
+        ReferrerId = nguoiGioiThieu;
+        TaxCode = string.IsNullOrEmpty(mst) ? null : mst;
+        Birthday = sinhNhat?.Date;
+    }
+
+    /// <summary>
+    /// 💰 **GHI NHẬN MỘT LẦN MUA** vào sổ của khách — **MỘT** cửa duy nhất cho điểm + tiền tích luỹ + công nợ.
+    ///
+    /// 🚨 **VÌ SAO PHẢI LÀ MỘT CỬA (và tại sao nó ở DOMAIN):** POS ghi hoá đơn, chứng từ trả ghi giảm nợ,
+    /// huỷ hoá đơn ghi đảo — ba đường khác nhau. Nếu mỗi đường tự `customer.Points += ...` thì:
+    /// ① thứ tự cộng trừ **không** được kiểm (điểm có thể âm), ② hạn mức nợ **không** được kiểm,
+    /// ③ không có chỗ **duy nhất** để ghi log đối chiếu. 📌 `POS`/`Sales` gọi qua cổng `ICustomerLedger`
+    /// (hợp đồng ở `Application.Contracts`) ⇒ **không** module nào đụng thẳng entity khách.
+    ///
+    /// 🔒 **MỌI THAY ĐỔI TRONG MỘT TRANSACTION** với chứng từ nguồn (UoW của ABP): nếu bước sau ném
+    /// (`DiemKhongDu`/`VuotHanMucNo`) thì **hoá đơn cũng không được lưu** — không có chuyện *"đã bán
+    /// nhưng khách không bị trừ điểm"*.
+    /// </summary>
+    /// <param name="tienHang">Giá trị hàng của chứng từ (đã trừ chiết khấu, **chưa** trừ điểm) — tiền tích luỹ.</param>
+    /// <param name="diemTich">Điểm khách **được** từ chứng từ.</param>
+    /// <param name="diemSuDung">Điểm khách **tiêu** trong chứng từ.</param>
+    /// <param name="noTang">Phần **ghi nợ** của chứng từ (`DebtAmount`), `0` nếu thu đủ.</param>
+    /// <exception cref="BusinessException">`0005` (bị chặn), `0018` (không đủ điểm), `0019` (vượt hạn mức nợ).</exception>
+    public KetQuaGhiNhanKhach GhiNhanMuaHang(decimal tienHang, decimal diemTich, decimal diemSuDung, decimal noTang)
+    {
+        if (Status == CustomerStatus.Blocked)
+        {
+            // 🚨 Chặn Ở ĐÂY (không chỉ ở `CuaKiemKhachGiaoDich` của đường đơn online): POS **không** đi qua
+            // cửa đó ⇒ nếu thiếu guard này thì khách đang bị chặn vì chây nợ vẫn **mua được** tại quầy,
+            // và món nợ mới lại cộng vào hồ sơ đang bị chặn.
+            throw new BusinessException(CustomerErrorCodes.KhachDangBiChan)
+                .WithData("customerId", Id)
+                .WithData("lyDo", "Khách đang BỊ CHẶN ⇒ không ghi nhận giao dịch mới (gỡ chặn trước).");
+        }
+
+        if (tienHang < 0m)
+        {
+            throw new BusinessException(CustomerErrorCodes.SoTienKhongHopLe)
+                .WithData("tienHang", tienHang)
+                .WithData("lyDo", "Giá trị hàng của giao dịch KHÔNG được âm.");
+        }
+
+        var diemMoi = NghiepVuKhach.DiemSauGiaoDich(Points, diemTich, diemSuDung);
+        var noMoi = NghiepVuKhach.NoSauGiaoDich(DebtBalance, noTang, DebtLimit);
+
+        var truoc = new KetQuaGhiNhanKhach(Points, AccumulatedAmount, DebtBalance);
+
+        Points = diemMoi;
+        AccumulatedAmount = NghiepVuKhach.LamTron(AccumulatedAmount + tienHang);
+        DebtBalance = noMoi;
+
+        return truoc;
+    }
+
+    /// <summary>
+    /// ↩️ **ĐẢO một lần ghi nhận** — dùng khi **huỷ hoá đơn** (đảo toàn bộ) hoặc **trả hàng** (đảo phần hàng trả).
+    ///
+    /// 🚨 **KẸP Ở `0`, KHÔNG NÉM:** đảo là đường **sửa sai**; nếu dữ liệu đã lệch (ví dụ ai đó sửa tay
+    /// `Points`) mà ta **ném** thì không huỷ được hoá đơn sai — 📌 tệ hơn nhiều so với việc kẹp về `0` và
+    /// ghi **cảnh báo** ở tầng gọi. Trả về số **thực sự** đã đảo để tầng gọi ghi log đối chiếu.
+    /// </summary>
+    public KetQuaDaoKhach DaoGhiNhanMuaHang(decimal tienHang, decimal diemTich, decimal diemSuDung, decimal noGiam)
+    {
+        if (tienHang < 0m || diemTich < 0m || diemSuDung < 0m || noGiam < 0m)
+        {
+            throw new BusinessException(CustomerErrorCodes.SoTienKhongHopLe)
+                .WithData("lyDo", "Các số của một lần ĐẢO phải là số DƯƠNG (chiều đảo do hàm quyết định).");
+        }
+
+        var diemTruoc = Points;
+        var tienTruoc = AccumulatedAmount;
+        var noTruoc = DebtBalance;
+
+        // Điểm đảo = trừ điểm đã tích + cộng lại điểm đã tiêu (đúng nghĩa "hoá đơn này chưa từng xảy ra").
+        Points = Math.Max(0m, NghiepVuKhach.LamTron(Points - diemTich + diemSuDung));
+        AccumulatedAmount = Math.Max(0m, NghiepVuKhach.LamTron(AccumulatedAmount - tienHang));
+        DebtBalance = Math.Max(0m, NghiepVuKhach.LamTron(DebtBalance - noGiam));
+
+        return new KetQuaDaoKhach(
+            DiemDaDao: NghiepVuKhach.LamTron(diemTruoc - Points),
+            TienDaDao: NghiepVuKhach.LamTron(tienTruoc - AccumulatedAmount),
+            NoDaGiam: NghiepVuKhach.LamTron(noTruoc - DebtBalance));
+    }
+
+    /// <summary>Gắn **cấp khách** — do `NghiepVuKhach.ChonCapKhach` quyết (tầng gọi đọc ngưỡng rồi truyền vào).</summary>
+    public void XepCap(Guid? levelId) => LevelId = levelId;
+
+    /// <summary>Kẹp **MST** — 10 số (doanh nghiệp) hoặc 13 ký tự có `-` (đơn vị trực thuộc).</summary>
+    private static readonly Regex KhuonMaSoThue = new(@"^\d{10}(-\d{3})?$", RegexOptions.Compiled);
 }
+
+/// <summary>Số dư **TRƯỚC** khi ghi nhận — để tầng gọi ghi log *"trước → sau"* mà không đọc lại DB.</summary>
+public sealed record KetQuaGhiNhanKhach(decimal DiemTruoc, decimal TienTichLuyTruoc, decimal NoTruoc);
+
+/// <summary>Số **THỰC SỰ** đã đảo — 📌 có thể **nhỏ hơn** yêu cầu khi số dư đã chạm `0` (xem `DaoGhiNhanMuaHang`).</summary>
+public sealed record KetQuaDaoKhach(decimal DiemDaDao, decimal TienDaDao, decimal NoDaGiam);

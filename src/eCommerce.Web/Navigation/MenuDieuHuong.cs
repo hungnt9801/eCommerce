@@ -59,6 +59,14 @@ public static class MenuDieuHuong
         },
         new()
         {
+            Nhan = "Thương hiệu",
+            Url = "/Brands",
+            // `BrandsController` gọi `IBrandAppService` (`[Authorize(Products.Default)]`) — cùng quyền với trang Sản phẩm.
+            QuyenCanCo = eCommerceConsts.Permissions.Products.Default,
+            MoTa = "Danh sách thương hiệu (mã, slug, logo, trạng thái)"
+        },
+        new()
+        {
             Nhan = "Đối soát tồn kho",
             Url = "/DoiSoat",
             // `DoiSoatController` gọi `IDoiSoatAppService` (`[Authorize(Inventory.Default)]`).
@@ -67,6 +75,22 @@ public static class MenuDieuHuong
             // sẽ đỏ nếu ai thêm mục cho một trang chưa làm).
             QuyenCanCo = eCommerceConsts.Permissions.Inventory.Default,
             MoTa = "Lịch sử lượt quét + dòng lệch cần xử lý"
+        },
+        new()
+        {
+            Nhan = "Kho",
+            Url = "/Kho",
+            // `KhoController` gọi `ITonKhoAppService` (`[Authorize(Inventory.Default)]`) — cùng quyền với Đối soát.
+            QuyenCanCo = eCommerceConsts.Permissions.Inventory.Default,
+            MoTa = "Tồn theo kho/SKU (OnHand · Reserved · Available)"
+        },
+        new()
+        {
+            Nhan = "Bảng giá",
+            Url = "/Pricing",
+            // `PricingController` gọi `IPriceListAppService` (`[Authorize(PricingPermissions.Default)]`).
+            QuyenCanCo = eCommerce.Pricing.PricingPermissions.Default,
+            MoTa = "Bảng giá và dòng giá theo SKU (chỉ đọc)"
         },
 
         // ══════════════════════════════════════════════════════════════════════════════════════════════
@@ -102,11 +126,48 @@ public static class MenuDieuHuong
                 },
                 new()
                 {
+                    Nhan = "Ngân sách tồn",
+                    Url = "/NganSach",
+                    // `NganSachController` gọi `IStockAllotmentAppService` (`[Authorize(Inventory.Default)]` khi đọc,
+                    // `…Allotment.Manage`/`.Release` cho ghi) ⇒ mục menu khai quyền **đọc** để mở được trang;
+                    // nút ghi vẫn tự chặn nếu thiếu quyền (đúng quy tắc `web-001` §95.5).
+                    QuyenCanCo = eCommerceConsts.Permissions.Inventory.Default,
+                    MoTa = "Ngân sách tồn theo (kho, SKU, kênh): ATP, đóng băng, nhả"
+                },
+                new()
+                {
                     Nhan = "Đối soát thanh toán",
                     Url = "/DoiSoatThanhToan",
                     // `DoiSoatThanhToanController` gọi `IPaymentAppService` (`[Authorize(Payments.Default)]`).
                     QuyenCanCo = eCommerceConsts.Permissions.Payments.Default,
                     MoTa = "Tra cứu giao dịch + trạng thái truy vấn từ cổng thanh toán"
+                },
+                new()
+                {
+                    Nhan = "Giá vốn",
+                    Url = "/GiaVon",
+                    // `GiaVonController` gọi `ICostPriceAppService` — service đó `[Authorize]` cấp class
+                    // bằng `PricingPermissions.CostPrice.View` (`S12`, `PRC-001` BR-013).
+                    //
+                    // 🚨 **VÌ SAO MỤC NÀY NẰM TRONG NHÓM "VẬN HÀNH" CHỨ KHÔNG Ở CẤP 1:** giá vốn là
+                    // **dữ liệu nội bộ của kế toán**, KHÔNG phải việc hằng ngày của người bán hàng. Để nó
+                    // ngang hàng `Đơn hàng`/`Sản phẩm` là **mời** người không cần xem bấm vào — và
+                    // quyền `CostPrice.View` là thứ duy nhất chặn (xem `PricingPermissions.CostPriceView`).
+                    // 📌 Quyền hẹp hơn `Pricing.Default`: người chỉ có quyền xem giá bán **không** thấy mục này.
+                    QuyenCanCo = eCommerce.Pricing.PricingPermissions.CostPriceView,
+                    MoTa = "Giá vốn theo SKU và kỳ (chỉ đọc · không hiển thị cho người mua)"
+                },
+                new()
+                {
+                    Nhan = "Phiếu trả hàng",
+                    Url = "/TraHang",
+                    // 🆕 `S14` phần E (`SAL-006` §32) — `TraHangController` gọi `IOrderReturnAppService`:
+                    // đọc `GetListAsync` = `[Authorize(Orders.Default)]` **cấp class**; duyệt/từ chối/hoàn tiền
+                    // = `Orders.Return.Approve`; nhận/đóng = `Orders.Manage`. ⇒ Menu khai quyền **đọc** (mở được
+                    // trang); nút ghi **tự chặn** nếu thiếu quyền, và **ẩn** theo `IAuthorizationService`.
+                    // ⚠️ Không có quyền mới: RMA dùng đúng 4 quyền đã seed từ `SAL-003`/`S14`.
+                    QuyenCanCo = eCommerceConsts.Permissions.Orders.Default,
+                    MoTa = "Phiếu trả (RMA): duyệt, nhận hàng về kho, đóng, ghi nhận hoàn tiền"
                 }
             ]
         }
@@ -129,3 +190,4 @@ public static class MenuDieuHuong
         // ══════════════════════════════════════════════════════════════════════════════════════════════
     ];
 }
+

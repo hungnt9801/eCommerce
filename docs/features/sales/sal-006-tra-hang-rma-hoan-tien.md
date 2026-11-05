@@ -1985,3 +1985,645 @@ ta sẽ **gỡ nó ra** thay vì **sửa nó** (🔒 đúng số phận của m�
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.8 | 17/10/2026 | *(agent, session GĐ1)* | **§27 — LÁT CẮT 10: THƯ VIỆN TIÊM TỰ KHẲNG ĐỊNH** (đóng nợ §26.6 #5): thêm **`tools\ham-tiem.ps1`** (**dot-source**, 🔒 **không có `param` cấp tệp** — ⚠️ tệp có `[CmdletBinding()]` cấp cao nhất sẽ **đòi tham số** khi bị dot-source ⇒ treo/lỗi) gồm **5 hàm**. 🔑 **VÌ SAO:** **CÙNG MỘT LỖI, HAI VÒNG LIÊN TIẾP** — **§25.5** (tiêm có **thoát nháy** ⇒ **sai cú pháp SQL** ⇒ dòng probe **KHÔNG hề tồn tại** ⇒ suýt **kết luận sai về sản phẩm**) và **§26.5 #1** (tiêm lại bằng `String.Replace` và **phép thay KHÔNG khớp** ⇒ bộ test báo `exit 0` ⇒ suýt kết luận *"bộ test không bắt được gì"*); 🔒 **điểm chung: phép tiêm KHÔNG XẢY RA nhưng KHÔNG AI KIỂM** ⇒ *"cổng không bắt"* **trông giống hệt** *"tiêm không thành"* ⇒ 📌 một ca **XANH** có thể xanh **vì lý do sai**; 🔑 **và tôi đã ghi bài học này HAI LẦN rồi vẫn vấp lại** ⇒ **kỷ luật cá nhân không đủ, phải là CƠ CHẾ**. **`TiemVaoTep`** khẳng định: khối cũ khớp **ĐÚNG MỘT LẦN** (⚠️ **0** lần = tiêm không xảy ra; **>1** lần = `Replace` thay **hết** ⇒ vượt ý định) · nội dung **phải đổi** · `-NeoXacNhan` **phải có** · **đọc lại từ đĩa** (⚠️ tệp bị **khoá** có thể **ghi hụt im lặng** — cùng họ bẫy *"build `exit 0` mà binary không đổi"*). **`KhoiPhucTep`** khẳng định nội dung **về đúng bản gốc** và `-NeoDaTiem` **phải mất** (🔒 nếu không thì một phép khôi phục hỏng làm **các ca sau** đỏ vì **lý do vô hình**). **`TiemVaoDb`** 🚨 chặn câu SQL **không có nháy đơn nào** (dấu hiệu chuỗi đã bị **lớp gọi ăn mất**) **TRƯỚC** khi chạm DB, ➕ sau khi ghi **đọc lại** (`-KiemSql` + `-SoDongMongDoi`) và **NÉM** nếu lệch. **`Invoke-Psql`** ghi ra **tệp tạm rồi đọc**, **KHÔNG** ống dẫn (⚠️ ống dẫn **che mất exit code** ⇒ `docker` thất bại bị hiểu nhầm là *"0 dòng"*, và *"0 dòng"* lại bị hiểu nhầm là *"sạch"*). **`TrongKhiDonDep`** dọn dẹp **luôn** chạy kể cả khi ca kiểm **NÉM**. 🚨 **MỘT LỖI CỦA TÔI NGAY KHI VIẾT thư viện:** bản đầu chặn câu SQL chứa **`''`** — ⚠️ **SAI**, vì `''` là **cú pháp HỢP LỆ** (nháy đơn **bị thoát** trong literal) ⇒ phép chặn đó **cấm luôn** câu **đúng** như `where "Id" = ''x''`; 🔑 **bài học: một phép kiểm *"trông có vẻ chặt"* mà SAI NGỮ NGHĨA thì sẽ CHẶN VIỆC ĐÚNG — và người ta sẽ GỠ NÓ RA thay vì SỬA NÓ** (🔒 đúng số phận của một *"cổng luôn đỏ"*, §23.4); ✅ chữa: kiểm **sự VẮNG MẶT của nháy đơn** thay vì sự **có mặt của `''`**. ✅ **KIỂM CHỨNG — 5 ca mới:** 🚨 **L** khối cũ **không khớp** ⇒ **NÉM** (🔑 **chính là §26.5 #1**) · **M** khớp **>1 lần** ⇒ **NÉM** · **N** neo không có trong khối mới ⇒ **NÉM** · **O** tiêm **được** ⇒ neo **có** ⇒ khôi phục ⇒ neo **mất** (🔒 khép kín **cả hai chiều**) · 🚨 **P** SQL **không có nháy đơn** ⇒ **NÉM** kèm thông điệp trỏ tới **§25.5** (🔑 **chính là lỗi §25.5**). ➕ **SO SÁNH TRỰC TIẾP (đo được):** cách **cũ** (`String.Replace`, khối không khớp) ⇒ nội dung **KHÔNG đổi** và **KHÔNG ném** = 📌 **IM LẶNG**; cách **mới** ⇒ ✅ **NÉM** *"PHEP TIEM KHONG XAY RA"*. ➕ **Tổng bộ test cổng: 17/17 ĐẠT** (12 cũ + 5 mới) · **7 bước** · `exit 0` · **132s** · **1155 unit** · **38 integration** · mermaid **197/0** · **DB 21/21**. Ghi **§27.5** (nợ: 🚨 **chưa có CI** — nay **7 bước** là nền · 🚨 **probe E2E vẫn SCRIPT TAY** ⇒ `web-001` §98.7 #1 **vẫn mở** · **thư viện chưa được dùng ở các probe CŨ** (🔑 nên chuyển dần) · chưa test `route-check.ps1`/`wait-host.ps1` (⚠️ cũng là **cổng**) · **`TiemVaoDb` chưa có ca kiểm "đọc lại THẤY LỆCH thì ném"** — mới kiểm ca **chặn nháy đơn**)) |
+
+---
+
+## 28. TRẠNG THÁI TRIỂN KHAI — **`S14` PHẦN A: MÔ HÌNH DỮ LIỆU + BẤT BIẾN PHIẾU TRẢ** (28/10/2026)
+
+> 🎯 **Phạm vi phần A (cố ý hẹp):** dựng **đúng lược đồ** + **đúng bất biến** cho RMA để phần B (service/API +
+> chứng từ kho + ETO) **không phải sửa lược đồ lần hai**. 📌 Phần B **chưa** làm — ghi rõ ở §28.3.
+
+### 28.1 Đã làm
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| 1 | **`OrderReturn`** (`OrdReturns`) | `OrderId` · `ReturnNumber` · `ChannelCode` (copy từ đơn) · **hai trục**: `Lifecycle` (`Requested/Approved/Rejected/Cancelled/Received/Closed`) và `Goods` (`Awaiting/PartiallyReceived/Received/Waived/NotReturned`) · `ReasonCode` (mã đóng) · `WarehouseId` · `RefundMethod`/`RefundedAmount`/`RefundCurrency` · actor · `IdempotencyKey` + `PayloadHash` · `Version` · mốc `ReceivedAtUtc`/`ClosedAtUtc` |
+| 2 | **`OrderReturnLine`** (`OrdReturnLines`) | `OrderLineId` · `Sku` (snapshot) · `Quantity`/`ReceivedQuantity` · `Disposition` (`Unset/Restock/Damaged/ReturnToSupplier`) · **3 snapshot tiền** (giá/giảm/thuế) · `RefundAmount` · `LedgerEntryId` |
+| 3 | **`OrderReturnHistory`** (`OrdReturnHistory`) | **APPEND-ONLY**: `Axis` (`Lifecycle`/`Goods`) · `FromStatus`/`ToStatus` (CHECK **phải đổi**) · actor · `EventId` · `VersionAfter` · `OccurredAtUtc` |
+| 4 | **`OrderLine.ReturnedQuantity`** + `TangTra`/`GiamTra` | 🚨 **HÀNG RÀO NGHIỆP VỤ chống trả vượt số đã mua** (`ADR-11`): giữ chỗ trả **ngay khi tạo phiếu**; NÉM `Sales:0011` khi vượt; DB có `CHECK "ReturnedQuantity" BETWEEN 0 AND "Quantity"` |
+| 5 | **Migration 49** `Gd1S14_OrderReturn` | 3 bảng + cột `ReturnedQuantity` + **8 `CHECK`** + **4 unique `NULLS NOT DISTINCT`** (sửa tay: mã phiếu · idempotency · một dòng-đơn-một-lần · một lịch sử/phiên bản). **NND 60 → 64** |
+
+### 28.2 Quyết định `Q4` — hoàn tiền **tự động** hay **chỉ ghi nhận**?
+
+**Chốt: `Q4` = CHỈ GHI NHẬN (không tự gọi cổng trong `S14`).**
+
+| Lý do | Chi tiết |
+|---|---|
+| Tiền ra khỏi tài khoản là hành vi **không sửa được** | Gọi cổng hoàn tiền sai số/hoàn hai lần = **mất tiền thật**. 📌 `PAY-001` đã có đường `RefundAsync` **có duyệt + idempotency**; `S14` **không** được mở đường thứ hai tự động từ RMA |
+| Bảng `OrdRefunds` (append-only, từng lần thử) cần **thiết kế đối soát riêng** | Đó là lát cắt **`S14b`** cùng với `PaymentHub`; thêm bảng khi chưa có đường ghi là tạo **bảng rỗng** trông như đã xong |
+| Kế toán vẫn cần ghi nhận | `OrderReturn.GhiNhanHoanTien(soTien, Manual)` cộng dồn `RefundedAmount` + `RefundMethod`; mọi so sánh tiền qua `decimal`/`Money` (`BR-006`) |
+
+📌 **Hệ quả:** `RefundStatus` (đặc tả §5.1) **chưa** có cột — thay bằng `RefundMethod` + `RefundedAmount` (đủ cho
+*"đã ghi nhận bao nhiêu"*). Khi `S14b` mở đường gọi cổng, thêm cột/bảng **trong migration riêng**.
+
+### 28.3 🚨 Chưa làm — và **không** được nói là đã có
+
+| # | Thiếu | Hệ quả hiện tại |
+|---|---|---|
+| 1 | **Service + API** (`TaoPhieu/Duyet/NhanHang/Dong`) | Chưa có đường tạo phiếu; entity + guard đã sẵn sàng cho phần B |
+| 2 | **Sinh `ReturnNumber`** + idempotency theo `PayloadHash` | Cần service (phần B); unique index đã là hàng rào cuối |
+| 3 | **Chứng từ kho `CustomerReturn`** + ghi sổ | Hàng hoàn **chưa** nhập kho tự động; `LedgerEntryId` để trống |
+| 4 | **Ghi `OrderReturnHistory`** trong mọi chuyển trạng thái | Entity + unique + CHECK đã có; **chưa** có nơi ghi |
+| 5 | **ETO** (`OrderReturnRequestedEto`…) + outbox | Chưa phát sự kiện |
+| 6 | **Cạnh tắt `Open → Returned` trên trục kết thúc** | Vẫn còn (có ghi chú ngay trong `OrderStateMachine`): `TraHangAsync` cũ còn dùng; **phần B sẽ xoá** kèm cập nhật test |
+| 7 | **UI** | Không có màn hình RMA |
+
+### 28.4 ✅ Bằng chứng đo được
+
+| Phép đo | Kết quả |
+|---|---|
+| Unit | **1571 → 1585** (+14: `OrderReturnTests` — guard tạo phiếu, duyệt/từ chối/huỷ, hai trục nhận hàng, đóng phiếu, ghi nhận hoàn tiền, `ReturnedQuantity` hai chiều) |
+| Integration | **83 → 87** (+4: unique NND mã phiếu + idempotency · khác tenant được phép · lịch sử `from = to` bị chặn · `ReturnedQuantity` vượt bị chặn và **bằng đúng** thì lọt) |
+| Bất biến DB | **NND 60 → 64** · quyền **71** (không đổi — chưa có API) |
+| Migration | **48 → 49** |
+| Cổng đầy đủ | **exit 0 · 363.7s · 15/15 bước** (E2E **140/140**) |
+
+### 28.5 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.4 | 28/10/2026 | *(agent, session GĐ1 — `S14` phần A)* | **Mô hình RMA**: 3 bảng + cột `ReturnedQuantity` trên dòng đơn + 8 `CHECK` + 4 unique NND (**NND 64**), migration **49**. Chốt **`Q4` = chỉ ghi nhận hoàn tiền** (§28.2). **+14 unit · +4 integration**. Ghi rõ **7 việc chưa làm** (§28.3) — phần B mới là service/API/chứng từ kho/ETO |
+
+
+---
+
+## 29. TRẠNG THÁI TRIỂN KHAI — **`S14` PHẦN B: DỊCH VỤ + API PHIẾU TRẢ** (28/10/2026)
+
+> 🎯 **Phạm vi phần B:** biến mô hình của phần A thành **đường chạy thật** — tạo phiếu, duyệt/từ chối/huỷ,
+> nhận hàng, đóng phiếu, ghi nhận hoàn tiền — với **máy trạng thái đơn** làm nguồn sự thật duy nhất.
+
+### 29.1 Đã làm
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| 1 | **`OrderReturnService`** (Domain) | `TaoPhieuAsync` · `DuyetAsync` · `TuChoiAsync` · `HuyAsync` · `NhanHangAsync` · `DongAsync` · `GhiNhanHoanTienAsync`. 🔒 **Cùng khoá** `sales:return:{tenant}:{orderId}` cho mọi thao tác tạo phiếu của một đơn |
+| 2 | **Idempotency** | `IdempotencyKey` tìm trước khi tạo; gọi lại **cùng khoá** ⇒ trả phiếu cũ, **không** ghi thêm. `PayloadHash` = SHA-256 của `(orderId + các dòng đã sắp xếp)` — sẵn cho bước kiểm *"dùng lại khoá với nội dung khác"* |
+| 3 | **Giữ chỗ trả** | `OrderLine.TangTra` khi tạo phiếu; **`GiamTra` khi phiếu bị từ chối/huỷ** ⇒ không khoá hàng vĩnh viễn |
+| 4 | **Trạng thái đơn** | Mọi chuyển dịch đi qua `Order.ChuyenKetThuc` (`SAL-003`): tạo ⇒ `ReturnRequested`; duyệt ⇒ `ReturnApproved`; từ chối ⇒ `ReturnRejected`; nhận **đủ** hàng ⇒ `Returned`. 🔑 **Không** gán `ReturnStatus` trực tiếp ở bất kỳ đâu |
+| 5 | **Nhật ký phiếu** | `OrderReturnHistory` ghi **mỗi** chuyển dịch (`Axis = Lifecycle/Goods`), `VersionAfter` = `phieu.Version`; **bỏ qua** khi `from = to` (không tạo dòng vô nghĩa) |
+| 6 | **API** `IOrderReturnAppService` | `GetListAsync` · `GetAsync` · `TaoPhieuAsync` · `DuyetAsync` · `TuChoiAsync` · `HuyAsync` · `NhanHangAsync` · `DongAsync` · `GhiNhanHoanTienAsync`. 🔐 Quyền: yêu cầu = `Orders.ReturnRequest`; duyệt/từ chối/hoàn tiền = `Orders.ReturnApprove`; nhận/đóng = `Orders.Manage` (tách **người yêu cầu ≠ người duyệt**) |
+| 7 | **Sinh mã phiếu** | `SinhSoPhieuTra.Sinh(at, seq)` → `RT-yyyyMMdd-N` (hàm thuần, test). ⚠️ Số thứ tự đếm theo **ngày tạo**; unique index `NULLS NOT DISTINCT` là hàng rào cuối khi hai phiếu cùng ngày tạo đồng thời |
+
+### 29.2 ✅ Bằng chứng đo được
+
+| Phép đo | Kết quả |
+|---|---|
+| Unit | **1585 → 1586** (+1: `SinhSoPhieuTra` — định dạng + không sinh `-0`) |
+| Integration | **87** (không đổi — phần B **không** đổi lược đồ) |
+| Migration / NND / quyền | **49 · 64 · 71** — **không đổi** (phần B dùng lược đồ + quyền đã có từ phần A) |
+| Cổng đầy đủ | **exit 0 · 356.4s · 15/15 bước** (E2E **140/140** — chưa có ca RMA vì API chưa có UI) |
+
+### 29.3 ⚠️ Vẫn còn (phần C — ghi rõ, **không** nói là đã xong)
+
+| # | Thiếu | Vì sao chưa làm |
+|---|---|---|
+| 1 | **Chứng từ kho `CustomerReturn` + ghi sổ** | Cần hợp đồng liên module (`ICustomerReturnGateway` — cùng khuôn `IStockReservationGateway`). 📌 Không dùng thẳng `IStockDocumentAppService` vì nó có `[Authorize(Inventory.Default)]` ⇒ Sales gọi trong tiến trình sẽ **403** (lỗi đã đo ở `SAL-005`) |
+| 2 | **ETO** (`OrderReturnRequestedEto`…) + outbox | Chưa có consumer nào; thêm sự kiện không có người nghe là tăng bề mặt mà **không** có giá trị |
+| 3 | **Xoá cạnh tắt `Open → Returned`** | `TraHangAsync` (đường cũ) còn dùng; phải chuyển nó sang quy trình RMA **trước** khi xoá |
+| 4 | **UI RMA** (trang đơn có nút “Yêu cầu trả”, màn hình duyệt/nhận) | Thuộc `S18` |
+| 5 | **Trả **một phần** rồi đóng, rồi trả tiếp** | Hiện phiếu đóng khi hàng về đủ; nhiều phiếu trên cùng đơn **được** phép (chưa chặn) — cần kiểm thêm nếu BA yêu cầu |
+| 6 | **Chưa có probe/E2E cho API RMA** | API chưa có UI nên chưa đi qua HTTP thật; hiện chỉ có test entity + hợp đồng (chính vì vậy **không** được nói là đã kiểm chứng end-to-end) |
+
+### 29.4 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.5 | 28/10/2026 | *(agent, session GĐ1 — `S14` phần B)* | **Service + API RMA**: tạo/duyệt/từ chối/huỷ/nhận/đóng/ghi nhận hoàn tiền; idempotency + `PayloadHash`; **giữ chỗ trả** có đối xứng; **máy trạng thái đơn** là nguồn sự thật duy nhất; nhật ký phiếu append-only; sinh mã phiếu thuần có test. **+1 unit**; **không** đổi migration/NND/quyền. Ghi rõ **5 việc còn lại** (§29.3) — phần C mới là chứng từ kho + ETO + UI |
+
+
+---
+
+## 30. TRẠNG THÁI TRIỂN KHAI — **`S14` PHẦN C: NHẬP LẠI KHO HÀNG HOÀN** (28/10/2026)
+
+> 🎯 **Phạm vi phần C:** hàng khách trả **về kho thật** qua **chứng từ `CustomerReturn` + ghi sổ**, và **chỉ** cho
+> dòng `Restock` — hàng hỏng/trả NCC **không** được nhập kho.
+
+### 30.1 Đã làm
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| 1 | **`ICustomerReturnGateway`** (`Inventory.Application.Contracts`) | Hợp đồng **liên module** *"nhập kho hàng khách trả"* — cùng khuôn `IStockReservationGateway`. 🔑 **Không** dùng `IStockDocumentAppService` vì nó có `[Authorize(Inventory.Default)]` cấp class ⇒ Sales gọi trong tiến trình sẽ **403** (lỗi đã đo ở `SAL-005`) |
+| 2 | **`CustomerReturnGateway`** (`Inventory.Application`) | Tạo `StockDocument(Type = CustomerReturn)` + dòng + **ghi sổ NGAY** bằng chính `StockPostingService` ⇒ **không** có đường ghi sổ thứ hai. 🔒 **Idempotent theo số chứng từ** (`TH-{ReturnNumber}`): gọi lại **không** nhập kho lần hai |
+| 3 | **Nối vào `NhanHangAsync`** (Sales) | Sau khi ghi nhận hàng về: các dòng `Disposition = Restock` & `ReceivedQuantity > 0` ⇒ gọi gateway ⇒ `OrderReturnLine.GanChungTuKho(id)` (guard: **chỉ** dòng `Restock`) |
+| 4 | **Bất biến mới** | `GanChungTuKho` **NÉM** nếu dòng chưa nhận hàng hoặc không phải `Restock` — 📌 ngăn *"đánh dấu đã nhập kho"* cho hàng hỏng (tồn kho ảo) |
+
+### 30.2 ✅ Bằng chứng
+
+| Phép đo | Kết quả |
+|---|---|
+| Unit | **1586 → 1587** (+1: `GanChungTuKho` chỉ cho `Restock`, cấm khi `Unset`/`Damaged`) |
+| Integration | **87** (không đổi — không đổi lược đồ; `CustomerReturn` + cột `LedgerEntryId` đã có) |
+| Migration / NND / quyền | **49 · 64 · 71** — **không đổi** |
+| Cổng đầy đủ | **exit 0 · 357.3s · 15/15 bước** (E2E **140/140**) |
+
+### 30.3 ⚠️ Còn lại
+
+| # | Thiếu | Ghi chú |
+|---|---|---|
+| 1 | **ETO** (`OrderReturnRequestedEto`…) + outbox | Chưa có consumer; thêm sự kiện không người nghe là tăng bề mặt vô ích |
+| 2 | **Xoá cạnh tắt `Open → Returned`** | `TraHangAsync` (đường cũ) còn dùng; phải chuyển nó sang quy trình RMA **trước** |
+| 3 | **UI RMA** | Thuộc `S18` |
+| 4 | **Probe/E2E cho API RMA** | Chưa có UI ⇒ chưa đi qua HTTP thật; hiện chỉ test entity + hợp đồng |
+| 5 | **Hoàn tiền tự động** | Cố ý **không** làm (`Q4` = chỉ ghi nhận) — `OrdRefunds` để dành cho lát cắt có duyệt |
+
+### 30.4 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.6 | 28/10/2026 | *(agent, session GĐ1 — `S14` phần C)* | **Nhập lại kho hàng hoàn**: gateway liên module + chứng từ `CustomerReturn` + ghi sổ ngay + idempotent theo số chứng từ; chỉ dòng `Restock`; gắn `LedgerEntryId` có guard. **+1 unit**; không đổi migration/NND/quyền. Ghi rõ 5 việc còn lại (§30.3) |
+
+
+---
+
+## 31. TRẠNG THÁI — **`S14` PHẦN D: XOÁ CẠNH TẮT `Open → Returned`** (28/10/2026)
+
+> 🎯 **Mục tiêu:** đóng **nợ `sal-003` §16** — *"khi `SAL-006` vào, đường `Open → Returned` phải đi qua
+> `ReturnRequested → ReturnApproved → Returned`"*.
+
+### 31.1 Đã làm
+
+| # | Việc | Chi tiết |
+|---|---|---|
+| 1 | **Xoá cạnh** `(Closure, Open → Returned)` | `OrderStateMachine` không còn cho phép *"đã trả"* mà **không có** phiếu trả/duyệt |
+| 2 | **Migrate `TraHangAsync`** (đường cũ) | Đi **đủ ba cạnh** trong cùng request: `ReturnRequested → ReturnApproved → Returned`. 🔑 Nhờ vậy `OrdStatusHistory` có **đủ** dấu vết cho **mọi** lần trả, kể cả đường cũ — không có ngoại lệ *"ghi tắt"* |
+| 3 | **Test hai chiều** | `OrderStateMachineTests`: (a) gọi thẳng `Open → Returned` ⇒ **NÉM** `Order:0002`; (b) đi đủ ba cạnh ⇒ `ClosureVersion = 3` (không còn `= 1`) |
+
+### 31.2 ✅ Bằng chứng
+
+| Phép đo | Kết quả |
+|---|---|
+| Unit | **1587** (số ca không đổi — sửa ca cũ thành **chặt hơn**: thêm khẳng định cạnh tắt bị chặn) |
+| Migration / NND / quyền | **49 · 64 · 71** — **không đổi** |
+| Cổng đầy đủ | **exit 0 · 347.4s · 15/15 bước** (E2E **145/145**) |
+
+### 31.3 ⚠️ Còn lại (S14)
+
+1. **ETO** (`OrderReturnRequestedEto`…) + outbox — **chưa** có consumer.
+2. **UI RMA** (trang đơn có nút yêu cầu trả; màn hình duyệt/nhận) — thuộc `S18`.
+3. **Probe/E2E cho API RMA** — API chưa có UI nên chưa đi qua HTTP thật.
+4. **Trạng thái `PartiallyReturned`** cho đơn trả một phần — nợ đã ghi ở `SAL-003`/§16, cần BA chốt hợp đồng API.
+
+### 31.4 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.7 | 28/10/2026 | *(agent, session GĐ1 — `S14` phần D)* | **Xoá cạnh tắt `Open → Returned`** + migrate `TraHangAsync` đi đủ ba cạnh; test khẳng định **hai chiều** (gọi tắt bị chặn · đi đủ ⇒ `ClosureVersion = 3`). Không đổi migration/NND/quyền |
+
+---
+
+## 32. TRẠNG THÁI — **`S14` PHẦN E: UI RMA + ĐO HTTP THẬT** (29/10/2026)
+
+> 🎯 **Phạm vi phần E:** biến API của phần B/C thành **đường chạy có người bấm** — màn hình `/TraHang`,
+> lối vào từ trang đơn, mục menu — rồi **đo bằng HTTP + DB thật**, không bằng lời khai.
+>
+> 🔒 **Không đổi:** lược đồ · migration (**49**) · NND (**64**) · quyền (**71**) · route/DTO của API RMA.
+> 🚫 **Không** thêm trạng thái `PartiallyReturned` (cần BA chốt hợp đồng — xem §32.5).
+
+### 32.1 Đã làm
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| 1 | **`TraHangController`** (`src/eCommerce.Web/Controllers/`) | `GET /TraHang?donId=` qua `IOrderReturnAppService.GetListAsync`; 5 hành động `POST` (`Duyet`, `TuChoi`, `NhanHang`, `Dong`, `GhiNhanHoanTien`) đều có `[ValidateAntiForgeryToken]`. 🚨 **Bắt `BusinessException`** và hiện **đúng mã** (`eCommerce:Sales:0010/0011`, `eCommerce:Lock:0001`) — **không** để thành `500`, và **không** có nhánh bắt-rồi-ghi-tiếp (không nuốt guard) |
+| 2 | **`Views/TraHang/Index.cshtml`** | Danh sách: mã phiếu · **số đơn** (đọc qua `IDonHangAppService`, không phải GUID) · kênh · `Status` · `GoodsStatus` · tiền đã hoàn · số dòng. ➕ khối "Xử lý phiếu" theo **đúng trạng thái**: `Requested` ⇒ Duyệt/Từ chối (lý do **bắt buộc**); `Approved` ⇒ **Nhận hàng** (mỗi dòng: số nhận + `Restock\|Damaged\|ReturnToSupplier`); `Received` ⇒ Đóng; còn mở ⇒ Ghi nhận hoàn tiền. 🔒 Nút ẩn theo quyền (`IAuthorizationService`) — **không** phải lớp bảo vệ, app service vẫn cưỡng chế |
+| 3 | **Lối vào từ trang đơn** | `Views/DonHang/ChiTiet.cshtml`: link "Trả hàng" ⇒ `@Url.Action("Index", "TraHang", new { donId = Model.Id })` (**không** viết cứng `href` — `MenuDieuHuongTests` cấm URL menu viết cứng trong view) |
+| 4 | **Mục menu** "Phiếu trả hàng" trong nhóm **Vận hành** | `QuyenCanCo = eCommerceConsts.Permissions.Orders.Default` (quyền **đọc** đã có từ `SAL-003`) — **không** thêm quyền |
+| 5 | **Neo ASCII + lưới test** | `[TRAHANG-MAN-HINH]` nằm **ngoài** chú thích Razor; thêm vào `ViewAnchorTests.BangNeo` ⇒ thiếu neo là test **ĐỎ** |
+| 6 | **`S14` trong `tools/kiem-e2e.ps1`** | **14 ca** `S14-E1…E14` (xem §32.2), dựng dữ liệu probe **bằng SQL** (`e0000000-…-f9/fa/fd/fe`, `ReturnNumber = K97E2E-RT-001`) và dọn **đầy đủ** trong `finally` (dòng trả → phiếu trả → dòng đơn → đơn, ➕ nhật ký phiếu & outbox/inbox của đơn probe) |
+
+📌 **Vì sao UI là điều kiện để `S14` có nghĩa:** phần B/C đã có service + chứng từ kho, nhưng **chưa có màn hình nào gọi** ⇒
+không ai duyệt/nhận/đóng phiếu ⇒ *"trả hàng"* trên sản phẩm vẫn chỉ là **một nút POST cũ**. Cùng loại nợ đã gặp ở
+`INV-003` §16.6, `REC-001` §18 và `S13` — **đường ghi đúng mà không có lối vào thì không giải quyết được vấn đề
+mà nó sinh ra để giải quyết.**
+
+### 32.2 ✅ Bằng chứng đo được (HTTP thật + DB thật, không tin HTML)
+
+Chạy `pwsh -File tools\kiem-e2e.ps1` (admin `$jar` + token thật từ chính trang):
+
+| Ca | Đo cái gì | Kết quả |
+|---|---|---|
+| `S14-E1` | `GET /TraHang` (admin) | **`200`** + neo `[TRAHANG-MAN-HINH]` |
+| `S14-E2` | Danh sách đọc **DB thật** (mã phiếu + **số đơn** qua app service) | có `K97E2E-RT-001` · `K97E2E-RT-DON` |
+| `S14-E3` | **Hai trục hiện riêng** | `Status = Requested` · hàng `Awaiting` |
+| `S14-E4` | **Chiều ngược**: `Requested` **chưa** có form Nhận hàng (chỉ `lyDo`/`soTien`) | đúng — không mời bấm sai |
+| `S14-E5` | Token chống giả mạo đọc từ **chính trang** | có |
+| `S14-E6` | **`POST /TraHang/Duyet`** ⇒ `200` sau redirect **và DB** | `OrdReturns.Status = 1` · `Version = 1` |
+| `S14-E7` | **Máy trạng thái đơn** chạy thật (không gán tay) | `OrdOrders.ReturnStatus = 2` · `ClosureVersion = 2` |
+| `S14-E8` | **Duyệt lần hai** ⇒ hiện **đúng mã** thay vì `500` | HTML có `eCommerce:Sales:0010` |
+| `S14-E9` | 🚨 Guard **không bị nuốt**: lần hai **không ghi gì** | DB vẫn `1\|1` |
+| `S14-E10` | Sau duyệt: form Nhận hàng hiện **3 cách xử lý** | `Restock` · `Damaged` · `ReturnToSupplier` |
+| `S14-E11` | **`POST /TraHang/NhanHang`** (1/2, `Damaged`) ⇒ DB dòng trả | `ReceivedQuantity = 1` · `Disposition = 2` |
+| `S14-E12` | 🚨 Hàng **chưa về đủ** ⇒ phiếu `Approved\|PartiallyReceived`, đơn **vẫn** `ReturnApproved` | `1\|1` · đơn `2` |
+| `S14-E13` | Lối vào từ **trang đơn** | HTML có `/TraHang?donId=<guid>` (sinh từ `Url.Action`) |
+| `S14-E14` | **Mục menu** trên trang chủ | khối menu có `/TraHang` |
+
+| Phép đo | Kết quả |
+|---|---|
+| E2E (HTML thật) | **145 → 159** (+14 ca `S14-E*`) |
+| Unit | **1612** (không đổi — `ViewAnchorTests` thêm **một dòng** vào bảng neo, không thêm ca) |
+| Integration | **87** (không đổi — không chạm lược đồ) |
+| Bất biến DB | **25/25** · **NND 64** · **71** quyền · **99** chỗ quét — **không đổi** |
+| Migration | **49** (không đổi) |
+| Cổng đầy đủ | **exit 0 · 15/15 bước · 360.1s** |
+| Dọn dẹp probe | `OrdReturns/OrdReturnLines/OrdReturnHistory/OrdOrders` của probe = **0** · outbox/inbox của đơn probe = **0/0** |
+
+🔑 **Vì sao phải đo DB (không tin `200`):** một controller **nuốt** `BusinessException` vẫn trả `200` + thông báo;
+một controller **bỏ qua** app service vẫn trả `200`. Chỉ cột `Status`/`Version` trong `OrdReturns` và
+`ReturnStatus`/`ClosureVersion` trong `OrdOrders` mới trả lời *"lệnh bấm có tác dụng thật không"*.
+
+### 32.3 Quyết định **ETO**: **KHÔNG thêm** (`OrderReturnRequestedEto` …)
+
+| Câu hỏi | Trả lời đo được |
+|---|---|
+| Có ai **nghe** sự kiện của phiếu trả chưa? | **Không.** `grep` toàn repo: **0** khai báo `OrderReturn*Eto`, **0** handler cho phiếu trả. Consumer **duy nhất** liên quan trong `Sales` là `OrderStatusMetricHandler` — nó nghe `OrderStatusChangedEto` |
+| Vậy thay đổi trạng thái RMA có **được phát** đi không? | **Có, rồi.** Mọi chuyển dịch của phiếu đều đi qua `Order.ChuyenKetThuc` ⇒ `OrderStatusChangedEto` đã được phát **trong cùng transaction** (qua outbox), kèm `Axis = Closure`, `from/to` và `OrderId`. 📌 Thêm ETO riêng cho phiếu trả là **bản sao thứ hai** của cùng sự thật |
+| Thêm bây giờ thì được gì? | **Không gì.** Đúng lập luận đã ghi ở §29.3 #2/§30.3 #1: *sự kiện không có người nghe là tăng bề mặt vô ích* — nó còn **đánh lừa** người đọc tài liệu rằng đã có tích hợp |
+| Khi nào **phải** thêm? | Khi có **consumer thật** đầu tiên (email/thông báo khách, WMS, kế toán, `PaymentHub` hoàn tiền tự động). Lúc đó thêm ETO + outbox + inbox idempotent **trong cùng lát cắt với consumer** — không thêm trước |
+
+### 32.4 🐞 Hai phát hiện khi làm phần E — **đã sửa ở §33** (`S14F`, 29/10/2026)
+
+> ✅ **TRẠNG THÁI: ĐÃ ĐÓNG.** Cả hai phát hiện dưới đây (ghi lúc làm phần E, **chưa** sửa khi đó) đã được
+> sửa trong lát cắt `S14F` — xem **§33** (§33.1 cho #1, §33.2 cho #2, §33.3 cho test hai chiều, §33.5 cho
+> bảng đối chiếu). Cột cuối giữ lại **lý do lọt** của lát cắt E để phiên sau hiểu vì sao 14 ca `S14-E*` không bắt được.
+
+| # | Phát hiện | Hệ quả | Vì sao lọt ở lát cắt E (chưa sửa khi đó) |
+|---|---|---|---|
+| 1 | `OrderReturnService.NhanHangAsync` tính `GoodsStatus` **chỉ trên các dòng có trong lần gọi** (`ketQua.All(...)`), không so với **toàn bộ** dòng của phiếu | Gọi **lẻ từng dòng** (đủ số cho dòng đó) có thể kết luận `Received` ⇒ phiếu `Received` ⇒ **đơn sang `Returned`** trong khi dòng khác **chưa về**. 📌 UI đã **gửi cả phiếu trong một lần** để không chạm lỗi này, nhưng **API** vẫn mở | UI gửi **cả phiếu** + 14 ca E2E chỉ đi đường đó ⇒ lỗi không lộ; không test nào gọi tập con. Sửa phải đổi hợp đồng entity (`daNhanDuTatCaDong`) + test hai chiều ⇒ tách lát cắt riêng, **không** gộp vào UI |
+| 2 | `OrderReturnLine.GhiNhanHang` cho phép `ReceivedQuantity = 0` **kèm** `Disposition` khác `Unset`, nhưng DB có `CHECK CK_OrdReturnLines_Disposition_ChiSauKhiNhan ("Disposition" = 0 OR "ReceivedQuantity" > 0)` | Gọi API với `0` + `Restock` ⇒ entity **nhận**, DB **từ chối** ⇒ `DbUpdateException` → **`500`** (không phải mã nghiệp vụ) | UI đã **chặn ở biên** (`min=1` + pre-check) ⇒ không lộ ra qua màn hình; sửa gốc là guard `Sales:0010` ở domain — quyết định nghiệp vụ, không phải sửa UI |
+
+📌 **Bài học giữ nguyên giá trị:** *"UI chặn"* **không** phải *"hệ thống chặn"* — API vẫn mở, và cả hai lỗi chỉ
+lộ khi đi **thẳng API**. Đó là lý do §33 sửa ở **tầng domain** (guard + cờ toàn phiếu) chứ không thêm kiểm ở controller.
+
+### 32.5 ⏳ Còn nợ
+
+| # | Thiếu | Ghi chú |
+|---|---|---|
+| ~~1~~ | ~~**Trạng thái `PartiallyReturned`** ở cấp đơn~~ ✅ **ĐÃ ĐÓNG 29/10/2026 — `S14H`, xem §35** | BA **đã chốt** (29/10/2026): thêm `ReturnStatus.PartiallyReturned = 6` (**append ở cuối dải**), đúng **2 cạnh** `ReturnApproved → PartiallyReturned → Returned`; **không** thêm `OrderStatus` mới. ✅ Đo hai chiều ở **§35.5/§35.6** (`S14-E12` đổi kỳ vọng + `S14-E21/E22` mới) |
+| 2 | **ETO phiếu trả** | Cố ý **không** làm (§32.3) — thêm khi có consumer thật |
+| 3 | ~~**Nút HUỶ phiếu trên UI**~~ ✅ **ĐÃ ĐÓNG 29/10/2026 — `S14G`, xem §34** | `HuyAsync` **đã có** trong API/service nhưng màn hình phần E chỉ có **5 hành động theo phạm vi** (duyệt/từ chối/nhận/đóng/hoàn tiền) ⇒ huỷ phiếu **không có lối vào**. ✅ Nay có `POST /TraHang/Huy` + nút **Huỷ phiếu** (ô lý do **bắt buộc**) — **không** đổi API/DTO/quyền |
+| 4 | **Hoàn tiền TỰ ĐỘNG** | Vẫn **`Q4` = chỉ ghi nhận** (§28.2); đường gọi cổng là `PAY-001` + lát cắt `S14b` |
+| ~~5~~ | ~~**Hai phát hiện §32.4**~~ ✅ **đã sửa 29/10/2026** | `S14F` — xem **§33**: cờ `daNhanDuTatCaDong` tính trên toàn phiếu + guard `Sales:0010` cho `0` + disposition. **Không** đổi schema/`CHECK` |
+| 6 | **Replay DLQ** | **Không liên quan** `S14`: replay là nợ của `Messaging`/`XC-005` (`messaging_dlq_replayed_total`), không có luồng RMA nào cần replay riêng |
+
+### 32.6 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.8 | 29/10/2026 | *(agent, session GĐ1 — `S14` phần E)* | **UI RMA**: `/TraHang` (danh sách + 5 hành động theo trạng thái), link từ trang đơn (`Url.Action`), mục menu nhóm Vận hành (`Orders` đọc), neo `[TRAHANG-MAN-HINH]` + `ViewAnchorTests`. **+14 ca E2E** (`S14-E1…E14`) đo HTTP + **DB**: duyệt ⇒ `OrdReturns.Status = 1`/`Version = 1` + đơn `ReturnStatus = 2`/`ClosureVersion = 2`; duyệt lần hai ⇒ `eCommerce:Sales:0010` + DB **không đổi**; nhận hàng 1/2 `Damaged` ⇒ dòng trả `1\|2`, đơn **vẫn** `ReturnApproved`. **ETO: KHÔNG thêm** (không có consumer — chuyển trạng thái RMA đã phát qua `OrderStatusChangedEto`). **0** schema/migration/quyền. Ghi **2 phát hiện** + **5 nợ** (§32.4/§32.5) |
+
+---
+
+## 33. `S14F` — SỬA HAI LỖI NHẬN HÀNG HOÀN (29/10/2026) — *đóng §32.4*
+
+> 🎯 **Phạm vi:** đúng **hai** phát hiện đã ghi ở §32.4. **Không** thêm tính năng, **không** đổi lược đồ,
+> migration (**49**), NND (**64**), quyền (**71**), route/DTO, và **không** nới `CHECK` DB.
+> 🚫 **Không** sửa test để "cho xanh": ca cũ nào đi qua hành vi nay bị chặn đều được **sửa dữ liệu cho đúng
+> hợp đồng mới** (dòng chưa về dùng `0` + `Unset`), và hành vi mới có **ca hai chiều** riêng (§33.3).
+
+### 33.1 Lỗi 1 — `GoodsStatus` chỉ tính trên **tập con** của lần gọi
+
+**Hiện tượng (đọc mã, đúng như §32.4 #1):** `OrderReturn.NhanHang` kết luận
+`GoodsStatus = ketQua.All(x => x.SoLuongNhan >= x.Dong.Quantity)`. `ketQua` là **các dòng có trong lần gọi**,
+không phải toàn phiếu. ⇒ Gọi API **lẻ từng dòng** (dòng đó đủ số) ⇒ `Received` ⇒ `Status = Received`
+⇒ tầng dịch vụ cho **đơn sang `Returned`** trong khi **dòng khác chưa về**.
+
+**Vì sao lọt (đo bằng đọc mã, không suy đoán):**
+
+| Lý do | Bằng chứng |
+|---|---|
+| UI luôn gửi **cả phiếu trong một lần** | `Views/TraHang/Index.cshtml` render form cho **mọi** dòng; 14 ca `S14-E*` chỉ đi đường đó ⇒ `ketQua` = toàn phiếu ⇒ lỗi **không lộ** |
+| Không có test nào gọi **tập con** | `OrderReturnTests` trước `S14F` truyền **mọi** dòng của phiếu trong **một** lần gọi |
+| Kết luận nằm **trong entity** nên trông như bất biến | `GoodsStatus` được suy ngay tại chỗ cập nhật dòng ⇒ không ai thấy nó phụ thuộc **tham số đầu vào** |
+
+**Cách sửa — đẩy "sự thật toàn phiếu" về phía có đủ dữ liệu, giữ bất biến ở entity:**
+
+1. **Đổi chữ ký entity** (`OrderReturn.cs`):
+
+   ```csharp
+   public void NhanHang(
+       string actorType, Guid? actorId,
+       IReadOnlyCollection<(OrderReturnLine Dong, int SoLuongNhan, ReturnDisposition XuLy)> ketQua,
+       bool daNhanDuTatCaDong,          // 🆕 người gọi PHẢI tính trên TOÀN BỘ dòng của phiếu
+       DateTime atUtc)
+   ```
+
+2. **Entity KHÔNG tự suy từ `ketQua` nữa:**
+   - `daNhanDuTatCaDong = true` ⇒ `GoodsStatus = Received` + `Status = Received` + `ReceivedAtUtc = atUtc`.
+   - `false` ⇒ `PartiallyReceived` khi lần gọi có dòng nhận `> 0` **hoặc** phiếu đã `PartiallyReceived`;
+     còn lại **giữ `Awaiting`**. 📌 Giữ **đơn điệu**: một lần gọi toàn số `0` (no-op hợp lệ) **không** kéo
+     phiếu từ `PartiallyReceived` về `Awaiting`.
+   - `Status`/`ReceivedAtUtc` **chỉ** đổi khi `daNhanDuTatCaDong` — nên đơn chỉ có thể sang `Returned` khi
+     phiếu thật sự `Received`.
+
+3. **`OrderReturnService.NhanHangAsync` tính cờ trên toàn phiếu:**
+
+   ```csharp
+   var dong = await _dongTra.GetListAsync(x => x.ReturnId == id);   // TOÀN BỘ dòng
+   // số nhận hiệu lực sau lần gọi = giá trị GhiNhanHang sẽ để lại trên dòng
+   var soNhanSau = dong.ToDictionary(x => x.Id, x => x.ReceivedQuantity);
+   foreach (var (d, soLuong, _) in capNhat)
+       if (soLuong > 0) soNhanSau[d.Id] = soLuong;      // 0 + Unset = no-op ⇒ giữ số đã có
+   var daNhanDuTatCaDong = dong.Count > 0 && dong.All(x => soNhanSau[x.Id] >= x.Quantity);
+   phieu.NhanHang(..., capNhat, daNhanDuTatCaDong, at);
+   ```
+
+   🔒 **Giữ nguyên:** chỉ `Status == Approved` mới nhận; chỉ chuyển đơn sang `Returned` khi phiếu `Received`;
+   `OrdReturnHistory` ghi `Goods`/`Lifecycle` khi trạng thái **đổi** (không ghi dòng `from = to`).
+
+### 33.2 Lỗi 2 — `ReceivedQuantity = 0` + `Disposition ≠ Unset` ⇒ `CHECK` DB ném ⇒ API `500`
+
+**Hiện tượng (đọc mã + `CHECK`):** `OrderReturnLine.GhiNhanHang` chỉ chặn `xuLy == Unset`; nó **nhận**
+`(0, Restock)`, gán `ReceivedQuantity = 0`, `Disposition = Restock`. DB có
+`CK_OrdReturnLines_Disposition_ChiSauKhiNhan ("Disposition" = 0 OR "ReceivedQuantity" > 0)` ⇒
+`DbUpdateException` ⇒ API trả **`500`** thay vì mã nghiệp vụ `eCommerce:Sales:0010`.
+
+**Vì sao lọt:** UI đã chặn ở biên (`min=1` + pre-check) nên **không lộ qua màn hình**; 14 ca `S14-E*` đều gửi
+số nhận `≥ 1`; test entity cũ chỉ kiểm `Unset` với số `> 0`. Lỗi chỉ xuất hiện khi gọi **thẳng API** với `0` +
+disposition — đúng đường mà §32.4 #2 đã chỉ ra.
+
+**Cách sửa — guard ở tầng domain, TRƯỚC khi chạm DB:**
+
+| Đầu vào | Hành vi mới |
+|---|---|
+| `soLuongNhan == 0` + `xuLy != Unset` | **NÉM** `BusinessException(Sales:0010)` với `lyDo = "Nhận 0 thì KHÔNG được chọn cách xử lý (bỏ trống = không nhận dòng này)."` |
+| `soLuongNhan == 0` + `xuLy == Unset` | **No-op hợp lệ**: không ném, **giữ nguyên** `ReceivedQuantity`/`Disposition` hiện tại (không xoá số đã nhận ở lần trước) |
+| `soLuongNhan > 0` + `xuLy == Unset` | Vẫn **NÉM** như cũ ("Đã nhận hàng ⇒ phải chọn cách xử lý") |
+| ngoài `[0, Quantity]` | Vẫn **NÉM** như cũ |
+
+🔒 **Không** nới `CHECK` DB: ràng buộc `CK_OrdReturnLines_Disposition_ChiSauKhiNhan` **giữ nguyên** (migration
+vẫn **49**) — nó là hàng rào cuối, và từ nay domain **không** tạo ra dữ liệu vi phạm nó nữa.
+
+### 33.3 Test hai chiều
+
+**Ca mới** (`OrderReturnTests`, 4 ca):
+
+| Ca | Chiều | Khẳng định |
+|---|---|---|
+| `NhanHang__tung_dong__chi_Received_khi_TOAN_BO_dong_da_ve` | ✅ dương tính | phiếu 2 dòng × 2: nhận dòng 1 (2) với `daNhanDuTatCaDong = false` ⇒ `PartiallyReceived` · `Approved` · `ReceivedAtUtc = null`; nhận dòng 2 với `true` ⇒ `Received` · `Status = Received` · có mốc |
+| `NhanHang__KHONG_duoc_ket_luan_Received_khi_chi_nhan_lai_dong_da_du` | 🚫 âm tính (đúng lỗi cũ) | sau lần 1, lần 2 **chỉ gửi dòng đã đủ 2/2** với `false` ⇒ **vẫn** `PartiallyReceived`/`Approved`, **không** `Received` |
+| `GhiNhanHang__nhan_0__kem_disposition_NEM_0010__truoc_khi_cham_DB` | 🚫 âm tính | `0` + `Restock`/`Damaged`/`ReturnToSupplier` ⇒ **NÉM** `Sales:0010`; dòng **không** đổi (`0`/`Unset`) |
+| `GhiNhanHang__nhan_0_va_Unset__no_op_hop_le__giu_nguyen_so_da_nhan` | ✅ dương tính | `0` + `Unset` không ném; sau khi đã nhận `1/Restock` thì no-op **không** xoá `1`/`Restock` |
+
+**Ca cũ:** giữ nguyên hành vi, cập nhật chữ ký `NhanHang` (thêm cờ) — riêng ca "nhận một phần" đổi dòng
+chưa về từ `0 + Damaged` sang `0 + Unset` (đúng hợp đồng mới: `0` + disposition **phải** ném). Đây **không**
+phải nới lỏng: chính ca âm tính mới khẳng định `0 + Damaged` bị chặn.
+
+### 33.4 ✅ Bằng chứng đo được
+
+| Phép đo | Kết quả |
+|---|---|
+| Unit | **1612 → 1616** (+4 ca `S14F`) · riêng `OrderReturnTests`: **20/20** |
+| Integration | **87** (không đổi — không chạm lược đồ) |
+| E2E (HTML thật) | **159/159** (không đổi — `S14-E12` vẫn `Approved\|PartiallyReceived`, nay đúng vì cờ tính trên toàn phiếu) |
+| Migration / NND / quyền | **49 · 64 · 71** — **không đổi**; `CHECK` **không** bị nới |
+| Cổng đầy đủ | **exit 0 · 483.6s · 15/15 bước** (đo trên cây có 2 lỗi đã sửa; hai cổng tài liệu chạy lại sau khi điền số: mermaid **0 lỗi**, link **0 chết**) |
+
+### 33.5 ✅ §32.4 đã đóng
+
+| # | Phát hiện §32.4 | Trạng thái |
+|---|---|---|
+| 1 | `GoodsStatus` tính trên tập con của lần gọi | ✅ **ĐÃ SỬA** — cờ `daNhanDuTatCaDong` tính trên **toàn bộ** dòng; entity không suy từ `ketQua` (§33.1) |
+| 2 | `0` + disposition ⇒ `CHECK` DB ⇒ `500` | ✅ **ĐÃ SỬA** — guard `Sales:0010` **trước** DB; `0` + `Unset` là no-op (§33.2) |
+
+📌 **Không** còn phát hiện nào trong §32.4 ở trạng thái "chưa sửa". Nợ **khác** của `S14` vẫn nguyên và
+**không** bị lát cắt này đóng: `PartiallyReturned` cấp đơn (`§32.5 #1`, cần BA) · ETO (`§32.5 #2`, cố ý không
+thêm) · nút huỷ phiếu trên UI (`§32.5 #3` — ✅ **đóng ở §34**, `S14G`, 29/10/2026) · hoàn tiền tự động (`§32.5 #4`).
+
+### 33.6 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v0.9 | 29/10/2026 | *(agent, session GĐ1 — `S14F`)* | **Sửa 2 lỗi nhận hàng** đã ghi ở §32.4: (1) `NhanHang` nhận cờ `daNhanDuTatCaDong` do service tính trên **toàn bộ** dòng của phiếu — `Status`/`ReceivedAtUtc` chỉ đổi khi đủ, đơn chỉ sang `Returned` khi phiếu `Received`; (2) `GhiNhanHang` **NÉM** `Sales:0010` khi `0` + disposition (trước DB), `0` + `Unset` là no-op. **+4 unit** (hai chiều); **0** schema/migration/NND/quyền; `CHECK` **không** nới. §32.4 **đã đóng** (§33.5) |
+
+---
+
+## 34. `S14G` — NÚT HUỶ PHIẾU TRẢ TRÊN UI (29/10/2026) — *đóng §32.5 #3*
+
+> 🎯 **Phạm vi — ĐÚNG MỘT VIỆC:** thêm **lối vào UI** cho hành động **HUỶ phiếu trả** (`HuyAsync` đã có trong
+> hợp đồng từ `S14B`, §29.1 #6) và **đo hai chiều bằng HTTP + DB**.
+>
+> 🔒 **Không đổi:** lược đồ · migration (**50**) · NND (**64**) · quyền (**72**) · route/DTO của API RMA ·
+> `HuyAsync`/`OrderReturn.Huy`. 🚫 **Không** thêm `PartiallyReturned` (vẫn là nợ cần BA — §32.5 #1).
+
+### 34.1 Đã làm
+
+| # | Thành phần | Nội dung |
+|---|---|---|
+| 1 | **`TraHangController.Huy`** (`src/eCommerce.Web/Controllers/`) | `POST /TraHang/Huy` với `[ValidateAntiForgeryToken]` ⇒ `IOrderReturnAppService.HuyAsync(id, LyDoTraHangInput)`. 🚨 Bắt `BusinessException` và hiện **đúng mã** (`eCommerce:Sales:0010` khi sai guard, `eCommerce:Lock:0001` khi quá hạn giành khoá) — **không** để thành `500`, và **không** có nhánh bắt-rồi-ghi-tiếp. 📌 Lý do kiểm **cùng ngưỡng** với DTO (`3…512`) ở biên UI để người dùng nhận câu giải thích, **không** nhận `500` từ validation interceptor |
+| 2 | **`Views/TraHang/Index.cshtml`** | Nút **Huỷ phiếu** + ô **lý do (bắt buộc, `minlength=3`)**. 🔒 Điều kiện hiện nút **chép đúng guard của entity**: `Status ∈ {Requested, Approved}` **và** `GoodsStatus ∉ {Received, PartiallyReceived}` — phiếu đã nhận hàng **không** huỷ được (phải nhận đủ rồi đóng). 📌 Nút ẩn theo `IAuthorizationService` với **đúng quyền của `HuyAsync`** (`Orders.ReturnRequest` — *rút yêu cầu của mình*, không phải quyền duyệt); **app service vẫn là nơi cưỡng chế**, ẩn nút không phải bảo vệ |
+| 3 | **Neo & lưới test** | `[TRAHANG-MAN-HINH]` **giữ nguyên** (không đổi anchor); view vẫn dùng `asp-action` (không `href` viết cứng — `MenuDieuHuongTests` cấm) |
+| 4 | **`S14` trong `tools/kiem-e2e.ps1`** | **+6 ca** `S14-E15…E20` + **bộ dữ liệu probe riêng** (`b0…b3`, `ReturnNumber = K97E2E-RT-HUY-001`) để **không** đụng 14 ca cũ (phiếu `fd` phải giữ `Approved|PartiallyReceived` cho `S14-E12`). 🔑 Gieo **đúng trạng thái sau khi tạo phiếu**: dòng đơn `ReturnedQuantity = 2` (**đã giữ chỗ** — `TaoPhieuAsync` gọi `OrderLine.TangTra`) ⇒ phép đo `GiamTra` mới có nghĩa. 🔒 Dọn trong `finally`: history → dòng trả → phiếu → dòng đơn → đơn, **đếm lại = 0** |
+
+### 34.2 ✅ Bằng chứng đo được — HAI CHIỀU (HTTP thật + DB thật)
+
+| Ca | Chiều | Đo cái gì | Kết quả |
+|---|---|---|---|
+| `S14-E15` | ✅ dương tính | Phiếu `Requested` ⇒ HTML có **nút Huỷ** + ô **lý do bắt buộc**; DB dòng đơn **đang giữ chỗ** | `HTTP 200` · `ReturnedQuantity = 2` |
+| `S14-E16` | 🚫 âm tính (guard UI) | Phiếu **đã nhận hàng** (`Approved\|PartiallyReceived`) ⇒ **KHÔNG** có nút Huỷ | nút vắng mặt — *không mời bấm vào chỗ chắc chắn lỗi* |
+| `S14-E17` | ✅ dương tính | `POST /TraHang/Huy` (token thật + lý do) ⇒ **DB** `OrdReturns.Status` | `3` (**Cancelled**) · `Version = 1` |
+| `S14-E18` | ✅ dương tính (đối xứng `GiamTra`) | Cùng lệnh ⇒ **DB dòng đơn** `OrdOrderLines.ReturnedQuantity` | `2 → 0` (**trả lại chỗ đã giữ**) |
+| `S14-E19` | 🚫 âm tính | Huỷ **lần hai** ⇒ trang hiện **đúng mã**, không `500` | HTML có `eCommerce:Sales:0010` · `HTTP 200` |
+| `S14-E20` | 🚫 âm tính | 🚨 Guard **không bị nuốt**: sau lần hai **không ghi gì** | `Status = 3` · `ReturnedQuantity = 0` (vẫn vậy) |
+
+### 34.3 🔑 Vì sao phải đo **cột dòng đơn**, không chỉ cột phiếu
+
+`HuyAsync` không chỉ đổi trạng thái: nó gọi `OrderReturnService.TraLaiDaGiuAsync` ⇒ `OrderLine.GiamTra(số lượng)`
+— **đối xứng** với `TangTra` lúc tạo phiếu (§29.1 #3). 🔒 Nếu controller (hoặc một bản sửa sau này) chỉ
+`UPDATE OrdReturns SET Status = 3` mà **bỏ qua** đường dịch vụ thì:
+
+- cột `Status` **vẫn đúng** ⇒ mọi ca chỉ đọc phiếu đều **XANH**;
+- nhưng `ReturnedQuantity` **vẫn = 2** ⇒ số hàng đó bị **khoá vĩnh viễn** khỏi mọi phiếu trả sau (trả vượt bị
+  chặn bởi `ADR-11` dù thực tế **chưa** trả) — một lỗi **im lặng** đúng loại đã gặp ở `SAL-005`/`S13`.
+
+📌 Vì vậy `S14-E18` khẳng định **cột dòng đơn** = `0`, và `S14-E20` khẳng định nó **không bị trừ hai lần** (nếu
+`GiamTra` chạy lại, `ReturnedQuantity` sẽ **âm** — `CHECK` của DB cũng chặn, nhưng ta không để chạm tới `500`).
+
+### 34.4 ✅ Đo cổng cuối (cây đã sửa)
+
+| Phép đo | Kết quả | Ghi chú |
+|---|---|---|
+| E2E (HTML thật) | **159 → 165** (+6 ca `S14-E15…E20`) | `tools/kiem-e2e.ps1` |
+| Unit | **1627** (không đổi) | view/controller **không** thêm unit — hành vi đo bằng HTTP như phần E |
+| Integration | **90** (không đổi) | không chạm lược đồ |
+| Migration / NND / quyền | **50 · 64 · 72** — **không đổi** | không thêm bảng/cột/quyền |
+| Cổng đầy đủ | **exit 0 · 397.2s · 15/15 bước** | `pwsh -File tools\kiem-tat-ca.ps1 -DayDu` |
+| Hai cổng tài liệu | mermaid **0 lỗi** · link **0 chết** | chạy lại sau khi điền số |
+| Dọn dẹp probe | `OrdReturns/OrdReturnLines/OrdReturnHistory/OrdOrders` của **cả hai** bộ GUID (`f9…fe` và `b0…b3`) = **0** | in ra ở `DON DEP (S14)` + `DON DEP (S14G)` |
+
+### 34.5 Quyết định & giới hạn (ghi rõ, **không** nói là đã xong)
+
+| # | Nội dung | Trạng thái |
+|---|---|---|
+| 1 | **Quyền của nút huỷ** | `Orders.ReturnRequest` — **không** thêm quyền mới, **không** dùng nhầm `ReturnApprove` (huỷ là *rút yêu cầu*, không phải *quyết định thay khách*). 📌 Hệ quả: người **duyệt** mà thiếu `ReturnRequest` sẽ **không** thấy nút — đúng ý đồ tách nhiệm (`BR-013`) |
+| 2 | **Huỷ khi đã duyệt** | **Cho phép** (`Huy` nhận `Requested` **và** `Approved`) — UI cũng hiện ở cả hai trạng thái, nhưng **chặn** khi đã nhận hàng (kể cả một phần) |
+| 3 | **Đơn hàng có đổi trục kết thúc không** | **Không** — `HuyAsync` không gọi `Order.ChuyenKetThuc` (chưa có cạnh `ReturnRequested → Open`); phiếu huỷ nghĩa là *"yêu cầu này không hiệu lực"*, đơn vẫn tạo được phiếu trả khác (§29 ghi rõ) |
+| 4 | **`PartiallyReturned`** | 🚫 **Vẫn nợ** — cần BA chốt hợp đồng API (§32.5 #1, `SAL-003` §16) |
+| 5 | **Hoàn tiền tự động** | 🚫 **Vẫn nợ** — `Q4` = chỉ ghi nhận (§32.5 #4) |
+
+> 🆕 **Cập nhật 29/10/2026 — `S14H`, xem §35:** dòng **4** ở trên **ĐÃ ĐÓNG**. `ReturnStatus.PartiallyReturned = 6`
+> đã có (append ở cuối dải · **đúng 2 cạnh** `ReturnApproved → PartiallyReturned → Returned` · **không** `OrderStatus`
+> mới). 📌 Bảng này là **ảnh chụp `S14G`** — **giữ nguyên** để truy vết, không viết lại lịch sử; nguồn chuẩn là **§35**.
+
+### 34.6 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.0 | 29/10/2026 | *(agent, session GĐ1 — `S14G`)* | **Nút HUỶ phiếu trên UI** (đóng **§32.5 #3**): `POST /TraHang/Huy` (token chống giả mạo, bắt `BusinessException` ⇒ hiện **đúng mã**, không `500`, không ghi tiếp) + nút **Huỷ phiếu** chỉ hiện ở `Requested\|Approved` **và chưa nhận hàng**, kèm **ô lý do bắt buộc**; ẩn/hiện theo `Orders.ReturnRequest` nhưng **app service cưỡng chế**. **+6 ca E2E** (`S14-E15…E20`) đo **hai chiều**: huỷ ⇒ `OrdReturns.Status = 3` **và** `OrdOrderLines.ReturnedQuantity 2 → 0` (đối xứng `GiamTra`); huỷ lần hai ⇒ `eCommerce:Sales:0010` + DB **không đổi**; phiếu đã nhận hàng **không** có nút. **0** schema/migration/NND/quyền. |
+
+---
+
+## 35. `S14H` — TRẠNG THÁI `PartiallyReturned` (chốt BA 29/10/2026) — *đóng §32.5 #1*
+
+> 🎯 **Phạm vi — ĐÚNG MỘT VIỆC:** thêm trạng thái **trả một phần** cho **trục kết thúc của ĐƠN**
+> (`OrderStatus`? **không** — xem §35.4) khi phiếu trả mới nhận **một phần** hàng hoàn.
+>
+> 🔒 **Không đổi:** lược đồ · migration (**50**) · NND (**64**) · quyền (**72**) · route/DTO · ETO ·
+> bảng `OrderReturn`/`OrderReturnLine`/`GoodsStatus`. 🚫 **Không** thêm `OrderStatus` mới, **không** thêm cạnh
+> tắt, **không** nới `CHECK` DB.
+
+### 35.1 Quyết định của BA (29/10/2026)
+
+| # | Quyết định | Lý do (ghi để phiên sau không mở lại) |
+|---|---|---|
+| 1 | **Thêm** trạng thái `PartiallyReturned` cho trục kết thúc của đơn | Trước lát cắt này, **nhận một phần** để đơn đứng nguyên `ReturnApproved` ⇒ *"đã trả một phần"* **không đọc được ở đâu**; báo cáo và UI đều nói *"chưa trả gì"* — sai sự thật vận hành (nợ đã ghi ở `SAL-003`/`INV-001`) |
+| 2 | **Append ở CUỐI dải** (giá trị `6`), **không** đổi số giá trị cũ | `OrdOrders.ReturnStatus` lưu **số** (`int`). Đổi số của `Returned`/`Cancelled` = **diễn giải lại toàn bộ lịch sử** (đơn *"đã trả xong"* đọc thành *"trả một phần"*) — **sai dữ liệu không có lỗi nào**. Đây là luật đã có cho `StockMovementType` (`INV-001` ADR-04) |
+| 3 | **Không** thêm `OrderStatus` tổng thể | `OrderStatus` là **giá trị SUY RA** (`SAL-003` D2). Thêm một giá trị cho *mức trả hàng* là **trục thứ 5 trá hình** (BR-003 cấm). Chi tiết + hệ quả đọc: **§35.4** |
+| 4 | **Không** đổi `OrderReturn.GoodsStatus` | Nó **đã** có `PartiallyReceived` từ `S14` — hai trục khác nhau: `GoodsStatus` = *phiếu trả*, `ReturnStatus` = *đơn*. Gộp lại là lặp lỗi "một enum hai nghĩa" (`SAL-003` D3) |
+| 5 | **Không** migration | Cột đã là `int`; enum thêm giá trị **không** đổi kiểu, **không** đổi `CHECK` (DB không ràng buộc dải `ReturnStatus`) |
+
+**Giá trị enum sau `S14H`** (`src/eCommerce.Domain.Shared/Enums.cs`) — **cột số là bất biến:**
+
+| Tên | Số | Hấp thụ? | Ghi chú |
+|---|---|---|---|
+| `Open` | 0 | ✖ | chưa có yêu cầu trả |
+| `ReturnRequested` | 1 | ✖ | khách/sàn yêu cầu trả |
+| `ReturnApproved` | 2 | ✖ | đã duyệt trả |
+| `ReturnRejected` | 3 | ✅ | từ chối trả |
+| `Returned` | 4 | ✅ | **đã trả xong** |
+| `Cancelled` | 5 | ✅ | đã huỷ đơn |
+| 🆕 `PartiallyReturned` | **6** | ✖ | **đã nhận một phần** — còn đi tiếp được `→ Returned` |
+
+### 35.2 Hai cạnh thêm vào máy trạng thái — **đúng 2, không cạnh tắt**
+
+`OrderStateMachine.Canh` (`modules/Sales/eCommerce.Sales.Domain/OrderStateMachine.cs`):
+
+| # | Từ → Sang | Ai được chuyển | Guard (điều kiện cho phép) | Nếu sai |
+|---|---|---|---|---|
+| 31 | `ReturnApproved` → `PartiallyReturned` | Nhân viên kho (nhận hàng hoàn, qua `OrderReturnService`) | Phiếu `Approved` **và** `GoodsStatus = PartiallyReceived` **và** đơn đang `ReturnApproved` | **`0001`** |
+| 32 | `PartiallyReturned` → `Returned` | Nhân viên kho · Job | Phiếu `Received` (**đã nhận đủ toàn bộ dòng** của phiếu) | **`0001`** / **`0006`** nếu đơn đã kết thúc khác |
+
+**Cạnh CỐ Ý KHÔNG thêm (và vì sao):**
+
+| Cạnh bị loại | Vì sao |
+|---|---|
+| `Open` / `ReturnRequested` → `PartiallyReturned` | Chưa duyệt trả thì **chưa thể** có hàng về. Hàng về trước khi duyệt là **sai quy trình** ⇒ phải chặn, không hợp thức hoá bằng một cạnh |
+| `PartiallyReturned` → `Cancelled` | **Đã nhận hàng** thì không huỷ (hàng đã ra khỏi kho ⇒ phải TRẢ HÀNG bằng chứng từ, cấm xoá bút toán). `Order.HuyDon` cũng chặn vì `FulfillmentStatus ≠ Pending` |
+| `PartiallyReturned` → `PartiallyReturned` | **Cạnh tự thân là vô nghĩa** (`from = to`): `Order.Chuyen` ném **`0001`**; nhận thêm một phần nữa **không** làm trạng thái đơn đổi ⇒ chỗ gọi phải **bỏ qua**, không gọi |
+| `PartiallyReturned` → `Open`/`ReturnRequested` | **Chỉ tiến, không lùi** (`SAL-003` §3): lùi nghĩa là *"hàng đã về lại thành chưa về"* |
+
+### 35.3 `OrderReturnService.NhanHangAsync` — **một chỗ quyết định**
+
+Sau khi entity xác định `Status`/`GoodsStatus` của **phiếu**, tầng dịch vụ đồng bộ **trục kết thúc của đơn**
+qua `Order.ChuyenKetThuc` (máy trạng thái, **không** gán tay):
+
+| Phiếu sau khi nhận | Đơn trước | Hành vi (mã `ReasonCode`) |
+|---|---|---|
+| `Status = Received` (nhận **đủ**) | `ReturnApproved` | `ChuyenKetThuc(Returned)` — `DA_TRA` · `ClosureVersion +1` |
+| `Status = Received` (nhận **đủ**) | `PartiallyReturned` | `ChuyenKetThuc(Returned)` — `DA_TRA` (cạnh `S14H` thứ hai) |
+| `Status = Received` (nhận **đủ**) | đã `Returned` | **không gọi** — trạng thái **không đổi** (không có cạnh tự thân) |
+| `Status = Approved`, `GoodsStatus = PartiallyReceived` | `ReturnApproved` | `ChuyenKetThuc(PartiallyReturned)` — `NHAN_MOT_PHAN` · `ClosureVersion +1` |
+| `Status = Approved`, `GoodsStatus = PartiallyReceived` | `PartiallyReturned` | **không gọi** — nhận **thêm** một phần nữa **không** đổi trạng thái đơn |
+| bất kỳ | `Open`/`ReturnRequested`/`ReturnRejected`/`Cancelled` | **NÉM** `0001`/`0006` — dữ liệu lệch, **không nuốt** |
+
+🔒 **Không viết tay lịch sử:** `Order.ChuyenKetThuc` tự thêm **đúng một** `OrdStatusHistory` (`Axis = Closure`,
+`VersionAfter` của trục) **và** phát `OrderStatusChangedEto` qua **outbox cùng transaction** — lát cắt này
+**không** tạo bản ghi thứ hai, không thêm ETO mới.
+📌 **Chỉ chuyển khi trạng thái THỰC SỰ đổi:** hàm nội bộ `ChuyenDonAsync` trả về ngay khi `don.ReturnStatus`
+đã bằng trạng thái đích — nếu không, lần *"nhận thêm một phần"* thứ hai sẽ gọi cạnh tự thân và **NÉM `0001`**
+dù nghiệp vụ **hợp lệ**.
+
+### 35.4 Vì sao **KHÔNG** có `OrderStatus` mới — người đọc phải hiểu đúng
+
+`Order.Status` **không phải** nguồn sự thật: nó được **suy ra** từ 4 trục (`SAL-003` D2/§4.2,
+`OrderStateMachine.TinhTrangThaiSuyRa`). Với `S14H`:
+
+- Hàm suy ra **không đổi một dòng nào**; `PartiallyReturned` **không** phải nhánh mới.
+- Đơn đã `Delivered` + `ReturnStatus = PartiallyReturned` ⇒ `Status = Completed`.
+- 🔑 Câu đúng để đọc: **"đơn vẫn `Completed` nhưng trục kết thúc đã `PartiallyReturned`"** — *"đã trả một
+  phần"* **chỉ** đọc được ở `ReturnStatus` (và ở `OrderReturn.GoodsStatus` nếu nhìn phiếu), **không** đọc ở
+  `Status`.
+- 📌 Vì sao **không** thêm `OrderStatus.PartiallyReturned`: (a) nó phá luật *"`Status` là giá trị suy ra"*;
+  (b) `OrderStatus` gộp 4 trục ⇒ thêm giá trị là **trục thứ 5 trá hình** (BR-003); (c) client cũ đang so
+  `Status == Completed` để biết *"đơn đã giao"* sẽ **đỏ** nếu ta đổi nó.
+
+Bất biến này được khoá **hai chỗ**: unit test (bảng `InlineData` + ca `S14H` khẳng định `OrderStatus.Completed`)
+và **E2E đo cột `OrdOrders.Status` = `4`** ngay lúc `ReturnStatus = 6` (§35.6).
+
+### 35.5 Test hai chiều
+
+**`test/eCommerce.Tests/Domain/OrderStateMachineTests.cs` — +7 ca** (gồm 2 ca `[Theory]`):
+
+| Ca | Chiều | Khẳng định |
+|---|---|---|
+| `Tra_mot_phan__ReturnApproved_sang_PartiallyReturned__hop_le__va_KHONG_doi_OrderStatus_tong_the` | ✅ dương tính | đi đúng đường `Delivered → ReturnRequested → ReturnApproved → PartiallyReturned`; `ToStatus = 6`; `ClosureVersion = 3`; **đúng MỘT** dòng lịch sử `Closure`; `OrderStatus` **vẫn `Completed`**; `LaHapThu = false` |
+| `Tra_mot_phan__PartiallyReturned_sang_Returned__hop_le__roi_MOI_hap_thu` | ✅ dương tính | `PartiallyReturned → Returned` hợp lệ ⇒ `OrderStatus.Returned`, `ClosureVersion = 4`; **`Returned` mới hấp thụ** — lùi về `PartiallyReturned` ⇒ **`0006`** |
+| `Tra_mot_phan__KHONG_mo_tu_truoc_khi_duyet__NEM_0001` (2 ca: `Open`, `ReturnRequested`) | 🚫 âm tính | `Open`/`ReturnRequested → PartiallyReturned` **NÉM `0001`**; trạng thái + lịch sử **không đổi** |
+| `Tra_mot_phan__tu_chuyen_sang_chinh_minh__NEM_0001` | 🚫 âm tính | `PartiallyReturned → PartiallyReturned` **NÉM `0001`** (`from = to`); `ClosureVersion` + số dòng lịch sử **không đổi** |
+| `Tra_mot_phan__KHONG_huy_duoc__va_KHONG_phai_trang_thai_hap_thu` | 🚫 âm tính + phân biệt | `PartiallyReturned → Cancelled` **NÉM `0001`**, `IsCancelled = false`; `LaHapThu` = **false** cho `PartiallyReturned` và **true** cho `Returned`/`Cancelled` |
+| `Ham_suy_ra_DerivedStatus__dung_cho_moi_to_hop` **+1 `InlineData`** | ✅ dương tính | `(Delivered, PartiallyReturned, false) ⇒ OrderStatus.Completed` — khoá luật *"không có `OrderStatus` mới"* |
+
+**`test/eCommerce.Tests/Sales/OrderReturnTests.cs`** — **không đổi ca nào**; các ca **đã có** khoá đúng tầng entity
+(tầng này **không** biết `Order`):
+`NhanHang__chi_tu_Approved__va_hai_trang_thai_dung_dan` (nhận một phần ⇒ `GoodsStatus = PartiallyReceived`,
+phiếu **vẫn** `Approved`) · `NhanHang__du_hang__Received_va_co_moc` (nhận đủ ⇒ `Received` + `ReceivedAtUtc`) ·
+`NhanHang__tung_dong__chi_Received_khi_TOAN_BO_dong_da_ve` (`S14F`). 🔒 Việc **đơn chuyển `PartiallyReturned`**
+là hành vi **tầng dịch vụ** ⇒ đo ở **E2E** (§35.6), đúng chỗ nó xảy ra.
+
+### 35.6 E2E — đo **DB thật** (`tools/kiem-e2e.ps1`, khối `S14`)
+
+| Ca | Chiều | Đo cái gì | Kết quả |
+|---|---|---|---|
+| `S14-E11` | ✅ (giữ nguyên) | POST nhận 1/2 qua form thật ⇒ `OrdReturnLines` | `1\|2` |
+| `S14-E12` | ✅ **ĐỔI KỲ VỌNG** | Nhận **một phần** ⇒ `OrdReturns.Status\|GoodsStatus` **và** `OrdOrders.ReturnStatus\|ClosureVersion\|Status` | `1\|1` · đơn **`6\|3\|4`** — trước đây ca này khẳng định `2` (đơn đứng yên) |
+| `S14-E21` 🆕 | ✅ dương tính | **HTML thật** `/DonHang/ChiTiet/<đơn>` phải in **chuỗi** `PartiallyReturned` (không phải số `6`) | khớp |
+| `S14-E22` 🆕 | ✅ dương tính (nhận nốt) | POST nhận **nốt** 2/2 ⇒ phiếu `Status\|GoodsStatus` **và** đơn `ReturnStatus\|ClosureVersion\|Status` | phiếu `4\|2` · đơn **`4\|4\|6`** |
+
+🔒 **Đo bằng `Invoke-Psql`, KHÔNG tin HTML** cho các khẳng định trạng thái (HTML chỉ dùng cho ca `E21` về **cách
+in** giá trị). 📌 `S14-E22` khẳng định **cả hai** đầu: phiếu `Received` **và** đơn `Returned` — nếu ai sửa
+`NhanHangAsync` chỉ đổi phiếu mà quên đơn (hoặc ngược lại) thì ca này **đỏ**.
+📌 Dọn trong `finally`: `OrdReturnHistory` → `OrdReturnLines` → `OrdReturns` → outbox/inbox theo GUID đơn →
+`OrdOrderLines` → `OrdOrders`; **đếm lại = 0** (`DON DEP (S14)`) — gồm cả sự kiện outbox do hai chuyển dịch mới.
+
+### 35.7 Ảnh hưởng API/UI — **thêm ở cuối ⇒ tương thích ngược**
+
+| Bề mặt | Ảnh hưởng |
+|---|---|
+| `OrdOrders.ReturnStatus` (cột `int`) | Thêm **một** giá trị `6`. **Không** đổi số của `0…5` ⇒ dữ liệu lịch sử **đọc y hệt** trước |
+| Client cũ đọc **số** | Vẫn hiểu đủ `0…5`; gặp `6` thì rơi vào nhánh mặc định của họ — **không** có giá trị nào **đổi nghĩa**, nên không diễn giải sai dữ liệu cũ. Client mới thấy thêm **một** giá trị |
+| Client đọc **tên** (JSON enum-as-string / HTML) | Thấy thêm `PartiallyReturned`; không tên nào bị đổi |
+| `OrderReturnDto.Status`/`GoodsStatus` | **Không đổi** — là **chuỗi** của trạng thái **phiếu** (`Requested…Closed` / `Awaiting…NotReturned`), không phải trục đơn |
+| `OrderStatusDto` / `Order.Status` | **Không đổi** — xem §35.4: không có `OrderStatus` mới |
+| `/TraHang` (UI RMA) | In `Status`/`GoodsStatus` **dạng chuỗi** ⇒ **không** phải sửa mã. 🔒 Nút **Huỷ phiếu** giữ **đúng guard của entity** `OrderReturn.Huy`: `Status ∈ {Requested, Approved}` **và** `GoodsStatus ∉ {Received, PartiallyReceived}` ⇒ **không** mời bấm huỷ khi đã nhận một phần (đã kiểm ở `S14-E16`) |
+| `/DonHang/ChiTiet` | In `@Model.ReturnStatus` **dạng chuỗi** ⇒ giá trị mới **tự hiện** (đo ở `S14-E21`) |
+| Route / DTO / quyền / ETO | **0 thay đổi** |
+
+### 35.8 Đo cổng cuối (cây đã sửa)
+
+| Phép đo | Kết quả | Ghi chú |
+|---|---|---|
+| Unit | **1627 → 1634** (+7 ca `S14H`) | `OrderStateMachineTests`; `OrderReturnTests` **không đổi** |
+| Integration | **90** (không đổi) | không chạm lược đồ |
+| E2E (HTML thật) | **165 → 167** (`S14-E12` đổi kỳ vọng + `S14-E21/E22` mới) | `tools/kiem-e2e.ps1` |
+| Migration / NND / quyền / chỗ quét | **50 · 64 · 72 · 99** — **không đổi** | enum thêm giá trị, **không** migration |
+| Cổng đầy đủ | **exit 0 · 389.7s · 15/15 bước** | `pwsh -File tools\kiem-tat-ca.ps1 -DayDu` |
+| Hai cổng tài liệu | mermaid **0 lỗi** · link **0 chết** | chạy lại sau khi điền số |
+| Dọn dẹp probe | `DON DEP (S14)` + `DON DEP (S14G)` = **0** — gồm **outbox/inbox** của đơn probe | in ra ở cuối bước ⑧ |
+
+### 35.9 Lịch sử thay đổi (bổ sung)
+
+| Phiên bản | Ngày | Người | Thay đổi |
+|---|---|---|---|
+| v1.1 | 29/10/2026 | *(agent, session GĐ1 — `S14H`)* | **Trạng thái `PartiallyReturned`** cho trục kết thúc của ĐƠN (đóng **§32.5 #1**, BA chốt 29/10/2026): `ReturnStatus.PartiallyReturned = 6` (**append ở cuối dải**, số cũ **không** đổi) · **đúng 2 cạnh** `ReturnApproved → PartiallyReturned` và `PartiallyReturned → Returned` (không cạnh tắt, không cạnh tự thân, **không** hấp thụ) · `NhanHangAsync` chuyển đơn **chỉ khi trạng thái thực sự đổi** (nhận thêm một phần ⇒ không gọi; nhận đủ ⇒ `Returned`) · **KHÔNG** thêm `OrderStatus` (đơn vẫn `Completed` — ghi rõ trong mã + §35.4) · **+7 unit** (hai chiều) · **+2 E2E** (`S14-E21/E22`) + **đổi kỳ vọng `S14-E12`** ⇒ **167 ca** · **0** schema/migration/NND/quyền/route/DTO/ETO. |
+
+
+
+

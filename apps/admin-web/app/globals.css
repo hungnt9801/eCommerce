@@ -1,0 +1,150 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
+@import "tailwindcss";
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Design tokens — chép từ Nhanh.vn (đo trực tiếp, xem docs/nhanh/01 §2.1)
+   Quy ước: nền xám #E2E6ED, card trắng, nút chính XANH LÁ #059669.
+   ───────────────────────────────────────────────────────────────────────────── */
+:root {
+  --primary: #0c83ff;
+  --primary-hover: #0b76e6;
+  --success: #059669;
+  --success-hover: #05875f;
+  --secondary: #247297;
+  --info: #049aad;
+  --warning: #f58646;
+  --danger: #ef4444;
+  --bg-app: #e2e6ed;
+  --bg-surface: #ffffff;
+  --bg-subtle: #f3f4f6;
+  --text: #1f2937;
+  --text-muted: #6b7280;
+  --border: #dee2e6;
+  --sidebar-bg: #f3f4f6;
+  --sidebar-text: #252b36;
+  --topbar-bg: #252b36;
+  --topbar-text: #ffffff;
+  --radius: 8px;
+  --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--bg-app);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Nút ─────────────────────────────────────────────────────────────────── */
+.nh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.nh-btn:hover {
+  background: var(--bg-subtle);
+}
+.nh-btn-primary {
+  background: var(--success);
+  border-color: var(--success);
+  color: #fff;
+}
+.nh-btn-primary:hover {
+  background: var(--success-hover);
+  border-color: var(--success-hover);
+}
+
+/* ── Ô nhập ──────────────────────────────────────────────────────────────── */
+.nh-input {
+  height: 36px;
+  width: 100%;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #fff;
+  font-size: 14px;
+  color: var(--text);
+  outline: none;
+}
+.nh-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgb(12 131 255 / 0.12);
+}
+
+/* ── Bảng dày (mật độ Nhanh: header 36px, ô 12/20px) ─────────────────────── */
+.nh-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 14px;
+}
+.nh-table thead th {
+  height: 36px;
+  padding: 0 20px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text);
+  background: #fff;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.nh-table tbody td {
+  height: 52px;
+  padding: 8px 20px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.nh-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+/* ── Thẻ ─────────────────────────────────────────────────────────────────── */
+.nh-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── In phiếu (`/{business}/inventory/bill/print`) ───────────────────────────────────────────
+   🚨 In từ trong app shell ⇒ nếu không ẩn, mỗi trang giấy có thêm **sidebar + topbar** (Nhanh in
+   chỉ có phiếu). 📌 Chỉ ẩn 2 thẻ đó; `main` phải bỏ cuộn vì `overflow:auto` cắt trang khi in.
+   ⚠️ Không dùng selector `header` trần cho tiêu đề phiếu — tiêu đề in là `<div>` (đã đổi ở trang in). */
+@media print {
+  body {
+    background: #fff;
+  }
+  aside,
+  header {
+    display: none !important;
+  }
+  main {
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+  .nh-card {
+    border: none;
+  }
+  .nh-table tbody td {
+    height: auto;
+  }
+}

@@ -6,7 +6,7 @@
 | **Module** | **Nền dùng chung** — hạ tầng nhắn tin, đề xuất module `Messaging` (`eCommerce.Messaging.Domain` / `.Application` / `.Contracts`) + bảng ABP nằm trên **DbContext hợp nhất** ở `src/eCommerce.EntityFrameworkCore` |
 | **Giai đoạn** | **Nền — phải xong TRƯỚC GĐ1** (mọi module phát/tiêu thụ sự kiện đều phụ thuộc) |
 | **Ưu tiên** | **Must have** |
-| **Trạng thái** | `Draft` — chờ review |
+| **Trạng thái** | 🟡 **ĐANG TRIỂN KHAI** — **outbox/inbox đã BẬT 24/10/2026** (P0 #3): 2 bảng `AbpEventOutbox`/`AbpEventInbox`, cấu hình tường minh, migration **43** — xem **§17** · ⏳ còn: test "publish lỗi ⇒ phát lại" + 2-instance |
 | **Người viết / người review** | *(điền)* / **Kiến trúc trưởng + toàn nhóm** (theo `design-doc-guidelines.md` §6: `XC-*` do kiến trúc trưởng viết, toàn nhóm review) |
 | **Phiên bản / ngày** | `v0.1 — 12/10/2026` |
 | **Tài liệu liên quan** | `XC-001` (BR-003 cấm so tiền bằng `==`) · `XC-003` (khoá phân tán) · `XC-005` (observability) · `XC-006` (BR-011 state machine phải ném lỗi) · `SAL-005` (webhook đơn từ sàn) · `REC-001` (đối soát thanh toán) · `INV-001` (sổ cái kho append-only) · `docs/structure-and-techstack.md` · `docs/design-doc-guidelines.md` · `docs/phase-0-execution-report.md` |
@@ -1325,7 +1325,7 @@ trong mã** (như tôi đã mất nhiều lượt) trong khi **mã đúng** — 
 | # | Nợ | Ghi chú |
 |---|---|---|
 **1** | ✅ **ĐÃ XÁC NHẬN — `S10` (21/10/2026): OUTBOX/RELAY KHÔNG CÓ** (nợ này **đóng ở dạng "đã xác nhận"**, không phải "đã làm") | 📌 Bằng chứng đo được: **0** bảng `AbpEvent*`/`*Outbox*`/`*Inbox*` (85 bảng, `psql` trên PostgreSQL 17) · **0** worker relay trong **10** worker đã đăng ký · sự kiện đi qua `IDistributedEventBus` với transport **in-process** (chính chỗ gọi đã ghi: `MarketplaceOrderIntakeHandler`). ⚠️ **Hệ quả (giữ nguyên, không được quên):** publish **KHÔNG** nằm trong transaction nghiệp vụ ⇒ 🔒 tiến trình chết giữa chừng là **mất sự kiện**; ➕ `messaging_outbox_pending` **vì vậy chưa thể có nơi phát** (`XC-005` §19.3). 📌 Đóng **thật** nợ này = một feature riêng (outbox + relay), **không** phải việc của phiên đóng GĐ1 |
-**2** | 🚨 **Chưa có job phát lại** (`XC-002` mục (a) phần *"job phát lại"*) | Nay có **đường đọc** + **đánh dấu**, nhưng **phát lại vẫn thủ công**. 🔒 Cố ý: phát lại tự động **có thể gây hỏng lần nữa** ⇒ phải **có người** + audit. ➕ `S10`: chính vì thế `messaging_dlq_replayed_total` **chưa có nơi phát** — đếm *"đánh dấu"* thành *"phát lại"* là **nói dối** (`XC-005` §19.3) |
+**2** | 🟡 **ĐÃ CÓ PHÁT LẠI THỦ CÔNG (29/10/2026, `S16b`) — CHƯA có job phát lại TỰ ĐỘNG** | `IDeadLetterAppService.PhatLaiAsync` **publish lại event gốc** lên `IDistributedEventBus` (`useOutbox: true`, **cùng UoW** với dấu `ReplayedAtUtc`) · idempotent **một dòng một lần** (`ReplayedAtUtc`/`ReplayCount`) · fail-closed khi `TenSuKien`/payload không ánh xạ được (`409`) · quyền **riêng** `eCommerce.Operations.DeadLetters.Replay` · metric `messaging_dlq_replayed_total` **+1 chỉ sau commit** ⇒ đóng nợ cuối của `XC-005` §19.3 (**§21** của tài liệu đó). 🔒 Vẫn **cố ý KHÔNG** tự động: phát lại một sự kiện đã hỏng **có thể hỏng lần nữa** ⇒ phải **có người** + audit |
 **3** | 🚨 **Chưa có cảnh báo khi có bản ghi DLQ mới** (`XC-002` mục (a)) | `thong-ke` **đã có** `cuNhatChuaXuLyUtc` ⇒ 🔑 **đủ dữ kiện** để làm cảnh báo, nhưng **chưa ai gọi định kỳ** |
 **4** | **Chưa có UI** cho DLQ | Endpoint **đã có**; trang `/VanHanh/Dlq` **chưa** làm |
 **5** | **Chưa có job dọn DLQ theo thời hạn** | Bảng **chỉ tăng** |
@@ -1336,3 +1336,70 @@ trong mã** (như tôi đã mất nhiều lượt) trong khi **mã đúng** — 
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v1.1 | 16/10/2026 | *(agent, session GĐ1)* | **§16 — DLQ ĐÃ CÓ BẢNG + ĐƯỜNG ĐỌC**: bảng **`MsgDeadLetters`** (⚠️ **sai lệch tên so với tài liệu `DeadLetterEvents` — CỐ Ý**, theo tiền tố `Msg*` mà `MsgIdempotencyRecords` đã dùng; ghi rõ lý do ở §16.1) · migration `20261016145709_Xc002_DeadLetterQueue` (**2 index**, một index **có bộ lọc** `NOT "DaXuLy"`) · **4 endpoint** (`danh-sach` · `chi-tiet` · `danh-dau-da-xu-ly` · `thong-ke`) · quyền **`eCommerce.Operations.DeadLetters`** (**tách khỏi `Inventory`** — đặc quyền tối thiểu) · **24/25 ca HTTP + DB thật** + **1 xác nhận riêng** cho lý do rỗng. 🔑 **Ba quyết định:** **mặc định chỉ chưa xử lý** (*"còn việc gì"*) · **sắp xếp CŨ NHẤT TRƯỚC** (không dùng mặc định *mới nhất trước* — nó **che** đúng dòng cần gấp nhất) · **`DaXuLy` ba giá trị** (`null`/`true`/`false` — hai giá trị **không** diễn đạt được *"tất cả"*). 🚨 **HAI PHÁT HIỆN**: (1) **KHÔNG có bảng `AbpEventOutbox`/`AbpEventInbox`** ⇒ tài liệu nói *"outbox ghi cùng transaction"* **CHƯA ĐÚNG** với cấu hình ⇒ nợ #1; (2) 🔑 **quyền MỚI cần NẠP LẠI tiến trình** — `403` dù grant **có trong DB** và chẩn đoán ghi **`đã định nghĩa ✅`** nhưng **`cấp ❌`**; quyền **CŨ** cùng token ⇒ `200`; **khởi động lại ⇒ `200`** ⇒ **cache quyền**, **không phải lỗi mã** ⇒ ghi **bước triển khai**. 🐞 **Bộ đo sai lần thứ CHÍN (một phần):** ca `F5` "đỏ" vì tôi kỳ vọng `403` còn **validation của DTO** chặn trước bằng **`400`** — 🔑 **guard ĐÚNG** (đã xác nhận `"The LyDoXuLy field is required."` + DB **không** đổi), chỉ **kỳ vọng của probe quá hẹp** ⇒ **lặp lại bài học lần thứ 7**: một ca đỏ có thể đỏ vì **tầng khác** chặn trước |
+
+---
+
+## 17. ✅ TRIỂN KHAI OUTBOX/INBOX (24/10/2026 — P0 #3)
+
+### 17.1 Đã bật gì (đúng §6.3)
+
+| Hạng mục | Bằng chứng |
+|---|---|
+| `eCommerceDbContext` implement **`IHasEventOutbox` + `IHasEventInbox`** | `src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs` |
+| **`DbSet<OutgoingEventRecord>` + `DbSet<IncomingEventRecord>`** | cùng tệp — quy ước #5 |
+| Model: `ConfigureEventOutbox()` + `ConfigureEventInbox()` | `OnModelCreating` |
+| Cấu hình **tường minh** 2 chiều | `eCommerceEntityFrameworkCoreModule.cs`: `options.Outboxes.Configure(c => c.UseDbContext<eCommerceDbContext>())` + `options.Inboxes.Configure(...)` |
+| `AbpEventBusBoxesOptions` | `PeriodTimeSpan = 2s` · `InboxProcessorFailurePolicy = Retry` (**cấm** `RetryLater`/`Discard`) · `MaxRetryCount = 10` |
+| Migration **43** | `20261024045237_AbpEventBusOutboxInbox` — 2 bảng + 3 index; **NND giữ 54** (không thêm unique index) |
+| `schema.sql` | đã sinh lại; thêm 2 bảng |
+
+### 17.2 Đo được (sau khi bật)
+
+| Phép đo | Kết quả |
+|---|---|
+| `AbpEventOutbox` sau khi các probe chạy xong | **0 dòng** ⇒ relay **đã phát và xoá** (không ứ đọng) |
+| `AbpEventInbox` | **có dòng** ⇒ consumer ghi nhận sự kiện đến (chống trùng phía nhận **đang chạy**) |
+| E2E | **135/135** · `probe-thanh-toan` **26/26** · `probe-don-san` **49/49** · `probe-outbox` **9/9** (replay sau khi process chết) |
+| DB | **25/25** bất biến · quét **89** chỗ (thêm 2 bảng `uuid`) |
+| Unit test chặn tháo cấu hình | `OutboxInboxBatBuocTests` — 4 ca (interface ×2, `DbSet` ×2, module có **đúng 2** `UseDbContext`) |
+
+### 17.3 🚨 Thay đổi hành vi **BẮT BUỘC** biết: event nay **bất đồng bộ**
+
+Trước: `PublishAsync` gọi handler **ngay trong request**. Nay: ghi outbox **cùng transaction**, `OutboxSender`
+relay tối đa **2 giây** sau commit. 📌 Hệ quả **đã đổ** ở cổng: `S8-P14` (cổng báo thất bại ⇒ đơn `Failed`)
+đọc DB **ngay** sau HTTP ⇒ thấy `Unpaid (0)` ⇒ **ĐỎ**. ✅ Sửa đúng cách: **hỏi DB có hạn** (poll 25×200 ms)
+như `S8-P10` đã làm — **không** nới điều kiện, **không** ngủ mù.
+🔒 Từ nay: **mọi test/probe** kiểm trạng thái do event sinh ra **phải** poll có hạn; đọc ngay = test **flaky**.
+
+### 17.4 Còn nợ (không được nói "outbox xong")
+
+| # | Nợ | Vì sao chưa làm |
+|---|---|---|
+| 1 | **Test "publish lỗi ⇒ event còn trong outbox ⇒ phát lại"** | ✅ **XONG 24/10/2026** — `tools/probe-outbox.ps1` (**bước ⑭**): relay tạm 600 s ⇒ commit ⇒ **giết Host** ⇒ `AbpEventOutbox = 1` (còn) ⇒ restart nhịp 2 s ⇒ **outbox = 0** + `AbpEventInbox` **tăng** (consumer nhận) · 9/9 ca |
+| 2 | **Relay 2 instance** | ✅ **ĐÓNG 26/10/2026** — `probe-outbox-2instance.ps1` (**bước ⑮**): hai Host 5000/5001 cùng DB/Redis ⇒ outbox **0**, event **1** dòng inbox (`distinct MessageId=1`), 0 exception. ⚠️ Giới hạn: chứng minh hai relay **phối hợp**, không chứng minh handler chạy một lần nếu không ghi inbox |
+| 3 | **Inbox dọn theo thời gian** | `WaitTimeToDeleteProcessedInboxEvents = 2 h`; chưa có test chứng minh job dọn chạy (quan sát: bảng có dòng ⇒ **chưa** tới hạn) |
+| 4 | **Metric `messaging_outbox_pending`** | ✅ **ĐÓNG 24/10/2026** — `OutboxPendingWorker` (project EF) đếm `AbpEventOutbox` mỗi 60 s + gọi `SetMessagingOutboxPending`; `XC-005` §5.1 nay **13/16** |
+
+---
+
+## 18. ✅ `S16b` — **PHÁT LẠI DLQ = PUBLISH LẠI EVENT LÊN BUS** (29/10/2026)
+
+> 📌 **Chủ dự án chốt:** *"replay"* = **phát lại event lên bus**, **KHÔNG** phải *"đánh dấu đã xử lý"*.
+> 🔗 Chi tiết + bằng chứng đầy đủ ở **`XC-005` §21** (metric `messaging_dlq_replayed_total`).
+> Mục này chỉ ghi phần **thuộc `XC-002`** (DLQ + outbox).
+
+| Hạng mục | Giá trị |
+|---|---|
+| Đường gọi | `IDeadLetterAppService.PhatLaiAsync(Guid id)` → `POST /api/app/dead-letter/{id}/phat-lai` |
+| Nghĩa của "phát lại" | **deserialize payload gốc → `IDistributedEventBus.PublishAsync(type, event, onUnitOfWorkComplete: false, useOutbox: true)`** ⇒ event đi qua **outbox** như mọi event khác |
+| Vì sao `useOutbox: true` | 🔒 *"không mất event"*: dòng outbox **commit cùng transaction** với dấu `ReplayedAtUtc`; process chết ngay sau commit ⇒ relay vẫn phát |
+| Vì sao `onUnitOfWorkComplete: false` | 📌 để việc ghi outbox xảy ra **trong** UoW `requiresNew` của thao tác, **không** phải sau khi UoW đóng |
+| Idempotent | **một dòng DLQ — một lần phát lại** (`ReplayedAtUtc` + `ReplayCount`); gọi lại ⇒ **200 + `DaPhatLai = false`** + lý do |
+| Fail-closed | `TenSuKien` không ánh xạ được ⇒ `0009`; payload không khớp ⇒ `0010`; cả hai **không publish**, HTTP **409** |
+| Không xoá | Dòng DLQ **giữ nguyên** (bằng chứng); chỉ ghi dấu + `DaXuLy` |
+| Quyền | `eCommerce.Operations.DeadLetters.Replay` (seed **72**) |
+| Bằng chứng | unit **11** · integration **3** · probe `tools/probe-dlq-replay.ps1` **21/21** (đo `AbpEventInbox` **tăng** ⇒ event **đã đi thật**) |
+| Đo cổng | `-DayDu` **exit 0 · 377.4s · 15/15** · unit **1627** · integration **90** · E2E **159/159** · DB **25/25** · NND **64** · **72** quyền · migration **50** |
+
+⚠️ **Còn nợ (không được nói "DLQ xong"):** **không** có phát lại **tự động**; **không** có **lô**
+(`ReplayBatchAsync` trong §6.1 vẫn chỉ là đặc tả); **không** có UI; **không** có job dọn DLQ theo thời hạn (§16.5 #5).

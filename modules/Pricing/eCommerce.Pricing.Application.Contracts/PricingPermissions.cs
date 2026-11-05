@@ -21,4 +21,17 @@ public static class PricingPermissions
 
     public const string Default = Nhom;
     public const string Manage = Default + ".Manage";
+
+    /// <summary>
+    /// 🆕 `S12` (`PRC-001` §6.1) — **XEM GIÁ VỐN** (`eCommerce.Pricing.CostPrice.View`).
+    ///
+    /// 🚨 **VÌ SAO KHÔNG DÙNG CHUNG `Default`:** xem giá vốn là xem **biên lợi nhuận của công ty**
+    /// (`PRC-001` **BR-013**). Mọi nhân viên bán hàng đều cần `Default` (xem giá bán); **không** phải ai
+    /// cũng được thấy giá nhập. Gộp hai quyền làm một là **cấp thừa quyền im lặng** — đúng loại lỗi
+    /// `XC-004` chống, và nó chỉ lộ ra khi có người **sao lưu/CSV** dữ liệu giá vốn ra ngoài.
+    ///
+    /// 🔒 Tên theo **đặc tả** `PRC-001` §6.1 (`…CostPrice.View`) để client/BA đối chiếu được, không theo
+    /// kiểu viết tắt của lớp này.
+    /// </summary>
+    public const string CostPriceView = Default + ".CostPrice.View";
 }

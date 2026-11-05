@@ -64,6 +64,56 @@ public static class InventoryErrorCodes
     /// <summary>Số lượng dòng chứng từ phải **≥ 1** (0 hoặc âm sẽ tạo bút toán vô nghĩa/đảo chiều ngầm).</summary>
     public const string SoLuongPhaiDuong = Nhom + "0023";
 
+    // ── 🆕 `WP-04` (02/11/2026) — PHIẾU KHO KIỂU NHANH: kiểu phiếu, đối tác, nguồn, tiền, VAT/serial ──
+    // 📌 Mỗi mã ứng với một **chỉ dẫn khác nhau** cho người dùng (bài học `0040`/`0042`: mã đúng kỹ thuật
+    // nhưng sai nghiệp vụ ⇒ người dùng đi sửa trường không sai).
+
+    /// <summary>**Kiểu phiếu (`mode`) KHÔNG khớp loại chứng từ** — ví dụ `Transfer` trên phiếu nhập.</summary>
+    public const string KieuPhieuKhongKhopLoai = Nhom + "0024";
+
+    /// <summary>Có `CounterpartyId` (hoặc ngược lại) mà **thiếu loại đối tượng** ⇒ không biết tra bảng nào.</summary>
+    public const string ThieuLoaiDoiTac = Nhom + "0025";
+
+    /// <summary>Có `RefId` mà **thiếu `RefType`** ⇒ không biết đối chiếu với chứng từ nào.</summary>
+    public const string ThieuLoaiNguon = Nhom + "0026";
+
+    /// <summary>**Chiết khấu / số đã trả trên phiếu ÂM** — tiền âm ở đây là dữ liệu hỏng, không phải "hoàn tiền".</summary>
+    public const string TienTrenPhieuKhongHopLe = Nhom + "0027";
+
+    /// <summary>**% VAT của dòng ngoài khoảng `0..100`.**</summary>
+    public const string VatPercentKhongHopLe = Nhom + "0028";
+
+    /// <summary>**Số serial/IMEI KHÁC số lượng dòng** ⇒ có đơn vị không truy vết được.</summary>
+    public const string SoSerialKhacSoLuong = Nhom + "0029";
+
+    /// <summary>**Serial trùng trong cùng một dòng** (cùng serial khai hai lần).</summary>
+    public const string SerialTrungTrongDong = Nhom + "0033";
+
+    /// <summary>Một dòng khai **cả lô VÀ serial** — WP-04 chưa có đường ghi lô nên dữ liệu sẽ không kiểm chứng được.</summary>
+    public const string LoVaSerialCungLuc = Nhom + "0034";
+
+    /// <summary>
+    /// **Phiếu kho đã được tạo cho cùng khoá chống trùng** (`IdempotencyKey` — D-04, POS `ClientBillId`).
+    /// 📌 Hàng rào thật là unique index `IX_InvStockDocuments_TenantId_IdempotencyKey`; mã này để client
+    /// **hiển thị phiếu cũ** thay vì báo "hệ thống hỏng" và retry vô hạn.
+    /// </summary>
+    public const string PhieuDaTonTaiTheoKhoa = Nhom + "0035";
+
+    /// <summary>
+    /// **Phiếu XUẤT kho thiếu `Mode`** (`WP-04`) — mode là thứ duy nhất quyết định bút toán của phiếu xuất
+    /// (`Retail ⇒ RetailSaleOut`, `Delivery ⇒ ShippingOut`, `Supplier ⇒ SupplierReturnOut`…).
+    /// 📌 Thiếu nó thì hệ thống phải **đoán** lý do xuất ⇒ sổ cái/báo cáo sai mà không có lỗi nào.
+    /// </summary>
+    public const string PhieuXuatThieuMode = Nhom + "0036";
+
+    /// <summary>
+    /// 🆕 **`WP-04` (việc 8, 03/11/2026)** — **Đơn giá dòng phiếu ÂM**: tiền âm ở đây là **dữ liệu hỏng**,
+    /// không phải "chiết khấu" (chiết khấu đi đường `DiscountAmount`, có luật riêng `0027`).
+    /// 📌 Vì sao mã riêng chứ không mượn `0027`: `0027` nói về **tiền của phiếu** (chiết khấu/đã trả);
+    /// dùng nó cho **đơn giá dòng** làm client hiện sai chỗ cần sửa (sửa đầu phiếu thay vì sửa dòng).
+    /// </summary>
+    public const string DonGiaKhongHopLe = Nhom + "0050";
+
     /// <summary>
     /// 🚨 **Khách trả NHIỀU HƠN số đã mua** (tính **luỹ kế** các lần trả trước) — `SAL-004`.
     /// 📌 **VÌ SAO CẦN MÃ RIÊNG (không mượn `0001`/`KhongDuTon`):** khi ca này trả `0001` (*"không đủ tồn"*),
@@ -127,5 +177,23 @@ public static class InventoryErrorCodes
     /// **ba chỉ dẫn khác nhau** cho người dùng (bài học `0040`/`0042`: mã đúng kỹ thuật nhưng sai nghiệp vụ).
     /// </summary>
     public const string HanMucKenhKhongTonTai = Nhom + "0046";
+
+    /// <summary>
+    /// 🆕 **`S13`** — **TỔNG NGÂN SÁCH KÊNH VƯỢT TỒN THỰC** (`INV-003` **BR-03**).
+    /// 📌 Ca này là **hành vi hợp lệ về nghiệp vụ**: người vận hành cấp ngân sách cho kênh thứ hai nhiều hơn
+    /// số hàng còn lại ⇒ phải **từ chối kèm số** (`OnHand`, `đã cấp`, `yêu cầu`) để họ sửa, **không** phải `500`.
+    /// 🔒 Không mượn `0042` (*"vượt hạn mức kênh"* — đó là **trần bán** theo chính sách, khác **ngân sách**).
+    /// </summary>
+    public const string NganSachTonVuotTon = Nhom + "0047";
+
+    /// <summary>🆕 **`S13`** — **KHÔNG CÓ ngân sách** cho `(kho, SKU, kênh)` khi cần đóng băng/nhả/sửa.</summary>
+    public const string NganSachTonKhongTonTai = Nhom + "0048";
+
+    /// <summary>
+    /// 🆕 **`S13`** — **NGÂN SÁCH TỒN KHÔNG HỢP LỆ / SAI GUARD** (`INV-003` BR-02/BR-05/BR-12):
+    /// số âm · đặt nhỏ hơn phần đang giữ chỗ · đóng băng/nhả sai trạng thái · nhả khi còn giữ chỗ · thiếu lý do.
+    /// 📌 Một mã cho nhóm *"dữ liệu/thao tác ngân sách sai"*; trường sai được chỉ qua `WithData("lyDo"/"status")`.
+    /// </summary>
+    public const string NganSachTonKhongHopLe = Nhom + "0049";
 
 }

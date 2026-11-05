@@ -94,6 +94,46 @@ public static class PricingDbContextModelCreatingExtensions
                 .HasDatabaseName("IX_PrcChannelPrices_TenantId_Sku_ChannelCode");
         });
 
+        // ── `PRC-001` §5.2 · `S12`: GIÁ VỐN (`PrcCostPrices`) ─────────────────────────────────────
+        // 🚨 BR-013: bảng này là **DỮ LIỆU NỘI BỘ** — không bao giờ trả cho người mua. Mapping đầy đủ ở đây
+        // chỉ để **đọc**; đường ghi chưa mở (`Q2` chưa chốt nguồn giá vốn).
+        builder.Entity<CostPrice>(b =>
+        {
+            b.ToTable("PrcCostPrices", t =>
+            {
+                // 🚨 BA `CHECK` dưới đây là **hàng rào phòng vệ chiều sâu**: tầng domain (`CostPrice..ctor`)
+                // đã ném `Pricing:0009` trước. Chúng tồn tại vì **có đường ghi TẮT qua domain** (SQL tay,
+                // import sau này) sẽ tạo ra dòng giá vốn **âm** / **tiền tệ sai** / **kỳ ngược** — đọc lên
+                // thì lãi gộp ra số vô nghĩa mà **không có lỗi nào**.
+                t.HasCheckConstraint("CK_PrcCostPrices_Amount_KhongAm", "\"AmountValue\" >= 0");
+                t.HasCheckConstraint(
+                    "CK_PrcCostPrices_EffectiveRange",
+                    "\"EffectiveTo\" IS NULL OR \"EffectiveTo\" >= \"EffectiveFrom\"");
+                // 📌 Mã ISO-4217 **HOA**, đúng 3 ký tự (`PRC-001` §5.2 + `XC-001` §5.2).
+                t.HasCheckConstraint("CK_PrcCostPrices_Currency_HopLe", "\"CurrencyCode\" ~ '^[A-Z]{3}$'");
+            });
+            b.ConfigureByConvention();
+
+            b.Property(x => x.Sku).IsRequired().HasMaxLength(64);
+
+            // 🚨 Cột tiền + cột tiền tệ đi KÈM (BR-001) — không bao giờ chỉ có `decimal` trần.
+            b.Property(x => x.AmountValue).HasPrecision(18, 4);
+            b.Property(x => x.CurrencyCode).IsRequired().HasMaxLength(8);
+            b.Ignore(x => x.Amount);
+
+            // `PRC-001` §5.2/BR-008: **một giá vốn cho một SKU trong một kỳ**.
+            // ⚠️ PHẢI sửa tay `NULLS NOT DISTINCT` trong migration: `TenantId = NULL` (hiện chạy 1 tenant) mà
+            // PostgreSQL coi NULL là DISTINCT thì index **mất tác dụng im lặng** ⇒ hai giá vốn cùng kỳ LỌT
+            // ⇒ lãi gộp tính bằng con số **không tất định** mà không lỗi nào.
+            b.HasIndex(x => new { x.TenantId, x.Sku, x.EffectiveFrom })
+                .IsUnique()
+                .HasDatabaseName("IX_PrcCostPrices_TenantId_Sku_EffectiveFrom");
+
+            // Truy vấn nóng: "giá vốn của SKU đang hiệu lực tại ngày X".
+            b.HasIndex(x => new { x.TenantId, x.Sku, x.EffectiveTo })
+                .HasDatabaseName("IX_PrcCostPrices_TenantId_Sku_EffectiveTo");
+        });
+
         // ── PRC-002: BẬC THANG GIÁ ────────────────────────────────────────────────────────────────
         builder.Entity<TierPriceSet>(b =>
         {

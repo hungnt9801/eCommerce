@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>eCommerce.Application.Pos</RootNamespace>
+    <AssemblyName>eCommerce.Pos.Application</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\eCommerce.Pos.Application.Contracts\eCommerce.Pos.Application.Contracts.csproj" />
+    <ProjectReference Include="..\eCommerce.Pos.Domain\eCommerce.Pos.Domain.csproj" />
+    <!-- 🚨 POS **KHÔNG** tự ghi sổ cái: mọi đường ghi tồn đi qua cổng `IPosStockGateway` của module
+         `Inventory` (chỉ tham chiếu `Application.Contracts` — đúng luật phụ thuộc `03 §2`).
+         📌 Nếu POS tự đụng `StockPostingService`/repository kho thì có **đường ghi thứ hai** vào sổ cái
+         ⇒ mất khoá phân tán + idempotency + bất biến append-only. -->
+    <ProjectReference Include="..\..\Inventory\eCommerce.Inventory.Application.Contracts\eCommerce.Inventory.Application.Contracts.csproj" />
+    <!-- 🆕 `WP-07` — **sổ điểm/công nợ của khách**: cổng `ICustomerLedger` + `IDataScopeResolver`
+         (chỉ tham chiếu tầng **Contracts** ⇒ `Pos` KHÔNG đụng entity `Customer`, đúng luật
+         *"module sở hữu entity của mình"*). -->
+    <ProjectReference Include="..\..\Customers\eCommerce.Customers.Application.Contracts\eCommerce.Customers.Application.Contracts.csproj" />
+    <ProjectReference Include="..\..\..\shared\eCommerce.Kernel\eCommerce.Kernel.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Volo.Abp.Ddd.Application" />
+    <PackageReference Include="Volo.Abp.EntityFrameworkCore" />
+  </ItemGroup>
+
+</Project>
