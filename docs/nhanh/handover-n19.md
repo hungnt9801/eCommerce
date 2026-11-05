@@ -77,13 +77,45 @@ bật. 📌 `cong-15-buoc` đã có **lần chạy xanh thật** trên `main` �
 
 📌 Bằng chứng JSON đầy đủ của lượt SAU: `%TEMP%\n19-protection-after.json` (*ngoài repo* — không commit).
 
-### 1.6 Bằng chứng **cổng có hiệu lực** — PR [#3](https://github.com/hungnt9801/eCommerce/pull/3)
+### 1.6 Bằng chứng **cổng có hiệu lực** — PR [#3](https://github.com/hungnt9801/eCommerce/pull/3) (docs-only, 5 tệp `.md`)
 
-PR này **docs-only** (5 tệp `.md`: handover + `decisions`/`07`/`08`/`README`), mở từ chính nhánh của phiên.
-Đo **TRƯỚC khi merge**: `GET /pulls/3` ⇒ `mergeable_state = **blocked**`, danh sách check gồm **cả**
-`cong-15-buoc` **và** `docker-build` (2 required) — 🔑 đây là phép đo *"cổng **thật sự** chặn merge"*, thứ mà
-`D-63` muốn thấy trước khi tin. Sau khi **cả 2** check xanh mới merge (**đúng luật**: ⛔ không merge khi check
-còn `pending`/`failure`).
+| Mục | Số đo |
+|---|---|
+| Head | `6d6889e` (**1** commit docs) · `mergeable=True` (không xung đột) |
+| **`GET /pulls/3` khi check còn pending** | **`mergeable_state = blocked`** · 4 check `in_progress` — 🔑 cổng **thật sự** chặn merge (thứ `D-63` đòi thấy trước khi tin) |
+| Lượt `ci` **1** (run [`41981712316`](https://github.com/hungnt9801/eCommerce/actions/runs/41981712316)) | `openapi-drift` **success** (1m57s) · `e2e-playwright` **success** (3m19s) · `docker-build` **success** (run [`41981712424`](https://github.com/hungnt9801/eCommerce/actions/runs/41981712424), 67 s) · **`cong-15-buoc` FAILURE** (7m53s) |
+| Nguyên nhân ĐỎ | 🚨 **ĐÚNG `D-64`** — `probe-giu-cho-2instance` **14 DAT / 3 HONG**: `P12` `200/409` (kỳ vọng `200/200`) · `P13` **1** dòng giữ chỗ (kỳ vọng 2) · `P14` **1** exception trong log Host B. ⛔ Không phải mã hỏng: PR **chỉ** đổi `.md`, và **cùng lúc** máy dev chạy `-DayDu` cho **17 DAT / 0 HONG** (`P12` `200/200`, `exception A = 0 · B = 0`) — 📌 **cùng mã, khác kết quả ⇒ đúng định nghĩa flaky** |
+| Hệ quả đo được | PR **bị chặn merge thật** (đúng cơ chế required check) và phải tốn **1 lượt rerun**: `POST …/actions/runs/41981712316/rerun-failed-jobs` ⇒ **attempt 2**, chỉ job `cong-15-buoc` chạy lại ⇒ **success** ⇒ mới merge |
+| Merge | `PUT /pulls/3/merge` (`merge_method=merge`) sau khi **cả 2** required check xanh |
+
+🔑 **Hai điều phiên này chứng minh được, không phải suy luận:** ① required check **có hiệu lực** (`blocked` + merge bị chặn khi đỏ);
+② **chi phí thật của `D-64`** là **1 lượt rerun ~8 phút** cho một PR **chỉ đổi tài liệu** — đúng cảnh báo ở §2 #1.
+
+### 1.7 Hai **sự cố đo đạc** trong phiên (ghi để phiên sau không đọc sai số)
+
+1. 🚨 **Cổng nhẹ ĐỎ OAN ở bước ⑦ (`gen:api`) ngay lượt đầu — vì CRLF, không phải drift.** Lượt 1: `kiem-tat-ca.ps1`
+   **exit 1** tại `OPENAPI DRIFT: schema.d.ts DOI khi sinh lai…`. Đo nguyên nhân: `git pull` vừa **checkout 361 tệp**
+   (cả cây FE) với `core.autocrlf=true` ⇒ `schema.d.ts` trên đĩa **242.325 B / 6.179 CRLF**; `pnpm gen:api` ghi
+   **236.146 B / 6.179 LF** ⇒ `chay lai roi so SHA256 TRUOC/SAU` **khác** ⇒ cổng báo drift. ⛔ **Nội dung HỢP ĐỒNG
+   không đổi**: bỏ CR ở cả hai bản ⇒ **giống hệt** (`True`), và `git diff` **rỗng** (cùng blob `be3cebf`).
+   ✅ Lượt 2 sau khi `gen:api` để tệp ở LF: **exit 0 — 9/9 bước, 187,3 s**. ⇒ **Nợ** ghi ở §5 #7 (cổng so **byte**
+   chứ không so **nội dung đã chuẩn hoá**; chỉ xảy ra trên **checkout Windows mới**, CI Linux không bị).
+2. ⚠️ **`dotnet build` "0 error / 0 warning" là số của build KHÔNG biên dịch lại** — xem §1.1 #4: build **full** của
+   `main` = **9** warning `CS8604` **có sẵn**. Ghi rõ *full*/*incremental* từ nay.
+
+### 1.8 Đo lại cuối phiên (sau khi docs xong; máy dev Windows)
+
+| Lệnh | Kết quả |
+|---|---|
+| `pwsh -File .\tools\kiem-tat-ca.ps1` (bản nhẹ) | **exit 0 — 9/9 bước, 187,3 s** (lượt 1 ĐỎ OAN ở ⑦ — §1.7 #1) |
+| `pwsh -File .\tools\kiem-tat-ca.ps1 -DayDu` | **exit 0 — 19/19 bước, 450,6 s** (⑱ giữ chỗ 2 instance **17/0** · ⑮ oversell **11/0** · ⑯ outbox **9/0** · ⑰ outbox 2 inst **9/0**) |
+| `pwsh -File .\tools\test-cong-kiem.ps1 -ChiKiemMoc` | **36/36 DAT · 0 HONG** |
+| `pwsh -File .\tools\kiem-db.ps1` | **25/25 DAT · 0 HONG** (exit 0) |
+| `pwsh -File .\tools\kiem-link-tai-lieu.ps1` | **PASS** — **121** tệp `.md` · **679** link · **446** backtick · **0** chết |
+| `npm --prefix tools run check:mermaid` | **PASS** — **213** khối · **0** lỗi |
+| Migration | **0** migration mới (**59** vẫn mới nhất) · **0** test BE thêm (1961 unit + 96 integration, đo trong bước ③/④ của cổng) |
+
+
 
 ---
 
@@ -128,10 +160,11 @@ còn `pending`/`failure`).
 ## 5. Nợ / rủi ro (điều sẽ nổ nếu phiên sau không xử lý)
 
 1. 🚨 **`D-64` flaky + required check = đỏ ngẫu nhiên chặn merge.** Đo được: cùng cây mã, `17/17` vs `14/3`
-   (`P12` `200/409` · `P13` **1** dòng · `P14` **1** exception). Khi thấy đúng 3 ca đó: **kiểm tra mã có đổi
-   không** rồi mới kết luận; ⛔ **không** nới probe, ⛔ **không** tắt required check để "merge cho xong"
-   (tắt = quay lại đúng `D-63`). Cách xử lý đúng: chọn hướng **retry có giới hạn** hoặc **chấp nhận `409`** +
-   sửa kỳ vọng probe, rồi đo lại **tỉ lệ** trên nhiều lượt.
+   (`P12` `200/409` · `P13` **1** dòng · `P14` **1** exception). **`N19` đo lại lần nữa trên PR thật:**
+   PR #3 (**chỉ** đổi `.md`) ⇒ `14 DAT / 3 HONG` ⇒ **merge bị chặn**, phải **rerun** mới xanh (§1.6). Khi thấy
+   đúng 3 ca đó: **kiểm tra mã có đổi không** rồi mới kết luận; ⛔ **không** nới probe, ⛔ **không** tắt required
+   check để "merge cho xong" (tắt = quay lại `D-63`). Cách xử lý đúng: chọn hướng **retry có giới hạn** hoặc
+   **chấp nhận `409`** + sửa kỳ vọng probe, rồi đo lại **tỉ lệ** trên nhiều lượt.
 2. ⚠️ **`PUT …/protection` là API ghi đè** — lần sau đổi bất cứ cờ nào: `GET` → sửa **đúng 1** trường → `PUT`
    **cả object** → `GET` lại so **từng** trường. Body **thiếu** `required_pull_request_reviews`/`restrictions`
    ⇒ chúng thành `null` **im lặng**.
@@ -142,6 +175,14 @@ còn `pending`/`failure`).
 5. 📌 **Commit message phải thuần ASCII** (hook `commit-msg` chặn cả `§`).
 6. 📌 **Baseline build**: ghi rõ **full** (0 error / **9** CS8604 có sẵn) hay **incremental** (0/0). Đừng ghi
    *"0/0"* mà không nói loại — đó là chỗ `N18` ghi lệch.
+7. 🚨 **Cổng nhẹ bước ⑦ báo drift GIẢ trên checkout Windows MỚI (`CRLF`)** — nợ **mới đo được** (§1.7 #1):
+   `schema.d.ts` được `git checkout` ghi **CRLF** (242.325 B), `pnpm gen:api` ghi **LF** (236.146 B) ⇒ so **SHA256
+   trước/sau** ⇒ *"OPENAPI DRIFT"* dù nội dung hợp đồng **giống hệt** (`git diff` rỗng, cùng blob). Hệ quả: **người
+   clone mới trên Windows chạy cổng lần đầu thấy ĐỎ** với thông điệp nói sai nguyên nhân (*"sửa tay/chưa commit"*)
+   — đúng lớp *"dạy người ta bỏ qua màu đỏ"*. ✅ Cách né tạm: chạy `pnpm gen:api` một lần rồi chạy lại cổng (lượt 2
+   **9/9, 187,3 s**). 🔒 Cách sửa đúng (**cần quyết định, ngoài phạm vi `N19`**): so **nội dung đã chuẩn hoá CRLF**,
+   hoặc thêm `.gitattributes` `*.d.ts eol=lf` — ⛔ **không** nới phép kiểm thành "bỏ qua drift". **Nhận chủ:**
+   phiên `WP-09`/P1 (cổng), cùng nhóm với `D-64`.
 
 ---
 
@@ -178,7 +219,8 @@ cấu hình đã đo. Không mở rộng phạm vi. Kết thúc bằng đo lại
 | `HEAD` local | commit docs của phiên (`git log -1 --format=%h`) — 📌 không chép SHA vào tài liệu, mỗi lần thêm docs lại đổi |
 | **`main` trước phiên** | **`0e5c275`** (merge PR #2 — docs `N18`) · `git log -1 --format=%H origin/main` là **nguồn sự thật** |
 | **`main` sau phiên** | merge commit của **PR #3** (docs-only) — xem `git log --oneline -3 origin/main` |
-| PR | [**#3**](https://github.com/hungnt9801/eCommerce/pull/3) — docs-only, **`ci` + `docker-build` xanh trước khi merge** (đo `mergeable_state=blocked` khi còn pending) |
+| PR | [**#3**](https://github.com/hungnt9801/eCommerce/pull/3) — docs-only, **1** commit; `docker-build` **success** (67 s) · `openapi-drift` **success** · `e2e-playwright` **success** · `cong-15-buoc` **ĐỎ lượt 1** vì `D-64` flaky (`14/3`) ⇒ **rerun** ⇒ xanh ⇒ **mới merge** (đo `mergeable_state=blocked` khi check pending) |
+| Run Actions trên PR #3 | `ci` [`41981712316`](https://github.com/hungnt9801/eCommerce/actions/runs/41981712316) — attempt **1** ĐỎ (`cong-15-buoc`) ⇒ attempt **2** sau `rerun-failed-jobs` **XANH** · `docker-build` [`41981712424`](https://github.com/hungnt9801/eCommerce/actions/runs/41981712424) **success** |
 | Branch protection `main` | required: **`docker-build`** · **`cong-15-buoc`** (`strict=false`, `enforce_admins=false`) — `D-65` |
 | Tệp `N19` đã tạo | `docs/nhanh/handover-n19.md` |
 | Tệp `N19` đã sửa | `docs/nhanh/decisions.md` · `docs/nhanh/07-ke-hoach-trien-khai.md` · `docs/nhanh/08-session-protocol.md` · `docs/nhanh/README.md` |

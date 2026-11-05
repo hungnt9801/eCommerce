@@ -637,11 +637,13 @@ thái "đỏ mà không ai đọc".
 - ✅ **Bật + đo SAU:** `PUT …/protection` **cả object** (11 cờ + 1 context) ⇒ **200**; `contexts =
   ["docker-build","cong-15-buoc"]`, 10 cờ còn lại **không đổi** ⇒ không nuốt cấu hình. 🔒 Chỉ bật **1** job
   (⛔ không `openapi-drift`/`e2e-playwright` — ngoài phạm vi).
-- ✅ **Chứng minh cổng có hiệu lực:** PR **#3** (docs-only) ⇒ `mergeable_state = blocked` khi 2 check còn pending,
-  chỉ merge sau khi **cả 2** xanh. ⇒ **`D-63` ĐÓNG.**
+- ✅ **Chứng minh cổng có hiệu lực:** PR **#3** (docs-only) ⇒ `mergeable_state = blocked` khi 2 check còn pending
+  — và 🚨 **lượt `ci` đầu của PR #3 ĐỎ thật** đúng `D-64` (`probe-giu-cho-2instance` **14/3**: `P12` `200/409`,
+  `P13` **1** dòng, `P14` **1** exception) trong khi **cùng lúc** máy dev đo **17/0** ⇒ **merge bị chặn**, phải
+  `rerun-failed-jobs` (attempt 2 xanh) mới merge được. ⇒ **`D-63` ĐÓNG**, và `D-64` thành **nợ chặn merge**.
 - 🚨 **Hệ quả đổi mức nghiêm trọng:** `D-64` (`probe-giu-cho-2instance` **flaky**: `17/17` vs `14/3` trên cùng cây
-  mã) **từ nay chặn merge PR thật** ⇒ phải chốt hướng xử lý trước khi tin cổng tuyệt đối; ⛔ không tắt required
-  check để "merge cho xong".
+  mã) **từ nay chặn merge PR thật** — đo được ngay trong phiên: PR **chỉ đổi `.md`** vẫn tốn **1 lượt rerun ~8 phút**.
+  Phải chốt hướng xử lý trước khi tin cổng tuyệt đối; ⛔ không tắt required check để "merge cho xong".
 - 📌 **Baseline build ghi lệch `N18`:** build **full** của `main` = **0 error / 9 warning** `CS8604` có sẵn
   (`Address` 6 · `Sales` 3); build **incremental** = **0/0**. Con số *"0/0"* ở các handover trước là **đầu ra của
   build không compile lại** — từ nay ghi rõ *"full"*/*"incremental"*.
