@@ -123,6 +123,24 @@ jobs:
       - name: '6. Thu vien npm cua tools (mermaid) - npm ci tu lock DA COMMIT (F4)'
         run: npm ci --prefix tools
 
+      - name: '6b. Thu vien + BUILD Web Admin (WP-09: cong co buoc FE)'
+        run: |
+          # 🆕 `N10` — su tu `WP-09`: cong `kiem-tat-ca.ps1` co them buoc FE (typecheck · vitest · gen:api)
+          # va (voi `-DayDu`) buoc Playwright 8 luong. Ba buoc do CAN `node_modules` + `.next/BUILD_ID`
+          # ⇒ cai + build o day, TRUOC buoc 10. Thieu buoc nay thi cong do voi thong diep "khong thay vitest"
+          # va nguoi doc se tuong ma nguon hong.
+          corepack enable
+          corepack prepare pnpm@10.22.0 --activate
+          pnpm install --frozen-lockfile
+          pnpm build
+
+      - name: '6c. Chromium cho Playwright (8 luong Web Admin — WP-09)'
+        run: |
+          # 📌 `--with-deps` cai thu vien he thong ma headless chromium can tren runner SACH (khong co san).
+          # ⚠️ Buoc 10 chay cong `-DayDu` ⇒ co buoc 17 (Playwright). Thieu chromium thi buoc do do voi
+          #    thong diep "Executable doesn't exist" — MOI TRUONG, khong phai ma nguon (de bi sua sai cho).
+          pnpm --filter @ecommerce/admin-web exec playwright install --with-deps chromium
+
       - name: '7. Thu vien client cua Web (E2E can CSS/JS - E-07)'
         run: |
           dotnet tool install --global Volo.Abp.Cli
@@ -235,3 +253,124 @@ jobs:
             Evidence.json
             .bat-dau.txt
             tools/_tam-kiem/*.log
+
+  # ══════════════════════════════════════════════════════════════════════════════════════════════════════
+  # JOB `openapi-drift` (`WP-09`, `N10`) — HOP DONG OpenAPI phai khop controller.
+  #
+  # 🔑 VI SAO LA JOB RIENG (khong gop vao `cong-15-buoc`): phai **BAT Host** de doc `/swagger/v1/swagger.json`
+  #    ⇒ ~1-2 phut. Cong `-DayDu` da ~30 phut; nhet them vao do thi khong ai doc log, va no bien "cong nhanh"
+  #    thanh "cong cham". 📌 No van la **required check** cua rieng no — khong phai buoc tuy chon.
+  #
+  # 🚨 NO BAT LOI GI: ai sua controller/DTO `/api/v1` ma quen `pnpm spec:snapshot` + `pnpm gen:api` ⇒
+  #    `schema.d.ts` van mo ta DTO **CU** ⇒ `tsc` XANH, FE doc `undefined` trong im lang (`D-33`).
+  # ══════════════════════════════════════════════════════════════════════════════════════════════════════
+  openapi-drift:
+    name: openapi-drift
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: '0. Checkout'
+        uses: actions/checkout@v4
+
+      - name: '1. .NET SDK theo global.json'
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: '2. Node 24'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: '3. Ha tang (PostgreSQL + Redis) - Host can DB de boot'
+        run: docker compose up -d --wait
+
+      - name: '4. Thu vien FE (pnpm theo packageManager)'
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.22.0 --activate
+          pnpm install --frozen-lockfile
+
+      - name: '5. Build (Host DLL cho script bat Host)'
+        run: dotnet build eCommerce.slnx
+
+      - name: '6. Migrate + seed (swagger chi co khi app boot duoc)'
+        working-directory: src/eCommerce.DbMigrator
+        run: dotnet run --no-build -c Debug
+
+      - name: '7. CONG DRIFT - snapshot + schema.d.ts phai khong doi'
+        shell: pwsh
+        run: |
+          # 📌 Script tu bat/tat Host va so TRUOC/SAU khi sinh lai (khong so `git diff` - working tree co the
+          #    dang co thay doi hop le chua commit). `exit` THAT, khong qua ong danh.
+          & pwsh -NoProfile -File tools/kiem-openapi-drift.ps1
+          exit $LASTEXITCODE
+
+  # ══════════════════════════════════════════════════════════════════════════════════════════════════════
+  # JOB `e2e-playwright` (`WP-09`, `N10`) — 8 luong Web Admin tren runner SACH.
+  #
+  # 🚨 VI SAO JOB NAY TON TAI DU CONG DA CO BUOC 17: buoc 17 chay tren **may dev** (DB co du lieu tu N2…N9)
+  #    va **bo qua** khi thieu `-DayDu`. Job nay chay tren **DB TRONG** (chi migrate + seed) ⇒ no la thu duy
+  #    nhat chung minh 8 luong khong dua vao "du lieu da co san tren may" — dung loai loi `S11` da tra gia.
+  #
+  # 📌 Playwright TU BAT Host + Next (`webServer` trong `playwright.config.ts`) ⇒ khong co buoc "start server"
+  #    o day; neu them, hai ben se tranh cong 3000/54275 va test do vi ly do sai.
+  # ══════════════════════════════════════════════════════════════════════════════════════════════════════
+  e2e-playwright:
+    name: e2e-playwright
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: '0. Checkout'
+        uses: actions/checkout@v4
+
+      - name: '1. .NET SDK theo global.json'
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: '2. Node 24'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: '3. Ha tang (PostgreSQL 17 + Redis 7)'
+        run: docker compose up -d --wait
+
+      - name: '4. Thu vien FE'
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.22.0 --activate
+          pnpm install --frozen-lockfile
+
+      - name: '5. Build .NET (Host DLL ma Playwright se bat)'
+        run: dotnet build eCommerce.slnx
+
+      - name: '6. Migrate + seed (DB TRONG: dieu kien de E2E co that)'
+        working-directory: src/eCommerce.DbMigrator
+        run: dotnet run --no-build -c Debug
+
+      - name: '7. Build Web Admin (next start = ban production)'
+        run: pnpm build
+
+      - name: '8. Chromium + thu vien he thong'
+        run: pnpm --filter @ecommerce/admin-web exec playwright install --with-deps chromium
+
+      - name: '9. E2E - 8 luong (exit code THAT, khong ong danh)'
+        shell: pwsh
+        run: |
+          & pwsh -NoProfile -File tools/e2e.ps1
+          exit $LASTEXITCODE
+
+      - name: '10. Bang chung E2E (bao cao HTML + trace + screenshot)'
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-bang-chung-${{ github.sha }}
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            apps/admin-web/e2e/.run/html-report
+            apps/admin-web/test-results
+            apps/admin-web/e2e/.run/state.json
+            tools/_tam-kiem/e2e-playwright-run.log
