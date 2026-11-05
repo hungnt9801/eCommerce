@@ -1,8 +1,16 @@
 # Hạ tầng dev tối thiểu cho kiến trúc đã chốt:
 #   PostgreSQL = nguồn sự thật (EF Core)
 #   Redis      = distributed cache + distributed lock (bắt buộc cho ChannelHub: lock per-shop khi refresh token)
+#   admin-web  = Web Admin Next.js **production build** (D-10, `WP-10`)
 #
-# Chạy:  docker compose up -d
+# Chạy:  docker compose up -d                          # hạ tầng dev: PostgreSQL + Redis (admin-web KHÔNG bật — profile `ops`)
+#        docker compose up -d --build admin-web        # Web Admin production (cổng 3000)
+#
+# 🚨 **API Host KHÔNG nằm trong compose** (`WP-10`, `D-51` ①): Host là tiến trình .NET chạy trên máy dev
+#    (`http://localhost:54275`, D-16) hoặc một deployment riêng. Container nói chuyện với nó qua
+#    `host.docker.internal`. 📌 Đó cũng là điều kiện để DoD *"`/api/health` trả 200 khi Host sống, 503 khi
+#    Host chết"* **đo được**: nếu Host là service của compose thì `depends_on` sẽ **chặn** admin-web khởi
+#    động khi Host chết ⇒ ta không bao giờ nhìn thấy `503`, chỉ nhìn thấy container "chưa chạy".
 services:
   postgres:
     image: postgres:17-alpine
@@ -34,6 +42,57 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  admin-web:
+    build:
+      # 🔒 Context = GỐC repo (workspace pnpm cần lockfile + `packages/api-client`) ⇒ `.dockerignore` ở gốc.
+      context: .
+      dockerfile: apps/admin-web/Dockerfile
+      args:
+        # 🚨 `NEXT_PUBLIC_*` NHÚNG LÚC BUILD ⇒ phải là build arg, không phải `environment` (`D-52` ③).
+        NEXT_PUBLIC_APP_NAME: ${NEXT_PUBLIC_APP_NAME:-eCommerce}
+    image: ecommerce-admin-web:local
+    container_name: ecommerce-admin-web
+    # 🚨 **PROFILE `ops` — ĐO ĐƯỢC, ĐỪNG BỎ (`D-51` ⑧):** cổng 3000 khi container chạy do
+    #    **`com.docker.backend`** giữ, và `tools/e2e.ps1` **GIẾT** tiến trình giữ 3000 ⇒ nếu `docker compose up -d`
+    #    (lệnh baseline của `08 §4`) tự bật service này thì **E2E sẽ giết Docker Desktop**.
+    #    ⇒ Web Admin chỉ chạy khi gọi **đích danh**: `docker compose up -d admin-web` (hoặc `--profile ops`).
+    profiles: ["ops"]
+    ports:
+      # 📌 Đổi cổng ngoài (khi 3000 đang bận việc dev): `ADMIN_WEB_PORT=3001 docker compose up -d admin-web`.
+      - "${ADMIN_WEB_PORT:-3000}:3000"
+    environment:
+      # 📌 Trong container `localhost` = **chính container** ⇒ trỏ về máy chủ Docker.
+      API_BASE_URL: ${API_BASE_URL:-http://host.docker.internal:54275}
+      AUTH_ISSUER: ${AUTH_ISSUER:-http://host.docker.internal:54275}
+      # 📌 Bí mật: **bắt buộc** override khi deploy thật (compose chỉ có mặc định dev).
+      AUTH_SECRET: ${AUTH_SECRET:-dev-only-auth-secret-doi-o-production}
+      AUTH_TRUST_HOST: "true"
+      OAUTH_CLIENT_ID: ${OAUTH_CLIENT_ID:-eCommerce_App}
+      OAUTH_CLIENT_SECRET: ${OAUTH_CLIENT_SECRET:-1q2w3e*}
+      OAUTH_SCOPE: ${OAUTH_SCOPE:-eCommerce offline_access}
+      DEFAULT_BUSINESS: ${DEFAULT_BUSINESS:-230222}
+      HEALTH_TIMEOUT_MS: ${HEALTH_TIMEOUT_MS:-3000}
+      # 📌 Giữ log ra stdout của Docker; Next tôn trọng biến này.
+      NEXT_TELEMETRY_DISABLED: "1"
+    # 📌 Linux engine: `host.docker.internal` không tự có (Docker Desktop tự thêm). Không có dòng này thì
+    #    trên runner Linux `API_BASE_URL` **phân giải thất bại** ⇒ `/api/health` trả 503 **vĩnh viễn**
+    #    dù Host sống — một cấu hình sai trông y hệt "Host chết".
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # 📌 KHÔNG `depends_on`. `WP-10` ghi "depends_on host", nhưng Host không phải service của compose và
+    #    ràng buộc đó sẽ **che mất** đúng hành vi cần chứng minh (503) — xem `D-51` ①.
+    healthcheck:
+      # 📌 Dùng **chính** `/api/health` (Next → Host): container "healthy" nghĩa là **cả chuỗi** sống.
+      #    `wget` có sẵn trong `node:22-alpine` (busybox) — không cần cài thêm gì.
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    # 📌 **KHÔNG đặt `restart`**: `restart: unless-stopped` sẽ làm container **tự sống lại** sau khi Docker
+    #    Desktop khởi động lại và **giữ cổng 3000** — đúng cái bẫy của `D-51` ⑧ (E2E giết `com.docker.backend`).
+    #    Đây là compose **dev**; môi trường thật dùng orchestrator, không dựa vào `restart` ở đây.
 
 volumes:
   ecommerce_pgdata:
