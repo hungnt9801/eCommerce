@@ -135,10 +135,22 @@ public class OrderAppService : ApplicationService, IOrderAppService
     private readonly IRepository<Order, Guid> _donHang;
     private readonly IRepository<OrderLine, Guid> _dongDon;
 
-    public OrderAppService(IRepository<Order, Guid> donHang, IRepository<OrderLine, Guid> dongDon)
+    /// <summary>
+    /// 🆕 `WP-07` — **phạm vi dữ liệu** của người đang đăng nhập (`07 §WP-07`: DoD
+    /// *"nhân viên bật 'chỉ xem dữ liệu của mình' chỉ thấy đơn mình tạo"*).
+    /// 🚨 Lọc ở **server**: ẩn ở UI là **không lọc** (DevTools vẫn gọi được API — và đó là dữ liệu doanh thu).
+    /// 📌 Dùng chung **một** hợp đồng với `Pos` (`Customers.IDataScopeResolver`) để hai màn không lệch nhau.
+    /// </summary>
+    private readonly eCommerce.Customers.IDataScopeResolver _phamVi;
+
+    public OrderAppService(
+        IRepository<Order, Guid> donHang,
+        IRepository<OrderLine, Guid> dongDon,
+        eCommerce.Customers.IDataScopeResolver phamVi)
     {
         _donHang = donHang;
         _dongDon = dongDon;
+        _phamVi = phamVi;
     }
 
     /// <inheritdoc />
@@ -214,6 +226,11 @@ public class OrderAppService : ApplicationService, IOrderAppService
     public async Task<OrderDetailDto> GetAsync(Guid id)
     {
         var don = await _donHang.GetAsync(id);
+
+        // 🆕 `WP-07` — kiểm phạm vi ở **đường đọc chi tiết** (không chỉ DS): nếu thiếu, đổi GUID trên URL
+        // là xem được đơn ngoài phạm vi — đúng lỗi *"lọc ở client"* mà `07 §WP-07` cấm.
+        await KiemPhamViAsync(don);
+
         var dong = await _dongDon.GetListAsync(x => x.OrderId == id);
 
         var dto = new OrderDetailDto();
@@ -272,6 +289,10 @@ public class OrderAppService : ApplicationService, IOrderAppService
     {
         var q = await _donHang.GetQueryableAsync();
 
+        // 🆕 `WP-07` — **phạm vi dữ liệu** áp TRƯỚC mọi bộ lọc khác (một chỗ duy nhất, áp cho **cả** DS và
+        // bộ đếm 14 tab ⇒ badge không thể đếm những đơn người dùng không được thấy).
+        q = await ApDungPhamViAsync(q);
+
         if (!string.IsNullOrWhiteSpace(input.Q))
         {
             var tim = input.Q.Trim();
@@ -300,6 +321,12 @@ public class OrderAppService : ApplicationService, IOrderAppService
             q = q.Where(x => x.WarehouseId == khoId);
         }
 
+        // 🆕 `WP-07` — tab "Đơn hàng" của màn chi tiết khách.
+        if (input.CustomerId is { } khachId)
+        {
+            q = q.Where(x => x.CustomerId == khachId);
+        }
+
         if (input.FromUtc is { } tu)
         {
             q = q.Where(x => x.CreationTime >= tu);
@@ -313,8 +340,53 @@ public class OrderAppService : ApplicationService, IOrderAppService
         return q;
     }
 
-    private static OrderListItemDto ToListItem(Order don, int soDong)
+    /// <summary>
+    /// 🆕 `WP-07` — áp **phạm vi dữ liệu** lên truy vấn đơn (server-side).
+    /// 📌 `Own` ⇒ `CreatorId == người đăng nhập`; `Store` ⇒ `WarehouseId == kho của cửa hàng`.
+    /// ⚠️ Thiếu khoá để lọc (`Own` không có người dùng / `Store` chưa gắn kho) ⇒ **RỖNG**, **không** rơi về
+    /// "tất cả": nới quyền im lặng khi cấu hình thiếu là lỗi bảo mật tệ nhất trong ba lựa chọn.
+    /// 📌 Đơn do **sàn/kênh** tạo (`CreatorId = null`) **không** thuộc `Own` — đúng nghĩa *"dữ liệu của tôi"*.
+    /// </summary>
+    private async Task<IQueryable<Order>> ApDungPhamViAsync(IQueryable<Order> q)
     {
+        var phamVi = await _phamVi.LayAsync();
+
+        return phamVi.PhamVi switch
+        {
+            eCommerce.Customers.PhamViDuLieu.Own =>
+                phamVi.NguoiDungId is { } nguoiDung ? q.Where(x => x.CreatorId == nguoiDung) : q.Where(_ => false),
+
+            eCommerce.Customers.PhamViDuLieu.Store =>
+                phamVi.KhoCuaHangId is { } kho ? q.Where(x => x.WarehouseId == kho) : q.Where(_ => false),
+
+            _ => q
+        };
+    }
+
+    /// <summary>Kiểm phạm vi cho **một** đơn (đường đọc chi tiết) — ném `0018` nếu ngoài phạm vi.</summary>
+    private async Task KiemPhamViAsync(Order don)
+    {
+        var phamVi = await _phamVi.LayAsync();
+
+        var ngoai = phamVi.PhamVi switch
+        {
+            eCommerce.Customers.PhamViDuLieu.Own =>
+                phamVi.NguoiDungId is null || don.CreatorId != phamVi.NguoiDungId,
+            eCommerce.Customers.PhamViDuLieu.Store =>
+                phamVi.KhoCuaHangId is null || don.WarehouseId != phamVi.KhoCuaHangId,
+            _ => false
+        };
+
+        if (ngoai)
+        {
+            throw new Volo.Abp.BusinessException(OrderErrorCodes.KhongTimThayDon)
+                .WithData("orderId", don.Id)
+                .WithData("phamVi", phamVi.PhamVi.ToString())
+                .WithData("lyDo", "Đơn NGOÀI phạm vi dữ liệu của bạn.");
+        }
+    }
+
+    private static OrderListItemDto ToListItem(Order don, int soDong)    {
         var dto = new OrderListItemDto();
         SaoChep(don, soDong, dto);
         return dto;

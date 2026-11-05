@@ -125,3 +125,34 @@ CK_CatProdBatches_Ngay_Khoang|WP-03: NSX sau HSD — CHƯA có đường ghi lô
 #    **dừng, không ghi gì** nếu thấy biến thể đã có bản đồ ⇒ mã `23505` ở index này chỉ xảy ra khi hai
 #    TIẾN TRÌNH backfill chạy song song (đã cấm bằng quy trình: chỉ một phiên được chạy migrator/backfill).
 IX_CatVariantMaps_TenantId_VariantId|WP-03 nửa sau: *một biến thể chỉ chuyển MỘT lần* — ca trùng là lỗi VẬN HÀNH (chạy backfill song song), không phải ca nghiệp vụ mà client cần phân biệt; service đã tiền kiểm bằng bảng đối chiếu và DỪNG trước khi ghi, nên chỉ còn race giữa hai tiến trình (không có mã riêng cần thiết)
+
+# ── WP-07 (04/11/2026) — KHÁCH MỞ RỘNG + CẤU HÌNH TỔ CHỨC ──
+# 📌 Ba `CHECK` dưới đây là **hàng rào cuối cho đường ghi tắt** (SQL tay/import). Mọi đường ghi thật đã
+#    bị **domain** chặn TRƯỚC với mã riêng (`Customers:0017..0020` · `Customers:0021`), nên `23514` chỉ
+#    xảy ra khi ai đó sửa DB trực tiếp — không phải ca nghiệp vụ mà client cần phân biệt.
+CK_CusCustomers_SoDu_KhongAm|WP-07: điểm/tiền tích luỹ/nợ/hạn mức âm — domain đã chặn (`NghiepVuKhach` + `Customer.GhiNhanMuaHang`); CHECK chỉ cho đường ghi tắt
+CK_CusLevels_Nguong_KhongAm|WP-07: ngưỡng lên cấp âm — domain đã ném (`CustomerLevel.DatNguong`); CHECK là hàng rào cuối
+CK_CusLevels_ChietKhau_0_100|WP-07: % chiết khấu cấp ngoài 0..100 — domain đã ném; CHECK chặn SQL tay (giảm 120% là bán lỗ có hệ thống)
+CK_SetRoleDataScopes_PhamVi_HopLe|WP-07: phạm vi dữ liệu ngoài 0..2 — enum chỉ có 3 giá trị và tầng app chỉ ghi qua `RoleDataScope` (nhận enum, không nhận số tự do); CHECK chặn SQL tay chèn số lạ (nếu lọt, phép gộp `Min` sẽ nới quyền IM LẶNG)
+
+# ── WP-08 (04/11/2026) — READ-MODEL BÁO CÁO (`Rpt*`, D-47) ──
+# 📌 **KHÔNG có đường ghi từ NGƯỜI DÙNG**: chỉ `TongHopBaoCaoService` (job + `POST /reports/aggregate`) ghi
+#    read-model, và mọi bất biến của nó đã được **domain** kiểm TRƯỚC (`Reporting:0001..0009`). `23505`/`23514`
+#    ở đây nghĩa là **lượt tổng hợp thứ hai chạy chồng** hoặc ai đó sửa DB trực tiếp — lỗi VẬN HÀNH, không phải
+#    ca nghiệp vụ mà client cần phân biệt bằng mã. 🔒 Unique index vẫn PHẢI có `NULLS NOT DISTINCT` (migration
+#    viết tay): thiếu là doanh thu **nhân đôi im lặng** khi job chạy lại — đó chính là DoD của WP-08.
+IX_RptFactSalesLines_TenantId_Nguon_DongNguon|WP-08: *một dòng chứng từ ⇒ một dòng sự kiện* — service đã `DELETE` theo (ngày, nguồn) rồi `INSERT` trong CÙNG transaction + khoá phân tán; trùng chỉ xảy ra khi hai lượt chồng nhau (đã chặn bằng khoá) hoặc ghi tắt
+IX_RptAggDailySales_TenantId_Ngay_Nguon|WP-08: *một dòng / (ngày, nguồn)* — cùng lý do trên; ca trùng là hệ quả của ghi tắt, không phải ca cần mã riêng
+IX_RptFactInventorySnapshots_TenantId_Ngay_Kho_Sku|WP-08: *một ảnh / (ngày, kho, SKU)* — service xoá ảnh của ngày trước khi chụp lại; trùng là lỗi vận hành (chạy song song)
+IX_RptWatermarks_TenantId_Nguon|WP-08: *một mốc / nguồn* — hai mốc cho cùng nguồn làm job "chạy lại từ đầu mỗi lượt" mà không có lỗi; service tạo mốc thiếu trong cùng transaction, trùng là ghi tắt
+IX_RptDimDates_TenantId_Ngay|WP-08: danh mục chiều — một dòng / ngày; service kiểm trước khi chèn (`FirstOrDefault` + `Insert`), trùng là ghi tắt/race
+IX_RptDimProducts_TenantId_Sku|WP-08: danh mục chiều — một dòng / SKU; cùng lý do
+IX_RptDimStores_TenantId_Kho|WP-08: danh mục chiều — một dòng / kho; cùng lý do
+IX_RptDimStaffs_TenantId_NhanVien|WP-08: danh mục chiều — một dòng / nhân viên; cùng lý do
+CK_RptFactSalesLines_Tien_KhongAm|WP-08: tiền dòng âm — domain đã ném `Reports:0004`; CHECK là hàng rào cuối cho ghi tắt
+CK_RptFactSalesLines_SoLuong_KhongAm|WP-08: số lượng dòng âm — domain đã ném; CHECK cho đường ghi tắt
+CK_RptFactSalesLines_Nguon_HopLe|WP-08: nguồn ngoài {0 bán lẻ, 1 đơn hàng} — domain đã ném `Reports:0001` (nguồn lạ làm doanh thu trùng hoặc sai cột); CHECK chặn SQL tay
+CK_RptFactInventorySnapshots_Chieu_KhongAm|WP-08: một chiều tồn âm — domain đã ném `Reports:0006` (không chụp ảnh xấu vào read-model); CHECK chặn SQL tay
+CK_RptAggDailySales_Tien_KhongAm|WP-08: doanh thu/số đếm âm — domain đã ném; CHECK cho ghi tắt
+CK_RptAggDailySales_Nguon_HopLe|WP-08: nguồn ngoài {0,1} — domain đã ném; CHECK chặn SQL tay
+CK_RptWatermarks_SoDong_KhongAm|WP-08: số dòng mốc âm — domain đã ném; CHECK cho ghi tắt

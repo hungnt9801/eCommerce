@@ -53,4 +53,11 @@ public static class OrderErrorCodes
 
     /// <summary>🆕 **`WP-05`** — dữ liệu đơn **không hợp lệ** (loại/nguồn/lý do ngoài danh mục, số âm…).</summary>
     public const string DuLieuDonKhongHopLe = Nhom + "0011";
+
+    /// <summary>
+    /// 🆕 **`WP-07`** — đơn **NGOÀI phạm vi dữ liệu** của người đang đăng nhập.
+    /// 🔒 Cùng lý do mã `Pos:0028`: người dùng cần phân biệt *"đơn không tồn tại"* với *"bạn không có quyền
+    /// xem đơn này"* — hai hành động khác nhau. 📌 Không trả kèm nội dung đơn (chỉ id) để không rò rỉ.
+    /// </summary>
+    public const string KhongTimThayDon = Nhom + "0012";
 }

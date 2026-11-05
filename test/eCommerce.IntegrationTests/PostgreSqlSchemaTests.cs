@@ -185,7 +185,27 @@ public class PostgreSqlSchemaTests
         //    → **74** (02/11/2026, `Wp04_Inventory_Buckets_Mode` — **+1**: `IX_InvStockDocuments_TenantId_IdempotencyKey`
         //      (chống tạo phiếu kho hai lần khi retry — D-29). Thiếu NND thì với `TenantId = NULL` index **mất
         //      tác dụng** ⇒ hai phiếu cùng `IdempotencyKey` LỌT ⇒ **nhập kho hai lần**, im lặng).
-        Assert.Equal(74L, await DemAsync(
+        //    → **79** (04/11/2026, `Wp06_Pos_BanLe` — **+5** index của POS, TẤT CẢ đều viết tay `NULLS NOT DISTINCT`:
+        //      `IX_PosRetailBills_TenantId_ClientBillId` (chống hoá đơn trùng khi POS offline gửi lại ⇒ khách bị
+        //      tính tiền hai lần), `IX_PosRetailBills_TenantId_Number`, `IX_PosRetailReturns_TenantId_Number`,
+        //      `IX_PosCashSessions_TenantId_Number`, và `IX_PosCashSessions_TenantId_WarehouseId_DangMo`
+        //      (**kèm bộ lọc `Status = 0`** — một quầy một ca mở; hai ca cùng lúc ⇒ két không tách được).
+        //      Thiếu NND thì với `TenantId = NULL` cả năm index **mất tác dụng IM LẶNG**).
+        //    → **85** (04/11/2026, `Wp07_KhachHang_NhanVien` — **+6** index của `WP-07`, TẤT CẢ viết tay
+        //      `NULLS NOT DISTINCT`: `IX_CusLevels_TenantId_Code` · `IX_SetStores_TenantId_Code` ·
+        //      `IX_SetDepartments_TenantId_Code` · `IX_SetStaffs_TenantId_Code` ·
+        //      `IX_SetStaffs_TenantId_IdentityUserId` (**kèm bộ lọc `IS NOT NULL`** — một tài khoản một nhân
+        //      viên) · `IX_SetRoleDataScopes_TenantId_RoleName` (một vai trò một phạm vi dữ liệu).
+        //      Thiếu NND thì với `TenantId = NULL` cả sáu index **mất tác dụng IM LẶNG** ⇒ mã cấu hình trùng
+        //      LỌT ⇒ hai "cấp VIP" cùng mã, hai nhân viên cùng tài khoản, hai phạm vi cho một vai trò).
+        //    → **93** (04/11/2026, `Wp08_BaoCao_Reporting` — **+8** index của read-model báo cáo, TẤT CẢ viết tay
+        //      `NULLS NOT DISTINCT`: `IX_RptFactSalesLines_TenantId_Nguon_DongNguon` (**grain** = một dòng chứng
+        //      từ ⇒ một dòng sự kiện), `IX_RptAggDailySales_TenantId_Ngay_Nguon`, `IX_RptFactInventorySnapshots_
+        //      TenantId_Ngay_Kho_Sku`, `IX_RptWatermarks_TenantId_Nguon`, và 4 chiều `RptDim*`.
+        //      🔑 Thiếu NND thì với `TenantId = NULL` (đang chạy 1 tenant) index MẤT TÁC DỤNG IM LẶNG ⇒ chạy lại
+        //      job tổng hợp (hoặc hai lượt chồng nhau) ghi **hai dòng cho một dòng chứng từ** ⇒ **doanh thu nhân
+        //      đôi** — đúng ca DoD `WP-08` (*"job chạy lại 2 lần không nhân đôi dữ liệu"*) sinh ra để chặn.
+        Assert.Equal(93L, await DemAsync(
             "select count(*) from pg_indexes where schemaname = 'public' and indexdef like '%NULLS NOT DISTINCT%'"));
 
         // Kiểm tra ĐÍCH DANH để thông báo lỗi có ý nghĩa (tên index dài có thể bị PostgreSQL cắt ⇒ so theo tiền tố).
@@ -331,6 +351,44 @@ public class PostgreSqlSchemaTests
             //    (tồn tăng gấp đôi) mà không có lỗi nào. ⚠️ Index có **bộ lọc** `IdempotencyKey IS NOT NULL`
             //    ⇒ EF không sinh được `NULLS NOT DISTINCT` kèm bộ lọc ⇒ đã viết SQL thô trong migration 53.
             "IX_InvStockDocuments_TenantId_IdempotencyKey",
+            // 🆕 `WP-06` (04/11/2026) — **NĂM index của POS**, cả năm đều do migration `Wp06_Pos_BanLe` viết tay:
+            //   • `ClientBillId`: POS **offline gửi lại** ⇒ thiếu NND là khách bị tính tiền HAI LẦN;
+            //   • `Number` (hoá đơn / phiếu trả / ca): hai chứng từ cùng số ⇒ đối chiếu két sai;
+            //   • `..._DangMo` (**có bộ lọc** `Status = 0`): một quầy một ca mở ⇒ hai ca cùng lúc là
+            //     `ExpectedCash` của cả hai đều sai và không ai chịu trách nhiệm được.
+            "IX_PosRetailBills_TenantId_ClientBillId",
+            "IX_PosRetailBills_TenantId_Number",
+            "IX_PosRetailReturns_TenantId_Number",
+            "IX_PosCashSessions_TenantId_Number",
+            "IX_PosCashSessions_TenantId_WarehouseId_DangMo",
+            // 🆕 `WP-07` (04/11/2026) — **SÁU index của khách/cấu hình tổ chức**, đều viết tay trong migration
+            // `Wp07_KhachHang_NhanVien`:
+            //   • `CusLevels.Code` · `SetStores.Code` · `SetDepartments.Code` · `SetStaffs.Code`: mã danh mục
+            //     duy nhất ⇒ thiếu NND là hai "cấp VIP" / hai cửa hàng cùng mã LỌT (báo cáo gộp nhầm);
+            //   • `SetStaffs.IdentityUserId` (**có bộ lọc** `IS NOT NULL`): một tài khoản một nhân viên ⇒
+            //     thiếu là *"đơn của tôi"* có **hai** nghĩa ⇒ phạm vi dữ liệu lọc SAI mà không lỗi nào;
+            //   • `SetRoleDataScopes.RoleName`: một vai trò một phạm vi ⇒ hai dòng mâu thuẫn thì phép gộp
+            //     phải "đoán" — và người vận hành thấy cấu hình khác với phạm vi đang áp.
+            "IX_CusLevels_TenantId_Code",
+            "IX_SetStores_TenantId_Code",
+            "IX_SetDepartments_TenantId_Code",
+            "IX_SetStaffs_TenantId_Code",
+            "IX_SetStaffs_TenantId_IdentityUserId",
+            "IX_SetRoleDataScopes_TenantId_RoleName",
+            // 🆕 `WP-08` (04/11/2026) — **TÁM index của read-model báo cáo**; mất NND ở bất kỳ index nào thì:
+            //   • `FactSalesLines (Nguon, DongNguon)`: hai dòng sự kiện cho MỘT dòng chứng từ ⇒ **doanh thu nhân đôi**;
+            //   • `AggDailySales (Ngay, Nguon)`: hai dòng tổng hợp cho một ngày ⇒ biểu đồ nhân đôi;
+            //   • `FactInventorySnapshots (Ngay, Kho, Sku)`: hai ảnh tồn cho một cặp ⇒ tồn kho báo gấp đôi;
+            //   • `Watermarks (Nguon)`: hai mốc ⇒ job chạy lại từ đầu mỗi lượt (hoặc không bao giờ tiến);
+            //   • 4 chiều `RptDim*`: dòng chiều trùng ⇒ phép gộp theo SKU/kho/nhân viên đếm sai.
+            "IX_RptFactSalesLines_TenantId_Nguon_DongNguon",
+            "IX_RptAggDailySales_TenantId_Ngay_Nguon",
+            "IX_RptFactInventorySnapshots_TenantId_Ngay_Kho_Sku",
+            "IX_RptWatermarks_TenantId_Nguon",
+            "IX_RptDimDates_TenantId_Ngay",
+            "IX_RptDimProducts_TenantId_Sku",
+            "IX_RptDimStores_TenantId_Kho",
+            "IX_RptDimStaffs_TenantId_NhanVien",
         ];
 
         foreach (var ten in phaiCo)

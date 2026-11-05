@@ -36,6 +36,8 @@ namespace eCommerce.EntityFrameworkCore;
     typeof(EInvoice.EntityFrameworkCore.EInvoiceEntityFrameworkCoreModule),
     typeof(Signing.EntityFrameworkCore.SigningEntityFrameworkCoreModule),
     typeof(Pricing.EntityFrameworkCore.PricingEntityFrameworkCoreModule),
+    // 🆕 `WP-08` — module REPORTING: mapping read-model báo cáo (`ConfigureReporting`).
+    typeof(Reporting.ReportingEntityFrameworkCoreModule),
     typeof(AbpEntityFrameworkCorePostgreSqlModule),
     typeof(AbpIdentityEntityFrameworkCoreModule),
     typeof(AbpPermissionManagementEntityFrameworkCoreModule),

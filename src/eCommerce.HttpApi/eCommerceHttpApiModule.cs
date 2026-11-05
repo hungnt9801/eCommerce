@@ -16,7 +16,9 @@ namespace eCommerce;
 [DependsOn(
     typeof(AbpAspNetCoreMvcModule),
     typeof(eCommerceApplicationContractsModule),
-    typeof(Catalog.CatalogApplicationContractsModule))]
+    typeof(Catalog.CatalogApplicationContractsModule),
+    // 🆕 `WP-06` — controller `/api/v1/pos` dùng DTO + kiểu enum của module `Pos`.
+    typeof(eCommerce.Pos.PosApplicationContractsModule))]
 public class eCommerceHttpApiModule : AbpModule
 {
 }

@@ -40,6 +40,12 @@
     <!-- 🆕 `P0 #1` — module Sales (Application + Contracts). -->
     <ProjectReference Include="..\..\modules\Sales\eCommerce.Sales.Application\eCommerce.Sales.Application.csproj" />
     <ProjectReference Include="..\..\modules\Sales\eCommerce.Sales.Application.Contracts\eCommerce.Sales.Application.Contracts.csproj" />
+    <!-- 🆕 `WP-06` — module POS (hoá đơn bán lẻ + ca thu ngân + trả hàng). app → module là HỢP LỆ. -->
+    <ProjectReference Include="..\..\modules\Pos\eCommerce.Pos.Application\eCommerce.Pos.Application.csproj" />
+    <ProjectReference Include="..\..\modules\Pos\eCommerce.Pos.Application.Contracts\eCommerce.Pos.Application.Contracts.csproj" />
+    <!-- 🆕 `WP-08` — module REPORTING (read-model báo cáo + job tổng hợp). app → module là HỢP LỆ. -->
+    <ProjectReference Include="..\..\modules\Reporting\eCommerce.Reporting.Application\eCommerce.Reporting.Application.csproj" />
+    <ProjectReference Include="..\..\modules\Reporting\eCommerce.Reporting.Application.Contracts\eCommerce.Reporting.Application.Contracts.csproj" />
     <!-- 🚨 `SAL-005` — nơi nhận đơn sàn dùng `IIdempotencyGuard` của module Messaging (`XC-002`).
          app → module là HỢP LỆ (module → app mới bị cấm). -->
     <ProjectReference Include="..\..\modules\Messaging\eCommerce.Messaging.Domain\eCommerce.Messaging.Domain.csproj" />

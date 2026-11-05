@@ -39,7 +39,15 @@ namespace eCommerce;
     typeof(eCommerce.Catalog.CatalogApplicationModule),
     typeof(eCommerce.Inventory.InventoryApplicationModule),
     typeof(eCommerce.Reconciliation.ReconciliationApplicationModule),
-    typeof(eCommerce.Sales.SalesApplicationModule)
+    typeof(eCommerce.Sales.SalesApplicationModule),
+    // 🆕 `WP-06` — module POS (hoá đơn bán lẻ + ca thu ngân + trả hàng).
+    // 📌 Thiếu dòng này thì `[Authorize(Pos.Sell)]` vẫn build, nhưng app service **KHÔNG được đăng ký**
+    // ⇒ `IRetailBillAppService` không resolve được ⇒ **HTTP 500** ở request đầu tiên (lỗi Phase 0 quen thuộc).
+    typeof(eCommerce.Pos.PosApplicationModule),
+    // 🆕 `WP-08` — module REPORTING (read-model báo cáo + job tổng hợp + API `/api/v1/reports`).
+    // 📌 Thiếu dòng này thì job tổng hợp **không được đăng ký** (read-model đứng yên ⇒ mọi báo cáo rỗng)
+    // và `IReportAppService` không resolve được ⇒ **HTTP 500**, dù build/migration xanh.
+    typeof(eCommerce.Reporting.ReportingApplicationModule)
 )]
 [DependsOn(typeof(AbpAccountApplicationModule))]
     public class eCommerceApplicationModule : AbpModule

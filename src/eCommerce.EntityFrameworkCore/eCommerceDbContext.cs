@@ -183,6 +183,25 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>, IHasEventOut
     /// </summary>
     public DbSet<Customers.CustomerDataExportLog> CustomerDataExportLogs { get; set; } = default!;
 
+    // ---- `WP-07` — KHÁCH MỞ RỘNG + CẤU HÌNH TỔ CHỨC ----
+    /// <summary>
+    /// 🆕 `WP-07` — cấp khách · chăm sóc · cửa hàng · phòng ban · nhân viên · phạm vi dữ liệu theo vai trò.
+    /// 🚨 **MỖI DÒNG LÀ BẮT BUỘC** (quy ước #5): thiếu `DbSet` ⇒ `IRepository<T>` **không được đăng ký**
+    /// ⇒ app service không resolve được ⇒ **`HTTP 500`** dù build/migration **xanh**. 🛡️ Lưới an toàn CI:
+    /// `DbSetRegistrationTests`.
+    /// </summary>
+    public DbSet<Customers.CustomerLevel> CustomerLevels { get; set; } = default!;
+
+    public DbSet<Customers.CustomerCare> CustomerCares { get; set; } = default!;
+
+    public DbSet<Customers.Store> Stores { get; set; } = default!;
+
+    public DbSet<Customers.Department> Departments { get; set; } = default!;
+
+    public DbSet<Customers.Staff> Staffs { get; set; } = default!;
+
+    public DbSet<Customers.RoleDataScope> RoleDataScopes { get; set; } = default!;
+
     // ---- Orders ----
     public DbSet<Orders.Order> Orders { get; set; } = default!;
     public DbSet<Orders.OrderLine> OrderLines { get; set; } = default!;
@@ -219,6 +238,40 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>, IHasEventOut
     /// + `MarketplaceEventLogBatBienTests`.
     /// </summary>
     public DbSet<Orders.MarketplaceEventLog> MarketplaceEventLogs { get; set; } = default!;
+
+    // ---- POS (`WP-06`) ----
+    // 🚨 **BẮT BUỘC có `DbSet`** cho TỪNG entity: ABP đăng ký `IRepository<T>` bằng cách **quét `DbSet`**
+    // trên DbContext, KHÔNG quét model ⇒ thiếu một dòng là app service POS **không resolve được** ⇒
+    // **HTTP 500** ở request đầu tiên, dù build/migration xanh (quy ước #3; lưới an toàn `DbSetRegistrationTests`).
+    public DbSet<Pos.RetailBill> RetailBills { get; set; } = default!;
+    public DbSet<Pos.RetailBillLine> RetailBillLines { get; set; } = default!;
+    public DbSet<Pos.RetailBillPayment> RetailBillPayments { get; set; } = default!;
+    public DbSet<Pos.CashSession> CashSessions { get; set; } = default!;
+    public DbSet<Pos.RetailReturn> RetailReturns { get; set; } = default!;
+    public DbSet<Pos.RetailReturnLine> RetailReturnLines { get; set; } = default!;
+
+    // ---- Reporting (`WP-08`) — READ-MODEL BÁO CÁO ----
+    /// <summary>
+    /// 🆕 `WP-08` — **bảng chiều + sự kiện + tổng hợp + mốc** của read-model báo cáo.
+    /// 🚨 **MỖI DÒNG LÀ BẮT BUỘC** (quy ước #5): thiếu `DbSet` ⇒ `IRepository<T>` **không được đăng ký** ⇒
+    /// job tổng hợp hoặc màn báo cáo **không resolve được** ⇒ **`HTTP 500`** dù build/migration **xanh**.
+    /// 🛡️ Lưới an toàn CI: `DbSetRegistrationTests`.
+    /// </summary>
+    public DbSet<Reporting.RptDimDate> ReportDimDates { get; set; } = default!;
+
+    public DbSet<Reporting.RptDimProduct> ReportDimProducts { get; set; } = default!;
+
+    public DbSet<Reporting.RptDimStore> ReportDimStores { get; set; } = default!;
+
+    public DbSet<Reporting.RptDimStaff> ReportDimStaffs { get; set; } = default!;
+
+    public DbSet<Reporting.RptFactSalesLine> ReportFactSalesLines { get; set; } = default!;
+
+    public DbSet<Reporting.RptFactInventorySnapshot> ReportFactInventorySnapshots { get; set; } = default!;
+
+    public DbSet<Reporting.RptAggDailySales> ReportAggDailySales { get; set; } = default!;
+
+    public DbSet<Reporting.RptWatermark> ReportWatermarks { get; set; } = default!;
 
     // ---- ChannelHub (module) ----
     // 🚨 VÌ SAO PHẢI KHAI BÁO DbSet Ở ĐÂY:
@@ -387,6 +440,12 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>, IHasEventOut
         });
         // 🆕 `P0 #1` (24/10/2026) — mapping đơn hàng/sàn đã chuyển sang MODULE `Sales.EntityFrameworkCore`.
         global::eCommerce.Sales.EntityFrameworkCore.SalesDbContextModelCreatingExtensions.ConfigureSales(builder);
+
+        // 🆕 `WP-06` — POS: hoá đơn bán lẻ + ca thu ngân + trả hàng (module tự cung cấp mapping).
+        global::eCommerce.Pos.EntityFrameworkCore.PosDbContextModelCreatingExtensions.ConfigurePos(builder);
+
+        // 🆕 `WP-08` — REPORTING: read-model báo cáo (chiều + sự kiện + tổng hợp + mốc).
+        global::eCommerce.Reporting.EntityFrameworkCore.ReportingDbContextModelCreatingExtensions.ConfigureReporting(builder);
 
     }
 }

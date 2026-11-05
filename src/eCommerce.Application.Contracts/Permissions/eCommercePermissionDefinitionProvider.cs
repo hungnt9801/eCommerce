@@ -150,6 +150,16 @@ public class eCommercePermissionDefinitionProvider : PermissionDefinitionProvide
         // 🔒 Thiếu dòng này ⇒ `403` cho MỌI người kể cả `admin` (lỗi im lặng, `XC-004` D2).
         customers.AddChild(eCommerceConsts.Permissions.Customers.ManageGroups);
 
+        // ---- Quầy bán lẻ (`WP-06`) ----
+        // 🚨 BẮT BUỘC khai ở CẢ HAI NƠI (hằng số `eCommerceConsts.Permissions.Pos` + ở đây): thiếu một nơi
+        // ⇒ `403` cho MỌI người kể cả `admin` (`XC-004` D2/E3). 🛡️ `BatBienPhanQuyenTests.TC02b` khoá hai chiều.
+        // 🔒 Bốn quyền **không thay thế nhau**: bán ≠ huỷ (đảo doanh thu) ≠ kết ca (biên bản tiền) ≠ trả hàng.
+        var pos = group.AddPermission(eCommerceConsts.Permissions.Pos.Default);
+        pos.AddChild(eCommerceConsts.Permissions.Pos.Sell);
+        pos.AddChild(eCommerceConsts.Permissions.Pos.Void);
+        pos.AddChild(eCommerceConsts.Permissions.Pos.SessionManage);
+        pos.AddChild(eCommerceConsts.Permissions.Pos.Return);
+
         // ---- Sổ địa chỉ (`ADDR-004` phần B) ----
         // 🚨 BẮT BUỘC khai ở CẢ HAI NƠI (hằng số + ở đây): thiếu một nơi ⇒ `403` cho MỌI người kể cả `admin`.
         // 🔑 BA mức: `Manage` (sửa `Address` DÙNG CHUNG — ảnh hưởng khách khác) · `ManageBook` (chỉ sổ của
@@ -159,5 +169,21 @@ public class eCommercePermissionDefinitionProvider : PermissionDefinitionProvide
         addresses.AddChild(eCommerceConsts.Permissions.Addresses.Manage);
         addresses.AddChild(eCommerceConsts.Permissions.Addresses.ManageBook);
         addresses.AddChild(eCommerceConsts.Permissions.Addresses.Verify);
+
+        // ---- Cấu hình tổ chức (`WP-07`) ----
+        // 🚨 BẮT BUỘC khai ở CẢ HAI NƠI (hằng số `eCommerceConsts.Permissions.Settings` + ở đây): thiếu một
+        // nơi ⇒ `403` cho MỌI người kể cả `admin` (`XC-004` D2/E3). 🛡️ `BatBienPhanQuyenTests.TC02b`.
+        // 🔒 Tách `Manage` khỏi `Customers.Manage`: đổi **phạm vi dữ liệu** = đổi *ai thấy dữ liệu của ai*
+        // ⇒ quyền **phân quyền**, không phải quyền sửa hồ sơ khách.
+        var settings = group.AddPermission(eCommerceConsts.Permissions.Settings.Default);
+        settings.AddChild(eCommerceConsts.Permissions.Settings.Manage);
+
+        // ---- Báo cáo (`WP-08`) ----
+        // 🚨 BẮT BUỘC khai ở CẢ HAI NƠI (hằng số `eCommerceConsts.Permissions.Reports` + ở đây): thiếu một nơi
+        // ⇒ `403` cho MỌI người kể cả `admin` (`XC-004` D2/E3). 🛡️ `BatBienPhanQuyenTests.TC02b`.
+        // 🔒 `Aggregate` (backfill read-model) tách khỏi `Default` (xem): chạy `DELETE`+`INSERT` theo ngày nên
+        // một khoảng sai có thể **xoá** số liệu của kỳ khác — thao tác ghi phải có quyền riêng.
+        var reports = group.AddPermission(eCommerceConsts.Permissions.Reports.Default);
+        reports.AddChild(eCommerceConsts.Permissions.Reports.Aggregate);
     }
 }

@@ -90,4 +90,55 @@ public static class CustomerErrorCodes
     /// 🔑 Tách khỏi `0011`: `0011` ⇒ *"mục này không có trong sổ"*, mã này ⇒ *"địa chỉ này đã chết, chọn cái khác"*.
     /// </summary>
     public const string DiaChiKhongDungDuoc = Nhom + "0016";
+
+    // ══════════════════════════════════════════════════════════════════════════════════════════
+    // `WP-07` — ĐIỂM / CÔNG NỢ / CẤP KHÁCH / CẤU HÌNH. 🔒 Dải **0017…0025**.
+    // 📌 Mỗi mã ứng với một HÀNH ĐỘNG khác nhau của người vận hành (cùng luật `D-20`/`D-38`:
+    // *"mã đúng kỹ thuật nhưng sai nghiệp vụ"* là lỗi tệ hơn một mã chung).
+    // ══════════════════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// **Điểm của giao dịch không hợp lệ** (âm).
+    /// 🔑 Tách khỏi `0018`: mã này ⇒ *"sửa con số trên chứng từ"*, `0018` ⇒ *"khách không đủ điểm"*.
+    /// </summary>
+    public const string DiemKhongHopLe = Nhom + "0017";
+
+    /// <summary>**Khách KHÔNG đủ điểm để tiêu** — điểm sau giao dịch sẽ âm.</summary>
+    public const string DiemKhongDu = Nhom + "0018";
+
+    /// <summary>
+    /// **Vượt HẠN MỨC NỢ** (`DebtLimit`) — khoản phải thu vượt cam kết tín dụng của doanh nghiệp.
+    /// 🚨 Tách khỏi `0020` (`SoTienKhongHopLe`): `0020` ⇒ *"con số vô lý"*, mã này ⇒ *"thu bớt tiền hoặc
+    /// nâng hạn mức có căn cứ"* — hai việc khác hẳn nhau với người bán.
+    /// </summary>
+    public const string VuotHanMucNo = Nhom + "0019";
+
+    /// <summary>**Số tiền âm / không hợp lệ** trên một giao dịch của khách.</summary>
+    public const string SoTienKhongHopLe = Nhom + "0020";
+
+    /// <summary>**Mã cấp khách đã tồn tại** trong tenant (dữ liệu cấu hình, không phải hồ sơ người).</summary>
+    public const string MaCapKhachDaTonTai = Nhom + "0021";
+
+    /// <summary>**Không tìm thấy cấp khách** (hoặc đã ngừng dùng). 📌 Tách khỏi `0001` (khách) để UI
+    /// biết lỗi nằm ở **ô chọn cấp**, không phải ở hồ sơ đang mở.</summary>
+    public const string KhongTimThayCapKhach = Nhom + "0022";
+
+    /// <summary>**Mã cửa hàng / phòng ban / nhân viên đã tồn tại** (dữ liệu cấu hình `WP-07`).</summary>
+    public const string MaCauHinhDaTonTai = Nhom + "0023";
+
+    /// <summary>**Không tìm thấy nhân viên / cửa hàng / phòng ban / phạm vi dữ liệu** cần thao tác.</summary>
+    public const string KhongTimThayCauHinh = Nhom + "0024";
+
+    /// <summary>
+    /// **Nhân viên chưa gắn tài khoản đăng nhập** khi thao tác cần biết *"ai đang đăng nhập"*
+    /// (ví dụ đặt phạm vi dữ liệu). 📌 Tách riêng vì hành động sửa là **gán tài khoản**, không phải sửa
+    /// phạm vi — gộp mã là chỉ dẫn sai.
+    /// </summary>
+    public const string NhanVienChuaCoTaiKhoan = Nhom + "0025";
+
+    /// <summary>
+    /// **Tab lạ trên màn DS khách** — 🚨 **PHẢI NÉM**, không im lặng trả "tất cả": trả tất cả thì người dùng
+    /// tưởng tab đó rỗng/đầy trong khi bộ lọc **đã bị bỏ qua im lặng** (cùng lý do `D-41` của đơn hàng).
+    /// </summary>
+    public const string TabKhongHopLe = Nhom + "0026";
 }

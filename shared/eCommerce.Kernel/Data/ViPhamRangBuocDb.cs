@@ -184,6 +184,27 @@ public static class ViPhamRangBuocDb
         ["IX_CusCustomers_TenantId_IdentityUserId"] =
             new("eCommerce:Customers:0004",
                 "Tài khoản này ĐÃ gắn với một hồ sơ khách khác ⇒ một tài khoản chỉ được một hồ sơ (ADR-07).", true),
+
+        // ── 🆕 `WP-07` — CẤP KHÁCH + CẤU HÌNH TỔ CHỨC (04/11/2026) ──────────────────────────────
+        // 📌 Cả sáu ràng buộc dưới đây chặn **một hành vi HỢP LỆ VỀ NGHIỆP VỤ**: hai người/API gửi **cùng
+        // một mã** (double-click, import hai lần, hai tab). 🔑 Client cần **mã riêng** để hiện
+        // *"mã này đã dùng"* thay vì *"hệ thống hỏng"* — và **không** retry tạo rác.
+        // 🚨 Tên phải khớp **CHÍNH XÁC** index viết tay trong migration `Wp07_KhachHang_NhanVien`
+        // (chuỗi, không phải hằng số) — `RangBuocDbChuaAnhXaTests` đối chiếu **hai chiều** với `schema.sql`.
+        ["IX_CusLevels_TenantId_Code"] =
+            new("eCommerce:Customers:0021", "Mã cấp khách đã tồn tại ⇒ chọn mã khác.", true),
+        ["IX_SetStores_TenantId_Code"] =
+            new("eCommerce:Customers:0023", "Mã CỬA HÀNG đã tồn tại ⇒ chọn mã khác.", true),
+        ["IX_SetDepartments_TenantId_Code"] =
+            new("eCommerce:Customers:0023", "Mã PHÒNG BAN đã tồn tại ⇒ chọn mã khác.", true),
+        ["IX_SetStaffs_TenantId_Code"] =
+            new("eCommerce:Customers:0023", "Mã NHÂN VIÊN đã tồn tại ⇒ chọn mã khác.", true),
+        ["IX_SetStaffs_TenantId_IdentityUserId"] =
+            new("eCommerce:Customers:0023",
+                "Tài khoản này ĐÃ gắn với một nhân viên khác ⇒ một tài khoản chỉ được một nhân viên.", true),
+        ["IX_SetRoleDataScopes_TenantId_RoleName"] =
+            new("eCommerce:Customers:0023",
+                "Vai trò này ĐÃ có phạm vi dữ liệu ⇒ sửa dòng cũ thay vì thêm dòng thứ hai.", true),
         // ── MEDIA SẢN PHẨM (`CAT-003` ADR-12, 16/10/2026) ─────────────────────────────────────────
         // 📌 Ràng buộc này CHẶN MỘT HÀNH VI HỢP LỆ VỀ NGHIỆP VỤ: đặt ảnh chính là thao tác
         // *"đọc ảnh chính hiện tại → bỏ đánh dấu → đánh dấu ảnh mới"*; hai request ĐỒNG THỜI
@@ -370,7 +391,72 @@ public static class ViPhamRangBuocDb
                 "đường ghi tắt qua domain.", false),
         ["CK_PayRefunds_Amount_Duong"] =
             new(MaChung,
-                "Dòng hoàn tiền có số tiền ≤ 0 ⇒ vô nghĩa (và số âm sẽ làm giảm tổng đã hoàn).", false)
+                "Dòng hoàn tiền có số tiền ≤ 0 ⇒ vô nghĩa (và số âm sẽ làm giảm tổng đã hoàn).", false),
+
+        // ── 🆕 `WP-06` (04/11/2026) — POS: HOÁ ĐƠN BÁN LẺ · CA · TRẢ HÀNG ─────────────────────────
+        // 🚨 Ba unique index dưới đây là **hàng rào CHỐNG MẤT TIỀN THẬT** của quầy:
+        //   • `ClientBillId` trùng ⇒ **POS offline gửi lại tạo hoá đơn thứ hai** ⇒ khách bị tính tiền hai lần;
+        //   • `Number` trùng ⇒ hai hoá đơn cùng số ⇒ đối chiếu két/hoá đơn giấy không khớp;
+        //   • ca mở trùng ⇒ hai ca trên một quầy ⇒ `ExpectedCash` của cả hai đều sai, không quy được trách nhiệm.
+        // ⚠️ Cả ba đều là ca NẶNG của lỗi C4/F1: `TenantId` có thể `NULL` ⇒ thiếu `NULLS NOT DISTINCT` thì
+        // index **mất tác dụng IM LẶNG** (migration `Wp06_Pos_BanLe` viết tay mệnh đề đó).
+        ["IX_PosRetailBills_TenantId_ClientBillId"] =
+            new(eCommerce.Pos.PosErrorCodes.HoaDonDaTonTaiTheoKhoa,
+                "Hoá đơn cho khoá này (ClientBillId) ĐÃ tồn tại ⇒ KHÔNG tạo hoá đơn thứ hai. " +
+                "Tra lại theo ClientBillId để lấy hoá đơn đã lưu.", true),
+        ["IX_PosRetailBills_TenantId_Number"] =
+            new(eCommerce.Pos.PosErrorCodes.SoHoaDonTrung,
+                "Số hoá đơn đã tồn tại ⇒ gửi lại để được cấp số mới (không phải lỗi nghiệp vụ).", true),
+        ["IX_PosRetailReturns_TenantId_Number"] =
+            new(eCommerce.Pos.PosErrorCodes.SoPhieuTraTrung,
+                "Số phiếu trả đã tồn tại ⇒ gửi lại để được cấp số mới.", true),
+        ["IX_PosCashSessions_TenantId_Number"] =
+            new(eCommerce.Pos.PosErrorCodes.SoCaTrung,
+                "Số ca đã tồn tại ⇒ gửi lại để được cấp số mới.", true),
+        ["IX_PosCashSessions_TenantId_WarehouseId_DangMo"] =
+            new(eCommerce.Pos.PosErrorCodes.DaCoCaDangMo,
+                "Quầy này ĐANG CÓ CA MỞ ⇒ kết ca cũ trước khi mở ca mới (hai ca cùng lúc làm lệch két).", true),
+
+        // 📌 Các `CHECK` dưới đây là **hàng rào CUỐI** cho đường ghi tắt (SQL tay/import/đồng bộ sai). Domain
+        // đã ném mã riêng trước ⇒ tới được DB nghĩa là có **đường ghi bỏ qua domain**, tức là **bug**.
+        // 🔒 Vẫn **phải** ánh xạ: ca đó trả 403 kèm tên ràng buộc (tra được ngay) thay vì `500` mù.
+        ["CK_PosRetailBills_Tien_KhongAm"] =
+            new(MaChung, "Một cột TIỀN của hoá đơn bán lẻ bị ÂM ⇒ dữ liệu tiền không hợp lệ.", false),
+        // 🔑 Ánh xạ sang mã **0024-cùng-họ nghiệp vụ** (`0004` = chiết khấu hai tầng): đây là luật Nhanh §5.1,
+        // client cần câu *"bỏ chiết khấu dòng"*, không phải *"dữ liệu vi phạm ràng buộc"*.
+        ["CK_PosRetailBills_ChietKhau_MotTang"] =
+            new(eCommerce.Pos.PosErrorCodes.ChietKhauHaiTang,
+                "Một hoá đơn chỉ được chiết khấu THEO DÒNG **hoặc** THEO TỔNG, KHÔNG cả hai.", false),
+        ["CK_PosRetailBills_No_CoHan"] =
+            new(eCommerce.Pos.PosErrorCodes.ThieuThongTinCongNo,
+                "Hoá đơn còn NỢ mà THIẾU hạn thanh toán ⇒ khoản phải thu không đòi được.", false),
+        ["CK_PosRetailBills_Huy_CoMoc"] =
+            new(MaChung, "Hoá đơn ở trạng thái ĐÃ HUỶ mà thiếu mốc thời gian/lý do huỷ.", false),
+        ["CK_PosRetailBillLines_SoLuong_Duong"] =
+            new(eCommerce.Pos.PosErrorCodes.SoLuongKhongHopLe, "Số lượng dòng hoá đơn phải LỚN HƠN 0.", false),
+        ["CK_PosRetailBillLines_DaTra_HopLe"] =
+            new(eCommerce.Pos.PosErrorCodes.TraVuotSoDaMua,
+                "Số lượng ĐÃ TRẢ của dòng hoá đơn vượt số đã mua ⇒ dữ liệu trả hàng không hợp lệ.", false),
+        ["CK_PosRetailBillLines_Tien_KhongAm"] =
+            new(eCommerce.Pos.PosErrorCodes.TienKhongHopLe,
+                "Đơn giá/chiết khấu/thành tiền của dòng hoá đơn bị ÂM.", false),
+        ["CK_PosRetailBillPayments_Tien_KhongAm"] =
+            new(eCommerce.Pos.PosErrorCodes.TienKhongHopLe, "Số tiền một dòng thanh toán bị ÂM.", false),
+        ["CK_PosCashSessions_Tien_KhongAm"] =
+            new(eCommerce.Pos.PosErrorCodes.TienCaKhongHopLe, "Một cột TIỀN của ca thu ngân bị ÂM.", false),
+        ["CK_PosCashSessions_KetCa_CoMoc"] =
+            new(MaChung, "Ca ở trạng thái ĐÃ KẾT mà thiếu mốc thời gian/người kết ca.", false),
+        ["CK_PosRetailReturns_Tien_KhongAm"] =
+            new(eCommerce.Pos.PosErrorCodes.TienHoanKhongHopLe, "Một cột TIỀN của phiếu trả bị ÂM.", false),
+        // 🚨 Bất biến §5.4: `hàng trả = giảm nợ + hoàn tiền + phí` — sai một đồng là **hai sổ lệch nhau**
+        // (kho nhập đủ hàng, tiền chỉ trả một phần) mà không có lỗi nào khi đọc.
+        ["CK_PosRetailReturns_Tien_CanBang"] =
+            new(eCommerce.Pos.PosErrorCodes.TienHoanKhongHopLe,
+                "Tiền phiếu trả KHÔNG CÂN: hàng trả ≠ giảm nợ + hoàn tiền + phí.", false),
+        ["CK_PosRetailReturnLines_SoLuong_Duong"] =
+            new(eCommerce.Pos.PosErrorCodes.PhieuTraThieuDong, "Số lượng dòng trả phải LỚN HƠN 0.", false),
+        ["CK_PosRetailReturnLines_Tien_KhongAm"] =
+            new(eCommerce.Pos.PosErrorCodes.TienHoanKhongHopLe, "Đơn giá/tiền hoàn của dòng trả bị ÂM.", false)
     };
 
     /// <summary>Mã SQLSTATE của PostgreSQL mà ta xử lý.</summary>

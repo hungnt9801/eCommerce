@@ -200,6 +200,12 @@ public class OrderListInput
 
     public Guid? WarehouseId { get; set; }
 
+    /// <summary>
+    /// 🆕 `WP-07` — lọc theo **khách** (tab "Đơn hàng" của màn chi tiết khách).
+    /// 📌 Đi qua **cùng** `ApDungBoLocAsync` với DS ⇒ tab đếm và tab lọc không thể lệch nhau.
+    /// </summary>
+    public Guid? CustomerId { get; set; }
+
     public DateTime? FromUtc { get; set; }
 
     public DateTime? ToUtc { get; set; }

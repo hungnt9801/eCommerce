@@ -266,6 +266,87 @@ public static class eCommerceConsts
         }
 
         /// <summary>
+        /// 🆕 **`WP-07` — CẤU HÌNH TỔ CHỨC** (cửa hàng · phòng ban · nhân viên · **phạm vi dữ liệu**).
+        ///
+        /// 🔒 **VÌ SAO TÁCH KHỎI `Customers.Manage` (không phải "thêm cho đủ"):** đổi **phạm vi dữ liệu**
+        /// là đổi *ai thấy dữ liệu của ai* — một thay đổi **phân quyền**, không phải sửa hồ sơ khách. 📌 Nếu
+        /// gộp vào `Customers.Manage` thì người trực CSKH (cần chặn khách chây nợ) **cũng** nới được phạm vi
+        /// dữ liệu của chính mình ⇒ **leo thang quyền im lặng** (cùng lý do `Orders.Cancel` tách khỏi
+        /// `Orders.StatusChange`, D-40).
+        ///
+        /// 🚨 **BẮT BUỘC khai ở CẢ HAI NƠI** (hằng số này **và** `eCommercePermissionDefinitionProvider`):
+        /// thiếu một nơi ⇒ permission **luôn bị từ chối** ⇒ `403` cho **mọi người** kể cả `admin`
+        /// (`XC-004` D2/E3; 🛡️ lưới an toàn `BatBienPhanQuyenTests.TC02b`).
+        /// 📌 Và thêm permission **KHÔNG** tự cấp cho role `admin` — phải chạy `DbMigrator`.
+        /// </summary>
+        public static class Settings
+        {
+            /// <summary>Xem cấu hình tổ chức (cửa hàng/phòng ban/nhân viên/phạm vi dữ liệu).</summary>
+            public const string Default = GroupName + ".Settings";
+
+            /// <summary>Tạo/sửa cấu hình tổ chức **và đổi phạm vi dữ liệu** — quyền **riêng**.</summary>
+            public const string Manage = Default + ".Manage";
+        }
+
+        /// <summary>
+        /// 🆕 **`WP-06` — QUYỀN CỦA QUẦY BÁN LẺ (POS)**.
+        ///
+        /// 📌 **VÌ SAO TÁCH 4 QUYỀN, KHÔNG GỘP MỘT:**
+        /// <list type="bullet">
+        ///   <item><see cref="Sell"/> — bán (tạo hoá đơn, đẩy tồn kho + ghi tiền);</item>
+        ///   <item><see cref="Void"/> — **huỷ** hoá đơn: đảo tồn **và** đảo tiền ⇒ ảnh hưởng **doanh thu đã ghi**
+        ///     ⇒ không gán cho mọi thu ngân (đặc quyền tối thiểu, cùng lý do `Orders.Cancel` tách khỏi
+        ///     `Orders.StatusChange`);</item>
+        ///   <item><see cref="SessionManage"/> — **mở/kết ca**: chốt số tiền mặt **bàn giao thực tế** và
+        ///     **chênh lệch** — đây là **biên bản tiền**, không phải thao tác bán;</item>
+        ///   <item><see cref="Return"/> — **trả hàng**: nhập lại kho + đảo công nợ/điểm.</item>
+        /// </list>
+        /// 🚨 **BẮT BUỘC khai ở CẢ HAI NƠI** (hằng số này + `eCommercePermissionDefinitionProvider`):
+        /// thiếu một nơi ⇒ ABP coi là **luôn bị từ chối** ⇒ **`403` cho MỌI người kể cả `admin`**
+        /// (`XC-004` D2/E3). 🛡️ Lưới an toàn: `BatBienPhanQuyenTests.TC02/TC02b` (hai chiều).
+        /// 📌 Và: thêm permission **KHÔNG** tự cấp cho role `admin` — phải chạy `DbMigrator`.
+        /// </summary>
+        public static class Pos
+        {
+            /// <summary>Xem DS hoá đơn / chi tiết hoá đơn / ca (quyền **đọc**).</summary>
+            public const string Default = GroupName + ".Pos";
+
+            /// <summary>Tạo hoá đơn bán lẻ (bán tại quầy).</summary>
+            public const string Sell = Default + ".Sell";
+
+            /// <summary>Huỷ hoá đơn (đảo tồn + đảo tiền/điểm) — quyền **riêng**.</summary>
+            public const string Void = Default + ".Void";
+
+            /// <summary>Mở ca / kết ca (biên bản tiền mặt + chênh lệch).</summary>
+            public const string SessionManage = Default + ".Session.Manage";
+
+            /// <summary>Tạo phiếu trả hàng từ hoá đơn bán lẻ.</summary>
+            public const string Return = Default + ".Return";
+        }
+
+        /// <summary>
+        /// 🆕 **`WP-08` — QUYỀN CỦA BÁO CÁO**.
+        ///
+        /// 📌 **VÌ SAO TÁCH 2 QUYỀN, KHÔNG GỘP MỘT:** <see cref="Default"/> là **đọc** số liệu (mọi nhân viên
+        /// văn phòng cần); <see cref="Aggregate"/> là **ghi read-model** — chạy lại một khoảng sẽ **xoá và ghi
+        /// lại** số liệu của kỳ đó (nếu chọn sai khoảng thì báo cáo của kỳ khác **đổi số**). Gộp lại nghĩa là
+        /// người chỉ cần xem báo cáo lại có quyền **viết lại** số liệu, và không ai truy được ai đã làm.
+        ///
+        /// 🚨 **BẮT BUỘC khai ở CẢ HAI NƠI** (hằng số này + `eCommercePermissionDefinitionProvider`): thiếu một
+        /// nơi ⇒ ABP coi là **luôn bị từ chối** ⇒ **`403` cho MỌI người kể cả `admin`** (`XC-004` D2/E3).
+        /// 🛡️ Lưới an toàn: `BatBienPhanQuyenTests.TC02/TC02b`.
+        /// 📌 Thêm permission **KHÔNG** tự cấp cho role `admin` — phải chạy `DbMigrator`.
+        /// </summary>
+        public static class Reports
+        {
+            /// <summary>Xem Dashboard + các báo cáo (quyền **đọc**).</summary>
+            public const string Default = GroupName + ".Reports";
+
+            /// <summary>Chạy tổng hợp / backfill read-model (quyền **ghi**, tách riêng).</summary>
+            public const string Aggregate = Default + ".Aggregate";
+        }
+
+        /// <summary>
         /// 🚨 **SỔ ĐỊA CHỈ** (`ADDR-004` phần B — `S2`, 18/10/2026).
         ///
         /// 🔒 **BẮT BUỘC khai ở CẢ HAI NƠI** (hằng số này **và** `eCommercePermissionDefinitionProvider`):

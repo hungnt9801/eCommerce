@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>eCommerce.Reporting</RootNamespace>
+    <AssemblyName>eCommerce.Reporting.Application</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\eCommerce.Reporting.Application.Contracts\eCommerce.Reporting.Application.Contracts.csproj" />
+    <!-- 🔒 **CHỈ TẦNG DOMAIN** của module nguồn (entity `RetailBill`/`Order`/`InventoryItem`), không tham
+         chiếu tầng Application của chúng: read-model đọc dữ liệu, **không** gọi API nghiệp vụ (gọi app
+         service của module khác = đi qua `[Authorize]` + phạm vi dữ liệu + phân trang ⇒ báo cáo thiếu dòng
+         mà không có lỗi nào; tiền lệ `WP-07` `CustomerAppService`). -->
+    <ProjectReference Include="..\..\Pos\eCommerce.Pos.Domain\eCommerce.Pos.Domain.csproj" />
+    <ProjectReference Include="..\..\Sales\eCommerce.Sales.Domain\eCommerce.Sales.Domain.csproj" />
+    <ProjectReference Include="..\..\Inventory\eCommerce.Inventory.Domain\eCommerce.Inventory.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Volo.Abp.Ddd.Application" />
+    <!-- Khoá phân tán: hai lượt tổng hợp chồng nhau sẽ `DELETE` rồi `INSERT` trên cùng ngày ⇒ nếu không
+         khoá, lượt sau có thể xoá dòng vừa ghi của lượt trước (báo cáo THIẾU dòng, không lỗi nào). -->
+    <PackageReference Include="Volo.Abp.DistributedLocking" />
+    <PackageReference Include="Volo.Abp.BackgroundWorkers" />
+  </ItemGroup>
+
+</Project>
