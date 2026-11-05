@@ -677,6 +677,10 @@ thái "đỏ mà không ai đọc".
 - ✅ **Giữ 2 required check đúng cấu hình đã đo:** `GET …/branches/main/protection` ⇒ `contexts =
   ["docker-build","cong-15-buoc"]`, `app_id` **15368**, `strict=false`, `enforce_admins=false`, 8 cờ còn lại
   `false`/`null`; `ci` trên `main` (head `25d2bd5`) **4/4 check success**. ⛔ **Không** `PUT`, không đổi cờ nào.
+- ⚠️ **Sau merge, `ci` trên `main` ĐỎ (KHÔNG do `N20`) — nợ mới `D-67`:** run `42005307510` (head `b1955989`, tree
+  **`a64d69a3`** = tree của PR head `e9f5942`) đỏ ở bước **⑭** `probe-don-san` `C10` (`tong = 0 · Late = 0`, trong khi
+  `C11…C14` + `C20…C35` DAT — sự kiện **đã** vào DLQ): attempt **1 ĐỎ** · **2 ĐỎ** · **3 XANH** ⇒ `main` **xanh**, nhưng
+  `C10` **flaky `2/3`**. ⛔ **Không** nới `Cho-DieuKien` (30 s) / bỏ ca; nhận chủ: phiên có `§WP-14`.
 - ⚠️ **Nợ còn lại (có nhận chủ):** `409` vẫn `code = null` (map mã nghiệp vụ = phiên có `§WP-14`);
   `openapi-drift`/`e2e-playwright` vẫn **không** required (`D-65` ⑤ giữ nguyên).
 

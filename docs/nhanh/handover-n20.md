@@ -128,6 +128,9 @@ lượt `ci` của PR phiên này (§7).
 3. ⏭ **`openapi-drift` + `e2e-playwright` vẫn KHÔNG required** — `D-65` ⑤ giữ nguyên (ngoài phạm vi phiên).
 4. 📌 **39 tệp `tools/_*` vẫn untracked** + `tools/_tam-kiem/n20/` (log + bản giả lập) **đúng ý đồ** (rác cổng, gitignore).
 5. 📌 **Máy dev không tái hiện được flake** (§1.7) ⇒ đừng kết luận *"hết flaky"* chỉ từ 5 lượt local; đọc `ci` của PR.
+6. ⏭ **`D-67` (mới, đo được sau merge) — `probe-don-san` `C10` flaky `2/3` lượt trên `main`** (§5 #9): **chưa sửa**, và
+   **chưa** đủ bằng chứng để chốt nguyên nhân (cần log Host `[MP-EVENTLOG-*]`). **Nhận chủ:** phiên có `§WP-14`.
+   ⛔ **Không** nới `Cho-DieuKien` / bỏ ca `C10`; 📌 khi gặp lại: **so cây mã với PR** + `rerun` (đã đo: attempt 3 xanh).
 
 ---
 
@@ -166,21 +169,30 @@ lượt `ci` của PR phiên này (§7).
    (`schema.d.ts` bị `git checkout` ghi CRLF, `pnpm gen:api` ghi LF). ✅ Phiên này **không** gặp (9/9 ngay lượt 1 —
    nhánh **không** checkout lại cây FE). Nếu gặp: chạy `pnpm gen:api` một lần rồi chạy lại cổng; ⛔ **không** nới phép kiểm.
 8. 📌 **Đừng `rerun` rồi `push`** — `concurrency.cancel-in-progress` của `pull_request` **huỷ** lượt đang chạy (`N19` §1.6).
+9. 🚨 **`D-67` — `probe-don-san` `C10` FLAKY trên `main` (2/3 lượt ĐỎ) dù CÙNG CÂY MÃ với PR xanh 2/2.** Đo được:
+   run `42005307510` (head `b1955989`, tree **`a64d69a3`** = tree của `e9f5942`) — attempt **1 ĐỎ** · **2 ĐỎ** (sau `rerun`) ·
+   **3 XANH**; chỗ đỏ: **⑭** `C10` `tong = 0 · Late = 0` trong khi `C11…C14` + `C20…C35` DAT (sự kiện **đã** vào DLQ).
+   📌 **Không** phải hồi quy `N20` (`N20` không chạm `Sales`/`Marketplace*`; PR xanh 2/2 + máy dev `-DayDu` xanh 2/2).
+   ⛔ **Không** nới `Cho-DieuKien` **30 s** hay bỏ ca; muốn chốt nguyên nhân phải **in thêm log Host**
+   (`[MP-EVENTLOG-GHI-HONG]`/`[MP-EVENTLOG-TRUNG]`) vì artifact hiện **không** chứa log Host. **Nhận chủ:** phiên có `§WP-14`.
+   📌 Đây là **cùng lớp** `D-64` (*probe đo thời điểm*): khi thấy đỏ, **so cây mã với PR** + `rerun` trước khi kết luận.
 
 ---
 
 ## 6. Việc đầu tiên của phiên sau
 
-**Trạng thái phiên: XONG phạm vi `N20` — `D-64` đã chốt hướng + probe thử lại có giới hạn + ca `Y7`; **đo trên CI đúng ca `D-64` và probe vẫn xanh nhờ 1 lần thử lại** (`PR #5`, run `42002078789`: `B = 1` xung đột · `THU LAI 1 lan` · `17/0` · cổng `19/19`); 2 required check giữ nguyên cấu hình đã đo. `07` **chưa** có `§WP-14` ⇒ phiên `N21` **không** mở WP mới.**
+**Trạng thái phiên: XONG phạm vi `N20` — `D-64` đã chốt hướng (`409` là hợp đồng, probe thử lại có giới hạn + ca `Y7`); **CI xác nhận đúng ca đó** (`PR #5`, run `42002078789`: `B = 1` xung đột · `THU LAI 1 lan` · `17/0`); merge **`b1955989`**; 2 required check **giữ nguyên** cấu hình đã đo. ⚠️ Sau merge, `main` lộ **nợ mới `D-67`** (`probe-don-san` `C10` flaky `2/3`, cùng cây mã với PR xanh) — **chưa** sửa. `07` **chưa** có `§WP-14` ⇒ phiên `N21` **không** mở WP mới.**
 
-1. 🔑 Đọc **`D-66`** + **`D-64`** + §2 **trước** khi làm gì: nợ còn lại **duy nhất** là `409` `code = null` (cần `§WP-14`).
+1. 🔑 Đọc **`D-66`** + **`D-67`** + **`D-64`** + §2 **trước** khi làm gì: `D-66` **đã đóng** (`409` = hợp đồng, probe thử lại,
+   CI xác nhận); nợ **mở** là **`D-67`** (`probe-don-san` `C10`).
 2. Kiểm **cấu hình còn đúng** (không `PUT` nếu không có quyết định mới):
    `GET /repos/hungnt9801/eCommerce/branches/main/protection` ⇒ **2** context (`docker-build`, `cong-15-buoc`),
-   `strict=false`, `enforce_admins=false`; và `ci` trên `main` **xanh** ở head mới nhất.
-3. **Đọc `ci` của lượt merge `N20`** (`cong-15-buoc` bước ⑱) để có **thêm mẫu** tỉ lệ flaky của probe sau khi sửa —
-   chuẩn để nhìn: `17/0` + `ℹ️ THU LAI 409: n lan` (§1.7 đã có **1** mẫu CI: `B = 1` xung đột, thử lại **1** lần, xanh).
-   Nếu còn **ĐỎ** vì `P12`/`P13`/`P14`: ghi `D-67` + log Host (`%TEMP%` trên CI là artifact `bang-chung-*`) — ⛔ **đừng** tăng `$SoLanThuLai`.
-4. Nếu có `§WP-14` ⇒ làm đúng WP đó (nhánh mới từ `main`). Nếu **chưa** có: **không** tự đặt WP.
+   `strict=false`, `enforce_admins=false`; và `ci` trên `main` **xanh** ở head mới nhất (`b1955989` — attempt 3).
+3. **`D-67` — thu bằng chứng, ⛔ KHÔNG sửa vội:** chạy `pwsh -File .\tools\kiem-tat-ca.ps1 -DayDu` **vài lượt** trên máy
+   dev (ghi tỉ lệ), và nếu đỏ thì **in thêm log Host** (`[MP-EVENTLOG-GHI-HONG]`/`[MP-EVENTLOG-TRUNG]`) — hiện artifact
+   **không** chứa log Host nên lượt ĐỎ trên CI **không** đọc được nguyên nhân. ⛔ Không nới `Cho-DieuKien` 30 s, không bỏ ca.
+4. Nếu có `§WP-14` ⇒ làm đúng WP đó (nhánh mới từ `main`, **không** dùng lại `ops/n20-d64-reservation`). Nếu **chưa** có:
+   **không** tự đặt WP.
 5. Sau khi sửa bất cứ thứ gì: `pwsh -File .\tools\kiem-tat-ca.ps1` (**9/9**) · trước khi push `-DayDu`
    (**19/19**) · `test-cong-kiem.ps1 -ChiKiemMoc` (**37/37**) · `kiem-db.ps1` (**25/25**) · `kiem-link-tai-lieu.ps1` (**PASS**).
 
@@ -188,12 +200,12 @@ lượt `ci` của PR phiên này (§7).
 Đọc `docs/nhanh/README.md`, `docs/nhanh/decisions.md`, `docs/nhanh/07-ke-hoach-trien-khai.md` §WP-13
 và handover gần nhất `docs/nhanh/handover-n20.md`. Chạy baseline 6 lệnh ở `docs/nhanh/08-session-protocol.md`
 §4, ghi số. `07` chưa có `§WP-14` ⇒ phiên `N21` **không** mở WP mới: việc còn lại đúng phạm vi ghi ở
-handover §2 — đọc số đo `cong-15-buoc` của lượt `ci` merge `N20` để chốt `D-66` có hiệu lực trên CI,
-và giữ 2 required check đúng cấu hình đã đo. Không mở rộng phạm vi. Kết thúc bằng đo lại + handover.
+handover §2 — thu bằng chứng cho `D-67` (flaky `probe-don-san` `C10`) và giữ 2 required check đúng cấu
+hình đã đo. Không mở rộng phạm vi. Kết thúc bằng đo lại + handover.
 ```
 
 > 📌 Khối trên là biến thể **"đóng nợ"** của `08 §5.1` (không có `§WP-14` để mở): đủ **3 thứ** là *mã phiên đích*
-> (`N21`) · *đường dẫn handover* (`handover-n20.md`) · *việc phải làm* (`đọc số đo CI` + giữ cổng), **không** mang số đo.
+> (`N21`) · *đường dẫn handover* (`handover-n20.md`) · *việc phải làm* (`D-67` + giữ cổng), **không** mang số đo.
 
 ---
 
@@ -206,7 +218,8 @@ và giữ 2 required check đúng cấu hình đã đo. Không mở rộng phạ
 | Commit của phiên | **`6c1fb5c`** (9 tệp · **+431 / −41**) — 📌 chỉ ghi SHA **ngắn**; nguồn sự thật là `git log -1 --format=%H` |
 | PR | [**#5**](https://github.com/hungnt9801/eCommerce/pull/5) — `ops/n20-d64-reservation` → `main` (docs + probe + cổng; **0** migration); `mergeable_state = blocked` khi 2 required check còn **pending** (đúng `D-65` ⑥) |
 | Run Actions | `ci` [**`42002078789`**](https://github.com/hungnt9801/eCommerce/actions/runs/42002078789) **SUCCESS** (head `6c1fb5c`; cổng **19/19, 293,9 s**; ⑱ **17/0** + `THU LAI 409: 1 lan`) · `docker-build` [**`42002078816`**](https://github.com/hungnt9801/eCommerce/actions/runs/42002078816) **success** · `mergeable_state = blocked` khi 2 check còn **pending** |
-| Branch protection `main` | required: **`docker-build`** · **`cong-15-buoc`** (`strict=false`, `enforce_admins=false`) — **không đổi** trong phiên này (`D-65`) |
+| Branch protection `main` | required: **`docker-build`** · **`cong-15-buoc`** (`strict=false`, `enforce_admins=false`) — **không đổi** trong phiên này (`D-65`); đo **SAU merge**: y hệt (2 context, `app_id` 15368, 8 cờ `false`) |
+| **`main` sau phiên** | **`b1955989`** (merge PR #5) — ⚠️ `ci` lượt **đầu** trên `main` **ĐỎ** ở ⑭ (`probe-don-san` `C10`), **attempt 2 ĐỎ**, **attempt 3 XANH** ⇒ `main` **xanh** (check-run **4/4 success**), nhưng **nợ mới `D-67`** (§5 #9); `docker-build` `42005307468` **success** |
 | Tệp `N20` đã tạo | `docs/nhanh/handover-n20.md` |
 | Tệp `N20` đã sửa | `docs/nhanh/decisions.md` · `docs/nhanh/07-ke-hoach-trien-khai.md` · `docs/nhanh/08-session-protocol.md` · `docs/nhanh/README.md` · `tools/probe-giu-cho-2instance.ps1` · `tools/test-cong-kiem.ps1` · `tools/kiem-tat-ca.ps1` (comment) · `modules/Inventory/eCommerce.Inventory.Domain/StockReservationService.cs` (**chỉ comment**) |
 | Dữ liệu `N20` đã xoá | **Không** chạm schema; dữ liệu probe `K9HC-*` đã dọn (probe + repro), cờ admin **bật lại** `true`; log/bản giả lập ở `tools/_tam-kiem/n20/` (gitignore) + `%TEMP%` (ngoài repo) |
