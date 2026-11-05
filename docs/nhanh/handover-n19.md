@@ -81,15 +81,19 @@ bật. 📌 `cong-15-buoc` đã có **lần chạy xanh thật** trên `main` �
 
 | Mục | Số đo |
 |---|---|
-| Head **đo cổng** | `6d6889e` (commit docs **thứ nhất**) · `mergeable=True` (không xung đột) · 📌 nhánh **sau đó** thêm **1** commit ghi số đo (§1.7/§1.8) nên head **cuối** khác — xem §7 (`git log`), không chép SHA vào tài liệu |
+| Head **đo cổng** | `6d6889e` (commit docs **thứ nhất**) · `mergeable=True` (không xung đột) · 📌 nhánh sau đó thêm **2** commit docs ⇒ **head cuối `99addf3`** (xem §7) |
 | **`GET /pulls/3` khi check còn pending** | **`mergeable_state = blocked`** · 4 check `in_progress` — 🔑 cổng **thật sự** chặn merge (thứ `D-63` đòi thấy trước khi tin) |
 | Lượt `ci` **1** của head `6d6889e` (run [`41981712316`](https://github.com/hungnt9801/eCommerce/actions/runs/41981712316)) | `openapi-drift` **success** (1m57s) · `e2e-playwright` **success** (3m19s) · `docker-build` **success** (run [`41981712424`](https://github.com/hungnt9801/eCommerce/actions/runs/41981712424), 67 s) · **`cong-15-buoc` FAILURE** (7m53s) |
 | Nguyên nhân ĐỎ | 🚨 **ĐÚNG `D-64`** — `probe-giu-cho-2instance` **14 DAT / 3 HONG**: `P12` `200/409` (kỳ vọng `200/200`) · `P13` **1** dòng giữ chỗ (kỳ vọng 2) · `P14` **1** exception trong log Host B. ⛔ Không phải mã hỏng: PR **chỉ** đổi `.md`, và **cùng lúc** máy dev chạy `-DayDu` cho **17 DAT / 0 HONG** (`P12` `200/200`, `exception A = 0 · B = 0`) — 📌 **cùng mã, khác kết quả ⇒ đúng định nghĩa flaky** |
-| Hệ quả đo được | PR **bị chặn merge thật** (đúng cơ chế required check) và phải tốn **1 lượt rerun**: `POST …/actions/runs/41981712316/rerun-failed-jobs` ⇒ **attempt 2**, chỉ job `cong-15-buoc` chạy lại ⇒ **success** |
-| Merge | `PUT /pulls/3/merge` (`merge_method=merge`) — **chỉ** sau khi **cả 2** required check xanh trên **head cuối của nhánh** (⛔ không merge ở head đã đỏ) |
+| Hệ quả đo được | PR **bị chặn merge thật** (đúng cơ chế required check) ⇒ phải chạy lại. ⚠️ **`rerun-failed-jobs` ⇒ attempt 2 khởi động 06:46:46Z nhưng bị HUỶ** khi push commit ghi số đo — `ci.yml` đặt `concurrency.cancel-in-progress = true` cho `pull_request` ⇒ **push huỷ lượt đang chạy**. 📌 Bài học: ⛔ **đừng vừa `rerun` vừa `push`** — muốn sửa docs thì push rồi để lượt mới chạy |
+| Các lượt của head sau | `2b92102` — run [`41983282829`](https://github.com/hungnt9801/eCommerce/actions/runs/41983282829) **cancelled** (bị push `99addf3` huỷ) · `99addf3` — `ci` [`41983348862`](https://github.com/hungnt9801/eCommerce/actions/runs/41983348862) **SUCCESS 3/3** + `docker-build` [`41983348917`](https://github.com/hungnt9801/eCommerce/actions/runs/41983348917) **success** ⇒ `mergeable_state = clean` |
+| Merge | `PUT /pulls/3/merge` (`merge_method=merge`) sau khi **cả 2** required check xanh trên **head cuối** `99addf3` ⇒ **`2d5ba1b`** |
+| **Đo SAU merge trên `main`** (head `2d5ba1b`) | `ci` [`41984368687`](https://github.com/hungnt9801/eCommerce/actions/runs/41984368687) **SUCCESS 3/3** · `docker-build` [`41984368722`](https://github.com/hungnt9801/eCommerce/actions/runs/41984368722) **success** · check-run **4/4 success** ⇒ `main` **xanh** ngay sau merge |
 
 🔑 **Hai điều phiên này chứng minh được, không phải suy luận:** ① required check **có hiệu lực** (`blocked` + merge bị chặn khi đỏ);
-② **chi phí thật của `D-64`** là **1 lượt rerun ~8 phút** cho một PR **chỉ đổi tài liệu** — đúng cảnh báo ở §2 #1.
+② **chi phí thật của `D-64`** cho một PR **chỉ đổi tài liệu**: **1** lượt ĐỎ (8 phút) + **2** lượt bị **huỷ** + **1** lượt
+xanh (8,5 phút) trước khi merge được — đúng cảnh báo ở §2 #1. 📌 Cộng thêm bài học **`rerun` ≠ `push`**: mỗi lần push
+head mới, `cancel-in-progress` **huỷ** lượt đang chạy ⇒ sửa docs xong **mới** đẩy, đừng rerun sớm.
 
 ### 1.7 Hai **sự cố đo đạc** trong phiên (ghi để phiên sau không đọc sai số)
 
@@ -218,9 +222,10 @@ cấu hình đã đo. Không mở rộng phạm vi. Kết thúc bằng đo lại
 | Nhánh làm việc | **`ops/n19-required-check`** (tạo từ `main` = `0e5c275`); `feature/wp-03-catalog` **là lịch sử**, không dùng lại |
 | `HEAD` local | commit docs của phiên (`git log -1 --format=%h`) — 📌 không chép SHA vào tài liệu, mỗi lần thêm docs lại đổi |
 | **`main` trước phiên** | **`0e5c275`** (merge PR #2 — docs `N18`) · `git log -1 --format=%H origin/main` là **nguồn sự thật** |
-| **`main` sau phiên** | merge commit của **PR #3** (docs-only) — xem `git log --oneline -3 origin/main` |
-| PR | [**#3**](https://github.com/hungnt9801/eCommerce/pull/3) — docs-only, **1** commit; `docker-build` **success** (67 s) · `openapi-drift` **success** · `e2e-playwright` **success** · `cong-15-buoc` **ĐỎ lượt 1** vì `D-64` flaky (`14/3`) ⇒ **rerun** ⇒ xanh ⇒ **mới merge** (đo `mergeable_state=blocked` khi check pending) |
-| Run Actions trên PR #3 | `ci` [`41981712316`](https://github.com/hungnt9801/eCommerce/actions/runs/41981712316) — attempt **1** ĐỎ (`cong-15-buoc`) ⇒ attempt **2** sau `rerun-failed-jobs` **XANH** · `docker-build` [`41981712424`](https://github.com/hungnt9801/eCommerce/actions/runs/41981712424) **success** |
+| **`main` sau phiên** | merge commit của **PR #3** = **`2d5ba1b`**, **rồi** merge commit của **PR #4** (*sửa số đo §1.6/§7*, docs-only) — `git log -1 --format=%H origin/main` là **nguồn sự thật**, không chép SHA |
+| PR | [**#3**](https://github.com/hungnt9801/eCommerce/pull/3) — docs-only (**3** commit); `docker-build` **success** · `openapi-drift` **success** · `e2e-playwright` **success** · `cong-15-buoc` **ĐỎ** ở head `6d6889e` vì `D-64` flaky (`14/3`); `rerun` bị **huỷ** khi push head mới; head cuối `99addf3` **xanh** ⇒ merge (đo `mergeable_state=blocked` khi pending, `clean` khi xanh). [**#4**](https://github.com/hungnt9801/eCommerce/pull/4) — docs-only, **sửa số đo** §1.6/§7 (cùng quy trình: 2 required check phải xanh mới merge) |
+| Run Actions **trên PR #3** | `ci` [`41981712316`](https://github.com/hungnt9801/eCommerce/actions/runs/41981712316) attempt 1 **ĐỎ** (`cong-15-buoc`; attempt 2 **cancelled**) · [`41983282829`](https://github.com/hungnt9801/eCommerce/actions/runs/41983282829) (`2b92102`) **cancelled** · `ci` [`41983348862`](https://github.com/hungnt9801/eCommerce/actions/runs/41983348862) + `docker-build` [`41983348917`](https://github.com/hungnt9801/eCommerce/actions/runs/41983348917) **SUCCESS** (head `99addf3`) |
+| Run Actions **trên `main` sau merge** | `ci` [`41984368687`](https://github.com/hungnt9801/eCommerce/actions/runs/41984368687) **SUCCESS 3/3** · `docker-build` [`41984368722`](https://github.com/hungnt9801/eCommerce/actions/runs/41984368722) **success** (head `2d5ba1b`) |
 | Branch protection `main` | required: **`docker-build`** · **`cong-15-buoc`** (`strict=false`, `enforce_admins=false`) — `D-65` |
 | Tệp `N19` đã tạo | `docs/nhanh/handover-n19.md` |
 | Tệp `N19` đã sửa | `docs/nhanh/decisions.md` · `docs/nhanh/07-ke-hoach-trien-khai.md` · `docs/nhanh/08-session-protocol.md` · `docs/nhanh/README.md` |
