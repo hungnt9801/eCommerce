@@ -607,6 +607,10 @@ if ($DayDu -and -not $BoQuaE2E) {
         # va ban 1 request vao MOI Host cung luc.
         # 🔒 Co ca CHIEU NGUOC: doi DUY NHAT `OnHand = 2` ⇒ **CA HAI** phai thanh cong. Khong co ca do thi
         # mot probe "luon bao mot thang" (vi du moi request deu bi tu choi vi ly do khac) van XANH.
+        # 🚨 `D-66` (`N20`): trong khe "nha khoa phan tan → commit" request thua co the vap **HTTP 409**
+        # (`AbpDbConcurrencyException`, `code = null`) du kho DU hang ⇒ hop dong la **thu lai**; probe
+        # gui lai toi da 3 lan CUNG `idempotencyKey` roi moi dem. ⛔ Khong phai noi long: bat bien
+        # `Reserved <= OnHand` / `Available = 0` / "dung MOT dong giu cho" giu nguyen (ca `Y7` quet tep).
         # ⚠️ Chay sau ⑮ de khong tranh cong 5000/5001 voi probe outbox 2 instance.
         $p = ChayLenh 'pwsh' @('-NoProfile', '-File', (Join-Path $PSScriptRoot 'probe-giu-cho-2instance.ps1')) 'giu-cho-2inst.log'
 
