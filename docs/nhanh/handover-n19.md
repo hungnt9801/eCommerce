@@ -81,12 +81,12 @@ bật. 📌 `cong-15-buoc` đã có **lần chạy xanh thật** trên `main` �
 
 | Mục | Số đo |
 |---|---|
-| Head | `6d6889e` (**1** commit docs) · `mergeable=True` (không xung đột) |
+| Head **đo cổng** | `6d6889e` (commit docs **thứ nhất**) · `mergeable=True` (không xung đột) · 📌 nhánh **sau đó** thêm **1** commit ghi số đo (§1.7/§1.8) nên head **cuối** khác — xem §7 (`git log`), không chép SHA vào tài liệu |
 | **`GET /pulls/3` khi check còn pending** | **`mergeable_state = blocked`** · 4 check `in_progress` — 🔑 cổng **thật sự** chặn merge (thứ `D-63` đòi thấy trước khi tin) |
-| Lượt `ci` **1** (run [`41981712316`](https://github.com/hungnt9801/eCommerce/actions/runs/41981712316)) | `openapi-drift` **success** (1m57s) · `e2e-playwright` **success** (3m19s) · `docker-build` **success** (run [`41981712424`](https://github.com/hungnt9801/eCommerce/actions/runs/41981712424), 67 s) · **`cong-15-buoc` FAILURE** (7m53s) |
+| Lượt `ci` **1** của head `6d6889e` (run [`41981712316`](https://github.com/hungnt9801/eCommerce/actions/runs/41981712316)) | `openapi-drift` **success** (1m57s) · `e2e-playwright` **success** (3m19s) · `docker-build` **success** (run [`41981712424`](https://github.com/hungnt9801/eCommerce/actions/runs/41981712424), 67 s) · **`cong-15-buoc` FAILURE** (7m53s) |
 | Nguyên nhân ĐỎ | 🚨 **ĐÚNG `D-64`** — `probe-giu-cho-2instance` **14 DAT / 3 HONG**: `P12` `200/409` (kỳ vọng `200/200`) · `P13` **1** dòng giữ chỗ (kỳ vọng 2) · `P14` **1** exception trong log Host B. ⛔ Không phải mã hỏng: PR **chỉ** đổi `.md`, và **cùng lúc** máy dev chạy `-DayDu` cho **17 DAT / 0 HONG** (`P12` `200/200`, `exception A = 0 · B = 0`) — 📌 **cùng mã, khác kết quả ⇒ đúng định nghĩa flaky** |
-| Hệ quả đo được | PR **bị chặn merge thật** (đúng cơ chế required check) và phải tốn **1 lượt rerun**: `POST …/actions/runs/41981712316/rerun-failed-jobs` ⇒ **attempt 2**, chỉ job `cong-15-buoc` chạy lại ⇒ **success** ⇒ mới merge |
-| Merge | `PUT /pulls/3/merge` (`merge_method=merge`) sau khi **cả 2** required check xanh |
+| Hệ quả đo được | PR **bị chặn merge thật** (đúng cơ chế required check) và phải tốn **1 lượt rerun**: `POST …/actions/runs/41981712316/rerun-failed-jobs` ⇒ **attempt 2**, chỉ job `cong-15-buoc` chạy lại ⇒ **success** |
+| Merge | `PUT /pulls/3/merge` (`merge_method=merge`) — **chỉ** sau khi **cả 2** required check xanh trên **head cuối của nhánh** (⛔ không merge ở head đã đỏ) |
 
 🔑 **Hai điều phiên này chứng minh được, không phải suy luận:** ① required check **có hiệu lực** (`blocked` + merge bị chặn khi đỏ);
 ② **chi phí thật của `D-64`** là **1 lượt rerun ~8 phút** cho một PR **chỉ đổi tài liệu** — đúng cảnh báo ở §2 #1.
