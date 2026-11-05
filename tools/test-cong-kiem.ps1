@@ -348,6 +348,36 @@ if (-not $ChiKiemDb) {
             $noiDung = Get-Content $k.Log -Raw
             KhangDinh ($noiDung -match 'B\.md') "Log KHONG nhac toi 'B.md' ⇒ do vi ly do khac. Log:`n$noiDung"
         }
+
+        It 'V4) Link toi `artifacts/` (bang chung KHONG commit) ⇒ exit 0 — 🚨 do duoc tren CI (`N18`)' {
+            # 🚨 **CA NAY SINH RA TU MOT LOI THAT (05/11/2026, run `41961196209`):** `01-khao-sat-nhanh-vn.md`
+            # nhung 3 anh `../../artifacts/nhanh-survey/*.png`; `README` §6 ghi *"`artifacts/` gitignore —
+            # khong commit"*. May dev **co** thu muc do ⇒ cong XANH; **ban clone sach (CI) khong co** ⇒ cong DO
+            # o buoc ⑪ ⇒ `ci` do tren PR #1 du moi buoc khac xanh.
+            # ✅ Quy uoc: duong dan **trong repo** phai tro toi tep CO THAT; `artifacts/` la **bang chung ngoai
+            # VCS** (da khai bao) ⇒ hai luat nay phai **doi xung** (xem `$boQua` cua `kiem-link-tai-lieu.ps1`).
+            $tam = Join-Path $thuMucTam ('link-artifacts-' + [Guid]::NewGuid().ToString('N'))
+            New-Item -ItemType Directory -Force -Path $tam | Out-Null
+            [IO.File]::WriteAllText((Join-Path $tam 'a.md'), ('# A' + "`n`n" + 'Anh: [survey](artifacts/nhanh-survey/x.png).' + "`n"))
+
+            $k = ChayScript $scriptLink @('-Goc', $tam)
+            BangNhau $k.Ma 0 'Link toi artifacts/ (ngoai VCS) KHONG duoc bao chet'
+        }
+
+        It 'V5) Cung tep do co them mot link chet TRONG repo ⇒ van exit 1 (🛡️ V4 khong duoc nuot loi that)' {
+            # 🔒 Chieu nguoc cua V4: neu bo qua `artifacts/` lam cong bo qua MOI thu thi V4 la "tat cong".
+            $tam = Join-Path $thuMucTam ('link-artifacts-lan-' + [Guid]::NewGuid().ToString('N'))
+            New-Item -ItemType Directory -Force -Path $tam | Out-Null
+            [IO.File]::WriteAllText((Join-Path $tam 'a.md'),
+                ('# A' + "`n`n" + 'Anh: [survey](artifacts/nhanh-survey/x.png). Xem [B](thieu.md).' + "`n"))
+
+            $k = ChayScript $scriptLink @('-Goc', $tam)
+            BangNhau $k.Ma 1 'Link chet TRONG repo van phai exit 1 du tep co link artifacts/'
+
+            $noiDung = Get-Content $k.Log -Raw
+            KhangDinh ($noiDung -match 'thieu\.md') "Log KHONG nhac toi 'thieu.md'. Log:`n$noiDung"
+            KhangDinh (-not ($noiDung -match 'nhanh-survey')) 'Link artifacts/ bi bao chet ⇒ V4 chua dung'
+        }
     }
 }
 

@@ -204,8 +204,18 @@ public class TongHopBaoCaoService : DomainService
         {
             soAnhTonKho = await ChupAnhTonKhoAsync(homNay, luc);
 
-            moc[NguonBaoCao.TonKho].GhiNhan(homNay, luc, soAnhTonKho);
-            await _moc.UpdateAsync(moc[NguonBaoCao.TonKho]);
+            // 🚨 `N18` — CHỈ GHI MỐC KHI ĐÃ CÓ ẢNH THẬT (sửa lỗi đo được trên DB TRỐNG của CI).
+            // Ghi mốc cho một lượt chụp **0 dòng** (kho chưa có hàng, DB vừa migrate) làm mốc = **hôm nay**
+            // ⇒ mọi lượt sau trong ngày **bỏ qua** bước chụp (điều kiện `moc < homNay`) ⇒ báo cáo tồn kho
+            // của cả ngày **rỗng mà không lỗi nào**; UI hiện *"chưa chụp ảnh tồn kho"* và nút `Xuất CSV`
+            // **bị vô hiệu** ⇒ `E2E` luồng ⑧ đỏ ở `waitForEvent('download')` (run `41961196209`, job
+            // `e2e-playwright`: **7 passed · 1 failed**). 📌 Mốc = *"ngày đã CÓ ảnh"*, không phải *"ngày đã
+            // THỬ chụp"* — lượt chụp rỗng để nguyên mốc thì lượt kế tiếp (15 phút) chụp lại.
+            if (soAnhTonKho > 0)
+            {
+                moc[NguonBaoCao.TonKho].GhiNhan(homNay, luc, soAnhTonKho);
+                await _moc.UpdateAsync(moc[NguonBaoCao.TonKho]);
+            }
         }
 
         if (!khoang.Rong)

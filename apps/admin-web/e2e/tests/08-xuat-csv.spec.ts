@@ -60,7 +60,10 @@ test.describe("⑧ Xuất CSV", () => {
     // ── ② Báo cáo TỒN KHO ───────────────────────────────────────────────────────────────────────────
     await page.goto(`/${BUSINESS}/report/inventory`);
     await expect(page.getByRole("heading", { name: "Tồn kho" })).toBeVisible();
-    await expect(page.getByText("Chưa chụp ảnh tồn kho nào")).toHaveCount(0);
+    // 🚨 `N18`: khop DUNG cau chu dang co tren trang ("…lan nào"). Ban cu tim "…nào" nen phep khang dinh
+    // **luon dung** ⇒ khi trang that su chua co anh, loi hien ra la `waitForEvent('download') timeout`
+    // (kho doc) thay vi "chua chup anh ton kho" (chi dung nguyen nhan) — do duoc o run `41961196209`.
+    await expect(page.getByText("Chưa chụp ảnh tồn kho lần nào")).toHaveCount(0);
 
     const [taiTonKho] = await Promise.all([
       page.waitForEvent("download"),
