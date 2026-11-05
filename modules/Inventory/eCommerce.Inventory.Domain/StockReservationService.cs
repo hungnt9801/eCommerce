@@ -262,6 +262,18 @@ public class StockReservationService : DomainService
                 .WithData("lyDo", "Tồn kho vừa bị giao dịch khác thay đổi ⇒ KHÔNG giữ chỗ (thử lại).");
         }
 
+        // 🚨 **`D-66` (`N20`) — CỬA SỔ GIỮA "NHẢ KHOÁ" VÀ "COMMIT" (đọc kỹ trước khi "sửa"):** khoá phân tán
+        // `InventoryLockKeys.TheoSku` được **nhả ở cuối hàm này**, còn transaction của checkout **commit ở cuối
+        // app service** (`CheckoutAppService.TinhVaGiuChoAsync`). Trong khe đó, request thứ hai đọc được **ảnh
+        // cũ** của `InventoryItem` ⇒ UPDATE bằng `ConcurrencyStamp` cũ ⇒ **0 dòng** ⇒ `AbpDbConcurrencyException`
+        // nổi lên **đúng tại `InsertAsync(but, autoSave: true)` dưới đây** — tức **NGOÀI** khối `try/catch` trên
+        // (khối đó chỉ bọc 2 lệnh `autoSave: false`). ⇒ HTTP **409**, `code = null`.
+        // 📌 **Đây là HỢP ĐỒNG, không phải bug khoá phân tán:** DB vẫn giữ `Reserved ≤ OnHand`; client **thử lại**
+        //    (`D-66` — probe `giu-cho-2instance` gửi lại tối đa 3 lần với cùng `idempotencyKey`).
+        // ⛔ **KHÔNG** "sửa" bằng cách mở rộng `try/catch` cho có mã đẹp: PostgreSQL **đã abort** transaction ⇒
+        //    retry tại chỗ là **bất khả**; muốn retry thật phải mở **UoW mới ở trên** app service (đổi mô hình
+        //    "một UoW" của `D-42`/`D-45` — phiên có `§WP-14` mới được quyết).
+
         // Bút toán giữ chỗ: `BalanceAfter` ghi **`OnHand`** (KHÔNG đổi) — `Reserved` nằm trên `InventoryItem`
         // và trên chính bản ghi giữ chỗ. 📌 Cố tình KHÔNG nhồi `Available` vào `BalanceAfter` để cột này
         // giữ **một nghĩa duy nhất** (số dư `OnHand` sau biến động) — trộn hai nghĩa vào một cột là mầm bug.

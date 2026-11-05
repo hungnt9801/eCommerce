@@ -22,6 +22,17 @@
          `Reserved = 2`. 📌 Neu buoc nay cung "mot thang", thi buoc ① do mot nguyen nhan KHAC
          (vi du moi request luon bi tu choi) chu khong phai khoa phan tan.
 
+    🚨 **HOP DONG `409` (`D-66`, `N20`) — THU LAI CO GIOI HAN, KHONG NOI PHEP KIEM:**
+      Khoa phan tan duoc nha o **cuoi `StockReservationService.GiuChoAsync`**, con transaction cua
+      checkout commit o **cuoi app service** ⇒ trong khe giua hai moc do, request thu hai co the doc
+      **anh cu** cua cung `InventoryItem` roi vap `AbpDbConcurrencyException` (`ConcurrencyStamp`) o
+      buoc flush ⇒ **HTTP 409**, `code = null` (do duoc: `_tam-kiem` §1.3 cua `handover-n20`).
+      ⇒ Hop dong: **409 = chong request, THU LAI**. Probe gui lai **chinh** request do (cung
+      `idempotencyKey`) toi da `$SoLanThuLai` lan. 📌 Day KHONG phai noi long khang dinh: bat bien
+      `Reserved <= OnHand` / `Available = 0` / "dung MOT dong giu cho" giu **nguyen**; chi dieu kien
+      "ca hai 200" duoc do **sau khi thu lai** (dung hanh vi client that). ⛔ Khong tang gioi han de
+      "cho xanh": ca `Y7` cua `test-cong-kiem.ps1` quet chinh tep nay.
+
     Duong giu cho that: `POST /api/app/checkout/tinh-va-giu-cho` (Khoa: `InventoryLockKeys.TheoSku`
     qua `IAbpDistributedLock` — Redis, `StockReservationService.GiuChoAsync`).
 
@@ -59,6 +70,9 @@ $SKU = 'K9HC-SKU-01'
 
 $script:soDat = 0
 $script:soHong = 0
+
+# 🚨 `D-66`: so lan da gap **409** va phai **thu lai** (bao cao o cuoi, KHONG phai ca kiem).
+$script:soXungDot = 0
 
 function Kq([string]$ten, [bool]$dat, [string]$chiTiet = '') {
     if ($dat) {
@@ -146,10 +160,35 @@ function DatTon([int]$onHand) {
     Psql 'delete from "InvStockReservations" where "Sku" = ''K9HC-SKU-01'';' | Out-Null
 }
 
+$DUONG_GIU_CHO = '/api/app/checkout/tinh-va-giu-cho'
+
+<#
+    🚨 `D-66`: so lan THU LAI toi da khi gap **409** (chong request tren cung `InventoryItem`).
+    📌 Gioi han **3** la CO Y (du de thang mot lan dua; ⛔ khong phai "thu mai cho xanh") va ca `Y7`
+    (`test-cong-kiem.ps1`) quet tep nay: gia tri > 3 hoac vong lap khong co tran ⇒ ca do DO.
+#>
+$SoLanThuLai = 3
+$ChoGiuaLanThuMs = 300
+
+<# Noi dung request — MOT cho, de request ban dau va request thu lai giong **het** nhau (cung khoa). #>
+function TaoBody([string]$khoa) {
+    return (@{
+            channelCode    = 'web'
+            warehouseId    = $GUID_KHO
+            customerId     = $null
+            items          = @(@{ sku = $SKU; quantity = 1; taxRate = 0 })
+            orderDiscount  = 0
+            orderFee       = 0
+            ttlPhut        = 15
+            idempotencyKey = $khoa
+        } | ConvertTo-Json -Depth 5)
+}
+
 <#
     Ban MOT request vao Host :cong va MOT request vao Host kia **cung luc**.
     🔒 `PostAsync` KHONG await ngay ⇒ hai request nam cung luc tren duong; `WaitAll` moi cho ca hai.
-    📌 Tra ve mang 2 phan tu: status + body (body de doc MA NGHIEP VU, khong doan tu status).
+    📌 Tra ve mang 2 phan tu: `{ Url; Khoa; Ma; Than }` — giu `Url`/`Khoa` de **thu lai dung request do**
+    (cung Host, cung `idempotencyKey`) khi gap 409.
 #>
 function BanHaiRequest([string]$url1, [string]$khoa1, [string]$url2, [string]$khoa2, [string]$token) {
     $client = [System.Net.Http.HttpClient]::new()
@@ -159,46 +198,63 @@ function BanHaiRequest([string]$url1, [string]$khoa1, [string]$url2, [string]$kh
         $client.DefaultRequestHeaders.Authorization =
             [System.Net.Http.Headers.AuthenticationHeaderValue]::new('Bearer', $token)
 
-        $urlGiuCho = '/api/app/checkout/tinh-va-giu-cho'
+        $nd1 = [System.Net.Http.StringContent]::new((TaoBody $khoa1), [System.Text.Encoding]::UTF8, 'application/json')
+        $nd2 = [System.Net.Http.StringContent]::new((TaoBody $khoa2), [System.Text.Encoding]::UTF8, 'application/json')
 
-        $body1 = (@{
-                channelCode    = 'web'
-                warehouseId    = $GUID_KHO
-                customerId     = $null
-                items          = @(@{ sku = $SKU; quantity = 1; taxRate = 0 })
-                orderDiscount  = 0
-                orderFee       = 0
-                ttlPhut        = 15
-                idempotencyKey = $khoa1
-            } | ConvertTo-Json -Depth 5)
-
-        $body2 = (@{
-                channelCode    = 'web'
-                warehouseId    = $GUID_KHO
-                customerId     = $null
-                items          = @(@{ sku = $SKU; quantity = 1; taxRate = 0 })
-                orderDiscount  = 0
-                orderFee       = 0
-                ttlPhut        = 15
-                idempotencyKey = $khoa2
-            } | ConvertTo-Json -Depth 5)
-
-        $nd1 = [System.Net.Http.StringContent]::new($body1, [System.Text.Encoding]::UTF8, 'application/json')
-        $nd2 = [System.Net.Http.StringContent]::new($body2, [System.Text.Encoding]::UTF8, 'application/json')
-
-        $t1 = $client.PostAsync(($url1 + $urlGiuCho), $nd1)
-        $t2 = $client.PostAsync(($url2 + $urlGiuCho), $nd2)
+        $t1 = $client.PostAsync(($url1 + $DUONG_GIU_CHO), $nd1)
+        $t2 = $client.PostAsync(($url2 + $DUONG_GIU_CHO), $nd2)
 
         [System.Threading.Tasks.Task]::WaitAll([System.Threading.Tasks.Task[]]@($t1, $t2))
 
         return @(
-            [pscustomobject]@{ Ma = [int]$t1.Result.StatusCode; Than = $t1.Result.Content.ReadAsStringAsync().Result }
-            [pscustomobject]@{ Ma = [int]$t2.Result.StatusCode; Than = $t2.Result.Content.ReadAsStringAsync().Result }
+            [pscustomobject]@{ Url = $url1; Khoa = $khoa1; Ma = [int]$t1.Result.StatusCode; Than = $t1.Result.Content.ReadAsStringAsync().Result }
+            [pscustomobject]@{ Url = $url2; Khoa = $khoa2; Ma = [int]$t2.Result.StatusCode; Than = $t2.Result.Content.ReadAsStringAsync().Result }
         )
     }
     finally {
         $client.Dispose()
     }
+}
+
+<# Gui lai **dung** mot request da co (cung Host + cung `idempotencyKey`) — dung cho vong thu lai. #>
+function GuiLaiMotRequest([string]$url, [string]$khoa, [string]$token) {
+    $client = [System.Net.Http.HttpClient]::new()
+    $client.Timeout = [TimeSpan]::FromSeconds(90)
+
+    try {
+        $client.DefaultRequestHeaders.Authorization =
+            [System.Net.Http.Headers.AuthenticationHeaderValue]::new('Bearer', $token)
+
+        $nd = [System.Net.Http.StringContent]::new((TaoBody $khoa), [System.Text.Encoding]::UTF8, 'application/json')
+        $t = $client.PostAsync(($url + $DUONG_GIU_CHO), $nd)
+
+        [System.Threading.Tasks.Task]::WaitAll([System.Threading.Tasks.Task[]]@($t))
+
+        return [pscustomobject]@{ Url = $url; Khoa = $khoa; Ma = [int]$t.Result.StatusCode; Than = $t.Result.Content.ReadAsStringAsync().Result }
+    }
+    finally {
+        $client.Dispose()
+    }
+}
+
+<#
+    🚨 `D-66`: `409` = **chong request tren cung `InventoryItem`** (`ConcurrencyStamp`), KHONG phai loi
+    nghiep vu va KHONG phai 5xx. Hop dong: client **thu lai** ⇒ probe gui lai toi da `$SoLanThuLai` lan,
+    **dem** so lan da thu lai (`$script:soXungDot`) de bao cao ti le, roi tra ve ket qua **cuoi cung**.
+#>
+function ThuLaiNeu409([object]$kq, [string]$token) {
+    $soLan = 0
+
+    while ($kq.Ma -eq 409 -and $soLan -lt $SoLanThuLai) {
+        $script:soXungDot++
+        $soLan++
+
+        Start-Sleep -Milliseconds $ChoGiuaLanThuMs
+
+        $kq = GuiLaiMotRequest -url $kq.Url -khoa $kq.Khoa -token $token
+    }
+
+    return $kq
 }
 
 Write-Host '════ PROBE GIU CHO 2 INSTANCE (hai Host, cung DB/Redis, cung mot mon hang) ════'
@@ -257,7 +313,11 @@ values ('e0000000-0000-0000-0000-0000000000d7',null,'e0000000-0000-0000-0000-000
     Kq 'P03 lay token admin tu Host A' (-not [string]::IsNullOrWhiteSpace($jwt.access_token)) 'password grant'
 
     # ── ③ CHIEU DUONG: OnHand = 1 ⇒ DUNG MOT thang ─────────────────────────────────────────────
+    # 🚨 `D-66`: hai request ban **dong thoi** (do duoc khoa phan tan), nhung request thua co the vap
+    # 409 trong khe "nha khoa → commit" ⇒ **thu lai** truoc khi dem. Chieu DUONG cung thu lai: neu
+    # thu lai ma van 2 thang ⇒ bat bien `Reserved <= OnHand` da bi pha (P09/P10 se bat).
     $kq1 = @(BanHaiRequest -url1 $urlA -khoa1 'K9HC-P1-A' -url2 $urlB -khoa2 'K9HC-P1-B' -token $jwt.access_token)
+    $kq1 = @($kq1 | ForEach-Object { ThuLaiNeu409 -kq $_ -token $jwt.access_token })
 
     Kq 'P04 ca HAI Host deu TRA LOI (khong co loi ket noi ⇒ hai tien trinh that su phuc vu)' `
         ($kq1.Count -eq 2 -and $kq1[0].Ma -gt 0 -and $kq1[1].Ma -gt 0) `
@@ -300,20 +360,37 @@ values ('e0000000-0000-0000-0000-0000000000d7',null,'e0000000-0000-0000-0000-000
         (((So $phan2[0]) -eq 2) -and ((So $phan2[1]) -eq 0)) ("ton = $ton2")
 
     $kq2 = @(BanHaiRequest -url1 $urlA -khoa1 'K9HC-P2-A' -url2 $urlB -khoa2 'K9HC-P2-B' -token $jwt.access_token)
+    $kq2 = @($kq2 | ForEach-Object { ThuLaiNeu409 -kq $_ -token $jwt.access_token })
 
     $soThang2 = @($kq2 | Where-Object { $_.Ma -eq 200 }).Count
-    Kq 'P12 chieu nguoc: du ton cho HAI ⇒ CA HAI request deu 200 (phep do KHONG luon bao mot thang)' `
+    Kq 'P12 chieu nguoc: du ton cho HAI ⇒ CA HAI request deu 200 sau khi thu lai 409 (phep do KHONG luon bao mot thang)' `
         ($soThang2 -eq 2) ("thanh cong = {0} · HTTP = {1}/{2}" -f $soThang2, $kq2[0].Ma, $kq2[1].Ma)
 
     $soGiuCho2 = Psql 'select count(*) from "InvStockReservations" where "Sku" = ''K9HC-SKU-01'';'
     Kq 'P13 chieu nguoc — DB: dung HAI dong giu cho' ($soGiuCho2 -eq '2') ("so dong = $soGiuCho2")
 
-    # ── ⑥ LOG: khong co exception THAT (🛡️ `AbpDbConcurrencyException` o day la loi THAT, khong phai flake) ──
-    $mauLoi = 'Unhandled exception|OutOfMemoryException|AbpDbConcurrencyException'
-    $loiA = @(Select-String -Path (Join-Path $goc '_probe-giu-cho-a.log') -Pattern $mauLoi -ErrorAction SilentlyContinue).Count
-    $loiB = @(Select-String -Path (Join-Path $goc '_probe-giu-cho-b.log') -Pattern $mauLoi -ErrorAction SilentlyContinue).Count
+    # ── ⑥ LOG: chi duoc phep co XUNG DOT da khai bao (409), khong duoc co loi KHAC ──────────────────
+    # 🚨 `D-66`: truoc day mau kiem gop `AbpDbConcurrencyException` vao "loi THAT" ⇒ moi lan xung dot
+    #    lam P14 DO, du do chinh la hop dong `409` (da khai bao). Nay tach **hai** nhom:
+    #      ① `Unhandled exception|OutOfMemoryException` ⇒ **KHONG duoc co** (loi that);
+    #      ② `AbpDbConcurrencyException` ⇒ **duoc phep**, nhung moi dong trong log PHAI co mot `409`
+    #         tuong ung ma probe da thay (⇒ khong co xung dot bi NUOT im lang).
+    #    📌 Do duoc (`handover-n20` §1.3): ca 409 in dung **1** dong `AbpDbConcurrencyException`, **0**
+    #    dong `Unhandled exception` ⇒ phep dem nay khong phu thuoc vao chuoi cua ABP.
+    $loiA = @(Select-String -Path (Join-Path $goc '_probe-giu-cho-a.log') -Pattern 'Unhandled exception|OutOfMemoryException' -ErrorAction SilentlyContinue).Count
+    $loiB = @(Select-String -Path (Join-Path $goc '_probe-giu-cho-b.log') -Pattern 'Unhandled exception|OutOfMemoryException' -ErrorAction SilentlyContinue).Count
+    $xungDotA = @(Select-String -Path (Join-Path $goc '_probe-giu-cho-a.log') -Pattern 'AbpDbConcurrencyException' -ErrorAction SilentlyContinue).Count
+    $xungDotB = @(Select-String -Path (Join-Path $goc '_probe-giu-cho-b.log') -Pattern 'AbpDbConcurrencyException' -ErrorAction SilentlyContinue).Count
 
-    Kq 'P14 khong co exception THAT trong log hai Host' ($loiA -eq 0 -and $loiB -eq 0) ("exception A = $loiA · exception B = $loiB")
+    $tongLoi = $loiA + $loiB
+    $tongXungDotLog = $xungDotA + $xungDotB
+
+    Kq 'P14 log: KHONG co loi that; xung dot trong log deu da tra 409 cho client (khong nuot im lang)' `
+        ($tongLoi -eq 0 -and ($tongXungDotLog -eq 0 -or $script:soXungDot -ge 1)) `
+        ("loi that A = $loiA · B = $loiB · xung dot trong log A = $xungDotA · B = $xungDotB · 409 da thay = $($script:soXungDot)")
+
+    Write-Host ("   ℹ️ THU LAI 409 (`D-66`): {0} lan · gioi han {1} lan/request · HTTP cuoi: chieu duong {2}/{3} · chieu nguoc {4}/{5}" -f `
+            $script:soXungDot, $SoLanThuLai, $kq1[0].Ma, $kq1[1].Ma, $kq2[0].Ma, $kq2[1].Ma)
 }
 catch {
     Write-Host ("   ❌ NGOAI LE: " + $_.Exception.Message)

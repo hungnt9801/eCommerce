@@ -652,6 +652,30 @@ thái "đỏ mà không ai đọc".
   (`Address` 6 · `Sales` 3); build **incremental** = **0/0**. Con số *"0/0"* ở các handover trước là **đầu ra của
   build không compile lại** — từ nay ghi rõ *"full"*/*"incremental"*.
 
+**Đã chốt hướng xử lý `D-64` (`N20`, 05/11/2026) — [handover-n20](handover-n20.md), quyết định [D-66](decisions.md):**
+
+- ✅ **Chốt hướng (b) của `D-64`:** `409` = **chồng request trên cùng `InventoryItem`, THỬ LẠI** — không phải 5xx,
+  không phải im lặng, và DB **vẫn** giữ `Reserved ≤ OnHand`. ⛔ Không nới bất biến, không bật/tắt required check.
+- ✅ **Repro TẤT ĐỊNH (máy dev) — lần đầu thấy tận mắt ca `D-64`:** một transaction `psql` khác giữ `InvItems` + đổi
+  `ConcurrencyStamp` đúng lúc request chạy ⇒ **HTTP 409** `code = null` (*"…changed by another user…"*); log Host
+  **1** dòng `AbpDbConcurrencyException` (**0** dòng `Unhandled exception`), stack tại
+  `EfCoreRepository.InsertAsync(autoSave)` ← `GiuChoAsync` ⇒ 🚨 **đúng chỗ flush `_soCaiRepository.InsertAsync(but, autoSave: true)`,
+  nằm NGOÀI `try/catch`**; **gửi lại cùng `idempotencyKey` ⇒ 200** + 1 dòng giữ chỗ, `OnHand/Reserved = 2.000/1.000`.
+  📌 **Nguyên nhân gốc:** khoá phân tán nhả ở **cuối `GiuChoAsync`**, transaction checkout commit ở **cuối app service**.
+- ✅ **Sửa MỘT tệp (probe, không phải mã nghiệp vụ):** `$SoLanThuLai = 3` + `ThuLaiNeu409` (gửi lại **đúng** request:
+  cùng Host, cùng `idempotencyKey`) + `P14` tách *xung đột đã khai báo* ↔ *lỗi thật* + 1 dòng `ℹ️` báo số lần thử lại.
+  **0** tệp `.cs` · **0** migration (59 vẫn mới nhất).
+- ✅ **Chống "nới cổng để cho xanh":** ca **`Y7`** (`test-cong-kiem.ps1`) quét **chính** tệp probe, **hai chiều**
+  (nới giới hạn lên **99** / xoá `Reserved <= OnHand` ⇒ phép quét **PHẢI ĐỎ**) ⇒ test cổng **36/36 → 37/37**.
+- ✅ **Đo lại tỉ lệ:** probe **5 lượt trước khi sửa `17/0 ×5`** (máy dev **không** tái hiện flake — khe rất hẹp) ·
+  **5 lượt sau khi sửa `17/0 ×5`** · bản **giả lập 409** (`tools/_tam-kiem/n20/`, **không commit**) ⇒ **17/0** +
+  `ℹ️ THU LAI 409: 1 lần` ⇒ đường thử lại **chạy thật** trên API (không chỉ đọc mã).
+- ✅ **Giữ 2 required check đúng cấu hình đã đo:** `GET …/branches/main/protection` ⇒ `contexts =
+  ["docker-build","cong-15-buoc"]`, `app_id` **15368**, `strict=false`, `enforce_admins=false`, 8 cờ còn lại
+  `false`/`null`; `ci` trên `main` (head `25d2bd5`) **4/4 check success**. ⛔ **Không** `PUT`, không đổi cờ nào.
+- ⚠️ **Nợ còn lại (có nhận chủ):** `409` vẫn `code = null` (map mã nghiệp vụ = phiên có `§WP-14`);
+  `openapi-drift`/`e2e-playwright` vẫn **không** required (`D-65` ⑤ giữ nguyên).
+
 ---
 
 ## 6. Lịch sprint (2 tuần/sprint)
@@ -800,7 +824,7 @@ bảo hành · website builder · affiliate · báo cáo ngoài 3 cái · app mo
 | 04/11/2026 | **WP-13 ② (`N15`) — JOB CI `docker-build`**: workflow **riêng** `.github/workflows/docker-build.yml` — `docker build -f apps/admin-web/Dockerfile` với context **gốc repo** + `NEXT_PUBLIC_APP_NAME` build arg, rồi **2 bất biến**: image có `server.js`+`.next/static` (`standalone`) và container **bật được** với `/login` **200** khi API chết (`D-52` ⑦) | run [**`41808550753`**](https://github.com/hungnt9801/eCommerce/actions/runs/41808550753) **success trên `ubuntu-latest`** — **76 s** (build **68 s**), **6/6** bước · trước đó cùng ngày, máy dev: `docker build` **exit 0** · `/login` **200** (lần thử 2) · `/api/health` **503** · size **354 MB** (`docker images`) = **83 MB** (`inspect .Size`) · **0 migration** · **0** test BE thêm | `D-57` (workflow riêng + **nhánh tạm** để có run thật rồi xoá; lượt đo **đầu ĐỎ** vì `Dockerfile`/`.dockerignore` **untracked** — nợ thật; 2 bất biến sau build; **hai** cách đo size; required check **chưa bật**). Chi tiết: [handover-n15.md](handover-n15.md) |
 | 05/11/2026 | **`N18` — Commit cây làm việc → `ci` xanh trên PR #1 → MERGE**: **6** commit · **160** tệp (`6ab9114` BE `WP-06…WP-08` + migration **57…59** · `4248d80` `ci.yml` bước FE + 2 job · `b94b13e` compose `admin-web` · `0bbc140` `tools/` `N12`–`N14` · `3f93c14` docs · `39df2d4` 2 fix); **39** tệp `tools/_*` **vẫn** ngoài VCS (rác cổng) | **`ci` lượt 1** (head `3f93c14`) **ĐỎ 2 chỗ** — bước 11 (`FAIL — 3 tham chieu chet`: `artifacts/`) + `e2e-playwright` (**1 failed · 7 passed**) — **nhưng cổng nghiệp vụ 19/19 XANH** (`290,5 s`); **`ci` lượt 2** (head `39df2d4`) **3/3 XANH, 10,2 phút** (run `41963379150`; log: **19/19 (352,8 s)** · Playwright **8 passed** · link **657**/PASS) · `docker-build` **6/6** (`41963379197`) ⇒ **merge PR #1 = `fab0089`** (46 commit · **610** tệp) · bản nhẹ **9/9** · `-DayDu` **19/19 (436,8 s)** · test cổng **36/36** · DB **25/25** · **0 migration** (59) | `D-62` (merge khi **đo** thấy xanh; **2 lỗi chỉ lộ trên cây sạch**: mốc ảnh tồn kho ghi cho lượt chụp **0 dòng** ⇒ báo cáo tồn kho rỗng cả ngày; cổng link bỏ qua `artifacts/` — **đối xứng** `$boQua`, ⛔ không nới cho link trong repo, ca `V4`/`V5`), `D-63` (`cong-15-buoc` required **chưa** bật — settings của repo, cần phiên riêng đo TRƯỚC/SAU). Chi tiết: [handover-n18.md](handover-n18.md) |
 | 05/11/2026 | **Đóng nợ CI `packageManager` (`N17`) — và KHÔNG merge PR #1**: bỏ **1 dòng** `packageManager` ở `package.json` gốc + sửa comment `Dockerfile` ⇒ `yarn`/`abp install-libs` chạy lại được; ⛔ **không** bỏ bước 7 khỏi `ci.yml` | **Bước 7 `ci` XANH trên CI thật** (run `41955331290`, job **294 s**; trước: đỏ sau **38 s**) · `docker-build` **xanh 6/6** (run `41955331294`, 66 s) · `yarn --version` **exit 1 → exit 0** · `abp install-libs` **exit 0** (10,2 s) · `pnpm install --frozen-lockfile` **exit 0** · cổng nhẹ **9/9 (228,5 s)** · `-DayDu` **19/19 (455,9 s)** · test cổng **34/34** (full **40/40**) · DB **25/25** · **0 migration** | `D-60` (bỏ field; pnpm ghim **2 chỗ**), `D-61` (**KHÔNG merge**: `ci` đỏ ở **⑦/Y1** vì 3 probe `N12`–`N14` chưa commit là **mới so với `main`** ⇒ merge làm `main` đỏ; + nửa FE/API 404). Chi tiết: [handover-n17.md](handover-n17.md) |
-
+| 05/11/2026 | **CHỐT HƯỚNG `D-64` (`N20`) — `409` là HỢP ĐỒNG, probe thử lại có GIỚI HẠN** (không mở WP mới: `07` chưa có `§WP-14`): `probe-giu-cho-2instance.ps1` thêm `$SoLanThuLai = 3` + `ThuLaiNeu409` (gửi lại **đúng** request: cùng Host + cùng `idempotencyKey`), `P12` đo **sau** thử lại, `P14` tách *xung đột đã khai báo* ↔ *lỗi thật*, 1 dòng `ℹ️` báo số lần thử lại; `test-cong-kiem.ps1` thêm ca **`Y7`** (quét chính tệp probe, **hai chiều**) | **Repro TẤT ĐỊNH**: transaction `psql` khác đổi `ConcurrencyStamp` ⇒ **409** `code=null` (*"…changed by another user…"*) + **1** dòng `AbpDbConcurrencyException` (**0** `Unhandled exception`), stack tại `EfCoreRepository.InsertAsync(autoSave)` ← `GiuChoAsync`; **thử lại cùng khoá ⇒ 200**, `OnHand/Reserved = 2.000/1.000` · bản **giả lập 409** (`tools/_tam-kiem`, không commit) ⇒ probe **17/0** + `ℹ️ THU LAI 409: 1 lần` · probe **5 lượt trước sửa `17/0 ×5`** / **5 lượt sau sửa `17/0 ×5`** (máy dev không tái hiện flake) · test cổng **36/36 → 37/37** · required check **không đổi** (`["docker-build","cong-15-buoc"]`, `strict=false`, `enforce_admins=false`) · **0 migration** (59), **0** tệp `.cs` | `D-66` (chốt hướng (b): `409` = chồng request, **thử lại**; ⛔ không retry trong server vì `GiuChoAsync` chạy trong transaction checkout — PostgreSQL đã abort; ⛔ không nới bất biến; `P14` **chỉ** phân loại lại, vẫn cấm `Unhandled exception`/`OutOfMemory`). Chi tiết: [handover-n20.md](handover-n20.md) |
 
 **Ô checklist §12 cập nhật:** đội 3 người ✅ · dev transport **http 54275** ✅ · plan đã duyệt ✅ · baseline đã chạy ✅
 

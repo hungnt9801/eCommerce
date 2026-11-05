@@ -686,6 +686,39 @@ if (-not $ChiKiemDb) {
         return @($viPham)
     }
 
+    <#
+        🚨 `D-66` (`N20`): `probe-giu-cho-2instance.ps1` duoc phep **thu lai 409** (hop dong: *"409 =
+        chong request tren cung `InventoryItem`, thu lai"*). 🔑 Nhung neu ai do doi thanh **thu mai**
+        hoac **xoa khang dinh bat bien** thi phep do bien thanh **dau dong** — va do dung la cach
+        *"tat cong de cho xanh"* ma ca du an cam. Ham **thuan** duoi day nhan **noi dung tep** (khong
+        doc dia) ⇒ ca XANH va ca DO chi khac nhau o **du lieu vao** (cung khuon `Tim-ViPhamNapThuVien`).
+
+        Ba dieu phai con: (1) `$SoLanThuLai` khai bao va **<= 3**; (2) vong thu lai chi vi **409**;
+        (3) ba khang dinh bat bien — `Reserved <= OnHand`, `Available = 0`, `CA HAI request deu 200`.
+    #>
+    function Tim-ViPhamThuLai409 {
+        param([string]$Ma)
+
+        $viPham = @()
+
+        $m = [regex]::Match($Ma, '(?m)^\s*\$SoLanThuLai\s*=\s*(\d+)\s*$')
+
+        if (-not $m.Success) {
+            $viPham += 'KHONG khai bao $SoLanThuLai ⇒ vong thu lai khong co tran'
+        }
+        elseif ([int]$m.Groups[1].Value -gt 3) {
+            $viPham += ('{0} = {1} > 3 ⇒ thu qua nhieu lan (noi long phep do)' -f '$SoLanThuLai', $m.Groups[1].Value)
+        }
+
+        if ($Ma -notmatch '-eq\s+409') { $viPham += 'vong thu lai KHONG chi vi 409' }
+
+        foreach ($neo in @('Reserved <= OnHand', 'Available = 0', 'CA HAI request deu 200')) {
+            if (-not $Ma.Contains($neo)) { $viPham += ('mat khang dinh: {0}' -f $neo) }
+        }
+
+        return @($viPham)
+    }
+
     Describe 'nen-tang.ps1 — khong con API chi-Windows, va ham chay DUNG tren he dieu hanh nay' {
 
         It 'Y1) MOI script cua cong khong con API chi-Windows va nap thu vien khi can (🛡️ chong sao chep khuon cu)' {
@@ -792,6 +825,32 @@ if (-not $ChiKiemDb) {
             }
 
             KhangDinh ($mo.Count -ge 4) ("Chi thay {0} script mo co bao mat ⇒ phep quet VO NGHIA (mong doi >= 4)." -f $mo.Count)
+        }
+
+        It 'Y7) probe giu cho 2 instance: THU LAI 409 co GIOI HAN va khong mat khang dinh bat bien (D-66)' {
+            # 🚨 `N20` (`D-66`): `D-64` — `probe-giu-cho-2instance` flaky tren CI (`17/17` vs `14/3`;
+            #    `P12` `200/409` · `P13` 1 dong · `P14` 1 exception). Da chot huong: **409 = chong request,
+            #    thu lai** ⇒ probe gui lai toi da 3 lan CUNG `idempotencyKey`.
+            # 🔑 Vi sao can CA NAY: noi long mot phep do la cach nhanh nhat de lam cong xanh — va lan sau
+            #    khong ai biet no da bi noi. Ca nay quet **hai chieu**: tep that phai SACH; sua tep theo
+            #    huong "thu mai"/"xoa khang dinh" thi phep quet PHAI bao.
+            $tep = Join-Path $PSScriptRoot 'probe-giu-cho-2instance.ps1'
+            KhangDinh (Test-Path $tep) ("KHONG thay {0} ⇒ ca kiem vo nghia." -f $tep)
+
+            $noiDung = [IO.File]::ReadAllText($tep)
+            $ma = [regex]::Replace($noiDung, '(?s)<#.*?#>', '')
+            $ma = (($ma -split "`n") | Where-Object { -not $_.TrimStart().StartsWith('#') }) -join "`n"
+
+            $viPham = @(Tim-ViPhamThuLai409 -Ma $ma)
+            KhangDinh ($viPham.Count -eq 0) ("probe-giu-cho-2instance.ps1: " + ($viPham -join ' · '))
+
+            # 🛡️ CHIEU NGUOC 1 — noi gioi han len 99 ⇒ phep quet PHAI bao.
+            $noiLong = $ma -replace '(?m)^(\s*\$SoLanThuLai\s*=\s*)\d+', '${1}99'
+            KhangDinh (@(Tim-ViPhamThuLai409 -Ma $noiLong).Count -gt 0) 'Noi gioi han thu lai len 99 ma phep quet KHONG bao ⇒ phep quet vo nghia.'
+
+            # 🛡️ CHIEU NGUOC 2 — xoa mot khang dinh bat bien ⇒ phep quet PHAI bao.
+            $matNeo = $ma.Replace('Reserved <= OnHand', 'BatDauGiuCho')
+            KhangDinh (@(Tim-ViPhamThuLai409 -Ma $matNeo).Count -gt 0) 'Xoa khang dinh "Reserved <= OnHand" ma phep quet KHONG bao ⇒ phep quet vo nghia.'
         }
     }
 }
