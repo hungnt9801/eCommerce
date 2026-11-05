@@ -623,6 +623,29 @@ thái "đỏ mà không ai đọc".
   **`409`** (đúng *"conflict, thử lại"*). ⛔ **Không** nới probe, **không** sửa trong `N18`; hai hướng phải **chọn**
   ở phiên `WP-05/06` kế (retry có giới hạn **hoặc** chấp nhận `409` + sửa kỳ vọng probe).
 
+**Đã bật required check (`N19`, 05/11/2026) — [handover-n19](handover-n19.md), quyết định [D-65](decisions.md):**
+
+- ✅ **Bật `cong-15-buoc` làm required check trên `main` — việc còn lại duy nhất của `D-63`** (phiên **không** mở
+  WP mới vì `07` chưa có `§WP-14`). 📌 `N19` **chỉ** đổi **settings của repo** + docs: **0** tệp `.cs`/`.ps1`/`.ts`,
+  **0** migration (59 vẫn mới nhất), **0** test BE thêm.
+- ✅ **Đo TRƯỚC:** `GET …/branches/main/protection` ⇒ **200**, `contexts = ["docker-build"]` (`app_id` 15368),
+  `strict=false`, `enforce_admins=false` — khớp `handover-n18` §7 (khác `N16`: lúc đó **404**).
+- ✅ **Điều kiện "`ci` xanh trên `main`" ĐÃ THOẢ (đo trên đúng head `0e5c275`):** run
+  [**`41969985282`**](https://github.com/hungnt9801/eCommerce/actions/runs/41969985282) **SUCCESS 3/3 job**
+  (`cong-15-buoc` 04:47:39→04:56:50 · `openapi-drift` · `e2e-playwright`), check-run của head **4/4 success** — đây là
+  lượt xanh **thứ hai** trên `main` (trước: run `41964732639` @ `fab0089`).
+- ✅ **Bật + đo SAU:** `PUT …/protection` **cả object** (11 cờ + 1 context) ⇒ **200**; `contexts =
+  ["docker-build","cong-15-buoc"]`, 10 cờ còn lại **không đổi** ⇒ không nuốt cấu hình. 🔒 Chỉ bật **1** job
+  (⛔ không `openapi-drift`/`e2e-playwright` — ngoài phạm vi).
+- ✅ **Chứng minh cổng có hiệu lực:** PR **#3** (docs-only) ⇒ `mergeable_state = blocked` khi 2 check còn pending,
+  chỉ merge sau khi **cả 2** xanh. ⇒ **`D-63` ĐÓNG.**
+- 🚨 **Hệ quả đổi mức nghiêm trọng:** `D-64` (`probe-giu-cho-2instance` **flaky**: `17/17` vs `14/3` trên cùng cây
+  mã) **từ nay chặn merge PR thật** ⇒ phải chốt hướng xử lý trước khi tin cổng tuyệt đối; ⛔ không tắt required
+  check để "merge cho xong".
+- 📌 **Baseline build ghi lệch `N18`:** build **full** của `main` = **0 error / 9 warning** `CS8604` có sẵn
+  (`Address` 6 · `Sales` 3); build **incremental** = **0/0**. Con số *"0/0"* ở các handover trước là **đầu ra của
+  build không compile lại** — từ nay ghi rõ *"full"*/*"incremental"*.
+
 ---
 
 ## 6. Lịch sprint (2 tuần/sprint)
