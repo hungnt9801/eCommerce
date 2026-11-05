@@ -16,8 +16,10 @@ FROM node:22-alpine AS builder
 
 WORKDIR /repo
 
-# 📌 `corepack` đọc `packageManager: pnpm@10.22.0` trong `package.json` gốc ⇒ **đúng** phiên bản pnpm
-#    đã sinh `pnpm-lock.yaml`. Dùng pnpm khác phiên bản thì `--frozen-lockfile` có thể báo lệch.
+# 📌 pnpm được GHIM NGAY TẠI ĐÂY (`corepack prepare pnpm@10.22.0`) — **không** dựa vào `packageManager`
+#    trong `package.json` gốc nữa: field đó đã bị bỏ ở `D-60` vì nó làm `yarn` 1.22 của `abp install-libs`
+#    (CI bước 7, `src/eCommerce.Web`) từ chối chạy. 🔒 Ghim cứng vẫn cần: `pnpm-lock.yaml` do 10.22.0 sinh,
+#    dùng pnpm khác phiên bản thì `--frozen-lockfile` có thể báo lệch.
 RUN corepack enable && corepack prepare pnpm@10.22.0 --activate
 
 # ① Chỉ manifest trước (tầng cache): sửa mã nguồn KHÔNG phải cài lại dependency.

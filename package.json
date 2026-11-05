@@ -1,7 +1,6 @@
 {
   "name": "ecommerce",
   "private": true,
-  "packageManager": "pnpm@10.22.0",
   "scripts": {
     "dev": "pnpm --filter @ecommerce/admin-web dev",
     "build": "pnpm --filter @ecommerce/admin-web build",
