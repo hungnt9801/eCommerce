@@ -233,7 +233,7 @@ làm required check** (đo TRƯỚC bằng `GET .../branches/main/protection`, c
 | Mục | Giá trị |
 |---|---|
 | Nhánh làm việc | `feature/wp-03-catalog` — **đã merge**, giữ làm lịch sử (tên **không** còn khớp phạm vi: chứa `N1…N18`) |
-| `HEAD` local | **`de05492`** (commit **docs** của phiên này; `origin/feature/wp-03-catalog` = `de05492`) |
+| `HEAD` local | commit **docs cuối phiên** (`git log -1 --format=%h`) — 📌 không chép SHA vào tài liệu: mỗi lần thêm docs lại đổi |
 | **`main`** | **`fab0089`** (merge commit của PR #1) · **rồi** merge commit của **PR #2** (docs) — 📌 `git log -1 --format=%H origin/main` là **nguồn sự thật**, không chép SHA vào tài liệu (mỗi lần merge lại đổi) |
 | PR | [**#1**](https://github.com/hungnt9801/eCommerce/pull/1) — **MERGED** · 46 commit · **610** tệp · `+258.467 / −4.073` · [**#2**](https://github.com/hungnt9801/eCommerce/pull/2) — **docs-only** (5 tệp `.md`: handover này + `decisions`/`07`/`08`/`README`), `ci` + `docker-build` xanh trước khi merge |
 | Run Actions **trên `main`** (head `fab0089`) | ✅ `ci` **[`41964732639`](https://github.com/hungnt9801/eCommerce/actions/runs/41964732639)** — **SUCCESS, 10,4 phút, 3/3 job** (`openapi-drift` 2m33s · `e2e-playwright` 3m57s · `cong-15-buoc` 10m21s) · ✅ `docker-build` **[`41964732648`](https://github.com/hungnt9801/eCommerce/actions/runs/41964732648)** — **SUCCESS, 76 s** |
