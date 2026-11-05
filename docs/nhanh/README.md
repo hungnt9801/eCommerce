@@ -174,7 +174,7 @@ Tóm tắt 6 quyết định gốc:
 | [08-session-protocol.md](08-session-protocol.md) | **Chia phiên**: 10 session cho GĐ0–GĐ2, mẫu kickoff/handover, **câu mở phiên kế bắt buộc — 2 biến thể (§5.1)**, khi nào dừng |
 | [09-parallel-sessions.md](09-parallel-sessions.md) | **Chạy song song**: worktree, cổng/DB riêng, contract-first, luật migration |
 | [baseline-2026-11-02.md](baseline-2026-11-02.md) | Baseline trước khi sửa (build/test/cổng) |
-| [decisions.md](decisions.md) | Biên bản quyết định **D-01…D-63** (**D-01…D-18** chốt 02/11/2026; **D-19…D-63** phát sinh khi thi công `N2…N18`) |
+| [decisions.md](decisions.md) | Biên bản quyết định **D-01…D-64** (**D-01…D-18** chốt 02/11/2026; **D-19…D-64** phát sinh khi thi công `N2…N18`) |
 | [nhanh-pos-v3-api-inventory.md](nhanh-pos-v3-api-inventory.md) | **68 endpoint + 10 webhook** Open API v3, enum, shape, câu hỏi mở |
 | [nhanh-pos-module-map.md](nhanh-pos-module-map.md) | Bản đồ 12 module, 18 trạng thái đơn, 10 quy trình, 50 màn P0/P1/P2 |
 

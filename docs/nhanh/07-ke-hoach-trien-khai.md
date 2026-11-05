@@ -617,6 +617,11 @@ thái "đỏ mà không ai đọc".
   có đo **TRƯỚC/SAU**.
 - ✅ **DoD đạt:** bản nhẹ **exit 0 (9/9)** · `-DayDu` **exit 0 (19/19, 436,8 s)** · test cổng **36/36** ·
   DB **25/25** · link **PASS (657 link)** · **0 migration** (59 vẫn mới nhất) · **0** test BE thêm.
+- 🚨 **Nợ MỚI có số đo (`D-64`) — `probe-giu-cho-2instance` FLAKY trên CI:** cùng một cây mã (khác **chỉ** `.md`),
+  run `41963379150` **17/17 DAT** vs run `41967295632` **14 DAT / 3 HONG** (`P12` `200/409`, `P13` **1** dòng,
+  `P14` **1** exception) — hai request **chồng nhau** trên cùng `InventoryItem` ⇒ `DbConcurrencyException` ⇒
+  **`409`** (đúng *"conflict, thử lại"*). ⛔ **Không** nới probe, **không** sửa trong `N18`; hai hướng phải **chọn**
+  ở phiên `WP-05/06` kế (retry có giới hạn **hoặc** chấp nhận `409` + sửa kỳ vọng probe).
 
 ---
 

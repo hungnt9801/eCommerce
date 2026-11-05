@@ -119,10 +119,17 @@ cả hai đã đo lại. 🔒 Nói rõ để phiên sau **không** đọc *"19/1
    (**D-63**), ⛔ **không** tự bật trong phiên "commit cây".
 2. ⏭ **`07` chưa có `§WP-14`** ⇒ phiên sau **không** được tự đặt WP mới (`08 §5.1` luật 5).
 3. 📌 **39 tệp `tools/_*` vẫn untracked** (rác cổng) — **đúng** ý đồ, không phải bỏ sót.
-4. 📌 **Ý nghĩa "ảnh tồn kho" sau fix:** ảnh được chụp **một lần/ngày** ở lượt tổng hợp **đầu tiên có hàng**.
+4. 🚨 **`probe-giu-cho-2instance` FLAKY trên CI — đo được 1 xanh / 1 đỏ trên CÙNG một cây mã** (khác nhau
+   **chỉ** ở tệp `.md`): run `41963379150` (`39df2d4`) **17/17 DAT** vs run `41967295632` (head `d99dbb8`,
+   **docs-only**) **14 DAT / 3 HONG** — `P12` hai request chồng nhau trả **`200/409`** (không phải `200/200`),
+   `P13` chỉ **1** dòng giữ chỗ, `P14` **1** exception trong log Host B. Log đầy đủ:
+   `tools/_tam-kiem/giu-cho-2inst.log` (artifact `bang-chung-*`). ⇒ **Không** sửa trong `N18` (ngoài phạm vi;
+   cần **quyết định**: thêm **retry có giới hạn** khi `DbConcurrencyException` **hoặc** chấp nhận `409` và sửa
+   kỳ vọng của probe). **Nhận chủ:** phiên `WP-05/06` kế — xem **`D-64`** + §5 #2.
+5. 📌 **Ý nghĩa "ảnh tồn kho" sau fix:** ảnh được chụp **một lần/ngày** ở lượt tổng hợp **đầu tiên có hàng**.
    Nếu **cả ngày** kho thật sự trống thì báo cáo tồn kho hiện *"chưa chụp ảnh"* (**đúng**: *chưa có gì để chụp*),
    không phải `0`. Muốn "ảnh luôn mới nhất trong ngày" thì phải đổi sang **chụp lại mỗi lượt** — việc **chưa làm**
-   (xem §5 #2).
+   (xem §5 #3).
 
 ---
 
@@ -151,7 +158,12 @@ cả hai đã đo lại. 🔒 Nói rõ để phiên sau **không** đọc *"19/1
 1. 🚨 **Cổng link chỉ đúng khi chạy trên cây sạch — bài học lặp lại LẦN THỨ HAI** (`D-57` ③ là lần đầu):
    mọi phép đo *"xanh"* trên máy dev đều phải hỏi *"tệp này có trong repo không?"*. `N18` mất **1 lượt CI
    (~10 phút)** để phát hiện 2 lỗi thuộc đúng lớp này.
-2. ⚠️ **Ảnh tồn kho = một ảnh/ngày** (sau `D-62` ①). Hệ quả: báo cáo tồn kho **không** phản ánh tồn **lúc mở
+2. 🚨 **`probe-giu-cho-2instance` FLAKY trên CI (đo được, `D-64`) — chưa sửa, đã có nhận chủ.** Cùng **một**
+   cây mã (khác nhau **chỉ** tệp `.md`): run `41963379150` **17/17 DAT** · run `41967295632` **14 DAT / 3 HONG**
+   (`P12` `200/409` thay vì `200/200` · `P13` **1** dòng giữ chỗ · `P14` **1** exception). Hai Host **chồng
+   request** trên **cùng** `InventoryItem` ⇒ `DbConcurrencyException` ⇒ `409`. ⚠️ Hệ quả: **`ci` có thể đỏ ngẫu
+   nhiên** ⇒ đừng kết luận *"mã hỏng"* khi thấy đúng 3 ca này; và ⛔ **đừng** "sửa" bằng cách nới probe.
+3. ⚠️ **Ảnh tồn kho = một ảnh/ngày** (sau `D-62` ①). Hệ quả: báo cáo tồn kho **không** phản ánh tồn **lúc mở
    màn hình**, mà tồn ở **lượt tổng hợp đầu tiên trong ngày**. Muốn "mỗi 15 phút một ảnh" phải đổi luật
    (chụp lại mỗi lượt, `DELETE` + `INSERT` theo ngày) — **cần đo chi phí** với 20.000 SKU trước khi đổi.
 3. ⚠️ **`ci` trên `main` giờ chạy 3 job (~10–25 phút)**; required check vẫn **chỉ** `docker-build` (**D-63**).
@@ -174,14 +186,17 @@ cả hai đã đo lại. 🔒 Nói rõ để phiên sau **không** đọc *"19/1
 có `§WP-14` ⇒ phiên `N19` **không** mở WP mới — việc còn lại là **bật `cong-15-buoc` required** (cần duyệt,
 `D-63`) rồi mới tới WP kế.**
 
-1. 🔑 **Đọc `D-62` + `D-63` + §2 TRƯỚC** khi nghĩ tới việc bật required check.
+1. 🔑 **Đọc `D-62` + `D-63` + `D-64` + §2 TRƯỚC** khi nghĩ tới việc bật required check.
 2. Đo **TRƯỚC** khi bật: `GET /repos/hungnt9801/eCommerce/branches/main/protection` (kỳ vọng: chỉ
    `docker-build`) · run `ci` **trên `main`** của head `fab0089` (**đã xanh** — §7) — *không* bật required cho
    một job **chưa** từng xanh trên `main`.
 3. Sau khi sửa bất cứ thứ gì: `pwsh -File .\tools\kiem-tat-ca.ps1` (**9/9**) · trước khi push `-DayDu`
    (**19/19**) · `test-cong-kiem.ps1 -ChiKiemMoc` (**36/36**) · `kiem-db.ps1` (**25/25**) ·
    `kiem-link-tai-lieu.ps1` (**PASS**).
-4. 🔒 **Nhánh mới từ `main` = `fab0089`** (không dùng lại `feature/wp-03-catalog`).
+4. 🔒 **Nhánh mới từ `main`** (SHA thật: `git log -1 --format=%h origin/main` — **đừng** chép từ tài liệu;
+   **không** dùng lại `feature/wp-03-catalog` — nhánh đó là lịch sử của `N1…N18`).
+5. ⚠️ **Nếu `ci` đỏ ở đúng `P12`/`P13`/`P14` của `probe-giu-cho-2instance`:** kiểm tra mã có đổi không rồi mới
+   kết luận; xem `D-64` (flaky **đo được**, chưa chọn hướng sửa).
 
 ```powershell
 cd D:\Projects\Tools\eCommerce
