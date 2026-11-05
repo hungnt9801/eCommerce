@@ -39,6 +39,10 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# 🔑 `nen-tang.ps1` = lop "mot cho" cho moi thu khac nhau giua Windows va Linux (`XC-007` P-01…P-06).
+#    🚨 Truoc `N12` tep nay con 3 khuon chi-Windows (duong dan output viet cung · co WindowStyle ·
+#    goi ban curl cua Windows) ⇒ tren `ubuntu-latest` no **do vi moi truong**, khong phai vi san pham.
+. (Join-Path $PSScriptRoot 'nen-tang.ps1')
 
 $gocRepo = Split-Path -Parent $PSScriptRoot
 $api = 'http://localhost:54275'
@@ -53,7 +57,7 @@ $maPhieu = "PN-WPF5-$ngauNhien"
 $canhBao = @()
 $hostProc = $null
 $webProc = $null
-$jar = Join-Path $env:TEMP "wpf5-cookies-$ngauNhien.txt"
+$jar = Lay-DuongDanTam "wpf5-cookies-$ngauNhien.txt"
 
 function In-KetQua {
     param([string]$Nhan, [int]$Status, [string]$Body)
@@ -68,7 +72,7 @@ function In-KetQua {
 
 # ── 0. Host ───────────────────────────────────────────────────────────────────────────────────────────────
 if (-not $BoQuaHost) {
-    $bin = Join-Path $gocRepo 'src\eCommerce.HttpApi.Host\bin\Debug\net10.0'
+    $bin = Lay-DuongDanBin -TenDuAn 'eCommerce.HttpApi.Host' -GocRepo $gocRepo
     if (-not (Test-Path (Join-Path $bin 'eCommerce.HttpApi.Host.dll'))) {
         Write-Host "KHONG THAY binary Host tai $bin — build truoc." -ForegroundColor Red
         exit 2
@@ -80,10 +84,10 @@ if (-not $BoQuaHost) {
     $env:ASPNETCORE_URLS = $api
     $env:AuthServer__Authority = $api
 
-    $hostProc = Start-Process dotnet -ArgumentList 'eCommerce.HttpApi.Host.dll' -WorkingDirectory $bin -PassThru `
-        -WindowStyle Hidden -RedirectStandardOutput "$env:TEMP\wpf5-host.log" -RedirectStandardError "$env:TEMP\wpf5-host.err"
+    $hostProc = Start-TienTrinhAn -Tep 'dotnet' -ThamSo 'eCommerce.HttpApi.Host.dll' -ThuMucLamViec $bin `
+        -TepLogRa (Lay-DuongDanTam 'wpf5-host.log') -TepLogLoi (Lay-DuongDanTam 'wpf5-host.err')
 
-    & pwsh -File (Join-Path $gocRepo 'tools\wait-host.ps1') -Url $api -LogFile "$env:TEMP\wpf5-host.log" -ProcessId $hostProc.Id
+    & pwsh -File (Join-Path $PSScriptRoot 'wait-host.ps1') -Url $api -LogFile (Lay-DuongDanTam 'wpf5-host.log') -ProcessId $hostProc.Id
     if ($LASTEXITCODE -ne 0) {
         Write-Host 'Host KHONG len duoc — xem log o tren.' -ForegroundColor Red
         exit 2
@@ -120,8 +124,8 @@ try {
     }
 
     if (-not $webDaChay -and -not $BoQuaWeb) {
-        $webProc = Start-Process cmd.exe -ArgumentList '/c', "pnpm --filter @ecommerce/admin-web start" -WorkingDirectory $gocRepo -PassThru `
-            -WindowStyle Hidden -RedirectStandardOutput "$env:TEMP\wpf5-web.log" -RedirectStandardError "$env:TEMP\wpf5-web.err"
+        $webProc = Start-NextAdmin -ThuMucLamViec $gocRepo `
+            -TepLogRa (Lay-DuongDanTam 'wpf5-web.log') -TepLogLoi (Lay-DuongDanTam 'wpf5-web.err')
 
         $daLen = $false
         for ($i = 0; $i -lt 60; $i++) {
@@ -148,14 +152,14 @@ try {
     Write-Host "Next: OK ($web)" -ForegroundColor Green
 
     # ── 4. Đăng nhập qua NextAuth (đúng đường người dùng) ────────────────────────────────────────────────
-    $csrf = (curl.exe -s -c $jar "$web/api/auth/csrf" | ConvertFrom-Json).csrfToken
+    $csrf = (& (Lay-Curl) -s -c $jar "$web/api/auth/csrf" | ConvertFrom-Json).csrfToken
     if ([string]::IsNullOrWhiteSpace($csrf)) {
         Write-Host 'KHONG lay duoc csrfToken cua NextAuth.' -ForegroundColor Red
         exit 1
     }
 
     $body = "csrfToken=$([uri]::EscapeDataString($csrf))&username=admin%40abp.io&password=1q2w3E%2A&callbackUrl=$([uri]::EscapeDataString("$web/$business"))"
-    $maDangNhap = (curl.exe -s -b $jar -c $jar -o NUL -w '%{http_code}' -X POST "$web/api/auth/callback/credentials" `
+    $maDangNhap = (& (Lay-Curl) -s -b $jar -c $jar -o (Lay-DuongDanTam 'dang-nhap.out') -w '%{http_code}' -X POST "$web/api/auth/callback/credentials" `
             -H 'Content-Type: application/x-www-form-urlencoded' --data $body)
 
     $coSession = (Select-String -Path $jar -Pattern 'authjs.session-token' -Quiet)
@@ -165,7 +169,7 @@ try {
     function Lay-Trang {
         param([Parameter(Mandatory)][string]$Path)
 
-        $raw = (curl.exe -s -b $jar -w '__HTTP__%{http_code}' "$web$Path") -join "`n"
+        $raw = (& (Lay-Curl) -s -b $jar -w '__HTTP__%{http_code}' "$web$Path") -join "`n"
         $i = $raw.LastIndexOf('__HTTP__')
         [pscustomobject]@{
             Status = [int]$raw.Substring($i + 8)
@@ -178,12 +182,12 @@ try {
 
         $thamSo = @('-s', '-b', $jar, '-w', '__HTTP__%{http_code}', '-X', $Method, "$web$Path")
         if ($null -ne $Body) {
-            $tep = Join-Path $env:TEMP "wpf5-body-$ngauNhien.json"
+            $tep = Lay-DuongDanTam "wpf5-body-$ngauNhien.json"
             ($Body | ConvertTo-Json -Depth 8 -Compress) | Set-Content -Path $tep -Encoding utf8 -NoNewline
             $thamSo += @('-H', 'Content-Type: application/json', '--data-binary', "@$tep")
         }
 
-        $raw = (curl.exe @thamSo) -join "`n"
+        $raw = (& (Lay-Curl) @thamSo) -join "`n"
         $i = $raw.LastIndexOf('__HTTP__')
         [pscustomobject]@{
             Status = [int]$raw.Substring($i + 8)

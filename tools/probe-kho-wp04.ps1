@@ -31,6 +31,10 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# 🔑 `nen-tang.ps1` = lop "mot cho" cho moi thu khac nhau giua Windows va Linux (`XC-007` P-01…P-06).
+#    🚨 Truoc `N12` tep nay con 3 khuon chi-Windows (duong dan output viet cung · co WindowStyle ·
+#    goi ban curl cua Windows) ⇒ tren `ubuntu-latest` no **do vi moi truong**, khong phai vi san pham.
+. (Join-Path $PSScriptRoot 'nen-tang.ps1')
 
 $gocRepo = Split-Path -Parent $PSScriptRoot
 $base = 'http://localhost:54275'
@@ -83,11 +87,19 @@ function In-KetQua {
     }
 }
 
+# 🔒 So **SỐ** cho cột `numeric(18,3)` (`D-55` ①): `psql` in `10.000`, và trên máy `vi-VN` dấu `.` là
+#    **phân cách nghìn** ⇒ parse **invariant** (không để culture máy quyết định `[decimal]'10.000'`).
+function So {
+    param([string]$Chuoi)
+
+    return [decimal]::Parse($Chuoi, [System.Globalization.CultureInfo]::InvariantCulture)
+}
+
 # ── 0. Host ───────────────────────────────────────────────────────────────────────────────────────────────
 $hostProc = $null
 
 if (-not $BoQuaHost) {
-    $bin = Join-Path $gocRepo 'src\eCommerce.HttpApi.Host\bin\Debug\net10.0'
+    $bin = Lay-DuongDanBin -TenDuAn 'eCommerce.HttpApi.Host' -GocRepo $gocRepo
     if (-not (Test-Path (Join-Path $bin 'eCommerce.HttpApi.Host.dll'))) {
         Write-Host "KHONG THAY binary Host tai $bin — build truoc." -ForegroundColor Red
         exit 2
@@ -99,10 +111,10 @@ if (-not $BoQuaHost) {
     $env:ASPNETCORE_URLS = $base
     $env:AuthServer__Authority = $base
 
-    $hostProc = Start-Process dotnet -ArgumentList 'eCommerce.HttpApi.Host.dll' -WorkingDirectory $bin -PassThru `
-        -WindowStyle Hidden -RedirectStandardOutput "$env:TEMP\wp04-host.log" -RedirectStandardError "$env:TEMP\wp04-host.err"
+    $hostProc = Start-TienTrinhAn -Tep 'dotnet' -ThamSo 'eCommerce.HttpApi.Host.dll' -ThuMucLamViec $bin `
+        -TepLogRa (Lay-DuongDanTam 'wp04-host.log') -TepLogLoi (Lay-DuongDanTam 'wp04-host.err')
 
-    & pwsh -File (Join-Path $gocRepo 'tools\wait-host.ps1') -Url $base -LogFile "$env:TEMP\wp04-host.log" -ProcessId $hostProc.Id
+    & pwsh -File (Join-Path $PSScriptRoot 'wait-host.ps1') -Url $base -LogFile (Lay-DuongDanTam 'wp04-host.log') -ProcessId $hostProc.Id
     if ($LASTEXITCODE -ne 0) {
         Write-Host 'Host KHONG len duoc — xem log o tren.' -ForegroundColor Red
         exit 2
@@ -111,14 +123,20 @@ if (-not $BoQuaHost) {
 
 try {
     # ── 1. Token (password grant — D-12/WP-01) ────────────────────────────────────────────────────────────
-    $token = Invoke-RestMethod -Method Post -Uri "$base/connect/token" -ContentType 'application/x-www-form-urlencoded' `
-        -Body @{
-        grant_type    = 'password'
-        client_id     = 'eCommerce_App'
-        client_secret = '1q2w3e*'
-        scope         = 'eCommerce offline_access'
-        username      = 'admin@abp.io'
-        password      = '1q2w3E*'
+    # 🔑 `D-56` (`WP-13` ①): `DbMigrator` **bat** co `ShouldChangePasswordOnNextLogin` cua `admin` ⇒ password
+    #    grant bi tu choi `invalid_grant`/`ID2024` (⚠️ KHONG phai sai mat khau). `Invoke-KhongCoDoiMatKhau`
+    #    (trong `nen-tang.ps1`) **TAT** co trong luc lay token roi **finally BAT LAI** ⇒ probe khong tu
+    #    `UPDATE`, va cong DB (nhom ② cua `kiem-db.ps1`) khong bi do sau luot chay.
+    $token = Invoke-KhongCoDoiMatKhau {
+        Invoke-RestMethod -Method Post -Uri "$base/connect/token" -ContentType 'application/x-www-form-urlencoded' `
+            -Body @{
+            grant_type    = 'password'
+            client_id     = 'eCommerce_App'
+            client_secret = '1q2w3e*'
+            scope         = 'eCommerce offline_access'
+            username      = 'admin@abp.io'
+            password      = '1q2w3E*'
+        }
     }
     $h = @{ Authorization = "Bearer $($token.access_token)" }
     Write-Host 'Token: OK (khong in gia tri).' -ForegroundColor Green
@@ -232,13 +250,24 @@ from "InvStockLedger" where "Sku" = '__SKU__' and "IsDeleted" = false;
 select coalesce("OnHand", 0) from "InvItems" where "Sku" = '__SKU__' and "IsDeleted" = false;
 '@
 
-    $tongSoCai = ((($sqlTongMau -replace '__SKU__', $sku) | docker exec -i ecommerce-postgres psql -U ecommerce -d ecommerce -t -A) | Out-String).Trim()
-    $anhChup = ((($sqlAnhMau -replace '__SKU__', $sku) | docker exec -i ecommerce-postgres psql -U ecommerce -d ecommerce -t -A) | Out-String).Trim()
+    $tongTho = ((($sqlTongMau -replace '__SKU__', $sku) | docker exec -i ecommerce-postgres psql -U ecommerce -d ecommerce -t -A) | Out-String).Trim()
+    $anhTho = ((($sqlAnhMau -replace '__SKU__', $sku) | docker exec -i ecommerce-postgres psql -U ecommerce -d ecommerce -t -A) | Out-String).Trim()
 
     Write-Host '⑫ BẤT BIẾN tổng sổ cái = ảnh chụp'
-    Write-Host ("   tổng sổ cái = {0} · OnHand = {1}" -f $tongSoCai, $anhChup)
-    if ($tongSoCai -ne $anhChup) {
-        $canhBao += "BAT BIEN SAI: tong so cai ($tongSoCai) <> OnHand ($anhChup)"
+    Write-Host ("   tổng sổ cái = {0} · OnHand = {1}" -f $tongTho, $anhTho)
+
+    # 📌 `D-55` ① (`N13`): hai vế là `numeric(18,3)` nên `psql` in `10.000` ⇒ so **SỐ** (parse **invariant**),
+    #    ⚠️ **không** so chuỗi. `handover-n13` §5 #4: sửa `WP-13` ① thì đổi luôn chỗ này — hôm nay hai vế
+    #    **cùng** scale 3 nên so chuỗi *"đúng"*, nhưng chỉ cần một vế đổi kiểu/scale là **sai âm thầm**.
+    if ($tongTho -eq '' -or $anhTho -eq '') {
+        $canhBao += "KHONG doc duoc so tu DB (tong='$tongTho', OnHand='$anhTho')"
+    }
+    else {
+        $tongSoCai = So $tongTho
+        $anhChup = So $anhTho
+        if ($tongSoCai -ne $anhChup) {
+            $canhBao += "BAT BIEN SAI: tong so cai ($tongTho) <> OnHand ($anhTho)"
+        }
     }
 
     # ── Kết luận ─────────────────────────────────────────────────────────────────────────────────────────

@@ -73,6 +73,24 @@ chỉ giữ **biến số cần kiểm** (định dạng số đơn `WEB-…`).
 📌 **Điểm đo nay đã THỐNG NHẤT:** **cả Host (:5000) lẫn Web (:5100) đều có `/health-status`** (`web-001` §71)
 ⇒ dùng **cùng một lệnh** cho mọi tiến trình.
 
+### F2. 🔐 `tools/nen-tang.ps1` — cờ `ShouldChangePasswordOnNextLogin` (`D-56`, `WP-13`)
+
+🚨 **Mọi probe xin token bằng `password grant` phải tắt cờ này** — `DbMigrator` **bật** nó cho `admin`
+(`D-49` ③a) ⇒ OpenIddict trả `invalid_grant` / `ID2024` / `error_description: ShouldChangePasswordOnNextLogin`
+(📌 **KHÔNG** phải sai mật khẩu; `N14` đo được đúng chuỗi này).
+
+| Dùng gì | Khi nào |
+|---|---|
+| **`Invoke-KhongCoDoiMatKhau { …khối… }`** | khối **ngắn** (điển hình: chỉ lời gọi `/connect/token`) — hàm **tự** tắt, chạy khối, rồi `finally` **bật lại** |
+| **`Start-KhongCoDoiMatKhau`** + **`BatLai-CoDoiMatKhau`** | probe cần tắt **suốt** lượt chạy (đi **cả** token Host **và** đăng nhập **BFF/NextAuth** — BFF cũng xin token bằng password grant). 🔒 `BatLai-…` phải là **dòng đầu `finally`** |
+| **`Dat-CoBuocDoiMatKhau -Bat $true/$false`** | hạ tầng — **đừng** gọi trực tiếp trong probe |
+
+🔒 Ba luật:
+1. **KHÔNG** viết `UPDATE "AbpUsers" …` trong probe (đó là lỗ `N14` đã đóng: **4** probe tắt mà **không** bật lại
+   ⇒ để lại một admin **không bị buộc đổi mật khẩu** + cổng DB nhóm ② đỏ ở lượt sau).
+2. Sau **mọi** lượt chạy, cờ **phải** = `true` (`SELECT` xác nhận — mục **D2** ở trên).
+3. ⛔ **Đừng** "sửa" bằng cách tắt nhóm ② của `kiem-db.ps1`; cổng **Y6** của `test-cong-kiem.ps1` quét đúng lỗi này.
+
 ---
 
 ## G. 🐛 HAI LỖI PROBE **MỚI** PHÁT HIỆN Ở VÒNG 94 (đọc trước khi viết hàm trợ giúp)

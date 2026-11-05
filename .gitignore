@@ -88,3 +88,9 @@ tools/_tam-*/
 _probe-*.err
 _probe-*.log
 _gate-*.log
+
+## E2E Playwright (WP-09) - ket qua chay la RAC, khong commit
+apps/admin-web/e2e/.run/
+apps/admin-web/test-results/
+apps/admin-web/playwright-report/
+apps/admin-web/blob-report/

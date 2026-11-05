@@ -262,22 +262,208 @@ function Lay-TienTrinhECommerce {
 function Start-TienTrinhAn {
     param(
         [Parameter(Mandatory)][string]$Tep,
-        [Parameter(Mandatory)][string]$ThamSo,
-        [Parameter(Mandatory)][string]$ThuMucLamViec,
-        [Parameter(Mandatory)][string]$TepLogRa,
-        [Parameter(Mandatory)][string]$TepLogLoi
+
+        # 📌 MOT chuoi doi so — khuon cu (15 probe dang dung).
+        [string]$ThamSo = '',
+
+        # 📌 MANG doi so: `--user-data-dir=C:\Users\Ten Co Dau Cach\...` — 🔑 noi bang `' '` se lam hong
+        #    duong dan co dau cach, nen phai de `Start-Process` tu quote TUNG phan tu.
+        [string[]]$DanhSachThamSo,
+
+        [string]$ThuMucLamViec = '',
+        [string]$TepLogRa = '',
+        [string]$TepLogLoi = ''
     )
 
-    $tuyChon = @{
-        PassThru               = $true
-        WorkingDirectory       = $ThuMucLamViec
-        RedirectStandardOutput = $TepLogRa
-        RedirectStandardError  = $TepLogLoi
-    }
+    $tuyChon = @{ PassThru = $true }
+
+    if ($ThuMucLamViec -ne '') { $tuyChon['WorkingDirectory'] = $ThuMucLamViec }
+    if ($TepLogRa -ne '') { $tuyChon['RedirectStandardOutput'] = $TepLogRa }
+    if ($TepLogLoi -ne '') { $tuyChon['RedirectStandardError'] = $TepLogLoi }
 
     if ($script:LaWindows) {
         $tuyChon['WindowStyle'] = 'Hidden'
     }
 
-    return Start-Process $Tep -ArgumentList $ThamSo @tuyChon
+    # 📌 Mac dinh = MOT chuoi (giu nguyen hanh vi cu cho 15 probe). Chi truyen mang khi co `-DanhSachThamSo`.
+    $doiSo = if ($PSBoundParameters.ContainsKey('DanhSachThamSo')) { $DanhSachThamSo } else { $ThamSo }
+
+    return Start-Process $Tep -ArgumentList $doiSo @tuyChon
+}
+
+<#
+    🔒 DUONG DAN MOT TEP TAM — `$env:TEMP` **KHONG TON TAI TREN LINUX**.
+
+    🚨 Van de do duoc: probe cu viet `"$env:TEMP\wp06-host.log"`. Tren Linux `$env:TEMP` rong ⇒ duong dan
+    thanh `\wp06-host.log`, tuc la **mot tep rac ngay trong repo** (ten co dau `\`), va `-LogFile` cua
+    `wait-host.ps1` doc mot tep **khong ton tai** ⇒ thong diep loi noi ve *"log"*, khong noi ve *"he dieu hanh"*.
+
+    📌 `[IO.Path]::GetTempPath()` la CUNG mot thu muc voi `$env:TEMP` tren Windows ⇒ hanh vi may dev KHONG doi.
+#>
+function Lay-DuongDanTam {
+    param([Parameter(Mandatory)][string]$Ten)
+
+    return [IO.Path]::Combine([IO.Path]::GetTempPath(), $Ten)
+}
+
+<#
+    🔒 KHOI DONG WEB ADMIN (`pnpm --filter @ecommerce/admin-web start`) — AN, GHI LOG, tra ve `Process`.
+
+    🚨 **DO DUOC TREN MAY DEV (`N12`, 04/11/2026):** `Start-Process pnpm` **NEM**
+    *"%1 is not a valid Win32 application"* — vi `pnpm` la shim `.cmd` chu khong phai tep thi hanh.
+    ⇒ Tren Windows phai boc qua `cmd.exe /c "…"` (do duoc: `exit 0` + in dung `10.22.0`).
+    📌 Tren Linux `pnpm` la script co shebang ⇒ chay truc tiep duoc, va `cmd.exe` **khong ton tai**
+    ⇒ giu khuon cu thi 6 probe chi chay duoc tren Windows.
+
+    🔑 Vi sao o DAY chu khong trong tung probe: 6 probe dang sao chep dung khuon `cmd.exe` + co WindowStyle;
+    sua tung cho thi lan sau them probe lai sao lai cai sai (dung ly do `nen-tang.ps1` sinh ra).
+#>
+function Start-NextAdmin {
+    param(
+        [Parameter(Mandatory)][string]$ThuMucLamViec,
+        [Parameter(Mandatory)][string]$TepLogRa,
+        [Parameter(Mandatory)][string]$TepLogLoi
+    )
+
+    $thamSo = @{
+        ThuMucLamViec = $ThuMucLamViec
+        TepLogRa      = $TepLogRa
+        TepLogLoi     = $TepLogLoi
+    }
+
+    if ($script:LaWindows) {
+        # 📌 `/c "<chuoi>"`: do duoc `exit 0` + in dung phien ban pnpm (xem ghi chu cua ham).
+        return Start-TienTrinhAn -Tep 'cmd.exe' -ThamSo '/c "pnpm --filter @ecommerce/admin-web start"' @thamSo
+    }
+
+    return Start-TienTrinhAn -Tep 'pnpm' -ThamSo '--filter @ecommerce/admin-web start' @thamSo
+}
+
+# ══════════════════════════════════════════════════════════════════════════════════════════════════
+# CO DOI MAT KHAU CUA `admin` — MO TAM ROI **BAT LAI** (`D-56`, `WP-13` ①)
+# ══════════════════════════════════════════════════════════════════════════════════════════════════
+
+<#
+    🔒 `Dat-CoBuocDoiMatKhau` — dat co `AbpUsers.ShouldChangePasswordOnNextLogin` cua `admin`.
+
+    📌 Day la **ham phu** cua `Invoke-KhongCoDoiMatKhau`; probe **KHONG** goi truc tiep no (xem ly do o
+    ham duoi). No ton tai de phep `UPDATE` + phep **XAC NHAN** nam o **mot cho**.
+
+    🚨 Vi sao phai XAC NHAN sau khi ghi: mot probe tuong *"da tat co"* ma that ra **khong** (sai tai khoan,
+    sai container, `psql` loi) se chet o buoc xin token voi `invalid_grant` — va thong diep do noi ve
+    *"dang nhap hong"*, khong noi ve *"co bao mat"* ⇒ nguoi doc di sai duong (bai hoc `N13` §1.2).
+#>
+function Dat-CoBuocDoiMatKhau {
+    param(
+        [Parameter(Mandatory)][bool]$Bat,
+        [string]$HostPg = 'ecommerce-postgres',
+        [string]$TenDb = 'ecommerce',
+        [string]$TaiKhoan = 'ADMIN'
+    )
+
+    $mongDoi = if ($Bat) { 'true' } else { 'false' }
+    $nhan = if ($Bat) { 'BAT' } else { 'TAT' }
+
+    $sql = @"
+update "AbpUsers" set "ShouldChangePasswordOnNextLogin" = $mongDoi where "NormalizedUserName" = '$TaiKhoan';
+select count(*)::text from "AbpUsers" where "NormalizedUserName" = '$TaiKhoan' and "ShouldChangePasswordOnNextLogin" = $mongDoi;
+"@
+
+    # 🔒 Ghi ra **tep tam** roi doc — ⚠️ **KHONG** ong danh: ong danh che mat `exit code` cua `docker`
+    #    (cung quy tac nhu `kiem-db.ps1` / bai hoc `sal-006` §23.2).
+    $tam = [IO.Path]::GetTempFileName()
+    $sql | docker exec -i $HostPg psql -U $TenDb -d $TenDb -q -t -A -f - *> $tam
+    $ma = $LASTEXITCODE
+
+    $dong = @(Get-Content $tam -ErrorAction SilentlyContinue | Where-Object { $_.Trim() -ne '' })
+    Remove-Item $tam -Force -ErrorAction SilentlyContinue
+
+    if ($ma -ne 0) {
+        throw ("psql THAT BAI (exit {0}) khi {1} co ShouldChangePasswordOnNextLogin (container '{2}')." -f $ma, $nhan, $HostPg)
+    }
+
+    # 📌 `-q` bo dong tag `UPDATE 1` ⇒ dong cuoi la con so cua `select count(*)`.
+    if (($dong | Select-Object -Last 1) -ne '1') {
+        throw ("Khong {0} duoc co ShouldChangePasswordOnNextLogin cho '{1}' (doc duoc: '{2}')." -f $nhan, $TaiKhoan, ($dong -join '|'))
+    }
+}
+
+<#
+    🔒 `Invoke-KhongCoDoiMatKhau` — CHAY MOT KHOI LENH trong luc co doi mat khau **dang tat**, roi
+    **finally BAT LAI**. Day la **cho DUY NHAT** mo/bat co nay.
+
+    🚨 VAN DE DO DUOC (`WP-13` ①, `N14`, 04/11/2026): `DbMigrator` **bat** co nay cho `admin`
+    (`D-49` ③a) ⇒ OpenIddict tu choi password grant voi
+    `invalid_grant: ShouldChangePasswordOnNextLogin` (ID2024) — **KHONG** phai sai mat khau.
+    Vi the moi probe xin token bang password grant phai tat co trong luc chay.
+
+    📌 Va day la ly do ham nay ton tai: do lai **14** tep probe co `UPDATE` co nay —
+      • **4** tep tat ma **KHONG** bao gio bat lai (`probe-pos`, `probe-don-hang`, `probe-bao-cao-wp08`,
+        `probe-khach-hang-wp07`) ⇒ chay xong la **commit mot admin khong bi buoc doi mat khau**, va cong DB
+        (nhom ② cua `kiem-db.ps1`) do o **lan sau** — ⚠️ nguoi ta se *"sua"* bang cach tat phep kiem;
+      • `probe-kho-wp04` thi **khong** tat ⇒ **khong dang nhap duoc** (DoD cua `WP-13` ①).
+    🔑 Sua **tung cho** thi lan sau them probe lai sao lai cai sai — dung ly do `nen-tang.ps1` sinh ra.
+
+    🔒 `finally` cua PowerShell **CHAY ca khi** khoi lenh goi `exit` (do duoc: `try { exit 3 } finally { … }`
+    van in ra `FINALLY-RAN`, exit code = 3) ⇒ khong con duong nao thoat ma co bi de **false**.
+
+    ⚠️ `probe-kho-fe` **khong** dung ham nay: no di qua **BFF/NextAuth** (khong xin token bang password
+    grant) ⇒ khong can cham vao co bao mat — do la duong **tot hon** khi da co Next chay.
+#>
+function Invoke-KhongCoDoiMatKhau {
+    param(
+        [Parameter(Mandatory)][scriptblock]$ThucThi,
+        [string]$HostPg = 'ecommerce-postgres',
+        [string]$TenDb = 'ecommerce',
+        [string]$TaiKhoan = 'ADMIN'
+    )
+
+    Dat-CoBuocDoiMatKhau -Bat $false -HostPg $HostPg -TenDb $TenDb -TaiKhoan $TaiKhoan
+
+    try {
+        return (& $ThucThi)
+    }
+    finally {
+        Dat-CoBuocDoiMatKhau -Bat $true -HostPg $HostPg -TenDb $TenDb -TaiKhoan $TaiKhoan
+    }
+}
+
+<#
+    🔒 `Start-KhongCoDoiMatKhau` + `BatLai-CoDoiMatKhau` — cap ham cho probe can co **TAT SUOT luot chay**
+    (khong phai chi mot khoi ngan).
+
+    📌 Vi sao van can cap nay: 4 probe `probe-pos`/`probe-don-hang`/`probe-bao-cao-wp08`/
+    `probe-khach-hang-wp07` do **ca hai duong** — token Host (password grant) **va** dang nhap qua
+    **BFF/NextAuth** (`/api/auth/callback/credentials` ⇒ BFF cung xin token bang password grant). ⇒ Mo co
+    quanh mot khoi ngan la **khong du**, phai tat tu dau den cuoi luot chay.
+
+    🚨 Nhung doi hoi nay **khong** duoc phep quay lai kieu cu (moi probe tu viet `UPDATE` va **quen**
+    `finally`): ⇒ 🔒 `BatLai-CoDoiMatKhau` **PHAI** nam o dong dau tien cua `finally` cua probe, va no
+    **XAC NHAN** da bat lai (nem neu khong). 📌 Mot co bi de `false` = commit mot admin **khong bi buoc
+    doi mat khau** (`kiem-db.ps1` nhom ② se do — va nguoi ta se "sua" bang cach tat phep kiem).
+#>
+function Start-KhongCoDoiMatKhau {
+    param(
+        [string]$HostPg = 'ecommerce-postgres',
+        [string]$TenDb = 'ecommerce',
+        [string]$TaiKhoan = 'ADMIN'
+    )
+
+    Dat-CoBuocDoiMatKhau -Bat $false -HostPg $HostPg -TenDb $TenDb -TaiKhoan $TaiKhoan
+}
+
+<#
+    🔒 `BatLai-CoDoiMatKhau` — BAT LAI co (goi trong `finally`; xem `Start-KhongCoDoiMatKhau`).
+
+    📌 `-NeuDangTat` KHONG can: ham nay **luon** dat `true` — 🔑 co phai la `true` moi la bat bien cua repo
+    (`DbMigrator` bat no, `kiem-db.ps1` nhom ② kiem no), nen *"bật lại"* luon co nghia la `true`.
+#>
+function BatLai-CoDoiMatKhau {
+    param(
+        [string]$HostPg = 'ecommerce-postgres',
+        [string]$TenDb = 'ecommerce',
+        [string]$TaiKhoan = 'ADMIN'
+    )
+
+    Dat-CoBuocDoiMatKhau -Bat $true -HostPg $HostPg -TenDb $TenDb -TaiKhoan $TaiKhoan
 }

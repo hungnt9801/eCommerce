@@ -59,6 +59,16 @@ function Psql([string]$sql) {
     return ($r | Out-String).Trim()
 }
 
+<#
+    🔒 `D-31` (`N4b`): `OnHand`/`Reserved` la `decimal(18,3)` ⇒ psql in ra **`1.000`**, khong phai `1`.
+    📌 Truoc `WP-12` probe so **CHUOI** (`'1/0'`) ⇒ DO oan du nghiep vu dung (`N12` §1.3 phat hien).
+    ✅ So **SO** va parse bang **invariant** (`psql` luon in dau `.`; tren may vi-VN `'.'` con la phan cach
+    nghin ⇒ `[decimal]'1.000'` se thanh **1000** neu de culture cua may quyet dinh).
+#>
+function So([string]$s) {
+    return [decimal]::Parse($s.Trim(), [System.Globalization.CultureInfo]::InvariantCulture)
+}
+
 function DonDep {
     # 🚨 `S8` bài học: bật Host làm `InventoryReconciliationWorker` (`RunOnStart`) chạy NGAY ⇒ nó ghi một
     # dòng lệch THẬT cho `InvItems` của probe (OnHand=1 mà sổ cái = 0). Xoá **cả** dòng lệch + sổ cái của SKU
@@ -108,7 +118,9 @@ insert into "InvItems" ("Id","TenantId","WarehouseId","Sku","OnHand","Reserved",
 values ('e0000000-0000-0000-0000-0000000000f8',null,'e0000000-0000-0000-0000-0000000000f3','K9OV-SKU-01',1,0,'{}','k9ovt',now(),false);
 '@ | Out-Null
 
-    Kq 'T01 seed: OnHand = 1 · Reserved = 0' ((Psql 'select "OnHand" || ''/'' || "Reserved" from "InvItems" where "Id" = ''e0000000-0000-0000-0000-0000000000f8'';') -eq '1/0') 'ton = 1/0'
+    $tonSeed = Psql 'select "OnHand" || ''/'' || "Reserved" from "InvItems" where "Id" = ''e0000000-0000-0000-0000-0000000000f8'';'
+    $phanSeed = $tonSeed.Split('/')
+    Kq 'T01 seed: OnHand = 1 · Reserved = 0' (((So $phanSeed[0]) -eq 1) -and ((So $phanSeed[1]) -eq 0)) ("ton = $tonSeed")
 
     # `ShouldChangePasswordOnNextLogin` chan password grant — cung xu ly nhu cac probe khac.
     Psql 'update "AbpUsers" set "ShouldChangePasswordOnNextLogin" = false where "NormalizedUserName" = ''ADMIN'';' | Out-Null
@@ -190,8 +202,8 @@ values ('e0000000-0000-0000-0000-0000000000f8',null,'e0000000-0000-0000-0000-000
 
     $ton = Psql 'select "OnHand" || ''/'' || "Reserved" || ''/'' || ("OnHand" - "Reserved") from "InvItems" where "Id" = ''e0000000-0000-0000-0000-0000000000f8'';'
     $phan = $ton.Split('/')
-    Kq 'T08 DB: Reserved <= OnHand' ([int]$phan[1] -le [int]$phan[0]) ("OnHand/Reserved/Available = $ton")
-    Kq 'T09 DB: Available = 0 (da ban het)' ($phan[2] -eq '0') ("Available = $($phan[2])")
+    Kq 'T08 DB: Reserved <= OnHand' ((So $phan[1]) -le (So $phan[0])) ("OnHand/Reserved/Available = $ton")
+    Kq 'T09 DB: Available = 0 (da ban het)' ((So $phan[2]) -eq 0) ("Available = $($phan[2])")
 
     # ── ⑥ DON DEP ────────────────────────────────────────────────────────────────────────────
     if (-not $GiuDuLieu) {

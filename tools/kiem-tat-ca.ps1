@@ -15,8 +15,16 @@
         ⇒ ket luan sai ve **SAN PHAM** (bai hoc §97.6 · §98.6 · `sal-006` §21.6 · §22.7 — **BON LAN**);
       • **quen mot buoc** ⇒ 📌 *"tat ca xanh"* nhung thuc ra **chua chay** buoc do — va **khong ai** biet.
 
-    ✅ Script nay gom lai: **mot lenh, nam buoc, exit code that, dung ngay khi hong.**
+    ✅ Script nay gom lai: **mot lenh, nhieu buoc, exit code that, dung ngay khi hong.**
     📌 Va no la **nen cua CI**: khi nao them CI thi chi can goi script nay.
+
+    🆕 **`N10` (`WP-09`) — CONG CO THEM 3 BUOC FE** (truoc do chi kiem .NET ⇒ *nua san pham* trong
+    `apps/admin-web` khong co luoi an toan nao):
+      • **typecheck + unit test (Vitest)** — ham thuan: dinh dang `vi-VN`, BOM/`;` cua CSV, cong thuc tien POS;
+      • **`gen:api` khong lam doi `schema.d.ts`** — hop dong OpenAPI bi sua tay / quen commit;
+      • *(chi voi `-DayDu`)* **Playwright 8 luong** — `tools/e2e.ps1`.
+    📌 Nua **nang** cua drift (controller → `openapi.v1.json`, can Host dang chay) o `tools/kiem-openapi-drift.ps1`
+    + job CI `openapi-drift`; dat o day se bien cong 40s thanh 3 phut moi lan chay.
 
     ══════════════════════════════════════════════════════════════════════════════════════════════════
     🔒 **HAI QUY TAC DO CHINH SCRIPT NAY THI HANH (khong phai loi khuyen):**
@@ -36,7 +44,8 @@
     vi buoc nay **khoi dong Web** (cham, va can cong 5100 trong).
 
 .PARAMETER DayDu
-    Chay **ca** buoc E2E (khoi dong Web + dang nhap that). ⚠️ Cham hon nhieu.
+    Chay **ca** buoc E2E: `kiem-e2e.ps1` (HTML that cua Razor) **va** `tools/e2e.ps1` (Playwright 8 luong Web
+    Admin — `WP-09`). ⚠️ Cham hon nhieu (phai bat Host + Next).
 
 .EXAMPLE
     # Vong lap nhanh trong luc sua
@@ -261,6 +270,73 @@ Buoc 'Tai lieu: kiem khoi mermaid' {
     Get-Content $m.Log | Select-Object -Last 2 | ForEach-Object { "   $_" }
 
     if ($m.Ma -ne 0) { throw "KIEM MERMAID DO (exit $($m.Ma))." }
+}
+
+# ── BUOC 4b: FE — TYPECHECK + UNIT TEST (`WP-09`) ─────────────────────────────────────────
+Buoc 'FE: typecheck + unit test (Vitest)' {
+    # 🔑 **VI SAO BUOC NAY O DAY (khong phai "chay rieng khi nho"):** `apps/admin-web` la mot nua san pham.
+    # Truoc `N10`, cong chi kiem .NET ⇒ FE sai type hoac hong ham thuan (dinh dang `vi-VN`, BOM CSV, cong
+    # thuc tien POS) **khong** lam cong do. 📌 *"Cong khong chay tu dong thi khong phai cong"* (`XC-007`).
+    Push-Location (Join-Path $goc 'apps\admin-web')
+    try {
+        $tc = ChayLenh 'pnpm' @('run', 'typecheck') 'fe-typecheck.log'
+        if ($tc.Ma -ne 0) {
+            Get-Content $tc.Log | Select-Object -Last 8 | ForEach-Object { "   $_" }
+            throw "TYPECHECK FE DO (exit $($tc.Ma)) — xem $($tc.Log)"
+        }
+        Write-Output '   ✅ typecheck FE (tsc --noEmit): 0 loi.'
+
+        $ut = ChayLenh 'pnpm' @('run', 'test') 'fe-unit.log'
+        $tong = Select-String -Path $ut.Log -Pattern 'Tests\s+\d+ passed|Tests\s+\d+ failed' |
+            Select-Object -First 1
+
+        if ($tong) { Write-Output ("   {0}" -f $tong.Line.Trim()) }
+
+        if ($ut.Ma -ne 0) {
+            Select-String -Path $ut.Log -Pattern 'FAIL|AssertionError|Error' | Select-Object -First 10 |
+                ForEach-Object { "   $($_.Line.Trim())" }
+            throw "UNIT TEST FE DO (exit $($ut.Ma)) — xem $($ut.Log)"
+        }
+    }
+    finally {
+        Pop-Location
+    }
+}
+
+# ── BUOC 4c: FE — HOP DONG OPENAPI KHONG LECH (`WP-09`) ────────────────────────────────────
+Buoc 'FE: gen:api khong lam doi schema.d.ts (hop dong OpenAPI)' {
+    # 🚨 **VI SAO LA "SINH LAI ROI SO", KHONG PHAI `git diff`:** working tree co the dang co thay doi hop le
+    # **chua commit** ⇒ so voi `HEAD` se bao "lech" vo nghia. O day: sinh lai tu **snapshot da commit** roi so
+    # **truoc/sau** ⇒ chi bao khi `schema.d.ts` **khong khop** voi `openapi.v1.json`.
+    # 📌 Day la nua **re** cua cong drift (khong can Host). Nua **nang** (controller → snapshot can Host dang
+    # chay) nam o `tools/kiem-openapi-drift.ps1` + job CI `openapi-drift`.
+    $schema = Join-Path $goc 'packages\api-client\src\schema.d.ts'
+
+    if (-not (Test-Path $schema)) { throw "Thieu $schema — chay 'pnpm gen:api'." }
+
+    $truoc = (Get-FileHash -Path $schema -Algorithm SHA256).Hash
+
+    Push-Location $goc
+    try {
+        $g = ChayLenh 'pnpm' @('run', 'gen:api') 'fe-gen-api.log'
+    }
+    finally {
+        Pop-Location
+    }
+
+    $sau = (Get-FileHash -Path $schema -Algorithm SHA256).Hash
+
+    if ($g.Ma -ne 0) {
+        Get-Content $g.Log | Select-Object -Last 8 | ForEach-Object { "   $_" }
+        throw "GEN API DO (exit $($g.Ma)) — xem $($g.Log)"
+    }
+
+    if ($truoc -ne $sau) {
+        throw ('OPENAPI DRIFT: schema.d.ts DOI khi sinh lai tu openapi.v1.json ⇒ hop dong da bi sua tay ' +
+            'hoac chua commit. Chay lai roi COMMIT schema.d.ts (do la hop dong, khong phai rac build).')
+    }
+
+    Write-Output '   ✅ schema.d.ts khop openapi.v1.json (sinh lai: KHONG doi).'
 }
 
 # ── BUOC 5: BAT BIEN DB ────────────────────────────────────────────────────────────────────
@@ -544,6 +620,31 @@ if ($DayDu -and -not $BoQuaE2E) {
         }
 
         Write-Output '   ✅ KHONG BAN VUOT TON XUYEN TIEN TRINH: hai instance, mot mon ⇒ dung MOT giu duoc cho.'
+    }
+
+    # ── BUOC 17: WEB ADMIN E2E — PLAYWRIGHT 8 LUONG (`WP-09`) ────────────────────────────────────
+    Buoc 'Web Admin E2E: 8 luong Playwright (WP-09)' {
+        # 🔑 **VI SAO PHAI LA BUOC CUA CONG (khong phai "luc nao ranh thi chay"):** 8 luong nay do dung thu ma
+        # **khong lop test nao khac do duoc** — form dang nhap -> server action -> cookie httpOnly, POS mo ca
+        # -> ban -> in -> ket ca, doi trang thai don tren du lieu that, va CSV tai ve (BOM + dau `;`).
+        # 📌 `web-001` §97 da tra gia dung mot lan: *"probe tay thi lan sau khong ai chay"*.
+        # ⚠️ Chay CUOI CUNG: `tools/e2e.ps1` **giet** tien trinh tren cong 3000/54275 de bat build hien tai
+        # ⇒ khong duoc de no chay truoc cac probe dang dung Host.
+        $e = ChayLenh 'pwsh' @('-NoProfile', '-File', (Join-Path $PSScriptRoot 'e2e.ps1')) 'e2e-playwright.log'
+
+        # 🚨 `WP-12` (`N13`): `Get-Content` tra ve **CHUOI**, khong phai `MatchInfo` (nhu `Select-String`)
+        # ⇒ `$_.Line` la `$null` ⇒ `.Trim()` NEM. Loi nay **chua bao gio lo** vi truoc `N12` cong luon
+        # dung o buoc ⑧/⑭ ⇒ buoc ⑰ (Playwright) chua tung chay qua duong in nay.
+        Get-Content $e.Log | Where-Object { $_ -match '^\s+(ok|✘|×)\s+\d|passed|failed|✅ E2E|🚨' } |
+            Select-Object -First 30 | ForEach-Object { "   $($_.Trim())" }
+
+        if ($e.Ma -ne 0) {
+            Get-Content $e.Log | Select-String 'Error:|failed|✘|×' | Select-Object -First 12 |
+                ForEach-Object { "   $($_.Line.Trim())" }
+            throw "E2E PLAYWRIGHT DO (exit $($e.Ma)) — xem log: $($e.Log)."
+        }
+
+        Write-Output '   ✅ 8/8 luong E2E: dang nhap · tao SP · nhap kho · ban le · in · doi trang thai · ket ca · CSV.'
     }
 }
 elseif (-not $BoQuaE2E -and -not $DayDu) {

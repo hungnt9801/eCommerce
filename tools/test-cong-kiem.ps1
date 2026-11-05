@@ -624,7 +624,11 @@ if (-not $ChiKiemDb) {
     }
 
     function Lay-MauHamNenTang {
-        return 'Lay-Curl|Lay-DuongDanBin|Lay-PidDangNghe|Test-CongDangMo|Start-' + 'TienTrinhAn'
+        # 📌 Them `Dat-CoBuocDoiMatKhau`/`Invoke-KhongCoDoiMatKhau` o `WP-13` ① (`D-56`): 🔑 mot probe
+        #    sao chep ham mo/bat co bao mat ma **quen nap thu vien** phai bi bat o day — neu khong, no
+        #    `CommandNotFoundException` o dong dau tien va thong diep noi ve *"lenh khong ton tai"*.
+        return 'Lay-Curl|Lay-DuongDanBin|Lay-PidDangNghe|Test-CongDangMo|Lay-DuongDanTam|Start-' +
+        'TienTrinhAn|Start-NextAdmin|Dat-CoBuocDoiMatKhau|Invoke-KhongCoDoiMatKhau|Start-KhongCoDoiMatKhau|BatLai-CoDoiMatKhau'
     }
 
     function Tim-ViPhamNapThuVien {
@@ -733,6 +737,31 @@ if (-not $ChiKiemDb) {
 
             KhangDinh (-not [string]::IsNullOrWhiteSpace($curl)) 'Lay-Curl tra ve rong.'
             KhangDinh ($null -ne (Get-Command $curl -ErrorAction SilentlyContinue)) ("Lenh '{0}' KHONG ton tai tren may nay (P-03)." -f $curl)
+        }
+
+        It 'Y6) Script nao MO co bao mat thi PHAI co dong BAT LAI (🛡️ chan "quen bat lai")' {
+            # 🚨 `WP-13` ① (`D-56`): do duoc **4** probe tat co `ShouldChangePasswordOnNextLogin` ma
+            #    **khong bao gio** bat lai ⇒ chay xong la **commit mot admin khong bi buoc doi mat khau**,
+            #    va cong DB (nhom ② cua `kiem-db.ps1`) do o **lan sau**.
+            # 📌 Phep quet **hai chieu**: (a) tep nao mo co phai co `BatLai-CoDoiMatKhau`; (b) phai thay
+            #    **that** it nhat 4 tep mo co — 🔑 neu khong thi phep quet *"khong bao gio do"* la vo nghia.
+            $mo = @()
+
+            foreach ($t in (Get-ChildItem $PSScriptRoot -Filter *.ps1 -File)) {
+                # ⚠️ Bo chinh tep nay: no **chua ten ham** trong bang quet `Lay-MauHamNenTang` ⇒ tu to cao.
+                if ($t.Name -eq 'test-cong-kiem.ps1') { continue }
+
+                $noiDung = [IO.File]::ReadAllText($t.FullName)
+                $ma = [regex]::Replace($noiDung, '(?s)<#.*?#>', '')
+                $ma = (($ma -split "`n") | Where-Object { -not $_.TrimStart().StartsWith('#') }) -join "`n"
+
+                if ($ma -match 'Start-KhongCoDoiMatKhau') {
+                    $mo += $t.Name
+                    KhangDinh ($ma -match 'BatLai-CoDoiMatKhau') ("{0}: MO co bao mat ma KHONG co dong BAT LAI ⇒ probe de lai mot admin khong bi buoc doi mat khau." -f $t.Name)
+                }
+            }
+
+            KhangDinh ($mo.Count -ge 4) ("Chi thay {0} script mo co bao mat ⇒ phep quet VO NGHIA (mong doi >= 4)." -f $mo.Count)
         }
     }
 }
@@ -956,6 +985,47 @@ delete from "AbpAuditLogs" where "Id" = 'e0000000-0000-0000-0000-0000000000b8';
                 # ⇒ 📌 ta biet ngay, thay vi de lan chay sau **hong vi ly do vo hinh**.
                 $k = ChayScript $scriptDb @()
                 BangNhau $k.Ma 0 'Kiem DB sau khi don dep'
+            }
+
+            It 'L2) `Invoke-KhongCoDoiMatKhau`: co TAT trong khoi lenh + BAT LAI — ke ca khi khoi lenh `exit`' {
+                # 🔑 CA NAY CHINH LA NO CUA `WP-13` ① (`D-56`): truoc `N14` **chua ai do** *"co bao mat co
+                # bat lai sau luot probe khong"* — ma do la thu duy nhat phan biet *"probe da don"* voi
+                # *"probe de lai mot admin khong bi buoc doi mat khau"*.
+                # 📌 Do **hai duong**: (a) khoi lenh thuong ⇒ co `false` ben trong, `true` sau;
+                # (b) khoi lenh goi `exit` ⇒ ⚠️ phai chay o **TIEN TRINH CON** (neu khong no lam chet bo test)
+                # va 🔒 phai giu **nguyen exit code** (7) — mot `finally` nuot exit code la mot cong *"do vi
+                # ly do khac"* (bai hoc `D-55` ③).
+                # 📌 Nap thu vien **ngay trong ca**: voi `-ChiKiemDb`, khoi `NHOM 1e` (noi nap thu vien cho
+                #    ca Y*) bi **BO QUA** ⇒ 🔑 khong nap o day thi ca nay bao *"lenh khong ton tai"* — do vi
+                #    thu tu nap, khong vi san pham (dung lop loi `nen-tang.ps1` sinh ra de chong).
+                . (Join-Path $PSScriptRoot 'nen-tang.ps1')
+
+                $docCo = {
+                    (PsqlTest @'
+select "ShouldChangePasswordOnNextLogin"::text from "AbpUsers" where "NormalizedUserName" = 'ADMIN';
+'@) -join ''
+                }
+
+                try {
+                    BangNhau (& $docCo) 'true' 'Tien de: co phai dang BAT truoc khi do'
+
+                    $benTrong = Invoke-KhongCoDoiMatKhau { & $docCo }
+                    BangNhau $benTrong 'false' 'Trong khoi lenh: co phai TAT'
+                    BangNhau (& $docCo) 'true' 'Sau khoi lenh: co phai BAT LAI'
+
+                    $tep = Join-Path $thuMucTam ('thu-l-exit-' + [Guid]::NewGuid().ToString('N') + '.ps1')
+                    $nenTang = Join-Path $PSScriptRoot 'nen-tang.ps1'
+                    [IO.File]::WriteAllText($tep, (". '{0}'`nInvoke-KhongCoDoiMatKhau {{ exit 7 }}`n" -f $nenTang))
+
+                    $k = ChayScript $tep @()
+                    BangNhau $k.Ma 7 'Khoi lenh goi exit: exit code KHONG duoc bi `finally` nuot'
+                    BangNhau (& $docCo) 'true' 'Sau `exit` trong khoi lenh: co phai BAT LAI'
+                }
+                finally {
+                    PsqlTest @'
+update "AbpUsers" set "ShouldChangePasswordOnNextLogin" = true where "NormalizedUserName" = 'ADMIN';
+'@ | Out-Null
+                }
             }
         }
     }

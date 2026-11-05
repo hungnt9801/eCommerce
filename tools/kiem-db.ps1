@@ -14,9 +14,13 @@
     🚨🚨 **RANH GIOI BAT BIEN — BAI HOC QUAN TRONG NHAT CUA SCRIPT NAY:**
 
     **CO nhung bang PHAI RONG** (chung la **dau vet thu nghiem**):
-      `AbpSettings` · `CusCustomers` · `CusGroups` · `CatProductMedia` · `CatProductChannelVisibilities` ·
-      `MsgDeadLetters` · `SalMarketplaceOrderIntakes` · `InvChannelLimits` · `PayTransactions` ·
-      `ReconRunMismatches` · `PayRefunds`
+      `AbpSettings` · `CatProductMedia` · `CatProductChannelVisibilities` · `MsgDeadLetters` ·
+      `SalMarketplaceOrderIntakes` · `InvChannelLimits` · `PayTransactions` · `ReconRunMismatches` ·
+      `PayRefunds` · `AddrAddresses` · `CusAddressLinks` · `SalMarketplaceEventLogs`
+
+    **CO nhung bang co BAT BIEN MANH HON "phai rong"** (🚨 rong KHONG phai la "sach"):
+      `CusGroups` — nhom ①b: **dung 3 nhom chuan** + **khong nhom probe** (`ADR-09`, `S3`) ·
+      `CusCustomers` — nhom ①c: **moi khach phai co CHUNG TU** (`D-53`, `N12`)
 
     **CO nhung bang PHAI GIU LICH SU** (🚨 **KHONG** duoc coi la rac):
       `ReconRuns` — **nhat ky luot quet doi soat**. 📌 Job `InventoryReconciliationWorker` ghi **mot dong
@@ -82,7 +86,12 @@ $goc = Split-Path -Parent $PSScriptRoot
 # 📌 Nhom ①: dau vet THU NGHIEM ⇒ phai RONG.
 $bangPhaiRong = @(
     'AbpSettings',                     # setting doi trong probe (doi chinh sach) ⇒ phai xoa
-    'CusCustomers',                    # probe CUS-001 gieo khach
+    # 🚨 **`CusCustomers` DA CHUYEN sang nhom ①c o `N12` (04/11/2026, `D-53`)** — va do la mot **SUA PHEP
+    #    KIEM**, khong phai "noi long cong": 📌 `POS` **bat buoc** co khach de ban ghi no/ghi diem (`D-42` ④)
+    #    ⇒ moi luot `probe-pos`/`probe-khach-hang-wp07` **phai** tao khach qua API that, ma API **khong co**
+    #    endpoint xoa khach ⇒ probe **khong the** don. 🔑 Mot cong "phai rong" o day la cong **LUON DO** sau moi
+    #    luot probe ⇒ nguoi ta hoc cach tat cong. ✅ Thay bang bat bien **manh hon** o nhom ①c:
+    #    *"moi khach phai co it nhat mot chung tu"* + *"khong co ban ghi xoa mem"*.
     # ⚠️ `CusGroups` DA CHUYEN sang nhom ② o `S3` (18/10/2026) — xem ly do ngay duoi.
     'CatProductMedia',                 # probe CAT-003 gieo media
     'CatProductChannelVisibilities',   # probe CAT-003 gieu hien thi theo kenh
@@ -123,6 +132,10 @@ $bangGiuLichSu = @(
     #   ✅ Thay bang mot bat bien **MANH HON** (nhom ②): *"phai co DUNG 3 nhom chuan, va khong co nhom probe"* —
     #      xem khoi `KIEM SEED NHOM KHACH` ngay sau vong lap nhom ①.
     'CusGroups'
+    # 🚨 **`CusCustomers` chuyen tu nhom ① sang day o `N12` (04/11/2026, `D-53`)** — 📌 bat bien that cua no
+    #    nam o nhom **①c** (*moi khach phai co chung tu*), KHONG phai o day. Ly do giong `CusGroups`: mot
+    #    phep kiem "phai rong" **mo ta sai su that** thi khong phai bat bien.
+    , 'CusCustomers'
 )
 
 $ketQua = [System.Collections.Generic.List[object]]::new()
@@ -236,6 +249,58 @@ ThemKq '①b seed nhom khach' 'Du 3 nhom chuan + khong rac probe' $seedDat `
 Write-Output ("   {0} CusGroups: conSong={1} · xoaMem={2} · thieu={3} · nhomProbe={4}" -f `
         $(if ($seedDat) { '✅' } else { '🚨' }), $soNhomSong, $soNhomXoaMem, `
         $(if ($thieuNhom.Count -eq 0) { 'khong' } else { $thieuNhom -join ',' }), $soNhomProbe)
+
+# ── ①c KHÁCH HÀNG — BẤT BIẾN **MẠNH HƠN** "PHẢI RỖNG" (`N12`, `D-53`) ────────────────────────
+# 🔑 **VI SAO `CusCustomers` RA KHOI NHOM ① (do duoc 04/11/2026):**
+#   • `D-42` ④: POS **bat buoc** co khach de ban **ghi no**/ghi diem ⇒ moi luot `probe-pos` (`WP06`) va
+#     `probe-khach-hang-wp07` **phai** tao khach qua **API that**; 🔒 ma API **khong co** endpoint xoa khach
+#     ⇒ probe **khong the** don sach. 📌 Mot cong "phai rong" tren bang do la cong **LUON DO** sau moi luot
+#     probe — va *"cong luon do thi nguoi ta hoc cach bo qua no"* (chinh `.DESCRIPTION` cua tep nay).
+#   • 🚨 Xoa khach con **te hon**: 6 dong do co **11 hoa don ban le + 3 phieu tra + 8 dong fact** tro vao.
+#     Xoa chung la **xoa bang chung cua chinh chung tu** — dung loai du lieu ma `D-45` da canh bao.
+#   ✅ Thay bang bat bien **MANH HON** — bat dung lop rac THAT:
+#     (a) moi khach **con song** phai co **it nhat MOT chung tu** (hoa don ban le · phieu tra · don hang ·
+#         phieu cham soc). 📌 "Tao khach roi khong dung" la rac that — va phep kiem moi **da bat duoc 1 dong
+#         nhu vay** ngay luot do dau (`Khách WP06 220419`, 0 chung tu) ⇒ 🔑 no MANH HON han "phai rong".
+#     (b) **khong** co ban ghi **xoa mem** — hom nay khong co duong xoa khach, ma dong xoa mem **van chiem**
+#         unique index `NULLS NOT DISTINCT` ⇒ lan gieo sau that bai vi ly do kho hieu (cung ly do o nhom ①).
+Write-Output ''
+Write-Output '── ①c Khach hang (CusCustomers) — moi khach phai co CHUNG TU (D-53) ──'
+
+$khachSong = [int](((Psql 'select count(*)::text from "CusCustomers" where not "IsDeleted";') -join '').Trim())
+$khachXoaMem = [int](((Psql 'select count(*)::text from "CusCustomers" where "IsDeleted";') -join '').Trim())
+
+$sqlMoCoi = @'
+select count(*)::text from "CusCustomers" c
+where not c."IsDeleted"
+  and not exists (select 1 from "PosRetailBills" b where b."CustomerId" = c."Id")
+  and not exists (select 1 from "PosRetailReturns" r where r."CustomerId" = c."Id")
+  and not exists (select 1 from "OrdOrders" o where o."CustomerId" = c."Id")
+  and not exists (select 1 from "CusCares" k where k."CustomerId" = c."Id");
+'@
+$khachMoCoi = [int](((Psql $sqlMoCoi) -join '').Trim())
+
+# 📌 In **ten** dong vi pham (toi da 5) — 🔑 mot con so "3 dong mo coi" khong cho biet phai xoa dong nao.
+$tenMoCoi = @(Psql @'
+select c."Name" || ' (' || c."Id"::text || ')' from "CusCustomers" c
+where not c."IsDeleted"
+  and not exists (select 1 from "PosRetailBills" b where b."CustomerId" = c."Id")
+  and not exists (select 1 from "PosRetailReturns" r where r."CustomerId" = c."Id")
+  and not exists (select 1 from "OrdOrders" o where o."CustomerId" = c."Id")
+  and not exists (select 1 from "CusCares" k where k."CustomerId" = c."Id")
+order by c."CreationTime" limit 5;
+'@) | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' }
+
+$khachDat = ($khachMoCoi -eq 0 -and $khachXoaMem -eq 0)
+$chiTietKhach = "conSong={0} · moCoi={1} · xoaMem={2}" -f $khachSong, $khachMoCoi, $khachXoaMem
+
+ThemKq '①c khach co chung tu' 'CusCustomers' $khachDat $chiTietKhach
+Write-Output ("   {0} CusCustomers: {1}" -f $(if ($khachDat) { '✅' } else { '🚨' }), $chiTietKhach)
+
+if (-not $khachDat) {
+    foreach ($t in $tenMoCoi) { Write-Output ("      🚨 khach KHONG co chung tu: {0}" -f $t) }
+    Write-Output '      ⇒ 📌 Xoa dung nhung dong do (chung KHONG co chung tu nao tro vao) — ⛔ KHONG xoa khach co hoa don.'
+}
 
 # ── ② CO BAO MAT CUA ADMIN ─────────────────────────────────────────────────────────────────
 Write-Output ''
@@ -501,6 +566,10 @@ $lyDoGiuLichSu = @{
     # 🔑 `CusGroups`: DỮ LIỆU THAM CHIẾU được seed (`ADR-09`) ⇒ phải CÓ, và số dòng đổi khi người vận hành
     # thêm nhóm. 📌 Bat bien that cua no nam o nhom ①b (đúng 3 nhóm chuẩn + không rác probe), KHÔNG phải ở đây.
     'CusGroups' = 'du lieu tham chieu duoc seed (ADR-09) — bat bien that o nhom (1b)'
+    # 🔑 `CusCustomers`: KHACH HANG THAT do probe tao qua API (POS bat buoc co khach de ghi no — `D-42` ④,
+    # va API khong co duong xoa). 📌 Bat bien that cua no nam o nhom **①c** (moi khach phai co chung tu),
+    # KHONG phai o day — cung ly do `CusGroups`.
+    'CusCustomers' = 'khach probe tao qua API, co chung tu tro vao — bat bien that o nhom (1c)'
 }
 
 foreach ($b in $bangGiuLichSu) {

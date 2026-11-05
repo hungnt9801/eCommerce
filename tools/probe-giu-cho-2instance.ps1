@@ -80,6 +80,15 @@ function Psql([string]$sql) {
 }
 
 <#
+    🔒 `D-31`: `OnHand`/`Reserved` la `decimal(18,3)` ⇒ psql in **`1.000`** ⇒ so **SO**, khong so chuoi
+    (`WP-12` ① — cung lop loi voi `probe-oversell`). Parse bang invariant de `'.'` khong bi coi la phan cach
+    nghin tren may `vi-VN`.
+#>
+function So([string]$s) {
+    return [decimal]::Parse($s.Trim(), [System.Globalization.CultureInfo]::InvariantCulture)
+}
+
+<#
     Don sach dau vet probe. 📌 Thu tu: giu cho → so cai → bang gia → ton → SKU → SP → kho.
     🚨 `S8` bai hoc: bat Host lam `InventoryReconciliationWorker` (`RunOnStart`) chay NGAY ⇒ no ghi mot
     dong lech THAT cho `InvItems` cua probe (OnHand ma so cai = 0). Xoa CA dong lech, neu khong buoc ⑥
@@ -228,8 +237,9 @@ insert into "InvItems" ("Id","TenantId","WarehouseId","Sku","OnHand","Reserved",
 values ('e0000000-0000-0000-0000-0000000000d7',null,'e0000000-0000-0000-0000-0000000000d2','K9HC-SKU-01',1,0,'{}','k9hct',now(),false);
 '@ | Out-Null
 
-    Kq 'P01 seed: OnHand = 1 · Reserved = 0' `
-        ((Psql 'select "OnHand" || ''/'' || "Reserved" from "InvItems" where "Id" = ''e0000000-0000-0000-0000-0000000000d7'';') -eq '1/0') 'ton = 1/0'
+    $tonSeed = Psql 'select "OnHand" || ''/'' || "Reserved" from "InvItems" where "Id" = ''e0000000-0000-0000-0000-0000000000d7'';'
+    $phanSeed = $tonSeed.Split('/')
+    Kq 'P01 seed: OnHand = 1 · Reserved = 0' (((So $phanSeed[0]) -eq 1) -and ((So $phanSeed[1]) -eq 0)) ("ton = $tonSeed")
 
     Psql 'update "AbpUsers" set "ShouldChangePasswordOnNextLogin" = false where "NormalizedUserName" = ''ADMIN'';' | Out-Null
 
@@ -277,15 +287,17 @@ values ('e0000000-0000-0000-0000-0000000000d7',null,'e0000000-0000-0000-0000-000
 
     $ton = Psql 'select "OnHand" || ''/'' || "Reserved" || ''/'' || ("OnHand" - "Reserved") from "InvItems" where "Id" = ''e0000000-0000-0000-0000-0000000000d7'';'
     $phan = $ton.Split('/')
-    Kq 'P09 DB: Reserved <= OnHand' ([int]$phan[1] -le [int]$phan[0]) ("OnHand/Reserved/Available = $ton")
-    Kq 'P10 DB: Available = 0 (da ban het)' ($phan[2] -eq '0') ("Available = $($phan[2])")
+    Kq 'P09 DB: Reserved <= OnHand' ((So $phan[1]) -le (So $phan[0])) ("OnHand/Reserved/Available = $ton")
+    Kq 'P10 DB: Available = 0 (da ban het)' ((So $phan[2]) -eq 0) ("Available = $($phan[2])")
 
     # ── ⑤ CHIEU NGUOC: OnHand = 2 ⇒ CA HAI thang ──────────────────────────────────────────────
     # 🔑 Khong co buoc nay thi mot probe "luon bao mot thang" (vi du moi request deu bi tu choi vi ly do
     #    khac — sai bang gia, thieu quyen…) van xanh o P05. Doi DUY NHAT so ton ⇒ ket qua phai doi.
     DatTon 2
+    $ton2 = Psql 'select "OnHand" || ''/'' || "Reserved" from "InvItems" where "Id" = ''e0000000-0000-0000-0000-0000000000d7'';'
+    $phan2 = $ton2.Split('/')
     Kq 'P11 chieu nguoc — tien de: OnHand = 2 va da xoa giu cho cu' `
-        ((Psql 'select "OnHand" || ''/'' || "Reserved" from "InvItems" where "Id" = ''e0000000-0000-0000-0000-0000000000d7'';') -eq '2/0') 'ton = 2/0'
+        (((So $phan2[0]) -eq 2) -and ((So $phan2[1]) -eq 0)) ("ton = $ton2")
 
     $kq2 = @(BanHaiRequest -url1 $urlA -khoa1 'K9HC-P2-A' -url2 $urlB -khoa2 'K9HC-P2-B' -token $jwt.access_token)
 
