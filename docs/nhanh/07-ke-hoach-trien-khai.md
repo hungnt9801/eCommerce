@@ -592,6 +592,37 @@ thái "đỏ mà không ai đọc".
 - ✅ **DoD phần được duyệt ĐẠT:** bản nhẹ **exit 0 (9/9, 228,5 s)** · `-DayDu` **exit 0 (19/19, 455,9 s)** ·
   test cổng **34/34** (full **40/40**) · DB **25/25** · **0 migration** (59 vẫn mới nhất) · **0** test BE thêm.
 
+**Đã hợp nhất (`N18`, 05/11/2026) — [handover-n18](handover-n18.md), quyết định [D-62](decisions.md)/[D-63](decisions.md):**
+
+- ✅ **③ merge PR #1: ĐÃ LÀM — sau khi commit cây và **đo** thấy `ci` xanh:** **6 commit · 160 tệp**
+  (`6ab9114` BE `WP-06…WP-08` + **migration 57…59** · `4248d80` `ci.yml` + 2 job · `b94b13e` compose `admin-web`
+  · `0bbc140` `tools/` `N12`–`N14` · `3f93c14` docs) ⇒ `ci` lượt **1** (head `3f93c14`)
+  [**`41961196209`**](https://github.com/hungnt9801/eCommerce/actions/runs/41961196209) **ĐỎ** ⇒ sửa `39df2d4`
+  ⇒ `ci` lượt **2** [**`41963379150`**](https://github.com/hungnt9801/eCommerce/actions/runs/41963379150)
+  **3/3 job XANH (10,2 phút)** · `docker-build` [**`41963379197`**](https://github.com/hungnt9801/eCommerce/actions/runs/41963379197)
+  **6/6** ⇒ **merge PR #1 = `fab0089`** (46 commit · **610** tệp).
+- 🚨 **Lượt CI ĐẦU ĐỎ — 2 lỗi CHỈ lộ trên cây sạch** (cổng nghiệp vụ vẫn **19/19** ngay lượt đó, đo trong log:
+  `TAT CA PHEP KIEM DAT (290,5 s)`): ① bước **11** `CONG 13` — **3** link `../../artifacts/*.png` (thư mục
+  **gitignore** theo `README` §6) ⇒ clone sạch **không có** ⇒ `FAIL — 3 tham chieu chet`; ② job
+  `e2e-playwright` — **7 passed / 1 failed** (`waitForEvent('download')` timeout; ảnh chụp trang:
+  `Xuất CSV [disabled]` + *"Chưa chụp ảnh tồn kho lần nào"*) vì **DB TRỐNG**: job `ReportingAggregationWorker`
+  chụp ảnh tồn kho **0 dòng** lúc Host khởi động **nhưng vẫn ghi mốc = hôm nay** ⇒ mọi lượt sau **bỏ qua**
+  bước chụp ⇒ báo cáo tồn kho **rỗng cả ngày**.
+- ✅ **Sửa MỘT chỗ mỗi lỗi:** `TongHopBaoCaoService` chỉ `GhiNhan` mốc tồn kho khi **`soAnhTonKho > 0`**;
+  `kiem-link-tai-lieu.ps1` coi link vào **`artifacts/`** (bằng chứng ngoài VCS **đã khai báo**) là hợp lệ
+  (đối xứng với `$boQua`) — ⛔ **không** nới cho link **trong** repo (ca **V5** canh đúng điều đó) · **2** ca
+  mới `V4`/`V5` ⇒ test cổng **36/36** · `e2e/08` khẳng định khớp **đúng** câu chữ *"Chưa chụp ảnh tồn kho lần nào"*.
+- ⏭ **`cong-15-buoc` required: KHÔNG bật** (**D-63**) — điều kiện `D-59` ③ đã hết hiệu lực (`ci.yml` có bước FE
+  **đã** ở `main`, `ci` **đã** xanh) **nhưng** bật required check là **settings của repo**, phải là phiên riêng
+  có đo **TRƯỚC/SAU**.
+- ✅ **DoD đạt:** bản nhẹ **exit 0 (9/9)** · `-DayDu` **exit 0 (19/19, 436,8 s)** · test cổng **36/36** ·
+  DB **25/25** · link **PASS (657 link)** · **0 migration** (59 vẫn mới nhất) · **0** test BE thêm.
+- 🚨 **Nợ MỚI có số đo (`D-64`) — `probe-giu-cho-2instance` FLAKY trên CI:** cùng một cây mã (khác **chỉ** `.md`),
+  run `41963379150` **17/17 DAT** vs run `41967295632` **14 DAT / 3 HONG** (`P12` `200/409`, `P13` **1** dòng,
+  `P14` **1** exception) — hai request **chồng nhau** trên cùng `InventoryItem` ⇒ `DbConcurrencyException` ⇒
+  **`409`** (đúng *"conflict, thử lại"*). ⛔ **Không** nới probe, **không** sửa trong `N18`; hai hướng phải **chọn**
+  ở phiên `WP-05/06` kế (retry có giới hạn **hoặc** chấp nhận `409` + sửa kỳ vọng probe).
+
 ---
 
 ## 6. Lịch sprint (2 tuần/sprint)
@@ -738,6 +769,7 @@ bảo hành · website builder · affiliate · báo cáo ngoài 3 cái · app mo
 | 04/11/2026 | **WP-13 (`N14`) — Đóng 2 nợ kiểm chứng**: **một chỗ** mở/bật cờ `ShouldChangePasswordOnNextLogin` — `Dat-CoBuocDoiMatKhau` (UPDATE + **xác nhận** `count=1`) + `Invoke-KhongCoDoiMatKhau` (mở → khối → `finally` bật lại) + cặp `Start-KhongCoDoiMatKhau`/`BatLai-CoDoiMatKhau` trong `tools/nen-tang.ps1`; **5** probe dùng lại (`probe-kho-wp04` + 4 probe tắt cờ mà **không** bật lại: `probe-pos`/`probe-don-hang`/`probe-bao-cao-wp08`/`probe-khach-hang-wp07`); `probe-kho-wp04` ⑫ so **SỐ**; **2** ca kiểm mới `Y6` (quét *mở cờ ⇒ phải có dòng bật lại*, ≥ 4 tệp) + `L2` (DB: `false` trong khối, `true` sau, khối `exit 7` ở tiến trình con giữ **exit 7**) | `probe-kho-wp04.ps1` **exit 0 — 12 ca** (trước khi sửa: `exit 1`, `invalid_grant`/`ID2024`) · `probe-pos.ps1` **exit 0 — 34 lời gọi** (cặp hàm chạy qua **cả** BFF) · cờ `ADMIN\|true` sau mỗi lượt · `kiem-db.ps1` **25/25** · `test-cong-kiem` **34/34** (full **40/40**) · bản nhẹ **exit 0 — 9/9, 196,3 s** · `-DayDu` **exit 0 — 19/19** · unit **1961/1961** · integration **96/96** · drift **51/51** · **0 migration** (59) | `D-56` (một chỗ + **4** chứ không phải 3 tệp "quên bật lại"; cặp hàm vì 4 probe đi **cả** BFF; `finally` chạy cả khi `exit`; 2 ca kiểm mới). ⏭ **② `docker-build` giữ P1** (chưa đo được trên `ubuntu-latest`). Chi tiết: [handover-n14.md](handover-n14.md) |
 | 04/11/2026 | **Đóng gói image Web Admin (`N16`) — commit → push → PR #1 → bật required check**: `d8e22dc` (**60** tệp **cây FE**; 🚨 **bắt buộc** — đo được: `HEAD` + **đúng 3 tệp** ⇒ `docker build` **ĐỎ** `standalone not found`, **D-58**) + `6c49d3a` (**3** tệp: `.dockerignore` · `apps/admin-web/Dockerfile` · `.github/workflows/docker-build.yml`) ⇒ `origin/feature/wp-03-catalog` ⇒ **PR [#1](https://github.com/hungnt9801/eCommerce/pull/1)** (39 commit · 488 tệp) | **`docker-build` XANH trên `pull_request` (lần đầu)** — run [**`41811821775`**](https://github.com/hungnt9801/eCommerce/actions/runs/41811821775) **88 s**, **6/6** bước; máy dev trên **cây sạch** `6c49d3a`: build **exit 0** · `server.js` **6380 B** · `/login` **200** (lần thử 2) · `/api/health` **503** · **83 MB**/**354 MB** · `-DayDu` **19/19** (485 s) · **0 migration** | `D-58` (commit đóng gói **phải** kèm cây FE — 3 tệp trên `HEAD` ⇒ **ĐỎ**; tách 2 commit), `D-59` (**`main` không có** protection trước phiên — `GET` **404**; bật **đúng một** `docker-build`, **không** bật `cong-15-buoc` vì nó đỏ do nợ `packageManager`+`yarn` **có sẵn**). ⚠️ PR #1 mang **nửa FE**, BE chưa commit (`§5 #3`). Chi tiết: [handover-n16.md](handover-n16.md) |
 | 04/11/2026 | **WP-13 ② (`N15`) — JOB CI `docker-build`**: workflow **riêng** `.github/workflows/docker-build.yml` — `docker build -f apps/admin-web/Dockerfile` với context **gốc repo** + `NEXT_PUBLIC_APP_NAME` build arg, rồi **2 bất biến**: image có `server.js`+`.next/static` (`standalone`) và container **bật được** với `/login` **200** khi API chết (`D-52` ⑦) | run [**`41808550753`**](https://github.com/hungnt9801/eCommerce/actions/runs/41808550753) **success trên `ubuntu-latest`** — **76 s** (build **68 s**), **6/6** bước · trước đó cùng ngày, máy dev: `docker build` **exit 0** · `/login` **200** (lần thử 2) · `/api/health` **503** · size **354 MB** (`docker images`) = **83 MB** (`inspect .Size`) · **0 migration** · **0** test BE thêm | `D-57` (workflow riêng + **nhánh tạm** để có run thật rồi xoá; lượt đo **đầu ĐỎ** vì `Dockerfile`/`.dockerignore` **untracked** — nợ thật; 2 bất biến sau build; **hai** cách đo size; required check **chưa bật**). Chi tiết: [handover-n15.md](handover-n15.md) |
+| 05/11/2026 | **`N18` — Commit cây làm việc → `ci` xanh trên PR #1 → MERGE**: **6** commit · **160** tệp (`6ab9114` BE `WP-06…WP-08` + migration **57…59** · `4248d80` `ci.yml` bước FE + 2 job · `b94b13e` compose `admin-web` · `0bbc140` `tools/` `N12`–`N14` · `3f93c14` docs · `39df2d4` 2 fix); **39** tệp `tools/_*` **vẫn** ngoài VCS (rác cổng) | **`ci` lượt 1** (head `3f93c14`) **ĐỎ 2 chỗ** — bước 11 (`FAIL — 3 tham chieu chet`: `artifacts/`) + `e2e-playwright` (**1 failed · 7 passed**) — **nhưng cổng nghiệp vụ 19/19 XANH** (`290,5 s`); **`ci` lượt 2** (head `39df2d4`) **3/3 XANH, 10,2 phút** (run `41963379150`; log: **19/19 (352,8 s)** · Playwright **8 passed** · link **657**/PASS) · `docker-build` **6/6** (`41963379197`) ⇒ **merge PR #1 = `fab0089`** (46 commit · **610** tệp) · bản nhẹ **9/9** · `-DayDu` **19/19 (436,8 s)** · test cổng **36/36** · DB **25/25** · **0 migration** (59) | `D-62` (merge khi **đo** thấy xanh; **2 lỗi chỉ lộ trên cây sạch**: mốc ảnh tồn kho ghi cho lượt chụp **0 dòng** ⇒ báo cáo tồn kho rỗng cả ngày; cổng link bỏ qua `artifacts/` — **đối xứng** `$boQua`, ⛔ không nới cho link trong repo, ca `V4`/`V5`), `D-63` (`cong-15-buoc` required **chưa** bật — settings của repo, cần phiên riêng đo TRƯỚC/SAU). Chi tiết: [handover-n18.md](handover-n18.md) |
 | 05/11/2026 | **Đóng nợ CI `packageManager` (`N17`) — và KHÔNG merge PR #1**: bỏ **1 dòng** `packageManager` ở `package.json` gốc + sửa comment `Dockerfile` ⇒ `yarn`/`abp install-libs` chạy lại được; ⛔ **không** bỏ bước 7 khỏi `ci.yml` | **Bước 7 `ci` XANH trên CI thật** (run `41955331290`, job **294 s**; trước: đỏ sau **38 s**) · `docker-build` **xanh 6/6** (run `41955331294`, 66 s) · `yarn --version` **exit 1 → exit 0** · `abp install-libs` **exit 0** (10,2 s) · `pnpm install --frozen-lockfile` **exit 0** · cổng nhẹ **9/9 (228,5 s)** · `-DayDu` **19/19 (455,9 s)** · test cổng **34/34** (full **40/40**) · DB **25/25** · **0 migration** | `D-60` (bỏ field; pnpm ghim **2 chỗ**), `D-61` (**KHÔNG merge**: `ci` đỏ ở **⑦/Y1** vì 3 probe `N12`–`N14` chưa commit là **mới so với `main`** ⇒ merge làm `main` đỏ; + nửa FE/API 404). Chi tiết: [handover-n17.md](handover-n17.md) |
 
 
