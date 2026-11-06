@@ -101,8 +101,9 @@ Vì vậy `C13 = 1` mà `C10 = 0` **không thể** là "ghi hỏng" — nó ngh�
 | Lượt | Kết quả |
 |---|---|
 | **10 lượt `probe-don-san`** (bản **đã** sửa; log `tools/_tam-kiem/n21/don-san-lan-1…10.log`) | **49/49 DAT × 10** · **10 XANH / 0 ĐỎ** · `choDu = True` **10/10** · `[CD-D67] Late = 1` **10/10** · thời gian **29,9 – 34,4 s** (trung bình ≈ **32,6 s**) ⇒ ⚠️ **máy dev KHÔNG tái hiện được flake** (khớp `handover-n20` §1.7) |
-| **Tỉ lệ trên CI (đếm từ artifact + run thật)** | **2 ĐỎ / 5 lượt** cùng cây mã `a64d69a3`: `42005307510` attempt 1 **ĐỎ** · attempt 2 **ĐỎ** · attempt 3 **XANH** · `42013066249` **XANH** · `42126116769` **XANH** |
-| Vì sao máy dev không tái hiện | ⑭ trên máy dev **29,9–34,4 s** cho **cả** probe (gồm bật Host); trên CI bước ⑭ **23,8–28,6 s** ⇒ **không** phải "CI chậm toàn cục"; khe *dispatch sự kiện → commit* phải **> 30 s** mới làm `C10` đỏ ⇒ cần log Host **có mốc thời gian** của lượt ĐỎ ⇒ nay **in được** (§1.5) |
+| **Tỉ lệ trên CI (đếm từ artifact + run thật)** | **2 ĐỎ / 7 lượt** trên cùng cây mã (`C10`): `42005307510` attempt 1 **ĐỎ** · attempt 2 **ĐỎ** · attempt 3 **XANH** · `42013066249` **XANH** · `42126116769` **XANH** · PR #7 `42168084408` **XANH attempt 1** · `main` sau merge `42169269729` **XANH attempt 1** |
+| 🎯 **Xác nhận chẩn đoán chạy trên CI** (run `42168084408`, artifact `13480536321`) | `donsan.log` + **`gate.log`** đều có dòng mới: `C10 … DAT — tong = 1 · Late = 1 · **choDu = True** · log Host: GHI = 1 · GHI-HONG = 0 · TRUNG = 0` và `[CD-D67] … sau khi DLQ da co ⇒ **tong = 1 · Late = 1**` ⇒ 🔑 lượt ĐỎ **tương lai** sẽ in **đúng cặp số** phân biệt *thời điểm* ↔ *lỗi ghi*; cổng **19/19**, bước ⑭ **28,9 s** |
+| Vì sao máy dev không tái hiện | ⑭ trên máy dev **28–34 s** cho **cả** probe (gồm bật Host); trên CI bước ⑭ **23,8–28,9 s** ⇒ **không** phải "CI chậm toàn cục"; khe *dispatch sự kiện → commit* phải **> 30 s** mới làm `C10` đỏ ⇒ cần log Host **có mốc thời gian** của lượt ĐỎ ⇒ nay **in được** (§1.5) |
 
 ### 1.8 Đo lại cuối phiên (sau khi sửa; máy dev Windows)
 
@@ -212,11 +213,21 @@ và giữ 2 required check đúng cấu hình đã đo. Không mở rộng phạ
 |---|---|
 | Nhánh làm việc | **`ops/n21-d67-bang-chung`** (tạo từ `main` = `f858b10`) |
 | `main` trước phiên | **`f858b10`** (*Merge pull request #6* — docs `D-67`); `git log -1 --format=%H origin/main` là **nguồn sự thật** |
-| Commit của phiên | *(điền sau)* |
-| PR | *(điền sau)* |
-| Run Actions | *(điền sau)* |
-| Branch protection `main` | required: **`docker-build`** · **`cong-15-buoc`** (`strict=false`, `enforce_admins=false`) — **không đổi** trong phiên này (`D-65`); đo **SAU** merge: *(điền sau)* |
-| **`main` sau phiên** | *(điền sau)* |
+| Commit của phiên | **`928557b`** (tools: **3** tệp · +147/−4 — chẩn đoán, **0** đổi điều kiện) + **`3ac6e2e`** (docs: **5** tệp · +228/−1) — 📌 chỉ ghi SHA **ngắn**; nguồn sự thật là `git log -1 --format=%H` |
+| PR | [**#7**](https://github.com/hungnt9801/eCommerce/pull/7) — `ops/n21-d67-bang-chung` → `main` (probe + cổng + test cổng + docs; **0** migration); `mergeable_state = blocked` khi 2 required check còn **pending** → **`clean`** sau khi cả 2 **success** (đúng `D-65` ⑥) |
+| Run Actions | `ci` [**`42168084408`**](https://github.com/hungnt9801/eCommerce/actions/runs/42168084408) **SUCCESS attempt 1** (head `3ac6e2e`; cổng **19/19**, ⑭ **28,9 s**; artifact `13480536321` có `[CD-D67]`) · `docker-build` [**`42168084400`**](https://github.com/hungnt9801/eCommerce/actions/runs/42168084400) **success** |
+| Branch protection `main` | required: **`docker-build`** · **`cong-15-buoc`** (`strict=false`, `enforce_admins=false`) — **không đổi** trong phiên này (`D-65`); đo **SAU merge**: y hệt (2 context, `app_id` 15368, 6 cờ `false`, `reviews`/`restrictions` **null**) |
+| **`main` sau phiên** | **`8aee153`** (merge PR #7) — `ci` trên `main` (run **`42169269729`**, head `8aee153`) *xem §7.1*; `docker-build` **`42169269770`** |
 | Tệp `N21` đã tạo | `docs/nhanh/handover-n21.md` |
 | Tệp `N21` đã sửa | `tools/probe-don-san.ps1` (chẩn đoán, **0** đổi điều kiện) · `tools/kiem-tat-ca.ps1` (bước ⑭: lọc thêm `CD-D67`) · `tools/test-cong-kiem.ps1` (ca **`Y8`** + hàm thuần `Tim-ViPhamChanDoanC10`) · `docs/nhanh/decisions.md` · `docs/nhanh/07-ke-hoach-trien-khai.md` · `docs/nhanh/08-session-protocol.md` · `docs/nhanh/README.md` |
 | Dữ liệu `N21` đã xoá | **Không** chạm schema; dữ liệu probe `POC-K9S6-*`/`K9S6-*` đã dọn (xác nhận `C48/C49`), cờ admin **bật lại** `true`; log đo tỉ lệ ở `tools/_tam-kiem/n21/` (gitignore) + `%TEMP%\n21\art\` (ngoài repo) |
+
+### 7.1 `ci` trên `main` **sau merge** — `main` xanh (đo, không suy đoán)
+
+| Mục | Giá trị |
+|---|---|
+| `ci` trên `main` (head `8aee153`, event `push`) | run **`42169269729`** **SUCCESS · attempt 1** — 📌 **không** phải `rerun`: `C10` **không** flaky ở lượt này |
+| Job | `cong-15-buoc` **687 s** · `openapi-drift` **149 s** · `e2e-playwright` **171 s** |
+| `docker-build` trên `main` | run **`42169269770`** **success** |
+| check-run của head `8aee153` | **4/4 success** (`cong-15-buoc` · `openapi-drift` · `e2e-playwright` · `docker-build`), `app_id` 15368 |
+| Tổng kết tỉ lệ `C10` trên CI (toàn phiên) | **2 ĐỎ / 7 lượt** — 2 lượt ĐỎ **đều** ở attempt 1–2 của run `42005307510` (trước phiên), 5 lượt sau đó **XANH** (gồm `42168084408` @ PR #7 và `42169269729` @ `main`) |
