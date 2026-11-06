@@ -719,6 +719,47 @@ if (-not $ChiKiemDb) {
         return @($viPham)
     }
 
+    <#
+        🚨 `D-67` (`N21`): `probe-don-san.ps1` ca **`C10`** do **2/3 luot** tren `main` (cung cay ma voi PR xanh).
+        🔑 Cach "sua" re nhat — va sai — la **noi han cho** (`Cho-DieuKien` 30 s) hoac **bo ca**. Ca kiem duoi
+        day chan dung hai viec do, va chan luon viec **am tham xoa bang chung chan doan** (khi do lan do sau
+        lai *"khong doc duoc nguyen nhan"* — dung cai no `D-67` ③ da ghi).
+
+        Bon dieu phai con: (1) khang dinh `tong = 1 VA Late = 1`; (2) `Cho-DieuKien` mac dinh **<= 30** giay;
+        (3) cho van doi **dung Outcome `Late` (2)** chu khong phai "co bat ky dong"; (4) du **neo chan doan**
+        (`CD-D67` + 3 ma `[MP-EVENTLOG-*]`) de luot DO tren CI tu noi nguyen nhan.
+
+        📌 Ham **thuan**: nhan **noi dung tep** (khong doc dia) ⇒ ca XANH va ca DO chi khac nhau o **du lieu vao**.
+    #>
+    function Tim-ViPhamChanDoanC10 {
+        param([string]$Ma)
+
+        $viPham = @()
+
+        if (-not $Ma.Contains('($tongA -eq 1 -and $lateA -eq 1)')) {
+            $viPham += 'mat khang dinh C10 (tong = 1 VA Late = 1)'
+        }
+
+        if (-not $Ma.Contains('(Dem-SuKienTheoKetCuc $donA.ExternalOrderId 2) -ge 1')) {
+            $viPham += 'cho KHONG con doi dung Outcome Late (2) ⇒ chi can "co dong" la DAT'
+        }
+
+        $m = [regex]::Match($Ma, '(?m)\[int\]\$GiayToiDa\s*=\s*(\d+)')
+
+        if (-not $m.Success) {
+            $viPham += 'KHONG khai bao $GiayToiDa ⇒ khong con tran cho'
+        }
+        elseif ([int]$m.Groups[1].Value -gt 30) {
+            $viPham += ('{0} = {1} > 30 ⇒ noi han cho (day nguoi ta bo qua mau do)' -f '$GiayToiDa', $m.Groups[1].Value)
+        }
+
+        foreach ($neo in @('CD-D67', '[MP-EVENTLOG-DA-GHI]', '[MP-EVENTLOG-GHI-HONG]', '[MP-EVENTLOG-TRUNG]')) {
+            if (-not $Ma.Contains($neo)) { $viPham += ('mat neo chan doan: {0}' -f $neo) }
+        }
+
+        return @($viPham)
+    }
+
     Describe 'nen-tang.ps1 — khong con API chi-Windows, va ham chay DUNG tren he dieu hanh nay' {
 
         It 'Y1) MOI script cua cong khong con API chi-Windows va nap thu vien khi can (🛡️ chong sao chep khuon cu)' {
@@ -851,6 +892,39 @@ if (-not $ChiKiemDb) {
             # 🛡️ CHIEU NGUOC 2 — xoa mot khang dinh bat bien ⇒ phep quet PHAI bao.
             $matNeo = $ma.Replace('Reserved <= OnHand', 'BatDauGiuCho')
             KhangDinh (@(Tim-ViPhamThuLai409 -Ma $matNeo).Count -gt 0) 'Xoa khang dinh "Reserved <= OnHand" ma phep quet KHONG bao ⇒ phep quet vo nghia.'
+        }
+
+        It 'Y8) probe don san: C10 KHONG bi noi han cho va con du bang chung chan doan (D-67)' {
+            # 🚨 `N21` (`D-67`): `C10` — *"su kien DEN MUON ⇒ nhat ky DUNG 1 dong, Outcome = Late"* — do **2/3 luot**
+            #    tren `main` **cung cay ma** voi PR xanh (`tong = 0 · Late = 0`, trong khi `C11…C14` DAT).
+            # 🔑 Vi sao can CA NAY: `D-67` ④ cam **noi `Cho-DieuKien` 30 s** va cam **bo ca** — nhung cam bang
+            #    loi van thi khong ai chan duoc. 📌 Ca nay quet **bon chieu xuoi** (tep that phai con du 4 thu) va
+            #    **bon chieu nguoc** (sua tep theo huong "cho xanh" thi phep quet PHAI bao).
+            $tep = Join-Path $PSScriptRoot 'probe-don-san.ps1'
+            KhangDinh (Test-Path $tep) ("KHONG thay {0} ⇒ ca kiem vo nghia." -f $tep)
+
+            $noiDung = [IO.File]::ReadAllText($tep)
+            $ma = [regex]::Replace($noiDung, '(?s)<#.*?#>', '')
+            $ma = (($ma -split "`n") | Where-Object { -not $_.TrimStart().StartsWith('#') }) -join "`n"
+
+            $viPham = @(Tim-ViPhamChanDoanC10 -Ma $ma)
+            KhangDinh ($viPham.Count -eq 0) ("probe-don-san.ps1: " + ($viPham -join ' · '))
+
+            # 🛡️ CHIEU NGUOC 1 — noi han cho 30 s len 99 s ⇒ phep quet PHAI bao.
+            $noiHan = $ma -replace '(?m)(\[int\]\$GiayToiDa\s*=\s*)\d+', '${1}99'
+            KhangDinh (@(Tim-ViPhamChanDoanC10 -Ma $noiHan).Count -gt 0) 'Noi han cho len 99 s ma phep quet KHONG bao ⇒ phep quet vo nghia.'
+
+            # 🛡️ CHIEU NGUOC 2 — xoa khang dinh `tong = 1 VA Late = 1` ⇒ phep quet PHAI bao.
+            $matKhangDinh = $ma.Replace('($tongA -eq 1 -and $lateA -eq 1)', '($true)')
+            KhangDinh (@(Tim-ViPhamChanDoanC10 -Ma $matKhangDinh).Count -gt 0) 'Xoa khang dinh "tong = 1 VA Late = 1" ma phep quet KHONG bao ⇒ phep quet vo nghia.'
+
+            # 🛡️ CHIEU NGUOC 3 — doi cho thanh "co bat ky dong nao" (bo doi Outcome Late) ⇒ phep quet PHAI bao.
+            $boDoiLate = $ma.Replace('(Dem-SuKienTheoKetCuc $donA.ExternalOrderId 2) -ge 1', '$true')
+            KhangDinh (@(Tim-ViPhamChanDoanC10 -Ma $boDoiLate).Count -gt 0) 'Bo dieu kien doi Outcome Late ma phep quet KHONG bao ⇒ phep quet vo nghia.'
+
+            # 🛡️ CHIEU NGUOC 4 — xoa neo chan doan ⇒ phep quet PHAI bao (neu khong, lan do sau lai khong doc duoc nguyen nhan).
+            $matNeo = $ma.Replace('CD-D67', 'X').Replace('[MP-EVENTLOG-GHI-HONG]', 'X')
+            KhangDinh (@(Tim-ViPhamChanDoanC10 -Ma $matNeo).Count -gt 0) 'Xoa neo chan doan ma phep quet KHONG bao ⇒ phep quet vo nghia.'
         }
     }
 }
