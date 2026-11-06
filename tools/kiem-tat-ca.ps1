@@ -525,8 +525,10 @@ if ($DayDu -and -not $BoQuaE2E) {
         #    cho tiến trình Host.
         $p = ChayLenh 'pwsh' @('-NoProfile', '-File', (Join-Path $PSScriptRoot 'probe-don-san.ps1')) 'donsan.log'
 
-        Get-Content $p.Log | Where-Object { $_ -match 'DAT|KHONG DAT|PROBE DON SAN|DON DEP' } |
-            Select-Object -First 44 | ForEach-Object { "   $_" }
+        # 🔎 `CD-D67` (`N21`): dòng **chẩn đoán** của probe đơn sàn (đếm neo log Host theo đơn) — 📌 phải lọt vào
+        #    `gate.log`, không chỉ `donsan.log`, để lượt ĐỎ đọc được nguyên nhân ngay ở log của cổng.
+        Get-Content $p.Log | Where-Object { $_ -match 'DAT|KHONG DAT|PROBE DON SAN|DON DEP|CD-D67' } |
+            Select-Object -First 46 | ForEach-Object { "   $_" }
 
         if ($p.Ma -ne 0) {
             Get-Content $p.Log | Select-String 'CAC CA KHONG DAT' -Context 0,10 |

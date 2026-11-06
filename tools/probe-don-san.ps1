@@ -124,6 +124,30 @@ function Chuoi-Db {
 }
 
 <#
+    🔎 **ĐẾM NEO TRONG LOG HOST CHO **MỘT ĐƠN CỤ THỂ** — **CHẨN ĐOÁN** cho `D-67` (`N21`), chỉ để **in ra**;
+    ⛔ **KHÔNG** dùng làm điều kiện ĐẠT của ca nào.
+
+    🔑 **Vì sao phải có (đo được, không suy đoán):** `D-67` — ca `C10` **đỏ 2/3 lượt** trên `main` dù **cùng cây
+    mã** với PR xanh (`C10` = `tong = 0 · Late = 0`, trong khi `C11…C14` DAT). Lượt ĐỎ trên CI **không đọc được
+    nguyên nhân** vì artifact `bang-chung-*` chỉ có `tools/_tam-kiem/*.log` — **KHÔNG** có log Host (nó nằm ở
+    `tools/_tam-donsan/host.log` trên runner, rồi biến mất). 📌 Hai nguyên nhân **hoàn toàn khác nhau** mà cùng
+    cho ra `tong = 0`:
+      (a) **handler CHƯA CHẠY** tới lúc đo (lỗi **THỜI ĐIỂM**) ⇒ log Host **KHÔNG** có dòng `[MP-EVENTLOG-DA-GHI]`;
+      (b) **writer ĐÃ CHẠY mà dòng không vào DB** (lỗi **GHI**) ⇒ log Host **CÓ** dòng `[MP-EVENTLOG-GHI-HONG]`
+          hoặc `[MP-EVENTLOG-TRUNG]`.
+    ⇒ Hàm này đếm **theo đơn** (không theo toàn tệp) để phép đếm **tự nói** nó thuộc nguyên nhân nào. Cùng lý do
+    với `D-66`: **đo bằng số**, đừng đoán theo câu chữ.
+#>
+function Dem-NeoLogHost {
+    param([string]$TepLog, [string]$Khoa, [string]$Neo)
+
+    if ([string]::IsNullOrWhiteSpace($Khoa) -or -not (Test-Path $TepLog)) { return 0 }
+
+    return @(Select-String -Path $TepLog -Pattern $Neo -SimpleMatch -ErrorAction SilentlyContinue |
+        Where-Object { $_.Line.Contains($Khoa) }).Count
+}
+
+<#
     🔒 **MỐC UTC** — dựng bằng `ParseExact` + `SpecifyKind(Utc)`, KHÔNG dùng `[datetime]::Parse` (nó trả `Local`
     ⇒ `.Ticks` lệch **7 tiếng** so với giá trị Postgres trả về ⇒ `ExternalOrderId` tính ra **khác** mã đơn
     connector sinh ra ⇒ probe đo một đơn **không tồn tại** — đúng bẫy `handover` §5.1 #6).
@@ -484,13 +508,33 @@ select count(*)::text from "AbpUsers" where "NormalizedUserName" = 'ADMIN' and n
     }
 
     # ⏱️ 24/10/2026 — OUTBOX: phải chờ ĐÚNG outcome `Late`, không phải "có bất kỳ dòng" (đã có từ sự kiện trước).
-    Cho-DieuKien { (Dem-SuKienTheoKetCuc $donA.ExternalOrderId 2) -ge 1 } | Out-Null
+    # 🔎 `D-67` (`N21`): **GIỮ NGUYÊN** hạn 30 s + điều kiện `1/1`; chỉ **ghi thêm** `choDu` (chờ được hay hết hạn)
+    #    và số neo trong log Host để lượt ĐỎ trên CI **tự nói nguyên nhân** (`handover-n20` §5 #9 cấm nới hạn/bỏ ca).
+    $choDuA = Cho-DieuKien { (Dem-SuKienTheoKetCuc $donA.ExternalOrderId 2) -ge 1 }
 
     $tongA = Dem-SuKien $donA.ExternalOrderId
     $lateA = Dem-SuKienTheoKetCuc $donA.ExternalOrderId 2
 
+    $neoGhiA = Dem-NeoLogHost -TepLog $logHost -Khoa $donA.ExternalOrderId -Neo '[MP-EVENTLOG-DA-GHI]'
+    $neoHongA = Dem-NeoLogHost -TepLog $logHost -Khoa $donA.ExternalOrderId -Neo '[MP-EVENTLOG-GHI-HONG]'
+    $neoTrungA = Dem-NeoLogHost -TepLog $logHost -Khoa $donA.ExternalOrderId -Neo '[MP-EVENTLOG-TRUNG]'
+
+    $chanDoanA = 'choDu = {0} · log Host: GHI = {1} · GHI-HONG = {2} · TRUNG = {3}' -f `
+        $choDuA, $neoGhiA, $neoHongA, $neoTrungA
+
     Kq 'C10 su kien DEN MUON => nhat ky DUNG 1 dong, Outcome = Late (2)' ($tongA -eq 1 -and $lateA -eq 1) `
-        ('tong = {0} · Late = {1}' -f $tongA, $lateA)
+        ('tong = {0} · Late = {1} · {2}' -f $tongA, $lateA, $chanDoanA)
+
+    # 📌 Đỏ `C10` ⇒ in **thẳng** các dòng log Host của đơn này vào log probe (`tools/_tam-kiem/donsan.log` ⇒ nằm
+    #    trong artifact) — nếu chỉ để chúng trong `host.log` thì lượt ĐỎ trên CI **không đọc được** (`D-67` ③).
+    if ($tongA -ne 1 -or $lateA -ne 1) {
+        Write-Output ('   [CD-D67 chi tiet] log Host cua don {0} (toi da 20 dong):' -f $donA.ExternalOrderId)
+
+        if (Test-Path $logHost) {
+            @(Select-String -Path $logHost -Pattern $donA.ExternalOrderId -SimpleMatch -ErrorAction SilentlyContinue |
+                Select-Object -Last 20) | ForEach-Object { Write-Output ('   [CD-D67] ' + $_.Line.Trim()) }
+        }
+    }
 
     $wmSauA = Lay-Watermark $donA.ExternalOrderId
 
@@ -521,6 +565,29 @@ select count(*)::text from "MsgDeadLetters" where "KhoaNghiepVu" like '%{0}%' an
     Kq 'C13 su kien DEN MUON VAO DLQ (LyDo = HaWatermark)' ($dlqA -eq 1) ('so dong DLQ = {0}' -f $dlqA)
     Kq 'C14 DLQ giu PAYLOAD GOC (phat lai duoc ⇒ KHONG mat du lieu)' ($payloadDayDuA -eq 1) `
         ('payload > 100 ky tu = {0}' -f $payloadDayDuA)
+
+    # ══════════════════════════════════════════════════════════════════════════════════════════════════════
+    # 🔎 **CHẨN ĐOÁN `D-67` (`N21`) — ĐO LẠI `Late` SAU KHI DLQ ĐÃ CÓ. ⛔ KHÔNG phải ca kiểm, KHÔNG đổi ĐẠT/ĐỎ.**
+    #
+    # 🔑 **Vì sao đúng chỗ này (chứng minh bằng thứ tự commit, không phải bằng niềm tin):**
+    #   ① nhánh `DenMuon` (`MarketplaceOrderIntakeHandler`) gọi **DLQ trước** rồi **nhật ký sự kiện sau**;
+    #   ② `DeadLetterWriter.DayVaoDlqAsync` dùng **UoW của NƠI GỌI** (chỉ `DayVaoDlqUoWRiengAsync` mới mở UoW
+    #      riêng) ⇒ dòng DLQ chỉ commit ở `uow.CompleteAsync()` **của handler** — tức **SAU** mọi lệnh trong handler;
+    #   ③ `MarketplaceEventLogWriter` mở **UoW RIÊNG** (`requiresNew`) và commit **ngay** trong `GhiAsync`.
+    #   ⇒ **DLQ có trong DB ⇒ dòng nhật ký `Late` ĐÃ commit TRƯỚC ĐÓ.** Vì vậy con số dưới đây **phân biệt được**:
+    #      • `LateSauDlq = 1` ⇒ `C10` đỏ chỉ vì **hết hạn 30 s** (lỗi THỜI ĐIỂM — KHÔNG mất dữ liệu);
+    #      • `LateSauDlq = 0` mà `DLQ = 1` ⇒ **mâu thuẫn với thứ tự commit** ⇒ lỗi **GHI thật**, phải mở nợ mới.
+    #   📌 Mốc so sánh là hành vi ĐO ĐƯỢC, không phải suy đoán: `D-67` ③ đòi đúng cặp số này.
+    # ══════════════════════════════════════════════════════════════════════════════════════════════════════
+    $tongSauDlqA = Dem-SuKien $donA.ExternalOrderId
+    $lateSauDlqA = Dem-SuKienTheoKetCuc $donA.ExternalOrderId 2
+
+    Write-Output ('   [CD-D67] don {0}: sau khi DLQ da co ⇒ tong = {1} · Late = {2} · log Host: GHI = {3} · GHI-HONG = {4} · TRUNG = {5} · THATBAI-HONG = {6}' -f `
+            $donA.ExternalOrderId, $tongSauDlqA, $lateSauDlqA,
+            (Dem-NeoLogHost -TepLog $logHost -Khoa $donA.ExternalOrderId -Neo '[MP-EVENTLOG-DA-GHI]'),
+            (Dem-NeoLogHost -TepLog $logHost -Khoa $donA.ExternalOrderId -Neo '[MP-EVENTLOG-GHI-HONG]'),
+            (Dem-NeoLogHost -TepLog $logHost -Khoa $donA.ExternalOrderId -Neo '[MP-EVENTLOG-TRUNG]'),
+            (Dem-NeoLogHost -TepLog $logHost -Khoa $donA.ExternalOrderId -Neo '[MP-EVENTLOG-THATBAI-HONG]'))
 
     # ── ⑥ KỊCH BẢN B — XUNG ĐỘT CÙNG MỐC ⇒ DLQ (KHÔNG đoán) ────────────────────────────────────
     $kqB = Goi-Api -PhuongThuc 'Post' -DuongDan ('/api/app/channel/' + $shopB + '/sync-now') -Token $token
