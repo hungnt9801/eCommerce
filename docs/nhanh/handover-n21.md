@@ -101,7 +101,7 @@ Vì vậy `C13 = 1` mà `C10 = 0` **không thể** là "ghi hỏng" — nó ngh�
 | Lượt | Kết quả |
 |---|---|
 | **10 lượt `probe-don-san`** (bản **đã** sửa; log `tools/_tam-kiem/n21/don-san-lan-1…10.log`) | **49/49 DAT × 10** · **10 XANH / 0 ĐỎ** · `choDu = True` **10/10** · `[CD-D67] Late = 1` **10/10** · thời gian **29,9 – 34,4 s** (trung bình ≈ **32,6 s**) ⇒ ⚠️ **máy dev KHÔNG tái hiện được flake** (khớp `handover-n20` §1.7) |
-| **Tỉ lệ trên CI (đếm từ artifact + run thật)** | **2 ĐỎ / 7 lượt** trên cùng cây mã (`C10`): `42005307510` attempt 1 **ĐỎ** · attempt 2 **ĐỎ** · attempt 3 **XANH** · `42013066249` **XANH** · `42126116769` **XANH** · PR #7 `42168084408` **XANH attempt 1** · `main` sau merge `42169269729` **XANH attempt 1** |
+| **Tỉ lệ trên CI (đếm từ artifact + run thật)** | **2 ĐỎ / 9 lượt** trên cùng cây mã (`C10`): `42005307510` attempt 1 **ĐỎ** · attempt 2 **ĐỎ** · attempt 3 **XANH** · `42013066249` **XANH** · `42126116769` **XANH** · PR #7 `42168084408` **XANH attempt 1** · `main` sau merge `42169269729` **XANH attempt 1** · PR #8 `42170461998` **XANH attempt 1** · `main` cuối phiên `42171720753` **XANH attempt 1** — 📌 **không** tính lượt `ci` của chính PR tài liệu này (chỉ đổi `.md`, không đổi mã) |
 | 🎯 **Xác nhận chẩn đoán chạy trên CI** (run `42168084408`, artifact `13480536321`) | `donsan.log` + **`gate.log`** đều có dòng mới: `C10 … DAT — tong = 1 · Late = 1 · **choDu = True** · log Host: GHI = 1 · GHI-HONG = 0 · TRUNG = 0` và `[CD-D67] … sau khi DLQ da co ⇒ **tong = 1 · Late = 1**` ⇒ 🔑 lượt ĐỎ **tương lai** sẽ in **đúng cặp số** phân biệt *thời điểm* ↔ *lỗi ghi*; cổng **19/19**, bước ⑭ **28,9 s** |
 | Vì sao máy dev không tái hiện | ⑭ trên máy dev **28–34 s** cho **cả** probe (gồm bật Host); trên CI bước ⑭ **23,8–28,9 s** ⇒ **không** phải "CI chậm toàn cục"; khe *dispatch sự kiện → commit* phải **> 30 s** mới làm `C10` đỏ ⇒ cần log Host **có mốc thời gian** của lượt ĐỎ ⇒ nay **in được** (§1.5) |
 
@@ -230,4 +230,4 @@ và giữ 2 required check đúng cấu hình đã đo. Không mở rộng phạ
 | Job | `cong-15-buoc` **687 s** · `openapi-drift` **149 s** · `e2e-playwright` **171 s** |
 | `docker-build` trên `main` | run **`42169269770`** **success** |
 | check-run của head `8aee153` | **4/4 success** (`cong-15-buoc` · `openapi-drift` · `e2e-playwright` · `docker-build`), `app_id` 15368 |
-| Tổng kết tỉ lệ `C10` trên CI (toàn phiên) | **2 ĐỎ / 7 lượt** — 2 lượt ĐỎ **đều** ở attempt 1–2 của run `42005307510` (trước phiên), 5 lượt sau đó **XANH** (gồm `42168084408` @ PR #7 và `42169269729` @ `main`) |
+| Tổng kết tỉ lệ `C10` trên CI (toàn phiên) | **2 ĐỎ / 9 lượt** — 2 lượt ĐỎ **đều** ở attempt 1–2 của run `42005307510` (trước phiên); **7** lượt sau đó **XANH liên tiếp** (`42168084408` @ PR #7 · `42169269729` @ `main` `8aee153` · `42170461998` @ PR #8 · `42171720753` @ `main` `2f393fb`) |
