@@ -133,7 +133,7 @@ Vì vậy `C13 = 1` mà `C10 = 0` **không thể** là "ghi hỏng" — nó ngh�
 2. ⏭ **`409` vẫn `code = null`** — nguyên trạng `D-66` ⑦; **nhận chủ:** phiên có `§WP-14`.
 3. ⏭ **`07` chưa có `§WP-14`** ⇒ phiên sau **không** được tự đặt WP mới (`08 §5.1` luật 5).
 4. ⏭ **`openapi-drift` + `e2e-playwright` vẫn KHÔNG required** — `D-65` ⑤ giữ nguyên (ngoài phạm vi phiên).
-5. 📌 **39 tệp `tools/_*` vẫn untracked** + `tools/_n21-do-ti-le.ps1` (script đo tỉ lệ của phiên này) + `tools/_tam-kiem/n21/` (10 log) **đúng ý đồ** (gitignore).
+5. 📌 **39 tệp `tools/_*` vẫn untracked** + `tools/do-ti-le-probe-don-san.ps1` (script đo tỉ lệ — **đã chính thức hoá ở `N22`**, trước là `_n21-do-ti-le.ps1`) + `tools/_tam-kiem/n21/` (10 log) **đúng ý đồ** — 🧹 **`N22` đã dọn** 40 tệp rác + thêm `tools/_*` vào `.gitignore`.
 6. 📌 **Máy dev không tái hiện flake** (§1.7) ⇒ đừng kết luận *"hết flaky"*; chỉ số **2 ĐỎ / 5** trên CI mới là tỉ lệ thật.
 
 ---

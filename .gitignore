@@ -76,8 +76,11 @@ media-noi-bo/
 # Moc build tam (tools\kiem-moc-build.ps1) - chi la cong cu kiem chung, khong phai ma nguon.
 .moc-build.json
 
-# Log tam cua script kiem chung trong tools\ (dang _ten.txt) - KHONG phai ma nguon.
-tools/_*.txt
+# 🚨 MỌI tệp/thư mục bắt đầu bằng `_` trong tools\ là **RÁC CỦA CỔNG** (ảnh chụp, dữ liệu tạm, log,
+#    script đo tạm): **không** phải mã nguồn ⇒ KHÔNG commit. `N22` đã dọn 40 tệp và chốt luật này để
+#    `git status` không còn nhiễu. 📌 Muốn giữ một script đo lâu dài ⇒ đặt tên **không** có `_`
+#    (ví dụ `tools/do-ti-le-probe-don-san.ps1`).
+tools/_*
 
 # 🚨 Thư mục TẠM của công cụ kiểm chứng trong tools\ (`_tam-kiem`, `_tam-e2e`, `_tam-diachi`):
 # log, file SQL tạm, cookie jar… 🔒 KHÔNG phải mã nguồn và KHÔNG được commit — chúng chứa
