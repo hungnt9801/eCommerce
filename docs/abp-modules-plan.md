@@ -1,4 +1,6 @@
 # Kế hoạch đưa module ABP vào source code
+> 🗄️ **LỊCH SỬ — KHÔNG dùng làm điểm vào** (gắn nhãn 14/11/2026 theo `D-69`). Tệp ghi lại một thời kỳ/việc **đã qua**; **số đo, trạng thái và 'việc tiếp theo' trong tệp đã cũ** — kể cả câu *'đọc tệp này trước'* bên dưới. Điểm vào hiện tại: `CLAUDE.md` → `docs/nhanh/README.md` → handover mới nhất `docs/nhanh/handover-n*.md` → `docs/nhanh/07-ke-hoach-trien-khai.md`. Xếp loại tài liệu: `docs/agents/ke-hoach-he-thong-agent.md` §14.1.
+
 
 > Trả lời câu hỏi: *"Tôi chưa thấy các module Framework trong source code"*.
 > **Kết luận ngắn:** các **framework module ĐÃ có trong source** — nhưng ở dạng **NuGet package**,

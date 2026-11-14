@@ -1,4 +1,6 @@
 # Kiến trúc — eCommerce đa kênh
+> 🧭 **PHẠM VI HIỆU LỰC** (gắn nhãn 14/11/2026): các **quyết định kiến trúc và ranh giới module** trong tệp còn hiệu lực; phần nói về **thứ tự làm / lộ trình** đã thay bằng `docs/nhanh/05-lo-trinh-rui-ro.md` + `docs/nhanh/07-ke-hoach-trien-khai.md` (`D-69`). Kiến trúc đích theo Nhanh: `docs/nhanh/03-kien-truc-dich.md`.
+
 
 Tài liệu này giải thích **thiết kế và lý do**, không lặp lại hướng dẫn chạy (xem `README.md`).
 

@@ -1,4 +1,6 @@
 # Đề xuất xây dựng module nghiệp vụ — bản khung
+> 🧭 **PHẠM VI HIỆU LỰC** (gắn nhãn 14/11/2026): **§6.7 (pháp lý & nghiệp vụ đặc thù VN)** và **§7.3 (danh sách port đã kiểm giấy phép)** là nguồn sự thật; phần thứ tự xây/đề xuất còn lại là LỊCH SỬ (lộ trình chính theo `D-69`).
+
 
 > **Trạng thái:** khung đề xuất (do tôi thiết kế dựa trên hiện trạng solution + yêu cầu đa kênh VN).
 > Phần **§6 "Nguồn tham chiếu & bài học từ các repo đã khảo sát"** đang chờ 6 nhánh khảo sát song song

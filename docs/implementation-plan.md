@@ -1,4 +1,6 @@
 # KẾ HOẠCH THỰC HIỆN — Hệ thống eCommerce đa kênh
+> 🧭 **PHẠM VI HIỆU LỰC** (gắn nhãn 14/11/2026 theo `D-69`): **lộ trình** của tệp này (GĐ0–GĐ4, phiên `S0…S19`) là **LỊCH SỬ** — lộ trình chính là `docs/nhanh/05-lo-trinh-rui-ro.md` + `docs/nhanh/07-ke-hoach-trien-khai.md`; việc dang dở GĐ2 cũ đã ánh xạ ở `docs/agents/anh-xa-lo-trinh-d69.md`. **Còn hiệu lực:** §3 *15 nguyên tắc* và §A.5 *điều kiện bắt đầu giai đoạn*. Trạng thái các dòng trong Phụ lục A là của thời điểm viết.
+
 
 > **Trạng thái:** bản kế hoạch để review — **chưa code**.
 > **Tài liệu liên quan:** `structure-and-techstack.md` (cấu trúc & công nghệ) ·

@@ -1,4 +1,6 @@
 # Báo cáo thực thi Phase 0 — đưa module ABP vào source code
+> 📚 **BÀI HỌC — không phải hiện trạng** (gắn nhãn 14/11/2026). Đọc để rút lỗi đã gặp; trạng thái/số đo trong tệp là **của thời điểm viết**. Điểm vào hiện tại: `CLAUDE.md` → `docs/nhanh/README.md` → handover mới nhất `docs/nhanh/handover-n*.md` → `docs/nhanh/07-ke-hoach-trien-khai.md`. Xếp loại tài liệu: `docs/agents/ke-hoach-he-thong-agent.md` §14.1.
+
 
 **Ngày:** 09/10/2026 · **Trạng thái:** ✅ hoàn thành phần code · ⏳ chưa kiểm chứng được luồng cần database
 **Commit:** `fc84e80` (checkpoint) → `d59128c` (thêm module + auth) → `adb8990` (sửa 3 lỗi thực chiến)
