@@ -1,4 +1,6 @@
 # BÀN GIAO — Phần còn lại của GĐ1 (mở session mới, sau `S12…S18`)
+> 🗄️ **LỊCH SỬ — KHÔNG dùng làm điểm vào** (gắn nhãn 14/11/2026 theo `D-69`). Tệp ghi lại một thời kỳ/việc **đã qua**; **số đo, trạng thái và 'việc tiếp theo' trong tệp đã cũ** — kể cả câu *'đọc tệp này trước'* bên dưới. Điểm vào hiện tại: `CLAUDE.md` → `docs/nhanh/README.md` → handover mới nhất `docs/nhanh/handover-n*.md` → `docs/nhanh/07-ke-hoach-trien-khai.md`. Xếp loại tài liệu: `docs/agents/ke-hoach-he-thong-agent.md` §14.1.
+
 
 > **Lập ngày:** 29/10/2026 · **Cây:** `main` @ `7923376` · **Người lập:** phiên tự động 28–29/10 (10 commit chính + 9 commit qua subagent)
 >

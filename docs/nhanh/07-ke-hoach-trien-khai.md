@@ -684,6 +684,55 @@ thái "đỏ mà không ai đọc".
 - ⚠️ **Nợ còn lại (có nhận chủ):** `409` vẫn `code = null` (map mã nghiệp vụ = phiên có `§WP-14`);
   `openapi-drift`/`e2e-playwright` vẫn **không** required (`D-65` ⑤ giữ nguyên).
 
+### WP-14 — GĐ3: cổng tài liệu — rà theo mô hình Nhanh + duyệt (3 phiên, mở 14/11/2026 theo `D-71`)
+
+> 📌 **Vì sao có WP này (không phải code):** `D-69` chốt lộ trình chính là `05` + `07`; `D-70` chốt phạm vi GĐ3.
+> Bảng ánh xạ [`anh-xa-lo-trinh-d69.md`](../agents/anh-xa-lo-trinh-d69.md) §2 đo được: **mọi** việc GĐ3 dựa trên tài liệu
+> **chưa duyệt** (27/55 duyệt — không tài liệu GĐ3 nào trong đó), mà `implementation-plan.md` §A.5 (còn hiệu lực theo `D-69` ③)
+> **cấm code** khi tài liệu chưa duyệt. Thêm nữa, các tài liệu này viết **trước** `D-07`/`D-08`/`D-18`/`D-27`/`D-31`/`D-45`
+> (mô hình website: `ProductVariant`, 7 trạng thái đơn, không POS, tồn một số) ⇒ duyệt nguyên văn sẽ **mâu thuẫn code hiện có**.
+> ⇒ WP-14 làm cho GĐ3 **được phép bắt đầu code**. ⛔ **0 tệp `.cs`, 0 migration** trong WP này.
+
+**Phạm vi — 18 tài liệu, chia 3 đợt (mỗi đợt một phiên, duyệt được theo đợt — §A.5 cho duyệt theo từng feature):**
+
+| Đợt | Phiên dự kiến | Tài liệu | Người review thêm (luật `design-doc-guidelines.md` §6) |
+|---|---|---|---|
+| **A** — Vận chuyển, COD, địa chỉ, trả hàng đơn | `N22` | `ADDR-001…003` · `SHP-001…004` · `REC-003` · `SAL-006` (9) | người **đã liên hệ GHN/GHTK** (tích hợp NCC) · kiến trúc (`SAL-006`, `SHP-002` có state machine) |
+| **B** — Khuyến mại, điểm | `N23` | `PRO-001` · `PRO-002` · `LOY-001` (3) | kiến trúc (engine điều kiện) |
+| **C** — Báo cáo, kế toán, thông báo | `N24` | `REP-001…003` · `ACC-001` · `NOT-001` · `NOT-002` (6) | **kế toán** (`ACC-001`, `REP-002` lãi gộp) |
+
+📌 `PRC-002` (giá bậc thang) **đã duyệt** ở `Q5` ⇒ **không** nằm trong WP này. `REC-002`, `CHN-*` thuộc **GĐ5**. `REV-001` **bỏ**,
+storefront còn lại **đóng băng** (`D-70`).
+
+- **① Đối chiếu mô hình Nhanh** — mỗi tài liệu thêm mục **"Đối chiếu mô hình Nhanh (14/11/2026)"** ở cuối: bảng *chỗ lệch* với
+  `D-07` (cha–con + ĐVT) · `D-08` (4 trục, 18 trạng thái) · `D-18`/`D-42` (POS riêng) · `D-27` (tồn vector) · `D-31` (`decimal(18,3)`) ·
+  `D-45` (một cửa ghi điểm/công nợ) · `D-47`/`D-48` (read-model báo cáo) · căn cứ pháp lý mới (`business-modules-proposal.md` §6.7),
+  rồi **sửa thân tài liệu** cho hết lệch. Không lệch ⇒ ghi "đã đối chiếu, không lệch" (không để trống).
+  📌 Code đã có một phần (`SAL-006` 24 tệp, `ADDR` 76 tệp, `REP` từ `WP-08`, `LOY` từ `WP-07`) ⇒ tài liệu phải mô tả **code thật**
+  kèm `file:dòng`, phần chưa có ghi rõ là kế hoạch (`coding-conventions.md` §12).
+- **② Kiểm tài liệu độc lập** — người/agent **khác** người sửa (vai `DOCREV` khi đã dựng): 6 nhóm D1–D6 + **D7** = 14 quy tắc của
+  `design-doc-guidelines.md` §5; ghi `docs/reviews/<MÃ>-docreview.md` có `VERDICT: DOC-OK | DOC-CHANGES`. SQL trong tài liệu chạy thử
+  trong `BEGIN … ROLLBACK` nếu có PostgreSQL; không có ⇒ ghi "chưa chạy" (không bỏ qua im lặng).
+- **③ Câu hỏi mở** của từng tài liệu: qua agent `decider` trước (`CLAUDE.md` §5); câu vùng cấm (NCC, pháp lý, chính sách đổi trả với
+  khách) ⇒ gom vào `docs/agents/hang-doi-xem-lai.md`, **không** chặn các tài liệu khác của đợt.
+- **④ Duyệt** — chủ dự án (+ người review thêm ở bảng trên) duyệt theo đợt; ghi **biên bản duyệt mới** cùng khuôn
+  `docs/bien-ban-duyet-gd1-2026-10-29.md` (đặt tên `docs/bien-ban-duyet-gd3-<đợt>-<ngày>.md`), **không** sửa header từng tệp (cùng
+  quy ước `Q5`); cập nhật `docs/features/README.md` §2 (số tài liệu đã duyệt).
+- **⑤ Sau đợt cuối:** đề xuất thứ tự WP **code** của GĐ3 (`§WP-15+`) — thứ tự trong phạm vi `D-70` là việc `decider` được chốt tạm;
+  thêm việc ngoài phạm vi ⇒ hỏi người.
+
+⛔ **Không thuộc WP-14** (giữ nhận chủ, chuyển sang **WP code đầu tiên của GĐ3 — `WP-15`**): sửa `C10` của `D-67` · map mã nghiệp vụ cho
+`409` (`code = null`). Hai việc này cần build/test chạy được — ⚠️ đo 14/11/2026: `dotnet build` trên máy dev **đỏ `MSB3491`** (không ghi
+được `obj\`, thư mục thuộc `BUILTIN/Administrators`) ⇒ phải sửa quyền trước `WP-15`. **WP-14 không cần build** nên không bị chặn.
+
+**DoD (mỗi đợt, đo được):**
+- Mỗi tài liệu của đợt: đủ **16** heading `## 0.` … `## 15.` (`grep`) · có mục **"Đối chiếu mô hình Nhanh"** · có
+  `docs/reviews/<MÃ>-docreview.md` với `VERDICT: DOC-OK` và **0 P1**.
+- `pwsh -File tools\kiem-link-tai-lieu.ps1` → **PASS** · `npm --prefix tools run check:mermaid` → **0 lỗi**.
+- Biên bản duyệt của đợt có **một dòng cho mỗi tài liệu** (duyệt / chưa duyệt + lý do).
+- `git diff --stat` **chỉ** chạm `docs/**` · **0 tệp `.cs`** · **0 migration**.
+- **Toàn WP:** 18/18 tài liệu có trạng thái cuối trong biên bản; `§WP-15+` đã có đề xuất thứ tự.
+
 ---
 
 ## 6. Lịch sprint (2 tuần/sprint)

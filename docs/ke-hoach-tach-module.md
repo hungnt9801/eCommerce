@@ -1,4 +1,6 @@
 # KẾ HOẠCH TÁCH 4 MODULE GĐ1 — `Catalog` · `Inventory` · `Sales` · `Reconciliation`
+> 🗄️ **LỊCH SỬ — KHÔNG dùng làm điểm vào** (gắn nhãn 14/11/2026 theo `D-69`). Tệp ghi lại một thời kỳ/việc **đã qua**; **số đo, trạng thái và 'việc tiếp theo' trong tệp đã cũ** — kể cả câu *'đọc tệp này trước'* bên dưới. Điểm vào hiện tại: `CLAUDE.md` → `docs/nhanh/README.md` → handover mới nhất `docs/nhanh/handover-n*.md` → `docs/nhanh/07-ke-hoach-trien-khai.md`. Xếp loại tài liệu: `docs/agents/ke-hoach-he-thong-agent.md` §14.1.
+
 
 > **Trạng thái:** 4 module GĐ1 **đã tách** (24/10/2026); `S17` (29/10/2026) **đóng nốt phần hợp đồng** —
 > xem §3.1 để biết dịch vụ nào còn ở host và **vì sao**.

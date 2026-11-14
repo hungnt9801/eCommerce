@@ -1,4 +1,6 @@
 # KIỂM TOÁN GIAI ĐOẠN 1 — "bán được trên website"
+> 📚 **BÀI HỌC — không phải hiện trạng** (gắn nhãn 14/11/2026). Đọc để rút lỗi đã gặp; trạng thái/số đo trong tệp là **của thời điểm viết**. Điểm vào hiện tại: `CLAUDE.md` → `docs/nhanh/README.md` → handover mới nhất `docs/nhanh/handover-n*.md` → `docs/nhanh/07-ke-hoach-trien-khai.md`. Xếp loại tài liệu: `docs/agents/ke-hoach-he-thong-agent.md` §14.1.
+
 
 > **Ngày đo:** 24/10/2026 · **Cây:** `main` @ `531bd9d` · **Người đo:** phiên kiểm toán độc lập
 > **Câu hỏi:** *"11 phiên `S1…S11` đã xong — GĐ1 đã hoàn thành chưa, còn thiếu gì?"*

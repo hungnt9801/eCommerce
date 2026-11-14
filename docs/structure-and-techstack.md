@@ -1,4 +1,6 @@
 # Structure & Tech Stack — source code mới
+> 🧭 **PHẠM VI HIỆU LỰC** (gắn nhãn 14/11/2026): **khuôn module, tech stack và quy ước** còn hiệu lực; **§5 thứ tự thi công (website trước)** là LỊCH SỬ — lộ trình chính theo `D-69` là `docs/nhanh/05-lo-trinh-rui-ro.md` + `docs/nhanh/07-ke-hoach-trien-khai.md`.
+
 
 > Tài liệu này **chỉ** trình bày cấu trúc và công nghệ. Chưa đi vào thiết kế chi tiết từng module.
 > Bối cảnh: solution hiện tại đã có 15 project (khung + `ChannelHub` + `PaymentHub` + Phase 0 auth).

@@ -1,4 +1,6 @@
 # BÁO CÁO CHỐT GIAI ĐOẠN 0
+> 📚 **BÀI HỌC — không phải hiện trạng** (gắn nhãn 14/11/2026). Đọc để rút lỗi đã gặp; trạng thái/số đo trong tệp là **của thời điểm viết**. Điểm vào hiện tại: `CLAUDE.md` → `docs/nhanh/README.md` → handover mới nhất `docs/nhanh/handover-n*.md` → `docs/nhanh/07-ke-hoach-trien-khai.md`. Xếp loại tài liệu: `docs/agents/ke-hoach-he-thong-agent.md` §14.1.
+
 
 > **Ngày:** 14/10/2026 · **Commit mốc:** `2f9ff13` + lượt này
 > **Phạm vi GĐ0:** hạ tầng nền + **Địa chỉ hành chính** + **Hoá đơn điện tử** + **Ký số** + luồng nghiệp vụ khép kín

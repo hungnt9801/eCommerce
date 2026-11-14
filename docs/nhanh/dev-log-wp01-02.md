@@ -1,4 +1,6 @@
 # Dev log — WP-01 (nền Web Admin) + WP-02 (hợp đồng API)
+> 🗄️ **LỊCH SỬ — KHÔNG dùng làm điểm vào** (gắn nhãn 14/11/2026 theo `D-69`). Tệp ghi lại một thời kỳ/việc **đã qua**; **số đo, trạng thái và 'việc tiếp theo' trong tệp đã cũ** — kể cả câu *'đọc tệp này trước'* bên dưới. Điểm vào hiện tại: `CLAUDE.md` → `docs/nhanh/README.md` → handover mới nhất `docs/nhanh/handover-n*.md` → `docs/nhanh/07-ke-hoach-trien-khai.md`. Xếp loại tài liệu: `docs/agents/ke-hoach-he-thong-agent.md` §14.1.
+
 
 > Ngày 02/11/2026 · nhánh `feature/wp-01-02-foundation` · người thực hiện: phiên thi công
 > Kế hoạch: [07](07-ke-hoach-trien-khai.md) · Quyết định: [decisions.md](decisions.md)
