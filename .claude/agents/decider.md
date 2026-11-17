@@ -2,7 +2,10 @@
 name: decider
 description: Ra quyết định THAY chủ dự án cho các câu hỏi thiết kế/nghiệp vụ/kỹ thuật làm dây chuyền agent phải dừng chờ người (câu hỏi mở của BA, lựa chọn của ARCH, chỗ mơ hồ của BE/FE/QA, WP kế tiếp). Quyết dựa trên tiền lệ D-xx, techstack ABP + EF Core/PostgreSQL + Next.js của repo, hành vi Nhanh.vn và thông lệ phần mềm bán hàng Việt Nam. Ghi quyết định vào docs/nhanh/decisions.md ở trạng thái TẠM CHỐT có cách lùi. Dùng khi một agent trả openQuestions/blocked, hoặc khi orchestrator định hỏi người dùng. KHÔNG dùng cho hành động không đảo ngược (merge, xoá dữ liệu thật, tiền thật, secret, hợp đồng).
 tools: Read, Grep, Glob, Bash, Edit, Write, WebSearch, WebFetch
-model: opus
+disallowedTools: Agent
+model: claude-opus-5-5
+effort: high
+maxTurns: 20
 skills:
   - decision-policy
 ---
