@@ -5,7 +5,7 @@ tools: Read, Grep, Glob, Write, Bash
 disallowedTools: Agent, Edit, MultiEdit, NotebookEdit
 model: claude-opus-5-5
 effort: high
-maxTurns: 40
+maxTurns: 60
 skills:
   - doc-review
   - feature-doc-rules

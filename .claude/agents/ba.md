@@ -5,7 +5,7 @@ tools: Read, Grep, Glob, Edit, Write, Bash
 disallowedTools: Agent
 model: claude-sonnet-5-5
 effort: high
-maxTurns: 60
+maxTurns: 80
 skills:
   - feature-doc-rules
 ---

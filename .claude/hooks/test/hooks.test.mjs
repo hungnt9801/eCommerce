@@ -233,6 +233,41 @@ test('N22-2b docrev: cac dang chay check:mermaid ⇒ cho', () => {
   assert.equal(shell('docrev', 'npm --prefix ./tools run check:mermaid').code, 0);
   assert.equal(shell('docrev', 'npm install left-pad').code, 2);
 });
+// ── Ca hoi quy tu phien N23 (handover-n23 §5 #2: last_assistant_message RONG 12/12, transcript khong doc duoc) ──
+test('N23-1 tin cuoi RONG + khong co transcript ⇒ KHONG chan, ghi khongXacMinh, khong sinh canh bao', () => {
+  const cb = join(repo, 'artifacts', 'agents', 'canh-bao.jsonl');
+  const truoc = existsSync(cb) ? readFileSync(cb, 'utf8') : '';
+  const r = startStop('decider', 'n23a', () => {}, '', { agent_transcript_path: join(repo, 'khong-co.jsonl') });
+  assert.equal(r.out, '', 'khong duoc chan khi khong thay noi dung vai');
+  assert.equal(existsSync(cb) ? readFileSync(cb, 'utf8') : '', truoc, 'khong duoc sinh canh bao gia');
+  const dir = join(repo, 'artifacts', 'agents');
+  const moiNhat = readdirSync(dir).filter((f) => /^\d{4}-\d{2}-\d{2}\.jsonl$/.test(f)).sort().pop();
+  const rec = readFileSync(join(dir, moiNhat), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).pop();
+  assert.equal(rec.khongXacMinh, true);
+  assert.ok(Array.isArray(rec.khoaInput) && rec.khoaInput.includes('agent_type'), 'phai ghi ten cac truong input de chan doan');
+});
+test('N23-2 duong dan transcript dang "~/..." duoc mo rong theo thu muc home', () => {
+  const home = mkdtempSync(join(tmpdir(), 'home-'));
+  mkdirSync(join(home, 'tx'), { recursive: true });
+  writeFileSync(join(home, 'tx', 'a.jsonl'), JSON.stringify({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: jsonBlock({ agent: 'DEC', outcome: 'TIEN_LE', choice: 'D-08' }) }] } }) + '\n');
+  run('subagent-start.mjs', { agent_type: 'decider', agent_id: 'n23b' });
+  const r = spawnSync(process.execPath, [join(HOOKS, 'check-agent-stop.mjs')], {
+    input: JSON.stringify({ cwd: repo, agent_type: 'decider', agent_id: 'n23b', last_assistant_message: '', agent_transcript_path: '~/tx/a.jsonl' }),
+    env: { ...process.env, CLAUDE_PROJECT_DIR: repo, HOME: home, USERPROFILE: home },
+    encoding: 'utf8',
+  });
+  assert.equal(r.stdout, '');
+  const dir = join(repo, 'artifacts', 'agents');
+  const moiNhat = readdirSync(dir).filter((f) => /^\d{4}-\d{2}-\d{2}\.jsonl$/.test(f)).sort().pop();
+  const rec = readFileSync(join(dir, moiNhat), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).pop();
+  assert.equal(rec.nguonJson, 'transcript');
+  rmSync(home, { recursive: true, force: true });
+});
+test('N23-3 transcript CO text nhung khong co JSON ⇒ van chan (co bang chung)', () => {
+  const tp = put('artifacts/transcripts/agent-n23c.jsonl', JSON.stringify({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: 'Toi da sua xong, khong co JSON.' }] } }) + '\n');
+  const r = startStop('ba', 'n23c', () => {}, '', { agent_transcript_path: tp });
+  assert.equal(JSON.parse(r.out).decision, 'block');
+});
 test('E14 vai khong khai (general-purpose) ⇒ hook start/stop bo qua', () => {
   const r = startStop('general-purpose', 'g1', () => {}, 'xong');
   assert.equal(r.out, '');

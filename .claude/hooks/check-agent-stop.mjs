@@ -52,19 +52,26 @@ try {
   // Nguon 1: tin cuoi; nguon 2 (du phong): transcript cua chinh subagent.
   let json = extractLastJson(input.last_assistant_message || '');
   let nguonJson = json ? 'last_assistant_message' : null;
+  let tDiag = null;
   if (!json) {
     const t = jsonFromTranscript(input.agent_transcript_path);
     json = t.json;
     nguonJson = t.nguon;
+    tDiag = t.diag;
   }
   const chanDoan = chanDoanJson(input.last_assistant_message);
+  // Chi CHAN khi THAY duoc noi dung vai ma khong co JSON. Khong doc duoc noi dung (tin cuoi rong + transcript
+  // khong doc duoc / khong co text) => chi ghi nhat ky: cong that la script ORCH chay (check-feature-doc,
+  // check-agent-artifact); chan khi khong chac chi ton luot (N22: 31/34, N23: 12/12 chan nham).
+  const thayNoiDung = chanDoan.len > 0 || Boolean(tDiag && tDiag.coText);
   const stop = cfg.stop || {};
   const thieu = [];
+  const khongXacMinh = !json && !thayNoiDung;
 
   if (!json && chanDoan.coKhoiJson && chanDoan.loiParse) {
     thieu.push(`khoi JSON KHONG HOP LE (${chanDoan.loiParse}) — sua dau nhay kep trong chuoi (\\"), bo dau phay thua`);
-  } else if (!json) thieu.push('khoi JSON cuoi (```json ... ```) theo muc "Dinh dang tra ve" cua vai');
-  else {
+  } else if (!json && thayNoiDung) thieu.push('khoi JSON cuoi (```json ... ```) theo muc "Dinh dang tra ve" cua vai');
+  else if (json) {
     for (const k of stop.jsonKeys || []) if (!(k in json)) thieu.push(`khoa JSON "${k}"`);
     const ak = stop.artifactKey;
     if (ak && typeof json[ak] === 'string' && json[ak]) {
@@ -102,6 +109,7 @@ try {
   const record = {
     ts: new Date().toISOString(), agentId: id, role, json: json ? true : false, nguonJson,
     lam: { len: chanDoan.len, coKhoiJson: chanDoan.coKhoiJson, loiParse: chanDoan.loiParse, coTranscript: Boolean(input.agent_transcript_path) },
+    transcript: tDiag, khongXacMinh, khoaInput: Object.keys(input).slice(0, 20),
     verdict: json && (json.verdict || json.outcome) || null, thieu, doi, ngoaiVung, ghiChuGit, lanChan: blocks,
   };
   appendJsonl(join(dir, `${today()}.jsonl`), record);

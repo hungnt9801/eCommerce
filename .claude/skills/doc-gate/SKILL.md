@@ -26,7 +26,8 @@ Tiền đề: đã chạy `/mo-phien` (baseline). Luật nền: `CLAUDE.md` §3�
 - `A` / `B` / `C` ⇒ đúng các mã của đợt đó trong bảng §WP-14 của `docs/nhanh/07-ke-hoach-trien-khai.md`
   (A: `ADDR-001…003`, `SHP-001…004`, `REC-003`, `SAL-006` · B: `PRO-001`, `PRO-002`, `LOY-001` · C: `REP-001…003`, `ACC-001`, `NOT-001`, `NOT-002`).
 - Mã lẻ ⇒ dùng đúng các mã đó. Tìm tệp: `Glob docs/features/**/<mã viết thường>-*.md` (vd `shp-003-*.md`).
-- **Gói Pro:** mỗi phiên chỉ nhận số tài liệu vừa một cửa sổ 5 giờ — mặc định **2 tài liệu**, `SAL-006` luôn **một mình**
+- **Gói Pro:** mỗi phiên chỉ nhận số tài liệu vừa một cửa sổ 5 giờ — mặc định **2 tài liệu**; tài liệu **> 120 KB** hoặc dự kiến ≥ 5 câu gửi decider
+  ⇒ **một tài liệu/phiên** (N23: `ADDR-003` một mình đã chạm hạn mức 5 giờ); `SAL-006` luôn **một mình**
   (`docs/agents/ke-hoach-v2-claude-code-pro.md` §10). Danh sách dài hơn ⇒ làm 2 mã đầu, ghi phần còn lại vào handover §6.
 
 ## 1. Vòng cho mỗi mã (tuần tự — không chạy hai mã song song)
@@ -43,7 +44,7 @@ Làm đúng .claude/agents/ba.md §5. Kết thúc bằng đúng một khối JSO
 
 **D1q — câu hỏi mở.** Từ `openQuestions` của BA, **chỉ** gửi decider những câu có `blocks` khác rỗng **và** `needs = DEC`
 (câu không chặn DoD của WP-14 giữ `Open` ở §15 — không tiêu lượt Opus cho chúng). Mỗi câu một lần gọi `Agent` `subagent_type: "decider"`,
-các câu độc lập gọi **song song**:
+gọi **tuần tự, từng câu một** — **không** song song (N23: hai decider cùng ghi `decisions.md` đã tranh cùng số `D-99`, rồi `D-100`):
 
 ```text
 Câu hỏi: <question>. Phương án: <options>. BA khuyến nghị: <recommend> (<why>).

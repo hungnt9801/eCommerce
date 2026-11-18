@@ -4,7 +4,7 @@
 
 import { readFileSync, existsSync, mkdirSync, appendFileSync, writeFileSync } from 'node:fs';
 import { join, resolve, relative, isAbsolute, sep } from 'node:path';
-import { tmpdir } from 'node:os';
+import { tmpdir, homedir } from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 
@@ -157,19 +157,34 @@ export function chanDoanJson(text) {
   return { len: t.length, coKhoiJson: fences.length > 0, loiParse: err };
 }
 
+// Mo rong "~" o dau duong dan (tai lieu Claude Code vi du agent_transcript_path dang "~/.claude/projects/...").
+export function moRongHome(p) {
+  if (!p) return p;
+  if (p === '~' || p.startsWith('~/') || p.startsWith('~\\')) return join(homedir(), p.slice(1));
+  return p;
+}
+
 // Doc transcript JSONL cua subagent (agent_transcript_path), lay text cua cac tin assistant tu cuoi len,
-// tim khoi JSON hop le gan nhat. Ly do (do o phien N22): last_assistant_message thuong KHONG chua khoi JSON
-// ma vai da gui ve (31/34 luot bao thieu nham) — transcript la nguon day du.
-export function jsonFromTranscript(p, toiDa = 12) {
-  if (!p || !existsSync(p)) return { json: null, nguon: null };
+// tim khoi JSON hop le gan nhat. Tra them chan doan de biet VI SAO khong thay (do o N22/N23:
+// last_assistant_message RONG 12/12 luot, transcript khong doc duoc).
+export function jsonFromTranscript(p0, toiDa = 12) {
+  const p = moRongHome(p0);
+  const diag = { duongDan: p || null, tonTai: false, soDong: 0, soTinAssistant: 0, coText: false, khoaDongCuoi: null };
+  if (!p || !existsSync(p)) return { json: null, nguon: null, diag };
+  diag.tonTai = true;
   let lines;
   try {
     lines = readFileSync(p, 'utf8').split('\n').filter(Boolean);
   } catch {
-    return { json: null, nguon: null };
+    return { json: null, nguon: null, diag };
   }
-  let dem = 0;
-  for (let i = lines.length - 1; i >= 0 && dem < toiDa; i--) {
+  diag.soDong = lines.length;
+  try {
+    diag.khoaDongCuoi = Object.keys(JSON.parse(lines[lines.length - 1]) || {}).slice(0, 8);
+  } catch {
+    /* bo qua */
+  }
+  for (let i = lines.length - 1; i >= 0 && diag.soTinAssistant < toiDa; i--) {
     let o;
     try {
       o = JSON.parse(lines[i]);
@@ -179,15 +194,16 @@ export function jsonFromTranscript(p, toiDa = 12) {
     const msg = o && (o.message || o);
     const role = (o && o.type) || (msg && msg.role);
     if (role !== 'assistant') continue;
-    dem++;
+    diag.soTinAssistant++;
     const content = msg && msg.content;
     const text = typeof content === 'string'
       ? content
       : Array.isArray(content) ? content.filter((c) => c && c.type === 'text').map((c) => c.text).join('\n') : '';
+    if (text) diag.coText = true;
     const j = extractLastJson(text);
-    if (j) return { json: j, nguon: 'transcript' };
+    if (j) return { json: j, nguon: 'transcript', diag };
   }
-  return { json: null, nguon: null };
+  return { json: null, nguon: null, diag };
 }
 
 export function stateDir(root) {

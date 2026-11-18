@@ -608,3 +608,43 @@ Theo `CLAUDE.md` §5: các câu "DEC" đưa qua `decider` khi bắt đầu B1; c
    `docrev` sửa một tệp `modules/**` ⇒ phải bị chặn, `git status` sạch.
 2. Trả lời `D-75` (= Q15) và Q3/Q7 của §13; duyệt lô `D-72`…`D-76` trong `docs/agents/hang-doi-xem-lai.md`.
 3. **B3 — Pilot-D (= phiên `N22`):** `/mo-phien WP-14 N22` → `/doc-gate ADDR-001 ADDR-002` → `/dong-phien`; ghi `/usage` sau mỗi tài liệu.
+
+### 16.5. Kiểm tra sau Pilot-D (phiên `N22`, 18/11/2026)
+
+Kiểm lại bằng chạy script trên tệp thật của máy (không dùng số vai tự báo):
+
+| Hạng mục | Kết quả |
+|---|---|
+| Phạm vi đã làm | **2/18** tài liệu WP-14 (`ADDR-001`, `ADDR-002`) = 2/9 đợt A — đúng như `handover-n22.md` ghi "DỞ DANG WP-14"; 16 tài liệu còn lại **chưa** đổi |
+| `check-feature-doc.ps1 -WP14` | `ADDR-001` DAT (16/16 mục · 14/14 BR có test · đối chiếu Nhanh dòng 1028 · 12 câu `Open`) · `ADDR-002` DAT (16/16 · 16/16 · dòng 941 · 8 `Open`) |
+| `check-agent-artifact.ps1 -Kind docreview` | cả hai `DOC-OK` · P1 = 0 · P2 = 2 |
+| `check-agent-artifact.ps1 -Kind decision` | 16 dòng `TẠM CHỐT (DEC)` (`D-77`…`D-92`) đều có cách lùi + hạn xem lại · `D-93`, `D-94` chủ dự án chốt |
+| Hàng đợi xem lại | 21 dòng chờ; 3 dòng chặn release (`D-77`, `D-78`, `D-92`) |
+| Hàng rào | 34 lượt vai · **0** lần ghi ngoài vùng · nhưng 31/34 báo "thiếu JSON" **nhầm** ⇒ mọi lượt bị chặn dừng 1 lần |
+| Kích thước tài liệu | `ADDR-001` 84 → 172 KB (+105%) · `ADDR-002` 97 → 178 KB (+84%) |
+| Nhịp | 2 tài liệu ≈ 34 lượt vai (17 lượt `decider`), chạm hạn mức 5 giờ 1 lần |
+
+**Đã sửa (ghi tạm `D-95` lúc 19:00 — dòng đó và mục này mất trong sự cố commit `5aa3dce` của `N23`; ghi lại ở `D-102`, §16.6)** — hook đọc JSON từ transcript của vai, phân biệt JSON thiếu / không hợp lệ · `docrev` chạy được psql heredoc
+`BEGIN…ROLLBACK` và các dạng `npm … check:mermaid` · `maxTurns` `ba` 60, `decider` 30 · `/doc-gate`: sau `DOC-OK` không sửa thêm ·
+bài học #7 của `ba` (sửa tại chỗ). `hooks.test.mjs` **30/30** (thêm 4 ca `N22-*`; negative control: tắt đọc transcript ⇒ `N22-1` đỏ).
+Cài bằng `pwsh -File artifacts/cai-dat-agent/cai-dat.ps1` (kèm bản sửa dấu `\` của `mo-phien`/`dong-phien` chưa cài từ 17/11).
+
+**Đề xuất cho B4 (chia lại WP-14):** với nhịp đo được, 16 tài liệu còn lại ≈ 8 phiên nếu giữ 2 tài liệu/phiên. Đo lại ở `N23` sau khi hết
+chặn nhầm (mỗi lượt vai bớt một lần chặn) rồi mới chốt số tài liệu/phiên.
+
+### 16.6. Kiểm tra sau `N23` và vòng sửa thứ hai (18/11/2026 tối)
+
+| Hạng mục | Kết quả |
+|---|---|
+| Phạm vi `N23` | `ADDR-003` tới D2 vòng 1 (`DOC-CHANGES`), còn áp `D-98…D-101` + DOCREV vòng 2 — đúng `handover-n23.md` §2. Đợt A: 2/9 xong, 1 dở |
+| `decisions.md` | 100 dòng `D-xx`, **không trùng số**, đủ `D-77…D-94` (đã khôi phục sau sự cố `5aa3dce`); 23 dòng DEC đều có cách lùi + hạn xem lại (`check-agent-artifact.ps1 -Kind decision` DAT) |
+| Hàng rào | 12 lượt vai · 0 ghi ngoài vùng · **12/12 vẫn báo "thiếu JSON" nhầm**: nhật ký mới cho thấy `last_assistant_message` **rỗng** (`len: 0`) cả 12 lượt và transcript không đọc được |
+| Trần lượt | `ba` chạm 60 hai lần, `docrev` 40, `decider` 30; hạn mức 5 giờ chạm giữa `ba` |
+| Song song | hai `decider` tranh cùng số `D-99`, `D-100` |
+
+**Vòng sửa thứ hai (`D-102`, ĐỀ XUẤT)** — hook chỉ chặn dừng khi **thấy** nội dung vai mà không có JSON; không đọc được ⇒ ghi
+`khongXacMinh` + tên các trường input (lần chạy sau sẽ cho biết trường nào mang khối JSON); mở rộng `~` trong `agent_transcript_path` ·
+sửa lỗi hook ném ngoại lệ khi vừa không có JSON vừa không có nội dung (ca `N23-1` bắt được trong lúc sửa) · `maxTurns` `ba` 80, `docrev` 60,
+`decider` 40 · `/doc-gate`: `decider` **tuần tự**; tài liệu > 120 KB hoặc ≥ 5 câu gửi decider ⇒ **một tài liệu/phiên**.
+`hooks.test.mjs` **33/33** (ca `N23-1…3`; negative control: bỏ luật không-chặn ⇒ `N23-1` đỏ; bỏ mở rộng `~` ⇒ `N23-2` đỏ).
+
