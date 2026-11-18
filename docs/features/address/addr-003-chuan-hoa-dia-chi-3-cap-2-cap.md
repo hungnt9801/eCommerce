@@ -3,13 +3,13 @@
 | Thuộc tính | Nội dung |
 |---|---|
 | **Mã** | `ADDR-003` |
-| **Module** | **AddressHub** (module mới ở `modules/AddressHub/`) · value object `Address` ở `eCommerce.Kernel` |
+| **Module** | **`Address`** (`modules/Address/` — ✅ 4 project đã có, đã vào `eCommerce.slnx:3-7`; "AddressHub" trong thân = **tên kế hoạch cũ**, như `ADDR-002`/`ADDR-001`) · ~~value object `Address` ở `eCommerce.Kernel`~~ **đã bỏ** (ADR-08). Phần ADDR-003 (normalizer, ánh xạ, sổ cái) ⬜ **chưa có code** |
 | **Giai đoạn** | **GĐ0 — Pháp lý** (theo `docs/implementation-plan.md` §5 dòng 111 và Phụ lục A.3 dòng 389) |
 | **Ưu tiên** | **Must have** — sai mô hình địa chỉ ở GĐ0 ⇒ phải migrate lại **toàn bộ đơn hàng** (`docs/implementation-plan.md` dòng 99) |
 | **Trạng thái** | 🟡 `Draft` — chờ review |
 | **Người viết / người review** | *(điền)* / **Kiến trúc trưởng + BA** (có yếu tố pháp lý: cần thêm người đã đọc Nghị quyết sắp xếp ĐVHC) |
-| **Phiên bản / ngày** | `v0.1 — 13/10/2026` |
-| **Tài liệu liên quan** | `ADDR-001` (tra cứu ĐVHC 2 cấp & 3 cấp — **chưa viết**) · `ADDR-002` (mã địa chỉ theo hãng vận chuyển — **chưa viết**) · `CUS-001` (sổ địa chỉ — **chưa viết**) · `SAL-002` (checkout/đặt hàng) · `XC-001` · `XC-002` · `XC-003` · `XC-004` · `XC-005` · `docs/implementation-plan.md` §6.1 · `docs/structure-and-techstack.md` dòng 14 |
+| **Phiên bản / ngày** | `v0.1 — 13/10/2026` · đối chiếu mô hình Nhanh `18/11/2026` (WP-14, cuối tài liệu) |
+| **Tài liệu liên quan** | [`ADDR-001`](addr-001-tra-cuu-don-vi-hanh-chinh-2-cap.md) (tra cứu ĐVHC, danh mục `AddrAdministrativeUnits`) · [`ADDR-002`](addr-002-dong-bo-ma-dia-chi-theo-hang-van-chuyen.md) (mã địa chỉ theo hãng) · [`ADDR-004`](addr-004-so-dia-chi-khach.md) (`Address` + sổ địa chỉ) · `CUS-001` (sổ địa chỉ) · `SAL-002` (checkout/đặt hàng) · `XC-001` · `XC-002` · `XC-003` · `XC-004` · `XC-005` · `docs/implementation-plan.md` §6.1 · `docs/structure-and-techstack.md` dòng 14 |
 
 > 📌 **Quy ước mã trong tài liệu này:** `ADR-nn` (quyết định thiết kế) · `BR-nn` (business rule) ·
 > `NFR-nn` (phi chức năng) · `TC-nn` (test case) — tất cả thuộc `ADDR-003`.
@@ -45,9 +45,9 @@ lại toàn bộ đơn hàng"*). Và có **hai cái bẫy im lặng** đã nhậ
 - ✅ Xử lý ca sáp nhập tỉnh / sáp nhập xã / bỏ huyện / điều chỉnh một phần địa giới.
 
 **Không nằm trong phạm vi:**
-- ❌ **API tra cứu danh mục** (dropdown tỉnh/xã, autocomplete) — thuộc **`ADDR-001`** (**chưa viết**).
+- ❌ **API tra cứu danh mục** (dropdown tỉnh/xã, autocomplete) và **bảng danh mục `AddrAdministrativeUnits`** — thuộc **`ADDR-001`** (✅ đã có code: `AdministrativeUnitAppService`).
 - ❌ **Bản đồ mã địa chỉ của từng hãng vận chuyển** (GHN/GHTK/ViettelPost) — thuộc **`ADDR-002`**
-  (**chưa viết**); `ADDR-003` chỉ định nghĩa **hợp đồng dữ liệu** mà `ADDR-002` tiêu thụ.
+  (✅ đã có code: `CarrierAddressMappingAppService`); `ADDR-003` chỉ định nghĩa **hợp đồng dữ liệu** mà `ADDR-002` tiêu thụ.
 - ❌ **Sổ địa chỉ của khách** — 🚨 **KHÔNG** thuộc `ADDR-003` và **KHÔNG** thuộc `Customers`:
   entity `Address` **do module `Address` sở hữu**, `Customers` chỉ giữ bảng liên kết —
   chốt tại [`ADDR-004`](addr-004-so-dia-chi-khach.md) **ADR-01** (🟢 Approved 17/10/2026).
@@ -62,16 +62,16 @@ lại toàn bộ đơn hàng"*). Và có **hai cái bẫy im lặng** đã nhậ
 | # | Quyết định | Phương án đã cân nhắc | Lý do chọn | Hệ quả |
 |---|---|---|---|---|
 | **ADR-01** | **Mô hình CHUẨN là 2 cấp (tỉnh + xã)**; snapshot 3 cấp cũ được giữ như **dữ liệu hiển thị** | (a) giữ 3 cấp làm chuẩn, thêm huyện ảo · (b) 2 cấp làm chuẩn + snapshot 3 cấp | Cấp huyện **không còn tồn tại** (`Luật số 72/2025/QH15`, hiệu lực 01/7/2025) ⇒ lấy 3 cấp làm chuẩn là mô hình hoá một cấp **không có thật**; mọi hãng vận chuyển đang chuyển sang 2 cấp | Phải có đường chuyển 2 → 3 cho hãng chưa kịp chuyển — nhưng **chỉ từ snapshot** (**ADR-04**) |
-| **ADR-02** | **CẤM lưu mã đơn vị hành chính mà không kèm `DatasetVersionId`** | (a) chỉ lưu mã · (b) lưu mã + phiên bản | Mã cấp tỉnh 02 chữ số và cấp xã 05 chữ số dùng **chung không gian số** cho cả bản 63 tỉnh (3 cấp) và bản 34 tỉnh (2 cấp) (`Quyết định 19/2025/QĐ-TTg`); mã "đã đóng" vẫn nằm trong dữ liệu cũ | Mọi truy vấn/validate phải có ngữ cảnh phiên bản; thêm 1 cột ở **mọi** bảng có mã ĐVHC |
-| **ADR-03** | **Ánh xạ cũ → mới là DỮ LIỆU có phiên bản** (`AddrUnitMappings`), **không** hard-code, **không** suy luận theo tên | (a) viết bảng ánh xạ trong code · (b) import từ file chính thức | Danh mục luật là **dữ liệu**, không phải code — cùng nguyên tắc đã chốt ở `XC-006` (`docs/implementation-plan.md` Phụ lục A.3 dòng 381: *"danh mục luật là **dữ liệu**, không hard-code"*) | Có quy trình nạp phiên bản mới không cần release (§11) |
+| **ADR-02** | **CẤM lưu mã đơn vị hành chính mà không kèm `DatasetVersionId`** — 🔶 **trong code, "phiên bản" = `SchemaVersion` (`int` 1|2)**, không phải `Guid` | (a) chỉ lưu mã · (b) lưu mã + phiên bản | Mã cấp tỉnh 02 chữ số và cấp xã 05 chữ số dùng **chung không gian số** cho cả bản 63 tỉnh (3 cấp) và bản 34 tỉnh (2 cấp) (`Quyết định 19/2025/QĐ-TTg`); mã "đã đóng" vẫn nằm trong dữ liệu cũ | Mọi truy vấn/validate phải có ngữ cảnh phiên bản; thêm 1 cột ở **mọi** bảng có mã ĐVHC. ✅ **Đã có**: `AdministrativeUnit.SchemaVersion` (`AdministrativeUnit.cs:23`) và `Address.SchemaVersion` (`Address.cs:47`), CHECK `in (1, 2)` (`AddressDbContextModelCreatingExtensions.cs:69-71,155-157`); `ADDR-004` §5.2 dẫn đúng ADR-02 này. Chỗ nào thân còn ghi `DatasetVersionId`/`DatasetId` = `SchemaVersion` (`D-95`: bảng `AddrDatasets` **bỏ**; "phiên bản đang hiệu lực" = `AdministrativeSchemaVersion.HienHanh`, `AdministrativeModels.cs:83`) |
+| **ADR-03** | **Ánh xạ cũ → mới là DỮ LIỆU có phiên bản** (`AddrUnitMappings`), **không** hard-code, **không** suy luận theo tên | (a) viết bảng ánh xạ trong code · (b) import từ file chính thức | Danh mục luật là **dữ liệu**, không phải code — cùng nguyên tắc đã chốt ở `XC-006` (`docs/implementation-plan.md` Phụ lục A.3 dòng 381: *"danh mục luật là **dữ liệu**, không hard-code"*) | Thay đổi **cùng cấu trúc** (sáp nhập/đổi tên/đóng mã trong 2 cấp) = file danh mục `ADDR-001` + file ánh xạ `ADDR-003` — **không** release code; thay đổi **cấu trúc** (số cấp khác) = thêm hằng `V3` + migration nới CHECK `in (1,2,3)` = **có** release code (`D-95` (g), hệ quả đã chấp nhận ở `D-80`) (§11) |
 | **ADR-04** | **2 cấp → 3 cấp CHỈ đọc lại snapshot đã lưu**; thiếu snapshot ⇒ **NÉM LỖI** | (a) tra ngược sang một xã cũ đại diện · (b) chọn huyện theo tên · (c) ném lỗi | Ánh xạ là **N:1** (nhiều xã cũ → 1 xã mới) ⇒ tra ngược là **mơ hồ**; huyện đã bị bỏ nên mọi giá trị "huyện" sinh ra đều là **bịa** | Hãng vận chuyển còn cần 3 cấp ⇒ địa chỉ phải có snapshot; nếu không ⇒ `CarrierIncompatible` (§12) |
-| **ADR-05** | **Mơ hồ ⇒ `NeedsReview`, KHÔNG đoán**; nhưng **không im lặng**: luôn có bản ghi review + metric + ETO | (a) chọn ứng viên "giống nhất" · (b) từ chối và bắt nhập lại | (a) tạo địa chỉ **sai** mà không ai biết (đúng loại lỗi "guard im lặng" bị cấm ở quy ước #11); (b) chặn cả luồng bán hàng | Có hàng đợi vận hành + màn hình xác nhận (§10); thêm bảng `AddrNormalizationReviews` |
-| **ADR-06** | **Danh mục ĐVHC + ánh xạ là dữ liệu CẤP HOST** (không có `TenantId`) | (a) `IMultiTenant` như mọi bảng khác · (b) cấp host | Đây là **dữ liệu pháp lý giống nhau cho mọi tenant**; nhân bản theo tenant là vô nghĩa và làm lệch dữ liệu giữa các tenant | Bảng host dùng unique index thường; **bảng có `TenantId`** (review, ledger) **vẫn** phải `NULLS NOT DISTINCT` (**BR-09**) |
+| **ADR-05** | **Mơ hồ ⇒ `NeedsReview`, KHÔNG đoán**; nhưng **không im lặng**: luôn có dòng ledger `NeedsReview` (kèm `ReasonCode` + `Candidates`) + địa chỉ vào hàng đợi + metric + ETO | (a) chọn ứng viên "giống nhất" · (b) từ chối và bắt nhập lại | (a) tạo địa chỉ **sai** mà không ai biết (đúng loại lỗi "guard im lặng" bị cấm ở quy ước #11); (b) chặn cả luồng bán hàng | Có hàng đợi vận hành + màn hình xác nhận (§10). ~~Bảng `AddrNormalizationReviews`~~ **BỎ** (`ADDR-004` Q9: một nguồn hàng đợi). Hàng đợi = `Address.TrangThai ∈ {ChuaChuanHoa, NghiNgo}` (`D-96` (1)); lý do/ứng viên/quyết định nằm ở ledger append-only, trạng thái review **suy ra** từ ledger (`D-96` (5)) |
+| **ADR-06** *(sửa theo `D-92`, 18/11/2026)* | **Danh mục ĐVHC + ánh xạ là dữ liệu DÙNG CHUNG Ở HOST**: bản ghi **luôn `TenantId = NULL`**, ghi/đọc từ ngữ cảnh host (worker không lặp tenant, không `CurrentTenant.Change`); **GIỮ cột `TenantId` nullable** (không xoá cột, không `SET NOT NULL`) | (a) `IMultiTenant` + bản sao theo tenant · (b) host-only **không có cột** `TenantId` *(thiết kế gốc v0.1 — đã bỏ)* · (c) host dùng chung, giữ cột nullable | Đây là **dữ liệu pháp lý giống nhau cho mọi tenant**; nhân bản theo tenant là vô nghĩa. Chọn (c) để **khớp code đã có** — `AdministrativeUnit` là `IMultiTenant` với `TenantId` nullable (`AdministrativeUnit.cs:18,20`) — và `ADDR-001` D1 / `ADDR-002` §5.2; chuyển sang theo-tenant sau này **không đổi lược đồ** | **Mọi** unique index có `TenantId` — kể cả bảng host (`AddrUnitMappings`, `AddrUnitMappingImports`) — **phải** `NULLS NOT DISTINCT` (**BR-09**; code: `AddressDbContextModelCreatingExtensions.cs:56-58`); quyền ghi danh mục/ánh xạ = `Host`, đọc = `Both` (§9). Q5 (tenant override) vẫn **KHÔNG** |
 | **ADR-07** | **Sổ cái `AddrNormalizationLedger` APPEND-ONLY** | (a) chỉ ghi log text · (b) bảng append-only | Quy ước bất biến: *"sổ cái APPEND-ONLY"*; cần **truy vết được** vì sao một địa chỉ ra kết quả đó (phục vụ khiếu nại giao sai) | Cấm UPDATE/DELETE; sửa sai bằng **bút toán mới** |
-| **ADR-08** ❌ **ĐÃ BỊ THAY** | ~~`Address` value object ở `eCommerce.Kernel`~~ → **BỊ LOẠI**: `Address` là **entity** có bảng (`AddrAddresses`), thuộc module `Address` — xem [`ADDR-004`](addr-004-so-dia-chi-khach.md) **ADR-02** (🟢 Approved 17/10/2026). | (a) tất cả trong module · (b) tất cả trong `src/` · (c) tách như trên | `docs/structure-and-techstack.md` dòng 52 quy định `eCommerce.Kernel/ Money · Currency · **Address (value object)**`; kernel **không mang EF** nên không thể chứa entity/migration | `eCommerce.Kernel` **chưa tồn tại** trong code (§15.2 **F2**) — đây là việc của `docs/implementation-plan.md` §7.0 mục 1 |
-| **ADR-09** | **Module `AddressHub` KHÔNG tham chiếu `src/`**; module/app khác gọi qua `.Application.Contracts` | (a) đặt entity vào `src/eCommerce.Domain` · (b) module riêng | Quy ước bất biến #3 — tiền lệ đã ghi rõ ở `modules/Tax/eCommerce.Tax.Domain/TaxErrorCodes.cs:6-8` và `modules/ChannelHub/eCommerce.ChannelHub.Domain/ChannelHubConsts.cs:8-10` | Phải tạo 4 project `modules/AddressHub/*` + thêm vào `eCommerce.slnx` |
-| **ADR-10** | **Tên khoá lock của module KHÔNG chứa tiền tố `ecommerce:`** (tiền tố do `AbpDistributedLockOptions.KeyPrefix` ghép) | (a) hàm sinh khoá trả về chuỗi đầy đủ · (b) hàm trả về phần **sau** tiền tố | `XC-003` §5.4 đã **chứng minh bằng `redis-cli MONITOR`**: khoá thật = `KeyPrefix + name` (**ghép không dấu phân cách**), và cấu hình thật là `KeyPrefix = "ecommerce:"` (`src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs:127`). Nếu hàm trả về cả tiền tố ⇒ khoá thật thành `ecommerce:ecommerce:…` | ⚠️ **Code hiện tại KHÔNG nhất quán** ⇒ ghi nhận ở §15.2 **F7**; `ADDR-003` theo (b) |
-| **ADR-11** | **Idempotency ở MỌI biên vào**: `Idempotency-Key` ổn định + unique index + `IIdempotencyGuard` (`XC-002`) | (a) chỉ chống trùng ở job · (b) mọi biên | Quy ước bất biến: *"idempotency ở MỌI biên vào"*; import file là biên vào **dễ gây trùng nhất** (cùng một file luật được nạp 2 lần) | Có cột `IdempotencyKey` + `DatasetSourceHash`; nạp lại cùng file ⇒ **0 dòng thêm** (**BR-10**) |
+| **ADR-08** ❌ **ĐÃ BỊ THAY** | ~~`Address` value object ở `eCommerce.Kernel`~~ → **BỊ LOẠI**: `Address` là **entity** có bảng (`AddrAddresses`), thuộc module `Address` — xem [`ADDR-004`](addr-004-so-dia-chi-khach.md) **ADR-02** (🟢 Approved 17/10/2026). | (a) tất cả trong module · (b) tất cả trong `src/` · (c) tách như trên | `docs/structure-and-techstack.md` dòng 52 quy định `eCommerce.Kernel/ Money · Currency · **Address (value object)**`; kernel **không mang EF** nên không thể chứa entity/migration | `shared/eCommerce.Kernel` **đã có** trong `eCommerce.slnx:87` nhưng **không** chứa `Address` (đã bỏ) — F2 §15.2 lỗi thời |
+| **ADR-09** | **Module `Address` (tên cũ "AddressHub") KHÔNG tham chiếu `src/`**; module/app khác gọi qua `.Application.Contracts` | (a) đặt entity vào `src/eCommerce.Domain` · (b) module riêng | Quy ước bất biến #3 — tiền lệ đã ghi rõ ở `modules/Tax/eCommerce.Tax.Domain/TaxErrorCodes.cs:6-8` và `modules/ChannelHub/eCommerce.ChannelHub.Domain/ChannelHubConsts.cs:8-10` | ✅ 4 project `modules/Address/eCommerce.Address.*` **đã có** và đã nằm trong `eCommerce.slnx:3-7` — **không** tạo mới. ⬜ Chưa có test chặn tham chiếu ngược `src/` (`TC-27`) |
+| **ADR-10** | **Tên khoá lock của module KHÔNG chứa tiền tố `ecommerce:`** (tiền tố do `AbpDistributedLockOptions.KeyPrefix` ghép) | (a) hàm sinh khoá trả về chuỗi đầy đủ · (b) hàm trả về phần **sau** tiền tố | `XC-003` §5.4 đã **chứng minh bằng `redis-cli MONITOR`**: khoá thật = `KeyPrefix + name` (**ghép không dấu phân cách**), và cấu hình thật là `KeyPrefix = "ecommerce:"` (`src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs:222,237`). Nếu hàm trả về cả tiền tố ⇒ khoá thật thành `ecommerce:ecommerce:…` | ✅ Code **đã thống nhất** (`TaxErrorCodes.cs:46,50` không tiền tố — xem §15.2 **F7**); `ADDR-003` theo (b), cùng `ADDR-001` §8 |
+| **ADR-11** | **Idempotency ở MỌI biên vào**: `Idempotency-Key` ổn định + unique index + `IIdempotencyGuard` (`XC-002`) | (a) chỉ chống trùng ở job · (b) mọi biên | Quy ước bất biến: *"idempotency ở MỌI biên vào"*; import file là biên vào **dễ gây trùng nhất** (cùng một file luật được nạp 2 lần) | Có cột `IdempotencyKey` (ledger) + `SourceHash` (bản ghi lô ánh xạ `AddrUnitMappingImports`, `D-95` (d)); nạp lại cùng file ánh xạ ⇒ **0 dòng thêm** (**BR-10**) |
 | **ADR-12** | **Không thêm gói NuGet nào**; giữ **một** phiên bản ABP duy nhất | (a) thêm thư viện chuẩn hoá địa chỉ/`unaccent` của bên thứ ba · (b) dùng PostgreSQL | `Directory.Packages.props` đang ghim **ABP 10.7.0** cho **mọi** gói (`Directory.Packages.props:21-99`); nhu cầu tìm kiếm không dấu giải quyết bằng `unaccent`/`pg_trgm` của PostgreSQL 17 | Không đụng `Directory.Packages.props`; cần bật extension trong migration (§11) |
 
 ---
@@ -83,16 +83,16 @@ lại toàn bộ đơn hàng"*). Và có **hai cái bẫy im lặng** đã nhậ
 | **Use Case ID** | `ADDR-003` |
 | **Use Case Name** | Chuẩn hoá địa chỉ khách hàng sang mô hình **2 cấp**, xử lý ca sáp nhập tỉnh/xã |
 | **Description** | *"Là hệ thống bán hàng đa kênh, tôi muốn mọi địa chỉ giao hàng — dù đến từ dữ liệu cũ 3 cấp, từ sàn TMĐT, hay khách tự nhập — đều được chuẩn hoá về **2 cấp (tỉnh + xã) có căn cứ pháp lý**, để không giao sai hàng và không phải migrate lại đơn hàng về sau."* |
-| **Actor(s)** | **Khách hàng** (nhập/chọn địa chỉ) · **Nhân viên CSKH** (xác nhận ca mơ hồ — `NeedsReview`) · **Quản trị host** (nạp/kích hoạt phiên bản danh mục) · **Hệ thống** (chuẩn hoá tự động, job nền, event bus) · **Sàn TMĐT / hãng vận chuyển** (nguồn địa chỉ ngoài) |
+| **Actor(s)** | **Khách hàng** (nhập/chọn địa chỉ) · **Nhân viên CSKH** (xác nhận ca mơ hồ — `NeedsReview`) · **Quản trị host** (nạp **file ánh xạ** — danh mục thuộc `ADDR-001`) · **Hệ thống** (chuẩn hoá tự động, job nền, event bus) · **Sàn TMĐT / hãng vận chuyển** (nguồn địa chỉ ngoài) |
 | **Priority** | **Must have** |
-| **Trigger** | (a) khách tạo/sửa địa chỉ trong sổ địa chỉ; (b) đơn từ sàn TMĐT kéo về mang địa chỉ 3 cấp; (c) job chuẩn hoá lại dữ liệu cũ; (d) **quản trị kích hoạt phiên bản danh mục mới** ⇒ làm kết quả cũ trở nên cần soát lại |
-| **Pre-Condition(s)** | • **Tenant hiện tại** (`TenantId` từ `ICurrentTenant`) — theo `XC-004` D8/BR-009, hệ thống đang chạy **1 tenant** ⇒ `TenantId` **có thể là `NULL`** ⇒ mọi unique index có `TenantId` **phải** `NULLS NOT DISTINCT` (tiền lệ: `src/eCommerce.EntityFrameworkCore/Migrations/20261013024226_Fix_NullableTenantId_UniqueIndexes.cs:39-86`).<br>• **`ChannelCode`** của đơn (nếu có) **chỉ để đối soát** — **không** tham gia quyết định chuẩn hoá địa chỉ (địa chỉ là thuộc tính của **người nhận**, không của kênh).<br>• **Tồn tại một phiên bản danh mục `Active`** cho từng cấu trúc cần dùng (2 cấp và 3 cấp). Thiếu ⇒ **NÉM** `eCommerce:Address:0011`, **không** mặc định ngầm (**BR-14**).<br>• **Ánh xạ cũ → mới đã được nạp** và có `LegalBasis` (**BR-05**).<br>• `[Authorize]` cấp class + permission **đã định nghĩa** (theo `XC-004` D2/D3; tiền lệ `src/eCommerce.Application/Channels/ChannelAppService.cs:27` và `src/eCommerce.Application.Contracts/Permissions/eCommercePermissionDefinitionProvider.cs:21-60`).<br>• **Redis 7** sẵn sàng cho khoá phân tán; nếu không, **vẫn phải đúng** nhờ unique index (theo `XC-003` D2). |
-| **Post-Condition(s)** | • Mọi địa chỉ đã chuẩn hoá có **`ProvinceCode` + `WardCode` + `DatasetVersionId`** và **snapshot tên** tại thời điểm chuẩn hoá.<br>• Mọi lần chuẩn hoá có **đúng một** bản ghi `AddrNormalizationLedger` (append-only).<br>• Ca mơ hồ **không** bị đoán: tồn tại **đúng một** bản ghi `AddrNormalizationReviews` ở trạng thái `Pending` (**BR-06/BR-07**).<br>• **Không** trường nào chứa "huyện" được sinh ra ngoài snapshot cũ (**BR-04**). |
-| **Basic Flow** | 1. Client gửi `NormalizeAddressDto` (3 cấp cũ **hoặc** 2 cấp **hoặc** chỉ chuỗi tự do) kèm `Idempotency-Key`.<br>2. App service `[Authorize]` kiểm permission, mở **Unit of Work**, gọi `IIdempotencyGuard.AcquireAsync(...)` (`XC-002`).<br>3. `IAddressNormalizer` tra `AddrUnitMappings` theo **(DatasetFrom, DatasetTo, Level, Code)** — **chỉ theo MÃ** (**BR-03**).<br>4. Tìm thấy **duy nhất** một đích và `MappingKind ≠ Partial` ⇒ ghi `NormalizedAddress` + 1 dòng ledger, phát `AddressNormalizedEto`.<br>5. Ghi **cùng transaction** dữ liệu địa chỉ + ledger + outbox (`XC-002` BR-001).<br>6. Trả `AddressNormalizationResultDto` (kèm `DatasetVersionId` và `Method`). |
-| **Alternative Flow** | **A1: Ca sáp nhập tỉnh** — mã tỉnh cũ **đã đóng** ⇒ ánh xạ sang mã tỉnh mới **theo bảng**, không theo tên; tên tỉnh trong snapshot giữ **tên cũ** ở trường `LegacyProvinceName` và **tên mới** ở `ProvinceName` (**BR-03**, §5.2).<br>**A2: Ca `Partial` (điều chỉnh một phần địa giới)** — một xã cũ được tách một phần sang xã mới khác ⇒ **nhiều ứng viên** ⇒ `NeedsReview` + danh sách ứng viên, **không** tự chọn (**BR-06**).<br>**A3: Yêu cầu 3 cấp cho hãng vận chuyển** — chỉ trả về từ `Legacy*` snapshot; thiếu ⇒ ném `eCommerce:Address:0005` (**BR-04**).<br>**A4: Job chuẩn hoá hàng loạt** — khoá phân tán `SkipIfBusy`, ghi ledger theo khoá `Address:Batch:{batchId}:{addressId}`, **không** dừng cả lô vì 1 ca mơ hồ.<br>**A5: Nạp lại cùng một file danh mục** — `DatasetSourceHash` trùng + metadata khớp ⇒ trả về phiên bản đã có, **0 dòng thêm** (**BR-10**). |
-| **Exception Flow** | **E1:** mã tỉnh/xã **sai định dạng** hoặc không thuộc phiên bản danh mục ⇒ `eCommerce:Address:0001`.<br>**E2:** cùng `IdempotencyKey` nhưng payload **khác** ⇒ **`eCommerce:Messaging:0002`** (theo `XC-002` BR-006) — **không** ghi đè.<br>**E3:** yêu cầu chuyển 2 → 3 mà **không** có snapshot ⇒ `eCommerce:Address:0005` — **cấm** bịa huyện.<br>**E4:** dùng đơn vị hành chính **đã đóng mã** làm đích ⇒ `eCommerce:Address:0010`.<br>**E5:** chuyển trạng thái sai (dataset/review) ⇒ `eCommerce:Address:0003` / `0004`; `UPDATE … WHERE Status = @expected` ảnh hưởng **0 dòng** ⇒ `eCommerce:Address:0008`.<br>**E6:** phiên bản danh mục chưa `Active` ⇒ `eCommerce:Address:0011`.<br>**E7:** file import thiếu cột/sai định dạng ⇒ `eCommerce:Address:0006`; `SourceHash` trùng nhưng metadata khác ⇒ `eCommerce:Address:0007`. |
-| **Business Rules** | • **BR-01**: Mọi địa chỉ đã lưu là **SNAPSHOT bất biến** (mã + tên + `DatasetVersionId`); sửa địa chỉ ⇒ ghi **bút toán mới** vào ledger, **cấm** UPDATE ngầm không vết.<br>• **BR-02**: **CẤM** lưu `ProvinceCode`/`WardCode`/`DistrictCode` mà **không** kèm `DatasetVersionId`.<br>• **BR-03**: **CẤM** ánh xạ đơn vị hành chính theo **TÊN**; chỉ ánh xạ theo **MÃ** (nhiều tên tỉnh trùng/đổi sau sáp nhập).<br>• **BR-04**: **CẤM** suy diễn/tự sinh cấp huyện khi chuyển 2 → 3; chỉ dùng snapshot 3 cấp đã lưu; thiếu ⇒ `eCommerce:Address:0005`.<br>• **BR-05**: Mọi bản ghi ánh xạ **phải** có `LegalBasis` không rỗng (số hiệu + mục phụ lục), ràng buộc bằng `CHECK` ở DB.<br>• **BR-06**: Chỉ coi là **chuẩn hoá tự động** khi ánh xạ **duy nhất** và `MappingKind ≠ Partial`; mọi trường hợp khác ⇒ `NeedsReview`.<br>• **BR-07**: Trạng thái `NeedsReview` **phải** sinh bản ghi review + metric + ETO; **cấm** bỏ qua im lặng (quy ước #11).<br>• **BR-08**: `AddrNormalizationLedger` **append-only** — **cấm** UPDATE/DELETE kể cả soft-delete.<br>• **BR-09**: Mọi unique index có `TenantId` **phải** `NULLS NOT DISTINCT` (theo `XC-004` BR-009) — tiền lệ migration đã có.<br>• **BR-10**: Mọi biên vào (import file · HTTP · webhook · job) **phải** idempotent bằng khoá **ỔN ĐỊNH** + unique index + `IIdempotencyGuard` (`XC-002`).<br>• **BR-11**: Chuyển trạng thái sai **PHẢI NÉM LỖI**; `UPDATE` 0 dòng ⇒ **NÉM LỖI**, không coi là thành công.<br>• **BR-12**: Mọi thao tác ghi qua **Unit of Work**; dữ liệu địa chỉ + ledger + review + outbox ghi **cùng transaction**.<br>• **BR-13**: Mọi app service của `AddressHub` **phải** có `[Authorize]` ở **cấp class** và permission **đã định nghĩa** (`XC-004` BR-001/BR-002).<br>• **BR-14**: **CẤM hard-code** danh mục/ánh xạ đơn vị hành chính trong code — danh mục là **DỮ LIỆU có phiên bản**.<br>• **BR-15**: Module `AddressHub` **cấm** tham chiếu `src/`; bên gọi dùng `eCommerce.AddressHub.Application.Contracts`.<br>• **BR-16**: Đơn vị hành chính `IsClosed = true` **cấm** dùng làm **đích** chuẩn hoá; chỉ được hiển thị ở trường `Legacy*` ⇒ ném `eCommerce:Address:0010`. |
-| **Non-Functional Requirement** | • **NFR-01**: Chuẩn hoá 1 địa chỉ (tra cứu đã warm cache) p95 **< 20 ms**.<br>• **NFR-02**: Import danh mục **3.321** xã + bộ 3 cấp cũ < **60 s**; chạy lại **2 lần ⇒ +0 dòng**.<br>• **NFR-03**: **Tái lập 100 %**: cùng input + cùng `DatasetVersionId` ⇒ cùng kết quả (10.000 ca).<br>• **NFR-04**: **0** chỗ suy diễn huyện (test quét mã nguồn).<br>• **NFR-05**: **100 %** bản ghi mapping có `LegalBasis` (CHECK ở DB) .<br>• **NFR-06**: **100 %** lần chuẩn hoá có ledger + `CorrelationId` (`XC-005`).<br>• **NFR-07**: Cách ly tenant: tenant A **không** đọc review/ledger của tenant B.<br>• **NFR-08**: **0** `double`/`float` trong `AddressHub`; nếu có trường tiền (phí ước tính) **phải** dùng `Money` + minor units (`XC-001`).<br>• **NFR-09**: Tra ứng viên theo tên (không dấu) p95 **< 100 ms**; bộ danh mục trong bộ nhớ **≤ 50 MB**.<br>• **NFR-10**: **100 %** endpoint trả `401` khi không token và `403` khi thiếu quyền (`XC-004`). |
+| **Trigger** | (a) khách tạo/sửa địa chỉ trong sổ địa chỉ; (b) đơn từ sàn TMĐT kéo về mang địa chỉ 3 cấp; (c) job chuẩn hoá lại dữ liệu cũ; (d) **một lô ánh xạ ADDR-003 được áp thành công** ⇒ làm kết quả cũ trở nên cần soát lại (`D-95` (f)) |
+| **Pre-Condition(s)** | • **Tenant hiện tại** (`TenantId` từ `ICurrentTenant`) — theo `XC-004` D8/BR-009, hệ thống đang chạy **1 tenant** ⇒ `TenantId` **có thể là `NULL`** ⇒ mọi unique index có `TenantId` **phải** `NULLS NOT DISTINCT` (tiền lệ: `src/eCommerce.EntityFrameworkCore/Migrations/20261013024226_Fix_NullableTenantId_UniqueIndexes.cs:39-86`).<br>• **`ChannelCode`** của đơn (nếu có) **chỉ để đối soát** — **không** tham gia quyết định chuẩn hoá địa chỉ (địa chỉ là thuộc tính của **người nhận**, không của kênh).<br>• **Danh mục của `SchemaVersion` cần dùng đã được nạp** (≥ 1 đơn vị `IsActive`; phiên bản hiện hành = `AdministrativeSchemaVersion.HienHanh`, số lạ ⇒ `TheoSo` NÉM `0005`, `AdministrativeModels.cs:75-80`). Thiếu ⇒ **NÉM** `eCommerce:Address:0311`, **không** mặc định ngầm (fail-closed; `D-95` (e)).<br>• **Ánh xạ cũ → mới đã được nạp** và có `LegalBasis` (**BR-05**).<br>• `[Authorize]` cấp class + permission **đã định nghĩa** (theo `XC-004` D2/D3; tiền lệ `src/eCommerce.Application/Channels/ChannelAppService.cs:28` và `src/eCommerce.Application.Contracts/Permissions/eCommercePermissionDefinitionProvider.cs:21-60`).<br>• **Redis 7** sẵn sàng cho khoá phân tán; nếu không, **vẫn phải đúng** nhờ unique index (theo `XC-003` D2). |
+| **Post-Condition(s)** | • Mọi địa chỉ đã chuẩn hoá có **`TinhCode` + `XaCode` + `SchemaVersion`** và **snapshot chữ** `DiaChiDayDu` tại thời điểm chuẩn hoá.<br>• Mọi lần chuẩn hoá có **đúng một** bản ghi `AddrNormalizationLedger` (append-only), ghi id lô ánh xạ đã dùng.<br>• Ca mơ hồ **không** bị đoán: địa chỉ nằm trong hàng đợi (`ChuaChuanHoa` nếu nguồn thô, `NghiNgo` nếu nguồn đã có mã) + **đúng một** dòng ledger `NeedsReview` (**BR-06/BR-07**; `D-96` (1)); mỗi review kết thúc bằng **đúng một** dòng ledger quyết định.<br>• **Không** trường nào chứa "huyện" được sinh ra ngoài snapshot cũ (**BR-04**). |
+| **Basic Flow** | 1. Client gửi `NormalizeAddressDto` (3 cấp cũ **hoặc** 2 cấp **hoặc** chỉ chuỗi tự do) kèm `Idempotency-Key`.<br>2. App service `[Authorize]` kiểm permission, mở **Unit of Work**, gọi `IIdempotencyGuard.ThucThiAsync(key, payloadJson, xuLy)` (`IdempotencyGuard.cs:27-48`, `XC-002`) — **toàn bộ** phần xử lý (địa chỉ + ledger + outbox) nằm **trong** callback `xuLy`; kết quả `TraVeKetQuaCu` ⇒ trả kết quả cũ, `XungDotPayload` ⇒ `Messaging:0001`, `DangXuLy` ⇒ `Messaging:0002`.<br>3. `IAddressNormalizer` tra `AddrUnitMappings` theo **(FromSchemaVersion, ToSchemaVersion, Level, Code)** — **chỉ theo MÃ** (**BR-03**).<br>4. Tìm thấy **duy nhất** một đích và `MappingKind ≠ Partial` ⇒ tạo/lấy `Address` 2 cấp qua `IAddressDirectory.TaoHoacLayAsync` (hoặc `ChuanHoaLaiAsync` nếu nguồn thô) + 1 dòng ledger, phát `AddressNormalizedEto`.<br>5. Ghi **cùng transaction** dữ liệu địa chỉ + ledger + outbox (`XC-002` BR-001).<br>6. Trả `AddressNormalizationResultDto` (kèm `SchemaVersion`, id lô ánh xạ và `Method`). |
+| **Alternative Flow** | **A1: Ca sáp nhập tỉnh** — mã tỉnh cũ **đã đóng** ⇒ ánh xạ sang mã tỉnh mới **theo bảng**, không theo tên; tên cũ nằm ở `DiaChiDayDu` của `Address` v1 nguồn (hoặc `InputSnapshot` của ledger), tên mới ở `DiaChiDayDu` của `Address` v2 — **không** có cột/trường `Legacy*` (`D-96` (6); **BR-03**, §5.2).<br>**A2: Ca `Partial` (điều chỉnh một phần địa giới)** — một xã cũ được tách một phần sang xã mới khác ⇒ **nhiều ứng viên** ⇒ `NeedsReview` + danh sách ứng viên, **không** tự chọn (**BR-06**).<br>**A3: Yêu cầu 3 cấp cho hãng vận chuyển** — chỉ trả về từ `Address` v1 nguồn (qua ledger `ResultAddressId`) hoặc `From*Code` + `InputSnapshot`; thiếu/mơ hồ ⇒ ném `eCommerce:Address:0305` (**BR-04**).<br>**A4: Job chuẩn hoá hàng loạt** — khoá phân tán `SkipIfBusy`, ghi ledger theo khoá `Address:Batch:{batchId}:{addressId}`, **không** dừng cả lô vì 1 ca mơ hồ.<br>**A5: Nạp lại cùng một file ánh xạ** — `SourceHash` (lô `AddrUnitMappingImports`) trùng + metadata khớp ⇒ trả lô đã có, **0 dòng thêm** (**BR-10**; `D-95` (d)). |
+| **Exception Flow** | **E1:** mã tỉnh/xã **sai định dạng** ⇒ `eCommerce:Address:0002` (tái dùng `MaKhongHopLe`, `AddressErrorCodes.cs:13`); không thuộc `SchemaVersion` đã chọn ⇒ `eCommerce:Address:0001` (tái dùng `KhongTimThayDonVi`, `:10`) — `D-79` giữ nguyên giá trị mã đã có.<br>**E2:** cùng `IdempotencyKey` nhưng payload **khác** ⇒ **`eCommerce:Messaging:0001`** (`PayloadConflict`, `MessagingErrorCodes.cs:14`; `XC-002` BR-006) — **không** ghi đè; đang xử lý ⇒ `eCommerce:Messaging:0002` (`DangXuLy`, `:17`).<br>**E3:** yêu cầu chuyển 2 → 3 mà **không** có snapshot ⇒ `eCommerce:Address:0305` — **cấm** bịa huyện.<br>**E4:** dùng đơn vị hành chính **đã đóng mã** làm đích ⇒ `eCommerce:Address:0006`.<br>**E5:** chuyển trạng thái địa chỉ sai hoặc quyết lại review đã kết thúc ⇒ `eCommerce:Address:0103` (`AddressErrorCodes.cs:48`; `0303` **bỏ, không cấp số** — `D-95` (e)); người quyết review sau (khoá `Address:Review:{ReviewLedgerId}:Decision` đã có) ⇒ `eCommerce:Address:0308` (`D-96` (2)).<br>**E6:** danh mục của `SchemaVersion` cần dùng chưa nạp (0 đơn vị `IsActive`) ⇒ `eCommerce:Address:0311`.<br>**E7:** file **ánh xạ** thiếu cột/sai định dạng ⇒ `eCommerce:Address:0306`; `SourceHash` trùng nhưng metadata khác ⇒ `eCommerce:Address:0307`. |
+| **Business Rules** | • **BR-01**: Mọi địa chỉ đã lưu là **SNAPSHOT bất biến** (mã + tên chữ `DiaChiDayDu` + `SchemaVersion`); sửa địa chỉ ⇒ tạo `Address` **mới** + ghi **bút toán mới** vào ledger, **cấm** UPDATE ngầm không vết — đỏ: sửa nội dung địa lý của địa chỉ đã `DaChuanHoa` ⇒ NÉM `eCommerce:Address:0102` (`Address.cs`, `AddressErrorCodes.cs:45`) ở `TC-25`. Tên ĐVHC trong danh mục có thể đổi tại chỗ (`D-77`) ⇒ chứng từ/địa chỉ **chỉ** dùng snapshot chữ, **cấm** dựng lại tên từ danh mục.<br>• **BR-02**: **CẤM** lưu `ProvinceCode`/`WardCode`/`DistrictCode` mà **không** kèm `SchemaVersion` (v0.1: `DatasetVersionId`) — đỏ ở `TC-02`.<br>• **BR-03**: **CẤM** ánh xạ đơn vị hành chính theo **TÊN**; chỉ ánh xạ theo **MÃ** (nhiều tên tỉnh trùng/đổi sau sáp nhập).<br>• **BR-04**: **CẤM** suy diễn/tự sinh cấp huyện khi chuyển 2 → 3; chỉ dùng snapshot 3 cấp đã lưu; thiếu ⇒ `eCommerce:Address:0305`.<br>• **BR-05**: Mọi bản ghi ánh xạ **phải** có `LegalBasis` không rỗng (số hiệu + mục phụ lục), ràng buộc bằng `CHECK` ở DB.<br>• **BR-06**: Chỉ coi là **chuẩn hoá tự động** khi ánh xạ **duy nhất** và `MappingKind ≠ Partial`; mọi trường hợp khác ⇒ `NeedsReview`.<br>• **BR-07**: Ca `NeedsReview` **phải** vào hàng đợi `ChuaChuanHoa` + `NghiNgo` (`ADDR-004` Q9): nguồn **thô** ⇒ **giữ `ChuaChuanHoa`**; nguồn **đã có mã** ⇒ `DanhDauNghiNgo` (`D-96` (1); `DanhDauNghiNgo` từ `ChuaChuanHoa` NÉM `0103` — `Address.cs:204`) — kèm ghi ledger `NeedsReview` + metric + ETO; **cấm** bỏ qua im lặng (quy ước #11). Đỏ khi thiếu một trong ba hoặc khi nguồn thô bị đặt `NghiNgo`: `TC-08`.<br>• **BR-08**: `AddrNormalizationLedger` **append-only** — **cấm** UPDATE/DELETE kể cả soft-delete.<br>• **BR-09**: Mọi unique index có `TenantId` **phải** `NULLS NOT DISTINCT` (theo `XC-004` BR-009) — tiền lệ migration đã có.<br>• **BR-10**: Mọi biên vào (import file · HTTP · webhook · job) **phải** idempotent bằng khoá **ỔN ĐỊNH** + unique index + `IIdempotencyGuard` (`XC-002`).<br>• **BR-11**: Chuyển trạng thái sai **PHẢI NÉM LỖI**; `UPDATE` 0 dòng ⇒ **NÉM LỖI**, không coi là thành công.<br>• **BR-12**: Mọi thao tác ghi qua **Unit of Work**; dữ liệu địa chỉ (gồm `TrangThai`) + ledger + outbox ghi **cùng transaction** — đỏ khi lỗi giữa chừng để lại ledger mồ côi hoặc địa chỉ không có ledger (`TC-26`).<br>• **BR-13**: Mọi app service của module `Address` **phải** có `[Authorize]` ở **cấp class** và permission **đã định nghĩa** (`XC-004` BR-001/BR-002).<br>• **BR-14**: **CẤM hard-code** danh mục/ánh xạ đơn vị hành chính trong code — danh mục là **DỮ LIỆU có phiên bản**; đỏ khi quét mã thấy literal mã ĐVHC hoặc bảng ánh xạ trong `eCommerce.Address.*` ngoài fixture (`TC-30`).<br>• **BR-15**: Module `Address` (`modules/Address/`) **cấm** tham chiếu `src/` **trừ allowlist `src/eCommerce.Domain.Shared`** (đã có ở `eCommerce.Address.Application.csproj:15`, chú thích "module → shared: HỢP LỆ" `:13-14`, để dùng permission `eCommerce.Addresses.*`) — đỏ khi `eCommerce.Address.*.csproj` có `ProjectReference` tới `src/` ngoài allowlist (`TC-27`); bên gọi dùng `eCommerce.Address.Application.Contracts`.<br>• **BR-16**: Đơn vị hành chính đã đóng (`AdministrativeUnit.IsActive = false`, `AdministrativeUnit.cs:40`; v0.1 gọi `IsClosed = true`) **cấm** dùng làm **đích** chuẩn hoá; chỉ được hiển thị ở `Address` v1 nguồn/`InputSnapshot` (không có cột `Legacy*`) ⇒ ném `eCommerce:Address:0006` (`MaDaDong`, `AddressErrorCodes.cs:28`) — đỏ ở `TC-28`. |
+| **Non-Functional Requirement** | • **NFR-01**: Chuẩn hoá 1 địa chỉ (tra cứu đã warm cache) p95 **< 20 ms**.<br>• **NFR-02**: Nạp file **ánh xạ** (toàn bộ ánh xạ 63 → 34 tỉnh + xã) < **60 s**; chạy lại **2 lần ⇒ +0 dòng** (đo ở integration test).<br>• **NFR-03**: **Tái lập 100 %**: cùng input + cùng `SchemaVersion` **và** cùng id lô ánh xạ đã dùng (ledger lưu id lô) ⇒ cùng kết quả (10.000 ca).<br>• **NFR-04**: **0** chỗ suy diễn huyện (test quét mã nguồn).<br>• **NFR-05**: **100 %** bản ghi mapping có `LegalBasis` (CHECK ở DB) .<br>• **NFR-06**: **100 %** lần chuẩn hoá có ledger + `CorrelationId` (`XC-005`).<br>• **NFR-07**: Cách ly tenant: tenant A **không** đọc địa chỉ/ledger của tenant B (danh mục + ánh xạ dùng chung ở host — `D-92`, không tính).<br>• **NFR-08**: **0** `double`/`float` trong assembly `eCommerce.Address.*`; nếu có trường tiền (phí ước tính) **phải** dùng `Money` + minor units (`XC-001`).<br>• **NFR-09**: Tra ứng viên theo tên (không dấu) p95 **< 100 ms**; bộ danh mục trong bộ nhớ **≤ 50 MB**.<br>• **NFR-10**: **100 %** endpoint trả `401` khi không token và `403` khi thiếu quyền (`XC-004`). |
 
 ---
 
@@ -109,14 +109,14 @@ flowchart LR
     ADM(("👤<br/>Quản trị host"))
     HT(("⚙️<br/>Hệ thống / job"))
 
-    subgraph ADDR["📦 AddressHub — chuẩn hoá địa chỉ"]
+    subgraph ADDR["📦 module Address — chuẩn hoá địa chỉ"]
         direction TB
         UC1(["«chuẩn hoá 3 cấp sang 2 cấp»"])
         UC2(["«chuẩn hoá từ tên tự do»"])
         UC3(["«lấy lại 3 cấp từ snapshot»"])
         UC4(["«xác nhận ca mơ hồ»"])
-        UC5(["«nạp phiên bản danh mục»"])
-        UC6(["«kích hoạt phiên bản danh mục»"])
+        UC5(["«nạp file ánh xạ»"])
+        UC6(["«soát lại sau lô ánh xạ»"])
         UC7(["«ghi sổ cái chuẩn hoá»"])
         class UC1,UC2,UC3,UC4,UC5,UC6,UC7 usecase;
     end
@@ -129,7 +129,8 @@ flowchart LR
     KH --- UC2
     CS --- UC4
     ADM --- UC5
-    ADM --- UC6
+    HT --- UC6
+    UC5 -. "«include»" .-> UC6
     HT --- UC1
     UC1 -. "«include»" .-> UC7
     UC2 -. "«include»" .-> UC4
@@ -156,46 +157,37 @@ flowchart LR
 
 ```mermaid
 stateDiagram-v2
-    [*] --> ChuaChuanHoa : «địa chỉ được tạo / import về»
-    ChuaChuanHoa --> DaChuanHoa : «ánh xạ DUY NHẤT và không Partial»
-    ChuaChuanHoa --> CanNguoiXacNhan : «không có ánh xạ HOẶC nhiều ứng viên»
-    ChuaChuanHoa --> LoiDuLieu : «mã sai định dạng hoặc không thuộc danh mục»
-    CanNguoiXacNhan --> DaChuanHoa : «CSKH chọn đúng 1 ứng viên»
-    CanNguoiXacNhan --> KhongTheChuanHoa : «CSKH từ chối hoặc hết hạn xử lý»
-    DaChuanHoa --> CanNguoiXacNhan : «kích hoạt phiên bản danh mục mới làm kết quả cũ hết hợp lệ»
-    DaChuanHoa --> [*] : «trạng thái hấp thụ khi không có phiên bản mới»
-    KhongTheChuanHoa --> [*]
-    LoiDuLieu --> [*]
+    [*] --> ChuaChuanHoa : «địa chỉ thô được tạo / import về»
+    ChuaChuanHoa --> DaChuanHoa : «ánh xạ DUY NHẤT và không Partial - hoặc CSKH xác nhận ứng viên»
+    ChuaChuanHoa --> ChuaChuanHoa : «mơ hồ - giữ thô, ghi ledger NeedsReview, nằm trong hàng đợi»
+    DaChuanHoa --> NghiNgo : «lô ánh xạ mới áp thành công và soát lại ra kết quả khác»
+    NghiNgo --> NghiNgo : «ca mơ hồ của địa chỉ đã có mã - giữ nguyên, nằm trong hàng đợi»
+    DaChuanHoa --> [*]
 ```
+
+Hai trạng thái logic của v0.1 **không còn là trạng thái lưu** (`D-96` (7)): `LoiDuLieu` = không lưu, NÉM lỗi fail-closed; `KhongTheChuanHoa` = ledger `Outcome = Unresolvable`, `Address` giữ nguyên trạng thái. **Không** thêm giá trị `TrangThaiDiaChi` (`D-96`, `D-17`).
 
 **Bảng chuyển trạng thái & guard — mọi chuyển sai **PHẢI NÉM LỖI** (quy ước #11):**
 
 | # | Từ → Sang | Ai được phép | Guard (điều kiện cho phép) | Hành động kèm theo | Nếu guard sai thì? |
 |---|---|---|---|---|---|
-| 1 | `[*]` → `ChuaChuanHoa` | Khách · hệ thống · webhook | Có `TenantId` (có thể `NULL`) + tồn tại phiên bản danh mục `Active` | Tạo bản ghi địa chỉ, `NormalizationStatus = ChuaChuanHoa` | Không có danh mục `Active` ⇒ **NÉM** `eCommerce:Address:0011` |
-| 2 | `ChuaChuanHoa` → `DaChuanHoa` | Hệ thống (tự động) | Tìm thấy **đúng 1** đích, `MappingKind ≠ Partial`, đích `IsClosed = false` | Ghi snapshot 2 cấp + 1 dòng ledger + phát `AddressNormalizedEto` | Đích đã đóng mã ⇒ **NÉM** `eCommerce:Address:0010` |
-| 3 | `ChuaChuanHoa` → `CanNguoiXacNhan` | Hệ thống (tự động) | **0** hoặc **≥ 2** ứng viên, hoặc có `Partial` | Tạo **đúng 1** bản ghi `AddrNormalizationReviews` (`Pending`) + metric + `AddressNormalizationFailedEto` | Thiếu bản ghi review ⇒ **vi phạm BR-07** (bắt ở review + `TC-08`) |
-| 4 | `ChuaChuanHoa` → `LoiDuLieu` | Hệ thống | Mã sai định dạng ( không khớp `^[0-9]{2}$` / `^[0-9]{5}$` ) hoặc không thuộc phiên bản | Ledger ghi `Outcome = InvalidInput` + metric | — |
-| 5 | `CanNguoiXacNhan` → `DaChuanHoa` | CSKH (`eCommerce.Address.Normalization.Review`) | `Status = Pending` **và** ứng viên được chọn **nằm trong** tập ứng viên đã lưu **và** `RowVersion` khớp | Ghi snapshot + ledger `Method = ManualConfirmed`, `ConfirmedBy`/`ConfirmedAtUtc` | Ứng viên ngoài tập ⇒ **NÉM** `eCommerce:Address:0009`; `RowVersion` lệch ⇒ **NÉM** `eCommerce:Address:0008` |
-| 6 | `CanNguoiXacNhan` → `KhongTheChuanHoa` | CSKH · job hết hạn | `Status = Pending` **và** (CSKH từ chối **hoặc** quá `ReviewDeadlineUtc`) | Ledger `Outcome = Unresolvable`; địa chỉ **không** dùng được để tạo vận đơn | Chuyển khi `Status ≠ Pending` ⇒ **NÉM** `eCommerce:Address:0004` |
-| 7 | `DaChuanHoa` → `CanNguoiXacNhan` | Job (khi kích hoạt phiên bản mới) | Tồn tại phiên bản `Active` mới **và** ánh xạ lại cho ra kết quả **khác** | Tạo review **mới** (không sửa review cũ); ledger `Outcome = ReNormalizeRequired` | Kích hoạt phiên bản chưa `Validating` xong ⇒ **NÉM** `eCommerce:Address:0003` |
-| 8 | `DaChuanHoa` → `DaChuanHoa` | — | **Không** có guard cho phép khi `DatasetVersionId` **không đổi** | — | Gọi chuẩn hoá lại **cùng phiên bản** ⇒ trả kết quả cũ (**idempotent**, `BR-10`), **không** ghi ledger thứ hai |
-| 9 | `KhongTheChuanHoa` / `LoiDuLieu` → bất kỳ | — | **KHÔNG** có guard nào cho phép | — | 🚨 **Trạng thái hấp thụ (absorbing)**: mọi chuyển dịch khỏi 2 trạng thái này ⇒ **NÉM** `eCommerce:Address:0004` — sửa sai bằng **bản ghi địa chỉ mới**, không hồi sinh bản ghi cũ |
+| 1 | `[*]` → `ChuaChuanHoa` | Khách · hệ thống · webhook | Có `TenantId` (có thể `NULL`) + danh mục của `SchemaVersion` đã nạp | Tạo địa chỉ thô qua `IAddressDirectory.TaoHoacLayAsync` (`ADDR-004`) | Danh mục chưa nạp ⇒ **NÉM** `eCommerce:Address:0311` |
+| 2 | `ChuaChuanHoa` → `DaChuanHoa` | Hệ thống (tự động) | Tra `AddrUnitMappings` (`IsActive`) theo (From/ToSchemaVersion, Level, FromCode) **đúng MỘT bước** (`D-97` (a)): đúng **1** dòng, `MappingKind ≠ Partial`, đích `IsActive = true` (resolver đã lọc đích đóng) | `AddressDirectory.ApplyNormalizationAsync` (thân của `ChuanHoaLaiAsync`, một lần — `D-99`) + 1 dòng ledger, `MappingImportId` = `ImportId` của chính dòng ánh xạ đó + phát `AddressNormalizedEto` | `0006` = **cửa ghi cuối** (guard hàng 2, `ChuanHoaLaiAsync`, `TaoHoacLayAsync` nhận đích đóng); gặp `0006` ở đường tự động = lỗi lập trình, **đỏ** (`TC-28`) — đích đóng ở bước tra ⇒ hàng 3, **không** ném |
+| 3 | mơ hồ → vào hàng đợi (`D-96` (1)) | Hệ thống (tự động) | **0** hoặc **≥ 2** dòng ánh xạ, hoặc có `Partial`, hoặc **đích đã đóng** (`IsActive = false`) — **không ném** (ném làm rollback dòng `NeedsReview`, vi phạm BR-07/BR-12, và dừng job A4). `ReasonCode` ưu tiên `PartialMapping` > `TargetClosed` > `MultipleCandidates` > `NoMapping`; `Candidates` chỉ gồm đích `IsActive` của **cùng bước**, được phép **rỗng** (`D-97` (c)) | Nguồn **thô** ⇒ **giữ `ChuaChuanHoa`**; nguồn **đã có mã** (v1, hoặc v2 bị soát lại ở hàng 7) ⇒ `DanhDauNghiNgo`. Ghi **1** dòng ledger `Outcome = NeedsReview` (`ReasonCode`, `Candidates`, `ReviewDeadlineUtc`) + metric + `AddressNormalizationFailedEto` | `DanhDauNghiNgo` từ `ChuaChuanHoa` ⇒ `0103` (`Address.cs:204`) — vì vậy nguồn thô **không thể** `NghiNgo`; thiếu dòng ledger ⇒ **vi phạm BR-07** (`TC-08`) |
+| 4 | đầu vào → **không lưu** | Hệ thống | Mã sai định dạng (không khớp `^[0-9]{2}$` / `^[0-9]{5}$`) hoặc không thuộc `SchemaVersion` | Dòng ledger `Outcome = InvalidInput` + metric ghi bằng UoW **riêng** (`requiresNew`, commit) **trước khi** NÉM `0002`/`0001` (khuôn §12 — nếu cùng UoW thì NÉM rollback dòng ledger); ETO của lượt này phát từ UoW riêng đó | — |
+| 5 | review → xác nhận (`D-96` (3)) | CSKH (`eCommerce.Addresses.Normalization.Review`) | Review `Pending` (suy ra từ ledger) **và** ứng viên ∈ `Candidates` của dòng `NeedsReview` | Nguồn thô ⇒ `AddressDirectory.ApplyNormalizationAsync` (cùng bản ghi, guard như `ChuanHoa` — `D-99`; CSKH chỉ cần `Normalization.Review`, **không** `Addresses.Manage`); nguồn đã có mã ⇒ `TaoHoacLayAsync` tạo/lấy `Address` **v2**, `Address` cũ **giữ nguyên** + `NghiNgo`. Ledger `Outcome = Normalized`, `Method = ManualConfirmed`, `ResultAddressId`, `ActorUserId`; ETO kèm `OldAddressId`/`NewAddressId` | Ứng viên ngoài `Candidates` ⇒ **NÉM** `0309`; người quyết sau (khoá `Address:Review:{ReviewLedgerId}:Decision`) ⇒ **NÉM** `0308`; review đã kết thúc ⇒ `0103` |
+| 6 | review → từ chối / hết hạn (`D-96` (4)) | CSKH · job hết hạn (**mặc định TẮT**) | Review `Pending` **và** (CSKH từ chối — `Note` bắt buộc — **hoặc** quá `ReviewDeadlineUtc`) | `Address` **giữ nguyên trạng thái**; ledger `Outcome = Unresolvable`, `Method = ManualRejected (4)` / `DeadlineExpired (5)` | Quyết lại review đã kết thúc ⇒ **NÉM** `0103` |
+| 7 | `DaChuanHoa` → `NghiNgo` | Job (khi **lô ánh xạ ADDR-003** áp thành công — `D-95` (f)) | Soát lại ra kết quả **khác**. Chuỗi A→B rồi B→C được đi **từng bước có người**: địa chỉ `DaChuanHoa` mã B gặp lô B→C ⇒ soát lại ⇒ `NghiNgo` — mỗi bước một dòng ledger, một `MappingImportId` (`D-97` (e)); muốn mã A đi tự động tới C, lô sau **tự chứa** dòng A→C (BR-14), hệ thống **không** tự suy. `D-100` (6): lô sau chứa A→C ⇒ nhóm A **thay thế** (dòng A→B bị `NgungHieuLuc` cùng lô, `SupersededByImportId` = lô mới) ⇒ resolver thấy **1** dòng ⇒ **tự động** tới C. Job chỉ quét địa chỉ có ledger `MappingImportId` trỏ dòng **vừa bị thay** (nhóm giữ nguyên **không** bị soát lại) | `DanhDauNghiNgo` + dòng ledger `NeedsReview` mới (`ReNormalizeRequired`); `AddressUnitMappingsImportedEto` (id lô, `From/ToSchemaVersion`) | Lô nạp bị chặn (`0306`/`0307`) ⇒ **không** soát lại, ghi lô trạng thái từ chối |
+| 8 | `DaChuanHoa` → `DaChuanHoa` | — | **Không** có guard cho phép khi `SchemaVersion` **và** id lô ánh xạ **không đổi** | — | Gọi chuẩn hoá lại ⇒ trả kết quả cũ (**idempotent**, `BR-10`), **không** ghi ledger thứ hai |
+| 9 | review đã kết thúc → quyết lại | — | **KHÔNG** có guard nào cho phép | — | "Hấp thụ" = review đã kết thúc **không quyết lại được**: khoá idempotency ở hàng 5 chặn ở DB (`0308`/`0103`); làm lại = `Address` mới hoặc review mới do hàng 7 (`D-96` (7)) |
 
-> ⚠️ **Trạng thái nguy hiểm nhất là `DaChuanHoa` + phiên bản danh mục bị thay:** kết quả cũ vẫn "trông
-> đúng" nhưng có thể trỏ vào đơn vị hành chính đã đổi. Vì vậy việc **kích hoạt phiên bản mới bắt buộc**
-> chạy job soát lại và **đếm** số bản ghi bị ảnh hưởng (§11, metric `address_renormalize_required_total`).
+> 🔶 **Quyết định `D-96`/`ADDR-004` Q9:** hàng đợi vận hành = `Address.TrangThai ∈ {ChuaChuanHoa, NghiNgo}` (`GetHangDoiChuanHoaAsync`, `AddressAppService.cs:135`, `AddressContracts.cs:148`; `TrangThaiDiaChi`: `ChuaChuanHoa=0 · DaChuanHoa=1 · DaXacMinh=2 · NghiNgo=3`, `Address.cs:35`). **Không** có bảng review, **không** cột `NormalizationStatus`, **không** giá trị enum mới; trạng thái review `Pending/Confirmed/Rejected/Expired` **suy ra** từ ledger (`D-19`, `D-96` (5)). Nội dung địa lý bất biến sau `DaChuanHoa` (`Address.cs:136-140`) nên xác nhận ca đã có mã luôn sinh `Address` v2 mới.
 
-### 3.2 Vòng đời phiên bản danh mục (`AddrDatasets.Status`)
+> ⚠️ **Trạng thái nguy hiểm nhất là `DaChuanHoa` + ánh xạ bị thay:** kết quả cũ vẫn "trông đúng" nhưng có thể không còn khớp ánh xạ mới. Vì vậy mỗi lô ánh xạ áp thành công **bắt buộc** chạy job soát lại (hàng 7) và **đếm** số bản ghi bị ảnh hưởng (§11, metric `address_renormalize_required_total`).
 
-| # | Từ → Sang | Guard | Nếu guard sai |
-|---|---|---|---|
-| 1 | `[*]` → `Draft` | Có `DatasetCode` + `Structure` (2 hoặc 3) + `LegalBasis` | **NÉM** `eCommerce:Address:0006` |
-| 2 | `Draft` → `Validating` | File đã nhận, `DatasetSourceHash` **mới** (chưa có phiên bản nào dùng hash này) | Trùng hash + metadata khác ⇒ **NÉM** `eCommerce:Address:0007` |
-| 3 | `Validating` → `Imported` | **0** lỗi toàn vẹn: mọi `Ward.ProvinceId` tồn tại, mọi mã khớp regex, **100 %** mapping có `LegalBasis` | Còn lỗi ⇒ `Validating` → `Failed` + báo cáo dòng lỗi |
-| 4 | `Imported` → `Active` | Người có quyền `eCommerce.Address.Dataset.Activate` **và** phiên bản cùng `Structure` trước đó chuyển `Superseded` **trong cùng transaction** | **NÉM** `eCommerce:Address:0003` |
-| 5 | `Active` → `Superseded` | Có phiên bản mới hơn được kích hoạt | `Superseded` là **hấp thụ** (không quay lại `Active`) |
-| 6 | `Failed` / `Superseded` → bất kỳ | **KHÔNG** cho phép | **NÉM** `eCommerce:Address:0003` |
+### 3.2 Vòng đời phiên bản danh mục — ❌ BỎ theo `D-95`
+
+> ❌ **Bỏ theo `D-95` (18/11/2026):** không bảng `AddrDatasets`, không máy trạng thái `Draft/Validating/Imported/Active/Superseded/Failed`, không `ActivateDatasetAsync`. "Phiên bản" = hằng `AdministrativeSchemaVersion` V1/V2, hiện hành = `HienHanh` (`AdministrativeModels.cs:34-50,83`; tiền lệ `D-80`). Nội dung danh mục trong một `SchemaVersion` chỉ đi qua `ADDR-001` (`D-78`/`D-81`/`D-82`/`D-93`). ADDR-003 chỉ nạp **ánh xạ**, mỗi lượt một bản ghi lô `AddrUnitMappingImports` (§5.2) — lô là bản ghi append-only, **không** có vòng đời trạng thái. Mã `0303` bỏ, không cấp số.
 
 ---
 
@@ -215,23 +207,23 @@ sequenceDiagram
 
     KH->>API: «POST /api/app/address-normalization/normalize + Idempotency-Key»
     API->>APP: «xac thuc + kiem permission + mo Unit of Work»
-    APP->>G: «AcquireAsync(key on dinh)»
-    alt «khoá đã tồn tại và PayloadHash khớp»
-        G-->>APP: «AlreadyProcessed»
+    APP->>G: «ThucThiAsync(key on dinh, payloadJson, xuLy)»
+    alt «khoá đã có và PayloadHash khớp»
+        G-->>APP: «TraVeKetQuaCu»
         APP-->>KH: «tra ve ket qua cu, 0 side effect»
-    else «khoá mới»
-        G-->>APP: «Acquired»
-        APP->>DB: «doc phien ban danh muc Active»
+    else «khoá mới - phần dưới chạy trong callback xuLy»
+        G-->>APP: «chay callback xuLy»
+        APP->>DB: «xac dinh SchemaVersion hien hanh va kiem danh muc da nap»
         APP->>NORM: «NormalizeAsync(input, mode)»
         NORM->>DB: «tra AddrUnitMappings theo MA + phien ban»
         alt «dung 1 ung vien»
             NORM-->>APP: «Normalized (Method = Converted3To2)»
-            APP->>DB: «ghi snapshot 2 cap + 1 dong ledger (cung transaction)»
+            APP->>DB: «tao hoac lay Address 2 cap + 1 dong ledger (cung transaction)»
             APP->>BUS: «AddressNormalizedEto (sau commit)»
             APP-->>KH: «200 + ket qua»
         else «0 hoặc >= 2 ung vien»
             NORM-->>APP: «NeedsReview + danh sach ung vien»
-            APP->>DB: «ghi 1 dong AddrNormalizationReviews (Pending) + ledger»
+            APP->>DB: «vao hang doi (giu ChuaChuanHoa hoac DanhDauNghiNgo) + ghi 1 dong ledger NeedsReview»
             APP->>BUS: «AddressNormalizationFailedEto (sau commit)»
             APP-->>KH: «200 + NeedsReview (khong doan)»
         end
@@ -243,16 +235,13 @@ sequenceDiagram
 | Bước | Nguồn | Xử lý | Đích | Ghi chú |
 |---|---|---|---|---|
 | 1 | Khách nhập / webhook sàn / job | Chuẩn hoá định dạng thô (trim, gộp khoảng trắng, chuẩn hoá tiếng Việt có dấu) | `Address` thô | **Không** sửa chuỗi địa chỉ đường/phố (giữ nguyên văn của khách) |
-| 2 | `Address` thô (3 cấp) | Tra `AddrUnitMappings` theo **(DatasetFrom, DatasetTo, Level, Code)** | Ứng viên 2 cấp | **Chỉ theo MÃ** (**BR-03**) |
-| 3 | Ứng viên | Quyết định: duy nhất ⇒ tự động; còn lại ⇒ review | `NormalizedAddress` **hoặc** `AddrNormalizationReviews` | **ADR-05** |
-| 4 | `NormalizedAddress` | Ghi snapshot + ledger + outbox **cùng transaction** | PostgreSQL | **BR-12** |
-| 5 | Yêu cầu 3 cấp (hãng vận chuyển) | Đọc `Legacy*` snapshot | `LegacyThreeLevelAddress` | Thiếu ⇒ `eCommerce:Address:0005` (**BR-04**) |
+| 2 | `Address` thô (3 cấp) | Tra `AddrUnitMappings` theo **(FromSchemaVersion, ToSchemaVersion, Level, Code)** | Ứng viên 2 cấp | **Chỉ theo MÃ** (**BR-03**) |
+| 3 | Ứng viên | Quyết định: duy nhất ⇒ tự động; còn lại ⇒ vào hàng đợi (`ChuaChuanHoa` + `NghiNgo`) | `Address` 2 cấp **hoặc** dòng ledger `NeedsReview` | **ADR-05**, `D-96` (1) |
+| 4 | `Address` 2 cấp | Ghi địa chỉ + ledger + outbox **cùng transaction** | PostgreSQL | **BR-12** |
+| 5 | Yêu cầu 3 cấp (hãng vận chuyển) | Đọc `Address` v1 nguồn (qua ledger `ResultAddressId` → `SourceEntityId`) hoặc `From*Code` + `InputSnapshot`; **không** có cột `Legacy*` | Bộ 3 cấp lịch sử | **0** hoặc **> 1** snapshot khác nhau ⇒ `eCommerce:Address:0305` (**BR-04**, `D-96` (6)) |
 | 6 | `AddressNormalizedEto` | Consumer: `Customers` (sổ địa chỉ) · `Sales` (đơn) · `ShippingHub` (mã hãng — `ADDR-002`) | Module khác | Qua outbox (`XC-002` BR-001) |
 
-> 📌 **Chênh lệch cần ghi rõ (thói quen tốt của tài liệu gốc):** số **"địa chỉ cần xác nhận"** trên màn hình
-> vận hành là số bản ghi review `Pending`, **không** bằng số địa chỉ có `NormalizationStatus = CanNguoiXacNhan`
-> (một địa chỉ có thể sinh review mới sau khi kích hoạt phiên bản danh mục, và review cũ đã `Confirmed`).
-> UI **phải** hiển thị cả hai con số và nhãn bộ lọc — nếu không sẽ bị báo "đếm sai".
+> 📌 **Đã đơn giản hoá (`ADDR-004` Q9, `D-96`):** số **"địa chỉ cần xác nhận"** = số `Address` có `TrangThai ∈ {ChuaChuanHoa, NghiNgo}` (`GetHangDoiChuanHoaAsync`) — **một** nguồn; trạng thái từng review suy ra từ ledger.
 
 ---
 
@@ -262,38 +251,39 @@ sequenceDiagram
 
 | Quan hệ | Bội số | Ghi chú |
 |---|---|---|
-| `AddrDatasets` → `AddrProvinces` | 1 → N | mỗi phiên bản danh mục có bộ tỉnh riêng |
-| `AddrDatasets` → `AddrDistricts` | 1 → N | **rỗng** với phiên bản 2 cấp (huyện không còn tồn tại) |
-| `AddrDatasets` → `AddrWards` | 1 → N | cấp xã/phường/đặc khu |
-| `AddrProvinces` → `AddrDistricts` | 1 → N | **chỉ** có ở phiên bản 3 cấp |
-| `AddrProvinces` → `AddrWards` | 1 → N | **luôn** có (kể cả mô hình 2 cấp — quan hệ này là đường chuẩn) |
-| `AddrDistricts` → `AddrWards` | 1 → N | **nullable**: `NULL` ở phiên bản 2 cấp |
-| `AddrDatasets` (from) → `AddrUnitMappings` → `AddrDatasets` (to) | N → N | ánh xạ **giữa hai phiên bản**; một đơn vị cũ có thể có **nhiều** đích |
-| `AddrNormalizationReviews` → `AddrNormalizationLedger` | 1 → N | mọi lần xác nhận/từ chối đều ghi ledger |
+| `AddrAdministrativeUnits` (`ADDR-001`, ✅ có) tự tham chiếu qua `ParentCode` | 1 → N | tỉnh → xã (v2) · tỉnh → huyện → xã (v1); khoá `(TenantId, SchemaVersion, Level, Code)` |
+| `AddrUnitMappingImports` → `AddrUnitMappings` | 1 → N | mỗi dòng ánh xạ mang id lô đã nạp nó (`D-95` (d)) — ⬜ |
+| `AddrUnitMappings` (`FromSchemaVersion`) → (`ToSchemaVersion`) | N → N | ánh xạ **giữa hai `SchemaVersion`** (và V2→V2: resolver chỉ đi **một bước**, không đi chuỗi — `D-97`); một đơn vị cũ có thể có **nhiều** đích — ⬜ |
+| `AddrNormalizationLedger` → `AddrNormalizationLedger` | 1 → N | dòng quyết định trỏ dòng `NeedsReview` qua `ReviewLedgerId` (`D-96` (2)) — ⬜ |
+| `AddrNormalizationLedger` → `AddrAddresses` (`ADDR-004`, ✅ có) | N → 1 | `SourceEntityId` = `AddressId` nguồn; `ResultAddressId` = `Address` kết quả (soft ref, không FK) |
 
 ### 5.2 Bảng & cột (Data Dictionary)
 
-**Bảng `AddrDatasets`** — *phiên bản danh mục đơn vị hành chính* — **dữ liệu cấp HOST** (ADR-06)
+> 🔶 **Đối chiếu WP-14 — đọc trước khi dùng các bảng dưới (tất cả ⬜ chưa có code; code thật: `AddressDbContextModelCreatingExtensions.cs:13-28`):**
+> - `AddrProvinces` / `AddrDistricts` / `AddrWards` **bị thay** bằng **một** bảng `AddrAdministrativeUnits` của `ADDR-001` (cột `SchemaVersion`, `Level`, `Code`, `ParentCode`, `IsActive`; unique `(TenantId, SchemaVersion, Level, Code)` `NULLS NOT DISTINCT` — `:56-58`; `ADDR-004` ADR-12). `IsClosed` = `!IsActive`; **không** có `ClosedAtUtc`, `DatasetId`, `NameNormalized` (⬜ thêm cột + index `gin` ở WP code). Các bảng ba cấp dưới đây chỉ còn là **mô tả cột logic** — **không** tạo bảng.
+> - `AddrNormalizationReviews` **BỎ** (`ADDR-004` Q9, `D-96`): `ReasonCode`/`Candidates`/`ReviewDeadlineUtc` + quyết định chuyển thành **7 cột nullable mới** của `AddrNormalizationLedger` (bảng ledger bên dưới); trạng thái review suy ra từ ledger.
+> - `AddrDatasets` **BỎ** (`D-95`): `DatasetId`/`DatasetFromId`/`DatasetToId` ở mọi bảng ⇒ `SchemaVersion` / `FromSchemaVersion`+`ToSchemaVersion` (`smallint`, CHECK `in (1, 2)` như `AddressDbContextModelCreatingExtensions.cs:69-71`); thay bằng bảng lô `AddrUnitMappingImports`.
+> - 🚨 **Mã `Level` đúng theo code** (`AdministrativeModels.cs:6-19`): `Tinh = 1 · Xa = 2 · QuanHuyen = 3` — v0.1 ghi `1=tỉnh · 2=huyện · 3=xã` là **SAI** (xã và huyện bị đảo; không lỗi biên dịch, lưu DB là số — `D-17`). Mọi `FromLevel`/`ToLevel` và fixture `TC` dùng bộ số này; ánh xạ huyện→xã = `3 → 2`, xã→xã = `2 → 2`.
+> - Bảng host (`AddrUnitMappingImports`, `AddrUnitMappings`) **có** cột `TenantId` nullable, luôn `NULL` (`D-92`), unique `NULLS NOT DISTINCT`; v0.1 ghi "không có `TenantId`" là thiết kế đã bỏ.
+
+**Bảng `AddrUnitMappingImports`** ⬜ — *bản ghi lô nạp ánh xạ* (append-only, khuôn `D-78`/`D-83`) — **dữ liệu cấp HOST** (ADR-06). Tên là **gợi ý** (`D-95` (d)); thay `AddrDatasets` đã bỏ.
 
 | Cột | Kiểu | Null? | Nguồn / ý nghĩa | Ghi chú |
 |---|---|---|---|---|
-| `Id` | `uuid` | ✖ | khoá chính | |
-| `DatasetCode` | `varchar(64)` | ✖ | ví dụ `VN-2025-2LEVEL`, `VN-2024-3LEVEL` | **không** có `TenantId` (ADR-06) |
-| `Structure` | `smallint` | ✖ | `TwoLevel = 2` · `ThreeLevel = 3` | |
-| `Status` | `smallint` | ✖ | `Draft=0` · `Validating=1` · `Imported=2` · `Active=3` · `Superseded=4` · `Failed=5` | state machine §3.2 |
-| `LegalBasis` | `varchar(512)` | ✖ | số hiệu văn bản (ví dụ `19/2025/QĐ-TTg`) | **BR-05** |
-| `EffectiveFrom` / `EffectiveTo` | `date` | ✖ / ✔ | hiệu lực của danh mục | |
-| `DatasetSourceHash` | `char(64)` | ✖ | **SHA-256** của file nguồn | **idempotency import** (**BR-10**) |
-| `RowCounts` | `jsonb` | ✖ | `{"provinces":34,"wards":3321,"districts":0}` | để đối soát sau import |
-| `ImportedAtUtc` / `ActivatedAtUtc` | `timestamptz` | ✔ | | mọi thời điểm là **UTC** (quy ước `eCommerceDomainModule.cs`: ép `AbpClockOptions.Kind = Utc`) |
-| `RowVersion` | `bytea`/`xmin` | ✖ | optimistic concurrency | 2 người cùng kích hoạt |
+| `Id` | `uuid` | ✖ | khoá chính = id lô | mỗi dòng `AddrUnitMappings` mang id này |
+| `TenantId` | `uuid` | ✔ | luôn `NULL` (`D-92`) | unique `NULLS NOT DISTINCT` |
+| `SourceName` | `varchar(128)` | ✖ | tên nguồn (file/văn bản) | `D-93`: nguồn production chưa xác định |
+| `SourceHash` | `char(64)` | ✖ | SHA-256 tập ánh xạ **chuẩn hoá** — sắp theo (`FromSchemaVersion`, `ToSchemaVersion`, `Level`, `FromCode`, `ToCode`), cấm `Guid.NewGuid()` | **idempotency nạp** (**BR-10**) |
+| `LegalBasis` / `EffectiveFrom` | `varchar(512)` / `date` | ✖ | căn cứ + ngày hiệu lực của lô | **BR-05** |
+| `ImportedAtUtc` / `ImportedBy` | `timestamptz` / `varchar` | ✖ | UTC (`AbpClockOptions.Kind = Utc`); user hoặc job | |
+| `Outcome` + số đếm | `smallint` + `int` | ✖ | áp / bị chặn (`0306`/`0307`) + số dòng thêm | lượt bị chặn **cũng ghi** lô |
 
 **Bảng `AddrProvinces`** *(cấp tỉnh)* — host
 
 | Cột | Kiểu | Null? | Ý nghĩa | Ghi chú |
 |---|---|---|---|---|
 | `Id` | `uuid` | ✖ | | |
-| `DatasetId` | `uuid` | ✖ | FK → `AddrDatasets` | **mọi** truy vấn phải kèm `DatasetId` (**BR-02**) |
+| `SchemaVersion` | `int` | ✖ | thay `DatasetId` (`D-95`; `AdministrativeUnit.cs:23`) | **mọi** truy vấn phải kèm `SchemaVersion` (**BR-02**) |
 | `Code` | `char(2)` | ✖ | mã tỉnh 02 chữ số | `Quyết định 19/2025/QĐ-TTg`: cấp tỉnh = 02 chữ số `01`–`99` |
 | `Name` | `varchar(128)` | ✖ | tên hiện hành | |
 | `UnitType` | `smallint` | ✖ | `Tinh=0` · `ThanhPho=1` | 34 đơn vị gồm 28 tỉnh + 6 thành phố |
@@ -305,7 +295,7 @@ sequenceDiagram
 | Cột | Kiểu | Null? | Ý nghĩa | Ghi chú |
 |---|---|---|---|---|
 | `Id` | `uuid` | ✖ | | |
-| `DatasetId` | `uuid` | ✖ | FK | |
+| `SchemaVersion` | `int` | ✖ | thay `DatasetId` (`D-95`) | |
 | `ProvinceId` | `uuid` | ✖ | FK | |
 | `Code` | `char(3)` | ✖ | mã huyện 03 chữ số (bộ cũ) | |
 | `Name` | `varchar(128)` | ✖ | | |
@@ -316,7 +306,7 @@ sequenceDiagram
 | Cột | Kiểu | Null? | Ý nghĩa | Ghi chú |
 |---|---|---|---|---|
 | `Id` | `uuid` | ✖ | | |
-| `DatasetId` | `uuid` | ✖ | FK | |
+| `SchemaVersion` | `int` | ✖ | thay `DatasetId` (`D-95`) | |
 | `ProvinceId` | `uuid` | ✖ | FK — **luôn** có | |
 | `DistrictId` | `uuid` | ✔ | FK — `NULL` ở phiên bản 2 cấp | |
 | `Code` | `char(5)` | ✖ | mã xã 05 chữ số | `Quyết định 19/2025/QĐ-TTg`: cấp xã = 05 chữ số `00001`–`99999` |
@@ -325,37 +315,24 @@ sequenceDiagram
 | `NameNormalized` | `varchar(160)` | ✖ | tên **bỏ dấu**, chữ thường | tìm kiếm bằng `unaccent` + `pg_trgm` (ADR-12) |
 | `IsClosed` | `boolean` | ✖ | mã đã đóng | **BR-16** |
 
-**Bảng `AddrUnitMappings`** — *ánh xạ đơn vị hành chính cũ → mới* — host, **append-only theo phiên bản**
+**Bảng `AddrUnitMappings`** — *ánh xạ đơn vị hành chính cũ → mới* — host, **append-only theo lô** (⬜ chưa có code)
 
 | Cột | Kiểu | Null? | Ý nghĩa | Ghi chú |
 |---|---|---|---|---|
 | `Id` | `uuid` | ✖ | | |
-| `DatasetFromId` / `DatasetToId` | `uuid` | ✖ | hai phiên bản danh mục | |
-| `FromLevel` / `ToLevel` | `smallint` | ✖ | `1`=tỉnh · `2`=huyện · `3`=xã | cho phép ánh xạ `3→3`, `1→1`, `2→3` |
+| `TenantId` | `uuid` | ✔ | luôn `NULL` (`D-92`) | unique `NULLS NOT DISTINCT` |
+| `ImportId` | `uuid` | ✖ | id lô `AddrUnitMappingImports` đã nạp dòng này (`D-95` (d)) | |
+| `FromSchemaVersion` / `ToSchemaVersion` | `smallint` | ✖ | thay `DatasetFromId`/`DatasetToId` (`D-95` (b)) | CHECK `in (1, 2)` |
+| `FromLevel` / `ToLevel` | `smallint` | ✖ | `1`=Tinh · `2`=Xa · `3`=QuanHuyen (`AdministrativeLevel`, `AdministrativeModels.cs:6-19`) | cho phép ánh xạ `2→2` (xã→xã), `1→1`, `3→2` (huyện→xã) |
 | `FromCode` / `ToCode` | `varchar(5)` | ✖ | **mã**, không phải tên (**BR-03**) | |
 | `MappingKind` | `smallint` | ✖ | `Exact=0` (nhập nguyên đơn vị) · `Partial=1` (chỉ **một phần** diện tích/dân số) · `RenamedOnly=2` (chỉ đổi tên, mã không đổi) | `Partial` ⇒ **buộc** `NeedsReview` (**BR-06**) |
 | `CoverageNote` | `varchar(512)` | ✔ | mô tả phần bị tách, ví dụ *"phần còn lại của thị trấn X"* | **bắt buộc** khi `MappingKind = Partial` |
 | `LegalBasis` | `varchar(512)` | ✖ | số hiệu Nghị quyết + mục phụ lục | **BR-05**, CHECK ở DB |
-| `IsActive` | `boolean` | ✖ | có hiệu lực áp dụng | |
+| `IsActive` | `boolean` | ✖ | có hiệu lực áp dụng | ⚠️ **chưa có cửa ghi** (bảng append-only theo lô, không method tắt dòng) — ai ghi/lúc nào = **Q14**; resolver tra **đúng một bước** theo (`FromSchemaVersion`, `ToSchemaVersion`, `Level`, `FromCode`), **không** tra tiếp theo `ToCode` (`D-97` (a)) |
 
-**Bảng `AddrNormalizationReviews`** — *hàng đợi ca cần người xác nhận* — **có `TenantId`**
+> ❌ **Bảng `AddrNormalizationReviews` BỎ** (`ADDR-004` Q9, `D-96`): không `Status`/`RowVersion`/`ChosenToCode`/`ConfirmedBy` — chuyển thành 7 cột nullable của ledger bên dưới; `Status` review **suy ra** (`D-96` (5)).
 
-| Cột | Kiểu | Null? | Ý nghĩa | Ghi chú |
-|---|---|---|---|---|
-| `Id` | `uuid` | ✖ | | |
-| `TenantId` | `uuid` | ✔ | tenant sở hữu | **có thể `NULL`** ⇒ index phải `NULLS NOT DISTINCT` |
-| `SourceEntityType` | `varchar(32)` | ✖ | `CustomerAddress` · `OrderShippingAddress` · `ImportedOrder` | |
-| `SourceEntityId` | `uuid` | ✖ | tham chiếu **mềm** (không FK sang module khác) | |
-| `InputHash` | `char(64)` | ✖ | SHA-256 của **đầu vào đã chuẩn hoá** | chống tạo review trùng |
-| `ReasonCode` | `smallint` | ✖ | `NoMapping=0` · `MultipleCandidates=1` · `PartialMapping=2` · `NameOnlyInput=3` | |
-| `Candidates` | `jsonb` | ✖ | danh sách ứng viên (mã + tên + `MappingKind`) để UI hiển thị | |
-| `Status` | `smallint` | ✖ | `Pending=0` · `Confirmed=1` · `Rejected=2` · `Expired=3` | state machine §3.1 |
-| `ChosenToCode` | `varchar(5)` | ✔ | mã xã được chọn | **phải** nằm trong `Candidates` (**E5**) |
-| `ReviewDeadlineUtc` | `timestamptz` | ✖ | hạn xử lý | quá hạn ⇒ job chuyển `Expired` |
-| `ConfirmedBy` / `ConfirmedAtUtc` | `uuid` / `timestamptz` | ✔ | người xác nhận | |
-| `RowVersion` | `bytea`/`xmin` | ✖ | optimistic concurrency | 2 CSKH cùng xác nhận |
-
-**Bảng `AddrNormalizationLedger`** — **SỔ CÁI APPEND-ONLY** — có `TenantId`
+**Bảng `AddrNormalizationLedger`** — **SỔ CÁI APPEND-ONLY** — có `TenantId` (⬜ chưa có code)
 
 | Cột | Kiểu | Null? | Ý nghĩa | Ghi chú |
 |---|---|---|---|---|
@@ -363,10 +340,17 @@ sequenceDiagram
 | `TenantId` | `uuid` | ✔ | | `NULLS NOT DISTINCT` |
 | `IdempotencyKey` | `varchar(256)` | ✖ | khoá **ổn định** của biên vào | **BR-10** |
 | `SourceEntityType` / `SourceEntityId` | `varchar(32)` / `uuid` | ✖ | đối tượng được chuẩn hoá | |
-| `InputSnapshot` | `jsonb` | ✖ | đầu vào **nguyên trạng** (mã cũ + chuỗi tự do) | cần cho khiếu nại |
+| `InputSnapshot` | `jsonb` | ✖ | đầu vào **nguyên trạng** (mã cũ + chuỗi địa chỉ tự do) — **không** chứa PII ngoài chuỗi địa chỉ (không tên/SĐT; ledger không ẩn danh được — BR-08; hướng ẩn danh = nợ GĐ2 của `ADDR-004` ADR-11, Q15) | cần cho khiếu nại |
 | `Outcome` | `smallint` | ✖ | `Normalized=0` · `NeedsReview=1` · `InvalidInput=2` · `Unresolvable=3` · `ReNormalizeRequired=4` | |
-| `Method` | `smallint` | ✖ | `Converted3To2=0` · `AlreadyTwoLevel=1` · `ManualConfirmed=2` · `FromCarrierData=3` | |
-| `DatasetFromId` / `DatasetToId` | `uuid` | ✔ | phiên bản dùng để suy ra kết quả | **BR-02** |
+| `Method` | `smallint` | ✖ | `Converted3To2=0` · `AlreadyTwoLevel=1` · `ManualConfirmed=2` · `FromCarrierData=3` · `ManualRejected=4` · `DeadlineExpired=5` (thêm **cuối dải** — `D-17`, `D-96` (4)) | |
+| `FromSchemaVersion` / `ToSchemaVersion` | `smallint` | ✔ | thay `DatasetFromId`/`DatasetToId` (`D-95`) | **BR-02**; CHECK `in (1, 2)` |
+| `MappingImportId` | `uuid` | ✔ | id lô ánh xạ đã dùng để suy ra kết quả | thay vai tái lập của `DatasetVersionId` (`D-95` (f)); NFR-03 |
+| `ReasonCode` | `smallint` | ✔ | `NoMapping=0` · `MultipleCandidates=1` · `PartialMapping=2` · `NameOnlyInput=3` · `TargetClosed=4` (thêm **cuối dải** — `D-17`, `D-97` (c)) | chỉ dòng `NeedsReview` (`D-96` (1)) |
+| `Candidates` | `jsonb` | ✔ | ứng viên (đúng trường `AddressCandidateDto`) để UI hiển thị | chỉ dòng `NeedsReview` |
+| `ReviewDeadlineUtc` | `timestamptz` | ✔ | hạn xử lý (giá trị mặc định = Q6, `Open`); job hết hạn **mặc định TẮT** | chỉ dòng `NeedsReview` |
+| `ReviewLedgerId` | `uuid` | ✔ | trỏ dòng `NeedsReview` mà dòng này kết thúc | chỉ dòng quyết định; `IdempotencyKey = Address:Review:{ReviewLedgerId}:Decision` ⇒ quyết định thứ hai bị unique chặn (`D-96` (2)) |
+| `ActorUserId` | `uuid` | ✔ | người xác nhận/từ chối | |
+| `ResultAddressId` | `uuid` | ✔ | `Address` kết quả (soft ref) | index §dưới |
 | `FromProvinceCode`/`FromDistrictCode`/`FromWardCode` | `varchar(5)` | ✔ | mã cũ | |
 | `ToProvinceCode` / `ToWardCode` | `varchar(5)` | ✔ | mã mới | |
 | `OccurredAtUtc` | `timestamptz` | ✖ | | |
@@ -380,24 +364,20 @@ sequenceDiagram
 
 | Bảng | Loại | Cột / biểu thức | Mục đích |
 |---|---|---|---|
-| `AddrDatasets` | UNIQUE | `(DatasetCode)` | một mã phiên bản định nghĩa một lần (**host — index thường**) |
-| `AddrDatasets` | UNIQUE | `(Structure) WHERE Status = 3` | 🚩 **tối đa MỘT phiên bản `Active` cho mỗi cấu trúc** |
-| `AddrDatasets` | UNIQUE | `(DatasetSourceHash)` | nạp lại cùng file ⇒ không tạo phiên bản mới (**BR-10**) |
-| `AddrProvinces` | UNIQUE | `(DatasetId, Code)` | mã tỉnh duy nhất trong phiên bản |
-| `AddrDistricts` | UNIQUE | `(DatasetId, Code)` | |
-| `AddrWards` | UNIQUE | `(DatasetId, Code)` | mã xã duy nhất trong phiên bản (**BR-02**) |
-| `AddrWards` | INDEX | `(DatasetId, ProvinceId)` · `(DatasetId, DistrictId)` | tra cứu dropdown — `ADDR-001` |
-| `AddrWards` | INDEX | `gin (NameNormalized gin_trgm_ops)` | tìm theo tên không dấu (ADR-12) |
-| `AddrUnitMappings` | UNIQUE | `(DatasetFromId, DatasetToId, FromLevel, FromCode, ToLevel, ToCode)` | một cặp ánh xạ khai báo một lần |
-| `AddrUnitMappings` | INDEX | `(DatasetFromId, DatasetToId, FromLevel, FromCode)` | **truy vấn nóng nhất** của normalizer |
-| `AddrNormalizationReviews` | **UNIQUE `NULLS NOT DISTINCT`** | `(TenantId, SourceEntityType, SourceEntityId, InputHash)` | chống tạo review trùng (**BR-09**) |
-| `AddrNormalizationReviews` | INDEX | `(TenantId, Status, CreatedAtUtc)` | hàng đợi vận hành |
+| ~~`AddrDatasets`~~ | ~~3 index + CHECK~~ | — | **bỏ** (`D-95`): không unique `(Structure) WHERE Status = 3`, không `(DatasetSourceHash)` |
+| `AddrUnitMappingImports` | **UNIQUE `NULLS NOT DISTINCT`** | `(TenantId, SourceHash)` | nạp lại cùng file ánh xạ ⇒ không thêm lô (**BR-10**; host, `D-92`) |
+| `AddrAdministrativeUnits` (✅ có, `ADDR-001`) | UNIQUE `NULLS NOT DISTINCT` | `(TenantId, SchemaVersion, Level, Code)` | `AddressDbContextModelCreatingExtensions.cs:56-58` — thay `AddrProvinces/Districts/Wards` |
+| `AddrAdministrativeUnits` | INDEX ⬜ | `gin (NameNormalized gin_trgm_ops)` (cột mới) | tìm theo tên không dấu (ADR-12) |
+| `AddrUnitMappings` | INDEX | `(FromSchemaVersion, ToSchemaVersion, FromLevel, FromCode)` | **truy vấn nóng nhất** của normalizer |
+| ~~`AddrNormalizationReviews`~~ | ~~2 index~~ | — | **bỏ** (`ADDR-004` Q9); hàng đợi dùng `IX_AddrAddresses_TenantId_TrangThai` đã có (`AddressDbContextModelCreatingExtensions.cs:130-131`); chống quyết định trùng = unique ledger `(TenantId, IdempotencyKey)` (`D-96` (2)) |
+| `AddrUnitMappings` | **UNIQUE `NULLS NOT DISTINCT`** | `(TenantId, FromSchemaVersion, ToSchemaVersion, FromLevel, FromCode, ToLevel, ToCode)` | `D-92`: bảng host giữ `TenantId` nullable ⇒ phải `NULLS NOT DISTINCT` (**BR-09**) |
 | `AddrNormalizationLedger` | **UNIQUE `NULLS NOT DISTINCT`** | `(TenantId, IdempotencyKey)` | ⭐ **hàng rào idempotency chính** (**BR-10**) |
 | `AddrNormalizationLedger` | INDEX | `(TenantId, SourceEntityId, OccurredAtUtc)` | tra vết một địa chỉ |
-| `AddrProvinces`/`AddrWards`/`AddrDistricts` | CHECK | `Code ~ '^[0-9]{2}$'` / `'^[0-9]{5}$'` / `'^[0-9]{3}$'` | chặn mã sai định dạng ở tầng DB (**BR-14**) |
+| `AddrNormalizationLedger` | INDEX ⬜ | `(TenantId, ResultAddressId)` | `ToThreeLevelAsync` tìm nguồn v1 của một `Address` v2 (`D-96` (6)) |
+| `AddrAdministrativeUnits` | CHECK ⬜ | `Code ~ '^[0-9]{2}$'` / `'^[0-9]{5}$'` / `'^[0-9]{3}$'` theo `Level` | chặn mã sai định dạng ở tầng DB (không gắn BR); hiện chỉ ép ở code (`AdministrativeUnit.cs:98-117`) |
 | `AddrUnitMappings` | CHECK | `LegalBasis <> ''` | **BR-05** — 100 % ánh xạ phải có căn cứ |
 | `AddrUnitMappings` | CHECK | `MappingKind <> 1 OR CoverageNote IS NOT NULL` | `Partial` **bắt buộc** có mô tả phần bị tách |
-| `AddrDatasets` | CHECK | `Structure IN (2,3)` | |
+| `AddrUnitMappings` / `AddrNormalizationLedger` | CHECK | `FromSchemaVersion`/`ToSchemaVersion` `in (1, 2)` | như `AddressDbContextModelCreatingExtensions.cs:69-71` (`D-95` (b)) |
 
 > 📌 **Tiền lệ `NULLS NOT DISTINCT`:** mọi unique index **có `TenantId`** phải sinh bằng **SQL thô** trong
 > migration (EF Core **không** mô hình hoá thuộc tính này) — xem
@@ -418,41 +398,25 @@ sequenceDiagram
 ### 6.1 Thư viện dùng chung + module
 
 ```csharp
-// ── eCommerce.Kernel (shared — CHƯA CÓ trong code, xem §15.2 F2) ────────────────
-namespace eCommerce.Kernel.Addressing;
+// ── ❌ BỎ: value object `Address` ở eCommerce.Kernel (ADR-08, `ADDR-004` ADR-02). ──
+// Địa chỉ đã chuẩn hoá = entity `Address` (`Address.cs:24`) + DTO đọc bất biến `DiaChiSnapshotDto`
+// (`AddressContracts.cs:41-54`: `SchemaVersion` thay `DatasetVersionId`, `TinhCode`/`XaCode`/`HuyenCode`, `DiaChiDayDu` = snapshot chữ).
+// Snapshot 3 cấp: KHÔNG thêm cột `Legacy*` vào `AddrAddresses` (`D-96` (6)) — lấy từ `Address` v1 nguồn hoặc `From*Code` + `InputSnapshot` của ledger.
 
-/// Snapshot 2 cấp — BẤT BIẾN. Mọi giá trị đã lưu KHÔNG bao giờ tự đổi khi danh mục đổi (BR-01).
-public readonly record struct Address
-{
-    public string CountryCode { get; }        // "VN"
-    public string ProvinceCode { get; }       // 02 chữ số
-    public string ProvinceName { get; }       // snapshot TÊN tại thời điểm chuẩn hoá
-    public string WardCode { get; }           // 05 chữ số
-    public string WardName { get; }           // snapshot TÊN
-    public string StreetLine { get; }         // nguyên văn của khách — không chuẩn hoá
-    public Guid DatasetVersionId { get; }     // 🚨 BẮT BUỘC (BR-02)
-
-    // Snapshot LỊCH SỬ 3 cấp — chỉ để HIỂN THỊ và trả cho hãng vận chuyển (BR-04)
-    public string? LegacyProvinceCode { get; }
-    public string? LegacyProvinceName { get; }
-    public string? LegacyDistrictCode { get; }
-    public string? LegacyDistrictName { get; }
-    public string? LegacyWardCode { get; }
-    public string? LegacyWardName { get; }
-
-    public bool HasLegacyThreeLevel => LegacyDistrictCode is not null;
-}
-
-// ── modules/AddressHub/eCommerce.AddressHub.Application.Contracts ──────────────
-namespace eCommerce.AddressHub.Contracts;
+// ── modules/Address/eCommerce.Address.Application.Contracts (✅ project đã có) — namespace thật: `eCommerce.Address` ──
+// ⬜ Toàn bộ khối dưới là THIẾT KẾ CHƯA CÓ CODE; `Address` trong `Normalized` = `DiaChiSnapshotDto`.
+namespace eCommerce.Address;
 
 public enum AddressNormalizationMode
 {
-    /// Chế độ tương tác (HTTP): mơ hồ ⇒ NÉM LỖI để client buộc phải xử lý.
+    /// Chế độ in-process (D-98): MỌI kết quả mà CreateReview sẽ trả NeedsReview (mọi ReasonCode, kể cả giá trị thêm cuối dải)
+    /// ⇒ NÉM `0302` + WithData("reasonCode"); KHÔNG tạo/đổi Address, KHÔNG ghi ledger NeedsReview, KHÔNG ETO, KHÔNG vào hàng đợi.
+    /// Là giá trị mặc định của enum (quên truyền ⇒ NÉM, fail-closed). Chưa có bên gọi nào (giữ/bỏ: Q17).
+    /// Endpoint HTTP §6.3 luôn chạy `CreateReview` — `NormalizeAddressDto` KHÔNG có trường `mode` (D-98).
     Strict = 0,
 
-    /// Chế độ lô (job/webhook): mơ hồ ⇒ trả NeedsReview + TẠO bản ghi review.
-    /// ⚠️ Đây KHÔNG phải "im lặng": luôn có dòng review + ledger + metric + ETO (BR-07).
+    /// Chế độ lô (job/webhook): mơ hồ ⇒ trả NeedsReview + vào hàng đợi (`Address` ChuaChuanHoa/NghiNgo).
+    /// ⚠️ Đây KHÔNG phải "im lặng": luôn có dòng ledger NeedsReview + metric + ETO (BR-07, `D-96`).
     CreateReview = 1
 }
 
@@ -467,8 +431,7 @@ public sealed record AddressInput(
     string? LegacyDistrictCode,
     string? LegacyWardCode,
     string StreetLine,
-    string? RecipientName,
-    string? Phone,
+    // ❌ bỏ RecipientName/Phone (đánh giá WP-14 #15): `Address` không có trường PII; ledger append-only không ẩn danh được (BR-08, ADDR-004 ADR-11)
     string IdempotencyKey,           // 🚨 BẮT BUỘC, khoá ỔN ĐỊNH (BR-10)
     string SourceEntityType,
     Guid SourceEntityId);
@@ -480,10 +443,11 @@ public sealed record AddressCandidateDto(
 
 public sealed record AddressNormalizationResult(
     AddressNormalizationStatus Status,
-    Address? Normalized,
+    DiaChiSnapshotDto? Normalized,
     IReadOnlyList<AddressCandidateDto> Candidates,
     string? ReasonCode,
-    Guid? DatasetVersionId);
+    int? SchemaVersion,           // thay `Guid? DatasetVersionId` (ADR-02, `D-95`)
+    Guid? MappingImportId);       // id lô ánh xạ đã dùng (tái lập — NFR-03)
 
 /// Không phụ thuộc EF, không phụ thuộc HTTP ⇒ test được bằng unit test thuần.
 public interface IAddressNormalizer
@@ -491,12 +455,12 @@ public interface IAddressNormalizer
     Task<AddressNormalizationResult> NormalizeAsync(
         AddressInput input, AddressNormalizationMode mode, CancellationToken ct = default);
 
-    /// 2 cấp → 3 cấp: CHỈ đọc lại snapshot. Thiếu ⇒ ném eCommerce:Address:0005 (BR-04).
-    Task<Address> ToThreeLevelAsync(Address address, CancellationToken ct = default);
+    /// 2 cấp → 3 cấp: CHỈ đọc lại snapshot. Thiếu ⇒ ném eCommerce:Address:0305 (BR-04).
+    Task<DiaChiSnapshotDto> ToThreeLevelAsync(DiaChiSnapshotDto address, CancellationToken ct = default);
 }
 ```
 
-> 🚨 **`ToThreeLevelAsync` CỐ Ý không truy vấn `AddrDistricts`.** Đây là chỗ dễ "tiện tay" tra ngược
+> 🚨 **`ToThreeLevelAsync` CỐ Ý không truy vấn `AddrAdministrativeUnits` với `Level = QuanHuyen` để SUY RA huyện** (v0.1 gọi là `AddrDistricts`). Đây là chỗ dễ "tiện tay" tra ngược
 > sang bộ huyện cũ nhất — và đó chính là **bịa dữ liệu**. Test `TC-09` là **test quét mã nguồn** chặn
 > việc này tái phát (**BR-04**, **NFR-04**).
 
@@ -504,21 +468,21 @@ public interface IAddressNormalizer
 
 | Mục | Giá trị |
 |---|---|
-| Interface | `IAddressNormalizationAppService` (tại `eCommerce.AddressHub.Application.Contracts`) |
-| Implementation | `AddressNormalizationAppService` (tại `eCommerce.AddressHub.Application`) |
+| Interface | ⬜ `IAddressNormalizationAppService` (tại `eCommerce.Address.Application.Contracts` — project có sẵn) |
+| Implementation | ⬜ `AddressNormalizationAppService` (tại `eCommerce.Address.Application`). **Thêm mới, không thay** `AdministrativeUnitAppService` (`AdministrativeUnitAppService.cs:29-83`, tra cứu/xác minh — `D-79` giữ nguyên) và `AddressAppService` (sổ địa chỉ — `ADDR-004`) |
 | `[Authorize]` | **cấp CLASS** + permission ở từng method (**BR-13**; tiền lệ `src/eCommerce.Application/Channels/ChannelAppService.cs:27`) |
 
 | Method | Input (DTO) | Output (DTO) | Permission | Ghi chú |
 |---|---|---|---|---|
-| `NormalizeAsync` | `NormalizeAddressDto` (+ header `Idempotency-Key`) | `AddressNormalizationResultDto` | `eCommerce.Address.Normalization.Execute` | idempotent theo header |
-| `GetReviewQueueAsync` | `PagedAndSortedResultRequestDto` | `PagedResultDto<AddressReviewDto>` | `eCommerce.Address.Normalization.Review` | lọc theo `Status`/`ReasonCode`/khoảng ngày |
-| `GetCandidatesAsync` | `Guid reviewId` | `IReadOnlyList<AddressCandidateDto>` | `eCommerce.Address.Normalization.Review` | đọc từ `Candidates` jsonb |
-| `ConfirmAsync` | `ConfirmAddressReviewDto` (`ReviewId`, `ChosenWardCode`, `RowVersion`) | `AddressReviewDto` | `eCommerce.Address.Normalization.Review` | guard theo §3.1 dòng 5 |
-| `RejectAsync` | `RejectAddressReviewDto` (`ReviewId`, `Reason`, `RowVersion`) | `AddressReviewDto` | `eCommerce.Address.Normalization.Review` | |
-| `ImportDatasetAsync` | `ImportAddressDatasetDto` (`DatasetCode`, `Structure`, `LegalBasis`, `EffectiveFrom`, `FileSha256`, `ContentBase64`) | `AddressDatasetDto` | `eCommerce.Address.Dataset.Import` | **host** |
-| `ActivateDatasetAsync` | `ActivateAddressDatasetDto` (`DatasetId`, `RowVersion`) | `AddressDatasetDto` | `eCommerce.Address.Dataset.Activate` | **host**; `Superseded` phiên bản cũ **cùng transaction** |
-| `GetDatasetsAsync` | `PagedAndSortedResultRequestDto` | `PagedResultDto<AddressDatasetDto>` | `eCommerce.Address.Dataset.View` | **host** |
-| `GetMappingsAsync` | `GetAddressMappingsDto` (`FromDatasetId`, `ToDatasetId`, `Level`, `Code`) | `IReadOnlyList<AddressMappingDto>` | `eCommerce.Address.Mapping.View` | dùng để điều tra ca `Partial` |
+| `NormalizeAsync` | `NormalizeAddressDto` (+ header `Idempotency-Key`) | `AddressNormalizationResultDto` | `eCommerce.Addresses.Normalization.Execute` | idempotent theo header |
+| `GetReviewQueueAsync` | `PagedAndSortedResultRequestDto` | `PagedResultDto<AddressReviewDto>` | `eCommerce.Addresses.Normalization.Review` | `Address.TrangThai ∈ {ChuaChuanHoa, NghiNgo}` + dòng `NeedsReview` mới nhất; lọc mặc định review `Pending` (suy ra từ ledger); lọc theo `ReasonCode`/khoảng ngày (`D-96` (5)). `GetHangDoiChuanHoaAsync` của `ADDR-004` giữ nguyên |
+| `GetCandidatesAsync` | `Guid reviewLedgerId` | `IReadOnlyList<AddressCandidateDto>` | `eCommerce.Addresses.Normalization.Review` | đọc từ `Candidates` jsonb của dòng `NeedsReview` |
+| `ConfirmAsync` | `ConfirmAddressReviewDto` (`ReviewLedgerId`, `ChosenWardCode`) — **không** `RowVersion` | `AddressReviewDto` | `eCommerce.Addresses.Normalization.Review` | guard theo §3.1 hàng 5; chống quyết định đôi bằng unique khoá `Address:Review:{ReviewLedgerId}:Decision` (`D-96` (2)) |
+| `RejectAsync` | `RejectAddressReviewDto` (`ReviewLedgerId`, `Reason` bắt buộc) | `AddressReviewDto` | `eCommerce.Addresses.Normalization.Review` | §3.1 hàng 6 |
+| ~~`ImportDatasetAsync`~~ | — | — | ~~`eCommerce.Address.Dataset.Import`~~ | ❌ **bỏ khỏi ADDR-003** (`D-95` (a)): nạp danh mục = `ImportDatasetAsync` của `ADDR-001` (`D-78`/`D-81`/`D-82`) |
+| `ImportUnitMappingsAsync` ⬜ | `ImportUnitMappingsDto` (`SourceName`, `LegalBasis`, `EffectiveFrom`, `FileSha256`, `ContentBase64`) | `UnitMappingImportDto` (id lô) | quyền **chỉ thêm khi code method** (khuôn `D-85`, gợi ý `Addresses.UnitMapping.Import`, `MultiTenancySides.Host`) | **host**; mỗi lượt ghi 1 bản ghi lô `AddrUnitMappingImports`; giành khoá `AddressLockKeys.CatalogImport` (`D-82`); cùng `SourceHash` ⇒ lô cũ, 0 dòng thêm; cùng hash + metadata khác ⇒ `0307` (`D-95` (d)) |
+| ~~`ActivateDatasetAsync`~~ / ~~`GetDatasetsAsync`~~ | — | — | — | ❌ **bỏ** (`D-95` (a)) |
+| `GetMappingsAsync` | `GetAddressMappingsDto` (`FromSchemaVersion`, `ToSchemaVersion`, `Level`, `Code`) | `IReadOnlyList<AddressMappingDto>` | `eCommerce.Addresses.Mapping.View` | dùng để điều tra ca `Partial` |
 
 ### 6.3 REST endpoint
 
@@ -526,7 +490,7 @@ public interface IAddressNormalizer
 |---|---|
 | Method / Route | `POST /api/app/address-normalization/normalize` |
 | Authentication | `Bearer` (OpenIddict — `XC-004` D1) |
-| Permission | `eCommerce.Address.Normalization.Execute` |
+| Permission | `eCommerce.Addresses.Normalization.Execute` |
 | Content-Type | `application/json` |
 | Header bắt buộc | `Idempotency-Key` (**BR-10**) |
 
@@ -539,8 +503,6 @@ public interface IAddressNormalizer
   "legacyDistrictCode": "001",
   "legacyWardCode": "00004",
   "streetLine": "Số 1 Đường X",
-  "recipientName": "Nguyễn Văn A",
-  "phone": "0900000000",
   "sourceEntityType": "CustomerAddress",
   "sourceEntityId": "6f1e0000-0000-0000-0000-000000000001"
 }
@@ -552,19 +514,22 @@ public interface IAddressNormalizer
 {
   "status": "Normalized",
   "normalized": {
-    "countryCode": "VN",
-    "provinceCode": "01",
-    "provinceName": "Thành phố Hà Nội",
-    "wardCode": "00004",
-    "wardName": "Phường ...",
-    "streetLine": "Số 1 Đường X",
-    "datasetVersionId": "b1a2...",
-    "legacyProvinceCode": "01",
-    "legacyDistrictCode": "001",
-    "legacyWardCode": "00004"
+    "addressId": "6f1e0000-0000-0000-0000-0000000000a2",
+    "trangThai": "DaChuanHoa",
+    "schemaVersion": 2,
+    "tinhCode": "01",
+    "tenTinh": "Thành phố Hà Nội",
+    "huyenCode": null,
+    "xaCode": "00004",
+    "tenXa": "Phường ...",
+    "soNhaDuong": "Số 1 Đường X",
+    "diaChiDayDu": "Số 1 Đường X, Phường ..., Thành phố Hà Nội",
+    "coDungDuoc": true
   },
   "candidates": [],
-  "reasonCode": null
+  "reasonCode": null,
+  "schemaVersion": 2,
+  "mappingImportId": "b1a2..."
 }
 ```
 
@@ -581,27 +546,32 @@ public interface IAddressNormalizer
       "legalBasis": "<số hiệu Nghị quyết UBTVQH> — Phụ lục ..." }
   ],
   "reasonCode": "PartialMapping",
-  "datasetId": null
+  "schemaVersion": 2,
+  "mappingImportId": null
 }
 ```
 
-**Mã lỗi nghiệp vụ** (mã module do **module tự sở hữu** — quy ước đã ghi ở
-`modules/Tax/eCommerce.Tax.Domain/TaxErrorCodes.cs:6-8`; `ADDR-003` khai báo trong `AddressHubErrorCodes`)
+**Mã lỗi nghiệp vụ** — **`D-79`: giữ nguyên giá trị mã đã có, cấm đánh số lại.** Mã v0.1 `0001…0011` **trùng** `AddressErrorCodes` đang chạy
+(`AddressErrorCodes.cs:10-31` dùng `0001…0007`; `ADDR-004` dùng `01xx` `:39-63`; `ADDR-002` `05xx`; đồng bộ `06xx`) nên bảng dưới **tái dùng** mã cùng nghĩa
+(`0001`, `0002`, `0006`, `0103`) và đặt mã mới ở dải **`03xx`** (⬜ chưa có hằng — thêm vào `AddressErrorCodes` ở WP code, tên do BE đặt; số cuối dải `03xx` = số kế tiếp).
+Cột HTTP là **đề xuất**: ánh xạ `BusinessException` → HTTP của host **chưa xác minh** trong lượt WP-14.
 
 | Mã | HTTP | Khi nào | Thông điệp |
 |---|---|---|---|
-| `eCommerce:Address:0001` | `400` | Mã ĐVHC sai định dạng hoặc không thuộc phiên bản danh mục | `Đơn vị hành chính '{code}' không hợp lệ trong phiên bản danh mục '{dataset}'.` |
-| `eCommerce:Address:0002` | `422` | **Chế độ `Strict`**: không tìm thấy ánh xạ | `Không tìm thấy ánh xạ cho đơn vị hành chính cũ. Vui lòng chọn lại địa chỉ.` |
-| `eCommerce:Address:0003` | `409` | Chuyển trạng thái phiên bản danh mục không hợp lệ | `Không thể chuyển phiên bản danh mục từ {from} sang {to}.` |
-| `eCommerce:Address:0004` | `409` | Chuyển trạng thái review không hợp lệ (kể cả từ trạng thái **hấp thụ**) | `Không thể chuyển bản ghi cần xác nhận từ {from} sang {to}.` |
-| `eCommerce:Address:0005` | `422` | Yêu cầu 3 cấp nhưng **không** có snapshot (**BR-04**) | `Địa chỉ không có thông tin cấp huyện lịch sử. Không thể suy diễn.` |
-| `eCommerce:Address:0006` | `400` | File danh mục thiếu cột/sai định dạng | `File danh mục không hợp lệ: {chi tiết}.` |
-| `eCommerce:Address:0007` | `409` | `DatasetSourceHash` trùng nhưng metadata khác | `File danh mục đã được nạp với thông tin khác. Cần điều tra thủ công.` |
-| `eCommerce:Address:0008` | `409` | `UPDATE … WHERE Status = @expected` ảnh hưởng **0 dòng** / `RowVersion` lệch | `Bản ghi đã bị thay đổi bởi người khác. Vui lòng tải lại.` |
-| `eCommerce:Address:0009` | `400` | Ứng viên được chọn **không** nằm trong tập ứng viên | `Ứng viên được chọn không thuộc danh sách ứng viên của bản ghi này.` |
-| `eCommerce:Address:0010` | `422` | Dùng đơn vị hành chính **đã đóng mã** làm đích (**BR-16**) | `Đơn vị hành chính '{code}' đã ngừng hiệu lực, không thể dùng làm đích chuẩn hoá.` |
-| `eCommerce:Address:0011` | `409` | Không có phiên bản danh mục `Active` cho cấu trúc cần dùng | `Chưa có phiên bản danh mục đơn vị hành chính đang hiệu lực.` |
-| `eCommerce:Messaging:0002` | `409` | Cùng `IdempotencyKey` nhưng `PayloadHash` **khác** | *(dùng lại mã của `XC-002` — **không** định nghĩa mã trùng nghĩa)* |
+| `eCommerce:Address:0001` ✅ có (`KhongTimThayDonVi`) | `400` | Mã ĐVHC **không thuộc** `SchemaVersion` đã chọn | `Đơn vị hành chính '{code}' không hợp lệ trong phiên bản danh mục '{dataset}'.` |
+| `eCommerce:Address:0002` ✅ có (`MaKhongHopLe`) | `400` | Mã ĐVHC **sai định dạng** (tỉnh 2 · huyện 3 · xã 5 chữ số) | *(thông điệp theo `AddressErrorCodes.cs:12`)* |
+| `eCommerce:Address:0302` ⬜ | `422` | **Chế độ `Strict` (chỉ in-process — `D-98`)**: mọi ca mà `CreateReview` sẽ trả `NeedsReview` (mọi `ReasonCode`) | `Không tự chuẩn hoá được địa chỉ ({reasonCode}). Vui lòng chọn lại địa chỉ.` |
+| ~~`eCommerce:Address:0303`~~ | — | **BỎ, không cấp số** (`D-95` (e)): không còn máy trạng thái phiên bản; giữ trống, không tái dùng cho nghĩa khác | — |
+| `eCommerce:Address:0103` ✅ có (`ChuyenTrangThaiKhongHopLe`) | `409` | Chuyển trạng thái của **địa chỉ / hàng đợi xác nhận** không hợp lệ (`ADDR-004` Q9: hàng đợi = `Address.TrangThai`) | `Không thể chuyển địa chỉ từ {from} sang {to}.` |
+| `eCommerce:Address:0305` ⬜ | `422` | Yêu cầu 3 cấp nhưng **không** có snapshot (**BR-04**) | `Địa chỉ không có thông tin cấp huyện lịch sử. Không thể suy diễn.` |
+| `eCommerce:Address:0306` ⬜ | `400` | **File ánh xạ** thiếu cột/sai định dạng, **hoặc trùng dòng trong một file** (hai dòng cùng `(nhóm, ToLevel, ToCode)` sau `Trim`) — gom rồi NÉM kèm `WithData` ≤ 20 mẫu, 0 dòng thêm/tắt, ghi lô từ chối (`D-95` (e), `D-100` (4)) | `File ánh xạ không hợp lệ: {chi tiết}.` |
+| `eCommerce:Address:0307` ⬜ | `409` | `SourceHash` của lô ánh xạ trùng nhưng metadata lô khác (`D-95`); lô bị chặn ⇒ **0** dòng bị tắt (`D-100` (4)) | `File ánh xạ đã được nạp với thông tin khác. Cần điều tra thủ công.` |
+| `eCommerce:Address:0308` ⬜ | `409` | Người quyết review sau — khoá `Address:Review:{ReviewLedgerId}:Decision` đã có dòng kết thúc (`D-96` (2); thay `RowVersion` của bảng review đã bỏ) | `Ca này đã được người khác xử lý. Vui lòng tải lại.` |
+| `eCommerce:Address:0309` ⬜ | `400` | Ứng viên được chọn **không** nằm trong `Candidates` của dòng `NeedsReview` | `Ứng viên được chọn không thuộc danh sách ứng viên của ca này.` |
+| `eCommerce:Address:0006` ✅ có (`MaDaDong`, `AddressErrorCodes.cs:28`) | `422` | Dùng đơn vị hành chính **đã đóng mã** (`IsActive = false`) làm đích (**BR-16**) | `Đơn vị hành chính '{code}' đã ngừng hiệu lực, không thể dùng làm đích chuẩn hoá.` |
+| `eCommerce:Address:0311` ⬜ | `409` | Danh mục của `SchemaVersion` cần dùng **chưa được nạp** (0 đơn vị `IsActive`) — fail-closed (`D-95` (e)) | `Chưa nạp danh mục đơn vị hành chính cho phiên bản này.` |
+| `eCommerce:Messaging:0001` ✅ có (`PayloadConflict`, `MessagingErrorCodes.cs:14`) | `409` | Cùng `IdempotencyKey` nhưng `PayloadHash` **khác** | *(dùng lại mã của `XC-002` — **không** định nghĩa mã trùng nghĩa)* |
+| `eCommerce:Messaging:0002` ✅ có (`DangXuLy`, `:17`) | `409` | Cùng `IdempotencyKey` đang được xử lý | *(dùng lại mã của `XC-002`)* |
 
 ---
 
@@ -611,9 +581,9 @@ public interface IAddressNormalizer
 
 | ETO | Khi nào phát | Trường dữ liệu | Ai tiêu thụ | Idempotent? |
 |---|---|---|---|---|
-| `AddressNormalizedEto` | sau khi ghi snapshot 2 cấp (commit) | `EventId`, `OccurredOn`, `AggregateId` (địa chỉ), `AggregateVersion`, `TenantId`, `SourceEntityType`, `SourceEntityId`, `ProvinceCode`, `WardCode`, `DatasetVersionId`, `Method` | `Customers` (sổ địa chỉ), `Sales` (đơn), `ShippingHub`/`ADDR-002` (map mã hãng) | ✅ theo `AggregateId` + `AggregateVersion` |
+| `AddressNormalizedEto` | sau khi ghi `Address` 2 cấp (commit) | `EventId`, `OccurredOn`, `AggregateId` (địa chỉ), `AggregateVersion`, `TenantId`, `SourceEntityType`, `SourceEntityId`, `ProvinceCode`, `WardCode`, `SchemaVersion`, `MappingImportId`, `Method`, `OldAddressId`/`NewAddressId` (không PII — `D-96` (3)) | `Customers` (sổ địa chỉ), `Sales` (đơn), `ShippingHub`/`ADDR-002` (map mã hãng) | ✅ theo `AggregateId` + `AggregateVersion` |
 | `AddressNormalizationFailedEto` | khi `NeedsReview` / `InvalidInput` / `Unresolvable` | `EventId`, `TenantId`, `SourceEntityId`, `ReasonCode`, `Candidates` (**không** kèm PII) | `Customers` (hiển thị "cần xác nhận địa chỉ"), `Notifications` (GĐ3) | ✅ theo `(SourceEntityId, InputHash)` |
-| `AddressDatasetActivatedEto` | khi `Imported → Active` | `DatasetId`, `Structure`, `EffectiveFrom`, `RowCounts` | `ADDR-002` (bỏ cache mã hãng), `ADDR-001` (bỏ cache tra cứu), job soát lại | ✅ theo `DatasetId` |
+| ~~`AddressDatasetActivatedEto`~~ → `AddressUnitMappingsImportedEto` ⬜ | khi một lô ánh xạ áp thành công (`D-95` (a), (f)) | id lô, `FromSchemaVersion`, `ToSchemaVersion` | job soát lại (§3.1 hàng 7) | ✅ theo id lô |
 
 > 🚨 **Bắt buộc qua outbox** (`useOutbox: true`, trong Unit of Work) — theo `XC-002` BR-001; eShop đã
 > chứng minh outbox **thiếu relay** thì dual-write vẫn còn nguyên.
@@ -622,15 +592,15 @@ public interface IAddressNormalizer
 
 | Nguồn | Loại | Xác thực | Khoá chống trùng | Nếu xử lý lỗi? | Thứ tự đến |
 |---|---|---|---|---|---|
-| Quản trị host — **file danh mục** | upload HTTP | Bearer + `eCommerce.Address.Dataset.Import` (chỉ host — `XC-004` Q7) | `DatasetSourceHash` = **SHA-256** file + UNIQUE `(DatasetSourceHash)` | `400` + báo cáo dòng lỗi; **không** ghi gì | 1 file 1 phiên bản; nạp lại **idempotent** |
+| Quản trị host — **file ánh xạ** (danh mục thuộc `ADDR-001`) | upload HTTP | Bearer + quyền host nạp ánh xạ (⬜ thêm khi code, `D-95` (d); `XC-004` Q7) | `SourceHash` = **SHA-256** tập ánh xạ chuẩn hoá + UNIQUE `(TenantId, SourceHash)` (bản ghi lô) | `400` + báo cáo dòng lỗi; lượt bị chặn **vẫn ghi** lô từ chối | 1 file 1 lô; nạp lại **idempotent**; nguồn production chưa xác định (`D-93`) |
 | Sàn TMĐT — địa chỉ giao trong đơn | webhook → **đi qua inbox `SAL-005`** (`XC-002`) | HMAC/allowlist do `SAL-005` lo | `Address:Normalize:{orderId}:{payloadHash}` + UNIQUE `(TenantId, IdempotencyKey)` | DLQ + retry nhịp sau (**không** nuốt lỗi) | ⚠️ **có thể sai thứ tự** — không phụ thuộc thứ tự vì mỗi địa chỉ độc lập |
-| Khách — nhập/sửa địa chỉ | HTTP | Bearer + `eCommerce.Address.Normalization.Execute` | `Idempotency-Key` (**client sinh, ỔN ĐỊNH qua retry**) | `422`/`409` theo §6.3 | — |
+| Khách — nhập/sửa địa chỉ | HTTP | Bearer + `eCommerce.Addresses.Normalization.Execute` header `Idempotency-Key` (**client sinh, ỔN ĐỊNH qua retry**) chỉ dùng cho `IIdempotencyGuard`; khoá ghi vào `AddrNormalizationLedger.IdempotencyKey` là khoá **server dựng từ nội dung** `Address:Normalize:{tenantId}:{sourceEntityId}:{inputHash}` (§8) ⇒ hai header khác nhau + cùng input ⇒ **1** dòng ledger (`TC-29`) | `422`/`409` theo §6.3 | — |
 | Hãng vận chuyển — trả địa chỉ đã chuẩn hoá | webhook (`SHP-002`) | theo `SHP-002` | `Address:Carrier:{carrierCode}:{trackingNo}:{payloadHash}` | DLQ | **có thể sai thứ tự** |
-| Job nền — soát lại sau khi kích hoạt phiên bản mới | job định kỳ | nội bộ | `Address:ReNormalize:{datasetId}:{addressId}` | `SkipIfBusy` + log + metric | — |
+| Job nền — soát lại sau khi một lô ánh xạ áp thành công | job định kỳ | nội bộ | `Address:ReNormalize:{mappingImportId}:{addressId}` | `SkipIfBusy` + log + metric | — |
 
 > 📌 **Idempotency key phải ỔN ĐỊNH** (`XC-002` BR-007): **cấm** `Guid.NewGuid()` mỗi lần gọi.
 > Ví dụ **đúng**: `Address:Normalize:{tenantId}:{sourceEntityId}:{inputHash}` ·
-> `Address:Dataset:{sha256}`. Ví dụ **sai**: `Guid.NewGuid().ToString()`.
+> `Address:Review:{reviewLedgerId}:Decision` · `Address:UnitMappings:{sha256}`. Ví dụ **sai**: `Guid.NewGuid().ToString()`.
 
 ### 7.3 Gọi API ra ngoài
 
@@ -651,12 +621,12 @@ public interface IAddressNormalizer
 
 | # | Bất biến | Cơ chế bảo vệ |
 |---|---|---|
-| 1 | Địa chỉ đã lưu là **snapshot bất biến** (mã + tên + `DatasetVersionId`) | Value object `readonly record struct Address`; sửa ⇒ **bút toán mới** trong ledger (**BR-01**) |
-| 2 | **Không** tồn tại mã ĐVHC mà thiếu `DatasetVersionId` | Cột `NOT NULL`; test reflection/quét cột (**TC-02**) |
-| 3 | **Không** có "huyện" nào được sinh ra ngoài snapshot | `ToThreeLevelAsync` **không** truy vấn `AddrDistricts`; test quét mã nguồn (**TC-09**) |
+| 1 | Địa chỉ đã lưu là **snapshot bất biến** (mã + tên chữ + `SchemaVersion`) | Entity `Address` (nội dung địa lý bất biến sau `DaChuanHoa`, NÉM `0102` — `Address.cs:136-140`) + DTO đọc `DiaChiSnapshotDto`; sửa ⇒ `Address` mới + **bút toán mới** trong ledger (**BR-01**, `TC-25`) |
+| 2 | **Không** tồn tại mã ĐVHC mà thiếu `SchemaVersion` | Cột `NOT NULL` + CHECK `in (1, 2)` (`Address.cs:47`); test reflection/quét cột (**TC-02**) |
+| 3 | **Không** có "huyện" nào được sinh ra ngoài snapshot | `ToThreeLevelAsync` **không** truy vấn `AddrAdministrativeUnits` `Level = QuanHuyen` để suy huyện; test quét mã nguồn (**TC-09**) |
 | 4 | Mọi ánh xạ **có căn cứ pháp lý** | `CHECK (LegalBasis <> '')` (**BR-05**) |
-| 5 | **Tối đa MỘT** phiên bản danh mục `Active` cho mỗi `Structure` | UNIQUE `(Structure) WHERE Status = 3` |
-| 6 | Ca mơ hồ **không** bị đoán ⇒ luôn có bản ghi review | UNIQUE `(TenantId, SourceEntityType, SourceEntityId, InputHash)` + `TC-08` (**BR-06/07**) |
+| 5 | ~~Tối đa MỘT phiên bản danh mục `Active` cho mỗi `Structure`~~ **bỏ** (`D-95`): "phiên bản hiện hành" là hằng `HienHanh` (`AdministrativeModels.cs:83`) — một nguồn | Test chụp hằng: `HienHanh == V2`, chỉ có `V1`/`V2` |
+| 6 | Ca mơ hồ **không** bị đoán ⇒ luôn có dòng ledger `NeedsReview` + địa chỉ trong hàng đợi | Dòng ledger cùng transaction với địa chỉ + `TC-08` (**BR-06/07**) |
 | 7 | `AddrNormalizationLedger` **chỉ được thêm** | Không có setter/nhánh UPDATE; review + test quét (**BR-08**) |
 | 8 | Gửi lại cùng một yêu cầu **100 lần** ⇒ **đúng 1** hiệu ứng | UNIQUE `(TenantId, IdempotencyKey)` + `IIdempotencyGuard` (`XC-002`) |
 | 9 | Unique index có `TenantId` **vẫn chặn trùng khi `TenantId = NULL`** | `NULLS NOT DISTINCT` sinh bằng SQL thô (**BR-09**) |
@@ -666,36 +636,36 @@ public interface IAddressNormalizer
 
 | # | Tình huống | Cơ chế |
 |---|---|---|
-| 1 | Hai CSKH cùng xác nhận một bản ghi review | `RowVersion` (optimistic concurrency) ⇒ luồng thua nhận `eCommerce:Address:0008` — **không** ghi đè |
-| 2 | Hai quản trị cùng kích hoạt hai phiên bản danh mục | UNIQUE `(Structure) WHERE Status = 3` + khoá phân tán + `RowVersion` ⇒ chỉ **một** thắng |
+| 1 | Hai CSKH cùng quyết một ca review | UNIQUE ledger `(TenantId, IdempotencyKey)` với khoá `Address:Review:{ReviewLedgerId}:Decision` ⇒ đúng 1 dòng kết thúc, người sau nhận `eCommerce:Address:0308` — **không** ghi đè (`D-96` (2); không `RowVersion`, `D-26`) |
+| 2 | Hai quản trị cùng nạp file ánh xạ | khoá `AddressLockKeys.CatalogImport` (`D-82`) + UNIQUE `(TenantId, SourceHash)` ⇒ chỉ **một** áp, người sau bị NÉM hoặc nhận lô cũ |
 | 3 | Job soát lại chạy trên nhiều instance | Khoá phân tán + `SkipIfBusy` + log + metric (`XC-003` D10) |
-| 4 | Nạp cùng một file danh mục từ 2 request song song | UNIQUE `(DatasetSourceHash)` ⇒ request thứ hai nhận `eCommerce:Address:0007` (nếu metadata khác) hoặc trả phiên bản đã có |
-| 5 | Kích hoạt phiên bản mới **trong khi** đang chuẩn hoá địa chỉ | Normalizer **ghim** `DatasetVersionId` một lần ở đầu UoW (snapshot) ⇒ request đang chạy dùng phiên bản cố định; job soát lại xử lý phần còn thiếu |
-| 6 | Redis chết | Fail-open (`AbortOnConnectFail = false`, `src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs:141`) ⇒ **vẫn đúng** nhờ unique index (`XC-003` D2) |
+| 4 | Nạp cùng một file ánh xạ từ 2 request song song | UNIQUE `(TenantId, SourceHash)` ⇒ request thứ hai nhận `eCommerce:Address:0307` (nếu metadata khác) hoặc trả lô đã có |
+| 5 | Một lô ánh xạ mới áp **trong khi** đang chuẩn hoá địa chỉ | Normalizer **ghim** id lô ánh xạ một lần ở đầu UoW ⇒ request đang chạy dùng lô cố định (ledger ghi `MappingImportId`); job soát lại xử lý phần còn thiếu |
+| 6 | Redis chết | Fail-open (`AbortOnConnectFail = false`, `src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs:251`) ⇒ **vẫn đúng** nhờ unique index (`XC-003` D2) |
 
 **Khoá phân tán dùng trong feature** — theo `XC-003` §5 khuôn `ecommerce:<module>:<đối tượng>:<id>[:<hậu tố>]`
 
-| Hàm sinh khoá (trong `AddressHubLockKeys`) | Chuỗi hàm trả về | **Khoá THẬT trong Redis** | Phạm vi | Vì sao cần |
+| Hàm sinh khoá (trong `AddressLockKeys` — ⬜ chưa có; hằng `CatalogImport` do `ADDR-001`/`D-82`) | Chuỗi hàm trả về | **Khoá THẬT trong Redis** | Phạm vi | Vì sao cần |
 |---|---|---|---|---|
-| `DatasetImport(datasetCode)` | `address:dataset-import:{datasetCode}` | `ecommerce:address:dataset-import:{datasetCode}` | **host** (không tenant) | 2 request cùng nạp một phiên bản ⇒ tránh chèn đôi |
-| `DatasetActivate(structure)` | `address:dataset-activate:{structure}` | `ecommerce:address:dataset-activate:{structure}` | **host** | chỉ 1 phiên bản `Active` cho mỗi cấu trúc |
+| `AddressLockKeys.CatalogImport` *(dùng lại, `D-82`/`D-95` (d))* | `address:sync-catalog` | `ecommerce:address:sync-catalog` | **host** (toàn danh mục) | nạp **ánh xạ** giành **cùng** khoá với nạp danh mục (kiểm đích `IsActive`/BR-16 đọc danh mục ⇒ không chạy song song với nạp danh mục) |
+| ~~`DatasetImport(datasetCode)`~~ · ~~`DatasetActivate(structure)`~~ | ~~`address:dataset-import:*`~~ · ~~`address:dataset-activate:*`~~ | — | — | ❌ **bỏ** (`D-95` (a)); **cấm** literal chuỗi thứ hai của khoá nạp |
 | `BatchNormalize(tenantId, batchId)` | `address:batch-normalize:{tenantId}:{batchId}` | `ecommerce:address:batch-normalize:{tenantId}:{batchId}` | theo tenant | job soát lại chỉ chạy 1 instance |
-| `ReviewClaim(tenantId, reviewId)` | `address:review-claim:{tenantId}:{reviewId}` | `ecommerce:address:review-claim:{tenantId}:{reviewId}` | theo tenant | 2 CSKH cùng mở một ca ⇒ tránh tranh chấp UI |
+| `ReviewClaim(tenantId, reviewLedgerId)` | `address:review-claim:{tenantId}:{reviewLedgerId}` | `ecommerce:address:review-claim:{tenantId}:{reviewLedgerId}` | theo tenant | 2 CSKH cùng mở một ca ⇒ tránh tranh chấp UI |
 
 > 🚨 **Vì sao cột "chuỗi hàm trả về" KHÔNG có tiền tố `ecommerce:` (ADR-10):** `XC-003` §5.4 đã chứng minh
 > bằng `redis-cli MONITOR` rằng **khoá thật = `KeyPrefix + name`** (ghép **không** dấu phân cách), và cấu
-> hình thật là `options.KeyPrefix = "ecommerce:"` (`src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs:127`).
-> Nếu hàm trả về cả tiền tố thì khoá thật thành `ecommerce:ecommerce:address:…`.
-> ⚠️ **Code hiện tại không nhất quán** ở điểm này ⇒ xem §15.2 **F7**.
+> hình thật là `options.KeyPrefix = "ecommerce:"` (`src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs:222,237`).
+> Nếu hàm trả về cả tiền tố thì khoá thật thành `ecommerce:ecommerce:address:…`. Code hiện **đã thống nhất** ⇒ xem §15.2 **F7**.
 
 **Idempotency key — bảng đăng ký**
 
 | Đối tượng | Cách sinh khoá | ⚠️ Lưu ý |
 |---|---|---|
 | Chuẩn hoá một địa chỉ (HTTP) | `Address:Normalize:{tenantId}:{sourceEntityId}:{inputHash}` | `inputHash` = SHA-256 của **đầu vào đã chuẩn hoá thứ tự**; **ổn định** qua retry |
-| Nạp file danh mục | `Address:Dataset:{sha256(file)}` | **chính là** `DatasetSourceHash` — một nguồn sự thật |
+| Nạp file ánh xạ | `Address:UnitMappings:{sha256(file ánh xạ chuẩn hoá)}` | **chính là** `SourceHash` của lô — một nguồn sự thật |
+| Quyết định review (xác nhận / từ chối / hết hạn) | `Address:Review:{ReviewLedgerId}:Decision` | **cùng** khoá cho cả ba ⇒ unique ledger chặn quyết định thứ hai (`D-96` (2)) |
 | Webhook sàn | `Address:Normalize:{orderId}:{payloadHash}` | đi qua inbox `SAL-005` trước |
-| Job soát lại | `Address:ReNormalize:{datasetId}:{addressId}` | chạy lại cùng phiên bản ⇒ **0** hiệu ứng mới |
+| Job soát lại | `Address:ReNormalize:{mappingImportId}:{addressId}` | chạy lại cùng lô ⇒ **0** hiệu ứng mới |
 
 ---
 
@@ -703,21 +673,22 @@ public interface IAddressNormalizer
 
 | Permission | Nhóm | Tầng | Gán cho | Vai trò mặc định |
 |---|---|---|---|---|
-| `eCommerce.Address.Dataset.View` | `Address` | **host** (`TenantId = null`) | `GetDatasetsAsync` | host admin |
-| `eCommerce.Address.Dataset.Import` | `Address` | **host** | `ImportDatasetAsync` | host admin |
-| `eCommerce.Address.Dataset.Activate` | `Address` | **host** | `ActivateDatasetAsync` | host admin |
-| `eCommerce.Address.Mapping.View` | `Address` | **host** | `GetMappingsAsync` | host admin · kế toán/vận hành (chỉ đọc) |
-| `eCommerce.Address.Normalization.Execute` | `Address` | **tenant** | `NormalizeAsync` | khách đã đăng nhập · job (client credentials) |
-| `eCommerce.Address.Normalization.Review` | `Address` | **tenant** | `GetReviewQueueAsync`, `GetCandidatesAsync`, `ConfirmAsync`, `RejectAsync` | CSKH |
+| ~~`eCommerce.Address.Dataset.View/Import/Activate`~~ | — | — | — | ❌ **bỏ** (`D-95` (a)); nạp danh mục dùng quyền của `ADDR-001` |
+| ⬜ quyền nạp ánh xạ (gợi ý `Addresses.UnitMapping.Import`, `MultiTenancySides.Host`) | `Addresses` | **host** | `ImportUnitMappingsAsync` | host admin — **chỉ thêm khi code method** (khuôn `D-85`) |
+| ⬜ `eCommerce.Addresses.Mapping.View` (hằng `eCommerceConsts.Permissions.Addresses.*`, `eCommerceConsts.cs:363`; **chỉ thêm khi code method**, khuôn `D-85`) | `Addresses` | **host** | `GetMappingsAsync` | host admin · kế toán/vận hành (chỉ đọc) |
+| ⬜ `eCommerce.Addresses.Normalization.Execute` | `Addresses` | **tenant** | `NormalizeAsync` | khách đã đăng nhập · job (client credentials) |
+| ⬜ `eCommerce.Addresses.Normalization.Review` | `Addresses` | **tenant** | `GetReviewQueueAsync`, `GetCandidatesAsync`, `ConfirmAsync`, `RejectAsync` | CSKH |
 
 **Quy tắc bắt buộc** (theo `XC-004`):
-- `[Authorize]` ở **cấp class** cho **mọi** app service của `AddressHub` (**BR-13**).
-- Tên permission **phải** là hằng số trong `AddressHubConsts.Permissions` (**cấm** magic string) và **phải**
+- `[Authorize]` ở **cấp class** cho **mọi** app service của module `Address` (**BR-13**).
+- Tên permission **phải** là hằng số trong `eCommerceConsts.Permissions.Addresses` (đã có nhóm — `eCommerceConsts.cs:363`; **cấm** magic string, **không** tạo nhóm "Address" thứ hai) và **phải**
   được **định nghĩa** trong `PermissionDefinitionProvider` (**XC-004** D2/D4; thiếu định nghĩa ⇒ `403` cho
   **mọi** người, kể cả host admin — **lỗi đã xảy ra thật ở Phase 0**).
 - Sửa **ánh xạ** và **danh mục** là thao tác **host-level** (nhất quán `XC-004` §5.3: `Tax.RateSchedule.Manage`
   là ví dụ quyền host; `XC-004` Q7 chốt: **chỉ host admin** được sửa cấu hình ở tầng này).
 - Bật/tắt quyền cho vai trò **phải** sinh **audit log** (`XC-004` BR-011).
+
+> ⚠️ **Cửa gọi `ChuanHoaLaiAsync` chưa chốt (Q13):** method chỉ có trên `AddressAppService`, mang `[Authorize(Addresses.Default)]` cấp class + `[Authorize(Addresses.Manage)]` (`AddressAppService.cs:21,80`); `IAddressDirectory` không có method tương ứng (`AddressContracts.cs:157-168`). Đường tự động (job, không user) và nút **Xác nhận** (CSKH chỉ có `Normalization.Review`) **chưa đo** có qua được interceptor không; cho tới khi Q13 chốt, **không** coi hàng 2/5 §3.1 là chạy được cho job/CSKH.
 
 > 📌 `ADDR-003` **không tạo** permission `Normalize` cho khách vãng lai; đặt hàng cho khách vãng lai (SAL-002 A4)
 > **vẫn** phải chuẩn hoá địa chỉ, nhưng thực hiện bằng **client credentials của Sales**, không mở endpoint công khai.
@@ -730,34 +701,31 @@ public interface IAddressNormalizer
 
 | Vùng UI | Dữ liệu hiển thị | Nguồn (DTO) | Hành động |
 |---|---|---|---|
-| Bộ lọc | `Status`, `ReasonCode`, khoảng ngày, `SourceEntityType` | query params | lọc — **mặc định `Pending`** |
-| Cột trái: **địa chỉ GỐC** | 3 cấp cũ (mã + tên) + chuỗi phố | `AddressReviewDto.InputSnapshot` | chỉ đọc — **cấm** sửa để "cho khớp" |
+| Bộ lọc | `Status` (**suy ra** từ ledger: `Pending/Confirmed/Rejected/Expired`), `ReasonCode`, khoảng ngày, `SourceEntityType` | query params | lọc — **mặc định `Pending`** |
+| Cột trái: **địa chỉ GỐC** | 3 cấp cũ (mã + tên) + chuỗi phố | `InputSnapshot` của dòng ledger `NeedsReview` (`AddressReviewDto`) | chỉ đọc — **cấm** sửa để "cho khớp" |
 | Cột phải: **ỨNG VIÊN** | mã + tên tỉnh/xã mới + `MappingKind` + `CoverageNote` + `LegalBasis` | `GetCandidatesAsync` | chọn 1 ⇒ bật nút **Xác nhận** |
 | Cảnh báo đỏ | hiện khi `MappingKind = Partial` | `Candidates` | yêu cầu người xác nhận **đọc `CoverageNote`** trước khi bấm |
-| Nút **Xác nhận** | — | `ConfirmAsync` | gửi kèm `RowVersion`; `409` ⇒ tải lại |
-| Nút **Từ chối** | — | `RejectAsync` | bắt buộc nhập lý do; địa chỉ chuyển `KhongTheChuanHoa` |
+| Nút **Xác nhận** | — | `ConfirmAsync` | gửi `ReviewLedgerId` + mã xã chọn; `409` (`0308`: người khác đã quyết) ⇒ tải lại |
+| Nút **Từ chối** | — | `RejectAsync` | bắt buộc nhập lý do; ledger `Unresolvable`, `Address` **giữ nguyên trạng thái** (không có trạng thái `KhongTheChuanHoa` — `D-96` (4)) |
 
 ### 10.2 Form địa chỉ của khách — storefront/admin
 
 | Vùng UI | Dữ liệu | Nguồn | Quy tắc |
 |---|---|---|---|
-| Chọn **Tỉnh/Thành** | 34 đơn vị | `ADDR-001` (danh mục `Active`, `Structure = 2`) | **không** hiển thị huyện |
+| Chọn **Tỉnh/Thành** | 34 đơn vị | `ADDR-001` (`SchemaVersion = HienHanh` = 2) | **không** hiển thị huyện |
 | Chọn **Xã/Phường/Đặc khu** | theo tỉnh đã chọn | `ADDR-001` | |
-| Ô **Địa chỉ cũ (chỉ đọc)** | 3 cấp snapshot | `Address.Legacy*` | **chỉ hiện** khi có snapshot; ghi rõ *"địa chỉ theo danh mục trước 01/7/2025"* |
-| Nhãn trạng thái | `NormalizationStatus` | `AddressNormalizationResultDto` | `CanNguoiXacNhan` ⇒ hiện *"đang chờ xác nhận, đơn có thể bị chậm"* — **không** hiện lỗi hệ thống |
+| Ô **Địa chỉ cũ (chỉ đọc)** | 3 cấp cũ | `DiaChiDayDu` của `Address` v1 nguồn hoặc `InputSnapshot` của ledger (**không** có cột `Legacy*` — `D-96` (6)) | **chỉ hiện** khi tìm được **đúng 1** nguồn; ghi rõ *"địa chỉ theo danh mục trước 01/7/2025"* |
+| Nhãn trạng thái | `Address.TrangThai` (`DiaChiSnapshotDto.TrangThai`) | `AddressNormalizationResultDto` | `ChuaChuanHoa`/`NghiNgo` ⇒ hiện *"đang chờ xác nhận, đơn có thể bị chậm"* — **không** hiện lỗi hệ thống |
 
-### 10.3 Màn hình "Phiên bản danh mục" — host
+### 10.3 Màn hình "Nạp file ánh xạ" — host
 
 | Vùng UI | Dữ liệu | Nguồn | Quy tắc |
 |---|---|---|---|
-| Bảng phiên bản | `DatasetCode`, `Structure`, `Status`, `EffectiveFrom`, `RowCounts`, `LegalBasis` | `GetDatasetsAsync` | hiển thị **rõ** phiên bản nào đang `Active` |
-| Nút **Nạp file** | `FileSha256` tính ở client + server | `ImportDatasetAsync` | cảnh báo *"nạp cùng file sẽ không tạo phiên bản mới"* |
-| Nút **Kích hoạt** | `RowVersion` | `ActivateDatasetAsync` | **hộp thoại xác nhận 2 bước** + hiển thị **số bản ghi sẽ phải soát lại** |
+| Bảng lô ánh xạ | `SourceName`, `LegalBasis`, `EffectiveFrom`, `ImportedAtUtc`, `Outcome`, số dòng | `AddrUnitMappingImports` (⬜) | lô bị chặn hiển thị cùng lô đã áp |
+| Nút **Nạp file ánh xạ** | `FileSha256` tính ở client + server | `ImportUnitMappingsAsync` | **hộp thoại xác nhận 2 bước** + **xem trước số địa chỉ phải soát lại**; cảnh báo *"nạp cùng file sẽ không thêm lô mới"* |
+| ~~Nút **Kích hoạt**~~ | — | — | ❌ **bỏ** (`D-95`): không có bước kích hoạt phiên bản |
 
-> 📌 **Chênh lệch số liệu (bắt buộc ghi rõ):** trên màn hình 10.1, số ở tiêu đề *"đang chờ xác nhận"* là
-> **số bản ghi review `Pending`**, còn số ở cột `NormalizationStatus` của danh sách khách là
-> **số địa chỉ**. Hai số này **khác nhau hợp lệ** khi đang có bộ lọc hoặc khi một địa chỉ đã được soát lại
-> nhiều lần. UI **phải** ghi nhãn rõ — nếu không sẽ bị báo là "đếm sai".
+> 📌 Số *"đang chờ xác nhận"* ở 10.1 = số `Address` ở `TrangThai ∈ {ChuaChuanHoa, NghiNgo}` (`ADDR-004` Q9, `GetHangDoiChuanHoaAsync` — `AddressContracts.cs:148`).
 
 ---
 
@@ -765,15 +733,15 @@ public interface IAddressNormalizer
 
 | Mục | Nội dung |
 |---|---|
-| Migration | `Added_AddressHub` — tạo **7 bảng** ở §5.2 + bật `CREATE EXTENSION IF NOT EXISTS unaccent` · `pg_trgm` (ADR-12) |
-| **Bắt buộc trong chính migration này** | 🚨 Sinh **SQL thô** `NULLS NOT DISTINCT` cho `AddrNormalizationReviews` và `AddrNormalizationLedger` — **không** để nợ như `XC-004` F1 (tiền lệ: `src/eCommerce.EntityFrameworkCore/Migrations/20261013024226_Fix_NullableTenantId_UniqueIndexes.cs:39-86`) |
-| DbSet trên DbContext hợp nhất | **BẮT BUỘC**: thêm 7 `DbSet<…>` vào `src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs` — **nếu không**, `IRepository<AddrWard, Guid>` **không** được đăng ký (runtime ném *"The requested service … has not been registered"*; ghi chú dài ở `eCommerceDbContext.cs:47-52`) |
-| Gọi mapping của module | `builder.ConfigureAddressHub()` trong `OnModelCreating` — theo khuôn `builder.ConfigureTax()` (`eCommerceDbContext.cs:76-78`) và `modules/Tax/eCommerce.Tax.EntityFrameworkCore/TaxDbContextModelCreatingExtensions.cs:14-70` |
-| Seed **bắt buộc** | `AddressDatasetDataSeedContributor`: (1) phiên bản **3 cấp cũ** (63 tỉnh, có huyện); (2) phiên bản **2 cấp mới** (34 tỉnh + **3.321** xã). **Idempotent** theo khuôn `src/eCommerce.DbMigrator/TaxRateScheduleDataSeedContributor.cs:49-57` (đếm > 0 ⇒ thoát) |
+| Migration | ⬜ **additive** (tên theo khuôn `Add_Addr003_…`, EF sinh; đã có 3 migration Address: `Add_Address_AdministrativeUnits`, `Add_Addr002_CarrierMappings`, `Addr004_SoDiaChi_Address`) — chỉ tạo bảng **còn lại** (`AddrUnitMappingImports`, `AddrUnitMappings`, `AddrNormalizationLedger` kèm 7 cột nullable của `D-96`; **không** `AddrDatasets`, **không** `AddrNormalizationReviews` — **không** còn 7 bảng) + CHECK `FromSchemaVersion`/`ToSchemaVersion` `in (1, 2)` + thêm cột `NameNormalized` vào `AddrAdministrativeUnits` + bật `CREATE EXTENSION IF NOT EXISTS unaccent` · `pg_trgm` (ADR-12) |
+| **Bắt buộc trong chính migration này** | 🚨 Sinh **SQL thô** `NULLS NOT DISTINCT` cho `AddrNormalizationLedger`, `AddrUnitMappings` và `AddrUnitMappingImports` (`D-92`) — **không** để nợ như `XC-004` F1 (tiền lệ: `src/eCommerce.EntityFrameworkCore/Migrations/20261013024226_Fix_NullableTenantId_UniqueIndexes.cs:39-86`) |
+| DbSet trên DbContext hợp nhất | **BẮT BUỘC**: thêm `DbSet<…>` cho từng bảng **mới** vào `src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs` (đã có 3: `AdministrativeUnits`, `CarrierAddressMappings`, `Addresses` — `:315,318,324`) — **nếu không**, `IRepository<AddrWard, Guid>` **không** được đăng ký (runtime ném *"The requested service … has not been registered"*; ghi chú dài ở `eCommerceDbContext.cs:47-52`) |
+| Gọi mapping của module | ✅ đã có `AddressDbContextModelCreatingExtensions.ConfigureAddress(builder)` (`eCommerceDbContext.cs:352`) — thêm cấu hình bảng mới vào **đó**; khuôn gốc `builder.ConfigureTax()` (`eCommerceDbContext.cs:76-78`) và `modules/Tax/eCommerce.Tax.EntityFrameworkCore/TaxDbContextModelCreatingExtensions.cs:14-70` |
+| Seed **bắt buộc** | ⬜ (`D-93`: nguồn production = file công bố của cơ quan nhà nước, cơ quan/định dạng/đường dẫn **chưa xác định** ⇒ không code nạp tới khi có input thật; hiện **không** có seeder — `ADDR-001` §0.2) **Danh mục** (63 tỉnh có huyện cho `SchemaVersion = 1`; 34 tỉnh + **3.321** xã cho `SchemaVersion = 2`) nạp qua `ADDR-001` (`D-95` (c)) — ADDR-003 **không** có seeder `AddressDatasetDataSeedContributor`. **Idempotent** theo khuôn `src/eCommerce.DbMigrator/TaxRateScheduleDataSeedContributor.cs:49-57` (đếm > 0 ⇒ thoát) |
 | Seed **ánh xạ** | `AddrUnitMappings` **phải** được nạp từ **phụ lục Nghị quyết sắp xếp** + **`Quyết định 19/2025/QĐ-TTg`**; **cấm** viết tay theo trí nhớ (**BR-05**, **BR-14**) — ⚠️ **chưa có nguồn file máy đọc được** (xem §15.1 **Q2**) |
-| Ảnh hưởng dữ liệu cũ | ✅ **KHÔNG cần backfill ngay**: đã kiểm tra code thật — `src/eCommerce.Domain/Entities/Orders/Order.cs:10-52` **không có cột địa chỉ nào**; `docs/features/sales/sal-002-checkout-va-dat-hang.md:503-504` mới chỉ **thiết kế** `ShippingAddressId?`. ⇒ Ngay khi `SAL-002`/`CUS-001` có cột địa chỉ, job soát lại **phải** chạy **trước** khi bật tính năng tạo vận đơn |
-| Khi kích hoạt phiên bản mới | Job `AddressRenormalizeJob`: quét địa chỉ có `DatasetVersionId` cũ, soát lại, đếm số cần xác nhận, ghi metric `address_renormalize_required_total`. **Không** tự đổi snapshot (BR-01) |
-| Rollback | `Down` của `Added_AddressHub` = `DROP TABLE` 7 bảng (chấp nhận mất dữ liệu danh mục vì **nạp lại được từ file**); `Down` **phải** khôi phục các index về trạng thái không `NULLS NOT DISTINCT` **chỉ khi** rollback thật sự cần. ⚠️ Nếu đã có dữ liệu địa chỉ thật ⇒ **cấm** rollback, phải sửa tiến |
+| Ảnh hưởng dữ liệu cũ | ✅ **KHÔNG cần backfill ngay**: đã kiểm tra code thật — `modules/Sales/eCommerce.Sales.Domain/Order.cs:11` (đo 18/11/2026: **0** trường `Address`/`Recipient`/`Province`/`Ward`) **không có cột địa chỉ nào**; `docs/features/sales/sal-002-checkout-va-dat-hang.md:503-504` mới chỉ **thiết kế** `ShippingAddressId?`. ⇒ Ngay khi `SAL-002`/`CUS-001` có cột địa chỉ, job soát lại **phải** chạy **trước** khi bật tính năng tạo vận đơn |
+| Khi một lô ánh xạ áp thành công (`D-95` (f)) | Job `AddressRenormalizeJob`: quét địa chỉ `DaChuanHoa` có `MappingImportId` cũ (ledger), soát lại, đếm số cần xác nhận, ghi metric `address_renormalize_required_total`. **Không** tự đổi snapshot (BR-01) |
+| Rollback | `Down` của migration ADDR-003 = `DROP TABLE` các bảng mới (chấp nhận mất ánh xạ vì **nạp lại được từ file**; ledger có dữ liệu thật ⇒ **cấm** rollback); `Down` **phải** khôi phục các index về trạng thái không `NULLS NOT DISTINCT` **chỉ khi** rollback thật sự cần. ⚠️ Nếu đã có dữ liệu địa chỉ thật ⇒ **cấm** rollback, phải sửa tiến |
 | Rủi ro đã biết | EF Core **không** mô hình hoá `NULLS NOT DISTINCT` ⇒ một migration **do EF sinh tự động** sau này có thể **tạo lại** index và **làm mất** thuộc tính ⇒ test `TC-16` phải bắt được |
 
 ---
@@ -782,26 +750,27 @@ public interface IAddressNormalizer
 
 | Tình huống | Nguyên nhân | Hành vi hệ thống | Phản hồi tới client |
 |---|---|---|---|
-| Mã xã cũ **không có** trong bảng ánh xạ | dữ liệu cũ chưa phủ / nguồn ngoài lạ | **`NeedsReview`** + tạo bản ghi review + metric (chế độ `CreateReview`) | `200` + `NeedsReview` — **không** phải lỗi hệ thống |
+| Mã xã cũ **không có** trong bảng ánh xạ | dữ liệu cũ chưa phủ / nguồn ngoài lạ | **`NeedsReview`** + dòng ledger + vào hàng đợi + metric (chế độ `CreateReview`) | `200` + `NeedsReview` — **không** phải lỗi hệ thống |
 | Cùng mã cũ có **≥ 2** đích (điều chỉnh một phần) | thành lập xã mới từ **một phần** đơn vị cũ | **`NeedsReview`** + danh sách ứng viên, `ReasonCode = PartialMapping` | `200` + `NeedsReview` |
-| Yêu cầu **3 cấp** nhưng **không** có snapshot | địa chỉ mới (2 cấp) hoặc dữ liệu vào không có huyện | **NÉM** `eCommerce:Address:0005` — **cấm** bịa (**BR-04**) | `422` |
-| Mã tỉnh/xã **sai định dạng** | client gửi rác | **NÉM** `eCommerce:Address:0001`; ledger `Outcome = InvalidInput` | `400` |
-| Dùng **mã đã đóng** làm đích | chọn nhầm đơn vị cũ | **NÉM** `eCommerce:Address:0010` | `422` |
-| Không có phiên bản danh mục `Active` | chưa seed / chưa kích hoạt | **NÉM** `eCommerce:Address:0011` (**BR-14**) | `409` |
-| Nạp lại **cùng file** danh mục | thao tác lặp | `DatasetSourceHash` trùng + metadata khớp ⇒ trả phiên bản **đã có**, **0 dòng thêm** | `200` |
-| Nạp file **cùng hash nhưng metadata khác** | file bị sửa cục bộ hoặc nhầm | **NÉM** `eCommerce:Address:0007` — **không** ghi đè | `409` |
-| Hai CSKH cùng xác nhận | tranh chấp | `RowVersion` lệch ⇒ **NÉM** `eCommerce:Address:0008` | `409` |
-| Chọn ứng viên **ngoài** danh sách | lỗi client / gian lận | **NÉM** `eCommerce:Address:0009` | `400` |
-| Gửi lại webhook sàn **cùng nội dung** | at-least-once — **bình thường** | `IIdempotencyGuard` trả `AlreadyProcessed` ⇒ **0** side effect | `200` |
+| Yêu cầu **3 cấp** nhưng **không** có snapshot | địa chỉ mới (2 cấp) hoặc dữ liệu vào không có huyện | **NÉM** `eCommerce:Address:0305` — **cấm** bịa (**BR-04**) | `422` |
+| Mã tỉnh/xã **sai định dạng** | client gửi rác | ledger `Outcome = InvalidInput` ghi bằng UoW **riêng** (`requiresNew`) rồi **NÉM** `eCommerce:Address:0002` | `400` |
+| Dùng **mã đã đóng** làm đích (cửa ghi cuối) | chọn nhầm đơn vị cũ; CSKH xác nhận ứng viên bị `Dong()` sau khi mở review | **NÉM** `eCommerce:Address:0006` | `422` |
+| **Đích ánh xạ đã đóng** (sau lô V2→V2: A→B rồi `Dong(B)`) | đường tự động tra một bước gặp đích `IsActive = false` | **`NeedsReview`** `ReasonCode = TargetClosed`, `Candidates` chỉ đích `IsActive` của cùng bước (có thể rỗng), **không** ném, **không** đi tiếp chuỗi (`D-97`) | `200` + `NeedsReview` |
+| Danh mục của `SchemaVersion` chưa nạp | chưa nạp qua `ADDR-001` | **NÉM** `eCommerce:Address:0311` (**BR-14**, `D-95` (e)) | `409` |
+| Nạp lại **cùng file ánh xạ** | thao tác lặp | `SourceHash` trùng + metadata khớp ⇒ trả lô **đã có**, **0 dòng thêm** | `200` |
+| Nạp file ánh xạ **cùng hash nhưng metadata khác** | file bị sửa cục bộ hoặc nhầm | **NÉM** `eCommerce:Address:0307` — **không** ghi đè; ghi lô từ chối | `409` |
+| Hai CSKH cùng xác nhận | tranh chấp | khoá `Address:Review:{ReviewLedgerId}:Decision` đã có ⇒ người sau **NÉM** `eCommerce:Address:0308` | `409` |
+| Chọn ứng viên **ngoài** danh sách | lỗi client / gian lận | **NÉM** `eCommerce:Address:0309` | `400` |
+| Gửi lại webhook sàn **cùng nội dung** | at-least-once — **bình thường** | `IIdempotencyGuard.ThucThiAsync` trả `TraVeKetQuaCu` ⇒ **0** side effect | `200` |
 | Redis chết | sự cố hạ tầng | Fail-open; **vẫn đúng** nhờ unique index | bình thường |
 | **Không có dữ liệu** — tỉnh chưa có xã nào | danh mục chưa nạp đủ | Trả **danh sách rỗng** | `200` — **không phải lỗi** |
 | Địa chỉ **chỉ có chuỗi tự do** (không mã) | khách tự gõ từ sàn khác | `ReasonCode = NameOnlyInput` ⇒ **`NeedsReview`** + tra ứng viên theo tên (`unaccent`) để **gợi ý**, **không** tự chọn | `200` + `NeedsReview` |
-| Phiên bản danh mục mới đổi kết quả của địa chỉ cũ | kích hoạt phiên bản | Job soát lại tạo review **mới**; snapshot cũ **không** bị sửa (**BR-01**) | — (job) |
+| Lô ánh xạ mới đổi kết quả của địa chỉ cũ | lô ánh xạ áp thành công | Job soát lại `DanhDauNghiNgo` + ghi dòng ledger `NeedsReview` **mới**; snapshot cũ **không** bị sửa (**BR-01**) | — (job) |
 
 **Chiến lược transaction:** App service mở **Unit of Work**; trong **cùng transaction** ghi
-(dữ liệu địa chỉ) + (`AddrNormalizationLedger`) + (`AddrNormalizationReviews` nếu có) + (bản ghi **outbox**)
-— theo `XC-002` BR-001. Sự kiện **chỉ được phát sau khi commit**; import file danh mục chạy theo **lô có
-batch** để không giữ transaction dài trên 3.321 dòng.
+(dữ liệu địa chỉ, gồm `TrangThai`) + (dòng `AddrNormalizationLedger`) + (bản ghi **outbox**)
+— theo `XC-002` BR-001. Sự kiện **chỉ được phát sau khi commit**; nạp file ánh xạ chạy theo **lô có
+batch** để không giữ transaction dài; bản ghi lô từ chối ghi trong UoW **riêng** trước khi NÉM (khuôn `D-78`).
 
 ---
 
@@ -810,9 +779,9 @@ batch** để không giữ transaction dài trên 3.321 dòng.
 | Mã | Yêu cầu | Ngưỡng đo được | Cách kiểm chứng |
 |---|---|---|---|
 | NFR-01 | Độ trễ chuẩn hoá 1 địa chỉ | p95 **< 20 ms** (cache danh mục đã warm) | benchmark trong integration test |
-| NFR-02 | Import danh mục | 3.321 xã + bộ 3 cấp cũ < **60 s**; chạy **2 lần ⇒ +0 dòng** | integration test (PostgreSQL thật) |
-| NFR-03 | Tính **tái lập** của kết quả | 10.000 ca ngẫu nhiên: cùng input + cùng `DatasetVersionId` ⇒ cùng kết quả **100 %** | property-based test (seed cố định) |
-| NFR-04 | **0** chỗ suy diễn huyện | test quét mã nguồn: trong luồng 2 → 3 **không** có truy vấn `AddrDistricts` | test quét mã (`TC-09`) |
+| NFR-02 | Nạp file **ánh xạ** | toàn bộ ánh xạ 63 → 34 tỉnh + xã < **60 s**; chạy **2 lần ⇒ +0 dòng** | integration test (PostgreSQL thật) |
+| NFR-03 | Tính **tái lập** của kết quả | 10.000 ca ngẫu nhiên: cùng input + cùng `SchemaVersion` + cùng id lô ánh xạ ⇒ cùng kết quả **100 %** | property-based test (seed cố định) |
+| NFR-04 | **0** chỗ suy diễn huyện | test quét mã nguồn: trong `ToThreeLevelAsync` **0** truy vấn `AdministrativeUnit` `Level = QuanHuyen` để suy huyện (bảng `AddrDistricts` không tồn tại) | test quét mã (`TC-09`) |
 | NFR-05 | Căn cứ pháp lý của ánh xạ | **100 %** bản ghi có `LegalBasis` khác rỗng | `CHECK` ở DB + `TC-11` |
 | NFR-06 | Truy vết | **100 %** lần chuẩn hoá có bản ghi ledger + `CorrelationId` | integration test (`XC-005`) |
 | NFR-07 | Cách ly tenant | tenant A **không** đọc review/ledger của tenant B | integration test 2 tenant |
@@ -828,30 +797,36 @@ batch** để không giữ transaction dài trên 3.321 dòng.
 
 | ID | Mục tiêu | Loại | Input chính | Expected | Phủ |
 |---|---|---|---|---|---|
-| **TC-01** | Chuẩn hoá 3 → 2 thành công, **duy nhất** 1 đích | Unit | địa chỉ 3 cấp có ánh xạ `Exact` | `Normalized`, có `ProvinceCode`+`WardCode`+`DatasetVersionId` | BR-06 |
-| **TC-02** | **Cấm** lưu mã ĐVHC thiếu phiên bản | Unit (reflection/DTO) | `Address` không có `DatasetVersionId` | **không** biên dịch được / bị từ chối | **BR-02** |
+| **TC-01** | Chuẩn hoá 3 → 2 thành công, **duy nhất** 1 đích | Unit | địa chỉ 3 cấp có ánh xạ `Exact` | `Normalized`, có `TinhCode`+`XaCode`+`SchemaVersion`+id lô ánh xạ | BR-06 |
+| **TC-02** | **Cấm** lưu mã ĐVHC thiếu phiên bản | Unit (reflection/DTO) | `Address`/ledger/ánh xạ không có `SchemaVersion` | **không** biên dịch được / bị từ chối (CHECK `in (1, 2)`) | **BR-02** |
 | **TC-03** | **Ca sáp nhập tỉnh**: mã tỉnh cũ đã đóng → mã tỉnh mới | Unit | mã tỉnh cũ thuộc nhóm hợp nhất | `ToProvinceCode` = mã **tỉnh nơi đặt trụ sở**, **không** suy từ tên | **BR-03** |
 | **TC-04** | Ánh xạ **theo tên** bị cấm | Unit | input 2 tên tỉnh **trùng nhau** ("Thành phố Hồ Chí Minh" cũ/mới) | kết quả **chỉ** phụ thuộc **mã**; tên không ảnh hưởng | **BR-03** |
 | **TC-05** | Ca `Partial` ⇒ **không** tự chọn | Unit | 1 mã cũ có **2** dòng mapping `Partial` | `NeedsReview`, `ReasonCode = PartialMapping`, **2** ứng viên | **BR-06** |
 | **TC-06** | Không có ánh xạ ⇒ `NeedsReview`, **không** đoán | Unit | mã cũ chưa có trong bảng | `NeedsReview`; **không** có `Normalized` | **BR-06** |
-| **TC-07** | Chế độ `Strict` ⇒ **NÉM LỖI** | Unit | input mơ hồ + `mode = Strict` | `BusinessException` `eCommerce:Address:0002` | **BR-11** |
-| **TC-08** | `NeedsReview` **luôn** tạo **đúng 1** bản ghi review | **Integration** | gọi 2 lần cùng `(entity, inputHash)` | **1** bản ghi review; lần 2 **không** tạo thêm | **BR-07**, BR-10 |
-| **TC-09** | **Cấm** suy diễn huyện khi 2 → 3 | Unit (**quét mã nguồn**) | quét luồng `ToThreeLevelAsync` | **0** truy vấn `AddrDistricts`; thiếu snapshot ⇒ `eCommerce:Address:0005` | **BR-04**, **NFR-04** |
+| **TC-07** | Chế độ `Strict` ⇒ **NÉM LỖI** | Unit | input mơ hồ + `mode = Strict` | `BusinessException` `eCommerce:Address:0302` | **BR-11** |
+| **TC-08** | `NeedsReview` **luôn** có địa chỉ trong hàng đợi + **đúng 1** dòng ledger `NeedsReview` | **Integration** | gọi 2 lần cùng `Idempotency-Key`; nguồn thô và nguồn đã có mã | **1** dòng ledger; nguồn thô giữ `ChuaChuanHoa`, nguồn có mã ⇒ `NghiNgo`; cả hai có trong `GetHangDoiChuanHoaAsync` | **BR-07**, BR-10 |
+| **TC-09** | **Cấm** suy diễn huyện khi 2 → 3 | Unit (**quét mã nguồn**) | quét luồng `ToThreeLevelAsync` | **0** truy vấn `Level = QuanHuyen` để suy huyện; **0** hoặc **> 1** nguồn v1 khác nhau cho một `Address` v2 ⇒ `eCommerce:Address:0305` (`D-96` (6)) | **BR-04**, **NFR-04** |
 | **TC-10** | Sổ cái **append-only** | Unit + review | cố UPDATE/DELETE ledger | **không** có đường code nào cho phép | **BR-08** |
 | **TC-11** | Căn cứ pháp lý là **bắt buộc** | **Integration** | chèn mapping `LegalBasis = ''` | DB **từ chối** (`CHECK`) | **BR-05**, **NFR-05** |
-| **TC-12** | Nạp cùng file danh mục **2 lần** | **Integration** | cùng `DatasetSourceHash` | lần 2: **0** dòng thêm; trả phiên bản đã có | **BR-10**, **NFR-02** |
-| **TC-13** | Cùng hash nhưng metadata khác | **Integration** | sửa `EffectiveFrom` rồi nạp lại | **NÉM** `eCommerce:Address:0007` | **BR-10** |
-| **TC-14** | **Tối đa 1** phiên bản `Active` mỗi `Structure` | **Integration** | kích hoạt phiên bản thứ hai | UNIQUE index chặn; phiên bản cũ ⇒ `Superseded` **cùng transaction** | BR-11 |
-| **TC-15** | Chuyển trạng thái sai ⇒ ném lỗi | Unit | `Superseded → Active`; `Rejected → Confirmed` | `eCommerce:Address:0003` / `0004` | **BR-11** |
+| **TC-12** | Nạp cùng file **ánh xạ** 2 lần | **Integration** | cùng `SourceHash` | lần 2: **0** dòng thêm; trả lô cũ | **BR-10**, **NFR-02** |
+| **TC-13** | Cùng hash nhưng metadata khác (file ánh xạ) | **Integration** | sửa `EffectiveFrom` rồi nạp lại | **NÉM** `eCommerce:Address:0307`; ghi lô từ chối | **BR-10** |
+| **TC-14** | Không còn bảng/trạng thái phiên bản (`D-95` ⑥(2)) | Unit (kiến trúc) | quét `eCommerce.Address.*` | **0** `DbSet`/entity tên `*Dataset*`; **0** kiểu có trạng thái `Superseded`; `HienHanh == V2`; nạp ánh xạ khi khoá `address:sync-catalog` bị giữ ⇒ NÉM, 0 dòng | BR-14 |
+| **TC-15** | Chuyển trạng thái sai ⇒ ném lỗi | Unit | quyết lại review đã kết thúc | `eCommerce:Address:0103` (vế `0303` **bỏ**, `D-95` (e)) | **BR-11** |
 | **TC-16** | Unique index có `TenantId` **vẫn chặn** khi `TenantId = NULL` | **Integration** | chèn 2 ledger cùng `IdempotencyKey`, `TenantId = NULL` | **DB từ chối** (`NULLS NOT DISTINCT`) | **BR-09** |
-| **TC-17** | Chỉ số **duy nhất** cho `(Structure) WHERE Status = Active` + index `NULLS NOT DISTINCT` còn nguyên | **Integration** | đọc `pg_indexes` | đúng số index, đúng định nghĩa | **BR-09** |
-| **TC-18** | Kết quả **tái lập** | Unit (property) | 10.000 ca ngẫu nhiên (seed cố định) | cùng input + cùng phiên bản ⇒ cùng kết quả **100 %** | **NFR-03** |
-| **TC-19** | **0** `double`/`float` | Unit (reflection) | duyệt assembly `AddressHub` | **0** xuất hiện | **NFR-08** |
+| **TC-17** | Index `NULLS NOT DISTINCT` còn nguyên (ledger, `AddrUnitMappings`, `AddrUnitMappingImports`) + CHECK `FromSchemaVersion`/`ToSchemaVersion` `in (1, 2)` | **Integration** | đọc `pg_indexes` + `pg_constraint` | đúng số index, đúng định nghĩa | **BR-09** |
+| **TC-18** | Kết quả **tái lập** | Unit (property) | 10.000 ca ngẫu nhiên (seed cố định) | cùng input + cùng `SchemaVersion` + cùng id lô ánh xạ ⇒ cùng kết quả **100 %** | **NFR-03** |
+| **TC-19** | **0** `double`/`float` | Unit (reflection) | duyệt assembly `eCommerce.Address.*` | **0** xuất hiện | **NFR-08** |
 | **TC-20** | `401` / `403` | **Integration** | không token · token thiếu quyền | `401` · `403` | **NFR-10**, **BR-13** |
-| **TC-21** | Cách ly tenant | **Integration** | tenant A đọc review/ledger của B | **không** thấy | **NFR-07** |
+| **TC-21** | Cách ly tenant | **Integration** | tenant A đọc địa chỉ/ledger của B | **không** thấy | **NFR-07** |
 | **TC-22** | Mọi app service có `[Authorize]` cấp class + permission đã định nghĩa | Unit (reflection) | quét assembly | **0** vi phạm | **BR-13** (`XC-004` TC-01/TC-02) |
-| **TC-23** | `UPDATE` 0 dòng ⇒ **NÉM LỖI** | Unit | 2 luồng cùng `ConfirmAsync` | luồng 2 nhận `eCommerce:Address:0008` | **BR-11** |
-| **TC-24** | Mã ĐVHC sai định dạng | Unit | `"1"`, `"ABCDE"` | `eCommerce:Address:0001` | BR-14 |
+| **TC-23** | Quyết định đôi ⇒ **NÉM LỖI** | **Integration** (`TenantId = NULL`) | 2 luồng cùng `ConfirmAsync` cho một `ReviewLedgerId`; ứng viên ngoài `Candidates`; xác nhận nguồn v1 | đúng **1** dòng kết thúc, luồng 2 nhận `eCommerce:Address:0308`; ngoài tập ⇒ `0309`, 0 dòng; `Address` v1 **không đổi** cột địa lý, có `Address` v2 + `ResultAddressId` | **BR-11** |
+| **TC-24** | Mã ĐVHC sai định dạng | Unit | `"1"`, `"ABCDE"` | `eCommerce:Address:0002` (`MaKhongHopLe`) | *(CHECK định dạng §5.2 — không gắn BR)* |
+| **TC-25** | Địa chỉ đã `DaChuanHoa` là snapshot bất biến | Unit | gọi chuẩn hoá/gán nội dung địa lý lần hai trên `Address` đã `DaChuanHoa` | NÉM `eCommerce:Address:0102`; **0** thay đổi cột địa lý; sửa thật = `Address` mới + dòng ledger mới (⬜ ledger) | **BR-01** |
+| **TC-26** | Ghi địa chỉ + ledger + outbox cùng transaction | **Integration** | ép lỗi sau khi ghi ledger, trước commit | rollback: **0** địa chỉ mới, **0** ledger, **0** outbox | **BR-12** |
+| **TC-27** | Module `Address` không tham chiếu `src/` | Unit (quét `.csproj`) | đọc 4 `modules/Address/**/*.csproj` | **0** `ProjectReference` tới `src/` **ngoài allowlist** `src/eCommerce.Domain.Shared` (`eCommerce.Address.Application.csproj:15`); module khác chỉ tham chiếu `eCommerce.Address.Application.Contracts` | **BR-15** |
+| **TC-28** | Đích đã đóng mã bị cấm | Unit | đích `AdministrativeUnit` có `IsActive = false` (`Dong()`) | NÉM `eCommerce:Address:0006`; **không** ghi `Normalized` | **BR-16** |
+| **TC-29** | Khoá idempotency ghi ledger do server dựng (#7) | **Integration** | cùng input, hai header `Idempotency-Key` khác nhau | **1** dòng `AddrNormalizationLedger`; lần 2 trả kết quả cũ | BR-10 |
+| **TC-30** | Cấm hard-code danh mục/ánh xạ | Unit (quét mã nguồn) | quét `eCommerce.Address.*` (trừ fixture test) | **0** literal mã ĐVHC 2/3/5 chữ số hoặc bảng ánh xạ trong code nghiệp vụ | **BR-14** |
 
 ### 14.2 Fixture skeleton (xUnit)
 
@@ -863,8 +838,8 @@ public class AddressNormalizationTests
     public async Task TC05_partial_mapping_thi_phai_cho_nguoi_xac_nhan()
     {
         var sut = TaoNormalizerVoiAnhXa(
-            from: ("3", "00004"),
-            to: [("3", "26734", MappingKind.Partial), ("3", "26735", MappingKind.Partial)]);
+            from: ("2", "00004"),   // level 2 = Xa (AdministrativeLevel.Xa)
+            to: [("2", "26734", MappingKind.Partial), ("2", "26735", MappingKind.Partial)]);
 
         var r = await sut.NormalizeAsync(Input3Cap("00004"), AddressNormalizationMode.CreateReview);
 
@@ -878,7 +853,7 @@ public class AddressNormalizationTests
     [Fact]
     public async Task TC09_khong_co_snapshot_3_cap_thi_nem_loi()
     {
-        var sut = TaoNormalizerVoiAnhXa(from: ("3", "00004"), to: [("3", "26734", MappingKind.Exact)]);
+        var sut = TaoNormalizerVoiAnhXa(from: ("2", "00004"), to: [("2", "26734", MappingKind.Exact)]);
 
         var r = await sut.NormalizeAsync(Input3Cap("00004"), AddressNormalizationMode.CreateReview);
         var addressHaiCap = r.Normalized!.Value with
@@ -887,7 +862,7 @@ public class AddressNormalizationTests
         };
 
         var ex = await Assert.ThrowsAsync<BusinessException>(() => sut.ToThreeLevelAsync(addressHaiCap));
-        Assert.Equal("eCommerce:Address:0005", ex.Code);
+        Assert.Equal("eCommerce:Address:0305", ex.Code);
     }
 
     /// TC-03 — sáp nhập tỉnh: ánh xạ theo MÃ, KHÔNG theo tên.
@@ -921,17 +896,17 @@ public class AddressSchemaTests
         Assert.Equal(2L, await DemAsync(
             "select count(*) from pg_indexes where schemaname='public' " +
             "and indexdef like '%NULLS NOT DISTINCT%' " +
-            "and (indexname like 'IX_AddrNormalizationLedger%' or indexname like 'IX_AddrNormalizationReviews%')"));
+            "and (indexname like 'IX_AddrNormalizationLedger%' or indexname like 'IX_AddrUnitMappings%')"));
     }
 }
 ```
 
 ### 14.3 Acceptance Criteria (Definition of Done)
 
-- [ ] 24 test case ở §14.1 pass, phủ **hết 16 BR** và **10 NFR**
+- [ ] 28 test case ở §14.1 pass, phủ **hết 16 BR** và **10 NFR**
 - [ ] **`TC-02` + `TC-09` chạy trong CI** — đây là **hai test quan trọng nhất** (chặn 2 cái bẫy im lặng ở §0)
-- [ ] **`NULLS NOT DISTINCT` viết ngay trong `Added_AddressHub`** — không để nợ (khác `XC-004` F1)
-- [ ] **7 `DbSet`** đã khai báo trên `eCommerceDbContext` ⇒ `IRepository<…>` resolve được ở runtime
+- [ ] **`NULLS NOT DISTINCT` viết ngay trong migration `Add_Addr003_…`** — không để nợ (khác `XC-004` F1)
+- [ ] **3 `DbSet` mới** (`AddrUnitMappingImports`, `AddrUnitMappings`, `AddrNormalizationLedger`) đã khai báo trên `eCommerceDbContext` ⇒ `IRepository<…>` resolve được ở runtime
 - [ ] **Bảng ánh xạ khớp 100 % nguồn chính thức** (`Quyết định 19/2025/QĐ-TTg` + phụ lục Nghị quyết) — có test đối soát **số dòng**
 - [ ] Seed **idempotent**: chạy `DbMigrator` 2 lần ⇒ **0** dòng thêm
 - [ ] **0** hard-code danh mục/ánh xạ trong code nghiệp vụ (**BR-14**)
@@ -941,14 +916,15 @@ public class AddressSchemaTests
 
 ### 14.4 Definition of Ready
 
-- [x] ✅ Vị trí đã chốt: value object `Address` ở `eCommerce.Kernel`; dữ liệu + dịch vụ ở **module `AddressHub`** (ADR-08)
-- [x] ✅ Ranh giới đã chốt: **sổ địa chỉ của khách thuộc `Customers`** (theo `docs/implementation-plan.md` dòng 181)
+- [x] ✅ Vị trí đã chốt: `Address` là **entity** của module `Address` (ADR-08 đã thay; `ADDR-004` ADR-02), **không** ở `eCommerce.Kernel`
+- [x] ✅ Ranh giới đã chốt: sổ địa chỉ = `ADDR-004` (`Address` thuộc module `Address`; `Customers` chỉ giữ liên kết — `ADDR-004` ADR-01)
+- [x] ✅ Q9 → `D-95`, Q10 → `D-96` (đã chốt, TẠM CHỐT)
 - [x] ✅ Quy ước lock key đã chốt theo `XC-003` §5.4 (ADR-10)
 - [ ] ⬜ **Q2 (§15.1)**: có **nguồn file máy đọc được** của phụ lục Nghị quyết sắp xếp ⇒ **chặn seed ánh xạ**
 - [ ] ⬜ **Q1 (§15.1)**: chặn ở bước **đặt hàng** hay chỉ ở bước **tạo vận đơn** khi địa chỉ chưa chuẩn hoá
 - [ ] ⬜ **Q3 (§15.1)**: có cần hỗ trợ địa chỉ **ngoài Việt Nam** không
 - [ ] ⬜ Chốt ngưỡng `ReviewDeadlineUtc` (đề xuất **7 ngày**)
-- [ ] ⬜ `ADDR-001` + `ADDR-002` đã có bản nháp để đối chiếu ranh giới dữ liệu
+- [x] ✅ `ADDR-001` + `ADDR-002` + `ADDR-004` đã có tài liệu và code để đối chiếu ranh giới dữ liệu
 
 ---
 
@@ -959,25 +935,33 @@ public class AddressSchemaTests
 | # | Câu hỏi | Cần ai | Trạng thái | Ảnh hưởng |
 |---|---|---|---|---|
 | **Q1** | Địa chỉ **chưa chuẩn hoá** thì **chặn ở đâu**: `PlaceOrderAsync` (`SAL-002`) hay chỉ chặn khi **tạo vận đơn** (`SHP-001`)? | BA + Kiến trúc trưởng | ⬜ `Open` | Chặn sớm ⇒ rõ ràng nhưng mất đơn; chặn muộn ⇒ đơn vào hệ thống nhưng **không giao được** ⇒ phải có màn hình xử lý |
-| **Q2** | 🔴 **BLOCKER** — Có **file máy đọc được** (Excel/CSV/PDF có lớp text) của **phụ lục các Nghị quyết sắp xếp ĐVHC cấp xã** và của **`Quyết định 19/2025/QĐ-TTg`** không? | Bạn / BA / luật sư | ⬜ `Open` | **Chặn seed ánh xạ** ⇒ chặn `ADDR-003` + `ADDR-002`. Không có ⇒ phải nhập tay **3.321** dòng và **không** kiểm chứng được (**rủi ro sai dữ liệu pháp lý**) |
+| **Q2** | 🔴 **BLOCKER** — Có **file máy đọc được** (Excel/CSV/PDF có lớp text) của **phụ lục các Nghị quyết sắp xếp ĐVHC cấp xã** và của **`Quyết định 19/2025/QĐ-TTg`** không? | Bạn / BA / luật sư | 🔶 `Open` — **một phần `D-93`** (nguồn production = file công bố của cơ quan nhà nước; cơ quan/định dạng/đường dẫn file ánh xạ cũ → mới **CHƯA XÁC ĐỊNH**) | **Chặn seed ánh xạ** ⇒ chặn `ADDR-003` + `ADDR-002`. Không có ⇒ phải nhập tay **3.321** dòng và **không** kiểm chứng được (**rủi ro sai dữ liệu pháp lý**) |
 | **Q3** | Có cần hỗ trợ địa chỉ **ngoài Việt Nam** (khách nước ngoài, kho nước ngoài)? | BA | ⬜ `Open` | Nếu CÓ ⇒ `ProvinceCode`/`WardCode` phải nullable và thêm `CountryCode` bắt buộc; mô hình §5.2 phải sửa **trước** khi migration |
 | **Q4** | Dùng **dịch vụ chuẩn hoá địa chỉ bên thứ ba** cho địa chỉ nhập tự do (Vietnam Post / GHN address API) không? | BA + Kiến trúc trưởng | ⬜ `Open` | Nếu CÓ ⇒ thêm NCC, `§7.3` phải mở rộng + endpoint vào **cấu hình** (cấm hard-code); phát sinh chi phí & phụ thuộc |
-| **Q5** | Có cho **tenant override** bảng ánh xạ không? | Kiến trúc trưởng | ✅ `Closed` — **KHÔNG** (ADR-06) | Dữ liệu pháp lý phải giống nhau mọi tenant; nếu cho override ⇒ hai nguồn sự thật |
+| **Q5** | Có cho **tenant override** bảng ánh xạ không? | Kiến trúc trưởng | ✅ `Closed` — **KHÔNG** (ADR-06, `D-92`) | Dữ liệu pháp lý phải giống nhau mọi tenant; nếu cho override ⇒ hai nguồn sự thật |
 | **Q6** | `ReviewDeadlineUtc` mặc định bao lâu? | BA | ⬜ `Open` | Quá ngắn ⇒ địa chỉ thành `Unresolvable` oan; quá dài ⇒ đơn treo |
-| **Q7** | Khi có **Nghị quyết sắp xếp tiếp** (sau 2025), quy trình nạp phiên bản mới đã đủ chưa? | Kiến trúc trưởng | ✅ `Closed` — **ĐỦ**: nạp phiên bản mới ⇒ `Activate` ⇒ job soát lại; **không** sửa snapshot cũ (**BR-01**) | Chỉ cần file dữ liệu mới, không release code (**BR-14**) |
+| **Q7** | Khi có **Nghị quyết sắp xếp tiếp** (sau 2025), quy trình nạp phiên bản mới đã đủ chưa? | Kiến trúc trưởng | ✅ `Closed` — **viết lại theo `D-95` (g)**: thay đổi **cùng cấu trúc** (sáp nhập/đổi tên/đóng mã trong 2 cấp) = file danh mục `ADDR-001` + file ánh xạ `ADDR-003` ⇒ lô ánh xạ áp thành công ⇒ job soát lại; **không** sửa snapshot cũ (**BR-01**) | Không release code cho thay đổi cùng cấu trúc; thay đổi **cấu trúc** (số cấp khác) = thêm hằng `V3` + migration nới CHECK `in (1,2,3)` = **có** release code (hệ quả `D-80`) — ❓ chủ dự án chấp nhận hệ quả này (không chặn) |
+| **Q9** 🆕 | Giữ bảng phiên bản `AddrDatasets` (+ `Import`/`Activate`/`Superseded`, §3.2, §6.2) hay thay bằng `SchemaVersion` hằng V1/V2 + bản ghi lô `D-78` của `ADDR-001` (ADDR-003 chỉ nạp **ánh xạ**)? | `DEC` | ✅ **Đã chốt — `D-95`** (bỏ `AddrDatasets`; "phiên bản" = `SchemaVersion`/`HienHanh`; nạp danh mục chỉ qua `ADDR-001`; ADDR-003 chỉ nạp ánh xạ, có bản ghi lô `AddrUnitMappingImports`) | Đã sửa §3.2, §5.2, §6.2, §9, §10.3, mã `0303` (bỏ) / `0306` / `0307` / `0311`, Q7 |
+| **Q10** 🆕 | Kết quả chuẩn hoá/xác nhận lưu ở đâu khi hàng đợi = `Address.TrangThai` (`ADDR-004` Q9) mà `Address` chỉ chuẩn hoá **một lần** và bất biến? (a) xác nhận ⇒ `Address` **v2 mới** + liên kết, ledger giữ mã/snapshot 3 cấp cũ + ứng viên (`jsonb`), từ chối/hết hạn ⇒ giữ `NghiNgo` + ledger `Unresolvable` · (b) thêm giá trị enum cuối dải | `DEC` | ✅ **Đã chốt — `D-96`** (phương án (a): không thêm enum, không ghi mã vào `Address` đã có mã; xác nhận qua cửa có sẵn của `ADDR-004`; lý do/ứng viên/quyết định ở ledger, trạng thái review suy ra; hàng đợi = `ChuaChuanHoa` + `NghiNgo`; nguồn thô không thể `NghiNgo`) | Đã sửa §3.1, §4, §5.1-5.2, §6.1-6.2, §7.1, §10.1-10.2 |
+| **Q11** 🆕 | Ánh xạ **trong cùng** `SchemaVersion` (V2→V2) nối tiếp nhiều lô (A→B rồi B→C): resolver đi chuỗi tới đích `IsActive` hay chỉ một bước? ≥ 2 đích ⇒ `NeedsReview` (BR-06). *(nợ N1 của `D-95`)* | `DEC` | ✅ **Đã chốt — `D-97`**: chỉ **một bước**; đích đóng ở đường tự động ⇒ `NeedsReview` `TargetClosed` (không ném); `0006` chỉ ở cửa ghi cuối | Đã sửa §3.1 hàng 2/3/7, §4.2, §5.2, §12 |
+| **Q13** 🆕 | Cửa gọi `ChuanHoaLaiAsync` cho job (không user) và CSKH (chỉ `Normalization.Review`): (a) thêm method nội bộ vào `IAddressDirectory` (không `[Authorize]`, cùng guard `ChuanHoa`) · (b) cấp thêm permission `Addresses.Manage` cho job/CSKH | `DEC` | ⬜ `Open` — khuyến nghị (a) (`ADDR-004` đã có `IAddressDirectory` cho module khác; `AddressAppService.cs:21,80`) | §3.1 hàng 2/5, §9, A4 |
+| **Q14** 🆕 | `AddrUnitMappings`: ai ghi `IsActive` và lúc nào, và nạp lại file đã sửa 1 dòng thì xử lý thế nào? (a) lô mới khai báo thay thế các `FromCode` ⇒ dòng cũ `IsActive = false` cùng lô · (b) lô chỉ thêm dòng mới, dòng trùng khoá bỏ qua + đếm · (c) unique gồm `ImportId` + luật resolver cho 2 lô cùng cặp | `DEC` | ⬜ `Open` — khuyến nghị (a); thân đang áp (b) tối thiểu ở `0307` | §3.1 hàng 7 (A→C tự động), §5.2 unique/`IsActive` |
+| **Q15** 🆕 | Ledger append-only (BR-08) mang `InputSnapshot`: ẩn danh khi khách yêu cầu xoá thế nào? (thân đã bỏ tên/SĐT khỏi `AddressInput`; chuỗi địa chỉ vẫn là PII) | `DEC` | ⬜ `Open` — khuyến nghị: nợ GĐ2 cùng `ADDR-004` ADR-11 (đường ẩn danh có kiểm soát) | BR-08, §5.2 ledger |
+| **Q16** 🆕 | Endpoint HTTP chạy chế độ nào? Thân đang: HTTP = `CreateReview`, `Strict` chỉ nội bộ (ném `0302` cho cả 4 `ReasonCode`). Hay thêm trường `mode` vào `NormalizeAddressDto`? | `DEC` | ⬜ `Open` — khuyến nghị: giữ như thân (khớp §4.1/§6.3) | §6.1, §6.3 |
+| **Q12** 🆕 | Ca `TargetClosed` có thể ra `Candidates` **rỗng** ⇒ CSKH chỉ **từ chối** được (§3.1 hàng 5 bắt ứng viên ∈ `Candidates`). Chọn: (a) **gợi ý** (không tự chọn) đích `IsActive` tìm bằng cách đi tiếp chuỗi, khuôn `NameOnlyInput` §12 · (b) chấp nhận "nạp lô ánh xạ trực tiếp A→C rồi mở review mới" | `nguoi` | ⬜ `Open` — **không chặn** DoD; khuyến nghị (b) (không thêm đường suy diễn — `D-97` (e), BR-14) | §3.1 hàng 5, §10.1 (màn xác nhận) |
 | **Q8** | Có cần **API tra ngược** "xã mới này gồm những xã cũ nào"? | BA | ⬜ `Open` | Hữu ích cho CSKH giải thích với khách; ánh xạ **N:1** nên tra ngược trả **danh sách**, không trả một giá trị |
 
 ### 15.2 🚨 Sai lệch, rủi ro & khoảng trống phát hiện được (từ **code thật**)
 
 | # | Vấn đề | Bằng chứng | Mức độ | Xử lý |
 |---|---|---|---|---|
-| **F1** | **Không tồn tại bất kỳ entity/thành phần địa chỉ nào trong code.** Quét toàn repo: `Address` chỉ xuất hiện dưới dạng `ClientIpAddress`/`IpAddresses` trong migration **của ABP**; **0** kết quả cho `Province`/`Ward`/`District`/`AddressHub` trong `src/` và `modules/` | `src/eCommerce.EntityFrameworkCore/Migrations/20261009102044_Added_Identity.Designer.cs:217,295` · cây thư mục `modules/` chỉ có `ChannelHub`, `PaymentHub`, `Tax` | 🟠 **Trung bình** (chưa có gì để hỏng, nhưng **toàn bộ** `ADDR-001…003` phải làm mới) | ✅ **Đúng kế hoạch**: GĐ0 chưa bắt đầu code. Ghi vào DoD |
-| **F2** | **`shared/eCommerce.Kernel` CHƯA tồn tại** ⇒ **không có chỗ** cho value object `Address` (và cả `Money`/`Currency` của `XC-001`) | `Test-Path shared` = **False**; `<Solution>` trong `eCommerce.slnx` chỉ có `modules/`, `src/`, `test/` | 🔴 **Cao** (là **phụ thuộc chặn**: `docs/implementation-plan.md` §7.0 mục 1) | ⬜ **Chưa làm** — việc của `docs/implementation-plan.md` §7.0 mục 1 (trước GĐ1) |
-| **F3** | **`ADDR-001` và `ADDR-002` chưa có tài liệu** dù `ADDR-003` định nghĩa **chính dữ liệu** mà hai tài liệu đó sẽ dùng (bảng `AddrWards`, `AddrUnitMappings`) | `docs/features/` **không** có file `addr-001-*` / `addr-002-*` (chỉ có `XC-*`, `CAT-*`, `SAL-*`, `CHN-*`, `INV-*`, `NOT-*`, `PRC-*`, `REP-*`, `REV-*`, `SHP-*`, `WEB-*`, `LOY-*`, `EINV-*`) | 🔴 **Cao** (nguy cơ **hai nguồn sự thật** cho cùng dữ liệu danh mục — đúng bài học `XC-003` F1 với lock key, và bài học *"mô hình địa chỉ hai nguồn sự thật"* ở `docs/business-modules-proposal.md:259`) | ⬜ Viết `ADDR-001` + `ADDR-002` **trước/đồng thời**, chốt ranh giới bảng nào thuộc tài liệu nào (§14.3) |
+| **F1** ⚠️ *lỗi thời 18/11/2026: module `Address` ĐÃ CÓ (`modules/Address/`, 25 tệp `.cs`); phần ADDR-003 vẫn ⬜* | **Không tồn tại bất kỳ entity/thành phần địa chỉ nào trong code.** Quét toàn repo: `Address` chỉ xuất hiện dưới dạng `ClientIpAddress`/`IpAddresses` trong migration **của ABP**; **0** kết quả cho `Province`/`Ward`/`District`/`AddressHub` trong `src/` và `modules/` | `src/eCommerce.EntityFrameworkCore/Migrations/20261009102044_Added_Identity.Designer.cs:217,295` · cây thư mục `modules/` chỉ có `ChannelHub`, `PaymentHub`, `Tax` | 🟠 **Trung bình** (chưa có gì để hỏng, nhưng **toàn bộ** `ADDR-001…003` phải làm mới) | ✅ **Đúng kế hoạch**: GĐ0 chưa bắt đầu code. Ghi vào DoD |
+| **F2** ⚠️ *lỗi thời: `shared/eCommerce.Kernel` đã có (`eCommerce.slnx:87`); `Address` không còn là VO* | **`shared/eCommerce.Kernel` CHƯA tồn tại** ⇒ **không có chỗ** cho value object `Address` (và cả `Money`/`Currency` của `XC-001`) | `Test-Path shared` = **False**; `<Solution>` trong `eCommerce.slnx` chỉ có `modules/`, `src/`, `test/` | 🔴 **Cao** (là **phụ thuộc chặn**: `docs/implementation-plan.md` §7.0 mục 1) | ⬜ **Chưa làm** — việc của `docs/implementation-plan.md` §7.0 mục 1 (trước GĐ1) |
+| **F3** ⚠️ *lỗi thời: `ADDR-001/002/004` đã có tài liệu + code; ranh giới bảng đã chốt (xem mục Đối chiếu)* | **`ADDR-001` và `ADDR-002` chưa có tài liệu** dù `ADDR-003` định nghĩa **chính dữ liệu** mà hai tài liệu đó sẽ dùng (bảng `AddrWards`, `AddrUnitMappings`) | `docs/features/` **không** có file `addr-001-*` / `addr-002-*` (chỉ có `XC-*`, `CAT-*`, `SAL-*`, `CHN-*`, `INV-*`, `NOT-*`, `PRC-*`, `REP-*`, `REV-*`, `SHP-*`, `WEB-*`, `LOY-*`, `EINV-*`) | 🔴 **Cao** (nguy cơ **hai nguồn sự thật** cho cùng dữ liệu danh mục — đúng bài học `XC-003` F1 với lock key, và bài học *"mô hình địa chỉ hai nguồn sự thật"* ở `docs/business-modules-proposal.md:259`) | ⬜ Viết `ADDR-001` + `ADDR-002` **trước/đồng thời**, chốt ranh giới bảng nào thuộc tài liệu nào (§14.3) |
 | **F4** | **Chưa có dữ liệu địa chỉ để backfill**: `Order` **không có** cột địa chỉ nào; `ShippingAddressId?` mới chỉ là **thiết kế** trong `SAL-002` | `src/eCommerce.Domain/Entities/Orders/Order.cs:10-52` (chỉ có `Number`, `ChannelCode`, `ChannelShopId`, `ExternalOrderId`, `CustomerId`, `Status`, `PaymentStatus`, `Currency`, tiền, `Note`) · `docs/features/sales/sal-002-checkout-va-dat-hang.md:503-504` | 🟡 **Thấp** (giảm rủi ro GĐ0) — **nhưng** là **cửa sổ thời gian**: phải xong `ADDR-003` **trước** khi `SAL-002`/`CUS-001` ghi cột địa chỉ | ⬜ Dùng khoảng thời gian này để làm `ADDR-003` (**không** để nợ) |
 | **F5** | **Rủi ro không gian mã**: mã ĐVHC cấp xã mới (05 chữ số) và mã cấp xã cũ (05 chữ số) **dùng chung dải số**; code hiện tại **không có gì** phân biệt ⇒ một `WardCode` "trần" là **mơ hồ** | `Quyết định 19/2025/QĐ-TTg`: cấp tỉnh **02 chữ số** `01–99`, cấp xã **05 chữ số** `00001–99999` ([nguồn](https://vietnamhoinhap.vn/vi/bang-danh-muc-va-ma-so-cua-34-tinh-thanh-moi-52507.htm) · [bảng chính thức](https://xaydungchinhsach.chinhphu.vn/bang-danh-muc-va-ma-so-cua-34-tinh-thanh-moi-cac-don-vi-hanh-chinh-cap-xa-moi-11925070418263625.htm)) | 🔴 **Cao** (lỗi **im lặng**: tra đúng mã nhưng **sai phiên bản**) | ✅ **Đã xử lý trong thiết kế**: **BR-02** + cột `DatasetVersionId` **NOT NULL** + `TC-02` |
 | **F6** | **Nguy cơ bảng `AddrDistricts` trở thành "nguồn sự thật thứ hai"** về địa chỉ — đúng loại lỗi đã bị loại bỏ ở nền tảng khác (`docs/business-modules-proposal.md:259`: *"Hai mô hình địa chỉ song song … ⇒ một nguồn sự thật"*) | `docs/implementation-plan.md` dòng 128 vẫn liệt kê `District` là entity (*"chỉ để tương thích 3 cấp cũ"*) | 🟠 **Trung bình** (lỗi thiết kế, phát hiện trên giấy) | ✅ **Đã xử lý**: `AddrDistricts` **chỉ** đọc để chuyển **3 → 2** và hiển thị legacy; **BR-04** + **BR-16** + **NFR-04** + `TC-09` |
-| **F7** 🆕 | **Quy ước tiền tố lock key ĐANG KHÔNG NHẤT QUÁN trong code thật** ⇒ khoá thật có **tiền tố ĐÔI**. `AbpDistributedLockOptions.KeyPrefix = "ecommerce:"` (ghép **không** dấu phân cách), nhưng `TaxLockKeys` và `eCommerceConsts.LockKeys` **vẫn trả về chuỗi đã có** `ecommerce:` ⇒ khoá thật thành `ecommerce:ecommerce:tax:…`. Trong khi `ChannelHubConsts.LockKeys` trả về **không** tiền tố (đúng theo `XC-003` §5.4) | `src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs:127` · `modules/Tax/eCommerce.Tax.Domain/TaxErrorCodes.cs:46,50` · `src/eCommerce.Domain.Shared/eCommerceConsts.cs:104` · `modules/ChannelHub/eCommerce.ChannelHub.Domain/ChannelHubConsts.cs:23,27,31` · `XC-003` §5.4 (bằng chứng `redis-cli MONITOR`) | 🔴 **Cao** (đúng **cùng loại lỗi im lặng** mà `XC-003` F1/F5 đã phát hiện: *"khoá vẫn 'hoạt động', chỉ là **không ai giữ đúng khoá**"*) | ⬜ **KHÔNG sửa ở đây** (ngoài phạm vi `ADDR-003`). `ADDR-003` theo **ADR-10** (không tiền tố). **Cần** một việc riêng: sửa `TaxLockKeys` + `eCommerceConsts.LockKeys.InventorySku` và thêm test quét mã nguồn (đề xuất bổ sung `TC` cho `XC-003` §15.2) |
+| **F7** 🆕 ⚠️ *đã khắc phục ở `Tax` (`TaxErrorCodes.cs:46,50` không tiền tố; `ADDR-001` §8) — `eCommerceConsts.LockKeys.InventorySku` chưa đo lại* | **Quy ước tiền tố lock key ĐANG KHÔNG NHẤT QUÁN trong code thật** ⇒ khoá thật có **tiền tố ĐÔI**. `AbpDistributedLockOptions.KeyPrefix = "ecommerce:"` (ghép **không** dấu phân cách), nhưng `TaxLockKeys` và `eCommerceConsts.LockKeys` **vẫn trả về chuỗi đã có** `ecommerce:` ⇒ khoá thật thành `ecommerce:ecommerce:tax:…`. Trong khi `ChannelHubConsts.LockKeys` trả về **không** tiền tố (đúng theo `XC-003` §5.4) | `src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs:127` · `modules/Tax/eCommerce.Tax.Domain/TaxErrorCodes.cs:46,50` · `src/eCommerce.Domain.Shared/eCommerceConsts.cs:104` · `modules/ChannelHub/eCommerce.ChannelHub.Domain/ChannelHubConsts.cs:23,27,31` · `XC-003` §5.4 (bằng chứng `redis-cli MONITOR`) | 🔴 **Cao** (đúng **cùng loại lỗi im lặng** mà `XC-003` F1/F5 đã phát hiện: *"khoá vẫn 'hoạt động', chỉ là **không ai giữ đúng khoá**"*) | ⬜ **KHÔNG sửa ở đây** (ngoài phạm vi `ADDR-003`). `ADDR-003` theo **ADR-10** (không tiền tố). **Cần** một việc riêng: sửa `TaxLockKeys` + `eCommerceConsts.LockKeys.InventorySku` và thêm test quét mã nguồn (đề xuất bổ sung `TC` cho `XC-003` §15.2) |
 | **F8** 🆕 | **Chưa kiểm chứng được yêu cầu 2 cấp của các hãng vận chuyển** (GHN/GHTK đã nhận 2 cấp chưa, bộ mã riêng là gì) | `docs/implementation-plan.md` dòng 199 cảnh báo: *"⚠️ **GHTK: xác minh địa chỉ 2 cấp TRƯỚC khi thiết kế**"*; dòng 131: nguồn `provinces.open-api.vn` **"`wards` trả rỗng khi test, phải kiểm tra lại"** | 🟠 **Trung bình** | ⬜ Thuộc **`ADDR-002`/`SHP-004`**; `ADDR-003` **chỉ** cam kết hợp đồng dữ liệu 2 cấp + snapshot 3 cấp để **không chặn** hãng nào |
 
 ### 15.3 Giả định
@@ -1012,3 +996,21 @@ public class AddressSchemaTests
 > (ADR-01…ADR-06). Nhưng **dữ liệu** (bảng mã cũ → mã mới + 3.321 mã xã) là **CHƯA kiểm chứng** trong môi
 > trường này ⇒ **cấm** seed bằng suy luận; phải có file chính thức (**Q2**). Đây là **cùng loại blocker**
 > mà `XC-001` §15.1.2 đã gặp với Phụ lục I/II của NĐ 174/2025 (bản scan không có lớp văn bản).
+
+## Đối chiếu mô hình Nhanh (18/11/2026)
+
+Đã đối chiếu `D-07…D-48`, `D-70`: không lệch (tài liệu không có sản phẩm/đơn/kho/POS/báo cáo). `D-77…D-96` đối chiếu theo `docs/nhanh/decisions.md` (`D-95`, `D-96` đọc nguyên văn) và `ADDR-001`/`ADDR-002`. Lệch đã sửa tại chỗ:
+
+| D-xx | Tài liệu cũ nói (§mục) | Đã sửa thành (§mục) | Code thật (file:dòng) / kế hoạch |
+|---|---|---|---|
+| `D-92` | §0.1 ADR-06, §5.2, §9: bảng host "không có `TenantId`", index thường | ADR-06: host dùng chung, `TenantId = NULL`, giữ cột nullable, unique `NULLS NOT DISTINCT`; §5.2 + bảng index | `AdministrativeUnit.cs:18,20`; `AddressDbContextModelCreatingExtensions.cs:56-58` |
+| `D-79` | §6.3, §1, §12, §14: mã `0001…0011` | Tái dùng `0001`, `0002`, `0006`, `0103`; mã mới dải `03xx` (`0302…0311`) | `AddressErrorCodes.cs:10-31,39-63` ✅; hằng `03xx` ⬜ |
+| `D-77` | §1 BR-01: snapshot gồm tên danh mục | BR-01: tên chỉ từ snapshot chữ `DiaChiDayDu`, cấm dựng lại từ danh mục | `Address.cs:61-62`; `AdministrativeUnit.cs:138` |
+| `D-95` (Q9; `D-78`/`D-80`/`D-82`/`D-93`) | §0.1 ADR-02/03/06/11, §1, §3.2, §5.2, §6.2, §6.3, §7, §8, §9, §10.3, §11, §12, TC-13/14/15, Q7: `AddrDatasets` + 6 trạng thái + `Import`/`Activate` + khoá/ETO/permission riêng | Bỏ `AddrDatasets`/§3.2; `DatasetVersionId` ⇒ `SchemaVersion`; thêm bảng lô `AddrUnitMappingImports`; nạp ánh xạ giành `address:sync-catalog`; `0303` bỏ, `0306`/`0307` đổi sang file ánh xạ, `0311` nghĩa mới; Q7 viết lại | `AdministrativeModels.cs:34-50,75-83`; `AddressDbContextModelCreatingExtensions.cs:69-71`; ⬜ WP-15+ |
+| `D-96` (Q10; `ADDR-004` Q9, `D-17`, `D-19`, `D-26`) | §0.1 ADR-05, §1, §3.1 (hàng 3/5/6/9 + callout), §4, §5.1-5.2, §6.1-6.2, §7.1, §10.1-10.2: bảng review + `RowVersion`, trạng thái `CanNguoiXacNhan`/`KhongTheChuanHoa`, cột `Legacy*` | Hàng đợi = `ChuaChuanHoa` + `NghiNgo` (nguồn thô không thể `NghiNgo`); xác nhận qua `ChuanHoaLaiAsync`/`TaoHoacLayAsync`; 7 cột nullable + `Method` cuối dải ở ledger; review suy ra; bỏ `Legacy*`; thêm Q11 (nợ N1, nay chốt `D-97`); BR-07, A1/A3/BR-16, §6.3 mẫu, TC-09 sửa theo (docreview #1, #2, #3) | `Address.cs:136-140,204`; `AddressAppService.cs:135`; `AddressContracts.cs:41-54,148` |
+| `D-97` (Q11; `D-17`, `D-95`, `D-96`) | §3.1 hàng 2/3/7, §4.2 ("nợ N1"), §5.2 (`AddrUnitMappings`, `ReasonCode`), §12, Q11: ánh xạ V2→V2 nối nhiều lô chưa rõ, đích đóng ⇒ ném `0006` | Resolver chỉ **một bước**; đích đóng ở đường tự động ⇒ `NeedsReview` `TargetClosed=4` (cuối dải, không ném); `0006` ở cửa ghi cuối; chuỗi đi từng bước có người qua hàng 7; thêm Q12 | `AdministrativeUnit.cs:40`; `AddressErrorCodes.cs:28`; ⬜ WP-15+ |
+| `D-17` | §5.2: `FromLevel`/`ToLevel` `1=tỉnh 2=huyện 3=xã` | `1=Tinh 2=Xa 3=QuanHuyen`; fixture TC sửa theo | `AdministrativeModels.cs:6-19` |
+| `ADDR-004` Q9, ADR-02/12 | §5.2: 7 bảng (`AddrProvinces/Districts/Wards`, `AddrNormalizationReviews`), VO `Address` ở Kernel, `AddressHub` | Thay bằng `AddrAdministrativeUnits`; bỏ bảng review; `Address` = entity + `DiaChiSnapshotDto`; module `Address` | `AddressDbContextModelCreatingExtensions.cs:13-28,40-72`; `AddressContracts.cs:41-54`; `eCommerce.slnx:3-7` |
+| *(không có D-xx)* | §15.2 F1-F3, F7, §11, §8.2: tham chiếu cũ | Ghi lỗi thời; sửa `file:dòng` (`Order.cs`, Redis, `ConfigureAddress`) | `modules/Sales/eCommerce.Sales.Domain/Order.cs:11`; `eCommerceHttpApiHostModule.cs:222,237,251`; `eCommerceDbContext.cs:352` |
+
+Thêm `TC-25…TC-28` phủ `BR-01`, `BR-12`, `BR-15`, `BR-16`.

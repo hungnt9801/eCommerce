@@ -1194,6 +1194,137 @@ update "AbpUsers" set "ShouldChangePasswordOnNextLogin" = true where "Normalized
     }
 }
 
+# ════════════════════════════════════════════════════════════════════════════════════════════
+# NHOM 4 — `tools/agents/*.ps1` — cong cua he agent Claude Code (📌 nhanh, KHONG cham DB)
+# Ke hoach: docs/agents/ke-hoach-v2-claude-code-pro.md §8. 🔑 Cung khuon "cong tu test chinh no": moi ca dung
+# tai lieu MAU trong `_tam-test`, ⚠️ KHONG dung tai lieu that (tai lieu that doi theo WP-14 ⇒ ca se do vo co).
+# ════════════════════════════════════════════════════════════════════════════════════════════
+if (-not $ChiKiemDb) {
+    $ckDoc = Join-Path $PSScriptRoot 'agents/check-feature-doc.ps1'
+    $ckArt = Join-Path $PSScriptRoot 'agents/check-agent-artifact.ps1'
+
+    function TaoTepMau {
+        param([string]$Ten, [string]$NoiDung)
+        $p = Join-Path $thuMucTam $Ten
+        [IO.File]::WriteAllText($p, $NoiDung, [Text.UTF8Encoding]::new($false))
+        return $p
+    }
+
+    # Tai lieu feature mau DU: 16 muc, 2 BR (1 viet tat, 1 day du o §14), muc doi chieu Nhanh co bang.
+    function TaiLieuMau {
+        param([int[]]$BoMuc = @(), [string]$PhuBr2 = 'BR-SHP-009-002', [string]$DoiChieu = 'bang')
+        $sb = [Text.StringBuilder]::new()
+        [void]$sb.AppendLine('# SHP-009 — tai lieu mau')
+        for ($i = 0; $i -le 15; $i++) {
+            if ($BoMuc -contains $i) { continue }
+            [void]$sb.AppendLine("## $i. Muc $i")
+            if ($i -eq 1) { [void]$sb.AppendLine('| **Business Rules** | • **BR-SHP-009-001**: a<br>• **BR-SHP-009-002**: b |') }
+            if ($i -eq 14) {
+                [void]$sb.AppendLine('| ID | Muc tieu | Loai | Input | Expected | Phu |')
+                [void]$sb.AppendLine('|---|---|---|---|---|---|')
+                [void]$sb.AppendLine('| TC-01 | x | Unit | a | b | BR-01 |')
+                [void]$sb.AppendLine("| TC-02 | y | Unit | a | b | $PhuBr2 |")
+            }
+            if ($i -eq 15) { [void]$sb.AppendLine('| **Q1** | hoi | Dev | 🟠 **`Open`** | x |') }
+        }
+        if ($DoiChieu -eq 'bang') {
+            [void]$sb.AppendLine('## Đối chiếu mô hình Nhanh (14/11/2026)')
+            [void]$sb.AppendLine('| D-xx | Cho lech | Da sua |')
+            [void]$sb.AppendLine('|---|---|---|')
+            [void]$sb.AppendLine('| D-08 | 7 trang thai | 4 truc |')
+        }
+        elseif ($DoiChieu -eq 'khong-lech') {
+            [void]$sb.AppendLine('## Đối chiếu mô hình Nhanh (14/11/2026)')
+            [void]$sb.AppendLine('Đã đối chiếu, không lệch.')
+        }
+        elseif ($DoiChieu -eq 'rong') {
+            [void]$sb.AppendLine('## Đối chiếu mô hình Nhanh (14/11/2026)')
+            [void]$sb.AppendLine('')
+        }
+        return $sb.ToString()
+    }
+
+    Describe 'tools/agents/check-feature-doc.ps1 — tai lieu feature 16 muc + BR co test + doi chieu Nhanh' {
+
+        It 'A1) Tai lieu du ⇒ exit 0 (🛡️ chong cong LUON DO)' {
+            $p = TaoTepMau 'shp-009-mau.md' (TaiLieuMau)
+            $k = ChayScript $ckDoc @('-Path', $p, '-WP14')
+            BangNhau $k.Ma 0 "Tai lieu du phai DAT — log: $(Get-Content $k.Log -Raw)"
+            KhangDinh ((Get-Content $k.Log -Raw) -match "1 dong cau hoi 'Open'") 'Phai dem duoc 1 cau hoi Open o §15'
+        }
+
+        It 'A2) Thieu heading ## 7. ⇒ exit 1 va NEU TEN muc thieu' {
+            $p = TaoTepMau 'shp-009-thieu7.md' (TaiLieuMau -BoMuc @(7))
+            $k = ChayScript $ckDoc @('-Path', $p)
+            BangNhau $k.Ma 1 'Thieu heading phai KHONG DAT'
+            KhangDinh ((Get-Content $k.Log -Raw).Contains('## 7.')) 'Log phai neu "## 7."'
+        }
+
+        It 'A3) BR §1 khong co o §14 ⇒ exit 1 va NEU MA BR (🛡️ BR khong test = loi hua)' {
+            $p = TaoTepMau 'shp-009-br.md' (TaiLieuMau -PhuBr2 'NFR-01')
+            $k = ChayScript $ckDoc @('-Path', $p)
+            BangNhau $k.Ma 1 'BR chua phu phai KHONG DAT'
+            KhangDinh ((Get-Content $k.Log -Raw).Contains('BR-SHP-009-002')) 'Log phai neu BR-SHP-009-002'
+        }
+
+        It 'A4) -WP14 ma KHONG co muc doi chieu ⇒ exit 1; khong -WP14 ⇒ exit 0' {
+            $p = TaoTepMau 'shp-009-khongdc.md' (TaiLieuMau -DoiChieu 'khong-co')
+            BangNhau (ChayScript $ckDoc @('-Path', $p, '-WP14')).Ma 1 '-WP14 thieu muc doi chieu'
+            BangNhau (ChayScript $ckDoc @('-Path', $p)).Ma 0 'Khong -WP14 thi khong doi muc doi chieu'
+        }
+
+        It 'A5) Muc doi chieu RONG ⇒ exit 1; ghi "khong lech" ⇒ exit 0' {
+            BangNhau (ChayScript $ckDoc @('-Path', (TaoTepMau 'shp-009-rong.md' (TaiLieuMau -DoiChieu 'rong')), '-WP14')).Ma 1 'Muc rong'
+            BangNhau (ChayScript $ckDoc @('-Path', (TaoTepMau 'shp-009-kl.md' (TaiLieuMau -DoiChieu 'khong-lech')), '-WP14')).Ma 0 'Khong lech'
+        }
+
+        It 'A6) Tep khong ton tai ⇒ exit 2 (khac exit 1 "khong dat")' {
+            BangNhau (ChayScript $ckDoc @('-Path', (Join-Path $thuMucTam 'khong-co.md'))).Ma 2 'Tep khong ton tai'
+        }
+    }
+
+    Describe 'tools/agents/check-agent-artifact.ps1 — verdict / P1 / D1–D7 / cach lui' {
+
+        $daKiem = "## Đã kiểm`n| Nhóm | Cách | Kết quả |`n|---|---|---|`n| D1 | a | ok |`n| D2 | a | ok |`n| D3 | a | ok |`n| D4 | a | chưa chạy |`n| D5 | a | ok |`n| D6 | a | ok |`n| D7 | a | ok |`n"
+
+        It 'B1) docreview DOC-OK, du D1–D7, 0 P1 ⇒ exit 0' {
+            $p = TaoTepMau 'SHP-009-docreview.md' ("# Doc review`n**VERDICT: DOC-OK**`n$daKiem## Phát hiện`n| # | Mức | Vị trí | Vấn đề | Đề nghị |`n|---|---|---|---|---|`n| 1 | P3 | §2 | chính tả | sửa |`n")
+            $k = ChayScript $ckArt @('-Kind', 'docreview', '-Path', $p)
+            BangNhau $k.Ma 0 "docreview hop le — log: $(Get-Content $k.Log -Raw)"
+        }
+
+        It 'B2) docreview DOC-OK nhung con P1 ⇒ exit 1 (🛡️ verdict noi doi)' {
+            $p = TaoTepMau 'SHP-009-docreview-p1.md' ("# Doc review`nVERDICT: DOC-OK`n$daKiem## Phát hiện`n| # | Mức | Vị trí | Vấn đề | Đề nghị |`n|---|---|---|---|---|`n| 1 | **P1** | §8 | khoá không tên | ghi tên |`n")
+            BangNhau (ChayScript $ckArt @('-Kind', 'docreview', '-Path', $p)).Ma 1 'DOC-OK + P1'
+        }
+
+        It 'B3) docreview thieu nhom D7 ⇒ exit 1' {
+            $p = TaoTepMau 'SHP-009-docreview-d7.md' ("VERDICT: DOC-CHANGES`n" + $daKiem.Replace('| D7 | a | ok |', ''))
+            BangNhau (ChayScript $ckArt @('-Kind', 'docreview', '-Path', $p)).Ma 1 'Thieu D7'
+        }
+
+        It 'B4) review: PASS co P1 ⇒ exit 1; CHANGES co P1 ⇒ exit 0' {
+            $bang = "| # | Mức | File:dòng | Vấn đề | Đề nghị |`n|---|---|---|---|---|`n| 1 | P1 | a.cs:1 | lộ token | bỏ |`n"
+            BangNhau (ChayScript $ckArt @('-Kind', 'review', '-Path', (TaoTepMau 'r1.md' "VERDICT: PASS`n$bang"))).Ma 1 'PASS + P1'
+            BangNhau (ChayScript $ckArt @('-Kind', 'review', '-Path', (TaoTepMau 'r2.md' "VERDICT: CHANGES`n$bang"))).Ma 0 'CHANGES + P1'
+        }
+
+        It 'B5) decision: dong DEC du "④ Lùi" + "⑤ Xem lại trước" ⇒ 0; thieu ⑤ ⇒ 1' {
+            $du = "| D-80 | **x** (DEC, 18/11/2026, phiên N22/ADDR-001) | ① Chọn: a ② Vì: T1 ③ Nguồn: D-08 ④ Lùi: git revert abc ⑤ Xem lại trước: release ⑥ Đỏ khi vi phạm: TC-01 | TẠM CHỐT (DEC) |"
+            BangNhau (ChayScript $ckArt @('-Kind', 'decision', '-Path', (TaoTepMau 'd1.md' "| ID | QĐ | Giá trị | TT |`n|---|---|---|---|`n$du`n"))).Ma 0 'Dong DEC du'
+            $thieu = $du.Replace('⑤ Xem lại trước: release ', '')
+            BangNhau (ChayScript $ckArt @('-Kind', 'decision', '-Path', (TaoTepMau 'd2.md' "$thieu`n"))).Ma 1 'Thieu xem lai truoc'
+        }
+
+        It 'B6) testplan: du BR + negative control do→xanh ⇒ 0; thieu BR ⇒ 1' {
+            $srs = TaoTepMau 'shp-009-srs.md' (TaiLieuMau)
+            $nc = "## Negative control`n| Ca | Mutation | Kết quả mutation | Sau khôi phục |`n|---|---|---|---|`n| NC-1 | bỏ kiểm | exit 1 — Failed: 1 | exit 0 — Passed |`n"
+            BangNhau (ChayScript $ckArt @('-Kind', 'testplan', '-Path', (TaoTepMau 't1.md' "BR-SHP-009-001 BR-SHP-009-002`n$nc"), '-Srs', $srs)).Ma 0 'Testplan du'
+            BangNhau (ChayScript $ckArt @('-Kind', 'testplan', '-Path', (TaoTepMau 't2.md' "BR-SHP-009-001`n$nc"), '-Srs', $srs)).Ma 1 'Testplan thieu BR-002'
+        }
+    }
+}
+
 # ── TONG KET ─────────────────────────────────────────────────────────────────────────────────
 Remove-Item -Recurse -Force $thuMucTam -ErrorAction SilentlyContinue
 
