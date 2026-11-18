@@ -5,7 +5,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync, execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, copyFileSync, rmSync, readFileSync, existsSync, appendFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, copyFileSync, rmSync, readFileSync, existsSync, appendFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -201,6 +201,37 @@ test('E13b heading viet HOA "TIẾN ĐỘ TRIỂN KHAI" cung duoc nhan', () => {
   const truoc = readFileSync(join(repo, 'artifacts', 'agents', 'canh-bao.jsonl'), 'utf8');
   startStop('be', 'b3', () => appendFileSync(join(repo, doc), '- WP-15 xong\n'), msg);
   assert.equal(readFileSync(join(repo, 'artifacts', 'agents', 'canh-bao.jsonl'), 'utf8'), truoc);
+});
+// ── Ca hoi quy tu phien N22 (handover-n22 §5 #1, #2) ────────────────
+test('N22-1 JSON khong co trong tin cuoi nhung CO trong transcript ⇒ khong chan, nguonJson=transcript', () => {
+  const tp = put('artifacts/transcripts/agent-t1.jsonl', [
+    JSON.stringify({ type: 'user', message: { role: 'user', content: 'lam viec' } }),
+    JSON.stringify({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: jsonBlock({ agent: 'DEC', outcome: 'TAM_CHOT', choice: 'a' }) }] } }),
+    JSON.stringify({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'tool_use', id: 'x', name: 'Bash', input: {} }] } }),
+    JSON.stringify({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: 'Xong.' }] } }),
+  ].join('\n') + '\n');
+  const r = startStop('decider', 't1', () => {}, 'Xong.', { agent_transcript_path: tp });
+  assert.equal(r.out, '', 'khong duoc chan dung khi transcript co JSON');
+  const dir = join(repo, 'artifacts', 'agents');
+  const moiNhat = readdirSync(dir).filter((f) => /^\d{4}-\d{2}-\d{2}\.jsonl$/.test(f)).sort().pop(); // ngay theo gio dia phuong cua hook
+  const log = readFileSync(join(dir, moiNhat), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+  assert.equal(log[log.length - 1].nguonJson, 'transcript');
+});
+test('N22-1b khoi ```json KHONG HOP LE ⇒ chan voi ly do "KHONG HOP LE" (khac voi "thieu")', () => {
+  const r = startStop('decider', 't2', () => {}, 'Ket qua:\n```json\n{"agent": "DEC", "choice": "dung "DoiTen" tai cho"}\n```');
+  assert.match(JSON.parse(r.out).reason, /KHONG HOP LE/);
+});
+test('N22-2 docrev: psql heredoc co BEGIN/ROLLBACK va dau > trong SQL ⇒ cho; ghi tep sau heredoc ⇒ chan', () => {
+  const sql = "docker exec -i ecommerce-postgres psql -U postgres -d eCommerce <<'SQL'\nBEGIN;\nSELECT count(*) FROM x WHERE a > 0;\nROLLBACK;\nSQL";
+  assert.equal(shell('docrev', sql).code, 0);
+  assert.equal(shell('docrev', sql + '\necho x > docs/a.md').code, 2);
+  assert.equal(shell('docrev', "psql <<'SQL'\nBEGIN;\nUPDATE x SET a=1;\nCOMMIT;\nSQL").code, 2);
+});
+test('N22-2b docrev: cac dang chay check:mermaid ⇒ cho', () => {
+  assert.equal(shell('docrev', 'npm --prefix tools run check:mermaid').code, 0);
+  assert.equal(shell('docrev', 'cd tools && npm run check:mermaid').code, 0);
+  assert.equal(shell('docrev', 'npm --prefix ./tools run check:mermaid').code, 0);
+  assert.equal(shell('docrev', 'npm install left-pad').code, 2);
 });
 test('E14 vai khong khai (general-purpose) ⇒ hook start/stop bo qua', () => {
   const r = startStop('general-purpose', 'g1', () => {}, 'xong');

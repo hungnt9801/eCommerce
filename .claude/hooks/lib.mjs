@@ -142,6 +142,54 @@ export function extractLastJson(text) {
   return null;
 }
 
+// Chan doan: co khoi ```json khong, parse loi gi (de phan biet "thieu" voi "khong hop le").
+export function chanDoanJson(text) {
+  const t = text || '';
+  const fences = [...t.matchAll(/```json\s*([\s\S]*?)```/g)];
+  let err = null;
+  if (fences.length) {
+    try {
+      JSON.parse(fences[fences.length - 1][1]);
+    } catch (e) {
+      err = e.message;
+    }
+  }
+  return { len: t.length, coKhoiJson: fences.length > 0, loiParse: err };
+}
+
+// Doc transcript JSONL cua subagent (agent_transcript_path), lay text cua cac tin assistant tu cuoi len,
+// tim khoi JSON hop le gan nhat. Ly do (do o phien N22): last_assistant_message thuong KHONG chua khoi JSON
+// ma vai da gui ve (31/34 luot bao thieu nham) — transcript la nguon day du.
+export function jsonFromTranscript(p, toiDa = 12) {
+  if (!p || !existsSync(p)) return { json: null, nguon: null };
+  let lines;
+  try {
+    lines = readFileSync(p, 'utf8').split('\n').filter(Boolean);
+  } catch {
+    return { json: null, nguon: null };
+  }
+  let dem = 0;
+  for (let i = lines.length - 1; i >= 0 && dem < toiDa; i--) {
+    let o;
+    try {
+      o = JSON.parse(lines[i]);
+    } catch {
+      continue;
+    }
+    const msg = o && (o.message || o);
+    const role = (o && o.type) || (msg && msg.role);
+    if (role !== 'assistant') continue;
+    dem++;
+    const content = msg && msg.content;
+    const text = typeof content === 'string'
+      ? content
+      : Array.isArray(content) ? content.filter((c) => c && c.type === 'text').map((c) => c.text).join('\n') : '';
+    const j = extractLastJson(text);
+    if (j) return { json: j, nguon: 'transcript' };
+  }
+  return { json: null, nguon: null };
+}
+
 export function stateDir(root) {
   const d = join(root, 'artifacts', 'agents');
   mkdirSync(join(d, 'run'), { recursive: true });

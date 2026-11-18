@@ -33,7 +33,7 @@ Thêm sau mục 7 (không đánh số, ngắn): **"Hàng rào agent"** — bản
 
 ## 4. Kiểm handover
 
-`pwsh -File .\tools\kiem-link-tai-lieu.ps1` → PASS. Cập nhật `docs/nhanh/07-ke-hoach-trien-khai.md` §13 (tiến độ) một dòng có số đo.
+`pwsh -File tools/kiem-link-tai-lieu.ps1` → PASS. Cập nhật `docs/nhanh/07-ke-hoach-trien-khai.md` §13 (tiến độ) một dòng có số đo.
 
 ## 5. Câu trả lời cuối cho người dùng
 

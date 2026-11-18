@@ -68,6 +68,8 @@ Tự chạy `pwsh -File tools/agents/check-agent-artifact.ps1 -Kind docreview -P
 - `DOC-CHANGES` ⇒ gọi BA: "Sửa theo `docs/reviews/<MÃ>-docreview.md`, mọi P1 và P2; không sửa ngoài các mục được nêu" ⇒ D1s ⇒ DOCREV **vòng 2**
   (kèm đường dẫn docreview vòng 1 + `changedSections` của BA). Vẫn `DOC-CHANGES` ⇒ mục §3.
 - `DOC-BLOCKED` ⇒ mục §3.
+- **Sau `DOC-OK` không gọi BA sửa thêm** (N22: 4 chỗ sửa P2 sau DOCREV vòng 2 ⇒ không ai kiểm lại). `DOC-OK` cho phép < 3 P2 — để nguyên
+  trong docreview cho người duyệt. Buộc phải sửa ⇒ gọi DOCREV **vòng kiểm nhanh**: chỉ các mục BA đổi (`changedSections`), cùng tệp docreview.
 
 **D3 — nháp biên bản.** Thêm một dòng vào `docs/agents/nhap-bien-ban-gd3-<đợt>.md` (tạo nếu chưa có; tiêu đề ghi rõ
 **"NHÁP — chưa có hiệu lực duyệt"**): `MÃ · tệp · DOCREV verdict + P1/P2 · số câu §15 còn Open · số câu chờ người · người review bắt buộc theo loại

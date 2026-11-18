@@ -12,6 +12,7 @@ import { execFileSync } from 'node:child_process';
 import {
   readStdinJson, projectRoot, loadScopes, stateDir, dirtySnapshot, changedSince, checkWrite,
   extractLastJson, appendJsonl, readJsonIfExists, writeJson, today, toRepoRelative,
+  chanDoanJson, jsonFromTranscript,
 } from './lib.mjs';
 
 function kiemMucTrienKhai(root, rel, headings) {
@@ -48,11 +49,21 @@ try {
 
   const dir = stateDir(root);
   const runDir = join(dir, 'run');
-  const json = extractLastJson(input.last_assistant_message || '');
+  // Nguon 1: tin cuoi; nguon 2 (du phong): transcript cua chinh subagent.
+  let json = extractLastJson(input.last_assistant_message || '');
+  let nguonJson = json ? 'last_assistant_message' : null;
+  if (!json) {
+    const t = jsonFromTranscript(input.agent_transcript_path);
+    json = t.json;
+    nguonJson = t.nguon;
+  }
+  const chanDoan = chanDoanJson(input.last_assistant_message);
   const stop = cfg.stop || {};
   const thieu = [];
 
-  if (!json) thieu.push('khoi JSON cuoi (```json ... ```) theo muc "Dinh dang tra ve" cua vai');
+  if (!json && chanDoan.coKhoiJson && chanDoan.loiParse) {
+    thieu.push(`khoi JSON KHONG HOP LE (${chanDoan.loiParse}) — sua dau nhay kep trong chuoi (\\"), bo dau phay thua`);
+  } else if (!json) thieu.push('khoi JSON cuoi (```json ... ```) theo muc "Dinh dang tra ve" cua vai');
   else {
     for (const k of stop.jsonKeys || []) if (!(k in json)) thieu.push(`khoa JSON "${k}"`);
     const ak = stop.artifactKey;
@@ -89,7 +100,8 @@ try {
   const blocksFile = join(runDir, `${id}.blocks.json`);
   const blocks = readJsonIfExists(blocksFile, { n: 0 }).n;
   const record = {
-    ts: new Date().toISOString(), agentId: id, role, json: json ? true : false,
+    ts: new Date().toISOString(), agentId: id, role, json: json ? true : false, nguonJson,
+    lam: { len: chanDoan.len, coKhoiJson: chanDoan.coKhoiJson, loiParse: chanDoan.loiParse, coTranscript: Boolean(input.agent_transcript_path) },
     verdict: json && (json.verdict || json.outcome) || null, thieu, doi, ngoaiVung, ghiChuGit, lanChan: blocks,
   };
   appendJsonl(join(dir, `${today()}.jsonl`), record);

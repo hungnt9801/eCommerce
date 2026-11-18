@@ -5,7 +5,7 @@ tools: Read, Grep, Glob, Edit, Write, Bash
 disallowedTools: Agent
 model: claude-sonnet-5-5
 effort: high
-maxTurns: 40
+maxTurns: 60
 skills:
   - feature-doc-rules
 ---
@@ -101,3 +101,6 @@ Chế độ `viet-moi`: theo mẫu 16 mục + skill `feature-doc-rules` §3; bư
 4. **Điều kiện dựa trên một cột/trường phải kiểm cột đó tồn tại và đủ dữ liệu** để làm việc cần làm (bảng OTP thiếu cột SĐT đích ⇒ không gửi được SMS).
 5. **Tài liệu GĐ3 viết trước `D-07`/`D-08`/`D-18`/`D-27`/`D-31`/`D-45`** (mô hình website: `ProductVariant`, 7 trạng thái đơn, không POS, tồn một số) — duyệt nguyên văn sẽ mâu thuẫn code hiện có (`07` §WP-14).
 6. **Header `Draft` không có nghĩa là chưa duyệt** — trạng thái duyệt nằm ở biên bản duyệt (CLAUDE.md §6).
+7. **Sửa tại chỗ, không viết thêm** (N22): `ADDR-001` 84 → 172 KB, `ADDR-002` 97 → 178 KB sau một lượt đối chiếu — mỗi người đọc sau
+   (DOCREV, BE, QA) trả gấp đôi hạn mức. Thay câu cũ bằng câu đúng; mục "Đối chiếu mô hình Nhanh" ≤ 1 bảng, mỗi dòng ≤ 2 câu;
+   không chép lại nội dung `D-xx` — trích mã `D-xx`.

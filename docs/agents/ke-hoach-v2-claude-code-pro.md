@@ -555,6 +555,10 @@ Theo `CLAUDE.md` §5: các câu "DEC" đưa qua `decider` khi bắt đầu B1; c
 
 > Dựng theo yêu cầu chủ dự án ("xây dựng theo kế hoạch"). **Chưa commit** — mọi tệp nằm trong cây làm việc; commit theo CLAUDE.md §8 khi chủ dự án yêu cầu.
 > Bước B0 (người) và B3 (Pilot-D chạy trong Claude Code trên máy) **chưa làm** — xem §16.4.
+> ⚠️ **Phần `.claude/**` chưa nằm trong `.claude/`**: công cụ từ xa của phiên dựng **không được phép ghi** vào thư mục `.claude` trên máy
+> ⇒ 19 tệp `.claude/**` đặt tạm ở `artifacts\cai-dat-agent\claude\` (gitignore). Chủ dự án chạy **một lần**
+> `pwsh -File artifacts\cai-dat-agent\cai-dat.ps1` (tạo mới 18, ghi đè 1 = `decider.md` có sao lưu, không xoá gì, rồi tự chạy ca thử hook).
+> Đã chạy thử script trên repo giả: tạo 18 · ghi đè 1 · `decision-policy` giữ nguyên · hook 26/26 · chạy lại lần 2 ⇒ 19 "giữ nguyên".
 
 ### 16.1. Tệp đã tạo / sửa
 
@@ -598,7 +602,7 @@ Theo `CLAUDE.md` §5: các câu "DEC" đưa qua `decider` khi bắt đầu B1; c
 
 ### 16.4. Việc tiếp theo
 
-1. **B0 — chủ dự án (~30 phút):** `git config --global --add safe.directory D:/Projects/Tools/eCommerce` · mở Claude Code tại repo, chấp nhận
+1. **B0 — chủ dự án (~30 phút):** `pwsh -File artifacts\cai-dat-agent\cai-dat.ps1` (chép `.claude/**`, xem đầu §16) · `git config --global --add safe.directory D:/Projects/Tools/eCommerce` · mở Claude Code tại repo, chấp nhận
    **workspace trust** (hook dự án chỉ chạy sau bước này) · `node --version` ≥ 20 · `/hooks` thấy 6 nhóm hook · `/agents` thấy `ba`, `docrev`, `decider` ·
    chạy `node --test .claude/hooks/test/hooks.test.mjs` và `pwsh -File tools\test-cong-kiem.ps1 -ChiKiemMoc` · **ca thật**: bảo phiên gọi
    `docrev` sửa một tệp `modules/**` ⇒ phải bị chặn, `git status` sạch.

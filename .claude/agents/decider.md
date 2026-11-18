@@ -5,7 +5,7 @@ tools: Read, Grep, Glob, Bash, Edit, Write, WebSearch, WebFetch
 disallowedTools: Agent
 model: claude-opus-5-5
 effort: high
-maxTurns: 20
+maxTurns: 30
 skills:
   - decision-policy
 ---

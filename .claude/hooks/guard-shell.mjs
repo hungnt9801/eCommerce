@@ -28,7 +28,7 @@ const DOC = [
   /^find\b(?!.*\s-(delete|exec|execdir|ok|fprint)\b)/i,
   /^(Get-ChildItem|gci|Get-Content|gc|Select-String|sls|Test-Path|Resolve-Path|Measure-Object|Select-Object|Sort-Object|Where-Object|Get-Item|Format-Table|Format-List|Out-String|Out-Null|ConvertFrom-Json|ConvertTo-Json|Get-Location|Set-Location|Write-Output|Write-Host|Get-FileHash|Compare-Object|Group-Object|Split-Path|Join-Path)\b/i,
   /^(pwsh|powershell)(\.exe)?\s+(-NoProfile\s+|-NoLogo\s+|-ExecutionPolicy\s+\S+\s+)*-File\s+["']?\.?[\\/]?tools[\\/](kiem-link-tai-lieu\.ps1|agents[\\/]check-[\w-]+\.ps1)\b/i,
-  /^npm\s+--prefix\s+["']?tools["']?\s+run\s+check:mermaid\b/i,
+  /^npm\s+((--prefix|-C)\s+["']?\.?[\\/]?tools["']?\s+)?run\s+check:mermaid\b/i, // ca dang `cd tools && npm run check:mermaid`
   /^(dotnet|pnpm|node|git|npm|pwsh|psql|docker)\s+--version\s*$/i,
   /^docker\s+(ps|compose\s+ps)\b/i,
 ];
@@ -41,6 +41,11 @@ const TEST = [
 
 const PSQL = /^(psql\b|docker\s+(compose\s+)?exec\b.*\bpsql\b)/i;
 
+// Bo than heredoc (<<'SQL' ... SQL / <<EOF ... EOF) ke ca dong ket thuc — noi dung la du lieu (SQL), khong phai lenh.
+export function boHeredoc(cmd) {
+  return cmd.replace(/<<-?\s*(['"]?)(\w+)\1[^\n]*\n[\s\S]*?\n\s*\2\s*(?=\n|$)/g, (m) => m.split('\n')[0].replace(/<<-?\s*(['"]?)\w+\1/, ' '));
+}
+
 // Thay noi dung trong dau nhay bang khoang trang de khong bat nham ky tu dac biet trong chuoi.
 export function boNhay(cmd) {
   return cmd.replace(/'[^']*'/g, (m) => "'" + ' '.repeat(m.length - 2) + "'").replace(/"(?:[^"\\]|\\.)*"/g, (m) => '"' + ' '.repeat(m.length - 2) + '"');
@@ -48,7 +53,8 @@ export function boNhay(cmd) {
 
 // Tach chuoi lenh theo && || ; | xuong dong — vi tri cat tinh tren ban da bo nhay (dau phan cach trong chuoi
 // khong tinh), noi dung lay tu ban goc (de duong dan trong nhay van khop regex).
-export function tachDoan(cmd) {
+export function tachDoan(cmd0) {
+  const cmd = boHeredoc(cmd0);
   const s = boNhay(cmd);
   const out = [];
   const re = /&&|\|\||;|\||\r?\n/g;
@@ -64,7 +70,7 @@ export function tachDoan(cmd) {
 
 // Chuyen huong ghi tep (> tep, >> tep) — bo qua 2>&1, >/dev/null, > $null, > NUL.
 export function coGhiTep(cmd) {
-  const s = boNhay(cmd);
+  const s = boNhay(boHeredoc(cmd));
   const re = /(\d|\*)?>>?\s*(\S*)/g;
   let m;
   while ((m = re.exec(s))) {
@@ -86,6 +92,11 @@ export function xetLenh(cmd, level) {
   if (coGhiTep(cmd)) return `vai chi doc (shell=${level}): khong duoc chuyen huong ghi tep (>, >>)`;
   const coPsql = level.includes('psql-rollback'); // cap do ghep duoc: read+psql-rollback+test
   const coTest = /(^|\+)test(\+|$)/.test(level);
+  // psql nhieu dong (heredoc <<'SQL' … SQL): cau lenh BAT DAU bang psql / docker exec … psql, co BEGIN + ROLLBACK,
+  // khong COMMIT ⇒ cho ca khoi (tach theo ; / xuong dong se cat SQL thanh manh vo nghia). Do o N22: docrev bi chan nham.
+  if (coPsql && doan.length && PSQL.test(doan[0].clean) && /\bBEGIN\b/i.test(cmd) && /\bROLLBACK\b/i.test(cmd) && !/\bCOMMIT\b/i.test(cmd)) {
+    return null;
+  }
   for (const d of doan) {
     if (DOC.some((re) => re.test(d.clean))) continue;
     if (coTest && TEST.some((re) => re.test(d.clean))) continue;

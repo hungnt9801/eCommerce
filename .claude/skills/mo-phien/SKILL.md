@@ -23,11 +23,13 @@ Một WP một nhánh (CLAUDE.md §4). `git status --short` phải sạch hoặc
 
 ## 3. Baseline — ghi **số**, không ghi "ổn"
 
+Lệnh shell của Claude Code trên máy này chạy qua **Git Bash** ⇒ đường dẫn viết bằng `/` (Bash nuốt `\`: `.\tools\x.ps1` thành `.toolsx.ps1`).
+
 | WP | Lệnh |
 |---|---|
-| **Có code** (`08` §4) | `docker compose up -d` · `dotnet build eCommerce.slnx --no-incremental` (0 error, ghi số warning) · `dotnet test test\eCommerce.Tests --no-build` (ghi số ca) · `pwsh -File .\tools\kiem-link-tai-lieu.ps1` |
-| **Thuần tài liệu** (WP-14, `D-71`: 0 `.cs`) | `pwsh -File .\tools\kiem-link-tai-lieu.ps1` · `npm --prefix tools run check:mermaid` · build/test **bỏ qua có lý do** "WP thuần tài liệu" (build đang đỏ `MSB3491` trên máy dev — nhận chủ WP-15) |
-| **Luôn chạy** | `node --test .claude/hooks/test/hooks.test.mjs` (hàng rào hook còn đúng) · `pwsh -File .\tools\test-cong-kiem.ps1 -ChiKiemMoc` khi WP sửa `tools/` |
+| **Có code** (`08` §4) | `docker compose up -d` · `dotnet build eCommerce.slnx --no-incremental` (0 error, ghi số warning) · `dotnet test test/eCommerce.Tests --no-build` (ghi số ca) · `pwsh -File tools/kiem-link-tai-lieu.ps1` |
+| **Thuần tài liệu** (WP-14, `D-71`: 0 `.cs`) | `pwsh -File tools/kiem-link-tai-lieu.ps1` · `npm --prefix tools run check:mermaid` · build/test **bỏ qua có lý do** "WP thuần tài liệu" (build đang đỏ `MSB3491` trên máy dev — nhận chủ WP-15) |
+| **Luôn chạy** | `node --test .claude/hooks/test/hooks.test.mjs` (hàng rào hook còn đúng) · `pwsh -File tools/test-cong-kiem.ps1 -ChiKiemMoc` khi WP sửa `tools/` |
 
 Lệnh đỏ ở baseline mà **không** do phiên này gây ra ⇒ ghi số đo + chủ nợ; WP thuần tài liệu không bị chặn bởi build đỏ.
 
