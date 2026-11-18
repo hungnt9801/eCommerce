@@ -1,6 +1,8 @@
 {
   "version": 1,
   "note": "NGUON DUY NHAT vung ghi theo vai. Hook .claude/hooks/*.mjs doc tep nay; ROLE trong .claude/agents/*.md chi DAN toi day. Duong dan tuong doi goc repo, dau '/', glob: ** = moi cap thu muc, * = trong mot doan. Ke hoach: docs/agents/ke-hoach-v2-claude-code-pro.md §7.2",
+  "chanDungKhiThieuJson": false,
+  "chanDungKhiThieuJsonNote": "N22-N24 do duoc: Claude Code 2.1.326 khong gui last_assistant_message, transcript chua co tin cuoi luc SubagentStop => hook khong doc duoc khoi JSON cua vai. false = chi ghi nhat ky (khong chan); cong that la script ORCH chay (D-104).",
   "orch": {
     "note": "Chi ap dung khi skill /doc-gate (hoac /feature) dang chay trong phien chinh: ORCH dieu phoi, khong tu sua thay vai.",
     "write": [

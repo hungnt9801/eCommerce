@@ -117,7 +117,8 @@ try {
     appendJsonl(join(dir, 'canh-bao.jsonl'), { ...record, daBao: false });
   }
 
-  if (thieu.length && !input.stop_hook_active && blocks < 1) {
+  // Chi chan khi bat cong tac (scopes.json chanDungKhiThieuJson) — mac dinh tat tu D-104.
+  if (scopes.chanDungKhiThieuJson === true && thieu.length && !input.stop_hook_active && blocks < 1) {
     writeJson(blocksFile, { n: blocks + 1 });
     process.stdout.write(JSON.stringify({
       decision: 'block',

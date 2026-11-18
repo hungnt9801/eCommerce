@@ -46,7 +46,10 @@ before(() => {
   git('config', 'user.email', 't@t');
   git('config', 'user.name', 't');
   mkdirSync(join(repo, '.claude'), { recursive: true });
-  copyFileSync(SCOPES, join(repo, '.claude', 'scopes.json'));
+  // Ca thu chan-dung can bat cong tac; ca N24-1 kiem mac dinh (tat).
+  const sc = JSON.parse(readFileSync(SCOPES, 'utf8'));
+  sc.chanDungKhiThieuJson = true;
+  writeFileSync(join(repo, '.claude', 'scopes.json'), JSON.stringify(sc, null, 2));
   put('docs/features/address/addr-001-x.md', '# ADDR-001\n\n## 0. Tom tat\n\nnoi dung\n\n## 16. Trạng thái triển khai\n\nchua co\n');
   put('README.md');
   put('.gitignore', 'artifacts/\n'); // giong .gitignore that cua repo (lib.mjs cung tu bo qua artifacts/agents/)
@@ -267,6 +270,20 @@ test('N23-3 transcript CO text nhung khong co JSON ⇒ van chan (co bang chung)'
   const tp = put('artifacts/transcripts/agent-n23c.jsonl', JSON.stringify({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: 'Toi da sua xong, khong co JSON.' }] } }) + '\n');
   const r = startStop('ba', 'n23c', () => {}, '', { agent_transcript_path: tp });
   assert.equal(JSON.parse(r.out).decision, 'block');
+});
+test('N24-1 mac dinh (scopes.json that: chanDungKhiThieuJson=false) ⇒ KHONG chan du thieu JSON, van ghi canh bao', () => {
+  const that = JSON.parse(readFileSync(SCOPES, 'utf8'));
+  assert.equal(that.chanDungKhiThieuJson, false, 'scopes.json cua repo phai tat chan dung (D-104)');
+  const f = join(repo, '.claude', 'scopes.json');
+  const cu = readFileSync(f, 'utf8');
+  writeFileSync(f, JSON.stringify({ ...JSON.parse(cu), chanDungKhiThieuJson: false }, null, 2));
+  try {
+    const r = startStop('docrev', 'n24a', () => {}, 'Toi da xem xong, khong JSON.');
+    assert.equal(r.out, '');
+    assert.match(readFileSync(join(repo, 'artifacts', 'agents', 'canh-bao.jsonl'), 'utf8'), /"agentId":"n24a"/);
+  } finally {
+    writeFileSync(f, cu);
+  }
 });
 test('E14 vai khong khai (general-purpose) ⇒ hook start/stop bo qua', () => {
   const r = startStop('general-purpose', 'g1', () => {}, 'xong');
