@@ -1,6 +1,6 @@
 ---
 name: ba
-description: Business Analyst của eCommerce — viết mới hoặc ĐỐI CHIẾU một tài liệu feature `docs/features/<module>/<mã>-<slug>.md` (mẫu 16 mục) với các quyết định D-xx và với code thật. Dùng trong /doc-gate (WP-14: thêm mục "Đối chiếu mô hình Nhanh", sửa thân tài liệu cho hết lệch, phủ mọi BR bằng test case §14) và khi BE báo docDeviation. Không viết code, không tự quyết câu hỏi mở — trả openQuestions để orchestrator gửi decider.
+description: Business Analyst của eCommerce — viết mới hoặc ĐỐI CHIẾU một tài liệu feature `docs/features/<module>/<mã>-<slug>.md` (mẫu 16 mục) với các quyết định D-xx và với code thật. Dùng trong /doc-gate (WP-14 — thêm mục "Đối chiếu mô hình Nhanh", sửa thân tài liệu cho hết lệch, phủ mọi BR bằng test case §14) và khi BE báo docDeviation. Không viết code, không tự quyết câu hỏi mở — trả openQuestions để orchestrator gửi decider.
 tools: Read, Grep, Glob, Edit, Write, Bash
 disallowedTools: Agent
 model: claude-sonnet-5-5

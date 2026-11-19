@@ -301,3 +301,41 @@ test('E15 session-context chi handover MOI NHAT + dong trang thai', () => {
   assert.match(ctx, /mở WP-14/);
   assert.doesNotMatch(ctx, /handover-n3\.md/);
 });
+
+// F1 — frontmatter cua vai/skill phai la YAML hop le. Claude Code 2.1.328 (19/11/2026) BO QUA IM LANG tep sai:
+// `description:` khong trich dan co ": " ⇒ "mapping values are not allowed here" ⇒ "Agent type 'ba' not found" (N29).
+// Kiem toi thieu khong can thu vien YAML: dong khoa cap 1 co gia tri tron (khong ' " | > [ {) thi khong duoc chua ": " hay " #".
+export function loiFrontmatter(text) {
+  const t = text.replace(/\r\n/g, '\n');
+  if (!t.startsWith('---\n')) return ['khong mo bang ---'];
+  const end = t.indexOf('\n---', 4);
+  if (end < 0) return ['khong dong bang ---'];
+  const loi = [];
+  for (const [i, dong] of t.slice(4, end).split('\n').entries()) {
+    const m = /^([A-Za-z][\w-]*):[ \t]+(.*)$/.exec(dong);
+    if (!m) continue;
+    const v = m[2].trim();
+    if (!v || /^['"|>\[{]/.test(v)) continue;
+    if (/: /.test(v) || /:$/.test(v)) loi.push(`dong ${i + 2} khoa "${m[1]}": gia tri tron chua ": " (doi thanh " — " hoac trich dan)`);
+    if (/\s#/.test(v)) loi.push(`dong ${i + 2} khoa "${m[1]}": gia tri tron chua " #" (YAML coi la chu thich)`);
+  }
+  return loi;
+}
+
+test('F1 frontmatter moi tep .claude/agents/*.md va .claude/skills/*/SKILL.md hop le', () => {
+  const goc = join(HOOKS, '..');
+  const tep = [];
+  const ag = join(goc, 'agents');
+  if (existsSync(ag)) for (const f of readdirSync(ag)) if (f.endsWith('.md')) tep.push(join(ag, f));
+  const sk = join(goc, 'skills');
+  if (existsSync(sk)) for (const d of readdirSync(sk)) if (existsSync(join(sk, d, 'SKILL.md'))) tep.push(join(sk, d, 'SKILL.md'));
+  assert.ok(tep.length > 0, 'khong thay tep vai/skill nao');
+  const hong = tep.map((f) => [f, loiFrontmatter(readFileSync(f, 'utf8'))]).filter(([, l]) => l.length);
+  assert.deepEqual(hong.map(([f, l]) => `${f}: ${l.join('; ')}`), []);
+});
+
+test('F2 negative control: description co ": " bi bat, ban trich dan va CRLF thi qua', () => {
+  assert.equal(loiFrontmatter('---\nname: ba\ndescription: Dung trong /doc-gate (WP-14: them muc)\n---\n# x\n').length, 1);
+  assert.equal(loiFrontmatter('---\r\nname: ba\r\ndescription: "Dung (WP-14: them muc)"\r\n---\r\n').length, 0);
+  assert.equal(loiFrontmatter('---\nname: ba\ndescription: Dung — them muc\nmodel: claude-sonnet-5-5\n---\n').length, 0);
+});
