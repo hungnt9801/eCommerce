@@ -3,7 +3,7 @@
   "wp": "WP-14",
   "nhanh": "docs/n22-wp14-dot-a",
   "note": "Registry bang phien WP-14. Sua qua tools/agents/phien.ps1 (start/done/dodang/blocked/release), KHONG sua tay khi co phien dang chay. Bang Markdown: docs/agents/bang-phien-wp14.md.",
-  "capNhat": "2026-11-19T20:49:42+07:00",
+  "capNhat": "2026-11-19T21:57:22+07:00",
   "rows": [
     {
       "id": "P-01",
@@ -72,12 +72,16 @@
       "dependsOn": [
         "U-01"
       ],
-      "status": "chua",
-      "phien": [],
-      "evidence": null,
+      "status": "xong",
+      "phien": [
+        "N28"
+      ],
+      "evidence": "AskUserQuestion 7 luot: M1-M6,V1-V3,P1-P16,R2,R3; ho so HIEU LUC; D-114,D-115; 36 dong D-xx DA CHOT; kiem-link PASS, mermaid 0 loi, hooks 34/34",
       "ghiChu": null,
-      "handover": null,
-      "prompt": "`/chay-phien U-02` (ngồi cùng)"
+      "handover": "docs/nhanh/handover-n28.md",
+      "prompt": "`/chay-phien U-02` (ngồi cùng)",
+      "batDau": "2026-11-19T21:47:31+07:00",
+      "xongLuc": "2026-11-19T21:57:20+07:00"
     },
     {
       "id": "P-03",
@@ -196,17 +200,17 @@
     {
       "id": "P-09",
       "dot": "A",
-      "loai": "nguoi",
+      "loai": "duyet-dec",
       "ma": [],
       "noiDung": "Duyệt đợt A: lập `docs/bien-ban-duyet-gd3-a-<ngày>.md` (9 tài liệu) + người đã liên hệ GHN/GHTK + kế toán (COD, hoàn tiền)",
-      "vai": "Chủ dự án",
+      "vai": "ORCH · decider (uỷ quyền D-115)",
       "dependsOn": [
         "P-08"
       ],
       "status": "chua",
       "phien": [],
       "evidence": null,
-      "ghiChu": "U-02 có thể chuyển hàng này cho decider tạm duyệt (M2) — `phien.ps1 uyquyen`",
+      "ghiChu": "uỷ quyền theo D-115 — chủ dự án xem lại theo lô",
       "handover": null
     },
     {
@@ -266,17 +270,17 @@
     {
       "id": "P-13",
       "dot": "B",
-      "loai": "nguoi",
+      "loai": "duyet-dec",
       "ma": [],
       "noiDung": "Duyệt đợt B: lập `docs/bien-ban-duyet-gd3-b-<ngày>.md` (3 tài liệu) + review kiến trúc cho engine điều kiện",
-      "vai": "Chủ dự án",
+      "vai": "ORCH · decider (uỷ quyền D-115)",
       "dependsOn": [
         "P-12"
       ],
       "status": "chua",
       "phien": [],
       "evidence": null,
-      "ghiChu": "U-02 có thể chuyển hàng này cho decider tạm duyệt (M2) — `phien.ps1 uyquyen`",
+      "ghiChu": "uỷ quyền theo D-115 — chủ dự án xem lại theo lô",
       "handover": null
     },
     {
