@@ -4,7 +4,14 @@
       {
         "matcher": "startup|resume|clear|compact",
         "hooks": [
-          { "type": "command", "command": "node", "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/session-context.mjs"], "timeout": 15 }
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/session-context.mjs"
+            ],
+            "timeout": 15
+          }
         ]
       }
     ],
@@ -12,13 +19,27 @@
       {
         "matcher": "Edit|Write|MultiEdit|NotebookEdit",
         "hooks": [
-          { "type": "command", "command": "node", "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/guard-write-scope.mjs"], "timeout": 15 }
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/guard-write-scope.mjs"
+            ],
+            "timeout": 15
+          }
         ]
       },
       {
         "matcher": "Bash|PowerShell",
         "hooks": [
-          { "type": "command", "command": "node", "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/guard-shell.mjs"], "timeout": 15 }
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/guard-shell.mjs"
+            ],
+            "timeout": 15
+          }
         ]
       }
     ],
@@ -26,26 +47,53 @@
       {
         "matcher": "Agent|Task",
         "hooks": [
-          { "type": "command", "command": "node", "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/bao-orch.mjs"], "timeout": 15 }
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/bao-orch.mjs"
+            ],
+            "timeout": 15
+          }
         ]
       }
     ],
     "SubagentStart": [
       {
         "hooks": [
-          { "type": "command", "command": "node", "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/subagent-start.mjs"], "timeout": 60 }
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/subagent-start.mjs"
+            ],
+            "timeout": 60
+          }
         ]
       }
     ],
     "SubagentStop": [
       {
         "hooks": [
-          { "type": "command", "command": "node", "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/check-agent-stop.mjs"], "timeout": 120 }
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/check-agent-stop.mjs"
+            ],
+            "timeout": 120
+          }
         ]
       }
     ]
   },
   "permissions": {
+    "allow": [
+      "Bash(pwsh -File tools/agents/phien.ps1 *)",
+      "PowerShell(pwsh -File tools/agents/phien.ps1 *)",
+      "Bash(pwsh -File tools/agents/test-phien.ps1)",
+      "PowerShell(pwsh -File tools/agents/test-phien.ps1)"
+    ],
     "deny": [
       "Bash(git config --global *)",
       "PowerShell(git config --global *)",

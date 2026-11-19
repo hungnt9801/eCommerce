@@ -16,7 +16,7 @@ description: Chính sách ra quyết định thay chủ dự án eCommerce — m
 |---|---|---|
 | `TIEN_LE` | Đã có dòng `ĐÃ CHỐT` trả lời câu hỏi (kể cả suy ra trực tiếp) | Không ghi dòng mới; trích `D-xx` |
 | `TAM_CHOT` | Ngoài vùng cấm, có ≥ 2 phương án, chọn được theo §5 | Dòng mới `TẠM CHỐT (DEC)` + hàng đợi xem lại |
-| `CHUYEN_NGUOI` | Thuộc vùng cấm §3, **hoặc** `confidence = THAP` **và** `reverseCost = CAO` | Dòng mới `ĐỀ XUẤT (DEC)` có khuyến nghị; dây chuyền làm `continueWhileWaiting` |
+| `CHUYEN_NGUOI` | Thuộc vùng cấm §3, **hoặc** `confidence = THAP` **và** `reverseCost = CAO` — **trừ khi** hồ sơ uỷ quyền có hiệu lực phủ câu đó (§3a) | Dòng mới `ĐỀ XUẤT (DEC)` có khuyến nghị; dây chuyền làm `continueWhileWaiting` |
 
 Người dùng duyệt hàng đợi theo lô: đổi `TẠM CHỐT (DEC)` ⇒ `ĐÃ CHỐT`, hoặc thêm dòng thay thế.
 
@@ -48,6 +48,17 @@ Người dùng duyệt hàng đợi theo lô: đổi `TẠM CHỐT (DEC)` ⇒ `�
    ✅ **Được** chốt tạm **thiết kế** (mô hình, trạng thái, adapter) để code chạy với **sandbox/giả lập**, `reviewBefore = release`.
 7. **Bảo mật & phân quyền mặc định mở rộng quyền** (ví dụ cho role mới quyền ghi tiền, tắt kiểm `[Authorize]`).
 
+## 3a. Hồ sơ uỷ quyền (`docs/agents/uy-quyen-chu-du-an.md`)
+
+Chủ dự án lập hồ sơ một lần ở phiên uỷ quyền `U-02` (`docs/agents/bang-phien-wp14.md`). Khi dòng đầu ghi **Trạng thái: HIỆU LỰC**:
+
+- Hồ sơ là tiêu chí **T0** (đứng trước T1 ở §5) và thu hẹp `CHUYEN_NGUOI` theo `.claude/agents/decider.md` §4a.
+- Hồ sơ **có thể** uỷ quyền có điều kiện mục 5 (phạm vi/thứ tự), mục 6 (thiết kế cho pháp lý, vẫn `reviewBefore = release`) và
+  duyệt tài liệu tạm (M2, không merge `main`).
+- Hồ sơ **không thể** uỷ quyền mục 1–4 và 7 của §3 (merge `main`, dữ liệu thật, tiền thật / NCC / secret, đảo `ĐÃ CHỐT`, mở rộng quyền) —
+  đó là luật `CLAUDE.md` §5, không phải của hồ sơ. Hồ sơ ghi khác ⇒ bỏ qua phần đó, trả `CHUYEN_NGUOI` và nêu mâu thuẫn.
+- Trạng thái CHƯA HIỆU LỰC / THU HỒI ⇒ bỏ qua hồ sơ.
+
 ## 4. Quy trình 7 bước
 
 1. **Chuẩn hoá câu hỏi** thành một câu có/không hoặc chọn-một. Tách câu ghép thành nhiều câu.
@@ -67,6 +78,7 @@ Người dùng duyệt hàng đợi theo lô: đổi `TẠM CHỐT (DEC)` ⇒ `�
 
 | # | Tiêu chí | Nguồn |
 |---|---|---|
+| T0 | Hồ sơ uỷ quyền có hiệu lực (§3a) — chính sách và khẩu vị rủi ro chủ dự án đã chốt | `docs/agents/uy-quyen-chu-du-an.md` |
 | T1 | Không vi phạm quyết định `ĐÃ CHỐT` và bất biến kỹ thuật đã ghi | `docs/nhanh/decisions.md`, `docs/coding-conventions.md`, `references/tech-defaults.md` |
 | T2 | Không sai pháp lý Việt Nam (theo căn cứ **đã tra trong repo**, ghi ngày tra) | `docs/business-modules-proposal.md` §6.7, `references/vn-commerce-domain.md` §Pháp lý |
 | T3 | Không làm sai tiền / tồn kho / trạng thái đơn **im lặng** (ưu tiên phương án NÉM LỖI hơn bỏ qua) | `docs/features/cross-cutting/XC-001-money-currency-lam-tron.md`, sổ cái kho, máy trạng thái |

@@ -52,7 +52,9 @@ Ngữ cảnh: MÃ=<MÃ>, tệp=<đường dẫn> §<mục bị chặn>, phiên <
 ```
 
 - `TIEN_LE` / `TAM_CHOT` ⇒ gom các `D-xx` + `choice`, gọi BA **một lần**: "Áp dụng các quyết định sau vào tài liệu: …".
-- `CHUYEN_NGUOI`, và mọi câu `needs = NCC | ke-toan | nguoi` ⇒ **không dừng**: ghi vào danh sách "Chờ người" của phiên (hỏi **một lần**
+- Hồ sơ `docs/agents/uy-quyen-chu-du-an.md` ghi **HIỆU LỰC** ⇒ gửi decider **cả** câu `needs = ke-toan | nguoi | NCC` có `blocks` (decider quyết theo
+  M4/M5 của hồ sơ); chỉ câu decider trả `CHUYEN_NGUOI` mới vào danh sách "Chờ người".
+- `CHUYEN_NGUOI`, và (khi hồ sơ **chưa** hiệu lực) mọi câu `needs = NCC | ke-toan | nguoi` ⇒ **không dừng**: ghi vào danh sách "Chờ người" của phiên (hỏi **một lần**
   ở `/dong-phien`); BA đã thiết kế phương án trung lập theo `continueWhileWaiting`.
 - Chạy lại `pwsh -File tools/agents/check-agent-artifact.ps1 -Kind decision -Path docs/nhanh/decisions.md` — dòng DEC mới phải có cách lùi + hạn xem lại.
 

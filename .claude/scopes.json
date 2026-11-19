@@ -13,61 +13,180 @@
       "docs/agents/hang-doi-xem-lai.md",
       "docs/features/README.md",
       "docs/bien-ban-duyet-*.md",
+      "docs/bien-ban-tam-duyet-*.md",
       "agents/state/**",
       "artifacts/**"
     ]
   },
   "roles": {
     "ba": {
-      "write": ["docs/features/**/*.md", "docs/inbox/**"],
-      "deny": ["docs/features/README.md", "docs/features/**/*-arch.md"],
+      "write": [
+        "docs/features/**/*.md",
+        "docs/inbox/**"
+      ],
+      "deny": [
+        "docs/features/README.md",
+        "docs/features/**/*-arch.md"
+      ],
       "shell": "read",
-      "stop": { "jsonKeys": ["agent", "doc", "sectionsPresent", "brWithoutTest", "openQuestions"], "artifactKey": "doc" }
+      "stop": {
+        "jsonKeys": [
+          "agent",
+          "doc",
+          "sectionsPresent",
+          "brWithoutTest",
+          "openQuestions"
+        ],
+        "artifactKey": "doc"
+      }
     },
     "docrev": {
-      "write": ["docs/reviews/*-docreview.md"],
+      "write": [
+        "docs/reviews/*-docreview.md"
+      ],
       "shell": "read+psql-rollback",
-      "stop": { "jsonKeys": ["agent", "doc", "verdict", "p1"], "artifactKey": "artifact", "artifactMustContain": "VERDICT:" }
+      "stop": {
+        "jsonKeys": [
+          "agent",
+          "doc",
+          "verdict",
+          "p1"
+        ],
+        "artifactKey": "artifact",
+        "artifactMustContain": "VERDICT:"
+      }
     },
     "decider": {
-      "write": ["docs/nhanh/decisions.md", "docs/agents/hang-doi-xem-lai.md"],
+      "write": [
+        "docs/nhanh/decisions.md",
+        "docs/agents/hang-doi-xem-lai.md"
+      ],
       "shell": "read+psql-rollback+test",
-      "stop": { "jsonKeys": ["agent", "outcome", "choice"] }
+      "stop": {
+        "jsonKeys": [
+          "agent",
+          "outcome",
+          "choice"
+        ]
+      }
     },
     "arch": {
-      "write": ["docs/features/**/*-arch.md", "docs/inbox/**"],
+      "write": [
+        "docs/features/**/*-arch.md",
+        "docs/inbox/**"
+      ],
       "shell": "read+psql-rollback",
-      "stop": { "jsonKeys": ["agent", "artifact", "boundaryViolations"], "artifactKey": "artifact" }
+      "stop": {
+        "jsonKeys": [
+          "agent",
+          "artifact",
+          "boundaryViolations"
+        ],
+        "artifactKey": "artifact"
+      }
     },
     "be": {
-      "write": ["modules/**", "src/**", "shared/**", "docs/features/**/*.md"],
-      "deny": ["docs/features/README.md"],
-      "docSection": ["Trạng thái triển khai", "Tiến độ triển khai"],
+      "write": [
+        "modules/**",
+        "src/**",
+        "shared/**",
+        "docs/features/**/*.md"
+      ],
+      "deny": [
+        "docs/features/README.md"
+      ],
+      "docSection": [
+        "Trạng thái triển khai",
+        "Tiến độ triển khai"
+      ],
       "shell": "dev",
-      "stop": { "jsonKeys": ["agent", "buildExit", "testExit", "docDeviation"] }
+      "stop": {
+        "jsonKeys": [
+          "agent",
+          "buildExit",
+          "testExit",
+          "docDeviation"
+        ]
+      }
     },
     "fe": {
-      "write": ["apps/admin-web/**", "packages/api-client/**"],
-      "deny": ["apps/admin-web/e2e/**", "apps/admin-web/test/**"],
+      "write": [
+        "apps/admin-web/**",
+        "packages/api-client/**"
+      ],
+      "deny": [
+        "apps/admin-web/e2e/**",
+        "apps/admin-web/test/**"
+      ],
       "shell": "dev",
-      "stop": { "jsonKeys": ["agent", "lintExit", "typecheckExit", "testExit", "buildExit"] }
+      "stop": {
+        "jsonKeys": [
+          "agent",
+          "lintExit",
+          "typecheckExit",
+          "testExit",
+          "buildExit"
+        ]
+      }
     },
     "qa": {
-      "write": ["test/**", "apps/admin-web/e2e/**", "apps/admin-web/test/**", "tools/probe-*.ps1", "docs/tests/**"],
+      "write": [
+        "test/**",
+        "apps/admin-web/e2e/**",
+        "apps/admin-web/test/**",
+        "tools/probe-*.ps1",
+        "docs/tests/**"
+      ],
       "shell": "dev",
-      "stop": { "jsonKeys": ["agent", "brCovered", "brTotal", "negativeControl", "testExit"], "artifactKey": "artifact" }
+      "stop": {
+        "jsonKeys": [
+          "agent",
+          "brCovered",
+          "brTotal",
+          "negativeControl",
+          "testExit"
+        ],
+        "artifactKey": "artifact"
+      }
     },
     "rev": {
-      "write": ["docs/reviews/*-review.md"],
-      "deny": ["docs/reviews/*-docreview.md"],
+      "write": [
+        "docs/reviews/*-review.md"
+      ],
+      "deny": [
+        "docs/reviews/*-docreview.md"
+      ],
       "shell": "read+test",
-      "stop": { "jsonKeys": ["agent", "verdict", "p1"], "artifactKey": "artifact", "artifactMustContain": "VERDICT:" }
+      "stop": {
+        "jsonKeys": [
+          "agent",
+          "verdict",
+          "p1"
+        ],
+        "artifactKey": "artifact",
+        "artifactMustContain": "VERDICT:"
+      }
     },
     "ops": {
-      "write": [".github/**", "docker-compose.yml", "**/Dockerfile", "tools/*.ps1", "docs/ops/**"],
-      "deny": ["tools/probe-*.ps1"],
+      "write": [
+        ".github/**",
+        "docker-compose.yml",
+        "**/Dockerfile",
+        "tools/*.ps1",
+        "docs/ops/**"
+      ],
+      "deny": [
+        "tools/probe-*.ps1"
+      ],
       "shell": "dev",
-      "stop": { "jsonKeys": ["agent", "filesChanged", "rollback", "gateExit"] }
+      "stop": {
+        "jsonKeys": [
+          "agent",
+          "filesChanged",
+          "rollback",
+          "gateExit"
+        ]
+      }
     }
   },
   "neverWrite": [
@@ -80,9 +199,21 @@
     ".git/**"
   ],
   "neverWriteExceptRoles": {
-    "eCommerce.slnx": ["be", "ops"],
-    "Directory.Packages.props": ["be", "ops"],
-    "pnpm-lock.yaml": ["fe", "ops"]
+    "eCommerce.slnx": [
+      "be",
+      "ops"
+    ],
+    "Directory.Packages.props": [
+      "be",
+      "ops"
+    ],
+    "pnpm-lock.yaml": [
+      "fe",
+      "ops"
+    ]
   },
-  "alwaysAllowOutsideRepo": ["<tmp>", "<scratchpad>"]
+  "alwaysAllowOutsideRepo": [
+    "<tmp>",
+    "<scratchpad>"
+  ]
 }
