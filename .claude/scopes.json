@@ -1,0 +1,219 @@
+{
+  "version": 1,
+  "note": "NGUON DUY NHAT vung ghi theo vai. Hook .claude/hooks/*.mjs doc tep nay; ROLE trong .claude/agents/*.md chi DAN toi day. Duong dan tuong doi goc repo, dau '/', glob: ** = moi cap thu muc, * = trong mot doan. Ke hoach: docs/agents/ke-hoach-v2-claude-code-pro.md §7.2",
+  "chanDungKhiThieuJson": false,
+  "chanDungKhiThieuJsonNote": "N22-N24 do duoc: Claude Code 2.1.326 khong gui last_assistant_message, transcript chua co tin cuoi luc SubagentStop => hook khong doc duoc khoi JSON cua vai. false = chi ghi nhat ky (khong chan); cong that la script ORCH chay (D-104).",
+  "orch": {
+    "note": "Chi ap dung khi skill /doc-gate (hoac /feature) dang chay trong phien chinh: ORCH dieu phoi, khong tu sua thay vai.",
+    "write": [
+      "docs/agents/**",
+      "docs/nhanh/handover-n*.md",
+      "docs/nhanh/07-ke-hoach-trien-khai.md",
+      "docs/nhanh/decisions.md",
+      "docs/agents/hang-doi-xem-lai.md",
+      "docs/features/README.md",
+      "docs/bien-ban-duyet-*.md",
+      "docs/bien-ban-tam-duyet-*.md",
+      "agents/state/**",
+      "artifacts/**"
+    ]
+  },
+  "roles": {
+    "ba": {
+      "write": [
+        "docs/features/**/*.md",
+        "docs/inbox/**"
+      ],
+      "deny": [
+        "docs/features/README.md",
+        "docs/features/**/*-arch.md"
+      ],
+      "shell": "read",
+      "stop": {
+        "jsonKeys": [
+          "agent",
+          "doc",
+          "sectionsPresent",
+          "brWithoutTest",
+          "openQuestions"
+        ],
+        "artifactKey": "doc"
+      }
+    },
+    "docrev": {
+      "write": [
+        "docs/reviews/*-docreview.md"
+      ],
+      "shell": "read+psql-rollback",
+      "stop": {
+        "jsonKeys": [
+          "agent",
+          "doc",
+          "verdict",
+          "p1"
+        ],
+        "artifactKey": "artifact",
+        "artifactMustContain": "VERDICT:"
+      }
+    },
+    "decider": {
+      "write": [
+        "docs/nhanh/decisions.md",
+        "docs/agents/hang-doi-xem-lai.md"
+      ],
+      "shell": "read+psql-rollback+test",
+      "stop": {
+        "jsonKeys": [
+          "agent",
+          "outcome",
+          "choice"
+        ]
+      }
+    },
+    "arch": {
+      "write": [
+        "docs/features/**/*-arch.md",
+        "docs/inbox/**"
+      ],
+      "shell": "read+psql-rollback",
+      "stop": {
+        "jsonKeys": [
+          "agent",
+          "artifact",
+          "boundaryViolations"
+        ],
+        "artifactKey": "artifact"
+      }
+    },
+    "be": {
+      "write": [
+        "modules/**",
+        "src/**",
+        "shared/**",
+        "docs/features/**/*.md"
+      ],
+      "deny": [
+        "docs/features/README.md"
+      ],
+      "docSection": [
+        "Trạng thái triển khai",
+        "Tiến độ triển khai"
+      ],
+      "shell": "dev",
+      "stop": {
+        "jsonKeys": [
+          "agent",
+          "buildExit",
+          "testExit",
+          "docDeviation"
+        ]
+      }
+    },
+    "fe": {
+      "write": [
+        "apps/admin-web/**",
+        "packages/api-client/**"
+      ],
+      "deny": [
+        "apps/admin-web/e2e/**",
+        "apps/admin-web/test/**"
+      ],
+      "shell": "dev",
+      "stop": {
+        "jsonKeys": [
+          "agent",
+          "lintExit",
+          "typecheckExit",
+          "testExit",
+          "buildExit"
+        ]
+      }
+    },
+    "qa": {
+      "write": [
+        "test/**",
+        "apps/admin-web/e2e/**",
+        "apps/admin-web/test/**",
+        "tools/probe-*.ps1",
+        "docs/tests/**"
+      ],
+      "shell": "dev",
+      "stop": {
+        "jsonKeys": [
+          "agent",
+          "brCovered",
+          "brTotal",
+          "negativeControl",
+          "testExit"
+        ],
+        "artifactKey": "artifact"
+      }
+    },
+    "rev": {
+      "write": [
+        "docs/reviews/*-review.md"
+      ],
+      "deny": [
+        "docs/reviews/*-docreview.md"
+      ],
+      "shell": "read+test",
+      "stop": {
+        "jsonKeys": [
+          "agent",
+          "verdict",
+          "p1"
+        ],
+        "artifactKey": "artifact",
+        "artifactMustContain": "VERDICT:"
+      }
+    },
+    "ops": {
+      "write": [
+        ".github/**",
+        "docker-compose.yml",
+        "**/Dockerfile",
+        "tools/*.ps1",
+        "docs/ops/**"
+      ],
+      "deny": [
+        "tools/probe-*.ps1"
+      ],
+      "shell": "dev",
+      "stop": {
+        "jsonKeys": [
+          "agent",
+          "filesChanged",
+          "rollback",
+          "gateExit"
+        ]
+      }
+    }
+  },
+  "neverWrite": [
+    "eCommerce.slnx",
+    "Directory.Packages.props",
+    "pnpm-lock.yaml",
+    ".claude/**",
+    "CLAUDE.md",
+    "docs/bien-ban-duyet-*.md",
+    ".git/**"
+  ],
+  "neverWriteExceptRoles": {
+    "eCommerce.slnx": [
+      "be",
+      "ops"
+    ],
+    "Directory.Packages.props": [
+      "be",
+      "ops"
+    ],
+    "pnpm-lock.yaml": [
+      "fe",
+      "ops"
+    ]
+  },
+  "alwaysAllowOutsideRepo": [
+    "<tmp>",
+    "<scratchpad>"
+  ]
+}
