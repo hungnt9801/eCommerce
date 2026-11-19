@@ -1,0 +1,427 @@
+{
+  "version": 1,
+  "wp": "WP-14",
+  "nhanh": "docs/n22-wp14-dot-a",
+  "note": "Registry bang phien WP-14. Sua qua tools/agents/phien.ps1 (start/done/dodang/blocked/release), KHONG sua tay khi co phien dang chay. Bang Markdown: docs/agents/bang-phien-wp14.md.",
+  "capNhat": "2026-11-19T20:49:42+07:00",
+  "rows": [
+    {
+      "id": "P-01",
+      "dot": "A",
+      "loai": "doc-gate",
+      "ma": [
+        "ADDR-001",
+        "ADDR-002"
+      ],
+      "noiDung": "`ADDR-001` tra cứu ĐVHC 2 cấp + `ADDR-002` đồng bộ mã địa chỉ theo hãng",
+      "vai": "ORCH · ba · docrev · decider",
+      "dependsOn": [],
+      "status": "xong",
+      "phien": [
+        "N22"
+      ],
+      "evidence": "check-feature-doc -WP14 exit 0 ×2 · DOC-OK 0 P1 ×2 · D-77…D-94",
+      "ghiChu": null,
+      "handover": "docs/nhanh/handover-n22.md"
+    },
+    {
+      "id": "P-02",
+      "dot": "A",
+      "loai": "doc-gate",
+      "ma": [
+        "ADDR-003"
+      ],
+      "noiDung": "`ADDR-003` chuẩn hoá địa chỉ 3 cấp ↔ 2 cấp",
+      "vai": "ORCH · ba · docrev · decider",
+      "dependsOn": [],
+      "status": "xong",
+      "phien": [
+        "N23",
+        "N24"
+      ],
+      "evidence": "DOC-OK vong 4 (0 P1, 2 P2, 37 P3); check-feature-doc exit 0 (17 BR, 47 TC); D-105..D-107 + D-111; 2 P2 sua truoc WP-15/WP code; ghi chu addr-004 6.1 con lai",
+      "ghiChu": null,
+      "handover": "docs/nhanh/handover-n26.md",
+      "xongLuc": "2026-11-19T20:08:40+07:00"
+    },
+    {
+      "id": "U-01",
+      "dot": "U",
+      "loai": "chuan-bi-uy-quyen",
+      "ma": [],
+      "noiDung": "Chuẩn bị phiên uỷ quyền: gom câu mở §15 của 18 tài liệu + hàng đợi `D-xx` chờ người + M1–M6; decider soạn khuyến nghị, xếp 4 rổ R0–R3 ⇒ `docs/agents/phien-uy-quyen-cau-hoi.md`",
+      "vai": "ORCH · decider",
+      "dependsOn": [],
+      "status": "xong",
+      "phien": [
+        "N27"
+      ],
+      "evidence": "phien-uy-quyen-cau-hoi.md: 166 cau §15 + 37 dong D-xx xep ro (R0 50+24, R1 58→16 chinh sach, R2 30+11, R3 28+2) · decider 5 luot · kiem-link PASS",
+      "ghiChu": null,
+      "handover": "docs/nhanh/handover-n27.md",
+      "batDau": "2026-11-19T20:24:28+07:00",
+      "xongLuc": "2026-11-19T20:49:42+07:00"
+    },
+    {
+      "id": "U-02",
+      "dot": "U",
+      "loai": "thao-luan",
+      "ma": [],
+      "noiDung": "**Phiên uỷ quyền — chủ dự án thảo luận với decider** (~1–2 giờ, một lần): chốt M1–M6, chính sách R1, ngoại lệ R2, ai lo R3 ⇒ `docs/agents/uy-quyen-chu-du-an.md` có hiệu lực; từ đây decider quyết thay",
+      "vai": "Chủ dự án · ORCH · decider",
+      "dependsOn": [
+        "U-01"
+      ],
+      "status": "chua",
+      "phien": [],
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "prompt": "`/chay-phien U-02` (ngồi cùng)"
+    },
+    {
+      "id": "P-03",
+      "dot": "A",
+      "loai": "doc-gate",
+      "ma": [
+        "SHP-001"
+      ],
+      "noiDung": "`SHP-001` adapter GHN, tính phí, vận đơn (131 KB ⇒ một mình)",
+      "vai": "ORCH · ba · docrev · decider",
+      "dependsOn": [
+        "U-02"
+      ],
+      "status": "chua",
+      "phien": [],
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "P-04",
+      "dot": "A",
+      "loai": "doc-gate",
+      "ma": [
+        "SHP-002",
+        "SHP-004"
+      ],
+      "noiDung": "`SHP-002` webhook trạng thái vận đơn + `SHP-004` adapter GHTK",
+      "vai": "ORCH · ba · docrev · decider",
+      "dependsOn": [
+        "U-02"
+      ],
+      "status": "chua",
+      "phien": [],
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "P-05",
+      "dot": "A",
+      "loai": "doc-gate",
+      "ma": [
+        "SHP-003"
+      ],
+      "noiDung": "`SHP-003` COD thu hộ / đổi COD (121 KB ⇒ một mình; 9 câu chờ hãng)",
+      "vai": "ORCH · ba · docrev · decider",
+      "dependsOn": [
+        "U-02"
+      ],
+      "status": "chua",
+      "phien": [],
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "P-06",
+      "dot": "A",
+      "loai": "doc-gate",
+      "ma": [
+        "REC-003"
+      ],
+      "noiDung": "`REC-003` đối soát COD import Excel",
+      "vai": "ORCH · ba · docrev · decider",
+      "dependsOn": [
+        "P-05",
+        "U-02"
+      ],
+      "status": "chua",
+      "phien": [],
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "P-07",
+      "dot": "A",
+      "loai": "doc-gate",
+      "ma": [
+        "SAL-006"
+      ],
+      "noiDung": "`SAL-006` trả hàng / RMA / hoàn tiền (303 KB, danh sách đỏ ⇒ một mình)",
+      "vai": "ORCH · ba · docrev · decider",
+      "dependsOn": [
+        "U-02"
+      ],
+      "status": "chua",
+      "phien": [],
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "P-08",
+      "dot": "A",
+      "loai": "tong-hop",
+      "ma": [],
+      "noiDung": "Chuẩn bị hồ sơ duyệt đợt A: nháp biên bản đủ dòng mọi tài liệu của đợt, danh sách người review bắt buộc theo loại, bảng câu chờ người còn mở",
+      "vai": "ORCH",
+      "dependsOn": [
+        "P-01",
+        "P-02",
+        "P-03",
+        "P-04",
+        "P-05",
+        "P-06",
+        "P-07"
+      ],
+      "status": "chua",
+      "phien": [],
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "P-09",
+      "dot": "A",
+      "loai": "nguoi",
+      "ma": [],
+      "noiDung": "Duyệt đợt A: lập `docs/bien-ban-duyet-gd3-a-<ngày>.md` (9 tài liệu) + người đã liên hệ GHN/GHTK + kế toán (COD, hoàn tiền)",
+      "vai": "Chủ dự án",
+      "dependsOn": [
+        "P-08"
+      ],
+      "status": "chua",
+      "phien": [],
+      "evidence": null,
+      "ghiChu": "U-02 có thể chuyển hàng này cho decider tạm duyệt (M2) — `phien.ps1 uyquyen`",
+      "handover": null
+    },
+    {
+      "id": "P-10",
+      "dot": "B",
+      "loai": "doc-gate",
+      "ma": [
+        "PRO-001"
+      ],
+      "noiDung": "`PRO-001` voucher / coupon (143 KB ⇒ một mình)",
+      "vai": "ORCH · ba · docrev · decider",
+      "dependsOn": [
+        "U-02"
+      ],
+      "status": "chua",
+      "phien": [],
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "P-11",
+      "dot": "B",
+      "loai": "doc-gate",
+      "ma": [
+        "PRO-002",
+        "LOY-001"
+      ],
+      "noiDung": "`PRO-002` engine điều kiện khuyến mại + `LOY-001` điểm thưởng",
+      "vai": "ORCH · ba · docrev · decider",
+      "dependsOn": [
+        "U-02"
+      ],
+      "status": "chua",
+      "phien": [],
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "P-12",
+      "dot": "B",
+      "loai": "tong-hop",
+      "ma": [],
+      "noiDung": "Chuẩn bị hồ sơ duyệt đợt B: nháp biên bản đủ dòng mọi tài liệu của đợt, danh sách người review bắt buộc theo loại, bảng câu chờ người còn mở",
+      "vai": "ORCH",
+      "dependsOn": [
+        "P-10",
+        "P-11"
+      ],
+      "status": "chua",
+      "phien": [],
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "P-13",
+      "dot": "B",
+      "loai": "nguoi",
+      "ma": [],
+      "noiDung": "Duyệt đợt B: lập `docs/bien-ban-duyet-gd3-b-<ngày>.md` (3 tài liệu) + review kiến trúc cho engine điều kiện",
+      "vai": "Chủ dự án",
+      "dependsOn": [
+        "P-12"
+      ],
+      "status": "chua",
+      "phien": [],
+      "evidence": null,
+      "ghiChu": "U-02 có thể chuyển hàng này cho decider tạm duyệt (M2) — `phien.ps1 uyquyen`",
+      "handover": null
+    },
+    {
+      "id": "P-14",
+      "dot": "C",
+      "loai": "doc-gate",
+      "ma": [
+        "REP-001",
+        "REP-002"
+      ],
+      "noiDung": "`REP-001` read-model + `REP-002` doanh thu, lãi gộp",
+      "vai": "ORCH · ba · docrev · decider",
+      "dependsOn": [
+        "U-02"
+      ],
+      "status": "chua",
+      "phien": [],
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "P-15",
+      "dot": "C",
+      "loai": "doc-gate",
+      "ma": [
+        "REP-003",
+        "ACC-001"
+      ],
+      "noiDung": "`REP-003` tồn kho, hiệu suất kênh + `ACC-001` xuất liệu kế toán",
+      "vai": "ORCH · ba · docrev · decider",
+      "dependsOn": [
+        "U-02"
+      ],
+      "status": "chua",
+      "phien": [],
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "P-16",
+      "dot": "C",
+      "loai": "doc-gate",
+      "ma": [
+        "NOT-001"
+      ],
+      "noiDung": "`NOT-001` template, hàng đợi thông báo (133 KB ⇒ một mình)",
+      "vai": "ORCH · ba · docrev · decider",
+      "dependsOn": [
+        "U-02"
+      ],
+      "status": "chua",
+      "phien": [],
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "P-17",
+      "dot": "C",
+      "loai": "doc-gate",
+      "ma": [
+        "NOT-002"
+      ],
+      "noiDung": "`NOT-002` kênh email / SMS / Zalo OA",
+      "vai": "ORCH · ba · docrev · decider",
+      "dependsOn": [
+        "U-02"
+      ],
+      "status": "chua",
+      "phien": [],
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "P-18",
+      "dot": "C",
+      "loai": "tong-hop",
+      "ma": [],
+      "noiDung": "Chuẩn bị hồ sơ duyệt đợt C: nháp biên bản đủ dòng mọi tài liệu của đợt, danh sách người review bắt buộc theo loại, bảng câu chờ người còn mở",
+      "vai": "ORCH",
+      "dependsOn": [
+        "P-14",
+        "P-15",
+        "P-16",
+        "P-17"
+      ],
+      "status": "chua",
+      "phien": [],
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "P-19",
+      "dot": "C",
+      "loai": "nguoi",
+      "ma": [],
+      "noiDung": "Duyệt đợt C: lập `docs/bien-ban-duyet-gd3-c-<ngày>.md` (6 tài liệu) — **bắt buộc kế toán** cho `ACC-001`, `REP-002`",
+      "vai": "Chủ dự án",
+      "dependsOn": [
+        "P-18"
+      ],
+      "status": "chua",
+      "phien": [],
+      "evidence": null,
+      "ghiChu": "U-02 có thể chuyển hàng này cho decider tạm duyệt (M2) — `phien.ps1 uyquyen`",
+      "handover": null
+    },
+    {
+      "id": "P-20",
+      "dot": "—",
+      "loai": "dong-wp",
+      "ma": [],
+      "noiDung": "Đóng WP-14: cập nhật `docs/features/README.md` §2 theo 3 biên bản; đề xuất thứ tự `§WP-15+` (07 §WP-14 ⑤, decider tạm chốt trong phạm vi D-70); 07 §13",
+      "vai": "ORCH · decider",
+      "dependsOn": [
+        "P-09",
+        "P-13",
+        "P-19"
+      ],
+      "status": "chua",
+      "phien": [],
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "P-21",
+      "dot": "—",
+      "loai": "nguoi",
+      "ma": [],
+      "noiDung": "Mở + merge PR: `chore/agents-b1-b2` trước, rồi `docs/n22-wp14-dot-a` (mô tả: `artifacts/pr/mo-ta-pr-wp14-dot-a.md`, dòng đầu `Refs: D-71`)",
+      "vai": "Chủ dự án",
+      "dependsOn": [
+        "P-20"
+      ],
+      "status": "chua",
+      "phien": [],
+      "evidence": null,
+      "ghiChu": "vùng cấm (merge `main`) — không uỷ quyền được",
+      "handover": null,
+      "camUyQuyen": true
+    }
+  ]
+}

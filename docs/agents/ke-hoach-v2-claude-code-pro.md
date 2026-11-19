@@ -648,3 +648,19 @@ sửa lỗi hook ném ngoại lệ khi vừa không có JSON vừa không có n�
 `decider` 40 · `/doc-gate`: `decider` **tuần tự**; tài liệu > 120 KB hoặc ≥ 5 câu gửi decider ⇒ **một tài liệu/phiên**.
 `hooks.test.mjs` **33/33** (ca `N23-1…3`; negative control: bỏ luật không-chặn ⇒ `N23-1` đỏ; bỏ mở rộng `~` ⇒ `N23-2` đỏ).
 
+### 16.7. Bảng phiên chạy WP-14 + `/chay-phien` (18/11/2026 khuya)
+
+Theo yêu cầu "mở phiên, dán prompt, không can thiệp" — khuôn §14 *Bảng phiên chạy* của `SelfLearningAI/docs/09-process/ke-hoach-xay-dung-cms.md`.
+
+| Thành phần | Vai trò |
+|---|---|
+| `agents/state/phien-wp14.json` | Registry — 23 hàng (2 phiên uỷ quyền `U-01`/`U-02`, 14 `doc-gate`, 3 chuẩn bị hồ sơ duyệt, 3 duyệt của người, 1 đóng WP, 1 PR của người); nguồn sự thật |
+| [bang-phien-wp14.md](bang-phien-wp14.md) | Bảng để người xem + dán prompt; phần giữa marker do script sinh, **không sửa tay** |
+| `tools/agents/phien.ps1` | `status` · `next` · `start` · `done` (bắt buộc bằng chứng) · `dodang` · `blocked` · `release` · `sync` · `check` · `doisoat` (đối soát phiên chạy kiểu cũ) · `uyquyen` (chuyển hàng duyệt cho decider sau `U-02`) |
+| `tools/agents/test-phien.ps1` | 37/37 ca (negative control: sửa tay bảng ⇒ `check` exit 1; sắp handover theo **số**, không theo chữ: `n10` > `n9`) |
+| `.claude/skills/chay-phien/SKILL.md` | Đối soát → chọn hàng → mở phiên → `/doc-gate` → đóng phiên → cập nhật bảng → commit + push nhánh WP; không hỏi giữa chừng |
+| [uy-quyen-chu-du-an.md](uy-quyen-chu-du-an.md) | Hồ sơ uỷ quyền (K1) — CHƯA HIỆU LỰC tới `U-02`; decider đọc trước mọi thứ (T0), `decision-policy` §3a, `decider.md` §4a |
+
+Đối soát trên dữ liệu thật (`handover-n24.md`): `ADDR-001…002` ⇒ đề xuất `done`; `ADDR-003` ⇒ làm tiếp (§2 còn áp `D-105…D-107`).
+Quyết định: dòng `D-xx` ĐỀ XUẤT do lần `/chay-phien` đầu tiên chèn (văn bản ở `artifacts/cai-dat-agent/D-bang-phien.md`).
+Giới hạn: hạn mức 5 giờ vẫn có thể cắt ngang phiên — hàng ở lại 🟨, lần `/chay-phien` sau làm tiếp từ cây làm việc; hàng 👤 luôn là việc của người.
