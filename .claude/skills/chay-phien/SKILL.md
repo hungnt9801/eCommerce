@@ -31,6 +31,10 @@ Lệnh shell chạy qua **Git Bash** ⇒ đường dẫn dùng `/`. Viết tắt
 
 ## 0. Chuẩn bị (≤ 5 lệnh)
 
+0. **Kiểm vai đã nạp (trước mọi việc khác):** danh sách `subagent_type` của công cụ `Agent` phải có đủ `ba`, `docrev`, `decider`.
+   Thiếu vai nào ⇒ **không** `start` hàng nào, **không** dùng `general-purpose` thay vai: chạy `node --test .claude/hooks/test/hooks.test.mjs`
+   (ca `F1` chỉ đúng tệp + dòng frontmatter hỏng — Claude Code bỏ qua im lặng tệp vai có YAML sai), báo kết quả trong câu trả lời và dừng.
+   Không viết handover cho phiên dừng ở bước này.
 1. `git status --short` + `git branch --show-current`. Nhánh phải là trường `nhanh` của `agents/state/phien-wp14.json`
    (`docs/n22-wp14-dot-a`). Khác nhánh và cây sạch ⇒ `git switch <nhanh>`; cây bẩn ngoài `docs/**`, `agents/state/**` ⇒ **dừng**, báo người (không stash hộ).
 2. `PH check` — đỏ vì bảng lệch ⇒ `PH sync` (không sửa tay bảng).
