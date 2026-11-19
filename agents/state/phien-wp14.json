@@ -3,7 +3,7 @@
   "wp": "WP-14",
   "nhanh": "docs/n22-wp14-dot-a",
   "note": "Registry bang phien WP-14. Sua qua tools/agents/phien.ps1 (start/done/dodang/blocked/release), KHONG sua tay khi co phien dang chay. Bang Markdown: docs/agents/bang-phien-wp14.md.",
-  "capNhat": "2026-11-19T22:01:39+07:00",
+  "capNhat": "2026-11-20T06:17:05+07:00",
   "rows": [
     {
       "id": "P-01",
@@ -118,14 +118,16 @@
       "dependsOn": [
         "U-02"
       ],
-      "status": "dang-lam",
+      "status": "do-dang",
       "phien": [
-        "N29"
+        "N29",
+        "N30",
+        "N32"
       ],
       "evidence": null,
-      "ghiChu": null,
-      "handover": null,
-      "batDau": "2026-11-19T22:01:39+07:00"
+      "ghiChu": "SHP-002 xong (7f3d61b, DOC-OK vong 2); con SHP-004 adapter GHTK. N30 release nham de nhuong P-05",
+      "handover": "docs/nhanh/handover-n32.md",
+      "batDau": "2026-11-20T06:17:04+07:00"
     },
     {
       "id": "P-05",
@@ -139,11 +141,15 @@
       "dependsOn": [
         "U-02"
       ],
-      "status": "chua",
-      "phien": [],
-      "evidence": null,
+      "status": "xong",
+      "phien": [
+        "N30"
+      ],
+      "evidence": "check-feature-doc -WP14 exit 0 (16/16, 22/22 BR); docreview DOC-OK vong 2 (0 P1/2 P2) exit 0; D-117 D-120; kiem-link PASS; mermaid 0 loi",
       "ghiChu": null,
-      "handover": null
+      "handover": "docs/nhanh/handover-n32.md",
+      "batDau": "2026-11-19T22:16:00+07:00",
+      "xongLuc": "2026-11-20T06:17:03+07:00"
     },
     {
       "id": "P-06",
