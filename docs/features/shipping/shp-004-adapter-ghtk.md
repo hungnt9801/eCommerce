@@ -5,80 +5,74 @@
 > • `docs/implementation-plan.md:427` — *"| SHP-004 | Adapter **GHTK** (⚠️ xác minh địa chỉ 2 cấp trước) |"*
 > • `docs/implementation-plan.md:199` — *"⚠️ **GHTK: xác minh địa chỉ 2 cấp TRƯỚC khi thiết kế**"*
 > • `docs/implementation-plan.md:290` — bảng rủi ro, dòng 2, mức **🔴 cao**: *"**GHTK chưa xác nhận địa chỉ 2 cấp** … Hỏi GHTK trước khi chốt mô hình địa chỉ"*
-> • `docs/business-modules-proposal.md:546` — *"⚠️ **GHTK vẫn dùng payload 3 cấp** (`province`/`district`/`ward`) và **KHÔNG tìm thấy** cờ tương đương `is_new_to_address` | **Xác minh với GHTK TRƯỚC KHI thiết kế địa chỉ**"*
+> • `docs/business-modules-proposal.md:546` — *"⚠️ **GHTK vẫn dùng payload 3 cấp** (`province`/`district`/`ward`) và **KHÔNG tìm thấy** cờ tương đương `is_new_to_address`"*
 > • `docs/business-modules-proposal.md:570` — *"**cờ địa chỉ 2 cấp của GHTK**"* nằm trong danh sách **16 mục KHÔNG TÌM THẤY**
-> ⇒ Toàn bộ tài liệu này được xây theo **một** nguyên tắc: **xác minh địa chỉ 2 cấp ở BIÊN GỬI, FAIL-CLOSED** — không xác minh được thì **KHÔNG gửi** (`ADR-02`, `BR-SHP-004-002`).
+> ⇒ Tài liệu này giữ **một** nguyên tắc: **chỉ gửi địa chỉ khi mã hãng đã được `Address` xác minh (`DaXacMinh`), FAIL-CLOSED** — không có mã ⇒ **KHÔNG gửi** (`ADR-02`, `BR-SHP-004-002`). Q1 chưa có trả lời GHTK ⇒ `SHP-004` nằm trong danh sách đỏ có điều kiện của `D-114` (`docs/agents/uy-quyen-chu-du-an.md:35`).
 >
-> ⚠️ **Phân biệt với `SHP-003` (đổi COD ở GHN cần OTP):** cảnh báo đó **không** thuộc tài liệu này. `SHP-003` **chưa có tài liệu** trong `docs/features/` — xem **§15.2 F2**. `SHP-004` **không** làm nghiệp vụ đổi COD (§0 phạm vi).
+> ⚠️ **Phân biệt với `SHP-003` (đổi COD ở GHN cần OTP):** cảnh báo đó thuộc `docs/features/shipping/shp-003-cod-thu-ho-doi-cod.md`. `SHP-004` **không** làm nghiệp vụ đổi COD (§0 phạm vi).
 
 | Thuộc tính | Nội dung |
 |---|---|
 | **Mã** | `SHP-004` |
-| **Module** | **ShippingHub** — dự kiến tạo mới `modules/ShippingHub/eCommerce.ShippingHub.{Domain, EntityFrameworkCore, Application.Contracts, Application}` (hiện **chưa tồn tại** — §15.2 F1) |
-| **Giai đoạn** | **GĐ2 — Vận hành & tuân thủ VN** (`docs/implementation-plan.md:113`, `docs/implementation-plan.md:427`) |
-| **Ưu tiên** | **Must have** — nhưng là **adapter thứ HAI** (`docs/implementation-plan.md:338`: *"**GHN** — REST, có sandbox… GHTK làm sau, cần xác minh địa chỉ 2 cấp trước"*) |
+| **Module** | **ShippingHub** — dự kiến tạo mới `modules/ShippingHub/eCommerce.ShippingHub.{Domain, EntityFrameworkCore, Application.Contracts, Application}` (hiện **chưa tồn tại** — §15.2 F1). `SHP-004` **không có bảng riêng** (§5) |
+| **Giai đoạn** | **GĐ3** (`D-69`; `docs/agents/anh-xa-lo-trinh-d69.md:28`) — lộ trình cũ ghi GĐ2 (`docs/implementation-plan.md:113`, `:427`) chỉ còn là lịch sử |
+| **Ưu tiên** | **Must have** — nhưng là **adapter thứ HAI** (`docs/implementation-plan.md:338`: *"GHN … GHTK làm sau, cần xác minh địa chỉ 2 cấp trước"*) |
 | **Trạng thái** | 🟡 `Draft` — chờ review |
 | **Người viết / người review** | *(điền)* / **Kiến trúc trưởng + người đã liên hệ GHTK** (`docs/design-doc-guidelines.md:134`: tích hợp NCC ngoài ⇒ review bởi người **đã liên hệ NCC**) |
-| **Phiên bản / ngày** | `v0.1 — 15/10/2026` |
-| **Tài liệu liên quan** | `SHP-001` (adapter GHN — *chưa có tài liệu*) · `SHP-002` (webhook trạng thái vận đơn & đối soát) · `SHP-003` (COD — *chưa có tài liệu*) · `XC-001` (Money) · `XC-002` (outbox/inbox, idempotency) · `XC-003` (khoá phân tán) · `XC-004` (phân quyền/tenant) · `XC-005` (log/metric) · `REC-003` (đối soát COD) · `REP-001` (read-model) · `SAL-003` (state machine 4 trục) · `docs/implementation-plan.md` · `docs/business-modules-proposal.md` · `docs/design-doc-guidelines.md` |
+| **Phiên bản / ngày** | `v0.5 — 21/11/2026` (v0.1 — 15/10/2026; v0.2 đối chiếu mô hình Nhanh WP-14; v0.3 áp `D-128`; v0.4 sửa theo `docs/reviews/SHP-004-docreview.md` vòng 1; v0.5 áp `D-129`/`D-130`/`D-131`) |
+| **Tài liệu liên quan** | `SHP-001` (**chủ** `IShippingCarrierProvider`, `ShpShipments`, `ShpShipmentCreateAttempts`, `IShipmentAppService`) · `SHP-002` (webhook + đối soát; **chủ** `IShipmentWebhookVerifier`, `ICarrierStatusMapper`) · `SHP-003` (COD) · `ADDR-002` (ánh xạ mã hãng, **chủ** `AddrCarrierMappings`) · `XC-001` · `XC-002` · `XC-003` · `XC-004` · `XC-005` · `REC-003` · `SAL-003` · `docs/implementation-plan.md` · `docs/business-modules-proposal.md` · `docs/design-doc-guidelines.md` |
 
-**Quy ước mã dùng trong tài liệu:** BR ⇒ `BR-SHP-004-nn` · NFR ⇒ `NFR-SHP-004-nn` (kế thừa khuôn `SHP-002`) · quyết định thiết kế ⇒ `ADR-nn` · test ⇒ `TC-nn`.
+**Quy ước mã dùng trong tài liệu:** BR ⇒ `BR-SHP-004-nn` · NFR ⇒ `NFR-SHP-004-nn` · quyết định thiết kế ⇒ `ADR-nn` · test ⇒ `TC-nn`.
 
 ---
 
 ## 0. Tóm tắt & quyết định thiết kế
 
-**Tóm tắt:** `SHP-004` cài **adapter GHTK** (hãng vận chuyển thứ hai) sau **một** hợp đồng trung lập hãng của `ShippingHub`: tính phí, tạo vận đơn, huỷ vận đơn, tra trạng thái. Ràng buộc **trung tâm** của tài liệu này **không** phải là HTTP mà là **dữ liệu địa chỉ**: sau **01/07/2025** Việt Nam **bỏ cấp huyện** và sáp nhập tỉnh (**63 → 34**) — `docs/business-modules-proposal.md:509` — trong khi **GHTK vẫn mô tả payload 3 cấp** (`province`/`district`/`ward`) và ta **chưa tìm thấy** cờ tương đương `is_new_to_address` của GHN (`docs/business-modules-proposal.md:513` nói **GHN đã thích ứng**; `:546` nói **GHTK thì chưa xác minh**).
+**Tóm tắt:** `SHP-004` cài **adapter GHTK** — một implementation của `IShippingCarrierProvider` (do `SHP-001` định nghĩa, `docs/features/shipping/shp-001-adapter-ghn-tinh-phi-van-don.md` §6.1) gồm **tính phí · tạo vận đơn · huỷ**, cộng đọc trạng thái chủ động và `VerifyAsync` + `ParseAsync` webhook GHTK cho `SHP-002` (`shp-002-webhook-trang-thai-van-don.md:56`). **Không** có luồng tạo vận đơn, bảng hay job riêng (ADR-12). Ràng buộc **trung tâm** là **dữ liệu địa chỉ**: sau **01/07/2025** Việt Nam **bỏ cấp huyện** và sáp nhập tỉnh (**63 → 34**) — `docs/business-modules-proposal.md:509` — trong khi **GHTK vẫn mô tả payload 3 cấp** và ta **chưa tìm thấy** cờ tương đương `is_new_to_address` của GHN (`:513` nói **GHN đã thích ứng**; `:546` nói **GHTK chưa xác minh**).
 
-**Vì sao phải "xác minh trước khi gửi" chứ không phải "gửi rồi sửa":**
+**Vì sao phải "chỉ gửi khi mã hãng đã xác minh" chứ không phải "gửi rồi sửa":**
 
 | Nếu gửi vận đơn với địa chỉ CHƯA xác minh | Hệ quả thật |
 |---|---|
-| Hãng từ chối payload ⇒ ta **retry mù** | Tốn quota, log nhiễu, CSKH tưởng lỗi hệ thống; **mỗi lần thử là một lần gọi API tính vào hạn mức** |
-| Hãng **chấp nhận** nhưng `district` là mã **đã bị bỏ** sau 01/07/2025 | Vận đơn đi vào **địa chỉ không còn tồn tại** ⇒ giao thất bại ⇒ **phí 2 chiều** + **COD treo** + khách phàn nàn. Đây là **lỗi im lặng** — API trả thành công |
-| Đơn có COD, giao sai địa chỉ | `CodRecord` chờ thu tiền **vô thời hạn** ⇒ `REC-003` đối soát với file Excel của hãng **không khớp** ⇒ **không biết mất ở đâu** (kế thừa cảnh báo `SHP-002` §0) |
-| Sản phẩm bị trả về kho | Phải nhập lại kho + hoàn tiền (`SAL-006` **chưa có tài liệu**) ⇒ phát sinh luồng nghiệp vụ **ngoài** phạm vi adapter |
-
-⇒ Vì vậy thiết kế ở đây **chặn ở biên gửi**: một bước **pre-flight** bắt buộc (`ADR-02`) trả về **một trong ba** kết quả — `Verified` · `Rejected` (có mã lỗi) · `Blocked` (thiếu dữ liệu/cấu hình). **Chỉ** `Verified` mới được phép gọi API tạo vận đơn.
+| Hãng từ chối payload ⇒ ta **retry mù** | Tốn quota, log nhiễu; **mỗi lần thử là một lần gọi API tính vào hạn mức** |
+| Hãng **chấp nhận** nhưng `district` là mã **đã bị bỏ** sau 01/07/2025 | Vận đơn đi vào **địa chỉ không còn tồn tại** ⇒ giao thất bại ⇒ **phí 2 chiều** + **COD treo**. **Lỗi im lặng** — API trả thành công |
+| Đơn có COD, giao sai địa chỉ | `REC-003` đối soát với file của hãng **không khớp** ⇒ không biết mất ở đâu |
+| Hàng bị trả về kho | Luồng hoàn hàng thuộc `SAL-006` (`D-70`) ⇒ phát sinh nghiệp vụ **ngoài** adapter |
 
 **Phạm vi:**
-- ✅ Hợp đồng **trung lập hãng** `IShippingCarrier` + factory chọn theo `ProviderCode` (khuôn `IChannelConnectorFactory` — `modules/ChannelHub/eCommerce.ChannelHub.Application.Contracts/Connectors/IChannelConnector.cs:117`).
-- ✅ **Adapter GHTK**: tính phí, tạo vận đơn, huỷ, tra trạng thái — **tất cả** sau interface, tầng nghiệp vụ **không** biết GHTK.
-- ✅ **Lớp xác minh địa chỉ 2 cấp** (`IShippingAddressNormalizer` + `IShippingAddressVerifier`) chạy **trước** khi gọi hãng, **fail-closed**.
-- ✅ **Danh mục địa chỉ của hãng là DỮ LIỆU ĐỒNG BỘ** (không phải master data) — `docs/business-modules-proposal.md:516`–`517`, có job đồng bộ + version + `SyncedAtUtc`.
-- ✅ **Idempotency ở MỌI biên vào** của feature: app service tạo vận đơn (HTTP), job thử lại, job đồng bộ địa chỉ — và **parser** webhook mà `SHP-002` gọi.
-- ✅ Mã trạng thái GHTK → trạng thái nội bộ (bảng ánh xạ là **dữ liệu**, kế thừa `SHP-002` D6).
-- ✅ Tiền (`CodAmount`, `ShippingFee`) theo `XC-001`: `decimal`, **cấm** so bằng `==`.
-- ✅ Log + `CorrelationId` + metric theo `XC-005`.
+- ✅ **Adapter GHTK** `GhtkCarrierProvider : IShippingCarrierProvider` (tính phí, tạo, huỷ) — tầng nghiệp vụ **không** biết GHTK.
+- ✅ **Kiểm địa chỉ theo mô hình hãng ở chính adapter** (defense-in-depth, fail-closed): request không đủ cấp bắt buộc của `AddressModel` ⇒ **trả** `Success = false` + `FailureKind = Business` + `FailureCode = 0102` (không NÉM — ADR-13), **0** lời gọi GHTK.
+- ✅ `GetTrackingAsync` (đọc trạng thái chủ động cho job đối soát) + `VerifyAsync` (`hash` + IP allowlist, BR-017) + `ParseAsync` GHTK theo `IShipmentWebhookVerifier` của `SHP-002`.
+- ✅ Tiền `decimal` qua `Money` (`shared/eCommerce.Kernel/Money/Money.cs:39`), số nguyên minor units ở biên hãng; log + `CorrelationId` + metric theo `XC-005`.
 
 **Không nằm trong phạm vi:**
-- ❌ **Nhận & xử lý webhook** trạng thái vận đơn — thuộc `SHP-002` (`docs/features/shipping/shp-002-webhook-trang-thai-van-don.md:53`–`56`). `SHP-004` **chỉ** cài `ParseAsync` cho GHTK theo hợp đồng `IShipmentWebhookVerifier` của `SHP-002`.
-- ❌ **Nghiệp vụ COD**: thu hộ, **đổi** COD — thuộc `SHP-003`. ⚠️ `SHP-003` **chưa có tài liệu**; cảnh báo *"đổi COD ở GHN cần **OTP**"* **chỉ** tồn tại ở `docs/implementation-plan.md:426` và được tham chiếu ở `docs/features/shipping/shp-002-webhook-trang-thai-van-don.md:18,55`, `docs/features/reporting/rep-003-bao-cao-ton-kho-hieu-suat-kenh.md:539`, `docs/features/notifications/not-002-kenh-gui-email-sms-zalo-oa.md:819` (§15.2 F2).
-- ❌ **Adapter GHN** (tính phí, tạo vận đơn) — thuộc `SHP-001`. `SHP-004` **phụ thuộc** `SHP-001` vì interface chung do `SHP-001` chốt lần đầu (`docs/implementation-plan.md:338`).
-- ❌ **Import file Excel đối soát COD theo "phiên"** — thuộc `REC-003` (`docs/implementation-plan.md:200`).
-- ❌ **Read-model/báo cáo** — thuộc `REP-001`/`REP-003`.
-- ❌ **Master data địa chỉ** (tỉnh/phường chuẩn quốc gia) — thuộc `AddressHub` (`docs/business-modules-proposal.md:526`, tiền tố `ADDR` ở `docs/design-doc-guidelines.md:82`). **Chưa có code, chưa có tài liệu** — xem §15.1 Q2.
-- ❌ **Sửa state machine 4 trục của đơn** — thuộc `SAL-003`. Ta **phát ETO**, Sales tự quyết định.
+- ❌ **Luồng tạo vận đơn 3 pha, `Shipment`, nhật ký thử, `ClientOrderCode`, job thử lại, khoá phân tán** — thuộc `SHP-001` (`D-109`, `D-116`, `D-118`; ADR-12).
+- ❌ **Danh mục/ánh xạ mã địa chỉ của hãng và job đồng bộ** — thuộc `Address` (`ADDR-002`, `D-83`, `D-89`, `D-110`); `SHP-004` chỉ đọc qua **cửa mã** (ADR-04).
+- ❌ **Nhận & xử lý webhook** (endpoint, chống trùng, đổi trạng thái) — thuộc `SHP-002`; `SHP-004` chỉ cài `VerifyAsync` + `ParseAsync` cho GHTK (`SHP-002` :56).
+- ❌ **Nghiệp vụ COD** (thu hộ, đổi COD, OTP) — thuộc `SHP-003`.
+- ❌ **Adapter GHN** — thuộc `SHP-001`. **Import Excel đối soát COD** — `REC-003`. **Read-model/báo cáo** — `REP-001`/`REP-003`.
+- ❌ **RMA/hoàn hàng đơn giao vận** — `SAL-006` (`D-70`). **State machine 4 trục của đơn** — `SAL-003` (`D-08`): ta chỉ để `SHP-001`/`SHP-002` phát ETO.
+- ❌ **Ghi điểm/công nợ khách** — chỉ `Customer.GhiNhanMuaHang` qua `ICustomerLedger` (`D-45`); `SHP-004` không đụng.
 
 ### 0.1 Quyết định thiết kế (ADR ngắn)
 
 | # | Quyết định | Phương án đã cân nhắc | Lý do chọn | Hệ quả |
 |---|---|---|---|---|
-| **ADR-01** | GHTK là **một implementation** sau `IShippingCarrier`; app service **không bao giờ** gọi HTTP trực tiếp | (a) gọi HTTP trong app service · (b) adapter riêng mỗi hãng nhưng chung interface · (c) adapter chung có `if provider == "ghtk"` | (a) vi phạm khuôn đã dùng thật cho 2 miền ngoài: `IChannelConnector` (`.../Connectors/IChannelConnector.cs:95`) và `IPaymentProvider` (`modules/PaymentHub/eCommerce.PaymentHub.Domain/Payments/IPaymentProvider.cs:58`) — cả hai đều ghi rõ *"chi tiết riêng của từng [đối tác] phải nằm SAU interface này"*. (c) dồn mọi hãng vào một class ⇒ sửa GHTK làm hỏng GHN | Thêm hãng mới = thêm class + **một dòng** đăng ký (khuôn `ChannelConnectorFactory` — `.../Connectors/ChannelConnectorFactory.cs:18`–`25`) |
-| **ADR-02** | ⭐ **Xác minh địa chỉ 2 cấp ở BIÊN GỬI, FAIL-CLOSED**: không xác minh được ⇒ **NÉM LỖI có mã**, tuyệt đối **không** gọi API tạo vận đơn | (a) gửi rồi xử lý lỗi của hãng · (b) gửi với `district` suy đoán · (c) **pre-flight bắt buộc + fail-closed** | (a)/(b) tạo **lỗi im lặng**: hãng có thể **chấp nhận** payload 3 cấp với mã huyện **đã bị bỏ** (`docs/business-modules-proposal.md:509`) ⇒ vận đơn đi sai địa chỉ mà **không có lỗi nào**. Đây đúng loại lỗi mà `XC-003` §0 gọi là *"lỗi im lặng, chỉ lộ ra khi có tranh chấp thật"* | CSKH **phải** sửa dữ liệu địa chỉ trước khi tạo vận đơn ⇒ cần UI hiển thị rõ lý do (§10) và mã lỗi riêng (`0012`/`0013`) |
-| **ADR-03** | Mô hình địa chỉ nội bộ hỗ trợ **CẢ HAI** cấu trúc, **canonical = 2 cấp**; `district` là trường **dẫn xuất / nullable**, **không** là khoá | (a) chỉ 2 cấp · (b) chỉ 3 cấp · (c) **cả hai, canonical 2 cấp** | `docs/business-modules-proposal.md:516` — *"**Mô hình địa chỉ của ta phải hỗ trợ CẢ HAI cấu trúc** (3 cấp cũ và 2 cấp mới)"*; `docs/business-modules-proposal.md:658` — quyết định 8: *"Hỗ trợ CẢ HAI — vì GHTK vẫn dùng 3 cấp và **chưa xác minh được** cờ tương đương `is_new_to_address`"* | Mọi DTO/entity địa chỉ **phải** có `DistrictCode` nullable + ghi rõ nguồn dẫn xuất |
-| **ADR-04** | **Danh mục địa chỉ của hãng là DỮ LIỆU ĐỒNG BỘ** (`ShpCarrierAddressMappings`), **không** phải master data và **không** hard-code | (a) hard-code bảng mã · (b) đọc master data quốc gia · (c) **bảng đồng bộ riêng theo hãng** | `docs/business-modules-proposal.md:517` — *"'địa chỉ gửi đối tác' là **DỮ LIỆU ĐỒNG BỘ**, không phải master data — mỗi hãng vận chuyển có bộ mã riêng"*; `docs/design-doc-guidelines.md:118` (quy tắc 8) — **cấm** hard-code dữ liệu NCC | Cần job đồng bộ + version + `SyncedAtUtc`; đổi danh mục = **không** cần release |
-| **ADR-05** | **Địa chỉ nội bộ là nguồn duy nhất** — adapter **không** lấy địa chỉ từ payload webhook và **không** nhận địa chỉ tự do từ client GHTK | (a) tin payload · (b) đọc lại từ đơn · (c) **đọc từ đơn/DTO nội bộ, chỉ dùng mã của hãng để đối chiếu** | Payload webhook của GHTK **không xác thực được nguồn** (`docs/business-modules-proposal.md:547`; `SHP-002` §0.1 D1/D2) ⇒ nếu lấy địa chỉ từ payload thì kẻ giả mạo điều khiển được **nơi hàng đi tới** | `VerifyAddressAsync` **chỉ** nhận đầu vào từ tầng nội bộ; có test `TC-16` |
-| **ADR-06** | **Idempotency tạo vận đơn bằng khoá ỔN ĐỊNH** `ClientOrderCode` + unique index **ở DB**; cấm `Guid.NewGuid()` mỗi lần gọi | (a) sinh Guid mỗi lần thử · (b) chỉ kiểm tra trong code · (c) **khoá ổn định + unique index** | `XC-002` BR-007 (dẫn qua `docs/features/shipping/shp-002-webhook-trang-thai-van-don.md:683`): *"⚠️ thuộc `SHP-001` — **cấm** `Guid.NewGuid()` mỗi lần gọi (`XC-002` BR-007)"*. Ngoài ra hãng **có thể** đã tạo vận đơn nhưng response bị mất ⇒ **phải tra cứu trước khi tạo lại** | Retry **luôn** theo trình tự: *tra theo `ClientOrderCode` → có thì dùng lại → không có mới tạo* (`BR-SHP-004-006`) |
-| **ADR-07** | Khoá phân tán **chỉ** quanh thao tác gọi hãng + job đồng bộ địa chỉ; **không** khoá mỗi webhook | (a) khoá mọi thứ · (b) không khoá gì · (c) **khoá đúng chỗ, DB là hàng rào cuối** | Kế thừa `SHP-002` D7 + `XC-003` D2 (*"bỏ lock đi, DB có chặn không?"*). `XC-003` D6 cấm acquire lồng ⇒ job **không** được acquire lại khoá của tầng trên | `SkipIfBusy` cho job + **bắt buộc** log + metric `lock_skipped_total{module="shipping"}` (`XC-003` A1/BR-010) |
-| **ADR-08** | Job định kỳ (đồng bộ địa chỉ, thử lại submission) dùng **`SkipIfBusy`**; HTTP thì **ném lỗi** | (a) chờ vô hạn · (b) ném lỗi cho mọi trường hợp · (c) **phân biệt job vs HTTP** | `XC-003` D10 + A1 (bỏ qua nhịp là hợp lý cho job, vì nhịp sau chạy lại) | Phải có `lock_skipped_total` + log `Information` mỗi lần bỏ qua |
-| **ADR-09** | Tiền: `decimal`; **so bằng minor units**, **cấm** `==` | (a) `double` · (b) `decimal` + so `==` · (c) **`decimal` + `ToMinorUnits()`** | `XC-001` BR-003/D3 (`docs/features/cross-cutting/XC-001-money-currency-lam-tron.md:41`) — bài học eShop so `ActualTotalPrice == OriginalPaymentAmount` ⇒ vỡ với VND/payOS. ⚠️ `Money`/`Currency` **chưa có trong code** (§15.2 F5) | Giai đoạn đầu dùng `decimal` + `string Currency` (khuôn `Order` — `src/eCommerce.Domain/Entities/Orders/Order.cs:36`); **khi** `XC-001` có code thì chuyển sang `Money` |
-| **ADR-10** | **Không** gọi lại API GHTK khi `EnableLiveCalls = false` (khuôn PoC) | (a) luôn gọi thật · (b) luôn mô phỏng · (c) **cờ cấu hình** | Khuôn **đã có thật** trong repo: `ShopeeOptions.EnableLiveCalls` (`modules/ChannelHub/eCommerce.ChannelHub.Application/ChannelHubOptions.cs:47`) + `ShopeeConnector` trả kết quả mô phỏng khi tắt (`.../Connectors/ShopeeConnector.cs:80`–`87`) và **ném `NotImplementedException`** khi bật mà chưa cài (`:94`) | Cho phép chạy toàn bộ luồng (lock/worker/event) **trước** khi có credential GHTK; ⚠️ **cấm** bật `EnableLiveCalls` ở production khi chưa có Q1 |
-| **ADR-11** | **Không** thêm gói ABP nào; giữ **một** phiên bản ABP duy nhất trong `Directory.Packages.props` | (a) thêm `Volo.Abp.Http.Client` · (b) **`HttpClient` + DI sẵn có** · (c) SDK của hãng | Toàn bộ `Directory.Packages.props` ghim **duy nhất** `10.7.0` cho mọi gói `Volo.Abp.*`; thêm gói ABP khác version ⇒ phá tính nhất quán. Không có gói ABP nào cần cho việc gọi HTTP ra ngoài | ⚠️ **Chưa kiểm chứng**: repo **không** có `Microsoft.Extensions.Http` trong `Directory.Packages.props` và **0** chỗ dùng `AddHttpClient`/`IHttpClientFactory` (grep) ⇒ xem §15.1 Q6 |
-| **ADR-12** | **Không** coi webhook GHTK là bằng chứng; adapter **chỉ** đọc trạng thái **chủ động** | (a) tin webhook · (b) đối soát chủ động qua adapter · (c) bỏ webhook | Kế thừa `SHP-002` D1 (`docs/features/shipping/shp-002-webhook-trang-thai-van-don.md:66`): *"Webhook là GỢI Ý, không phải SỰ THẬT"* — **bắt buộc** vì GHTK không có HMAC | Adapter **phải** có `GetTrackingAsync` dùng được cho job đối soát; quota trở thành tài nguyên cần quản (`SHP-002` §15.1 Q4) |
+| **ADR-01** | GHTK là **một implementation** của `IShippingCarrierProvider` (`SHP-001` §6.1); app service **không** gọi HTTP trực tiếp | (a) gọi HTTP trong app service · (b) adapter riêng mỗi hãng chung interface · (c) adapter chung `if provider == "ghtk"` | Khuôn **đã có thật**: `IChannelConnector` (`modules/ChannelHub/eCommerce.ChannelHub.Application.Contracts/Connectors/IChannelConnector.cs:122`) và `IPaymentProvider` (`modules/PaymentHub/eCommerce.PaymentHub.Domain/Payments/IPaymentProvider.cs:58`) ghi *"chi tiết riêng của từng [đối tác] nằm SAU interface này"*. (c) dồn mọi hãng vào một class | Thêm hãng = thêm class + **một dòng** đăng ký (khuôn `ChannelConnectorFactory` — `.../Connectors/ChannelConnectorFactory.cs:9`) |
+| **ADR-02** | ⭐ **Chỉ gửi địa chỉ khi mã hãng của từng cấp bắt buộc đã `DaXacMinh` (nguồn: cửa mã `Address`), FAIL-CLOSED**; thiếu ⇒ **trả** `Business` + `0102` (ADR-13), **không** gọi GHTK | (a) gửi rồi xử lý lỗi hãng · (b) gửi với `district` suy đoán · (c) **fail-closed** | (a)/(b) tạo **lỗi im lặng**: hãng có thể **chấp nhận** mã huyện đã bị bỏ (`docs/business-modules-proposal.md:509`). `Address` đã fail-closed: chỉ ánh xạ `DaXacMinh` dùng được, còn lại NÉM `0501`/`0502`/`0504` (`D-86`, `D-89`) | Adapter **kiểm lại** lớp mô hình (`AddressModel`) dù `SHP-001` đã kiểm — hai lớp độc lập (TC-02/TC-03) |
+| **ADR-03** | Mô hình địa chỉ hỗ trợ **CẢ HAI** cấu trúc, **canonical = 2 cấp**; `district` là trường **dẫn xuất/nullable**, không là khoá. Mô hình riêng của GHTK = cột `ShpCarriers.AddressModel` (`SHP-001` §5.2) — **nguồn duy nhất**: không có khoá `AddressModel` trong `appsettings` (§6.3), adapter nhận qua `SupportedAddressModel` do factory cấp | (a) chỉ 2 cấp · (b) chỉ 3 cấp · (c) cả hai | `D-114` (Q1 của `SHP-001`: hỗ trợ cả hai; mô hình riêng từng hãng ⇒ `SHP-004-Q1`); `docs/business-modules-proposal.md:516`, `:658`. Mặc định GHTK = `ThreeLevel` (phía an toàn, **chưa xác minh** — Q1) | Mọi DTO địa chỉ có `DistrictCode` nullable (`CarrierAddress` — `SHP-001` §6.1). Đổi sang `TwoLevel` **không** cần release |
+| **ADR-04** | **Không có danh mục/bảng ánh xạ địa chỉ riêng** (thay `ShpCarrierAddressMappings` + job đồng bộ + `MaxCatalogueAgeDays` của v0.1). Mã hãng **chỉ** lấy qua cửa mã `Address.Application.Contracts` | (a) bảng của `SHP-004` · (b) tự truy vấn `AddrCarrierMappings` · (c) **cửa mã của `Address`** | `D-114` (R0 `SHP-004-Q2`: dùng `IAddressDirectory` + mã hãng — `D-89`, `D-110`); `D-89` N1: bảng riêng là **nguồn sự thật thứ hai** của `AddrCarrierMappings`; `D-83`: ánh xạ sửa tại chỗ + hàng rào `0506`–`0508` chặn đồng bộ xấu — độ cũ danh mục là việc của `ADDR-002` | `SHP-004` **mất** lỗi 0014 (danh mục cũ): lượt đồng bộ hỏng ⇒ ánh xạ `NghiNgo` ⇒ `Address:0502` ⇒ `SHP-001` NÉM `0102` |
+| **ADR-05** | **Địa chỉ nội bộ là nguồn duy nhất**: địa chỉ + COD + dòng hàng đi từ **snapshot đơn** qua hợp đồng Sales (`D-108`); adapter **không** nhận địa chỉ từ payload/response của hãng | (a) tin payload · (b) **đọc từ đơn** | Payload webhook GHTK **không xác thực được nguồn** (`docs/business-modules-proposal.md:547`; `SHP-002` D1/D2) ⇒ nếu lấy địa chỉ từ payload thì kẻ giả mạo điều khiển **nơi hàng đi tới** | `GetTrackingAsync`/`ParseAsync` **không** trả trường địa chỉ (TC-09) |
+| **ADR-06** | **`ClientOrderCode` = hàm thuần `TaoClientOrderCode(orderId, generation)` của `SHP-001` (`D-109`)**; adapter dùng **đúng** chuỗi nhận vào, chỉ kiểm độ dài theo giới hạn GHTK ⇒ vượt thì **trả** `Business` + `0401`, **cấm** cắt/băm/tự sinh; `ClientOrderCodeMaxLength = 0` là "CHƯA biết giới hạn" — **không bao giờ** dùng làm ngưỡng so độ dài | (a) `"{tenantCode}-{orderNumber}"` (v0.1) · (b) `Guid.NewGuid()` · (c) **hàm D-109** | (a) có thể > giới hạn hãng, hệ chưa có `tenantCode`, không phân biệt lần tạo lại; (b) vi phạm `XC-002` BR-007. Hãng **có thể** đã tạo mà response mất ⇒ adapter **tra theo mã trước khi tạo** (`BR-SHP-004-006`) | Khoá guard `Create:{tenantId}:{orderId}:{generation}:{attemptNo}` thuộc `SHP-001` §7.3 |
+| **ADR-07** | **Không có khoá phân tán, job, UoW riêng**: khoá `shipping:shipment-create:…` và job thử lại là của `SHP-001` §8.2 (tên khoá **không** tiền tố `ecommerce:` — `D-82`, `D-114` R0 `SHP-004-Q5`) | (a) khoá riêng trong adapter · (b) **không** khoá ở adapter | Adapter chạy **ngoài** transaction DB (Pha 2 của `SHP-001`) và **không ghi DB** ⇒ khoá ở adapter không bảo vệ gì thêm; `XC-003` D6 cấm acquire lồng | Adapter không tham chiếu `IAbpDistributedLock`/repository (TC-10) |
+| **ADR-08** | Tiền: `decimal`; ra biên hãng là **số nguyên minor units**; so bằng `Money.Equals`/`CompareTo`, **cấm** `==` trên `decimal` | (a) `double` · (b) `decimal` + `==` · (c) **`Money` + số nguyên ở biên** | `XC-001` BR-003/D3; `Money` **đã có** nhưng chỉ `Vnd`/`CompareTo`/`Equals` (`Money.cs:39,112,123`), **không** có `Money.Of`/`ToMinorUnits()` (Q11 của `SHP-003`, `D-114`) | Phí hãng báo → `Money.Vnd(...)`; COD lẻ đã bị `SHP-001` NÉM `0111` **trước** khi tới adapter |
+| **ADR-09** | **Không** gọi API GHTK thật khi `EnableLiveCalls = false` (khuôn PoC) | (a) luôn thật · (b) luôn mô phỏng · (c) **cờ cấu hình** | Khuôn **đã có**: `ShopeeOptions.EnableLiveCalls` (`modules/ChannelHub/eCommerce.ChannelHub.Application/ChannelHubOptions.cs:47`); `ShopeeConnector` mô phỏng khi tắt, `NotImplementedException` khi bật mà chưa cài (`.../Connectors/ShopeeConnector.cs:80-102`) | Chạy được toàn luồng **trước** khi có credential; ⚠️ **cấm** bật ở production khi chưa có Q1 (cổng release §14.3) |
+| **ADR-10** | `HttpClient` qua `IHttpClientFactory`, **đăng ký ở Host**, **không** thêm gói mới | (a) thêm `Volo.Abp.Http.Client` · (b) **`AddHttpClient` ở Host** · (c) SDK hãng | `D-114` (R0 `SHP-004-Q6`). Khuôn **đã có**: `AddHttpClient<...>` ở Host (`src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs:171`), module `Address` ghi rõ **không** đặt `AddHttpClient` ở project thư viện (`modules/Address/eCommerce.Address.Application/AddressApplicationModule.cs:31`). Mọi gói `Volo.Abp.*` ghim `10.7.0` | Thiếu `AddHttpClient` ⇒ lỗi **cấu hình**, **không** coi là thành công (khuôn `VnPayPaymentProvider.cs:264`) — §15.2 F5 |
+| **ADR-11** | **Webhook GHTK không phải bằng chứng**; adapter **chủ động** đọc trạng thái | (a) tin webhook · (b) đối soát chủ động · (c) bỏ webhook | `SHP-002` D1: *"Webhook là GỢI Ý"* — **bắt buộc** vì GHTK không có HMAC | `GetTrackingAsync` bắt buộc (BR-014); quota là tài nguyên cần quản (Q7) |
+| **ADR-12** | ⭐ **`SHP-004` không có luồng tạo/aggregate riêng**: dùng `Shipment` + `ShpShipmentCreateAttempts` của `SHP-001`; **bỏ** `ShpShipmentSubmissions` + máy trạng thái Submission + `CreateShipmentAsync` riêng của v0.1 | (a) giữ Submission riêng · (b) **dùng `Shipment` của `SHP-001`** | `D-116`/`D-118`: `CreateShipmentAsync`/`CancelShipmentAsync`/`EstimateOrderFeeAsync`/`EstimateCartFeeAsync` khai **đúng 1** lần ở `IShipmentAppService` (`SHP-001` TC-53); `D-109`: `Generation` + unique trên `ShpShipments`; `SHP-001` ADR-09: `SHP-001` là chủ `ShpShipments`. Hai máy trạng thái cho cùng việc tạo vận đơn ⇒ lệch im lặng | **Đã chốt — `D-128`** (Q9): `SHP-004` 0 bảng/0 DbSet (TC-10); `SHP-001` không phải sửa |
+| **ADR-13** | ⭐ **Sau khi `SHP-001` đã commit `Submitting`, adapter TRẢ kết quả (`FailureKind` + `FailureCode`), KHÔNG NÉM `BusinessException`** cho lỗi nghiệp vụ/cấu hình của `CreateShipmentAsync`/`CancelShipmentAsync`/`GetFeeAsync` | (a) **trả `Business`/`Configuration`** · (b) thêm bước kiểm thuần chạy **trước Pha 1** vào `IShippingCarrierProvider` (đổi hợp đồng `SHP-001` §6.1) · (c) NÉM từ adapter | `SHP-001` §4.1 :252–256 chỉ xử lý kết quả `FailureKind` ở Pha 3; không có nhánh cho ngoại lệ của provider, và `Submitting` không có cạnh ra nào ngoài Pha 3/job (`SHP-001` §3.2 #4, #6: không huỷ được `Submitting`) ⇒ (c) làm vận đơn **kẹt `Submitting`** (đơn COD > trần, cân > trần, số lượng lẻ…) mà không đường gỡ ngoài sửa DB. (a) không đổi hợp đồng `SHP-001` | `SHP-001` Pha 3 ghi `SubmitFailed` + attempt `Rejected` — đúng điều kiện tạo lại của `D-109` (4); `SHP-001` giữ nguyên `FailureCode` của adapter, cả `Configuration` vào `Rejected` (`D-130`). Ngoại lệ NÉM duy nhất: `GetTrackingAsync` (không nằm giữa hai pha ghi DB) và lỗi lập trình (`ArgumentNullException`, huỷ `CancellationToken`) |
 
-> 📌 Ghi lại **phương án bị loại** và lý do — để 6 tháng sau không ai hỏi lại "sao không làm cách kia"
-> (`docs/design-doc-guidelines.md:63`).
+> 📌 Ghi lại **phương án bị loại** và lý do — để 6 tháng sau không ai hỏi lại "sao không làm cách kia" (`docs/design-doc-guidelines.md:63`).
 
 ---
 
@@ -87,18 +81,18 @@
 | Thuộc tính | Nội dung |
 |---|---|
 | **Use Case ID** | `SHP-004` |
-| **Use Case Name** | Tạo & quản lý vận đơn **GHTK** với **địa chỉ đã được xác minh 2 cấp** |
-| **Description** | *"Là hệ thống bán hàng, tôi muốn đẩy đơn sang GHTK để giao hàng — nhưng tôi KHÔNG muốn vận đơn đi tới một địa chỉ không còn tồn tại, và tôi KHÔNG muốn tạo trùng vận đơn chỉ vì mạng lỗi rồi thử lại."* |
-| **Actor(s)** | **Nhân viên xử lý đơn/CSKH** (bấm tạo vận đơn) · **Job đồng bộ địa chỉ** (hệ thống) · **Job thử lại submission** (hệ thống) · **Hãng GHTK** (hệ thống ngoài) · **Quản trị** (cấu hình hãng + chính sách địa chỉ) |
-| **Priority** | **Must have** (adapter thứ hai — điều kiện để bán được ở khu vực GHTK phủ tốt hơn GHN) |
-| **Trigger** | (a) đơn chuyển sang trạng thái cần giao (`SAL-003`) và người dùng bấm **Tạo vận đơn**; (b) job định kỳ **đồng bộ danh mục địa chỉ** của hãng; (c) job định kỳ **thử lại** submission `Failed`; (d) job đối soát (`SHP-002`) gọi **tra trạng thái** |
-| **Pre-Condition(s)** | • **Đơn đã tồn tại** và **đã xác nhận** — `Order.Status` là `OrderStatus` (`src/eCommerce.Domain/Entities/Orders/Order.cs:31`) với giá trị `Confirmed = 1` (`src/eCommerce.Domain.Shared/Enums.cs:53`) — cùng danh sách dòng + người nhận.<br>• **Tenant hiện tại** (`TenantId`) — ⚠️ hiện hệ thống chạy **1 tenant** nên `TenantId` có thể là `NULL` (xem `src/eCommerce.EntityFrameworkCore/Migrations/20261013024226_Fix_NullableTenantId_UniqueIndexes.cs:14`–`17`).<br>• `ChannelCode` **không** bắt buộc: vận đơn có thể phát sinh từ đơn website (`Order.ChannelCode = "web"`) hoặc đơn sàn.<br>• **Hãng `ghtk` đã được cấu hình** (`ShippingHub:Providers:ghtk:*`) — thiếu ⇒ **fail-closed** `eCommerce:Shipping:0007` (kế thừa `SHP-002` §6.2).<br>• **Danh mục địa chỉ của hãng còn "đủ mới"** (`SyncedAtUtc` trong ngưỡng `MaxCatalogueAgeDays`) — quá cũ ⇒ **chặn** (§12).<br>• `CorrelationId` theo `XC-005` (job tự sinh + ghi `JobName`; HTTP lấy từ header). |
-| **Post-Condition(s)** | • **Mỗi** lần thử tạo vận đơn có **đúng một** dòng `ShpShipmentSubmissions` (kể cả khi bị chặn ở pre-flight).<br>• `ShpShipments` **chỉ** được tạo/gắn mã vận đơn khi `Submission.Status = Created` **và** `AddressVerification.Status = Verified`.<br>• Mọi lần **không** tạo được đều có **dấu vết**: `BusinessException` có mã **hoặc** `Status`/`FailureCode` trên submission — **cấm** im lặng.<br>• `ShippingFee`/`CodAmount` là `decimal` **đã chuẩn hoá theo `Currency`**; mọi đối chiếu tiền dùng **minor units**.<br>• Mọi thay đổi trạng thái vận đơn **do hãng** đi qua `SHP-002` (append-only + đối soát) — `SHP-004` **không** tự ghi trạng thái vận đơn. |
-| **Basic Flow** | 1. Người dùng gọi `CreateShipmentAsync(OrderId, ProviderCode = "ghtk", addressInput)`.<br>2. App service mở **Unit of Work**, giành khoá `ecommerce:shipping:submission:{tenantId}:{orderId}` (ADR-07).<br>3. **Pre-flight địa chỉ** (`BR-SHP-004-002`): (a) chuẩn hoá (trim, chuẩn hoá khoảng trắng, chuẩn hoá mã); (b) khớp **tỉnh** và **phường/xã** với `ShpCarrierAddressMappings` của `ghtk` **theo `CatalogueVersion` hiện hành**; (c) kiểm tra `AddressLevelMode` của hãng (§5.2).<br>4. Nếu **không** `Verified` ⇒ ghi submission `Status = Rejected` + ném lỗi (`0012`/`0013`) — **không** gọi hãng.<br>5. Nếu `Verified` ⇒ tra `ClientOrderCode` (khoá **ổn định**, ADR-06). Đã có trong DB **và** đã có `ProviderTrackingCode` ⇒ **trả lại vận đơn cũ** (idempotent), **không** gọi hãng.<br>6. Tính phí (`GetQuoteAsync`) rồi tạo vận đơn (`CreateShipmentAsync`) — cả hai nằm **sau** `IShippingCarrier`.<br>7. Ghi `ProviderTrackingCode` + `ShippingFee` + lưu `ShpShipments`; `Submission.Status = Created`.<br>8. Phát `ShipmentCreatedEto` **qua outbox, cùng transaction** (`XC-002` BR-001) — ⚠️ outbox **chưa bật trong code** (§15.2 F4) ⇒ đây là **điều kiện tiên quyết**. |
-| **Alternative Flow** | **A1: Hãng báo trùng `ClientOrderCode`** (response lỗi "đã tồn tại") ⇒ **tra lại** theo `ClientOrderCode`, dùng vận đơn hãng trả về, `Status = Created`, log `Information` + metric `result="duplicate"`. **Không** phải lỗi.<br>**A2: Mất response / timeout sau khi hãng đã tạo** ⇒ **bắt buộc** tra cứu trước khi tạo lại (`BR-SHP-004-006`); nếu tra cứu cũng lỗi ⇒ `Status = Failed` + thử lại nhịp sau + **cảnh báo** (không đoán).<br>**A3: Danh mục địa chỉ vừa được đồng bộ sang version mới trong lúc đơn đang chờ** ⇒ submission giữ `AddressCatalogueVersion` đã dùng ⇒ **có thể truy vết** vì sao hôm qua `Verified` mà hôm nay `Rejected`.<br>**A4: `EnableLiveCalls = false`** (PoC/dev) ⇒ adapter trả kết quả mô phỏng + log `Information`; **toàn bộ** luồng lock/worker/event vẫn chạy (khuôn `ShopeeConnector` — `.../Connectors/ShopeeConnector.cs:80`–`87`).<br>**A5: Người dùng bấm "Tạo vận đơn" lần hai** ⇒ bước 5 trả vận đơn cũ, `200`, **không** tạo mới. |
-| **Exception Flow** | **E1:** thiếu cấp **phường/xã** hoặc không khớp danh mục hãng ⇒ **`eCommerce:Shipping:0012`**, `422`, submission `Rejected` — **không** gọi hãng.<br>**E2:** hãng **bắt buộc** `district` (`AddressLevelMode = ThreeLevel`) trong khi đơn chỉ có 2 cấp **và** không suy ra được ⇒ **`eCommerce:Shipping:0013`**, `409`, `Rejected` + **cảnh báo** (cần bổ sung dữ liệu/ánh xạ — §15 Q1).<br>**E3:** danh mục địa chỉ **quá cũ** (`SyncedAtUtc` > `MaxCatalogueAgeDays`) ⇒ **`eCommerce:Shipping:0014`**, `503`, `Status = Blocked`; metric + cảnh báo. **Cấm** bỏ qua kiểm tra để "chạy được".<br>**E4:** trọng lượng/kích thước ngoài ngưỡng hãng ⇒ **`eCommerce:Shipping:0015`**, `400`.<br>**E5:** hãng lỗi `5xx`/timeout ⇒ **`eCommerce:Shipping:0016`**, `502`, `Status = Failed`, `AttemptCount++`, **thử lại nhịp sau** — **không** rollback dữ liệu đã ghi (kế thừa `SHP-002` §12).<br>**E6:** cùng `ClientOrderCode` nhưng `PayloadHash` **khác** ⇒ **`eCommerce:Shipping:0017`**, `409` — **xung đột khoá**, **cấm** ghi đè (kế thừa `XC-002` BR-006; nếu `XC-002` đã có thì dùng `eCommerce:Messaging:0002` — xem `SHP-002` §6.2 mã `0011`).<br>**E7:** thiếu dữ liệu bắt buộc để dựng payload (SKU chưa map, thiếu cân nặng) ⇒ **`eCommerce:Shipping:0018`**, `400`.<br>**E8:** token/`PartnerCode` của hãng sai/hết hạn ⇒ **`eCommerce:Shipping:0020`**, `502` + **cảnh báo cấu hình**; **cấm** retry mù (retry không làm token đúng).<br>**E9:** huỷ vận đơn ở trạng thái hãng **không cho huỷ** ⇒ **`eCommerce:Shipping:0021`**, `409`.<br>**E10:** job không giành được khoá ⇒ **bỏ qua nhịp** + log + metric `lock_skipped_total{module="shipping"}` (`XC-003` A1) — **không** ném lỗi. |
-| **Business Rules** | • **BR-SHP-004-001**: Mọi lời gọi API của GHTK **phải** đi qua `IShippingCarrier`; **cấm** gọi HTTP/SDK của hãng từ app service, job hay domain (khuôn `IChannelConnector`/`IPaymentProvider`).<br>• **BR-SHP-004-002**: ⭐ **Xác minh địa chỉ 2 cấp là BẮT BUỘC và FAIL-CLOSED trước khi tạo vận đơn.** Không xác minh được ⇒ **NÉM LỖI có mã** (`0012`/`0013`/`0014`); **cấm** gọi API tạo vận đơn khi chưa `Verified`.<br>• **BR-SHP-004-003**: `district` **không bao giờ** là khoá định danh địa chỉ của ta; nó chỉ là trường **dẫn xuất/nullable** và **phải** ghi rõ nguồn dẫn xuất khi có giá trị (ADR-03).<br>• **BR-SHP-004-004**: Danh mục địa chỉ hãng **phải** là **dữ liệu** có `CatalogueVersion` + `SyncedAtUtc` + hiệu lực theo thời gian; **cấm** hard-code mã tỉnh/phường/huyện của hãng trong code.<br>• **BR-SHP-004-005**: **Cấm** hard-code base URL/endpoint/mã trạng thái của GHTK — **phải** nằm ở cấu hình (`ShippingHub:Providers:ghtk:*`) hoặc dữ liệu (kế thừa `SHP-002` BR-009; `docs/design-doc-guidelines.md:118`).<br>• **BR-SHP-004-006**: ⭐ **Idempotency tạo vận đơn**: khoá **ổn định** `ClientOrderCode` + unique index **ở DB**; mọi lần thử lại **phải** tra cứu trước khi tạo; **cấm** `Guid.NewGuid()` cho mỗi lần gọi (`XC-002` BR-007).<br>• **BR-SHP-004-007**: Địa chỉ gửi hàng **chỉ** lấy từ **dữ liệu nội bộ** (đơn/DTO nội bộ); **cấm** lấy địa chỉ từ payload của hãng (ADR-05).<br>• **BR-SHP-004-008**: Mọi thao tác ghi **phải** đi qua **Unit of Work**; `ShpShipmentSubmissions` + `ShpShipments` + **outbox** ghi trong **cùng** transaction (`XC-002` BR-001).<br>• **BR-SHP-004-009**: Mọi **chuyển trạng thái của `Submission`** **phải** qua guard ở §3; chuyển sai ⇒ **NÉM LỖI** `eCommerce:Shipping:0019` — **cấm** no-op im lặng (kế thừa `XC-006`/quy ước #11).<br>• **BR-SHP-004-010**: `Status = Created` là **trạng thái hấp thụ** của submission; mọi chuyển dịch khỏi nó ⇒ **NÉM LỖI** `0019`.<br>• **BR-SHP-004-011**: Tiền (`CodAmount`, `ShippingFee`, `DeclaredValue`) là `decimal`; **cấm** `double`/`float`; **cấm** so tiền bằng `==` — so bằng **minor units** (`XC-001` BR-003/BR-008).<br>• **BR-SHP-004-012**: Payload **gửi đi** và **nhận về** lưu vào DB **phải** đi qua hàm **che dữ liệu nhạy cảm** trước khi lưu **và** trước khi log (kế thừa `XC-005` Q6 + `PaymentTransaction.MaskSensitiveData` — `modules/PaymentHub/eCommerce.PaymentHub.Domain/Entities/PaymentTransaction.cs:147`). **Cấm** log token của hãng.<br>• **BR-SHP-004-013**: Mọi **mã trạng thái thô** của GHTK nhận được **phải** có ánh xạ **hoặc** đi vào `Discrepancy` của `SHP-002` — **cấm** im lặng coi là "không đổi" (kế thừa `SHP-002` NFR-010).<br>• **BR-SHP-004-014**: Mã lỗi **phải** theo khuôn `eCommerce:Shipping:NNNN` và **do module `ShippingHub` sở hữu** (`ShippingHubErrorCodes`), **cấm** khai ở `eCommerceConsts.ErrorCodes` (kế thừa `XC-003` F2 + cách làm của `TaxErrorCodes` — `modules/Tax/eCommerce.Tax.Domain/TaxErrorCodes.cs:10`). **Dải `0012`–`0021` được giành riêng cho `SHP-004`** (dải `0001`–`0011` đã dùng ở `SHP-002` §6.2).<br>• **BR-SHP-004-015**: Job định kỳ **phải** dùng khoá phân tán + `SkipIfBusy`, và **bắt buộc** log + metric mỗi lần bỏ qua (`XC-003` BR-010).<br>• **BR-SHP-004-016**: Mọi metric phát ra **phải** nằm trong `eCommerceMetricNames` (`shared/eCommerce.Kernel/Observability/eCommerceMetrics.cs:13`) và nhãn **chỉ** từ `eCommerceMetricTags.Allowed` (`:62`); **cấm** `orderId`/`sku`/`userId`/`correlationId` (`:81`). |
-| **Non-Functional Requirement** | • **NFR-SHP-004-001**: Pre-flight xác minh địa chỉ (không gọi mạng ngoài, chỉ tra DB/cache) ⇒ p95 **< 50 ms**.<br>• **NFR-SHP-004-002**: **0** vận đơn được tạo khi `AddressVerification.Status ≠ Verified` (test + CHECK constraint, xem §5.2).<br>• **NFR-SHP-004-003**: **Idempotent 100 %**: gọi `CreateShipmentAsync` **100 lần** cho cùng đơn ⇒ **đúng 1** vận đơn, **0** lần gọi API hãng thêm sau lần đầu.<br>• **NFR-SHP-004-004**: **0** `double`/`float` trong DTO/entity/payload của module (test reflection, kế thừa `XC-001` NFR-004).<br>• **NFR-SHP-004-005**: Tiền của hãng và tiền nội bộ khớp theo **minor units**; lệch ⇒ `Discrepancy`, **0** trường hợp tự sửa số của hãng.<br>• **NFR-SHP-004-006**: `CorrelationId` hiện diện trong **100 %** log của luồng tạo vận đơn (kế thừa `XC-005` NFR-002).<br>• **NFR-SHP-004-007**: **0** token/`PartnerCode`/header `Authorization` xuất hiện trong log hoặc trong payload đã lưu (quét tự động).<br>• **NFR-SHP-004-008**: Job đồng bộ địa chỉ chạy khi **rỗng** ⇒ **< 10** dòng log/nhịp (`XC-005` BR-004 — cấm log trong vòng lặp nóng).<br>• **NFR-SHP-004-009**: Cách ly tenant: **0** bản ghi tenant khác lọt vào truy vấn (integration test 2 tenant — ⚠️ **cần PostgreSQL**, xem §14.4).<br>• **NFR-SHP-004-010**: **0** lần acquire khoá thiếu `timeout`; **0** acquire lồng trên cùng tên khoá (`XC-003` BR-004/BR-005).<br>• **NFR-SHP-004-011**: **0** endpoint/mã trạng thái/base URL literal trong code nghiệp vụ (test grep trong CI — `docs/design-doc-guidelines.md:118`).<br>• **NFR-SHP-004-012**: **0** metric phát ra ngoài bảng đăng ký (`MetricsTests` — `test/eCommerce.Tests/Observability/MetricsTests.cs:50`). |
+| **Use Case Name** | Gửi / huỷ / tra vận đơn **GHTK** qua adapter, địa chỉ **chỉ gửi khi mã hãng đã xác minh** |
+| **Description** | *"Là hệ thống bán hàng, tôi muốn đẩy đơn sang GHTK — nhưng KHÔNG muốn vận đơn đi tới địa chỉ không còn tồn tại, và KHÔNG muốn tạo trùng vận đơn chỉ vì mạng lỗi rồi thử lại."* |
+| **Actor(s)** | **`ShipmentAppService`/job thử lại của `SHP-001`** (gọi adapter) · **Job đối soát của `SHP-002`** (gọi `GetTrackingAsync`) · **Hãng GHTK** (hệ thống ngoài) · **Quản trị** (cấu hình hãng) |
+| **Priority** | **Must have** (adapter thứ hai) |
+| **Trigger** | (a) `SHP-001` Pha 2 gọi `CreateShipmentAsync`/`CancelShipmentAsync`/`GetFeeAsync` của provider `ghtk`; (b) `SHP-002` gọi `GetTrackingAsync`; (c) `SHP-002` gọi `VerifyAsync` rồi `ParseAsync` khi có webhook |
+| **Pre-Condition(s)** | • `ShpCarriers` có dòng `ghtk` với `IsEnabled = true` (cờ bật hãng **duy nhất**) và `AddressModel` (nguồn **duy nhất** của mô hình địa chỉ) (`SHP-001` §5.2); cấu hình `ShippingHub:Providers:ghtk:*` đủ theo chế độ (BR-013: `FromAddress` luôn bắt buộc; `BaseUrl`/token/`PartnerCode`/`ClientOrderCodeMaxLength`/`AddHttpClient` khi `EnableLiveCalls = true`) — thiếu ⇒ adapter **trả** `Configuration` + `eCommerce:Shipping:0101` (fail-closed).<br>• `SHP-001` đã dựng `CarrierCreateShipmentRequest` từ **snapshot đơn** qua hợp đồng Sales (`D-108`; địa chỉ/COD/dòng hàng **không** từ DTO của API) và lấy mã hãng qua **cửa mã** `Address` (`D-110`) — cả hai ⬜ kế hoạch (grep `*.cs` = 0).<br>• `ClientOrderCode` đã do `SHP-001` sinh ở Pha 1 (`D-109`).<br>• `CorrelationId` theo `XC-005`. |
+| **Post-Condition(s)** | • Adapter **không ghi DB, không phát ETO** (BR-008): kết quả trả về `CarrierCreateShipmentResult`/`CarrierCancelResult`; `SHP-001` Pha 3 ghi `ShpShipments` + `ShpShipmentCreateAttempts` + outbox.<br>• `CreateShipmentAsync`/`CancelShipmentAsync`/`GetFeeAsync` thất bại luôn **trả** `FailureKind` (`None/Business/Transient/Configuration`) + `FailureCode` — **không NÉM** lỗi nghiệp vụ/cấu hình (BR-018, ADR-13); chỉ `GetTrackingAsync` NÉM `0404`/`0402` — **cấm** im lặng.<br>• Tiền ra biên hãng là **số nguyên**; phí hãng báo về là `decimal` qua `Money`. |
+| **Basic Flow** | 1. `SHP-001` Pha 2 gọi `GhtkCarrierProvider.CreateShipmentAsync(request)`.<br>2. **Kiểm cấu hình theo chế độ** (BR-013): `FromAddress` đủ cấp bắt buộc (luôn); khi `EnableLiveCalls = true` thêm `BaseUrl`, token, `PartnerCode`, `ClientOrderCodeMaxLength > 0`, `AddHttpClient` — thiếu ⇒ **trả** `Configuration` + `0101` (E9).<br>3. **Kiểm** `request.ToAddress` đủ các cấp mã bắt buộc của `AddressModel` (BR-002) — thiếu ⇒ **trả** `Business` + `0102`.<br>4. Kiểm giới hạn (cân, COD, số lượng lẻ; độ dài `ClientOrderCode` **chỉ khi** `ClientOrderCodeMaxLength > 0`) — vượt ⇒ **trả** `Business` + `0401`.<br>5. `EnableLiveCalls = false` ⇒ trả kết quả mô phỏng + log `Information` (A4).<br>6. **Tra theo `ClientOrderCode`** (GET, được retry) — hãng đã có ⇒ `AlreadyExisted = true` + `ProviderTrackingCode`, **không** POST.<br>7. Chưa có ⇒ POST tạo vận đơn (**không** retry mù).<br>8. Ánh xạ response ⇒ `CarrierCreateShipmentResult` (mã vận đơn bắt buộc khác rỗng khi `Success`; phí hãng báo là nguồn sự thật). |
+| **Alternative Flow** | **A1: Hãng báo trùng `ClientOrderCode`** ⇒ tra lại, trả `AlreadyExisted = true`; **không** phải lỗi.<br>**A2: Mất response/timeout sau khi hãng đã tạo** ⇒ POST trả `FailureKind = Transient`; lần thử sau của `SHP-001` **tra trước** (bước 6) ⇒ không tạo vận đơn thứ hai. Tra cũng lỗi ⇒ `Transient` (không đoán).<br>**A3: Huỷ** ⇒ `CancelShipmentAsync` chỉ gọi khi có `ProviderTrackingCode` (`SHP-001` §6.1); hãng không cho huỷ ⇒ `Success = false` + `FailureKind = Business` + `0403`.<br>**A4: `EnableLiveCalls = false`** (PoC/dev) ⇒ mô phỏng; toàn bộ luồng lock/worker/event của `SHP-001` vẫn chạy (khuôn `ShopeeConnector.cs:80-102`).<br>**A5: Tra trạng thái** ⇒ `GetTrackingAsync` (GET) cho job đối soát `SHP-002`. |
+| **Exception Flow** | **E1:** `ToAddress` thiếu cấp bắt buộc của `AddressModel` ⇒ adapter **trả** `Success = false`, `FailureKind = Business`, `FailureCode = eCommerce:Shipping:0102` (`SHP-001` §6.3), 0 lời gọi GHTK; `SHP-001` Pha 3 ghi `SubmitFailed` + attempt `Rejected`, giữ nguyên `FailureCode` của adapter (`D-130`) — **không** kẹt `Submitting`.<br>**E2:** cửa mã `Address` NÉM (`Address:0001`/`0005`/`0501`/`0502`/`0504` hoặc > 1 ánh xạ `DaXacMinh` — `D-89`) ⇒ `SHP-001` bọc thành `0102` kèm `InnerErrorCode`; adapter **không** được gọi.<br>**E3:** cân/COD/số lượng vượt giới hạn hãng hoặc số lượng lẻ không đổi được sang payload ⇒ adapter **trả** `FailureKind = Business` + **`eCommerce:Shipping:0401`** (`SHP-001` phản hồi `400`), 0 HTTP. **Không** làm tròn.<br>**E4:** hãng `5xx`/timeout ⇒ tạo/huỷ: `FailureKind = Transient` (thử lại do `SHP-001`); **tính phí**: **trả** kết quả lỗi mềm (`FailureKind = Transient` + `0404`, không có phí) — **không** NÉM, để checkout dùng ước tính dự phòng như GHN (`SHP-001` §7.3 :750); **tra trạng thái**: NÉM **`0404`**, `502` (job `SHP-002` bắt và thử nhịp sau).<br>**E5:** token/`PartnerCode` sai/hết hạn (401/403) ⇒ tạo/huỷ/tính phí: `FailureKind = Configuration` + **`0402`**; tra trạng thái: NÉM `0402`, `502`; **cấm** retry (retry không làm token đúng).<br>**E6:** huỷ khi hãng không cho ⇒ **trả** `Success = false` + `FailureKind = Business` + **`0403`** (`SHP-001` phản hồi `409`); **cấm** tự đánh dấu "đã huỷ".<br>**E7:** hãng 4xx nghiệp vụ / "thành công" mà không có mã vận đơn ⇒ `Business` ⇒ `SHP-001` NÉM `0103` (`0103` chỉ dùng khi hãng từ chối không có mã riêng/mã rỗng — `D-130`).<br>**E8:** cùng `ClientOrderCode` nhưng nội dung khác ⇒ do `SHP-001` (`RequestPayloadHash` + `eCommerce:Messaging:0001` — `modules/Messaging/eCommerce.Messaging.Domain/Idempotency/MessagingErrorCodes.cs:14`), **không** ở adapter.<br>**E9:** cấu hình thiếu theo chế độ (bước 2; gồm `FromAddress` thiếu/không đủ cấp, `ClientOrderCodeMaxLength = 0` khi live, thiếu `AddHttpClient`) ⇒ **trả** `FailureKind = Configuration` + **`0101`**, 0 HTTP; **cấm** coi là thành công. |
+| **Business Rules** | • **BR-SHP-004-001**: Mọi lời gọi HTTP tới GHTK **phải** nằm trong assembly riêng `eCommerce.ShippingHub.Carriers.Ghtk` (`GhtkCarrierProvider`/`GhtkTrackingReader`/`GhtkWebhookVerifier` — `D-128` ⑤, §6.1); **cấm** gọi từ app service, job hay domain, và **cấm** kiểu ngoài assembly đó tham chiếu `GhtkOptions`/typed client GHTK. Đỏ: `TC-01`.<br>• **BR-SHP-004-002**: ⭐ Địa chỉ **chỉ** được gửi khi `request.ToAddress` đủ mã hãng cho **mọi** cấp bắt buộc của `AddressModel` (mã do `Address` trả, `DaXacMinh`): `TwoLevel` = tỉnh + xã; `ThreeLevel` = tỉnh + huyện + xã; `Both` = đủ tỉnh + xã là đủ, `DistrictCode` có thì gửi (chưa xác minh — Q1). Chuỗi rỗng/khoảng trắng coi như thiếu. `ToAddress` thiếu ⇒ **trả** `Business` + `0102`, **0** lời gọi GHTK; `FromAddress` (từ cấu hình hãng, `SHP-001` §6.4) thiếu cấp ⇒ **trả** `Configuration` + `0101` (BR-013). `AddressModel` đọc **chỉ** từ `ShpCarriers.AddressModel` qua `SupportedAddressModel` (ADR-03). Đỏ: `TC-02`, `TC-03`, `TC-28`.<br>• **BR-SHP-004-003**: `district` **không** là khoá định danh, **không** được adapter tự suy ra (từ tên, từ bảng cứng); chỉ dùng `DistrictCode` mà `Address` đã trả. Đỏ: `TC-04`.<br>• **BR-SHP-004-004**: `ShippingHub` **không** có bảng ánh xạ/danh mục địa chỉ hãng, **không** tự truy vấn `AddrCarrierMappings`, **không** hard-code mã tỉnh/huyện/xã (`D-89`, `D-110`). Đỏ: `TC-05`.<br>• **BR-SHP-004-005**: **Cấm** hard-code base URL/endpoint/mã trạng thái GHTK — nằm ở cấu hình `ShippingHub:Providers:ghtk:*` hoặc dữ liệu (`docs/design-doc-guidelines.md:118`). Đỏ: `TC-06`.<br>• **BR-SHP-004-006**: ⭐ Adapter dùng **đúng** `request.ClientOrderCode` (hàm `D-109`); độ dài vượt `ClientOrderCodeMaxLength` (**chỉ so khi** `> 0`; `0` = chưa biết giới hạn, không bao giờ làm ngưỡng) ⇒ **trả** `Business` + `0401`, **cấm** cắt/băm/tự sinh; **tra theo mã trước** khi POST. Đỏ: `TC-07`, `TC-08`.<br>• **BR-SHP-004-007**: Địa chỉ gửi hàng **chỉ** từ dữ liệu nội bộ; `GetTrackingAsync`/`ParseAsync` **không** trả/dùng địa chỉ do hãng gửi (ADR-05). Đỏ: `TC-09`.<br>• **BR-SHP-004-008**: Adapter **không** ghi DB, mở UoW, phát ETO hay giành khoá phân tán — thuộc `SHP-001`/`SHP-002`. Đỏ: `TC-10`.<br>• **BR-SHP-004-009**: Tiền ra biên hãng là **số nguyên** (`long` minor units); phí hãng báo về qua `Money`; **cấm** `double`/`float`, **cấm** `==` trên `decimal` tiền. Đỏ: `TC-11`.<br>• **BR-SHP-004-010**: Payload gửi/nhận **phải che** trước khi lưu (`RawPayloadMasked`, `FailureMessage`) **và** trước khi log, bằng **hàm che riêng của adapter** (hàm thuần, khuôn `PaymentTransaction.MaskSensitiveData` — `modules/PaymentHub/eCommerce.PaymentHub.Domain/Entities/PaymentTransaction.cs:313`, **mở rộng**: hàm khuôn chỉ che trường tên `password/secret/token/card_number/cvv/otp/pin` và chuỗi 12–19 chữ số — `:321–334` — nên **không** che `PartnerCode`, SĐT, địa chỉ). Phải che: (i) theo **tên trường** (không phân biệt hoa/thường): token, `Authorization`, `PartnerCode`, `hash`, SĐT, địa chỉ, tên người nhận; (ii) theo **giá trị đã biết** của request/cấu hình (`ApiToken`, `PartnerCode`, `WebhookHashToken`, `RecipientName`, `RecipientPhone`, `AddressLine`, tên các cấp) thay thế ở **mọi chỗ** trong chuỗi, kể cả thông điệp lỗi do hãng trả (tên trường GHTK chưa xác minh — Q1, nên lớp (ii) là lớp chắc chắn). **Cấm** log token. Đỏ: `TC-12`.<br>• **BR-SHP-004-011**: `ParseAsync` trả mã trạng thái **thô nguyên văn**; ánh xạ sang trạng thái nội bộ là **dữ liệu** của `SHP-002` (`ICarrierStatusMapper`); mã chưa ánh xạ ⇒ `Discrepancy` (`SHP-002` `0210`), **cấm** coi là "không đổi". Đỏ: `TC-13`.<br>• **BR-SHP-004-012**: Mã lỗi theo khuôn `eCommerce:Shipping:NNNN`, do `ShippingHubErrorCodes` sở hữu (khuôn `TaxErrorCodes` — `modules/Tax/eCommerce.Tax.Domain/TaxErrorCodes.cs:10`); **dải `0401`–`0499` dành cho `SHP-004`** (`D-114`, R0 `SHP-001`-Q7); **cấm** dùng lại `0012`–`0021` của v0.1 và **cấm** khai ở `eCommerceConsts.ErrorCodes`. Đỏ: `TC-14`.<br>• **BR-SHP-004-013**: `EnableLiveCalls = false` là mặc định; Cấu hình bắt buộc **theo chế độ**: **luôn** `FromAddress` đủ cấp theo `AddressModel`; khi `true` thêm `BaseUrl`, token, `PartnerCode`, `ClientOrderCodeMaxLength > 0`, `AddHttpClient`. Thiếu ⇒ **trả** `Configuration` + `0101`, 0 HTTP, **không** coi là thành công. **Thứ tự kiểm cố định** (§1 bước 2→4, §3): cấu hình (`0101`) → địa chỉ (`0102`) → giới hạn (`0401`) → nhánh mô phỏng → tra → POST; nhờ đó chế độ mô phỏng mặc định (`ClientOrderCodeMaxLength = 0`) **không** bị `0401`. Đỏ: `TC-15`.<br>• **BR-SHP-004-014**: Adapter **phải** có `GetTrackingAsync` (GET chủ động); `ParseAsync` là hàm **thuần** (không DB, không mạng) và không bao giờ tự quyết trạng thái (ADR-11). Đỏ: `TC-16`.<br>• **BR-SHP-004-015**: `POST` tạo vận đơn **không** retry mù ở tầng HTTP (đúng 1 POST mỗi lần gọi); `GET` được retry ≤ `MaxRetries` (`SHP-001` §6.4). Đỏ: `TC-17`.<br>• **BR-SHP-004-016**: Mọi metric phát ra **phải** nằm trong `eCommerceMetricNames` (`shared/eCommerce.Kernel/Observability/eCommerceMetrics.cs:13`), nhãn **chỉ** từ `eCommerceMetricTags.Allowed` (`:212`), cấm nhãn trong `Forbidden` (`:219`: `orderId`/`sku`/…). `SHP-004` **không** thêm metric/nhãn mới — dùng `shipping_carrier_call_failed_total{provider,reason}` của `SHP-001` §13 (`provider`, `reason` đều ∈ `Allowed`; `reason` ∈ `timeout`/`transient`/`business`/`not_configured`/`invalid_address`, `SHP-001` :981). Muốn phân biệt thao tác ⇒ `SHP-001` thêm nhãn vào `Allowed` (cùng PR `XC-005` §5.1), `SHP-004` **không** tự thêm. Đỏ: `TC-18`.<br>• **BR-SHP-004-017**: `GhtkWebhookVerifier.VerifyAsync` là lớp xác thực **duy nhất** của webhook GHTK (không HMAC — `docs/business-modules-proposal.md:547`): kiểm **IP nguồn ∈ `WebhookAllowedIps`** (sai ⇒ `Accepted = false`, `FailureReason = "ip_not_allowed"`) và **`hash` khớp `WebhookHashToken`** của tenant theo path (sai/thiếu ⇒ `"bad_token"`); thiếu `WebhookAllowedIps`/`WebhookHashToken` ⇒ **fail-closed** `Accepted = false`, `"not_configured"` (**cấm** coi allowlist rỗng là "cho tất cả"). Nhãn thuộc 6 nhãn của `SHP-002` §6.1 (`shp-002-webhook-trang-thai-van-don.md:515`); `too_large`/`unknown_tenant`/`malformed` do lớp chung của `SHP-002`. **Cấm** log `hash`. Đỏ: `TC-25`, `TC-26`, `TC-27`.<br>• **BR-SHP-004-018**: Sau khi `SHP-001` đã commit `Submitting`, `CreateShipmentAsync`/`CancelShipmentAsync`/`GetFeeAsync` **không NÉM** `BusinessException` cho lỗi nghiệp vụ/cấu hình — **trả** `FailureKind` + `FailureCode` (ADR-13). Vi phạm ⇒ vận đơn kẹt `Submitting` (không cạnh ra, `SHP-001` §3.2). Đỏ: `TC-29` (mọi nhánh lỗi của TC-03/04/08/15/19/20/21 không ném) + `TC-22`. |
+| **Non-Functional Requirement** | • **NFR-SHP-004-001**: Dựng payload GHTK từ request (hàm thuần, 0 I/O) p95 **< 5 ms** với đơn 50 dòng — đo bằng test hiệu năng đơn vị (`TC-23`).<br>• **NFR-SHP-004-002**: **0** lời gọi HTTP tới GHTK khi địa chỉ thiếu mã bắt buộc — đếm bằng `HttpMessageHandler` giả trên ≥ 100 ca (`TC-03`: 126 ca sinh bằng theory; `TC-02`).<br>• **NFR-SHP-004-003**: Idempotent: gọi `CreateShipmentAsync` **100 lần** cùng `ClientOrderCode` với hãng giả đã có đơn ⇒ **0** POST (`TC-07`).<br>• **NFR-SHP-004-004**: **0** `double`/`float` trong DTO/payload của assembly `eCommerce.ShippingHub.Carriers.Ghtk` — test reflection (`TC-11`).<br>• **NFR-SHP-004-005**: Phí hãng và phí nội bộ khớp theo `Money.Equals` **100 %**; lệch ≥ 1 đồng ⇒ `shipping_fee_discrepancy_total` (`SHP-001`), **0** lần tự sửa số của hãng (`TC-11`).<br>• **NFR-SHP-004-006**: `CorrelationId` hiện diện trong **100 %** dòng log của lời gọi hãng — test thu log (`TC-24`).<br>• **NFR-SHP-004-007**: **0** token/`PartnerCode`/`Authorization`/`hash`/SĐT/địa chỉ/tên người nhận **nguyên văn** trong log và payload đã lưu — quét tự động trên payload mẫu có đủ các trường đó (`TC-12`).<br>• **NFR-SHP-004-008**: Mỗi lời gọi hãng có timeout ≤ `CallTimeoutSeconds` (mặc định **10 s**, `SHP-001` §6.4); **0** `HttpClient` không đặt timeout — quét mã nguồn (`TC-17`).<br>• **NFR-SHP-004-009**: **0** literal endpoint/mã trạng thái/mã địa chỉ trong code nghiệp vụ — grep CI (`TC-06`).<br>• **NFR-SHP-004-010**: **0** metric ngoài bảng đăng ký — `MetricsTests` (`test/eCommerce.Tests/Observability/MetricsTests.cs:64`) (`TC-18`). |
 
 ---
 
@@ -110,149 +104,108 @@ flowchart LR
     classDef usecase fill:#e2f4f6,stroke:#17a2b8,stroke-width:2px;
     classDef note fill:#fffbe6,stroke:#ffc107,stroke-width:1px,color:#5c4a00;
 
-    CS(("👤<br/>CSKH<br/>xử lý đơn"))
-    JOB(("⚙️<br/>Job đồng bộ<br/>địa chỉ"))
-    JOB2(("⚙️<br/>Job thử lại<br/>submission"))
+    S1(("⚙️<br/>SHP-001<br/>tạo và huỷ"))
+    S2(("⚙️<br/>SHP-002<br/>đối soát và webhook"))
     GHTK(("🚚<br/>GHTK<br/>hệ thống ngoài"))
 
     subgraph SHP["📦 Adapter GHTK — ShippingHub"]
         direction TB
-        UC1(["«chuẩn hoá địa chỉ 2 cấp»"])
-        UC2(["«xác minh địa chỉ với danh mục hãng»"])
-        UC3(["«chặn khi chưa xác minh»"])
-        UC4(["«tính phí vận chuyển»"])
-        UC5(["«tạo vận đơn idempotent»"])
-        UC6(["«huỷ vận đơn»"])
-        UC7(["«tra trạng thái chủ động»"])
-        UC8(["«đồng bộ danh mục địa chỉ hãng»"])
-        class UC1,UC2,UC3,UC4,UC5,UC6,UC7,UC8 usecase;
+        UC1(["«kiểm mã địa chỉ theo mô hình hãng»"])
+        UC2(["«tính phí»"])
+        UC3(["«tạo vận đơn: tra trước rồi tạo»"])
+        UC4(["«huỷ vận đơn»"])
+        UC5(["«tra trạng thái chủ động»"])
+        UC6(["«parse webhook»"])
+        class UC1,UC2,UC3,UC4,UC5,UC6 usecase;
     end
 
-    N1["<b>Nguyên tắc nền:</b><br/>«GHTK vẫn 3 cấp, ta chưa xác minh»<br/>«không xác minh được thì KHÔNG gửi»"]
+    N1["<b>Nguyên tắc nền:</b><br/>«chỉ gửi khi mã hãng đã DaXacMinh»<br/>«không có mã thì KHÔNG gửi»"]
     class N1 note;
 
-    CS --- UC5
-    CS --- UC6
-    JOB --- UC8
-    JOB2 --- UC5
+    S1 --- UC2
+    S1 --- UC3
+    S1 --- UC4
+    S2 --- UC5
+    S2 --- UC6
+    GHTK --- UC3
     GHTK --- UC5
-    GHTK --- UC7
 
-    UC5 -. "«include»" .-> UC1
-    UC1 -. "«include»" .-> UC2
-    UC2 -. "«extend khi không xác minh được»" .-> UC3
-    UC8 -. "«cung cấp dữ liệu cho»" .-> UC2
-    UC5 -. "«include»" .-> UC4
-    UC3 -.- N1
+    UC3 -. "«include»" .-> UC1
+    UC2 -. "«include»" .-> UC1
+    UC1 -.- N1
 ```
 
 ### Chú giải
 
 | Ký hiệu | Ý nghĩa |
 |---|---|
-| ⭕ Xanh lá | Actor (người dùng + hệ thống + hãng ngoài) |
+| ⭕ Xanh lá | Actor (luồng của tài liệu khác gọi adapter + hãng ngoài) |
 | 🟦 Bầu dục xanh dương | Use Case |
 | 🟨 Khung vàng | Note (nguyên tắc nền) |
 | `───` | Liên kết Actor ↔ Use Case |
 | `-.«include».->` | Quan hệ bao hàm |
-| `-.«extend khi ...».->` | Quan hệ mở rộng (chỉ xảy ra ở nhánh đó) |
 
 ---
 
 ## 3. Sơ đồ trạng thái (state machine)
 
-> Feature này có **hai** vòng đời. `SHP-004` **sở hữu** vòng đời **submission** (yêu cầu gửi hàng).
-> Vòng đời **vận đơn** (`Created → PickedUp → Delivering → Delivered`) thuộc **`SHP-002`** — `SHP-004` **chỉ đọc**, **không** ghi
-> (`docs/features/shipping/shp-002-webhook-trang-thai-van-don.md:157`).
+**Không áp dụng.** `SHP-004` **không sở hữu aggregate/trạng thái nào** (ADR-12): vòng đời tạo vận đơn (`Draft → Submitting → Created/SubmitFailed/Cancelled`) thuộc `SHP-001` §3; vòng đời theo hãng (`Created → PickedUp → … → Delivered`) thuộc `SHP-002` §3 (`D-119`: chuyển nhiều bước). Adapter là hàm **không trạng thái**: mỗi lời gọi trả một kết quả, trạng thái nằm ở `ShpShipments`.
 
-### 3.1 Vòng đời `ShpShipmentSubmissions` — SHP-004 sở hữu
+Bảng thay thế — **nhánh kết quả của một lời gọi tạo vận đơn**, kiểm **theo đúng thứ tự #1 → #6** (guard sai thì làm gì, L4). Nhánh #1–#3 **TRẢ** kết quả, **không NÉM** (ADR-13, BR-018):
 
-```mermaid
-stateDiagram-v2
-    [*] --> Pending : «CreateShipmentAsync mở UoW»
-    Pending --> AddressRejected : «pre-flight địa chỉ KHONG Verified»
-    Pending --> AddressBlocked : «danh mục địa chỉ quá cũ hoặc thiếu cấu hình hãng»
-    Pending --> AddressVerified : «pre-flight địa chỉ Verified»
-    AddressVerified --> Created : «tra ClientOrderCode roi tao vận đơn thành công»
-    AddressVerified --> Failed : «hãng 5xx hoặc timeout»
-    Failed --> Created : «job thử lại nhịp sau, TRA TRƯỚC khi tạo»
-    Failed --> Abandoned : «vượt trần AttemptCount, canh bao cho CSKH»
-    Created --> [*]
-    AddressRejected --> [*]
-    AddressBlocked --> [*]
-    Abandoned --> [*]
-```
-
-**Bảng chuyển trạng thái & guard (mọi chuyển sai **phải ném lỗi**, không im lặng):**
-
-| # | Từ → Sang | Guard (điều kiện cho phép) | Hành động kèm theo | Nếu guard sai thì? |
-|---|---|---|---|---|
-| 1 | `[*]` → `Pending` | Có `UnitOfWork` đang mở; `OrderId` tồn tại và **không** rỗng | Ghi submission với `ClientOrderCode` **ổn định** | Thiếu UoW ⇒ **lỗi lập trình** (`InvalidOperationException`), không phải `BusinessException` |
-| 2 | `Pending` → `AddressVerified` | `IShippingAddressVerifier` trả `Verified` **và** `CatalogueVersion` khớp bản đang hiệu lực | Ghi `AddressVerifiedAtUtc` + `AddressCatalogueVersion` + mã tỉnh/phường đã khớp | Sang `AddressRejected` |
-| 3 | `Pending` → `AddressRejected` | (đây là **nhánh** của guard 2, không phải guard) | Ném `0012` hoặc `0013`; `FailureCode` = mã lỗi | — |
-| 4 | `Pending` → `AddressBlocked` | Danh mục cũ hơn `MaxCatalogueAgeDays` **hoặc** hãng chưa cấu hình | Ném `0014`/`0007`; log `Error` + metric + **cảnh báo** | — |
-| 5 | `AddressVerified` → `Created` | (a) tra `ClientOrderCode` **không** thấy vận đơn cũ **hoặc** (b) hãng báo trùng và tra cứu trả về vận đơn | Ghi `ProviderTrackingCode` + `ShippingFee` + `ShpShipments` + **outbox** cùng transaction | **NÉM LỖI** — **cấm** coi `0` dòng là thành công (`XC-002` BR-008) |
-| 6 | `AddressVerified` → `Failed` | Hãng trả `5xx`/timeout **hoặc** `ClientOrderCode` đã tồn tại với `PayloadHash` **khác** | `AttemptCount++`; `0006` ⇒ `Failed`; `0017` ⇒ **NÉM** + **không** retry tự động | Vi phạm E6 ⇒ phải **dừng** và cho người xử lý |
-| 7 | `Failed` → `Created` | `AttemptCount < MaxSubmissionAttempts` **và** bước **tra cứu trước** đã chạy | `LastAttemptAtUtc`; giữ nguyên `ClientOrderCode` | Vượt trần ⇒ `Abandoned` + cảnh báo |
-| 8 | `Failed` → `Abandoned` | `AttemptCount >= MaxSubmissionAttempts` | Log `Error` + metric + **cảnh báo** cho CSKH | — |
-| 9 | `Created` → bất kỳ | **KHÔNG** có guard nào cho phép | — | **Trạng thái hấp thụ**: mọi chuyển dịch khỏi `Created` ⇒ **NÉM** `eCommerce:Shipping:0019` (`BR-SHP-004-010`) |
-| 10 | `AddressRejected`/`AddressBlocked`/`Abandoned` → `Pending` | **Chỉ** khi người dùng **sửa dữ liệu địa chỉ/cấu hình** rồi bấm tạo lại — sinh submission **MỚI** (`AttemptNo++`) | Submission cũ **giữ nguyên** (append-only theo tinh thần `SHP-002` BR-005) | **Cấm** sửa đè submission cũ ⇒ **NÉM** `0019` |
-
-> ⚠️ **Quy tắc bất di bất dịch #11** (`docs/features/cross-cutting/XC-002-outbox-inbox-chong-trung-su-kien.md:27`):
-> guard sai **phải NÉM LỖI** (hoặc ghi log có cấu trúc), **không** im lặng. Bài học `SetPaidStatus()` của eShop.
-> **Ai được phép chuyển:** `Pending → AddressVerified/AddressRejected/AddressBlocked` do **app service/pre-flight**;
-> `Failed → Created/Abandoned` do **job thử lại**; `[*] → Pending` do **người dùng có permission**.
-
-⚠️ **Trạng thái nguy hiểm nhất là `AddressVerified`:** nếu danh mục địa chỉ đổi **sau** khi đã xác minh mà
-submission vẫn dùng kết quả cũ, ta có thể gửi **mã đã lỗi thời**. Vì vậy `AddressCatalogueVersion` được ghi
-xuống chính bản ghi `ShpShipments` **và** có metric đếm số lần lệch phiên bản (§13 `NFR-SHP-004-005`).
+| # | Điều kiện | Kết quả adapter | Nếu guard sai thì? |
+|---|---|---|---|
+| 1 | Cấu hình thiếu theo chế độ (`FromAddress` luôn; `BaseUrl`/token/`PartnerCode`/`ClientOrderCodeMaxLength > 0`/`AddHttpClient` khi live) | `Configuration` + `0101`, 0 HTTP | **Không** mặc định chấp nhận (BR-013) |
+| 2 | `ToAddress` thiếu cấp bắt buộc của `AddressModel` | `Business` + `0102`, 0 HTTP | **Không** "bỏ qua" — chặn fail-closed (BR-002) |
+| 3 | Vượt giới hạn cân/COD/số lượng lẻ; độ dài mã (chỉ khi `ClientOrderCodeMaxLength > 0`) | `Business` + `0401`, 0 HTTP | **Không** làm tròn/cắt (BR-006, E3) |
+| 4 | `EnableLiveCalls = false` | Mô phỏng, 0 HTTP | Bật mà thiếu cấu hình ⇒ nhánh #1 |
+| 5 | Tra theo `ClientOrderCode` thấy đơn | `AlreadyExisted = true`, 0 POST | — |
+| 6 | Chưa có đơn | 1 POST; `Success`/`Business`/`Transient`/`Configuration` | POST lỗi mạng ⇒ `Transient`, **không** retry (BR-015) |
 
 ---
 
 ## 4. Sequence Diagram & luồng dữ liệu
 
-### 4.1 Tạo vận đơn GHTK — xác minh 2 cấp TRƯỚC khi gọi hãng
+### 4.1 Tạo vận đơn GHTK — adapter trong Pha 2 của `SHP-001`
 
 ```mermaid
 sequenceDiagram
-    actor CS as CSKH
-    participant APP as ShipmentAppService
-    participant VER as IShippingAddressVerifier
-    participant DB as PostgreSQL
-    participant REPO as ShpShipmentSubmissions
-    participant ADP as GhtkCarrierAdapter
+    participant APP as ShipmentAppService SHP-001
+    participant ADR as Cửa mã Address
+    participant ADP as GhtkCarrierProvider
     participant API as GHTK API
+    participant DB as PostgreSQL
 
-    CS->>APP: «Tạo vận đơn cho đơn ORD-1001, hãng ghtk»
-    Note over APP: Mở Unit of Work · giành khoá submission
-    APP->>VER: «VerifyAsync DTO địa chỉ nội bộ»
-    VER->>DB: «khớp tỉnh và phường/xã với ShpCarrierAddressMappings»
-    alt «danh mục địa chỉ quá cũ»
-        VER-->>APP: «Blocked»
-        APP-->>CS: «LỖI 0014 - không gửi, cần đồng bộ danh mục»
-    else «không khớp được tỉnh hoặc phường/xã»
-        VER-->>APP: «Rejected kèm mã lỗi»
-        APP->>REPO: «ghi submission AddressRejected»
-        APP-->>CS: «LỖI 0012 hoặc 0013 - KHÔNG gọi hãng»
-    else «Verified»
-        VER-->>APP: «Verified kèm CatalogueVersion»
-        APP->>REPO: «tra ClientOrderCode»
-        alt «đã có vận đơn»
-            REPO-->>APP: «vận đơn cũ»
-            APP-->>CS: «trả vận đơn cũ - idempotent»
-        else «chưa có»
-            APP->>ADP: «GetQuoteAsync»
-            ADP->>API: «gọi API tính phí»
-            API-->>ADP: «phí vận chuyển»
-            APP->>ADP: «CreateShipmentAsync»
-            ADP->>API: «gọi API tạo vận đơn»
-            API-->>ADP: «mã vận đơn»
-            APP->>DB: «ShpShipments + ShpShipmentSubmissions.Created + outbox CÙNG transaction»
-            APP-->>CS: «200 kèm mã vận đơn»
+    Note over APP: Pha 1 trong UoW: Shipment Draft, ClientOrderCode theo D-109
+    Note over APP: Dưới khoá, TRƯỚC commit Submitting: cửa mã Address + dựng request (D-131)
+    APP->>ADR: «lấy mã hãng cho từng cấp của snapshot đơn»
+    alt «ánh xạ chưa DaXacMinh hoặc không có»
+        ADR-->>APP: «NÉM Address:0501 hoặc 0502 hoặc 0504»
+        APP-->>APP: «NÉM 0102, 0 lời gọi GHTK, 0 dòng ghi, Shipment giữ Draft»
+    else «có mã»
+        ADR-->>APP: «mã hãng, request dựng xong»
+        Note over APP: Submitting COMMIT, rồi gọi adapter ngoài transaction DB với CÙNG request
+        APP->>ADP: «CreateShipmentAsync request»
+        ADP->>ADP: «kiểm cấu hình, cấp bắt buộc, giới hạn theo thứ tự»
+        alt «thiếu cấu hình hoặc thiếu cấp hoặc vượt giới hạn»
+            ADP-->>APP: «TRẢ Success false, FailureKind Configuration hoặc Business, FailureCode 0101 hoặc 0102 hoặc 0401, 0 HTTP»
+            Note over APP: Pha 3 ghi SubmitFailed và attempt Rejected, không kẹt Submitting
+        else «hợp lệ»
+            ADP->>API: «GET tra theo ClientOrderCode»
+            alt «đã có đơn»
+                API-->>ADP: «mã vận đơn cũ»
+                ADP-->>APP: «AlreadyExisted = true»
+            else «chưa có»
+                ADP->>API: «POST tạo vận đơn, đúng 1 lần»
+                API-->>ADP: «mã vận đơn và phí»
+                ADP-->>APP: «Success, phí hãng báo»
+            end
         end
     end
-    Note over DB: «Bỏ CHECK constraint đi thì DB vẫn phải chặn»<br/>«vận đơn không có xác minh địa chỉ»
+    Note over APP,DB: Pha 3 do SHP-001: ghi Shipment Created, attempts, outbox cùng transaction
 ```
+
+> 📌 Từ lúc `Submitting` đã commit, mọi lỗi của adapter phải đi qua Pha 3 (kết quả `FailureKind`) — NÉM ở đây làm vận đơn kẹt (ADR-13). Cửa mã `Address` + dựng request chạy **trước** commit `Submitting`, dưới khoá, cho cả ba đường vào Pha 2 (bấm đầu, A5 gặp `Draft`, job thử lại); lỗi ở đó NÉM, 0 dòng ghi, `Shipment` giữ trạng thái cũ; request truyền nguyên cho adapter, cấm tra cửa mã lần hai (`D-131`, đã chốt Q12). `SHP-001` §4.1 chưa vẽ bước này — BA `SHP-001` sửa trước WP code `SHP-001` (`D-131` việc kèm).
 
 ---
 
@@ -260,110 +213,21 @@ sequenceDiagram
 
 ### 5.1 ERD
 
-**Không áp dụng** — vượt giới hạn **3 sơ đồ Mermaid** của tài liệu này (đã dùng ở §2, §3, §4).
-Thay thế bằng **Data Dictionary** đầy đủ ở §5.2 (cột + index + ràng buộc).
+**Không áp dụng** — `SHP-004` không có bảng riêng (ADR-04, ADR-12). Dữ liệu mà adapter đọc/ghi thuộc module khác:
 
 ### 5.2 Bảng & cột (Data Dictionary)
 
-> ⚠️ **Chưa có bảng nào tồn tại trong code.** Đã kiểm bằng `read`/`grep`:
-> `eCommerce.slnx` chỉ khai **3** module (`ChannelHub`, `PaymentHub`, `Tax`) — **không** có `ShippingHub`;
-> `src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs:36`–`64` chỉ có DbSet của Catalog/Inventory/Orders/ChannelHub/PaymentHub/Tax.
-> Thứ duy nhất liên quan tới vận chuyển trong code hiện tại là **cột tiền phí ship của đơn**:
-> `Order.ShippingTotal` (`src/eCommerce.Domain/Entities/Orders/Order.cs:45`) với mapping `HasPrecision(18, 4)`
-> (`src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs:176`).
-> ⇒ **Toàn bộ 3 bảng dưới đây là kế hoạch GĐ2** — chưa có trong code.
+> ⚠️ **Chưa có bảng `Shp*` nào trong code** — module `ShippingHub` chưa tồn tại (`eCommerce.slnx`, thư mục `modules/` không có `ShippingHub`; §15.2 F1). Mọi cột dưới đây là **kế hoạch** của tài liệu chủ.
 
-**Bảng `ShpShipmentSubmissions`** — ⭐ nhật ký **mọi lần thử** tạo vận đơn (idempotency + truy vết pre-flight)
-
-| Cột | Kiểu | Null? | Nguồn / ý nghĩa | Ghi chú |
-|---|---|---|---|---|
-| `Id` | `uuid` | ✖ | khoá chính | |
-| `TenantId` | `uuid` | ✔ | tenant sở hữu | `IMultiTenant`; ⚠️ `NULL` = 1 tenant (xem ghi chú §5.2 index) |
-| `OrderId` | `uuid` | ✖ | đơn hàng | tham chiếu **mềm** sang Sales — **cấm** module gọi app, đây là **id** không phải navigation |
-| `ProviderCode` | `varchar(32)` | ✖ | mã hãng, `ghtk` với tài liệu này | khớp nhãn log `Provider` (`XC-005` §5.2) |
-| `AttemptNo` | `int` | ✖ | lần thử thứ mấy của cùng đơn | bắt đầu `1`; tăng khi người dùng sửa dữ liệu rồi tạo lại |
-| `ClientOrderCode` | `varchar(64)` | ✖ | ⭐ **mã đơn phía TA gửi sang hãng** — khoá idempotency | ổn định qua mọi lần retry (`BR-SHP-004-006`) |
-| `IdempotencyKey` | `varchar(128)` | ✖ | khoá chống trùng nghiệp vụ | dạng `Ghtk:Create:{tenantId}:{orderId}:{attemptNo}` |
-| `PayloadHash` | `char(64)` | ✖ | **SHA-256** payload gửi đi (**canonical JSON**) | phát hiện **xung đột khoá** (E6/`0017`) |
-| `Status` | `int` | ✖ | `Pending=0` · `AddressVerified=1` · `AddressRejected=2` · `AddressBlocked=3` · `Created=4` · `Failed=5` · `Abandoned=6` | §3.1 |
-| `AddressVerificationStatus` | `int` | ✖ | `Verified=0` · `Rejected=1` · `Blocked=2` | ⭐ **căn cứ của `BR-SHP-004-002`** |
-| `AddressLevelMode` | `int` | ✖ | `TwoLevel=0` · `ThreeLevel=1` · `Both=2` — chế độ đã dùng khi xác minh | chụp lại cấu hình tại thời điểm xác minh |
-| `AddressCatalogueVersion` | `varchar(32)` | ✔ | phiên bản danh mục địa chỉ hãng đã dùng | `null` khi `Blocked` |
-| `ProvinceProviderCode` | `varchar(64)` | ✔ | mã **tỉnh** của hãng sau khi khớp | giữ **mã của hãng**, không phải mã nội bộ |
-| `WardProviderCode` | `varchar(64)` | ✔ | mã **phường/xã** của hãng sau khi khớp | ⭐ trường **bắt buộc có** với `Verified` |
-| `DistrictProviderCodeUsed` | `varchar(64)` | ✔ | mã **huyện** đã dùng **nếu** hãng yêu cầu (`ThreeLevel`) | ⚠️ **dẫn xuất** — `null` với chế độ 2 cấp (`BR-SHP-004-003`) |
-| `ProviderTrackingCode` | `varchar(64)` | ✔ | mã vận đơn hãng cấp | khớp `ShpShipments.ProviderTrackingCode` |
-| `ShippingFeeAmount` | `numeric(18,4)` | ✔ | phí vận chuyển hãng báo | ⚠️ `decimal`, **không bao giờ** `double` |
-| `ShippingFeeCurrency` | `char(3)` | ✔ | ISO-4217, mặc định `VND` | theo `XC-001` §5.2 |
-| `CodAmount` | `numeric(18,4)` | ✖ | số tiền thu hộ gửi sang hãng | `0` = không thu hộ |
-| `CodCurrency` | `char(3)` | ✖ | ISO-4217 | |
-| `RequestPayloadMasked` | `text` | ✔ | payload gửi đi **ĐÃ CHE** | ⚠️ **cấm** lưu token/payload thô (`BR-SHP-004-012`) |
-| `ResponsePayloadMasked` | `text` | ✔ | response hãng **ĐÃ CHE** | |
-| `FailureCode` | `varchar(64)` | ✔ | mã lỗi nghiệp vụ | `eCommerce:Shipping:00NN` |
-| `FailureReason` | `varchar(2048)` | ✔ | mô tả ngắn (**đã che**) | |
-| `AttemptCount` | `int` | ✖ | số lần **gọi hãng** đã thực hiện | mặc định `0`; trần `MaxSubmissionAttempts` |
-| `CreatedAtUtc` / `LastAttemptAtUtc` | `timestamptz` | ✖ / ✔ | mốc tạo và mốc gọi gần nhất | |
-| `CorrelationId` | `varchar(64)` | ✔ | truy vết end-to-end | `XC-005` |
-| `RowVersion` | `xmin` (ánh xạ `uint`) | ✖ | optimistic concurrency | `IsRowVersion()` ⇒ dùng cột hệ thống `xmin`, **không** thêm cột thật |
-
-**Bảng `ShpCarrierAddressMappings`** — ⭐ **danh mục địa chỉ ĐỒNG BỘ từ hãng** (DỮ LIỆU, không hard-code — ADR-04)
-
-| Cột | Kiểu | Null? | Ý nghĩa | Ghi chú |
-|---|---|---|---|---|
-| `Id` | `uuid` | ✖ | khoá chính | |
-| `ProviderCode` | `varchar(32)` | ✖ | mã hãng | `ghtk` với tài liệu này |
-| `CatalogueVersion` | `varchar(32)` | ✖ | phiên bản danh mục (ví dụ `2026-10-15`) | ⭐ cho phép **truy vết** vì sao hôm qua `Verified` mà hôm nay `Rejected` |
-| `Level` | `int` | ✖ | `Province=0` · `District=1` · `Ward=2` | ⚠️ `District` **có thể rỗng** nếu hãng đã bỏ cấp huyện |
-| `ProviderCodeValue` | `varchar(64)` | ✖ | mã địa chỉ **do hãng cấp** | khoá đối chiếu |
-| `ProviderName` | `varchar(256)` | ✖ | tên địa chỉ theo hãng | |
-| `ParentProviderCodeValue` | `varchar(64)` | ✔ | mã cấp cha | `null` với `Province` |
-| `NormalizedName` | `varchar(256)` | ✖ | tên **đã chuẩn hoá** để khớp khi hãng không trả mã | ⚠️ chuẩn hoá **không** được bỏ dấu tuỳ tiện — xem §15 Q4 |
-| `IsActive` | `bool` | ✖ | còn hiệu lực trong danh mục hay không | |
-| `SyncedAtUtc` | `timestamptz` | ✖ | thời điểm đồng bộ | ⭐ dùng cho `MaxCatalogueAgeDays` |
-
-**Bảng `ShpCarrierAddressPolicies`** — chính sách địa chỉ theo hãng (**DỮ LIỆU, có duyệt + audit**)
-
-| Cột | Kiểu | Null? | Ý nghĩa | Ghi chú |
-|---|---|---|---|---|
-| `Id` | `uuid` | ✖ | khoá chính | |
-| `TenantId` | `uuid` | ✔ | `null` = dùng chung | |
-| `ProviderCode` | `varchar(32)` | ✖ | mã hãng | |
-| `AddressLevelMode` | `int` | ✖ | `TwoLevel=0` · `ThreeLevel=1` · `Both=2` | ⭐ **quyết định** cách xác minh — **chưa kiểm chứng** với GHTK (§15 Q1) |
-| `RequiresDistrict` | `bool` | ✖ | hãng có **bắt buộc** `district` không | mặc định **`true`** cho tới khi GHTK xác nhận (**fail-closed**) |
-| `IsFailClosed` | `bool` | ✖ | không xác minh được ⇒ **chặn** | mặc định **`true`**; đổi thành `false` cần **kiến trúc trưởng** duyệt |
-| `MaxCatalogueAgeDays` | `int` | ✖ | tuổi tối đa của danh mục địa chỉ | mặc định **30** |
-| `EffectiveFrom` / `EffectiveTo` | `date` / `date` | ✖ / ✔ | khung hiệu lực | kế thừa khuôn `XC-006` — **cấm** sửa đè bản ghi đang hiệu lực |
-| `ApprovedBy` / `ApprovedAtUtc` | `uuid` / `timestamptz` | ✔ | người duyệt | có **audit** |
-
-**Index & ràng buộc** *(phần hay bị bỏ sót nhất — `docs/templates/feature-design-template.md`)*
-
-| Bảng | Loại | Cột | Mục đích |
+| Dữ liệu `SHP-004` dùng | **Module chủ** / tài liệu chủ | Cách `SHP-004` dùng | Ghi chú |
 |---|---|---|---|
-| `ShpShipmentSubmissions` | **UNIQUE** `NULLS NOT DISTINCT` | `(TenantId, ProviderCode, ClientOrderCode, AttemptNo)` | ⭐ **idempotency tầng DB** — chặn 2 luồng cùng tạo 1 vận đơn cho 1 đơn (`BR-SHP-004-006`) |
-| `ShpShipmentSubmissions` | INDEX | `(TenantId, Status, LastAttemptAtUtc)` | job thử lại: *"submission `Failed` đến hạn"* |
-| `ShpShipmentSubmissions` | INDEX | `(TenantId, ProviderCode, ProviderTrackingCode)` | tra ngược từ mã vận đơn (webhook `SHP-002` khớp sang) |
-| `ShpShipmentSubmissions` | INDEX | `(PayloadHash)` | điều tra **xung đột khoá** (E6) |
-| `ShpShipmentSubmissions` | CHECK | `Status <> 4 OR (AddressVerificationStatus = 0 AND ProviderTrackingCode IS NOT NULL)` | 🚨 **`BR-SHP-004-002` ở TẦNG DB**: **không** thể có submission `Created` mà **chưa** xác minh địa chỉ — trả lời *"bỏ tầng ứng dụng đi, DB có chặn không?"* (`XC-003` D2) |
-| `ShpShipmentSubmissions` | CHECK | `CodAmount >= 0 AND (ShippingFeeAmount IS NULL OR ShippingFeeAmount >= 0)` | bất biến tiền ở tầng DB |
-| `ShpShipmentSubmissions` | CHECK | `CodCurrency ~ '^[A-Z]{3}$'` | theo khuyến nghị `XC-001` §5.2 |
-| `ShpShipmentSubmissions` | CHECK | `PayloadHash ~ '^[0-9a-f]{64}$'` | bắt buộc SHA-256 hex thường |
-| `ShpCarrierAddressMappings` | **UNIQUE** | `(ProviderCode, CatalogueVersion, Level, ProviderCodeValue)` | chống nạp trùng danh mục khi job chạy lại |
-| `ShpCarrierAddressMappings` | INDEX | `(ProviderCode, Level, ParentProviderCodeValue, IsActive)` | pre-flight tra phường/xã theo tỉnh — ⭐ **đường nóng nhất** |
-| `ShpCarrierAddressMappings` | INDEX | `(ProviderCode, Level, NormalizedName)` | khớp theo tên khi hãng không trả mã |
-| `ShpCarrierAddressPolicies` | **UNIQUE** `NULLS NOT DISTINCT` | `(TenantId, ProviderCode, EffectiveFrom)` | chống trùng khung hiệu lực |
-| `ShpCarrierAddressPolicies` | CHECK | `MaxCatalogueAgeDays > 0` | không cho cấu hình vô hiệu hoá kiểm tra |
+| `ShpCarriers` (dòng `ghtk`: `IsEnabled`, `AddressModel`, `ConfigKey`) | ShippingHub / `SHP-001` §5.2 | đọc qua factory; **nguồn duy nhất** của `AddressModel` (cấp cho provider qua `SupportedAddressModel`) và của cờ bật hãng `IsEnabled`; phần còn lại đọc từ options (§6.3) | mặc định đề nghị `IsEnabled = false`, `AddressModel = ThreeLevel` (Q1, chưa xác minh) |
+| `ShpShipments`, `ShpShipmentCreateAttempts` (`ClientOrderCode`, `Generation`, `RequestPayloadHash`, `ProviderTrackingCode`) | ShippingHub / `SHP-001` §5.2 | **không ghi** — `SHP-001` Pha 2/3 ghi | UNIQUE `(TenantId, ProviderCode, ClientOrderCode)` `NULLS NOT DISTINCT` là hàng rào DB (`SHP-001` §5.2) |
+| Snapshot mã hãng đã gửi: `CarrierCode` + `CarrierAddressCode` + tên đã gửi | ShippingHub / `SHP-001` §5.2 (nhóm cột snapshot) | adapter nhận trong `CarrierAddress`, `SHP-001` lưu | `D-83`: **cấm** dựng lại từ `AddrCarrierMappings` (ánh xạ sửa tại chỗ — `D-86`) ⇒ nợ ở §15.2 F3 |
+| `AddrCarrierMappings` | Address / `ADDR-002` | **chỉ** gián tiếp qua cửa mã (`D-89`, `D-110`) | `SHP-004` **không** tham chiếu bảng/entity này (BR-004) |
+| Ánh xạ mã trạng thái GHTK → trạng thái nội bộ (`CarrierStatusMapping`) | ShippingHub / `SHP-002` §5.2 | adapter chỉ trả mã thô (BR-011) | không seed giá trị suy đoán (§11) |
 
-> ⚠️ **`NULLS NOT DISTINCT` là BẮT BUỘC, và EF KHÔNG mô hình hoá nó.**
-> Bằng chứng **đã kiểm chứng thật** trong repo: `src/eCommerce.EntityFrameworkCore/Migrations/20261013024226_Fix_NullableTenantId_UniqueIndexes.cs:14`–`17`
-> ghi lại thí nghiệm — *"chèn 2 dòng `TaxRateSchedules` cùng `Code='DUP_TEST'`, `TenantId = NULL` ⇒ **INSERT 0 2 — THÀNH CÔNG**"*;
-> và `:23`–`25` cảnh báo *"vì EF không mô hình hoá `NULLS NOT DISTINCT`, nếu một migration **do EF sinh tự động** sau này tạo lại một trong các index dưới đây, thuộc tính sẽ **mất**"*.
-> ⇒ Migration của `SHP-004` **phải** có một bước SQL thô cho **mọi** unique index có `TenantId` (xem §11).
-
-**Ghi chú về `ShpShipments` (SHP-001/002 sở hữu):** `SHP-004` **không** định nghĩa lại bảng này. Nó **cần** 4 cột đã được `SHP-002` liệt kê — `ClientOrderCode`, `ProviderTrackingCode`, `Status`, `CodAmount` (`docs/features/shipping/shp-002-webhook-trang-thai-van-don.md:318`–`330`) — và **cần thêm** một cột để trả lời *"địa chỉ này đã được xác minh bằng phiên bản danh mục nào"*:
-
-| Cột | Kiểu | Null? | Ý nghĩa | Ghi chú |
-|---|---|---|---|---|
-| `AddressCatalogueVersion` | `varchar(32)` | ✔ | phiên bản danh mục địa chỉ dùng khi tạo vận đơn | ⭐ **đề nghị `SHP-001` bổ sung** vào `ShpShipments` — nếu không, không truy vết được sự cố địa chỉ về sau |
+**Ghi chú:** các bảng/index/CHECK/`NULLS NOT DISTINCT` của v0.1 (`ShpShipmentSubmissions`, `ShpCarrierAddressMappings`, `ShpCarrierAddressPolicies`) **đã bỏ** — thay thế bởi bảng của `SHP-001` + `ADDR-002` (`Đối chiếu` cuối tài liệu).
 
 ---
 
@@ -373,209 +237,108 @@ Thay thế bằng **Data Dictionary** đầy đủ ở §5.2 (cột + index + r�
 
 | Mục | Giá trị |
 |---|---|
-| Interface hãng (nội bộ) | `IShippingCarrier` — đặt tại `eCommerce.ShippingHub.Application.Contracts` (**trung lập hãng**, chốt lần đầu ở `SHP-001`) |
-| Interface xác minh địa chỉ | `IShippingAddressNormalizer` + `IShippingAddressVerifier` |
-| Factory | `IShippingCarrierFactory` — khuôn `IChannelConnectorFactory` (`modules/ChannelHub/eCommerce.ChannelHub.Application.Contracts/Connectors/IChannelConnector.cs:117`) |
-| Implementation | `GhtkCarrierAdapter` (gọi API GHTK), `ShippingAddressVerifier` (tra danh mục), `GhtkAddressCatalogueSyncer` (job đồng bộ) |
-| `[Authorize]` | **cấp CLASS** (bắt buộc — khuôn thật: `src/eCommerce.Application/Channels/ChannelAppService.cs:27` với comment *"đặt `[Authorize]` ở cấp CLASS để mặc định mọi method đều yêu cầu đăng nhập"*). **Ngoại lệ duy nhất:** webhook (thuộc `SHP-002`) |
+| Interface hãng (nội bộ) | `IShippingCarrierProvider` + `IShippingCarrierProviderFactory` — `eCommerce.ShippingHub.Carriers`, **chủ = `SHP-001`** §6.1 (3 method: `GetFeeAsync`, `CreateShipmentAsync`, `CancelShipmentAsync`; thuộc tính `SupportedAddressModel`) |
+| Implementation | `GhtkCarrierProvider` (`SHP-004`), `GhtkTrackingReader`, `GhtkWebhookVerifier` — **assembly riêng `eCommerce.ShippingHub.Carriers.Ghtk`** (`D-128` ⑤), **không** nằm trong `ShippingHub.Application`; chỉ tham chiếu assembly hợp đồng chứa interface của `SHP-001`/`SHP-002` (vị trí do chủ interface chốt) + `eCommerce.Kernel`, **không** tham chiếu `Application`/`Domain`/`EntityFrameworkCore` của ShippingHub; đăng ký DI **một dòng** (khuôn `ChannelConnectorFactory.cs:9`; `AddHttpClient` ở Host — ADR-10). ⬜ kế hoạch |
+| Interface xác thực webhook | `IShipmentWebhookVerifier` — **chủ = `SHP-002`** §6.1 (`VerifyAsync`, `ParseAsync`); `SHP-004` cài **cả** `VerifyAsync` (hash + IP allowlist, BR-017) **và** `ParseAsync` cho GHTK (không HMAC — `SHP-002` D2; `shp-002-webhook-trang-thai-van-don.md:56`) |
+| App service | **Không có** — `SHP-004` **không** thêm method vào `IShipmentAppService` (`D-116`/`D-118`: danh sách đóng; `CreateShipmentAsync` khai đúng 1 lần ở `SHP-001`). `[Authorize]` cấp class, permission: thuộc `SHP-001` §9 |
 
 ```csharp
-namespace eCommerce.ShippingHub.Carriers;
+namespace eCommerce.ShippingHub.Carriers.Ghtk;
 
-/// ⭐ Hợp đồng TRUNG LẬP HÃNG. Chi tiết của GHTK/GHN nằm SAU interface này —
-/// khuôn đã dùng thật: IChannelConnector và IPaymentProvider.
-/// 🚨 VÌ SAO PHẢI TRUNG LẬP: GHN ĐÃ thích ứng địa chỉ 2 cấp (có is_new_to_address),
-///    GHTK thì CHƯA XÁC MINH được (docs/business-modules-proposal.md:513 vs :546).
-///    Nếu nhét giả định "mọi hãng đều 3 cấp" vào app service thì SHP-004 sẽ chặn oan GHN
-///    (và ngược lại, sẽ gửi sai cho GHTK).
-public interface IShippingCarrier
+/// ⬜ KẾ HOẠCH — module chưa có code (F1). Chi tiết GHTK nằm SAU IShippingCarrierProvider (ADR-01).
+/// 🚨 Chi tiết payload (tên trường, tên hay mã, endpoint) CHƯA xác minh — Q1. KHÔNG viết dựa trên suy đoán.
+public sealed class GhtkCarrierProvider : IShippingCarrierProvider
+{
+    public string ProviderCode => "ghtk";
+
+    /// Do factory cấp từ cột ShpCarriers.AddressModel — NGUỒN DUY NHẤT (ADR-03). KHÔNG đọc từ options, KHÔNG hard-code.
+    /// Mặc định ThreeLevel tới khi Q1 có trả lời.
+    public CarrierAddressModel SupportedAddressModel { get; }
+
+    // GetFeeAsync / CreateShipmentAsync / CancelShipmentAsync — chữ ký theo SHP-001 §6.1.
+    // CreateShipmentAsync: kiểm cấu hình (0101) → cấp bắt buộc (0102) → giới hạn (0401) → mô phỏng → GET theo ClientOrderCode → POST đúng 1 lần.
+    //   MỌI nhánh lỗi TRẢ CarrierCreateShipmentResult(Success: false, FailureKind, FailureCode) — KHÔNG NÉM (ADR-13, BR-018).
+    // GetFeeAsync: lỗi hãng/token TRẢ kết quả lỗi mềm (FailureKind + FailureCode), KHÔNG NÉM — như GHN (SHP-001 §7.3).
+    //   CarrierFeeResult(Success, Fee, CurrencyCode, FailureCode, FailureKind, FailureMessage): khai ở SHP-001 §6.1 + bất biến theo D-129; IsEstimate/FailureReason ở tầng app.
+}
+
+/// Hợp đồng SHP-002 §6.1 — SHP-004 cài CẢ hai method cho GHTK (BR-017).
+public sealed class GhtkWebhookVerifier : IShipmentWebhookVerifier
+{
+    // VerifyAsync: IP ∈ WebhookAllowedIps → hash khớp WebhookHashToken → thiếu cấu hình ⇒ fail-closed (Accepted = false).
+    //   FailureReason ∈ ip_not_allowed · bad_token · not_configured (nhãn của SHP-002 §6.1).
+    // ParseAsync: hàm THUẦN (0 DB, 0 mạng), mã trạng thái thô nguyên văn (BR-011, BR-014).
+}
+
+/// ⭐ ĐỀ XUẤT — dùng cho job đối soát của SHP-002 (ADR-11). Chủ interface = SHP-002; SHP-001/SHP-002 chưa khai (F2).
+public interface ICarrierTrackingReader
 {
     string ProviderCode { get; }
-
-    /// BƯỚC BẮT BUỘC TRƯỚC KHI TẠO VẬN ĐƠN (BR-SHP-004-002).
-    /// KHÔNG gọi mạng ngoài — chỉ tra danh mục địa chỉ của hãng trong DB.
-    Task<AddressVerificationResult> VerifyAddressAsync(ShippingAddressInput address, CancellationToken ct = default);
-
-    Task<ShippingQuoteResult> GetQuoteAsync(ShippingQuoteRequest request, CancellationToken ct = default);
-
-    /// PHẢI idempotent theo ClientOrderCode: tra trước, chỉ tạo khi chưa có.
-    Task<CreateShipmentResult> CreateShipmentAsync(CreateShipmentRequest request, CancellationToken ct = default);
-
-    Task<bool> CancelShipmentAsync(string providerTrackingCode, string reason, CancellationToken ct = default);
-
-    /// ⭐ Dùng cho job đối soát của SHP-002 (vì webhook GHTK KHÔNG có HMAC — ADR-12).
     Task<CarrierTrackingSnapshot> GetTrackingAsync(string providerTrackingCode, CancellationToken ct = default);
 }
 
-/// Đầu vào địa chỉ — canonical là 2 CẤP, district là dẫn xuất (ADR-03/BR-SHP-004-003).
-public sealed record ShippingAddressInput(
-    string ProvinceNameOrCode,
-    string WardNameOrCode,
-    string? DistrictNameOrCode,      // ⚠️ DẪN XUẤT — không phải khoá định danh
-    string AddressLine,
-    string RecipientName,
-    string RecipientPhone);
-
-public enum AddressVerificationStatus { Verified = 0, Rejected = 1, Blocked = 2 }
-
-public sealed record AddressVerificationResult(
-    AddressVerificationStatus Status,
-    string? FailureCode,             // eCommerce:Shipping:0012 / 0013 / 0014
-    string? FailureReason,           // nhãn HỮU HẠN cho metric: "ward_not_found" · "district_required" · "catalogue_stale"
-    string? CatalogueVersion,
-    string? ProvinceProviderCode,
-    string? WardProviderCode,
-    string? DistrictProviderCodeUsed);
-
-public sealed record CreateShipmentRequest(
-    Guid OrderId,
-    string ClientOrderCode,
-    ShippingAddressInput Address,
-    decimal CodAmount,
-    string Currency,
-    decimal DeclaredValue,
-    int WeightInGrams,
-    int? LengthCm, int? WidthCm, int? HeightCm,
-    IReadOnlyList<ShipmentLineInput> Lines);
-
-public sealed record CreateShipmentResult(
-    bool Success,
-    bool WasDuplicate,               // ⭐ hãng báo đã tồn tại ⇒ dùng lại, KHÔNG phải lỗi (A1)
-    string? ProviderTrackingCode,
-    decimal? ShippingFeeAmount,
-    string? ShippingFeeCurrency,
-    string? FailureCode,
-    string? FailureReason);
-
-/// Job đồng bộ danh mục địa chỉ — DỮ LIỆU, không hard-code (ADR-04).
-public interface IAddressCatalogueSyncer
-{
-    /// Trả về phiên bản danh mục mới. Idempotent theo (ProviderCode, CatalogVersion).
-    Task<AddressCatalogueSyncResult> SyncAsync(string providerCode, CancellationToken ct = default);
-}
-
-public interface IShipmentSubmissionRepository : IRepository<ShipmentSubmission, Guid>
-{
-    Task<ShipmentSubmission?> FindLatestAsync(
-        string providerCode, string clientOrderCode, CancellationToken ct = default);
-
-    /// ⚠️ `UPDATE … WHERE Status = @expected` — trả về 0 ⇒ tầng trên PHẢI NÉM LỖI (BR-SHP-004-009).
-    Task<int> TryTransitionAsync(
-        Guid submissionId, ShipmentSubmissionStatus expected, ShipmentSubmissionStatus next,
-        string? failureCode, CancellationToken ct = default);
-}
+/// KHÔNG có trường địa chỉ (BR-007). CodAmount cùng kiểu decimal? với WebhookVerificationResult của SHP-002.
+public sealed record CarrierTrackingSnapshot(
+    string ProviderTrackingCode,
+    string ProviderStatusCode,        // mã thô nguyên văn (BR-011)
+    DateTime? ProviderOccurredAtUtc,
+    decimal? CodAmount,
+    string RawPayloadMasked);         // ⚠️ ĐÃ CHE (BR-010)
 ```
-
-**Method của `IShipmentAppService` (phần thuộc `SHP-004`)**
-
-| Method | Input (DTO) | Output (DTO) | Permission | Ghi chú |
-|---|---|---|---|---|
-| `CreateShipmentAsync` | `CreateShipmentInput` | `ShipmentDto` | `eCommerce.Shipping.Shipments.Create` | ⭐ chạy **pre-flight** bắt buộc; idempotent theo `ClientOrderCode` |
-| `VerifyAddressAsync` | `VerifyShippingAddressInput` | `AddressVerificationDto` | `eCommerce.Shipping.Shipments.Create` | cho UI kiểm tra **trước** khi bấm gửi (giảm lỗi cho CSKH) |
-| `GetQuoteAsync` | `GetShippingQuoteInput` | `ShippingQuoteDto` | `eCommerce.Shipping.Shipments.Create` | ⚠️ **tính vào quota** ⇒ có kiểm soát tần suất |
-| `CancelShipmentAsync` | `CancelShipmentInput` | `ShipmentDto` | `eCommerce.Shipping.Shipments.Cancel` | **bắt buộc** `Reason` + audit |
-| `SyncAddressCatalogueAsync` | `SyncAddressCatalogueInput` | `AddressCatalogueSyncResultDto` | `eCommerce.Shipping.AddressCatalogue.Sync` | dùng **cùng** code với job (không có đường logic thứ hai) |
-| `GetSubmissionsAsync` | `GetSubmissionsInput` | `PagedResultDto<ShipmentSubmissionDto>` | `eCommerce.Shipping.Shipments.View` | ⭐ màn hình điều tra "vì sao không tạo được vận đơn" |
-| `GetAddressPoliciesAsync` / `UpsertAddressPolicyAsync` | … | `CarrierAddressPolicyDto` | `.AddressPolicies.View` / `.Manage` | `IsFailClosed = false` cần **thêm** quyền `.Approve` |
 
 ### 6.2 REST endpoint
 
-| Method | Route | Auth | Permission | Mô tả |
-|---|---|---|---|---|
-| `POST` | `/api/app/shipping/shipments` | Bearer (OpenIddict) | `.Shipments.Create` | tạo vận đơn (chạy pre-flight) |
-| `POST` | `/api/app/shipping/shipments/verify-address` | Bearer | `.Shipments.Create` | kiểm tra địa chỉ **không** tạo vận đơn |
-| `POST` | `/api/app/shipping/shipments/quote` | Bearer | `.Shipments.Create` | tính phí |
-| `POST` | `/api/app/shipping/shipments/{id}/cancel` | Bearer | `.Shipments.Cancel` | huỷ (bắt buộc `Reason`) |
-| `GET` | `/api/app/shipping/shipments/{id}/submissions` | Bearer | `.Shipments.View` | nhật ký thử tạo vận đơn |
-| `POST` | `/api/app/shipping/address-catalogue/sync` | Bearer | `.AddressCatalogue.Sync` | đồng bộ danh mục địa chỉ hãng |
-| `GET` `PUT` | `/api/app/shipping/address-policies…` | Bearer | `.AddressPolicies.View/Manage` | chính sách địa chỉ theo hãng |
-| `POST` | `/api/shipping/webhooks/ghtk/{tenantCode}` | **`[AllowAnonymous]` CÓ CHỦ Ý** | — | ⚠️ **thuộc `SHP-002`** (`docs/features/shipping/shp-002-webhook-trang-thai-van-don.md:522`). `SHP-004` **chỉ** cài `ParseAsync` cho GHTK |
+**`SHP-004` không thêm endpoint nào.** Route do tài liệu khác sở hữu:
 
-**Request mẫu — tạo vận đơn (chỉ minh hoạ cấu trúc DTO của TA, KHÔNG phải payload GHTK)**
+| Method | Route | Thuộc | Ghi chú |
+|---|---|---|---|
+| `POST` | `/api/app/shipping/orders/{orderId}/shipments` · `/api/app/shipping/shipments/{id}/cancel` | `SHP-001` §6.2 (:581–582) | tạo/huỷ — gọi adapter ở Pha 2 |
+| `POST` | `/api/shipping/webhooks/ghtk/{tenantCode}` | `SHP-002` §6.2 | `[AllowAnonymous]` có chủ ý; `SHP-004` chỉ cài `VerifyAsync` + `ParseAsync` |
 
-```http
-POST /api/app/shipping/shipments HTTP/1.1
-Authorization: Bearer <token>
-X-Correlation-Id: (tùy chọn)
+**Cách phát lỗi:** `CreateShipmentAsync`/`CancelShipmentAsync`/`GetFeeAsync` **trả** mã qua `FailureCode` (ADR-13); chỉ `GetTrackingAsync` NÉM. Cột HTTP là mã `SHP-001`/`SHP-002` dùng khi chuyển lỗi thành phản hồi (hoặc khi `GetTrackingAsync` NÉM).
 
-{
-  "orderId": "…",
-  "clientOrderCode": "TENANT-A-ORD-1001",
-  "providerCode": "ghtk",
-  "address": {
-    "provinceNameOrCode": "…",
-    "wardNameOrCode": "…",
-    "districtNameOrCode": null,
-    "addressLine": "…",
-    "recipientName": "…",
-    "recipientPhone": "…"
-  },
-  "codAmount": 250000,
-  "currency": "VND",
-  "weightInGrams": 800
-}
-```
-
-> 🚨 **Cấu trúc payload GỬI SANG GHTK (tên trường `province`/`district`/`ward`, kiểu mã, endpoint) CHƯA ĐƯỢC KIỂM CHỨNG.**
-> Nguồn duy nhất trong repo là **mô tả gián tiếp** ở `docs/business-modules-proposal.md:546` — *"GHTK vẫn dùng payload 3 cấp (`province`/`district`/`ward`)"* — **không** có tài liệu API chính thức.
-> ⇒ **Chặn code**: xem **§15.1 Q1**. Không được viết `GhtkCarrierAdapter` dựa trên suy đoán.
-
-**Response mẫu (mọi nhánh)**
-
-| Nhánh | HTTP | Body |
-|---|---|---|
-| Tạo thành công | `200` | `{ "trackingCode": "…", "shippingFee": 22000, "wasDuplicate": false, "correlationId": "…" }` |
-| Đã tồn tại (A1/A5) | `200` | `{ "trackingCode": "…", "wasDuplicate": true, "correlationId": "…" }` |
-| Không xác minh được địa chỉ | `422` | `{ "error": { "code": "eCommerce:Shipping:0012", "message": "…" }, "correlationId": "…" }` |
-| Hãng bắt buộc `district` | `409` | `{ "error": { "code": "eCommerce:Shipping:0013" }, "correlationId": "…" }` |
-| Danh mục địa chỉ quá cũ | `503` | `{ "error": { "code": "eCommerce:Shipping:0014" }, "correlationId": "…" }` |
-
-**Mã lỗi nghiệp vụ** (`ShippingHubErrorCodes` — **module tự sở hữu**, kế thừa cách làm của `TaxErrorCodes` ở `modules/Tax/eCommerce.Tax.Domain/TaxErrorCodes.cs:10`).
-⚠️ **Dải `0001`–`0011` ĐÃ DÙNG ở `SHP-002`** (`docs/features/shipping/shp-002-webhook-trang-thai-van-don.md:565`–`575`) ⇒ `SHP-004` dùng **`0012`–`0021`**:
+**Mã lỗi nghiệp vụ** (`ShippingHubErrorCodes`, dải **`0401`–`0499`** — `D-114`; mã **kế thừa** không khai lại ở đây: `0101` hãng chưa cấu hình, `0102` địa chỉ không hợp lệ, `0103` hãng từ chối, `0105` chuyển trạng thái sai — `SHP-001` §6.3; `eCommerce:Messaging:0001` xung đột khoá — `MessagingErrorCodes.cs:14`):
 
 | Mã | HTTP | Khi nào | Thông điệp |
 |---|---|---|---|
-| `eCommerce:Shipping:0012` | `422` | ⭐ Thiếu/không khớp **phường/xã** (hoặc tỉnh) với danh mục địa chỉ hãng | `Địa chỉ giao hàng chưa xác minh được với hãng {provider}: {chiTiet}.` |
-| `eCommerce:Shipping:0013` | `409` | Hãng **yêu cầu cấp huyện** nhưng đơn chỉ có 2 cấp và không dẫn xuất được | `Hãng {provider} yêu cầu cấp quận/huyện; đơn chưa có dữ liệu này.` |
-| `eCommerce:Shipping:0014` | `503` | Danh mục địa chỉ hãng **quá cũ** (`> MaxCatalogueAgeDays`) ⇒ chặn (fail-closed) | `Danh mục địa chỉ của hãng {provider} đã cũ; cần đồng bộ trước khi gửi.` |
-| `eCommerce:Shipping:0015` | `400` | Trọng lượng/kích thước ngoài ngưỡng hãng | `Khối lượng hoặc kích thước vượt giới hạn của hãng {provider}.` |
-| `eCommerce:Shipping:0016` | `502` | Hãng trả `5xx`/timeout khi tính phí hoặc tạo vận đơn | `Hãng {provider} tạm thời không phản hồi; sẽ thử lại.` |
-| `eCommerce:Shipping:0017` | `409` | Cùng `ClientOrderCode` nhưng `PayloadHash` **khác** (xung đột khoá) | `Mã đơn gửi hãng đã tồn tại với nội dung khác — cần điều tra thủ công.` |
-| `eCommerce:Shipping:0018` | `400` | Thiếu dữ liệu bắt buộc để dựng payload (SKU chưa map, thiếu cân nặng) | `Đơn chưa đủ dữ liệu để tạo vận đơn: {chiTiet}.` |
-| `eCommerce:Shipping:0019` | `409` | Chuyển trạng thái `Submission` không hợp lệ · `UPDATE` **0 dòng** | `Không thể chuyển yêu cầu gửi hàng từ {from} sang {to}.` |
-| `eCommerce:Shipping:0020` | `502` | Token/`PartnerCode` của hãng sai/hết hạn | `Xác thực với hãng {provider} thất bại — kiểm tra cấu hình.` |
-| `eCommerce:Shipping:0021` | `409` | Huỷ vận đơn ở trạng thái hãng không cho huỷ | `Hãng {provider} không cho huỷ vận đơn ở trạng thái hiện tại.` |
-| `eCommerce:Shipping:0007` | `400` | *(kế thừa `SHP-002`)* hãng chưa được cấu hình — **fail-closed** | `Hãng vận chuyển {provider} chưa được cấu hình.` |
+| `eCommerce:Shipping:0401` (`GhtkVuotGioiHan`) | `400` | Cân/COD/số lượng/độ dài `ClientOrderCode` vượt giới hạn GHTK, hoặc số lượng lẻ không đổi được sang payload (không làm tròn) | `Đơn vượt giới hạn của hãng {provider}: {chiTiet}.` |
+| `eCommerce:Shipping:0402` (`GhtkXacThucThatBai`) | `502` | Token/`PartnerCode` sai/hết hạn (401/403): tạo/huỷ/tính phí ⇒ trả `Configuration`; tra trạng thái ⇒ NÉM | `Xác thực với hãng {provider} thất bại — kiểm tra cấu hình.` |
+| `eCommerce:Shipping:0403` (`GhtkKhongChoHuy`) | `409` | Hãng không cho huỷ vận đơn ở trạng thái hiện tại | `Hãng {provider} không cho huỷ vận đơn ở trạng thái hiện tại.` |
+| `eCommerce:Shipping:0404` (`GhtkKhongPhanHoi`) | `502` | `5xx`/timeout khi **tính phí** (trả kết quả lỗi mềm `Transient`, không ném) hoặc **tra trạng thái** (NÉM); đường tạo/huỷ trả `FailureKind = Transient`, không ném | `Hãng {provider} tạm thời không phản hồi.` |
 
-> 📌 Ghi rõ: mã `0017` **trùng tình huống** với `eCommerce:Messaging:0002` của `XC-002`. Cách xử lý đã chốt ở `SHP-002` §6.2 (mã `0011`): **khi `XC-002` đã được triển khai thì dùng mã của `XC-002`** để không có hai định nghĩa cho một tình huống (bài học `XC-003` F2). ⚠️ `XC-002` **chưa có trong code** (§15.2 F4).
+Số kế hoạch `0012`–`0021` của v0.1 **bỏ**: `0012`/`0013`/`0014` ⇒ `0102` (+ `Address:05xx`); `0016` ⇒ `0404`/`Transient`; `0017` ⇒ `eCommerce:Messaging:0001`; `0018` ⇒ `0107`/`0110` của `SHP-001`; `0019` ⇒ `0105`; `0015`/`0020`/`0021` ⇒ `0401`/`0402`/`0403`.
 
 ### 6.3 Cấu hình (đề xuất) — **không hard-code endpoint hãng** (`BR-SHP-004-005`)
 
 ```jsonc
 {
   "ShippingHub": {
-    "DefaultLockTimeoutSeconds": 10,
+    // Timeout, MaxRetries, SubmitRetryPeriodSeconds, MaxSubmitAttempts: dùng CHUNG của SHP-001 §6.4 (không lặp ở đây).
     "Providers": {
       "ghtk": {
-        // ⚠️ CHƯA KIỂM CHỨNG — §15 Q1. KHÔNG commit giá trị thật.
-        "ApiBaseUrl": "",
+        // ⚠️ CHƯA KIỂM CHỨNG — §15 Q1. KHÔNG commit giá trị thật. Token đọc từ secret ngoài repo.
+        // KHÔNG có khoá "Enabled" (cờ bật hãng = ShpCarriers.IsEnabled) và KHÔNG có "AddressModel" (nguồn duy nhất = ShpCarriers.AddressModel) — ADR-03.
+        "BaseUrl": "",
         "ApiToken": "",
         "PartnerCode": "",
-        "EnableLiveCalls": false,          // ADR-10: khuôn ShopeeOptions.EnableLiveCalls
-        "TimeoutSeconds": 10,
-        "MaxRetries": 3,
-        "MaxSubmissionAttempts": 5,        // trần AttemptCount của submission
-        "AddressCatalogueSyncPeriodSeconds": 86400,   // 1 ngày
-        "MaxCatalogueAgeDays": 30,         // quá ngưỡng ⇒ CHẶN (0014)
-        "AddressLevelMode": "Both",        // TwoLevel | ThreeLevel | Both
-        "RequiresDistrict": true,          // ⚠️ mặc định TRUE cho tới khi GHTK xác nhận (fail-closed)
-        "MaxCodAmount": 50000000,
-        "MaxWeightInGrams": 50000
+        "EnableLiveCalls": false,            // ADR-09: khuôn ShopeeOptions.EnableLiveCalls
+        "FromAddress": {                     // địa chỉ lấy hàng — DỮ LIỆU THEO HÃNG, cùng khuôn SHP-001 §6.4 (CarrierAddress). Thiếu/không đủ cấp ⇒ Configuration + 0101 (BR-013)
+          "Name": "", "Phone": "", "AddressLine": "",
+          "ProvinceCode": "", "DistrictCode": "", "WardCode": ""
+        },
+        "DefaultServiceId": "",              // mã dịch vụ mặc định — GHTK có cần không: CHƯA xác minh (Q1); nếu cần ⇒ thêm vào danh sách bắt buộc của BR-013
+        "WebhookHashToken": "",              // 🔒 secret ngoài repo: giá trị `hash` GHTK gắn trên URL webhook (BR-017) — cách GHTK cấp/theo tenant: CHƯA xác minh (Q1)
+        "WebhookAllowedIps": [],             // IP nguồn webhook GHTK — CHƯA xác minh (Q1); rỗng ⇒ VerifyAsync fail-closed "not_configured"
+        "ClientOrderCodeMaxLength": 0,       // 0 = CHƯA biết giới hạn ⇒ KHÔNG dùng làm ngưỡng; EnableLiveCalls=true mà còn 0 ⇒ 0101 (BR-013, D-109 ≤ 43 ký tự)
+        "MaxCodAmount": 50000000,            // mặc định đề xuất, CHƯA xác minh (R3-1) — ABP Setting theo P8 của D-114
+        "MaxWeightInGrams": 50000            // như trên
       }
     }
   }
 }
 ```
+
+> 🚨 Cấu trúc payload GỬI SANG GHTK (tên trường `province`/`district`/`ward`, tên hay mã, endpoint) **CHƯA được kiểm chứng**: nguồn duy nhất trong repo là mô tả gián tiếp `docs/business-modules-proposal.md:546`. Theo `D-114` (R2 `SHP-004-Q4`) payload mang **tên snapshot nguyên văn**; nếu Q1 xác nhận GHTK cần **mã**, mã hãng đã có sẵn trong `CarrierAddress.*Code`. ⇒ **Chặn code** `GhtkCarrierProvider` thật: xem Q1.
 
 ---
 
@@ -583,45 +346,30 @@ X-Correlation-Id: (tùy chọn)
 
 ### 7.1 Sự kiện phát ra (ETO)
 
-| ETO | Khi nào | Trường bắt buộc | Ghi chú |
-|---|---|---|---|
-| `ShipmentCreatedEto` | Submission `→ Created` | `TenantId`, `OrderId`, `ShipmentId`, `ProviderCode`, `ProviderTrackingCode`, `ShippingFeeAmount`, `Currency`, `AddressCatalogueVersion`, `CorrelationId` | ⚠️ **`OrderId` là id, không navigation** — module **cấm** tham chiếu app |
-| `ShipmentCreationFailedEto` | Submission `→ Failed`/`Abandoned` | `TenantId`, `OrderId`, `ProviderCode`, `FailureCode`, `AttemptCount`, `CorrelationId` | để `NOT-002` cảnh báo CSKH |
-| `CarrierAddressCatalogueSyncedEto` | Job đồng bộ xong | `ProviderCode`, `CatalogueVersion`, `RowCount`, `SyncedAtUtc` | cho vận hành biết danh mục đã cập nhật |
-
-> 🚨 **ĐIỀU KIỆN TIÊN QUYẾT:** mọi ETO **phải** phát qua **outbox** với `useOutbox: true` trong UoW
-> (`XC-002` BR-001; `docs/features/shipping/shp-002-webhook-trang-thai-van-don.md:638`–`639` ghi cùng cảnh báo cho `SHP-002`).
-> ⚠️ **Outbox CHƯA được bật trong code hiện tại** — đã kiểm: **0** chỗ có `IHasEventOutbox`/`IHasEventInbox`/`ConfigureEventOutbox`,
-> **0** chỗ cấu hình `AbpDistributedEventBusOptions` (grep toàn repo). Xem **§15.2 F4**.
+**`SHP-004` không phát ETO** (BR-008). `ShipmentCreatedEto`/`ShipmentCreationFailedEto` do `SHP-001` §7.1 phát qua outbox cùng transaction ở Pha 3. Outbox **đã bật** (`src/eCommerce.EntityFrameworkCore/eCommerceEntityFrameworkCoreModule.cs:86-87`).
 
 ### 7.2 Sự kiện / webhook **nhận vào**
 
 | Nguồn | Loại | **Xác thực** | Chống trùng bằng | Nếu xử lý lỗi? | Thuộc |
 |---|---|---|---|---|---|
-| **GHTK** (trạng thái vận đơn) | `webhook` | 🚨 **KHÔNG có HMAC** — chỉ `hash` trên URL + IP allowlist + tenant theo path (`docs/business-modules-proposal.md:547`) | `UNIQUE (TenantId, ProviderCode, ProviderEventId)` + `IIdempotencyGuard` | lưu `ShipmentEvents` + `FailureCode`, log `Warning`, metric, **job nhặt lại** | ⚠️ **`SHP-002`** — `SHP-004` chỉ cài `ParseAsync` |
-| **Job đồng bộ danh mục địa chỉ** | `schedule` | nội bộ | `UNIQUE (ProviderCode, CatalogueVersion, Level, ProviderCodeValue)` | thử lại nhịp sau; **0** dòng ⇒ ném lỗi | ✅ `SHP-004` |
-| **Job thử lại submission** | `schedule` | nội bộ | `UPDATE … WHERE Status = Failed` + tra `ClientOrderCode` **trước** | `AttemptCount++`; vượt trần ⇒ `Abandoned` + cảnh báo | ✅ `SHP-004` |
-| **Người dùng bấm tạo vận đơn** | `http` | Bearer + permission | `UNIQUE (TenantId, ProviderCode, ClientOrderCode, AttemptNo)` | ném lỗi có mã; **không** nuốt | ✅ `SHP-004` |
+| **GHTK** (trạng thái vận đơn) | `webhook` | 🚨 **KHÔNG có HMAC** — `hash` trên URL + IP allowlist + tenant theo path (`docs/business-modules-proposal.md:547`) | `UNIQUE (TenantId, ProviderCode, ProviderEventId)` + `IIdempotencyGuard` (`SHP-002` §7.2) | `SHP-002` lưu sự kiện + `FailureCode`, job nhặt lại | ⚠️ **`SHP-002`** sở hữu luồng; `SHP-004` cài `VerifyAsync` (hash + IP allowlist, BR-017) + `ParseAsync` (hàm thuần) |
+| **`SHP-001` Pha 2** | gọi nội bộ | tin cậy nội bộ | `ClientOrderCode` (`D-109`) + unique `(TenantId, ProviderCode, ClientOrderCode)` ở DB | adapter trả `FailureKind`, `SHP-001` ghi attempt | adapter (kết quả) |
+| **Job đối soát `SHP-002`** | gọi nội bộ | tin cậy nội bộ | chỉ đọc (GET), không ghi | `0404` ⇒ job thử nhịp sau | `GetTrackingAsync` |
 
 ### 7.3 Gọi API **ra ngoài**
 
 | NCC | Endpoint (base URL) | Auth | Timeout | Retry | Nếu thất bại |
 |---|---|---|---|---|---|
-| **GHTK** | `ShippingHub:Providers:ghtk:ApiBaseUrl` (**cấu hình**, **cấm** hard-code — `BR-SHP-004-005`) | token/`PartnerCode` theo tài liệu GHTK — 🔴 **CHƯA KIỂM CHỨNG** | **10 s** (cấu hình) | **3** lần + backoff cho **GET**; ⚠️ **KHÔNG** retry mù `POST` tạo vận đơn (xem dưới) | ghi `FailureCode`/`FailureReason`; `AttemptCount++`; **thử lại nhịp sau**; **KHÔNG** rollback dữ liệu đã ghi; metric `carrier_submission_failed_total` |
+| **GHTK** | `ShippingHub:Providers:ghtk:BaseUrl` (**cấu hình**, **cấm** hard-code — BR-005) | token/`PartnerCode` theo tài liệu GHTK — 🔴 **CHƯA KIỂM CHỨNG** (Q1) | `CallTimeoutSeconds` = **10 s** (`SHP-001` §6.4) | `GET`: ≤ `MaxRetries` (3) + backoff; ⚠️ **`POST` tạo vận đơn: KHÔNG retry** (BR-015) | tạo/huỷ/tính phí: **trả** `FailureKind` + `FailureCode` (ADR-13), `SHP-001` ghi attempt; tra trạng thái: NÉM `0404`/`0402`; metric `shipping_carrier_call_failed_total{provider,reason}` (`reason` theo `SHP-001` §13: `timeout`/`transient`/`business`/`not_configured`/`invalid_address`) |
 
-> 🚨 **Khác biệt sống còn giữa `GET` và `POST`:** `GET` (tính phí, tra trạng thái, tra theo `ClientOrderCode`) **an toàn** để retry.
-> `POST` tạo vận đơn **không** an toàn để retry mù — nếu hãng đã tạo nhưng response mất, retry mù có thể sinh **vận đơn thứ hai**.
-> ⇒ `SHP-004` **bắt buộc** dùng trình tự **"tra trước – tạo sau"** (`BR-SHP-004-006`) và **coi** `ClientOrderCode` là **hợp đồng** với hãng.
-> ⚠️ **Chưa kiểm chứng**: GHTK có hỗ trợ `ClientOrderCode` như một khoá chống trùng ở phía hãng hay không (§15 Q3).
+> 🚨 `GET` (tính phí, tra trạng thái, tra theo `ClientOrderCode`) an toàn để retry; `POST` tạo vận đơn **không** — hãng có thể đã tạo mà response mất. ⇒ trình tự **"tra trước – tạo sau"** (BR-006). ⚠️ **Chưa kiểm chứng**: GHTK có coi `ClientOrderCode` là khoá chống trùng phía hãng hay không (Q3) và có API tra theo mã hay không (§15.3 giả định 2/3).
 
 **Idempotency key**
 
 | Đối tượng | Cách sinh khoá | ⚠️ Lưu ý |
 |---|---|---|
-| Tạo vận đơn | `ClientOrderCode = "{tenantCode}-{orderNumber}"` + `IdempotencyKey = "Ghtk:Create:{tenantId}:{orderId}:{attemptNo}"` | ⭐ **ỔN ĐỊNH** qua retry; **cấm** `Guid.NewGuid()` (`XC-002` BR-007) |
-| Đồng bộ danh mục địa chỉ | `"Ghtk:AddressSync:{providerCode}:{catalogueVersion}"` | chạy lại **cùng** version ⇒ **không** nhân bản dòng |
-| Job thử lại submission | `"Ghtk:Retry:{tenantId}:{runId}"` với `runId = yyyyMMddHHmm` | cùng kỳ chạy lại ⇒ không xử lý 2 lần |
-| Webhook trạng thái (thuộc `SHP-002`) | `"Webhook:ghtk:{ProviderEventId}"` | ⚠️ GHTK có cấp `ProviderEventId` **ổn định** không — **chưa kiểm chứng** (`SHP-002` §15 Q1/Q6) |
+| Tạo vận đơn | `ClientOrderCode = TaoClientOrderCode(orderId, generation)` (`D-109`) + guard `Create:{tenantId}:{orderId}:{generation}:{attemptNo}` (`SHP-001` §7.3) | ⭐ **ỔN ĐỊNH** qua retry; **cấm** `Guid.NewGuid()` (`XC-002` BR-007); adapter **không** sinh khoá |
+| Webhook trạng thái (thuộc `SHP-002`) | `Webhook:ghtk:{ProviderEventId}` | ⚠️ GHTK có cấp `ProviderEventId` **ổn định** không — **chưa kiểm chứng** (`SHP-002` Q1) |
 
 ---
 
@@ -631,53 +379,30 @@ X-Correlation-Id: (tùy chọn)
 
 | # | Bất biến | Cơ chế bảo vệ |
 |---|---|---|
-| 1 | ⭐ **Không** vận đơn nào được tạo khi địa chỉ **chưa** xác minh | Pre-flight **fail-closed** (`BR-SHP-004-002`) **+ CHECK constraint** ở DB (`Status <> Created OR AddressVerificationStatus = Verified`) + `TC-03`/`TC-21` |
-| 2 | **Đúng một** vận đơn cho một `ClientOrderCode` trong một tenant+hãng | **UNIQUE `NULLS NOT DISTINCT`** `(TenantId, ProviderCode, ClientOrderCode, AttemptNo)` + tra trước khi tạo |
-| 3 | `district` **không** là khoá định danh | Review + `BR-SHP-004-003` + test `TC-08` |
-| 4 | Danh mục địa chỉ hãng **luôn** có version + `SyncedAtUtc`; **không** hard-code | `BR-SHP-004-004` + test grep `TC-19` |
-| 5 | **Không** có chuyển trạng thái submission ngầm | Setter **private**; mọi đổi qua guard §3; `Created` là **hấp thụ** |
-| 6 | Chuyển trạng thái đồng thời: **đúng 1** thắng; `0` dòng ⇒ **NÉM LỖI** | `TryTransitionAsync` (`UPDATE … WHERE Status = @expected`) + `RowVersion` |
-| 7 | **0** token/payload thô nhạy cảm trong DB/log | `MaskSensitiveData` trước khi lưu **và** trước khi log + test quét `TC-11` |
-| 8 | Tiền **luôn** `decimal`, **so bằng minor units** | `BR-SHP-004-011` + test `TC-09` |
-| 9 | Cách ly tenant | `IMultiTenant` + query filter + `ICurrentTenant` + unique index có `TenantId` (**`NULLS NOT DISTINCT`**) |
-| 10 | Hãng **chưa** cấu hình **hoặc** danh mục quá cũ ⇒ **fail-closed** | `0007`/`0014` — **cấm** mặc định chấp nhận |
-| 11 | Metric **không** dùng để ra quyết định nghiệp vụ | Review (kế thừa `XC-005` §7) |
+| 1 | ⭐ **Không** có lời gọi tạo vận đơn GHTK khi địa chỉ thiếu mã hãng bắt buộc | Kiểm ở `SHP-001` (cửa mã fail-closed) **và** ở adapter (BR-002) — `TC-02`/`TC-03` |
+| 2 | **Đúng một** vận đơn cho một `ClientOrderCode` trong một tenant+hãng | UNIQUE `NULLS NOT DISTINCT` của `SHP-001` §5.2 + tra trước khi POST (BR-006) |
+| 3 | `district` **không** là khoá, không tự suy ra | BR-003 + `TC-04` |
+| 4 | `SHP-004` **không** có nguồn địa chỉ hãng thứ hai | BR-004 + `TC-05` |
+| 5 | **0** token/`PartnerCode`/SĐT/địa chỉ/tên người nhận nguyên văn trong DB/log | hàm che riêng của adapter (BR-010) trước lưu **và** log + `TC-12` |
+| 6 | Tiền **luôn** `decimal`, ra biên hãng là số nguyên | BR-009 + `TC-11` |
+| 7 | Adapter **không ghi DB** | BR-008 + `TC-10` |
+| 8 | Hãng **chưa** cấu hình ⇒ **fail-closed** | trả `Configuration` + `0101` — **cấm** mặc định chấp nhận (`TC-15`) |
+| 9 | Metric **không** dùng để ra quyết định nghiệp vụ | Review (`XC-005` §7) |
+| 10 | Sau khi `SHP-001` commit `Submitting`, adapter **không NÉM** lỗi nghiệp vụ/cấu hình (không kẹt `Submitting`) | BR-018 + `TC-29` |
+| 11 | Webhook GHTK **không** được nhận khi sai `hash`/IP hoặc thiếu cấu hình | BR-017 + `TC-25`…`TC-27` |
 
 ### 8.2 Xử lý đồng thời
 
-| # | Tình huống | Cơ chế |
+Adapter **không giữ trạng thái và không khoá** (ADR-07). Mọi tình huống đồng thời thuộc `SHP-001` §8.2:
+
+| # | Tình huống | Cơ chế (chủ) |
 |---|---|---|
-| 1 | **2 người cùng bấm "Tạo vận đơn"** cho cùng đơn | Khoá `ecommerce:shipping:submission:{tenantId}:{orderId}` (30 s) ⇒ 1 thắng; người thua **chờ** rồi đọc lại submission ⇒ trả vận đơn đã có (A5) |
-| 2 | **Job thử lại chạy trên nhiều instance** | Khoá `ecommerce:shipping:submission-retry:ghtk:{tenantId}` + `SkipIfBusy` + log + metric `lock_skipped_total{module="shipping"}` |
-| 3 | **2 instance đồng bộ danh mục địa chỉ cùng lúc** | Khoá `ecommerce:shipping:address-sync:ghtk` + `SkipIfBusy`; chốt cuối là **unique index** `(ProviderCode, CatalogueVersion, Level, ProviderCodeValue)` |
-| 4 | **Danh mục địa chỉ đổi version trong lúc đang xác minh** | Submission **chụp lại** `AddressCatalogueVersion` đã dùng (A3) ⇒ truy vết được; pre-flight đọc **một** version trong suốt request |
-| 5 | **Người dùng xác minh địa chỉ trong khi job vừa đổi danh mục** | Pre-flight đọc `CatalogueVersion` hiện hành **một lần** vào đầu request (snapshot) — kế thừa cách xử lý setting của `XC-001` §8.2 |
-| 6 | **Hãng đã tạo vận đơn nhưng response mất** | ⭐ **"Tra trước – tạo sau"** (`BR-SHP-004-006`); nếu cả tra cũng lỗi ⇒ `Failed` + cảnh báo, **không** đoán |
-| 7 | **Redis chết** | `AbortOnConnectFail = false` **đã sửa** (`src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs:141`) ⇒ app **vẫn chạy**, **mất** tính tuần tự của job. Chốt cuối vẫn là **unique index + CHECK constraint** ở DB (`XC-003` D2) |
-| 8 | **2 đơn khác nhau, cùng `orderNumber` ở 2 tenant** | `ClientOrderCode` có `tenantCode`; unique index có `TenantId` ⇒ hợp lệ |
+| 1 | 2 người cùng bấm "Tạo vận đơn" | Pha 1 + `23505` + khoá `shipping:shipment-create:{tenantId}:{orderId}` (`SHP-001` §8.2 #1; **không** tiền tố `ecommerce:` — `D-82`) |
+| 2 | Job thử lại chạy nhiều instance | `shipping:submit-retry:{tenantId}` + `SkipIfBusy` (`SHP-001` §8.2 #3) |
+| 3 | Hãng đã tạo nhưng response mất | adapter **tra trước – tạo sau** (BR-006); tra cũng lỗi ⇒ `Transient`, không đoán |
+| 4 | Redis chết | `AbortOnConnectFail = false`; hàng rào cuối là UNIQUE ở DB (`SHP-001` §8.2 #7) |
 
-**Khoá phân tán dùng trong feature** *(liệt kê chính xác tên khoá — quy tắc 6 của `docs/design-doc-guidelines.md:116`)*
-
-| Tên khoá | Hàm sinh khoá | Phạm vi | Vì sao cần | TTL đề xuất |
-|---|---|---|---|---|
-| `ecommerce:shipping:submission:{tenantId}:{orderId}` | `ShippingHubLockKeys.CarrierSubmission(providerCode, tenantId, orderId)` | theo đơn + hãng | chống 2 luồng cùng gọi API tạo vận đơn cho 1 đơn | **30 s** |
-| `ecommerce:shipping:submission-retry:ghtk:{tenantId}` | `ShippingHubLockKeys.SubmissionRetry(providerCode, tenantId)` | theo hãng + tenant | chống job thử lại chạy chồng | **120 s** |
-| `ecommerce:shipping:address-sync:ghtk` | `ShippingHubLockKeys.AddressCatalogueSync(providerCode)` | theo hãng (hạ tầng) | chống 2 instance cùng đồng bộ danh mục | **600 s** |
-| `ecommerce:shipping:carrier-config:ghtk` | `ShippingHubLockKeys.CarrierConfig(providerCode)` | theo hãng (hạ tầng) | chống 2 admin sửa chính sách địa chỉ cùng lúc | **30 s** |
-
-> 📌 **Đoạn `<module>` = `shipping`** — khớp bảng ánh xạ module → đoạn khoá của `XC-003` §5.
-> Hàm sinh khoá nằm ở **`ShippingHubLockKeys`** (module sở hữu) — **cấm** viết literal trong code nghiệp vụ (`XC-003` BR-001).
->
-> 🚨 **XUNG ĐỘT TIỀN TỐ KHOÁ VẪN CHƯA ĐƯỢC GIẢI QUYẾT (kế thừa `SHP-002` §15.2 F3):**
-> `AbpDistributedLockOptions.KeyPrefix` **đã** là `"ecommerce:"` (`src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs:127`)
-> và ABP ghép `KeyPrefix + name` **KHÔNG** có dấu phân cách (comment tại `:119` nói rõ).
-> Trong khi đó code hiện tại **mâu thuẫn**: `ChannelHubConsts.LockKeys.ChannelTokenRefresh` sinh **không** có tiền tố
-> (`modules/ChannelHub/eCommerce.ChannelHub.Domain/ChannelHubConsts.cs:23`) còn `TaxLockKeys.Classification`
-> và `eCommerceConsts.LockKeys.InventorySku` sinh **có** (`modules/Tax/eCommerce.Tax.Domain/TaxErrorCodes.cs:46`;
-> `src/eCommerce.Domain.Shared/eCommerceConsts.cs:104`).
-> ⇒ **Ít nhất một** quy ước đang tạo khoá **SAI** (hoặc tiền tố đôi `ecommerce:ecommerce:…`, hoặc khoá thiếu tiền tố).
-> **Quyết định cho `SHP-004`:** theo **`SHP-002`** — dùng dạng **CÓ** `ecommerce:` (đúng `BR-002` văn bản của `XC-003`), và
-> **coi việc chốt quy ước là điều kiện tiên quyết** (§15.1 Q5, §15.2 F3). **Chưa** chạy `redis-cli MONITOR` để xác minh.
+**Khoá phân tán dùng trong feature:** **không có** khoá riêng của `SHP-004`. Tên khoá (`ShippingHubLockKeys`) khai ở `SHP-001` §8.2.
 
 **Idempotency key:** xem §7.3.
 
@@ -685,47 +410,27 @@ X-Correlation-Id: (tùy chọn)
 
 ## 9. Phân quyền
 
-| Permission | Nhóm | Method được gán | Vai trò mặc định | Ghi chú |
+`SHP-004` **không thêm permission** — adapter không phải điểm vào của người dùng.
+
+| Permission | Nhóm | Method được gán | Chủ | Ghi chú |
 |---|---|---|---|---|
-| `eCommerce.Shipping.Shipments.View` | Shipping | `GetSubmissionsAsync`, tra cứu vận đơn | CSKH, kế toán, quản trị | **chỉ đọc** |
-| `eCommerce.Shipping.Shipments.Create` | Shipping | `CreateShipmentAsync`, `VerifyAddressAsync`, `GetQuoteAsync` | CSKH | ⚠️ gọi API hãng ⇒ **tốn quota** ⇒ cần kiểm soát |
-| `eCommerce.Shipping.Shipments.Cancel` | Shipping | `CancelShipmentAsync` | CSKH trưởng | **bắt buộc** `Reason` + audit |
-| `eCommerce.Shipping.AddressCatalogue.Sync` | Shipping | `SyncAddressCatalogueAsync` | quản trị/vận hành | tốn quota + ảnh hưởng **mọi** lần xác minh địa chỉ |
-| `eCommerce.Shipping.AddressPolicies.View` | Shipping | `GetAddressPoliciesAsync` | quản trị, kiến trúc | |
-| `eCommerce.Shipping.AddressPolicies.Manage` | Shipping | `UpsertAddressPolicyAsync` | **kiến trúc trưởng** | ⚠️ đổi `AddressLevelMode`/`RequiresDistrict` ⇒ ảnh hưởng **mọi** vận đơn ⇒ audit |
-| `eCommerce.Shipping.AddressPolicies.Approve` | Shipping | duyệt `IsFailClosed = false` | **kiến trúc trưởng** | ⭐ nới fail-closed là **quyết định rủi ro** ⇒ phải có người duyệt riêng |
+| `eCommerce.Shipping.Shipments.Create` / `.Cancel` / `.Estimate` / `.View` | Shipping | `CreateShipmentAsync`, `CancelShipmentAsync`, `Estimate*`, `Get*` | `SHP-001` §9 | tạo/tính phí gọi adapter ⇒ **tốn quota** GHTK (Q7) |
 
-📌 **Bắt buộc làm theo ABP (đã kiểm chứng ở Phase 0):** app service **không** tự được bảo vệ ⇒ **`[Authorize]` ở cấp CLASS**
-(`src/eCommerce.Application/Channels/ChannelAppService.cs:27`), và **mọi** permission **phải** được khai trong
-`eCommercePermissionDefinitionProvider` (`src/eCommerce.Application.Contracts/Permissions/eCommercePermissionDefinitionProvider.cs:23`)
-— nếu không ⇒ **`403` cho mọi người, kể cả admin**.
+📌 `[Authorize]` ở **cấp CLASS** và khai permission ở `eCommercePermissionDefinitionProvider` (`src/eCommerce.Application.Contracts/Permissions/eCommercePermissionDefinitionProvider.cs`) do `SHP-001` làm; hiện **chưa** có nhóm Shipping (⬜ kế hoạch).
 
-> ⚠️ **Hiện trạng đã kiểm:** `eCommercePermissionDefinitionProvider` **chưa** có permission nào của Shipping
-> (chỉ có Products, Inventory, Channels, Orders, Payments, Tax — đọc `:28`–`:59`). ⇒ `SHP-004` **phải** thêm nhóm Shipping.
-
-**Cấu hình hãng** (`ShippingHub:Providers:ghtk:*`) nằm ở `appsettings` — **không** phải DB ⇒ đổi là **thay đổi hạ tầng**,
-có audit ở tầng deploy (giống lập luận của `SHP-002` §9). **Chính sách địa chỉ** thì **là dữ liệu** ⇒ có permission + duyệt + audit.
-
-**Ngoại lệ allowlist:** endpoint webhook **thuộc `SHP-002`**, không phải `SHP-004` (`docs/features/shipping/shp-002-webhook-trang-thai-van-don.md:769`–`777`).
+**Cấu hình hãng** (`ShippingHub:Providers:ghtk:*`) nằm ở `appsettings`/secret — đổi là **thay đổi hạ tầng**, có audit ở tầng deploy. **Chính sách địa chỉ** là `ShpCarriers.AddressModel` — thuộc quyền `.Carriers.Manage` của `SHP-001` (đổi ⇒ audit). Endpoint webhook (`[AllowAnonymous]`) thuộc `SHP-002`.
 
 ---
 
 ## 10. UI Mockup & mapping dữ liệu
 
-**Không có UI riêng** — màn hình xử lý đơn/vận đơn thuộc `WEB-001` (khung + menu + phân quyền). Tài liệu này
-**chốt dữ liệu** mà UI **phải** hiển thị để CSKH không bị "lỗi im lặng".
+**Không có UI riêng** — màn hình vận đơn thuộc `WEB-001`/`SHP-001`. Dữ liệu UI **phải** hiển thị để CSKH không bị "lỗi im lặng":
 
-| Vùng UI | Thành phần | Dữ liệu | Nguồn | Quy tắc |
-|---|---|---|---|---|
-| **Nút "Tạo vận đơn"** | nút + trạng thái | `AddressVerification.Status` | `VerifyAddressAsync` | ⭐ **phải** hiển thị trạng thái xác minh **trước** khi cho bấm; nút **bị chặn** khi `Rejected`/`Blocked` — **không** để người dùng bấm rồi nhận lỗi |
-| **Khối địa chỉ** | form | `ProvinceNameOrCode`, `WardNameOrCode`, `DistrictNameOrCode?`, `AddressLine` | DTO nội bộ | ⭐ **phải** hiển thị nhãn *"2 cấp (không có quận/huyện)"* khi `DistrictNameOrCode` rỗng, **không** để trống gây hiểu nhầm là thiếu dữ liệu |
-| **Cảnh báo danh mục địa chỉ** | banner vàng | `MaxCatalogueAgeDays` vs `SyncedAtUtc` | `AddressPolicies` | hiển thị *"danh mục địa chỉ hãng đồng bộ lúc {thoiDiem}"*; khi gần quá ngưỡng ⇒ **cảnh báo trước** |
-| **Chi tiết submission** | timeline **chỉ đọc** | mọi `ShpShipmentSubmissions` của đơn | `SubmissionDto` | **không** có nút Sửa/Xóa; hiện **rõ** `AddressRejected`/`AddressBlocked` khác màu để người dùng hiểu **không phải** lỗi hệ thống |
-| **Phí vận chuyển** | số tiền | `ShippingFeeAmount` + `ShippingFeeCurrency` | `GetQuoteAsync` | format theo locale (`vi-VN`), VND **0 chữ số thập phân** (`XC-001` §10); **so** với phí dự kiến của đơn bằng **minor units** |
-| **Màn hình chính sách địa chỉ** | bảng + form | `ShpCarrierAddressPolicies` | API | chỉ **kiến trúc trưởng** thấy; nút nới `IsFailClosed` **phải** có cảnh báo đỏ *"nới fail-closed nghĩa là chấp nhận gửi vận đơn tới địa chỉ chưa xác minh"* |
-
-> 📌 **Ghi rõ điểm dễ bị coi là bug:** với đơn chỉ có **2 cấp**, `district` **rỗng là ĐÚNG** — UI **không** được đánh dấu
-> trường này là "thiếu". Đây là hệ quả trực tiếp của việc bỏ cấp huyện từ **01/07/2025** (`docs/business-modules-proposal.md:509`).
+| Vùng UI | Dữ liệu | Nguồn | Quy tắc |
+|---|---|---|---|
+| **Lỗi tạo vận đơn** | `0102` + `InnerErrorCode` (`Address:0502`…) | `SHP-001` | ⭐ **phải** hiện lý do bằng chữ ("ánh xạ địa chỉ GHTK chưa xác minh") — không để người dùng thấy lỗi chung |
+| **Khối địa chỉ** | tỉnh/(huyện)/xã snapshot | snapshot đơn | với đơn **2 cấp**, `district` **rỗng là ĐÚNG** — **không** đánh dấu "thiếu"; hiện nhãn *"2 cấp (không có quận/huyện)"* (hệ quả bỏ cấp huyện 01/07/2025 — `docs/business-modules-proposal.md:509`) |
+| **Phí vận chuyển** | `ShippingFee` + currency | `GetFeeAsync` | định dạng `vi-VN`, VND **0 chữ số thập phân** (`XC-001` §10); so với phí dự kiến bằng `Money` |
 
 ---
 
@@ -733,46 +438,37 @@ có audit ở tầng deploy (giống lập luận của `SHP-002` §9). **Chính
 
 | Mục | Nội dung |
 |---|---|
-| **Module mới** | ⚠️ **Chưa có trong code.** Phải tạo `modules/ShippingHub/eCommerce.ShippingHub.{Domain, EntityFrameworkCore, Application.Contracts, Application}` + thêm vào `eCommerce.slnx` (hiện chỉ có ChannelHub/PaymentHub/Tax — `eCommerce.slnx:1`–`17`) |
-| **DbSet bắt buộc** | ⭐ `ShpShipmentSubmissions`, `ShpCarrierAddressMappings`, `ShpCarrierAddressPolicies` **phải** được khai trên **DbContext hợp nhất** `src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs`, **nếu không** `IRepository<T, Guid>` **không** được đăng ký. Đây là **bài học đã ghi trong chính file đó**: *"`AddDefaultRepositories(includeAllEntities: true)` chỉ tạo `IRepository<T>` cho entity **CÓ DbSet** trên DbContext… runtime báo: `The requested service 'IRepository<ChannelShop, Guid>' has not been registered`"* (`src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs:48`–`55`) |
-| **Hàm mapping** | Thêm `builder.ConfigureShippingHub()` trong `OnModelCreating` — khuôn `builder.ConfigureChannelHub()` (`src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs:76`) |
-| **Migration 1 (EF sinh)** | `Add_ShippingHub_Ghtk_Adapter` — tạo 3 bảng + index + **CHECK constraint** ở §5.2. ⚠️ **Bắt buộc**: migration do EF sinh cần `.Designer.cs` cung cấp `TargetModel` — *"thiếu nó EF sẽ không nhận diện migration; đã thử viết tay và bị bỏ qua hoàn toàn"* (`src/eCommerce.EntityFrameworkCore/Migrations/20261013024226_Fix_NullableTenantId_UniqueIndexes.cs:31`–`32`) |
-| **Migration 2 (SQL thô)** | 🚨 `Fix_NullsNotDistinct_ShpTables` — tạo lại **mọi** unique index có `TenantId` với **`NULLS NOT DISTINCT`** (`ShpShipmentSubmissions`, `ShpCarrierAddressPolicies`). Khuôn **đã có thật**: `src/eCommerce.EntityFrameworkCore/Migrations/20261013024226_Fix_NullableTenantId_UniqueIndexes.cs:39`–`59` + cảnh báo ở `:23`–`25` |
-| **Migration 3 (SQL thô)** | Nếu chọn ràng buộc **`EXCLUDE`/CHECK** không biểu diễn được bằng EF ⇒ dùng SQL thô (khuôn `Add_Tax_Module` dùng `EXCLUDE` — được nhắc ở `20261013024226_...cs:21`) |
-| **Seed — `ShpCarriers`** | Thêm dòng `code = "ghtk"`, `isActive = true`. ⚠️ **Bảng này thuộc `SHP-001`** — `SHP-004` chỉ **đề nghị**, không tự tạo |
-| **Seed — `ShpCarrierAddressPolicies`** | ⭐ Nạp **1** bản ghi cho `ghtk` với **`IsFailClosed = true`**, **`RequiresDistrict = true`**, `AddressLevelMode = Both`, `MaxCatalogueAgeDays = 30`. **Lý do:** mặc định **phải** là phía an toàn — GHTK **chưa xác nhận** địa chỉ 2 cấp (`docs/implementation-plan.md:290`). Đổi sang `false` cần **`AddressPolicies.Approve`** + audit |
-| **Seed — danh mục địa chỉ** | ❌ **KHÔNG seed.** Danh mục địa chỉ là **DỮ LIỆU ĐỒNG BỘ** từ hãng (`docs/business-modules-proposal.md:517`), không phải master data ⇒ chỉ nạp bằng **job/API đồng bộ**. Seed tay ⇒ sai ngay khi hãng đổi danh mục |
-| **Seed idempotent** | Bắt buộc theo khuôn **đã có thật**: `if (await _repository.GetCountAsync() > 0) return;` (`src/eCommerce.DbMigrator/TaxRateScheduleDataSeedContributor.cs:52`). Chạy `DbMigrator` nhiều lần **không** được nhân bản |
-| **Ảnh hưởng dữ liệu cũ** | **Không backfill.** Chưa có vận đơn nào tồn tại (module chưa có — §15.2 F1). ⚠️ Nếu `SHP-001` đã chạy trước ⇒ mọi vận đơn cũ có `AddressCatalogueVersion = NULL` ⇒ ghi rõ là *"chưa xác minh theo danh mục"*, **không** suy diễn là đã xác minh |
-| **Gói NuGet** | ⚠️ **Quyết định chưa chốt** (§15.1 Q6): repo **không** có `Microsoft.Extensions.Http` trong `Directory.Packages.props` và **0** chỗ dùng `AddHttpClient`/`IHttpClientFactory`. **Cấm** thêm bất kỳ gói `Volo.Abp.*` nào — phải giữ **một** phiên bản ABP duy nhất trong `Directory.Packages.props` (hiện **mọi** gói ABP đều `10.7.0`) |
-| **Rollback** | Xoá 3 bảng + xoá dòng seed. ⚠️ **Không** rollback được dữ liệu **đã gửi sang hãng** — đó là **hệ quả vật lý** ngoài DB |
+| **Module mới** | ⚠️ **Chưa có trong code.** `modules/ShippingHub/…` + `eCommerce.slnx` do `SHP-001` tạo (F1) |
+| **Bảng / migration / DbSet** | **Không có** (ADR-04, ADR-12). `SHP-004` không thêm DbSet vào `src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs` |
+| **Seed — `ShpCarriers`** | **Đề nghị** `SHP-001` seed dòng `ghtk`, `IsEnabled = false`, `AddressModel = ThreeLevel` (fail-closed tới khi Q1). Bảng thuộc `SHP-001` |
+| **Seed — ánh xạ trạng thái GHTK** | ❌ **KHÔNG seed giá trị suy đoán** — mã trạng thái GHTK **chưa xác minh** (R3-1); nạp sau khi có tài liệu hãng (bảng thuộc `SHP-002`) |
+| **Seed — danh mục địa chỉ** | ❌ Không thuộc `SHP-004` — ánh xạ mã hãng do `ADDR-002` đồng bộ (`D-83`) |
+| **Đăng ký HTTP ở Host** | `AddHttpClient<…Ghtk…>` thêm ở `src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs` (khuôn `:171`) — **không** thêm gói NuGet (ADR-10); ⬜ kế hoạch (F5) |
+| **Ảnh hưởng dữ liệu cũ** | **Không backfill** — chưa có vận đơn nào |
+| **Rollback** | Gỡ dòng đăng ký provider + cấu hình. ⚠️ Không rollback được dữ liệu **đã gửi sang hãng** |
 
 ---
 
 ## 12. Xử lý lỗi & trường hợp biên
 
-| Tình huống | Nguyên nhân | Hành vi hệ thống | Phản hồi |
+| Tình huống | Nguyên nhân | Hành vi adapter | Phản hồi |
 |---|---|---|---|
-| ⭐ **Không khớp được phường/xã** với danh mục hãng | dữ liệu địa chỉ sai / danh mục hãng khác | Ghi submission `AddressRejected`; **NÉM** `0012`; **KHÔNG** gọi hãng | `422` |
-| ⭐ **Hãng bắt buộc `district`** nhưng đơn chỉ 2 cấp | GHTK chưa thích ứng 2 cấp (`docs/business-modules-proposal.md:546`) | Ghi `AddressRejected`; **NÉM** `0013`; **cảnh báo** cho vận hành | `409` |
-| **Danh mục địa chỉ quá cũ** | job đồng bộ chết/trễ | Ghi `AddressBlocked`; **NÉM** `0014`; metric + cảnh báo. **Cấm** tắt kiểm tra để chạy | `503` |
-| **Hãng chưa cấu hình** | thiếu `ShippingHub:Providers:ghtk:*` | **NÉM** `0007` (fail-closed, kế thừa `SHP-002` §6.2) | `400` |
-| **Hãng trả trùng `ClientOrderCode`** | lần thử trước đã tạo thành công | Tra cứu, dùng lại vận đơn, `Status = Created`, `WasDuplicate = true`; log `Information` + metric | `200` (**không** phải lỗi) |
-| **Timeout sau khi hãng đã tạo** | mạng/response mất | `Status = Failed`; nhịp sau **tra trước** rồi mới tạo; nếu tra cũng lỗi ⇒ cảnh báo | `502` |
-| **Cùng `ClientOrderCode`, `PayloadHash` khác** | lập trình sai / dữ liệu đổi | **NÉM** `0017`; **cấm** ghi đè; **cấm** retry tự động | `409` |
-| **Token hãng sai/hết hạn** | cấu hình sai | **NÉM** `0020` + **cảnh báo cấu hình**; **cấm** retry mù | `502` |
-| **Chuyển trạng thái submission sai** (ví dụ `Created → Pending`) | lập trình sai | **NÉM** `0019` — **cấm** no-op im lặng | `409` |
-| **`UPDATE … WHERE Status = @expected` ảnh hưởng 0 dòng** | luồng khác vừa đổi | **NÉM** `0019`; **cấm** coi là thành công (`XC-002` BR-008) | `409` |
-| **Huỷ vận đơn ở trạng thái hãng không cho huỷ** | hãng đã lấy hàng | **NÉM** `0021`; ghi `FailureCode`; **cấm** tự đánh dấu "đã huỷ" | `409` |
-| **Job không giành được khoá** | instance khác đang chạy | **Bỏ qua nhịp** + log + metric `lock_skipped_total{module="shipping"}` | — |
-| **Redis chết** | sự cố hạ tầng | App **vẫn chạy** (`AbortOnConnectFail = false`); job mất tính tuần tự; **unique index + CHECK** ở DB là hàng rào cuối (`XC-003` D2) | bình thường |
-| **`TenantId = NULL`** (chế độ 1 tenant) | chưa bật multi-tenant | Unique index **vẫn chặn** **nhờ** `NULLS NOT DISTINCT` (đã có tiền lệ sửa: `20261013024226_Fix_NullableTenantId_UniqueIndexes.cs`) | — |
-| **Mã trạng thái thô của GHTK chưa có ánh xạ** | hãng thêm mã mới | ⇒ `Discrepancy` của `SHP-002` (`Kind = UnmappedStatusCode`) — **cấm** im lặng coi là "không đổi" (`BR-SHP-004-013`) | — |
+| ⭐ **Thiếu cấp mã bắt buộc** (vd ThreeLevel nhưng `DistrictCode = null`) | đơn 2 cấp + GHTK chưa thích ứng (`docs/business-modules-proposal.md:546`) hoặc `Address` không có mã huyện (`D-89` N2) | **Trả** `Business` + `0102`; **0** HTTP; cảnh báo vận hành | `400` (`SHP-001`) |
+| **Cửa mã `Address` NÉM** | ánh xạ `ChuaXacMinh`/`NghiNgo`, đơn vị đóng, > 1 ánh xạ `DaXacMinh` | adapter **không được gọi** — `SHP-001` NÉM `0102` kèm `InnerErrorCode` | `400` |
+| **Hãng chưa cấu hình** | thiếu `FromAddress` (mọi chế độ) hoặc `BaseUrl`/token/`PartnerCode`/`ClientOrderCodeMaxLength = 0` khi bật live | **Trả** `Configuration` + `0101` (fail-closed) | `400` (`SHP-001`) |
+| **Vượt giới hạn / số lượng lẻ** | cân/COD/số lượng; độ dài mã (chỉ khi `ClientOrderCodeMaxLength > 0`) | **Trả** `Business` + `0401`; **không** làm tròn/cắt | `400` (`SHP-001`) |
+| **Hãng trả trùng `ClientOrderCode`** | lần thử trước đã tạo | `AlreadyExisted = true`; log `Information` | `200` (không phải lỗi) |
+| **Timeout sau khi hãng đã tạo** | mạng/response mất | tạo ⇒ `Transient`; lần sau **tra trước** | `502`/attempt |
+| **Token hãng sai/hết hạn** | cấu hình sai | `Configuration` + `0402` + cảnh báo; **cấm** retry | `502` |
+| **Huỷ khi hãng không cho** | hãng đã lấy hàng | `0403`; **cấm** tự đánh dấu đã huỷ (`SHP-001` giữ `Created`) | `409` |
+| **Tính phí lỗi mạng** | hãng 5xx/timeout | **Trả** kết quả lỗi mềm (`Transient` + `0404`, không phí), **không** NÉM — checkout dùng ước tính dự phòng | `200` ước tính (`SHP-001`) |
+| **Tra trạng thái lỗi mạng** | hãng 5xx/timeout | NÉM `0404` (job `SHP-002` thử nhịp sau) | `502` |
+| **Thiếu `AddHttpClient` ở Host** | quên đăng ký | **Trả** `Configuration` + `0101` khi live, không coi là thành công (khuôn `VnPayPaymentProvider.cs:264`) | `400` (`SHP-001`) |
+| **Webhook sai `hash` / IP ngoài allowlist / thiếu cấu hình** | giả mạo hoặc cấu hình thiếu | `VerifyAsync` trả `Accepted = false` + `FailureReason` (`bad_token`/`ip_not_allowed`/`not_configured`); **không** parse (BR-017) | do `SHP-002` |
+| **Mã trạng thái thô chưa ánh xạ** | hãng thêm mã mới | `ParseAsync` trả nguyên văn ⇒ `Discrepancy` của `SHP-002` (BR-011) | — |
+| **Cùng mã, nội dung khác** | lập trình sai | thuộc `SHP-001` (`RequestPayloadHash`, `eCommerce:Messaging:0001`) | `409` |
 
-**Chiến lược transaction:** **B1** — pre-flight + tra `ClientOrderCode` + ghi submission **trong** UoW có transaction
-(để "đã thử" và "kết quả" **không** lệch nhau). **B2** — gọi API hãng **ngoài** transaction DB (không giữ transaction
-trong lúc chờ mạng), sau đó mở UoW **mới** để ghi kết quả + outbox **cùng transaction** (`XC-002` BR-001).
-**Phạm vi khoá phân tán bao ngoài** UoW (`XC-003` §12) ⇒ khoá được nhả **sau** khi transaction kết thúc.
+**Chiến lược transaction:** adapter chạy **ngoài** transaction DB (Pha 2 của `SHP-001`, `isTransactional: false` — `SHP-001` BR-002); mọi ghi DB + outbox ở Pha 1/3 của `SHP-001`.
 
 ---
 
@@ -780,33 +476,18 @@ trong lúc chờ mạng), sau đó mở UoW **mới** để ghi kết quả + ou
 
 | Mã | Yêu cầu | Ngưỡng đo được | Cách kiểm chứng |
 |---|---|---|---|
-| NFR-SHP-004-001 | Độ trễ pre-flight xác minh địa chỉ | p95 **< 50 ms** (không gọi mạng ngoài) | benchmark trên DB có ≥ 10.000 dòng danh mục |
-| NFR-SHP-004-002 | Không tạo vận đơn khi chưa xác minh | **0** vi phạm | unit + **CHECK constraint** ở DB (`TC-03`, `TC-21`) |
-| NFR-SHP-004-003 | Idempotent tạo vận đơn | gọi **100** lần ⇒ **1** vận đơn, **1** lần gọi API hãng | integration test với HTTP giả (`TC-02`) |
-| NFR-SHP-004-004 | Không `double`/`float` | **0** xuất hiện trong assembly module | test reflection (khuôn `XC-001` TC-11) |
-| NFR-SHP-004-005 | Tiền khớp theo minor units | **100 %**; lệch ⇒ `Discrepancy` | unit test `TC-09` |
-| NFR-SHP-004-006 | `CorrelationId` hiện diện | **100 %** log luồng tạo vận đơn | integration test (`XC-005` NFR-002) |
-| NFR-SHP-004-007 | Không rò bí mật | **0** token/`Authorization` trong log + payload đã lưu | quét tự động `TC-11` |
-| NFR-SHP-004-008 | Log không ngập khi job rỗng | **< 10** dòng log/nhịp | đo trên job đồng bộ địa chỉ (`XC-005` TC-09) |
-| NFR-SHP-004-009 | Cách ly tenant | **0** bản ghi tenant khác lọt | integration test 2 tenant (⚠️ **cần PostgreSQL** — §14.4) |
-| NFR-SHP-004-010 | Khoá phân tán đúng quy ước | **0** acquire thiếu `timeout`; **0** acquire lồng | test quét mã nguồn (`XC-003` TC-08/TC-13) |
-| NFR-SHP-004-011 | Không hard-code endpoint/mã hãng | **0** literal URL/mã địa chỉ/mã trạng thái trong code nghiệp vụ | test grep trong CI (`docs/design-doc-guidelines.md:118`) |
-| NFR-SHP-004-012 | Metric nằm trong bảng đăng ký | **0** metric phát ra ngoài `eCommerceMetricNames` | `MetricsTests` (`test/eCommerce.Tests/Observability/MetricsTests.cs:50`) |
+| NFR-SHP-004-001 | Dựng payload GHTK (hàm thuần) | p95 **< 5 ms**, đơn 50 dòng | test hiệu năng đơn vị (`TC-23`) |
+| NFR-SHP-004-002 | Không gọi GHTK khi thiếu mã bắt buộc | **0** lời gọi / ≥ 100 ca | `HttpMessageHandler` giả (`TC-03`: 126 ca theory; `TC-02`) |
+| NFR-SHP-004-003 | Idempotent tạo vận đơn | 100 lần cùng mã ⇒ **0** POST (hãng giả đã có) | `TC-07` |
+| NFR-SHP-004-004 | Không `double`/`float` | **0** trong assembly `eCommerce.ShippingHub.Carriers.Ghtk` | reflection (`TC-11`) |
+| NFR-SHP-004-005 | Tiền khớp | **100 %** `Money.Equals`; lệch ≥ 1 đồng ⇒ `Discrepancy` | `TC-11` |
+| NFR-SHP-004-006 | `CorrelationId` hiện diện | **100 %** log lời gọi hãng | `TC-24` |
+| NFR-SHP-004-007 | Không rò bí mật/PII | **0** token/`PartnerCode`/`Authorization`/`hash`/SĐT/địa chỉ/tên người nhận nguyên văn trong log + payload lưu | quét tự động payload mẫu `TC-12` |
+| NFR-SHP-004-008 | Timeout mọi lời gọi hãng | ≤ **10 s** (`CallTimeoutSeconds`); **0** `HttpClient` không timeout | quét mã nguồn `TC-17` |
+| NFR-SHP-004-009 | Không hard-code endpoint/mã | **0** literal trong code nghiệp vụ | grep CI `TC-06` |
+| NFR-SHP-004-010 | Metric nằm trong bảng đăng ký | **0** metric ngoài `eCommerceMetricNames` | `MetricsTests.cs:64` (`TC-18`) |
 
-**Metric cần bổ sung** (⚠️ **bắt buộc** cập nhật `shared/eCommerce.Kernel/Observability/eCommerceMetrics.cs`
-**và** `XC-005` §5.1 **và** hằng số `12` trong `MetricsTests` — `test/eCommerce.Tests/Observability/MetricsTests.cs:64` — **trong cùng PR**):
-
-| Metric | Loại | Nhãn (hữu hạn) | Ý nghĩa / ngưỡng |
-|---|---|---|---|
-| `carrier_address_verification_total` | Counter | `provider`, `result` (`verified`/`rejected`/`blocked`) | ⭐ tỉ lệ địa chỉ **không xác minh được**; **> 5 %** ⇒ cảnh báo dữ liệu địa chỉ |
-| `carrier_address_catalogue_age_days` | Gauge | `provider` | ⭐ tuổi danh mục địa chỉ; **≥ `MaxCatalogueAgeDays`** ⇒ cảnh báo **trước** khi chặn |
-| `carrier_submission_total` | Counter | `provider`, `result` (`created`/`duplicate`/`failed`/`abandoned`) | tỉ lệ tạo được vận đơn |
-| `carrier_api_failed_total` | Counter | `provider`, `operation` (`quote`/`create`/`cancel`/`track`) | lỗi phía hãng |
-| `carrier_address_version_mismatch_total` | Counter | `provider` | 🚨 số lần danh mục địa chỉ đổi giữa lúc xác minh và lúc gửi — **kỳ vọng 0** |
-
-> 🚨 **Quy tắc nhãn (`XC-005` BR-009):** nhãn **chỉ** lấy từ `eCommerceMetricTags.Allowed`
-> (`shared/eCommerce.Kernel/Observability/eCommerceMetrics.cs:62`). **Cấm** `orderId`, `sku`, `userId`,
-> `correlationId`, `lockKey` (danh sách cấm ở `:81`). Cần truy vết theo các giá trị đó ⇒ dùng **log**.
+**Metric:** `SHP-004` **không thêm metric** — dùng `shipping_carrier_call_failed_total{provider,reason}` và `shipping_fee_discrepancy_total` đã khai ở `SHP-001` §13 (:981; không thêm nhãn `operation` — không có trong `Allowed`) (`MetricsTests` không còn đếm cứng — `MetricsTests.cs:64-74`). Nhãn chỉ từ `eCommerceMetricTags.Allowed` (`eCommerceMetrics.cs:212`); cấm `orderId`/`sku`/`userId`/`correlationId` (`:219`).
 
 ---
 
@@ -816,145 +497,111 @@ trong lúc chờ mạng), sau đó mở UoW **mới** để ghi kết quả + ou
 
 | ID | Mục tiêu | Loại | Input chính | Expected | Phủ |
 |---|---|---|---|---|---|
-| **TC-01** | ⭐ Pre-flight **chặn** khi thiếu phường/xã | Unit | địa chỉ 2 cấp nhưng phường không có trong danh mục | `Rejected` + `eCommerce:Shipping:0012`; **0** lời gọi HTTP | **BR-002** |
-| **TC-02** | ⭐ Idempotent tạo vận đơn | **Integration** | gọi `CreateShipmentAsync` **100** lần cùng đơn | **1** vận đơn; **1** lời gọi HTTP; `WasDuplicate = true` cho các lần sau | **BR-006**, NFR-003 |
-| **TC-03** | ⭐ CHECK constraint DB chặn `Created` khi chưa xác minh | **Integration** (cần PostgreSQL) | `INSERT` thẳng `Status = Created`, `AddressVerificationStatus = Rejected` | **DB từ chối** (`CHECK` violation) | **BR-002**, NFR-002 |
-| **TC-04** | Hãng **bắt buộc** `district` ⇒ từ chối, không gửi | Unit | `RequiresDistrict = true`, đơn 2 cấp | `eCommerce:Shipping:0013`; **0** HTTP | **BR-002/003** |
-| **TC-05** | Danh mục **quá cũ** ⇒ chặn | Unit | `SyncedAtUtc` = hôm nay − 40 ngày, `MaxCatalogueAgeDays = 30` | `eCommerce:Shipping:0014`, `Blocked` | **BR-002**, ADR-02 |
-| **TC-06** | **Không** hard-code endpoint/mã hãng | Unit (quét mã nguồn) | grep `http`/mã tỉnh/mã trạng thái trong code nghiệp vụ | **0** match | **BR-004/005**, NFR-011 |
-| **TC-07** | `district` **rỗng** là **hợp lệ** với chế độ 2 cấp | Unit | `AddressLevelMode = TwoLevel`, `DistrictNameOrCode = null` | `Verified`; `DistrictProviderCodeUsed = null` | **BR-003** |
-| **TC-08** | Guard trạng thái submission **NÉM LỖI** | Unit | `Created → Pending` | `BusinessException` `eCommerce:Shipping:0019` | **BR-009/010** |
-| **TC-09** | Tiền so bằng **minor units**, cấm `==` | Unit | phí hãng `250000.00` vs nội bộ `250000` | **khớp**; lệch 1 đồng ⇒ `Discrepancy` | **BR-011**, NFR-005 |
-| **TC-10** | Tra **trước** khi tạo (mất response) | **Integration** | hãng đã có vận đơn cho `ClientOrderCode`, ta tưởng chưa | **không** gọi `POST`; dùng vận đơn tra được | **BR-006**, ADR-06 |
-| **TC-11** | **Không** rò bí mật vào log/payload | Unit (quét) | tìm `apiToken`/`Authorization` trong lời gọi log + payload đã lưu | **0** match | **BR-012**, NFR-007 |
-| **TC-12** | Xung đột `ClientOrderCode` + `PayloadHash` khác | Unit | cùng khoá, payload khác | **NÉM** `eCommerce:Shipping:0017`; **không** ghi đè | **BR-006** |
-| **TC-13** | `UPDATE … WHERE Status` **0 dòng** ⇒ ném lỗi | **Integration** | 2 luồng cùng chuyển trạng thái | 1 thắng; luồng kia `eCommerce:Shipping:0019` | **BR-009** |
-| **TC-14** | Job dùng `SkipIfBusy` + log + metric | Unit | không giành được khoá | **không** ném; **có** log **và** metric `lock_skipped_total` | **BR-015** |
-| **TC-15** | Không acquire khoá thiếu `timeout` / không lồng | Unit (reflection/quét) | danh sách lời gọi acquire | **0** vi phạm | **BR-015**, NFR-010 |
-| **TC-16** | ⭐ Adapter **không** nhận địa chỉ từ payload hãng | Unit (API surface) | kiểm `VerifyAddressAsync` **không** có tham số payload | chỉ nhận `ShippingAddressInput` **nội bộ** | **BR-007**, ADR-05 |
-| **TC-17** | Đồng bộ danh mục **idempotent** | **Integration** | chạy job 2 lần cùng `CatalogueVersion` | **0** dòng thêm | **BR-004** |
-| **TC-18** | Phiên bản danh mục **được chụp lại** | Unit | danh mục đổi giữa 2 lần xác minh | submission ghi đúng `AddressCatalogueVersion` của **lần dùng** | **BR-004**, A3 |
-| **TC-19** | ⭐ Phủ **hết** metric/nhãn đăng ký | Unit | `MeterListener` | đúng số tên trong `eCommerceMetricNames`; nhãn ∈ `Allowed` | **BR-016**, NFR-012 |
-| **TC-20** | Cách ly tenant | **Integration** (cần PostgreSQL) | 2 tenant cùng `orderNumber` | **0** bản ghi tenant khác lọt; unique index **vẫn** hiệu lực khi `TenantId = NULL` | NFR-009 |
-| **TC-21** | ⭐ Fail-closed khi hãng **chưa** cấu hình | Unit | thiếu `ShippingHub:Providers:ghtk` | `eCommerce:Shipping:0007`; **0** HTTP | ADR-02, **BR-002** |
-| **TC-22** | Timeout hãng ⇒ `Failed` + thử lại nhịp sau | **Integration** | HTTP giả trả timeout | `Status = Failed`; `AttemptCount = 1`; **không** rollback | E5 |
-| **TC-23** | Vượt trần `AttemptCount` ⇒ `Abandoned` + cảnh báo | Unit | `AttemptCount = MaxSubmissionAttempts` | `Abandoned`; log `Error`; metric | §3.1 guard 8 |
-| **TC-24** | Tiền âm / quá `MaxCodAmount` bị chặn | Unit | `CodAmount = -1`; `CodAmount > MaxCodAmount` | **NÉM** lỗi tham số / `0018`; **0** HTTP | **BR-011** |
-| **TC-25** | Huỷ vận đơn ở trạng thái hãng không cho huỷ | **Integration** | hãng trả lỗi không cho huỷ | `eCommerce:Shipping:0021`; **không** tự đánh dấu "đã huỷ" | E9 |
-| **TC-26** | **Đơn vị tiền tệ** sai bị chặn | Unit | `CodCurrency = "vnd"` (chữ thường) / `"XXX"` | chuẩn hoá HOA hoặc **NÉM** (kế thừa `XC-001` `0002`) | **BR-011** |
+| **TC-01** | HTTP GHTK chỉ trong assembly provider | Unit (quét kiểu theo namespace/assembly) | quét mọi assembly `eCommerce.ShippingHub.*`: kiểu tham chiếu `GhtkOptions`/typed client GHTK hoặc đọc khoá cấu hình `ShippingHub:Providers:ghtk`; **loại trừ** namespace provider của hãng khác (GHN — `SHP-001`) | **0** kiểu ngoài assembly `eCommerce.ShippingHub.Carriers.Ghtk` (`D-128` ⑤) | **BR-001** |
+| **TC-02** | ⭐ Thiếu mã ⇒ không gọi hãng | Unit | cửa mã giả NÉM `Address:0502` (ánh xạ `NghiNgo`) | `SHP-001` NÉM `0102` + `InnerErrorCode`; **0** HTTP | **BR-002**, NFR-002 |
+| **TC-03** | ⭐ Adapter tự kiểm cấp bắt buộc (cả `ToAddress` và `FromAddress`) | Unit (theory **126 ca** = 7 tổ hợp cấp thiếu × 3 mô hình × 3 dạng rỗng `null`/`""`/khoảng trắng × 2 địa chỉ) | vd `AddressModel = ThreeLevel`, `ToAddress.DistrictCode = null`; `FromAddress` thiếu `WardCode` | expected theo bảng BR-002 (`TwoLevel` thiếu huyện ⇒ hợp lệ): `ToAddress` thiếu ⇒ **trả** `Success = false`, `Business`, `0102`; `FromAddress` thiếu ⇒ `Configuration`, `0101`; **không NÉM**; **0** HTTP | **BR-002**, **BR-013**, **BR-018**, NFR-002 |
+| **TC-04** | Không tự suy `district` | Unit | đơn 2 cấp, model ThreeLevel | **trả** `Business` + `0102`; payload builder **không** được gọi; 0 bảng tra quận trong assembly | **BR-003** |
+| **TC-05** | Không có nguồn địa chỉ hãng thứ hai | Unit (quét) | tham chiếu trong `eCommerce.ShippingHub.*` | **0** tham chiếu `eCommerce.Address.Domain`/`.Application`/`.EntityFrameworkCore`; **0** entity `ShpCarrierAddress*` | **BR-004** |
+| **TC-06** | Không hard-code endpoint/mã | Unit (quét) | grep `http`/mã trạng thái/mã địa chỉ trong code nghiệp vụ | **0** match | **BR-005**, NFR-009 |
+| **TC-07** | ⭐ Tra trước – tạo sau, idempotent | Unit (HTTP giả) | hãng giả đã có `ClientOrderCode`; gọi 100 lần | **0** POST; `AlreadyExisted = true` | **BR-006**, NFR-003 |
+| **TC-08** | Dùng đúng `ClientOrderCode`, không cắt | Unit | mã 43 ký tự; `ClientOrderCodeMaxLength = 40`; thêm ca `ClientOrderCodeMaxLength = 0` + mô phỏng | `40`: **trả** `Business` + `0401` (không ném); payload (khi hợp lệ) chứa **nguyên văn** mã nhận vào; `0`: **không** so độ dài (mô phỏng chạy, 0 HTTP) | **BR-006**, **BR-018** |
+| **TC-09** | Không địa chỉ từ hãng | Unit (reflection) | `CarrierTrackingSnapshot`, `ProviderShipmentEvent` | **0** thuộc tính địa chỉ; `ParseAsync` bỏ qua trường địa chỉ của payload | **BR-007** |
+| **TC-10** | Adapter không ghi DB/khoá/ETO | Unit (reflection) | tham chiếu + kiểu sử dụng của assembly `eCommerce.ShippingHub.Carriers.Ghtk` (riêng, `D-128`); quét tên kiểu + `DbSet` của `eCommerce.ShippingHub.*` | trong assembly Ghtk: **0** `IRepository<,>`, `IUnitOfWorkManager`, `IDistributedEventBus`, `IAbpDistributedLock`, `DbContext`, tham chiếu `ShippingHub.Application`/`.Domain`/`.EntityFrameworkCore`; trong `eCommerce.ShippingHub.*`: **0** kiểu có tên chứa `Submission`; **0** `DbSet` mới do `SHP-004` thêm | **BR-008** |
+| **TC-11** | Tiền: số nguyên + `Money` | Unit | COD `250000L`; phí hãng `22000` vs nội bộ `22001` | payload COD là số nguyên; `Money.Equals` **false** ⇒ `Discrepancy`; reflection **0** `double`/`float` | **BR-009**, NFR-004/005 |
+| **TC-12** | Không rò bí mật/PII | Unit (quét) | payload mẫu request + response + thông điệp lỗi hãng chứa `ApiToken`, `PartnerCode`, `Authorization`, `hash`, **SĐT 10 số**, **địa chỉ**, **tên người nhận** (cả dạng khoá JSON và dạng giá trị nằm trong chuỗi tự do) | sau hàm che (`RawPayloadMasked`, `FailureMessage`, log) **0** giá trị nguyên văn của các trường đó; ca giá trị-trong-chuỗi-tự-do cũng bị che (lớp (ii) BR-010) | **BR-010**, NFR-007 |
+| **TC-13** | Mã trạng thái thô nguyên văn | Unit | payload webhook mã lạ | `ProviderStatusCode` giữ **nguyên văn**; 0 bảng mã cứng; `SHP-002` ghi `Discrepancy` | **BR-011** |
+| **TC-14** | Mã lỗi đúng dải/chủ | Unit (reflection) | liệt kê `ShippingHubErrorCodes` | mã `SHP-004` ∈ `0401`–`0499`; **0** mã `0012`–`0021`; `eCommerceConsts.ErrorCodes` **0** mã Shipping | **BR-012** |
+| **TC-15** | Fail-closed cấu hình + `EnableLiveCalls` + thứ tự kiểm | Unit | (a) `false`, `ClientOrderCodeMaxLength = 0`, mã 34 ký tự; (b) `true` + `BaseUrl` rỗng; (c) `true` + `ClientOrderCodeMaxLength = 0`; (d) `FromAddress` thiếu (cả `false` và `true`); (e) thiếu `AddHttpClient` + `true` | (a) **0** HTTP + mô phỏng + log `Information` (**không** `0401`); (b)(c)(d)(e) **trả** `Configuration` + `0101` (**không** `0401`, không NÉM) | **BR-013**, **BR-018** |
+| **TC-16** | `ParseAsync` thuần + `GetTrackingAsync` | Unit | `DbContext`/HTTP giả NÉM nếu bị gọi trong `ParseAsync` | `ParseAsync` không chạm DB/mạng; `GetTrackingAsync` gọi đúng 1 GET | **BR-014** |
+| **TC-17** | POST không retry mù; timeout đặt | Unit (HTTP giả) | POST timeout lần 1; GET timeout | đúng **1** POST, `Transient`; GET retry ≤ 3; quét: 0 `HttpClient` không timeout | **BR-015**, NFR-008 |
+| **TC-18** | Metric trong bảng đăng ký | Unit | `MeterListener` + `MetricsTests` | tên ∈ `eCommerceMetricNames`; nhãn ∈ `Allowed`; `shipping_carrier_call_failed_total` chỉ mang `{provider, reason}` (**0** nhãn `operation`), `reason` ∈ 5 giá trị của `SHP-001` §13 | **BR-016**, NFR-010 |
+| **TC-19** | Vượt giới hạn hãng | Unit | COD > `MaxCodAmount` (vd 60.000.000 đ); cân > `MaxWeightInGrams`; số lượng `1.5` | **trả** `Business` + `0401` (**không** NÉM — vận đơn không kẹt `Submitting`); **0** HTTP; **không** làm tròn | **BR-006**, **BR-009**, **BR-018** |
+| **TC-20** | Token sai ⇒ không retry | Unit (HTTP giả) | 401/403 | `Configuration` + `0402`; đúng 1 lời gọi | **BR-015** |
+| **TC-21** | Huỷ bị hãng từ chối | Unit (HTTP giả) | hãng trả lỗi không cho huỷ | `Success = false` + `0403`; adapter không tự đánh dấu huỷ | **BR-008** |
+| **TC-22** | Lỗi mạng tính phí/tra trạng thái | Unit (HTTP giả) | 5xx/timeout ở `GetFeeAsync`/`GetTrackingAsync`; 401 ở `GetFeeAsync` | `GetFeeAsync`: **trả** kết quả lỗi mềm (`Transient` + `0404`; 401 ⇒ `Configuration` + `0402`), **không** NÉM; `GetTrackingAsync`: NÉM `0404`; tạo ⇒ `Transient` không ném | **BR-015**, **BR-018** |
+| **TC-23** | Hiệu năng dựng payload | Unit (đo) | đơn 50 dòng, 1.000 lần | p95 **< 5 ms** | NFR-001 |
+| **TC-24** | `CorrelationId` trong log | Unit (thu log) | một lượt tạo + một lượt tra | **100 %** dòng log có `CorrelationId` | NFR-006 |
+| **TC-25** | ⭐ `hash` webhook sai/thiếu | Unit | `WebhookVerificationContext` với `HashToken` sai, `null`, đúng (IP hợp lệ, cấu hình đủ) | sai/`null` ⇒ `Accepted = false`, `FailureReason = "bad_token"`, **không** parse; đúng ⇒ `Accepted = true`; `hash` **không** xuất hiện trong log | **BR-017** |
+| **TC-26** | ⭐ IP ngoài allowlist | Unit | `SourceIp` ngoài `WebhookAllowedIps`; `hash` đúng | `Accepted = false`, `FailureReason = "ip_not_allowed"` | **BR-017** |
+| **TC-27** | Thiếu cấu hình webhook ⇒ fail-closed | Unit | (a) `WebhookAllowedIps` rỗng; (b) `WebhookHashToken` rỗng; IP + `hash` "đúng" | `Accepted = false`, `FailureReason = "not_configured"` (**không** coi allowlist rỗng là "cho tất cả") | **BR-017** |
+| **TC-28** | `AddressModel` một nguồn | Unit (reflection + mô phỏng) | (a) reflection `GhtkOptions`; (b) factory cấp `SupportedAddressModel = TwoLevel` (cột DB đổi), `ToAddress` 2 cấp | (a) **0** thuộc tính `AddressModel`/`Enabled` trong options; (b) adapter **không** đòi `DistrictCode`, **không** trả `0102`, theo cột DB | **BR-002** |
+| **TC-29** | ⭐ Sau `Submitting` không NÉM | Unit (theory) | mọi input lỗi của TC-03/04/08/15/19/20/21 (thiếu cấp, vượt giới hạn, thiếu cấu hình, 401/403, huỷ bị từ chối) gọi qua `CreateShipmentAsync`/`CancelShipmentAsync` | `Record.ExceptionAsync` = `null`; kết quả `Success = false` với `FailureKind ≠ None` + `FailureCode` đúng bảng §6.2 | **BR-018** |
 
 ### 14.2 Fixture skeleton (xUnit)
 
 ```csharp
-public class GhtkAdapterTests
+public class GhtkCarrierProviderTests
 {
-    // TC-01 — ⭐ mục tiêu trung tâm: địa chỉ CHƯA xác minh thì KHÔNG được gọi hãng (BR-002).
+    // TC-03 — ⭐ mục tiêu trung tâm: địa chỉ thiếu cấp bắt buộc thì KHÔNG được gọi hãng (BR-002)
+    // và KHÔNG được NÉM — adapter chạy sau khi SHP-001 đã commit Submitting (BR-018, ADR-13).
     [Fact]
-    public async Task TC01_dia_chi_khong_xac_minh_duoc_thi_nem_0012_va_khong_goi_hang()
+    public async Task TC03_thieu_ma_huyen_voi_mo_hinh_ba_cap_thi_tra_Business_0102_va_khong_goi_hang()
     {
-        var http = TaoHttpGia();                      // đếm số lời gọi
-        var sut  = TaoAppService(danhMuc: DanhMucThieuPhuong("P-01"));
+        var http = TaoHttpGia();                              // đếm số lời gọi
+        var sut  = TaoProvider(http, mo_hinh: CarrierAddressModel.ThreeLevel);
 
-        var ex = await Assert.ThrowsAsync<BusinessException>(() =>
-            sut.CreateShipmentAsync(TaoInput(ward: "P-99")));
+        var kq = await sut.CreateShipmentAsync(TaoRequest(districtCode: null));   // KHÔNG ném
 
-        Assert.Equal("eCommerce:Shipping:0012", ex.Code);
-        Assert.Equal(0, http.SoLanGoi);               // ⭐ KHÔNG gọi hãng
+        Assert.False(kq.Success);
+        Assert.Equal(CarrierFailureKind.Business, kq.FailureKind);
+        Assert.Equal("eCommerce:Shipping:0102", kq.FailureCode);
+        Assert.Equal(0, http.SoLanGoi);                       // ⭐ KHÔNG gọi hãng
     }
 
-    // TC-02 — idempotent: 100 lần gọi ⇒ 1 vận đơn, 1 lời gọi POST (BR-006).
+    // TC-07 — tra trước – tạo sau: hãng đã có mã thì 0 POST (BR-006).
     [Fact]
-    public async Task TC02_goi_100_lan_chi_tao_mot_van_don()
+    public async Task TC07_hang_da_co_ClientOrderCode_thi_khong_POST()
     {
-        var http = TaoHttpGia();
-        var sut  = TaoAppService(danhMuc: DanhMucDayDu());
-        var input = TaoInput(ward: "P-01");
+        var http = TaoHttpGia(daCoVanDon: "GHTK-123");
+        var sut  = TaoProvider(http);
 
         for (var i = 0; i < 100; i++)
         {
-            await sut.CreateShipmentAsync(input);
+            var kq = await sut.CreateShipmentAsync(TaoRequest());
+            Assert.True(kq.AlreadyExisted);
         }
 
-        Assert.Equal(1, await sut.DemVanDonAsync(input.OrderId));
-        Assert.Equal(1, http.SoLanGoiPost);           // ⭐ tra trước – tạo sau
+        Assert.Equal(0, http.SoLanGoiPost);
     }
 
-    // TC-08 — guard trạng thái PHẢI NÉM LỖI (BR-009), KHÔNG được im lặng.
+    // TC-11 — tiền: so bằng Money, không dùng == trên decimal (BR-009).
     [Fact]
-    public async Task TC08_chuyen_trang_thai_sai_thi_nem_0019()
+    public void TC11_phi_lech_mot_dong_thi_khong_khop()
     {
-        var submission = TaoSubmission(ShipmentSubmissionStatus.Created);
+        var cuaHang = Money.Vnd(22000m);
+        var cuaTa   = Money.Vnd(22001m);
 
-        var ex = await Assert.ThrowsAsync<BusinessException>(() =>
-            submission.TransitionTo(ShipmentSubmissionStatus.Pending, failureCode: null));
-
-        Assert.Equal("eCommerce:Shipping:0019", ex.Code);
-    }
-
-    // TC-07 — đơn 2 cấp: district RỖNG là ĐÚNG, không phải lỗi (BR-003).
-    [Fact]
-    public async Task TC07_thieu_huyen_la_hop_le_voi_che_do_hai_cap()
-    {
-        var sut = TaoVerifier(cheDo: AddressLevelMode.TwoLevel, danhMuc: DanhMucDayDu());
-
-        var kq = await sut.VerifyAddressAsync(TaoDiaChi(district: null));
-
-        Assert.Equal(AddressVerificationStatus.Verified, kq.Status);
-        Assert.Null(kq.DistrictProviderCodeUsed);     // ⭐ dẫn xuất, không phải khoá
-    }
-
-    // TC-09 — tiền so bằng minor units, CẤM dùng == trên decimal (BR-011).
-    [Fact]
-    public void TC09_so_tien_phi_van_chuyen_theo_minor_units()
-    {
-        var cuaTa   = 250000.00m;
-        var cuaHang = 250000m;
-
-        Assert.Equal(ToMinorUnits(cuaTa), ToMinorUnits(cuaHang));
-        // Lệch 1 đồng ⇒ PHẢI sinh Discrepancy, không được coi là khớp.
-        Assert.NotEqual(ToMinorUnits(cuaTa), ToMinorUnits(249999m));
+        Assert.False(cuaHang.Equals(cuaTa));
     }
 }
 ```
 
-> ⚠️ **Giới hạn môi trường (kế thừa `SHP-002` §14.2 và `XC-006` §14.5):** máy dev **không có PostgreSQL/Docker**
-> ⇒ các test đánh dấu **Integration** (`TC-02`, `TC-03`, `TC-10`, `TC-13`, `TC-17`, `TC-20`, `TC-22`, `TC-25`)
-> **chưa chạy được** ở môi trường hiện tại. **Phải** chạy trên **Testcontainers PostgreSQL** trước khi `SHP-004` được coi là xong.
-> 🔴 **`TC-01` và `TC-02` là 2 test sống còn:** chúng chứng minh điều duy nhất mà tài liệu này bảo vệ —
-> **không gửi hàng tới địa chỉ chưa xác minh**, và **không tạo vận đơn trùng**.
+> ⚠️ **Môi trường:** `SHP-004` **không có bảng** nên **mọi** TC ở trên là unit test với `HttpMessageHandler` giả — **không** cần PostgreSQL/Docker. Test tích hợp DB (unique `ClientOrderCode`, `NULLS NOT DISTINCT`) thuộc `SHP-001` (`TC-32`, `TC-49`).
+> 🔴 **`TC-03` và `TC-07` là hai test sống còn:** chúng chứng minh điều duy nhất mà tài liệu này bảo vệ — **không gửi hàng tới địa chỉ chưa xác minh** và **không tạo vận đơn trùng**.
 
 ### 14.3 Acceptance Criteria (Definition of Done)
 
-- [ ] 26 test case pass, phủ **hết 16 BR** và **12 NFR**
-- [ ] ⭐ **`TC-01` pass**: địa chỉ chưa xác minh ⇒ **0** lời gọi HTTP tới hãng
-- [ ] ⭐ **`TC-03` pass**: **CHECK constraint** ở DB chặn `Created` khi chưa xác minh — trả lời câu hỏi *"bỏ tầng ứng dụng đi, DB có chặn không?"* (`XC-003` D2)
-- [ ] ⭐ **`TC-02`/`TC-10` pass**: idempotent + **tra trước – tạo sau** (không có vận đơn trùng khi mất response)
-- [ ] **`TC-08`/`TC-13` pass**: guard trạng thái **NÉM LỖI**, `0` dòng ⇒ **NÉM LỖI** (không no-op im lặng)
-- [ ] **`TC-06`/`TC-19` pass**: **0** hard-code endpoint/mã hãng; metric nằm trong bảng đăng ký
-- [ ] **5 metric mới** đã thêm vào `eCommerceMetricNames` + `eCommerceMetrics`; **`XC-005` §5.1 đã cập nhật**; hằng số `12` trong `MetricsTests` đã sửa; `MetricsTests` xanh
-- [ ] **Mọi unique index có `TenantId`** dùng **`NULLS NOT DISTINCT`** (migration SQL thô) + **có test** chứng minh chặn trùng khi `TenantId = NULL`
-- [ ] **Permission Shipping** đã khai trong `eCommercePermissionDefinitionProvider`; **`TC-23`** (allowlist `[AllowAnonymous]`) của `XC-004` **không** bị ảnh hưởng
-- [ ] **Tên khoá lock** khớp quy ước; **xung đột tiền tố (§15.2 F3) đã được quyết định + ghi vào `XC-003` §5.4**
-- [ ] ⚠️ **Điều kiện tiên quyết đã xong:** `SHP-001` (interface `IShippingCarrier` + bảng `ShpShipments`) · **outbox đã bật** (`XC-002` §6.3) · `XC-001/003/004/005` đã **Approved**
+- [ ] 29 test case pass, phủ **hết 18 BR** và **10 NFR**
+- [ ] ⭐ **`TC-02`/`TC-03` pass**: địa chỉ thiếu mã ⇒ **0** lời gọi HTTP tới hãng
+- [ ] ⭐ **`TC-07` pass**: tra trước – tạo sau (không có vận đơn trùng khi mất response)
+- [ ] ⭐ **`TC-29` pass**: sau `Submitting` adapter không NÉM lỗi nghiệp vụ/cấu hình (không kẹt `Submitting`); **`TC-25`/`TC-26`/`TC-27` pass**: webhook sai `hash`/IP/thiếu cấu hình bị từ chối (fail-closed)
+- [ ] **`TC-05`/`TC-10` pass**: `ShippingHub` không có nguồn địa chỉ hãng thứ hai; adapter không ghi DB
+- [ ] **`TC-06`/`TC-18` pass**: **0** hard-code endpoint/mã hãng; metric nằm trong bảng đăng ký; `MetricsTests` xanh
+- [ ] ⚠️ **Điều kiện tiên quyết đã xong:** `SHP-001` (interface `IShippingCarrierProvider` + `ShpShipments`) · cửa mã `Address` (`D-89`, `D-110` — ⬜ WP-15) · hợp đồng Sales đọc snapshot đơn (`D-108`) · `AddHttpClient` ở Host (F5)
 - [ ] 🔴 **Q1 (payload/endpoint/địa chỉ 2 cấp của GHTK) đã có câu trả lời bằng văn bản từ GHTK** — **chưa có** ⇒ `SHP-004` **không** được coi là xong
-- [ ] 🔴 **`EnableLiveCalls = false`** trên **mọi** môi trường chưa có Q1 (ADR-10) — có test cấu hình chặn
-- [ ] Có **văn bản xác nhận của kiến trúc trưởng** cho: (a) `AddressLevelMode`/`RequiresDistrict` của GHTK; (b) nếu nới `IsFailClosed = false` thì **kèm lý do + rủi ro đã chấp nhận**
-- [ ] Tài liệu này cập nhật khớp code (nếu code lệch ⇒ **sửa tài liệu trước** — `docs/design-doc-guidelines.md:102`)
+- [ ] 🔴 **`EnableLiveCalls = false` và `ShpCarriers.IsEnabled = false`** trên **mọi** môi trường chưa có Q1 — có test cấu hình (`TC-15`) và là cổng release
+- [ ] Có **văn bản xác nhận của kiến trúc trưởng** cho `AddressModel` của GHTK
+- [ ] Tài liệu này cập nhật khớp code (code lệch ⇒ **sửa tài liệu trước** — `docs/design-doc-guidelines.md:102`)
 
 ### 14.4 Definition of Ready
 
 - [x] ✅ Đã kiểm hiện trạng: **không** có module `ShippingHub`, **không** có entity/bảng vận đơn, **không** có permission Shipping (§15.2 F1)
-- [x] ✅ Đã xác định **điều kiện tiên quyết**: `SHP-001` (interface + bảng vận đơn) + outbox đã bật (`XC-002`) + `XC-001/003/004/005` Approved
-- [x] ✅ Đã chốt **nguyên tắc nền**: **xác minh địa chỉ 2 cấp ở biên gửi, FAIL-CLOSED** (ADR-02) — **bắt buộc** vì GHTK chưa xác nhận địa chỉ 2 cấp (`docs/implementation-plan.md:290`)
-- [x] ✅ Đã ghi rõ **giới hạn môi trường**: test Integration **chưa chạy được** (thiếu PostgreSQL/Testcontainers)
-- [ ] 🔴 **Q1** — payload/endpoint/quy tắc địa chỉ **thật** của GHTK đã được đọc từ tài liệu chính thức (**CHẶN code**)
-- [ ] 🔴 **Q2** — chốt `AddressHub` có được làm trước `SHP-004` hay không (**ảnh hưởng §6.1**)
-- [ ] 🔴 **Q3** — GHTK có hỗ trợ `ClientOrderCode` như khoá chống trùng phía hãng (**ảnh hưởng `BR-SHP-004-006`**)
-- [ ] **Q4** — quy tắc **chuẩn hoá tên địa chỉ** (có bỏ dấu không) đã chốt
-- [ ] **Q5** — xung đột tiền tố khoá phân tán (F3) đã được quyết định
-- [ ] **Q6** — chốt có thêm `Microsoft.Extensions.Http` hay tự quản `HttpClient`
-- [ ] **Q7** — quota API của GHTK (số lần gọi/ngày) đã biết ⇒ đặt được nhịp job + trần thử lại
-- [ ] **Q8** — quyết định về nghiệp vụ **đổi COD** (`SHP-003`) có ảnh hưởng thiết kế submission không (⚠️ GHN cần **OTP** — `docs/implementation-plan.md:426`)
+- [x] ✅ Đã chốt **nguyên tắc nền**: chỉ gửi khi mã hãng đã xác minh, fail-closed (ADR-02)
+- [x] ✅ Q2, Q4, Q5, Q6, Q8 đã chốt `D-114`
+- [ ] 🔴 **Q1** — payload/endpoint/quy tắc địa chỉ **thật** của GHTK đã đọc từ tài liệu chính thức (**CHẶN code**)
+- [ ] **Q3** — GHTK có khoá chống trùng `ClientOrderCode` phía hãng không (R3-1)
+- [ ] **Q7** — quota API GHTK đã biết (R3-1)
+- [x] ✅ **Q9** — đã chốt `D-128`: xác nhận ADR-12 (không có Submission riêng)
 
 ---
 
@@ -964,44 +611,65 @@ public class GhtkAdapterTests
 
 | # | Câu hỏi | Cần ai | Trạng thái | Ảnh hưởng |
 |---|---|---|---|---|
-| **Q1** | 🔴 **GHTK có hỗ trợ địa chỉ 2 CẤP không?** Payload tạo vận đơn thật gồm trường nào (`province`/`district`/`ward` là **tên** hay **mã**)? Có cờ tương đương `is_new_to_address` của GHN không? Base URL + endpoint thật là gì? | **Người đã liên hệ GHTK** (`docs/implementation-plan.md:321` còn treo việc gửi email) | 🔴 **`Open`** | 🔴 **CHẶN code.** Không có ⇒ **không** viết được `GhtkCarrierAdapter`; giá trị `AddressLevelMode`/`RequiresDistrict` là **suy đoán** (đang để phía an toàn: `Both` + `true`) |
-| **Q2** | `AddressHub` (master data địa chỉ 2 cấp) có được làm **trước** `SHP-004` không? Nếu không, ai sở hữu lớp chuẩn hoá địa chỉ tạm thời? | Kiến trúc trưởng | 🟠 **`Open`** | ⚠️ `AddressHub` **chưa có code và chưa có tài liệu** (`docs/business-modules-proposal.md:526`; tiền tố `ADDR` ở `docs/design-doc-guidelines.md:82`). Nếu làm tạm trong `ShippingHub` ⇒ **nợ kỹ thuật** phải ghi rõ và có kế hoạch chuyển |
-| **Q3** | GHTK có **khoá chống trùng** phía hãng cho `ClientOrderCode` không? Nếu **không**, retry vẫn có thể sinh **vận đơn trùng** ⇒ phải dựa vào "tra trước – tạo sau" và chấp nhận cửa sổ rủi ro | NCC | 🔴 **`Open`** | Ảnh hưởng trực tiếp `BR-SHP-004-006`. Nếu **không** có khoá ⇒ phải bổ sung **tra cứu theo `ClientOrderCode`** trước mọi lần thử và **ghi rõ** cửa sổ rủi ro |
-| **Q4** | Chuẩn hoá tên địa chỉ để khớp danh mục: có **bỏ dấu** không, có chuẩn hoá `TP.`/`Thành phố`/`Tỉnh` không? | Kiến trúc trưởng + người liên hệ NCC | 🟡 **`Open`** | Bỏ dấu quá tay ⇒ **khớp sai** (`Hà Nam` vs `Hà Nội` vẫn khác, nhưng `Phú Thọ` vs `Phù Thọ` sẽ **dính**) ⇒ đây là loại lỗi im lặng **nguy hiểm nhất** của feature này. **Đề xuất:** khớp theo **mã** trước, chỉ dùng tên khi hãng **không** trả mã, và **không** bỏ dấu |
-| **Q5** | 🚨 **Xung đột tiền tố khoá lock** (kế thừa `SHP-002` §15.1 Q5): khoá module sinh có chứa `ecommerce:` hay `KeyPrefix` lo việc đó? | **Kiến trúc trưởng** | 🟠 **`Open`** | Nếu chọn sai ⇒ khoá thật thành `ecommerce:ecommerce:…` (tiền tố đôi) ⇒ **khoá không bảo vệ gì** (đúng lỗi im lặng `XC-003` F1/F5). Ảnh hưởng `SHP-004` **và** `ChannelHub`/`Tax`/`Inventory` |
-| **Q6** | Có thêm gói **`Microsoft.Extensions.Http`** để dùng `IHttpClientFactory` không, hay tự quản `HttpClient` tĩnh? | Kiến trúc trưởng | 🟡 **`Open`** | ⚠️ `Directory.Packages.props` **không** có gói này và code **0** chỗ dùng `AddHttpClient` (grep). Ảnh hưởng §11. **Cấm** thêm gói `Volo.Abp.*` khác version |
-| **Q7** | **Quota** API của GHTK (số lần gọi/ngày/theo tài khoản) là bao nhiêu? | NCC | 🟡 **`Open`** | Quyết định nhịp job đồng bộ địa chỉ + `MaxSubmissionAttempts` + tần suất job đối soát (`SHP-002` §15.1 Q4). Vượt quota ⇒ **mất khả năng đối soát** (ADR-12) |
-| **Q8** | Việc **đổi COD** (`SHP-003`) có ảnh hưởng thiết kế `Submission` không? (`SHP-003` **chưa có tài liệu** — §15.2 F2) | Kiến trúc trưởng + kế toán | 🟡 **`Open`** | ⚠️ Cảnh báo đã biết: **đổi COD ở GHN cần OTP** (`docs/implementation-plan.md:426`) ⇒ **không** tự động hoá 100 %. Nếu `SHP-003` cần **sửa** `CodAmount` **sau khi** đã tạo vận đơn ⇒ `SHP-004` phải thêm luồng cập nhật (hiện **ngoài** phạm vi) |
+| **Q1** | 🔴 **GHTK có hỗ trợ địa chỉ 2 CẤP không?** Payload tạo vận đơn gồm trường nào (`province`/`district`/`ward` là **tên** hay **mã**)? Có cờ tương đương `is_new_to_address` không? Base URL + endpoint thật? Giới hạn độ dài mã đơn? Webhook: giá trị `hash` do GHTK cấp thế nào (theo tenant/shop?) và dải IP nguồn? | **Người đã liên hệ GHTK** (R3-1; email treo ở `docs/implementation-plan.md:324`) | 🔴 **`Open`** (R3 — chủ dự án nhận liên hệ) | 🔴 **CHẶN code** `GhtkCarrierProvider` thật; `AddressModel`/`ClientOrderCodeMaxLength` đang là phía an toàn (`ThreeLevel`, `0`). Dây chuyền làm tiếp: adapter + cấu hình + fail-closed + chặn release (`D-114` P5) |
+| **Q2** | `AddressHub` (master data địa chỉ) làm trước `SHP-004` không? Ai sở hữu lớp ánh xạ mã hãng? | — | ✅ **Đã chốt — `D-114`** (R0): module `Address` đã có (`modules/Address/`); mã hãng chỉ qua cửa mã (`D-89`, `D-110`); `SHP-004` không có bảng ánh xạ (ADR-04) | §0, §5 |
+| **Q3** | GHTK có **khoá chống trùng** phía hãng cho `ClientOrderCode` không? | NCC (R3-1) | 🔴 **`Open` — tạm chốt (R3, `D-114`)**: giả định **không** chống trùng ⇒ tra trước rồi tạo + nhật ký attempt của `SHP-001` | `BR-SHP-004-006`; nếu hãng không chống trùng ⇒ cửa sổ rủi ro giữa GET và POST (§15.3 #2) |
+| **Q4** | Chuẩn hoá tên địa chỉ để khớp danh mục: có bỏ dấu không? | — | ✅ **Đã chốt — `D-114`** (R2): khớp danh mục qua chuẩn hoá của `ADDR-003`; **gửi hãng tên snapshot nguyên văn**; adapter không chuẩn hoá tên | §6.3 |
+| **Q5** | Tiền tố khoá lock có `ecommerce:` không? | — | ✅ **Đã chốt — `D-114`** (R0) + `D-82`: khoá **không** tiền tố (`KeyPrefix` lo); `SHP-004` không có khoá riêng | §8.2 |
+| **Q6** | Thêm `Microsoft.Extensions.Http`? | — | ✅ **Đã chốt — `D-114`** (R0): dùng `IHttpClientFactory` như `Address`/`PaymentHub`, **đăng ký ở Host**, không gói mới (`eCommerceHttpApiHostModule.cs:171`) | ADR-10, §11 |
+| **Q7** | **Quota** API GHTK (số lần gọi/ngày/theo tài khoản)? | NCC (R3-1) | 🟡 **`Open` — tạm chốt (R3, `D-114`)**: chu kỳ poll + trần gọi là Setting mặc định thấp, `429` ⇒ giãn dần (như `SHP-002`-Q4, theo hãng) | tần suất job đối soát; vượt quota ⇒ mất đối soát chủ động (ADR-11) |
+| **Q8** | Đổi COD (`SHP-003`) có ảnh hưởng thiết kế `Submission` không? | — | ✅ **Đã chốt — `D-114`** (R0): không — đổi COD là lệnh/aggregate riêng của `SHP-003` (`IShipmentCodAppService`, `D-116`/`D-118`); `SHP-004` không có Submission | §0 phạm vi |
+| **Q9** 🆕 | ADR-12 (bỏ `ShpShipmentSubmissions` + máy trạng thái Submission + `CreateShipmentAsync` riêng; dùng `Shipment` + `ShpShipmentCreateAttempts` của `SHP-001`) có được xác nhận không? | DEC | ✅ **Đã chốt — `D-128`**: xác nhận ADR-12 (căn cứ `D-109`, `D-116`, `D-118`, `SHP-001` ADR-09); `SHP-004` 0 bảng/0 DbSet, chỉ cài `IShippingCarrierProvider` | §3, §5.2, §6.1 |
+| **Q10** 🆕 | `CarrierFeeResult` chỉ có chữ ký ở `SHP-001` §6.1 (:456) mà **chưa** khai trường; `GetFeeAsync` của GHTK cần nhánh lỗi mềm (E4, ADR-13). Chọn: (a) `SHP-001` thêm `Success`, `FailureKind`, `FailureCode`, `FailureMessage` vào `CarrierFeeResult` theo khuôn `CarrierCreateShipmentResult` · (b) chỉ trả `IsEstimate` + `FailureReason` như :750 | DEC (BA `SHP-001` sửa nếu chọn (a)) | ✅ **Closed (`D-129`)** — chọn **(a)**: `CarrierFeeResult(Success, Fee, CurrencyCode, FailureCode, FailureKind, FailureMessage)`; `IsEstimate`/`FailureReason` giữ ở tầng app | §6.1, E4, `TC-22` — BA `SHP-001` sửa §6.1/§7.3/§14 (việc kèm `D-129`); `SHP-004` **không** sửa `SHP-001` |
+| **Q11** 🆕 | Adapter **trả** `FailureKind = Business`/`Configuration` + `FailureCode` riêng (`0101`/`0102`/`0401`/`0402`/`0403`) — `SHP-001` Pha 3 có (a) ghi `SubmitFailed` + attempt `Rejected` (kể cả `Configuration`, vì enum `Result` của `ShpShipmentCreateAttempts` không có giá trị `Configuration`) và **giữ nguyên** `FailureCode` của adapter, hay (b) đổi hết thành `0103`? | DEC (BA `SHP-001` ghi §3.2 #4/§12 nếu cần) | ✅ **Closed (`D-130`)** — chọn **(a)**: `Business`/`Configuration` ⇒ `SubmitFailed` + attempt `Rejected`, giữ nguyên `FailureCode` adapter; `0103` chỉ cho mã rỗng/hãng từ chối không mã riêng | E1, ADR-13, `TC-29` |
+| **Q12** 🆕 | Cửa mã `Address` (`D-110`) + dựng `CarrierCreateShipmentRequest` chạy **trước** hay **sau** commit `Submitting` của `SHP-001` §4.2 P2? Chọn: (a) **trước** (lỗi ở đó chỉ để lại `Draft`, `SHP-001` A5 đi tiếp được) · (b) giữ như hiện tại (không nêu) | DEC (BA `SHP-001`) | ✅ **Closed (`D-131`)** — chọn **(a)**: cửa mã + dựng request chạy **trước** commit `Submitting`, dưới khoá | §4.1 |
 
-### 15.2 🚨 Phát hiện khi viết tài liệu này
+### 15.2 🚨 Phát hiện khi đối chiếu
 
 | # | Vấn đề | Bằng chứng | Mức độ | Xử lý |
 |---|---|---|---|---|
-| **F1** | **Module `ShippingHub` CHƯA TỒN TẠI** trong code: không project, không entity, không `DbSet`, không permission `eCommerce.Shipping.*` | `eCommerce.slnx:1`–`17` (chỉ có ChannelHub/PaymentHub/Tax) · `src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs:36`–`64` (không có DbSet vận đơn) · `src/eCommerce.Application.Contracts/Permissions/eCommercePermissionDefinitionProvider.cs:28`–`59` (không có nhóm Shipping) · `src/eCommerce.Domain/Entities/Orders/Order.cs:45` (`ShippingTotal` là thứ duy nhất liên quan) | 🟡 **Thấp** (đúng kế hoạch — `SHP-004` là tài liệu **GĐ2**, viết trước khi code) | ✅ **Không phải lỗi.** Ghi rõ **toàn bộ** §5/§6/§11 là **kế hoạch GĐ2** — chưa có trong code |
-| **F2** | 🚨 **Tài liệu `SHP-003` KHÔNG TỒN TẠI** trong `docs/features/` ⇒ cảnh báo *"đổi COD ở GHN cần **OTP**"* **không** có văn bản nào của `SHP-003` để đọc. Nó **chỉ** nằm ở kế hoạch và được **tham chiếu** ở nơi khác. ⚠️ Nhiệm vụ "`SHP-003` ghi rõ cảnh báo…" **chưa được thực hiện** | Liệt kê `docs/features/`: **không** có file `shp-003-*`; cảnh báo gốc ở `docs/implementation-plan.md:426` — *"SHP-003 | **COD**: thu hộ, đổi COD (⚠️ GHN cần OTP)"*; các tham chiếu: `docs/features/shipping/shp-002-webhook-trang-thai-van-don.md:18,55` · `docs/features/reporting/rep-003-bao-cao-ton-kho-hieu-suat-kenh.md:539` · `docs/features/notifications/not-002-kenh-gui-email-sms-zalo-oa.md:819` · `docs/features/sales/sal-003-state-machine-4-truc.md:12` · `docs/features/reporting/rep-001-read-model-job-tong-hop.md:737` | 🟠 **Trung bình** (tài liệu được viện dẫn nhưng không tồn tại ⇒ người đọc sau không kiểm được) | ⬜ **Chưa sửa.** Ghi nhận: `SHP-003` **cần được viết**; và **cảnh báo OTP thuộc `SHP-003`**, **không** thuộc `SHP-004` (xem cảnh báo đầu tài liệu + §0 phạm vi) |
-| **F3** 🆕 | 🚨 **Hai quy ước tiền tố khoá lock cùng tồn tại** ⇒ **ít nhất một** đang tạo khoá **SAI**. Kế thừa `SHP-002` §15.2 F3, **chưa** được sửa | `modules/ChannelHub/eCommerce.ChannelHub.Domain/ChannelHubConsts.cs:23` (KHÔNG có `ecommerce:`) vs `modules/Tax/eCommerce.Tax.Domain/TaxErrorCodes.cs:46` (CÓ) vs `src/eCommerce.Domain.Shared/eCommerceConsts.cs:104` (CÓ) vs `src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs:127` (`KeyPrefix = "ecommerce:"`) và comment `:119` | 🔴 **Cao** (lỗi **im lặng**: *"khoá không bảo vệ gì cả"* — `XC-003` §0) | ⬜ **CHƯA sửa — CHƯA kiểm chứng bằng `redis-cli MONITOR`.** `SHP-004` **phụ thuộc** quyết định này (§8.2). Cần: (a) chốt **một** quy ước; (b) ghi vào `XC-003` §5.4 + `coding-conventions.md` |
-| **F4** 🆕 | **`XC-002` CHƯA được triển khai trong code**: **0** chỗ có `IIdempotencyGuard`, `IHasEventOutbox`, `IHasEventInbox`, `InboxRecords`, `DeadLetterEvents`; **0** cấu hình `AbpDistributedEventBusOptions` ⇒ **outbox CHƯA bật** | grep toàn repo: **0** match cho `IIdempotencyGuard`/`IHasEventOutbox`/`IHasEventInbox`/`InboxRecords`/`DeadLetterEvents`; grep `Outbox|Inbox` trong `src/` chỉ ra **hằng số metric** ở `shared/eCommerce.Kernel/Observability/eCommerceMetrics.cs:16`–`17` (không có hạ tầng); `src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs:71`–`91` **không** gọi `ConfigureEventOutbox()`/`ConfigureEventInbox()` | 🟠 **Trung bình–Cao** (`SHP-004` **cần** outbox để phát ETO **cùng transaction**) | ⬜ **Chưa sửa.** `SHP-004` **phải** coi *"outbox đã bật"* là **điều kiện tiên quyết** (§7.1, §11, §14.3) — đúng như `SHP-002` đã ghi ở `docs/features/shipping/shp-002-webhook-trang-thai-van-don.md:638`–`639` |
-| **F5** 🆕 | **`Money`/`Currency` (`XC-001`) CHƯA có trong code** ⇒ mọi tham chiếu `Money.Of(...)`/`ToMinorUnits()` trong tài liệu này là **kế hoạch**, không phải API đang tồn tại | grep toàn repo `Money` ⇒ **0** match; trong khi `XC-001` §6.1 đã đặc tả `Money` (`docs/features/cross-cutting/XC-001-money-currency-lam-tron.md:202`) và `SHP-002` §14.2 **dùng** `Money.Of(...)` trong fixture (`docs/features/shipping/shp-002-webhook-trang-thai-van-don.md:999`) | 🟡 **Thấp** (đúng kế hoạch — `XC-001` là tài liệu nền, code ở GĐ1) | ✅ Ghi rõ: **ADR-09** dùng `decimal` + `string Currency` (khuôn `Order` — `src/eCommerce.Domain/Entities/Orders/Order.cs:36`) cho tới khi `XC-001` có code |
-| **F6** 🆕 | **Chưa có hạ tầng HTTP client** trong repo để gọi NCC ngoài: **0** chỗ dùng `IHttpClientFactory`/`AddHttpClient`; `Directory.Packages.props` **không** có `Microsoft.Extensions.Http`; toàn bộ adapter hiện tại (Shopee, VNPay) **chỉ ký/xác thực**, phần gọi HTTP thật vẫn là `NotImplementedException` | grep `IHttpClientFactory|AddHttpClient` ⇒ **0** match; `modules/ChannelHub/eCommerce.ChannelHub.Application/Connectors/ShopeeConnector.cs:94` — `throw new NotImplementedException(...)`; `modules/PaymentHub/eCommerce.PaymentHub.Application/Providers/VnPayPaymentProvider.cs:162` — `NotImplementedException("Hoàn tiền VNPay chưa được cài đặt…")` | 🟠 **Trung bình** (là **hạ tầng dùng chung** chưa ai làm ⇒ `SHP-001` **và** `SHP-004` đều cần) | ⬜ **Chưa sửa.** Cần chốt ở **Q6**; **đề xuất**: làm **một** lớp `ICarrierHttpClient` dùng chung trong `ShippingHub` để `SHP-001`/`SHP-004` không mỗi bên tự quản `HttpClient` |
-| **F7** | **`Orders.Order.SetStatus` không có guard** — mầm lỗi im lặng; `SHP-004` **phải** tránh | `src/eCommerce.Domain/Entities/Orders/Order.cs:111` — `public void SetStatus(OrderStatus status) => Status = status;` (kế thừa `SHP-002` §15.2 F5) | 🟡 **Thấp–Trung bình** | ⬜ **Ngoài phạm vi `SHP-004`** (thuộc `SAL-003`). `SHP-004` **chỉ** phát ETO, **không** gọi `SetStatus` |
-| **F8** | **`NULLS NOT DISTINCT` đã được vá cho các index HIỆN CÓ, nhưng index MỚI sẽ mất thuộc tính này** nếu để EF tự sinh | `src/eCommerce.EntityFrameworkCore/Migrations/20261013024226_Fix_NullableTenantId_UniqueIndexes.cs:23`–`25` cảnh báo: *"nếu một migration do EF sinh tự động sau này tạo lại một trong các index dưới đây, thuộc tính sẽ **mất**"* | 🟠 **Trung bình** (lỗi **im lặng**: idempotency mất tác dụng khi `TenantId = NULL`) | ✅ **Đã xử lý trong thiết kế**: §5.2 yêu cầu `NULLS NOT DISTINCT` cho **mọi** unique index có `TenantId`; §11 có **migration 2** SQL thô; `TC-20` kiểm chứng |
+| **F1** | **Module `ShippingHub` CHƯA TỒN TẠI**: không project, entity, `DbSet`, permission `eCommerce.Shipping.*` | thư mục `modules/` chỉ có `Address`…`Tax` (không `ShippingHub`); `grep` `GhtkCarrier\|IShippingCarrier` trong `*.cs` = 0 (chỉ có chuỗi `ghtk` trong test `Address`) | 🟡 Thấp (đúng kế hoạch) | ✅ Toàn bộ §5/§6/§11 là **kế hoạch** |
+| **F2** | **Không có interface tra trạng thái chủ động**: `IShippingCarrierProvider` của `SHP-001` §6.1 chỉ có `GetFee`/`Create`/`Cancel`; `SHP-002` §6.1 khai `IShipmentStatusReconciler` nhưng không nói gọi hãng qua interface nào | `shp-001-…md` §6.1; `shp-002-…md` §6.1 | 🟠 Trung bình | ⬜ `SHP-004` **đề xuất** `ICarrierTrackingReader` (§6.1); chủ interface = `SHP-002` ⇒ BA `SHP-002` chốt |
+| **F3** | **`D-83` nợ có nhận chủ**: ánh xạ sửa tại chỗ ⇒ `Shipment` phải tự lưu snapshot `CarrierCode` + `CarrierAddressCode` + tên đã gửi; `SHP-001` §5.2 nhóm cột snapshot (`D-108` (6)) chưa nói rõ là mã **hãng** | `D-83`, `shp-001-…md` §5.2 | 🟠 Trung bình | ⬜ BA `SHP-001` ghi rõ khi rà; `SHP-004` ghi yêu cầu ở §5.2 |
+| **F4** | **`D-89` N2**: đơn vị 2 cấp mới có thể ứng **nhiều** mã hãng (GHTK còn mã cũ) ⇒ cửa mã NÉM ⇒ GHTK 3 cấp **bị chặn** với đơn 2 cấp tới khi có đường gỡ (`ADDR-003`) | `D-89` N2, `D-110` (3) | 🟠 Trung bình | ⬜ Chủ = BA khi chốt Q1; không quyết ở đây |
+| **F5** | **`AddHttpClient` cho GHTK chưa đăng ký** ở Host (chỉ có cho `Address`/VNPay) | `src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs:171` | 🟡 Thấp | ⬜ Làm ở WP code của `SHP-004` (khuôn `:171`) |
 
 ### 15.3 Giả định
 
 | # | Giả định | Nếu **SAI** |
 |---|---|---|
-| 1 | GHTK **bắt buộc** `district` trong payload (nên mặc định `RequiresDistrict = true`) | Nếu GHTK **đã** hỗ trợ 2 cấp ⇒ nới `RequiresDistrict = false` + `AddressLevelMode = TwoLevel` ⇒ bỏ được **cả một lớp** chặn oan. Đổi qua `ShpCarrierAddressPolicies` (**không** cần release) |
-| 2 | GHTK **không** hỗ trợ khoá chống trùng phía hãng | ⇒ **"tra trước – tạo sau"** trở thành **hàng rào duy nhất** ⇒ phải tăng tần suất tra cứu + `TC-10` là test **sống còn**; và phải **ghi rõ cửa sổ rủi ro** trong tài liệu vận hành |
-| 3 | Danh mục địa chỉ hãng **đổi chậm** (vài lần/năm) ⇒ nhịp đồng bộ **1 ngày** là đủ | Nếu hãng đổi **thường xuyên** ⇒ phải tăng nhịp + đặt `MaxCatalogueAgeDays` nhỏ hơn; nếu đổi **quá nhanh** ⇒ `carrier_address_version_mismatch_total` sẽ tăng ⇒ cần khoá version chặt hơn |
-| 4 | `Database` **có** hỗ trợ `NULLS NOT DISTINCT` (PostgreSQL **15+**; dự án dùng **17**) | Nếu hạ cấp PostgreSQL < 15 ⇒ **mất** hàng rào chống trùng khi `TenantId = NULL` ⇒ phải thay bằng cột `TenantId` **không** nullable hoặc unique index trên biểu thức `COALESCE` |
-| 5 | Hãng **có** API tra trạng thái + tra theo `ClientOrderCode` (cần cho ADR-12 + `BR-SHP-004-006`) | 🚨 Nếu **KHÔNG** ⇒ mất khả năng đối soát chủ động (đối với GHTK điều này **đặc biệt** nghiêm trọng vì webhook **không có HMAC**) ⇒ phải chuyển sang **upload file bảng kê** thủ công như `REC-003` (`docs/implementation-plan.md:200`) |
-| 6 | Số hãng vận chuyển **nhỏ (2–5)** ⇒ `provider` là **nhãn hữu hạn** | Vẫn ổn — nhãn theo **số hãng**, không theo số vận đơn (`SHP-002` §15.3 giả định 4) |
-| 7 | `orderNumber` của đơn là **duy nhất theo tenant** ⇒ `ClientOrderCode` ổn định | Nếu **không** ⇒ unique index `(TenantId, ProviderCode, ClientOrderCode, AttemptNo)` chặn **oan** ⇒ phải chuyển sang `{orderId}` (nhưng mất tính dễ đọc khi tra với hãng). ⚠️ Hiện đã có unique `(TenantId, Number)` trên `OrdOrders` — `src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs:180` |
-| 8 | `XC-002` (`InboxRecords` + `IIdempotencyGuard`) **sẽ** được triển khai trước `SHP-004` | Nếu **chưa** ⇒ `SHP-004` vẫn **đủ** an toàn nhờ **unique index ở DB** (§5.2) nhưng **mất** tính nhất quán tra cứu vận hành (đúng như `SHP-002` §15.3 giả định 7 đã ghi) |
-| 9 | Payload gửi/nhận của hãng **có** chứa dữ liệu nhạy cảm (token, số điện thoại người nhận, địa chỉ) | Nếu **nhiều hơn** (số tài khoản, CCCD) ⇒ **phải** bổ sung mẫu che trước khi lưu + test `TC-11` |
+| 1 | GHTK **bắt buộc** `district` ⇒ `AddressModel = ThreeLevel` mặc định | GHTK đã hỗ trợ 2 cấp ⇒ đổi `ShpCarriers.AddressModel = TwoLevel` (không cần release) — gỡ cả một lớp chặn oan |
+| 2 | GHTK **không** chống trùng phía hãng (Q3) | "tra trước – tạo sau" là hàng rào **duy nhất** ⇒ `TC-07` sống còn; ghi cửa sổ rủi ro vào tài liệu vận hành |
+| 3 | GHTK **có** API tra theo `ClientOrderCode` và tra trạng thái (cần cho ADR-11 + BR-006) | 🚨 Nếu **không** ⇒ mất đối soát chủ động (nghiêm trọng vì webhook không HMAC) ⇒ chuyển sang bảng kê thủ công của `REC-003` (`docs/implementation-plan.md:200`) |
+| 4 | Số hãng vận chuyển **nhỏ (2–5)** ⇒ nhãn `provider` hữu hạn | Vẫn ổn — nhãn theo số hãng (`SHP-002` §15.3) |
+| 5 | Payload gửi/nhận **có** dữ liệu nhạy cảm (token, `PartnerCode`, SĐT, địa chỉ, tên người nhận) — che bằng hàm riêng theo tên trường **và** giá trị đã biết (BR-010) | Nhiều hơn (số tài khoản, CCCD) ⇒ bổ sung mẫu che + `TC-12` |
 
 ### 15.4 Lịch sử thay đổi
 
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
-| v0.1 | 15/10/2026 | *(điền)* | Bản nháp đầu — theo đúng **16 mục** của `XC-003` và khuôn `SHP-002`. **Chốt nguyên tắc nền:** *xác minh địa chỉ 2 cấp ở **biên gửi**, **fail-closed*** (ADR-02, `BR-SHP-004-002`), vì GHTK **chưa xác nhận** địa chỉ 2 cấp (`docs/implementation-plan.md:290`, `docs/business-modules-proposal.md:546`). Lập **Data Dictionary** 3 bảng (**chưa có trong code** — F1) + bảng index có **CHECK constraint** làm hàng rào DB cho `BR-SHP-004-002`. Ghi dải mã lỗi `0012`–`0021` (dải `0001`–`0011` đã dùng ở `SHP-002`). Phát hiện **F2** (`SHP-003` **không tồn tại** ⇒ cảnh báo OTP chưa có văn bản), **F3** (xung đột tiền tố khoá lock — kế thừa), **F4** (outbox/`XC-002` **chưa được bật**), **F5** (`Money`/`XC-001` chưa có trong code), **F6** (chưa có hạ tầng HTTP client), **F8** (`NULLS NOT DISTINCT` dễ mất nếu để EF sinh index). **12 ADR · 16 BR · 12 NFR · 26 test case · 5 metric mới · 3 sơ đồ Mermaid** (giới hạn 3 — §5.1 ghi rõ lý do không có ERD) |
+| v0.1 | 15/10/2026 | *(điền)* | Bản nháp đầu — nguyên tắc nền: xác minh địa chỉ 2 cấp ở biên gửi, fail-closed. 12 ADR · 16 BR · 12 NFR · 26 test case · 3 bảng `Shp*` · dải mã `0012`–`0021` |
+| v0.2 | 20/11/2026 | BA (WP-14 ①) | Đối chiếu mô hình Nhanh: bỏ Submission + danh mục địa chỉ + job đồng bộ (ADR-04/ADR-12), dùng `Shipment` của `SHP-001` + cửa mã `Address`; `ClientOrderCode` theo `D-109`; mã lỗi `04xx`; đóng Q2/Q4/Q5/Q6/Q8 theo `D-114`; thêm Q9. **16 BR · 10 NFR · 24 test case**, 0 bảng |
+| v0.3 | 20/11/2026 | BA (WP-14 ①) | Áp `D-128`: Q9 → `Đã chốt`; `TC-10` thêm quét 0 kiểu `Submission` + 0 DbSet mới |
+| v0.4 | 21/11/2026 | BA (WP-14 ①) | Sửa theo `docs/reviews/SHP-004-docreview.md` vòng 1 (P1 + P2): ADR-13 adapter **trả** `FailureKind`, không NÉM sau `Submitting`; thứ tự kiểm cấu hình → địa chỉ → giới hạn → mô phỏng; `VerifyAsync` thuộc `SHP-004` (BR-017); metric `{provider,reason}`; `GetFeeAsync` lỗi mềm; assembly riêng `Carriers.Ghtk`; `AddressModel` một nguồn; `FromAddress`; che PII (BR-010). **18 BR · 10 NFR · 29 test case**; thêm Q10–Q12 |
+| v0.5 | 21/11/2026 | BA (WP-14 ①) | Áp `D-129` (Q10 → `CarrierFeeResult` theo khuôn lỗi chung), `D-130` (Q11 → `Business`/`Configuration` ⇒ `SubmitFailed` + `Rejected`, giữ `FailureCode`), `D-131` (Q12 → cửa mã + dựng request trước commit `Submitting`); đóng Q10–Q12; sửa §0 ADR-13, E1, E7, §4.1, §6.1. Số BR/NFR/TC không đổi |
+
+---
+
+## Đối chiếu mô hình Nhanh (20/11/2026)
+
+| D-xx | Tài liệu cũ nói (§mục) | Đã sửa thành (§mục) | Code thật (file:dòng) / kế hoạch |
+|---|---|---|---|
+| D-83 | §5.2: bảng `ShpCarrierAddressMappings` + job đồng bộ + `MaxCatalogueAgeDays` (nguồn sự thật thứ hai) | §0 ADR-04, §5.2, §11: bỏ; ánh xạ do `Address`; `Shipment` tự lưu snapshot mã hãng (F3) | `modules/Address/` (`CarrierAddressMapping`); ⬜ kế hoạch |
+| D-89 · D-110 | ADR-04, §6.1: `IShippingAddressVerifier` tự tra danh mục | ADR-02/04, BR-002/004: chỉ qua cửa mã `Address`, adapter kiểm lại cấp bắt buộc (TC-02…TC-05) | ⬜ WP-15 (grep `ResolveCarrierAddressCode*` trong `*.cs` = 0) |
+| D-109 | §7.3: `ClientOrderCode = "{tenantCode}-{orderNumber}"`; unique có `AttemptNo` | ADR-06, BR-006, §7.3: hàm `D-109`, adapter dùng nguyên văn; unique thuộc `SHP-001` | ⬜ kế hoạch (`ShipmentCodes.TaoClientOrderCode`, `SHP-001`) |
+| D-116 · D-118 · D-128 | §6.1: `CreateShipmentAsync`/`VerifyAddressAsync`/`GetQuoteAsync` riêng + `IShippingCarrier` | ADR-12, §6.1: dùng `IShippingCarrierProvider` + `IShipmentAppService` của `SHP-001`; không thêm method; Q9 đã chốt `D-128` (TC-10 quét 0 kiểu `Submission`, 0 DbSet mới); adapter ở assembly riêng `eCommerce.ShippingHub.Carriers.Ghtk` (§6.1, `D-128` ⑤); `VerifyAsync` + `ParseAsync` do `SHP-004` cài (BR-017) | ⬜ kế hoạch (F1) |
+| D-108 | §1: `CreateShipmentAsync(OrderId, "ghtk", addressInput)` (client gõ địa chỉ, COD) | ADR-05, §1: địa chỉ/COD/dòng hàng từ snapshot đơn qua Sales; adapter không đọc địa chỉ từ hãng | `modules/Sales/eCommerce.Sales.Domain/Order.cs:121,130`; hợp đồng Sales ⬜ |
+| D-114 | §6.2 `0012`–`0021`; §15 Q2/Q4/Q5/Q6/Q8 `Open` | §6.2: dải `0401`–`0404`; Q2/Q4/Q5/Q6/Q8 `Đã chốt — D-114`; Q1/Q3/Q7 `Open` (R3); `EnableLiveCalls`/`IsEnabled` mặc định tắt | `docs/agents/uy-quyen-chu-du-an.md:35,78` |
+| D-129 | §6.1: `CarrierFeeResult` chưa có hình dạng (Q10 `Open`) | §6.1, §15.1 Q10: `CarrierFeeResult(Success, Fee, CurrencyCode, FailureCode, FailureKind, FailureMessage)` theo `SHP-001` §6.1 + `D-129` | ⬜ kế hoạch (F1) |
+| D-130 | ADR-13, E1: "chờ xác nhận ở Q11" | ADR-13, E1, E7, Q11: `Business`/`Configuration` ⇒ `SubmitFailed` + `Rejected`, giữ `FailureCode` adapter; `0103` chỉ cho mã rỗng | ⬜ kế hoạch (F1) |
+| D-131 | §4.1 ghi chú: thứ tự cửa mã so với commit `Submitting` chưa chốt (Q12) | §4.1: sơ đồ + ghi chú — cửa mã + dựng request trước commit `Submitting`; Q12 đóng | ⬜ kế hoạch (F1) |
+| D-82 | §8.2: khoá `ecommerce:shipping:…` + F3 "xung đột tiền tố" | §8.2, Q5: không tiền tố, không khoá riêng | `docs/coding-conventions.md:79,83-84` |
+| D-08 · D-69/D-70 | Header: GĐ2; §1 `OrderStatus.Confirmed` | Header: GĐ3; RMA = `SAL-006`; adapter không đổi trạng thái đơn (4 trục, `D-08`) | `docs/agents/anh-xa-lo-trinh-d69.md:28` |
+| Hiện trạng | §7.1/§15.2 F4–F6: outbox, `Money`, `HttpClient` "chưa có"; mốc `file:dòng` cũ | Có outbox, `Money` (`Vnd`/`Equals`, không `ToMinorUnits`), `AddHttpClient` ở Host | `eCommerceEntityFrameworkCoreModule.cs:86-87` · `Money.cs:39,123` · `eCommerceHttpApiHostModule.cs:171` · `PaymentTransaction.cs:313` |
+| Không lệch | D-03, D-06, D-07, D-17, D-18/D-42, D-27, D-31, D-45, D-47/D-48 | Không liên quan (không có enum lưu DB, POS, tồn kho, số lượng lưu, ledger, báo cáo) | — |
