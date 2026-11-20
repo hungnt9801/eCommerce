@@ -33,6 +33,7 @@ param([string]`$Root)
 `$dem = Join-Path `$Root 'dem.txt'
 `$n = if (Test-Path `$dem) { [int](Get-Content `$dem) } else { 0 }; Set-Content `$dem (`$n + 1)
 if ('$mode' -eq 'khong') { '{"result":"khong lam gi"}'; exit 0 }
+if ('$mode' -eq 'env') { [Console]::Error.WriteLine('Background tasks still running 10m after the last turn (subagent "BA"); stopping them.'); '{"result":"BG=' + `$env:CLAUDE_CODE_DISABLE_BACKGROUND_TASKS + ' CEIL=' + `$env:CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS + '","permission_denials":[{"tool_name":"Bash","tool_input":{"command":"grep -n x docs/a.md"}}]}'; exit 0 }
 if ('$mode' -eq 'han-muc-1' -and `$n -eq 0) { '{"is_error":true,"result":"You''ve hit your session limit · resets 3:45pm"}'; exit 1 }
 `$id = (& pwsh -NoProfile -File `$ph next -Root `$Root | Select-Object -Last 1).Trim()
 `$o = & pwsh -NoProfile -File `$ph start -Id `$id -Root `$Root
@@ -99,6 +100,10 @@ try {
     & git -C $repo add -A; & git -C $repo -c user.email=t@t -c user.name=t commit -qm sua
     $k = Chay (ClaudeGia 'lam')
     Ca 'T11 sau khi commit => chay binh thuong' (((Reg)[0].status -eq 'xong') -and ($k.out -match 'KET THUC sau 1 phien')) $k
+
+    RepoMoi 't12' @((Hang 'P-01' 'doc-gate' @()))
+    $k = Chay (ClaudeGia 'env') @('-ToiDa', '1')
+    Ca 'T12 phien con nhan bien tat tac vu nen; doc JSON dung du stderr co chu; bao lenh bi tu choi + vai nen bi dung' (($k.out -match 'BG=1 CEIL=0') -and ($k.out -match '1 lenh bi tu choi quyen') -and ($k.out -match 'vai chay nen bi dung')) $k
 }
 finally { Remove-Item -Recurse -Force $goc -ErrorAction SilentlyContinue }
 

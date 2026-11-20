@@ -29,6 +29,8 @@ Lệnh shell chạy qua **Git Bash** ⇒ đường dẫn dùng `/`. Viết tắt
 **Uỷ quyền git của lệnh này:** người dùng gọi `/chay-phien` = yêu cầu **commit + push nhánh WP** (`CLAUDE.md` §8 "chỉ khi người dùng yêu cầu")
 ở các điểm xanh của phiên. **Không bao giờ:** merge, mở/đóng PR, push `main`, `--force`, `git add -A`/`.`, `git config --global`, sửa lịch sử.
 
+**Gọi vai luôn ở tiền cảnh:** mọi lần gọi `Agent` (ba, docrev, decider) đặt `run_in_background: false` và **chờ kết quả** rồi mới làm bước kế; không bao giờ kết thúc lượt với câu "vai còn đang chạy, sẽ tiếp khi có thông báo" — ở chế độ không cửa sổ (bộ chạy tự động) lượt kết thúc là phiên kết thúc, vai chạy nền bị dừng (N34, 20/11).
+
 ## 0. Chuẩn bị (≤ 5 lệnh)
 
 0. **Kiểm vai đã nạp (trước mọi việc khác):** danh sách `subagent_type` của công cụ `Agent` phải có đủ `ba`, `docrev`, `decider`.

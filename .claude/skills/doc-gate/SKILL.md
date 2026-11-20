@@ -21,6 +21,8 @@ hook khoá phiên chính vào vùng ORCH của `.claude/scopes.json` (`docs/agen
 
 Tiền đề: đã chạy `/mo-phien` (baseline). Luật nền: `CLAUDE.md` §3–§7, `docs/nhanh/08-session-protocol.md` §6 (dấu hiệu dừng).
 
+**Gọi vai luôn ở tiền cảnh:** mọi lần gọi `Agent` (ba, docrev, decider) đặt `run_in_background: false` và **chờ kết quả** rồi mới làm bước kế; không bao giờ kết thúc lượt với câu "vai còn đang chạy, sẽ tiếp khi có thông báo" — ở chế độ không cửa sổ (bộ chạy tự động) lượt kết thúc là phiên kết thúc, vai chạy nền bị dừng (N34, 20/11).
+
 ## 0. Xác định danh sách mã
 
 - `A` / `B` / `C` ⇒ đúng các mã của đợt đó trong bảng §WP-14 của `docs/nhanh/07-ke-hoach-trien-khai.md`

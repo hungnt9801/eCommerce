@@ -103,6 +103,10 @@ $claude = if ($claudeTest) { $null } else { (Get-Command claude -CommandType App
 if (-not $claudeTest -and -not $claude) { Write-Output 'LOI: khong thay lenh claude trong PATH'; Remove-Item $khoa -Force; exit 1 }
 
 $env:CHAY_TU_DONG_PHIEN = '1'   # phien con biet minh do bo chay mo (skill /chay-phien buoc 0)
+# N34 (20/11): phien chinh goi vai `ba` CHAY NEN, ket thuc luot "cho thong bao" => `claude -p` cho 10 phut roi GIET vai, phien mat trang.
+# Tat tac vu nen (vai chay tien canh, phien chinh doi ket qua) + bo tran cho 10 phut phong khi van co tac vu nen.
+$env:CLAUDE_CODE_DISABLE_BACKGROUND_TASKS = '1'
+$env:CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS = '0'
 $maThoat = 0; $soPhien = 0; $khongTien = 0
 try {
     Ghi ("BAT DAU bo chay (toi da {0} phien, model {1})" -f $ToiDa, $Model)
@@ -139,11 +143,19 @@ try {
         if (-not $p.WaitForExit([int]($GioToiDaMotPhien * 3600 * 1000))) {
             $p.Kill($true); Ghi "phien $id qua $GioToiDaMotPhien gio — da dung tien trinh (hang o lai, phien sau lam tiep)"
         }
-        $ra = (Get-Content -LiteralPath $tep -Raw -ErrorAction SilentlyContinue) + "`n" + (Get-Content -LiteralPath "$tep.err" -Raw -ErrorAction SilentlyContinue)
-        $ketQua = ''
-        try { $j = ($ra.Trim() | ConvertFrom-Json -ErrorAction Stop); $ketQua = [string]$j.result } catch { $ketQua = $ra }
+        $stdout = [string](Get-Content -LiteralPath $tep -Raw -ErrorAction SilentlyContinue)
+        $stderr = [string](Get-Content -LiteralPath "$tep.err" -Raw -ErrorAction SilentlyContinue)
+        $ra = $stdout + "`n" + $stderr
+        $ketQua = ''; $j = $null
+        try { $j = ($stdout.Trim() | ConvertFrom-Json -ErrorAction Stop); $ketQua = [string]$j.result } catch { $ketQua = $ra }
         $tom = ($ketQua -replace '\s+', ' ').Trim(); if ($tom.Length -gt 300) { $tom = $tom.Substring(0, 300) + '…' }
         Ghi ("  ket thuc exit {0}: {1}" -f $p.ExitCode, $tom)
+        if ($j -and $j.permission_denials -and @($j.permission_denials).Count) {
+            Ghi ("  canh bao: {0} lenh bi tu choi quyen (khong ai duyet): {1}" -f @($j.permission_denials).Count, ((@($j.permission_denials) | ForEach-Object { $c = [string]$_.tool_input.command; if ($c.Length -gt 60) { $c = $c.Substring(0, 60) + '…' }; "$($_.tool_name): $c" }) -join ' | '))
+        }
+        if ($stderr -match 'Background tasks still running' -or ($j -and $j.subagent_stats -and $j.subagent_stats.killed.system -gt 0)) {
+            Ghi '  canh bao: vai chay nen bi dung khi phien ket thuc — phien sau lam tiep hang nay'
+        }
 
         $hm = DocHanMuc $ra
         if ($hm) {

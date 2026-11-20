@@ -50,7 +50,7 @@ Quyết định trong phiên do `decider` lấy theo [hồ sơ uỷ quyền](uy-
 2. Kiểm ca thử của bộ chạy (không gọi Claude thật, ~1 phút):
 
    ```powershell
-   pwsh -File tools/agents/test-chay-tu-dong.ps1    # TONG: 11 dat · 0 truot
+   pwsh -File tools/agents/test-chay-tu-dong.ps1    # TONG: 12 dat · 0 truot
    pwsh -File tools/agents/test-phien.ps1           # TONG: 38 dat · 0 truot
    ```
 
@@ -123,6 +123,7 @@ duyệt đợt C cần kế toán; sau đó `P-20` (đóng WP) và `P-21` (mở 
 | Hiện tượng | Nguyên nhân thường gặp | Cách xử lý |
 |---|---|---|
 | Bộ chạy dừng ngay, nhật ký "cay lam viec co thay doi ngoai docs/**" | tệp hệ thống (`.claude/`, `tools/`) vừa cài hoặc sửa mà chưa commit | chạy đúng lệnh `git add -- …` bộ chạy in ra, `git commit`, rồi chạy lại |
+| Phiên xong sau ~10 phút, kết quả "Agent BA vẫn đang chạy…", `.err` có "Background tasks still running … stopping them" | phiên chính gọi vai **chạy nền** rồi kết thúc lượt; `claude -p` chờ 10 phút rồi dừng vai (N34) | bộ chạy bản 20/11 tối đặt `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1` (vai luôn chạy tiền cảnh) + `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0`; skill dặn `run_in_background: false` |
 | Chữ tiếng Việt trong cửa sổ thành `?` | console Windows dùng code page cũ | bộ chạy bản 20/11 tối đã tự đổi sang UTF-8; vẫn lỗi ⇒ dùng Windows Terminal |
 | Phiên báo "Agent type 'ba' not found" / dừng ở bước 0 | frontmatter vai sai YAML (Claude Code bỏ qua im lặng) | `node --test .claude/hooks/test/hooks.test.mjs` — ca `F1` chỉ tệp + dòng; sửa trong gói cài, chạy lại `cai-dat.ps1` |
 | `Unknown command: /chay-phien` | chưa cài gói, hoặc cài sau khi mở Claude | chạy `cai-dat.ps1`; bộ chạy luôn mở phiên mới nên lần sau tự nhận |
