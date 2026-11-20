@@ -50,7 +50,7 @@ Quyết định trong phiên do `decider` lấy theo [hồ sơ uỷ quyền](uy-
 2. Kiểm ca thử của bộ chạy (không gọi Claude thật, ~1 phút):
 
    ```powershell
-   pwsh -File tools/agents/test-chay-tu-dong.ps1    # TONG: 12 dat · 0 truot
+   pwsh -File tools/agents/test-chay-tu-dong.ps1    # TONG: 13 dat · 0 truot
    pwsh -File tools/agents/test-phien.ps1           # TONG: 38 dat · 0 truot
    ```
 
@@ -86,6 +86,18 @@ Muốn bắt đầu vào một giờ cố định (ví dụ 22:00 tối nay) mà
 schtasks /Create /TN "eCommerce-chay-tu-dong" /SC ONCE /ST 22:00 /TR "pwsh -NoProfile -File D:\Projects\Tools\eCommerce\tools\agents\chay-tu-dong.ps1"
 schtasks /Delete /TN "eCommerce-chay-tu-dong" /F    # xoá lịch khi không cần
 ```
+
+### 4.1. Nhịp thật trên gói Pro (đo 20–21/11/2026)
+
+| Cửa sổ 5 giờ | Làm được | Dùng (ước theo giá API) | Ghi chú |
+|---|---|---|---|
+| 20:57 → hết lúc 21:20 | 23 phút, 4 lượt vai (`ba` 2, `decider` 1, `docrev` 1) | Sonnet ≈ 2,5 $ · Opus ≈ 3,1 $ | cửa sổ đã bị 2 phiên thử lúc 20:05, 20:11 dùng trước |
+| 01:21 → hết lúc 01:55 | 34 phút, 7 lượt vai (`decider` 3, `docrev` 2, `ba` 2) | Sonnet ≈ 2,6 $ · Opus ≈ 7,5 $ | Opus chiếm ~¾ |
+
+⇒ Mỗi cửa sổ 5 giờ chỉ đủ khoảng **25–35 phút** dây chuyền; phần lớn hạn mức đi vào hai vai Opus (`decider`, `docrev`).
+Chạy liên tục cả ngày ≈ 4–5 cửa sổ ⇒ khoảng 2–3 giờ dây chuyền/ngày, và còn trần hạn mức **tuần**. Một tài liệu lớn thường cần 2 cửa sổ;
+phiên bị cắt giữa chừng thì phiên sau làm tiếp từ cây làm việc (bảng giữ 🟨, cột Phiên thêm số mới).
+Thông báo hết hạn mức đo được: `You've hit your 5-hour limit · resets 1am (Asia/Bangkok)` — bộ chạy bản 21/11 đọc được mẫu này, ngủ đúng tới giờ hồi + 3 phút.
 
 ## 5. Theo dõi
 
@@ -129,7 +141,8 @@ duyệt đợt C cần kế toán; sau đó `P-20` (đóng WP) và `P-21` (mở 
 | `Unknown command: /chay-phien` | chưa cài gói, hoặc cài sau khi mở Claude | chạy `cai-dat.ps1`; bộ chạy luôn mở phiên mới nên lần sau tự nhận |
 | JSON có `permission_denials` (ví dụ `git push`) | chế độ không cửa sổ không có ai duyệt — lệnh không có luật cho phép bị từ chối | commit vẫn ở máy, phiên ghi vào câu trả lời; push tay, hoặc báo để thêm luật `permissions.allow` trong gói cài |
 | Cầu dao sau 2 phiên | phiên lỗi ngay đầu (thiếu vai, cây bẩn ngoài `docs/**`, nhánh sai) | đọc `.json` + `.err`; sửa điều kiện §2 |
-| Ngủ mãi 30 phút một | không đọc được giờ hồi hạn mức | bình thường khi định dạng thông báo đổi; báo để cập nhật mẫu trong `chay-tu-dong.ps1` (`DocHanMuc`) |
+| Ngủ mãi 30 phút một, nhật ký "khong doc duoc gio hoi" | thông báo hạn mức đổi mẫu (20/11: "5-hour limit" thay "session limit") | không hại (lần thử khi chưa hồi không tốn hạn mức); gửi dòng thông báo để cập nhật `DocHanMuc` |
+| Nhiều dòng "lenh bi tu choi quyen" (`for`, `awk`, `cd … && …`) | phiên đọc tệp bằng chuỗi lệnh shell; không cửa sổ thì không ai duyệt | skill bản 21/11 dặn dùng `Read`/`Grep`; còn lệnh nào hay bị từ chối ⇒ gửi để thêm luật `permissions.allow` |
 | Hai phiên cùng số `N` / commit lẫn nhau | mở cửa sổ `/chay-phien` tay song song với bộ chạy | **không** chạy song song; phiên tay sẽ tự dừng nếu thấy khoá bộ chạy |
 
 ## 9. Luật không đổi khi chạy tự động

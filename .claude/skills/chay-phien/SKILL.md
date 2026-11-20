@@ -31,6 +31,10 @@ Lệnh shell chạy qua **Git Bash** ⇒ đường dẫn dùng `/`. Viết tắt
 
 **Gọi vai luôn ở tiền cảnh:** mọi lần gọi `Agent` (ba, docrev, decider) đặt `run_in_background: false` và **chờ kết quả** rồi mới làm bước kế; không bao giờ kết thúc lượt với câu "vai còn đang chạy, sẽ tiếp khi có thông báo" — ở chế độ không cửa sổ (bộ chạy tự động) lượt kết thúc là phiên kết thúc, vai chạy nền bị dừng (N34, 20/11).
 
+**Đọc tệp bằng công cụ `Read` / `Grep`, không bằng chuỗi lệnh shell:** ở chế độ không cửa sổ không ai duyệt quyền — lệnh ghép
+(`cd … && grep … | cut`, `for n in …; do sed …`, `awk 'NR==…'`) bị **từ chối** và mất lượt (N35/N36: 14 lệnh bị từ chối). Cần dòng N của tệp ⇒
+`Read` với `offset`/`limit`; tìm chuỗi ⇒ `Grep` (có `-n`). Shell chỉ để chạy script cổng (`pwsh -File tools/…`, `node --test …`) và git.
+
 ## 0. Chuẩn bị (≤ 5 lệnh)
 
 0. **Kiểm vai đã nạp (trước mọi việc khác):** danh sách `subagent_type` của công cụ `Agent` phải có đủ `ba`, `docrev`, `decider`.

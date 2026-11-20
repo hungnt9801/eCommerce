@@ -68,18 +68,25 @@ function DauVet {
         ForEach-Object { $_.Name + ':' + $_.Length } | Sort-Object
     return (Get-FileHash -LiteralPath $reg -Algorithm SHA256).Hash + '|' + ($hd -join ',')
 }
-# "You've hit your session limit · resets 3:45pm" / "... weekly limit · resets Mon 12:00am"
+# Mau thong bao (do duoc 20/11/2026 tren 2.1.328):
+#   "You've hit your 5-hour limit · resets 1am (Asia/Bangkok)"   "... · resets 6:20am (Asia/Bangkok)"
+#   tai lieu: "You've hit your session limit · resets 3:45pm" / "... weekly limit · resets Mon 12:00am" / "Opus limit" / "Sonnet limit"
 function DocHanMuc([string]$text) {
-    $m = [regex]::Match($text, "hit your (session|weekly|Opus|Sonnet) limit\s*(?:\u00b7|-)?\s*resets\s+([A-Za-z]{3}\s+)?(\d{1,2})(?::(\d{2}))?\s*([ap]m)", 'IgnoreCase')
+    $m = [regex]::Match($text, "hit your ([\w\s-]+?) limit\s*(?:\u00b7|-|,)?\s*resets\s+(?:([A-Za-z]{3,9})\.?\s+)?(\d{1,2})(?::(\d{2}))?\s*([ap]m)", 'IgnoreCase')
     if (-not $m.Success) {
-        if ($text -match "hit your (session|weekly|Opus|Sonnet) limit|usage limit|rate_limit") { return @{ loai = 'khong-ro' } }
+        if ($text -match "hit your [\w\s-]+ limit|usage limit|rate_limit") { return @{ loai = 'khong-ro' } }
         return $null
     }
-    $loai = $m.Groups[1].Value.ToLower()
-    if ($loai -eq 'weekly') { return @{ loai = 'tuan'; chu = $m.Value } }
+    if ($m.Groups[1].Value -match 'week') { return @{ loai = 'tuan'; chu = $m.Value } }
     $h = [int]$m.Groups[3].Value % 12; if ($m.Groups[5].Value -ieq 'pm') { $h += 12 }
     $mi = if ($m.Groups[4].Success) { [int]$m.Groups[4].Value } else { 0 }
     $t = (Get-Date).Date.AddHours($h).AddMinutes($mi)
+    $thu = $m.Groups[2].Value
+    if ($thu -and ($thu -notmatch '^(today|tomorrow)$')) {
+        $ten = @('sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat')
+        $k = [Array]::IndexOf($ten, $thu.Substring(0, [Math]::Min(3, $thu.Length)).ToLower())
+        if ($k -ge 0) { while ([int]$t.DayOfWeek -ne $k -or $t -le (Get-Date)) { $t = $t.AddDays(1) } }
+    }
     if ($t -le (Get-Date)) { $t = $t.AddDays(1) }
     return @{ loai = 'phien'; luc = $t; chu = $m.Value }
 }
@@ -157,7 +164,7 @@ try {
             Ghi '  canh bao: vai chay nen bi dung khi phien ket thuc — phien sau lam tiep hang nay'
         }
 
-        $hm = DocHanMuc $ra
+        $hm = DocHanMuc ($ketQua + "`n" + $ra)   # $ketQua da giai ma JSON ("\u00b7" -> "·")
         if ($hm) {
             $soPhien--
             if ($hm.loai -eq 'tuan') { Ghi "DUNG: het han muc TUAN ($($hm.chu)) — chay lai sau khi hoi"; $maThoat = 2; break }
