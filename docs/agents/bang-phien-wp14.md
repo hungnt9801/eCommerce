@@ -4,6 +4,23 @@
 > Khuôn theo §14 "Bảng phiên chạy" của dự án SelfLearningAI (`ke-hoach-xay-dung-cms.md`), làm cho eCommerce:
 > **một lệnh dán cho mọi phiên**, phiên tự chọn việc, tự cập nhật bảng, tự commit.
 
+## 0. Chạy tự động khi không ngồi máy (khuyến nghị)
+
+Mở **một** cửa sổ PowerShell tại repo, chạy rồi để máy bật (tắt chế độ ngủ của Windows):
+
+```powershell
+pwsh -File tools/agents/chay-tu-dong.ps1
+```
+
+Bộ chạy lặp: chọn hàng kế (`phien.ps1 next`) → mở **một phiên Claude Code mới** (`claude -p "/chay-phien"`, Sonnet, auto mode, không chờ ai duyệt)
+→ chờ phiên xong (bảng + handover + commit) → hàng kế. Hết hạn mức 5 giờ ⇒ tự ngủ tới giờ hồi rồi chạy tiếp đúng hàng đó.
+Tự dừng khi: hết việc của agent · tới hàng 🗣/👤 (cần anh/chị) · hết hạn mức **tuần** · 2 phiên liền không tiến triển (cầu dao) ·
+có tệp phanh `artifacts/agents/tu-dong/DUNG` (tạo tệp đó để dừng sau phiên đang chạy). Nhật ký: `artifacts/agents/tu-dong/nhat-ky.md`.
+
+⚠️ **Một phiên một lúc.** Không mở thêm cửa sổ `/chay-phien` khi bộ chạy đang chạy, và không mở hai cửa sổ `/chay-phien` cùng lúc:
+mọi phiên dùng chung thư mục, nhánh và các tệp `decisions.md`, nháp biên bản, bảng này (đêm 19–20/11 ba phiên song song đã trùng số `N30`,
+commit lẫn quyết định của nhau, mất `handover-n30`). Cột Phụ thuộc chỉ nói về **nội dung**; việc chạy luôn tuần tự.
+
 ## 1. Cách dùng — chủ dự án chỉ làm 3 việc
 
 > **Một lần, trước đợt còn lại — phiên uỷ quyền.** `U-01` (agent tự gom câu hỏi, anh/chị không cần ngồi) rồi `U-02`: anh/chị **ngồi cùng
@@ -53,7 +70,7 @@ và lần `/chay-phien` sau làm tiếp đúng phần còn lại theo handover. 
 | `P-03` | A | `SHP-001` adapter GHN, tính phí, vận đơn (131 KB ⇒ một mình) | ORCH · ba · docrev · decider | U-02 | `/chay-phien P-03` | N29 | ✅ Hoàn thành | SHP-001 DOC-OK vong kiem nhanh (0 P1, 0 P2, 17 P3); check-feature-doc -WP14 exit 0 (22 BR, 52 TC); check-agent-artifact -Kind docreview exit 0; nhap-bien-ban-gd3-a co dong SHP-001; D-108..D-110 TAM CHOT · `docs/nhanh/handover-n25.md` |
 | `P-04` | A | `SHP-002` webhook trạng thái vận đơn + `SHP-004` adapter GHTK | ORCH · ba · docrev · decider | U-02 | `/chay-phien P-04` | N29, N30, N32 | 🔁 Dở dang | SHP-002 xong (7f3d61b, DOC-OK vong 2); con SHP-004 adapter GHTK. N30 release nham de nhuong P-05 · `docs/nhanh/handover-n32.md` |
 | `P-05` | A | `SHP-003` COD thu hộ / đổi COD (121 KB ⇒ một mình; 9 câu chờ hãng) | ORCH · ba · docrev · decider | U-02 | `/chay-phien P-05` | N30 | ✅ Hoàn thành | check-feature-doc -WP14 exit 0 (16/16, 22/22 BR); docreview DOC-OK vong 2 (0 P1/2 P2) exit 0; D-117 D-120; kiem-link PASS; mermaid 0 loi · `docs/nhanh/handover-n32.md` |
-| `P-06` | A | `REC-003` đối soát COD import Excel | ORCH · ba · docrev · decider | P-05, U-02 | `/chay-phien P-06` | — | ⬜ Chưa bắt đầu |  |
+| `P-06` | A | `REC-003` đối soát COD import Excel | ORCH · ba · docrev · decider | P-05, U-02 | `/chay-phien P-06` | N33 | ✅ Hoàn thành | check-feature-doc -WP14 exit 0 (16/16 muc, 16/16 BR, 44 TC); DOCREV REC-003 DOC-OK vong 2 (0 P1, 2 P2, 9 P3) + check-agent-artifact exit 0; D-121..D-127 (check decision DAT); D3 nhap bien ban; link PASS, mermaid 0 loi · `docs/nhanh/handover-n33.md` |
 | `P-07` | A | `SAL-006` trả hàng / RMA / hoàn tiền (303 KB, danh sách đỏ ⇒ một mình) | ORCH · ba · docrev · decider | U-02 | `/chay-phien P-07` | — | ⬜ Chưa bắt đầu |  |
 | `P-08` | A | Chuẩn bị hồ sơ duyệt đợt A: nháp biên bản đủ dòng mọi tài liệu của đợt, danh sách người review bắt buộc theo loại, bảng câu chờ người còn mở | ORCH | P-01, P-02, P-03, P-04, P-05, P-06, P-07 | `/chay-phien P-08` | — | ⬜ Chưa bắt đầu |  |
 | `P-09` | A | Duyệt đợt A: lập `docs/bien-ban-duyet-gd3-a-<ngày>.md` (9 tài liệu) + người đã liên hệ GHN/GHTK + kế toán (COD, hoàn tiền) | ORCH · decider (uỷ quyền D-115) | P-08 | `/chay-phien P-09` | — | ⬜ Chưa bắt đầu | uỷ quyền theo D-115 — chủ dự án xem lại theo lô |
