@@ -11,11 +11,12 @@
     Lenh:
       status                                   in bang
       next                                     in Id hang phai chay tiep (dang-lam > do-dang > chua co phu thuoc xong)
-      start  -Id P-xx -Session Nxx             nhan hang (kiem phu thuoc, khong 2 hang dang-lam)
+      start  -Id P-xx [-Session Nxx]           nhan hang (kiem phu thuoc, khong 2 hang dang-lam); bo -Session => script
+                                               tu cap so phien = max(handover, cot Phien) + 1, in dong `PHIEN=Nxx`
       done   -Id P-xx -Evidence "..." [-Handover <tep>]   hoan thanh (bat buoc bang chung)
       dodang -Id P-xx -Reason "..."   [-Handover <tep>]   phien ket thuc nhung hang chua dat DoD
       blocked -Id P-xx -Reason "..."           bi chan ben ngoai
-      release -Id P-xx [-Reason "..."]         tra ve chua bat dau
+      release -Id P-xx [-Reason "..."]         tra ve chua bat dau (hang dang-lam: chi voi -Force — co the la phien khac)
       sync                                     sinh lai bang Markdown tu registry
       check                                    bang khop registry, toi da 1 hang dang-lam, hang xong co bang chung
       doisoat -Id P-xx                         doi soat hang doc-gate voi docreview + handover moi nhat (phien chay kieu cu):
@@ -112,6 +113,17 @@ function Sync($r) {
     $moi = $t.Substring(0, $i + $batDau.Length) + "`n" + (Sinh-Bang $r) + "`n" + $t.Substring($j)
     if ($moi -ne $t) { [IO.File]::WriteAllText($docPath, $moi, $utf8) }
 }
+function SoPhienKe($r) {
+    $max = 0
+    $hdDir = Join-Path $Root 'docs/nhanh'
+    if (Test-Path -LiteralPath $hdDir) {
+        foreach ($f in Get-ChildItem -LiteralPath $hdDir -Filter 'handover-n*.md' -File) {
+            $m = [regex]::Match($f.Name, '^handover-n(\d+)\.md$'); if ($m.Success) { $max = [Math]::Max($max, [int]$m.Groups[1].Value) }
+        }
+    }
+    foreach ($h in $r['rows']) { foreach ($p in @($h['phien'])) { $m = [regex]::Match([string]$p, '^N(\d+)$'); if ($m.Success) { $max = [Math]::Max($max, [int]$m.Groups[1].Value) } } }
+    return 'N' + ($max + 1)
+}
 function Can([string]$ten, [string]$v) { if (-not $v) { Write-Output "LOI: lenh nay bat buoc -$ten"; exit 1 } }
 function KiemHandover {
     if (-not $Handover) { return }
@@ -140,7 +152,7 @@ switch ($Lenh) {
         exit 3
     }
     'start' {
-        Can 'Id' $Id; Can 'Session' $Session
+        Can 'Id' $Id
         $h = Hang $r $Id
         if ($h['loai'] -eq 'nguoi') { Write-Output "LOI: $Id la viec cua NGUOI — dung 'done' khi nguoi da lam"; exit 6 }
         if ($h['status'] -eq 'xong') { Write-Output "LOI: $Id da xong"; exit 1 }
@@ -148,11 +160,13 @@ switch ($Lenh) {
         if ($d -and -not $Force) { Write-Output "BLOCKED: phu thuoc $d chua xong"; exit 2 }
         $khac = @($r['rows'] | Where-Object { $_['status'] -eq 'dang-lam' -and $_['id'] -ne $Id })
         if ($khac.Count -and -not $Force) { Write-Output ("BLOCKED: {0} dang lam — dong no truoc (done/dodang/release)" -f $khac[0]['id']); exit 4 }
+        if (-not $Session) { $Session = SoPhienKe $r }
         $h['status'] = 'dang-lam'
         if (-not (@($h['phien']) -contains $Session)) { $h['phien'] = @(@($h['phien']) | Where-Object { $_ }) + $Session }
         $h['batDau'] = (Get-Date).ToString('yyyy-MM-ddTHH:mm:sszzz')
         Ghi-Reg $r; Sync $r
         Write-Output ("OK: {0} dang lam (phien {1}) — {2}" -f $Id, $Session, $h['noiDung'])
+        Write-Output ("PHIEN={0}" -f $Session)
         exit 0
     }
     'done' {
@@ -187,6 +201,7 @@ switch ($Lenh) {
     'release' {
         Can 'Id' $Id
         $h = Hang $r $Id
+        if ($h['status'] -eq 'dang-lam' -and -not $Force) { Write-Output "BLOCKED: $Id dang-lam (co the phien khac dang chay) — khong release; that su bo hang thi them -Force"; exit 4 }
         $h['status'] = 'chua'; $h['ghiChu'] = $Reason
         Ghi-Reg $r; Sync $r
         Write-Output "OK: $Id tra ve chua bat dau"

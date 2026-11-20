@@ -92,7 +92,21 @@
       "Bash(pwsh -File tools/agents/phien.ps1 *)",
       "PowerShell(pwsh -File tools/agents/phien.ps1 *)",
       "Bash(pwsh -File tools/agents/test-phien.ps1)",
-      "PowerShell(pwsh -File tools/agents/test-phien.ps1)"
+      "PowerShell(pwsh -File tools/agents/test-phien.ps1)",
+      "Bash(pwsh -File tools/kiem-link-tai-lieu.ps1)",
+      "PowerShell(pwsh -File tools/kiem-link-tai-lieu.ps1)",
+      "Bash(npm --prefix tools run check:mermaid)",
+      "PowerShell(npm --prefix tools run check:mermaid)",
+      "Bash(node --test .claude/hooks/test/hooks.test.mjs)",
+      "PowerShell(node --test .claude/hooks/test/hooks.test.mjs)",
+      "Bash(pwsh -File tools/agents/check-feature-doc.ps1 *)",
+      "PowerShell(pwsh -File tools/agents/check-feature-doc.ps1 *)",
+      "Bash(pwsh -File tools/agents/check-agent-artifact.ps1 *)",
+      "PowerShell(pwsh -File tools/agents/check-agent-artifact.ps1 *)",
+      "Bash(git add -- *)",
+      "PowerShell(git add -- *)",
+      "Bash(git commit -m *)",
+      "PowerShell(git commit -m *)"
     ],
     "deny": [
       "Bash(git config --global *)",

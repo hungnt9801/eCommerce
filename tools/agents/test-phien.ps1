@@ -57,7 +57,7 @@ try {
     $doc = [IO.File]::ReadAllText((Join-Path $tam 'docs/agents/bang-phien-wp14.md'), $utf8)
     Kiem 'C4 sync giu noi dung ngoai marker + co 8 hang + nhan ngoi cung' (($doc -match 'duoi') -and (([regex]::Matches($doc, '\| `P-0\d` \|')).Count -eq 8) -and ($doc -match '🗣 Chờ ngồi cùng'))
     Ca 'C5 next = hang chua dau tien du phu thuoc' 0 @('next') '^P-02'
-    Ca 'C6 start thieu -Session bi tu choi' 1 @('start', '-Id', 'P-02') 'Session'
+    Ca 'C6 start khong -Session => script tu cap so = max(handover n10) + 1' 0 @('start', '-Id', 'P-02') 'PHIEN=N11'
     Ca 'C7 start hang co phu thuoc chua xong' 2 @('start', '-Id', 'P-03', '-Session', 'N11') 'P-02'
     Ca 'C8 start hang cua nguoi bi tu choi' 6 @('start', '-Id', 'P-04', '-Session', 'N11') 'NGUOI'
     Ca 'C9 start P-02' 0 @('start', '-Id', 'P-02', '-Session', 'N11') 'dang lam'
@@ -69,6 +69,7 @@ try {
     Ca 'C15 next uu tien hang do-dang' 0 @('next') '^P-02'
     Ca 'C16 start lai hang do-dang, phien moi duoc ghi them' 0 @('start', '-Id', 'P-02', '-Session', 'N12') 'dang lam'
     Kiem 'C17 registry ghi ca N11 va N12' ((@((Reg).rows[1].phien) -join ',') -eq 'N11,N12')
+    Ca 'C39 release hang dang-lam khong -Force bi tu choi (phien khac co the dang chay)' 4 @('release', '-Id', 'P-02') 'dang-lam'
     Ca 'C18 doisoat: DOC-OK va handover moi nhat §2 khong nhac => de xuat done' 0 @('doisoat', '-Id', 'P-02') 'DE-XUAT: done'
     Ca 'C19 doisoat: DOC-CHANGES => lam tiep' 1 @('doisoat', '-Id', 'P-05') 'lam tiep'
     Ca 'C20 done P-02' 0 @('done', '-Id', 'P-02', '-Evidence', 'DOC-OK 0 P1', '-Handover', 'docs/nhanh/handover-n10.md') 'xong'
@@ -83,7 +84,7 @@ try {
     Ca 'C30 uyquyen truoc khi phien uy quyen xong bi tu choi' 2 @('uyquyen', '-Id', 'P-08', '-Evidence', 'D-1') 'uy quyen'
     Ca 'C31 uyquyen hang vung cam bi tu choi' 6 @('uyquyen', '-Id', 'P-07', '-Evidence', 'D-1') 'vung cam'
     Ca 'C32 uyquyen hang khong phai cua nguoi bi tu choi' 1 @('uyquyen', '-Id', 'P-05', '-Evidence', 'D-1') 'khong phai'
-    Ca 'C33 start phien uy quyen (-Force vi phu thuoc bi chan)' 0 @('start', '-Id', 'P-06', '-Session', 'N13', '-Force') 'dang lam'
+    Ca 'C33 start tu cap so vuot ca cot Phien (handover n10, da dung N11 N12 => N13; -Force vi phu thuoc bi chan)' 0 @('start', '-Id', 'P-06', '-Force') 'PHIEN=N13'
     Ca 'C34 done phien uy quyen' 0 @('done', '-Id', 'P-06', '-Evidence', 'ho so HIEU LUC D-2') 'xong'
     Ca 'C35 uyquyen sau phien uy quyen' 0 @('uyquyen', '-Id', 'P-08', '-Evidence', 'D-2') 'decider'
     Kiem 'C36 hang chuyen sang duyet-dec, vai ghi D-2' (((Reg).rows[7].loai -eq 'duyet-dec') -and ((Reg).rows[7].vai -match 'D-2'))
