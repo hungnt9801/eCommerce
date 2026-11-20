@@ -35,6 +35,9 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# Windows: console mac dinh la code page OEM => tieng Viet tu tien trinh con (phien.ps1, claude) thanh "?". Doi sang UTF-8 cho ca cha lan con.
+try { [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false); [Console]::InputEncoding = [Text.UTF8Encoding]::new($false) } catch { }
+$OutputEncoding = [Text.UTF8Encoding]::new($false)
 if (-not $Root) { $Root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path }
 $utf8 = [Text.UTF8Encoding]::new($false)
 $phien = Join-Path $Root 'tools/agents/phien.ps1'
@@ -53,6 +56,12 @@ function Ghi([string]$s) {
 function PH([string[]]$a) {
     $out = & pwsh -NoProfile -File $phien @a -Root $Root 2>&1 | Out-String
     return @{ ma = $LASTEXITCODE; out = $out.Trim() }
+}
+# Cay lam viec ban ngoai docs/** va agents/state/** => /chay-phien se tu dung (§0.1) — kiem truoc de khoi ton mot phien.
+function TepBanNgoaiVung {
+    $out = & git -C $Root status --porcelain 2>$null
+    if ($LASTEXITCODE -ne 0) { return @() }   # khong phai repo git (ca thu) => bo qua
+    return @($out | ForEach-Object { $_.Substring(3).Trim('"') } | ForEach-Object { ($_ -split ' -> ')[-1] } | Where-Object { $_ -and $_ -notmatch '^(docs/|agents/state/|artifacts/)' })
 }
 function DauVet {
     $hd = Get-ChildItem -LiteralPath (Join-Path $Root 'docs/nhanh') -Filter 'handover-n*.md' -File -ErrorAction SilentlyContinue |
@@ -107,6 +116,11 @@ try {
         $hang = @((Get-Content -LiteralPath $reg -Raw -Encoding utf8 | ConvertFrom-Json).rows | Where-Object { $_.id -eq $id })[0]
         if ($hang.loai -eq 'thao-luan') { Ghi "DUNG: hang $id can nguoi ngoi cung — mo cua so va dan /chay-phien $id"; $maThoat = 3; break }
 
+        $ban = TepBanNgoaiVung
+        if ($ban.Count) {
+            Ghi ("DUNG: cay lam viec co thay doi ngoai docs/** va agents/state/** — commit tay truoc (phien se tu choi chay):`n    " + ($ban -join "`n    ") + "`n    goi y: git add -- " + ($ban -join ' ') + "; git commit -m `"chore(agents): ...`"")
+            $maThoat = 1; break
+        }
         $truoc = DauVet
         $soPhien++
         $tep = Join-Path $logDir ((Get-Date -Format 'yyyyMMdd-HHmmss') + "-$id.json")

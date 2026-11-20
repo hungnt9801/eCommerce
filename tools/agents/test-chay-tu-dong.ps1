@@ -88,6 +88,17 @@ try {
     RepoMoi 't9' @((Hang 'P-01' 'doc-gate' @()), (Hang 'P-02' 'doc-gate' @()))
     $k = Chay (ClaudeGia 'lam') @('-ToiDa', '1')
     Ca 'T9 -ToiDa 1 => dung sau 1 phien' (($k.out -match 'da chay du 1 phien') -and ((Reg | Where-Object status -eq 'xong').Count -eq 1)) $k
+
+    RepoMoi 't10' @((Hang 'P-01' 'doc-gate' @()))
+    Ghi '.gitignore' "dem.txt`n"
+    & git -C $repo init -q; & git -C $repo add -A; & git -C $repo -c user.email=t@t -c user.name=t commit -qm init
+    Ghi 'tools/agents/phien.ps1' ((Get-Content (Join-Path $repo 'tools/agents/phien.ps1') -Raw) + "`n# sua`n")
+    Ghi 'docs/x.md' 'trong vung'
+    $k = Chay (ClaudeGia 'lam')
+    Ca 'T10 cay ban ngoai docs/** + agents/state/** => dung TRUOC khi mo phien, liet ke tep (exit 1)' (($k.ma -eq 1) -and ($k.out -match 'tools/agents/phien.ps1') -and ($k.out -notmatch 'docs/x.md') -and -not (Test-Path (Join-Path $repo 'dem.txt'))) $k
+    & git -C $repo add -A; & git -C $repo -c user.email=t@t -c user.name=t commit -qm sua
+    $k = Chay (ClaudeGia 'lam')
+    Ca 'T11 sau khi commit => chay binh thuong' (((Reg)[0].status -eq 'xong') -and ($k.out -match 'KET THUC sau 1 phien')) $k
 }
 finally { Remove-Item -Recurse -Force $goc -ErrorAction SilentlyContinue }
 
