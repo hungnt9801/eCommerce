@@ -1,78 +1,94 @@
 # Doc review — SAL-006 Trả hàng / RMA và hoàn tiền (một phần / toàn bộ)
 
-**VERDICT: DOC-CHANGES**
+**VERDICT: DOC-OK**
 
 | | |
 |---|---|
-| Tài liệu | `docs/features/sales/sal-006-tra-hang-rma-hoan-tien.md` (2725 dòng, v1.6) |
-| Ngày · vòng | 21/11/2026 · vòng 2 |
+| Tài liệu | `docs/features/sales/sal-006-tra-hang-rma-hoan-tien.md` (2723 dòng, v1.7) |
+| Ngày · vòng | 21/11/2026 · vòng 3 (kiểm nhanh: chỉ các mục BA đổi từ v1.6 sang v1.7) |
 | Người kiểm | agent `docrev` (ngữ cảnh sạch) |
-| Đã đọc | dòng 1–2725 (toàn văn, kể cả §16–§27 vòng 1 bỏ qua) + `decisions.md:146-152` (`D-132`…`D-138`) |
-| Máy | `check-feature-doc.ps1 -WP14` → exit 0 (0 lỗi; 16/16 heading, 23/23 BR có test, mục đối chiếu ở dòng 2698; INFO 14 câu `Open`, 0 TODO) |
+| Đã đọc | toàn bộ `git diff --word-diff` v1.6 → v1.7 (79 dòng thêm / 81 dòng bớt); ngữ cảnh ở các dòng 38–53, 205–249, 340–384, 547–566, 628–667, 800–849, 929, 1052–1054, 2686–2720; `decisions.md:146-154` (`D-132`…`D-140`); báo cáo vòng 2 (toàn văn) |
+| Máy | `check-feature-doc.ps1 -WP14` → exit 0 (0 lỗi; 16/16 heading, 23/23 BR có test, mục đối chiếu ở dòng 2694; INFO 14 câu `Open`, 0 TODO) |
 
 ## Đã kiểm
 
 | Nhóm | Cách kiểm | Kết quả |
 |---|---|---|
-| D1 tự mâu thuẫn | grep `phiếu mới`/`phiếu khác`/`nhiều phiếu`/`qua nhiều phiếu`/`hai phiếu` (31 chỗ), `RefundedAmount`, `0004`, `TH-{ReturnNumber}`, `NhapHangKhachTraAsync` trên toàn tệp; so ADR-11/BR-005/BR-012 với §3.3, §5.1, §5.2, §6.2, §8.3, §11, TC-40/41/43 | 4 phát hiện (#3, #4, #5, #10) |
-| D2 chéo tài liệu / code / D-xx | đọc `CustomerReturnGateway.cs` 1–83; `OrderReturnService.cs` 60–209; `OrderStateMachine.cs` 175–247 (7 cạnh `Closure`); `Order.cs` 236–257, 600–644, 825–849; `OrderReturn.cs` 9–36, 173–300, 382, 420; `OrderReturnAppService.cs` (grep `Authorize`/`TH-`); `MoneyAllocator.cs` 15–94; `InventoryDbContextModelCreatingExtensions.cs` 94/110/160–168/240; `eCommerceConsts.cs` (grep :99/:100/:108/:802/:827); `eCommerceHttpApiHostModule.cs` (grep `KeyPrefix`); `DonHangAppService.cs`/`MarketplaceOrderFactory.cs` (grep); so với `D-132` (3)(5), `D-135` (3), `D-136` (1), `D-137` (4), `D-138` | 5 phát hiện (#1, #2, #8, #9, #11) |
-| D3 cơ chế thực thi | BR-004/005/009/011/012/016/023 → cái gì đỏ; riêng BR-012 + `D-137` (4) dò đường gọi cổng hai lần cùng số chứng từ qua nhánh idempotent `CustomerReturnGateway.cs:45-54` | 1 phát hiện (#1) |
-| D4 SQL chạy được | không có khối `sql`/`powershell`/`bash` (grep fence: 3 `mermaid`, 6 `csharp`). CHECK nội tuyến §5.1 (`"Method" <> 1 OR "EvidenceReference" IS NOT NULL`) **chưa chạy**: `which psql` → không có; `docker` → command not found (exit 127) | 0 phát hiện |
-| D5 test/probe/tệp có thật | grep `test/`: `OrderStateMachineTests`, `Wp04TonKhoChieuTests`, `OrderReturnTests` có; `DbSet` RMA `eCommerceDbContext.cs:220-225` có; provider `:89-90`, `:96` có; registry 16 tên (`eCommerceMetrics.cs:16-78`), tag `:192-210`, `Allowed :212`, `Forbidden :219` khớp; `ReturnRefundMethod.Manual = 1` (`OrderReturn.cs:34`) khớp CHECK; `KeyPrefix` dẫn sai dòng | 1 phát hiện (#11) |
-| D6 nhãn tin cậy | ✅ ở §0 (dòng 31–54) và §14.4 so code đã đọc ở D2/D5 | 0 phát hiện |
-| D7 14 quy tắc + đối chiếu Nhanh | #1–#14; `npm --prefix tools run check:mermaid` → 211 khối, 0 lỗi (exit 0); `pwsh -File tools/kiem-link-tai-lieu.ps1` → 770 link + 969 backtick, 0 chết (exit 0); thẻ HTML; mục đối chiếu (dòng 2698–2721) so thân + `D-132`…`D-138` | 3 phát hiện (#6, #12, #13) + #1 (hàng `D-137` của mục đối chiếu) |
+| D1 tự mâu thuẫn | Grep trên toàn tệp các mẫu: ``mỗi `(đợt…`/``mỗi `(dòng…`` (8 chỗ: :113, :117, :118, :663, :871, :907, :2703, :2710), `Return:0001/0006/0011`, `` `0004` `` (27 chỗ), `phiếu mới`/`tạo phiếu (trả) mới`, `Σ RefundAmount ==`, `một đợt = một chứng từ`, `cùng số chứng từ`, `Migration [0-9]`. So BR-012 với Basic Flow 9, §7.3, §7.4, §8.1 #8, TC-20, TC-34 (vi), TC-41 (v), TC-45 | 2 phát hiện (#1, #3) |
+| D2 chéo tài liệu / code / D-xx | So thân tài liệu với `D-139` (1)–(6) ⑥ và `D-140` (1)–(5). Đọc code: `CustomerReturnGateway.cs:1-83` (idempotent `:45-54`; `autoSave` + `GhiSoAsync` `:62-75`); `OrderReturnAppService.cs:85-122`; `OrderReturn.cs:172-294`, `:353`, `:428-443` (`LedgerEntryId = chungTuId`); `OrderReturnService.cs:92-99`, `:320-333`; `SalesErrorCodes.cs:14`, `:20`; `eCommerceConsts.cs:522`, `:525`; `TinhButToanChungTu.cs:33-36`; `Enums.Inventory.cs:4-146`. Grep: `InventoryDbContextModelCreatingExtensions.cs` (`HasIndex` ở `:94`, `:110`, `:166-168`, `:240`); `StockPostingService.cs` (`requiresNew`/`UnitOfWork` = 0); `eCommerceHttpApiHostModule.cs` (`:94` `TransactionBehavior.Auto`, `:222`, `:237`, `:299`); `options.Map(` cho mã `Sales` trên toàn repo = 0 | 4 phát hiện (#2, #5, #6, #7) |
+| D3 cơ chế thực thi | Mỗi BR mới, cái gì đỏ khi vi phạm: "không có hai lời gọi cổng cùng số" → TC-45 (vi); "lời gọi sau NÉM ⇒ cả đợt rollback" → TC-45 (iii) + UoW transactional (`TransactionBehavior.Auto`, POST); gộp theo SKU → unique `:166-168` + TC-45 (ii); `D-140` → `S14-E8`/`S14-E19` + TC-06/TC-21 | 0 phát hiện |
+| D4 SQL chạy được | Grep fence `sql`/`powershell`/`bash`/`sh`/`pwsh` = 0 khối. Phần BA đổi không thêm SQL | 0 phát hiện (không có khối sql) |
+| D5 test/probe/tệp có thật | `S14-E8`, `S14-E19` có ở `tools/kiem-e2e.ps1:1731`, `:1788`, `:1978`, `:2047` (khẳng định `eCommerce:Sales:0010`). TC-45 có ở §14 (dòng 932) và được dẫn đúng ở BR-012 (iii)(iv)(vi), §7.4, §8.1 #8, Q16, F17. DoD §14 ghi "45 test case" (dòng 982). `KeyPrefix` `:222`/`:237` khớp. `OrderReturn.cs:173`/`:178-181`/`:208-213`/`:286-293` và `OrderReturnService.cs:95-98` khớp nội dung được dẫn | 0 phát hiện |
+| D6 nhãn tin cậy | Ghi chú §6.2 (dòng 549) "grep = 0 `Sales`": đo lại, đúng. Kết luận "HTTP theo code, chưa xác định" dừng trước con số → #2 | 1 phát hiện (#2) |
+| D7 14 quy tắc + đối chiếu Nhanh | `npm --prefix tools run check:mermaid` → 211 khối, 0 lỗi (exit 0). `pwsh -File tools/kiem-link-tai-lieu.ps1` → 772 link + 977 backtick, 0 chết (exit 0). Grep `<list`/`<item>`: chỉ còn trong chữ của dòng lịch sử 2690. Mục đối chiếu (dòng 2694–2719) có hàng `D-139` và `D-140`; hàng `D-137` đã ghi rõ phần (4) bị thay | 1 phát hiện (#6) |
 
 ## Phát hiện
 
 | # | Mức | Vị trí | Vấn đề | Đề nghị |
 |---|---|---|---|---|
-| 1 | P1 | §1 Basic Flow bước 9 (dòng 114); BR-012 (dòng 117); §7.4 hàng `Sales → Inventory` (dòng 644); F6 (dòng 1044); TC-34 (vi) (dòng 921); TC-41 (v) (dòng 928); mục đối chiếu hàng `D-137` (dòng 2717) | **Lỗi mới do chỗ sửa.** Một đợt nhận có cả dòng `Restock` lẫn dòng hàng lỗi bị tài liệu bắt đi **hai lời gọi cổng cùng số chứng từ** `TH-{ReturnNumber}-{rev}`: dòng `Restock` qua `NhapHangKhachTraAsync` "không đổi hợp đồng", dòng hàng lỗi qua method additive "nhận cùng số chứng từ, nằm trong cùng chứng từ, một lần `GhiSoAsync`". Điều này không làm được. `NhapHangKhachTraAsync` tự tạo chứng từ và tự ghi sổ (`CustomerReturnGateway.cs:62-75`), nên lời gọi thứ hai cùng số rơi vào nhánh idempotent "chứng từ đã có ⇒ trả id cũ, không nhập kho" (`:45-54`), đúng cái BR-012 đòi ("idempotent theo số chứng từ ở cổng"). Đường hỏng: BE làm đúng chữ §7.4, gọi `Restock` trước rồi hàng lỗi sau. Lời gọi hàng lỗi bị nuốt mà không báo gì, nên `OnHand`/`Damaged` thiếu đúng phần hàng lỗi. Gọi ngược thứ tự thì phần `Restock` mất. Trong cả hai trường hợp phiếu vẫn `Received`, đơn vẫn `Returned`. Chính `D-132` (3) đã cấm cách này: "không dùng chung số … trùng số ⇒ lời gọi sau bị nuốt im lặng", nên `D-137` (4) mâu thuẫn với `D-132` (3). Thêm một chỗ nữa: unique `(TenantId, StockDocumentId, Sku)` (`InventoryDbContextModelCreatingExtensions.cs:166-168`) không cho hai dòng cùng SKU trong một chứng từ, nên đợt trộn có hai dòng đơn cùng SKU khác cách xử lý sẽ đỏ ở DB | ORCH gửi **DEC** chốt một trong hai cách (vì hai `D-xx` đang mâu thuẫn, BA không tự chọn được). (a) Đợt có dòng hàng lỗi ⇒ **một** lời gọi method additive nhận **mọi** dòng của đợt (`Restock` + hàng lỗi), chạy một `GhiSoAsync`; `NhapHangKhachTraAsync` chỉ dùng cho đợt toàn `Restock`. (b) Hai chứng từ mỗi đợt, có hậu tố riêng cho nhánh hàng lỗi theo `D-132` (3), và bỏ câu "một đợt = một chứng từ". Sau đó BA sửa Basic Flow 9, BR-012, §7.4, F6, TC-34 (vi), TC-41 (v), hàng `D-137` của mục đối chiếu; sửa cả `D-132` (5) ("hàm guard chỉ nhận chứng từ của nhánh hàng lỗi" không còn phân biệt được nếu chọn (a)); thêm ca TC "đợt trộn `Restock` + `Damaged`, hai dòng đơn cùng SKU" |
-| 2 | P2 | §3 câu mở đầu (dòng 186); §1 E1, E6 (dòng 116); §6.2 hàng `0001`, `0006`, `0011` (dòng 553, 558, 563); TC-06/TC-21 (dòng 893, 908) | **Vòng 1 #4 mới đóng một phần.** §6.2 chỉ ghi mã thật cho `0003`/`0004`/`0014`, rồi viết "không ghi = chưa có code (`S14b` khai mới)". Nhưng chuyển trạng thái phiếu sai, phiếu đã hấp thụ, và đóng phiếu khi hàng chưa về **đã** ném `eCommerce:Sales:0010` trong code (`OrderReturn.cs:173`, `:178-181`, `:208-213`, `:286-293`), và E2E đang khoá đúng mã này (§32.2 `S14-E8`, §34.2 `S14-E19`). Ai làm `S14b` theo §6.2 sẽ khai `Return:0001`/`0006`/`0011` cho những khái niệm đã có mã. Như vậy hoặc trái chính ADR-10/NFR-012 ("đã có mã `Sales:*` thì dùng lại"), hoặc làm đỏ `S14-E8`/`S14-E19` | Ghi mã thật hiện nay (`Sales:0010`) vào ô của `0001`/`0006`/`0011`. Chốt rõ có tách mã hay không. Nếu tách thì ghi lộ trình và nói rõ sẽ đổi kỳ vọng `S14-E8`/`S14-E19`, TC-06/TC-21 |
-| 3 | P2 | §3.3 hàng 8 (dòng 246); §5.2 (dòng 470); §6.2 thông điệp `0006` (dòng 558); §8.3 #10 (dòng 701) | Vẫn còn di chứng của vòng 1 #1: bốn chỗ hướng dẫn "**tạo phiếu trả mới**" sau khi phiếu đã kết thúc. Cụ thể: "muốn hoàn thêm ⇒ tạo phiếu trả mới"; "trả một phần nhiều lần — ADR-11"; "Hãy tạo phiếu mới."; "kế toán mở phiếu mới nếu cần". Nhưng theo ADR-11/`D-135`, phiếu `Rejected`/`Closed` làm đơn hấp thụ, nên tạo phiếu mới sẽ NÉM `Order:0006` (`Order.cs:612-622`). Phiếu đã có lần hoàn `Succeeded` thì không huỷ được (§3.1 #5), nên cũng không về `Open` được. UI hoặc vận hành làm theo các câu này sẽ đưa ra nút hay quy trình luôn lỗi | Sửa cả 4 chỗ thành "không có phiếu thứ hai sau phiếu đã kết thúc (nợ Q17)". Bỏ "Hãy tạo phiếu mới." khỏi thông điệp `0006`. §5.2 ghi lý do quan hệ 1–n là "có các phiếu `Cancelled`", không phải "trả nhiều lần" |
-| 4 | P2 | §5.1 `OrdReturnLines.RefundAmount` cột ghi chú (dòng 380); cùng câu ở `D-136` (1) | Ghi bất biến `Σ RefundAmount == OrdReturns.RefundedAmount`. Nhưng `RefundedAmount` là "Σ tiền **đã hoàn**" (dòng 348, cộng dồn ở `GhiNhanHoanTien`, `OrderReturn.cs:303-318`), còn `Σ RefundAmount` là số **đề nghị**. Hoàn một phần là luồng hợp lệ (TC-16 60 % rồi 40 %, `PartiallyRefunded`), nên đẳng thức sai ngay giữa chừng. TC-43 lại dùng `Σ RefundAmount` làm **trần** (`≤`). Ai làm theo "==" (assert, CHECK, hoặc gán `RefundedAmount := Σ RefundAmount`) sẽ chặn hoàn một phần, hoặc ghi "đã hoàn" một khoản chưa chi | Viết lại thành `RefundedAmount ≤ Σ RefundAmount` (trần cấp phiếu, TC-43), bằng nhau khi đã hoàn đủ. BR-006 giữ nghĩa "phân bổ tổng xuống dòng". Báo ORCH để `D-136` (1) có dòng đính chính |
-| 5 | P3 | BR-005 ví dụ "trả 1/1/1", "trả 1 rồi 2", "trả hết qua nhiều phiếu" + "hàng rào luỹ kế `r0 > 0`" (dòng 117); §5.1 dòng 378–379; TC-40 (iv)(v)(viii)(xi) (dòng 927); §15.3 #10 (dòng 1073) | Theo `D-135`, mỗi lần tạo phiếu thành công thì luôn có `r0 = 0`: huỷ hay từ chối đều nhả `ReturnedQuantity` (`OrderReturnService.cs:176`, `:195`), còn phiếu thứ hai khi phiếu trước chưa huỷ thì NÉM. Vì vậy công thức luỹ kế và hàng rào `r0 > 0` chỉ có nghĩa khi Q17 cho phép phiếu thứ hai. Các ví dụ "qua nhiều phiếu" trái câu "không có lần trả thứ hai" ở ADR-11 | Ghi rõ "`r0 > 0` chỉ xuất hiện khi Q17 mở; dưới `D-135` thì `r0 = 0`". TC-40 (viii) đổi thành "trả hết trong một phiếu". Ghi (iv)/(xi) là test hàm thuần |
-| 6 | P3 | §11 hàng "Bảng có thêm cột (còn lại)" (dòng 813) so với Migration 1 (dòng 806); thứ tự các hàng Migration | Hàng tóm tắt ghi `OrdReturnLines (+2 snapshot)`, nhưng Migration 1 thêm **4** cột (`OrderLineQuantitySnapshot`, `ReturnedBeforeQuantity`, `OrderDiscountAllocatedSnapshot`, `OrderTaxAllocatedSnapshot`). Đánh số Migration là 1, 3, 4, 5, 7, 6: thiếu số 2, số 7 đứng trước số 6 | Ghi "+4 cột (2 snapshot số lượng F18 + 2 snapshot phân bổ `D-138`)" và đánh số lại |
-| 7 | P3 | §5.1 tiêu đề `OrdOrderLines` (dòng 420); ghi chú SQL thô (dòng 459) | Vẫn ghi "bổ sung 1 cột" và "phải thêm cột `ReturnedQuantity` + constraint bằng SQL thô, **và** backfill `0`", trong khi cột và CHECK đã có từ `Gd1S14_OrderReturn` (chính §11 dòng 805 ghi vậy) | Ghi là "đã có", bỏ việc thêm cột ra khỏi danh sách cần SQL thô |
-| 8 | P3 | ADR-11 cột "Lý do chọn" (dòng 91); §34.5 #3 (dòng 2522) | ADR-11 dẫn "`HuyAsync` cho phép tạo phiếu khác — `OrderReturnService.cs:198-201`" làm bằng chứng. Đó là **comment sai** trong code: chính F16 và §3.1 #4 nói huỷ xong thì đơn kẹt `ReturnRequested` và phiếu 2 NÉM `Order:0001`. §34.5 #3 cũng nói "đơn vẫn tạo được phiếu trả khác" mà không có ghi chú lỗi thời như dòng 4 của cùng bảng | ADR-11 bỏ câu dẫn này, hoặc ghi rõ "comment hiện sai (F16)". Thêm ghi chú ở §34.5 rằng #3 đã lỗi thời theo `D-135` |
-| 9 | P3 | A3 (dòng 115); §3.1 #1 (dòng 207); §12 (dòng 835) | Ghi đơn `Cancelled` ⇒ `Order:0006`, nhưng code chặn từ trước bằng `Sales:0010` "Đơn đã HUỶ" (`OrderReturnService.cs:95-98`), chưa đi tới `ChuyenKetThuc` | Ghi `Sales:0010` cho trường hợp đơn `Cancelled`, hoặc ghi rõ là cố ý đổi mã (kèm TC) |
-| 10 | P3 | BR-012, Basic Flow 9 (dòng 114, 117); §3.2 ghi chú (dòng 231); §12 (dòng 837) | Ghi "`ReceivedQuantity` giảm ⇒ NÉM `0004`", trong khi §6.2 định nghĩa `0004` là "thiếu `ReasonCode`/actor/`Disposition`" | Dùng nhãn khác (vd `0001`, mã thật `Sales:0010`), hoặc mở rộng định nghĩa của `0004` ở §6.2 |
-| 11 | P3 | §0 hàng "Khoá phân tán" (dòng 48) | Dẫn `KeyPrefix` ở `eCommerceHttpApiHostModule.cs:115-128`, nhưng thực tế `options.KeyPrefix = "ecommerce:"` nằm ở `:222` và `:237` (grep) | Sửa dòng dẫn |
-| 12 | P3 | §23.2 (dòng 1651–1656); §25.5 (dòng 1865–1869); §26.2 (dòng 1908–1916) | Dùng thẻ `<list type="number">`/`<item>`, không phải thẻ HTML hợp lệ (D7 #13), nên renderer Markdown không đánh số và có thể hiện sai | Đổi sang danh sách Markdown `1.` / `2.` |
-| 13 | P3 | NFR-SAL-006-005 (§1 dòng 118; §13 dòng 871) | Ghi "gửi lại sự kiện 100 lần ⇒ 1 bút toán **và 1 lần hoàn**", kiểm bằng TC-20. Nhưng TC-20 nay gọi `NhanHangAsync` (API) 100 lần và không phủ phần hoàn tiền | Đổi "cách kiểm" thành TC-20 (kho) + TC-17/NFR-007 (hoàn tiền), hoặc thêm ca cho sự kiện |
+| 1 | P2 | BR-012 câu đầu (dòng 117); Post-Condition (dòng 113); §8.1 #8 (dòng 663); TC-20 (dòng 907). So với NFR-005 (dòng 118, 871), câu gộp SKU của BR-012, TC-45 (ii) | **Đơn vị đếm bút toán chưa được sửa theo `D-139` (3).** Câu đầu BR-012 ghi "đúng một bút toán mỗi `(đợt nhận, dòng phiếu trả, MovementType)`". Nhưng câu sau của chính BR-012, cùng TC-45 (ii), yêu cầu gộp hai dòng phiếu trả cùng SKU cùng nhánh thành **một** dòng chứng từ. Unique `(TenantId, ReferenceLineId, MovementType)` (`:240`) cũng tính theo dòng **chứng từ**. Vậy hai dòng `Restock` cùng SKU chỉ sinh **1** `CustomerReturn`, không phải 2. Tài liệu đang dùng ba cách gọi cho cùng một đơn vị: "dòng phiếu trả" (:117), "dòng" (:113, :663, :907), "dòng chứng từ" (:118, :871). Cách hỏng: QA viết TC-20/TC-45 theo câu đầu BR-012 sẽ kỳ vọng 2 bút toán, mâu thuẫn với TC-45 (ii). Hoặc BE gửi mỗi dòng phiếu trả thành một dòng chứng từ thì va unique `:166-168`, cả đợt NÉM. Lỗi này làm DB báo đỏ chứ không sai im lặng, nên xếp P2 | Dùng **một** đơn vị ở cả 4 chỗ: "đúng một bút toán mỗi `(chứng từ của đợt, dòng chứng từ = SKU, MovementType)`; mỗi dòng phiếu trả nhận > 0 thuộc đúng một dòng chứng từ của nhánh mình". Sửa câu đầu BR-012, Post-Condition, §8.1 #8 và cột kỳ vọng của TC-20 |
+| 2 | P2 | §6.2: ghi chú (dòng 549), hàng `0003` (`Sales:0011`, `400`, dòng 555), `0004` (`400`, :556), `0014` (`400`, :566). §12: dòng 834 (`400`), 835 (`409`, gồm cả `Sales:0010` cho đơn `Cancelled`), 837 (`409`/`400`), 840, 848 | **`D-140` (1) mới áp được một nửa.** `D-140` yêu cầu "HTTP ghi theo code đang trả … BA đo, không ghi 409/400 suy đoán". Ba hàng `0001`/`0006`/`0011` đã đổi sang "theo code (chưa có ánh xạ HTTP riêng)". Các hàng còn lại cũng là mã thật `Sales:0010`/`Sales:0011` nhưng vẫn ghi `400`/`409`. Kết quả đo: grep `options.Map(` cho mã `Sales`/`PhieuTra`/`TraVuot` trên toàn repo = 0, và bản đồ mã ở `eCommerceHttpApiHostModule.cs:299` không có mã Sales nào. Chính repo ghi rằng mã không được map thì ABP trả **`403`** (`ReportingErrorCodes.cs:8-9`, bài học `INV-003` `0042`). Tức là API thật nhiều khả năng trả 403 cho các mã này, không phải 400/409. Cách hỏng: FE `admin-web` xử lý lỗi theo §6.2/§12 (400 = sửa form, 409 = tải lại) sẽ nhận 403 và hiện "không có quyền". Chưa gọi API thật để đo (xem "Không kiểm được") | Ghi số HTTP thật, cùng một cách ghi, cho **mọi** hàng mang mã `Sales:0010`/`0011` ở §6.2 và §12. Chọn một: ghi `403 (mặc định ABP, chưa map — đo bằng …)`, hoặc đưa việc thêm `options.Map` vào `S14b` (kèm TC). Không để `400`/`409` nằm cạnh "theo code" cho cùng một mã |
+| 3 | P3 | BR-012, câu "Σ bút toán `CustomerReturn` của một SKU = Σ `ReceivedQuantity` luỹ kế của các dòng phiếu trả SKU đó" (dòng 117) | Câu thiếu phạm vi. "Của một SKU" không giới hạn trong phiếu trả này (các chứng từ `TH-{ReturnNumber}-*`), nên nếu tính trên cả sổ cái (mọi phiếu, mọi kho) thì đẳng thức sai | Thêm "trong các chứng từ của phiếu này (`TH-{ReturnNumber}-*`)" |
+| 4 | P3 | §5.1 `LedgerEntryId` (dòng 381), so với §11 Migration 6 (dòng 811) | "Truy vết đủ mọi đợt qua `TH-{ReturnNumber}-*`" bỏ sót chứng từ kiểu cũ `TH-{ReturnNumber}` (không có `-`). Đó là chứng từ của phiếu đã nhận một đợt trước `D-137`, chính Migration 6 có nhắc | Ghi "`TH-{ReturnNumber}` (phiếu trước `D-137`) và `TH-{ReturnNumber}-*`" |
+| 5 | P3 | §6.2 hàng `0004` (dòng 556) và `0014` (dòng 566), so với ghi chú dòng 549 | Ghi chú đặt luật: "mã thật ghi trong ô Mã (gạch nhãn); nhãn không gạch = chưa có khái niệm trong code (`S14b` khai mới — `0002`, `0005`, `0007`–`0010`, `0012`, `0013`)". Hai hàng `0004`/`0014` đã có mã thật `Sales:0010` (`OrderReturn.cs:196-199` thiếu lý do; `OrderReturnAppService.cs:90-95` disposition sai) nhưng **không gạch** nhãn, và cũng **không** nằm trong danh sách khai mới. Người làm `S14b` không biết có phải khai `Return:0004`/`0014` hay không | Gạch nhãn và ghi "→ `eCommerce:Sales:0010` (không khai `Return:0004`/`0014`)", theo đúng khuôn của hàng `0001`/`0003` |
+| 6 | P3 | Mục đối chiếu, hàng `D-134`, cột "Đã sửa thành" (dòng 2705) | "Migration 2 bỏ đích" đã lỗi thời. Sau khi đánh số lại (P3 #6 vòng 2), Migration 2 là SQL thô `NULLS NOT DISTINCT` (dòng 807); không còn mục migration nào về kiểu số lượng | Ghi "§11: bỏ mục đổi kiểu `numeric(18,3)` (không còn migration riêng — `D-134`)" |
+| 7 | P3 | `decisions.md:150`, `D-136` (1) | Tài liệu đã đính chính (§5.1 dòng 380, mục đối chiếu dòng 2712), nhưng `D-136` (1) vẫn ghi "`Σ RefundAmount (dòng) == OrdReturns.RefundedAmount` (BR-006)", và chưa có dòng `D-xx` nào đính chính (grep `D-14[1-9]`/"đính chính" = 0). Ai đọc `D-xx` trước tài liệu sẽ làm theo đẳng thức sai | Việc của **ORCH** (không phải BA): thêm một dòng `D-xx` đính chính `D-136` (1), hoặc ghi vào handover. Không chặn tài liệu |
 
 ## Không kiểm được
 
-- D4: không có khối `sql`/shell. CHECK nội tuyến ở §5.1 (`OrdRefunds`: `"Method" <> 1 OR "EvidenceReference" IS NOT NULL`) **chưa chạy** vì máy không có `psql` (`which psql` không thấy) và không có `docker` (exit 127). Tài liệu đã tự ghi "chưa chạy, chạy khi viết migration `S14b`".
-- P1 #1 kết luận bằng **đọc mã** (`CustomerReturnGateway.cs:45-75`, `InventoryDbContextModelCreatingExtensions.cs:166-168`), chưa có test tái hiện vì method hàng lỗi additive chưa tồn tại. QA nên viết TC-34 (vi) đỏ trước khi BE dựng method đó.
-- Không chạy `dotnet test`. Số ca ghi trong §28–§35 là số đo lịch sử, chưa đo lại.
+- D4: tài liệu không có khối `sql`/shell, và phần BA đổi không thêm SQL. CHECK nội tuyến `OrdRefunds` từ vòng 2 vẫn **chưa chạy** vì máy không có `psql`/`docker` (như vòng 2).
+- #2: chưa gọi API thật để đo mã HTTP của `Sales:0010`/`0011`. Kết luận `403` dựa trên hai điều: grep thấy 0 `options.Map` cho mã Sales, và chú thích của chính repo (`ReportingErrorCodes.cs:8-9`). BA/QA nên đo bằng probe/E2E trước khi ghi số.
+- Quan sát về `D-139` (5), **không** tính là phát hiện vì tài liệu đã có lối thoát "buộc thêm enum/cột ⇒ câu mới cho DEC". `D-139` (5) giao cho arch/BE `Inventory` chọn cách nhận biết chứng từ `-L` để sinh thêm `DamagedIn`, trong giới hạn "0 enum, 0 migration". Hiện `TinhButToanChungTu.cs:33-36` cho loại `CustomerReturn` chỉ sinh `CustomerReturn`, còn `StockDocumentType` (5 giá trị) và `StockDocumentMode` không có giá trị nào cho hàng lỗi. Như vậy dấu hiệu chỉ có thể là hậu tố số chứng từ, hoặc một method tự ghi riêng. Arch nên chốt điểm này trước khi viết code.
+- Không chạy `dotnet test`. TC-45 là ca **kế hoạch** (tài liệu đã ghi "chờ code"); QA cần viết (vi) đỏ trước.
+- Đây là vòng kiểm nhanh: phần không đổi từ v1.6 không đọc lại, kết luận vòng 2 cho phần đó vẫn giữ.
 
-## Vòng trước (chỉ vòng 2)
+## Vòng trước
 
 <!-- Cột 2 KHÔNG phải "Mức": check-agent-artifact.ps1 đếm P1/P2 theo cột 2 của mọi bảng. Phát hiện còn mở phải chép lại vào bảng "Phát hiện". -->
 
+### Vòng 2 (21/11/2026, v1.6 — kết luận lúc đó DOC-CHANGES, 1 P1 · 3 P2 · 9 P3)
+
+| # vòng 2 | Trạng thái | Mức lúc đó | Ghi chú kiểm vòng 3 |
+|---|---|---|---|
+| 1 | đã đóng — theo `D-139`: Basic Flow 9, BR-012, §0, §3.2, §4 (sơ đồ :289, bảng :314), §5.1 :381, §7.3 :633, §7.4 :644, §8.1 #8, §11 Migration 4/6, F6/F17, Q16, TC-34 (vi), TC-41 (v) và TC-45 mới (i)–(vi) đều khớp `D-139` ⑥. `D-132` (5) giữ nguyên (`GanChungTuKho` chỉ nhận `Restock`, guard riêng cho `-L`). Hai lời gọi cổng nay khác số, nên nhánh idempotent `CustomerReturnGateway.cs:45-54` không còn nuốt lời gọi. UoW là transactional (POST, `TransactionBehavior.Auto` `:94`; gateway `autoSave` trong cùng giao dịch). Phần đơn vị đếm bút toán còn sót → #1 | P1 |
+| 2 | đã đóng phần mã — theo `D-140`: §3 :186, E1/E6/E11, A3, §3.1 #1, §6.2 `0001`/`0006`/`0011`, §8.1 #1/#11, §8.3 #10, §12, TC-06/TC-21 dùng `Sales:0010` + `lyDo`; khớp `OrderReturn.cs:172-213`, `:286-293`, `OrderReturnService.cs:95-98`, `S14-E8`/`S14-E19`. Phần HTTP chưa đo → #2; hàng `0004`/`0014` → #5 | P2 |
+| 3 | đã đóng — §3.3 #8, §5.2 :470, §6.2 `0006`, §8.3 #10 không còn "tạo phiếu mới". Các chỗ `phiếu mới` còn lại (grep) đều đúng ngữ cảnh: sau `Cancelled`, "0 phiếu mới", ghi chú lỗi thời §29/§34.5 | P2 |
+| 4 | đã đóng ở tài liệu — §5.1 :380 ghi `RefundedAmount ≤ Σ RefundAmount`; `D-136` (1) chưa có dòng đính chính → #7 (việc của ORCH) | P2 |
+| 5 | đã đóng — BR-005 ghi "`r0 > 0` chỉ khi Q17 mở"; TC-40 (iii)(iv)(xi) là hàm thuần; (viii) "trong một phiếu"; §15.3 #10 | P3 |
+| 6 | đã đóng — Migration đánh số 1–6, hàng tóm tắt ghi "+4 cột"; còn một chỗ dẫn cũ ở mục đối chiếu → #6 | P3 |
+| 7 | đã đóng — §5.1 :420, :456-459 | P3 |
+| 8 | đã đóng — ADR-11 ghi comment `HuyAsync` là sai (F16); §34.5 #3 có ghi chú lỗi thời | P3 |
+| 9 | đã đóng — A3, §3.1 #1, §12 :835 dùng `Sales:0010` cho đơn `Cancelled` | P3 |
+| 10 | đã đóng — BR-012, Basic Flow 9, §3.2 :231, §12 :837, TC-41 (viii) dùng `Sales:0010` | P3 |
+| 11 | đã đóng — §0 :48 dẫn `:222`, `:237` (grep khớp) | P3 |
+| 12 | đã đóng — §23.2/§25.5/§26.2 dùng danh sách Markdown | P3 |
+| 13 | đã đóng — NFR-005 (§1 :118, §13 :871): kho kiểm bằng TC-20, hoàn tiền bằng TC-17/NFR-007 | P3 |
+
+### Vòng 1 (v1.3 — trạng thái chốt ở vòng 2)
+
 | # vòng 1 | Trạng thái | Mức lúc đó |
 |---|---|---|
-| 1 | đã đóng — ADR-11/§3.1 #4/#5/§8.3/§12/TC-42 theo `D-135` (2 cạnh `→ Open`, ánh xạ chặt; mã máy trạng thái khớp `OrderStateMachine.cs:184-203`, `Order.cs:612-638`); di chứng ở 4 chỗ khác → chép lên #3, #5, #8 | P1 |
-| 2 | đã đóng — BR-005 có công thức `P(x,k)` + `D-136`/`D-138`, cột snapshot ở §5.1, TC-40 (i)–(xii); số ví dụ đã kiểm tay (98.000 · 294.000 · 6.667/3.333 · 19.333/9.667 · 319.000); di chứng → #4, #5 | P1 |
-| 3 | đã đóng phần chính — `D-137` (revision, delta, `LastReceiptRevision`, TC-41); **lỗi mới** ở đợt trộn `Restock` + hàng lỗi → #1 | P1 |
-| 4 | còn (đóng một phần: `0003`/`0004`/`0014` đã có mã thật) → chép lên #2 | P2 |
-| 5 | đã đóng — §6.1/§9/§11/§14.3 khớp `OrderReturnAppService.cs:15/58/73/77/81/85/124/128`, provider `:89-90`, `:96`; 3 permission mới | P2 |
-| 6 | đã đóng — ADR-06/§0/§4.1/§4.2/§7.1/TC-20 dùng cổng đồng bộ | P2 |
-| 7 | đã đóng — §8.1 #8, §8.2 theo `(đợt, dòng, MovementType)` | P2 |
-| 8 | đã đóng — `OrdRefunds.Method` + CHECK cùng bảng; `Manual = 1` khớp `OrderReturn.cs:34` | P2 |
-| 9 | đã đóng — F20, A5, BR-009, TC-43 | P2 |
-| 10 | đã đóng — ADR-12/BR-016/§8.3 dùng tên khoá thật `sales:return:{tenant}:{orderId}` (`OrderReturnService.cs:75`) | P2 |
-| 11 | đã đóng — §11 chỉ còn phần chưa có; hàng tóm tắt lệch số cột → #6 | P2 |
-| 12 | đã đóng — §0/§1/F7/TC-10/TC-44 ghi `PayloadHash` chưa so (khớp `OrderReturnService.cs:82-91`) | P2 |
-| 13 | đã đóng — §0 F19, Pre-Condition, TC-44 | P2 |
-| 14 | đã đóng | P3 |
-| 15 | đã đóng | P3 |
-| 16 | đã đóng | P3 |
-| 17 | đã đóng — chỉ còn `IPaymentRefundPort` (grep `IPaymentHubRefundPort` = 0) | P3 |
-| 18 | đã đóng — 16 tên, dòng dẫn `:16-78`/`:190-212`/`:219` khớp | P3 |
-| 19 | đã đóng — CHECK `"Disposition" = 0 OR "ReceivedQuantity" > 0` | P3 |
-| 20 | đã đóng | P3 |
-| 21 | đã đóng | P3 |
-| 22 | đã đóng — BR-002 dùng `Order.ChuyenKetThuc` (grep `ExecuteTransition` chỉ còn ở trích `SAL-003` dòng 24 và F1 lịch sử) | P3 |
-| 23 | đã đóng | P3 |
-| 24 | đã đóng — header `v1.6`; TC-23 không còn `TaxRateSnapshot` | P3 |
+| 1 | đã đóng ở vòng 2 — ADR-11/§3.1 #4/#5/§8.3/§12/TC-42 theo `D-135`; di chứng → vòng 2 #3, #5, #8 (đã đóng ở vòng 3) | P1 |
+| 2 | đã đóng ở vòng 2 — BR-005 `P(x,k)` + `D-136`/`D-138`; di chứng → vòng 2 #4, #5 (đã đóng ở vòng 3) | P1 |
+| 3 | đã đóng ở vòng 2 — `D-137`; lỗi mới đợt trộn → vòng 2 #1 (đã đóng ở vòng 3 theo `D-139`) | P1 |
+| 4 | đóng ở vòng 3 phần mã (`D-140`); phần HTTP còn → #2 | P2 |
+| 5 | đã đóng ở vòng 2 | P2 |
+| 6 | đã đóng ở vòng 2 | P2 |
+| 7 | đã đóng ở vòng 2 | P2 |
+| 8 | đã đóng ở vòng 2 | P2 |
+| 9 | đã đóng ở vòng 2 | P2 |
+| 10 | đã đóng ở vòng 2 | P2 |
+| 11 | đã đóng ở vòng 2; lệch số cột → vòng 2 #6 (đã đóng ở vòng 3) | P2 |
+| 12 | đã đóng ở vòng 2 | P2 |
+| 13 | đã đóng ở vòng 2 | P2 |
+| 14 | đã đóng ở vòng 2 | P3 |
+| 15 | đã đóng ở vòng 2 | P3 |
+| 16 | đã đóng ở vòng 2 | P3 |
+| 17 | đã đóng ở vòng 2 | P3 |
+| 18 | đã đóng ở vòng 2 | P3 |
+| 19 | đã đóng ở vòng 2 | P3 |
+| 20 | đã đóng ở vòng 2 | P3 |
+| 21 | đã đóng ở vòng 2 | P3 |
+| 22 | đã đóng ở vòng 2 | P3 |
+| 23 | đã đóng ở vòng 2 | P3 |
+| 24 | đã đóng ở vòng 2 | P3 |
