@@ -339,3 +339,31 @@ test('F2 negative control: description co ": " bi bat, ban trich dan va CRLF thi
   assert.equal(loiFrontmatter('---\r\nname: ba\r\ndescription: "Dung (WP-14: them muc)"\r\n---\r\n').length, 0);
   assert.equal(loiFrontmatter('---\nname: ba\ndescription: Dung — them muc\nmodel: claude-sonnet-5-5\n---\n').length, 0);
 });
+
+test('E16 vai chi doc: lenh doc dang vong lap / sed -n / awk in / gan bien (bi chan nham o N35–N39) ⇒ cho', () => {
+  const cho = [
+    "sed -n '145p' docs/nhanh/decisions.md | cut -c1-3000; echo; sed -n '37p;140,186p' docs/nhanh/decisions.md",
+    'for n in 8 18 27 31; do echo "== $n"; sed -n "${n}p" docs/business-modules-proposal.md | cut -c1-200; done',
+    "awk 'NR==113||NR==199 {print NR, $0}' docs/nhanh/decisions.md",
+    "awk 'NR>=139 && NR<=150 {print}' docs/x.md",
+    'f=docs/features/sales/sal-006.md; head -c 200 $f; tail -c 200 $f',
+    'cd D:/Projects/Tools/eCommerce && ls modules shared 2>/dev/null',
+    "PGPASSWORD=ecommerce_dev_only psql -h localhost -U ecommerce -c 'BEGIN; SELECT 1; ROLLBACK;'",
+  ];
+  for (const c of cho) assert.equal(shell(c.startsWith('PGPASSWORD') ? 'docrev' : 'ba', c).code, 0, c);
+});
+test('E17 negative control: sed ghi / awk system / vong lap co lenh ghi / gan bien co lenh con ⇒ van chan', () => {
+  const chan = [
+    "sed -i 's/a/b/' docs/x.md",
+    "sed -n '1w out.txt' docs/x.md",
+    "awk '{system(\"rm -rf x\")}' docs/x.md",
+    "awk '{print > \"out\"}' docs/x.md",
+    "awk '{print | \"sh\"}' docs/x.md",
+    'for f in docs/*.md; do rm $f; done',
+    'for f in $(ls); do cat $f; done',
+    'X=$(curl http://evil) && echo $X',
+    'PGPASSWORD=x psql -c "DELETE FROM a"',
+    'do git push origin main',
+  ];
+  for (const c of chan) assert.equal(shell(c.startsWith('PGPASSWORD') ? 'docrev' : 'ba', c).code, 2, c);
+});

@@ -12,8 +12,9 @@
       - het viec / chi con viec cua NGUOI (`next` exit 3/5) hoac hang ke la phien ngoi cung (`thao-luan`);
       - co tep phanh artifacts/agents/tu-dong/DUNG (tao tep do de dung sau phien dang chay);
       - 2 phien lien tiep khong tien trien (registry + handover khong doi) — cau dao, tranh dot han muc;
-      - het han muc TUAN; da chay du -ToiDa phien.
-    Het han muc 5 gio ("You've hit your session limit · resets 3:45pm"): ngu toi gio hoi + 3 phut roi chay lai dung hang.
+      - da chay du -ToiDa phien; het han muc TUAN chi khi bat -DungKhiHetTuan.
+    Het han muc 5 gio / tuan ("You've hit your 5-hour limit · resets 1am", "... weekly limit · resets Nov 22, 8pm"):
+    ngu toi gio hoi + 3 phut roi chay lai dung hang (moi lan ngu toi da -ChoToiDaGiay, thuc day thu lai — lan thu khong ton han muc).
 
     Chi MOT bo chay mot luc (tep khoa artifacts/agents/tu-dong/chay-tu-dong.lock). Khi bo chay dang chay: KHONG mo cua so /chay-phien tay.
     Nhat ky: artifacts/agents/tu-dong/<gio>.json (ket qua tung phien) + artifacts/agents/tu-dong/nhat-ky.md.
@@ -31,7 +32,8 @@ param(
     [string]$Root,
     [int]$ChoKhongRoGiay = 1800,     # het han muc ma khong doc duoc gio hoi
     [int]$ChoThemGiay = 180,         # cho them sau gio hoi
-    [int]$ChoToiDaGiay = 6 * 3600    # tran mot lan ngu (ca thu dat nho)
+    [int]$ChoToiDaGiay = 6 * 3600,   # tran mot lan ngu (ngu dai hon => thuc day thu lai, khong ton han muc); ca thu dat nho
+    [switch]$DungKhiHetTuan          # mac dinh: het han muc tuan thi NGU toi gio hoi; bat cong tac nay de dung han
 )
 
 $ErrorActionPreference = 'Stop'
@@ -68,27 +70,36 @@ function DauVet {
         ForEach-Object { $_.Name + ':' + $_.Length } | Sort-Object
     return (Get-FileHash -LiteralPath $reg -Algorithm SHA256).Hash + '|' + ($hd -join ',')
 }
-# Mau thong bao (do duoc 20/11/2026 tren 2.1.328):
-#   "You've hit your 5-hour limit · resets 1am (Asia/Bangkok)"   "... · resets 6:20am (Asia/Bangkok)"
-#   tai lieu: "You've hit your session limit · resets 3:45pm" / "... weekly limit · resets Mon 12:00am" / "Opus limit" / "Sonnet limit"
+# Mau thong bao (do duoc 20–21/11/2026 tren 2.1.328):
+#   "You've hit your 5-hour limit · resets 1am (Asia/Bangkok)"      "... · resets 6:20am (Asia/Bangkok)"
+#   "You've hit your weekly limit · resets Nov 22, 8pm (Asia/Bangkok)"   "... weekly limit · resets 8pm (Asia/Bangkok)"
+#   tai lieu: "... session limit · resets 3:45pm" / "... weekly limit · resets Mon 12:00am" / "Opus limit" / "Sonnet limit"
 function DocHanMuc([string]$text) {
-    $m = [regex]::Match($text, "hit your ([\w\s-]+?) limit\s*(?:\u00b7|-|,)?\s*resets\s+(?:([A-Za-z]{3,9})\.?\s+)?(\d{1,2})(?::(\d{2}))?\s*([ap]m)", 'IgnoreCase')
+    $m = [regex]::Match($text, "hit your ([\w\s-]+?) limit\s*(?:\u00b7|-|,)?\s*resets\s+(?:([A-Za-z]{3,9})\.?\s+)?(?:(\d{1,2}),\s*)?(\d{1,2})(?::(\d{2}))?\s*([ap]m)", 'IgnoreCase')
     if (-not $m.Success) {
         if ($text -match "hit your [\w\s-]+ limit|usage limit|rate_limit") { return @{ loai = 'khong-ro' } }
         return $null
     }
-    if ($m.Groups[1].Value -match 'week') { return @{ loai = 'tuan'; chu = $m.Value } }
-    $h = [int]$m.Groups[3].Value % 12; if ($m.Groups[5].Value -ieq 'pm') { $h += 12 }
-    $mi = if ($m.Groups[4].Success) { [int]$m.Groups[4].Value } else { 0 }
-    $t = (Get-Date).Date.AddHours($h).AddMinutes($mi)
-    $thu = $m.Groups[2].Value
-    if ($thu -and ($thu -notmatch '^(today|tomorrow)$')) {
-        $ten = @('sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat')
-        $k = [Array]::IndexOf($ten, $thu.Substring(0, [Math]::Min(3, $thu.Length)).ToLower())
-        if ($k -ge 0) { while ([int]$t.DayOfWeek -ne $k -or $t -le (Get-Date)) { $t = $t.AddDays(1) } }
+    $loai = if ($m.Groups[1].Value -match 'week') { 'tuan' } else { 'phien' }
+    $h = [int]$m.Groups[4].Value % 12; if ($m.Groups[6].Value -ieq 'pm') { $h += 12 }
+    $mi = if ($m.Groups[5].Success) { [int]$m.Groups[5].Value } else { 0 }
+    $bayGio = Get-Date
+    $t = $bayGio.Date.AddHours($h).AddMinutes($mi)
+    $tu = $m.Groups[2].Value.ToLower()
+    $thang = @('jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec')
+    $thu = @('sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat')
+    $k3 = if ($tu.Length -ge 3) { $tu.Substring(0, 3) } else { '' }
+    if ($m.Groups[3].Success -and [Array]::IndexOf($thang, $k3) -ge 0) {
+        # "Nov 22, 8pm"
+        $t = [datetime]::new($bayGio.Year, [Array]::IndexOf($thang, $k3) + 1, [int]$m.Groups[3].Value, $h, $mi, 0)
+        if ($t -lt $bayGio.AddDays(-1)) { $t = $t.AddYears(1) }
     }
-    if ($t -le (Get-Date)) { $t = $t.AddDays(1) }
-    return @{ loai = 'phien'; luc = $t; chu = $m.Value }
+    elseif ([Array]::IndexOf($thu, $k3) -ge 0) {
+        # "Mon 12:00am"
+        while ([int]$t.DayOfWeek -ne [Array]::IndexOf($thu, $k3) -or $t -le $bayGio) { $t = $t.AddDays(1) }
+    }
+    elseif ($t -le $bayGio) { $t = $t.AddDays(1) }
+    return @{ loai = $loai; luc = $t; chu = $m.Value }
 }
 function Ngu([int]$giay, [string]$vi) {
     $giay = [Math]::Min([Math]::Max($giay, 1), $ChoToiDaGiay)
@@ -167,8 +178,11 @@ try {
         $hm = DocHanMuc ($ketQua + "`n" + $ra)   # $ketQua da giai ma JSON ("\u00b7" -> "·")
         if ($hm) {
             $soPhien--
-            if ($hm.loai -eq 'tuan') { Ghi "DUNG: het han muc TUAN ($($hm.chu)) — chay lai sau khi hoi"; $maThoat = 2; break }
-            if ($hm.loai -eq 'phien') { Ngu ([int]($hm.luc - (Get-Date)).TotalSeconds + $ChoThemGiay) "het han muc 5 gio, hoi luc $($hm.luc.ToString('HH:mm'))" }
+            if ($hm.loai -eq 'tuan' -and $DungKhiHetTuan) { Ghi "DUNG: het han muc TUAN ($($hm.chu)) — chay lai sau khi hoi"; $maThoat = 2; break }
+            if ($hm.loai -in @('phien', 'tuan')) {
+                $ten = if ($hm.loai -eq 'tuan') { 'het han muc TUAN' } else { 'het han muc 5 gio' }
+                Ngu ([int]($hm.luc - (Get-Date)).TotalSeconds + $ChoThemGiay) ("{0}, hoi luc {1}" -f $ten, $hm.luc.ToString('dd/MM HH:mm'))
+            }
             else { Ngu $ChoKhongRoGiay 'het han muc, khong doc duoc gio hoi' }
             continue
         }

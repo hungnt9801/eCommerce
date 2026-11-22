@@ -16,7 +16,7 @@ lặp:
   claude -p "/chay-phien" --model sonnet --permission-mode auto --permission-prompts none --output-format json
       (một phiên Claude Code MỚI, ngữ cảnh sạch: mở phiên → /doc-gate → handover → cập nhật bảng → commit + push nhánh WP)
   hết hạn mức 5 giờ?                                        → ngủ tới giờ hồi + 3 phút, chạy lại đúng hàng đó
-  hết hạn mức tuần?                                         → dừng
+  hết hạn mức tuần?                                         → ngủ tới giờ hồi (mặc định; -DungKhiHetTuan ⇒ dừng)
   2 phiên liền không tiến triển (bảng + handover không đổi)? → dừng (cầu dao, khỏi đốt hạn mức)
 ```
 
@@ -50,7 +50,7 @@ Quyết định trong phiên do `decider` lấy theo [hồ sơ uỷ quyền](uy-
 2. Kiểm ca thử của bộ chạy (không gọi Claude thật, ~1 phút):
 
    ```powershell
-   pwsh -File tools/agents/test-chay-tu-dong.ps1    # TONG: 13 dat · 0 truot
+   pwsh -File tools/agents/test-chay-tu-dong.ps1    # TONG: 15 dat · 0 truot
    pwsh -File tools/agents/test-phien.ps1           # TONG: 38 dat · 0 truot
    ```
 
@@ -78,6 +78,7 @@ pwsh -File tools/agents/chay-tu-dong.ps1
 | `-Model` | `sonnet` | model của phiên chính (các vai phụ không đổi) |
 | `-GioToiDaMotPhien` | 6 | quá giờ ⇒ dừng tiến trình phiên đó; hàng ở lại 🟨, phiên sau làm tiếp |
 | `-ChoKhongRoGiay` | 1800 | hết hạn mức mà không đọc được giờ hồi ⇒ ngủ 30 phút rồi thử lại |
+| `-DungKhiHetTuan` | tắt | bật ⇒ hết hạn mức tuần thì dừng hẳn (mặc định: ngủ tới giờ hồi, mỗi 6 giờ thức dậy thử lại — lần thử không tốn hạn mức) |
 
 Muốn bắt đầu vào một giờ cố định (ví dụ 22:00 tối nay) mà không ngồi máy — tuỳ chọn, dùng Task Scheduler của Windows
 (chỉ chạy khi anh/chị đang đăng nhập Windows, để `claude` dùng được phiên đăng nhập gói Pro):
@@ -93,6 +94,8 @@ schtasks /Delete /TN "eCommerce-chay-tu-dong" /F    # xoá lịch khi không c�
 |---|---|---|---|
 | 20:57 → hết lúc 21:20 | 23 phút, 4 lượt vai (`ba` 2, `decider` 1, `docrev` 1) | Sonnet ≈ 2,5 $ · Opus ≈ 3,1 $ | cửa sổ đã bị 2 phiên thử lúc 20:05, 20:11 dùng trước |
 | 01:21 → hết lúc 01:55 | 34 phút, 7 lượt vai (`decider` 3, `docrev` 2, `ba` 2) | Sonnet ≈ 2,6 $ · Opus ≈ 7,5 $ | Opus chiếm ~¾ |
+
+| 21/11 06:42 → 16:47 (3 cửa sổ) | `SAL-006` (303 KB) xong qua 2 phiên (N38, N39) | — | tới 16:47 chạm **hạn mức tuần** (hồi 22/11 20:00) |
 
 ⇒ Mỗi cửa sổ 5 giờ chỉ đủ khoảng **25–35 phút** dây chuyền; phần lớn hạn mức đi vào hai vai Opus (`decider`, `docrev`).
 Chạy liên tục cả ngày ≈ 4–5 cửa sổ ⇒ khoảng 2–3 giờ dây chuyền/ngày, và còn trần hạn mức **tuần**. Một tài liệu lớn thường cần 2 cửa sổ;
@@ -123,7 +126,7 @@ Thông báo hết hạn mức đo được: `You've hit your 5-hour limit · res
 |---|---|---|---|
 | 0 | `het viec` / `tep phanh` / `da chay du N phien` | xong đúng ý | xem bảng; chạy lại nếu còn việc |
 | 3 | `chi con viec cua nguoi` / `can nguoi ngoi cung` | tới hàng 👤 / 🗣 hoặc hàng ⛔ | làm việc của người (duyệt đợt, mở PR, phiên ngồi cùng), đánh dấu xong (bảng §1 bước 3), chạy lại |
-| 2 | `het han muc TUAN` | trần hạn mức tuần | chạy lại sau giờ hồi ghi trong nhật ký |
+| 2 | `het han muc TUAN` | chỉ khi chạy với `-DungKhiHetTuan` (mặc định bộ chạy ngủ chờ) | chạy lại sau giờ hồi ghi trong nhật ký |
 | 1 | `cau dao` | 2 phiên liền không tiến triển | mở 2 tệp `.json` mới nhất xem lỗi (§8), sửa rồi chạy lại |
 | 4 | `bo chay khac dang chay` | đã có một bộ chạy | không chạy thêm; hoặc xoá khoá nếu nó đã chết (§6) |
 
@@ -142,7 +145,7 @@ duyệt đợt C cần kế toán; sau đó `P-20` (đóng WP) và `P-21` (mở 
 | JSON có `permission_denials` (ví dụ `git push`) | chế độ không cửa sổ không có ai duyệt — lệnh không có luật cho phép bị từ chối | commit vẫn ở máy, phiên ghi vào câu trả lời; push tay, hoặc báo để thêm luật `permissions.allow` trong gói cài |
 | Cầu dao sau 2 phiên | phiên lỗi ngay đầu (thiếu vai, cây bẩn ngoài `docs/**`, nhánh sai) | đọc `.json` + `.err`; sửa điều kiện §2 |
 | Ngủ mãi 30 phút một, nhật ký "khong doc duoc gio hoi" | thông báo hạn mức đổi mẫu (20/11: "5-hour limit" thay "session limit") | không hại (lần thử khi chưa hồi không tốn hạn mức); gửi dòng thông báo để cập nhật `DocHanMuc` |
-| Nhiều dòng "lenh bi tu choi quyen" (`for`, `awk`, `cd … && …`) | phiên đọc tệp bằng chuỗi lệnh shell; không cửa sổ thì không ai duyệt | skill bản 21/11 dặn dùng `Read`/`Grep`; còn lệnh nào hay bị từ chối ⇒ gửi để thêm luật `permissions.allow` |
+| Nhiều dòng "lenh bi tu choi quyen" (`for`, `awk`, `sed -n`, `PGPASSWORD=… psql`) | phần lớn là **hàng rào của chính ta** (`guard-shell.mjs`) chặn vai chỉ đọc (`ba`, `docrev`, `decider`) dùng lệnh ngoài danh sách | bản 22/11 cho phép `sed -n <số dòng>p`, `awk` chỉ in, vòng `for … do … done` với lệnh đọc, gán biến trước lệnh; vẫn chặn `sed -i`, `awk` có `system`/ghi tệp/ống, vòng lặp có lệnh ghi (ca `E16`, `E17`) |
 | Hai phiên cùng số `N` / commit lẫn nhau | mở cửa sổ `/chay-phien` tay song song với bộ chạy | **không** chạy song song; phiên tay sẽ tự dừng nếu thấy khoá bộ chạy |
 
 ## 9. Luật không đổi khi chạy tự động

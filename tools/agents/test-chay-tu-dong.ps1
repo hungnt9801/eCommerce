@@ -34,6 +34,7 @@ param([string]`$Root)
 `$n = if (Test-Path `$dem) { [int](Get-Content `$dem) } else { 0 }; Set-Content `$dem (`$n + 1)
 if ('$mode' -eq 'khong') { '{"result":"khong lam gi"}'; exit 0 }
 if ('$mode' -eq 'env') { [Console]::Error.WriteLine('Background tasks still running 10m after the last turn (subagent "BA"); stopping them.'); '{"result":"BG=' + `$env:CLAUDE_CODE_DISABLE_BACKGROUND_TASKS + ' CEIL=' + `$env:CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS + '","permission_denials":[{"tool_name":"Bash","tool_input":{"command":"grep -n x docs/a.md"}}]}'; exit 0 }
+if ('$mode' -eq 'han-muc-tuan' -and `$n -eq 0) { '{"is_error":true,"api_error_status":429,"result":"You''ve hit your weekly limit \u00b7 resets Nov 22, 8pm (Asia/Bangkok)"}'; exit 1 }
 if ('$mode' -eq 'han-muc-5h' -and `$n -eq 0) { '{"is_error":true,"api_error_status":429,"result":"You''ve hit your 5-hour limit \u00b7 resets 1am (Asia/Bangkok)"}'; exit 1 }
 if ('$mode' -eq 'han-muc-1' -and `$n -eq 0) { '{"is_error":true,"result":"You''ve hit your session limit · resets 3:45pm"}'; exit 1 }
 `$id = (& pwsh -NoProfile -File `$ph next -Root `$Root | Select-Object -Last 1).Trim()
@@ -67,11 +68,18 @@ try {
 
     RepoMoi 't4' @((Hang 'P-01' 'doc-gate' @()))
     $k = Chay (ClaudeGia 'han-muc-1')
-    Ca 'T4 het han muc 5 gio => ngu roi chay lai dung hang, khong tinh la phien' (($k.ma -eq 5 -or $k.ma -eq 0) -and ($k.out -match 'het han muc 5 gio, hoi luc 15:45') -and ((Reg)[0].status -eq 'xong') -and ($k.out -match 'KET THUC sau 1 phien')) $k
+    Ca 'T4 het han muc 5 gio => ngu roi chay lai dung hang, khong tinh la phien' (($k.ma -eq 5 -or $k.ma -eq 0) -and ($k.out -match 'het han muc 5 gio, hoi luc \d\d/\d\d 15:45') -and ((Reg)[0].status -eq 'xong') -and ($k.out -match 'KET THUC sau 1 phien')) $k
 
     RepoMoi 't4b' @((Hang 'P-01' 'doc-gate' @()))
     $k = Chay (ClaudeGia 'han-muc-5h')
-    Ca 'T4b mau that 20/11 "5-hour limit · resets 1am (Asia/Bangkok)" => doc duoc gio hoi 01:00' (($k.out -match 'hoi luc 01:00') -and ($k.out -notmatch 'khong doc duoc gio hoi') -and ((Reg)[0].status -eq 'xong')) $k
+    Ca 'T4b mau that 20/11 "5-hour limit · resets 1am (Asia/Bangkok)" => doc duoc gio hoi 01:00' (($k.out -match 'hoi luc \d\d/\d\d 01:00') -and ($k.out -notmatch 'khong doc duoc gio hoi') -and ((Reg)[0].status -eq 'xong')) $k
+
+    RepoMoi 't4c' @((Hang 'P-01' 'doc-gate' @()))
+    $k = Chay (ClaudeGia 'han-muc-tuan')
+    Ca 'T4c het han muc TUAN "resets Nov 22, 8pm" => mac dinh NGU toi 22/11 20:00 roi chay tiep' (($k.out -match 'het han muc TUAN, hoi luc 22/11 20:00') -and ((Reg)[0].status -eq 'xong')) $k
+    RepoMoi 't4d' @((Hang 'P-01' 'doc-gate' @()))
+    $k = Chay (ClaudeGia 'han-muc-tuan') @('-DungKhiHetTuan')
+    Ca 'T4d -DungKhiHetTuan => dung han (exit 2), khong chay lai' (($k.ma -eq 2) -and ((Reg)[0].status -eq 'chua')) $k
 
     RepoMoi 't5' @((Hang 'P-01' 'doc-gate' @()))
     $k = Chay (ClaudeGia 'khong')
