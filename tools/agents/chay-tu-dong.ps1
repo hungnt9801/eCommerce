@@ -10,7 +10,8 @@
 
     Dung khi:
       - het viec / chi con viec cua NGUOI (`next` exit 3/5) hoac hang ke la phien ngoi cung (`thao-luan`);
-      - co tep phanh artifacts/agents/tu-dong/DUNG (tao tep do de dung sau phien dang chay);
+      - co tep phanh artifacts/agents/tu-dong/DUNG: dang ngu cho han muc => dung trong <= 30 giay;
+        dang co phien chay => dung SAU KHI phien do xong (khong cat ngang phien);
       - 2 phien lien tiep khong tien trien (registry + handover khong doi) — cau dao, tranh dot han muc;
       - da chay du -ToiDa phien; het han muc TUAN chi khi bat -DungKhiHetTuan.
     Het han muc 5 gio / tuan ("You've hit your 5-hour limit · resets 1am", "... weekly limit · resets Nov 22, 8pm"):
@@ -33,7 +34,8 @@ param(
     [int]$ChoKhongRoGiay = 1800,     # het han muc ma khong doc duoc gio hoi
     [int]$ChoThemGiay = 180,         # cho them sau gio hoi
     [int]$ChoToiDaGiay = 6 * 3600,   # tran mot lan ngu (ngu dai hon => thuc day thu lai, khong ton han muc); ca thu dat nho
-    [switch]$DungKhiHetTuan          # mac dinh: het han muc tuan thi NGU toi gio hoi; bat cong tac nay de dung han
+    [switch]$DungKhiHetTuan,         # mac dinh: het han muc tuan thi NGU toi gio hoi; bat cong tac nay de dung han
+    [int]$BuocChoGiay = 30           # khi ngu: cu moi buoc nay kiem tep phanh DUNG
 )
 
 $ErrorActionPreference = 'Stop'
@@ -104,7 +106,12 @@ function DocHanMuc([string]$text) {
 function Ngu([int]$giay, [string]$vi) {
     $giay = [Math]::Min([Math]::Max($giay, 1), $ChoToiDaGiay)
     Ghi ("ngu {0} phut ({1}); tao artifacts/agents/tu-dong/DUNG de dung han" -f [Math]::Round($giay / 60), $vi)
-    Start-Sleep -Seconds $giay
+    # Ngu tung buoc ngan de tep phanh co tac dung ngay ca khi dang cho han muc (23/11: DUNG tao luc 01:35 ma bo chay ngu toi 4 gio)
+    $het = (Get-Date).AddSeconds($giay)
+    while ((Get-Date) -lt $het) {
+        if (Test-Path -LiteralPath $phanh) { return }
+        Start-Sleep -Seconds ([Math]::Max(1, [Math]::Min($BuocChoGiay, [int]($het - (Get-Date)).TotalSeconds)))
+    }
 }
 
 # ── khoa: mot bo chay mot luc ───────────────────────────────────────────

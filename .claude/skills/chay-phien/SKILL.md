@@ -10,6 +10,11 @@ hooks:
         - type: command
           command: node
           args: ["${CLAUDE_PROJECT_DIR}/.claude/hooks/guard-write-scope.mjs", "--orch"]
+    - matcher: "mcp__gitnexus__.*|mcp__codegraph__.*"
+      hooks:
+        - type: command
+          command: node
+          args: ["${CLAUDE_PROJECT_DIR}/.claude/hooks/guard-orch-mcp.mjs"]
 ---
 
 # /chay-phien — một lệnh cho một phiên
@@ -35,6 +40,8 @@ Lệnh shell chạy qua **Git Bash** ⇒ đường dẫn dùng `/`. Viết tắt
 (`cd … && grep … | cut`, `for n in …; do sed …`, `awk 'NR==…'`) bị **từ chối** và mất lượt (N35/N36: 14 lệnh bị từ chối). Cần dòng N của tệp ⇒
 `Read` với `offset`/`limit`; tìm chuỗi ⇒ `Grep` (có `-n`). Shell chỉ để chạy script cổng (`pwsh -File tools/…`, `node --test …`) và git.
 
+**Không tự dò code:** phiên chính không gọi `mcp__gitnexus__*` / `mcp__codegraph__*` (hook `guard-orch-mcp.mjs` chặn khi skill này chạy) — cần biết gì trong code thì giao `ba` (hoặc `docrev` khi kiểm chéo); hai vai này có công cụ đồ thị chỉ đọc.
+
 ## 0. Chuẩn bị (≤ 5 lệnh)
 
 0. **Kiểm vai đã nạp (trước mọi việc khác):** danh sách `subagent_type` của công cụ `Agent` phải có đủ `ba`, `docrev`, `decider`.
@@ -47,7 +54,7 @@ Lệnh shell chạy qua **Git Bash** ⇒ đường dẫn dùng `/`. Viết tắt
 1. `git status --short` + `git branch --show-current`. Nhánh phải là trường `nhanh` của `agents/state/phien-wp14.json`
    (`docs/n22-wp14-dot-a`). Khác nhánh và cây sạch ⇒ `git switch <nhanh>`; cây bẩn ngoài `docs/**`, `agents/state/**` ⇒ **dừng**, báo người (không stash hộ).
 2. `PH check` — đỏ vì bảng lệch ⇒ `PH sync` (không sửa tay bảng).
-3. Một lần duy nhất: nếu có `artifacts/cai-dat-agent/D-bang-phien.md` ⇒ làm đúng hướng dẫn trong tệp (chèn dòng `D-xx`), rồi đổi tên tệp thành `D-bang-phien.da-chen.md`.
+3. Dòng quyết định chờ chèn: với mỗi tệp `artifacts/cai-dat-agent/*.cho-chen.md` (và `D-bang-phien.md` nếu còn) ⇒ làm đúng hướng dẫn trong tệp (chèn dòng `D-xx`, số = lớn nhất + 1, đọc lại `decisions.md` trước), rồi đổi đuôi thành `.da-chen.md`. Đã chèn rồi thì không chèn lại.
 
 ## 1. Đối soát phiên trước + trả lời của người
 

@@ -50,7 +50,7 @@ Quyết định trong phiên do `decider` lấy theo [hồ sơ uỷ quyền](uy-
 2. Kiểm ca thử của bộ chạy (không gọi Claude thật, ~1 phút):
 
    ```powershell
-   pwsh -File tools/agents/test-chay-tu-dong.ps1    # TONG: 15 dat · 0 truot
+   pwsh -File tools/agents/test-chay-tu-dong.ps1    # TONG: 16 dat · 0 truot
    pwsh -File tools/agents/test-phien.ps1           # TONG: 38 dat · 0 truot
    ```
 
@@ -115,7 +115,8 @@ Thông báo hết hạn mức đo được: `You've hit your 5-hour limit · res
 
 ## 6. Dừng và chạy lại
 
-- **Dừng êm** (sau khi phiên đang chạy xong): `New-Item artifacts/agents/tu-dong/DUNG` từ cửa sổ khác.
+- **Dừng êm:** `New-Item artifacts/agents/tu-dong/DUNG` từ cửa sổ khác. Đang **ngủ chờ hạn mức** ⇒ dừng trong ≤ 30 giây
+  (bộ chạy bản 23/11); đang có **phiên chạy** ⇒ dừng **sau khi phiên đó xong** (một phiên có thể 10–40 phút) — không cắt ngang phiên.
   Chạy lại: xoá tệp đó (`Remove-Item artifacts/agents/tu-dong/DUNG`) rồi chạy lại lệnh §4.
 - **Dừng ngay:** `Ctrl+C` ở cửa sổ bộ chạy. Phiên đang làm bị cắt ⇒ hàng ở lại 🟨; lần chạy sau tự làm tiếp từ cây làm việc
   (không làm lại bước đã có tệp kết quả). Nếu báo "bộ chạy khác đang chạy" mà thật ra không còn: xoá `artifacts/agents/tu-dong/chay-tu-dong.lock`.
@@ -147,6 +148,22 @@ duyệt đợt C cần kế toán; sau đó `P-20` (đóng WP) và `P-21` (mở 
 | Ngủ mãi 30 phút một, nhật ký "khong doc duoc gio hoi" | thông báo hạn mức đổi mẫu (20/11: "5-hour limit" thay "session limit") | không hại (lần thử khi chưa hồi không tốn hạn mức); gửi dòng thông báo để cập nhật `DocHanMuc` |
 | Nhiều dòng "lenh bi tu choi quyen" (`for`, `awk`, `sed -n`, `PGPASSWORD=… psql`) | phần lớn là **hàng rào của chính ta** (`guard-shell.mjs`) chặn vai chỉ đọc (`ba`, `docrev`, `decider`) dùng lệnh ngoài danh sách | bản 22/11 cho phép `sed -n <số dòng>p`, `awk` chỉ in, vòng `for … do … done` với lệnh đọc, gán biến trước lệnh; vẫn chặn `sed -i`, `awk` có `system`/ghi tệp/ống, vòng lặp có lệnh ghi (ca `E16`, `E17`) |
 | Hai phiên cùng số `N` / commit lẫn nhau | mở cửa sổ `/chay-phien` tay song song với bộ chạy | **không** chạy song song; phiên tay sẽ tự dừng nếu thấy khoá bộ chạy |
+
+## 8a. GitNexus và CodeGraph (công cụ đồ thị code)
+
+Hai máy chủ MCP này đăng ký **cấp người dùng** (`claude mcp list`) nên mọi phiên đều nạp. Từ 23/11 (hướng A): vai `ba`, `docrev`
+dùng các công cụ **chỉ đọc** của chúng để đối chiếu tài liệu với code; `decider` có 4 công cụ (`codegraph_explore`, `query`, `context`, `impact`)
+chỉ cho câu phụ thuộc code hiện có, tối đa 5 truy vấn/câu; phiên chính bị hook `guard-orch-mcp.mjs` chặn khi `/chay-phien`,
+`/doc-gate` chạy; không vai nào có `rename`, `group_sync`, `cypher`. Đếm số lần gọi theo công cụ:
+
+```powershell
+$thuMuc = Get-ChildItem "$env:USERPROFILE\.claude\projects" -Directory | Where-Object Name -like '*eCommerce*'
+Get-ChildItem $thuMuc.FullName -Recurse -Filter *.jsonl | Where-Object LastWriteTime -gt (Get-Date).AddDays(-1) |
+  Select-String -Pattern '"name":"(mcp__[^"]*(gitnexus|codegraph)[^"]*)"' -AllMatches |
+  ForEach-Object { $_.Matches } | ForEach-Object { $_.Groups[1].Value } | Group-Object | Sort-Object Count -Descending | Format-Table Count, Name
+```
+
+Máy chủ có thêm công cụ đọc mới ⇒ thêm tên vào `tools:` của `ba`/`docrev` trong gói cài (từng tên — `tools:` không nhận `mcp__x__*`).
 
 ## 9. Luật không đổi khi chạy tự động
 

@@ -34,6 +34,7 @@ param([string]`$Root)
 `$n = if (Test-Path `$dem) { [int](Get-Content `$dem) } else { 0 }; Set-Content `$dem (`$n + 1)
 if ('$mode' -eq 'khong') { '{"result":"khong lam gi"}'; exit 0 }
 if ('$mode' -eq 'env') { [Console]::Error.WriteLine('Background tasks still running 10m after the last turn (subagent "BA"); stopping them.'); '{"result":"BG=' + `$env:CLAUDE_CODE_DISABLE_BACKGROUND_TASKS + ' CEIL=' + `$env:CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS + '","permission_denials":[{"tool_name":"Bash","tool_input":{"command":"grep -n x docs/a.md"}}]}'; exit 0 }
+if ('$mode' -eq 'han-muc-phanh') { New-Item -ItemType Directory -Force (Join-Path `$Root 'artifacts/agents/tu-dong') | Out-Null; Set-Content (Join-Path `$Root 'artifacts/agents/tu-dong/DUNG') ''; '{"is_error":true,"result":"You''ve hit your 5-hour limit \u00b7 resets 1am (Asia/Bangkok)"}'; exit 1 }
 if ('$mode' -eq 'han-muc-tuan' -and `$n -eq 0) { '{"is_error":true,"api_error_status":429,"result":"You''ve hit your weekly limit \u00b7 resets Nov 22, 8pm (Asia/Bangkok)"}'; exit 1 }
 if ('$mode' -eq 'han-muc-5h' -and `$n -eq 0) { '{"is_error":true,"api_error_status":429,"result":"You''ve hit your 5-hour limit \u00b7 resets 1am (Asia/Bangkok)"}'; exit 1 }
 if ('$mode' -eq 'han-muc-1' -and `$n -eq 0) { '{"is_error":true,"result":"You''ve hit your session limit · resets 3:45pm"}'; exit 1 }
@@ -46,9 +47,9 @@ Set-Content (Join-Path `$Root ("docs/nhanh/handover-{0}.md" -f `$nx.ToLower())) 
 "@, $utf8)
     return $f
 }
-function Chay([string]$claude, [string[]]$them = @()) {
+function Chay([string]$claude, [string[]]$them = @(), [int]$choToiDa = 1) {
     $env:CHAY_TU_DONG_CLAUDE = $claude
-    $out = & pwsh -NoProfile -File (Join-Path $repo 'tools/agents/chay-tu-dong.ps1') -Root $repo -ChoToiDaGiay 1 -ChoThemGiay 0 @them 2>&1 | Out-String
+    $out = & pwsh -NoProfile -File (Join-Path $repo 'tools/agents/chay-tu-dong.ps1') -Root $repo -ChoToiDaGiay $choToiDa -ChoThemGiay 0 -BuocChoGiay 1 @them 2>&1 | Out-String
     $ma = $LASTEXITCODE
     Remove-Item Env:CHAY_TU_DONG_CLAUDE
     return @{ ma = $ma; out = $out }
@@ -80,6 +81,11 @@ try {
     RepoMoi 't4d' @((Hang 'P-01' 'doc-gate' @()))
     $k = Chay (ClaudeGia 'han-muc-tuan') @('-DungKhiHetTuan')
     Ca 'T4d -DungKhiHetTuan => dung han (exit 2), khong chay lai' (($k.ma -eq 2) -and ((Reg)[0].status -eq 'chua')) $k
+
+    RepoMoi 't6b' @((Hang 'P-01' 'doc-gate' @()))
+    $dongHo = [Diagnostics.Stopwatch]::StartNew()
+    $k = Chay (ClaudeGia 'han-muc-phanh') @() 600
+    Ca 'T6b dang ngu cho han muc (toi da 10 phut) ma co tep DUNG => dung sau vai giay, khong ngu het' (($dongHo.Elapsed.TotalSeconds -lt 60) -and ($k.out -match 'tep phanh') -and ([int](Get-Content (Join-Path $repo 'dem.txt')) -eq 1)) $k
 
     RepoMoi 't5' @((Hang 'P-01' 'doc-gate' @()))
     $k = Chay (ClaudeGia 'khong')

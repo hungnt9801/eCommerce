@@ -367,3 +367,26 @@ test('E17 negative control: sed ghi / awk system / vong lap co lenh ghi / gan bi
   ];
   for (const c of chan) assert.equal(shell(c.startsWith('PGPASSWORD') ? 'docrev' : 'ba', c).code, 2, c);
 });
+
+test('E18 /chay-phien: ORCH goi GitNexus/CodeGraph ⇒ chan; vai ba/docrev ⇒ cho', () => {
+  const goi = (role, tool_name) => run('guard-orch-mcp.mjs', { hook_event_name: 'PreToolUse', tool_name, tool_input: {}, ...(role ? { agent_type: role, agent_id: 'a1' } : {}) });
+  assert.equal(goi(null, 'mcp__codegraph__codegraph_explore').code, 2);
+  assert.equal(goi(null, 'mcp__gitnexus__impact').code, 2);
+  assert.equal(goi('ba', 'mcp__gitnexus__context').code, 0);
+  assert.equal(goi('docrev', 'mcp__codegraph__codegraph_explore').code, 0);
+});
+
+test('F3 tools cua vai: khong ky tu dai dien MCP (Claude Code khong nhan), khong cong cu GHI cua GitNexus', () => {
+  const ag = join(HOOKS, '..', 'agents');
+  if (!existsSync(ag)) return;
+  const CAM = ['mcp__gitnexus__rename', 'mcp__gitnexus__group_sync', 'mcp__gitnexus__cypher'];
+  for (const f of readdirSync(ag).filter((x) => x.endsWith('.md'))) {
+    const m = /^tools:(.*)$/m.exec(readFileSync(join(ag, f), 'utf8').replace(/\r\n/g, '\n'));
+    if (!m) continue;
+    const tools = m[1].split(',').map((x) => x.trim()).filter(Boolean);
+    for (const t of tools) {
+      assert.ok(!/^mcp__[^_]+(__\*)?$/.test(t) && !t.endsWith('*'), `${f}: "${t}" la ky tu dai dien — phai liet ke tung ten`);
+      assert.ok(!CAM.includes(t), `${f}: "${t}" la cong cu ghi`);
+    }
+  }
+});

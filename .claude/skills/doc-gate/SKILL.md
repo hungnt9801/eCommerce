@@ -10,6 +10,11 @@ hooks:
         - type: command
           command: node
           args: ["${CLAUDE_PROJECT_DIR}/.claude/hooks/guard-write-scope.mjs", "--orch"]
+    - matcher: "mcp__gitnexus__.*|mcp__codegraph__.*"
+      hooks:
+        - type: command
+          command: node
+          args: ["${CLAUDE_PROJECT_DIR}/.claude/hooks/guard-orch-mcp.mjs"]
 ---
 
 # /doc-gate — dây chuyền tài liệu
@@ -22,6 +27,8 @@ hook khoá phiên chính vào vùng ORCH của `.claude/scopes.json` (`docs/agen
 Tiền đề: đã chạy `/mo-phien` (baseline). Luật nền: `CLAUDE.md` §3–§7, `docs/nhanh/08-session-protocol.md` §6 (dấu hiệu dừng).
 
 **Gọi vai luôn ở tiền cảnh:** mọi lần gọi `Agent` (ba, docrev, decider) đặt `run_in_background: false` và **chờ kết quả** rồi mới làm bước kế; không bao giờ kết thúc lượt với câu "vai còn đang chạy, sẽ tiếp khi có thông báo" — ở chế độ không cửa sổ (bộ chạy tự động) lượt kết thúc là phiên kết thúc, vai chạy nền bị dừng (N34, 20/11).
+
+**Không tự dò code:** phiên chính không gọi `mcp__gitnexus__*` / `mcp__codegraph__*` (hook `guard-orch-mcp.mjs` chặn khi skill này chạy) — cần biết gì trong code thì giao `ba` (hoặc `docrev` khi kiểm chéo); hai vai này có công cụ đồ thị chỉ đọc.
 
 ## 0. Xác định danh sách mã
 
