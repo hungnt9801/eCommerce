@@ -3,7 +3,7 @@
   "wp": "WP-14",
   "nhanh": "docs/n22-wp14-dot-a",
   "note": "Registry bang phien WP-14. Sua qua tools/agents/phien.ps1 (start/done/dodang/blocked/release), KHONG sua tay khi co phien dang chay. Bang Markdown: docs/agents/bang-phien-wp14.md.",
-  "capNhat": "2026-11-22T21:01:10+07:00",
+  "capNhat": "2026-11-23T06:33:26+07:00",
   "rows": [
     {
       "id": "P-01",
@@ -260,11 +260,15 @@
       "dependsOn": [
         "U-02"
       ],
-      "status": "chua",
-      "phien": [],
+      "status": "do-dang",
+      "phien": [
+        "N42",
+        "N43"
+      ],
       "evidence": null,
-      "ghiChu": null,
-      "handover": null
+      "ghiChu": "PRO-001: DOCREV vong 2 DOC-CHANGES 0 P1/9 P2; con BA sua 9 P2 -> DOCREV kiem nhanh -> D3/D4; decider dinh chinh D-147/D-149",
+      "handover": "docs/nhanh/handover-n43.md",
+      "batDau": "2026-11-23T06:32:58+07:00"
     },
     {
       "id": "P-11",
