@@ -64,7 +64,7 @@ Không có.
 
 ## 7. Trạng thái nhánh
 
-- `docs/n22-wp14-dot-a`; commit đóng phiên N53 = `__COMMIT__` (**đã push**). `main` = `be301c5`. Chưa PR.
+- `docs/n22-wp14-dot-a`; commit đóng phiên N53 = `0fd6276` (**đã push**). `main` = `be301c5`. Chưa PR.
 
 ---
 
