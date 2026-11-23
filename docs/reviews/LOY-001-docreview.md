@@ -1,46 +1,54 @@
 # Doc review — «LOY-001» «Điểm thưởng»
 
-**VERDICT: DOC-CHANGES**
+**VERDICT: DOC-OK**
 
 | | |
 |---|---|
-| Tài liệu | `docs/features/loyalty/loy-001-diem-thuong.md` (v0.7 — 24/11/2026) |
-| Ngày · vòng | 24/11/2026 · vòng 3 — **kiểm nhanh** (chỉ mục BA đã đổi theo `changedSections` v0.7 + xác nhận P1/P2 vòng 2) |
+| Tài liệu | `docs/features/loyalty/loy-001-diem-thuong.md` (v0.8 — 24/11/2026) |
+| Ngày · vòng | 24/11/2026 · vòng 4 — **kiểm nhanh** (chỉ mục BA đã đổi theo `changedSections` v0.8 + xác nhận 3 phát hiện vòng 3; mục không đổi giữ kết luận vòng 3) |
 | Người kiểm | agent `docrev` (ngữ cảnh sạch) |
-| Đã đọc | dòng 1–926 (toàn văn) |
-| Máy | `check-feature-doc.ps1 -Path docs/features/loyalty/loy-001-diem-thuong.md -WP14` → exit 0 (0 lỗi; 16/16 heading, 24/24 BR có test, mục đối chiếu Nhanh ở dòng 909) |
+| Đã đọc | dòng 1–943 (toàn văn) + `docs/nhanh/decisions.md` `D-167`/`D-168` (đọc nguyên văn dòng 181–182) |
+| Máy | `check-feature-doc.ps1 -Path docs/features/loyalty/loy-001-diem-thuong.md -WP14` → exit 0 (0 lỗi; 16/16 heading, 24/24 BR có test, mục đối chiếu Nhanh ở dòng 925); `npm --prefix tools run check:mermaid` → 211 khối, **0** lỗi (5 khối của `loy-001`: dòng 144/193/248/280/309 PASS) |
 
 ## Đã kiểm
 
 | Nhóm | Cách kiểm | Kết quả |
 |---|---|---|
-| D1 tự mâu thuẫn | grep 18 câu cấm/`CẤM`/`KHÔNG được` trên 926 dòng; đối chiếu chéo §5.2 (dòng 340) ⇔ §3 guard #2/#3 (206–207) ⇔ §6.1 (397–399) ⇔ §6.2 `0001` (418) ⇔ §8.1 #2/#6 (534/538) ⇔ §10 (594/603) ⇔ §12 (643) ⇔ §13 NFR-003 (681) ⇔ TC-05/TC-49 (720/764) | 1 phát hiện (#3) |
-| D2 chéo tài liệu / code / D-xx | mở đúng dòng: `IDataScopeResolver.cs:60–88/70–71/77–78/86` (chữ ký `GhiNhanTraHangAsync` = **5** tham số có `noGiam`, trả `Task<bool>`), `CustomerLedger.cs:86–110`, `Customer.cs:454–513/473/492–513/526`, `CustomerDtos.cs:43/109`, `RetailReturnAppService.cs:183–188`, **`RetailBillAppService.cs:242/262–268`**, `decisions.md` dòng `D-167` (181), `SAL-006` §7.1 :318 + `BR-023` :117 | 2 phát hiện (#1, #2) |
-| D3 cơ chế thực thi | rà 24 BR + 12 bất biến §8.1 (v0.7): cái gì **đỏ** khi vi phạm (guard/unique/CHECK/trigger/test `TC-*`), tập trung bất biến mới "`pointsFromLots == Customer.Points` mọi thời điểm" | 1 phát hiện (#1) |
-| D4 SQL chạy được | liệt kê code fence: 5 `mermaid` (140/189/244/276/305) + 1 `csharp` (770); **không** có `sql`/`powershell`/`bash` ⇒ không có câu nào để chạy trong `psql BEGIN…ROLLBACK` | 0 phát hiện |
-| D5 test/probe/tệp có thật | mở đúng dòng mọi `file:dòng` trong mục đã đổi; grep `modules/Sales/**` cho `GhiNhanBanHangAsync\|DaoBanHangAsync\|GhiNhanTraHangAsync` → **0** hit (nên `TC-51` khả thi, đường Sales hiện chưa gọi thẳng); `module Loyalty` vẫn **chưa tồn tại** ⇒ test/cổng/trigger của Loyalty là kế hoạch | 0 phát hiện |
-| D6 nhãn tin cậy | §0.2/§7.0: các ✅ đã đổi (`Money` ✅, `IIdempotencyGuard` ✅, outbox ✅ dòng 35/377–379) đều có dòng code kèm; không có ✅ mới chưa đo trong mục v0.7 | 0 phát hiện |
-| D7 14 quy tắc + đối chiếu Nhanh | `npm --prefix tools run check:mermaid` → 211 khối, **0 lỗi**; NFR có ngưỡng số; guard-sai có hành vi (§3 #2/#3); mục "Đối chiếu mô hình Nhanh" dòng 909 + hàng mới `D-167`/`D-45` (926); tên khoá phân tán ghi cụ thể (§5.3/§7.1/§7.3) | 0 phát hiện mới (xuyên #1, #2) |
+| D1 tự mâu thuẫn | grep toàn văn các ràng buộc `CẤM`/`KHÔNG`/`phải`; đối chiếu chéo §0 ⇔ §1 ⇔ §5.1/§5.2 ⇔ §6.1/§6.2 ⇔ §7.0/§7.1 ⇔ §8.1 ⇔ §9 ⇔ §10 ⇔ §11 ⇔ §12 ⇔ §13 ⇔ §14 ⇔ §15 + bảng "Đối chiếu" | 1 phát hiện (#2 — §7.1 "6 biên vào" vs 7 hàng) |
+| D2 chéo tài liệu / code / D-xx | đọc `D-167`/`D-168` (`decisions.md`:181–182) nguyên văn; mở đúng dòng code: `IDataScopeResolver.cs:70/77/86` (6/6/5 tham số), `CustomerLedger.cs:37–110`, `RetailBillAppService.cs:262–268/323–329`, `RetailReturnAppService.cs:146–151/183–188`, `PosDtos.cs:33/35/119/122/285/312`, `RetailBill.cs:233`, `StockLedger.cs:260–262`, `eCommerceHttpApiHostModule.cs:222/237`, `eCommerceMetrics.cs:219–222`, permission provider (**19** nhóm) | 2 phát hiện (#1 §11 thiếu unique `RetailBillId`; #3 trích `PosDtos` chưa phủ `PointsUsed`) |
+| D3 cơ chế thực thi | rà cái gì **đỏ** khi vi phạm cho thay đổi `D-168`: unique `(TenantId, RetailBillId)`, `TC-52` (kiến trúc)/`TC-53` (Integration), `TC-49` mở rộng, trigger append-only | xuyên #1 (unique thiếu trong danh sách §11) |
+| D4 SQL chạy được | liệt kê code fence: **5** `mermaid` + **1** `csharp` (skeleton placeholder); **không** có `sql`/`powershell`/`bash` | 0 phát hiện (không có câu để chạy — xem "Không kiểm được") |
+| D5 test/probe/tệp có thật | mở đúng dòng mọi `file:dòng` ở mục đã đổi; module `Loyalty` **chưa tồn tại** ⇒ `TC-49`/`TC-52`/`TC-53` + trigger/index là **kế hoạch** | 0 phát hiện |
+| D6 nhãn tin cậy | các ✅ đổi/mới (§0.2, §15.2 `G9`) đều kèm dòng code đã mở; không có ✅ chưa đo | 0 phát hiện |
+| D7 14 quy tắc + đối chiếu Nhanh | NFR có ngưỡng số (§13); guard-sai có hành vi (§3); tên khoá phân tán cụ thể (§5.3); mermaid không `;`/`<...>`; mục "Đối chiếu mô hình Nhanh" (dòng 925) có hàng `D-168` + ghi `D-167` đã cập nhật 24/11/2026 | 0 phát hiện mới |
 
 ## Phát hiện
 
 | # | Mức | Vị trí | Vấn đề | Đề nghị |
 |---|---|---|---|---|
-| 1 | P1 | §8.1 #2 (dòng 534) · §5.2 chú thích (dòng 340) · §13 NFR-003 (dòng 681) · §6.1 hàng `GET /balance` (dòng 397) · TC-49 (dòng 764) · §11 "Không backfill: chưa có điểm nào" (dòng 632) | **Bất biến "`pointsFromLots` == `Customer.Points` **mọi thời điểm**" (bất biến v0.7 mở rộng) không thể đúng vì POS ghi điểm **không tạo lô**.** Đường POS đã có thật trong repo: `RetailBillAppService.cs:262–268` gọi thẳng `ICustomerLedger.GhiNhanBanHangAsync(diemTich: hoaDon.PointsEarned, diemSuDung: hoaDon.PointsUsed)` (giá trị do client gửi — `RetailBill.HoanTat(..., diemTich: input.PointsEarned)` :242), và `RetailReturnAppService.cs:183–188` gọi `GhiNhanTraHangAsync(...)` trực tiếp — **không** chỗ nào đi qua `LoyLedgerEntries`/`LoyCreditLots`. Hệ quả khi làm theo tài liệu: (a) khách có hoá đơn POS tích/tiêu điểm ⇒ `GET /api/app/loyalty/admin/reconciliation` `difference ≠ 0` **vĩnh viễn** (ô đỏ + ticket, §10 dòng 606) trong khi `TC-49` dựng 10.000 bút toán **bằng Loyalty** nên **xanh**; (b) `preview.maxRedeemable` = Σ lô (chỉ phần Sales) ⇒ khách **không tiêu được** điểm đã thấy ở `balance` (§6.1 trả `Customer.Points`) — mất quyền lợi đã hiển thị; (c) §11 "chưa có điểm nào" sai nếu bất kỳ hoá đơn POS nào đã ghi `PointsEarned > 0` ⇒ không có kế hoạch backfill lô. | Chốt **một** hướng và ghi vào tài liệu: (a) **ưu tiên** — POS cũng đi cổng Loyalty (`GhiNhanDiemHoaDonAsync` cho `RetailBill`, POS **cấm** truyền `diemTich`/`diemSuDung` thẳng xuống `ICustomerLedger`; sửa §1/§7.1 thêm biên vào POS, thêm TC kiến trúc cho `modules/Pos/**` + TC đối soát có hoá đơn POS); hoặc (b) nếu POS ngoài phạm vi ⇒ **backfill lô** cho tồn điểm POS (hoặc tạo lô gốc "không hết hạn"), định nghĩa lại `maxRedeemable`/guard cho phần điểm không lô, và sửa NFR-003/§8.1 #2 thành "chỉ phần điểm Loyalty sở hữu". Ghi ca POS vào `TC-49`. |
-| 2 | P2 | §1 A2 (dòng 131) · §7.0 (dòng 453) · §7.1 (dòng 476/483) · §12 (dòng 651) · TC-12 (dòng 727) · "Đối chiếu" (dòng 926) ↔ `D-167` trong `docs/nhanh/decisions.md` (dòng 181) | **Chữ ký cổng v0.7 (8 tham số, có `noGiam`) lệch dòng quyết định `D-167` (7 tham số, không `noGiam`).** `D-167` ① vẫn ghi `GhiNhanDaoDiemTraHangAsync(customerId, orderId, returnId, T, V, V_trước, nguon)`; tài liệu tự nhận "đối chiếu `D-167`" (dòng 926, 917) nhưng thêm `noGiam` mà **không** ghi delta vào quyết định. Ai đọc `decisions.md` — điểm vào #3 theo `CLAUDE.md` §1, và là nguồn cho hợp đồng chéo module — sẽ dựng cổng thiếu `noGiam` ⇒ lặp lại đúng lỗi P1 vòng 2 (mất giảm nợ khi `noGiam ≠ 0`). | ORCH/decider cập nhật dòng `D-167` (**TẠM CHỐT** — được sửa theo `CLAUDE.md` §5) thêm `noGiam` + câu "Loyalty **chuyển nguyên** xuống `ICustomerLedger.GhiNhanTraHangAsync` (5 tham số, `IDataScopeResolver.cs:86`)", hoặc thêm `D-168` ghi delta chữ ký; bảng "Đối chiếu" ghi rõ "D-167 đã cập nhật `<ngày>`". |
-| 3 | P2 | §10 bề mặt 1 (dòng 594) · bề mặt 2 (dòng 603) ↔ §5.2 (dòng 340) · §6.1 (dòng 397) · `CustomerDtos.cs:43` | **§10 gọi thứ đọc từ `ICustomerDirectory` là "số dư khả dụng" — trái định nghĩa vừa chốt.** `ICustomerDirectory` trả `CustomerDto.Points` (= `Customer.Points`), còn "số dư khả dụng" (v0.7) = Σ `RemainingAmount` lô **chưa hết hạn**; hai số khác nhau trong cửa sổ hết hạn **và** với điểm không lô (#1). FE làm theo §10 sẽ dán nhãn "dùng được" lên số khách không tiêu được ⇒ lỗi hiển thị tài sản điểm, đúng loại lỗi mà `NFR-010`/BR-006 muốn chặn. | Sửa §10: thẻ "Điểm của tôi" hiện `balance` (`LoyaltyBalanceDto` = `Customer.Points`, gọi đúng tên "điểm tích luỹ"), **số dùng được** lấy `preview.maxRedeemable` (số dư khả dụng — §5.2); bỏ chữ "(từ `ICustomerDirectory`)" ở hai ô đang gọi là "số dư khả dụng". |
+| 1 | P2 | §11 dòng 634 (hàng "Unique index + `NULLS NOT DISTINCT`") ↔ §5.2 dòng 336 (hàng 4) ↔ `D-168` (4) | §11 ghi "**Bắt buộc** cho **mọi** unique index có `TenantId`" rồi liệt kê **3** (`LoyAccounts(TenantId, CustomerId)`, `LoyLedgerEntries(TenantId, ReferenceType, ReferenceId, EntryType)`, `LoyRedemptions(TenantId, IdempotencyKey)`) — **thiếu** `LoyRedemptions(TenantId, RetailBillId) WHERE RetailBillId IS NOT NULL` (và `(TenantId, OrderId) WHERE OrderId IS NOT NULL` từ trước) mà `D-168` (4) gắn đích danh "(NULLS NOT DISTINCT, **§11**)" và §5.2 hàng 4 định nghĩa. Ai dựng migration `Added_Loyalty_Points` theo §11 sẽ **không** tạo unique chống trùng lô tiêu POS theo hoá đơn ⇒ mất lưới chống trùng DB của biên vào POS. | Thêm `LoyRedemptions(TenantId, RetailBillId) WHERE RetailBillId IS NOT NULL` + `LoyRedemptions(TenantId, OrderId) WHERE OrderId IS NOT NULL` (cùng `NULLS NOT DISTINCT`) vào danh sách §11 dòng 634. |
+| 2 | P3 | §7.1 dòng 476 | Heading "Sự kiện NHẬN VÀO (**6** biên vào — …)" nhưng bảng ngay dưới có **7** hàng (thêm hàng `Pos` bán/huỷ/trả — `D-168`, dòng 482). | Đổi "6" → "7". |
+| 3 | P3 | §1 3b (dòng 133) · §6.1 (dòng 414) · §7.1 hàng `Pos` (dòng 482) | Trích `PosDtos.cs:35,122` cho "bỏ tin `PointsEarned`/`PointsUsed` của client": `:35`/`:122` đều là `PointsEarned`, còn `PointsUsed` ở `:33`/`:119` ⇒ trích **chưa phủ** `PointsUsed`. | Trích `PosDtos.cs:33,35,119,122` (hoặc `:119,122` cho DTO đầu vào `CreateRetailBillDto`). |
 
 ## Không kiểm được
 
-- **D4:** tài liệu **không có** khối `sql`/`powershell`/`bash` (chỉ 5 `mermaid` + 1 `csharp`) ⇒ không có câu SQL nào để chạy trong `psql BEGIN…ROLLBACK`.
-- **D5 (một phần):** module `Loyalty` **chưa tồn tại** trong repo ⇒ entity, cổng `ILoyaltyEarnGateway`, `LoyaltyPointsCalculator`, trigger `LoyLedgerEntries_AppendOnly`, `CHECK`/`EXCLUDE`, `TC-01…TC-51` là **kế hoạch**, không kiểm được sự tồn tại. Chỉ kiểm được các tệp thật được trích ở `Customers`/`Sales`/`Pos`/`Inventory`/`Kernel` (đã mở đúng dòng).
-- **D4/D7 — PostgreSQL:** chưa chạy; các cam kết trigger/`CHECK`/`EXCLUDE`/`NULLS NOT DISTINCT` ghi "chưa chạy" (tài liệu tự ghi ⚠️ *chưa có tiền lệ*). Không có migration nào tồn tại để chạy.
-- `csharp` skeleton §14.2 dùng `ShouldBe`/`TaoTaiKhoanVoiSoDu` (placeholder) — minh hoạ, không biên dịch; không phải cam kết chạy.
-- Phát hiện **#1** dựa trên code thật đã đọc (không phải suy đoán cơ chế); phần "điểm POS đã phát sinh trong dữ liệu production" **chưa đo được** (repo không có client POS; `PointsEarned` do client gửi) — nhưng đường ghi là **hợp đồng API đang mở**.
+- **D4:** tài liệu **không có** khối `sql`/`powershell`/`bash` (chỉ 5 `mermaid` + 1 `csharp` skeleton placeholder) ⇒ không có câu SQL nào để chạy `psql BEGIN…ROLLBACK`; DDL trigger `LoyLedgerEntries_AppendOnly`/`CHECK`/`EXCLUDE` **chưa chạy** (module `Loyalty` chưa có trong code).
+- **D5 (một phần):** module `Loyalty` **chưa tồn tại** trong repo ⇒ `TC-49`/`TC-52`/`TC-53`, trigger `LoyLedgerEntries_AppendOnly`, các unique index là **kế hoạch**; chỉ kiểm được các tệp thật ở `Pos`/`Customers`/`Sales`/`Kernel` (đã mở đúng dòng).
+- `csharp` skeleton §14.2 dùng `Shouldly`/`TaoTaiKhoanVoiSoDu` (placeholder) — minh hoạ, không biên dịch; không phải cam kết chạy.
 
-## Vòng trước (vòng 2 — 24/11/2026, `DOC-CHANGES`)
+## Vòng trước
 
-<!-- Cột 2 KHÔNG phải "Mức": check-agent-artifact.ps1 đếm P1/P2 theo cột 2 của mọi bảng. -->
+> Cột 2 là "Trạng thái" (không phải "Mức") để `check-agent-artifact.ps1` không đếm trùng P1/P2/P3.
+
+### Vòng 3 (24/11/2026, `DOC-CHANGES`) — đã đóng cả 3
+
+| # vòng 3 | Trạng thái | Mức lúc đó |
+|---|---|---|
+| 1 | **đã đóng (trong tài liệu v0.8)** — POS bán/huỷ/trả nay đi **cổng** `ILoyaltyEarnGateway` cùng UoW, `modules/Pos/**` **0** lời gọi `ICustomerLedger`; §8.1 #2/#12 ghi POS là một nguồn; §14 thêm `TC-52`/`TC-53` + mở rộng `TC-49`; Q12 ⇒ `Closed (D-168)`; §15.2 `G9`. Đã kiểm code: `RetailBillAppService.cs:262–268/323–329`, `RetailReturnAppService.cs:183–188` xác nhận POS **hiện** gọi thẳng (việc phải CR) — tài liệu phản ánh đúng hiện trạng + kế hoạch `D-168`. | P1 |
+| 2 | **đã đóng** — `D-167` (`decisions.md`:181) đã **cập nhật 24/11/2026**: thêm `noGiam` (**8** tham số `GhiNhanDaoDiemTraHangAsync`), trạng thái giữ `TẠM CHỐT`; A2/§7.0/§7.1/§12/`TC-12`/bảng đối chiếu (dòng 942) đều khớp "8 tham số" + "Loyalty **chuyển nguyên** `noGiam` xuống `ICustomerLedger.GhiNhanTraHangAsync` (5 tham số — `IDataScopeResolver.cs:86`, đã mở: trả `Task<bool>`)". | P2 |
+| 3 | **đã đóng** — §10 (dòng 600/609/617) nay tách rõ: `balance` = `Customer.Points` gọi "**điểm tích luỹ**"; "**số dư khả dụng**" = `preview.maxRedeemable`; ghi đích danh "**không** gọi `balance` là 'số dư khả dụng'". | P2 |
+
+### Vòng 2 (24/11/2026) — lịch sử
 
 | # vòng 2 | Trạng thái | Mức lúc đó |
 |---|---|---|
@@ -53,4 +61,6 @@
 | 7 | còn — để nguyên (§9 "provider 6 nhóm" ⇒ thực tế nhiều nhóm) | P3 |
 | 8 | còn — để nguyên (§13 dòng 702–704 trích `Forbidden` 81–85 ⇒ thực tế 219–222, không có `customerId`) | P3 |
 
-> **Vòng 1:** xem lịch sử ở bản vòng 2 — 9 mục; #1–#6 đã đóng, #7–#9 chuyển thành #6–#8 vòng 2 (vẫn còn, P3).
+### Vòng 1 — lịch sử
+
+> **Vòng 1:** 9 mục; #1–#6 đã đóng, #7–#9 chuyển thành #6–#8 vòng 2 (P3). Các P3 vòng 2 (#3–#8) đã được v0.8 sửa trong tài liệu (Basic Flow **6** tham số `GhiNhanBanHangAsync`; `StockLedger` 260–262; `0015` đủ **3** điều kiện + no-op xét trước; `KeyPrefix` 222/237; §9 **19** nhóm; `Forbidden` 219–222) — đã kiểm lại ở vòng 4, khớp code.
