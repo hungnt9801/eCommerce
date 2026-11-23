@@ -465,7 +465,7 @@ sequenceDiagram
 
 > 📌 **Rule điều kiện do `PRO-001` cung cấp** (cắm vào registry `PRO-002` — **ADR-07**): **đúng 4** `SystemName` — `MinOrderAmount`,
 > `ChannelScope`, `CustomerGroup`, `FirstOrderOnly` (`D-149`, **BR-26**). `SkuInclude`/`SkuExclude`/`CategoryInclude` **không đăng ký** ở v1 (ngoài phạm vi — nợ `CR-P1`): lá có `SystemName` đó là `SystemName` lạ theo `PRO-002` ⇒ **NÉM** `eCommerce:Promotion:0004` (`InvalidConditionNode`) ở guard `Draft → Approved` (`pro-002:164`, `ApproveAsync` `:513`) **và** khi đánh giá (`pro-002:186`), không bỏ qua im lặng; `0010` giữ nghĩa của `PRO-002` (rule bị gỡ/đổi tên sau deploy, `pro-002:550`) — `D-150`; 0 mã lỗi mới.
-> Lá `CustomerGroup`/`FirstOrderOnly` trả `false` khi `CustomerId` NULL (`D-162`, `pro-002` **BR-08**); trên đường voucher ca này không xảy ra vì `ReserveAsync` ném `0118` **trước** khi gọi engine (**BR-24**, `D-146`).
+> Lá `CustomerGroup`/`FirstOrderOnly` trả `false` khi `CustomerId` NULL (`D-162`, `pro-002` **BR-08**); trên đường voucher ca này không xảy ra vì `ReserveAsync` ném `0118` **trước** khi gọi engine (**BR-24**, `D-146`). Lá `FirstOrderOnly` (khách **có** `CustomerId`) dùng định nghĩa "đơn đầu" **đếm cả đơn đã huỷ/đã trả** (`D-163`, `pro-002` §6.1 quy tắc 11).
 > Mỗi rule **phải** khai `DeclaredCostFactor` trong `ProPromotionRuleCosts` (**BR-16**) và **phải THUẦN** (không I/O — `PRO-002` **BR-08**, `pro-002:101`).
 > ℹ️ Chọn `ConfigJson` hay `ProPromotionMappings` cho 3 rule hoãn (**Q3**) = `Deferred`, gắn `CR-P1`: không rule nào của v1 cần `ConfigJson`/`ProPromotionMappings`.
 
