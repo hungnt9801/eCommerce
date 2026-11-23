@@ -3,7 +3,7 @@
   "wp": "WP-14",
   "nhanh": "docs/n22-wp14-dot-a",
   "note": "Registry bang phien WP-14. Sua qua tools/agents/phien.ps1 (start/done/dodang/blocked/release), KHONG sua tay khi co phien dang chay. Bang Markdown: docs/agents/bang-phien-wp14.md.",
-  "capNhat": "2026-11-24T05:22:18+07:00",
+  "capNhat": "2026-11-24T05:30:01+07:00",
   "rows": [
     {
       "id": "P-01",
@@ -314,11 +314,15 @@
         "P-10",
         "P-11"
       ],
-      "status": "chua",
-      "phien": [],
-      "evidence": null,
+      "status": "xong",
+      "phien": [
+        "N54"
+      ],
+      "evidence": "kiem-link PASS 0 chet (185 tep/846 link/1108 backtick); check:mermaid 211/0; hooks 40/40; PH check OK; nhap bien ban 3/3 dong + bang cau cho nguoi 13 cau/26 TAM CHOT/6 viec",
       "ghiChu": null,
-      "handover": null
+      "handover": "docs/nhanh/handover-n54.md",
+      "batDau": "2026-11-24T05:26:45+07:00",
+      "xongLuc": "2026-11-24T05:30:01+07:00"
     },
     {
       "id": "P-13",
