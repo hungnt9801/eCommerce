@@ -62,7 +62,7 @@ Không có.
 
 ## 7. Trạng thái nhánh
 
-- `docs/n22-wp14-dot-a`; commit đóng phiên N54 = `<sha>` (**đã push**). `main` = `04b7712` tại đầu phiên. Chưa PR.
+- `docs/n22-wp14-dot-a`; commit đóng phiên N54 = `3a0e7d3` (**đã push**). `main` = `04b7712` tại đầu phiên. Chưa PR.
 
 ---
 
