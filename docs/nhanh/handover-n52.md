@@ -63,7 +63,7 @@ Không có.
 
 ## 7. Trạng thái nhánh
 
-- `docs/n22-wp14-dot-a`; HEAD trước commit phiên này `95dc9ed`; `main` = `be301c5`. Commit đóng phiên (LOY-001 + `doc-gate` + handover + registry) kế tiếp; đã push ngay sau commit. Chưa PR.
+- `docs/n22-wp14-dot-a`; commit đóng phiên `b2a0031` (**đã push**). `main` = `be301c5`. Chưa PR.
 
 ---
 
