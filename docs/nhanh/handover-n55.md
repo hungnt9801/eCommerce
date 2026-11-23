@@ -69,7 +69,7 @@ Không có.
 
 ## 7. Trạng thái nhánh
 
-- `docs/n22-wp14-dot-a`; commit phiên N55 = `bbf3ecd` (**đã push** lên `origin/docs/n22-wp14-dot-a`). `main` = `04b7712` tại đầu phiên. Chưa PR.
+- `docs/n22-wp14-dot-a`; commit `P-13` = `bbf3ecd`, commit đóng phiên = `5410829` (**cả hai đã push** lên `origin/docs/n22-wp14-dot-a`; bản cập nhật SHA này là commit kế). `main` = `04b7712` tại đầu phiên. Chưa PR.
 
 ---
 
