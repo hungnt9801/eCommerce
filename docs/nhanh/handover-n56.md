@@ -81,7 +81,7 @@ Không có (WP thuần tài liệu; 0 tệp `.cs`, 0 migration).
 
 ## 7. Trạng thái nhánh
 
-- `docs/n22-wp14-dot-a`; `HEAD` trước commit phiên = `be9e6b9`, `main` = `be301c5`. Commit phiên `N56` = commit tạo handover này (SHA ghi ở commit cập nhật kế tiếp), đã push lên `origin/docs/n22-wp14-dot-a` ở bước §5. Chưa PR.
+- `docs/n22-wp14-dot-a`; `HEAD` trước commit phiên = `be9e6b9`, `main` = `be301c5`. Commit phiên `N56` = `863071e` (**đã push** lên `origin/docs/n22-wp14-dot-a`; bản cập nhật SHA này là commit kế). Chưa PR.
 
 ---
 
