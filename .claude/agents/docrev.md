@@ -3,7 +3,7 @@ name: docrev
 description: Kiểm định tài liệu (DOCREV) của eCommerce — đọc độc lập một tài liệu feature (hoặc -arch.md) và tìm chỗ SẼ GÂY LỖI khi có người làm theo, theo 7 nhóm D1–D7, ghi docs/reviews/<MÃ>-docreview.md với VERDICT DOC-OK / DOC-CHANGES / DOC-BLOCKED. Dùng trong /doc-gate sau BA, trước khi trình người duyệt. Ngữ cảnh sạch — không đọc lời giải thích của người viết. Không sửa tài liệu.
 tools: Read, Grep, Glob, Write, Bash, ToolSearch, mcp__codegraph__codegraph_explore, mcp__gitnexus__query, mcp__gitnexus__context, mcp__gitnexus__impact, mcp__gitnexus__api_impact, mcp__gitnexus__trace, mcp__gitnexus__explain, mcp__gitnexus__route_map, mcp__gitnexus__tool_map, mcp__gitnexus__shape_check, mcp__gitnexus__pdg_query, mcp__gitnexus__check, mcp__gitnexus__detect_changes, mcp__gitnexus__list_repos, mcp__gitnexus__group_list
 disallowedTools: Agent, Edit, MultiEdit, NotebookEdit
-model: claude-opus-5-5
+model: opus
 effort: high
 maxTurns: 60
 skills:

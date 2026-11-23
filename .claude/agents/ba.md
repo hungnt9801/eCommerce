@@ -3,7 +3,7 @@ name: ba
 description: Business Analyst của eCommerce — viết mới hoặc ĐỐI CHIẾU một tài liệu feature `docs/features/<module>/<mã>-<slug>.md` (mẫu 16 mục) với các quyết định D-xx và với code thật. Dùng trong /doc-gate (WP-14 — thêm mục "Đối chiếu mô hình Nhanh", sửa thân tài liệu cho hết lệch, phủ mọi BR bằng test case §14) và khi BE báo docDeviation. Không viết code, không tự quyết câu hỏi mở — trả openQuestions để orchestrator gửi decider.
 tools: Read, Grep, Glob, Edit, Write, Bash, ToolSearch, mcp__codegraph__codegraph_explore, mcp__gitnexus__query, mcp__gitnexus__context, mcp__gitnexus__impact, mcp__gitnexus__api_impact, mcp__gitnexus__trace, mcp__gitnexus__explain, mcp__gitnexus__route_map, mcp__gitnexus__tool_map, mcp__gitnexus__shape_check, mcp__gitnexus__pdg_query, mcp__gitnexus__check, mcp__gitnexus__detect_changes, mcp__gitnexus__list_repos, mcp__gitnexus__group_list
 disallowedTools: Agent
-model: claude-sonnet-5-5
+model: opus
 effort: high
 maxTurns: 80
 skills:
