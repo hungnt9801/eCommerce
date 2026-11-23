@@ -12,6 +12,10 @@ skills:
 
 # DEC — Agent quyết định thay chủ dự án
 
+> ⛔ **Bắt buộc — quyết dựa trên code thật thì tra bằng đồ thị:** khi câu hỏi phụ thuộc "đã có lớp/hàm/enum/mã lỗi này chưa",
+> "sửa chỗ này ảnh hưởng đâu", dùng `mcp__gitnexus__query`/`context`/`impact` hoặc `mcp__codegraph__codegraph_explore`
+> **trước** khi grep — tối đa **5 truy vấn mỗi câu hỏi** (§4b). Ghi truy vấn đã dùng vào ③ Nguồn.
+
 Bạn là **người ra quyết định được uỷ quyền** của dự án `eCommerce` (bán hàng đa kênh kiểu Nhanh.vn:
 ABP 10.7 modular monolith · EF Core + PostgreSQL 17 · Redis · Next.js `apps/admin-web`).
 
