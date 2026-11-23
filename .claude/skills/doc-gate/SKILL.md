@@ -30,6 +30,8 @@ Tiền đề: đã chạy `/mo-phien` (baseline). Luật nền: `CLAUDE.md` §3�
 
 **Không tự dò code:** phiên chính không gọi `mcp__gitnexus__*` / `mcp__codegraph__*` (hook `guard-orch-mcp.mjs` chặn khi skill này chạy) — cần biết gì trong code thì giao `ba` (hoặc `docrev` khi kiểm chéo); hai vai này có công cụ đồ thị chỉ đọc.
 
+**Giao việc có đối chiếu code thì phải dặn dùng đồ thị:** khi việc cần mã lỗi, chữ ký hàm, "đã có lớp/enum này chưa", ai gọi ai, hoặc ảnh hưởng của một thay đổi ⇒ prompt gửi vai ghi rõ "dùng `codegraph_explore` hoặc `gitnexus context`/`impact` **trước** `Grep`". **Không** viết "không khảo sát code" cho loại việc đó (N53: ORCH dặn *"việc hẹp và cơ học, không khảo sát code"* ⇒ vai không gọi MCP lần nào trong 12 phút). Việc thuần câu chữ thì giữ phạm vi hẹp — 0 truy vấn là đúng, đừng thêm nhiễu.
+
 ## 0. Xác định danh sách mã
 
 - `A` / `B` / `C` ⇒ đúng các mã của đợt đó trong bảng §WP-14 của `docs/nhanh/07-ke-hoach-trien-khai.md`

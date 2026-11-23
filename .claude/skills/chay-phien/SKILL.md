@@ -42,6 +42,8 @@ Lệnh shell chạy qua **Git Bash** ⇒ đường dẫn dùng `/`. Viết tắt
 
 **Không tự dò code:** phiên chính không gọi `mcp__gitnexus__*` / `mcp__codegraph__*` (hook `guard-orch-mcp.mjs` chặn khi skill này chạy) — cần biết gì trong code thì giao `ba` (hoặc `docrev` khi kiểm chéo); hai vai này có công cụ đồ thị chỉ đọc.
 
+**Giao việc có đối chiếu code thì phải dặn dùng đồ thị:** khi việc cần mã lỗi, chữ ký hàm, "đã có lớp/enum này chưa", ai gọi ai, hoặc ảnh hưởng của một thay đổi ⇒ prompt gửi vai ghi rõ "dùng `codegraph_explore` hoặc `gitnexus context`/`impact` **trước** `Grep`". **Không** viết "không khảo sát code" cho loại việc đó (N53: ORCH dặn *"việc hẹp và cơ học, không khảo sát code"* ⇒ vai không gọi MCP lần nào trong 12 phút). Việc thuần câu chữ thì giữ phạm vi hẹp — 0 truy vấn là đúng, đừng thêm nhiễu.
+
 ## 0. Chuẩn bị (≤ 5 lệnh)
 
 0. **Kiểm vai đã nạp (trước mọi việc khác):** danh sách `subagent_type` của công cụ `Agent` phải có đủ `ba`, `docrev`, `decider`.
