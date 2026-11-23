@@ -145,6 +145,25 @@ function KiemTraApi([string]$key) {
     }
 }
 
+# Tong token cua CA phien: `modelUsage` gom moi model da goi (phien chinh + vai ba/docrev/decider).
+function ThongKeToken($j) {
+    if (-not $j) { return $null }
+    $v = 0; $c = 0; $r = 0; $theo = @()
+    if ($j.modelUsage -and @($j.modelUsage.PSObject.Properties).Count) {
+        foreach ($p in $j.modelUsage.PSObject.Properties) {
+            $mv = [int]$p.Value.inputTokens; $mc = [int]$p.Value.cacheReadInputTokens; $mr = [int]$p.Value.outputTokens
+            $v += $mv; $c += $mc; $r += $mr
+            $theo += ('{0}: vao {1}, cache {2}, ra {3}' -f $p.Name, $mv, $mc, $mr)
+        }
+    }
+    elseif ($j.usage) {
+        $v = [int]$j.usage.input_tokens; $c = [int]$j.usage.cache_read_input_tokens; $r = [int]$j.usage.output_tokens
+        $theo += ('phien chinh: vao {0}, cache {1}, ra {2}' -f $v, $c, $r)
+    }
+    else { return $null }
+    return @{ vao = $v; cache = $c; ra = $r; theoModel = $theo }
+}
+
 # ── phan loai loi tra ve tu phien (JSON + stderr) ───────────────────────────────────────────────
 function PhanLoaiLoi($j, [string]$text) {
     $st = if ($j -and $j.api_error_status) { [int]$j.api_error_status } else { 0 }
@@ -285,12 +304,16 @@ try {
         $tom = ($ketQua -replace '\s+', ' ').Trim(); if ($tom.Length -gt 300) { $tom = $tom.Substring(0, 300) + '...' }
         Ghi ("  ket thuc exit {0}: {1}" -f $p.ExitCode, $tom)
 
-        # token + chi phi uoc tinh
-        if ($j -and $j.usage) {
-            $vao = [int]$j.usage.input_tokens; $raTok = [int]$j.usage.output_tokens; $cache = [int]$j.usage.cache_read_input_tokens
-            $tongVao += $vao; $tongRa += $raTok; $tongCache += $cache
-            $usd = ($vao * $GiaVao1M + $cache * $GiaCache1M + $raTok * $GiaRa1M) / 1000000
-            Ghi ("  token: vao {0} (cache {1}) ra {2} - uoc tinh {3}" -f $vao, $cache, $raTok, (Tien $usd))
+        # token + chi phi uoc tinh.
+        # PHAI doc modelUsage, khong phai usage: `usage` chi la cua phien chinh (ORCH),
+        # con `modelUsage` cong don moi model da goi trong phien — ke ca cac vai
+        # ba/docrev/decider. Thuc do 23/11: usage=$0.11 nhung modelUsage=$0.46 (gap 4 lan).
+        $tk = ThongKeToken $j
+        if ($tk) {
+            $tongVao += $tk.vao; $tongRa += $tk.ra; $tongCache += $tk.cache
+            $usd = ($tk.vao * $GiaVao1M + $tk.cache * $GiaCache1M + $tk.ra * $GiaRa1M) / 1000000
+            Ghi ("  token (ca phien + vai): vao {0} (cache {1}) ra {2} - uoc tinh {3}" -f $tk.vao, $tk.cache, $tk.ra, (Tien $usd))
+            if ($tk.theoModel.Count -gt 1) { Ghi ("  theo model: {0}" -f ($tk.theoModel -join ' | ')) }
         }
         if ($j -and $j.permission_denials -and @($j.permission_denials).Count) {
             Ghi ("  canh bao: {0} lenh bi tu choi quyen (khong ai duyet): {1}" -f @($j.permission_denials).Count, ((@($j.permission_denials) | ForEach-Object { $c = [string]$_.tool_input.command; if ($c.Length -gt 60) { $c = $c.Substring(0, 60) + '...' }; "$($_.tool_name): $c" }) -join ' | '))
