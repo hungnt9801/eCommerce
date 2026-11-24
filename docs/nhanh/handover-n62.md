@@ -75,7 +75,7 @@ Không có (WP thuần tài liệu; 0 tệp `.cs`, 0 migration).
 
 ## 7. Trạng thái nhánh
 
-- `docs/n22-wp14-dot-a`; `HEAD` = `9608b53` (commit công việc N62: 4 tệp, +109/−9). Commit đóng phiên (handover + state/`P-18` done) là commit kế tiếp. Chưa PR.
+- `docs/n22-wp14-dot-a`; commit công việc N62 = `9608b53` (4 tệp, +109/−9); commit đóng phiên N62 = `6e0b928` (3 tệp, +89/−6). **Chưa push** — `git push origin docs/n22-wp14-dot-a` bị auto-mode classifier từ chối ("out-of-place publication"); người push tay khi duyệt. Chưa PR.
 
 ---
 
