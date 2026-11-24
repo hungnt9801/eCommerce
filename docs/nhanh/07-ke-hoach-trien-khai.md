@@ -733,6 +733,39 @@ storefront còn lại **đóng băng** (`D-70`).
 - `git diff --stat` **chỉ** chạm `docs/**` · **0 tệp `.cs`** · **0 migration**.
 - **Toàn WP:** 18/18 tài liệu có trạng thái cuối trong biên bản; `§WP-15+` đã có đề xuất thứ tự.
 
+### WP-15+ — đề xuất thứ tự WP code GĐ3 (bước ⑤ của WP-14)
+
+> **`D-209`** (DEC, uỷ quyền `D-114`/`D-70`, phiên `N64`): thứ tự dưới là **tạm chốt** trong phạm vi `D-70` theo `07` :721.
+> **Quy tắc chạy:** WP có cổng **"chưa"** ⇒ **chỉ xếp lịch, không code**; dây chuyền chuyển sang WP kế tiếp có cổng đạt.
+> WP khác module được song song theo [`09-parallel-sessions.md`](09-parallel-sessions.md) (DB + cổng riêng, **một chủ migration**).
+> Merge `main` vẫn cần **biên bản người ký** + cổng OPS (`D-115` ⑤). Đổi thứ tự = dòng `D-xx` mới thay `D-209` + sửa mục này.
+
+| WP | Phạm vi | Cổng tài liệu (điều kiện vào) | Phụ thuộc |
+|---|---|---|---|
+| **WP-15** | **Nền GĐ3 + 2 nợ `D-71` ④**: sửa `C10` của `D-67` (đo `Late` **sau** khi DLQ có — khuôn `D-68`; ⛔ không nới 30 s, không bỏ ca) + map mã nghiệp vụ cho `409` (`code = null` ⇒ **một** mã chung qua **một** exception filter ở Host, khuôn `BoLocViPhamRangBuocDb`) | Không có tài liệu feature. Vào được khi build/test chạy (gỡ `MSB3491` = việc người/máy dev) | — |
+| **WP-16** | Bảng giá GĐ3 + giá bậc thang (`PRC-002` phần còn thiếu) | `PRC-001`/`PRC-002` **đã duyệt `Q5`**; câu mới ⇒ decider | WP-15 |
+| **WP-17** | Giá vốn: **đường ghi + duyệt + động cơ bình quân gia quyền di động** (`PRC-001` §20; `D-177` ④–⑦, `D-186`) — **bắt buộc trước `WP-32`** | `PRC-001` duyệt `Q5`; BA sửa `prc-001` §15.1/§20.4 + `inv-001` §0 + `rep-003` §0/Q11 **cùng PR** (`D-186` ⑥); **M4** trước release | WP-15 |
+| **WP-18** | `ADDR-001` + `ADDR-002` | `D-141` từng dòng: DOCREV kiểm nhanh v0.5 đóng 2 P2 **mỗi** tài liệu; mã GHTK không code bằng suy đoán (R3-1); `ADDR-003` + PII **ngoài** WP | WP-15 |
+| **WP-19** | `ADDR-003` phần thiết kế (**trừ** PII `freeText`) | **"chưa"** — BA sửa P2 #1 (`D-107`) + #2 (TC-36) → DOCREV `DOC-OK` → **dòng DEC sau**; PII (R3-5) **chặn release** | WP-18 |
+| **WP-20** | `SHP-001` adapter GHN (module `ShippingHub` mới) | `D-141` dòng `SHP-001`: BA sửa P2 #45/#47 + áp `D-129`/`D-130`/`D-131` cùng PR `SHP-004` P2 #1 → DOCREV kiểm nhanh; sandbox GHN/OTP = người (R3-2), API production **cấm** (M5) | WP-18 |
+| **WP-21** | `SHP-002` webhook trạng thái vận đơn | `D-141` dòng `SHP-002`: sửa #1 (không dùng lại UoW đã abort `25P02`) + #2 backfill `StatusSource` → DOCREV; **P10**: controller `[AllowAnonymous]` **chờ người**; P4 chặn release | WP-20 |
+| **WP-22** | `NOT-001` template + hàng đợi (module `Notification` mới, `D-197`) | `D-208` dòng `NOT-001`: sửa **2 P2** #24/#26 → DOCREV kiểm nhanh **trước** `migrations add`/state machine; 15 P3 cùng WP | WP-15 |
+| **WP-23** | `NOT-002` kênh gửi — **thiết kế trung lập** | `D-208` dòng `NOT-002`: sửa P2 #1 + P3 → DOCREV; `Q1`/`Q3` + HMAC production **ngoài** tạm duyệt (R3-6) ⇒ chỉ hợp đồng adapter + `fake` sender + fail-closed `0003` | WP-22 |
+| **WP-24** | `PRO-002` engine điều kiện (module `Promotions` mới; `Add_Promotion_Module` là **nguồn schema duy nhất**, `D-151`) | `D-169` dòng `PRO-002`: điều kiện "(sau P3)" **đã đạt**; 2 P3 cùng WP; Q8 chỉ chặn nhánh điều kiện địa chỉ (R3-1) | WP-16 |
+| **WP-25** | `PRO-001` voucher/coupon (trên engine `WP-24`) | `D-169` dòng `PRO-001`: sửa **P2 #20** đúng hướng `D-169` (**cấm** gán `UsageSequence = 1`) → DOCREV kiểm nhanh; P3 cùng WP; **M4** trước release | WP-24 |
+| **WP-26** | `REP-001` read-model + job + khoá kỳ (`RepPeriodClose`) | `D-208` dòng `REP-001`: tạm duyệt có điều kiện, điều kiện đỏ **đã đạt**; 10 P3 cùng WP; **không** đụng cột giá vốn | WP-15 |
+| **WP-27** | `SHP-004` adapter GHTK | **"chưa"** — R3-1 (trả lời GHTK Q1) + 2 P2 (cùng PR `WP-20`) + DOCREV `DOC-OK` → **dòng DEC sau**; không bảng Submission riêng (`D-128`) | WP-20 |
+| **WP-28** | `SHP-003` COD thu hộ / đổi COD | **"chưa" — đỏ cứng** §2.1 (người + kế toán ký); sửa 2 P2 trước khi trình; kế toán điền ngưỡng/trần + "người duyệt ≠ người yêu cầu" | WP-20 |
+| **WP-29** | `REC-003` đối soát COD | **"chưa" — đỏ cứng**; P2 #1 cần **một câu DEC chọn-một**; file bảng kê thật (R3-4) trước WP code; `D-124`/`D-125` M4 | WP-28 |
+| **WP-30** | `SAL-006` RMA đơn giao vận | **"chưa" — đỏ cứng**; 2 P2 + 5 P3; Q17 (đổi nghĩa `SAL-003`) người quyết trước WP code; `D-136`/`D-138` M4 | WP-20, WP-21 |
+| **WP-31** | `LOY-001` điểm thưởng (phần còn lại) | **"chưa"** — người ghi "P13 đã duyệt" → BA sửa **P2 §11** (unique `(TenantId, RetailBillId)`/`(TenantId, OrderId)`, `NULLS NOT DISTINCT`) → DOCREV → **dòng DEC sau**; P2 §11 **trước** `migrations add` bảng `Loy*` | WP-15 |
+| **WP-32** | `REP-002` doanh thu + lãi gộp | **"chưa" — đỏ cứng**; 5 P3; **bắt buộc** sau `WP-17` (`D-177` ⑦/`D-186` ⑦) + `WP-26` | WP-17, WP-26 |
+| **WP-33** | `REP-003` tồn kho + hiệu suất kênh | **"chưa" — đỏ cứng**; 4 P3; thiếu giá vốn ⇒ `NULL` + `CostMissing`, **cấm `0`** | WP-17, WP-32 |
+| **WP-34** | `ACC-001` xuất liệu kế toán | **"chưa" — đỏ cứng** (R3-3/R3-8); 5 P3; `Q12` (kế toán trưởng) không chặn xuất file; chỉ **tiêu thụ** `IReportFactReader` (`D-183`) | WP-32, WP-33 |
+
+**Phủ `D-70`:** `PRO-001/002` = 24/25 · `SHP-001…004` = 20/21/27/28 · `REC-003` = 29 · `SAL-006` = 30 · `NOT-001/002` = 22/23 · `ACC-001` = 34 · `REP-*` = 26/32/33 · `LOY-001` = 31 · `PRC-002` = 16 · `ADDR-001…003` = 18/19 — **không** thêm/bỏ mục nào.
+**Cổng máy còn thiếu** (`D-209` ⑥): "cổng tài liệu chưa đạt ⇒ cấm code WP" + "merge `main` khi biên bản chưa ký" (`D-115` ⑤) — **OPS** dựng trước `WP-15`; **QA** thêm ca quét mục này với 3 biên bản (mã nào "chưa" mà có WP đang code ⇒ ĐỎ).
+
 ---
 
 ## 6. Lịch sprint (2 tuần/sprint)
@@ -908,6 +941,7 @@ bảo hành · website builder · affiliate · báo cáo ngoài 3 cái · app mo
 
 | 24/11/2026 | **WP-14 đợt C (`N62`, handover `N62`) — `P-18` XONG**: hoàn thiện `docs/agents/nhap-bien-ban-gd3-c.md` — 6/6 dòng đợt C; cột người review theo `design-doc-guidelines.md` §6 (state machine ⇒ +BA; PII ⇒ +Security; tiền/thuế ⇒ +kế toán); thêm **§3 bảng câu còn chờ người**: **13** câu §15 `Open` + **36** dòng `TẠM CHỐT` + **2** `ĐỀ XUẤT` + bảng P2/P3 sửa cùng WP code. **Không** lập biên bản thật (hàng `P-19`) | `kiem-link` PASS 0 chết (201 tệp · 894 link · 1320 backtick) · `check:mermaid` 212/0 · hooks 48/48 · `check-agent-artifact -Kind decision` DAT (**92** dòng) · `PH check` OK · **0** `.cs`, **0** migration | Không `D-xx` mới. **Còn:** `P-19` (người, duyệt đợt C, bắt buộc kế toán), `P-20`, `P-21` (người). Chi tiết: [handover-n62.md](handover-n62.md) |
 | 24/11/2026 | **WP-14 đợt C (`N63`, handover `N63`) — `P-19` XONG**: mở lại `P-19` (trước đó bị đánh `xong` sớm, evidence template, **không** có biên bản) → `duyet-dec` uỷ quyền `D-115`; decider **`D-208`** — **tạm duyệt có điều kiện 3/6**: `REP-001` (đỏ có điều kiện, điều kiện ĐÃ ĐẠT qua `D-114` P2/P4), `NOT-001` (2 P2 #24/#26 sửa trước WP code), `NOT-002` (**thiết kế**, trừ `Q1`/`Q3` + HMAC production — `R3-6`); **"chưa" 3/6**: `REP-002`, `REP-003`, `ACC-001` (đỏ cứng §2.1, người + kế toán ký); lập `docs/bien-ban-tam-duyet-gd3-c-2026-11-24.md` 6 dòng + 6 dòng hàng đợi | `check-agent-artifact -Kind decision` DAT (**93** dòng) · `kiem-link` PASS 0 chết (203 tệp · 913 link · 1335 backtick) · `check:mermaid` 212/0 · hooks 48/48 · `PH check` OK · **0** `.cs`, **0** migration | `D-208` (TẠM CHỐT DEC, 6 dòng: REP-001/NOT-001/NOT-002 tạm duyệt; REP-002/REP-003/ACC-001 chưa). **Chờ người:** biên bản duyệt đợt C (bắt buộc kế toán). **Còn:** `P-20`, `P-21` (người). Chi tiết: [handover-n63.md](handover-n63.md) |
+| 24/11/2026 | **WP-14 (`N64`, handover `N64`) — `P-20` XONG (ĐÓNG WP-14)**: cập nhật `docs/features/README.md` §2 theo 3 biên bản **tạm duyệt** — 27/55 người duyệt **giữ nguyên**, **9/18** tạm duyệt có điều kiện, **9/18 "chưa"**, DoR §A.5 GĐ3 **chưa đạt**; decider **`D-209`** — thứ tự **20 WP code GĐ3** `WP-15`…`WP-34` **phủ đủ `D-70`**, `WP-15` nhận 2 nợ `D-71` ④, **giá vốn `WP-17` đứng trước lãi gộp `WP-32`**; thêm mục `§WP-15+` | `check-agent-artifact -Kind decision` DAT (**94** dòng) · `kiem-link` PASS 0 chết (**204** tệp · **919** link · **1342** backtick) · `check:mermaid` 212/0 · hooks 48/48 · `PH check` OK · **0** `.cs`, **0** migration | `D-209` (TẠM CHỐT DEC). **Còn:** `P-21` (người: mở + merge PR, vùng cấm). Chi tiết: [handover-n64.md](handover-n64.md) |
 
 **Ô checklist §12 cập nhật:** đội 3 người ✅ · dev transport **http 54275** ✅ · plan đã duyệt ✅ · baseline đã chạy ✅
 
