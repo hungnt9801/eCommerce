@@ -3,7 +3,7 @@
   "wp": "WP-14",
   "nhanh": "docs/n22-wp14-dot-a",
   "note": "Registry bang phien WP-14. Sua qua tools/agents/phien.ps1 (start/done/dodang/blocked/release), KHONG sua tay khi co phien dang chay. Bang Markdown: docs/agents/bang-phien-wp14.md.",
-  "capNhat": "2026-11-24T19:18:56+07:00",
+  "capNhat": "2026-11-24T21:23:49+07:00",
   "rows": [
     {
       "id": "P-01",
@@ -511,12 +511,13 @@
       "dependsOn": [
         "P-20"
       ],
-      "status": "chua",
+      "status": "xong",
       "phien": [],
-      "evidence": null,
-      "ghiChu": "vùng cấm (merge `main`) — không uỷ quyền được",
+      "evidence": "PR #13 merged vao main (0df49cf); CI run  success",
+      "ghiChu": null,
       "handover": null,
-      "camUyQuyen": true
+      "camUyQuyen": true,
+      "xongLuc": "2026-11-24T21:23:49+07:00"
     }
   ]
 }
