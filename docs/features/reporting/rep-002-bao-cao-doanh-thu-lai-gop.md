@@ -8,7 +8,7 @@
 | **Ưu tiên** | **Must have** — báo cáo số 1 mà kế toán trưởng/điều hành mở mỗi ngày |
 | **Trạng thái** | 🟡 `Draft` — chờ review (**đỏ cứng** `D-114` §2.1: **không** code mới khi chưa duyệt) |
 | **Người viết / người review** | *(điền)* / **Kế toán trưởng + Kiến trúc trưởng** |
-| **Phiên bản / ngày** | `v0.3 — 24/11/2026` (áp kết quả decider `D-114` P2–P4 + `D-172`/`D-175`; xem §15.3) |
+| **Phiên bản / ngày** | `v0.4 — 24/11/2026` (áp kết quả decider `D-114` P2–P4 + `D-172`/`D-175`; vòng sửa DOCREV vòng 2 — xem §15.3) |
 | **Tài liệu liên quan** | `REP-001` (read-model nền — **đã có code**) · `REP-003` · `ACC-001` · `XC-001` · `XC-003` · `XC-005` · `XC-006` · `PRC-001`/`PRC-002` (giá vốn — **đã có bảng đọc `PrcCostPrices`**, chưa có cửa ghi) · `SAL-002`/`SAL-003`/`SAL-006` · `REC-002`/`REC-003` · `docs/implementation-plan.md` |
 
 ---
@@ -47,7 +47,7 @@ ví dụ *lãi gộp = 0 vì chưa có giá vốn* trông y như *hoà vốn*.
 | Quyền | ✅ `eCommerce.Reports` + `eCommerce.Reports.Aggregate` | `src/eCommerce.Domain.Shared/eCommerceConsts.cs:340-347` |
 
 ⇒ 🔴 **Hệ quả thẳng:** `REP-002` **đã có một nửa**. **Doanh thu** là **as-built** (2 nguồn, ngày/tháng — **chưa** có chiều SKU/kênh/shop);
-**lãi gộp** là **kế hoạch** — nhưng **nguồn giá vốn đã tồn tại**: `REP-002` **tiêu thụ** giá vốn từ **`PrcCostPrices`** (`PRC-001`/`PRC-002` **đã có** bảng đọc, chưa có cửa ghi), **KHÔNG** dựng nguồn giá vốn thứ hai; `RptGrossMarginSnapshot` chỉ là **read-model báo cáo**, không phải nguồn giá vốn. Snapshot thuế suất (`SAL-002` **chưa có**) chỉ cần cho **chiều tách thuế suất** (A5), **KHÔNG** cho công thức lãi gộp (`Q4` đã đóng — `D-48` + `D-114` P3).
+**lãi gộp** là **kế hoạch** — nhưng **nguồn giá vốn đã tồn tại**: `REP-002` **tiêu thụ** giá vốn từ **`PrcCostPrices`** (`PRC-001`/`PRC-002` **đã có** bảng đọc, chưa có cửa ghi), **KHÔNG** dựng nguồn giá vốn thứ hai; `RptGrossMarginSnapshot` chỉ là **read-model báo cáo**, không phải nguồn giá vốn. Snapshot thuế suất (`SAL-002` **đã có code** — `CheckoutAppService.cs:39,59`; phần **snapshot thuế suất trên `OrderLine`** (`TaxRate`/`TaxClassificationId`) **chưa có**) chỉ cần cho **chiều tách thuế suất** (A5), **KHÔNG** cho công thức lãi gộp (`Q4` đã đóng — `D-48` + `D-114` P3).
 Tài liệu **không** che các khoảng trống: chúng là **cờ dữ liệu** + **lỗi từ chối** (§6, §12).
 
 **Phạm vi:**
@@ -103,8 +103,8 @@ ghi ngược module nguồn (**cấm**); dashboard BI ngoài (chỉ chốt hợp
 | **Priority** | **Must have** |
 | **Trigger** | (a) `GET /api/v1/reports/revenue`; (b) xuất CSV ở FE; (c) `ReportingAggregationWorker` theo nhịp (`NhipJobPhut`, as-built **15**; mục tiêu **5** theo `D-172`); (d) `POST /api/v1/reports/aggregate` |
 | **Pre-Condition(s)** | • **Tenant hiện tại** (`ICurrentTenant`); mọi entity `IMultiTenant`.<br>• **8 bảng `Rpt*`** + `DbSet` đã khai (`eCommerceDbContext.cs:260-274`); thiếu `DbSet` ⇒ `IRepository<T>` không đăng ký.<br>• `ReportingAggregationWorker` đã đăng ký (`ReportingApplicationModule.cs:34-37`) — thiếu thì job không bao giờ chạy, không có lỗi biên dịch.<br>• Múi giờ **Asia/Ho_Chi_Minh** (`ReportingOptions.GioLechUtc = 7`).<br>• Redis cho khoá `report:tong-hop`; Redis chết vẫn không sai số nhờ UNIQUE index.<br>• ⚠️ **Giá vốn có thể chưa có** ⇒ doanh thu vẫn chạy; lãi gộp **chưa** tồn tại trong code. |
-| **Post-Condition(s)** | • Số doanh thu chỉ đến từ `RptAggDailySales`; **0** truy vấn nguồn trong đường đọc doanh thu (BR-001).<br>• Mỗi ngày/tháng trong khoảng **đều có điểm**, kể cả 0 đồng (`TaoDiem`, `ReportAppService.cs:265-349`).<br>• Phản hồi mang `DaTongHop` + `NgayTongHopMoiNhat` + `DinhNghiaTien`; `DaTongHop = false` nghĩa là **chưa tổng hợp**, không phải **0 đồng** (BR-013).<br>• Chứng từ huỷ không vào doanh thu: `RetailBill.Status = Completed`, `Order.IsCancelled = false`.<br>• Chạy lại cùng khoảng ⇒ số liệu không đổi (BR-006).<br>• ⬜ Lãi gộp: `null` + cờ khi thiếu giá vốn — chưa có trong code. |
-| **Basic Flow** | 1. `GET /api/v1/reports/revenue?tuNgay=&denNgay=&nguon=&theoThang=` (`ReportsController.cs:35-37`).<br>2. `KhoangTongHop.XacDinh` xác định khoảng: `từ > đến` ⇒ `Reports:0002`; `> 366 ngày` ⇒ `Reports:0003`; ngày tương lai bị kẹp về hôm nay; khoảng rỗng ⇒ `Rong = true` (`KhoangTongHop.cs:37-73`).<br>3. `Rong` ⇒ trả `DaTongHop = false` + `NgayTongHopMoiNhat` (**không** ném lỗi).<br>4. Đọc `RptAggDailySales` trong `[Tu, Den]`; lọc `Nguon` ở bộ nhớ nếu có (`ReportAppService.cs:78-88`).<br>5. `TaoDiem` dựng điểm theo ngày (hoặc gộp tháng bằng cách cộng từng ngày, để không mất tháng 0 đồng).<br>6. Trả tổng + `DinhNghiaTien`.<br>**Nhánh kế hoạch (lãi gộp):** `GET /gross-margin` đọc fact dòng + tiêu thụ **giá vốn từ `PrcCostPrices`** (chụp snapshot tại thời điểm bán), tính lãi gộp lúc truy vấn; thiếu giá vốn ⇒ `null` + cờ + từ chối xuất (D5/D6). |
+| **Post-Condition(s)** | • Số doanh thu chỉ đến từ `RptAggDailySales`; **0** truy vấn nguồn trong đường đọc doanh thu (BR-001).<br>• Mỗi ngày/tháng trong khoảng **đều có điểm**, kể cả 0 đồng (`TaoDiem`, `ReportAppService.cs:265-349`).<br>• Phản hồi mang `DaTongHop` + `NgayTongHopMoiNhat` + `DinhNghiaTien`; `DaTongHop = false` nghĩa là **chưa tổng hợp**, không phải **0 đồng** (BR-013).<br>• Chứng từ huỷ **tại thời điểm tổng hợp** không vào doanh thu: `RetailBill.Status = Completed`, `Order.IsCancelled = false`; huỷ **sau** khi ngày đã tổng hợp phải **backfill ngày đó** (BR-018/TC-44).<br>• Chạy lại cùng khoảng ⇒ số liệu không đổi (BR-006).<br>• ⬜ Lãi gộp: `null` + cờ khi thiếu giá vốn — chưa có trong code. |
+| **Basic Flow** | 1. `GET /api/v1/reports/revenue?tuNgay=&denNgay=&nguon=&theoThang=` (`ReportsController.cs:35-37`).<br>2. `KhoangTongHop.XacDinh` xác định khoảng: `từ > đến` ⇒ `Reports:0002`; `> 366 ngày` ⇒ `Reports:0003`; ngày tương lai bị kẹp về hôm nay; khoảng rỗng ⇒ `Rong = true` (`KhoangTongHop.cs:37-73`).<br>3. `Rong` ⇒ trả `DaTongHop = false` + `NgayTongHopMoiNhat` (**không** ném lỗi).<br>4. Đọc `RptAggDailySales` trong `[Tu, Den]`; lọc `Nguon` ở bộ nhớ nếu có (`ReportAppService.cs:78-88`).<br>5. `TaoDiem` dựng điểm theo ngày (hoặc gộp tháng bằng cách cộng từng ngày, để không mất tháng 0 đồng).<br>6. Trả tổng + `DinhNghiaTien`.<br>**Nhánh kế hoạch (lãi gộp):** `GET /gross-margin` đọc `RptFactSalesLines` (đã có `CostUnitAmount`/`CostMissing` do job chụp lúc tổng hợp), tính lãi gộp lúc truy vấn; **không** đọc `PrcCostPrices` lúc truy vấn; thiếu giá vốn ⇒ `null` + cờ + từ chối xuất (D5/D6). |
 | **Alternative Flow** | **A1: Redis chết** — job vẫn chạy; UNIQUE + thay thế theo ngày là hàng rào cuối; log `Error` + metric.<br>**A2: Khoảng rỗng** ⇒ `DaTongHop = false`, không phải lỗi (`KhoangTongHop.cs:66-72`).<br>**A3: Read-model rỗng lần đầu** ⇒ `TaoDiem` vẫn dựng đủ ngày với `0`; `DaTongHop = false`, `NgayTongHopMoiNhat = null`; UI hiện *chưa tổng hợp*, không hiện *0 đồng*.<br>**A4: Ngày tương lai** ⇒ kẹp về hôm nay (`Khoang_ngay_TUONG_LAI_bi_KEP_ve_hom_nay`).<br>**A5: Tách theo thuế suất** ⇒ **không** làm được: `OrderLine` chưa có `TaxRate`/`TaxClassificationId`; fact dòng chỉ có `VatPercent`/`VatAmount`.<br>**A6: Lãi gộp** (kế hoạch) — phí sàn **dự kiến** + cờ `SettlementPending`. |
 | **Exception Flow** | **E1:** `từ > đến` ⇒ `eCommerce:Reports:0002`.<br>**E2:** khoảng > 366 ngày ⇒ `Reports:0003` — ném, không tự cắt.<br>**E3:** chiết khấu chứng từ > tổng tiền dòng ⇒ `Reports:0004` — không làm tròn về 0.<br>**E4:** dòng mồ côi / dòng nguồn trùng / chứng từ có chiết khấu mà không có dòng ⇒ `Reports:0005`/`0008`/`0009`.<br>**E5:** `POST /aggregate` khi lượt khác đang chạy ⇒ `409` `eCommerce:Lock:0001` (`ReportsController.cs:60`).<br>**E6:** nguồn `TonKho` cho sổ doanh thu ⇒ `Reports:0001`.<br>**E7:** (kế hoạch) lãi gộp/xuất khi thiếu giá vốn ⇒ `eCommerce:Reports:0010` (`409`). |
 | **Business Rules** | Phát biểu đầy đủ ở §8.1: **`BR-REP-002-001`** chỉ đọc read-model · **`BR-REP-002-002`** thiếu dữ liệu ⇒ `null` + cờ, cấm `0` · **`BR-REP-002-003`** hai tầng khớp nhau · **`BR-REP-002-004`** chỉ lưu số cộng được · **`BR-REP-002-005`** tiền `numeric(18,2)`, SL `numeric(18,3)`, cấm `double`/`float` (tiền lãi gộp qua `Money`) · **`BR-REP-002-006`** idempotent theo `(ngày, nguồn)` · **`BR-REP-002-007`** mọi lượt tổng hợp dưới khoá `report:tong-hop` · **`BR-REP-002-008`** dữ liệu bất thường phải ném/lộ ra · **`BR-REP-002-009`** công thức trong hàm thuần · **`BR-REP-002-010`** cách ly tenant · **`BR-REP-002-011`** một chiều, cấm ghi ngược · **`BR-REP-002-012`** cấm SQL nối chuỗi · **`BR-REP-002-013`** phản hồi mang `DaTongHop`/`NgayTongHopMoiNhat` · **`BR-REP-002-014`** thuế dùng số đã chốt · **`BR-REP-002-015`** xuất chứng từ có nhật ký + hash (thuộc `ACC-001`) · **`BR-REP-002-016`** thiếu ngữ cảnh tenant ⇒ từ chối · **`BR-REP-002-017`** nguồn `DonHang` chỉ ghi doanh thu khi giao **đã đối soát** (D-114 P4) · **`BR-REP-002-018`** chứng từ huỷ không vào doanh thu. |
@@ -300,7 +300,7 @@ graph LR
     R2[("<b>Ke hoach GD3</b><br/>RptGrossMarginSnapshot")]
     OUT[("<b>Nguoi doc</b><br/>Ke toan truong · Quan ly")]
     KTT[("Ke toan truong")]
-    EXT[("<b>PRC-001 PRC-002</b><br/>gia von - CHUA CO trong code")]
+    EXT[("<b>PRC-001 PRC-002</b><br/>bang doc PrcCostPrices<br/>chua co cua ghi")]
 
     class KTT actor;
     class SRC,RM,R2,OUT,EXT datastore;
@@ -316,7 +316,7 @@ graph LR
 
     SRC -- "job doc theo cua so ngay" --> P1
     P3 -- "ghi cung UoW" --> RM
-    EXT -. "gia von theo ky - khi co" .-> P2
+    EXT -. "gia von chup luc tong hop ngay ban - khi co" .-> P2
     P4 -- "daTongHop + ngayTongHopMoiNhat" --> OUT
     OUT --> KTT
 
@@ -360,6 +360,8 @@ erDiagram
         decimal LineAmount
         decimal VatPercent
         decimal VatAmount
+        decimal CostUnitAmount
+        bool CostMissing
     }
     RptAggDailySales {
         uuid Id PK
@@ -396,6 +398,7 @@ erDiagram
 
 > 📌 **Không FK tới bảng giao dịch** (`REP-001` D14). `Sku`/`WarehouseId`/`StaffId`/`CustomerId` là tham chiếu mềm.
 > `RptGrossMarginSnapshot` là **kế hoạch** (chưa có bảng) — **read-model báo cáo**, **không** phải nguồn giá vốn; `RptFactInventorySnapshots`/`RptDimStores`/`RptDimStaffs` tồn tại nhưng **không** thuộc `REP-002`.
+> ⬜ `CostUnitAmount`/`CostMissing` trên `RptFactSalesLines` là **kế hoạch** — as-built chưa có hai cột này (`FactSalesLine.cs:47-58`).
 
 ### 5.2 Bảng & cột
 
@@ -433,6 +436,7 @@ erDiagram
 | `Quantity` | `numeric(18,3)` | D-31 |
 | `UnitPrice` / `LineDiscount` / `LineAmount` | `numeric(18,2)` | `LineAmount` **chưa** VAT |
 | `VatPercent` / `VatAmount` | `numeric(18,2)?` / `numeric(18,2)` | snapshot thuế của dòng |
+| `CostUnitAmount` / `CostMissing` | `numeric(18,2)?` / `bool` | ⬜ **kế hoạch** (D-114 P2): giá vốn đơn vị **chụp** lúc tổng hợp ngày bán từ bảng đọc `PrcCostPrices`; `null`/`true` = chưa có giá vốn ⇒ báo cáo đọc **số đã chụp**, **không** tra lại bảng kỳ |
 | `OccurredAtUtc` | `timestamptz` | mốc phát sinh; đủ để `GROUP BY` theo giờ lúc đọc (`D-174`) |
 
 | Loại | Cột | Mục đích |
@@ -440,6 +444,9 @@ erDiagram
 | **UNIQUE** | `(TenantId, Nguon, SourceLineId)` | ⭐ hàng rào chống nhân đôi |
 | INDEX | `(TenantId, BusinessDate, Nguon)` · `(TenantId, Sku)` | báo cáo theo ngày/nguồn/SKU |
 | CHECK | tiền/SL **không âm**; `Nguon IN (0,1)` | tiền âm = ghi sai dấu |
+| CHECK (⬜) | `CostMissing = (CostUnitAmount IS NULL)` | chặn **cờ lệch**: không thể `CostMissing = false` khi `CostUnitAmount IS NULL`. **Không** chặn giá trị `0` (giá vốn `0` hợp lệ — `CostPrice.cs:86-87`); vế "cấm `0` thay cho không biết" do resolver (không tra được ⇒ ghi `NULL` + cờ) + TC-16, không do CHECK |
+
+> ⬜ As-built fact **chưa** có hai cột giá vốn (`FactSalesLine.cs:47-58`, `ReportingDbContextModelCreatingExtensions.cs:78-120`); chúng thêm **cùng migration** khi làm lãi gộp.
 
 #### 5.2.3 `RptWatermarks` — *mốc tổng hợp theo nguồn*
 
@@ -453,18 +460,18 @@ erDiagram
 
 | Cột | Kiểu | Ý nghĩa |
 |---|---|---|
-| `PeriodFrom` / `PeriodTo` | `date` | kỳ hiệu lực giá vốn |
+| `PeriodFrom` / `PeriodTo` | `date` | kỳ báo cáo lãi gộp đã tổng hợp |
 | `Sku` / `WarehouseId?` | `varchar(64)` / `uuid?` | `NULL` = bình quân toàn tenant |
-| `CostUnitAmount` | `numeric(18,2)` | giá vốn đơn vị **đã chụp** (snapshot) tại thời điểm bán — bất biến |
+| `CostUnitAmount` | `numeric(18,2)` | giá vốn đơn vị **của kỳ** — dẫn xuất từ `RptFactSalesLines.CostUnitAmount`, **không** dùng để tính lại lãi gộp |
 | `CostingMethod` | `int` | `Wavg = 0` (**bình quân gia quyền DI ĐỘNG**, mặc định) / `Fifo = 1` thêm ở **cuối dải** (D-17); **không** có nhánh FIFO (D-114 P2) |
 
 | Loại | Cột | Mục đích |
 |---|---|---|
-| **UNIQUE** | `(TenantId, PeriodFrom, PeriodTo, Sku, WarehouseId, CostingMethod)` | chống 2 job ghi 2 giá vốn cùng kỳ |
+| **UNIQUE** | `(TenantId, PeriodFrom, PeriodTo, Sku, WarehouseId, CostingMethod)` | chống 2 job ghi 2 bản cùng kỳ |
 | **EXCLUDE** | `(TenantId WITH =, Sku WITH =, daterange(PeriodFrom, PeriodTo, '[]') WITH &&)` | chặn khung chồng — kỹ thuật `btree_gist` **đã chạy thật** trên PG17 (`D-171`); **chưa** áp cho bảng này ⇒ 4 ca test trước `migrations add` |
 
-> ⚠️ **Nguồn giá vốn là `PrcCostPrices`** (`PRC-001`/`PRC-002` **đã có**, chỉ đọc — `modules/Pricing/eCommerce.Pricing.Domain/CostPrice.cs:36`): `REP-002` **tiêu thụ**, **KHÔNG** dựng nguồn giá vốn thứ hai; bảng này chỉ là **read-model báo cáo** để chụp giá vốn tại thời điểm bán. Bảng này **không** được tạo trước khi kế toán **duyệt lô** phương pháp (D-114 P2 — Wavg di động, mặc định; cấu hình theo tenant).
-> Giá vốn đơn vị được **chụp vào fact lúc bán**; báo cáo đọc số đã chụp, **không** tra lại bảng kỳ rồi tính lại — sửa bảng giá vốn sau ngày bán **không** đổi lãi gộp kỳ cũ.
+> ⚠️ **Nguồn giá vốn là `PrcCostPrices`** (`PRC-001`/`PRC-002` **đã có**, chỉ đọc — `modules/Pricing/eCommerce.Pricing.Domain/CostPrice.cs:36`): `REP-002` **tiêu thụ**, **KHÔNG** dựng nguồn giá vốn thứ hai; bảng này chỉ là **read-model báo cáo** tổng hợp theo kỳ/SKU. Bảng này **không** được tạo trước khi kế toán **duyệt lô** phương pháp (D-114 P2 — Wavg di động, mặc định; cấu hình theo tenant).
+> 📌 **Chỗ chụp giá vốn = `RptFactSalesLines.CostUnitAmount`** (kèm `CostMissing`), ghi lúc job tổng hợp ngày bán từ bảng đọc `PrcCostPrices` — căn cứ `D-114` P2 ("chụp lúc bán") + công thức `Σ (Quantity × CostUnitAmount)` ở §6.3 + TC-25/TC-36 (sửa bảng giá vốn sau ngày bán **không** đổi lãi gộp kỳ cũ). Báo cáo đọc **số đã chụp trên fact**, **không** tra lại bảng kỳ rồi tính lại.
 > 📌 **Phí sàn thật KHÔNG ở bảng này:** `ChannelFeeSettledAmount` chỉ là ghi chú kế hoạch §0.1 D13; cột phí thật (`ChannelFeeEstimatedAmount`/`ChannelFeeActualAmount`) thuộc read-model `REP-003` — **không** thêm cột trùng nghĩa ở hai bảng.
 
 #### 5.2.5 `RptExportRunLog` — ⬜ **không thực hiện trong `REP-002`** (thuộc `ACC-001`)
@@ -570,7 +577,7 @@ erDiagram
 | Doanh thu chứng từ | `Σ thành tiền dòng − chiết khấu chứng từ`, làm tròn 2 chữ số `AwayFromZero` | ✅ as-built (`TongHopDoanhThu.cs:72-100`) |
 | Doanh thu báo cáo | `Σ Revenue` của `RptAggDailySales` trong khoảng | ✅ as-built |
 | VAT | `Σ VatAmount` của dòng | ✅ as-built |
-| Giá vốn (`CostAmount`) | `Σ (Quantity × giá vốn đã chụp tại thời điểm bán)` — nguồn **`PrcCostPrices`**; đọc số **snapshot**, không tra lại bảng kỳ rồi tính lại | ⬜ kế hoạch (D-114 P2) |
+| Giá vốn (`CostAmount`) | `Σ (Quantity × CostUnitAmount)` của `RptFactSalesLines`; `CostUnitAmount` **chụp** lúc tổng hợp ngày bán từ bảng đọc **`PrcCostPrices`** (D-114 P2); thiếu ⇒ `CostMissing = true`; **không** tra lại bảng kỳ để tính lại | ⬜ kế hoạch (D-114 P2) |
 | `RevenueNet` (DT ròng) | `Revenue` của `RptAggDailySales` **hoặc** `LineAmount` (chưa VAT) của `RptFactSalesLines`; **cấm** `LineTotal`/`TotalPayment` (đã gồm VAT) | ⬜ kế hoạch (D-48) |
 | `CostMissing` | `true` khi không có giá vốn ⇒ `CostAmount`/`GrossProfitAmount` = `NULL`; **tuyệt đối không** ghi `0` | ⬜ kế hoạch (BR-002) |
 | Phí sàn (`ChannelFeeAmount`) | `Order.ChannelFeeAmount` (số **DỰ KIẾN**) khi chưa settlement; kỳ chưa đối soát ⇒ `SettlementPending = true`, `ChannelFeeSettledAmount` (số thực) = `NULL`; đơn không phải sàn / `NULL` ⇒ **không** cấn trừ, không bịa `0` | ⬜ kế hoạch (D-114 P3 / Q7) |
@@ -648,8 +655,8 @@ phụ thuộc vào nó để quyết định nghiệp vụ (kế thừa `XC-005`
 
 | Mã | Bất biến / quy tắc (kiểm chứng được) | Cơ chế bảo vệ | Test |
 |---|---|---|---|
-| **BR-REP-002-001** | Đường đọc **doanh thu/lãi gộp** chỉ chạm `Rpt*`; **cấm** query `PosRetailBills`/`OrdOrders` trong đường đọc doanh thu. Ngoại lệ as-built **ngoài phạm vi** `REP-002`: **đúng một** method `GetTongQuanDonHangAsync` (D-175) | `ReportAppService.GetDoanhThuAsync` chỉ dùng `IRepository<RptAggDailySales>`; test quét mã nguồn allow-list đúng một method | **TC-02** |
-| **BR-REP-002-002** | Thiếu giá vốn ⇒ `CostAmount`/`GrossProfitAmount` = `NULL` + cờ `CostMissing`; thiếu phí sàn thật ⇒ `ChannelFeeSettledAmount` = `NULL` + cờ `SettlementPending`; **cấm** `0` thay cho *không biết* | ⬜ kế hoạch: CHECK `CostMissing = (CostAmount IS NULL)` + `warnings[]` | **TC-16**, **TC-36**, **TC-40**, **TC-41** |
+| **BR-REP-002-001** | **Đường đọc** doanh thu/lãi gộp chỉ chạm `Rpt*`; **cấm** query `PosRetailBills`/`OrdOrders` **trong đường đọc**. BR **không áp** cho job tổng hợp — `TongHopBaoCaoService` **phải** đọc bảng nguồn (`TongHopBaoCaoService.cs:255-259`). Ngoại lệ as-built **ngoài phạm vi** `REP-002`: **đúng một** method `GetTongQuanDonHangAsync` (D-175) | `ReportAppService.GetDoanhThuAsync` chỉ dùng `IRepository<RptAggDailySales>`; test quét mã nguồn allow-list **hai** mục: job `TongHopBaoCaoService` + `GetTongQuanDonHangAsync` | **TC-02** |
+| **BR-REP-002-002** | Thiếu giá vốn ⇒ `CostAmount`/`GrossProfitAmount` = `NULL` + cờ `CostMissing`; thiếu phí sàn thật ⇒ `ChannelFeeSettledAmount` = `NULL` + cờ `SettlementPending`; **cấm** `0` thay cho *không biết* | ⬜ kế hoạch: CHECK trên fact `CostMissing = (CostUnitAmount IS NULL)` + CHECK tầng lãi gộp `CostMissing = (CostAmount IS NULL)` + `warnings[]` | **TC-16**, **TC-36**, **TC-40**, **TC-41** |
 | **BR-REP-002-003** | Tổng báo cáo **=** `Σ` chứng từ nguồn (bán lẻ + đơn), sai lệch 0 đồng | `TongHopDoanhThu` + test đẳng thức | **TC-03** |
 | **BR-REP-002-004** | Bảng fact **chỉ** chứa số cộng được; **cấm** lưu tỉ lệ/trung bình | Review schema; test gộp tháng = Σ ngày | **TC-04** |
 | **BR-REP-002-005** | Tiền `numeric(18,2)`, số lượng `numeric(18,3)`; **cấm** `double`/`float`; tiền lãi gộp **phải** qua `eCommerce.Kernel.Money.Money`. Vế "cấm so tiền bằng `==`" chỉ là **quy ước review** — **chưa** có test tự động (ghi rõ, không hứa máy kiểm) | `HasPrecision` trong `ConfigureReporting`; test reflection `double`/`float` (TC-34); `Money` cho tiền lãi gộp (kế hoạch) | **TC-34**, NFR-010 |
@@ -665,11 +672,11 @@ phụ thuộc vào nó để quyết định nghiệp vụ (kế thừa `XC-005`
 | **BR-REP-002-015** | Mọi lần xuất **chứng từ** có nhật ký + `ContentHash` + `RequestedBy` — **thuộc `ACC-001`**, **không** thực hiện trong `REP-002`; CSV ở FE **không** tính | kế hoạch `ACC-001` (`AccExportRuns`/`AccExportArtifacts`); §3.2 | **TC-08** |
 | **BR-REP-002-016** | Thiếu ngữ cảnh tenant / không có quyền ⇒ **từ chối**, không trả dữ liệu | `[Authorize]` cấp class + query filter | **TC-31**, **TC-33** |
 | **BR-REP-002-017** | Nguồn `DonHang` **chỉ** ghi doanh thu khi `FulfillmentStatus = Delivered` **và** đối soát vận đơn đã xác nhận (`Source = Reconciliation`, `ConfirmedAtUtc <> null`); webhook `Delivered` đơn thuần **KHÔNG** sinh dòng fact. `BusinessDate`/`OccurredAtUtc` = ngày UTC+7 của **`Shipment.DeliveredAtUtc`**, **không** phải `Order.CreationTime` (D-114 P4) | Luồng tổng hợp đọc mốc giao đã xác nhận; kỳ đã chốt không sửa, lệch điều chỉnh kỳ sau (giữ `D-47` ④) | **TC-42** |
-| **BR-REP-002-018** | **Chứng từ huỷ/không hoàn tất KHÔNG vào doanh thu**: chỉ `RetailBill.Status = Completed` và `Order.IsCancelled = false` sinh dòng fact; chứng từ huỷ không bao giờ xuất hiện trong `Rpt*` | Bộ lọc nguồn `TongHopBaoCaoService.cs:255-259` | **TC-30** |
+| **BR-REP-002-018** | **Chứng từ huỷ/không hoàn tất KHÔNG vào doanh thu** — **tại thời điểm tổng hợp**: chỉ `RetailBill.Status = Completed` và `Order.IsCancelled = false` sinh dòng fact. Huỷ **sau** khi ngày đó đã tổng hợp **không** tự rời `Rpt*` (job chỉ chạy mốc + 1 → hôm nay, `KhoangTongHop.cs:28,58-72`) ⇒ phải **backfill ngày đó** bằng `POST /api/v1/reports/aggregate` hoặc điều chỉnh kỳ sau | Bộ lọc nguồn `TongHopBaoCaoService.cs:255-259` + backfill theo ngày | **TC-30**, **TC-44** |
 
-> 📌 **Giới hạn phạm vi BR-001 (Q12 = `Closed (D-175)`):** `GetTongQuanDonHangAsync` (báo cáo **tổng quan đơn**, `ReportAppService.cs:109-168`,
-> đọc `Order`/`OrderLine` tại `:125-135`) là ngoại lệ as-built **NGOÀI** phạm vi `REP-002` (thuộc `WP-08`). `TC-02` quét `modules/Reporting/**`
-> với allow-list **đúng một** method `GetTongQuanDonHangAsync`; mọi `IRepository<Order>`/`<OrderLine>` hay chuỗi `OrdOrders`/`OrdOrderLines` khác ⇒ **đỏ**.
+> 📌 **Phạm vi BR-001:** chỉ áp **đường đọc** (`ReportAppService`) — job `TongHopBaoCaoService` **phải** đọc bảng nguồn nên **không** bị quét.
+> `TC-02` quét `modules/Reporting/**` với allow-list **hai** mục: class job `TongHopBaoCaoService` (inject `IRepository<Order>`/`<OrderLine>` tại `TongHopBaoCaoService.cs:70-71`, đọc `:258-259`) và method `GetTongQuanDonHangAsync`
+> (báo cáo **tổng quan đơn**, `ReportAppService.cs:109-168`, đọc tại `:125-135`) — ngoại lệ as-built **NGOÀI** phạm vi `REP-002` (`Q12` = `Closed (D-175)`, thuộc `WP-08`). Mọi `IRepository<Order>`/`<OrderLine>` hay chuỗi `OrdOrders`/`OrdOrderLines` **khác hai mục trên** ⇒ **đỏ**.
 
 ### 8.2 Xử lý đồng thời
 
@@ -754,7 +761,7 @@ phụ thuộc vào nó để quyết định nghiệp vụ (kế thừa `XC-005`
 | GĐ3 | `REP-002` — doanh thu (ngày/tháng/nguồn) | ✅ **đã có code** |
 | GĐ3 | `REP-002` — lãi gộp + SKU | ⬜ **kế hoạch**, chờ `PRC-001`/`PRC-002` + kế toán |
 | GĐ3 | **Nợ (Q10 / D-114 P4):** nguồn fact `DonHang` chuyển sang **sự kiện giao đã xác nhận** (`Delivered` + `Source = Reconciliation`); cửa sổ job tính theo **mốc giao/`ConfirmedAtUtc`** chứ **không** theo `CreationTime` | ⬜ **chưa có** (`modules/Shipping` chưa vào `eCommerce.slnx`) |
-| GĐ1/2 | `PRC-001`/`PRC-002` (giá vốn — **đã có** bảng đọc `PrcCostPrices`, chưa có cửa ghi), `SAL-002` (snapshot thuế), `REC-002` (settlement) | 🔶 PRC đã có bảng đọc; SAL-002/REC-002 ⚠️ **chưa có code** |
+| GĐ1/2 | `PRC-001`/`PRC-002` (giá vốn — **đã có** bảng đọc `PrcCostPrices`, chưa có cửa ghi), `SAL-002` (**đã có code**, thiếu **snapshot thuế suất trên `OrderLine`**), `REC-002` (settlement) | 🔶 PRC đã có bảng đọc; SAL-002 đã có code (`CheckoutAppService.cs:39,59`), phần snapshot thuế suất ⬜; REC-002 ⚠️ **chưa có code** |
 
 ---
 
@@ -795,7 +802,7 @@ phụ thuộc vào nó để quyết định nghiệp vụ (kế thừa `XC-005`
 | **NFR-REP-002-005** | Idempotent | xử lý lại **1.000** lần ⇒ số liệu không đổi | TC-06/TC-09 | ✅ có test chạy lại |
 | **NFR-REP-002-006** | Cách ly tenant | tenant A **0** dòng của B | integration 2 tenant | ⬜ |
 | **NFR-REP-002-007** | Quan sát được | 100 % lượt tổng hợp có log + `CorrelationId`; lệch ≥ `Warning` | `XC-005` TC-04 | 🔶 |
-| **NFR-REP-002-008** | Không chặn bán hàng | **0** truy vấn `OrdOrders` từ **đường đọc doanh thu** (allow-list đúng một `GetTongQuanDonHangAsync` ngoài phạm vi) | TC-02 | 🔶 ngoại lệ allow-list ngoài đường đọc doanh thu (D-175) |
+| **NFR-REP-002-008** | Không chặn bán hàng | **0** truy vấn `OrdOrders` từ **đường đọc doanh thu** (allow-list trên đường đọc: đúng một `GetTongQuanDonHangAsync` ngoài phạm vi; job `TongHopBaoCaoService` **không** tính vì phải đọc nguồn) | TC-02 | 🔶 ngoại lệ allow-list ngoài đường đọc doanh thu (D-175) |
 | **NFR-REP-002-009** | Kích thước read-model | ≤ **3×** số dòng nguồn cho cùng kỳ | `COUNT(*)` fact vs nguồn | ⬜ |
 | **NFR-REP-002-010** | **0** `double`/`float` | **0** lần xuất hiện trong assembly Reporting | test reflection | ⬜ |
 
@@ -830,7 +837,7 @@ phụ thuộc vào nó để quyết định nghiệp vụ (kế thừa `XC-005`
 | ID | Mục tiêu | Loại | Expected | Phủ | Trạng thái |
 |---|---|---|---|---|---|
 | **TC-01** | Công thức doanh thu chứng từ = Σ dòng − chiết khấu | Unit | `DoanhThu_chung_tu_bang_tien_dong_TRU_chiet_khau_chung_tu` xanh | **BR-009**, **BR-003**, D14 | ✅ có |
-| **TC-02** | Đường đọc **doanh thu/lãi gộp** không query bảng nguồn | Unit (quét mã nguồn) | quét `modules/Reporting/**` allow-list **đúng một** method `GetTongQuanDonHangAsync`; mọi `IRepository<Order>`/`<OrderLine>`/`OrdOrders`/`OrdOrderLines` khác ⇒ **đỏ** | **BR-001**, NFR-008 | ⬜ |
+| **TC-02** | Đường đọc **doanh thu/lãi gộp** không query bảng nguồn | Unit (quét mã nguồn) | quét `modules/Reporting/**` allow-list **hai** mục: job `TongHopBaoCaoService` + `GetTongQuanDonHangAsync`; mọi `IRepository<Order>`/`<OrderLine>`/`OrdOrders`/`OrdOrderLines` khác ⇒ **đỏ** | **BR-001**, NFR-008 | ⬜ |
 | **TC-03** | Tổng báo cáo = Σ chứng từ bán lẻ + đơn | Unit | `DoD_doanh_thu_bao_cao_BANG_tong_chung_tu_ban_le_va_don_hang` | **BR-003**, NFR-004 | ✅ có |
 | **TC-04** | Gộp tháng = Σ ngày | Unit | `TaoDiem` tháng = cộng điểm ngày | **BR-004** | ⬜ |
 | **TC-05** | Dữ liệu bất thường phải ném | Unit | `0004`/`0005`/`0008`/`0009` | **BR-008** | ✅ có |
@@ -872,8 +879,9 @@ phụ thuộc vào nó để quyết định nghiệp vụ (kế thừa `XC-005`
 | **TC-41** | Phí sàn có settlement | Unit | dùng **số thực** + `SettlementPending = false`; chênh lệch dự kiến-vs-thực điều chỉnh **kỳ sau** | **BR-002** | ⬜ |
 | **TC-42** | Ghi nhận doanh thu chỉ khi giao **đã đối soát** | Unit/Integration | `DonHang` chỉ sinh fact khi `Delivered` + `Source = Reconciliation` + `ConfirmedAtUtc <> null`; webhook `Delivered` đơn thuần **không** sinh fact; `BusinessDate` = ngày UTC+7 của `Shipment.DeliveredAtUtc` (không phải `CreationTime`) | **BR-017** | ⬜ |
 | **TC-43** | `asOfUtc` + nhãn *tạm tính* suy ra | Unit + Integration | `asOfUtc` nullable (plan); điểm ngày hôm nay mang nhãn *tạm tính*, ngày đã qua **không**; cảnh báo *số cũ* khi `now − asOfUtc > 900 s` | **BR-013**, NFR-007 | ⬜ |
+| **TC-44** | Huỷ chứng từ **sau khi ngày đã tổng hợp** | Unit/Integration | ngày D đã tổng hợp; huỷ đơn/hoá đơn của D; lượt job kế tiếp (mốc + 1 → hôm nay) **không** sửa D; `POST /aggregate?tuNgay=denNgay=D` ⇒ D giảm đúng phần chứng từ huỷ, **0** dòng của chứng từ huỷ còn trong `Rpt*` | **BR-018** | ⬜ |
 
-**Tổng: 43 test case · phủ 18 BR và 10 NFR.** Đếm theo cột Trạng thái: ✅ **8** · 🔶 **4** · ⬜ **31**. Không được coi ⬜/🔶 là đã pass.
+**Tổng: 44 test case · phủ 18 BR và 10 NFR.** Đếm theo cột Trạng thái: ✅ **8** · 🔶 **4** · ⬜ **32**. Không được coi ⬜/🔶 là đã pass.
 
 ### 14.2 Fixture hiện có
 
@@ -902,7 +910,7 @@ phụ thuộc vào nó để quyết định nghiệp vụ (kế thừa `XC-005`
 - [ ] Tài liệu được review + Approved (**đỏ cứng**: cần biên bản người ký)
 - [x] ✅ Module + vị trí project đã chốt
 - [x] ✅ Hiện trạng đã kiểm: doanh thu **có**; giá vốn **có bảng đọc** `PrcCostPrices` (`PRC-001`/`PRC-002`, chưa có cửa ghi); chiều kênh/SKU **chưa**
-- [ ] Có **nguồn ghi** giá vốn (`PrcCostPrices` đã có bảng đọc — `PRC-001`/`PRC-002`) + `SAL-002` có snapshot thuế
+- [ ] Có **nguồn ghi** giá vốn (`PrcCostPrices` đã có bảng đọc — `PRC-001`/`PRC-002`) + **snapshot thuế suất trên `OrderLine`** (`SAL-002` **đã có code**; cột `TaxRate`/`TaxClassificationId` ⬜)
 - [x] ✅ **Q2** (Wavg di động, snapshot), **Q4** (không trừ VAT lần nữa), **Q7** (phí sàn dự kiến + cờ), **Q10** (giao đã đối soát) — đã chốt `D-114` P2/P3/P4
 - [ ] Mã lỗi mới `Reports:0010+` được duyệt (nối tiếp as-built)
 
@@ -925,7 +933,7 @@ phụ thuộc vào nó để quyết định nghiệp vụ (kế thừa `XC-005`
 | **REP-002-Q9** | Có cần **bản tạm tính trong ngày** tách nhãn khỏi số chính thức? | Kế toán trưởng | **Closed — `D-114` + `D-172`**: **CÓ** nhãn *tạm tính* + `asOfUtc` (⬜ plan, additive, nullable), **KHÔNG** tách bảng/bản riêng; nhãn là thuộc tính **suy ra** ở tầng đọc/FE cho điểm ngày hôm nay (UTC+7) | Cấm thêm bảng/DTO/endpoint/snapshot "bản chính thức"; không mở rộng lookback 3 ngày |
 | **REP-002-Q10** | 🔴 **Ghi nhận doanh thu theo ngày nào:** ngày tạo chứng từ (as-built: `CreationTime`, bỏ huỷ) hay ngày giao thành công đã đối soát? | Kế toán trưởng | **Closed — `D-114` P4** (áp cho **mọi đơn giao vận**, không chỉ COD): chỉ ghi khi `Delivered` + đối soát xác nhận (`Source = Reconciliation`, `ConfirmedAtUtc <> null`); `BusinessDate` = ngày UTC+7 của `Shipment.DeliveredAtUtc`; kỳ chốt không sửa, lệch điều chỉnh kỳ sau | — |
 | **REP-002-Q11** | CSV ở FE đủ cho GĐ3, hay cần **endpoint xuất server có audit** (`RptExportRunLog`)? | Kiến trúc trưởng | **Closed — `D-03` + `D-36`**: giữ CSV dựng ở **FE** (một định nghĩa cột, BOM UTF-8) làm tiện ích màn hình; **KHÔNG** endpoint xuất, **KHÔNG** `RptExportRunLog` trong `REP-002`; file có audit thuộc `ACC-001` | — |
-| **REP-002-Q12** | `GetTongQuanDonHangAsync` đọc `Order`/`OrderLine` — chấp nhận, hay chuyển sang read-model? | Kiến trúc trưởng | **Closed — `D-175`**: **CHẤP NHẬN** ngoại lệ, ghi rõ **ngoài phạm vi** `REP-002` (báo cáo tổng quan đơn thuộc `WP-08`); giữ code as-built; `TC-02` allow-list **đúng một** method | — |
+| **REP-002-Q12** | `GetTongQuanDonHangAsync` đọc `Order`/`OrderLine` — chấp nhận, hay chuyển sang read-model? | Kiến trúc trưởng | **Closed — `D-175`**: **CHẤP NHẬN** ngoại lệ, ghi rõ **ngoài phạm vi** `REP-002` (báo cáo tổng quan đơn thuộc `WP-08`); giữ code as-built; `TC-02` allow-list **hai** mục (job `TongHopBaoCaoService` + `GetTongQuanDonHangAsync`), BR-001 chỉ áp đường đọc | — |
 
 ### 15.2 Giả định
 
@@ -946,6 +954,7 @@ phụ thuộc vào nó để quyết định nghiệp vụ (kế thừa `XC-005`
 | v0.1 | 15/10/2026 | *(điền)* | Bản nháp đầu — lập từ code thật; xác nhận **giá vốn** và **snapshot thuế suất** chưa có; chốt công thức chỉ tiêu + `NULL`+cờ (D5) + từ chối xuất (D6); 9 câu hỏi mở |
 | v0.2 | 24/11/2026 | *(điền)* | **Đối chiếu mô hình Nhanh (WP-14)**: sửa toàn bộ theo as-built `WP-08` — 8 bảng `Rpt*`, route `/api/v1/reports/revenue`, DTO `BaoCaoDoanhThuDto`, `numeric(18,2)`/`numeric(18,3)`, mã lỗi `eCommerce:Reports:*`, quyền `eCommerce.Reports`; bỏ chiều kênh/shop (không có), bỏ `ProductVariantId` (D-07), bỏ job đối chiếu/sự kiện ETO (D-47); đóng Q1/Q3/Q5/Q6/Q8 theo as-built + `D-171`; thêm Q10 (thời điểm ghi nhận, `D-114` P4), Q11 (xuất có audit), Q12 (orders-summary đọc bảng nguồn) |
 | v0.3 | 24/11/2026 | *(điền)* | **Áp kết quả decider N57** (`D-114` P2–P4, `D-48`, `D-03`/`D-36`, `D-172`, `D-175`): Q2 = Wavg **di động** + giá vốn **snapshot**; Q4 = **không** trừ VAT lần nữa; Q7 = phí sàn **dự kiến** có cấn trừ + `SettlementPending`; Q9 = nhãn *tạm tính* suy ra + `asOfUtc` (plan); Q10 = ghi nhận khi giao **đã đối soát** (mọi đơn giao vận), thêm BR-REP-002-017; Q11 = CSV FE, audit thuộc `ACC-001`; Q12 = chấp nhận ngoại lệ (D-175). Thêm TC-36…TC-43, cập nhật TC-02/07/08/16/17/18/20/25 |
+| v0.4 | 24/11/2026 | *(điền)* | **Vòng sửa DOCREV vòng 2 (N58) — 5 P2**: §4.3 nhãn PRC "đã có bảng đọc"; BR-001/TC-02 allow-list **hai** mục (job `TongHopBaoCaoService` + `GetTongQuanDonHangAsync`); chốt **chỗ chụp giá vốn** = `RptFactSalesLines.CostUnitAmount`/`CostMissing` (căn cứ `D-114` P2); `SAL-002` **đã có code** (chỉ thiếu snapshot thuế suất trên `OrderLine`); BR-018 thu hẹp "**tại thời điểm tổng hợp**" + thêm TC-44 (huỷ muộn ⇒ backfill ngày đó) |
 
 ---
 
@@ -964,6 +973,9 @@ phụ thuộc vào nó để quyết định nghiệp vụ (kế thừa `XC-005`
 - `graph: mcp__codegraph__codegraph_explore "Order ChannelFeeAmount ShippingCostAmount FulfillmentStatus DeliveredAtUtc Shipment Reconciliation ConfirmedAtUtc"` → `Order.ChannelFeeAmount` (`Order.cs:167`), `OrderLine.LineTotal` gồm `TaxAmount` (`Order.cs:840`); `ShippingCostAmount`/`DeliveredAtUtc` **chưa có** trong chỉ mục (kế hoạch GĐ3).
 - `graph: mcp__codegraph__codegraph_explore "CostPrice CostPriceAppService PrcCostPrices PricingDbContextModelCreatingExtensions PricingApplicationModule eCommerce.Pricing.Domain"` → **có** `CostPrice` (`modules/Pricing/eCommerce.Pricing.Domain/CostPrice.cs:36`) map `PrcCostPrices`, `CostPriceAppService` (`CostPriceAppService.cs:24-82`), `CostPriceTests`; 4 project `eCommerce.slnx:71-75`.
 - `graph: mcp__codegraph__codegraph_explore "Order ShippingFeeActual ShippingFeeCustomer ChannelFeeAmount LineTotal TaxAmount OrderLine"` → `ShippingFeeActual` (`Order.cs:127` — phí **thực trả HVC**), `ShippingFeeCustomer` (`Order.cs:124` — phí báo khách), `LineTotal` (`Order.cs:840`); `ShippingCostAmount` **không tồn tại**.
+- `graph: mcp__codegraph__codegraph_explore "RptFactSalesLine FactSalesLine ConfigureReporting ReportingDbContextModelCreatingExtensions RptAggDailySales CostUnitAmount CostMissing"` → `RptFactSalesLine` (`FactSalesLine.cs:17-61`) **không** có `CostUnitAmount`/`CostMissing`; mapping fact `ReportingDbContextModelCreatingExtensions.cs:78-120`.
+- `graph: mcp__codegraph__codegraph_explore "TinhNgayAsync TongHopBaoCaoService donHang dongDonHang Where IsCancelled Status Completed"` → job lọc `Completed`/`!IsCancelled` tại `TongHopBaoCaoService.cs:255-259`, inject `IRepository<Order>`/`<OrderLine>` tại `:70-71`; `KhoangTongHop.XacDinh:37` chạy **mốc + 1** (`:62-64`), lần đầu lùi **30** ngày (`:28,58-61`).
+- `graph: mcp__codegraph__codegraph_explore "CheckoutAppService TinhVaGiuChoAsync CheckoutDtos TaxRate TaxClassificationId CheckoutApplication SAL-002"` → `CheckoutAppService.cs:39` (class), `TinhVaGiuChoAsync:59`; `DongCheckoutDto.TaxRate` (`CheckoutDtos.cs:18`); `OrderLine` chỉ có `TaxAmount` (`Order.cs:838`) — **chưa** có `TaxRate`.
 
 | D-xx | Tài liệu cũ nói (§mục) | Đã sửa thành (§mục) | Code thật / kế hoạch |
 |---|---|---|---|
@@ -993,3 +1005,7 @@ phụ thuộc vào nó để quyết định nghiệp vụ (kế thừa `XC-005`
 | — (Money) | §0.1 D8: `Money` **chưa có** | §0.1 D8: `eCommerce.Kernel.Money.Money` **đã có**, dùng cho lãi gộp | `shared/eCommerce.Kernel/Money/Money.cs:23` |
 | — (phí ship) | §6.3: trừ `ShippingCostAmount` (không tồn tại) | §6.3/§15 Q4: trừ **`Order.ShippingFeeActual`** (phí thực trả HVC) | `Order.cs:127` |
 | — (BR huỷ) | §14.1 TC-30 phủ nhầm **BR-016** | Thêm **BR-REP-002-018** (chứng từ huỷ không vào doanh thu); TC-30 phủ BR-018 | `TongHopBaoCaoService.cs:255-259` |
+| — (SAL-002) | §0/§11/§14.4: `SAL-002` "**chưa có code**" | §0/§11/§14.4: `SAL-002` **đã có code**; chỉ **snapshot thuế suất trên `OrderLine`** là ⬜ | `CheckoutAppService.cs:39,59`; `CheckoutDtos.cs:18`; `Order.cs:838` |
+| — (chỗ chụp giá vốn) | §5.1/§5.2.4: "chụp vào fact" nhưng fact **không** có cột; ERD đặt ở bảng kỳ | §5.1/§5.2.2/§5.2.4/§6.3: `RptFactSalesLines.CostUnitAmount` + `CostMissing` là chỗ chụp; bảng kỳ chỉ dẫn xuất | `FactSalesLine.cs:47-58`; `ReportingDbContextModelCreatingExtensions.cs:78-120` |
+| — (allow-list TC-02) | §8.1/TC-02: allow-list "đúng một method" | §8.1/TC-02: allow-list **hai** mục (job `TongHopBaoCaoService` + `GetTongQuanDonHangAsync`); BR-001 chỉ áp đường đọc | `TongHopBaoCaoService.cs:70-71,258-259` |
+| — (huỷ muộn) | §1/§8.1: chứng từ huỷ "không bao giờ xuất hiện trong `Rpt*`" | §1/§8.1/TC-44: đúng **tại thời điểm tổng hợp**; huỷ muộn ⇒ backfill ngày đó | `KhoangTongHop.cs:28,58-72` |
