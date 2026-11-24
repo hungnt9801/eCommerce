@@ -1323,6 +1323,55 @@ if (-not $ChiKiemDb) {
             BangNhau (ChayScript $ckArt @('-Kind', 'testplan', '-Path', (TaoTepMau 't2.md' "BR-SHP-009-001`n$nc"), '-Srs', $srs)).Ma 1 'Testplan thieu BR-002'
         }
     }
+
+    Describe 'tools/agents/negative-control.ps1 — dot bien DO -> khoi phuc XANH -> ghi bang chung' {
+
+        $nc = Join-Path $PSScriptRoot 'agents/negative-control.ps1'
+
+        # Repo git tam: negative-control tu choi tep chua commit => ca thu phai co repo that.
+        $repoNc = Join-Path $thuMucTam ('nc-' + [Guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Force -Path $repoNc | Out-Null
+        & git -C $repoNc init -q
+        & git -C $repoNc config user.email 't@t'
+        & git -C $repoNc config user.name 't'
+
+        $tepNc = Join-Path $repoNc 'target.txt'
+        [IO.File]::WriteAllText($tepNc, "OK`n", [Text.UTF8Encoding]::new($false))
+        $probeNc = Join-Path $repoNc 'probe.ps1'
+        [IO.File]::WriteAllText($probeNc, "param([string]`$File)`n`$t = [IO.File]::ReadAllText(`$File, [Text.Encoding]::UTF8)`nif (`$t.Contains('BROKEN')) { Write-Output 'probe: BROKEN => DO'; exit 1 }`nWrite-Output 'probe: XANH'; exit 0`n", [Text.UTF8Encoding]::new($false))
+        $planNc = Join-Path $repoNc 'testplan.md'
+        [IO.File]::WriteAllText($planNc, "## Negative control`n| Ngay | Ma | Tep:dong | Dot bien | Lenh test | Bang chung |`n|---|---|---|---|---|---|`n", [Text.UTF8Encoding]::new($false))
+        & git -C $repoNc add -A
+        & git -C $repoNc commit -q -m init
+
+        $lenhNc = 'pwsh -NoProfile -File "{0}" "{1}"' -f $probeNc, $tepNc
+
+        It 'C1) dot bien lam test DO -> khoi phuc XANH => exit 0 + testplan co 2 dong exit' {
+            $k = ChayScript $nc @('-File', $tepNc, '-Find', 'OK', '-Replace', 'BROKEN', '-TestCommand', $lenhNc, '-Testplan', $planNc, '-Id', 'NC-1')
+            BangNhau $k.Ma 0 "dot bien do roi xanh phai DAT — log: $(Get-Content $k.Log -Raw)"
+            $plan = Get-Content $planNc -Raw
+            KhangDinh ($plan -match 'exit\s+1\s+\(do\)') 'Testplan phai co "exit 1 (do)"'
+            KhangDinh ($plan -match 'exit\s+0\s+\(xanh\)') 'Testplan phai co "exit 0 (xanh)"'
+            BangNhau ([IO.File]::ReadAllText($tepNc).Trim()) 'OK' 'Tep dich phai ve nguyen trang'
+        }
+
+        It 'C2) tep dich chua commit => exit 3 (khong dot bien tren ban dang sua)' {
+            [IO.File]::WriteAllText($tepNc, "OK dirty`n", [Text.UTF8Encoding]::new($false))
+            try {
+                BangNhau (ChayScript $nc @('-File', $tepNc, '-Find', 'OK', '-Replace', 'BROKEN', '-TestCommand', $lenhNc)).Ma 3 'Tep ban phai bi tu choi'
+            }
+            finally {
+                & git -C $repoNc checkout -- target.txt
+            }
+        }
+
+        It 'C3) dot bien KHONG lam test do => exit 2 va khoi phuc (🛡️ chong test rong)' {
+            $k = ChayScript $nc @('-File', $tepNc, '-Find', 'OK', '-Replace', 'OK!', '-TestCommand', $lenhNc)
+            BangNhau $k.Ma 2 'Mutation khong lam do phai KHONG DAT'
+            KhangDinh ((Get-Content $k.Log -Raw) -match 'KHONG lam test do') 'Log phai noi ro mutation khong lam do'
+            BangNhau ([IO.File]::ReadAllText($tepNc).Trim()) 'OK' 'Tep dich phai ve nguyen trang'
+        }
+    }
 }
 
 # ── TONG KET ─────────────────────────────────────────────────────────────────────────────────

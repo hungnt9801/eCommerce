@@ -512,21 +512,21 @@ Theo `CLAUDE.md` §5: các câu "DEC" đưa qua `decider` khi bắt đầu B1; c
 
 | Nguồn (`SelfLearningAI`) | Đích (`eCommerce`) | Bước | Trạng thái |
 |---|---|---|---|
-| `agents/roles/00-orchestrator/ROLE.md` | `CLAUDE.md` + skill `doc-gate`, `feature-pipeline`, `session-protocol` | B2, B5 | `CLAUDE.md` ✅ (+§9) · `doc-gate`, `mo-phien`, `dong-phien` ✅ (17/11) · `feature-pipeline` ⬜ (B5) |
+| `agents/roles/00-orchestrator/ROLE.md` | `CLAUDE.md` + skill `doc-gate`, `feature-pipeline`, `session-protocol` | B2, B5 | `CLAUDE.md` ✅ (+§9) · `doc-gate`, `mo-phien`, `dong-phien` ✅ (17/11) · `feature-pipeline` ✅ (N66) |
 | `agents/roles/10-business-analyst/ROLE.md` | `.claude/agents/ba.md` + skill `feature-doc-rules` | B2 | ✅ 17/11 |
 | `agents/roles/65-doc-reviewer/ROLE.md` | `.claude/agents/docrev.md` + skill `doc-review` (D1–D7) | B2 | ✅ 17/11 |
-| `agents/roles/20…70/ROLE.md` (6 vai còn lại) | `.claude/agents/{arch,be,fe,qa,rev,ops}.md` + 5 skill | B5 | ⬜ |
+| `agents/roles/20…70/ROLE.md` (6 vai còn lại) | `.claude/agents/{arch,be,fe,qa,rev,ops}.md` + 5 skill | B5 | ✅ N67 (kỹ năng ở N66) |
 | "Thẩm quyền tự quyết" ORCH §7 + `decide.ps1` | `.claude/agents/decider.md` + skill `decision-policy` | — | ✅ (14/11) |
 | Kiểm vùng ghi sau khi chạy (`git status` + `git checkout --`) | hook `guard-write-scope` + `guard-shell` (chặn **trước**) + `subagent-start` / `check-agent-stop` (lưới sau) + `bao-orch` (báo phiên chính) | B1 | ✅ 17/11 |
 | `scripts/check-artifact.ps1`, `check-docs.ps1` | `tools/agents/check-agent-artifact.ps1`, `check-feature-doc.ps1` | B2 | ✅ 17/11 |
-| `scripts/negative-control.ps1` | `tools/agents/negative-control.ps1` | B5 | ⬜ |
+| `scripts/negative-control.ps1` | `tools/agents/negative-control.ps1` | B5 | ✅ N67 |
 | `scripts/check-all.ps1`, `verify.ps1` | **không port** — `tools/kiem-tat-ca.ps1` | — | có sẵn |
 | `scripts/wp.ps1`, `session-new/merge.ps1`, `board.json`, `work-packages.json` | **hoãn** (C11); phiên tuần tự theo `08`, song song theo `09` | B7 nếu cần | hoãn |
 | `scripts/decide.ps1` | **không port** (C12) | — | — |
 | `SelfLearningAI/docs/00-templates/feature-design-template-v2.md` | **không port** — giữ `docs/templates/feature-design-template.md` | — | có sẵn |
 | `docs/10-inbox/` | `docs/inbox/` | B2 | ✅ 17/11 |
 | `docs/08-adr/` | **không port** — `D-xx` đóng vai ADR | — | — |
-| "Bài học bắt buộc" cuối ROLE | mục 9 cố định của mỗi tệp vai; nguồn bài học eCommerce: tệp nhãn **B** (§14.1 bản 14/11) | B2, B5 | ✅ `ba`, `docrev` · ⬜ vai code |
+| "Bài học bắt buộc" cuối ROLE | mục 9 cố định của mỗi tệp vai; nguồn bài học eCommerce: tệp nhãn **B** (§14.1 bản 14/11) | B2, B5 | ✅ `ba`, `docrev` · ✅ vai code (N67) |
 
 ---
 
