@@ -17,7 +17,7 @@
 
 **Tóm tắt:** `REP-001` dựng **read-model riêng** cho Reporting và **job tổng hợp** nuôi nó, để **mọi báo cáo đọc trên bảng tổng hợp** thay vì
 query nặng trên **DB giao dịch**. Tài liệu này chốt: mô hình dữ liệu (bảng fact + watermark + nhật ký chạy), cơ chế cập nhật
-(**sự kiện tăng dần** + **job đối chiếu định kỳ** — hai đường độc lập, có thể kiểm chứng lẫn nhau), hợp đồng API, khoá phân tán,
+(**batch thay thế theo `(ngày, nguồn)`** — job đọc thẳng bảng nguồn theo cửa sổ ngày, **không** tiêu thụ ETO; D-47), hợp đồng API, khoá phân tán,
 idempotency, và cách phát hiện **lệch số** thay vì để nó im lặng.
 
 **Vì sao phải có tài liệu này (yêu cầu đã chốt ở kế hoạch):**
@@ -105,7 +105,7 @@ Phần **vận hành GĐ3 còn lại** (rebuild/backfill có audit, chốt kỳ,
 | **Trigger** | (a) **nhịp job tổng hợp theo mốc** (mỗi nguồn; job nền — xem §4); (b) người dùng mở báo cáo (đọc read-model); (c) người có quyền yêu cầu **tổng hợp lại** một khoảng ngày — **kế hoạch GĐ3** (rebuild/backfill, chốt kỳ). **Không** có đường sự kiện tăng dần: `D-47` đã thay bằng batch thay thế theo `(ngày, nguồn)`. |
 | **Pre-Condition(s)** | • **Tenant hiện tại** (`TenantId` từ `ICurrentTenant`) — mọi bảng read-model là `IMultiTenant` có query filter; **cấm** đọc xuyên tenant.<br>• **Nguồn dữ liệu** sẵn sàng: `Order`/`OrderLine` (kể cả đơn sàn), `RetailBill`/`RetailBillLine` (POS, `D-18`/`D-42`), `InventoryItem` (tồn 9 chiều, `D-27`).<br>• **Đã có `DbSet`** cho mọi entity read-model trên `eCommerceDbContext` (D13).<br>• **Redis 7** cho khoá `report:tong-hop`; **nếu Redis chết** job vẫn **không** nhân đôi nhờ unique index + thay thế theo ngày (D-47 ①, `XC-003` D2).<br>• Múi giờ nghiệp vụ = **Asia/Ho_Chi_Minh**; ngày kinh doanh = `CreationTime` quy đổi UTC+7 (D-47 ④, `NgayKinhDoanh.TuUtc`). |
 | **Post-Condition(s)** | • Mỗi ngày đã tổng hợp có dòng trong `RptFactSalesLines`/`RptAggDailySales`, **đúng bằng** nguồn của ngày đó (thay thế theo ngày).<br>• `RptWatermarks` của mỗi nguồn **chỉ tiến**, cập nhật **sau** khi ngày đó ghi xong.<br>• Tổng theo **mọi** cách nhóm **bằng nhau** (D5) — test `TC-12`.<br>• Chạy lại cùng ngày ⇒ **0** thay đổi ròng / **không** nhân đôi (idempotent, BR-REP-001-005/013). |
-| **Basic Flow** | 1. **Job tổng hợp** (nền, định kỳ) gọi `TongHopBaoCaoService.ChayAsync` ⇒ giành khoá `report:tong-hop` (D-3/BR-007).<br>2. Xác định khoảng ngày từ **mốc mỗi nguồn** (`RptWatermarks.LastAggregatedDate`) + tham số (mặc định tới hôm nay).<br>3. Với **từng ngày**: đọc nguồn theo **nửa khoảng** `[bắt đầu, kết thúc)` (POS `Completed`, đơn `!IsCancelled`); bỏ qua chứng từ 0 dòng + log `Warning` (D-48 ⑥).<br>4. Tính bằng hàm thuần `TongHopDoanhThu.TinhNgay` ⇒ dòng sự kiện + dòng tổng hợp `(ngày, nguồn)`, làm tròn theo `XC-001`.<br>5. **Thay thế**: `DELETE` mọi dòng của ngày rồi `INSERT` (một lượt); cập nhật mốc nguồn **sau** khi ghi.<br>6. Ảnh tồn kho (nếu bật): chụp **trạng thái hiện tại** của `InventoryItem`, thay ảnh cùng ngày (D-47 ⑦).<br>7. Người dùng gọi `GET /api/v1/reports/danh-thu` ⇒ đọc **chỉ** trên read-model, trả cờ `DaTongHop`/`DaCoDuLieu`. |
+| **Basic Flow** | 1. **Job tổng hợp** (nền, định kỳ) gọi `TongHopBaoCaoService.ChayAsync` ⇒ giành khoá `report:tong-hop` (D-3/BR-007).<br>2. Xác định khoảng ngày từ **mốc mỗi nguồn** (`RptWatermarks.LastAggregatedDate`) + tham số (mặc định tới hôm nay).<br>3. Với **từng ngày**: đọc nguồn theo **nửa khoảng** `[bắt đầu, kết thúc)` (POS `Completed`, đơn `!IsCancelled`); bỏ qua chứng từ 0 dòng + log `Warning` (D-48 ⑥).<br>4. Tính bằng hàm thuần `TongHopDoanhThu.TinhNgay` ⇒ dòng sự kiện + dòng tổng hợp `(ngày, nguồn)`, làm tròn theo `XC-001`.<br>5. **Thay thế**: `DELETE` mọi dòng của ngày rồi `INSERT` (một lượt); cập nhật mốc nguồn **sau** khi ghi.<br>6. Ảnh tồn kho (nếu bật): chụp **trạng thái hiện tại** của `InventoryItem`, thay ảnh cùng ngày (D-47 ⑦).<br>7. Người dùng gọi `GET /api/v1/reports/revenue` ⇒ đọc **chỉ** trên read-model, trả cờ `DaTongHop`/`DaCoDuLieu`. |
 | **Alternative Flow** | **A1: Ngày không có chứng từ** — không tạo dòng; mốc vẫn tiến khi chạy theo khoảng; báo cáo không suy từ `MAX(BusinessDate)` mà dựa trên `RptWatermarks`.<br>**A2: Tổng hợp lại một khoảng** — **kế hoạch GĐ3**: người có quyền khai `FromDate`/`ToDate` + lý do, ghi audit (D9/D10).<br>**A3: Kỳ đã chốt** — **kế hoạch GĐ3**: job bỏ qua ngày thuộc kỳ đã chốt + log/metric (D8).<br>**A4: Redis chết** — **fail-open**: job vẫn chạy; DB (unique index + thay thế theo ngày) chặn nhân đôi (`XC-003` E2).<br>**A5: Chưa tổng hợp** — trả **"chưa tổng hợp"** (`DaTongHop = false`), **không** trả `0` (§12). |
 | **Exception Flow** | **E1:** không giành được khoá `report:tong-hop` ⇒ `eCommerce:Lock:0001` (`KhongGianhDuocKhoa`; `TongHopBaoCaoService.cs:116`, `eCommerceConsts.cs:545`); API trả `409`, job nền bỏ nhịp + log.<br>**E2:** chạy lại cùng ngày ⇒ `DELETE` + `INSERT` thay thế, **không** nhân đôi (D-47 ①).<br>**E3:** chiết khấu chứng từ > tổng tiền dòng ⇒ `eCommerce:Reports:0004` (**không** làm tròn về 0 — D-48 ⑤).<br>**E4:** dòng mồ côi (không thuộc chứng từ nào) ⇒ `eCommerce:Reports:0005`.<br>**E5:** ảnh tồn kho có chiều âm ⇒ `eCommerce:Reports:0006` (không ghi ảnh xấu).<br>**E6:** khoảng > **366 ngày** ⇒ `eCommerce:Reports:0003` + chia nhỏ. |
 | **Business Rules** | Phát biểu đầy đủ ở §8.1 (BR-REP-001-001 … 015) — mục này chỉ liệt kê mã: **BR-001** sở hữu read-model · **BR-002** cấm query DB giao dịch ngoài job · **BR-003** cách ly tenant · **BR-004** tiền `decimal` + không so `==`, số lượng `decimal(18,3)` · **BR-005** idempotent theo unique index + thay thế theo ngày · **BR-006** mốc (watermark) bắt buộc, chỉ tiến · **BR-007** khoá phân tán `report:tong-hop` · **BR-008** mọi ghi qua UoW · **BR-009** thay thế theo `(ngày, nguồn)`, không xoá lẻ · **BR-010** một chiều, không ghi ngược · **BR-011** rebuild có quyền + audit + tường minh (kế hoạch) · **BR-012** số liệu lệch phải **lộ ra** (kế hoạch) · **BR-013** chạy lại không nhân đôi · **BR-014** "chưa tổng hợp" ≠ 0 · **BR-015** cấm SQL nối chuỗi + cấm PII trong read-model. |
@@ -188,7 +188,7 @@ stateDiagram-v2
 
 | Từ | Sang | Guard (điều kiện cho phép) | Hành động kèm theo | Nếu guard sai thì? |
 |---|---|---|---|---|
-| `Queued` | `Running` | Giành được khoá `report:job:{jobName}:{tenantId}` trong timeout (mặc định **30 s**) | ghi `StartedAtUtc`, `HostName` | Sang `Skipped` + log `Information` + metric `lock_skipped_total{module=reporting}` (`XC-003` A1) |
+| `Queued` | `Running` | Giành được khoá `report:tong-hop` trong timeout (mặc định **30 s**) | ghi `StartedAtUtc`, `HostName` | Sang `Skipped` + log `Information` + metric `lock_skipped_total{module=reporting}` (`XC-003` A1) |
 | `Queued` | `Skipped` | **Chỉ** job định kỳ (`SkipIfBusy`) | log + metric (**bắt buộc** — thiếu là vi phạm `XC-003` BR-010) | Vi phạm BR-REP-001-007 |
 | `Running` | `Succeeded` | **Mọi** cửa sổ đã commit + watermark đã cập nhật | ghi `FinishedAtUtc`, `RowsUpserted`, `WindowsDone` | Ở lại `Running` |
 | `Running` | `PartiallySucceeded` | Có cửa sổ lỗi **và** còn cửa sổ chưa chạy | ghi `LastErrorCode`, `FailedWindows`, giữ checkpoint | — |
@@ -414,11 +414,11 @@ erDiagram
 | `Sku` | `varchar(64)` | ✖ | `RetailBillLine.Sku` / `OrderLine.Sku` | **không** dùng `ProductVariantId` (D-07) |
 | `ProductName` | `varchar(256)` | ✔ | POS có tên; đơn để `null`, tra từ `RptDimProducts` | không bịa tên bằng SKU |
 | `Quantity` | `numeric(18,3)` | ✖ | số lượng dòng | **decimal** (D-31); `OrderLine.Quantity` còn `int` |
-| `UnitPrice` | `numeric(18,4)` | ✖ | đơn giá snapshot | |
-| `LineDiscount` | `numeric(18,4)` | ✖ | chiết khấu **dòng** | |
-| `LineAmount` | `numeric(18,4)` | ✖ | **thành tiền dòng CHƯA VAT** | đơn: `UnitPrice×Qty − Discount` (**không** `LineTotal` vì nó cộng thuế — D-48 ③) |
-| `VatPercent` | `numeric(18,4)` | ✔ | % VAT dòng | |
-| `VatAmount` | `numeric(18,4)` | ✖ | tiền VAT dòng | **tách riêng** (D-48) |
+| `UnitPrice` | `numeric(18,2)` | ✖ | đơn giá snapshot | `HasPrecision(18,2)` (`ReportingDbContextModelCreatingExtensions.cs:103`) |
+| `LineDiscount` | `numeric(18,2)` | ✖ | chiết khấu **dòng** | `:104` |
+| `LineAmount` | `numeric(18,2)` | ✖ | **thành tiền dòng CHƯA VAT** | đơn: `UnitPrice×Qty − Discount` (**không** `LineTotal` vì nó cộng thuế — D-48 ③); `:105` |
+| `VatPercent` | `numeric(18,2)` | ✔ | % VAT dòng | `:106` |
+| `VatAmount` | `numeric(18,2)` | ✖ | tiền VAT dòng | **tách riêng** (D-48); `:107` |
 | `OccurredAtUtc` | `timestamptz` | ✖ | `CreationTime` (UTC) | để đối chiếu chứng từ |
 
 **Index & ràng buộc**
@@ -547,7 +547,7 @@ public enum NguonBaoCao { BanLe = 0, DonHang = 1, TonKho = 2 }
   "tuNgay": "2026-10-01",
   "denNgay": "2026-10-13",
   "daTongHop": true,
-  "dinhNghia": "Doanh thu = Σ thành tiền dòng (CHƯA gồm VAT) − chiết khấu chứng từ. CHƯA trừ hàng trả lại; hoá đơn đã huỷ và đơn đã huỷ KHÔNG được tính.",
+  "dinhNghiaTien": "Doanh thu = Σ thành tiền dòng (CHƯA gồm VAT) − chiết khấu chứng từ. CHƯA trừ hàng trả lại; hoá đơn đã huỷ và đơn đã huỷ KHÔNG được tính.",
   "diem": [
     { "nhan": "2026-10-13", "tuNgay": "2026-10-13", "denNgay": "2026-10-13",
       "doanhThuBanLe": 128400000, "doanhThuDonHang": 47200000, "tongDoanhThu": 175600000, "tienVat": 14048000, "soChungTu": 57 }
@@ -639,9 +639,9 @@ Mọi biên vào từ ngoài (webhook sàn `SAL-005`, IPN `PaymentHub`, webhook 
 | Mã | Bất biến / quy tắc (phát biểu **kiểm chứng được**) | Cơ chế bảo vệ | Test |
 |---|---|---|---|
 | **BR-REP-001-001** | Read-model **thuộc sở hữu** module `Reporting`; **chỉ** job/tổng hợp được ghi. Không app service nào ghi trực tiếp | Không có write endpoint (§6.3) + `[Authorize]` cấp class | TC-13 |
-| **BR-REP-001-002** | 🚨 **Cấm** báo cáo/API đọc query **bảng giao dịch** (`OrdOrders`, `OrdOrderLines`, `RetailBill*`, `InvItems`) trực tiếp; **chỉ** job tổng hợp được đọc nguồn | Test quét mã nguồn `TC-02` | **TC-02** |
+| **BR-REP-001-002** | 🚨 **Cấm** báo cáo/API đọc query **bảng giao dịch** để lấy **số liệu đã tổng hợp**; **chỉ** job tổng hợp được đọc nguồn. **Ngoại lệ as-built có kiểm:** `GetTongQuanDonHangAsync` đọc thẳng `OrdOrders`/`OrdOrderLines` (chỉ đọc, tenant filter giữ nguyên) vì chưa có read-model cho phân bố trạng thái đơn; mọi truy vấn bảng giao dịch **khác** ⇒ TC-02 đỏ | Test quét mã nguồn `TC-02` (allow-list **đúng một** method) | **TC-02** |
 | **BR-REP-001-003** | Mọi entity read-model là `IMultiTenant` + query filter | `IMultiTenant` + index `NULLS NOT DISTINCT` | TC-06, TC-20 |
-| **BR-REP-001-004** | Tiền `numeric(18,4)`; **số lượng `numeric(18,3)`**; **cấm** `double`/`float`; **cấm** so tiền bằng `==` — so `Delta` | Kế thừa `XC-001` BR-003/BR-008; cột theo §5.2 | TC-14 |
+| **BR-REP-001-004** | Tiền `numeric(18,2)`; **số lượng `numeric(18,3)`**; **cấm** `double`/`float`; **cấm** so tiền bằng `==` — so `Delta` | Kế thừa `XC-001` BR-003/BR-008; cột theo §5.2 | TC-14 |
 | **BR-REP-001-005** | Ghi **idempotent** theo unique `(TenantId, Nguon, SourceLineId)` + **thay thế theo `(ngày, nguồn)`**: chạy lại N lần ⇒ cùng số dòng, số liệu **không đổi** | UNIQUE index + `DELETE`/`INSERT` theo ngày (D-47 ①) | **TC-03**, TC-11 |
 | **BR-REP-001-006** | Mỗi nguồn **phải** có dòng `RptWatermarks`; mốc **chỉ tiến**, cập nhật **sau** khi ngày đó ghi xong | Code (D-47 ⑤) + test `TC-05` | **TC-05** |
 | **BR-REP-001-007** | Mọi job tổng hợp chạy dưới **khoá phân tán** `report:tong-hop`; không giành được ⇒ ném `KhongGianhDuocKhoa` (không chạy chồng) | `IAbpDistributedLock` (`XC-003`) | TC-04 |
@@ -853,7 +853,7 @@ Test `MetricsTests` **không còn** chốt cứng 12 — đã chuyển sang `Ass
 | ID | Mục tiêu | Loại | Input chính | Expected | Phủ |
 |---|---|---|---|---|---|
 | **TC-01** | `IRepository<Rpt*, Guid>` **đăng ký được** (mọi entity có `DbSet`) | Unit (DI) | resolve `IRepository<T>` cho **8** entity | **0** exception | BR-001, D13 |
-| **TC-02** | 🚨 **Không** báo cáo nào query bảng giao dịch | Unit (quét mã nguồn) | `grep 'OrdOrders\|OrdOrderLines\|RetailBill\|InvItems\|InventoryItems\|InvStockLedger'` + `IRepository<(Order\|OrderLine\|RetailBill\|RetailBillLine\|InventoryItem)>` ngoài `Reporting` | **0** match trong `Application`/`Application.Contracts` của `REP-*` | **BR-002** |
+| **TC-02** | 🚨 **Không** báo cáo nào query bảng giao dịch **để lấy số đã tổng hợp** | Unit (quét mã nguồn) | `grep 'OrdOrders\|OrdOrderLines\|RetailBill\|InvItems\|InventoryItems\|InvStockLedger'` + `IRepository<(Order\|OrderLine\|RetailBill\|RetailBillLine\|InventoryItem)>` trong `Application`/`Application.Contracts` của `REP-*` | allow-list **đúng một** method `GetTongQuanDonHangAsync` (đọc `Order`/`OrderLine`, **không** ghi); mọi lời gọi **khác** ⇒ **đỏ** | **BR-002** |
 | **TC-03** | Idempotent: chạy lại **batch** **1.000 lần** ⇒ số liệu không đổi | Unit/Integration | `TinhNgay` + thay thế theo `(ngày, nguồn)` × 1.000 (cùng ngày) | cùng số dòng; số liệu **không đổi** (D-47 ①) | **BR-005**, NFR-005 |
 | **TC-03b** | Chạy lại **cùng ngày** không nhân đôi | Unit | `TinhNgay` + thay thế 2 lần cùng ngày | cùng số dòng & cùng số liệu (D-47 ①) | **BR-013**, D4 |
 | **TC-04** | Job định kỳ khi **đang bận** ⇒ bỏ qua **có** log + metric | Unit | `SkipIfBusy`, khoá đã bị giữ | **không** ném lỗi; **có** log **và** `lock_skipped_total` | **BR-007** (`XC-003` BR-010) |
@@ -873,7 +873,7 @@ Test `MetricsTests` **không còn** chốt cứng 12 — đã chuyển sang `Ass
 | **TC-17** | Phản hồi nói **"chưa tổng hợp" ≠ 0** | Unit | gọi endpoint khi mốc `null` | `DaTongHop = false`; **không** trả `0` (`AsOfUtc` ⬜ GĐ3) | **BR-014**, D7 |
 | **TC-18** | Dòng nguồn **trùng** ⇒ `Reports:0008` | Unit | 2 dòng cùng `SourceLineId` trong một ngày | ném `eCommerce:Reports:0008` | **BR-013** |
 | **TC-19** | Chốt kỳ khi **còn lệch** ⇒ **từ chối** (⬜ GĐ3) | Integration | có 1 dòng `RepConsistencyCheck` mở | từ chối chốt | §3.3, D8 |
-| **TC-20** | Mọi entity read-model là `IMultiTenant` + có CHECK `TenantId NOT NULL` | Unit (reflection + migration) | duyệt 8 entity | **8/8** là `IMultiTenant`; `TenantId` **không** nullable | **BR-003** |
+| **TC-20** | Mọi entity read-model là `IMultiTenant` + `TenantId` nullable có unique index dùng `NULLS NOT DISTINCT` | Unit (reflection + migration) | duyệt 8 entity; đọc migration | **8/8** là `IMultiTenant`; `TenantId` **nullable** (`Guid?`) + unique index `NULLS NOT DISTINCT` | **BR-003** |
 | **TC-21** | Không SQL nối chuỗi; tham số nhóm/sắp xếp **chỉ** tập đóng | Unit (quét mã nguồn) | tìm `$"SELECT` / `+ "SELECT"` trong module | **0** match; tham số nhóm là enum/tập đóng | **BR-015**, D11 |
 | **TC-22** | **Cấm** rebuild khoảng mở + **bắt buộc** lý do (⬜ GĐ3) | Unit + Integration | `StartRebuild` thiếu `ToDate`, hoặc `Reason` rỗng | `eCommerce:Reports:0003`; **và** CHECK ở DB chặn | **BR-011**, D10 |
 | **TC-23** | Ghi vào kỳ **đã chốt** ⇒ không ghi + ghi nhận | Integration | chốt kỳ 01–30/09, rồi đẩy sự kiện ngày 15/09 | **0** thay đổi fact; `RepConsistencyCheck` loại `LateEventInClosedPeriod` | A3, D8 |
@@ -885,7 +885,7 @@ Test `MetricsTests` **không còn** chốt cứng 12 — đã chuyển sang `Ass
 ```csharp
 // test/eCommerce.Tests/Reporting/TongHopDoanhThuTests.cs
 // Unit test KHÔNG cần DB (khuôn: test/eCommerce.Tests/Observability/MetricsTests.cs)
-// ⇒ TC-03b/TC-12/TC-17 chạy được NGAY; test cần DB chờ Testcontainers (GĐ1).
+// ⇒ TC-03b/TC-12/TC-17 chạy được NGAY; test cần DB chạy trong test/eCommerce.IntegrationTests (Testcontainers).
 
 using eCommerce.Reporting;
 
@@ -919,11 +919,10 @@ public class TongHopDoanhThuTests
 }
 ```
 
-> 📌 **Ghi rõ giới hạn hiện tại (không được che):** hạ tầng test hiện có là **unit test thuần, không DB**
-> (`test/eCommerce.Tests/eCommerce.Tests.csproj` — chỉ `xunit` + `Microsoft.NET.Test.Sdk`, **không** có Testcontainers).
-> Các test đánh dấu **Integration** ở §14.1 (TC-05, TC-05b, TC-06, TC-08, TC-09, TC-10, TC-11, TC-18, TC-19, TC-23)
-> **chưa chạy được** cho tới khi có `test/eCommerce.IntegrationTests` + Testcontainers PostgreSQL — việc đó là **GĐ1**
-> (`docs/implementation-plan.md:167`). **Không** được coi là "đã pass" khi chưa chạy.
+> 📌 **Hạ tầng test (as-built):** unit test thuần ở `test/eCommerce.Tests` (`xunit` + `Microsoft.NET.Test.Sdk`, **không** DB)
+> và **integration test PostgreSQL thật** ở `test/eCommerce.IntegrationTests` (`Testcontainers.PostgreSql 4.16.0`, vào solution `eCommerce.slnx`;
+> vd `PostgreSqlWp08BaoCaoTests.cs` chèn `TenantId = NULL` để kiểm unique `NULLS NOT DISTINCT`). Các test đánh dấu **Integration** ở §14.1
+> (TC-05, TC-05b, TC-06, TC-08, TC-09, TC-10, TC-11, TC-18, TC-19, TC-23) chạy được trên hạ tầng này — **không** được coi là "đã pass" khi chưa chạy.
 
 ### 14.3 Acceptance Criteria (Definition of Done)
 
@@ -980,7 +979,7 @@ public class TongHopDoanhThuTests
 | **F3** | Giá vốn: entity `Pricing.CostPrice` **đã có** (PRC-001) + `DbSet`; **nhưng** bảng fact **chưa có cột giá vốn** | `eCommerceDbContext.cs:128`; `modules/Pricing/eCommerce.Pricing.Domain/CostPrice.cs` | 🟠 Trung bình — `REP-002` (lãi gộp) bị **chặn** | ⬜ Cần bổ sung cột giá vốn vào fact + chụp theo P2 (D-114); **cấm** hiện lãi gộp khi thiếu |
 | **F4** | **16 metric hiện tại KHÔNG có metric nào cho projection** ⇒ read-model tụt lại thì **không có gì cảnh báo** | `shared/eCommerce.Kernel/Observability/eCommerceMetrics.cs:81-107` — 16 tên, **0** tên `reporting_` | 🔴 **Cao** (mù vận hành — đúng lớp lỗi `XC-005` F1) | ✅ Đề xuất **4 metric mới** + việc phải sửa ở §13 |
 | **F5** | **Có thư mục module "mồ côi"** từ lần đổi tiền tố (`ChannelHub.Domain`, `PaymentHub.Domain`) — chỉ còn `obj/`, **không** nằm trong solution | `modules/ChannelHub/ChannelHub.Domain/obj/…` và `modules/PaymentHub/PaymentHub.Domain/obj/…`; `eCommerce.slnx` **không** tham chiếu (chỉ `eCommerce.ChannelHub.*`) | 🟡 Thấp (không ảnh hưởng build) | ⬜ **Chưa dọn** — ghi nhận; khi tạo `modules/Reporting` **phải** dùng đúng tiền tố `eCommerce.Reporting.*` để không lặp lại |
-| **F6** | **Test hiện tại KHÔNG cần DB** ⇒ mọi test Integration của `REP-001` **chưa chạy được** | `test/eCommerce.Tests/eCommerce.Tests.csproj` — chỉ `xunit`/`Microsoft.NET.Test.Sdk`/`coverlet`, **0** Testcontainers | 🟠 Trung bình — nguy cơ "test xanh trên giấy" | ✅ Đã ghi rõ ở §14.2 **kèm danh sách 10 test chưa chạy được** |
+| **F6** | ✅ **ĐÃ GIẢI QUYẾT** — hạ tầng integration test PostgreSQL thật đã có | `test/eCommerce.IntegrationTests` (vào solution `eCommerce.slnx`) dùng `Testcontainers.PostgreSql 4.16.0`; `PostgreSqlWp08BaoCaoTests.cs` kiểm `TenantId = NULL` + index `NULLS NOT DISTINCT` | ✅ (đúng kế hoạch) | Ghi ở §14.2 |
 | **F7** | ✅ **ĐÃ ĐÓNG phần kỹ thuật** — `EXCLUDE USING gist` + `btree_gist` **đã chạy thật** trên `postgres:17-alpine`: migration Tax `20261013012648_Add_Tax_Module.cs:118-130` + `PostgreSqlSchemaTests` **96/96** (`D-171`) | `D-171` ①; cảnh báo `XC-006` §14.5 *"CHƯA chạy thử"* nay **lạc hậu** (BA `XC-006` cập nhật — ngoài WP-14) | ✅ (kỹ thuật) | Bảng `RepPeriodClose` vẫn phải đạt **4 ca** + fallback ở §5.2.6 trước `migrations add` |
 
 ### 15.3 Giả định
