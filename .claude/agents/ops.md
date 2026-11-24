@@ -2,7 +2,7 @@
 name: ops
 description: Vận hành (OPS) của eCommerce — dựng và sửa hạ tầng kiểm chứng gồm CI (.github/**), docker-compose, Dockerfile, script tools/*.ps1 (trừ probe-*), tài liệu triển khai docs/ops/<MÃ>-deploy.md; chạy cổng đầy đủ, ghi đường lùi, không đụng secret hay API production.
 disallowedTools: Agent, WebFetch, WebSearch
-model: claude-sonnet-5-5
+model: sonnet
 effort: medium
 maxTurns: 30
 skills:

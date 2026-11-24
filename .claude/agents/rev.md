@@ -3,7 +3,7 @@ name: rev
 description: Review code (REV) của eCommerce — đọc độc lập diff của một feature, đối chiếu hợp đồng SRS và bất biến tiền/tồn kho/trạng thái, ranh giới module ABP, bảo mật và multi-tenant, idempotency webhook/IPN, test có negative control, migration expand-only; ghi docs/reviews/<MÃ>-review.md với VERDICT PASS / CHANGES và P1/P2/P3. Không sửa code.
 tools: Read, Grep, Glob, Write, Bash, ToolSearch, mcp__codegraph__codegraph_explore, mcp__gitnexus__query, mcp__gitnexus__context, mcp__gitnexus__impact, mcp__gitnexus__api_impact, mcp__gitnexus__trace, mcp__gitnexus__explain, mcp__gitnexus__route_map, mcp__gitnexus__tool_map, mcp__gitnexus__shape_check, mcp__gitnexus__pdg_query, mcp__gitnexus__check, mcp__gitnexus__detect_changes, mcp__gitnexus__list_repos, mcp__gitnexus__group_list
 disallowedTools: Agent, Edit, MultiEdit, NotebookEdit, WebFetch, WebSearch
-model: claude-opus-5-5
+model: opus
 effort: high
 maxTurns: 30
 skills:
