@@ -3,7 +3,7 @@
   "wp": "WP-14",
   "nhanh": "docs/n22-wp14-dot-a",
   "note": "Registry bang phien WP-14. Sua qua tools/agents/phien.ps1 (start/done/dodang/blocked/release), KHONG sua tay khi co phien dang chay. Bang Markdown: docs/agents/bang-phien-wp14.md.",
-  "capNhat": "2026-11-19T22:01:39+07:00",
+  "capNhat": "2026-11-24T19:18:56+07:00",
   "rows": [
     {
       "id": "P-01",
@@ -118,14 +118,21 @@
       "dependsOn": [
         "U-02"
       ],
-      "status": "dang-lam",
+      "status": "xong",
       "phien": [
-        "N29"
+        "N29",
+        "N30",
+        "N32",
+        "N34",
+        "N35",
+        "N36",
+        "N37"
       ],
-      "evidence": null,
+      "evidence": "check-feature-doc SHP-004 -WP14 exit 0; DOCREV vong 2 DOC-OK 0 P1/2 P2/15 P3; D-128..D-131; link PASS; mermaid 0 loi",
       "ghiChu": null,
-      "handover": null,
-      "batDau": "2026-11-19T22:01:39+07:00"
+      "handover": "docs/nhanh/handover-n37.md",
+      "batDau": "2026-11-21T06:26:48+07:00",
+      "xongLuc": "2026-11-21T06:37:01+07:00"
     },
     {
       "id": "P-05",
@@ -139,11 +146,15 @@
       "dependsOn": [
         "U-02"
       ],
-      "status": "chua",
-      "phien": [],
-      "evidence": null,
+      "status": "xong",
+      "phien": [
+        "N30"
+      ],
+      "evidence": "check-feature-doc -WP14 exit 0 (16/16, 22/22 BR); docreview DOC-OK vong 2 (0 P1/2 P2) exit 0; D-117 D-120; kiem-link PASS; mermaid 0 loi",
       "ghiChu": null,
-      "handover": null
+      "handover": "docs/nhanh/handover-n32.md",
+      "batDau": "2026-11-19T22:16:00+07:00",
+      "xongLuc": "2026-11-20T06:17:03+07:00"
     },
     {
       "id": "P-06",
@@ -158,11 +169,15 @@
         "P-05",
         "U-02"
       ],
-      "status": "chua",
-      "phien": [],
-      "evidence": null,
+      "status": "xong",
+      "phien": [
+        "N33"
+      ],
+      "evidence": "check-feature-doc -WP14 exit 0 (16/16 muc, 16/16 BR, 44 TC); DOCREV REC-003 DOC-OK vong 2 (0 P1, 2 P2, 9 P3) + check-agent-artifact exit 0; D-121..D-127 (check decision DAT); D3 nhap bien ban; link PASS, mermaid 0 loi",
       "ghiChu": null,
-      "handover": null
+      "handover": "docs/nhanh/handover-n33.md",
+      "batDau": "2026-11-20T06:21:00+07:00",
+      "xongLuc": "2026-11-20T11:14:52+07:00"
     },
     {
       "id": "P-07",
@@ -176,11 +191,16 @@
       "dependsOn": [
         "U-02"
       ],
-      "status": "chua",
-      "phien": [],
-      "evidence": null,
+      "status": "xong",
+      "phien": [
+        "N38",
+        "N39"
+      ],
+      "evidence": "check-feature-doc -WP14 exit 0 (16/16, 23/23 BR); docreview vong 3 DOC-OK P1=0 P2=2 P3=5; check-agent-artifact docreview+decision exit 0; link PASS; mermaid 211/0; D-139,D-140",
       "ghiChu": null,
-      "handover": null
+      "handover": "docs/nhanh/handover-n39.md",
+      "batDau": "2026-11-21T12:07:13+07:00",
+      "xongLuc": "2026-11-21T16:46:46+07:00"
     },
     {
       "id": "P-08",
@@ -198,11 +218,15 @@
         "P-06",
         "P-07"
       ],
-      "status": "chua",
-      "phien": [],
-      "evidence": null,
+      "status": "xong",
+      "phien": [
+        "N40"
+      ],
+      "evidence": "check-feature-doc 9/9 DAT; nhap-bien-ban-gd3-a.md du 9 dong + tom tat + 10 cau cho nguoi; link PASS; mermaid 0 loi; hooks 38/38",
       "ghiChu": null,
-      "handover": null
+      "handover": "docs/nhanh/handover-n40.md",
+      "batDau": "2026-11-22T20:50:58+07:00",
+      "xongLuc": "2026-11-22T20:53:39+07:00"
     },
     {
       "id": "P-09",
@@ -214,11 +238,15 @@
       "dependsOn": [
         "P-08"
       ],
-      "status": "chua",
-      "phien": [],
-      "evidence": null,
-      "ghiChu": "uỷ quyền theo D-115 — chủ dự án xem lại theo lô",
-      "handover": null
+      "status": "xong",
+      "phien": [
+        "N41"
+      ],
+      "evidence": "bien-ban-tam-duyet-gd3-a-2026-11-22.md: 4/9 tam duyet (ADDR-001/002, SHP-001/002), 5/9 chua; D-141; kiem-link PASS",
+      "ghiChu": null,
+      "handover": "docs/nhanh/handover-n41.md",
+      "batDau": "2026-11-22T20:54:14+07:00",
+      "xongLuc": "2026-11-22T21:01:10+07:00"
     },
     {
       "id": "P-10",
@@ -232,11 +260,18 @@
       "dependsOn": [
         "U-02"
       ],
-      "status": "chua",
-      "phien": [],
-      "evidence": null,
+      "status": "xong",
+      "phien": [
+        "N42",
+        "N43",
+        "N44",
+        "N45"
+      ],
+      "evidence": "check-feature-doc -WP14 DAT 16/16 muc 36/36 BR; DOCREV DOC-OK vong 3 P1=0 P2=1; kiem-link PASS; mermaid 0 loi; D-146..D-150",
       "ghiChu": null,
-      "handover": null
+      "handover": "docs/nhanh/handover-n45.md",
+      "batDau": "2026-11-23T11:03:20+07:00",
+      "xongLuc": "2026-11-23T11:13:24+07:00"
     },
     {
       "id": "P-11",
@@ -251,11 +286,22 @@
       "dependsOn": [
         "U-02"
       ],
-      "status": "chua",
-      "phien": [],
-      "evidence": null,
+      "status": "xong",
+      "phien": [
+        "N46",
+        "N47",
+        "N48",
+        "N49",
+        "N50",
+        "N51",
+        "N52",
+        "N53"
+      ],
+      "evidence": "check-feature-doc -WP14 exit 0 (16/16, 24/24 BR, 0 Open); DOCREV vong 4 DOC-OK P1=0/P2=1; check-agent-artifact docreview+decision exit 0; kiem-link PASS; mermaid 211/0; hooks 40/40; D-168 + cap nhat D-167",
       "ghiChu": null,
-      "handover": null
+      "handover": "docs/nhanh/handover-n53.md",
+      "batDau": "2026-11-24T05:04:08+07:00",
+      "xongLuc": "2026-11-24T05:22:18+07:00"
     },
     {
       "id": "P-12",
@@ -268,11 +314,15 @@
         "P-10",
         "P-11"
       ],
-      "status": "chua",
-      "phien": [],
-      "evidence": null,
+      "status": "xong",
+      "phien": [
+        "N54"
+      ],
+      "evidence": "kiem-link PASS 0 chet (185 tep/846 link/1108 backtick); check:mermaid 211/0; hooks 40/40; PH check OK; nhap bien ban 3/3 dong + bang cau cho nguoi 13 cau/26 TAM CHOT/6 viec",
       "ghiChu": null,
-      "handover": null
+      "handover": "docs/nhanh/handover-n54.md",
+      "batDau": "2026-11-24T05:26:45+07:00",
+      "xongLuc": "2026-11-24T05:30:01+07:00"
     },
     {
       "id": "P-13",
@@ -284,11 +334,15 @@
       "dependsOn": [
         "P-12"
       ],
-      "status": "chua",
-      "phien": [],
-      "evidence": null,
-      "ghiChu": "uỷ quyền theo D-115 — chủ dự án xem lại theo lô",
-      "handover": null
+      "status": "xong",
+      "phien": [
+        "N55"
+      ],
+      "evidence": "check-feature-doc -WP14 3/3 DAT; D-169 (tam duyet 2/3, LOY-001 chua) + bien ban tam duyet 3 dong + 3 dong hang doi; check-agent-artifact decision DAT (54); kiem-link PASS 0 chet (188 tep/859 link/1136 backtick); mermaid 211/0; hooks 40/40; PH check OK",
+      "ghiChu": null,
+      "handover": "docs/nhanh/handover-n55.md",
+      "batDau": "2026-11-24T05:33:25+07:00",
+      "xongLuc": "2026-11-24T05:42:27+07:00"
     },
     {
       "id": "P-14",
@@ -303,11 +357,17 @@
       "dependsOn": [
         "U-02"
       ],
-      "status": "chua",
-      "phien": [],
-      "evidence": null,
+      "status": "xong",
+      "phien": [
+        "N56",
+        "N57",
+        "N58"
+      ],
+      "evidence": "check-feature-doc -WP14 DAT (16/16 heading, 18/18 BR, 0 Open); check-agent-artifact docreview DAT DOC-OK (P1=0 P2=0 P3=5); kiem-link PASS 0 chet (193 tep/880 link/1171 backtick); check:mermaid 212 khoi/0 loi; hooks 48/48; 0 D-xx moi",
       "ghiChu": null,
-      "handover": null
+      "handover": "docs/nhanh/handover-n58.md",
+      "batDau": "2026-11-24T11:13:41+07:00",
+      "xongLuc": "2026-11-24T11:30:17+07:00"
     },
     {
       "id": "P-15",
@@ -322,11 +382,15 @@
       "dependsOn": [
         "U-02"
       ],
-      "status": "chua",
-      "phien": [],
-      "evidence": null,
+      "status": "xong",
+      "phien": [
+        "N59"
+      ],
+      "evidence": "check-feature-doc -WP14 exit 0 x2 (REP-003 14/14 BR 0 Open; ACC-001 18/18 BR 1 Open=Q12); DOCREV DOC-OK P1=0/P2=0 x2; check-agent-artifact docreview x2 + decision DAT (81 dong); D-176..D-196 (21 TAM CHOT DEC); kiem-link PASS 196 tep/884 link/1259 backtick; mermaid 212/0; hooks 48/48",
       "ghiChu": null,
-      "handover": null
+      "handover": "docs/nhanh/handover-n59.md",
+      "batDau": "2026-11-24T11:42:33+07:00",
+      "xongLuc": "2026-11-24T13:52:56+07:00"
     },
     {
       "id": "P-16",
@@ -340,11 +404,15 @@
       "dependsOn": [
         "U-02"
       ],
-      "status": "chua",
-      "phien": [],
-      "evidence": null,
+      "status": "xong",
+      "phien": [
+        "N60"
+      ],
+      "evidence": "check-feature-doc -WP14 exit 0 (16/16 heading, 25/25 BR, 12 Open); DOC-OK vong 3 (0 P1, 2 P2, 3 P3); D-197..D-199; kiem-link PASS 198/887/1279; mermaid 212/0; hooks 48/48",
       "ghiChu": null,
-      "handover": null
+      "handover": "docs/nhanh/handover-n60.md",
+      "batDau": "2026-11-24T13:53:51+07:00",
+      "xongLuc": "2026-11-24T14:42:27+07:00"
     },
     {
       "id": "P-17",
@@ -358,11 +426,15 @@
       "dependsOn": [
         "U-02"
       ],
-      "status": "chua",
-      "phien": [],
-      "evidence": null,
+      "status": "xong",
+      "phien": [
+        "N61"
+      ],
+      "evidence": "check-feature-doc -WP14 exit 0 (16/16 muc, 24/24 BR, 2 Open Q1/Q3); DOCREV vong 3 DOC-OK 0 P1/1 P2/1 P3 + check-agent-artifact exit 0; D3 co dong trong nhap-bien-ban-gd3-c (6/6); D4 kiem-link PASS 890 link/1312 backtick, mermaid 212/0; D-200..D-207",
       "ghiChu": null,
-      "handover": null
+      "handover": "docs/nhanh/handover-n61.md",
+      "batDau": "2026-11-24T17:12:24+07:00",
+      "xongLuc": "2026-11-24T18:29:23+07:00"
     },
     {
       "id": "P-18",
@@ -377,27 +449,35 @@
         "P-16",
         "P-17"
       ],
-      "status": "chua",
-      "phien": [],
-      "evidence": null,
+      "status": "xong",
+      "phien": [
+        "N62"
+      ],
+      "evidence": "nhap-bien-ban-gd3-c.md 6/6 dong dot C + §3 bang cau cho nguoi (13 cau Open, 36 TAM CHOT + 2 DE XUAT); kiem-link PASS 894 link/0 chet; mermaid 212/0; hooks 48/48; PH check OK; 0 D-xx moi",
       "ghiChu": null,
-      "handover": null
+      "handover": "docs/nhanh/handover-n62.md",
+      "batDau": "2026-11-24T18:34:13+07:00",
+      "xongLuc": "2026-11-24T18:39:21+07:00"
     },
     {
       "id": "P-19",
       "dot": "C",
-      "loai": "nguoi",
+      "loai": "duyet-dec",
       "ma": [],
       "noiDung": "Duyệt đợt C: lập `docs/bien-ban-duyet-gd3-c-<ngày>.md` (6 tài liệu) — **bắt buộc kế toán** cho `ACC-001`, `REP-002`",
-      "vai": "Chủ dự án",
+      "vai": "ORCH · decider (uỷ quyền D-115)",
       "dependsOn": [
         "P-18"
       ],
-      "status": "chua",
-      "phien": [],
-      "evidence": null,
-      "ghiChu": "U-02 có thể chuyển hàng này cho decider tạm duyệt (M2) — `phien.ps1 uyquyen`",
-      "handover": null
+      "status": "xong",
+      "phien": [
+        "N63"
+      ],
+      "evidence": "decider D-208 (3/6 tam duyet co dieu kien REP-001/NOT-001/NOT-002; 3/6 chua REP-002/REP-003/ACC-001); bien-ban-tam-duyet-gd3-c-2026-11-24.md 6 dong + 6 dong hang doi; check-agent-artifact decision DAT 93; kiem-link PASS 204 tep/915 link/0 chet; mermaid 212/0; hooks 48/48",
+      "ghiChu": null,
+      "handover": "docs/nhanh/handover-n63.md",
+      "xongLuc": "2026-11-24T19:08:34+07:00",
+      "batDau": "2026-11-24T19:01:24+07:00"
     },
     {
       "id": "P-20",
@@ -411,11 +491,15 @@
         "P-13",
         "P-19"
       ],
-      "status": "chua",
-      "phien": [],
-      "evidence": null,
+      "status": "xong",
+      "phien": [
+        "N64"
+      ],
+      "evidence": "README §2 khớp 3 biên bản tạm duyệt (9/18 tạm duyệt có điều kiện, 9/18 chưa; 27/55 người duyệt giữ nguyên); D-209 thứ tự 20 WP code WP-15..WP-34 phủ đủ D-70, WP-15 nhận 2 nợ D-71④, giá vốn WP-17 trước lãi gộp WP-32; check-agent-artifact decision DAT 94; kiem-link PASS 205 tệp/920 link/0 chết; mermaid 212/0; hooks 48/48; PH check OK",
       "ghiChu": null,
-      "handover": null
+      "handover": "docs/nhanh/handover-n64.md",
+      "batDau": "2026-11-24T19:09:22+07:00",
+      "xongLuc": "2026-11-24T19:18:56+07:00"
     },
     {
       "id": "P-21",

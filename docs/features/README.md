@@ -51,6 +51,17 @@ thì chưa có tài liệu nào được duyệt. Việc còn lại **không ph�
 
 > 🆕 **29/10/2026 — `Q5` ĐÃ ĐƯỢC DUYỆT:** chủ dự án **duyệt** **26** tài liệu trong phạm vi cổng 0 (**7 `XC-*` + 19 GĐ1**) ⇒ **27/55** tài liệu đã Approved; các dòng `1/55` / `54 tệp vẫn Draft` / *"chưa có tài liệu nào được duyệt"* ở trên là **ảnh chụp 17/10/2026** — đọc kèm [**biên bản duyệt GĐ1 29/10/2026**](../bien-ban-duyet-gd1-2026-10-29.md).
 
+> 🆕 **24/11/2026 — WP-14 (cổng tài liệu GĐ3): TẠM DUYỆT (DEC, uỷ quyền `D-115`) — KHÔNG phải duyệt của người.**
+> 18 tài liệu GĐ3 đã qua `/doc-gate`: **18/18** có `docs/reviews/<MÃ>-docreview.md` với `VERDICT: DOC-OK` · 0 P1.
+> Ba biên bản **tạm duyệt**: [đợt A 22/11](../bien-ban-tam-duyet-gd3-a-2026-11-22.md) **4/9** ·
+> [đợt B 24/11](../bien-ban-tam-duyet-gd3-b-2026-11-24.md) **2/3** ·
+> [đợt C 24/11](../bien-ban-tam-duyet-gd3-c-2026-11-24.md) **3/6** (riêng `NOT-002` chỉ phần **thiết kế**)
+> ⇒ **9/18 tạm duyệt có điều kiện**, **9/18 "chưa"**: `ADDR-003` · `SHP-003` · `SHP-004` · `REC-003` · `SAL-006` ·
+> `LOY-001` · `REP-002` · `REP-003` · `ACC-001`. **0/18 có chữ ký người** ⇒ tổng vẫn **27/55** Approved,
+> cổng Definition of Ready `implementation-plan.md` §A.5 **chưa đạt** cho GĐ3.
+> "Tạm duyệt" chỉ cho **code trên nhánh WP** khi điều kiện "trước WP code" của dòng đó đã đạt; merge `main` vẫn cần
+> biên bản **người ký** `docs/bien-ban-duyet-gd3-<đợt>-<ngày>.md`.
+
 ---
 
 ## 3. Phân bố theo giai đoạn

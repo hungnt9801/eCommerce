@@ -10,6 +10,11 @@ hooks:
         - type: command
           command: node
           args: ["${CLAUDE_PROJECT_DIR}/.claude/hooks/guard-write-scope.mjs", "--orch"]
+    - matcher: "mcp__gitnexus__.*|mcp__codegraph__.*"
+      hooks:
+        - type: command
+          command: node
+          args: ["${CLAUDE_PROJECT_DIR}/.claude/hooks/guard-orch-mcp.mjs"]
 ---
 
 # /chay-phien — một lệnh cho một phiên
@@ -29,16 +34,29 @@ Lệnh shell chạy qua **Git Bash** ⇒ đường dẫn dùng `/`. Viết tắt
 **Uỷ quyền git của lệnh này:** người dùng gọi `/chay-phien` = yêu cầu **commit + push nhánh WP** (`CLAUDE.md` §8 "chỉ khi người dùng yêu cầu")
 ở các điểm xanh của phiên. **Không bao giờ:** merge, mở/đóng PR, push `main`, `--force`, `git add -A`/`.`, `git config --global`, sửa lịch sử.
 
+**Gọi vai luôn ở tiền cảnh:** mọi lần gọi `Agent` (ba, docrev, decider) đặt `run_in_background: false` và **chờ kết quả** rồi mới làm bước kế; không bao giờ kết thúc lượt với câu "vai còn đang chạy, sẽ tiếp khi có thông báo" — ở chế độ không cửa sổ (bộ chạy tự động) lượt kết thúc là phiên kết thúc, vai chạy nền bị dừng (N34, 20/11).
+
+**Đọc tệp bằng công cụ `Read` / `Grep`, không bằng chuỗi lệnh shell:** ở chế độ không cửa sổ không ai duyệt quyền — lệnh ghép
+(`cd … && grep … | cut`, `for n in …; do sed …`, `awk 'NR==…'`) bị **từ chối** và mất lượt (N35/N36: 14 lệnh bị từ chối). Cần dòng N của tệp ⇒
+`Read` với `offset`/`limit`; tìm chuỗi ⇒ `Grep` (có `-n`). Shell chỉ để chạy script cổng (`pwsh -File tools/…`, `node --test …`) và git.
+
+**Không tự dò code:** phiên chính không gọi `mcp__gitnexus__*` / `mcp__codegraph__*` (hook `guard-orch-mcp.mjs` chặn khi skill này chạy) — cần biết gì trong code thì giao `ba` (hoặc `docrev` khi kiểm chéo); hai vai này có công cụ đồ thị chỉ đọc.
+
+**Giao việc có đối chiếu code thì phải dặn dùng đồ thị:** khi việc cần mã lỗi, chữ ký hàm, "đã có lớp/enum này chưa", ai gọi ai, hoặc ảnh hưởng của một thay đổi ⇒ prompt gửi vai ghi rõ "dùng `codegraph_explore` hoặc `gitnexus context`/`impact` **trước** `Grep`". **Không** viết "không khảo sát code" cho loại việc đó (N53: ORCH dặn *"việc hẹp và cơ học, không khảo sát code"* ⇒ vai không gọi MCP lần nào trong 12 phút). Việc thuần câu chữ thì giữ phạm vi hẹp — 0 truy vấn là đúng, đừng thêm nhiễu.
+
 ## 0. Chuẩn bị (≤ 5 lệnh)
 
 0. **Kiểm vai đã nạp (trước mọi việc khác):** danh sách `subagent_type` của công cụ `Agent` phải có đủ `ba`, `docrev`, `decider`.
    Thiếu vai nào ⇒ **không** `start` hàng nào, **không** dùng `general-purpose` thay vai: chạy `node --test .claude/hooks/test/hooks.test.mjs`
    (ca `F1` chỉ đúng tệp + dòng frontmatter hỏng — Claude Code bỏ qua im lặng tệp vai có YAML sai), báo kết quả trong câu trả lời và dừng.
    Không viết handover cho phiên dừng ở bước này.
+0b. **Một phiên một lúc:** có tệp `artifacts/agents/tu-dong/chay-tu-dong.lock` mà biến môi trường `CHAY_TU_DONG_PHIEN` **không** có
+   (`echo "$CHAY_TU_DONG_PHIEN"` rỗng) ⇒ bộ chạy tự động đang chạy ⇒ dừng ngay, báo "đang có bộ chạy tự động — tạo
+   `artifacts/agents/tu-dong/DUNG` rồi chờ nó dừng". Không đụng registry.
 1. `git status --short` + `git branch --show-current`. Nhánh phải là trường `nhanh` của `agents/state/phien-wp14.json`
    (`docs/n22-wp14-dot-a`). Khác nhánh và cây sạch ⇒ `git switch <nhanh>`; cây bẩn ngoài `docs/**`, `agents/state/**` ⇒ **dừng**, báo người (không stash hộ).
 2. `PH check` — đỏ vì bảng lệch ⇒ `PH sync` (không sửa tay bảng).
-3. Một lần duy nhất: nếu có `artifacts/cai-dat-agent/D-bang-phien.md` ⇒ làm đúng hướng dẫn trong tệp (chèn dòng `D-xx`), rồi đổi tên tệp thành `D-bang-phien.da-chen.md`.
+3. Dòng quyết định chờ chèn: với mỗi tệp `artifacts/cai-dat-agent/*.cho-chen.md` (và `D-bang-phien.md` nếu còn) ⇒ làm đúng hướng dẫn trong tệp (chèn dòng `D-xx`, số = lớn nhất + 1, đọc lại `decisions.md` trước), rồi đổi đuôi thành `.da-chen.md`. Đã chèn rồi thì không chèn lại.
 
 ## 1. Đối soát phiên trước + trả lời của người
 
@@ -51,7 +69,7 @@ Lệnh shell chạy qua **Git Bash** ⇒ đường dẫn dùng `/`. Viết tắt
      exit 0 ⇒ `PH done` với đúng `-Evidence` script đề xuất + `-Handover docs/nhanh/handover-n<x>.md`; exit 1 ⇒ hàng còn việc (§2 của handover đó là việc còn lại).
      Script chỉ đếm "§2 còn nhắc mã": đọc đúng các dòng §2 có mã đó để chắc nó là việc **chưa xong** (không phải lời nhắc qua).
    - Hàng ⬜ loại `doc-gate` mà đã có `docs/reviews/<MÃ>-docreview.md` của mã trong hàng (phiên kiểu cũ làm luôn mã kế, vd `N25` làm `SHP-001`)
-     ⇒ cũng `PH doisoat`; exit 0 ⇒ `PH start -Id <hàng> -Session N<x>` (đúng số phiên cũ đã làm) rồi `PH done` như trên; exit 1 ⇒ để nguyên,
+     ⇒ cũng `PH doisoat`; exit 0 ⇒ `PH start -Id <hàng> -Session N<x>` (đúng số phiên **cũ** đã làm — chỗ duy nhất được truyền `-Session`) rồi `PH done` như trên; exit 1 ⇒ để nguyên,
      ghi nhận để §2 chọn nó (làm tiếp từ bước đã có, không làm lại).
    - Hàng 🟨 mà **không** có handover mới hơn ⇒ phiên trước **bị cắt ngang** (hết hạn mức / đóng cửa sổ): việc dở nằm trong cây làm việc +
      `docs/reviews/<MÃ>-docreview.md` + `docs/agents/doc-gate-*.md`. Ghi nhận, làm tiếp ở §3 (không làm lại bước đã có tệp kết quả).
@@ -60,8 +78,10 @@ Lệnh shell chạy qua **Git Bash** ⇒ đường dẫn dùng `/`. Viết tắt
 
 1. `$ARGUMENTS` có `P-xx` ⇒ hàng đó; không ⇒ `PH next`.
    - exit 3 (chỉ còn việc của người / bị chặn) hoặc exit 5 (hết việc) ⇒ **không mở phiên mới, không viết handover**: in bảng chờ người (§6) và dừng.
-2. `Nx` = số handover lớn nhất + 1 (hàng 🟨 bị cắt ngang mà chưa có handover của phiên đó ⇒ vẫn `+1`).
-3. `PH start -Id <hàng> -Session N<x>` — exit 2/4/6 ⇒ làm theo thông báo của script (đóng hàng đang dở trước), không `-Force`.
+2. `PH start -Id <hàng>` (**không** truyền `-Session`): script tự cấp số phiên = max(handover, cột Phiên) + 1 và in `PHIEN=N<x>` —
+   dùng đúng số đó cho handover; không tự tính (N30 bị hai phiên cùng lấy).
+3. exit 4 (đã có hàng khác 🟨) ⇒ **có phiên khác đang chạy**: dừng ngay, **không** `release`, **không** `-Force` hàng của phiên khác,
+   không viết handover; báo "đang có phiên khác chạy <hàng> — không chạy song song". exit 2/6 ⇒ làm theo thông báo của script.
 4. **Mở phiên:** đọc `.claude/skills/mo-phien/SKILL.md` và làm đúng các bước của nó với `WP-14 N<x>` (skill đó gọi tay được ⇒ bạn **đọc tệp rồi làm**,
    không gọi Skill). Bảng baseline giữ lại cho handover §1.
 

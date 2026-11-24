@@ -76,8 +76,10 @@ máy trạng thái NÉM lỗi · `[Authorize]` cấp class · module không ph�
 
 - **Phiên chính = orchestrator (ORCH)**: điều phối, chạy script kiểm, **không** sửa thay vai khi đang chạy `/doc-gate`.
   Lệnh: `/mo-phien <WP> <Nx>` · `/doc-gate A|B|C|<MÃ…>` · `/dong-phien`.
-- **Vai** (`.claude/agents/`): `ba` (Sonnet) soạn/đối chiếu tài liệu feature · `docrev` (Opus) kiểm D1–D7, ngữ cảnh sạch ·
+- **Vai** (`.claude/agents/`): `ba` (Opus) soạn/đối chiếu tài liệu feature · `docrev` (Opus) kiểm D1–D7, ngữ cảnh sạch ·
   `decider` (Opus) quyết thay người việc đảo ngược được. Vai code (`arch`, `be`, `fe`, `qa`, `rev`, `ops`) dựng ở bước B5.
+- **Khảo sát code**: vai dùng `codegraph_explore` / `gitnexus context|impact` **trước** `Grep` (mục "Dò code bằng đồ thị"
+  trong tệp từng vai). ORCH **không** tự dò code — `guard-orch-mcp.mjs` chặn khi chạy `/doc-gate`, `/chay-phien`.
 - **Vùng ghi** của từng vai: **một nguồn** `.claude/scopes.json`; hook `.claude/hooks/` chặn trước khi ghi và so `git status` sau khi vai chạy.
   Không sửa `.claude/**` từ trong vai. Ca thử: `node --test .claude/hooks/test/hooks.test.mjs`.
 - **Kiểm bằng máy**: `tools/agents/check-feature-doc.ps1` (16 mục, BR có test, mục đối chiếu Nhanh) ·

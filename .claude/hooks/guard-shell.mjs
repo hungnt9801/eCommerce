@@ -24,7 +24,7 @@ const CAM_CHUNG = [
 const DOC = [
   /^git\s+(diff|log|show|status|blame|grep|ls-files|rev-parse|merge-base|describe|cat-file|shortlog)\b/i,
   /^git\s+branch(\s+(--show-current|--list|-a|-r|-v|-vv|--contains\s+\S+))*\s*$/i,
-  /^(rg|grep|egrep|fgrep|findstr|ls|dir|cat|type|head|tail|wc|sort|uniq|cut|tr|pwd|echo|cd|jq|diff|cmp|stat|file|basename|dirname|realpath|which|where)\b/i,
+  /^(rg|grep|egrep|fgrep|findstr|ls|dir|cat|type|head|tail|wc|sort|uniq|cut|tr|pwd|echo|printf|cd|jq|diff|cmp|stat|file|basename|dirname|realpath|which|where)\b/i,
   /^find\b(?!.*\s-(delete|exec|execdir|ok|fprint)\b)/i,
   /^(Get-ChildItem|gci|Get-Content|gc|Select-String|sls|Test-Path|Resolve-Path|Measure-Object|Select-Object|Sort-Object|Where-Object|Get-Item|Format-Table|Format-List|Out-String|Out-Null|ConvertFrom-Json|ConvertTo-Json|Get-Location|Set-Location|Write-Output|Write-Host|Get-FileHash|Compare-Object|Group-Object|Split-Path|Join-Path)\b/i,
   /^(pwsh|powershell)(\.exe)?\s+(-NoProfile\s+|-NoLogo\s+|-ExecutionPolicy\s+\S+\s+)*-File\s+["']?\.?[\\/]?tools[\\/](kiem-link-tai-lieu\.ps1|agents[\\/]check-[\w-]+\.ps1)\b/i,
@@ -65,8 +65,30 @@ export function tachDoan(cmd0) {
     last = m.index + m[0].length;
   }
   out.push(cmd.slice(last));
-  return out.map((x) => ({ clean: x.trim() })).filter((x) => x.clean.length > 0);
+  return out.map((x) => ({ clean: chuanHoa(x.trim()) })).filter((x) => x.clean.length > 0);
 }
+
+// N35–N39 (20–21/11): vai chi doc bi chan nham `for … do sed -n …p … done`, `PGPASSWORD=x psql …`.
+// Bo tien to `do`/`then`/`else` cua vong lap/re nhanh va gan bien moi truong dung truoc lenh (VAR=gia-tri lenh …)
+// de xet DUNG lenh that; gan bien thuan (khong lenh theo sau) giu nguyen de luat GAN_BIEN xet.
+export function chuanHoa(d) {
+  let x = d.replace(/^(do|then|else)\s+/, '');
+  const m = /^((?:\w+=(?:'[^']*'|"[^"$`]*"|[^\s'"$`;|&()]*)\s+)+)(\S.*)$/.exec(x);
+  if (m) x = m[2];
+  return x;
+}
+
+// Lenh in thuan: sed -n chi in theo so dong (khong -i, khong lenh w/e), awk khong system/getline/chuyen huong/ong.
+export function lenhInThuan(d) {
+  const sed = /^sed\s+-n\s+(['"]?)((?:\$\{?\w+\}?|[\d,;$p\s])+)\1((?:\s+[^\s>|;&]+)*)\s*$/.exec(d);
+  if (sed && !/\s-i\b|--in-place/.test(d)) return true;
+  const awk = /^awk\s+'([^']*)'((?:\s+[^\s>|;&]+)*)\s*$/.exec(d);
+  // awk: cam system/getline/close/fflush/ENVIRON, `print … >` (ghi tep) va ong don `|` (`||` la HOAC logic, cho phep; `>`/`>=` so sanh cung cho)
+  if (awk && !/system|getline|close\(|fflush|ENVIRON|printf?\b[^;}]*>|(^|[^|])\|([^|]|$)/.test(awk[1])) return true;
+  return false;
+}
+const GAN_BIEN = /^\w+=(?:'[^']*'|"[^"$`]*"|[^\s'"$`;|&()]*)$/;
+const VONG_LAP = [/^for\s+\w+\s+in\s+(?!.*(\$\(|`))[^;|&]*$/, /^(done|fi)$/];
 
 // Chuyen huong ghi tep (> tep, >> tep) — bo qua 2>&1, >/dev/null, > $null, > NUL.
 export function coGhiTep(cmd) {
@@ -99,6 +121,7 @@ export function xetLenh(cmd, level) {
   }
   for (const d of doan) {
     if (DOC.some((re) => re.test(d.clean))) continue;
+    if (lenhInThuan(d.clean) || GAN_BIEN.test(d.clean) || VONG_LAP.some((re) => re.test(d.clean))) continue;
     if (coTest && TEST.some((re) => re.test(d.clean))) continue;
     if (coPsql && PSQL.test(d.clean)) {
       if (/\bBEGIN\b/i.test(cmd) && /\bROLLBACK\b/i.test(cmd) && !/\bCOMMIT\b/i.test(cmd)) continue;

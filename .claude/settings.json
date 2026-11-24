@@ -41,6 +41,19 @@
             "timeout": 15
           }
         ]
+      },
+      {
+        "matcher": "Grep|Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/guard-code-lookup.mjs"
+            ],
+            "timeout": 15
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -92,7 +105,56 @@
       "Bash(pwsh -File tools/agents/phien.ps1 *)",
       "PowerShell(pwsh -File tools/agents/phien.ps1 *)",
       "Bash(pwsh -File tools/agents/test-phien.ps1)",
-      "PowerShell(pwsh -File tools/agents/test-phien.ps1)"
+      "PowerShell(pwsh -File tools/agents/test-phien.ps1)",
+      "Bash(pwsh -File tools/kiem-link-tai-lieu.ps1)",
+      "PowerShell(pwsh -File tools/kiem-link-tai-lieu.ps1)",
+      "Bash(npm --prefix tools run check:mermaid)",
+      "PowerShell(npm --prefix tools run check:mermaid)",
+      "Bash(node --test .claude/hooks/test/hooks.test.mjs)",
+      "PowerShell(node --test .claude/hooks/test/hooks.test.mjs)",
+      "Bash(pwsh -File tools/agents/check-feature-doc.ps1 *)",
+      "PowerShell(pwsh -File tools/agents/check-feature-doc.ps1 *)",
+      "Bash(pwsh -File tools/agents/check-agent-artifact.ps1 *)",
+      "PowerShell(pwsh -File tools/agents/check-agent-artifact.ps1 *)",
+      "Bash(git add -- *)",
+      "PowerShell(git add -- *)",
+      "Bash(git commit -m *)",
+      "PowerShell(git commit -m *)",
+      "Bash(grep *)",
+      "Bash(sed -n *)",
+      "Bash(ls *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(wc *)",
+      "Bash(cut *)",
+      "Bash(cat *)",
+      "Bash(echo *)",
+      "Bash(sort *)",
+      "Bash(uniq *)",
+      "Bash(git log *)",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git show *)",
+      "Bash(git branch --show-current)",
+      "Bash(cd *)",
+      "Bash(awk *)",
+      "Bash(nl *)",
+      "Bash(fold *)",
+      "mcp__codegraph__codegraph_explore",
+      "mcp__gitnexus__query",
+      "mcp__gitnexus__context",
+      "mcp__gitnexus__impact",
+      "mcp__gitnexus__api_impact",
+      "mcp__gitnexus__trace",
+      "mcp__gitnexus__explain",
+      "mcp__gitnexus__route_map",
+      "mcp__gitnexus__tool_map",
+      "mcp__gitnexus__shape_check",
+      "mcp__gitnexus__pdg_query",
+      "mcp__gitnexus__check",
+      "mcp__gitnexus__detect_changes",
+      "mcp__gitnexus__list_repos",
+      "mcp__gitnexus__group_list"
     ],
     "deny": [
       "Bash(git config --global *)",

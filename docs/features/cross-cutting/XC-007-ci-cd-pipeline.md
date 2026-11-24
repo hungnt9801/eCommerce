@@ -928,7 +928,11 @@ jobs:
 
       - name: Thu vien client cua Web (E2E can CSS/JS)
         run: |
-          dotnet tool install -g Volo.Abp.Cli
+          # GHIM PHIEN BAN: khong ghim => NuGet tra ban moi nhat (Volo.Abp.Cli 11.0.0)
+          # chi ship tools/net11.0 trong khi runner chay SDK 10.0.400 => cai that bai
+          # "DotnetToolSettings.xml was not found in the package" (do la drift goi CLI,
+          # KHONG phai ma nguon - vong N64).
+          dotnet tool install -g Volo.Abp.Cli --version 10.7.1
           abp install-libs -wd src/eCommerce.Web
 
       - name: BUILD LAM NONG (bat buoc — xem E-03)

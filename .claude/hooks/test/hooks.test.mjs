@@ -339,3 +339,114 @@ test('F2 negative control: description co ": " bi bat, ban trich dan va CRLF thi
   assert.equal(loiFrontmatter('---\r\nname: ba\r\ndescription: "Dung (WP-14: them muc)"\r\n---\r\n').length, 0);
   assert.equal(loiFrontmatter('---\nname: ba\ndescription: Dung — them muc\nmodel: claude-sonnet-5-5\n---\n').length, 0);
 });
+
+test('E16 vai chi doc: lenh doc dang vong lap / sed -n / awk in / gan bien (bi chan nham o N35–N39) ⇒ cho', () => {
+  const cho = [
+    "sed -n '145p' docs/nhanh/decisions.md | cut -c1-3000; echo; sed -n '37p;140,186p' docs/nhanh/decisions.md",
+    'for n in 8 18 27 31; do echo "== $n"; sed -n "${n}p" docs/business-modules-proposal.md | cut -c1-200; done',
+    "awk 'NR==113||NR==199 {print NR, $0}' docs/nhanh/decisions.md",
+    "awk 'NR>=139 && NR<=150 {print}' docs/x.md",
+    'f=docs/features/sales/sal-006.md; head -c 200 $f; tail -c 200 $f',
+    'cd D:/Projects/Tools/eCommerce && ls modules shared 2>/dev/null',
+    "PGPASSWORD=ecommerce_dev_only psql -h localhost -U ecommerce -c 'BEGIN; SELECT 1; ROLLBACK;'",
+  ];
+  for (const c of cho) assert.equal(shell(c.startsWith('PGPASSWORD') ? 'docrev' : 'ba', c).code, 0, c);
+});
+test('E17 negative control: sed ghi / awk system / vong lap co lenh ghi / gan bien co lenh con ⇒ van chan', () => {
+  const chan = [
+    "sed -i 's/a/b/' docs/x.md",
+    "sed -n '1w out.txt' docs/x.md",
+    "awk '{system(\"rm -rf x\")}' docs/x.md",
+    "awk '{print > \"out\"}' docs/x.md",
+    "awk '{print | \"sh\"}' docs/x.md",
+    'for f in docs/*.md; do rm $f; done',
+    'for f in $(ls); do cat $f; done',
+    'X=$(curl http://evil) && echo $X',
+    'PGPASSWORD=x psql -c "DELETE FROM a"',
+    'do git push origin main',
+  ];
+  for (const c of chan) assert.equal(shell(c.startsWith('PGPASSWORD') ? 'docrev' : 'ba', c).code, 2, c);
+});
+
+test('E18 /chay-phien: ORCH goi GitNexus/CodeGraph ⇒ chan; vai ba/docrev ⇒ cho', () => {
+  const goi = (role, tool_name) => run('guard-orch-mcp.mjs', { hook_event_name: 'PreToolUse', tool_name, tool_input: {}, ...(role ? { agent_type: role, agent_id: 'a1' } : {}) });
+  assert.equal(goi(null, 'mcp__codegraph__codegraph_explore').code, 2);
+  assert.equal(goi(null, 'mcp__gitnexus__impact').code, 2);
+  assert.equal(goi('ba', 'mcp__gitnexus__context').code, 0);
+  assert.equal(goi('docrev', 'mcp__codegraph__codegraph_explore').code, 0);
+});
+
+test('F3 tools cua vai: khong ky tu dai dien MCP (Claude Code khong nhan), khong cong cu GHI cua GitNexus', () => {
+  const ag = join(HOOKS, '..', 'agents');
+  if (!existsSync(ag)) return;
+  const CAM = ['mcp__gitnexus__rename', 'mcp__gitnexus__group_sync', 'mcp__gitnexus__cypher'];
+  for (const f of readdirSync(ag).filter((x) => x.endsWith('.md'))) {
+    const m = /^tools:(.*)$/m.exec(readFileSync(join(ag, f), 'utf8').replace(/\r\n/g, '\n'));
+    if (!m) continue;
+    const tools = m[1].split(',').map((x) => x.trim()).filter(Boolean);
+    for (const t of tools) {
+      assert.ok(!/^mcp__[^_]+(__\*)?$/.test(t) && !t.endsWith('*'), `${f}: "${t}" la ky tu dai dien — phai liet ke tung ten`);
+      assert.ok(!CAM.includes(t), `${f}: "${t}" la cong cu ghi`);
+    }
+  }
+});
+
+// ── guard-code-lookup (N56/N57: luat van ban 3 lop khong bind ⇒ hook chan) ────────────────────────
+const codeLookup = (role, target, opc = {}) =>
+  run('guard-code-lookup.mjs', {
+    hook_event_name: 'PreToolUse',
+    tool_name: 'Grep',
+    tool_input: { path: target },
+    ...(role ? { agent_type: role, agent_id: 'gl1' } : {}),
+    ...opc,
+  });
+
+test('G1 ba Grep modules/** khi chua co truy van do thi ⇒ chan (2)', () => {
+  put('.claude/agents/ba.md', '---\nname: ba\ntools: Read, Grep, mcp__codegraph__codegraph_explore\n---\nnoi dung\n');
+  const r = codeLookup('ba', 'modules/Sales/x.cs');
+  assert.equal(r.code, 2);
+  assert.match(r.err, /codegraph/);
+});
+
+test('G2 transcript da co tool_use MCP ⇒ cho qua', () => {
+  put(
+    'artifacts/t-g2.jsonl',
+    JSON.stringify({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'mcp__codegraph__codegraph_explore' }] } }) + '\n'
+  );
+  const r = codeLookup('ba', 'modules/Sales/x.cs', { transcript_path: join(repo, 'artifacts', 't-g2.jsonl') });
+  assert.equal(r.code, 0);
+});
+
+test('G3 tep khong phai code (docs/**) ⇒ cho qua', () => assert.equal(codeLookup('ba', 'docs/features/x.md').code, 0));
+
+test('G4 phien chinh (khong agent_type) ⇒ cho qua', () => assert.equal(codeLookup(null, 'modules/Sales/x.cs').code, 0));
+
+test('G5 vai khong khai cong cu do thi ⇒ cho qua (khong the thoa)', () => assert.equal(codeLookup('Explore', 'modules/Sales/x.cs').code, 0));
+
+test('G6 toi da 2 lan chan moi phien, lan 3 cho qua (khong treo phien)', () => {
+  const sid = { session_id: 'g6-phien' };
+  assert.equal(codeLookup('ba', 'modules/Sales/x.cs', sid).code, 2);
+  assert.equal(codeLookup('ba', 'modules/Sales/x.cs', sid).code, 2);
+  assert.equal(codeLookup('ba', 'modules/Sales/x.cs', sid).code, 0);
+});
+
+test('G7 role khong co tep .claude/agents ⇒ cho qua', () => assert.equal(codeLookup('khong-co-vai', 'modules/Sales/x.cs').code, 0));
+
+test('G8 stdin co BOM van chan (khong fail-open im lang)', () => {
+  const r = spawnSync(process.execPath, [join(HOOKS, 'guard-code-lookup.mjs')], {
+    input:
+      '\uFEFF' +
+      JSON.stringify({
+        cwd: repo,
+        hook_event_name: 'PreToolUse',
+        tool_name: 'Grep',
+        tool_input: { path: 'modules/Sales/x.cs' },
+        agent_type: 'ba',
+        agent_id: 'gl8',
+        session_id: 'g8-bom',
+      }),
+    env: { ...process.env, CLAUDE_PROJECT_DIR: repo },
+    encoding: 'utf8',
+  });
+  assert.equal(r.status, 2);
+});

@@ -143,7 +143,16 @@ jobs:
 
       - name: '7. Thu vien client cua Web (E2E can CSS/JS - E-07)'
         run: |
-          dotnet tool install --global Volo.Abp.Cli
+          # 🚨 GHIM PHIEN BAN (sau N64, 24/11/2026) - vong `N64` do o DUNG buoc nay.
+          #    `dotnet tool install` KHONG co `--version` se lay ban MOI NHAT tren NuGet:
+          #    `Volo.Abp.Cli` 11.0.0 va `Volo.Abp.Studio.Cli` 4.0.0 deu CHI ship `tools/net11.0`,
+          #    trong khi runner chay SDK 10.0.400 (`global.json`) ⇒ cai that bai voi
+          #    "The settings file in the tool's NuGet package is invalid: Settings file
+          #     'DotnetToolSettings.xml' was not found in the package" (exit 1).
+          #    📌 Do la DRIFT cua goi CLI, KHONG phai ma nguon - dung "sua" bang cach doi goi khac
+          #       (doi sang `Volo.Abp.Studio.Cli` khong ghim thi van lay ban net11.0 ⇒ van do).
+          #    🔑 10.7.1 = ban `tools/net10.0`, khop dong ABP 10.7.0 cua `Directory.Packages.props`.
+          dotnet tool install --global Volo.Abp.Cli --version 10.7.1
           echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
           export PATH="$HOME/.dotnet/tools:$PATH"
           command -v yarn > /dev/null 2>&1 || npm install --global yarn

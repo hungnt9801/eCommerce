@@ -10,6 +10,11 @@ hooks:
         - type: command
           command: node
           args: ["${CLAUDE_PROJECT_DIR}/.claude/hooks/guard-write-scope.mjs", "--orch"]
+    - matcher: "mcp__gitnexus__.*|mcp__codegraph__.*"
+      hooks:
+        - type: command
+          command: node
+          args: ["${CLAUDE_PROJECT_DIR}/.claude/hooks/guard-orch-mcp.mjs"]
 ---
 
 # /doc-gate — dây chuyền tài liệu
@@ -20,6 +25,12 @@ Bạn là **orchestrator** (phiên chính). Bạn **điều phối và kiểm b�
 hook khoá phiên chính vào vùng ORCH của `.claude/scopes.json` (`docs/agents/**`, handover, `07`, `docs/features/README.md`…) tới hết phiên.
 
 Tiền đề: đã chạy `/mo-phien` (baseline). Luật nền: `CLAUDE.md` §3–§7, `docs/nhanh/08-session-protocol.md` §6 (dấu hiệu dừng).
+
+**Gọi vai luôn ở tiền cảnh:** mọi lần gọi `Agent` (ba, docrev, decider) đặt `run_in_background: false` và **chờ kết quả** rồi mới làm bước kế; không bao giờ kết thúc lượt với câu "vai còn đang chạy, sẽ tiếp khi có thông báo" — ở chế độ không cửa sổ (bộ chạy tự động) lượt kết thúc là phiên kết thúc, vai chạy nền bị dừng (N34, 20/11).
+
+**Không tự dò code:** phiên chính không gọi `mcp__gitnexus__*` / `mcp__codegraph__*` (hook `guard-orch-mcp.mjs` chặn khi skill này chạy) — cần biết gì trong code thì giao `ba` (hoặc `docrev` khi kiểm chéo); hai vai này có công cụ đồ thị chỉ đọc.
+
+**Giao việc có đối chiếu code thì phải dặn dùng đồ thị:** khi việc cần mã lỗi, chữ ký hàm, "đã có lớp/enum này chưa", ai gọi ai, hoặc ảnh hưởng của một thay đổi ⇒ prompt gửi vai ghi rõ "dùng `codegraph_explore` hoặc `gitnexus context`/`impact` **trước** `Grep`". **Không** viết "không khảo sát code" cho loại việc đó (N53: ORCH dặn *"việc hẹp và cơ học, không khảo sát code"* ⇒ vai không gọi MCP lần nào trong 12 phút). Việc thuần câu chữ thì giữ phạm vi hẹp — 0 truy vấn là đúng, đừng thêm nhiễu.
 
 ## 0. Xác định danh sách mã
 
@@ -66,6 +77,8 @@ Làm đúng .claude/agents/docrev.md §5. Kết thúc bằng đúng một khối
 ```
 
 Tự chạy `pwsh -File tools/agents/check-agent-artifact.ps1 -Kind docreview -Path docs/reviews/<MÃ>-docreview.md`.
+
+**Kiểm trước khi tin docreview:** nếu docreview có P1/P2 nói về **code thật** (as-built, chữ ký hàm, tên lớp/enum, khoá ngoại, mã lỗi) mà **thiếu** dòng `graph: <tool> "<query>"` ⇒ trả lại `docrev` yêu cầu bổ sung truy vấn đồ thị; đừng chạy script rồi chấp nhận `DOC-OK` (N56: 5/10 lượt đã dặn dùng đồ thị, vai vẫn không gọi vì "trước khi `Grep`" không bao giờ xảy ra — đọc tài liệu, không grep code).
 
 - `DOC-OK` + script exit 0 ⇒ D3.
 - `DOC-CHANGES` ⇒ gọi BA: "Sửa theo `docs/reviews/<MÃ>-docreview.md`, mọi P1 và P2; không sửa ngoài các mục được nêu" ⇒ D1s ⇒ DOCREV **vòng 2**

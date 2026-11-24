@@ -97,3 +97,7 @@ apps/admin-web/e2e/.run/
 apps/admin-web/test-results/
 apps/admin-web/playwright-report/
 apps/admin-web/blob-report/
+
+# Chi muc code graph cuc bo (GitNexus, CodeGraph) - khong commit
+.gitnexus/
+.codegraph/
