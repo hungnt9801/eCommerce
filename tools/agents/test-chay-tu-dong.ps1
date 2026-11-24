@@ -32,6 +32,17 @@ param([string]`$Root)
 `$ph = Join-Path `$Root 'tools/agents/phien.ps1'
 `$dem = Join-Path `$Root 'dem.txt'
 `$n = if (Test-Path `$dem) { [int](Get-Content `$dem) } else { 0 }; Set-Content `$dem (`$n + 1)
+if ('$mode' -eq 'stream') {
+  '{"type":"system","subtype":"init"}'
+  '{"type":"assistant","parent_tool_use_id":null,"message":{"content":[{"type":"tool_use","id":"t1","name":"Agent","input":{"subagent_type":"ba","description":"doi chieu SHP-009"}}]}}'
+  '{"type":"assistant","parent_tool_use_id":"t1","message":{"content":[{"type":"tool_use","id":"t2","name":"Read","input":{"file_path":"D:/x/docs/features/a.md"}}]}}'
+  '{"type":"user","parent_tool_use_id":null,"message":{"content":[{"type":"tool_result","tool_use_id":"t1","content":"ok"}]}}'
+  `$id = (& pwsh -NoProfile -File `$ph next -Root `$Root | Select-Object -Last 1).Trim()
+  & pwsh -NoProfile -File `$ph start -Id `$id -Root `$Root | Out-Null
+  & pwsh -NoProfile -File `$ph done -Id `$id -Evidence 'gia lap' -Root `$Root | Out-Null
+  '{"type":"result","subtype":"success","is_error":false,"result":"xong stream","permission_denials":[]}'
+  exit 0
+}
 if ('$mode' -eq 'khong') { '{"result":"khong lam gi"}'; exit 0 }
 if ('$mode' -eq 'env') { [Console]::Error.WriteLine('Background tasks still running 10m after the last turn (subagent "BA"); stopping them.'); '{"result":"BG=' + `$env:CLAUDE_CODE_DISABLE_BACKGROUND_TASKS + ' CEIL=' + `$env:CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS + '","permission_denials":[{"tool_name":"Bash","tool_input":{"command":"grep -n x docs/a.md"}}]}'; exit 0 }
 if ('$mode' -eq 'han-muc-phanh') { New-Item -ItemType Directory -Force (Join-Path `$Root 'artifacts/agents/tu-dong') | Out-Null; Set-Content (Join-Path `$Root 'artifacts/agents/tu-dong/DUNG') ''; '{"is_error":true,"result":"You''ve hit your 5-hour limit \u00b7 resets 1am (Asia/Bangkok)"}'; exit 1 }
@@ -123,6 +134,10 @@ try {
     RepoMoi 't12' @((Hang 'P-01' 'doc-gate' @()))
     $k = Chay (ClaudeGia 'env') @('-ToiDa', '1')
     Ca 'T12 phien con nhan bien tat tac vu nen; doc JSON dung du stderr co chu; bao lenh bi tu choi + vai nen bi dung' (($k.out -match 'BG=1 CEIL=0') -and ($k.out -match '1 lenh bi tu choi quyen') -and ($k.out -match 'vai chay nen bi dung')) $k
+
+    RepoMoi 't13' @((Hang 'P-01' 'doc-gate' @()))
+    $k = Chay (ClaudeGia 'stream') @('-ChiTiet')
+    Ca 'T13 stream-json: in vai bat dau/xong, lenh cua vai (-ChiTiet), doc ket qua cuoi' (($k.out -match '> ba bat dau: doi chieu SHP-009') -and ($k.out -match '< ba xong sau') -and ($k.out -match 'ba : Read docs/features/a.md') -and ($k.out -match 'ket thuc exit 0: xong stream')) $k
 }
 finally { Remove-Item -Recurse -Force $goc -ErrorAction SilentlyContinue }
 

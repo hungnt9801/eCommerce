@@ -35,7 +35,8 @@ param(
     [int]$ChoThemGiay = 180,         # cho them sau gio hoi
     [int]$ChoToiDaGiay = 6 * 3600,   # tran mot lan ngu (ngu dai hon => thuc day thu lai, khong ton han muc); ca thu dat nho
     [switch]$DungKhiHetTuan,         # mac dinh: het han muc tuan thi NGU toi gio hoi; bat cong tac nay de dung han
-    [int]$BuocChoGiay = 30           # khi ngu: cu moi buoc nay kiem tep phanh DUNG
+    [int]$BuocChoGiay = 30,          # khi ngu: cu moi buoc nay kiem tep phanh DUNG
+    [switch]$ChiTiet                 # in ca tung lenh/tep cua moi vai (mac dinh: chi vai bat dau/xong + moc chinh)
 )
 
 $ErrorActionPreference = 'Stop'
@@ -114,6 +115,83 @@ function Ngu([int]$giay, [string]$vi) {
     }
 }
 
+# ── theo doi truc tiep: doc stream-json cua `claude -p` trong luc phien chay ───────────────
+# Moi dong la mot su kien JSON. Su kien cua vai phu mang `parent_tool_use_id` = id lenh Agent da goi vai do.
+$script:vaiTheoId = @{}; $script:batDauVai = @{}
+# Trong luc theo doi, in bang Write-Host (khong lan vao gia tri tra ve cua TheoDoi); dong quan trong ghi them vao nhat ky
+function GhiHost([string]$s) {
+    $dong = ('{0}  {1}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm'), $s)
+    Write-Host $dong
+    [IO.File]::AppendAllText($nhatKy, "- $dong`n", $utf8)
+}
+function TomLenh($ten, $inp) {
+    switch -Regex ($ten) {
+        '^(Read|Edit|Write|MultiEdit)$' { return "$ten " + ([string]$inp.file_path -replace '^.*?(docs|tools|modules|src|agents|\.claude)[\\/]', '$1/') }
+        '^(Grep|Glob)$' { return "$ten " + [string]$inp.pattern }
+        '^(Bash|PowerShell)$' { $c = ([string]$inp.command -replace '\s+', ' ').Trim(); if ($c.Length -gt 90) { $c = $c.Substring(0, 90) + '…' }; return "$ten $c" }
+        '^mcp__' { return ($ten -replace '^mcp__', '') }
+        default { return $ten }
+    }
+}
+function InSuKien([string]$dong) {
+    if (-not $dong.Trim().StartsWith('{')) { return }
+    try { $e = $dong | ConvertFrom-Json -ErrorAction Stop } catch { return }
+    $cha = [string]$e.parent_tool_use_id
+    $vai = if ($cha -and $script:vaiTheoId.ContainsKey($cha)) { $script:vaiTheoId[$cha] } else { $null }
+    $noi = if ($e.message -and $e.message.content -is [array]) { $e.message.content } else { @() }
+    if ($e.type -eq 'assistant') {
+        foreach ($b in $noi) {
+            if ($b.type -ne 'tool_use') { continue }
+            if ($b.name -in @('Agent', 'Task')) {
+                $loai = if ($b.input.subagent_type) { [string]$b.input.subagent_type } else { 'vai' }
+                $script:vaiTheoId[[string]$b.id] = $loai; $script:batDauVai[[string]$b.id] = Get-Date
+                GhiHost ("    > {0} bat dau: {1}" -f $loai, [string]$b.input.description)
+            }
+            elseif ($vai) { if ($ChiTiet) { Write-Host ("{0}      {1} : {2}" -f (Get-Date -Format 'HH:mm'), $vai, (TomLenh $b.name $b.input)) } }
+            else {
+                $t = TomLenh $b.name $b.input
+                if ($ChiTiet -or $t -match 'phien\.ps1 (start|done|dodang|blocked)|git (commit|push)|check-feature-doc|check-agent-artifact|kiem-link') {
+                    Write-Host ("{0}      ORCH : {1}" -f (Get-Date -Format 'HH:mm'), $t)
+                }
+            }
+        }
+    }
+    elseif ($e.type -eq 'user' -and -not $vai) {
+        foreach ($b in $noi) {
+            $id = [string]$b.tool_use_id
+            if ($b.type -eq 'tool_result' -and $script:vaiTheoId.ContainsKey($id)) {
+                $phut = [Math]::Round(((Get-Date) - $script:batDauVai[$id]).TotalMinutes, 1)
+                GhiHost ("    < {0} xong sau {1} phut{2}" -f $script:vaiTheoId[$id], $phut, $(if ($b.is_error) { ' (LOI)' } else { '' }))
+            }
+        }
+    }
+    elseif ($e.type -eq 'system' -and $e.subtype -eq 'api_retry') {
+        Write-Host ("{0}      (thu lai API lan {1}: {2})" -f (Get-Date -Format 'HH:mm'), $e.attempt, $e.error)
+    }
+}
+function TheoDoi($proc, [string]$tep, [int]$giayToiDa) {
+    $viTri = 0L; $du = ''; $het = (Get-Date).AddSeconds($giayToiDa)
+    while ($true) {
+        $xong = $proc.HasExited
+        if (Test-Path -LiteralPath $tep) {
+            $fs = [IO.File]::Open($tep, 'Open', 'Read', 'ReadWrite')
+            try {
+                if ($fs.Length -gt $viTri) {
+                    $fs.Seek($viTri, 'Begin') | Out-Null
+                    $buf = New-Object byte[] ($fs.Length - $viTri); $n = $fs.Read($buf, 0, $buf.Length); $viTri += $n
+                    $du += $utf8.GetString($buf, 0, $n)
+                    $dongs = $du -split "`n"; $du = $dongs[-1]
+                    foreach ($d in $dongs[0..($dongs.Count - 2)]) { InSuKien $d }
+                }
+            }
+            finally { $fs.Dispose() }
+        }
+        if ($xong) { if ($du) { InSuKien $du }; return $true }
+        if ((Get-Date) -gt $het) { return $false }
+        Start-Sleep -Milliseconds 1000
+    }
+}
+
 # ── khoa: mot bo chay mot luc ───────────────────────────────────────────
 if (Test-Path -LiteralPath $khoa) {
     $pidCu = ([IO.File]::ReadAllText($khoa, $utf8)).Trim()
@@ -159,20 +237,28 @@ try {
                 -RedirectStandardOutput $tep -RedirectStandardError "$tep.err" -NoNewWindow -PassThru
         }
         else {
-            $thamSo = @('-p', '/chay-phien', '--model', $Model, '--permission-mode', 'auto', '--permission-prompts', 'none', '--output-format', 'json')
+            $thamSo = @('-p', '/chay-phien', '--model', $Model, '--permission-mode', 'auto', '--permission-prompts', 'none', '--output-format', 'stream-json', '--verbose')
             $exe = $claude
             if ($claude -match '\.(cmd|bat)$') { $exe = $env:ComSpec; $thamSo = @('/c', $claude) + $thamSo }
             $p = Start-Process -FilePath $exe -WorkingDirectory $Root -RedirectStandardOutput $tep -RedirectStandardError "$tep.err" -NoNewWindow -PassThru `
                 -ArgumentList $thamSo
         }
-        if (-not $p.WaitForExit([int]($GioToiDaMotPhien * 3600 * 1000))) {
+        $script:vaiTheoId = @{}; $script:batDauVai = @{}
+        if (-not (TheoDoi $p $tep ([int]($GioToiDaMotPhien * 3600)))) {
             $p.Kill($true); Ghi "phien $id qua $GioToiDaMotPhien gio — da dung tien trinh (hang o lai, phien sau lam tiep)"
         }
+        $p.WaitForExit()
         $stdout = [string](Get-Content -LiteralPath $tep -Raw -ErrorAction SilentlyContinue)
         $stderr = [string](Get-Content -LiteralPath "$tep.err" -Raw -ErrorAction SilentlyContinue)
-        $ra = $stdout + "`n" + $stderr
+        # stream-json: su kien cuoi `type = result` mang ket qua (giong --output-format json); khong co thi lay dong JSON cuoi doc duoc
         $ketQua = ''; $j = $null
-        try { $j = ($stdout.Trim() | ConvertFrom-Json -ErrorAction Stop); $ketQua = [string]$j.result } catch { $ketQua = $ra }
+        $dongJson = @($stdout -split "`r?`n" | Where-Object { $_.Trim().StartsWith('{') })
+        for ($k = $dongJson.Count - 1; $k -ge 0 -and -not $j; $k--) {
+            try { $x = $dongJson[$k] | ConvertFrom-Json -ErrorAction Stop; if ($x.type -eq 'result' -or -not $x.type) { $j = $x } } catch { }
+        }
+        if ($j) { $ketQua = [string]$j.result }
+        $ra = $ketQua + "`n" + $stderr
+        if (-not $j) { $ketQua = $stdout + "`n" + $stderr; $ra = $ketQua }
         $tom = ($ketQua -replace '\s+', ' ').Trim(); if ($tom.Length -gt 300) { $tom = $tom.Substring(0, 300) + '…' }
         Ghi ("  ket thuc exit {0}: {1}" -f $p.ExitCode, $tom)
         if ($j -and $j.permission_denials -and @($j.permission_denials).Count) {

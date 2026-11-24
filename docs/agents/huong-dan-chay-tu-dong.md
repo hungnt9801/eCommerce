@@ -50,7 +50,7 @@ Quyết định trong phiên do `decider` lấy theo [hồ sơ uỷ quyền](uy-
 2. Kiểm ca thử của bộ chạy (không gọi Claude thật, ~1 phút):
 
    ```powershell
-   pwsh -File tools/agents/test-chay-tu-dong.ps1    # TONG: 16 dat · 0 truot
+   pwsh -File tools/agents/test-chay-tu-dong.ps1    # TONG: 17 dat · 0 truot
    pwsh -File tools/agents/test-phien.ps1           # TONG: 38 dat · 0 truot
    ```
 
@@ -78,6 +78,7 @@ pwsh -File tools/agents/chay-tu-dong.ps1
 | `-Model` | `sonnet` | model của phiên chính (các vai phụ không đổi) |
 | `-GioToiDaMotPhien` | 6 | quá giờ ⇒ dừng tiến trình phiên đó; hàng ở lại 🟨, phiên sau làm tiếp |
 | `-ChoKhongRoGiay` | 1800 | hết hạn mức mà không đọc được giờ hồi ⇒ ngủ 30 phút rồi thử lại |
+| `-ChiTiet` | tắt | bật ⇒ in thêm từng lệnh của mỗi vai (`ba : Read docs/…`, `docrev : Grep …`) và mọi lệnh của phiên chính |
 | `-DungKhiHetTuan` | tắt | bật ⇒ hết hạn mức tuần thì dừng hẳn (mặc định: ngủ tới giờ hồi, mỗi 6 giờ thức dậy thử lại — lần thử không tốn hạn mức) |
 
 Muốn bắt đầu vào một giờ cố định (ví dụ 22:00 tối nay) mà không ngồi máy — tuỳ chọn, dùng Task Scheduler của Windows
@@ -101,6 +102,17 @@ schtasks /Delete /TN "eCommerce-chay-tu-dong" /F    # xoá lịch khi không c�
 Chạy liên tục cả ngày ≈ 4–5 cửa sổ ⇒ khoảng 2–3 giờ dây chuyền/ngày, và còn trần hạn mức **tuần**. Một tài liệu lớn thường cần 2 cửa sổ;
 phiên bị cắt giữa chừng thì phiên sau làm tiếp từ cây làm việc (bảng giữ 🟨, cột Phiên thêm số mới).
 Thông báo hết hạn mức đo được: `You've hit your 5-hour limit · resets 1am (Asia/Bangkok)` — bộ chạy bản 21/11 đọc được mẫu này, ngủ đúng tới giờ hồi + 3 phút.
+
+Trong lúc phiên chạy, cửa sổ in trực tiếp (bộ chạy đọc luồng sự kiện `--output-format stream-json` của Claude Code):
+
+```text
+2026-11-24 17:20      > ba bat dau: Đối chiếu NOT-002 với code
+2026-11-24 17:41      < ba xong sau 21,3 phut
+2026-11-24 17:41      > docrev bat dau: DOCREV vòng 1 NOT-002
+17:58      ORCH : PowerShell pwsh -File tools/agents/phien.ps1 done -Id P-17 …
+```
+
+Dòng `>` / `<` (vai bắt đầu / xong, kèm số phút) cũng ghi vào `nhat-ky.md`; dòng `ORCH :` chỉ hiện các mốc chính (bảng, cổng kiểm, commit, push), `-ChiTiet` hiện tất cả.
 
 ## 5. Theo dõi
 
