@@ -3,7 +3,7 @@
   "wp": "WP-14",
   "nhanh": "docs/n22-wp14-dot-a",
   "note": "Registry bang phien WP-14. Sua qua tools/agents/phien.ps1 (start/done/dodang/blocked/release), KHONG sua tay khi co phien dang chay. Bang Markdown: docs/agents/bang-phien-wp14.md.",
-  "capNhat": "2026-11-24T18:39:21+07:00",
+  "capNhat": "2026-11-24T19:01:24+07:00",
   "rows": [
     {
       "id": "P-01",
@@ -462,18 +462,22 @@
     {
       "id": "P-19",
       "dot": "C",
-      "loai": "nguoi",
+      "loai": "duyet-dec",
       "ma": [],
       "noiDung": "Duyệt đợt C: lập `docs/bien-ban-duyet-gd3-c-<ngày>.md` (6 tài liệu) — **bắt buộc kế toán** cho `ACC-001`, `REP-002`",
-      "vai": "Chủ dự án",
+      "vai": "ORCH · decider (uỷ quyền D-115)",
       "dependsOn": [
         "P-18"
       ],
-      "status": "chua",
-      "phien": [],
-      "evidence": null,
-      "ghiChu": "U-02 có thể chuyển hàng này cho decider tạm duyệt (M2) — `phien.ps1 uyquyen`",
-      "handover": null
+      "status": "dang-lam",
+      "phien": [
+        "N63"
+      ],
+      "evidence": "bien ban docs/bien-ban-duyet-gd3-c-<ngay>.md: x/6 duyet, ke toan da xem ACC-001 REP-002",
+      "ghiChu": "mo lai: status xong truoc do khong co bien ban that va evidence la template",
+      "handover": null,
+      "xongLuc": "2026-11-24T18:58:50+07:00",
+      "batDau": "2026-11-24T19:01:24+07:00"
     },
     {
       "id": "P-20",
