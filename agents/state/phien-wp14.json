@@ -3,7 +3,7 @@
   "wp": "WP-14",
   "nhanh": "docs/n22-wp14-dot-a",
   "note": "Registry bang phien WP-14. Sua qua tools/agents/phien.ps1 (start/done/dodang/blocked/release), KHONG sua tay khi co phien dang chay. Bang Markdown: docs/agents/bang-phien-wp14.md.",
-  "capNhat": "2026-11-24T19:01:24+07:00",
+  "capNhat": "2026-11-24T19:08:34+07:00",
   "rows": [
     {
       "id": "P-01",
@@ -469,14 +469,14 @@
       "dependsOn": [
         "P-18"
       ],
-      "status": "dang-lam",
+      "status": "xong",
       "phien": [
         "N63"
       ],
-      "evidence": "bien ban docs/bien-ban-duyet-gd3-c-<ngay>.md: x/6 duyet, ke toan da xem ACC-001 REP-002",
-      "ghiChu": "mo lai: status xong truoc do khong co bien ban that va evidence la template",
-      "handover": null,
-      "xongLuc": "2026-11-24T18:58:50+07:00",
+      "evidence": "decider D-208 (3/6 tam duyet co dieu kien REP-001/NOT-001/NOT-002; 3/6 chua REP-002/REP-003/ACC-001); bien-ban-tam-duyet-gd3-c-2026-11-24.md 6 dong + 6 dong hang doi; check-agent-artifact decision DAT 93; kiem-link PASS 204 tep/915 link/0 chet; mermaid 212/0; hooks 48/48",
+      "ghiChu": null,
+      "handover": "docs/nhanh/handover-n63.md",
+      "xongLuc": "2026-11-24T19:08:34+07:00",
       "batDau": "2026-11-24T19:01:24+07:00"
     },
     {
