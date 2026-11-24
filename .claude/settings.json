@@ -41,6 +41,19 @@
             "timeout": 15
           }
         ]
+      },
+      {
+        "matcher": "Grep|Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/guard-code-lookup.mjs"
+            ],
+            "timeout": 15
+          }
+        ]
       }
     ],
     "PostToolUse": [

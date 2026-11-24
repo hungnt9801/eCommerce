@@ -390,3 +390,63 @@ test('F3 tools cua vai: khong ky tu dai dien MCP (Claude Code khong nhan), khong
     }
   }
 });
+
+// ── guard-code-lookup (N56/N57: luat van ban 3 lop khong bind ⇒ hook chan) ────────────────────────
+const codeLookup = (role, target, opc = {}) =>
+  run('guard-code-lookup.mjs', {
+    hook_event_name: 'PreToolUse',
+    tool_name: 'Grep',
+    tool_input: { path: target },
+    ...(role ? { agent_type: role, agent_id: 'gl1' } : {}),
+    ...opc,
+  });
+
+test('G1 ba Grep modules/** khi chua co truy van do thi ⇒ chan (2)', () => {
+  put('.claude/agents/ba.md', '---\nname: ba\ntools: Read, Grep, mcp__codegraph__codegraph_explore\n---\nnoi dung\n');
+  const r = codeLookup('ba', 'modules/Sales/x.cs');
+  assert.equal(r.code, 2);
+  assert.match(r.err, /codegraph/);
+});
+
+test('G2 transcript da co tool_use MCP ⇒ cho qua', () => {
+  put(
+    'artifacts/t-g2.jsonl',
+    JSON.stringify({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'mcp__codegraph__codegraph_explore' }] } }) + '\n'
+  );
+  const r = codeLookup('ba', 'modules/Sales/x.cs', { transcript_path: join(repo, 'artifacts', 't-g2.jsonl') });
+  assert.equal(r.code, 0);
+});
+
+test('G3 tep khong phai code (docs/**) ⇒ cho qua', () => assert.equal(codeLookup('ba', 'docs/features/x.md').code, 0));
+
+test('G4 phien chinh (khong agent_type) ⇒ cho qua', () => assert.equal(codeLookup(null, 'modules/Sales/x.cs').code, 0));
+
+test('G5 vai khong khai cong cu do thi ⇒ cho qua (khong the thoa)', () => assert.equal(codeLookup('Explore', 'modules/Sales/x.cs').code, 0));
+
+test('G6 toi da 2 lan chan moi phien, lan 3 cho qua (khong treo phien)', () => {
+  const sid = { session_id: 'g6-phien' };
+  assert.equal(codeLookup('ba', 'modules/Sales/x.cs', sid).code, 2);
+  assert.equal(codeLookup('ba', 'modules/Sales/x.cs', sid).code, 2);
+  assert.equal(codeLookup('ba', 'modules/Sales/x.cs', sid).code, 0);
+});
+
+test('G7 role khong co tep .claude/agents ⇒ cho qua', () => assert.equal(codeLookup('khong-co-vai', 'modules/Sales/x.cs').code, 0));
+
+test('G8 stdin co BOM van chan (khong fail-open im lang)', () => {
+  const r = spawnSync(process.execPath, [join(HOOKS, 'guard-code-lookup.mjs')], {
+    input:
+      '\uFEFF' +
+      JSON.stringify({
+        cwd: repo,
+        hook_event_name: 'PreToolUse',
+        tool_name: 'Grep',
+        tool_input: { path: 'modules/Sales/x.cs' },
+        agent_type: 'ba',
+        agent_id: 'gl8',
+        session_id: 'g8-bom',
+      }),
+    env: { ...process.env, CLAUDE_PROJECT_DIR: repo },
+    encoding: 'utf8',
+  });
+  assert.equal(r.status, 2);
+});
