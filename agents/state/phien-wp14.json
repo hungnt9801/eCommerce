@@ -3,7 +3,7 @@
   "wp": "WP-14",
   "nhanh": "docs/n22-wp14-dot-a",
   "note": "Registry bang phien WP-14. Sua qua tools/agents/phien.ps1 (start/done/dodang/blocked/release), KHONG sua tay khi co phien dang chay. Bang Markdown: docs/agents/bang-phien-wp14.md.",
-  "capNhat": "2026-11-24T11:42:33+07:00",
+  "capNhat": "2026-11-24T13:52:56+07:00",
   "rows": [
     {
       "id": "P-01",
@@ -382,14 +382,15 @@
       "dependsOn": [
         "U-02"
       ],
-      "status": "dang-lam",
+      "status": "xong",
       "phien": [
         "N59"
       ],
-      "evidence": null,
+      "evidence": "check-feature-doc -WP14 exit 0 x2 (REP-003 14/14 BR 0 Open; ACC-001 18/18 BR 1 Open=Q12); DOCREV DOC-OK P1=0/P2=0 x2; check-agent-artifact docreview x2 + decision DAT (81 dong); D-176..D-196 (21 TAM CHOT DEC); kiem-link PASS 196 tep/884 link/1259 backtick; mermaid 212/0; hooks 48/48",
       "ghiChu": null,
-      "handover": null,
-      "batDau": "2026-11-24T11:42:33+07:00"
+      "handover": "docs/nhanh/handover-n59.md",
+      "batDau": "2026-11-24T11:42:33+07:00",
+      "xongLuc": "2026-11-24T13:52:56+07:00"
     },
     {
       "id": "P-16",
