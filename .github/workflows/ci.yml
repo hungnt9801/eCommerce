@@ -143,11 +143,11 @@ jobs:
 
       - name: '7. Thu vien client cua Web (E2E can CSS/JS - E-07)'
         run: |
-          dotnet tool install --global Volo.Abp.Cli
+          dotnet tool install --global Volo.Abp.Studio.Cli
           echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
           export PATH="$HOME/.dotnet/tools:$PATH"
           command -v yarn > /dev/null 2>&1 || npm install --global yarn
-          abp install-libs -wd src/eCommerce.Web
+          abp install-libs -wd src/eCommerce.Web          
 
       - name: '8. BUILD LAM NONG (bat buoc - vap F2)'
         run: |
