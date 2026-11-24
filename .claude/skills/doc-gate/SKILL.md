@@ -78,6 +78,8 @@ Làm đúng .claude/agents/docrev.md §5. Kết thúc bằng đúng một khối
 
 Tự chạy `pwsh -File tools/agents/check-agent-artifact.ps1 -Kind docreview -Path docs/reviews/<MÃ>-docreview.md`.
 
+**Kiểm trước khi tin docreview:** nếu docreview có P1/P2 nói về **code thật** (as-built, chữ ký hàm, tên lớp/enum, khoá ngoại, mã lỗi) mà **thiếu** dòng `graph: <tool> "<query>"` ⇒ trả lại `docrev` yêu cầu bổ sung truy vấn đồ thị; đừng chạy script rồi chấp nhận `DOC-OK` (N56: 5/10 lượt đã dặn dùng đồ thị, vai vẫn không gọi vì "trước khi `Grep`" không bao giờ xảy ra — đọc tài liệu, không grep code).
+
 - `DOC-OK` + script exit 0 ⇒ D3.
 - `DOC-CHANGES` ⇒ gọi BA: "Sửa theo `docs/reviews/<MÃ>-docreview.md`, mọi P1 và P2; không sửa ngoài các mục được nêu" ⇒ D1s ⇒ DOCREV **vòng 2**
   (kèm đường dẫn docreview vòng 1 + `changedSections` của BA). Vẫn `DOC-CHANGES` ⇒ mục §3.

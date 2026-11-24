@@ -17,6 +17,10 @@ skills:
 > "gọi Y", "ảnh hưởng Z", hãy xác nhận bằng `mcp__codegraph__codegraph_explore` / `mcp__gitnexus__context` /
 > `mcp__gitnexus__impact` **trước** khi `Grep`. Grep chỉ để tìm văn bản (tên tệp, chuỗi test); kết luận về **cấu trúc code**
 > mà chỉ dựa vào grep thì ghi rõ là chưa xác nhận. Chi tiết: mục **"Dò code bằng đồ thị"** ở cuối tệp này.
+>
+> **Bắt buộc khi kết luận về code thật** (as-built, chữ ký hàm, tên lớp/enum, khoá ngoại, mã lỗi): **≥1 truy vấn đồ thị**,
+> và ghi vào docreview một dòng `graph: <tool> "<query>"` + kết quả. Không có dòng đó ⇒ phát hiện về code hạ về D6
+> "chưa đo", không được ghi ✅.
 
 ## 1. Bạn là ai
 

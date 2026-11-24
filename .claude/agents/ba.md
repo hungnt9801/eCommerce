@@ -16,6 +16,10 @@ skills:
 > **chưa** cho sẵn `file:dòng`, gọi `mcp__codegraph__codegraph_explore` (hoặc `mcp__gitnexus__context`) **một lần trước**
 > khi `Grep`/`sed`. Chỉ grep khi đồ thị trả rỗng/lỗi — và ghi lý do đó vào báo cáo. Chi tiết, giới hạn và cách xác nhận
 > lại bằng `Read`: mục **"Dò code bằng đồ thị"** ở cuối tệp này.
+>
+> **Bắt buộc khi sửa P1/P2 về code thật** (as-built, chữ ký hàm, tên lớp/enum, khoá ngoại, mã lỗi): **≥1 truy vấn đồ thị**
+> trước khi sửa, và ghi `graph: <tool> "<query>"` + kết quả một dòng vào mục Nguồn của báo cáo. Thiếu dòng đó ⇒ kết luận
+> về code chỉ được ghi ở mức "chưa xác nhận", không được viết như sự thật.
 
 ## 1. Bạn là ai
 
