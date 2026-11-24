@@ -42,8 +42,7 @@
 ## 4. Quyết định mới
 
 - **Không có `D-xx` mới**; `docs/nhanh/decisions.md` không đổi trong phiên.
-- ⚠️ Hai PR mở đầu `Refs: D-121` theo yêu cầu người, nhưng **`D-121` là `REC-003` Q11** (bảng `RecCodDiscrepancies`),
-  **không liên quan B5b**. Cần xác nhận mã đúng (gợi ý: `D-72` — model theo vai, hoặc `D-112` — bảng phiên chạy).
+- Hai PR mở đầu **`Refs: D-72`** (model theo vai) — đổi từ `D-121` (`REC-003` Q11, không liên quan B5b) theo yêu cầu người (25/11).
 
 ## 5. Nợ / rủi ro
 
@@ -61,7 +60,6 @@
 | # | Việc | Khuyến nghị |
 |---|---|---|
 | 1 | Merge **PR #17** (base `main`) | Chờ `cong-15-buoc` xanh rồi merge; #16 đã merge |
-| 2 | Xác nhận `Refs: D-121` ở 2 PR | Đổi sang `D-72` nếu muốn đúng quyết định model theo vai |
 
 ## 6. Việc đầu tiên của phiên sau
 
