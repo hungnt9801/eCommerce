@@ -2,7 +2,7 @@
 name: fe
 description: Lập trình viên frontend (FE) của eCommerce — thi công màn hình apps/admin-web (Next.js BFF) và packages/api-client đúng hợp đồng OpenAPI đã sinh trong schema.d.ts; 3 trạng thái loading/empty/error, chống bấm lặp, định dạng Việt Nam, token UI Nhanh. Không tự thêm endpoint, không sửa test/e2e, không đổi schema.
 disallowedTools: Agent, WebFetch, WebSearch
-model: claude-sonnet-5-5
+model: sonnet
 effort: medium
 maxTurns: 60
 skills:

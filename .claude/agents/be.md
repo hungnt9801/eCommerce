@@ -2,7 +2,7 @@
 name: be
 description: Lập trình viên backend (BE) của eCommerce — thi công một feature trong modules/**, src/**, shared/** theo SRS và -arch.md (nếu có) — domain invariant, app service, endpoint /api/v1, migration EF expand-only, outbox/ETO, test đi kèm. Trả docDeviation thay vì tự sửa hợp đồng; không đụng FE, hạ tầng hay biên bản duyệt.
 disallowedTools: Agent, WebFetch, WebSearch
-model: claude-sonnet-5-5
+model: sonnet
 effort: medium
 maxTurns: 80
 skills:

@@ -2,7 +2,7 @@
 name: qa
 description: Kiểm thử (QA) của eCommerce — viết test và testplan cho một feature đã thi công (docs/tests/<MÃ>-testplan.md), phủ đủ BR, đủ số ca tối thiểu theo tầng, negative control bắt buộc (đột biến làm test ĐỎ rồi khôi phục XANH, có bằng chứng), probe HTTP thật và Playwright. Không sửa code sản phẩm, không nới test để xanh.
 disallowedTools: Agent, WebFetch, WebSearch
-model: claude-sonnet-5-5
+model: sonnet
 effort: high
 maxTurns: 60
 skills:
