@@ -66,6 +66,19 @@ test('H1 rev sua modules/** ⇒ chan', () => {
   assert.match(r.err, /chi duoc ghi/);
 });
 test('H2 rev ghi docs/reviews/SHP-001-review.md ⇒ cho', () => assert.equal(write('rev', 'docs/reviews/SHP-001-review.md').code, 0));
+// B5b — ca that "QA/ARCH/OPS khong ghi duoc modules/**" (§11 B5 DoD).
+test('H2b qa/arch/ops khong ghi duoc modules/**; moi vai ghi dung vung ⇒ cho', () => {
+  for (const r of ['qa', 'arch', 'ops', 'fe', 'rev']) {
+    assert.equal(write(r, 'modules/Sales/x.cs', 'Edit').code, 2, `${r} phai bi chan khi ghi modules/**`);
+  }
+  assert.equal(write('qa', 'test/Sales/x.cs').code, 0);
+  assert.equal(write('qa', 'docs/tests/SAL-001-testplan.md').code, 0);
+  assert.equal(write('arch', 'docs/features/address/addr-001-arch.md').code, 0);
+  assert.equal(write('ops', 'tools/kiem-moi.ps1').code, 0);
+  assert.equal(write('ops', 'tools/probe-don-hang.ps1').code, 2);
+  assert.equal(write('fe', 'apps/admin-web/src/x.tsx').code, 0);
+  assert.equal(shell('arch', 'echo x > modules/Sales/x.cs').code, 2);
+});
 test('H4 ba sua docs/features/README.md ⇒ chan', () => assert.equal(write('ba', 'docs/features/README.md', 'Edit').code, 2));
 test('H5 vai la (Explore) ghi ⇒ chan fail-closed', () => {
   const r = write('Explore', 'docs/x.md');
@@ -330,6 +343,10 @@ test('F1 frontmatter moi tep .claude/agents/*.md va .claude/skills/*/SKILL.md ho
   const sk = join(goc, 'skills');
   if (existsSync(sk)) for (const d of readdirSync(sk)) if (existsSync(join(sk, d, 'SKILL.md'))) tep.push(join(sk, d, 'SKILL.md'));
   assert.ok(tep.length > 0, 'khong thay tep vai/skill nao');
+  // B5 DoD "/agents du 9" — du 9 vai trong .claude/agents/.
+  const duVai = ['ba', 'decider', 'docrev', 'arch', 'be', 'fe', 'qa', 'rev', 'ops'];
+  const coVai = readdirSync(ag).filter((f) => f.endsWith('.md')).map((f) => f.replace(/\.md$/, ''));
+  assert.deepEqual(duVai.filter((v) => !coVai.includes(v)), [], 'thieu tep vai trong .claude/agents/');
   const hong = tep.map((f) => [f, loiFrontmatter(readFileSync(f, 'utf8'))]).filter(([, l]) => l.length);
   assert.deepEqual(hong.map(([f, l]) => `${f}: ${l.join('; ')}`), []);
 });

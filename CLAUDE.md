@@ -72,17 +72,20 @@ máy trạng thái NÉM lỗi · `[Authorize]` cấp class · module không ph�
 - Commit **thuần ASCII**: `<loại>(<phạm vi>): <mã phiên> - <nội dung>` (ví dụ `docs(nhanh): N22 - ...`); PR mở đầu `Refs: D-xx`.
 - `git add` theo **đường dẫn cụ thể**, không `git add -A`. Commit/push/PR chỉ khi người dùng yêu cầu.
 
-## 9. Vai agent & dây chuyền (bước B1–B2 của `docs/agents/ke-hoach-v2-claude-code-pro.md`)
+## 9. Vai agent & dây chuyền (bước B1–B5 của `docs/agents/ke-hoach-v2-claude-code-pro.md`)
 
 - **Phiên chính = orchestrator (ORCH)**: điều phối, chạy script kiểm, **không** sửa thay vai khi đang chạy `/doc-gate`.
-  Lệnh: `/mo-phien <WP> <Nx>` · `/doc-gate A|B|C|<MÃ…>` · `/dong-phien`.
+  Lệnh: `/mo-phien <WP> <Nx>` · `/doc-gate A|B|C|<MÃ…>` · `/feature <MÃ>` · `/dong-phien`.
 - **Vai** (`.claude/agents/`): `ba` (Opus) soạn/đối chiếu tài liệu feature · `docrev` (Opus) kiểm D1–D7, ngữ cảnh sạch ·
-  `decider` (Opus) quyết thay người việc đảo ngược được. Vai code (`arch`, `be`, `fe`, `qa`, `rev`, `ops`) dựng ở bước B5.
+  `decider` (Opus) quyết thay người việc đảo ngược được. **Vai code** (dựng ở B5/`N67`): `arch` (Opus) thiết kế liên module ·
+  `be`, `fe`, `qa`, `ops` (Sonnet) thi công/kiểm/vận hành · `rev` (Opus) review code.
 - **Khảo sát code**: vai dùng `codegraph_explore` / `gitnexus context|impact` **trước** `Grep` (mục "Dò code bằng đồ thị"
   trong tệp từng vai). ORCH **không** tự dò code — `guard-orch-mcp.mjs` chặn khi chạy `/doc-gate`, `/chay-phien`.
 - **Vùng ghi** của từng vai: **một nguồn** `.claude/scopes.json`; hook `.claude/hooks/` chặn trước khi ghi và so `git status` sau khi vai chạy.
   Không sửa `.claude/**` từ trong vai. Ca thử: `node --test .claude/hooks/test/hooks.test.mjs`.
 - **Kiểm bằng máy**: `tools/agents/check-feature-doc.ps1` (16 mục, BR có test, mục đối chiếu Nhanh) ·
-  `tools/agents/check-agent-artifact.ps1` (docreview / review / testplan / dòng `D-xx` của DEC). ORCH tự chạy, không tin số vai báo.
+  `tools/agents/check-agent-artifact.ps1` (docreview / review / testplan / dòng `D-xx` của DEC) ·
+  `tools/agents/negative-control.ps1` (đột biến **đỏ** → khôi phục **xanh** → ghi bằng chứng vào testplan).
+  ORCH tự chạy, không tin số vai báo.
 - Vai **không** được tool `Agent` (không lồng); mỗi vai trả **đúng một** khối JSON cuối — hook chặn dừng một lần nếu thiếu.
 - Lệnh shell của Claude Code trên máy dev chạy qua **Git Bash** ⇒ viết đường dẫn bằng `/` (`pwsh -File tools/kiem-tat-ca.ps1`, `dotnet test test/eCommerce.Tests`); `\` trong bảng §3 chỉ dùng khi tự gõ trong PowerShell.

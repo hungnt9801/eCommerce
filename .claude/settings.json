@@ -106,6 +106,8 @@
       "PowerShell(pwsh -File tools/agents/phien.ps1 *)",
       "Bash(pwsh -File tools/agents/test-phien.ps1)",
       "PowerShell(pwsh -File tools/agents/test-phien.ps1)",
+      "Bash(pwsh -File tools/agents/negative-control.ps1 *)",
+      "PowerShell(pwsh -File tools/agents/negative-control.ps1 *)",
       "Bash(pwsh -File tools/kiem-link-tai-lieu.ps1)",
       "PowerShell(pwsh -File tools/kiem-link-tai-lieu.ps1)",
       "Bash(npm --prefix tools run check:mermaid)",
