@@ -10,18 +10,20 @@
 > Cập nhật **N59 (24/11/2026)** — hàng `P-15`: `REP-003` chạy đủ dây chuyền: BA đối chiếu + áp `D-170`; 11 câu §15 → decider (10 câu `TẠM CHỐT` `D-176`…`D-185` + `D-186`); DOCREV **vòng 1 `DOC-CHANGES`** (2 P1 · 7 P2: `QuantityDelta` cộng thô, doanh thu gồm VAT …) → BA sửa hết → **vòng 2 `DOC-OK`** (0 P1 · 1 P2) → BA sửa P2 tàn dư → **vòng 3 kiểm nhanh `DOC-OK`** (0 P1 · 0 P2 · 4 P3) ⇒ **đủ điều kiện trình duyệt**. `ACC-001` cùng phiên: BA đối chiếu + 10 câu §15 → decider (`D-187`…`D-196`); DOCREV **vòng 1 `DOC-CHANGES`** (0 P1 · 6 P2) → BA sửa hết → **vòng 2 `DOC-OK`** (0 P1 · 1 P2) → sửa P2 → **vòng 3 kiểm nhanh `DOC-OK`** (0 P1 · 0 P2 · 5 P3) ⇒ **đủ điều kiện trình duyệt**; `Q12` (hạn lưu trữ) giữ `Open` cho kế toán trưởng.
 > Cập nhật **N61 (24/11/2026)** — hàng `P-17`: `NOT-002` chạy đủ dây chuyền: BA đối chiếu as-built (module `Notification` chưa có) + đồng bộ nợ chéo `D-197` (`ChannelKind`, một module/permission) và `D-199` (dải NOT-002 `0001–0009`, NOT-001 `0010–0020`) + đóng `Q9` theo `D-193`; 8 câu §15 có `blocks` → decider (`D-200`/`D-202` `CHUYEN_NGUOI` vì R3-6; `D-201`, `D-203`…`D-207` `TẠM CHỐT`); DOCREV **vòng 1 `DOC-CHANGES`** (0 P1 · 3 P2) → BA sửa hết → **vòng 2 `DOC-CHANGES`** (0 P1 · 5 P2, đa số lỗi có sẵn) → BA sửa → **vòng 3 kiểm nhanh `DOC-OK`** (0 P1 · **1 P2** · 1 P3) ⇒ **đủ điều kiện trình duyệt**; `Q1`/`Q3` giữ `Open` (chọn NCC/kênh Zalo, R3-6).
 
+> Cập nhật **N62 (24/11/2026)** — hàng `P-18` (`tong-hop`): đủ **6/6** dòng tài liệu của đợt C, cột người review bắt buộc theo `design-doc-guidelines.md` §6, thêm **bảng câu còn chờ người** (§3) — **13** câu §15 còn `Open` (`ACC-001` `Q12`; `NOT-001` `Q3–Q9`,`Q11–Q13`; `NOT-002` `Q1`,`Q3`), **36** dòng `TẠM CHỐT` + **2** `ĐỀ XUẤT` chờ duyệt lô. Không lập biên bản thật.
+
 ## 1. Bảng tài liệu đợt C
 
 | MÃ | Tệp | DOCREV | §15 còn Open | Chờ người | Người review bắt buộc (`design-doc-guidelines.md` §6) | Đề xuất |
 |---|---|---|---|---|---|---|
-| REP-001 | [rep-001-read-model-job-tong-hop.md](../features/reporting/rep-001-read-model-job-tong-hop.md) | **`DOC-OK`** vòng 3 kiểm nhanh (24/11/2026) · 0 P1 · **0 P2** · 10 P3 ([docreview](../reviews/REP-001-docreview.md)); 8 P2 vòng 2 đã đóng, xác nhận bằng đồ thị | 0 câu (Q1/Q2/Q4/Q6/Q8 `Closed` bởi `D-170`…`D-174`; 3 dòng `Open` còn lại là mô tả lịch sử trong bảng đối chiếu) | 0 câu chờ người; 10 P3 để người duyệt; kế toán duyệt lô M4 (`D-172` ngưỡng vận hành; `D-173` COD tách khỏi `REC-003`) trước release | **Kiến trúc trưởng** (read-model theo lô, kế hoạch `RepPeriodClose`) + **kế toán** (giá vốn/ghi nhận: `D-114` P2/P4) | **Trình duyệt** — DOC-OK, 0 P1/0 P2; 10 P3 để người duyệt |
+| REP-001 | [rep-001-read-model-job-tong-hop.md](../features/reporting/rep-001-read-model-job-tong-hop.md) | **`DOC-OK`** vòng 3 kiểm nhanh (24/11/2026) · 0 P1 · **0 P2** · 10 P3 ([docreview](../reviews/REP-001-docreview.md)); 8 P2 vòng 2 đã đóng, xác nhận bằng đồ thị | 0 câu (Q1/Q2/Q4/Q6/Q8 `Closed` bởi `D-170`…`D-174`; 3 dòng `Open` còn lại là mô tả lịch sử trong bảng đối chiếu) | 0 câu chờ người; 10 P3 để người duyệt; kế toán duyệt lô M4 (`D-172` ngưỡng vận hành; `D-173` COD tách khỏi `REC-003`) trước release | **Kiến trúc trưởng + BA** (read-model theo lô, `RepPeriodClose` — khoá kỳ/state machine, `D-171`; `design-doc-guidelines.md` §6) + **kế toán** (giá vốn/ghi nhận: `D-114` P2/P4) | **Trình duyệt** — DOC-OK, 0 P1/0 P2; 10 P3 để người duyệt |
 | REP-002 | [rep-002-bao-cao-doanh-thu-lai-gop.md](../features/reporting/rep-002-bao-cao-doanh-thu-lai-gop.md) | **`DOC-OK`** vòng 4 kiểm nhanh (24/11/2026) · 0 P1 · **0 P2** · 5 P3 ([docreview](../reviews/REP-002-docreview.md)); 5 P2 vòng 2 đã đóng ở vòng 3, 3 P2 mới của vòng 3 đã đóng ở vòng 4 | 0 câu (7 câu §15 chốt: 6 `TIEN_LE` `D-114`/`D-48`/`D-172`/`D-03`/`D-36` + `D-175`) | 0 câu chờ người; 5 P3 để người duyệt; kế toán duyệt lô M4 (`D-114` P2/P4) trước release | Kiến trúc trưởng + **kế toán** (đỏ cứng `D-114` §2.1) | **Trình duyệt** — DOC-OK, 0 P1/0 P2; 5 P3 để người duyệt |
 | REP-003 | [rep-003-bao-cao-ton-kho-hieu-suat-kenh.md](../features/reporting/rep-003-bao-cao-ton-kho-hieu-suat-kenh.md) | **`DOC-OK`** vòng 3 kiểm nhanh (24/11/2026) · 0 P1 · **0 P2** · 4 P3 (2 P3 vòng 2 + 2 P3 vòng 3) ([docreview](../reviews/REP-003-docreview.md)); vòng 1 `DOC-CHANGES` 2 P1/7 P2 và 1 P2 vòng 2 đã đóng | 0 câu (§15: Q1–Q11 `Closed` bởi `D-170`, `D-176`…`D-186`) | 0 câu chờ người; 4 P3 để người duyệt; kế toán duyệt lô M4 (`D-177` giá vốn, `D-181` LG1/LG2, `D-182` retention, `D-186` chủ giá vốn) trước release | Kiến trúc trưởng + **kế toán** (đỏ cứng `D-114` §2.1) | **Trình duyệt** — DOC-OK, 0 P1/0 P2; 4 P3 để người duyệt |
 | ACC-001 | [acc-001-xuat-lieu-ke-toan-excel-csv.md](../features/accounting/acc-001-xuat-lieu-ke-toan-excel-csv.md) | **`DOC-OK`** vòng 3 kiểm nhanh (24/11/2026) · 0 P1 · **0 P2** · 5 P3 ([docreview](../reviews/ACC-001-docreview.md)); vòng 1 `DOC-CHANGES` 0 P1/6 P2 và 1 P2 vòng 2 đã đóng | 1 câu `Open` (`Q12` hạn lưu trữ — R3-3, `D-196` chốt mặc định KHÔNG xoá); 9 câu đóng bởi `D-183`/`D-186`/`D-187`…`D-196` | 0 câu chờ người cho thiết kế; **`Q12` chờ kế toán trưởng** (không chặn xuất file); 5 P3 để người duyệt; kế toán duyệt lô M4 (`D-187`…`D-196`) trước release | Kiến trúc trưởng + **kế toán** (đỏ cứng `D-114` §2.1, R3-3/R3-8) | **Trình duyệt** — DOC-OK, 0 P1/0 P2; `Q12` + 5 P3 để người duyệt |
 | NOT-001 | [not-001-template-hang-doi-thong-bao.md](../features/notifications/not-001-template-hang-doi-thong-bao.md) | **`DOC-OK`** vòng 3 kiểm nhanh (24/11/2026) · 0 P1 · **2 P2** · 3 P3 ([docreview](../reviews/NOT-001-docreview.md)); vòng 1 `DOC-CHANGES` (0 P1/6 P2) + vòng 2 `DOC-CHANGES` (0 P1/5 P2) đã đóng đủ; 12 P3 vòng 2 chưa sửa (giữ cho người duyệt) | 10 câu `Open` có mặc định an toàn (Q1 `D-198`, Q2 `D-199`, Q10 `D-197` đã `Closed`); Q3–Q9, Q11–Q13 để người duyệt xác nhận | 0 câu **chặn duyệt**; 2 P2 (cạnh `DangBanGiao→HetHan` #24 · rollback UoW khi bắt `23505` #26) + 3 P3 vòng 3 + 12 P3 vòng 2 để người duyệt; Q9/Q11 cần Security, Q3/Q5/Q6/Q8 cần Vận hành xác nhận | **Kiến trúc trưởng + BA** (có state machine — `design-doc-guidelines.md` §6) | **Trình duyệt** — DOC-OK, 0 P1; 2 P2 + 15 P3 + 10 câu `Open` để người duyệt. `D-199` text-only ⇒ không cần Security riêng cho XSS |
-| NOT-002 | [not-002-kenh-gui-email-sms-zalo-oa.md](../features/notifications/not-002-kenh-gui-email-sms-zalo-oa.md) | **`DOC-OK`** vòng 3 kiểm nhanh (24/11/2026) · 0 P1 · **1 P2** · 1 P3 ([docreview](../reviews/NOT-002-docreview.md)); vòng 1 `DOC-CHANGES` (0 P1/3 P2) + vòng 2 `DOC-CHANGES` (0 P1/5 P2 lỗi có sẵn) đã đóng đủ | 2 câu `Open` (`Q1` chọn NCC email/SMS — `D-200`; `Q3` 5 thông số Zalo OA — `D-202`); `Q2`/`Q5`/`Q6`/`Q7`/`Q8` đóng bởi `D-201`/`D-204`/`D-205`/`D-206`/`D-207`, `Q4` bởi `D-203`, `Q9` bởi `D-193`, `Q10` bởi `D-197` | `Q1`/`Q3` chờ **người** (chọn NCC + ký hợp đồng + khoá HMAC production, R3-6); 1 P2 (ADR-03 dẫn `PaymentTransaction.cs:76` thay vì `:84`) + 1 P3 (Pre-Condition còn nhắc chế độ suy giảm) để người duyệt; `D-201`…`D-207` là `TẠM CHỐT` chờ duyệt | **BA + Kiến trúc trưởng + người** (khoá HMAC/chọn NCC/kênh Zalo, R3-6; state machine) | **Trình duyệt** — DOC-OK, 0 P1/1 P2; `Q1`/`Q3` + 1 P2 + 1 P3 để người duyệt. Chưa chọn NCC ⇒ chỉ adapter email tổng quát + fake sender |
+| NOT-002 | [not-002-kenh-gui-email-sms-zalo-oa.md](../features/notifications/not-002-kenh-gui-email-sms-zalo-oa.md) | **`DOC-OK`** vòng 3 kiểm nhanh (24/11/2026) · 0 P1 · **1 P2** · 1 P3 ([docreview](../reviews/NOT-002-docreview.md)); vòng 1 `DOC-CHANGES` (0 P1/3 P2) + vòng 2 `DOC-CHANGES` (0 P1/5 P2 lỗi có sẵn) đã đóng đủ | 2 câu `Open` (`Q1` chọn NCC email/SMS — `D-200`; `Q3` 5 thông số Zalo OA — `D-202`); `Q2`/`Q5`/`Q6`/`Q7`/`Q8` đóng bởi `D-201`/`D-204`/`D-205`/`D-206`/`D-207`, `Q4` bởi `D-203`, `Q9` bởi `D-193`, `Q10` bởi `D-197` | `Q1`/`Q3` chờ **người** (chọn NCC + ký hợp đồng + khoá HMAC production, R3-6); 1 P2 (ADR-03 dẫn `PaymentTransaction.cs:76` thay vì `:84`) + 1 P3 (Pre-Condition còn nhắc chế độ suy giảm) để người duyệt; `D-201`…`D-207` là `TẠM CHỐT` chờ duyệt | **BA + Kiến trúc trưởng + Security + người** (khoá HMAC/chọn NCC/kênh Zalo — `R3-6`; state machine; PII/bí mật) | **Trình duyệt** — DOC-OK, 0 P1/1 P2; `Q1`/`Q3` + 1 P2 + 1 P3 để người duyệt. Chưa chọn NCC ⇒ chỉ adapter email tổng quát + fake sender |
 
-## 2. Tóm tắt phần đã chạy (N56–N58)
+## 2. Tóm tắt đợt C (N56–N62 — chốt hồ sơ)
 
 - **`REP-001`**: BA đối chiếu lại toàn thân theo as-built `WP-08` (module `Reporting` + 8 bảng `Rpt*` + `ReportAppService` đã có) và `D-47`/`D-48`; 5 câu §15 chốt bằng `D-170`…`D-174`; `check-feature-doc.ps1 -WP14` exit 0 (16/16 mục · 17/17 BR có test). **N57:** BA sửa 8 P2 vòng 2 (sai as-built: kiểu tiền, route, DTO, `TenantId`, Testcontainers, cơ chế BR-002, khoá cache/JSON) → DOCREV **vòng 3 kiểm nhanh `DOC-OK`** (0 P1 · 0 P2 · 10 P3, mỗi phát hiện code xác nhận bằng dòng `graph:`).
 - **`REP-002`** (N57): BA đối chiếu + 7 câu §15 → decider (6 `TIEN_LE` theo `D-114` P2/P3/P4 + `D-48` + `D-172` + `D-03`/`D-36`; 1 `TẠM CHỐT` `D-175`); BA áp 7 quyết định. DOCREV vòng 1 `DOC-CHANGES` (1 P1 · 6 P2) → sửa → **vòng 2 `DOC-CHANGES` (0 P1 · 5 P2 · 3 P3)** — hết trần 2 vòng. `REP-002` là **đỏ cứng** (`D-114` §2.1): cần người/kế toán ký biên bản trước khi code.
@@ -33,7 +35,100 @@
 
 - **`NOT-002`** (N61): BA đối chiếu as-built (module `Notification` **chưa có** — `graph` 0 ký hiệu) + đồng bộ nợ `D-197` (enum `ChannelKind`, một `ConfigureNotification`/`NotificationErrorCodes`/bộ permission) và `D-199` (dải NOT-002 `0001–0009`, NOT-001 `0010–0020`) + đóng `Q9` theo `D-193`; thêm mục "Đối chiếu mô hình Nhanh" + TC-33…TC-47 (18 → 24 BR có test, 14 NFR). 8 câu chặn → decider: `D-200` (`CHUYEN_NGUOI` — chưa chọn NCC; hợp đồng adapter + cấu hình + fake sender + fail-closed `0003`) · `D-201` (`BodyMasked` + luật mask, OTP ⇒ NULL) · `D-202` (`CHUYEN_NGUOI` — 5 thông số Zalo; Settings + `WebhookSecretEncrypted`, không mở callback GĐ3) · `D-203` (một `DedupKey` + UNIQUE `NULLS NOT DISTINCT`) · `D-204` (HMAC-SHA256 opt-out) · `D-205` (`SentAckTtl` 1440/720/720) · `D-206` (cảnh báo kỹ thuật: người nhận cấu hình, fan-out Critical, vá lỗ hổng cột người nhận §5) · `D-207` (opt-out sync adapter, mặc định off + đường đẩy `RecipientRefused`). DOCREV vòng 1 `DOC-CHANGES` (0 P1 · 3 P2 lỗi thời `TaxLockKeys`/`CorrelationId`/`ChoTai`) → sửa → vòng 2 `DOC-CHANGES` (0 P1 · 5 P2 lỗi có sẵn: `NULLS NOT DISTINCT`, 5→6 bảng, NFR-007/012, toạ độ as-built) → sửa → **vòng 3 kiểm nhanh `DOC-OK`** (0 P1 · 1 P2 · 1 P3) ⇒ đủ điều kiện **trình duyệt**; `Q1`/`Q3` + 1 P2 + 1 P3 để người duyệt.
 
-## 3. Việc cần trước khi trình đợt C
+- **Chốt hồ sơ (N62):** **6/6 tài liệu** có `DOC-OK` (0 P1) và `check-feature-doc.ps1 -WP14` exit 0 — `REP-001` (vòng 3: 0 P1/0 P2/10 P3) · `REP-002` (vòng 4: 0 P1/0 P2/5 P3) · `REP-003` (vòng 3: 0 P1/0 P2/4 P3) · `ACC-001` (vòng 3: 0 P1/0 P2/5 P3 + `Q12` `Open`) · `NOT-001` (vòng 3: 0 P1/**2 P2**/3 P3 + 12 P3 vòng 2) · `NOT-002` (vòng 3: 0 P1/**1 P2**/1 P3). **0 P1** trên cả 6; P2 mở: `NOT-001` 2 · `NOT-002` 1 (3 P2 — BA sửa cùng WP code, không P1 chặn).
+- **Cột "Người review bắt buộc"** theo `design-doc-guidelines.md` §6: `NOT-001`/`NOT-002` có **state machine** (thiết kế `NotificationBatches` + `Moi → ChoGui → DaGui …`) ⇒ **Kiến trúc trưởng + BA**; `REP-001` có `RepPeriodClose` (khoá kỳ, `D-171`) ⇒ **Kiến trúc trưởng + BA**; `NOT-002` thêm **Security** (PII opt-out, khoá HMAC, bí mật webhook) và **người đã liên hệ NCC** (email/SMS/Zalo — `R3-6`); cả 6 chạm **tiền/thuế/giá vốn/lưu trữ** ⇒ thêm **kế toán** (`ACC-001`, `REP-002`, `REP-003` bắt buộc ký theo `D-114` §2.1; `REP-001` duyệt lô M4).
+- **Phân loại theo hồ sơ uỷ quyền (M2/M4):** cả **6** tài liệu `DOC-OK` 0 P1 ⇒ đủ điều kiện **trình duyệt**; **kế toán phải ký** ở biên bản người (`P-19`) cho `ACC-001`, `REP-002`, `REP-003` (đỏ cứng `D-114` §2.1); `NOT-002` còn `Q1`/`Q3` (`R3-6`) ⇒ tới khi chọn NCC chỉ chạy adapter email tổng quát + `fake` sender.
+
+## 3. Bảng câu còn chờ người của đợt C
+
+Nguồn: §15.1 của 6 tài liệu · [hang-doi-xem-lai.md](hang-doi-xem-lai.md) (dòng `TẠM CHỐT` của đợt C) · [uy-quyen-chu-du-an.md](uy-quyen-chu-du-an.md) §5 (R3).
+**Không dòng nào chặn DoD `P-18`** — đây là việc của người duyệt, gom để trình cùng biên bản thật (`P-19`).
+
+### 3.1 Câu §15 còn mở / chưa chốt (thuộc đợt C)
+
+| # | Câu hỏi | Tài liệu | Loại / cần ai | Khuyến nghị (đứng đầu) | Khi nào |
+|---|---|---|---|---|---|
+| 1 | **Chọn NCC email** (SMTP riêng / dịch vụ API) + **SMS brandname** (eSMS / VietGuys / Twilio) | NOT-002 `Q1` | 🔴 NCC + kế toán — `R3-6` (vùng cấm) | Email **SMTP tổng quát** chạy trước (adapter trung lập + `fake` sender + fail-closed `0003`); chốt NCC SMS/Zalo sau | Trước WP code adapter thật; release |
+| 2 | **Zalo OA**: cơ chế xác thực webhook, loại tin CSKH/ZNS, cửa sổ gửi, mẫu tin, giá (5 thông số) | NOT-002 `Q3` | 🔴 NCC/đối tác Zalo — `R3-6` (vùng cấm) | Giữ **trung lập** (Settings + `WebhookSecretEncrypted`, không mở callback GĐ3); bật Zalo phải có `unitCostPerMessage` | Trước WP code kênh Zalo |
+| 3 | **Hạn lưu trữ** artifact kế toán (bao nhiêu tháng theo luật) | ACC-001 `Q12` | Kế toán trưởng + chủ dự án — `R3-3` | Giữ mặc định **KHÔNG xoá** (`ArtifactRetentionMonths = 0`); `24` tháng chỉ là **đề xuất**, không phải kết luận pháp lý | Trước khi bật đường xoá; **không** chặn xuất file |
+| 4 | Ai được **publish** template (CSKH trưởng hay chỉ admin) | NOT-001 `Q3` | BA + Vận hành | **CSKH trưởng** + audit (`Templates.Publish`) | Trước WP code `NOT-001` |
+| 5 | GĐ3 hỗ trợ **mấy ngôn ngữ** (`vi` / `vi+en`) | NOT-001 `Q4` | BA | Chỉ **`vi`** (schema đã sẵn `Locale`) | Trước WP code `NOT-001` |
+| 6 | **Cửa sổ khử trùng nội dung** marketing mặc định | NOT-001 `Q5` | Vận hành | **300 s**, đo lại sau pilot | Trước WP code `NOT-001` |
+| 7 | **Hạn sống** (`ExpiresAtUtc`) theo loại tin (OTP / giao dịch / marketing) | NOT-001 `Q6` | Vận hành + BA | Giữ mặc định **OTP 5 phút · giao dịch 24 h · marketing 72 h**, cấu hình theo template | Trước WP code `NOT-001` |
+| 8 | **Engine template** tự viết hay dùng thư viện (Scriban/Liquid) | NOT-001 `Q7` | Kiến trúc trưởng | **Tự viết** ở GĐ3 (0 gói NuGet) | Trước WP code `NOT-001` |
+| 9 | **Số người nhận tối đa** một lô | NOT-001 `Q8` | Vận hành + Kiến trúc trưởng | **50.000**; vượt ⇒ job chia lô | Trước WP code `NOT-001` |
+| 10 | `PreviewAsync` có cho dùng **dữ liệu thật** của đơn không | NOT-001 `Q9` | Security | **Chỉ dữ liệu mẫu**; nếu cho dùng thật ⇒ thêm permission + audit | Trước WP code `NOT-001` |
+| 11 | Chế độ 1 tenant: template hệ thống (`TenantId = NULL`) có cho **mọi** tenant đọc | NOT-001 `Q11` | Kiến trúc trưởng + Security | Template `IsSystem` **chỉ đọc**, không chứa PII | Trước WP code `NOT-001` |
+| 12 | **API/CLI tra cứu theo `IdempotencyKey`** cho vận hành | NOT-001 `Q12` | Vận hành | Có (kế thừa tinh thần `XC-002` Q7) — đường thoát khi gỡ sự cố "gửi trùng" | Trước release nếu làm |
+| 13 | **Timeout gọi `INotificationSender`** | NOT-001 `Q13` | Kiến trúc trưởng | **10 s**, khớp timeout NCC của `NOT-002` | Trước WP code `NOT-001` |
+
+> `REP-001`, `REP-002`, `REP-003` không còn câu §15 `Open` (đóng bởi `D-170`…`D-186`). `NOT-001` `Q1`/`Q2`/`Q10` và `NOT-002` `Q2`/`Q4`…`Q10` đã `Closed` bởi `D-197`…`D-207`.
+
+### 3.2 Quyết định `TẠM CHỐT` của đợt C đang chờ duyệt lô
+
+**36** dòng `TẠM CHỐT` (`D-170`…`D-199`, `D-201`, `D-203`…`D-207`) — uỷ quyền `D-114`/`D-115`, mọi dòng có ④ Lùi + ⑤ Xem lại. Duyệt lô theo [hang-doi-xem-lai.md](hang-doi-xem-lai.md).
+
+| D-xx | Nội dung ngắn | Xem lại trước |
+|---|---|---|
+| `D-170` | `REP-001` Q1 / `INV-001` — chuyển kho = **hai** bút toán `TransferOut` + `TransferIn` cùng `ReferenceLineId`/UoW; cấm `Transfer=6`; `numeric(18,3)` | WP code `REP-003`/`INV-001`; release |
+| `D-171` | `REP-001` Q2 — `EXCLUDE USING gist` + `btree_gist` cho `RepPeriodClose` (khoá kỳ không chồng lấn) + fallback `UNIQUE`/trigger | WP code `REP-001`; release |
+| `D-172` | `REP-001` Q4 — nhịp job **5 phút / lookback 3 ngày / `IsStale` 900 s** (Setting theo tenant), đo lại sau pilot | WP code `REP-001`; release |
+| `D-173` | `REP-001` Q6 — COD thuộc `REC-003`; `REP-001` **không** bảng/cột/job COD | WP code `REC-003`/`REP-001`; release |
+| `D-174` | `REP-001` Q8 — **không** bảng fact theo giờ ở GĐ3; tổng hợp giờ lúc đọc | release |
+| `D-175` | `REP-002` Q12 — chấp nhận ngoại lệ `GetTongQuanDonHangAsync` đọc `Order`/`OrderLine` (allow-list đúng **một** method, cơ chế đỏ `TC-02`) | WP code `REP-002`; release |
+| `D-176` | `REP-003` Q1 — vòng quay = tồn bình quân **2 đầu kỳ**; `CoveredDays` thiếu ⇒ banner, không nội suy | release |
+| `D-177` | `REP-003` Q2 — giá vốn bình quân gia quyền di động, snapshot theo **ngày bán**, chỉ `DaDuyet`; thiếu ⇒ NULL + `CostMissing` | release |
+| `D-178` | `REP-003` Q3 — làn trong ngày bằng **một** job `D-172`; L2 tắt ⇒ ghi T+1 | release |
+| `D-179` | `REP-003` Q4 — phí sàn dự kiến + `SettlementPending`; `ChannelFeeActualAmount` luôn NULL ở GĐ3 | release |
+| `D-180` | `REP-003` Q5 — grain `(ngày, ChannelCode, ChannelShopId)`, bỏ sentinel `Guid.Empty`, `NULLS NOT DISTINCT` | release |
+| `D-181` | `REP-003` Q6 — tách `GrossMargin1Amount`/`GrossMargin2Amount`; không trừ VAT lần hai | release (M4) |
+| `D-182` | `REP-003` Q7 — retention chi tiết ngày mặc định **TẮT**; 24 tháng chỉ là đề xuất | release |
+| `D-183` | `REP-003` Q8 — `ACC-001` **tự đọc** read-model qua `IReportFactReader`; `ACC-001` sở hữu file + hash | release |
+| `D-184` | `REP-003` Q9 — công cụ so sánh read-model ↔ nguồn: một method GET + script mỏng + permission riêng | release |
+| `D-185` | `REP-003` Q10 — `SaleQty` gồm `Sale` + `RetailSaleOut` + `ShippingOut` | release |
+| `D-186` | `REP-003` Q11 — chủ giá vốn = **Pricing/PRC-001**; `INV-001` chỉ cấp đơn giá | release |
+| `D-187` | `ACC-001` Q1 — **không** seed bảng tài khoản Bravo/MISA; `LegalBasisNote` bắt buộc; mã mới `0012` | WP code `ACC-001`; release |
+| `D-188` | `ACC-001` Q2 — CSV cấu hình được, **một** hồ sơ `csv-generic`; `Xlsx`/`htkk` fail-closed; 0 gói NuGet | WP code `ACC-001`; release |
+| `D-189` | `ACC-001` Q3 — `htkk-mau01` **bị chặn** tới khi có file mẫu thật (`R3-3`) | WP code `ACC-001`; release |
+| `D-190` | `ACC-001` Q4 — `IAccArtifactStore` + đĩa app + `File.Move` atomic + SHA-256; job chỉ dọn file tạm/mồ côi | WP code `ACC-001`; release (`R3-8`) |
+| `D-191` | `ACC-001` Q5 — PII mặc định **tắt**; chỉ `HoaDon` + permission `Export.BuyerPii` + cờ `ContainsBuyerPii` | release (`R3-5`) |
+| `D-192` | `ACC-001` Q6 — không mã hoá/ZIP; tải đúng byte + audit `[ACC-DOWNLOAD]` | release |
+| `D-193` | `ACC-001` Q9 — chi phí thông báo là **chi phí kỳ**, không vào giá vốn; kỳ theo `OccurredAtUtc` | release (kế toán) |
+| `D-194` | `ACC-001` Q10 — `Reporting:StaleSeconds` **900 s** (một nguồn), fail-closed `0004` | release |
+| `D-195` | `ACC-001` Q11 — **không** xuất dòng giá vốn; giữ 18 cột | release |
+| `D-196` | `ACC-001` Q12 — hạn lưu artifact mặc định `0` = **TẮT**; `Q12` giữ `Open` cho kế toán trưởng | release (`R3-3`) |
+| `D-197` | `NOT-001` Q10 — **một** module `Notification` dùng chung NOT-001+NOT-002; một `ConfigureNotification`/`NotificationErrorCodes`/`ChannelKind`/`NotificationLockKeys`/permission; không gộp `Messaging` | WP code đầu tiên `NOT-001` |
+| `D-198` | `NOT-001` Q1 — **giữ** duyệt lô (`NotificationBatches`+`ChoDuyet`); chỉ mục marketing phải duyệt; ETO không `BatchId`; fail-closed | WP code đầu tiên `NOT-001` |
+| `D-199` | `NOT-001` Q2 — GĐ3 **chỉ `Text`**; `Html` NÉM mã `0020`; dải NOT-001 `0010–0020`; 0 sanitizer/0 NuGet | WP code đầu tiên `NOT-001` |
+| `D-201` | `NOT-002` Q2 — lưu `BodyMasked` (mask **một cửa**); tin OTP ⇒ `NULL`; không thêm `BodyHash`; cấm log/ETO | Duyệt tài liệu `NOT-002`; WP code; release |
+| `D-203` | `NOT-002` Q4 — **một** cột `DedupKey` + `DedupKeyVersion`, UNIQUE `NULLS NOT DISTINCT`, dùng `CanonicalJsonHasher` | WP code `NOT-002` (trước `migrations add`); release |
+| `D-204` | `NOT-002` Q5 — opt-out **băm một chiều** HMAC-SHA256 hex64 + `HashVersion`; một cửa; thêm `POST opt-outs/check` | WP code `NOT-002`; `R3-6` khoá HMAC; release |
+| `D-205` | `NOT-002` Q6 — `SentAckTtl` **1440/720/720 phút** theo dòng kênh; biên `[60, 43200]` | WP code `NOT-002`; release |
+| `D-206` | `NOT-002` Q7 — cảnh báo kỹ thuật: người nhận cấu hình, fan-out `Critical`, fail-closed; vá lỗ hổng cột người nhận §5 | WP code `NOT-002`; release (F6 chặn tới khi bật kênh 2) |
+| `D-207` | `NOT-002` Q8 — opt-out sync: mặc định **off** + adapter kéo; đường đẩy `SendOutcome.RecipientRefused`; `Source` append | WP code `NOT-002`; release |
+
+**2 dòng `ĐỀ XUẤT` — chuyển người (chưa chốt):**
+
+| D-xx | Nội dung ngắn | Xem lại trước |
+|---|---|---|
+| `D-200` | `NOT-002` Q1 — **chưa chọn NCC** email/SMS (`CHUYEN_NGUOI`, `R3-6`); chốt phần trung lập: hợp đồng adapter + registry, cấu hình, `fake` sender, fail-closed `0003`, 0 NuGet NCC | Người chốt NCC (trước WP code adapter thật); release |
+| `D-202` | `NOT-002` Q3 — **chưa chốt** 5 thông số Zalo OA (`CHUYEN_NGUOI`, `R3-6`); phần trung lập: Settings + `WebhookSecretEncrypted`, không mở callback GĐ3 | Người chốt Zalo (trước WP code kênh 2); release |
+
+### 3.3 Việc người duyệt sửa **cùng WP code** (không chặn tạm duyệt)
+
+| # | Việc | Tài liệu | Ghi chú |
+|---|---|---|---|
+| 1 | **P2**: cạnh `DangBanGiao → HetHan` (#24) · rollback UoW khi bắt `23505` (#26) + 15 P3 (3 P3 vòng 3 + 12 P3 vòng 2) | NOT-001 | Sửa **trước** khi code state machine / handler DB |
+| 2 | **P2**: ADR-03 còn dẫn `PaymentTransaction.cs:76` thay vì `:84` + 1 P3 (Pre-Condition còn nhắc "chế độ suy giảm") | NOT-002 | Sửa cùng WP code `NOT-002` |
+| 3 | P3 (10) | REP-001 | Sửa cùng WP code `REP-001` |
+| 4 | P3 (5) | REP-002 | Sửa cùng WP code `REP-002` |
+| 5 | P3 (4) | REP-003 | Sửa cùng WP code `REP-003` |
+| 6 | P3 (5) | ACC-001 | Sửa cùng WP code `ACC-001` |
+| 7 | **Nợ chéo** (chủ khác): `REP-003` §5.2 dòng 256 đổi `StockMovementType.Transfer=6` → `TransferIn`/`TransferOut` + `numeric(18,3)` (`D-170`); `XC-006` §14.5 cảnh báo `EXCLUDE` "chưa từng chạy thật" đã lạc hậu (`D-171`); `ACC-001` F4 `OrderLine` thiếu snapshot thuế (thuộc `SAL-002`, chặn một phần `Mau01PhanII`); `ACC-001` F5 `REP-001` thiếu `IReportFactReader`/`AccExport*`/`CostUnitAmount` (WP GĐ3 Reporting); `NOT-002` ghi chú trùng tên ETO F8 + dải mã F9 cùng PR với `NOT-001` | nhiều tài liệu | Việc **chủ tài liệu/module khác**, không sửa trong WP-14 |
+
+> Dòng 1–6 **không cần người trả lời** — ghi để chủ dự án biết "trình duyệt" còn điều kiện sửa tài liệu; dòng 7 là nợ chéo ngoài phạm vi WP-14.
+
+## 4. Việc cần trước khi trình đợt C
 
 1. ✅ **N57:** BA sửa 8 P2 `REP-001` → `check-feature-doc` DAT → `DOCREV` vòng 3 kiểm nhanh `DOC-OK` (0 P1 · 0 P2). 10 P3 để người duyệt.
 2. ✅ **N58:** `REP-002` — BA sửa 5 P2 → DOCREV vòng 3 kiểm nhanh `DOC-CHANGES` (3 P2 mới) → BA sửa 3 P2 → DOCREV **vòng 4 kiểm nhanh `DOC-OK`** (0 P1 · 0 P2). 5 P3 để người duyệt.
