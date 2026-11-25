@@ -397,6 +397,7 @@ if (-not $ChiKiemDb) {
         'kiem-db.ps1'          = 'buoc ⑥ bat bien DB'
         'test-cong-kiem.ps1'   = 'buoc ⑦ test cho chinh cac cong'
         'kiem-e2e.ps1'         = 'buoc ⑧ E2E co phien (HTML that)'
+        'probe-cong-tai-lieu.ps1' = 'buoc tai lieu: WP dang code co duyet khong (`D-211`, `D-212`)'
         'probe-so-dia-chi.ps1' = 'buoc ⑨ so dia chi'
         'probe-khach-hang.ps1' = 'buoc ⑩ khach hang'
         'probe-thanh-toan.ps1' = 'buoc ⑪ thanh toan'
@@ -693,8 +694,14 @@ if (-not $ChiKiemDb) {
         *"tat cong de cho xanh"* ma ca du an cam. Ham **thuan** duoi day nhan **noi dung tep** (khong
         doc dia) ⇒ ca XANH va ca DO chi khac nhau o **du lieu vao** (cung khuon `Tim-ViPhamNapThuVien`).
 
-        Ba dieu phai con: (1) `$SoLanThuLai` khai bao va **<= 3**; (2) vong thu lai chi vi **409**;
-        (3) ba khang dinh bat bien — `Reserved <= OnHand`, `Available = 0`, `CA HAI request deu 200`.
+        Tam dieu phai con: (1) `$SoLanThuLai` khai bao va **<= 3**; (2) vong thu lai chi vi **409**;
+        (3) ba khang dinh bat bien — `Reserved <= OnHand`, `Available = 0`, `CA HAI request deu 200`;
+        (4) `D-214` ①: ca `P15` phai doc **that** `error.code` VA ma `eCommerce:Db:0002` cua `D-210`;
+        (5) ca `P15` phai chon nhanh bang `$script:soXungDot` (0 lan 409 ⇒ `CHUA CHAY`, khong DAT);
+        (6) `D-215` ①(3): `409` co **hai** nguyen nhan hop le — tep phai co `$script:coMaDb0002` (dieu kien
+        `DAT`) VA `$script:coMaRong` (bat bien "moi 409 phai co ma"); (7) tep phai co hang chan doan
+        `eCommerce:Lock:0001` (het han khoa phan tan ⇒ `CHUA CHAY`, khong do oan); (8) nhanh `coMaRong`
+        phai dan toi `Kq ... $false` (DO), khong duoc doi thanh `CHUA CHAY`.
     #>
     function Tim-ViPhamThuLai409 {
         param([string]$Ma)
@@ -716,6 +723,48 @@ if (-not $ChiKiemDb) {
             if (-not $Ma.Contains($neo)) { $viPham += ('mat khang dinh: {0}' -f $neo) }
         }
 
+        # 🚨 `D-214` ① (`N69`/WP-15): ca `P15` do **RUNTIME**, nhung tep probe phai doc **that**
+        #    `error.code` va ma `eCommerce:Db:0002` (`D-210`) — neu xoa chung thi `P15` khong the bat
+        #    duoc `409` thieu ma (dung lo hong `D-66` ⑤ muon bit). 📌 Quet tinh la **lop thu hai**, ca
+        #    runtime la lop thu nhat — ca nay chan viec "ha cap" ca runtime thanh quet chuoi.
+        if (-not $Ma.Contains('error.code')) {
+            $viPham += 'thieu neo error.code (ca P15 khong doc ma loi cua 409)'
+        }
+
+        if (-not $Ma.Contains('eCommerce:Db:0002')) {
+            $viPham += 'thieu ma eCommerce:Db:0002 (409 phai co ma nghiep vu, D-210)'
+        }
+
+        if ($Ma -notmatch 'if\s*\(\s*\$script:soXungDot\s+-gt\s+0\s*\)') {
+            $viPham += 'KHONG dung $script:soXungDot de chon nhanh P15 (0 lan 409 phai la CHUA CHAY)'
+        }
+
+        # 🚨 `D-215` ①(3)(a): `P15` phan biet **Hai** nguyen nhan hop le cua 409 — phai co CA HAI bien
+        #    phan loai. Xoa mot bien ⇒ khong con phan biet "xung dot DB" va "het han khoa".
+        foreach ($bien in @('$script:coMaDb0002', '$script:coMaRong')) {
+            if (-not $Ma.Contains($bien)) {
+                $viPham += ('thieu bien phan loai 409: {0} (D-215)' -f $bien)
+            }
+        }
+
+        # 🚨 `D-215` ①(3)(b): hang chan doan cho `Lock:0001`. 🔒 Day la ma cua **het han cho khoa phan tan**
+        #    (`ChoKhoaToiDaGiay = 30`), mot 409 **hop le** ⇒ `CHUA CHAY`; neu mat hang nay thi bao cao
+        #    khong con noi duoc vi sao CHUA CHAY.
+        if (-not $Ma.Contains('eCommerce:Lock:0001')) {
+            $viPham += 'thieu hang chan doan eCommerce:Lock:0001 (409 het han khoa phan tan, D-215)'
+        }
+
+        # 🚨 `D-215` ①(3)(c): nhanh `coMaRong` PHAI dan toi `Kq ... $false` ⇒ 409 co `code` null/rong la DO
+        #    (no `D-66` ⑦), khong duoc ha xuong `CHUA CHAY`. 📌 Lay dung khoi than cua `if ($script:coMaRong)`.
+        $mNhanhDo = [regex]::Match($Ma, '(?s)if\s*\(\s*\$script:coMaRong\s*\)\s*\{(?<khoi>.*?)\n\s*\}')
+
+        if (-not $mNhanhDo.Success) {
+            $viPham += 'KHONG thay nhanh if ($script:coMaRong) { ... } (D-215)'
+        }
+        elseif ($mNhanhDo.Groups['khoi'].Value -notmatch 'Kq[^\r\n]*\$false') {
+            $viPham += 'nhanh coMaRong KHONG dan toi Kq … $false (409 thieu ma phai DO, khong phai CHUA CHAY)'
+        }
+
         return @($viPham)
     }
 
@@ -725,9 +774,14 @@ if (-not $ChiKiemDb) {
         day chan dung hai viec do, va chan luon viec **am tham xoa bang chung chan doan** (khi do lan do sau
         lai *"khong doc duoc nguyen nhan"* — dung cai no `D-67` ③ da ghi).
 
-        Bon dieu phai con: (1) khang dinh `tong = 1 VA Late = 1`; (2) `Cho-DieuKien` mac dinh **<= 30** giay;
-        (3) cho van doi **dung Outcome `Late` (2)** chu khong phai "co bat ky dong"; (4) du **neo chan doan**
-        (`CD-D67` + 3 ma `[MP-EVENTLOG-*]`) de luot DO tren CI tu noi nguyen nhan.
+        📌 `D-213` (`N69`/WP-15): **THU DUOC CHO** doi tu **he qua** (`Outcome = Late`) sang **tien de da
+        commit** (`DLQ LyDo = HaWatermark`), **khong** noi `$GiayToiDa` (van `<= 30`), **khong** bo ca,
+        **khong** doi khang dinh `tong = 1 VA Late = 1`.
+
+        Nam dieu phai con: (1) khang dinh `tong = 1 VA Late = 1`; (2) `Cho-DieuKien` mac dinh **<= 30** giay;
+        (3) khoi `$choDuA` cho **DLQ** (`$mauDemDlqLyDo`, `LyDo = 1`) va **dung MOT** `Cho-DieuKien` dung mau
+        DLQ (khong cho trung 30 s + 30 s); (4) du **neo chan doan** (`CD-D67` + 3 ma `[MP-EVENTLOG-*]`);
+        (5) khang dinh van doi `Late` (khong chi "co bat ky dong").
 
         📌 Ham **thuan**: nhan **noi dung tep** (khong doc dia) ⇒ ca XANH va ca DO chi khac nhau o **du lieu vao**.
     #>
@@ -740,8 +794,40 @@ if (-not $ChiKiemDb) {
             $viPham += 'mat khang dinh C10 (tong = 1 VA Late = 1)'
         }
 
-        if (-not $Ma.Contains('(Dem-SuKienTheoKetCuc $donA.ExternalOrderId 2) -ge 1')) {
-            $viPham += 'cho KHONG con doi dung Outcome Late (2) ⇒ chi can "co dong" la DAT'
+        # 🚨 `D-213`: dieu kien cho phai doi **DLQ (LyDo = HaWatermark)**; cu phap cu (`Dem-SuKienTheoKetKuc`)
+        #    la **he qua** doc truoc luc commit ⇒ het han oan. 📌 Xet **trong khoi `$choDuA`** (khong phai
+        #    bat ky chuoi nao trong tep) de khong bi danh lua boi mot cho khac.
+        $mCho = [regex]::Match($Ma, '(?m)^\s*\$choDuA\s*=\s*Cho-DieuKien\s*(?<khoi>\{[^\r\n]*\})')
+
+        if (-not $mCho.Success) {
+            $viPham += 'KHONG thay khoi $choDuA = Cho-DieuKien { ... }'
+        }
+        else {
+            $khoi = $mCho.Groups['khoi'].Value
+
+            if (-not $khoi.Contains('$mauDemDlqLyDo')) {
+                $viPham += 'cho KHONG con doi DLQ ($mauDemDlqLyDo) trong khoi $choDuA'
+            }
+
+            if ($khoi -notmatch '\$mauDemDlqLyDo\s+-f\s+[^,]+,\s*1\s*\)') {
+                $viPham += 'khoi $choDuA KHONG truyen LyDo = 1 (mau DLQ HaWatermark)'
+            }
+        }
+
+        if ($Ma -notmatch '"LyDo"\s*=\s*\{1\}') {
+            $viPham += 'mau SQL DLQ khong loc theo "LyDo" = {1}'
+        }
+
+        # 📌 Dem lan cho **HaWatermark (`LyDo = 1`)** — don B co lan cho DLQ `LyDo = 0` rieng, khong phai
+        #    lan cho trung cua `C10`. Bo lan cho trung o `C13` ⇒ ca A chi con **DUNG MOT** lan cho DLQ.
+        $soLanChoDlq = @([regex]::Matches($Ma, '(?m)^[^\r\n]*Cho-DieuKien[^\r\n]*\$mauDemDlqLyDo[^\r\n]*,\s*1\s*\)')).Count
+
+        if ($soLanChoDlq -ne 1) {
+            $viPham += ('co {0} lan Cho-DieuKien dung $mauDemDlqLyDo voi LyDo = 1 (mong doi DUNG 1 — lan cho trung lam tong cho thanh 60 s)' -f $soLanChoDlq)
+        }
+
+        if ($Ma -match '(?m)^[^\r\n]*Cho-DieuKien[^\r\n]*Dem-SuKienTheoKetKuc\s+\$donA\.ExternalOrderId[^\r\n]*') {
+            $viPham += 'con lan cho TRUNG tren he qua Late cua don A (C13) — tong thoi gian cho thanh 60 s'
         }
 
         $m = [regex]::Match($Ma, '(?m)\[int\]\$GiayToiDa\s*=\s*(\d+)')
@@ -868,13 +954,17 @@ if (-not $ChiKiemDb) {
             KhangDinh ($mo.Count -ge 4) ("Chi thay {0} script mo co bao mat ⇒ phep quet VO NGHIA (mong doi >= 4)." -f $mo.Count)
         }
 
-        It 'Y7) probe giu cho 2 instance: THU LAI 409 co GIOI HAN va khong mat khang dinh bat bien (D-66)' {
+        It 'Y7) probe giu cho 2 instance: THU LAI 409 co GIOI HAN, khong mat khang dinh bat bien, VA 409 do that co ma (D-66, D-214, D-215)' {
             # 🚨 `N20` (`D-66`): `D-64` — `probe-giu-cho-2instance` flaky tren CI (`17/17` vs `14/3`;
             #    `P12` `200/409` · `P13` 1 dong · `P14` 1 exception). Da chot huong: **409 = chong request,
             #    thu lai** ⇒ probe gui lai toi da 3 lan CUNG `idempotencyKey`.
             # 🔑 Vi sao can CA NAY: noi long mot phep do la cach nhanh nhat de lam cong xanh — va lan sau
             #    khong ai biet no da bi noi. Ca nay quet **hai chieu**: tep that phai SACH; sua tep theo
-            #    huong "thu mai"/"xoa khang dinh" thi phep quet PHAI bao.
+            #    huong "thu mai"/"xoa khang dinh"/"bo ma loi"/"ha nhanh DO" thi phep quet PHAI bao.
+            # 📌 `D-214` ①: them 2 neo `error.code` + `eCommerce:Db:0002` va nhanh `$script:soXungDot`
+            #    (`P15`) — neu khong, ca runtime `409` bi ha cap thanh "co 409 la du" ma khong ai thay.
+            # 📌 `D-215` ①(3): them 2 bien phan loai (`coMaDb0002`/`coMaRong`), hang `eCommerce:Lock:0001`,
+            #    va nhanh `coMaRong` phai dan toi `Kq ... $false` (409 thieu ma la DO).
             $tep = Join-Path $PSScriptRoot 'probe-giu-cho-2instance.ps1'
             KhangDinh (Test-Path $tep) ("KHONG thay {0} ⇒ ca kiem vo nghia." -f $tep)
 
@@ -892,14 +982,30 @@ if (-not $ChiKiemDb) {
             # 🛡️ CHIEU NGUOC 2 — xoa mot khang dinh bat bien ⇒ phep quet PHAI bao.
             $matNeo = $ma.Replace('Reserved <= OnHand', 'BatDauGiuCho')
             KhangDinh (@(Tim-ViPhamThuLai409 -Ma $matNeo).Count -gt 0) 'Xoa khang dinh "Reserved <= OnHand" ma phep quet KHONG bao ⇒ phep quet vo nghia.'
+
+            # 🛡️ CHIEU NGUOC 3 — xoa neo `error.code` ⇒ phep quet PHAI bao (`D-214` ①).
+            $matErrorCode = $ma.Replace('error.code', 'errorXcode')
+            KhangDinh ($matErrorCode -ne $ma) 'Phep thay neo error.code KHONG xay ra ⇒ ca chieu nguoc VO NGHIA.'
+            KhangDinh (@(Tim-ViPhamThuLai409 -Ma $matErrorCode).Count -gt 0) 'Xoa neo error.code ma phep quet KHONG bao ⇒ phep quet vo nghia.'
+
+            # 🛡️ CHIEU NGUOC 4 — xoa ma `eCommerce:Db:0002` ⇒ phep quet PHAI bao (`D-214` ①).
+            $matMaXungDot = $ma.Replace('eCommerce:Db:0002', 'X')
+            KhangDinh ($matMaXungDot -ne $ma) 'Phep thay ma eCommerce:Db:0002 KHONG xay ra ⇒ ca chieu nguoc VO NGHIA.'
+            KhangDinh (@(Tim-ViPhamThuLai409 -Ma $matMaXungDot).Count -gt 0) 'Xoa ma eCommerce:Db:0002 ma phep quet KHONG bao ⇒ phep quet vo nghia.'
+
+            # 🛡️ CHIEU NGUOC 5 — ha nhanh DO cua `coMaRong` xuong `if ($false)` ⇒ phep quet PHAI bao (`D-215` ①(3)).
+            $haNhanhDo = $ma.Replace('if ($script:coMaRong) {', 'if ($false) {')
+            KhangDinh ($haNhanhDo -ne $ma) 'Phep thay nhanh coMaRong KHONG xay ra ⇒ ca chieu nguoc VO NGHIA.'
+            KhangDinh (@(Tim-ViPhamThuLai409 -Ma $haNhanhDo).Count -gt 0) 'Doi nhanh coMaRong thanh $false ma phep quet KHONG bao ⇒ phep quet vo nghia.'
         }
 
-        It 'Y8) probe don san: C10 KHONG bi noi han cho va con du bang chung chan doan (D-67)' {
+        It 'Y8) probe don san: C10 KHONG bi noi han cho, cho DLQ (khong phai he qua), va con du bang chung chan doan (D-67, D-213)' {
             # 🚨 `N21` (`D-67`): `C10` — *"su kien DEN MUON ⇒ nhat ky DUNG 1 dong, Outcome = Late"* — do **2/3 luot**
             #    tren `main` **cung cay ma** voi PR xanh (`tong = 0 · Late = 0`, trong khi `C11…C14` DAT).
             # 🔑 Vi sao can CA NAY: `D-67` ④ cam **noi `Cho-DieuKien` 30 s** va cam **bo ca** — nhung cam bang
-            #    loi van thi khong ai chan duoc. 📌 Ca nay quet **bon chieu xuoi** (tep that phai con du 4 thu) va
-            #    **bon chieu nguoc** (sua tep theo huong "cho xanh" thi phep quet PHAI bao).
+            #    loi van thi khong ai chan duoc. 📌 Ca nay quet **nam chieu xuoi** (tep that phai con du) va
+            #    **nam chieu nguoc** (sua tep theo huong "cho xanh" thi phep quet PHAI bao).
+            # 📌 `D-213` (`N69`/WP-15): cho doi **DLQ (tien de da commit)**, khong doi **he qua** `Late` nua.
             $tep = Join-Path $PSScriptRoot 'probe-don-san.ps1'
             KhangDinh (Test-Path $tep) ("KHONG thay {0} ⇒ ca kiem vo nghia." -f $tep)
 
@@ -912,19 +1018,53 @@ if (-not $ChiKiemDb) {
 
             # 🛡️ CHIEU NGUOC 1 — noi han cho 30 s len 99 s ⇒ phep quet PHAI bao.
             $noiHan = $ma -replace '(?m)(\[int\]\$GiayToiDa\s*=\s*)\d+', '${1}99'
+            KhangDinh ($noiHan -ne $ma) 'Phep thay han cho KHONG xay ra ⇒ ca chieu nguoc VO NGHIA.'
             KhangDinh (@(Tim-ViPhamChanDoanC10 -Ma $noiHan).Count -gt 0) 'Noi han cho len 99 s ma phep quet KHONG bao ⇒ phep quet vo nghia.'
 
             # 🛡️ CHIEU NGUOC 2 — xoa khang dinh `tong = 1 VA Late = 1` ⇒ phep quet PHAI bao.
             $matKhangDinh = $ma.Replace('($tongA -eq 1 -and $lateA -eq 1)', '($true)')
+            KhangDinh ($matKhangDinh -ne $ma) 'Phep thay khang dinh KHONG xay ra ⇒ ca chieu nguoc VO NGHIA.'
             KhangDinh (@(Tim-ViPhamChanDoanC10 -Ma $matKhangDinh).Count -gt 0) 'Xoa khang dinh "tong = 1 VA Late = 1" ma phep quet KHONG bao ⇒ phep quet vo nghia.'
 
-            # 🛡️ CHIEU NGUOC 3 — doi cho thanh "co bat ky dong nao" (bo doi Outcome Late) ⇒ phep quet PHAI bao.
-            $boDoiLate = $ma.Replace('(Dem-SuKienTheoKetCuc $donA.ExternalOrderId 2) -ge 1', '$true')
+            # 🛡️ CHIEU NGUOC 3 — bo dieu kien doi `Late` (`-and $lateA -eq 1` ⇒ `-and $true`) ⇒ phep quet PHAI bao.
+            $boDoiLate = $ma.Replace('-and $lateA -eq 1', '-and $true')
+            KhangDinh ($boDoiLate -ne $ma) 'Phep thay "-and $lateA -eq 1" KHONG xay ra ⇒ ca chieu nguoc VO NGHIA.'
             KhangDinh (@(Tim-ViPhamChanDoanC10 -Ma $boDoiLate).Count -gt 0) 'Bo dieu kien doi Outcome Late ma phep quet KHONG bao ⇒ phep quet vo nghia.'
 
             # 🛡️ CHIEU NGUOC 4 — xoa neo chan doan ⇒ phep quet PHAI bao (neu khong, lan do sau lai khong doc duoc nguyen nhan).
             $matNeo = $ma.Replace('CD-D67', 'X').Replace('[MP-EVENTLOG-GHI-HONG]', 'X')
+            KhangDinh ($matNeo -ne $ma) 'Phep thay neo chan doan KHONG xay ra ⇒ ca chieu nguoc VO NGHIA.'
             KhangDinh (@(Tim-ViPhamChanDoanC10 -Ma $matNeo).Count -gt 0) 'Xoa neo chan doan ma phep quet KHONG bao ⇒ phep quet vo nghia.'
+
+            # 🛡️ CHIEU NGUOC 5 — bo dieu kien cho DLQ (doi khoi `$choDuA` thanh `$true`) ⇒ phep quet PHAI bao (`D-213`).
+            $boChoDlq = [regex]::Replace($ma, '\$choDuA\s*=\s*Cho-DieuKien\s*\{[^}]*\}', '$choDuA = Cho-DieuKien { $true }')
+            KhangDinh ($boChoDlq -ne $ma) 'Phep thay khoi $choDuA KHONG xay ra ⇒ ca chieu nguoc VO NGHIA.'
+            KhangDinh (@(Tim-ViPhamChanDoanC10 -Ma $boChoDlq).Count -gt 0) 'Bo dieu kien cho DLQ ma phep quet KHONG bao ⇒ phep quet vo nghia.'
+        }
+
+        It 'Y9) Cong tai lieu: -TuKiem DAT va repo THAT xanh o CA HAI che do (D-211, D-212)' {
+            # 🚨 `D-211` ① (`N69`/WP-15): QA so huu LOGIC (`tools/probe-cong-tai-lieu.ps1`), OPS so huu
+            #    **DAU DAY** — ca nay chong "cong rong": `-TuKiem` phai tu DAT (fixture cua chinh probe),
+            #    va probe phai XANH tren **repo that** (khong chi tren fixture).
+            # 📌 `exit 2` = KHONG XAC DINH DUOC (fail-closed) ⇒ ca nay DO. 📌 `Y9` la lop thu ba cua
+            #    `D-211` ①: (1) `-TuKiem` moi lan cong chay · (2) `Y9` (ca nay) · (3) negative-control cua QA.
+            $tepProbe = Join-Path $PSScriptRoot 'probe-cong-tai-lieu.ps1'
+            KhangDinh (Test-Path $tepProbe) ("KHONG thay {0} ⇒ ca kiem vo nghia." -f $tepProbe)
+
+            $tuKiem = ChayScript $tepProbe @('-TuKiem')
+            KhangDinh ($tuKiem.Ma -eq 0) ("-TuKiem phai exit 0 nhung do duoc {0}. Log:`n{1}" -f $tuKiem.Ma, (Get-Content $tuKiem.Log -Raw))
+
+            # 📌 Chay `Code` tren repo that, de `-WP auto` tu suy (GITHUB_HEAD_REF → GITHUB_REF_NAME → ten nhanh).
+            $cheDoCode = ChayScript $tepProbe @('-CheDo', 'Code')
+            KhangDinh ($cheDoCode.Ma -eq 0) ("-CheDo Code tren repo that phai exit 0 nhung do duoc {0} (2 = KHONG XAC DINH DUOC = DO). Log:`n{1}" -f $cheDoCode.Ma, (Get-Content $cheDoCode.Log -Raw))
+
+            # 📌 `MergeMain` ghim `-WP WP-15`: che do nay chi chay tren workflow `pull_request` base `main`
+            #    (`D-212` (ii)); o cong cuc bo, WP khac co ma thi MergeMain DO **dung y** cho toi khi co chu
+            #    ky NGUOI — ghim WP-15 de `Y9` khong bien `kiem-tat-ca.ps1` thanh cong luon DO cho moi WP.
+            $cheDoMerge = ChayScript $tepProbe @('-CheDo', 'MergeMain', '-WP', 'WP-15')
+            KhangDinh ($cheDoMerge.Ma -eq 0) ("-CheDo MergeMain (WP-15, khong ma) tren repo that phai exit 0 nhung do duoc {0}. Log:`n{1}" -f $cheDoMerge.Ma, (Get-Content $cheDoMerge.Log -Raw))
+
+            Write-Output ("   -TuKiem exit {0} · Code exit {1} · MergeMain (WP-15) exit {2}" -f $tuKiem.Ma, $cheDoCode.Ma, $cheDoMerge.Ma)
         }
     }
 }

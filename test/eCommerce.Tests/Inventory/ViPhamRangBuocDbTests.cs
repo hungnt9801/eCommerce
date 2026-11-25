@@ -1,4 +1,7 @@
 using eCommerce.Kernel.Data;
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
+using Volo.Abp.Data;
 
 namespace eCommerce.Tests.Inventory;
 
@@ -108,5 +111,52 @@ public class ViPhamRangBuocDbTests
             Assert.StartsWith("eCommerce:", kq!.Code, StringComparison.Ordinal);
             Assert.False(string.IsNullOrWhiteSpace(kq.Message), $"Ràng buộc {ten} thiếu thông điệp.");
         }
+    }
+
+    // ── 🆕 `D-210` (`WP-15`): mã chung cho XUNG ĐỘT DỮ LIỆU (HTTP `409`) ─────────────────────
+    // 🚨 Vì sao KHÔNG dùng lại `MaChung = 0001`: `0001` là "dữ liệu bị từ chối, phải SỬA" (`403`);
+    // `0002` là "người khác vừa sửa, THỬ LẠI được" (`409`). Cùng một mã ⇒ client/alert không phân biệt
+    // được hai hành vi TRÁI NGƯỢC bằng `error.code` (đúng nợ `D-66`⑦). Ca dưới khoá bất biến đó.
+
+    [Fact]
+    public void Ma_xung_dot_la_0002_va_KHONG_trung_ma_chung_0001()
+    {
+        Assert.Equal("eCommerce:Db:0002", ViPhamRangBuocDb.MaXungDot);
+        Assert.NotEqual(ViPhamRangBuocDb.MaChung, ViPhamRangBuocDb.MaXungDot);
+    }
+
+    [Fact]
+    public void LaXungDotDuLieu_nhan_AbpDbConcurrencyException_long_trong_Exception()
+    {
+        // 🔑 ABP/EF có thể bọc xung đột trong một lớp `Exception` khác ⇒ phải đi `InnerException`.
+        var ex = new Exception("boc ngoai", new AbpDbConcurrencyException("xung dot ConcurrencyStamp"));
+
+        Assert.True(ViPhamRangBuocDb.LaXungDotDuLieu(ex));
+    }
+
+    [Fact]
+    public void LaXungDotDuLieu_nhan_AbpDbConcurrencyException_long_trong_DbUpdateException()
+    {
+        // Đường thật khi `SaveChangesAsync` flush: `DbUpdateException` bọc `AbpDbConcurrencyException`.
+        var ex = new DbUpdateException("luu that bai", new AbpDbConcurrencyException("xung dot ConcurrencyStamp"));
+
+        Assert.True(ViPhamRangBuocDb.LaXungDotDuLieu(ex));
+    }
+
+    [Fact]
+    public void LaXungDotDuLieu_KHONG_nhan_PostgresException_va_null()
+    {
+        // 🚨 Nhánh `409` CHỈ nhận xung đột đồng thời, KHÔNG nuốt vi phạm ràng buộc (`23505`) hay
+        // serialization failure (`40001`) — hai loại đó phải đi nhánh Postgres hiện có (`403`/`500`).
+        Assert.False(ViPhamRangBuocDb.LaXungDotDuLieu(new PostgresException("vi pham duy nhat", "ERROR", "ERROR", "23505")));
+        Assert.False(ViPhamRangBuocDb.LaXungDotDuLieu(new PostgresException("serialization", "ERROR", "ERROR", "40001")));
+        Assert.False(ViPhamRangBuocDb.LaXungDotDuLieu(null));
+    }
+
+    [Fact]
+    public void LaXungDotDuLieu_dung_o_dung_khi_tim_thay__khong_nham_Exception_thuong()
+    {
+        // Chiều ngược: `Exception` thường (không có xung đột trong chuỗi) phải trả `false`.
+        Assert.False(ViPhamRangBuocDb.LaXungDotDuLieu(new Exception("loi thuong", new InvalidOperationException("khac"))));
     }
 }

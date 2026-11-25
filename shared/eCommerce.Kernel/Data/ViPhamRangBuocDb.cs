@@ -1,3 +1,5 @@
+using Volo.Abp.Data;
+
 namespace eCommerce.Kernel.Data;
 
 /// <summary>
@@ -15,6 +17,14 @@ namespace eCommerce.Kernel.Data;
 ///
 /// ⚠️ **BẢO TRÌ:** mỗi khi thêm unique index/`CHECK` mới **có ý nghĩa nghiệp vụ**, phải thêm một dòng vào đây —
 /// nếu không, ca đó rơi về mã chung `eCommerce:Db:0001` (vẫn **tốt hơn `500`**, nhưng kém hữu ích cho CSKH).
+///
+/// 🆕 **`D-210` (`WP-15`, 25/11/2026) — NHÁNH HTTP `409`:** lớp này **cũng** khai mã chung cho
+/// **XUNG ĐỘT DỮ LIỆU** (`AbpDbConcurrencyException` — hai người sửa cùng bản ghi, `ConcurrencyStamp` lệch):
+/// <see cref="MaXungDot"/> + <see cref="ThongDiepXungDot"/> + <see cref="LaXungDotDuLieu"/>.
+/// `BoLocViPhamRangBuocDb` kiểm hàm này **TRƯỚC** nhánh Postgres (hai loại **không chồng nhau**)
+/// ⇒ trả HTTP `409` để client **thử lại được**; các mã `403` của vi phạm ràng buộc (`MaChung = 0001`…)
+/// **giữ nguyên**. 📌 Vì sao **KHÔNG** dùng lại `0001`: cùng một mã ở `403` (*"phải sửa dữ liệu"*) và `409`
+/// (*"thử lại được"*) ⇒ client/alert **không phân biệt được** hai hành vi trái ngược bằng `error.code`.
 /// </summary>
 public static class ViPhamRangBuocDb
 {
@@ -23,6 +33,42 @@ public static class ViPhamRangBuocDb
 
     /// <summary>Mã **chung** khi không nhận ra ràng buộc — vẫn là lỗi **nghiệp vụ/dữ liệu**, KHÔNG phải `500`.</summary>
     public const string MaChung = "eCommerce:Db:0001";
+
+    /// <summary>
+    /// Mã **chung** cho **XUNG ĐỘT DỮ LIỆU** — HTTP `409` (`D-210`, `WP-15`).
+    /// 📌 **KHÔNG dùng lại <see cref="MaChung"/>:** `0001` là *"dữ liệu bị từ chối, phải SỬA"* (`403`);
+    /// `0002` là *"người khác vừa sửa, THỬ LẠI được"* (`409`). Gộp một mã cho cả hai ⇒ client/alert
+    /// không phân biệt được hai hành vi **trái ngược** bằng `error.code` (đúng nợ `D-66`⑦).
+    /// </summary>
+    public const string MaXungDot = "eCommerce:Db:0002";
+
+    /// <summary>Thông điệp cho người dùng khi hai thao tác ghi đụng cùng bản ghi (HTTP `409`).</summary>
+    public const string ThongDiepXungDot =
+        "Dữ liệu vừa bị người khác thay đổi ⇒ thao tác chưa được áp dụng. Vui lòng thử lại.";
+
+    /// <summary>
+    /// Tìm `AbpDbConcurrencyException` trong **chuỗi** exception (đi `InnerException` tối đa 10 lớp).
+    /// Phải đi sâu vì ABP/EF có thể bọc nó trong `DbUpdateException` hoặc một lớp `Exception` khác.
+    /// 🚨 Trả `false` cho `PostgresException` và `null` — nhánh này **chỉ** nhận xung đột đồng thời
+    /// (hai người sửa cùng bản ghi, `ConcurrencyStamp` lệch), **không** nuốt vi phạm ràng buộc.
+    /// </summary>
+    public static bool LaXungDotDuLieu(Exception? ex)
+    {
+        var hienTai = ex;
+        var soLan = 0;
+
+        while (hienTai is not null && soLan++ < 10)
+        {
+            if (hienTai is AbpDbConcurrencyException)
+            {
+                return true;
+            }
+
+            hienTai = hienTai.InnerException;
+        }
+
+        return false;
+    }
 
     private static readonly Dictionary<string, KetQua> TheoRangBuoc = new(StringComparer.Ordinal)
     {

@@ -507,10 +507,19 @@ select count(*)::text from "AbpUsers" where "NormalizedUserName" = 'ADMIN' and n
         throw ('Khong dong bo duoc shop A (HTTP {0}) ⇒ cac ca sau VO NGHIA: {1}' -f $kqA.Ma, $kqA.Than)
     }
 
-    # ⏱️ 24/10/2026 — OUTBOX: phải chờ ĐÚNG outcome `Late`, không phải "có bất kỳ dòng" (đã có từ sự kiện trước).
-    # 🔎 `D-67` (`N21`): **GIỮ NGUYÊN** hạn 30 s + điều kiện `1/1`; chỉ **ghi thêm** `choDu` (chờ được hay hết hạn)
-    #    và số neo trong log Host để lượt ĐỎ trên CI **tự nói nguyên nhân** (`handover-n20` §5 #9 cấm nới hạn/bỏ ca).
-    $choDuA = Cho-DieuKien { (Dem-SuKienTheoKetCuc $donA.ExternalOrderId 2) -ge 1 }
+    # 🔎 `D-213` (`N69`/WP-15) — ĐỔI **THỨ ĐƯỢC CHỜ** từ **hệ quả** (`Outcome = Late`) sang **TIỀN ĐỀ ĐÃ COMMIT**
+    #    (`DLQ LyDo = HaWatermark`), vẫn **MỘT** lần chờ, trần `$GiayToiDa = 30` **KHÔNG nới**, **KHÔNG bỏ ca**.
+    #    Vì sao tất định: `DeadLetterWriter.DayVaoDlqAsync` dùng UoW của nơi gọi ⇒ dòng DLQ chỉ commit ở
+    #    `uow.CompleteAsync()` của handler, còn `MarketplaceEventLogWriter` mở UoW `requiresNew` và commit
+    #    **ngay** ⇒ **DLQ có ⇒ dòng `Late` ĐÃ commit trước đó** (`D-68` ②③). Điều kiện `Late` cũ bị loại vì
+    #    nó là **hệ quả** đọc **trước** lúc commit ⇒ thỉnh thoảng hết hạn oan.
+    #    ⛔ Nếu thứ tự commit vỡ (`DLQ = 1` mà `Late = 0`) thì `C10` vẫn ĐỎ ⇒ **không** che lỗi ghi thật (`D-68` ③).
+    #    📌 `$mauDemDlqLyDo` khai **ở đây** (trước lần chờ) để dùng chung cho `C13`.
+    $mauDemDlqLyDo = @'
+select count(*)::text from "MsgDeadLetters" where "KhoaNghiepVu" like '%{0}%' and "LyDo" = {1};
+'@
+
+    $choDuA = Cho-DieuKien { (So-Db ($mauDemDlqLyDo -f $donA.ExternalOrderId, 1)) -ge 1 }
 
     $tongA = Dem-SuKien $donA.ExternalOrderId
     $lateA = Dem-SuKienTheoKetCuc $donA.ExternalOrderId 2
@@ -545,10 +554,6 @@ select count(*)::text from "AbpUsers" where "NormalizedUserName" = 'ADMIN' and n
 select count(*)::text from "OrdOrders" where "ExternalOrderId" = '{0}';
 '@
 
-    $mauDemDlqLyDo = @'
-select count(*)::text from "MsgDeadLetters" where "KhoaNghiepVu" like '%{0}%' and "LyDo" = {1};
-'@
-
     $mauDemDlqPayload = @'
 select count(*)::text from "MsgDeadLetters" where "KhoaNghiepVu" like '%{0}%' and length("PayloadJson") > 100;
 '@
@@ -557,8 +562,8 @@ select count(*)::text from "MsgDeadLetters" where "KhoaNghiepVu" like '%{0}%' an
 
     Kq 'C12 ban den MUON KHONG tao don noi bo (khong co tac dung phu)' ($donNoiBoA -eq 0) ('so don = {0}' -f $donNoiBoA)
 
-    $dlqA = So-Db ($mauDemDlqLyDo -f $donA.ExternalOrderId, 1)
-    Cho-DieuKien { (So-Db ($mauDemDlqLyDo -f $donA.ExternalOrderId, 1)) -ge 1 } | Out-Null
+    # 📌 `D-213`: KHÔNG chờ lại ở đây — lần chờ DUY NHẤT cho `C10`/`C13` đã ở trên (`$choDuA`), để tổng thời gian
+    #    chờ không thành 60 s và hai ca dùng **cùng** kết quả. `$dlqA` đọc lại ngay sau khi `$choDuA` xong.
     $dlqA = So-Db ($mauDemDlqLyDo -f $donA.ExternalOrderId, 1)
     $payloadDayDuA = So-Db ($mauDemDlqPayload -f $donA.ExternalOrderId)
 
