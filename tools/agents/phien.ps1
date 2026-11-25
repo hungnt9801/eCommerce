@@ -23,17 +23,22 @@
                                                exit 0 = moi ma DOC-OK va handover §2 khong con nhac ma => nen `done`
       uyquyen -Id P-xx -Evidence "D-xx"        chuyen hang cua NGUOI sang decider lam thay (chi sau khi hang
                                                phien uy quyen `thao-luan` da xong; hang camUyQuyen bi tu choi)
+      show   -Id P-xx                          in JSON {hang, chuoi} — bo chay + skill /chay-phien-code doc nhanh/buoc cua hang
+
+    -Chuoi <ten>: dung registry agents/state/phien-<ten>.json + bang docs/agents/bang-phien-<ten>.md (mac dinh: WP-14).
+      Chuoi code GD3 (`D-xx` phuong an B): `-Chuoi gd3-1`.
 
     Ma thoat: 0 OK · 1 loi tham so/tep/check · 2 phu thuoc chua xong · 3 chi con viec cua NGUOI / bi chan
               4 da co hang khac dang-lam · 5 het viec · 6 hang cua nguoi khong `start` duoc
 
 .EXAMPLE
     pwsh -File tools/agents/phien.ps1 next
+    pwsh -File tools/agents/phien.ps1 next -Chuoi gd3-1
     pwsh -File tools/agents/phien.ps1 done -Id P-04 -Evidence "check-feature-doc exit 0; DOC-OK 0 P1" -Handover docs/nhanh/handover-n25.md
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Position = 0)][ValidateSet('status', 'next', 'start', 'done', 'dodang', 'blocked', 'release', 'sync', 'check', 'doisoat', 'uyquyen')][string]$Lenh = 'status',
+    [Parameter(Position = 0)][ValidateSet('status', 'next', 'start', 'done', 'dodang', 'blocked', 'release', 'sync', 'check', 'doisoat', 'uyquyen', 'show')][string]$Lenh = 'status',
     [string]$Id,
     [string]$Session,
     [string]$Evidence,
@@ -42,11 +47,17 @@ param(
     [string]$Root,
     [string]$Registry = 'agents/state/phien-wp14.json',
     [string]$Doc = 'docs/agents/bang-phien-wp14.md',
+    [string]$Chuoi,
     [switch]$Force
 )
 
 $ErrorActionPreference = 'Stop'
 if (-not $Root) { $Root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path }
+if ($Chuoi) {
+    if ($Chuoi -notmatch '^[a-z0-9][a-z0-9-]*$') { Write-Output "LOI: -Chuoi chi gom a-z 0-9 -"; exit 1 }
+    if (-not $PSBoundParameters.ContainsKey('Registry')) { $Registry = "agents/state/phien-$Chuoi.json" }
+    if (-not $PSBoundParameters.ContainsKey('Doc')) { $Doc = "docs/agents/bang-phien-$Chuoi.md" }
+}
 $regPath = if ([IO.Path]::IsPathRooted($Registry)) { $Registry } else { Join-Path $Root $Registry }
 $docPath = if ([IO.Path]::IsPathRooted($Doc)) { $Doc } else { Join-Path $Root $Doc }
 $utf8 = [Text.UTF8Encoding]::new($false)
@@ -93,7 +104,8 @@ function Sinh-Bang($r) {
     [void]$sb.AppendLine('| # | Đợt | Nội dung | Vai | Phụ thuộc | Prompt để dán | Phiên | Trạng thái | Bằng chứng / ghi chú |')
     [void]$sb.AppendLine('|---|---|---|---|---|---|---|---|---|')
     foreach ($h in $r['rows']) {
-        $prompt = if ($h['loai'] -eq 'nguoi') { '— (việc của người)' } else { '`/chay-phien ' + $h['id'] + '`' }
+        $lenhSkill = '/' + $(if ($r['skill']) { $r['skill'] } else { 'chay-phien' }) + $(if ($r['chuoi']) { ' chuoi=' + $r['chuoi'] } else { '' })
+        $prompt = if ($h['loai'] -eq 'nguoi') { '— (việc của người)' } else { '`' + $lenhSkill + ' ' + $h['id'] + '`' }
         if ($h['prompt']) { $prompt = $h['prompt'] }
         $dep = (@($h['dependsOn']) | Where-Object { $_ }) -join ', '
         if (-not $dep) { $dep = '—' }
@@ -251,6 +263,13 @@ switch ($Lenh) {
         $h['ghiChu'] = "uỷ quyền theo $Evidence — chủ dự án xem lại theo lô"
         Ghi-Reg $r; Sync $r
         Write-Output "OK: $Id chuyen sang decider lam thay ($Evidence)"
+        exit 0
+    }
+    'show' {
+        Can 'Id' $Id
+        $h = Hang $r $Id
+        $c = [ordered]@{ chuoi = $r['chuoi']; skill = $r['skill']; nhanhTichHop = $r['nhanhTichHop']; nhanhGocChuoi = $r['nhanhGoc'] }
+        Write-Output ([ordered]@{ hang = $h; chuoi = $c } | ConvertTo-Json -Depth 8 -Compress)
         exit 0
     }
     'sync' { Sync $r; Write-Output "OK: da sinh lai bang trong $Doc"; exit 0 }

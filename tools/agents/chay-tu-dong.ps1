@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Bo chay tu dong bang phien WP-14: mo phien -> cho xong -> mo phien ke, khong can nguoi ngoi may.
+    Bo chay tu dong bang phien (WP-14, hoac chuoi WP code GD3 voi -Chuoi): mo phien -> cho xong -> mo phien ke, khong can nguoi ngoi may.
 
 .DESCRIPTION
     Moi vong: `phien.ps1 next` chon hang -> chay MOT phien Claude Code khong tuong tac:
@@ -20,9 +20,16 @@
     Chi MOT bo chay mot luc (tep khoa artifacts/agents/tu-dong/chay-tu-dong.lock). Khi bo chay dang chay: KHONG mo cua so /chay-phien tay.
     Nhat ky: artifacts/agents/tu-dong/<gio>.json (ket qua tung phien) + artifacts/agents/tu-dong/nhat-ky.md.
 
+    -Chuoi <ten> (chuoi WP code, docs/agents/bang-phien-<ten>.md): registry agents/state/phien-<ten>.json; moi phien chay
+    `claude -p "/<skill> chuoi=<ten>"` (skill lay tu truong `skill` cua registry, mac dinh chay-phien-code).
+      - Cau dao CI (M3 cua ho so uy quyen, D-114): truoc moi phien doc lan chay `ci` HOAN TAT moi nhat tren nhanh tich hop
+        (truong `nhanhTichHop`) bang `gh`; `failure` => DUNG (exit 1). Dang chay / bi huy => chay tiep. Tat: -KhongKiemCI.
+      - -MoPRCuoi: khi het viec, mo moi WP mot PR xep chong (WP dau -> `nhanhGoc`, WP sau -> nhanh WP truoc); khong bao gio merge.
+
 .EXAMPLE
     pwsh -File tools/agents/chay-tu-dong.ps1                # chay toi khi het viec cua agent
     pwsh -File tools/agents/chay-tu-dong.ps1 -ToiDa 3       # toi da 3 phien
+    pwsh -File tools/agents/chay-tu-dong.ps1 -Chuoi gd3-1 -ChiTiet   # chuoi WP code GD3 (docs/agents/bang-phien-gd3-1.md)
     New-Item artifacts/agents/tu-dong/DUNG                              # (cua so khac) dung sau phien dang chay
 #>
 [CmdletBinding()]
@@ -36,7 +43,10 @@ param(
     [int]$ChoToiDaGiay = 6 * 3600,   # tran mot lan ngu (ngu dai hon => thuc day thu lai, khong ton han muc); ca thu dat nho
     [switch]$DungKhiHetTuan,         # mac dinh: het han muc tuan thi NGU toi gio hoi; bat cong tac nay de dung han
     [int]$BuocChoGiay = 30,          # khi ngu: cu moi buoc nay kiem tep phanh DUNG
-    [switch]$ChiTiet                 # in ca tung lenh/tep cua moi vai (mac dinh: chi vai bat dau/xong + moc chinh)
+    [switch]$ChiTiet,                # in ca tung lenh/tep cua moi vai (mac dinh: chi vai bat dau/xong + moc chinh)
+    [string]$Chuoi,                  # chuoi WP code (vd gd3-1); bo trong = bang WP-14
+    [switch]$KhongKiemCI,            # bo cau dao CI tren nhanh tich hop
+    [switch]$MoPRCuoi                # het viec => mo PR xep chong cho tung WP (khong merge)
 )
 
 $ErrorActionPreference = 'Stop'
@@ -46,7 +56,15 @@ $OutputEncoding = [Text.UTF8Encoding]::new($false)
 if (-not $Root) { $Root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path }
 $utf8 = [Text.UTF8Encoding]::new($false)
 $phien = Join-Path $Root 'tools/agents/phien.ps1'
-$reg = Join-Path $Root 'agents/state/phien-wp14.json'
+if ($Chuoi -and $Chuoi -notmatch '^[a-z0-9][a-z0-9-]*$') { Write-Output 'LOI: -Chuoi chi gom a-z 0-9 -'; exit 1 }
+$reg = if ($Chuoi) { Join-Path $Root "agents/state/phien-$Chuoi.json" } else { Join-Path $Root 'agents/state/phien-wp14.json' }
+if (-not (Test-Path -LiteralPath $reg)) { Write-Output "LOI: khong thay registry $reg"; exit 1 }
+$regInfo = Get-Content -LiteralPath $reg -Raw -Encoding utf8 | ConvertFrom-Json
+$lenhPhien = if ($Chuoi) { '/' + $(if ($regInfo.skill) { $regInfo.skill } else { 'chay-phien-code' }) + " chuoi=$Chuoi" } else { '/chay-phien' }
+$ghTest = $env:CHAY_TU_DONG_GH   # ca thu: duong dan .ps1 gia lap gh
+# Start-Process noi -ArgumentList bang dau cach, KHONG tu them ngoac kep => moi doi so co dau cach phai boc san:
+# lenh '/chay-phien-code chuoi=gd3-1', duong dan 'C:\Users\Tran Hung\...' (TEMP, claude.cmd) — 25/11: thieu boc => "-File 'C:\Users\Tran' failed".
+function QA([string[]]$a) { return @($a | ForEach-Object { if ($_ -match '\s' -and $_ -notmatch '^".*"$') { '"' + $_ + '"' } else { $_ } }) }
 $phanh = Join-Path $Root 'artifacts/agents/tu-dong/DUNG'
 $khoa = Join-Path $Root 'artifacts/agents/tu-dong/chay-tu-dong.lock'
 $logDir = Join-Path $Root 'artifacts/agents/tu-dong'
@@ -59,6 +77,7 @@ function Ghi([string]$s) {
     [IO.File]::AppendAllText($nhatKy, "- $dong`n", $utf8)
 }
 function PH([string[]]$a) {
+    if ($Chuoi) { $a = @($a) + @('-Chuoi', $Chuoi) }
     $out = & pwsh -NoProfile -File $phien @a -Root $Root 2>&1 | Out-String
     return @{ ma = $LASTEXITCODE; out = $out.Trim() }
 }
@@ -67,6 +86,51 @@ function TepBanNgoaiVung {
     $out = & git -C $Root status --porcelain 2>$null
     if ($LASTEXITCODE -ne 0) { return @() }   # khong phai repo git (ca thu) => bo qua
     return @($out | ForEach-Object { $_.Substring(3).Trim('"') } | ForEach-Object { ($_ -split ' -> ')[-1] } | Where-Object { $_ -and $_ -notmatch '^(docs/|agents/state/|artifacts/)' })
+}
+function GH([string[]]$a) {
+    if ($ghTest) { $out = & pwsh -NoProfile -File $ghTest @a 2>&1 | Out-String }
+    else {
+        if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { return @{ ma = 127; out = 'khong thay lenh gh' } }
+        Push-Location $Root; try { $out = & gh @a 2>&1 | Out-String } finally { Pop-Location }
+    }
+    return @{ ma = $LASTEXITCODE; out = $out.Trim() }
+}
+# Cau dao CI: lan chay `ci` HOAN TAT moi nhat tren nhanh tich hop. Tra 'do' / 'xanh' / 'chua-ro' (+ mo ta).
+function TrangThaiCI {
+    $nh = [string]$regInfo.nhanhTichHop
+    if (-not $Chuoi -or $KhongKiemCI -or -not $nh) { return @{ kq = 'bo-qua' } }
+    $k = GH @('run', 'list', '--branch', $nh, '--workflow', 'ci', '--limit', '10', '--json', 'databaseId,status,conclusion,headSha')
+    if ($k.ma -ne 0) { return @{ kq = 'chua-ro'; mo = "gh exit $($k.ma): $($k.out)" } }
+    try { $runs = @($k.out | ConvertFrom-Json) } catch { return @{ kq = 'chua-ro'; mo = 'gh tra ve khong phai JSON' } }
+    $xong = @($runs | Where-Object { $_.status -eq 'completed' -and $_.conclusion -notin @('cancelled', 'skipped') })
+    if (-not $xong.Count) { return @{ kq = 'chua-ro'; mo = "chua co lan ci hoan tat tren $nh" } }
+    $r0 = $xong[0]
+    $sha = [string]$r0.headSha; if ($sha.Length -gt 7) { $sha = $sha.Substring(0, 7) }
+    $mo = "run $($r0.databaseId) ($sha) = $($r0.conclusion)"
+    if ($r0.conclusion -eq 'success') { return @{ kq = 'xanh'; mo = $mo } }
+    return @{ kq = 'do'; mo = $mo }
+}
+# Het viec: moi WP (theo thu tu xuat hien trong registry) mot PR xep chong — khong merge, khong mo trung.
+function MoPRXepChong {
+    $rows = @((Get-Content -LiteralPath $reg -Raw -Encoding utf8 | ConvertFrom-Json).rows)
+    $nhanhs = [Collections.Generic.List[object]]::new()
+    foreach ($h in $rows) { if ($h.nhanh -and -not ($nhanhs | Where-Object { $_.nhanh -eq $h.nhanh })) { $nhanhs.Add([pscustomobject]@{ nhanh = $h.nhanh; dot = $h.dot }) } }
+    $base = if ($regInfo.nhanhGoc) { [string]$regInfo.nhanhGoc } else { 'main' }
+    foreach ($w in $nhanhs) {
+        $chuaXong = @($rows | Where-Object { $_.nhanh -eq $w.nhanh -and $_.status -ne 'xong' })
+        if ($chuaXong.Count) { Ghi "  PR: dung o $($w.dot) — con hang chua xong ($((@($chuaXong) | ForEach-Object { $_.id }) -join ', '))"; break }
+        $co = GH @('pr', 'list', '--head', $w.nhanh, '--state', 'open', '--json', 'number,url')
+        $daCo = $null; try { $daCo = @($co.out | ConvertFrom-Json) | Select-Object -First 1 } catch { }
+        if ($daCo) { Ghi "  PR: $($w.dot) da co $($daCo.url)" }
+        else {
+            $hd = @($rows | Where-Object { $_.nhanh -eq $w.nhanh -and $_.handover } | ForEach-Object { '- ' + $_.id + ': ' + $_.handover }) -join "`n"
+            $body = "Refs: $($regInfo.refs)`n`nChuoi $Chuoi · $($w.dot) · base = $base (PR xep chong; merge theo thu tu, GitHub tu doi base khi nhanh truoc duoc merge).`n`nHandover:`n$hd`n`n🤖 Generated with [Claude Code](https://claude.com/claude-code)"
+            $k = GH @('pr', 'create', '--base', $base, '--head', $w.nhanh, '--title', "feat($($w.dot)): chuoi $Chuoi - $($w.dot)", '--body', $body)
+            Ghi ("  PR: {0} -> {1}: exit {2} {3}" -f $w.nhanh, $base, $k.ma, $k.out)
+            if ($k.ma -ne 0) { break }
+        }
+        $base = $w.nhanh
+    }
 }
 function DauVet {
     $hd = Get-ChildItem -LiteralPath (Join-Path $Root 'docs/nhanh') -Filter 'handover-n*.md' -File -ErrorAction SilentlyContinue |
@@ -212,12 +276,17 @@ $env:CLAUDE_CODE_DISABLE_BACKGROUND_TASKS = '1'
 $env:CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS = '0'
 $maThoat = 0; $soPhien = 0; $khongTien = 0
 try {
-    Ghi ("BAT DAU bo chay (toi da {0} phien, model {1})" -f $ToiDa, $Model)
+    Ghi ("BAT DAU bo chay (toi da {0} phien, model {1}, {2})" -f $ToiDa, $Model, $(if ($Chuoi) { "chuoi $Chuoi, lenh $lenhPhien" } else { 'WP-14' }))
+    if ($Chuoi) { $env:CHAY_TU_DONG_CHUOI = $Chuoi }
     while ($true) {
         if (Test-Path -LiteralPath $phanh) { Ghi 'DUNG: co tep phanh artifacts/agents/tu-dong/DUNG (xoa tep de chay lai)'; break }
         if ($soPhien -ge $ToiDa) { Ghi "DUNG: da chay du $ToiDa phien"; break }
+        $ci = TrangThaiCI
+        if ($ci.kq -eq 'do') { Ghi "DUNG: cau dao CI — lan ci hoan tat moi nhat tren $($regInfo.nhanhTichHop) DO: $($ci.mo). Xem: gh run view <id> --log-failed"; $maThoat = 1; break }
+        if ($ci.kq -eq 'chua-ro') { Ghi "  CI: chua ro ($($ci.mo)) — chay tiep" }
+        elseif ($ci.kq -eq 'xanh') { Ghi "  CI: xanh ($($ci.mo))" }
         $n = PH @('next')
-        if ($n.ma -eq 5) { Ghi "DUNG: het viec — $($n.out)"; break }
+        if ($n.ma -eq 5) { Ghi "DUNG: het viec — $($n.out)"; if ($MoPRCuoi -and $Chuoi) { MoPRXepChong }; break }
         if ($n.ma -ne 0) { Ghi "DUNG: chi con viec cua nguoi / bi chan — $($n.out)"; $maThoat = 3; break }
         $id = ($n.out -split "`r?`n")[-1].Trim()
         $hang = @((Get-Content -LiteralPath $reg -Raw -Encoding utf8 | ConvertFrom-Json).rows | Where-Object { $_.id -eq $id })[0]
@@ -233,13 +302,14 @@ try {
         $tep = Join-Path $logDir ((Get-Date -Format 'yyyyMMdd-HHmmss') + "-$id.json")
         Ghi ("PHIEN {0}: hang {1} — {2}" -f $soPhien, $id, $hang.noiDung)
         if ($claudeTest) {
-            $p = Start-Process -FilePath 'pwsh' -ArgumentList @('-NoProfile', '-File', $claudeTest, $Root) -WorkingDirectory $Root `
+            $p = Start-Process -FilePath 'pwsh' -ArgumentList (QA @('-NoProfile', '-File', $claudeTest, $Root, $lenhPhien)) -WorkingDirectory $Root `
                 -RedirectStandardOutput $tep -RedirectStandardError "$tep.err" -NoNewWindow -PassThru
         }
         else {
-            $thamSo = @('-p', '/chay-phien', '--model', $Model, '--permission-mode', 'auto', '--permission-prompts', 'none', '--output-format', 'stream-json', '--verbose')
+            $thamSo = QA @('-p', $lenhPhien, '--model', $Model, '--permission-mode', 'auto', '--permission-prompts', 'none', '--output-format', 'stream-json', '--verbose')
             $exe = $claude
-            if ($claude -match '\.(cmd|bat)$') { $exe = $env:ComSpec; $thamSo = @('/c', $claude) + $thamSo }
+            # cmd /c bo cap ngoac dau/cuoi khi co > 2 dau ngoac => boc CA dong lenh them mot cap: cmd /c ""C:\x y\claude.cmd" -p "/..." ..."
+            if ($claude -match '\.(cmd|bat)$') { $exe = $env:ComSpec; $thamSo = @('/c', ('"' + ((@(QA @($claude)) + $thamSo) -join ' ') + '"')) }
             $p = Start-Process -FilePath $exe -WorkingDirectory $Root -RedirectStandardOutput $tep -RedirectStandardError "$tep.err" -NoNewWindow -PassThru `
                 -ArgumentList $thamSo
         }

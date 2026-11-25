@@ -138,6 +138,69 @@ try {
     RepoMoi 't13' @((Hang 'P-01' 'doc-gate' @()))
     $k = Chay (ClaudeGia 'stream') @('-ChiTiet')
     Ca 'T13 stream-json: in vai bat dau/xong, lenh cua vai (-ChiTiet), doc ket qua cuoi' (($k.out -match '> ba bat dau: doi chieu SHP-009') -and ($k.out -match '< ba xong sau') -and ($k.out -match 'ba : Read docs/features/a.md') -and ($k.out -match 'ket thuc exit 0: xong stream')) $k
+
+    Write-Output 'NHOM 7 — chuoi WP code (-Chuoi, cau dao CI, PR xep chong)'
+    # claude gia cho chuoi: doc ten chuoi tu bien CHAY_TU_DONG_CHUOI, ghi lai lenh nhan duoc
+    $fc = Join-Path $goc 'claude-chuoi.ps1'
+    [IO.File]::WriteAllText($fc, @'
+param([string]$Root, [string]$Lenh)
+$ph = Join-Path $Root 'tools/agents/phien.ps1'; $c = $env:CHAY_TU_DONG_CHUOI
+Add-Content (Join-Path $Root 'lenh.txt') $Lenh
+$dem = Join-Path $Root 'dem.txt'; $n = if (Test-Path $dem) { [int](Get-Content $dem) } else { 0 }; Set-Content $dem ($n + 1)
+$id = (& pwsh -NoProfile -File $ph next -Chuoi $c -Root $Root | Select-Object -Last 1).Trim()
+$o = & pwsh -NoProfile -File $ph start -Chuoi $c -Id $id -Root $Root
+$nx = (($o | Select-String 'PHIEN=(N\d+)').Matches[0].Groups[1].Value)
+Set-Content (Join-Path $Root ("docs/nhanh/handover-{0}.md" -f $nx.ToLower())) "# $nx"
+& pwsh -NoProfile -File $ph done -Chuoi $c -Id $id -Evidence 'build 0 · test 1/1' -Handover ("docs/nhanh/handover-{0}.md" -f $nx.ToLower()) -Root $Root | Out-Null
+'{"result":"xong ' + $id + '"}'
+'@, $utf8)
+    # gh gia: CHAY_TU_DONG_GH_MODE = xanh | do ; ghi moi lenh vao gh.txt
+    $fg = Join-Path $goc 'gh-gia.ps1'
+    [IO.File]::WriteAllText($fg, @'
+Add-Content (Join-Path $env:CHAY_TU_DONG_GH_LOG 'gh.txt') ($args -join ' ')
+if ($args[0] -eq 'run') {
+  $kl = if ($env:CHAY_TU_DONG_GH_MODE -eq 'do') { 'failure' } else { 'success' }
+  '[{"databaseId":9,"status":"in_progress","conclusion":"","headSha":"bbbbbbbbbb"},{"databaseId":8,"status":"completed","conclusion":"cancelled","headSha":"cccccccccc"},{"databaseId":7,"status":"completed","conclusion":"' + $kl + '","headSha":"aaaaaaaaaa"}]'
+  exit 0
+}
+if ($args[0] -eq 'pr' -and $args[1] -eq 'list') { '[]'; exit 0 }
+if ($args[0] -eq 'pr' -and $args[1] -eq 'create') { 'https://github.com/x/y/pull/1'; exit 0 }
+exit 1
+'@, $utf8)
+    function RepoChuoi([string]$ten, [object[]]$rows) {
+        RepoMoi $ten @()
+        Ghi 'agents/state/phien-gd3-t.json' ([ordered]@{ version = 1; chuoi = 'gd3-t'; skill = 'chay-phien-code'; nhanhTichHop = 'tich-hop/gd3'; nhanhGoc = 'main'; refs = 'D-999'; rows = $rows } | ConvertTo-Json -Depth 6)
+        Ghi 'docs/agents/bang-phien-gd3-t.md' "# C`n<!-- BANG-PHIEN:BAT-DAU -->`n<!-- BANG-PHIEN:KET-THUC -->`n"
+    }
+    function HangC($id, $loai, $deps, $nhanh, $dot) { $h = Hang $id $loai $deps; $h['nhanh'] = $nhanh; $h['dot'] = $dot; $h }
+    function ChayChuoi([string]$mode, [string[]]$them = @()) {
+        $env:CHAY_TU_DONG_GH = $fg; $env:CHAY_TU_DONG_GH_MODE = $mode; $env:CHAY_TU_DONG_GH_LOG = $repo
+        try { return (Chay $fc (@('-Chuoi', 'gd3-t') + $them)) } finally { Remove-Item Env:CHAY_TU_DONG_GH, Env:CHAY_TU_DONG_GH_MODE, Env:CHAY_TU_DONG_GH_LOG }
+    }
+    function RegC { (Get-Content (Join-Path $repo 'agents/state/phien-gd3-t.json') -Raw | ConvertFrom-Json).rows }
+
+    RepoChuoi 't14' @((HangC 'W1' 'code' @() 'feat/a' 'WP-16'), (HangC 'W2' 'nguoi' @('W1') $null 'WP-16'), (HangC 'W3' 'code' @('W1') 'feat/b' 'WP-18'))
+    $k = ChayChuoi 'xanh'
+    $lenh = @(Get-Content (Join-Path $repo 'lenh.txt'))
+    Ca 'T14 -Chuoi: chay 2 hang code (bo qua hang nguoi), lenh = /chay-phien-code chuoi=gd3-t, dung o hang nguoi (exit 3)' (($k.ma -eq 3) -and ($lenh.Count -eq 2) -and ($lenh[0] -eq '/chay-phien-code chuoi=gd3-t') -and (@(RegC | Where-Object status -eq 'xong').Count -eq 2)) $k
+    Ca 'T15 cau dao CI: bo qua lan dang chay + bi huy, doc lan hoan tat (xanh) => chay tiep' (($k.out -match 'CI: xanh \(run 7 \(aaaaaaa\) = success\)')) $k
+
+    RepoChuoi 't16' @((HangC 'W1' 'code' @() 'feat/a' 'WP-16'))
+    $k = ChayChuoi 'do'
+    Ca 'T16 CI do tren nhanh tich hop => DUNG truoc khi mo phien (exit 1)' (($k.ma -eq 1) -and ($k.out -match 'cau dao CI') -and -not (Test-Path (Join-Path $repo 'dem.txt'))) $k
+
+    RepoChuoi 't17' @((HangC 'W1' 'code' @() 'feat/a' 'WP-16'))
+    $k = ChayChuoi 'do' @('-KhongKiemCI')
+    Ca 'T17 -KhongKiemCI => bo cau dao, chay phien' (((RegC)[0].status -eq 'xong') -and ($k.out -notmatch 'cau dao CI')) $k
+
+    RepoChuoi 't18' @((HangC 'W1' 'code' @() 'feat/a' 'WP-16'), (HangC 'W2' 'dong-wp' @('W1') 'feat/a' 'WP-16'), (HangC 'W3' 'code' @('W2') 'feat/b' 'WP-18'))
+    $k = ChayChuoi 'xanh' @('-MoPRCuoi')
+    $gh = @(Get-Content (Join-Path $repo 'gh.txt') | Where-Object { $_ -match '^pr create' })
+    Ca 'T18 -MoPRCuoi: het viec => moi WP mot PR xep chong (feat/a -> main, feat/b -> feat/a), khong merge' (($k.ma -eq 0) -and ($gh.Count -eq 2) -and ($gh[0] -match '--base main --head feat/a') -and ($gh[1] -match '--base feat/a --head feat/b') -and ($gh[0] -match 'Refs: D-999') -and -not (@(Get-Content (Join-Path $repo 'gh.txt')) -match '^pr merge')) $k
+
+    RepoChuoi 't19' @((HangC 'W1' 'code' @() 'feat/a' 'WP-16'))
+    $k = Chay $fc @('-Chuoi', 'khong-co')
+    Ca 'T19 -Chuoi khong co registry => loi (exit 1), khong mo phien' (($k.ma -eq 1) -and ($k.out -match 'khong thay registry') -and -not (Test-Path (Join-Path $repo 'dem.txt'))) $k
 }
 finally { Remove-Item -Recurse -Force $goc -ErrorAction SilentlyContinue }
 

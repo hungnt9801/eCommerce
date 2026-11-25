@@ -1,0 +1,955 @@
+{
+  "version": 1,
+  "wp": "GĐ3 — chuỗi 1",
+  "chuoi": "gd3-1",
+  "skill": "chay-phien-code",
+  "nhanhTichHop": "tich-hop/gd3",
+  "nhanhGoc": "main",
+  "refs": "D-216",
+  "ghiChu": "Phương án B (D-216): mỗi WP một nhánh cắt từ đỉnh tich-hop/gd3; dong-wp đẩy fast-forward vào tich-hop/gd3 (M3, D-114); PR xếp chồng mở một lần cuối chuỗi.",
+  "capNhat": null,
+  "rows": [
+    {
+      "id": "W16-1",
+      "dot": "WP-16",
+      "loai": "code",
+      "ma": [
+        "PRC-002"
+      ],
+      "noiDung": "F0–F2b: đọc SRS theo mục, ARCH khi chạm ≥ 2 module / schema / contract; G1/G2 theo M2 (PRC-001/002 đã duyệt Q5; câu mới ⇒ decider)",
+      "vai": "ORCH · arch · docrev · decider",
+      "dependsOn": [],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp16-bang-gia",
+      "buoc": "F0–F2b",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W16-2",
+      "dot": "WP-16",
+      "loai": "code",
+      "ma": [
+        "PRC-002"
+      ],
+      "noiDung": "F3 BE: domain + app service + endpoint + migration (expand-only, pg_dump trước khi áp) + test đơn vị",
+      "vai": "be",
+      "dependsOn": [
+        "W16-1"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp16-bang-gia",
+      "buoc": "F3 BE",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W16-3",
+      "dot": "WP-16",
+      "loai": "code",
+      "ma": [
+        "PRC-002"
+      ],
+      "noiDung": "F3 FE: màn Web Admin theo SRS (contract-first `schema.d.ts`); WP không có FE ⇒ done kèm lý do",
+      "vai": "fe",
+      "dependsOn": [
+        "W16-2"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp16-bang-gia",
+      "buoc": "F3 FE",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W16-4",
+      "dot": "WP-16",
+      "loai": "code",
+      "ma": [
+        "PRC-002"
+      ],
+      "noiDung": "F4 QA (mọi BR- có test + negative control đỏ→xanh) → F5 REV (`VERDICT: PASS`, P1 = 0)",
+      "vai": "qa · rev",
+      "dependsOn": [
+        "W16-3"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp16-bang-gia",
+      "buoc": "F4–F5",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W16-5",
+      "dot": "WP-16",
+      "loai": "dong-wp",
+      "ma": [
+        "PRC-002"
+      ],
+      "noiDung": "F6 OPS + G6 `kiem-tat-ca.ps1 -DayDu` ⇒ đẩy fast-forward vào `tich-hop/gd3`; `07` §13",
+      "vai": "ops · ORCH",
+      "dependsOn": [
+        "W16-4"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp16-bang-gia",
+      "buoc": "F6–G6",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W18-0",
+      "dot": "WP-18",
+      "loai": "doc-gate",
+      "ma": [
+        "ADDR-001",
+        "ADDR-002"
+      ],
+      "noiDung": "Cổng tài liệu `D-141`: DOCREV kiểm nhanh v0.5 đóng 2 P2 **mỗi** tài liệu; mã GHTK không code bằng suy đoán (R3-1); `ADDR-003` + PII ngoài WP",
+      "vai": "ba · docrev · decider",
+      "dependsOn": [
+        "W16-5"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp18-dia-chi",
+      "buoc": "D-141: đóng 2 P2 mỗi tài liệu",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W18-1",
+      "dot": "WP-18",
+      "loai": "code",
+      "ma": [
+        "ADDR-001",
+        "ADDR-002"
+      ],
+      "noiDung": "F0–F2b: đọc SRS theo mục, ARCH khi chạm ≥ 2 module / schema / contract; G1/G2 theo M2 (mã GHTK chưa có ⇒ không code nhánh đó)",
+      "vai": "ORCH · arch · docrev · decider",
+      "dependsOn": [
+        "W18-0"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp18-dia-chi",
+      "buoc": "F0–F2b",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W18-2",
+      "dot": "WP-18",
+      "loai": "code",
+      "ma": [
+        "ADDR-001",
+        "ADDR-002"
+      ],
+      "noiDung": "F3 BE: domain + app service + endpoint + migration (expand-only, pg_dump trước khi áp) + test đơn vị",
+      "vai": "be",
+      "dependsOn": [
+        "W18-1"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp18-dia-chi",
+      "buoc": "F3 BE",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W18-3",
+      "dot": "WP-18",
+      "loai": "code",
+      "ma": [
+        "ADDR-001",
+        "ADDR-002"
+      ],
+      "noiDung": "F3 FE: màn Web Admin theo SRS (contract-first `schema.d.ts`); WP không có FE ⇒ done kèm lý do",
+      "vai": "fe",
+      "dependsOn": [
+        "W18-2"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp18-dia-chi",
+      "buoc": "F3 FE",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W18-4",
+      "dot": "WP-18",
+      "loai": "code",
+      "ma": [
+        "ADDR-001",
+        "ADDR-002"
+      ],
+      "noiDung": "F4 QA (mọi BR- có test + negative control đỏ→xanh) → F5 REV (`VERDICT: PASS`, P1 = 0)",
+      "vai": "qa · rev",
+      "dependsOn": [
+        "W18-3"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp18-dia-chi",
+      "buoc": "F4–F5",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W18-5",
+      "dot": "WP-18",
+      "loai": "dong-wp",
+      "ma": [
+        "ADDR-001",
+        "ADDR-002"
+      ],
+      "noiDung": "F6 OPS + G6 `kiem-tat-ca.ps1 -DayDu` ⇒ đẩy fast-forward vào `tich-hop/gd3`; `07` §13",
+      "vai": "ops · ORCH",
+      "dependsOn": [
+        "W18-4"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp18-dia-chi",
+      "buoc": "F6–G6",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W22-0",
+      "dot": "WP-22",
+      "loai": "doc-gate",
+      "ma": [
+        "NOT-001"
+      ],
+      "noiDung": "Cổng tài liệu `D-208`: BA sửa 2 P2 #24/#26 → DOCREV kiểm nhanh **trước** `migrations add`/state machine (15 P3 làm cùng WP)",
+      "vai": "ba · docrev · decider",
+      "dependsOn": [
+        "W18-5"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp22-thong-bao",
+      "buoc": "D-208: P2 #24, #26",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W22-1",
+      "dot": "WP-22",
+      "loai": "code",
+      "ma": [
+        "NOT-001"
+      ],
+      "noiDung": "F0–F2b: đọc SRS theo mục, ARCH khi chạm ≥ 2 module / schema / contract; G1/G2 theo M2 (module `Notification` mới, D-197; 15 P3 cùng WP)",
+      "vai": "ORCH · arch · docrev · decider",
+      "dependsOn": [
+        "W22-0"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp22-thong-bao",
+      "buoc": "F0–F2b",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W22-2",
+      "dot": "WP-22",
+      "loai": "code",
+      "ma": [
+        "NOT-001"
+      ],
+      "noiDung": "F3 BE: domain + app service + endpoint + migration (expand-only, pg_dump trước khi áp) + test đơn vị",
+      "vai": "be",
+      "dependsOn": [
+        "W22-1"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp22-thong-bao",
+      "buoc": "F3 BE",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W22-3",
+      "dot": "WP-22",
+      "loai": "code",
+      "ma": [
+        "NOT-001"
+      ],
+      "noiDung": "F3 FE: màn Web Admin theo SRS (contract-first `schema.d.ts`); WP không có FE ⇒ done kèm lý do",
+      "vai": "fe",
+      "dependsOn": [
+        "W22-2"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp22-thong-bao",
+      "buoc": "F3 FE",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W22-4",
+      "dot": "WP-22",
+      "loai": "code",
+      "ma": [
+        "NOT-001"
+      ],
+      "noiDung": "F4 QA (mọi BR- có test + negative control đỏ→xanh) → F5 REV (`VERDICT: PASS`, P1 = 0)",
+      "vai": "qa · rev",
+      "dependsOn": [
+        "W22-3"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp22-thong-bao",
+      "buoc": "F4–F5",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W22-5",
+      "dot": "WP-22",
+      "loai": "dong-wp",
+      "ma": [
+        "NOT-001"
+      ],
+      "noiDung": "F6 OPS + G6 `kiem-tat-ca.ps1 -DayDu` ⇒ đẩy fast-forward vào `tich-hop/gd3`; `07` §13",
+      "vai": "ops · ORCH",
+      "dependsOn": [
+        "W22-4"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp22-thong-bao",
+      "buoc": "F6–G6",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W26-1",
+      "dot": "WP-26",
+      "loai": "code",
+      "ma": [
+        "REP-001"
+      ],
+      "noiDung": "F0–F2b: đọc SRS theo mục, ARCH khi chạm ≥ 2 module / schema / contract; G1/G2 theo M2 (D-208 tạm duyệt có điều kiện, điều kiện đỏ đã đạt; 10 P3 cùng WP; KHÔNG đụng cột giá vốn)",
+      "vai": "ORCH · arch · docrev · decider",
+      "dependsOn": [
+        "W22-5"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp26-read-model",
+      "buoc": "F0–F2b",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W26-2",
+      "dot": "WP-26",
+      "loai": "code",
+      "ma": [
+        "REP-001"
+      ],
+      "noiDung": "F3 BE: domain + app service + endpoint + migration (expand-only, pg_dump trước khi áp) + test đơn vị",
+      "vai": "be",
+      "dependsOn": [
+        "W26-1"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp26-read-model",
+      "buoc": "F3 BE",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W26-3",
+      "dot": "WP-26",
+      "loai": "code",
+      "ma": [
+        "REP-001"
+      ],
+      "noiDung": "F3 FE: màn Web Admin theo SRS (contract-first `schema.d.ts`); WP không có FE ⇒ done kèm lý do",
+      "vai": "fe",
+      "dependsOn": [
+        "W26-2"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp26-read-model",
+      "buoc": "F3 FE",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W26-4",
+      "dot": "WP-26",
+      "loai": "code",
+      "ma": [
+        "REP-001"
+      ],
+      "noiDung": "F4 QA (mọi BR- có test + negative control đỏ→xanh) → F5 REV (`VERDICT: PASS`, P1 = 0)",
+      "vai": "qa · rev",
+      "dependsOn": [
+        "W26-3"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp26-read-model",
+      "buoc": "F4–F5",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W26-5",
+      "dot": "WP-26",
+      "loai": "dong-wp",
+      "ma": [
+        "REP-001"
+      ],
+      "noiDung": "F6 OPS + G6 `kiem-tat-ca.ps1 -DayDu` ⇒ đẩy fast-forward vào `tich-hop/gd3`; `07` §13",
+      "vai": "ops · ORCH",
+      "dependsOn": [
+        "W26-4"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp26-read-model",
+      "buoc": "F6–G6",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W24-1",
+      "dot": "WP-24",
+      "loai": "code",
+      "ma": [
+        "PRO-002"
+      ],
+      "noiDung": "F0–F2b: đọc SRS theo mục, ARCH khi chạm ≥ 2 module / schema / contract; G1/G2 theo M2 (module `Promotions` mới; `Add_Promotion_Module` là nguồn schema duy nhất, D-151; Q8 chỉ chặn nhánh điều kiện địa chỉ)",
+      "vai": "ORCH · arch · docrev · decider",
+      "dependsOn": [
+        "W26-5"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp24-dieu-kien-km",
+      "buoc": "F0–F2b",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W24-2",
+      "dot": "WP-24",
+      "loai": "code",
+      "ma": [
+        "PRO-002"
+      ],
+      "noiDung": "F3 BE: domain + app service + endpoint + migration (expand-only, pg_dump trước khi áp) + test đơn vị",
+      "vai": "be",
+      "dependsOn": [
+        "W24-1"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp24-dieu-kien-km",
+      "buoc": "F3 BE",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W24-3",
+      "dot": "WP-24",
+      "loai": "code",
+      "ma": [
+        "PRO-002"
+      ],
+      "noiDung": "F3 FE: màn Web Admin theo SRS (contract-first `schema.d.ts`); WP không có FE ⇒ done kèm lý do",
+      "vai": "fe",
+      "dependsOn": [
+        "W24-2"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp24-dieu-kien-km",
+      "buoc": "F3 FE",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W24-4",
+      "dot": "WP-24",
+      "loai": "code",
+      "ma": [
+        "PRO-002"
+      ],
+      "noiDung": "F4 QA (mọi BR- có test + negative control đỏ→xanh) → F5 REV (`VERDICT: PASS`, P1 = 0)",
+      "vai": "qa · rev",
+      "dependsOn": [
+        "W24-3"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp24-dieu-kien-km",
+      "buoc": "F4–F5",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W24-5",
+      "dot": "WP-24",
+      "loai": "dong-wp",
+      "ma": [
+        "PRO-002"
+      ],
+      "noiDung": "F6 OPS + G6 `kiem-tat-ca.ps1 -DayDu` ⇒ đẩy fast-forward vào `tich-hop/gd3`; `07` §13",
+      "vai": "ops · ORCH",
+      "dependsOn": [
+        "W24-4"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp24-dieu-kien-km",
+      "buoc": "F6–G6",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W25-0",
+      "dot": "WP-25",
+      "loai": "doc-gate",
+      "ma": [
+        "PRO-001"
+      ],
+      "noiDung": "Cổng tài liệu `D-169`: BA sửa P2 #20 đúng hướng `D-169` (**cấm** gán `UsageSequence = 1`) → DOCREV kiểm nhanh; P3 cùng WP",
+      "vai": "ba · docrev · decider",
+      "dependsOn": [
+        "W24-5"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp25-voucher",
+      "buoc": "D-169: P2 #20",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W25-1",
+      "dot": "WP-25",
+      "loai": "code",
+      "ma": [
+        "PRO-001"
+      ],
+      "noiDung": "F0–F2b: đọc SRS theo mục, ARCH khi chạm ≥ 2 module / schema / contract; G1/G2 theo M2 (trên engine WP-24; M4 trước release)",
+      "vai": "ORCH · arch · docrev · decider",
+      "dependsOn": [
+        "W25-0"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp25-voucher",
+      "buoc": "F0–F2b",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W25-2",
+      "dot": "WP-25",
+      "loai": "code",
+      "ma": [
+        "PRO-001"
+      ],
+      "noiDung": "F3 BE: domain + app service + endpoint + migration (expand-only, pg_dump trước khi áp) + test đơn vị",
+      "vai": "be",
+      "dependsOn": [
+        "W25-1"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp25-voucher",
+      "buoc": "F3 BE",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W25-3",
+      "dot": "WP-25",
+      "loai": "code",
+      "ma": [
+        "PRO-001"
+      ],
+      "noiDung": "F3 FE: màn Web Admin theo SRS (contract-first `schema.d.ts`); WP không có FE ⇒ done kèm lý do",
+      "vai": "fe",
+      "dependsOn": [
+        "W25-2"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp25-voucher",
+      "buoc": "F3 FE",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W25-4",
+      "dot": "WP-25",
+      "loai": "code",
+      "ma": [
+        "PRO-001"
+      ],
+      "noiDung": "F4 QA (mọi BR- có test + negative control đỏ→xanh) → F5 REV (`VERDICT: PASS`, P1 = 0)",
+      "vai": "qa · rev",
+      "dependsOn": [
+        "W25-3"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp25-voucher",
+      "buoc": "F4–F5",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W25-5",
+      "dot": "WP-25",
+      "loai": "dong-wp",
+      "ma": [
+        "PRO-001"
+      ],
+      "noiDung": "F6 OPS + G6 `kiem-tat-ca.ps1 -DayDu` ⇒ đẩy fast-forward vào `tich-hop/gd3`; `07` §13",
+      "vai": "ops · ORCH",
+      "dependsOn": [
+        "W25-4"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp25-voucher",
+      "buoc": "F6–G6",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W23-0",
+      "dot": "WP-23",
+      "loai": "doc-gate",
+      "ma": [
+        "NOT-002"
+      ],
+      "noiDung": "Cổng tài liệu `D-208`: BA sửa P2 #1 + P3 → DOCREV kiểm nhanh",
+      "vai": "ba · docrev · decider",
+      "dependsOn": [
+        "W25-5"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp23-kenh-gui",
+      "buoc": "D-208: P2 #1 + P3",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W23-1",
+      "dot": "WP-23",
+      "loai": "code",
+      "ma": [
+        "NOT-002"
+      ],
+      "noiDung": "F0–F2b: đọc SRS theo mục, ARCH khi chạm ≥ 2 module / schema / contract; G1/G2 theo M2 — **chỉ** hợp đồng adapter + `fake` sender + fail-closed `0003`; `Q1`/`Q3` + HMAC production ngoài phạm vi (R3-6)",
+      "vai": "ORCH · arch · docrev · decider",
+      "dependsOn": [
+        "W23-0"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp23-kenh-gui",
+      "buoc": "F0–F2b",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W23-2",
+      "dot": "WP-23",
+      "loai": "code",
+      "ma": [
+        "NOT-002"
+      ],
+      "noiDung": "F3 BE: domain + app service + endpoint + migration (expand-only, pg_dump trước khi áp) + test đơn vị",
+      "vai": "be",
+      "dependsOn": [
+        "W23-1"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp23-kenh-gui",
+      "buoc": "F3 BE",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W23-3",
+      "dot": "WP-23",
+      "loai": "code",
+      "ma": [
+        "NOT-002"
+      ],
+      "noiDung": "F3 FE: SRS không có màn ⇒ done kèm lý do (kiểm lại SRS)",
+      "vai": "fe",
+      "dependsOn": [
+        "W23-2"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp23-kenh-gui",
+      "buoc": "F3 FE",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W23-4",
+      "dot": "WP-23",
+      "loai": "code",
+      "ma": [
+        "NOT-002"
+      ],
+      "noiDung": "F4 QA (mọi BR- có test + negative control đỏ→xanh) → F5 REV (`VERDICT: PASS`, P1 = 0)",
+      "vai": "qa · rev",
+      "dependsOn": [
+        "W23-3"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp23-kenh-gui",
+      "buoc": "F4–F5",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W23-5",
+      "dot": "WP-23",
+      "loai": "dong-wp",
+      "ma": [
+        "NOT-002"
+      ],
+      "noiDung": "F6 OPS + G6 `kiem-tat-ca.ps1 -DayDu` ⇒ đẩy fast-forward vào `tich-hop/gd3`; `07` §13",
+      "vai": "ops · ORCH",
+      "dependsOn": [
+        "W23-4"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp23-kenh-gui",
+      "buoc": "F6–G6",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W17-0",
+      "dot": "WP-17",
+      "loai": "doc-gate",
+      "ma": [
+        "PRC-001",
+        "INV-001",
+        "REP-003"
+      ],
+      "noiDung": "Cổng tài liệu `D-186` ⑥: BA sửa `prc-001` §15.1/§20.4 + `inv-001` §0 + `rep-003` §0/Q11 **cùng nhánh** → DOCREV kiểm nhanh (REP-003 đỏ cứng ⇒ không tạm duyệt)",
+      "vai": "ba · docrev",
+      "dependsOn": [
+        "W23-5"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp17-gia-von",
+      "buoc": "D-186 ⑥",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W17-0n",
+      "dot": "WP-17",
+      "loai": "nguoi",
+      "ma": [],
+      "noiDung": "**Người ký** phần sửa `rep-003` §0/Q11 (đỏ cứng) + xác nhận WP-17 chạy mức L1 (lõi tồn/tiền: mọi cổng có người)",
+      "vai": "người",
+      "dependsOn": [
+        "W17-0"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp17-gia-von",
+      "buoc": "G1 người",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W17-1",
+      "dot": "WP-17",
+      "loai": "code",
+      "ma": [
+        "PRC-001"
+      ],
+      "noiDung": "F0–F2b: ARCH động cơ bình quân gia quyền di động (`PRC-001` §20; `D-177` ④–⑦, `D-186`) — BE dùng Opus cho lõi sổ cái",
+      "vai": "ORCH · arch · docrev",
+      "dependsOn": [
+        "W17-0n"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp17-gia-von",
+      "buoc": "F0–F2b",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W17-1n",
+      "dot": "WP-17",
+      "loai": "nguoi",
+      "ma": [],
+      "noiDung": "**Người duyệt G2** thiết kế ARCH giá vốn (danh sách đỏ §4.3 — decider không tạm duyệt)",
+      "vai": "người",
+      "dependsOn": [
+        "W17-1"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp17-gia-von",
+      "buoc": "G2 người",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W17-2",
+      "dot": "WP-17",
+      "loai": "code",
+      "ma": [
+        "PRC-001"
+      ],
+      "noiDung": "F3 BE (model opus): đường ghi + duyệt + động cơ giá vốn; migration expand-only + pg_dump",
+      "vai": "be",
+      "dependsOn": [
+        "W17-1n"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp17-gia-von",
+      "buoc": "F3 BE",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W17-3",
+      "dot": "WP-17",
+      "loai": "code",
+      "ma": [
+        "PRC-001"
+      ],
+      "noiDung": "F3 FE: màn duyệt giá vốn theo SRS; không có ⇒ done kèm lý do",
+      "vai": "fe",
+      "dependsOn": [
+        "W17-2"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp17-gia-von",
+      "buoc": "F3 FE",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W17-4",
+      "dot": "WP-17",
+      "loai": "code",
+      "ma": [
+        "PRC-001"
+      ],
+      "noiDung": "F4 QA (domain invariant mọi luật tiền/tồn — K-06) → F5 REV",
+      "vai": "qa · rev",
+      "dependsOn": [
+        "W17-3"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp17-gia-von",
+      "buoc": "F4–F5",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W17-5",
+      "dot": "WP-17",
+      "loai": "dong-wp",
+      "ma": [
+        "PRC-001"
+      ],
+      "noiDung": "F6 OPS + G6 `-DayDu` ⇒ đẩy fast-forward vào `tich-hop/gd3`; **M4 trước release**",
+      "vai": "ops · ORCH",
+      "dependsOn": [
+        "W17-4"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp17-gia-von",
+      "buoc": "F6–G6",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    }
+  ]
+}

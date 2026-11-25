@@ -93,6 +93,28 @@ try {
     $p = Join-Path $tam 'docs/agents/bang-phien-wp14.md'
     [IO.File]::WriteAllText($p, ([IO.File]::ReadAllText($p, $utf8) -replace '⬜ Chưa bắt đầu', '✅ Hoàn thành'), $utf8)
     Ca 'C38 negative control: sua tay bang => check do' 1 @('check') 'LECH'
+
+    # ── chuoi code (-Chuoi): registry + bang rieng, prompt theo skill cua chuoi, show tra JSON ──
+    $regC = [ordered]@{ version = 1; chuoi = 'gd3-t'; skill = 'chay-phien-code'; nhanhTichHop = 'tich-hop/gd3'; nhanhGoc = 'feat/wp15'; rows = @(
+            ([ordered]@{ id = 'W16-1'; dot = 'WP-16'; loai = 'code'; ma = @('PRC-002'); noiDung = 'arch'; vai = 'arch'; dependsOn = @(); status = 'chua'; phien = @(); nhanh = 'feat/gd3-wp16'; buoc = 'F0-F2b'; evidence = $null; ghiChu = $null; handover = $null }),
+            ([ordered]@{ id = 'W16-2'; dot = 'WP-16'; loai = 'nguoi'; ma = @(); noiDung = 'nguoi ky'; vai = 'nguoi'; dependsOn = @('W16-1'); status = 'chua'; phien = @(); evidence = $null; ghiChu = $null; handover = $null }),
+            ([ordered]@{ id = 'W18-1'; dot = 'WP-18'; loai = 'code'; ma = @('ADDR-001'); noiDung = 'be'; vai = 'be'; dependsOn = @('W16-1'); status = 'chua'; phien = @(); nhanh = 'feat/gd3-wp18'; buoc = 'F3'; evidence = $null; ghiChu = $null; handover = $null })
+        )
+    }
+    Ghi 'agents/state/phien-gd3-t.json' ($regC | ConvertTo-Json -Depth 6)
+    Ghi 'docs/agents/bang-phien-gd3-t.md' "# Bang chuoi`n<!-- BANG-PHIEN:BAT-DAU -->`n<!-- BANG-PHIEN:KET-THUC -->`n"
+    $wp14Truoc = [IO.File]::ReadAllText((Join-Path $tam 'docs/agents/bang-phien-wp14.md'), $utf8)
+    Ca 'C39 -Chuoi sync ghi bang cua chuoi' 0 @('sync', '-Chuoi', 'gd3-t') 'bang-phien-gd3-t'
+    $bangC = [IO.File]::ReadAllText((Join-Path $tam 'docs/agents/bang-phien-gd3-t.md'), $utf8)
+    Kiem 'C40 prompt dung skill + chuoi cua registry' ($bangC -match '/chay-phien-code chuoi=gd3-t W16-1')
+    Kiem 'C41 -Chuoi khong cham bang WP-14' ([IO.File]::ReadAllText((Join-Path $tam 'docs/agents/bang-phien-wp14.md'), $utf8) -eq $wp14Truoc)
+    Ca 'C42 next chuoi = hang code dau' 0 @('next', '-Chuoi', 'gd3-t') 'W16-1'
+    Ca 'C43 show tra JSON co nhanh + buoc + nhanhTichHop' 0 @('show', '-Chuoi', 'gd3-t', '-Id', 'W18-1') '"nhanh":"feat/gd3-wp18".*"buoc":"F3".*"nhanhTichHop":"tich-hop/gd3"'
+    Ca 'C44 start + done hang code' 0 @('start', '-Chuoi', 'gd3-t', '-Id', 'W16-1') 'PHIEN='
+    Ca 'C45 done hang code' 0 @('done', '-Chuoi', 'gd3-t', '-Id', 'W16-1', '-Evidence', 'build 0 · test 10/10') 'xong'
+    Ca 'C46 next bo qua hang nguoi, chon hang doc lap ke' 0 @('next', '-Chuoi', 'gd3-t') 'W18-1'
+    Ca 'C47 -Chuoi sai ky tu => loi' 1 @('next', '-Chuoi', '../x') 'LOI'
+    Ca 'C48 check chuoi xanh' 0 @('check', '-Chuoi', 'gd3-t') 'khop'
 }
 finally { Remove-Item -Recurse -Force $tam -ErrorAction SilentlyContinue }
 
