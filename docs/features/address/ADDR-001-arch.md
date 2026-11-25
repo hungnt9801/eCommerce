@@ -17,6 +17,11 @@
 >
 > 🔄 **N80 (26/11/2026):** đóng **6/6 P3** của DOCREV vòng 2 — chỉnh tài liệu khớp **code as-built N78**, **không** đổi
 > thiết kế/quyết định; mục #4 (`Enum.IsDefined` trước `DoDaiMa`) **đã đóng bởi `D-251`** (vá + `qa` phủ ca + NC, 26/11/2026 N80) ⇒ `ADDR-001-AQ6` **Closed** (§8).
+>
+> 🔄 **N81 (26/11/2026):** đồng bộ as-built `W18-5` — đóng **P2 #1/#2** của review `ADDR-001` (`docs/reviews/ADDR-001-review.md`):
+> (a) overload `ApDung(keHoach)` một tham số **đã xoá** (`D-250`, commit `cea05f7`; **0** call site một tham số — §5.6);
+> (b) `SourceName` rỗng **hoặc** `Trim().Length > 512` ⇒ `0002` tại **hai** cửa (§3.6). Test + NC + testplan ở commit `d73b552`.
+> **Không** đổi thiết kế/hợp đồng/schema.
 
 ---
 
@@ -195,7 +200,7 @@ public static class AddressSyncGuard
 
 | Mã | Hằng | Nơi ném (sau WP-18) | Map đề xuất |
 |---|---|---|---|
-| `0002` | `AddressErrorCodes.MaKhongHopLe` | `SourceName` rỗng (validate **trước** khoá) | **`400`** (`D-240`; nợ `D-79`) |
+| `0002` | `AddressErrorCodes.MaKhongHopLe` | **Cửa import** (`ImportDatasetAsync`, as-built N81): `SourceName` rỗng **hoặc** `Trim().Length > 512` ⇒ NÉM `0002`, validate **trước** khoá (`AdministrativeUnitAppService.cs:277-291`, dùng `CatalogSyncRun.DoDaiSourceNameToiDa = 512`). **Hàng rào chung** ở `CatalogSyncRun.Ghi` cho **nhánh worker**: `CatChuoi(sourceName, DoDaiSourceNameToiDa, …)` **ném** `ArgumentException` khi vượt 512 — **không** cắt im lặng (`CatalogSyncRun.cs:42-43,140,156-172`) | **`400`** (`D-240`; nợ `D-79`) |
 | `0007` | `HuyenKhongThuocTinh` | resolver (đã có) | **`400`** (`D-240`; nợ `D-79`) |
 | `0008` | `AddressErrorCodes.NguonDoiDonViCapTren` (**mới**, cuối dải sau `0007`) | `LapKeHoach` hàng rào 5 | **`409`** (`D-240`) |
 | `0009` | `AddressErrorCodes.ThieuCanCuDoiTen` (**mới**, sau `0008` — `D-239`) | `AdministrativeUnit.DoiTen` khi căn cứ rỗng | **không** map: **không** reachable qua HTTP ở WP-18 (`ApDung` luôn truyền `danhMuc.Nguon` đã validate non-empty — §5.6) |
@@ -375,7 +380,7 @@ Thứ tự **bắt buộc** (mọi bước trước khi trả `KeHoachDongBo`):
 ```
 1. [Authorize(Addresses.CatalogImport)]  (cấp method, trên [Authorize] cấp class)
 2. TheoSo(input.SchemaVersion)            ⇒ 0005            ┐ validate TRƯỚC khoá ⇒ 0 dòng lô
-3. SourceName rỗng                        ⇒ 0002            ┘ (TC-21 ca a)
+3. SourceName rỗng hoặc Trim().Length > 512 ⇒ 0002  ┘ (TC-21 ca a; as-built :277-291)
 4. TryAcquireAsync(AddressLockKeys.CatalogImport, 5 s)
      └─ null ⇒ NÉM BusinessException(eCommerce:Lock:0001)   → 409, 0 dòng
 5. startedAtUtc = clock.Now; sourceHash = Bam(Rows)
@@ -412,6 +417,9 @@ Thứ tự **bắt buộc** (mọi bước trước khi trả `KeHoachDongBo`):
   (`:236` hiện gọi `DoiTen(td.Nguon!.Name)` **thiếu** căn cứ). Chữ ký đổi ⇒ sửa **mọi** nơi gọi: worker
   (`AdministrativeUnitSyncWorker.cs:130`), `test/eCommerce.Tests/AddressSync/AdministrativeUnitSynchronizerTests.cs` và
   `test/eCommerce.Tests/AddressSync/ProvincesOpenApiParserTests.cs:217` — bỏ sót tệp thứ ba ⇒ **build đỏ**.
+- ✅ **Overload `ApDung(keHoach)` một tham số ĐÃ XOÁ ở N81** (`D-250`, commit `cea05f7`) — **không** còn dạng "giữ để tương thích
+  ngược". As-built chỉ còn **một** chữ ký `ApDung(KeHoachDongBo keHoach, string legalBasis, Guid? tenantId = null)`
+  (`AdministrativeUnitSynchronizer.cs:263-266`); **0** call site một tham số trong `modules/` và `test/` (cơ chế đỏ là **trình biên dịch**).
 - Kèm nợ `D-77` (EInvoice snapshot chữ) — **ngoài WP-18**, chỉ ghi nhận.
 
 ---
@@ -429,7 +437,7 @@ Thứ tự **bắt buộc** (mọi bước trước khi trả `KeHoachDongBo`):
 | Mới (`D-242`) | Setting TTL trống / `"0"` / `"-5"` / `"abc"` ⇒ dùng **86400** + `LogWarning`; `Address:Cache:Enabled=false` ⇒ đọc DB (không chạm cache); nạp lô ⇒ cache sạch **trước** TTL | Unit + Integration |
 | `TC-18/19` | Permission mới định nghĩa 2 chiều; `ImportDatasetAsync` **không** `[AllowAnonymous]` và có permission riêng; class có `[Authorize]` | Unit (reflection) |
 | `TC-20` | 3 metric mới nằm trong `eCommerceMetricNames.All`; (khuyến nghị) test **hai chiều** "mọi hằng ⇒ có trong `All`" — nợ §26 của `XC-005` | Unit |
-| `TC-21` | (a) `SourceName` rỗng ⇒ ném, **0** dòng; (b) import hợp lệ ⇒ dòng lô đủ trường; (c) job 2 lượt cùng dữ liệu ⇒ **2** dòng, **cùng** `SourceHash`; (d) lượt job bị hàng rào ⇒ dòng `BiChan`; (e) cùng dữ liệu qua file vs job ⇒ **cùng** hash; (f) import bị `0008` ⇒ client nhận lỗi **và** dòng từ chối đọc được sau rollback | Unit + Integration |
+| `TC-21` | (a) `SourceName` rỗng **hoặc** > 512 ký tự ⇒ ném `0002`, **0** dòng (`N81`: 3 ca unit — import 512-guard + `CatalogSyncRun`); (b) import hợp lệ ⇒ dòng lô đủ trường; (c) job 2 lượt cùng dữ liệu ⇒ **2** dòng, **cùng** `SourceHash`; (d) lượt job bị hàng rào ⇒ dòng `BiChan`; (e) cùng dữ liệu qua file vs job ⇒ **cùng** hash; (f) import bị `0008` ⇒ client nhận lỗi **và** dòng từ chối đọc được sau rollback | Unit + Integration |
 | `TC-22` | Bảng ca a–h; thêm ca **rỗng/không đọc được `ASPNETCORE_ENVIRONMENT` ⇒ NÉM** (fail-closed) | Unit (hàm thuần) + khởi động Host thật |
 | `TC-24` | Hàng rào 5: đổi cha ⇒ NÉM `0008`, `ParentCode` giữ nguyên, **0** thay đổi; ca (b) đổi tên mã khác không áp; (c) mã đang đóng vẫn NÉM; (d) chỉ khác khoảng trắng/`null`↔rỗng ⇒ **không** ném; (e) qua `ImportDatasetAsync` ⇒ dòng từ chối còn đọc được | Unit + Integration |
 | `TC-25` | `AddressLockKeys.CatalogImport == "address:sync-catalog"`; literal xuất hiện **đúng 1** lần trong `modules/Address`; khoá giả bị giữ ⇒ `ex.Code == "eCommerce:Lock:0001"`, **0** dòng | Unit |
@@ -499,6 +507,7 @@ Chạy bằng `tools/agents/negative-control.ps1` (ORCH chạy lại, không tin
   `eCommerceEntityFrameworkCoreModule.cs`, `AddressEvents.cs`, `eCommerce.Address.Application.csproj`, `PhatHanhHoaDonGd0Flow.cs`,
   `eCommerce.EInvoice.Application.csproj`.
 - **0** câu mở mới (`ADDR-001-AQ6` **đã đóng bởi `D-251`** — vá `Enum.IsDefined` trước `DoDaiMa`, `qa` phủ ca + NC, 26/11/2026 N80); **0** cam kết endpoint/trường NCC; **0** thay đổi `AddrAdministrativeUnits`/`AddrCarrierMappings`/`AddrAddresses`.
+- **N81 (26/11/2026) — 2 P2 của review `ADDR-001` ĐÃ ĐÓNG:** #1 = xoá overload `ApDung` một tham số (`D-250`, commit `cea05f7`; as-built `AdministrativeUnitSynchronizer.cs:263-266`); #2 = giới hạn `SourceName` (`0002` tại `ImportDatasetAsync` **trước** khoá + hàng rào `CatChuoi` trong `CatalogSyncRun.Ghi` cho worker — §3.6). Test + NC + testplan ở commit `d73b552`.
 - **DOCREV vòng 2 (N80) — 6/6 P3 đã xử lý:** #1 danh sách "Tài liệu phải sửa cùng PR" (§4.3, ghi rõ BA đã đồng bộ SRS v0.7 ở N78) · #2 `WithData("lyDo")` (§5.6) · #3 bỏ nhãn `D-241` cho DTO (§3.2) · #4 `Enum.IsDefined` trước `DoDaiMa` (§5.2 — as-built chưa có ⇒ `AQ6`) · #5 `AddChild(...).MultiTenancySide = Host` (§3.3) · #6 không gọi `CompleteAsync` trên UoW ambient (§5.5).
 - **Đã áp quyết định N77 — `D-238`…`D-242`** (§3.1, §3.3, §3.6, §5.4, §5.5, §5.6, §8); §8 **không còn** câu mở.
 - Đã sửa theo DOCREV vòng 1: P2 #1 (đo p95, không dùng counter) · P2 #2 (bỏ `requiresNew` ở UoW thành công) · P2 #3 (thêm `TC-12`, NC-6 trỏ ca test) · P2 #4 (`ProvincesOpenApiParserTests.cs:217`); P3 (route `import-dataset`, §1.1, TTL vào §8, `docDeviation` DTO, `SourceHash varchar(64)`, hàng rào 0b không đánh số lại `0002`, dải metric `:81-107`).
