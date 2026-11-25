@@ -125,6 +125,6 @@ không có thay đổi schema/dữ liệu trong phiên.
 
 ---
 
-**Hàng rào agent** (phiên `N81`): **9 lượt vai** — `decider` ×1 (`D-252`), `be` ×1 (2 P2), `ops` ×2 (2 deploy docs + mục 403),
+**Hàng rào agent** (phiên `N81`): **7 lượt vai** — `decider` ×1 (`D-252`), `be` ×1 (2 P2), `ops` ×2 (2 deploy docs + mục 403),
 `qa` ×1 (4 ca + 4 NC + 2 testplan), `ba` ×1 (SRS), `arch` ×1 (arch). **0 lần chặn dừng**; 1 lần `be` ghi ngoài vùng (2 tài liệu)
 đã `git restore` + làm lại đúng vai; 3 cảnh báo "thiếu JSON" của harness (khối JSON thật có).
