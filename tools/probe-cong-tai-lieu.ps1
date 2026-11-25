@@ -26,7 +26,7 @@
 
     ══════════════════════════════════════════════════════════════════════════════════════════════════
     🔑 **ANH XA WP → MA (`D-212` (i)):** doc `docs/nhanh/07-ke-hoach-trien-khai.md`, doan giua `### WP-15+`
-    va `---` ke tiep, hang `| **WP-xx** |`, lay moi `[A-Z]{3}-\d{3}` trong o **Pham vi**.
+    va `---` ke tiep, hang `| **WP-xx** |`, lay moi `[A-Z]{3,4}-\d{3}` trong o **Pham vi**.
     Tap ma RONG ⇒ tra o **Cong tai lieu**: co cau `Không có tài liệu feature` ⇒ **XANH + in ly do**;
     rong ma khong co cau do, hoac khong thay hang WP ⇒ `2`.
 
@@ -41,9 +41,10 @@
 
     ══════════════════════════════════════════════════════════════════════════════════════════════════
     🔑 **`-TuKiem` (`D-211` ①):** dung fixture trong thu muc tam (`Lay-DuongDanTam`, khuon `XC-007`),
-    >= 6 ca (ma `Chưa` + WP dang code ⇒ `1` · tam duyet ⇒ `0` o Code / `1` o MergeMain · WP-15 khong ma
+    >= 8 ca (ma `Chưa` + WP dang code ⇒ `1` · tam duyet ⇒ `0` o Code / `1` o MergeMain · WP-15 khong ma
     ⇒ `0` o CA HAI · khong suy duoc WP + co tep ma nguon ⇒ `1` · khong suy duoc WP + chi tai lieu ⇒ `0` ·
-    co bien ban nguoi ky (`Đã duyệt` + `Nguoi ky`) ⇒ MergeMain `0`). Moi ca in `DAT/DO` + ma thoat ky vong.
+    co bien ban nguoi ky (`Đã duyệt` + `Nguoi ky`) ⇒ MergeMain `0` · ma 4 chu cai (`ADDR-002`) tam duyet
+    ⇒ Code `0` · bien ban KHONG co ma do ⇒ Code `1`). Moi ca in `DAT/DO` + ma thoat ky vong.
     Cuoi `-TuKiem`: moi ca DAT ⇒ `exit 0`, nguoc lai `exit 1`.
 
     📌 **WP-15 XANH o CA HAI che do** vi hang WP-15 co tap ma rong + cau `Không có tài liệu feature`
@@ -161,7 +162,7 @@ function Doc-BienBan {
             $o = Lay-O $dong[$i]
             $ma = Chuan-O $o[$idxMa]
 
-            if ($ma -notmatch '^[A-Z]{3}-\d{3}$') { continue }
+            if ($ma -notmatch '^[A-Z]{3,4}-\d{3}$') { continue }
 
             $kqO = if ($idxKq -lt $o.Count) { Chuan-O $o[$idxKq] } else { '' }
             $kyO = if ($idxKy -ge 0 -and $idxKy -lt $o.Count) { Chuan-O $o[$idxKy] } else { '' }
@@ -213,7 +214,7 @@ function Lay-HangWp {
             $phamVi = if ($o.Count -gt 1) { $o[1] } else { '' }
             $cong = if ($o.Count -gt 2) { $o[2] } else { '' }
 
-            $ma = @([regex]::Matches($phamVi, '[A-Z]{3}-\d{3}') | ForEach-Object { $_.Value } | Sort-Object -Unique)
+            $ma = @([regex]::Matches($phamVi, '[A-Z]{3,4}-\d{3}') | ForEach-Object { $_.Value } | Sort-Object -Unique)
 
             return [pscustomobject]@{ TimThay = $true; Ma = $ma; CongTaiLieu = $cong; LyDo = '' }
         }
@@ -462,7 +463,7 @@ function Kiem-Cong {
 }
 
 # ══════════════════════════════════════════════════════════════════════════════════════════════════
-# TU KIEM (`-TuKiem`) — fixture trong thu muc tam, >= 6 ca
+# TU KIEM (`-TuKiem`) — fixture trong thu muc tam, >= 8 ca
 # ══════════════════════════════════════════════════════════════════════════════════════════════════
 
 function Ghi-Fixture07 {
@@ -478,6 +479,7 @@ function Ghi-Fixture07 {
 |---|---|---|---|
 | **WP-15** | **Nền GĐ3** | Không có tài liệu feature. Vào được khi build/test chạy | — |
 | **WP-16** | `PRC-002` phần còn thiếu | `PRC-002` đã duyệt `Q5` | WP-15 |
+| **WP-18** | `ADDR-002` (ma 4 chu cai) | fixture dieu kien | WP-16 |
 
 ---
 '@
@@ -486,7 +488,7 @@ function Ghi-Fixture07 {
 }
 
 function Ghi-FixtureTamDuyet {
-    param([string]$GocTam, [string]$KetLuan)
+    param([string]$GocTam, [string]$KetLuan, [string]$Ma = 'PRC-002')
 
     $thuMuc = Join-Path $GocTam 'docs'
     New-Item -ItemType Directory -Force -Path $thuMuc | Out-Null
@@ -496,10 +498,10 @@ function Ghi-FixtureTamDuyet {
 
 | # | MÃ | Tài liệu | DOCREV | Kết luận DEC | Lý do | Điều kiện | Người review còn thiếu |
 |---|---|---|---|---|---|---|---|
-| 1 | PRC-002 | fixture | DOC-OK | **__KETLUAN__** | fixture | fixture | fixture |
+| 1 | __MA__ | fixture | DOC-OK | **__KETLUAN__** | fixture | fixture | fixture |
 '@
 
-    $s = $s.Replace('__KETLUAN__', $KetLuan)
+    $s = $s.Replace('__KETLUAN__', $KetLuan).Replace('__MA__', $Ma)
 
     [IO.File]::WriteAllText((Join-Path $thuMuc 'bien-ban-tam-duyet-gd3-tukiem-2026-11-24.md'), $s, [Text.UTF8Encoding]::new($false))
 }
@@ -578,6 +580,17 @@ function Invoke-TuKiem {
         Ghi-FixtureTamDuyet -GocTam $gocTam -KetLuan 'Tạm duyệt có điều kiện'
         Ghi-FixtureNguoiKy -GocTam $gocTam
         Ca 'CA6 co bien ban nguoi ky ⇒ MergeMain XANH' 0 ((Kiem-Cong -GocRepo $gocTam -CheDoCong 'MergeMain' -WpSo 16).Ma)
+
+        # Ca 7 — ma 4 chu cai (`ADDR-002`) tam duyet ⇒ Code XANH (0). Chong hoi quy regex `{3}` cu
+        # (chi nhan 3 chu cai ⇒ cat thanh `DDR-002` va bo sot dong bien ban `ADDR-002`).
+        Ghi-FixtureTamDuyet -GocTam $gocTam -KetLuan 'Tạm duyệt có điều kiện' -Ma 'ADDR-002'
+        Xoa-FixtureNguoiKy -GocTam $gocTam
+        Ca 'CA7 ma 4 chu cai (ADDR-002) tam duyet ⇒ Code XANH' 0 ((Kiem-Cong -GocRepo $gocTam -CheDoCong 'Code' -WpSo 18).Ma)
+
+        # Ca 8 — bien ban KHONG co ma do (chi co `ADDR-099`) ⇒ Code DO (1).
+        Ghi-FixtureTamDuyet -GocTam $gocTam -KetLuan 'Tạm duyệt có điều kiện' -Ma 'ADDR-099'
+        Xoa-FixtureNguoiKy -GocTam $gocTam
+        Ca 'CA8 bien ban KHONG co ADDR-002 ⇒ Code DO' 1 ((Kiem-Cong -GocRepo $gocTam -CheDoCong 'Code' -WpSo 18).Ma)
     }
     finally {
         if (Test-Path $gocTam) { Remove-Item -Recurse -Force $gocTam -ErrorAction SilentlyContinue }
@@ -585,7 +598,7 @@ function Invoke-TuKiem {
 
     Write-Host ("════ TU KIEM: {0}/{1} ca DAT ════" -f $script:soCaTuKiemDat, $script:soCaTuKiem)
 
-    if ($script:soCaTuKiem -ge 6 -and $script:soCaTuKiemDat -eq $script:soCaTuKiem) { return 0 }
+    if ($script:soCaTuKiem -ge 8 -and $script:soCaTuKiemDat -eq $script:soCaTuKiem) { return 0 }
 
     return 1
 }
