@@ -112,6 +112,20 @@
   thực tế của lượt deploy để cập nhật bảng route trong SRS nếu cần.
 - Kiểm nhanh runtime toàn tuyến ADDR: `pwsh -File tools/probe-dia-chi.ps1` (chạy trên máy có Host `:5000` + DB seed).
 
+### Kiểm trước go-live (403 — `D-252`, nợ `D-249`)
+
+- **Kỳ vọng**: user **thiếu** quyền `Addresses.CarrierMapping.Verify` gọi
+  `POST /api/app/carrier-address-mapping/{id}/xac-minh` phải nhận **`403`** (không `401`, không `200`).
+- **Điều kiện đo được**: Host phải expose `/api/identity/**` để probe tạo/đăng nhập user thường; **hôm nay CHƯA CÓ**
+  (Host không tham chiếu `Volo.Abp.Identity.HttpApi` ⇒ `/api/identity/**` trả **`404`**, `D-252` ①(2)/(4)).
+  Vì chưa đo runtime được, `tools/probe-dia-chi.ps1` in khối **`CHUA DO`** cho ca này — ⛔ **không** ghi "403 OK".
+- **Khi chưa có `/api/identity/**`**: người vận hành đo ở **staging** có Identity HTTP API, hoặc **chuyển người**
+  quyết định. ⛔ **Không** tự thêm package, **không** sửa `src/eCommerce.HttpApi.Host/eCommerce.HttpApi.Host.csproj`
+  (`D-252` ①(5)).
+- **Nợ & hạn**: nợ thuộc chủ **`qa`**, hạn **`release`** (`D-252` thay hạn `W18-5` của `D-249`). Nợ này **không**
+  chặn `pwsh -File tools/kiem-tat-ca.ps1 -DayDu` hay push `tich-hop/gd3` — `-DayDu` **được** XANH khi probe in
+  `CHUA DO` (ghi nhận trung thực, **không** phải ca đạt, `D-249` ①).
+
 ## 6. Khi hỏng — ai gọi
 
 - **Ánh xạ hãng sai** (tra nhầm đơn vị / thiếu mã / `0501`–`0510` sai nhánh): gọi **`be`**
