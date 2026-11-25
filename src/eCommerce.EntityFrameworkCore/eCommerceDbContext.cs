@@ -314,6 +314,10 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>, IHasEventOut
     // ── Address (ADDR-001): danh mục đơn vị hành chính theo PHIÊN BẢN schema ──
     public DbSet<Address.AdministrativeUnit> AdministrativeUnits { get; set; } = default!;
 
+    // ── Address (ADDR-001 / WP-18): SỔ LÔ NẠP DANH MỤC — append-only (`D-78`, BR-009) ──
+    // 🚨 Thiếu DbSet ⇒ `IRepository<CatalogSyncRun, Guid>` KHÔNG được đăng ký (lỗi chỉ lộ lúc chạy).
+    public DbSet<Address.CatalogSyncRun> CatalogSyncRuns { get; set; } = default!;
+
     // ── Address (ADDR-002): ánh xạ mã địa chỉ theo hãng vận chuyển ──
     public DbSet<Address.Carrier.CarrierAddressMapping> CarrierAddressMappings { get; set; } = default!;
 

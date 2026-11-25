@@ -33,6 +33,15 @@ public static class AddressDbContextModelCreatingExtensions
     /// <summary>*"Địa chỉ nào thuộc xã vừa bị sáp nhập"* — job đối chiếu (`ADDR-004` §3.1 #5).</summary>
     public const string TenIndexTheoXa = "IX_AddrAddresses_TenantId_TinhCode_XaCode";
 
+    // ── ADDR-001 (`WP-18`): SỔ LÔ NẠP DANH MỤC — entity `CatalogSyncRun` (append-only) ──
+    public const string TenBangLoNap = "AddrCatalogSyncRuns";
+
+    /// <summary>Lịch sử / lượt gần nhất theo `(tenant, schema)`. Không unique (`D-78` — idempotency là NỘI DUNG `SourceHash`).</summary>
+    public const string TenIndexLoNapTheoThoiDiem = "IX_AddrCatalogSyncRuns_TenantId_SchemaVersion_ImportedAtUtc";
+
+    /// <summary>Lượt `DaApDung` gần nhất (màn vận hành).</summary>
+    public const string TenIndexLoNapTheoKetCuc = "IX_AddrCatalogSyncRuns_TenantId_SchemaVersion_Outcome_ImportedAtUtc";
+
     public static void ConfigureAddress(this ModelBuilder builder)
     {
         Check.NotNull(builder, nameof(builder));
@@ -170,6 +179,40 @@ public static class AddressDbContextModelCreatingExtensions
             b.ToTable(t => t.HasCheckConstraint(
                 "CK_AddrAddresses_ContentHashHex",
                 "\"ContentHash\" ~ '^[0-9a-f]{64}$'"));
+        });
+
+        // ── ADDR-001 (`WP-18`): SỔ LÔ NẠP DANH MỤC — append-only, KHÔNG FK/navigation (`arch` §4.1) ──
+        builder.Entity<CatalogSyncRun>(b =>
+        {
+            b.ToTable(TenBangLoNap);
+            b.ConfigureByConvention();
+
+            b.Property(x => x.SourceName).HasMaxLength(512);
+            // varchar(64) — SHA-256 hex; CHECK ở dưới chặn base64/bytea/chữ HOA.
+            b.Property(x => x.SourceHash).HasMaxLength(64);
+            b.Property(x => x.ImportedBy).IsRequired().HasMaxLength(128);
+            b.Property(x => x.ErrorCode).HasMaxLength(64);
+            // CHỈ `ex.GetType().FullName` — cấm message/stack/payload (BR-011).
+            b.Property(x => x.ErrorType).HasMaxLength(256);
+
+            b.HasIndex(x => new { x.TenantId, x.SchemaVersion, x.ImportedAtUtc })
+                .HasDatabaseName(TenIndexLoNapTheoThoiDiem);
+
+            b.HasIndex(x => new { x.TenantId, x.SchemaVersion, x.Outcome, x.ImportedAtUtc })
+                .HasDatabaseName(TenIndexLoNapTheoKetCuc);
+
+            // Hàng rào DB cho enum lưu dạng int — enum chỉ thêm ở CUỐI dải (`D-17`).
+            b.ToTable(t => t.HasCheckConstraint(
+                "CK_AddrCatalogSyncRuns_SchemaVersion",
+                "\"SchemaVersion\" in (1, 2)"));
+
+            b.ToTable(t => t.HasCheckConstraint(
+                "CK_AddrCatalogSyncRuns_Outcome",
+                "\"Outcome\" in (0, 1, 2)"));
+
+            b.ToTable(t => t.HasCheckConstraint(
+                "CK_AddrCatalogSyncRuns_SourceHashHex",
+                "\"SourceHash\" IS NULL OR \"SourceHash\" ~ '^[0-9a-f]{64}$'"));
         });
     }
 }

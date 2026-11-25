@@ -134,15 +134,22 @@ public class AdministrativeUnit : FullAuditedAggregateRoot<Guid>, IMultiTenant
     /// đang tham chiếu tới **Id** này. Nếu tạo bản ghi mới rồi đóng bản cũ thì các tham chiếu cũ
     /// **trỏ vào một đơn vị đã đóng** ⇒ tra cứu địa chỉ cũ sẽ **fail-closed** và không sửa được.
     /// Tên là **thuộc tính mô tả**, không phải danh tính — danh tính là (phiên bản, cấp, mã).
+    ///
+    /// 🔒 **Căn cứ pháp lý là BẮT BUỘC** (`D-239`, BR-007): không có căn cứ thì không được đổi tên danh mục.
+    /// Ném <see cref="AddressErrorCodes.ThieuCanCuDoiTen"/> (0009) — **không** im lặng bỏ qua căn cứ.
     /// </summary>
-    public void DoiTen(string tenMoi, string? legalBasis = null)
+    public void DoiTen(string tenMoi, string legalBasis)
     {
-        Name = Volo.Abp.Check.NotNullOrWhiteSpace(tenMoi, nameof(tenMoi), maxLength: 256);
-
-        if (!string.IsNullOrWhiteSpace(legalBasis))
+        if (string.IsNullOrWhiteSpace(legalBasis))
         {
-            LegalBasis = legalBasis;
+            throw new BusinessException(AddressErrorCodes.ThieuCanCuDoiTen)
+                .WithData("lyDo", "thiếu căn cứ pháp lý khi đổi tên")
+                .WithData("level", Level.ToString())
+                .WithData("code", Code);
         }
+
+        Name = Volo.Abp.Check.NotNullOrWhiteSpace(tenMoi, nameof(tenMoi), maxLength: 256);
+        LegalBasis = legalBasis.Trim();
     }
 
     /// <summary>

@@ -169,6 +169,10 @@ public class eCommercePermissionDefinitionProvider : PermissionDefinitionProvide
         addresses.AddChild(eCommerceConsts.Permissions.Addresses.Manage);
         addresses.AddChild(eCommerceConsts.Permissions.Addresses.ManageBook);
         addresses.AddChild(eCommerceConsts.Permissions.Addresses.Verify);
+        // 🆕 `WP-18` (`D-238`): nạp danh mục ĐVHC — side **Host** (chỉ host admin sửa dữ liệu hệ thống,
+        // `XC-004` Q7). `AddChild(string)` trả `PermissionDefinition`; đặt side qua thuộc tính.
+        addresses.AddChild(eCommerceConsts.Permissions.Addresses.CatalogImport).MultiTenancySide =
+            Volo.Abp.MultiTenancy.MultiTenancySides.Host;
 
         // ---- Cấu hình tổ chức (`WP-07`) ----
         // 🚨 BẮT BUỘC khai ở CẢ HAI NƠI (hằng số `eCommerceConsts.Permissions.Settings` + ở đây): thiếu một

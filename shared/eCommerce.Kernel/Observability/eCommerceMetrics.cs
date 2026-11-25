@@ -35,8 +35,7 @@ public static class eCommerceMetricNames
     // ---- Nghiệp vụ thuế (XC-006) ----
     public const string TaxUnclassifiedSkus = "tax_unclassified_skus";
 
-    // ---- Nghiệp vụ ĐƠN HÀNG (`SAL-003` NFR-012, 24/10/2026) ----
-    /// <summary>
+    // ---- Nghiệp vụ ĐƠN HÀNG (`SAL-003` NFR-012, 24/10/2026) ----    /// <summary>
     /// **SỐ LẦN CHUYỂN TRẠNG THÁI ĐƠN** — nhãn `axis`/`from`/`to` (giá trị **hữu hạn**: 4 trục × ~10 giá trị).
     ///
     /// 🔑 **VÌ SAO PHẢI CÓ:** `SAL-003` NFR-012 yêu cầu *"mọi chuyển trạng thái có metric"*. 📌 Không có nó thì
@@ -44,6 +43,20 @@ public static class eCommerceMetricNames
     /// không vẽ được biểu đồ. 🚨 **CẤM** gắn nhãn `orderId` (`XC-005` BR-009 — cardinality cao).
     /// </summary>
     public const string SalesOrderTransitionTotal = "sales_order_transition_total";
+
+    // ---- Nghiệp vụ ĐỊA CHỈ / danh mục ĐVHC (`ADDR-001` NFR-008/009, WP-18) ----
+    /// <summary>
+    /// Số lượt nạp danh mục ĐVHC — nhãn <c>trigger</c> (`job`/`import`) và <c>outcome</c>
+    /// (`applied`/`blocked`/`error`/`skipped`). Cardinality ≤ 8 (`D-78` §5.1).
+    /// 🚨 **CẤM** gắn nhãn mã lỗi/tỉnh (`XC-005` BR-009).
+    /// </summary>
+    public const string AddressCatalogSyncTotal = "address_catalog_sync_total";
+
+    /// <summary>Số lần đọc cache danh mục **trúng** — chỉ để chẩn đoán cache có tác dụng (NFR-008).</summary>
+    public const string AddressCatalogCacheHitsTotal = "address_catalog_cache_hits_total";
+
+    /// <summary>Số lần đọc cache danh mục **trượt** — đi kèm ca trúng để suy ra tỉ lệ.</summary>
+    public const string AddressCatalogCacheMissesTotal = "address_catalog_cache_misses_total";
 
     // ---- Nghiệp vụ THANH TOÁN / đối soát (`REC-001` mục 7, 17/10/2026) ----
     /// <summary>
@@ -103,7 +116,11 @@ public static class eCommerceMetricNames
         PaymentReconChangedTotal,
         LoggingFailuresTotal,
         // 🆕 `SAL-003` NFR-012 (24/10/2026)
-        SalesOrderTransitionTotal
+        SalesOrderTransitionTotal,
+        // 🆕 `WP-18` — `ADDR-001` NFR-008/009 (26/11/2026)
+        AddressCatalogSyncTotal,
+        AddressCatalogCacheHitsTotal,
+        AddressCatalogCacheMissesTotal
     ];
 
     /// <summary>
@@ -150,7 +167,10 @@ public static class eCommerceMetricNames
             [PaymentReconUnresolved] = nameof(eCommerceMetrics.SetPaymentReconUnresolved),
             [PaymentReconChangedTotal] = nameof(eCommerceMetrics.PaymentReconChanged),
             [LoggingFailuresTotal] = nameof(eCommerceMetrics.LoggingFailures),
-            [SalesOrderTransitionTotal] = nameof(eCommerceMetrics.SalesOrderTransition)
+            [SalesOrderTransitionTotal] = nameof(eCommerceMetrics.SalesOrderTransition),
+            [AddressCatalogSyncTotal] = nameof(eCommerceMetrics.AddressCatalogSync),
+            [AddressCatalogCacheHitsTotal] = nameof(eCommerceMetrics.AddressCatalogCacheHits),
+            [AddressCatalogCacheMissesTotal] = nameof(eCommerceMetrics.AddressCatalogCacheMisses)
         };
 
     /// <summary>
@@ -209,10 +229,16 @@ public static class eCommerceMetricTags
     /// <summary>`SAL-003` NFR-012 — trạng thái **sau** (số enum của trục; hữu hạn).</summary>
     public const string ToStatus = "to";
 
+    /// <summary>`ADDR-001` — đường nạp danh mục: `job` / `import` (hữu hạn).</summary>
+    public const string Trigger = "trigger";
+
+    /// <summary>`ADDR-001` — kết cục lượt nạp: `applied` / `blocked` / `error` / `skipped` (hữu hạn).</summary>
+    public const string Outcome = "outcome";
+
     public static readonly IReadOnlyList<string> Allowed =
     [
         Channel, Provider, EventName, Status, Reason, Kind, Module, Result, Method, Route,
-        Axis, FromStatus, ToStatus
+        Axis, FromStatus, ToStatus, Trigger, Outcome
     ];
 
     /// <summary>Nhãn **BỊ CẤM** vì cardinality cao — test `TC-07` chặn nếu chúng lọt vào danh sách cho phép.</summary>
@@ -265,6 +291,15 @@ public sealed class eCommerceMetrics : ISingletonDependency
 
     /// <summary>`SAL-003` NFR-012 — số lần chuyển trạng thái đơn, nhãn `axis`/`from`/`to`.</summary>
     public Counter<long> SalesOrderTransition { get; }
+
+    /// <summary>`ADDR-001` NFR-008 — số lượt nạp danh mục ĐVHC, nhãn `trigger`/`outcome`.</summary>
+    public Counter<long> AddressCatalogSync { get; }
+
+    /// <summary>`ADDR-001` NFR-008 — số lần cache danh mục **trúng** (chẩn đoán cache có tác dụng).</summary>
+    public Counter<long> AddressCatalogCacheHits { get; }
+
+    /// <summary>`ADDR-001` NFR-008 — số lần cache danh mục **trượt**.</summary>
+    public Counter<long> AddressCatalogCacheMisses { get; }
 
     // ---- Histogram ----
     public Histogram<double> HttpRequestDurationSeconds { get; }
@@ -324,6 +359,14 @@ public sealed class eCommerceMetrics : ISingletonDependency
         SalesOrderTransition = _meter.CreateCounter<long>(eCommerceMetricNames.SalesOrderTransitionTotal,
             unit: "{transition}",
             description: "Số lần chuyển trạng thái đơn (SAL-003 NFR-012) — nhãn axis/from/to, CẤM orderId.");
+
+        AddressCatalogSync = _meter.CreateCounter<long>(eCommerceMetricNames.AddressCatalogSyncTotal,
+            unit: "{run}",
+            description: "Số lượt nạp danh mục ĐVHC (ADDR-001) — nhãn trigger/outcome, CẤM mã/tỉnh.");
+        AddressCatalogCacheHits = _meter.CreateCounter<long>(eCommerceMetricNames.AddressCatalogCacheHitsTotal,
+            unit: "{hit}", description: "Số lần cache danh mục ĐVHC trúng (ADDR-001).");
+        AddressCatalogCacheMisses = _meter.CreateCounter<long>(eCommerceMetricNames.AddressCatalogCacheMissesTotal,
+            unit: "{miss}", description: "Số lần cache danh mục ĐVHC trượt (ADDR-001).");
 
         HttpRequestDurationSeconds = _meter.CreateHistogram<double>(eCommerceMetricNames.HttpRequestDurationSeconds,
             unit: "s", description: "Độ trễ xử lý request HTTP.");

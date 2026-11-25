@@ -30,6 +30,20 @@ public static class AddressErrorCodes
     /// <summary>Huyện không thuộc tỉnh đã khai báo (chỉ có nghĩa ở schema 3 cấp).</summary>
     public const string HuyenKhongThuocTinh = "eCommerce:Address:0007";
 
+    /// <summary>
+    /// 🚨 **Nguồn đổi `ParentCode` của một mã ĐÃ CÓ** (danh tính đổi) ⇒ **từ chối CẢ LÔ** (hàng rào thứ 5,
+    /// `D-81`). Không áp dụng bất kỳ thay đổi nào, `ParentCode` của entity giữ nguyên.
+    /// 📌 Số **kế tiếp cuối dải** sau `0007` (`D-79` cấm đánh số lại).
+    /// </summary>
+    public const string NguonDoiDonViCapTren = "eCommerce:Address:0008";
+
+    /// <summary>
+    /// **Đổi tên đơn vị mà KHÔNG có căn cứ pháp lý** (`D-239`, BR-007). Căn cứ là bằng chứng vì sao tên đổi;
+    /// thiếu căn cứ ⇒ không được sửa tên danh mục (danh tính bất biến, tên chỉ đổi qua `DoiTen`).
+    /// 📌 KHÔNG dùng lại `0106` (miền xác minh của `ADDR-004`) hay `0605` (sai định dạng nguồn).
+    /// </summary>
+    public const string ThieuCanCuDoiTen = "eCommerce:Address:0009";
+
     // ══════════════════════════════════════════════════════════════════════════════════════════
     // ADDR-004 — SỔ ĐỊA CHỈ (`Address` + `CustomerAddressLink`). Dải **01xx** để KHÔNG đụng 0001…0007
     // (mã cũ đã có nghĩa khác — bài học `cus-001` **F6** ở `ADDR-004` §15.2).

@@ -1023,6 +1023,26 @@ Module **`eCommerce.Address.Domain`** đã tạo, hiện thực hoá **đúng 3 
 | 3 | **Bảng ánh xạ 3 cấp ↔ 2 cấp** (ca sáp nhập tỉnh) | 🚧 **Q2 là ĐIỀU KIỆN CHẶN**: cần **văn bản chính thức có lớp text**; tài liệu này **cấm seed ánh xạ bằng suy luận** |
 | 4 | Truy vấn/API tra cứu + cache | Chờ #1 |
 
+### Trạng thái triển khai — `WP-18` / `W18-2` (26/11/2026, vai `be`, nhánh `feat/gd3-wp18-dia-chi`)
+
+> ⚠️ **Chỉ `ADDR-001`** (lượt này); `ADDR-002` để lượt sau. Thiết kế: [`ADDR-001-arch.md`](./ADDR-001-arch.md) (G2 tạm duyệt, `D-243`).
+
+**Đã làm (code sản phẩm)**
+- **Domain**: hằng khoá `AddressLockKeys.CatalogImport = "address:sync-catalog"` (`D-82`); guard khởi động thuần `AddressSyncGuard.KiemTra` (`D-78`, BR-010); entity append-only `CatalogSyncRun` + enum `CatalogSyncTrigger`/`CatalogSyncOutcome`; băm danh mục `AddressSourceHash.Tinh` (`D-78` §7.3); `AdministrativeUnit.DoiTen` **bắt buộc** `LegalBasis` (`D-239`, mã `0009`); mã `0008 NguonDoiDonViCapTren`; hàng rào 0b (`0605`) + hàng rào 5 (`0008`) trong `AdministrativeUnitSynchronizer`; Setting `Address:Cache:TtlSeconds`.
+- **Application**: 3 endpoint danh sách `GetProvincesAsync`/`GetDistrictsAsync`/`GetWardsByDistrictAsync`; `ImportDatasetAsync` trả `CatalogSyncRunDto` (`D-241`); DTO `ImportDatasetInput`/`ImportUnitRow`/`CatalogSyncRunDto`; cache `AddressCatalogCache` (TTL 86400, cờ `Address:Cache:Enabled`) + `AddressCacheInvalidatedEto` + handler; 3 truy vấn tra cứu cũ đổi sang truy vấn **có điều kiện**; permission method-level `Addresses.Catalog.Import` (`D-238`); metric `address_catalog_sync_total` + hit/miss cache.
+- **Worker**: `AdministrativeUnitSyncWorker` dùng UoW transactional, ghi dòng lô cho **mọi** lượt (kể cả 0 thay đổi), phân loại `BiChan`/`Loi`, bỏ lượt + metric khi bận khoá, `TenKhoa` trỏ hằng chung.
+- **Host**: gọi guard **vô điều kiện** trước `AddHttpClient`; map HTTP 8 mã (`D-240`).
+- **Schema**: bảng `AddrCatalogSyncRuns` + 2 index + CHECK, migration **EF sinh** `20261125191757_Add_Addr001_CatalogSyncRuns` (expand-only; **chưa áp DB**).
+
+**Chưa làm (ngoài vùng ghi của vai `be`)**
+- ⬜ **Test đơn vị mới** cho hàng rào 0b/5, guard, `SourceHash`, `DoiTen` 0009, cache, reflection permission/metric — `.claude/scopes.json` cho `be` chỉ ghi `modules/**`, `src/**`, `shared/**`, `docs/features/**`; `test/**` thuộc QA. ORCH cần giao QA (`W18-4`) các ca §6 arch doc.
+- ⬜ **3 call site test cũ** còn gọi `ApDung(kế hoạch)` (overload tương thích tạm thời được giữ): `test/eCommerce.Tests/AddressSync/AdministrativeUnitSynchronizerTests.cs:118,258,275` và `test/eCommerce.Tests/AddressSync/ProvincesOpenApiParserTests.cs:217` — QA đổi sang `ApDung(kế hoạch, danhMuc.Nguon)` rồi **xoá overload tương thích**.
+- ⬜ Áp migration (`DbMigrator`, binary mới build) — ORCH/OPS chạy sau `pg_dump`.
+
+**Lệch tài liệu đã báo (`docDeviation`)**
+- SRS §6.1 mô tả output `{ Added, Renamed, Reopened, Closed }`; DTO thực tế giàu hơn (`D-241`, arch §3.2) — BA cập nhật khi rà `ADDR-001`.
+- `TC-13` ghi "đủ **3** `DbSet`"; sau `WP-18` là **4** (`+ CatalogSyncRuns`) — BA sửa cùng PR.
+
 ---
 
 ## Đối chiếu mô hình Nhanh (17/11/2026)

@@ -168,6 +168,15 @@ public class eCommerceHttpApiHostModule : AbpModule
         // 📌 BaseUrl đọc từ cấu hình `TaxAuthority:BaseUrl`; hiện chưa có endpoint thật của CQT nên
         // để giá trị mặc định và GHI RÕ là chưa kiểm chứng được.
         // Nguồn danh mục ĐVHC chính thức (ADDR-001). BaseUrl đọc từ cấu hình để đổi môi trường.
+        //
+        // 🚨 `D-78` (BR-010) — GUARD KHỞI ĐỘNG: gọi **TRỰC TIẾP trong thân ConfigureServices**, TRƯỚC
+        //    `AddHttpClient`. CẤM đặt trong lambda `http => { … }`: lambda chỉ chạy khi typed client được
+        //    resolve lần đầu ⇒ host không dùng client sẽ KHÔNG chạy guard (đúng lỗi im lặng D-78 cảnh báo).
+        eCommerce.Address.AddressSyncGuard.KiemTra(
+            configuration.GetValue("Address:Sync:Enabled", defaultValue: false),
+            configuration["Address:Sync:BaseUrl"],
+            configuration["ASPNETCORE_ENVIRONMENT"]);
+
         context.Services.AddHttpClient<eCommerce.Address.ProvincesOpenApiSource>(http =>
         {
             var baseUrl = configuration["Address:Sync:BaseUrl"];
@@ -311,6 +320,20 @@ public class eCommerceHttpApiHostModule : AbpModule
             options.Map(eCommerce.Address.AddressErrorCodes.ThieuNoiDung, System.Net.HttpStatusCode.BadRequest);             // 0105
             options.Map(eCommerce.Address.AddressErrorCodes.ThieuCanCuXacMinh, System.Net.HttpStatusCode.BadRequest);        // 0106
             options.Map(eCommerce.Address.AddressErrorCodes.ConLienKetHieuLuc, System.Net.HttpStatusCode.Conflict);          // 0107
+
+            // ── NẠP DANH MỤC ĐVHC (`ADDR-001` `D-240`, `WP-18`) ────────────────────────────────
+            // 🔑 Trước WP-18 các mã `06xx` chỉ đi qua job (log). Khi có `ImportDatasetAsync`, chúng ĐI RA HTTP;
+            // không map ⇒ ABP trả `403` ⇒ người dùng đi XIN QUYỀN trong khi lỗi thật là "file thiếu tỉnh".
+            // 📌 8 dòng theo `D-240`; `0009` KHÔNG map (không reachable qua HTTP — `ApDung` luôn truyền căn cứ);
+            // `eCommerce:Lock:0001` → `409` đã map ở khối hạ tầng chung bên dưới.
+            options.Map(eCommerce.Address.AddressErrorCodes.MaKhongHopLe, System.Net.HttpStatusCode.BadRequest);                    // 0002
+            options.Map(eCommerce.Address.AddressErrorCodes.HuyenKhongThuocTinh, System.Net.HttpStatusCode.BadRequest);              // 0007
+            options.Map(eCommerce.Address.AddressErrorCodes.NguonDoiDonViCapTren, System.Net.HttpStatusCode.Conflict);               // 0008
+            options.Map(eCommerce.Address.Sync.AdministrativeSyncErrorCodes.DanhMucRong, System.Net.HttpStatusCode.Conflict);       // 0601
+            options.Map(eCommerce.Address.Sync.AdministrativeSyncErrorCodes.DanhMucQuaIt, System.Net.HttpStatusCode.Conflict);      // 0602
+            options.Map(eCommerce.Address.Sync.AdministrativeSyncErrorCodes.ThieuCapBatBuoc, System.Net.HttpStatusCode.Conflict);   // 0603
+            options.Map(eCommerce.Address.Sync.AdministrativeSyncErrorCodes.DongHangLoatVuotNguong, System.Net.HttpStatusCode.Conflict); // 0604
+            options.Map(eCommerce.Address.Sync.AdministrativeSyncErrorCodes.DanhMucSaiDinhDang, System.Net.HttpStatusCode.BadRequest); // 0605
 
             // ── SỔ ĐỊA CHỈ (`ADDR-004` phần B) ──────────────────────────────────────────────────
             options.Map(eCommerce.Customers.CustomerErrorCodes.LienKetDiaChiDaTonTai, System.Net.HttpStatusCode.Conflict);     // 0010

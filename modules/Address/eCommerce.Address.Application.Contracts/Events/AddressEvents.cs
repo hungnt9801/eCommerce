@@ -47,7 +47,32 @@ public class AddressChangedEto
 }
 
 /// <summary>
-/// Sự kiện: **mặc định của sổ địa chỉ một khách đã đổi** (`ADDR-004` §7.1).
+/// Sự kiện: **cache tra cứu danh mục ĐVHC cần bị xoá** (`ADDR-001` BR-014, `D-242`).
+///
+/// 🔑 Mang <see cref="ParentCodes"/> **cần để hành động** ⇒ phát qua **outbox** trong **cùng UoW** với
+/// dòng lô `DaApDung` (nguyên tử với dữ liệu). Mất sự kiện ⇒ chỉ trễ xoá cache (TTL 24 h chặn) ⇒ **không**
+/// phải dữ liệu nghiệp vụ, nhưng vẫn dùng outbox để không có trạng thái "lô đã áp, instance khác giữ cache cũ".
+///
+/// 📌 Phần tử `null` = danh sách **tỉnh** (con của `parentCode = null`).
+/// 🔒 KHÔNG chứa nội dung địa chỉ/PII — chỉ khoá cache.
+/// </summary>
+[Serializable]
+public class AddressCacheInvalidatedEto
+{
+    public Guid EventId { get; set; } = Guid.NewGuid();
+
+    public DateTime OccurredOn { get; set; } = DateTime.UtcNow;
+
+    public Guid? TenantId { get; set; }
+
+    public int SchemaVersion { get; set; }
+
+    /// <summary>
+    /// Danh sách `parentCode` cần xoá (hợp của danh mục **mới** và danh mục **hiện có trước commit**);
+    /// `null` = danh sách tỉnh. Thiếu vế "hiện có" ⇒ tỉnh vừa biến mất giữ cache con tới hết TTL.
+    /// </summary>
+    public List<string?> ParentCodes { get; set; } = [];
+}
 ///
 /// 📌 Consumer: `Sales` (gợi ý địa chỉ ở checkout), `WEB-*` (xoá cache), `NOT-*`.
 /// 🔒 **KHÔNG** chứa nội dung địa chỉ — cùng lý do như <see cref="AddressChangedEto"/>.

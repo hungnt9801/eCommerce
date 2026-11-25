@@ -373,6 +373,14 @@ public static class eCommerceConsts
 
             /// <summary>Xác minh địa chỉ (bắt buộc căn cứ) — tách khỏi `Manage`.</summary>
             public const string Verify = Default + ".Verify";
+
+            /// <summary>
+            /// 🆕 `WP-18` (`D-238`) — **NẠP DANH MỤC ĐVHC** (`ImportDatasetAsync`). Side **`Host`**.
+            /// 🔒 Không dùng lại `Manage` của `ADDR-004` (nghĩa là "sửa `Address` dùng chung"): người được
+            /// sửa địa chỉ dùng chung **không** đương nhiên được thay danh mục địa lý toàn hệ thống.
+            /// 📌 Khai **cả hai nơi** (hằng số + `eCommercePermissionDefinitionProvider`).
+            /// </summary>
+            public const string CatalogImport = Default + ".Catalog.Import";
         }
     }
 

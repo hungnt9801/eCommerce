@@ -22,7 +22,12 @@ namespace eCommerce.Address.Application;
 /// </summary>
 [DependsOn(
     typeof(AddressDomainModule),
-    typeof(AbpDddApplicationModule)
+    typeof(AbpDddApplicationModule),
+    // 🆕 `WP-18`: `IDistributedCache<>`/`IDistributedCache<T,TKey>` cho cache danh mục (`D-242`).
+    typeof(Volo.Abp.Caching.AbpCachingModule),
+    // 🆕 `WP-18`: metric + `LockErrorCodes` nằm ở Kernel; phải có module trong đồ thị để type
+    // `ISingletonDependency` (eCommerceMetrics) được đăng ký DI khi module này được dùng độc lập.
+    typeof(eCommerce.Kernel.eCommerceKernelModule)
 )]
 public class AddressApplicationModule : AbpModule
 {

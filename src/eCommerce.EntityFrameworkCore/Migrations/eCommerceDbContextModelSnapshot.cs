@@ -2228,6 +2228,101 @@ namespace eCommerce.Migrations
                         });
                 });
 
+            modelBuilder.Entity("eCommerce.Address.CatalogSyncRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("ConcurrencyStamp");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<string>("ErrorCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ErrorType")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("ExtraProperties")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("ExtraProperties");
+
+                    b.Property<DateTime>("ImportedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ImportedBy")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<int>("Outcome")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SchemaVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SoDoiTen")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SoDong")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SoMoLai")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SoThemMoi")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("SourceHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("SourceName")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<DateTime>("StartedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.Property<int>("Trigger")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "SchemaVersion", "ImportedAtUtc")
+                        .HasDatabaseName("IX_AddrCatalogSyncRuns_TenantId_SchemaVersion_ImportedAtUtc");
+
+                    b.HasIndex("TenantId", "SchemaVersion", "Outcome", "ImportedAtUtc")
+                        .HasDatabaseName("IX_AddrCatalogSyncRuns_TenantId_SchemaVersion_Outcome_ImportedAtUtc");
+
+                    b.ToTable("AddrCatalogSyncRuns", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_AddrCatalogSyncRuns_Outcome", "\"Outcome\" in (0, 1, 2)");
+
+                            t.HasCheckConstraint("CK_AddrCatalogSyncRuns_SchemaVersion", "\"SchemaVersion\" in (1, 2)");
+
+                            t.HasCheckConstraint("CK_AddrCatalogSyncRuns_SourceHashHex", "\"SourceHash\" IS NULL OR \"SourceHash\" ~ '^[0-9a-f]{64}$'");
+                        });
+                });
+
             modelBuilder.Entity("eCommerce.Catalog.Brand", b =>
                 {
                     b.Property<Guid>("Id")

@@ -13,6 +13,9 @@
     <!-- 🔒 Cần `eCommerceConsts` (permission `eCommerce.Addresses.*` + mã lỗi khoá phân tán).
          📌 Cùng hướng đã có: `Customers.Application` → `eCommerce.Domain.Shared` (module → shared: HỢP LỆ). -->
     <ProjectReference Include="..\..\..\src\eCommerce.Domain.Shared\eCommerce.Domain.Shared.csproj" />
+    <!-- 🆕 `WP-18` (`ADDR-001`): metric NFR-008/009 + `LockErrorCodes.KhongGianhDuocKhoa` (`D-82`).
+         📌 Hợp lệ theo tiền lệ 15 module đã trỏ `shared/eCommerce.Kernel` (`arch` B6). -->
+    <ProjectReference Include="..\..\..\shared\eCommerce.Kernel\eCommerce.Kernel.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -21,6 +24,11 @@
          (`ADDR-004` §8.2 #1). 📌 Đây là **package** (không phải project ref) nên KHÔNG tạo phụ thuộc vòng;
          và nó không kéo theo `eCommerce.EntityFrameworkCore`. -->
     <PackageReference Include="Volo.Abp.EntityFrameworkCore" />
+    <!-- 🆕 `WP-18`: cache phân tán cho tra cứu danh mục (`D-242`) + khoá phân tán dùng chung job/import (`D-82`).
+         📌 Cả hai đã nằm trong `Directory.Packages.props` cùng phiên bản ABP 10.7.0 — khai TƯỜNG MINH vì
+         project dùng TRỰC TIẾP kiểu của chúng (không phó mặc phụ thuộc bắc cầu). -->
+    <PackageReference Include="Volo.Abp.Caching" />
+    <PackageReference Include="Volo.Abp.DistributedLocking" />
   </ItemGroup>
 
 </Project>
