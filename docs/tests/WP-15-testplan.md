@@ -111,9 +111,16 @@ và dòng `[CD-D67]` in thêm `THATBAI-HONG = 0`. Điều kiện chờ mới **k
    **ĐỎ**; 0 lần `409` ⇒ `CHUA CHAY`. **Nợ `D-214` ② giữ nguyên:** chỉ cần thêm đường tạo xung đột **tất định**
    (`psql` giữ `InvItems` + bump `ConcurrencyStamp`) nếu **3** lượt CI liền có `0` lần `409`; **không** dùng
    `negative-control.ps1` trên `P15` làm bằng chứng chính (lượt 0 lần `409` thì đột biến không đổi màu).
-3. **`negative-control.ps1`:** chỉ chạy được **sau khi ORCH commit** nhánh (tệp đích phải đã commit, không dirty).
-   Bằng chứng trước commit: NC-1 (đột biến tay) + `-TuKiem` CA1–CA6 + 5 ca unit.
+3. **`negative-control.ps1` — ĐÃ CHẠY:** sau commit `dab2567`, **NC-1 DAT** — đột biến ⇒ **exit 1** (`7/8` ca, log
+   `artifacts/negative-control/20261125-195435-do.log`); khôi phục byte gốc ⇒ **exit 0** (`8/8`, log
+   `…-xanh.log`); bằng chứng ghi ở mục "Negative control" cuối tệp. Bằng chứng trước commit: NC-1 (đột biến tay) +
+   `-TuKiem` CA1–CA6 + 5 ca unit.
 4. **`check-agent-artifact.ps1 -Kind testplan`:** **không áp dụng** — WP-15 không có SRS/BR (đòi `-Srs` có `BR` §1).
 5. **Nợ môi trường — ĐÃ ĐÓNG:** `-DayDu` **chạy trọn 20/20 · 836,4 s** trên cây cuối (log
    `artifacts/dayDu-wp15.txt`), gồm **E2E 8/8** và **`P15 DAT`**; `pnpm@10.22.0` đã cài toàn cục cho user,
    shim corepack ở `%TEMP%` đã bỏ.
+
+## Negative control
+| Ngay | Ma | Tep:dong | Dot bien | Lenh test | Bang chung |
+|---|---|---|---|---|---|
+| 2026-11-25 | NC-1 | tools/probe-cong-tai-lieu.ps1:411 | if ($giaTri[0].StartsWith('Tạm duyệt')) { -> if ($true) { | pwsh -NoProfile -File tools/probe-cong-tai-lieu.ps1 -TuKiem | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
