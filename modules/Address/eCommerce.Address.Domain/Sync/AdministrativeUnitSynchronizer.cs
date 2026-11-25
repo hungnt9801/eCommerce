@@ -304,16 +304,6 @@ public static class AdministrativeUnitSynchronizer
         return deThem;
     }
 
-    /// <summary>
-    /// ⚠️ **Overload TƯƠNG THÍCH NGƯỢC** cho call site cũ chưa truyền căn cứ (test của `WP-14`).
-    ///
-    /// 🔒 **KHÔNG dùng cho code mới**: code sản phẩm (worker, `ImportDatasetAsync`) **PHẢI** gọi overload có
-    /// `legalBasis = danhMuc.Nguon` để `DoiTen` ghi đúng căn cứ pháp lý (`D-239`). Overload này chỉ tồn tại
-    /// để không phá build khi vùng ghi của vai `be` không bao gồm `test/**`; QA thay call site cũ rồi xoá nó.
-    /// </summary>
-    public static IReadOnlyList<AdministrativeUnit> ApDung(KeHoachDongBo keHoach, Guid? tenantId = null)
-        => ApDung(keHoach, "Tương thích ngược: kế hoạch đã có lý do thay đổi", tenantId);
-
     /// <summary>Khoá so khớp: **cấp + mã** (trong cùng một phiên bản schema).</summary>
     private static string Khoa(AdministrativeLevel level, string code)
         => $"{level}|{code.Trim()}";

@@ -39,6 +39,9 @@ public enum CatalogSyncOutcome
 /// </summary>
 public class CatalogSyncRun : CreationAuditedAggregateRoot<Guid>, IMultiTenant
 {
+    /// <summary>Độ dài cột `SourceName` (`character varying(512)`) — vượt thì **ném**, không cắt im lặng.</summary>
+    public const int DoDaiSourceNameToiDa = 512;
+
     public Guid? TenantId { get; protected set; }
 
     public int SchemaVersion { get; private set; }
@@ -134,7 +137,7 @@ public class CatalogSyncRun : CreationAuditedAggregateRoot<Guid>, IMultiTenant
             TenantId = tenantId,
             SchemaVersion = schemaVersion,
             Trigger = trigger,
-            SourceName = string.IsNullOrWhiteSpace(sourceName) ? null : sourceName.Trim(),
+            SourceName = CatChuoi(sourceName, DoDaiSourceNameToiDa, nameof(sourceName)),
             SourceHash = sourceHash,
             StartedAtUtc = ChuanHoaUtc(startedAtUtc),
             ImportedAtUtc = ChuanHoaUtc(importedAtUtc),
@@ -147,6 +150,25 @@ public class CatalogSyncRun : CreationAuditedAggregateRoot<Guid>, IMultiTenant
             SoMoLai = soMoLai,
             SoDong = soDong
         };
+    }
+
+    /// <summary>Chuẩn hoá chuỗi tuỳ chọn; **ném** nếu vượt độ dài cột (không cắt im lặng).</summary>
+    private static string? CatChuoi(string? giaTri, int doDaiToiDa, string tenThamSo)
+    {
+        if (string.IsNullOrWhiteSpace(giaTri))
+        {
+            return null;
+        }
+
+        var sach = giaTri.Trim();
+
+        if (sach.Length > doDaiToiDa)
+        {
+            throw new ArgumentException(
+                $"Giá trị vượt độ dài tối đa {doDaiToiDa} ký tự.", tenThamSo);
+        }
+
+        return sach;
     }
 
     /// <summary>Npgsql yêu cầu `DateTime` Kind=UTC cho cột `timestamptz`; chuẩn hoá thay vì để lỗi lúc ghi.</summary>

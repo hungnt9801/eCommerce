@@ -281,6 +281,15 @@ public class AdministrativeUnitAppService : ApplicationService
                 .WithData("lyDo", "SourceName rỗng");
         }
 
+        // Cột `SourceName` là `varchar(512)` ⇒ chặn > 512 TRƯỚC khoá để trả 400 (không 500 lúc commit UoW)
+        // và không để lại dòng lô rác; hàng rào chung ở `CatalogSyncRun.Ghi` cho nhánh worker.
+        if (input.SourceName.Trim().Length > CatalogSyncRun.DoDaiSourceNameToiDa)
+        {
+            throw new BusinessException(AddressErrorCodes.MaKhongHopLe)
+                .WithData("truong", nameof(input.SourceName))
+                .WithData("lyDo", "SourceName vượt 512 ký tự");
+        }
+
         var rows = (input.Rows ?? [])
             .Select(r => new DonViNguon(
                 input.SchemaVersion,
