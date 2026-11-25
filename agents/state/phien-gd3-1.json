@@ -7,7 +7,7 @@
   "nhanhGoc": "main",
   "refs": "D-216",
   "ghiChu": "Phương án B (D-216): mỗi WP một nhánh cắt từ đỉnh tich-hop/gd3; dong-wp đẩy fast-forward vào tich-hop/gd3 (M3, D-114); PR xếp chồng mở một lần cuối chuỗi.",
-  "capNhat": "2026-11-25T23:37:26+07:00",
+  "capNhat": "2026-11-25T23:45:19+07:00",
   "rows": [
     {
       "id": "W16-1",
@@ -67,13 +67,17 @@
       "dependsOn": [
         "W16-2"
       ],
-      "status": "chua",
-      "phien": [],
+      "status": "xong",
+      "phien": [
+        "N73"
+      ],
       "nhanh": "feat/gd3-wp16-bang-gia",
       "buoc": "F3 FE",
-      "evidence": null,
+      "evidence": "F3 FE WP khong co FE (SRS 10 -> WEB-001); admin-web 23 route khong Pricing/tier-price; grep ma FE 0 hit; W16-2 khong doi DTO => schema.d.ts khong doi; kiem-tat-ca exit 0 (10/10, 290.5s); build 0 error/9 warning; unit 1999/1999; integration 96/96; FE typecheck 0 loi; Vitest 25/25; gen:api schema.d.ts khong doi; DB 25/25; test cong 60/60; kiem-link PASS 238 tep/932 link; hooks 49/49; 0 .cs/0 migration",
       "ghiChu": null,
-      "handover": null
+      "handover": "docs/nhanh/handover-n73.md",
+      "batDau": "2026-11-25T23:38:15+07:00",
+      "xongLuc": "2026-11-25T23:45:19+07:00"
     },
     {
       "id": "W16-4",
