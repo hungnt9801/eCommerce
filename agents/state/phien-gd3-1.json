@@ -7,7 +7,7 @@
   "nhanhGoc": "main",
   "refs": "D-216",
   "ghiChu": "Phương án B (D-216): mỗi WP một nhánh cắt từ đỉnh tich-hop/gd3; dong-wp đẩy fast-forward vào tich-hop/gd3 (M3, D-114); PR xếp chồng mở một lần cuối chuỗi.",
-  "capNhat": "2026-11-26T03:28:25+07:00",
+  "capNhat": "2026-11-26T05:02:57+07:00",
   "rows": [
     {
       "id": "W16-1",
@@ -240,16 +240,17 @@
       "dependsOn": [
         "W18-3"
       ],
-      "status": "dang-lam",
+      "status": "xong",
       "phien": [
         "N80"
       ],
       "nhanh": "feat/gd3-wp18-dia-chi",
       "buoc": "F4–F5",
-      "evidence": null,
+      "evidence": "F4 QA: testplan 14/14 + 16/16 BR DAT x2; unit 2166/2166 (+77); integration 106/106 (+10); schema.sql regen + PostgreSqlSchemaTests 93->94; 11 NC do->xanh; probe 10/10 (P2 D-233 404+0501); NFR-001 p95 1.353ms/<0.01ms; 28 P3 arch closed; D-248..D-251; F5 REV PASS P1=0 x2; kiem-tat-ca 10/10 305.2s; commit 540ccd2",
       "ghiChu": null,
-      "handover": null,
-      "batDau": "2026-11-26T03:28:25+07:00"
+      "handover": "docs/nhanh/handover-n80.md",
+      "batDau": "2026-11-26T03:28:25+07:00",
+      "xongLuc": "2026-11-26T05:02:56+07:00"
     },
     {
       "id": "W18-5",
