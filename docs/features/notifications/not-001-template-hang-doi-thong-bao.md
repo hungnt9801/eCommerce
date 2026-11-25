@@ -8,7 +8,7 @@
 | **Ưu tiên** | **Must have** — `NOT-002` **phụ thuộc cứng**: `NOT-002` **không** tự dựng nội dung, mọi yêu cầu vào `NOT-002` **phải** có nội dung + `IdempotencyKey` do `NOT-001` cấp (`docs/features/notifications/not-002-kenh-gui-email-sms-zalo-oa.md:82,108,488`) |
 | **Trạng thái** | 🟡 `Draft` — chờ review |
 | **Người viết / người review** | *(điền)* / **Kiến trúc trưởng + BA + Vận hành** (có state machine) |
-| **Phiên bản / ngày** | `v0.4 — 24/11/2026` (WP-14 vòng sửa 2: docreview vòng 2 — 5 P2 #13–#17) |
+| **Phiên bản / ngày** | `v0.5 — 26/11/2026` (WP-22 — vòng sửa 3: docreview vòng 3 — 2 P2 #24/#26 theo `D-208`) |
 | **Tài liệu liên quan** | `NOT-002` (kênh gửi — **ranh giới sống còn**) · `XC-002` (outbox/inbox + idempotency) · `XC-003` (khoá phân tán) · `XC-004` (`[Authorize]`, permission, bất biến `NULLS NOT DISTINCT`) · `XC-005` (log/correlationId/metric) · `XC-001` (tiền tệ/làm tròn) · `XC-006` + `ACC-001` (thuế & xuất liệu kế toán) · `REP-001`/`REP-002` (read-model) · `docs/design-doc-guidelines.md` |
 
 ---
@@ -200,6 +200,7 @@ stateDiagram-v2
     DangBanGiao --> DaBanGiao : «NOT-002 nhận yêu cầu»
     DangBanGiao --> ChoGui : «lease hết hạn hoặc NOT-002 lỗi tạm thời»
     DangBanGiao --> Loi : «lỗi vĩnh viễn khi bàn giao»
+    DangBanGiao --> HetHan : «quá ExpiresAtUtc khi NOT-002 lỗi tạm thời»
     ChoGui --> HetHan : «quá ExpiresAtUtc»
     ChoGui --> DaHuy : «huỷ có lý do»
     DaBanGiao --> [*]
@@ -226,8 +227,9 @@ stateDiagram-v2
 | 10 | `ChoGui`/`Moi` → `DaHuy` | Có lý do huỷ **và** `Status` **chưa** hấp thụ | Người có `…Queue.Cancel` | `QueueEvent(Cancelled, reason)` | **NÉM** `0011` nếu cố huỷ mục **đã** `DaBanGiao`/`HetHan`/`Loi` |
 | 11 | `Loi` (mục gốc **không** đổi) → **mục MỚI** `[*]` → `Moi` | Người phát lại có `…Queue.Retry` **và** khoá mới `{khóa gốc}:replay-{n}` **chưa** tồn tại | Người vận hành | **tạo** `QueueItem` mới (`RootItemId` = mục gốc) + `QueueEvent(Enqueued)` trên mục mới; ghi `QueueEvent(Replayed, by = userId)` trên **mục gốc** (không đổi trạng thái) | **NÉM** `403` nếu thiếu quyền; **NÉM** `0010` nếu cố dùng lại khoá gốc |
 | 12 | `DaBanGiao`/`HetHan`/`DaHuy` → `*` (lùi) | 🚨 **KHÔNG BAO GIỜ** | — | — | **NÉM** `0011` (`InvalidStatusTransition`) — trạng thái kết thúc là **hấp thụ** |
-| 13 | `Moi`/`ChoGui` → `DaHuy` | Trùng **cửa sổ khử trùng** (ADR-12) — **pre-check** theo partial UNIQUE index **trước** khi ghi | `NotificationQueueAppender` | Tạo mục rồi chuyển **ngay** `Moi`/`ChoGui` → `DaHuy` (**cùng UoW**) với `CoalesceBucketStartUtc = NULL` (**cố ý** ra ngoài partial index ⇒ index chỉ là **backstop**) + `QueueEvent(Suppressed, reason = window)` | **NÉM** `0019` nếu tầng gọi yêu cầu **bắt buộc** gửi (chế độ `Force`); **đua** hai luồng: bên thua bắt `23505` ⇒ ghi mục `DaHuy` bucket `NULL` + event + `0019`, **không** có mục gửi thứ hai |
-| 14 | `DangBanGiao` → `ChoGui` | `NOT-002` trả **lỗi tạm thời** (NCC timeout/quota — `not-002…:108`) **và** `now <= ExpiresAtUtc` | Job bàn giao | `QueueEvent(RetryScheduled)` + `AttemptCount++` + `LastErrorCode`; giữ `ScheduledAtUtc` cho nhịp sau | **NÉM** `0011` nếu mục **không** ở `DangBanGiao`; quá `ExpiresAtUtc` ⇒ đi hàng 9 (`HetHan`) thay vì thử lại; **phân biệt hàng 7** (lease hết hạn **không** tăng `AttemptCount`) |
+| 13 | `Moi`/`ChoGui` → `DaHuy` | Trùng **cửa sổ khử trùng** (ADR-12) — **pre-check** theo partial UNIQUE index **trước** khi ghi | `NotificationQueueAppender` | Tạo mục rồi chuyển **ngay** `Moi`/`ChoGui` → `DaHuy` (**cùng UoW**) với `CoalesceBucketStartUtc = NULL` (**cố ý** ra ngoài partial index ⇒ index chỉ là **backstop**) + `QueueEvent(Suppressed, reason = window)` | **NÉM** `0019` nếu tầng gọi yêu cầu **bắt buộc** gửi (chế độ `Force`); **đua** hai luồng: bên thua bắt `23505` ⇒ **rollback** UoW đã lỗi rồi ghi **lần hai trong UoW MỚI `requiresNew`** (mục `DaHuy` bucket `NULL` + **đúng 1** `QueueEvent(Suppressed)`) ⇒ `0019` — bên thua **CÓ** ghi mục + event, **không** có mục gửi thứ hai; dùng lại UoW đã abort ⇒ PostgreSQL 17 trả `25P02` (mất dấu vết hoặc `500` thay vì `0019`) |
+| 14 | `DangBanGiao` → `ChoGui` | `NOT-002` trả **lỗi tạm thời** (NCC timeout/quota — `not-002…:108`) **và** `now <= ExpiresAtUtc` | Job bàn giao | `QueueEvent(RetryScheduled)` + `AttemptCount++` + `LastErrorCode`; giữ `ScheduledAtUtc` cho nhịp sau | **NÉM** `0011` nếu mục **không** ở `DangBanGiao`; quá `ExpiresAtUtc` ⇒ **không** đi hàng 14 — job gọi **hàng 15** (`HetHan`) thay vì thử lại; **phân biệt hàng 7** (lease hết hạn **không** tăng `AttemptCount`) |
+| 15 | `DangBanGiao` → `HetHan` | `NOT-002` trả **lỗi tạm thời** **và** `now > ExpiresAtUtc` (`ExpiresAtUtc` **không** null) | Job bàn giao | `QueueEvent(Expired)` + **metric**; `AttemptCount` **không** tăng | `ExpiresAtUtc` null ⇒ job **không gọi** hàm hết hạn (tin không hạn); **gọi hàm** khi chưa quá hạn ⇒ **NÉM** `0011` (còn hạn ⇒ đi hàng 14); **phân biệt hàng 9** (mục đang `ChoGui`) |
 
 > ⚠️ **Trạng thái nguy hiểm nhất là `DangBanGiao` kẹt.** Nếu app bị kill **giữa** lời gọi `NOT-002` và lúc commit,
 > mục ở lại `DangBanGiao` **vĩnh viễn** nếu không có **lease**. Hệ quả: tin **không bao giờ** tới người nhận
@@ -728,7 +730,7 @@ Lời gọi **duy nhất** mà `NOT-001` thực hiện là **in-process** tới 
 | **L2** | **UNIQUE** `(TenantId, IdempotencyKey)` `NULLS NOT DISTINCT` | `NotificationQueueItems` (**DB**) | Trùng khi 2 luồng **đồng thời** xếp cùng việc | 2 mục trong hàng đợi ⇒ **chắc chắn** 2 tin ra người thật |
 | **L3** | `UPDATE … WHERE Status = ChoGui` + khoá `notification:queue-dispatch:{tenantId}` | job bàn giao (**DB + Redis**) | **Bàn giao 2 lần** một mục | 2 job cùng gọi `NOT-002` cho **1** mục ⇒ gửi trùng (Redis chết ⇒ **chỉ** lớp DB `UPDATE` còn chặn) |
 | **L4** | `IdempotencyKey` **nguyên vẹn** truyền sang `NOT-002` (unique **riêng** của `NOT-002`) | `NOT-002` (**DB**) | Trùng **giữa hai tầng** (ta nghĩ "chưa gửi", `NOT-002` đã gửi) | Mất tầng khử trùng **độc lập** — hỏng đúng khi `NOT-001` gặp sự cố (lease hết hạn, restart) |
-| **L5** | **Khử trùng nội dung theo cửa sổ** — partial UNIQUE `(TenantId, RecipientHash, ChannelKind, ContentFingerprint, CoalesceBucketStartUtc)` (ADR-12) | `NotificationQueueItems` (**DB**) | Cùng **nội dung** tới **cùng người** trong **một cửa sổ** (spam) | Người nhận có thể nhận 2 tin **giống nhau** do tầng trên gọi sai khoá — vẫn **không** gửi trùng kỹ thuật, nhưng **trải nghiệm** và **chi phí** xấu. Cơ chế: **pre-check** → ghi mục `DaHuy` + bucket `NULL` (ngoài index); index là **backstop**, đua `23505` ⇒ `0019` |
+| **L5** | **Khử trùng nội dung theo cửa sổ** — partial UNIQUE `(TenantId, RecipientHash, ChannelKind, ContentFingerprint, CoalesceBucketStartUtc)` (ADR-12) | `NotificationQueueItems` (**DB**) | Cùng **nội dung** tới **cùng người** trong **một cửa sổ** (spam) | Người nhận có thể nhận 2 tin **giống nhau** do tầng trên gọi sai khoá — vẫn **không** gửi trùng kỹ thuật, nhưng **trải nghiệm** và **chi phí** xấu. Cơ chế: **pre-check** → ghi mục `DaHuy` + bucket `NULL` (ngoài index); index là **backstop**; đua `23505` ⇒ **rollback** UoW lỗi rồi ghi lần hai (`DaHuy` + `Suppressed`) trong **UoW MỚI `requiresNew`** ⇒ `0019` |
 
 > 🎯 **Trả lời câu hỏi bắt buộc của `XC-003` BR-007 — *"bỏ lock đi, DB có chặn không?"* ⇒ CÓ.**
 > L2 + L3 (`UPDATE … WHERE`) + L5 đều nằm ở **PostgreSQL**. Khi **Redis chết** (mà app **vẫn chạy** —
@@ -906,21 +908,22 @@ tổng nào. Đây là loại sai sót rất khó phát hiện khi test (`docs/d
 | Chuyển trạng thái sai / **lùi** | lập trình sai / callback sai | **NÉM** `0011`; **không** lùi trạng thái | `409` `0011` |
 | Cố bàn giao mục đã hấp thụ | job chồng chạy sai | **NÉM** `0014` + log `Error` (đây là **lỗi thật**, không phải trùng bình thường) | `409` `0014` |
 | Bàn giao mục thuộc lô chưa duyệt | lập trình sai | **NÉM** `0018` | `409` `0018` |
-| **Bị khử trùng cửa sổ** | tầng trên gọi lặp trong cửa sổ | **pre-check** ⇒ mục ghi `DaHuy` với bucket `NULL` + `QueueEvent(Suppressed)` + metric; **không** gửi. Đua hai luồng ⇒ bên thua `23505` trả `0019` + metric (**không** ghi mục gửi thứ hai) | `409` `0019` (**không** phải lỗi hệ thống) |
+| **Bị khử trùng cửa sổ** | tầng trên gọi lặp trong cửa sổ | **pre-check** ⇒ mục ghi `DaHuy` với bucket `NULL` + `QueueEvent(Suppressed)` + metric; **không** gửi. Đua hai luồng: bên thua bắt `23505` ⇒ **rollback UoW đã lỗi** rồi ghi **lần hai trong UoW MỚI `requiresNew`** (mục `DaHuy` bucket `NULL` + **đúng 1** `QueueEvent(Suppressed)`) ⇒ `0019` — bên thua **CÓ** ghi mục + event; **không** ghi mục gửi thứ hai | `409` `0019` (**không** phải lỗi hệ thống) |
 | **Mục kẹt `DangBanGiao`** | app bị kill giữa lời gọi | Job khôi phục lease ⇒ về `ChoGui`; lần sau **cùng** `IdempotencyKey` ⇒ `NOT-002` khử trùng | bình thường + metric |
 | **Không giành được khoá bàn giao** | tiến trình khác đang chạy | **`SkipIfBusy`**: bỏ qua nhịp + log `Debug` + metric `lock_skipped_total` (job định kỳ — `XC-003` D10) | bình thường |
 | **Redis chết** | sự cố hạ tầng | Lock **vô hiệu** nhưng app **vẫn chạy** (`AbortOnConnectFail = false` — `eCommerceHttpApiHostModule.cs:137–145`). ⇒ Bất biến **được DB bảo vệ**: UNIQUE idempotency + `UPDATE … WHERE` (§7.4) | bình thường |
 | `NOT-002` trả về **đã gửi rồi** (`AlreadySent`) | hai tầng cùng khoá | Ghi `DaBanGiao` + `ResponseReused = true`; **không** coi là lỗi | bình thường |
 | `NOT-002` trả **lỗi vĩnh viễn** | định danh sai / template bị từ chối | Mục `Loi` + lưu **mã lỗi của `NOT-002`** + metric; **không** tự thử lại vô hạn | `409`/`400` theo mã `NOT-002` |
-| `NOT-002` trả **lỗi tạm thời** | NCC timeout, quota | Chuyển `DangBanGiao → ChoGui` (**hàng 14 §3**) + `QueueEvent(RetryScheduled)` + `AttemptCount++` + `LastErrorCode`; việc **thử lại** do `NOT-002` sở hữu (`not-002…:108`); quá `ExpiresAtUtc` ⇒ `HetHan` | bình thường |
+| `NOT-002` trả **lỗi tạm thời** | NCC timeout, quota | Chuyển `DangBanGiao → ChoGui` (**hàng 14 §3**) + `QueueEvent(RetryScheduled)` + `AttemptCount++` + `LastErrorCode`; việc **thử lại** do `NOT-002` sở hữu (`not-002…:108`); quá `ExpiresAtUtc` ⇒ `HetHan` (**hàng 15 §3** — **không** thử lại) | bình thường |
 | Thiếu `Locale` bản dịch | chưa dịch | Dùng `Locale` mặc định của tenant + **log `Warning` + metric** — **không** im lặng | bình thường |
-| Mục quá `ExpiresAtUtc` | hàng đợi tồn đọng | `HetHan` + `QueueEvent(Expired)` + metric; **không** bàn giao (OTP cũ gửi ra là **vô nghĩa và gây hoang mang**) | bình thường |
+| Mục quá `ExpiresAtUtc` | hàng đợi tồn đọng | `HetHan` (**hàng 9 §3** nếu đang `ChoGui`; **hàng 15 §3** nếu đang `DangBanGiao` khi `NOT-002` lỗi tạm thời) + `QueueEvent(Expired)` + metric; **không** bàn giao (OTP cũ gửi ra là **vô nghĩa và gây hoang mang**) | bình thường |
 | `TenantId` rỗng trong lô/template | thiếu ngữ cảnh tenant | **NÉM** lỗi tham số — **cấm** khoá toàn cục cho tài nguyên tenant (`XC-003` BR-003) | `400`/`500` |
 | Lỗi đã xử lý bị **nuốt** | lập trình sai | **Bắt buộc** log ≥ `Warning` + `ErrorCode` (BR-018; kế thừa `XC-005` BR-013) | — |
 
 **Chiến lược transaction:** mọi thao tác ghi đi qua **Unit of Work** của ABP
 (`TransactionBehavior.Auto` — `src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs:60–64`).
 `QueueItem` + `QueueEvent` + **outbox** ghi **cùng một transaction** (BR-007).
+Ngoại lệ **duy nhất**: nhánh đua khử trùng `23505` (hàng 13 §3) ghi lần hai trong **UoW MỚI `requiresNew`** sau khi UoW lỗi rollback — **cấm** dùng lại transaction đã abort (`25P02`).
 Phạm vi **khoá phân tán bao NGOÀI** Unit of Work (theo `XC-003` §12 — `docs/features/cross-cutting/XC-003-khoa-phan-tan-quy-uoc.md:412`)
 ⇒ khoá được nhả **sau** khi transaction kết thúc. 🚨 **Lời gọi `NOT-002` nằm NGOÀI transaction của ta** — đây là
 lý do **bắt buộc** có `UPDATE … WHERE Status = ChoGui` (ghi ý định **trước** khi gọi) + **lease**: nếu gọi trong
@@ -963,7 +966,7 @@ transaction thì một lời gọi mạng chậm sẽ **giữ transaction mở**
 | TC-02 | 🚨 **Cùng `IdempotencyKey` 1.000 lần (có song song)** | **Integration** | vòng lặp 1.000, một nửa chạy `Task.WhenAll` | **1** `QueueItem`; 999 lần `AlreadyQueued`; **1** lần bàn giao | **BR-002**, BR-013, NFR-002 |
 | TC-03 | Trùng khoá nhưng **payload khác** | Unit | cùng khoá, `Data` khác | **NÉM** `eCommerce:Notification:0010` | **BR-002** |
 | TC-04 | Render là **hàm thuần** | Unit (**không cần DB**) | cùng input gọi 100 lần | 100 kết quả **giống hệt**; 0 truy vấn DB | **ADR-06**, NFR-001 |
-| TC-05 | **Từng nhánh state machine §3** | Unit (lý thuyết hoá) | **14** hàng §3 (gồm hàng 12 cấm lùi, hàng 14 lỗi tạm thời) | hợp lệ ⇒ đổi trạng thái + **đúng 1** event; **sai ⇒ NÉM** `0011`; hàng 14 tăng `AttemptCount`, hàng 7 **không** tăng | **BR-005** |
+| TC-05 | **Từng nhánh state machine §3** | Unit (lý thuyết hoá) | **15** hàng §3 (gồm hàng 12 cấm lùi, hàng 14 lỗi tạm thời, hàng 15 hết hạn khi đang `DangBanGiao`) | hợp lệ ⇒ đổi trạng thái + **đúng 1** event; **sai ⇒ NÉM** `0011`; hàng 14 tăng `AttemptCount`, hàng 7 **không** tăng, hàng 15 phát `Expired` và **không** tăng `AttemptCount` | **BR-005** |
 | TC-06 | **Lùi trạng thái** `DaBanGiao` → `ChoGui` | Unit | gọi thẳng hàm | **NÉM** `0011` | **BR-005** |
 | TC-07 | **Version đã `Published` là bất biến** | Unit | gọi hàm sửa `BodyText` | **NÉM** `0016`; `ContentHash` **không** đổi | **BR-003**, ADR-02, NFR-004 |
 | TC-08 | Mục **ghim** version: publish version mới **không** đổi nội dung mục cũ | Unit | publish v2 sau khi có mục ghim v1 | nội dung mục **không** đổi | **BR-003**, **ADR-02** |
@@ -988,7 +991,7 @@ transaction thì một lời gọi mạng chậm sẽ **giữ transaction mở**
 | TC-27 | **Cách ly tenant** | **Integration** | tenant B đọc/ghi template/lô/mục của A | không thấy / không ghi được | NFR-010 |
 | TC-28 | Báo cáo **không** query bảng giao dịch | Unit (quét) | quét lớp reporting/UI | **0** truy vấn tới `NotificationQueueEvents` | **BR-020**, NFR-009 |
 | TC-29 | 🔒 **Mọi unique index mới có `NULLS NOT DISTINCT`** | **Integration** | đọc `pg_indexes` | **0** index thiếu thuộc tính; danh sách đích danh khớp | **BR-021**, `XC-004` BR-009, §11 |
-| TC-30 | **Khử trùng cửa sổ** (marketing) | **Integration** (PostgreSQL) | 2 tin marketing cùng nội dung trong cửa sổ, chạy **tuần tự và** 2 luồng song song | lần 2: mục `DaHuy` + bucket `NULL` + `QueueEvent(Suppressed)`, trả `0019`; đua ⇒ bên thua `23505` ⇒ `0019`, **1** mục gửi | **BR-005**, ADR-12 |
+| TC-30 | **Khử trùng cửa sổ** (marketing) | **Integration** (PostgreSQL) | 2 tin marketing cùng nội dung trong cửa sổ, chạy **tuần tự và** 2 luồng song song | lần 2: mục `DaHuy` + bucket `NULL` + `QueueEvent(Suppressed)`, trả `0019`; đua ⇒ bên thua `23505` ⇒ `0019` + mục `DaHuy` có **đúng 1** `QueueEvent(Suppressed)` (ghi trong UoW mới sau rollback), **1** mục gửi | **BR-005**, ADR-12 |
 | TC-31 | **Không** khử trùng tin giao dịch | Unit | 2 tin `Transactional` cùng nội dung | **cả hai** được xếp hàng (`CoalesceWindowSeconds = 0`) | ADR-12 |
 | TC-32 | **Lease hết hạn ⇒ khôi phục** | **Integration** | mục kẹt `DangBanGiao`, lease quá hạn | về `ChoGui` + `QueueEvent(LeaseExpired)` + metric; lần bàn giao sau **cùng** khoá | §3 hàng 7, NFR-012 |
 | TC-33 | Cấm gọi app service module khác | Unit (quét tham chiếu) | quét `using`/DI của module | **0** tham chiếu tới `I*AppService` của module khác | **BR-019**, ADR-09 |
@@ -1227,6 +1230,7 @@ public class NotificationConventionTests
 | `v0.2` | 24/11/2026 | BA (WP-14) | **Đối chiếu mô hình Nhanh**: áp `D-191` (PII mặc định TẮT — template/người nhận/ETO/log/metric) và `D-193` (chi phí gửi là chi phí kỳ, sổ 8 cột, cấm `OrderId`/JOIN bảng đơn); `D-17` (enum chỉ thêm ở cuối). **Thêm 7 TC** (`TC-35…TC-41`) phủ 6 BR còn thiếu + PII. **Cập nhật hiện trạng code**: 16 metric (registry không đếm cứng) · test chốt **93** index · `ChannelOrderPulledEto` đã có `CorrelationId` · outbox/inbox ABP đã có · `eCommerce.Kernel` đã có `Money` |
 | `v0.3` | 24/11/2026 | BA (WP-14, vòng sửa) | **Sửa docreview vòng 1** (6 P2): §7.1 `ChannelOrderPulledEto` **đã có** `CorrelationId`, chỉ `ChannelShopTokenRefreshedEto` thiếu · phát lại = **mục mới** (bỏ cạnh `Loi → ChoGui`, sửa §1/§3/§8.1) · thu hẹp BR-005 + nêu no-op **có log + metric** cho hàng 3/5/9 · F5 `TaxLockKeys` **đã sửa** + test · F11 sửa thành "chưa có test cho module `Notification`" (repo có 136 tệp test). **Áp quyết định**: `D-197` (một module `Notification`, đóng Q10) · `D-198` (giữ lô + `ChoDuyet`, chỉ marketing — đóng Q1) · `D-199` (GĐ3 chỉ `Text`, mã `0020`, dải `0010–0020` — đóng Q2); thêm BR-023…025, NFR-018, `TC-42…TC-45` |
 | `v0.4` | 24/11/2026 | BA (WP-14, vòng sửa 2) | **Sửa docreview vòng 2** (5 P2): #13 lô **không tồn tại** ⇒ `0017`, `0018` **một** nghĩa · #14 thêm `QueueEvent(QueuedForApproval)` cho `Moi → ChoDuyet` · #15 khử trùng cửa sổ **pre-check** + mục `DaHuy` bucket `NULL`, index là backstop, đua `23505` ⇒ `0019` · #16 giữ enum **`ChannelKind`** (`D-197`) + ghi nợ đổi tên `NotificationChannelKind` ở `NOT-002` (§14.3 e, `TC-44`) · #17 thêm hàng 14 `DangBanGiao → ChoGui` cho `NOT-002` lỗi tạm thời (`AttemptCount++`) |
+| `v0.5` | 26/11/2026 | BA (WP-22, vòng sửa 3) | **Sửa docreview vòng 3 — 2 P2 theo `D-208`** (điều kiện trước WP code): **#24** thêm **hàng 15** `DangBanGiao → HetHan` (guard `now > ExpiresAtUtc`, event `Expired`) thay cho câu "đi hàng 9" — cạnh mới có trong sơ đồ §3, §12, `TC-05` · **#26** nhánh đua `23505` ghi lần hai trong **UoW MỚI `requiresNew`** sau rollback (§3 hàng 13, §7.4 L5, §12, `TC-30` khẳng định **đúng 1** `QueueEvent(Suppressed)`) |
 
 ---
 
