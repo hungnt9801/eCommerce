@@ -7,7 +7,7 @@
   "nhanhGoc": "main",
   "refs": "D-216",
   "ghiChu": "Phương án B (D-216): mỗi WP một nhánh cắt từ đỉnh tich-hop/gd3; dong-wp đẩy fast-forward vào tich-hop/gd3 (M3, D-114); PR xếp chồng mở một lần cuối chuỗi.",
-  "capNhat": "2026-11-26T02:03:39+07:00",
+  "capNhat": "2026-11-26T03:11:02+07:00",
   "rows": [
     {
       "id": "W16-1",
@@ -190,16 +190,17 @@
       "dependsOn": [
         "W18-1"
       ],
-      "status": "dang-lam",
+      "status": "xong",
       "phien": [
         "N78"
       ],
       "nhanh": "feat/gd3-wp18-dia-chi",
       "buoc": "F3 BE",
-      "evidence": null,
+      "evidence": "kiem-tat-ca exit 0 (10/10, 304.3s); build 0 error/9 warning; unit 2089/2089 (+68); integration 96/96; NC-N78-1/2 do->xanh; check-feature-doc DAT x2; kiem-link PASS; migration Add_Addr001/Add_Addr002 applied sau pg_dump 197121B; D-243; commit 0b2ea6f",
       "ghiChu": null,
-      "handover": null,
-      "batDau": "2026-11-26T02:03:39+07:00"
+      "handover": "docs/nhanh/handover-n78.md",
+      "batDau": "2026-11-26T02:03:39+07:00",
+      "xongLuc": "2026-11-26T03:11:02+07:00"
     },
     {
       "id": "W18-3",
