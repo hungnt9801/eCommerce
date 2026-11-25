@@ -7,7 +7,7 @@
   "nhanhGoc": "main",
   "refs": "D-216",
   "ghiChu": "Phương án B (D-216): mỗi WP một nhánh cắt từ đỉnh tich-hop/gd3; dong-wp đẩy fast-forward vào tich-hop/gd3 (M3, D-114); PR xếp chồng mở một lần cuối chuỗi.",
-  "capNhat": "2026-11-26T03:11:02+07:00",
+  "capNhat": "2026-11-26T03:27:20+07:00",
   "rows": [
     {
       "id": "W16-1",
@@ -215,13 +215,17 @@
       "dependsOn": [
         "W18-2"
       ],
-      "status": "chua",
-      "phien": [],
+      "status": "xong",
+      "phien": [
+        "N79"
+      ],
       "nhanh": "feat/gd3-wp18-dia-chi",
       "buoc": "F3 FE",
-      "evidence": null,
+      "evidence": "probe -CheDo Code -WP WP-18 exit 0; pnpm gen:api 51/51 + schema.d.ts khong doi (0 path address); fe verdict KHONG_CO_FE_CONTRACT (0 Address controller, 0 admin-web address route, BFF chi /api/v1); kiem-tat-ca exit 0 (10/10, 279.6s); unit 2089/2089; check-agent-artifact -Kind decision DAT (116 dong, D-244..D-247); kiem-link PASS (948 link/1523 backtick); mermaid 213/0; hooks 49/49; done kem ly do tu SRS (ADDR-002 §10 -> WEB-001, §6.2 ABP /api/app, arch §7.1 khong co ca UI); 0 .cs/0 test/0 migration",
       "ghiChu": null,
-      "handover": null
+      "handover": "docs/nhanh/handover-n79.md",
+      "batDau": "2026-11-26T03:12:14+07:00",
+      "xongLuc": "2026-11-26T03:27:20+07:00"
     },
     {
       "id": "W18-4",
