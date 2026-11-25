@@ -31,7 +31,7 @@
 | **BR-ADDR-002-005** (thay đổi mã không im lặng; đếm đúng ở dòng lô) | `CarrierAddressMappingSourceRulesTests.cs` · `BR005_hang_rao_3_chi_dem_CHUYEN_MOI_sang_NghiNgo_qua_tung_luot` · `BR005_hang_rao_3_dung_MAU_SO_la_so_anh_xa_CHUA_NghiNgo` · `BR005_doi_ten_anh_xa_DA_NghiNgo_van_sinh_CapNhatTen_nhung_KHONG_vao_tu_so` · 🆕 `CarrierAddressAppServiceTests.cs` · `BR005_luot_moi_nhat_BiChan_van_tra_luot_DaApDung_va_LatestRunOutcome_1` · `CarrierAddressMappingSynchronizerTests.cs` · `Ten_doi_thi_CAP_NHAT_TEN_va_entity_TU_HA_muc_tin_cay` · `Ma_bien_mat_thi_DANH_DAU_NGHI_NGO_chu_KHONG_XOA` | Unit + app service | ✅ |
 | **BR-ADDR-002-006** (đổi tên ghi đè tại chỗ, hạ `NghiNgo`, giữ đơn vị đích) | `test/eCommerce.Tests/AddressCarrier/CarrierAddressMappingTests.cs` · TC-09 (`CapNhatTuDongBo` đổi tên ⇒ `NghiNgo`, giữ `OurAdministrativeUnitId`/`MatchMethod`) · `CarrierAddressMappingSynchronizerTests.cs` · `Ten_doi_thi_CAP_NHAT_TEN_va_entity_TU_HA_muc_tin_cay` | Unit (domain) | ✅ |
 | **BR-ADDR-002-007** (unique index có `TenantId` phải `NULLS NOT DISTINCT`) | `test/eCommerce.IntegrationTests/PostgreSqlAddressSyncTests.cs` · `UX_UnmappedCodes_chan_MA_LA_TRUNG_trong_CUNG_luot_khi_TenantId_NULL` · `UX_UnmappedCodes_cho_phep_CUNG_ma_o_HAI_luot_khac_nhau` · `PostgreSqlSchemaTests.cs` (đếm **94** index + tên `UX_AddrCarrierSyncRunUnmappedCodes_Tenant_SyncRun_Code`) | Integration (PG) | ✅ |
-| **BR-ADDR-002-008** (`[Authorize]` cấp class; permission định nghĩa trước khi dùng) | `AddressSyncInvariantTests.cs` · `BR008_permission_XAC_MINH_ANH_XA_co_hang_so_VA_duoc_dinh_nghia_trong_provider` · `AddressContractGuardTests.cs` · `TC18_TC19_ImportDatasetAsync_co_permission_rieng_khong_AllowAnonymous` · 🆕 `tools/probe-dia-chi.ps1` T02/T04 (`unmapped-codes`/`xac-minh` **401** không token) | Unit (reflection) + Runtime HTTP | ✅ |
+| **BR-ADDR-002-008** (`[Authorize]` cấp class; permission định nghĩa trước khi dùng) | `AddressSyncInvariantTests.cs` · `BR008_permission_XAC_MINH_ANH_XA_co_hang_so_VA_duoc_dinh_nghia_trong_provider` · `AddressContractGuardTests.cs` · `TC18_TC19_ImportDatasetAsync_co_permission_rieng_khong_AllowAnonymous` · 🆕 `AddressCarrierContractGuardTests.cs` · `D252_XacMinhAsync_co_Authorize_dung_permission_Verify` (`D-252`: `[Authorize]` **cấp method** đúng policy `Addresses.CarrierMapping.Verify` + định nghĩa side `Host`) · 🆕 `tools/probe-dia-chi.ps1` T02/T04 (`unmapped-codes`/`xac-minh` **401** không token) | Unit (reflection) + Runtime HTTP | ✅ |
 | **BR-ADDR-002-009** (chuyển `CarrierMappingStatus` chỉ qua method; đọc fail-closed) | `CarrierAddressResolverTraNguocTests.cs` · `BR009_HAI_anh_xa_DaXacMinh_cung_dich_thi_0510_khong_chon_bua` · `BR009_chi_co_ChuaXacMinh_va_NghiNgo_thi_0502` · `BR009_MOT_DaXacMinh_va_MOT_NghiNgo_thi_tra_DaXacMinh` · `BR009_dich_da_DONG_thi_0504_khong_tra_ma_hang` · `CarrierAddressMappingTests.cs` (TC-06 `Tra` ném `0502`) | Unit | ✅ |
 | **BR-ADDR-002-010** (khoá phân tán theo hãng; timeout hữu hạn; cấm lồng) | 🆕 `AddressCarrierContractGuardTests.cs` · `BR010_worker_dung_khoa_theo_hang_va_co_timeout_huu_han` (`address:carrier-sync` + `TimeSpan.FromSeconds(5)`) | Unit (quét mã nguồn) | ✅ |
 | **BR-ADDR-002-011** (cấm hard-code endpoint/bộ mã/cấp hãng) | 🆕 `AddressCarrierContractGuardTests.cs` · `BR011_khong_hard_code_endpoint_hang_trong_ma_nguon_Carrier` · 🆕 `CarrierAddressSyncWorkerTests.cs` · `TC29_BR011_adapter_nem_HttpRequestException_thi_Loi_ErrorType_va_KHONG_lo_SECRET` (dòng lô `Loi` chỉ lưu **tên kiểu**, không message/payload) | Unit (worker + quét mã nguồn) | ✅ |
@@ -50,7 +50,7 @@
 | Toàn bộ `test/eCommerce.Tests` | **2136** | **2165** | pass 2 +22, pass 3 +7 ca worker (không xoá/skip/nới test cũ); 0 fail |
 | App service `ADDR-002` (`CarrierAddressAppServiceTests`) | 0 | **9** | `GetUnmappedCodesAsync`: happy · 2.999 · lượt `BiChan` mới nhất · chưa có lượt ⇒ rỗng·không ném · phân trang · hãng rỗng (`0505` ×3) · hãng khác |
 | Worker `ADDR-002` (`CarrierAddressSyncWorkerTests`) | 0 | **7** | TC-07/BR-014 · TC-29/BR-011 · NC-4 · BR-003 (`DaApDung` 0 việc · `BiChan` 0506 · bận khoá · không adapter) |
-| Reflection / quét mã nguồn (`AddressCarrierContractGuardTests`) | 0 | **13** | `D-232`…`D-237` + BR-001/003/010/011/014/016 |
+| Reflection / quét mã nguồn (`AddressCarrierContractGuardTests`) | 0 | **14** | `D-232`…`D-237` + BR-001/003/010/011/014/016 + `D-252` (`W18-5`: ca khoá `[Authorize]` cấp method) |
 | API `/api/v1` (200 + 401/403) | — | **N/A** | `ADDR-002` là **ABP auto-API `/api/app/**`**, **không** có bề mặt `/api/v1` trong `gd3-1` (`D-245`). Đo **runtime HTTP** qua `tools/probe-dia-chi.ps1` (§3) |
 | UI Vitest / E2E Playwright | — | **N/A** | WP-18 **không có FE** (`D-244`/`D-247`) |
 | OpenAPI drift | — | **N/A** | Không đổi DTO `/api/v1` (`D-245`) |
@@ -58,6 +58,9 @@
 
 > 📌 `D-229` ② yêu cầu `dotnet test` **tăng số ca** (không giảm) — đo được **unit 2136 → 2165 (+29)**
 > (pass 2 +22, pass 3 +7), **integration 105 → 106 (+1)**; 0 fail.
+>
+> 📌 **Lượt đo `W18-5` (`N81`, `D-252`):** `dotnet test test/eCommerce.Tests --no-build` = **2170/2170** pass, 0 fail
+> (**2166 → 2170, +4** unit: 1 ca reflection `D252_…` ở `AddressCarrierContractGuardTests` + 3 ca `ADDR-001` P2 #2).
 
 ## 3. RUNTIME (P2 #1 / `D-233` / `D-243`) — bằng chứng HTTP THẬT
 
@@ -99,7 +102,10 @@ Route in bằng `tools/route-check.ps1 -Match carrier-address` (không đoán): 
 > Probe ghi nhận `CHUA DO DUOC` (không đánh dấu ✅, không tính là ca hỏng). Quyền vẫn được phủ bằng reflection
 > (§1 BR-008) nhưng **không thay** được hành vi 403 runtime. Khối 4 bước đo 403 đã có trong
 > `tools/probe-dia-chi.ps1` và sẽ chạy ngay khi Host thêm Identity HTTP API.
-> **Nợ chủ `qa`, hạn `W18-5`** — xem §6 #3.
+> **Nợ chủ `qa`, hạn `release`** — `D-252` **thay hạn `W18-5` của `D-249` bằng `release`** (dòng hàng đợi
+> `Xem lại trước = release` ⇒ cổng release **ĐỎ** tới khi người duyệt); gỡ khi `WEB-001` (BE/contract `D-245` + `D-247`
+> (a)(c)) có `/api/v1` + màn hiện **403 thân thiện**, hoặc khi Host expose `/api/identity/**`. Xem §6 #3.
+> 🔒 **Giữ nguyên** khối `⑦` probe + nhánh `ChuaDo`: `D-252` **cấm** đổi `ChuaDo` ⇒ `Kq $true` hay ghi "403 ✅".
 
 ## 4. Negative control
 
@@ -116,15 +122,17 @@ Route in bằng `tools/route-check.ps1 -Match carrier-address` (không đoán): 
 | 2026-11-26 | NC-3 | modules/Address/eCommerce.Address.Domain/Carrier/CarrierAddressMappingResolver.cs:167 | TraNguoc tra anh xa dau thay vi NEM 0510 | dotnet test test/eCommerce.Tests/eCommerce.Tests.csproj --filter "FullyQualifiedName~CarrierAddressResolverTraNguocTests" --nologo -v q | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
 | 2026-11-26 | NC-5 | modules/Address/eCommerce.Address.Domain/Sync/CarrierAddressMappingSynchronizer.cs:132 | Bo Trim ma hang (BR-013/D-84) | dotnet test test/eCommerce.Tests/eCommerce.Tests.csproj --filter "FullyQualifiedName~CarrierAddressMappingSourceRulesTests" --nologo -v q | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
 | 2026-11-26 | NC-2 | modules/Address/eCommerce.Address.Application/Sync/CarrierAddressSyncWorker.cs:178 | NC-2: bo requiresNew khi mo UoW ghi dong lo DaApDung (D-248/arch 7.2) | dotnet test test/eCommerce.Tests/eCommerce.Tests.csproj --filter "FullyQualifiedName~CarrierAddressSyncWorkerTests" --nologo -v q | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
+| 2026-11-26 | NC-6 (`D-252`) | modules/Address/eCommerce.Address.Application/CarrierAddressMappingAppService.cs:127 | Bo policy Verify o [Authorize] cap METHOD cua XacMinhAsync (con [Authorize] trong) => moi user dang nhap xac minh duoc | dotnet test test/eCommerce.Tests/eCommerce.Tests.csproj --filter "FullyQualifiedName~D252_XacMinhAsync_co_Authorize_dung_permission_Verify" --nologo -v q | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
 
-**Kết luận NC:** **4/4 đỏ → xanh** (đo 26/11/2026 `N80` pass 3). Sau mỗi ca `git status --porcelain -- modules/` **rỗng**
+**Kết luận NC:** **5/5 đỏ → xanh** (đo 26/11/2026; `W18-5`/`N81` thêm NC-6 cho `D-252`). Sau mỗi ca `git status --porcelain -- modules/` **rỗng**
 (script tự khôi phục byte gốc + tự kiểm lại). Bản đồ tới §7.2 của `ADDR-002-arch.md`:
 NC-1 ↔ arch **NC-1** (hàng rào 3 đếm chuyển mới `D-87`); NC-3 ↔ arch **NC-3** (`TraNguoc` > 1 `DaXacMinh` ⇒ `0510`);
 NC-5 ↔ arch **NC-5** (`Trim`/`Ordinal` mã hãng BR-013); NC-2 ↔ arch **NC-2** (`D-248`: mở UoW **không** `requiresNew`
 ⇒ thay đổi của worker dùng chung vùng chờ UoW ngoài ⇒ `CompleteAsync` của UoW ngoài commit chúng dù lượt thất bại ⇒
 `TC07_…_0_anh_xa_doi` **đỏ** đúng 1 ca, 6 ca còn lại vẫn xanh — xem log `artifacts/negative-control/`).
 Arch **NC-4** (gộp `BiChan`/`Loi`) được phủ **hành vi** bằng ca `NC4_adapter_nem_BusinessException_ma_ngoai_hang_rao_thi_Loi_khong_BiChan`.
-Arch **NC-5** (khuyến nghị) đã chạy ở pass 2.
+Arch **NC-5** (khuyến nghị) đã chạy ở pass 2. **NC-6 ↔ `D-252`** (bỏ policy `Addresses.CarrierMapping.Verify` ở `[Authorize]`
+**cấp method** của `XacMinhAsync` ⇒ ca reflection `D252_…` **đỏ**; khôi phục ⇒ xanh).
 
 ## 5. Cổng (đo trong phiên `N80`, ORCH tự chạy lại)
 
@@ -134,9 +142,9 @@ Arch **NC-5** (khuyến nghị) đã chạy ở pass 2.
 | `pwsh -File tools/route-check.ps1 -Match carrier-address` | **0** | in **6** route thật: `tra-ma-hang`/`lay-chua-xac-minh`/`{id}/xac-minh`/`phat-hien-sai-lech`/`resolve-carrier-address-code` (POST) + `unmapped-codes` (GET) |
 | `pwsh -File tools/probe-dia-chi.ps1` | **0** | **10/10 DAT** — `404/0501` · `400/0505` · `409/0502` · `409/0504` · `409/0510` · `unmapped-codes` 401/200 · `xac-minh` 401 (§3). **1 CHƯA ĐO ĐƯỢC**: 403 thiếu Verify — Host không expose `/api/identity/**` (§3.1, D-249) |
 | `dotnet build eCommerce.slnx --no-incremental` | **0** | **0 error / 9 warning** (= baseline, 0 warning mới) |
-| `dotnet test test/eCommerce.Tests --no-build` | **0** | **2165/2165** pass (baseline 2136 → **+29**) |
+| `dotnet test test/eCommerce.Tests --no-build` | **0** | **2170/2170** pass (`W18-5` đo 26/11/2026: 2166 → **+4**, trong đó 1 ca reflection `D252_…`; baseline pass 3 = 2136 → 2165) |
 | `dotnet test test/eCommerce.IntegrationTests/eCommerce.IntegrationTests.csproj --nologo` | **0** | **106/106** pass (105 → **+1**), Docker/Testcontainers `postgres:17-alpine` |
-| `tools/agents/negative-control.ps1` ×4 | **0** | 4/4 **đỏ (exit 1) → xanh (exit 0)** (NC-1/3/5 pass 2 + **NC-2 pass 3**); `modules/` sạch sau mỗi ca |
+| `tools/agents/negative-control.ps1` ×5 | **0** | 5/5 **đỏ (exit 1) → xanh (exit 0)** (NC-1/3/5 pass 2 + NC-2 pass 3 + **NC-6 `D-252` `W18-5`**); `modules/` sạch sau mỗi ca |
 
 ## 6. Chưa phủ / nợ / lệch có chủ
 
@@ -148,12 +156,15 @@ Arch **NC-5** (khuyến nghị) đã chạy ở pass 2.
 2. **`0503 AnhXaTrungLap`** không dựng được qua HTTP vì unique `(TenantId, CarrierCode, CarrierAddressCode)`
    `NULLS NOT DISTINCT` chặn trùng ở DB ⇒ nhánh `0503` không reachable bằng dữ liệu sạch. Cùng khối `options.Map`
    `D-233`; nhánh `0502/0504/0510` đã chứng minh **cơ chế map** ở runtime (§3).
-3. 🚨 **403 (thiếu `Addresses.CarrierMapping.Verify`) — CHƯA ĐO ĐƯỢC (`D-249`, pass 3).** Khối 4 bước đã có trong
-   `tools/probe-dia-chi.ps1` (tạo user thường qua `/api/identity/users`, password grant, `unmapped-codes` 200,
+3. 🚨 **403 (thiếu `Addresses.CarrierMapping.Verify`) — CÒN MỞ tới `release` (`D-249` + `D-252`).** Khối 4 bước đã có
+   trong `tools/probe-dia-chi.ps1` (tạo user thường qua `/api/identity/users`, password grant, `unmapped-codes` 200,
    `xac-minh` 403, dọn trong `finally`), nhưng **Host không expose Identity HTTP API** (thiếu `Volo.Abp.Identity.HttpApi`;
    `route-check -Match identity` = **0** route) ⇒ `POST /api/identity/users` = **404**. Probe ghi `CHUA DO DUOC`,
-   **không** đánh dấu 403 ✅. Quyền phủ bằng reflection (BR-008). **Nợ chủ `qa`, hạn `W18-5`** — chạy lại probe ngay khi
-   Host thêm Identity HTTP API (không sửa seed/quyền: `D-85`/P12).
+   **không** đánh dấu 403 ✅ (khối `ChuaDo` **giữ nguyên** — `D-252` cấm đổi thành "403 OK"). Quyền phủ bằng reflection:
+   `D252_XacMinhAsync_co_Authorize_dung_permission_Verify` (`D-252` ①(1) — khoá `[Authorize]` **cấp method** đúng policy
+   + định nghĩa side `Host`; NC-6 **đỏ → xanh**). **Nợ chủ `qa`, hạn `release`** (`D-252` thay hạn `W18-5` của `D-249`);
+   gỡ khi **`WEB-001`** (`D-245` + `D-247` (a)(c)) có `/api/v1` + màn hiện 403 thân thiện, hoặc khi Host thêm Identity HTTP API
+   (không sửa seed/quyền: `D-85`/P12).
 4. **NFR-001 (p95 ≤ 5 phút cho lượt ~3.000 đơn vị)** chưa đo riêng cho `ADDR-002` (harness worker hiện **không** có
    PostgreSQL/EF thật để đo thời gian ghi); `Nfr001AddressP95Tests` của pass 1 đo **tra xã** của `ADDR-001`, không cùng
    luồng đồng bộ mã hãng. Ca harness pass 3 là **hành vi** (đúng/sai), **không** phải ca hiệu năng — không đánh dấu NFR-001.

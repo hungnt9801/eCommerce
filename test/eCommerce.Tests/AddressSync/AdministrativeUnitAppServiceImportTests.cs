@@ -212,6 +212,36 @@ public class AdministrativeUnitAppServiceImportTests
         Assert.Empty(bo.Khoa.TenDaXin);
     }
 
+    // ── P2 #2 (`D-252`): SourceName > 512 ⇒ 0002 TRƯỚC khoá, 0 dòng lô — biên đúng 512 vẫn nạp ───
+
+    [Fact]
+    public async Task P2_2_SourceName_513_ky_tu_thi_NEM_0002_TRUOC_khoa_0_dong_lo()
+    {
+        var (sut, bo) = HaTangDiaChi.Dung();
+
+        var ex = await Assert.ThrowsAsync<BusinessException>(
+            () => sut.ImportDatasetAsync(Nguon(source: new string('x', 513))));
+
+        Assert.Equal(AddressErrorCodes.MaKhongHopLe, ex.Code);          // eCommerce:Address:0002
+        Assert.Equal("SourceName", ex.Data["truong"]);
+        Assert.Empty(bo.LoNap.TatCa);                                   // 0 dòng lô
+        Assert.Empty(bo.Uow.LanBegin);                                  // chưa mở UoW
+        Assert.Empty(bo.Khoa.TenDaXin);                                 // chưa chiếm khoá
+    }
+
+    [Fact]
+    public async Task P2_2_SourceName_dung_512_ky_tu_van_nap_duoc()
+    {
+        var (sut, bo) = HaTangDiaChi.Dung();
+        var source = new string('x', 512);
+
+        var kq = await sut.ImportDatasetAsync(Nguon(source: source));
+
+        Assert.Equal(CatalogSyncOutcome.DaApDung, kq.Outcome);
+        Assert.Equal(512, kq.SourceName!.Length);
+        Assert.Single(bo.LoNap.TatCa);
+    }
+
     // ── TC-25: khoá bận ⇒ NÉM eCommerce:Lock:0001 (KHÔNG TimeoutException), 0 dòng lô ──────────
 
     [Fact]

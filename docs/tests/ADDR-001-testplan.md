@@ -23,7 +23,7 @@
 | **BR-ADDR-001-006** (cấm cấp huyện cho địa chỉ MỚI) | `test/eCommerce.Tests/Address/AdministrativeUnitTests.cs` · `KHONG_tao_duoc_don_vi_cap_huyen_o_schema_2_cap` · `KiemTraBaCap_o_schema_2_cap_bi_TU_CHOI_theo_luat` | Unit | ✅ |
 | **BR-ADDR-001-007** (danh tính bất biến; `DoiTen` + `LegalBasis`; hàng rào 5) | `test/eCommerce.Tests/AddressSync/AdministrativeUnitSynchronizerWp18Tests.cs` · `BR007_DoiTen_thieu_can_cu_phap_ly_thi_NEM_0009_va_KHONG_doi_ten` · `BR007_nguon_doi_ParentCode_cua_ma_DA_CO_thi_NEM_0008_va_khong_ghi_de_ParentCode` · 🆕 `AddressContractGuardTests.cs` · `TC12_khong_co_public_setter_tren_danh_tinh_va_ten` · `TC12_DoiTen_bat_buoc_tham_so_can_cu_khong_co_default` | Unit (domain + reflection) | ✅ |
 | **BR-ADDR-001-008** (seed/nạp idempotent — không trùng, không đổi hash) | `test/eCommerce.Tests/AddressSync/AddressSourceHashTests.cs` · `BR009_chay_lai_cung_du_lieu_thi_CUNG_hash` · `BR009_thu_tu_dong_nguon_KHONG_doi_hash` · 🆕 `AdministrativeUnitAppServiceImportTests.cs` · `TC21c_import_HAI_lan_cung_du_lieu_thi_HAI_dong_lo_cung_SourceHash` | Unit | ✅ |
-| **BR-ADDR-001-009** (mọi lượt nạp ghi lô + `SourceHash`; lượt từ chối vẫn ghi) | 🆕 `AdministrativeUnitAppServiceImportTests.cs` · `TC21b_import_hop_le_tra_CatalogSyncRunDto_cua_luot_minh` · `TC21c_…` · `TC21f_TC24e_doi_ParentCode_thi_NEM_0008_va_dong_tu_choi_CON_DOC_DUOC` · `TC21_loi_khong_mong_doi_thi_ghi_dong_lo_Loi_roi_nem_lai` · 🆕 `test/eCommerce.IntegrationTests/PostgreSqlAddressSyncTests.cs` · `TC21f_TC24e_dong_TU_CHOI_o_transaction_rieng_CON_DOC_DUOC_sau_rollback` · 🆕 `test/eCommerce.Tests/AddressSync/AdministrativeUnitSynchronizerTests.cs` · `BR009_hang_rao_0b_cap_ngoai_AdministrativeLevel_thi_NEM_0605_khong_phai_0002` (`D-251`/`AQ6`: cấp ngoài enum ⇒ `0605` — dòng lô `BiChan`, **không** `0002`/`Loi`) | Unit (domain + app svc) + Integration (PG) | ✅ |
+| **BR-ADDR-001-009** (mọi lượt nạp ghi lô + `SourceHash`; lượt từ chối vẫn ghi) | 🆕 `AdministrativeUnitAppServiceImportTests.cs` · `TC21b_import_hop_le_tra_CatalogSyncRunDto_cua_luot_minh` · `TC21c_…` · `TC21f_TC24e_doi_ParentCode_thi_NEM_0008_va_dong_tu_choi_CON_DOC_DUOC` · `TC21_loi_khong_mong_doi_thi_ghi_dong_lo_Loi_roi_nem_lai` · `P2_2_SourceName_513_ky_tu_thi_NEM_0002_TRUOC_khoa_0_dong_lo` · `P2_2_SourceName_dung_512_ky_tu_van_nap_duoc` (`D-252` P2 #2: cột `varchar(512)` ⇒ 513 NÉM `0002` trước khoá, 0 dòng lô; đúng 512 vẫn nạp) · 🆕 `test/eCommerce.Tests/AddressSync/CatalogSyncRunTests.cs` · `P2_2_Ghi_sourceName_513_ky_tu_thi_NEM_ArgumentException_khong_tra_entity` (hàng rào domain cho nhánh worker/job) · 🆕 `test/eCommerce.IntegrationTests/PostgreSqlAddressSyncTests.cs` · `TC21f_TC24e_dong_TU_CHOI_o_transaction_rieng_CON_DOC_DUOC_sau_rollback` · 🆕 `test/eCommerce.Tests/AddressSync/AdministrativeUnitSynchronizerTests.cs` · `BR009_hang_rao_0b_cap_ngoai_AdministrativeLevel_thi_NEM_0605_khong_phai_0002` (`D-251`/`AQ6`: cấp ngoài enum ⇒ `0605` — dòng lô `BiChan`, **không** `0002`/`Loi`) | Unit (domain + app svc) + Integration (PG) | ✅ |
 | **BR-ADDR-001-010** (guard khởi động fail-closed) | `test/eCommerce.Tests/AddressSync/AddressSyncGuardTests.cs` · `BR010_nguon_cong_khai_o_moi_truong_NGOAI_allowlist_thi_NEM_fail_closed` · `BR010_baseUrl_rong_thi_COI_la_nguon_cong_khai_mac_dinh_va_NEM_o_Production` · `BR010_host_KHAC_nguon_cong_khai_thi_guard_KHONG_y_kien_ke_ca_o_Production` | Unit (hàm thuần) | ✅ |
 | **BR-ADDR-001-011** (cấp suy từ hằng + kiểm cấp và tồn tại mã) | `test/eCommerce.Tests/Address/AdministrativeUnitTests.cs` · `Dia_chi_2_cap_hop_le` · `Khong_tra_duoc_xa_thi_FAIL_CLOSED` · `Huyen_khong_thuoc_tinh_thi_FAIL_CLOSED` · `Xa_khong_thuoc_huyen_thi_FAIL_CLOSED` | Unit | ✅ |
 | **BR-ADDR-001-012** (mọi entity Address có `DbSet`) | 🆕 `AddressContractGuardTests.cs` · `TC13_du_SAU_DbSet_module_Address_tren_DbContext_hop_nhat` (6 `DbSet`: `AdministrativeUnits` · `CatalogSyncRuns` · `CarrierAddressMappings` · `CarrierAddressSyncRuns` · `CarrierAddressSyncRunUnmappedCodes` · `Addresses`) | Unit (reflection) | ✅ |
@@ -51,8 +51,8 @@
 | Tầng | Trước (`N78`) | Sau (`N80`) | Ghi chú |
 |---|---|---|---|
 | Toàn bộ `test/eCommerce.Tests` | **2089** | **2136** | +47 ca mới (không xoá/skip/nới test cũ); 0 fail |
-| Unit + app service (`AddressSync`) | 90 | **137** | +47: `AddressContractGuardTests` 16 · `AddressCatalogCacheTests` 20 · `AdministrativeUnitAppServiceImportTests` 11 |
-| Application (app service `ADDR-001`) | 0 | **11** | **MỚI**: `AdministrativeUnitAppServiceImportTests` (TC-21/24/25/14) — dựng `new` + fake (`D-229`) |
+| Unit + app service (`AddressSync`) | 90 | **141** | +51: `AddressContractGuardTests` 16 · `AddressCatalogCacheTests` 20 · `AdministrativeUnitAppServiceImportTests` 13 (`W18-5`: +2 ca `D-252` P2 #2) · `CatalogSyncRunTests` 1 (`W18-5`) |
+| Application (app service `ADDR-001`) | 0 | **13** | **MỚI**: `AdministrativeUnitAppServiceImportTests` (TC-21/24/25/14 + 2 ca `D-252` P2 #2) — dựng `new` + fake (`D-229`) |
 | API `/api/v1` (200 + 401/403) | — | **N/A** | `ADDR-001` là **ABP auto-API `/api/app/**`**, **không** có bề mặt `/api/v1` trong `gd3-1` (`D-245`); kiểm quyền bằng reflection `TC-18/TC-19` (policy `Addresses.Catalog.Import`, `[Authorize]` cấp class, **không** `[AllowAnonymous]`) |
 | UI Vitest / E2E Playwright | — | **N/A** | WP-18 **không có FE** — `W18-3` kết luận `KHONG_CO_FE_CONTRACT` (`D-244`) |
 | OpenAPI drift | — | **N/A** | `W18-2`/`W18-6` không đổi DTO `/api/v1`; `pnpm gen:api` không đổi `schema.d.ts` (`D-244`/`D-245`) |
@@ -64,6 +64,9 @@
 > 📌 **Lượt đo cuối `N80` (sau ca `AQ6`/`D-251`, 26/11/2026):** `dotnet test test/eCommerce.Tests --no-build` =
 > **2166/2166** pass, 0 fail (đầu lượt **2165** → **+1**; các ca `W18-4` thêm sau lần đo `2136` ở trên gồm
 > harness worker `D-248` và các testplan pass tiếp).
+>
+> 📌 **Lượt đo `W18-5` (`N81`, `D-252` P2 #2):** `dotnet test test/eCommerce.Tests --no-build` = **2170/2170** pass,
+> 0 fail (**2166 → 2170, +4**: 2 ca app service + 1 ca domain `CatalogSyncRunTests` + 1 ca reflection `D252_…`).
 
 ## 3. NFR-001 — số đo p95 tra xã của tỉnh lớn nhất
 
@@ -96,13 +99,19 @@ Môi trường: Windows 10 Pro · PostgreSQL 17 (`postgres:17-alpine`, Testconta
 | 2026-11-26 | NC-5 | modules/Address/eCommerce.Address.Application/Caching/AddressCatalogCache.cs:66 | Bo co Address:Cache:Enabled=false => van dung cache thay vi doc DB | dotnet test test/eCommerce.Tests/eCommerce.Tests.csproj --filter "FullyQualifiedName~AddressCatalogCacheTests" | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
 | 2026-11-26 | NC-6 | modules/Address/eCommerce.Address.Domain/Sync/AdministrativeUnitSynchronizer.cs:217 | Vo hieu hang rao 5 => nguon doi ParentCode khong NEM 0008 | dotnet test test/eCommerce.Tests/eCommerce.Tests.csproj --filter "FullyQualifiedName~AdministrativeUnitSynchronizerWp18Tests" | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
 | 2026-11-26 | NC-7 | modules/Address/eCommerce.Address.Domain/AddressLockKeys.cs:19 | Them tien to ecommerce: vao khoa => tien to doi, cache/lock sai | dotnet test test/eCommerce.Tests/eCommerce.Tests.csproj --filter "FullyQualifiedName~AddressContractGuardTests" | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
+| 2026-11-26 | NC-8 (`D-251`) | modules/Address/eCommerce.Address.Domain/Sync/AdministrativeUnitSynchronizer.cs:345 | Vo hieu hoa guard Enum.IsDefined => cap 99 roi vao 0002 thay vi 0605 | dotnet test test/eCommerce.Tests/eCommerce.Tests.csproj --filter "FullyQualifiedName~AdministrativeUnitSynchronizerTests" | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
+| 2026-11-26 | NC-9 (`D-252` P2 #2) | modules/Address/eCommerce.Address.Application/AdministrativeUnitAppService.cs:286 | Vo hieu guard do dai SourceName o app service (>512 => luon false) => 513 roi xuong Ghi nem ArgumentException thay vi BusinessException 0002 | dotnet test test/eCommerce.Tests/eCommerce.Tests.csproj --filter "FullyQualifiedName~P2_2_SourceName_513_ky_tu_thi_NEM_0002_TRUOC_khoa_0_dong_lo" --nologo -v q | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
+| 2026-11-26 | NC-10 (`D-252` P2 #2) | modules/Address/eCommerce.Address.Application/AdministrativeUnitAppService.cs:286 | Doi dau so sanh > thanh >= o guard do dai => SourceName dung 512 bi tu choi oan | dotnet test test/eCommerce.Tests/eCommerce.Tests.csproj --filter "FullyQualifiedName~P2_2_SourceName_dung_512_ky_tu_van_nap_duoc" --nologo -v q | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
+| 2026-11-26 | NC-11 (`D-252` P2 #2, domain) | modules/Address/eCommerce.Address.Domain/CatalogSyncRun.cs:165 | Noi guard do dai SourceName o CatalogSyncRun.Ghi them 1 => 513 khong con nem ArgumentException | dotnet test test/eCommerce.Tests/eCommerce.Tests.csproj --filter "FullyQualifiedName~P2_2_Ghi_sourceName_513_ky_tu_thi_NEM_ArgumentException" --nologo -v q | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
 
-**Kết luận NC:** **8/8 đỏ → xanh** (đo 26/11/2026). `git status --porcelain -- modules/ src/ shared/` **rỗng** sau cả 8 ca
+**Kết luận NC:** **11/11 đỏ → xanh** (đo 26/11/2026; `W18-5`/`N81` thêm NC-9…NC-11 cho `D-252` P2 #2). `git status --porcelain -- modules/ src/ shared/` **rỗng** sau cả 8 ca
 (script tự khôi phục byte gốc + tự kiểm lại). Bản đồ tới §6.1 của `ADDR-001-arch.md`:
 NC-1 ↔ arch NC-1 (UoW riêng khi từ chối — đo qua phân loại `BiChan`/`Loi` + `requiresNew` ở test app service);
 NC-2 ↔ arch NC-2 (guard khởi động); NC-3 ↔ arch NC-6 (`DoiTen` căn cứ); NC-4/NC-5 ↔ phát sinh `D-242` (TTL + cờ `Enabled`);
 NC-6 ↔ arch NC-5 (hàng rào 5 ưu tiên trước hàng rào 4); NC-7 ↔ `D-82` (khoá một nguồn, không tiền tố đôi);
-**NC-8 ↔ `D-251`/`ADDR-001-AQ6`** (guard `Enum.IsDefined` trước `DoDaiMa` — vô hiệu hoá ⇒ cấp 99 rơi vào `0002` thay vì `0605`).
+**NC-8 ↔ `D-251`/`ADDR-001-AQ6`** (guard `Enum.IsDefined` trước `DoDaiMa` — vô hiệu hoá ⇒ cấp 99 rơi vào `0002` thay vì `0605`);
+**NC-9…NC-11 ↔ `D-252` P2 #2** (guard độ dài `SourceName`: vô hiệu guard app service ⇒ 513 rơi xuống `Ghi` ném `ArgumentException`;
+`>`→`>=` ⇒ đúng 512 bị từ chối oan; nới guard domain thêm 1 ⇒ 513 không còn fail-closed).
 arch NC-3 ("giữ early-return khi `!CoThayDoi`") và NC-4 ("bỏ xoá cache sau commit") được phủ **trực tiếp** bằng test
 (TC-21(c) `TC21c_import_HAI_lan…` và TC-14 `TC14_import_thi_xoa_cache…`) thay vì đột biến riêng — ghi nhận ở §6.
 
@@ -112,9 +121,9 @@ arch NC-3 ("giữ early-return khi `!CoThayDoi`") và NC-4 ("bỏ xoá cache sau
 |---|---|---|
 | `pwsh -File tools/agents/check-agent-artifact.ps1 -Kind testplan -Path docs/tests/ADDR-001-testplan.md -Srs docs/features/address/addr-001-tra-cuu-don-vi-hanh-chinh-2-cap.md` | **0** | `BR trong SRS=14 · chua co trong testplan=0 · KET QUA: DAT` |
 | `dotnet build eCommerce.slnx --no-incremental` | **0** | **0 error / 9 warning** (= baseline, 0 warning mới) |
-| `dotnet test test/eCommerce.Tests --no-build` | **0** | **2166/2166** pass (đầu lượt `AQ6` = 2165 → **+1**; mốc `2089 → 2136 (+47)` ở §2 là đo giữa phiên `W18-4`) |
+| `dotnet test test/eCommerce.Tests --no-build` | **0** | **2170/2170** pass (đầu lượt `W18-5` = **2166** → **+4**; mốc `2089 → 2136 (+47)` ở §2 là đo giữa phiên `W18-4`) |
 | `dotnet test test/eCommerce.IntegrationTests/eCommerce.IntegrationTests.csproj --nologo` | **0** | **105/105** pass (baseline 96 → **+9**), Docker/Testcontainers `postgres:17-alpine` |
-| `tools/agents/negative-control.ps1` ×8 | **0** | 8/8 **đỏ (exit 1) → xanh (exit 0)** |
+| `tools/agents/negative-control.ps1` ×11 | **0** | 11/11 **đỏ (exit 1) → xanh (exit 0)** (`W18-5` thêm NC-9…NC-11 cho `D-252` P2 #2) |
 
 ## 6. Chưa phủ / nợ / lệch có chủ
 
@@ -125,16 +134,13 @@ arch NC-3 ("giữ early-return khi `!CoThayDoi`") và NC-4 ("bỏ xoá cache sau
 3. **NFR-001** là **số đo tay** (mục §3), **không** phải cổng CI; đường nóng dùng fake in-memory (cận dưới).
 4. **API `/api/v1` 200 + 401/403**: `N/A` vì `ADDR-001` là ABP auto-API `/api/app/**` (`D-245`); quyền kiểm bằng
    reflection (TC-18/TC-19). Runtime probe `D-233` (`ADDR-002`) thuộc lượt qa sau.
-5. **Overload tương thích `ApDung(kế hoạch)`** — `D-250`: `qa` **đã đổi 4 call site test** sang dạng 2 tham số
-   (`AdministrativeUnitSynchronizerTests.cs:118,258,275` + `ProvincesOpenApiParserTests.cs:217` → `ApDung(kh, "test")`),
-   nên `grep "AdministrativeUnitSynchronizer.ApDung(" test/**` hiện **0** lời gọi 1 tham số. **Còn nợ chủ `be`:**
-   xoá overload `modules/Address/eCommerce.Address.Domain/Sync/AdministrativeUnitSynchronizer.cs:314-315` ở phiên BE kế
-   (hoặc cửa sổ BE của `W18-5`). **Hạn cứng: trước PR `tich-hop/gd3 → main`** — sau khi xoá, build **ĐỎ** nếu còn call site
-   1 tham số (cơ chế đỏ là trình biên dịch). **Không** để nợ này trôi qua PR `main`.
-6. **UI/E2E/OpenAPI drift**: `N/A` (WP-18 không có FE — `D-244`; không đổi DTO `/api/v1`).
-
-
-## Negative control
-| Ngay | Ma | Tep:dong | Dot bien | Lenh test | Bang chung |
-|---|---|---|---|---|---|
-| 2026-11-26 | NC-8 | modules/Address/eCommerce.Address.Domain/Sync/AdministrativeUnitSynchronizer.cs:345 | Vo hieu hoa guard Enum.IsDefined => cap 99 roi vao 0002 thay vi 0605 | dotnet test test/eCommerce.Tests/eCommerce.Tests.csproj --filter "FullyQualifiedName~AdministrativeUnitSynchronizerTests" | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
+5. ✅ **Overload tương thích `ApDung(kế hoạch)` — ĐÃ ĐÓNG (`D-250`, `N81`).** `qa` đã đổi 4 call site test sang dạng
+   2 tham số (`AdministrativeUnitSynchronizerTests.cs:118,258,275` + `ProvincesOpenApiParserTests.cs:217` →
+   `ApDung(kh, "test")`); `be` xoá overload ở `cea05f7` (`modules/Address/eCommerce.Address.Domain/Sync/AdministrativeUnitSynchronizer.cs`,
+   đoạn `ApDung(KeHoachDongBo, Guid?)` **đã biến mất**). Đo lại `N81`: `grep "AdministrativeUnitSynchronizer.ApDung("`
+   trên `test/ modules/ src/` = **0** lời gọi 1 tham số; build **0 error** ⇒ **0 call site mồ côi**.
+6. ✅ **P2 #2 (`SourceName` ≤ 512) — ĐÃ ĐÓNG (`N81`, `cea05f7` + ca `qa`).** Hàng rào app service (400 trước khoá) +
+   hàng rào domain `CatalogSyncRun.Ghi` (ném `ArgumentException` cho nhánh worker/job) đã có test: 2 ca ở
+   `AdministrativeUnitAppServiceImportTests` (513 ⇒ `0002`, 0 dòng lô, chưa chiếm khoá; đúng 512 vẫn nạp) + 1 ca
+   `CatalogSyncRunTests`; negative control NC-9…NC-11 **đỏ → xanh** (§4).
+7. **UI/E2E/OpenAPI drift**: `N/A` (WP-18 không có FE — `D-244`; không đổi DTO `/api/v1`).

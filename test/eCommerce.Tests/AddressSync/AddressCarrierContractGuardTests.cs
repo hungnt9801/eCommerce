@@ -1,6 +1,11 @@
 using System.Reflection;
 using eCommerce.Address;
 using eCommerce.Address.Carrier;
+using eCommerce.Permissions;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.DependencyInjection;
+using Volo.Abp.Authorization.Permissions;
+using Volo.Abp.MultiTenancy;
 
 namespace eCommerce.Tests.AddressSync;
 
@@ -211,6 +216,56 @@ public class AddressCarrierContractGuardTests
             .ToList();
 
         Assert.Empty(nghiVan);
+    }
+
+    // ── D-252: [Authorize] CẤP METHOD đúng permission Verify + định nghĩa ở Host ───────────────
+    //
+    // Lỗ thật của lưới cũ (`D-252` ② T8): `D235` chỉ so TÊN 6 method; `TC01` chỉ đòi `[Authorize]` cấp CLASS;
+    // `TC02` chỉ kiểm permission *khi* attribute có; `BR008` chỉ kiểm hằng ↔ định nghĩa. Không ca nào bắt
+    // việc XOÁ `[Authorize(...)]` cấp method của `XacMinhAsync` ⇒ xác minh ánh xạ (mở khoá vận đơn cho cả
+    // tenant) chỉ còn `[Authorize]` TRỐNG của class (mọi user đăng nhập đều xác minh được). Ca này khoá lại.
+
+    [Fact]
+    public void D252_XacMinhAsync_co_Authorize_dung_permission_Verify()
+    {
+        var method = typeof(CarrierAddressMappingAppService)
+            .GetMethod(nameof(CarrierAddressMappingAppService.XacMinhAsync));
+
+        Assert.NotNull(method);
+
+        // `inherit: false` ⇒ phải là attribute CẤP METHOD, không mượn `[Authorize]` trống của class.
+        var authorize = method!.GetCustomAttribute<AuthorizeAttribute>(inherit: false);
+
+        Assert.NotNull(authorize);
+        Assert.Equal(eCommerceConsts.Permissions.Addresses.CarrierMappingVerify, authorize!.Policy);
+        Assert.NotEqual(eCommerceConsts.Permissions.Addresses.Manage, authorize.Policy);
+
+        // Permission tương ứng phải có định nghĩa và định nghĩa ở side Host (`D-85`, khuôn BR008/TC18).
+        Assert.Equal("eCommerce.Addresses.CarrierMapping.Verify",
+            eCommerceConsts.Permissions.Addresses.CarrierMappingVerify);
+
+        var boiCanh = new PermissionDefinitionContext(new ServiceCollection().BuildServiceProvider());
+        new eCommercePermissionDefinitionProvider().Define(boiCanh);
+
+        var dinhNghia = boiCanh.Groups.Values
+            .SelectMany(g => g.Permissions)
+            .SelectMany(LayCaCay)
+            .Single(p => p.Name == eCommerceConsts.Permissions.Addresses.CarrierMappingVerify);
+
+        Assert.Equal(MultiTenancySides.Host, dinhNghia.MultiTenancySide);
+    }
+
+    private static IEnumerable<PermissionDefinition> LayCaCay(PermissionDefinition goc)
+    {
+        yield return goc;
+
+        foreach (var con in goc.Children)
+        {
+            foreach (var chau in LayCaCay(con))
+            {
+                yield return chau;
+            }
+        }
     }
 
     // ── tiện ích đọc mã nguồn ──────────────────────────────────────────────────────────────────
