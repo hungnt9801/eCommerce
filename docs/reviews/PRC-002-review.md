@@ -1,0 +1,50 @@
+# Review code `PRC-002` — 26/11/2026
+
+- Nhánh: `feat/gd3-wp16-bang-gia` · base `origin/tich-hop/gd3` @ `e481094` · head `685b659`
+- Diff: `git diff e481094..HEAD -- modules/ src/ shared/` = **368 dòng sản phẩm / 7 tệp**; toàn bộ nhánh **2833 dòng thêm · 99 dòng xoá / 37 tệp** (phần lớn là `docs/**` và `test/**`); **0 migration · 0 đổi schema/DTO/route**
+- SRS: `docs/features/pricing/prc-002-gia-bac-thang-pipeline-tinh-gia.md` (mục đã đọc: §1 21 BR · §8 · §9 · §14 · §22) · `PRC-002-arch.md` (§3 · §6.2 · §6.3 · §6.4 · §7 R4/R8/R10) · `docs/nhanh/decisions.md` (`D-218`…`D-230`) · `docs/nhanh/handover-n73.md` §2/§5 · `docs/tests/PRC-002-testplan.md`
+- Phạm vi review: 4 hạng mục `W16-2` (setting snapshot · ngưỡng số bậc `0011` · guard tổng âm `0010` · 4 tên index NND) + `W16-4` (test/testplan/NC). `docs/features/**` và `docs/nhanh/**` **không** phải đối tượng review (đã có DOCREV `DOC-OK`).
+
+## Đã kiểm
+
+| Nhóm | Kết quả |
+|---|---|
+| A. Hợp đồng & đúng đắn | Khớp BR: snapshot B1 đọc 3 setting **một lần**; `ChinhSachSnapshot` additive (tham số cuối có mặc định) chỉ **1** nơi dựng; `TinhTienDon` overload 5 tham số, 4 tham số uỷ quyền `Reject`; mã `0010`/`0011` append cuối dải (0001…0011 liên tục); enum `ChinhSachTongDonAm` thêm ở cuối; `TinhGioAsync` cùng `IdempotencyKey` trả bản đã lưu, **0** ghi thêm. |
+| B. Tiền, tồn kho, dữ liệu | `TinhTienDon` Reject NÉM `0010` kèm `tong`/`giamGiaCapDon`/`phi`; Clamp kẹp **trước** phân bổ R2 nên `Σ dòng = tổng` (test 3b) và `BiKep/SoKep` đi qua kết quả; 0 `double`/`float`, 0 `.Amount ==`, 0 `Math.Round`/`decimal.Round` trong `modules/Pricing` (TC10/11/12 xanh); 0 migration — không có đường lùi DB cần thiết. |
+| C. Bảo mật & multi-tenant | `[Authorize]` **cấp class** giữ nguyên ở `PriceCalculationAppService:28` + `TierPriceSetAppService:21`; setting khai `WithProviders(D,C,G,T)` — **loại `User`**, đúng `Application|Tenant`; không đổi `MapInboundClaims`/permission/route; không log secret/PII (log chỉ số tiền + mã policy). |
+| D. Test & vận hành | `dotnet test test/eCommerce.Tests --no-build` → **2021/2021** (baseline 1999, **+22**); 4 negative control có dòng `exit 1 → exit 0` thật (NC-1…NC-4) với `git status` sạch; test 1c đếm **lượt đọc từng khoá**; test 2a khẳng định **`SoLanChen = 0`** khi ném `0011` (`RepoGia` NÉM `NotSupportedException` ở thành viên không dùng); `TC13` đếm đúng 4 điểm làm tròn/dòng. `dotnet test test/eCommerce.IntegrationTests` **chưa chạy trong N74** — baseline `N73` là **96/96**; 4 tên index đã đối chiếu **có thật** trong migration (`20261015101649_Pricing_PriceList_And_ChannelPrice.cs:107/123/129`, `20261015110229_Prc002_PriceCalculationRecords.cs:53`) và khớp tiền tố test `indexname like '{ten}%'` + `indexdef like '%NULLS NOT DISTINCT%'`. |
+
+**Bằng chứng đồ thị (bắt buộc khi kết luận về code):**
+
+- `graph: codegraph_explore "TinhTienDon Tinh PhanBoVaTron PriceCalculationAppService TinhMoiAsync ChinhSachThieuGia"` → `TinhTienDon.Tinh` (4 tham số, `:87`) uỷ quyền `Tinh` 5 tham số (`:106`); `PhanBoVaTron` (`:218`) → `MoneyAllocator.PhanBo`; `TinhMoiAsync` (`:85`) dựng snapshot 1 lần rồi truyền `chinhSach.ChinhSachTongDonAm`/`ChinhSachThieuGia` xuống `TinhTienDon` và `GiaCoSoResolver.Giai`; chỉ **một** nơi dựng `ChinhSachSnapshot` (`PriceCalculationAppService.cs:313`). Khớp diff.
+- Xác nhận lại dòng cụ thể bằng `Read`: `PricingChinhSach.cs:102-114` (`DocSoBacToiDa`), `TinhTienDon.cs:155/195` (Clamp/Reject), `TierPriceSetAppService.cs:116-128` (guard số bậc).
+
+## Phát hiện
+
+| # | Mức | Vị trí | Phát hiện + đường tới lỗi | Bằng chứng | Khuyến nghị |
+|---|---|---|---|---|---|
+| 1 | P2 | `modules/Pricing/eCommerce.Pricing.Domain/PricingChinhSach.cs:113` (tiêu thụ ở `modules/Pricing/eCommerce.Pricing.Application/TierPriceSetAppService.cs:116-121`) | `DocSoBacToiDa` trả `(int)Math.Floor(so)` **không chặn trần**. `ChinhSach.DocSo` nhận mọi `decimal` dương (chỉ dấu chấm). Nếu `Pricing:MaxTiersPerSet` được đặt **> 2.147.483.647** — đúng đường lùi mà `PRC-002-arch.md` §6.2 hàng 2 đề nghị ("đặt số rất lớn để vô hiệu guard", vd `99999999999`) — thì ép `decimal → int` **ném `OverflowException`** (chuyển đổi tường minh decimal→int là checked), `AddTierAsync` trả **500** thay vì thêm bậc. Cấu hình mặc định `20` không bị ảnh hưởng; test `2b` chỉ phủ `abc`/`""`/`"0"`, **không** phủ giá trị vượt trần. | C# spec: decimal→int ngoài dải ném `OverflowException`; `PricingChinhSach.cs:104-113`; `TierPriceSetAppService.cs:116-121` | Chặn trần trước khi ép: `var n = so >= int.MaxValue ? int.MaxValue : (int)Math.Floor(so); return n;` (giữ ngữ nghĩa "số rất lớn = vô hiệu guard" **và** không ném); hoặc coi `> int.MaxValue` là **không hợp lệ** → trả `20` + `hopLe = false`. Thêm 1 dòng `[InlineData("99999999999")]` vào ca không-hợp-lệ. |
+| 2 | P3 | `modules/Pricing/eCommerce.Pricing.Domain/TinhTienDon.cs:84-85` | Chú thích XML của overload 4 tham số ghi *"⇒ hành vi **trước WP-16** (ném `eCommerce:Pricing:0010` khi tổng âm thay vì trả số âm)"* — **ngược sự thật**: trước WP-16 **không có mã `0010`** và hàm **trả tổng âm** (chính tripwire cũ khẳng định `-4.997`); `PRC-002-arch.md` §3.5 cũng ghi "trước đây trả tổng âm". Dễ khiến người sau tưởng `Reject` là hành vi cũ. | `TinhTienDon.cs:84-85` ↔ `prc-002` §20.3 / `-arch` §3.5 | Sửa thành: *"Overload CŨ giữ nguyên chữ ký, nay uỷ quyền `Reject` ⇒ **hành vi MỚI sau WP-16** ném `0010`; trước WP-16 trả tổng âm"*. |
+| 3 | P3 | `modules/Pricing/eCommerce.Pricing.Domain/PricingChinhSach.cs:47-54` (so với `:65`, `:82/88`, `:123/129`) | Ba mảng `ChinhSachLamTronHopLe`/`ThieuGiaHopLe`/`TongDonAmHopLe` được khai là allowlist nhưng **hàm đọc không dùng** — chúng so bằng **chuỗi literal/`nameof`** cứng. Nếu `AQ1` sau này thêm giá trị vào mảng (nguồn "sự thật" tưởng là mảng), reader vẫn **từ chối** ⇒ cấu hình **im lặng bị bỏ qua**. | `PricingChinhSach.cs:47-54` vs `:65/82/88/123/129` | Cho hàm đọc dẫn xuất từ mảng (`ChinhSachLamTronHopLe.Any(x => string.Equals(...))`) hoặc khai một `const` dùng chung cho cả mảng lẫn reader. |
+| 4 | P3 | `modules/Pricing/eCommerce.Pricing.Application/TierPriceSetAppService.cs:116-117` | `PricingChinhSach.DocSoBacToiDa(..., out _)` **bỏ cờ `hopLe`** ⇒ khi `Pricing:MaxTiersPerSet` gõ sai (`abc`/`0`), guard **im lặng** rơi về `20` **không** `LogWarning` — đúng kịch bản `-arch` R9 ("đổi cấu hình mà hệ thống vẫn chạy giá trị cũ"). Không sai số, chỉ mất khả năng truy vết vận hành. | `TierPriceSetAppService.cs:116-117`; tương phản `PriceCalculationAppService.cs:288-306` (có cảnh báo `hopLe`) | Bắt `hopLe` và `Logger.LogWarning` khi `false` (mirror snapshot); hoặc ghi `[CHINH-SACH-SO-BAC]` kèm `hopLe`. |
+| 5 | P3 | `modules/Pricing/eCommerce.Pricing.Application/PriceCalculationAppService.cs:288-311` | `TaoChinhSachSnapshotAsync` phát tới **4 dòng log/1 lần tính** (`[CHINH-SACH-DA-DOC]` mức `Information` + tới 3 `LogWarning` khi có giá trị lạ) trên **đường nóng** `TinhGio` (NFR p95 < 30 ms/giỏ). Không sai số, nhưng mỗi giỏ checkout sinh 1 dòng Information ⇒ phình log khi lưu lượng cao. | `PriceCalculationAppService.cs:307-311` | Hạ dòng tổng hợp `[CHINH-SACH-DA-DOC]` xuống `Debug` (hoặc `Information` nhưng gộp 1 dòng/giỏ đã có); giữ `LogWarning` chỉ khi `hopLe = false`. |
+| 6 | P3 | `modules/Pricing/eCommerce.Pricing.Domain/PricingSettingDefinitionProvider.cs:1-38` + `test/` (không có ca) | **Nợ kế thừa — KHÔNG thuộc `W16-4`.** Không có test nào chạm `PricingSettingDefinitionProvider.Define`/phạm vi; `-arch` R7 nói "W16-2 có ca đọc được ở cả hai mức (host + tenant)" nhưng **không tồn tại** ca đó (test chỉ dùng `SettingGia` giả). R8 (ABP quét provider trong `eCommerce.Pricing.Domain` + đọc 4 setting host/tenant cần **khởi động Host thật** — M6) **vẫn treo** (handover `N73` §5). Hệ quả nếu sai: cấu hình **im lặng bị bỏ qua** (mặc định vẫn an toàn: `half-away-from-zero`/`NemLoi`/`20`/`Reject`) — không mất tiền, nhưng vô hiệu hoá mục tiêu của feature. | `PricingSettingDefinitionProvider.cs:1-38`; grep `test/` 0 ca; `handover-n73.md:58` | Theo dõi `R8`/`D-217`④ đúng hạn (trước `W17-*` / trước PR `tich-hop/gd3→main`): khởi động Host thật, đọc 4 khoá ở host **và** tenant, thêm ca (integration) khẳng định definition tồn tại + phạm vi loại `User`. **Không** phải P1 của `W16-4`. |
+
+## Phạm vi
+
+- K-04 (≤ ~600 dòng trừ migration): tổng nhánh **2833/99 dòng / 37 tệp** vượt ngưỡng, nhưng **phần code sản phẩm chỉ ~368 dòng / 7 tệp** (0 migration); phần vượt là `docs/**` (arch 480 dòng + SRS + handover) và `test/**` (~1300 dòng) — hợp lý cho một WP BE + QA; **ghi nhận, không phải phát hiện**.
+- Không chạm `src/**`, `shared/**`; `test/eCommerce.Tests.csproj` thêm **đúng 1** `ProjectReference` `eCommerce.Pricing.Application` (`D-229` ①(A1)); không đổi `eCommerce.slnx`/`Directory.Packages.props`/`pnpm-lock.yaml`.
+
+## Không kiểm được
+
+- **Integration test:** `dotnet test test/eCommerce.IntegrationTests` **chưa chạy trong N74** (baseline `N73` **96/96**). Đã đối chiếu thủ công 4 tên index NND với migration — đều có thật và khớp mẫu kiểm; NC-4 (đột biến tên index → đỏ) đã chạy được theo testplan.
+- **R8 (Host thật):** không khởi động Host trong review — thuộc nợ kế thừa, xem phát hiện #6.
+- **`D-230`** (4 `docDeviation` hoãn có chủ BA/ARCH) và **`D-217`④** (probe) — ngoài phạm vi code `W16-4`, không tính P.
+
+## Kết luận
+
+Hai bề mặt đắt nhất — **tính tiền** (`TinhTienDon` Reject/Clamp) và **idempotency/append-only** (sổ giải trình) — đúng hợp đồng và có test đỏ được (3a/3b/3c + NC-3; 1c + idempotency). Guard số bậc đọc **trước** insert, test 2a chứng minh **không ghi nửa**, NC-2 đỏ→xanh. Snapshot B1 đọc **một lần**/khoá, `RoundingPolicyCode` vào kết quả + sổ (1c). **0 migration, 0 đổi DTO/route/quyền.** Không có lỗi mất tiền/sai giá/ghi nửa/không idempotent/test không đỏ được/vi phạm ranh giới module hay quyền trong phạm vi WP-16.
+
+`P1 = 0`. Một **P2** (`DocSoBacToiDa` tràn `int` trên đường lùi "số rất lớn") + **5 P3** đã ghi rõ vị trí/đường tới lỗi/đề nghị; P2 không chạm tiền/tồn/quyền/idempotency (chỉ là guard vận hành trên giá trị cấu hình ngoài dải).
+
+VERDICT: PASS
