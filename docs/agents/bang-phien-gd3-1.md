@@ -26,6 +26,8 @@ Chạy tay một phiên (có người ngồi xem): mở Claude Code tại repo, 
    Nếu đặt branch protection cho `tich-hop/gd3`: **cho phép** push fast-forward (không force) — agent đẩy vào đây ở hàng `dong-wp`.
 3. Mở **một PR nháp** `tich-hop/gd3` → `main` để CI chạy trên mọi lần đẩy (cầu dao CI đọc lần chạy `ci` của nhánh này):
    `gh pr create --draft --base main --head tich-hop/gd3 --title "GD3 chuoi 1 (nhap - chi de CI)" --body "Refs: D-216"`.
+   📌 Lúc vừa tạo, `tich-hop/gd3` **trùng** `main` ⇒ GitHub từ chối PR (`pull request create failed: GraphQL` — không có commit khác biệt).
+   Mở PR nháp **sau** hàng `dong-wp` đầu tiên (`W16-5`) đẩy vào `tich-hop/gd3`; trước đó cầu dao CI in `CI: chua ro` và chạy tiếp.
 4. Máy dev: biến môi trường `ConnectionStrings__Default` / `Redis__Configuration` trỏ cổng 5433/6380 (`.env` của compose); `pnpm@10.22.0`
    có trên PATH; tắt chế độ ngủ của Windows.
 
