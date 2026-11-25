@@ -3,7 +3,7 @@
 - SRS: `docs/features/pricing/prc-002-gia-bac-thang-pipeline-tinh-gia.md` (§1 BR · §8 · §9 · §14)
 - Kiến trúc bổ trợ: `docs/features/pricing/PRC-002-arch.md` (§6.3 bảng ca 1a/1b/1c/2a/2b/3a–3d/4 · §6.4 tên index)
 - Nhánh: `feat/gd3-wp16-bang-gia` · Phiên `N74` · Hàng `W16-4` · Bước **F4 pass 1** (F5 REV làm sau)
-- Quyết định nguồn: `D-218`…`D-229` (`docs/nhanh/decisions.md`) — đặc biệt `D-229` (hạ tầng test tầng app service).
+- Quyết định nguồn: `D-218`…`D-230` (`docs/nhanh/decisions.md`) — đặc biệt `D-229` (hạ tầng test tầng app service) và `D-230` (4 `docDeviation` thành nợ có chủ BA/ARCH).
 - Phạm vi WP-16: **4 hạng mục** (setting snapshot · ngưỡng số bậc · guard tổng âm · 4 tên index NND). WP **không**
   thêm app service/endpoint/DTO/route mới.
 
@@ -46,11 +46,11 @@
 - Thêm **1 dòng** `ProjectReference` `eCommerce.Pricing.Application` vào
   `test/eCommerce.Tests/eCommerce.Tests.csproj` (khuôn `ChannelHub.Application`; `D-229` ①(A1)).
 
-> 📌 **Điều chỉnh so với `D-229` ①(A2) — ghi rõ, không giấu:** ABP 10.7 dựng `FirstOrDefaultAsync`/`CountAsync`
+> 📌 **Điều chỉnh so với bản `D-229` ①(A2) ban đầu — `D-229` đã được sửa ở pass 2:** ABP 10.7 dựng `FirstOrDefaultAsync`/`CountAsync`
   > extension **trên `GetQueryableAsync` + `AsyncExecuter`**, **không** trên `FindAsync(predicate)` (đo bằng
   > stack trace thật khi chạy ca 2a). Vì vậy `RepoGia` mở **thêm** `GetQueryable()`/`GetQueryableAsync()` và cấp
   > `AsyncExecuter = new AsyncQueryableExecuter(Array.Empty<IAsyncQueryableProvider>())` (bộ thực thi thật của ABP,
-  > fallback đồng bộ cho LINQ-to-Objects). `FindAsync(predicate)` vẫn được hiện thực như `D-229` yêu cầu; mọi
+  > fallback đồng bộ cho LINQ-to-Objects). `FindAsync(predicate)` vẫn được hiện thực; mọi
   > thành viên khác vẫn **NÉM**. Không đổi ngữ nghĩa test, không sửa `modules/**`.
 
 ## 2. Số ca theo tầng (K-06)
@@ -66,52 +66,64 @@
 
 > 📌 `D-229` ② yêu cầu `dotnet test` **tăng số ca** (không giảm) — đo được **+22**, đúng.
 
-## 3. Negative control (bắt buộc) — **DỰ KIẾN, chờ pass 2**
+## Negative control (bắt buộc) — bằng chứng thật (pass 2, sau commit `70641e4`)
 
-> 🚨 `tools/agents/negative-control.ps1` **CHƯA CHẠY** trong pass 1: script **từ chối tệp chưa commit** (exit `3`).
-> Các tệp của `W16-4` đang **dirty/untracked** ⇒ chưa áp được đột biến. Bảng dưới là **kế hoạch chạy lại sau khi
-> ORCH commit nhánh** (pass 2). **Chưa có** exit code đỏ→xanh thật — không ghi bằng chứng giả.
+> Chạy `pwsh -File tools/agents/negative-control.ps1` cho từng ca: **đột biến thật → test phải ĐỎ (exit ≠ 0) →
+> khôi phục byte gốc → test phải XANH (exit 0)**. `TestCommand` **có build lại** (không `--no-build`) vì script
+> sửa mã nguồn. Bảng dưới do script tự chèn dòng bằng chứng. Xác nhận sau mỗi ca: `git status --porcelain -- modules/ src/` rỗng.
+>
+> 🔒 Mục tiêu: `BR-PRC-002-010` (đọc chính sách đúng 1 lần) · `BR-PRC-002-014`/`D-224` (ngưỡng số bậc là cấu hình) ·
+> `BR-PRC-002-020`/`D-219` (guard tổng đơn âm fail-closed). Mỗi luật đều thuộc nhóm **tiền / trạng thái / idempotency**
+> nên bắt buộc có bằng chứng đỏ→xanh (`testing-negative-control` §2).
 
-| # | Đột biến (dự kiến) | Tệp:dòng | Test phải đỏ | Lệnh test dự kiến |
-|---|---|---|---|---|
-| **NC-1** | Gỡ lượt đọc `Pricing:MissingPricePolicy`: `var thoThieuGia = await _settingProvider.GetOrNullAsync(PRC002SettingTenKhoa.ThieuGia);` → `var thoThieuGia = (string?)null;` | `modules/Pricing/eCommerce.Pricing.Application/PriceCalculationAppService.cs:280` | `TinhGio__moi_khoa_chinh_sach_doc_DUNG_MOT_LAN_cho_mot_lan_tinh_1c` (ThieuGia đọc 0 lần) **và** `TinhGio__DungGiaNiemYet__...` (rơi về `NemLoi`) | `dotnet test test/eCommerce.Tests --no-build --filter "FullyQualifiedName~PriceCalculationAppServiceTests"` |
-| **NC-2** | Gỡ khối ngưỡng số bậc: `if (soHienTai + 1 > toiDa)` → `if (false)` | `modules/Pricing/eCommerce.Pricing.Application/TierPriceSetAppService.cs:121` | `AddTier__bac_thu_21__nem_0011_va_KHONG_ghi_nua_2a` + `AddTier__MaxTiersPerSet_bang_3__bac_thu_4_bi_chan_2b` | `dotnet test test/eCommerce.Tests --no-build --filter "FullyQualifiedName~TierPriceSetAppServiceTests"` |
-| **NC-3** | `Reject` → kẹp im lặng: `if (chinhSachTongDon == ChinhSachTongDonAm.Reject && tongThanhToan.Amount < 0m)` → `if (false)` | `modules/Pricing/eCommerce.Pricing.Domain/TinhTienDon.cs:200` | `Tong_don_am__mac_dinh_Reject__NEM_0010_kem_du_lieu__3a` | `dotnet test test/eCommerce.Tests --no-build --filter "FullyQualifiedName~TinhTienDonTests"` |
-| **NC-4** (nếu chạy được) | Sửa 1 ký tự trong tên index của `phaiCo` (`IX_PrcPriceLists_TenantId_Code_EffectiveFrom` → `…EffectiveFroX`) | `test/eCommerce.IntegrationTests/PostgreSqlSchemaTests.cs` | ca “4 tên index đích danh phải có NND” | `dotnet test test/eCommerce.IntegrationTests --filter "FullyQualifiedName~PostgreSqlSchemaTests"` — **cần Docker/PostgreSQL**; nếu không có thì ghi “chờ” |
+| Ngày | Mã | Tệp:dòng | Đột biến | Lệnh test | Bằng chứng |
+|---|---|---|---|---|---|
+| 2026-11-26 | NC-1 | modules/Pricing/eCommerce.Pricing.Application/PriceCalculationAppService.cs:280 | var thoThieuGia = await _settingProvider.GetOrNullAsync(PRC002SettingTenKhoa.ThieuGia); -> var thoThieuGia = (string?)null; | dotnet test test/eCommerce.Tests --filter "FullyQualifiedName~PriceCalculationAppServiceTests" | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
+| 2026-11-26 | NC-2 | modules/Pricing/eCommerce.Pricing.Application/TierPriceSetAppService.cs:121 | if (soHienTai + 1 > toiDa) -> if (false) | dotnet test test/eCommerce.Tests --filter "FullyQualifiedName~TierPriceSetAppServiceTests" | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
+| 2026-11-26 | NC-3 | modules/Pricing/eCommerce.Pricing.Domain/TinhTienDon.cs:195 | if (chinhSachTongDon == ChinhSachTongDonAm.Reject && tongThanhToan.Amount < 0m) -> if (false) | dotnet test test/eCommerce.Tests --filter "FullyQualifiedName~TinhTienDonTests" | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
+| 2026-11-26 | NC-4 | test/eCommerce.IntegrationTests/PostgreSqlSchemaTests.cs:399 | "IX_PrcPriceLists_TenantId_Code_EffectiveFrom" -> "IX_PrcPriceLists_TenantId_Code_EffectiveFroX" | dotnet test test/eCommerce.IntegrationTests --filter "FullyQualifiedName~PostgreSqlSchemaTests" | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
 
-- Sau mỗi đột biến: khôi phục + `git diff` xác nhận tệp về nguyên trạng; ghi **cả** exit code đỏ và exit code xanh
-  vào bảng này ở **pass 2**.
+- **NC-4 đã chạy được** (Docker/Testcontainers `postgres:17-alpine`): tên index trong `phaiCo` là **đang được
+  đọc** — sửa 1 ký tự làm test đỏ, khôi phục xanh. Tổng **4/4** ca negative control đạt (đỏ → xanh).
+  `git status --porcelain -- modules/ src/` rỗng sau cả 4 ca (script tự khôi phục byte gốc + tự kiểm lại).
 
 ## 4. Cổng (đo trong phiên N74)
 
 ```powershell
 dotnet build eCommerce.slnx --no-incremental      # 0 error / 9 warning (bằng baseline phiên)
 dotnet test test/eCommerce.Tests --no-build       # 2021 pass · 0 fail · trước 1999 (+22)
-pwsh -File tools/kiem-link-tai-doc.ps1            # cần chạy sau khi thêm tệp .md này
-npm --prefix tools run check:mermaid              # cần chạy sau khi thêm tệp .md này
+pwsh -File tools/kiem-link-tai-lieu.ps1           # PASS — 0 tham chiếu chết
+npm --prefix tools run check:mermaid              # PASS — 213 khối, 0 lỗi
 ```
 
 - `dotnet build eCommerce.slnx --no-incremental` → **0 error**, **9 warning** (không phát sinh warning mới).
 - `dotnet test test/eCommerce.Tests` → **2021/2021 pass**, exit **0** (baseline đầu phiên **1999**).
-- `check-agent-artifact.ps1 -Kind testplan` → **dự kiến đỏ ở mục “negative control chưa có bằng chứng”** cho tới
-  pass 2 (script đòi ≥ 2 dòng có `exit N` thật). Không giả bằng chứng.
+- `pwsh -File tools/agents/check-agent-artifact.ps1 -Kind testplan -Path docs/tests/PRC-002-testplan.md -Srs docs/features/pricing/prc-002-gia-bac-thang-pipeline-tinh-gia.md`
+  → **exit 0** (BR SRS=21 · thiếu=0; negative control có **4** dòng `exit 1 (do) -> … -> exit 0 (xanh)`).
+- Không chạm `modules/**`, `src/**` sau negative control (`git status` rỗng).
 
 ## 5. Chưa phủ / nợ
 
-1. **Negative control thật (NC-1…NC-4)** — chờ ORCH commit nhánh rồi chạy
-   `tools/agents/negative-control.ps1` ở pass 2. Không có bằng chứng đỏ→xanh ⇒ **G4 chưa đạt**.
+1. **Negative control: ĐẠT 4/4** — `NC-1..NC-4` chạy sau commit `70641e4`, mỗi ca **đỏ (exit 1) → khôi phục →
+   xanh (exit 0)** (bảng ở §3). `git status --porcelain -- modules/ src/` rỗng sau tất cả.
 2. **§14 SRS thiếu dòng TC cho `BR-PRC-002-010/011/013/014`** (`D-227` — nợ có chủ BA). Testplan **vẫn phủ**
    đủ 4 BR bằng test thật (xem §1); không chờ SRS.
 3. **`BR-PRC-002-013` phần `PercentOff`**: SRS §5.2 mô tả `TierPrices.Kind` (`FixedUnitPrice`/`PercentOff`/
    `AmountOff`), `MaxQuantity`, `ExternalRef` và CHECK `"Kind" <> 1 OR ("Amount" BETWEEN 0 AND 100)`; code
    `TierPrice` hiện **chỉ có** `Sku/MinQuantity/AmountValue/CurrencyCode` ⇒ **không test được** nhánh
-   `PercentOff`. Phần đã có code (`Amount ≥ 0`, `MinQuantity ≥ 1`, cùng loại tiền) **đã phủ**. Ghi `docDeviation`.
+   `PercentOff`. Phần đã có code (`Amount ≥ 0`, `MinQuantity ≥ 1`, cùng loại tiền) **đã phủ**. Phần lệch này là
+   **docDeviation có chủ** theo `D-230` (xem mục 8).
 4. **`BR-PRC-002-016` TC-25/26/27 (Import idempotent / cùng khoá khác payload / thiếu khoá)**:
    `ITierPriceImportAppService` **chưa tồn tại** trong code (SRS §6.1 khai, `-arch` §3.5 nói hợp đồng không đổi)
    ⇒ chưa có biên Import để test. Phần **đã có** là idempotency của `TinhGioAsync` (cùng khoá ⇒ trả kết quả đã
-   lưu, 0 bản ghi mới) — **đã phủ**. Ghi `docDeviation`.
-5. **Test tích hợp PostgreSQL** (`TC-15`, `TC-19`, `TC-23`, `TC-24`, `TC-25/26/28`, và 4 tên index NND ở
-   `PostgreSqlSchemaTests.cs`): chưa chạy trong pass 1 (không có Docker trong phiên). Không đổi schema trong
-   WP-16 (`D-218` ②) nên 4 tên index là **hạng mục W16-2 đã sửa** — cần REV/pass 2 xác nhận khi có Docker.
+   lưu, 0 bản ghi mới) — **đã phủ** và **được tính trong 21/21 BR**. TC-25/26/27 **chưa kiểm được — chờ BA**
+   (nợ theo `D-230`), **không** tính vào 21/21.
+5. **Test tích hợp PostgreSQL** (`TC-15`, `TC-19`, `TC-23`, `TC-24`, `TC-25/26/28`): chưa chạy trong pass 2 (chỉ
+   chạy `PostgreSqlSchemaTests` cho NC-4). Không đổi schema trong WP-16 (`D-218` ②) nên 4 tên index là **hạng mục
+   W16-2 đã sửa**; NC-4 chứng minh danh sách `phaiCo` đang được đọc.
 6. **`check-feature-doc.ps1 -WP14`** không phải cổng của WP-16 (`D-227`) — không chạy.
 7. Không có `apps/admin-web` thay đổi ⇒ **không** chạy `pnpm lint/typecheck/test/build`; WP không có FE (`W16-3`).
+8. **`D-230`** (DEC): **KHÔNG** sửa SRS trong `W16-4`; 4 `docDeviation` (mục 3 trên + `Money.ToMinorUnits` ở §14 +
+   danh sách app service §6.1 + nhãn “CHƯA có trong code” ở §5.2) thành **nợ có chủ BA/ARCH**, hạn **trước `W17-1`**
+   / `doc-gate` kế tiếp / trước PR `tich-hop/gd3→main`. `D-229` đã sửa: ABP 10.7 dựng `FirstOrDefaultAsync`/
+   `CountAsync` trên `GetQueryableAsync` + `AsyncExecuter` (đúng như phát hiện ở pass 1 — xem ghi chú §1).
