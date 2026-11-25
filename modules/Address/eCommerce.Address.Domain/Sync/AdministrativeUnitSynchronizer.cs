@@ -340,6 +340,18 @@ public static class AdministrativeUnitSynchronizer
             var ten = dv.Name?.Trim();
             var cha = dv.ParentCode?.Trim();
 
+            // 🔒 `D-251`: kiểm cấp TRƯỚC `DoDaiMa` — cấp ngoài `AdministrativeLevel` phải là `0605`
+            // (dòng lô `BiChan`), KHÔNG được rơi vào `0002` của `DoDaiMa` (dòng lô `Loi`).
+            if (!Enum.IsDefined(typeof(AdministrativeLevel), dv.Level))
+            {
+                throw new BusinessException(AdministrativeSyncErrorCodes.DanhMucSaiDinhDang)
+                    .WithData("lyDo", $"cấp {(int)dv.Level} không xác định / ngoài AdministrativeLevel")
+                    .WithData("level", (int)dv.Level)
+                    .WithData("ma", ma)
+                    .WithData("nguon", nguonTen)
+                    .WithData("schemaVersion", schemaVersion);
+            }
+
             var doDai = AdministrativeSchemaVersion.DoDaiMa(dv.Level);
 
             if (ma.Length != doDai || !ma.All(char.IsAsciiDigit))
