@@ -87,11 +87,14 @@ function TepBanNgoaiVung {
     if ($LASTEXITCODE -ne 0) { return @() }   # khong phai repo git (ca thu) => bo qua
     return @($out | ForEach-Object { $_.Substring(3).Trim('"') } | ForEach-Object { ($_ -split ' -> ')[-1] } | Where-Object { $_ -and $_ -notmatch '^(docs/|agents/state/|artifacts/)' })
 }
-function GH([string[]]$a) {
+# 25/11: ham ten `GH` tung goi `& gh` = goi CHINH NO (PowerShell khong phan biet hoa/thuong, ham thang lenh ngoai)
+# => "call depth overflow". Ten ham khac han + chi goi tep thuc thi (-CommandType Application).
+function GoiGh([string[]]$a) {
     if ($ghTest) { $out = & pwsh -NoProfile -File $ghTest @a 2>&1 | Out-String }
     else {
-        if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { return @{ ma = 127; out = 'khong thay lenh gh' } }
-        Push-Location $Root; try { $out = & gh @a 2>&1 | Out-String } finally { Pop-Location }
+        $ghExe = (Get-Command gh -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1).Source
+        if (-not $ghExe) { return @{ ma = 127; out = 'khong thay lenh gh' } }
+        Push-Location $Root; try { $out = & $ghExe @a 2>&1 | Out-String } finally { Pop-Location }
     }
     return @{ ma = $LASTEXITCODE; out = $out.Trim() }
 }
@@ -99,7 +102,7 @@ function GH([string[]]$a) {
 function TrangThaiCI {
     $nh = [string]$regInfo.nhanhTichHop
     if (-not $Chuoi -or $KhongKiemCI -or -not $nh) { return @{ kq = 'bo-qua' } }
-    $k = GH @('run', 'list', '--branch', $nh, '--workflow', 'ci', '--limit', '10', '--json', 'databaseId,status,conclusion,headSha')
+    $k = GoiGh @('run', 'list', '--branch', $nh, '--workflow', 'ci', '--limit', '10', '--json', 'databaseId,status,conclusion,headSha')
     if ($k.ma -ne 0) { return @{ kq = 'chua-ro'; mo = "gh exit $($k.ma): $($k.out)" } }
     try { $runs = @($k.out | ConvertFrom-Json) } catch { return @{ kq = 'chua-ro'; mo = 'gh tra ve khong phai JSON' } }
     $xong = @($runs | Where-Object { $_.status -eq 'completed' -and $_.conclusion -notin @('cancelled', 'skipped') })
@@ -119,13 +122,13 @@ function MoPRXepChong {
     foreach ($w in $nhanhs) {
         $chuaXong = @($rows | Where-Object { $_.nhanh -eq $w.nhanh -and $_.status -ne 'xong' })
         if ($chuaXong.Count) { Ghi "  PR: dung o $($w.dot) — con hang chua xong ($((@($chuaXong) | ForEach-Object { $_.id }) -join ', '))"; break }
-        $co = GH @('pr', 'list', '--head', $w.nhanh, '--state', 'open', '--json', 'number,url')
+        $co = GoiGh @('pr', 'list', '--head', $w.nhanh, '--state', 'open', '--json', 'number,url')
         $daCo = $null; try { $daCo = @($co.out | ConvertFrom-Json) | Select-Object -First 1 } catch { }
         if ($daCo) { Ghi "  PR: $($w.dot) da co $($daCo.url)" }
         else {
             $hd = @($rows | Where-Object { $_.nhanh -eq $w.nhanh -and $_.handover } | ForEach-Object { '- ' + $_.id + ': ' + $_.handover }) -join "`n"
             $body = "Refs: $($regInfo.refs)`n`nChuoi $Chuoi · $($w.dot) · base = $base (PR xep chong; merge theo thu tu, GitHub tu doi base khi nhanh truoc duoc merge).`n`nHandover:`n$hd`n`n🤖 Generated with [Claude Code](https://claude.com/claude-code)"
-            $k = GH @('pr', 'create', '--base', $base, '--head', $w.nhanh, '--title', "feat($($w.dot)): chuoi $Chuoi - $($w.dot)", '--body', $body)
+            $k = GoiGh @('pr', 'create', '--base', $base, '--head', $w.nhanh, '--title', "feat($($w.dot)): chuoi $Chuoi - $($w.dot)", '--body', $body)
             Ghi ("  PR: {0} -> {1}: exit {2} {3}" -f $w.nhanh, $base, $k.ma, $k.out)
             if ($k.ma -ne 0) { break }
         }

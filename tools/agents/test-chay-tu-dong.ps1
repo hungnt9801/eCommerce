@@ -198,6 +198,17 @@ exit 1
     $gh = @(Get-Content (Join-Path $repo 'gh.txt') | Where-Object { $_ -match '^pr create' })
     Ca 'T18 -MoPRCuoi: het viec => moi WP mot PR xep chong (feat/a -> main, feat/b -> feat/a), khong merge' (($k.ma -eq 0) -and ($gh.Count -eq 2) -and ($gh[0] -match '--base main --head feat/a') -and ($gh[1] -match '--base feat/a --head feat/b') -and ($gh[0] -match 'Refs: D-999') -and -not (@(Get-Content (Join-Path $repo 'gh.txt')) -match '^pr merge')) $k
 
+    # T20: gh THAT tren PATH (khong qua CHAY_TU_DONG_GH) — ca nay bat loi "call depth overflow" 25/11 (ham GH tu goi chinh no)
+    RepoChuoi 't20' @((HangC 'W1' 'code' @() 'feat/a' 'WP-16'))
+    $binGh = Join-Path $goc 'bin-gh'; New-Item -ItemType Directory -Force -Path $binGh | Out-Null
+    [IO.File]::WriteAllText((Join-Path $binGh 'gh.cmd'), "@pwsh -NoProfile -File `"$fg`" %*`r`n", $utf8)
+    [IO.File]::WriteAllText((Join-Path $binGh 'gh'), "#!/bin/sh`nexec pwsh -NoProfile -File '$fg' `"`$@`"`n", $utf8)
+    if (-not $IsWindows) { & chmod +x (Join-Path $binGh 'gh') }
+    $pathCu = $env:PATH; $env:PATH = $binGh + [IO.Path]::PathSeparator + $env:PATH
+    $env:CHAY_TU_DONG_GH_MODE = 'xanh'; $env:CHAY_TU_DONG_GH_LOG = $repo
+    try { $k = Chay $fc @('-Chuoi', 'gd3-t') } finally { $env:PATH = $pathCu; Remove-Item Env:CHAY_TU_DONG_GH_MODE, Env:CHAY_TU_DONG_GH_LOG }
+    Ca 'T20 gh that tren PATH: cau dao CI goi duoc gh (khong de quy), phien chay' (($k.out -match 'CI: xanh') -and ($k.out -notmatch 'call depth') -and ((RegC)[0].status -eq 'xong')) $k
+
     RepoChuoi 't19' @((HangC 'W1' 'code' @() 'feat/a' 'WP-16'))
     $k = Chay $fc @('-Chuoi', 'khong-co')
     Ca 'T19 -Chuoi khong co registry => loi (exit 1), khong mo phien' (($k.ma -eq 1) -and ($k.out -match 'khong thay registry') -and -not (Test-Path (Join-Path $repo 'dem.txt'))) $k
