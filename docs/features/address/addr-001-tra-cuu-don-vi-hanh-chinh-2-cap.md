@@ -508,7 +508,7 @@ sequenceDiagram
 | Mã | Hằng số | HTTP (`eCommerceHttpApiHostModule.cs:322-337`) | Khi nào |
 |---|---|---|---|
 | `eCommerce:Address:0001` | `KhongTimThayDonVi` | `400` | không tra được đơn vị theo `(phiên bản, cấp, mã)` *(thiết kế gốc: `0002`)* |
-| `eCommerce:Address:0002` | `MaKhongHopLe` | `400` | mã sai độ dài/chữ số, tên rỗng, thiếu `ParentCode`, `SourceName` rỗng |
+| `eCommerce:Address:0002` | `MaKhongHopLe` | `400` | mã sai độ dài/chữ số, tên rỗng, thiếu `ParentCode`; `SourceName` **rỗng hoặc dài hơn 512 ký tự** (validate **trước khoá** ⇒ `400`, không để lại dòng lô rác; hàng rào chung ở `CatalogSyncRun.Ghi` ném `ArgumentException` cho nhánh worker — N81) |
 | `eCommerce:Address:0003` | `XaKhongThuocTinh` | `400` | xã không thuộc tỉnh khai báo *(thiết kế gốc: một phần `0003`)* |
 | `eCommerce:Address:0004` | `HuyenKhongDuocPhepOCap2` | `400` | khai cấp huyện ở schema 2 cấp (BR-006) *(thiết kế gốc: `0003`)* |
 | `eCommerce:Address:0005` | `PhienBanKhongHopLe` | `400` | phiên bản ngoài `1`/`2` (E1) *(thiết kế gốc: `0001`)* |
@@ -533,7 +533,7 @@ Nguồn mã: `AddressErrorCodes.cs:10-45`; `Sync/AdministrativeUnitSynchronizer.
 | Mã thật | Hằng số | Khi nào | HTTP (Host) | Tương ứng thiết kế §6.2 |
 |---|---|---|---|---|
 | `eCommerce:Address:0001` | `KhongTimThayDonVi` | không tra được đơn vị theo `(phiên bản, cấp, mã)` | `400` | ≈ `0002` thiết kế (404) |
-| `eCommerce:Address:0002` | `MaKhongHopLe` | mã sai độ dài/chữ số, tên rỗng, thiếu `ParentCode` | `400` (từ `WP-18`, `D-240`) | không có |
+| `eCommerce:Address:0002` | `MaKhongHopLe` | mã sai độ dài/chữ số, tên rỗng, thiếu `ParentCode`; `SourceName` rỗng/`>512` (validate trước khoá — N81) | `400` (từ `WP-18`, `D-240`) | không có |
 | `eCommerce:Address:0003` | `XaKhongThuocTinh` | xã không thuộc tỉnh khai báo | `400` | một phần `0003` thiết kế |
 | `eCommerce:Address:0004` | `HuyenKhongDuocPhepOCap2` | khai cấp huyện ở schema 2 cấp | `400` | ≈ `0003` thiết kế (BR-006) |
 | `eCommerce:Address:0005` | `PhienBanKhongHopLe` | phiên bản ngoài `1`/`2` | `400` | ≈ `0001` thiết kế (E1) |
@@ -1040,12 +1040,17 @@ Module **`eCommerce.Address.Domain`** đã tạo, hiện thực hoá **đúng 3 
 - **Application**: 3 endpoint danh sách `GetProvincesAsync`/`GetDistrictsAsync`/`GetWardsByDistrictAsync`; `ImportDatasetAsync` trả `CatalogSyncRunDto` (`D-241`); DTO `ImportDatasetInput`/`ImportUnitRow`/`CatalogSyncRunDto`; cache `AddressCatalogCache` (TTL 86400, cờ `Address:Cache:Enabled`) + `AddressCacheInvalidatedEto` + handler; 3 truy vấn tra cứu cũ đổi sang truy vấn **có điều kiện**; permission method-level `Addresses.Catalog.Import` (`D-238`); metric `address_catalog_sync_total` + hit/miss cache.
 - **Worker**: `AdministrativeUnitSyncWorker` dùng UoW transactional, ghi dòng lô cho **mọi** lượt (kể cả 0 thay đổi), phân loại `BiChan`/`Loi`, bỏ lượt + metric khi bận khoá, `TenKhoa` trỏ hằng chung.
 - **Host**: gọi guard **vô điều kiện** trước `AddHttpClient`; map HTTP 8 mã (`D-240`).
-- **Schema**: bảng `AddrCatalogSyncRuns` + 2 index + CHECK, migration **EF sinh** `20261125191757_Add_Addr001_CatalogSyncRuns` (expand-only; **chưa áp DB**).
+- **Schema**: bảng `AddrCatalogSyncRuns` + 2 index + CHECK, migration **EF sinh** `20261125191757_Add_Addr001_CatalogSyncRuns` (expand-only; ✅ **đã áp DB dev ở N78** sau `pg_dump` — handover N78 §3; `W18-5` **0** migration mới).
 
-**Chưa làm (ngoài vùng ghi của vai `be`)**
-- ⬜ **Test đơn vị mới** cho hàng rào 0b/5, guard, `SourceHash`, `DoiTen` 0009, cache, reflection permission/metric — `.claude/scopes.json` cho `be` chỉ ghi `modules/**`, `src/**`, `shared/**`, `docs/features/**`; `test/**` thuộc QA. ORCH cần giao QA (`W18-4`) các ca §6 arch doc.
-- ⬜ **3 call site test cũ** còn gọi `ApDung(kế hoạch)` (overload tương thích tạm thời được giữ): `test/eCommerce.Tests/AddressSync/AdministrativeUnitSynchronizerTests.cs:118,258,275` và `test/eCommerce.Tests/AddressSync/ProvincesOpenApiParserTests.cs:217` — QA đổi sang `ApDung(kế hoạch, danhMuc.Nguon)` rồi **xoá overload tương thích**.
-- ⬜ Áp migration (`DbMigrator`, binary mới build) — ORCH/OPS chạy sau `pg_dump`.
+**Đã đóng sau `W18-4` / `N81`**
+- ✅ **Test đơn vị** cho hàng rào 0b/5, guard, `SourceHash`, `DoiTen` 0009, cache, reflection permission/metric — `W18-4`: **2170** ca đơn vị (N80 đóng **2166**, N81 bổ sung **+4**), 2 testplan `ADDR-001` **14/14 BR** + `ADDR-002` **16/16 BR**, **15** negative control (11 ở `W18-4` + 4 ở `N81`).
+- ✅ **Overload `AdministrativeUnitSynchronizer.ApDung(kế hoạch)` một tham số đã XOÁ** (`D-250`, commit `cea05f7`); **0** call site một tham số còn lại (`modules/`, `test/`).
+- ✅ **Áp migration** `20261125191757_Add_Addr001_CatalogSyncRuns` lên DB dev **N78** sau `pg_dump` (handover N78 §3).
+- ✅ **P2 #2 review `ADDR-001`** (giới hạn độ dài `SourceName`): `ImportDatasetAsync` validate **trước khoá** (`0002`/`400`) + hàng rào chung `CatalogSyncRun.Ghi` (ném `ArgumentException` cho nhánh worker) + 3 ca unit ở `N81`.
+
+**Còn lại (ngoài vùng ghi / chờ người)**
+- ⬜ Màn vận hành **`WEB-001`** (2 màn + nạp danh mục) — `D-247` **CHUYỂN NGƯỜI** (thêm WP ngoài `07` §WP-15+); SRS này **không** nhắc nên không chặn.
+- ⬜ Nợ **403 runtime** (thiếu `Addresses.CarrierMapping.Verify`) — thuộc `ADDR-002`/vận hành (`D-249`/`D-252`), **không** thuộc SRS `ADDR-001`; ghi ở đây chỉ để không lẫn phạm vi.
 
 **Lệch tài liệu đã báo (`docDeviation`)**
 - SRS §6.1 mô tả output `{ Added, Renamed, Reopened, Closed }`; DTO thực tế giàu hơn (`D-241`, arch §3.2) — ✅ **BA đã sửa §6.1 cùng PR** (N78).
