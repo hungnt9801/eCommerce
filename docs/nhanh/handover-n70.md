@@ -109,9 +109,10 @@ và handover gần nhất `docs/nhanh/handover-n70.md`. Chạy baseline 6 lệnh
 ## 7. Trạng thái nhánh
 
 - Nhánh `feat/n69-wp15-nen-gd3`, base `main` head `7267060`.
-- Commit: **`dab2567`** (17 tệp, +1551/−28) + commit tài liệu đóng phiên (`N70`: handover này, testplan bằng
-  chứng NC-1, `07` §13).
-- **Đã push:** `<cập nhật sau push>` · **PR:** `<cập nhật sau khi mở>` (base `main`, `Refs: D-210…D-215`).
+- Commit: **`dab2567`** (17 tệp, +1551/−28) + **`a146725`** (tài liệu đóng phiên `N70`: handover này, testplan
+  bằng chứng NC-1, `07` §13).
+- **Đã push** `origin/feat/n69-wp15-nen-gd3` · **PR #20** — <https://github.com/hungnt9801/eCommerce/pull/20>
+  (base `main`, `Refs: D-210…D-215`). **Không** tự merge; required check `cong-tai-lieu` vẫn là việc người.
 
 ---
 
