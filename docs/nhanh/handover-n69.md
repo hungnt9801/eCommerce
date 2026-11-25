@@ -36,10 +36,10 @@
 ## 2. Chưa xong / cắt giữa
 
 1. **[ĐÃ ĐÓNG 25/11/2026 — môi trường]** `-DayDu` đã chạy **trọn 20/20 (836,4 s)** trên cây cuối bằng lượt **ngoài phiên** (`artifacts/dayDu-wp15.txt`, exit 0) ⇒ nợ "hết bộ nhớ" của `N69` **đóng**; Playwright **8/8**; `P15 DAT`. Môi trường: đã cài **pnpm@10.22.0 toàn cục cho user** (npm) và **bỏ shim corepack** ở `%TEMP%` ⇒ bước FE chạy không cần shim, **không** đổi cấu hình corepack.
-2. **Chưa commit / chưa có PR** — người dùng chưa yêu cầu (CLAUDE.md §8). Nhánh `feat/n69-wp15-nen-gd3` đang giữ **11 tệp tracked + 5 tệp mới** (xem §7).
+2. **[ĐÃ ĐÓNG 25/11/2026]** Đã commit **`dab2567`** (17 tệp) + **`a146725`**/**`a5808e5`** (docs đóng phiên), **đã push** nhánh `feat/n69-wp15-nen-gd3` và mở **PR #20** (base `main`, `Refs: D-210…D-215`); **không tách PR** (`P2 #1` chấp nhận) — xem `handover-n70` §7.
 3. **Bật `cong-tai-lieu` thành required check** — **việc NGƯỜI** (branch protection = vùng cấm).
-4. **`negative-control.ps1` NC-1** — chỉ chạy được sau khi commit (tệp đích phải đã commit, không dirty); bằng chứng trước commit: `-TuKiem` CA1–CA6 + đột biến tay NC-1 (`exit 1` → khôi phục `exit 0`, sha256 `66eab23…`).
-5. **P3 còn lại của REV** (không chặn merge): #4 chú thích `BUOC 4a` lệch số bước; #5 `MergeMain` chưa in cảnh báo README; #6 chú thích Kernel "closure bắc cầu"; #7 sàn số bước `ci-khang-dinh` giữ 15; #8 thứ tự luật "rỗng mã" trước luật ĐỎ (b); #10 lượt `-DayDu` chưa xanh (nay là nợ môi trường đã ghi). **P2 #1** (diff ~1.475 dòng > ~600) — chấp nhận, không tách (631 dòng là probe cổng do `D-211`① buộc).
+4. **[ĐÃ ĐÓNG 25/11/2026]** `negative-control.ps1` **NC-1 DAT** sau commit `dab2567`: đột biến `tools/probe-cong-tai-lieu.ps1:411` ⇒ **exit 1** (`-TuKiem` **7/8**, log `artifacts/negative-control/20261125-195435-do.log`); khôi phục byte gốc ⇒ **exit 0** (**8/8**, log `…-xanh.log`); bằng chứng trong `docs/tests/WP-15-testplan.md`.
+5. **P3 còn lại của REV** (không chặn merge): #4 chú thích `BUOC 4a` lệch số bước; #5 `MergeMain` chưa in cảnh báo README; #6 chú thích Kernel "closure bắc cầu"; #7 sàn số bước `ci-khang-dinh` giữ 15; #8 thứ tự luật "rỗng mã" trước luật ĐỎ (b); **#10 ĐÃ ĐÓNG** (`-DayDu` 20/20 xanh). **P2 #1** (diff ~1551 dòng > ~600) — chấp nhận, không tách (631 dòng là probe cổng do `D-211`① buộc).
 
 ## 3. Migration đã áp
 
