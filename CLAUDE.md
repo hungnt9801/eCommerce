@@ -40,6 +40,8 @@ Báo cáo/handover ghi **tên lệnh + số đo**, không ghi "đã ổn". Khôn
 
 - Mở phiên bằng baseline 6 lệnh (`08` §4); đóng bằng handover **7 mục** + **đúng một** khối A/B (`08` §5.1).
 - Một phiên = một WP, một nhánh, PR nhỏ (≤ ~600 dòng diff trừ migration). **Chỉ cắt phiên ở điểm xanh**, không cắt giữa migration/backfill.
+  Ngoại lệ có chủ đích — **chuỗi WP code GĐ3** (`D-216`): mỗi phiên = một hàng của `docs/agents/bang-phien-<chuỗi>.md`, nhánh WP xếp chồng trên
+  `tich-hop/gd3`, không PR mỗi phiên (PR xếp chồng mở cuối chuỗi) — chạy bằng `/chay-phien-code` / `tools/agents/chay-tu-dong.ps1 -Chuoi`.
 - **Dừng phiên** (ghi handover, kể cả chưa xong WP) khi: 3 vòng liên tiếp cùng lỗi · context > ~70% · phải sửa > 5 tệp ngoài phạm vi WP ·
   test đỏ do thay đổi ngoài dự kiến · migration chạm DB có dữ liệu mà chưa `pg_dump`.
 - Song song: theo `docs/nhanh/09-parallel-sessions.md` — DB + cổng riêng mỗi luồng, **một chủ migration**, merge BE trước FE,
