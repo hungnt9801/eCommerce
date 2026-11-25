@@ -39,6 +39,24 @@ public static class CarrierAddressErrorCodes
     /// fail-closed** ⇒ sập luồng giao hàng.
     /// </summary>
     public const string BienMatHangLoat = "eCommerce:Address:0508";
+
+    /// <summary>
+    /// 🚨 **Danh mục hãng có mã địa chỉ KHÔNG HỢP LỆ** — phần tử `null`, mã `null`/rỗng/chỉ khoảng trắng,
+    /// hoặc **hai đơn vị trùng mã sau `Trim`** (`D-84`/`D-91`). Từ chối **cả lô** (0 thay đổi).
+    ///
+    /// 📌 Số **kế tiếp sau `0508`** (mã cao nhất có trong code lúc viết — `D-79` cấm đánh số lại).
+    /// Hằng thay tên gợi ý cũ `DanhMucHangTrungMa` (`D-91` — gộp cả "trùng" và "rỗng" vào một hàng rào).
+    /// </summary>
+    public const string DanhMucHangMaKhongHopLe = "eCommerce:Address:0509";
+
+    /// <summary>
+    /// 🚨 **Tra NGƯỢC không duy nhất**: nhiều hơn một ánh xạ `DaXacMinh` cùng (hãng, đơn vị đích) ⇒
+    /// **không** được chọn bừa "cái đầu/mới nhất" (`D-89`). `WithData`: `carrierCode`,
+    /// `ourAdministrativeUnitId`, `soAnhXa`, tối đa 20 `carrierAddressCode` sắp `Ordinal`.
+    ///
+    /// 📌 Số **kế tiếp sau `0509`** (`D-84` lấy trước, `D-89` lấy sau — `D-79` cấm đánh số lại).
+    /// </summary>
+    public const string AnhXaNguocKhongDuyNhat = "eCommerce:Address:0510";
 }
 
 /// <summary>Cách một ánh xạ được tạo ra — quyết định **mức tin cậy** của nó.</summary>

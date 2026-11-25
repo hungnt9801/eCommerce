@@ -2228,6 +2228,163 @@ namespace eCommerce.Migrations
                         });
                 });
 
+            modelBuilder.Entity("eCommerce.Address.Carrier.CarrierAddressSyncRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CarrierCode")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("ConcurrencyStamp");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<string>("ErrorCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ErrorType")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("ExtraProperties")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("ExtraProperties");
+
+                    b.Property<DateTime>("FinishedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.PrimitiveCollection<string[]>("MauCanNguoiAnhXa")
+                        .HasColumnType("text[]");
+
+                    b.Property<int>("Outcome")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SoCanNguoiAnhXa")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SoCapNhatTen")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SoDanhDauNghiNgo")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SoMaNhan")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Source")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<string>("SourceHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("StartedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.Property<string>("TriggeredBy")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "CarrierCode", "StartedAtUtc")
+                        .HasDatabaseName("IX_AddrCarrierSyncRuns_Tenant_Carrier_StartedAt");
+
+                    b.HasIndex("TenantId", "CarrierCode", "Outcome", "FinishedAtUtc")
+                        .HasDatabaseName("IX_AddrCarrierSyncRuns_Tenant_Carrier_Outcome_FinishedAt");
+
+                    b.ToTable("AddrCarrierSyncRuns", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_AddrCarrierSyncRuns_Outcome", "\"Outcome\" in (0, 1, 2)");
+                        });
+                });
+
+            modelBuilder.Entity("eCommerce.Address.Carrier.CarrierAddressSyncRunUnmappedCode", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CarrierAddressCode")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("CarrierAddressName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("CarrierCode")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("CarrierLevel")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("ConcurrencyStamp");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<string>("ExtraProperties")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("ExtraProperties");
+
+                    b.Property<Guid>("SyncRunId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SyncRunId", "CarrierLevel", "CarrierAddressCode")
+                        .HasDatabaseName("IX_AddrCarrierSyncRunUnmappedCodes_Sync_Level_Code");
+
+                    b.HasIndex("TenantId", "SyncRunId", "CarrierAddressCode")
+                        .IsUnique()
+                        .HasDatabaseName("UX_AddrCarrierSyncRunUnmappedCodes_Tenant_SyncRun_Code");
+
+                    b.ToTable("AddrCarrierSyncRunUnmappedCodes", (string)null);
+                });
+
             modelBuilder.Entity("eCommerce.Address.CatalogSyncRun", b =>
                 {
                     b.Property<Guid>("Id")
@@ -10433,6 +10590,15 @@ namespace eCommerce.Migrations
                     b.HasOne("Volo.Abp.OpenIddict.Authorizations.OpenIddictAuthorization", null)
                         .WithMany()
                         .HasForeignKey("AuthorizationId");
+                });
+
+            modelBuilder.Entity("eCommerce.Address.Carrier.CarrierAddressSyncRunUnmappedCode", b =>
+                {
+                    b.HasOne("eCommerce.Address.Carrier.CarrierAddressSyncRun", null)
+                        .WithMany()
+                        .HasForeignKey("SyncRunId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("eCommerce.Catalog.CatalogAttributeValue", b =>

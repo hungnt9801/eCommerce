@@ -321,6 +321,13 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>, IHasEventOut
     // ── Address (ADDR-002): ánh xạ mã địa chỉ theo hãng vận chuyển ──
     public DbSet<Address.Carrier.CarrierAddressMapping> CarrierAddressMappings { get; set; } = default!;
 
+    // ── Address (ADDR-002 / WP-18): SỔ LÔ ĐỒNG BỘ MÃ ĐỊA CHỈ HÃNG — append-only (`D-83`/`D-90`) ──
+    // 🚨 Thiếu DbSet ⇒ `IRepository<CarrierAddressSyncRun, Guid>` KHÔNG được đăng ký (lỗi chỉ lộ lúc chạy).
+    public DbSet<Address.Carrier.CarrierAddressSyncRun> CarrierAddressSyncRuns { get; set; } = default!;
+
+    // ── Address (ADDR-002 / WP-18): MÃ HÃNG CHƯA ÁNH XẠ của một lượt (`D-88`) — bảng con append-only ──
+    public DbSet<Address.Carrier.CarrierAddressSyncRunUnmappedCode> CarrierAddressSyncRunUnmappedCodes { get; set; } = default!;
+
     // ── Address (ADDR-004): SỔ ĐỊA CHỈ — địa chỉ VẬT LÝ dùng chung trong tenant ──
     // 🚨 BẮT BUỘC có DbSet cho MỌI entity: ABP đăng ký `IRepository<T>` bằng cách **quét DbSet**,
     //    KHÔNG quét model. Thiếu ⇒ DI nổ lúc chạy ⇒ HTTP 500, dù build và migration đều XANH.

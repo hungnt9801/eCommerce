@@ -970,3 +970,47 @@ Toàn bộ luật (kế hoạch · 3 hàng rào · áp dụng · 14 test) **đã
 | (không thuộc bảng skill) | §15.2 F5 "entity chưa tồn tại", banner đầu, §5.1, §6.1, §11, §17 hàng 1/3 | Cập nhật theo code thật | `eCommerceDbContext.cs:318,352`; migration `20261014042922_Add_Addr002_CarrierMappings.cs:50` |
 
 **Các lệch từng chờ quyết định đã chốt:** Q8 → `D-83`, Q9 → `D-84`, Q10 → `D-85`, Q11 → `D-86`, Q13 → `D-87`, Q14 → `D-88`, Q15 → `D-89`, Q16 → `D-91`, Q17 → `D-90`, Q3 → `D-92`, Q12 → `D-94`. **Còn mở (không chặn):** Q1/Q2/Q7 (`NCC`), Q4/Q5/Q6. **Chưa kiểm lại** trong lượt này: §15.2 F1-F4/F6 (khoá `Tax`, metric, `IIdempotencyGuard`, nguồn `wards`) — mô tả phản ánh 13/10/2026.
+
+---
+
+## 19. TRẠNG THÁI TRIỂN KHAI (26/11/2026) — `WP-18` / `W18-2` (F3 BE, ADDR-002)
+
+> Nhánh `feat/gd3-wp18-dia-chi`; G2 tạm duyệt thiết kế theo `D-243`. Thi công theo
+> [`ADDR-002-arch.md`](./ADDR-002-arch.md) §1.2 (IN). **Không** áp migration lên DB (ORCH `pg_dump` rồi chạy
+> `DbMigrator`); **không** adapter GHN/GHTK (`R3-1`); **không** PII/`ADDR-003`.
+
+### ✅ Đã làm (code)
+
+| Hạng mục | Vị trí |
+|---|---|
+| Mã lỗi mới `0509 DanhMucHangMaKhongHopLe`, `0510 AnhXaNguocKhongDuyNhat` (`D-84`/`D-89`/`D-91`) | `modules/Address/eCommerce.Address.Domain/Carrier/CarrierAddressMapping.cs` |
+| Lõi `LapKeHoach`: `ChuanHoaVaKiemMa` (một vòng quét, `Trim`/`Ordinal`, mã rỗng/`null`/phần tử `null`/trùng ⇒ **một** `0509`); hàng rào 3 chỉ đếm **chuyển mới** sang `NghiNgo`, mẫu số = ánh xạ chưa `NghiNgo` (+`soDaNghiNgoTruoc`); ánh xạ đã `NghiNgo` vắng mặt không sinh lại việc (`D-84`/`D-87`/`D-91`) | `modules/Address/eCommerce.Address.Domain/Sync/CarrierAddressMappingSynchronizer.cs` |
+| `ViecMaHang.CarrierLevel` (additive, record nội bộ) để ghi **đủ** cấp vào bảng con | như trên |
+| Tra ngược `TraNguoc` + `KetQuaTraNguoc` (fail-closed: `0505`/`0501`/`0504`/`0502`/**`0510`**, không chọn bừa — `D-89`) | `modules/Address/eCommerce.Address.Domain/Carrier/CarrierAddressMappingResolver.cs` |
+| `CarrierAddressSourceHash` (§5.3: sắp `(CarrierLevel, CarrierAddressCode)` `Ordinal`, `\t`/`\n`, UTF-8, SHA-256 hex thường) | `modules/Address/eCommerce.Address.Domain/Sync/CarrierAddressSourceHash.cs` |
+| Entity append-only `CarrierAddressSyncRun` (`MauCanNguoiAnhXa` ≤ 20, `null` khi 0 việc — `D-234`) + `CarrierAddressSyncRunUnmappedCode` (không navigation, không FK tới ánh xạ — `D-88`), enum `CarrierAddressSyncOutcome` | `modules/Address/eCommerce.Address.Domain/Carrier/` |
+| Hợp đồng hẹp `ICarrierAddressResolver` + 3 DTO ở `Application.Contracts` (**0** tham chiếu `Address.Domain`; `MatchMethod`/`Status`/`Level` là `int` — `D-232`) | `modules/Address/eCommerce.Address.Application.Contracts/Carrier/CarrierAddressResolverContracts.cs` |
+| Hiện thực **lớp riêng** `CarrierAddressResolver : ITransientDependency` (không sinh HTTP route; mapper dùng chung — `D-232`) | `modules/Address/eCommerce.Address.Application/CarrierAddressResolver.cs` |
+| App service cùng lớp (`D-85`): `ResolveCarrierAddressCodeAsync` (uỷ quyền resolver), `GetUnmappedCodesAsync` (lượt `DaApDung` gần nhất, trừ ánh xạ hiện có, phân trang ≤ 1000, `LatestRunOutcome`), `XacMinhAsync` + `[Authorize(Addresses.CarrierMapping.Verify)]` — đúng **6** method public (`D-235`) | `modules/Address/eCommerce.Address.Application/CarrierAddressMappingAppService.cs` |
+| Worker: quét `D-84`/`D-91` **trước** khi băm ⇒ băm ⇒ `LapKeHoach`; **một UoW** `requiresNew` bao đọc + `UpdateManyAsync(autoSave:false)` + dòng lô + dòng con, `CompleteAsync` một lần; bỏ early-return khi 0 việc; phân loại `BiChan` **theo mã hàng rào** (`0506`/`0507`/`0508`/`0509`), mọi exception khác ⇒ `Loi` (`ErrorCode=null`, `SourceHash=null`, `ErrorType`=tên kiểu); `BiChan`/`Loi` ghi UoW **riêng**; `StartedAtUtc` trước adapter (`D-90`) | `modules/Address/eCommerce.Address.Application/Sync/CarrierAddressSyncWorker.cs` |
+| Permission `eCommerce.Addresses.CarrierMapping.Verify` khai **cả hai nơi**, side `Host` (`D-85`/`D-92`) | `src/eCommerce.Domain.Shared/eCommerceConsts.cs`; `src/eCommerce.Application.Contracts/Permissions/eCommercePermissionDefinitionProvider.cs` |
+| Map HTTP **đúng 6** mã reachable: `0501`→404 · `0502`/`0503`/`0504`/`0510`→409 · `0505`→400 (`D-233`) | `src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs` |
+| 2 `DbSet` trên DbContext hợp nhất (M4) | `src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs` |
+| Schema: `AddrCarrierSyncRuns` + `AddrCarrierSyncRunUnmappedCodes`, `MauCanNguoiAnhXa text[]`, 4 index, FK `Restrict`, CHECK `Outcome in (0,1,2)`; unique bảng con **SQL thô `NULLS NOT DISTINCT`** | `modules/Address/eCommerce.Address.EntityFrameworkCore/AddressDbContextModelCreatingExtensions.cs`; migration `20261125193330_Add_Addr002_CarrierSyncRuns` (EF sinh) |
+
+### 🔶 Chưa làm / nợ (có chủ)
+
+- **Chưa áp migration** lên DB — ORCH `pg_dump` rồi chạy `DbMigrator` (binary mới build) ⇒ sau đó `db-admin`/ORCH kiểm `__EFMigrationsHistory` + `\d` hai bảng.
+- **Permission role `admin`** chỉ được cấp sau khi chạy `DbMigrator` (bài học `S6`) — chưa chạy.
+- `test/eCommerce.IntegrationTests/PostgreSqlSchemaTests.cs`: số đếm index `NULLS NOT DISTINCT` **93 → 94** và thêm tên đích danh `UX_AddrCarrierSyncRunUnmappedCodes_Tenant_SyncRun_Code` (M8) — **vai `be` không ghi `test/**`**, QA cập nhật ở `W18-3`.
+- Toàn bộ **29 test case** §14.1 (TC-01…TC-29) — chưa viết (vùng `test/**` của QA); danh sách ca cần thêm ở `W18-3` do BE liệt kê trong báo cáo phiên.
+- Metric của lượt đồng bộ/NFR-008 — arch §1.2 **không** yêu cầu metric mới ở `WP-18` ⇒ không thêm vào `eCommerceMetricNames.All` (tránh `MetricEmitterTests` báo tên chưa có nơi phát).
+- Nợ GĐ4: method **đọc** (`TraMaHangAsync`, `ResolveCarrierAddressCodeAsync`, `GetUnmappedCodesAsync`) phải chạy dưới `CurrentTenant.Change(null)` khi bật multi-tenancy thật (`D-92` ⑤).
+- `GetSyncRunsAsync` (lịch sử lượt) — additive sau (`D-235`), không làm ở `WP-18`.
+
+### ⚠️ Ghi chú kỹ thuật (không đổi hợp đồng)
+
+- `GetUnmappedCodesAsync` đọc **toàn bộ** dòng con của lượt nguồn rồi lọc trong bộ nhớ (chặn bởi kích thước danh mục hãng — NFR-001); chuyển anti-join SQL sau này là additive (§5.5 R3).
+- Trong worker, đọc `hienCo` nằm **trong** UoW #1 (thay vì trước `Begin` như sơ đồ §5.1) vì `IRepository` của ABP cần UoW; thứ tự bất biến giữ nguyên: nạp adapter **ngoài** transaction → quét `D-84`/`D-91` → băm → `LapKeHoach` → áp dụng + ghi lô + dòng con + `CompleteAsync` **một** lần.
+- `ChuanHoaVaKiemMa` gom `soMaTrung` = số **đơn vị** trong nhóm trùng (hai dòng `" P1 "` + `"P1"` ⇒ `2` — khớp TC-10).
+- Tên index bảng lô dùng dạng **rút ngắn ≤ 63 byte** (`IX_AddrCarrierSyncRuns_Tenant_Carrier_StartedAt`, `…_Outcome_FinishedAt`) như `arch` §4.1; dạng đầy đủ `…_TenantId_CarrierCode_…` dài 64 byte sẽ bị PostgreSQL cắt ngầm.

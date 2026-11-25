@@ -335,6 +335,19 @@ public class eCommerceHttpApiHostModule : AbpModule
             options.Map(eCommerce.Address.Sync.AdministrativeSyncErrorCodes.DongHangLoatVuotNguong, System.Net.HttpStatusCode.Conflict); // 0604
             options.Map(eCommerce.Address.Sync.AdministrativeSyncErrorCodes.DanhMucSaiDinhDang, System.Net.HttpStatusCode.BadRequest); // 0605
 
+            // ── MÃ HÃNG — `ADDR-002` (`D-233`, `WP-18`) ────────────────────────────────────────
+            // 🔑 Trước WP-18 **0** mã `05xx` được map ⇒ mọi lỗi ADDR-002 trả **`403`** (client đọc thành
+            // "không có quyền"). Map đúng **6** mã reachable qua HTTP: `ResolveCarrierAddressCodeAsync`
+            // (method công khai ⇒ ABP sinh route) + `TraMaHangAsync`. **KHÔNG** map `0506`/`0507`/`0508`/
+            // `0509` — job-only ở WP-18 (chưa có đường HTTP gọi `LapKeHoach`) ⇒ thêm dòng khi mở đường đó.
+            // 📌 Mã vẫn là nguồn sự thật (`D6`); HTTP chỉ phân loại "thử lại được" / "phải sửa dữ liệu".
+            options.Map(eCommerce.Address.Carrier.CarrierAddressErrorCodes.KhongTimThayMaHang, System.Net.HttpStatusCode.NotFound);              // 0501
+            options.Map(eCommerce.Address.Carrier.CarrierAddressErrorCodes.MaChuaXacMinh, System.Net.HttpStatusCode.Conflict);                 // 0502
+            options.Map(eCommerce.Address.Carrier.CarrierAddressErrorCodes.AnhXaTrungLap, System.Net.HttpStatusCode.Conflict);                 // 0503
+            options.Map(eCommerce.Address.Carrier.CarrierAddressErrorCodes.DonViDichDaDong, System.Net.HttpStatusCode.Conflict);               // 0504
+            options.Map(eCommerce.Address.Carrier.CarrierAddressErrorCodes.ThieuThongTinBatBuoc, System.Net.HttpStatusCode.BadRequest);        // 0505
+            options.Map(eCommerce.Address.Carrier.CarrierAddressErrorCodes.AnhXaNguocKhongDuyNhat, System.Net.HttpStatusCode.Conflict);        // 0510
+
             // ── SỔ ĐỊA CHỈ (`ADDR-004` phần B) ──────────────────────────────────────────────────
             options.Map(eCommerce.Customers.CustomerErrorCodes.LienKetDiaChiDaTonTai, System.Net.HttpStatusCode.Conflict);     // 0010
             options.Map(eCommerce.Customers.CustomerErrorCodes.KhongTimThayLienKet, System.Net.HttpStatusCode.NotFound);       // 0011

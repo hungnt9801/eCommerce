@@ -174,6 +174,12 @@ public class eCommercePermissionDefinitionProvider : PermissionDefinitionProvide
         addresses.AddChild(eCommerceConsts.Permissions.Addresses.CatalogImport).MultiTenancySide =
             Volo.Abp.MultiTenancy.MultiTenancySides.Host;
 
+        // 🆕 `WP-18` (`ADDR-002`, `D-85`) — xác minh ánh xạ mã địa chỉ hãng (`XacMinhAsync`), side **Host**
+        // (`D-92` ④): ánh xạ là dữ liệu dùng chung ở host (`TenantId = NULL`). 🔒 Tách khỏi `Addresses.Verify`
+        // (xác minh địa chỉ của khách) — xác minh ánh xạ **mở khoá vận đơn cho cả hệ thống**.
+        addresses.AddChild(eCommerceConsts.Permissions.Addresses.CarrierMappingVerify).MultiTenancySide =
+            Volo.Abp.MultiTenancy.MultiTenancySides.Host;
+
         // ---- Cấu hình tổ chức (`WP-07`) ----
         // 🚨 BẮT BUỘC khai ở CẢ HAI NƠI (hằng số `eCommerceConsts.Permissions.Settings` + ở đây): thiếu một
         // nơi ⇒ `403` cho MỌI người kể cả `admin` (`XC-004` D2/E3). 🛡️ `BatBienPhanQuyenTests.TC02b`.

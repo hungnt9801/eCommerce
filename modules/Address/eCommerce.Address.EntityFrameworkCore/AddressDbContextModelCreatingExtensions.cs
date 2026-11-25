@@ -42,6 +42,29 @@ public static class AddressDbContextModelCreatingExtensions
     /// <summary>Lượt `DaApDung` gần nhất (màn vận hành).</summary>
     public const string TenIndexLoNapTheoKetCuc = "IX_AddrCatalogSyncRuns_TenantId_SchemaVersion_Outcome_ImportedAtUtc";
 
+    // ── ADDR-002 (`WP-18`): SỔ LÔ ĐỒNG BỘ MÃ ĐỊA CHỈ HÃNG (`D-83`/`D-88`/`D-90`) ──
+    public const string TenBangLoMaHang = "AddrCarrierSyncRuns";
+
+    /// <summary>
+    /// Lịch sử lượt theo hãng (`psql`/vận hành). 📌 Tên **≤ 63 byte** (`D-235`): tên đầy đủ
+    /// `…_TenantId_CarrierCode_StartedAtUtc` sẽ **64** byte ⇒ PostgreSQL cắt ngầm.
+    /// </summary>
+    public const string TenIndexLoMaHangTheoThoiDiem = "IX_AddrCarrierSyncRuns_Tenant_Carrier_StartedAt";
+
+    /// <summary>Đường đọc `GetUnmappedCodesAsync`: lượt `DaApDung` gần nhất theo `(tenant, hãng, outcome)`.</summary>
+    public const string TenIndexLoMaHangTheoKetCuc = "IX_AddrCarrierSyncRuns_Tenant_Carrier_Outcome_FinishedAt";
+
+    public const string TenBangDongConMaHang = "AddrCarrierSyncRunUnmappedCodes";
+
+    /// <summary>
+    /// UNIQUE `(TenantId, SyncRunId, CarrierAddressCode)` — một mã một dòng con trong một lượt.
+    /// ⚠️ EF không diễn đạt được `NULLS NOT DISTINCT` ⇒ migration thay bằng SQL thô (`D-88`, `D-92`).
+    /// </summary>
+    public const string TenIndexUniqueDongConMaHang = "UX_AddrCarrierSyncRunUnmappedCodes_Tenant_SyncRun_Code";
+
+    /// <summary>Phân trang `GetUnmappedCodesAsync` sắp `(CarrierLevel, CarrierAddressCode)` `Ordinal`.</summary>
+    public const string TenIndexDongConMaHang = "IX_AddrCarrierSyncRunUnmappedCodes_Sync_Level_Code";
+
     public static void ConfigureAddress(this ModelBuilder builder)
     {
         Check.NotNull(builder, nameof(builder));
@@ -213,6 +236,64 @@ public static class AddressDbContextModelCreatingExtensions
             b.ToTable(t => t.HasCheckConstraint(
                 "CK_AddrCatalogSyncRuns_SourceHashHex",
                 "\"SourceHash\" IS NULL OR \"SourceHash\" ~ '^[0-9a-f]{64}$'"));
+        });
+
+        // ── ADDR-002 (`WP-18`): SỔ LÔ ĐỒNG BỘ MÃ ĐỊA CHỈ HÃNG — append-only, không FK tới ánh xạ (`D-83`) ──
+        builder.Entity<Carrier.CarrierAddressSyncRun>(b =>
+        {
+            b.ToTable(TenBangLoMaHang);
+            b.ConfigureByConvention();
+
+            b.Property(x => x.CarrierCode).IsRequired().HasMaxLength(32);
+            b.Property(x => x.Source).HasMaxLength(512);
+            // varchar(64) — SHA-256 hex thường; `null` khi lỗi trước khi có danh mục (`D-90`).
+            b.Property(x => x.SourceHash).HasMaxLength(64);
+            b.Property(x => x.TriggeredBy).IsRequired().HasMaxLength(128);
+            b.Property(x => x.ErrorCode).HasMaxLength(64);
+            // CHỈ `ex.GetType().FullName` — cấm message/stack/payload (BR-011).
+            b.Property(x => x.ErrorType).HasMaxLength(256);
+
+            // 🆕 `D-234`: `text[]` (Npgsql map `string[]` sẵn — **0** converter), `null` khi 0 việc.
+            b.Property(x => x.MauCanNguoiAnhXa).HasColumnType("text[]");
+
+            // Lịch sử lượt theo hãng.
+            b.HasIndex(x => new { x.TenantId, x.CarrierCode, x.StartedAtUtc })
+                .HasDatabaseName(TenIndexLoMaHangTheoThoiDiem);
+
+            // Đường đọc: lượt `DaApDung` gần nhất theo `FinishedAtUtc`.
+            b.HasIndex(x => new { x.TenantId, x.CarrierCode, x.Outcome, x.FinishedAtUtc })
+                .HasDatabaseName(TenIndexLoMaHangTheoKetCuc);
+
+            // Hàng rào DB cho enum lưu dạng int — enum chỉ thêm ở CUỐI dải (`D-17`).
+            b.ToTable(t => t.HasCheckConstraint(
+                "CK_AddrCarrierSyncRuns_Outcome",
+                "\"Outcome\" in (0, 1, 2)"));
+        });
+
+        // ── ADDR-002 (`WP-18`): MÃ HÃNG CHƯA ÁNH XẠ của một lượt (`D-88`) — bảng con append-only ──
+        builder.Entity<Carrier.CarrierAddressSyncRunUnmappedCode>(b =>
+        {
+            b.ToTable(TenBangDongConMaHang);
+            b.ConfigureByConvention();
+
+            b.Property(x => x.CarrierCode).IsRequired().HasMaxLength(32);
+            b.Property(x => x.CarrierLevel).IsRequired().HasMaxLength(32);
+            b.Property(x => x.CarrierAddressCode).IsRequired().HasMaxLength(64);
+            b.Property(x => x.CarrierAddressName).IsRequired().HasMaxLength(256);
+
+            // FK trong CÙNG module: dòng con → lượt. **Không** cascade: sổ bất biến (`D-88`).
+            b.HasOne<Carrier.CarrierAddressSyncRun>()
+                .WithMany()
+                .HasForeignKey(x => x.SyncRunId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Một mã một dòng con trong một lượt — migration thay bằng SQL thô `NULLS NOT DISTINCT`.
+            b.HasIndex(x => new { x.TenantId, x.SyncRunId, x.CarrierAddressCode })
+                .IsUnique()
+                .HasDatabaseName(TenIndexUniqueDongConMaHang);
+
+            b.HasIndex(x => new { x.SyncRunId, x.CarrierLevel, x.CarrierAddressCode })
+                .HasDatabaseName(TenIndexDongConMaHang);
         });
     }
 }

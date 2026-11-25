@@ -5,6 +5,9 @@ namespace eCommerce.Address.Carrier;
 /// <summary>Kết quả tra một mã địa chỉ hãng vận chuyển.</summary>
 public sealed record KetQuaTraMaHang(CarrierAddressMapping AnhXa, AdministrativeUnit DonVi);
 
+/// <summary>Kết quả tra **ngược** đơn vị của ta → mã địa chỉ hãng (`D-89`).</summary>
+public sealed record KetQuaTraNguoc(CarrierAddressMapping AnhXa, AdministrativeUnit DonVi);
+
 /// <summary>Loại sai lệch phát hiện khi đồng bộ lại danh mục của hãng.</summary>
 public enum LoaiSaiLech
 {
@@ -100,6 +103,97 @@ public static class CarrierAddressMappingResolver
         }
 
         return new KetQuaTraMaHang(mapping, dich);
+    }
+
+    /// <summary>
+    /// **Tra NGƯỢC** đơn vị của ta → mã địa chỉ hãng, cho `SHP-001`/`SHP-004` tạo vận đơn (`D-89`).
+    /// 🔒 **FAIL-CLOSED**: không trả `null`, **không** chọn bừa "cái đầu/mới nhất".
+    ///
+    /// Thứ tự luật:
+    ///   1. `carrierCode` rỗng **hoặc** `Guid.Empty` ⇒ NÉM `0505`;
+    ///   2. không thấy đơn vị đích ⇒ NÉM `0501`;
+    ///   3. đơn vị đích `IsActive = false` ⇒ NÉM `0504`;
+    ///   4. không có ánh xạ nào cùng hãng + cùng đích ⇒ NÉM `0501`;
+    ///   5. **&gt; 1** ánh xạ `DaXacMinh` cùng đích ⇒ NÉM <see cref="CarrierAddressErrorCodes.AnhXaNguocKhongDuyNhat"/> (`0510`);
+    ///   6. đúng **0** `DaXacMinh` (chỉ `ChuaXacMinh`/`NghiNgo`) ⇒ NÉM `0502`;
+    ///   7. đúng **1** `DaXacMinh` ⇒ trả nó + đơn vị đích.
+    /// </summary>
+    public static KetQuaTraNguoc TraNguoc(
+        IEnumerable<CarrierAddressMapping> anhXa,
+        IEnumerable<AdministrativeUnit> donVi,
+        string carrierCode,
+        Guid ourAdministrativeUnitId)
+    {
+        ArgumentNullException.ThrowIfNull(anhXa);
+        ArgumentNullException.ThrowIfNull(donVi);
+
+        if (string.IsNullOrWhiteSpace(carrierCode) || ourAdministrativeUnitId == Guid.Empty)
+        {
+            throw new BusinessException(CarrierAddressErrorCodes.ThieuThongTinBatBuoc)
+                .WithData("carrierCode", carrierCode)
+                .WithData("ourAdministrativeUnitId", ourAdministrativeUnitId);
+        }
+
+        var hang = carrierCode.Trim().ToUpperInvariant();
+
+        var dich = donVi.FirstOrDefault(u => u.Id == ourAdministrativeUnitId)
+            ?? throw new BusinessException(CarrierAddressErrorCodes.KhongTimThayMaHang)
+                .WithData("lyDo", "không tìm thấy đơn vị đích theo Id")
+                .WithData("ourAdministrativeUnitId", ourAdministrativeUnitId);
+
+        if (!dich.IsActive)
+        {
+            throw new BusinessException(CarrierAddressErrorCodes.DonViDichDaDong)
+                .WithData("ourCode", dich.Code)
+                .WithData("ourName", dich.Name);
+        }
+
+        // Mọi `CarrierLevel` đều tính — khoá tra ngược là (hãng, đơn vị đích), không phải cấp.
+        var ungVien = anhXa
+            .Where(x => string.Equals(x.CarrierCode, hang, StringComparison.OrdinalIgnoreCase)
+                        && x.OurAdministrativeUnitId == ourAdministrativeUnitId)
+            .ToList();
+
+        if (ungVien.Count == 0)
+        {
+            throw new BusinessException(CarrierAddressErrorCodes.KhongTimThayMaHang)
+                .WithData("carrierCode", hang)
+                .WithData("ourAdministrativeUnitId", ourAdministrativeUnitId)
+                .WithData("soAnhXa", 0);
+        }
+
+        var daXacMinh = ungVien.Where(x => x.Status == CarrierMappingStatus.DaXacMinh).ToList();
+
+        if (daXacMinh.Count > 1)
+        {
+            // 🚨 Nhiều mã hãng cùng trỏ một đơn vị của ta là dữ liệu **hợp lệ** để đọc xuôi, nhưng để
+            // TẠO VẬN ĐƠN thì không biết chọn mã nào ⇒ phải NÉM, KHÔNG chọn bừa (D-89).
+            throw new BusinessException(CarrierAddressErrorCodes.AnhXaNguocKhongDuyNhat)
+                .WithData("carrierCode", hang)
+                .WithData("ourAdministrativeUnitId", ourAdministrativeUnitId)
+                .WithData("soAnhXa", daXacMinh.Count)
+                .WithData("carrierAddressCode", daXacMinh
+                    .Select(x => x.CarrierAddressCode)
+                    .OrderBy(x => x, StringComparer.Ordinal)
+                    .Take(20)
+                    .ToList());
+        }
+
+        if (daXacMinh.Count == 0)
+        {
+            // Ứng viên `ChuaXacMinh`/`NghiNgo` (cùng hãng + đích) **không** dùng được cho vận đơn — cùng
+            // luật "chỉ `DaXacMinh`" của `Tra` (fail-closed).
+            throw new BusinessException(CarrierAddressErrorCodes.MaChuaXacMinh)
+                .WithData("carrierCode", hang)
+                .WithData("ourAdministrativeUnitId", ourAdministrativeUnitId)
+                .WithData("soAnhXa", ungVien.Count)
+                .WithData("trangThai", string.Join(
+                    ", ",
+                    ungVien.Select(x => x.Status.ToString()).Distinct(StringComparer.Ordinal)
+                        .OrderBy(x => x, StringComparer.Ordinal)));
+        }
+
+        return new KetQuaTraNguoc(daXacMinh[0], dich);
     }
 
     /// <summary>Tra **mềm** — trả `null` thay vì ném lỗi. Dùng cho báo cáo/đối chiếu, KHÔNG cho vận đơn.</summary>

@@ -49,12 +49,18 @@ public enum LoaiViecMaHang
 }
 
 /// <summary>Một việc cụ thể trong kế hoạch đồng bộ mã hãng.</summary>
+/// <param name="CarrierLevel">
+/// Cấp phía hãng của đơn vị trong danh mục — cần để ghi **đủ** cấp/mã/tên vào bảng con
+/// `AddrCarrierSyncRunUnmappedCodes` (`ADDR-002` §4.2, `D-88`). `null` cho việc `DanhDauNghiNgo`
+/// (đơn vị đã biến mất khỏi danh mục nên không có cấp mới); additive trên record **nội bộ**.
+/// </param>
 public sealed record ViecMaHang(
     LoaiViecMaHang Loai,
     string CarrierAddressCode,
     CarrierAddressMapping? HienCo,
     string? TenMoi,
-    string? LyDo);
+    string? LyDo,
+    string? CarrierLevel = null);
 
 /// <summary>Kế hoạch đồng bộ mã hãng — TÍNH TRƯỚC, chưa áp dụng gì.</summary>
 public sealed record KeHoachDongBoMaHang(IReadOnlyList<ViecMaHang> Viec)
@@ -92,6 +98,69 @@ public static class CarrierAddressMappingSynchronizer
     /// <summary>Số đơn vị tối thiểu của một danh mục hãng được coi là hợp lệ.</summary>
     public const int SoDonViToiThieuMacDinh = 5;
 
+    /// <summary>
+    /// **MỘT vòng quét chuẩn hoá + kiểm mã hãng** (`D-84`/`D-91`) — dùng chung bởi **worker** (trước khi băm
+    /// `SourceHash`) và <see cref="LapKeHoach"/> (ở đầu hàm) ⇒ **một** hiện thực, không hai logic.
+    ///
+    /// 🔒 Luật:
+    ///   • phần tử `null` **hoặc** `CarrierAddressCode` `null`/rỗng/chỉ khoảng trắng ⇒ đếm `soMaRong`
+    ///     (**không** bỏ qua im lặng, **không** ném `0505` ở cửa đồng bộ — `D-91`);
+    ///   • mã còn lại **chỉ** `Trim()` (`D-84`) ⇒ gom trùng `Ordinal` (giữ hoa–thường, số 0 đầu, khoảng trắng giữa);
+    ///   • `soMaRong > 0` **hoặc** có mã trùng ⇒ NÉM **một** `BusinessException`
+    ///     <see cref="CarrierAddressErrorCodes.DanhMucHangMaKhongHopLe"/> (0509) mang cả hai số + tối đa 20 mã
+    ///     trùng sắp `Ordinal` — **0** việc, từ chối cả lô.
+    ///
+    /// 📌 Trả danh sách **đã sạch**: không phần tử `null`, mã đã `Trim`, mỗi mã xuất hiện **một** lần
+    /// (giữ bản ghi **đầu tiên** khi trùng — nhưng trùng thì đã ném trước khi trả).
+    /// </summary>
+    public static IReadOnlyList<DonViDiaChiHang> ChuanHoaVaKiemMa(DanhMucDiaChiHang danhMuc)
+    {
+        ArgumentNullException.ThrowIfNull(danhMuc);
+
+        var soLanTheoMa = new Dictionary<string, int>(StringComparer.Ordinal);
+        var daChuanHoa = new List<DonViDiaChiHang>(danhMuc.DonVis?.Count ?? 0);
+        var soMaRong = 0;
+
+        foreach (var dv in danhMuc.DonVis ?? [])
+        {
+            if (dv is null || string.IsNullOrWhiteSpace(dv.CarrierAddressCode))
+            {
+                soMaRong++;
+                continue;
+            }
+
+            var ma = dv.CarrierAddressCode.Trim();
+
+            soLanTheoMa[ma] = soLanTheoMa.TryGetValue(ma, out var soLan) ? soLan + 1 : 1;
+
+            if (soLanTheoMa[ma] == 1)
+            {
+                daChuanHoa.Add(dv with { CarrierAddressCode = ma });
+            }
+        }
+
+        var maTrung = soLanTheoMa
+            .Where(x => x.Value > 1)
+            .Select(x => x.Key)
+            .OrderBy(x => x, StringComparer.Ordinal)
+            .ToList();
+
+        // 📌 `soMaTrung` = số **đơn vị** nằm trong nhóm trùng (hai dòng `" P1 "` + `"P1"` ⇒ 2 — TC-10).
+        var soMaTrung = soLanTheoMa.Where(x => x.Value > 1).Sum(x => x.Value);
+
+        if (soMaRong > 0 || maTrung.Count > 0)
+        {
+            throw new BusinessException(CarrierAddressErrorCodes.DanhMucHangMaKhongHopLe)
+                .WithData("carrierCode", (danhMuc.CarrierCode ?? string.Empty).Trim().ToUpperInvariant())
+                .WithData("soMaRong", soMaRong)
+                .WithData("soMaTrung", soMaTrung)
+                .WithData("maTrung", maTrung.Take(20).ToList())
+                .WithData("nguon", danhMuc.Nguon);
+        }
+
+        return daChuanHoa;
+    }
+
     public static KeHoachDongBoMaHang LapKeHoach(
         string carrierCode,
         IReadOnlyList<CarrierAddressMapping> anhXaHienCo,
@@ -118,12 +187,13 @@ public static class CarrierAddressMappingSynchronizer
             .Where(x => string.Equals(x.CarrierCode, hang, StringComparison.OrdinalIgnoreCase))
             .ToList();
 
-        var theoMa = new Dictionary<string, DonViDiaChiHang>(StringComparer.Ordinal);
+        // ── VÒNG QUÉT `D-84`/`D-91` — TRƯỚC hàng rào 1: mã rỗng/`null`/phần tử `null`/trùng sau `Trim`
+        //    ⇒ NÉM **một** `0509` (từ chối cả lô). `theoMa` dựng **sau** khi đã kiểm trùng (không ghi đè
+        //    im lặng như code cũ `theoMa[...] = dv`).
+        var daChuanHoa = ChuanHoaVaKiemMa(danhMuc);
 
-        foreach (var dv in danhMuc.DonVis)
-        {
-            theoMa[dv.CarrierAddressCode.Trim()] = dv;
-        }
+        var theoMa = daChuanHoa.ToDictionary(
+            x => x.CarrierAddressCode, x => x, StringComparer.Ordinal);
 
         // ── HÀNG RÀO 1: danh mục rỗng ──
         if (theoMa.Count == 0)
@@ -155,8 +225,10 @@ public static class CarrierAddressMappingSynchronizer
 
             if (!string.Equals(anhXa.CarrierAddressName, moi.CarrierAddressName?.Trim(), StringComparison.Ordinal))
             {
+                // Giữ cho MỌI ánh xạ kể cả `NghiNgo` (tên mới giúp người xác minh — `D-87` ①(2)).
                 viec.Add(new ViecMaHang(LoaiViecMaHang.CapNhatTen, anhXa.CarrierAddressCode, anhXa,
-                    moi.CarrierAddressName, $"Tên hãng đổi: '{anhXa.CarrierAddressName}' → '{moi.CarrierAddressName}'."));
+                    moi.CarrierAddressName, $"Tên hãng đổi: '{anhXa.CarrierAddressName}' → '{moi.CarrierAddressName}'.",
+                    moi.CarrierLevel));
             }
         }
 
@@ -165,20 +237,31 @@ public static class CarrierAddressMappingSynchronizer
         foreach (var ma in theoMa.Keys.Where(k => !maDaCoAnhXa.Contains(k)).OrderBy(k => k, StringComparer.Ordinal))
         {
             viec.Add(new ViecMaHang(LoaiViecMaHang.CanNguoiAnhXa, ma, null, theoMa[ma].CarrierAddressName,
-                "Mã mới chưa có ánh xạ — cần người ánh xạ sang đơn vị hành chính. Hệ thống KHÔNG tự đoán theo tên."));
+                "Mã mới chưa có ánh xạ — cần người ánh xạ sang đơn vị hành chính. Hệ thống KHÔNG tự đoán theo tên.",
+                theoMa[ma].CarrierLevel));
         }
 
         // ③ Mã biến mất ⇒ đánh dấu NGHI NGỜ (KHÔNG xoá: vận đơn cũ còn tham chiếu).
-        foreach (var anhXa in cuaTa.Where(x => !theoMa.ContainsKey(x.CarrierAddressCode)))
+        //    `D-87` ①(1): ánh xạ ĐÃ `NghiNgo` mà vẫn vắng mặt ⇒ **không** sinh lại việc, **không** đếm
+        //    (vẫn còn bản ghi, vẫn tra được — NFR-009) ⇒ không đếm lặp gây `0508` vĩnh viễn.
+        foreach (var anhXa in cuaTa.Where(x =>
+                     !theoMa.ContainsKey(x.CarrierAddressCode)
+                     && x.Status != CarrierMappingStatus.NghiNgo))
         {
             viec.Add(new ViecMaHang(LoaiViecMaHang.DanhDauNghiNgo, anhXa.CarrierAddressCode, anhXa, null,
-                "Mã không còn trong danh mục hãng."));
+                "Mã không còn trong danh mục hãng.", anhXa.CarrierLevel));
         }
 
-        var soNghiNgo = viec.Count(x => x.Loai is LoaiViecMaHang.DanhDauNghiNgo or LoaiViecMaHang.CapNhatTen);
-        var tongDangDung = cuaTa.Count;
+        // ── HÀNG RÀO 3 (`D-87`): CHỈ đếm **chuyển trạng thái MỚI** sang `NghiNgo` trong lượt.
+        //    Tử số = số việc `CapNhatTen`/`DanhDauNghiNgo` trên ánh xạ **chưa** `NghiNgo`;
+        //    mẫu số = số ánh xạ của hãng **chưa** `NghiNgo`. So với mẫu số TOÀN BỘ sẽ chặn oan (TC-25).
+        var soNghiNgo = viec.Count(x =>
+            (x.Loai == LoaiViecMaHang.DanhDauNghiNgo || x.Loai == LoaiViecMaHang.CapNhatTen)
+            && x.HienCo!.Status != CarrierMappingStatus.NghiNgo);
 
-        // ── HÀNG RÀO 3: đánh dấu nghi ngờ quá nhiều ──
+        var tongDangDung = cuaTa.Count(x => x.Status != CarrierMappingStatus.NghiNgo);
+        var soDaNghiNgoTruoc = cuaTa.Count(x => x.Status == CarrierMappingStatus.NghiNgo);
+
         if (tongDangDung > 0 && soNghiNgo > 0)
         {
             var tiLe = (double)soNghiNgo / tongDangDung;
@@ -188,6 +271,7 @@ public static class CarrierAddressMappingSynchronizer
                 throw new BusinessException(CarrierAddressErrorCodes.BienMatHangLoat)
                     .WithData("soNghiNgo", soNghiNgo)
                     .WithData("tongDangDung", tongDangDung)
+                    .WithData("soDaNghiNgoTruoc", soDaNghiNgoTruoc)
                     .WithData("tiLe", Math.Round(tiLe, 4))
                     .WithData("nguong", nguongNghiNgo)
                     .WithData("carrierCode", hang)

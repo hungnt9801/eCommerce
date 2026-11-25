@@ -381,6 +381,16 @@ public static class eCommerceConsts
             /// 📌 Khai **cả hai nơi** (hằng số + `eCommercePermissionDefinitionProvider`).
             /// </summary>
             public const string CatalogImport = Default + ".Catalog.Import";
+
+            /// <summary>
+            /// 🆕 `WP-18` (`ADDR-002`, `D-85`) — **XÁC MINH ánh xạ mã địa chỉ hãng** (`XacMinhAsync`).
+            /// Side **`Host`** (`D-92` ④): ánh xạ là dữ liệu **dùng chung ở host** (`TenantId = NULL`);
+            /// xác minh một ánh xạ **mở khoá vận đơn cho cả hệ thống** ⇒ không giao cho người dùng tenant.
+            /// 🔒 Không tái dùng `Addresses.Verify` (xác minh **địa chỉ của khách** ≠ xác minh ánh xạ mã hãng).
+            /// 📌 Khai **cả hai nơi** (hằng số + `eCommercePermissionDefinitionProvider`) — thiếu một nơi
+            /// ⇒ `403` cho **mọi** người kể cả `admin` (`XC-004` D2).
+            /// </summary>
+            public const string CarrierMappingVerify = Default + ".CarrierMapping.Verify";
         }
     }
 
