@@ -74,6 +74,59 @@ $script:soHong = 0
 # 🚨 `D-66`: so lan da gap **409** va phai **thu lai** (bao cao o cuoi, KHONG phai ca kiem).
 $script:soXungDot = 0
 
+# 🚨 `D-214` (`N69`/WP-15): body cua phan hoi **409** gan nhat — de ca `P15` doc `error.code` THAT
+#    (`D-210`), khong chi quet tinh. 📌 Truoc day vong thu lai **vut** ket qua trung gian ⇒ khong do duoc.
+$script:bodyXungDot = $null
+
+# 🚨 `D-215` (`N69`/WP-15 vòng 2) — PHAN BIET **HAI** nguyen nhan hop le cua `409`:
+#    `eCommerce:Db:0002` = xung dot `ConcurrencyStamp` (DAT); `eCommerce:Lock:0001` = het han cho khoa
+#    phan tan (CHUA CHAY, KHONG do oan). Bat bien giu: **MOI `409` PHAI CO `error.code` KHAC NULL/RONG**
+#    (thieu ⇒ DO). 🔒 `$script:soXungDot` KHONG doi nghia (van = so lan **thu lai**; `Y7` + `P14` dua vao no).
+$script:soLan409 = 0                                                  # dem MOI phan hoi 409 (ban dau + thu lai)
+$script:coMaDb0002 = $false                                           # da thay body co code = eCommerce:Db:0002
+$script:bodyDb0002 = $null                                            # body DAU TIEN co code = eCommerce:Db:0002
+$script:coMaRong = $false                                             # co body code null/rong HOAC khong parse duoc
+$script:dsMa409 = [System.Collections.Generic.List[string]]::new()    # cac ma PHAN BIET da thay
+
+# 🔒 Chi de CHAN DOAN (`D-215`): ma `409` do het han cho khoa phan tan (`ChoKhoaToiDaGiay = 30`).
+$MA_KHOA_PHAN_TAN = 'eCommerce:Lock:0001'
+
+# 📌 `D-214` ① / `D-215` ①(2): ca `P15` co the `CHUA CHAY` (0 lan 409, hoac 409 mang ma khong phai xung dot DB).
+#    Dem rieng de bao cao khong doi lot xanh.
+$script:soCaChuaChay = 0
+
+<#
+    Ghi nhan MOT phan hoi `409` (`D-215` ①(1)): cap nhat body cuoi, dem so lan, phan loai ma.
+    📌 Goi o CA HAI cho: ban dau (`:257` cu) va tung lan thu lai (`:267` cu).
+#>
+function Ghi-Nhan409([string]$than) {
+    $script:soLan409++
+    $script:bodyXungDot = $than
+
+    $json = $null
+
+    try { $json = $than | ConvertFrom-Json } catch { $json = $null }
+
+    $ma = ''
+
+    if ($null -ne $json -and $null -ne $json.error) { $ma = [string]$json.error.code }
+
+    if ([string]::IsNullOrWhiteSpace($ma)) {
+        $script:coMaRong = $true
+
+        if (-not $script:dsMa409.Contains('(rong/null)')) { $script:dsMa409.Add('(rong/null)') }
+
+        return
+    }
+
+    if (-not $script:dsMa409.Contains($ma)) { $script:dsMa409.Add($ma) }
+
+    if ($ma -eq 'eCommerce:Db:0002' -and -not $script:coMaDb0002) {
+        $script:coMaDb0002 = $true
+        $script:bodyDb0002 = $than
+    }
+}
+
 function Kq([string]$ten, [bool]$dat, [string]$chiTiet = '') {
     if ($dat) {
         $script:soDat++
@@ -245,6 +298,10 @@ function GuiLaiMotRequest([string]$url, [string]$khoa, [string]$token) {
 function ThuLaiNeu409([object]$kq, [string]$token) {
     $soLan = 0
 
+    # 🚨 `D-214`/`D-215`: ghi nhan body cua **MOI** phan hoi 409 (ca ban dau lan tung lan thu lai) qua
+    #    `Ghi-Nhan409` — cap nhat `bodyXungDot` (cuoi), dem `soLan409`, phan loai ma. `200` bo qua.
+    if ($kq.Ma -eq 409) { Ghi-Nhan409 $kq.Than }
+
     while ($kq.Ma -eq 409 -and $soLan -lt $SoLanThuLai) {
         $script:soXungDot++
         $soLan++
@@ -252,6 +309,8 @@ function ThuLaiNeu409([object]$kq, [string]$token) {
         Start-Sleep -Milliseconds $ChoGiuaLanThuMs
 
         $kq = GuiLaiMotRequest -url $kq.Url -khoa $kq.Khoa -token $token
+
+        if ($kq.Ma -eq 409) { Ghi-Nhan409 $kq.Than }
     }
 
     return $kq
@@ -389,6 +448,58 @@ values ('e0000000-0000-0000-0000-0000000000d7',null,'e0000000-0000-0000-0000-000
         ($tongLoi -eq 0 -and ($tongXungDotLog -eq 0 -or $script:soXungDot -ge 1)) `
         ("loi that A = $loiA · B = $loiB · xung dot trong log A = $xungDotA · B = $xungDotB · 409 da thay = $($script:soXungDot)")
 
+    # ── ⑦ HOP DONG `409` CO MA NGHIEP VU (`D-210`/`D-214`/`D-215`) — DO **RUNTIME**, KHONG quet tinh ──────
+    # 🚨 `D-215` ①(2) — BON NHANH, THEO THU TU:
+    #    (i)   0 lan thu lai (`soXungDot = 0`) ⇒ `CHUA CHAY`, khong DAT/HONG (giu dung regex nhanh `> 0` ma `Y7` quet).
+    #    (ii)  co body `code` null/rong/khong parse ⇒ **DO** (`D-209` ⑥ + no `D-66` ⑦).
+    #    (iii) co `Db:0002` + `error.message` khac rong ⇒ **DAT** (xung dot `ConcurrencyStamp` — `D-210`).
+    #    (iv)  con lai (moi 409 co ma khac rong nhung khong phai `Db:0002`, hom nay `Lock:0001` do het han
+    #          `ChoKhoaToiDaGiay = 30`) ⇒ `CHUA CHAY`, khong do oan.
+    $dsMa = if ($script:dsMa409.Count -gt 0) { ($script:dsMa409 -join ', ') } else { '(khong co)' }
+
+    if ($script:soXungDot -gt 0) {
+        if ($script:coMaRong) {
+            # (ii) — bat bien: MOI 409 phai co `error.code` khac null/rong.
+            $thanXungDot = [string]$script:bodyXungDot
+            $bodyRutGon = if ($thanXungDot.Length -gt 200) { $thanXungDot.Substring(0, 200) } else { $thanXungDot }
+
+            Kq 'P15 MOI 409 phai co error.code KHAC null/rong (D-209 ⑥, D-66 ⑦)' $false `
+                ("so lan 409 = {0} · ma = {1} · body = {2}" -f $script:soLan409, $dsMa, $bodyRutGon)
+        }
+        else {
+            $jsonDb = $null
+
+            if ($null -ne $script:bodyDb0002) {
+                try { $jsonDb = [string]$script:bodyDb0002 | ConvertFrom-Json } catch { $jsonDb = $null }
+            }
+
+            $thongDiepDb = if ($null -ne $jsonDb -and $null -ne $jsonDb.error) { [string]$jsonDb.error.message } else { '' }
+
+            if ($script:coMaDb0002 -and -not [string]::IsNullOrWhiteSpace($thongDiepDb)) {
+                # (iii) — DAT: da thay xung dot DB that.
+                Kq 'P15 409 co error.code = eCommerce:Db:0002 VA error.message khac rong (D-210, do runtime)' $true `
+                    ("so lan 409 = {0} · ma = {1}" -f $script:soLan409, $dsMa)
+            }
+            else {
+                # (iv) — CHUA CHAY (khong DAT, khong HONG): ma khac rong nhung khong phai xung dot DB.
+                $script:soCaChuaChay++
+
+                $lyDo = if ($script:coMaDb0002) { 'Db:0002 nhung message rong' } else { 'khong phai xung dot DB' }
+
+                Write-Host ("      [P15] CHUA CHAY ({0} lan 409, ma = [{1}], {2}) — KHONG tinh DAT, KHONG phai ca DO" -f `
+                        $script:soLan409, $dsMa, $lyDo)
+
+                if ($script:dsMa409.Contains($script:MA_KHOA_PHAN_TAN)) {
+                    Write-Host ("             ↳ thay {0} ⇒ nghi khoa giu qua 30 s — xem P07" -f $script:MA_KHOA_PHAN_TAN)
+                }
+            }
+        }
+    }
+    else {
+        $script:soCaChuaChay++
+        Write-Host '      [P15] CHUA CHAY (0 lan 409) — KHONG tinh DAT'
+    }
+
     Write-Host ("   ℹ️ THU LAI 409 (`D-66`): {0} lan · gioi han {1} lan/request · HTTP cuoi: chieu duong {2}/{3} · chieu nguoc {4}/{5}" -f `
             $script:soXungDot, $SoLanThuLai, $kq1[0].Ma, $kq1[1].Ma, $kq2[0].Ma, $kq2[1].Ma)
 }
@@ -411,18 +522,26 @@ finally {
 
     Psql 'update "AbpUsers" set "ShouldChangePasswordOnNextLogin" = true where "NormalizedUserName" = ''ADMIN'';' | Out-Null
 
-    Kq 'P15 don dep: khong con giu cho / ton / don vi probe' `
+    # 📌 `D-214`: so ca don dep doi `P15/P16` -> `P16/P17` de nhuong `P15` cho ca runtime 409 o tren.
+    Kq 'P16 don dep: khong con giu cho / ton / don vi probe' `
         ((Psql 'select count(*) from "InvStockReservations" where "Sku" = ''K9HC-SKU-01'';') -eq '0' -and
          (Psql 'select count(*) from "InvItems" where "Id" = ''e0000000-0000-0000-0000-0000000000d7'';') -eq '0') `
         'giu cho = 0 · ton = 0'
 
-    Kq 'P16 don dep: da BAT LAI co ShouldChangePasswordOnNextLogin' `
+    Kq 'P17 don dep: da BAT LAI co ShouldChangePasswordOnNextLogin' `
         ((Psql 'select count(*) from "AbpUsers" where "NormalizedUserName" = ''ADMIN'' and "ShouldChangePasswordOnNextLogin";') -eq '1') 'co = 1'
 
     Remove-Item Env:\ASPNETCORE_URLS -ErrorAction SilentlyContinue
 }
 
-Write-Host ("════ PROBE GIU CHO 2 INSTANCE: {0} DAT / {1} HONG ════" -f $script:soDat, $script:soHong)
+Write-Host ("════ PROBE GIU CHO 2 INSTANCE: {0} DAT / {1} HONG / {2} CHUA CHAY ════" -f $script:soDat, $script:soHong, $script:soCaChuaChay)
+
+if ($script:soCaChuaChay -gt 0) {
+    $dsMaCuoi = if ($script:dsMa409.Count -gt 0) { ($script:dsMa409 -join ', ') } else { '(khong co)' }
+
+    Write-Host ("   ⚠️ CHUA CHAY: {0} ca (P15). HAI ly do (`D-215`): (a) 0 lan 409; (b) 409 co ma khac rong nhung KHONG phai xung dot DB (vd {1}). KHONG tinh DAT, KHONG tinh HONG. Tong 409 thay duoc = {2} · ma = [{3}]." -f `
+            $script:soCaChuaChay, $MA_KHOA_PHAN_TAN, $script:soLan409, $dsMaCuoi)
+}
 
 if ($script:soHong -gt 0) { exit 1 }
 

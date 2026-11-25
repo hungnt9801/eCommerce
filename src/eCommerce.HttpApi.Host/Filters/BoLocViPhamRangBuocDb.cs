@@ -18,6 +18,9 @@ namespace eCommerce.HttpApi.Host.Filters;
 /// **HÀNH VI:**
 ///   • `23505` / `23514` / `23503` **nhận ra** ⇒ trả JSON đúng dạng lỗi của ABP với **mã nghiệp vụ**
 ///     (`eCommerce:Inventory:0010`, `…:0032`, …) và HTTP **`403`** (cùng quy ước với `BusinessException` của hệ thống).
+///   • 🆕 `AbpDbConcurrencyException` (xung đột đồng thời — hai người sửa cùng bản ghi, `ConcurrencyStamp` lệch)
+///     ⇒ **`409`** với **một mã chung** `eCommerce:Db:0002` (`D-210`) để client biết **thử lại được**.
+///     📌 Nhánh `409` kiểm **TRƯỚC** nhánh Postgres — hai loại **không chồng nhau**; đổi lại mã `403` nào.
 ///   • Lỗi **không nhận ra** (SQLSTATE khác, hoặc lỗi không phải Postgres) ⇒ **KHÔNG** can thiệp ⇒ nổi lên `500`
 ///     như cũ. 🚨 **Không bao giờ nuốt lỗi hệ thống thành lỗi nghiệp vụ** — làm vậy sẽ che mất sự cố thật.
 /// </summary>
@@ -32,6 +35,40 @@ public class BoLocViPhamRangBuocDb : IAsyncExceptionFilter
 
     public async Task OnExceptionAsync(ExceptionContext context)
     {
+        // 🆕 `D-210` (`WP-15`) — XUNG ĐỘT DỮ LIỆU ⇒ `409` + mã chung `eCommerce:Db:0002`.
+        // 🚨 Kiểm TRƯỚC nhánh Postgres: `AbpDbConcurrencyException` và `PostgresException` KHÔNG chồng nhau,
+        // nhưng nếu để ABP xử lý trước thì nó trả `409` với `code = null` (`D-66`①) — mất đúng thứ `D-66`⑦ cần.
+        // 🔒 Chỉ nhánh này bị đổi; mọi hành vi `403` của ràng buộc DB **giữ nguyên**.
+        if (ViPhamRangBuocDb.LaXungDotDuLieu(context.Exception))
+        {
+            _logger.LogWarning(
+                "Xung đột dữ liệu đã được ánh xạ thành HTTP 409: Mã={Ma} LoạiLỗi={LoaiLoi} Đường dẫn: {Path}",
+                ViPhamRangBuocDb.MaXungDot, context.Exception.GetType().Name,
+                context.HttpContext.Request.Path);
+
+            context.HttpContext.Response.StatusCode = StatusCodes.Status409Conflict;
+            context.HttpContext.Response.ContentType = "application/json; charset=utf-8";
+
+            // Cùng khuôn lỗi ABP để client chỉ cần xử lý MỘT định dạng (`code` là nguồn sự thật — `D6`).
+            var thanXungDot = JsonSerializer.Serialize(new
+            {
+                error = new
+                {
+                    code = ViPhamRangBuocDb.MaXungDot,
+                    message = ViPhamRangBuocDb.ThongDiepXungDot,
+                    details = (string?)null,
+                    data = new Dictionary<string, object?>(),
+                    validationErrors = (object?)null
+                }
+            });
+
+            await context.HttpContext.Response.WriteAsync(thanXungDot);
+
+            // Đánh dấu ĐÃ xử lý ⇒ `AbpExceptionFilter` không ghi đè thành `409` + `code = null`.
+            context.ExceptionHandled = true;
+            return;
+        }
+
         var pg = TimPostgres(context.Exception);
 
         if (pg is null)

@@ -1,0 +1,41 @@
+# CONG TAI LIEU tren `pull_request` vao `main` (`D-211` (1), `D-212` (ii)).
+#
+# VI SAO TEP NAY TON TAI: `D-209` (6) va `D-115` (5) - "merge `main` khi bien ban CHUA KY => DO" chua co
+# cong may. Cong nay la MOT nguon logic (`tools/probe-cong-tai-lieu.ps1`), hai che do:
+#   - `Code`      chay trong `tools/kiem-tat-ca.ps1` (buoc "Cong tai lieu").
+#   - `MergeMain` chay o day: chan MERGE khi chua co bien ban NGUOI KY (`docs/bien-ban-duyet-gd3-*.md`).
+#
+# KHONG dat cong nay vao `ci.yml`: `ci.yml` chay ca `push`/`schedule` va PR vao `tich-hop/*` - noi chua can
+# chu ky nguoi (`D-212` (ii)).
+#
+# CANH BAO: bat job `cong-tai-lieu` thanh REQUIRED CHECK la viec NGUOI (branch protection la vung cam cua
+# agent). Workflow nay chi chay khi duoc goi; no khong tu thanh required check.
+
+name: cong-tai-lieu
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  # `D-212` (i): CI truyen base SHA that cua PR de probe tinh dung tap tep thay doi khi khong suy duoc WP.
+  GITHUB_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+
+jobs:
+  cong-tai-lieu:
+    name: cong-tai-lieu
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: '0. Checkout (can lich su de tinh merge-base)'
+        uses: actions/checkout@v4
+        with:
+          # Probe doc `docs/nhanh/07-ke-hoach-trien-khai.md` + bien ban + `git diff` so merge-base/HEAD.
+          fetch-depth: 0
+
+      - name: '1. Cong tai lieu - MergeMain (bien ban NGUOI KY)'
+        # KHONG `continue-on-error`: exit 1 (vi pham) va exit 2 (khong xac dinh duoc) deu lam job DO.
+        run: pwsh -NoProfile -File tools/probe-cong-tai-lieu.ps1 -CheDo MergeMain

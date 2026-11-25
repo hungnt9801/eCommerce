@@ -10,8 +10,12 @@
 
   <ItemGroup>
     <!-- Chỉ cần Abp.Core để dùng BusinessException + mã lỗi theo quy ước chung.
-         KHÔNG tham chiếu EF/Ddd ⇒ Kernel là thư viện THUẦN, test được không cần hạ tầng. -->
+         KHÔNG tham chiếu EF/Ddd ⇒ Kernel là thư viện THUẦN, test được không cần hạ tầng.
+         🆕 `D-210` (`WP-15`) — thêm `Volo.Abp.Data` để dùng `AbpDbConcurrencyException` (nhánh HTTP `409`
+         khai tại `ViPhamRangBuocDb`). Gói này KHÔNG kéo EF; nó đã nằm trong closure bắc cầu, nay khai
+         TƯỜNG MINH vì Kernel dùng TRỰC TIẾP kiểu của nó (không phó mặc cho phụ thuộc bắc cầu). -->
     <PackageReference Include="Volo.Abp.Core" />
+    <PackageReference Include="Volo.Abp.Data" />
   </ItemGroup>
 
   <ItemGroup>

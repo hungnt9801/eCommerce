@@ -272,6 +272,32 @@ Buoc 'Tai lieu: kiem khoi mermaid' {
     if ($m.Ma -ne 0) { throw "KIEM MERMAID DO (exit $($m.Ma))." }
 }
 
+# ── BUOC 4a: CONG TAI LIEU — WP dang code phai co tai lieu DAT (`D-211`, `D-212` (ii)) ──────
+Buoc 'Cong tai lieu: WP dang code co duyet khong' {
+    # 🚨 VI SAO CO BUOC NAY (`D-209` ⑥, `D-211` ①): "ma nao *chua* ma co WP dang code ⇒ DO" la mot
+    #    **DoD** cua `D-209` nhung chua co cong may. 📌 Chi chay che do `Code` — `MergeMain` (doi chu ky
+    #    **NGUOI**) nam o `.github/workflows/cong-tai-lieu.yml` tren `pull_request` base `main`
+    #    (`D-212` (ii)); nhet `MergeMain` vao day se chan ca `push`/`schedule` va lam cong cuc bo DO
+    #    cho moi WP co ma (dung y cho CI, sai cho vong lap phat trien).
+    $c = ChayLenh 'pwsh' @('-NoProfile', '-File', (Join-Path $PSScriptRoot 'probe-cong-tai-lieu.ps1'),
+        '-CheDo', 'Code') 'cong-tai-lieu.log'
+
+    # 📌 In **ly do** (WP nao, ma nao, ket qua) — khong chi mot dong "XANH" suong.
+    Get-Content $c.Log | Select-Object -Last 4 | ForEach-Object { "   $_" }
+
+    # 🔒 `exit 2` = KHONG XAC DINH DUOC (khong suy duoc WP / khong anh xa duoc ma) ⇒ **DO** (fail-closed).
+    #    📌 Khong duoc coi ma 2 la "khong ap dung": do la che do ma `D-212` (i) cam coi la xanh.
+    if ($c.Ma -eq 2) {
+        Get-Content $c.Log | Select-Object -Last 10 | ForEach-Object { "   $_" }
+        throw 'CONG TAI LIEU KHONG XAC DINH DUOC (exit 2, fail-closed) — khong suy duoc WP hoac khong anh xa duoc ma tai lieu; nguoi phai xem.'
+    }
+
+    if ($c.Ma -ne 0) {
+        Get-Content $c.Log | Select-Object -Last 20 | ForEach-Object { "   $_" }
+        throw "CONG TAI LIEU DO (exit $($c.Ma)) — WP dang code co tai lieu CHUA dat; xem log: $($c.Log)"
+    }
+}
+
 # ── BUOC 4b: FE — TYPECHECK + UNIT TEST (`WP-09`) ─────────────────────────────────────────
 Buoc 'FE: typecheck + unit test (Vitest)' {
     # 🔑 **VI SAO BUOC NAY O DAY (khong phai "chay rieng khi nho"):** `apps/admin-web` la mot nua san pham.
