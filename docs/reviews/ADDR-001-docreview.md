@@ -5,39 +5,49 @@
 | | |
 |---|---|
 | Tài liệu | `docs/features/address/addr-001-tra-cuu-don-vi-hanh-chinh-2-cap.md` |
-| Ngày · vòng | 18/11/2026 · vòng 2 |
+| Ngày · vòng | 18/11/2026 · vòng 2 · **26/11/2026 · kiểm nhanh v0.5 (phiên N76)** |
 | Người kiểm | agent `docrev` (ngữ cảnh sạch) |
-| Đã đọc | dòng 1–1069 (toàn văn) |
-| Máy | `check-feature-doc.ps1 -WP14` → exit 0 (0 lỗi: 16/16 heading, 14/14 BR có test, mục đối chiếu Nhanh ở dòng 1027) · `npm --prefix tools run check:mermaid` → exit 0 (3 sơ đồ PASS: dòng 136, 204, 242) · `kiem-link-tai-lieu.ps1` → `PASS - 0 tham chieu chet` |
+| Đã đọc | vòng 2: dòng 1–1069 (toàn văn). Kiểm nhanh v0.5: đọc §0 (16–100), §1 (118–136), §8 (597–641), §11–12 (686–728), §14 (748–827, 880–924), §15 (940–989), mục "Đối chiếu" (1028–1077); grep **toàn văn** theo từng ràng buộc BA đã sửa (không đọc lại toàn văn — theo `/doc-gate` §D2 / `D-141`) |
+| Máy | `check-feature-doc.ps1 -WP14` → **KẾT QUẢ: DAT** (16/16 heading `## 0.`…`## 15.`, 14/14 BR có test, mục "Đối chiếu mô hình Nhanh" dòng 1028) · `check-agent-artifact.ps1 -Kind docreview` → **exit 0** · mermaid (3 sơ đồ) PASS ở vòng 2, sơ đồ không đổi ở v0.5 nên không chạy lại |
 
-Tổng: **0 P1 · 2 P2 · 22 P3**. Lý do verdict: 0 P1 và 2 P2 (< 3). Cả **13** P1/P2 của vòng 1 **đã đóng** (bảng "Vòng trước").
-Hai P2 mới đều nằm ở phần BA viết lại theo `D-81`/`D-82`, nên sửa trước khi người duyệt, dù chưa đủ để đổi verdict.
-P3 gồm 13 mục vòng 1 còn mở (BA ghi ở §15.4 v0.3 là để lại vòng sau) và 9 mục mới.
+Tổng: **0 P1 · 0 P2 mở · 19 P3 mở**. Lý do verdict: 0 P1 và 0 P2 (< 3) ⇒ `DOC-OK`.
+**Hai P2 của vòng 2 đã đóng ở v0.5** (chi tiết ở mục "Vòng kiểm nhanh v0.5"). Không phát sinh P1/P2 mới từ 4 mục BA đổi ở v0.5.
+19 P3 mở là các mục vòng 1/vòng 2 còn lại (BA ghi ở §15.4 v0.5 là để vòng sau); v0.5 đã đóng thêm P3 #4, #5, #8.
 
 ## Đã kiểm
 
 | Nhóm | Cách kiểm | Kết quả |
 |---|---|---|
-| D1 tự mâu thuẫn | Lấy từng ràng buộc mới/chốt của `D-77…D-82` rồi grep cả tài liệu: `ValidateAsync`, `AddressLevelPolicy`, `EffectiveTo`, `Address.Manage`, `0004`/`0008`, `hàm sinh khoá`, `Q4`, `KeyPrefix`, `TimeoutException`, `bản ghi lô`, `rollback`, `Unit of Work`. Đối chiếu E5 (dòng 127) ↔ §8.1 #5 (dòng 607) ↔ §12 dòng 714/726 ↔ BR-009 | 7 phát hiện (#1, #4, #5, #7, #10, #11, #23) |
-| D2 chéo tài liệu / code / D-xx | Đọc `D-78…D-82` (`docs/nhanh/decisions.md` dòng 92-96). Đối chiếu Basic Flow 3–6 ↔ `AdministrativeUnitAppService.cs:43-62` + `AdministrativeUnitResolver.cs:92-150` (`ThuTra` không ném ⇒ chỉ `TheoSo` ở `:100` ném, khớp). §8.2 ↔ `AdministrativeUnitSyncWorker.cs:38,94-104`, `eCommerceHttpApiHostModule.cs:217-238,376-377`, `LockErrorCodes.cs:20`, `XC-003` §5.4 dòng 252-256 + §6.2 dòng 314. Q4 đóng theo tiền lệ ↔ biên bản `bien-ban-duyet-gd1-2026-10-29.md` §2.1 dòng 33 (`XC-003` đã duyệt). `D-81` ↔ `AdministrativeUnitSynchronizer.cs:112-209` (hàng rào 1-3 ở `:127-151`, nhánh `MoLai` ở `:168`, so `Name` ở `:174`, hàng rào 4 ở `:190-206`, `DoiTen` không căn cứ ở `:236`) | 4 phát hiện (#2, #3, #6, #26) |
-| D3 cơ chế thực thi | Với BR mới/viết lại (BR-002/003/005/007/009/010), hỏi "cái gì đỏ khi vi phạm": TC-05/17 (khung có `NgoaiLeCoLyDo`), TC-23 (grep `IRepository<Address, Guid>` trong `src`/`modules`/`test` ⇒ đúng 2 lớp `AddressAppService.cs:25`, `AddressDirectory.cs:26`), TC-24, TC-25, TC-21 ca a–e. Kiểm vế "lượt bị chặn ghi bản ghi lô từ chối" của `D-81` có test nào phủ đường `ImportDatasetAsync` không | 1 phát hiện (#1) |
-| D4 SQL chạy được | Grep rào mã: `mermaid` (dòng 135, 203, 241), `json` (482, 492), `csharp` (797) — không có khối `sql`/`powershell`/`bash` | không có khối sql — 0 phát hiện |
-| D5 test/probe/tệp có thật | Mở đúng dòng: `PostgreSqlSchemaTests.cs:235,240,296` (3 index đích danh), `AddressDbContextModelCreatingExtensions.cs:16,22,28,56,89,125,150-151` (`CK_AddrAddresses_DaChuanHoaCoMa`), `CategoryTreeTests.cs:272-280` (`Khoa_cay_danh_muc_KHONG_chua_tien_to_ecommerce`), `AddressDtos.cs:32` (`MaXaHaiPhienBanDto(int SchemaVersion, …)`), `AddressDirectory.cs:56-77`, `AdministrativeUnitSyncWorker.cs:107` (`private DongBoAsync`), `DbSetRegistrationTests.cs:54`; grep `UnitOfWork` trong `modules/Address` = 0 | 2 phát hiện (#9, #20) |
-| D6 nhãn tin cậy | Soát nhãn ở bảng BR §0.2 (BR-002 nay 🔶, BR-003 ✅ có `PostgreSqlSchemaTests`), §8.2 khối Q4 (🔶 chưa đo `MONITOR`), DoR §14.4 | 1 phát hiện (#21) |
-| D7 14 quy tắc + đối chiếu Nhanh | `design-doc-guidelines.md` §5 #1–#14 trên mục đã đổi: guard sai thì làm gì (E5, §12 dòng 714-716: đủ 3 nhánh tên/cha/mã), chống trùng + tên khoá (`D-82` một hằng, đúng tên chuỗi), Mermaid PASS; mục "Đối chiếu mô hình Nhanh" có thêm bảng vòng sửa + dòng `D-81`, `D-82`, Q4; kiểm thân đã sửa theo từng dòng bảng | 7 phát hiện (#8, #12, #13, #14, #15, #24, #25) — phần lớn là P3 vòng 1 còn mở |
+| D1 tự mâu thuẫn | Lấy từng ràng buộc **đã sửa ở v0.5** rồi grep cả tài liệu tìm chỗ trái: `TimeoutException`, `requiresNew`, `UoW bao lô`, `cùng UoW`, `bản ghi lô`, `Q4`, `hàm sinh khoá`, `D-93`. Đối chiếu E5 (dòng 127) ↔ §8.1 #5 (dòng 607) ↔ §12 dòng 714/726 ↔ BR-009 (dòng 128); §8.2 #1 (dòng 616) ↔ TC-25 (dòng 778) | v0.5: **0 phát hiện mới** (2 P2 đã đóng — xem "Vòng kiểm nhanh v0.5") |
+| D2 chéo tài liệu / code / D-xx | Đọc `D-93` (`docs/nhanh/decisions.md` dòng 107): production = file công bố của cơ quan nhà nước + `SourceHash` + bản ghi lô. Đối chiếu §0.1 D4 (52) · §11 (693–694) · §14.4 DoR (902) · BR-010 (128) · TC-22 ca g (790) · Q2 (916) — **khớp `D-93`, không lệch**. Xác nhận code qua đồ thị: `LockErrorCodes.KhongGianhDuocKhoa = "eCommerce:Lock:0001"` (`shared/eCommerce.Kernel/Locking/LockErrorCodes.cs:20`), trùng `eCommerceConsts.ErrorCodes.KhongGianhDuocKhoa` (`eCommerceConsts.cs:545`); ánh xạ 409 ở `eCommerceHttpApiHostModule.cs:377` (đã xác nhận ở vòng 2) | v0.5: 0 phát hiện mới cho 4 mục; P3 #6 (dẫn `:222` thay vì `:237`) **còn mở** |
+| D3 cơ chế thực thi | Với ràng buộc v0.5 sửa: bản ghi lô **từ chối** phải ghi UoW riêng `requiresNew: true` trước khi NÉM ⇒ cái gì đỏ: TC-21 ca (f) (dòng 774: sau khi request trả lỗi mở UoW mới đọc bản ghi từ chối) + TC-24 ca (e) (dòng 777: sau `0008` bản ghi từ chối còn đọc được, kiểm `requiresNew`) | **TC-21 ca (f) + TC-24 ca (e) có thật** (đọc dòng 774/777) ⇒ ràng buộc đã có cơ chế đỏ; 0 phát hiện mới |
+| D4 SQL chạy được | Grep rào mã: `mermaid`, `json`, `csharp` — **không** có khối `sql`/`powershell`/`bash` (không đổi từ vòng 2) | không có khối sql — 0 phát hiện |
+| D5 test/probe/tệp có thật | Mở đúng dòng các test mà v0.5 dẫn: TC-21/TC-24/TC-25 viết trong §14.1 (dòng 774/777/778); `LockErrorCodes.cs:20` + `eCommerceConsts.cs:545` xác nhận qua `codegraph_explore` (khớp giá trị `eCommerce:Lock:0001`) | 0 phát hiện mới (P3 #9/#17 còn mở — test reflection/gọi worker) |
+| D6 nhãn tin cậy | Soát nhãn ở các mục v0.5: `D-93` ghi "cơ quan/định dạng/đường dẫn file = CHƯA XÁC ĐỊNH" (đúng — không ✅ khi chưa đo) ở §0.1 D4 + §11 + §14.4 DoR; `ImportDatasetAsync`/guard/bảng lô vẫn ⬜ WP-15+ | 0 phát hiện mới |
+| D7 14 quy tắc + đối chiếu Nhanh | `design-doc-guidelines.md` §5 #1–#14 trên mục đã đổi: guard sai thì làm gì (E5 + §12 đủ nhánh tên/cha/mã), chống trùng + tên khoá (`D-82` một hằng `address:sync-catalog`), `D-93` không đổi guard (TC-22 ca g ghi lỗ hở). Mục "Đối chiếu mô hình Nhanh" (dòng 1028) có thêm hàng `D-93` (dòng 1040) và 2 hàng "Vòng 2 #1/#2" (dòng 1072–1073); thân đã sửa theo — kiểm bằng grep | 0 phát hiện mới; P3 #7 (hàng `#12`/Q4) còn mở |
+
+## Vòng kiểm nhanh v0.5 — 26/11/2026 · phiên N76
+
+Phạm vi: 4 mục BA đã đổi ở v0.5 (`docs/reviews/ADDR-001-docreview.md` vòng 2 + §15.4 dòng v0.5), kiểm nhanh theo `/doc-gate` §D2 / `D-141` (không đọc lại toàn văn; với mỗi ràng buộc đã sửa, grep toàn tài liệu tìm chỗ trái).
+
+| # | Phạm vi | Kết quả | Bằng chứng |
+|---|---|---|---|
+| 1 | P2 #1 vòng 2 — bản ghi lô **từ chối** ghi UoW riêng `requiresNew: true`, commit **trước khi NÉM** | **ĐÃ ĐÓNG** — không còn chỗ nào nói bản ghi lô từ chối nằm trong **cùng** UoW với lô | E5 (dòng 127), §8.1 #5 (607), §12 dòng `0008` (714) + "Chiến lược transaction" (726), BR-009 (128) đều ghi "UoW **riêng** `requiresNew: true`, commit **TRƯỚC khi NÉM**"; các câu "UoW bao lô" còn lại chỉ để **giải thích** vì sao phải tách (không mâu thuẫn). TC-21 ca (f) dòng 774 + TC-24 ca (e) dòng 777 kiểm lại được: sau request trả lỗi, mở UoW mới đọc bản ghi lô trạng thái từ chối |
+| 2 | P2 #2 vòng 2 — khoá bận ⇒ `BusinessException(eCommerce:Lock:0001)` → 409, KHÔNG `TimeoutException` | **ĐÃ ĐÓNG** — không còn "`TimeoutException` → 409" trong thân | §8.2 #1 (616): "**ném** `BusinessException(LockErrorCodes.KhongGianhDuocKhoa)`, mã `eCommerce:Lock:0001` (`LockErrorCodes.cs:20`) → **409** (`eCommerceHttpApiHostModule.cs:377`); **không** dùng `TimeoutException`". TC-25 (778) kiểm `ex.Code == "eCommerce:Lock:0001"` + HTTP 409. Grep `TimeoutException` chỉ còn: dòng 616 (câu "không dùng"), 778 (câu "không"), 962 (lịch sử v0.5), 1073 (cột "Tài liệu cũ nói" của bảng vòng sửa — bản ghi lịch sử, không phải mâu thuẫn sống) |
+| 3 | Các mục BA đổi theo `D-93` (§0.1 D4, §11, §14.4 DoR, BR-010/TC-22 ca g) | **Không tạo mâu thuẫn D1/D2 mới** | §0.1 D4 (52), §11 Seed/Nguồn seed (693–694), §14.4 DoR (902), BR-010 (128), TC-22 ca g (790), Q2 (916) đều thống nhất: production = **file công bố của cơ quan nhà nước** + `SourceHash` + bản ghi lô (`D-78`); **không** dùng `provinces.open-api.vn` ở production; cơ quan/định dạng/đường dẫn = **CHƯA XÁC ĐỊNH**. Khớp `D-93` (`decisions.md` dòng 107). `D-93` **không** đổi guard (TC-22 ca g vẫn ghi lỗ hở) — nhất quán |
+| 4 | Không có P1 mới; P2 mới < 3 | **ĐẠT** | 0 P1, 0 P2 mới. 19 P3 mở là các mục còn lại từ vòng 1/2 (không đổi mức) |
+
+Ghi chú: `D-141` (dòng 155) đặt điều kiện tạm duyệt `ADDR-001` = "DOCREV kiểm nhanh v0.5" cho 2 P2 vòng 2 + nguồn ĐVHC production (`D-93`). Phiên này kiểm nhanh ⇒ **2 P2 đã đóng, `D-93` đã áp đúng**; phần địa chỉ trên hoá đơn (nợ `D-77`, họ `EINV-*`) vẫn **ngoài** tạm duyệt.
 
 ## Phát hiện
 
+<!-- Chỉ phát hiện MỞ. P1/P2 vòng 2 đã đóng, KHÔNG chép lại ở đây (xem "Vòng kiểm nhanh v0.5" + "Vòng trước"). Cột 2 = "Mức", script đếm P1/P2 theo cột này. -->
+
 | # | Mức | Vị trí | Vấn đề | Đề nghị |
 |---|---|---|---|---|
-| 1 | P2 | §8.1 #5 (dòng 607) + §12 "Chiến lược transaction" (dòng 726) ↔ E5 (dòng 127), BR-009 (dòng 128), §12 dòng 714 | Tài liệu vừa yêu cầu bản ghi lô nằm **trong cùng** một UoW transactional với lô ("một Unit of Work transactional bao cả hai bước **và** bản ghi lô"), và `ImportDatasetAsync` "chạy trong UoW của ABP", vừa yêu cầu lượt bị `0008`/hàng rào chặn **phải ném lỗi** và **phải còn** "bản ghi lô trạng thái từ chối". Ở đường file (đường production duy nhất theo `D-78`), exception đi ra khỏi app service thì UoW của ABP rollback luôn bản ghi từ chối. Đường tới lỗi: BE làm đúng §8.1 #5 (ghi bản ghi lô trong UoW) rồi đúng `D-81` (ném `0008` cho client), kết quả là lô bị từ chối không để lại dấu vết, BR-009 hỏng im lặng. Không test nào bắt được: TC-21 ca (d) chỉ có đường job (worker bắt lỗi ở `AdministrativeUnitSyncWorker.cs:155`, không ném tiếp), còn TC-24 không kiểm bản ghi lô | Ghi rõ ở §8.1 #5 + E5 + §12: bản ghi lô **từ chối** phải ghi trong UoW riêng (`requiresNew: true`, commit) **trước khi** ném. Thêm TC-21 ca (f): `ImportDatasetAsync` bị `0008` hoặc `0601…0604` thì sau khi request trả lỗi vẫn đọc được bản ghi lô trạng thái từ chối. TC-24 kiểm thêm bản ghi này |
-| 2 | P2 | §8.2 #1 (dòng 616) | Khi không giành được khoá, `ImportDatasetAsync` "ném lỗi (`TimeoutException` → 409)". Trong repo, 409 cho khoá bận là `BusinessException(eCommerceConsts.ErrorCodes.KhongGianhDuocKhoa)` = `eCommerce:Lock:0001` (`LockErrorCodes.cs:20`), được ánh xạ ở `eCommerceHttpApiHostModule.cs:377` (cũng là quy ước `XC-003` §6.2 dòng 314). `TimeoutException` không có `Map` nào. Làm theo tài liệu thì client nhận mã khác 409 (đọc theo mặc định ABP là 500, **chưa chạy**), trái lời hứa "409, client thử lại được". TC-25 chỉ đòi "NÉM", không kiểm mã | Sửa thành "ném `BusinessException` `eCommerce:Lock:0001` (`KhongGianhDuocKhoa`) → 409 (`eCommerceHttpApiHostModule.cs:377`)". Cho TC-25 kiểm `ex.Code` |
-| 3 | P3 | §6.2 dòng 515 + nợ `Map` ở dòng 509/514/925 | `0008` sẽ bị `ImportDatasetAsync` ném tới client nhưng cột HTTP để "(chưa gán)", và danh sách nợ `Map` WP-15 chỉ có `0002`/`0007`. Không `Map` thì có thể ra 403 (chính dòng 520 đã nói) | Thêm `0008` vào nợ `Map` (ví dụ `Conflict`) cùng chỗ với `0002`/`0007` |
-| 4 | P3 | §8.2 khối hiện trạng, dòng 639 | "(Q4 toàn hệ thống vẫn mở)" trái Q4 `Đã đóng — theo tiền lệ` (dòng 918) và DoR dòng 903 | Bỏ vế "Q4 vẫn mở" |
-| 5 | P3 | §8.2 khối hiện trạng, dòng 640 | "Khoá nạp danh mục chung … là thiết kế chưa có (hàm sinh khoá)" trái `D-82` và dòng 625 ("**không** hàm sinh khoá nhận tham số" — là hằng) | Đổi thành "hằng `AddressLockKeys.CatalogImport` chưa có" |
+| 3 | P3 | §6.2 dòng 515 + nợ `Map` ở dòng 509/514/925 | `0008` sẽ bị `ImportDatasetAsync` ném tới client nhưng cột HTTP để "(chưa gán)", và danh sách nợ `Map` WP-15 chỉ có `0002`/`0007`. Không `Map` thì có thể ra 403 | Thêm `0008` vào nợ `Map` (ví dụ `Conflict`) cùng chỗ với `0002`/`0007` |
 | 6 | P3 | DoR dòng 903, Q4 dòng 918, bảng Đối chiếu dòng 1069 | Dẫn `eCommerceHttpApiHostModule.cs:222` làm bằng chứng `KeyPrefix` của **lock**. Thật ra `:222` là `AbpDistributedCacheOptions` (cache); lock nằm ở `:237`. §8.2 dòng 630 đã ghi đúng | Đổi thành `:237` (hoặc `:222,237`, ghi rõ cache/lock) |
 | 7 | P3 | Bảng vòng sửa, dòng 1066 (#12) | "Q4 trỏ `XC-003` §5.4 (đóng cần `D-xx`)" mâu thuẫn với dòng 1069 (Q4 đã đóng theo tiền lệ, không cần `D-xx`) | Sửa câu hoặc ghi "(thay bởi dòng Q4 bên dưới)" |
-| 8 | P3 | Header dòng 11 | Phiên bản vẫn ghi `v0.2 — 17/11/2026`, trong khi §15.4 đã có v0.3, v0.4 (18/11/2026) | Cập nhật header |
 | 9 | P3 | TC-11 ca (b), dòng 764 | Ca này bảo chạy `AdministrativeUnitSyncWorker.DongBoAsync`, nhưng method là `private` (`AdministrativeUnitSyncWorker.cs:107`) nên test không gọi trực tiếp được | Ghi điểm vào test thật (`DoWorkAsync` qua worker context, hoặc tách service nạp ở WP-15) |
 | 10 | P3 | §4.1 DFD, dòng 222 | Nút `P3` vẫn ghi "ValidateAsync". Dòng `D-79` của bảng Đối chiếu chỉ ghi đã sửa sequence §4.2 | Đổi nhãn thành `XacMinhDiaChiAsync` |
 | 11 | P3 | §11 dòng "Rollback", dòng 697 | "Cấm rollback theo cách UPDATE hồi tố (D8/BR-007)" còn dẫn D8 gốc, đã bị `D-77` thay | Viết lại theo `D-77` (danh tính bất biến; tên đổi tại chỗ qua `DoiTen`) |
@@ -58,11 +68,11 @@ P3 gồm 13 mục vòng 1 còn mở (BA ghi ở §15.4 v0.3 là để lại vòn
 ## Không kiểm được
 
 - D4: tài liệu không có khối `sql`/`powershell`/`bash` nên không có gì để chạy, không cần PostgreSQL.
-- #2: kết luận "`TimeoutException` không ra 409" dựa vào grep (`eCommerceHttpApiHostModule.cs` không có `Map` cho `TimeoutException`; 409 của khoá bận đi qua `:377`). Mã thật mà ABP trả cho `TimeoutException` (500 theo mặc định) **chưa chạy** trên host.
+- Ánh xạ HTTP 409 ở `eCommerceHttpApiHostModule.cs:377`: xác nhận qua đồ thị + bằng chứng vòng 2 (grep `LockErrorCodes` KHÔNG có `Map` cho `TimeoutException`); **chưa** khởi động host đo mã thật của `BusinessException` `Lock:0001` trong phiên này.
 - #1: kết luận dựa trên ngữ nghĩa UoW mặc định của ABP (exception đi ra khỏi app service ⇒ rollback) và việc đọc tài liệu. Code `ImportDatasetAsync` chưa có (WP-15+), nên **chưa chạy**.
-- Khung `csharp` §14.2: **chưa biên dịch/chạy**. Đã đối chiếu bằng tay chữ ký `TraDonViRequest`/`MaXaHaiPhienBanDto` (`AddressDtos.cs:14,32`) và kiểu trả về `Task<IReadOnlyList<MaXaHaiPhienBanDto>>` (`AdministrativeUnitAppService.cs:83`): biểu thức `GetGenericArguments()[0].GetGenericArguments()[0]` của TC-17 khớp. Riêng lớp cơ sở thì không khớp (#16).
-- Ghi chú ngoài phạm vi (không tính phát hiện): việc đóng Q4 theo tiền lệ là hợp lệ (`XC-003` §5.4 hệ quả #2, dòng 255, đã duyệt ở biên bản §2.1). Tuy nhiên chính `XC-003` còn tự mâu thuẫn: D4 (dòng 47) và `LockKeyPrefix.Build` §6.1 (dòng 275-281, TC-07 dòng 443 kỳ vọng `ecommerce:tax:…`) đều ghép tiền tố ở module. Ai làm theo §6.1 của `XC-003` sẽ ra tiền tố đôi. Nên giao kiểm `XC-003` riêng.
+- Khung `csharp` §14.2: **chưa biên dịch/chạy** (giữ nguyên kết luận vòng 2: chữ ký `TraDonViRequest`/`MaXaHaiPhienBanDto` khớp, riêng lớp cơ sở test không khớp — P3 #16).
 - Không tái kiểm gọi API thật `provinces.open-api.vn` và `redis-cli MONITOR` (cần mạng/host chạy). Tài liệu đã gắn nhãn 🔶 chưa đo.
+- Ghi chú ngoài phạm vi (không tính phát hiện): đóng Q4 theo tiền lệ là hợp lệ (`XC-003` §5.4 hệ quả #2, đã duyệt ở biên bản §2.1). Riêng `XC-003` còn tự mâu thuẫn (D4 dòng 47 và `LockKeyPrefix.Build` §6.1 dòng 275-281, TC-07 dòng 443) — nên giao kiểm `XC-003` riêng.
 
 ## Vòng trước (chỉ vòng 2)
 
@@ -79,9 +89,9 @@ P3 gồm 13 mục vòng 1 còn mở (BA ghi ở §15.4 v0.3 là để lại vòn
 | 7 | đã đóng — `D-81` + E5/§12/TC-24 | P2 |
 | 8 | đã đóng — §8.1 #5 ⬜ + TC-11 ca (b). Lỗi phụ về cách gọi test nay là #9 (P3) | P2 |
 | 9 | đã đóng — §7.3 theo câu `D-78` | P2 |
-| 10 | đã đóng — `D-82`: một hằng `address:sync-catalog` cho cả hai đường. Mã lỗi khi khoá bận nay là #2 (P2 mới) | P2 |
+| 10 | đã đóng — `D-82`: một hằng `address:sync-catalog` cho cả hai đường | P2 |
 | 11 | đã đóng — BR-010 ghi đúng phạm vi guard, TC-22 ca g là lỗ hở ghi nhận | P2 |
-| 12 | đã đóng — bằng chứng `TaxErrorCodes.cs:45-46` cập nhật, F4/Q4 đóng theo tiền lệ. Phần sót là #4, #6, #7 (P3) | P2 |
+| 12 | đã đóng — bằng chứng `TaxErrorCodes.cs:45-46` cập nhật, F4/Q4 đóng theo tiền lệ. Phần sót là #6, #7 (P3) | P2 |
 | 13 | đã đóng — BR-005 đổi cửa thật + cơ chế + TC-23 (grep xác nhận đúng 2 lớp) | P2 |
 | 14 | còn (đã chép lên bảng Phát hiện, #12) | P3 |
 | 15 | còn (#13) | P3 |
