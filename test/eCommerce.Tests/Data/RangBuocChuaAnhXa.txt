@@ -156,3 +156,13 @@ CK_RptFactInventorySnapshots_Chieu_KhongAm|WP-08: một chiều tồn âm — do
 CK_RptAggDailySales_Tien_KhongAm|WP-08: doanh thu/số đếm âm — domain đã ném; CHECK cho ghi tắt
 CK_RptAggDailySales_Nguon_HopLe|WP-08: nguồn ngoài {0,1} — domain đã ném; CHECK chặn SQL tay
 CK_RptWatermarks_SoDong_KhongAm|WP-08: số dòng mốc âm — domain đã ném; CHECK cho ghi tắt
+# ── WP-18 (`ADDR-001`/`ADDR-002`, `W18-2` migration · surface khi `schema.sql` được sinh lại ở `W18-4`) ──
+# 📌 Đây là ràng buộc **toàn vẹn sổ lô nạp** + **chống trùng mã chưa ánh xạ**, KHÔNG phải ca nghiệp vụ client
+#    cần mã riêng: mọi lượt nạp đã được domain/hàng rào kiểm TRƯỚC khi chạm DB (`CatalogSyncRun.Ghi`,
+#    `AdministrativeSchemaVersion.TheoSo`, `AdministrativeUnitSynchronizer`), và worker ghi trong MỘT UoW.
+#    `23505`/`23514` ở đây nghĩa là **ghi tắt/lượt chồng** — lỗi vận hành, đọc bằng `psql` (`D-241`).
+CK_AddrCatalogSyncRuns_Outcome|ADDR-001 (D-78): Outcome ∈ {0,1,2} — `CatalogSyncRun.Ghi` kiểm `Enum.IsDefined` + số đếm không âm trước khi ghi; CHECK là hàng rào cuối cho SQL tay
+CK_AddrCatalogSyncRuns_SchemaVersion|ADDR-001 (D-78): SchemaVersion ∈ {1,2} — `AdministrativeSchemaVersion.TheoSo` ném `0005` TRƯỚC khi ghi; CHECK chặn SQL tay (không phải ca client cần mã)
+CK_AddrCatalogSyncRuns_SourceHashHex|ADDR-001 (§5.3, D-78): SourceHash là SHA-256 hex thường 64 — `CatalogSyncRun.Ghi` kiểm định dạng; CHECK chặn SQL tay, không phải ca client cần mã
+CK_AddrCarrierSyncRuns_Outcome|ADDR-002 (D-78): Outcome ∈ {0,1,2} — entity dòng lô kiểm `Enum.IsDefined`; CHECK là hàng rào cuối cho ghi tắt
+UX_AddrCarrierSyncRunUnmappedCodes_Tenant_SyncRun_Code|ADDR-002 (D-234): *một mã hãng ⇒ một dòng / lượt* — worker ghi trong MỘT UoW; trùng là race/ghi tắt, không phải ca cần mã riêng; unique vẫn phải `NULLS NOT DISTINCT` (chống nhân đôi danh sách "cần người ánh xạ" khi `TenantId = NULL`)

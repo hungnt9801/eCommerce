@@ -115,7 +115,7 @@ public class AdministrativeUnitSynchronizerTests
         var hienCo = new List<AdministrativeUnit> { DonVi(AdministrativeLevel.Tinh, "01", "Thành phố Hà Nội"), xaCu };
 
         var kh = Lap(hienCo, Nguon(("00004", "Phường Ba Đình")));
-        var deThem = AdministrativeUnitSynchronizer.ApDung(kh);
+        var deThem = AdministrativeUnitSynchronizer.ApDung(kh, "test");
 
         Assert.False(xaCu.IsActive);                  // bị đóng
         Assert.Single(deThem);                        // 1 xã mới được tạo
@@ -255,7 +255,7 @@ public class AdministrativeUnitSynchronizerTests
         var hienCo = new List<AdministrativeUnit> { DonVi(AdministrativeLevel.Tinh, "01", "Thành phố Hà Nội") };
         var kh = Lap(hienCo, Nguon(("00004", "Phường Ba Đình")));
 
-        var moi = Assert.Single(AdministrativeUnitSynchronizer.ApDung(kh));
+        var moi = Assert.Single(AdministrativeUnitSynchronizer.ApDung(kh, "test"));
 
         Assert.Equal(2, moi.SchemaVersion);
         Assert.Equal(AdministrativeLevel.Xa, moi.Level);
@@ -272,7 +272,7 @@ public class AdministrativeUnitSynchronizerTests
         var hienCo = new List<AdministrativeUnit> { DonVi(AdministrativeLevel.Tinh, "01", "Thành phố Hà Nội"), cu };
         var kh = Lap(hienCo, Nguon(("00004", "Tên mới")));
 
-        AdministrativeUnitSynchronizer.ApDung(kh);
+        AdministrativeUnitSynchronizer.ApDung(kh, "test");
 
         Assert.Equal("Tên mới", cu.Name);
     }

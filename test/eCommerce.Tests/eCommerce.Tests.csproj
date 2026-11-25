@@ -31,6 +31,10 @@
     <!-- 🔑 `ADDR-004` phần B (`S2`): hợp đồng của miền địa chỉ (DTO snapshot + ETO) và entity sổ địa chỉ
          của khách — cần cho test bất biến của sổ + test `TC-18` (ETO không chứa PII). -->
     <ProjectReference Include="..\..\modules\Address\eCommerce.Address.Application.Contracts\eCommerce.Address.Application.Contracts.csproj" />
+    <!-- 🆕 `W18-4` (`N80`, F4 QA): test tầng APP SERVICE của `ADDR-001` — `AdministrativeUnitAppService`
+         (`ImportDatasetAsync`, TC-21(f)/TC-24(e)) + `AddressCatalogCache` (`D-242`, TC-14). Dựng bằng `new` +
+         fake in-memory (Repo/UoW/Lock/Cache/Bus/Clock), KHÔNG host ABP, KHÔNG PostgreSQL — khuôn `D-229`. -->
+    <ProjectReference Include="..\..\modules\Address\eCommerce.Address.Application\eCommerce.Address.Application.csproj" />
     <ProjectReference Include="..\..\modules\Customers\eCommerce.Customers.Domain\eCommerce.Customers.Domain.csproj" />
     <ProjectReference Include="..\..\modules\EInvoice\eCommerce.EInvoice.Domain\eCommerce.EInvoice.Domain.csproj" />
     <ProjectReference Include="..\..\modules\EInvoice\eCommerce.EInvoice.Application\eCommerce.EInvoice.Application.csproj" />

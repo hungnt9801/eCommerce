@@ -4065,3 +4065,95 @@ VALUES ('20261104033300_Wp08_BaoCao_Reporting', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE TABLE "AddrCatalogSyncRuns" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "SchemaVersion" integer NOT NULL,
+    "Trigger" integer NOT NULL,
+    "SourceName" character varying(512),
+    "SourceHash" character varying(64),
+    "StartedAtUtc" timestamp with time zone NOT NULL,
+    "ImportedAtUtc" timestamp with time zone NOT NULL,
+    "ImportedBy" character varying(128) NOT NULL,
+    "Outcome" integer NOT NULL,
+    "ErrorCode" character varying(64),
+    "ErrorType" character varying(256),
+    "SoThemMoi" integer NOT NULL,
+    "SoDoiTen" integer NOT NULL,
+    "SoMoLai" integer NOT NULL,
+    "SoDong" integer NOT NULL,
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    CONSTRAINT "PK_AddrCatalogSyncRuns" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_AddrCatalogSyncRuns_Outcome" CHECK ("Outcome" in (0, 1, 2)),
+    CONSTRAINT "CK_AddrCatalogSyncRuns_SchemaVersion" CHECK ("SchemaVersion" in (1, 2)),
+    CONSTRAINT "CK_AddrCatalogSyncRuns_SourceHashHex" CHECK ("SourceHash" IS NULL OR "SourceHash" ~ '^[0-9a-f]{64}$')
+);
+
+CREATE INDEX "IX_AddrCatalogSyncRuns_TenantId_SchemaVersion_ImportedAtUtc" ON "AddrCatalogSyncRuns" ("TenantId", "SchemaVersion", "ImportedAtUtc");
+
+CREATE INDEX "IX_AddrCatalogSyncRuns_TenantId_SchemaVersion_Outcome_ImportedAtUtc" ON "AddrCatalogSyncRuns" ("TenantId", "SchemaVersion", "Outcome", "ImportedAtUtc");
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261125191757_Add_Addr001_CatalogSyncRuns', '10.0.11');
+
+COMMIT;
+
+START TRANSACTION;
+CREATE TABLE "AddrCarrierSyncRuns" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "CarrierCode" character varying(32) NOT NULL,
+    "Source" character varying(512),
+    "SourceHash" character varying(64),
+    "StartedAtUtc" timestamp with time zone NOT NULL,
+    "FinishedAtUtc" timestamp with time zone NOT NULL,
+    "TriggeredBy" character varying(128) NOT NULL,
+    "Outcome" integer NOT NULL,
+    "ErrorCode" character varying(64),
+    "ErrorType" character varying(256),
+    "SoMaNhan" integer NOT NULL,
+    "SoCapNhatTen" integer NOT NULL,
+    "SoDanhDauNghiNgo" integer NOT NULL,
+    "SoCanNguoiAnhXa" integer NOT NULL,
+    "MauCanNguoiAnhXa" text[],
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    CONSTRAINT "PK_AddrCarrierSyncRuns" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_AddrCarrierSyncRuns_Outcome" CHECK ("Outcome" in (0, 1, 2))
+);
+
+CREATE TABLE "AddrCarrierSyncRunUnmappedCodes" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "SyncRunId" uuid NOT NULL,
+    "CarrierCode" character varying(32) NOT NULL,
+    "CarrierLevel" character varying(32) NOT NULL,
+    "CarrierAddressCode" character varying(64) NOT NULL,
+    "CarrierAddressName" character varying(256) NOT NULL,
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    CONSTRAINT "PK_AddrCarrierSyncRunUnmappedCodes" PRIMARY KEY ("Id"),
+    CONSTRAINT "FK_AddrCarrierSyncRunUnmappedCodes_AddrCarrierSyncRuns_SyncRun~" FOREIGN KEY ("SyncRunId") REFERENCES "AddrCarrierSyncRuns" ("Id") ON DELETE RESTRICT
+);
+
+CREATE INDEX "IX_AddrCarrierSyncRuns_Tenant_Carrier_Outcome_FinishedAt" ON "AddrCarrierSyncRuns" ("TenantId", "CarrierCode", "Outcome", "FinishedAtUtc");
+
+CREATE INDEX "IX_AddrCarrierSyncRuns_Tenant_Carrier_StartedAt" ON "AddrCarrierSyncRuns" ("TenantId", "CarrierCode", "StartedAtUtc");
+
+CREATE INDEX "IX_AddrCarrierSyncRunUnmappedCodes_Sync_Level_Code" ON "AddrCarrierSyncRunUnmappedCodes" ("SyncRunId", "CarrierLevel", "CarrierAddressCode");
+
+CREATE UNIQUE INDEX "UX_AddrCarrierSyncRunUnmappedCodes_Tenant_SyncRun_Code" ON "AddrCarrierSyncRunUnmappedCodes" ("TenantId", "SyncRunId", "CarrierAddressCode") NULLS NOT DISTINCT;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261125193330_Add_Addr002_CarrierSyncRuns', '10.0.11');
+
+COMMIT;
+

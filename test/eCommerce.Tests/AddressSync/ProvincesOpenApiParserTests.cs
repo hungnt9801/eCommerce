@@ -214,7 +214,7 @@ public class ProvincesOpenApiParserTests
 
         Assert.Equal(3, kh.SoThemMoi);
 
-        var moi = AdministrativeUnitSynchronizer.ApDung(kh);
+        var moi = AdministrativeUnitSynchronizer.ApDung(kh, "test");
         Assert.Contains(moi, x => x.Code == "00004" && x.ParentCode == "01");
     }
 }

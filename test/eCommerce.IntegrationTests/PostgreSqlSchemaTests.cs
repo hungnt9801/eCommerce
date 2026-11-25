@@ -205,7 +205,14 @@ public class PostgreSqlSchemaTests
         //      🔑 Thiếu NND thì với `TenantId = NULL` (đang chạy 1 tenant) index MẤT TÁC DỤNG IM LẶNG ⇒ chạy lại
         //      job tổng hợp (hoặc hai lượt chồng nhau) ghi **hai dòng cho một dòng chứng từ** ⇒ **doanh thu nhân
         //      đôi** — đúng ca DoD `WP-08` (*"job chạy lại 2 lần không nhân đôi dữ liệu"*) sinh ra để chặn.
-        Assert.Equal(93L, await DemAsync(
+        //    → **94** (26/11/2026, `Wp18_DiaChi` — **+1** index: `UX_AddrCarrierSyncRunUnmappedCodes_Tenant_
+        //      SyncRun_Code` của `ADDR-002` (migration `Add_Addr002_CarrierSyncRuns`). Khoá *(tenant, lượt, mã
+        //      hãng)* chống ghi trùng **một mã chưa ánh xạ** trong **một lượt** đồng bộ. Thiếu NND thì khi
+        //      `TenantId = NULL` (đang chạy 1 tenant) index mất tác dụng ⇒ cùng một mã lạ xuất hiện HAI dòng
+        //      ⇒ màn vận hành nhân đôi danh sách "cần người ánh xạ" và đếm `SoCanNguoiAnhXa` lệch. 📌 Hai
+        //      index còn lại của 2 bảng lô (`AddrCatalogSyncRuns`/`AddrCarrierSyncRuns`) **không** unique ⇒
+        //      **không** làm tăng con số này.
+        Assert.Equal(94L, await DemAsync(
             "select count(*) from pg_indexes where schemaname = 'public' and indexdef like '%NULLS NOT DISTINCT%'"));
 
         // Kiểm tra ĐÍCH DANH để thông báo lỗi có ý nghĩa (tên index dài có thể bị PostgreSQL cắt ⇒ so theo tiền tố).
@@ -400,6 +407,12 @@ public class PostgreSqlSchemaTests
             "IX_PrcPriceListItems_TenantId_PriceListId_Sku",
             "IX_PrcChannelPrices_TenantId_Kenh_Shop_Sku_MinQty",
             "IX_PrcPriceCalculationRecords_TenantId_IdempotencyKey",
+            // 🆕 `WP-18` (`ADDR-002`, `D-234`) — **mã chưa ánh xạ** của một lượt đồng bộ: *một mã hãng ⇒ một dòng
+            // trong một lượt*. Mất `NULLS NOT DISTINCT` thì khi `TenantId = NULL` (đang chạy 1 tenant) index mất
+            // tác dụng ⇒ cùng một mã lạ ghi HAI dòng ⇒ danh sách "cần người ánh xạ" (`MauCanNguoiAnhXa`) và số đếm
+            // `SoCanNguoiAnhXa` trong dòng lô SAI. ⚠️ Đây là **unique index** đặt tên tường minh `UX_` (không phải
+            // `IX_`) vì viết bằng SQL thô trong migration `Add_Addr002_CarrierSyncRuns` (EF không sinh NND kèm tên).
+            "UX_AddrCarrierSyncRunUnmappedCodes_Tenant_SyncRun_Code",
         ];
 
         foreach (var ten in phaiCo)
