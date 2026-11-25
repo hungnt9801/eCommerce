@@ -7,7 +7,7 @@
   "nhanhGoc": "main",
   "refs": "D-216",
   "ghiChu": "Phương án B (D-216): mỗi WP một nhánh cắt từ đỉnh tich-hop/gd3; dong-wp đẩy fast-forward vào tich-hop/gd3 (M3, D-114); PR xếp chồng mở một lần cuối chuỗi.",
-  "capNhat": "2026-11-26T01:20:52+07:00",
+  "capNhat": "2026-11-26T02:02:51+07:00",
   "rows": [
     {
       "id": "W16-1",
@@ -165,13 +165,17 @@
       "dependsOn": [
         "W18-0"
       ],
-      "status": "chua",
-      "phien": [],
+      "status": "xong",
+      "phien": [
+        "N77"
+      ],
       "nhanh": "feat/gd3-wp18-dia-chi",
       "buoc": "F0–F2b",
-      "evidence": null,
+      "evidence": "ARCH 2 docs (ADDR-001 475d, ADDR-002 482d); DOCREV v1 DOC-CHANGES -> v2 DOC-OK (ADDR-001 0P1/0P2/6P3; ADDR-002 0P1/1P2/16P3); D-232..D-243; probe -CheDo Code -WP WP-18 exit 0; check-agent-artifact docreview DAT x2; -Kind decision DAT; kiem-link PASS 250 tep/946 link/1504 backtick; mermaid 213/0; hooks 49/49; build 0 error/9 warning + unit 2021/2021 unchanged (0 .cs, 0 migration)",
       "ghiChu": null,
-      "handover": null
+      "handover": "docs/nhanh/handover-n77.md",
+      "batDau": "2026-11-26T01:21:43+07:00",
+      "xongLuc": "2026-11-26T02:02:51+07:00"
     },
     {
       "id": "W18-2",
