@@ -7,7 +7,7 @@
   "nhanhGoc": "main",
   "refs": "D-216",
   "ghiChu": "Phương án B (D-216): mỗi WP một nhánh cắt từ đỉnh tich-hop/gd3; dong-wp đẩy fast-forward vào tich-hop/gd3 (M3, D-114); PR xếp chồng mở một lần cuối chuỗi.",
-  "capNhat": "2026-11-26T05:42:56+07:00",
+  "capNhat": "2026-11-26T05:56:23+07:00",
   "rows": [
     {
       "id": "W16-1",
@@ -289,13 +289,17 @@
       "dependsOn": [
         "W18-5"
       ],
-      "status": "chua",
-      "phien": [],
+      "status": "xong",
+      "phien": [
+        "N82"
+      ],
       "nhanh": "feat/gd3-wp22-thong-bao",
       "buoc": "D-208: P2 #24, #26",
-      "evidence": null,
+      "evidence": "check-feature-doc -WP14 exit0 16/16 25/25 12-Open; docreview exit0 DOC-OK P1=0 P2=0 (vong4 dong P2 #24/#26, P3 #25 dong kem); decision exit0 D-253; probe Code WP-22 exit0; kiem-link PASS 951 link 1602 path; mermaid 213/0; hooks 49/49; commit 2bc9478",
       "ghiChu": null,
-      "handover": null
+      "handover": "docs/nhanh/handover-n82.md",
+      "batDau": "2026-11-26T05:44:37+07:00",
+      "xongLuc": "2026-11-26T05:56:23+07:00"
     },
     {
       "id": "W22-1",
