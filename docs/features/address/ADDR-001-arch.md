@@ -10,6 +10,13 @@
 >
 > **Module chủ của mọi bảng/DTO/endpoint dưới đây: `Address`.** Mọi `file:dòng` đã đối chiếu trong N77
 > (đồ thị `codegraph_explore` trước, `Read` sau cho phần đồ thị cắt bớt).
+>
+> 📄 **Loại tài liệu:** `-arch` là **tài liệu bổ trợ**, **ngoài** mẫu 16 mục / BR / mục "Đối chiếu mô hình Nhanh" mà
+> `tools/agents/check-feature-doc.ps1 -WP14` áp cho **SRS** `<mã>-<slug>.md`; `tools/kiem-tat-ca.ps1` **không** gọi công cụ đó.
+> Vì vậy tệp này không có `## 0.` / `## 10.`–`## 15.` là **đúng chủng loại**, không phải thiếu mục (ORCH chốt 25/11/2026).
+>
+> 🔄 **N80 (26/11/2026):** đóng **6/6 P3** của DOCREV vòng 2 — chỉnh tài liệu khớp **code as-built N78**, **không** đổi
+> thiết kế/quyết định; mục #4 (`Enum.IsDefined` trước `DoDaiMa`) **đã đóng bởi `D-251`** (vá + `qa` phủ ca + NC, 26/11/2026 N80) ⇒ `ADDR-001-AQ6` **Closed** (§8).
 
 ---
 
@@ -120,19 +127,23 @@ public sealed record CatalogSyncRunDto(
   Cho phép truyền `IsActive` là mở đường "đóng/mở" tuỳ ý qua file ⇒ **bỏ**.
 - `SourceHash` do **server** tính (§5.3), **không** nhận từ client (BR-009). DTO **không** chứa message/stack.
 - Enum ở `Application` (không vào `Contracts`) — hiện **0** module khác tiêu thụ (HP: `Shipping` sau này, qua ETO).
-- 📌 **`docDeviation` (`D-241`):** SRS §6.1 mô tả output `{ Added, Renamed, Reopened, Closed }`; DTO ở đây **giàu hơn**
-  (thêm `Trigger`/`Outcome`/`ErrorCode`/`SourceHash`/`ImportedBy`/thời điểm) vì dòng lô là hợp đồng của BR-009 và UI cần
-  hiển thị lượt **bị từ chối**. BA cập nhật SRS khi rà `ADDR-001`.
+- 📌 **`docDeviation` — ĐÃ ĐÓNG (N78, SRS v0.7):** SRS §6.1 nay mô tả **đúng** `CatalogSyncRunDto` đầy đủ
+  (`Id`/`Trigger`/`Outcome`/`ErrorCode`/`SourceHash`/`ImportedBy`/thời điểm + 4 số đếm — `AddressDtos.cs:56-70`),
+  khớp as-built. `D-241` **chỉ** quy định "**không** thêm method đọc lịch sử lượt ở WP-18" — **không** quy định hình dạng
+  DTO, nên **không** dùng `D-241` làm nhãn cho deviation hình dạng DTO nữa.
 
 ### 3.3 Permission
 
 | Hằng (đã chốt `D-238`) | Giá trị | Định nghĩa | Side |
 |---|---|---|---|
-| `eCommerceConsts.Permissions.Addresses.CatalogImport` | `eCommerce.Addresses.Catalog.Import` | (a) `eCommerceConsts.cs:363-376` (b) `addresses.AddChild(…)` — `eCommercePermissionDefinitionProvider.cs:168-171` | `MultiTenancySides.Host` |
+| `eCommerceConsts.Permissions.Addresses.CatalogImport` | `eCommerce.Addresses.Catalog.Import` | (a) `eCommerceConsts.cs:377-383` (b) as-built: `addresses.AddChild(eCommerceConsts.Permissions.Addresses.CatalogImport).MultiTenancySide = Volo.Abp.MultiTenancy.MultiTenancySides.Host;` — `eCommercePermissionDefinitionProvider.cs:174-175` | `MultiTenancySides.Host` |
 
 - `D-238`: khai **cả hai nơi**; `[Authorize(...)]` ở **cấp method** trên `ImportDatasetAsync` (trên `[Authorize]` cấp class);
   **không** `[AllowAnonymous]`; **không** dùng lại `Addresses.Manage` của `ADDR-004`.
 - Khai **cả hai nơi**; sau khi thêm phải chạy `DbMigrator` (binary mới build) để role `admin` được cấp.
+- ⚠️ **Bẫy copy:** mẫu cũ `eCommercePermissionDefinitionProvider.cs:168-171` dùng `addresses.AddChild(name)` **không** kèm
+  side ⇒ quyền thành `Both` (trái `D-238`). `AddChild(string)` trả `PermissionDefinition` ⇒ đặt side qua thuộc tính; as-built
+  dùng đúng dạng `:174-175` (`AddChild(...).MultiTenancySide = MultiTenancySides.Host`).
 
 ### 3.4 Hằng khoá & guard (Domain — `AddressLockKeys`, `AddressSyncGuard`)
 
@@ -253,12 +264,16 @@ không UPDATE/DELETE), **0** public setter, **0** method đổi, chỉ factory `
 | 2. Kiểm diff | Không chạm `AddrAdministrativeUnits`; `.Designer.cs` có; tên bảng/index khớp §4.1 | BE + review | nếu EF sinh `DROP`/đổi kiểu ⇒ **dừng**, không merge |
 | 3. Áp | `dotnet build` rồi `dotnet run --project src/eCommerce.DbMigrator` (binary **mới build**); kiểm `__EFMigrationsHistory` + `\d "AddrCatalogSyncRuns"` | BE/OPS | **cấm** `dotnet ef database update` (M6) |
 | 4. Contract | **Không có** (không bỏ/đổi cột) | — | |
-| Đường lùi | (a) tắt `Address:Sync:Enabled=false` ⇒ job ngừng; (b) trước merge: `git revert` + `migrations remove`; sau merge: **migration mới** `DropTable` (bảng là nhật ký, mất không mất danh mục); (c) tắt cache bằng cờ cấu hình `Address:Cache:Enabled=false` ⇒ đọc DB như trước | BE | `pg_dump` khuyến nghị (rẻ) dù additive |
+| Đường lùi | (a) tắt `Address:Sync:Enabled=false` ⇒ job ngừng; (b) trước merge: `git revert` + `migrations remove`; sau merge: **migration mới** `DropTable` (bảng là nhật ký, mất không mất danh mục); (c) tắt cache bằng cờ cấu hình `Address:Cache:Enabled=false` ⇒ đọc DB như trước | BE | `pg_dump` **BẮT BUỘC** trước khi áp (`ef-migration-postgres` M9: chạm DB có dữ liệu) — as-built N78 `artifacts/pg-dump/N78-W18-2.dump` |
 | Backfill | **Không** — bảng mới | — | |
 | Thứ tự | **migration trước, code sau** — code ghi dòng lô khi bảng chưa có ⇒ mỗi lượt `Loi` (`PostgresException`) và **không** áp thay đổi | BE | chạy `DbMigrator` **trước** khi bật cờ |
 
 - **Không** seed; **không** đổi `AddrAdministrativeUnits`; **không** đổi `eCommerce.slnx`/`Directory.Packages.props`.
-- ⚠️ **Tài liệu phải sửa cùng PR:** SRS `TC-13` ghi "đủ **3** `DbSet`" — sau WP-18 là **4** (`+ CatalogSyncRuns`). Ghi `docDeviation` cho BA.
+- ⚠️ **Tài liệu phải sửa cùng PR (CLAUDE.md §6) — trạng thái 26/11/2026:** BA **đã** đồng bộ SRS ở N78
+  (commit `0b2ea6f`, SRS v0.7) cho các điểm từng lệch: `TC-13` = **6** `DbSet` (`+ CatalogSyncRuns`; `addr-001` §14.1);
+  §6.2/§6.3 + §12 (mã `0601…0605` **reachable qua HTTP**, bổ sung `0009`, `0002`/`0007` hết nợ map — `D-240`);
+  §9/§13 NFR-010 (permission chốt `eCommerce.Addresses.Catalog.Import` — `D-238`); §15.1 Q8 ⇒ `D-242`.
+  Lần sau đổi hợp đồng/schema ⇒ rà lại **đúng danh sách này** trong **cùng** PR với code.
 
 ---
 
@@ -312,6 +327,13 @@ Thứ tự **bắt buộc** (mọi bước trước khi trả `KeHoachDongBo`):
    ⚠️ **Không** đổi nghĩa mã `0002` của `AdministrativeUnit.ChuanHoaMa` (vẫn là lỗi *tạo entity*; `D-79` cấm đánh số lại) —
    `LapKeHoach` tự kiểm bằng `DoDaiMa` và ném `0605` **trước** khi chạm `TaoMoi`.
    Lý do: nếu để `TaoMoi` ném trong bước áp dụng, lỗi ra dưới dạng "lỗi không mong đợi" và **dòng lô bị ghi `Loi` thay vì `BiChan`**.
+   ✅ **Đã sửa theo `D-251` (N80, 26/11/2026):** `KiemTraToanVenNguon` kiểm
+   `Enum.IsDefined(typeof(AdministrativeLevel), dv.Level)` **trước** `AdministrativeSchemaVersion.DoDaiMa(dv.Level)`
+   (as-built `AdministrativeUnitSynchronizer.cs:343-353`, đầu vòng `foreach`). `Level` **ngoài dải** (enum lạ) ⇒ ném
+   `BusinessException(AdministrativeSyncErrorCodes.DanhMucSaiDinhDang)` = **`0605`** (thuộc `HangRaoChan` ⇒ dòng lô `BiChan`),
+   **không** còn rơi vào `0002`/`Loi`; `Data` mang `lyDo`, `level` (`(int)dv.Level`), `ma`, `nguon`, `schemaVersion`.
+   `be` sửa `modules/Address/.../AdministrativeUnitSynchronizer.cs:343-353`; `qa` phủ ca `Level=(AdministrativeLevel)99` ⇒
+   `0605` + `Data["level"]==99` **và** NC (bỏ/đảo thứ tự `Enum.IsDefined` xuống sau `DoDaiMa` ⇒ ĐỎ nhận `0002`). **`ADDR-001-AQ6` đóng** (§8).
 4. **Hàng rào 5 (`0008`) — `ParentCode`:** trong vòng `foreach` (`:157-179`), **trước** nhánh `!cu.IsActive` (`:168`):
    so `ParentCode` chuẩn hoá (`Trim()`, `null ≡ ""`, `Ordinal`). Gom **toàn bộ** mã lệch; nếu `soDoiCha > 0` ⇒
    sau khi quét xong (và **trước** hàng rào 4) NÉM **một** `BusinessException(0008)` với `soDoiCha`, `nguon`, `schemaVersion`,
@@ -361,7 +383,9 @@ Thứ tự **bắt buộc** (mọi bước trước khi trả `KeHoachDongBo`):
    ├─ hienCo = repo.GetListAsync(SchemaVersion)
    ├─ keHoach = LapKeHoach(...)           ── hàng rào 0b/1..5 (DÙNG CHUNG với job)
    ├─ UoW của lời gọi (ABP mở sẵn — **KHÔNG** `requiresNew`): insert/update (autoSave:false)
-   │    · dòng lô DaApDung · ETO (outbox) · CompleteAsync   ← MỘT transaction
+   │    · dòng lô DaApDung · ETO (outbox)   ← MỘT transaction
+   │    · **KHÔNG** gọi `CompleteAsync` thủ công — để interceptor/UoW middleware của ABP hoàn tất UoW ambient
+   │      (as-built `AdministrativeUnitAppService.cs:309-371`: chỉ `autoSave:false` + `DangKySauCommitAsync`; commit do ABP)
    ├─ xoá cache cục bộ + metric {trigger=import,outcome=applied}
    └─ trả CatalogSyncRunDto
 7. catch BusinessException ∈ HangRaoChan ∪ {0008}
@@ -381,7 +405,8 @@ Thứ tự **bắt buộc** (mọi bước trước khi trả `KeHoachDongBo`):
 ### 5.6 `DoiTen` bắt buộc căn cứ (BR-007, review #6)
 
 - **`D-239`:** `AdministrativeUnit.DoiTen(string tenMoi, string legalBasis)` — **bỏ** giá trị mặc định; `IsNullOrWhiteSpace(legalBasis)`
-  ⇒ NÉM `BusinessException(AddressErrorCodes.ThieuCanCuDoiTen)` = `eCommerce:Address:0009`, kèm `WithData("level", …)`, `WithData("code", …)`.
+  ⇒ NÉM `BusinessException(AddressErrorCodes.ThieuCanCuDoiTen)` = `eCommerce:Address:0009`, kèm `WithData("lyDo", "thiếu căn cứ pháp lý khi đổi tên")`
+  (**đúng khoá `lyDo` của `D-239`**, as-built `AdministrativeUnit.cs:145-146`), `WithData("level", …)`, `WithData("code", …)` (`:147-148`).
   `Dong`/`MoLai` giữ tham số tuỳ chọn; **không** dùng lại `0106`/`0605`.
 - `AdministrativeUnitSynchronizer.ApDung(keHoach, string legalBasis, Guid? tenantId = null)` — truyền `danhMuc.Nguon` của lượt
   (`:236` hiện gọi `DoiTen(td.Nguon!.Name)` **thiếu** căn cứ). Chữ ký đổi ⇒ sửa **mọi** nơi gọi: worker
@@ -444,7 +469,7 @@ Chạy bằng `tools/agents/negative-control.ps1` (ORCH chạy lại, không tin
 
 ## 8. Câu hỏi mở (không tự chọn đáp án)
 
-**Không còn câu hỏi mở.** Toàn bộ câu của lượt ARCH đã được DEC chốt trong N77:
+**Không còn câu hỏi mở từ lượt ARCH N77.** Toàn bộ câu của lượt ARCH đã được DEC chốt trong N77:
 
 | ID | Nội dung | Quyết định |
 |---|---|---|
@@ -453,6 +478,12 @@ Chạy bằng `tools/agents/negative-control.ps1` (ORCH chạy lại, không tin
 | `ADDR-001-AQ3` | Map HTTP 8 mã | **`D-240`** |
 | `ADDR-001-AQ4` | Đọc dòng lô | **`D-241`** |
 | `ADDR-001-AQ5` | TTL cache | **`D-242`** (86400 s; sai/không đọc được ⇒ 86400 + `LogWarning`; `Enabled=false` tắt cache; **không** đưa TTL/token vào khoá) |
+
+**Câu mới từ DOCREV vòng 2 (N80, 26/11/2026) — cần `decider`/`be`:**
+
+| ID | Nội dung | Đề xuất | `needs` |
+|---|---|---|---|
+| `ADDR-001-AQ6` | **Closed (`D-251`)** — hàng rào 0b kiểm `Enum.IsDefined(typeof(AdministrativeLevel), dv.Level)` **trước** `DoDaiMa` ⇒ `Level` ngoài dải ra **`0605`** (dòng lô `BiChan`), không còn `0002`/`Loi`. `be` sửa `AdministrativeUnitSynchronizer.cs:343-353`, `qa` phủ ca + NC (N80, 26/11/2026). | — (đã vá) | — |
 
 > Không nêu lại các câu đã có quyết định: `D-77`…`D-82`, `D-79` (giữ class/mã), `D-80` (bỏ policy), `D-93` (nguồn production = file,
 > định dạng chưa xác định), `Q5` (`[AllowAnonymous]` — **không** mở ở WP-18).
@@ -467,7 +498,8 @@ Chạy bằng `tools/agents/negative-control.ps1` (ORCH chạy lại, không tin
   `eCommerceConsts.cs`, `eCommercePermissionDefinitionProvider.cs`, `eCommerceMetrics.cs`, `LockErrorCodes.cs`,
   `eCommerceEntityFrameworkCoreModule.cs`, `AddressEvents.cs`, `eCommerce.Address.Application.csproj`, `PhatHanhHoaDonGd0Flow.cs`,
   `eCommerce.EInvoice.Application.csproj`.
-- **0** việc bỏ ngỏ; **0** cam kết endpoint/trường NCC; **0** thay đổi `AddrAdministrativeUnits`/`AddrCarrierMappings`/`AddrAddresses`.
+- **0** câu mở mới (`ADDR-001-AQ6` **đã đóng bởi `D-251`** — vá `Enum.IsDefined` trước `DoDaiMa`, `qa` phủ ca + NC, 26/11/2026 N80); **0** cam kết endpoint/trường NCC; **0** thay đổi `AddrAdministrativeUnits`/`AddrCarrierMappings`/`AddrAddresses`.
+- **DOCREV vòng 2 (N80) — 6/6 P3 đã xử lý:** #1 danh sách "Tài liệu phải sửa cùng PR" (§4.3, ghi rõ BA đã đồng bộ SRS v0.7 ở N78) · #2 `WithData("lyDo")` (§5.6) · #3 bỏ nhãn `D-241` cho DTO (§3.2) · #4 `Enum.IsDefined` trước `DoDaiMa` (§5.2 — as-built chưa có ⇒ `AQ6`) · #5 `AddChild(...).MultiTenancySide = Host` (§3.3) · #6 không gọi `CompleteAsync` trên UoW ambient (§5.5).
 - **Đã áp quyết định N77 — `D-238`…`D-242`** (§3.1, §3.3, §3.6, §5.4, §5.5, §5.6, §8); §8 **không còn** câu mở.
 - Đã sửa theo DOCREV vòng 1: P2 #1 (đo p95, không dùng counter) · P2 #2 (bỏ `requiresNew` ở UoW thành công) · P2 #3 (thêm `TC-12`, NC-6 trỏ ca test) · P2 #4 (`ProvincesOpenApiParserTests.cs:217`); P3 (route `import-dataset`, §1.1, TTL vào §8, `docDeviation` DTO, `SourceHash varchar(64)`, hàng rào 0b không đánh số lại `0002`, dải metric `:81-107`).
 - Đồ thị dùng trước `Grep`/`Read`: `codegraph_explore` cho `AdministrativeUnit*`, `AddressDbContextModelCreatingExtensions`,
