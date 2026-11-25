@@ -13,6 +13,9 @@ namespace eCommerce.Tests.Pricing;
 ///   1. chọn giá theo "cái nào mới nhất" ⇒ hai lần tính **hai giá**;
 ///   2. cùng cấp + cùng `Priority` mà **chọn bừa** ⇒ kết quả phụ thuộc thứ tự duyệt;
 ///   3. trộn loại tiền ⇒ sai 25.000 lần.
+///
+/// 🔒 Phủ BR của `PRC-002`: **BR-PRC-002-001** (`Money` + loại tiền), **-005** (trùng bậc ⇒ NÉM `0008`),
+/// **-012** (hiệu lực theo ngày), **-018** (khác tiền tệ ⇒ NÉM `0005`, cấm quy đổi), **-015** (append-only).
 /// </summary>
 public class GiaCoSoResolverTests
 {

@@ -9,6 +9,11 @@ namespace eCommerce.Tests.Pricing;
 /// 🚨 **VÌ SAO BỘ TEST NÀY QUAN TRỌNG NHẤT TRONG PRICING:** đây là chỗ **mất/thừa tiền thật**.
 /// Sai 1–2 đồng ở đây ⇒ **hoá đơn không khớp**, khách khiếu nại, kế toán không đối soát được —
 /// và **không có lỗi biên dịch, không exception** nào chỉ ra.
+///
+/// 🔒 Phủ BR của `PRC-002`: **BR-PRC-002-001/-003** (mọi số tiền là `Money`, không so `decimal` trần),
+/// **-007** (làm tròn chỉ qua `IRoundingPolicy`), **-008** (làm tròn từng dòng, tổng = Σ dòng), **-017**
+/// (phân bổ bảo toàn tổng), **-018** (cấm trộn tiền tệ), **-019** (tái lập được — hành vi), **-009**
+/// (R1–R4), **-010** (mã chính sách có trong kết quả).
 /// </summary>
 public class TinhTienDonTests
 {

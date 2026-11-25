@@ -17,6 +17,9 @@ namespace eCommerce.Tests.Pricing;
 ///
 /// 📌 Test ở đây chạy **không cần PostgreSQL** — đó là chủ ý: luật nằm trong Domain, DB chỉ là hàng rào
 /// thứ hai (xem `PostgreSqlSchemaTests` cho các `CHECK`/unique index thật).
+///
+/// 🔒 Phủ BR của `PRC-002`: **BR-PRC-002-001** (tiền là `Money`, có cột tiền tệ đi kèm), **-012** (hiệu lực
+/// theo ngày), **-021** (giá vốn không lộ ra DTO công khai — neo mã lỗi riêng).
 /// </summary>
 public class CostPriceTests
 {

@@ -10,6 +10,9 @@ namespace eCommerce.Tests.Pricing;
 /// Quyết định này **tách khỏi** `GiaCoSoResolver` **có chủ ý**: nếu bậc thang nằm cùng "cấp" với giá bảng giá
 /// mà `Priority` bằng nhau thì `GiaCoSoResolver` **NÉM `Pricing:0001`** ⇒ biến tính năng giảm giá theo số lượng
 /// thành **sự cố checkout chết**.
+///
+/// 🔒 Phủ BR của `PRC-002`: **BR-PRC-002-006** (kết quả có nguồn/cấp để giải trình), **-018** (bậc lệch
+/// loại tiền ⇒ NÉM, cấm tự quy đổi).
 /// </summary>
 public class ChonDonGiaCuoiTests
 {

@@ -12,6 +12,9 @@ namespace eCommerce.Tests.Pricing;
 ///
 /// 📌 **Vì sao test riêng, không cần DB:** đây là hàm thuần không I/O ⇒ kiểm được ở tầng đơn vị; nếu
 /// phải dựng Host/DB mới kiểm được thì đúng loại luật "không được kiểm thường xuyên".
+///
+/// 🔒 Phủ BR của `PRC-002`: **BR-PRC-002-011** (mặc định `half-away-from-zero`; giá trị lạ ⇒ mặc định an
+/// toàn, không ném), **-010/-019** (giá trị cấu hình là dữ liệu vào ⇒ tái lập được).
 /// </summary>
 public class PricingChinhSachTests
 {

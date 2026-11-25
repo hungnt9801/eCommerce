@@ -10,6 +10,10 @@ namespace eCommerce.Tests.Pricing;
 /// 🚨 **VÌ SAO QUAN TRỌNG:** chọn bậc sai ⇒ **bán sai giá** hoặc **ném lỗi làm chết checkout**:
 ///   • lấy "bậc đầu tiên khớp" ⇒ kết quả **phụ thuộc thứ tự DB trả về** ⇒ **cùng giỏ, hai lần tính, hai giá**;
 ///   • hai bậc cùng `MinQuantity` mà **không ném** ⇒ không ai biết bậc nào đúng.
+///
+/// 🔒 Phủ BR của `PRC-002`: **BR-PRC-002-004** (chọn bậc `MinQuantity` lớn nhất ≤ số lượng), **-005**
+/// (trùng `MinQuantity` ⇒ NÉM `0008`), **-013** (`Amount ≥ 0`, `MinQuantity ≥ 1`), **-014** (bậc là DỮ LIỆU),
+/// **-015** (append-only + guard sai NÉM), **-012** (hiệu lực theo ngày).
 /// </summary>
 public class ChonBacThangTests
 {
