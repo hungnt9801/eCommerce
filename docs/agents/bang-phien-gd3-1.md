@@ -47,7 +47,7 @@ Trong lúc chạy: hàng 👤 (`W17-0n`, `W17-1n`) — ký/duyệt xong thì dá
 <!-- BANG-PHIEN:BAT-DAU -->
 | # | Đợt | Nội dung | Vai | Phụ thuộc | Prompt để dán | Phiên | Trạng thái | Bằng chứng / ghi chú |
 |---|---|---|---|---|---|---|---|---|
-| `W16-1` | WP-16 | F0–F2b: đọc SRS theo mục, ARCH khi chạm ≥ 2 module / schema / contract; G1/G2 theo M2 (PRC-001/002 đã duyệt Q5; câu mới ⇒ decider) | ORCH · arch · docrev · decider | — | `/chay-phien-code chuoi=gd3-1 W16-1` | — | ⬜ Chưa bắt đầu |  |
+| `W16-1` | WP-16 | F0–F2b: đọc SRS theo mục, ARCH khi chạm ≥ 2 module / schema / contract; G1/G2 theo M2 (PRC-001/002 đã duyệt Q5; câu mới ⇒ decider) | ORCH · arch · docrev · decider | — | `/chay-phien-code chuoi=gd3-1 W16-1` | N71 | ✅ Hoàn thành | DOCREV DOC-OK 0 P1/0 P2 + check-agent-artifact docreview DAT + kiem-link PASS 235 tep/930 link + probe Code WP-16 exit 0 (D-217 mirror) + D-217..D-224 + commit 028d20d · `docs/nhanh/handover-n71.md` |
 | `W16-2` | WP-16 | F3 BE: domain + app service + endpoint + migration (expand-only, pg_dump trước khi áp) + test đơn vị | be | W16-1 | `/chay-phien-code chuoi=gd3-1 W16-2` | — | ⬜ Chưa bắt đầu |  |
 | `W16-3` | WP-16 | F3 FE: màn Web Admin theo SRS (contract-first `schema.d.ts`); WP không có FE ⇒ done kèm lý do | fe | W16-2 | `/chay-phien-code chuoi=gd3-1 W16-3` | — | ⬜ Chưa bắt đầu |  |
 | `W16-4` | WP-16 | F4 QA (mọi BR- có test + negative control đỏ→xanh) → F5 REV (`VERDICT: PASS`, P1 = 0) | qa · rev | W16-3 | `/chay-phien-code chuoi=gd3-1 W16-4` | — | ⬜ Chưa bắt đầu |  |

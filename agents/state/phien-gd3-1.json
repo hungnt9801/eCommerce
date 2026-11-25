@@ -7,7 +7,7 @@
   "nhanhGoc": "main",
   "refs": "D-216",
   "ghiChu": "Phương án B (D-216): mỗi WP một nhánh cắt từ đỉnh tich-hop/gd3; dong-wp đẩy fast-forward vào tich-hop/gd3 (M3, D-114); PR xếp chồng mở một lần cuối chuỗi.",
-  "capNhat": null,
+  "capNhat": "2026-11-25T22:33:19+07:00",
   "rows": [
     {
       "id": "W16-1",
@@ -19,13 +19,17 @@
       "noiDung": "F0–F2b: đọc SRS theo mục, ARCH khi chạm ≥ 2 module / schema / contract; G1/G2 theo M2 (PRC-001/002 đã duyệt Q5; câu mới ⇒ decider)",
       "vai": "ORCH · arch · docrev · decider",
       "dependsOn": [],
-      "status": "chua",
-      "phien": [],
+      "status": "xong",
+      "phien": [
+        "N71"
+      ],
       "nhanh": "feat/gd3-wp16-bang-gia",
       "buoc": "F0–F2b",
-      "evidence": null,
+      "evidence": "DOCREV DOC-OK 0 P1/0 P2 + check-agent-artifact docreview DAT + kiem-link PASS 235 tep/930 link + probe Code WP-16 exit 0 (D-217 mirror) + D-217..D-224 + commit 028d20d",
       "ghiChu": null,
-      "handover": null
+      "handover": "docs/nhanh/handover-n71.md",
+      "batDau": "2026-11-25T21:58:38+07:00",
+      "xongLuc": "2026-11-25T22:33:19+07:00"
     },
     {
       "id": "W16-2",
