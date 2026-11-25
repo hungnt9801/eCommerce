@@ -196,6 +196,29 @@ public class AdministrativeUnitSynchronizerTests
         Assert.Equal(AdministrativeSyncErrorCodes.ThieuCapBatBuoc, ex.Code);
     }
 
+    // ── 🚨 HÀNG RÀO 0b: cấp ngoài `AdministrativeLevel` (D-251, BR-ADDR-001-009) ──
+
+    [Fact]
+    public void BR009_hang_rao_0b_cap_ngoai_AdministrativeLevel_thi_NEM_0605_khong_phai_0002()
+    {
+        // 🔒 `ADDR-001-AQ6` / `D-251`: danh mục nguồn có cấp NGOÀI enum (ví dụ 99 — file hỏng/đổi định dạng)
+        // phải bị phân loại là "hàng rào chặn" `0605` (⇒ dòng lô `BiChan`), KHÔNG được rơi vào `0002`
+        // (`MaKhongHopLe` của `DoDaiMa` — lỗi TẠO ENTITY, khi đó worker ghi dòng lô `Loi`).
+        var hienCo = new List<AdministrativeUnit> { DonVi(AdministrativeLevel.Tinh, "01", "Thành phố Hà Nội") };
+
+        var nguonCoCapLa = new DanhMucNguon(
+        [
+            new DonViNguon(2, AdministrativeLevel.Tinh, "01", "Thành phố Hà Nội"),
+            new DonViNguon(2, (AdministrativeLevel)99, "00004", "Phường cấp lạ", "01")
+        ], "provinces.open-api.vn", TaiLuc);
+
+        var ex = Assert.Throws<BusinessException>(() => Lap(hienCo, nguonCoCapLa));
+
+        Assert.Equal(AdministrativeSyncErrorCodes.DanhMucSaiDinhDang, ex.Code);
+        Assert.Equal(99, ex.Data["level"]);
+        Assert.NotEqual(AddressErrorCodes.MaKhongHopLe, ex.Code);
+    }
+
     // ── 🚨 HÀNG RÀO 4: đóng hàng loạt (hàng rào BẮT ĐÚNG CA NGUY HIỂM NHẤT) ──
 
     [Fact]
