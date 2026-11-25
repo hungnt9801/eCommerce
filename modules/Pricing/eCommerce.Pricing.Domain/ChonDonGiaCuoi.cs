@@ -12,7 +12,9 @@ public sealed record ChinhSachSnapshot(
     string MaChinhSachLamTron,
     IRoundingPolicy ChinhSachLamTron,
     ChinhSachThieuGia ChinhSachThieuGia,
-    DateTime At);
+    DateTime At,
+    // 🆕 WP-16 — tham số cuối có giá trị mặc định ⇒ mã nguồn cũ vẫn biên dịch (`-arch` §3.1).
+    ChinhSachTongDonAm ChinhSachTongDonAm = ChinhSachTongDonAm.Reject);
 
 /// <summary>
 /// 🚨 **CHỌN ĐƠN GIÁ CUỐI** (`PRC-002` **B5**) — hàm **THUẦN**.

@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Volo.Abp;
 using Volo.Abp.Application.Services;
 using Volo.Abp.Domain.Repositories;
+using Volo.Abp.Settings;
 
 namespace eCommerce.Pricing;
 
@@ -22,13 +23,16 @@ public class TierPriceSetAppService : ApplicationService, ITierPriceSetAppServic
 {
     private readonly IRepository<TierPriceSet, Guid> _boBacRepository;
     private readonly IRepository<TierPrice, Guid> _bacRepository;
+    private readonly ISettingProvider _settingProvider;
 
     public TierPriceSetAppService(
         IRepository<TierPriceSet, Guid> boBacRepository,
-        IRepository<TierPrice, Guid> bacRepository)
+        IRepository<TierPrice, Guid> bacRepository,
+        ISettingProvider settingProvider)
     {
         _boBacRepository = boBacRepository;
         _bacRepository = bacRepository;
+        _settingProvider = settingProvider;
     }
 
     public async Task<List<TierPriceSetDto>> GetListAsync()
@@ -105,6 +109,22 @@ public class TierPriceSetAppService : ApplicationService, ITierPriceSetAppServic
                 .WithData("minQuantity", input.MinQuantity)
                 .WithData("tierPriceSetId", tierPriceSetId)
                 .WithData("lyDo", "Đã có bậc với CÙNG `MinQuantity` cho SKU này trong bộ (PRC-002 ADR-02).");
+        }
+
+        // 🆕 D-218 ① (2): ngưỡng số bậc mỗi bộ (`Pricing:MaxTiersPerSet`, mặc định 20). Guard **vận hành**,
+        // đọc TRƯỚC khi insert để KHÔNG ghi nửa; không đổi unique index, không thêm khoá (D-218 cấm).
+        var toiDa = PricingChinhSach.DocSoBacToiDa(
+            await _settingProvider.GetOrNullAsync(PRC002SettingTenKhoa.SoBacToiDa), out _);
+
+        var soHienTai = (int)await _bacRepository.CountAsync(x => x.TierPriceSetId == tierPriceSetId);
+
+        if (soHienTai + 1 > toiDa)
+        {
+            throw new BusinessException(PricingErrorCodes.VuotSoBacToiDa)
+                .WithData("tierPriceSetId", tierPriceSetId)
+                .WithData("soBacHienTai", soHienTai)
+                .WithData("toiDa", toiDa)
+                .WithData("lyDo", $"Bộ đã có {soHienTai} bậc — thêm bậc thứ {soHienTai + 1} vượt ngưỡng {toiDa} (Pricing:MaxTiersPerSet).");
         }
 
         var bac = new TierPrice(

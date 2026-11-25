@@ -174,33 +174,58 @@ public class TinhTienDonTests
         Assert.Equal(12_345.6789m, kq.CacDong[0].DonGiaSauLamTron.Amount);
     }
 
-    // ── 🚨 LỖ HỔNG TIỀN THẬT (ghi nhận 15/10/2026 — CHƯA sửa, CẦN NGƯỜI QUYẾT) ──
+    // ── `D-219` — CHÍNH SÁCH TỔNG ĐƠN ÂM (3a/3b/3c, thay tripwire "lỗ hổng tiền" cũ) ────────────
+    // 📌 Tripwire cũ (`TONG_DON_CO_THE_AM__…`) **ghi nhận hiện trạng** "trả tổng âm". WP-16 đã chốt chính sách
+    //    (`D-219`): mặc định `Reject` NÉM `0010`, `Clamp` kẹp giảm giá về thành tiền. Ba ca dưới đây phủ ĐÚNG
+    //    ba nhánh hợp đồng của `PRC-002-arch` §6.3 (3a/3b/3c). Số ca CHỈ TĂNG (1 tripwire ⇒ 3 ca tường minh).
 
     [Fact]
-    public void TONG_DON_CO_THE_AM__khong_co_guard__day_la_LO_HONG_TIEN_CAN_NGUOI_QUYET()
+    public void Tong_don_am__mac_dinh_Reject__NEM_0010_kem_du_lieu__3a()
     {
-        // 🔥 PHÁT HIỆN THẬT (đo được qua HTTP, không phải suy đoán): khi **giảm giá cấp đơn** LỚN HƠN thành tiền
-        // của giỏ thì `TinhTienDon` trả **TỔNG ÂM** — ví dụ giỏ 3 đồng, giảm 10.000, phí 5.000 ⇒ `-4.997`.
-        //
-        // ⇒ Hệ thống đang **cho phép tổng đơn ÂM**, nghĩa là về mặt số học **đơn vị bán phải TRẢ TIỀN cho khách**
-        // mà **không có guard nào** chặn. Hậu quả thật: nếu tầng thanh toán/đối soát tin vào con số này thì
-        // **tiền ĐI RA** khỏi hệ thống (hoặc lệch sổ) mà không ai bị chặn ở đâu.
-        //
-        // 📌 **KHÔNG tự sửa** vì đây là **LUẬT NGHIỆP VỤ**, có (ít nhất) 3 cách xử lý KHÁC NHAU:
-        //    (a) **kẹp** giảm giá về tối đa bằng thành tiền (tổng ≥ 0) — thông dụng nhất;
-        //    (b) **TỪ CHỐI** đơn (NÉM lỗi) khi giảm giá vượt thành tiền — an toàn nhất, buộc người nhập sửa;
-        //    (c) **cho phép âm** (coi như phiếu hoàn tiền/credit) — nhưng khi đó phải có **chứng từ hoàn tiền**
-        //        và đối soát riêng, KHÔNG được lẫn vào đơn bán.
-        //    Ba cách này cho **ba hành vi hoàn toàn khác nhau** ⇒ chọn sai là **sai tiền**. **CẦN NGƯỜI QUYẾT.**
-        //
-        // Test này **GHI NHẬN hiện trạng** (không phải khẳng định nó đúng): nếu ai đó thêm guard thì test **ĐỎ**
-        // và buộc phải cập nhật `prc-002` §20.3 + chọn một trong ba cách trên **một cách tường minh**.
-        var kq = TinhTienDon.Tinh(
-            [Dong("A", 3, 1m)], Money.Vnd(10_000m), Money.Vnd(5_000m), Tron);
+        // 3a — dùng **OVERLOAD 4 THAM SỐ** để chứng minh mặc định = `Reject`.
+        // Giỏ 3 dòng (mỗi dòng 1 × 1đ) = 3đ; giảm cấp đơn 10.000; phí 5.000 ⇒ 3 − 10.000 + 5.000 = −4.997.
+        var dong = new List<DongCanTinh> { Dong("A", 1, 1m), Dong("B", 1, 1m), Dong("C", 1, 1m) };
 
-        Assert.True(kq.TongThanhToan.Amount < 0m,
-            "Nếu test này ĐỎ: guard chống tổng ÂM đã được thêm ⇒ cập nhật prc-002 §20.3 và bỏ test ghi nhận này.");
-        Assert.Equal(-4_997m, kq.TongThanhToan.Amount);
+        var loi = Assert.Throws<Volo.Abp.BusinessException>(
+            () => TinhTienDon.Tinh(dong, Money.Vnd(10_000m), Money.Vnd(5_000m), Tron));
+
+        Assert.Equal(PricingErrorCodes.TongDonAm, loi.Code);
+        Assert.Equal(-4_997m, (decimal)loi.Data["tong"]!);
+        Assert.Equal(10_000m, (decimal)loi.Data["giamGiaCapDon"]!);
+        Assert.Equal(5_000m, (decimal)loi.Data["phi"]!);
+    }
+
+    [Fact]
+    public void Tong_don_am__Clamp__kep_giam_gia_ve_thanh_tien__tong_khong_am__3b()
+    {
+        // 3b — cùng đầu vào, chuyển sang `Clamp`: giảm cấp đơn bị kẹp về ĐÚNG thành tiền (3đ) TRƯỚC phân bổ R2.
+        // Tổng = thành tiền − giảm(đã kẹp) + phí = 3 − 3 + 5.000 = 5.000 ≥ 0 và Σ dòng vẫn bảo toàn.
+        var dong = new List<DongCanTinh> { Dong("A", 1, 1m), Dong("B", 1, 1m), Dong("C", 1, 1m) };
+
+        var kq = TinhTienDon.Tinh(
+            dong, Money.Vnd(10_000m), Money.Vnd(5_000m), Tron, ChinhSachTongDonAm.Clamp);
+
+        Assert.True(kq.TongThanhToan.Amount >= 0m, "Clamp phải kẹp để tổng KHÔNG âm.");
+        Assert.True(kq.BiKep, "Kẹp phải được báo qua `BiKep` (D-219/AQ3: đi qua kết quả, không ném).");
+        Assert.Equal(1, kq.SoKep);
+        Assert.Equal(3m, kq.TongGiamGia.Amount);   // 🚨 kẹp về ĐÚNG thành tiền, không phải 0 và không phải 10.000
+
+        // Bảo toàn sau kẹp: tổng = Σ (thành tiền sau giảm + thuế) của từng dòng (ADR-06).
+        var tuCacDong = kq.CacDong.Aggregate(
+            Money.Zero(Currency.Vnd), (a, d) => a + d.ThanhTienSauGiam + d.Thue);
+
+        Assert.Equal(tuCacDong.Amount, kq.TongThanhToan.Amount);
+    }
+
+    [Fact]
+    public void Tong_dung_bang_0_voi_Reject__KHONG_nem__dieu_kien_la_nho_hon_0__3c()
+    {
+        // 3c — BIÊN của guard: `Reject` chỉ ném khi tổng `< 0`; tổng ĐÚNG BẰNG 0 là HỢP LỆ.
+        // Đơn 0 đồng (trọng số phân bổ toàn 0) + có yêu cầu phí 5.000 ⇒ phân bổ phí = 0 ⇒ tổng = 0.
+        // 🚨 Nếu ai đó đổi `< 0` thành `<= 0`, ca này ĐỎ (đơn 0 đồng bị chặn oan).
+        var kq = TinhTienDon.Tinh([Dong("A", 1, 0m)], Money.Vnd(0m), Money.Vnd(5_000m), Tron);
+
+        Assert.Equal(0m, kq.TongThanhToan.Amount);
     }
 
     // ── Bất biến đầu vào ─────────────────────────────────────────────────────

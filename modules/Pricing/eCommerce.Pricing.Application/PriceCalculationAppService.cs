@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Volo.Abp;
 using Volo.Abp.Application.Services;
 using Volo.Abp.Domain.Repositories;
+using Volo.Abp.Settings;
 
 namespace eCommerce.Pricing;
 
@@ -33,6 +34,7 @@ public class PriceCalculationAppService : ApplicationService, IPriceCalculationA
     private readonly IRepository<TierPriceSet, Guid> _boBacRepository;
     private readonly IRepository<TierPrice, Guid> _bacRepository;
     private readonly IRepository<PriceCalculationRecord, Guid> _soGiaiTrinhRepository;
+    private readonly ISettingProvider _settingProvider;
 
     public PriceCalculationAppService(
         IRepository<ChannelPrice, Guid> giaTheoKenhRepository,
@@ -40,7 +42,8 @@ public class PriceCalculationAppService : ApplicationService, IPriceCalculationA
         IRepository<PriceListItem, Guid> dongGiaRepository,
         IRepository<TierPriceSet, Guid> boBacRepository,
         IRepository<TierPrice, Guid> bacRepository,
-        IRepository<PriceCalculationRecord, Guid> soGiaiTrinhRepository)
+        IRepository<PriceCalculationRecord, Guid> soGiaiTrinhRepository,
+        ISettingProvider settingProvider)
     {
         _giaTheoKenhRepository = giaTheoKenhRepository;
         _bangGiaRepository = bangGiaRepository;
@@ -48,6 +51,7 @@ public class PriceCalculationAppService : ApplicationService, IPriceCalculationA
         _boBacRepository = boBacRepository;
         _bacRepository = bacRepository;
         _soGiaiTrinhRepository = soGiaiTrinhRepository;
+        _settingProvider = settingProvider;
     }
 
     public async Task<GioTinhTienDto> TinhGioAsync(TinhGioInput input)
@@ -80,12 +84,8 @@ public class PriceCalculationAppService : ApplicationService, IPriceCalculationA
 
     private async Task<GioTinhTienDto> TinhMoiAsync(TinhGioInput input, string khoa)
     {
-        // ── B1: SNAPSHOT chính sách (một lần cho cả lần tính — ADR-08) ─────────────────────────
-        var chinhSach = new ChinhSachSnapshot(
-            MaChinhSachLamTron: ChinhSachLamTronMacDinh.Ten,
-            ChinhSachLamTron: ChinhSachLamTronMacDinh,
-            ChinhSachThieuGia: ChinhSachThieuGia.NemLoi,
-            At: input.At ?? Clock.Now);
+        // ── B1: SNAPSHOT chính sách (đọc MỘT lần cho cả lần tính — ADR-08) ──────────────────────
+        var chinhSach = await TaoChinhSachSnapshotAsync(input.At);
 
         var tapSku = input.Items.Select(x => x.Sku.Trim()).Distinct(StringComparer.Ordinal).ToList();
 
@@ -195,12 +195,26 @@ public class PriceCalculationAppService : ApplicationService, IPriceCalculationA
             });
         }
 
-        // ── B6–B8: tính tiền (4 điểm làm tròn) ────────────────────────────────────────────────
+        // ── B6–B8: tính tiền (4 điểm làm tròn) + chính sách tổng đơn âm (D-219) ─────────────────
+        var loaiTienDon = LoaiTien(cacDongCanTinh);
+        var giamGiaYeuCau = Money.Cua(input.OrderDiscount, loaiTienDon);
+        var phiCapDon = Money.Cua(input.OrderFee, loaiTienDon);
+
         var tien = TinhTienDon.Tinh(
             cacDongCanTinh,
-            Money.Cua(input.OrderDiscount, LoaiTien(cacDongCanTinh)),
-            Money.Cua(input.OrderFee, LoaiTien(cacDongCanTinh)),
-            chinhSach.ChinhSachLamTron);
+            giamGiaYeuCau,
+            phiCapDon,
+            chinhSach.ChinhSachLamTron,
+            chinhSach.ChinhSachTongDonAm);
+
+        // 🆕 D-219/AQ3: Clamp không ném ⇒ mang `BiKep/SoKep` qua kết quả + log để kế toán truy vết.
+        if (tien.BiKep)
+        {
+            Logger.LogWarning(
+                "ĐÃ KẸP giảm giá cấp đơn: biKep={BiKep}, soKep={SoKep}, giảm giá YÊU CẦU={GiamGiaYeuCau}, " +
+                "giảm giá THỰC TẾ={GiamGiaThucTe} (chính sách tổng đơn âm: {ChinhSach}).",
+                tien.BiKep, tien.SoKep, giamGiaYeuCau.Amount, tien.TongGiamGia.Amount, chinhSach.ChinhSachTongDonAm);
+        }
 
         for (var i = 0; i < chiTiet.Count; i++)
         {
@@ -253,8 +267,56 @@ public class PriceCalculationAppService : ApplicationService, IPriceCalculationA
         return ketQua;
     }
 
-    /// <summary>Chính sách làm tròn mặc định (VND = 0 chữ số) — cấu hình được là việc của D14/§18.3.</summary>
-    private static readonly IRoundingPolicy ChinhSachLamTronMacDinh = new RoundHalfAwayFromZeroPolicy();
+    /// <summary>
+    /// **B1 — SNAPSHOT chính sách** (`PRC-002` ADR-08): đọc **MỘT LẦN** 3 setting cho cả lần tính giá rồi truyền
+    /// xuyên suốt. Đọc lại giữa pipeline ⇒ hai dòng trong **cùng** hoá đơn có thể dùng **hai chính sách khác nhau**
+    /// ⇒ tổng không khớp Σ dòng. Giá trị lạ ⇒ `LogWarning` + **mặc định an toàn** (hàm đọc không ném).
+    /// </summary>
+    private async Task<ChinhSachSnapshot> TaoChinhSachSnapshotAsync(DateTime? at)
+    {
+        var thoLamTron = await _settingProvider.GetOrNullAsync(PRC002SettingTenKhoa.ChinhSachLamTron);
+        var chinhSachLamTron = PricingChinhSach.DocChinhSachLamTron(thoLamTron, out var lamTronHopLe);
+
+        var thoThieuGia = await _settingProvider.GetOrNullAsync(PRC002SettingTenKhoa.ThieuGia);
+        var chinhSachThieuGia = PricingChinhSach.DocThieuGia(thoThieuGia, out var thieuGiaHopLe);
+
+        var thoTongDonAm = await _settingProvider.GetOrNullAsync(PRC002SettingTenKhoa.TongDonAm);
+        var chinhSachTongDonAm = PricingChinhSach.DocTongDonAm(thoTongDonAm, out var tongDonAmHopLe);
+
+        if (!lamTronHopLe)
+        {
+            Logger.LogWarning(
+                "Setting {Khoa} không hợp lệ ('{GiaTri}') ⇒ dùng mặc định {MacDinh}.",
+                PRC002SettingTenKhoa.ChinhSachLamTron, thoLamTron, chinhSachLamTron.Ten);
+        }
+
+        if (!thieuGiaHopLe)
+        {
+            Logger.LogWarning(
+                "Setting {Khoa} không hợp lệ ('{GiaTri}') ⇒ dùng mặc định {MacDinh}.",
+                PRC002SettingTenKhoa.ThieuGia, thoThieuGia, chinhSachThieuGia);
+        }
+
+        if (!tongDonAmHopLe)
+        {
+            Logger.LogWarning(
+                "Setting {Khoa} không hợp lệ ('{GiaTri}') ⇒ dùng mặc định {MacDinh}.",
+                PRC002SettingTenKhoa.TongDonAm, thoTongDonAm, chinhSachTongDonAm);
+        }
+
+        Logger.LogInformation(
+            "[CHINH-SACH-DA-DOC] làm tròn={LamTron} (hợp lệ={LamTronOk}), thiếu giá={ThieuGia} (hợp lệ={ThieuGiaOk}), " +
+            "tổng đơn âm={TongDonAm} (hợp lệ={TongDonAmOk}).",
+            chinhSachLamTron.Ten, lamTronHopLe, chinhSachThieuGia, thieuGiaHopLe,
+            chinhSachTongDonAm, tongDonAmHopLe);
+
+        return new ChinhSachSnapshot(
+            MaChinhSachLamTron: chinhSachLamTron.Ten,
+            ChinhSachLamTron: chinhSachLamTron,
+            ChinhSachThieuGia: chinhSachThieuGia,
+            At: at ?? Clock.Now,
+            ChinhSachTongDonAm: chinhSachTongDonAm);
+    }
 
     private static Currency LoaiTien(IReadOnlyList<DongCanTinh> cacDong)
         => cacDong.Count > 0 ? cacDong[0].DonGiaChuaLamTron.Currency : Currency.Vnd;

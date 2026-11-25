@@ -171,10 +171,10 @@ public class PostgreSqlSchemaTests
         //      vốn cho một SKU trong một kỳ** (`PRC-001` §5.2/BR-008). Mất `NULLS NOT DISTINCT` ⇒ khi
         //      `TenantId = NULL` (đang chạy 1 tenant) hai dòng cùng `(Sku, EffectiveFrom)` LỌT ⇒ câu hỏi *"giá
         //      vốn của SKU này ngày X là bao nhiêu"* có **hai đáp án** ⇒ lãi gộp **không tất định**, và
-        //      📌 **không có lỗi nào** để lần ra. ⚠️ Bốn index `NULLS NOT DISTINCT` trước đó của module Pricing
+        //      📌 **không có lỗi nào** để lần ra. ✅ Bốn index `NULLS NOT DISTINCT` của module Pricing
         //      (`PrcPriceLists`/`PrcPriceListItems`/`PrcChannelPrices`/`PrcPriceCalculationRecords`) nằm trong
-        //      migration `Pricing_PriceList_And_ChannelPrice`/`Prc002_PriceCalculationRecords` — 📌 chúng **chưa**
-        //      có tên trong danh sách đích danh dưới đây (nợ của `PRC-001` §15.2, ghi ở `PRC-001` §16).
+        //      migration `Pricing_PriceList_And_ChannelPrice`/`Prc002_PriceCalculationRecords` — **đã đóng ở WP-16**:
+        //      nay có tên **đích danh** trong danh sách dưới đây (nợ cũ của `PRC-001` §15.2/§16).
         //    → **64** (29/10/2026, `Xc002_DlqReplay` — **không** thêm unique index; con số giữ nguyên)
         //    → **72** (02/11/2026, `Wp03_Catalog_NhanhModel` — **+8** index của mô hình hàng hóa Nhanh:
         //    → **73** (02/11/2026, `Wp03_Catalog_Backfill_OrderLineProductId` — **+1**: bảng đối chiếu
@@ -322,10 +322,10 @@ public class PostgreSqlSchemaTests
             "IX_OrdReturns_TenantId_IdempotencyKey",
             "IX_OrdReturnLines_TenantId_ReturnId_OrderLineId",
             "IX_OrdReturnHistory_TenantId_ReturnId_Axis_VersionAfter",
-            // ⚠️ NỢ ĐÃ GHI (`PRC-001` §15.2): BỐN index `NULLS NOT DISTINCT` của module Pricing
-            // (`PrcPriceLists`, `PrcPriceListItems`, `PrcChannelPrices`, `PrcPriceCalculationRecords`) hiện chỉ
-            // được đếm qua **TỔNG**, chưa có tên ở đây ⇒ nếu một cái mất mệnh đề mà một cái khác thêm vào thì
-            // tổng không đổi và test **không** bắt được. 📌 Ghi nhận thay vì im lặng (xem `PRC-001` §16).
+            // ✅ ĐÃ ĐÓNG Ở WP-16 (`PRC-002` `-arch` §6.4): BỐN index `NULLS NOT DISTINCT` của module Pricing
+            // (`PrcPriceLists`, `PrcPriceListItems`, `PrcChannelPrices`, `PrcPriceCalculationRecords`) trước đây
+            // chỉ được đếm qua **TỔNG**; nay có tên **đích danh** ở cuối danh sách ⇒ nếu một cái mất mệnh đề mà
+            // một cái khác thêm vào thì tổng không đổi nhưng danh sách đích danh vẫn bắt được (nợ `PRC-001` §16).
             // 🆕 WP-03 (02/11/2026) — **8 index của mô hình hàng hóa Nhanh** (`03 §3.1`, D-07):
             //   • `..._TenantId_Barcode`: barcode duy nhất toàn tenant ⇒ quét mã ở POS không bán **sai món**;
             //   • `..._ProductId_Name`: một ĐVT một dòng giá (không có hai giá cho "thùng");
@@ -389,6 +389,17 @@ public class PostgreSqlSchemaTests
             "IX_RptDimProducts_TenantId_Sku",
             "IX_RptDimStores_TenantId_Kho",
             "IX_RptDimStaffs_TenantId_NhanVien",
+            // 🆕 WP-16 (`PRC-002` `-arch` §6.4) — **BỐN index `NULLS NOT DISTINCT` của Pricing** nay được kiểm
+            // ĐÍCH DANH (trước chỉ đếm tổng). Mất mệnh đề ở đây (khi `TenantId = NULL` — đang chạy 1 tenant) thì:
+            //   • `PrcPriceLists (Code, EffectiveFrom)`: hai bảng giá cùng mã cùng ngày hiệu lực LỌT ⇒ chọn giá
+            //     không tất định;
+            //   • `PrcPriceListItems (PriceListId, Sku)`: một SKU hai dòng giá trong một bảng ⇒ bán sai giá;
+            //   • `PrcChannelPrices (Kenh, Shop, Sku, MinQty)`: hai giá kênh/shop/bậc cho một SKU ⇒ giá không xác định;
+            //   • `PrcPriceCalculationRecords (IdempotencyKey)`: gọi lại một lần tính giá **ghi hai sổ** ⇒ đối soát lệch.
+            "IX_PrcPriceLists_TenantId_Code_EffectiveFrom",
+            "IX_PrcPriceListItems_TenantId_PriceListId_Sku",
+            "IX_PrcChannelPrices_TenantId_Kenh_Shop_Sku_MinQty",
+            "IX_PrcPriceCalculationRecords_TenantId_IdempotencyKey",
         ];
 
         foreach (var ten in phaiCo)

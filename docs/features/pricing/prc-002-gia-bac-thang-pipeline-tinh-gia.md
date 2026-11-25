@@ -96,8 +96,8 @@ phải đi qua **một** `IRoundingPolicy` của `XC-001`, và làm tròn **theo
 | **Pre-Condition(s)** | • **Tenant hiện tại** (`TenantId` từ `ICurrentTenant`) — `TierPriceSet`/`TierPrice`/`PriceCalculationRecords` là `IMultiTenant`.<br>• **Kênh bán** (`ChannelCode`) — **bắt buộc** cho mọi lần tính giá (kể cả kênh website: mã `web`); giá trị phải tồn tại trong `ChnChannels` (`modules/ChannelHub/eCommerce.ChannelHub.EntityFrameworkCore/ChannelHubDbContextModelCreatingExtensions.cs:23,27` — `Channel.Code` unique toàn hệ thống).<br>• **SKU** đã tồn tại trong Catalog — `ProductVariant.Sku` unique theo tenant (`src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs:129`). ⚠️ Pricing **không** tham chiếu trực tiếp `eCommerce.Catalog.*` (rành buộc kế thừa từ `PRC-001` §15.1 **Q1** — **chưa chốt**).<br>• 🔴 **`Money`/`Currency`/`IRoundingPolicy` của `XC-001` đã có trong `eCommerce.Kernel`** — **chưa có trong code** (`grep` → 0 match; `shared/` không tồn tại) ⇒ **phụ thuộc chặn** (§14.4).<br>• 🔴 **`PRC-001` đã có `IPriceResolver`** (cấp 1–4) — module `Pricing` **chưa tồn tại** ⇒ **phụ thuộc chặn** thứ hai.<br>• Ngày tính giá `at` **bắt buộc** truyền vào (BR-012) — **cấm** dùng `DateTime.Now` bên trong pipeline.<br>• `ChannelShopId` **chỉ** có mặt khi bộ bậc thang áp cho **một shop cụ thể**; không áp dụng cho kênh website. |
 | **Post-Condition(s)** | • Mọi số tiền trả về là `Money` **đã chuẩn hoá** về `Currency.Decimals` (`XC-001` BR-001) và **kèm breakdown từng bước** + bậc thắng + `RoundingPolicyCode` (BR-006/BR-010/BR-019).<br>• Tổng đơn = **Σ các dòng đã làm tròn** — **không** làm tròn trên tổng (BR-008).<br>• Mọi lần tính giá **có** một bản ghi append-only trong `PriceCalculationRecords` **trong cùng Unit of Work** (BR-020).<br>• Bộ bậc thang `Active` **không** bị sửa (append-only) — muốn đổi phải tạo bộ mới (BR-015).<br>• Mọi chuyển trạng thái + mọi đổi chính sách làm tròn **có audit** (`XC-001` BR-004, `XC-004` BR-011). |
 | **Basic Flow** | 1. Quản trị giá tạo `TierPriceSet` (`Code`, `Name`, `Scope`, `ChannelCode?`, `Currency`, `EffectiveFrom/To`) ⇒ `Draft`.<br>2. Thêm các `TierPrice` (`Sku`, `MinQuantity`, `Kind`, `Amount`, `Currency`) ⇒ hệ thống **chuẩn hoá** `Amount` qua `Money.Of` + làm tròn theo `IRoundingPolicy`.<br>3. Quản trị giá **Phát hành** ⇒ `Draft → Approved` (guard: ≥ 1 bậc, cùng `Currency`, khung ngày hợp lệ, **không** trùng `MinQuantity`, **không** chồng khung cùng phạm vi) ⇒ **NÉM LỖI** nếu vi phạm.<br>4. Job hằng ngày: tới `EffectiveFrom` ⇒ `Approved → Active`; quá `EffectiveTo` ⇒ `Active → Expired`.<br>5. `SAL-002` gọi `IPricePipeline.Calculate(context)`: nạp dữ liệu (1 lần) → **snapshot chính sách** → chạy **8 bước** (§4.2) → trả `PriceBreakdown`.<br>6. App service ghi `PriceCalculationRecords` (**append-only**) + phát `PriceCalculatedEto` **trong cùng UoW**.<br>7. `SAL-002` chụp `UnitPrice`/`DiscountAmount`/`TaxAmount` đã làm tròn vào `OrderLine` (`src/eCommerce.Domain/Entities/Orders/Order.cs:139`). |
-| **Alternative Flow** | **A1: Không có bậc nào khớp số lượng** ⇒ dùng giá cơ sở (cấp 1–4 của `PRC-001`) và **ghi rõ** `SelectedTier = BasePrice` trong breakdown; nếu **không có cả** giá cơ sở ⇒ theo `MissingPricePolicy` (`PRC-001` D14: mặc định **ném** `eCommerce:Pricing:0004`).<br>**A2: Nhiều bậc cùng `MinQuantity`** ⇒ **NÉM** `eCommerce:Pricing:0008` — **cấm** chọn tuỳ tiện (ADR-02).<br>**A3: Nhiều ứng viên cùng cấp cùng `Priority`** ⇒ **NÉM** `eCommerce:Pricing:0001` (`PRC-001` D7) — `PRC-002` **không** nới lỏng luật này.<br>**A4: Chiến lược `LowestPrice`** ⇒ chạy hết pipeline rồi chọn **giá thấp nhất trong các ứng viên hợp lệ**; bằng nhau ⇒ so `Priority`, vẫn bằng ⇒ **NÉM** `0001`.<br>**A5: Import hàng loạt bậc thang** ⇒ nhận **JSON DTO** + `IdempotencyKey` ổn định; chạy lại **cùng khoá** ⇒ trả kết quả cũ, **0** bản ghi mới (BR-016).<br>**A6: Chưa đăng ký `IPriceAdjustment` nào** (chưa có `PRO-*`) ⇒ bước 4 là **no-op có ghi nhận** trong breakdown (`Skipped: NoProvider`) — **không** phải lỗi.<br>**A7: Kế toán duyệt chính sách làm tròn** ⇒ đổi Setting `eCommerce.Money.RoundingPolicy` (`XC-001` §9) ⇒ **chỉ áp cho lần tính MỚI**, không hồi tố (BR-011). |
-| **Exception Flow** | **E1:** phát hành bộ bậc thang vi phạm guard (0 bậc / khác `Currency` / khung ngày sai / trùng `MinQuantity`) ⇒ `eCommerce:Pricing:0002` hoặc `0008` (`400`/`409`).<br>**E2:** sửa/xoá bộ bậc thang đang `Active` ⇒ `eCommerce:Pricing:0003` (`409`) — append-only (ADR-10).<br>**E3:** không có giá ở mọi cấp và policy = `Throw` ⇒ `eCommerce:Pricing:0004` (`409`) kèm `Sku`/`ChannelCode`/`At`.<br>**E4:** `Currency` của bậc khác `Currency` của kênh/tenant ⇒ `eCommerce:Pricing:0005` (`409`) — **không** tự quy đổi (BR-018).<br>**E5:** bậc `PercentOff` có `Amount` ngoài `[0,100]` ⇒ `eCommerce:Pricing:0009` (`400`).<br>**E6:** chồng khung hiệu lực cùng `(Scope, ChannelCode, ChannelShopId)` ⇒ `eCommerce:Pricing:0010` (`409`).<br>**E7:** chính sách làm tròn không hợp lệ/không hỗ trợ ⇒ `eCommerce:Pricing:0011` (`400`).<br>**E8:** `Σ dòng đã làm tròn ≠ tổng` (lỗi thuật toán/`MoneyAllocator`) ⇒ **`InvalidOperationException`** ⇒ `eCommerce:Pricing:0012` (`500`) + log `Error` — **phải lộ ra CI**, không nuốt (`XC-001` §12 cùng nguyên tắc).<br>**E9:** import thiếu `IdempotencyKey` ⇒ `eCommerce:Pricing:0006` (`400`) — **trước khi** ghi bất cứ dòng nào.<br>**E10:** `RowVersion` lệch khi hai người sửa cùng bộ ⇒ `eCommerce:Pricing:0007` (`409`).<br>**E11:** khoá phân tán bận khi job kích hoạt / import ⇒ `eCommerce:Lock:0001` (`409`) theo `XC-003` (§8.2). |
+| **Alternative Flow** | **A1: Không có bậc nào khớp số lượng** ⇒ dùng giá cơ sở (cấp 1–4 của `PRC-001`) và **ghi rõ** `SelectedTier = BasePrice` trong breakdown; nếu **không có cả** giá cơ sở ⇒ theo `MissingPricePolicy` (`PRC-001` D14: mặc định **ném** `eCommerce:Pricing:0004`).<br>**A2: Nhiều bậc cùng `MinQuantity`** ⇒ **NÉM** `eCommerce:Pricing:0008` — **cấm** chọn tuỳ tiện (ADR-02).<br>**A3: Nhiều ứng viên cùng cấp cùng `Priority`** ⇒ **NÉM** `eCommerce:Pricing:0001` (`PRC-001` D7) — `PRC-002` **không** nới lỏng luật này.<br>**A4: Chiến lược `LowestPrice`** ⇒ chạy hết pipeline rồi chọn **giá thấp nhất trong các ứng viên hợp lệ**; bằng nhau ⇒ so `Priority`, vẫn bằng ⇒ **NÉM** `0001`.<br>**A5: Import hàng loạt bậc thang** ⇒ nhận **JSON DTO** + `IdempotencyKey` ổn định; chạy lại **cùng khoá** ⇒ trả kết quả cũ, **0** bản ghi mới (BR-016).<br>**A6: Chưa đăng ký `IPriceAdjustment` nào** (chưa có `PRO-*`) ⇒ bước 4 là **no-op có ghi nhận** trong breakdown (`Skipped: NoProvider`) — **không** phải lỗi.<br>**A7: Kế toán trưởng duyệt chính sách làm tròn** ⇒ đổi Setting `Pricing:RoundingPolicyCode` qua đường ABP `setting-management/*` ⇒ **chỉ áp cho lần tính MỚI**, không hồi tố (BR-011; người duyệt = kế toán trưởng M4 — `D-226`). |
+| **Exception Flow** | **E1:** phát hành bộ bậc thang vi phạm guard (0 bậc / khác `Currency` / khung ngày sai / trùng `MinQuantity`) ⇒ `eCommerce:Pricing:0002` hoặc `0008` (`400`/`409`).<br>**E2:** sửa/xoá bộ bậc thang đang `Active` ⇒ `eCommerce:Pricing:0003` (`409`) — append-only (ADR-10).<br>**E3:** không có giá ở mọi cấp và policy = `Throw` ⇒ `eCommerce:Pricing:0004` (`409`) kèm `Sku`/`ChannelCode`/`At`.<br>**E4:** `Currency` của bậc khác `Currency` của kênh/tenant ⇒ `eCommerce:Pricing:0005` (`409`) — **không** tự quy đổi (BR-018).<br>**E5:** bậc `PercentOff` có `Amount` ngoài `[0,100]` ⇒ `eCommerce:Pricing:0009` (`400`).<br>**E6:** chồng khung hiệu lực cùng `(Scope, ChannelCode, ChannelShopId)` ⇒ `eCommerce:Pricing:0013` (`409`).<br>**E7:** giá trị `Pricing:RoundingPolicyCode` lạ/rỗng/`none` ⇒ dùng mặc định `half-away-from-zero` + `hopLe = false` + `LogWarning`, **không ném** (`D-221`).<br>**E8:** `Σ dòng đã làm tròn ≠ tổng` (lỗi thuật toán/`MoneyAllocator`) ⇒ **`InvalidOperationException`** ⇒ `eCommerce:Pricing:0012` (`500`) + log `Error` — **phải lộ ra CI**, không nuốt (`XC-001` §12 cùng nguyên tắc).<br>**E9:** import thiếu `IdempotencyKey` ⇒ `eCommerce:Pricing:0006` (`400`) — **trước khi** ghi bất cứ dòng nào.<br>**E10:** `RowVersion` lệch khi hai người sửa cùng bộ ⇒ `eCommerce:Pricing:0007` (`409`).<br>**E11:** khoá phân tán bận khi job kích hoạt / import ⇒ `eCommerce:Lock:0001` (`409`) theo `XC-003` (§8.2).<br>**E12:** tổng đơn âm khi `Pricing:OrderTotalNegativePolicy = Reject` (mặc định) ⇒ `eCommerce:Pricing:0010` (`409` — cùng nhóm `0004`/`0005`/`0008`) kèm `tong`/`giamGiaCapDon`/`phi`; tổng = 0 vẫn hợp lệ (`D-219`).<br>**E13:** thêm bậc vượt `Pricing:MaxTiersPerSet` tại `AddTierAsync` ⇒ `eCommerce:Pricing:0011` (`409`) kèm `tierPriceSetId`/`soBacHienTai`/`toiDa` (`D-224`). |
 | **Business Rules** | • **BR-PRC-002-001**: Mọi giá/tiền trong Pricing **phải** là `Money` (có `Currency`); **cấm** lưu `decimal` tiền mà **không** có cột tiền tệ đi kèm.<br>• **BR-PRC-002-002**: **Cấm** `double`/`float` trong bất kỳ biểu thức tiền nào (entity, DTO, adapter).<br>• **BR-PRC-002-003**: **Cấm** so sánh tiền bằng `==` trên `decimal`; so bằng `ToMinorUnits()` (`XC-001` BR-003).<br>• **BR-PRC-002-004**: Bậc được chọn = bậc có `MinQuantity` **lớn nhất** ≤ `quantity`; **không** bậc nào thoả ⇒ dùng giá cơ sở và ghi rõ trong breakdown.<br>• **BR-PRC-002-005**: Hai bậc cùng `(Sku, MinQuantity)` trong cùng bộ ⇒ **NÉM** `eCommerce:Pricing:0008`; **cấm** chọn theo thứ tự duyệt.<br>• **BR-PRC-002-006**: Pipeline **chạy HẾT** mọi bước **rồi mới** so sánh/chọn; kết quả **phải** kèm `PriceBreakdown` từng bước + danh sách ứng viên.<br>• **BR-PRC-002-007**: Làm tròn **chỉ** qua `IRoundingPolicy`; **cấm** `decimal.Round`/`Math.Round` trong `modules/Pricing`.<br>• **BR-PRC-002-008**: Làm tròn **theo TỪNG DÒNG**; tổng = **Σ các dòng đã làm tròn**; **cấm** làm tròn trên tổng (`XC-001` BR-005).<br>• **BR-PRC-002-009**: Làm tròn **chỉ** tại 4 điểm cố định R1–R4 (§4.2); **cấm** làm tròn ở bước khác.<br>• **BR-PRC-002-010**: Chính sách làm tròn đọc **đúng 1 lần** cho mỗi lần tính; mã policy **phải** được lưu vào bản ghi giải trình.<br>• **BR-PRC-002-011**: Làm tròn mặc định `AwayFromZero`; đổi chính sách **phải** có audit và **không** hồi tố dữ liệu đã ghi (`XC-001` BR-004/§9).<br>• **BR-PRC-002-012**: Bậc thang có hiệu lực theo khoảng `[EffectiveFrom, EffectiveTo]`; truy vấn giá **bắt buộc** kèm tham số ngày; **cấm** truy vấn "mới nhất" không ngày.<br>• **BR-PRC-002-013**: `Amount ≥ 0`; với `Kind = PercentOff` thì `0 ≤ Amount ≤ 100`; **cấm** tạo giá âm (giảm giá dùng `PRO-*`).<br>• **BR-PRC-002-014**: Bậc thang là **DỮ LIỆU**: **cấm** hard-code ngưỡng/tỷ lệ trong code và **cấm** seed dữ liệu giá thật.<br>• **BR-PRC-002-015**: Bộ bậc thang `Active` là **append-only**; mọi chuyển trạng thái sai guard **phải NÉM** `BusinessException` có mã — **cấm** no-op im lặng.<br>• **BR-PRC-002-016**: Mọi biên vào ghi bậc thang / ghi bản ghi giải trình **phải** idempotent (`IdempotencyKey` **ổn định** + inbox + unique index); **cùng khoá khác payload** ⇒ **NÉM** `eCommerce:Messaging:0002` (`XC-002` BR-006).<br>• **BR-PRC-002-017**: Phân bổ giảm giá/phí theo dòng **phải bảo toàn tổng** (`Σ == total`) — dùng `MoneyAllocator` (`XC-001` BR-006).<br>• **BR-PRC-002-018**: Khác `Currency` ⇒ **NÉM** `eCommerce:Pricing:0005`; **cấm** tự quy đổi tiền tệ.<br>• **BR-PRC-002-019**: Kết quả tính giá **phải TÁI LẬP được**: cùng input + cùng phiên bản rule/policy ⇒ cùng kết quả (so bằng `ToMinorUnits()`).<br>• **BR-PRC-002-020**: `PriceCalculationRecords` là **sổ append-only** — **cấm** UPDATE/DELETE.<br>• **BR-PRC-002-021**: Giá vốn (`CostPrice` của `PRC-001`) **cấm** lộ ra storefront/DTO công khai, và **cấm** xuất hiện trong `PriceBreakdown` trả cho người mua (`PRC-001` BR-013). |
 | **Non-Functional Requirement** | • **NFR-PRC-002-001**: `CalculatePrice` p95 **< 30 ms** cho 1 dòng với **500** bậc thang hiệu lực (PostgreSQL 17 thật).<br>• **NFR-PRC-002-002**: Số truy vấn DB cho **một** lần tính **≤ 4** (không N+1).<br>• **NFR-PRC-002-003**: **0** `double`/`float` trong `modules/Pricing` (test reflection).<br>• **NFR-PRC-002-004**: **0** so sánh tiền bằng `==` trong `modules/Pricing` (quét mã nguồn).<br>• **NFR-PRC-002-005**: **0** `decimal.Round`/`Math.Round` trong `modules/Pricing` (quét mã nguồn).<br>• **NFR-PRC-002-006**: Property-based **10.000** bộ: `Σ dòng đã làm tròn == tổng`, lệch **0** đồng.<br>• **NFR-PRC-002-007**: Tái lập: **1.000/1.000** lần chạy cùng input ⇒ cùng kết quả.<br>• **NFR-PRC-002-008**: **100 %** nhánh state machine §3 có test, **kể cả** nhánh guard sai.<br>• **NFR-PRC-002-009**: **100 %** app service của Pricing có `[Authorize]` **cấp class**; **0** permission "mồ côi" (`XC-004` TC-01/TC-02).<br>• **NFR-PRC-002-010**: Metric mới **phải** có tên trong `eCommerceMetricNames` (`eCommerceMetrics.cs:38-52`) **và** `XC-005` §5.1; **0** nhãn ngoài allowlist; **0** nhãn `sku`. |
 | | • **NFR-PRC-002-011**: Cách ly tenant — tenant A **không** đọc/ghi được bậc thang của tenant B (integration 2 tenant). |
@@ -156,7 +156,7 @@ stateDiagram-v2
 |---|---|---|---|---|
 | 1 | `[*]` → `Draft` | `Code` chưa tồn tại trong `(TenantId, Code, EffectiveFrom)`; `Currency` hợp lệ | ghi audit `Created` | `eCommerce:Pricing:0005` (tiền tệ) / `400` validate |
 | 2 | `Draft` → `Draft` | Trạng thái **là** `Draft` | `UpdateDraft(...)` + `RowVersion++` | `eCommerce:Pricing:0003` — **NÉM** (append-only, ADR-10) |
-| 3 | `Draft` → `Approved` | **≥ 1** `TierPrice`; mọi bậc **cùng `Currency`**; `EffectiveTo >= EffectiveFrom`; **không** trùng `(Sku, MinQuantity)`; **không** chồng khung với bộ `Active` cùng `(Scope, ChannelCode, ChannelShopId)` | ghi `ApprovedBy`/`ApprovedAtUtc`; phát `TierPriceSetPublishedEto` (outbox) | `eCommerce:Pricing:0002` / `0008` / `0010` — **NÉM** |
+| 3 | `Draft` → `Approved` | **≥ 1** `TierPrice`; mọi bậc **cùng `Currency`**; `EffectiveTo >= EffectiveFrom`; **không** trùng `(Sku, MinQuantity)`; **không** chồng khung với bộ `Active` cùng `(Scope, ChannelCode, ChannelShopId)` | ghi `ApprovedBy`/`ApprovedAtUtc`; phát `TierPriceSetPublishedEto` (outbox) | `eCommerce:Pricing:0002` / `0008` / `0013` — **NÉM** |
 | 4 | `Draft` → `Cancelled` | Trạng thái **là** `Draft` | ghi audit `Cancelled` + lý do | `eCommerce:Pricing:0003` — **NÉM** |
 | 5 | `Approved` → `Active` | `today >= EffectiveFrom` **và** không còn bộ `Active` khác cùng phạm vi | ghi `ActivatedAtUtc`; phát `TierPriceSetActivatedEto` | 🚫 **Không phải lỗi** — job **trả `false`**, giữ nguyên `Approved` (ADR-11) |
 | 6 | `Approved` → `Draft` | `today < EffectiveFrom` | xoá `ApprovedBy`; ghi audit | `eCommerce:Pricing:0003` — **NÉM** |
@@ -233,7 +233,7 @@ sequenceDiagram
 
 | Bước | Tên | Đầu vào | Đầu ra | Làm tròn | Nguồn luật |
 |---|---|---|---|---|---|
-| **B1** | **Snapshot chính sách** | `TenantId`, `Currency`, `RoundingPolicyCode`, `MissingPricePolicy`, `TierSelectionStrategy`, `at` | `PolicySnapshot` (bất biến trong suốt lần tính) | ❌ | ADR-08 · `XC-001` §8.2 #1 |
+| **B1** | **Snapshot chính sách** | `TenantId`, `Currency`, `RoundingPolicyCode`, `MissingPricePolicy`, `OrderTotalNegativePolicy`, `at` | `PolicySnapshot` (bất biến trong suốt lần tính) | ❌ | ADR-08 · `XC-001` §8.2 #1 |
 | **B2** | **Giá cơ sở (4 cấp)** | `Sku`, `ChannelCode`, `ChannelShopId?`, `at` | `Money` giá cơ sở + cấp thắng | ❌ | `PRC-001` D7/BR-006 |
 | **B3** | **Thu thập ứng viên bậc thang** | các `TierPrice` **hiệu lực** khớp `(Sku, kênh, quantity, at)` | danh sách `TierCandidate` (**KHÔNG** áp mù) | ❌ | BR-004 · ADR-03 |
 | **B4** | **Điều chỉnh (khuyến mãi)** | `IPriceAdjustment[]` đã đăng ký | thêm ứng viên/điều chỉnh | ❌ | `PRO-001`/`PRO-002` (cắm vào) |
@@ -241,6 +241,8 @@ sequenceDiagram
 | **B6** | **Làm tròn R1 — đơn giá** | đơn giá thắng | `Money` đơn giá đã làm tròn | ✅ **R1** | BR-009 · `XC-001` BR-001 |
 | **B7** | **Giảm giá/phí cấp đơn + phân bổ theo dòng** | `Money` tổng giảm/phí, trọng số dòng | `Money[]` phần mỗi dòng | ✅ **R2/R3** | BR-017 · `XC-001` BR-006 |
 | **B8** | **Thuế theo dòng + tổng** | dòng sau giảm giá, mức thuế (từ `Tax`) | `Money` thuế mỗi dòng; **tổng = Σ dòng đã làm tròn** | ✅ **R4** | BR-008 · `XC-001` BR-005 · `XC-006` |
+
+> 📌 **`Pricing:MaxTiersPerSet` KHÔNG thuộc snapshot B1** — ngưỡng số bậc đọc **một lần** ở `AddTierAsync` (guard vận hành, `D-224`), **không** thêm trường chết vào pipeline (`D-226`).
 
 **Bảng điểm làm tròn (hợp đồng — BR-009):**
 
@@ -424,7 +426,7 @@ Module **chưa có** trong code; khi tạo, **phải** làm đúng 3 việc (gi�
 
 | Mục | Giá trị |
 |---|---|
-| Interface | `ITierPriceSetAppService`, `ITierPriceImportAppService`, `IPricePipelineAppService`, `IRoundingPolicySettingAppService` (đặt tại `eCommerce.Pricing.Application.Contracts`) |
+| Interface | `ITierPriceSetAppService`, `ITierPriceImportAppService`, `IPricePipelineAppService` (đặt tại `eCommerce.Pricing.Application.Contracts`) |
 | Implementation | `…AppService` (đặt tại `eCommerce.Pricing.Application`) |
 | `[Authorize]` | **cấp CLASS** + permission cụ thể ở từng method (`XC-004` BR-001/D3; bài học thật ghi tại `src/eCommerce.Application/Channels/ChannelAppService.cs:22-28`) |
 
@@ -440,8 +442,12 @@ Module **chưa có** trong code; khi tạo, **phải** làm đúng 3 việc (gi�
 | `ImportAsync` | `ImportTiersDto` (**JSON, không file**) | `ImportResultDto` | `…TierPrice.Import` | **bắt buộc** `IdempotencyKey` (BR-016) |
 | **`CalculateAsync`** | `CalculatePriceInput` | `PriceBreakdownDto` | `eCommerce.Pricing.Price.Resolve` **(tái dùng của `PRC-001`)** | **đường nóng** của `SAL-002` |
 | `CalculateManyAsync` | `CalculateManyInput` | `List<PriceBreakdownDto>` | `…Price.Resolve` | lô cho giỏ hàng; **≤ 200** dòng/lần (`PRC-001` cùng giới hạn) |
-| `GetRoundingPolicyAsync` | — | `RoundingPolicyDto` | `…TierPrice.View` | chỉ đọc |
-| `SetRoundingPolicyAsync` | `SetRoundingPolicyDto` | `RoundingPolicyDto` | **`eCommerce.Pricing.RoundingPolicy.Manage`** | đổi Setting + **audit** (BR-011) |
+
+> 📌 **Chính sách làm tròn / thiếu giá:** đọc ở B1 `ChinhSachSnapshot` qua `ISettingProvider` (một lần — ADR-08);
+> đường **ghi** là ABP SettingManagement (`setting-management/*`, Host đã nạp — `src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs:73`).
+> WP-16 **không** có app service Pricing riêng: `IRoundingPolicySettingAppService` + permission
+> `eCommerce.Pricing.RoundingPolicy.Manage` **hoãn** (`D-222`; điều kiện: `W16-4` phải đo được vết audit).
+> Không còn `GetRoundingPolicyAsync`/`SetRoundingPolicyAsync`.
 
 **Hợp đồng lõi dùng bởi `SAL-002` (thuần — ADR-04):**
 
@@ -527,11 +533,11 @@ public static class TierPriceLockKeys
 | `POST /api/app/pricing/tier-price-sets/{id}/approve` | `Bearer` | `eCommerce.Pricing.TierPrice.Approve` | `application/json` |
 | `POST /api/app/pricing/tier-prices/import` | `Bearer` | `eCommerce.Pricing.TierPrice.Import` | `application/json` |
 | `POST /api/app/pricing/calculate` | `Bearer` | `eCommerce.Pricing.Price.Resolve` | `application/json` |
-| `GET /api/app/pricing/rounding-policy` | `Bearer` | `eCommerce.Pricing.TierPrice.View` | `application/json` |
-| `PUT /api/app/pricing/rounding-policy` | `Bearer` | `eCommerce.Pricing.RoundingPolicy.Manage` | `application/json` |
 
 > ⚠️ Route do **ABP auto API controller** sinh từ app service — tên thật phụ thuộc quy ước đặt tên của ABP và
 > **chưa kiểm chứng** (module chưa tồn tại). Ghi ở đây để review hợp đồng, **không** phải cam kết URL cuối cùng.
+
+> 📌 **Chính sách làm tròn/thiếu giá KHÔNG có route Pricing riêng:** đổi qua ABP `setting-management/*` (Host đã nạp — `src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs:73`); route đọc/ghi cấu hình ở Pricing **đã xoá** khỏi hợp đồng (`D-222`, `D-226`).
 
 **Request mẫu — tính giá**
 
@@ -579,9 +585,10 @@ public static class TierPriceLockKeys
 | `eCommerce:Pricing:0007` *(PRC-001)* | `409` | `RowVersion` lệch | `Dữ liệu đã bị thay đổi bởi người khác. Vui lòng tải lại và thử lại.` |
 | **`eCommerce:Pricing:0008`** | `409` | **Hai bậc cùng `MinQuantity`** ⇒ không xác định được bậc | `Bậc giá bị trùng số lượng tối thiểu ({MinQuantity}) cho SKU '{Sku}'. Vui lòng gỡ một bậc.` |
 | **`eCommerce:Pricing:0009`** | `400` | `PercentOff` có `Amount` ngoài `[0,100]` | `Mức giảm phần trăm phải trong khoảng 0..100 (nhận được {Amount}).` |
-| **`eCommerce:Pricing:0010`** | `409` | Chồng khung hiệu lực cùng `(Scope, ChannelCode, ChannelShopId)` | `Khung hiệu lực của '{Code}' chồng với '{OtherCode}'.` |
-| **`eCommerce:Pricing:0011`** | `400` | Chính sách làm tròn không hợp lệ / không hỗ trợ | `Chính sách làm tròn '{Policy}' không được hỗ trợ.` |
+| **`eCommerce:Pricing:0010`** | `409` | **Tổng đơn âm** khi `Pricing:OrderTotalNegativePolicy = Reject` (mặc định) | `Tổng đơn âm ({Tong}) sau giảm giá cấp đơn ({GiamGiaCapDon}) và phí ({Phi}).` |
+| **`eCommerce:Pricing:0011`** | `409` | **Thêm bậc vượt `Pricing:MaxTiersPerSet`** (ở `AddTierAsync`) | `Bộ bậc thang đã có {SoBacHienTai} bậc, thêm bậc này vượt tối đa {ToiDa}.` |
 | **`eCommerce:Pricing:0012`** | `500` | `Σ dòng ≠ tổng` sau phân bổ/làm tròn (lỗi thuật toán) | `Tổng tiền không khớp sau khi làm tròn — lỗi hệ thống, đã ghi log.` |
+| **`eCommerce:Pricing:0013`** | `409` | Chồng khung hiệu lực cùng `(Scope, ChannelCode, ChannelShopId)` | `Khung hiệu lực của '{Code}' chồng với '{OtherCode}'.` |
 | `eCommerce:Money:0001…0005` *(của `XC-001`)* | `400`/`500` | Khác tiền tệ / mã tiền tệ lạ / tổng trọng số 0 / tràn / trọng số âm | theo `XC-001` §6.2 — **không** khai lại |
 | `eCommerce:Messaging:0002` *(của `XC-002`)* | `409` | Cùng `IdempotencyKey` nhưng **payload khác** | theo `XC-002` BR-006 — **không** khai lại |
 | `eCommerce:Lock:0001` *(của `XC-003`)* | `409` | Không giành được khoá (job/import) | `Tài nguyên đang được xử lý bởi tiến trình khác, vui lòng thử lại.` |
@@ -701,22 +708,26 @@ public static class TierPriceLockKeys
 | Permission | Nhóm | Method được gán | Vai trò mặc định | Ghi chú |
 |---|---|---|---|---|
 | `eCommerce.Pricing.TierPrice` | `Pricing.TierPrice` | — (nhóm cha) | admin | |
-| `eCommerce.Pricing.TierPrice.View` | `Pricing.TierPrice` | `GetListAsync`, `GetAsync`, `GetRoundingPolicyAsync` | admin · nhân viên | |
+| `eCommerce.Pricing.TierPrice.View` | `Pricing.TierPrice` | `GetListAsync`, `GetAsync` | admin · nhân viên | |
 | `eCommerce.Pricing.TierPrice.Manage` | `Pricing.TierPrice` | `CreateAsync`, `AddTierAsync`, `UpdateDraftAsync`, `CancelAsync` | admin | |
 | `eCommerce.Pricing.TierPrice.Approve` | `Pricing.TierPrice` | `ApproveAsync` | **quản trị giá** (không phải mọi admin) | tách người nhập ↔ người duyệt (`XC-006` cùng nguyên tắc) |
 | `eCommerce.Pricing.TierPrice.Import` | `Pricing.TierPrice` | `ImportAsync` | admin | **biên vào** ⇒ kèm idempotency (BR-016) |
-| `eCommerce.Pricing.RoundingPolicy.Manage` | `Pricing.RoundingPolicy` | `SetRoundingPolicyAsync` | **kế toán trưởng** | `XC-001` BR-004: đổi policy **phải có audit** |
 | `eCommerce.Pricing.Price.Resolve` **(tái dùng của `PRC-001`)** | `Pricing.Price` | `CalculateAsync`, `CalculateManyAsync` | admin · nhân viên · **client `SAL-002`** | ⚠️ `SAL-002` chạy **cùng tiến trình** ⇒ dùng quyền nội bộ, **không** cấp cho storefront |
 | *(của `PRC-001`, **không** khai lại ở đây)* | — | `PriceList.*`, `ChannelPrice.*`, `CostPrice.*` | — | Nếu cả `PRC-001` và `PRC-002` cùng triển khai ⇒ bảng permission là **hợp** của hai tài liệu |
 
-**Setting liên quan** *(đọc bởi pipeline — **không** định nghĩa lại ở đây)*
+> 📌 **`eCommerce.Pricing.RoundingPolicy.Manage` + `IRoundingPolicySettingAppService` đã HOÃN (`D-222`).** WP-16 **không** thêm
+> permission/app service Pricing nào; đổi chính sách làm tròn/thiếu giá qua ABP `setting-management/*`
+> (`src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs:73`). Không đổi `PricingPermissions` trong WP-16.
 
-| Setting | Kiểu | Mặc định | Ai được đổi | Nguồn |
-|---|---|---|---|---|
-| `eCommerce.Money.RoundingPolicy` | `AwayFromZero` \| `ToEven` | `AwayFromZero` | **Admin tenant**, **có audit**, **không hồi tố** | `XC-001` §9/BR-004 |
-| `eCommerce.Money.DefaultCurrency` | mã ISO | `VND` | Chỉ host admin | `XC-001` §9 |
-| `eCommerce.Pricing.MissingPricePolicy` | `Throw` \| `FallbackToBase` | `Throw` | Admin tenant | `PRC-001` D14 |
-| `eCommerce.Pricing.TierSelectionStrategy` | `UseByPriority` \| `LowestPrice` | `UseByPriority` | Admin tenant | **mới** — ADR-14 (**Q4** §15.1) |
+**Setting của module Pricing** *(khai trong `PricingSettingDefinitionProvider` — `PRC-002-arch.md` §2.2; đọc **một lần** ở B1 `ChinhSachSnapshot`)*
+
+| Setting | Kiểu giá trị | Mặc định | Hợp lệ | Phạm vi | Ai được đổi · nguồn |
+|---|---|---|---|---|---|
+| `Pricing:RoundingPolicyCode` | chuỗi mã policy | `half-away-from-zero` | **Chỉ** `half-away-from-zero`; giá trị khác (`none`, rỗng, lạ) ⇒ **dùng mặc định** + cảnh báo, **không** ném (`D-221`: allowlist = {`half-away-from-zero`}; **loại** `none`) | `Application \| Tenant` | Qua `setting-management/*`; cấp quyền Pricing riêng **hoãn** (`D-222`). Đổi **phải** có vết audit (`XC-001` BR-004) — `W16-4` đo. Nguồn: `D-218` ①(1), `D-221` |
+| `Pricing:MissingPricePolicy` | chuỗi tên enum | `NemLoi` | `NemLoi` · `DungGiaNiemYet` | `Application \| Tenant` | Qua `setting-management/*` (host/tenant admin). Nguồn: `D-218` ①(1) |
+| `Pricing:MaxTiersPerSet` | số nguyên dạng chuỗi | `20` | số nguyên `≥ 1`; `0`/âm/không phải số ⇒ **dùng `20`** + cảnh báo (`D-224`) | `Application \| Tenant` | Qua `setting-management/*` (host/tenant admin — kỹ thuật). Nguồn: `D-218` ①(2), `D-224` |
+| `Pricing:OrderTotalNegativePolicy` | chuỗi tên enum (append cuối dải) | `Reject` | `Reject` · `Clamp` | `Application \| Tenant` | Qua `setting-management/*`; **giá trị** do kế toán trưởng duyệt lô trước release (M4). Nguồn: `D-219` |
+| `eCommerce.Money.DefaultCurrency` *(của `XC-001`, giữ để tham chiếu)* | mã ISO | `VND` | mã ISO hợp lệ | Host | Chỉ host admin — `XC-001` §9 |
 
 > ⚠️ **Bắt buộc khi code (đã có tiền lệ lỗi thật):**
 > 1. `[Authorize]` **cấp CLASS** cho **mọi** app service — `XC-004` D3; lỗi đã xảy ra thật và được ghi lại tại
@@ -741,7 +752,7 @@ public static class TierPriceLockKeys
 | **Bảng "bậc theo SKU" (dạng bậc thang)** | trực quan hoá 3–5 bậc của một SKU + cảnh báo **gián đoạn** (khoảng trống giữa các bậc) | `TierPriceDto[]` (sắp theo `MinQuantity`) | chỉ đọc; cảnh báo giúp phát hiện cấu hình thiếu bậc |
 | **Nút "Vì sao giá này?"** | đơn giá cuối + **bậc thắng** + danh sách ứng viên + **8 bước pipeline** + mã chính sách làm tròn | `PriceBreakdownDto` (`FinalUnitPrice`, `WinningTier`, `RoundingPolicyCode`, `Steps`) | chỉ đọc; đây là công cụ **gỡ tranh cãi** "sao khách này rẻ hơn" |
 | **Màn hình nhập bậc thang hàng loạt** | chọn kênh + tải tệp + xem trước + kết quả | `ImportResultDto` (`TotalRows`, `ImportedRows`, `FailedRows[]`) | **bắt buộc** hiển thị `IdempotencyKey` đã sinh; nút **Chạy lại** phải dùng **cùng** khoá |
-| **Màn hình chính sách làm tròn** | policy hiện tại · ai đổi gần nhất · khi nào | `RoundingPolicyDto` | **chỉ** vai trò kế toán trưởng; có ghi chú cảnh báo **"không hồi tố"** |
+| **Màn hình chính sách làm tròn** | ⏸ **HOÃN — `D-222`**: **không** có `RoundingPolicyDto`, **không** màn riêng | — (đổi qua ABP `setting-management/*`) | Yêu cầu `XC-001` BR-004 (ai · khi nào · giá trị cũ/mới) **giữ** làm điều kiện `W16-4` đo trên `setting-management`; chưa đạt ⇒ nợ có chủ + **chặn release** (`D-226`) |
 
 **Quy tắc hiển thị (kế thừa `XC-001` §10 — bắt buộc):**
 
@@ -784,12 +795,14 @@ public static class TierPriceLockKeys
 | **Không có giá ở mọi cấp** và policy = `Throw` | thiếu cấu hình giá | **NÉM** `eCommerce:Pricing:0004` kèm `Sku`/`ChannelCode`/`At` | `409` + danh sách SKU thiếu giá |
 | **Hai bậc cùng `MinQuantity`** | cấu hình trùng | **NÉM** `eCommerce:Pricing:0008` — **cấm** chọn ngẫu nhiên (BR-005) | `409` |
 | **`PercentOff` > 100 hoặc < 0** | nhập sai | **NÉM** `eCommerce:Pricing:0009` (và **CHECK DB** chặn) | `400` |
-| **Chồng khung hiệu lực cùng phạm vi** | hai người tạo hai bộ cùng kỳ | **NÉM** `eCommerce:Pricing:0010` khi `Approve`; ⚠️ **không** có hàng rào DB cho luật "một bộ Active" ⇒ **F8** | `409` |
+| **Chồng khung hiệu lực cùng phạm vi** | hai người tạo hai bộ cùng kỳ | **NÉM** `eCommerce:Pricing:0013` khi `Approve` (mã **append sau `0012`**; `0010` đã cấp cho tổng âm); ⚠️ **không** có hàng rào DB cho luật "một bộ Active" ⇒ **F8** | `409` |
 | **Khác `Currency`** (bậc VND, kênh USD) | chưa có tỷ giá | **NÉM** `eCommerce:Pricing:0005` — **cấm** tự quy đổi (BR-018) | `409` |
 | **Làm tròn ra 0 đồng** (ví dụ 0,4 đồng với VND) | chia nhỏ quá mức | Trả `Money.Zero` — **không phải lỗi** (`XC-001` §12) | `200` |
 | **`quantity` = 0 hoặc âm** | dữ liệu vào sai | **Từ chối** ở validation DTO (`400`) — **không** rơi vào bậc nào | `400` |
 | **`quantity` lớn hơn mọi bậc** | mua sỉ số lượng lớn | Chọn bậc có `MinQuantity` **lớn nhất** ≤ `quantity`; nếu **không** bậc nào ≤ ⇒ dùng giá cơ sở (A1) | `200` |
 | **`Σ dòng đã làm tròn ≠ tổng`** | lỗi thuật toán/`MoneyAllocator` | **NÉM `InvalidOperationException`** ⇒ `0012` (`500`) + log `Error` + `CorrelationId`; **không** trả tiền chưa kiểm chứng | `500` |
+| **Tổng đơn âm** (giảm giá cấp đơn > thành tiền) | giảm giá/khuyến mãi vượt thành tiền | Theo `Pricing:OrderTotalNegativePolicy` (snapshot B1): **`Reject` (mặc định)** ⇒ **NÉM** `eCommerce:Pricing:0010` kèm `tong`, `giamGiaCapDon`, `phi`; **tổng = 0 vẫn hợp lệ**. **`Clamp`** ⇒ kẹp giảm cấp đơn ≤ thành tiền ⇒ tổng ≥ 0, `KetQuaTinhTien` mang `BiKep`/`SoKep` + `LogWarning` (`D-223`). **`AllowNegative` bị cấm** (`D-219`) | `409` (đăng ký trong `AbpExceptionHttpStatusCodeOptions`; ABP mặc định `403` — `src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs:291`) |
+| **Thêm bậc khi bộ đã đủ `Pricing:MaxTiersPerSet`** | cấu hình vượt ngưỡng vận hành | **NÉM** `eCommerce:Pricing:0011` ở `AddTierAsync` (sau guard trùng `MinQuantity`) kèm `tierPriceSetId`, `soBacHienTai`, `toiDa`; hạ ngưỡng **không hồi tố** (bộ đã vượt vẫn `Publish`/`Activate` được) | `409` |
 | **`Σ trọng số phân bổ = 0`** | dữ liệu giảm giá sai | **NÉM** `eCommerce:Money:0003` (`XC-001` E3) | `400` |
 | **Trọng số phân bổ âm** | dữ liệu sai | **NÉM** `eCommerce:Money:0005` — không hỗ trợ (`XC-001` Q6) | `400` |
 | **`ExternalRef` trùng nhưng `Amount` khác** | import lại tệp đã sửa | **NÉM** `eCommerce:Messaging:0002` (`XC-002` BR-006) — **cấm** ghi đè im lặng | `409` |
@@ -856,12 +869,12 @@ nếu đơn rollback thì **không** còn bản ghi giải trình mồ côi.
 | **TC-11** | Không so tiền bằng `==` | Unit (quét mã nguồn) | `modules/Pricing/**/*.cs` | **0** match | **BR-003**, NFR-004 |
 | **TC-12** | Không làm tròn ngoài policy | Unit (quét mã nguồn) | `decimal.Round` / `Math.Round` trong `modules/Pricing` | **0** match | **BR-007**, NFR-005 |
 | **TC-13** | Chỉ làm tròn tại R1–R4 | Unit (quét + test hành vi) | mọi lời gọi `IRoundingPolicy` trong 1 lần tính | **đúng 4** lời gọi ở **đúng** 4 điểm | **BR-009** |
-| **TC-14** | Tiền tệ: sai định dạng / khác nhau | Unit | `"vnd"`, `"XXX"`, bậc VND vs kênh USD | `0011`/`0005`; CHECK DB từ chối `"vnd"` | **BR-001**, **BR-018** |
+| **TC-14** | Tiền tệ: sai định dạng / khác nhau | Unit | `"vnd"`, `"XXX"`, bậc VND vs kênh USD | (a) `Currency.FromCode("vnd")` + `Money.Cua(1000m, …)` ⇒ `Currency.Code = "VND"`, **không ném** (registry `StringComparer.OrdinalIgnoreCase` + `Trim()`, `Currency.cs:24,69`)<br>(b) `Currency.FromCode("XXX")` (chưa đăng ký) ⇒ **`eCommerce:Money:0003`** (`UnsupportedCurrency`, `MoneyErrorCodes.cs:16`)<br>(c) cộng/so sánh hai `Money` khác tiền tệ (bậc VND vs kênh USD) ⇒ **`eCommerce:Money:0001`** (`CurrencyMismatch`, `Money.cs:49-57`)<br>(d) **không** có CHECK `^[A-Z]{3}$` trên bảng của `PRC-002` — ràng buộc chỉ ở `PrcCostPrices` (`CK_PrcCostPrices_Currency_HopLe`, WP-17, `PricingDbContextModelCreatingExtensions.cs:113`) | **BR-001**, **BR-018** |
 | **TC-15** | Sổ giải trình **append-only** + có bản ghi | **Integration** | gọi `CalculateAsync` rồi thử sửa/xoá bản ghi | có bản ghi; **cấm** API sửa/xoá | **BR-020**, NFR-012 |
 | **TC-16** | Tái lập kết quả | Unit | chạy 1.000 lần cùng input | **1 kết quả** (so `ToMinorUnits()`) | **BR-019**, NFR-007 |
 | **TC-17** | Chuyển trạng thái **sai** ⇒ **NÉM** | Unit | `UpdateDraft` trên bộ `Active` | `BusinessException` `eCommerce:Pricing:0003` | **BR-015** |
 | **TC-18** | Phát hành bộ **rỗng** | Unit | `Approve()` khi 0 bậc | `BusinessException` `eCommerce:Pricing:0002` | **BR-015** |
-| **TC-19** | Hai bộ `Active` cùng phạm vi | **Integration** | phát hành bộ thứ hai cùng `(Scope, ChannelCode)` chồng khung | **NÉM** `0010`/`0001`; **DB vẫn giữ 1** bản ghi hợp lệ | **F8** §15.2 |
+| **TC-19** | Hai bộ `Active` cùng phạm vi | **Integration** | phát hành bộ thứ hai cùng `(Scope, ChannelCode)` chồng khung | **NÉM** `0013` (`0001` chỉ khi kịch bản đồng thời có ứng viên trùng `Priority`, **không** thay `0013`); **DB vẫn giữ 1** bản ghi hợp lệ | **F8** §15.2 |
 | **TC-20** | Đổi bậc **không** đổi đơn đã đặt | **Integration** | tạo đơn với giá X → đổi/tạo bộ mới → đọc lại đơn | `OrdOrderLines.UnitPrice` **vẫn X** | §8.1 #11 |
 | **TC-21** | Giá vốn **không** lộ ra DTO công khai | Unit (reflection) | duyệt DTO của endpoint storefront | **0** trường giá vốn; **0** trong `PriceBreakdownDto` | **BR-021** |
 | **TC-22** | Tên khoá phân tán **đúng** quy ước | Unit (quét) | so `TierPriceLockKeys.*` + literal trong Pricing | khoá **không** chứa tiền tố `ecommerce:`; **0** literal `channel:` trong Pricing | **ADR-12**, `XC-003` BR-002 |
@@ -1064,6 +1077,8 @@ public class TierPriceSetStateMachineTests
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.1 | 14/10/2026 | *(điền)* | Bản nháp đầu — **14 ADR** · **21 BR** · **12 NFR** · **30 test case** · 3 sơ đồ Mermaid (state machine §3 · sequence §4.1 · ERD §5.1) · §4.2 chốt **8 bước pipeline + 4 điểm làm tròn R1–R4**. **Mọi khẳng định về code đều có đường dẫn file đã kiểm**: module `Pricing`/`TierPrice`/`Money` **chưa có** (`grep` 0 match) ⇒ §5/§6/§11 là **kế hoạch GĐ1**; ghi nhận **F1–F9**, trong đó **F3** là **mâu thuẫn thật giữa `PRC-001` và `XC-003`** về tiền tố khoá phân tán (đã chốt theo `XC-003` + code thật tại `eCommerceHttpApiHostModule.cs:127`) |
+| v0.8 | 25/11/2026 | *(agent BA, phiên N72/WP-16)* | Đồng bộ SRS với thiết kế đã duyệt `PRC-002-arch.md` (`DOC-OK` vòng 2): **§20.3** — guard tổng âm thành chính sách theo tenant `Pricing:OrderTotalNegativePolicy` (`Reject` mặc định **NÉM** `0010`; `Clamp` mang `BiKep`/`SoKep`; cấm `AllowNegative`) theo `D-219`; **§12** — "chồng khung hiệu lực" đổi sang mã **`0013`**, thêm dòng `0010` (tổng âm) + `0011` (vượt `MaxTiersPerSet`); **§9** — đúng **4 khoá setting** của `D-218` (bỏ tên cũ `Money.RoundingPolicy`/`MissingPricePolicy = Throw\|FallbackToBase`/`TierSelectionStrategy`), allowlist làm tròn `D-221`, `MaxTiersPerSet` 0/âm/sai ⇒ 20 `D-224`; **§6.1** — bỏ `IRoundingPolicySettingAppService` + 2 method, đường ghi = ABP `setting-management/*` (`D-222`) |
+| v0.9 | 25/11/2026 | *(agent BA, phiên N72/WP-16)* | Đồng bộ nghĩa mã lỗi + dọn bề mặt chính sách làm tròn: **§1 E6** `0010`→**`0013`** (chồng khung), **E7** không ném khi `RoundingPolicyCode` lạ/rỗng/`none` (`D-221`), thêm **E12** (tổng âm ⇒ `0010`) + **E13** (vượt `MaxTiersPerSet` ⇒ `0011`); **§3** dòng 3 đổi `0010`→`0013`; **§6.2** sửa thông điệp `0010`/`0011` + thêm dòng `0013`; **§14** TC-14 (`"vnd"` ⇒ `eCommerce:Money:0002`) + TC-19 (`0013`); **§1 A7** → `Pricing:RoundingPolicyCode` + ABP `setting-management/*`, **§4.2 B1** bỏ `TierSelectionStrategy` thêm `OrderTotalNegativePolicy`, **§6.2 REST** xoá `rounding-policy`, **§10** màn chính sách HOÃN (`D-225`/`D-226`) |
 
 ---
 
@@ -1328,17 +1343,24 @@ Trong phép đo #6 (giỏ `3` đồng, giảm giá cấp đơn `10.000`, phí `5
 **Hậu quả:** giảm giá cấp đơn **lớn hơn** thành tiền của giỏ ⇒ hệ thống (về mặt số học) **phải TRẢ TIỀN cho khách**.
 Nếu tầng thanh toán/đối soát tin vào con số này thì **tiền ĐI RA** khỏi hệ thống (hoặc lệch sổ) mà **không bị chặn ở đâu**.
 
-🚨 **KHÔNG tự sửa** — đây là **LUẬT NGHIỆP VỤ**, có **ít nhất 3 cách xử lý KHÁC NHAU**:
+✅ **ĐÃ CHỐT — `D-219` (25/11/2026).** Guard tổng âm là **chính sách cấu hình theo tenant** `Pricing:OrderTotalNegativePolicy`,
+enum **append cuối dải** với **hai** giá trị:
 
-| Cách | Hành vi | Hệ quả |
-|---|---|---|
-| **(a) Kẹp** giảm giá về tối đa bằng thành tiền | tổng ≥ 0 | thông dụng nhất; nhưng khách **tưởng** được giảm nhiều hơn thực tế |
-| **(b) TỪ CHỐI** đơn (NÉM lỗi) | buộc người nhập sửa | an toàn nhất về tiền; nhưng chặn cả ca **hợp lệ** (đơn 0 đồng có phí) |
-| **(c) Cho phép âm** (coi như phiếu hoàn tiền/credit) | tổng âm là **hợp lệ** | **PHẢI** có chứng từ hoàn tiền + đối soát riêng, **không** lẫn vào đơn bán |
+| Giá trị | Hành vi |
+|---|---|
+| `Reject = 0` (**mặc định**) | Tổng < 0 ⇒ **NÉM** `eCommerce:Pricing:0010` kèm `WithData(tong, giamGiaCapDon, phi)`. **Tổng = 0 vẫn hợp lệ** (đơn 0 đồng + có phí **không** bị chặn). |
+| `Clamp = 1` | Giảm giá cấp đơn kẹp về **không vượt thành tiền** ⇒ tổng ≥ 0. `KetQuaTinhTien` mang `BiKep`/`SoKep` (**init-only**); app service ghi `LogWarning` (hàm `TinhTienDon` **thuần, không I/O** — `D-223`). |
 
-⇒ Chọn sai = **sai tiền**. **CẦN NGƯỜI QUYẾT.** Hiện trạng được **ghi nhận bằng test**
-(`TONG_DON_CO_THE_AM__khong_co_guard__day_la_LO_HONG_TIEN_CAN_NGUOI_QUYET`) ⇒ khi guard được thêm, test **ĐỎ**
-và buộc cập nhật tài liệu + chọn cách xử lý **tường minh**.
+`TinhTienDon` nhận chính sách qua **overload additive** (chữ ký cũ giữ nguyên, uỷ quyền `Reject`, XML doc ghi rõ);
+`PriceCalculationAppService` truyền giá trị đọc **một lần** ở B1 `ChinhSachSnapshot`.
+
+🚫 **Không có `AllowNegative`:** phương án (c) "cho phép âm" **bị cấm** (`D-219`) cho tới khi có **đường chứng từ hoàn tiền + đối soát riêng**
+(việc kế toán, M4). Muốn mở sau ⇒ thêm **một giá trị enum append**, không sửa hành vi cũ.
+
+**Test:** `TONG_DON_CO_THE_AM__khong_co_guard__day_la_LO_HONG_TIEN_CAN_NGUOI_QUYET` (`test/eCommerce.Tests/Pricing/TinhTienDonTests.cs:179-204`)
+**được thay** bằng **3 ca tường minh**: mặc định `Reject` NÉM · `Clamp` cho tổng ≥ 0 + `BiKep` · tổng 0 + có phí vẫn pass — số ca **tăng**, không nới test.
+
+> 📌 §20.4 #3 và §21.3 #2 vẫn ghi "CẦN NGƯỜI QUYẾT" vì là **ảnh chụp lịch sử 15/10/2026**; nội dung **hiệu lực** là mục này (`D-219`).
 
 ### 20.4 Còn lại của `PRC-002`
 
@@ -1401,3 +1423,21 @@ khách/kế toán hỏi** *"vì sao đơn này giá này?"*. **Bằng chứng t�
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.7 | 15/10/2026 | *(agent, session GĐ1)* | **Lát cắt 6 — tra sổ giải trình**: `GET /so-giai-trinh` (trả **đúng payload đã lưu**, `0004` nếu không có) + `GET /lich-su-giai-trinh` (tóm tắt, lọc theo ngày). 🚨 **Sửa quy ước REST**: đổi tên phương thức để ABP map **`GET`** thay vì **`POST`** (*tra cứu bằng POST là sai quy ước*). **Kiểm chứng HTTP 7 phép đo**, gồm: tra sổ **khớp** kết quả đã tính · có **cấp thắng + nguồn + mã chính sách làm tròn** · `0004` khi khoá lạ · **`CreationTime ≠ CalculatedAt`** · `Payload` **635 ký tự** trong DB thật |
+
+## 22. TRẠNG THÁI TRIỂN KHAI — WP-16 (F3 BE: 4 hạng mục)
+
+**Phiên N72 · hàng W16-2 · ngày 25/11/2026 · SHA:** *(để trống — chưa commit)*
+
+| # | Hạng mục | Trạng thái | Tệp chính |
+|---|---|---|---|
+| A | Setting + hàm đọc thuần (`PRC002SettingTenKhoa`, `ChinhSachTongDonAm`, `PricingChinhSach`, `PricingSettingDefinitionProvider`) | ✅ xong | `modules/Pricing/eCommerce.Pricing.Domain/PricingChinhSach.cs`, `PricingSettingDefinitionProvider.cs` |
+| B | `ChinhSachSnapshot` mở rộng additive (tham số cuối có mặc định) | ✅ xong | `modules/Pricing/eCommerce.Pricing.Domain/ChonDonGiaCuoi.cs` |
+| C | `TinhTienDon` overload 5 tham số + Reject/Clamp (`BiKep`/`SoKep`) | ✅ xong | `modules/Pricing/eCommerce.Pricing.Domain/TinhTienDon.cs` |
+| D | Mã lỗi mới: `0010` (`TongDonAm`), `0011` (`VuotSoBacToiDa`) | ✅ xong | `modules/Pricing/eCommerce.Pricing.Domain/PricingErrorCodes.cs` |
+| E | `PriceCalculationAppService`: đọc setting **một lần** ở B1 + clamp log | ✅ xong | `modules/Pricing/eCommerce.Pricing.Application/PriceCalculationAppService.cs` |
+| F | `TierPriceSetAppService.AddTierAsync`: guard `Pricing:MaxTiersPerSet` | ✅ xong | `modules/Pricing/eCommerce.Pricing.Application/TierPriceSetAppService.cs` |
+
+- **0 migration**, 0 đổi schema, 0 đổi unique index (đúng `D-218`).
+- Không đổi DTO/route/chữ ký `IPriceCalculationAppService`/`ITierPriceSetAppService`; không thêm app service cấu hình.
+- 📌 Ghi chú kỹ thuật: ABP **10.7 không còn enum `SettingScopes`** (đã bị bỏ khỏi API) — phạm vi `Application | Tenant` được khai bằng `SettingDefinition.WithProviders(...)` gồm `DefaultValue`/`Configuration`/`Global`/`Tenant`, **loại trừ** `User` (U).
+- ⚠️ **Thay đổi hành vi có chủ ý** (`D-219`): `TinhTienDon.Tinh` (chữ ký 4 tham số) nay uỷ quyền `Reject` ⇒ giỏ có giảm giá vượt thành tiền **NÉM `eCommerce:Pricing:0010`** thay vì trả tổng âm. Ca tripwire cũ `TONG_DON_CO_THE_AM__khong_co_guard__...` trong `test/eCommerce.Tests/Pricing/TinhTienDonTests.cs` **ĐỎ** đúng như thiết kế (`-arch` §6.3) — vai `qa` thay bằng 3 ca 3a/3b/3c; BE **không** sửa `test/**`.

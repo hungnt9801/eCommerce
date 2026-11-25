@@ -44,6 +44,18 @@ public static class PricingErrorCodes
     /// **nhập liệu** làm sổ mã lỗi phình và client phải xử lý 5 nhánh giống nhau.
     /// </summary>
     public const string GiaVonKhongHopLe = "eCommerce:Pricing:0009";
+
+    /// <summary>
+    /// **Tổng đơn âm** (`PRC-002` `D-219`): chính sách `Reject` và tổng thanh toán `&lt; 0` (giảm giá cấp đơn vượt
+    /// thành tiền) ⇒ **NÉM** kèm `tong`/`giamGiaCapDon`/`phi` để người nhập sửa. 📌 Tổng `= 0` **hợp lệ**.
+    /// </summary>
+    public const string TongDonAm = "eCommerce:Pricing:0010";
+
+    /// <summary>
+    /// **Vượt số bậc tối đa** (`PRC-002` `D-218`): thêm bậc vượt `Pricing:MaxTiersPerSet` ⇒ **NÉM** kèm
+    /// `tierPriceSetId`/`soBacHienTai`/`toiDa`. 📌 Guard vận hành, **không** phải bất biến dữ liệu.
+    /// </summary>
+    public const string VuotSoBacToiDa = "eCommerce:Pricing:0011";
 }
 
 /// <summary>

@@ -89,16 +89,29 @@ public class PricingSettingDefinitionProvider : SettingDefinitionProvider
     {
         // Phạm vi: Application (giá trị host-level, đường ghi sẵn có: ISettingManager.SetGlobalAsync)
         //          + Tenant (D-218: "cấu hình theo tenant").
-        var phamVi = SettingScopes.Application | SettingScopes.Tenant;
+        // 📌 ABP 10.7 KHÔNG còn enum `SettingScopes` và ctor `SettingDefinition` không có tham số `scopes`;
+        //    phạm vi khai qua `WithProviders(...)`.
+        var phamVi = new[]
+        {
+            DefaultValueSettingValueProvider.ProviderName,
+            ConfigurationSettingValueProvider.ProviderName,
+            GlobalSettingValueProvider.ProviderName,
+            TenantSettingValueProvider.ProviderName
+        };
 
         context.Add(
-            new SettingDefinition(PRC002SettingTenKhoa.ChinhSachLamTron,  "half-away-from-zero", scopes: phamVi),
-            new SettingDefinition(PRC002SettingTenKhoa.ThieuGia,          "NemLoi",              scopes: phamVi),
-            new SettingDefinition(PRC002SettingTenKhoa.SoBacToiDa,        "20",                  scopes: phamVi),
-            new SettingDefinition(PRC002SettingTenKhoa.TongDonAm,         "Reject",              scopes: phamVi));
+            new SettingDefinition(PRC002SettingTenKhoa.ChinhSachLamTron,  "half-away-from-zero").WithProviders(phamVi),
+            new SettingDefinition(PRC002SettingTenKhoa.ThieuGia,          "NemLoi").WithProviders(phamVi),
+            new SettingDefinition(PRC002SettingTenKhoa.SoBacToiDa,        "20").WithProviders(phamVi),
+            new SettingDefinition(PRC002SettingTenKhoa.TongDonAm,         "Reject").WithProviders(phamVi));
     }
 }
 ```
+
+📌 **Phạm vi tương đương `Application | Tenant`:** bốn provider trên gồm `DefaultValue` (giá trị mặc định trong code), `Configuration`
+(`appsettings`), `Global` (host-level, ghi qua `SetGlobalAsync`) và `Tenant` — tức đúng tập **host-level + theo tenant**, **loại trừ
+`User`**. Muốn cho phép ghi đè theo **từng người dùng** thì phải nói rõ và thêm `UserSettingValueProvider` — **WP-16 KHÔNG cho** để
+chính sách giá bị đổi theo user. Cột "Tenant-scoped" ở bảng dưới giữ nguyên `Application \| Tenant` (✅).
 
 | Khoá setting | Kiểu giá trị (chuỗi, `InvariantCulture`) | Mặc định | Hợp lệ | Tenant-scoped |
 |---|---|---|---|---|
@@ -158,7 +171,8 @@ public static class PricingChinhSach
 - Nguyên tắc **"dữ liệu cấu hình cũng là dữ liệu vào"** (tiền lệ `ChinhSach.cs:114-120`): giá trị lạ/âm/rỗng ⇒ **không ném**,
   trả **mặc định an toàn** + `hopLe = false` để chỗ gọi **ghi cảnh báo**. Riêng đường **ghi** (nếu sau này có app service) phải **NÉM**
   — tiền lệ `src/eCommerce.Application/Inventory/ChinhSachHanMucAppService.cs:118-124`.
-- Số bậc dùng `ChinhSach.DocSo` của Kernel (`shared/eCommerce.Kernel/Settings/ChinhSach.cs:192-207`) để **không** nhận dấu phẩy thập phân
+- Số bậc dùng `eCommerce.Settings.ChinhSach.DocSo` của Kernel (`shared/eCommerce.Kernel/Settings/ChinhSach.cs:192-207`; tệp nằm ở
+  `Kernel/Settings` nhưng **namespace là `eCommerce.Settings`**) để **không** nhận dấu phẩy thập phân
   (`"0,5"` từng bị đọc thành `5`) và **không** nhận số âm.
 
 ---

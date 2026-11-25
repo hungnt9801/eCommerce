@@ -1,4 +1,5 @@
 using eCommerce.Kernel.Money;
+using Volo.Abp;
 
 namespace eCommerce.Pricing;
 
@@ -35,6 +36,15 @@ public sealed record KetQuaTinhTien(
 {
     /// <summary>Số dòng — dùng để test/báo cáo nhanh.</summary>
     public int SoDong => CacDong.Count;
+
+    /// <summary>
+    /// 🆕 `PRC-002` `D-219` — `true` khi chính sách `Clamp` **đã kẹp** giảm giá cấp đơn về không vượt thành tiền.
+    /// 📌 Đây là **tín hiệu** để chỗ gọi `LogWarning`; `Clamp` không ném nên dữ liệu đi qua kết quả, giữ hàm thuần.
+    /// </summary>
+    public bool BiKep { get; init; }
+
+    /// <summary>Số lần kẹp (`0` hoặc `1`) — hiện chỉ có tối đa một khoản cấp đơn bị kẹp.</summary>
+    public int SoKep { get; init; }
 }
 
 /// <summary>Đầu vào tính tiền cho một dòng (đơn giá đã chọn ở B5 — **chưa** làm tròn).</summary>
@@ -70,11 +80,35 @@ public static class TinhTienDon
     /// <param name="giamGiaCapDon">Tổng giảm giá cấp đơn (phân bổ theo trọng số thành tiền từng dòng).</param>
     /// <param name="phiCapDon">Tổng phí cấp đơn (phân bổ cùng cách).</param>
     /// <param name="chinhSach">Chính sách làm tròn — **một** cho cả lần tính (ADR-08).</param>
+    /// <remarks>
+    /// 🆕 `PRC-002` `D-219` — chữ ký **CŨ giữ nguyên tuyệt đối**, uỷ quyền cho <see cref="ChinhSachTongDonAm.Reject"/>
+    /// ⇒ hành vi trước WP-16 (ném `eCommerce:Pricing:0010` khi tổng âm thay vì trả số âm).
+    /// </remarks>
     public static KetQuaTinhTien Tinh(
         IReadOnlyList<DongCanTinh> cacDong,
         Money giamGiaCapDon,
         Money phiCapDon,
         IRoundingPolicy chinhSach)
+        => Tinh(cacDong, giamGiaCapDon, phiCapDon, chinhSach, ChinhSachTongDonAm.Reject);
+
+    /// <summary>
+    /// Tính tiền cho cả đơn với **chính sách tổng đơn âm** (`PRC-002` `D-219`).
+    /// </summary>
+    /// <param name="cacDong">Các dòng hàng (đơn giá đã chọn ở B5, **chưa** làm tròn).</param>
+    /// <param name="giamGiaCapDon">Tổng giảm giá cấp đơn (phân bổ theo trọng số thành tiền từng dòng).</param>
+    /// <param name="phiCapDon">Tổng phí cấp đơn (phân bổ cùng cách).</param>
+    /// <param name="chinhSach">Chính sách làm tròn — **một** cho cả lần tính (ADR-08).</param>
+    /// <param name="chinhSachTongDon">
+    /// `Reject`: tổng `&lt; 0` ⇒ **NÉM** `PricingErrorCodes.TongDonAm` (tổng `= 0` hợp lệ).
+    /// `Clamp`: giảm giá cấp đơn `&gt;` thành tiền ⇒ **kẹp** về thành tiền **trước** phân bổ R2 ⇒ tổng `≥ 0`,
+    /// kết quả mang `BiKep = true`, `SoKep = 1`.
+    /// </param>
+    public static KetQuaTinhTien Tinh(
+        IReadOnlyList<DongCanTinh> cacDong,
+        Money giamGiaCapDon,
+        Money phiCapDon,
+        IRoundingPolicy chinhSach,
+        ChinhSachTongDonAm chinhSachTongDon)
     {
         ArgumentNullException.ThrowIfNull(cacDong);
         ArgumentNullException.ThrowIfNull(chinhSach);
@@ -111,10 +145,24 @@ public static class TinhTienDon
 
         var tongTruocGiam = thanhTien.Aggregate(Money.Zero(loaiTien), (a, b) => a + b);
 
+        // ── 🆕 CLAMP (D-219): kẹp giảm giá cấp đơn ≤ thành tiền TRƯỚC khi phân bổ R2 ────────────
+        // 📌 Kẹp SAU phân bổ sẽ làm Σ phần không còn khớp khoản gốc, và thuế R4 tính trên số CHƯA kẹp
+        // ⇒ hoá đơn tự mâu thuẫn. Phải kẹp ở đây, rồi dùng `giamGiaHieuLuc` cho phân bổ.
+        var biKep = false;
+        var soKep = 0;
+        var giamGiaHieuLuc = giamGiaCapDon;
+
+        if (chinhSachTongDon == ChinhSachTongDonAm.Clamp && giamGiaCapDon.Amount > tongTruocGiam.Amount)
+        {
+            giamGiaHieuLuc = tongTruocGiam;
+            biKep = true;
+            soKep = 1;
+        }
+
         // ── R2/R3: PHÂN BỔ giảm giá & phí theo trọng số THÀNH TIỀN, rồi làm tròn TỪNG PHẦN ───────
         var trongSo = thanhTien.Select(t => t.Amount).ToList();
 
-        var giamGiaTungDong = PhanBoVaTron(giamGiaCapDon, trongSo, loaiTien, chinhSach);
+        var giamGiaTungDong = PhanBoVaTron(giamGiaHieuLuc, trongSo, loaiTien, chinhSach);
         var phiTungDong = PhanBoVaTron(phiCapDon, trongSo, loaiTien, chinhSach);
 
         // ── R4: THUẾ THEO TỪNG DÒNG, làm tròn TỪNG DÒNG ─────────────────────────────────────────
@@ -142,8 +190,22 @@ public static class TinhTienDon
         var tongThue = cacDongKetQua.Aggregate(Money.Zero(loaiTien), (a, d) => a + d.Thue);
         var tongThanhToan = cacDongKetQua.Aggregate(Money.Zero(loaiTien), (a, d) => a + d.ThanhTienSauGiam + d.Thue);
 
+        // ── 🆕 REJECT (D-219): tổng < 0 ⇒ NÉM. Tổng = 0 là HỢP LỆ (đơn 0 đồng + phí vẫn đi được) ──
+        // 📌 Kiểm trên TỔNG ĐÃ TÍNH XONG (không side effect) để giữ hàm thuần; `tongThanhToan` không âm khi Clamp.
+        if (chinhSachTongDon == ChinhSachTongDonAm.Reject && tongThanhToan.Amount < 0m)
+        {
+            throw new BusinessException(PricingErrorCodes.TongDonAm)
+                .WithData("tong", tongThanhToan.Amount)
+                .WithData("giamGiaCapDon", giamGiaCapDon.Amount)
+                .WithData("phi", phiCapDon.Amount);
+        }
+
         return new KetQuaTinhTien(
-            cacDongKetQua, tongTruocGiam, tongGiamGia, tongPhi, tongThue, tongThanhToan, chinhSach.Ten);
+            cacDongKetQua, tongTruocGiam, tongGiamGia, tongPhi, tongThue, tongThanhToan, chinhSach.Ten)
+        {
+            BiKep = biKep,
+            SoKep = soKep
+        };
     }
 
     /// <summary>
