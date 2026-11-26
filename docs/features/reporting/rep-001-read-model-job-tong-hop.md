@@ -8,7 +8,7 @@
 | **Ưu tiên** | **Must have** — là **nền** của `REP-002`, `REP-003`, `ACC-001` |
 | **Trạng thái** | 🟡 `Draft` — chờ review |
 | **Người viết / người review** | *(điền)* / **Kiến trúc trưởng + Kế toán** |
-| **Phiên bản / ngày** | `v0.1 — 13/10/2026` |
+| **Phiên bản / ngày** | `v0.4 — 27/11/2026` |
 | **Tài liệu liên quan** | `XC-001` (Money/làm tròn) · `XC-002` (outbox/inbox, ETO, `AggregateVersion`) · `XC-003` (khoá phân tán) · `XC-005` (log/metric) · `XC-006` (thuế GTGT, Mẫu 01) · `REP-002` · `REP-003` · `ACC-001` · `INV-001` (ledger append-only) · `SHP-002/003/004` (nguồn dữ liệu COD — có cảnh báo bảo mật) · `docs/implementation-plan.md` · `docs/structure-and-techstack.md` |
 
 ---
@@ -40,22 +40,22 @@ idempotency, và cách phát hiện **lệch số** thay vì để nó im lặng
 | Hàm thuần định nghĩa tiền | ✅ `TongHopDoanhThu.TinhDoanhThuChungTu` = `Σ thành tiền dòng − chiết khấu chứng từ` (D-48) | `modules/Reporting/eCommerce.Reporting.Domain/BaoCao/TongHopDoanhThu.cs:72-100` |
 | Mapping nguồn (POS + đơn) | ✅ `AnhXaNguonBanHang` — POS `RetailBillLine`, đơn `OrderLine` (loại VAT khỏi thành tiền dòng) | `modules/Reporting/eCommerce.Reporting.Application/AnhXaNguonBanHang.cs:29-120` |
 | API báo cáo | ✅ `ReportAppService` — `/api/v1/reports/**`, quyền `eCommerce.Reports` | `modules/Reporting/eCommerce.Reporting.Application/ReportAppService.cs:10,26` |
-| Mã lỗi | ✅ `eCommerce:Reports:0001…0009` | `modules/Reporting/eCommerce.Reporting.Domain/ReportingErrorCodes.cs:11-38` |
+| Mã lỗi | ✅ `eCommerce:Reports:0001…0017` (thêm `0010–0017` cho vận hành — `WP-26`) | `modules/Reporting/eCommerce.Reporting.Domain/ReportingErrorCodes.cs:14-66` |
 | Entity nguồn thô | ✅ `Order`/`OrderLine`, `RetailBill`/`RetailBillLine`, `InventoryItem` | `modules/Sales/eCommerce.Sales.Domain/Order.cs:808`, `modules/Pos/eCommerce.Pos.Domain/RetailBill.cs:400` |
 | Snapshot thuế trên dòng đơn | ⚠️ `OrderLine` có `TaxAmount`; **chưa có** `TaxRate`/`TaxClassificationId` | `modules/Sales/eCommerce.Sales.Domain/Order.cs:832-840` |
 | Giá vốn | ✅ entity `Pricing.CostPrice` **đã có** (PRC-001) + `DbSet`; **nhưng** bảng fact **chưa có cột giá vốn** | `src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs:128`, `modules/Pricing/eCommerce.Pricing.Domain/CostPrice.cs` |
-| Metric cho projection | ⚠️ `All` hiện **16** metric, **0** metric `reporting_*` | `shared/eCommerce.Kernel/Observability/eCommerceMetrics.cs:81-107` |
+| Metric cho projection | ✅ `All` hiện **30** metric (`WP-22` để lại **26** + `WP-26` thêm **4** `reporting_*`) | `shared/eCommerce.Kernel/Observability/eCommerceMetrics.cs:115-171` |
 
 ⇒ 🔴 **Hệ quả:** phần **lõi** (bảng fact + tổng hợp + mốc + API đọc) **đã có** — mô tả **as-built** ở §5–§6.
-Phần **vận hành GĐ3 còn lại** (rebuild/backfill có audit, chốt kỳ, đối chiếu lộ lệch, metric projection) hiện **chưa có trong code** ⇒ ghi rõ "kế hoạch" ở các mục tương ứng.
+Phần **vận hành GĐ3** (rebuild/backfill có audit, chốt kỳ, đối chiếu lộ lệch, metric projection) **đã có trong code ở `WP-26` (`W26-2`)** — mô tả **as-built** ở §3.1/§3.3/§5.2.4–§5.2.6/§6.2/§7.3/§8.2/§9/§11–§13; phần **chưa** hiện thực ghi rõ "kế hoạch" tại chỗ.
 
 **Phạm vi:**
 - ✅ **(đã có)** **Mô hình read-model** 8 bảng `Rpt*`: dòng sự kiện **grain = dòng chứng từ nguồn**, tổng hợp theo `(ngày, nguồn)`, mốc mỗi nguồn, ảnh tồn kho, 4 bảng chiều (D-47).
 - ✅ **(đã có)** **Job tổng hợp theo mốc**: đọc nguồn theo cửa sổ ngày, **thay thế** toàn bộ dòng của ngày đó (`DELETE` + `INSERT` trong một lượt), tính lại bằng **hàm thuần** chung (D-47/D-48).
 - ✅ **(đã có)** **Hợp đồng API đọc** (`IReportAppService` + `ReportAppService`) cho FE / `REP-002`/`REP-003`/`ACC-001`.
 - ✅ **(đã có)** **Khoá phân tán `report:tong-hop`**, idempotency theo unique index, mốc chỉ tiến, cách ly tenant, phân quyền, test.
-- ⬜ **(kế hoạch GĐ3)** **Rebuild/backfill có checkpoint + audit** và **chốt kỳ** (khoảng ngày tường minh).
-- ⬜ **(kế hoạch GĐ3)** **Đối chiếu lộ lệch** (`RepConsistencyCheck`) — biến lỗi im lặng thành **dữ liệu quan sát được**.
+- ✅ **(đã có — `WP-26`/`W26-2`)** **Rebuild/backfill có checkpoint + audit** (`RepRunLogs`, worker nền) và **chốt kỳ** (`RepPeriodCloses`, khoảng ngày tường minh).
+- ✅ **(đã có — `WP-26`/`W26-2`)** **Đối chiếu lộ lệch** (`RepConsistencyChecks`) — biến lỗi im lặng thành **dữ liệu quan sát được**; **chưa** sửa số tự động.
 
 **Không nằm trong phạm vi:**
 - ❌ **Nội dung báo cáo** (doanh thu, lãi gộp, tồn kho luân chuyển, hiệu suất kênh) — thuộc `REP-002` / `REP-003`.
@@ -79,9 +79,9 @@ Phần **vận hành GĐ3 còn lại** (rebuild/backfill có audit, chốt kỳ,
 | **D5** | Chỉ lưu **số cộng được**; tỉ lệ/lãi gộp/trung bình **tính lúc đọc** | ✅ đã có | `RptAggDailySales` (`Revenue`/`Quantity` cộng dồn); test `TC-12` |
 | **D6** | **Một công thức doanh thu**: `Σ thành tiền dòng − chiết khấu chứng từ`; **loại** chứng từ huỷ; VAT tách riêng; **không** dùng `TotalPayment` | ✅ đã có (D-48) | `TongHopDoanhThu.cs:72-100`; `TongHopBaoCaoService.cs:255-259` |
 | **D7** | Phản hồi nói **"chưa tổng hợp" ≠ 0** (`DaTongHop`/`DaCoDuLieu`); `AsOfUtc`/`LagSeconds`/`IsStale` **bổ sung sau** | 🔶 một phần / ⬜ kế hoạch | `ReportAppService.cs:16-19` (as-built); D7 đầy đủ chưa có |
-| **D8** | Chốt kỳ + `SnapshotHash` (bất biến hoá số đã xuất) | ⬜ **kế hoạch GĐ3** | chưa có bảng trong code |
-| **D9** | Rebuild/backfill có checkpoint | ⬜ **kế hoạch GĐ3** | chưa có `RepRunLog` |
-| **D10** | Rebuild có quyền riêng + audit + `FromDate`/`ToDate` tường minh | ⬜ **kế hoạch GĐ3** | chưa có |
+| **D8** | Chốt kỳ + `SnapshotHash` (bất biến hoá số đã xuất); mở lại giữ dòng, chốt lại **tái dùng** dòng | ✅ đã có (`WP-26`) | `RepPeriodClose.cs:100-140`; `RepIdempotency.cs:19-20` |
+| **D9** | Rebuild/backfill có checkpoint + audit | ✅ đã có (`WP-26`) | `RepRunLog.cs:156-193`; `ReportRebuildWorker.cs:123-189` |
+| **D10** | Rebuild có quyền riêng + audit + `FromDate`/`ToDate` tường minh | ✅ đã có (`WP-26`, `D-270`) | `ReportAdminAppService.cs:79-124`; `eCommerceConsts.cs:340-361` |
 | **D11** | Đọc/ghi bằng **EF `IRepository`** (`Delete` + `InsertMany`); **không** dùng Dapper; **cấm** nối chuỗi SQL | ✅ đã có (đóng Q3) | `TongHopBaoCaoService.cs:154-166` |
 | **D12** | Mọi ghi qua **UoW**; từng cửa sổ ngày commit rồi mới sang ngày sau | ✅ đã có | `TongHopBaoCaoService.cs:150-166` |
 | **D13** | **`DbSet` trên DbContext hợp nhất** cho mọi entity read-model | ✅ đã có | `src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs:260-274` |
@@ -100,15 +100,15 @@ Phần **vận hành GĐ3 còn lại** (rebuild/backfill có audit, chốt kỳ,
 | **Use Case ID** | `REP-001` |
 | **Use Case Name** | Nuôi read-model tổng hợp và cấp số liệu **có kiểm chứng** cho báo cáo & xuất liệu kế toán |
 | **Description** | *"Là kế toán trưởng/người điều hành, tôi muốn báo cáo trả lời **trong vài trăm ms** trên read-model, **không** làm chậm DB bán hàng, và **biết rõ số liệu đang cũ tới mức nào** — để tôi không ra quyết định hay lập tờ khai trên số liệu thiếu."* |
-| **Actor(s)** | **Kế toán** (lập tờ khai, đối chiếu) · **Kế toán trưởng** (xem doanh thu/lãi gộp, chốt kỳ — kế hoạch) · **Quản trị tenant** (tổng hợp lại/rebuild — kế hoạch) · **Hệ thống** (job tổng hợp theo mốc + watermark) |
+| **Actor(s)** | **Kế toán** (lập tờ khai, đối chiếu) · **Kế toán trưởng** (xem doanh thu/lãi gộp, chốt kỳ) · **Quản trị tenant** (tổng hợp lại/rebuild/đối chiếu — `WP-26`) · **Hệ thống** (job tổng hợp theo mốc + watermark + worker rebuild) |
 | **Priority** | **Must have** (là điều kiện để `REP-002/003` và `ACC-001` bắt đầu) |
-| **Trigger** | (a) **nhịp job tổng hợp theo mốc** (mỗi nguồn; job nền — xem §4); (b) người dùng mở báo cáo (đọc read-model); (c) người có quyền yêu cầu **tổng hợp lại** một khoảng ngày — **kế hoạch GĐ3** (rebuild/backfill, chốt kỳ). **Không** có đường sự kiện tăng dần: `D-47` đã thay bằng batch thay thế theo `(ngày, nguồn)`. |
+| **Trigger** | (a) **nhịp job tổng hợp theo mốc** (mỗi nguồn; job nền — xem §4); (b) người dùng mở báo cáo (đọc read-model); (c) người có quyền yêu cầu **tổng hợp lại/rebuild một khoảng ngày**, **chốt/mở kỳ**, **đối chiếu** — as-built `WP-26` (§6.2). **Không** có đường sự kiện tăng dần: `D-47` đã thay bằng batch thay thế theo `(ngày, nguồn)`. |
 | **Pre-Condition(s)** | • **Tenant hiện tại** (`TenantId` từ `ICurrentTenant`) — mọi bảng read-model là `IMultiTenant` có query filter; **cấm** đọc xuyên tenant.<br>• **Nguồn dữ liệu** sẵn sàng: `Order`/`OrderLine` (kể cả đơn sàn), `RetailBill`/`RetailBillLine` (POS, `D-18`/`D-42`), `InventoryItem` (tồn 9 chiều, `D-27`).<br>• **Đã có `DbSet`** cho mọi entity read-model trên `eCommerceDbContext` (D13).<br>• **Redis 7** cho khoá `report:tong-hop`; **nếu Redis chết** job vẫn **không** nhân đôi nhờ unique index + thay thế theo ngày (D-47 ①, `XC-003` D2).<br>• Múi giờ nghiệp vụ = **Asia/Ho_Chi_Minh**; ngày kinh doanh = `CreationTime` quy đổi UTC+7 (D-47 ④, `NgayKinhDoanh.TuUtc`). |
 | **Post-Condition(s)** | • Mỗi ngày đã tổng hợp có dòng trong `RptFactSalesLines`/`RptAggDailySales`, **đúng bằng** nguồn của ngày đó (thay thế theo ngày).<br>• `RptWatermarks` của mỗi nguồn **chỉ tiến**, cập nhật **sau** khi ngày đó ghi xong.<br>• Tổng theo **mọi** cách nhóm **bằng nhau** (D5) — test `TC-12`.<br>• Chạy lại cùng ngày ⇒ **0** thay đổi ròng / **không** nhân đôi (idempotent, BR-REP-001-005/013). |
 | **Basic Flow** | 1. **Job tổng hợp** (nền, định kỳ) gọi `TongHopBaoCaoService.ChayAsync` ⇒ giành khoá `report:tong-hop` (D-3/BR-007).<br>2. Xác định khoảng ngày từ **mốc mỗi nguồn** (`RptWatermarks.LastAggregatedDate`) + tham số (mặc định tới hôm nay).<br>3. Với **từng ngày**: đọc nguồn theo **nửa khoảng** `[bắt đầu, kết thúc)` (POS `Completed`, đơn `!IsCancelled`); bỏ qua chứng từ 0 dòng + log `Warning` (D-48 ⑥).<br>4. Tính bằng hàm thuần `TongHopDoanhThu.TinhNgay` ⇒ dòng sự kiện + dòng tổng hợp `(ngày, nguồn)`, làm tròn theo `XC-001`.<br>5. **Thay thế**: `DELETE` mọi dòng của ngày rồi `INSERT` (một lượt); cập nhật mốc nguồn **sau** khi ghi.<br>6. Ảnh tồn kho (nếu bật): chụp **trạng thái hiện tại** của `InventoryItem`, thay ảnh cùng ngày (D-47 ⑦).<br>7. Người dùng gọi `GET /api/v1/reports/revenue` ⇒ đọc **chỉ** trên read-model, trả cờ `DaTongHop`/`DaCoDuLieu`. |
-| **Alternative Flow** | **A1: Ngày không có chứng từ** — không tạo dòng; mốc vẫn tiến khi chạy theo khoảng; báo cáo không suy từ `MAX(BusinessDate)` mà dựa trên `RptWatermarks`.<br>**A2: Tổng hợp lại một khoảng** — **kế hoạch GĐ3**: người có quyền khai `FromDate`/`ToDate` + lý do, ghi audit (D9/D10).<br>**A3: Kỳ đã chốt** — **kế hoạch GĐ3**: job bỏ qua ngày thuộc kỳ đã chốt + log/metric (D8).<br>**A4: Redis chết** — **fail-open**: job vẫn chạy; DB (unique index + thay thế theo ngày) chặn nhân đôi (`XC-003` E2).<br>**A5: Chưa tổng hợp** — trả **"chưa tổng hợp"** (`DaTongHop = false`), **không** trả `0` (§12). |
+| **Alternative Flow** | **A1: Ngày không có chứng từ** — không tạo dòng; mốc vẫn tiến khi chạy theo khoảng; báo cáo không suy từ `MAX(BusinessDate)` mà dựa trên `RptWatermarks`.<br>**A2: Tổng hợp lại một khoảng** — **as-built `WP-26`**: người có `Reports.Rebuild` khai `FromDate`/`ToDate` + lý do (≥ 10 ký tự), ghi `RepRunLogs` + audit; xếp hàng cho worker nền.<br>**A3: Kỳ đã chốt** — **as-built `WP-26`**: rebuild/ghi giao kỳ `DaChot` ⇒ **từ chối** `Reports:0011` (không ghi số); mở lại kỳ trước.<br>**A4: Redis chết** — **fail-open**: job vẫn chạy; DB (unique index + thay thế theo ngày) chặn nhân đôi (`XC-003` E2).<br>**A5: Chưa tổng hợp** — trả **"chưa tổng hợp"** (`DaTongHop = false`), **không** trả `0` (§12). |
 | **Exception Flow** | **E1:** không giành được khoá `report:tong-hop` ⇒ `eCommerce:Lock:0001` (`KhongGianhDuocKhoa`; `TongHopBaoCaoService.cs:116`, `eCommerceConsts.cs:545`); API trả `409`, job nền bỏ nhịp + log.<br>**E2:** chạy lại cùng ngày ⇒ `DELETE` + `INSERT` thay thế, **không** nhân đôi (D-47 ①).<br>**E3:** chiết khấu chứng từ > tổng tiền dòng ⇒ `eCommerce:Reports:0004` (**không** làm tròn về 0 — D-48 ⑤).<br>**E4:** dòng mồ côi (không thuộc chứng từ nào) ⇒ `eCommerce:Reports:0005`.<br>**E5:** ảnh tồn kho có chiều âm ⇒ `eCommerce:Reports:0006` (không ghi ảnh xấu).<br>**E6:** khoảng > **366 ngày** ⇒ `eCommerce:Reports:0003` + chia nhỏ. |
-| **Business Rules** | Phát biểu đầy đủ ở §8.1 (BR-REP-001-001 … 015) — mục này chỉ liệt kê mã: **BR-001** sở hữu read-model · **BR-002** cấm query DB giao dịch ngoài job · **BR-003** cách ly tenant · **BR-004** tiền `decimal` + không so `==`, số lượng `decimal(18,3)` · **BR-005** idempotent theo unique index + thay thế theo ngày · **BR-006** mốc (watermark) bắt buộc, chỉ tiến · **BR-007** khoá phân tán `report:tong-hop` · **BR-008** mọi ghi qua UoW · **BR-009** thay thế theo `(ngày, nguồn)`, không xoá lẻ · **BR-010** một chiều, không ghi ngược · **BR-011** rebuild có quyền + audit + tường minh (kế hoạch) · **BR-012** số liệu lệch phải **lộ ra** (kế hoạch) · **BR-013** chạy lại không nhân đôi · **BR-014** "chưa tổng hợp" ≠ 0 · **BR-015** cấm SQL nối chuỗi + cấm PII trong read-model. |
+| **Business Rules** | Phát biểu đầy đủ ở §8.1 (BR-REP-001-001 … 015) — mục này chỉ liệt kê mã: **BR-001** sở hữu read-model · **BR-002** cấm query DB giao dịch ngoài job · **BR-003** cách ly tenant · **BR-004** tiền `decimal` + không so `==`, số lượng `decimal(18,3)` · **BR-005** idempotent theo unique index + thay thế theo ngày · **BR-006** mốc (watermark) bắt buộc, chỉ tiến · **BR-007** khoá phân tán `report:tong-hop` · **BR-008** mọi ghi qua UoW · **BR-009** thay thế theo `(ngày, nguồn)`, không xoá lẻ · **BR-010** một chiều, không ghi ngược · **BR-011** rebuild có quyền + audit + tường minh · **BR-012** số liệu lệch phải **lộ ra** · **BR-013** chạy lại không nhân đôi · **BR-014** "chưa tổng hợp" ≠ 0 · **BR-015** cấm SQL nối chuỗi + cấm PII trong read-model. |
 | **Non-Functional Requirement** | Phát biểu đầy đủ ở §13 (NFR-REP-001-001 … 010) — mục này chỉ liệt kê mã: **001** hiệu năng job · **002** độ trễ API báo cáo · **003** độ trễ watermark · **004** khớp số với nguồn · **005** idempotent 1.000 lần · **006** mở rộng ngang · **007** quan sát được (metric/log) · **008** cách ly tenant · **009** khả năng chạy tiếp/rebuild · **010** kích thước read-model. |
 
 ---
@@ -168,33 +168,33 @@ flowchart LR
 
 ## 3. Sơ đồ trạng thái (state machine)
 
-`REP-001` có **hai** vòng đời **as-built** (mốc nguồn · chạy job) và **hai** vòng đời **kế hoạch GĐ3** (nhật ký chạy, chốt kỳ). Mọi chuyển trạng thái sai **phải ném lỗi** — không có nhánh "bỏ qua im lặng".
+`REP-001` có **bốn** vòng đời **as-built**: mốc nguồn (§3.2), chạy job (§3.1), chốt kỳ (§3.3), `RepConsistencyChecks` (§5.2.5). Mọi chuyển trạng thái sai **phải ném lỗi** — không có nhánh "bỏ qua im lặng".
 
-### 3.1 Vòng đời `RepRunLog` (một lần chạy job / rebuild) — ⬜ **kế hoạch GĐ3 (chưa có trong code)**
+### 3.1 Vòng đời `RepRunLog` (một lần chạy rebuild / đối chiếu) — ✅ **as-built `WP-26` (`W26-2`)**
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Queued : «co yeu cau chay»
-    Queued --> Running : «gianh duoc khoa phan tan»
-    Queued --> Skipped : «khong gianh duoc khoa (SkipIfBusy)»
+    [*] --> Queued : «co yeu cau rebuild hoac doi chieu»
+    Queued --> Running : «worker gianh duoc khoa report:rebuild (cho 30 s)»
     Running --> Succeeded : «moi cua so da commit»
     Running --> PartiallySucceeded : «co cua so loi nhung con chay tiep duoc»
     Running --> Failed : «loi khong the chay tiep»
     PartiallySucceeded --> Running : «chay tiep tu checkpoint»
-    Failed --> Running : «chay lai tu checkpoint»
+    Failed --> Running : «chay tiep tu checkpoint»
     Succeeded --> [*]
-    Skipped --> [*]
 ```
 
 | Từ | Sang | Guard (điều kiện cho phép) | Hành động kèm theo | Nếu guard sai thì? |
 |---|---|---|---|---|
-| `Queued` | `Running` | Giành được khoá `report:tong-hop` trong timeout (mặc định **30 s**) | ghi `StartedAtUtc`, `HostName` | Sang `Skipped` + log `Information` + metric `lock_skipped_total{module=reporting}` (`XC-003` A1) |
-| `Queued` | `Skipped` | **Chỉ** job định kỳ (`SkipIfBusy`) | log + metric (**bắt buộc** — thiếu là vi phạm `XC-003` BR-010) | Vi phạm BR-REP-001-007 |
-| `Running` | `Succeeded` | **Mọi** cửa sổ đã commit + watermark đã cập nhật | ghi `FinishedAtUtc`, `RowsUpserted`, `WindowsDone` | Ở lại `Running` |
-| `Running` | `PartiallySucceeded` | Có cửa sổ lỗi **và** còn cửa sổ chưa chạy | ghi `LastErrorCode`, `FailedWindows`, giữ checkpoint | — |
-| `Running` | `Failed` | Lỗi hạ tầng (mất DB) hoặc lỗi không xác định | ghi `LastErrorCode` + log `Error` | — |
-| `PartiallySucceeded`/`Failed` | `Running` | Người có quyền `Rebuild` gọi *chạy tiếp* (`resumeFromCheckpoint = true`) | tiếp tục từ `RptWatermarks.LastAggregatedDate` | **Cấm** chạy tiếp nếu checkpoint **rỗng** ⇒ phải `Rebuild` tường minh (`eCommerce:Reports:0003`) |
-| `Succeeded` | `[*]` | — | trạng thái **hấp thụ** (absorbing) | Mọi chuyển khỏi `Succeeded` ⇒ `InvalidOperationException` (lỗi lập trình) |
+| `Queued` | `Running` | Worker giành được khoá **`report:rebuild:{tenant}:{projection}`** (chờ **30 s** — `ReportRebuildWorker.cs:102-103`) | `BatDau` ghi `StartedAtUtc`, `HostName` | **Giữ `Queued`** + log `Warning`, thử lại nhịp sau (`ReportRebuildWorker.cs:105-110`) — **không** ném, **không** `Skipped` |
+| — | `Skipped` | **Dự trữ** (`RepRunStatus.Skipped = 5`) | — | ⬜ `WP-26` **không phát** trạng thái này (`docDeviation #5`) |
+| `Running` | `Succeeded` | `WindowsDone == WindowsTotal` | ghi `FinishedAtUtc` | Chuyển sai ⇒ **`Reports:0015`** |
+| `Running` | `PartiallySucceeded` | Có cửa sổ lỗi **và** `WindowsDone > 0` | ghi `LastErrorCode`, giữ `CheckpointDate` | — |
+| `Running` | `Failed` | Lỗi hạ tầng / cửa sổ đầu lỗi (`WindowsDone == 0`) | ghi `LastErrorCode` + `FinishedAtUtc` + log `Error` | — |
+| `PartiallySucceeded`/`Failed` | `Queued` | Người có `Reports.Rebuild` gọi *chạy tiếp* (`POST …/rebuild/{runId}/resume`) | `YeuCauChayLai`; worker chạy từ **`CheckpointDate + 1`** (`ReportRebuildWorker.cs:123`) | `CheckpointDate` **rỗng** ⇒ **`Reports:0017`** (`RepRunLog.cs:250-255`) — phải `Rebuild` tường minh |
+| `Succeeded` | `[*]` | — | trạng thái **hấp thụ** (absorbing) | Mọi chuyển khỏi `Succeeded` ⇒ `Reports:0015` |
+
+> 📌 `RepRunLog` **chỉ** ghi cho `Rebuild` + `Reconcile` (và `Aggregate` **khi có việc/lỗi** — `D-271`, §13 NFR-007). Rebuild `TonKho` **chỉ** nhận `FromDate == ToDate == hôm nay (UTC+7)` và `WindowsTotal = 1` (`D-272`, `KhoangChot.KiemRebuildTonKho:52`).
 
 ### 3.2 Vòng đời `RptWatermarks` (mốc mỗi nguồn — as-built)
 
@@ -214,25 +214,28 @@ stateDiagram-v2
 
 > ⚠️ Mốc là **"đã tổng hợp tới ngày nào"**, **không** phải `MAX(BusinessDate)` của bảng fact — ngày không có chứng từ sẽ khiến `MAX()` đứng yên (D-47 ⑤). Mốc cập nhật **sau** khi ngày đó ghi xong.
 
-### 3.3 Vòng đời `RepPeriodClose` (kỳ kế toán) — ⬜ **kế hoạch GĐ3 (chưa có trong code)**
+### 3.3 Vòng đời `RepPeriodClose` (kỳ kế toán) — ✅ **as-built `WP-26` (`W26-2`)**
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Mo : «ky chua chot»
-    Mo --> DangChot : «ke toan truong yeu cau chot»
+    [*] --> Mo : «ke toan truong yeu cau chot»
+    Mo --> DangChot : «co quyen Reports.PeriodClose + ly do >= 10»
     DangChot --> DaChot : «doi chieu nguon khop 0 dong»
-    DangChot --> Mo : «doi chieu lech - TU CHOI»
-    DaChot --> DaMoLai : «mo ky co quyen rieng + ly do»
-    DaMoLai --> Mo : «da ghi audit»
+    DangChot --> Mo : «doi chieu con lech - TU CHOI 0014»
+    DaChot --> DaMoLai : «mo ky co quyen rieng + ly do >= 20»
+    DaMoLai --> DangChot : «chot lai cung khoang - TAI DUNG dong»
     DaChot --> [*]
 ```
 
 | Từ | Sang | Guard | Hành động | Nếu guard sai thì? |
 |---|---|---|---|---|
-| `Mo` | `DangChot` | Có quyền `eCommerce.Reporting.PeriodClose` + `FromDate <= ToDate` | tạo bản ghi, tính `SnapshotHash` | `403` |
-| `DangChot` | `DaChot` | Job đối chiếu trên **toàn bộ** khoảng ngày trả **lệch 0 dòng** | lưu `SnapshotHash`, `ClosedBy`, `ClosedAtUtc` | về `Mo` + **từ chối** (D8, ⬜ kế hoạch). **Cấm** chốt khi còn lệch |
-| `DaChot` | `DaMoLai` | Có quyền `eCommerce.Reporting.PeriodReopen` **và** lý do ≥ 20 ký tự | ghi audit (ai/lý do/khi nào); mọi job được phép ghi lại khoảng ngày | `403`; thiếu lý do ⇒ **từ chối** (⬜ kế hoạch) |
-| bất kỳ ghi fact | — | `FactDate` **không** thuộc kỳ `DaChot` | ghi bình thường | Nếu thuộc kỳ `DaChot` ⇒ **không ghi**, ghi `RepConsistencyCheck` loại `LateEventInClosedPeriod` + metric (A3) |
+| — | `Mo` | Có `Reports.PeriodClose` + `FromDate <= ToDate` + lý do đóng **≥ 10** ký tự | tạo dòng (`CloseReason`, `IdempotencyKey` = `Report:PeriodClose:{tenant}:{from}:{to}`) | `403`; lý do ngắn ⇒ **`0016`** (400); khoảng đảo ⇒ **`0002`** (400) |
+| `Mo`/`DaMoLai` | `DangChot` | Lý do **≥ 10** ký tự (sau `Trim`) | `BatDauChot` | `0016` |
+| `DangChot` | `DaChot` | Đối chiếu **toàn bộ** khoảng trả **lệch 0 dòng** (`ResolvedAtUtc IS NULL`) | `Chot` lưu `SnapshotHash` (SHA-256 64 hex), `ClosedBy`, `ClosedAtUtc` | Còn lệch ⇒ **`0014`** (409) + rollback (kỳ ở lại `Mo`) — **cấm** chốt khi còn lệch |
+| `DaChot` | `DaMoLai` | Có `Reports.PeriodReopen` **và** lý do **≥ 20** ký tự | ghi `ReopenedBy`/`ReopenReason`/`ReopenedAtUtc`; **GIỮ** `ClosedBy`/`ClosedAtUtc`/`SnapshotHash` để audit | `403`; lý do ngắn ⇒ **`0016`** |
+| `DaMoLai` | `DangChot` | Chốt lại **cùng khoảng** | **TÁI DÙNG** dòng (idempotency key `(tenant, from, to)` cố định ⇒ không tạo kỳ trùng) | — |
+| Hai kỳ `DaChot` chồng nhau | — | `EXCLUDE USING gist` (§5.2.6) | chặn ở DB `23P01` | App trả **`0012`** (409) trước; DB là hàng rào cuối |
+| bất kỳ ghi fact | — | `FactDate` **không** thuộc kỳ `DaChot` | ghi bình thường | Giao kỳ `DaChot` ⇒ **từ chối** `0011` (409), **0** dòng thay đổi |
 
 > 📌 **Vì sao cần chốt kỳ:** `XC-006` BR-008 yêu cầu **xuất Mẫu 01 Phụ lục III** khớp dữ liệu **đã phát hành trong kỳ**.
 > Nếu kỳ không chốt được thì lần xuất sau **có thể khác** lần trước (do sự kiện đến muộn hoặc rebuild) ⇒ kế toán **không biết tin bản nào**.
@@ -389,6 +392,19 @@ erDiagram
         varchar Sku
         varchar ProductName
     }
+    RptDimStores {
+        uuid Id PK
+        uuid TenantId
+        uuid WarehouseId
+        varchar Code
+        varchar Name
+    }
+    RptDimStaffs {
+        uuid Id PK
+        uuid TenantId
+        uuid StaffId
+        varchar DisplayName
+    }
     RptAggDailySales ||--o{ RptFactSalesLines : "cung ngay va nguon"
 ```
 
@@ -469,17 +485,84 @@ erDiagram
 | **UNIQUE** (NND) | `(TenantId, Nguon)` | một mốc/nguồn |
 | — | mốc **chỉ tiến** | `GhiNhan` giữ nguyên nếu ngày cũ hơn |
 
-#### 5.2.4 Bảng `RepRunLog` — *nhật ký mọi lần chạy* — ⬜ **kế hoạch GĐ3 (chưa có trong code)**
+#### 5.2.4 Bảng `RepRunLogs` — *nhật ký một lượt chạy + checkpoint* — ✅ **as-built `WP-26` (`W26-2`)**
 
-Bảng dự kiến cho **rebuild/backfill có checkpoint + audit** (D9/D10). Cột chính: `TenantId`, `JobName`, `ProjectionName`, `Status`, `FromDate`/`ToDate`, `WindowsTotal`/`WindowsDone`, `RowsUpserted`, `RequestedBy`, `Reason`, `StartedAtUtc`/`FinishedAtUtc`, `HostName`. Ràng buộc dự kiến: UNIQUE filter *"một lần chạy hoạt động /(job, projection)"*; CHECK `rebuild` **phải** có `FromDate`/`ToDate`. **Chưa có entity/migration.**
+**Phạm vi (`D-271` + `D-275`):** ghi **mọi** lượt `Rebuild` + `Reconcile`; lượt `Aggregate` (job định kỳ) **chỉ** ghi khi **có việc/lỗi** — lượt rỗng **không** tạo dòng, vẫn log + metric (NFR-007). ✅ As-built `W26-2` (`D-275`, `ReportingAggregationWorker.cs:61-172`, `NhatKyAggregate.cs`): **có việc** ⇒ 1 dòng/projection (`BanHang` khi `SoDongSuKien > 0 || SoDongTongHop > 0`, khoảng `TuNgay..DenNgay`, `WindowsTotal = SoNgay`; `TonKho` khi `SoAnhTonKho > 0`, `FromDate = ToDate = hôm nay (UTC+7)`, `WindowsTotal = 1`) ở `Succeeded`, ghi **trong cùng UoW**; **lỗi** ⇒ **đúng 1** dòng `Failed`/lượt ở UoW **riêng** (`LastErrorCode` = mã `BusinessException` hoặc tên kiểu); **rỗng/bỏ nhịp khoá** ⇒ **0** dòng (`Skipped` vẫn dự trữ).
 
-#### 5.2.5 Bảng `RepConsistencyCheck` — *lệch số phải LỘ RA (BR-012)* — ⬜ **kế hoạch GĐ3 (chưa có trong code)**
+| Cột | Kiểu | Null? | Ý nghĩa |
+|---|---|---|---|
+| `Id` | `uuid` | ✖ | khoá chính |
+| `TenantId` | `uuid` | ✔ | `IMultiTenant` |
+| `JobName` | `varchar(64)` | ✖ | `Rebuild` / `Reconcile` / `Aggregate` (CHECK `IN`) |
+| `Projection` | `smallint` | ✖ | `0 = BanHang` · `1 = TonKho` (enum **lưu int**, `D-17`; **không** phải `ProjectionName` chuỗi) |
+| `Status` | `smallint` | ✖ | `0 Queued · 1 Running · 2 Succeeded · 3 PartiallySucceeded · 4 Failed · 5 Skipped` (§3.1) |
+| `FromDate` / `ToDate` | `date` | ✖ | khoảng ngày tường minh; CHECK `ToDate >= FromDate` |
+| `WindowsTotal` / `WindowsDone` | `int` | ✖ | `>= 0` và `WindowsDone <= WindowsTotal` |
+| `CheckpointDate` | `date` | ✔ | ngày **đã commit gần nhất**; `NULL` = chưa cửa sổ nào; CHECK nằm trong `[FromDate, ToDate]` |
+| `RowsWritten` | `bigint` | ✖ | số dòng fact **đã ghi** (thay thế) — **không** phải `RowsUpserted`; `>= 0` |
+| `Reason` | `varchar(512)` | ✖ | **NOT NULL**, `length(btrim) >= 10`; dòng **hệ thống** dùng hằng `RepRunLog.LyDoHeThong` (`"Đối chiếu theo yêu cầu"` / `"Tổng hợp định kỳ"`) |
+| `RequestedBy` | `uuid` | ✔ | người yêu cầu; `NULL` = **dòng hệ thống** |
+| `StartedAtUtc` / `FinishedAtUtc` | `timestamptz` | ✔ | mốc chạy |
+| `HostName` / `CorrelationId` / `LastErrorCode` | `varchar` | ✔ | `128` / `64` / `64` |
+| `IdempotencyKey` | `varchar(256)` | ✖ | **NOT NULL** — khoá theo §7.3 |
 
-As-built: job **thay thế** theo ngày từ nguồn nên số liệu khớp tại thời điểm tổng hợp; bảng này dự kiến để **lộ lệch** khi nguồn đổi **sau** tổng hợp. Cột chính: `FactDate`, `ProjectionName`, `MismatchKind`, `FactKey`, `ExpectedValue`/`ActualValue`/`Delta`, `AutoCorrected`, `DetectedByRunId`. ⚠️ So tiền bằng `Delta` theo `numeric`, **KHÔNG** so `==` (`XC-001` BR-003). **Chưa có entity/migration.**
+**Index & ràng buộc** (viết tay trong migration — EF **không** sinh được NND/partial)
 
-#### 5.2.6 Bảng `RepPeriodClose` — *chốt kỳ (D8)* — ⬜ **kế hoạch GĐ3 (chưa có trong code)**
+| Loại | Cột | Mục đích |
+|---|---|---|
+| INDEX | `(TenantId, CreationTime)` | danh sách lượt chạy |
+| **UNIQUE** (NND, **partial**) | `(TenantId, IdempotencyKey)` **`WHERE "RequestedBy" IS NOT NULL`** | gọi lại cùng khoảng + lý do ⇒ trả lần chạy cũ; **không** chặn dòng hệ thống (khoá theo `runId`) |
+| **UNIQUE** (NND, partial) | `(TenantId, JobName, Projection)` **`WHERE "Status" IN (0, 1)`** | **một** lượt hoạt động cho mỗi `(job, projection)` — hàng rào DB, không phụ thuộc Redis |
+| — | **KHÔNG** FK | D14 |
 
-Cột chính: `FromDate`/`ToDate`, `Status` (`Mo`/`DangChot`/`DaChot`/`DaMoLai`), `SnapshotHash` (SHA-256), `ClosedBy`/`ClosedAtUtc`, `ReopenedBy`/`ReopenReason`. Ràng buộc (`D-171`): `CREATE EXTENSION IF NOT EXISTS btree_gist` + `EXCLUDE USING gist` trên `daterange("FromDate", "ToDate", '[]')` với `&&` (khuôn `EX_TaxClassifications_ChongChongKhung` — **đã chạy thật** trên `postgres:17-alpine`). Ba điểm bắt buộc: (i) `EXCLUDE` **không** có mệnh đề `WHERE` ⇒ phải mã hoá `Status` vào khoá (`Status WITH =` **hoặc** cột biểu thức quy `Mo`/`DangChot`/`DaMoLai` về một giá trị và `DaChot` giá trị riêng) để **chỉ** chặn hai kỳ `DaChot` chồng nhau; (ii) `TenantId` nullable ⇒ `COALESCE("TenantId", '000…0'::uuid)` như Tax; (iii) `FromDate`/`ToDate` là `date`, `daterange(..., '[]')` đóng hai đầu (UTC+7, `D-114` P4). **Điều kiện bắt buộc trước `migrations add`:** 4 ca integration (đỏ trước, xanh sau) — constraint đích danh tồn tại; hai kỳ `DaChot` chồng nhau ⇒ `23P01`; hai kỳ **liền kề** ⇒ nhận; ca đối chứng cách mã hoá `Status` (vd `Mo` chồng `DaChot` ⇒ kết quả **đã định**). Ca nào đỏ ⇒ **fallback** `UNIQUE` + trigger/guard trong cùng PR, **không** hạ xuống "chỉ kiểm ở app". **Chưa có entity/migration.**
+#### 5.2.5 Bảng `RepConsistencyChecks` — *lệch số phải LỘ RA (BR-012)* — ✅ **as-built `WP-26` (`W26-2`)**
+
+Job **thay thế** theo ngày từ nguồn nên số liệu khớp tại thời điểm tổng hợp; bảng này **lộ lệch** khi nguồn đổi **sau** tổng hợp. Đối chiếu **KHÔNG** sửa số (`AutoCorrected` luôn `false`; sửa = mở kỳ + rebuild).
+
+| Cột | Kiểu | Null? | Ý nghĩa |
+|---|---|---|---|
+| `Id` | `uuid` | ✖ | khoá chính |
+| `TenantId` | `uuid` | ✔ | `IMultiTenant` |
+| `FactDate` | `date` | ✖ | ngày bị lệch |
+| `Projection` / `MismatchKind` | `smallint` | ✖ | `0 BanHang · 1 TonKho` / `0 SoDong · 1 DoanhThu · 2 SoChungTu · 3 AnhTonKho · 4 SuKienTre` |
+| `FactKey` | `varchar(128)` | ✖ | NOT NULL + không rỗng; khuôn `{projection}:{yyyy-MM-dd}` |
+| `ExpectedValue` / `ActualValue` | `numeric(18,4)` | ✔ | số nguồn / số read-model |
+| `Delta` | `numeric(18,4)` | ✔ | `Actual − Expected` **chỉ khi cả hai vế có số**, ngược lại `NULL`; CHECK `("Delta" IS NULL) = ("ExpectedValue" IS NULL OR "ActualValue" IS NULL)` — **so bằng `Delta`**, **cấm** `==` trên `decimal` (`XC-001` BR-003) |
+| `AutoCorrected` | `boolean` | ✖ | as-built luôn `false` |
+| `DetectedByRunId` | `uuid` | ✔ | lượt chạy phát hiện |
+| `DetectedAtUtc` | `timestamptz` | ✖ | |
+| `ResolvedAtUtc` / `ResolvedBy` | `timestamptz` / `uuid` | ✔ | đánh dấu **đã xử lý**; **idempotent** (đã xử lý thì giữ nguyên) |
+
+**Index & ràng buộc**
+
+| Loại | Cột | Mục đích |
+|---|---|---|
+| INDEX | `(TenantId, FactDate)` | danh sách lệch theo ngày |
+| INDEX | `(TenantId, ResolvedAtUtc)` | đếm dòng **chưa xử lý** (`ResolvedAtUtc IS NULL`) — NFR-004/TC-19 |
+| **UNIQUE** (NND, **partial**) | `(TenantId, Projection, FactDate, MismatchKind, FactKey)` **`WHERE "ResolvedAtUtc" IS NULL`** | chống trùng dòng lệch **đang mở** mỗi nhịp; xử lý xong thì dòng mới được ghi lại |
+
+> 📌 `MismatchKind.SuKienTre = 4` (sự kiện đến muộn) **dự trữ** — as-built `SoDoiChieu.KiemNgay` **chưa** phát; đường thay thế là chặn ghi vào kỳ `DaChot` bằng `0011`.
+
+#### 5.2.6 Bảng `RepPeriodCloses` — *chốt kỳ (D8)* — ✅ **as-built `WP-26` (`W26-2`)**
+
+| Cột | Kiểu | Null? | Ý nghĩa |
+|---|---|---|---|
+| `Id` / `TenantId` | `uuid` / `uuid` | ✖ / ✔ | `IMultiTenant` |
+| `FromDate` / `ToDate` | `date` | ✖ | CHECK `ToDate >= FromDate` |
+| `Status` | `smallint` | ✖ | `0 Mo · 1 DangChot · 2 DaChot · 3 DaMoLai` |
+| `SnapshotHash` | `char(64)` | ✔ | SHA-256 hex; CHECK `Status = 2` ⇒ **đủ** `SnapshotHash` + `ClosedBy` + `ClosedAtUtc` |
+| `CloseReason` | `varchar(512)` | ✖ | CHECK `length(btrim) >= 10` (`D-274`) |
+| `ClosedBy` / `ClosedAtUtc` | `uuid` / `timestamptz` | ✔ | audit đóng |
+| `ReopenedBy` / `ReopenReason` / `ReopenedAtUtc` | `uuid` / `varchar(512)` / `timestamptz` | ✔ | audit mở; CHECK `ReopenReason IS NULL OR length(btrim) >= 20` (`D-274`) |
+| `IdempotencyKey` | `varchar(256)` | ✖ | **NOT NULL**; khoá `Report:PeriodClose:{tenant}:{from}:{to}` (§7.3) |
+
+**Ràng buộc chống chồng kỳ (`D-171`) — as-built trong migration `20261126181842_Wp26_VanHanh_BaoCao`:**
+
+- `CREATE EXTENSION IF NOT EXISTS btree_gist` + `EXCLUDE USING gist` (migration `:168-179`).
+- Khoá **thứ hai** là `CASE WHEN "Status" = 2 THEN '000…0'::uuid ELSE "Id" END` ⇒ **chỉ** hai kỳ `DaChot` chồng nhau bị chặn; hai kỳ `Mo`/`DaMoLai` chồng nhau **hợp lệ** (`docDeviation #1`).
+- `TenantId` nullable ⇒ `COALESCE("TenantId", '000…0'::uuid)`; `daterange("FromDate", "ToDate", '[]')` đóng hai đầu (UTC+7, `D-114` P4).
+- **UNIQUE** (NND) `(TenantId, IdempotencyKey)` — chốt lại cùng khoảng **trả dòng cũ**.
+- **Đã đạt 4 ca integration** (`PostgreSqlWp26VanHanhTests`: EX-1..EX-5 — constraint đích danh tồn tại; hai kỳ `DaChot` chồng ⇒ `23P01`; hai kỳ **liền kề** ⇒ nhận; `Mo` chồng `DaChot` ⇒ nhận). Không cần `fallback` `UNIQUE` + trigger.
 
 > 📌 **Không có bảng fact theo giờ** (`D-174`): `RptFactSalesLines.OccurredAtUtc` đã có trên từng dòng fact ⇒ tổng hợp theo giờ là **truy vấn lúc đọc** `GROUP BY date_trunc('hour', "OccurredAtUtc")` (quy UTC+7 bằng `ReportingOptions.GioLechUtc`); **không** thêm bảng/job giờ ở GĐ3.
 
@@ -510,7 +593,9 @@ Cột chính: `FromDate`/`ToDate`, `Status` (`Mo`/`DangChot`/`DaChot`/`DaMoLai`)
 | `GetTongQuanTonKhoAsync` | `TongQuanTonKhoInput` (`Ngay?`) | `TongQuanTonKhoDto` | `eCommerce.Reports` | ảnh tồn `RptFactInventorySnapshot` ✅ |
 | `GetDashboardAsync` | — | `TongQuanDashboardDto` | `eCommerce.Reports` | `RptAggDailySales` + ảnh tồn ✅ |
 | `ChayTongHopAsync` | `ChayTongHopInput` (`TuNgay?`, `DenNgay?`, `GhiAnhTonKho`) | `KetQuaTongHopDto` | `eCommerce.Reports.Aggregate` | ghi read-model ✅ |
-| ⬜ `StartRebuild`/`ClosePeriod`/`RunReconciliation` | — | — | `eCommerce.Reporting.Rebuild`/`PeriodClose`/… | ⬜ kế hoạch GĐ3 |
+| ✅ `IReportAdminAppService` (as-built `WP-26`) | `StartRebuild` · `ResumeRebuild` · `GetLanChay` · `GetLanChays` | `LanChayDto` / `LanChayPageDto` | `eCommerce.Reports.Rebuild` | `RepRunLogs` ✅ |
+| ✅ `IReportAdminAppService` | `ClosePeriod` · `ReopenPeriod` · `GetKyChot` · `GetKyChots` | `KyChotDto` / `KyChotPageDto` | `eCommerce.Reports.PeriodClose` / `PeriodReopen` | `RepPeriodCloses` ✅ |
+| ✅ `IReportAdminAppService` | `RunReconciliation` · `GetLechSo` | `KetQuaDoiChieuDto` / `LechSoPageDto` | `eCommerce.Reports.Reconcile` | `RepConsistencyChecks` ✅ |
 
 **Hợp đồng đọc** *(as-built — `IReportAppService`; `REP-002`/`REP-003`/`ACC-001` đọc qua API, **cấm** tự query bảng giao dịch)*
 
@@ -536,9 +621,16 @@ public enum NguonBaoCao { BanLe = 0, DonHang = 1, TonKho = 2 }
 
 | Method | Route | Quyền | Mô tả | Trạng thái |
 |---|---|---|---|---|
-| `GET` | `/api/v1/reports/**` | `eCommerce.Reports` | báo cáo doanh thu / tồn kho / dashboard (đọc read-model) | ✅ as-built |
-| `POST` | `/api/v1/reports/aggregate` | `eCommerce.Reports.Aggregate` | tổng hợp lại (ghi read-model) | ✅ as-built |
-| `POST` | `/api/v1/reports/…` (rebuild, chốt kỳ, đối chiếu) | ⬜ kế hoạch | rebuild / chốt kỳ / đối chiếu | ⬜ GĐ3 |
+| `GET` | `/api/v1/reports/revenue` · `orders/summary` · `inventory/summary` · `dashboard` | `eCommerce.Reports` | báo cáo doanh thu / đơn / tồn kho / dashboard (đọc read-model) | ✅ as-built (`ReportsController.cs:37-56`) |
+| `POST` | `/api/v1/reports/aggregate` | `eCommerce.Reports.Aggregate` | tổng hợp lại (ghi read-model) | ✅ as-built (`:64`) |
+| `POST` | `/api/v1/reports/rebuild` | `eCommerce.Reports.Rebuild` | tạo lượt rebuild (xếp hàng) | ✅ `WP-26` (`:75`) |
+| `POST` | `/api/v1/reports/rebuild/{runId}/resume` | `eCommerce.Reports.Rebuild` | chạy tiếp từ checkpoint | ✅ `WP-26` (`:82`) |
+| `GET` | `/api/v1/reports/rebuild/{runId}` · `/rebuilds` | `eCommerce.Reports` | đọc lượt chạy (1 / danh sách) | ✅ `WP-26` (`:89,94`) |
+| `POST` | `/api/v1/reports/period-close` | `eCommerce.Reports.PeriodClose` | chốt kỳ (từ chối khi còn lệch `0014`) | ✅ `WP-26` (`:99`) |
+| `POST` | `/api/v1/reports/period-close/{id}/reopen` | `eCommerce.Reports.PeriodReopen` | mở lại kỳ (lý do ≥ 20) | ✅ `WP-26` (`:105`) |
+| `GET` | `/api/v1/reports/period-close/{id}` · `/period-closes` | `eCommerce.Reports` | đọc kỳ chốt (1 / danh sách) | ✅ `WP-26` (`:114,119`) |
+| `POST` | `/api/v1/reports/reconciliation` | `eCommerce.Reports.Reconcile` | đối chiếu nguồn ↔ read-model (**ghi** dòng lệch) | ✅ `WP-26` (`:124`) |
+| `GET` | `/api/v1/reports/consistency-checks` | `eCommerce.Reports` | danh sách dòng lệch | ✅ `WP-26` (`:130`) |
 
 **Response mẫu (rút gọn — theo `DiemDoanhThuDto`)**
 
@@ -570,9 +662,17 @@ public enum NguonBaoCao { BanLe = 0, DonHang = 1, TonKho = 2 }
 | `eCommerce:Reports:0007` | `ChuaTongHop` | Chưa có lượt tổng hợp cho khoảng ngày hỏi (báo cáo **rỗng**, không phải `0`) |
 | `eCommerce:Reports:0008` | `DongTrung` | Một dòng nguồn xuất hiện **hai lần** trong cùng lượt ⇒ doanh thu nhân đôi |
 | `eCommerce:Reports:0009` | `ChungTuKhongCoDong` | Chứng từ có chiết khấu nhưng **không** có dòng nào |
-| `eCommerce:*` (khoá) | `KhongGianhDuocKhoa` | Không giành được khoá `report:tong-hop` khi người dùng gọi tổng hợp thủ công |
+| `eCommerce:Reports:0010` | `LanChayKhongTonTai` | `runId`/`periodId` không có (hoặc khác tenant) ⇒ **`404`** |
+| `eCommerce:Reports:0011` | `KyDaChot` | Khoảng ngày giao kỳ `DaChot` (rebuild/ghi bị chặn) ⇒ **`409`** |
+| `eCommerce:Reports:0012` | `KyChongLan` | Hai kỳ `DaChot` chồng nhau (`23P01` ở DB) ⇒ **`409`** |
+| `eCommerce:Reports:0013` | `KhongHoTroRebuild` | Rebuild `TonKho` cho ngày **quá khứ** / projection không hỗ trợ (`D-272`) ⇒ **`400`** |
+| `eCommerce:Reports:0014` | `ConLechChuaXuLy` | Chốt kỳ khi còn `RepConsistencyCheck` **mở** ⇒ **`409`** |
+| `eCommerce:Reports:0015` | `ChuyenTrangThaiKhongHopLe` | Chuyển trạng thái sai (máy trạng thái §3.1/§3.3) ⇒ **`409`** |
+| `eCommerce:Reports:0016` | `ThieuLyDo` | Lý do rỗng/ngắn hơn ngưỡng **10/20/10** (`D-274`) ⇒ **`400`** |
+| `eCommerce:Reports:0017` | `CheckpointKhongCo` | Chạy tiếp khi `CheckpointDate` **rỗng** ⇒ **`409`** |
+| `eCommerce:*` (khoá) | `KhongGianhDuocKhoa` | Không giành được khoá phân tán (§8.2) khi người dùng gọi thao tác ghi ⇒ **`409`** |
 
-> 📌 Bằng chứng: `modules/Reporting/eCommerce.Reporting.Domain/ReportingErrorCodes.cs:11-38`. Mọi mã **phải** được map sang HTTP status ở Host (`AbpExceptionHttpStatusCodeOptions`), nếu không ABP trả `403` (bài học `INV-003` `0042`).
+> 📌 Bằng chứng: `modules/Reporting/eCommerce.Reporting.Domain/ReportingErrorCodes.cs:14-66`; map HTTP ở `src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs:405-422` (`0013`/`0016` → `400`; `0011`–`0015`/`0017` → `409`; `0010` → `404`). Mọi mã **phải** được map sang HTTP status ở Host (`AbpExceptionHttpStatusCodeOptions`), nếu không ABP trả `403` (bài học `INV-003` `0042`).
 
 ### 6.3 ⚠️ Không có write endpoint nào trên bảng fact
 
@@ -624,8 +724,12 @@ Mọi biên vào từ ngoài (webhook sàn `SAL-005`, IPN `PaymentHub`, webhook 
 | Đối tượng | Cách sinh khoá | ⚠️ Lưu ý |
 |---|---|---|
 | Job tổng hợp theo mốc | Khoá `report:tong-hop` + unique `(TenantId, Nguon, SourceLineId)` + **thay thế theo ngày** | Chạy lại cùng ngày ⇒ cùng số dòng, **không** nhân đôi (D-47 ①) |
-| Rebuild (kế hoạch GĐ3) | `Report:Rebuild:{projectionName}:{tenantId}:{fromDate}:{toDate}:{sha256(reason)}` | Gọi lại **cùng khoảng + cùng lý do** ⇒ trả lần chạy cũ (`AlreadyRequested`), **không** tạo lần thứ hai |
-| Chốt kỳ (kế hoạch GĐ3) | `Report:PeriodClose:{tenantId}:{fromDate}:{toDate}` | Chốt lại cùng kỳ ⇒ trả bản ghi cũ, **không** tạo kỳ trùng |
+| Rebuild (as-built `WP-26`) | `Report:Rebuild:{projection}:{tenant}:{from}:{to}:{sha256(reason.Trim())}` — `projection` = `ban-hang`/`ton-kho`, `tenant` = GUID hoặc `host`, hash **hex thường** (`RepIdempotency.cs:15-16`) | Gọi lại **cùng khoảng + cùng lý do** ⇒ trả lần chạy cũ (`AlreadyRequested`); unique **partial** `WHERE "RequestedBy" IS NOT NULL` |
+| Chốt kỳ (as-built) | `Report:PeriodClose:{tenant}:{from}:{to}` (`RepIdempotency.cs:19-20`) | Chốt lại cùng kỳ ⇒ **tái dùng** dòng (kể cả sau mở lại), **không** tạo kỳ trùng |
+| Đối chiếu — **dòng hệ thống** (as-built) | `Report:Reconcile:{tenant}:{projection}:{runId}` (`RepIdempotency.cs:23-24`) | Khoá theo **lượt** ⇒ chạy lại cùng khoảng **không** `23505`; unique partial bỏ qua dòng `RequestedBy IS NULL` |
+| Tổng hợp định kỳ — **dòng hệ thống** (as-built `D-275`) | `Report:AggregateRun:{tenant}:{projection}:{runId}` (`RepIdempotency.cs:27-28`) | **Dùng thật**: worker ghi 1 dòng/projection khi **có việc** (một `runId`/lượt) + 1 dòng `Failed`/lượt khi lỗi — mỗi lượt `runId` mới nên không `23505` |
+
+> 📌 **Vì sao dòng hệ thống dùng khoá theo `runId`:** nếu dùng khuôn khoá theo **khoảng ngày**, lượt đối chiếu thứ hai cùng khoảng sẽ `23505` (đã thấy trên PG17) — `docDeviation #10`. Đối chiếu không chỉ định projection ghi **2** dòng (mỗi `Projection` một dòng) — `ReportAdminAppService.cs:394-425`.
 
 > 📌 **Vì sao job phải idempotent:** người dùng gọi tổng hợp lại (hoặc job nền chạy lại sau khi đứt) là **chuyện thường**.
 > Hàng rào đúng là **unique index** `(TenantId, Nguon, SourceLineId)` **+ xoá-và-ghi-lại theo ngày** (`TongHopBaoCaoService.cs:154-166`), khoá phân tán chỉ là tối ưu (D-47 ①).
@@ -648,8 +752,8 @@ Mọi biên vào từ ngoài (webhook sàn `SAL-005`, IPN `PaymentHub`, webhook 
 | **BR-REP-001-008** | Mọi thao tác ghi đi qua **Unit of Work**; từng ngày commit rồi mới sang ngày sau | `TongHopBaoCaoService.cs:150-166` (D-47 ②) | TC-09 |
 | **BR-REP-001-009** | **Thay thế theo `(ngày, nguồn)`**: dòng cũ của ngày bị xoá rồi ghi lại; **cấm** xoá lẻ ngoài lượt thay thế | Code + test quét `TC-16` | TC-16 |
 | **BR-REP-001-010** | 🚨 **Một chiều**: module nguồn (`Sales`, `Pos`, `Inventory`, `Catalog`) **cấm** tham chiếu entity/bảng của `Reporting` | Test reflection quét assembly nguồn | **TC-15** |
-| **BR-REP-001-011** | Rebuild/backfill **bắt buộc**: quyền riêng, `FromDate`/`ToDate`, `Reason`, audit + nhật ký (**kế hoạch GĐ3**) | D10 + §5.2.4 | TC-10, TC-22 |
-| **BR-REP-001-012** | Lệch giữa nguồn và read-model **phải lộ ra**: `RepConsistencyCheck` + metric + log ≥ `Warning` (**kế hoạch GĐ3**); **cấm** nuốt im lặng | Code + `XC-005` BR-013 | **TC-05**, TC-19 |
+| **BR-REP-001-011** | Rebuild/backfill **bắt buộc**: quyền riêng (`Reports.Rebuild`), `FromDate`/`ToDate`, `Reason` ≥ 10, audit + nhật ký `RepRunLogs` | `D10` + §5.2.4 + `ReportAdminAppService.cs:79-124` | TC-10, TC-22 |
+| **BR-REP-001-012** | Lệch giữa nguồn và read-model **phải lộ ra**: `RepConsistencyChecks` + metric + log ≥ `Warning`; **cấm** nuốt im lặng | `SoDoiChieu` + `ReportAdminAppService.cs:387-455` (`XC-005` BR-013) | **TC-05**, TC-19 |
 | **BR-REP-001-013** | Chạy lại **cùng ngày** ⇒ **không** nhân đôi (thay thế theo ngày — thay cho version guard của v0.1) | `DELETE`/`INSERT` (D-47 ①) | **TC-03b**, TC-18 |
 | **BR-REP-001-014** | **"Chưa tổng hợp" ≠ 0**: phản hồi mang `DaTongHop`/`DaCoDuLieu`; `AsOfUtc`/`LagSeconds`/`IsStale` **bổ sung sau** | D7 + test `TC-17` | **TC-17** |
 | **BR-REP-001-015** | **Cấm** dựng SQL bằng nối chuỗi; nhóm/sắp xếp **chỉ** nhận tập **đóng** (enum). **Cấm** PII/token trong bảng read-model | D11 + enum; test quét `TC-21` | **TC-21** |
@@ -664,16 +768,19 @@ Mọi biên vào từ ngoài (webhook sàn `SAL-005`, IPN `PaymentHub`, webhook 
 | 4 | Job ghi trong khi người dùng đọc báo cáo | Đọc thấy phiên bản **đã commit**; ghi theo ngày không khoá cả bảng |
 | 5 | Hai nguồn cùng ngày | Tổng hợp chung một lượt; `RptAggDailySales` unique `(TenantId, BusinessDate, Nguon)` |
 | 6 | **Redis chết** | Fail-open: job vẫn chạy; DB (unique index + thay thế theo ngày) là hàng rào cuối (D-47 ①, `XC-003` D2) |
-| 7 | Người dùng **chốt kỳ** trong khi job đang chạy | **Kế hoạch GĐ3** (`RepPeriodClose` §3.3) |
+| 7 | Người dùng **chốt kỳ** trong khi job đang chạy | Khoá `report:period-close:{tenant}` (chờ **2 s**); rebuild dùng khoá **khác** nên không chặn; ghi vào kỳ `DaChot` ⇒ `0011` (`WP-26`) |
 | 8 | Job **đứt** giữa đường rồi chạy lại | Mốc `RptWatermarks.LastAggregatedDate` (chỉ tiến) + chạy tiếp từ mốc |
 
 **Khoá phân tán dùng trong feature** *(tên chính xác — as-built dùng `report:`; **không** tự thêm tiền tố `ecommerce:` vì `AbpDistributedLockOptions.KeyPrefix` đã thêm — `TongHopBaoCaoService.cs:41-44`)*
 
 | Tên khoá | Phạm vi | Vì sao cần | Trạng thái / TTL |
 |---|---|---|---|
-| `report:tong-hop` | toàn cục (một lượt) | một lượt tổng hợp tại một thời điểm (D-47 ⑥) | ✅ as-built; `TryAcquire` chờ **2 s** |
-| `report:rebuild:{tenantId}:{projectionName}` | tenant + projection | rebuild nặng, không chạy chồng | ⬜ **kế hoạch GĐ3** |
-| `report:period-close:{tenantId}` | tenant | 2 người không chốt kỳ cùng lúc | ⬜ **kế hoạch GĐ3** |
+| `report:tong-hop` | toàn cục (một lượt) | một lượt tổng hợp tại một thời điểm (D-47 ⑥) | ✅ as-built; `TryAcquire` chờ **2 s** (`TongHopBaoCaoService.cs:112`) |
+| `report:rebuild:{tenant}:{projection}` | tenant + projection | rebuild nặng, không chạy chồng; **không** chặn job toàn cục | ✅ as-built; worker chờ **30 s**, bận ⇒ giữ `Queued` (`ReportRebuildWorker.cs:102-110`; `ReportingLockKeys.Rebuild:15-16`) |
+| `report:period-close:{tenant}` | tenant | 2 người không chốt/mở kỳ cùng lúc | ✅ as-built; chờ **2 s** (`ReportAdminAppService.cs:187-188, 264-265`) |
+| `report:reconciliation:{tenant}` | tenant | 2 lượt đối chiếu không chạy chồng | ✅ as-built; chờ **2 s** (`ReportAdminAppService.cs:327-328`) |
+
+> 📌 **Hai mức chờ khác nhau là có chủ đích** (`docDeviation #3`/`#9`): `report:tong-hop` giữ **2 s** (nhịp 15 phút, bỏ lượt là chuyện thường); `report:rebuild` chờ **30 s** (lượt dài, không muốn bỏ ngay). Đây là **hai khoá khác nhau**, không phải cùng một khoá với hai timeout.
 
 > ⚠️ **Nhắc lại `XC-003` D2:** mất Redis ⇒ **mất khoá**, nhưng bất biến *"chạy lại không nhân đôi"* vẫn **đúng** nhờ **unique index** + **thay thế theo ngày** (D-47 ①).
 
@@ -683,7 +790,7 @@ Mọi biên vào từ ngoài (webhook sàn `SAL-005`, IPN `PaymentHub`, webhook 
 
 | Module / project | Đoạn khoá |
 |---|---|
-| `modules/Reporting/*` | `report` (as-built: `report:tong-hop`; **không** tiền tố `ecommerce:`) |
+| `modules/Reporting/*` | `report` cho **khoá phân tán** (`report:tong-hop` · `report:rebuild:*` · `report:period-close:*` · `report:reconciliation:*`); `Report` cho **khoá idempotency** (`Report:Rebuild:*` · `Report:PeriodClose:*` · `Report:Reconcile:*` · `Report:AggregateRun:*`) — **không** tiền tố `ecommerce:` |
 
 > 📌 Tên khoá as-built dùng tiền tố `report:`; khi cập nhật bảng ánh xạ `XC-003` §5 thì ghi nhận đúng tiền tố này (quy tắc vàng: sửa tài liệu trước).
 
@@ -693,11 +800,14 @@ Mọi biên vào từ ngoài (webhook sàn `SAL-005`, IPN `PaymentHub`, webhook 
 
 | Permission | Nhóm | Method / route | Trạng thái |
 |---|---|---|---|
-| `eCommerce.Reports` | Reports | `GET /api/v1/reports/**` (đọc read-model) | ✅ as-built (`ReportAppService.cs:26`, `eCommerceConsts.cs:340-343`) |
-| `eCommerce.Reports.Aggregate` | Reports | `POST /api/v1/reports/aggregate` (**ghi** read-model) | ✅ as-built (doc của `ReportAppService.cs:24`) |
-| `eCommerce.Reporting.Rebuild` | Reporting | rebuild/backfill + resume | ⬜ **kế hoạch GĐ3** |
-| `eCommerce.Reporting.PeriodClose` | Reporting | chốt kỳ | ⬜ **kế hoạch GĐ3** |
-| `eCommerce.Reporting.PeriodReopen` | Reporting | mở lại kỳ | ⬜ **kế hoạch GĐ3** |
+| `eCommerce.Reports` (`Reports.Default`) | Reports | `GET /api/v1/reports/**` (đọc read-model) | ✅ as-built (`ReportAppService.cs:26`, `eCommerceConsts.cs:340-343`) |
+| `eCommerce.Reports.Aggregate` | Reports | `POST /api/v1/reports/aggregate` (**ghi** read-model) | ✅ as-built (`ReportAppService.cs:254`) |
+| `eCommerce.Reports.Rebuild` | Reports | `POST …/rebuild` · `POST …/rebuild/{runId}/resume` | ✅ `WP-26` (`D-270`; `ReportAdminAppService.cs:79,127`) |
+| `eCommerce.Reports.PeriodClose` | Reports | `POST …/period-close` | ✅ `WP-26` (`:177`) |
+| `eCommerce.Reports.PeriodReopen` | Reports | `POST …/period-close/{id}/reopen` | ✅ `WP-26` (`:253`) |
+| `eCommerce.Reports.Reconcile` | Reports | `POST …/reconciliation` | ✅ `WP-26` (**thêm mới** — `D-270`; `:319`) |
+
+> 📌 **4 quyền hẹp là CON của `Reports.Default`** (`D-270`): `ReportsController` + `ReportAdminAppService` có `[Authorize(Reports.Default)]` cấp class ⇒ ASP.NET **AND** hai attribute. Chỉ cấp role **`admin` tenant** (qua `DbMigrator`, `IdentityDataSeedContributor.cs:105`); **không** cấp role khác. Khai **2 nơi** (hằng + `AddChild` — `eCommercePermissionDefinitionProvider.cs:196-204`); thiếu 1 nơi ⇒ `403` kể cả `admin` (`XC-004` D2).
 
 > 📌 **Quyền báo cáo tách riêng** vì báo cáo là số liệu **toàn tenant** cho người có `eCommerce.Reports` — **chưa** áp phạm vi dữ liệu `D-46` (`ReportAppService.cs:20-22`).
 
@@ -705,9 +815,9 @@ Mọi biên vào từ ngoài (webhook sàn `SAL-005`, IPN `PaymentHub`, webhook 
 
 | Việc | File | Lưu ý |
 |---|---|---|
-| Khai hằng số permission | `src/eCommerce.Domain.Shared/eCommerceConsts.cs:340-343` (`Permissions.Reports`) | ✅ đã có `eCommerce.Reports`; `Reports.Aggregate` theo doc service |
+| Khai hằng số permission | `src/eCommerce.Domain.Shared/eCommerceConsts.cs:340-361` (`Permissions.Reports`) | ✅ `Default` · `Aggregate` · `Rebuild` · `PeriodClose` · `PeriodReopen` · `Reconcile` |
 | Đăng ký permission | `src/eCommerce.Application.Contracts/Permissions/eCommercePermissionDefinitionProvider.cs` | 🚨 **BẮT BUỘC**: permission không được định nghĩa ⇒ ABP luôn từ chối ⇒ `403` kể cả admin |
-| `[Authorize]` cấp class | `modules/Reporting/eCommerce.Reporting.Application/ReportAppService.cs:26` | ⭐ **BẮT BUỘC** — lỗi đã xảy ra thật ở `ChannelAppService` |
+| `[Authorize]` cấp class | `modules/Reporting/eCommerce.Reporting.Application/ReportAppService.cs:26` · `ReportAdminAppService.cs:24` | ⭐ **BẮT BUỘC** — lỗi đã xảy ra thật ở `ChannelAppService` |
 
 > 📌 **Ghi chú kế thừa:** `XC-004` yêu cầu **test quét mã nguồn** chứng minh mọi `*AppService` có `[Authorize]` cấp class
 > (`docs/implementation-plan.md:170`). `ReportAppService` **phải** nằm trong phạm vi test đó.
@@ -724,7 +834,7 @@ Mọi biên vào từ ngoài (webhook sàn `SAL-005`, IPN `PaymentHub`, webhook 
 | **Báo cáo tồn kho** | bảng | `SnapshotDate`, `WarehouseId`, `Sku`, `OnHand`, `Reserved`, `Available`, `InWarehouse` (… 9–10 chiều) | `TongQuanTonKhoDto` / `DongTonKhoDto` | đọc `RptFactInventorySnapshots` — **ảnh mới nhất**, **không** phải lịch sử (D-47 ⑦) |
 | **Banner "chưa tổng hợp"** | dòng chữ | "Báo cáo chưa được tổng hợp" khi `DaTongHop = false` | `DaTongHop`/`DaCoDuLieu` | ⭐ `0` ≠ "chưa tổng hợp"; **cấm** hiện `0` khi chưa chạy (D7) |
 | **Banner tuổi dữ liệu** — ⬜ kế hoạch | chip màu | `asOfUtc` · `lagSeconds` · `isStale` | *(chưa có — D7 bổ sung)* | ⬜ kế hoạch GĐ3 |
-| **Màn hình vận hành + chốt kỳ** — ⬜ kế hoạch | bảng + nút | `RepRunLog` · `RepConsistencyCheck` · `RepPeriodClose` | *(chưa có)* | ⬜ kế hoạch GĐ3 |
+| **Màn hình vận hành + chốt kỳ** — ⬜ FE (BE ✅ `WP-26`) | bảng + nút | `RepRunLog` · `RepConsistencyCheck` · `RepPeriodClose` | `LanChayPageDto` · `LechSoPageDto` · `KyChotPageDto` (§6.2) | ⬜ UI thuộc `WEB-*`; API đã có |
 
 > 📌 **Ghi rõ chênh lệch (bắt buộc theo `design-doc-guidelines.md` §5 quy tắc 9):**
 > 1. **`0` ≠ "chưa tổng hợp".** As-built trả `DaTongHop`/`DaCoDuLieu`; `AsOfUtc`/`LagSeconds`/`IsStale` là **kế hoạch GĐ3** (D7).
@@ -732,7 +842,7 @@ Mọi biên vào từ ngoài (webhook sàn `SAL-005`, IPN `PaymentHub`, webhook 
 > 3. **VAT là số đã chốt vào chứng từ** (`VatAmount`/`VatPercent`), không tính lại theo cấu hình hiện tại (`XC-006` BR-002).
 > 4. **Bảng fact chưa có cột giá vốn** ⇒ lãi gộp **chưa** tính được; **cấm** hiện lãi gộp như số thật (D-114 P2, còn nợ).
 
-**Trạng thái rỗng:** khi read-model **chưa có dòng nào** (lần đầu, chưa chạy job) ⇒ hiện hướng dẫn *"Dữ liệu tổng hợp chưa được khởi tạo — chạy `Reconciliation` hoặc `Rebuild`"*,
+**Trạng thái rỗng:** khi read-model **chưa có dòng nào** (lần đầu, chưa chạy job) ⇒ hiện hướng dẫn *"Dữ liệu tổng hợp chưa được khởi tạo — chạy tổng hợp (`POST /api/v1/reports/aggregate`)"*,
 **không** hiện bảng trống, và **không** hiện lỗi (đây **không phải** lỗi — theo nguyên tắc *"không có dữ liệu ≠ lỗi"*).
 
 ---
@@ -745,10 +855,12 @@ Mọi biên vào từ ngoài (webhook sàn `SAL-005`, IPN `PaymentHub`, webhook 
 | Bảng đã tạo | **8 bảng `Rpt*`**: `RptFactSalesLines`, `RptAggDailySales`, `RptFactInventorySnapshots`, `RptWatermarks`, `RptDimDates`, `RptDimProducts`, `RptDimStores`, `RptDimStaffs` (§5.2) |
 | `DbSet` | ✅ đã khai đủ 8 trên `eCommerceDbContext.cs:260-274`; `ConfigureReporting` gọi ở `:448` |
 | Dapper | ❌ **không** dùng — as-built `Delete` + `InsertMany` qua EF `IRepository` (D11; **đóng Q3**) |
-| Kế hoạch GĐ3 | `RepRunLog`, `RepConsistencyCheck`, `RepPeriodClose` **chưa có** — cần migration mới khi làm rebuild/chốt kỳ; `EXCLUDE` của `RepPeriodClose` dùng `btree_gist` **đã chạy thật** trên PostgreSQL 17 (khuôn Tax — `D-171`), nhưng vẫn phải đạt **4 ca** ở §5.2.6 **trước** `migrations add` |
-| Seed | **Không** seed dữ liệu nghiệp vụ. Chỉ seed permission `eCommerce.Reports` (ABP idempotent); **không** seed `RptWatermarks` — mốc `null` = chưa chạy |
+| Migration (as-built `WP-26`) | `20261126181842_Wp26_VanHanh_BaoCao` — `src/eCommerce.EntityFrameworkCore/Migrations/20261126181842_Wp26_VanHanh_BaoCao.cs`: **3 bảng `Rep*`** (`RepRunLogs`, `RepConsistencyChecks`, `RepPeriodCloses`), **expand-only** (chỉ `CREATE TABLE/INDEX/CHECK`, `CREATE EXTENSION btree_gist`, `EXCLUDE`), **0 FK** |
+| Ràng buộc viết tay trong migration | 4 unique **NND**/partial (§5.2.4/§5.2.5/§5.2.6) + `EXCLUDE USING gist` chỉ chặn hai kỳ `DaChot` (`:133-179`) — EF **không** sinh được NND/partial/`EXCLUDE` |
+| Kế hoạch GĐ3 | ✅ **đã hiện thực `WP-26`** (`RepRunLogs`/`RepConsistencyChecks`/`RepPeriodCloses`); trước đó `EXCLUDE` + `btree_gist` đã chứng minh trên PG17 (khuôn Tax — `D-171`) và nay **đã đạt 4 ca** ở §5.2.6 |
+| Seed | **Không** seed dữ liệu nghiệp vụ. Chỉ seed permission `eCommerce.Reports` + `.Aggregate` + `.Rebuild` + `.PeriodClose` + `.PeriodReopen` + `.Reconcile` (ABP idempotent; `DbMigrator` cấp cho role `admin`); **không** seed `RptWatermarks` — mốc `null` = chưa chạy |
 | Ảnh hưởng dữ liệu cũ | Backfill bằng job tổng hợp **theo khoảng ngày** (không script SQL rời); mỗi lượt giới hạn **366 ngày** (`Reports:0003`) |
-| Rollback | `Down()` xoá **8 bảng `Rpt*`**. ✅ An toàn: read-model; nguồn sự thật ở `OrdOrders`/`PosRetailBills`/`InvItems` |
+| Rollback | `Wp08_BaoCao_Reporting.Down()` xoá **8 bảng `Rpt*`** — ✅ an toàn (read-model; nguồn sự thật ở `OrdOrders`/`PosRetailBills`/`InvItems`). `Wp26_VanHanh_BaoCao.Down()` xoá **3 bảng `Rep*`** — ⚠️ **mất audit** (`RepRunLogs`)/dấu chốt kỳ; chỉ lùi khi chấp nhận mất lịch sử vận hành |
 | Kiểm chứng | Migration **phải** chạy được **từ DB trống** *và* trên **DB đã có dữ liệu** (`XC-002` §11) |
 
 > 📌 **Phạm vi triển khai theo giai đoạn:**
@@ -758,7 +870,7 @@ Mọi biên vào từ ngoài (webhook sàn `SAL-005`, IPN `PaymentHub`, webhook 
 > | **GĐ1** | `OrderLine.TaxAmount` (thuế đã chốt trên dòng) | ✅ có; `TaxRate`/`TaxClassificationId` **chưa có** (kế hoạch) |
 > | **GĐ1** | `Pricing.CostPrice` (nguồn giá vốn) | ✅ entity + `DbSet` đã có; **fact chưa có cột giá vốn** |
 > | **GĐ3** | **`REP-001`** — module + 8 bảng + job + API đọc | ✅ **đã có (WP-08)** |
-> | **GĐ3** | rebuild/chốt kỳ/đối chiếu lộ lệch (`RepRunLog`/`RepPeriodClose`/`RepConsistencyCheck`) | ⬜ kế hoạch |
+> | **GĐ3** | rebuild/chốt kỳ/đối chiếu lộ lệch (`RepRunLogs`/`RepPeriodCloses`/`RepConsistencyChecks`) | ✅ **đã có (`WP-26`)** |
 > | **GĐ3** | `REP-002`, `REP-003`, `ACC-001` — nội dung báo cáo/xuất liệu | ⬜ chưa có |
 
 ---
@@ -781,16 +893,23 @@ Mọi biên vào từ ngoài (webhook sàn `SAL-005`, IPN `PaymentHub`, webhook 
 | **Redis chết** | sự cố hạ tầng | **fail-open**: job vẫn chạy; DB (unique + thay thế ngày) chặn trùng | bình thường |
 | Không giành được khoá | instance khác đang chạy | **ném** `KhongGianhDuocKhoa` (API `409`; job nền bỏ nhịp) | `409` |
 | Job đứt giữa đường | deploy / hết bộ nhớ | mốc **không** đổi cho ngày dở ⇒ chạy tiếp từ mốc | — |
-| Đơn bị xoá mềm ở module nguồn | dọn dữ liệu / huỷ | read-model **vẫn còn** số liệu (D14) | `200` + ghi chú |
+| Đơn bị xoá mềm ở module nguồn | dọn dữ liệu / huỷ | read-model **vẫn còn** số liệu **tới lượt tổng hợp kế tiếp của ngày đó** — lượt sau thay thế theo ngày nên dòng **biến mất** (D14) | `200` + ghi chú |
 | **Thiếu `DbSet`** cho entity read-model | lỗi lập trình | DI nổ khi resolve `IRepository<Rpt*, Guid>` | `500` — test `TC-01` |
 | Lỗi runtime DB (deadlock, timeout) | tải | rollback UoW của **ngày đó** (ngày trước đã commit) | `500` |
-| Chốt kỳ · rebuild · đối chiếu lộ lệch | — | ⬜ **kế hoạch GĐ3** (`RepRunLog`/`RepPeriodClose`/`RepConsistencyCheck`) | — |
+| Rebuild `TonKho` cho ngày quá khứ | ảnh tồn kho là **trạng thái hiện tại** | **NÉM** `KhongHoTroRebuild` (không tạo lịch sử giả — `D-272`) | `400` + `Reports:0013` |
+| Rebuild/ghi giao kỳ `DaChot` | số liệu đã phát hành | **từ chối**, `0` dòng thay đổi | `409` + `Reports:0011` |
+| Chốt kỳ khi còn dòng lệch **mở** | đối chiếu chưa sạch | **từ chối** chốt (rollback UoW) | `409` + `Reports:0014` |
+| Hai kỳ `DaChot` chồng nhau | chốt trùng khoảng | app chặn trước; DB `23P01` là hàng rào cuối | `409` + `Reports:0012` |
+| Mở lại kỳ lý do < 20 / đóng kỳ < 10 | lý do không đủ | **từ chối** | `400` + `Reports:0016` |
+| Chạy tiếp lượt **không có** checkpoint | lượt chết trước cửa sổ đầu | **từ chối**, phải `Rebuild` tường minh | `409` + `Reports:0017` |
+| `runId`/`periodId` không tồn tại | sai id / khác tenant | `404` | `Reports:0010` |
 
 **Chiến lược transaction:**
 - **Job tổng hợp:** mỗi ngày một lượt — `DELETE` rồi `INSERT` rồi cập nhật mốc, commit xong mới sang ngày sau (`TongHopBaoCaoService.cs:150-166`, D-47 ②).
   ⚠️ **Cố ý KHÔNG** dùng một transaction cho cả lượt dài: transaction lớn giữ lock + phình WAL và **mất hết** nếu đứt.
 - **API chỉ đọc:** **không** mở transaction ghi.
-- **Chốt kỳ / rebuild:** ⬜ kế hoạch GĐ3.
+- **Rebuild (as-built `WP-26`):** `ICurrentTenant.Change(run.TenantId)` **trước mọi UoW**; **mỗi ngày một UoW** ghi fact + `GhiCuaSo` **cùng commit**; trạng thái terminal (`Succeeded`/`PartiallySucceeded`/`Failed`) trong **UoW riêng** để không bị rollback cùng cửa sổ lỗi (`ReportRebuildWorker.cs:99-201`). Lượt bận khoá ⇒ giữ `Queued`, thử nhịp sau.
+- **Chốt/mở kỳ (as-built):** `[UnitOfWork(isTransactional: true)]` — tạo kỳ → đối chiếu → kiểm còn lệch → `BatDauChot` + `Chot` trong **một** transaction (`ReportAdminAppService.cs:176-248`); còn lệch ⇒ `0014` + rollback.
 
 ---
 
@@ -804,32 +923,31 @@ Mọi biên vào từ ngoài (webhook sàn `SAL-005`, IPN `PaymentHub`, webhook 
 | **NFR-REP-001-004** | Số liệu khớp dữ liệu gốc | lệch **0 đồng** trên mẫu **1.000** dòng đơn; **0** dòng trong `RepConsistencyCheck` chưa xử lý ở trạng thái bình thường | test `TC-05` + `TC-19`; query kiểm tra |
 | **NFR-REP-001-005** | Idempotent | chạy lại cùng **lượt tổng hợp** **1.000** lần ⇒ số liệu **không đổi** (cùng số dòng, giá trị giống hệt) | test `TC-03` lặp 1.000 vòng |
 | **NFR-REP-001-006** | Mở rộng ngang | **3** instance chạy song song ⇒ **0** dòng trùng, tổng **bằng** chạy 1 instance | integration test 3 tiến trình (hoặc 3 UoW song song + ước lượng) |
-| **NFR-REP-001-007** | Quan sát được | **100 %** lần chạy job có `CorrelationId` + dòng `RepRunLog`; mọi lệch có metric + log ≥ `Warning` | `XC-005` TC-04 + test đọc `RepRunLog` |
+| **NFR-REP-001-007** | Quan sát được | **Mọi** lượt `Rebuild`/`Reconcile` có `CorrelationId` + **1** dòng `RepRunLogs`; lượt `Aggregate` **có việc/lỗi** cũng ghi dòng; lượt rỗng **0** dòng nhưng **vẫn** có log + `reporting_watermark_lag_seconds` (`D-271`) | test đọc `RepRunLogs` (đếm dòng theo `JobName`); `XC-005` TC-04 |
 | **NFR-REP-001-008** | Cách ly tenant | tenant A **không** thấy **1** dòng nào của tenant B (mọi endpoint) | integration test 2 tenant `TC-06` |
 | **NFR-REP-001-009** | Khả năng chạy tiếp | rebuild **1 năm** bị đứt ở tháng thứ **7** ⇒ chạy tiếp **không** tính lại 6 tháng đầu (**0** cửa sổ chạy lại) | test `TC-10` (giả lập lỗi) |
 | **NFR-REP-001-010** | Kích thước read-model | ≤ **3×** số dòng giao dịch nguồn cho cùng kỳ (không phình do ghi lại) | so `COUNT(*)` giữa fact và `OrdOrderLines` |
 
-**Metric — hiện trạng 24/11/2026**
+**Metric — hiện trạng 27/11/2026**
 
-`shared/eCommerce.Kernel/Observability/eCommerceMetrics.cs` phát **16** metric (`All` ở `:81-107`); **0** metric `reporting_*`.
-Test `MetricsTests` **không còn** chốt cứng 12 — đã chuyển sang `Assert.Equal(All.Count, All.Distinct().Count())` (`test/eCommerce.Tests/Observability/MetricsTests.cs:39-73`); hậu tố hợp lệ `{_total, _seconds, _size, _pending, _skus}`.
-⇒ `REP-001` **đề xuất 4 metric mới** (as-built **chưa có**), đặt tên đúng hậu tố:
+`shared/eCommerce.Kernel/Observability/eCommerceMetrics.cs` phát **30** metric (`All` ở `:129-171`): **26** có trước `WP-26`, **+4** do `WP-26` (`D-273`); trước đó **0** metric `reporting_*`. Test `MetricsTests` **không** chốt cứng số — `Assert.Equal(All.Count, All.Distinct().Count())` (`test/eCommerce.Tests/Observability/MetricsTests.cs:39-73`); hậu tố hợp lệ `{_total, _seconds, _size, _pending, _skus}`.
+⇒ 4 metric **đã có** (as-built), mô hình **thay thế** — **KHÔNG** "upsert":
 
-| Metric đề xuất | Loại | Nhãn (hữu hạn) | Ý nghĩa |
+| Metric | Loại | Nhãn (hữu hạn) | Ý nghĩa | Điểm phát (as-built) |
+|---|---|---|---|---|
+| `reporting_watermark_lag_seconds` | Gauge | `projection` | tuổi dữ liệu (cảnh báo > 900 s) | `ReportRebuildWorker.cs:199-200`; `SetReportingWatermarkLagSeconds` (`eCommerceMetrics.cs:425`) |
+| `reporting_projection_failed_total` | Counter | `projection`, `reason` | số cửa sổ tổng hợp/đối chiếu **lỗi** | `ReportRebuildWorker.cs:153-156` |
+| `reporting_rows_written_total` | Counter | `projection` | số dòng **đã ghi** (thay thế) | `ReportRebuildWorker.cs:145` |
+| `reporting_replace_conflict_total` | Counter | `projection` | số lần **chạm thay thế** (mỗi cửa sổ ghi lại) | `ReportRebuildWorker.cs:146` |
+
+**Việc bắt buộc khi thêm metric — ✅ đã làm (`WP-26`):**
+
+| # | Việc | File / vị trí | Trạng thái |
 |---|---|---|---|
-| `reporting_watermark_lag_seconds` | Gauge | `projection` | tuổi dữ liệu (cảnh báo > 900 s) |
-| `reporting_projection_failed_total` | Counter | `projection`, `reason` | số lần tổng hợp/đối chiếu thất bại |
-| `reporting_rows_upserted_total` | Counter | `projection` | số dòng đã ghi (thông lượng) |
-| `reporting_upsert_conflict_total` | Counter | `projection` | số lần chạm unique/thay thế |
-
-**Việc bắt buộc khi thêm metric (quy tắc vàng: sửa tài liệu trước, rồi mới code):**
-
-| # | Việc | File / vị trí | Bằng chứng hiện trạng |
-|---|---|---|---|
-| 1 | Bổ sung tên vào `eCommerceMetricNames.All` | `shared/eCommerce.Kernel/Observability/eCommerceMetrics.cs:81-107` | hiện **16** phần tử |
-| 2 | Tạo instrument trong constructor | cùng file, `:305-355` | mỗi metric tạo tường minh |
-| 3 | Thêm nhãn `projection` vào `Allowed` | `eCommerceMetrics.cs:212` | nhãn ngoài `Allowed` ⇒ vi phạm `XC-005` BR-009 |
-| 4 | Cập nhật bảng đăng ký metric `XC-005` §5.1 | `docs/features/cross-cutting/XC-005-observability-log-metric.md` | hiện 16 dòng |
+| 1 | Bổ sung tên vào `eCommerceMetricNames.All` | `eCommerceMetrics.cs:129-171` | ✅ **30** phần tử |
+| 2 | Tạo instrument trong constructor | cùng file | ✅ mỗi metric tạo tường minh |
+| 3 | Thêm nhãn `projection` vào `Allowed` | `eCommerceMetrics.cs:298-299` | ✅ nhãn ngoài `Allowed` ⇒ vi phạm `XC-005` BR-009 |
+| 4 | Cập nhật bảng đăng ký metric `XC-005` §5.1 | `docs/features/cross-cutting/XC-005-observability-log-metric.md` | ✅ 30 dòng |
 
 > 📌 **Cấm nhãn cardinality cao** (`XC-005` BR-009): **không** `sku`, **không** `orderId`, **không** `tenantId` (nhãn duy nhất `projection` — tập hữu hạn). Truy vết theo SKU ⇒ **dùng log**.
 
@@ -839,7 +957,7 @@ Test `MetricsTests` **không còn** chốt cứng 12 — đã chuyển sang `Ass
 |---|---|---|
 | Job chạy xong | `Information` | `Nguon`, `TuNgay`, `DenNgay`, `SoDongSuKien`, `SoDongTongHop`, `DurationMs` |
 | Chứng từ 0 dòng (bỏ qua) | `Warning` | `Ngay`, `SoChungTu` |
-| Phát hiện lệch số (kế hoạch GĐ3) | `Error` | `ProjectionName`, `FactDate`, `MismatchKind`, `Delta` |
+| Phát hiện lệch số (as-built `WP-26`) | `Warning` | `Projection`, `FactDate`, `MismatchKind`, `Delta` |
 | Ảnh tồn kho chiều âm (chặn) | `Error` | `Kho`, `Sku`, `OnHand` |
 | 🔒 **Cấm** | — | **Không** log payload thô, **không** log PII/token (`XC-005` BR-005) |
 | 🔒 **Cấm** log trong vòng lặp nóng | — | `XC-005` BR-004: **không** log `Information` cho **từng** ngày/dòng — chỉ log **tổng kết** mỗi lượt |
@@ -857,7 +975,7 @@ Test `MetricsTests` **không còn** chốt cứng 12 — đã chuyển sang `Ass
 | **TC-03** | Idempotent: chạy lại **batch** **1.000 lần** ⇒ số liệu không đổi | Unit/Integration | `TinhNgay` + thay thế theo `(ngày, nguồn)` × 1.000 (cùng ngày) | cùng số dòng; số liệu **không đổi** (D-47 ①) | **BR-005**, NFR-005 |
 | **TC-03b** | Chạy lại **cùng ngày** không nhân đôi | Unit | `TinhNgay` + thay thế 2 lần cùng ngày | cùng số dòng & cùng số liệu (D-47 ①) | **BR-013**, D4 |
 | **TC-04** | Job định kỳ khi **đang bận** ⇒ bỏ qua **có** log + metric | Unit | `SkipIfBusy`, khoá đã bị giữ | **không** ném lỗi; **có** log **và** `lock_skipped_total` | **BR-007** (`XC-003` BR-010) |
-| **TC-05** | Sửa **nguồn** rồi chạy lại ⇒ read-model khớp nguồn; đối chiếu lộ lệch là **kế hoạch GĐ3** | Integration | sửa thẳng DB nguồn 1 dòng rồi chạy lại ngày | fact khớp nguồn sau lượt thay thế; (`RepConsistencyCheck` ⬜ GĐ3) | **BR-012**, NFR-004 |
+| **TC-05** | Sửa **nguồn** rồi chạy lại ⇒ read-model khớp nguồn; đối chiếu **lộ lệch** | Integration | sửa thẳng DB nguồn 1 dòng rồi chạy lại ngày; chạy `RunReconciliation` | fact khớp nguồn sau lượt thay thế; trước khi chạy lại ⇒ `RepConsistencyChecks` có dòng lệch + metric | **BR-012**, NFR-004 |
 | **TC-05b** | Mốc **không** tiến khi ghi ngày lỗi | Integration | ném lỗi **sau** khi `INSERT` trong cùng ngày | `LastAggregatedDate` **giữ nguyên** (D-47 ⑤) | **BR-006**, D12 |
 | **TC-06** | Cách ly tenant | Integration | tenant A đọc, dữ liệu của B có sẵn | **0** dòng của B; `403` khi thiếu permission | **BR-003**, **NFR-008** |
 | **TC-07** | Nguồn khai báo hợp lệ: `NguonBaoCao` chỉ có `BanLe`/`DonHang` cho doanh thu, `TonKho` chỉ cho mốc/ảnh | Unit (reflection/enum) | nguồn của dòng sự kiện | không có dòng sự kiện mang `TonKho`; `TonKho` không hợp lệ ⇒ `Reports:0001` | E6, D2 |
@@ -866,19 +984,19 @@ Test `MetricsTests` **không còn** chốt cứng 12 — đã chuyển sang `Ass
 | **TC-10** | Rebuild **chạy tiếp** không tính lại | Integration | rebuild 12 tháng, đứt ở tháng 7, gọi `Resume` | 6 tháng đầu **không** chạy lại (**0** upsert cho cửa sổ cũ) | **NFR-009** |
 | **TC-11** | Idempotency của **Rebuild** | Integration | gọi `StartRebuild` **2 lần** cùng khoảng + cùng lý do | **1** `RepRunLog`; lần 2 trả `AlreadyRequested` | §7.3, **BR-005** |
 | **TC-12** | Doanh thu = `Σ thành tiền dòng − chiết khấu chứng từ`; tổng theo dòng = tổng theo ngày (D5/D-48) | Unit | cùng dữ liệu gọi `TinhNgay` | **Σ `DoanhThu` bằng nhau** (so `Delta`, **không** `==`) | **BR-004**, D5 |
-| **TC-13** | **Không** có write endpoint trên bảng fact | Unit (reflection) | quét route của `ReportAppService` | **0** route `POST/PUT/DELETE` trên fact | **BR-001** |
+| **TC-13** | **Không** có write endpoint trên bảng fact | Unit (reflection) | quét route của **`ReportsController`** (khuôn `Wp08BaoCaoTests.Controller_bao_cao_PHAI_co_du_5_route…`) | **0** route `POST/PUT/DELETE` trên fact; các route `POST` chỉ tới `aggregate`/`rebuild`/`period-close`/`reconciliation` | **BR-001** |
 | **TC-14** | Không `double`/`float` trong read-model | Unit (reflection) | duyệt assembly `eCommerce.Reporting.Domain` | **0** xuất hiện | **BR-004** (`XC-001` BR-008) |
 | **TC-15** | ⭐ **Một chiều**: module nguồn **không** tham chiếu `Reporting` | Unit (reflection) | quét assembly `Sales`/`Inventory`/`PaymentHub`/`Catalog` | **0** kiểu `eCommerce.Reporting.*` | **BR-010** |
 | **TC-16** | Chỉ **xoá trong lượt thay thế** theo `(ngày, nguồn)`; **cấm** xoá lẻ | Unit (quét mã nguồn) | mọi `DeleteAsync`/`DeleteManyAsync` trên `IRepository<Rpt*>` | chỉ có ở `TongHopBaoCaoService`, lọc `BusinessDate == ngày`; **0** lời gọi xoá lẻ / API xoá | **BR-009**, D-47 ② |
 | **TC-17** | Phản hồi nói **"chưa tổng hợp" ≠ 0** | Unit | gọi endpoint khi mốc `null` | `DaTongHop = false`; **không** trả `0` (`AsOfUtc` ⬜ GĐ3) | **BR-014**, D7 |
-| **TC-18** | Dòng nguồn **trùng** ⇒ `Reports:0008` | Unit | 2 dòng cùng `SourceLineId` trong một ngày | ném `eCommerce:Reports:0008` | **BR-013** |
-| **TC-19** | Chốt kỳ khi **còn lệch** ⇒ **từ chối** (⬜ GĐ3) | Integration | có 1 dòng `RepConsistencyCheck` mở | từ chối chốt | §3.3, D8 |
+| **TC-18** | Dòng nguồn **trùng** ⇒ `Reports:0008` | **Integration** (unique `(TenantId, Nguon, SourceLineId)` ở DB) | chèn 2 dòng cùng `SourceLineId` trong một ngày | DB ném `23505` (unique NND) / app ném `eCommerce:Reports:0008` | **BR-013** |
+| **TC-19** | Chốt kỳ khi **còn lệch** ⇒ **từ chối** | Integration | có 1 dòng `RepConsistencyCheck` **mở** (`ResolvedAtUtc IS NULL`) trong khoảng | `eCommerce:Reports:0014` (409); kỳ **không** sang `DaChot` | §3.3, D8 |
 | **TC-20** | Mọi entity read-model là `IMultiTenant` + `TenantId` nullable có unique index dùng `NULLS NOT DISTINCT` | Unit (reflection + migration) | duyệt 8 entity; đọc migration | **8/8** là `IMultiTenant`; `TenantId` **nullable** (`Guid?`) + unique index `NULLS NOT DISTINCT` | **BR-003** |
 | **TC-21** | Không SQL nối chuỗi; tham số nhóm/sắp xếp **chỉ** tập đóng | Unit (quét mã nguồn) | tìm `$"SELECT` / `+ "SELECT"` trong module | **0** match; tham số nhóm là enum/tập đóng | **BR-015**, D11 |
-| **TC-22** | **Cấm** rebuild khoảng mở + **bắt buộc** lý do (⬜ GĐ3) | Unit + Integration | `StartRebuild` thiếu `ToDate`, hoặc `Reason` rỗng | `eCommerce:Reports:0003`; **và** CHECK ở DB chặn | **BR-011**, D10 |
-| **TC-23** | Ghi vào kỳ **đã chốt** ⇒ không ghi + ghi nhận | Integration | chốt kỳ 01–30/09, rồi đẩy sự kiện ngày 15/09 | **0** thay đổi fact; `RepConsistencyCheck` loại `LateEventInClosedPeriod` | A3, D8 |
+| **TC-22** | **Cấm** rebuild khoảng mở + **bắt buộc** lý do + **cấm** `TonKho` quá khứ | Unit + Integration | `StartRebuild`: thiếu `ToDate`/khoảng đảo; `Reason` rỗng/9 ký tự; `TonKho` ngày cũ | khoảng ⇒ **`0002`/`0003`**; lý do ⇒ **`0016`** (400); `TonKho` quá khứ ⇒ **`0013`** (400); CHECK DB tương ứng | **BR-011**, D10/D-272/D-274 |
+| **TC-23** | Ghi vào kỳ **đã chốt** ⇒ **từ chối** | Integration | chốt kỳ 01–30/09, rồi `StartRebuild`/tổng hợp ngày 15/09 | **0** dòng fact thay đổi; `eCommerce:Reports:0011` (409); `MismatchKind.SuKienTre` **dự trữ** (chưa phát) | A3, D8 |
 
-**Tổng:** **23** test case · phủ **15** BR và **10** NFR.
+**Tổng:** **25** test case · phủ **15** BR và **10** NFR.
 
 ### 14.2 Fixture skeleton (xUnit)
 
@@ -926,7 +1044,7 @@ public class TongHopDoanhThuTests
 
 ### 14.3 Acceptance Criteria (Definition of Done)
 
-- [ ] **23** test case ở §14.1 pass (Integration chạy được trên PostgreSQL thật), phủ **hết 15 BR** và **10 NFR**
+- [ ] **25** test case ở §14.1 pass (Integration chạy được trên PostgreSQL thật), phủ **hết 15 BR** và **10 NFR**
 - [x] ✅ **8 bảng `Rpt*`** đã tạo bằng migration `20261104033300_Wp08_BaoCao_Reporting`; chạy được **từ DB trống** *và* trên **DB đã có dữ liệu**
 - [x] ✅ ⭐ `DbSet` cho **8** entity đã khai trên `eCommerceDbContext.cs:260-274`; `TC-01` xanh
 - [ ] **`TC-02` xanh**: **0** query bảng giao dịch ngoài job tổng hợp
@@ -934,10 +1052,11 @@ public class TongHopDoanhThuTests
 - [ ] **`TC-03` xanh**: chạy lại cùng ngày **1.000** lần ⇒ số liệu **không đổi**
 - [ ] **`TC-13` xanh**: **0** write endpoint trên bảng fact
 - [ ] **`[Authorize]` ở cấp CLASS** trên `ReportAppService` + quyền `eCommerce.Reports` đã khai; test `401`/`403` xanh
-- [ ] **4 metric đề xuất** đã đăng ký + phát thật; ⚠️ bảng §5.1 của `XC-005` cập nhật (hiện `All` = 16, thêm 4 ⇒ **20**; test **không** còn chốt cứng số)
+- [x] ✅ **4 metric `reporting_*`** đã đăng ký + phát thật (`WP-26`); `All` = **30** (`eCommerceMetrics.cs:129-171`), nhãn `projection`; `XC-005` §5.1 cập nhật 30 dòng; test **không** còn chốt cứng số
 - [ ] **Job chạy được trên 3 instance** ⇒ **0** dòng trùng (NFR-006)
 - [ ] ⚠️ **Ghi rõ việc còn nợ**: cột **giá vốn** (`CostAmount`) và snapshot `TaxRate`/`TaxClassificationId` **chưa có** ⇒ quay lại bổ sung khi `PRC-*`/`SAL-002` xong
-- [ ] ⬜ **Kế hoạch GĐ3**: rebuild/backfill đã chạy **thật** có audit; chốt kỳ `RepPeriodClose` đạt **4 ca** §5.2.6 (kỹ thuật `EXCLUDE` đã chứng minh trên PG17 — `D-171`); đối chiếu lộ lệch
+- [x] ✅ **Kế hoạch GĐ3 đã hiện thực (`WP-26`/`W26-2`)**: migration `20261126181842_Wp26_VanHanh_BaoCao` (3 bảng `Rep*`, 0 FK); `EXCLUDE USING gist` + 4 unique NND/partial; rebuild/backfill có audit + checkpoint; chốt/mở kỳ; đối chiếu lộ lệch; 10 route §6.2; 4 permission `eCommerce.Reports.*`
+- [ ] ⬜ **Đo** `EXPLAIN` index (NFR-003/007), 3 instance (NFR-006), TC-06 2 tenant / TC-10 resume đầy đủ — **để QA**
 - [ ] Tài liệu này cập nhật khớp code sau khi code
 
 ### 14.4 Definition of Ready (trước khi bắt đầu code)
@@ -946,11 +1065,11 @@ public class TongHopDoanhThuTests
 - [x] ✅ Vị trí module đã chốt: **`modules/Reporting/eCommerce.Reporting.{Domain,EntityFrameworkCore,Application,Application.Contracts}`**
 - [x] ✅ Đã kiểm hiện trạng: module + **8 bảng `Rpt*`** + job + API **đã có (WP-08)**
 - [x] ✅ Đã xác định danh sách **nguồn** (§7.1): POS + đơn + `InventoryItem`
-- [x] ✅ Đã xác định **16** metric hiện có và **đề xuất 4 metric mới** (§13)
+- [x] ✅ Đã xác định **26** metric có trước `WP-26` và **4** metric mới ⇒ `All` = **30** (§13)
 - [x] ✅ **Q1** — `Closed (D-170)`: `INV-001` ghi **2 bút toán đối ứng** (`TransferOut` + `TransferIn`); hệ quả cho `REP-003` ghi ở §5.3 (việc chéo còn nợ)
-- [x] ✅ **Q2** — `Closed (D-171)`: `EXCLUDE USING gist` + `btree_gist` **đã chạy thật** trên `postgres:17-alpine` (Tax migration + `PostgreSqlSchemaTests` 96/96); điều kiện 4 ca + fallback ở §5.2.6
+- [x] ✅ **Q2** — `Closed (D-171)`: `EXCLUDE USING gist` + `btree_gist` **đã chạy thật** trên `postgres:17-alpine` (Tax migration + `PostgreSqlSchemaTests` 96/96); `RepPeriodCloses` **đã đạt 4 ca** ở §5.2.6
 - [ ] **Q3** — Chấp thuận thêm gói **`Dapper`** vào `Directory.Packages.props`? (D11) — **cần Kiến trúc trưởng**
-- [x] ✅ **Q4** — `Closed (D-172)`: mặc định **Setting theo tenant** — job **5 phút**, lookback **3 ngày**, `IsStale` **900 s**; đo lại sau pilot. ⚠️ Code hiện `NhipMacDinhPhut = 15` (`ReportingOptions.cs:17-18`, `ReportingAggregationWorker.cs:31`) là **chỗ lệch cần sửa**; một `Timer.Period` ⇒ chạy nhịp nhỏ nhất và bỏ qua tenant chưa tới hạn, **cấm** cache Setting lúc khởi động
+- [x] ✅ **Q4** — `Closed (D-172)` nhưng **ngoài `WP-26`** (`D-273`): mặc định **Setting theo tenant** — job **5 phút**, lookback **3 ngày**, `IsStale` **900 s**; đo lại sau pilot. ⚠️ Code hiện `ReportingOptions.NhipJobPhut` = **15** (`ReportingOptions.cs:17-18`) + `ReportingAggregationWorker.NhipMacDinhPhut` = **15** (`ReportingAggregationWorker.cs:31`) — **chỗ lệch** cần sửa ở WP `D-172`; một `Timer.Period` ⇒ chạy nhịp nhỏ nhất và bỏ qua tenant chưa tới hạn, **cấm** cache Setting lúc khởi động
 - [ ] **Q5** — Chốt **đơn vị ngày** của `FactDate` (**Asia/Ho_Chi_Minh**) và xử lý ca đơn tạo **23:59** giờ VN — **cần Kế toán**
 
 ---
@@ -964,7 +1083,7 @@ public class TongHopDoanhThuTests
 | **Q1** | `INV-001` ghi bút toán `Transfer` thế nào — **2 bút toán đối ứng** (kho xuất âm + kho nhập dương) hay **1 bút toán có `ReferenceId` của kho đối ứng**? | Dev Inventory + Kiến trúc trưởng | `Closed (D-170)` — `INV-001` ghi **2 bút toán đối ứng** (`TransferOut` + `TransferIn`, cùng `ReferenceLineId`, cùng UoW); `REP-001` không bị chặn (dùng ảnh tồn kho); hệ quả `ClosingQty`/`TransferInQty`/`TransferOutQty` cho `REP-003` ở §5.3 | — |
 | **Q2** | `EXCLUDE USING gist` + `btree_gist` cho `RepPeriodClose` có chạy được trên PostgreSQL 17 (Docker) không? | Dev + Vận hành | `Closed (D-171)` — **đã chạy thật** trên `postgres:17-alpine` (Tax migration `20261013012648_Add_Tax_Module.cs:118-130` + `PostgreSqlSchemaTests` **96/96**); cảnh báo `XC-006` §14.5 *"chưa chạy thử"* nay **lạc hậu**; bảng mới vẫn phải đạt 4 ca + fallback ở §5.2.6 | — |
 | **Q3** | Có được thêm gói **`Dapper`** vào `Directory.Packages.props` không? (D11) | Kiến trúc trưởng | ✅ `Đã chốt — code`: as-built dùng EF `Delete` + `InsertMany`, **không** Dapper (`TongHopBaoCaoService.cs:154-166`) ⇒ không cần thêm gói | — |
-| **Q4** | Nhịp job đối chiếu (**5 phút**) + lookback (**3 ngày**) + ngưỡng `IsStale` (**900 s**) có phù hợp với lưu lượng thật? | Vận hành + Kế toán | `Closed (D-172)` — **Setting theo tenant**: job **5 phút**, lookback **3 ngày**, `IsStale` **900 s** (= 3× nhịp), đo lại sau pilot. ⚠️ Code hiện `NhipMacDinhPhut = 15` (`ReportingOptions.cs:17-18`, `ReportingAggregationWorker.cs:31`) là **chỗ lệch cần sửa**, **không** phải chuẩn; một `Timer.Period` ⇒ chạy nhịp nhỏ nhất + bỏ qua tenant chưa tới hạn qua `ISettingProvider`, **cấm** cache Setting lúc khởi động | — |
+| **Q4** | Nhịp job đối chiếu (**5 phút**) + lookback (**3 ngày**) + ngưỡng `IsStale` (**900 s**) có phù hợp với lưu lượng thật? | Vận hành + Kế toán | `Closed (D-172)` nhưng **ngoài `WP-26`** (`D-273`) — **Setting theo tenant**: job **5 phút**, lookback **3 ngày**, `IsStale` **900 s** (= 3× nhịp), đo lại sau pilot; `WP-26` **giữ** nhịp as-built **15 phút**, mở WP riêng. ⚠️ Code hiện `ReportingOptions.NhipJobPhut` = **15** (`ReportingOptions.cs:17-18`) + `ReportingAggregationWorker.NhipMacDinhPhut` = **15** (`ReportingAggregationWorker.cs:31`); một `Timer.Period` ⇒ chạy nhịp nhỏ nhất + bỏ qua tenant chưa tới hạn qua `ISettingProvider`, **cấm** cache Setting lúc khởi động | — |
 | **Q5** | `FactDate` chốt theo **giờ VN** — đơn tạo **23:59 ngày 30/09** nhưng sự kiện `Paid` tới **00:05 ngày 01/10** thì tính vào kỳ nào? | Kế toán trưởng | ✅ `Đã chốt — D-114 (P4)`: kỳ = **ngày UTC+7 của sự kiện**; ghi nhận khi `Delivered` đã đối soát; kỳ đã chốt **không sửa**, lệch điều chỉnh **kỳ sau**. ⚠️ as-built tính ngày từ `CreationTime` (D-47 ④); chuyển mốc ghi nhận sang `Delivered` là việc **còn lại của GĐ3** | — |
 | **Q6** | Projection **COD** (`SHP-003`/`REC-003`) có cần `REP-001` không, hay để `REC-003` tự lo bảng riêng? | Kiến trúc trưởng + Kế toán | `Closed (D-173)` — `REP-001` **không** thêm bảng/cột/job COD; số COD lấy từ bảng đối soát `REC-003` (**chỉ** dòng đã khớp/đã xử lý), dòng chưa đối soát mang cờ `CodUnreconciled` ở `REP-003`; **không** tạm duyệt `REC-003`. Chi tiết §7.2 | — |
 | **Q7** | `CostAmount` (giá vốn): lấy giá vốn **tại thời điểm bán** (snapshot) hay **bình quân gia quyền** theo kỳ? | Kế toán trưởng + Kiến trúc trưởng | ✅ `Đã chốt — D-114 (P2)`: **bình quân gia quyền di động, chụp vào fact lúc bán**, có cấu hình; **chặn release** tới khi kế toán duyệt. ⚠️ fact **chưa có cột giá vốn** — cần bổ sung (còn nợ) | — |
@@ -977,7 +1096,7 @@ public class TongHopDoanhThuTests
 | **F1** | ✅ **ĐÃ GIẢI QUYẾT** — module `Reporting` (WP-08) + **8 bảng `Rpt*`** + job tổng hợp + API **đã có** | `modules/Reporting/…`; `eCommerceDbContext.cs:260-274`; migration `20261104033300_Wp08_BaoCao_Reporting` | ✅ (đúng kế hoạch) | Ghi ở §0/§5/§11 |
 | **F2** | **`OrderLine` CHƯA có snapshot thuế** (`TaxRate`, `TaxClassificationId`) — `XC-006` D3/BR-002 yêu cầu có; hiện chỉ có `TaxAmount` | `modules/Sales/eCommerce.Sales.Domain/Order.cs:832-840` | 🔴 **Cao** — `REP-001` **không** xuất được báo cáo theo **thuế suất** / đối chiếu Mẫu 01 theo từng mức thuế (`XC-006` BR-008) | ⬜ **Chưa sửa** — thuộc `SAL-002`; ghi vào §11/§15 Q |
 | **F3** | Giá vốn: entity `Pricing.CostPrice` **đã có** (PRC-001) + `DbSet`; **nhưng** bảng fact **chưa có cột giá vốn** | `eCommerceDbContext.cs:128`; `modules/Pricing/eCommerce.Pricing.Domain/CostPrice.cs` | 🟠 Trung bình — `REP-002` (lãi gộp) bị **chặn** | ⬜ Cần bổ sung cột giá vốn vào fact + chụp theo P2 (D-114); **cấm** hiện lãi gộp khi thiếu |
-| **F4** | **16 metric hiện tại KHÔNG có metric nào cho projection** ⇒ read-model tụt lại thì **không có gì cảnh báo** | `shared/eCommerce.Kernel/Observability/eCommerceMetrics.cs:81-107` — 16 tên, **0** tên `reporting_` | 🔴 **Cao** (mù vận hành — đúng lớp lỗi `XC-005` F1) | ✅ Đề xuất **4 metric mới** + việc phải sửa ở §13 |
+| **F4** | ✅ **ĐÃ GIẢI QUYẾT (`WP-26`)** — trước đó **0** metric nào cho projection ⇒ read-model tụt lại thì **không có gì cảnh báo** | Nay `All` = **30** (`eCommerceMetrics.cs:129-171`), 4 metric `reporting_*` phát thật (§13) | ✅ | Ghi ở §13 |
 | **F5** | **Có thư mục module "mồ côi"** từ lần đổi tiền tố (`ChannelHub.Domain`, `PaymentHub.Domain`) — chỉ còn `obj/`, **không** nằm trong solution | `modules/ChannelHub/ChannelHub.Domain/obj/…` và `modules/PaymentHub/PaymentHub.Domain/obj/…`; `eCommerce.slnx` **không** tham chiếu (chỉ `eCommerce.ChannelHub.*`) | 🟡 Thấp (không ảnh hưởng build) | ⬜ **Chưa dọn** — ghi nhận; khi tạo `modules/Reporting` **phải** dùng đúng tiền tố `eCommerce.Reporting.*` để không lặp lại |
 | **F6** | ✅ **ĐÃ GIẢI QUYẾT** — hạ tầng integration test PostgreSQL thật đã có | `test/eCommerce.IntegrationTests` (vào solution `eCommerce.slnx`) dùng `Testcontainers.PostgreSql 4.16.0`; `PostgreSqlWp08BaoCaoTests.cs` kiểm `TenantId = NULL` + index `NULLS NOT DISTINCT` | ✅ (đúng kế hoạch) | Ghi ở §14.2 |
 | **F7** | ✅ **ĐÃ ĐÓNG phần kỹ thuật** — `EXCLUDE USING gist` + `btree_gist` **đã chạy thật** trên `postgres:17-alpine`: migration Tax `20261013012648_Add_Tax_Module.cs:118-130` + `PostgreSqlSchemaTests` **96/96** (`D-171`) | `D-171` ①; cảnh báo `XC-006` §14.5 *"CHƯA chạy thử"* nay **lạc hậu** (BA `XC-006` cập nhật — ngoài WP-14) | ✅ (kỹ thuật) | Bảng `RepPeriodClose` vẫn phải đạt **4 ca** + fallback ở §5.2.6 trước `migrations add` |
@@ -1001,12 +1120,15 @@ public class TongHopDoanhThuTests
 | `v0.1` | 13/10/2026 | *(điền)* | Bản nháp đầu — lập **hiện trạng từ code thật** (chưa có module Reporting/bảng read-model/job tổng hợp); chốt **14 ADR**; phát hiện **F2** (`OrderLine` thiếu snapshot thuế ⇒ chặn báo cáo theo mức thuế) và **F4** (12 metric hiện có **0** metric cho projection ⇒ mù vận hành); đề xuất **4 metric mới** kèm 5 việc phải sửa (gồm `TC-06` của `XC-005`: 12 → 16) |
 | `v0.2` | 24/11/2026 | *(điền)* | **Đối chiếu mô hình Nhanh (WP-14)**: sửa thân theo `D-47`/`D-48` (grain dòng chứng từ, thay thế theo `(ngày, nguồn)`, doanh thu `Σ thành tiền dòng − chiết khấu chứng từ`, VAT tách, loại chứng từ huỷ); thêm POS `RetailBill` làm nguồn (D-18/D-42); bỏ `ProductVariantId` khỏi fact (D-07), tồn 9–10 chiều (D-27), số lượng `numeric(18,3)` (D-31); cập nhật hiện trạng (module + 8 bảng đã có), mã lỗi `eCommerce:Reports:*`, quyền `eCommerce.Reports`; đóng Q3 (code), Q5 (**D-114 P4**), Q7 (**D-114 P2**) |
 | `v0.3` | 24/11/2026 | *(điền)* | **Áp quyết định WP-14 (đợt C)**: đóng Q1 (**D-170** — `INV-001` 2 bút toán, hệ quả §5.3), Q2 (**D-171** — `EXCLUDE`/`btree_gist` đã chạy thật, điều kiện 4 ca ở §5.2.6), Q4 (**D-172** — Setting 5 phút/3 ngày/900 s), Q6 (**D-173** — không COD trong `REP-001`, nguồn `REC-003`, §7.2), Q8 (**D-174** — không bảng fact giờ, §0/§5.2); không đổi NFR/BR đã chốt |
+| `v0.4` | 27/11/2026 | vai `ba` (N89/W26-2) | **Đồng bộ SRS với `REP-001-arch` đã duyệt + code as-built `WP-26`** — áp `D-270`…`D-274` và 10 `docDeviation`/10 P3 vòng 3: §0/§0.1/§1/§3.1/§3.3/§5.1/§5.2.4–§5.2.6/§6.1/§6.2/§7.3/§8.1/§8.2/§8.3/§9/§10/§11/§12/§13/§14.1–§14.4/§15.1/§15.2. Sửa chính: quyền `eCommerce.Reports.*` (4 quyền con + `Reconcile`); metric **26→30** + tên `rows_written`/`replace_conflict` (mô hình **thay thế**); `Projection smallint`/`RowsWritten bigint`/`Reason` NOT NULL ≥10/`IdempotencyKey` NOT NULL + unique partial `WHERE RequestedBy IS NOT NULL`; `EXCLUDE` chỉ chặn kỳ `DaChot` + `btree_gist`; khoá `report:rebuild` 30 s tách `report:tong-hop` 2 s; `DaChot → DaMoLai` giữ dòng, chốt lại **tái dùng** dòng; `0010–0017` + map HTTP; NFR-007 theo `D-271`; 23→**25** test case; ERD đủ **8** bảng `Rpt*` |
 
 ---
 
-## Đối chiếu mô hình Nhanh (24/11/2026)
+## Đối chiếu mô hình Nhanh (24/11/2026 · bổ sung 27/11/2026)
 
 Đối chiếu bằng `codegraph_explore` + `read` trên `modules/Reporting/**`, `modules/Sales/**`, `modules/Pos/**`, `modules/Pricing/**`, `src/eCommerce.EntityFrameworkCore/**`. Bảng dưới là các chỗ lệch **đã sửa trong thân**; phần **chưa có trong code** ghi rõ "kế hoạch GĐ3".
+
+> 🔁 **Bổ sung 27/11/2026 (`WP-26`/`W26-2`):** đồng bộ SRS với `REP-001-arch` v0.4 (10 `docDeviation` `#1`–`#10`) + code as-built `WP-26` + `D-270`…`D-274`; 10 P3 vòng 3 của `docs/reviews/REP-001-docreview.md:37-48` đã đóng.
 
 > 🔁 **Vòng DOCREV 24/11/2026:** sửa hợp đồng as-built đúng code (`ChayTongHopAsync(ChayTongHopInput)`, `GetTongQuanDonHangAsync`/`GetTongQuanTonKhoAsync`, `ReportAppService`, `eCommerce:Lock:0001`, khoá `report:*`) và đồng bộ §2/TC-03/TC-16/TC-20 với `D-47` (bỏ đường `OrderStatusChangedEto`).
 
@@ -1029,6 +1151,12 @@ public class TongHopDoanhThuTests
 | D-172 (Q4) | §15.1 Q4: nhịp/lookback/`IsStale` `Open` | §15.1/§14.4: `Closed` — Setting 5 phút/3 ngày/900 s; code 15 phút là **lệch cần sửa** | `ReportingOptions.cs:17-18`; `ReportingAggregationWorker.cs:31` |
 | D-173 (Q6) | §7.2/§15.1 Q6: projection COD còn bỏ ngỏ | §7.2/§15.1: `REP-001` **không** có bảng/cột/job COD; nguồn `REC-003`, cờ `CodUnreconciled` ở `REP-003` | kế hoạch (0 code COD trong `modules/Reporting` — `D-173`) |
 | D-174 (Q8) | §15.1 Q8: cân nhắc `RepSalesHourlyFact` | §0/§5.2/§15.1: **không** bảng giờ; tổng hợp giờ = `date_trunc('hour', OccurredAtUtc)` lúc đọc | `FactSalesLine.cs:60-61,152` |
+| D-270 | §9: `eCommerce.Reporting.Rebuild/PeriodClose/PeriodReopen` | §6.1/§9: `eCommerce.Reports.{Rebuild,PeriodClose,PeriodReopen,Reconcile}` — 4 quyền **con** của `Reports.Default`, chỉ role `admin` tenant | `eCommerceConsts.cs:340-361`; `eCommercePermissionDefinitionProvider.cs:196-204` |
+| D-271 | §13 NFR-007: **100 %** lần chạy job có dòng `RepRunLog` | §13/§5.2.4: rebuild/reconcile **luôn**; `Aggregate` **chỉ** khi có việc/lỗi (lượt rỗng vẫn log + metric) | `RepRunLog.cs:29-33`; as-built `W26-2`/`D-275`: `ReportingAggregationWorker.cs:75-171` ghi dòng khi **có việc/lỗi** |
+| D-272 | §5.3/§10: rebuild `TonKho` mọi ngày | §3.1/§12: chỉ `FromDate == ToDate == hôm nay (UTC+7)`, `WindowsTotal = 1`; ngày cũ ⇒ `0013` (400) | `KhoangChot.KiemRebuildTonKho:52`; `ReportAdminAppService.cs:93` |
+| D-273 | §13 NFR-003/§15.1 Q4: nhịp 5 phút/lookback 3 ngày/`IsStale` 900 s | §13/§15.1: **ngoài `WP-26`**, giữ **15 phút** as-built; mở WP riêng | `ReportingOptions.cs:17-18`; `ReportingAggregationWorker.cs:31` |
+| D-274 | §3.3: chỉ mở lại ≥ **20** | §3.3/§6.2/§12: đóng **≥ 10**, mở lại **≥ 20**, rebuild **≥ 10** (sau `Trim`); thiếu ⇒ `0016` (400) | `RepPeriodClose.cs:19-23`; `ReportAdminAppService.cs:571-583` |
+| — (arch `#2`/`#9`) | §13: metric `rows_upserted`/`upsert_conflict`, `All` = 16 → 20 | §13: `reporting_rows_written_total`/`reporting_replace_conflict_total`; `All` = **26 → 30** | `eCommerceMetrics.cs:115-171` |
 
 ---
 
@@ -1040,11 +1168,12 @@ public class TongHopDoanhThuTests
 - Domain `Reporting`: 4 enum (`RepProjection`/`RepRunStatus`/`RepPeriodStatus`/`RepMismatchKind`, `smallint` + CHECK), 3 aggregate `RepRunLog`/`RepConsistencyCheck`/`RepPeriodClose` (máy trạng thái NÉM `0015`), hàm thuần `SoDoiChieu`/`BamKyChot`/`KhoangChot`, `RepIdempotency`, `ReportingLockKeys`, mã lỗi `0010–0017`.
 - Application.Contracts: `IReportAdminAppService` + DTO §4.1 (map tay, enum số, 0 PII).
 - Application: `ReportAdminAppService` (rebuild/resume/get/list · close/reopen/get/list · reconcile/getLech), `ReportRebuildWorker` (`ICurrentTenant.Change` trước UoW, mỗi ngày một UoW + `GhiCuaSo` cùng commit, terminal UoW riêng, resume từ `CheckpointDate+1`), `TongHopBaoCaoService.ChayKhoangAsync` (không giành khoá toàn cục).
+- 🆕 `D-275` (giữ `D-271`): `ReportingAggregationWorker` ghi `RepRunLog` cho lượt `Aggregate` — **có việc** (`BanHang`/`TonKho`) ghi trong **cùng UoW** trước `CompleteAsync`; **lỗi** ⇒ **đúng 1** dòng `Failed` ở UoW **riêng** sau rollback (`LastErrorCode` = `BusinessException.Code` hoặc tên kiểu); **rỗng**/**bỏ nhịp vì khoá** ⇒ **0** dòng. Quyết định ghi dòng tách thành hàm thuần `NhatKyAggregate` (+6 ca unit). ⚠️ Worker thật `DoWorkAsync` **chưa** có harness cho module `Reporting` ⇒ QA dựng khuôn `D-248` (testplan ghi "chưa kiểm được"), **không** đánh dấu đã phủ.
 - EF: 3 entity config + 3 `DbSet`; migration `20261126181842_Wp26_VanHanh_BaoCao` do EF sinh, sửa tay 4 unique index `NULLS NOT DISTINCT` (partial đúng §5.2/§5.3/§5.4) + `btree_gist` + `EXCLUDE USING gist` (§5.5). Expand-only (chỉ CREATE TABLE/INDEX/CHECK + EXTENSION/EXCLUDE).
 - Permission `eCommerce.Reports.{Rebuild,PeriodClose,PeriodReopen,Reconcile}` (hằng + `AddChild`); `[Authorize]` cấp class + method ghi quyền hẹp.
 - 4 metric (`reporting_watermark_lag_seconds`/`reporting_projection_failed_total`/`reporting_rows_written_total`/`reporting_replace_conflict_total`), `All` 26→30, nhãn `projection`; `XC-005` §5.1 cập nhật.
 - Endpoint §4.2 (10 route mới trên `ReportsController`) + map 8 mã lỗi ở Host §4.3.
-- Test: unit 2283→2336 (+53) gồm domain thuần/máy trạng thái/0013/0014/0016/0017/idempotency/enum/metric/endpoint metadata; integration 122/122 gồm 4 ca `EXCLUDE` (§10.2: EX-1..EX-5) + 4 unique NND + dòng hệ thống 2 lượt không `23505` + `UX_DangChay`.
+- Test: unit 2283→2342 (+59) gồm domain thuần/máy trạng thái/0013/0014/0016/0017/idempotency/enum/metric/endpoint metadata/`NhatKyAggregate` (D-275); integration 122/122 gồm 4 ca `EXCLUDE` (§10.2: EX-1..EX-5) + 4 unique NND + dòng hệ thống 2 lượt không `23505` + `UX_DangChay`.
 - Migration đã áp dev DB bằng `DbMigrator` (sau `pg_dump` `artifacts/pg-dump/N89-W26-2.dump`, 497829 byte); kiểm `__EFMigrationsHistory` + 3 bảng + `EXCLUDE` (`contype='x'`) + 4 NND index.
 
 **Chưa làm / để phiên sau:**
