@@ -9714,6 +9714,512 @@ namespace eCommerce.Migrations
                     b.ToTable("PrcTierPriceSets", (string)null);
                 });
 
+            modelBuilder.Entity("eCommerce.Promotions.FlashSaleSlot", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character(3)")
+                        .IsFixedLength();
+
+                    b.Property<Guid>("PromotionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("QuantityLimit")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<decimal>("SalePrice")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<string>("Sku")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<decimal>("SoldCount")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PromotionId");
+
+                    b.HasIndex("TenantId", "PromotionId")
+                        .HasDatabaseName("IX_ProFlashSaleSlots_TenantId_PromotionId");
+
+                    b.ToTable("ProFlashSaleSlots", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ProFlashSaleSlots_Slot", "\"SalePrice\" >= 0 AND \"SoldCount\" >= 0 AND \"SoldCount\" <= \"QuantityLimit\"");
+                        });
+                });
+
+            modelBuilder.Entity("eCommerce.Promotions.Promotion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ChannelScope")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("ConcurrencyStamp");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character(3)")
+                        .IsFixedLength();
+
+                    b.Property<Guid?>("DeleterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("DeleterId");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("DeletionTime");
+
+                    b.Property<string>("DiscountKind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<decimal>("DiscountValue")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<DateTime?>("EndsAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ExtraProperties")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("ExtraProperties");
+
+                    b.Property<bool>("IsCumulative")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("IsDeleted");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<decimal?>("MaxDiscountAmount")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<int?>("MaxUsagePerCustomer")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("MaxUsageTotal")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal?>("MinOrderAmount")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ReservedCount")
+                        .HasColumnType("integer");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("bytea");
+
+                    b.Property<DateTime>("StartsAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.Property<int>("TreeVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("UsedCount")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("IX_ProPromotions_TenantId_Code");
+
+                    b.HasIndex("TenantId", "Status", "StartsAtUtc", "EndsAtUtc")
+                        .HasDatabaseName("IX_ProPromotions_TenantId_Status_StartsAtUtc_EndsAtUtc");
+
+                    b.ToTable("ProPromotions", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ProPromotions_Currency", "\"Currency\" ~ '^[A-Z]{3}$'");
+
+                            t.HasCheckConstraint("CK_ProPromotions_DiscountKind_NotFreeShipping", "\"DiscountKind\" <> 'FreeShipping'");
+
+                            t.HasCheckConstraint("CK_ProPromotions_DiscountValue", "\"DiscountValue\" >= 0");
+
+                            t.HasCheckConstraint("CK_ProPromotions_Kind_NotFlashSale", "\"Kind\" <> 'FlashSale'");
+
+                            t.HasCheckConstraint("CK_ProPromotions_Percentage", "\"DiscountKind\" <> 'Percentage' OR (\"DiscountValue\" <= 100 AND \"MaxDiscountAmount\" IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_ProPromotions_Usage", "\"UsedCount\" >= 0 AND \"ReservedCount\" >= 0 AND (\"MaxUsageTotal\" IS NULL OR \"UsedCount\" + \"ReservedCount\" <= \"MaxUsageTotal\")");
+
+                            t.HasCheckConstraint("CK_ProPromotions_Window", "\"EndsAtUtc\" IS NULL OR \"EndsAtUtc\" > \"StartsAtUtc\"");
+                        });
+                });
+
+            modelBuilder.Entity("eCommerce.Promotions.PromotionCondition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ConfigJson")
+                        .HasColumnType("jsonb");
+
+                    b.Property<int>("Depth")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("InteractionType")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)");
+
+                    b.Property<bool>("IsGroup")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid?>("ParentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PromotionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("RuleSystemName")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ParentId");
+
+                    b.HasIndex("PromotionId");
+
+                    b.HasIndex("TenantId", "PromotionId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_ProPromotionConditions_MotGoc")
+                        .HasFilter("\"ParentId\" IS NULL");
+
+                    b.HasIndex("TenantId", "PromotionId", "ParentId", "SortOrder")
+                        .IsUnique()
+                        .HasDatabaseName("IX_ProPromotionConditions_Tenant_Promotion_Parent_Sort");
+
+                    b.ToTable("ProPromotionConditions", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ProPromotionConditions_Depth", "\"Depth\" BETWEEN 1 AND 8");
+
+                            t.HasCheckConstraint("CK_ProPromotionConditions_InteractionType", "NOT \"IsGroup\" OR \"InteractionType\" IN ('And','Or')");
+
+                            t.HasCheckConstraint("CK_ProPromotionConditions_NodeLai", "(\"IsGroup\" AND \"InteractionType\" IS NOT NULL AND \"RuleSystemName\" IS NULL) OR (NOT \"IsGroup\" AND \"InteractionType\" IS NULL AND \"RuleSystemName\" IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_ProPromotionConditions_ParentKhacId", "\"ParentId\" IS NULL OR \"ParentId\" <> \"Id\"");
+
+                            t.HasCheckConstraint("CK_ProPromotionConditions_SortOrder", "\"SortOrder\" >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("eCommerce.Promotions.PromotionMapping", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<Guid>("PromotionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TargetId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TargetType")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PromotionId");
+
+                    b.HasIndex("TenantId", "PromotionId")
+                        .HasDatabaseName("IX_ProPromotionMappings_TenantId_PromotionId");
+
+                    b.ToTable("ProPromotionMappings", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ProPromotionMappings_TargetType", "\"TargetType\" NOT IN ('Sku','Category','Brand')");
+                        });
+                });
+
+            modelBuilder.Entity("eCommerce.Promotions.PromotionRedemption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("AppliedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("BreakdownJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character(3)")
+                        .IsFixedLength();
+
+                    b.Property<Guid?>("CustomerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("DiscountAmount")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<DateTime>("EvaluatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<Guid?>("OrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PromotionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ReasonCode")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateTime?>("ReleasedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ReversedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.Property<int>("TreeVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("UsageSequence")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("VoucherCodeId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PromotionId");
+
+                    b.HasIndex("VoucherCodeId");
+
+                    b.HasIndex("TenantId", "IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("IX_ProPromotionRedemptions_TenantId_IdempotencyKey");
+
+                    b.HasIndex("TenantId", "OrderId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_ProPromotionRedemptions_TenantId_OrderId_Voucher")
+                        .HasFilter("\"OrderId\" IS NOT NULL AND \"VoucherCodeId\" IS NOT NULL");
+
+                    b.HasIndex("TenantId", "PromotionId", "OrderId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_ProPromotionRedemptions_TenantId_PromotionId_OrderId_TuDong")
+                        .HasFilter("\"OrderId\" IS NOT NULL AND \"VoucherCodeId\" IS NULL");
+
+                    b.HasIndex("TenantId", "Status", "ExpiresAtUtc")
+                        .HasDatabaseName("IX_ProPromotionRedemptions_TenantId_Status_ExpiresAtUtc");
+
+                    b.HasIndex("TenantId", "PromotionId", "CustomerId", "UsageSequence")
+                        .IsUnique()
+                        .HasDatabaseName("IX_ProPromRedemptions_Tenant_Prom_Cust_Seq")
+                        .HasFilter("\"CustomerId\" IS NOT NULL AND \"Status\" <> 2");
+
+                    b.HasIndex("TenantId", "PromotionId", "OrderId", "VoucherCodeId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_ProPromRedemptions_Tenant_Prom_Order_Voucher")
+                        .HasFilter("\"VoucherCodeId\" IS NOT NULL AND \"OrderId\" IS NOT NULL");
+
+                    b.ToTable("ProPromotionRedemptions", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ProPromotionRedemptions_AppliedAt", "\"Status\" <> 1 OR \"AppliedAtUtc\" IS NOT NULL");
+
+                            t.HasCheckConstraint("CK_ProPromotionRedemptions_Currency", "\"Currency\" ~ '^[A-Z]{3}$'");
+
+                            t.HasCheckConstraint("CK_ProPromotionRedemptions_DiscountAmount", "\"DiscountAmount\" >= 0");
+
+                            t.HasCheckConstraint("CK_ProPromotionRedemptions_ReasonCode", "\"Status\" NOT IN (2, 3) OR \"ReasonCode\" IS NOT NULL");
+
+                            t.HasCheckConstraint("CK_ProPromotionRedemptions_ReleasedAt", "\"Status\" <> 2 OR \"ReleasedAtUtc\" IS NOT NULL");
+
+                            t.HasCheckConstraint("CK_ProPromotionRedemptions_ReservedExpires", "\"Status\" <> 0 OR \"ExpiresAtUtc\" IS NOT NULL");
+
+                            t.HasCheckConstraint("CK_ProPromotionRedemptions_ReversedAt", "\"Status\" <> 3 OR \"ReversedAtUtc\" IS NOT NULL");
+
+                            t.HasCheckConstraint("CK_ProPromotionRedemptions_UsageSequence", "\"UsageSequence\" >= 1");
+                        });
+                });
+
+            modelBuilder.Entity("eCommerce.Promotions.PromotionRuleCost", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("CostKind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<int>("DeclaredCostFactor")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("RequiresVerifiedCod")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("RetiredAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ProPromotionRuleCosts", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ProPromotionRuleCosts_DeclaredCostFactor", "\"DeclaredCostFactor\" >= 1");
+                        });
+                });
+
+            modelBuilder.Entity("eCommerce.Promotions.VoucherCode", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("MaxUsage")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("PromotionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("ReservedCount")
+                        .HasColumnType("integer");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("bytea");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.Property<int>("UsedCount")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PromotionId");
+
+                    b.HasIndex("TenantId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("IX_ProVoucherCodes_TenantId_Code");
+
+                    b.ToTable("ProVoucherCodes", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ProVoucherCodes_Usage", "\"UsedCount\" >= 0 AND \"ReservedCount\" >= 0 AND \"UsedCount\" + \"ReservedCount\" <= \"MaxUsage\"");
+                        });
+                });
+
             modelBuilder.Entity("eCommerce.Reconciliation.PaymentDiscrepancy", b =>
                 {
                     b.Property<Guid>("Id")
@@ -11755,6 +12261,61 @@ namespace eCommerce.Migrations
                     b.HasOne("eCommerce.Pricing.TierPriceSet", null)
                         .WithMany()
                         .HasForeignKey("TierPriceSetId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("eCommerce.Promotions.FlashSaleSlot", b =>
+                {
+                    b.HasOne("eCommerce.Promotions.Promotion", null)
+                        .WithMany()
+                        .HasForeignKey("PromotionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("eCommerce.Promotions.PromotionCondition", b =>
+                {
+                    b.HasOne("eCommerce.Promotions.PromotionCondition", null)
+                        .WithMany()
+                        .HasForeignKey("ParentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("eCommerce.Promotions.Promotion", null)
+                        .WithMany()
+                        .HasForeignKey("PromotionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("eCommerce.Promotions.PromotionMapping", b =>
+                {
+                    b.HasOne("eCommerce.Promotions.Promotion", null)
+                        .WithMany()
+                        .HasForeignKey("PromotionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("eCommerce.Promotions.PromotionRedemption", b =>
+                {
+                    b.HasOne("eCommerce.Promotions.Promotion", null)
+                        .WithMany()
+                        .HasForeignKey("PromotionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("eCommerce.Promotions.VoucherCode", null)
+                        .WithMany()
+                        .HasForeignKey("VoucherCodeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("eCommerce.Promotions.VoucherCode", b =>
+                {
+                    b.HasOne("eCommerce.Promotions.Promotion", null)
+                        .WithMany()
+                        .HasForeignKey("PromotionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

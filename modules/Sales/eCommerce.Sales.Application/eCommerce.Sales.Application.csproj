@@ -14,6 +14,8 @@
     <ProjectReference Include="..\..\ChannelHub\eCommerce.ChannelHub.Application.Contracts\eCommerce.ChannelHub.Application.Contracts.csproj" />
     <ProjectReference Include="..\..\PaymentHub\eCommerce.PaymentHub.Application.Contracts\eCommerce.PaymentHub.Application.Contracts.csproj" />
     <ProjectReference Include="..\..\Messaging\eCommerce.Messaging.Domain\eCommerce.Messaging.Domain.csproj" />
+    <!-- 🆕 `WP-24` (`PRO-002` D6) — `Sales` gọi engine IN-PROCESS qua hợp đồng; KHÔNG tham chiếu Domain/Application. -->
+    <ProjectReference Include="..\..\Promotions\eCommerce.Promotions.Application.Contracts\eCommerce.Promotions.Application.Contracts.csproj" />
     <ProjectReference Include="..\..\..\shared\eCommerce.Kernel\eCommerce.Kernel.csproj" />
   </ItemGroup>
 

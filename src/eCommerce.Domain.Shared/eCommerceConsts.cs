@@ -362,6 +362,31 @@ public static class eCommerceConsts
         }
 
         /// <summary>
+        /// 🆕 **KHUYẾN MÃI** (`PRO-002` §7 / `D-270` mẫu quyền hẹp) — khai **CẢ HAI NƠI** (hằng số này +
+        /// `eCommercePermissionDefinitionProvider`): thiếu một nơi ⇒ `403` cho MỌI người kể cả `admin`.
+        /// 🛡️ Lưới an toàn: `BatBienPhanQuyenTests`.
+        /// 🔒 `Approve` tách khỏi `Manage` (`D-150`): người dựng cây **không** tự duyệt (`SetStatusAsync → Approved`
+        /// ⇒ `0006`). `Import` tách riêng vì import bảng chi phí rule.
+        /// </summary>
+        public static class Promotions
+        {
+            /// <summary>Quyền gốc (nhóm) của module khuyến mãi.</summary>
+            public const string Default = GroupName + ".Promotions";
+
+            /// <summary>Xem + đánh giá + kiểm mã + đọc sổ lượt (không side effect).</summary>
+            public const string View = Default + ".View";
+
+            /// <summary>Tạo · lưu cây · đổi trạng thái thủ công (KHÔNG được tự duyệt).</summary>
+            public const string Manage = Default + ".Manage";
+
+            /// <summary>Duyệt cây (`Draft → Approved`) — tách người dựng ≠ người duyệt.</summary>
+            public const string Approve = Default + ".Approve";
+
+            /// <summary>Import bảng chi phí rule (`Import:{tenantId}:{sha256}`).</summary>
+            public const string Import = Default + ".Import";
+        }
+
+        /// <summary>
         /// 🚨 **SỔ ĐỊA CHỈ** (`ADDR-004` phần B — `S2`, 18/10/2026).
         ///
         /// 🔒 **BẮT BUỘC khai ở CẢ HAI NƠI** (hằng số này **và** `eCommercePermissionDefinitionProvider`):

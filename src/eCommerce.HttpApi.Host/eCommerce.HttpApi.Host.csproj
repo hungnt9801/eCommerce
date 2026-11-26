@@ -20,6 +20,8 @@
     <ProjectReference Include="..\..\modules\Tax\eCommerce.Tax.EntityFrameworkCore\eCommerce.Tax.EntityFrameworkCore.csproj" />
     <!-- 🆕 `WP-22` (`NOT-001`) — module thông báo: nạp assembly Application để tạo endpoint (~conventional). -->
     <ProjectReference Include="..\..\modules\Notification\eCommerce.Notification.Application\eCommerce.Notification.Application.csproj" />
+    <!-- 🆕 `WP-24` (`PRO-002`) — module khuyến mãi: nạp assembly Application để tạo endpoint (~conventional). -->
+    <ProjectReference Include="..\..\modules\Promotions\eCommerce.Promotions.Application\eCommerce.Promotions.Application.csproj" />
   </ItemGroup>
 
   <ItemGroup>

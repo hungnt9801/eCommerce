@@ -3,12 +3,15 @@ using eCommerce.Application.Contracts.Inventory;
 using eCommerce.Application.Sales;
 using eCommerce.Customers;
 using eCommerce.Inventory;
+using eCommerce.Orders;
 using eCommerce.Pricing;
 using eCommerce.Pricing.Dtos;
+using eCommerce.Promotions.Contracts;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Logging;
 using Volo.Abp;
 using Volo.Abp.Application.Services;
+using Volo.Abp.Settings;
 
 namespace eCommerce.Application.Checkout;
 
@@ -46,18 +49,38 @@ public class CheckoutAppService : ApplicationService, ICheckoutAppService
     /// **vẫn đặt được hàng** ở đường thật.</summary>
     private readonly ICustomerDirectory _thuMucKhach;
 
+    /// <summary>🆕 `PRO-002` D6 — engine khuyến mãi **in-process** (nguồn giảm giá cấp đơn DUY NHẤT).</summary>
+    private readonly IPromotionEngine _khuyenMai;
+
+    /// <summary>🆕 `PRO-002` — đọc cờ `Promotions:Enabled` (cờ tắt ⇒ KHÔNG gọi engine, `DiscountTotal = 0`).</summary>
+    private readonly ISettingProvider _settings;
+
     public CheckoutAppService(
         IPriceCalculationAppService tinhGia,
         IStockReservationAppService giuCho,
-        ICustomerDirectory thuMucKhach)
+        ICustomerDirectory thuMucKhach,
+        IPromotionEngine khuyenMai,
+        ISettingProvider settings)
     {
         _tinhGia = tinhGia;
         _giuCho = giuCho;
         _thuMucKhach = thuMucKhach;
+        _khuyenMai = khuyenMai;
+        _settings = settings;
     }
 
     public async Task<KetQuaCheckoutDto> TinhVaGiuChoAsync(CheckoutInput input)
     {
+        // ── 🚨 `PRO-002` D6 / `D-143` (2): `OrderDiscount` do CLIENT gửi PHẢI = 0 ─────────────────────
+        // 🔑 `DiscountTotal` của đơn **chỉ** đến từ engine khuyến mãi. Nhận giảm giá tay từ client là
+        // **nguồn giảm giá thứ hai** ⇒ `TinhTienDon` phân bổ sai ⇒ thuế/doanh thu sai IMP LẶNG.
+        // 📌 Kiểm **TRƯỚC MỌI tác dụng phụ** (giữ chỗ/tính tiền) ⇒ lỗi ⇒ **0 đơn, 0 lượt giữ chỗ**.
+        if (input.OrderDiscount != 0m)
+        {
+            throw new BusinessException(SalesErrorCodes.KhongNhanGiamGiaNhapTay)
+                .WithData("lyDo", "OrderDiscount phải do engine khuyến mãi tính — client gửi ≠ 0 bị từ chối.");
+        }
+
         // ── ⓪ CỔNG KHÁCH BỊ CHẶN — TRƯỚC MỌI TÁC DỤNG PHỤ (`CUS-001` §28) ─────────────────────────
         // 🔑 **VÌ SAO LÀ BƯỚC ĐẦU TIÊN, KHÔNG PHẢI BƯỚC SAU `ThuKetQuaCuAsync`:** bước ① có thể **trả lại**
         // một kết quả cũ ⇒ nếu đặt cổng sau nó, khách vừa bị chặn mà **vẫn nhận được** *"đã giữ chỗ"* của lần
@@ -102,11 +125,38 @@ public class CheckoutAppService : ApplicationService, ICheckoutAppService
         // ── ② TÍNH TIỀN (pipeline Pricing; hàm này GHI SỔ GIẢI TRÌNH) ────────────────────────────────
         var at = input.At ?? Clock.Now;
 
+        // 🆕 `PRO-002` D6 — giảm giá cấp đơn **chỉ** đến từ engine (nếu bật cờ). Engine CHỈ ĐỌC.
+        var giamGiaKhuyenMai = 0m;
+        var batKhuyenMai = !string.Equals(
+            (await _settings.GetOrNullAsync(PromotionContractConsts.EnabledSettingName))?.Trim(),
+            "false",
+            StringComparison.OrdinalIgnoreCase);
+
+        if (batKhuyenMai)
+        {
+            var subtotal = input.Items.Sum(x => (x.ListPrice ?? 0m) * x.Quantity);
+            var kqKhuyenMai = await _khuyenMai.EvaluateAsync(new PromotionEvaluationRequest(
+                CheckoutSessionId: Guid.Empty, // engine KHÔNG dùng; khoá idempotency thuộc bước ghi của Sales
+                Lines: input.Items
+                    .Select(x => new PromotionCartLine(x.Sku, x.Quantity, x.ListPrice ?? 0m))
+                    .ToList(),
+                ChannelCode: input.ChannelCode,
+                Currency: "VND",
+                Subtotal: subtotal,
+                CustomerId: input.CustomerId,
+                CustomerGroupId: null, // Q26 fail-closed: Sales chưa nạp nhóm khách
+                IsFirstOrder: null,     // Q26 fail-closed
+                VoucherCode: null,
+                Mode: PromotionApplyMode.AutoApply));
+
+            giamGiaKhuyenMai = kqKhuyenMai.Applied ? kqKhuyenMai.DiscountTotal : 0m;
+        }
+
         var tien = await _tinhGia.TinhGioAsync(new TinhGioInput
         {
             ChannelCode = input.ChannelCode,
             ChannelShopId = input.ChannelShopId,
-            OrderDiscount = input.OrderDiscount,
+            OrderDiscount = giamGiaKhuyenMai,
             OrderFee = input.OrderFee,
             At = at,
             IdempotencyKey = khoa,

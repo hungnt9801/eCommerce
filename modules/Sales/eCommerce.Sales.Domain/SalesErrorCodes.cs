@@ -18,6 +18,13 @@ public static class SalesErrorCodes
     /// 📌 Mã riêng vì người dùng cần chỉ dẫn *"xem lại số lượng đã trả"*, không phải *"phiếu sai định dạng"*.
     /// </summary>
     public const string TraVuotSoDaMua = eCommerceConsts.ErrorCodes.TraVuotSoDaMua;
+
+    /// <summary>
+    /// 🆕 **`PRO-002` D6** — client gửi `CheckoutInput.OrderDiscount ≠ 0` ⇒ **NÉM** (`D-143` (2)).
+    /// 📌 `DiscountTotal` của đơn **chỉ** đến từ engine khuyến mãi; nhận giảm giá tay từ client là **nguồn
+    /// giảm giá thứ hai** ⇒ sai thuế/doanh thu. HTTP `400` (map ở Host).
+    /// </summary>
+    public const string KhongNhanGiamGiaNhapTay = "eCommerce:Sales:0004";
 }
 
 

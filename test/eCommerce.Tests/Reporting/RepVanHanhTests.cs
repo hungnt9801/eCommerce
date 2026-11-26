@@ -583,14 +583,14 @@ public class RepVanHanhTests
     }
 
     // ══════════════════════════════════════════════════════════════════════════════════════════════════
-    // 10. METRIC — All 30 + nhãn projection
+    // 10. METRIC — All 39 + nhãn projection
     // ══════════════════════════════════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public void Metric_All_co_30_ten_va_4_ten_reporting()
+    public void Metric_All_co_39_ten_va_4_ten_reporting()
     {
-        Assert.Equal(30, eCommerceMetricNames.All.Count);
-        Assert.Equal(30, eCommerceMetricNames.All.Distinct(StringComparer.Ordinal).Count());
+        Assert.Equal(39, eCommerceMetricNames.All.Count);
+        Assert.Equal(39, eCommerceMetricNames.All.Distinct(StringComparer.Ordinal).Count());
 
         Assert.Contains(eCommerceMetricNames.ReportingWatermarkLagSeconds, eCommerceMetricNames.All);
         Assert.Contains(eCommerceMetricNames.ReportingProjectionFailedTotal, eCommerceMetricNames.All);

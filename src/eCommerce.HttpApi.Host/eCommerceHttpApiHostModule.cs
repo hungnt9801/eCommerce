@@ -81,6 +81,8 @@ namespace eCommerce;
     // 🆕 `WP-22` (`NOT-001`) — module THÔNG BÁO. Thiếu dòng này ⇒ assembly Application không nằm trong
     // đồ thị module ⇒ API 404 body rỗng (bài học C8/C16).
     typeof(global::eCommerce.Notification.NotificationApplicationModule),
+    // 🆕 `WP-24` (`PRO-002`) — module KHUYẾN MÃI. Thiếu dòng này ⇒ API 404 body rỗng (bài học C8/C16).
+    typeof(global::eCommerce.Promotions.PromotionsApplicationModule),
     // 🆕 `D-13`/`D-14` — tầng API **tường minh** `/api/v1/**` cho Web Admin Next.js.
     // ⚠️ Thiếu dòng này thì controller v1 **KHÔNG** được nạp (không có lỗi biên dịch) — cùng họ lỗi C8/C16.
     typeof(eCommerceHttpApiModule)
@@ -440,6 +442,25 @@ public class eCommerceHttpApiHostModule : AbpModule
             // ── Hạ tầng chung ──────────────────────────────────────────────────────────────────
             // Không giành được khoá phân tán ⇒ **409** (client thử lại được) — `ADDR-004` §12 ghi rõ.
             options.Map(eCommerceConsts.ErrorCodes.KhongGianhDuocKhoa, System.Net.HttpStatusCode.Conflict);
+
+            // ── 🆕 `WP-24` — KHUYẾN MÃI (`PRO-002` §4.4, 13 mã) ───────────────────────────────
+            // 🔑 Không map ⇒ ABP trả `403` cho `BusinessException` ⇒ client đọc thành *"không có quyền"* trong khi
+            // lỗi thật là *"cây quá lớn"* / *"hết lượt"* / *"sai trạng thái"*. Mã vẫn là nguồn sự thật (`D6`).
+            options.Map(eCommerce.Promotions.PromotionErrorCodes.TreeTooLarge, System.Net.HttpStatusCode.BadRequest);            // 0001
+            options.Map(eCommerce.Promotions.PromotionErrorCodes.CombinationExplosion, System.Net.HttpStatusCode.BadRequest);     // 0002
+            options.Map(eCommerce.Promotions.PromotionErrorCodes.ConditionCycleDetected, System.Net.HttpStatusCode.BadRequest);  // 0003
+            options.Map(eCommerce.Promotions.PromotionErrorCodes.InvalidConditionNode, System.Net.HttpStatusCode.BadRequest);     // 0004
+            options.Map(eCommerce.Promotions.PromotionErrorCodes.EvaluationBudgetExceeded, System.Net.HttpStatusCode.UnprocessableEntity); // 0005
+            options.Map(eCommerce.Promotions.PromotionErrorCodes.InvalidStatusTransition, System.Net.HttpStatusCode.Conflict);     // 0006
+            options.Map(eCommerce.Promotions.PromotionErrorCodes.UsageLimitExceeded, System.Net.HttpStatusCode.Conflict);         // 0007
+            options.Map(eCommerce.Promotions.PromotionErrorCodes.UnverifiedCodCondition, System.Net.HttpStatusCode.UnprocessableEntity); // 0008
+            options.Map(eCommerce.Promotions.PromotionErrorCodes.DiscountExceedsOrder, System.Net.HttpStatusCode.BadRequest);     // 0009
+            options.Map(eCommerce.Promotions.PromotionErrorCodes.RuleNotRegistered, System.Net.HttpStatusCode.BadRequest);        // 0010
+            options.Map(eCommerce.Kernel.Money.MoneyErrorCodes.CurrencyMismatch, System.Net.HttpStatusCode.BadRequest);           // Money 0001
+            options.Map(eCommerce.Messaging.MessagingErrorCodes.PayloadConflict, System.Net.HttpStatusCode.Conflict);             // Messaging 0001
+            options.Map(eCommerce.Messaging.MessagingErrorCodes.DangXuLy, System.Net.HttpStatusCode.Conflict);                    // Messaging 0002
+            // `PRO-002` D6 — client gửi OrderDiscount ≠ 0 (Sales).
+            options.Map(eCommerce.Orders.SalesErrorCodes.KhongNhanGiamGiaNhapTay, System.Net.HttpStatusCode.BadRequest);           // Sales 0004
         });
 
         Configure<AbpAspNetCoreMvcOptions>(options =>

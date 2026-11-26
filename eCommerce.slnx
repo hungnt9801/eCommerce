@@ -89,6 +89,12 @@
     <Project Path="modules/Tax/eCommerce.Tax.Domain/eCommerce.Tax.Domain.csproj" />
     <Project Path="modules/Tax/eCommerce.Tax.EntityFrameworkCore/eCommerce.Tax.EntityFrameworkCore.csproj" />
   </Folder>
+  <Folder Name="/modules/Promotions/">
+    <Project Path="modules/Promotions/eCommerce.Promotions.Application.Contracts/eCommerce.Promotions.Application.Contracts.csproj" />
+    <Project Path="modules/Promotions/eCommerce.Promotions.Application/eCommerce.Promotions.Application.csproj" />
+    <Project Path="modules/Promotions/eCommerce.Promotions.Domain/eCommerce.Promotions.Domain.csproj" />
+    <Project Path="modules/Promotions/eCommerce.Promotions.EntityFrameworkCore/eCommerce.Promotions.EntityFrameworkCore.csproj" />
+  </Folder>
   <Folder Name="/shared/">
     <Project Path="shared/eCommerce.Kernel/eCommerce.Kernel.csproj" />
   </Folder>

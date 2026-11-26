@@ -12,7 +12,7 @@
 | **Ưu tiên** | **Must have (trong GĐ2)** — `docs/implementation-plan.md:205` đặt *"một khuyến mãi phức tạp (nhiều điều kiện AND/OR) tính đúng tiền"* làm **cổng kiểm soát GĐ2** |
 | **Trạng thái** | 🟡 `Draft` — chờ review |
 | **Người viết / người review** | *(điền)* / **Kiến trúc trưởng + BA** |
-| **Phiên bản / ngày** | `v0.10 — 27/11/2026` — F1 N94 (`W24-2`): ghi 5 `docDeviation` D1–D5 theo `PRO-002-arch.md` §12.1, cờ tắt vận hành `Promotions:Enabled`, đóng các P3 của DOCREV vòng 4–5; lịch sử đầy đủ ở §15.4 |
+| **Phiên bản / ngày** | `v0.11 — 27/11/2026` — F3 N94 (`W24-2`) as-built: áp `D-283` (metric 5/9 + 4 nợ) và `D-284` (không nối guard; khoá phân tán + delete-then-insert), làm mới Trạng thái triển khai (2419 test), docDeviation D7–D10; lịch sử đầy đủ ở §15.4 |
 | **Tài liệu liên quan** | `XC-001` (Money/làm tròn) · `XC-002` (outbox/inbox + `IIdempotencyGuard`) · `XC-003` (khoá phân tán + quy ước tiền tố) · `XC-004` (`[Authorize]` cấp class, tenant) · `XC-005` (log/`CorrelationId`/metric + `eCommerceMetricNames`) · `PRC-001` (giá theo kênh) · `PRC-002` (pipeline tính giá) · `SAL-002` (đặt hàng) · `SAL-003` (state machine 4 trục) · `REP-001` (`Σ OrderLine.DiscountAmount`) · `SHP-002` (webhook vận đơn — **GHTK không HMAC**) · [`SHP-003`](../shipping/shp-003-cod-thu-ho-doi-cod.md)/[`SHP-004`](../shipping/shp-004-adapter-ghtk.md) (đã có file, 🟡 `Draft` — §15.2 **F6**) · `PRO-001` ([voucher/coupon](pro-001-voucher-coupon.md) — dải mã `01xx`, CR vào tài liệu này) · `docs/business-modules-proposal.md` §6.4 · `docs/implementation-plan.md:198` |
 
 ---
@@ -693,8 +693,8 @@ public interface IPromotionConditionRule
 |---|---|---|---|---|---|---|
 | 1 | `POST /promotion/evaluate` (báo giá) — **chỉ đọc** | `api` | JWT + tenant (`XC-004`); `[Authorize]` + `Promotions.View` | **Không bọc `IIdempotencyGuard`, không có khoá** (`D-159`, **Q21** `Closed`): endpoint không ghi gì (`D-151`) nên gọi lại vô hại; bọc guard còn gây hại — guard **ghi** bản ghi và **so payload**, cùng khoá khác giỏ ⇒ `XungDotPayload` (`modules/Messaging/eCommerce.Messaging.Domain/Idempotency/IdempotencyGuard.cs:43-45`), khách sửa giỏ rồi báo giá lại sẽ nhận lỗi xung đột (hoặc giá cũ). ⚠️ **Đính chính chữ `D-151` CR-7:** khoá `Checkout:{tenantId}:{checkoutSessionId}:{code}` thuộc **`ReserveAsync`** của `PRO-001` (§7.2 #1b, BR-03), **không** thuộc `evaluate`; `orderOrCartId` bị bỏ hẳn khỏi `evaluate` | Gọi lại ⇒ tính lại, trả giá **mới** (trạng thái lượt/cây có thể đã đổi) | `4xx` + mã lỗi nghiệp vụ |
 | 1b | Ghi lượt khi checkout (**không** thuộc `EvaluateAsync`) | nội bộ (`Sales` → `PRO-001`/đường tự động) | nội bộ | **Voucher:** `Checkout:{tenantId}:{checkoutSessionId}:{code}` của `ReserveAsync` (`PRO-001` §7.2 #1; `checkoutSessionId` do `SAL-002` cấp, ổn định qua retry — **không** dùng `orderOrCartId`, CR-7, `D-151`) và khoá của `CommitAsync`. **Khuyến mãi tự động (`Applied` thẳng, Basic Flow bước 7):** `PromotionAuto:{tenantId}:{orderId}:{promotionId}` — ghi vào `ProPromotionRedemptions.IdempotencyKey` (unique §5.3) | `AlreadyProcessed` ⇒ **trả lại kết quả cũ**, **không** ghi lại, **không** trừ lượt lần 2 (tự động: hàng rào cuối = unique `(TenantId, PromotionId, OrderId) WHERE VoucherCodeId IS NULL`, `D-157`) | `4xx` + mã lỗi nghiệp vụ; trùng khoá khác payload ⇒ `Messaging:0001` |
-| 2 | `POST /promotion/{id}/save-tree` (lưu cây) | `api` | JWT + `Promotions.Manage` | `PromotionTree:{tenantId}:{promotionId}:{TreeVersion}:{sha256(treeJson)}` — `TreeVersion` = giá trị **hiện tại** đọc dưới khoá `PromotionLockKeys.Tree` (§8.2 #3) trước khi gọi guard; tăng mỗi lần lưu thành công (§5.2) nên lưu A → B → A cho ba khoá **khác nhau** | `AlreadyProcessed` ⇒ trả `PromotionTreeValidationResultDto` cũ + cờ `AlreadySaved` (chỉ khi cùng `TreeVersion` **và** cùng cây). Retry sau khi lưu thành công đọc `TreeVersion` mới ⇒ lưu lại **cùng nội dung**, `TreeVersion` tăng thêm 1 — chấp nhận ở `Draft` (chỉ từ `Approved` `TreeVersion` mới được ghi vào snapshot, §5.2) | `0001`…`0004`, `0006` (không phải `Draft`), `0010` |
-| 3 | `POST /promotion/import-rule-costs` | `import` | JWT + `Promotions.Import` | `Import:{tenantId}:{sha256(fileContent)}` (`XC-002` §7.3) | Trả kết quả cũ + `AlreadyImported` | `0004` (file sai) |
+| 2 | `POST /promotion/{id}/save-tree` (lưu cây) | `api` | JWT + `Promotions.Manage` | Khoá phân tán `PromotionLockKeys.Tree` (30 s; bận ⇒ NÉM `KhongGianhDuocKhoa`); chỉ `Draft` (khác ⇒ `0006`); xoá cây theo `Depth` giảm dần rồi chèn lại trong **cùng** UoW. **Không** dùng `IIdempotencyGuard` ở v1 (`D-284`). | Retry cùng nội dung ⇒ `TreeVersion` +1 — **chấp nhận ở `Draft`** (`D-159`); `AlreadySaved` luôn `false`. | `0001`…`0004`, `0006` (không phải `Draft`), `0010` |
+| 3 | `POST /promotion/import-rule-costs` | `import` | JWT + `Promotions.Import` | Khoá phân tán `PromotionLockKeys.Import` (120 s); tên ∉ registry ⇒ `0004`; tên chưa có dòng ⇒ `BoQua`; dòng có ⇒ cập nhật — idempotent theo "chỉ cập nhật dòng có". **Không** dùng `IIdempotencyGuard`/`sha256(fileContent)` ở v1 (`D-284`). | `AlreadyImported` luôn `false`. | `0004` (file sai) |
 | 4 | Consumer **`OrderCancelledEto`** — **duy nhất** nguồn hoàn lượt (`D-148`). ⬜ **ETO chưa tồn tại** (`SAL-004`); khi thêm **phải** đặt ở `Sales.Application.Contracts`. WP-24 **hoãn** consumer, **không** giả lập ETO trong `Promotions` — ghi **"chưa kiểm được"** (`D5`, `PRO-002-arch.md` §12.1) | `distributed event` | nội bộ (đã qua outbox) | `PromotionRefund:{tenantId}:{orderId}:{promotionId}` | Bỏ qua + log `Information` + metric (lượt đã `Released` với `ORDER_CANCELLED`) | DLQ + retry (**cấm** nuốt lỗi): lượt `Reversed` ⇒ `0105` (`PRO-001`) |
 | 5 | Job `promotion-expiry` — **một job làm cả hai chiều theo giờ**: `Active`/`Paused → Expired` khi `Now > EndsAtUtc` **và** `Approved → Active` khi `Now ≥ StartsAtUtc` (và `EndsAtUtc` null hoặc `> Now`); mở flash sale = `CR-P2`, `D-156` | `schedule` | nội bộ | **Không** dùng khoá idempotency **theo kỳ giờ** (khoá-theo-kỳ làm trễ kích hoạt tới 1 kỳ — job nay kiêm **kích hoạt** lẫn hết hạn): mỗi chuyển trạng thái **tự idempotent** nhờ **guard trạng thái** (`Approved`/`Active`/`Paused`/`Expired`) + `RowVersion`; chống chạy chồng bằng khoá phân tán `promotion:job:expiry:{tenantId}` + `SkipIfBusy` (§8.2 #5). **Cấm** `DateTime.Now` làm khoá | Chạy lại ⇒ guard trạng thái bỏ qua (không đổi 2 lần); lần chạy **sau** trong cùng khoảng thời gian **vẫn** kích hoạt được promotion có `StartsAtUtc` rơi giữa hai lần chạy | DLQ + retry. Đỏ ở `TC-50` |
 | 6 | **Webhook hãng vận chuyển** | ❌ **Không áp dụng cho `PRO-002`** | — | — | — | Xem §7.4 (**cấm** dùng làm điều kiện) |
@@ -933,7 +933,7 @@ nó **phải** đọc từ **dữ liệu nội bộ đã đối soát** (không 
 | **NFR-14** | Số candidate đánh giá mỗi request | **≤ 50** (`MaxCandidatesPerCart`) | `TC-19` |
 | **NFR-15** | Số lượt thăm lá mỗi candidate | **≤ 512** (`LeafVisitBudget`) | `TC-07` ca (b) |
 
-**Metric mới (9 = 6 của `PRO-002` + 3 của `PRO-001`, CR-8/`D-151`) — ⚠️ CHƯA có trong code; phải thêm vào `eCommerceMetricNames` + `KyHieuMetric`/điểm phát + `XC-005` §5.1 + `TC-22` trong cùng PR (BR-20; `PRO-001` BR-21)**
+**9** metric `promotion_*` đã đăng ký trong `eCommerceMetricNames.All`/`KyHieuMetric`: **5** có điểm phát thật (`PromotionEngine` — candidates_truncated, eval_duration, usage_limit_hit, eval_budget_exceeded, condition_rejected); **4** (`promotion_voucher_reserved_total`/`_released_total`/`_reservation_expired_total` = `PRO-001`; `promotion_applied_total` = `SAL-001` tạo `Order`) nằm trong `ChuaCoNoiPhat` là **nợ có chủ** — `D-283`. `XC-005` §5.1 + `TC-22` đã cập nhật (BR-20; `PRO-001` BR-21).
 
 | Tên metric | Loại | Nhãn (từ `Allowed`) | Ý nghĩa / ngưỡng |
 |---|---|---|---|
@@ -1230,6 +1230,7 @@ public class PromotionConditionTreeTests
 | v0.8 | 23/11/2026 | BA (WP-14, áp `D-162`) | Đóng `Q25`: lá `CustomerGroup`/`FirstOrderOnly` + `CustomerId` NULL ⇒ `false` (không ném), `FirstOrderOnly` + vãng lai = `false`, cây `ConditionFalse`; `PromotionRuleContext` nullable (§6.1 quy tắc 10); thêm `TC-66`; mở `Q26` (lỗi nạp context của khách có `CustomerId`, `D-162` (6)). Delta `pro-001` §6.1 |
 | v0.9 | 23/11/2026 | BA (WP-14, sửa theo DOCREV vòng 3) | Candidate tự động chỉ `Kind = 'Discount'`; promotion `Voucher` không tự áp (§4.2 bước 2, quy tắc 8, `TC-67`). Bỏ khoá idempotency **theo kỳ giờ** của job `promotion-expiry` (guard trạng thái + `RowVersion`, chỉ còn khoá phân tán `promotion:job:expiry:{tenantId}` — §7.2 #5, §8.2, `TC-50` (viii) kích hoạt không trễ kỳ). Quy tắc 8 ghi tường minh lỗi cấu hình `0001/0002/0004/0010` **NÉM ở mọi nguồn** (`D-154` (5)) + hàng rào gỡ-rule trước deploy (`TC-68`). Định nghĩa `PromotionEvaluationContext`/`PromotionRuleContext` + quy tắc 11 định nghĩa "đơn đầu". Thêm `Q27`/`Q28`/`Q29`; quy tắc 4 kiểm `Mode` hai chiều; §0 :61 rõ phạm vi quầy `RetailBill`; DoD **55** test case |
 | v0.10 | 27/11/2026 | BA (N94, `W24-2` F1) | F1 N94 — ghi 5 `docDeviation` D1–D5 theo `PRO-002-arch.md` §12.1 (enum lưu chuỗi + `CHECK`; `Currency char(3)` + `CHECK ~ '^[A-Z]{3}$'`; ETO tự khai trường thay `IntegrationEventBase` + marker `INotificationEvent`/fail-closed; namespace `.Contracts`; `OrderCancelledEto` chờ `SAL-004`); thêm cờ **`Promotions:Enabled`** (§11); đóng 2 P3 (DoD **54 → 55**; delta `pro-001` §6.1 đổi từ trích **số dòng** sang **tên mục**). Không đổi BR/TC/hợp đồng. Vòng 2 N94: đóng 4 P3 DOCREV (header `v0.10`; `pro-001` đổi 3 trích số dòng cũ sang tên mục; setting đổi `Promotions:Enabled`; sửa trích `REP-001` §5.2.1 `LineDiscount`) |
+| v0.11 | 27/11/2026 | BA (N94/W24-2) | F3 BE as-built: áp `D-283` (metric 5/9 + 4 nợ) và `D-284` (không nối guard; khoá phân tán + delete-then-insert); làm mới Trạng thái triển khai (2419 test); thêm docDeviation D7–D10. |
 
 ---
 
@@ -1261,3 +1262,50 @@ public class PromotionConditionTreeTests
 | Code thật | §0, §15.2: `Order` ở `src/…/Orders/Order.cs`; `Money`, `IIdempotencyGuard`, `SHP-003/004` "chưa có"; khoá `Tax` có tiền tố | Đường dẫn → `modules/Sales/eCommerce.Sales.Domain/Order.cs:158,836`; `Money` ✅ (`shared/eCommerce.Kernel/Money/`); `IIdempotencyGuard` ✅ (`modules/Messaging/…/IdempotencyGuard.cs:27`); `SHP-003/004` ✅; F1 ✅ | xem §0 bảng "Điểm xuất phát thật" |
 
 `D-07`, `D-08`, `D-17`, `D-27`, `D-45`, `D-47`/`D-48`, `D-03`, `D-06`/`D-70`: đã đối chiếu, **không lệch** (tài liệu không dựa `ProductVariant`, trạng thái đơn, tồn kho, điểm/công nợ, báo cáo, kế toán sổ kép hay storefront).
+
+---
+
+## Trạng thái triển khai
+
+> Phiên **N94** (`W24-2 F3 BE`), nhánh `feat/gd3-wp24-dieu-kien-km`, mã `PRO-002`. Cập nhật lần cuối: 27/11/2026.
+
+### Đã code
+
+- **4 project module mới** `modules/Promotions/`: `eCommerce.Promotions.Domain`, `.Application.Contracts`, `.Application`, `.EntityFrameworkCore`; đăng ký `eCommerce.slnx`, `[DependsOn]` Host, `ConfigurePromotions(builder)` gọi **một lần**.
+- **Contracts** (`eCommerce.Promotions.Contracts`): `IPromotionEngine`, `PromotionEvaluationRequest/Result/BreakdownItem`, `PromotionCartLine`, `PromotionApplyMode`, `PromotionRejectionReason` (**12 giá trị `0…11`, ghim ordinal**), `IPromotionConditionRule`, `PromotionRuleContext`, `IPromotionAppService` (đúng **10 method**, không `UpdateAsync`) + DTO.
+- **Domain**: enum, `Promotion` (máy trạng thái **NÉM `0006`**; `ActivateByJob`/`ExpireByJob` khoan dung theo §3.2), `PromotionCondition` (không soft-delete), `PromotionRuleCost`, `VoucherCode`, `PromotionMapping`, `FlashSaleSlot`, `PromotionRedemption`, `PromotionErrorCodes` (`0001–0010`), `PromotionLockKeys`, `PromotionIdempotencyKeys`, settings (`Promotions:*`), `PromotionRuleRegistry` + 4 rule thuần (`MinOrderAmount`, `ChannelScope`, `CustomerGroup`, `FirstOrderOnly`; `CustomerId = NULL ⇒ false`), `PromotionTreeValidator` + `PromotionTreeEvaluator` (ngắn mạch + ngân sách), seeder upsert **0 DELETE**.
+- **Application**: `PromotionEngine` (`IPromotionEngine`, **CHỈ ĐỌC**, 0 idempotency guard, 0 truy vấn trong vòng lá; quy tắc 4/8/9), `EfPromotionDataSource`, `PromotionDiscountCalculator` (Percentage trên `Subtotal` gốc + trần `MaxDiscountAmount`), `PromotionAppService` (10 method, `[Authorize]` cấp class + method hẹp; `SaveTree` chỉ `Draft`, xoá sâu nhất trước), `PromotionExpiryWorker` (kích hoạt + hết hạn; `DISTINCT TenantId` + `ICurrentTenant.Change` + khoá `SkipIfBusy`).
+- **EF**: mapping **7 bảng** `Pro*` + CHECK; `DbSet` **7** trên `eCommerceDbContext`; migration **`20261126224627_Add_Promotion_Module`** (EF sinh + SQL thô `NULLS NOT DISTINCT`/partial unique).
+- **Tích hợp `Sales` (D6)**: `CheckoutAppService` **NÉM** `eCommerce:Sales:0004` khi `CheckoutInput.OrderDiscount ≠ 0` **trước mọi tác dụng phụ**; gọi engine **chỉ khi** `Promotions:Enabled=true`, nối `DiscountTotal` vào `TinhGioInput.OrderDiscount`. **Không** sửa `Order`/`TinhTienDon`/`Pos`/`Pricing`.
+- **Quyền** `eCommerce.Promotions.{Default,View,Manage,Approve,Import}` khai **2 nơi**; **9 metric** + cấm nhãn `promotionId`/`voucherCode`/`customerId`; map **13 mã lỗi** → HTTP ở Host.
+
+### Test
+
+- **43 test** đã hợp nhất vào `test/eCommerce.Tests/Promotions/` (5 tệp: `HaTang`, `PromotionDomainTests`, `PromotionEngineTests`, `PromotionSurfaceTests`, `PromotionCheckoutGuardTests`); `dotnet test test/eCommerce.Tests` = **2419/2419 ca** (2376 + 43), 0 failed.
+- `RepVanHanhTests` đã cập nhật `All.Count` **30 → 39** (registry tăng thật 9 metric) — không nới assertion.
+- Các lưới kiểm 7 `DbSet`/quyền 2 nơi/allowlist 10 method/ranh giới `using`/`TC-38` `Pos` nằm trong `PromotionSurfaceTests`; F4 QA sẽ mở rộng lưới gốc nếu cần. **Không còn test đỏ.**
+
+### Migration / áp DB
+
+- Migration `20261126224627_Add_Promotion_Module` (+ `.Designer.cs`) + snapshot: `pg_dump` `artifacts/pg-dump/N94-W24-2.dump` (ORCH). Áp bằng `dotnet run --project src/eCommerce.DbMigrator` (**không** `dotnet ef database update`).
+- Ghi chú: `ProPromotionRuleCosts` là bảng **toàn cục** (không `TenantId`); 6/7 bảng còn lại `IMultiTenant`. Tên index dài > 63 byte trong `-arch` §5.5 được **rút gọn ≤ 63 byte** (xem **docDeviation** D7 ở tiểu mục dưới).
+
+### docDeviation (as-built ↔ SRS/ARCH)
+
+| # | Mục | As-built (khác tài liệu) | Xử lý |
+|---|---|---|---|
+| **D7** | Tên index — `PRO-002-arch.md` §5.5 | Tên > **63 byte** bị PostgreSQL **cắt âm thầm** ⇒ **rút gọn ≤ 63 byte**. Tên thật đã áp: `IX_ProPromotionConditions_Tenant_Promotion_Parent_Sort`, `IX_ProPromRedemptions_Tenant_Prom_Order_Voucher`, `IX_ProPromRedemptions_Tenant_Prom_Cust_Seq`; đã đọc `pg_indexes` xác nhận đủ `UNIQUE` + `NULLS NOT DISTINCT` + `WHERE`. | Ghi as-built ở SRS (mục "Migration / áp DB" + đây) |
+| **D8** | Namespace `IPromotionConditionRule`/`PromotionRuleContext`/`PromotionCartLine` | Khai trong **assembly Domain** nhưng giữ **namespace `eCommerce.Promotions.Contracts`** (Contracts→Domain hợp lệ); **không** đổi chữ ký công khai. | Ghi as-built; cấu trúc assembly giữ nguyên |
+| **D9** | `SaveTree`/`Import` — idempotency | **Không** nối `IIdempotencyGuard` (`D-284`); allowlist ranh giới giữ đúng `eCommerce.Messaging.EventCoverage`. | Ghi as-built §7.2 #2/#3; nợ "nối guard khi có dịp" (chủ `arch`/`be`) |
+| **D10** | Metric — `PRO-002` §13 | **4/9** metric ở `ChuaCoNoiPhat` (`D-283`): 3 của `PRO-001`, 1 của `SAL-001`. | Ghi as-built §13 + `XC-005` §5.1 |
+| **D5** | Hoàn lượt | `OrderCancelledEto` chờ `SAL-004` — **giữ** hoãn. | Không đổi |
+
+### Phần hoãn (ghi nợ — không tự chốt)
+
+- `OrderCancelledEto` (`SAL-004`) + consumer hoàn lượt (`PromotionRefund:…`): **hoãn**, ETO chưa tồn tại.
+- `PromotionAppliedEto` (mang dữ liệu, fail-closed qua `IEventCoverageProbe`): **chưa phát** — `Reporting`/`AccountingHub` chưa có handler; `promotion_applied_total` khai **"chưa có nơi phát"** (`ChuaCoNoiPhat`, lý do: `Sales` chưa tạo `Order`/`SAL-001`).
+- Đường ghi lượt voucher + 3 metric `promotion_voucher_*` thuộc **`PRO-001`** (chưa có code ⇒ `ChuaCoNoiPhat`).
+- `FreeShipping` (`CR-S2`) và `FlashSale` (`CR-P2`): chặn bằng `CHECK` + validation; `FlashSaleSlot` 0 dòng.
+- Giảm theo SKU/danh mục/thương hiệu và `PerLine` (`CR-P1`, `D-152`): engine v1 chỉ **một** `DiscountTotal` cấp đơn.
+- `IIdempotencyGuard` cho `SaveTree`/`Import`: **chưa nối** — giới hạn ranh giới §2.1 chỉ cho `Promotions.Application` tham chiếu `eCommerce.Messaging.EventCoverage`; idempotency hiện dựa khoá phân tán `Tree`/`Import` + delete-then-insert trong transaction + import chỉ-cập-dòng. Xem `openQuestions`.
+- `Q5` (tách người dựng ≠ người duyệt) và `Q28`/`Q26`: giữ nguyên theo ARCH §11.

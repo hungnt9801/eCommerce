@@ -125,6 +125,34 @@ public static class eCommerceMetricNames
     /// <summary>Số lần chạm thay thế (mỗi cửa sổ ghi lại) — nhãn `projection`.</summary>
     public const string ReportingReplaceConflictTotal = "reporting_replace_conflict_total";
 
+    // ---- KHUYẾN MÃI (`PRO-002` §8 — 9 metric = 6 của PRO-002 + 3 của PRO-001) ----
+    /// <summary>Độ trễ một lượt đánh giá — Histogram, nhãn `kind`.</summary>
+    public const string PromotionEvalDurationSeconds = "promotion_eval_duration_seconds";
+
+    /// <summary>Vượt ngân sách chạy — Counter, nhãn `kind`.</summary>
+    public const string PromotionEvalBudgetExceededTotal = "promotion_eval_budget_exceeded_total";
+
+    /// <summary>Candidate bị loại — Counter, nhãn `kind`, `reason` (12 giá trị enum).</summary>
+    public const string PromotionConditionRejectedTotal = "promotion_condition_rejected_total";
+
+    /// <summary>Khuyến mãi được áp (sau commit) — Counter, nhãn `kind`, `channel`.</summary>
+    public const string PromotionAppliedTotal = "promotion_applied_total";
+
+    /// <summary>Chạm trần lượt — Counter, nhãn `kind`.</summary>
+    public const string PromotionUsageLimitHitTotal = "promotion_usage_limit_hit_total";
+
+    /// <summary>Cắt candidate vượt `MaxCandidatesPerCart` — Counter, nhãn `kind`.</summary>
+    public const string PromotionCandidatesTruncatedTotal = "promotion_candidates_truncated_total";
+
+    /// <summary>Giữ lượt voucher (`PRO-001`) — Counter, nhãn `kind`, `result`.</summary>
+    public const string PromotionVoucherReservedTotal = "promotion_voucher_reserved_total";
+
+    /// <summary>Nhả lượt voucher (`PRO-001`) — Counter, nhãn `reason`.</summary>
+    public const string PromotionVoucherReleasedTotal = "promotion_voucher_released_total";
+
+    /// <summary>Lượt giữ voucher hết TTL (`PRO-001`) — Counter, nhãn `kind`.</summary>
+    public const string PromotionVoucherReservationExpiredTotal = "promotion_voucher_reservation_expired_total";
+
     /// <summary>Toàn bộ tên metric — nguồn sự thật duy nhất cho test `TC-06`.</summary>
     public static readonly IReadOnlyList<string> All =    [
         MessagingOutboxPending,
@@ -167,7 +195,17 @@ public static class eCommerceMetricNames
         ReportingWatermarkLagSeconds,
         ReportingProjectionFailedTotal,
         ReportingRowsWrittenTotal,
-        ReportingReplaceConflictTotal
+        ReportingReplaceConflictTotal,
+        // 🆕 `PRO-002` (`WP-24`) — 9 metric khuyến mãi.
+        PromotionEvalDurationSeconds,
+        PromotionEvalBudgetExceededTotal,
+        PromotionConditionRejectedTotal,
+        PromotionAppliedTotal,
+        PromotionUsageLimitHitTotal,
+        PromotionCandidatesTruncatedTotal,
+        PromotionVoucherReservedTotal,
+        PromotionVoucherReleasedTotal,
+        PromotionVoucherReservationExpiredTotal
     ];
 
     /// <summary>
@@ -230,7 +268,17 @@ public static class eCommerceMetricNames
             [ReportingWatermarkLagSeconds] = nameof(eCommerceMetrics.SetReportingWatermarkLagSeconds),
             [ReportingProjectionFailedTotal] = nameof(eCommerceMetrics.ReportingProjectionFailed),
             [ReportingRowsWrittenTotal] = nameof(eCommerceMetrics.ReportingRowsWritten),
-            [ReportingReplaceConflictTotal] = nameof(eCommerceMetrics.ReportingReplaceConflict)
+            [ReportingReplaceConflictTotal] = nameof(eCommerceMetrics.ReportingReplaceConflict),
+            // 🆕 `PRO-002` (`WP-24`)
+            [PromotionEvalDurationSeconds] = nameof(eCommerceMetrics.PromotionEvalDurationSeconds),
+            [PromotionEvalBudgetExceededTotal] = nameof(eCommerceMetrics.PromotionEvalBudgetExceeded),
+            [PromotionConditionRejectedTotal] = nameof(eCommerceMetrics.PromotionConditionRejected),
+            [PromotionAppliedTotal] = nameof(eCommerceMetrics.PromotionApplied),
+            [PromotionUsageLimitHitTotal] = nameof(eCommerceMetrics.PromotionUsageLimitHit),
+            [PromotionCandidatesTruncatedTotal] = nameof(eCommerceMetrics.PromotionCandidatesTruncated),
+            [PromotionVoucherReservedTotal] = nameof(eCommerceMetrics.PromotionVoucherReserved),
+            [PromotionVoucherReleasedTotal] = nameof(eCommerceMetrics.PromotionVoucherReleased),
+            [PromotionVoucherReservationExpiredTotal] = nameof(eCommerceMetrics.PromotionVoucherReservationExpired)
         };
 
     /// <summary>
@@ -257,6 +305,16 @@ public static class eCommerceMetricNames
             // (`XC-005` §19.3/§20.3).
             // 🔒 KHÔNG được thêm lại tên nào vào đây để làm test xanh — `MetricEmitterTests` kiểm **hai chiều**
             // và sẽ ĐỎ nếu khai "chưa có" trong khi mã đã có lời gọi.
+            //
+            // 🆕 `PRO-002` (`WP-24`) — 3 metric GIỮ/NHẢ LƯỢT VOUCHER thuộc đường ghi của **`PRO-001`**
+            // (`ReserveAsync`/`CommitAsync`/`ReleaseAsync`), **chưa** có code ở WP-24. Đăng ký tên theo §8
+            // nhưng **chưa có điểm phát** — nợ có chủ, đóng khi `PRO-001` hiện thực đường ghi lượt.
+            [PromotionVoucherReservedTotal] = "PRO-001 chưa hiện thực đường giữ lượt voucher ở WP-24.",
+            [PromotionVoucherReleasedTotal] = "PRO-001 chưa hiện thực đường nhả lượt voucher ở WP-24.",
+            [PromotionVoucherReservationExpiredTotal] = "PRO-001 chưa hiện thực job hết TTL lượt voucher ở WP-24.",
+            // `promotion_applied_total` phát **sau commit** ở `Sales` khi TẠO ĐƠN (`SAL-001`); WP-24 chỉ giữ chỗ,
+            // chưa tạo `Order` ⇒ chưa có điểm phát thật. Đóng khi `Sales` tạo đơn + áp khuyến mãi.
+            [PromotionAppliedTotal] = "Sales chưa tạo Order ở WP-24 (SAL-001) — chưa có mốc 'sau commit'."
         };
 }
 
@@ -307,7 +365,9 @@ public static class eCommerceMetricTags
     /// <summary>Nhãn **BỊ CẤM** vì cardinality cao — test `TC-07` chặn nếu chúng lọt vào danh sách cho phép.</summary>
     public static readonly IReadOnlyList<string> Forbidden =
     [
-        "orderId", "orderNumber", "sku", "userId", "correlationId", "email", "phone", "lockKey"
+        "orderId", "orderNumber", "sku", "userId", "correlationId", "email", "phone", "lockKey",
+        // 🆕 `PRO-002` §8 — nhãn định danh cardinality cao, chỉ dùng ở log.
+        "promotionId", "voucherCode", "customerId"
     ];
 }
 
@@ -382,8 +442,21 @@ public sealed class eCommerceMetrics : ISingletonDependency
     /// <summary>Số lần chạm thay thế (mỗi cửa sổ ghi lại) — nhãn `projection`.</summary>
     public Counter<long> ReportingReplaceConflict { get; }
 
+    // ---- KHUYẾN MÃI (`PRO-002`) ----
+    public Counter<long> PromotionEvalBudgetExceeded { get; }
+    public Counter<long> PromotionConditionRejected { get; }
+    public Counter<long> PromotionApplied { get; }
+    public Counter<long> PromotionUsageLimitHit { get; }
+    public Counter<long> PromotionCandidatesTruncated { get; }
+    public Counter<long> PromotionVoucherReserved { get; }
+    public Counter<long> PromotionVoucherReleased { get; }
+    public Counter<long> PromotionVoucherReservationExpired { get; }
+
     // ---- Histogram ----
     public Histogram<double> HttpRequestDurationSeconds { get; }
+
+    /// <summary>`PRO-002` — độ trễ một lượt đánh giá khuyến mãi, nhãn `kind`.</summary>
+    public Histogram<double> PromotionEvalDurationSeconds { get; }
 
     // ---- Gauge (giá trị do nơi phát cập nhật) ----
     private long _messagingOutboxPending;
@@ -489,8 +562,28 @@ public sealed class eCommerceMetrics : ISingletonDependency
         ReportingReplaceConflict = _meter.CreateCounter<long>(eCommerceMetricNames.ReportingReplaceConflictTotal,
             unit: "{replace}", description: "Số lần chạm thay thế mỗi cửa sổ (REP-001) — nhãn projection.");
 
+        // 🆕 `PRO-002` (`WP-24`) — 9 metric khuyến mãi.
+        PromotionEvalBudgetExceeded = _meter.CreateCounter<long>(eCommerceMetricNames.PromotionEvalBudgetExceededTotal,
+            unit: "{eval}", description: "Số lượt đánh giá vượt ngân sách chạy (PRO-002) — nhãn kind.");
+        PromotionConditionRejected = _meter.CreateCounter<long>(eCommerceMetricNames.PromotionConditionRejectedTotal,
+            unit: "{candidate}", description: "Số candidate bị loại (PRO-002) — nhãn kind, reason (hữu hạn).");
+        PromotionApplied = _meter.CreateCounter<long>(eCommerceMetricNames.PromotionAppliedTotal,
+            unit: "{order}", description: "Số lượt khuyến mãi được áp (PRO-002) — nhãn kind, channel.");
+        PromotionUsageLimitHit = _meter.CreateCounter<long>(eCommerceMetricNames.PromotionUsageLimitHitTotal,
+            unit: "{candidate}", description: "Số candidate chạm trần lượt (PRO-002) — nhãn kind.");
+        PromotionCandidatesTruncated = _meter.CreateCounter<long>(eCommerceMetricNames.PromotionCandidatesTruncatedTotal,
+            unit: "{candidate}", description: "Số candidate bị cắt do MaxCandidatesPerCart (PRO-002) — nhãn kind.");
+        PromotionVoucherReserved = _meter.CreateCounter<long>(eCommerceMetricNames.PromotionVoucherReservedTotal,
+            unit: "{reservation}", description: "Số lượt giữ voucher (PRO-001) — nhãn kind, result.");
+        PromotionVoucherReleased = _meter.CreateCounter<long>(eCommerceMetricNames.PromotionVoucherReleasedTotal,
+            unit: "{reservation}", description: "Số lượt nhả voucher (PRO-001) — nhãn reason.");
+        PromotionVoucherReservationExpired = _meter.CreateCounter<long>(eCommerceMetricNames.PromotionVoucherReservationExpiredTotal,
+            unit: "{reservation}", description: "Số lượt giữ voucher hết TTL (PRO-001) — nhãn kind.");
+
         HttpRequestDurationSeconds = _meter.CreateHistogram<double>(eCommerceMetricNames.HttpRequestDurationSeconds,
             unit: "s", description: "Độ trễ xử lý request HTTP.");
+        PromotionEvalDurationSeconds = _meter.CreateHistogram<double>(eCommerceMetricNames.PromotionEvalDurationSeconds,
+            unit: "s", description: "Độ trễ một lượt đánh giá khuyến mãi (PRO-002) — nhãn kind.");
 
         _meter.CreateObservableGauge(eCommerceMetricNames.MessagingOutboxPending,
             () => Interlocked.Read(ref _messagingOutboxPending),

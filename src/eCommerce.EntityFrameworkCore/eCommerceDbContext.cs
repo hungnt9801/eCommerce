@@ -66,6 +66,17 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>, IHasEventOut
     public DbSet<global::eCommerce.Notification.NotificationQueueItem> NotificationQueueItems { get; set; } = default!;
     public DbSet<global::eCommerce.Notification.NotificationQueueEvent> NotificationQueueEvents { get; set; } = default!;
 
+    // ── 🆕 `PRO-002` (`WP-24`) — KHUYẾN MÃI: 7 bảng `Pro*` ────────────────────────────────────────
+    // 🚨 THIẾU `DbSet` ⇒ `IRepository<T>` KHÔNG được đăng ký (lỗi chỉ-lộ-khi-chạy ⇒ HTTP 500).
+    // 🛡️ Lưới an toàn: `DbSetRegistrationTests` (quét đích danh 7 entity).
+    public DbSet<global::eCommerce.Promotions.Promotion> Promotions { get; set; } = default!;
+    public DbSet<global::eCommerce.Promotions.PromotionCondition> PromotionConditions { get; set; } = default!;
+    public DbSet<global::eCommerce.Promotions.PromotionRuleCost> PromotionRuleCosts { get; set; } = default!;
+    public DbSet<global::eCommerce.Promotions.VoucherCode> VoucherCodes { get; set; } = default!;
+    public DbSet<global::eCommerce.Promotions.PromotionMapping> PromotionMappings { get; set; } = default!;
+    public DbSet<global::eCommerce.Promotions.FlashSaleSlot> FlashSaleSlots { get; set; } = default!;
+    public DbSet<global::eCommerce.Promotions.PromotionRedemption> PromotionRedemptions { get; set; } = default!;
+
     // ── WP-03 (02/11/2026) — mô hình hàng hóa theo Nhanh (`03 §3.1`, D-07) ──────────────────────
     // 🚨 Mỗi dòng là một entity THẬT trong model ⇒ thiếu `DbSet` là DI nổ (HTTP 500) dù build xanh —
     // lưới an toàn: `DbSetRegistrationTests`.
@@ -475,5 +486,7 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>, IHasEventOut
         // 🆕 `WP-08` — REPORTING: read-model báo cáo (chiều + sự kiện + tổng hợp + mốc).
         global::eCommerce.Reporting.EntityFrameworkCore.ReportingDbContextModelCreatingExtensions.ConfigureReporting(builder);
 
+        // 🆕 `PRO-002` (`WP-24`) — KHUYẾN MÃI: cây điều kiện + engine (gọi MỘT LẦN).
+        global::eCommerce.Promotions.EntityFrameworkCore.PromotionsDbContextModelCreatingExtensions.ConfigurePromotions(builder);
     }
 }

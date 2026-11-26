@@ -216,8 +216,19 @@ graph LR
 | `reporting_projection_failed_total` | Counter | `projection`, `reason` | **`REP-001`/`WP-26`** | ✅ `ReportRebuildWorker` (cửa sổ lỗi) + `ReportAdminAppService` (mismatch) |
 | `reporting_rows_written_total` | Counter | `projection` | **`REP-001`/`WP-26`** | ✅ `ReportRebuildWorker` |
 | `reporting_replace_conflict_total` | Counter | `projection` | **`REP-001`/`WP-26`** | ✅ `ReportRebuildWorker` |
+| `promotion_eval_duration_seconds` | Histogram | `kind` | **`PRO-002`** §13 (WP-24, 27/11/2026) | ✅ `PromotionEngine` (`PromotionEngine.cs:232`) |
+| `promotion_eval_budget_exceeded_total` | Counter | `kind` | **`PRO-002`** §13 | ✅ `PromotionEngine` (`PromotionEngine.cs:348`) |
+| `promotion_condition_rejected_total` | Counter | `kind`, `reason` | **`PRO-002`** §13 | ✅ `PromotionEngine` (`PromotionEngine.cs:418`) |
+| `promotion_usage_limit_hit_total` | Counter | `kind` | **`PRO-002`** §13 | ✅ `PromotionEngine` (`PromotionEngine.cs:310`, `:330`) |
+| `promotion_candidates_truncated_total` | Counter | `kind` | **`PRO-002`** §13 | ✅ `PromotionEngine` (`PromotionEngine.cs:133`) |
+| `promotion_applied_total` | Counter | `kind`, `channel` | **`PRO-002`** §13 / `SAL-001` | ⏳ `ChuaCoNoiPhat` — `SAL-001` tạo `Order` (chưa có điểm phát; `D-283`) |
+| `promotion_voucher_reserved_total` | Counter | `kind`, `result` | **`PRO-001`**/`PRO-002` §13 | ⏳ `ChuaCoNoiPhat` — `PRO-001` `ReserveAsync`/`CommitAsync` (chưa có; `D-283`) |
+| `promotion_voucher_released_total` | Counter | `reason` | **`PRO-001`**/`PRO-002` §13 | ⏳ `ChuaCoNoiPhat` — `PRO-001` `ReleaseAsync` (chưa có; `D-283`) |
+| `promotion_voucher_reservation_expired_total` | Counter | `kind` | **`PRO-001`**/`PRO-002` §13 | ⏳ `ChuaCoNoiPhat` — `PRO-001` job hết TTL (chưa có; `D-283`) |
 
 > 📌 **`WP-26` (`REP-001`, 27/11/2026):** nâng registry **26 → 30** (4 metric `reporting_*`, nhãn `projection` ∈ `eCommerceMetricTags.Allowed`). Cả 4 có điểm phát thật (`ReportRebuildWorker`/`ReportAdminAppService`) nên **không** vào `ChuaCoNoiPhat`.
+
+> 📌 **`WP-24` (`PRO-002`, 27/11/2026):** nâng registry **30 → 39** (9 metric `promotion_*`, nhãn `kind`/`reason`/`channel`/`result` đều ∈ `eCommerceMetricTags.Allowed`). **5** có điểm phát thật (`PromotionEngine`); **4** vào `ChuaCoNoiPhat` là **nợ có chủ** — 3 của `PRO-001`, 1 của `SAL-001` — `D-283`.
 
 > 📌 **`WP-22` (`NOT-001`, 26/11/2026):** nâng registry **19 → 26**. 7 metric `notification_*` có điểm phát thật (`NotificationQueueAppender`/`NotificationDispatchWorker`) nên **không** vào `ChuaCoNoiPhat`; nhãn `channel`/`result`/`reason` đều thuộc `eCommerceMetricTags.Allowed`; `notification_queue_backlog` là **gauge** (tồn đọng `ChoGui`), tên giữ theo `D-267` (qa thêm `_backlog` vào whitelist test).
 

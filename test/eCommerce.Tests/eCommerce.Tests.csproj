@@ -70,6 +70,17 @@
     <ProjectReference Include="..\..\modules\Notification\eCommerce.Notification.Domain\eCommerce.Notification.Domain.csproj" />
     <ProjectReference Include="..\..\modules\Notification\eCommerce.Notification.Application.Contracts\eCommerce.Notification.Application.Contracts.csproj" />
     <ProjectReference Include="..\..\modules\Notification\eCommerce.Notification.Application\eCommerce.Notification.Application.csproj" />
+    <!-- 🆕 `PRO-002` (`W24-2`, phiên `N94`): HỢP NHẤT 43 test của module `Promotions` (do `be` đặt ở project
+         ngoài chuẩn `modules/Promotions/eCommerce.Promotions.Tests`) vào project test chuẩn để cổng
+         `tools/kiem-tat-ca.ps1` chạy được. Tầng domain/engine/rules/validator + surface (allowlist DTO, `[Authorize]`,
+         `DbSet` hợp nhất) + guard D6 (`CheckoutAppService` giữ `OrderDiscount = 0`). Dựng bằng `new` + fake
+         (đồng hồ/setting/data source), KHÔNG host ABP, KHÔNG PostgreSQL — khuôn `D-229`. -->
+    <ProjectReference Include="..\..\modules\Promotions\eCommerce.Promotions.Domain\eCommerce.Promotions.Domain.csproj" />
+    <ProjectReference Include="..\..\modules\Promotions\eCommerce.Promotions.Application.Contracts\eCommerce.Promotions.Application.Contracts.csproj" />
+    <ProjectReference Include="..\..\modules\Promotions\eCommerce.Promotions.Application\eCommerce.Promotions.Application.csproj" />
+    <!-- `PromotionCheckoutGuardTests` (D6): dựng `CheckoutAppService` để khẳng định `OrderDiscount ≠ 0` NÉM
+         TRƯỚC mọi tác dụng phụ. -->
+    <ProjectReference Include="..\..\modules\Sales\eCommerce.Sales.Application\eCommerce.Sales.Application.csproj" />
     <ProjectReference Include="..\..\src\eCommerce.HttpApi\eCommerce.HttpApi.csproj" />
   </ItemGroup>
 

@@ -40,6 +40,8 @@ namespace eCommerce.EntityFrameworkCore;
     typeof(Reporting.ReportingEntityFrameworkCoreModule),
     // 🆕 `WP-22` (`NOT-001`) — module NOTIFICATION: kéo `Notification.Domain` vào đồ thị (seeder + DI).
     typeof(global::eCommerce.Notification.EntityFrameworkCore.NotificationEntityFrameworkCoreModule),
+    // 🆕 `WP-24` (`PRO-002`) — module PROMOTIONS: mapping `Pro*` + kéo `Promotions.Domain` (seeder + DI).
+    typeof(global::eCommerce.Promotions.EntityFrameworkCore.PromotionsEntityFrameworkCoreModule),
     typeof(AbpEntityFrameworkCorePostgreSqlModule),
     typeof(AbpIdentityEntityFrameworkCoreModule),
     typeof(AbpPermissionManagementEntityFrameworkCoreModule),

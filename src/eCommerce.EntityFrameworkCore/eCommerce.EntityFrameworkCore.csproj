@@ -33,6 +33,8 @@
     <ProjectReference Include="..\..\modules\Reporting\eCommerce.Reporting.EntityFrameworkCore\eCommerce.Reporting.EntityFrameworkCore.csproj" />
     <!-- 🆕 `WP-22` (`NOT-001`) — module Notification tự cung cấp mapping (`ConfigureNotification`). -->
     <ProjectReference Include="..\..\modules\Notification\eCommerce.Notification.EntityFrameworkCore\eCommerce.Notification.EntityFrameworkCore.csproj" />
+    <!-- 🆕 `WP-24` (`PRO-002`) — module Promotions tự cung cấp mapping (`ConfigurePromotions`). -->
+    <ProjectReference Include="..\..\modules\Promotions\eCommerce.Promotions.EntityFrameworkCore\eCommerce.Promotions.EntityFrameworkCore.csproj" />
   </ItemGroup>
 
   <ItemGroup>

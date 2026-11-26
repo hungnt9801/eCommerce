@@ -203,6 +203,8 @@ Phân loại `0004`/`0010` **chỉ** dựa vào **sự có mặt của dòng** t
 
 Idempotency key **chỉ** ở biên **có ghi**: `PromotionTree:…`, `Import:…`, `PromotionAuto:{tenantId}:{orderId}:{promotionId}`, `PromotionRefund:…`; `evaluate` **không** khoá (`D-159`). Khoá voucher (`Checkout:{tenantId}:{checkoutSessionId}:{code}`) thuộc `ReserveAsync`/`CommitAsync` của `PRO-001`.
 
+> 📌 `PromotionTree:…` và `Import:…` khai trong `PromotionIdempotencyKeys` nhưng **chưa dùng** ở v1 (`D-284`): `SaveTreeAsync`/`ImportRuleCostsAsync` **không** bọc `IIdempotencyGuard` (allowlist ranh giới giữ đúng `eCommerce.Messaging.EventCoverage`, không nới); chống trùng theo **nghiệp vụ** = khoá phân tán `Tree`/`Import` + delete-then-insert cùng transaction + import chỉ cập nhật dòng có. Xem §12.1-D9.
+
 ---
 
 ## 4. Hợp đồng `Application.Contracts`
@@ -265,6 +267,8 @@ public interface IPromotionConditionRule
 ```
 
 `PromotionCartLine` = `{ Sku, Quantity (decimal, `D-31`), UnitPrice, ProductGroup? }`; mọi giá trị tiền là `decimal` **cùng `Currency`** của request, **không** `double`.
+
+> 📌 **Vị trí as-built của `IPromotionConditionRule`/`PromotionRuleContext`/`PromotionCartLine`:** khai trong **assembly Domain** (`modules/Promotions/eCommerce.Promotions.Domain/Contracts/PromotionRuleContracts.cs:1`) nhưng giữ **namespace `eCommerce.Promotions.Contracts`** — hợp lệ theo §2.1 vì chiều phụ thuộc `Contracts → Domain` cho phép (rule lá cần đọc dòng giỏ, mà Domain **không** được tham chiếu `Application.Contracts`). **Không** đổi chữ ký công khai (D8).
 
 ### 4.2 Ai gọi, phiên bản, tương thích
 
@@ -360,6 +364,8 @@ Thiếu một `DbSet` ⇒ `IRepository<T>` **không** resolve (“The requested 
 
 Mẫu SQL thô + cảnh báo “EF sinh lại index sẽ **mất** thuộc tính NND”: `src/eCommerce.EntityFrameworkCore/Migrations/20261013024226_Fix_NullableTenantId_UniqueIndexes.cs:1-60`. Test `TC-33` phải đọc `pg_indexes`/`pg_constraint` và kiểm **đích danh từng tên index** (không đếm tổng).
 
+> 📌 PostgreSQL cắt định danh > 63 byte **âm thầm**, nên 3 tên dài được **rút gọn ≤ 63 byte** khi tạo: `IX_ProPromotionConditions_Tenant_Promotion_Parent_Sort`, `IX_ProPromRedemptions_Tenant_Prom_Order_Voucher`, `IX_ProPromRedemptions_Tenant_Prom_Cust_Seq`; đã đọc `pg_indexes` xác nhận đủ `UNIQUE` + `NULLS NOT DISTINCT` + `WHERE` đúng (D7).
+
 ---
 
 ## 6. Luồng nghiệp vụ
@@ -441,7 +447,8 @@ Khai tại **cả hai** nơi: `src/eCommerce.Domain.Shared/eCommerceConsts.cs:15
 | `promotion_voucher_released_total` | Counter | `reason` | `PRO-001` |
 | `promotion_voucher_reservation_expired_total` | Counter | `kind` | `PRO-001` |
 
-Cập nhật **cùng PR**: `eCommerceMetricNames` (hằng số + `All` + `KyHieuMetric`), thêm hàm phát, `ChuaCoNoiPhat` **không** được thêm tên (phải có nơi phát thật), `XC-005` §5.1, test `TC-22` — registry as-built ở `shared/eCommerce.Kernel/Observability/eCommerceMetrics.cs:13`, `:240-300`.
+Cập nhật **cùng PR**: `eCommerceMetricNames` (hằng số + `All` + `KyHieuMetric`), thêm hàm phát, `XC-005` §5.1, test `TC-22` — registry as-built ở `shared/eCommerce.Kernel/Observability/eCommerceMetrics.cs:13`, `:240-300`.
+**9** metric `promotion_*` đã đăng ký; **5** có điểm phát thật (`PromotionEngine`: `promotion_eval_duration_seconds`, `promotion_eval_budget_exceeded_total`, `promotion_condition_rejected_total`, `promotion_usage_limit_hit_total`, `promotion_candidates_truncated_total`); **4** (`promotion_voucher_reserved_total`/`_released_total`/`_reservation_expired_total` = `PRO-001`; `promotion_applied_total` = `SAL-001`) nằm trong `ChuaCoNoiPhat` là **nợ có chủ**. Chỉ được thêm tên vào `ChuaCoNoiPhat` khi có đủ: (a) hạ tầng còn thiếu nêu rõ, (b) chủ nợ, (c) mốc đóng; xoá ngay khi có lời gọi phát thật — `MetricEmitterTests` đỏ cả hai chiều. `D-283`.
 Thêm **cấm** `promotionId`, `voucherCode`, `customerId` vào `eCommerceMetricTags.Forbidden` (SRS §13); nhãn chỉ từ `Allowed`.
 
 ---
@@ -530,6 +537,10 @@ Thêm **cấm** `promotionId`, `voucherCode`, `customerId` vào `eCommerceMetric
 | **D4** | §6.1 `namespace eCommerce.Promotions.Contracts` | Module mới dùng namespace gốc `eCommerce.Notification` (`modules/Notification/eCommerce.Notification.Application.Contracts/NotificationDtos.cs:4`) | **Giữ SRS** (namespace con `.Contracts` không xung đột project); ghi nhận để không ai “sửa cho giống” rồi phá chữ ký đã duyệt |
 | **D5** | SRS §7.2 #4 coi `OrderCancelledEto` là đầu vào đã có | ETO **chưa tồn tại** (SAL-004) | Ghi rõ “chờ SAL-004”; consumer hoãn, không giả lập ETO trong `Promotions` (`AQ9`) |
 | **D6** | SRS §6.1 quy tắc 6: `CheckoutInput.OrderDiscount` do client gửi **≠ 0 ⇒ server NÉM** (`D-143` (2)) | As-built **chưa** có guard: `modules/Sales/eCommerce.Sales.Application/CheckoutAppService.cs:109` truyền thẳng `OrderDiscount = input.OrderDiscount` | **W24-2** thêm guard ở `CheckoutAppService` + test (client gửi ≠ 0 ⇒ `400`, **0** đơn/giữ chỗ); đây là điều kiện để engine là **nguồn giảm giá duy nhất**. Không sửa `Order` (thuộc `SAL-002`/`SAL-003`) |
+| **D7** | SRS §5.2 đặt tên index đầy đủ (`IX_ProPromotionConditions_TenantId_PromotionId_ParentId_SortOrder`, `IX_ProPromotionRedemptions_TenantId_PromotionId_OrderId_VoucherCodeId`, `IX_ProPromotionRedemptions_TenantId_PromotionId_CustomerId_UsageSequence`) | PostgreSQL cắt định danh > 63 byte **âm thầm**; migration `Add_Promotion_Module` rút gọn ≤ 63 byte: `IX_ProPromotionConditions_Tenant_Promotion_Parent_Sort`, `IX_ProPromRedemptions_Tenant_Prom_Order_Voucher`, `IX_ProPromRedemptions_Tenant_Prom_Cust_Seq`; đọc `pg_indexes` xác nhận đủ `UNIQUE` + `NULLS NOT DISTINCT` + `WHERE` đúng | **Theo as-built** (tên rút gọn — §5.5); test `TC-33` kiểm **đích danh** tên đã rút gọn. BA ghi tên rút gọn vào SRS để không ai tưởng index còn nguyên chữ dài |
+| **D8** | SRS §6.1 đặt `IPromotionConditionRule`/`PromotionRuleContext`/`PromotionCartLine` dưới namespace `eCommerce.Promotions.Contracts` | Khai trong **assembly Domain** (`modules/Promotions/eCommerce.Promotions.Domain/Contracts/PromotionRuleContracts.cs:1`) nhưng **giữ** namespace `eCommerce.Promotions.Contracts` | **Theo as-built** (Contracts→Domain hợp lệ §2.1); **không** đổi chữ ký công khai, **không** di chuyển kiểu. BA ghi rõ vị trí để không ai “sửa cho khớp assembly” rồi phá tham chiếu |
+| **D9** | SRS §7.2 #2/#3 cột “Idempotency key (ổn định)” (`PromotionTree:…`/`Import:…`) | `SaveTreeAsync`/`ImportRuleCostsAsync` **không** nối `IIdempotencyGuard` ở v1 (as-built `modules/Promotions/eCommerce.Promotions.Application/PromotionAppService.cs:154-203,345-408`); allowlist ranh giới giữ đúng `eCommerce.Messaging.EventCoverage` | **Theo as-built** (`D-284`): chống trùng theo nghiệp vụ = khoá `Tree`/`Import` + delete-then-insert cùng transaction + import chỉ cập nhật dòng có; 2 khoá `PromotionTree:…`/`Import:…` khai nhưng **chưa dùng** (§3.7); retry `SaveTree` tăng `TreeVersion` +1 ở `Draft` — **chấp nhận** |
+| **D10** | SRS §13: “Metric mới (9) — ⚠️ CHƯA có trong code” | 9 đã **đăng ký**; **5** có điểm phát thật (`PromotionEngine`); **4** (`promotion_voucher_reserved_total`/`_released_total`/`_reservation_expired_total` = `PRO-001`; `promotion_applied_total` = `SAL-001`) ở `ChuaCoNoiPhat` là **nợ có chủ** | **Theo as-built** (`D-283` — §8); `MetricEmitterTests` đỏ cả hai chiều; BA sửa SRS §13 thành “9 đăng ký; 5 có điểm phát; 4 nợ có chủ” |
 
 ### 12.2 Câu hỏi mở **mới** (đưa vào khối JSON)
 
@@ -603,3 +614,4 @@ P3 #1 (54→55 test case ở SRS §15.4) và P3 #2 (trích số dòng cũ trong 
 | v0.3 | 27/11/2026 | ARCH (N93 — sửa theo DOCREV vòng 2: P1=0, P2=1, P3=4) | **P2:** chốt **phương án (a)** cho `IEventCoverageProbe` — `Promotions.Application` tham chiếu **`eCommerce.Messaging.Domain`** (module hạ tầng, không có Contracts), khai nhánh phụ thuộc §2.1 + ngoại lệ B2 + hệ quả allowlist test ranh giới; §6.2 nêu đường dẫn probe + phương án (b) cross-cutting ngoài WP-24 (nếu chọn: v1 không phát `PromotionAppliedEto`). **P3:** sửa bằng chứng khoá phân tán sang `NotificationDispatchWorker.cs:79`; §5.5 “cả 4 index đều có `WHERE`”; §5.4 khai 4 cột `ExpiresAtUtc`/`AppliedAtUtc`/`ReleasedAtUtc`/`ReversedAtUtc`; §14 ghi cụ thể phép quét từ khoá bỏ-ngỏ = 0 |
 | v0.4 | 27/11/2026 | ARCH (N94/W24-2) | P3 DOCREV vòng 3: thu hẹp allowlist test ranh giới còn đúng namespace `eCommerce.Messaging.EventCoverage` (không wildcard) + nêu tên test `RanhGioiPromotionsTests` ở §10.2. |
 | v0.5 | 27/11/2026 | ARCH (N94/W24-2) | Cập nhật trạng thái: SRS `v0.10`, DOCREV vòng 4/5 `DOC-OK`, 0 P3 còn mở; không đổi thiết kế. |
+| v0.6 | 27/11/2026 | ARCH (N94/W24-2) | áp `D-283` (metric 5/9 + 4 nợ) & `D-284` (không nối guard); thêm docDeviation D7–D10; ghi rõ tên index rút gọn; không đổi thiết kế khác. |

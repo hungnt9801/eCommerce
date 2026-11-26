@@ -203,6 +203,15 @@ public class eCommercePermissionDefinitionProvider : PermissionDefinitionProvide
         reports.AddChild(eCommerceConsts.Permissions.Reports.PeriodReopen);
         reports.AddChild(eCommerceConsts.Permissions.Reports.Reconcile);
 
+        // 🆕 `WP-24` (`PRO-002`) — KHUYẾN MÃI. 🚨 BẮT BUỘC khai ở CẢ HAI NƠI (hằng số + ở đây): thiếu một nơi
+        // ⇒ `403` cho MỌI người kể cả `admin` (`XC-004` D2/E3). 🛡️ `BatBienPhanQuyenTests.TC02b`.
+        // 🔒 `Approve` tách khỏi `Manage`; `Import` tách riêng (import bảng chi phí rule).
+        var promotions = group.AddPermission(eCommerceConsts.Permissions.Promotions.Default);
+        promotions.AddChild(eCommerceConsts.Permissions.Promotions.View);
+        promotions.AddChild(eCommerceConsts.Permissions.Promotions.Manage);
+        promotions.AddChild(eCommerceConsts.Permissions.Promotions.Approve);
+        promotions.AddChild(eCommerceConsts.Permissions.Promotions.Import);
+
         // ---- Thông báo (`WP-22` / `NOT-001`) ----
         // 🚨 BẮT BUỘC khai ở CẢ HAI NƠI (hằng số `eCommerceConsts.Permissions.Notifications` + ở đây):
         // thiếu một nơi ⇒ `403` cho MỌI người kể cả `admin` (`XC-004` D2/E3). 🛡️ `BatBienPhanQuyenTests.TC02b`.
