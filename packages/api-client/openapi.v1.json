@@ -670,6 +670,457 @@
         }
       }
     },
+    "/api/v1/notifications/batches": {
+      "post": {
+        "tags": [
+          "NotificationBatches"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Notification.CreateBatchDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Notification.CreateBatchDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Notification.CreateBatchDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Notification.NotificationBatchDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Notification.NotificationBatchDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Notification.NotificationBatchDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notifications/batches/{id}/approve": {
+      "post": {
+        "tags": [
+          "NotificationBatches"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Notification.NotificationBatchDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Notification.NotificationBatchDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Notification.NotificationBatchDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notifications/queue": {
+      "get": {
+        "tags": [
+          "NotificationQueue"
+        ],
+        "parameters": [
+          {
+            "name": "Status",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/eCommerce.Notification.NotificationQueueStatus"
+            }
+          },
+          {
+            "name": "ChannelKind",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/eCommerce.Notification.ChannelKind"
+            }
+          },
+          {
+            "name": "TuNgayUtc",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "DenNgayUtc",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "Page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "PageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "Sort",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Notification.NotificationQueueItemDto, eCommerce.Notification.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Notification.NotificationQueueItemDto, eCommerce.Notification.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Notification.NotificationQueueItemDto, eCommerce.Notification.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notifications/queue/{id}/events": {
+      "get": {
+        "tags": [
+          "NotificationQueue"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/eCommerce.Notification.NotificationQueueEventDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/eCommerce.Notification.NotificationQueueEventDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/eCommerce.Notification.NotificationQueueEventDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notifications/templates": {
+      "get": {
+        "tags": [
+          "NotificationTemplates"
+        ],
+        "parameters": [
+          {
+            "name": "Page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "PageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "Sort",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Notification.NotificationTemplateDto, eCommerce.Notification.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Notification.NotificationTemplateDto, eCommerce.Notification.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Notification.NotificationTemplateDto, eCommerce.Notification.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "NotificationTemplates"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Notification.CreateTemplateDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Notification.CreateTemplateDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Notification.CreateTemplateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Notification.NotificationTemplateDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Notification.NotificationTemplateDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Notification.NotificationTemplateDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notifications/templates/{id}/versions": {
+      "post": {
+        "tags": [
+          "NotificationTemplates"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Notification.PublishTemplateVersionDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Notification.PublishTemplateVersionDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Notification.PublishTemplateVersionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Notification.NotificationTemplateVersionDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Notification.NotificationTemplateVersionDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Notification.NotificationTemplateVersionDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notifications/templates/{id}/archive": {
+      "post": {
+        "tags": [
+          "NotificationTemplates"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/v1/notifications/templates/preview": {
+      "post": {
+        "tags": [
+          "NotificationTemplates"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Notification.PreviewTemplateDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Notification.PreviewTemplateDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Notification.PreviewTemplateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Notification.PreviewResultDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Notification.PreviewResultDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Notification.PreviewResultDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/orders": {
       "get": {
         "tags": [
@@ -3648,6 +4099,40 @@
         },
         "additionalProperties": false
       },
+      "Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Notification.NotificationQueueItemDto, eCommerce.Notification.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/eCommerce.Notification.NotificationQueueItemDto"
+            },
+            "nullable": true
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Notification.NotificationTemplateDto, eCommerce.Notification.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/eCommerce.Notification.NotificationTemplateDto"
+            },
+            "nullable": true
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
       "Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Reconciliation.Dtos.PaymentDiscrepancyDto, eCommerce.Reconciliation.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]": {
         "type": "object",
         "properties": {
@@ -5183,6 +5668,102 @@
         },
         "additionalProperties": false
       },
+      "eCommerce.Address.Carrier.AdministrativeUnitContractDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "schemaVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "level": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "parentCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Address.Carrier.CarrierAddressCodeResultDto": {
+        "type": "object",
+        "properties": {
+          "mapping": {
+            "$ref": "#/components/schemas/eCommerce.Address.Carrier.CarrierAddressMappingContractDto"
+          },
+          "unit": {
+            "$ref": "#/components/schemas/eCommerce.Address.Carrier.AdministrativeUnitContractDto"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Address.Carrier.CarrierAddressMappingContractDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "carrierCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "carrierLevel": {
+            "type": "string",
+            "nullable": true
+          },
+          "carrierAddressCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "carrierAddressName": {
+            "type": "string",
+            "nullable": true
+          },
+          "ourAdministrativeUnitId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "matchMethod": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "syncedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Address.Carrier.CarrierAddressSyncOutcome": {
+        "enum": [
+          0,
+          1,
+          2
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
       "eCommerce.Address.Carrier.CarrierMappingStatus": {
         "enum": [
           0,
@@ -5209,6 +5790,20 @@
         ],
         "type": "integer",
         "format": "int32"
+      },
+      "eCommerce.Address.Carrier.ResolveCarrierAddressCodeRequest": {
+        "type": "object",
+        "properties": {
+          "carrierCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "ourAdministrativeUnitId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
       },
       "eCommerce.Address.CarrierAddressMappingDto": {
         "type": "object",
@@ -5249,6 +5844,83 @@
           }
         },
         "additionalProperties": false
+      },
+      "eCommerce.Address.CatalogSyncOutcome": {
+        "enum": [
+          0,
+          1,
+          2
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "eCommerce.Address.CatalogSyncRunDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "schemaVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "trigger": {
+            "$ref": "#/components/schemas/eCommerce.Address.CatalogSyncTrigger"
+          },
+          "sourceName": {
+            "type": "string",
+            "nullable": true
+          },
+          "sourceHash": {
+            "type": "string",
+            "nullable": true
+          },
+          "startedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "importedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "importedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/eCommerce.Address.CatalogSyncOutcome"
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "soThemMoi": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "soDoiTen": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "soMoLai": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "soDong": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Address.CatalogSyncTrigger": {
+        "enum": [
+          0,
+          1
+        ],
+        "type": "integer",
+        "format": "int32"
       },
       "eCommerce.Address.ChuanHoaInput": {
         "type": "object",
@@ -5435,6 +6107,48 @@
         },
         "additionalProperties": false
       },
+      "eCommerce.Address.ImportDatasetInput": {
+        "type": "object",
+        "properties": {
+          "schemaVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sourceName": {
+            "type": "string",
+            "nullable": true
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/eCommerce.Address.ImportUnitRow"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Address.ImportUnitRow": {
+        "type": "object",
+        "properties": {
+          "level": {
+            "$ref": "#/components/schemas/eCommerce.Address.AdministrativeLevel"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "parentCode": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "eCommerce.Address.KetQuaTraMaHangDto": {
         "type": "object",
         "properties": {
@@ -5555,6 +6269,54 @@
           "carrierAddressCode": {
             "type": "string",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Address.UnmappedCarrierCodeDto": {
+        "type": "object",
+        "properties": {
+          "carrierLevel": {
+            "type": "string",
+            "nullable": true
+          },
+          "carrierAddressCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "carrierAddressName": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Address.UnmappedCodesResultDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/eCommerce.Address.UnmappedCarrierCodeDto"
+            },
+            "nullable": true
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "syncRunId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "finishedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "latestRunOutcome": {
+            "$ref": "#/components/schemas/eCommerce.Address.Carrier.CarrierAddressSyncOutcome"
           }
         },
         "additionalProperties": false
@@ -11273,6 +12035,56 @@
         },
         "additionalProperties": false
       },
+      "eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Notification.NotificationQueueItemDto, eCommerce.Notification.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/eCommerce.Notification.NotificationQueueItemDto"
+            },
+            "nullable": true
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Notification.NotificationTemplateDto, eCommerce.Notification.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/eCommerce.Notification.NotificationTemplateDto"
+            },
+            "nullable": true
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
       "eCommerce.HttpApi.Dtos.ProductDetailDto": {
         "type": "object",
         "properties": {
@@ -12204,6 +13016,616 @@
               "type": "integer",
               "format": "int32"
             },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Notification.CancelQueueItemRequest": {
+        "type": "object",
+        "properties": {
+          "lyDo": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Notification.ChannelKind": {
+        "enum": [
+          0,
+          1,
+          2
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "eCommerce.Notification.CreateBatchDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "templateId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "templateVersionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "totalItems": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "correlationId": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Notification.CreateTemplateDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "channelKind": {
+            "$ref": "#/components/schemas/eCommerce.Notification.ChannelKind"
+          },
+          "locale": {
+            "type": "string",
+            "nullable": true
+          },
+          "purpose": {
+            "$ref": "#/components/schemas/eCommerce.Notification.NotificationPurpose"
+          },
+          "bodyFormat": {
+            "$ref": "#/components/schemas/eCommerce.Notification.NotificationBodyFormat"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Notification.EnqueueResult": {
+        "type": "object",
+        "properties": {
+          "queueItemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "alreadyQueued": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Notification.NotificationBatchDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "templateId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "templateVersionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/eCommerce.Notification.NotificationBatchStatus"
+          },
+          "totalItems": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "createdByUserId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "approvedByUserId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "approvedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "correlationId": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Notification.NotificationBatchStatus": {
+        "enum": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "eCommerce.Notification.NotificationBodyFormat": {
+        "enum": [
+          0,
+          1
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "eCommerce.Notification.NotificationPlaceholderDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "kind": {
+            "$ref": "#/components/schemas/eCommerce.Notification.NotificationPlaceholderKind"
+          },
+          "required": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Notification.NotificationPlaceholderKind": {
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "eCommerce.Notification.NotificationPurpose": {
+        "enum": [
+          0,
+          1,
+          2
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "eCommerce.Notification.NotificationQueueEventDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "queueItemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "eventType": {
+            "$ref": "#/components/schemas/eCommerce.Notification.NotificationQueueEventType"
+          },
+          "fromStatus": {
+            "$ref": "#/components/schemas/eCommerce.Notification.NotificationQueueStatus"
+          },
+          "toStatus": {
+            "$ref": "#/components/schemas/eCommerce.Notification.NotificationQueueStatus"
+          },
+          "reasonMasked": {
+            "type": "string",
+            "nullable": true
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "correlationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "actorUserId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "occurredAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Notification.NotificationQueueEventType": {
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "eCommerce.Notification.NotificationQueueItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "rootItemId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "batchId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "sourceEventType": {
+            "type": "string",
+            "nullable": true
+          },
+          "sourceAggregateId": {
+            "type": "string",
+            "nullable": true
+          },
+          "channelKind": {
+            "$ref": "#/components/schemas/eCommerce.Notification.ChannelKind"
+          },
+          "templateId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "templateVersionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "recipientMasked": {
+            "type": "string",
+            "nullable": true
+          },
+          "renderedSubject": {
+            "type": "string",
+            "nullable": true
+          },
+          "renderedBodyMasked": {
+            "type": "string",
+            "nullable": true
+          },
+          "priority": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "$ref": "#/components/schemas/eCommerce.Notification.NotificationQueueStatus"
+          },
+          "attemptCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "scheduledAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "dispatchedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastErrorCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastReasonMasked": {
+            "type": "string",
+            "nullable": true
+          },
+          "correlationId": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Notification.NotificationQueueStatus": {
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "eCommerce.Notification.NotificationTemplateDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "channelKind": {
+            "$ref": "#/components/schemas/eCommerce.Notification.ChannelKind"
+          },
+          "locale": {
+            "type": "string",
+            "nullable": true
+          },
+          "purpose": {
+            "$ref": "#/components/schemas/eCommerce.Notification.NotificationPurpose"
+          },
+          "coalesceWindowSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "defaultExpiresAfterSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/eCommerce.Notification.NotificationTemplateStatus"
+          },
+          "currentPublishedVersionId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "isSystem": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Notification.NotificationTemplateStatus": {
+        "enum": [
+          0,
+          1,
+          2
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "eCommerce.Notification.NotificationTemplateVersionDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "templateId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "subject": {
+            "type": "string",
+            "nullable": true
+          },
+          "bodyText": {
+            "type": "string",
+            "nullable": true
+          },
+          "bodyFormat": {
+            "$ref": "#/components/schemas/eCommerce.Notification.NotificationBodyFormat"
+          },
+          "placeholders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/eCommerce.Notification.NotificationPlaceholderDto"
+            },
+            "nullable": true
+          },
+          "contentHash": {
+            "type": "string",
+            "nullable": true
+          },
+          "publishedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "publishedByUserId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Notification.PreviewResultDto": {
+        "type": "object",
+        "properties": {
+          "subject": {
+            "type": "string",
+            "nullable": true
+          },
+          "body": {
+            "type": "string",
+            "nullable": true
+          },
+          "bodyFingerprint": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Notification.PreviewTemplateDto": {
+        "type": "object",
+        "properties": {
+          "templateId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "templateVersionId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "sampleData": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Notification.PublishTemplateVersionDto": {
+        "type": "object",
+        "properties": {
+          "templateId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "subject": {
+            "type": "string",
+            "nullable": true
+          },
+          "bodyText": {
+            "type": "string",
+            "nullable": true
+          },
+          "placeholders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/eCommerce.Notification.NotificationPlaceholderDto"
+            },
+            "nullable": true
+          },
+          "bodyFormat": {
+            "$ref": "#/components/schemas/eCommerce.Notification.NotificationBodyFormat"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Notification.SendManualRequest": {
+        "type": "object",
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "templateCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "channelKind": {
+            "$ref": "#/components/schemas/eCommerce.Notification.ChannelKind"
+          },
+          "locale": {
+            "type": "string",
+            "nullable": true
+          },
+          "recipient": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "priority": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "scheduledAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "batchId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "sourceAggregateId": {
+            "type": "string",
+            "nullable": true
+          },
+          "correlationId": {
+            "type": "string",
             "nullable": true
           }
         },
@@ -14604,6 +16026,21 @@
     },
     {
       "name": "MarketplaceIntake"
+    },
+    {
+      "name": "NotificationBatch"
+    },
+    {
+      "name": "NotificationBatches"
+    },
+    {
+      "name": "NotificationQueue"
+    },
+    {
+      "name": "NotificationTemplate"
+    },
+    {
+      "name": "NotificationTemplates"
     },
     {
       "name": "Order"

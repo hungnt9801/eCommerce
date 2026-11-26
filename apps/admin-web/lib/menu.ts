@@ -74,6 +74,32 @@ export const MENU: MenuGroup[] = [
       { label: "Tồn kho", href: "report/inventory", permission: "eCommerce.Reports", enabled: true },
     ],
   },
+  {
+    label: "Thông báo",
+    items: [
+      // ✅ `WP-22` W22-3 — Mẫu thông báo (NOT-001), quyền đọc `Notification.Templates.View`.
+      {
+        label: "Mẫu thông báo",
+        href: "notifications/templates",
+        permission: "eCommerce.Notification.Templates.View",
+        enabled: true,
+      },
+      // ✅ Hàng đợi gửi — quyền đọc `Notification.Queue.View` (người nhận đã che, D-191).
+      {
+        label: "Hàng đợi gửi",
+        href: "notifications/queue",
+        permission: "eCommerce.Notification.Queue.View",
+        enabled: true,
+      },
+      // ✅ Lô gửi — tạo/duyệt tách quyền (D-198). Menu mở bằng quyền TẠO; nút duyệt kiểm riêng trong màn.
+      {
+        label: "Lô gửi",
+        href: "notifications/batches",
+        permission: "eCommerce.Notification.Batches.Create",
+        enabled: true,
+      },
+    ],
+  },
 ];
 
 /** Quyền cần hỏi server để dựng menu (gom 1 lần, không N+1). */

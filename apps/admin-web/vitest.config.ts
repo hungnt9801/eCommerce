@@ -16,7 +16,9 @@ export default defineConfig({
     alias: { "@": path.resolve(__dirname) },
   },
   test: {
-    include: ["test/**/*.test.ts"],
+    // `test/**` = bộ test của QA; `lib/**/*.test.ts` = test hàm thuần co-located do vai fe thêm (vùng ghi
+    // của fe DENY `apps/admin-web/test/**`, xem `.claude/scopes.json`). Cả hai đều chạy qua `pnpm test`.
+    include: ["test/**/*.test.ts", "lib/**/*.test.ts"],
     environment: "node",
     reporters: ["default"],
   },

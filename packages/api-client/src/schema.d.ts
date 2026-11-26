@@ -459,6 +459,363 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/notifications/batches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["eCommerce.Notification.CreateBatchDto"];
+                    "text/json": components["schemas"]["eCommerce.Notification.CreateBatchDto"];
+                    "application/*+json": components["schemas"]["eCommerce.Notification.CreateBatchDto"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Notification.NotificationBatchDto"];
+                        "application/json": components["schemas"]["eCommerce.Notification.NotificationBatchDto"];
+                        "text/json": components["schemas"]["eCommerce.Notification.NotificationBatchDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/batches/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Notification.NotificationBatchDto"];
+                        "application/json": components["schemas"]["eCommerce.Notification.NotificationBatchDto"];
+                        "text/json": components["schemas"]["eCommerce.Notification.NotificationBatchDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/queue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    Status?: components["schemas"]["eCommerce.Notification.NotificationQueueStatus"];
+                    ChannelKind?: components["schemas"]["eCommerce.Notification.ChannelKind"];
+                    TuNgayUtc?: string;
+                    DenNgayUtc?: string;
+                    Page?: number;
+                    PageSize?: number;
+                    Sort?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Notification.NotificationQueueItemDto, eCommerce.Notification.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"];
+                        "application/json": components["schemas"]["eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Notification.NotificationQueueItemDto, eCommerce.Notification.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"];
+                        "text/json": components["schemas"]["eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Notification.NotificationQueueItemDto, eCommerce.Notification.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/queue/{id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Notification.NotificationQueueEventDto"][];
+                        "application/json": components["schemas"]["eCommerce.Notification.NotificationQueueEventDto"][];
+                        "text/json": components["schemas"]["eCommerce.Notification.NotificationQueueEventDto"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    Page?: number;
+                    PageSize?: number;
+                    Sort?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Notification.NotificationTemplateDto, eCommerce.Notification.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"];
+                        "application/json": components["schemas"]["eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Notification.NotificationTemplateDto, eCommerce.Notification.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"];
+                        "text/json": components["schemas"]["eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Notification.NotificationTemplateDto, eCommerce.Notification.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["eCommerce.Notification.CreateTemplateDto"];
+                    "text/json": components["schemas"]["eCommerce.Notification.CreateTemplateDto"];
+                    "application/*+json": components["schemas"]["eCommerce.Notification.CreateTemplateDto"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Notification.NotificationTemplateDto"];
+                        "application/json": components["schemas"]["eCommerce.Notification.NotificationTemplateDto"];
+                        "text/json": components["schemas"]["eCommerce.Notification.NotificationTemplateDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/templates/{id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["eCommerce.Notification.PublishTemplateVersionDto"];
+                    "text/json": components["schemas"]["eCommerce.Notification.PublishTemplateVersionDto"];
+                    "application/*+json": components["schemas"]["eCommerce.Notification.PublishTemplateVersionDto"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Notification.NotificationTemplateVersionDto"];
+                        "application/json": components["schemas"]["eCommerce.Notification.NotificationTemplateVersionDto"];
+                        "text/json": components["schemas"]["eCommerce.Notification.NotificationTemplateVersionDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/templates/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/templates/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["eCommerce.Notification.PreviewTemplateDto"];
+                    "text/json": components["schemas"]["eCommerce.Notification.PreviewTemplateDto"];
+                    "application/*+json": components["schemas"]["eCommerce.Notification.PreviewTemplateDto"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Notification.PreviewResultDto"];
+                        "application/json": components["schemas"]["eCommerce.Notification.PreviewResultDto"];
+                        "text/json": components["schemas"]["eCommerce.Notification.PreviewResultDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orders": {
         parameters: {
             query?: never;
@@ -2532,6 +2889,16 @@ export interface components {
             /** Format: int64 */
             totalCount?: number;
         };
+        "Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Notification.NotificationQueueItemDto, eCommerce.Notification.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]": {
+            items?: components["schemas"]["eCommerce.Notification.NotificationQueueItemDto"][] | null;
+            /** Format: int64 */
+            totalCount?: number;
+        };
+        "Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Notification.NotificationTemplateDto, eCommerce.Notification.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]": {
+            items?: components["schemas"]["eCommerce.Notification.NotificationTemplateDto"][] | null;
+            /** Format: int64 */
+            totalCount?: number;
+        };
         "Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Reconciliation.Dtos.PaymentDiscrepancyDto, eCommerce.Reconciliation.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]": {
             items?: components["schemas"]["eCommerce.Reconciliation.Dtos.PaymentDiscrepancyDto"][] | null;
             /** Format: int64 */
@@ -2989,6 +3356,43 @@ export interface components {
             parentCode?: string | null;
             isActive?: boolean;
         };
+        "eCommerce.Address.Carrier.AdministrativeUnitContractDto": {
+            /** Format: uuid */
+            id?: string;
+            /** Format: int32 */
+            schemaVersion?: number;
+            /** Format: int32 */
+            level?: number;
+            code?: string | null;
+            name?: string | null;
+            parentCode?: string | null;
+            isActive?: boolean;
+        };
+        "eCommerce.Address.Carrier.CarrierAddressCodeResultDto": {
+            mapping?: components["schemas"]["eCommerce.Address.Carrier.CarrierAddressMappingContractDto"];
+            unit?: components["schemas"]["eCommerce.Address.Carrier.AdministrativeUnitContractDto"];
+        };
+        "eCommerce.Address.Carrier.CarrierAddressMappingContractDto": {
+            /** Format: uuid */
+            id?: string;
+            carrierCode?: string | null;
+            carrierLevel?: string | null;
+            carrierAddressCode?: string | null;
+            carrierAddressName?: string | null;
+            /** Format: uuid */
+            ourAdministrativeUnitId?: string;
+            /** Format: int32 */
+            matchMethod?: number;
+            /** Format: int32 */
+            status?: number;
+            /** Format: date-time */
+            syncedAtUtc?: string;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        "eCommerce.Address.Carrier.CarrierAddressSyncOutcome": 0 | 1 | 2;
         /**
          * Format: int32
          * @enum {integer}
@@ -3004,6 +3408,11 @@ export interface components {
          * @enum {integer}
          */
         "eCommerce.Address.Carrier.LoaiSaiLech": 0 | 1 | 2;
+        "eCommerce.Address.Carrier.ResolveCarrierAddressCodeRequest": {
+            carrierCode?: string | null;
+            /** Format: uuid */
+            ourAdministrativeUnitId?: string;
+        };
         "eCommerce.Address.CarrierAddressMappingDto": {
             /** Format: uuid */
             id?: string;
@@ -3018,6 +3427,40 @@ export interface components {
             /** Format: date-time */
             syncedAtUtc?: string;
         };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        "eCommerce.Address.CatalogSyncOutcome": 0 | 1 | 2;
+        "eCommerce.Address.CatalogSyncRunDto": {
+            /** Format: uuid */
+            id?: string;
+            /** Format: int32 */
+            schemaVersion?: number;
+            trigger?: components["schemas"]["eCommerce.Address.CatalogSyncTrigger"];
+            sourceName?: string | null;
+            sourceHash?: string | null;
+            /** Format: date-time */
+            startedAtUtc?: string;
+            /** Format: date-time */
+            importedAtUtc?: string;
+            importedBy?: string | null;
+            outcome?: components["schemas"]["eCommerce.Address.CatalogSyncOutcome"];
+            errorCode?: string | null;
+            /** Format: int32 */
+            soThemMoi?: number;
+            /** Format: int32 */
+            soDoiTen?: number;
+            /** Format: int32 */
+            soMoLai?: number;
+            /** Format: int32 */
+            soDong?: number;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        "eCommerce.Address.CatalogSyncTrigger": 0 | 1;
         "eCommerce.Address.ChuanHoaInput": {
             /** Format: int32 */
             schemaVersion?: number;
@@ -3078,6 +3521,18 @@ export interface components {
             normalizedAtUtc?: string | null;
             coDungDuoc?: boolean;
         };
+        "eCommerce.Address.ImportDatasetInput": {
+            /** Format: int32 */
+            schemaVersion?: number;
+            sourceName?: string | null;
+            rows?: components["schemas"]["eCommerce.Address.ImportUnitRow"][] | null;
+        };
+        "eCommerce.Address.ImportUnitRow": {
+            level?: components["schemas"]["eCommerce.Address.AdministrativeLevel"];
+            code?: string | null;
+            name?: string | null;
+            parentCode?: string | null;
+        };
         "eCommerce.Address.KetQuaTraMaHangDto": {
             anhXa?: components["schemas"]["eCommerce.Address.CarrierAddressMappingDto"];
             donVi?: components["schemas"]["eCommerce.Address.AdministrativeUnitDto"];
@@ -3117,6 +3572,21 @@ export interface components {
         "eCommerce.Address.TraMaHangRequest": {
             carrierCode?: string | null;
             carrierAddressCode?: string | null;
+        };
+        "eCommerce.Address.UnmappedCarrierCodeDto": {
+            carrierLevel?: string | null;
+            carrierAddressCode?: string | null;
+            carrierAddressName?: string | null;
+        };
+        "eCommerce.Address.UnmappedCodesResultDto": {
+            items?: components["schemas"]["eCommerce.Address.UnmappedCarrierCodeDto"][] | null;
+            /** Format: int32 */
+            totalCount?: number;
+            /** Format: uuid */
+            syncRunId?: string | null;
+            /** Format: date-time */
+            finishedAtUtc?: string | null;
+            latestRunOutcome?: components["schemas"]["eCommerce.Address.Carrier.CarrierAddressSyncOutcome"];
         };
         "eCommerce.Address.XacMinhDiaChiRequest": {
             /** Format: int32 */
@@ -5020,6 +5490,24 @@ export interface components {
             /** Format: int32 */
             pageSize?: number;
         };
+        "eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Notification.NotificationQueueItemDto, eCommerce.Notification.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]": {
+            items?: components["schemas"]["eCommerce.Notification.NotificationQueueItemDto"][] | null;
+            /** Format: int64 */
+            total?: number;
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            pageSize?: number;
+        };
+        "eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Notification.NotificationTemplateDto, eCommerce.Notification.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]": {
+            items?: components["schemas"]["eCommerce.Notification.NotificationTemplateDto"][] | null;
+            /** Format: int64 */
+            total?: number;
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            pageSize?: number;
+        };
         "eCommerce.HttpApi.Dtos.ProductDetailDto": {
             /** Format: uuid */
             id?: string;
@@ -5348,6 +5836,228 @@ export interface components {
             theoLyDo?: {
                 [key: string]: number;
             } | null;
+        };
+        "eCommerce.Notification.CancelQueueItemRequest": {
+            lyDo?: string | null;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        "eCommerce.Notification.ChannelKind": 0 | 1 | 2;
+        "eCommerce.Notification.CreateBatchDto": {
+            code?: string | null;
+            /** Format: uuid */
+            templateId?: string;
+            /** Format: uuid */
+            templateVersionId?: string;
+            idempotencyKey?: string | null;
+            /** Format: int32 */
+            totalItems?: number;
+            correlationId?: string | null;
+        };
+        "eCommerce.Notification.CreateTemplateDto": {
+            code?: string | null;
+            name?: string | null;
+            channelKind?: components["schemas"]["eCommerce.Notification.ChannelKind"];
+            locale?: string | null;
+            purpose?: components["schemas"]["eCommerce.Notification.NotificationPurpose"];
+            bodyFormat?: components["schemas"]["eCommerce.Notification.NotificationBodyFormat"];
+        };
+        "eCommerce.Notification.EnqueueResult": {
+            /** Format: uuid */
+            queueItemId?: string;
+            alreadyQueued?: boolean;
+            status?: string | null;
+            errorCode?: string | null;
+        };
+        "eCommerce.Notification.NotificationBatchDto": {
+            /** Format: uuid */
+            id?: string;
+            code?: string | null;
+            /** Format: uuid */
+            templateId?: string;
+            /** Format: uuid */
+            templateVersionId?: string;
+            status?: components["schemas"]["eCommerce.Notification.NotificationBatchStatus"];
+            /** Format: int32 */
+            totalItems?: number;
+            /** Format: uuid */
+            createdByUserId?: string | null;
+            /** Format: uuid */
+            approvedByUserId?: string | null;
+            /** Format: date-time */
+            approvedAtUtc?: string | null;
+            correlationId?: string | null;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        "eCommerce.Notification.NotificationBatchStatus": 0 | 1 | 2 | 3;
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        "eCommerce.Notification.NotificationBodyFormat": 0 | 1;
+        "eCommerce.Notification.NotificationPlaceholderDto": {
+            name?: string | null;
+            kind?: components["schemas"]["eCommerce.Notification.NotificationPlaceholderKind"];
+            required?: boolean;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        "eCommerce.Notification.NotificationPlaceholderKind": 0 | 1 | 2 | 3 | 4;
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        "eCommerce.Notification.NotificationPurpose": 0 | 1 | 2;
+        "eCommerce.Notification.NotificationQueueEventDto": {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            queueItemId?: string;
+            eventType?: components["schemas"]["eCommerce.Notification.NotificationQueueEventType"];
+            fromStatus?: components["schemas"]["eCommerce.Notification.NotificationQueueStatus"];
+            toStatus?: components["schemas"]["eCommerce.Notification.NotificationQueueStatus"];
+            reasonMasked?: string | null;
+            errorCode?: string | null;
+            correlationId?: string | null;
+            /** Format: uuid */
+            actorUserId?: string | null;
+            /** Format: date-time */
+            occurredAtUtc?: string;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        "eCommerce.Notification.NotificationQueueEventType": 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
+        "eCommerce.Notification.NotificationQueueItemDto": {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            tenantId?: string | null;
+            idempotencyKey?: string | null;
+            /** Format: uuid */
+            rootItemId?: string | null;
+            /** Format: uuid */
+            batchId?: string | null;
+            sourceEventType?: string | null;
+            sourceAggregateId?: string | null;
+            channelKind?: components["schemas"]["eCommerce.Notification.ChannelKind"];
+            /** Format: uuid */
+            templateId?: string;
+            /** Format: uuid */
+            templateVersionId?: string;
+            recipientMasked?: string | null;
+            renderedSubject?: string | null;
+            renderedBodyMasked?: string | null;
+            /** Format: int32 */
+            priority?: number;
+            status?: components["schemas"]["eCommerce.Notification.NotificationQueueStatus"];
+            /** Format: int32 */
+            attemptCount?: number;
+            /** Format: date-time */
+            scheduledAtUtc?: string;
+            /** Format: date-time */
+            expiresAtUtc?: string | null;
+            /** Format: date-time */
+            dispatchedAtUtc?: string | null;
+            lastErrorCode?: string | null;
+            lastReasonMasked?: string | null;
+            correlationId?: string | null;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        "eCommerce.Notification.NotificationQueueStatus": 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+        "eCommerce.Notification.NotificationTemplateDto": {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            tenantId?: string | null;
+            code?: string | null;
+            name?: string | null;
+            channelKind?: components["schemas"]["eCommerce.Notification.ChannelKind"];
+            locale?: string | null;
+            purpose?: components["schemas"]["eCommerce.Notification.NotificationPurpose"];
+            /** Format: int32 */
+            coalesceWindowSeconds?: number;
+            /** Format: int32 */
+            defaultExpiresAfterSeconds?: number | null;
+            status?: components["schemas"]["eCommerce.Notification.NotificationTemplateStatus"];
+            /** Format: uuid */
+            currentPublishedVersionId?: string | null;
+            isSystem?: boolean;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        "eCommerce.Notification.NotificationTemplateStatus": 0 | 1 | 2;
+        "eCommerce.Notification.NotificationTemplateVersionDto": {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            templateId?: string;
+            /** Format: int32 */
+            version?: number;
+            subject?: string | null;
+            bodyText?: string | null;
+            bodyFormat?: components["schemas"]["eCommerce.Notification.NotificationBodyFormat"];
+            placeholders?: components["schemas"]["eCommerce.Notification.NotificationPlaceholderDto"][] | null;
+            contentHash?: string | null;
+            /** Format: date-time */
+            publishedAtUtc?: string;
+            /** Format: uuid */
+            publishedByUserId?: string | null;
+        };
+        "eCommerce.Notification.PreviewResultDto": {
+            subject?: string | null;
+            body?: string | null;
+            bodyFingerprint?: string | null;
+        };
+        "eCommerce.Notification.PreviewTemplateDto": {
+            /** Format: uuid */
+            templateId?: string;
+            /** Format: uuid */
+            templateVersionId?: string | null;
+            sampleData?: {
+                [key: string]: string;
+            } | null;
+        };
+        "eCommerce.Notification.PublishTemplateVersionDto": {
+            /** Format: uuid */
+            templateId?: string;
+            subject?: string | null;
+            bodyText?: string | null;
+            placeholders?: components["schemas"]["eCommerce.Notification.NotificationPlaceholderDto"][] | null;
+            bodyFormat?: components["schemas"]["eCommerce.Notification.NotificationBodyFormat"];
+        };
+        "eCommerce.Notification.SendManualRequest": {
+            idempotencyKey?: string | null;
+            templateCode?: string | null;
+            channelKind?: components["schemas"]["eCommerce.Notification.ChannelKind"];
+            locale?: string | null;
+            recipient?: string | null;
+            data?: {
+                [key: string]: string;
+            } | null;
+            /** Format: int32 */
+            priority?: number;
+            /** Format: date-time */
+            scheduledAtUtc?: string;
+            /** Format: date-time */
+            expiresAtUtc?: string | null;
+            /** Format: uuid */
+            batchId?: string | null;
+            sourceAggregateId?: string | null;
+            correlationId?: string | null;
         };
         /**
          * Format: int32
