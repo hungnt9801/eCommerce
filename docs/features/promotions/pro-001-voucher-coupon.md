@@ -464,9 +464,9 @@ sequenceDiagram
 | | `ReverseAsync` | `ReverseVoucherDto` (`OrderId`, `ReasonCode`) | `void` | hệ thống | **KHÔNG** hoàn lượt |
 
 > 📌 **Rule điều kiện do `PRO-001` cung cấp** (cắm vào registry `PRO-002` — **ADR-07**): **đúng 4** `SystemName` — `MinOrderAmount`,
-> `ChannelScope`, `CustomerGroup`, `FirstOrderOnly` (`D-149`, **BR-26**). `SkuInclude`/`SkuExclude`/`CategoryInclude` **không đăng ký** ở v1 (ngoài phạm vi — nợ `CR-P1`): lá có `SystemName` đó là `SystemName` lạ theo `PRO-002` ⇒ **NÉM** `eCommerce:Promotion:0004` (`InvalidConditionNode`) ở guard `Draft → Approved` (`pro-002:164`, `ApproveAsync` `:513`) **và** khi đánh giá (`pro-002:186`), không bỏ qua im lặng; `0010` giữ nghĩa của `PRO-002` (rule bị gỡ/đổi tên sau deploy, `pro-002:550`) — `D-150`; 0 mã lỗi mới.
+> `ChannelScope`, `CustomerGroup`, `FirstOrderOnly` (`D-149`, **BR-26**). `SkuInclude`/`SkuExclude`/`CategoryInclude` **không đăng ký** ở v1 (ngoài phạm vi — nợ `CR-P1`): lá có `SystemName` đó là `SystemName` lạ theo `PRO-002` ⇒ **NÉM** `eCommerce:Promotion:0004` (`InvalidConditionNode`) ở guard `Draft → Approved` (`pro-002` §3.2, `ApproveAsync` §6.2) **và** khi đánh giá (`pro-002` §3.3), không bỏ qua im lặng; `0010` giữ nghĩa của `PRO-002` (rule bị gỡ/đổi tên sau deploy, `pro-002` §6.4) — `D-150`; 0 mã lỗi mới.
 > Lá `CustomerGroup`/`FirstOrderOnly` trả `false` khi `CustomerId` NULL (`D-162`, `pro-002` **BR-08**); trên đường voucher ca này không xảy ra vì `ReserveAsync` ném `0118` **trước** khi gọi engine (**BR-24**, `D-146`). Lá `FirstOrderOnly` (khách **có** `CustomerId`) dùng định nghĩa "đơn đầu" **đếm cả đơn đã huỷ/đã trả** (`D-163`, `pro-002` §6.1 quy tắc 11).
-> Mỗi rule **phải** khai `DeclaredCostFactor` trong `ProPromotionRuleCosts` (**BR-16**) và **phải THUẦN** (không I/O — `PRO-002` **BR-08**, `pro-002:101`).
+> Mỗi rule **phải** khai `DeclaredCostFactor` trong `ProPromotionRuleCosts` (**BR-16**) và **phải THUẦN** (không I/O — `PRO-002` **BR-08**, `pro-002` §1).
 > ℹ️ Chọn `ConfigJson` hay `ProPromotionMappings` cho 3 rule hoãn (**Q3**) = `Deferred`, gắn `CR-P1`: không rule nào của v1 cần `ConfigJson`/`ProPromotionMappings`.
 
 **Ràng buộc DTO (bắt buộc):**
@@ -474,7 +474,7 @@ sequenceDiagram
 - **Cấm** `double`/`float` ở **mọi** trường DTO (**BR-08**).
 - Mọi trường tiền **phải** đi kèm `Currency` (hoặc dùng `Money` — **đã có** `Money.cs:23`, `MoneyAllocator.cs:31`; **F2** đã đóng).
 - DTO đầu vào **cấm** có trường "tổng đã giảm"/"số tiền phải trả" — mọi số tiền **tính ở server** (kế thừa `SAL-002` **BR-001**).
-- `ReserveVoucherDto` **cấm** nhận `TenantId` — lấy từ `ICurrentTenant` (`PRO-002` §6.1 quy tắc 1 — `pro-002:500`).
+- `ReserveVoucherDto` **cấm** nhận `TenantId` — lấy từ `ICurrentTenant` (`PRO-002` §6.1 quy tắc 1).
 
 ### 6.2 REST endpoint
 
@@ -489,7 +489,7 @@ sequenceDiagram
 
 > 🚫 **KHÔNG có route `reserve`/`commit`** (docrev vòng 1 #7): `ReserveAsync`/`CommitAsync` phải chạy **trong** UoW đặt hàng (**ADR-13**) — một HTTP request riêng không chung UoW với việc ghi `Order`, và quyền `.View` (Sale, CSKH, Kế toán) không được phép tạo/chốt lượt. Storefront chỉ đi qua **checkout của `Sales`** (vãng lai ⇒ `0118` — **Q5** `Closed`, `D-146`). Đỏ ở `TC-34` (quét controller: 0 route `reserve`/`commit`).
 > 📌 Route do ABP tự sinh theo `<verb>/api/app/<resource>` (`docs/design-doc-guidelines.md` §2.2).
-> 📌 `PRO-002` **đã** có `POST /api/app/promotion/voucher/validate` (`pro-002:530`) **không** side effect ⇒ **giữ nguyên**, **không** giữ lượt (`pro-002:515`).
+> 📌 `PRO-002` **đã** có `POST /api/app/promotion/voucher/validate` (`PRO-002` §6.3) **không** side effect ⇒ **giữ nguyên**, **không** giữ lượt (`PRO-002` §6.1 — record `PromotionEvaluationResult`).
 
 **Input mẫu của `ReserveAsync` — áp mã khi báo giá** (gọi nội bộ từ `Sales`, không qua HTTP)
 

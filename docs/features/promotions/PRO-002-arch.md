@@ -1,23 +1,24 @@
 # `PRO-002` — Kiến trúc module `Promotions`: cây điều kiện AND/OR & engine khuyến mãi
 
-> Vai **ARCH**, phiên **N93**, chuỗi `gd3-1`, hàng `W24-1` (`WP-24`), nhánh `feat/gd3-wp24-dieu-kien-km`.
+> Vai **ARCH**, phiên **N93** (bản đầu) — cập nhật N94, chuỗi `gd3-1`, hàng `W24-1`/`W24-2` (`WP-24`), nhánh `feat/gd3-wp24-dieu-kien-km`.
 > Tài liệu này **chỉ thiết kế** quanh SRS
-> [`pro-002-cay-dieu-kien-engine-khuyen-mai.md`](./pro-002-cay-dieu-kien-engine-khuyen-mai.md) (`v0.9 — 23/11/2026`, sau đây gọi **SRS**);
+> [`pro-002-cay-dieu-kien-engine-khuyen-mai.md`](./pro-002-cay-dieu-kien-engine-khuyen-mai.md) (`v0.10 — 27/11/2026`, sau đây gọi **SRS**);
 > **không** code, **không** sinh migration, **không** sửa SRS.
 >
 > **Module chủ của mọi bảng/DTO/endpoint/mã lỗi/khoá dưới đây: `Promotions`** — module **mới**, hiện **0 dòng code**
 > (`ls modules` ngày 27/11/2026: `Address, Catalog, ChannelHub, Customers, EInvoice, Inventory, Messaging, Notification, PaymentHub, Pos, Pricing, Reconciliation, Reporting, Sales, Signing, Tax`; không có `Promotions`).
 > Vì vậy mọi mục §3–§9 là **thiết kế mới**; mọi khẳng định “as-built” về module khác đều kèm `file:dòng` đã đối chiếu trong phiên N93.
 >
-> **Nguồn quyết định:** `D-151`…`D-163` (PRO-002 đã áp trong SRS v0.3–v0.9), `D-144` (`docs/nhanh/decisions.md:158`),
-> `D-163` (`decisions.md:177`), `D-209` (`decisions.md:223` — WP-24 sau WP-16), `D-169` (tạm duyệt có điều kiện + 2 P3),
+> **Nguồn quyết định:** `D-151`…`D-163` (PRO-002 đã áp trong SRS v0.3–v0.10), `D-144` (`docs/nhanh/decisions.md:158`),
+> `D-163` (`decisions.md:177`), `D-209` (`decisions.md:223` — WP-24 sau WP-16), `D-169` (tạm duyệt có điều kiện + 2 P3 — **đã đóng**),
 > `D-270` (mẫu 4 quyền hẹp `Reports.*`, dùng lại cho `Promotions.*`), `D-17` (enum chỉ thêm ở cuối), `D-31`
 > (số lượng `decimal(18,3)`), `D-155` (`Money`/`MoneyAllocator.PhanBo`), `D-151` (**`Add_Promotion_Module` là nguồn schema `Pro*` duy nhất**).
 > Lộ trình: `docs/nhanh/07-ke-hoach-trien-khai.md:754` (WP-24) · song song/migration: `docs/nhanh/09-parallel-sessions.md:114-122`.
 >
-> **DOCREV:** [`docs/reviews/PRO-002-docreview.md`](../../reviews/PRO-002-docreview.md) — `VERDICT: DOC-OK`, 0 P1, 0 P2, còn 2 P3
-> (số test case 54→55 ở §15.4; trích số dòng cũ trong delta `pro-001` §6.1). **Không phải việc của ARCH**;
-> ghi nhận để BA sửa ở F3/W24-2.
+> **DOCREV:** [`docs/reviews/PRO-002-docreview.md`](../../reviews/PRO-002-docreview.md) — `VERDICT: DOC-OK`, **0 P1 / 0 P2**;
+> 2 P3 của SRS (số test case 54→55 ở §15.4; trích số dòng cũ trong delta `pro-001` §6.1 đổi sang tên mục) **đã đóng ở N94/F1**;
+> P3 vòng 3 của ARCH (thu hẹp allowlist `eCommerce.Messaging.EventCoverage` + tên test `RanhGioiPromotionsTests`) **đã đóng ở vòng 4**
+> ([`PRO-002-arch-docreview.md`](../../reviews/PRO-002-arch-docreview.md)) — nay còn **0 P3**.
 >
 > 📄 `-arch` là tài liệu **bổ trợ**, ngoài mẫu 16 mục áp cho SRS; tệp này giữ khuôn 15 mục của
 > [`REP-001-arch.md`](../reporting/REP-001-arch.md).
@@ -98,7 +99,7 @@ Sales.Application ──▶ Promotions.Application.Contracts              (in-pr
 | `eCommerce.Sales.Application` | **thêm** `Promotions.Application.Contracts` | `Promotions.Domain`, `Promotions.Application` |
 | `eCommerce.Pos.*` | — | **mọi** `eCommerce.Promotions.*` (`TC-38`) |
 
-> 🔓 **Ngoại lệ có chủ — `Promotions.Application → eCommerce.Messaging.Domain`:** `Messaging` là module **hạ tầng** (outbox/inbox/idempotency/coverage), không phải module nghiệp vụ; `IEventCoverageProbe` nằm ở `modules/Messaging/eCommerce.Messaging.Domain/EventCoverage/IEventCoverageProbe.cs:17` và **Messaging không có** project `.Application.Contracts`. Tiền lệ as-built: `Promotions.Application` đi cùng đường với `Sales.Application` — cả hai đều tham chiếu `Messaging.Domain` (`modules/Sales/eCommerce.Sales.Application/eCommerce.Sales.Application.csproj`). **Hệ quả cho test ranh giới:** test quét `using` phải **allowlist đúng một** namespace `eCommerce.Messaging.*` trong `Promotions.Application`; **cấm** mở rộng sang `Messaging.Application`/`Messaging.EntityFrameworkCore` hoặc dùng probe cho việc khác ngoài phát ETO. Đây là phương án **(a)**; phương án (b) tách probe sang một project Contracts dùng chung là việc cross-cutting **ngoài WP-24** (nếu chọn (b): v1 **không phát** `PromotionAppliedEto` + ghi nợ, không để BE tự đoán).
+> 🔓 **Ngoại lệ có chủ — `Promotions.Application → eCommerce.Messaging.Domain`:** `Messaging` là module **hạ tầng** (outbox/inbox/idempotency/coverage), không phải module nghiệp vụ; `IEventCoverageProbe` nằm ở `modules/Messaging/eCommerce.Messaging.Domain/EventCoverage/IEventCoverageProbe.cs:17` và **Messaging không có** project `.Application.Contracts`. Tiền lệ as-built: `Promotions.Application` đi cùng đường với `Sales.Application` — cả hai đều tham chiếu `Messaging.Domain` (`modules/Sales/eCommerce.Sales.Application/eCommerce.Sales.Application.csproj`). **Hệ quả cho test ranh giới:** test quét `using` (tên: `RanhGioiPromotionsTests`) phải **allowlist đúng một** namespace `eCommerce.Messaging.EventCoverage` (**không** wildcard) trong `Promotions.Application`; **cấm** mở rộng sang `eCommerce.Messaging.Application`/`eCommerce.Messaging.EntityFrameworkCore` hoặc dùng probe cho việc khác ngoài phát ETO. Đây là phương án **(a)**; phương án (b) tách probe sang một project Contracts dùng chung là việc cross-cutting **ngoài WP-24** (nếu chọn (b): v1 **không phát** `PromotionAppliedEto` + ghi nợ, không để BE tự đoán).
 
 Bằng chứng as-built cho mẫu “module mới = 4 project, chỉ tham chiếu Contracts của module khác”:
 `modules/Reporting/eCommerce.Reporting.Application/eCommerce.Reporting.Application.csproj` (chỉ Contracts + Domain module nguồn);
@@ -110,7 +111,7 @@ Bằng chứng as-built cho mẫu “module mới = 4 project, chỉ tham chiế
 | # | Luật | Cách giữ |
 |---|---|---|
 | B1 | Module **sở hữu** entity/bảng/mã lỗi | `PromotionErrorCodes` trong Domain (mẫu `modules/Tax/eCommerce.Tax.Domain/TaxErrorCodes.cs:10-35`); **cấm** thêm `eCommerce:Promotion:*` vào `eCommerceConsts.ErrorCodes` |
-| B2 | Gọi chéo module **chỉ** qua `*.Application.Contracts` hoặc ETO | `Sales` → `Promotions.Application.Contracts`; `Promotions` **không** gọi module nghiệp vụ nào. **Ngoại lệ duy nhất:** `Promotions.Application` → `eCommerce.Messaging.Domain` **chỉ** cho `IEventCoverageProbe` (module hạ tầng; Messaging không có Contracts) — allowlist đúng namespace này trong test ranh giới (§2.1) |
+| B2 | Gọi chéo module **chỉ** qua `*.Application.Contracts` hoặc ETO | `Sales` → `Promotions.Application.Contracts`; `Promotions` **không** gọi module nghiệp vụ nào. **Ngoại lệ duy nhất:** `Promotions.Application` → `eCommerce.Messaging.Domain` **chỉ** cho `IEventCoverageProbe` (module hạ tầng; Messaging không có Contracts) — allowlist đúng `eCommerce.Messaging.EventCoverage` (không wildcard) trong test ranh giới (§2.1) |
 | B3 | Module **không** phụ thuộc ngược app/host | 0 `using eCommerce.Web/HttpApi/Application` trong module; `Promotions.Domain` không biết EF/HTTP |
 | B4 | **Không FK xuyên module** | `ProPromotionRedemptions.OrderId` là **tham chiếu mềm**, không FK sang `Sales` |
 | B5 | `IRepository<T>` ⇒ **phải** có `DbSet` hợp nhất | 7 `DbSet` (§5.3); lưới `test/eCommerce.Tests/EfCoreRegistration/DbSetRegistrationTests.cs` |
@@ -489,6 +490,7 @@ Thêm **cấm** `promotionId`, `voucherCode`, `customerId` vào `eCommerceMetric
 - Lưới có sẵn phải mở rộng: `test/eCommerce.Tests/EfCoreRegistration/DbSetRegistrationTests.cs` (7 `DbSet`), `test/eCommerce.Tests/Authorization/BatBienPhanQuyenTests.cs` (hằng số ↔ provider), `test/eCommerce.Tests/Authorization/AllowlistCongKhaiTests.cs`.
 - Test bất biến **đích danh** tên index (`TC-33`) — không đếm tổng.
 - **Cơ chế ĐỎ cho 2 bất biến vận hành:** (a) quét assembly `Promotions` tìm `Task.WhenAll`/`Parallel.` trong đường đánh giá ⇒ đỏ (§3.6 **cấm** song song hoá để giữ tất định); (b) đặt `eCommerce.Promotions.Enabled = false` ⇒ test `Sales` khẳng định engine **không** được gọi (`0` command, `DiscountTotal = 0`) — cờ tắt phải thật sự tắt, không chỉ là chữ trong tài liệu.
+- Test ranh giới `using` **`RanhGioiPromotionsTests`** (ở `test/eCommerce.Tests/...`): khẳng định `eCommerce.Promotions.Application` chỉ `using` **đúng** namespace `eCommerce.Messaging.EventCoverage` (không `eCommerce.Messaging.*` wildcard, không `Messaging.Application`/`Messaging.EntityFrameworkCore`); đỏ nếu ai mở rộng.
 
 ### 10.3 `TC-xx` **chưa kiểm được** ở W24-1 (design-only)
 
@@ -533,9 +535,9 @@ Thêm **cấm** `promotionId`, `voucherCode`, `customerId` vào `eCommerceMetric
 
 `AQ8` (tenant iteration của job) và `AQ9` (nơi đặt `OrderCancelledEto`) — xem §11; `D6` là việc bắt buộc của W24-2 (không phải câu hỏi mở, đã có `D-143` (2)).
 
-### 12.3 Ghi nhận P3 của DOCREV (không sửa)
+### 12.3 Ghi nhận P3 của DOCREV (đã đóng)
 
-P3 #1 (54→55 test case ở SRS §15.4) và P3 #2 (trích số dòng cũ trong delta `pro-001` §6.1) — **BA** sửa ở F3; ARCH không sửa SRS.
+P3 #1 (54→55 test case ở SRS §15.4) và P3 #2 (trích số dòng cũ trong delta `pro-001` §6.1) — **BA** đã đóng ở N94/F1 (SRS `v0.10`); ARCH không sửa SRS.
 
 ---
 
@@ -599,3 +601,5 @@ P3 #1 (54→55 test case ở SRS §15.4) và P3 #2 (trích số dòng cũ trong 
 | v0.1 | 27/11/2026 | ARCH (N93/W24-1) | Bản đầu: 15 mục; chốt ranh giới module `Promotions` mới; hợp đồng `IPromotionEngine` chép nguyên SRS §6.1; 7 bảng + một migration `Add_Promotion_Module` (không `btree_gist`); 9 metric; 9 dòng permission; 5 `docDeviation`; 10 câu mở (`Q1`, `Q2`, `Q5`, `Q9`, `Q26`, `Q28`, `Q29`, `Q8` chặn, `AQ8`, `AQ9`) |
 | v0.2 | 27/11/2026 | ARCH (N93 — sửa theo DOCREV vòng 1: P1=1, P2=6, P3=6) | **P1:** §5.5 ghi rõ **UNIQUE + `NULLS NOT DISTINCT`** cho **cả 4** index chống trùng `ProPromotionRedemptions` + cơ chế đỏ `TC-33`. **P2:** bổ sung cột thiếu §5.4 (`ChannelScope`; `CustomerId`/`ReasonCode`/`TreeVersion`/`EvaluatedAtUtc`); thống nhất **CR-1…CR-7 + CR-11**; thêm bảng map mã lỗi → HTTP (§4.4, sửa tham chiếu §7.4); sửa citation `:52-54` → `:41-43`; `PromotionAppliedEto` **mang dữ liệu = fail-closed**, chỉ 2 ETO thông báo gắn `INotificationEvent`; thêm guard `CheckoutInput.OrderDiscount ≠ 0 ⇒ NÉM` (§6.1, `D6`). **P3:** citation worker `:24-31`; cơ chế đỏ “cấm song song hoá” + cờ `Promotions.Enabled=false`; ghi trung thực phạm vi cổng 16 mục; dải `TC-01…TC-51` + `TC-66…TC-69`; đếm lại 13 mã lỗi / 9 dòng permission; thứ tự xoá cây an toàn với FK tự thân `Restrict` |
 | v0.3 | 27/11/2026 | ARCH (N93 — sửa theo DOCREV vòng 2: P1=0, P2=1, P3=4) | **P2:** chốt **phương án (a)** cho `IEventCoverageProbe` — `Promotions.Application` tham chiếu **`eCommerce.Messaging.Domain`** (module hạ tầng, không có Contracts), khai nhánh phụ thuộc §2.1 + ngoại lệ B2 + hệ quả allowlist test ranh giới; §6.2 nêu đường dẫn probe + phương án (b) cross-cutting ngoài WP-24 (nếu chọn: v1 không phát `PromotionAppliedEto`). **P3:** sửa bằng chứng khoá phân tán sang `NotificationDispatchWorker.cs:79`; §5.5 “cả 4 index đều có `WHERE`”; §5.4 khai 4 cột `ExpiresAtUtc`/`AppliedAtUtc`/`ReleasedAtUtc`/`ReversedAtUtc`; §14 ghi cụ thể phép quét từ khoá bỏ-ngỏ = 0 |
+| v0.4 | 27/11/2026 | ARCH (N94/W24-2) | P3 DOCREV vòng 3: thu hẹp allowlist test ranh giới còn đúng namespace `eCommerce.Messaging.EventCoverage` (không wildcard) + nêu tên test `RanhGioiPromotionsTests` ở §10.2. |
+| v0.5 | 27/11/2026 | ARCH (N94/W24-2) | Cập nhật trạng thái: SRS `v0.10`, DOCREV vòng 4/5 `DOC-OK`, 0 P3 còn mở; không đổi thiết kế. |

@@ -4,46 +4,53 @@
 
 | | |
 |---|---|
-| Tài liệu | `docs/features/promotions/PRO-002-arch.md` (v0.3, 15 mục) |
-| Ngày · vòng | 27/11/2026 · **vòng 3** (kiểm nhanh mục vừa đổi) |
+| Tài liệu | `docs/features/promotions/PRO-002-arch.md` (v0.4, 15 mục) |
+| Ngày · vòng | 27/11/2026 · **vòng 4** (N94 — kiểm nhanh P3 vòng 3) |
 | Người kiểm | agent `docrev` (ngữ cảnh sạch) |
-| Đã đọc vòng 3 | §1.1, §1.2, §2.1, §2.2, §5.4, §5.5, §6.2, §13, §14; `Sales.Application.csproj`; `NotificationDispatchWorker.cs:66–97` |
-| Máy | `check-agent-artifact.ps1 -Kind docreview` → exit 0 ("KET QUA: DAT"); `check-feature-doc.ps1 -WP14` **không áp** cho tệp `-arch` (đã ghi đúng ở §14 :589) |
+| Đã đọc vòng 4 | dòng 1–26 (header) · 72–128 (§2.1–§2.3) · 474–540 (§10–§12) · 596–603 (§15); đối chiếu `IEventCoverageProbe.cs:3,17`, `Sales.Application.csproj` (tiền lệ, vòng 2–3) |
+| Máy | `check-agent-artifact.ps1 -Kind docreview` → exit 0; `check-feature-doc.ps1 -WP14` **không áp** cho tệp `-arch` (đã ghi đúng ở §14) |
 
 **P1 = 0 · P2 = 0 · P3 = 1**
 
-## Đã kiểm (vòng 3)
+Tóm tắt vòng 4: **P3 vòng 3 đã đóng** — allowlist thu hẹp còn **đúng một** namespace `eCommerce.Messaging.EventCoverage` (không wildcard) ở §2.1 (:101) + B2 (:113), và §10.2 (:492) nêu tên test `RanhGioiPromotionsTests`; hàng `v0.4` có ở §15 (:603). Không phát sinh P1/P2.
+
+## Vòng 4 (N94 — kiểm nhanh P3 vòng 3)
+
+### Đã kiểm (vòng 4)
 
 | Nhóm | Cách kiểm | Kết quả |
 |---|---|---|
-| D1 tự mâu thuẫn | đọc lại §2.1/§2.2/§6.2/§13: bảng cho phép, sơ đồ, ngoại lệ B2 và câu "hiện không cần" cũ | 0 — câu cũ đã bị thay; 4 chỗ nói cùng một ngoại lệ, không lệch |
-| D2 chéo SRS / code | `Sales.Application.csproj` có thật tham chiếu `Messaging.Domain`; `NotificationDispatchWorker.cs:79` là `TryAcquireAsync`; `IEventCoverageProbe` :17 (đã xác nhận vòng 2) | 0 |
-| D3 cơ chế thực thi | ngoại lệ B2 có cổng "test quét `using`" — nhưng chưa đích danh tên test/namespace | 1 phát hiện (#1) |
-| D4 SQL | không có khối ` ```sql `; §5.5 vẫn đúng cú pháp partial + NND | 0 |
-| D5 tệp/symbol có thật | `NotificationDispatchWorker.cs:79`, `Sales.Application.csproj:16` | 0 |
-| D6 nhãn | §14 :591 nay là phép đo ("quét từ khoá = 0"), không còn câu chung chung | 0 |
-| D7 15 mục + mermaid | đủ 15 mục; không có Mermaid | 0 |
+| D1 tự mâu thuẫn | Grep `Messaging.*`/`EventCoverage`/`RanhGioiPromotionsTests`: §2.1 sơ đồ (:83), bảng cho phép (:96), ngoại lệ (:101), B2 (:113), §10.2 (:492), §13 (:564) nói **cùng một** ngoại lệ; wildcard `eCommerce.Messaging.*` chỉ còn xuất hiện trong câu **cấm** ("không wildcard"). | 0 phát hiện |
+| D2 chéo SRS / code | `IEventCoverageProbe.cs:3` = `namespace eCommerce.Messaging.EventCoverage;` đúng như allowlist; `Sales.Application.csproj` tham chiếu `Messaging.Domain` (tiền lệ vòng 2); SRS v0.10 §7.1 nay khớp D3/D4/D5 của §12.1. | 0 phát hiện |
+| D3 cơ chế thực thi | Cổng cho ngoại lệ B2 = test quét `using` **đích danh** `RanhGioiPromotionsTests` (đỏ nếu mở rộng) — §10.2 :492; tên + phạm vi + "không wildcard" đã rõ. | 0 phát hiện |
+| D4 SQL | Không có khối ` ```sql ` trong các mục vừa sửa; §5.5 (:342-363) không đổi. | 0 phát hiện (không có khối sql) |
+| D5 tệp/symbol có thật | `IEventCoverageProbe.cs:17` có thật (đồ thị); `grep -rln "RanhGioiPromotionsTests" test modules` → **0** tệp — đúng là **kế hoạch** W24-2 (`§10.2` "Harness cần"), tài liệu **không** nói "đã có". | 0 phát hiện |
+| D6 nhãn | §15 :603 có hàng `v0.4` mô tả đúng thay đổi. Header :5 và :18–20 vẫn chụp trạng thái cũ (SRS `v0.9`, "còn 2 P3"). | 1 phát hiện (#1) |
+| D7 15 mục + mermaid | Đủ 15 mục; tệp không có Mermaid; F1 không thêm `;`/placeholder. | 0 phát hiện |
 
-## Phát hiện (vòng 3)
+### Phát hiện (vòng 4)
 
 | # | Mức | Vị trí | Vấn đề | Đề nghị |
 |---|---|---|---|---|
-| 1 | P3 | §2.1 dòng 101 · §2.2 B2 dòng 113 · §10.2 | Cổng cho ngoại lệ `Promotions.Application → Messaging.Domain` mới chỉ nói "test quét `using` phải allowlist đúng một namespace `eCommerce.Messaging.*`": vừa là wildcard vừa là "một namespace", và test này **không** có tên/tệp trong §10.1–§10.2. Nếu allowlist đúng `eCommerce.Messaging.*` thì ngoại lệ mở luôn `eCommerce.Messaging.Idempotency`/`DeadLetter` — rộng hơn "**CHỈ** `IEventCoverageProbe`" | Ghi chính xác namespace `eCommerce.Messaging.EventCoverage` (không wildcard) và thêm một dòng §10.2 nêu tên test (vd `RanhGioiPromotionsTests`) khẳng định chỉ namespace đó được `using` |
+| 1 | P3 | Header dòng 5, 12, 18–20; §12.3 dòng 539 | Header còn trích SRS `v0.9 — 23/11/2026` (SRS nay `v0.10`), "SRS v0.3–v0.9", và ghi "DOCREV … còn 2 P3 (số test case 54→55; trích số dòng cũ trong delta `pro-001` §6.1) … BA sửa ở F3" — cả hai P3 đó **đã đóng** (DoD **55**; hai dòng delta chính đã đổi sang tên mục; chỉ còn `pro-001` :477/:492). | Cập nhật header sang SRS `v0.10` + trạng thái DOCREV vòng 5, hoặc ghi rõ đây là ảnh chụp lúc `v0.3`; sửa §12.3 "đã đóng" cho khớp. |
 
-## Bằng chứng đồ thị (vòng 3)
+### Không kiểm được (vòng 4)
 
-- `Read modules/Sales/eCommerce.Sales.Application/eCommerce.Sales.Application.csproj` :16 → `<ProjectReference Include="..\..\Messaging\eCommerce.Messaging.Domain\eCommerce.Messaging.Domain.csproj" />` ⇒ **tiền lệ "Sales.Application tham chiếu Messaging.Domain" là THẬT**, đúng như §2.1 :101.
-- `Read modules/Notification/eCommerce.Notification.Application/Dispatch/NotificationDispatchWorker.cs` :79–80 → `await using var handle = await lockService.TryAcquireAsync(NotificationLockKeys.QueueDispatch(tenantId), TimeSpan.FromSeconds(5));` ⇒ bằng chứng khoá phân tán dùng thật đúng dòng, §1.1 :36 đóng.
-- §2.1 :83 (sơ đồ), :96 (bảng cho phép, cấm `Messaging.Application`), :101 (ngoại lệ có chủ), §2.2 B2 :113, §6.2 :386, §13 :563 (`XC-002` E3) — **nhất quán**; không còn câu "hiện không cần" mâu thuẫn.
-- §5.4 :338 khai đủ `ExpiresAtUtc/AppliedAtUtc/ReleasedAtUtc/ReversedAtUtc`; §5.5 :357 ghi "cả 4 đều có `WHERE`" — 2 P3 vòng 2 đóng.
-- (Vòng 2) `codegraph_explore "IEventCoverageProbe EventCoverageProbe EventCoverage"` → interface :17, impl :15, caller `ChannelShopSyncer` — cơ chế có thật.
+- **D4:** không có khối ` ```sql `; các `CHECK`/partial index là mô tả, chưa chạy trên PostgreSQL 17 (module `Promotions` chưa có migration).
+- **Test ranh giới `RanhGioiPromotionsTests`:** chưa có tệp vì module `Promotions` chưa tồn tại — việc của W24-2; đây là **kế hoạch**, không phải tuyên bố "đã có".
 
-## Không kiểm được
+### Bằng chứng đồ thị (vòng 4)
 
-- **D4:** tài liệu không có khối ` ```sql `; các `CHECK`/partial index là mô tả, chưa chạy trên PostgreSQL 17 (chưa có migration).
-- **Test ranh giới `using`** (#1): chưa có tệp vì module `Promotions` chưa tồn tại — đây là việc của W24-2, ghi để BA/QA không quên.
+- `graph: codegraph_explore "IEventCoverageProbe INotificationEvent AddressEvents PromotionAppliedEto namespace eCommerce.Messaging.EventCoverage"` → `IEventCoverageProbe` :17 trong namespace `eCommerce.Messaging.EventCoverage`, impl `EventCoverageProbe` :15, caller `ChannelShopSyncer` (calls `CoNguoiNhan`) ⇒ tên allowlist ở §2.1/§10.2 **đúng namespace thật**, không phải suy đoán.
+- `Grep "namespace" IEventCoverageProbe.cs` → dòng 3 `namespace eCommerce.Messaging.EventCoverage;` — xác nhận lại bằng tệp (đồ thị có thể trễ).
 
 ## Vòng trước
+
+### Vòng 3 (P1=0, P2=0, P3=1)
+
+| # vòng 3 | Trạng thái | Mức lúc đó |
+|---|---|---|
+| 1 allowlist chỉ nói "`eCommerce.Messaging.*`" (wildcard) + thiếu tên test | **đã đóng** — §2.1 :101 + B2 :113 ghi đúng `eCommerce.Messaging.EventCoverage` (không wildcard); §10.2 :492 nêu `RanhGioiPromotionsTests`; §15 :603 hàng `v0.4` | P3 |
 
 ### Vòng 2 (P2=1, P3=4)
 
