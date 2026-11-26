@@ -59,11 +59,16 @@ public class TongHopBaoCaoService : DomainService
     private readonly IRepository<RptDimStore, Guid> _dimKho;
     private readonly IRepository<RptDimStaff, Guid> _dimNhanVien;
     private readonly IRepository<RptWatermark, Guid> _moc;
+    private readonly IRepository<RepPeriodClose, Guid> _kyChot;
     private readonly IAbpDistributedLock _khoaPhanTan;
     private readonly IOptions<ReportingOptions> _tuyChon;
     private readonly IClock _dongHo;
     private readonly IGuidGenerator _boSinhId;
 
+    /// <param name="kyChot">
+    /// 🚨 **BẮT BUỘC** — cổng `0011` ở **đường ghi** (`REP-001` §3.3 hàng cuối, §8.2 #7, §12). Không có
+    /// tham số này thì cổng bất biến tài chính **không được phép chạy** (không fail-open).
+    /// </param>
     public TongHopBaoCaoService(
         IRepository<RetailBill, Guid> hoaDonBanLe,
         IRepository<RetailBillLine, Guid> dongHoaDonBanLe,
@@ -82,7 +87,8 @@ public class TongHopBaoCaoService : DomainService
         IAbpDistributedLock khoaPhanTan,
         IOptions<ReportingOptions> tuyChon,
         IClock dongHo,
-        IGuidGenerator boSinhId)
+        IGuidGenerator boSinhId,
+        IRepository<RepPeriodClose, Guid> kyChot)
     {
         _hoaDonBanLe = hoaDonBanLe;
         _dongHoaDonBanLe = dongHoaDonBanLe;
@@ -98,6 +104,7 @@ public class TongHopBaoCaoService : DomainService
         _dimKho = dimKho;
         _dimNhanVien = dimNhanVien;
         _moc = moc;
+        _kyChot = kyChot;
         _khoaPhanTan = khoaPhanTan;
         _tuyChon = tuyChon;
         _dongHo = dongHo;
@@ -149,6 +156,10 @@ public class TongHopBaoCaoService : DomainService
 
         foreach (var ngay in khoang.CacNgay())
         {
+            // 🚨 CỔNG `0011` — kiểm NGAY TRƯỚC khi thay thế ngày (trước `DELETE`): kỳ có thể chốt SAU khi
+            // nhận yêu cầu (TOCTOU) ⇒ không dựa vào cổng fail-sớm ở `ReportAdminAppService`.
+            await ChanNeuGiaoKyDaChotAsync(ngay);
+
             var ketQua = await TinhNgayAsync(ngay, gioLech);
 
             await _dongSuKien.DeleteAsync(x => x.BusinessDate == ngay);
@@ -254,6 +265,10 @@ public class TongHopBaoCaoService : DomainService
     /// </summary>
     public async Task<int> ChayKhoangAsync(DateOnly ngay, bool ghiAnhTonKho = false)
     {
+        // 🚨 CỔNG `0011` — TRƯỚC mọi ghi/thay thế của ngày (trước `DELETE`), trong UoW của ngày đó
+        // (worker mở `requiresNew`): kỳ chốt chen giữa lúc xếp hàng và lúc worker chạy KHÔNG được lọt.
+        await ChanNeuGiaoKyDaChotAsync(ngay);
+
         var gioLech = _tuyChon.Value.GioLechUtc;
         var luc = _dongHo.Now.ToUniversalTime();
 
@@ -400,6 +415,10 @@ public class TongHopBaoCaoService : DomainService
     /// <summary>Chụp ảnh tồn kho **mới nhất** và gán vào `ngay` (thay thế ảnh cũ của ngày đó).</summary>
     private async Task<int> ChupAnhTonKhoAsync(DateOnly ngay, DateTime luc)
     {
+        // 🚨 CỔNG `0011` — ảnh tồn kho cũng là FACT của ngày ⇒ kiểm trước `DELETE` (đường `ChupTonKhoAsync`
+        // của rebuild `TonKho` không đi qua `ChayKhoangAsync`).
+        await ChanNeuGiaoKyDaChotAsync(ngay);
+
         var ton = await _tonKho.GetListAsync();
 
         await _anhTonKho.DeleteAsync(x => x.SnapshotDate == ngay);
@@ -429,6 +448,33 @@ public class TongHopBaoCaoService : DomainService
         }
 
         return anh.Count;
+    }
+
+    /// <summary>
+    /// 🚨 **CỔNG `eCommerce:Reports:0011` Ở ĐƯỜNG GHI** (`REP-001` §3.3 hàng cuối, §8.2 #7, §12) — `W26-4`.
+    ///
+    /// Kiểm **NGAY TRƯỚC `DELETE`** của `ngay`: có một <see cref="RepPeriodClose"/> `DaChot` mà
+    /// `[FromDate..ToDate]` **phủ** `ngay` ⇒ **NÉM** ⇒ UoW của ngày đó rollback (rebuild chuyển
+    /// `PartiallySucceeded`/`Failed` mang `LastErrorCode`), **0 dòng thay đổi**.
+    ///
+    /// 📌 Cổng ở `ReportAdminAppService.StartRebuildAsync` chỉ là **fail sớm**: nó KHÔNG thay được cổng này
+    /// vì kỳ có thể chốt **sau** lúc xếp hàng và **trước** lúc worker chạy (TOCTOU), hoặc đường
+    /// `POST /reports/aggregate`/`ChupTonKhoAsync` không đi qua nó.
+    /// </summary>
+    private async Task ChanNeuGiaoKyDaChotAsync(DateOnly ngay)
+    {
+        var ky = await _kyChot.FirstOrDefaultAsync(x =>
+            x.Status == RepPeriodStatus.DaChot && x.FromDate <= ngay && x.ToDate >= ngay);
+
+        if (ky is not null)
+        {
+            throw new BusinessException(ReportingErrorCodes.KyDaChot)
+                .WithData("ngay", ngay)
+                .WithData("kyId", ky.Id)
+                .WithData("tu", ky.FromDate)
+                .WithData("den", ky.ToDate)
+                .WithData("lyDo", "Ngày ghi giao một kỳ ĐÃ CHỐT — mở kỳ trước khi tổng hợp/rebuild.");
+        }
     }
 
     private async Task<Dictionary<NguonBaoCao, RptWatermark>> NapMocAsync()

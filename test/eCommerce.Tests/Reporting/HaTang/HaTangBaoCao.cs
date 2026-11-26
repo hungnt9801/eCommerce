@@ -30,6 +30,9 @@ public sealed class RepoBaoCaoGia<T> : IRepository<T, Guid> where T : class, IEn
     public int SoLanSua { get; private set; }
     public int SoLanXoa { get; private set; }
 
+    /// <summary>Số **lời gọi** `DeleteAsync(predicate)` (kể cả khi 0 dòng khớp).</summary>
+    public int SoLanGoiXoa { get; private set; }
+
     public IReadOnlyCollection<T> TatCa => _duLieu.Values;
 
     /// <summary>Nạp sẵn dữ liệu — KHÔNG tính là một lần chèn của app service.</summary>
@@ -103,6 +106,8 @@ public sealed class RepoBaoCaoGia<T> : IRepository<T, Guid> where T : class, IEn
         Expression<Func<T, bool>> predicate, bool autoSave = false,
         CancellationToken cancellationToken = default)
     {
+        SoLanGoiXoa++;
+
         foreach (var id in _duLieu.Values.Where(predicate.Compile()).Select(x => x.Id).ToList())
         {
             _duLieu.Remove(id);

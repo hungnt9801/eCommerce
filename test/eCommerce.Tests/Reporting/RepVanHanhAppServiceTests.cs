@@ -77,7 +77,7 @@ public class RepVanHanhAppServiceTests
             TongHop = new TongHopBaoCaoService(
                 HoaDon, DongHoaDon, DonHang, DongDonHang, TonKho, Kho,
                 Fact, Agg, AnhTonKho, DimNgay, DimSanPham, DimKho, DimNhanVien, Moc,
-                Khoa, Options.Create(TuyChon), DongHo, new GuidBaoCaoGia());
+                Khoa, Options.Create(TuyChon), DongHo, new GuidBaoCaoGia(), KyChot);
 
             Admin = HaTangBaoCao.Noi(
                 new ReportAdminAppService(
@@ -340,5 +340,119 @@ public class RepVanHanhAppServiceTests
         Assert.Equal(ketQua.Dong.Count, dong.Count);
         Assert.Equal(ketQua.TongHop.Count, tong.Count);
         Assert.Equal(150_000m, tong.Sum(x => x.DoanhThu));   // 200.000 − 50.000
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════════════════════════════
+    // P1 REV vòng 2 — CỔNG `0011` Ở **ĐƯỜNG GHI** (`TongHopBaoCaoService`), không chỉ fail-sớm ở app service
+    // ══════════════════════════════════════════════════════════════════════════════════════════════════
+
+    private static RepPeriodClose TaoKyDaChot(DateOnly from, DateOnly to)
+    {
+        var ky = new RepPeriodClose(Guid.NewGuid(), from, to, "Lý do đóng kỳ đủ dài", "ky-" + Guid.NewGuid());
+        ky.BatDauChot(Guid.NewGuid(), "Lý do đóng kỳ đủ dài");
+        ky.Chot(new string('a', 64), Guid.NewGuid(), Luc);
+        return ky;
+    }
+
+    [Fact]
+    public async Task BR011_ChayKhoangAsync_ngay_nam_trong_ky_DaChot__nem_0011_va_KHONG_ghi_gi()
+    {
+        var bo = new BoVanHanh();
+        bo.KyChot.Them(TaoKyDaChot(HomNay, HomNay));
+
+        var loi = await Assert.ThrowsAsync<BusinessException>(() => bo.TongHop.ChayKhoangAsync(HomNay));
+
+        Assert.Equal(ReportingErrorCodes.KyDaChot, loi.Code);
+
+        // 🚨 Bất biến tài chính: cổng kiểm TRƯỚC `DELETE` ⇒ 0 lời gọi xoá, 0 dòng bị xoá/ghi.
+        Assert.Equal(0, bo.Fact.SoLanGoiXoa);
+        Assert.Equal(0, bo.Agg.SoLanGoiXoa);
+        Assert.Equal(0, bo.Fact.SoLanXoa);
+        Assert.Equal(0, bo.Agg.SoLanXoa);
+        Assert.Equal(0, bo.Fact.SoLanChen);
+        Assert.Equal(0, bo.Agg.SoLanChen);
+    }
+
+    [Fact]
+    public async Task BR011_ChayAsync_gap_ngay_trong_ky_DaChot__nem_0011()
+    {
+        var bo = new BoVanHanh();
+        bo.KyChot.Them(TaoKyDaChot(HomNay, HomNay));   // kỳ chốt phủ hôm nay = ngày cuối của khoảng
+
+        var loi = await Assert.ThrowsAsync<BusinessException>(
+            () => bo.TongHop.ChayAsync(null, null, ghiAnhTonKho: false));
+
+        Assert.Equal(ReportingErrorCodes.KyDaChot, loi.Code);
+    }
+
+    [Fact]
+    public async Task BR011_ky_DaChot_KHONG_phu_ngay__ChayKhoangAsync_chay_duoc()
+    {
+        var bo = new BoVanHanh();
+        bo.KyChot.Them(TaoKyDaChot(HomNay.AddDays(-40), HomNay.AddDays(-30)));   // không phủ hôm nay
+
+        var soDong = await bo.TongHop.ChayKhoangAsync(HomNay);
+
+        Assert.Equal(0, soDong);
+        // 📌 Vẫn chạy lượt thay thế: gọi xoá fact + agg của ngày (2 lời gọi), rồi không chèn (nguồn rỗng).
+        Assert.Equal(1, bo.Fact.SoLanGoiXoa);
+        Assert.Equal(1, bo.Agg.SoLanGoiXoa);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════════════════════════════
+    // P2 #1 REV vòng 2 — đã có lượt `Rebuild` Queued cùng projection, khoảng/lý do KHÁC ⇒ AlreadyRequested
+    // ══════════════════════════════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public async Task BR005_StartRebuild_khi_da_co_luot_Queued_cung_projection__AlreadyRequested_khong_chen()
+    {
+        var bo = new BoVanHanh();
+
+        var dangChay = new RepRunLog(
+            Guid.NewGuid(), RepRunLog.TenJob.Rebuild, RepProjection.BanHang,
+            HomNay.AddDays(-5), HomNay.AddDays(-3), 3, "Lý do rebuild đủ dài", null, "idem-dang-chay");
+
+        bo.LanChay.Them(dangChay);
+        Assert.Equal(RepRunStatus.Queued, dangChay.Status);
+
+        var dto = await bo.Admin.StartRebuildAsync(new StartRebuildInput
+        {
+            FromDate = HomNay.AddDays(-2), ToDate = HomNay, Projection = RepProjection.BanHang,
+            Reason = "Lý do KHÁC đủ dài"
+        });
+
+        // 🚨 Trước `UX_RepRunLogs_..._DangChay`: nếu cứ chèn thì `23505` nổi thành 500. Phải trả lượt đang chạy.
+        Assert.True(dto.AlreadyRequested);
+        Assert.Equal(dangChay.Id, dto.Id);
+        Assert.Equal(0, bo.LanChay.SoLanChen);
+        Assert.Single(bo.LanChay.TatCa);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════════════════════════════
+    // P2 #2 REV vòng 2 — đối chiếu `TonKho` phát ĐÚNG `MismatchKind.AnhTonKho` (3) khi số ảnh lệch
+    // ══════════════════════════════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public async Task BR012_doi_chieu_TonKho_lech_so_anh__phat_MismatchKind_AnhTonKho()
+    {
+        var bo = new BoVanHanh();
+
+        // Nguồn: 1 dòng tồn kho. Read-model: 0 ảnh của hôm nay ⇒ lệch 1.
+        bo.TonKho.Them(new InventoryItem(Guid.NewGuid(), Guid.NewGuid(), "SKU-ANH"));
+
+        var ketQua = await bo.Admin.RunReconciliationAsync(new RunReconciliationInput
+        {
+            FromDate = HomNay, ToDate = HomNay, Projection = RepProjection.TonKho
+        });
+
+        Assert.Equal(1, ketQua.SoDongLechMoi);
+
+        var lech = Assert.Single(bo.Lech.TatCa);
+        Assert.Equal(RepMismatchKind.AnhTonKho, lech.MismatchKind);
+        Assert.Equal(HomNay, lech.FactDate);
+        Assert.Equal(RepProjection.TonKho, lech.Projection);
+        Assert.Equal(1m, lech.ExpectedValue);
+        Assert.Equal(0m, lech.ActualValue);
+        Assert.Equal(-1m, lech.Delta);
     }
 }

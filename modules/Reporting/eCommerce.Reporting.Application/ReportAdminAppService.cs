@@ -103,6 +103,20 @@ public class ReportAdminAppService : ApplicationService, IReportAdminAppService
             return ChuyenLanChay(hienCo, alreadyRequested: true);
         }
 
+        // 🚨 Hàng rào NGHIỆP VỤ trước unique `UX_RepRunLogs_TenantId_Job_Projection_DangChay`
+        // (partial `WHERE Status IN (0,1)`): đã có lượt `Rebuild` `Queued`/`Running` cùng projection —
+        // khoảng/lý do KHÁC nên `IdempotencyKey` khác ⇒ nếu cứ `InsertAsync` sẽ `23505` nổi thành **500**.
+        // Trả lượt đang chạy (`AlreadyRequested = true`) để client biết *"một lượt rebuild đang chờ/chạy"*.
+        var dangChay = await _lanChay.FirstOrDefaultAsync(x =>
+            x.JobName == RepRunLog.TenJob.Rebuild
+            && x.Projection == input.Projection
+            && (x.Status == RepRunStatus.Queued || x.Status == RepRunStatus.Running));
+
+        if (dangChay is not null)
+        {
+            return ChuyenLanChay(dangChay, alreadyRequested: true);
+        }
+
         var soNgay = input.Projection == RepProjection.TonKho
             ? 1
             : input.ToDate.DayNumber - input.FromDate.DayNumber + 1;
@@ -486,8 +500,11 @@ public class ReportAdminAppService : ApplicationService, IReportAdminAppService
             var tonQ = await _tonKho.GetQueryableAsync();
             var soAnhNguon = await AsyncExecuter.CountAsync(tonQ);
 
+            // 🚨 Ảnh tồn kho là phép ĐẾM ⇒ truyền qua `anhTonKhoNguon/anhTonKhoReadModel` để phát đúng
+            // `MismatchKind.AnhTonKho` (3, §5.2.5) và `Delta` = read-model − nguồn. Nhét vào `soDong*` thì
+            // kind là `SoDong` (0) và `Expected/Actual` bị ghi 0 ⇒ loại 3 KHÔNG BAO GIỜ xuất hiện.
             lech.AddRange(SoDoiChieu.KiemNgay(
-                projection, ngay, 0m, 0m, soAnhNguon, soAnhReadModel, 0, 0));
+                projection, ngay, 0m, 0m, 0, 0, 0, 0, soAnhNguon, soAnhReadModel));
         }
 
         if (lech.Count == 0)

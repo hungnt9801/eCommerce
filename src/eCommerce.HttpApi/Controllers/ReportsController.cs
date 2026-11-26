@@ -74,14 +74,14 @@ public class ReportsController : AbpControllerBase
     /// <summary>**REBUILD** một khoảng (xếp hàng `Queued`; worker xử lý). `Reason` ≥ 10 ký tự.</summary>
     [HttpPost("rebuild")]
     [Authorize(eCommerceConsts.Permissions.Reports.Rebuild)]
-    [ProducesResponseType(202)]
+    [ProducesResponseType(200)]
     public Task<LanChayDto> StartRebuildAsync([FromBody] StartRebuildInput input)
         => _vanHanh.StartRebuildAsync(input);
 
     /// <summary>**CHẠY TIẾP** một lượt `PartiallySucceeded`/`Failed` từ checkpoint (0 cửa sổ cũ chạy lại).</summary>
     [HttpPost("rebuild/{runId:guid}/resume")]
     [Authorize(eCommerceConsts.Permissions.Reports.Rebuild)]
-    [ProducesResponseType(202)]
+    [ProducesResponseType(200)]
     public Task<LanChayDto> ResumeRebuildAsync([FromRoute] Guid runId)
         => _vanHanh.ResumeRebuildAsync(runId);
 
