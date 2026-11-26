@@ -116,3 +116,8 @@ nghĩa (không đỏ) — thay bằng NC-3 (đột biến thật ở guard).
 6. ⚠️ **Lệch hợp đồng cần BA xem** (không tự sửa SRS): SRS §14.2 ghi fixture `TongHopDoanhThu.TinhNgay(chungTu, dong)`
    trả `.TongDoanhThu`/`.TongHop`; as-built trả `KetQuaTinhNgay` có `.Dong`/`.TongHop` (không có `TongDoanhThu`). Test
    viết theo **as-built**, không sửa mã sản phẩm.
+
+## Negative control
+| Ngay | Ma | Tep:dong | Dot bien | Lenh test | Bang chung |
+|---|---|---|---|---|---|
+| 2026-11-27 | NC-4 | modules/Reporting/eCommerce.Reporting.Application/TongHopBaoCaoService.cs:467 | Dao cong 0011 duong ghi: Status == DaChot -> != DaChot | dotnet test test/eCommerce.Tests/eCommerce.Tests.csproj --filter FullyQualifiedName~RepVanHanh --nologo -v q | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
