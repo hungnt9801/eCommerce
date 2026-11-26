@@ -179,12 +179,14 @@ public class NotificationQueueAppService : ApplicationService, INotificationQueu
             ?? throw new BusinessException(NotificationErrorCodes.KhongTimThay).WithData("loai", "queue-item");
 
         var now = _clock.Now.ToUniversalTime();
-        var transition = item.Huy(input.LyDo, _currentUser.Id);
+        // 🔒 `D-269`: lý do người dùng gõ có thể chứa SĐT/email ⇒ mask MỘT lần, dùng chung cho mục + event.
+        var lyDoMasked = NotificationMasker.CheBiMat(input.LyDo);
+        var transition = item.Huy(lyDoMasked, _currentUser.Id);
 
         await _events.InsertAsync(
             NotificationQueueEvent.TaoMoi(
                 _guid.Create(), item.Id, transition, item.CorrelationId, _currentUser.Id, now,
-                reasonMasked: input.LyDo, tenantId: item.TenantId),
+                reasonMasked: lyDoMasked, tenantId: item.TenantId),
             autoSave: false);
 
         await _items.UpdateAsync(item, autoSave: true);

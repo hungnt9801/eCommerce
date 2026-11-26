@@ -365,6 +365,131 @@ public class NotificationQueueAppenderTests
         Assert.Equal(1, bo.BoGhi.Tong(eCommerceMetricNames.NotificationRenderFailedTotal));
     }
 
+    // ── TC-30: khử trùng cửa sổ (marketing) — tuần tự ─────────────────────────────────────────
+
+    [Fact]
+    public async Task TC30_khu_trung_cua_so_marketing_lan_hai_thanh_DaHuy_bucket_NULL_va_0019()
+    {
+        using var bo = new BoKiemThu();
+        bo.SeedTemplate(purpose: NotificationPurpose.Marketing, coalesceWindowSeconds: 300);
+
+        var lan1 = await bo.Appender.EnqueueAsync(YeuCau(key: "mk:1"));
+        var lan2 = await bo.Appender.EnqueueAsync(YeuCau(key: "mk:2")); // khoá khác, NỘI DUNG trùng
+
+        // Lần 1 vào hàng đợi bình thường + có bucket (nằm TRONG partial UNIQUE index).
+        Assert.False(lan1.AlreadyQueued);
+        Assert.Equal(nameof(NotificationQueueStatus.Moi), lan1.Status);
+        var muc1 = Assert.Single(bo.Items.TatCa, x => x.Id == lan1.QueueItemId);
+        Assert.NotNull(muc1.CoalesceBucketStartUtc);
+
+        // Lần 2 bị khử trùng: mục `DaHuy`, bucket = NULL (ra ngoài index), trả `0019`.
+        Assert.False(lan2.AlreadyQueued);
+        Assert.Equal(nameof(NotificationQueueStatus.DaHuy), lan2.Status);
+        Assert.Equal(NotificationErrorCodes.BiKhudupCuaSo, lan2.ErrorCode);
+
+        var muc2 = Assert.Single(bo.Items.TatCa, x => x.Id == lan2.QueueItemId);
+        Assert.Equal(NotificationQueueStatus.DaHuy, muc2.Status);
+        Assert.Null(muc2.CoalesceBucketStartUtc);
+
+        // ĐÚNG MỘT event `Suppressed` trên mục bị khử trùng.
+        Assert.Single(bo.Events.TatCa, e =>
+            e.QueueItemId == muc2.Id && e.EventType == NotificationQueueEventType.Suppressed);
+
+        // Mục lần 1 KHÔNG bị đổi; metric `window_suppressed` tăng 1.
+        Assert.Equal(NotificationQueueStatus.Moi, bo.Items.TatCa.Single(x => x.Id == lan1.QueueItemId).Status);
+        Assert.Equal(1, bo.BoGhi.Tong(eCommerceMetricNames.NotificationWindowSuppressedTotal));
+    }
+
+    // ── BR-007: QueueItem + QueueEvent + outbox trong CÙNG một UoW ────────────────────────────
+
+    [Fact]
+    public async Task BR007_ghi_muc_va_event_va_outbox_trong_MOT_uow()
+    {
+        using var bo = new BoKiemThu();
+        bo.SeedTemplate();
+
+        await bo.Appender.EnqueueAsync(YeuCau(key: "uow:1"));
+
+        // Một lần mở UoW cho cả ba lần ghi ⇒ cùng transaction (atomicity trên DB là hệ quả).
+        Assert.Equal(1, bo.Uow.SoLanBegin);
+        Assert.Single(bo.Items.TatCa);
+        Assert.Single(bo.Events.TatCa);
+        Assert.Single(bo.Bus.DaPhat); // outbox publish TRONG cùng UoW
+    }
+
+    [Fact]
+    public async Task BR007_render_loi_thi_KHONG_mo_uow_va_khong_ghi_gi()
+    {
+        using var bo = new BoKiemThu();
+        bo.SeedTemplate();
+
+        await Assert.ThrowsAsync<BusinessException>(() => bo.Appender.EnqueueAsync(YeuCau(
+            key: "uow:loi", data: new Dictionary<string, string>(StringComparer.Ordinal))));
+
+        Assert.Equal(0, bo.Uow.SoLanBegin);
+        Assert.Empty(bo.Items.TatCa);
+        Assert.Empty(bo.Events.TatCa);
+        Assert.Empty(bo.Bus.DaPhat);
+    }
+
+    // ── BR-025: lô chỉ marketing, fail-closed — template khác vẫn `ChoDuyet` (phải duyệt) ─────
+
+    [Fact]
+    public async Task BR025_lo_bang_template_Transactional_van_vao_ChoDuyet_KHONG_gui_thang()
+    {
+        using var bo = new BoKiemThu();
+        bo.SeedTemplate(purpose: NotificationPurpose.Transactional); // KHÔNG phải Marketing
+
+        var ketQua = await bo.Appender.EnqueueAsync(YeuCau(key: "lo:tx", batchId: Guid.NewGuid()));
+
+        // ❌ fail-closed: KHÔNG gửi thẳng, KHÔNG mã lỗi mới — vẫn `ChoDuyet`, phải duyệt (D-198).
+        Assert.Equal(nameof(NotificationQueueStatus.ChoDuyet), ketQua.Status);
+        Assert.Equal(NotificationQueueStatus.ChoDuyet, Assert.Single(bo.Items.TatCa).Status);
+    }
+
+    [Fact]
+    public void BR025_ETO_nghiep_vu_KHONG_mang_BatchId()
+    {
+        Assert.Null(typeof(NotificationEnqueuedEto).GetProperty("BatchId"));
+    }
+
+    // ── D-269: mask MỘT lần sau render + fingerprint trên giá trị ĐÃ LƯU ────────────────────
+
+    /// <summary>
+    /// `TC-14` / `D-269` ①(2): appender mask **một lần** ngay sau render rồi dùng **cùng** giá trị đã mask
+    /// cho `ContentFingerprint.TinhMuc(...)`, `TaoMuc` và `GhiKhudupAsync` — không có cửa ghi thứ hai.
+    /// Body chứa email gốc ⇒ cột `RenderedBodyMasked` KHÔNG còn email gốc, và fingerprint khớp **giá trị đã lưu**.
+    /// </summary>
+    [Fact]
+    public async Task TC14_appender_mask_than_va_fingerprint_tren_gia_tri_da_luu()
+    {
+        using var bo = new BoKiemThu();
+        var (_, version) = bo.SeedTemplate(
+            subject: "Xin chào {{Ten}}",
+            body: "Lien he {{Ten}} — tong 1.500.000 ₫");
+
+        await bo.Appender.EnqueueAsync(YeuCau(
+            key: "tc14:1",
+            data: new Dictionary<string, string>(StringComparer.Ordinal) { ["Ten"] = "a@b.com" }));
+
+        var muc = Assert.Single(bo.Items.TatCa);
+
+        // (a) cột đã-che KHÔNG chứa PII gốc; tiền giữ nguyên (D-269 ①(2)(v)).
+        Assert.DoesNotContain("a@b.com", muc.RenderedBodyMasked);
+        Assert.Contains("a***@b.com", muc.RenderedBodyMasked);
+        Assert.Contains("1.500.000 ₫", muc.RenderedBodyMasked);
+        Assert.DoesNotContain("a@b.com", muc.RenderedSubject);
+
+        // (b) fingerprint tính trên ĐÚNG giá trị đã lưu (cùng công thức SRS §5.2).
+        var recipientHash = NotificationRecipient.TinhHash("a@b.com");
+        var subjectMasked = NotificationMasker.CheBiMat("Xin chào a@b.com");
+        var bodyMasked = NotificationMasker.CheBiMat("Lien he a@b.com — tong 1.500.000 ₫");
+
+        Assert.Equal(
+            ContentFingerprint.TinhMuc(version.Id, recipientHash, subjectMasked, bodyMasked).Sha256,
+            muc.ContentFingerprint);
+    }
+
     // ── Phụ thuộc giả ─────────────────────────────────────────────────────────────────────────
 
     private sealed class ClockGia : IClock

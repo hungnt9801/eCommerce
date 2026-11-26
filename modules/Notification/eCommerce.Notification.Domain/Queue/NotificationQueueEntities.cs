@@ -193,8 +193,9 @@ public class NotificationQueueItem : FullAuditedAggregateRoot<Guid>, IMultiTenan
             TemplateVersionId = templateVersionId,
             RecipientEncrypted = recipientEncrypted,
             RecipientHash = recipientHash,
-            RenderedSubject = renderedSubject,
-            RenderedBodyMasked = renderedBodyMasked,
+            // 🔒 MỘT CỬA (`D-269`): giá trị thô không bao giờ vào cột đã-che.
+            RenderedSubject = renderedSubject is null ? null : NotificationMasker.CheBiMat(renderedSubject),
+            RenderedBodyMasked = NotificationMasker.CheBiMat(renderedBodyMasked),
             ContentFingerprint = contentFingerprint,
             CoalesceBucketStartUtc = coalesceBucketStartUtc,
             Priority = priority,
@@ -301,7 +302,7 @@ public class NotificationQueueItem : FullAuditedAggregateRoot<Guid>, IMultiTenan
         }
 
         LastErrorCode = errorCode;
-        LastReasonMasked = reasonMasked;
+        LastReasonMasked = NotificationMasker.CheBiMat(reasonMasked);
         DispatchLeaseExpiresAtUtc = null;
         return ChuyenSang(NotificationQueueStatus.Loi, NotificationQueueEventType.Failed);
     }
@@ -329,7 +330,7 @@ public class NotificationQueueItem : FullAuditedAggregateRoot<Guid>, IMultiTenan
             Nem(Status, NotificationQueueStatus.DaHuy);
         }
 
-        LastReasonMasked = lyDo;
+        LastReasonMasked = NotificationMasker.CheBiMat(lyDo);
         return ChuyenSang(NotificationQueueStatus.DaHuy, NotificationQueueEventType.Cancelled);
     }
 
@@ -360,7 +361,7 @@ public class NotificationQueueItem : FullAuditedAggregateRoot<Guid>, IMultiTenan
         }
 
         CoalesceBucketStartUtc = null;
-        LastReasonMasked = lyDo;
+        LastReasonMasked = NotificationMasker.CheBiMat(lyDo);
         return ChuyenSang(NotificationQueueStatus.DaHuy, NotificationQueueEventType.Suppressed);
     }
 
@@ -468,7 +469,7 @@ public class NotificationQueueEvent : CreationAuditedEntity<Guid>, IMultiTenant
             EventType = transition.EventType,
             FromStatus = transition.FromStatus,
             ToStatus = transition.ToStatus,
-            ReasonMasked = reasonMasked,
+            ReasonMasked = reasonMasked is null ? null : NotificationMasker.CheBiMat(reasonMasked),
             ErrorCode = errorCode,
             CorrelationId = correlationId ?? string.Empty,
             ActorUserId = actorUserId,

@@ -112,9 +112,13 @@ public class NotificationQueueAppender : INotificationQueueAppender, ITransientD
         }
 
         // ⑤ Người nhận: mã hoá + băm MỘT cửa; plaintext KHÔNG rời bộ nhớ.
+        //    🔒 `D-269`: mask **một lần** sau render rồi dùng **cùng** giá trị đã mask cho fingerprint
+        //    (fingerprint trên giá trị **đã lưu**), `TaoMuc` và `GhiKhudupAsync` — không có cửa ghi thứ hai.
         var recipientHash = NotificationRecipient.TinhHash(request.Recipient);
         var recipientEncrypted = _encryption.Encrypt(request.Recipient) ?? string.Empty;
-        var fingerprint = ContentFingerprint.TinhMuc(version.Id, recipientHash, rendered.Subject, rendered.Body).Sha256;
+        var subjectMasked = NotificationMasker.CheBiMat(rendered.Subject);
+        var bodyMasked = NotificationMasker.CheBiMat(rendered.Body);
+        var fingerprint = ContentFingerprint.TinhMuc(version.Id, recipientHash, subjectMasked, bodyMasked).Sha256;
 
         // ⑥ Trùng khoá: cùng fingerprint ⇒ AlreadyQueued; khác ⇒ 0010 (TC-03).
         var existing = await _items.FirstOrDefaultAsync(
@@ -142,7 +146,7 @@ public class NotificationQueueAppender : INotificationQueueAppender, ITransientD
 
             if (trung is not null)
             {
-                return await GhiKhudupAsync(request, key, template, version, recipientEncrypted, recipientHash, rendered, fingerprint, now, ct);
+                return await GhiKhudupAsync(request, key, template, version, recipientEncrypted, recipientHash, subjectMasked, bodyMasked, fingerprint, now, ct);
             }
         }
 
@@ -155,7 +159,7 @@ public class NotificationQueueAppender : INotificationQueueAppender, ITransientD
 
             using (var uow = _uow.Begin(requiresNew: true, isTransactional: true))
             {
-                var item = TaoMuc(request, key, template, version, recipientEncrypted, recipientHash, rendered, fingerprint, bucketStart, now);
+                var item = TaoMuc(request, key, template, version, recipientEncrypted, recipientHash, subjectMasked, bodyMasked, fingerprint, bucketStart, now);
                 await _items.InsertAsync(item, autoSave: false, cancellationToken: ct);
 
                 var transition = item.SuKienTaoMoi();
@@ -210,7 +214,8 @@ public class NotificationQueueAppender : INotificationQueueAppender, ITransientD
         NotificationTemplateVersion version,
         string recipientEncrypted,
         string recipientHash,
-        RenderResult rendered,
+        string subjectMasked,
+        string bodyMasked,
         string fingerprint,
         DateTime? bucketStart,
         DateTime now)
@@ -227,8 +232,8 @@ public class NotificationQueueAppender : INotificationQueueAppender, ITransientD
             version.Id,
             recipientEncrypted,
             recipientHash,
-            rendered.Subject,
-            rendered.Body,
+            subjectMasked,
+            bodyMasked,
             fingerprint,
             bucketStart,
             request.Priority,
@@ -238,12 +243,12 @@ public class NotificationQueueAppender : INotificationQueueAppender, ITransientD
 
     private async Task<EnqueueResult> GhiKhudupAsync(
         EnqueueRequest request, string key, NotificationTemplate template, NotificationTemplateVersion version,
-        string recipientEncrypted, string recipientHash, RenderResult rendered, string fingerprint,
+        string recipientEncrypted, string recipientHash, string subjectMasked, string bodyMasked, string fingerprint,
         DateTime now, CancellationToken ct)
     {
         using var uow = _uow.Begin(requiresNew: true, isTransactional: true);
 
-        var item = TaoMuc(request, key, template, version, recipientEncrypted, recipientHash, rendered, fingerprint, bucketStart: null, now);
+        var item = TaoMuc(request, key, template, version, recipientEncrypted, recipientHash, subjectMasked, bodyMasked, fingerprint, bucketStart: null, now);
         var transition = item.GhiNhanBiKhudup("cua-so-khu-trung");
 
         await _items.InsertAsync(item, autoSave: false, cancellationToken: ct);
