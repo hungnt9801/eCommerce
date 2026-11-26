@@ -78,6 +78,9 @@ namespace eCommerce;
     // trong đồ thị module ⇒ ABP không quét app service ⇒ **không tạo endpoint** ⇒ API trả **404 body rỗng**
     // dù build/test **xanh** (bài học C8/C16, đã trả giá).
     typeof(Customers.CustomersApplicationModule),
+    // 🆕 `WP-22` (`NOT-001`) — module THÔNG BÁO. Thiếu dòng này ⇒ assembly Application không nằm trong
+    // đồ thị module ⇒ API 404 body rỗng (bài học C8/C16).
+    typeof(global::eCommerce.Notification.NotificationApplicationModule),
     // 🆕 `D-13`/`D-14` — tầng API **tường minh** `/api/v1/**` cho Web Admin Next.js.
     // ⚠️ Thiếu dòng này thì controller v1 **KHÔNG** được nạp (không có lỗi biên dịch) — cùng họ lỗi C8/C16.
     typeof(eCommerceHttpApiModule)
@@ -407,6 +410,22 @@ public class eCommerceHttpApiHostModule : AbpModule
             options.Map(eCommerce.Reporting.ReportingErrorCodes.TonKhoAm, System.Net.HttpStatusCode.Conflict);             // 0006
             options.Map(eCommerce.Reporting.ReportingErrorCodes.DongTrung, System.Net.HttpStatusCode.Conflict);            // 0008
             options.Map(eCommerce.Reporting.ReportingErrorCodes.ChungTuKhongCoDong, System.Net.HttpStatusCode.Conflict);   // 0009
+
+            // ── 🆕 `WP-22` — THÔNG BÁO (`NOT-001`, dải `0010–0020`) ─────────────────────────────
+            // 🔑 Không map ⇒ ABP trả `403` cho mọi `BusinessException` ⇒ client đọc thành *"không có quyền"*
+            // trong khi lỗi thật là *"template chưa publish"* / *"trùng khoá"* / *"thiếu trường"*. Mã lỗi vẫn
+            // là nguồn sự thật (`D6`); HTTP chỉ phân loại "thử lại được" / "phải sửa dữ liệu".
+            options.Map(eCommerce.Notification.NotificationErrorCodes.KhoaXungDot, System.Net.HttpStatusCode.Conflict);                  // 0010
+            options.Map(eCommerce.Notification.NotificationErrorCodes.ChuyenTrangThaiKhongHopLe, System.Net.HttpStatusCode.Conflict);      // 0011
+            options.Map(eCommerce.Notification.NotificationErrorCodes.TemplateChuaSanSang, System.Net.HttpStatusCode.BadRequest);          // 0012
+            options.Map(eCommerce.Notification.NotificationErrorCodes.ThieuTruongBatBuoc, System.Net.HttpStatusCode.BadRequest);           // 0013
+            options.Map(eCommerce.Notification.NotificationErrorCodes.DaBanGiaoRoi, System.Net.HttpStatusCode.Conflict);                   // 0014
+            options.Map(eCommerce.Notification.NotificationErrorCodes.PlaceholderNgoaiWhitelist, System.Net.HttpStatusCode.BadRequest);     // 0015
+            options.Map(eCommerce.Notification.NotificationErrorCodes.PhienBanBatBien, System.Net.HttpStatusCode.Conflict);                // 0016
+            options.Map(eCommerce.Notification.NotificationErrorCodes.KhongTimThay, System.Net.HttpStatusCode.NotFound);                    // 0017
+            options.Map(eCommerce.Notification.NotificationErrorCodes.LoChuaDuyet, System.Net.HttpStatusCode.Conflict);                    // 0018
+            options.Map(eCommerce.Notification.NotificationErrorCodes.BiKhudupCuaSo, System.Net.HttpStatusCode.Conflict);                  // 0019
+            options.Map(eCommerce.Notification.NotificationErrorCodes.BodyFormatKhongHoTro, System.Net.HttpStatusCode.BadRequest);         // 0020
 
             // ── Hạ tầng chung ──────────────────────────────────────────────────────────────────
             // Không giành được khoá phân tán ⇒ **409** (client thử lại được) — `ADDR-004` §12 ghi rõ.

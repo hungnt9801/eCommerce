@@ -6599,6 +6599,562 @@ namespace eCommerce.Migrations
                         });
                 });
 
+            modelBuilder.Entity("eCommerce.Notification.NotificationBatch", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ApprovedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ApprovedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("ConcurrencyStamp");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<Guid?>("DeleterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("DeleterId");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("DeletionTime");
+
+                    b.Property<string>("ExtraProperties")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("ExtraProperties");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("IsDeleted");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TemplateId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TemplateVersionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.Property<int>("TotalItems")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TemplateId");
+
+                    b.HasIndex("TemplateVersionId");
+
+                    b.HasIndex("TenantId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("IX_NotificationBatches_Tenant_Code");
+
+                    b.HasIndex("TenantId", "IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("IX_NotificationBatches_Tenant_IdempotencyKey");
+
+                    b.HasIndex("TenantId", "Status", "CreationTime")
+                        .HasDatabaseName("IX_NotificationBatches_Tenant_Status_CreationTime");
+
+                    b.ToTable("NotificationBatches", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_NotificationBatches_CoNguoiDuyet", "\"ApprovedAtUtc\" IS NULL OR \"ApprovedByUserId\" IS NOT NULL");
+
+                            t.HasCheckConstraint("CK_NotificationBatches_Status", "\"Status\" in (0, 1, 2, 3)");
+
+                            t.HasCheckConstraint("CK_NotificationBatches_TotalItems", "\"TotalItems\" >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("eCommerce.Notification.NotificationQueueEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ActorUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<string>("ErrorCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("EventType")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("FromStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("QueueItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ReasonMasked")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.Property<int?>("ToStatus")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("QueueItemId");
+
+                    b.HasIndex("TenantId", "EventType", "OccurredAtUtc")
+                        .HasDatabaseName("IX_NotificationQueueEvents_Tenant_Type_Time");
+
+                    b.HasIndex("TenantId", "QueueItemId", "OccurredAtUtc")
+                        .HasDatabaseName("IX_NotificationQueueEvents_Tenant_Item_Time");
+
+                    b.ToTable("NotificationQueueEvents", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_NotificationQueueEvents_EventType", "\"EventType\" in (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12)");
+
+                            t.HasCheckConstraint("CK_NotificationQueueEvents_FromStatus", "(\"EventType\" = 0 AND \"FromStatus\" IS NULL) OR (\"EventType\" <> 0 AND \"FromStatus\" IS NOT NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("eCommerce.Notification.NotificationQueueItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("BatchId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("ChannelKind")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("CoalesceBucketStartUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("ConcurrencyStamp");
+
+                    b.Property<string>("ContentFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character(64)")
+                        .IsFixedLength();
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<Guid?>("DeleterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("DeleterId");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("DeletionTime");
+
+                    b.Property<DateTime?>("DispatchLeaseExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DispatchedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ExtraProperties")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("ExtraProperties");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("IsDeleted");
+
+                    b.Property<string>("LastErrorCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<string>("LastReasonMasked")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("RecipientEncrypted")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("RecipientHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character(64)")
+                        .IsFixedLength();
+
+                    b.Property<string>("RenderedBodyMasked")
+                        .HasColumnType("text");
+
+                    b.Property<string>("RenderedSubject")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<Guid?>("RootItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<DateTime>("ScheduledAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("SourceAggregateId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("SourceEventType")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TemplateId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TemplateVersionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BatchId");
+
+                    b.HasIndex("TemplateId");
+
+                    b.HasIndex("TemplateVersionId");
+
+                    b.HasIndex("TenantId", "BatchId")
+                        .HasDatabaseName("IX_NotificationQueueItems_Tenant_Batch");
+
+                    b.HasIndex("TenantId", "IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("IX_NotificationQueueItems_Tenant_IdempotencyKey");
+
+                    b.HasIndex("TenantId", "SourceEventType", "SourceAggregateId")
+                        .HasDatabaseName("IX_NotificationQueueItems_Tenant_Source");
+
+                    b.HasIndex("TenantId", "Status", "DispatchLeaseExpiresAtUtc")
+                        .HasDatabaseName("IX_NotificationQueueItems_Tenant_Status_Lease");
+
+                    b.HasIndex("TenantId", "Status", "ScheduledAtUtc")
+                        .HasDatabaseName("IX_NotificationQueueItems_Tenant_Status_Scheduled")
+                        .HasFilter("\"Status\" IN (0, 1, 2)");
+
+                    b.HasIndex("TenantId", "RecipientHash", "ChannelKind", "ContentFingerprint", "CoalesceBucketStartUtc")
+                        .IsUnique()
+                        .HasDatabaseName("IX_NotificationQueueItems_Tenant_Recipient_Fingerprint_Bucket")
+                        .HasFilter("\"CoalesceBucketStartUtc\" IS NOT NULL");
+
+                    b.ToTable("NotificationQueueItems", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_NotificationQueueItems_AttemptCount", "\"AttemptCount\" >= 0");
+
+                            t.HasCheckConstraint("CK_NotificationQueueItems_ChannelKind", "\"ChannelKind\" in (0, 1, 2)");
+
+                            t.HasCheckConstraint("CK_NotificationQueueItems_HanSauLich", "\"ExpiresAtUtc\" IS NULL OR \"ExpiresAtUtc\" > \"ScheduledAtUtc\"");
+
+                            t.HasCheckConstraint("CK_NotificationQueueItems_Priority", "\"Priority\" in (0, 1, 2, 3)");
+
+                            t.HasCheckConstraint("CK_NotificationQueueItems_Status", "\"Status\" in (0, 1, 2, 3, 4, 5, 6, 7)");
+                        });
+                });
+
+            modelBuilder.Entity("eCommerce.Notification.NotificationTemplate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("ChannelKind")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("CoalesceWindowSeconds")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("ConcurrencyStamp");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<Guid?>("CurrentPublishedVersionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("DefaultExpiresAfterSeconds")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("DeleterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("DeleterId");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("DeletionTime");
+
+                    b.Property<string>("ExtraProperties")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("ExtraProperties");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("IsDeleted");
+
+                    b.Property<bool>("IsSystem")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<string>("Locale")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<int>("Purpose")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Status", "ChannelKind")
+                        .HasDatabaseName("IX_NotificationTemplates_Tenant_Status_Channel");
+
+                    b.HasIndex("TenantId", "Code", "ChannelKind", "Locale")
+                        .IsUnique()
+                        .HasDatabaseName("IX_NotificationTemplates_Tenant_Code_Channel_Locale");
+
+                    b.ToTable("NotificationTemplates", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_NotificationTemplates_ChannelKind", "\"ChannelKind\" in (0, 1, 2)");
+
+                            t.HasCheckConstraint("CK_NotificationTemplates_ChiMarketingKhuTrung", "\"Purpose\" = 1 OR \"CoalesceWindowSeconds\" = 0");
+
+                            t.HasCheckConstraint("CK_NotificationTemplates_CoalesceWindow", "\"CoalesceWindowSeconds\" >= 0");
+
+                            t.HasCheckConstraint("CK_NotificationTemplates_Purpose", "\"Purpose\" in (0, 1, 2)");
+                        });
+                });
+
+            modelBuilder.Entity("eCommerce.Notification.NotificationTemplateVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("BodyFormat")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("BodyText")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ContentHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character(64)")
+                        .IsFixedLength();
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<string>("PlaceholdersJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("Placeholders");
+
+                    b.Property<DateTime>("PublishedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("PublishedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<string>("Subject")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<Guid>("TemplateId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TemplateId", "Version")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("IX_NotificationTemplateVersions_Template_Version");
+
+                    b.HasIndex("TenantId", "TemplateId", "ContentHash")
+                        .IsUnique()
+                        .HasDatabaseName("IX_NotificationTemplateVersions_Tenant_Template_Hash");
+
+                    b.HasIndex("TenantId", "TemplateId", "Version")
+                        .IsUnique()
+                        .HasDatabaseName("IX_NotificationTemplateVersions_Tenant_Template_Version");
+
+                    b.ToTable("NotificationTemplateVersions", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_NotificationTemplateVersions_BodyFormat", "\"BodyFormat\" in (0, 1)");
+
+                            t.HasCheckConstraint("CK_NotificationTemplateVersions_Version", "\"Version\" >= 1");
+                        });
+                });
+
             modelBuilder.Entity("eCommerce.Orders.MarketplaceEventLog", b =>
                 {
                     b.Property<Guid>("Id")
@@ -10809,6 +11365,59 @@ namespace eCommerce.Migrations
                     b.HasOne("eCommerce.Inventory.StockDocument", null)
                         .WithMany()
                         .HasForeignKey("StockDocumentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("eCommerce.Notification.NotificationBatch", b =>
+                {
+                    b.HasOne("eCommerce.Notification.NotificationTemplate", null)
+                        .WithMany()
+                        .HasForeignKey("TemplateId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("eCommerce.Notification.NotificationTemplateVersion", null)
+                        .WithMany()
+                        .HasForeignKey("TemplateVersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("eCommerce.Notification.NotificationQueueEvent", b =>
+                {
+                    b.HasOne("eCommerce.Notification.NotificationQueueItem", null)
+                        .WithMany()
+                        .HasForeignKey("QueueItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("eCommerce.Notification.NotificationQueueItem", b =>
+                {
+                    b.HasOne("eCommerce.Notification.NotificationBatch", null)
+                        .WithMany()
+                        .HasForeignKey("BatchId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("eCommerce.Notification.NotificationTemplate", null)
+                        .WithMany()
+                        .HasForeignKey("TemplateId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("eCommerce.Notification.NotificationTemplateVersion", null)
+                        .WithMany()
+                        .HasForeignKey("TemplateVersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("eCommerce.Notification.NotificationTemplateVersion", b =>
+                {
+                    b.HasOne("eCommerce.Notification.NotificationTemplate", null)
+                        .WithMany()
+                        .HasForeignKey("TemplateId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

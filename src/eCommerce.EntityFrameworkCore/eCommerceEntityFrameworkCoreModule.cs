@@ -38,6 +38,8 @@ namespace eCommerce.EntityFrameworkCore;
     typeof(Pricing.EntityFrameworkCore.PricingEntityFrameworkCoreModule),
     // 🆕 `WP-08` — module REPORTING: mapping read-model báo cáo (`ConfigureReporting`).
     typeof(Reporting.ReportingEntityFrameworkCoreModule),
+    // 🆕 `WP-22` (`NOT-001`) — module NOTIFICATION: kéo `Notification.Domain` vào đồ thị (seeder + DI).
+    typeof(global::eCommerce.Notification.EntityFrameworkCore.NotificationEntityFrameworkCoreModule),
     typeof(AbpEntityFrameworkCorePostgreSqlModule),
     typeof(AbpIdentityEntityFrameworkCoreModule),
     typeof(AbpPermissionManagementEntityFrameworkCoreModule),

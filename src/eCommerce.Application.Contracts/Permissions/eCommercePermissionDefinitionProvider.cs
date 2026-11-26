@@ -195,5 +195,20 @@ public class eCommercePermissionDefinitionProvider : PermissionDefinitionProvide
         // một khoảng sai có thể **xoá** số liệu của kỳ khác — thao tác ghi phải có quyền riêng.
         var reports = group.AddPermission(eCommerceConsts.Permissions.Reports.Default);
         reports.AddChild(eCommerceConsts.Permissions.Reports.Aggregate);
+
+        // ---- Thông báo (`WP-22` / `NOT-001`) ----
+        // 🚨 BẮT BUỘC khai ở CẢ HAI NƠI (hằng số `eCommerceConsts.Permissions.Notifications` + ở đây):
+        // thiếu một nơi ⇒ `403` cho MỌI người kể cả `admin` (`XC-004` D2/E3). 🛡️ `BatBienPhanQuyenTests.TC02b`.
+        // 📌 9 quyền LÁ, thêm TRỰC TIẾP vào group (tên có dấu chấm là quy ước, không cần node cha).
+        // 🔒 `Reports.View` **KHÔNG** có: endpoint `reports/summary` đã hoãn (`D-255`).
+        group.AddPermission(eCommerceConsts.Permissions.Notifications.TemplatesView);
+        group.AddPermission(eCommerceConsts.Permissions.Notifications.TemplatesManage);
+        group.AddPermission(eCommerceConsts.Permissions.Notifications.TemplatesPublish);
+        group.AddPermission(eCommerceConsts.Permissions.Notifications.QueueCreate);
+        group.AddPermission(eCommerceConsts.Permissions.Notifications.QueueView);
+        group.AddPermission(eCommerceConsts.Permissions.Notifications.QueueCancel);
+        group.AddPermission(eCommerceConsts.Permissions.Notifications.QueueRetry);
+        group.AddPermission(eCommerceConsts.Permissions.Notifications.BatchesCreate);
+        group.AddPermission(eCommerceConsts.Permissions.Notifications.BatchesApprove);
     }
 }

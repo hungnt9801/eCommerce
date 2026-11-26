@@ -158,10 +158,12 @@ public class MetricsTests
             var laThoiGian = ten.EndsWith("_seconds", StringComparison.Ordinal);
             var laKichThuoc = ten.EndsWith("_size", StringComparison.Ordinal)
                               || ten.EndsWith("_pending", StringComparison.Ordinal)
-                              || ten.EndsWith("_skus", StringComparison.Ordinal);
+                              || ten.EndsWith("_skus", StringComparison.Ordinal)
+                              // `D-267`: Gauge độ dài hàng đợi (`notification_queue_backlog`) — hậu tố hợp lệ.
+                              || ten.EndsWith("_backlog", StringComparison.Ordinal);
 
             Assert.True(laCounter || laThoiGian || laKichThuoc,
-                $"Metric '{ten}' thiếu hậu tố đơn vị/loại (_total · _seconds · _size · _pending · _skus).");
+                $"Metric '{ten}' thiếu hậu tố đơn vị/loại (_total · _seconds · _size · _pending · _skus · _backlog).");
         }
     }
 }

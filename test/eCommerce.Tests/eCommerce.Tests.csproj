@@ -63,6 +63,13 @@
          tổng tính độc lập từ chứng từ (DoD `WP-08`). Cần tầng Application của `Reporting` (hàm ánh xạ) và
          `eCommerce.HttpApi` (hợp đồng route/quyền của controller `/api/v1/reports`). -->
     <ProjectReference Include="..\..\modules\Reporting\eCommerce.Reporting.Application\eCommerce.Reporting.Application.csproj" />
+    <!-- 🆕 `W22-2` (`NOT-001`, phiên `N84`): test ĐƠN VỊ cho module `Notification` — máy trạng thái 15 hàng,
+         renderer thuần (`TC-04`/`TC-43`), version bất biến (`TC-07`/`TC-08`), appender (`TC-01`/`TC-03`) và
+         quét quy ước bằng reflection (`TC-12/17/20/21/22/40/41/44`). Tầng app dựng bằng `new` + repo in-memory
+         (khuôn `D-229`, `Pricing/HaTang/RepoGia`), KHÔNG host ABP, KHÔNG PostgreSQL. -->
+    <ProjectReference Include="..\..\modules\Notification\eCommerce.Notification.Domain\eCommerce.Notification.Domain.csproj" />
+    <ProjectReference Include="..\..\modules\Notification\eCommerce.Notification.Application.Contracts\eCommerce.Notification.Application.Contracts.csproj" />
+    <ProjectReference Include="..\..\modules\Notification\eCommerce.Notification.Application\eCommerce.Notification.Application.csproj" />
     <ProjectReference Include="..\..\src\eCommerce.HttpApi\eCommerce.HttpApi.csproj" />
   </ItemGroup>
 

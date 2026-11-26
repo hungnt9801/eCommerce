@@ -166,3 +166,35 @@ CK_AddrCatalogSyncRuns_SchemaVersion|ADDR-001 (D-78): SchemaVersion ∈ {1,2} �
 CK_AddrCatalogSyncRuns_SourceHashHex|ADDR-001 (§5.3, D-78): SourceHash là SHA-256 hex thường 64 — `CatalogSyncRun.Ghi` kiểm định dạng; CHECK chặn SQL tay, không phải ca client cần mã
 CK_AddrCarrierSyncRuns_Outcome|ADDR-002 (D-78): Outcome ∈ {0,1,2} — entity dòng lô kiểm `Enum.IsDefined`; CHECK là hàng rào cuối cho ghi tắt
 UX_AddrCarrierSyncRunUnmappedCodes_Tenant_SyncRun_Code|ADDR-002 (D-234): *một mã hãng ⇒ một dòng / lượt* — worker ghi trong MỘT UoW; trùng là race/ghi tắt, không phải ca cần mã riêng; unique vẫn phải `NULLS NOT DISTINCT` (chống nhân đôi danh sách "cần người ánh xạ" khi `TenantId = NULL`)
+
+# ── WP-22 (`NOT-001`, `W22-2`) — TEMPLATE + HÀNG ĐỢI THÔNG BÁO (`Notification*`) ──
+# 📌 Các CHECK dưới đây là **hàng rào cuối cho đường ghi tắt** (SQL tay/import). Mọi đường ghi thật đi qua
+#    hàm entity và đã NÉM mã riêng TRƯỚC khi chạm DB (`0011` chuyển trạng thái, `0013` thiếu trường,
+#    `0016` version bất biến, `0020` BodyFormat Html). `23514` chỉ xảy ra khi ai đó sửa DB trực tiếp —
+#    không phải ca nghiệp vụ client cần phân biệt.
+CK_NotificationTemplates_ChannelKind|NOT-001: ChannelKind ∈ {0,1,2} — enum chỉ 3 giá trị + `NotificationTemplate.TaoMoi` ném 0013 cho mã/định dạng sai; CHECK chặn SQL tay
+CK_NotificationTemplates_Purpose|NOT-001: Purpose ∈ {0,1,2} — enum + `TaoMoi` kiểm; CHECK chặn SQL tay
+CK_NotificationTemplates_CoalesceWindow|NOT-001: CoalesceWindowSeconds >= 0 — `TaoMoi` ném 0013 khi âm; CHECK chặn SQL tay
+CK_NotificationTemplates_ChiMarketingKhuTrung|NOT-001: chỉ Marketing mới bật khử trùng (ADR-12) — app service đặt cửa sổ = 0 cho mọi Purpose khác; CHECK là hàng rào cuối (bật cửa sổ cho tin giao dịch = nuốt tin thật)
+CK_NotificationTemplateVersions_Version|NOT-001: Version >= 1 — `TaoMoi` ném 0013; CHECK chặn SQL tay
+CK_NotificationTemplateVersions_BodyFormat|NOT-001: BodyFormat ∈ {0,1} — `TaoMoi` ném 0020 nếu khác Text (D-199); CHECK chặn SQL tay
+CK_NotificationBatches_TotalItems|NOT-001: TotalItems >= 0 — `TaoMoi` ném 0013; CHECK chặn SQL tay
+CK_NotificationBatches_Status|NOT-001: Status ∈ {0,1,2,3} — enum + `Duyet`/`Huy` ném 0011 khi sai; CHECK chặn SQL tay
+CK_NotificationBatches_CoNguoiDuyet|NOT-001: ApprovedAtUtc ⇒ ApprovedByUserId — `Duyet` gán cả hai cùng lúc; CHECK chặn SQL tay
+CK_NotificationQueueItems_ChannelKind|NOT-001: ChannelKind ∈ {0,1,2} — enum; CHECK chặn SQL tay
+CK_NotificationQueueItems_Priority|NOT-001: Priority ∈ {0,1,2,3} — `TaoMoi` ném 0013; CHECK chặn SQL tay
+CK_NotificationQueueItems_AttemptCount|NOT-001: AttemptCount >= 0 — chỉ tăng qua `HoanLaiChoGui`; CHECK chặn SQL tay
+CK_NotificationQueueItems_Status|NOT-001: Status ∈ {0..7} — máy trạng thái 15 hàng NÉM 0011 khi sai; CHECK chặn SQL tay
+CK_NotificationQueueItems_HanSauLich|NOT-001: ExpiresAtUtc IS NULL hoặc sau ScheduledAtUtc — `TaoMoi` ném 0013; CHECK chặn SQL tay
+CK_NotificationQueueEvents_EventType|NOT-001: EventType ∈ {0..12} — enum; CHECK chặn SQL tay
+CK_NotificationQueueEvents_FromStatus|NOT-001: Enqueued ⇒ FromStatus NULL, event khác ⇒ NOT NULL — `NotificationQueueEvent.TaoMoi` nhận transition đã đúng; CHECK chặn SQL tay
+# 📌 Unique index chống gửi trùng: appender BẮT 23505 và MAP tại chỗ — cùng khoá cùng payload ⇒ `AlreadyQueued`,
+#    payload khác ⇒ 0010, bị khử trùng cửa sổ ⇒ 0019. Không cần dòng `ViPhamRangBuocDb` toàn cục vì exception
+#    KHÔNG thoát ra handler chung. Unique vẫn phải `NULLS NOT DISTINCT` (migration viết tay) — thiếu là gửi trùng IM LẶNG khi `TenantId = NULL`.
+IX_NotificationTemplates_Tenant_Code_Channel_Locale|NOT-001: *(tenant, mã, kênh, locale) duy nhất* — `CreateAsync` không kiểm trùng, DB chặn (23505 ⇒ 400) — lỗi thao tác, không cần mã riêng; unique phải NULLS NOT DISTINCT
+IX_NotificationTemplateVersions_Tenant_Template_Version|NOT-001: *(tenant, template, version) duy nhất* — app service tính số kế tiếp trong khoá phân tán; trùng là race/ghi tắt; unique phải NULLS NOT DISTINCT
+IX_NotificationTemplateVersions_Tenant_Template_Hash|NOT-001: *(tenant, template, ContentHash) duy nhất* — chống publish lại y hệt nội dung; trùng là race/ghi tắt; unique phải NULLS NOT DISTINCT
+IX_NotificationBatches_Tenant_IdempotencyKey|NOT-001: *khoá idempotency của lô duy nhất* — trùng là double-click/race; unique phải NULLS NOT DISTINCT
+IX_NotificationBatches_Tenant_Code|NOT-001: *mã lô duy nhất* — trùng là ghi tắt; unique phải NULLS NOT DISTINCT
+IX_NotificationQueueItems_Tenant_IdempotencyKey|NOT-001: *hàng rào chống gửi trùng (BR-002)* — appender bắt 23505 ⇒ AlreadyQueued/0010; unique phải NULLS NOT DISTINCT (mất NND ⇒ gửi hai lần khi TenantId=NULL)
+IX_NotificationQueueItems_Tenant_Recipient_Fingerprint_Bucket|NOT-001: *khử trùng cửa sổ marketing (ADR-12)* — appender pre-check + bắt 23505 ⇒ 0019; partial index (bucket NULL ra ngoài); unique phải NULLS NOT DISTINCT

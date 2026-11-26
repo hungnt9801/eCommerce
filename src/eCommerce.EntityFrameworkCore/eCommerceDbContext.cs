@@ -59,6 +59,13 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>, IHasEventOut
     public DbSet<eCommerce.Reconciliation.PaymentDiscrepancy> PaymentDiscrepancies { get; set; } = default!;
     public DbSet<Catalog.ProductVariant> ProductVariants { get; set; } = default!;
 
+    // ── 🆕 `WP-22` (`NOT-001`) — THÔNG BÁO: template + hàng đợi + sổ sự kiện ─────────────────────────
+    public DbSet<global::eCommerce.Notification.NotificationTemplate> NotificationTemplates { get; set; } = default!;
+    public DbSet<global::eCommerce.Notification.NotificationTemplateVersion> NotificationTemplateVersions { get; set; } = default!;
+    public DbSet<global::eCommerce.Notification.NotificationBatch> NotificationBatches { get; set; } = default!;
+    public DbSet<global::eCommerce.Notification.NotificationQueueItem> NotificationQueueItems { get; set; } = default!;
+    public DbSet<global::eCommerce.Notification.NotificationQueueEvent> NotificationQueueEvents { get; set; } = default!;
+
     // ── WP-03 (02/11/2026) — mô hình hàng hóa theo Nhanh (`03 §3.1`, D-07) ──────────────────────
     // 🚨 Mỗi dòng là một entity THẬT trong model ⇒ thiếu `DbSet` là DI nổ (HTTP 500) dù build xanh —
     // lưới an toàn: `DbSetRegistrationTests`.
@@ -363,6 +370,9 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>, IHasEventOut
         Address.EntityFrameworkCore.AddressDbContextModelCreatingExtensions.ConfigureAddress(builder);
         EInvoice.EntityFrameworkCore.EInvoiceDbContextModelCreatingExtensions.ConfigureEInvoice(builder);
         Signing.EntityFrameworkCore.SigningDbContextModelCreatingExtensions.ConfigureSigning(builder);
+
+        // 🆕 `WP-22` (`NOT-001`) — thông báo: 5 bảng + index + CHECK. Gọi **MỘT LẦN** (`D-197`).
+        global::eCommerce.Notification.EntityFrameworkCore.NotificationDbContextModelCreatingExtensions.ConfigureNotification(builder);
 
         ConfigureCommerce(builder);
 

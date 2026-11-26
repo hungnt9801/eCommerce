@@ -8,7 +8,7 @@
 | **Ưu tiên** | **Must have** — `NOT-002` **phụ thuộc cứng**: `NOT-002` **không** tự dựng nội dung, mọi yêu cầu vào `NOT-002` **phải** có nội dung + `IdempotencyKey` do `NOT-001` cấp (`docs/features/notifications/not-002-kenh-gui-email-sms-zalo-oa.md:82,108,488`) |
 | **Trạng thái** | 🟡 `Draft` — chờ review |
 | **Người viết / người review** | *(điền)* / **Kiến trúc trưởng + BA + Vận hành** (có state machine) |
-| **Phiên bản / ngày** | `v0.5 — 26/11/2026` (WP-22 — vòng sửa 3: docreview vòng 3 — 2 P2 #24/#26 theo `D-208`) |
+| **Phiên bản / ngày** | `v0.6 — 26/11/2026` (WP-22 — W22-2: đồng bộ theo ARCH `NOT-001` + `D-254…D-266` — docDeviation #1–#9 + 15 P3 SRS-side) |
 | **Tài liệu liên quan** | `NOT-002` (kênh gửi — **ranh giới sống còn**) · `XC-002` (outbox/inbox + idempotency) · `XC-003` (khoá phân tán) · `XC-004` (`[Authorize]`, permission, bất biến `NULLS NOT DISTINCT`) · `XC-005` (log/correlationId/metric) · `XC-001` (tiền tệ/làm tròn) · `XC-006` + `ACC-001` (thuế & xuất liệu kế toán) · `REP-001`/`REP-002` (read-model) · `docs/design-doc-guidelines.md` |
 
 ---
@@ -46,18 +46,18 @@
 | Gói NuGet gửi thư / template engine (Scriban, Razor, MailKit…) | ❌ **0 gói** trong danh sách package tập trung | `Directory.Packages.props` (không có mục nào) |
 | Bảng `AbpBackgroundJobs` (job bền vững) | ✅ **CÓ** (đã migrate) ⇒ dùng được cho job bền vững của `NOT-001` | `src/eCommerce.EntityFrameworkCore/Migrations/20261009102627_Added_Phase0_AuthModules.cs:64,83` |
 | `IAbpDistributedLock` + Redis thật | ✅ **CÓ thật**, dùng cho refresh token, có double-check trong khoá | `modules/ChannelHub/eCommerce.ChannelHub.Application/Sync/ChannelTokenManager.cs:29,67–91` |
-| `KeyPrefix` của lock | ✅ `"ecommerce:"` (**có** dấu `:`) — đã vá lỗi dính tiền tố bằng `redis-cli MONITOR` | `src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs:115–128` (dòng 127) |
+| `KeyPrefix` của lock | ✅ `"ecommerce:"` (**có** dấu `:`) — đã vá lỗi dính tiền tố bằng `redis-cli MONITOR` | `src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs:231,246` |
 | **Worker động** + supervisor (mẫu hàng đợi chạy thật) | ✅ **CÓ thật**, tên worker `channel-sync:{channelCode}:{externalShopId}`; **đã sửa lỗi starvation** (gọi `AddAsync` mỗi nhịp làm worker không bao giờ chạy) | `modules/ChannelHub/eCommerce.ChannelHub.Application/Sync/ChannelSyncSupervisorWorker.cs:30,68–106,123` |
-| Metric | ✅ **16 metric** đã đăng ký **và** `ChuaCoNoiPhat` **rỗng** (16/16 có điểm phát, `MetricEmitterTests` khoá hai chiều) | `shared/eCommerce.Kernel/Observability/eCommerceMetrics.cs:81–107,169–180` · `test/eCommerce.Tests/Observability/MetricEmitterTests.cs` |
-| Registry metric | ⚠️ **KHÔNG còn đếm cứng**: test so **đúng tập** `eCommerceMetricNames.All` với instrument thật + kiểm **chiều ngược** mọi hằng số phải có trong `All` ⇒ thêm metric **vẫn** phải sửa `All` + `XC-005` §5.1, nếu không **CI đỏ** | `test/eCommerce.Tests/Observability/MetricsTests.cs:38–47,69–105` |
-| Nhãn metric `email`/`phone` | 🚨 **BỊ CẤM** (cardinality cao) — ràng buộc **trực tiếp** lên `NOT-001` | `shared/eCommerce.Kernel/Observability/eCommerceMetrics.cs:219–222` |
+| Metric | ✅ **19 metric** đã đăng ký **và** `ChuaCoNoiPhat` **rỗng** (19/19 có điểm phát, `MetricEmitterTests` khoá hai chiều); `NOT-001` thêm **7** ⇒ **26** sau PR | `shared/eCommerce.Kernel/Observability/eCommerceMetrics.cs:94–124,189–200` · `test/eCommerce.Tests/Observability/MetricEmitterTests.cs` |
+| Registry metric | ⚠️ **KHÔNG còn đếm cứng**: test so **đúng tập** `eCommerceMetricNames.All` với instrument thật + kiểm **chiều ngược** mọi hằng số phải có trong `All` ⇒ thêm metric **vẫn** phải sửa `All` + `XC-005` §5.1, nếu không **CI đỏ** | `test/eCommerce.Tests/Observability/MetricsTests.cs:44-45,55,72-73,100-103` |
+| Nhãn metric `email`/`phone` | 🚨 **BỊ CẤM** (cardinality cao) — ràng buộc **trực tiếp** lên `NOT-001` | `shared/eCommerce.Kernel/Observability/eCommerceMetrics.cs:245–248` |
 | `DbSet` cho entity của module | ✅ **CÓ tiền lệ**: phải khai `DbSet` trên `eCommerceDbContext` hợp nhất, nếu không `IRepository<T>` **không** được đăng ký | `src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs:47–55,60–64` |
 | Module tự cấu hình model | ✅ tiền lệ `builder.ConfigureChannelHub()` / `ConfigureTax()` | `src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs:76–78` · `modules/ChannelHub/eCommerce.ChannelHub.EntityFrameworkCore/ChannelHubDbContextModelCreatingExtensions.cs:14–16` |
-| Unit of Work | ✅ `TransactionBehavior = Auto` cho toàn hệ thống | `src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs:60–64` |
+| Unit of Work | ✅ `TransactionBehavior = Auto` cho toàn hệ thống | `src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs:94` |
 | `[Authorize]` cấp class | ✅ **ĐÃ CÓ tiền lệ đúng** (bài học `GetShopsAsync` từng là API công khai) | `src/eCommerce.Application/Channels/ChannelAppService.cs:21–28` |
 | Permission phải **được định nghĩa** | ✅ tiền lệ provider (thiếu định nghĩa ⇒ ABP **luôn** từ chối ⇒ `403`) | `src/eCommerce.Application.Contracts/Permissions/eCommercePermissionDefinitionProvider.cs:8–11,21–60` |
-| Bất biến unique index `NULLS NOT DISTINCT` | ✅ **ĐÃ CÓ thật** + test chốt **đúng 93** index — lỗi thật đã chứng minh: `TenantId = NULL` ⇒ index **mất tác dụng** | `src/eCommerce.EntityFrameworkCore/Migrations/20261013024226_Fix_NullableTenantId_UniqueIndexes.cs:8–25,39–86` · `test/eCommerce.IntegrationTests/PostgreSqlSchemaTests.cs:98–112,208–209` |
-| Sổ cái append-only | ✅ tiền lệ rõ: `StockLedgerEntry` "APPEND-ONLY. Không bao giờ UPDATE/DELETE" | `src/eCommerce.Domain/Entities/Inventory/StockLedger.cs:80–83` |
+| Bất biến unique index `NULLS NOT DISTINCT` | ✅ **ĐÃ CÓ thật** + test chốt **đúng 94** index — lỗi thật đã chứng minh: `TenantId = NULL` ⇒ index **mất tác dụng** | `src/eCommerce.EntityFrameworkCore/Migrations/20261013024226_Fix_NullableTenantId_UniqueIndexes.cs:8–25,39–86` · `test/eCommerce.IntegrationTests/PostgreSqlSchemaTests.cs:98–112,215–216` |
+| Sổ cái append-only | ✅ tiền lệ rõ: `StockLedgerEntry` "APPEND-ONLY. Không bao giờ UPDATE/DELETE" | `modules/Inventory/eCommerce.Inventory.Domain/StockLedger.cs:240,243` |
 | Check constraint ở tầng DB | ✅ tiền lệ `CHECK` (đã có trong migration + test) | `test/eCommerce.IntegrationTests/PostgreSqlSchemaTests.cs:92–96` |
 | ETO hiện có mang `CorrelationId`? | ⚠️ **MỘT PHẦN** — `ChannelOrderPulledEto` **ĐÃ CÓ** `CorrelationId`; `ChannelShopTokenRefreshedEto` **vẫn thiếu** ⇒ `XC-005` BR-003 chưa đủ ở code hiện tại | `modules/ChannelHub/eCommerce.ChannelHub.Application.Contracts/Events/ChannelEvents.cs:72,116–125` · `docs/features/cross-cutting/XC-005-observability-log-metric.md:79` |
 | `XC-002` (outbox/inbox) | ✅ **ĐÃ CÓ hạ tầng ABP**: `DbSet` `OutgoingEvents`/`IncomingEvents` trên DbContext hợp nhất + module `Messaging` (khoá idempotency, DLQ) | `src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs:47,50` · `modules/Messaging/eCommerce.Messaging.EntityFrameworkCore/MessagingDbContextModelCreatingExtensions.cs:14–19` |
@@ -96,14 +96,14 @@
 |---|---|---|---|---|
 | **ADR-01** | **Tách lớp: `NOT-001` = quyết định gửi · `NOT-002` = vận chuyển & theo dõi phát** | (a) gộp một module làm hết · (b) tách theo trách nhiệm | `docs/implementation-plan.md:439–440` **đã tách sẵn** hai tài liệu, và `NOT-002` ADR-02 đã chốt cùng ranh giới (`not-002…:82`). Gộp lại ⇒ "chống gửi trùng lúc xếp hàng" và "retry vận chuyển" **tranh nhau cùng một trạng thái** — đúng cái bẫy sinh ra gửi trùng | `NOT-001` **cấm** gọi SDK nhà cung cấp; `NOT-001` **cấm** sở hữu trạng thái "đã tới"; `NOT-002` **cấm** tự sinh nội dung; **một** module `modules/Notification/` cho cả hai tài liệu (`D-197`) — **không** gộp vào `Messaging` |
 | **ADR-02** | **Phiên bản template là BẤT BIẾN sau khi `Published`**; mục hàng đợi **ghim** `TemplateVersionId` | (a) con trỏ "template hiện tại" · (b) **ghim version** | Nếu chỉ có con trỏ "hiện tại" thì **sửa template làm đổi nội dung của tin đã xếp hàng** ⇒ tin đã bàn giao và tin trong hàng **khác nhau**, không giải trình được, và "gửi trùng" trở nên vô nghĩa vì **nội dung đã đổi** | Sửa nội dung = **tạo version mới**; tin cũ giữ nguyên nội dung đã ghim. Có test `TC-06` |
-| **ADR-03** | **Idempotency ở MỌI biên vào** cài bằng **bảng + unique index** (không cài bằng lock) | (a) tin vào distributed lock · (b) chỉ kiểm ở code · (c) bảng + unique index | `XC-003` §7.3 + BR-008: **lock không thay thế idempotency** (lock hết TTL ⇒ mất tác dụng). Bằng chứng lock **có thể vô hiệu**: `AbortOnConnectFail = false` ⇒ Redis chết thì app **vẫn chạy** nhưng **khoá biến mất** (`src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs:137–145`) | Bắt buộc `UNIQUE (TenantId, IdempotencyKey)` **`NULLS NOT DISTINCT`** (BR-XC-004-009) — nếu quên `NULLS NOT DISTINCT` thì index **mất tác dụng** khi `TenantId = NULL` (lỗi **đã chứng minh thật**: `Migrations/20261013024226_…cs:14–17`) |
+| **ADR-03** | **Idempotency ở MỌI biên vào** cài bằng **bảng + unique index** (không cài bằng lock) | (a) tin vào distributed lock · (b) chỉ kiểm ở code · (c) bảng + unique index | `XC-003` §7.3 + BR-008: **lock không thay thế idempotency** (lock hết TTL ⇒ mất tác dụng). Bằng chứng lock **có thể vô hiệu**: `AbortOnConnectFail = false` ⇒ Redis chết thì app **vẫn chạy** nhưng **khoá biến mất** (`src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs:260`) | Bắt buộc `UNIQUE (TenantId, IdempotencyKey)` **`NULLS NOT DISTINCT`** (BR-XC-004-009) — nếu quên `NULLS NOT DISTINCT` thì index **mất tác dụng** khi `TenantId = NULL` (lỗi **đã chứng minh thật**: `Migrations/20261013024226_…cs:14–17`) |
 | **ADR-04** | **State machine NÉM LỖI** khi chuyển sai, **cấm** no-op im lặng; trạng thái kết thúc là **hấp thụ** | (a) bỏ qua im lặng · (b) log rồi bỏ qua · (c) `BusinessException` có mã | Tiền lệ code thật: `TaxClassification.Approve()` ném `TaxErrorCodes.InvalidStatusTransition` (`modules/Tax/eCommerce.Tax.Domain/Classifications/TaxClassification.cs:122–134`) và `NOT-002` ADR-04 (`not-002…:84`) | Mỗi nhánh state machine cần **1 test**, kể cả nhánh **guard sai** (`TC-05`, `TC-06`) |
 | **ADR-05** | **Hàng đợi sống trong DB giao dịch**, job chạy **bền vững**; **cấm** "hàng đợi trong bộ nhớ" | (a) `ConcurrentDictionary` + timer trong bộ nhớ · (b) DB + job bền vững | Bảng `AbpBackgroundJobs` **đã có** (`Migrations/20261009102627_Added_Phase0_AuthModules.cs:64`) ⇒ không thêm hạ tầng. Và **bài học F6/C10 thật**: supervisor từng gọi `AddAsync` **mỗi nhịp** ⇒ ABP **THAY THẾ** worker ⇒ timer reset ⇒ worker **không bao giờ chạy** (`ChannelSyncSupervisorWorker.cs:68–85`) | Tin đang chờ **sống qua restart** (NFR-011). **Cấm** thiết kế "queue trong RAM" — mất việc khi restart mà **không** có dấu vết |
 | **ADR-06** | **Render là HÀM THUẦN** — không DB, không I/O, không `async`, không `DateTime.Now` | (a) render có truy vấn DB (tra tên sản phẩm…) · (b) **thuần** + dữ liệu đã đủ trong lệnh | Hàm thuần ⇒ test được **không cần DB**, và **tái lập** (cùng input ⇒ cùng output) — đây là điều kiện để ADR-02 có nghĩa. Muốn dữ liệu thêm ⇒ **tầng nghiệp vụ** đưa vào `Data` khi phát ETO | `NOT-001` **cấm** render gọi app service module khác (BR-019). Test `TC-04` chạy **không** cần DB |
 | **ADR-07** | **Tiền trong template**: placeholder kiểu `Money` chỉ nhận **chuỗi đã định dạng qua MỘT hàm dùng chung**; **cấm** `double`/`float`; VND **0** chữ số thập phân | (a) nối `decimal` rồi format tại chỗ · (b) **một** hàm định dạng + kiểu placeholder | `XC-001` BR-003 (cấm `==` trên tiền), BR-008 (cấm `double`/`float`), BR-009 (`VND`, 0 chữ số), và §10 quy tắc hiển thị "*Format theo locale (`vi-VN`), VND **0** chữ số thập phân*" (`docs/features/cross-cutting/XC-001-money-currency-lam-tron.md:64,327`) | Tiền vào template là **chuỗi** ⇒ không có phép toán tiền trong miền template ⇒ **không thể** so `==` sai. Test reflection `TC-22` |
-| **ADR-08** | **Thêm metric ⇒ cập nhật `eCommerceMetricNames` + `XC-005` §5.1 + test, trong CÙNG PR** | (a) phát metric mới ngay · (b) cập nhật registry trước | Test hiện tại so **đúng tập** `All` với instrument thật và kiểm **chiều ngược** mọi hằng số phải có trong `All` (`MetricsTests.cs:38–47,86–105`) ⇒ phát metric chưa đăng ký là **CI đỏ**; `NOT-002` ADR-07 đã chốt cùng nguyên tắc (`not-002…:87`) | Là **việc tường minh** trong PR đầu của module, **không** phải việc phụ. Nhãn **chỉ** từ `eCommerceMetricTags.Allowed` (`eCommerceMetrics.cs:212–216`) |
+| **ADR-08** | **Thêm metric ⇒ cập nhật `eCommerceMetricNames` + `XC-005` §5.1 + test, trong CÙNG PR** | (a) phát metric mới ngay · (b) cập nhật registry trước | Test hiện tại so **đúng tập** `All` với instrument thật và kiểm **chiều ngược** mọi hằng số phải có trong `All` (`MetricsTests.cs:44-45,55,72-73,100-103`) ⇒ phát metric chưa đăng ký là **CI đỏ**; `NOT-002` ADR-07 đã chốt cùng nguyên tắc (`not-002…:87`) | Là **việc tường minh** trong PR đầu của module, **không** phải việc phụ. Nhãn **chỉ** từ `eCommerceMetricTags.Allowed` (`eCommerceMetrics.cs:238–242`) |
 | **ADR-09** | 🚨 **CẤM** gọi app service của module khác — chỉ **tiêu thụ ETO**; ETO **phải đủ dữ liệu** để dựng tin | (a) gọi `IOrdersAppService.GetAsync()` để lấy số tiền · (b) ETO mang đủ trường | Quy ước bất biến **"module gọi app BỊ CẤM"**; tiền lệ thật: `ChannelOrderPulledEto` mang **đủ** dòng hàng để app tự tạo đơn (`modules/ChannelHub/eCommerce.ChannelHub.Application.Contracts/Events/ChannelEvents.cs:17–40`), `NOT-002` ADR-09 (`not-002…:89`) | Hệ quả **trực tiếp** lên `XC-002`/`REP-*`: ETO muốn thêm trường ⇒ **sửa module phát**, không được "hỏi ngược" |
-| **ADR-10** | **Tên khoá phân tán do module sinh KHÔNG chứa `ecommerce:`** | (a) tên khoá có tiền tố · (b) không tiền tố | ABP ghép `KeyPrefix + name` **không dấu phân cách**, và `KeyPrefix` **đã là** `"ecommerce:"` (`src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs:222,237`). `ChannelHubConsts` làm **đúng** (`channel:…` — `modules/ChannelHub/eCommerce.ChannelHub.Domain/ChannelHubConsts.cs:19–32`); `TaxLockKeys` **đã sửa** ⇒ trả `tax:…` (`modules/Tax/eCommerce.Tax.Domain/TaxErrorCodes.cs:45–50`) và có test `LockKeyPrefixTests.TaxLockKeys_khong_chua_tien_to` (`test/eCommerce.Tests/DistributedLocking/LockKeyPrefixTests.cs:33–40`) | `NOT-001` dùng **một** `NotificationLockKeys` trả `notification:…` (`D-197`); **cấm** literal khoá trong code nghiệp vụ (`XC-003` BR-001); grep kiểm bằng `TC-20` |
+| **ADR-10** | **Tên khoá phân tán do module sinh KHÔNG chứa `ecommerce:`** | (a) tên khoá có tiền tố · (b) không tiền tố | ABP ghép `KeyPrefix + name` **không dấu phân cách**, và `KeyPrefix` **đã là** `"ecommerce:"` (`src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs:231,246`). `ChannelHubConsts` làm **đúng** (`channel:…` — `modules/ChannelHub/eCommerce.ChannelHub.Domain/ChannelHubConsts.cs:19–32`); `TaxLockKeys` **đã sửa** ⇒ trả `tax:…` (`modules/Tax/eCommerce.Tax.Domain/TaxErrorCodes.cs:45–50`) và có test `LockKeyPrefixTests.TaxLockKeys_khong_chua_tien_to` (`test/eCommerce.Tests/DistributedLocking/LockKeyPrefixTests.cs:33–40`) | `NOT-001` dùng **một** `NotificationLockKeys` trả `notification:…` (`D-197`); **cấm** literal khoá trong code nghiệp vụ (`XC-003` BR-001); grep kiểm bằng `TC-20` |
 | **ADR-11** | **Bàn giao chống trùng bằng `UPDATE … WHERE Status = ChoGui`** + `IdempotencyKey` **nguyên vẹn** sang `NOT-002`; lock chỉ để **giảm tranh chấp** | (a) chỉ dựa vào lock · (b) chỉ dựa vào code `if` · (c) **cập nhật có điều kiện** ở DB | Trả lời đúng câu hỏi của `XC-003` BR-007: *"bỏ lock đi, DB có chặn không?"* ⇒ **CÓ**: `UPDATE … WHERE Status = ChoGui` chỉ cho **1** luồng đổi trạng thái. Và tầng `NOT-002` **cũng** có unique `(TenantId, IdempotencyKey)` (`not-002…:303,321`) ⇒ **hai** hàng rào độc lập | `NOT-001` + `NOT-002` **cùng** khoá gốc ⇒ gửi lại **cùng** khoá là **idempotent** ở cả hai tầng. Test `TC-09` |
 | **ADR-12** | **Khử trùng nội dung theo cửa sổ** (soft dedupe) bằng `ContentFingerprint` + `bucket` thời gian, **partial unique index**; **mặc định TẮT** cho tin giao dịch | (a) không khử trùng · (b) khử trùng **mọi** tin · (c) khử trùng **có chọn lọc** bằng partial index | Khử trùng mọi tin ⇒ **chặn nhầm** tin hợp lệ (2 tin khác mục đích nhưng cùng nội dung). Không khử trùng ⇒ "spam" khi tầng trên retry sai. Chọn (c): chỉ tin có `CoalesceWindowSeconds > 0` (marketing) mới bị áp | `BucketStartUtc` **NULL** cho tin giao dịch ⇒ **không** bị chặn (thiết kế tường minh). Cấu hình ở template, ghi rõ ở §5.1 |
 | **ADR-13** | **PII mặc định TẮT** (`D-191`): **CẤM** template chứa PII thật; **CẤM** lưu & CẤM log dữ liệu nhạy cảm; **OTP KHÔNG BAO GIỜ** vào template/hàng đợi; người nhận lưu **mã hoá** + **hash** để tra cứu | (a) lưu người nhận dạng plaintext · (b) mã hoá + hash | Tiền lệ thật: `IStringEncryptionService` dùng cho token shop (`modules/ChannelHub/eCommerce.ChannelHub.Domain/Entities/ChannelEntities.cs:52–59`) và `ChannelAppService.cs:97–101`; mask 2 lớp + che cả `otp` (`modules/PaymentHub/eCommerce.PaymentHub.Domain/Entities/PaymentTransaction.cs:147–171`); `NOT-002` ADR-12 + BR-009 (`not-002…:92,111`) | Không hiển thị người nhận đầy đủ trên UI (chỉ dạng che); không có cột nào để chứa OTP; ETO **chỉ tham chiếu** (`D-191` (5)) |
@@ -219,16 +219,16 @@ stateDiagram-v2
 | 2 | `Moi` → `ChoDuyet` | Mục thuộc một `NotificationBatch`; **chỉ** `CreateBatchAsync` sinh cạnh này | `NotificationQueueAppender` (qua `CreateBatchAsync`) | gán `BatchId` + `QueueEvent(QueuedForApproval)` | **NÉM** `0017` (`404`) nếu cố gán lô **không** tồn tại (FK cũng chặn; `D-198` ①(3) **cấm** mở rộng nghĩa `0018`); gọi thẳng API lô bằng template ≠ `Marketing` ⇒ **vẫn** vào `ChoDuyet` (phải duyệt, **không** gửi thẳng) |
 | 3 | `Moi` → `ChoGui` | `ScheduledAtUtc <= now` **và** không thuộc lô **hoặc** lô đã `DaDuyet` | Job bàn giao | `QueueEvent(ReadyToDispatch)` | Job **không gọi** hàm chuyển khi chưa tới hạn ⇒ ở lại `Moi`; **gọi hàm** khi `ScheduledAtUtc > now` ⇒ **NÉM** `0011` |
 | 4 | `ChoDuyet` → `ChoGui` | Lô được duyệt bởi người có `…Batches.Approve` | Người duyệt | `QueueEvent(BatchApproved)`, `ApprovedByUserId` | **NÉM** `403` nếu thiếu quyền; **NÉM** `0011` nếu lô **không** ở `ChoDuyet` |
-| 5 | `ChoGui` → `DangBanGiao` | `UPDATE … SET Status = DangBanGiao WHERE Id = @id AND Status = ChoGui` trả **1** dòng **và** đã giành khoá `notification:queue-dispatch:{tenantId}` | Job bàn giao | `DispatchLeaseExpiresAtUtc = now + lease`, `QueueEvent(Dispatching)` | `0` dòng ⇒ job **không gọi** hàm chuyển + ghi log `Debug`/metric (no-op **có** dấu vết); không giành được khoá ⇒ `SkipIfBusy` (**log + metric**, `XC-003` D10) |
+| 5 | `ChoGui` → `DangBanGiao` | `UPDATE … SET Status = DangBanGiao WHERE Id = @id AND Status = ChoGui` trả **1** dòng **và** đã giành khoá `notification:queue-dispatch:{tenantId}` | Job bàn giao | `DispatchLeaseExpiresAtUtc = now + lease`, `QueueEvent(Dispatching, FromStatus = ChoGui, ToStatus = DangBanGiao)` — **đường nóng (C2)**, phát **TRONG CÙNG UoW** với `UPDATE` | `0` dòng ⇒ job **không gọi** hàm chuyển + ghi log `Debug`/metric (no-op **có** dấu vết); không giành được khoá ⇒ `SkipIfBusy` (**log + metric**, `XC-003` D10) |
 | 6 | `DangBanGiao` → `DaBanGiao` | `INotificationSender.SendAsync` trả thành công **hoặc** `AlreadySent = true` (`NOT-002` khử trùng) | Job bàn giao | `QueueEvent(HandedOff)` + phát `NotificationHandedOffEto` | **NÉM** `0014` nếu bị gọi khi mục **đã** ở trạng thái hấp thụ |
 | 7 | `DangBanGiao` → `ChoGui` | `now > DispatchLeaseExpiresAtUtc` (app bị kill giữa chừng) | Job khôi phục lease | `QueueEvent(LeaseExpired)` + **metric**; `AttemptCount` **không** tăng | **NÉM** `0011` nếu lease **chưa** hết hạn (cấm cướp mục của luồng đang chạy); **phân biệt hàng 14**: khôi phục lease **không** tăng `AttemptCount` |
-| 8 | `DangBanGiao` → `Loi` | Lỗi **vĩnh viễn**: template version bị `Archived`, dữ liệu không còn hợp lệ, `NOT-002` trả lỗi vĩnh viễn | Job bàn giao | `QueueEvent(Failed)` + `LastErrorCode` + **metric** | **NÉM** `0002`/`0007` (**mã của `NOT-002`**, không tự đặt mã mới) |
+| 8 | `DangBanGiao` → `Loi` | Lỗi **vĩnh viễn**: template version bị `Archived`, dữ liệu không còn hợp lệ, `NOT-002` trả lỗi vĩnh viễn | Job bàn giao | `QueueEvent(Failed)` + `LastErrorCode` + **metric** | **NÉM** `0011` — **mọi** chuyển sai dùng **một** mã `0011`; mã `NOT-002` (`0002`/`0007`) **chỉ** lưu vào cột `LastErrorCode` (dữ liệu), **không** làm `Code` của exception |
 | 9 | `ChoGui` → `HetHan` | `now > ExpiresAtUtc` (`ExpiresAtUtc` **không** null) | Job hết hạn | `QueueEvent(Expired)` + **metric** | `ExpiresAtUtc` null ⇒ job **không gọi** hàm hết hạn (tin không hạn); **gọi hàm** khi chưa quá hạn ⇒ **NÉM** `0011` |
 | 10 | `ChoGui`/`Moi` → `DaHuy` | Có lý do huỷ **và** `Status` **chưa** hấp thụ | Người có `…Queue.Cancel` | `QueueEvent(Cancelled, reason)` | **NÉM** `0011` nếu cố huỷ mục **đã** `DaBanGiao`/`HetHan`/`Loi` |
 | 11 | `Loi` (mục gốc **không** đổi) → **mục MỚI** `[*]` → `Moi` | Người phát lại có `…Queue.Retry` **và** khoá mới `{khóa gốc}:replay-{n}` **chưa** tồn tại | Người vận hành | **tạo** `QueueItem` mới (`RootItemId` = mục gốc) + `QueueEvent(Enqueued)` trên mục mới; ghi `QueueEvent(Replayed, by = userId)` trên **mục gốc** (không đổi trạng thái) | **NÉM** `403` nếu thiếu quyền; **NÉM** `0010` nếu cố dùng lại khoá gốc |
 | 12 | `DaBanGiao`/`HetHan`/`DaHuy` → `*` (lùi) | 🚨 **KHÔNG BAO GIỜ** | — | — | **NÉM** `0011` (`InvalidStatusTransition`) — trạng thái kết thúc là **hấp thụ** |
 | 13 | `Moi`/`ChoGui` → `DaHuy` | Trùng **cửa sổ khử trùng** (ADR-12) — **pre-check** theo partial UNIQUE index **trước** khi ghi | `NotificationQueueAppender` | Tạo mục rồi chuyển **ngay** `Moi`/`ChoGui` → `DaHuy` (**cùng UoW**) với `CoalesceBucketStartUtc = NULL` (**cố ý** ra ngoài partial index ⇒ index chỉ là **backstop**) + `QueueEvent(Suppressed, reason = window)` | **NÉM** `0019` nếu tầng gọi yêu cầu **bắt buộc** gửi (chế độ `Force`); **đua** hai luồng: bên thua bắt `23505` ⇒ **rollback** UoW đã lỗi rồi ghi **lần hai trong UoW MỚI `requiresNew`** (mục `DaHuy` bucket `NULL` + **đúng 1** `QueueEvent(Suppressed)`) ⇒ `0019` — bên thua **CÓ** ghi mục + event, **không** có mục gửi thứ hai; dùng lại UoW đã abort ⇒ PostgreSQL 17 trả `25P02` (mất dấu vết hoặc `500` thay vì `0019`) |
-| 14 | `DangBanGiao` → `ChoGui` | `NOT-002` trả **lỗi tạm thời** (NCC timeout/quota — `not-002…:108`) **và** `now <= ExpiresAtUtc` | Job bàn giao | `QueueEvent(RetryScheduled)` + `AttemptCount++` + `LastErrorCode`; giữ `ScheduledAtUtc` cho nhịp sau | **NÉM** `0011` nếu mục **không** ở `DangBanGiao`; quá `ExpiresAtUtc` ⇒ **không** đi hàng 14 — job gọi **hàng 15** (`HetHan`) thay vì thử lại; **phân biệt hàng 7** (lease hết hạn **không** tăng `AttemptCount`) |
+| 14 | `DangBanGiao` → `ChoGui` | `NOT-002` trả **lỗi tạm thời** (NCC timeout/quota — `not-002…:108`) **và** (`ExpiresAtUtc IS NULL` **hoặc** `now <= ExpiresAtUtc`) | Job bàn giao | `QueueEvent(RetryScheduled)` + `AttemptCount++` + `LastErrorCode`; giữ `ScheduledAtUtc` cho nhịp sau | **NÉM** `0011` nếu mục **không** ở `DangBanGiao`; quá `ExpiresAtUtc` ⇒ **không** đi hàng 14 — job gọi **hàng 15** (`HetHan`) thay vì thử lại; **phân biệt hàng 7** (lease hết hạn **không** tăng `AttemptCount`). 📌 Thử lại **mỗi nhịp** là **chủ ý** (không backoff/trần ngầm — trần do `ExpiresAtUtc`; việc thử lại **vận chuyển** do `NOT-002` sở hữu) |
 | 15 | `DangBanGiao` → `HetHan` | `NOT-002` trả **lỗi tạm thời** **và** `now > ExpiresAtUtc` (`ExpiresAtUtc` **không** null) | Job bàn giao | `QueueEvent(Expired)` + **metric**; `AttemptCount` **không** tăng | `ExpiresAtUtc` null ⇒ job **không gọi** hàm hết hạn (tin không hạn); **gọi hàm** khi chưa quá hạn ⇒ **NÉM** `0011` (còn hạn ⇒ đi hàng 14); **phân biệt hàng 9** (mục đang `ChoGui`) |
 
 > ⚠️ **Trạng thái nguy hiểm nhất là `DangBanGiao` kẹt.** Nếu app bị kill **giữa** lời gọi `NOT-002` và lúc commit,
@@ -274,12 +274,13 @@ sequenceDiagram
     end
 
     Note over JOB,DB: «job chạy nhịp 10 giây, lấy việc theo index (TenantId, Status, ScheduledAtUtc)»
+    JOB->>DB: «(C1) UPDATE Status = ChoGui WHERE Status = Moi (đã tới hạn) — cùng UoW phát QueueEvent(ReadyToDispatch)»
     JOB->>LOCK: «giành notification:queue-dispatch:{tenantId}»
     alt «không giành được khoá»
         LOCK-->>JOB: «null»
         Note over JOB: «SkipIfBusy — bỏ qua nhịp này, CÓ log + metric, KHÔNG ném»
     else «giành được»
-        JOB->>DB: «UPDATE Status = DangBanGiao WHERE Id AND Status = ChoGui»
+        JOB->>DB: «(C2) UPDATE Status = DangBanGiao WHERE Id AND Status = ChoGui — cùng UoW phát QueueEvent(Dispatching)»
         alt «0 dòng bị ảnh hưởng»
             Note over JOB: «luồng khác đã lấy — bỏ qua, KHÔNG phải lỗi»
         else «1 dòng»
@@ -290,6 +291,13 @@ sequenceDiagram
             else «lỗi vĩnh viễn»
                 SVC-->>JOB: «mã lỗi của NOT-002»
                 JOB->>DB: «Loi + QueueEvent(Failed) + metric»
+            else «lỗi tạm thời»
+                SVC-->>JOB: «mã lỗi tạm thời của NOT-002»
+                alt «còn hạn hoặc không hạn»
+                    JOB->>DB: «về ChoGui + QueueEvent(RetryScheduled) + AttemptCount++ — hàng 14 §3»
+                else «quá ExpiresAtUtc»
+                    JOB->>DB: «HetHan + QueueEvent(Expired) — hàng 15 §3»
+                end
             end
         end
     end
@@ -350,6 +358,8 @@ sequenceDiagram
 | CHECK | `CoalesceWindowSeconds >= 0` | |
 | CHECK | `Purpose IN (0,1,2)` | |
 | CHECK | `Purpose = 1 OR CoalesceWindowSeconds = 0` | 🚨 **bất biến ADR-12 ở tầng DB**: chỉ tin marketing mới được bật khử trùng |
+
+> 🔐 **Template hệ thống (`TenantId = NULL`) — `D-256`:** **CẤM** `IgnoreQueryFilters()` ở **mọi** repository/app service/renderer lookup của module (grep phải = **0**). Ở chế độ **một tenant** hiện nay, filter mặc định của ABP đọc được template `TenantId = NULL` (template hệ thống **chỉ đọc**, **0 PII**). Bật multi-tenancy thật + đường đọc template chung = **nợ GĐ4** có chủ (khuôn `D-92` ⑤), **chưa** mở hôm nay.
 
 ### 5.2 Bảng `NotificationTemplateVersions` — **phiên bản bất biến** (ADR-02)
 
@@ -479,7 +489,7 @@ sequenceDiagram
 | `TenantId` | `uuid` | ✓ | tenant | |
 | `QueueItemId` | `uuid` | ✗ | **FK** → `NotificationQueueItems.Id` | |
 | `EventType` | `int` | ✗ | `Enqueued · ReadyToDispatch · Dispatching · HandedOff · LeaseExpired · Failed · Expired · Cancelled · Suppressed · Replayed · BatchApproved · QueuedForApproval · RetryScheduled` | chỉ **thêm ở cuối** (`D-17`) |
-| `FromStatus` / `ToStatus` | `int` | ✗ | mốc chuyển trạng thái (**bắt buộc** — để chứng minh guard đã chạy) | `FromStatus = ToStatus` **chỉ** cho event **không** đổi trạng thái (`Replayed` trên mục gốc); `Suppressed` là `Moi`/`ChoGui` → `DaHuy` |
+| `FromStatus` / `ToStatus` | `int?` | ✓ | mốc chuyển trạng thái — **để chứng minh guard đã chạy** | `int?` vì `Enqueued` **không có** trạng thái nguồn; **CHECK**: `EventType = Enqueued ⇒ FromStatus IS NULL`; event khác ⇒ **NOT NULL** (kể cả `Replayed` có `FromStatus = ToStatus`); `Suppressed` là `Moi`/`ChoGui` → `DaHuy` |
 | `ReasonMasked` | `varchar(512)` | ✓ | lý do — **đã mask** | |
 | `ErrorCode` | `varchar(64)` | ✓ | mã lỗi nghiệp vụ (BR-018 `XC-005`) | |
 | `CorrelationId` | `varchar(64)` | ✗ | theo `XC-005` BR-002 | |
@@ -487,10 +497,11 @@ sequenceDiagram
 | `OccurredAtUtc` | `timestamptz` | ✗ | | |
 
 > 🚨 **`NotificationQueueEvents` là APPEND-ONLY** (BR-006) — kế thừa nguyên tắc `StockLedgerEntry`
-> (*"APPEND-ONLY. Không bao giờ UPDATE/DELETE"* — `src/eCommerce.Domain/Entities/Inventory/StockLedger.cs:80–83`).
+> (*"APPEND-ONLY. Không bao giờ UPDATE/DELETE"* — `modules/Inventory/eCommerce.Inventory.Domain/StockLedger.cs:240,243`).
 > **Cấm** `UPDATE`/`DELETE`; sửa sai **phải** ghi event mới.
 
 **Index:** `INDEX (TenantId, QueueItemId, OccurredAtUtc)` (timeline một tin) · `INDEX (TenantId, EventType, OccurredAtUtc)` (điều tra/đối soát).
+**CHECK:** `EventType = Enqueued ⇒ FromStatus IS NULL`; event khác ⇒ `FromStatus`/`ToStatus` **NOT NULL**.
 **Không** unique index (nhiều event cùng loại là hợp lệ, ví dụ `LeaseExpired` nhiều lần).
 
 ### 5.6 Bảng **không tạo** — và vì sao (tránh hai nguồn sự thật)
@@ -556,8 +567,10 @@ public interface INotificationRenderer
 public sealed record RenderResult(
     string Subject,
     string Body,
-    string ContentFingerprint,        // SHA-256 — dùng cho khử trùng cửa sổ (ADR-12)
+    string BodyFingerprint,           // SHA-256(Subject + Body) — renderer THUẦN; KHÔNG biết RecipientHash/TemplateVersionId
     IReadOnlyList<string> MissingRequiredPlaceholders);
+
+// ⚠️ ContentFingerprint của MỤC (ADR-12) do APPENDER tính = SHA-256(TemplateVersionId + RecipientHash + RenderedSubject + RenderedBodyMasked) — KHÔNG do renderer.
 
 /// <summary>HỢP ĐỒNG XẾP HÀNG — biên vào #1 (ETO) và #2 (API).</summary>
 public interface INotificationQueueAppender
@@ -590,6 +603,16 @@ public sealed record EnqueueResult(
     bool AlreadyQueued,
     string Status,
     string? ErrorCode);
+
+/// <summary>
+/// Yêu cầu gửi MỘT tin thủ công (biên vào #2). API map DTO → <c>EnqueueRequest</c>; <c>IdempotencyKey</c> BẮT BUỘC do client cấp.
+/// 🆕 WP-22 (additive): <c>BatchId</c> TÙY CHỌN — có ⇒ mục vào lô + <c>Moi → ChoDuyet</c> (hàng 2 §3); <c>ApproveBatchAsync</c> mới → <c>ChoGui</c>.
+/// </summary>
+public sealed record SendManualRequest(
+    string TemplateCode, ChannelKind ChannelKind, string Locale, string Recipient,
+    IReadOnlyDictionary<string, string> Data, string IdempotencyKey, int Priority,
+    DateTime ScheduledAtUtc, DateTime? ExpiresAtUtc = null, Guid? BatchId = null,
+    string CorrelationId = "");
 
 public interface INotificationTemplateAppService : IApplicationService
 {
@@ -625,6 +648,8 @@ public sealed record PublishTemplateVersionDto(
 > của nhà cung cấp **buộc** phải `[AllowAnonymous]` + tự xác thực chữ ký — `not-002…:530,691–695`).
 > `NOT-001` **không** nhận webhook nhà cung cấp ⇒ **không** có ngoại lệ nào cho quy tắc `[Authorize]` cấp class.
 
+> 🧩 **Lô gửi từ API thủ công (`SendManualRequest.BatchId` — additive, WP-22):** `SendManualRequest` có thêm trường **`Guid? BatchId` tùy chọn** (truyền xuống `EnqueueRequest.BatchId`). Khi có `BatchId` ⇒ mục vào lô và chuyển `Moi → ChoDuyet` (hàng 2 §3) — **chưa** gửi; `ApproveBatchAsync` mới chuyển `ChoDuyet → ChoGui`. Luồng đầy đủ: **tạo header lô** (`CreateBatchDto` — **KHÔNG** mang danh sách người nhận) → **enqueue từng người nhận** kèm `BatchId` → **duyệt lô**.
+
 ### 6.2 REST endpoint
 
 | Method | Route | Quyền | Mô tả |
@@ -641,7 +666,9 @@ public sealed record PublishTemplateVersionDto(
 | `POST` | `/api/notification/queue/{id}/cancel` | `eCommerce.Notification.Queue.Cancel` | huỷ mục chưa bàn giao |
 | `POST` | `/api/notification/batches` | `eCommerce.Notification.Batches.Create` | tạo lô gửi (`ChoDuyet`) |
 | `POST` | `/api/notification/batches/{id}/approve` | `eCommerce.Notification.Batches.Approve` | **duyệt** lô ⇒ các mục chuyển `ChoGui` |
-| `GET` | `/api/notification/reports/summary` | `eCommerce.Notification.Reports.View` | tổng hợp **từ read-model** (`REP-001`/`REP-002`) — **không** query DB giao dịch |
+| ~~`GET`~~ | ~~`/api/notification/reports/summary`~~ | — | **HOÃN ở WP-22** — chờ `REP-001`/`REP-002` có read-model (`D-255`); **chưa** tạo permission `Reports.View` khi chưa có endpoint |
+
+> 📌 **Route do ABP/BFF SINH — KHÔNG đặt `[Route]` tay** (`D-262`): 3 app service dùng **conventional controller** của ABP; các đường dẫn trên là **dự kiến**, **xác minh bằng `pnpm gen:api`** ở W22-2. BFF hôm nay **chỉ** proxy `/api/v1` (W18-3) ⇒ `/api/app/...` **chưa** gọi được từ FE (nợ có chủ `fe`, đóng ở hàng contract `/api/v1` của `W22-3`).
 
 **Mã lỗi nghiệp vụ** (đặt trong `modules/Notification/.../NotificationErrorCodes.cs` — **chưa có**, kế hoạch GĐ3;
 theo đúng khuôn `ChannelHubErrorCodes` `modules/ChannelHub/eCommerce.ChannelHub.Domain/ChannelHubConsts.cs:36–42`
@@ -651,7 +678,7 @@ và `TaxErrorCodes` `modules/Tax/eCommerce.Tax.Domain/TaxErrorCodes.cs:10–35`)
 |---|---|---|---|---|
 | `eCommerce:Notification:0001` | `409` | **`NOT-002`** | Trùng `IdempotencyKey` khi ở chế độ **cấm** trùng | `Yêu cầu gửi này đã tồn tại.` |
 | … `0002`–`0009` | — | **`NOT-002`** | Người nhận sai · thiếu credential · vượt hạn mức · DLQ · thiếu `ProviderMessageId` · sai trạng thái · callback sai chữ ký · opt-out | xem `not-002…:543–553` |
-| `eCommerce:Notification:0010` | `409` | **`NOT-001`** | Trùng `IdempotencyKey` **nhưng payload KHÁC** (xung đột khoá) · hoặc thiếu khoá ở API thủ công | `Khoá chống trùng đã tồn tại với nội dung khác; cần khoá mới.` |
+| `eCommerce:Notification:0010` | `409` | **`NOT-001`** | **Hai nghĩa** dùng **một** mã: (a) trùng `IdempotencyKey` nhưng payload **KHÁC**; (b) thiếu khoá ở API thủ công — API kiểm **thiếu khoá TRƯỚC mọi ghi**; phân biệt bằng `BusinessException.WithData("lyDo", …)` | `Khoá chống trùng không hợp lệ (trùng nội dung khác) hoặc thiếu khoá; cần khoá mới.` |
 | `eCommerce:Notification:0011` | `409` | **`NOT-001`** | Chuyển trạng thái mục hàng đợi không hợp lệ (kể cả **lùi** trạng thái) | `Không thể chuyển mục hàng đợi từ {từ} sang {sang}.` |
 | `eCommerce:Notification:0012` | `400` | **`NOT-001`** | Template không tồn tại hoặc **chưa** `Published` cho `(Code, ChannelKind, Locale)` | `Mẫu tin {mã} chưa sẵn sàng để gửi.` |
 | `eCommerce:Notification:0013` | `400` | **`NOT-001`** | Thiếu trường **bắt buộc** của template (render dry-run thất bại) | `Thiếu dữ liệu bắt buộc cho mẫu tin: {danh sách}.` |
@@ -676,10 +703,12 @@ và `TaxErrorCodes` `modules/Tax/eCommerce.Tax.Domain/TaxErrorCodes.cs:10–35`)
 
 | ETO | Phát khi | Trường dữ liệu | Ai tiêu thụ | Idempotent? |
 |---|---|---|---|---|
-| `NotificationEnqueuedEto` | ghi mục hàng đợi (`Moi`) | `TenantId`, `QueueItemId`, `ChannelKind`, `TemplateCode`, `IdempotencyKey`, `ScheduledAtUtc`, `CorrelationId` | job bàn giao, `REP-*` | ✅ theo `QueueItemId` |
+| `NotificationEnqueuedEto` | ghi mục hàng đợi (`Moi`) | `TenantId`, `QueueItemId`, `ChannelKind`, `TemplateCode`, `IdempotencyKey`, `ScheduledAtUtc`, `CorrelationId` | `REP-*` (**chỉ** — job bàn giao **quét DB**, **không** tiêu thụ ETO) | ✅ theo `QueueItemId` |
 | `NotificationHandedOffEto` | `DaBanGiao` | + `DispatchedAtUtc`, `Priority` | `REP-001`/`REP-002` (**read-model**) | ✅ theo `(QueueItemId, EventType)` |
 | `NotificationQueueFailedEto` | `Loi` | + `ErrorCode`, `LastReasonMasked` | Vận hành (**cảnh báo**), `REP-*` | ✅ |
-| `NotificationBatchApprovedEto` | lô được duyệt | `BatchId`, `TotalItems`, `ApprovedByUserId`, `CorrelationId` | job bàn giao, `REP-*` | ✅ theo `BatchId` |
+| `NotificationBatchApprovedEto` | lô được duyệt | `BatchId`, `TotalItems`, `ApprovedByUserId`, `CorrelationId` | `REP-*` (**chỉ**) | ✅ theo `BatchId` |
+
+> 🚨 **Job bàn giao KHÔNG tiêu thụ ETO nào** (`D-263`, ADR-05): job **quét DB** theo index `(TenantId, Status, ScheduledAtUtc)`; mọi ETO dưới đây **chỉ** để `REP-*` tổng hợp read-model (và cảnh báo vận hành). Cột "Ai tiêu thụ" ghi bên nhận **duy nhất** của ETO — **tránh 2 đường cùng bàn giao**.
 
 > 🚨 **CẢNH BÁO TRÙNG TÊN ETO — bắt buộc xử lý trong cùng PR:** `NOT-002` §7.1 **đã** đặt tên
 > `NotificationQueuedEto` cho sự kiện "tạo tin `ChoGui`" (`not-002…:566`). `NOT-001` **KHÔNG** được dùng lại
@@ -734,7 +763,7 @@ Lời gọi **duy nhất** mà `NOT-001` thực hiện là **in-process** tới 
 
 > 🎯 **Trả lời câu hỏi bắt buộc của `XC-003` BR-007 — *"bỏ lock đi, DB có chặn không?"* ⇒ CÓ.**
 > L2 + L3 (`UPDATE … WHERE`) + L5 đều nằm ở **PostgreSQL**. Khi **Redis chết** (mà app **vẫn chạy** —
-> `AbortOnConnectFail = false`, `src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs:137–145`), hệ thống
+> `AbortOnConnectFail = false`, `src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs:260`), hệ thống
 > **mất** tính tuần tự nhưng **không** mất tính đúng: vẫn **không** có tin nào gửi 2 lần. Nếu thiết kế chỉ dựa
 > vào lock ⇒ **sai** (BR-013, `XC-003` D2).
 
@@ -762,10 +791,10 @@ Lời gọi **duy nhất** mà `NOT-001` thực hiện là **in-process** tới 
 | 4 | **Không** có chuyển trạng thái **lùi**; trạng thái kết thúc **hấp thụ**; phát lại = **mục mới** (`RootItemId` + khoá `:replay-{n}`), mục gốc ở lại `Loi` | Guard **NÉM** `0011`; test từng nhánh §3 |
 | 5 | `NotificationQueueEvents` **append-only** | Không có API sửa/xoá + test chặn `UPDATE`/`DELETE` (`TC-12`) |
 | 6 | **Không** tồn tại cột/bản ghi nào chứa **OTP** | Không có cột/nhánh ghi OTP + test quét `TC-13` |
-| 7 | Nhãn metric **không** chứa `email`/`phone`/`messageId` | `eCommerceMetricTags.Forbidden` (`eCommerceMetrics.cs:219–222`) + test `TC-16` |
+| 7 | Nhãn metric **không** chứa `email`/`phone`/`messageId` | `eCommerceMetricTags.Forbidden` (`eCommerceMetrics.cs:245–248`) + test `TC-16` |
 | 8 | **Không** tồn tại `double`/`float` trong biểu thức tiền của module | Test reflection (`TC-22`, `XC-001` NFR-004) |
 | 9 | Tenant B **không** đọc/ghi template/lô/mục của tenant A | `IMultiTenant` + query filter của ABP + integration test 2 tenant (`TC-27`) |
-| 10 | Mọi unique index có `TenantId` **có hiệu lực cả khi `TenantId` là `NULL`** | `NULLS NOT DISTINCT` (`XC-004` BR-009) + **cập nhật** test chốt **93** index (`PostgreSqlSchemaTests.cs:208–209`) — `TC-29` |
+| 10 | Mọi unique index có `TenantId` **có hiệu lực cả khi `TenantId` là `NULL`** | `NULLS NOT DISTINCT` (`XC-004` BR-009) + **cập nhật** test chốt **94** index (`PostgreSqlSchemaTests.cs:215–216`) — `TC-29` |
 | 11 | Mục đang chờ **sống qua restart** | Hàng đợi nằm trong DB (ADR-05) — test tích hợp `TC-24` |
 | 12 | **Không** mục nào kẹt `DangBanGiao` quá `lease` mà không được phát hiện | `DispatchLeaseExpiresAtUtc` + job khôi phục + **metric** `notification_dispatch_lease_expired_total` |
 
@@ -780,7 +809,7 @@ Lời gọi **duy nhất** mà `NOT-001` thực hiện là **in-process** tới 
 
 > 🚨 **HAI BẪY BẮT BUỘC TRÁNH (đều đã có lỗi thật trong repo):**
 > 1. **BẪY TIỀN TỐ ĐÔI** — ABP ghép khoá thật bằng `KeyPrefix + tên khoá` **KHÔNG có dấu phân cách**, và
->    `KeyPrefix` **đã là** `"ecommerce:"` (`src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs:115–128`).
+>    `KeyPrefix` **đã là** `"ecommerce:"` (`src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs:231,246`).
 >    ⇒ **Tên khoá do module sinh TUYỆT ĐỐI KHÔNG chứa `ecommerce:`** (đúng như `ChannelHubConsts.LockKeys` trả
 >    `channel:…` — `modules/ChannelHub/eCommerce.ChannelHub.Domain/ChannelHubConsts.cs:19–32`).
 >    ✅ **`TaxLockKeys` đã sửa** — nay trả `tax:…` (`modules/Tax/eCommerce.Tax.Domain/TaxErrorCodes.cs:45–50`) và có test
@@ -825,7 +854,6 @@ Lời gọi **duy nhất** mà `NOT-001` thực hiện là **in-process** tới 
 | `eCommerce.Notification.Queue.Retry` | `eCommerce` | `RetryAsync` | **admin** — 🚨 thao tác rủi ro: **gửi lại ra người thật** |
 | `eCommerce.Notification.Batches.Create` | `eCommerce` | `CreateBatchAsync` | CSKH trưởng |
 | `eCommerce.Notification.Batches.Approve` | `eCommerce` | `ApproveBatchAsync` | **admin** — 🚨 gửi **hàng loạt** ra người thật |
-| `eCommerce.Notification.Reports.View` | `eCommerce` | `GetSummaryAsync` | CSKH trưởng / kế toán trưởng (liên kết `ACC-001`) |
 
 > 📌 **Định nghĩa permission là ĐIỀU KIỆN BẮT BUỘC, không phải việc phụ:** nếu permission **không** được khai
 > trong `PermissionDefinitionProvider` thì ABP **luôn** coi là bị từ chối ⇒ API trả `403` dù user là admin
@@ -844,7 +872,7 @@ Lời gọi **duy nhất** mà `NOT-001` thực hiện là **in-process** tới 
 >
 > ⚠️ **Ranh giới với `NOT-002` §9:** `NOT-002` đã có 8 permission `eCommerce.Notification.Messages.*` /
 > `.Dlq.*` / `.Channels.*` / `.OptOut.*` / `.Cost.*` (`not-002…:674–683`). `NOT-001` **cấm** khai trùng các mã đó;
-> nó dùng `.Templates.*`, `.Queue.*`, `.Batches.*`, `.Reports.View`. **Cả hai** danh sách **phải** nằm trong
+> nó dùng `.Templates.*`, `.Queue.*`, `.Batches.*`. **Cả hai** danh sách **phải** nằm trong
 > **cùng** `eCommerceConsts.Permissions` khi triển khai (một nguồn sự thật — ADR-14).
 
 ---
@@ -883,14 +911,14 @@ tổng nào. Đây là loại sai sót rất khó phát hiện khi test (`docs/d
 | `DbSet` | 🚨 **BẮT BUỘC** khai báo **cả 5** `DbSet` trên `src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs`, nếu không `IRepository<T, Guid>` **không** được đăng ký (bài học đã trả giá — `eCommerceDbContext.cs:47–52`) |
 | Module mapping | thêm `builder.ConfigureNotification();` vào `OnModelCreating` (`eCommerceDbContext.cs:76–78`), theo khuôn `ChannelHubDbContextModelCreatingExtensions.ConfigureChannelHub` (`modules/ChannelHub/eCommerce.ChannelHub.EntityFrameworkCore/ChannelHubDbContextModelCreatingExtensions.cs:14`) |
 | 🚨 **SQL thô bắt buộc** | **Mọi** unique index có `TenantId` **phải** tạo lại bằng `NULLS NOT DISTINCT` — EF Core **không** mô hình hoá thuộc tính này (`Migrations/20261013024226_Fix_NullableTenantId_UniqueIndexes.cs:19–25`). Gồm **7** index (xem §5.1–§5.5: 1 ở `NotificationTemplates` · 2 ở `NotificationTemplateVersions` · 2 ở `NotificationBatches` · 2 ở `NotificationQueueItems`). ⚠️ **Rủi ro đã biết:** migration do EF sinh **sau này** tạo lại index sẽ **làm mất** thuộc tính ⇒ phải chạy lại SQL (`Migrations/20261013024226_….cs:23–25`) |
-| 🚨 **Test phải cập nhật trong CÙNG PR** | `test/eCommerce.IntegrationTests/PostgreSqlSchemaTests.cs` **chốt cứng đúng 93** index `NULLS NOT DISTINCT` (dòng 208) **và** có **danh sách đích danh** (dòng 212+) ⇒ thêm 7 index ⇒ **phải** đổi `93` → `100` **và** bổ sung tên index vào danh sách, nếu không **CI đỏ** (`TC-29`) |
-| 🚨 **Metric phải cập nhật trong CÙNG PR** | `eCommerceMetricNames`/`eCommerceMetricTags` (`shared/eCommerce.Kernel/Observability/eCommerceMetrics.cs`) **và** `XC-005` §5.1 **và** test `MetricsTests` (`test/eCommerce.Tests/Observability/MetricsTests.cs:38–47,86–105` đối chiếu **đúng tập** + chiều ngược) — theo ADR-08/BR-015 |
-| **Metric đề xuất cho `NOT-001`** | `notification_queued_total` (Counter, nhãn `channel`) · `notification_dispatched_total` (Counter, `channel`, `result`) · `notification_queue_failed_total` (Counter, `channel`, `reason`) · `notification_render_failed_total` (Counter, `reason`) · `notification_queue_backlog` (Gauge, không nhãn) · `notification_dispatch_lease_expired_total` (Counter, không nhãn) · `notification_window_suppressed_total` (Counter, `channel`). ⚠️ **Tất cả** nhãn nằm trong `eCommerceMetricTags.Allowed` (`eCommerceMetrics.cs:75–78`); **cấm** `email`/`phone`/`messageId`/`queueItemId`/`correlationId` |
+| 🚨 **Test phải cập nhật trong CÙNG PR** | `test/eCommerce.IntegrationTests/PostgreSqlSchemaTests.cs` **chốt cứng đúng 94** index `NULLS NOT DISTINCT` (dòng 215) **và** có **danh sách đích danh** (dòng 219+) ⇒ thêm 7 index ⇒ **phải** đổi `94` → `101` **và** bổ sung tên index vào danh sách, nếu không **CI đỏ** (`TC-29`) |
+| 🚨 **Metric phải cập nhật trong CÙNG PR** | `eCommerceMetricNames`/`eCommerceMetricTags` (`shared/eCommerce.Kernel/Observability/eCommerceMetrics.cs`) **và** `XC-005` §5.1 **và** test `MetricsTests` (`test/eCommerce.Tests/Observability/MetricsTests.cs:44-45,55,72-73,100-103` đối chiếu **đúng tập** + chiều ngược) — theo ADR-08/BR-015 |
+| **Metric đề xuất cho `NOT-001`** | `notification_queued_total` (Counter, nhãn `channel`) · `notification_dispatched_total` (Counter, `channel`, `result`) · `notification_queue_failed_total` (Counter, `channel`, `reason`) · `notification_render_failed_total` (Counter, `reason`) · `notification_queue_backlog` (Gauge, không nhãn) · `notification_dispatch_lease_expired_total` (Counter, không nhãn) · `notification_window_suppressed_total` (Counter, `channel`). ⚠️ **Tất cả** nhãn nằm trong `eCommerceMetricTags.Allowed` (`eCommerceMetrics.cs:238–242`); **cấm** `email`/`phone`/`messageId`/`queueItemId`/`correlationId` |
 | Seed | **CÓ, idempotent**: (a) **3 template hệ thống** `ops-alert` (Email, `OpsAlert`), `order-confirmation`, `order-shipped` với **version 1 `Published`** và **dữ liệu mẫu an toàn**; (b) **không** seed người nhận, **không** seed lô gửi, **không** seed mục hàng đợi |
 | 🚨 **CẤM seed** | **CẤM** seed credential, token, số điện thoại/email thật, hay nội dung chứa OTP vào migration/seed/`appsettings.json` (kế thừa cảnh báo `XC-004` F4 về mật khẩu seed trong tài liệu — `docs/features/cross-cutting/XC-005-observability-log-metric.md:463`) |
 | Ảnh hưởng dữ liệu cũ | **Không backfill** — module mới, không có dữ liệu lịch sử |
 | Rollback | `DROP` 5 bảng theo thứ tự **ngược** khoá ngoại (`QueueEvents` → `QueueItems` → `Batches` → `TemplateVersions` → `Templates`); an toàn vì **không** module nào tham chiếu **khoá ngoại** tới chúng (module khác chỉ phát ETO). ⚠️ **Rollback làm mất hàng đợi chưa bàn giao** — phải **dừng job** và **bàn giao hết** trước khi rollback |
-| Việc phải làm **trước** khi thêm module | (1) thêm `typeof(NotificationApplicationModule)` vào `[DependsOn]` của `eCommerceHttpApiHostModule` (`src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs:36–53`); (2) đăng ký permission vào `eCommercePermissionDefinitionProvider`; (3) thêm section `Notification` vào `appsettings.json`; (4) **0** gói ABP lệch phiên bản — mọi gói `Volo.Abp.*` mới **phải** `10.7.0` (`Directory.Packages.props`) |
+| Việc phải làm **trước** khi thêm module | (1) thêm `typeof(NotificationApplicationModule)` vào `[DependsOn]` của `eCommerceHttpApiHostModule` (`src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs:40`); (2) đăng ký permission vào `eCommercePermissionDefinitionProvider`; (3) thêm section `Notification` vào `appsettings.json`; (4) **0** gói ABP lệch phiên bản — mọi gói `Volo.Abp.*` mới **phải** `10.7.0` (`Directory.Packages.props`) |
 
 ---
 
@@ -911,7 +939,7 @@ tổng nào. Đây là loại sai sót rất khó phát hiện khi test (`docs/d
 | **Bị khử trùng cửa sổ** | tầng trên gọi lặp trong cửa sổ | **pre-check** ⇒ mục ghi `DaHuy` với bucket `NULL` + `QueueEvent(Suppressed)` + metric; **không** gửi. Đua hai luồng: bên thua bắt `23505` ⇒ **rollback UoW đã lỗi** rồi ghi **lần hai trong UoW MỚI `requiresNew`** (mục `DaHuy` bucket `NULL` + **đúng 1** `QueueEvent(Suppressed)`) ⇒ `0019` — bên thua **CÓ** ghi mục + event; **không** ghi mục gửi thứ hai | `409` `0019` (**không** phải lỗi hệ thống) |
 | **Mục kẹt `DangBanGiao`** | app bị kill giữa lời gọi | Job khôi phục lease ⇒ về `ChoGui`; lần sau **cùng** `IdempotencyKey` ⇒ `NOT-002` khử trùng | bình thường + metric |
 | **Không giành được khoá bàn giao** | tiến trình khác đang chạy | **`SkipIfBusy`**: bỏ qua nhịp + log `Debug` + metric `lock_skipped_total` (job định kỳ — `XC-003` D10) | bình thường |
-| **Redis chết** | sự cố hạ tầng | Lock **vô hiệu** nhưng app **vẫn chạy** (`AbortOnConnectFail = false` — `eCommerceHttpApiHostModule.cs:137–145`). ⇒ Bất biến **được DB bảo vệ**: UNIQUE idempotency + `UPDATE … WHERE` (§7.4) | bình thường |
+| **Redis chết** | sự cố hạ tầng | Lock **vô hiệu** nhưng app **vẫn chạy** (`AbortOnConnectFail = false` — `eCommerceHttpApiHostModule.cs:260`). ⇒ Bất biến **được DB bảo vệ**: UNIQUE idempotency + `UPDATE … WHERE` (§7.4) | bình thường |
 | `NOT-002` trả về **đã gửi rồi** (`AlreadySent`) | hai tầng cùng khoá | Ghi `DaBanGiao` + `ResponseReused = true`; **không** coi là lỗi | bình thường |
 | `NOT-002` trả **lỗi vĩnh viễn** | định danh sai / template bị từ chối | Mục `Loi` + lưu **mã lỗi của `NOT-002`** + metric; **không** tự thử lại vô hạn | `409`/`400` theo mã `NOT-002` |
 | `NOT-002` trả **lỗi tạm thời** | NCC timeout, quota | Chuyển `DangBanGiao → ChoGui` (**hàng 14 §3**) + `QueueEvent(RetryScheduled)` + `AttemptCount++` + `LastErrorCode`; việc **thử lại** do `NOT-002` sở hữu (`not-002…:108`); quá `ExpiresAtUtc` ⇒ `HetHan` (**hàng 15 §3** — **không** thử lại) | bình thường |
@@ -921,7 +949,7 @@ tổng nào. Đây là loại sai sót rất khó phát hiện khi test (`docs/d
 | Lỗi đã xử lý bị **nuốt** | lập trình sai | **Bắt buộc** log ≥ `Warning` + `ErrorCode` (BR-018; kế thừa `XC-005` BR-013) | — |
 
 **Chiến lược transaction:** mọi thao tác ghi đi qua **Unit of Work** của ABP
-(`TransactionBehavior.Auto` — `src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs:60–64`).
+(`TransactionBehavior.Auto` — `src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs:94`).
 `QueueItem` + `QueueEvent` + **outbox** ghi **cùng một transaction** (BR-007).
 Ngoại lệ **duy nhất**: nhánh đua khử trùng `23505` (hàng 13 §3) ghi lần hai trong **UoW MỚI `requiresNew`** sau khi UoW lỗi rollback — **cấm** dùng lại transaction đã abort (`25P02`).
 Phạm vi **khoá phân tán bao NGOÀI** Unit of Work (theo `XC-003` §12 — `docs/features/cross-cutting/XC-003-khoa-phan-tan-quy-uoc.md:412`)
@@ -962,7 +990,7 @@ transaction thì một lời gọi mạng chậm sẽ **giữ transaction mở**
 
 | ID | Mục tiêu | Loại | Input | Expected | Phủ |
 |---|---|---|---|---|---|
-| TC-01 | Xếp hàng happy path từ ETO | Unit (fake sender) | ETO hợp lệ, template `Published` | `Moi` → `ChoGui` → `DaBanGiao`; 3 `QueueEvent`; **1** lần gọi sender | BR-001, NFR-001 |
+| TC-01 | Xếp hàng happy path từ ETO (**4 event**) | Unit (fake sender) | ETO hợp lệ, template `Published` | `Moi` → `ChoGui` → `DangBanGiao` → `DaBanGiao`; **4** `QueueEvent` (`Enqueued`, `ReadyToDispatch`, `Dispatching`, `HandedOff`); **có** trạng thái trung gian `DangBanGiao`; **1** lần gọi sender | BR-001, NFR-001, `D-265` |
 | TC-02 | 🚨 **Cùng `IdempotencyKey` 1.000 lần (có song song)** | **Integration** | vòng lặp 1.000, một nửa chạy `Task.WhenAll` | **1** `QueueItem`; 999 lần `AlreadyQueued`; **1** lần bàn giao | **BR-002**, BR-013, NFR-002 |
 | TC-03 | Trùng khoá nhưng **payload khác** | Unit | cùng khoá, `Data` khác | **NÉM** `eCommerce:Notification:0010` | **BR-002** |
 | TC-04 | Render là **hàm thuần** | Unit (**không cần DB**) | cùng input gọi 100 lần | 100 kết quả **giống hệt**; 0 truy vấn DB | **ADR-06**, NFR-001 |
@@ -1071,7 +1099,7 @@ public class NotificationQueueDedupeTests
         var lan2 = renderer.Render(template, duLieu, "vi", new MoneyFormatterVi());
 
         Assert.Equal(lan1.Body, lan2.Body);
-        Assert.Equal(lan1.ContentFingerprint, lan2.ContentFingerprint);
+        Assert.Equal(lan1.BodyFingerprint, lan2.BodyFingerprint);
     }
 
     /// <summary>TC-23 — tien trong template: VND 0 chu so thap phan, khong double/float (XC-001).</summary>
@@ -1137,7 +1165,7 @@ public class NotificationConventionTests
 - [ ] **45 test case** pass, phủ **hết 25 BR** và **18 NFR**
 - [ ] **Idempotency ở MỌI biên vào** chứng minh bằng test: `TC-02` (xếp hàng, có chạy **song song**) · `TC-09` (bàn giao) · `TC-03` (xung đột khoá) — **unique index** là hàng rào, **không** chỉ code
 - [ ] **Mọi nhánh state machine (§3) có test** — **kể cả nhánh guard sai** (`TC-05`, `TC-06`)
-- [ ] 🚨 **`TC-19` + `TC-29` chứng minh unique index có hiệu lực khi `TenantId = NULL`** (`NULLS NOT DISTINCT`) — **và** `test/eCommerce.IntegrationTests/PostgreSqlSchemaTests.cs` đã cập nhật số **93 → 100** + danh sách đích danh
+- [ ] 🚨 **`TC-19` + `TC-29` chứng minh unique index có hiệu lực khi `TenantId = NULL`** (`NULLS NOT DISTINCT`) — **và** `test/eCommerce.IntegrationTests/PostgreSqlSchemaTests.cs` đã cập nhật số **94 → 101** + danh sách đích danh
 - [ ] **Redis chết ⇒ bất biến vẫn đúng** (nhờ UNIQUE + `UPDATE … WHERE`) — test tích hợp dừng Redis (kế thừa `XC-003` TC-11)
 - [ ] 🚨 **`TC-13` chứng minh 0 OTP trong log và trong DB** — bắt buộc (rủi ro bảo mật thật, liên kết `SHP-003` qua `NOT-002`)
 - [ ] 🔐 **`TC-41` chứng minh PII mặc định TẮT** (`D-191`): template/version/seed **0** PII thật; ETO **0** `Recipient`; DB chỉ mã hoá + hash
@@ -1148,7 +1176,7 @@ public class NotificationConventionTests
 - [ ] **`TC-24` + `TC-32` chứng minh không mất việc**: hàng đợi sống qua restart và **mục kẹt `DangBanGiao` được khôi phục**
 - [ ] **Bảng đăng ký metric (`XC-005` §5.1) đã cập nhật** và `TC-15` xanh (ADR-08/BR-015); registry `MetricsTests` (so **đúng tập** + chiều ngược) xanh
 - [ ] **5 bảng có `DbSet`** trên `eCommerceDbContext` + `ConfigureNotification()` trong `OnModelCreating`
-- [ ] `[Authorize]` **cấp CLASS** trên **3** app service + **10 permission** đã định nghĩa trong `PermissionDefinitionProvider`; test `401`/`403`
+- [ ] `[Authorize]` **cấp CLASS** trên **3** app service + **9 permission** đã định nghĩa trong `PermissionDefinitionProvider`; test `401`/`403`
 - [ ] **Bất biến tách nhiệm vụ**: người tạo lô **không** tự duyệt (`TC-25`); `Templates.Manage` ≠ `Templates.Publish`
 - [ ] **Cách ly tenant** đúng: `TC-27` xanh
 - [ ] **`REP-*` không query DB giao dịch**: `TC-28` xanh; báo cáo đọc từ read-model
@@ -1162,8 +1190,8 @@ public class NotificationConventionTests
 - [ ] Tài liệu đã **review và Approved** (Kiến trúc trưởng + BA + Vận hành — vì có state machine + gửi ra người thật)
 - [x] ✅ **Ranh giới `NOT-001` / `NOT-002` đã rõ** (theo `docs/implementation-plan.md:439–440` + `not-002…:23–26` + `not-002…:82`)
 - [x] ✅ **Đã xác nhận hiện trạng**: 0 dòng code miền thông báo, 0 gói NuGet, module chưa tồn tại
-- [x] ✅ **Đã xác nhận ràng buộc cứng**: `email`/`phone` **bị cấm** làm nhãn metric; registry **so đúng tập** + kiểm chiều ngược (`eCommerceMetrics.cs:219–222` · `MetricsTests.cs:38–47,86–105`)
-- [x] ✅ **Đã xác nhận bất biến DB**: unique index có `TenantId` **phải** `NULLS NOT DISTINCT` + test chốt **93** index (`PostgreSqlSchemaTests.cs:208`)
+- [x] ✅ **Đã xác nhận ràng buộc cứng**: `email`/`phone` **bị cấm** làm nhãn metric; registry **so đúng tập** + kiểm chiều ngược (`eCommerceMetrics.cs:245–248` · `MetricsTests.cs:44-45,55,72-73,100-103`)
+- [x] ✅ **Đã xác nhận bất biến DB**: unique index có `TenantId` **phải** `NULLS NOT DISTINCT` + test chốt **94** index (`PostgreSqlSchemaTests.cs:215`)
 - [x] ✅ **Q1 đã chốt — `D-198`**: **GIỮ** `NotificationBatches` + `ChoDuyet`; duyệt **chỉ** cho mục thuộc lô (marketing); tin giao dịch/`OpsAlert` đi thẳng `Moi → ChoGui`; giữ tách nhiệm vụ tạo/duyệt (§9)
 - [x] ✅ **Q2 đã chốt — `D-199`**: GĐ3 **chỉ `Text`**; `Html` ⇒ `0020` **trước** mọi ghi; giữ cột + CHECK `(0,1)` + `Html = 1` cuối enum để mở sau **0** migration; **0** sanitizer/gói NuGet
 - [ ] **Q5/Q6 đã chốt**: cửa sổ khử trùng mặc định + hạn sống (`ExpiresAtUtc`) theo từng loại tin
@@ -1183,13 +1211,13 @@ public class NotificationConventionTests
 | **Q2** | Template email lưu **HTML** hay chỉ **text**? Nếu HTML ⇒ cần **sanitize** thế nào (whitelist thẻ)? | Kiến trúc trưởng + Security | **Đã chốt — `D-199`** | GĐ3 **chỉ `Text = 0`**; giữ cột `int` + CHECK `(0,1)` + `Html = 1` cuối enum để mở sau **0** migration; giá trị khác ⇒ **NÉM** `0020` **trước** mọi ghi, **cấm** hạ cấp im lặng; **0** sanitizer/gói NuGet; preview `textContent` (cấm `dangerouslySetInnerHTML`) |
 | **Q3** | Ai được **publish** template (CSKH trưởng hay chỉ admin)? | BA + Vận hành | `Open` (đề xuất CSKH trưởng + audit) | Ảnh hưởng `Templates.Publish`; publish sai ⇒ nội dung sai ra **hàng nghìn** người |
 | **Q4** | GĐ3 hỗ trợ **mấy ngôn ngữ** (`vi` / `vi+en`)? | BA | `Open` (đề xuất chỉ `vi`, schema đã sẵn `Locale`) | Ảnh hưởng unique index `(TenantId, Code, ChannelKind, Locale)` + UI + khối lượng dịch |
-| **Q5** | **Cửa sổ khử trùng nội dung** mặc định cho tin marketing (đề xuất **300 s**)? | Vận hành | `Open` | Quá dài ⇒ **chặn nhầm** tin hợp lệ; quá ngắn ⇒ không có tác dụng |
-| **Q6** | **Hạn sống** (`ExpiresAtUtc`) theo loại tin? (đề xuất: OTP **5 phút** · giao dịch **24 h** · marketing **72 h**) | Vận hành + BA | `Open` | Quá ngắn ⇒ `HetHan` giả; quá dài ⇒ khách nhận tin cũ vô nghĩa |
-| **Q7** | **Engine template**: tự viết (thay `{{...}}`) hay dùng thư viện (Scriban/Liquid) — cần thêm gói NuGet? | Kiến trúc trưởng | `Open` (đề xuất **tự viết** cho GĐ3) | Thêm gói ⇒ phải ghim version trong `Directory.Packages.props` + rà license (xem `THIRD-PARTY-NOTICES.md`) |
-| **Q8** | **Số người nhận tối đa** một lô? (ảnh hưởng batch insert + nhịp job) | Vận hành + Kiến trúc trưởng | `Open` (đề xuất **50.000**) | Không chốt ⇒ không biết ngưỡng chuyển sang job chia lô |
-| **Q9** | `PreviewAsync` có cho phép dùng **dữ liệu thật** của một đơn có thật không (rủi ro lộ dữ liệu khách cho người không có quyền)? | Security | `Open` (đề xuất **chỉ dữ liệu mẫu**) | Nếu cho dùng dữ liệu thật ⇒ cần thêm permission + audit mỗi lần preview |
+| **Q5** | **Cửa sổ khử trùng nội dung** mặc định cho tin marketing (đề xuất **300 s**)? | Vận hành | **Đã chốt — `D-257`** | `CoalesceWindowSeconds = 300` **chỉ** khi `Purpose = Marketing`; `0` cho `Transactional`/`OpsAlert` (CHECK DB); cột là `int NOT NULL` — **0 = TẮT** (không có nghĩa "không hạn") |
+| **Q6** | **Hạn sống** (`ExpiresAtUtc`) theo loại tin? (đề xuất: OTP **5 phút** · giao dịch **24 h** · marketing **72 h**) | Vận hành + BA | **Đã chốt — `D-257`** | `DefaultExpiresAfterSeconds = 86400` (`Transactional`/`OpsAlert`), **259200** (`Marketing`); `NULL` = **không hạn** (giữ hàng 14 thử lại); OTP (tương lai) **300 s** — hôm nay 0 OTP vào hàng đợi |
+| **Q7** | **Engine template**: tự viết (thay `{{...}}`) hay dùng thư viện (Scriban/Liquid) — cần thêm gói NuGet? | Kiến trúc trưởng | **Đã chốt — `D-258`** | **Tự viết** — 1 hàm thuần, 0 gói NuGet, 0 đổi `Directory.Packages.props`; placeholder lạ ⇒ `0015`, thiếu ⇒ `0013`; GĐ3 không vòng lặp/partial |
+| **Q8** | **Số người nhận tối đa** một lô? (ảnh hưởng batch insert + nhịp job) | Vận hành + Kiến trúc trưởng | **Đã chốt — `D-259`** | **50.000** (`Notification:Batch:MaxRecipients`); vượt ⇒ `AbpValidationException` (**400**), bên gọi chia lô; job cắt trang cùng ngưỡng |
+| **Q9** | `PreviewAsync` có cho phép dùng **dữ liệu thật** của một đơn có thật không (rủi ro lộ dữ liệu khách cho người không có quyền)? | Security | **Đã chốt — `D-260`** | **Chỉ dữ liệu mẫu** (`PreviewTemplateDto` = `TemplateId` + `SampleData`); **cấm** trường `OrderId`/`CustomerId`; renderer 0 DB; 0 permission mới |
 | **Q10** | Tiền tố bảng (`Not`) và **module `Notification` dùng chung** với `NOT-002` hay tách riêng? | Kiến trúc trưởng | **Đã chốt — `D-197`** | **MỘT** module `modules/Notification/` (4 project như `ChannelHub`) cho cả hai tài liệu, **không** gộp vào `Messaging`; một `ConfigureNotification`, một `NotificationErrorCodes.cs` (`0001–0009` + `0010–0020`), một enum `ChannelKind`, một `NotificationLockKeys`, permission một chỗ; giữ đúng tên bảng `Notification*` (không rút gọn `Not*` khi chưa có `D-xx` mới) |
-| **Q11** | Ở chế độ 1 tenant, `TenantId = NULL` cho template **hệ thống** — có cho phép **mọi** tenant đọc không? | Kiến trúc trưởng + Security | `Open` (đề xuất: template `IsSystem` **chỉ đọc**, không chứa dữ liệu khách) | Nếu cho phép ⇒ phải chứng minh template hệ thống **không** chứa PII, nếu không là rò rỉ chéo tenant |
+| **Q11** | Ở chế độ 1 tenant, `TenantId = NULL` cho template **hệ thống** — có cho phép **mọi** tenant đọc không? | Kiến trúc trưởng + Security | **Đã chốt GĐ3 — `D-256`** (đa tenant thật để **mở**, nợ GĐ4) | **CẤM** `IgnoreQueryFilters()` (grep = 0); chế độ 1 tenant, filter mặc định đọc template `TenantId = NULL`; template hệ thống **chỉ đọc**, **0 PII**; bật multi-tenancy thật + đường đọc chung = **nợ GĐ4** có chủ (khuôn `D-92` ⑤), chưa mở hôm nay (AQ3) |
 | **Q12** | Có cần **API/CLI tra cứu theo `IdempotencyKey`** cho vận hành? | Vận hành | `Open` (kế thừa tinh thần `XC-002` Q7 — `docs/features/cross-cutting/XC-002-outbox-inbox-chong-trung-su-kien.md:1143`) | Thiếu ⇒ gỡ sự cố "gửi trùng" chậm vì phải tra theo `Id` |
 | **Q13** | Timeout **gọi `INotificationSender`** là bao nhiêu (đề xuất **10 s** nếu `NOT-002` giữ timeout NCC 10 s — `not-002…:597–599`)? | Kiến trúc trưởng | `Open` | Quá ngắn ⇒ lease hết hạn khi `NOT-002` còn đang gửi ⇒ khôi phục **sớm** (vẫn an toàn nhờ unique của `NOT-002`, nhưng tạo tải) |
 
@@ -1198,14 +1226,14 @@ public class NotificationConventionTests
 | # | Vấn đề | Bằng chứng (đường dẫn thật) | Mức độ | Xử lý |
 |---|---|---|---|---|
 | **F1** | **Miền thông báo hoàn toàn CHƯA CÓ trong code**: không có project, không có entity, **0 dòng** code template/hàng đợi, **0 gói NuGet** gửi thư/template | `modules/` có 15 module nhưng **không** có `Notification`; graph không thấy `NotificationErrorCodes`/`NotificationQueueItems`/`NotificationTemplate`; `Directory.Packages.props` không có gói nào | 🟠 **Trung bình** (*không* phải lỗi — đúng kế hoạch GĐ3) | ⬜ **Chưa có** — tài liệu này là bước chuẩn bị; code là **kế hoạch GĐ3** |
-| **F2** | **Registry metric KHÔNG còn đếm cứng**: test so **đúng tập** `All` + kiểm **chiều ngược**; `ChuaCoNoiPhat` **rỗng** (16/16 có điểm phát). Việc của `NOT-001` là **thêm metric mới** theo ADR-08, không phải "wire lại metric cũ" | `shared/eCommerce.Kernel/Observability/eCommerceMetrics.cs:81–107,169–180` · `test/eCommerce.Tests/Observability/MetricsTests.cs:38–47,69–105` · `MetricEmitterTests.cs` | ✅ **Đã đóng** (`S16b`, 29/10/2026) | ✅ Không còn nợ; `NOT-001` **vẫn phải** cập nhật `All` + `XC-005` §5.1 + test trong **cùng** PR |
+| **F2** | **Registry metric KHÔNG còn đếm cứng**: test so **đúng tập** `All` + kiểm **chiều ngược**; `ChuaCoNoiPhat` **rỗng** (19/19 có điểm phát). Việc của `NOT-001` là **thêm metric mới** theo ADR-08, không phải "wire lại metric cũ" | `shared/eCommerce.Kernel/Observability/eCommerceMetrics.cs:94–124,189–200` · `test/eCommerce.Tests/Observability/MetricsTests.cs:44-45,55,72-73,100-103` · `MetricEmitterTests.cs` | ✅ **Đã đóng** (`S16b`, 29/10/2026) | ✅ Không còn nợ; `NOT-001` **vẫn phải** cập nhật `All` + `XC-005` §5.1 + test trong **cùng** PR |
 | **F3** | ⚠️ **ETO hiện có mang `CorrelationId` KHÔNG ĐỒNG ĐỀU**: `ChannelOrderPulledEto` **đã có**; `ChannelShopTokenRefreshedEto` **vẫn thiếu** ⇒ `XC-005` BR-003 chưa đủ | `modules/ChannelHub/eCommerce.ChannelHub.Application.Contracts/Events/ChannelEvents.cs:72,116–125`; BR-003 ở `docs/features/cross-cutting/XC-005-observability-log-metric.md:79` | 🟠 **Trung bình** (không sai dữ liệu, nhưng **không nối được chuỗi log** xuyên tiến trình) | ⬜ **Chưa sửa** — `NOT-001` **phải** có `CorrelationId` trong ETO của mình (`TC-17`) và **không** lặp lại lỗi này |
-| **F4** | 🚨 **Unique index có `TenantId` mất tác dụng khi `TenantId = NULL`** — lỗi **đã chứng minh thật** trên PostgreSQL 17: chèn 2 dòng cùng `Code`, `TenantId = NULL` ⇒ **INSERT 0 2 THÀNH CÔNG**. Đây là loại lỗi **âm thầm** đúng vào hàng rào chống gửi trùng của `NOT-001` (chế độ 1 tenant ⇒ `TenantId = NULL`) | `src/eCommerce.EntityFrameworkCore/Migrations/20261013024226_Fix_NullableTenantId_UniqueIndexes.cs:8–25` (mô tả + bằng chứng) · `test/eCommerce.IntegrationTests/PostgreSqlSchemaTests.cs:98–112,208` | 🔴 **Cao** (mất toàn vẹn dữ liệu ⇒ **gửi trùng**) | ✅ **Đã sửa cho 93 index hiện có** bằng `NULLS NOT DISTINCT`; ⬜ **việc của `NOT-001`**: tạo **7** index mới **cũng** với `NULLS NOT DISTINCT` **và** nâng số trong test `PostgreSqlSchemaTests.cs:208` **93 → 100** (`TC-19`, `TC-29`) |
+| **F4** | 🚨 **Unique index có `TenantId` mất tác dụng khi `TenantId = NULL`** — lỗi **đã chứng minh thật** trên PostgreSQL 17: chèn 2 dòng cùng `Code`, `TenantId = NULL` ⇒ **INSERT 0 2 THÀNH CÔNG**. Đây là loại lỗi **âm thầm** đúng vào hàng rào chống gửi trùng của `NOT-001` (chế độ 1 tenant ⇒ `TenantId = NULL`) | `src/eCommerce.EntityFrameworkCore/Migrations/20261013024226_Fix_NullableTenantId_UniqueIndexes.cs:8–25` (mô tả + bằng chứng) · `test/eCommerce.IntegrationTests/PostgreSqlSchemaTests.cs:98–112,215` | 🔴 **Cao** (mất toàn vẹn dữ liệu ⇒ **gửi trùng**) | ✅ **Đã sửa cho 94 index hiện có** bằng `NULLS NOT DISTINCT`; ⬜ **việc của `NOT-001`**: tạo **7** index mới **cũng** với `NULLS NOT DISTINCT` **và** nâng số trong test `PostgreSqlSchemaTests.cs:215` **94 → 101** (`TC-19`, `TC-29`) |
 | **F5** | ✅ **Khoá lock của `Tax` ĐÃ SỬA**: `TaxLockKeys` nay trả `tax:…` (`tax:classification:…` · `tax:rate-schedule:…`) — **không** còn tiền tố đôi, khớp quy ước `XC-003` §5.4 điểm 2 và `ChannelHubConsts` (`channel:…`). Có test khoá bất biến | `modules/Tax/eCommerce.Tax.Domain/TaxErrorCodes.cs:45–50` · `modules/ChannelHub/eCommerce.ChannelHub.Domain/ChannelHubConsts.cs:19–32` · `test/eCommerce.Tests/DistributedLocking/LockKeyPrefixTests.cs:33–40` | ✅ **Đã đóng** | ✅ `NOT-001` dùng **một** `NotificationLockKeys` trả `notification:…` (`D-197`); `TC-20` chặn tái phát |
 | **F6** | ✅ **`XC-002` (outbox/inbox) ĐÃ CÓ hạ tầng ABP**: `DbSet` `OutgoingEvents`/`IncomingEvents` + module `Messaging` (khoá idempotency, DLQ) | `src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs:47,50` · `modules/Messaging/eCommerce.Messaging.EntityFrameworkCore/MessagingDbContextModelCreatingExtensions.cs:14–19` | ✅ **Đã đóng** | ✅ `NOT-001` publish `useOutbox: true`; vẫn ghi `QueueItem` + `QueueEvent` trong UoW để không mất việc |
 | **F7** | ✅ **`eCommerce.Kernel` ĐÃ TỒN TẠI** — có `Money`/`Currency`/`RoundingPolicy`; **không** thấy `ILockManager`/`ToMinorUnits` trong index ⇒ lock key vẫn tự đặt trong module | `shared/eCommerce.Kernel/Money/Money.cs:23` · `shared/eCommerce.Kernel/Money/Currency.cs:16` · graph: `ILockManager`/`ToMinorUnits` *not in the index* | ✅ **Đã đóng một phần** | ✅ `NOT-001` dùng `Money` cho tiền; `NotificationLockKeys`/`NotificationErrorCodes` vẫn tự đặt (khuôn `ChannelHubConsts`) |
 | **F8** 🆕 | 🚨 **RỦI RO TRÙNG TÊN ETO GIỮA HAI TÀI LIỆU**: `NOT-002` §7.1 đã đặt `NotificationQueuedEto` cho sự kiện "tạo tin `ChoGui`", trong khi `NOT-001` cần một sự kiện "đã xếp **ý định** vào hàng đợi" — **cùng tên, khác nghĩa** ⇒ đúng loại lỗi của `XC-003` F1 (hai nguồn sự thật cho một định danh, **không** lỗi biên dịch) | `docs/features/notifications/not-002-kenh-gui-email-sms-zalo-oa.md:566` **vs** §7.1 tài liệu này | 🟠 **Trung bình** (lỗi **tài liệu** — sẽ thành lỗi code nếu cả hai module cùng được viết) | 🔒 **Đã xử lý**: `NOT-001` dùng **`NotificationEnqueuedEto`** (khác tên); `D-197` chốt **một module** ⇒ hai ETO **khác tên** nằm cùng module, `TC-44` quét không có hai kiểu cùng tên. ⬜ **Cần**: `NOT-002` ghi chú lại **cùng PR** để không ai "đổi tên cho gọn" |
-| **F9** 🆕 | 🚨 **RỦI RO TRÙNG DẢI MÃ LỖI**: `NOT-002` §6.2 **đã chiếm** `eCommerce:Notification:0001–0009`; nếu `NOT-001` cũng bắt đầu từ `0001` (như thói quen các tài liệu `XC-*`) ⇒ **hai mã khác nghĩa cùng chuỗi** | `docs/features/notifications/not-002-kenh-gui-email-sms-zalo-oa.md:543–553` **vs** §6.3 tài liệu này | 🟠 **Trung bình** | 🔒 **Đã xử lý**: `NOT-001` dùng **`0010–0020`** (`0020` theo `D-199`) + **một** `NotificationErrorCodes.cs` trong **cùng** module (`D-197`). ⬜ **Cần**: `NOT-002` trỏ về cùng file khi code |
+| **F9** 🆕 | 🚨 **RỦI RO TRÙNG DẢI MÃ LỖI**: `NOT-002` §6.2 **đã chiếm** `eCommerce:Notification:0001–0009`; nếu `NOT-001` cũng bắt đầu từ `0001` (như thói quen các tài liệu `XC-*`) ⇒ **hai mã khác nghĩa cùng chuỗi** | `docs/features/notifications/not-002-kenh-gui-email-sms-zalo-oa.md:543–553` **vs** §6.2 tài liệu này | 🟠 **Trung bình** | 🔒 **Đã xử lý**: `NOT-001` dùng **`0010–0020`** (`0020` theo `D-199`) + **một** `NotificationErrorCodes.cs` trong **cùng** module (`D-197`). ⬜ **Cần**: `NOT-002` trỏ về cùng file khi code |
 | **F10** | **0 định nghĩa `SettingDefinition` trong code app** — chỉ có **bảng** `AbpSettings`/`AbpSettingDefinitions` do migration ABP tạo ⇒ cấu hình template/hàng đợi hiện **không có chỗ** | `grep "SettingDefinition"` (đã ghi nhận ở `not-002…:968` F8) | 🟡 **Thấp** | ✅ **Đã xử lý trong thiết kế**: cấu hình nằm ở **bảng** (`NotificationTemplates.CoalesceWindowSeconds`, `DefaultExpiresAfterSeconds`) + section `Notification` trong `appsettings.json` — **không** phụ thuộc SettingManagement |
 | **F11** 🆕 | **Chưa có test nào cho module `Notification`** (module chưa tồn tại). Repo **đã có** test tầng application/job để bám khuôn: `test/eCommerce.Tests` có **136** tệp, gồm `ChannelHubSync/ChannelAppServiceSyncNowTests.cs`, `Inventory/BackgroundWorkerCoCheTests.cs`, `CrossCutting/OutboxInboxBatBuocTests.cs`, `Authorization/BatBienPhanQuyenTests.cs`, `CrossCutting/HopDongHostTests.cs`, `EfCoreRegistration/DbSetRegistrationTests.cs` | liệt kê `test/eCommerce.Tests/**` (136 tệp) | 🟡 **Thấp** (đúng thực trạng: miền thông báo chưa có code) | ⬜ **Việc của `NOT-001`**: viết test theo khuôn sẵn có; `TC-02`/`TC-09`/`TC-19`/`TC-24` **cần** PostgreSQL ⇒ đặt ở `test/eCommerce.IntegrationTests` (đang chạy ở môi trường có PostgreSQL) |
 
@@ -1214,10 +1242,10 @@ public class NotificationConventionTests
 | # | Giả định | Nếu giả định SAI thì sao |
 |---|---|---|
 | 1 | ✅ **`XC-002` (outbox + inbox) ĐÃ CÓ hạ tầng ABP** (`eCommerceDbContext.cs:47,50`); relay/DLQ riêng dùng module `Messaging` | Nếu relay chậm: ghi `QueueItem` + `QueueEvent` trong UoW **vẫn đủ** để **không mất việc** (job quét **DB**, không phụ thuộc sự kiện). Chỉ **chậm** việc phát ETO cho `REP-*`. **Cấm** dual-write không outbox (`XC-002`:56,1193) |
-| 2 | **`NOT-002` sẵn sàng nhận** `INotificationSender.SendAsync` **và** khử trùng theo `IdempotencyKey` | Nếu `NOT-002` **chưa** sẵn sàng: `NOT-001` vẫn xếp hàng được nhưng **không** bàn giao ⇒ cần **cờ tắt bàn giao** (`Notification:EnableDispatch = false`) để môi trường dev không "gửi ma". Nếu `NOT-002` **không** khử trùng ⇒ mất lớp L4 ⇒ lease-hết-hạn có thể gây **gửi trùng** ⇒ **bắt buộc** kiểm `TC-10` |
+| 2 | **`NOT-002` sẵn sàng nhận** `INotificationSender.SendAsync` **và** khử trùng theo `IdempotencyKey` | WP-22 **phát hành** `INotificationSender` (ARCH §4.4 canonical) + sender giả `ChuaCoKenhGuiSender` **fail-closed** (NÉM ⇒ lease đưa về `ChoGui`, **0** `DaBanGiao` giả); cờ `Notification:EnableDispatch` mặc định **`false`** (dev + prod) tới khi `NOT-002` có sender thật — **bật `true` mà chưa có sender ⇒ fail-closed, không "gửi ma"** (`D-263`). Nếu `NOT-002` **không** khử trùng ⇒ mất lớp L4 ⇒ lease-hết-hạn có thể gây **gửi trùng** ⇒ **bắt buộc** kiểm `TC-10` |
 | 3 | **Số tenant nhỏ** ⇒ `tenantId` an toàn khi làm **nhãn metric** (kế thừa `XC-005` §15.3 giả định 3 — `docs/features/cross-cutting/XC-005-observability-log-metric.md:471`) | Nếu GĐ4 có **hàng nghìn** tenant ⇒ **phải bỏ** `tenantId` khỏi **mọi** nhãn metric (nhãn phải **hữu hạn**) ⇒ đổi `NOT-001` **và** bảng §5.1 của `XC-005` |
 | 4 | ✅ **`eCommerce.Kernel` đã có `Money`/`Currency`/`RoundingPolicy`**; **không** có `ILockManager`/`ToMinorUnits` ⇒ module vẫn tự đặt khoá/hằng số | Dùng `Money` cho mọi giá trị tiền trong template (ADR-07); nếu Kernel bổ sung lock helper: chuyển theo quy ước **module sở hữu hằng số** — ⚠️ **không** đổi **khoá Redis** (đổi khoá ⇒ mất tính tuần tự, vận hành gỡ khoá tay theo tên cũ) |
-| 5 | **Người nhận (email/số điện thoại) là PII** ⇒ **mặc định TẮT** theo `D-191`: **mã hoá at-rest** + **hash** + **che khi hiển thị/log** | Nếu pháp lý cho phép hiển thị: giảm việc che **nhưng** `email`/`phone` **vẫn** bị cấm làm **nhãn metric** (`eCommerceMetrics.cs:219–222`, **không** thương lượng ở tài liệu này) |
+| 5 | **Người nhận (email/số điện thoại) là PII** ⇒ **mặc định TẮT** theo `D-191`: **mã hoá at-rest** + **hash** + **che khi hiển thị/log** | Nếu pháp lý cho phép hiển thị: giảm việc che **nhưng** `email`/`phone` **vẫn** bị cấm làm **nhãn metric** (`eCommerceMetrics.cs:245–248`, **không** thương lượng ở tài liệu này) |
 | 6 | **Khối lượng hàng đợi < 100.000** mục "chưa bàn giao" tại một thời điểm | Nếu vượt thường xuyên ⇒ phải **phân vùng** job theo tenant/batch và thêm index một phần; thiết kế hiện tại (1 khoá/tenant) **không** đáp ứng ⇒ cần thiết kế lại §8.2 |
 | 7 | **`TimeProvider` khả dụng** để kiểm `ScheduledAtUtc`/lease/cửa sổ khử trùng (khuôn `XC-006` NFR-004) | Nếu không: test phụ thuộc đồng hồ hệ thống ⇒ **giòn**; các test `TC-24`/`TC-30`/`TC-32` trở nên khó viết |
 | 8 | Template **không** phải chứng từ pháp lý (không cần chữ ký số / lưu trữ bất biến dài hạn) | Nếu cần (thông báo có giá trị pháp lý): phải thêm **lưu trữ bất biến + chữ ký** ⇒ **thay đổi lớn**, tách tài liệu riêng (kế thừa `not-002…:978` giả định 5) |
@@ -1231,6 +1259,7 @@ public class NotificationConventionTests
 | `v0.3` | 24/11/2026 | BA (WP-14, vòng sửa) | **Sửa docreview vòng 1** (6 P2): §7.1 `ChannelOrderPulledEto` **đã có** `CorrelationId`, chỉ `ChannelShopTokenRefreshedEto` thiếu · phát lại = **mục mới** (bỏ cạnh `Loi → ChoGui`, sửa §1/§3/§8.1) · thu hẹp BR-005 + nêu no-op **có log + metric** cho hàng 3/5/9 · F5 `TaxLockKeys` **đã sửa** + test · F11 sửa thành "chưa có test cho module `Notification`" (repo có 136 tệp test). **Áp quyết định**: `D-197` (một module `Notification`, đóng Q10) · `D-198` (giữ lô + `ChoDuyet`, chỉ marketing — đóng Q1) · `D-199` (GĐ3 chỉ `Text`, mã `0020`, dải `0010–0020` — đóng Q2); thêm BR-023…025, NFR-018, `TC-42…TC-45` |
 | `v0.4` | 24/11/2026 | BA (WP-14, vòng sửa 2) | **Sửa docreview vòng 2** (5 P2): #13 lô **không tồn tại** ⇒ `0017`, `0018` **một** nghĩa · #14 thêm `QueueEvent(QueuedForApproval)` cho `Moi → ChoDuyet` · #15 khử trùng cửa sổ **pre-check** + mục `DaHuy` bucket `NULL`, index là backstop, đua `23505` ⇒ `0019` · #16 giữ enum **`ChannelKind`** (`D-197`) + ghi nợ đổi tên `NotificationChannelKind` ở `NOT-002` (§14.3 e, `TC-44`) · #17 thêm hàng 14 `DangBanGiao → ChoGui` cho `NOT-002` lỗi tạm thời (`AttemptCount++`) |
 | `v0.5` | 26/11/2026 | BA (WP-22, vòng sửa 3) | **Sửa docreview vòng 3 — 2 P2 theo `D-208`** (điều kiện trước WP code): **#24** thêm **hàng 15** `DangBanGiao → HetHan` (guard `now > ExpiresAtUtc`, event `Expired`) thay cho câu "đi hàng 9" — cạnh mới có trong sơ đồ §3, §12, `TC-05` · **#26** nhánh đua `23505` ghi lần hai trong **UoW MỚI `requiresNew`** sau rollback (§3 hàng 13, §7.4 L5, §12, `TC-30` khẳng định **đúng 1** `QueueEvent(Suppressed)`) |
+| `v0.6` | 26/11/2026 | BA (WP-22, W22-2) | **Đồng bộ theo ARCH `NOT-001` + `D-254…D-266`** (SRS-side): docDeviation #1 (index **94 → 101**), #2 (metric **19 → 26**), #3/#21 (`RenderResult.BodyFingerprint`; `ContentFingerprint` do appender), #4/#22 (`FromStatus`/`ToStatus` **`int?`** + CHECK theo `EventType`), #5 (route do ABP/BFF sinh — `pnpm gen:api`), #6 (hoãn `reports/summary`), #7/#29 (hàng 14 guard `ExpiresAtUtc IS NULL`), #8 (job **quét DB**, ETO chỉ cho `REP-*`), #9 (`INotificationSender` + `ChuaCoKenhGuiSender` fail-closed + `EnableDispatch=false`); P3 #1-v2 (`TC-01` **4 event**, `Dispatching` phát ở C2 cùng UoW) · #7/#8/#9/#18 (dẫn dòng thật) · #10 (Q11: **cấm** `IgnoreQueryFilters`) · #11 (`0010` hai nghĩa) · #12 (hàng 8: mọi chuyển sai ⇒ `0011`) · #19 (F9 `§6.2`) · #27 (thử lại mỗi nhịp là chủ ý) · #28 (§4.1 nhánh lỗi tạm thời) |
 
 ---
 
@@ -1243,7 +1272,7 @@ public class NotificationConventionTests
 | `D-191` | §0/§1/§5 chưa nói PII mặc định TẮT | §0 phạm vi · BR-010 · §5.2/§5.4/§5.6 · §7.1 · `TC-41` | Kế hoạch GĐ3 — module chưa có |
 | `D-193` | §0 chỉ nói "chi phí thuộc `NOT-002`" | §0 · BR-022 · §5.4/§5.6 · `TC-40`: chi phí **kỳ**, sổ **8 cột**, cấm `OrderId`/JOIN bảng đơn | `not-002…:366–385` |
 | `D-197` | §15.1 Q10 `Open`; §5 ghi tiền tố `Not` là "đề xuất, cần chốt" | Q10 = **`Closed`**; §5: **một** `modules/Notification/` (4 project), giữ tên bảng `Notification*`, **một** `ConfigureNotification` / `NotificationErrorCodes` (`0001–0020`) / enum `ChannelKind` / `NotificationLockKeys` / permission; §13 NFR-018 + `TC-44` | Chưa có code (graph: 0 ký hiệu `Notification*`); tiền lệ `ChannelHub` (4 project), `Reporting` |
-| `D-198` | §15.1 Q1 `Open`; §3 hàng 2 chưa nêu **nguồn duy nhất** `CreateBatchAsync` | Q1 = **`Closed`**; giữ `NotificationBatches` + `ChoDuyet`; §5.1 `Purpose`/§5.3 lọc `Marketing`; §3 hàng 2; §9/§10; BR-025 + `TC-45`; giữ **5 bảng / 7 index / 93 → 100** | Chưa có code — kế hoạch GĐ3 |
+| `D-198` | §15.1 Q1 `Open`; §3 hàng 2 chưa nêu **nguồn duy nhất** `CreateBatchAsync` | Q1 = **`Closed`**; giữ `NotificationBatches` + `ChoDuyet`; §5.1 `Purpose`/§5.3 lọc `Marketing`; §3 hàng 2; §9/§10; BR-025 + `TC-45`; giữ **5 bảng / 7 index / 94 → 101** | Chưa có code — kế hoạch GĐ3 |
 | `D-199` | §5.2 `BodyFormat` `Text=0 · Html=1` + "HTML phải sanitize"; §6.2 dải `0010–0019` | §5.2 **chỉ `Text`**, `Html` cuối enum; §6.1 DTO mặc định `Text`; §6.2 thêm `0020`, dải `0010–0020`; BR-023/024 + `TC-42`/`TC-43`; §7.1 ETO **không** `BatchId` | Chưa có code — kế hoạch GĐ3 |
 | `D-198` (vòng 2) | §3 hàng 2 trả `0018` cho "lô **không tồn tại**" | Hàng 2 trả `0017` (`404`); `0018` còn **một** nghĩa (§3/§6.2) | Chưa có code — kế hoạch GĐ3 |
 | `D-197` (vòng 2) | `NOT-002` khai enum `NotificationChannelKind` | Giữ `ChannelKind`; nợ đổi tên `NOT-002` ghi ở §14.3(e) + `TC-44` | `not-002…:440,461,503` (tài liệu) |
@@ -1251,4 +1280,23 @@ public class NotificationConventionTests
 | `D-07` · `D-08` · `D-18` · `D-27` · `D-31` · `D-42` · `D-45` | — | **Không áp dụng**: không có `ProductVariant`/tồn kho/đơn/POS/điểm khách | — |
 | `D-47` / `D-48` | §10 báo cáo có query DB giao dịch? | Đã đúng: BR-020 + §10 đọc **read-model** `REP-001`/`REP-002` | `modules/Reporting` đã có |
 
-Ngoài các `D-xx` trên, đã cập nhật **hiện trạng code** đang lệch: **16 metric** (registry không đếm cứng, `ChuaCoNoiPhat` rỗng) · test chốt **93** index · `ChannelOrderPulledEto` **đã có** `CorrelationId` · outbox/inbox ABP **đã có** · `eCommerce.Kernel` **đã có** `Money` (chi tiết §0 và §15.2). Vòng sửa 1 đóng **6 phát hiện P2**; vòng sửa 2 đóng **5 P2** (#13–#17) của `docs/reviews/NOT-001-docreview.md` — #14/#15/#17 chỉ **làm rõ cơ chế** trong phạm vi thiết kế đã có (thêm event/transition, nêu bucket `NULL`), không đổi phạm vi.
+Ngoài các `D-xx` trên, đã cập nhật **hiện trạng code** đang lệch: **19 metric** (registry không đếm cứng, `ChuaCoNoiPhat` rỗng) · test chốt **94** index · `ChannelOrderPulledEto` **đã có** `CorrelationId` · outbox/inbox ABP **đã có** · `eCommerce.Kernel` **đã có** `Money` (chi tiết §0 và §15.2). Vòng sửa 1 đóng **6 phát hiện P2**; vòng sửa 2 đóng **5 P2** (#13–#17) của `docs/reviews/NOT-001-docreview.md` — #14/#15/#17 chỉ **làm rõ cơ chế** trong phạm vi thiết kế đã có (thêm event/transition, nêu bucket `NULL`), không đổi phạm vi. **v0.6 (W22-2)** đồng bộ ARCH `NOT-001` + `D-254…D-266` (chi tiết §15.4).
+
+---
+
+## Trạng thái triển khai
+
+> Cập nhật theo hàng `W22-2` (F3 BE), phiên **N84**, nhánh `feat/gd3-wp22-thong-bao`. Chỉ ghi **đã làm / chưa làm / lệch**.
+
+**Đã làm (module `modules/Notification/` — 4 project theo `D-197`):**
+- Domain: 8 enum (§3.1), `NotificationErrorCodes` dải `0010–0020`, `NotificationLockKeys` (`notification:*`, 0 tiền tố đôi), value object (`ContentFingerprint`/`IdempotencyKey`/`NotificationRecipient`), renderer **hàm thuần** + money formatter `vi-VN` + loại CR/LF/NUL một cửa, aggregate template/version (bất biến `0016`)/batch/item (máy trạng thái 15 hàng — guard sai NÉM `0011`; hàng 7 không tăng `AttemptCount`; hàng 14 có vế `ExpiresAtUtc IS NULL`)/event (append-only, `FromStatus`/`ToStatus` `int?`), seed idempotent **3** template hệ thống (`TenantId = NULL`, 0 PII).
+- Application.Contracts: DTO + 3 interface app service + `INotificationQueueAppender` + `INotificationSender` canonical (§4.4) + 4 ETO implement `INotificationEvent` có `CorrelationId`, 0 PII.
+- Application: 3 app service `[Authorize]` **cấp class** + permission từng method; appender chống trùng (pre-check + UNIQUE + partial + nhánh `23505` ghi bằng UoW mới `requiresNew`); `ChuaCoKenhGuiSender` fail-closed (`EnableDispatch` mặc định `false`); `NotificationDispatchWorker` 3 pha (§7.2), 0 dynamic worker, log vô điều kiện đầu nhịp.
+- EntityFrameworkCore: **một** `ConfigureNotification`; 5 bảng + index + CHECK; **7** unique index `NULLS NOT DISTINCT` tạo bằng SQL thô trong migration.
+- Nối hệ thống: 5 `DbSet` + `ConfigureNotification` trong `eCommerceDbContext`; DependsOn `NotificationEntityFrameworkCoreModule` (EF) + `NotificationApplicationModule` (Host); map mã lỗi HTTP §4.3; **9** permission (không có `Reports.View` — `D-255`) ở `eCommerceConsts` + provider; metric **7** (registry **19→26**, `KyHieuMetric`, emitter, gauge) trong `eCommerceMetrics.cs`; `TienToModule` thêm `notification`; `XC-005` §5.1 (**BA** thêm 7 dòng metric — ngoài vùng ghi `be`).
+
+**Migration:** `20261126132231_Added_Notification_Template_Queue` — **đã áp** qua `DbMigrator` (`__EFMigrationsHistory` có dòng; **5** bảng `Notification%`; **7** index `NULLS NOT DISTINCT` đích danh; seed chạy **2 lần** vẫn 3 template/3 version ⇒ idempotent). Up **expand-only** (chỉ `CREATE TABLE/INDEX` + CHECK; 0 `DROP`/`ALTER` bảng cũ). `pg_dump` trước: `artifacts/pg-dump/N84-W22-2.dump`.
+
+**Cổng đã chạy:** build `eCommerce.slnx --no-incremental` = **0 error / 9 warning** (bằng baseline). `dotnet test test/eCommerce.Tests` = **2169/2170 pass, 1 fail** — ca `MetricsTests.Ten_metric_theo_dung_quy_uoc_snake_case_va_hau_to_don_vi` đỏ vì `notification_queue_backlog` chưa có trong danh sách hậu tố đơn vị của **test**; **sửa 1 dòng ở `test/**` nằm NGOÀI vùng ghi của vai `be`** (`guard-write-scope`) ⇒ giao `qa` (thêm `_backlog`). Tương tự, test đơn vị `test/eCommerce.Tests/Notification/**` và cập nhật `PostgreSqlSchemaTests` **94→101** + 7 tên index thuộc `qa`/`test` — **chưa viết ở hàng này**.
+
+**Chưa làm (ngoài W22-2 / thuộc hàng khác):** endpoint `GET /reports/summary` + permission `Reports.View` (hoãn, `D-255`); sender thật + callback + chi phí + DLQ vận chuyển (`NOT-002`, WP-23); `CreateBatchAsync` mới tạo header lô `ChoDuyet` (danh sách người nhận + sinh mục do FE/W22-3 cấp qua appender với `BatchId`).

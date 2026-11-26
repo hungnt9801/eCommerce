@@ -90,9 +90,30 @@ public static class eCommerceMetricNames
     // ---- Tự quan sát ----
     public const string LoggingFailuresTotal = "logging_failures_total";
 
+    // ---- Nghiệp vụ THÔNG BÁO (`NOT-001`, WP-22) ----
+    /// <summary>Số tin được xếp hàng — nhãn `channel` (`email`/`sms`/`zalo_oa`).</summary>
+    public const string NotificationQueuedTotal = "notification_queued_total";
+
+    /// <summary>Số tin đã bàn giao — nhãn `channel`, `result` (`accepted`/`already_sent`).</summary>
+    public const string NotificationDispatchedTotal = "notification_dispatched_total";
+
+    /// <summary>Số tin lỗi/hết hạn — nhãn `channel`, `reason` (mã lỗi hữu hạn).</summary>
+    public const string NotificationQueueFailedTotal = "notification_queue_failed_total";
+
+    /// <summary>Số lần render thất bại — nhãn `reason` (mã lỗi).</summary>
+    public const string NotificationRenderFailedTotal = "notification_render_failed_total";
+
+    /// <summary>Tồn đọng hàng đợi (`ChoGui`) — gauge, không nhãn.</summary>
+    public const string NotificationQueueBacklog = "notification_queue_backlog";
+
+    /// <summary>Số lần lease bàn giao hết hạn được khôi phục — không nhãn.</summary>
+    public const string NotificationDispatchLeaseExpiredTotal = "notification_dispatch_lease_expired_total";
+
+    /// <summary>Số tin bị khử trùng cửa sổ — nhãn `channel`.</summary>
+    public const string NotificationWindowSuppressedTotal = "notification_window_suppressed_total";
+
     /// <summary>Toàn bộ tên metric — nguồn sự thật duy nhất cho test `TC-06`.</summary>
-    public static readonly IReadOnlyList<string> All =
-    [
+    public static readonly IReadOnlyList<string> All =    [
         MessagingOutboxPending,
         MessagingInboxFailedTotal,
         MessagingDlqSize,
@@ -120,7 +141,15 @@ public static class eCommerceMetricNames
         // 🆕 `WP-18` — `ADDR-001` NFR-008/009 (26/11/2026)
         AddressCatalogSyncTotal,
         AddressCatalogCacheHitsTotal,
-        AddressCatalogCacheMissesTotal
+        AddressCatalogCacheMissesTotal,
+        // 🆕 `WP-22` — `NOT-001` (26/11/2026): 7 metric thông báo → 19→26.
+        NotificationQueuedTotal,
+        NotificationDispatchedTotal,
+        NotificationQueueFailedTotal,
+        NotificationRenderFailedTotal,
+        NotificationQueueBacklog,
+        NotificationDispatchLeaseExpiredTotal,
+        NotificationWindowSuppressedTotal
     ];
 
     /// <summary>
@@ -170,7 +199,15 @@ public static class eCommerceMetricNames
             [SalesOrderTransitionTotal] = nameof(eCommerceMetrics.SalesOrderTransition),
             [AddressCatalogSyncTotal] = nameof(eCommerceMetrics.AddressCatalogSync),
             [AddressCatalogCacheHitsTotal] = nameof(eCommerceMetrics.AddressCatalogCacheHits),
-            [AddressCatalogCacheMissesTotal] = nameof(eCommerceMetrics.AddressCatalogCacheMisses)
+            [AddressCatalogCacheMissesTotal] = nameof(eCommerceMetrics.AddressCatalogCacheMisses),
+            // 🆕 `WP-22` (`NOT-001`)
+            [NotificationQueuedTotal] = nameof(eCommerceMetrics.NotificationQueued),
+            [NotificationDispatchedTotal] = nameof(eCommerceMetrics.NotificationDispatched),
+            [NotificationQueueFailedTotal] = nameof(eCommerceMetrics.NotificationQueueFailed),
+            [NotificationRenderFailedTotal] = nameof(eCommerceMetrics.NotificationRenderFailed),
+            [NotificationQueueBacklog] = nameof(eCommerceMetrics.SetNotificationQueueBacklog),
+            [NotificationDispatchLeaseExpiredTotal] = nameof(eCommerceMetrics.NotificationDispatchLeaseExpired),
+            [NotificationWindowSuppressedTotal] = nameof(eCommerceMetrics.NotificationWindowSuppressed)
         };
 
     /// <summary>
@@ -301,6 +338,14 @@ public sealed class eCommerceMetrics : ISingletonDependency
     /// <summary>`ADDR-001` NFR-008 — số lần cache danh mục **trượt**.</summary>
     public Counter<long> AddressCatalogCacheMisses { get; }
 
+    // ---- Nghiệp vụ THÔNG BÁO (`NOT-001`) ----
+    public Counter<long> NotificationQueued { get; }
+    public Counter<long> NotificationDispatched { get; }
+    public Counter<long> NotificationQueueFailed { get; }
+    public Counter<long> NotificationRenderFailed { get; }
+    public Counter<long> NotificationDispatchLeaseExpired { get; }
+    public Counter<long> NotificationWindowSuppressed { get; }
+
     // ---- Histogram ----
     public Histogram<double> HttpRequestDurationSeconds { get; }
 
@@ -312,6 +357,9 @@ public sealed class eCommerceMetrics : ISingletonDependency
 
     /// <summary>`REC-001` mục 7 — số giao dịch đối soát **cổng không xác nhận được** ở lượt gần nhất.</summary>
     private long _paymentReconUnresolved;
+
+    /// <summary>`NOT-001` — tồn đọng hàng đợi (`ChoGui`) ở lượt gần nhất.</summary>
+    private long _notificationQueueBacklog;
 
     public void SetMessagingOutboxPending(long value) => Interlocked.Exchange(ref _messagingOutboxPending, value);
     public void SetMessagingDlqSize(long value) => Interlocked.Exchange(ref _messagingDlqSize, value);
@@ -326,6 +374,9 @@ public sealed class eCommerceMetrics : ISingletonDependency
 
     /// <summary>Ghi số cặp `(kho, SKU)` đang LỆCH khi đối soát kho (`INV-001` ADR-10).</summary>
     public void SetInventoryReconMismatchSkus(long value) => Interlocked.Exchange(ref _inventoryReconMismatchSkus, value);
+
+    /// <summary>`NOT-001` — ghi tồn đọng hàng đợi (`ChoGui`).</summary>
+    public void SetNotificationQueueBacklog(long value) => Interlocked.Exchange(ref _notificationQueueBacklog, value);
 
     public eCommerceMetrics()
         : this(new Meter(MeterName, MeterVersion))
@@ -368,6 +419,20 @@ public sealed class eCommerceMetrics : ISingletonDependency
         AddressCatalogCacheMisses = _meter.CreateCounter<long>(eCommerceMetricNames.AddressCatalogCacheMissesTotal,
             unit: "{miss}", description: "Số lần cache danh mục ĐVHC trượt (ADDR-001).");
 
+        // 🆕 `NOT-001` (WP-22)
+        NotificationQueued = _meter.CreateCounter<long>(eCommerceMetricNames.NotificationQueuedTotal,
+            unit: "{item}", description: "Số tin được xếp hàng (NOT-001) — nhãn channel, CẤM email/phone.");
+        NotificationDispatched = _meter.CreateCounter<long>(eCommerceMetricNames.NotificationDispatchedTotal,
+            unit: "{item}", description: "Số tin đã bàn giao (NOT-001) — nhãn channel/result.");
+        NotificationQueueFailed = _meter.CreateCounter<long>(eCommerceMetricNames.NotificationQueueFailedTotal,
+            unit: "{item}", description: "Số tin lỗi/hết hạn (NOT-001) — nhãn channel/reason.");
+        NotificationRenderFailed = _meter.CreateCounter<long>(eCommerceMetricNames.NotificationRenderFailedTotal,
+            unit: "{failure}", description: "Số lần render mẫu tin thất bại (NOT-001) — nhãn reason.");
+        NotificationDispatchLeaseExpired = _meter.CreateCounter<long>(eCommerceMetricNames.NotificationDispatchLeaseExpiredTotal,
+            unit: "{occurrence}", description: "Số lần lease bàn giao hết hạn được khôi phục (NOT-001).");
+        NotificationWindowSuppressed = _meter.CreateCounter<long>(eCommerceMetricNames.NotificationWindowSuppressedTotal,
+            unit: "{item}", description: "Số tin bị khử trùng cửa sổ (NOT-001) — nhãn channel.");
+
         HttpRequestDurationSeconds = _meter.CreateHistogram<double>(eCommerceMetricNames.HttpRequestDurationSeconds,
             unit: "s", description: "Độ trễ xử lý request HTTP.");
 
@@ -400,5 +465,9 @@ public sealed class eCommerceMetrics : ISingletonDependency
             unit: "{transaction}",
             description: "Số giao dịch đối soát CỔNG KHÔNG XÁC NHẬN ĐƯỢC. Bằng số giao dịch cần đối soát " +
                 "nghĩa là lượt quét KHÔNG mang lại thông tin (cấu hình sai / cổng chết) — KHÔNG PHẢI 'khoẻ' (REC-001).");
+
+        _meter.CreateObservableGauge(eCommerceMetricNames.NotificationQueueBacklog,
+            () => Interlocked.Read(ref _notificationQueueBacklog),
+            unit: "{item}", description: "Số tin tồn đọng ở trạng thái ChoGui (NOT-001).");
     }
 }

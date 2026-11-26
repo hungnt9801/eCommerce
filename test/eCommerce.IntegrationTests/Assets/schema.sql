@@ -4157,3 +4157,208 @@ VALUES ('20261125193330_Add_Addr002_CarrierSyncRuns', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE TABLE "NotificationTemplates" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "Code" character varying(64) NOT NULL,
+    "Name" character varying(256) NOT NULL,
+    "ChannelKind" integer NOT NULL,
+    "Locale" character varying(8) NOT NULL,
+    "Purpose" integer NOT NULL,
+    "CoalesceWindowSeconds" integer NOT NULL,
+    "DefaultExpiresAfterSeconds" integer,
+    "Status" integer NOT NULL,
+    "CurrentPublishedVersionId" uuid,
+    "IsSystem" boolean NOT NULL,
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_NotificationTemplates" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_NotificationTemplates_ChannelKind" CHECK ("ChannelKind" in (0, 1, 2)),
+    CONSTRAINT "CK_NotificationTemplates_ChiMarketingKhuTrung" CHECK ("Purpose" = 1 OR "CoalesceWindowSeconds" = 0),
+    CONSTRAINT "CK_NotificationTemplates_CoalesceWindow" CHECK ("CoalesceWindowSeconds" >= 0),
+    CONSTRAINT "CK_NotificationTemplates_Purpose" CHECK ("Purpose" in (0, 1, 2))
+);
+
+CREATE TABLE "NotificationTemplateVersions" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "TemplateId" uuid NOT NULL,
+    "Version" integer NOT NULL,
+    "Subject" character varying(512),
+    "BodyText" text NOT NULL,
+    "BodyFormat" integer NOT NULL,
+    "Placeholders" jsonb NOT NULL,
+    "ContentHash" character(64) NOT NULL,
+    "PublishedAtUtc" timestamp with time zone NOT NULL,
+    "PublishedByUserId" uuid,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    CONSTRAINT "PK_NotificationTemplateVersions" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_NotificationTemplateVersions_BodyFormat" CHECK ("BodyFormat" in (0, 1)),
+    CONSTRAINT "CK_NotificationTemplateVersions_Version" CHECK ("Version" >= 1),
+    CONSTRAINT "FK_NotificationTemplateVersions_NotificationTemplates_Template~" FOREIGN KEY ("TemplateId") REFERENCES "NotificationTemplates" ("Id") ON DELETE RESTRICT
+);
+
+CREATE TABLE "NotificationBatches" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "Code" character varying(64) NOT NULL,
+    "TemplateId" uuid NOT NULL,
+    "TemplateVersionId" uuid NOT NULL,
+    "IdempotencyKey" character varying(256) NOT NULL,
+    "Status" integer NOT NULL,
+    "TotalItems" integer NOT NULL,
+    "CreatedByUserId" uuid,
+    "ApprovedByUserId" uuid,
+    "ApprovedAtUtc" timestamp with time zone,
+    "CorrelationId" character varying(64) NOT NULL,
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_NotificationBatches" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_NotificationBatches_CoNguoiDuyet" CHECK ("ApprovedAtUtc" IS NULL OR "ApprovedByUserId" IS NOT NULL),
+    CONSTRAINT "CK_NotificationBatches_Status" CHECK ("Status" in (0, 1, 2, 3)),
+    CONSTRAINT "CK_NotificationBatches_TotalItems" CHECK ("TotalItems" >= 0),
+    CONSTRAINT "FK_NotificationBatches_NotificationTemplateVersions_TemplateVe~" FOREIGN KEY ("TemplateVersionId") REFERENCES "NotificationTemplateVersions" ("Id") ON DELETE RESTRICT,
+    CONSTRAINT "FK_NotificationBatches_NotificationTemplates_TemplateId" FOREIGN KEY ("TemplateId") REFERENCES "NotificationTemplates" ("Id") ON DELETE RESTRICT
+);
+
+CREATE TABLE "NotificationQueueItems" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "IdempotencyKey" character varying(256) NOT NULL,
+    "RootItemId" uuid,
+    "BatchId" uuid,
+    "SourceEventType" character varying(256),
+    "SourceAggregateId" character varying(128),
+    "ChannelKind" integer NOT NULL,
+    "TemplateId" uuid NOT NULL,
+    "TemplateVersionId" uuid NOT NULL,
+    "RecipientEncrypted" text NOT NULL,
+    "RecipientHash" character(64) NOT NULL,
+    "RenderedSubject" character varying(512),
+    "RenderedBodyMasked" text,
+    "ContentFingerprint" character(64) NOT NULL,
+    "CoalesceBucketStartUtc" timestamp with time zone,
+    "Priority" integer NOT NULL,
+    "Status" integer NOT NULL,
+    "AttemptCount" integer NOT NULL,
+    "ScheduledAtUtc" timestamp with time zone NOT NULL,
+    "ExpiresAtUtc" timestamp with time zone,
+    "DispatchLeaseExpiresAtUtc" timestamp with time zone,
+    "DispatchedAtUtc" timestamp with time zone,
+    "LastErrorCode" character varying(64),
+    "LastReasonMasked" character varying(512),
+    "CorrelationId" character varying(64) NOT NULL,
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_NotificationQueueItems" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_NotificationQueueItems_AttemptCount" CHECK ("AttemptCount" >= 0),
+    CONSTRAINT "CK_NotificationQueueItems_ChannelKind" CHECK ("ChannelKind" in (0, 1, 2)),
+    CONSTRAINT "CK_NotificationQueueItems_HanSauLich" CHECK ("ExpiresAtUtc" IS NULL OR "ExpiresAtUtc" > "ScheduledAtUtc"),
+    CONSTRAINT "CK_NotificationQueueItems_Priority" CHECK ("Priority" in (0, 1, 2, 3)),
+    CONSTRAINT "CK_NotificationQueueItems_Status" CHECK ("Status" in (0, 1, 2, 3, 4, 5, 6, 7)),
+    CONSTRAINT "FK_NotificationQueueItems_NotificationBatches_BatchId" FOREIGN KEY ("BatchId") REFERENCES "NotificationBatches" ("Id") ON DELETE RESTRICT,
+    CONSTRAINT "FK_NotificationQueueItems_NotificationTemplateVersions_Templat~" FOREIGN KEY ("TemplateVersionId") REFERENCES "NotificationTemplateVersions" ("Id") ON DELETE RESTRICT,
+    CONSTRAINT "FK_NotificationQueueItems_NotificationTemplates_TemplateId" FOREIGN KEY ("TemplateId") REFERENCES "NotificationTemplates" ("Id") ON DELETE RESTRICT
+);
+
+CREATE TABLE "NotificationQueueEvents" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "QueueItemId" uuid NOT NULL,
+    "EventType" integer NOT NULL,
+    "FromStatus" integer,
+    "ToStatus" integer,
+    "ReasonMasked" character varying(512),
+    "ErrorCode" character varying(64),
+    "CorrelationId" character varying(64) NOT NULL,
+    "ActorUserId" uuid,
+    "OccurredAtUtc" timestamp with time zone NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    CONSTRAINT "PK_NotificationQueueEvents" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_NotificationQueueEvents_EventType" CHECK ("EventType" in (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12)),
+    CONSTRAINT "CK_NotificationQueueEvents_FromStatus" CHECK (("EventType" = 0 AND "FromStatus" IS NULL) OR ("EventType" <> 0 AND "FromStatus" IS NOT NULL)),
+    CONSTRAINT "FK_NotificationQueueEvents_NotificationQueueItems_QueueItemId" FOREIGN KEY ("QueueItemId") REFERENCES "NotificationQueueItems" ("Id") ON DELETE RESTRICT
+);
+
+CREATE INDEX "IX_NotificationBatches_TemplateId" ON "NotificationBatches" ("TemplateId");
+
+CREATE INDEX "IX_NotificationBatches_TemplateVersionId" ON "NotificationBatches" ("TemplateVersionId");
+
+CREATE INDEX "IX_NotificationBatches_Tenant_Status_CreationTime" ON "NotificationBatches" ("TenantId", "Status", "CreationTime");
+
+CREATE INDEX "IX_NotificationQueueEvents_QueueItemId" ON "NotificationQueueEvents" ("QueueItemId");
+
+CREATE INDEX "IX_NotificationQueueEvents_Tenant_Item_Time" ON "NotificationQueueEvents" ("TenantId", "QueueItemId", "OccurredAtUtc");
+
+CREATE INDEX "IX_NotificationQueueEvents_Tenant_Type_Time" ON "NotificationQueueEvents" ("TenantId", "EventType", "OccurredAtUtc");
+
+CREATE INDEX "IX_NotificationQueueItems_BatchId" ON "NotificationQueueItems" ("BatchId");
+
+CREATE INDEX "IX_NotificationQueueItems_TemplateId" ON "NotificationQueueItems" ("TemplateId");
+
+CREATE INDEX "IX_NotificationQueueItems_TemplateVersionId" ON "NotificationQueueItems" ("TemplateVersionId");
+
+CREATE INDEX "IX_NotificationQueueItems_Tenant_Batch" ON "NotificationQueueItems" ("TenantId", "BatchId");
+
+CREATE INDEX "IX_NotificationQueueItems_Tenant_Source" ON "NotificationQueueItems" ("TenantId", "SourceEventType", "SourceAggregateId");
+
+CREATE INDEX "IX_NotificationQueueItems_Tenant_Status_Lease" ON "NotificationQueueItems" ("TenantId", "Status", "DispatchLeaseExpiresAtUtc");
+
+CREATE INDEX "IX_NotificationQueueItems_Tenant_Status_Scheduled" ON "NotificationQueueItems" ("TenantId", "Status", "ScheduledAtUtc") WHERE "Status" IN (0, 1, 2);
+
+CREATE INDEX "IX_NotificationTemplates_Tenant_Status_Channel" ON "NotificationTemplates" ("TenantId", "Status", "ChannelKind");
+
+CREATE INDEX "IX_NotificationTemplateVersions_Template_Version" ON "NotificationTemplateVersions" ("TemplateId", "Version" DESC);
+
+CREATE UNIQUE INDEX "IX_NotificationTemplates_Tenant_Code_Channel_Locale"
+    ON "NotificationTemplates" ("TenantId", "Code", "ChannelKind", "Locale") NULLS NOT DISTINCT;
+
+CREATE UNIQUE INDEX "IX_NotificationTemplateVersions_Tenant_Template_Version"
+    ON "NotificationTemplateVersions" ("TenantId", "TemplateId", "Version") NULLS NOT DISTINCT;
+
+CREATE UNIQUE INDEX "IX_NotificationTemplateVersions_Tenant_Template_Hash"
+    ON "NotificationTemplateVersions" ("TenantId", "TemplateId", "ContentHash") NULLS NOT DISTINCT;
+
+CREATE UNIQUE INDEX "IX_NotificationBatches_Tenant_IdempotencyKey"
+    ON "NotificationBatches" ("TenantId", "IdempotencyKey") NULLS NOT DISTINCT;
+
+CREATE UNIQUE INDEX "IX_NotificationBatches_Tenant_Code"
+    ON "NotificationBatches" ("TenantId", "Code") NULLS NOT DISTINCT;
+
+CREATE UNIQUE INDEX "IX_NotificationQueueItems_Tenant_IdempotencyKey"
+    ON "NotificationQueueItems" ("TenantId", "IdempotencyKey") NULLS NOT DISTINCT;
+
+CREATE UNIQUE INDEX "IX_NotificationQueueItems_Tenant_Recipient_Fingerprint_Bucket"
+    ON "NotificationQueueItems" ("TenantId", "RecipientHash", "ChannelKind", "ContentFingerprint", "CoalesceBucketStartUtc")
+    NULLS NOT DISTINCT
+    WHERE "CoalesceBucketStartUtc" IS NOT NULL;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261126132231_Added_Notification_Template_Queue', '10.0.11');
+
+COMMIT;
+

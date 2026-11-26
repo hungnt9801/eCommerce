@@ -392,6 +392,25 @@ public static class eCommerceConsts
             /// </summary>
             public const string CarrierMappingVerify = Default + ".CarrierMapping.Verify";
         }
+
+        /// <summary>
+        /// 🆕 `WP-22` (`NOT-001`) — quyền của miền **thông báo**. Tiền tố tên `eCommerce.Notification.*`
+        /// (`D-197` ⑥). 🔒 `Reports.View` **KHÔNG** khai: endpoint `reports/summary` đã **hoãn** (`D-255`) —
+        /// quyền không có endpoint là hợp đồng chết. **9** quyền dùng thật, khai **một chỗ** ở đây và
+        /// định nghĩa ở `eCommercePermissionDefinitionProvider` (thiếu một nơi ⇒ `403` cho mọi người).
+        /// </summary>
+        public static class Notifications
+        {
+            public const string TemplatesView = GroupName + ".Notification.Templates.View";
+            public const string TemplatesManage = GroupName + ".Notification.Templates.Manage";
+            public const string TemplatesPublish = GroupName + ".Notification.Templates.Publish";
+            public const string QueueCreate = GroupName + ".Notification.Queue.Create";
+            public const string QueueView = GroupName + ".Notification.Queue.View";
+            public const string QueueCancel = GroupName + ".Notification.Queue.Cancel";
+            public const string QueueRetry = GroupName + ".Notification.Queue.Retry";
+            public const string BatchesCreate = GroupName + ".Notification.Batches.Create";
+            public const string BatchesApprove = GroupName + ".Notification.Batches.Approve";
+        }
     }
 
     /// <summary>

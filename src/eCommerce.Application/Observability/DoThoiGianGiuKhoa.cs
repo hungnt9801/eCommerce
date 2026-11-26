@@ -35,7 +35,7 @@ public sealed class DoThoiGianGiuKhoa : IAbpDistributedLock
     private static readonly FrozenSet<string> TienToModule = new[]
     {
         "address", "catalog", "channel", "customers", "einvoice", "inventory",
-        "marketplace", "payment", "pricing", "reconciliation", "sales", "tax"
+        "marketplace", "notification", "payment", "pricing", "reconciliation", "sales", "tax"
     }.ToFrozenSet(StringComparer.Ordinal);
 
     private readonly IAbpDistributedLock _benTrong;

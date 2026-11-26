@@ -205,8 +205,17 @@ graph LR
 | `payment_recon_changed_total` | Counter | `result` | `REC-001` §7 | ✅ `MetricDoiSoatThanhToan` |
 | `sales_order_transition_total` | Counter | `axis`, `from`, `to` | **`SAL-003` NFR-012** (24/10/2026) | ✅ `OrderStatusMetricHandler` (nghe `OrderStatusChangedEto`) |
 | `logging_failures_total` | Counter | — | `XC-005` D10 | ✅ **29/10/2026** — `DemLoiGhiLogProvider` (bọc mọi `ILoggerProvider`; lỗi ⇒ stderr + counter) |
+| `notification_queued_total` | Counter | `channel` | **`NOT-001`** §11 (WP-22, 26/11/2026) | ✅ `NotificationQueueAppender` |
+| `notification_dispatched_total` | Counter | `channel`, `result` | **`NOT-001`** §11 | ✅ `NotificationDispatchWorker` |
+| `notification_queue_failed_total` | Counter | `channel`, `reason` | **`NOT-001`** §11 | ✅ `NotificationDispatchWorker` |
+| `notification_render_failed_total` | Counter | `reason` | **`NOT-001`** §11 | ✅ `NotificationQueueAppender` |
+| `notification_queue_backlog` | Gauge | — | **`NOT-001`** §11 | ✅ `NotificationDispatchWorker` (`SetNotificationQueueBacklog`) |
+| `notification_dispatch_lease_expired_total` | Counter | — | **`NOT-001`** §11 | ✅ `NotificationDispatchWorker` |
+| `notification_window_suppressed_total` | Counter | `channel` | **`NOT-001`** §11 | ✅ `NotificationQueueAppender` |
 
-> 📌 **ĐẾM ĐƯỢC (`S16`, 29/10/2026): 15/16 có nơi phát · 1/16 chưa.** 🔒 **KHÔNG** ghi *"16/16"* khi chưa có phép đo —
+> 📌 **`WP-22` (`NOT-001`, 26/11/2026):** nâng registry **19 → 26**. 7 metric `notification_*` có điểm phát thật (`NotificationQueueAppender`/`NotificationDispatchWorker`) nên **không** vào `ChuaCoNoiPhat`; nhãn `channel`/`result`/`reason` đều thuộc `eCommerceMetricTags.Allowed`; `notification_queue_backlog` là **gauge** (tồn đọng `ChoGui`), tên giữ theo `D-267` (qa thêm `_backlog` vào whitelist test).
+
+> 📌 **ĐẾM ĐƯỢC (`S16`, 29/10/2026 — lịch sử: 15/16; `S16b`: 16/16; WP-22: 19 → 26).** 🔒 **KHÔNG** ghi *"16/16"* khi chưa có phép đo —
 > con số này khớp với `MetricEmitterTests` (quét mã **hai chiều**).
 > ✅ **`S16b` (29/10/2026): 16/16.** Nợ cuối cùng (`messaging_dlq_replayed_total`) **đã đóng bằng mã** —
 > `DeadLetterAppService.PhatLaiAsync` **publish lại event thật** rồi mới đếm (xem §21) ⇒

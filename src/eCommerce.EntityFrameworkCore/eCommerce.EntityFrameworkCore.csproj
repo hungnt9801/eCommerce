@@ -31,6 +31,8 @@
     <ProjectReference Include="..\..\modules\Pos\eCommerce.Pos.EntityFrameworkCore\eCommerce.Pos.EntityFrameworkCore.csproj" />
     <!-- 🆕 `WP-08` — module REPORTING tự cung cấp mapping (`ConfigureReporting`): read-model báo cáo. -->
     <ProjectReference Include="..\..\modules\Reporting\eCommerce.Reporting.EntityFrameworkCore\eCommerce.Reporting.EntityFrameworkCore.csproj" />
+    <!-- 🆕 `WP-22` (`NOT-001`) — module Notification tự cung cấp mapping (`ConfigureNotification`). -->
+    <ProjectReference Include="..\..\modules\Notification\eCommerce.Notification.EntityFrameworkCore\eCommerce.Notification.EntityFrameworkCore.csproj" />
   </ItemGroup>
 
   <ItemGroup>

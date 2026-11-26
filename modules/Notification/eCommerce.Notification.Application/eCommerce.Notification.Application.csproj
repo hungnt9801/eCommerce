@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>eCommerce.Notification</RootNamespace>
+    <AssemblyName>eCommerce.Notification.Application</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\eCommerce.Notification.Domain\eCommerce.Notification.Domain.csproj" />
+    <ProjectReference Include="..\eCommerce.Notification.Application.Contracts\eCommerce.Notification.Application.Contracts.csproj" />
+    <ProjectReference Include="..\..\..\shared\eCommerce.Kernel\eCommerce.Kernel.csproj" />
+    <ProjectReference Include="..\..\..\src\eCommerce.Domain.Shared\eCommerce.Domain.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Volo.Abp.Ddd.Application" />
+    <PackageReference Include="Volo.Abp.BackgroundWorkers" />
+    <PackageReference Include="Volo.Abp.DistributedLocking" />
+    <PackageReference Include="Volo.Abp.EventBus" />
+    <!-- Cần `ExecuteUpdateAsync` (cập nhật CÓ ĐIỀU KIỆN ở đường nóng, §7.2). Version đã ghim ở CPM. -->
+    <PackageReference Include="Volo.Abp.EntityFrameworkCore" />
+  </ItemGroup>
+
+</Project>

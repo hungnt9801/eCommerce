@@ -212,7 +212,14 @@ public class PostgreSqlSchemaTests
         //      ⇒ màn vận hành nhân đôi danh sách "cần người ánh xạ" và đếm `SoCanNguoiAnhXa` lệch. 📌 Hai
         //      index còn lại của 2 bảng lô (`AddrCatalogSyncRuns`/`AddrCarrierSyncRuns`) **không** unique ⇒
         //      **không** làm tăng con số này.
-        Assert.Equal(94L, await DemAsync(
+        //    → **101** (26/11/2026, `Wp22_Notification_Template_Queue` — **+7** unique index của `NOT-001`,
+        //      TẤT CẢ viết tay `NULLS NOT DISTINCT`: `IX_NotificationTemplates_Tenant_Code_Channel_Locale`,
+        //      `IX_NotificationTemplateVersions_Tenant_Template_Version`, `IX_NotificationTemplateVersions_Tenant_Template_Hash`,
+        //      `IX_NotificationBatches_Tenant_IdempotencyKey`, `IX_NotificationBatches_Tenant_Code`,
+        //      `IX_NotificationQueueItems_Tenant_IdempotencyKey` (hàng rào chống gửi trùng ở DB — mất NND thì
+        //      `TenantId = NULL` bị nhân bản IM LẶNG ⇒ gửi hai lần), và
+        //      `IX_NotificationQueueItems_Tenant_Recipient_Fingerprint_Bucket` (partial, khử trùng cửa sổ).
+        Assert.Equal(101L, await DemAsync(
             "select count(*) from pg_indexes where schemaname = 'public' and indexdef like '%NULLS NOT DISTINCT%'"));
 
         // Kiểm tra ĐÍCH DANH để thông báo lỗi có ý nghĩa (tên index dài có thể bị PostgreSQL cắt ⇒ so theo tiền tố).
@@ -413,6 +420,17 @@ public class PostgreSqlSchemaTests
             // `SoCanNguoiAnhXa` trong dòng lô SAI. ⚠️ Đây là **unique index** đặt tên tường minh `UX_` (không phải
             // `IX_`) vì viết bằng SQL thô trong migration `Add_Addr002_CarrierSyncRuns` (EF không sinh NND kèm tên).
             "UX_AddrCarrierSyncRunUnmappedCodes_Tenant_SyncRun_Code",
+            // 🆕 `WP-22` (`NOT-001`, `W22-2`) — **7 unique index** của module Notification (§5.6 ARCH). Đây là
+            // **hàng rào thật** chống gửi trùng (BR-002/BR-013) và khử trùng cửa sổ (ADR-12). Mất
+            // `NULLS NOT DISTINCT` thì khi `TenantId = NULL` (đang chạy 1 tenant) index MẤT TÁC DỤNG IM LẶNG
+            // ⇒ hai mục cùng khoá idempotency ⇒ khách nhận HAI tin (tốn tiền thật, mất uy tín).
+            "IX_NotificationTemplates_Tenant_Code_Channel_Locale",
+            "IX_NotificationTemplateVersions_Tenant_Template_Version",
+            "IX_NotificationTemplateVersions_Tenant_Template_Hash",
+            "IX_NotificationBatches_Tenant_IdempotencyKey",
+            "IX_NotificationBatches_Tenant_Code",
+            "IX_NotificationQueueItems_Tenant_IdempotencyKey",
+            "IX_NotificationQueueItems_Tenant_Recipient_Fingerprint_Bucket",
         ];
 
         foreach (var ten in phaiCo)

@@ -79,6 +79,12 @@
     <Project Path="modules/Signing/eCommerce.Signing.Domain/eCommerce.Signing.Domain.csproj" />
     <Project Path="modules/Signing/eCommerce.Signing.EntityFrameworkCore/eCommerce.Signing.EntityFrameworkCore.csproj" />
   </Folder>
+  <Folder Name="/modules/Notification/">
+    <Project Path="modules/Notification/eCommerce.Notification.Application.Contracts/eCommerce.Notification.Application.Contracts.csproj" />
+    <Project Path="modules/Notification/eCommerce.Notification.Application/eCommerce.Notification.Application.csproj" />
+    <Project Path="modules/Notification/eCommerce.Notification.Domain/eCommerce.Notification.Domain.csproj" />
+    <Project Path="modules/Notification/eCommerce.Notification.EntityFrameworkCore/eCommerce.Notification.EntityFrameworkCore.csproj" />
+  </Folder>
   <Folder Name="/modules/Tax/">
     <Project Path="modules/Tax/eCommerce.Tax.Domain/eCommerce.Tax.Domain.csproj" />
     <Project Path="modules/Tax/eCommerce.Tax.EntityFrameworkCore/eCommerce.Tax.EntityFrameworkCore.csproj" />
