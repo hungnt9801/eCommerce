@@ -75,6 +75,7 @@
 | 2026-11-26 | NC-1 | test/eCommerce.IntegrationTests/Assets/schema.sql:4353 | ON "NotificationQueueItems" ("TenantId", "IdempotencyKey") NULLS NOT DISTINCT; -> ON "NotificationQueueItems" ("TenantId", "IdempotencyKey"); | dotnet test test/eCommerce.IntegrationTests --filter "FullyQualifiedName~PostgreSqlNotificationTests" | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
 | 2026-11-26 | NC-4 | modules/Notification/eCommerce.Notification.Domain/Queue/NotificationQueueEntities.cs:256 | Nem(Status, NotificationQueueStatus.DangBanGiao); -> _ = NotificationQueueStatus.DangBanGiao; | dotnet test test/eCommerce.Tests --filter "FullyQualifiedName~TC05_hang5_guard_sai_trang_thai_thi_NEM_0011" | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
 | 2026-11-26 | NC-5 | modules/Notification/eCommerce.Notification.Domain/Rendering/NotificationRendering.cs:134 | var subject = ThayThe(template.Subject ?? string.Empty, whitelist, data, moneyFormatter); -> var subject = ThayThe(template.Subject ?? string.Empty, whitelist, data, moneyFormatter) + DateTime.Now.Ticks; | dotnet test test/eCommerce.Tests --filter "FullyQualifiedName~TC04_render_tai_lap_100_lan_cung_ket_qua" | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
+| 2026-11-26 | NC-8 | modules/Notification/eCommerce.Notification.Domain/Rendering/NotificationMasker.cs:77 | NC-8 bo mask email (masker thanh no-op mot phan) | dotnet test test/eCommerce.Tests --filter "FullyQualifiedName~NotificationMaskerTests" | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
 
 ### Kế hoạch 7 negative control theo `ARCH §13.2`
 
