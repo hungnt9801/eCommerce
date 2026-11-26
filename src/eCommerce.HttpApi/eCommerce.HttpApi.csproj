@@ -20,6 +20,9 @@
     <!-- 🆕 `WP-08` — controller `/api/v1/reports` cần hợp đồng của module `Reporting`
          (chỉ `Application.Contracts`). -->
     <ProjectReference Include="..\..\modules\Reporting\eCommerce.Reporting.Application.Contracts\eCommerce.Reporting.Application.Contracts.csproj" />
+    <!-- 🆕 `WP-22` `W22-3` — controller `/api/v1/notifications/**` cần DTO + interface của module `Notification`
+         (chỉ `Application.Contracts` — không kéo `.Domain`/`.Application`). -->
+    <ProjectReference Include="..\..\modules\Notification\eCommerce.Notification.Application.Contracts\eCommerce.Notification.Application.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>
