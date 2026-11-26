@@ -28,8 +28,8 @@
 | ├ `dotnet test test/eCommerce.Tests` (bước 3) | 0 | **2283/2283** · 0 skipped · 23,7 s |
 | ├ `dotnet test test/eCommerce.IntegrationTests` (bước 4) | 0 | **110/110** · 0 skipped |
 | └ các bước 5–20 (mermaid · FE typecheck/Vitest · `gen:api` không đổi · DB 25/25 · test cổng 60/60 · ADDR/CUS/PAY/SAL · oversell · outbox ×2 · giữ chỗ 2 instance · Playwright 8/8) | 0 | **ĐẠT** (xem `artifacts/dayDu-wp22.out`) |
-| `git push origin feat/gd3-wp22-thong-bao` | 0 | xem §7 |
-| `git push origin feat/gd3-wp22-thong-bao:tich-hop/gd3` (fast-forward) | 0 | xem §7 |
+| `git push origin feat/gd3-wp22-thong-bao` | 0 | `24fd918..d7bd128` |
+| `git push origin feat/gd3-wp22-thong-bao:tich-hop/gd3` (fast-forward) | 0 | `58326ba..d7bd128` |
 | `pwsh -File tools/kiem-link-tai-lieu.ps1` (đóng phiên) | 0 | **PASS** (số đo ở câu trả lời cuối) |
 
 > Ghi chú kỹ thuật: `-DayDu` chạy bằng `Start-Process` nền (vượt trần 600 s/lệnh). Script kết thúc bằng
@@ -93,10 +93,11 @@ và handover gần nhất `docs/nhanh/handover-n87.md`. Chạy baseline 6 lệnh
 
 ## 7. Trạng thái nhánh
 
-- Nhánh `feat/gd3-wp22-thong-bao`; base `origin/tich-hop/gd3` @ `58326ba`; `HEAD` code/ops **`24fd918`**
-  (+ commit đóng phiên chứa tệp này).
-- **Đã push** `origin/feat/gd3-wp22-thong-bao` và **fast-forward** `origin/tich-hop/gd3` = tip nhánh WP sau commit
-  đóng phiên (kiểm bằng `git log --oneline -1 origin/tich-hop/gd3`).
+- Nhánh `feat/gd3-wp22-thong-bao`; base `origin/tich-hop/gd3` @ `58326ba`; `HEAD` code/ops `24fd918`; commit F6/G6 +
+  handover `c728a46`; commit registry/bảng phiên `d7bd128`; tệp handover này nằm ở commit đóng phiên cuối cùng.
+- **Đã push** `origin/feat/gd3-wp22-thong-bao` (`24fd918..d7bd128`) và **fast-forward** `origin/tich-hop/gd3`
+  (`58326ba..d7bd128`); commit handover này được đẩy tiếp **cùng hai nhánh** (fast-forward), nên tip hai nhánh
+  luôn trùng nhau — kiểm bằng `git log --oneline -1 origin/tich-hop/gd3`.
 - **Không** mở PR (`D-216` ③); PR xếp chồng mở một lần cuối chuỗi.
 
 ---
