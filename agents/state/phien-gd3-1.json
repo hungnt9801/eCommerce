@@ -7,7 +7,7 @@
   "nhanhGoc": "main",
   "refs": "D-216",
   "ghiChu": "Phương án B (D-216): mỗi WP một nhánh cắt từ đỉnh tich-hop/gd3; dong-wp đẩy fast-forward vào tich-hop/gd3 (M3, D-114); PR xếp chồng mở một lần cuối chuỗi.",
-  "capNhat": "2026-11-27T04:38:20+07:00",
+  "capNhat": "2026-11-27T05:13:28+07:00",
   "rows": [
     {
       "id": "W16-1",
@@ -553,13 +553,17 @@
       "dependsOn": [
         "W26-5"
       ],
-      "status": "chua",
-      "phien": [],
+      "status": "xong",
+      "phien": [
+        "N93"
+      ],
       "nhanh": "feat/gd3-wp24-dieu-kien-km",
       "buoc": "F0–F2b",
-      "evidence": null,
+      "evidence": "F0-F2b: arch PRO-002-arch.md v0.3 DOCREV DOC-OK vong 3 P1=0/P2=0 (check-agent-artifact DAT) · kiem-link PASS 969 link/1719 backtick · mermaid 214/0 · build 0 error/9 warning · unit 2376/2376 · probe-cong-tai-lieu Code WP-24 exit 0 · D-277..D-282 · nhanh feat/gd3-wp24-dieu-kien-km",
       "ghiChu": null,
-      "handover": null
+      "handover": "docs/nhanh/handover-n93.md",
+      "batDau": "2026-11-27T04:40:19+07:00",
+      "xongLuc": "2026-11-27T05:13:28+07:00"
     },
     {
       "id": "W24-2",

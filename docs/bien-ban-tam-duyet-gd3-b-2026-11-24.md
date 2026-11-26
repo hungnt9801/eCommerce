@@ -38,3 +38,11 @@ WP-14 bước ④ đòi "review kiến trúc cho engine điều kiện". DEC **k
 | vii | Fail-closed: `CustomerId` NULL ⇒ lá `CustomerGroup`/`FirstOrderOnly` = `false`; tự động có trần/khách + vãng lai ⇒ bỏ qua `CustomerRequired = 11`; "đơn đầu" đếm cả đơn huỷ/trả | `D-162`, `D-161`, `D-163` |
 
 Bản review kiến trúc do **người** viết (nếu chủ dự án muốn) là phần của **biên bản người ký** trước merge `main` — **không** phải điều kiện của tạm duyệt.
+
+## 3. Tạm duyệt tài liệu ARCH của `PRO-002` — hàng `W24-1` (phiên `N93`, 27/11/2026) · [D-277](nhanh/decisions.md)
+
+| # | MÃ | Tài liệu | DOCREV | Kết luận DEC | Lý do | Điều kiện (trước release) | Người review bắt buộc còn thiếu |
+|---|---|---|---|---|---|---|---|
+| 1 | PRO-002 (ARCH) | [PRO-002-arch](features/promotions/PRO-002-arch.md) v0.3 | [DOC-OK vòng 3](reviews/PRO-002-arch-docreview.md) · 0 P1 · 0 P2 · 1 P3 | **Tạm duyệt (M2)** — chỉ để code **F3 trên nhánh WP** | Ngoài danh sách đỏ §2.1; điều kiện "(sau P3)" của dòng `PRO-002` **đã đạt** ở `D-169` (3) | P3 còn lại (thu hẹp allowlist test `eCommerce.Messaging.EventCoverage` + nêu tên test) sửa **cùng `W24-2`**; **5 `docDeviation` D1–D5** giữ theo SRS/ARCH, BA ghi rõ ở `W24-2`; **D6** guard `CheckoutInput.OrderDiscount ≠ 0 ⇒ NÉM` (`D-143` (2)) **bắt buộc** `W24-2`; **Q8/AQ10** (`D-282`) vẫn **chuyển người** (R3-1, GHTK) — **không** chặn WP. M4 **trước release**: `D-158`, `D-160`, `D-161`, `D-162`, `D-163` + phần flash `D-156` | **Kiến trúc trưởng** · BA · **kế toán** (trước release) |
+
+> Đây **không** phải biên bản duyệt của người: `main` vẫn cần biên bản **người ký**. Tạm duyệt mất hiệu lực nếu DOCREV ra `DOC-CHANGES` hoặc tài liệu đổi mà không qua DOCREV (`D-169` (1)).
