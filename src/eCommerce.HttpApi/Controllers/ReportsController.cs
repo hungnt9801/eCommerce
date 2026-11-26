@@ -22,10 +22,12 @@ namespace eCommerce.HttpApi.Controllers;
 public class ReportsController : AbpControllerBase
 {
     private readonly IReportAppService _baoCao;
+    private readonly IReportAdminAppService _vanHanh;
 
-    public ReportsController(IReportAppService baoCao)
+    public ReportsController(IReportAppService baoCao, IReportAdminAppService vanHanh)
     {
         _baoCao = baoCao;
+        _vanHanh = vanHanh;
     }
 
     /// <summary>
@@ -63,4 +65,69 @@ public class ReportsController : AbpControllerBase
     [Authorize(eCommerceConsts.Permissions.Reports.Aggregate)]
     public Task<KetQuaTongHopDto> ChayTongHopAsync([FromBody] ChayTongHopInput input)
         => _baoCao.ChayTongHopAsync(input);
+
+    // ══════════════════════════════════════════════════════════════════════════════════════════════════
+    // 🆕 `WP-26` — VẬN HÀNH GĐ3: rebuild · chốt kỳ · đối chiếu (`REP-001` §4.2).
+    // 🔐 Class `Reports.Default`; method GHI thêm quyền hẹp (AND-combination).
+    // ══════════════════════════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>**REBUILD** một khoảng (xếp hàng `Queued`; worker xử lý). `Reason` ≥ 10 ký tự.</summary>
+    [HttpPost("rebuild")]
+    [Authorize(eCommerceConsts.Permissions.Reports.Rebuild)]
+    [ProducesResponseType(202)]
+    public Task<LanChayDto> StartRebuildAsync([FromBody] StartRebuildInput input)
+        => _vanHanh.StartRebuildAsync(input);
+
+    /// <summary>**CHẠY TIẾP** một lượt `PartiallySucceeded`/`Failed` từ checkpoint (0 cửa sổ cũ chạy lại).</summary>
+    [HttpPost("rebuild/{runId:guid}/resume")]
+    [Authorize(eCommerceConsts.Permissions.Reports.Rebuild)]
+    [ProducesResponseType(202)]
+    public Task<LanChayDto> ResumeRebuildAsync([FromRoute] Guid runId)
+        => _vanHanh.ResumeRebuildAsync(runId);
+
+    /// <summary>Đọc một lượt chạy.</summary>
+    [HttpGet("rebuild/{runId:guid}")]
+    public Task<LanChayDto> GetLanChayAsync([FromRoute] Guid runId)
+        => _vanHanh.GetLanChayAsync(runId);
+
+    /// <summary>Danh sách lượt chạy (phân trang + lọc).</summary>
+    [HttpGet("rebuilds")]
+    public Task<LanChayPageDto> GetLanChaysAsync([FromQuery] GetLanChayInput input)
+        => _vanHanh.GetLanChaysAsync(input);
+
+    /// <summary>**CHỐT KỲ** — từ chối khi còn dòng lệch mở (`0014`); `Reason` ≥ 10.</summary>
+    [HttpPost("period-close")]
+    [Authorize(eCommerceConsts.Permissions.Reports.PeriodClose)]
+    public Task<KyChotDto> ClosePeriodAsync([FromBody] ClosePeriodInput input)
+        => _vanHanh.ClosePeriodAsync(input);
+
+    /// <summary>**MỞ LẠI KỲ** đã chốt — `Reason` ≥ 20 ký tự.</summary>
+    [HttpPost("period-close/{id:guid}/reopen")]
+    [Authorize(eCommerceConsts.Permissions.Reports.PeriodReopen)]
+    public Task<KyChotDto> ReopenPeriodAsync([FromRoute] Guid id, [FromBody] ReopenPeriodInput input)
+    {
+        input.PeriodId = id;
+        return _vanHanh.ReopenPeriodAsync(input);
+    }
+
+    /// <summary>Đọc một kỳ chốt.</summary>
+    [HttpGet("period-close/{id:guid}")]
+    public Task<KyChotDto> GetKyChotAsync([FromRoute] Guid id)
+        => _vanHanh.GetKyChotAsync(id);
+
+    /// <summary>Danh sách kỳ chốt (phân trang + lọc).</summary>
+    [HttpGet("period-closes")]
+    public Task<KyChotPageDto> GetKyChotsAsync([FromQuery] GetKyChotInput input)
+        => _vanHanh.GetKyChotsAsync(input);
+
+    /// <summary>**ĐỐI CHIẾU** nguồn ↔ read-model, ghi nhận dòng lệch (KHÔNG sửa số).</summary>
+    [HttpPost("reconciliation")]
+    [Authorize(eCommerceConsts.Permissions.Reports.Reconcile)]
+    public Task<KetQuaDoiChieuDto> RunReconciliationAsync([FromBody] RunReconciliationInput input)
+        => _vanHanh.RunReconciliationAsync(input);
+
+    /// <summary>Danh sách dòng lệch số (phân trang + lọc).</summary>
+    [HttpGet("consistency-checks")]
+    public Task<LechSoPageDto> GetLechSoAsync([FromQuery] GetLechSoInput input)
+        => _vanHanh.GetLechSoAsync(input);
 }

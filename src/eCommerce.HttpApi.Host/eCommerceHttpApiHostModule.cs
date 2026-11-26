@@ -411,6 +411,16 @@ public class eCommerceHttpApiHostModule : AbpModule
             options.Map(eCommerce.Reporting.ReportingErrorCodes.DongTrung, System.Net.HttpStatusCode.Conflict);            // 0008
             options.Map(eCommerce.Reporting.ReportingErrorCodes.ChungTuKhongCoDong, System.Net.HttpStatusCode.Conflict);   // 0009
 
+            // 🆕 `WP-26` — VẬN HÀNH GĐ3 (dải `0010–0017`). Thiếu map ⇒ 403 thay vì 404/409/400.
+            options.Map(eCommerce.Reporting.ReportingErrorCodes.LanChayKhongTonTai, System.Net.HttpStatusCode.NotFound);          // 0010
+            options.Map(eCommerce.Reporting.ReportingErrorCodes.KyDaChot, System.Net.HttpStatusCode.Conflict);                    // 0011
+            options.Map(eCommerce.Reporting.ReportingErrorCodes.KyChongLan, System.Net.HttpStatusCode.Conflict);                  // 0012
+            options.Map(eCommerce.Reporting.ReportingErrorCodes.KhongHoTroRebuild, System.Net.HttpStatusCode.BadRequest);         // 0013
+            options.Map(eCommerce.Reporting.ReportingErrorCodes.ConLechChuaXuLy, System.Net.HttpStatusCode.Conflict);             // 0014
+            options.Map(eCommerce.Reporting.ReportingErrorCodes.ChuyenTrangThaiKhongHopLe, System.Net.HttpStatusCode.Conflict);   // 0015
+            options.Map(eCommerce.Reporting.ReportingErrorCodes.ThieuLyDo, System.Net.HttpStatusCode.BadRequest);                 // 0016
+            options.Map(eCommerce.Reporting.ReportingErrorCodes.CheckpointKhongCo, System.Net.HttpStatusCode.Conflict);            // 0017
+
             // ── 🆕 `WP-22` — THÔNG BÁO (`NOT-001`, dải `0010–0020`) ─────────────────────────────
             // 🔑 Không map ⇒ ABP trả `403` cho mọi `BusinessException` ⇒ client đọc thành *"không có quyền"*
             // trong khi lỗi thật là *"template chưa publish"* / *"trùng khoá"* / *"thiếu trường"*. Mã lỗi vẫn

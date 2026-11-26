@@ -36,4 +36,32 @@ public static class ReportingErrorCodes
 
     /// <summary>Chứng từ có chiết khấu nhưng KHÔNG có dòng nào ⇒ không tính được doanh thu.</summary>
     public const string ChungTuKhongCoDong = "eCommerce:Reports:0009";
+
+    // ══════════════════════════════════════════════════════════════════════════════════════════════════
+    // 🆕 `WP-26` — VẬN HÀNH GĐ3 (rebuild · chốt kỳ · đối chiếu). Dải `0010–0017` (`REP-001` §3.6).
+    // ══════════════════════════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>`runId` không có (hoặc khác tenant). HTTP `404`.</summary>
+    public const string LanChayKhongTonTai = "eCommerce:Reports:0010";
+
+    /// <summary>Khoảng ngày giao với kỳ `DaChot` (rebuild/ghi bị chặn). HTTP `409`.</summary>
+    public const string KyDaChot = "eCommerce:Reports:0011";
+
+    /// <summary>Hai kỳ `DaChot` chồng nhau (`23P01`). HTTP `409`.</summary>
+    public const string KyChongLan = "eCommerce:Reports:0012";
+
+    /// <summary>Rebuild `TonKho` cho ngày quá khứ / projection không hỗ trợ. HTTP `400` (`D-272`).</summary>
+    public const string KhongHoTroRebuild = "eCommerce:Reports:0013";
+
+    /// <summary>Chốt kỳ khi còn `RepConsistencyCheck` mở. HTTP `409`.</summary>
+    public const string ConLechChuaXuLy = "eCommerce:Reports:0014";
+
+    /// <summary>Chuyển trạng thái sai (máy trạng thái). HTTP `409`.</summary>
+    public const string ChuyenTrangThaiKhongHopLe = "eCommerce:Reports:0015";
+
+    /// <summary>Lý do rỗng/ngắn hơn ngưỡng (`D-274`). HTTP `400`.</summary>
+    public const string ThieuLyDo = "eCommerce:Reports:0016";
+
+    /// <summary>Chạy tiếp khi `CheckpointDate` rỗng. HTTP `409`.</summary>
+    public const string CheckpointKhongCo = "eCommerce:Reports:0017";
 }

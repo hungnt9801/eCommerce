@@ -344,6 +344,21 @@ public static class eCommerceConsts
 
             /// <summary>Chạy tổng hợp / backfill read-model (quyền **ghi**, tách riêng).</summary>
             public const string Aggregate = Default + ".Aggregate";
+
+            // 🆕 `WP-26` (`D-270`) — 4 quyền hẹp dưới `Reports.Default`, chỉ cấp role `admin` cấp tenant.
+            // 🔒 Mỗi quyền ứng với một thao tác ảnh hưởng số liệu **đã chốt** — không gộp vào `Default`.
+
+            /// <summary>Rebuild / chạy tiếp một lượt tổng hợp (ghi read-model theo khoảng).</summary>
+            public const string Rebuild = Default + ".Rebuild";
+
+            /// <summary>Chốt kỳ kế toán (khoá số liệu đã phát hành).</summary>
+            public const string PeriodClose = Default + ".PeriodClose";
+
+            /// <summary>Mở lại kỳ đã chốt (mở đường ghi lại khoảng đã chốt — cần lý do ≥ 20 ký tự).</summary>
+            public const string PeriodReopen = Default + ".PeriodReopen";
+
+            /// <summary>Chạy đối chiếu nguồn ↔ read-model (lộ lệch, KHÔNG sửa số).</summary>
+            public const string Reconcile = Default + ".Reconcile";
         }
 
         /// <summary>

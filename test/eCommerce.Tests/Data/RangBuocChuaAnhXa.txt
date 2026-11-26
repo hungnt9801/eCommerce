@@ -198,3 +198,30 @@ IX_NotificationBatches_Tenant_IdempotencyKey|NOT-001: *khoá idempotency của l
 IX_NotificationBatches_Tenant_Code|NOT-001: *mã lô duy nhất* — trùng là ghi tắt; unique phải NULLS NOT DISTINCT
 IX_NotificationQueueItems_Tenant_IdempotencyKey|NOT-001: *hàng rào chống gửi trùng (BR-002)* — appender bắt 23505 ⇒ AlreadyQueued/0010; unique phải NULLS NOT DISTINCT (mất NND ⇒ gửi hai lần khi TenantId=NULL)
 IX_NotificationQueueItems_Tenant_Recipient_Fingerprint_Bucket|NOT-001: *khử trùng cửa sổ marketing (ADR-12)* — appender pre-check + bắt 23505 ⇒ 0019; partial index (bucket NULL ra ngoài); unique phải NULLS NOT DISTINCT
+
+# ── WP-26 (`REP-001`, W26-2) — VẬN HÀNH GĐ3: `RepRunLogs` · `RepConsistencyChecks` · `RepPeriodCloses` ──
+# 📌 Các ràng buộc dưới đây là HÀNG RÀO CUỐI cho đường ghi tắt (SQL tay / race). Mọi đường ghi thật đi qua
+#    domain ĐÃ NÉM mã riêng TRƯỚC khi chạm DB (`0015` chuyển trạng thái, `0016` thiếu lý do, `0014` còn lệch),
+#    nên `23505`/`23514` ở đây nghĩa là ghi tắt hoặc hai lượt chồng — lỗi VẬN HÀNH, không phải ca client cần
+#    phân biệt bằng mã riêng. Unique vẫn PHẢI `NULLS NOT DISTINCT` (migration viết tay).
+CK_RepRunLogs_JobName_HopLe|WP-26: JobName ∈ {Rebuild,Reconcile,Aggregate} — `RepRunLog` kiểm trước khi tạo; CHECK chặn SQL tay
+CK_RepRunLogs_Projection_HopLe|WP-26: projection ∈ {0,1} — `Enum.IsDefined` ở constructor; CHECK chặn SQL tay
+CK_RepRunLogs_Status_HopLe|WP-26: status ∈ {0..5} — máy trạng thái NÉM 0015; CHECK chặn SQL tay
+CK_RepRunLogs_Khoang_HopLe|WP-26: ToDate >= FromDate — constructor/`KhoangChot` kiểm trước; CHECK cho ghi tắt
+CK_RepRunLogs_Windows_KhongAm|WP-26: WindowsDone <= WindowsTotal, không âm — `GhiCuaSo`/`HoanTat` kiểm; CHECK là hàng rào cuối
+CK_RepRunLogs_Checkpoint_Khoang|WP-26: checkpoint trong [FromDate,ToDate] — `GhiCuaSo` kiểm; CHECK cho ghi tắt
+CK_RepRunLogs_RowsWritten_KhongAm|WP-26: RowsWritten >= 0 — `GhiCuaSo` kiểm soDong >= 0; CHECK cho ghi tắt
+CK_RepRunLogs_Reason_ToiThieu|WP-26: Reason >= 10 ký tự — domain ném 0016 + hằng lý do hệ thống >= 10; CHECK là hàng rào cuối
+IX_RepRunLogs_TenantId_KhoaIdempotency|WP-26: dòng rebuild người dùng gọi lại cùng khoảng+lý do ⇒ 1 dòng — app service tiền kiểm trả `AlreadyRequested`; trùng chỉ do race ⇒ lỗi vận hành, không cần mã riêng; unique partial `WHERE RequestedBy IS NOT NULL` + NULLS NOT DISTINCT
+UX_RepRunLogs_TenantId_Job_Projection_DangChay|WP-26: một lần chạy HOẠT ĐỘNG /(job,projection) — khoá phân tán + worker tiền kiểm; trùng là race/ghi tắt; unique partial `WHERE Status IN (0,1)` + NULLS NOT DISTINCT
+CK_RepConsistencyChecks_Projection_HopLe|WP-26: projection ∈ {0,1} — `GhiNhan` kiểm; CHECK chặn SQL tay
+CK_RepConsistencyChecks_MismatchKind_HopLe|WP-26: kind ∈ {0..4} — `GhiNhan` kiểm; CHECK chặn SQL tay
+CK_RepConsistencyChecks_FactKey_KhongRong|WP-26: FactKey không rỗng — `GhiNhan` kiểm + độ dài 128; CHECK chặn SQL tay
+CK_RepConsistencyChecks_Delta_Khop|WP-26: Delta NULL ⇔ một vế NULL — `GhiNhan` tính Delta đúng; CHECK chặn SQL tay
+UX_RepConsistencyChecks_DangMo|WP-26: chống trùng dòng lệch ĐANG MỞ khi đối chiếu lặp — app service bỏ qua khoá đã có; trùng là race/ghi tắt; unique partial `WHERE ResolvedAtUtc IS NULL` + NULLS NOT DISTINCT
+CK_RepPeriodCloses_Status_HopLe|WP-26: status ∈ {0..3} — máy trạng thái NÉM 0015; CHECK chặn SQL tay
+CK_RepPeriodCloses_Khoang_HopLe|WP-26: ToDate >= FromDate — `KhoangChot.Kiem` kiểm trước; CHECK cho ghi tắt
+CK_RepPeriodCloses_CloseReason_ToiThieu|WP-26: CloseReason >= 10 — domain ném 0016; CHECK là hàng rào cuối
+CK_RepPeriodCloses_DaChot_DuChungTu|WP-26: DaChot ⇒ SnapshotHash+ClosedBy+ClosedAtUtc — `Chot` gán đồng thời; CHECK chặn "nửa chốt" do ghi tắt
+CK_RepPeriodCloses_ReopenReason_ToiThieu|WP-26: ReopenReason NULL hoặc >= 20 — `MoLai` ném 0016; CHECK là hàng rào cuối
+IX_RepPeriodCloses_TenantId_KhoaIdempotency|WP-26: chốt kỳ idempotent theo (tenant,from,to) — app service tiền kiểm trả `AlreadyClosed`; trùng chỉ do race ⇒ lỗi vận hành; unique đầy đủ + NULLS NOT DISTINCT

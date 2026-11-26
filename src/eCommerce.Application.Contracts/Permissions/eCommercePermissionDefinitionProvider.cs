@@ -196,6 +196,13 @@ public class eCommercePermissionDefinitionProvider : PermissionDefinitionProvide
         var reports = group.AddPermission(eCommerceConsts.Permissions.Reports.Default);
         reports.AddChild(eCommerceConsts.Permissions.Reports.Aggregate);
 
+        // 🆕 `WP-26` (`D-270`) — 4 quyền hẹp là CON của `Reports.Default`; thiếu một định nghĩa ⇒ `403` cho
+        // MỌI người kể cả `admin` (`XC-004` D2, `BatBienPhanQuyenTests.TC02b` khoá hai chiều).
+        reports.AddChild(eCommerceConsts.Permissions.Reports.Rebuild);
+        reports.AddChild(eCommerceConsts.Permissions.Reports.PeriodClose);
+        reports.AddChild(eCommerceConsts.Permissions.Reports.PeriodReopen);
+        reports.AddChild(eCommerceConsts.Permissions.Reports.Reconcile);
+
         // ---- Thông báo (`WP-22` / `NOT-001`) ----
         // 🚨 BẮT BUỘC khai ở CẢ HAI NƠI (hằng số `eCommerceConsts.Permissions.Notifications` + ở đây):
         // thiếu một nơi ⇒ `403` cho MỌI người kể cả `admin` (`XC-004` D2/E3). 🛡️ `BatBienPhanQuyenTests.TC02b`.

@@ -280,6 +280,13 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>, IHasEventOut
 
     public DbSet<Reporting.RptWatermark> ReportWatermarks { get; set; } = default!;
 
+    // 🆕 `WP-26` — 3 bảng VẬN HÀNH GĐ3. 🚨 THIẾU `DbSet` ⇒ `IRepository<T>` không đăng ký ⇒ DI nổ (HTTP 500).
+    public DbSet<Reporting.RepRunLog> ReportRunLogs { get; set; } = default!;
+
+    public DbSet<Reporting.RepConsistencyCheck> ReportConsistencyChecks { get; set; } = default!;
+
+    public DbSet<Reporting.RepPeriodClose> ReportPeriodCloses { get; set; } = default!;
+
     // ---- ChannelHub (module) ----
     // 🚨 VÌ SAO PHẢI KHAI BÁO DbSet Ở ĐÂY:
     // AddDefaultRepositories(includeAllEntities: true) chỉ tạo IRepository<T> cho entity

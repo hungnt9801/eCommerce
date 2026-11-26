@@ -244,6 +244,77 @@ public class TongHopBaoCaoService : DomainService
         };
     }
 
+    /// <summary>
+    /// 🆕 `WP-26` — **XỬ LÝ MỘT NGÀY, KHÔNG GIÀNH KHOÁ** (rebuild gọi dưới `report:rebuild`).
+    ///
+    /// 🔑 Tách khỏi <see cref="ChayAsync"/> để rebuild tenant A **không** phải giành khoá **toàn cục**
+    /// `report:tong-hop` (sẽ chặn job của tenant khác). Cùng đường đọc/hàm thuần/`DELETE`+`INSERT` theo ngày
+    /// ⇒ chạy lại cùng ngày **thay thế**, không nhân đôi (`D-47` ①).
+    /// 📌 Trả **số dòng fact đã ghi** cho ngày đó (để `RepRunLog.GhiCuaSo` cộng `RowsWritten`).
+    /// </summary>
+    public async Task<int> ChayKhoangAsync(DateOnly ngay, bool ghiAnhTonKho = false)
+    {
+        var gioLech = _tuyChon.Value.GioLechUtc;
+        var luc = _dongHo.Now.ToUniversalTime();
+
+        var ketQua = await TinhNgayAsync(ngay, gioLech);
+
+        await _dongSuKien.DeleteAsync(x => x.BusinessDate == ngay);
+        await _tongHopNgay.DeleteAsync(x => x.BusinessDate == ngay);
+
+        if (ketQua.Dong.Count > 0)
+        {
+            await _dongSuKien.InsertManyAsync(
+                ketQua.Dong.Select(x => RptFactSalesLine.TuSuKien(_boSinhId.Create(), x)));
+        }
+
+        if (ketQua.TongHop.Count > 0)
+        {
+            await _tongHopNgay.InsertManyAsync(
+                ketQua.TongHop.Select(x => RptAggDailySales.TuTongHop(_boSinhId.Create(), x, luc)));
+        }
+
+        var sanPham = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        var khoCuaDong = new HashSet<Guid>();
+        var nhanVienCuaDong = new HashSet<Guid>();
+
+        foreach (var dong in ketQua.Dong)
+        {
+            if (!sanPham.ContainsKey(dong.Sku))
+            {
+                sanPham[dong.Sku] = dong.TenSanPham;
+            }
+
+            if (dong.KhoId is { } k)
+            {
+                khoCuaDong.Add(k);
+            }
+
+            if (dong.NhanVienId is { } nv)
+            {
+                nhanVienCuaDong.Add(nv);
+            }
+        }
+
+        await CapNhatChieuAsync(sanPham, khoCuaDong, nhanVienCuaDong);
+        await DamBaoDimNgayAsync(ngay);
+
+        if (ghiAnhTonKho)
+        {
+            await ChupAnhTonKhoAsync(ngay, luc);
+        }
+
+        return ketQua.Dong.Count;
+    }
+
+    /// <summary>🆕 `WP-26` — chụp ảnh tồn kho **mới nhất** gán vào `ngay` (rebuild projection `TonKho`).</summary>
+    public Task<int> ChupTonKhoAsync(DateOnly ngay)
+        => ChupAnhTonKhoAsync(ngay, _dongHo.Now.ToUniversalTime());
+
+    /// <summary>🆕 `WP-26` — dựng lại số **nguồn** của một ngày (cùng đường đọc của job, KHÔNG ghi).</summary>
+    internal Task<KetQuaTinhNgay> TinhNgayNguonAsync(DateOnly ngay)
+        => TinhNgayAsync(ngay, _tuyChon.Value.GioLechUtc);
+
     /// <summary>Tính **một ngày** từ chứng từ nguồn (đọc repo, không qua app service).</summary>
     private async Task<KetQuaTinhNgay> TinhNgayAsync(DateOnly ngay, int gioLech)
     {

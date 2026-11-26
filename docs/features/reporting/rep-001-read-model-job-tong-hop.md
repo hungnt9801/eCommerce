@@ -1029,3 +1029,27 @@ public class TongHopDoanhThuTests
 | D-172 (Q4) | §15.1 Q4: nhịp/lookback/`IsStale` `Open` | §15.1/§14.4: `Closed` — Setting 5 phút/3 ngày/900 s; code 15 phút là **lệch cần sửa** | `ReportingOptions.cs:17-18`; `ReportingAggregationWorker.cs:31` |
 | D-173 (Q6) | §7.2/§15.1 Q6: projection COD còn bỏ ngỏ | §7.2/§15.1: `REP-001` **không** có bảng/cột/job COD; nguồn `REC-003`, cờ `CodUnreconciled` ở `REP-003` | kế hoạch (0 code COD trong `modules/Reporting` — `D-173`) |
 | D-174 (Q8) | §15.1 Q8: cân nhắc `RepSalesHourlyFact` | §0/§5.2/§15.1: **không** bảng giờ; tổng hợp giờ = `date_trunc('hour', OccurredAtUtc)` lúc đọc | `FactSalesLine.cs:60-61,152` |
+
+---
+
+## Trạng thái triển khai (WP-26 / N89 — BE, `D-270`..`D-274`)
+
+> Cập nhật cuối phiên N89 (27/11/2026), vai `be`, nhánh `feat/gd3-wp26-read-model`.
+
+**Đã làm (W26-2 BE):**
+- Domain `Reporting`: 4 enum (`RepProjection`/`RepRunStatus`/`RepPeriodStatus`/`RepMismatchKind`, `smallint` + CHECK), 3 aggregate `RepRunLog`/`RepConsistencyCheck`/`RepPeriodClose` (máy trạng thái NÉM `0015`), hàm thuần `SoDoiChieu`/`BamKyChot`/`KhoangChot`, `RepIdempotency`, `ReportingLockKeys`, mã lỗi `0010–0017`.
+- Application.Contracts: `IReportAdminAppService` + DTO §4.1 (map tay, enum số, 0 PII).
+- Application: `ReportAdminAppService` (rebuild/resume/get/list · close/reopen/get/list · reconcile/getLech), `ReportRebuildWorker` (`ICurrentTenant.Change` trước UoW, mỗi ngày một UoW + `GhiCuaSo` cùng commit, terminal UoW riêng, resume từ `CheckpointDate+1`), `TongHopBaoCaoService.ChayKhoangAsync` (không giành khoá toàn cục).
+- EF: 3 entity config + 3 `DbSet`; migration `20261126181842_Wp26_VanHanh_BaoCao` do EF sinh, sửa tay 4 unique index `NULLS NOT DISTINCT` (partial đúng §5.2/§5.3/§5.4) + `btree_gist` + `EXCLUDE USING gist` (§5.5). Expand-only (chỉ CREATE TABLE/INDEX/CHECK + EXTENSION/EXCLUDE).
+- Permission `eCommerce.Reports.{Rebuild,PeriodClose,PeriodReopen,Reconcile}` (hằng + `AddChild`); `[Authorize]` cấp class + method ghi quyền hẹp.
+- 4 metric (`reporting_watermark_lag_seconds`/`reporting_projection_failed_total`/`reporting_rows_written_total`/`reporting_replace_conflict_total`), `All` 26→30, nhãn `projection`; `XC-005` §5.1 cập nhật.
+- Endpoint §4.2 (10 route mới trên `ReportsController`) + map 8 mã lỗi ở Host §4.3.
+- Test: unit 2283→2336 (+53) gồm domain thuần/máy trạng thái/0013/0014/0016/0017/idempotency/enum/metric/endpoint metadata; integration 122/122 gồm 4 ca `EXCLUDE` (§10.2: EX-1..EX-5) + 4 unique NND + dòng hệ thống 2 lượt không `23505` + `UX_DangChay`.
+- Migration đã áp dev DB bằng `DbMigrator` (sau `pg_dump` `artifacts/pg-dump/N89-W26-2.dump`, 497829 byte); kiểm `__EFMigrationsHistory` + 3 bảng + `EXCLUDE` (`contype='x'`) + 4 NND index.
+
+**Chưa làm / để phiên sau:**
+- Đo `EXPLAIN` index mới (NFR-003/007), test 3 instance (NFR-006), TC-06 cách ly 2 tenant/TC-10 resume đầy đủ — để QA ở G4.
+- `D-172` (nhịp 5 phút/lookback/`IsStale`) vẫn ngoài `WP-26` (`D-273`); giữ 15 phút as-built.
+- Báo cáo `TonKho` đối chiếu chỉ so được hôm nay (ảnh là trạng thái hiện tại — `D-47` ⑦).
+
+**Lệch đã báo (docDeviation):** không có lệch mới ở W26-2 BE; 10 mục `docDeviation #1..#10` của `-arch` §12.1 vẫn chờ BA sửa SRS cùng chuỗi (W26 BA).

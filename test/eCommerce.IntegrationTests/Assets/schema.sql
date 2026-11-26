@@ -4362,3 +4362,117 @@ VALUES ('20261126132231_Added_Notification_Template_Queue', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE TABLE "RepConsistencyChecks" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "FactDate" date NOT NULL,
+    "Projection" smallint NOT NULL,
+    "MismatchKind" smallint NOT NULL,
+    "FactKey" character varying(128) NOT NULL,
+    "ExpectedValue" numeric(18,4),
+    "ActualValue" numeric(18,4),
+    "Delta" numeric(18,4),
+    "AutoCorrected" boolean NOT NULL,
+    "DetectedByRunId" uuid,
+    "DetectedAtUtc" timestamp with time zone NOT NULL,
+    "ResolvedAtUtc" timestamp with time zone,
+    "ResolvedBy" uuid,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    CONSTRAINT "PK_RepConsistencyChecks" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_RepConsistencyChecks_Delta_Khop" CHECK (("Delta" IS NULL) = ("ExpectedValue" IS NULL OR "ActualValue" IS NULL)),
+    CONSTRAINT "CK_RepConsistencyChecks_FactKey_KhongRong" CHECK (length(btrim("FactKey")) > 0),
+    CONSTRAINT "CK_RepConsistencyChecks_MismatchKind_HopLe" CHECK ("MismatchKind" IN (0, 1, 2, 3, 4)),
+    CONSTRAINT "CK_RepConsistencyChecks_Projection_HopLe" CHECK ("Projection" IN (0, 1))
+);
+
+CREATE TABLE "RepPeriodCloses" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "FromDate" date NOT NULL,
+    "ToDate" date NOT NULL,
+    "Status" smallint NOT NULL,
+    "SnapshotHash" character(64),
+    "CloseReason" character varying(512) NOT NULL,
+    "ClosedBy" uuid,
+    "ClosedAtUtc" timestamp with time zone,
+    "ReopenedBy" uuid,
+    "ReopenReason" character varying(512),
+    "ReopenedAtUtc" timestamp with time zone,
+    "IdempotencyKey" character varying(256) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    CONSTRAINT "PK_RepPeriodCloses" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_RepPeriodCloses_CloseReason_ToiThieu" CHECK (length(btrim("CloseReason")) >= 10),
+    CONSTRAINT "CK_RepPeriodCloses_DaChot_DuChungTu" CHECK ("Status" <> 2 OR ("SnapshotHash" IS NOT NULL AND "ClosedBy" IS NOT NULL AND "ClosedAtUtc" IS NOT NULL)),
+    CONSTRAINT "CK_RepPeriodCloses_Khoang_HopLe" CHECK ("ToDate" >= "FromDate"),
+    CONSTRAINT "CK_RepPeriodCloses_ReopenReason_ToiThieu" CHECK ("ReopenReason" IS NULL OR length(btrim("ReopenReason")) >= 20),
+    CONSTRAINT "CK_RepPeriodCloses_Status_HopLe" CHECK ("Status" IN (0, 1, 2, 3))
+);
+
+CREATE TABLE "RepRunLogs" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "JobName" character varying(64) NOT NULL,
+    "Projection" smallint NOT NULL,
+    "Status" smallint NOT NULL,
+    "FromDate" date NOT NULL,
+    "ToDate" date NOT NULL,
+    "WindowsTotal" integer NOT NULL,
+    "WindowsDone" integer NOT NULL,
+    "CheckpointDate" date,
+    "RowsWritten" bigint NOT NULL,
+    "Reason" character varying(512) NOT NULL,
+    "RequestedBy" uuid,
+    "StartedAtUtc" timestamp with time zone,
+    "FinishedAtUtc" timestamp with time zone,
+    "HostName" character varying(128),
+    "CorrelationId" character varying(64),
+    "LastErrorCode" character varying(64),
+    "IdempotencyKey" character varying(256) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    CONSTRAINT "PK_RepRunLogs" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_RepRunLogs_Checkpoint_Khoang" CHECK ("CheckpointDate" IS NULL OR ("CheckpointDate" >= "FromDate" AND "CheckpointDate" <= "ToDate")),
+    CONSTRAINT "CK_RepRunLogs_JobName_HopLe" CHECK ("JobName" IN ('Rebuild', 'Reconcile', 'Aggregate')),
+    CONSTRAINT "CK_RepRunLogs_Khoang_HopLe" CHECK ("ToDate" >= "FromDate"),
+    CONSTRAINT "CK_RepRunLogs_Projection_HopLe" CHECK ("Projection" IN (0, 1)),
+    CONSTRAINT "CK_RepRunLogs_Reason_ToiThieu" CHECK (length(btrim("Reason")) >= 10),
+    CONSTRAINT "CK_RepRunLogs_RowsWritten_KhongAm" CHECK ("RowsWritten" >= 0),
+    CONSTRAINT "CK_RepRunLogs_Status_HopLe" CHECK ("Status" IN (0, 1, 2, 3, 4, 5)),
+    CONSTRAINT "CK_RepRunLogs_Windows_KhongAm" CHECK ("WindowsTotal" >= 0 AND "WindowsDone" >= 0 AND "WindowsDone" <= "WindowsTotal")
+);
+
+CREATE INDEX "IX_RepConsistencyChecks_TenantId_ChuaXuLy" ON "RepConsistencyChecks" ("TenantId", "ResolvedAtUtc");
+
+CREATE INDEX "IX_RepConsistencyChecks_TenantId_Ngay" ON "RepConsistencyChecks" ("TenantId", "FactDate");
+
+CREATE INDEX "IX_RepPeriodCloses_TenantId_TrangThai" ON "RepPeriodCloses" ("TenantId", "Status");
+
+CREATE INDEX "IX_RepRunLogs_TenantId_ThoiDiem" ON "RepRunLogs" ("TenantId", "CreationTime");
+
+CREATE UNIQUE INDEX "IX_RepRunLogs_TenantId_KhoaIdempotency" ON "RepRunLogs" ("TenantId", "IdempotencyKey") NULLS NOT DISTINCT WHERE "RequestedBy" IS NOT NULL;
+
+CREATE UNIQUE INDEX "UX_RepRunLogs_TenantId_Job_Projection_DangChay" ON "RepRunLogs" ("TenantId", "JobName", "Projection") NULLS NOT DISTINCT WHERE "Status" IN (0, 1);
+
+CREATE UNIQUE INDEX "UX_RepConsistencyChecks_DangMo" ON "RepConsistencyChecks" ("TenantId", "Projection", "FactDate", "MismatchKind", "FactKey") NULLS NOT DISTINCT WHERE "ResolvedAtUtc" IS NULL;
+
+CREATE UNIQUE INDEX "IX_RepPeriodCloses_TenantId_KhoaIdempotency" ON "RepPeriodCloses" ("TenantId", "IdempotencyKey") NULLS NOT DISTINCT;
+
+CREATE EXTENSION IF NOT EXISTS btree_gist;
+
+ALTER TABLE "RepPeriodCloses"
+    ADD CONSTRAINT "EX_RepPeriodCloses_KyDaChot_KhongChong"
+    EXCLUDE USING gist (
+        (COALESCE("TenantId", '00000000-0000-0000-0000-000000000000'::uuid)) WITH =,
+        (CASE WHEN "Status" = 2 THEN '00000000-0000-0000-0000-000000000000'::uuid
+              ELSE "Id" END) WITH =,
+        daterange("FromDate", "ToDate", '[]') WITH &&
+    );
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261126181842_Wp26_VanHanh_BaoCao', '10.0.11');
+
+COMMIT;
+

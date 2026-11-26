@@ -112,6 +112,19 @@ public static class eCommerceMetricNames
     /// <summary>Số tin bị khử trùng cửa sổ — nhãn `channel`.</summary>
     public const string NotificationWindowSuppressedTotal = "notification_window_suppressed_total";
 
+    // ---- Read-model BÁO CÁO (`REP-001` / `WP-26`) ----
+    /// <summary>Tuổi dữ liệu tổng hợp (`now − LastRunAtUtc`) — Gauge, nhãn `projection` (NFR-003).</summary>
+    public const string ReportingWatermarkLagSeconds = "reporting_watermark_lag_seconds";
+
+    /// <summary>Số lần cửa sổ lỗi / đối chiếu phát hiện lệch — nhãn `projection`, `reason`.</summary>
+    public const string ReportingProjectionFailedTotal = "reporting_projection_failed_total";
+
+    /// <summary>Số dòng **đã ghi** (thay thế) mỗi cửa sổ — nhãn `projection`.</summary>
+    public const string ReportingRowsWrittenTotal = "reporting_rows_written_total";
+
+    /// <summary>Số lần chạm thay thế (mỗi cửa sổ ghi lại) — nhãn `projection`.</summary>
+    public const string ReportingReplaceConflictTotal = "reporting_replace_conflict_total";
+
     /// <summary>Toàn bộ tên metric — nguồn sự thật duy nhất cho test `TC-06`.</summary>
     public static readonly IReadOnlyList<string> All =    [
         MessagingOutboxPending,
@@ -149,7 +162,12 @@ public static class eCommerceMetricNames
         NotificationRenderFailedTotal,
         NotificationQueueBacklog,
         NotificationDispatchLeaseExpiredTotal,
-        NotificationWindowSuppressedTotal
+        NotificationWindowSuppressedTotal,
+        // 🆕 `REP-001` / `WP-26` (27/11/2026): 4 metric read-model → 26→30.
+        ReportingWatermarkLagSeconds,
+        ReportingProjectionFailedTotal,
+        ReportingRowsWrittenTotal,
+        ReportingReplaceConflictTotal
     ];
 
     /// <summary>
@@ -207,7 +225,12 @@ public static class eCommerceMetricNames
             [NotificationRenderFailedTotal] = nameof(eCommerceMetrics.NotificationRenderFailed),
             [NotificationQueueBacklog] = nameof(eCommerceMetrics.SetNotificationQueueBacklog),
             [NotificationDispatchLeaseExpiredTotal] = nameof(eCommerceMetrics.NotificationDispatchLeaseExpired),
-            [NotificationWindowSuppressedTotal] = nameof(eCommerceMetrics.NotificationWindowSuppressed)
+            [NotificationWindowSuppressedTotal] = nameof(eCommerceMetrics.NotificationWindowSuppressed),
+            // 🆕 `REP-001` / `WP-26`
+            [ReportingWatermarkLagSeconds] = nameof(eCommerceMetrics.SetReportingWatermarkLagSeconds),
+            [ReportingProjectionFailedTotal] = nameof(eCommerceMetrics.ReportingProjectionFailed),
+            [ReportingRowsWrittenTotal] = nameof(eCommerceMetrics.ReportingRowsWritten),
+            [ReportingReplaceConflictTotal] = nameof(eCommerceMetrics.ReportingReplaceConflict)
         };
 
     /// <summary>
@@ -272,10 +295,13 @@ public static class eCommerceMetricTags
     /// <summary>`ADDR-001` — kết cục lượt nạp: `applied` / `blocked` / `error` / `skipped` (hữu hạn).</summary>
     public const string Outcome = "outcome";
 
+    /// <summary>`REP-001` / `WP-26` — phép chiếu read-model: `ban-hang` / `ton-kho` (hữu hạn).</summary>
+    public const string Projection = "projection";
+
     public static readonly IReadOnlyList<string> Allowed =
     [
         Channel, Provider, EventName, Status, Reason, Kind, Module, Result, Method, Route,
-        Axis, FromStatus, ToStatus, Trigger, Outcome
+        Axis, FromStatus, ToStatus, Trigger, Outcome, Projection
     ];
 
     /// <summary>Nhãn **BỊ CẤM** vì cardinality cao — test `TC-07` chặn nếu chúng lọt vào danh sách cho phép.</summary>
@@ -346,6 +372,16 @@ public sealed class eCommerceMetrics : ISingletonDependency
     public Counter<long> NotificationDispatchLeaseExpired { get; }
     public Counter<long> NotificationWindowSuppressed { get; }
 
+    // ---- Read-model BÁO CÁO (`REP-001` / `WP-26`) ----
+    /// <summary>Cửa sổ lỗi / đối chiếu phát hiện lệch — nhãn `projection`, `reason`.</summary>
+    public Counter<long> ReportingProjectionFailed { get; }
+
+    /// <summary>Số dòng đã ghi (thay thế) mỗi cửa sổ — nhãn `projection`.</summary>
+    public Counter<long> ReportingRowsWritten { get; }
+
+    /// <summary>Số lần chạm thay thế (mỗi cửa sổ ghi lại) — nhãn `projection`.</summary>
+    public Counter<long> ReportingReplaceConflict { get; }
+
     // ---- Histogram ----
     public Histogram<double> HttpRequestDurationSeconds { get; }
 
@@ -360,6 +396,10 @@ public sealed class eCommerceMetrics : ISingletonDependency
 
     /// <summary>`NOT-001` — tồn đọng hàng đợi (`ChoGui`) ở lượt gần nhất.</summary>
     private long _notificationQueueBacklog;
+
+    /// <summary>`WP-26` — tuổi dữ liệu (giây) theo `projection`; Gauge đa nhãn cập nhật qua dictionary.</summary>
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, long> _reportingWatermarkLag =
+        new(StringComparer.Ordinal);
 
     public void SetMessagingOutboxPending(long value) => Interlocked.Exchange(ref _messagingOutboxPending, value);
     public void SetMessagingDlqSize(long value) => Interlocked.Exchange(ref _messagingDlqSize, value);
@@ -377,6 +417,13 @@ public sealed class eCommerceMetrics : ISingletonDependency
 
     /// <summary>`NOT-001` — ghi tồn đọng hàng đợi (`ChoGui`).</summary>
     public void SetNotificationQueueBacklog(long value) => Interlocked.Exchange(ref _notificationQueueBacklog, value);
+
+    /// <summary>
+    /// `WP-26` — ghi tuổi dữ liệu (giây) cho một `projection` (`ban-hang`/`ton-kho`). Gauge đa nhãn: mỗi
+    /// giá trị là một chuỗi thời gian riêng, tập nhãn **hữu hạn** (2 giá trị) — không vi phạm `XC-005` BR-009.
+    /// </summary>
+    public void SetReportingWatermarkLagSeconds(long value, string projection)
+        => _reportingWatermarkLag[projection] = value;
 
     public eCommerceMetrics()
         : this(new Meter(MeterName, MeterVersion))
@@ -433,6 +480,15 @@ public sealed class eCommerceMetrics : ISingletonDependency
         NotificationWindowSuppressed = _meter.CreateCounter<long>(eCommerceMetricNames.NotificationWindowSuppressedTotal,
             unit: "{item}", description: "Số tin bị khử trùng cửa sổ (NOT-001) — nhãn channel.");
 
+        // 🆕 `REP-001` / `WP-26`
+        ReportingProjectionFailed = _meter.CreateCounter<long>(eCommerceMetricNames.ReportingProjectionFailedTotal,
+            unit: "{failure}",
+            description: "Cửa sổ tổng hợp lỗi / đối chiếu phát hiện lệch (REP-001) — nhãn projection, reason.");
+        ReportingRowsWritten = _meter.CreateCounter<long>(eCommerceMetricNames.ReportingRowsWrittenTotal,
+            unit: "{row}", description: "Số dòng đã ghi (thay thế) mỗi cửa sổ (REP-001) — nhãn projection.");
+        ReportingReplaceConflict = _meter.CreateCounter<long>(eCommerceMetricNames.ReportingReplaceConflictTotal,
+            unit: "{replace}", description: "Số lần chạm thay thế mỗi cửa sổ (REP-001) — nhãn projection.");
+
         HttpRequestDurationSeconds = _meter.CreateHistogram<double>(eCommerceMetricNames.HttpRequestDurationSeconds,
             unit: "s", description: "Độ trễ xử lý request HTTP.");
 
@@ -469,5 +525,12 @@ public sealed class eCommerceMetrics : ISingletonDependency
         _meter.CreateObservableGauge(eCommerceMetricNames.NotificationQueueBacklog,
             () => Interlocked.Read(ref _notificationQueueBacklog),
             unit: "{item}", description: "Số tin tồn đọng ở trạng thái ChoGui (NOT-001).");
+
+        // 🆕 `REP-001` / `WP-26` — Gauge đa nhãn theo `projection` (tập hữu hạn: ban-hang/ton-kho).
+        _meter.CreateObservableGauge(eCommerceMetricNames.ReportingWatermarkLagSeconds,
+            () => _reportingWatermarkLag.Select(kv => new Measurement<long>(
+                kv.Value,
+                new KeyValuePair<string, object?>(eCommerceMetricTags.Projection, kv.Key))),
+            unit: "s", description: "Tuổi dữ liệu tổng hợp (now − LastRunAtUtc) theo projection (REP-001 NFR-003).");
     }
 }

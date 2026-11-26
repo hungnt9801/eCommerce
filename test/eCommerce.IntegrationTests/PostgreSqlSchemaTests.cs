@@ -219,7 +219,7 @@ public class PostgreSqlSchemaTests
         //      `IX_NotificationQueueItems_Tenant_IdempotencyKey` (hàng rào chống gửi trùng ở DB — mất NND thì
         //      `TenantId = NULL` bị nhân bản IM LẶNG ⇒ gửi hai lần), và
         //      `IX_NotificationQueueItems_Tenant_Recipient_Fingerprint_Bucket` (partial, khử trùng cửa sổ).
-        Assert.Equal(101L, await DemAsync(
+        Assert.Equal(105L, await DemAsync(
             "select count(*) from pg_indexes where schemaname = 'public' and indexdef like '%NULLS NOT DISTINCT%'"));
 
         // Kiểm tra ĐÍCH DANH để thông báo lỗi có ý nghĩa (tên index dài có thể bị PostgreSQL cắt ⇒ so theo tiền tố).
@@ -431,6 +431,11 @@ public class PostgreSqlSchemaTests
             "IX_NotificationBatches_Tenant_Code",
             "IX_NotificationQueueItems_Tenant_IdempotencyKey",
             "IX_NotificationQueueItems_Tenant_Recipient_Fingerprint_Bucket",
+                    // 🆕 `WP-26` — 4 index NND của vận hành GĐ3.
+            "IX_RepRunLogs_TenantId_KhoaIdempotency",
+            "UX_RepRunLogs_TenantId_Job_Projection_DangChay",
+            "UX_RepConsistencyChecks_DangMo",
+            "IX_RepPeriodCloses_TenantId_KhoaIdempotency",
         ];
 
         foreach (var ten in phaiCo)

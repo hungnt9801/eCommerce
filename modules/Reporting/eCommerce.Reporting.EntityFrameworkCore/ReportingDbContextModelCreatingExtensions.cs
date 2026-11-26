@@ -212,5 +212,95 @@ public static class ReportingDbContextModelCreatingExtensions
                 .IsUnique()
                 .HasDatabaseName("IX_RptWatermarks_TenantId_Nguon");
         });
+
+        // ══════════════════════════════════════════════════════════════════════════════════════════════
+        // 🆕 `WP-26` — 3 BẢNG VẬN HÀNH GĐ3 (rebuild · chốt kỳ · đối chiếu). `REP-001` §5.
+        // ⚠️ 4 unique index `NULLS NOT DISTINCT` + `EXCLUDE USING gist` viết TAY trong migration
+        //    (`Wp26_VanHanh_BaoCao`) — EF KHÔNG sinh được NND/partial/EXCLUDE ⇒ KHÔNG khai `IsUnique` ở đây.
+        // ══════════════════════════════════════════════════════════════════════════════════════════════
+        builder.Entity<RepRunLog>(b =>
+        {
+            b.ToTable("RepRunLogs", t =>
+            {
+                t.HasCheckConstraint("CK_RepRunLogs_JobName_HopLe",
+                    "\"JobName\" IN ('Rebuild', 'Reconcile', 'Aggregate')");
+                t.HasCheckConstraint("CK_RepRunLogs_Projection_HopLe", "\"Projection\" IN (0, 1)");
+                t.HasCheckConstraint("CK_RepRunLogs_Status_HopLe", "\"Status\" IN (0, 1, 2, 3, 4, 5)");
+                t.HasCheckConstraint("CK_RepRunLogs_Khoang_HopLe", "\"ToDate\" >= \"FromDate\"");
+                t.HasCheckConstraint("CK_RepRunLogs_Windows_KhongAm",
+                    "\"WindowsTotal\" >= 0 AND \"WindowsDone\" >= 0 AND \"WindowsDone\" <= \"WindowsTotal\"");
+                t.HasCheckConstraint("CK_RepRunLogs_Checkpoint_Khoang",
+                    "\"CheckpointDate\" IS NULL OR " +
+                    "(\"CheckpointDate\" >= \"FromDate\" AND \"CheckpointDate\" <= \"ToDate\")");
+                t.HasCheckConstraint("CK_RepRunLogs_RowsWritten_KhongAm", "\"RowsWritten\" >= 0");
+                t.HasCheckConstraint("CK_RepRunLogs_Reason_ToiThieu", "length(btrim(\"Reason\")) >= 10");
+            });
+
+            b.ConfigureByConvention();
+
+            b.Property(x => x.JobName).IsRequired().HasMaxLength(64);
+            b.Property(x => x.Projection).HasConversion<short>();
+            b.Property(x => x.Status).HasConversion<short>();
+            b.Property(x => x.Reason).IsRequired().HasMaxLength(512);
+            b.Property(x => x.HostName).HasMaxLength(128);
+            b.Property(x => x.CorrelationId).HasMaxLength(64);
+            b.Property(x => x.LastErrorCode).HasMaxLength(64);
+            b.Property(x => x.IdempotencyKey).IsRequired().HasMaxLength(256);
+
+            b.HasIndex(x => new { x.TenantId, x.CreationTime })
+                .HasDatabaseName("IX_RepRunLogs_TenantId_ThoiDiem");
+        });
+
+        builder.Entity<RepConsistencyCheck>(b =>
+        {
+            b.ToTable("RepConsistencyChecks", t =>
+            {
+                t.HasCheckConstraint("CK_RepConsistencyChecks_Projection_HopLe", "\"Projection\" IN (0, 1)");
+                t.HasCheckConstraint("CK_RepConsistencyChecks_MismatchKind_HopLe", "\"MismatchKind\" IN (0, 1, 2, 3, 4)");
+                t.HasCheckConstraint("CK_RepConsistencyChecks_FactKey_KhongRong", "length(btrim(\"FactKey\")) > 0");
+                t.HasCheckConstraint("CK_RepConsistencyChecks_Delta_Khop",
+                    "(\"Delta\" IS NULL) = (\"ExpectedValue\" IS NULL OR \"ActualValue\" IS NULL)");
+            });
+
+            b.ConfigureByConvention();
+
+            b.Property(x => x.Projection).HasConversion<short>();
+            b.Property(x => x.MismatchKind).HasConversion<short>();
+            b.Property(x => x.FactKey).IsRequired().HasMaxLength(128);
+            b.Property(x => x.ExpectedValue).HasPrecision(18, 4);
+            b.Property(x => x.ActualValue).HasPrecision(18, 4);
+            b.Property(x => x.Delta).HasPrecision(18, 4);
+
+            b.HasIndex(x => new { x.TenantId, x.FactDate })
+                .HasDatabaseName("IX_RepConsistencyChecks_TenantId_Ngay");
+            b.HasIndex(x => new { x.TenantId, x.ResolvedAtUtc })
+                .HasDatabaseName("IX_RepConsistencyChecks_TenantId_ChuaXuLy");
+        });
+
+        builder.Entity<RepPeriodClose>(b =>
+        {
+            b.ToTable("RepPeriodCloses", t =>
+            {
+                t.HasCheckConstraint("CK_RepPeriodCloses_Status_HopLe", "\"Status\" IN (0, 1, 2, 3)");
+                t.HasCheckConstraint("CK_RepPeriodCloses_Khoang_HopLe", "\"ToDate\" >= \"FromDate\"");
+                t.HasCheckConstraint("CK_RepPeriodCloses_CloseReason_ToiThieu", "length(btrim(\"CloseReason\")) >= 10");
+                t.HasCheckConstraint("CK_RepPeriodCloses_DaChot_DuChungTu",
+                    "\"Status\" <> 2 OR (\"SnapshotHash\" IS NOT NULL AND \"ClosedBy\" IS NOT NULL " +
+                    "AND \"ClosedAtUtc\" IS NOT NULL)");
+                t.HasCheckConstraint("CK_RepPeriodCloses_ReopenReason_ToiThieu",
+                    "\"ReopenReason\" IS NULL OR length(btrim(\"ReopenReason\")) >= 20");
+            });
+
+            b.ConfigureByConvention();
+
+            b.Property(x => x.Status).HasConversion<short>();
+            b.Property(x => x.SnapshotHash).HasMaxLength(64).IsFixedLength();
+            b.Property(x => x.CloseReason).IsRequired().HasMaxLength(512);
+            b.Property(x => x.ReopenReason).HasMaxLength(512);
+            b.Property(x => x.IdempotencyKey).IsRequired().HasMaxLength(256);
+
+            b.HasIndex(x => new { x.TenantId, x.Status })
+                .HasDatabaseName("IX_RepPeriodCloses_TenantId_TrangThai");
+        });
     }
 }

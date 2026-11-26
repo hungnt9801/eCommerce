@@ -447,7 +447,24 @@ public class Wp08BaoCaoTests
             .ToList();
 
         Assert.Equal(
-            new[] { "GET dashboard", "GET inventory/summary", "GET orders/summary", "GET revenue", "POST aggregate" },
+            new[]
+            {
+                "GET consistency-checks",
+                "GET dashboard",
+                "GET inventory/summary",
+                "GET orders/summary",
+                "GET period-close/{id:guid}",
+                "GET period-closes",
+                "GET rebuild/{runId:guid}",
+                "GET rebuilds",
+                "GET revenue",
+                "POST aggregate",
+                "POST period-close",
+                "POST period-close/{id:guid}/reopen",
+                "POST rebuild",
+                "POST rebuild/{runId:guid}/resume",
+                "POST reconciliation"
+            },
             duong);
     }
 

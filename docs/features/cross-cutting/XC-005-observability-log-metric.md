@@ -212,6 +212,12 @@ graph LR
 | `notification_queue_backlog` | Gauge | — | **`NOT-001`** §11 | ✅ `NotificationDispatchWorker` (`SetNotificationQueueBacklog`) |
 | `notification_dispatch_lease_expired_total` | Counter | — | **`NOT-001`** §11 | ✅ `NotificationDispatchWorker` |
 | `notification_window_suppressed_total` | Counter | `channel` | **`NOT-001`** §11 | ✅ `NotificationQueueAppender` |
+| `reporting_watermark_lag_seconds` | Gauge | `projection` | **`REP-001`/`WP-26`** (27/11/2026) | ✅ `ReportRebuildWorker` (`SetReportingWatermarkLagSeconds`) |
+| `reporting_projection_failed_total` | Counter | `projection`, `reason` | **`REP-001`/`WP-26`** | ✅ `ReportRebuildWorker` (cửa sổ lỗi) + `ReportAdminAppService` (mismatch) |
+| `reporting_rows_written_total` | Counter | `projection` | **`REP-001`/`WP-26`** | ✅ `ReportRebuildWorker` |
+| `reporting_replace_conflict_total` | Counter | `projection` | **`REP-001`/`WP-26`** | ✅ `ReportRebuildWorker` |
+
+> 📌 **`WP-26` (`REP-001`, 27/11/2026):** nâng registry **26 → 30** (4 metric `reporting_*`, nhãn `projection` ∈ `eCommerceMetricTags.Allowed`). Cả 4 có điểm phát thật (`ReportRebuildWorker`/`ReportAdminAppService`) nên **không** vào `ChuaCoNoiPhat`.
 
 > 📌 **`WP-22` (`NOT-001`, 26/11/2026):** nâng registry **19 → 26**. 7 metric `notification_*` có điểm phát thật (`NotificationQueueAppender`/`NotificationDispatchWorker`) nên **không** vào `ChuaCoNoiPhat`; nhãn `channel`/`result`/`reason` đều thuộc `eCommerceMetricTags.Allowed`; `notification_queue_backlog` là **gauge** (tồn đọng `ChoGui`), tên giữ theo `D-267` (qa thêm `_backlog` vào whitelist test).
 

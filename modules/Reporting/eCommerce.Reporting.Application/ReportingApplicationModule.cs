@@ -34,5 +34,8 @@ public class ReportingApplicationModule : AbpModule
     public override async Task OnPostApplicationInitializationAsync(ApplicationInitializationContext context)
     {
         await context.AddBackgroundWorkerAsync<ReportingAggregationWorker>();
+
+        // 🆕 `WP-26` — worker xử lý hàng đợi rebuild (`RepRunLogs.Status = Queued`).
+        await context.AddBackgroundWorkerAsync<ReportRebuildWorker>();
     }
 }

@@ -10086,6 +10086,262 @@ namespace eCommerce.Migrations
                     b.ToTable("RecPaymentReconciliationRuns", (string)null);
                 });
 
+            modelBuilder.Entity("eCommerce.Reporting.RepConsistencyCheck", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("ActualValue")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<bool>("AutoCorrected")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<decimal?>("Delta")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<DateTime>("DetectedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DetectedByRunId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("ExpectedValue")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<DateOnly>("FactDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("FactKey")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<short>("MismatchKind")
+                        .HasColumnType("smallint");
+
+                    b.Property<short>("Projection")
+                        .HasColumnType("smallint");
+
+                    b.Property<DateTime?>("ResolvedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ResolvedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "FactDate")
+                        .HasDatabaseName("IX_RepConsistencyChecks_TenantId_Ngay");
+
+                    b.HasIndex("TenantId", "ResolvedAtUtc")
+                        .HasDatabaseName("IX_RepConsistencyChecks_TenantId_ChuaXuLy");
+
+                    b.ToTable("RepConsistencyChecks", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_RepConsistencyChecks_Delta_Khop", "(\"Delta\" IS NULL) = (\"ExpectedValue\" IS NULL OR \"ActualValue\" IS NULL)");
+
+                            t.HasCheckConstraint("CK_RepConsistencyChecks_FactKey_KhongRong", "length(btrim(\"FactKey\")) > 0");
+
+                            t.HasCheckConstraint("CK_RepConsistencyChecks_MismatchKind_HopLe", "\"MismatchKind\" IN (0, 1, 2, 3, 4)");
+
+                            t.HasCheckConstraint("CK_RepConsistencyChecks_Projection_HopLe", "\"Projection\" IN (0, 1)");
+                        });
+                });
+
+            modelBuilder.Entity("eCommerce.Reporting.RepPeriodClose", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CloseReason")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<DateTime?>("ClosedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ClosedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<DateOnly>("FromDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("ReopenReason")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<DateTime?>("ReopenedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ReopenedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SnapshotHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character(64)")
+                        .IsFixedLength();
+
+                    b.Property<short>("Status")
+                        .HasColumnType("smallint");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.Property<DateOnly>("ToDate")
+                        .HasColumnType("date");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Status")
+                        .HasDatabaseName("IX_RepPeriodCloses_TenantId_TrangThai");
+
+                    b.ToTable("RepPeriodCloses", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_RepPeriodCloses_CloseReason_ToiThieu", "length(btrim(\"CloseReason\")) >= 10");
+
+                            t.HasCheckConstraint("CK_RepPeriodCloses_DaChot_DuChungTu", "\"Status\" <> 2 OR (\"SnapshotHash\" IS NOT NULL AND \"ClosedBy\" IS NOT NULL AND \"ClosedAtUtc\" IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_RepPeriodCloses_Khoang_HopLe", "\"ToDate\" >= \"FromDate\"");
+
+                            t.HasCheckConstraint("CK_RepPeriodCloses_ReopenReason_ToiThieu", "\"ReopenReason\" IS NULL OR length(btrim(\"ReopenReason\")) >= 20");
+
+                            t.HasCheckConstraint("CK_RepPeriodCloses_Status_HopLe", "\"Status\" IN (0, 1, 2, 3)");
+                        });
+                });
+
+            modelBuilder.Entity("eCommerce.Reporting.RepRunLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly?>("CheckpointDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("CorrelationId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<DateTime?>("FinishedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly>("FromDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("HostName")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("JobName")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("LastErrorCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<short>("Projection")
+                        .HasColumnType("smallint");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<Guid?>("RequestedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("RowsWritten")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("StartedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<short>("Status")
+                        .HasColumnType("smallint");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.Property<DateOnly>("ToDate")
+                        .HasColumnType("date");
+
+                    b.Property<int>("WindowsDone")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("WindowsTotal")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "CreationTime")
+                        .HasDatabaseName("IX_RepRunLogs_TenantId_ThoiDiem");
+
+                    b.ToTable("RepRunLogs", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_RepRunLogs_Checkpoint_Khoang", "\"CheckpointDate\" IS NULL OR (\"CheckpointDate\" >= \"FromDate\" AND \"CheckpointDate\" <= \"ToDate\")");
+
+                            t.HasCheckConstraint("CK_RepRunLogs_JobName_HopLe", "\"JobName\" IN ('Rebuild', 'Reconcile', 'Aggregate')");
+
+                            t.HasCheckConstraint("CK_RepRunLogs_Khoang_HopLe", "\"ToDate\" >= \"FromDate\"");
+
+                            t.HasCheckConstraint("CK_RepRunLogs_Projection_HopLe", "\"Projection\" IN (0, 1)");
+
+                            t.HasCheckConstraint("CK_RepRunLogs_Reason_ToiThieu", "length(btrim(\"Reason\")) >= 10");
+
+                            t.HasCheckConstraint("CK_RepRunLogs_RowsWritten_KhongAm", "\"RowsWritten\" >= 0");
+
+                            t.HasCheckConstraint("CK_RepRunLogs_Status_HopLe", "\"Status\" IN (0, 1, 2, 3, 4, 5)");
+
+                            t.HasCheckConstraint("CK_RepRunLogs_Windows_KhongAm", "\"WindowsTotal\" >= 0 AND \"WindowsDone\" >= 0 AND \"WindowsDone\" <= \"WindowsTotal\"");
+                        });
+                });
+
             modelBuilder.Entity("eCommerce.Reporting.RptAggDailySales", b =>
                 {
                     b.Property<Guid>("Id")
