@@ -110,3 +110,10 @@ test so với **chính hằng** ⇒ đột biến vô nghĩa (không đỏ) — 
 6. ⚠️ **Lệch hợp đồng cần BA xem** (không tự sửa SRS): SRS §14.2 ghi fixture `TongHopDoanhThu.TinhNgay(chungTu, dong)`
    trả `.TongDoanhThu`/`.TongHop`; as-built trả `KetQuaTinhNgay` có `.Dong`/`.TongHop` (không có `TongDoanhThu`). Test
    viết theo **as-built**, không sửa mã sản phẩm.
+
+## Negative control
+| Ngay | Ma | Tep:dong | Dot bien | Lenh test | Bang chung |
+|---|---|---|---|---|---|
+| 2026-11-27 | NC-1 | modules/Reporting/eCommerce.Reporting.Domain/VanHanh/RepPeriodClose.cs:20 | Nguong ly do dong ky 10 -> 9 (ly do 9 ky tu bi nhan) | dotnet test test/eCommerce.Tests/eCommerce.Tests.csproj --filter FullyQualifiedName~RepVanHanh --nologo -v q | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
+| 2026-11-27 | NC-2 | modules/Reporting/eCommerce.Reporting.Domain/VanHanh/KhoangChot.cs:66 | Noi cua chan chot ky: so dong lech mo > 0 -> > 1 | dotnet test test/eCommerce.Tests/eCommerce.Tests.csproj --filter FullyQualifiedName~RepVanHanh --nologo -v q | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
+| 2026-11-27 | NC-3 | modules/Reporting/eCommerce.Reporting.Domain/VanHanh/KhoangChot.cs:54 | Dao guard rebuild TonKho qua khu | dotnet test test/eCommerce.Tests/eCommerce.Tests.csproj --filter FullyQualifiedName~RepVanHanh --nologo -v q | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
