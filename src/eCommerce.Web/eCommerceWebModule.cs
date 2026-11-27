@@ -2,6 +2,7 @@ using eCommerce.Observability;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Volo.Abp;
 using Volo.Abp.Account.Web;
@@ -12,6 +13,7 @@ using Volo.Abp.Autofac;
 using Volo.Abp.BackgroundJobs;
 using Volo.Abp.BackgroundWorkers;
 using Volo.Abp.Data;
+using Volo.Abp.DistributedLocking;
 using Volo.Abp.Modularity;
 using Volo.Abp.Uow;
 
@@ -74,7 +76,13 @@ namespace eCommerce.Web;
         typeof(PaymentHub.PaymentHubApplicationModule),
         // 🚨 `ADDR-004` (`S2`) — sổ địa chỉ. `CustomerAppService` cần `IAddressDirectory` ⇒ **thiếu dòng này**
         // thì `/KhachHang` trả `500` (DI không dựng được controller) mà **build vẫn xanh**.
-        typeof(Address.Application.AddressApplicationModule)
+        typeof(Address.Application.AddressApplicationModule),
+        // 🚨 `D-293` (`WP-24`, `PRO-002`) — **KHUYẾN MÃI PHẢI ĐƯỢC NẠP Ở WEB**: `/DatHang` gọi
+        // `ICheckoutAppService`, ctor tiêm `IPromotionEngine` ⇒ thiếu module này DI **KHÔNG dựng được**
+        // `DatHangController` ⇒ **`HTTP 500`** (đo được ở G6: E2E 145/150).
+        // 📌 Cùng khuôn `Pricing`/`CatalogMedia`: Web chạy **in-process** ⇒ dùng app service của module nào
+        // thì **phải nạp module đó ở CẢ Host VÀ Web** — chỉ thêm `ProjectReference` là **KHÔNG đủ**.
+        typeof(Promotions.PromotionsApplicationModule)
 )]
 public class eCommerceWebModule : AbpModule
 {
@@ -105,6 +113,14 @@ public class eCommerceWebModule : AbpModule
         // 📌 Không dùng `new HttpClient()` trong controller: tạo client mỗi request là cách chắc chắn nhất để
         // cạn socket, và nó **không có** chỗ nào để đặt timeout/đo đạc tập trung.
         context.Services.AddHttpClient();
+
+        // 🚨 `D-294` (`WP-24`, `PRO-002`) — ÉP KHOÁ PHÂN TÁN VỀ `LocalAbpDistributedLock`:
+        // `PromotionsApplicationModule` kéo `AbpDistributedLockingModule` ⇒ ABP thay `IAbpDistributedLock`
+        // bằng `MedallionAbpDistributedLock`, mà loại này cần `IDistributedLockProvider` (Redis) ⇒ **Web
+        // KHÔNG boot** (`AbpInitializationException … Cannot resolve parameter 'IDistributedLockProvider'`).
+        // Web **không** dùng khoá liên tiến trình (worker/job đã tắt ngay dưới) ⇒ dùng lại
+        // `LocalAbpDistributedLock` có sẵn của ABP; **0** package mới, **0** Redis.
+        context.Services.Replace(ServiceDescriptor.Singleton<IAbpDistributedLock, LocalAbpDistributedLock>());
 
         // Mọi thao tác ghi đi qua Unit of Work (transaction tự động) — giống Host.
         Configure<Volo.Abp.Uow.AbpUnitOfWorkDefaultOptions>(options =>
