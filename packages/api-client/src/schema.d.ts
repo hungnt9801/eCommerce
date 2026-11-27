@@ -3482,6 +3482,306 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/voucher": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    PromotionId?: string;
+                    Status?: components["schemas"]["eCommerce.Promotions.VoucherCodeStatus"];
+                    Code?: string;
+                    Page?: number;
+                    PageSize?: number;
+                    Sort?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Promotions.Contracts.VoucherDto, eCommerce.Promotions.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"];
+                        "application/json": components["schemas"]["eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Promotions.Contracts.VoucherDto, eCommerce.Promotions.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"];
+                        "text/json": components["schemas"]["eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Promotions.Contracts.VoucherDto, eCommerce.Promotions.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/voucher/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Promotions.Contracts.VoucherDetailDto"];
+                        "application/json": components["schemas"]["eCommerce.Promotions.Contracts.VoucherDetailDto"];
+                        "text/json": components["schemas"]["eCommerce.Promotions.Contracts.VoucherDetailDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/voucher/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["eCommerce.Promotions.Contracts.GenerateVouchersDto"];
+                    "text/json": components["schemas"]["eCommerce.Promotions.Contracts.GenerateVouchersDto"];
+                    "application/*+json": components["schemas"]["eCommerce.Promotions.Contracts.GenerateVouchersDto"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Promotions.Contracts.GeneratedVouchersDto"];
+                        "application/json": components["schemas"]["eCommerce.Promotions.Contracts.GeneratedVouchersDto"];
+                        "text/json": components["schemas"]["eCommerce.Promotions.Contracts.GeneratedVouchersDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/voucher/{id}/issue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Promotions.Contracts.VoucherDto"];
+                        "application/json": components["schemas"]["eCommerce.Promotions.Contracts.VoucherDto"];
+                        "text/json": components["schemas"]["eCommerce.Promotions.Contracts.VoucherDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/voucher/{id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["eCommerce.HttpApi.Controllers.VoucherReasonInput"];
+                    "text/json": components["schemas"]["eCommerce.HttpApi.Controllers.VoucherReasonInput"];
+                    "application/*+json": components["schemas"]["eCommerce.HttpApi.Controllers.VoucherReasonInput"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Promotions.Contracts.VoucherDto"];
+                        "application/json": components["schemas"]["eCommerce.Promotions.Contracts.VoucherDto"];
+                        "text/json": components["schemas"]["eCommerce.Promotions.Contracts.VoucherDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/voucher/{id}/override-limit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["eCommerce.HttpApi.Controllers.VoucherOverrideLimitInput"];
+                    "text/json": components["schemas"]["eCommerce.HttpApi.Controllers.VoucherOverrideLimitInput"];
+                    "application/*+json": components["schemas"]["eCommerce.HttpApi.Controllers.VoucherOverrideLimitInput"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Promotions.Contracts.VoucherDto"];
+                        "application/json": components["schemas"]["eCommerce.Promotions.Contracts.VoucherDto"];
+                        "text/json": components["schemas"]["eCommerce.Promotions.Contracts.VoucherDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/voucher/redemptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    OrderId?: string;
+                    Status?: components["schemas"]["eCommerce.Promotions.PromotionRedemptionStatus"];
+                    CustomerId?: string;
+                    PromotionId?: string;
+                    Page?: number;
+                    PageSize?: number;
+                    Sort?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Promotions.Contracts.RedemptionDto, eCommerce.Promotions.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"];
+                        "application/json": components["schemas"]["eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Promotions.Contracts.RedemptionDto, eCommerce.Promotions.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"];
+                        "text/json": components["schemas"]["eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Promotions.Contracts.RedemptionDto, eCommerce.Promotions.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3599,6 +3899,11 @@ export interface components {
         };
         "Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Promotions.Contracts.RedemptionDto, eCommerce.Promotions.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]": {
             items?: components["schemas"]["eCommerce.Promotions.Contracts.RedemptionDto"][] | null;
+            /** Format: int64 */
+            totalCount?: number;
+        };
+        "Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Promotions.Contracts.VoucherDto, eCommerce.Promotions.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]": {
+            items?: components["schemas"]["eCommerce.Promotions.Contracts.VoucherDto"][] | null;
             /** Format: int64 */
             totalCount?: number;
         };
@@ -4317,6 +4622,7 @@ export interface components {
             orderDiscount?: number;
             /** Format: double */
             orderFee?: number;
+            voucherCode?: string | null;
             /** Format: int32 */
             ttlPhut?: number | null;
             idempotencyKey: string;
@@ -4338,6 +4644,13 @@ export interface components {
             /** Format: date-time */
             expiresAtUtc?: string;
             laKetQuaDaCo?: boolean;
+            /** Format: uuid */
+            voucherRedemptionId?: string | null;
+            /** Format: double */
+            voucherDiscountTotal?: number | null;
+            /** Format: date-time */
+            voucherExpiresAtUtc?: string | null;
+            voucherReasonCode?: string | null;
         };
         "eCommerce.Application.Contracts.Inventory.ChinhSachHanMucDto": {
             donVi?: string | null;
@@ -5156,6 +5469,9 @@ export interface components {
             /** Format: uuid */
             customerId?: string | null;
             note?: string | null;
+            /** Format: uuid */
+            voucherRedemptionId?: string | null;
+            voucherCode?: string | null;
         };
         "eCommerce.Application.Contracts.Sales.TraHangInput": {
             /** Format: uuid */
@@ -6157,6 +6473,14 @@ export interface components {
             serverTimeUtc?: string;
             authenticated?: boolean;
         };
+        "eCommerce.HttpApi.Controllers.VoucherOverrideLimitInput": {
+            /** Format: int32 */
+            newMaxUsage?: number;
+            reason?: string | null;
+        };
+        "eCommerce.HttpApi.Controllers.VoucherReasonInput": {
+            reason?: string | null;
+        };
         "eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Application.Contracts.Inventory.StockBalanceDto, eCommerce.Inventory.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]": {
             items?: components["schemas"]["eCommerce.Application.Contracts.Inventory.StockBalanceDto"][] | null;
             /** Format: int64 */
@@ -6213,6 +6537,24 @@ export interface components {
         };
         "eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Promotions.Contracts.PromotionListItemDto, eCommerce.Promotions.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]": {
             items?: components["schemas"]["eCommerce.Promotions.Contracts.PromotionListItemDto"][] | null;
+            /** Format: int64 */
+            total?: number;
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            pageSize?: number;
+        };
+        "eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Promotions.Contracts.RedemptionDto, eCommerce.Promotions.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]": {
+            items?: components["schemas"]["eCommerce.Promotions.Contracts.RedemptionDto"][] | null;
+            /** Format: int64 */
+            total?: number;
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            pageSize?: number;
+        };
+        "eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Promotions.Contracts.VoucherDto, eCommerce.Promotions.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]": {
+            items?: components["schemas"]["eCommerce.Promotions.Contracts.VoucherDto"][] | null;
             /** Format: int64 */
             total?: number;
             /** Format: int32 */
@@ -7168,6 +7510,7 @@ export interface components {
             /** Format: date-time */
             at?: string | null;
             idempotencyKey: string;
+            khongGhiSoGiaiTrinh?: boolean;
         };
         /**
          * Format: int32
@@ -7208,6 +7551,24 @@ export interface components {
             maxUsageTotal?: number | null;
             /** Format: int32 */
             maxUsagePerCustomer?: number | null;
+        };
+        "eCommerce.Promotions.Contracts.GenerateVouchersDto": {
+            /** Format: uuid */
+            promotionId?: string;
+            prefix?: string | null;
+            /** Format: int32 */
+            length?: number;
+            /** Format: int32 */
+            quantity?: number;
+            /** Format: int32 */
+            maxUsage?: number;
+        };
+        "eCommerce.Promotions.Contracts.GeneratedVouchersDto": {
+            /** Format: uuid */
+            promotionId?: string;
+            codes?: string[] | null;
+            /** Format: int32 */
+            count?: number;
         };
         "eCommerce.Promotions.Contracts.ImportResultDto": {
             /** Format: int32 */
@@ -7459,6 +7820,8 @@ export interface components {
             treeVersion?: number;
             /** Format: date-time */
             evaluatedAtUtc?: string;
+            /** Format: date-time */
+            expiresAtUtc?: string | null;
         };
         "eCommerce.Promotions.Contracts.SetPromotionStatusInput": {
             status?: components["schemas"]["eCommerce.Promotions.PromotionStatus"];
@@ -7477,6 +7840,55 @@ export interface components {
             /** Format: uuid */
             customerGroupId?: string | null;
             isFirstOrder?: boolean | null;
+        };
+        "eCommerce.Promotions.Contracts.VoucherDetailDto": {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            promotionId?: string;
+            code?: string | null;
+            /** Format: int32 */
+            maxUsage?: number;
+            /** Format: int32 */
+            usedCount?: number;
+            /** Format: int32 */
+            reservedCount?: number;
+            status?: components["schemas"]["eCommerce.Promotions.VoucherCodeStatus"];
+            /** Format: int32 */
+            remainingUses?: number;
+            isExpired?: boolean;
+            isExhausted?: boolean;
+            currency?: string | null;
+            /** Format: date-time */
+            startsAtUtc?: string | null;
+            /** Format: date-time */
+            endsAtUtc?: string | null;
+            /** Format: int32 */
+            maxUsagePerCustomer?: number | null;
+            promotionCode?: string | null;
+        };
+        "eCommerce.Promotions.Contracts.VoucherDto": {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            promotionId?: string;
+            code?: string | null;
+            /** Format: int32 */
+            maxUsage?: number;
+            /** Format: int32 */
+            usedCount?: number;
+            /** Format: int32 */
+            reservedCount?: number;
+            status?: components["schemas"]["eCommerce.Promotions.VoucherCodeStatus"];
+            /** Format: int32 */
+            remainingUses?: number;
+            isExpired?: boolean;
+            isExhausted?: boolean;
+            currency?: string | null;
+            /** Format: date-time */
+            startsAtUtc?: string | null;
+            /** Format: date-time */
+            endsAtUtc?: string | null;
         };
         "eCommerce.Promotions.Contracts.VoucherValidationDto": {
             isValid?: boolean;
@@ -7512,6 +7924,11 @@ export interface components {
          * @enum {integer}
          */
         "eCommerce.Promotions.PromotionStatus": 0 | 1 | 2 | 3 | 4 | 5;
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        "eCommerce.Promotions.VoucherCodeStatus": 0 | 1 | 2;
         "eCommerce.Reconciliation.Dtos.PaymentDiscrepancyDto": {
             /** Format: uuid */
             id?: string;

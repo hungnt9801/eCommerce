@@ -4633,6 +4633,413 @@
           }
         }
       }
+    },
+    "/api/v1/voucher": {
+      "get": {
+        "tags": [
+          "Voucher"
+        ],
+        "parameters": [
+          {
+            "name": "PromotionId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Status",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/eCommerce.Promotions.VoucherCodeStatus"
+            }
+          },
+          {
+            "name": "Code",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "PageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "Sort",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Promotions.Contracts.VoucherDto, eCommerce.Promotions.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Promotions.Contracts.VoucherDto, eCommerce.Promotions.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Promotions.Contracts.VoucherDto, eCommerce.Promotions.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/voucher/{id}": {
+      "get": {
+        "tags": [
+          "Voucher"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.VoucherDetailDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.VoucherDetailDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.VoucherDetailDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/voucher/generate": {
+      "post": {
+        "tags": [
+          "Voucher"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.GenerateVouchersDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.GenerateVouchersDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.GenerateVouchersDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.GeneratedVouchersDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.GeneratedVouchersDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.GeneratedVouchersDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/voucher/{id}/issue": {
+      "post": {
+        "tags": [
+          "Voucher"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.VoucherDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.VoucherDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.VoucherDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/voucher/{id}/revoke": {
+      "post": {
+        "tags": [
+          "Voucher"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.HttpApi.Controllers.VoucherReasonInput"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.HttpApi.Controllers.VoucherReasonInput"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.HttpApi.Controllers.VoucherReasonInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.VoucherDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.VoucherDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.VoucherDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/voucher/{id}/override-limit": {
+      "post": {
+        "tags": [
+          "Voucher"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.HttpApi.Controllers.VoucherOverrideLimitInput"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.HttpApi.Controllers.VoucherOverrideLimitInput"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.HttpApi.Controllers.VoucherOverrideLimitInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.VoucherDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.VoucherDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.VoucherDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/voucher/redemptions": {
+      "get": {
+        "tags": [
+          "Voucher"
+        ],
+        "parameters": [
+          {
+            "name": "OrderId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Status",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/eCommerce.Promotions.PromotionRedemptionStatus"
+            }
+          },
+          {
+            "name": "CustomerId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "PromotionId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "PageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "Sort",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Promotions.Contracts.RedemptionDto, eCommerce.Promotions.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Promotions.Contracts.RedemptionDto, eCommerce.Promotions.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Promotions.Contracts.RedemptionDto, eCommerce.Promotions.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -5022,6 +5429,23 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.RedemptionDto"
+            },
+            "nullable": true
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Promotions.Contracts.VoucherDto, eCommerce.Promotions.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.VoucherDto"
             },
             "nullable": true
           },
@@ -7308,6 +7732,12 @@
             "type": "number",
             "format": "double"
           },
+          "voucherCode": {
+            "maxLength": 64,
+            "minLength": 0,
+            "type": "string",
+            "nullable": true
+          },
           "ttlPhut": {
             "maximum": 1440,
             "minimum": 1,
@@ -7381,6 +7811,25 @@
           },
           "laKetQuaDaCo": {
             "type": "boolean"
+          },
+          "voucherRedemptionId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "voucherDiscountTotal": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "voucherExpiresAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "voucherReasonCode": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -9715,6 +10164,17 @@
           },
           "note": {
             "maxLength": 2048,
+            "minLength": 0,
+            "type": "string",
+            "nullable": true
+          },
+          "voucherRedemptionId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "voucherCode": {
+            "maxLength": 64,
             "minLength": 0,
             "type": "string",
             "nullable": true
@@ -12834,6 +13294,30 @@
         },
         "additionalProperties": false
       },
+      "eCommerce.HttpApi.Controllers.VoucherOverrideLimitInput": {
+        "type": "object",
+        "properties": {
+          "newMaxUsage": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.HttpApi.Controllers.VoucherReasonInput": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Application.Contracts.Inventory.StockBalanceDto, eCommerce.Inventory.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]": {
         "type": "object",
         "properties": {
@@ -12991,6 +13475,56 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.PromotionListItemDto"
+            },
+            "nullable": true
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Promotions.Contracts.RedemptionDto, eCommerce.Promotions.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.RedemptionDto"
+            },
+            "nullable": true
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Promotions.Contracts.VoucherDto, eCommerce.Promotions.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.VoucherDto"
             },
             "nullable": true
           },
@@ -15736,6 +16270,9 @@
             "maxLength": 128,
             "minLength": 0,
             "type": "string"
+          },
+          "khongGhiSoGiaiTrinh": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -15839,6 +16376,53 @@
             "type": "integer",
             "format": "int32",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Promotions.Contracts.GenerateVouchersDto": {
+        "type": "object",
+        "properties": {
+          "promotionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "prefix": {
+            "type": "string",
+            "nullable": true
+          },
+          "length": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxUsage": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Promotions.Contracts.GeneratedVouchersDto": {
+        "type": "object",
+        "properties": {
+          "promotionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
           }
         },
         "additionalProperties": false
@@ -16515,6 +17099,11 @@
           "evaluatedAtUtc": {
             "type": "string",
             "format": "date-time"
+          },
+          "expiresAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -16570,6 +17159,129 @@
           },
           "isFirstOrder": {
             "type": "boolean",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Promotions.Contracts.VoucherDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "promotionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "maxUsage": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "usedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "reservedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "$ref": "#/components/schemas/eCommerce.Promotions.VoucherCodeStatus"
+          },
+          "remainingUses": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "isExpired": {
+            "type": "boolean"
+          },
+          "isExhausted": {
+            "type": "boolean"
+          },
+          "currency": {
+            "type": "string",
+            "nullable": true
+          },
+          "startsAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "endsAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "maxUsagePerCustomer": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "promotionCode": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Promotions.Contracts.VoucherDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "promotionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "maxUsage": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "usedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "reservedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "$ref": "#/components/schemas/eCommerce.Promotions.VoucherCodeStatus"
+          },
+          "remainingUses": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "isExpired": {
+            "type": "boolean"
+          },
+          "isExhausted": {
+            "type": "boolean"
+          },
+          "currency": {
+            "type": "string",
+            "nullable": true
+          },
+          "startsAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "endsAtUtc": {
+            "type": "string",
+            "format": "date-time",
             "nullable": true
           }
         },
@@ -16644,6 +17356,15 @@
           3,
           4,
           5
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "eCommerce.Promotions.VoucherCodeStatus": {
+        "enum": [
+          0,
+          1,
+          2
         ],
         "type": "integer",
         "format": "int32"
@@ -18308,6 +19029,12 @@
     },
     {
       "name": "VnPayIpn"
+    },
+    {
+      "name": "Voucher"
+    },
+    {
+      "name": "VoucherAdmin"
     },
     {
       "name": "Warehouse"
