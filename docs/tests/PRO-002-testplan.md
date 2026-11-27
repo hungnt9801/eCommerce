@@ -2,7 +2,8 @@
 
 - SRS: `docs/features/promotions/pro-002-cay-dieu-kien-engine-khuyen-mai.md` (**v0.18**)
 - Kiến trúc bổ trợ: `docs/features/promotions/PRO-002-arch.md`
-- Nhánh: `feat/gd3-wp24-dieu-kien-km` · Phiên `N96` (vòng 2) → **`N97` (F4 QA bổ sung sau BE vá P1/P2 REV vòng 1)** · Hàng `W24-4`
+- Nhánh: `feat/gd3-wp24-dieu-kien-km` · Phiên `N96` (vòng 2) → **`N97` (F4 QA bổ sung sau BE vá P1/P2 REV vòng 1)** →
+  **`N98` (F4 QA `W24-5`: khoá cấu trúc nạp module ở Host+Web + `Replace` `LocalAbpDistributedLock`)** · Hàng `W24-4` → `W24-5`
 - Quyết định nguồn: `D-285`…`D-290` (bề mặt `/api/v1/promotion` 7 route, `Limits`, `rule-catalog`, nhãn lấy từ code) ·
   **`D-291`** (phạm vi vá REV vòng 1: guard trạng thái voucher, `Subtotal`/`Currency` từ pipeline giá, `VoucherOutcome`,
   `?sort=` whitelist, calculator `default` NÉM, probe 200/401/403 bắt buộc THỬ) · **`D-292`** (cây duyệt **trước**, hết lượt sau —
@@ -71,6 +72,22 @@
 | **`D-292` (vi)** | Comment integration `TC-43 (ix)` chỉ đúng nhánh cây `true`; ca cây `false` ⇒ `ConditionFalse` | `eCommerce.IntegrationTests/PostgreSqlPromotionSchemaTests.cs` (comment đầu tệp) | — (chú thích) | ✅ |
 | **DI rule (bug ①)** — BE `3d52d51` | 4 rule `IPromotionConditionRule` **phải** được DI nạp qua `[ExposeServices]`; `PromotionRuleRegistry` resolve từ container có **đủ 4** `SystemName` | `Promotions/PromotionRuleDiTests.cs` · `Di_resolve_IPromotionConditionRule__du_4_rule` · `Di_resolve_PromotionRuleRegistry__du_4_SystemName_va_khong_nem` · `Bon_rule_deu_khai_ExposeServices_cho_hop_dong` | Unit (DI container `AddAssemblyOf`) | ✅ |
 
+### 1.4 `W24-5` — khoá cấu trúc nạp module + `Replace` Local lock (`D-293` ③ / `D-294` ④, N98)
+
+> Hồi quy thật (N98, G6 `-DayDu` đỏ): `CheckoutAppService` tiêm `IPromotionEngine` nhưng `src/eCommerce.Web` chỉ thêm
+> `ProjectReference`, **quên** `PromotionsApplicationModule` trong `[DependsOn]` ⇒ `GET /DatHang` **`HTTP 500`**; build +2461 unit
+> test **xanh**. Nạp module xong kéo `AbpDistributedLockingModule` (Medallion cần Redis) ⇒ Web **không boot** ⇒ phải `Replace`
+> về `LocalAbpDistributedLock`. Test **quét mã nguồn** (bỏ chú thích `//`/`/* */`) — khuôn `Catalog/CatalogMediaModuleTests.cs`
+> (`CAT-003`); **boot thật** đo bằng G6 `-DayDu` (`/DatHang 200`, E2E 150/150 — `D-294` ④ cấm test boot riêng).
+
+| Hạng mục | Test (tệp · tên method) | Tầng | Kết quả |
+|---|---|---|---|
+| 6 module phải nằm trong `[DependsOn]` của **cả** `src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs` **và** `src/eCommerce.Web/eCommerceWebModule.cs` (`PromotionsApplicationModule` · `CatalogMediaModule` · `PricingApplicationModule` · `CustomersApplicationModule` · `PaymentHubApplicationModule` · `AddressApplicationModule`) — Theory 6 module × 2 tệp = **12** ca | `Promotions/PromotionsModuleKienTrucTests.cs` · `Module_PHAI_nam_trong_DependsOn_cua_CA_Host_VA_Web` (12 InlineData) | Unit (quét mã nguồn) | ✅ |
+| Mọi `<ProjectReference>` của Web trỏ `modules/**/eCommerce.*.Application/*.csproj` ⇒ class `AbpModule` của project đó **phải** có trong `[DependsOn]` Web (bắt họ lỗi "thêm reference, quên `DependsOn`"); khoá sàn 5 cặp (hôm nay Pricing/Customers/Address/PaymentHub/Promotions; `CatalogMediaModule` ở `Catalog.Domain` đi bắc cầu + đã khoá bởi 12 ca theory) | `Promotions/PromotionsModuleKienTrucTests.cs` · `MOI_ProjectReference_toi_modules_Application__PHAI_co_typeof_trong_DependsOn_cua_Web` | Unit (quét csproj + mã nguồn) | ✅ |
+| Web phải chứa `Replace(ServiceDescriptor.Singleton<IAbpDistributedLock, LocalAbpDistributedLock>())` — thiếu ⇒ Web **không boot** (`D-294`) | `Promotions/PromotionsModuleKienTrucTests.cs` · `Web_PHAI_Replace_IAbpDistributedLock_bang_LocalAbpDistributedLock__D294` | Unit (quét mã nguồn) | ✅ |
+| Web **vẫn** tắt worker/job (`AbpBackgroundWorkerOptions.IsEnabled = false` + `AbpBackgroundJobsOptions.IsJobExecutionEnabled = false`) — nạp `PromotionsApplicationModule` kéo `promotion-expiry` chạy kép (`web-001`) | `Promotions/PromotionsModuleKienTrucTests.cs` · `Web_VAN_tat_worker_va_job__vi_nap_Promotions_keo_promotion_expiry_chay_kep` | Unit (quét mã nguồn) | ✅ |
+| Khoá sàn phép quét: đủ **6** module × **2** tệp = 12 cặp InlineData + tìm được gốc repo (chống xoá InlineData ⇒ xanh giả) | `Promotions/PromotionsModuleKienTrucTests.cs` · `Phep_quet_KHONG_rong__du_6_module_va_2_tep` | Unit (reflection) | ✅ |
+
 ## 2. Số ca theo tầng (K-06)
 
 | Tầng | Trước (đầu vòng 2) | Sau (N97) | Ghi chú |
@@ -82,6 +99,14 @@
 | API `/api/v1` (200 + 401/403) | — | **401 + 200 đo thật; 403 CHƯA ĐO** | `tools/probe-promotion-wp24.ps1` — ẩn danh ⇒ `401` (3 route), admin `GET rule-catalog`/`POST /` ⇒ `200`; **403 chưa đo** (Host không expose `/api/identity/**` ⇒ 404) — xem §3.1. 7 route còn lại kiểm **tĩnh** (`TC-70a`). |
 | UI Vitest / Playwright | **60** | **60** | `W24-3` đã có (list/new/tree builder) — hàng trước, **không** đổi. |
 | OpenAPI drift | — | **N/A** | N97 không đổi DTO/route (additive `VoucherOutcome`/`KhongGhiSoGiaiTrinh` đã ở vòng vá BE, không đổi `schema.d.ts`). |
+
+### 2.1 Số đo `W24-5` (N98)
+
+| Tầng | Trước (N97) | Sau (N98) | Ghi chú |
+|---|---|---|---|
+| Toàn bộ `test/eCommerce.Tests` (unit) | **2461** | **2477** | **+16** ca `Promotions/PromotionsModuleKienTrucTests.cs` (12 theory + 4 fact). 0 fail. Số ca **chỉ tăng**. |
+| `test/eCommerce.IntegrationTests` (PostgreSQL thật) | **156** | **156** | Không đổi (hàng này chỉ chạm `src/eCommerce.Web/**` + `test/**`). |
+| Probe HTTP `/api/v1/promotion/**` | 401×3 + 200; 403 chưa đo | **không đổi** | Hàng `W24-5` đo bằng **G6 `-DayDu`** (`/DatHang 200`, E2E 150/150 — ORCH ④). Nợ probe `403` vẫn chưa đo (§3.1, §5 #7) — **không** đổi kỳ vọng. |
 
 ## Negative control (bắt buộc) — bằng chứng thật (vòng 2, sau commit `33559e5`)
 
@@ -106,6 +131,17 @@
 | 2026-11-27 | NC-N97-5 | modules/Sales/eCommerce.Sales.Application/CheckoutAppService.cs:170 | TC-73: Subtotal = Sum(ListPrice x Qty) thay vi GioTinhTienDto.Subtotal (P2 #2) | dotnet test test/eCommerce.Tests --filter FullyQualifiedName~PromotionCheckoutSubtotalTests | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
 | 2026-11-27 | NC-N97-6 | modules/Promotions/eCommerce.Promotions.Application/PromotionAppService.cs:126 | TC-75: sort=Code dao thanh descending (whitelist sai chieu) | dotnet test test/eCommerce.Tests --filter FullyQualifiedName~PromotionVoucherValidationTests | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
 | 2026-11-27 | NC-N97-7 | modules/Promotions/eCommerce.Promotions.Domain/Rules/PromotionRules.cs:14 | go [ExposeServices] cua MinOrderAmountRule => DI chi con 3 IPromotionConditionRule (bug that da do qua probe) | dotnet test test/eCommerce.Tests --filter FullyQualifiedName~PromotionRuleDiTests | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
+| 2026-11-27 | NC-N98-1 | src/eCommerce.Web/eCommerceWebModule.cs:123 | **D-294**: go dong `context.Services.Replace(ServiceDescriptor.Singleton<IAbpDistributedLock, LocalAbpDistributedLock>())` (Web khong boot) | dotnet test test/eCommerce.Tests --no-build --filter FullyQualifiedName~PromotionsModuleKienTrucTests | exit 1 (do: 1 failed / 15 passed) -> khoi phuc -> exit 0 (xanh: 16/16) |
+| 2026-11-27 | NC-N98-2 | src/eCommerce.Web/eCommerceWebModule.cs:85 | **D-293**: go dong `typeof(Promotions.PromotionsApplicationModule)` khoi `[DependsOn]` Web (HTTP 500 `/DatHang`) | dotnet test test/eCommerce.Tests --no-build --filter FullyQualifiedName~PromotionsModuleKienTrucTests | exit 1 (do: 2 failed / 14 passed) -> khoi phuc -> exit 0 (xanh: 16/16) |
+
+> 📌 **NC-N98-1/N98-2 chạy TAY, không qua `tools/agents/negative-control.ps1`:** script từ chối tệp đích có thay đổi
+> **chưa commit** (`exit 3`, vì `src/eCommerce.Web/eCommerceWebModule.cs` là bản vá của `be` trong cùng hàng `W24-5`,
+> chưa commit). Quy trình tay giữ **đúng** ngữ nghĩa script: sao lưu byte gốc → áp đột biến (chuỗi xuất hiện **đúng 1 lần**)
+> → `dotnet test --no-build` **phải đỏ** → `[IO.File]::WriteAllText` khôi phục byte gốc → chạy lại **phải xanh** →
+> `Get-FileHash` **khớp** hash trước đột biến (`8092899347289992F2A4DC508BF773D3F51A243D2FEAEB0FCDE51022D3A85533` cả 2 lượt)
+> → `git status --porcelain` chỉ còn 2 tệp `src/eCommerce.Web/**` của `be`, **không** dấu vết đột biến.
+> 🔒 Test quét mã **sau khi bỏ chú thích** nên đột biến "gỡ dòng mã" thật sự làm đỏ — nếu quét thô, chú thích nhắc
+> `LocalAbpDistributedLock`/`CatalogMediaModule` sẽ che mất (`D-294` ③(b)).
 
 ## 3.1 Probe HTTP THẬT — `tools/probe-promotion-wp24.ps1` (N97, Host `54275`)
 
@@ -137,7 +173,7 @@
 
 ```powershell
 dotnet build eCommerce.slnx --no-incremental      # 0 error / 9 warning (baseline phiên)
-dotnet test test/eCommerce.Tests --no-build       # 2461 pass · 0 fail
+dotnet test test/eCommerce.Tests --no-build       # 2461 pass · 0 fail (N97) → 2477 pass · 0 fail (N98)
 dotnet test test/eCommerce.IntegrationTests       # 156 pass · 0 fail (Testcontainers postgres:17-alpine)
 pwsh -File tools/probe-promotion-wp24.ps1          # 401 x3, 200 (rule-catalog 4 ten, POST, save-tree, approve), 400 0001, 409 0006; 403 CHƯA ĐO (§3.1)
 pwsh -File tools/agents/check-agent-artifact.ps1 -Kind testplan -Path docs/tests/PRO-002-testplan.md -Srs docs/features/promotions/pro-002-cay-dieu-kien-engine-khuyen-mai.md   # exit 0
@@ -151,6 +187,17 @@ pwsh -File tools/kiem-link-tai-lieu.ps1           # PASS
 - `check-agent-artifact -Kind testplan` → **exit 0**.
 - `pwsh -File tools/kiem-link-tai-lieu.ps1` → **PASS**.
 - `git status --porcelain -- modules/ src/ shared/` rỗng sau toàn bộ negative control (code sản phẩm khôi phục nguyên trạng; 2 bug ①/② sửa bởi `be` ở commit `3d52d51`).
+
+### 4.1 Cổng đo trong phiên N98 (`W24-5`)
+
+- `dotnet build test/eCommerce.Tests` (kéo cả `src/**` + `modules/**`) → **0 error · 0 warning**.
+- `dotnet test test/eCommerce.Tests --no-build` → **2477/2477 pass**, 0 fail (baseline đầu phiên **2461** ⇒ **+16**, không giảm).
+- `dotnet test test/eCommerce.Tests --no-build --filter FullyQualifiedName~PromotionsModuleKienTrucTests` → **16/16 pass**.
+- NC-N98-1 → `exit 1` (đỏ) → khôi phục → `exit 0` (xanh); NC-N98-2 → `exit 1` (đỏ) → khôi phục → `exit 0` (xanh); hash tệp khớp trước/sau.
+- `git diff --stat -- src/` sau NC chỉ còn **2** tệp vá của `be` (`eCommerce.Web.csproj` +3, `eCommerceWebModule.cs` +18/−1) — **0** dấu vết đột biến.
+- `pwsh -File tools/kiem-link-tai-lieu.ps1` → **PASS**.
+- `pwsh -File tools/agents/check-agent-artifact.ps1 -Kind testplan …` → **exit 0**.
+- **G6 `-DayDu`** (`/DatHang 200`, E2E 150/150) do **ORCH** chạy ở bước ④ — không thuộc phạm vi `qa`; **403 vẫn chưa đo** (§5 #7).
 
 ## 5. Chưa phủ / nợ
 

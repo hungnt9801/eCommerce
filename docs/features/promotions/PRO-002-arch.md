@@ -1,6 +1,6 @@
 # `PRO-002` — Kiến trúc module `Promotions`: cây điều kiện AND/OR & engine khuyến mãi
 
-> Vai **ARCH**, phiên **N93** (bản đầu) — cập nhật N94/N95, chuỗi `gd3-1`, hàng `W24-1`/`W24-2`/`W24-3` (`WP-24`), nhánh `feat/gd3-wp24-dieu-kien-km`.
+> Vai **ARCH**, phiên **N93** (bản đầu) — cập nhật N94/N95/N98, chuỗi `gd3-1`, hàng `W24-1`/`W24-2`/`W24-3`/`W24-5` (`WP-24`), nhánh `feat/gd3-wp24-dieu-kien-km`.
 > Tài liệu này **chỉ thiết kế** quanh SRS
 > [`pro-002-cay-dieu-kien-engine-khuyen-mai.md`](./pro-002-cay-dieu-kien-engine-khuyen-mai.md) (`v0.14 — 27/11/2026`, sau đây gọi **SRS**);
 > **không** code, **không** sinh migration, **không** sửa SRS.
@@ -81,7 +81,7 @@
 ### 2.1 Chiều phụ thuộc (một chiều — `abp-module-rules` M1/M2/M5)
 
 ```
-Host (eCommerce.HttpApi.Host)
+Host (eCommerce.HttpApi.Host) + Web (eCommerce.Web)   ← cả hai chạy in-process, cùng `[DependsOn]` (§B6)
   └─ [DependsOn] Promotions.Application ──▶ Promotions.Application.Contracts ──▶ Promotions.Domain
                                           └─▶ eCommerce.Kernel (Money, Locking, Metrics)
      Promotions.Application ──▶ Domain · Contracts · Kernel
@@ -121,7 +121,7 @@ Bằng chứng as-built cho mẫu “module mới = 4 project, chỉ tham chiế
 | B3 | Module **không** phụ thuộc ngược app/host | 0 `using eCommerce.Web/HttpApi/Application` trong module; `Promotions.Domain` không biết EF/HTTP |
 | B4 | **Không FK xuyên module** | `ProPromotionRedemptions.OrderId` là **tham chiếu mềm**, không FK sang `Sales` |
 | B5 | `IRepository<T>` ⇒ **phải** có `DbSet` hợp nhất | 7 `DbSet` (§5.3); lưới `test/eCommerce.Tests/EfCoreRegistration/DbSetRegistrationTests.cs` |
-| B6 | Project `.Application` có `AbpModule` + nằm trong `[DependsOn]` Host | `PromotionsApplicationModule` thêm vào `src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs:40-92`; thiếu ⇒ 404 body rỗng |
+| B6 | Project `.Application` có `AbpModule` + nằm trong `[DependsOn]` **Host và Web** | `PromotionsApplicationModule` thêm vào `src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs:40-92` **và** `src/eCommerce.Web/eCommerceWebModule.cs:47-86`; Web chạy **in-process** ⇒ dùng app service của module nào **phải** nạp module đó ở **cả** Host **và** Web — chỉ `ProjectReference` là **không đủ**; thiếu ở Host ⇒ API 404 body rỗng, thiếu ở Web ⇒ `CheckoutAppService` không resolve `IPromotionEngine` ⇒ `GET /DatHang` = **500** (`D-293`) |
 | B7 | `ConventionalControllers` quét assembly `eCommerce*.Application` **đã nạp** | Host đã quét động (`eCommerceHttpApiHostModule.cs:445-478`) ⇒ **không** sửa chỗ đăng ký |
 | B8 | Module nguồn **cấm** tham chiếu `Promotions.*` | `Sales`/`Pos` không bị `Promotions` gọi ngược; test `TC-38` |
 | B9 | Mọi entity **có** `TenantId` + tenant filter | 6/7 bảng `IMultiTenant`; **ngoại lệ có chủ**: `ProPromotionRuleCosts` là bảng tra **toàn cục**, không tenant (SRS §5.2) — ghi rõ để test phân quyền/tenant không đỏ nhầm |
@@ -397,8 +397,10 @@ Hai module mới nhất **không** có DbContext riêng: `Notification` và `Rep
 
 1. `eCommerce.EntityFrameworkCore.csproj` thêm project reference tới `Promotions.EntityFrameworkCore`; `eCommerceEntityFrameworkCoreModule` thêm `[DependsOn(typeof(Promotions.EntityFrameworkCore.PromotionsEntityFrameworkCoreModule))]` (mẫu as-built `src/eCommerce.EntityFrameworkCore/eCommerceEntityFrameworkCoreModule.cs` với Reporting/Notification).
 2. `eCommerceDbContext.OnModelCreating` thêm **một** dòng `global::eCommerce.Promotions.EntityFrameworkCore.PromotionsDbContextModelCreatingExtensions.ConfigurePromotions(builder);`.
-3. Host thêm `typeof(Promotions.PromotionsApplicationModule)` vào `[DependsOn]` (`src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs:40-92`) — thiếu ⇒ API 404 body rỗng.
+3. **Host và Web** đều thêm `typeof(Promotions.PromotionsApplicationModule)` vào `[DependsOn]` (`src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs:40-92` · `src/eCommerce.Web/eCommerceWebModule.cs:47-86`) — thiếu ⇒ API 404 body rỗng (Host) / `GET /DatHang` **500** do `CheckoutAppService` không resolve `IPromotionEngine` (Web, hồi quy `D-293`). Web chạy **in-process** ⇒ **chỉ** `ProjectReference` là **không đủ**, phải có **cả** `DependsOn`.
 4. `eCommerce.slnx` thêm 4 project (mẫu `eCommerce.slnx:27-31,82-86`).
+
+> 🚨 **Web `Replace` khoá phân tán (`D-294`):** nạp `PromotionsApplicationModule` kéo `AbpDistributedLockingModule` ⇒ ABP thay `IAbpDistributedLock` bằng `MedallionAbpDistributedLock`, loại này **cần** `IDistributedLockProvider` (Redis) ⇒ Web **không boot**. `eCommerceWebModule.ConfigureServices` gọi `context.Services.Replace(ServiceDescriptor.Singleton<IAbpDistributedLock, LocalAbpDistributedLock>());` (`src/eCommerce.Web/eCommerceWebModule.cs:117-123`, `using Volo.Abp.DistributedLocking`). **Phạm vi:** chỉ tiến trình UI — worker/job đã tắt tường minh (`:131-140`) nên không cần khoá liên tiến trình; **hệ quả:** 0 Redis, 0 package mới, hành vi Web y như trước `W24-5`. Host **không** đổi (vẫn `AbpDistributedLockingModule` + provider Redis riêng — `eCommerceHttpApiHostModule.cs:44-45,254-271`).
 
 ### 5.3 `DbSet` bắt buộc (`BR-18`) — **7 dòng mới**
 
@@ -694,3 +696,4 @@ P3 #1 (54→55 test case ở SRS §15.4) và P3 #2 (trích số dòng cũ trong 
 | v0.6 | 27/11/2026 | ARCH (N94/W24-2) | áp `D-283` (metric 5/9 + 4 nợ) & `D-284` (không nối guard); thêm docDeviation D7–D10; ghi rõ tên index rút gọn; không đổi thiết kế khác. |
 | v0.7 | 27/11/2026 | ARCH (N95/W24-3) | Áp `D-285`/`D-287`/`D-288`: §4.3 thêm **service đọc riêng** `IPromotionRuleCatalogAppService.GetRulesAsync()` (+ `PromotionRuleCatalogItemDto`) — allowlist **10** method giữ nguyên; §4.3 thêm `PromotionDetailDto.Limits` (`PromotionTreeLimitsDto` gán từ `DocLimitsAsync()`, additive); §4.4 thêm tiểu mục bề mặt `/api/v1/promotion/**` **7** route (controller tường minh, `ApiPage<T>`, 4 op không mở + chủ nợ `SAL-002`/`ops`/`WEB-*`), giữ nguyên `/api/app` 10 route + bảng map mã → HTTP; §12.1 thêm `docDeviation` **D11**; header lên SRS `v0.13`. **0** migration, **0** đổi schema, **0** mã lỗi mới. |
 | v0.8 | 27/11/2026 | ARCH (N95/W24-3) | Áp `D-289`/`D-290` + dọn P3 `docrev`: §4.3 DTO `PromotionRuleCatalogItemDto` thêm **`IsSeeded`** (true ⇔ có dòng `ProPromotionRuleCosts`); `GetRulesAsync` lặp `PromotionRuleRegistry.SystemNames` (không lặp bảng), thiếu dòng ⇒ `PromotionRuleCostCatalog.Cua` (`O1`/`1`/`false`) + `IsSeeded = false` + `LogWarning` một lần/lượt gọi, **không** ném `0010`/không bỏ khỏi danh sách/0 metric; **gỡ** gạch "Biên chưa chốt" + viện dẫn `AQ11` (đã chốt bằng `D-289`); thêm hàng **"Nguồn nhãn"** = `PromotionRuleCostCatalog.Meta.Label` trong code (`PromotionRuleCostSeedContributor.cs:13-27`) + fallback `Label = SystemName`, **không** sửa `IPromotionConditionRule`/không cột DB/không từ điển thứ hai ở Application; §4.4 nói rõ `eCommerce.HttpApi.csproj` **phải thêm** `ProjectReference` tới `Promotions.Application.Contracts` (hiện **chưa** có); §12.1 D11 bổ sung `IsSeeded` + nguồn `Label`; header lên SRS `v0.14`. **0** migration, **0** route/method mới. |
+| v0.9 | 27/11/2026 | ARCH (N98/W24-5) | Áp `D-293`/`D-294` (hồi quy `GET /DatHang` = **500** do Web thiếu `PromotionsApplicationModule`): §2.1 sơ đồ + §B6 + §5.2 mục 3 đổi "Host" → "**Host và Web**" (Web chạy in-process ⇒ chỉ `ProjectReference` là **không đủ**); thêm đoạn `Replace(... IAbpDistributedLock, LocalAbpDistributedLock ...)` ở Web (nạp module kéo `AbpDistributedLockingModule` ⇒ Medallion cần `IDistributedLockProvider`; chỉ tiến trình UI, worker/job tắt; **0** Redis, **0** package). **0** migration, **0** đổi schema/hợp đồng. |
