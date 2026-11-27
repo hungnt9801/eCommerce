@@ -69,12 +69,13 @@
 | **`D-292` (iii)** | Voucher cây `true` + hết lượt ⇒ **NÉM** `0007`/`0119`/`0104` | `Promotions/PromotionVoucherGuardTests.cs` · `D292iii_voucher_cay_TRUE_het_luot_MUC_MA__nem_0007` · `…_MUC_PROMOTION__nem_0119` · `…_MUC_KHACH__nem_0104` | Unit (domain/engine) | ✅ |
 | **`D-292` (iv)** | Giữ xanh ca cây `true`: `Tu_dong_tran_theo_khach_ma_vang_lai__CustomerRequired` | `Promotions/PromotionEngineTests.cs` · `Tu_dong_tran_theo_khach_ma_vang_lai__CustomerRequired` (không sửa) | Unit (domain/engine) | ✅ |
 | **`D-292` (vi)** | Comment integration `TC-43 (ix)` chỉ đúng nhánh cây `true`; ca cây `false` ⇒ `ConditionFalse` | `eCommerce.IntegrationTests/PostgreSqlPromotionSchemaTests.cs` (comment đầu tệp) | — (chú thích) | ✅ |
+| **DI rule (bug ①)** — BE `3d52d51` | 4 rule `IPromotionConditionRule` **phải** được DI nạp qua `[ExposeServices]`; `PromotionRuleRegistry` resolve từ container có **đủ 4** `SystemName` | `Promotions/PromotionRuleDiTests.cs` · `Di_resolve_IPromotionConditionRule__du_4_rule` · `Di_resolve_PromotionRuleRegistry__du_4_SystemName_va_khong_nem` · `Bon_rule_deu_khai_ExposeServices_cho_hop_dong` | Unit (DI container `AddAssemblyOf`) | ✅ |
 
 ## 2. Số ca theo tầng (K-06)
 
 | Tầng | Trước (đầu vòng 2) | Sau (N97) | Ghi chú |
 |---|---|---|---|
-| Toàn bộ `test/eCommerce.Tests` (unit) | **2432** | **2458** | +26 ca N97: `PromotionVoucherGuardTests` (12) + `PromotionVoucherValidationTests` (9) + `PromotionDiscountCalculatorTests` (3) + `PromotionCheckoutSubtotalTests` (2). 0 fail. Số ca **chỉ tăng**. |
+| Toàn bộ `test/eCommerce.Tests` (unit) | **2432** | **2461** | +26 ca N97 (vòng F4) + **+3 ca `PromotionRuleDiTests`** (khoá DI, sau bug ① `3d52d51`). 0 fail. Số ca **chỉ tăng**. |
 | `test/eCommerce.IntegrationTests` (PostgreSQL thật) | **156** | **156** | Chỉ sửa **comment** `PostgreSqlPromotionSchemaTests.cs` (`D-292`); 0 ca mới. 0 fail. |
 | Domain invariant / Unit (`Promotions`) | 43 | 43 | `HaTang`/`PromotionDomainTests`/`PromotionEngineTests`/`PromotionSurfaceTests`/`PromotionCheckoutGuardTests` (giữ nguyên). |
 | Application / API surface (`Promotions`) — unit mới | 13 | 13 | `PromotionV1SurfaceTests` (6) + `PromotionRuleCatalogTests` (5) + `PromotionGetLimitsTests` (2). |
@@ -104,6 +105,7 @@
 | 2026-11-27 | NC-N97-4 | modules/Promotions/eCommerce.Promotions.Application/Engine/PromotionDiscountCalculator.cs:45 | TC-76: nhanh default tra Money.Zero im lang thay vi NEM (P3 #8) | dotnet test test/eCommerce.Tests --filter FullyQualifiedName~PromotionDiscountCalculatorTests | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
 | 2026-11-27 | NC-N97-5 | modules/Sales/eCommerce.Sales.Application/CheckoutAppService.cs:170 | TC-73: Subtotal = Sum(ListPrice x Qty) thay vi GioTinhTienDto.Subtotal (P2 #2) | dotnet test test/eCommerce.Tests --filter FullyQualifiedName~PromotionCheckoutSubtotalTests | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
 | 2026-11-27 | NC-N97-6 | modules/Promotions/eCommerce.Promotions.Application/PromotionAppService.cs:126 | TC-75: sort=Code dao thanh descending (whitelist sai chieu) | dotnet test test/eCommerce.Tests --filter FullyQualifiedName~PromotionVoucherValidationTests | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
+| 2026-11-27 | NC-N97-7 | modules/Promotions/eCommerce.Promotions.Domain/Rules/PromotionRules.cs:14 | go [ExposeServices] cua MinOrderAmountRule => DI chi con 3 IPromotionConditionRule (bug that da do qua probe) | dotnet test test/eCommerce.Tests --filter FullyQualifiedName~PromotionRuleDiTests | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
 
 ## 3.1 Probe HTTP THẬT — `tools/probe-promotion-wp24.ps1` (N97, Host `54275`)
 
@@ -116,38 +118,39 @@
 | T02 `POST /api/v1/promotion` ẩn danh | `401` | **HTTP 401** | ✅ |
 | T03 `POST /api/v1/promotion/{id}/approve` ẩn danh | `401` | **HTTP 401** | ✅ |
 | T04–T08 user **thiếu quyền** (View/Manage/Approve, tách quyền) | `403` | **CHƯA ĐO** | ⛔ Host trả **`404`** cho `/api/identity/roles` — **không expose** Identity HTTP API ⇒ không tạo được user thường qua HTTP ⇒ **không dựng được ca 403**. **KHÔNG hạ kỳ vọng 403**; nợ chủ `qa`, hạn `W24-5`. |
-| T09 admin `GET /rule-catalog` | `200` | **HTTP 200** | ✅ (body `[]` — xem ghi chú dưới) |
-| T10 admin `POST /api/v1/promotion` | `200/201` | **HTTP 200** | ✅ tạo `Draft` |
-| T10b/ T11 `save-tree` 1 lá → `approve` | `200` | **HTTP 400** `0004` | ⛔ Bảng `ProPromotionRuleCosts` **rỗng** trên DB dev (seeder chưa chạy) ⇒ mọi rule ⇒ `0004` "Rule chua tung dang ky" ⇒ **không dựng được cây hợp lệ** ⇒ chưa đo được `approve` `200` / `0006`→`409`. |
-| T12 approve lần hai | `409` + `0006` | **CHƯA ĐO** | phụ thuộc T11. |
-| T13 `save-tree` 65 node | `400` + `0001` | **HTTP 400 + `eCommerce:Promotion:0001`** (data `NodeCount=65, MaxNodes=64`) | ✅ map lỗi `0001`→`400` đúng |
+| T09 admin `GET /rule-catalog` | `200` + **4 tên** | **HTTP 200 + đủ 4 tên** (`ChannelScope`/`CustomerGroup`/`FirstOrderOnly`/`MinOrderAmount`; `isSeeded:true` sau khi seed `ProPromotionRuleCosts`) | ✅ bug ① (DI) đã sửa — trước đó trả `[]` |
+| T10 admin `POST /api/v1/promotion` | `200/201` | **HTTP 200** | ✅ tạo `Draft` (`status 0`) |
+| T10a `save-tree` 65 node | `400` + `0001` | **HTTP 400 + `eCommerce:Promotion:0001`** (data `NodeCount=65, MaxNodes=64`) | ✅ map `0001`→`400`; chạy **trước** approve để không lẫn `409` |
+| T10b `save-tree` 1 lá hợp lệ | `200` | **HTTP 200** (`nodeCount=1, depth=1, leafCount=1, declaredCost=1`) | ✅ bug ② (tenant `CurrentTenant.Id`) đã sửa — trước đó `0004` |
+| T11 admin `POST /{id}/approve` | `200` (`status 1`, `treeVersion 1`) | **HTTP 200 · `status 1` · `treeVersion 1`** | ✅ |
+| T12 approve lần hai | `409` + `0006` | **HTTP 409 + `eCommerce:Promotion:0006`** (data `from/to = Approved`) | ✅ map `0006`→`409` |
 | Dọn dẹp | `ProPromotions` mã probe = 0 | **còn lại = 0** | ✅ |
 
-- **Tổng đo được:** `401` (3 route) · `200` (admin `GET rule-catalog`, `POST /`) · `400` map `0001`/`0004`.
-  **Chưa đo được:** `403` (thiếu Identity HTTP API) · `approve` `200` / `0006`→`409` (`ProPromotionRuleCosts` rỗng).
-- ⚠️ **Quan sát cần REV/ORCH xác nhận (không sửa từ `qa`):** `GET /api/v1/promotion/rule-catalog` trả **`[]`** trên
-  Host thật trong khi `PromotionRuleCatalogAppService` duyệt `PromotionRuleRegistry.SystemNames` và unit test `TC-71(i)`
-  kỳ vọng **đủ 4 tên mặc định** khi bảng chi phí rỗng. Dấu hiệu: `IPromotionConditionRule` (4 rule `ISingletonDependency`)
-  **không được DI nạp** trong Host runtime ⇒ registry rỗng. Ghi nhận, **không** kết luận thay REV.
+- **Tổng đo được:** `401` (3 route ẩn danh) · `200` (admin `GET rule-catalog` + `POST /` + `save-tree` 1 lá + `approve`) · `400` (`0001`) · `409` (`0006`).
+  **Chưa đo được:** `403` (Host không expose Identity HTTP API) — nợ `qa`, `W24-5`.
+- 🔑 **Hai bug thật phát hiện qua probe N97, đã sửa ở commit BE `3d52d51` (và phủ bằng test):**
+  (①) `IPromotionConditionRule` không được ABP expose theo quy ước tên (`MinOrderAmountRule` ≠ `IMinOrderAmountRule`) ⇒ registry rỗng trong Host ⇒ `rule-catalog` trả `[]` — sửa bằng `[ExposeServices(typeof(IPromotionConditionRule))]` cho 4 rule, **khoá** bởi `PromotionRuleDiTests` (NC-N97-7).
+  (②) `SaveTreeAsync` ghi `TenantId = Guid.Empty` ⇒ `approve` đọc không thấy cây ⇒ `0004` — sửa dùng `CurrentTenant.Id`; probe T10b/T11 xác nhận `save-tree 200` → `approve 200/status 1/treeVersion 1`.
+- 📌 **Tiền đề đo:** chạy `dotnet run --project src/eCommerce.DbMigrator` để seed `ProPromotionRuleCosts` (4 dòng) trước khi chạy probe; đã kiểm `count = 4` (A8).
 
 ## 4. Cổng (đo trong phiên N97)
 
 ```powershell
 dotnet build eCommerce.slnx --no-incremental      # 0 error / 9 warning (baseline phiên)
-dotnet test test/eCommerce.Tests --no-build       # 2458 pass · 0 fail
+dotnet test test/eCommerce.Tests --no-build       # 2461 pass · 0 fail
 dotnet test test/eCommerce.IntegrationTests       # 156 pass · 0 fail (Testcontainers postgres:17-alpine)
-pwsh -File tools/probe-promotion-wp24.ps1          # 401/200 đo thật; 403 + approve CHƯA ĐO (§3.1)
+pwsh -File tools/probe-promotion-wp24.ps1          # 401 x3, 200 (rule-catalog 4 ten, POST, save-tree, approve), 400 0001, 409 0006; 403 CHƯA ĐO (§3.1)
 pwsh -File tools/agents/check-agent-artifact.ps1 -Kind testplan -Path docs/tests/PRO-002-testplan.md -Srs docs/features/promotions/pro-002-cay-dieu-kien-engine-khuyen-mai.md   # exit 0
 pwsh -File tools/kiem-link-tai-lieu.ps1           # PASS
 ```
 
 - `dotnet build eCommerce.slnx --no-incremental` → **0 error**, **9 warning** (không phát sinh warning mới — đều ở Address/Sales).
-- `dotnet test test/eCommerce.Tests --no-build` → **2458/2458 pass**, exit **0** (baseline đầu phiên **2432** ⇒ **+26**, không giảm).
+- `dotnet test test/eCommerce.Tests --no-build` → **2461/2461 pass**, exit **0** (baseline đầu phiên **2432** ⇒ **+29**, không giảm).
 - `dotnet test test/eCommerce.IntegrationTests` → **156/156 pass**, exit **0**.
-- `pwsh -File tools/probe-promotion-wp24.ps1` → `400/401/200` đo thật; `403` + `approve 200`/`0006` **CHƯA ĐO** (§3.1).
+- `pwsh -File tools/probe-promotion-wp24.ps1` → `401`×3 · `200` (rule-catalog 4 tên, `POST /`, `save-tree` 1 lá, `approve` status 1/treeVersion 1) · `400` `0001` · `409` `0006`; **`403` CHƯA ĐO** (Identity HTTP API 404, nợ `qa`/`W24-5`) (§3.1).
 - `check-agent-artifact -Kind testplan` → **exit 0**.
 - `pwsh -File tools/kiem-link-tai-lieu.ps1` → **PASS**.
-- `git status --porcelain -- modules/ src/ shared/` rỗng sau toàn bộ negative control (code sản phẩm khôi phục nguyên trạng).
+- `git status --porcelain -- modules/ src/ shared/` rỗng sau toàn bộ negative control (code sản phẩm khôi phục nguyên trạng; 2 bug ①/② sửa bởi `be` ở commit `3d52d51`).
 
 ## 5. Chưa phủ / nợ
 
@@ -158,5 +161,6 @@ pwsh -File tools/kiem-link-tai-lieu.ps1           # PASS
 5. **`BR-12`** phủ ở **hành vi** (tính tiền qua `Money`/`decimal`); **chưa** có test quét tĩnh `double`/`float` riêng cho `Promotions` (không có `double`/`float` trong code — kiểm tay + `NFR-10` tổng thể).
 6. **`BR-16`** phủ ở **hành vi** (engine không có đường ghi; `TC-43` một lượt/đơn); **chưa** có test reflection "không setter công khai"/"không có `Delete`" trên `PromotionRedemption` (entity đã đóng setter `private set`). Nợ nhỏ, không chặn.
 7. **Probe `403` cho 7 route `/api/v1/promotion/**` — CHƯA ĐO ĐƯỢC (N97).** Host trả `404` cho `/api/identity/**` ⇒ không tạo được user thường qua HTTP để đo "thiếu quyền ⇒ 403". **Không hạ kỳ vọng 403**; nợ chủ `qa`, hạn `W24-5` (khuôn `D-249` ①). Admin `200` + ẩn danh `401` đã đo thật. Khi Identity HTTP API được bật (hoặc có user seed sẵn) ⇒ chạy lại `tools/probe-promotion-wp24.ps1` (T04–T08).
-8. **Probe `approve` `200` / `0006`→`409` — CHƯA ĐO ĐƯỢC.** Bảng `ProPromotionRuleCosts` **rỗng** trên DB dev (seeder `PromotionRuleCostSeedContributor` chưa chạy) ⇒ `save-tree` mọi rule ⇒ `0004` "Rule chua tung dang ky" ⇒ không có cây hợp lệ để duyệt. Đo được map `0001`→`400` (65 node) và `0004`→`400`. Chạy `DbMigrator`/seed rồi chạy lại probe (T10b–T12).
-9. **⚠️ Quan sát cho REV/ORCH:** `GET /api/v1/promotion/rule-catalog` trả **`[]`** trên Host thật trong khi unit test `TC-71(i)` kỳ vọng đủ 4 tên mặc định khi bảng chi phí rỗng ⇒ nghi `IPromotionConditionRule` **không được DI nạp** trong Host runtime (`PromotionRuleRegistry.SystemNames` rỗng). `qa` **không sửa** mã sản phẩm; cần REV xác nhận có phải lỗi đăng ký DI/module hay không — nếu đúng thì đây là lỗi **chặn dùng** màn dựng cây (FE lấy nhãn lá từ `rule-catalog`).
+8. **~~`approve` `200` / `0006`→`409` chưa đo~~ — ĐÃ ĐO (N97, sau `3d52d51`).** Probe T10b/T11/T12: `save-tree` 1 lá = `200`, `approve` = `200` (`status 1`, `treeVersion 1`), approve lần hai = `409 + 0006`. Nguyên nhân trước đó là bug ② (tenant `Guid.Empty`) + seeder `ProPromotionRuleCosts` chưa chạy; nay đã seed (4 dòng) và BE sửa.
+9. **~~`rule-catalog` trả `[]`~~ — ĐÃ SỬA (bug ①, `3d52d51`).** `[ExposeServices(typeof(IPromotionConditionRule))]` cho 4 rule ⇒ Host trả đủ 4 tên; khoá bằng `Promotions/PromotionRuleDiTests.cs` + NC-N97-7. (Ghi nhận lại: unit test dựng registry **tay** đã xanh trong khi Host thật rỗng — đây là lý do phải có test DI + probe thật.)
+10. **Ca `403` và "user thiếu quyền tách View/Manage/Approve" vẫn CHƯA ĐO** — xem #7. Khi Host expose Identity HTTP API (hoặc có user seed tối thiểu) ⇒ chạy lại probe T04–T08.

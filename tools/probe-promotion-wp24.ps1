@@ -147,18 +147,19 @@ try {
     if ($tao.Status -in @(200, 201)) { $kmId = ($tao.Body | ConvertFrom-Json).id }
 
     if ($kmId) {
+        # T13 TRƯỚC approve (promotion còn `Draft`, không đụng trạng thái) ⇒ ca `0001`⇒400 không bị nhầm với `409/0006`.
+        $nodes = @()
+        for ($i = 0; $i -lt 65; $i++) {
+            $nodes += @{ isGroup = $false; ruleSystemName = 'MinOrderAmount'; configJson = '{"minAmount":0}'; sortOrder = $i; depth = 1 }
+        }
+        InKq "T10a save-tree 65 node => 400 + 0001" (Goi -Method POST -Path "$tr/$kmId/save-tree" -Headers $hAdmin -Body @{ nodes = $nodes })
+
         # Cây hợp lệ tối thiểu (đúng 1 gốc lá) — approve đòi cây không rỗng.
         InKq "T10b save-tree 1 la hop le => 200" (Goi -Method POST -Path "$tr/$kmId/save-tree" -Headers $hAdmin -Body @{
             nodes = @(@{ isGroup = $false; ruleSystemName = 'MinOrderAmount'; sortOrder = 0; depth = 1 })
         })
         InKq "T11 admin POST /{id}/approve => 200" (Goi -Method POST -Path "$tr/$kmId/approve" -Headers $hAdmin)
         InKq "T12 approve LAN HAI => 409 + 0006" (Goi -Method POST -Path "$tr/$kmId/approve" -Headers $hAdmin)
-
-        $nodes = @()
-        for ($i = 0; $i -lt 65; $i++) {
-            $nodes += @{ isGroup = $false; ruleSystemName = 'MinOrderAmount'; configJson = '{"minAmount":0}'; sortOrder = $i; depth = 1 }
-        }
-        InKq "T13 save-tree 65 node => 400 + 0001" (Goi -Method POST -Path "$tr/$kmId/save-tree" -Headers $hAdmin -Body @{ nodes = $nodes })
     }
 }
 finally {
