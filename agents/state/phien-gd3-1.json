@@ -7,7 +7,7 @@
   "nhanhGoc": "main",
   "refs": "D-216",
   "ghiChu": "Phương án B (D-216): mỗi WP một nhánh cắt từ đỉnh tich-hop/gd3; dong-wp đẩy fast-forward vào tich-hop/gd3 (M3, D-114); PR xếp chồng mở một lần cuối chuỗi.",
-  "capNhat": "2026-11-28T00:03:28+07:00",
+  "capNhat": "2026-11-28T00:29:42+07:00",
   "rows": [
     {
       "id": "W16-1",
@@ -746,13 +746,17 @@
       "dependsOn": [
         "W25-2"
       ],
-      "status": "chua",
-      "phien": [],
+      "status": "xong",
+      "phien": [
+        "N102"
+      ],
       "nhanh": "feat/gd3-wp25-voucher",
       "buoc": "F3 FE",
-      "evidence": null,
+      "evidence": "F3 FE: D-307 KHONG_CO_FE_DONE_LY_DO 0 dong code man (SRS §10:743 -> WEB-001; DoD hang); D-308 fe spec:snapshot 75->82 path (+7 /api/v1/voucher), schema.d.ts +417/0, semantic removed=0 changed=0, gen:api drift 0; kiem-tat-ca 10/10 430.8s: build 0err/9warn, unit 2593/2593, integration 156/156, FE typecheck+vitest 60/60, DB 25/25, test cong 60/60; FE build EPERM K-05 + lint no-script N70 (env debt); check-agent-artifact decision DAT; SHA 24e408a 11613ad",
       "ghiChu": null,
-      "handover": null
+      "handover": "docs/nhanh/handover-n102.md",
+      "batDau": "2026-11-28T00:04:52+07:00",
+      "xongLuc": "2026-11-28T00:29:42+07:00"
     },
     {
       "id": "W25-4",
