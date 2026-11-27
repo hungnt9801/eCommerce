@@ -1111,8 +1111,12 @@ public class NotificationConventionTests
 
 ### 16.3 Test
 
-- **Kế hoạch test đơn vị** theo `NOT-002-arch.md` §13.1: `TC-FC/EN/MAP/KEY/LOG/MET/REG/DI/ARCH-*` (arch ghi bộ TC mới này **tạo ở `W23-4`**, `NOT-002-arch.md:555-556`). 🔶 **Chưa có trên nhánh** tại thời điểm đo.
-- `TC44` (`NotificationConventionsTests`) hiện assert **11** mã (`NotificationConventionsTests.cs:257`); `NOT-002` thêm `0002/0003/0006` ⇒ **phải** cập nhật lên **14** (dải `0010–0020` vẫn đủ 11). 🔶 **Chưa cập nhật** trên nhánh.
+- **QA đã tạo trên nhánh** (cuối phiên N107) **3** tệp phủ đủ bộ `TC-FC/EN/MAP/KEY/LOG/MET/REG/DI/ARCH-*` của `NOT-002-arch.md` §13.1:
+  `NotificationChannelSenderTests.cs:194-502` (`TC_EN_01…03` · `TC_FC_01…07` · `TC_MAP_01…04` · `TC_KEY_01` · `TC_LOG_01` · `TC_MET_01`),
+  `NotificationChannelRegistryDiTests.cs:19` (`TC_REG_01/02` · `TC_DI_01/02`), `NotificationChannelArchTests.cs:13-126` (`TC_ARCH_01…04`).
+- `TC44` (`NotificationConventionsTests`) **đã cập nhật lên 14** mã (`NotificationConventionsTests.cs:257`); dải `0010–0020` vẫn đủ 11 (`:267`); **xanh**.
+- Số đo cuối phiên (QA/ORCH báo): unit **2649/2649** (baseline 2619, **+30**) · build **0** error / **9** warning · `kiem-tat-ca.ps1` **10/10 ĐẠT** · negative control **NC-1 đỏ→xanh** (bỏ guard `config is null` ⇒ `TC-FC-01` đỏ; khôi phục xanh). Bộ NC đầy đủ (6 NC) thuộc `W23-4`.
+- Nhãn `W23-4` ở arch §13.1 (`NOT-002-arch.md:555-556`) là **nhãn kế hoạch cũ**; hàng `W23-2` đã giao test đơn vị ⇒ QA tạo ngay ở `W23-2`, còn `W23-4` mở rộng + testplan + NC đầy đủ.
 
 ### 16.4 Đường lùi
 
