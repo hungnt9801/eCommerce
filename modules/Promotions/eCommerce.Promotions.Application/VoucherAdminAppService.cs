@@ -130,6 +130,27 @@ public class VoucherAdminAppService : ApplicationService, IVoucherAdminAppServic
                 .WithData("prefix", prefix);
         }
 
+        // 🔒 D-309 (P2 #1): PRE-CHECK dung lượng không gian mã TRƯỚC vòng sinh — chống treo vô hạn.
+        // Input HỢP LỆ theo guard trên vẫn có thể bất khả thi: {Length:3, Prefix:"AB", Quantity:100}
+        // chỉ có 36^(3−2)=36 mã phân biệt < 100 ⇒ vòng `while` dưới KHÔNG BAO GIỜ đủ ⇒ treo.
+        // Thiếu chỗ ⇒ NÉM `0107` VoucherCodeInvalid (giữ số đã cấp, KHÔNG thêm mã) thay vì treo.
+        // Nhân có trần `>= Quantity` để tránh tràn `long` khi `doDai` tới `DoDaiMaToiDa` (32).
+        var soKyTuNga = doDai - prefix.Length; // ≥ 1 nhờ guard `prefix.Length >= doDai` ở trên.
+        long codespace = 1;
+        for (var i = 0; i < soKyTuNga && codespace < input.Quantity; i++)
+        {
+            codespace *= Alphabet.Length;
+        }
+
+        if (codespace < input.Quantity)
+        {
+            throw new BusinessException(PromotionErrorCodes.VoucherCodeInvalid)
+                .WithData("length", doDai)
+                .WithData("prefix", prefix)
+                .WithData("codespace", codespace)
+                .WithData("quantity", input.Quantity);
+        }
+
         var ma = new HashSet<string>(StringComparer.Ordinal);
         while (ma.Count < input.Quantity)
         {
