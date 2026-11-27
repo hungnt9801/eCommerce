@@ -1,11 +1,13 @@
 # `PRO-001` — Kiến trúc Voucher/Coupon: giữ · chốt · nhả lượt trên mô hình `Pro*` của `PRO-002`
 
+> **v0.5 — 27/11/2026** (N101/W25-2 — sửa `docrev` vòng 3 **delta** N101: **2 P2 + 1 P3** vùng arch — nêu **validator** `Subtotal`/`Currency`/`CheckoutSessionId` ở §4.2/§6.1; **D13** chuyển "đã đóng một phần ở N101") ·
+> **v0.4 — 27/11/2026** (N101/W25-2: áp `D-303` — `CheckoutSessionId` = **`string`** (≤ 128) ở `ReserveVoucherDto`/`CommitVoucherDto`; sửa số dòng map `01xx` **14 → 17**) ·
 > **v0.3 — 27/11/2026** (sửa `docrev` vòng 1: `DOC-CHANGES` P1=0/P2=5/P3=6 → sửa 5 P2 + 6 P3) ·
 > **v0.2** cùng ngày (áp `D-297`…`D-302`, đóng toàn bộ §11) · bản đầu v0.1.
 >
-> Vai **ARCH**, phiên **N100**, hàng `W25-1`, chuỗi `gd3-1` (`WP-25`), nhánh `feat/gd3-wp25-voucher`.
+> Vai **ARCH**, phiên **N100** (v0.1–v0.3) và **N101** (v0.4–v0.5), hàng `W25-1`/`W25-2`, chuỗi `gd3-1` (`WP-25`), nhánh `feat/gd3-wp25-voucher`.
 > Tài liệu này **chỉ thiết kế** quanh SRS
-> [`pro-001-voucher-coupon.md`](./pro-001-voucher-coupon.md) (`v0.10 — 27/11/2026`, sau đây gọi **SRS**);
+> [`pro-001-voucher-coupon.md`](./pro-001-voucher-coupon.md) (`v0.11 — 27/11/2026`, sau đây gọi **SRS**);
 > **không** code, **không** sinh migration, **không** sửa SRS.
 >
 > **Nguồn schema duy nhất của bảng `Pro*` là `PRO-002`** (`D-151`, `pro-002` §5.2/§5.3/§6.4). Tài liệu này
@@ -29,7 +31,7 @@
 > **0** cột/migration), **`D-300`** (`AQ4`: **một** migration `Add_Voucher_Status_Check` do **`PRO-002` sở hữu**),
 > **`D-301`** (`AQ6`: trả **cả hai** `ExpiresAtUtc`, FE hiện **min**), **`D-302`** (`Q2/Q6/Q7/Q9/Q11`: TTL **900 s**
 > không gia hạn · `MaxBatchSize = 10000` không rate limit · liệt kê lượt giữ qua `GetRedemptionsAsync(status=Reserved)`
-> · không dry-run · test chuỗi khoá 0 tiền tố `ecommerce:`).
+> · không dry-run · test chuỗi khoá 0 tiền tố `ecommerce:`), **`D-303`** (`CheckoutSessionId` của `ReserveVoucherDto`/`CommitVoucherDto` là **`string`** ≤ 128, **không** `Guid`; SRS giữ `string`), **`D-304`** (2 ca `TtlSeconds` ngoài dải + `Subtotal`=0/`Currency` sai hoãn **`qa`** ở `W25-4`; **cơ chế validator** phải có sẵn ở `W25-2` — §4.2/§6.1).
 >
 > 📄 `-arch` là tài liệu **bổ trợ**, ngoài mẫu 16 mục áp cho SRS; tệp giữ khuôn 15 mục của `PRO-002-arch`.
 
@@ -83,7 +85,7 @@
    cùng UoW (`ADR-13`); 7 trường DTO additive phía `Sales` (§4.5), `ba` ghi CR `SAL-002`/`SAL-001` **cùng nhánh cùng PR**.
 5. **Bề mặt HTTP + map lỗi** (`D-299`): controller tường minh `VoucherController` `/api/v1/voucher/**` **7 route** (khuôn
    `PromotionsController`); **giữ** auto `/api/app/voucher-admin/**`; **cấm** `[AllowAnonymous]`/`RemoteService(Name=…)`;
-   thêm **14** dòng map `01xx → HTTP` vào `eCommerceHttpApiHostModule` (§7.6) — thiếu thì `0104`/`0119` trả **403** che lỗi.
+   thêm **17** dòng map `01xx → HTTP` vào `eCommerceHttpApiHostModule` (§7.6; map đủ `0101…0119` trừ `0109`/`0113`) — thiếu thì `0104`/`0119` trả **403** che lỗi.
 6. **Phân quyền**: 3 quyền hẹp `.Voucher.*` khai **2 nơi**; `[Authorize]` cấp class.
 7. **Migration** (`D-300`): **đúng một** `Add_Voucher_Status_Check` (2 `CHECK` miền `Status`, **0** cột/index/dữ liệu) —
    **`PRO-002` sở hữu mapping + migration**; `PRO-001` chỉ gửi CR; nếu **không** phải chủ migration duy nhất ⇒ hoãn
@@ -296,17 +298,17 @@ public interface IVoucherRedemptionService
 
 public sealed record ReserveVoucherDto(
     string VoucherCode,
-    Guid CheckoutSessionId,      // = CheckoutInput.IdempotencyKey của Sales
+    string CheckoutSessionId,    // D-303: = CheckoutInput.IdempotencyKey của Sales; [property: Required][StringLength(128, MinimumLength=1)], KHÔNG Guid; rỗng/>128 ⇒ 400
     Guid? CustomerId,            // NULL ⇒ NÉM 0118 (D-146, TRƯỚC engine/TRƯỚC ghi)
     string ChannelCode,
     IReadOnlyList<PromotionCartLine> Lines,
-    decimal Subtotal,            // D-298 ①(4): bắt buộc — lấy từ GioTinhTienDto của Sales; CẤM Σ ListPrice×Quantity
-    string Currency,             // bắt buộc — cùng Currency của Subtotal
-    int TtlSeconds);             // D-302: bắt buộc, 60…86400; Sales = (TtlPhut ?? 15) * 60
+    decimal Subtotal,            // D-298 ①(4)+D-304: lấy từ GioTinhTienDto của Sales; [property: Range(typeof(decimal), "0.01", "99999999999999.9999")] (= numeric(18,4)); 0/thiếu ⇒ 400; CẤM Σ ListPrice×Quantity
+    string Currency,             // [property: Required][RegularExpression("^[A-Z]{3}$")] (khớp CHECK Pro*); cùng Currency của Subtotal
+    int TtlSeconds);             // D-302: [property: Range(60, 86400)]; ngoài dải ⇒ 400; Sales = (TtlPhut ?? 15) * 60
 
 public sealed record CommitVoucherDto(
     Guid RedemptionId, Guid OrderId, string VoucherCode,
-    Guid CheckoutSessionId);     // D-298: để Promotions xác minh IdempotencyKey == Checkout:{tenant}:{session}:{code}
+    string CheckoutSessionId);   // D-298/D-303: [property: Required][StringLength(128, MinimumLength=1)], KHÔNG Guid; so khớp string IdempotencyKey == Checkout:{tenant}:{session}:{code}
 public sealed record ReleaseVoucherDto(Guid RedemptionId, string ReasonCode);
 public sealed record ReverseVoucherDto(Guid OrderId, string ReasonCode);
 ```
@@ -314,10 +316,31 @@ public sealed record ReverseVoucherDto(Guid OrderId, string ReasonCode);
 - **`Subtotal`/`Currency` bắt buộc trong `ReserveVoucherDto`** (`D-298` ①(4)): `PromotionEvaluationRequest` **cần**
   `Subtotal`; `Sales` lấy từ `GioTinhTienDto` (`CheckoutAppService.cs:151-189`). **CẤM** tự tính
   `Σ ListPrice × Quantity` (`D-291` ②, `pro-002` §6.1 quy tắc 9).
-- **`CustomerId` mang trong `ReserveVoucherDto`**; `CheckoutSessionId` là nguồn dựng `IdempotencyKey` (không nhận khoá
-  thô từ client). **`CommitVoucherDto.CheckoutSessionId` bắt buộc**: server kiểm `(TenantId, RedemptionId)` **và**
-  `IdempotencyKey == Checkout:{tenant}:{session}:{code}`; **lệch ⇒ `0105`** (mở rộng nghĩa "lượt không khớp
-  phiên/khách", **0** cột/khoá mới).
+- 🆕 **Cơ chế từ chối `Subtotal = 0` / `Currency` sai / `CheckoutSessionId` rỗng** (`D-304` ⑥, `D-303` ⑥) — **cơ chế
+  thật**, không chỉ "bắt buộc" trên kiểu giá trị (**`decimal`/`string` non-nullable thì `[Required]`/không mô tả không
+  chặn được `0`**):
+  - **Lớp ném**: `AbpValidationException` ⇒ **400** (as-built `Promotion.cs:130` = ca `0109`, `§12-D7`/`D-296`; **0** mã
+    lỗi mới). **Không** dùng `ArgumentException` (ABP **không** map 400 ⇒ rơi 500).
+  - **`Subtotal`**: `[property: Range(typeof(decimal), "0.01", "99999999999999.9999")]` — cận dưới **0.01** ⇒ `0`/thiếu
+    **400** (đúng ca `D-304` ⑥); cận trên = **trần `numeric(18,4)`** as-built của cột tiền `Pro*`
+    (`PromotionsDbContextModelCreatingExtensions.cs:52-54,186`). Khuôn overload `Range(typeof(decimal), …)`:
+    `StockDocumentDtos.cs:185`; khuôn `Range` cận dưới: `TraHangLineDto.Quantity` (`DonHangDtos.cs:46`). **Không** dùng
+    `[Range(0.01, double.MaxValue)]` (khuôn `OrderReturnDtos.cs:99`) cho tiền — biên kiểu `double` trái `T1`.
+  - **`Currency`**: `[Required]` + `[RegularExpression("^[A-Z]{3}$")]` — **cùng biểu thức** với `CHECK
+    CK_ProPromotions_Currency`/`CK_ProPromotionRedemptions_Currency` (`:73`, `:217`); rỗng/sai 3 ký tự IN HOA ⇒ **400**
+    (fail-closed `T3`, **không** tự `.ToUpper()`).
+  - **`CheckoutSessionId`** (cả **hai** record): `[Required]` + `[StringLength(128, MinimumLength = 1)]`; rỗng/> 128 ⇒
+    **400** (`D-303` ⑥).
+  - 📌 **Vì sao phải guard tường minh**: `VoucherRedemptionService` **không** kế thừa `IApplicationService` (§4.3) ⇒
+    interceptor DataAnnotations của ABP **không tự chạy** trên `ReserveVoucherDto`; `ReserveAsync` **bước 1** (§6.1) tự
+    kiểm và ném `AbpValidationException` **trước** mọi `UPDATE`/`INSERT` ⇒ **0** dòng `ProPromotionRedemptions`.
+    Thuộc tính đặt dạng `[property: …]` trên tham số record để rơi vào **property** (DataAnnotations đọc property).
+- **`ReserveVoucherDto.CheckoutSessionId` = `string` (không rỗng, ≤ 128)** (`D-303`; cùng nguồn
+  `CheckoutInput.IdempotencyKey`, `CheckoutDtos.cs:67-69`) — **không** chỉ `CommitVoucherDto`; đây là nguồn dựng khoá
+  `Checkout:{tenant}:{session}:{code}` (§3.5), **không** nhận khoá thô từ client (**không** `Guid`, **không** parse lại).
+- **`CustomerId` mang trong `ReserveVoucherDto`**; **`CommitVoucherDto.CheckoutSessionId` bắt buộc**: server kiểm
+  `(TenantId, RedemptionId)` **và** `IdempotencyKey == Checkout:{tenant}:{session}:{code}`; **lệch ⇒ `0105`** (mở rộng
+  nghĩa "lượt không khớp phiên/khách", **0** cột/khoá mới).
 - `VoucherQuoteResultDto`: `RedemptionId`, `DiscountTotal`, `Currency`, `ReasonCode?`, `IdempotencyKey`,
   **`ExpiresAtUtc`** (hạn **lượt voucher**) — **không** có `ShippingDiscountTotal` ở v1 (`D-158`). `ExpiresAtUtc`
   **không** đổi nghĩa trường cũ của `KetQuaCheckoutDto` (`D-301`).
@@ -430,9 +453,11 @@ chốt `Assert.Equal(114L, …)`. `W25-2` **cấm** đổi số này (0 index m�
 
 Thứ tự **bắt buộc** (mọi kiểm "trước khi ghi" ở đây là **trước** `UPDATE` đầu tiên):
 
-1. **Tenant + tham số**: `ICurrentTenant.Id == Guid.Empty` (`00000000-0000-0000-0000-000000000000`) ⇒ **NÉM** `0112`;
-   `ICurrentTenant.Id == null` là **ca 1-tenant hợp lệ** (**không** ném); `TtlSeconds` ngoài `60…86400` ⇒ **400**
-   (`AbpValidationException`, **0** mã mới, `D-302`); `Subtotal`/`Currency` **bắt buộc** có (`D-298`).
+1. **Tenant + tham số** (guard **tường minh** vì `VoucherRedemptionService` **không** phải `IApplicationService` —
+   §4.2): `ICurrentTenant.Id == Guid.Empty` (`00000000-0000-0000-0000-000000000000`) ⇒ **NÉM** `0112`;
+   `ICurrentTenant.Id == null` là **ca 1-tenant hợp lệ** (**không** ném); `TtlSeconds ∉ [60, 86400]` · `Subtotal ∉
+   [0.01, 99999999999999.9999]` (kể cả `= 0`/thiếu) · `Currency !~ ^[A-Z]{3}$` (rỗng/sai) · `CheckoutSessionId` rỗng/> 128
+   ⇒ **NÉM** `AbpValidationException` (**400**, **0** mã mới, **0** dòng ghi; `D-302`/`D-298`/`D-303`/`D-304`).
    📌 `Sales` dựng `TtlSeconds` = `(CheckoutInput.TtlPhut ?? 15) * 60` ⇒ mặc định **900 s**, **trùng** mốc giữ chỗ kho.
 2. **Chuẩn hoá + tìm mã** theo tenant: không có ⇒ `0101`; `Status = Revoked` ⇒ `0103`; `Generated` ⇒ `0101`;
    ngoài `[StartsAtUtc, EndsAtUtc]` ⇒ `0102` (đọc `ProPromotions` qua repository).
@@ -612,7 +637,7 @@ tường minh chạy `/api/app/voucher` (trái `D-13`: `/api/app/**` = conventio
 
 Chỗ thêm: khối `options.Map(...)` trong `src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs` — hiện **chỉ** map
 `0001–0010` (`:449-458`). **Không** thêm ⇒ `BusinessException` mã `01xx` rơi về mặc định **`403`**, che lỗi thật
-(`0104`/`0119` do `PromotionEngine.cs:372/383/411` ném sẽ hiện "không có quyền"). Thêm **14** dòng (cùng PR với 14 hằng):
+(`0104`/`0119` do `PromotionEngine.cs:372/383/411` ném sẽ hiện "không có quyền"). Thêm **17** dòng `options.Map` — map đủ `0101…0119` trừ `0109`/`0113` (cùng PR với 14 hằng **mới**; `0101`/`0104`/`0119` đã có hằng):
 
 | Mã | HTTP | Mã | HTTP |
 |---|---|---|---|
@@ -719,6 +744,7 @@ Chỗ thêm: khối `options.Map(...)` trong `src/eCommerce.HttpApi.Host/eCommer
 | `D-300` | (i) `UPDATE ProVoucherCodes SET Status='Expired'` ⇒ `23514`; (ii) `ProPromotionRedemptions.Status = 4` ⇒ `23514`; (iii) `\d` đủ 2 constraint; (iv) đếm index NND **vẫn 114**; (v) NC xoá 1 `HasCheckConstraint` ⇒ snapshot/migration lệch ⇒ đỏ |
 | `D-301` | (i) quote có mã ⇒ `VoucherExpiresAtUtc` có giá trị, không mã ⇒ `null`; (ii) `ExpiresAtUtc` **vẫn** = min hạn giữ chỗ kho; (iii) FE chọn **min**; (iv) `gen:api` chỉ **thêm** trường |
 | `D-302` | (i) `TtlSeconds` ngoài `60…86400` ⇒ 400, **0** dòng lượt; (ii) `Quantity = 10001` ⇒ `0108`, **0** dòng `ProVoucherCodes`; (iii) `Quantity ≤ 0` ⇒ 400; (iv) Setting `MaxBatchSize = "abc"/0` ⇒ mặc định 10000 + `hopLe=false` (không ném); (v) `GET …/redemptions?status=Reserved` chỉ trả `Reserved` + `.View`; (vi) chuỗi khoá **0** tiền tố `ecommerce:`; (vii) NC đổi default `MaxBatchSize` ⇒ (ii) đỏ; (viii) `validate-voucher` **0** ghi |
+| `D-303`/`D-304` | (i) `Subtotal = 0`/thiếu ⇒ **400**, **0** dòng `ProPromotionRedemptions`; (ii) `Currency = ""`/`"vnd"`/`"VNDD"` ⇒ **400**; (iii) `CheckoutSessionId = ""`/> 128 ⇒ **400** ở **cả hai** record; (iv) `TtlSeconds ∈ {≤ 0, 59, 86401}` ⇒ **400**, **0** dòng; (v) reflection: `CheckoutSessionId` là `string` (**không** `Guid`) ở cả hai record; NC đổi `Subtotal` sang `decimal?`/bỏ `Range` ⇒ (i) đỏ |
 | §7.6 map lỗi | Probe HTTP: `0104 ⇒ 409`, `0119 ⇒ 409`, `0101 ⇒ 404`, `0102 ⇒ 400`, `0105 ⇒ 409`; **rơi `403` ⇒ ĐỎ** (dấu hiệu thiếu dòng `options.Map` ở `eCommerceHttpApiHostModule`) |
 
 ### 10.3 Thêm file test mới (gợi ý, không bắt buộc tên)
@@ -771,7 +797,7 @@ Chỗ thêm: khối `options.Map(...)` trong `src/eCommerce.HttpApi.Host/eCommer
 | **D10** | §6.1 `IVoucherAdminAppService` (7 method) | Chưa có; `IPromotionAppService` **đã** 10 method | `W25-2` tạo **interface thứ hai cùng module** (+ `RedemptionFilterDto` mới), **không** thêm method vào `IPromotionAppService` (`TC-31` giữ 10) — `D-302` ①(3) |
 | **D11** | SRS §0 `ADR-13` coi `Sales` đã "gọi contract của `Promotions`" cho voucher | As-built `Sales` **đã** tham chiếu Contracts nhưng chỉ gọi `EvaluateAsync` (auto, `VoucherCode=null`) | **`D-298` ①(1)**: `Sales` gọi `ReserveAsync` **thay** `EvaluateAsync` khi có mã; SRS ghi rõ điểm cắm **vừa** nối |
 | **D12** | `PRO-002-arch` §2.1 allowlist **1** namespace `Messaging.EventCoverage` | `BR-02` buộc `IIdempotencyGuard` (`eCommerce.Messaging.Idempotency`) | **`D-298` (BR-02) + `D-297` ①(3)**: mở rộng allowlist **đúng 2 namespace** (§2.2) + sửa method `PromotionSurfaceTests.RanhGioi__…` (`:97-108`) cùng PR — thay đổi **chủ đích**, **không** phải vi phạm |
-| **D13** | SRS §6.1 (`pro-001:461-462`) ghi chữ ký cũ: `ReserveVoucherDto` **chưa** có `Subtotal`/`Currency`/`TtlSeconds`, `CommitVoucherDto` **chưa** có `CheckoutSessionId` | `-arch` §4.2 chốt chữ ký mới theo **`D-298` ①(4)** + **`D-302`**: `ReserveVoucherDto` = `VoucherCode, CheckoutSessionId, CustomerId?, ChannelCode, Lines, Subtotal, Currency, TtlSeconds`; `CommitVoucherDto` = `RedemptionId, OrderId, VoucherCode, CheckoutSessionId` | **Chủ `ba` ở `W25-2`**, cùng nhánh cùng PR: cập nhật SRS §6.1 (bảng chữ ký + ràng buộc `Subtotal`/`TtlSeconds`/`CheckoutSessionId`); **v1 không** đổi thứ tự tham số nào khác |
+| **D13** | §6.1 (`pro-001:461-462`) **trước N101** ghi chữ ký cũ: `ReserveVoucherDto` **chưa** có `Subtotal`/`Currency`/`TtlSeconds`, `CommitVoucherDto` **chưa** có `CheckoutSessionId` | **Đã sửa ở N101 (W25-2, cùng PR)** — SRS §6.1 **bảng 461-462** nay đã có đủ 4 trường + bullet **478-480** (`Subtotal`+`Currency`, `TtlSeconds [Range(60,86400)]`, `CommitVoucherDto.CheckoutSessionId` `string` ≤128), khớp §4.2; `-arch` giữ chữ ký theo **`D-298` ①(4)** + **`D-302`** + **`D-303`** (`ReserveVoucherDto` = `VoucherCode, CheckoutSessionId, CustomerId?, ChannelCode, Lines, Subtotal, Currency, TtlSeconds`; `CommitVoucherDto` = `RedemptionId, OrderId, VoucherCode, CheckoutSessionId`) | **Đã đóng một phần ở N101**; **còn lại — chủ `ba`, cùng PR** (docrev vòng 3): (i) nêu **cơ chế validator** `Subtotal` (`Range(typeof(decimal),"0.01","99999999999999.9999")`) + `Currency` (`^[A-Z]{3}$`) theo §4.2 v0.5 (#2); (ii) thêm bullet `ReserveVoucherDto.CheckoutSessionId` = `string` ≤128 — hiện **chỉ** `CommitVoucherDto` có (#5); (iii) `CheckoutDtos.cs:63-69` → `:67-69` (#4); (iv) bump SRS `v0.11` + dòng changelog N101 (#3). **v1 không** đổi thứ tự tham số nào khác |
 
 ---
 
@@ -798,6 +824,8 @@ Chỗ thêm: khối `options.Map(...)` trong `src/eCommerce.HttpApi.Host/eCommer
 | `D-300` | `AQ4`: **một** migration `Add_Voucher_Status_Check` (2 `CHECK` miền `Status`), **`PRO-002` sở hữu**; lùi `DROP CONSTRAINT`; không chủ duy nhất ⇒ hoãn | §5.2, §5.5, §9.1, §9.3 |
 | `D-301` | `AQ6`: trả **cả hai** `ExpiresAtUtc` additive, FE hiện **min**, Sales ghép không sửa `Promotions` | §4.2, §4.5, §6.1 bước 8 |
 | `D-302` | `Q2/Q6/Q7/Q9/Q11`: TTL **900 s** (`TtlSeconds` bắt buộc 60…86400, không gia hạn) · `MaxBatchSize = 10000` (Setting + hàm thuần, không rate limit) · `GetRedemptionsAsync(status=Reserved)` + `RedemptionDto.ExpiresAtUtc` · không dry-run · test chuỗi khoá 0 tiền tố | §3.6, §4.1, §4.2, §10.4 |
+| `D-303` | `Q16`: `CheckoutSessionId` (cả `ReserveVoucherDto`/`CommitVoucherDto`) là **`string`** ≤ 128 (= `CheckoutInput.IdempotencyKey` của `Sales`), **không** `Guid`; SRS giữ `string`; rỗng/>128 ⇒ **400** `AbpValidationException` | §4.2 |
+| `D-304` | `Q17`: 2 ca `TtlSeconds` ngoài dải + `Subtotal`=0/`Currency` sai hoãn **`qa`** ở `W25-4`; **cơ chế** `[Range(typeof(decimal), "0.01", "99999999999999.9999")]` + `[RegularExpression("^[A-Z]{3}$")]` + `AbpValidationException` phải có ở `W25-2` | §4.2, §6.1, §10.4 |
 | `D-169` | tạm duyệt có điều kiện (nay đã đóng) — khuôn tài liệu | header |
 | luật E2 (ABP module rules) | handler ghi dữ liệu mở UoW riêng | §6.4 |
 | luật D3 (`NULLS NOT DISTINCT`) | giữ 9 index, test 114 | §5.3 |
@@ -827,6 +855,7 @@ Chỗ thêm: khối `options.Map(...)` trong `src/eCommerce.HttpApi.Host/eCommer
 | Đọc đúng dòng `D-297`…`D-302` trước khi sửa | `docs/nhanh/decisions.md:311-316` (đọc nguyên văn trong phiên N100) |
 | Delta schema khớp `D-300` | **1** migration `Add_Voucher_Status_Check` (2 `CHECK`) do `PRO-002` sở hữu; **0** cột/index; index NND **vẫn 114** |
 | DOCREV vòng 1 (v0.3) | `DOC-CHANGES` P1=0/P2=5/P3=6 → đã sửa **5 P2** (§6.2 conflict target; tên/file test ranh giới `PromotionSurfaceTests.cs:97-108`; §7.6 bảng map `01xx` + DoD; `Guid.Empty` ≠ `null`; `docDeviation` D13) + **6 P3** (`:372/383/411`, `Promotion.cs:130`, `TC-41`, 7 trường, bỏ vế build-đỏ, số dòng) |
+| DOCREV vòng 3 — delta N101 (v0.5) | `DOC-OK` P1=0/P2=2/P3=3 → đã sửa **2 P2 vùng arch** (#1 `D13` → "đã đóng một phần ở N101", nêu phần SRS đã có + phần `ba` còn lại; #2 §4.2 nêu **cơ chế** `[Range(typeof(decimal),"0.01","99999999999999.9999")]`/`[RegularExpression("^[A-Z]{3}$")]` + `AbpValidationException` 400, tiền lệ `Promotion.cs:130`/`StockDocumentDtos.cs:185`, trần `numeric(18,4)` as-built) + **1 P3 arch** (#5 bullet `ReserveVoucherDto.CheckoutSessionId` = `string` ≤128) — **phần còn lại chủ `ba`/SRS: #2 (SRS), #3, #4, #5 (SRS)** ghi trong `D13`; **không** sửa SRS (ngoài vùng ghi arch) |
 | Cổng tài liệu | `pwsh -File tools/kiem-link-tai-lieu.ps1` **PASS**; `npm --prefix tools run check:mermaid` **0 lỗi** (tệp không có Mermaid) |
 | ⚠️ Giới hạn | `tools/agents/check-feature-doc.ps1` (16 mục) **KHÔNG** áp cho tệp `-arch` — **không** tuyên bố "16 mục xanh" |
 
@@ -839,3 +868,5 @@ Chỗ thêm: khối `options.Map(...)` trong `src/eCommerce.HttpApi.Host/eCommer
 | v0.1 | 27/11/2026 | ARCH (N100/W25-1) | Bản đầu: 15 mục. Chốt **schema delta = 0 cột** (CR-1…CR-7 + CR-11 đã nằm trong `Add_Promotion_Module` từ W24-2; test NND 114); đề xuất P2 `Add_Voucher_Status_Check` (`AQ4`). Thiết kế 2 máy trạng thái (mã/lượt) **NÉM**; 2 service voucher; cấp `UsageSequence` đúng **`D-295`** (SAVEPOINT, 5 lần thử, 0 metric mới); 3 metric gỡ khỏi `ChuaCoNoiPhat`; 3 quyền `.Voucher.*`; 2 job + 2 consumer hoãn (chờ `SAL-004`/`SAL-006`); **mở rộng allowlist B2 đúng 2 namespace** (`Messaging.Idempotency`); 12 `docDeviation`; 12 câu mở (`AQ1`–`AQ6` + `Q2/Q6/Q7/Q9/Q11`). |
 | v0.2 | 27/11/2026 | ARCH (N100/W25-1) | Áp **`D-297`…`D-302`**, **đóng toàn bộ §11**. `D-298`: `ReserveVoucherDto` thêm `Subtotal`/`Currency`/`TtlSeconds`, `CommitVoucherDto` thêm `CheckoutSessionId`, chốt điểm gọi `CommitAsync` sau `Recalculate() :107` trước tripwire `:110`, 7 trường DTO additive phía `Sales` (§4.5); 2 lá khách **luôn `false`** + công bố Marketing. `D-299`: `VoucherController` tường minh `/api/v1/voucher/**` **7 route** + giữ auto `voucher-admin`; audit bằng ABP audit log, **0** cột/migration, `reason` ≥ 10 ⇒ 400. `D-300`: **một** migration `Add_Voucher_Status_Check` (2 `CHECK` miền `Status`) do **`PRO-002` sở hữu**. `D-301`: trả **cả hai** `ExpiresAtUtc`, FE hiện **min**. `D-302`: TTL **900 s** qua `TtlSeconds` bắt buộc (60…86400, không gia hạn, không Setting TTL v1), `MaxBatchSize = 10000` (Setting + hàm thuần, không rate limit, vượt ⇒ `0108` trước khi ghi), `GetRedemptionsAsync(status=Reserved)` + `RedemptionDto.ExpiresAtUtc` additive, không dry-run, test chuỗi khoá 0 tiền tố. Thêm §3.6, §4.5, §7.4–7.5, §10.4; §12 cập nhật D2–D4/D6/D9–D12; §13 thêm 6 dòng truy vết. |
 | v0.3 | 27/11/2026 | ARCH (N100/W25-1 — sửa `docrev` vòng 1) | **P2 #1**: §6.2 `ON CONFLICT` nêu **đúng conflict target** `(TenantId,PromotionId,CustomerId,UsageSequence) WHERE "CustomerId" IS NOT NULL AND "Status" <> 2`; **0 dòng = trùng số** (thử lại), **`23505` từ index khác** (vd `IdempotencyKey`) = **NÉM trong `SAVEPOINT`, không thử lại**. **P2 #2**: test ranh giới đúng là method `PromotionSurfaceTests.RanhGioi__…` (`:97-108`, hiện vacuous; sẽ đỏ khi thêm `using …Idempotency`); bỏ vế "build đỏ vì thiếu ref" (`csproj:16` đã có). **P2 #3**: thêm §7.6 bảng **`01xx → HTTP`** + chỗ map `eCommerceHttpApiHostModule` + ca DoD (`0104⇒409`, `0119⇒409`, rơi `403` ⇒ đỏ). **P2 #4**: `ICurrentTenant.Id == null` = 1-tenant hợp lệ, **`Guid.Empty` ⇒ `0112`**. **P2 #5**: thêm `docDeviation` **D13** (`ba` sửa SRS §6.1 chữ ký mới ở `W25-2`). **P3**: `PromotionEngine.cs:372/383/411`; `Promotion.cs:130`; `TC-41` engine là của `PRO-002`; 7 trường DTO; `PostgreSqlSchemaTests` Assert `:227-228`. |
+| v0.4 | 27/11/2026 | ARCH (N101/W25-2) | Áp **`D-303`**: `ReserveVoucherDto.CheckoutSessionId` và `CommitVoucherDto.CheckoutSessionId` (§4.2) **`Guid` → `string`** (không rỗng, ≤ 128 = `[StringLength(128)]` = `CheckoutInput.IdempotencyKey` của `Sales`). Sửa P3 còn lại: §1.2 + §7.6 "14 dòng map" → **17 dòng `options.Map`** (map đủ `0101…0119` trừ `0109`/`0113`). Không đổi nội dung ánh xạ hay mục nào khác. |
+| v0.5 | 27/11/2026 | ARCH (N101/W25-2 — sửa `docrev` vòng 3 delta) | **P2 #1 (`D13`)**: chuyển "chờ `ba`" → **"đã đóng một phần ở N101"** — SRS §6.1 `461-462` + bullet `478-480` đã có đủ `Subtotal`/`Currency`/`TtlSeconds`/`CommitVoucherDto.CheckoutSessionId`; nêu phần còn lại chủ `ba` (#2 validator SRS, #3 bump `v0.11`, #4 `CheckoutDtos.cs:67-69`, #5 bullet `ReserveVoucherDto.CheckoutSessionId`). **P2 #2 (`D-304`)**: §4.2 nêu **cơ chế** từ chối `Subtotal = 0` — `[Range(typeof(decimal), "0.01", "99999999999999.9999")]` (trần `numeric(18,4)` as-built `:52-54,186`; tiền lệ `StockDocumentDtos.cs:185`/`DonHangDtos.cs:46`) + `Currency` `[RegularExpression("^[A-Z]{3}$")]` khớp `CHECK` `:73/:217` + `CheckoutSessionId` `[StringLength(128, MinimumLength=1)]`; lớp ném **`AbpValidationException` = 400** (as-built `Promotion.cs:130`; **không** `ArgumentException`); guard **tường minh** ở §6.1 bước 1 vì `VoucherRedemptionService` không phải `IApplicationService`. **P3 #5 arch**: thêm dòng §4.2 `ReserveVoucherDto.CheckoutSessionId` = `string` ≤128 (không chỉ `CommitVoucherDto`). Thêm §13 `D-304` + §10.4 ca đỏ; **không** đổi schema/code. |
