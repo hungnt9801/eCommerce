@@ -12,7 +12,7 @@
 | **Ưu tiên** | **Must have** — cổng kiểm soát cũ ở `docs/implementation-plan.md` §8 (dòng *"Cổng kiểm soát GĐ2"*): *"một khuyến mãi phức tạp (nhiều điều kiện AND/OR) tính đúng tiền"* |
 | **Trạng thái** | 🟡 `Draft` — chờ review |
 | **Người viết / người review** | *(điền)* / **Kiến trúc trưởng + BA + Kế toán** (voucher làm đổi `DiscountTotal`/`TaxTotal` ⇒ ảnh hưởng hoá đơn GTGT ⇒ bắt buộc có kế toán, theo `docs/design-doc-guidelines.md` §6) |
-| **Phiên bản / ngày** | `v0.12 — 27/11/2026` (N101 áp `D-305` + `D-306`, đồng bộ `PRO-001-arch.md` v0.6: §6.1 `CommitVoucherDto` thêm trường thứ 5 `OrderDiscountTotal`; BR-06/E6/§6.2 `0111` — `Promotions` tự so `Σ DiscountAmount` vs `OrderDiscountTotal`; §7.1 `docDeviation` 0 ETO mới; §7.2/§8.2/§13 job `voucher-expiry` thuộc `W25-2`; nợ as-built `PromotionExpiryWorker`; kế thừa v0.11 vòng 3 `docrev` `D-303`/`D-304`) |
+| **Phiên bản / ngày** | `v0.13 — 28/11/2026` (N103 áp `D-307` ①(5)(b): §6.2 bảng route as-built `/api/v1/voucher/**` + giữ auto `voucher-admin`; §10 thêm dòng màn voucher thuộc `WEB-001`, hợp đồng đã tái sinh `D-308`; kế thừa v0.12 `D-305`/`D-306`) |
 | **Tài liệu liên quan** | ⭐ **`PRO-002`** (`docs/features/promotions/pro-002-cay-dieu-kien-engine-khuyen-mai.md` — **chủ sở hữu** `ProPromotions`/`ProVoucherCodes`/`ProPromotionConditions`/`ProPromotionRedemptions`, engine, mã lỗi `0001`–`0010`, `PromotionLockKeys`) · `XC-001` (Money/làm tròn/phân bổ) · `XC-002` (outbox/inbox, `IIdempotencyGuard`) · `XC-003` (khoá phân tán) · `XC-004` (`[Authorize]` cấp class, permission, `NULLS NOT DISTINCT`) · `XC-005` (log/metric) · `SAL-002` (checkout/đặt hàng) · `SAL-003` (state machine 4 trục) · `SAL-006` (RMA/hoàn tiền) · `PRC-001`/`PRC-002` (giá & pipeline giá) · `EINV-001` (hoá đơn) · `REP-001` (read-model) · ⭐ `SHP-003` (`shp-003-cod-thu-ho-doi-cod.md` — ⚠️ **GHN đổi COD bắt buộc OTP**, có trần **5.000.000**) · ⭐ `SHP-004` (`shp-004-adapter-ghtk.md` — ⚠️ **xác minh địa chỉ 2 cấp CHƯA có câu trả lời từ GHTK**, fail-closed) · `LOY-001` (điểm thưởng) · `docs/implementation-plan.md` §8, §A.3.1 (lịch sử) · `docs/business-modules-proposal.md` · `docs/templates/feature-design-template.md` |
 
 ---
@@ -486,15 +486,17 @@ sequenceDiagram
 
 | Method / Route | Authentication | Permission | Mã lỗi có thể |
 |---|---|---|---|
-| `GET /api/app/voucher` | Bearer (OpenIddict) | `.View` | — |
-| `POST /api/app/voucher/generate` | Bearer | `.Voucher.Generate` | `0107` `0108` `0114` |
-| `POST /api/app/voucher/{id}/issue` | Bearer | `.Voucher.Publish` | `0006` `0102` `0114` |
-| `POST /api/app/voucher/{id}/revoke` | Bearer | `.Voucher.Publish` | `0006` |
-| `POST /api/app/voucher/{id}/override-limit` | Bearer | `.Voucher.OverrideLimit` | `0116` |
-| `GET /api/app/voucher/redemptions` | Bearer | `.View` | — |
+| `GET /api/v1/voucher` | Bearer (OpenIddict) | `.View` | — |
+| `GET /api/v1/voucher/{id}` | Bearer | `.View` | — (`404` `EntityNotFoundException`, không `Code`) |
+| `POST /api/v1/voucher/generate` | Bearer | `.Voucher.Generate` | `0107` `0108` `0114` |
+| `POST /api/v1/voucher/{id}/issue` | Bearer | `.Voucher.Publish` | `0006` `0102` `0114` |
+| `POST /api/v1/voucher/{id}/revoke` | Bearer | `.Voucher.Publish` | `0006` |
+| `POST /api/v1/voucher/{id}/override-limit` | Bearer | `.Voucher.OverrideLimit` | `0116` |
+| `GET /api/v1/voucher/redemptions` | Bearer | `.View` | — |
 
+> 📌 **Giữ nguyên** bề mặt auto `/api/app/voucher-admin/**` do ABP sinh từ `IVoucherAdminAppService` (`D-299` ①(2), khuôn `D-285`) — **hai bề mặt** cùng tồn tại; **cấm** xoá/đổi bề mặt auto (Razor/tích hợp).
 > 🚫 **KHÔNG có route `reserve`/`commit`** (docrev vòng 1 #7): `ReserveAsync`/`CommitAsync` phải chạy **trong** UoW đặt hàng (**ADR-13**) — một HTTP request riêng không chung UoW với việc ghi `Order`, và quyền `.View` (Sale, CSKH, Kế toán) không được phép tạo/chốt lượt. Storefront chỉ đi qua **checkout của `Sales`** (vãng lai ⇒ `0118` — **Q5** `Closed`, `D-146`). Đỏ ở `TC-34` (quét controller: 0 route `reserve`/`commit`).
-> 📌 Route do ABP tự sinh theo `<verb>/api/app/<resource>` (`docs/design-doc-guidelines.md` §2.2).
+> 📌 Route `/api/v1/voucher/**` trong bảng do `VoucherController` **tường minh** khai (`src/eCommerce.HttpApi/Controllers/VoucherController.cs:24` — `[Route("api/v1/voucher")]`, `{id}` ràng buộc `:guid`), **không** do ABP tự sinh; ABP chỉ tự sinh route `<verb>/api/app/<resource>` (`docs/design-doc-guidelines.md` §2.2) — với voucher nay là `/api/app/voucher-admin/**`, giữ nguyên theo dòng trên (`D-299` ①(1)(2), `D-307` ①(5)(b)).
 > 📌 `PRO-002` **đã** có `POST /api/app/promotion/voucher/validate` (`PRO-002` §6.3) **không** side effect ⇒ **giữ nguyên**, **không** giữ lượt (`PRO-002` §6.1 — record `PromotionEvaluationResult`).
 
 **Input mẫu của `ReserveAsync` — áp mã khi báo giá** (gọi nội bộ từ `Sales`, không qua HTTP)
@@ -755,6 +757,7 @@ màn hình **dựng cây** (`pro-002:706-714`) và **checkout/chi tiết đơn**
 | Màn vận hành job nhả TTL | số lượt treo, tuổi lượt treo | metric + `RedemptionDto` | ⚠️ Treo quá **2 × TTL** ⇒ **cảnh báo đỏ** (job chết = lượt treo vĩnh viễn — rủi ro lớn nhất của ADR-02) |
 | Báo cáo khuyến mãi (thuộc `REP-002`) | `Σ DiscountAmount`, số lượt (⏸ `Σ ShippingDiscountTotal` — `CR-S2`, `D-158`) | `REP-001` read-model | ⚠️ **ghi rõ chênh lệch:** số lượt ở **bộ đếm** và số **dòng sổ cái** **có thể** lệch **tạm thời** trong lúc job nhả đang chạy (Luồng B bước B4) — UI **phải** hiện **cả hai** cột khi lệch, **không** im lặng chọn một |
 
+> 📌 **Màn voucher thuộc WP `WEB-001`** (chờ người xếp lịch — `D-247`); `packages/api-client/openapi.v1.json` đã tái sinh ở `W25-3` (`D-308`) với **đúng 7** path `/api/v1/voucher/**` ⇒ WP `WEB-001` **không** phải tái sinh lại hợp đồng (`D-307` ①(5)(b)).
 > 📌 **Quy tắc kế thừa `XC-001` §10:** tổng tiền **phải** hiển thị bằng **Σ các dòng đã làm tròn**, **không** tính lại từ
 > tổng chưa làm tròn. Với VND (0 chữ số thập phân) hai cách này **có thể lệch 1–2 đồng** — và đó **không phải** bug.
 > 📌 **Quy tắc kế thừa `PRO-002` §10:** tổng giảm **lấy từ `Redemption`**, các dòng **lấy từ `BreakdownJson`**; nếu lệch ⇒
@@ -1183,6 +1186,7 @@ public class VoucherRedemptionTests
 | `v0.10` | 27/11/2026 | BA (WP-25 áp `D-296` + sửa docreview vòng 4) | P1 #26 (`D-296`): mô tả as-built — `Percentage` sai ⇒ `AbpValidationException` (400, không `Code`) trong `CreateAsync`/`Promotion.TaoMoi` (`Promotion.cs:112-116,130`), `PromotionErrorCodes` **không** có `0109`; giữ số `0109` + §6.2 ghi "v1 chưa có đường ném"; E10/BR-19/CR-1/§12/`TC-20`/`TC-21`; thêm `TC-21b` (`DiscountValue = 0` lọt ở v1, nợ `PRO-002`); §14.3 66 TC. P2 #27: trỏ đúng §6.2 `IPromotionAppService` (`IPromotionAppService.cs:12-30`, 10 method) ở BR-18/`TC-40`/Đối chiếu thay `pro-002:511`/`510-517`. P3 #28: heading Đối chiếu "cập nhật 27/11/2026". §8.1 #3 bổ sung nhánh `MaxUsagePerCustomer = NULL` ⇒ `[1, ∞)`. |
 | `v0.11` | 27/11/2026 | BA (N101 sửa `docrev` vòng 3 — P3 D6/D5/D2 + P2 D3 phía SRS) | N101: `ReserveVoucherDto` thêm **`Subtotal`/`Currency`/`TtlSeconds`** + **`CheckoutSessionId`**, `CommitVoucherDto` thêm **`CheckoutSessionId`** theo `D-298`/`D-302`/`D-303` (§6.1 đã khai đủ trường). §6.1 nêu **cơ chế ném 400**: `[Range(typeof(decimal), "0.01", "99999999999999.9999")]` cho `Subtotal` (trần `numeric(18,4)` as-built), `[Required]` + `[RegularExpression("^[A-Z]{3}$")]` cho `Currency` (khớp `CHECK` `CK_ProPromotions_Currency`/`CK_ProPromotionRedemptions_Currency`, fail-closed không `ToUpper`), `[Required]` + `[StringLength(128, MinimumLength = 1)]` cho cả hai `CheckoutSessionId`; `VoucherRedemptionService` **không** kế thừa `IApplicationService` ⇒ DataAnnotations **không** tự chạy ⇒ service **guard tường minh**, ném `AbpValidationException` (400) ở đầu phương thức (`D-304` ⑥). Sửa `CheckoutDtos.cs:63-69` ⇒ `:67-69`. Không thêm test §14 (`D-304` hoãn về `qa` `W25-4`). |
 | `v0.12` | 27/11/2026 | BA (N101 áp `D-305` + `D-306`, đồng bộ `PRO-001-arch.md` v0.6) | `D-305`: §6.1 `CommitVoucherDto` thêm **trường thứ 5** `OrderDiscountTotal` (`[Range("0.00","99999999999999.9999")]`, cho phép `0`, guard `< 0` ⇒ 400, **không** trong payload khoá); BR-06/E6/§6.2 `0111`: `Promotions` tự so `Σ DiscountAmount` vs `OrderDiscountTotal` sau `UPDATE` (nhánh replay vẫn so). `D-306`: §7.1 `docDeviation` **0** ETO mới (hoãn `REP-001`/`SAL-004`/`SAL-001`); §7.2 #5/§8.2 #4/§13 job `voucher-expiry` thuộc `W25-2` (khoá riêng TTL 300 s, lô 500, `requiresNew`, 2 counter, `reservation_expired` rời `ChuaCoNoiPhat`), nợ as-built `PromotionExpiryWorker` không đọc cờ ⇒ `PRO-002`; sửa `TC-42`; thêm 2 dòng Đối chiếu `D-305`/`D-306`. Không thêm test §14. |
+| `v0.13` | 28/11/2026 | BA (N103 áp `D-307` ①(5)(b)) | §6.2 sửa bảng REST endpoint về **as-built** `/api/v1/voucher/**` (**đúng 7** route, `VoucherController.cs:24`), map permission theo `D-299` ①(1) — View · `.Voucher.Generate` · `.Voucher.Publish` (issue + revoke) · `.Voucher.OverrideLimit` · View; thêm dòng giữ nguyên bề mặt auto `/api/app/voucher-admin/**` (**hai bề mặt**, `D-285`/`D-299`); sửa dòng 📌 "ABP tự sinh" cho khớp as-built. §10 thêm dòng màn voucher thuộc `WEB-001` (`D-247`) + `openapi.v1.json` đã tái sinh ở `W25-3` (`D-308`, 7 path) ⇒ `WEB-001` không tái sinh lại. Không đổi mã lỗi/BR/test §14. |
 
 ## Đối chiếu mô hình Nhanh (cập nhật 27/11/2026)
 
