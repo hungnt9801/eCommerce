@@ -1,12 +1,13 @@
 # `PRO-001` — Kiến trúc Voucher/Coupon: giữ · chốt · nhả lượt trên mô hình `Pro*` của `PRO-002`
 
+> **v0.7 — 28/11/2026** (N103/W25-4 — **doc-only giữ code**, áp **`D-310`** + **`D-309`**: (1) §6.4 sửa **câu chữ** cho khớp as-built — counter `reservation_expired`/`released{reason=TTL_EXPIRED}` **chỉ** phát khi `daNha > 0`, nhánh **0 dòng** = `LogDebug` + bỏ qua, **KHÔNG** metric; (2) §1.1 + §8 sửa as-built cũ — **cả 3** metric voucher đã có điểm phát, cả 3 đã rời `ChuaCoNoiPhat`, nợ chỉ còn `promotion_applied_total`; (3) thêm **§6.1b** đặc tả thứ tự guard `GenerateAsync` + **pre-check dung lượng mã** (`36^(Length−len(Prefix)) < Quantity` ⇒ `0107`); giữ nguyên `VoucherExpiryWorker.cs:180-186` + test `D306_…`; §13 trỏ thêm §6.1b/§1.1/§8) ·
 > **v0.6 — 27/11/2026** (N101/W25-2 — áp **`D-305`** + **`D-306`**: `CommitVoucherDto` **5** trường + `Promotions` tự so `Σ DiscountAmount` vs `OrderDiscountTotal` ⇒ `0111`; job `voucher-expiry` nhả TTL **ngay trong `W25-2`** + 2 counter; ETO ra **hoãn có chủ**; nêu nợ as-built `PromotionExpiryWorker` **chưa** đọc cờ) ·
 > **v0.5 — 27/11/2026** (N101/W25-2 — sửa `docrev` vòng 3 **delta** N101: **2 P2 + 1 P3** vùng arch — nêu **validator** `Subtotal`/`Currency`/`CheckoutSessionId` ở §4.2/§6.1; **D13** chuyển "đã đóng một phần ở N101") ·
 > **v0.4 — 27/11/2026** (N101/W25-2: áp `D-303` — `CheckoutSessionId` = **`string`** (≤ 128) ở `ReserveVoucherDto`/`CommitVoucherDto`; sửa số dòng map `01xx` **14 → 17**) ·
 > **v0.3 — 27/11/2026** (sửa `docrev` vòng 1: `DOC-CHANGES` P1=0/P2=5/P3=6 → sửa 5 P2 + 6 P3) ·
 > **v0.2** cùng ngày (áp `D-297`…`D-302`, đóng toàn bộ §11) · bản đầu v0.1.
 >
-> Vai **ARCH**, phiên **N100** (v0.1–v0.3) và **N101** (v0.4–v0.6), hàng `W25-1`/`W25-2`, chuỗi `gd3-1` (`WP-25`), nhánh `feat/gd3-wp25-voucher`.
+> Vai **ARCH**, phiên **N100** (v0.1–v0.3), **N101** (v0.4–v0.6) và **N103** (v0.7), hàng `W25-1`/`W25-2`/`W25-4`, chuỗi `gd3-1` (`WP-25`), nhánh `feat/gd3-wp25-voucher`.
 > Tài liệu này **chỉ thiết kế** quanh SRS
 > [`pro-001-voucher-coupon.md`](./pro-001-voucher-coupon.md) (`v0.11 — 27/11/2026`, sau đây gọi **SRS**);
 > **không** code, **không** sinh migration, **không** sửa SRS.
@@ -66,7 +67,7 @@
 | Mã lỗi `01xx` | 🔶 **chỉ có** `0101`, `0104`, `0119` | `modules/Promotions/eCommerce.Promotions.Domain/PromotionErrorCodes.cs:40-53` |
 | Map mã lỗi → HTTP | ❌ chỉ map `0001–0010` | `src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs:449-458` |
 | Permission voucher | ❌ **5/8** (`View/Manage/Approve/Import` + gốc); thiếu `.Voucher.Generate/.Publish/.OverrideLimit`, `.Export` | `src/eCommerce.Domain.Shared/eCommerceConsts.cs:371-387`; `src/eCommerce.Application.Contracts/Permissions/eCommercePermissionDefinitionProvider.cs:210` |
-| 3 metric voucher | 🔶 `reserved` + `released` **đã có điểm phát** (N101/F3 `ReserveAsync`/`ReleaseAsync`); **`reservation_expired` CHƯA** ⇒ còn nợ `ChuaCoNoiPhat` (job `voucher-expiry`, `D-306`) | `shared/eCommerce.Kernel/Observability/eCommerceMetrics.cs:147-154,297-318` (`:314` là dòng nợ duy nhất còn lại của 3 tên; `:317` `promotion_applied_total` giữ nợ `SAL-001`) |
+| 3 metric voucher | ✅ **cả 3 đã có điểm phát** (N101/`W25-2`): `reserved` (`ReserveAsync`), `released` (`ReleaseAsync` + job `voucher-expiry` `reason=TTL_EXPIRED`), `reservation_expired` (job `voucher-expiry`, **chỉ khi** có lượt nhả thật — `D-310`); cả 3 tên **đã rời** `ChuaCoNoiPhat`, danh sách nợ **chỉ còn** `promotion_applied_total` (`SAL-001`) | `shared/eCommerce.Kernel/Observability/eCommerceMetrics.cs:147-154,297-316` (`:315` là dòng nợ **duy nhất**); `VoucherExpiryWorker.cs:180-186`; `VoucherRedemptionService.cs:575-577` (`ReleaseAsync`) |
 | Job hết hạn promotion | ✅ có (`promotion-expiry`); **as-built KHÔNG đọc cờ `Promotions:Enabled`** (nợ `PRO-002`, `D-306` ⑥) | `modules/Promotions/eCommerce.Promotions.Application/Workers/PromotionExpiryWorker.cs:35-50` (class + ctor), `:84-122` (`DoWorkAsync`) |
 | Job nhả TTL lượt + job đối soát | ❌ **chưa có** — `W25-2` **tạo** `VoucherExpiryWorker` (job `voucher-expiry`) theo `D-306`; job đối soát vẫn **hoãn** | cùng thư mục `Workers/` chỉ có 1 file (`PromotionExpiryWorker.cs`) |
 | Tuỳ chọn & setting | 🔶 `PromotionOptions` có `JobPeriodMinutes`/`ExpiryJobName`/`MaxUsageSequenceAttempts`; **0** option/Setting TTL; lô job `voucher-expiry` = **hằng 500**, cờ dùng `PromotionContractConsts.EnabledSettingName` (`D-306`) | `PromotionExpiryWorker.cs:16-25`; `PromotionContractConsts.cs:10` |
@@ -523,6 +524,30 @@ Thứ tự **bắt buộc** (mọi kiểm "trước khi ghi" ở đây là **tr�
    rồi **lưu `RedemptionId`** trong `KetQuaCheckoutDto.VoucherRedemptionId` cùng phiên (`D-298`); `Sales` **ghép**
    `VoucherExpiresAtUtc` **additive** — **không** đổi nghĩa `ExpiresAtUtc` cũ (`D-301`).
 
+### 6.1b `GenerateAsync` — sinh lô mã: thứ tự guard **trước khi ghi** (`D-302` + `D-309`)
+
+`VoucherAdminAppService.GenerateAsync` (`VoucherAdminAppService.cs:92-174`) kiểm **theo đúng thứ tự** dưới đây; mọi
+nhánh ném đều **trước** `InsertAsync` đầu tiên (`:165`, `autoSave: false`) ⇒ **0** dòng `ProVoucherCodes`:
+
+1. **Quyền + trạng thái**: `[Authorize(Promotions.VoucherGenerate)]` ở method (`:92`); promotion phải
+   `Approved`/`Active` — sai ⇒ **NÉM** `PromotionNotApproved` (`:98-103`).
+2. **Số lượng tối thiểu**: `Quantity < 1` hoặc `MaxUsage < 1` ⇒ `AbpValidationException` (**400**, `:108-114`).
+3. **Trần lô (`0108`)**: `Quantity > MaxBatchSize` (Setting `Promotions:MaxBatchSize`, `D-302`) ⇒ **NÉM `0108`**
+   `BatchSizeExceeded` (`:116-122`) — kiểm **trước** mọi guard hình dạng mã.
+4. **Hình dạng mã (`0107`)**: `Length ∉ [3, 32]` hoặc `len(Prefix) ≥ Length` ⇒ **NÉM `0107`** `VoucherCodeInvalid`
+   (`:124-131`); `Prefix` chuẩn hoá ≤ 8 ký tự `A-Z`/`0-9`/`-` (`ChuanHoaPrefix`, `:284-305`).
+5. 🆕 **Dung lượng không gian mã (`D-309`, `0107`)** — chống **treo vô hạn** cho input **hợp lệ** ở bước 4:
+   `codespace = 36^(Length − len(Prefix))` (`Alphabet.Length = 36`, `:30`), tính bằng **vòng nhân có trần** dừng khi
+   `codespace >= Quantity` (`:138-143`) để **không tràn** `long` khi `Length` tới 32; `codespace < Quantity` ⇒
+   **NÉM `0107`** `VoucherCodeInvalid` + `WithData("length"/"prefix"/"codespace"/"quantity", …)` (`:145-152`).
+   Ví dụ đo được: `{Length: 3, Prefix: "AB", Quantity: 100}` ⇒ `36 < 100` ⇒ **`0107`** ngay, **không** vào `while`.
+6. **Sinh + ghi**: `while (HashSet.Count < Quantity)` sinh qua `TaoMa` (`:154-158`), rồi `InsertAsync(..., autoSave:
+   false)` từng mã (`:160-166`) — cùng UoW của app service.
+
+> 📌 Quan hệ `0108` ↔ `0107` (`D-309` ①(2)): `0108` nghĩa là *"lô vượt `MaxBatchSize`"* và **luôn kiểm trước**; khi
+> `Quantity ≤ MaxBatchSize` mà **không gian mã không đủ** thì nguyên nhân là **tham số `Length`/`Prefix`** ⇒ dùng
+> `0107`, **không** dùng `0108`, **không** thêm/đổi số mã lỗi. Cả hai là **400** (client sửa được tham số), **không** 500.
+
 ### 6.2 Cấp `UsageSequence` — đúng `D-295`, **cấm** tiếp tục trong transaction đã abort (`25P02`)
 
 - Số cần cấp = **số nhỏ nhất chưa bị lượt còn hiệu lực giữ** (`Status <> Released`, cùng `TenantId, PromotionId,
@@ -605,7 +630,7 @@ Thứ tự **bắt buộc** (mọi kiểm "trước khi ghi" ở đây là **tr�
 
 | Đường | Guard | 0 dòng | Bộ đếm |
 |---|---|---|---|
-| **Job `voucher-expiry`** (`Reserved`, `ExpiresAtUtc <= now`) | `Status=0` + hết TTL | **bỏ qua** + log `Debug` + metric `reservation_expired` (không phải lỗi) | `ReservedCount − 1` (mã → promotion) |
+| **Job `voucher-expiry`** (`Reserved`, `ExpiresAtUtc <= now`) | `Status=0` + hết TTL | **bỏ qua** + log `Debug`; **KHÔNG** phát metric — 2 counter chỉ cộng khi có lượt nhả **thật** (`daNha > 0`, `D-310`) | `ReservedCount − 1` (mã → promotion) |
 | **Consumer `OrderCancelledEto`** (`Applied`, `D-148`) | `OrderId=@o AND PromotionId=@p AND Status=1` | **không có lượt** ⇒ bỏ qua + log `Debug` + metric; đã `Released/ORDER_CANCELLED` ⇒ phát lại, bỏ qua; `Reversed` ⇒ **NÉM** `0105` ⇒ DLQ | `UsedCount − 1` (mã → promotion) |
 | **Consumer `OrderReturnedEto`** (`Applied → Reversed`) | `OrderId=@o AND Status=1` | không có lượt ⇒ bỏ qua; đã `Reversed` ⇒ bỏ qua; `Released/ORDER_CANCELLED` ⇒ **NÉM** `0105` ⇒ DLQ | **KHÔNG** hoàn lượt |
 
@@ -625,12 +650,18 @@ Thứ tự **bắt buộc** (mọi kiểm "trước khi ghi" ở đây là **tr�
   - **Liệt kê tenant**: `DISTINCT TenantId` với `dataFilter.Disable<IMultiTenant>()` **có ghi lý do** + `ICurrentTenant.Change`
     (khuôn `PromotionExpiryWorker.cs:66-73,84-98`).
   - **Lô 500**, **mỗi lô một** UoW `requiresNew: true, isTransactional: true`. Điều kiện chọn: `Status = 0` (`Reserved`)
-    **và** `ExpiresAtUtc <= now`. `UPDATE` **có guard** `Status = 0` — **0 dòng ⇒ bỏ qua** + log `Debug` + metric
-    (**không** phải lỗi, idempotent giữa 2 instance).
+    **và** `ExpiresAtUtc <= now`. `UPDATE` **có guard** `Status = 0` — **0 dòng ⇒ bỏ qua** + log `Debug`
+    (**không** phải lỗi, idempotent giữa 2 instance) và **KHÔNG** phát metric (`D-310` ①(a)).
   - **Bộ đếm**: `ReservedCount − 1` trên **dòng mã trước**, rồi **dòng promotion** (nếu `MaxUsageTotal` có giá trị),
     **sắp `Id`** — tránh `40P01` (SRS §8.2 #9); bắt `40P01` ⇒ thử lại **có trần** + log + metric.
-  - **Hai counter** mỗi lượt nhả: `promotion_voucher_reservation_expired_total{kind="voucher"}` **và**
-    `promotion_voucher_released_total{reason="TTL_EXPIRED"}` (§8).
+  - **Hai counter** mỗi **lượt nhả thật** (`daNha > 0`): `promotion_voucher_reservation_expired_total{kind="voucher"}`
+    **và** `promotion_voucher_released_total{reason="TTL_EXPIRED"}` (§8) — phát **SAU commit** (tránh đếm khi UoW
+    rollback do deadlock), với `daNha` là **số dòng đã nhả** (`VoucherExpiryWorker.cs:180-186`).
+  - **Metric chỉ khi có lượt nhả THẬT (`D-310`)**: nhánh **0 dòng** (lượt đã đổi trạng thái giữa 2 instance/lần quét)
+    **chỉ** `LogDebug` (`VoucherExpiryWorker.cs:235`) rồi bỏ qua, **KHÔNG** gọi `Add(...)`. Lý do: counter `+= 0`
+    **không tạo sample** ⇒ không phân biệt được "job chạy mà 0 việc" với "job không chạy"; tín hiệu đó đã có ở
+    `LogInformation` **vô điều kiện** đầu nhịp (`:49`) + cuối nhịp (`:108`, in `tongNha`) + khoá bỏ nhịp
+    (`LockSkipped`). **Cấm** thêm counter `kind="skipped"`/`Add(0)` cho nhánh này.
   - **Chỉ `Reserved`** — **cấm** nhả lượt `Applied` (đường đó thuộc consumer `OrderCancelledEto`, `SAL-004`).
 - Job `voucher-counter-audit` (15 phút): **chỉ đọc**, so `UsedCount` = số lượt `Applied`+`Reversed`,
   `ReservedCount` = số lượt `Reserved`, ở **cả hai** mức; lệch ⇒ **cảnh báo + metric, cấm tự sửa** (`Q10` Closed) —
@@ -735,25 +766,29 @@ Chỗ thêm: khối `options.Map(...)` trong `src/eCommerce.HttpApi.Host/eCommer
 
 ## 8. Metric (`ADR-15`/`BR-21`/`CR-8`)
 
-3 tên **đã đăng ký** (`eCommerceMetrics.cs:147-154`, factory `:576-581`). As-built sau N101/F3: `reserved` **có** điểm
-phát (`ReserveAsync`), `released` **có** điểm phát (`ReleaseAsync`); **chỉ `reservation_expired` còn nợ**
-(`ChuaCoNoiPhat` `:297-318`, dòng nợ `:314`; `:317` `promotion_applied_total` giữ nợ `SAL-001`). `W25-2` **phải**,
-trong **cùng PR** (`D-306` ①(2)):
+3 tên **đã đăng ký** (`eCommerceMetrics.cs:147-154`, factory `:576-581`). **As-built sau `W25-2`** (`D-306`, `D-310`):
+**cả 3 đều có điểm phát** — `reserved` (`ReserveAsync`), `released` (`ReleaseAsync` + job `voucher-expiry` với
+`reason=TTL_EXPIRED`), `reservation_expired` (**chỉ** job `voucher-expiry`, **chỉ khi** `daNha > 0` —
+`VoucherExpiryWorker.cs:180-186`). Cả 3 tên **đã rời** `ChuaCoNoiPhat` (`eCommerceMetrics.cs:297-316`); danh sách nợ
+**chỉ còn** `promotion_applied_total` (`:315`, chủ `SAL-001`, `D-283`). Việc `W25-2` **đã làm trong cùng PR**
+(`D-306` ①(2)) — ghi lại để truy vết:
 
-1. Thêm **điểm phát thật** cho `reservation_expired` **và** cho `released{reason=TTL_EXPIRED}` (job `voucher-expiry`);
-2. **Xoá dòng `[PromotionVoucherReservationExpiredTotal]`** (`:314`) khỏi `ChuaCoNoiPhat` + sửa comment `:309-313`;
+1. ✅ Thêm **điểm phát thật** cho `reservation_expired` **và** cho `released{reason=TTL_EXPIRED}` (job `voucher-expiry`);
+2. ✅ **Xoá dòng `[PromotionVoucherReservationExpiredTotal]`** khỏi `ChuaCoNoiPhat` + sửa comment `:309-314`;
    **GIỮ `promotion_applied_total`** (chủ `SAL-001`, `D-283`) — **cấm** gỡ tên khi chưa có điểm phát
    (`MetricEmitterTests` kiểm **hai chiều**);
-3. Cập nhật `XC-005` §5.1 + `TC-22` của `PRO-002`.
+3. ✅ Cập nhật `XC-005` §5.1 + `TC-22` của `PRO-002`.
 
 | Metric | Loại | Nhãn (`eCommerceMetricTags.Allowed`) | Điểm phát |
 |---|---|---|---|
 | `promotion_voucher_reserved_total` | Counter | `kind`, `result` ∈ {`ok`,`duplicate`,`rejected`,`usage_sequence_exhausted`} | `ReserveAsync` (`VoucherRedemptionService.cs:590-594`) |
 | `promotion_voucher_released_total` | Counter | `reason` ∈ {`TTL_EXPIRED`,`ORDER_CANCELLED`,`ORDER_RETURNED`,`MANUAL`} | Release/job/consumer — `ReleaseAsync` + **job `voucher-expiry`** phát `reason=TTL_EXPIRED` (`D-306`) |
-| `promotion_voucher_reservation_expired_total` | Counter | `kind` (=`voucher`) | **job `voucher-expiry`** (`promotion_voucher_reservation_expired_total`; `D-306`) |
+| `promotion_voucher_reservation_expired_total` | Counter | `kind` (=`voucher`) | **job `voucher-expiry`** (`D-306`), **chỉ** khi `daNha > 0` — phát sau commit (`VoucherExpiryWorker.cs:180-186`); nhánh 0 dòng **0** sample (`D-310`) |
 
 - **0 metric mới** cho `usage_sequence_exhausted` — dùng **nhãn** `result` trên counter sẵn có (`D-295`).
-  `D-306` **cũng 0 metric mới**: dùng **2** counter đã đăng ký, chỉ thêm **điểm phát**.
+  `D-306` **cũng 0 metric mới**: dùng **2** counter đã đăng ký, chỉ thêm **điểm phát**. `D-310`: 2 counter của job
+  **không** cộng ở nhánh **0 dòng** (`counter += 0` không tạo sample) — tín hiệu "job chạy mà 0 việc" nằm ở
+  `LogInformation` đầu/cuối nhịp + `LockSkipped`; **cấm** counter `kind="skipped"`.
 - **Cấm** nhãn `promotionId`/`voucherCode`/`customerId` — đã nằm `eCommerceMetricTags.Forbidden`
   (`eCommerceMetrics.cs:366-371`).
 
@@ -930,7 +965,9 @@ trong **cùng PR** (`D-306` ①(2)):
 | `D-303` | `Q16`: `CheckoutSessionId` (cả `ReserveVoucherDto`/`CommitVoucherDto`) là **`string`** ≤ 128 (= `CheckoutInput.IdempotencyKey` của `Sales`), **không** `Guid`; SRS giữ `string`; rỗng/>128 ⇒ **400** `AbpValidationException` | §4.2 |
 | `D-304` | `Q17`: 2 ca `TtlSeconds` ngoài dải + `Subtotal`=0/`Currency` sai hoãn **`qa`** ở `W25-4`; **cơ chế** `[Range(typeof(decimal), "0.01", "99999999999999.9999")]` + `[RegularExpression("^[A-Z]{3}$")]` + `AbpValidationException` phải có ở `W25-2` | §4.2, §6.1, §10.4 |
 | `D-305` | `BR-06`/`0111`: `CommitVoucherDto` thêm **trường thứ 5** `decimal OrderDiscountTotal` (additive, cho phép `0`, guard `Range "0.00"…`); `Sales` truyền `don.DiscountTotal` tại `:111-113`/`:118-130`, trước tripwire `:133`, cùng UoW; `Promotions.VoucherRedemptionService` **tự** tính `Σ DiscountAmount` của lượt `Applied` cùng `OrderId` rồi NÉM `0111` (**500**), nhánh **replay vẫn so** với payload khoá **giữ nguyên**; **0** migration/0 schema; lùi = 1 commit | header, §1.2, §4.2, §4.3, §6.3 bước 1/4/6, §10.2, §10.4, §12-D13 |
-| `D-306` | job `voucher-expiry` nhả TTL **ngay `W25-2`**: `Workers/VoucherExpiryWorker.cs` + DI `PromotionsApplicationModule`; cờ `Promotions:Enabled` (`PromotionContractConsts.EnabledSettingName`); khoá `Job("voucher-expiry", tenantId)` TTL 300 s (khác `"expiry"`); lô 500/UoW `requiresNew`; `Reserved` + `ExpiresAtUtc <= now`, guard `Status=0`, 0 dòng ⇒ bỏ qua + log `Debug` + metric; `ReservedCount − 1` mã→promotion, bắt `40P01` thử lại có trần; **2** counter (`reservation_expired{kind}`, `released{reason=TTL_EXPIRED}`); gỡ `reservation_expired` khỏi `ChuaCoNoiPhat`, **giữ** `promotion_applied_total`; ETO ra **hoãn có chủ**; nợ `PromotionExpiryWorker` chưa đọc cờ → chủ `PRO-002` | header, §1.1, §1.2, §4.2, §6.3 bước 6, §6.4, §6.5, §8, §9.3, §10.2, §10.4, §11, §12-D14 |
+| `D-306` | job `voucher-expiry` nhả TTL **ngay `W25-2`**: `Workers/VoucherExpiryWorker.cs` + DI `PromotionsApplicationModule`; cờ `Promotions:Enabled` (`PromotionContractConsts.EnabledSettingName`); khoá `Job("voucher-expiry", tenantId)` TTL 300 s (khác `"expiry"`); lô 500/UoW `requiresNew`; `Reserved` + `ExpiresAtUtc <= now`, guard `Status=0`, 0 dòng ⇒ bỏ qua + log `Debug` (**không** metric — sửa câu chữ bởi `D-310`, xem dòng dưới); `ReservedCount − 1` mã→promotion, bắt `40P01` thử lại có trần; **2** counter (`reservation_expired{kind}`, `released{reason=TTL_EXPIRED}`); gỡ `reservation_expired` khỏi `ChuaCoNoiPhat`, **giữ** `promotion_applied_total`; ETO ra **hoãn có chủ**; nợ `PromotionExpiryWorker` chưa đọc cờ → chủ `PRO-002` | header, §1.1, §1.2, §4.2, §6.3 bước 6, §6.4, §6.5, §8, §9.3, §10.2, §10.4, §11, §12-D14 |
+| `D-309` | `GenerateAsync` **pre-check dung lượng không gian mã**: `36^(Length − len(Prefix)) ≥ Quantity` (tính **sau** guard độ dài/prefix, **trước** vòng sinh); thiếu ⇒ **NÉM `0107`** `VoucherCodeInvalid` (**400**), **không** thêm mã nào; dùng **mã có sẵn**, **không** đổi số đã cấp, **0** migration | §4.1, §6.1b, §7.6 |
+| `D-310` | **doc-only, giữ code**: 2 counter `reservation_expired`/`released{reason=TTL_EXPIRED}` **chỉ** phát khi `daNha > 0` (sau commit); nhánh **0 dòng** = `LogDebug` + bỏ qua, **KHÔNG** metric (`counter += 0` không tạo sample; tín hiệu "job chạy 0 việc" ở log đầu/cuối nhịp + `LockSkipped`); **cấm** counter `kind="skipped"`; giữ `VoucherExpiryWorker.cs:180-186` + test `D306_…` | §1.1, §6.4, §8 |
 | `D-169` | tạm duyệt có điều kiện (nay đã đóng) — khuôn tài liệu | header |
 | luật E2 (ABP module rules) | handler ghi dữ liệu mở UoW riêng | §6.4 |
 | luật D3 (`NULLS NOT DISTINCT`) | giữ 9 index, test 114 | §5.3 |
@@ -977,3 +1014,5 @@ trong **cùng PR** (`D-306` ①(2)):
 | v0.3 | 27/11/2026 | ARCH (N100/W25-1 — sửa `docrev` vòng 1) | **P2 #1**: §6.2 `ON CONFLICT` nêu **đúng conflict target** `(TenantId,PromotionId,CustomerId,UsageSequence) WHERE "CustomerId" IS NOT NULL AND "Status" <> 2`; **0 dòng = trùng số** (thử lại), **`23505` từ index khác** (vd `IdempotencyKey`) = **NÉM trong `SAVEPOINT`, không thử lại**. **P2 #2**: test ranh giới đúng là method `PromotionSurfaceTests.RanhGioi__…` (`:97-108`, hiện vacuous; sẽ đỏ khi thêm `using …Idempotency`); bỏ vế "build đỏ vì thiếu ref" (`csproj:16` đã có). **P2 #3**: thêm §7.6 bảng **`01xx → HTTP`** + chỗ map `eCommerceHttpApiHostModule` + ca DoD (`0104⇒409`, `0119⇒409`, rơi `403` ⇒ đỏ). **P2 #4**: `ICurrentTenant.Id == null` = 1-tenant hợp lệ, **`Guid.Empty` ⇒ `0112`**. **P2 #5**: thêm `docDeviation` **D13** (`ba` sửa SRS §6.1 chữ ký mới ở `W25-2`). **P3**: `PromotionEngine.cs:372/383/411`; `Promotion.cs:130`; `TC-41` engine là của `PRO-002`; 7 trường DTO; `PostgreSqlSchemaTests` Assert `:227-228`. |
 | v0.4 | 27/11/2026 | ARCH (N101/W25-2) | Áp **`D-303`**: `ReserveVoucherDto.CheckoutSessionId` và `CommitVoucherDto.CheckoutSessionId` (§4.2) **`Guid` → `string`** (không rỗng, ≤ 128 = `[StringLength(128)]` = `CheckoutInput.IdempotencyKey` của `Sales`). Sửa P3 còn lại: §1.2 + §7.6 "14 dòng map" → **17 dòng `options.Map`** (map đủ `0101…0119` trừ `0109`/`0113`). Không đổi nội dung ánh xạ hay mục nào khác. |
 | v0.5 | 27/11/2026 | ARCH (N101/W25-2 — sửa `docrev` vòng 3 delta) | **P2 #1 (`D13`)**: chuyển "chờ `ba`" → **"đã đóng một phần ở N101"** — SRS §6.1 `461-462` + bullet `478-480` đã có đủ `Subtotal`/`Currency`/`TtlSeconds`/`CommitVoucherDto.CheckoutSessionId`; nêu phần còn lại chủ `ba` (#2 validator SRS, #3 bump `v0.11`, #4 `CheckoutDtos.cs:67-69`, #5 bullet `ReserveVoucherDto.CheckoutSessionId`). **P2 #2 (`D-304`)**: §4.2 nêu **cơ chế** từ chối `Subtotal = 0` — `[Range(typeof(decimal), "0.01", "99999999999999.9999")]` (trần `numeric(18,4)` as-built `:52-54,186`; tiền lệ `StockDocumentDtos.cs:185`/`DonHangDtos.cs:46`) + `Currency` `[RegularExpression("^[A-Z]{3}$")]` khớp `CHECK` `:73/:217` + `CheckoutSessionId` `[StringLength(128, MinimumLength=1)]`; lớp ném **`AbpValidationException` = 400** (as-built `Promotion.cs:130`; **không** `ArgumentException`); guard **tường minh** ở §6.1 bước 1 vì `VoucherRedemptionService` không phải `IApplicationService`. **P3 #5 arch**: thêm dòng §4.2 `ReserveVoucherDto.CheckoutSessionId` = `string` ≤128 (không chỉ `CommitVoucherDto`). Thêm §13 `D-304` + §10.4 ca đỏ; **không** đổi schema/code. |
+| v0.6 | 27/11/2026 | ARCH (N101/W25-2) | Áp **`D-305`** + **`D-306`**: `CommitVoucherDto` **5** trường (`OrderDiscountTotal`) + `Promotions` tự so `Σ DiscountAmount` vs `OrderDiscountTotal` ⇒ `0111` (500), nhánh replay vẫn so; job `voucher-expiry` nhả TTL **ngay trong `W25-2`** (`Workers/VoucherExpiryWorker.cs` + DI, cờ `Promotions:Enabled`, khoá `"voucher-expiry"` TTL 300 s, lô 500/UoW `requiresNew`, guard `Status=0`) + 2 counter `reservation_expired{kind}`/`released{reason=TTL_EXPIRED}`; ETO ra **hoãn có chủ** `REP-001`/`SAL-004`/`SAL-001`; nêu **nợ as-built** `PromotionExpiryWorker` chưa đọc cờ ⇒ chủ `PRO-002`. |
+| v0.7 | 28/11/2026 | ARCH (N103/W25-4 — áp `D-310` + `D-309`) | **Doc-only, giữ code.** (1) §6.4 sửa **hai chỗ** cho khớp as-built: dòng bảng job `voucher-expiry` (cột "0 dòng") và bullet đặc tả lô — **bỏ "+ metric"** ở nhánh **0 dòng**, ghi rõ 2 counter `promotion_voucher_reservation_expired_total`/`promotion_voucher_released_total{reason=TTL_EXPIRED}` **chỉ** cộng khi `daNha > 0` (**sau** commit, tránh đếm khi rollback); nhánh 0 dòng = `LogDebug` (`VoucherExpiryWorker.cs:235`) + bỏ qua, **KHÔNG** metric (lý do: `counter += 0` không tạo sample; "job chạy 0 việc" đã thấy ở `LogInformation` đầu/cuối nhịp `:49`/`:108` + `LockSkipped`); thêm bullet cấm `kind="skipped"`/`Add(0)`. (2) §1.1 (dòng "3 metric voucher") + §8 sửa **as-built cũ** "`reservation_expired` CHƯA có điểm phát / còn trong `ChuaCoNoiPhat`" → **cả 3 đã có điểm phát** (`VoucherExpiryWorker.cs:180-186`, `VoucherRedemptionService.cs:575-577`), cả 3 đã rời `ChuaCoNoiPhat` (`eCommerceMetrics.cs:297-316`), nợ **chỉ còn** `promotion_applied_total` (`:315`, `SAL-001`). (3) Thêm **§6.1b** đặc tả `GenerateAsync` **thứ tự guard trước khi ghi** + **pre-check dung lượng mã `D-309`** (`VoucherAdminAppService.cs:133-152`: `36^(Length−len(Prefix))`, vòng nhân có trần, thiếu ⇒ `0107` + `WithData`, ví dụ `{3,"AB",100}` ⇒ `36 < 100` ⇒ `0107`), nêu quan hệ với `0108` kiểm **trước**. §13 trỏ thêm §6.1b/§1.1/§8. **Giữ nguyên** code + test `VoucherExpiryWorkerTests.D306_…`; **0** thay đổi test/SRS/quyết định khác. |
