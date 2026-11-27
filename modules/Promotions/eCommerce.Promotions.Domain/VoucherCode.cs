@@ -1,3 +1,4 @@
+using Volo.Abp;
 using Volo.Abp.Domain.Entities;
 using Volo.Abp.MultiTenancy;
 
@@ -34,4 +35,54 @@ public class VoucherCode : Entity<Guid>, IMultiTenant
             ReservedCount = 0,
             Status = status
         };
+
+    // ── Máy trạng thái mã (`PRO-001-arch` §3.2) — **NÉM** `0006` ở mọi chuyển sai (`BR-10`). ────────────
+    // 🚨 Bộ đếm `UsedCount`/`ReservedCount` **KHÔNG** có setter công khai và **KHÔNG** đổi qua entity —
+    //    mọi thay đổi đi bằng `UPDATE` có điều kiện ở service để tránh mất lượt khi hai luồng song song.
+
+    /// <summary>`Generated → Issued`. Sai ⇒ **NÉM** `0006`.</summary>
+    public void Issue(DateTime now)
+    {
+        _ = now;
+        if (Status != VoucherCodeStatus.Generated)
+        {
+            NemChuyenSai(VoucherCodeStatus.Issued);
+        }
+
+        Status = VoucherCodeStatus.Issued;
+    }
+
+    /// <summary>`Issued → Revoked`. Sai ⇒ **NÉM** `0006` (kể cả `Generated → Revoked`).</summary>
+    public void Revoke(DateTime now)
+    {
+        _ = now;
+        if (Status != VoucherCodeStatus.Issued)
+        {
+            NemChuyenSai(VoucherCodeStatus.Revoked);
+        }
+
+        Status = VoucherCodeStatus.Revoked;
+    }
+
+    /// <summary>
+    /// Ngoại lệ **duy nhất** của `BR-18`: đổi `MaxUsage` (không đổi giá trị/`promotion`).
+    /// `newMaxUsage &lt; UsedCount + ReservedCount` ⇒ **NÉM** `0116`; `≤ 0` cũng bị từ chối.
+    /// </summary>
+    public void DoiGioiHan(int newMaxUsage)
+    {
+        if (newMaxUsage < 1 || newMaxUsage < UsedCount + ReservedCount)
+        {
+            throw new BusinessException(PromotionErrorCodes.OverrideLimitTooLow)
+                .WithData("id", Id)
+                .WithData("newMaxUsage", newMaxUsage)
+                .WithData("daDung", UsedCount + ReservedCount);
+        }
+
+        MaxUsage = newMaxUsage;
+    }
+
+    private void NemChuyenSai(VoucherCodeStatus den)
+        => throw new BusinessException(PromotionErrorCodes.InvalidStatusTransition)
+            .WithData("from", Status.ToString())
+            .WithData("to", den.ToString());
 }

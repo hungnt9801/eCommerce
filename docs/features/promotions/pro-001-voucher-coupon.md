@@ -1203,3 +1203,22 @@ public class VoucherRedemptionTests
 | — (docrev vòng 1, 23/11/2026) | §5.2/§5.3: index tham chiếu cột không có; §3.1/§6.2/§7.2: route `reserve`/`commit`, lượt không chọn được theo đơn; Messaging `0002`; mốc dòng | §5.2, §5.3 (CR-5/CR-6), §3.1, §6.1–§6.2, §7.2, §9.1, §11, §14.1 (`TC-49`–`TC-54`), §15 (thêm `Q14`, `Q15`; `Q5`, `Q8`, `Q14`, `Q15` đóng ở bốn dòng `D-146`…`D-149` dưới) | `MessagingErrorCodes.cs:14,17`; `TinhTienDon.cs:73-77,115-127`; `CheckoutAppService.cs:102-120` |
 
 Không lệch với D-03, D-06, D-07, D-08, D-17, D-27, D-70 (tài liệu không dùng `ProductVariant`/trạng thái đơn một trục/tồn một số; huỷ/trả hàng dùng ETO của `SAL-004`/`SAL-006`, chưa có trong code — kế hoạch).
+
+## Trạng thái triển khai (N101 / `W25-2` F3 BE)
+
+> Phiên `N101`, hàng `W25-2`, nhánh `feat/gd3-wp25-voucher`. Căn cứ: `PRO-001-arch.md` v0.5 + `D-295`…`D-304`.
+
+| Hạng mục | Trạng thái | Bằng chứng |
+|---|---|---|
+| Hợp đồng `IVoucherAdminAppService` (7 method) + `IVoucherRedemptionService` (4 method, **không** `IApplicationService`, `[RemoteService(IsEnabled=false)]`) | ✅ Đã code | `modules/Promotions/eCommerce.Promotions.Application.Contracts/IVoucherAdminAppService.cs`, `IVoucherRedemptionService.cs`; `RedemptionDto.ExpiresAtUtc` additive |
+| Domain: máy trạng thái mã (`Issue`/`Revoke`/`DoiGioiHan`) + lượt (`ChotApplied`/`NhaReleased`/`DaoReversed`) **NÉM** `0006`/`0105`/`0116`; 14 hằng `01xx` (`0102…0118` trừ `0109`/`0113`); hàm thuần `MaxBatchSize` kẹp `1…100000` | ✅ Đã code | `VoucherCode.cs`, `PromotionRedemption.cs`, `PromotionErrorCodes.cs`, `PromotionSettings.cs`, `PromotionSettingNames.cs`, `PromotionSettingDefinitionProvider.cs`; `PromotionOptions.MaxUsageSequenceAttempts = 5` |
+| Application: `VoucherRedemptionService` (Reserve/Commit/Release/Reverse) — guard tường minh `AbpValidationException` (400), idempotency `Checkout:`/`PromotionCommit:`, `UsageSequence` đúng `D-295` (SAVEPOINT + `ON CONFLICT` **có target** + 5 lần thử), `UPDATE` bộ đếm có điều kiện, sổ append-only | ✅ Đã code | `VoucherRedemptionService.cs`, `UsageSequenceAllocator.cs`, `VoucherRequestValidator.cs` |
+| Application: `VoucherAdminAppService` (7 method, `[Authorize]` cấp class) + 3 quyền `.Voucher.Generate/Publish/OverrideLimit`; `GenerateAsync` guard `0108` trước ghi; audit `Revoke`/`OverrideLimit` ≥ 10 ký tự | ✅ Đã code | `VoucherAdminAppService.cs`; `eCommerceConsts.cs`, `eCommercePermissionDefinitionProvider.cs` |
+| HTTP: `VoucherController` `/api/v1/voucher/**` **7 route** + map `01xx`→HTTP (17 dòng) ở Host; giữ auto `/api/app/voucher-admin/**` | ✅ Đã code | `src/eCommerce.HttpApi/Controllers/VoucherController.cs`; `src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs` |
+| Sales (`D-298`): DTO additive (`CheckoutInput.VoucherCode`; `KetQuaCheckoutDto.Voucher*`; `TaoDonTuCheckoutInput.VoucherRedemptionId/VoucherCode`); `CheckoutAppService` gọi `ReserveAsync` thay `EvaluateAsync` khi có mã; `DonHangAppService` gọi `CommitAsync` sau `Recalculate()` trước tripwire, cùng UoW; lệch phiên ⇒ `0105` | ✅ Đã code | `CheckoutDtos.cs`, `DonHangDtos.cs`, `CheckoutAppService.cs`, `DonHangAppService.cs`, `SalesErrorCodes.cs` (`eCommerce:Sales:0005`) |
+| Metric: phát `promotion_voucher_reserved_total` (Reserve) + `promotion_voucher_released_total` (Release); gỡ 2 tên khỏi `ChuaCoNoiPhat` | ✅ Đã code | `VoucherRedemptionService.cs`; `shared/eCommerce.Kernel/Observability/eCommerceMetrics.cs` |
+| Migration `Add_Voucher_Status_Check` (2 `CHECK` miền `Status`, expand-only) | ✅ EF sinh, **chưa áp DB** | `src/eCommerce.EntityFrameworkCore/Migrations/20261127153549_Add_Voucher_Status_Check.cs` (+ `.Designer.cs`, snapshot) |
+| Test đơn vị (`test/eCommerce.Tests`) | ⏸ **Chưa có** — vai `be` **không** có quyền ghi `test/**` (hook `guard-write-scope`); chuyển `qa`/ORCH | Cần phủ: máy trạng thái NÉM, `UsageSequence` (trùng số→thử, 23505 khác→NÉM, hết 5→`0104`), guard DTO, `MaxBatchSize`, Commit lệch phiên, idempotency |
+| Job `voucher-expiry` + `voucher-counter-audit` (metric `reservation_expired`) | ⏸ Hoãn (ngoài phạm vi phiên BE này) | `promotion_voucher_reservation_expired_total` còn trong `ChuaCoNoiPhat` |
+| Test ranh giới allowlist **2** namespace `Messaging` | ⏸ Chưa sửa test (vai `be` không ghi `test/**`) — code dùng **tên đầy đủ** `eCommerce.Messaging.Idempotency.*`, không thêm `using` ⇒ test hiện có vẫn xanh | `PromotionSurfaceTests.RanhGioi__…` |
+

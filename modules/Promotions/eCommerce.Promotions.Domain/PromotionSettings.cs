@@ -66,6 +66,36 @@ public static class PromotionSettings
     public static bool DocBat(string? enabled)
         => !string.Equals((enabled ?? string.Empty).Trim(), "false", StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>Trần **sinh lô mã** mặc định (`D-302`).</summary>
+    public const int MaxBatchSizeMacDinh = 10_000;
+
+    /// <summary>Trần **cứng** sinh lô (`D-302`) — cấu hình không bao giờ vượt số này.</summary>
+    public const int MaxBatchSizeCung = 100_000;
+
+    /// <summary>
+    /// 🔒 **HÀM THUẦN** đọc `Promotions:MaxBatchSize` (`D-302`): kẹp `1…100000`, giá trị rỗng/không hợp lệ ⇒
+    /// **mặc định** `10000`; **không** ném (một setting gõ sai không được làm chết đường sinh mã).
+    /// </summary>
+    public static int DocMaxBatchSize(string? tho)
+    {
+        if (string.IsNullOrWhiteSpace(tho))
+        {
+            return MaxBatchSizeMacDinh;
+        }
+
+        var so = ChinhSach.DocSo(tho, MaxBatchSizeMacDinh, out var hopLeDong);
+        if (!hopLeDong)
+        {
+            return MaxBatchSizeMacDinh;
+        }
+
+        return KepMaxBatchSize((int)Math.Floor(so));
+    }
+
+    /// <summary>Kẹp số vào `1…100000` (hàm thuần, test được).</summary>
+    public static int KepMaxBatchSize(int raw)
+        => raw < 1 ? 1 : raw > MaxBatchSizeCung ? MaxBatchSizeCung : raw;
+
     private static int DocSoDuong(string? tho, int macDinh, ref bool ok)
     {
         // Rỗng ⇒ dùng mặc định (hợp lệ — không phải "cấu hình sai").

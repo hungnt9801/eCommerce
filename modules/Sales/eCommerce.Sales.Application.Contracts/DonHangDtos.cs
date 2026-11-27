@@ -34,6 +34,16 @@ public class TaoDonTuCheckoutInput
 
     [StringLength(2048)]
     public string? Note { get; set; }
+
+    /// <summary>
+    /// 🆕 **`PRO-001` `D-298`** — lượt voucher đã giữ ở checkout (chốt **trong cùng UoW** với việc ghi đơn,
+    /// `ADR-13`, sau `Recalculate()` và trước tripwire). `null` ⇒ đơn không voucher.
+    /// </summary>
+    public Guid? VoucherRedemptionId { get; set; }
+
+    /// <summary>Mã voucher — đối chiếu khoá phiên `Checkout:{tenant}:{session}:{code}` khi chốt (lệch ⇒ `0105`).</summary>
+    [StringLength(64)]
+    public string? VoucherCode { get; set; }
 }
 
 /// <summary>Một dòng khách trả: SKU + số lượng (phải ≥ 1 và **không vượt** số còn lại của dòng đơn).</summary>

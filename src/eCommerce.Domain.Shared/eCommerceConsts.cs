@@ -384,6 +384,17 @@ public static class eCommerceConsts
 
             /// <summary>Import bảng chi phí rule (`Import:{tenantId}:{sha256}`).</summary>
             public const string Import = Default + ".Import";
+
+            // ── 3 quyền hẹp của `PRO-001` (`W25-2`, `D-299`) — rủi ro tiền, tách khỏi `.Manage` (`CR-10`). ──
+
+            /// <summary>Sinh lô mã (`GenerateAsync`).</summary>
+            public const string VoucherGenerate = Default + ".Voucher.Generate";
+
+            /// <summary>Phát hành/thu hồi mã (`IssueAsync`/`RevokeAsync`).</summary>
+            public const string VoucherPublish = Default + ".Voucher.Publish";
+
+            /// <summary>Ngoại lệ duy nhất `BR-18`: đổi `MaxUsage` (`OverrideLimitAsync`).</summary>
+            public const string VoucherOverrideLimit = Default + ".Voucher.OverrideLimit";
         }
 
         /// <summary>

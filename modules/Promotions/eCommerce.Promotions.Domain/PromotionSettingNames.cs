@@ -16,4 +16,7 @@ public static class PromotionSettingNames
     public const string MaxCandidatesPerCart = "Promotions:MaxCandidatesPerCart";
     public const string LeafVisitBudget = "Promotions:LeafVisitBudget";
     public const string ComparisonBudget = "Promotions:ComparisonBudget";
+
+    /// <summary>Trần **sinh lô mã** (`D-302`) — mặc định `10000`, kẹp `1…100000`. Vượt ⇒ `0108`.</summary>
+    public const string MaxBatchSize = "Promotions:MaxBatchSize";
 }

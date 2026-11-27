@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Logging;
 using Volo.Abp;
 using Volo.Abp.Application.Services;
+using Volo.Abp.DependencyInjection;
 using Volo.Abp.Settings;
 
 namespace eCommerce.Application.Checkout;
@@ -54,6 +55,13 @@ public class CheckoutAppService : ApplicationService, ICheckoutAppService
 
     /// <summary>🆕 `PRO-002` — đọc cờ `Promotions:Enabled` (cờ tắt ⇒ KHÔNG gọi engine, `DiscountTotal = 0`).</summary>
     private readonly ISettingProvider _settings;
+
+    /// <summary>
+    /// 🆕 `PRO-001` `D-298` — đường ghi lượt voucher. Resolve **lười** qua `LazyServiceProvider` để không đổi
+    /// chữ ký ctor (test dựng `CheckoutAppService` với tham số `null!` vẫn chạy cho nhánh auto).
+    /// </summary>
+    private IVoucherRedemptionService VoucherRedemption
+        => LazyServiceProvider.LazyGetRequiredService<IVoucherRedemptionService>();
 
     public CheckoutAppService(
         IPriceCalculationAppService tinhGia,
@@ -127,6 +135,10 @@ public class CheckoutAppService : ApplicationService, ICheckoutAppService
 
         // 🆕 `PRO-002` D6 — giảm giá cấp đơn **chỉ** đến từ engine (nếu bật cờ). Engine CHỈ ĐỌC.
         var giamGiaKhuyenMai = 0m;
+        Guid? voucherRedemptionId = null;
+        decimal? voucherDiscount = null;
+        DateTime? voucherExpiresAtUtc = null;
+        string? voucherReasonCode = null;
         var batKhuyenMai = !string.Equals(
             (await _settings.GetOrNullAsync(PromotionContractConsts.EnabledSettingName))?.Trim(),
             "false",
@@ -148,7 +160,7 @@ public class CheckoutAppService : ApplicationService, ICheckoutAppService
             // `"VND"` (đơn ngoại tệ sẽ lệch `Money` — `XC-001`). Lượt DÒ dùng cờ additive
             // `KhongGhiSoGiaiTrinh = true` ⇒ KHÔNG ghi sổ giải trình (lượt tính chính thức bên dưới mới ghi,
             // `ADR-13` giữ).
-            var giaTruoc = await _tinhGia.TinhGioAsync(new TinhGioInput
+            var kqGia = await _tinhGia.TinhGioAsync(new TinhGioInput
             {
                 ChannelCode = input.ChannelCode,
                 ChannelShopId = input.ChannelShopId,
@@ -160,21 +172,46 @@ public class CheckoutAppService : ApplicationService, ICheckoutAppService
                 Items = itemTinhGia
             });
 
-            var kqKhuyenMai = await _khuyenMai.EvaluateAsync(new PromotionEvaluationRequest(
-                CheckoutSessionId: Guid.Empty, // engine KHÔNG dùng; khoá idempotency thuộc bước ghi của Sales
-                Lines: input.Items
-                    .Select(x => new PromotionCartLine(x.Sku, x.Quantity, x.ListPrice ?? 0m))
-                    .ToList(),
-                ChannelCode: input.ChannelCode,
-                Currency: giaTruoc.CurrencyCode,
-                Subtotal: giaTruoc.Subtotal,
-                CustomerId: input.CustomerId,
-                CustomerGroupId: null, // Q26 fail-closed: Sales chưa nạp nhóm khách
-                IsFirstOrder: null,     // Q26 fail-closed
-                VoucherCode: null,
-                Mode: PromotionApplyMode.AutoApply));
+            if (!string.IsNullOrWhiteSpace(input.VoucherCode))
+            {
+                // 🆕 `PRO-001` `D-298` ①(1) — CÓ mã ⇒ `ReserveAsync` **thay** `EvaluateAsync` (KHÔNG gọi cả hai).
+                // `Subtotal`/`Currency` lấy từ pipeline giá (D-291 ② P2 #2). TTL = (TtlPhut ?? 15) × 60 ⇒ mặc định 900 s.
+                var quote = await VoucherRedemption.ReserveAsync(new ReserveVoucherDto(
+                    VoucherCode: input.VoucherCode.Trim(),
+                    CheckoutSessionId: khoa,
+                    CustomerId: input.CustomerId,
+                    ChannelCode: input.ChannelCode,
+                    Lines: input.Items
+                        .Select(x => new PromotionCartLine(x.Sku, x.Quantity, x.ListPrice ?? 0m))
+                        .ToList(),
+                    Subtotal: kqGia.Subtotal,
+                    Currency: kqGia.CurrencyCode,
+                    TtlSeconds: (input.TtlPhut ?? 15) * 60));
 
-            giamGiaKhuyenMai = kqKhuyenMai.Applied ? kqKhuyenMai.DiscountTotal : 0m;
+                giamGiaKhuyenMai = quote.DiscountTotal;
+                voucherRedemptionId = quote.RedemptionId;
+                voucherDiscount = quote.DiscountTotal;
+                voucherExpiresAtUtc = quote.ExpiresAtUtc;
+                voucherReasonCode = quote.ReasonCode?.ToString();
+            }
+            else
+            {
+                var kqKhuyenMai = await _khuyenMai.EvaluateAsync(new PromotionEvaluationRequest(
+                    CheckoutSessionId: Guid.Empty, // engine KHÔNG dùng; khoá idempotency thuộc bước ghi của Sales
+                    Lines: input.Items
+                        .Select(x => new PromotionCartLine(x.Sku, x.Quantity, x.ListPrice ?? 0m))
+                        .ToList(),
+                    ChannelCode: input.ChannelCode,
+                    Currency: kqGia.CurrencyCode,
+                    Subtotal: kqGia.Subtotal,
+                    CustomerId: input.CustomerId,
+                    CustomerGroupId: null, // Q26 fail-closed: Sales chưa nạp nhóm khách
+                    IsFirstOrder: null,     // Q26 fail-closed
+                    VoucherCode: null,
+                    Mode: PromotionApplyMode.AutoApply));
+
+                giamGiaKhuyenMai = kqKhuyenMai.Applied ? kqKhuyenMai.DiscountTotal : 0m;
+            }
         }
 
         var tien = await _tinhGia.TinhGioAsync(new TinhGioInput
@@ -221,7 +258,11 @@ public class CheckoutAppService : ApplicationService, ICheckoutAppService
             Tien = tien,
             ReservationIds = idGiuCho,
             ExpiresAtUtc = hetHanSomNhat,
-            LaKetQuaDaCo = false
+            LaKetQuaDaCo = false,
+            VoucherRedemptionId = voucherRedemptionId,
+            VoucherDiscountTotal = voucherDiscount,
+            VoucherExpiresAtUtc = voucherExpiresAtUtc,
+            VoucherReasonCode = voucherReasonCode
         };
     }
 

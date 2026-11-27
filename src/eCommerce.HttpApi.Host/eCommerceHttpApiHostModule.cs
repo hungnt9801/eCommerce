@@ -456,11 +456,32 @@ public class eCommerceHttpApiHostModule : AbpModule
             options.Map(eCommerce.Promotions.PromotionErrorCodes.UnverifiedCodCondition, System.Net.HttpStatusCode.UnprocessableEntity); // 0008
             options.Map(eCommerce.Promotions.PromotionErrorCodes.DiscountExceedsOrder, System.Net.HttpStatusCode.BadRequest);     // 0009
             options.Map(eCommerce.Promotions.PromotionErrorCodes.RuleNotRegistered, System.Net.HttpStatusCode.BadRequest);        // 0010
+            // 🆕 `PRO-001` (`W25-2`, `D-299`/`§7.6`) — map đủ `0101…0119` TRỪ `0109`/`0113` (giữ số, không đường ném).
+            // Thiếu map ⇒ `BusinessException` rơi về 403, che lỗi thật (`0104`/`0119` hiện "không có quyền").
+            options.Map(eCommerce.Promotions.PromotionErrorCodes.VoucherNotFound, System.Net.HttpStatusCode.NotFound);            // 0101
+            options.Map(eCommerce.Promotions.PromotionErrorCodes.VoucherOutOfWindow, System.Net.HttpStatusCode.BadRequest);        // 0102
+            options.Map(eCommerce.Promotions.PromotionErrorCodes.VoucherRevoked, System.Net.HttpStatusCode.Conflict);              // 0103
+            options.Map(eCommerce.Promotions.PromotionErrorCodes.CustomerUsageLimitExceeded, System.Net.HttpStatusCode.Conflict);  // 0104
+            options.Map(eCommerce.Promotions.PromotionErrorCodes.RedemptionNotReserved, System.Net.HttpStatusCode.Conflict);       // 0105
+            options.Map(eCommerce.Promotions.PromotionErrorCodes.VoucherImmutable, System.Net.HttpStatusCode.Conflict);            // 0106
+            options.Map(eCommerce.Promotions.PromotionErrorCodes.VoucherCodeInvalid, System.Net.HttpStatusCode.BadRequest);        // 0107
+            options.Map(eCommerce.Promotions.PromotionErrorCodes.BatchSizeExceeded, System.Net.HttpStatusCode.BadRequest);         // 0108
+            options.Map(eCommerce.Promotions.PromotionErrorCodes.VoucherChannelNotAllowed, System.Net.HttpStatusCode.BadRequest);  // 0110
+            options.Map(eCommerce.Promotions.PromotionErrorCodes.RedemptionSumMismatch, System.Net.HttpStatusCode.InternalServerError); // 0111
+            options.Map(eCommerce.Promotions.PromotionErrorCodes.MissingTenantContext, System.Net.HttpStatusCode.BadRequest);      // 0112
+            options.Map(eCommerce.Promotions.PromotionErrorCodes.PromotionNotApproved, System.Net.HttpStatusCode.Conflict);        // 0114
+            options.Map(eCommerce.Promotions.PromotionErrorCodes.SecondVoucherOnOrder, System.Net.HttpStatusCode.Conflict);        // 0115
+            options.Map(eCommerce.Promotions.PromotionErrorCodes.OverrideLimitTooLow, System.Net.HttpStatusCode.Conflict);         // 0116
+            options.Map(eCommerce.Promotions.PromotionErrorCodes.ReservationReleasedReplay, System.Net.HttpStatusCode.Conflict);   // 0117
+            options.Map(eCommerce.Promotions.PromotionErrorCodes.CustomerRequiredForVoucher, System.Net.HttpStatusCode.BadRequest);// 0118
+            options.Map(eCommerce.Promotions.PromotionErrorCodes.PromotionUsageLimitExceeded, System.Net.HttpStatusCode.Conflict); // 0119
             options.Map(eCommerce.Kernel.Money.MoneyErrorCodes.CurrencyMismatch, System.Net.HttpStatusCode.BadRequest);           // Money 0001
             options.Map(eCommerce.Messaging.MessagingErrorCodes.PayloadConflict, System.Net.HttpStatusCode.Conflict);             // Messaging 0001
             options.Map(eCommerce.Messaging.MessagingErrorCodes.DangXuLy, System.Net.HttpStatusCode.Conflict);                    // Messaging 0002
             // `PRO-002` D6 — client gửi OrderDiscount ≠ 0 (Sales).
             options.Map(eCommerce.Orders.SalesErrorCodes.KhongNhanGiamGiaNhapTay, System.Net.HttpStatusCode.BadRequest);           // Sales 0004
+            // `PRO-001` `D-298` — tạo đơn có `VoucherRedemptionId` nhưng sổ giải trình không có giảm từ mã.
+            options.Map(eCommerce.Orders.SalesErrorCodes.VoucherKhongCoGiam, System.Net.HttpStatusCode.BadRequest);                // Sales 0005
         });
 
         Configure<AbpAspNetCoreMvcOptions>(options =>

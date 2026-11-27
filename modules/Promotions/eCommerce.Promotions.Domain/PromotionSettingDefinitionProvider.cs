@@ -31,6 +31,7 @@ public class PromotionSettingDefinitionProvider : SettingDefinitionProvider
             new SettingDefinition(PromotionSettingNames.MaxDeclaredCombinations, d.MaxDeclaredCombinations.ToString()).WithProviders(phamVi),
             new SettingDefinition(PromotionSettingNames.MaxCandidatesPerCart, d.MaxCandidatesPerCart.ToString()).WithProviders(phamVi),
             new SettingDefinition(PromotionSettingNames.LeafVisitBudget, d.LeafVisitBudget.ToString()).WithProviders(phamVi),
-            new SettingDefinition(PromotionSettingNames.ComparisonBudget, d.ComparisonBudget.ToString()).WithProviders(phamVi));
+            new SettingDefinition(PromotionSettingNames.ComparisonBudget, d.ComparisonBudget.ToString()).WithProviders(phamVi),
+            new SettingDefinition(PromotionSettingNames.MaxBatchSize, PromotionSettings.MaxBatchSizeMacDinh.ToString()).WithProviders(phamVi));
     }
 }

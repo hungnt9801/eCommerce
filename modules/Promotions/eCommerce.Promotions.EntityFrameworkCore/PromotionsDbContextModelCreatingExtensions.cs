@@ -136,8 +136,14 @@ public static class PromotionsDbContextModelCreatingExtensions
 
             b.HasIndex(x => new { x.TenantId, x.Code }).IsUnique().HasDatabaseName(IxVoucherTenantCode);
 
-            b.ToTable(t => t.HasCheckConstraint("CK_ProVoucherCodes_Usage",
-                "\"UsedCount\" >= 0 AND \"ReservedCount\" >= 0 AND \"UsedCount\" + \"ReservedCount\" <= \"MaxUsage\""));
+            b.ToTable(t =>
+            {
+                t.HasCheckConstraint("CK_ProVoucherCodes_Usage",
+                    "\"UsedCount\" >= 0 AND \"ReservedCount\" >= 0 AND \"UsedCount\" + \"ReservedCount\" <= \"MaxUsage\"");
+                // `D-300` (`W25-2`) — miền `Status` (gia cố `BR-09`/`ADR-09`; enum CẤM chứa Expired/Exhausted).
+                t.HasCheckConstraint("CK_ProVoucherCodes_Status",
+                    "\"Status\" IN ('Generated','Issued','Revoked')");
+            });
         });
 
         builder.Entity<PromotionMapping>(b =>
@@ -222,6 +228,8 @@ public static class PromotionsDbContextModelCreatingExtensions
                 t.HasCheckConstraint("CK_ProPromotionRedemptions_ReversedAt", "\"Status\" <> 3 OR \"ReversedAtUtc\" IS NOT NULL");
                 t.HasCheckConstraint("CK_ProPromotionRedemptions_ReasonCode",
                     "\"Status\" NOT IN (2, 3) OR \"ReasonCode\" IS NOT NULL");
+                // `D-300` (`W25-2`) — miền `Status` (0..3) bằng `CHECK` ở DB.
+                t.HasCheckConstraint("CK_ProPromotionRedemptions_Status", "\"Status\" BETWEEN 0 AND 3");
             });
         });
     }

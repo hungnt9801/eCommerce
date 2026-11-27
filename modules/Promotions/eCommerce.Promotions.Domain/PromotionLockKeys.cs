@@ -49,5 +49,17 @@ public static class PromotionIdempotencyKeys
     public static string Refund(Guid? tenantId, Guid orderId, Guid promotionId)
         => $"PromotionRefund:{Host(tenantId)}:{orderId}:{promotionId}";
 
+    /// <summary>`Checkout:{tenantId}:{checkoutSessionId}:{code}` — chỉ `ReserveAsync` dùng (`D-159`, `PRO-001` §3.5).</summary>
+    public static string Checkout(Guid? tenantId, string checkoutSessionId, string code)
+        => $"Checkout:{Host(tenantId)}:{checkoutSessionId}:{code}";
+
+    /// <summary>`PromotionCommit:{tenantId}:{orderId}:{code}` — chốt lượt trong UoW tạo đơn (`PRO-001` §3.5).</summary>
+    public static string Commit(Guid? tenantId, Guid orderId, string code)
+        => $"PromotionCommit:{Host(tenantId)}:{orderId}:{code}";
+
+    /// <summary>`PromotionReverse:{tenantId}:{orderId}:{promotionId}` — trả hàng (`PRO-001` §3.5, `D-148`).</summary>
+    public static string Reverse(Guid? tenantId, Guid orderId, Guid promotionId)
+        => $"PromotionReverse:{Host(tenantId)}:{orderId}:{promotionId}";
+
     private static string Host(Guid? tenantId) => tenantId?.ToString() ?? "host";
 }

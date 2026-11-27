@@ -25,6 +25,12 @@ public static class SalesErrorCodes
     /// giảm giá thứ hai** ⇒ sai thuế/doanh thu. HTTP `400` (map ở Host).
     /// </summary>
     public const string KhongNhanGiamGiaNhapTay = "eCommerce:Sales:0004";
+
+    /// <summary>
+    /// 🆕 **`PRO-001` `D-298`** — tạo đơn có `VoucherRedemptionId` nhưng **sổ giải trình không có giảm từ mã**
+    /// ⇒ **NÉM** (400). 📌 Cấm tạo đơn **mất giảm im lặng** (`BR-06` chốt chặn thứ hai).
+    /// </summary>
+    public const string VoucherKhongCoGiam = "eCommerce:Sales:0005";
 }
 
 

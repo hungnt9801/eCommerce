@@ -55,6 +55,13 @@ public class CheckoutInput
     [Range(0, double.MaxValue)]
     public decimal OrderFee { get; set; }
 
+    /// <summary>
+    /// 🆕 **`PRO-001` `D-298`** — mã giảm giá KÊNH NỘI BỘ (chỉ `web`). Có mã ⇒ `CheckoutAppService` gọi
+    /// `IVoucherRedemptionService.ReserveAsync` **thay** `EvaluateAsync` (không gọi cả hai). Rỗng ⇒ đường tự động.
+    /// </summary>
+    [StringLength(64)]
+    public string? VoucherCode { get; set; }
+
     /// <summary>TTL giữ chỗ (phút). Để trống ⇒ **15 phút**.</summary>
     [Range(1, 1440)]
     public int? TtlPhut { get; set; }
@@ -85,6 +92,20 @@ public class KetQuaCheckoutDto
 
     /// <summary>`true` ⇒ đây là **kết quả trả lại** của một lần gọi trước (idempotent replay), **không** ghi gì mới.</summary>
     public bool LaKetQuaDaCo { get; set; }
+
+    // ── 🆕 `PRO-001` `D-298`/`D-301` — trường ADDITIVE; **không** đổi nghĩa `ExpiresAtUtc` cũ (= min hạn giữ chỗ kho). ──
+
+    /// <summary>Id lượt voucher đã giữ (dùng để chốt khi tạo đơn).</summary>
+    public Guid? VoucherRedemptionId { get; set; }
+
+    /// <summary>Số tiền giảm của voucher (đã đưa vào `Tien`).</summary>
+    public decimal? VoucherDiscountTotal { get; set; }
+
+    /// <summary>Hạn của **lượt voucher** (FE hiện `min(ExpiresAtUtc, VoucherExpiresAtUtc)`).</summary>
+    public DateTime? VoucherExpiresAtUtc { get; set; }
+
+    /// <summary>Lý do voucher không áp (nếu có) — không ném khi điều kiện sai.</summary>
+    public string? VoucherReasonCode { get; set; }
 }
 
 /// <summary>

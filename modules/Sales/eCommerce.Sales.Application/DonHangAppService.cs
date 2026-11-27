@@ -3,6 +3,7 @@ using eCommerce.Customers;
 using eCommerce.Inventory;
 using eCommerce.Orders;
 using eCommerce.Pricing;
+using eCommerce.Promotions.Contracts;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -41,13 +42,17 @@ public class DonHangAppService : ApplicationService, IDonHangAppService
     /// kiểm"* **KHÔNG** suy ra *"đường tạo đơn đã kiểm"*. Kiểm ở **cả hai** biên là chủ ý, không phải trùng lặp.</summary>
     private readonly ICustomerDirectory _thuMucKhach;
 
+    /// <summary>🆕 `PRO-001` `D-298` — chốt lượt voucher **cùng UoW** tạo đơn (`ADR-13`).</summary>
+    private readonly IVoucherRedemptionService _voucherRedemption;
+
     public DonHangAppService(
         IRepository<Order, Guid> donRepository,
         IRepository<OrderLine, Guid> dongDonRepository,
         IStockReservationGateway giuCho,
         IPriceCalculationAppService tinhGia,
         eCommerce.Application.Contracts.Inventory.IStockDocumentAppService phieuKho,
-        ICustomerDirectory thuMucKhach)
+        ICustomerDirectory thuMucKhach,
+        IVoucherRedemptionService voucherRedemption)
     {
         _donRepository = donRepository;
         _dongDonRepository = dongDonRepository;
@@ -55,6 +60,7 @@ public class DonHangAppService : ApplicationService, IDonHangAppService
         _tinhGia = tinhGia;
         _phieuKho = phieuKho;
         _thuMucKhach = thuMucKhach;
+        _voucherRedemption = voucherRedemption;
     }
 
     [Authorize(eCommerceConsts.Permissions.Orders.Manage)]
@@ -105,6 +111,23 @@ public class DonHangAppService : ApplicationService, IDonHangAppService
         don.SetDiscount(tien.TotalDiscount);
         don.SetTotals(tien.TotalTax, tien.TotalFee);
         don.Recalculate();
+
+        // ── 🆕 `PRO-001` `D-298` ①(3) — CHỐT LƯỢT VOUCHER **cùng UoW**, SAU `Recalculate()` và TRƯỚC tripwire ──
+        // 📌 Chọn đúng lượt theo `RedemptionId` (không theo mã — 2 khách giữ cùng mã sẽ lẫn lượt). Server kiểm
+        // `(TenantId, RedemptionId)` + khoá phiên ⇒ lệch `0105`. Lỗi ⇒ UoW rollback ⇒ KHÔNG đơn, KHÔNG chốt lượt.
+        if (input.VoucherRedemptionId is Guid redemptionId)
+        {
+            var daChot = await _voucherRedemption.CommitAsync(new CommitVoucherDto(
+                redemptionId, don.Id, input.VoucherCode ?? string.Empty, khoa));
+
+            // Có `VoucherRedemptionId` mà sổ giải trình KHÔNG có giảm từ mã ⇒ 400 (cấm tạo đơn mất giảm im lặng).
+            if (decimal.Compare(daChot.DiscountAmount, 0m) <= 0)
+            {
+                throw new BusinessException(SalesErrorCodes.VoucherKhongCoGiam)
+                    .WithData("redemptionId", redemptionId)
+                    .WithData("lyDo", "Sổ giải trình không có giảm từ mã voucher.");
+            }
+        }
 
         // ④ 🚨 TRIPWIRE: đơn PHẢI khớp TỪNG ĐỒNG với số đã báo khách.
         if (don.GrandTotal != tien.Total)

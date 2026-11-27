@@ -306,12 +306,12 @@ public static class eCommerceMetricNames
             // 🔒 KHÔNG được thêm lại tên nào vào đây để làm test xanh — `MetricEmitterTests` kiểm **hai chiều**
             // và sẽ ĐỎ nếu khai "chưa có" trong khi mã đã có lời gọi.
             //
-            // 🆕 `PRO-002` (`WP-24`) — 3 metric GIỮ/NHẢ LƯỢT VOUCHER thuộc đường ghi của **`PRO-001`**
-            // (`ReserveAsync`/`CommitAsync`/`ReleaseAsync`), **chưa** có code ở WP-24. Đăng ký tên theo §8
-            // nhưng **chưa có điểm phát** — nợ có chủ, đóng khi `PRO-001` hiện thực đường ghi lượt.
-            [PromotionVoucherReservedTotal] = "PRO-001 chưa hiện thực đường giữ lượt voucher ở WP-24.",
-            [PromotionVoucherReleasedTotal] = "PRO-001 chưa hiện thực đường nhả lượt voucher ở WP-24.",
-            [PromotionVoucherReservationExpiredTotal] = "PRO-001 chưa hiện thực job hết TTL lượt voucher ở WP-24.",
+            // 🆕 `PRO-002` (`WP-24`) — 3 metric GIỮ/NHẢ LƯỢT VOUCHER thuộc đường ghi của **`PRO-001`**.
+            // ✅ `W25-2` (N101): `promotion_voucher_reserved_total` (ReserveAsync) và
+            //    `promotion_voucher_released_total` (ReleaseAsync) **ĐÃ CÓ ĐIỂM PHÁT** ⇒ đã gỡ khỏi danh sách nợ.
+            // ⚠️ `promotion_voucher_reservation_expired_total` **CHƯA** có điểm phát — job `voucher-expiry` (nhả TTL)
+            //    chưa thuộc phạm vi phiên BE này; giữ nợ có chủ, đóng cùng hàng job.
+            [PromotionVoucherReservationExpiredTotal] = "Job voucher-expiry (nhả TTL) chưa hiện thực ở W25-2.",
             // `promotion_applied_total` phát **sau commit** ở `Sales` khi TẠO ĐƠN (`SAL-001`); WP-24 chỉ giữ chỗ,
             // chưa tạo `Order` ⇒ chưa có điểm phát thật. Đóng khi `Sales` tạo đơn + áp khuyến mãi.
             [PromotionAppliedTotal] = "Sales chưa tạo Order ở WP-24 (SAL-001) — chưa có mốc 'sau commit'."

@@ -10138,6 +10138,8 @@ namespace eCommerce.Migrations
 
                             t.HasCheckConstraint("CK_ProPromotionRedemptions_ReversedAt", "\"Status\" <> 3 OR \"ReversedAtUtc\" IS NOT NULL");
 
+                            t.HasCheckConstraint("CK_ProPromotionRedemptions_Status", "\"Status\" BETWEEN 0 AND 3");
+
                             t.HasCheckConstraint("CK_ProPromotionRedemptions_UsageSequence", "\"UsageSequence\" >= 1");
                         });
                 });
@@ -10216,6 +10218,8 @@ namespace eCommerce.Migrations
 
                     b.ToTable("ProVoucherCodes", null, t =>
                         {
+                            t.HasCheckConstraint("CK_ProVoucherCodes_Status", "\"Status\" IN ('Generated','Issued','Revoked')");
+
                             t.HasCheckConstraint("CK_ProVoucherCodes_Usage", "\"UsedCount\" >= 0 AND \"ReservedCount\" >= 0 AND \"UsedCount\" + \"ReservedCount\" <= \"MaxUsage\"");
                         });
                 });

@@ -226,6 +226,9 @@ public class RedemptionDto
     public string Currency { get; set; } = default!;
     public int TreeVersion { get; set; }
     public DateTime EvaluatedAtUtc { get; set; }
+
+    /// <summary>🆕 `PRO-001` `D-302` — hạn của lượt **đang giữ** (CSKH cần hạn; additive, **không** trả `IdempotencyKey`).</summary>
+    public DateTime? ExpiresAtUtc { get; set; }
 }
 
 public class ImportResultDto

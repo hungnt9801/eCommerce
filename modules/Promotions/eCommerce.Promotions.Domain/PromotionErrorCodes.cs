@@ -51,4 +51,49 @@ public static class PromotionErrorCodes
 
     /// <summary>Hết lượt **mức promotion** (`MaxUsageTotal`; mã `PRO-001` `0119`, `D-147`). HTTP `409`.</summary>
     public const string PromotionUsageLimitExceeded = "eCommerce:Promotion:0119";
+
+    // ── `W25-2` (`N101`) — 14 hằng còn thiếu của dải `01xx` (`PRO-001-arch` §1.2). `0109`/`0113` **giữ số,
+    //    không hằng** (`D-296`/`D-158`). Thêm **chỉ ở cuối dải** (`D-144`).
+
+    /// <summary>Mã ngoài cửa sổ hiệu lực của promotion (`0102`). HTTP `400`.</summary>
+    public const string VoucherOutOfWindow = "eCommerce:Promotion:0102";
+
+    /// <summary>Mã đã bị thu hồi (`0103`). HTTP `409`.</summary>
+    public const string VoucherRevoked = "eCommerce:Promotion:0103";
+
+    /// <summary>Lượt không còn `Reserved` khi chốt/nhả/đảo (`0105`). HTTP `409`.</summary>
+    public const string RedemptionNotReserved = "eCommerce:Promotion:0105";
+
+    /// <summary>Mã đã phát hành — không sửa giá trị/giới hạn (`0106`, v1 chưa có đường ném). HTTP `409`.</summary>
+    public const string VoucherImmutable = "eCommerce:Promotion:0106";
+
+    /// <summary>`Code` sai định dạng sau chuẩn hoá (`0107`). HTTP `400`.</summary>
+    public const string VoucherCodeInvalid = "eCommerce:Promotion:0107";
+
+    /// <summary>Lô sinh vượt `MaxBatchSize` (`0108`). HTTP `400`.</summary>
+    public const string BatchSizeExceeded = "eCommerce:Promotion:0108";
+
+    /// <summary>Áp voucher nội bộ cho đơn không thuộc kênh `web` (`0110`). HTTP `400`.</summary>
+    public const string VoucherChannelNotAllowed = "eCommerce:Promotion:0110";
+
+    /// <summary>`Σ DiscountAmount` không khớp `Order.DiscountTotal` (`0111`). HTTP `500`.</summary>
+    public const string RedemptionSumMismatch = "eCommerce:Promotion:0111";
+
+    /// <summary>Thiếu ngữ cảnh tenant (`Guid.Empty`) (`0112`). HTTP `400`.</summary>
+    public const string MissingTenantContext = "eCommerce:Promotion:0112";
+
+    /// <summary>Tạo/phát hành mã cho promotion chưa `Approved` (`0114`). HTTP `409`.</summary>
+    public const string PromotionNotApproved = "eCommerce:Promotion:0114";
+
+    /// <summary>Chốt mã thứ hai cho cùng một đơn (`0115`). HTTP `409`.</summary>
+    public const string SecondVoucherOnOrder = "eCommerce:Promotion:0115";
+
+    /// <summary>`OverrideLimit` đặt trần mới thấp hơn `UsedCount + ReservedCount` (`0116`). HTTP `409`.</summary>
+    public const string OverrideLimitTooLow = "eCommerce:Promotion:0116";
+
+    /// <summary>Khoá idempotency trùng với lượt đã `Released` (`0117`). HTTP `409`.</summary>
+    public const string ReservationReleasedReplay = "eCommerce:Promotion:0117";
+
+    /// <summary>`ReserveAsync` với `CustomerId = NULL` — khách vãng lai (`0118`). HTTP `400`.</summary>
+    public const string CustomerRequiredForVoucher = "eCommerce:Promotion:0118";
 }

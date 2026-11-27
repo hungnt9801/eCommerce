@@ -17,6 +17,11 @@ public class PromotionOptions
 {
     public int JobPeriodMinutes { get; set; } = 5;
     public string ExpiryJobName { get; set; } = "expiry";
+
+    /// <summary>
+    /// 🚨 `D-295` — số lần **THỬ** cấp `UsageSequence` (1 ghi + 4 thử lại). Hết trần ⇒ `0104` (`PRO-001` §6.2).
+    /// </summary>
+    public int MaxUsageSequenceAttempts { get; set; } = 5;
 }
 
 /// <summary>

@@ -1,3 +1,4 @@
+using Volo.Abp;
 using Volo.Abp.Domain.Entities;
 using Volo.Abp.MultiTenancy;
 
@@ -68,4 +69,59 @@ public class PromotionRedemption : Entity<Guid>, IMultiTenant
             EvaluatedAtUtc = evaluatedAtUtc,
             AppliedAtUtc = status == PromotionRedemptionStatus.Applied ? evaluatedAtUtc : null
         };
+
+    // ── Máy trạng thái lượt (`PRO-001-arch` §3.3) — **NÉM** `0105` ở mọi chuyển sai (`BR-10`). ─────────
+    // 🔒 Cột bất biến sau khi ghi (`BR-11`): `DiscountAmount`, `IdempotencyKey`, `VoucherCodeId`,
+    //    `PromotionId`, `CustomerId`, `UsageSequence`, `TreeVersion`, `EvaluatedAtUtc` — **cấm** method nào đổi.
+    //    `OrderId` chỉ được đặt **đúng một lần** (`NULL → giá trị`) tại `ChotApplied`.
+
+    /// <summary>`Reserved → Applied`; lượt hết TTL (`now &gt;= ExpiresAtUtc`) ⇒ **NÉM** `0105`.</summary>
+    public void ChotApplied(Guid orderId, DateTime now)
+    {
+        if (Status != PromotionRedemptionStatus.Reserved
+            || ExpiresAtUtc is null
+            || ExpiresAtUtc.Value.ToUniversalTime() <= now.ToUniversalTime())
+        {
+            NemChuyenSai(PromotionRedemptionStatus.Applied);
+        }
+
+        OrderId = orderId;
+        AppliedAtUtc = now;
+        Status = PromotionRedemptionStatus.Applied;
+    }
+
+    /// <summary>
+    /// `Reserved → Released` (hết TTL / `MANUAL`) **hoặc** `Applied → Released` (huỷ đơn, `D-148`).
+    /// Trạng thái khác ⇒ **NÉM** `0105`. 📌 Nhánh `Applied` **chỉ** consumer `OrderCancelledEto` được gọi.
+    /// </summary>
+    public void NhaReleased(DateTime now, string reasonCode)
+    {
+        if (Status is not (PromotionRedemptionStatus.Reserved or PromotionRedemptionStatus.Applied))
+        {
+            NemChuyenSai(PromotionRedemptionStatus.Released);
+        }
+
+        ReleasedAtUtc = now;
+        ReasonCode = string.IsNullOrWhiteSpace(reasonCode) ? "MANUAL" : reasonCode;
+        Status = PromotionRedemptionStatus.Released;
+    }
+
+    /// <summary>`Applied → Reversed` (trả hàng). Trạng thái khác ⇒ **NÉM** `0105`. **KHÔNG** hoàn lượt.</summary>
+    public void DaoReversed(DateTime now, string reasonCode)
+    {
+        if (Status != PromotionRedemptionStatus.Applied)
+        {
+            NemChuyenSai(PromotionRedemptionStatus.Reversed);
+        }
+
+        ReversedAtUtc = now;
+        ReasonCode = string.IsNullOrWhiteSpace(reasonCode) ? "ORDER_RETURNED" : reasonCode;
+        Status = PromotionRedemptionStatus.Reversed;
+    }
+
+    private void NemChuyenSai(PromotionRedemptionStatus den)
+        => throw new BusinessException(PromotionErrorCodes.RedemptionNotReserved)
+            .WithData("from", Status.ToString())
+            .WithData("to", den.ToString())
+            .WithData("redemptionId", Id);
 }

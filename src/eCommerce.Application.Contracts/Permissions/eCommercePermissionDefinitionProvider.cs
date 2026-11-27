@@ -211,6 +211,9 @@ public class eCommercePermissionDefinitionProvider : PermissionDefinitionProvide
         promotions.AddChild(eCommerceConsts.Permissions.Promotions.Manage);
         promotions.AddChild(eCommerceConsts.Permissions.Promotions.Approve);
         promotions.AddChild(eCommerceConsts.Permissions.Promotions.Import);
+        promotions.AddChild(eCommerceConsts.Permissions.Promotions.VoucherGenerate);
+        promotions.AddChild(eCommerceConsts.Permissions.Promotions.VoucherPublish);
+        promotions.AddChild(eCommerceConsts.Permissions.Promotions.VoucherOverrideLimit);
 
         // ---- Thông báo (`WP-22` / `NOT-001`) ----
         // 🚨 BẮT BUỘC khai ở CẢ HAI NƠI (hằng số `eCommerceConsts.Permissions.Notifications` + ở đây):
