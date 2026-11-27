@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using eCommerce.Promotions.Contracts;
 using eCommerce.Tests.Pricing.HaTang;
 using Microsoft.Extensions.DependencyInjection;
@@ -178,6 +179,85 @@ public class VoucherMaxBatchSizeTests
         await Assert.ThrowsAsync<AbpValidationException>(
             () => bo.Sut.GenerateAsync(bo.Vao(quantity: 0)));
 
+        Assert.Equal(0, bo.Vouchers.SoLanChen);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════════════════════════
+    //  `D-309` (P2 #1, `TC-02`/A5/NFR-13) — PRE-CHECK dung lượng mã `36^(Length−len(Prefix))`
+    //  Input HỢP LỆ theo guard độ dài vẫn có thể bất khả thi ⇒ phải NÉM `0107`, KHÔNG treo vòng sinh.
+    // ══════════════════════════════════════════════════════════════════════════════════════════════
+
+    private static GenerateVouchersDto VaoMa(Bo bo, int length, string prefix, int quantity)
+        => new()
+        {
+            PromotionId = bo.PromotionId,
+            Quantity = quantity,
+            MaxUsage = 1,
+            Length = length,
+            Prefix = prefix,
+        };
+
+    [Fact]
+    public async Task D309_codespace_thieu__nem_0107_khong_treo()
+    {
+        // `{Length:3, Prefix:"AB", Quantity:100}`: guard độ dài qua (`3 ≥ 3`, `len(AB)=2 < 3`) nhưng chỉ có
+        // `36^(3−2) = 36` mã phân biệt < 100 ⇒ TRƯỚC `D-309` vòng `while` treo VÔ HẠN. Nay phải NÉM `0107` < 1 s.
+        var bo = new Bo(maxBatchSetting: null); // mặc định 10000 ⇒ 0108 KHÔNG chen ngang
+        var dongHo = Stopwatch.StartNew();
+
+        // ⏱️ `WaitAsync` biến "treo" thành ĐỎ sau 5 s — không để bộ test treo vô hạn khi guard bị gỡ.
+        var ex = await Assert.ThrowsAsync<BusinessException>(
+            () => bo.Sut.GenerateAsync(VaoMa(bo, length: 3, prefix: "AB", quantity: 100))
+                .WaitAsync(TimeSpan.FromSeconds(5)));
+
+        dongHo.Stop();
+
+        Assert.Equal(PromotionErrorCodes.VoucherCodeInvalid, ex.Code);
+        Assert.Equal("eCommerce:Promotion:0107", ex.Code); // D-309 ①(2): ĐÚNG số 0107 (không 0108)
+        Assert.Equal(36L, Convert.ToInt64(ex.Data["codespace"]));
+        Assert.Equal(100, Convert.ToInt32(ex.Data["quantity"]));
+        Assert.Equal(0, bo.Vouchers.SoLanChen);            // không thêm mã nào
+        Assert.True(dongHo.Elapsed < TimeSpan.FromSeconds(1),
+            $"Phải NÉM trong < 1 s, đo được {dongHo.Elapsed.TotalMilliseconds:F0} ms.");
+    }
+
+    [Fact]
+    public async Task D309_codespace_du__sinh_du_so_dong()
+    {
+        // `{Length:12, Quantity:10000}`: `36^12 ≫ 10000` ⇒ pre-check KHÔNG được chặn oan.
+        var bo = new Bo(maxBatchSetting: null);
+
+        var kq = await bo.Sut.GenerateAsync(VaoMa(bo, length: 12, prefix: string.Empty, quantity: 10_000))
+            .WaitAsync(TimeSpan.FromSeconds(15));
+
+        Assert.Equal(10_000, kq.Count);
+        Assert.Equal(10_000, bo.Vouchers.SoLanChen);
+    }
+
+    [Fact]
+    public async Task D309_codespace_bang_dung_Quantity__KHONG_nem()
+    {
+        // Biên `space == Quantity`: `{Length:4, Prefix:"AB", Quantity:1296}` = `36^2` ⇒ điều kiện là `space < Quantity`.
+        var bo = new Bo(maxBatchSetting: null);
+
+        var kq = await bo.Sut.GenerateAsync(VaoMa(bo, length: 4, prefix: "AB", quantity: 1296))
+            .WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.Equal(1296, kq.Count);
+    }
+
+    [Fact]
+    public async Task D309_thu_tu__quantity_10001_van_0108_truoc_0107()
+    {
+        // Thứ tự cố định (`D-309` ①(4)): vượt `MaxBatchSize` ⇒ `0108` (lỗi trần lô) TRƯỚC pre-check dung lượng
+        // ⇒ KHÔNG được báo `0107` (nói sai nguyên nhân) dù `{Length:3, Prefix:"AB"}` cũng thiếu chỗ.
+        var bo = new Bo(maxBatchSetting: null); // mặc định 10000
+
+        var ex = await Assert.ThrowsAsync<BusinessException>(
+            () => bo.Sut.GenerateAsync(VaoMa(bo, length: 3, prefix: "AB", quantity: 10_001))
+                .WaitAsync(TimeSpan.FromSeconds(5)));
+
+        Assert.Equal(PromotionErrorCodes.BatchSizeExceeded, ex.Code); // 0108
         Assert.Equal(0, bo.Vouchers.SoLanChen);
     }
 }

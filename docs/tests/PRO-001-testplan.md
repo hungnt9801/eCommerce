@@ -8,9 +8,9 @@
 
 ## 1. Phủ BR
 
-> Nguồn test: **116** ca `W25-2` (domain/app/worker) + **22** ca mới `W25-4`: `Promotions/VoucherV1SurfaceTests.cs` (8) ·
+> Nguồn test: **116** ca `W25-2` (domain/app/worker) + **26** ca mới `W25-4`: `Promotions/VoucherV1SurfaceTests.cs` (8) ·
 > `Promotions/VoucherOpenApiContractTests.cs` (4) · `Promotions/VoucherDomainRulesTests.cs` (10) ·
-> `IntegrationTests/PostgreSqlVoucherWp25Tests.cs` (6). Mã BR ghi literal `BR-01`…`BR-26` (SRS §1, dòng 141).
+> `Promotions/VoucherMaxBatchSizeTests.cs` (+4 `D-309`) · `IntegrationTests/PostgreSqlVoucherWp25Tests.cs` (6). Mã BR ghi literal `BR-01`…`BR-26` (SRS §1, dòng 141).
 
 | BR | Nội dung (SRS §1) | Test (tệp · tên method) | Tầng | Trạng thái |
 |---|---|---|---|---|
@@ -42,6 +42,7 @@
 | **BR-26** | Voucher chỉ giảm cấp đơn; registry đúng 4 `SystemName`; lá `SkuInclude`/`SkuExclude`/`CategoryInclude` ⇒ `0004` cả khi duyệt và khi đánh giá | `Promotions/PromotionDomainTests.cs` · `Validator_rule_chua_tung_dang_ky__0004__da_go__0010` · `Validator_hai_goc_hoac_node_lai__0004`; `Promotions/PromotionRuleDiTests.cs` · `Di_resolve_PromotionRuleRegistry__du_4_SystemName_va_khong_nem`; `Promotions/PromotionRuleCatalogTests.cs` · `TC70d_TC71v_moi_SystemName_co_Label_khac_rong_va_khac_SystemName__4_nhan_v1_dung` | Unit (domain/DI) | ✅ |
 
 - Tổng BR: **26** · đã phủ: **26** · chưa phủ: **0**.
+- 📌 `D-309` (pre-check dung lượng mã của `GenerateAsync`) **không** có BR riêng trong §1 — thuộc `A5`/`TC-02`/NFR-13; ca + bằng chứng ở **§1.2**.
 - BR phủ **một phần** (có test nhưng thiếu tiểu-ca): `BR-05` (`0115` mapping), `BR-08` (quét `double`), `BR-12`/`BR-17` (`0110`), `BR-13` (nợ cũ `PromotionAppService`), `BR-20` ("số còn thiếu"), `BR-22` (seed 2 lần trên DB), `BR-24` (`0118` service), `BR-25` (consumer ETO).
 
 ### 1.1 Ca mới `W25-4` (đối chiếu `D-307` ①(5)(c) + `D-308`)
@@ -53,11 +54,24 @@
 | Luật domain còn nợ | `BR-19` (Percentage) 4 ca + `BR-09` (enum không chứa `Expired`/`Exhausted`) + `BR-11`/`BR-13`/`BR-22` (quét mã nguồn/reflection) | `Promotions/VoucherDomainRulesTests.cs` · 10 ca (3 theory + 7 fact) | ✅ 10/10 |
 | Integration PostgreSQL thật | `BR-06` rollback UoW; `D-295` `23505` · `25P02` không SAVEPOINT · SAVEPOINT cứu transaction; `D-306` guard `Status = 0` (0 dòng) + đối chứng (1 dòng) | `IntegrationTests/PostgreSqlVoucherWp25Tests.cs` · 6 Fact | ✅ 6/6 |
 
+### 1.2 `D-309` — pre-check dung lượng mã `GenerateAsync` (`A5`/`TC-02`/NFR-13)
+
+> `decider` chốt `D-309` (REV P2 #1): input **hợp lệ** theo guard độ dài vẫn bất khả thi (`{Length:3, Prefix:"AB",
+> Quantity:100}` chỉ có `36^(3−2)=36` mã phân biệt) ⇒ trước đây treo vô hạn trong `while`. `be` vá pre-check tại
+> `modules/Promotions/eCommerce.Promotions.Application/VoucherAdminAppService.cs:133-152`; `qa` thêm ca **không sửa code**.
+
+| Nội dung | Test (`Promotions/VoucherMaxBatchSizeTests.cs` · method) | Kết quả |
+|---|---|---|
+| `{Length:3, Prefix:"AB", Quantity:100}` ⇒ **NÉM `0107`** (`VoucherCodeInvalid`, data `codespace=36`/`quantity=100`), **0 dòng ghi**, **< 1 s** (không treo) | `D309_codespace_thieu__nem_0107_khong_treo` (dùng `Task.WaitAsync(5 s)` để treo ⇒ đỏ, không treo bộ test) | ✅ |
+| `{Length:12, Quantity:10000}` (`36^12 ≫ 10000`) ⇒ sinh **đủ 10000**, không ném | `D309_codespace_du__sinh_du_so_dong` | ✅ |
+| Biên `space == Quantity`: `{Length:4, Prefix:"AB", Quantity:1296}` = `36^2` ⇒ **KHÔNG** ném | `D309_codespace_bang_dung_Quantity__KHONG_nem` | ✅ |
+| Thứ tự: `Quantity=10001` + `{Length:3, Prefix:"AB"}` ⇒ `0108` (trần lô) **trước**, không phải `0107` | `D309_thu_tu__quantity_10001_van_0108_truoc_0107` | ✅ |
+
 ## 2. Số ca theo tầng (K-06)
 
 | Tầng | Trước (baseline N103) | Sau (W25-4) | Ghi chú |
 |---|---|---|---|
-| `test/eCommerce.Tests` (unit) | **2593** | **2615** | **+22** ca (`VoucherV1SurfaceTests` 8 · `VoucherOpenApiContractTests` 4 · `VoucherDomainRulesTests` 10). 0 fail. Số ca **chỉ tăng**. |
+| `test/eCommerce.Tests` (unit) | **2593** | **2619** | **+26** ca (`VoucherV1SurfaceTests` 8 · `VoucherOpenApiContractTests` 4 · `VoucherDomainRulesTests` 10 · `VoucherMaxBatchSizeTests` +4 `D-309`). 0 fail. Số ca **chỉ tăng**. |
 | `test/eCommerce.IntegrationTests` (PostgreSQL thật) | **156** | **162** | **+6** ca `PostgreSqlVoucherWp25Tests`. 0 fail. |
 | Domain invariant (`Promotions`) | 116 (W25-2) | 126 | +10 `VoucherDomainRulesTests` (`BR-09`/`BR-11`/`BR-13`/`BR-19`/`BR-22`). |
 | Application (`VoucherAdminAppService`/`VoucherRedemptionService`) | `VoucherMaxBatchSizeTests` 7 · `VoucherStateMachineTests` 18 · `VoucherRequestValidatorTests` 26 · `VoucherRedemptionCommitTests` 6 · `UsageSequenceAllocatorTests` 11 | không đổi | Happy/sai dữ liệu phủ; **sai quyền** phủ ở tầng route (`VoucherV1SurfaceTests` + `AllowlistCongKhaiTests`) + probe T04b ⇒ `403` thật. |
@@ -79,12 +93,13 @@
 |---|---|---|---|---|---|
 | NC-1 | Quyền: `OverrideLimitAsync` đổi `.Voucher.OverrideLimit` → `.Voucher.Publish` (hạ quyền ngoại lệ rủi ro tiền xuống quyền phát hành) | `src/eCommerce.HttpApi/Controllers/VoucherController.cs:81` | `VoucherV1SurfaceTests.D307a_map_method_sang_permission_dung` | (script ghi) | (script ghi) |
 | NC-2 | Tiền: đảo so `Σ` (bỏ guard `BR-06`) trong `ThucHienCommitAsync` | `modules/Promotions/eCommerce.Promotions.Application/VoucherRedemptionService.cs` | `VoucherRedemptionCommitTests` | (script ghi) | (script ghi) |
+| NC-3 | `D-309` **surrogate**: hạ trần lô mặc định `10_000` → `20` ⇒ 3 ca `D309` đỏ. ⚠️ Tệp đích thật `VoucherAdminAppService.cs` **CHƯA COMMIT** (bản vá `be` trong phiên) nên script từ chối (exit 3) — dùng tệp **đã commit** `PromotionSettings.cs`; cần ORCH commit bản vá rồi chạy NC trực tiếp (gỡ khối pre-check) | `modules/Promotions/eCommerce.Promotions.Domain/PromotionSettings.cs:70` | `VoucherMaxBatchSizeTests` (`~D309`) | (script ghi) | (script ghi) |
 
 ## 4. Cổng (đo trong phiên N103)
 
 ```powershell
 dotnet build eCommerce.slnx --no-incremental     # 0 error / 9 warning (nền: Address/Sales, không phát sinh mới)
-dotnet test test/eCommerce.Tests --no-build      # 2615/2615 pass · 0 fail (baseline 2593 ⇒ +22)
+dotnet test test/eCommerce.Tests --no-build      # 2619/2619 pass · 0 fail (baseline 2593 ⇒ +26)
 dotnet test test/eCommerce.IntegrationTests      # 162/162 pass · 0 fail (baseline 156 ⇒ +6)
 pwsh -File tools/probe-voucher-wp25.ps1          # 6/6 PASS: 401×3 · 200×2 · 403×1 (§3.1)
 pwsh -File tools/agents/check-agent-artifact.ps1 -Kind testplan -Path docs/tests/PRO-001-testplan.md -Srs docs/features/promotions/pro-001-voucher-coupon.md   # exit 0
@@ -92,7 +107,7 @@ pwsh -File tools/kiem-tat-ca.ps1                 # exit 0
 ```
 
 - `dotnet build eCommerce.slnx --no-incremental` → **0 error · 9 warning** (không warning mới — cả 9 ở `Address`/`Sales`, nền phiên).
-- `dotnet test test/eCommerce.Tests --no-build` → **2615/2615 pass**, exit **0**.
+- `dotnet test test/eCommerce.Tests --no-build` → **2619/2619 pass**, exit **0**.
 - `dotnet test test/eCommerce.IntegrationTests` → **162/162 pass**, exit **0**.
 - `check-agent-artifact -Kind testplan` → **exit 0**.
 - `tools/probe-voucher-wp25.ps1` → **6/6 PASS** (`T01`–`T03` `401` · `T04a` `200` · `T04b` `403` · `T05` `200`); dọn user probe = 0 (§3.1).
@@ -135,6 +150,10 @@ pwsh -File tools/kiem-tat-ca.ps1                 # exit 0
 |---|---|---|---|---|---|
 | 2026-11-28 | NC-1 | src/eCommerce.HttpApi/Controllers/VoucherController.cs:81 | quyen: ha OverrideLimit xuong VoucherPublish | dotnet test test/eCommerce.Tests --filter FullyQualifiedName~VoucherV1SurfaceTests | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
 | 2026-11-28 | NC-2 | modules/Promotions/eCommerce.Promotions.Application/VoucherRedemptionService.cs:427 | tien: dao guard BR-06 nhanh replay (!= 0 -> == 0) | dotnet test test/eCommerce.Tests --filter FullyQualifiedName~VoucherRedemptionCommitTests | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
+| 2026-11-28 | NC-3 | modules/Promotions/eCommerce.Promotions.Domain/PromotionSettings.cs:70 | D-309 surrogate: ha tran lo mac dinh 10000 -> 20 (tep dich that VoucherAdminAppService.cs CHUA COMMIT nen dung tep da commit; ca D309 do) | dotnet test test/eCommerce.Tests --filter FullyQualifiedName~D309 | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
 
 11. **NỢ MỚI PHÁT HIỆN khi phủ `BR-13` (không thuộc `PRO-001`)**: `modules/Promotions/eCommerce.Promotions.Application/PromotionAppService.cs` còn **7** chỗ `autoSave: true` (`:174`, `:234`, `:239`, `:242`, `:276`, `:330`, `:476` — code `PRO-002`/W24) và `modules/Promotions/eCommerce.Promotions.Domain/Seed/PromotionRuleCostSeedContributor.cs` **3** chỗ (`:81`, `:88`, `:98`). Trái `BR-13`/`NFR-09`. Test `BR13_…` giữ **allowlist** đúng `PromotionAppService.cs` để lỗi **mới** vẫn ĐỎ; sửa nợ cũ thuộc **`rev`/`PRO-002`** (không sửa trong `W25-4`).
 12. **`BR-22` (b) — seed idempotent mới phủ ở mức TĨNH**: đã khẳng định seeder module không chứa `VoucherCode` và `VoucherCode.TaoMoi` chỉ ở `VoucherAdminAppService`; **chưa** chạy seed 2 lần trên DB để đếm 0 dòng mới (không có seeder voucher để chạy). Nợ chủ `ops`, hạn `W26`.
+13. **`D-309` — NC trực tiếp (gỡ khối pre-check) CHƯA chạy được**: `modules/Promotions/eCommerce.Promotions.Application/VoucherAdminAppService.cs` đang **có thay đổi chưa commit** (bản vá `be` cho `D-309`), `tools/agents/negative-control.ps1` từ chối tệp chưa commit (đúng thiết kế). NC-3 dùng **surrogate** trên tệp đã commit `PromotionSettings.cs` (hạ trần lô) ⇒ 3 ca `D309` đỏ → xanh, chứng minh ca mới **đỏ được** nhưng **không** chứng minh trực tiếp khối `codespace`. **ORCH cần commit bản vá `be` rồi chạy lại** NC trực tiếp:
+    `pwsh -File tools/agents/negative-control.ps1 -File modules/Promotions/eCommerce.Promotions.Application/VoucherAdminAppService.cs -Find "if (codespace < input.Quantity)" -Replace "if (false && codespace < input.Quantity)" -TestCommand "dotnet test test/eCommerce.Tests --filter FullyQualifiedName~D309" -Testplan docs/tests/PRO-001-testplan.md -Id NC-3b -MoTa "D-309: go pre-check codespace"`
+    (Ca `D309_codespace_thieu` phải đỏ bằng `TimeoutException` sau 5 s, **không** treo bộ test.)
