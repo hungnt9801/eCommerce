@@ -1,8 +1,8 @@
 # `PRO-002` — Kiến trúc module `Promotions`: cây điều kiện AND/OR & engine khuyến mãi
 
-> Vai **ARCH**, phiên **N93** (bản đầu) — cập nhật N94, chuỗi `gd3-1`, hàng `W24-1`/`W24-2` (`WP-24`), nhánh `feat/gd3-wp24-dieu-kien-km`.
+> Vai **ARCH**, phiên **N93** (bản đầu) — cập nhật N94/N95, chuỗi `gd3-1`, hàng `W24-1`/`W24-2`/`W24-3` (`WP-24`), nhánh `feat/gd3-wp24-dieu-kien-km`.
 > Tài liệu này **chỉ thiết kế** quanh SRS
-> [`pro-002-cay-dieu-kien-engine-khuyen-mai.md`](./pro-002-cay-dieu-kien-engine-khuyen-mai.md) (`v0.10 — 27/11/2026`, sau đây gọi **SRS**);
+> [`pro-002-cay-dieu-kien-engine-khuyen-mai.md`](./pro-002-cay-dieu-kien-engine-khuyen-mai.md) (`v0.14 — 27/11/2026`, sau đây gọi **SRS**);
 > **không** code, **không** sinh migration, **không** sửa SRS.
 >
 > **Module chủ của mọi bảng/DTO/endpoint/mã lỗi/khoá dưới đây: `Promotions`** — module **mới**, hiện **0 dòng code**
@@ -13,12 +13,18 @@
 > `D-163` (`decisions.md:177`), `D-209` (`decisions.md:223` — WP-24 sau WP-16), `D-169` (tạm duyệt có điều kiện + 2 P3 — **đã đóng**),
 > `D-270` (mẫu 4 quyền hẹp `Reports.*`, dùng lại cho `Promotions.*`), `D-17` (enum chỉ thêm ở cuối), `D-31`
 > (số lượng `decimal(18,3)`), `D-155` (`Money`/`MoneyAllocator.PhanBo`), `D-151` (**`Add_Promotion_Module` là nguồn schema `Pro*` duy nhất**).
+> Nhóm hàng `W24-3`: `D-285` (bề mặt `/api/v1/promotion/**` **7** route + service đọc `IPromotionRuleCatalogAppService`), `D-286` (§10.2 ngoài hàng — nợ có chủ),
+> `D-287` (thứ tự `ba` → `arch` → `docrev` → `be` → `fe`), `D-288` (`PromotionDetailDto.Limits` **additive** — **không** thêm route thứ 8),
+> `D-289` (`rule-catalog` vẫn trả dòng khi registry ∈ mà chưa seed — mặc định `PromotionRuleCostCatalog.Cua` + `IsSeeded = false` + `LogWarning`, **không** ném `0010`),
+> `D-290` (nhãn tiếng Việt ở `PromotionRuleCostCatalog.Meta.Label` trong **code**, fallback `SystemName`; **không** cột DB/`IPromotionConditionRule`).
 > Lộ trình: `docs/nhanh/07-ke-hoach-trien-khai.md:754` (WP-24) · song song/migration: `docs/nhanh/09-parallel-sessions.md:114-122`.
 >
 > **DOCREV:** [`docs/reviews/PRO-002-docreview.md`](../../reviews/PRO-002-docreview.md) — `VERDICT: DOC-OK`, **0 P1 / 0 P2**;
 > 2 P3 của SRS (số test case 54→55 ở §15.4; trích số dòng cũ trong delta `pro-001` §6.1 đổi sang tên mục) **đã đóng ở N94/F1**;
 > P3 vòng 3 của ARCH (thu hẹp allowlist `eCommerce.Messaging.EventCoverage` + tên test `RanhGioiPromotionsTests`) **đã đóng ở vòng 4**
 > ([`PRO-002-arch-docreview.md`](../../reviews/PRO-002-arch-docreview.md)) — nay còn **0 P3**.
+> Bản `v0.7`/`v0.8` (N95/`W24-3`) sửa **§4.3/§4.4/§12.1** theo `D-285`/`D-287`/`D-288` (và `D-289`/`D-290`) ⇒ chờ `docrev` kiểm **nhanh phần sửa**
+> (**P1 = 0**, `D-287` ①(3)) — **không** phải DOC-OK toàn tài liệu.
 >
 > 📄 `-arch` là tài liệu **bổ trợ**, ngoài mẫu 16 mục áp cho SRS; tệp này giữ khuôn 15 mục của
 > [`REP-001-arch.md`](../reporting/REP-001-arch.md).
@@ -279,9 +285,42 @@ public interface IPromotionConditionRule
 | `IPromotionConditionRule` | chỉ trong `Promotions` (registry) | in-module | **cấm** async/I/O |
 | `PromotionRejectionReason` | `Sales` (breakdown hiển thị), metric `reason` | enum | **ghim ordinal 0…11**, chỉ thêm ở cuối (`D-17`); metric `reason` = tên enum hữu hạn |
 
-### 4.3 App service quản trị (10 method — allowlist `TC-31`)
+### 4.3 App service quản trị (10 method — allowlist `TC-31`) + **service đọc rule catalog**
 
 `GetAsync`, `GetListAsync`, `CreateAsync`, `EvaluateAsync`, `SaveTreeAsync`, `ApproveAsync`, `SetStatusAsync`, `ValidateVoucherAsync`, `GetRedemptionsAsync`, `ImportRuleCostsAsync` — đúng SRS §6.2. `SetStatusAsync` **không** nhận đích `Approved`/`Expired` (`0006`). **Không** có `UpdateAsync` (`D-150`).
+
+As-built: `IPromotionAppService` khai **đúng 10** method (`modules/Promotions/eCommerce.Promotions.Application.Contracts/IPromotionAppService.cs:10-31`), `PromotionAppService` gắn `[Authorize(Promotions.Default)]` ở **cấp class** (`modules/Promotions/eCommerce.Promotions.Application/PromotionAppService.cs:25-26`).
+
+**Service đọc riêng — `IPromotionRuleCatalogAppService` (`D-285` ①(ii))**
+
+| Hạng mục | Nội dung |
+|---|---|
+| Interface | `IPromotionRuleCatalogAppService : IApplicationService` — **một** method `Task<IReadOnlyList<PromotionRuleCatalogItemDto>> GetRulesAsync()` |
+| DTO | `PromotionRuleCatalogItemDto`: `SystemName` (string) · `Label` (tiếng Việt, **từ code** — xem hàng "Nguồn nhãn") · `RequiresVerifiedCod` (bool) · `DeclaredCostFactor` (int) · `RetiredAtUtc` (DateTime?) · **`IsSeeded`** (bool — `true` ⇔ có dòng `ProPromotionRuleCosts`, `D-289`) |
+| Vị trí | `Promotions.Application.Contracts` — **service thứ hai** của **cùng** module `Promotions`; impl ở `Promotions.Application` |
+| Permission | `Promotions.View` — `[Authorize]` **cấp class** trên impl (luật A1); **không** `[AllowAnonymous]` |
+| Dữ liệu | Lặp **`PromotionRuleRegistry.SystemNames`** (`modules/Promotions/eCommerce.Promotions.Domain/Rules/PromotionRuleRegistry.cs:38-40`) — **không** lặp bảng DB ⇒ mỗi rule **đúng 1** dòng; ⨝ `ProPromotionRuleCosts` theo PK `Id` = tên rule (`modules/Promotions/eCommerce.Promotions.Domain/PromotionRuleCost.cs:10-15`) |
+| Nguồn nhãn | `PromotionRuleCostCatalog.Meta.Label` — bảng metadata rule **trong code** ở `modules/Promotions/eCommerce.Promotions.Domain/Seed/PromotionRuleCostSeedContributor.cs:13-27` (nguồn sự thật `D-154`), **không** lấy từ DB; 4 nhãn v1: `MinOrderAmount` = "Giá trị đơn tối thiểu" · `ChannelScope` = "Kênh bán" · `CustomerGroup` = "Nhóm khách hàng" · `FirstOrderOnly` = "Khách mua lần đầu"; tên **ngoài** bảng ⇒ `Label = SystemName` (hiển thị thô, **không** tính là "có nhãn") — `D-290` |
+| Ghi | **0** — chỉ đọc registry + repository, không ghi, không khoá, không idempotency |
+
+- 🚨 **Không** thêm method thứ 11 vào `IPromotionAppService`: allowlist **10** method của `TC-31` **giữ nguyên**; test phản chiếu đang assert đúng 10 (`test/eCommerce.Tests/Promotions/PromotionSurfaceTests.cs:36-49`) vẫn xanh. Bề mặt mới kiểm bằng `PromotionV1SurfaceTests` (**7** route `/api/v1`), không đếm tổng số interface (§4.4).
+- **Vì sao cần**: §10.1 buộc lá hiển thị **`Label` tiếng Việt** và nhãn COD theo `RequiresVerifiedCod`; hôm nay đường duy nhất chạm `ProPromotionRuleCosts` là `ImportRuleCostsAsync` (đường **ghi**, quyền `.Import`) — không có đường **đọc** nào (`D-285` ①(ii)). Bảng chi phí **không có cột nhãn** (`PromotionRuleCost.cs:10-15`), nên nhãn thuộc **code** (`PromotionRuleCostCatalog`) — bất biến "mọi `SystemName` trong registry **phải** có nhãn khác `SystemName`" kiểm bằng `TC-70` (d).
+- **An toàn tenant**: `ProPromotionRuleCosts` là bảng **toàn cục** (không `TenantId` — §5.4) ⇒ service đọc không lộ dữ liệu chéo tenant; không cần `ICurrentTenant`.
+- **Đã chốt — `D-289`** (khe deploy code-trước-seeder: `SystemName` ∈ registry nhưng **chưa có dòng** `ProPromotionRuleCosts`): vẫn **trả dòng** với `DeclaredCostFactor = 1` / `RequiresVerifiedCod = false` lấy từ **`PromotionRuleCostCatalog.Cua(name)`** (cùng bộ `O1`/`1`/`false` mà seeder và `PromotionTreeValidator.TinhDeclaredCost` đang dùng — **một** nguồn, **cấm** khai lại `1`/`false` trong Application), `IsSeeded = false`, `RetiredAtUtc = null`, `LogWarning` **một lần/lượt gọi** (liệt kê tên thiếu, trần ~10 + "…"). **Không** ném `0010` (chiều `0010` là **∉ registry và có dòng** — ngược lại), **không** bỏ khỏi danh sách (FE dựng lá từ catalog), **0** metric mới, **0** route, **0** migration. Có dòng ⇒ dùng **3 giá trị của dòng** + `IsSeeded = true` (bất kể `RetiredAtUtc`). Test `PromotionRuleCatalogTests`: bảng rỗng ⇒ **đủ** `SystemNames`, mỗi dòng `1`/`false`/`IsSeeded = false`; đổi vòng lặp sang duyệt DB hoặc `continue` khi thiếu dòng ⇒ **ĐỎ**.
+- **Nhãn không đụng hợp đồng engine**: giữ nguyên `IPromotionConditionRule` (`SystemName` + `IsSatisfied`, `modules/Promotions/eCommerce.Promotions.Domain/Contracts/PromotionRuleContracts.cs:40-45`) ⇒ **`D8` giữ**; `PromotionRuleCostCatalog` là lớp `static` **nội bộ** của Domain, **không** phải kiểu công khai của `D8`; **không** cột `Label` ở DB ⇒ **0** migration (hàng `W24-3` cấm migration mới); **không** từ điển nhãn thứ hai ở Application (`D-290`).
+
+**`PromotionDetailDto.Limits` — trường additive (`D-288` ①)**
+
+| Hạng mục | Nội dung |
+|---|---|
+| DTO | `PromotionTreeLimitsDto`: `MaxNodes` / `MaxDepth` / `MaxLeaves` / `MaxDeclaredCombinations` (int) — **4** trần, **không** gồm ngân sách chạy |
+| Gắn vào | `PromotionDetailDto : PromotionDto` — thêm **một** trường `Limits` (`modules/Promotions/eCommerce.Promotions.Application.Contracts/IPromotionAppService.cs:59-62` là chỗ khai) |
+| Gán ở | `PromotionAppService.GetAsync` (`modules/Promotions/eCommerce.Promotions.Application/PromotionAppService.cs:60-82`) từ **`DocLimitsAsync()`** (`:507-520`) — **một cửa** đọc setting đã có, hiện dùng chung với `SaveTreeAsync` (`:177`) và `ApproveAsync` (`:221`); giá trị do `PromotionSettings.Doc` kẹp `MaxDepth` về **1…8** (`modules/Promotions/eCommerce.Promotions.Domain/PromotionSettings.cs:33-63`) |
+| Phạm vi | **Additive** trên `/api/app` (**giữ đúng 10** method) và trên `/api/v1` (**giữ đúng 7** route — chỉ thêm trường, **không** route thứ 8); rollback = xoá 1 trường + 2 dòng map + test, 0 migration, 0 dữ liệu |
+
+- **Vì sao trường chứ không phải route**: trần là **ABP Setting theo tenant** (`Promotions:MaxNodes`/`MaxDepth`/`MaxLeaves`/`MaxDeclaredCombinations`, `PromotionSettingDefinitionProvider.cs:26-34`), nên FE **không** được chép hằng số `64/8/32/1024` sang app (`D-33`; `Q1` còn `Open` ⇒ mặc định chỉ là **đề xuất**). Repo **không** có route đọc setting của module khác: `/api/v1/settings/**` (`src/eCommerce.HttpApi/Controllers/SettingsController.cs:23-101`) = **14** route cấu hình tổ chức/ma trận quyền, **0** route đọc ABP Setting (`grep -rn "application-configuration" apps/admin-web/app src` = **0**, đo 27/11/2026 — `D-288` ③). Thêm route thứ 8 chỉ để trả 4 số là mở bề mặt không cần thiết.
+- Số **đếm** (node/độ sâu/lá/tổ hợp) **không** do server trả trong `GetAsync` — FE tự đếm từ `Nodes` + `rule-catalog` (`D-288` ①(1)); số **chính thức** chỉ có **sau** lần lưu thành công (`PromotionTreeValidationResultDto`).
+
 
 ### 4.4 REST
 
@@ -306,6 +345,43 @@ Route theo quy ước auto-controller ABP, **giữ bảng SRS §6.3** (10 route 
 | `eCommerce:Messaging:0002` `DangXuLy` | 409 | `XC-002` |
 
 `0119`/`0104`/`0105`/`0115` thuộc **`PRO-001`** — map ở WP của `PRO-001`, **không** nhân đôi tại đây.
+
+#### Bề mặt `/api/v1/promotion/**` — **7 route** dựng bằng controller tường minh (`D-285`, hàng `W24-3`)
+
+**Giữ nguyên** 10 route `/api/app/promotion/**` ở trên (ABP auto-controller của `IPromotionAppService`, `D-13`) — dùng cho Razor/tích hợp nội bộ; bảng SRS §6.3 vẫn là as-built của bề mặt đó. Màn Web Admin §10.1 đi **đường thứ hai**, tường minh, vì BFF + `packages/api-client/scripts/gen.mjs:35-45` **chỉ** nhận `/api/v1` (`openapi.v1.json` 31 path, **0** path promotion trước hàng này — `D-285` ②).
+
+- **Controller**: `src/eCommerce.HttpApi/Controllers/PromotionsController.cs` — `[ApiController]`, `[Route("api/v1/promotion")]`, `[Authorize(eCommerceConsts.Permissions.Promotions.Default)]` ở **cấp class**, permission hẹp (`View`/`Manage`/`Approve`) khai `[Authorize]` ở **cấp method**; khuôn `NotificationTemplatesController.cs:28-38`.
+- **Chỉ gọi app service**: inject `IPromotionAppService` (+ `IPromotionRuleCatalogAppService` cho `rule-catalog`); **không** repository, **không** `DbContext`, **không** lọc/truy vấn trong controller — mọi lọc/phân trang do app service (khuôn `NotificationTemplatesController.cs:12-38` "mọi đường đọc đi qua app service"). Controller nằm **ngoài** module `Promotions` (project `eCommerce.HttpApi` thuộc app) nên **không** đụng allowlist ranh giới `eCommerce.Messaging.EventCoverage` (`D-284` §2.1); chiều phụ thuộc `HttpApi → Promotions.Application.Contracts` là hợp lệ M1/M2.
+- **Tham chiếu project — phải THÊM ở hàng `W24-3`**: `src/eCommerce.HttpApi/eCommerce.HttpApi.csproj` hiện **chưa** có `ProjectReference` tới `Promotions.Application.Contracts` (đọc 27/11/2026: 8 dòng reference — `Application.Contracts`, `Catalog`, `Inventory`, `Sales`, `Pos`, `Customers`, `Reporting`, `Notification`). Thêm **một** dòng `<ProjectReference Include="..\..\modules\Promotions\eCommerce.Promotions.Application.Contracts\eCommerce.Promotions.Application.Contracts.csproj" />` (additive, khuôn dòng `Notification`/`Reporting` sẵn có) — **chỉ** `.Application.Contracts`, **không** kéo `.Domain`/`.Application` vào project HTTP; quên ⇒ controller không biên dịch.
+- **Danh sách trả `ApiPage<T>`** (`src/eCommerce.HttpApi/Dtos/ProductApiDtos.cs:9` — `Items`/`Total`/`Page`/`PageSize`), **không** trả `PagedResultDto` của ABP: controller map `PagedResultDto → ApiPage` sau khi app service trả (khuôn `NotificationTemplatesController.cs:44-58`), để client Next.js có hợp đồng `/api/v1` ổn định.
+- **Route literal `rule-catalog` không đụng `GET /{id:guid}`** nhờ ràng buộc `guid` — khai **đúng** constraint, **không** đổi thành `{id}` (nếu đổi, `rule-catalog` rơi vào `404`/parse lỗi).
+- **Hệ quả của service thứ hai**: `IPromotionRuleCatalogAppService` cũng là `IApplicationService` trong assembly `eCommerce*.Application` mà `ConventionalControllers` quét (`src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs:466-469`) ⇒ ABP **tự sinh** thêm một route auto dạng `/api/app/promotion-rule-catalog/...` (tên thực xác nhận bằng swagger sau khi có code). Đó là **additive**; bảng 10 route `/api/app` ở trên vẫn đúng cho `IPromotionAppService`, `TC-31` đếm **method của interface** (không đếm route), và FE **không** dùng route auto này — FE đi `/api/v1/promotion/rule-catalog`.
+
+| Method | Route | Query/Body | Trả về | Permission | Mã lỗi có thể |
+|---|---|---|---|---|---|
+| `GET` | `/api/v1/promotion` | `status?`, `kind?`, `page`, `pageSize`, `sort` | `ApiPage<PromotionListItemDto>` | `Promotions.View` | — |
+| `GET` | `/api/v1/promotion/{id:guid}` | — | `PromotionDetailDto` (cây `Nodes` + **`Limits`** — trường additive `D-288`, §4.3) | `Promotions.View` | `404` (không có) |
+| `POST` | `/api/v1/promotion` | `CreatePromotionDto` | `PromotionDto` | `Promotions.Manage` | validation `400` (`FlashSale`/`FreeShipping`/`Currency` — 0 mã mới) |
+| `POST` | `/api/v1/promotion/{id:guid}/save-tree` | cây điều kiện | `PromotionTreeValidationResultDto` — **200 chỉ khi** cây hợp lệ; validator **NÉM** `0001`/`0002`/`0003`/`0004`/`0010` (và `0006` khi `Status ≠ Draft`), **không** trả `ViPham` | `Promotions.Manage` | `0001` `0002` `0003` `0004` `0006` `0010` |
+| `POST` | `/api/v1/promotion/{id:guid}/approve` | — | `PromotionDto` | `Promotions.Approve` | `0001` `0002` `0004` `0006` `0010` |
+| `POST` | `/api/v1/promotion/{id:guid}/set-status` | `{ status }` — **chỉ** `Paused`/`Active`/`Cancelled` | `PromotionDto` | `Promotions.Manage` | `0006` |
+| `GET` | `/api/v1/promotion/rule-catalog` | — | `IReadOnlyList<PromotionRuleCatalogItemDto>` | `Promotions.View` | — |
+
+Map mã → HTTP **dùng chung** bảng ở trên (Host `eCommerceHttpApiHostModule.cs:449-458`); hàng này **0** mã lỗi mới.
+
+**4 op còn lại không mở ở v1** (`D-285` ④, `D-286`) — ghi nợ **có chủ**; thêm route nào trong 4 op này vào `/api/v1` mà **không** có dòng `D-xx` ⇒ `PromotionV1SurfaceTests` **ĐỎ**:
+
+| Op | Vì sao chưa mở | Chủ nợ | Mốc mở |
+|---|---|---|---|
+| `POST …/evaluate` | cần **màn checkout** (ô mã giảm giá + câu theo `PromotionRejectionReason`); repo **0** màn checkout | **`SAL-002`** | hàng màn checkout |
+| `POST …/validate-voucher` | cùng màn checkout; `ValidateVoucherAsync` **không** trả `SupersededByVoucher`/`ExcludedByNonCumulative` — hai lý do đó **chỉ** có ở `evaluate` (`D-286` ①(i)) | **`SAL-002`** | hàng màn checkout |
+| `POST …/import-rule-costs` | không có màn trong §10; cần upload tệp + `Promotions.Import` | **`ops`/`WEB-*`** | khi có nhu cầu thật |
+| `GET …/redemptions?orderId=` | thuộc khối "Vì sao giảm" ở **chi tiết đơn** (`BreakdownJson` chưa có trong `RedemptionDto`) | **`WEB-*`** | hàng màn chi tiết đơn |
+
+**Kiểm bằng máy (`D-285` ⑥, `D-288` ⑥(ii)):** `PromotionV1SurfaceTests` — allowlist **đúng 7** route (`[Route]` + `[Http*]`), `[Authorize]` cấp class `Promotions.Default` + map method → permission, `IPromotionAppService` vẫn **đúng 10** method (`PromotionSurfaceTests` giữ xanh); probe swagger: `0006` ⇒ **409**, `0001` ⇒ **400**, thiếu token ⇒ **401**; thêm trường `Limits` **không** được làm số route khác 7.
+
+**Đường lùi:** revert **1** commit (`PromotionsController.cs`, và `IPromotionRuleCatalogAppService`/DTO/impl + test nếu lùi cả bề mặt) + `git checkout packages/api-client/openapi.v1.json packages/api-client/src/schema.d.ts`; **0** migration, **0** dữ liệu, `/api/app/promotion/**` không đụng.
+
 
 ---
 
@@ -541,6 +617,7 @@ Thêm **cấm** `promotionId`, `voucherCode`, `customerId` vào `eCommerceMetric
 | **D8** | SRS §6.1 đặt `IPromotionConditionRule`/`PromotionRuleContext`/`PromotionCartLine` dưới namespace `eCommerce.Promotions.Contracts` | Khai trong **assembly Domain** (`modules/Promotions/eCommerce.Promotions.Domain/Contracts/PromotionRuleContracts.cs:1`) nhưng **giữ** namespace `eCommerce.Promotions.Contracts` | **Theo as-built** (Contracts→Domain hợp lệ §2.1); **không** đổi chữ ký công khai, **không** di chuyển kiểu. BA ghi rõ vị trí để không ai “sửa cho khớp assembly” rồi phá tham chiếu |
 | **D9** | SRS §7.2 #2/#3 cột “Idempotency key (ổn định)” (`PromotionTree:…`/`Import:…`) | `SaveTreeAsync`/`ImportRuleCostsAsync` **không** nối `IIdempotencyGuard` ở v1 (as-built `modules/Promotions/eCommerce.Promotions.Application/PromotionAppService.cs:154-203,345-408`); allowlist ranh giới giữ đúng `eCommerce.Messaging.EventCoverage` | **Theo as-built** (`D-284`): chống trùng theo nghiệp vụ = khoá `Tree`/`Import` + delete-then-insert cùng transaction + import chỉ cập nhật dòng có; 2 khoá `PromotionTree:…`/`Import:…` khai nhưng **chưa dùng** (§3.7); retry `SaveTree` tăng `TreeVersion` +1 ở `Draft` — **chấp nhận** |
 | **D10** | SRS §13: “Metric mới (9) — ⚠️ CHƯA có trong code” | 9 đã **đăng ký**; **5** có điểm phát thật (`PromotionEngine`); **4** (`promotion_voucher_reserved_total`/`_released_total`/`_reservation_expired_total` = `PRO-001`; `promotion_applied_total` = `SAL-001`) ở `ChuaCoNoiPhat` là **nợ có chủ** | **Theo as-built** (`D-283` — §8); `MetricEmitterTests` đỏ cả hai chiều; BA sửa SRS §13 thành “9 đăng ký; 5 có điểm phát; 4 nợ có chủ” |
+| **D11** | Allowlist `TC-31` chỉ biết **một** app service quản trị — **10** method của `IPromotionAppService` (SRS §6.2 cũ) | SRS §6.2/§6.3 (v0.12–v0.14, `D-285` ①(ii) + `D-289`/`D-290`) thêm **interface thứ hai** `IPromotionRuleCatalogAppService.GetRulesAsync()` (chỉ đọc, `Promotions.View`) **cùng** `Promotions.Application.Contracts`; DTO có trường additive **`IsSeeded`** (`D-289`) và **`Label` lấy từ `PromotionRuleCostCatalog.Meta` trong code, fallback `SystemName`** (`D-290`; **không** cột DB, **không** sửa `IPromotionConditionRule` — `D8` giữ); test phản chiếu vẫn đếm **10** method của `IPromotionAppService` (`PromotionSurfaceTests.cs:36-49`) | **Thiết kế bổ sung, không đảo `TC-31`**: allowlist **10** method **giữ nguyên** (không thêm method thứ 11); `/api/v1` vẫn **7** route; `/api/app` có thêm auto route của service mới (additive, §4.4). QA/`docrev` **không** viết test "tổng 11 method" — test đúng 10 trên `IPromotionAppService` + đúng 7 route trên `/api/v1` (`PromotionV1SurfaceTests`); `PromotionRuleCatalogTests` phủ `IsSeeded` + nguồn nhãn (`D-289`/`D-290` ⑥) |
 
 ### 12.2 Câu hỏi mở **mới** (đưa vào khối JSON)
 
@@ -615,3 +692,5 @@ P3 #1 (54→55 test case ở SRS §15.4) và P3 #2 (trích số dòng cũ trong 
 | v0.4 | 27/11/2026 | ARCH (N94/W24-2) | P3 DOCREV vòng 3: thu hẹp allowlist test ranh giới còn đúng namespace `eCommerce.Messaging.EventCoverage` (không wildcard) + nêu tên test `RanhGioiPromotionsTests` ở §10.2. |
 | v0.5 | 27/11/2026 | ARCH (N94/W24-2) | Cập nhật trạng thái: SRS `v0.10`, DOCREV vòng 4/5 `DOC-OK`, 0 P3 còn mở; không đổi thiết kế. |
 | v0.6 | 27/11/2026 | ARCH (N94/W24-2) | áp `D-283` (metric 5/9 + 4 nợ) & `D-284` (không nối guard); thêm docDeviation D7–D10; ghi rõ tên index rút gọn; không đổi thiết kế khác. |
+| v0.7 | 27/11/2026 | ARCH (N95/W24-3) | Áp `D-285`/`D-287`/`D-288`: §4.3 thêm **service đọc riêng** `IPromotionRuleCatalogAppService.GetRulesAsync()` (+ `PromotionRuleCatalogItemDto`) — allowlist **10** method giữ nguyên; §4.3 thêm `PromotionDetailDto.Limits` (`PromotionTreeLimitsDto` gán từ `DocLimitsAsync()`, additive); §4.4 thêm tiểu mục bề mặt `/api/v1/promotion/**` **7** route (controller tường minh, `ApiPage<T>`, 4 op không mở + chủ nợ `SAL-002`/`ops`/`WEB-*`), giữ nguyên `/api/app` 10 route + bảng map mã → HTTP; §12.1 thêm `docDeviation` **D11**; header lên SRS `v0.13`. **0** migration, **0** đổi schema, **0** mã lỗi mới. |
+| v0.8 | 27/11/2026 | ARCH (N95/W24-3) | Áp `D-289`/`D-290` + dọn P3 `docrev`: §4.3 DTO `PromotionRuleCatalogItemDto` thêm **`IsSeeded`** (true ⇔ có dòng `ProPromotionRuleCosts`); `GetRulesAsync` lặp `PromotionRuleRegistry.SystemNames` (không lặp bảng), thiếu dòng ⇒ `PromotionRuleCostCatalog.Cua` (`O1`/`1`/`false`) + `IsSeeded = false` + `LogWarning` một lần/lượt gọi, **không** ném `0010`/không bỏ khỏi danh sách/0 metric; **gỡ** gạch "Biên chưa chốt" + viện dẫn `AQ11` (đã chốt bằng `D-289`); thêm hàng **"Nguồn nhãn"** = `PromotionRuleCostCatalog.Meta.Label` trong code (`PromotionRuleCostSeedContributor.cs:13-27`) + fallback `Label = SystemName`, **không** sửa `IPromotionConditionRule`/không cột DB/không từ điển thứ hai ở Application; §4.4 nói rõ `eCommerce.HttpApi.csproj` **phải thêm** `ProjectReference` tới `Promotions.Application.Contracts` (hiện **chưa** có); §12.1 D11 bổ sung `IsSeeded` + nguồn `Label`; header lên SRS `v0.14`. **0** migration, **0** route/method mới. |
