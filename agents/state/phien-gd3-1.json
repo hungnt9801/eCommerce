@@ -7,7 +7,7 @@
   "nhanhGoc": "main",
   "refs": "D-216",
   "ghiChu": "Phương án B (D-216): mỗi WP một nhánh cắt từ đỉnh tich-hop/gd3; dong-wp đẩy fast-forward vào tich-hop/gd3 (M3, D-114); PR xếp chồng mở một lần cuối chuỗi.",
-  "capNhat": "2026-11-27T09:08:03+07:00",
+  "capNhat": "2026-11-27T11:00:22+07:00",
   "rows": [
     {
       "id": "W16-1",
@@ -625,17 +625,18 @@
       "dependsOn": [
         "W24-3"
       ],
-      "status": "dang-lam",
+      "status": "xong",
       "phien": [
         "N96",
         "N97"
       ],
       "nhanh": "feat/gd3-wp24-dieu-kien-km",
       "buoc": "F4–F5",
-      "evidence": null,
-      "ghiChu": "F4 QA XONG (testplan 18/20 BR + 4 NC do->xanh, +13 unit +17 integration, schema.sql regen); F5 REV CHANGES P1=1 (voucher candidate khong kiem Promotion.Status/VoucherCode.Status) + 4 P2 -> can luot be sua + qa test + rev vong 2 (PASS/P1=0)",
-      "handover": "docs/nhanh/handover-n96.md",
-      "batDau": "2026-11-27T09:08:03+07:00"
+      "evidence": "F5 REV vong 2 PASS P1=0 (P2=1 owner PRO-001 map 01xx, P3=5); F4 testplan DAT 20/0; +29 unit 2432->2461; integration 156/156; 7 NC do->xanh; probe 401x3 + 200 rule-catalog 4 ten + 200 approve + 400 0001 + 409 0006 (403 CHUA DO); kiem-tat-ca 10/10 346.0s; D-291 D-292; SHA 48d9732 3d52d51 e602e92 48eda1d",
+      "ghiChu": null,
+      "handover": "docs/nhanh/handover-n97.md",
+      "batDau": "2026-11-27T09:08:03+07:00",
+      "xongLuc": "2026-11-27T11:00:22+07:00"
     },
     {
       "id": "W24-5",
