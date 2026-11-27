@@ -7,7 +7,7 @@
   "nhanhGoc": "main",
   "refs": "D-216",
   "ghiChu": "Phương án B (D-216): mỗi WP một nhánh cắt từ đỉnh tich-hop/gd3; dong-wp đẩy fast-forward vào tich-hop/gd3 (M3, D-114); PR xếp chồng mở một lần cuối chuỗi.",
-  "capNhat": "2026-11-27T20:54:49+07:00",
+  "capNhat": "2026-11-27T21:22:21+07:00",
   "rows": [
     {
       "id": "W16-1",
@@ -674,13 +674,17 @@
       "dependsOn": [
         "W24-5"
       ],
-      "status": "chua",
-      "phien": [],
+      "status": "xong",
+      "phien": [
+        "N99"
+      ],
       "nhanh": "feat/gd3-wp25-voucher",
       "buoc": "D-169: P2 #20",
-      "evidence": null,
+      "evidence": "DOCREV DOC-OK vong 5 (0 P1, P2 #29, P3 #30); probe -CheDo Code -WP WP-25 XANH exit 0; check-agent-artifact docreview DAT; check-feature-doc -WP14 exit 0; kiem-link PASS (990 link/1797 backtick); P2 #20 dong; D-295 + D-296; handover docs/nhanh/handover-n99.md",
       "ghiChu": null,
-      "handover": null
+      "handover": "docs/nhanh/handover-n99.md",
+      "batDau": "2026-11-27T20:55:45+07:00",
+      "xongLuc": "2026-11-27T21:22:21+07:00"
     },
     {
       "id": "W25-1",
