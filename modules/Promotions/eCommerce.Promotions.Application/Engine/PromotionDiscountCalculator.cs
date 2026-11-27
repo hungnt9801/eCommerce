@@ -1,4 +1,5 @@
 using eCommerce.Kernel.Money;
+using Volo.Abp;
 
 namespace eCommerce.Promotions.Engine;
 
@@ -42,7 +43,11 @@ public static class PromotionDiscountCalculator
                 return policy.Round(Money.Cua(discountValue, subtotal.Currency));
 
             default:
-                return Money.Zero(subtotal.Currency);
+                // `D-291` ③ P3 #8 — **NÉM** lỗi cấu hình (fail-closed), KHÔNG trả `Money.Zero` im lặng cho
+                // giá trị lạ. `FreeShipping` bị `CHECK` + validation chặn từ `CreateAsync` (`D-158`) nên chỉ
+                // tới được đây khi cấu hình/enum hỏng — thà đỏ còn hơn giảm 0 đồng im lặng.
+                throw new AbpException(
+                    $"Kiểu giảm giá không hỗ trợ ở v1: '{kind}' (chỉ Percentage/FixedAmount — PRO-002 D-151).");
         }
     }
 }

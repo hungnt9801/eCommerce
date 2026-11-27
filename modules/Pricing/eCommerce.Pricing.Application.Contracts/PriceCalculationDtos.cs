@@ -36,6 +36,13 @@ public class TinhGioInput
     [System.ComponentModel.DataAnnotations.Required]
     [StringLength(128)]
     public string IdempotencyKey { get; set; } = default!;
+
+    /// <summary>
+    /// 🆕 `D-291` ② P2 #2 — **cờ ADDITIVE** (mặc định `false` = hành vi cũ): `true` ⇒ **KHÔNG** ghi sổ giải
+    /// trình, chỉ **đọc trước** kết quả tính (dùng cho lượt dò `Subtotal`/`CurrencyCode` của engine khuyến mãi
+    /// ở `Sales`, để **không** ghi sổ hai lần — `ADR-13` giữ). Lượt tính chính thức vẫn ghi sổ.
+    /// </summary>
+    public bool KhongGhiSoGiaiTrinh { get; set; }
 }
 
 public class DongGioInput

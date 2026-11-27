@@ -99,8 +99,7 @@ public class PromotionAppService : ApplicationService, IPromotionAppService
             (input.Status == null || x.Status == input.Status) && (input.Kind == null || x.Kind == input.Kind));
 
         var total = ds.Count;
-        var items = ds
-            .OrderByDescending(x => x.CreationTime)
+        var items = SapXep(ds, input.Sorting)
             .Skip(input.SkipCount)
             .Take(input.MaxResultCount)
             .Select(x =>
@@ -112,6 +111,42 @@ public class PromotionAppService : ApplicationService, IPromotionAppService
             .ToList();
 
         return new PagedResultDto<PromotionListItemDto>(total, items);
+    }
+
+    /// <summary>
+    /// `D-291` ③ P3 #6 — `?sort=` chỉ nhận **whitelist** trường an toàn (không nội suy SQL thô; dữ liệu đang
+    /// phân trang trong bộ nhớ). Cú pháp ABP `"Field [asc|desc]"`; rỗng/trường lạ ⇒ mặc định `CreationTime desc`.
+    /// Tie-break `Id` để **tất định** với trường trùng.
+    /// </summary>
+    private static IEnumerable<Promotion> SapXep(IReadOnlyList<Promotion> ds, string? sorting)
+    {
+        var (field, desc) = ParseSorting(sorting);
+        IOrderedEnumerable<Promotion> ordered = field switch
+        {
+            "code" => desc ? ds.OrderByDescending(x => x.Code) : ds.OrderBy(x => x.Code),
+            "name" => desc ? ds.OrderByDescending(x => x.Name) : ds.OrderBy(x => x.Name),
+            "status" => desc ? ds.OrderByDescending(x => x.Status) : ds.OrderBy(x => x.Status),
+            "kind" => desc ? ds.OrderByDescending(x => x.Kind) : ds.OrderBy(x => x.Kind),
+            "priority" => desc ? ds.OrderByDescending(x => x.Priority) : ds.OrderBy(x => x.Priority),
+            "startsatutc" => desc ? ds.OrderByDescending(x => x.StartsAtUtc) : ds.OrderBy(x => x.StartsAtUtc),
+            "endsatutc" => desc ? ds.OrderByDescending(x => x.EndsAtUtc) : ds.OrderBy(x => x.EndsAtUtc),
+            "creationtime" => desc ? ds.OrderByDescending(x => x.CreationTime) : ds.OrderBy(x => x.CreationTime),
+            _ => ds.OrderByDescending(x => x.CreationTime)
+        };
+        return ordered.ThenBy(x => x.Id);
+    }
+
+    private static (string field, bool desc) ParseSorting(string? sorting)
+    {
+        if (string.IsNullOrWhiteSpace(sorting))
+        {
+            return ("creationtime", true);
+        }
+
+        var parts = sorting.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var field = parts[0].ToLowerInvariant();
+        var desc = parts.Length > 1 && string.Equals(parts[1], "desc", StringComparison.OrdinalIgnoreCase);
+        return (field, desc);
     }
 
     [Authorize(eCommerceConsts.Permissions.Promotions.Manage)]
@@ -144,7 +179,7 @@ public class PromotionAppService : ApplicationService, IPromotionAppService
     }
 
     [Authorize(eCommerceConsts.Permissions.Promotions.View)]
-    public async Task<PromotionEvaluationResultDto> EvaluateAsync(PromotionEvaluateInput input)
+    public async Task<PromotionEvaluationResultDto> EvaluateAsync(PromotionEvaluateInput input, CancellationToken cancellationToken = default)
     {
         var request = new PromotionEvaluationRequest(
             input.CheckoutSessionId,
@@ -158,7 +193,7 @@ public class PromotionAppService : ApplicationService, IPromotionAppService
             input.VoucherCode,
             string.IsNullOrWhiteSpace(input.VoucherCode) ? PromotionApplyMode.AutoApply : PromotionApplyMode.CustomerRequested);
 
-        var kq = await _engine.EvaluateAsync(request, CancellationToken.None);
+        var kq = await _engine.EvaluateAsync(request, cancellationToken);
         return Map(kq);
     }
 
@@ -299,7 +334,7 @@ public class PromotionAppService : ApplicationService, IPromotionAppService
     /// Không side effect (không trừ lượt). **KHÔNG** cho phép ẩn danh (Q7 — `D-146`).
     /// </summary>
     [Authorize(eCommerceConsts.Permissions.Promotions.View)]
-    public async Task<VoucherValidationDto> ValidateVoucherAsync(ValidateVoucherInput input)
+    public async Task<VoucherValidationDto> ValidateVoucherAsync(ValidateVoucherInput input, CancellationToken cancellationToken = default)
     {
         var request = new PromotionEvaluationRequest(
             input.CheckoutSessionId,
@@ -313,16 +348,39 @@ public class PromotionAppService : ApplicationService, IPromotionAppService
             input.Code,
             PromotionApplyMode.CustomerRequested);
 
-        var kq = await _engine.EvaluateAsync(request, CancellationToken.None);
+        PromotionEvaluationResult kq;
+        try
+        {
+            kq = await _engine.EvaluateAsync(request, cancellationToken);
+        }
+        catch (BusinessException ex) when (ex.Code == PromotionErrorCodes.VoucherNotFound)
+        {
+            // `D-291` ⑥ — mã **không tồn tại** ⇒ `IsValid=false` (không ném ra biên validate), kể cả khi có
+            // một khuyến mãi tự động khác khớp.
+            return new VoucherValidationDto
+            {
+                IsValid = false,
+                PromotionId = null,
+                DiscountTotal = 0m,
+                Currency = input.Currency,
+                RejectionReason = PromotionRejectionReason.NoCandidate
+            };
+        }
 
-        var voucherItem = kq.Breakdown.FirstOrDefault(x => x.Source == "Internal");
+        // `D-291` ② P2 #3 — chỉ đọc kết quả RIÊNG của voucher (`VoucherOutcome`), KHÔNG lấy
+        // `Breakdown.FirstOrDefault(Source=="Internal")` (có thể trỏ item tự động/bị cắt). `IsValid` true
+        // **chỉ khi** chính voucher được nhận.
+        var voucher = kq.VoucherOutcome;
+        var voucherDuocNhan = voucher is { Applied: true };
         return new VoucherValidationDto
         {
-            IsValid = kq.Applied,
-            PromotionId = kq.Applied ? voucherItem?.PromotionId : null,
-            DiscountTotal = kq.DiscountTotal,
+            IsValid = voucherDuocNhan,
+            PromotionId = voucherDuocNhan ? voucher!.PromotionId : null,
+            DiscountTotal = voucherDuocNhan ? voucher!.DiscountTotal : 0m,
             Currency = kq.Currency,
-            RejectionReason = kq.Applied ? null : (kq.RejectionReason ?? PromotionRejectionReason.ConditionFalse)
+            RejectionReason = voucherDuocNhan
+                ? null
+                : (voucher?.RejectionReason ?? kq.RejectionReason ?? PromotionRejectionReason.NoCandidate)
         };
     }
 

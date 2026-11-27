@@ -1,172 +1,48 @@
-# Doc review — PRO-002 Cây điều kiện AND/OR & engine khuyến mãi
+# Doc review — PRO-002 «Cây điều kiện & engine khuyến mãi» (kiểm nhanh v0.18, vòng 2)
 
 **VERDICT: DOC-OK**
 
 | | |
 |---|---|
-| Tài liệu | `docs/features/promotions/pro-002-cay-dieu-kien-engine-khuyen-mai.md` (**v0.15**, SRS — tài liệu chính) · đối chiếu `docs/features/promotions/PRO-002-arch.md` (**v0.8**) |
-| Ngày · vòng | 27/11/2026 · **vòng 8** (N95 — **đóng P2 còn lại** của vòng 7 sau bản vá `v0.15`; không kiểm lại toàn tài liệu) |
+| Tài liệu | `docs/features/promotions/pro-002-cay-dieu-kien-engine-khuyen-mai.md` (v0.18, 1.396 dòng) |
+| Ngày · vòng | 27/11/2026 · vòng 2 (kiểm nhanh phần sửa v0.17/v0.18 theo `D-292`; không phải doc-gate đầy đủ) |
 | Người kiểm | agent `docrev` (ngữ cảnh sạch) |
-| Đã đọc | SRS dòng 1–20 (header), 600–615 (§6.2), 635–655 (§6.3 v1), 840–860 (§10.1), 1040–1055 (`TC-70`/`TC-71`), 1150–1155 (DoD), 1266–1275 (§15.4); ARCH dòng 1–30 (header), 295–315 (§4.3), 345–360 (§4.4), 692–698 (§15); code `PromotionRuleCostSeedContributor.cs:1-40` (đồ thị) |
-| Máy | `check-feature-doc.ps1 -Path … -WP14` → **DAT** (16/16 heading · 20/20 BR có test · đối chiếu Nhanh dòng 1276 · 15 câu `Open`, 0 TODO) · `npm --prefix tools run check:mermaid` → **214 khối, 0 lỗi** · `check-agent-artifact.ps1 -Kind docreview` → **exit 0** |
+| Đã đọc | vòng 1: các mục ghi ở "Giới hạn lượt kiểm". Vòng 2: đọc lại đúng 3 P2 + 4 P3 (dòng 102–103, 188, 247–254, 601–602, 700, 943, 1054, 1069–1073, 1175, 1297–1298, 1344, 1361, 1395–1396) + đọc lại `PromotionEngine.DanhGiaCandidateAsync` toàn bộ |
+| Máy | `check-feature-doc.ps1 -Path … -WP14` → exit 0 · **DAT** (16/16 heading, 20/20 BR có test §14, mục đối chiếu Nhanh dòng 1302) · `check-agent-artifact.ps1 -Kind docreview` → exit 0 |
+| Đồ thị | `graph: codegraph_explore "DanhGiaCandidateAsync PromotionTreeEvaluator DanhGia CustomerRequired MaxUsagePerCustomer"` → `DanhGiaCandidateAsync` (`PromotionEngine.cs:280`) gọi `PromotionTreeEvaluator.DanhGia` tại `:342`, khối kiểm lượt ở `:368-421`; nhánh `CustomerRequired` chỉ khi `!isVoucherSource` (`:396-400`). Xác nhận thứ tự **cây trước, lượt sau** đúng `D-292`. |
 
-**P1 = 0 · P2 = 0 · P3 = 4** (P3 ghi nhận, không chặn)
-
-Tóm tắt vòng 8 — xác nhận **đúng 3 điều** của bản vá `v0.15`:
-1. **§14.1 `TC-70` (d) (:1049)** nay là "`Label` **khác rỗng VÀ khác `SystemName`**", cột kỳ vọng giải thích đúng vì sao (fallback làm "khác rỗng" luôn đúng, phải kiểm **cả hai vế**, `D-290` ⑥(iv)) ⇒ **đóng P2 vòng 7 #1**.
-2. **§14.1 có `TC-71` (:1050)** phủ đúng `D-289` ⑥(i)–(iii) + `D-290` ⑥(iv)–(v): (i) bảng chi phí rỗng ⇒ đủ `SystemNames`, `1`/`false`/`IsSeeded = false`, không ném `0010`, 0 tên bị bỏ; (ii) có dòng ⇒ `IsSeeded = true` + giá trị theo dòng; (iii) sửa nhãn trong `PromotionRuleCostCatalog.V1` ⇒ trả theo bảng code; (iv) **đột biến** duyệt DB/`continue` ⇒ ca (i) **ĐỎ**; (v) nhãn v1 khác rỗng và khác `SystemName`, tên ngoài bảng ⇒ `Label = SystemName`. Cột **Phủ** neo đúng "**hàng `W24-4` — QA**".
-3. **§14.3/DoD (:1152)** ghi **57** test case = `grep -c '^| \*\*TC-'` = **57**; **§6.3 (:639)** ghi `openapi.v1.json` **59** path = số đo lại (59 key `/api/v1`, **0** path promotion).
-
-Còn 4 **P3** (đều ở `PRO-002-arch.md` hoặc câu chữ test), không chặn: `TC-71` (v) nên tách vế "4 tên v1" / "tên ngoài bảng"; ARCH §4.4 vẫn "31 path"; ARCH header còn trích SRS `v0.14`; ARCH §4.3 chưa ghi "thêm trường `Label`".
-
-## Vòng 8 (N95) — đóng P2 còn lại
-
-### Đã kiểm (vòng 8)
+## Đã kiểm
 
 | Nhóm | Cách kiểm | Kết quả |
 |---|---|---|
-| D1 tự mâu thuẫn | Grep `khác rỗng`/`khác \`SystemName\``/`TC-70`/`TC-71`: vế "chỉ khác rỗng" **không còn** ở chỗ nào cho nhãn — `TC-70` (d) (:1049) và `TC-71` (v) (:1050) đều nêu hai vế; `TC-70` (d) và `TC-71` (v) bổ trợ (endpoint ↔ service/bảng code), không đếm trùng route/method (vẫn 7 route, 10 method); `IsSeeded` vẫn **một** định nghĩa. | 1 phát hiện (#1 — câu chữ `TC-71` (v)) |
-| D2 chéo tài liệu / code / D-xx | `TC-71` ↔ `D-289` ⑥(i)–(iii) + `D-290` ⑥(iv)–(v): phủ **đủ**, không thêm ràng buộc mới; `TC-71` neo `W24-4`. Số đo: `grep -c '^| \*\*TC-'` = **57** = DoD (:1152); `grep -c '^    "/api/v1' packages/api-client/openapi.v1.json` = **59**, promotion = **0** = §6.3 (:639). §6.2 (:609) / §10.1 (:847, :856) giữ nguồn nhãn `PromotionRuleCostCatalog.Meta.Label` + fallback `SystemName`; `PromotionRuleCostCatalog` :13-27, `Meta` :15 (3 trường, `Label` **additive** — đúng như SRS :856 ghi "trường additive, thêm ở `W24-3`"). | 0 phát hiện |
-| D3 cơ chế thực thi | `TC-70` (d) **đỏ được** khi `Label = SystemName` (fallback) — đúng ca "thêm rule vào registry mà quên `V1`" (`D-290` ⑥(iv)); `TC-71` (iv) **đỏ được** khi đổi vòng lặp sang DB/`continue` (`D-289` ⑥(iii)); `TC-71` (iii) **đỏ được** khi nhãn đọc từ DB thay vì bảng code (`D-290` ⑥(v)). Mỗi bất biến của 2 quyết định có **≥ 1 ca đỏ**. | 0 phát hiện |
-| D4 SQL chạy được | Bản vá `v0.15` là văn bản; `grep -c '```sql'` trên 2 tệp = **0/0**; không có khối `bash`/`powershell` mới. | **Không có khối sql** — không chạy |
-| D5 test/probe/tệp có thật | `TC-71` / `PromotionV1SurfaceTests` / `PromotionRuleCatalogTests` **chưa có tệp** — là **kế hoạch** của `W24-3`/`W24-4`, tài liệu ghi đúng (TC là danh sách kế hoạch, không nói "đã có"); `PromotionRuleCostCatalog` **có thật** (:13-27). | 0 phát hiện |
-| D6 nhãn tin cậy | SRS header `v0.15` (:15) + hàng `v0.15` §15.4 (:1272) khớp bản vá; "Trạng thái triển khai" :1309 "Phiên **N95** (`W24-3`)". ARCH header (:4) vẫn trích SRS `v0.14`; ARCH §4.4 (:351) vẫn "31 path" — **P3 #2/#3**. | 2 phát hiện (#2, #3) |
-| D7 14 quy tắc + đối chiếu Nhanh | `check-feature-doc -WP14` **DAT** (đối chiếu Nhanh dòng 1276); mermaid 214/0; "đếm ≠ dòng hiển thị" xử lý tường minh; không thêm bảng Mermaid. ARCH §4.3 (:303) chưa ghi "thêm trường `Label`" dù SRS :856 đã ghi — **P3 #4**. | 1 phát hiện (#4) |
+| D1 tự mâu thuẫn | grep "TRƯỚC cây/trước bước 5/sau bước 6", "latent/không lộ", "không xảy ra ca này"; đối chiếu A1 ↔ §3.3 ↔ §4.2 ↔ §6.1 q8 ↔ §12 ↔ blockquote | Không còn câu cũ. A1 (v) dòng 103, §4.2 bước 5–7 + blockquote dòng 253, §6.1 q8 dòng 601, §12 dòng 943, Basic Flow dòng 102 đều nói **cây trước, hết lượt sau** (`D-292`) — nhất quán nội bộ và khớp code. 0 phát hiện |
+| D2 chéo tài liệu / code / D-xx | đọc lại `PromotionEngine.DanhGiaCandidateAsync` (`:280-429`) + `PromotionVoucherOutcome` (`PromotionEngineContracts.cs:46-68`) + `PromotionAppService.ValidateVoucherAsync` (`:337-385`) + `PromotionDiscountCalculator.cs:45-52` + `PromotionErrorCodes.cs:47,50,53`; đối chiếu `D-292`, `D-291`, `D-144`, `D-147`, `D-161`, `D-162`, `D-17` | Thứ tự code **đã đảo** đúng `D-292` ①(1): guard trạng thái `:296-301` → guard tĩnh `:308` → khung/kênh/`MinOrderAmount` `:310-331` → **cây** `:342` → ngân sách `:346-360` → `!Satisfied ⇒ ConditionFalse` `:362-366` → **hết lượt** `:368-421`; voucher cây `false` không ném, voucher cây `true` vẫn ném `0007`/`0119`/`0104`. Trích dẫn dòng trong SRS (`:342`, `:368`, `:392-401`, `:368-421`) **đúng**. 0 phát hiện |
+| D3 cơ chế thực thi | đọc `TC-72`…`TC-76` §14.1 + DoD §14.3 + "Chưa làm" dòng 1395 | 5 luật vá có **đúng 1 TC/luật**, mỗi TC ghi kỳ vọng + "gỡ guard/đột biến ⇒ ĐỎ"; DoD `57 → 62`; "Chưa làm" ghi rõ `qa` bổ sung (`D-291` ⑥). 0 phát hiện |
+| D4 SQL chạy được | grep khối ```; `git status` | Không có khối `sql`; lượt vá 0 migration ⇒ không có gì để chạy/không có DDL mâu thuẫn |
+| D5 test/probe/tệp có thật | `ls test/eCommerce.Tests/Promotions/`; kiểm các tên tệp SRS nhắc | `PromotionV1SurfaceTests.cs`/`PromotionRuleCatalogTests.cs`/`PromotionGetLimitsTests.cs` có thật; dòng 1361 đã ghi đúng "đã có từ N96". Không có tên test nào bị khẳng định sai |
+| D6 nhãn tin cậy | đọc blockquote §6.4 dòng 700 + "Vá REV vòng 1" + changelog v0.17/v0.18 | `0101` ghi **reachable hôm nay** qua `/api/app` → chưa map Host ⇒ `403` (không phải 404) — đúng thực tế (Host đăng ký conventional controller cho mọi `eCommerce*.Application`, `eCommerceHttpApiHostModule.cs:494-506`). Không còn nhãn "latent". Không tuyên bố đã chạy test cho lượt vá |
+| D7 14 quy tắc + đối chiếu Nhanh | `design-doc-guidelines.md` §5 #1–#14; mục đối chiếu Nhanh | 16 mục + mục đối chiếu Nhanh có thật; `check-feature-doc` DAT; dòng Mermaid sửa không `;`/không `<...>`. `check:mermaid` chưa chạy (hook vai chặn `npm`). 0 phát hiện mới |
 
-### Phát hiện (vòng 8)
-
-| # | Mức | Vị trí | Vấn đề | Đề nghị |
-|---|---|---|---|---|
-| 1 | P3 | SRS §14.1 dòng **1050** (`TC-71` (v)) | Cột kỳ vọng (v) viết "**mọi tên** có mặt với `Label` khác rỗng **và** khác `SystemName`; tên ngoài bảng ⇒ `Label = SystemName`" — nếu tên "ngoài bảng" vẫn ∈ `SystemNames` (ca đột biến) thì hai vế **đá nhau** (vừa phải khác `SystemName`, vừa phải bằng). Ý đúng (4 nhãn v1 ⇔ ⊂ `V1`) đọc ra được nhưng dễ viết sai test. | Tách câu: "4 tên **∈ `V1`** ⇒ `Label` khác rỗng **và** khác `SystemName`; tên **∉ `V1`** (dù ∈ registry) ⇒ `Label = SystemName` **và** `TC-70` (d) **ĐỎ**". (Câu chữ; không mở vòng mới.) |
-| 2 | P3 | ARCH §4.4 dòng **351** | (Còn mở từ vòng 7 #2 — chỉ còn ở ARCH) "`openapi.v1.json` **31** path" trong khi SRS §6.3 (:639) đã sửa **59** = số đo. | `arch` đổi 31 → **59** (hoặc bỏ con số) cho khớp SRS. |
-| 3 | P3 | ARCH header dòng **4** | Vẫn trích SRS `v0.14 — 27/11/2026`; SRS nay `v0.15`. | `arch` cập nhật `v0.15`. |
-| 4 | P3 | ARCH §4.3 dòng **303** | Hàng "Nguồn nhãn" trích `PromotionRuleCostCatalog.Meta.Label` kèm `file:dòng` nhưng **không** nói `Meta` **thêm** trường `Label` (hiện 3 trường, `:15`); SRS :856 đã ghi "trường additive, thêm ở `W24-3`". Không phải mâu thuẫn (additive, `D-290` ①(1)). | `arch` thêm "(`Meta` **thêm** trường `Label` — additive, `W24-3`)". |
-
-### Không kiểm được (vòng 8)
-
-- **D4:** không có khối `sql` trong 2 tệp (`grep -c '```sql'` = 0) ⇒ không có gì để chạy trong `BEGIN…ROLLBACK`.
-- **Phần as-built:** `TC-70`/`TC-71`/`PromotionV1SurfaceTests`/`PromotionRuleCatalogTests`/`IPromotionRuleCatalogAppService`/`IsSeeded`/`Meta.Label` **chưa có trong code** — là kế hoạch `W24-3`/`W24-4`; tài liệu ghi đúng trạng thái kế hoạch.
-- Vòng 8 chỉ **kiểm máy nhanh 3 điều** của bản vá; các mục ngoài delta giữ kết luận vòng 7/6/5.
-
-### Bằng chứng đồ thị / đo (vòng 8)
-
-- `graph: codegraph_explore "PromotionRuleCostCatalog PromotionRuleCostSeedContributor PromotionRuleRegistry PromotionRuleCost Cua Meta"` → `PromotionRuleCostCatalog` :13; `Meta(string CostKind, int DeclaredCostFactor, bool RequiresVerifiedCod)` :15 (**3** trường, **chưa** `Label`); `V1` :17-23 (4 rule); `Cua` :25-26; `PromotionRuleCost` :12-15 (không cột nhãn); `SystemNames` :39-40.
-- `grep -c '^| \*\*TC-'` = **57** ↔ DoD :1152 "**57** test case" (khớp); `TC-71` :1050 có mặt, cột Phủ "hàng `W24-4` — QA".
-- `grep -c '^    "/api/v1' packages/api-client/openapi.v1.json` = **59**, promotion = **0** ↔ SRS §6.3 :639 "**59** path"; ARCH §4.4 :351 còn "31".
-- `grep -n "TC-70"` → (d) :1049 "khác rỗng **VÀ** khác `SystemName`"; không còn câu chỉ "khác rỗng" cho nhãn.
-
-## Vòng trước (vòng 7 — kiểm lại 2 P2)
-
-<!-- Cột 2 KHÔNG phải "Mức": check-agent-artifact.ps1 đếm P1/P2 theo cột 2 của mọi bảng. -->
-
-| # vòng 7 | Trạng thái (vòng 8) | Mức lúc đó | Ghi chú |
-|---|---|---|---|
-| 1 | **đã đóng** | P2 | `TC-70` (d) :1049 nay "khác rỗng **VÀ** khác `SystemName`" + `TC-71` :1050 phủ `D-289` ⑥(i)–(iii)/`D-290` ⑥(iv)–(v), neo `W24-4` |
-| 2 | đóng ở SRS, **còn ở ARCH** | P3 | SRS §6.3 :639 = 59; ARCH §4.4 :351 còn 31 → chép lên bảng "Phát hiện" **#2** vòng 8 |
-| 3 | **đã đóng** | P3 | DoD :1152 = **57** = đếm thật (56 + `TC-71`) |
-| 4 | đóng ở SRS, **còn ở ARCH** | P3 | SRS :856 "trường additive, thêm ở `W24-3`"; ARCH §4.3 :303 chưa → **#4** vòng 8 |
-
-### Vòng 7 — Đã kiểm (giữ nguyên, tóm tắt)
-
-| Nhóm | Cách kiểm | Kết quả |
-|---|---|---|
-| D1 tự mâu thuẫn | Grep `khác rỗng`/`IsSeeded`/`PromotionRuleCatalog`: `IsSeeded` một định nghĩa ở cả hai; fallback nhãn nói cùng một cách; còn `TC-70` (d) "khác rỗng" lệch ARCH "khác `SystemName`". | 1 phát hiện (#1) |
-| D2 chéo tài liệu / code / D-xx | `PromotionRuleCostCatalog` :13-27, `Meta` :15 (3 trường), `Cua` :25-26; `PromotionRuleCost` :12-15; SRS/ARCH khớp `D-289`/`D-290`. | 1 phát hiện (#4) |
-| D3 cơ chế thực thi | `D-289` ⑥ ⇒ `PromotionRuleCatalogTests` (i)-(iii); `D-290` ⑥ ⇒ (iv)-(v); SRS không có TC ⇒ `TC-70` (d) không đỏ được. | 1 phát hiện (#1) |
-| D4 SQL chạy được | `grep -c '```sql'` = 0/0. | Không có khối sql |
-| D5 test/probe/tệp có thật | `PromotionRuleCostCatalog` có; `PromotionRuleCatalogTests`/`IsSeeded` chưa có (kế hoạch); `AQ11` chỉ còn hàng lịch sử `v0.8`. | 0 phát hiện |
-| D6 nhãn tin cậy | Header SRS v0.14 ↔ ARCH v0.8; §6.2/§10.1 ghi kế hoạch; "Trạng thái triển khai" N95; DoD 55 vs 56. | 1 phát hiện (#3) |
-| D7 14 quy tắc + đối chiếu Nhanh | `check-feature-doc -WP14` DAT; mermaid 0; còn "openapi 31"+`Meta.Label`. | 2 phát hiện (#2, #4) |
-
-### Vòng 7 — Không kiểm được / Bằng chứng (giữ nguyên)
-
-- **D4:** không có khối `sql`; `CHECK`/index ngoài delta.
-- **`IPromotionRuleCatalogAppService`/`GetRulesAsync`/`IsSeeded`/`Meta.Label`:** chưa có trong code (đồ thị) — kế hoạch `W24-3`.
-- `grep -rn "AQ11" docs/features/promotions/` → **1** hit `PRO-002-arch.md:696` (hàng lịch sử `v0.8`).
-- `PromotionRuleCostSeedContributor.cs:19-22` = 4 `new("O1", 1, false)`.
-
-## Vòng trước (vòng 6 — kiểm delta W24-3)
-
-<!-- Cột 2 KHÔNG phải "Mức": check-agent-artifact.ps1 đếm P1/P2 theo cột 2 của mọi bảng. -->
-
-| # vòng 6 | Trạng thái (vòng 7) | Mức lúc đó | Ghi chú |
-|---|---|---|---|
-| 1 | đã đóng (vòng 7) | P2 | `AQ11` gỡ khỏi ARCH §4.3; chỉ còn hàng lịch sử `v0.8` |
-| 2 | còn một phần (vòng 7) → đã đóng (vòng 8) | P2 | Nguồn nhãn nêu đích danh; cơ chế đỏ sửa ở v0.15 (`TC-70` (d) + `TC-71`) |
-| 3 | đã đóng (vòng 8) | P3 | openapi 59 ở SRS (:639) |
-| 4 | đã đóng (vòng 6) | P3 | ARCH §4.4 :355 "phải THÊM `ProjectReference` … hiện chưa có" |
-| 5 | đã đóng (vòng 6) | P3 | §6.2 :611 "của `IPromotionAppService` — hàng `rule-catalog` là service riêng" |
-| 6 | đã đóng (vòng 6) | P3 | "Trạng thái triển khai" N95 (:1309) |
-| 7 | đã đóng (vòng 6) | P3 | §10.1 dùng `{id:guid}` |
-
-### Vòng 6 — Không kiểm được / Bằng chứng (giữ nguyên)
-
-- **D4:** delta không có khối `sql`.
-- **`PromotionV1SurfaceTests`/`PromotionTreeLimitsDto`:** chưa có trong code — kế hoạch, có nhãn 🔶.
-- `graph: codegraph_explore "IPromotionAppService PromotionAppService GetAsync DocLimitsAsync PromotionDetailDto RedemptionDto"` → 10 method :10-31; `PromotionDetailDto` :59-62; `RedemptionDto` :196-210.
-- `graph: codegraph_explore "PromotionTreeValidator TinhDeclaredCost …"` → `0001` :51 / `0002` :64; `TinhDeclaredCost` :94-104; `PromotionSettings.Doc` :33-63.
-- Mở dòng: `PromotionRuleContracts.cs:40-45`; `PromotionSurfaceTests.cs:36-49`; `ProductApiDtos.cs:9`; `NotificationTemplatesController.cs:28-38`; Host :449-458, :486-500; `SettingsController.cs` 14 route; `openapi.v1.json` 59 path; FE `order/manage/[id]/page.tsx:177`.
-
-## Vòng trước (vòng 5 — F1b N94, kiểm nhanh)
-
-<!-- Cột 2 KHÔNG phải "Mức": check-agent-artifact.ps1 đếm P1/P2 theo cột 2 của mọi bảng. -->
-
-| # vòng 5 | Trạng thái | Mức lúc đó |
-|---|---|---|
-| 1 | đã đóng — header SRS `v0.15`; ARCH trích `v0.14` (P3 vòng 8 #3) | P3 |
-| 2 | đã đóng — trích số dòng `pro-001` §6.1 đổi sang tên mục | P3 |
-| 3 | đã đóng — cờ `Promotions:Enabled` | P3 |
-| 4 | đã đóng — `REP-001 §5.2.1 LineDiscount` | P3 |
-
-### Vòng 5 — Phát hiện (giữ nguyên)
+## Phát hiện
 
 | # | Mức | Vị trí | Vấn đề | Đề nghị |
 |---|---|---|---|---|
-| 1 | P3 | Header dòng 15 | Header còn `v0.9`; ARCH trích `v0.9`. | Cập nhật; đã đóng. |
-| 2 | P3 | `pro-001` §6.1 :477/:492 | Còn 2 trích số dòng cũ. | Đổi sang tên mục; đã đóng. |
-| 3 | P3 | §11 :865 | Cờ đặt tên kiểu permission. | Đổi `Promotions:Enabled`; đã đóng. |
-| 4 | P3 | §7.1 :683 | `rep-001:442` không khớp. | Đổi `REP-001 §5.2.1 LineDiscount`; đã đóng. |
+| 1 | P3 | "Đối chiếu mô hình Nhanh (23/11/2026)" dòng 1302–1320 | `D-292` ③ ghi "bảng đối chiếu thêm/sửa hàng `D-292`" nhưng bảng **không có** hàng `D-292` (bảng chỉ liệt kê `D-07`…`D-163` của mô hình Nhanh). Nội dung `D-292` đã nằm đủ ở §3.3/§4.2/blockquote/changelog nên **không ảnh hưởng hành vi**. | Hoặc thêm 1 hàng `D-292` vào bảng, hoặc ghi chú trong `D-292` rằng bảng Nhanh không áp dụng cho quyết định nội bộ này. Không chặn. |
 
-## Vòng trước (vòng 4 — kiểm nhanh, 2 P3)
+## Vòng trước
 
-<!-- Cột 2 KHÔNG phải "Mức": check-agent-artifact.ps1 đếm P1/P2 theo cột 2 của mọi bảng. -->
-
-| # vòng 4 | Trạng thái | Mức lúc đó |
-|---|---|---|
-| 1 | đã đóng — DoD tăng thật lên 57 | P3 |
-| 2 | đã đóng (vòng 5 #2) | P3 |
-
-## Vòng trước (vòng 3 — 4 phát hiện bắt buộc + 5 P3)
-
-<!-- Cột 2 KHÔNG phải "Mức": check-agent-artifact.ps1 đếm P1/P2 theo cột 2 của mọi bảng. Mức lúc đó để ở cột 3. -->
-
-| # (v3) | Trạng thái | Mức lúc đó | Bằng chứng đóng (vòng 4) |
+| # vòng 1 | Trạng thái | Mức lúc đó | Ghi chú đóng |
 |---|---|---|---|
-| 1 | đã đóng | P1 | §4.2 bước 2 (:244); A2 (1) (:103); §6.1 quy tắc 8 (:580); §5.2 `Kind` (:382); `TC-67` (:996) |
-| 2 | đã đóng | P2 | §7.2 #5 (:682), §8.2 #5 (:743), bảng khoá (:771), `TC-50` (viii) (:993) |
-| 3 | đã đóng | P2 | §6.1 quy tắc 8 (:580) + §3.3 `LoiCauHinh` (:191); §12 (:862); `TC-68` (:997); `Q28` (:1175) |
-| 4 | đã đóng | P2 | `CustomerGroupId`/`IsFirstOrder` có nguồn (:519-520); quy tắc 10/11 (:582-583); `Q27` `Closed` (:1174); `TC-69` (:998) |
-| 5 | đã đóng | P3 | §14.3 ghi đúng số test case khi đó |
-| 6 | đã đóng | P3 | Basic Flow 1 (:102) + §4.2 bước 1 (:243); `IClock` một lần |
-| 7 | đã đóng | P3 | §0 :61 phạm vi quầy `RetailBill` rõ ràng |
-| 8 | đã đóng | P3 | §6.1 quy tắc 4 (:576) kiểm `Mode` hai chiều |
-| 9 | đã đóng (vòng 5 #2) | P3 | delta `pro-001` :467,:469 đổi sang tên mục |
+| 1 | đã đóng | P2 | §6.4 dòng 700: bỏ "latent/không lộ"; ghi `0101` reachable qua `/api/app` → `403` hiện tại, `PRO-001` map **trước khi có client** (đúng như đề nghị) |
+| 2 | đã đóng | P2 | `DanhGiaCandidateAsync` đảo về **cây trước, hết lượt sau** (`:342` trước `:368-421`, xác nhận bằng `Read` + graph); SRS A1 (v)/§3.3/§4.2/bước 6–7/§6.1 q8/§12/`TC-43` (ix)/`TC-66` (iv) hoàn nguyên theo `D-292`; voucher cây `false` không ném, cây `true` vẫn ném — khớp code |
+| 3 | đã đóng | P2 | Thêm `TC-72`…`TC-76` (mỗi luật 1 TC, có ca đột biến ĐỎ), DoD `57 → 62`, "Chưa làm" dòng 1395 ghi `qa` bổ sung `D-291` ⑥ |
+| 4 | đã đóng | P3 | Dòng 1344 thêm "(as-built N94; **N97 sửa additive** `Pricing` — `KhongGhiSoGiaiTrinh`)"; khớp `PriceCalculationDtos.cs:39-45` + `PriceCalculationAppService.cs:251-253` |
+| 5 | đã đóng | P3 | Dòng 1361 ghi 3 tệp test **đã có** từ N96 F4 |
+| 6 | đã đóng | P3 | Con trỏ `Subtotal` đổi sang `PriceCalculationAppService.cs:240` (dòng 525, 602, A2 (2a)); BR-11 dùng `TinhTienDon.cs:173` |
+| 7 | đã đóng | P3 | Dòng 102 + 943: "đường voucher **ghi** không xảy ra ca này (0118 trước engine); đường **chỉ đọc** cho qua candidate voucher vãng lai (`PromotionEngine.cs:392-401`) ⇒ `IsValid` có thể `true`, chỉ đọc, không mất lượt" — đúng code |
 
-## Vòng trước (chỉ vòng 2)
+## Giới hạn lượt kiểm
 
-<!-- Cột 2 KHÔNG phải "Mức": check-agent-artifact.ps1 đếm P1/P2 theo cột 2 của mọi bảng. Phát hiện còn mở phải chép lại vào bảng "Phát hiện". -->
-
-| # vòng 2 | Trạng thái | Mức lúc đó |
-|---|---|---|
-| 1 | đã đóng — `D-160` đã áp (A2 (2a)/(5), BR-11, enum `= 10`, `Subtotal` :517, `TC-48`/`TC-49`) | P2 |
-| 2 | đã đóng — candidate tự động hết lượt ⇒ bỏ qua + `UsageLimitHit` (Basic Flow 6, `TC-51`) | P2 |
-| 3 | đã đóng — quy tắc 8 (:575); BR-07, §7.4 #4; `TC-07` (c) | P2 |
-| 4 | đã đóng — `UsageSequence` (Basic Flow 7, `TC-43` (iv)–(vi), `D-161`) | P2 |
-| 5 | đã đóng — `promotion-expiry` kiêm kích hoạt (§7.2 #5, §8.2 #5, `TC-50`) | P2 |
-| 6 | đã đóng — khoá lưu cây có `TreeVersion` (:673, :762), `TC-28` (f) | P2 |
-| 7 | đã đóng — route `POST /api/app/promotion` (:608) | P3 |
-| 8 | đã đóng — route theo quy ước ABP + 🔶 chưa đo (:609-617) | P3 |
-| 9 | đã đóng — `TC-13` (a)–(d); (a) đổi `Percentage` 100 % | P3 |
-| 10 | đã đóng — §10.2 :813 lấy từ `EvaluateAsync` | P3 |
-| 11 | đã đóng — dòng trống trước `**Idempotency key**` (:754) | P3 |
-| 12 | đã đóng — record `PromotionBreakdownItem` (:525-530) | P3 |
+- Vòng 2 chỉ kiểm **đúng 7 phát hiện vòng 1** + phần thân bị chúng chạm; **không** khảo sát lại toàn văn. Các mục không đọc lại toàn văn ở vòng 1: header 1–19, §6.3 phần 612–640, §7 (702–765), §8 (765–855), §9, §11 (898–918), §13 (964–1004), §14.1–14.2 (1004–1155) — **chưa khẳng định bằng 0** mâu thuẫn mới ở đó.
+- D4: không có khối `sql` ⇒ không chạy; không kết nối PostgreSQL (0 migration).
+- Chưa chạy `dotnet build`/`dotnet test`/`pnpm`/`check:mermaid` (vai chỉ đọc bị hook chặn). Kết luận code là **đọc mã**, không phải exit code; test `TC-72`…`TC-76` **chưa tồn tại** (chủ `qa`, đã ghi trong SRS dòng 1395).

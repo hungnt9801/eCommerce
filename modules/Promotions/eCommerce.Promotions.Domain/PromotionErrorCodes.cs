@@ -38,4 +38,17 @@ public static class PromotionErrorCodes
 
     /// <summary>`SystemName` **có dòng** ở `ProPromotionRuleCosts` nhưng không còn trong registry. HTTP `400`.</summary>
     public const string RuleNotRegistered = "eCommerce:Promotion:0010";
+
+    // ── Mã thuộc dải `01xx` của `PRO-001` (`D-144`/`D-147`), dùng ở ENGINE `PRO-002` khi nguồn candidate là
+    //    MÃ khách nhập (`D-291` ② P2 #4: "hết lượt ⇒ NÉM đúng mã đã cấp; cấm đặt mã mới"). Chỉ KHAI hằng ở
+    //    class MỘT của miền; map HTTP để `PRO-001` đặt ở WP của nó (không nhân đôi tại `PRO-002`).
+
+    /// <summary>Mã không tồn tại (mã `PRO-001` `0101`, `D-144`). HTTP `404`.</summary>
+    public const string VoucherNotFound = "eCommerce:Promotion:0101";
+
+    /// <summary>Vượt `MaxUsagePerCustomer` của mã (mã `PRO-001` `0104`, `D-144`). HTTP `409`.</summary>
+    public const string CustomerUsageLimitExceeded = "eCommerce:Promotion:0104";
+
+    /// <summary>Hết lượt **mức promotion** (`MaxUsageTotal`; mã `PRO-001` `0119`, `D-147`). HTTP `409`.</summary>
+    public const string PromotionUsageLimitExceeded = "eCommerce:Promotion:0119";
 }

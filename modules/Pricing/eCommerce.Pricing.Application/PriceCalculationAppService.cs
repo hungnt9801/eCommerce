@@ -248,21 +248,26 @@ public class PriceCalculationAppService : ApplicationService, IPriceCalculationA
         // ── 🔒 GHI SỔ GIẢI TRÌNH (append-only, ADR-13) ────────────────────────────────────────
         // 📌 Ghi **sau khi** tính xong và **trước khi** trả: nếu ghi sau khi trả mà request đứt thì đơn có giá
         // nhưng **không có bằng chứng** vì sao. Bản ghi chứa **payload đầy đủ** (từng dòng + ứng viên + cấp thắng).
-        var soGiaiTrinh = new PriceCalculationRecord(
-            GuidGenerator.Create(),
-            khoa,
-            input.ChannelCode.Trim(),
-            input.ChannelShopId,
-            chinhSach.At,
-            ketQua.RoundingPolicyCode,
-            ketQua.CurrencyCode,
-            ketQua.Subtotal, ketQua.TotalDiscount, ketQua.TotalFee, ketQua.TotalTax, ketQua.Total,
-            JsonSerializer.Serialize(ketQua));
+        // 🆕 `D-291` ② P2 #2: `KhongGhiSoGiaiTrinh = true` ⇒ lượt **đọc trước** (dò `Subtotal` cho engine KM) —
+        // KHÔNG ghi sổ, để lượt tính chính thức không bị nhân đôi bản ghi.
+        if (!input.KhongGhiSoGiaiTrinh)
+        {
+            var soGiaiTrinh = new PriceCalculationRecord(
+                GuidGenerator.Create(),
+                khoa,
+                input.ChannelCode.Trim(),
+                input.ChannelShopId,
+                chinhSach.At,
+                ketQua.RoundingPolicyCode,
+                ketQua.CurrencyCode,
+                ketQua.Subtotal, ketQua.TotalDiscount, ketQua.TotalFee, ketQua.TotalTax, ketQua.Total,
+                JsonSerializer.Serialize(ketQua));
 
-        await _soGiaiTrinhRepository.InsertAsync(soGiaiTrinh, autoSave: true);
+            await _soGiaiTrinhRepository.InsertAsync(soGiaiTrinh, autoSave: true);
 
-        Logger.LogInformation("Đã GHI SỔ GIẢI TRÌNH {Id} cho khoá {Khoa} (append-only — không sửa, không xoá).",
-            soGiaiTrinh.Id, khoa);
+            Logger.LogInformation("Đã GHI SỔ GIẢI TRÌNH {Id} cho khoá {Khoa} (append-only — không sửa, không xoá).",
+                soGiaiTrinh.Id, khoa);
+        }
 
         return ketQua;
     }

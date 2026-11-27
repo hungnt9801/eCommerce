@@ -15,7 +15,7 @@ public interface IPromotionAppService : IApplicationService
 
     Task<PromotionDto> CreateAsync(CreatePromotionDto input);
 
-    Task<PromotionEvaluationResultDto> EvaluateAsync(PromotionEvaluateInput input);
+    Task<PromotionEvaluationResultDto> EvaluateAsync(PromotionEvaluateInput input, CancellationToken cancellationToken = default);
 
     Task<PromotionTreeValidationResultDto> SaveTreeAsync(Guid id, PromotionTreeInput input);
 
@@ -23,7 +23,7 @@ public interface IPromotionAppService : IApplicationService
 
     Task<PromotionDto> SetStatusAsync(Guid id, SetPromotionStatusInput input);
 
-    Task<VoucherValidationDto> ValidateVoucherAsync(ValidateVoucherInput input);
+    Task<VoucherValidationDto> ValidateVoucherAsync(ValidateVoucherInput input, CancellationToken cancellationToken = default);
 
     Task<PagedResultDto<RedemptionDto>> GetRedemptionsAsync(Guid orderId);
 

@@ -132,17 +132,42 @@ public class CheckoutAppService : ApplicationService, ICheckoutAppService
             "false",
             StringComparison.OrdinalIgnoreCase);
 
+        // Dựng dòng giỏ MỘT LẦN cho cả lượt dò giá lẫn lượt tính chính thức (cùng cửa `TinhGioAsync`).
+        var itemTinhGia = input.Items.Select(x => new DongGioInput
+        {
+            Sku = x.Sku,
+            Quantity = x.Quantity,
+            TaxRate = x.TaxRate,
+            ListPrice = x.ListPrice
+        }).ToList();
+
         if (batKhuyenMai)
         {
-            var subtotal = input.Items.Sum(x => (x.ListPrice ?? 0m) * x.Quantity);
+            // `D-291` ② P2 #2 — `Subtotal` (== `tongTruocGiam`) và `Currency` PHẢI lấy từ **pipeline giá**;
+            // KHÔNG `Sum(ListPrice × Quantity)` (ListPrice chỉ là giá niêm yết fallback) và KHÔNG hard-code
+            // `"VND"` (đơn ngoại tệ sẽ lệch `Money` — `XC-001`). Lượt DÒ dùng cờ additive
+            // `KhongGhiSoGiaiTrinh = true` ⇒ KHÔNG ghi sổ giải trình (lượt tính chính thức bên dưới mới ghi,
+            // `ADR-13` giữ).
+            var giaTruoc = await _tinhGia.TinhGioAsync(new TinhGioInput
+            {
+                ChannelCode = input.ChannelCode,
+                ChannelShopId = input.ChannelShopId,
+                OrderDiscount = 0m,
+                OrderFee = input.OrderFee,
+                At = at,
+                IdempotencyKey = khoa,
+                KhongGhiSoGiaiTrinh = true,
+                Items = itemTinhGia
+            });
+
             var kqKhuyenMai = await _khuyenMai.EvaluateAsync(new PromotionEvaluationRequest(
                 CheckoutSessionId: Guid.Empty, // engine KHÔNG dùng; khoá idempotency thuộc bước ghi của Sales
                 Lines: input.Items
                     .Select(x => new PromotionCartLine(x.Sku, x.Quantity, x.ListPrice ?? 0m))
                     .ToList(),
                 ChannelCode: input.ChannelCode,
-                Currency: "VND",
-                Subtotal: subtotal,
+                Currency: giaTruoc.CurrencyCode,
+                Subtotal: giaTruoc.Subtotal,
                 CustomerId: input.CustomerId,
                 CustomerGroupId: null, // Q26 fail-closed: Sales chưa nạp nhóm khách
                 IsFirstOrder: null,     // Q26 fail-closed
@@ -160,13 +185,7 @@ public class CheckoutAppService : ApplicationService, ICheckoutAppService
             OrderFee = input.OrderFee,
             At = at,
             IdempotencyKey = khoa,
-            Items = input.Items.Select(x => new DongGioInput
-            {
-                Sku = x.Sku,
-                Quantity = x.Quantity,
-                TaxRate = x.TaxRate,
-                ListPrice = x.ListPrice
-            }).ToList()
+            Items = itemTinhGia
         });
 
         // ── ③ GIỮ CHỖ TỪNG DÒNG (cùng transaction) ─────────────────────────────────────────────────

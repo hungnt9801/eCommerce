@@ -138,5 +138,8 @@ public class EfPromotionDataSource : IPromotionDataSource, ITransientDependency
                 .OrderBy(x => x.SortOrder).ThenBy(x => x.Id)
                 .Select(x => new PromotionConditionData(
                     x.Id, x.ParentId, x.IsGroup, x.InteractionType, x.RuleSystemName, x.SortOrder, x.Depth))
-                .ToList());
+                .ToList(),
+            // `D-291` ① P1 #1 — mang trạng thái vào candidate; engine guard fail-closed ở đường voucher.
+            p.Status,
+            voucher?.Status);
 }

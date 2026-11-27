@@ -34,7 +34,13 @@ public sealed record PromotionCandidateData(
     int? VoucherMaxUsage,
     int VoucherUsedCount,
     int VoucherReservedCount,
-    IReadOnlyList<PromotionConditionData> Conditions);
+    IReadOnlyList<PromotionConditionData> Conditions,
+    // 🆕 `D-291` ① P1 #1 — trạng thái để engine guard **fail-closed** ở đường voucher (`Status == Active`
+    // **và** `VoucherCode.Status != Revoked`). Mặc định `Active`/`null` để không phá caller cũ; nguồn thật
+    // (`EfPromotionDataSource.Map`) **luôn** điền tường minh. `Status` khác `Active` hoặc voucher `Revoked`
+    // ⇒ engine coi như **không có candidate** (không áp, 0 đồng).
+    PromotionStatus Status = PromotionStatus.Active,
+    VoucherCodeStatus? VoucherStatus = null);
 
 /// <summary>
 /// **CỔNG NẠP DỮ LIỆU** cho engine — tách khỏi `IRepository` để engine test được **không cần DB**

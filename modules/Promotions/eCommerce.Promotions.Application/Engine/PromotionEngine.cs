@@ -103,6 +103,16 @@ public class PromotionEngine : IPromotionEngine, ITransientDependency
         if (coMa)
         {
             voucher = await _data.FindVoucherCandidateAsync(request.VoucherCode!.Trim(), cancellationToken);
+
+            // `D-291` ② P2 #4 — mã **không tồn tại** (không có dòng `ProVoucherCodes`/promotion) ⇒ **NÉM**
+            // đúng mã đã cấp `0101` (`D-144`), KHÔNG trả `NoCandidate` im lặng. (Voucher tồn tại nhưng
+            // promotion không `Active`/voucher `Revoked` thì vẫn tạo candidate rồi bị guard trạng thái từ chối
+            // mềm ở `DanhGiaCandidateAsync` ⇒ `Applied=false` theo `D-291` ②.)
+            if (voucher is null)
+            {
+                throw new BusinessException(PromotionErrorCodes.VoucherNotFound)
+                    .WithData("code", request.VoucherCode!.Trim());
+            }
         }
 
         var autos = await _data.ListAutoCandidatesAsync(now, request.ChannelCode, cancellationToken);
@@ -243,6 +253,19 @@ public class PromotionEngine : IPromotionEngine, ITransientDependency
             lyDoTong = outcomes.Select(x => x.Reason).FirstOrDefault(r => r is not null);
         }
 
+        // `D-291` ② P2 #3/#4 — kết quả RIÊNG của voucher, additive; `Applied` chỉ true khi chính voucher được
+        // nhận (không phụ thuộc candidate tự động). Lý do của kênh voucher vẫn hiện kể cả khi auto áp.
+        PromotionVoucherOutcome? ketQuaVoucher = null;
+        if (voucherOutcome is not null)
+        {
+            var voucherDuocNhan = voucherOutcome.Satisfied;
+            ketQuaVoucher = new PromotionVoucherOutcome(
+                voucherOutcome.Data.PromotionId,
+                voucherDuocNhan,
+                voucherDuocNhan ? (voucherOutcome.Discount?.Amount ?? 0m) : 0m,
+                voucherDuocNhan ? null : voucherOutcome.Reason);
+        }
+
         return new PromotionEvaluationResult(
             daAp,
             tong.Amount,
@@ -250,7 +273,8 @@ public class PromotionEngine : IPromotionEngine, ITransientDependency
             breakdown,
             lyDoTong,
             dem.LeafVisits,
-            dem.Comparisons);
+            dem.Comparisons,
+            ketQuaVoucher);
     }
 
     private async Task<Outcome> DanhGiaCandidateAsync(
@@ -263,14 +287,25 @@ public class PromotionEngine : IPromotionEngine, ITransientDependency
         Dem dem,
         CancellationToken ct)
     {
+        var outcome = new Outcome(candidate, isVoucherSource);
+
+        // `D-291` ① P1 #1 — GUARD TRẠNG THÁI **fail-closed** ở đường voucher: chỉ áp khi promotion
+        // `Status == Active` **và** voucher **không** `Revoked` (đối xứng `ListAutoCandidatesAsync` đã lọc
+        // `Status == Active`). Trạng thái lạ/không đạt ⇒ coi như **không có candidate**: `Applied=false`,
+        // 0 đồng, lý do hiện trong kết quả — **không** chạy guard tĩnh/validate cây của promotion đã tạm dừng.
+        if (isVoucherSource
+            && (candidate.Status != PromotionStatus.Active || candidate.VoucherStatus == VoucherCodeStatus.Revoked))
+        {
+            outcome.Reason = PromotionRejectionReason.NoCandidate;
+            return outcome;
+        }
+
         var nodes = candidate.Conditions
             .Select(x => new PromotionConditionNode(x.Id, x.ParentId, x.IsGroup, x.InteractionType, x.RuleSystemName, x.SortOrder, x.Depth))
             .ToList();
 
         // Guard TĨNH — NÉM ở MỌI nguồn (0001/0002/0004/0010).
         PromotionTreeValidator.Validate(nodes, limits, _registry.SystemNames, knownRows, costs);
-
-        var outcome = new Outcome(candidate, isVoucherSource);
 
         // Khung hiệu lực + kênh (candidate tự động đã lọc; voucher thì kiểm ở đây).
         var now = context.NowUtc;
@@ -295,44 +330,9 @@ public class PromotionEngine : IPromotionEngine, ITransientDependency
             return outcome;
         }
 
-        // Kiểm lượt — CHỈ ĐỌC (CR-7).
-        if (isVoucherSource && candidate.VoucherMaxUsage is not null
-            && candidate.VoucherUsedCount + candidate.VoucherReservedCount >= candidate.VoucherMaxUsage.Value)
-        {
-            throw new BusinessException(PromotionErrorCodes.UsageLimitExceeded)
-                .WithData("voucherCodeId", candidate.VoucherCodeId ?? Guid.Empty);
-        }
-
-        if (candidate.MaxUsageTotal is not null
-            && candidate.UsedCount + candidate.ReservedCount >= candidate.MaxUsageTotal.Value)
-        {
-            outcome.Reason = PromotionRejectionReason.UsageLimitHit;
-            _metrics.PromotionUsageLimitHit.Add(1, new KeyValuePair<string, object?>(eCommerceMetricTags.Kind, candidate.Kind.ToString()));
-            return outcome;
-        }
-
-        if (candidate.MaxUsagePerCustomer is not null)
-        {
-            if (context.CustomerId is null)
-            {
-                if (!isVoucherSource)
-                {
-                    outcome.Reason = PromotionRejectionReason.CustomerRequired;
-                    return outcome;
-                }
-            }
-            else
-            {
-                var daDung = await _data.CountCustomerUsageAsync(candidate.PromotionId, context.CustomerId.Value, ct);
-                if (daDung >= candidate.MaxUsagePerCustomer.Value)
-                {
-                    outcome.Reason = PromotionRejectionReason.UsageLimitHit;
-                    _metrics.PromotionUsageLimitHit.Add(1, new KeyValuePair<string, object?>(eCommerceMetricTags.Kind, candidate.Kind.ToString()));
-                    return outcome;
-                }
-            }
-        }
-
+        // ── `D-292` — DUYỆT CÂY **TRƯỚC** KHI KIỂM HẾT LƯỢT (đúng `D-161`(1)/`D-162`(3): cây → khách → ghép →
+        //    tiền → trần). Cây `false` ⇒ `ConditionFalse` — KHÔNG bao giờ mang `CustomerRequired`/`UsageLimitHit`;
+        //    voucher cây `false` + hết lượt ⇒ `ConditionFalse` **không ném** (chỉ ném khi cây `true`).
         // Duyệt cây — ngắn mạch, đếm ngân sách, KHÔNG I/O.
         var ruleContext = new PromotionRuleContext(
             context.Lines, context.ChannelCode, context.MaTienTe.Code, context.Subtotal.Amount,
@@ -365,6 +365,62 @@ public class PromotionEngine : IPromotionEngine, ITransientDependency
             return outcome;
         }
 
+        // Kiểm lượt — CHỈ ĐỌC (CR-7) — nay chỉ chạy **sau** khi cây `true` (`D-292`).
+        if (isVoucherSource && candidate.VoucherMaxUsage is not null
+            && candidate.VoucherUsedCount + candidate.VoucherReservedCount >= candidate.VoucherMaxUsage.Value)
+        {
+            throw new BusinessException(PromotionErrorCodes.UsageLimitExceeded)
+                .WithData("voucherCodeId", candidate.VoucherCodeId ?? Guid.Empty);
+        }
+
+        if (candidate.MaxUsageTotal is not null
+            && candidate.UsedCount + candidate.ReservedCount >= candidate.MaxUsageTotal.Value)
+        {
+            // `D-291` ② P2 #4 — hết lượt **mức promotion** ở nguồn voucher ⇒ **NÉM** `0119` (`D-147`);
+            // nguồn tự động ⇒ bỏ candidate + `UsageLimitHit` (không ném — BR-07/A4).
+            if (isVoucherSource)
+            {
+                throw new BusinessException(PromotionErrorCodes.PromotionUsageLimitExceeded)
+                    .WithData("promotionId", candidate.PromotionId);
+            }
+
+            outcome.Reason = PromotionRejectionReason.UsageLimitHit;
+            _metrics.PromotionUsageLimitHit.Add(1, new KeyValuePair<string, object?>(eCommerceMetricTags.Kind, candidate.Kind.ToString()));
+            return outcome;
+        }
+
+        if (candidate.MaxUsagePerCustomer is not null)
+        {
+            if (context.CustomerId is null)
+            {
+                if (!isVoucherSource)
+                {
+                    outcome.Reason = PromotionRejectionReason.CustomerRequired;
+                    return outcome;
+                }
+            }
+            else
+            {
+                var daDung = await _data.CountCustomerUsageAsync(candidate.PromotionId, context.CustomerId.Value, ct);
+                if (daDung >= candidate.MaxUsagePerCustomer.Value)
+                {
+                    // `D-291` ② P2 #4 — vượt trần **mức khách** ở nguồn voucher ⇒ **NÉM** `0104` (`D-144`);
+                    // nguồn tự động ⇒ bỏ candidate + `UsageLimitHit`.
+                    if (isVoucherSource)
+                    {
+                        throw new BusinessException(PromotionErrorCodes.CustomerUsageLimitExceeded)
+                            .WithData("promotionId", candidate.PromotionId)
+                            .WithData("customerId", context.CustomerId!.Value);
+                    }
+
+                    outcome.Reason = PromotionRejectionReason.UsageLimitHit;
+                    _metrics.PromotionUsageLimitHit.Add(1, new KeyValuePair<string, object?>(eCommerceMetricTags.Kind, candidate.Kind.ToString()));
+                    return outcome;
+                }
+            }
+        }
+
+        // Duyệt cây đã chạy **trước** khối kiểm lượt (`D-292`); tới đây cây chắc chắn `true`.
         outcome.Satisfied = true;
         outcome.Discount = PromotionDiscountCalculator.Tinh(
             candidate.DiscountKind, candidate.DiscountValue, candidate.MaxDiscountAmount,
