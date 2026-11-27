@@ -7,7 +7,7 @@
   "nhanhGoc": "main",
   "refs": "D-216",
   "ghiChu": "Phương án B (D-216): mỗi WP một nhánh cắt từ đỉnh tich-hop/gd3; dong-wp đẩy fast-forward vào tich-hop/gd3 (M3, D-114); PR xếp chồng mở một lần cuối chuỗi.",
-  "capNhat": "2026-11-27T19:10:27+07:00",
+  "capNhat": "2026-11-27T20:54:49+07:00",
   "rows": [
     {
       "id": "W16-1",
@@ -650,16 +650,17 @@
       "dependsOn": [
         "W24-4"
       ],
-      "status": "dang-lam",
+      "status": "xong",
       "phien": [
         "N98"
       ],
       "nhanh": "feat/gd3-wp24-dieu-kien-km",
       "buoc": "F6–G6",
-      "evidence": null,
+      "evidence": "G6 kiem-tat-ca -DayDu exit 0 (20/20, ~840.6s): unit 2477/2477, integration 156/156, E2E 167/167, Playwright 8/8, DB 25/25, test cong 60/60; build 0 error/9 warning; D-293/D-294; deploy doc docs/ops/PRO-002-deploy.md co duong lui; push FF tich-hop/gd3 84157a1..6645b19",
       "ghiChu": null,
-      "handover": null,
-      "batDau": "2026-11-27T19:10:27+07:00"
+      "handover": "docs/nhanh/handover-n98.md",
+      "batDau": "2026-11-27T19:10:27+07:00",
+      "xongLuc": "2026-11-27T20:54:49+07:00"
     },
     {
       "id": "W25-0",
