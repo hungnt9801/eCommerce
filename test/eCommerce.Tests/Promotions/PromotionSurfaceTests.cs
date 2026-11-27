@@ -93,19 +93,51 @@ public class PromotionSurfaceTests
         Assert.Equal(0, viPham);
     }
 
+    /// <summary>
+    /// `PRO-001-arch` §2.2 (`D-306`) — allowlist **ĐÚNG 2** namespace Messaging mà `Promotions.Application` được
+    /// `using`: `EventCoverage` (có sẵn) + `Idempotency` (thêm cho `BR-02`/`D-305`). **Không** wildcard, **không**
+    /// allow-all. 🚨 Danh sách này là chốt DUY NHẤT — thêm namespace thứ ba phải sửa tường minh + có lý do.
+    /// </summary>
+    private static readonly string[] AllowlistMessaging =
+    [
+        "using eCommerce.Messaging.EventCoverage;",
+        "using eCommerce.Messaging.Idempotency;"
+    ];
+
+    private static List<string> ViPhamMessaging(IEnumerable<string> dong)
+        => dong.Select(l => l.Trim())
+            .Where(l => l.StartsWith("using eCommerce.Messaging", StringComparison.Ordinal))
+            .Where(l => !AllowlistMessaging.Contains(l, StringComparer.Ordinal))
+            .ToList();
+
     [Fact]
-    public void RanhGioi__Promotions_Application_chi_dung_Messaging_EventCoverage()
+    public void RanhGioi__Promotions_Application_chi_dung_2_namespace_Messaging()
     {
         var goc = Path.Combine(Goc(), "modules/Promotions/eCommerce.Promotions.Application");
         var usings = Directory.EnumerateFiles(goc, "*.cs", SearchOption.AllDirectories)
             .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
                         && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
-            .SelectMany(File.ReadAllLines)
-            .Select(l => l.Trim())
-            .Where(l => l.StartsWith("using eCommerce.Messaging", StringComparison.Ordinal))
-            .ToList();
+            .SelectMany(File.ReadAllLines);
 
-        Assert.All(usings, u => Assert.Equal("using eCommerce.Messaging.EventCoverage;", u));
+        Assert.Equal(2, AllowlistMessaging.Length);
+        Assert.Empty(ViPhamMessaging(usings));
+    }
+
+    /// <summary>
+    /// 🚨 Chống "nới thành allow-all": allowlist **phải bắt** namespace lạ. Nếu ai đổi sang kiểm
+    /// `StartsWith("using eCommerce.Messaging")` (luôn đúng) thì ca này **ĐỎ**.
+    /// </summary>
+    [Fact]
+    public void RanhGioi__allowlist_KHONG_phai_allow_all__namespace_la_bi_bat()
+    {
+        var viPham = ViPhamMessaging(
+        [
+            "using eCommerce.Messaging.EventCoverage;",
+            "using eCommerce.Messaging.Idempotency;",
+            "using eCommerce.Messaging.Outbox;"
+        ]);
+
+        Assert.Equal(["using eCommerce.Messaging.Outbox;"], viPham);
     }
 
     [Fact]
