@@ -4476,3 +4476,242 @@ VALUES ('20261126181842_Wp26_VanHanh_BaoCao', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE TABLE "ProPromotionRuleCosts" (
+    "Id" character varying(128) NOT NULL,
+    "CostKind" character varying(16) NOT NULL,
+    "DeclaredCostFactor" integer NOT NULL,
+    "RequiresVerifiedCod" boolean NOT NULL,
+    "RetiredAtUtc" timestamp with time zone,
+    CONSTRAINT "PK_ProPromotionRuleCosts" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_ProPromotionRuleCosts_DeclaredCostFactor" CHECK ("DeclaredCostFactor" >= 1)
+);
+
+CREATE TABLE "ProPromotions" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "Code" character varying(64) NOT NULL,
+    "Name" character varying(256) NOT NULL,
+    "Kind" character varying(32) NOT NULL,
+    "Status" character varying(32) NOT NULL,
+    "IsCumulative" boolean NOT NULL,
+    "Priority" integer NOT NULL,
+    "ChannelScope" character varying(64),
+    "StartsAtUtc" timestamp with time zone NOT NULL,
+    "EndsAtUtc" timestamp with time zone,
+    "TreeVersion" integer NOT NULL,
+    "MaxUsageTotal" integer,
+    "UsedCount" integer NOT NULL,
+    "ReservedCount" integer NOT NULL,
+    "MaxUsagePerCustomer" integer,
+    "DiscountKind" character varying(16) NOT NULL,
+    "DiscountValue" numeric(18,4) NOT NULL,
+    "MaxDiscountAmount" numeric(18,4),
+    "MinOrderAmount" numeric(18,4),
+    "Currency" character(3) NOT NULL,
+    "RowVersion" bytea,
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_ProPromotions" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_ProPromotions_Currency" CHECK ("Currency" ~ '^[A-Z]{3}$'),
+    CONSTRAINT "CK_ProPromotions_DiscountKind_NotFreeShipping" CHECK ("DiscountKind" <> 'FreeShipping'),
+    CONSTRAINT "CK_ProPromotions_DiscountValue" CHECK ("DiscountValue" >= 0),
+    CONSTRAINT "CK_ProPromotions_Kind_NotFlashSale" CHECK ("Kind" <> 'FlashSale'),
+    CONSTRAINT "CK_ProPromotions_Percentage" CHECK ("DiscountKind" <> 'Percentage' OR ("DiscountValue" <= 100 AND "MaxDiscountAmount" IS NOT NULL)),
+    CONSTRAINT "CK_ProPromotions_Usage" CHECK ("UsedCount" >= 0 AND "ReservedCount" >= 0 AND ("MaxUsageTotal" IS NULL OR "UsedCount" + "ReservedCount" <= "MaxUsageTotal")),
+    CONSTRAINT "CK_ProPromotions_Window" CHECK ("EndsAtUtc" IS NULL OR "EndsAtUtc" > "StartsAtUtc")
+);
+
+CREATE TABLE "ProFlashSaleSlots" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "PromotionId" uuid NOT NULL,
+    "Sku" character varying(64) NOT NULL,
+    "SalePrice" numeric(18,4) NOT NULL,
+    "Currency" character(3) NOT NULL,
+    "QuantityLimit" numeric(18,3) NOT NULL,
+    "SoldCount" numeric(18,3) NOT NULL,
+    CONSTRAINT "PK_ProFlashSaleSlots" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_ProFlashSaleSlots_Slot" CHECK ("SalePrice" >= 0 AND "SoldCount" >= 0 AND "SoldCount" <= "QuantityLimit"),
+    CONSTRAINT "FK_ProFlashSaleSlots_ProPromotions_PromotionId" FOREIGN KEY ("PromotionId") REFERENCES "ProPromotions" ("Id") ON DELETE RESTRICT
+);
+
+CREATE TABLE "ProPromotionConditions" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "PromotionId" uuid NOT NULL,
+    "ParentId" uuid,
+    "IsGroup" boolean NOT NULL,
+    "InteractionType" character varying(8),
+    "RuleSystemName" character varying(128),
+    "ConfigJson" jsonb,
+    "SortOrder" integer NOT NULL,
+    "Depth" integer NOT NULL,
+    CONSTRAINT "PK_ProPromotionConditions" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_ProPromotionConditions_Depth" CHECK ("Depth" BETWEEN 1 AND 8),
+    CONSTRAINT "CK_ProPromotionConditions_InteractionType" CHECK (NOT "IsGroup" OR "InteractionType" IN ('And','Or')),
+    CONSTRAINT "CK_ProPromotionConditions_NodeLai" CHECK (("IsGroup" AND "InteractionType" IS NOT NULL AND "RuleSystemName" IS NULL) OR (NOT "IsGroup" AND "InteractionType" IS NULL AND "RuleSystemName" IS NOT NULL)),
+    CONSTRAINT "CK_ProPromotionConditions_ParentKhacId" CHECK ("ParentId" IS NULL OR "ParentId" <> "Id"),
+    CONSTRAINT "CK_ProPromotionConditions_SortOrder" CHECK ("SortOrder" >= 0),
+    CONSTRAINT "FK_ProPromotionConditions_ProPromotionConditions_ParentId" FOREIGN KEY ("ParentId") REFERENCES "ProPromotionConditions" ("Id") ON DELETE RESTRICT,
+    CONSTRAINT "FK_ProPromotionConditions_ProPromotions_PromotionId" FOREIGN KEY ("PromotionId") REFERENCES "ProPromotions" ("Id") ON DELETE CASCADE
+);
+
+CREATE TABLE "ProPromotionMappings" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "PromotionId" uuid NOT NULL,
+    "TargetType" character varying(16) NOT NULL,
+    "TargetId" uuid NOT NULL,
+    "Mode" character varying(16) NOT NULL,
+    CONSTRAINT "PK_ProPromotionMappings" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_ProPromotionMappings_TargetType" CHECK ("TargetType" NOT IN ('Sku','Category','Brand')),
+    CONSTRAINT "FK_ProPromotionMappings_ProPromotions_PromotionId" FOREIGN KEY ("PromotionId") REFERENCES "ProPromotions" ("Id") ON DELETE RESTRICT
+);
+
+CREATE TABLE "ProVoucherCodes" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "PromotionId" uuid NOT NULL,
+    "Code" character varying(64) NOT NULL,
+    "MaxUsage" integer NOT NULL,
+    "UsedCount" integer NOT NULL,
+    "ReservedCount" integer NOT NULL,
+    "Status" character varying(16) NOT NULL,
+    "RowVersion" bytea,
+    CONSTRAINT "PK_ProVoucherCodes" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_ProVoucherCodes_Usage" CHECK ("UsedCount" >= 0 AND "ReservedCount" >= 0 AND "UsedCount" + "ReservedCount" <= "MaxUsage"),
+    CONSTRAINT "FK_ProVoucherCodes_ProPromotions_PromotionId" FOREIGN KEY ("PromotionId") REFERENCES "ProPromotions" ("Id") ON DELETE RESTRICT
+);
+
+CREATE TABLE "ProPromotionRedemptions" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "PromotionId" uuid NOT NULL,
+    "VoucherCodeId" uuid,
+    "OrderId" uuid,
+    "Status" integer NOT NULL,
+    "ExpiresAtUtc" timestamp with time zone,
+    "UsageSequence" integer NOT NULL,
+    "ReasonCode" character varying(32),
+    "CustomerId" uuid,
+    "AppliedAtUtc" timestamp with time zone,
+    "ReleasedAtUtc" timestamp with time zone,
+    "ReversedAtUtc" timestamp with time zone,
+    "IdempotencyKey" character varying(256) NOT NULL,
+    "DiscountAmount" numeric(18,4) NOT NULL,
+    "Currency" character(3) NOT NULL,
+    "BreakdownJson" jsonb NOT NULL,
+    "TreeVersion" integer NOT NULL,
+    "EvaluatedAtUtc" timestamp with time zone NOT NULL,
+    CONSTRAINT "PK_ProPromotionRedemptions" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_ProPromotionRedemptions_AppliedAt" CHECK ("Status" <> 1 OR "AppliedAtUtc" IS NOT NULL),
+    CONSTRAINT "CK_ProPromotionRedemptions_Currency" CHECK ("Currency" ~ '^[A-Z]{3}$'),
+    CONSTRAINT "CK_ProPromotionRedemptions_DiscountAmount" CHECK ("DiscountAmount" >= 0),
+    CONSTRAINT "CK_ProPromotionRedemptions_ReasonCode" CHECK ("Status" NOT IN (2, 3) OR "ReasonCode" IS NOT NULL),
+    CONSTRAINT "CK_ProPromotionRedemptions_ReleasedAt" CHECK ("Status" <> 2 OR "ReleasedAtUtc" IS NOT NULL),
+    CONSTRAINT "CK_ProPromotionRedemptions_ReservedExpires" CHECK ("Status" <> 0 OR "ExpiresAtUtc" IS NOT NULL),
+    CONSTRAINT "CK_ProPromotionRedemptions_ReversedAt" CHECK ("Status" <> 3 OR "ReversedAtUtc" IS NOT NULL),
+    CONSTRAINT "CK_ProPromotionRedemptions_UsageSequence" CHECK ("UsageSequence" >= 1),
+    CONSTRAINT "FK_ProPromotionRedemptions_ProPromotions_PromotionId" FOREIGN KEY ("PromotionId") REFERENCES "ProPromotions" ("Id") ON DELETE RESTRICT,
+    CONSTRAINT "FK_ProPromotionRedemptions_ProVoucherCodes_VoucherCodeId" FOREIGN KEY ("VoucherCodeId") REFERENCES "ProVoucherCodes" ("Id") ON DELETE RESTRICT
+);
+
+CREATE INDEX "IX_ProFlashSaleSlots_PromotionId" ON "ProFlashSaleSlots" ("PromotionId");
+
+CREATE INDEX "IX_ProFlashSaleSlots_TenantId_PromotionId" ON "ProFlashSaleSlots" ("TenantId", "PromotionId");
+
+CREATE UNIQUE INDEX "IX_ProPromotionConditions_MotGoc" ON "ProPromotionConditions" ("TenantId", "PromotionId") WHERE "ParentId" IS NULL;
+
+CREATE INDEX "IX_ProPromotionConditions_ParentId" ON "ProPromotionConditions" ("ParentId");
+
+CREATE INDEX "IX_ProPromotionConditions_PromotionId" ON "ProPromotionConditions" ("PromotionId");
+
+CREATE UNIQUE INDEX "IX_ProPromotionConditions_Tenant_Promotion_Parent_Sort" ON "ProPromotionConditions" ("TenantId", "PromotionId", "ParentId", "SortOrder");
+
+CREATE INDEX "IX_ProPromotionMappings_PromotionId" ON "ProPromotionMappings" ("PromotionId");
+
+CREATE INDEX "IX_ProPromotionMappings_TenantId_PromotionId" ON "ProPromotionMappings" ("TenantId", "PromotionId");
+
+CREATE INDEX "IX_ProPromotionRedemptions_PromotionId" ON "ProPromotionRedemptions" ("PromotionId");
+
+CREATE UNIQUE INDEX "IX_ProPromotionRedemptions_TenantId_IdempotencyKey" ON "ProPromotionRedemptions" ("TenantId", "IdempotencyKey");
+
+CREATE UNIQUE INDEX "IX_ProPromotionRedemptions_TenantId_OrderId_Voucher" ON "ProPromotionRedemptions" ("TenantId", "OrderId") WHERE "OrderId" IS NOT NULL AND "VoucherCodeId" IS NOT NULL;
+
+CREATE UNIQUE INDEX "IX_ProPromotionRedemptions_TenantId_PromotionId_OrderId_TuDong" ON "ProPromotionRedemptions" ("TenantId", "PromotionId", "OrderId") WHERE "OrderId" IS NOT NULL AND "VoucherCodeId" IS NULL;
+
+CREATE INDEX "IX_ProPromotionRedemptions_TenantId_Status_ExpiresAtUtc" ON "ProPromotionRedemptions" ("TenantId", "Status", "ExpiresAtUtc");
+
+CREATE INDEX "IX_ProPromotionRedemptions_VoucherCodeId" ON "ProPromotionRedemptions" ("VoucherCodeId");
+
+CREATE UNIQUE INDEX "IX_ProPromRedemptions_Tenant_Prom_Cust_Seq" ON "ProPromotionRedemptions" ("TenantId", "PromotionId", "CustomerId", "UsageSequence") WHERE "CustomerId" IS NOT NULL AND "Status" <> 2;
+
+CREATE UNIQUE INDEX "IX_ProPromRedemptions_Tenant_Prom_Order_Voucher" ON "ProPromotionRedemptions" ("TenantId", "PromotionId", "OrderId", "VoucherCodeId") WHERE "VoucherCodeId" IS NOT NULL AND "OrderId" IS NOT NULL;
+
+CREATE UNIQUE INDEX "IX_ProPromotions_TenantId_Code" ON "ProPromotions" ("TenantId", "Code");
+
+CREATE INDEX "IX_ProPromotions_TenantId_Status_StartsAtUtc_EndsAtUtc" ON "ProPromotions" ("TenantId", "Status", "StartsAtUtc", "EndsAtUtc");
+
+CREATE INDEX "IX_ProVoucherCodes_PromotionId" ON "ProVoucherCodes" ("PromotionId");
+
+CREATE UNIQUE INDEX "IX_ProVoucherCodes_TenantId_Code" ON "ProVoucherCodes" ("TenantId", "Code");
+
+DROP INDEX IF EXISTS "IX_ProPromotions_TenantId_Code";
+CREATE UNIQUE INDEX "IX_ProPromotions_TenantId_Code"
+    ON "ProPromotions" ("TenantId", "Code") NULLS NOT DISTINCT;
+
+DROP INDEX IF EXISTS "IX_ProPromotionConditions_Tenant_Promotion_Parent_Sort";
+CREATE UNIQUE INDEX "IX_ProPromotionConditions_Tenant_Promotion_Parent_Sort"
+    ON "ProPromotionConditions" ("TenantId", "PromotionId", "ParentId", "SortOrder") NULLS NOT DISTINCT;
+
+DROP INDEX IF EXISTS "IX_ProPromotionConditions_MotGoc";
+CREATE UNIQUE INDEX "IX_ProPromotionConditions_MotGoc"
+    ON "ProPromotionConditions" ("TenantId", "PromotionId")
+    NULLS NOT DISTINCT
+    WHERE "ParentId" IS NULL;
+
+DROP INDEX IF EXISTS "IX_ProVoucherCodes_TenantId_Code";
+CREATE UNIQUE INDEX "IX_ProVoucherCodes_TenantId_Code"
+    ON "ProVoucherCodes" ("TenantId", "Code") NULLS NOT DISTINCT;
+
+DROP INDEX IF EXISTS "IX_ProPromotionRedemptions_TenantId_IdempotencyKey";
+CREATE UNIQUE INDEX "IX_ProPromotionRedemptions_TenantId_IdempotencyKey"
+    ON "ProPromotionRedemptions" ("TenantId", "IdempotencyKey") NULLS NOT DISTINCT;
+
+DROP INDEX IF EXISTS "IX_ProPromRedemptions_Tenant_Prom_Order_Voucher";
+CREATE UNIQUE INDEX "IX_ProPromRedemptions_Tenant_Prom_Order_Voucher"
+    ON "ProPromotionRedemptions" ("TenantId", "PromotionId", "OrderId", "VoucherCodeId")
+    NULLS NOT DISTINCT
+    WHERE "VoucherCodeId" IS NOT NULL AND "OrderId" IS NOT NULL;
+
+DROP INDEX IF EXISTS "IX_ProPromRedemptions_Tenant_Prom_Cust_Seq";
+CREATE UNIQUE INDEX "IX_ProPromRedemptions_Tenant_Prom_Cust_Seq"
+    ON "ProPromotionRedemptions" ("TenantId", "PromotionId", "CustomerId", "UsageSequence")
+    NULLS NOT DISTINCT
+    WHERE "CustomerId" IS NOT NULL AND "Status" <> 2;
+
+DROP INDEX IF EXISTS "IX_ProPromotionRedemptions_TenantId_OrderId_Voucher";
+CREATE UNIQUE INDEX "IX_ProPromotionRedemptions_TenantId_OrderId_Voucher"
+    ON "ProPromotionRedemptions" ("TenantId", "OrderId")
+    NULLS NOT DISTINCT
+    WHERE "OrderId" IS NOT NULL AND "VoucherCodeId" IS NOT NULL;
+
+DROP INDEX IF EXISTS "IX_ProPromotionRedemptions_TenantId_PromotionId_OrderId_TuDong";
+CREATE UNIQUE INDEX "IX_ProPromotionRedemptions_TenantId_PromotionId_OrderId_TuDong"
+    ON "ProPromotionRedemptions" ("TenantId", "PromotionId", "OrderId")
+    NULLS NOT DISTINCT
+    WHERE "OrderId" IS NOT NULL AND "VoucherCodeId" IS NULL;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261126224627_Add_Promotion_Module', '10.0.11');
+
+COMMIT;
+

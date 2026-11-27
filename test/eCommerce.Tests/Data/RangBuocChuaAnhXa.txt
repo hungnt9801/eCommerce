@@ -225,3 +225,43 @@ CK_RepPeriodCloses_CloseReason_ToiThieu|WP-26: CloseReason >= 10 — domain ném
 CK_RepPeriodCloses_DaChot_DuChungTu|WP-26: DaChot ⇒ SnapshotHash+ClosedBy+ClosedAtUtc — `Chot` gán đồng thời; CHECK chặn "nửa chốt" do ghi tắt
 CK_RepPeriodCloses_ReopenReason_ToiThieu|WP-26: ReopenReason NULL hoặc >= 20 — `MoLai` ném 0016; CHECK là hàng rào cuối
 IX_RepPeriodCloses_TenantId_KhoaIdempotency|WP-26: chốt kỳ idempotent theo (tenant,from,to) — app service tiền kiểm trả `AlreadyClosed`; trùng chỉ do race ⇒ lỗi vận hành; unique đầy đủ + NULLS NOT DISTINCT
+
+# ── PRO-002 (`W24-4`) — MODULE KHUYẾN MÃI: 7 bảng `Pro*` (migration `Add_Promotion_Module`) ──
+# 📌 Các ràng buộc dưới đây là HÀNG RÀO CUỐI cho đường ghi tắt (SQL tay / race). Mọi đường ghi thật đi qua
+#    domain `Promotion*` / validator cây, đã NÉM `eCommerce:Promotion:0001..0010` TRƯỚC khi chạm DB, nên
+#    `23505`/`23514` ở đây nghĩa là ghi tắt hoặc hai lượt chồng — lỗi VẬN HÀNH, không phải ca nghiệp vụ
+#    client cần phân biệt. 🔒 Unique PHẢI `NULLS NOT DISTINCT` (migration viết tay) — thiếu là cộng dồn
+#    lượt / hai gốc cây IM LẶNG khi `TenantId = NULL` (`TC-33`, `TC-43`).
+IX_ProPromotions_TenantId_Code|PRO-002: *mã khuyến mãi duy nhất trong tenant* — `CreateAsync` chưa trả mã riêng cho ca trùng; trùng là thao tác/ghi tắt; unique phải NULLS NOT DISTINCT
+IX_ProVoucherCodes_TenantId_Code|PRO-002: *mã voucher duy nhất trong tenant* — trùng là thao tác/ghi tắt; unique phải NULLS NOT DISTINCT
+IX_ProPromotionConditions_Tenant_Promotion_Parent_Sort|PRO-002: *(tenant, promotion, parent, sort) duy nhất* — `SaveTreeAsync` xoá cũ-thêm mới trong một UoW; trùng chỉ do race/ghi tắt; unique phải NULLS NOT DISTINCT
+IX_ProPromotionConditions_MotGoc|PRO-002 (`D-159`): *đúng MỘT gốc / cây* — validator NÉM `0004` trước khi ghi; `23505` chỉ khi hai `SaveTreeAsync` đồng thời ghép cây (ánh xạ `0004` theo tên constraint ở tầng app), nên không cần dòng `ViPhamRangBuocDb` toàn cục; unique partial `WHERE "ParentId" IS NULL` + NULLS NOT DISTINCT
+IX_ProPromotionRedemptions_TenantId_IdempotencyKey|PRO-002: *khoá idempotency bước ghi lượt* — trùng là retry/double-click; app bắt 23505 trước khi lộ ra client; unique phải NULLS NOT DISTINCT
+IX_ProPromRedemptions_Tenant_Prom_Order_Voucher|PRO-002 (`D-151`): *một đơn dùng một mã tối đa một lượt* — trùng là race/ghi tắt; app bắt 23505 rollback cả đơn; unique partial + NULLS NOT DISTINCT
+IX_ProPromRedemptions_Tenant_Prom_Cust_Seq|PRO-002 (`D-157`): *trần lượt theo khách* — số thứ tự còn hiệu lực; lượt Released (2) nhả số; trùng là race/ghi tắt; unique partial + NULLS NOT DISTINCT
+IX_ProPromotionRedemptions_TenantId_OrderId_Voucher|PRO-002 (`D-157`): *một đơn tối đa một lượt voucher* — trùng là race/ghi tắt; unique partial + NULLS NOT DISTINCT
+IX_ProPromotionRedemptions_TenantId_PromotionId_OrderId_TuDong|PRO-002 (`D-157`): *một khuyến mãi tự động tối đa một lượt/đơn* — trùng là race/ghi tắt; unique partial + NULLS NOT DISTINCT
+CK_ProPromotions_Kind_NotFlashSale|PRO-002 (`D-156`): FlashSale bị chặn fail-closed — `Promotion.TaoMoi` ném `AbpValidationException` (400) trước khi chạm DB; CHECK là hàng rào cuối cho ghi tắt
+CK_ProPromotions_DiscountKind_NotFreeShipping|PRO-002 (`D-158`): FreeShipping bị chặn fail-closed — `TaoMoi` ném 400 trước khi chạm DB; CHECK là hàng rào cuối
+CK_ProPromotions_DiscountValue|PRO-002: DiscountValue >= 0 — `TaoMoi` ném 400; CHECK chặn SQL tay
+CK_ProPromotions_Percentage|PRO-002: Percentage <= 100 và BẮT BUỘC có MaxDiscountAmount — `TaoMoi` ném 400; CHECK chặn SQL tay
+CK_ProPromotions_Currency|PRO-002: Currency ISO-4217 chữ HOA — `TaoMoi` kiểm regex; CHECK chặn SQL tay
+CK_ProPromotions_Window|PRO-002: EndsAtUtc > StartsAtUtc — `TaoMoi` ném 400; CHECK chặn SQL tay
+CK_ProPromotions_Usage|PRO-002 (`CR-11`): UsedCount+ReservedCount <= MaxUsageTotal — entity chỉ tăng qua cửa tiêu lượt; CHECK chặn vượt trần ở DB
+CK_ProVoucherCodes_Usage|PRO-002 (`D-151`, ADR-09): UsedCount+ReservedCount <= MaxUsage — chặn vượt lượt kể cả khi code sai; app bắt 23505; CHECK là hàng rào cuối cho ghi tắt
+CK_ProPromotionConditions_NodeLai|PRO-002 (`BR-01`): node nhóm có InteractionType + RuleSystemName NULL, node lá ngược lại — validator NÉM `0001..0003` trước khi ghi; CHECK là hàng rào cuối
+CK_ProPromotionConditions_InteractionType|PRO-002: InteractionType ∈ {And,Or} khi IsGroup — validator kiểm; CHECK chặn SQL tay
+CK_ProPromotionConditions_ParentKhacId|PRO-002 (`BR-02`): ParentId <> Id — validator NÉM `0003` chu trình trước khi ghi; CHECK là hàng rào cuối
+CK_ProPromotionConditions_Depth|PRO-002 (`BR-05`, ADR-03): Depth ∈ [1,8] — validator + setting MaxDepth <= 8 kiểm trước; CHECK là trần cứng ở DB
+CK_ProPromotionConditions_SortOrder|PRO-002: SortOrder >= 0 — validator kiểm; CHECK chặn SQL tay
+CK_ProPromotionMappings_TargetType|PRO-002 (`D-152`): v1 chỉ Channel/Shipping — chặn 'Sku'/'Category'/'Brand' (chưa có giảm theo dòng); app không có đường ghi mapping; CHECK là hàng rào cuối
+CK_ProPromotionRedemptions_UsageSequence|PRO-002: UsageSequence >= 1 — entity factory đặt; CHECK chặn SQL tay
+CK_ProPromotionRedemptions_Currency|PRO-002: Currency ISO-4217 — factory kiểm; CHECK chặn SQL tay
+CK_ProPromotionRedemptions_DiscountAmount|PRO-002 (`BR-12`): DiscountAmount >= 0 — factory/Money; CHECK chặn SQL tay
+CK_ProPromotionRedemptions_ReservedExpires|PRO-002: Reserved ⇒ ExpiresAtUtc — máy trạng thái đặt; CHECK chặn "nửa lượt giữ" do ghi tắt
+CK_ProPromotionRedemptions_AppliedAt|PRO-002: Applied ⇒ AppliedAtUtc — máy trạng thái đặt; CHECK chặn ghi tắt
+CK_ProPromotionRedemptions_ReleasedAt|PRO-002: Released ⇒ ReleasedAtUtc — máy trạng thái đặt; CHECK chặn ghi tắt
+CK_ProPromotionRedemptions_ReversedAt|PRO-002: Reversed ⇒ ReversedAtUtc — máy trạng thái đặt; CHECK chặn ghi tắt
+CK_ProPromotionRedemptions_ReasonCode|PRO-002: Released/Reversed ⇒ ReasonCode — máy trạng thái đặt; CHECK chặn ghi tắt
+CK_ProFlashSaleSlots_Slot|PRO-002 (CR-P2 chưa mở): bảng FlashSale dựng trước nhưng chưa có đường ghi (Kind=FlashSale bị chặn); CHECK là hàng rào cuối cho ghi tắt
+CK_ProPromotionRuleCosts_DeclaredCostFactor|PRO-002 (`D-154`): DeclaredCostFactor >= 1 — seeder chỉ ghi từ code catalog; CHECK bảo vệ bảng toàn cục khỏi ghi tắt

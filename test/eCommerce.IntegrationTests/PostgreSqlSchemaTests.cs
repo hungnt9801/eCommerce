@@ -219,7 +219,12 @@ public class PostgreSqlSchemaTests
         //      `IX_NotificationQueueItems_Tenant_IdempotencyKey` (hàng rào chống gửi trùng ở DB — mất NND thì
         //      `TenantId = NULL` bị nhân bản IM LẶNG ⇒ gửi hai lần), và
         //      `IX_NotificationQueueItems_Tenant_Recipient_Fingerprint_Bucket` (partial, khử trùng cửa sổ).
-        Assert.Equal(105L, await DemAsync(
+        //    → **114** (27/11/2026, `Add_Promotion_Module` — **+9** index `NULLS NOT DISTINCT` của **7** bảng
+        //      `Pro*` (`PRO-002`, `W24-4`): `ProPromotions`/`ProVoucherCodes` (mã duy nhất trong tenant),
+        //      `ProPromotionConditions` (thứ tự node + **một gốc** theo `PromotionId`), `ProPromotionRedemptions`
+        //      (khoá idempotency + **4** index chống trùng theo đơn/khách — `D-151`/`D-157`). 📌 Tất cả viết tay
+        //      **SQL thô** trong migration vì EF **không** sinh được `NULLS NOT DISTINCT` kèm bộ lọc).
+        Assert.Equal(114L, await DemAsync(
             "select count(*) from pg_indexes where schemaname = 'public' and indexdef like '%NULLS NOT DISTINCT%'"));
 
         // Kiểm tra ĐÍCH DANH để thông báo lỗi có ý nghĩa (tên index dài có thể bị PostgreSQL cắt ⇒ so theo tiền tố).
@@ -436,6 +441,24 @@ public class PostgreSqlSchemaTests
             "UX_RepRunLogs_TenantId_Job_Projection_DangChay",
             "UX_RepConsistencyChecks_DangMo",
             "IX_RepPeriodCloses_TenantId_KhoaIdempotency",
+            // 🆕 `PRO-002` (`W24-4`) — **9 index `NULLS NOT DISTINCT` của 7 bảng `Pro*`** (migration
+            // `Add_Promotion_Module`, tất cả viết tay SQL thô). Mất NND thì khi `TenantId = NULL` (đang chạy
+            // 1 tenant) các hàng rào chống trùng mất tác dụng IM LẶNG:
+            //   • `ProPromotions (Code)` / `ProVoucherCodes (Code)`: hai khuyến mãi/mã cùng mã ⇒ chọn nhầm;
+            //   • `ProPromotionConditions (SortOrder)` + **một gốc** (`ParentId IS NULL`): duyệt cây không
+            //     tất định / hai gốc ⇒ `SaveTreeAsync`/`ApproveAsync` sai;
+            //   • `ProPromotionRedemptions`: khoá idempotency + 4 partial (một đơn một voucher, một tự động/đơn,
+            //     trần lượt theo khách, chống dùng cùng mã hai lần) ⇒ **cộng dồn `UsedCount` im lặng**
+            //     (`TC-33`, `TC-43`).
+            "IX_ProPromotions_TenantId_Code",
+            "IX_ProVoucherCodes_TenantId_Code",
+            "IX_ProPromotionConditions_Tenant_Promotion_Parent_Sort",
+            "IX_ProPromotionConditions_MotGoc",
+            "IX_ProPromotionRedemptions_TenantId_IdempotencyKey",
+            "IX_ProPromRedemptions_Tenant_Prom_Order_Voucher",
+            "IX_ProPromRedemptions_Tenant_Prom_Cust_Seq",
+            "IX_ProPromotionRedemptions_TenantId_OrderId_Voucher",
+            "IX_ProPromotionRedemptions_TenantId_PromotionId_OrderId_TuDong",
         ];
 
         foreach (var ten in phaiCo)
