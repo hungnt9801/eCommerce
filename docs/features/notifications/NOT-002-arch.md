@@ -438,10 +438,11 @@ giữ lớp làm fixture test; **chỉ** `NotificationSender` đăng ký `INotif
 
 ---
 
-## 7. Job bàn giao — **không đổi**
+## 7. Job bàn giao — **chỉ thêm 1 dòng `CorrelationId`**
 
-- `WP-23` **không** sửa `NotificationDispatchWorker`: vẫn một worker định kỳ, `Timer.RunOnStart = true`, nhịp 10 s, khoá
+- `WP-23` **không đổi** luồng/lease/hành vi `NotificationDispatchWorker`: vẫn một worker định kỳ, `Timer.RunOnStart = true`, nhịp 10 s, khoá
   `notification:queue-dispatch:{tenant}` (`NotificationErrorCodes.cs:69-70`), `UPDATE … WHERE Status=ChoGui` (C2a), gọi sender ngoài transaction (C2b).
+  `W23-2` chỉ thêm **một dòng** truyền `muc.CorrelationId` vào `NotificationSendRequest` (`NotificationDispatchWorker.cs:268-271`, additive — `D-315`/`AQ4`).
 - Chỉ **một** thứ thay đổi ở biên DI: `INotificationSender` resolve ra `NotificationSender` (§5.3) thay vì `ChuaCoKenhGuiSender`.
 - **Cấm** thêm dynamic worker / timer trong bộ nhớ (bài học C10, `NOT-001-arch.md:437`); **cấm** cho job biết adapter/NCC (trung lập qua interface).
 - Retry/backoff/DLQ của `NOT-002` **không** thuộc job này ở `WP-23`; job hiện tại chỉ có retry "mỗi nhịp + lease" của `NOT-001`.
@@ -560,10 +561,16 @@ Bảng `NotificationChannelAccounts` (module chủ `Notification`): `Id uuid PK`
 | Domain thuần (không DB) | `TC-EN-01` (mới) `NotificationFailureKind` đúng 5 giá trị `0..4`, **append-only**; `TC-EN-02` (mới) `0002/0003/0006` khớp `^eCommerce:Notification:\d{4}$`, giao với `0010–0020` **rỗng**; `TC-EN-03` (mới) `ProviderCodeToiDa = 32` | `D-17`, `D-197` ⑥, `D-199` |
 | Application (unit, `fake` adapter + `fake` config) | `TC-FC-01…07` (**mới**, bảng §6.1): **NÉM** `0003`, adapter **0** lần gọi, **0 `DaBanGiao`/`DaGui`**; `TC-MAP-01` (mới) bảng ánh xạ §4.5 (7 hàng); `TC-MAP-02` (mới) `Accepted=true` + `ProviderMessageId` rỗng ⇒ `0006`; `TC-MAP-03` (mới) `Accepted=false` + `None` ⇒ NÉM; `TC-MAP-04` (mới) `Unauthenticated` ⇒ NÉM `0003`; `TC-KEY-01` (mới) `IdempotencyKey`/`RecipientEncrypted`/`CredentialEncrypted`/`Subject`/`Body` **nguyên văn** sang `SendCommand`; `TC-LOG-01` (mới) log `Warning` + `ErrorCode`, **0** PII; `TC-MET-01` (mới) metric `reason=0003` | BR-001, BR-002 (phần truyền khoá), BR-018, BR-024, NFR-014 |
 | Registry | `TC-REG-01` (mới) trùng `(ChannelKind, ProviderCode)` ⇒ NÉM khi khởi tạo; `TC-REG-02` (mới) `Find` trả `null` khi rỗng (không fallback) | BR-001, `D-200` |
-| DI / Host | `TC-DI-01` (mới) **đúng một** `INotificationSender` = `NotificationSender`; `TC-DI-02` (mới) Host khởi động resolve được (skill §6 "thay DI ⇒ khởi động Host thật") | B6, §5.3 |
+| DI / Host | `TC-DI-01` (mới) **đúng một** `INotificationSender` = `NotificationSender`; `TC-DI-02` (mới) **container ABP thật** (không dựng Host) resolve được `INotificationSender` + `INotificationChannelConfigProvider` và fail-closed `0003` (skill §6 "thay DI ⇒ khởi động Host thật") | B6, §5.3 |
 | Kiến trúc (quét) | `TC-ARCH-01` (mới) **0** gói NuGet NCC (`Directory.Packages.props` + csproj module); `TC-ARCH-02` (mới) `NotificationSender` **0** `HttpClient`/`SmtpClient`/`System.Net.Mail`; `TC-ARCH-03` (mới) **0** `I*AppService` của module khác; `TC-ARCH-04` (mới) **0** endpoint/`[AllowAnonymous]` mới; **0** metric mới ngoài registry | BR-001, BR-016, BR-024, NFR-005/014 |
 | Endpoint | không có endpoint mới ⇒ kiểm **không đổi** ma trận `401/403/200` hiện có của module | `XC-004` |
 | Integration (PostgreSQL) | **không có** ca mới (0 schema); chạy lại `PostgreSqlSchemaTests` phải **114** không đổi | §8 |
+
+> **Phạm vi `TC-DI-02` ở `W23-4` (`D-317`):** container ABP thật cho phần **resolve**; nửa "Host khởi động" đo bằng cổng có sẵn
+> `pwsh -File tools/kiem-tat-ca.ps1 -DayDu` (Host thật + PostgreSQL/Redis/OpenIddict), **không** dựng `WebApplicationFactory` —
+> việc đó hoãn sang increment đầy đủ `NOT-002` sau `R3-6`. Số đo thật ở `docs/tests/NOT-002-testplan.md` §5 (`N109`, `2026-11-28`):
+> **exit 0** · **20/20** bước · **888,2 s**, log `artifacts/DayDu-N109.log` ⇒ **boot** đã chứng minh bằng `-DayDu`, **resolve**
+> đo bằng `TC-DI-02` (`D-317`: hai phép đo bù nhau, không suy cái này từ cái kia).
 
 **Map TC mới → TC gốc/BR (cho QA/REV):**
 
@@ -576,7 +583,7 @@ Bảng `NotificationChannelAccounts` (module chủ `Notification`): `Id uuid PK`
 | `TC-LOG-01` | `TC-13`, `TC-47`, BR-009/BR-018 | log không PII, có `ErrorCode` |
 | `TC-MET-01` | `TC-12`, NFR-014 | dùng lại metric đã đăng ký |
 | `TC-REG-01/02` | `TC-45`, BR-001 | registry một cửa |
-| `TC-DI-01/02` | (không có TC gốc), B6/§5.3 | DI một hiện thực + Host boot |
+| `TC-DI-01/02` | (không có TC gốc), B6/§5.3 | DI một hiện thực + resolve trong container; boot đo bằng `-DayDu` (`D-317`) |
 | `TC-ARCH-01…04` | `TC-26`, `TC-27`, BR-016/BR-017/BR-024 | 0 SDK/0 gói/0 app service khác |
 
 ### 13.2 Negative control **bắt buộc** (đột biến **đỏ** → khôi phục **xanh**; ORCH chạy `tools/agents/negative-control.ps1`)
@@ -597,6 +604,12 @@ Bảng `NotificationChannelAccounts` (module chủ `Notification`): `Id uuid PK`
 (callback dedupe/opt-out/TTL/cảnh báo/opt-out sync) — **chưa có bảng/adapter/endpoint** ⇒ thuộc `W23-4` chỉ ở phần đã hiện thực, phần còn lại
 ghi "chưa kiểm được" (khuôn `docs/tests/NOT-001-testplan.md`). `BR-011` chỉ phủ **một phần**: interface có `CancellationToken`, **0** lời gọi mạng
 ⇒ "timeout hữu hạn" chưa chứng minh được cho tới khi có adapter thật.
+
+- **Giới hạn "boot ≠ resolve" của `TC-DI-02` (`D-317`):** `NotificationDispatchWorker.DoWorkAsync` **return sớm** khi
+  `EnableDispatch=false` (`NotificationDispatchWorker.cs:42-48`) — **trước** `GetRequiredService<INotificationSender>()` (`:53`)
+  ⇒ cổng `-DayDu` chứng minh **Host khởi động**, `TC-DI-02` (container ABP thật) chứng minh **resolve**; hai phép đo **bù nhau**,
+  cấm suy cái này từ cái kia. Nợ có chủ: test bằng `WebApplicationFactory`/Host thật trong bộ test ⇒ increment đầy đủ `NOT-002`
+  sau `R3-6`.
 
 ---
 

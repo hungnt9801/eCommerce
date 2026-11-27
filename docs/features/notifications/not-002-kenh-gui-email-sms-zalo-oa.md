@@ -759,6 +759,8 @@ cho báo cáo quét bảng này mỗi lần mở màn hình. Bắt buộc:
 
 ## 10. UI Mockup & mapping dữ liệu
 
+> 🚧 **Phạm vi:** các màn hình dưới đây thuộc **increment đầy đủ của `NOT-002` sau `R3-6`**; hàng `WP-23` có **0 màn hình / 0 endpoint / 0 DTO mới** (`D-316`, `NOT-002-arch.md` §12) — **giữ thiết kế** làm hợp đồng, **chưa** làm ở WP-23.
+
 | Vùng UI | Thành phần | Dữ liệu | Nguồn (DTO/trường) | Quy tắc |
 |---|---|---|---|---|
 | **Danh sách tin** | bảng + lọc theo kênh/trạng thái/khoảng thời gian | mã tin, kênh, trạng thái, người nhận (**đã che một phần**), mốc gửi | `NotificationMessages` | 🚨 **che** email/số điện thoại (`k****@gmail.com`, `09xx***456`); **cấm** hiển thị đầy đủ |
@@ -1117,6 +1119,7 @@ public class NotificationConventionTests
 - `TC44` (`NotificationConventionsTests`) **đã cập nhật lên 14** mã (`NotificationConventionsTests.cs:257`); dải `0010–0020` vẫn đủ 11 (`:267`); **xanh**.
 - Số đo cuối phiên (QA/ORCH báo): unit **2649/2649** (baseline 2619, **+30**) · build **0** error / **9** warning · `kiem-tat-ca.ps1` **10/10 ĐẠT** · negative control **NC-1 đỏ→xanh** (bỏ guard `config is null` ⇒ `TC-FC-01` đỏ; khôi phục xanh). Bộ NC đầy đủ (6 NC) thuộc `W23-4`.
 - Nhãn `W23-4` ở arch §13.1 (`NOT-002-arch.md:555-556`) là **nhãn kế hoạch cũ**; hàng `W23-2` đã giao test đơn vị ⇒ QA tạo ngay ở `W23-2`, còn `W23-4` mở rộng + testplan + NC đầy đủ.
+- Hàng `W23-4` (phiên `N109`): bổ sung testplan `NOT-002-testplan.md` (trong `docs/tests/`) + bộ negative control đầy đủ theo `NOT-002-arch.md` §13.2 (bằng chứng ORCH chèn sau); **0** tệp FE.
 
 ### 16.4 Đường lùi
 
