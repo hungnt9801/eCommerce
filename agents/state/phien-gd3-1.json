@@ -7,7 +7,7 @@
   "nhanhGoc": "main",
   "refs": "D-216",
   "ghiChu": "Phương án B (D-216): mỗi WP một nhánh cắt từ đỉnh tich-hop/gd3; dong-wp đẩy fast-forward vào tich-hop/gd3 (M3, D-114); PR xếp chồng mở một lần cuối chuỗi.",
-  "capNhat": "2026-11-27T08:22:54+07:00",
+  "capNhat": "2026-11-27T09:06:51+07:00",
   "rows": [
     {
       "id": "W16-1",
@@ -625,13 +625,16 @@
       "dependsOn": [
         "W24-3"
       ],
-      "status": "chua",
-      "phien": [],
+      "status": "do-dang",
+      "phien": [
+        "N96"
+      ],
       "nhanh": "feat/gd3-wp24-dieu-kien-km",
       "buoc": "F4–F5",
       "evidence": null,
-      "ghiChu": null,
-      "handover": null
+      "ghiChu": "F4 QA XONG (testplan 18/20 BR + 4 NC do->xanh, +13 unit +17 integration, schema.sql regen); F5 REV CHANGES P1=1 (voucher candidate khong kiem Promotion.Status/VoucherCode.Status) + 4 P2 -> can luot be sua + qa test + rev vong 2 (PASS/P1=0)",
+      "handover": "docs/nhanh/handover-n96.md",
+      "batDau": "2026-11-27T08:23:59+07:00"
     },
     {
       "id": "W24-5",
