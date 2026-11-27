@@ -42,14 +42,20 @@ public sealed record ReserveVoucherDto(
     [property: Range(60, 86400)]
     int TtlSeconds);
 
-/// <summary>Chốt lượt — `CheckoutSessionId` dùng để đối chiếu khoá `Checkout:{tenant}:{session}:{code}` đã ghi.</summary>
+/// <summary>
+/// Chốt lượt — `CheckoutSessionId` dùng để đối chiếu khoá `Checkout:{tenant}:{session}:{code}` đã ghi.
+/// 🆕 `D-305` — `OrderDiscountTotal` = `Order.DiscountTotal` tại điểm chốt (để kiểm `BR-06`/`0111`).
+/// **Tham số cuối**, giữ nguyên thứ tự 4 trường cũ (cấm đổi thứ tự record).
+/// </summary>
 public sealed record CommitVoucherDto(
     Guid RedemptionId,
     Guid OrderId,
     string VoucherCode,
     [property: Required]
     [property: StringLength(128, MinimumLength = 1)]
-    string CheckoutSessionId);
+    string CheckoutSessionId,
+    [property: Range(typeof(decimal), "0.00", "99999999999999.9999")]
+    decimal OrderDiscountTotal);
 
 /// <summary>Nhả lượt — **chỉ** `Reserved → Released` (hết TTL / `MANUAL`); `Applied → Released` **không** qua đây.</summary>
 public sealed record ReleaseVoucherDto(Guid RedemptionId, string ReasonCode);

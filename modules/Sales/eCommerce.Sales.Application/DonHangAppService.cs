@@ -117,8 +117,10 @@ public class DonHangAppService : ApplicationService, IDonHangAppService
         // `(TenantId, RedemptionId)` + khoá phiên ⇒ lệch `0105`. Lỗi ⇒ UoW rollback ⇒ KHÔNG đơn, KHÔNG chốt lượt.
         if (input.VoucherRedemptionId is Guid redemptionId)
         {
+            // 🆕 `D-305` (`BR-06`) — truyền `don.DiscountTotal` (đã `SetDiscount` + `Recalculate`) để Promotions
+            // đối chiếu `Σ DiscountAmount` của các lượt cùng đơn ⇒ lệch `0111` (cùng UoW, rollback cả đơn).
             var daChot = await _voucherRedemption.CommitAsync(new CommitVoucherDto(
-                redemptionId, don.Id, input.VoucherCode ?? string.Empty, khoa));
+                redemptionId, don.Id, input.VoucherCode ?? string.Empty, khoa, don.DiscountTotal));
 
             // Có `VoucherRedemptionId` mà sổ giải trình KHÔNG có giảm từ mã ⇒ 400 (cấm tạo đơn mất giảm im lặng).
             if (decimal.Compare(daChot.DiscountAmount, 0m) <= 0)

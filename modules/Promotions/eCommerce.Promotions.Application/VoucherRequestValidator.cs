@@ -63,6 +63,14 @@ public static class VoucherRequestValidator
         var loi = new List<ValidationResult>();
         KiemTraSession(input.CheckoutSessionId, loi);
 
+        // 🆕 `D-305` (`BR-06`) — `OrderDiscountTotal` bắt buộc ∈ [0, trần numeric(18,4)], TRƯỚC mọi UPDATE.
+        if (input.OrderDiscountTotal < 0m || input.OrderDiscountTotal > SubtotalToiDa)
+        {
+            loi.Add(new ValidationResult(
+                $"OrderDiscountTotal phải trong [0, {SubtotalToiDa}] (nhận {input.OrderDiscountTotal}).",
+                new[] { nameof(CommitVoucherDto.OrderDiscountTotal) }));
+        }
+
         if (loi.Count > 0)
         {
             throw new AbpValidationException(loi);

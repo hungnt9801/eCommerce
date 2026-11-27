@@ -34,5 +34,7 @@ public class PromotionsApplicationModule : AbpModule
     public override async Task OnApplicationInitializationAsync(ApplicationInitializationContext context)
     {
         await context.AddBackgroundWorkerAsync<PromotionExpiryWorker>();
+        // 🆕 `D-306` — job nhả lượt voucher hết TTL (`promotion:job:voucher-expiry:{tenant}`).
+        await context.AddBackgroundWorkerAsync<VoucherExpiryWorker>();
     }
 }

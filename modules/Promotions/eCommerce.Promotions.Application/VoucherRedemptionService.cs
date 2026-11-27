@@ -421,6 +421,16 @@ DO NOTHING", ct);
         if (outcome.Kind == eCommerce.Messaging.Idempotency.IdempotencyOutcomeKind.TraVeKetQuaCu)
         {
             applied.AlreadyApplied = true;
+
+            // 🆕 `D-305` — nhánh replay VẪN so `applied.DiscountAmount` với `OrderDiscountTotal`; lệch ⇒ `0111`
+            // (payload khoá **không** chứa `OrderDiscountTotal` ⇒ lỗi vẫn là `0111`, KHÔNG thành `Messaging:PayloadConflict`).
+            if (decimal.Compare(applied.DiscountAmount, input.OrderDiscountTotal) != 0)
+            {
+                throw Loi(PromotionErrorCodes.RedemptionSumMismatch)
+                    .WithData("orderId", input.OrderId)
+                    .WithData("discountAmount", applied.DiscountAmount)
+                    .WithData("orderDiscountTotal", input.OrderDiscountTotal);
+            }
         }
 
         return applied;
@@ -478,6 +488,22 @@ UPDATE ""ProPromotionRedemptions""
             throw Loi(PromotionErrorCodes.RedemptionNotReserved)
                 .WithData("redemptionId", input.RedemptionId)
                 .WithData("orderId", input.OrderId);
+        }
+
+        // 🆕 `D-305` (`BR-06`) — SAU khi lượt thành `Applied`: `Σ DiscountAmount` các lượt `Applied` cùng đơn
+        // phải bằng `OrderDiscountTotal`; lệch ⇒ NÉM `0111` (UoW rollback). Dùng `AsNoTracking` để đọc lại DB
+        // (bỏ qua identity-map đang giữ bản ghi `Reserved` cũ). So bằng `decimal.Compare` — KHÔNG `==`.
+        var query = await _redemptions.GetQueryableAsync();
+        var tongTheoDon = await query.AsNoTracking()
+            .Where(x => x.OrderId == input.OrderId && x.Status == PromotionRedemptionStatus.Applied)
+            .SumAsync(x => x.DiscountAmount, ct);
+
+        if (decimal.Compare(tongTheoDon, input.OrderDiscountTotal) != 0)
+        {
+            throw Loi(PromotionErrorCodes.RedemptionSumMismatch)
+                .WithData("orderId", input.OrderId)
+                .WithData("tongSoLuot", tongTheoDon)
+                .WithData("orderDiscountTotal", input.OrderDiscountTotal);
         }
 
         // Bộ đếm: `ReservedCount − 1`, `UsedCount + 1` — mã TRƯỚC, promotion SAU.
