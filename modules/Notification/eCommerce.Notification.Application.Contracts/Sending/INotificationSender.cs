@@ -21,7 +21,8 @@ public sealed record NotificationSendRequest(
     string RecipientEncrypted,
     string Subject,
     string Body,
-    int Priority);
+    int Priority,
+    string? CorrelationId = null); // `D-315` AQ4 — thêm ở CUỐI, additive, default `null`
 
 public sealed record NotificationSendResult(
     bool Accepted,

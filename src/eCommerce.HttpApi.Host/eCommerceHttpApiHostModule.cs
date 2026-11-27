@@ -439,6 +439,10 @@ public class eCommerceHttpApiHostModule : AbpModule
             options.Map(eCommerce.Notification.NotificationErrorCodes.BiKhudupCuaSo, System.Net.HttpStatusCode.Conflict);                  // 0019
             options.Map(eCommerce.Notification.NotificationErrorCodes.BodyFormatKhongHoTro, System.Net.HttpStatusCode.BadRequest);         // 0020
 
+            // ── 🆕 `WP-23` — KÊNH GỬI `NOT-002` (dải `0001–0009`) ────────────────────────────────
+            // `0003` = kênh chưa sẵn sàng (fail-closed TRƯỚC mọi lời gọi mạng) ⇒ **503** (không phải 403).
+            options.Map(eCommerce.Notification.NotificationErrorCodes.KenhGuiChuaSanSang, System.Net.HttpStatusCode.ServiceUnavailable); // 0003
+
             // ── Hạ tầng chung ──────────────────────────────────────────────────────────────────
             // Không giành được khoá phân tán ⇒ **409** (client thử lại được) — `ADDR-004` §12 ghi rõ.
             options.Map(eCommerceConsts.ErrorCodes.KhongGianhDuocKhoa, System.Net.HttpStatusCode.Conflict);

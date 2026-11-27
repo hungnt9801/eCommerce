@@ -268,7 +268,7 @@ public class NotificationDispatchWorker : AsyncPeriodicBackgroundWorkerBase
                 yeuCau = new NotificationSendRequest(
                     muc.TenantId, muc.Id, muc.IdempotencyKey, muc.ChannelKind,
                     muc.RecipientEncrypted, muc.RenderedSubject ?? string.Empty, muc.RenderedBodyMasked ?? string.Empty,
-                    muc.Priority);
+                    muc.Priority, muc.CorrelationId);
                 _ = template;
                 await uowDoc.CompleteAsync();
             }

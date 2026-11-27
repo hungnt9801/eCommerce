@@ -95,3 +95,25 @@ public static class NotificationPriorities
     public const int High = 2;
     public const int Critical = 3;
 }
+
+/// <summary>
+/// Phân loại lỗi của MỘT lần gửi qua adapter (`NOT-002` §3.1). **KHÔNG** lưu DB ở WP-23 (0 bảng);
+/// vẫn khai **một nơi** và **chỉ thêm ở cuối** (`D-17`/`D-197` ⑥) để increment sau dùng lại.
+/// </summary>
+public enum NotificationFailureKind
+{
+    /// <summary>Thành công (adapter tự khai) — chỉ hợp lệ khi `Accepted = true`.</summary>
+    None = 0,
+
+    /// <summary>Timeout/5xx/rate-limit ⇒ trả `IsTransient = true` để job hoàn lại chờ gửi.</summary>
+    Transient = 1,
+
+    /// <summary>Định danh sai / mẫu bị từ chối ⇒ `Permanent`, job đánh dấu lỗi.</summary>
+    Permanent = 2,
+
+    /// <summary>Hết hạn mức NCC ⇒ thử lại ở cửa sổ sau (`IsTransient = true`).</summary>
+    QuotaExceeded = 3,
+
+    /// <summary>Credential bị NCC từ chối ⇒ **NÉM** `0003`, KHÔNG trả `IsTransient` (`docDeviation #8`).</summary>
+    Unauthenticated = 4
+}

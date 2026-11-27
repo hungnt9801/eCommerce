@@ -39,6 +39,20 @@ public static class NotificationErrorCodes
 
     /// <summary>`BodyFormat` khác `Text` ở GĐ3 (`Html = 1`) — NÉM trước mọi ghi (`D-199`).</summary>
     public const string BodyFormatKhongHoTro = "eCommerce:Notification:0020";
+
+    // ── `NOT-002` — dải `0001–0009` (WP-23 chỉ khai mã ĐANG DÙNG; append-only, không chiếm `0010+`) ──
+
+    /// <summary>Người nhận không hợp lệ theo NCC (adapter trả `Permanent`).</summary>
+    public const string NguoiNhanKhongHopLe = "eCommerce:Notification:0002";
+
+    /// <summary>
+    /// Kênh gửi CHƯA sẵn sàng — fail-closed **NÉM** TRƯỚC mọi lời gọi mạng (thiếu cấu hình/adapter/
+    /// credential/hạn/thiếu khoá Settings, hoặc NCC trả `Unauthenticated`). Map **HTTP 503**.
+    /// </summary>
+    public const string KenhGuiChuaSanSang = "eCommerce:Notification:0003";
+
+    /// <summary>Adapter báo `Accepted = true` nhưng KHÔNG trả `ProviderMessageId` — không đánh dấu thành công.</summary>
+    public const string KhongCoProviderMessageId = "eCommerce:Notification:0006";
 }
 
 /// <summary>Giới hạn độ dài — **một nguồn** giữa entity, EF mapping và DTO.</summary>
@@ -55,6 +69,9 @@ public static class NotificationConsts
     public const int SourceEventTypeToiDa = 256;
     public const int SourceAggregateIdToiDa = 128;
     public const int HashHexLength = 64;
+
+    /// <summary>Độ dài `ProviderCode` của kênh gửi — khớp `varchar(32)` (SRS §5.1/§5.5; `NOT-002`).</summary>
+    public const int ProviderCodeToiDa = 32;
 
     /// <summary>Tiền tố mã lỗi — dùng cho test `TC-44`.</summary>
     public const string ErrorCodePrefix = "eCommerce:Notification:";

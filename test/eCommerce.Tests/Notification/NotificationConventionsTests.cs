@@ -231,7 +231,7 @@ public class NotificationConventionsTests
     // ── TC-44: một module, một nguồn ─────────────────────────────────────────────────────────
 
     [Fact]
-    public void TC44_mot_ChannelKind_mot_NotificationErrorCodes_dai_0010_0020()
+    public void TC44_mot_ChannelKind_mot_NotificationErrorCodes_dai_0010_0020_va_ma_moi_0002_0003_0006()
     {
         var tatCa = TatCaTypeCuaModule().ToList();
 
@@ -244,7 +244,7 @@ public class NotificationConventionsTests
             new[] { ("Email", 0), ("Sms", 1), ("ZaloOa", 2) },
             Enum.GetValues<ChannelKind>().Select(v => (v.ToString(), (int)v)).ToArray());
 
-        // 2) Một lớp mã lỗi, dải 0010–0020.
+        // 2) Một lớp mã lỗi: 11 mã NOT-001 (`0010–0020`) + 3 mã NOT-002 mới (`0002`/`0003`/`0006`).
         var lopMa = tatCa.Where(t => t.Name == "NotificationErrorCodes").ToList();
         Assert.Single(lopMa);
 
@@ -254,13 +254,23 @@ public class NotificationConventionsTests
             .Select(f => (string)f.GetRawConstantValue()!)
             .ToList();
 
-        Assert.Equal(11, ma.Count);
+        Assert.Equal(14, ma.Count);
+        Assert.Equal(ma.Count, ma.Distinct(StringComparer.Ordinal).Count());
         Assert.All(ma, m => Assert.Matches(new Regex(@"^eCommerce:Notification:\d{4}$"), m));
 
         var so = ma.Select(m => int.Parse(m[^4..], System.Globalization.CultureInfo.InvariantCulture))
             .OrderBy(x => x)
             .ToArray();
-        Assert.Equal(Enumerable.Range(10, 11).ToArray(), so); // {10..20} — dải 0010–0020
+
+        // Dải NOT-001 vẫn ĐỦ 11 mã `0010–0020` (không được đánh số lại / rút bớt).
+        var daiCu = so.Where(x => x is >= 10 and <= 20).ToArray();
+        Assert.Equal(Enumerable.Range(10, 11).ToArray(), daiCu);
+
+        // 3 mã mới của NOT-002 dùng dải `0001–0009` (không chiếm `0010+`).
+        var maMoi = so.Where(x => x is 2 or 3 or 6).ToArray();
+        Assert.Equal(new[] { 2, 3, 6 }, maMoi);
+        Assert.Equal(14, daiCu.Length + maMoi.Length);
+
         Assert.Equal("eCommerce:Notification:", NotificationConsts.ErrorCodePrefix);
     }
 }
