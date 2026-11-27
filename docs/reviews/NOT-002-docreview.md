@@ -10,6 +10,8 @@
 | Đã đọc | §0 (16–115) · §3 (173–287) · §4.2 (275–287) · §5/§5.1 (288–457) · §8 (654–713) · §9 (714–738) · §11–§12 (763–812) · §14.1–§14.3 (835–1004) · §15 (1004–1074). Không đọc lại §2/§6/§7/§10 (không đổi, không bị vòng 2 đánh dấu) |
 | Máy | `check-feature-doc.ps1 -WP14` (vòng 2) → exit 0 · `check-agent-artifact.ps1 -Kind docreview` (vòng 3) → exit 0 |
 
+> **Cập nhật 28/11/2026 — vòng 4 (kiểm nhanh sau khi BA sửa 2 phát hiện vòng 3):** xem mục "Vòng kiểm nhanh 28/11/2026" ở cuối tệp.
+
 ## Đã kiểm
 
 | Nhóm | Cách kiểm (vòng 3 — trọng tâm mục đã đổi) | Kết quả |
@@ -22,7 +24,7 @@
 | D6 nhãn tin cậy | Toạ độ as-built vòng 2 đã sửa đúng: `KeyPrefix` `:222,237` · `AbortOnConnectFail` :251 · health `:506–509` · UoW `:91–95`; migration outbox có thật; còn **1** toạ độ sai (ADR-03 `PaymentTransaction.cs:76`) | 1 phát hiện (#1, cùng D2) |
 | D7 14 quy tắc + đối chiếu Nhanh | §14.3 DoD (:974) nay khớp TC-46/TC-47 (`NFR-007`/`NFR-012` được phủ); rà BR-001…024 + NFR-001…014 trong cột "Phủ" §14.1 = **đủ**; mục "Đối chiếu mô hình Nhanh (24/11/2026)" (:1057) có thật, khớp `D-193`/`D-197`/`D-199`/`D-200`…`D-207`; NFR có ngưỡng số; mermaid vòng 2 đã xanh | 0 phát hiện |
 
-## Phát hiện
+## Phát hiện (vòng 3 — cả 2 đã đóng ở vòng 4)
 
 | # | Mức | Vị trí | Vấn đề | Đề nghị |
 |---|---|---|---|---|
@@ -63,3 +65,64 @@
 | 6 | **đã đóng** — §1 Basic Flow bước 5 (:108) nay dẫn "(khoá ở §8.2)", bỏ "(ADR-08/BR-010)" | P3 |
 | 7 | **đã đóng** — §1 Exception Flow E6 (:110) nay `ProcessStatus=Rejected` (không còn `Status=Rejected`) | P3 |
 | 8 | **đã đóng** — §5.1 :328 partial index nay "`WHERE Status IN (ChoGui, ChoThuLai)` — dùng **hằng enum**, **không** chép số `0,3`" | P3 |
+
+---
+
+## Vòng kiểm nhanh 28/11/2026 (vòng 4)
+
+**VERDICT: DOC-OK** — 2 phát hiện vòng 3 **đã đóng**; 0 P1; 1 P2 mới **ngoài** 2 fix (as-built lệch code sau v0.4).
+
+| | |
+|---|---|
+| Tài liệu | `docs/features/notifications/not-002-kenh-gui-email-sms-zalo-oa.md` (v0.4, 1074 dòng) |
+| Ngày · vòng | 28/11/2026 · **vòng 4** (kiểm nhanh — chỉ 3 dòng BA đã sửa: §0.2 ADR-03 :83 · §1 Pre-Condition :106 · §14.4 :999) |
+| Người kiểm | agent `docrev` (ngữ cảnh sạch) |
+| Đã đọc | 25–38 · 60–124 · 972–1044; `git diff` xác nhận đúng 3 dòng đổi (3 insertion / 3 deletion), không đọc lại toàn văn |
+| Máy | `check-feature-doc.ps1 -WP14` → exit 0 (`DAT`; 16/16 heading · 24/24 BR · mục đối chiếu Nhanh :1057) · `check-agent-artifact.ps1 -Kind docreview` → exit 0 (P2 máy đếm = 2 gồm 1 dòng lịch sử vòng 3 đã đóng) |
+
+### Đã kiểm (vòng 4)
+
+| Nhóm | Cách kiểm | Kết quả |
+|---|---|---|
+| D1 tự mâu thuẫn | `grep` toàn tài liệu `nếu chưa|chế độ suy giảm` — các chỗ liên quan `:75`, `:106`, `:999`, `:1029`, `:1038` đều nói **cùng một ý**: `XC-002` đã triển khai, dùng trực tiếp; hồi quy ⇒ job quét DB giữ tin. Không còn câu "nếu chưa, chạy chế độ suy giảm"; khớp còn lại duy nhất là tiêu đề bảng §15.1 "Ảnh hưởng nếu chưa trả lời" (vô hại) | 0 phát hiện |
+| D2 chéo code / `D-xx` | `graph: codegraph_explore "PaymentTransaction IdempotencyKey FailureReason"` → `public string? IdempotencyKey { get; set; }` tại `modules/PaymentHub/eCommerce.PaymentHub.Domain/Entities/PaymentTransaction.cs:84` (**đúng** dẫn mới; dòng 76 **không** phải `IdempotencyKey`). Đối chiếu `D-197` (một module `Notification`) + `ls modules/` + `git log -- modules/Notification` | 1 phát hiện (#1, P2 — as-built cũ, **ngoài** 3 dòng sửa) |
+| D3 cơ chế thực thi | 3 dòng sửa chỉ là điều kiện/văn bản, không đụng BR/unique index; UNIQUE `(TenantId, IdempotencyKey)` NND §5.1 :326–327 giữ nguyên | 0 phát hiện |
+| D4 SQL chạy được | Tài liệu vẫn **0** khối `sql`/`powershell`/`bash` (chỉ `mermaid` + `csharp` minh hoạ) ⇒ không có gì phải chạy trên PostgreSQL | 0 phát hiện |
+| D5 test/probe/tệp có thật | Toạ độ mới `PaymentTransaction.cs:84` xác nhận bằng graph; 3 dòng sửa không thêm tên test/probe/tệp mới | 0 phát hiện |
+| D6 nhãn tin cậy | `XC-002` mang ✅ ở §0.1 :38 có bằng chứng (migration `20261024045237_AbpEventBusOutboxInbox.cs:68–72`, `DeadLetterAppService.cs:40`, `IdempotencyGuard.cs:50`) — nhãn khớp; 3 dòng sửa không đổi nhãn | 0 phát hiện (trừ #1) |
+| D7 14 quy tắc + đối chiếu Nhanh | 3 dòng sửa không đụng NFR/BR/index/Mermaid; mục "Đối chiếu mô hình Nhanh (24/11/2026)" :1057 vẫn có và máy nhận | 0 phát hiện |
+
+### Phát hiện (vòng 4)
+
+| # | Mức | Vị trí | Vấn đề | Đề nghị |
+|---|---|---|---|---|
+| 1 | P2 | §0.1 :32–34 · §14.4 :994 (cùng gốc §15.2 F1 :1025) | **As-built đã lệch code sau v0.4:** tài liệu ghi `modules/` có **15** module, **không** có `Notification`, "0 dòng code miền thông báo, 0 project", và DoR :994 đánh `[x] ✅ "module chưa tồn tại"`. Thực tế `modules/Notification/` có **4 project** (Domain/EF/Application/Contracts), **28 tệp tracked**, commit `7f23726` (**N84, 26/11/2026** — sau v0.4 24/11) với `NotificationDomainModule`/`NotificationErrorCodes`/`NotificationConsts`; `ls modules/` nay **17** module (thêm `Notification`, `Promotions`). Người làm WP-23 đọc §0.1/§14.4 dễ tưởng phải dựng module mới / tự đặt mã lỗi thay vì mở rộng module có sẵn (trái `D-197` "một module") | Cập nhật as-built: "`modules/Notification` **đã có** (N84/N86, 26/11/2026), NOT-001 đã code; NOT-002 còn là kế hoạch"; `15` → `17`; sửa/tick dòng DoR :994 cho khớp |
+
+### Đã đóng (2 phát hiện vòng 3)
+
+| # vòng 3 | Trạng thái | Bằng chứng vòng 4 |
+|---|---|---|
+| 1 (P2) | **đã đóng** | §0.2 ADR-03 :83 nay dẫn `PaymentTransaction.IdempotencyKey` (`PaymentTransaction.cs:84`); `graph: codegraph_explore …` xác nhận `IdempotencyKey` ở **:84**, không còn `:76` |
+| 2 (P3) | **đã đóng** | §1 :106 và §14.4 :999 nay "**`XC-002` (outbox/inbox) đã triển khai** — dùng trực tiếp; nếu hồi quy thì job quét DB vẫn giữ tin (§15.3 giả định 1)", khớp §15.3 :1038 và §0.2 :75; `grep "nếu chưa"` không còn câu nói ngược |
+
+### Không kiểm được (vòng 4)
+
+- **D4**: không có khối `sql`/`powershell`/`bash` để chạy PostgreSQL.
+- **Không chạy `dotnet test`**: 47 TC §14 là **kế hoạch**; vòng kiểm nhanh không chạy test.
+- **Ngoài phạm vi**: không đọc lại §2/§6/§7/§10/§11–§13 (không đổi); phát hiện #1 là as-built lệch code **sau** v0.4, không do 3 dòng sửa.
+
+```json
+{
+  "agent": "DOCREV",
+  "doc": "docs/features/notifications/not-002-kenh-gui-email-sms-zalo-oa.md",
+  "artifact": "docs/reviews/NOT-002-docreview.md",
+  "round": 4,
+  "verdict": "DOC-OK",
+  "p1": 0,
+  "p2": 1,
+  "p3": 0,
+  "sqlRun": "không có khối sql",
+  "readRanges": ["25-38", "60-124", "972-1044"],
+  "mustFix": ["#1 §0.1 :32–34 / §14.4 :994 — cập nhật as-built: modules/Notification đã có (N84/N86, 26/11/2026); NOT-002 còn kế hoạch"]
+}
+```
