@@ -63,6 +63,17 @@ public class PromotionAppService : ApplicationService, IPromotionAppService
         var p = await _promotions.GetAsync(id);
         var dto = new PromotionDetailDto();
         Map(p, dto);
+
+        // `D-288`: trần cây theo tenant — MỘT cửa đọc setting (`DocLimitsAsync`), additive trên DTO.
+        var limits = await DocLimitsAsync();
+        dto.Limits = new PromotionTreeLimitsDto
+        {
+            MaxNodes = limits.MaxNodes,
+            MaxDepth = limits.MaxDepth,
+            MaxLeaves = limits.MaxLeaves,
+            MaxDeclaredCombinations = limits.MaxDeclaredCombinations
+        };
+
         var nodes = await _conditions.GetListAsync(x => x.PromotionId == id);
         dto.Nodes = nodes
             .OrderBy(x => x.Depth).ThenBy(x => x.SortOrder).ThenBy(x => x.Id)

@@ -12,18 +12,22 @@ namespace eCommerce.Promotions.Seed;
 /// </summary>
 public static class PromotionRuleCostCatalog
 {
-    public sealed record Meta(string CostKind, int DeclaredCostFactor, bool RequiresVerifiedCod);
+    /// <summary>
+    /// Metadata rule (`D-290`): `Label` là **nhãn tiếng Việt** cho UI, **do code sở hữu** (không cột DB,
+    /// không migration); tên ngoài bảng ⇒ `Label = SystemName` (hiển thị thô, **không** tính là "có nhãn").
+    /// </summary>
+    public sealed record Meta(string CostKind, int DeclaredCostFactor, bool RequiresVerifiedCod, string Label);
 
     public static readonly IReadOnlyDictionary<string, Meta> V1 = new Dictionary<string, Meta>(StringComparer.Ordinal)
     {
-        [MinOrderAmountRule.Ten] = new("O1", 1, false),
-        [ChannelScopeRule.Ten] = new("O1", 1, false),
-        [CustomerGroupRule.Ten] = new("O1", 1, false),
-        [FirstOrderOnlyRule.Ten] = new("O1", 1, false)
+        [MinOrderAmountRule.Ten] = new("O1", 1, false, "Giá trị đơn tối thiểu"),
+        [ChannelScopeRule.Ten] = new("O1", 1, false, "Kênh bán"),
+        [CustomerGroupRule.Ten] = new("O1", 1, false, "Nhóm khách hàng"),
+        [FirstOrderOnlyRule.Ten] = new("O1", 1, false, "Khách mua lần đầu")
     };
 
     public static Meta Cua(string ruleSystemName)
-        => V1.TryGetValue(ruleSystemName, out var meta) ? meta : new Meta("O1", 1, false);
+        => V1.TryGetValue(ruleSystemName, out var meta) ? meta : new Meta("O1", 1, false, ruleSystemName);
 }
 
 /// <summary>

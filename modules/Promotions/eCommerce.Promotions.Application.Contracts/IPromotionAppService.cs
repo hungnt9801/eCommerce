@@ -59,6 +59,25 @@ public class PromotionDto
 public class PromotionDetailDto : PromotionDto
 {
     public List<PromotionTreeNodeDto> Nodes { get; set; } = new();
+
+    /// <summary>
+    /// **Trần cây theo tenant** (`D-288`) — **4** trần đọc từ ABP Setting qua `DocLimitsAsync()`;
+    /// FE dùng **một nguồn duy nhất** này, **không** chép hằng số `64/8/32/1024` sang app (`D-33`).
+    /// </summary>
+    public PromotionTreeLimitsDto Limits { get; set; } = new();
+}
+
+/// <summary>
+/// **4 trần cây điều kiện** theo tenant (`D-288`, trường additive trên <see cref="PromotionDetailDto"/>).
+/// Không gồm ngân sách chạy (`MaxCandidatesPerCart`/`LeafVisitBudget`/`ComparisonBudget`) — chúng không
+/// hiển thị ở "đồng hồ giới hạn".
+/// </summary>
+public class PromotionTreeLimitsDto
+{
+    public int MaxNodes { get; set; }
+    public int MaxDepth { get; set; }
+    public int MaxLeaves { get; set; }
+    public int MaxDeclaredCombinations { get; set; }
 }
 
 public class PromotionListItemDto : PromotionDto
