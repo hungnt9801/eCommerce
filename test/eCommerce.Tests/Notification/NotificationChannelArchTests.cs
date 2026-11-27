@@ -71,20 +71,39 @@ public class NotificationChannelArchTests
             "Module Notification tham chiếu SDK/Gói nhà cung cấp (D-200 cấm):\n  " + string.Join("\n  ", viPham));
     }
 
-    // ── TC-ARCH-02: sender không tự mở kết nối mạng ────────────────────────────────────────────
+    // ── TC-ARCH-02: tầng kênh gửi + job không tự mở kết nối mạng ───────────────────────────────
 
     [Fact]
-    public void TC_ARCH_02_NotificationSender_khong_dung_HttpClient_SmtpClient_System_Net_Mail()
+    public void TC_ARCH_02_NotificationSender_va_job_khong_dung_HttpClient_SmtpClient_System_Net_Mail()
     {
-        var tep = Path.Combine(ThuMucChannels(), "NotificationSender.cs");
-        Assert.True(File.Exists(tep), "Không tìm thấy `NotificationSender.cs` ⇒ phép kiểm VÔ NGHĨA.");
-
-        var noiDung = File.ReadAllText(tep);
-
-        foreach (var cam in new[] { "HttpClient", "SmtpClient", "System.Net.Mail", "System.Net.Http" })
+        // BR-001: CẤM app service/job gọi SDK/HTTP nhà cung cấp trực tiếp. Quét CẢ tầng kênh gửi
+        // VÀ job bàn giao — không chỉ một tệp (nếu job tự gọi mạng, sender trung lập bị vòng qua).
+        var thuMucQuet = new[]
         {
-            Assert.DoesNotContain(cam, noiDung, StringComparison.Ordinal);
+            ThuMucChannels(),
+            ThuMucModule(Path.Combine("eCommerce.Notification.Application", "Dispatch"))
+        };
+
+        var files = thuMucQuet
+            .Where(Directory.Exists)
+            .SelectMany(d => Directory.GetFiles(d, "*.cs", SearchOption.AllDirectories))
+            .ToList();
+        Assert.NotEmpty(files);
+
+        var cam = new[] { "HttpClient", "SmtpClient", "System.Net.Mail", "System.Net.Http" };
+        var viPham = new List<string>();
+
+        foreach (var tep in files)
+        {
+            var noiDung = File.ReadAllText(tep);
+            viPham.AddRange(cam
+                .Where(c => noiDung.Contains(c, StringComparison.Ordinal))
+                .Select(c => $"{Path.GetFileName(tep)}: {c}"));
         }
+
+        Assert.True(viPham.Count == 0,
+            "Tầng kênh gửi / job bàn giao tham chiếu SDK/HTTP nhà cung cấp trực tiếp (BR-001):\n  "
+            + string.Join("\n  ", viPham));
     }
 
     // ── TC-ARCH-03: không gọi app service của module khác ──────────────────────────────────────
@@ -183,5 +202,37 @@ public class NotificationChannelArchTests
         Assert.NotEmpty(filesApplication);
         Assert.All(filesApplication, tep =>
             Assert.DoesNotContain("new Meter(", File.ReadAllText(tep), StringComparison.Ordinal));
+    }
+
+    // ── TC-ARCH-05 (BR-011, phần đã hiện thực): hợp đồng bắt buộc `CancellationToken` ──────────
+
+    [Fact]
+    public void TC_ARCH_05_hop_dong_adapter_bat_buoc_CancellationToken_cho_timeout()
+    {
+        // BR-011 yêu cầu MỌI lời gọi nhà cung cấp phải huỷ được theo thời hạn. Phần đã hiện thực ở WP-23 là
+        // hợp đồng: adapter kênh chỉ có ĐÚNG một `SendAsync(...)` với tham số cuối `CancellationToken`.
+        // Bỏ tham số này ⇒ không thể áp timeout hữu hạn ⇒ job gọi không huỷ được (test PHẢI đỏ).
+        var lenhKenh = typeof(INotificationChannelSender)
+            .GetMethods()
+            .Where(m => m.Name == "SendAsync")
+            .ToList();
+
+        var guiKenh = Assert.Single(lenhKenh);
+        Assert.Equal(typeof(Task<SendOutcome>), guiKenh.ReturnType);
+
+        var thamSoKenh = guiKenh.GetParameters();
+        Assert.Equal(2, thamSoKenh.Length);
+        Assert.Equal(typeof(SendCommand), thamSoKenh[0].ParameterType);
+        Assert.Equal(typeof(CancellationToken), thamSoKenh[1].ParameterType);
+        Assert.True(thamSoKenh[1].HasDefaultValue, "`CancellationToken` phải có mặc định `default`.");
+
+        // Hợp đồng nội module cũng phải nhận `CancellationToken` để job truyền huỷ xuống adapter.
+        var lenhNoiModule = typeof(INotificationSender)
+            .GetMethods()
+            .Where(m => m.Name == "SendAsync")
+            .ToList();
+
+        var guiNoiModule = Assert.Single(lenhNoiModule);
+        Assert.Equal(typeof(CancellationToken), guiNoiModule.GetParameters()[^1].ParameterType);
     }
 }
