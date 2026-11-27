@@ -55,6 +55,19 @@ export const MENU: MenuGroup[] = [
     ],
   },
   {
+    label: "Khuyến mãi",
+    items: [
+      // ✅ `PRO-002` W24-3 — màn dựng cây điều kiện (list · tạo · chi tiết). Menu mở bằng quyền ĐỌC; nút
+      // tạo/lưu cây kiểm `Promotions.Manage`, nút duyệt kiểm `Promotions.Approve` riêng trong màn.
+      {
+        label: "Khuyến mãi",
+        href: "promotion",
+        permission: "eCommerce.Promotions.View",
+        enabled: true,
+      },
+    ],
+  },
+  {
     label: "Khách hàng",
     items: [
       // ✅ `WP-07` — DS khách 5 tab phân khúc + chi tiết 5 tab.

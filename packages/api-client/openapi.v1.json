@@ -2459,6 +2459,356 @@
         }
       }
     },
+    "/api/v1/promotion": {
+      "get": {
+        "tags": [
+          "Promotions"
+        ],
+        "parameters": [
+          {
+            "name": "Status",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/eCommerce.Promotions.PromotionStatus"
+            }
+          },
+          {
+            "name": "Kind",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/eCommerce.Promotions.PromotionKind"
+            }
+          },
+          {
+            "name": "Page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "PageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "Sort",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Promotions.Contracts.PromotionListItemDto, eCommerce.Promotions.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Promotions.Contracts.PromotionListItemDto, eCommerce.Promotions.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Promotions.Contracts.PromotionListItemDto, eCommerce.Promotions.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Promotions"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.CreatePromotionDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.CreatePromotionDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.CreatePromotionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.PromotionDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.PromotionDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.PromotionDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/promotion/rule-catalog": {
+      "get": {
+        "tags": [
+          "Promotions"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.PromotionRuleCatalogItemDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.PromotionRuleCatalogItemDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.PromotionRuleCatalogItemDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/promotion/{id}": {
+      "get": {
+        "tags": [
+          "Promotions"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.PromotionDetailDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.PromotionDetailDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.PromotionDetailDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/promotion/{id}/save-tree": {
+      "post": {
+        "tags": [
+          "Promotions"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.PromotionTreeInput"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.PromotionTreeInput"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.PromotionTreeInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.PromotionTreeValidationResultDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.PromotionTreeValidationResultDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.PromotionTreeValidationResultDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/promotion/{id}/approve": {
+      "post": {
+        "tags": [
+          "Promotions"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.PromotionDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.PromotionDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.PromotionDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/promotion/{id}/set-status": {
+      "post": {
+        "tags": [
+          "Promotions"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.SetPromotionStatusInput"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.SetPromotionStatusInput"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.SetPromotionStatusInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.PromotionDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.PromotionDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.PromotionDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/reports/revenue": {
       "get": {
         "tags": [
@@ -2676,6 +3026,521 @@
               "text/json": {
                 "schema": {
                   "$ref": "#/components/schemas/eCommerce.Reporting.KetQuaTongHopDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/rebuild": {
+      "post": {
+        "tags": [
+          "Reports"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Reporting.StartRebuildInput"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Reporting.StartRebuildInput"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Reporting.StartRebuildInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Reporting.LanChayDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Reporting.LanChayDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Reporting.LanChayDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/rebuild/{runId}/resume": {
+      "post": {
+        "tags": [
+          "Reports"
+        ],
+        "parameters": [
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Reporting.LanChayDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Reporting.LanChayDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Reporting.LanChayDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/rebuild/{runId}": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "parameters": [
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Reporting.LanChayDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Reporting.LanChayDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Reporting.LanChayDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/rebuilds": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "parameters": [
+          {
+            "name": "SkipCount",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "MaxResultCount",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "Projection",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/eCommerce.Reporting.RepProjection"
+            }
+          },
+          {
+            "name": "Status",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/eCommerce.Reporting.RepRunStatus"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Reporting.LanChayPageDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Reporting.LanChayPageDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Reporting.LanChayPageDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/period-close": {
+      "post": {
+        "tags": [
+          "Reports"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Reporting.ClosePeriodInput"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Reporting.ClosePeriodInput"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Reporting.ClosePeriodInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Reporting.KyChotDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Reporting.KyChotDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Reporting.KyChotDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/period-close/{id}/reopen": {
+      "post": {
+        "tags": [
+          "Reports"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Reporting.ReopenPeriodInput"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Reporting.ReopenPeriodInput"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Reporting.ReopenPeriodInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Reporting.KyChotDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Reporting.KyChotDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Reporting.KyChotDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/period-close/{id}": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Reporting.KyChotDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Reporting.KyChotDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Reporting.KyChotDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/period-closes": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "parameters": [
+          {
+            "name": "SkipCount",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "MaxResultCount",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "Status",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/eCommerce.Reporting.RepPeriodStatus"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Reporting.KyChotPageDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Reporting.KyChotPageDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Reporting.KyChotPageDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/reconciliation": {
+      "post": {
+        "tags": [
+          "Reports"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Reporting.RunReconciliationInput"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Reporting.RunReconciliationInput"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/eCommerce.Reporting.RunReconciliationInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Reporting.KetQuaDoiChieuDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Reporting.KetQuaDoiChieuDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Reporting.KetQuaDoiChieuDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/consistency-checks": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "parameters": [
+          {
+            "name": "SkipCount",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "MaxResultCount",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "Projection",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/eCommerce.Reporting.RepProjection"
+            }
+          },
+          {
+            "name": "FromDate",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "ToDate",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "DaXuLy",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Reporting.LechSoPageDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Reporting.LechSoPageDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/eCommerce.Reporting.LechSoPageDto"
                 }
               }
             }
@@ -4123,6 +4988,40 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/eCommerce.Notification.NotificationTemplateDto"
+            },
+            "nullable": true
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Promotions.Contracts.PromotionListItemDto, eCommerce.Promotions.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.PromotionListItemDto"
+            },
+            "nullable": true
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Promotions.Contracts.RedemptionDto, eCommerce.Promotions.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.RedemptionDto"
             },
             "nullable": true
           },
@@ -12085,6 +12984,31 @@
         },
         "additionalProperties": false
       },
+      "eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Promotions.Contracts.PromotionListItemDto, eCommerce.Promotions.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.PromotionListItemDto"
+            },
+            "nullable": true
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
       "eCommerce.HttpApi.Dtos.ProductDetailDto": {
         "type": "object",
         "properties": {
@@ -14851,6 +15775,879 @@
         "type": "integer",
         "format": "int32"
       },
+      "eCommerce.Promotions.Contracts.CreatePromotionDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "kind": {
+            "$ref": "#/components/schemas/eCommerce.Promotions.PromotionKind"
+          },
+          "isCumulative": {
+            "type": "boolean"
+          },
+          "priority": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "channelScope": {
+            "type": "string",
+            "nullable": true
+          },
+          "startsAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endsAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "discountKind": {
+            "$ref": "#/components/schemas/eCommerce.Promotions.PromotionDiscountKind"
+          },
+          "discountValue": {
+            "type": "number",
+            "format": "double"
+          },
+          "maxDiscountAmount": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "minOrderAmount": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "currency": {
+            "type": "string",
+            "nullable": true
+          },
+          "maxUsageTotal": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "maxUsagePerCustomer": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Promotions.Contracts.ImportResultDto": {
+        "type": "object",
+        "properties": {
+          "capNhat": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "boQua": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "alreadyImported": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Promotions.Contracts.ImportRuleCostsInput": {
+        "type": "object",
+        "properties": {
+          "fileContent": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Promotions.Contracts.PromotionBreakdownItem": {
+        "type": "object",
+        "properties": {
+          "promotionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nodeId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "satisfied": {
+            "type": "boolean"
+          },
+          "rejectionReason": {
+            "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.PromotionRejectionReason"
+          },
+          "source": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Promotions.Contracts.PromotionCartLine": {
+        "type": "object",
+        "properties": {
+          "sku": {
+            "type": "string",
+            "nullable": true
+          },
+          "quantity": {
+            "type": "number",
+            "format": "double"
+          },
+          "unitPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "productGroup": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Promotions.Contracts.PromotionDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "kind": {
+            "$ref": "#/components/schemas/eCommerce.Promotions.PromotionKind"
+          },
+          "status": {
+            "$ref": "#/components/schemas/eCommerce.Promotions.PromotionStatus"
+          },
+          "isCumulative": {
+            "type": "boolean"
+          },
+          "priority": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "channelScope": {
+            "type": "string",
+            "nullable": true
+          },
+          "startsAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endsAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "treeVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxUsageTotal": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "usedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "reservedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxUsagePerCustomer": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "discountKind": {
+            "$ref": "#/components/schemas/eCommerce.Promotions.PromotionDiscountKind"
+          },
+          "discountValue": {
+            "type": "number",
+            "format": "double"
+          },
+          "maxDiscountAmount": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "minOrderAmount": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "currency": {
+            "type": "string",
+            "nullable": true
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.PromotionTreeNodeDto"
+            },
+            "nullable": true
+          },
+          "limits": {
+            "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.PromotionTreeLimitsDto"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Promotions.Contracts.PromotionDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "kind": {
+            "$ref": "#/components/schemas/eCommerce.Promotions.PromotionKind"
+          },
+          "status": {
+            "$ref": "#/components/schemas/eCommerce.Promotions.PromotionStatus"
+          },
+          "isCumulative": {
+            "type": "boolean"
+          },
+          "priority": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "channelScope": {
+            "type": "string",
+            "nullable": true
+          },
+          "startsAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endsAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "treeVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxUsageTotal": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "usedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "reservedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxUsagePerCustomer": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "discountKind": {
+            "$ref": "#/components/schemas/eCommerce.Promotions.PromotionDiscountKind"
+          },
+          "discountValue": {
+            "type": "number",
+            "format": "double"
+          },
+          "maxDiscountAmount": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "minOrderAmount": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "currency": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Promotions.Contracts.PromotionEvaluateInput": {
+        "type": "object",
+        "properties": {
+          "checkoutSessionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.PromotionCartLine"
+            },
+            "nullable": true
+          },
+          "channelCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "currency": {
+            "type": "string",
+            "nullable": true
+          },
+          "subtotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "customerId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "customerGroupId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "isFirstOrder": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "voucherCode": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Promotions.Contracts.PromotionEvaluationResultDto": {
+        "type": "object",
+        "properties": {
+          "applied": {
+            "type": "boolean"
+          },
+          "discountTotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "currency": {
+            "type": "string",
+            "nullable": true
+          },
+          "breakdown": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.PromotionBreakdownItem"
+            },
+            "nullable": true
+          },
+          "rejectionReason": {
+            "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.PromotionRejectionReason"
+          },
+          "leafVisits": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "comparisons": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Promotions.Contracts.PromotionListItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "kind": {
+            "$ref": "#/components/schemas/eCommerce.Promotions.PromotionKind"
+          },
+          "status": {
+            "$ref": "#/components/schemas/eCommerce.Promotions.PromotionStatus"
+          },
+          "isCumulative": {
+            "type": "boolean"
+          },
+          "priority": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "channelScope": {
+            "type": "string",
+            "nullable": true
+          },
+          "startsAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endsAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "treeVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxUsageTotal": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "usedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "reservedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxUsagePerCustomer": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "discountKind": {
+            "$ref": "#/components/schemas/eCommerce.Promotions.PromotionDiscountKind"
+          },
+          "discountValue": {
+            "type": "number",
+            "format": "double"
+          },
+          "maxDiscountAmount": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "minOrderAmount": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "currency": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Promotions.Contracts.PromotionRejectionReason": {
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "eCommerce.Promotions.Contracts.PromotionRuleCatalogItemDto": {
+        "type": "object",
+        "properties": {
+          "systemName": {
+            "type": "string",
+            "nullable": true
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "requiresVerifiedCod": {
+            "type": "boolean"
+          },
+          "declaredCostFactor": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "retiredAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "isSeeded": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Promotions.Contracts.PromotionTreeInput": {
+        "type": "object",
+        "properties": {
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.PromotionTreeNodeInput"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Promotions.Contracts.PromotionTreeLimitsDto": {
+        "type": "object",
+        "properties": {
+          "maxNodes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxDepth": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxLeaves": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxDeclaredCombinations": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Promotions.Contracts.PromotionTreeNodeDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "parentId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "isGroup": {
+            "type": "boolean"
+          },
+          "interactionType": {
+            "$ref": "#/components/schemas/eCommerce.Promotions.PromotionConditionGroupType"
+          },
+          "ruleSystemName": {
+            "type": "string",
+            "nullable": true
+          },
+          "configJson": {
+            "type": "string",
+            "nullable": true
+          },
+          "sortOrder": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "depth": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Promotions.Contracts.PromotionTreeNodeInput": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "parentId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "isGroup": {
+            "type": "boolean"
+          },
+          "interactionType": {
+            "$ref": "#/components/schemas/eCommerce.Promotions.PromotionConditionGroupType"
+          },
+          "ruleSystemName": {
+            "type": "string",
+            "nullable": true
+          },
+          "configJson": {
+            "type": "string",
+            "nullable": true
+          },
+          "sortOrder": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "depth": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Promotions.Contracts.PromotionTreeValidationResultDto": {
+        "type": "object",
+        "properties": {
+          "nodeCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "depth": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "leafCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "declaredCost": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxDeclaredCombinations": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "alreadySaved": {
+            "type": "boolean"
+          },
+          "viPham": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Promotions.Contracts.RedemptionDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "promotionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "voucherCodeId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "orderId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/eCommerce.Promotions.PromotionRedemptionStatus"
+          },
+          "usageSequence": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "reasonCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "customerId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "discountAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "currency": {
+            "type": "string",
+            "nullable": true
+          },
+          "treeVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "evaluatedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Promotions.Contracts.SetPromotionStatusInput": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/eCommerce.Promotions.PromotionStatus"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Promotions.Contracts.ValidateVoucherInput": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "checkoutSessionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.PromotionCartLine"
+            },
+            "nullable": true
+          },
+          "channelCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "currency": {
+            "type": "string",
+            "nullable": true
+          },
+          "subtotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "customerId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "customerGroupId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "isFirstOrder": {
+            "type": "boolean",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Promotions.Contracts.VoucherValidationDto": {
+        "type": "object",
+        "properties": {
+          "isValid": {
+            "type": "boolean"
+          },
+          "promotionId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "discountTotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "currency": {
+            "type": "string",
+            "nullable": true
+          },
+          "rejectionReason": {
+            "$ref": "#/components/schemas/eCommerce.Promotions.Contracts.PromotionRejectionReason"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Promotions.PromotionConditionGroupType": {
+        "enum": [
+          0,
+          1
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "eCommerce.Promotions.PromotionDiscountKind": {
+        "enum": [
+          0,
+          1,
+          2
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "eCommerce.Promotions.PromotionKind": {
+        "enum": [
+          0,
+          1,
+          2
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "eCommerce.Promotions.PromotionRedemptionStatus": {
+        "enum": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "eCommerce.Promotions.PromotionStatus": {
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
       "eCommerce.Reconciliation.Dtos.PaymentDiscrepancyDto": {
         "type": "object",
         "properties": {
@@ -15165,6 +16962,24 @@
         },
         "additionalProperties": false
       },
+      "eCommerce.Reporting.ClosePeriodInput": {
+        "type": "object",
+        "properties": {
+          "fromDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "toDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "eCommerce.Reporting.DiemDoanhThuDto": {
         "type": "object",
         "properties": {
@@ -15233,6 +17048,24 @@
         },
         "additionalProperties": false
       },
+      "eCommerce.Reporting.KetQuaDoiChieuDto": {
+        "type": "object",
+        "properties": {
+          "soNgayDaSo": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "soDongLech": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "soDongLechMoi": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
       "eCommerce.Reporting.KetQuaTongHopDto": {
         "type": "object",
         "properties": {
@@ -15276,6 +17109,239 @@
           "mocTonKho": {
             "type": "string",
             "format": "date",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Reporting.KyChotDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fromDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "toDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "status": {
+            "$ref": "#/components/schemas/eCommerce.Reporting.RepPeriodStatus"
+          },
+          "snapshotHash": {
+            "type": "string",
+            "nullable": true
+          },
+          "closedBy": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "closedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "closeReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "reopenedBy": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "reopenReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "reopenedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "alreadyClosed": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Reporting.KyChotPageDto": {
+        "type": "object",
+        "properties": {
+          "totalCount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/eCommerce.Reporting.KyChotDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Reporting.LanChayDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "jobName": {
+            "type": "string",
+            "nullable": true
+          },
+          "projection": {
+            "$ref": "#/components/schemas/eCommerce.Reporting.RepProjection"
+          },
+          "status": {
+            "$ref": "#/components/schemas/eCommerce.Reporting.RepRunStatus"
+          },
+          "fromDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "toDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "windowsTotal": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "windowsDone": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "checkpointDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "rowsWritten": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "requestedBy": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "startedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "finishedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "hostName": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastErrorCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "alreadyRequested": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Reporting.LanChayPageDto": {
+        "type": "object",
+        "properties": {
+          "totalCount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/eCommerce.Reporting.LanChayDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Reporting.LechSoDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "factDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "projection": {
+            "$ref": "#/components/schemas/eCommerce.Reporting.RepProjection"
+          },
+          "mismatchKind": {
+            "$ref": "#/components/schemas/eCommerce.Reporting.RepMismatchKind"
+          },
+          "factKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "expectedValue": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "actualValue": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "delta": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "autoCorrected": {
+            "type": "boolean"
+          },
+          "detectedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "resolvedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Reporting.LechSoPageDto": {
+        "type": "object",
+        "properties": {
+          "totalCount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/eCommerce.Reporting.LechSoDto"
+            },
             "nullable": true
           }
         },
@@ -15330,6 +17396,99 @@
           "giaTriDon": {
             "type": "number",
             "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Reporting.ReopenPeriodInput": {
+        "type": "object",
+        "properties": {
+          "periodId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Reporting.RepMismatchKind": {
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "eCommerce.Reporting.RepPeriodStatus": {
+        "enum": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "eCommerce.Reporting.RepProjection": {
+        "enum": [
+          0,
+          1
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "eCommerce.Reporting.RepRunStatus": {
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "eCommerce.Reporting.RunReconciliationInput": {
+        "type": "object",
+        "properties": {
+          "fromDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "toDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "projection": {
+            "$ref": "#/components/schemas/eCommerce.Reporting.RepProjection"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Reporting.StartRebuildInput": {
+        "type": "object",
+        "properties": {
+          "fromDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "toDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "projection": {
+            "$ref": "#/components/schemas/eCommerce.Reporting.RepProjection"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -16091,7 +18250,19 @@
       "name": "Products"
     },
     {
+      "name": "Promotion"
+    },
+    {
+      "name": "PromotionRuleCatalog"
+    },
+    {
+      "name": "Promotions"
+    },
+    {
       "name": "Report"
+    },
+    {
+      "name": "ReportAdmin"
     },
     {
       "name": "Reports"

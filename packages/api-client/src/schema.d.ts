@@ -1712,6 +1712,281 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/promotion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    Status?: components["schemas"]["eCommerce.Promotions.PromotionStatus"];
+                    Kind?: components["schemas"]["eCommerce.Promotions.PromotionKind"];
+                    Page?: number;
+                    PageSize?: number;
+                    Sort?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Promotions.Contracts.PromotionListItemDto, eCommerce.Promotions.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"];
+                        "application/json": components["schemas"]["eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Promotions.Contracts.PromotionListItemDto, eCommerce.Promotions.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"];
+                        "text/json": components["schemas"]["eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Promotions.Contracts.PromotionListItemDto, eCommerce.Promotions.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["eCommerce.Promotions.Contracts.CreatePromotionDto"];
+                    "text/json": components["schemas"]["eCommerce.Promotions.Contracts.CreatePromotionDto"];
+                    "application/*+json": components["schemas"]["eCommerce.Promotions.Contracts.CreatePromotionDto"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Promotions.Contracts.PromotionDto"];
+                        "application/json": components["schemas"]["eCommerce.Promotions.Contracts.PromotionDto"];
+                        "text/json": components["schemas"]["eCommerce.Promotions.Contracts.PromotionDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/promotion/rule-catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Promotions.Contracts.PromotionRuleCatalogItemDto"][];
+                        "application/json": components["schemas"]["eCommerce.Promotions.Contracts.PromotionRuleCatalogItemDto"][];
+                        "text/json": components["schemas"]["eCommerce.Promotions.Contracts.PromotionRuleCatalogItemDto"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/promotion/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Promotions.Contracts.PromotionDetailDto"];
+                        "application/json": components["schemas"]["eCommerce.Promotions.Contracts.PromotionDetailDto"];
+                        "text/json": components["schemas"]["eCommerce.Promotions.Contracts.PromotionDetailDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/promotion/{id}/save-tree": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["eCommerce.Promotions.Contracts.PromotionTreeInput"];
+                    "text/json": components["schemas"]["eCommerce.Promotions.Contracts.PromotionTreeInput"];
+                    "application/*+json": components["schemas"]["eCommerce.Promotions.Contracts.PromotionTreeInput"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Promotions.Contracts.PromotionTreeValidationResultDto"];
+                        "application/json": components["schemas"]["eCommerce.Promotions.Contracts.PromotionTreeValidationResultDto"];
+                        "text/json": components["schemas"]["eCommerce.Promotions.Contracts.PromotionTreeValidationResultDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/promotion/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Promotions.Contracts.PromotionDto"];
+                        "application/json": components["schemas"]["eCommerce.Promotions.Contracts.PromotionDto"];
+                        "text/json": components["schemas"]["eCommerce.Promotions.Contracts.PromotionDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/promotion/{id}/set-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["eCommerce.Promotions.Contracts.SetPromotionStatusInput"];
+                    "text/json": components["schemas"]["eCommerce.Promotions.Contracts.SetPromotionStatusInput"];
+                    "application/*+json": components["schemas"]["eCommerce.Promotions.Contracts.SetPromotionStatusInput"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Promotions.Contracts.PromotionDto"];
+                        "application/json": components["schemas"]["eCommerce.Promotions.Contracts.PromotionDto"];
+                        "text/json": components["schemas"]["eCommerce.Promotions.Contracts.PromotionDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reports/revenue": {
         parameters: {
             query?: never;
@@ -1907,6 +2182,424 @@ export interface paths {
                 };
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/rebuild": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["eCommerce.Reporting.StartRebuildInput"];
+                    "text/json": components["schemas"]["eCommerce.Reporting.StartRebuildInput"];
+                    "application/*+json": components["schemas"]["eCommerce.Reporting.StartRebuildInput"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Reporting.LanChayDto"];
+                        "application/json": components["schemas"]["eCommerce.Reporting.LanChayDto"];
+                        "text/json": components["schemas"]["eCommerce.Reporting.LanChayDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/rebuild/{runId}/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    runId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Reporting.LanChayDto"];
+                        "application/json": components["schemas"]["eCommerce.Reporting.LanChayDto"];
+                        "text/json": components["schemas"]["eCommerce.Reporting.LanChayDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/rebuild/{runId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    runId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Reporting.LanChayDto"];
+                        "application/json": components["schemas"]["eCommerce.Reporting.LanChayDto"];
+                        "text/json": components["schemas"]["eCommerce.Reporting.LanChayDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/rebuilds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    SkipCount?: number;
+                    MaxResultCount?: number;
+                    Projection?: components["schemas"]["eCommerce.Reporting.RepProjection"];
+                    Status?: components["schemas"]["eCommerce.Reporting.RepRunStatus"];
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Reporting.LanChayPageDto"];
+                        "application/json": components["schemas"]["eCommerce.Reporting.LanChayPageDto"];
+                        "text/json": components["schemas"]["eCommerce.Reporting.LanChayPageDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/period-close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["eCommerce.Reporting.ClosePeriodInput"];
+                    "text/json": components["schemas"]["eCommerce.Reporting.ClosePeriodInput"];
+                    "application/*+json": components["schemas"]["eCommerce.Reporting.ClosePeriodInput"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Reporting.KyChotDto"];
+                        "application/json": components["schemas"]["eCommerce.Reporting.KyChotDto"];
+                        "text/json": components["schemas"]["eCommerce.Reporting.KyChotDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/period-close/{id}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["eCommerce.Reporting.ReopenPeriodInput"];
+                    "text/json": components["schemas"]["eCommerce.Reporting.ReopenPeriodInput"];
+                    "application/*+json": components["schemas"]["eCommerce.Reporting.ReopenPeriodInput"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Reporting.KyChotDto"];
+                        "application/json": components["schemas"]["eCommerce.Reporting.KyChotDto"];
+                        "text/json": components["schemas"]["eCommerce.Reporting.KyChotDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/period-close/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Reporting.KyChotDto"];
+                        "application/json": components["schemas"]["eCommerce.Reporting.KyChotDto"];
+                        "text/json": components["schemas"]["eCommerce.Reporting.KyChotDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/period-closes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    SkipCount?: number;
+                    MaxResultCount?: number;
+                    Status?: components["schemas"]["eCommerce.Reporting.RepPeriodStatus"];
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Reporting.KyChotPageDto"];
+                        "application/json": components["schemas"]["eCommerce.Reporting.KyChotPageDto"];
+                        "text/json": components["schemas"]["eCommerce.Reporting.KyChotPageDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/reconciliation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["eCommerce.Reporting.RunReconciliationInput"];
+                    "text/json": components["schemas"]["eCommerce.Reporting.RunReconciliationInput"];
+                    "application/*+json": components["schemas"]["eCommerce.Reporting.RunReconciliationInput"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Reporting.KetQuaDoiChieuDto"];
+                        "application/json": components["schemas"]["eCommerce.Reporting.KetQuaDoiChieuDto"];
+                        "text/json": components["schemas"]["eCommerce.Reporting.KetQuaDoiChieuDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/consistency-checks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    SkipCount?: number;
+                    MaxResultCount?: number;
+                    Projection?: components["schemas"]["eCommerce.Reporting.RepProjection"];
+                    FromDate?: string;
+                    ToDate?: string;
+                    DaXuLy?: boolean;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["eCommerce.Reporting.LechSoPageDto"];
+                        "application/json": components["schemas"]["eCommerce.Reporting.LechSoPageDto"];
+                        "text/json": components["schemas"]["eCommerce.Reporting.LechSoPageDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2896,6 +3589,16 @@ export interface components {
         };
         "Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Notification.NotificationTemplateDto, eCommerce.Notification.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]": {
             items?: components["schemas"]["eCommerce.Notification.NotificationTemplateDto"][] | null;
+            /** Format: int64 */
+            totalCount?: number;
+        };
+        "Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Promotions.Contracts.PromotionListItemDto, eCommerce.Promotions.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]": {
+            items?: components["schemas"]["eCommerce.Promotions.Contracts.PromotionListItemDto"][] | null;
+            /** Format: int64 */
+            totalCount?: number;
+        };
+        "Volo.Abp.Application.Dtos.PagedResultDto`1[[eCommerce.Promotions.Contracts.RedemptionDto, eCommerce.Promotions.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]": {
+            items?: components["schemas"]["eCommerce.Promotions.Contracts.RedemptionDto"][] | null;
             /** Format: int64 */
             totalCount?: number;
         };
@@ -5508,6 +6211,15 @@ export interface components {
             /** Format: int32 */
             pageSize?: number;
         };
+        "eCommerce.HttpApi.Dtos.ApiPage`1[[eCommerce.Promotions.Contracts.PromotionListItemDto, eCommerce.Promotions.Application.Contracts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]": {
+            items?: components["schemas"]["eCommerce.Promotions.Contracts.PromotionListItemDto"][] | null;
+            /** Format: int64 */
+            total?: number;
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            pageSize?: number;
+        };
         "eCommerce.HttpApi.Dtos.ProductDetailDto": {
             /** Format: uuid */
             id?: string;
@@ -6472,6 +7184,334 @@ export interface components {
          * @enum {integer}
          */
         "eCommerce.ProductType": 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+        "eCommerce.Promotions.Contracts.CreatePromotionDto": {
+            code?: string | null;
+            name?: string | null;
+            kind?: components["schemas"]["eCommerce.Promotions.PromotionKind"];
+            isCumulative?: boolean;
+            /** Format: int32 */
+            priority?: number;
+            channelScope?: string | null;
+            /** Format: date-time */
+            startsAtUtc?: string;
+            /** Format: date-time */
+            endsAtUtc?: string | null;
+            discountKind?: components["schemas"]["eCommerce.Promotions.PromotionDiscountKind"];
+            /** Format: double */
+            discountValue?: number;
+            /** Format: double */
+            maxDiscountAmount?: number | null;
+            /** Format: double */
+            minOrderAmount?: number | null;
+            currency?: string | null;
+            /** Format: int32 */
+            maxUsageTotal?: number | null;
+            /** Format: int32 */
+            maxUsagePerCustomer?: number | null;
+        };
+        "eCommerce.Promotions.Contracts.ImportResultDto": {
+            /** Format: int32 */
+            capNhat?: number;
+            /** Format: int32 */
+            boQua?: number;
+            alreadyImported?: boolean;
+        };
+        "eCommerce.Promotions.Contracts.ImportRuleCostsInput": {
+            fileContent?: string | null;
+        };
+        "eCommerce.Promotions.Contracts.PromotionBreakdownItem": {
+            /** Format: uuid */
+            promotionId?: string;
+            /** Format: uuid */
+            nodeId?: string | null;
+            satisfied?: boolean;
+            rejectionReason?: components["schemas"]["eCommerce.Promotions.Contracts.PromotionRejectionReason"];
+            source?: string | null;
+        };
+        "eCommerce.Promotions.Contracts.PromotionCartLine": {
+            sku?: string | null;
+            /** Format: double */
+            quantity?: number;
+            /** Format: double */
+            unitPrice?: number;
+            productGroup?: string | null;
+        };
+        "eCommerce.Promotions.Contracts.PromotionDetailDto": {
+            /** Format: uuid */
+            id?: string;
+            code?: string | null;
+            name?: string | null;
+            kind?: components["schemas"]["eCommerce.Promotions.PromotionKind"];
+            status?: components["schemas"]["eCommerce.Promotions.PromotionStatus"];
+            isCumulative?: boolean;
+            /** Format: int32 */
+            priority?: number;
+            channelScope?: string | null;
+            /** Format: date-time */
+            startsAtUtc?: string;
+            /** Format: date-time */
+            endsAtUtc?: string | null;
+            /** Format: int32 */
+            treeVersion?: number;
+            /** Format: int32 */
+            maxUsageTotal?: number | null;
+            /** Format: int32 */
+            usedCount?: number;
+            /** Format: int32 */
+            reservedCount?: number;
+            /** Format: int32 */
+            maxUsagePerCustomer?: number | null;
+            discountKind?: components["schemas"]["eCommerce.Promotions.PromotionDiscountKind"];
+            /** Format: double */
+            discountValue?: number;
+            /** Format: double */
+            maxDiscountAmount?: number | null;
+            /** Format: double */
+            minOrderAmount?: number | null;
+            currency?: string | null;
+            nodes?: components["schemas"]["eCommerce.Promotions.Contracts.PromotionTreeNodeDto"][] | null;
+            limits?: components["schemas"]["eCommerce.Promotions.Contracts.PromotionTreeLimitsDto"];
+        };
+        "eCommerce.Promotions.Contracts.PromotionDto": {
+            /** Format: uuid */
+            id?: string;
+            code?: string | null;
+            name?: string | null;
+            kind?: components["schemas"]["eCommerce.Promotions.PromotionKind"];
+            status?: components["schemas"]["eCommerce.Promotions.PromotionStatus"];
+            isCumulative?: boolean;
+            /** Format: int32 */
+            priority?: number;
+            channelScope?: string | null;
+            /** Format: date-time */
+            startsAtUtc?: string;
+            /** Format: date-time */
+            endsAtUtc?: string | null;
+            /** Format: int32 */
+            treeVersion?: number;
+            /** Format: int32 */
+            maxUsageTotal?: number | null;
+            /** Format: int32 */
+            usedCount?: number;
+            /** Format: int32 */
+            reservedCount?: number;
+            /** Format: int32 */
+            maxUsagePerCustomer?: number | null;
+            discountKind?: components["schemas"]["eCommerce.Promotions.PromotionDiscountKind"];
+            /** Format: double */
+            discountValue?: number;
+            /** Format: double */
+            maxDiscountAmount?: number | null;
+            /** Format: double */
+            minOrderAmount?: number | null;
+            currency?: string | null;
+        };
+        "eCommerce.Promotions.Contracts.PromotionEvaluateInput": {
+            /** Format: uuid */
+            checkoutSessionId?: string;
+            lines?: components["schemas"]["eCommerce.Promotions.Contracts.PromotionCartLine"][] | null;
+            channelCode?: string | null;
+            currency?: string | null;
+            /** Format: double */
+            subtotal?: number;
+            /** Format: uuid */
+            customerId?: string | null;
+            /** Format: uuid */
+            customerGroupId?: string | null;
+            isFirstOrder?: boolean | null;
+            voucherCode?: string | null;
+        };
+        "eCommerce.Promotions.Contracts.PromotionEvaluationResultDto": {
+            applied?: boolean;
+            /** Format: double */
+            discountTotal?: number;
+            currency?: string | null;
+            breakdown?: components["schemas"]["eCommerce.Promotions.Contracts.PromotionBreakdownItem"][] | null;
+            rejectionReason?: components["schemas"]["eCommerce.Promotions.Contracts.PromotionRejectionReason"];
+            /** Format: int32 */
+            leafVisits?: number;
+            /** Format: int32 */
+            comparisons?: number;
+        };
+        "eCommerce.Promotions.Contracts.PromotionListItemDto": {
+            /** Format: uuid */
+            id?: string;
+            code?: string | null;
+            name?: string | null;
+            kind?: components["schemas"]["eCommerce.Promotions.PromotionKind"];
+            status?: components["schemas"]["eCommerce.Promotions.PromotionStatus"];
+            isCumulative?: boolean;
+            /** Format: int32 */
+            priority?: number;
+            channelScope?: string | null;
+            /** Format: date-time */
+            startsAtUtc?: string;
+            /** Format: date-time */
+            endsAtUtc?: string | null;
+            /** Format: int32 */
+            treeVersion?: number;
+            /** Format: int32 */
+            maxUsageTotal?: number | null;
+            /** Format: int32 */
+            usedCount?: number;
+            /** Format: int32 */
+            reservedCount?: number;
+            /** Format: int32 */
+            maxUsagePerCustomer?: number | null;
+            discountKind?: components["schemas"]["eCommerce.Promotions.PromotionDiscountKind"];
+            /** Format: double */
+            discountValue?: number;
+            /** Format: double */
+            maxDiscountAmount?: number | null;
+            /** Format: double */
+            minOrderAmount?: number | null;
+            currency?: string | null;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        "eCommerce.Promotions.Contracts.PromotionRejectionReason": 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
+        "eCommerce.Promotions.Contracts.PromotionRuleCatalogItemDto": {
+            systemName?: string | null;
+            label?: string | null;
+            requiresVerifiedCod?: boolean;
+            /** Format: int32 */
+            declaredCostFactor?: number;
+            /** Format: date-time */
+            retiredAtUtc?: string | null;
+            isSeeded?: boolean;
+        };
+        "eCommerce.Promotions.Contracts.PromotionTreeInput": {
+            nodes?: components["schemas"]["eCommerce.Promotions.Contracts.PromotionTreeNodeInput"][] | null;
+        };
+        "eCommerce.Promotions.Contracts.PromotionTreeLimitsDto": {
+            /** Format: int32 */
+            maxNodes?: number;
+            /** Format: int32 */
+            maxDepth?: number;
+            /** Format: int32 */
+            maxLeaves?: number;
+            /** Format: int32 */
+            maxDeclaredCombinations?: number;
+        };
+        "eCommerce.Promotions.Contracts.PromotionTreeNodeDto": {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            parentId?: string | null;
+            isGroup?: boolean;
+            interactionType?: components["schemas"]["eCommerce.Promotions.PromotionConditionGroupType"];
+            ruleSystemName?: string | null;
+            configJson?: string | null;
+            /** Format: int32 */
+            sortOrder?: number;
+            /** Format: int32 */
+            depth?: number;
+        };
+        "eCommerce.Promotions.Contracts.PromotionTreeNodeInput": {
+            /** Format: uuid */
+            id?: string | null;
+            /** Format: uuid */
+            parentId?: string | null;
+            isGroup?: boolean;
+            interactionType?: components["schemas"]["eCommerce.Promotions.PromotionConditionGroupType"];
+            ruleSystemName?: string | null;
+            configJson?: string | null;
+            /** Format: int32 */
+            sortOrder?: number;
+            /** Format: int32 */
+            depth?: number;
+        };
+        "eCommerce.Promotions.Contracts.PromotionTreeValidationResultDto": {
+            /** Format: int32 */
+            nodeCount?: number;
+            /** Format: int32 */
+            depth?: number;
+            /** Format: int32 */
+            leafCount?: number;
+            /** Format: int32 */
+            declaredCost?: number;
+            /** Format: int32 */
+            maxDeclaredCombinations?: number;
+            alreadySaved?: boolean;
+            viPham?: string[] | null;
+        };
+        "eCommerce.Promotions.Contracts.RedemptionDto": {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            promotionId?: string;
+            /** Format: uuid */
+            voucherCodeId?: string | null;
+            /** Format: uuid */
+            orderId?: string | null;
+            status?: components["schemas"]["eCommerce.Promotions.PromotionRedemptionStatus"];
+            /** Format: int32 */
+            usageSequence?: number;
+            reasonCode?: string | null;
+            /** Format: uuid */
+            customerId?: string | null;
+            /** Format: double */
+            discountAmount?: number;
+            currency?: string | null;
+            /** Format: int32 */
+            treeVersion?: number;
+            /** Format: date-time */
+            evaluatedAtUtc?: string;
+        };
+        "eCommerce.Promotions.Contracts.SetPromotionStatusInput": {
+            status?: components["schemas"]["eCommerce.Promotions.PromotionStatus"];
+        };
+        "eCommerce.Promotions.Contracts.ValidateVoucherInput": {
+            code?: string | null;
+            /** Format: uuid */
+            checkoutSessionId?: string;
+            lines?: components["schemas"]["eCommerce.Promotions.Contracts.PromotionCartLine"][] | null;
+            channelCode?: string | null;
+            currency?: string | null;
+            /** Format: double */
+            subtotal?: number;
+            /** Format: uuid */
+            customerId?: string | null;
+            /** Format: uuid */
+            customerGroupId?: string | null;
+            isFirstOrder?: boolean | null;
+        };
+        "eCommerce.Promotions.Contracts.VoucherValidationDto": {
+            isValid?: boolean;
+            /** Format: uuid */
+            promotionId?: string | null;
+            /** Format: double */
+            discountTotal?: number;
+            currency?: string | null;
+            rejectionReason?: components["schemas"]["eCommerce.Promotions.Contracts.PromotionRejectionReason"];
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        "eCommerce.Promotions.PromotionConditionGroupType": 0 | 1;
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        "eCommerce.Promotions.PromotionDiscountKind": 0 | 1 | 2;
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        "eCommerce.Promotions.PromotionKind": 0 | 1 | 2;
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        "eCommerce.Promotions.PromotionRedemptionStatus": 0 | 1 | 2 | 3;
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        "eCommerce.Promotions.PromotionStatus": 0 | 1 | 2 | 3 | 4 | 5;
         "eCommerce.Reconciliation.Dtos.PaymentDiscrepancyDto": {
             /** Format: uuid */
             id?: string;
@@ -6593,6 +7633,13 @@ export interface components {
             denNgay?: string | null;
             ghiAnhTonKho?: boolean;
         };
+        "eCommerce.Reporting.ClosePeriodInput": {
+            /** Format: date */
+            fromDate?: string;
+            /** Format: date */
+            toDate?: string;
+            reason?: string | null;
+        };
         "eCommerce.Reporting.DiemDoanhThuDto": {
             nhan?: string | null;
             /** Format: date */
@@ -6623,6 +7670,14 @@ export interface components {
             /** Format: double */
             tamGiu?: number;
         };
+        "eCommerce.Reporting.KetQuaDoiChieuDto": {
+            /** Format: int32 */
+            soNgayDaSo?: number;
+            /** Format: int32 */
+            soDongLech?: number;
+            /** Format: int32 */
+            soDongLechMoi?: number;
+        };
         "eCommerce.Reporting.KetQuaTongHopDto": {
             /** Format: date */
             tuNgay?: string;
@@ -6643,6 +7698,91 @@ export interface components {
             mocDonHang?: string | null;
             /** Format: date */
             mocTonKho?: string | null;
+        };
+        "eCommerce.Reporting.KyChotDto": {
+            /** Format: uuid */
+            id?: string;
+            /** Format: date */
+            fromDate?: string;
+            /** Format: date */
+            toDate?: string;
+            status?: components["schemas"]["eCommerce.Reporting.RepPeriodStatus"];
+            snapshotHash?: string | null;
+            /** Format: uuid */
+            closedBy?: string | null;
+            /** Format: date-time */
+            closedAtUtc?: string | null;
+            closeReason?: string | null;
+            /** Format: uuid */
+            reopenedBy?: string | null;
+            reopenReason?: string | null;
+            /** Format: date-time */
+            reopenedAtUtc?: string | null;
+            alreadyClosed?: boolean;
+        };
+        "eCommerce.Reporting.KyChotPageDto": {
+            /** Format: int64 */
+            totalCount?: number;
+            items?: components["schemas"]["eCommerce.Reporting.KyChotDto"][] | null;
+        };
+        "eCommerce.Reporting.LanChayDto": {
+            /** Format: uuid */
+            id?: string;
+            jobName?: string | null;
+            projection?: components["schemas"]["eCommerce.Reporting.RepProjection"];
+            status?: components["schemas"]["eCommerce.Reporting.RepRunStatus"];
+            /** Format: date */
+            fromDate?: string;
+            /** Format: date */
+            toDate?: string;
+            /** Format: int32 */
+            windowsTotal?: number;
+            /** Format: int32 */
+            windowsDone?: number;
+            /** Format: date */
+            checkpointDate?: string | null;
+            /** Format: int64 */
+            rowsWritten?: number;
+            reason?: string | null;
+            /** Format: uuid */
+            requestedBy?: string | null;
+            /** Format: date-time */
+            startedAtUtc?: string | null;
+            /** Format: date-time */
+            finishedAtUtc?: string | null;
+            hostName?: string | null;
+            lastErrorCode?: string | null;
+            alreadyRequested?: boolean;
+        };
+        "eCommerce.Reporting.LanChayPageDto": {
+            /** Format: int64 */
+            totalCount?: number;
+            items?: components["schemas"]["eCommerce.Reporting.LanChayDto"][] | null;
+        };
+        "eCommerce.Reporting.LechSoDto": {
+            /** Format: uuid */
+            id?: string;
+            /** Format: date */
+            factDate?: string;
+            projection?: components["schemas"]["eCommerce.Reporting.RepProjection"];
+            mismatchKind?: components["schemas"]["eCommerce.Reporting.RepMismatchKind"];
+            factKey?: string | null;
+            /** Format: double */
+            expectedValue?: number | null;
+            /** Format: double */
+            actualValue?: number | null;
+            /** Format: double */
+            delta?: number | null;
+            autoCorrected?: boolean;
+            /** Format: date-time */
+            detectedAtUtc?: string;
+            /** Format: date-time */
+            resolvedAtUtc?: string | null;
+        };
+        "eCommerce.Reporting.LechSoPageDto": {
+            /** Format: int64 */
+            totalCount?: number;
+            items?: components["schemas"]["eCommerce.Reporting.LechSoDto"][] | null;
         };
         "eCommerce.Reporting.MatHangSapHetDto": {
             /** Format: uuid */
@@ -6665,6 +7805,46 @@ export interface components {
             soDon?: number;
             /** Format: double */
             giaTriDon?: number;
+        };
+        "eCommerce.Reporting.ReopenPeriodInput": {
+            /** Format: uuid */
+            periodId?: string;
+            reason?: string | null;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        "eCommerce.Reporting.RepMismatchKind": 0 | 1 | 2 | 3 | 4;
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        "eCommerce.Reporting.RepPeriodStatus": 0 | 1 | 2 | 3;
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        "eCommerce.Reporting.RepProjection": 0 | 1;
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        "eCommerce.Reporting.RepRunStatus": 0 | 1 | 2 | 3 | 4 | 5;
+        "eCommerce.Reporting.RunReconciliationInput": {
+            /** Format: date */
+            fromDate?: string;
+            /** Format: date */
+            toDate?: string;
+            projection?: components["schemas"]["eCommerce.Reporting.RepProjection"];
+        };
+        "eCommerce.Reporting.StartRebuildInput": {
+            /** Format: date */
+            fromDate?: string;
+            /** Format: date */
+            toDate?: string;
+            projection?: components["schemas"]["eCommerce.Reporting.RepProjection"];
+            reason?: string | null;
         };
         "eCommerce.Reporting.TongQuanDashboardDto": {
             /** Format: date */
