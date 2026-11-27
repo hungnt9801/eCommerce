@@ -82,14 +82,15 @@ internal static class HaTang
     });
 
     public static PromotionEngine Engine(
-        DataSourceGia data, IClock? clock = null, Dictionary<string, string?>? settings = null)
+        DataSourceGia data, IClock? clock = null, Dictionary<string, string?>? settings = null,
+        eCommerceMetrics? metrics = null)
         => new(
             data,
             Registry(),
             new SettingGia(settings),
             clock ?? new DongHoGia(new DateTime(2026, 11, 27, 0, 0, 0, DateTimeKind.Utc)),
             NullLogger<PromotionEngine>.Instance,
-            new eCommerceMetrics(new System.Diagnostics.Metrics.Meter("promo-test-" + Guid.NewGuid())));
+            metrics ?? new eCommerceMetrics(new System.Diagnostics.Metrics.Meter("promo-test-" + Guid.NewGuid())));
 
     // Child order: (id, isGroup, interaction, rule, sortOrder, depth, parent)
     public static PromotionCandidateData Candidate(
@@ -110,7 +111,9 @@ internal static class HaTang
         int? voucherMaxUsage = null,
         int voucherUsed = 0,
         string currency = "VND",
-        DateTime? startsAt = null)
+        DateTime? startsAt = null,
+        PromotionStatus status = PromotionStatus.Active,
+        VoucherCodeStatus? voucherStatus = null)
         => new(
             promotionId,
             isAutomatic ? PromotionKind.Discount : PromotionKind.Voucher,
@@ -134,7 +137,9 @@ internal static class HaTang
             voucherMaxUsage,
             voucherUsed,
             0,
-            conditions);
+            conditions,
+            status,
+            voucherStatus);
 
     /// <summary>Cây một lá `MinOrderAmount` (ngưỡng null ⇒ true).</summary>
     public static IReadOnlyList<PromotionConditionData> CayMotLa(string rule = "MinOrderAmount")

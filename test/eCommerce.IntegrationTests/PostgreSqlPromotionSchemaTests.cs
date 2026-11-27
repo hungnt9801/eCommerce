@@ -23,8 +23,9 @@ namespace eCommerce.IntegrationTests;
 /// ⚠️ **NỢ (ghi ở testplan vòng 2, KHÔNG giả vờ phủ):** các tiểu-ca của `TC-43` cần **app service + UoW** — rollback
 /// cả đơn khi `23505` (0 `Order`, 0 redemption, bộ đếm không đổi), `UsageSequence` 1→2 qua hai đơn, đua song song,
 /// và `TC-43 (ix)` (unit `CustomerRequired`) — **không** biểu diễn được bằng raw SQL một dòng; do `qa` vòng 2 ghi
-/// nợ. Ca `TC-33` "hai lượt `Reserved` cùng mã **không** `23505`" **được** phủ ở đây vì chỉ cần chứng minh index có
-/// bộ lọc `"OrderId" IS NOT NULL`.
+/// nợ. (`TC-43 (ix)` chỉ đúng ở **nhánh cây `true`**; ca cây `false` trả `ConditionFalse` — `D-292`: cây duyệt
+/// **trước** hết lượt, xem `PromotionEngineTests`/`PromotionVoucherGuardTests`.) Ca `TC-33` "hai lượt `Reserved`
+/// cùng mã **không** `23505`" **được** phủ ở đây vì chỉ cần chứng minh index có bộ lọc `"OrderId" IS NOT NULL`.
 ///
 /// 🔒 Dùng chung fixture Testcontainers (`PostgreSqlSchemaFixture`, `postgres:17-alpine`), schema áp từ
 /// `Assets/schema.sql` (**sinh lại từ chính migration** ở `W24-4`). Mọi câu lệnh **tham số** — không nối chuỗi.

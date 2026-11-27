@@ -1,10 +1,12 @@
 # Testplan `PRO-002` — 27/11/2026
 
-- SRS: `docs/features/promotions/pro-002-cay-dieu-kien-engine-khuyen-mai.md` (v0.15)
+- SRS: `docs/features/promotions/pro-002-cay-dieu-kien-engine-khuyen-mai.md` (**v0.18**)
 - Kiến trúc bổ trợ: `docs/features/promotions/PRO-002-arch.md`
-- Nhánh: `feat/gd3-wp24-dieu-kien-km` · Phiên `N96` · Hàng `W24-4` · Bước **F4 QA (vòng 2/2)**
-- Quyết định nguồn: `D-285`…`D-290` (`docs/nhanh/decisions.md`) — bề mặt `/api/v1/promotion` 7 route, `Limits`, `rule-catalog`,
-  nhãn lấy từ code; `D-283` (metric chỉ 5/9 có điểm phát), `D-284` (guard chống trùng payload **chưa** áp v1).
+- Nhánh: `feat/gd3-wp24-dieu-kien-km` · Phiên `N96` (vòng 2) → **`N97` (F4 QA bổ sung sau BE vá P1/P2 REV vòng 1)** · Hàng `W24-4`
+- Quyết định nguồn: `D-285`…`D-290` (bề mặt `/api/v1/promotion` 7 route, `Limits`, `rule-catalog`, nhãn lấy từ code) ·
+  **`D-291`** (phạm vi vá REV vòng 1: guard trạng thái voucher, `Subtotal`/`Currency` từ pipeline giá, `VoucherOutcome`,
+  `?sort=` whitelist, calculator `default` NÉM, probe 200/401/403 bắt buộc THỬ) · **`D-292`** (cây duyệt **trước**, hết lượt sau —
+  giữ `D-161`/`D-162`) · `D-283` (metric chỉ 5/9 có điểm phát) · `D-284` (guard chống trùng payload **chưa** áp v1).
 - Phạm vi WP-24: engine cây AND/OR + 3 tầng guard · 7 bảng `Pro*` + 9 unique `NULLS NOT DISTINCT` · app service 10 method ·
   controller `/api/v1/promotion` 7 route · `rule-catalog` + `Limits` trên `PromotionDetailDto`.
 
@@ -53,17 +55,32 @@
 | Setting rỗng ⇒ `MaxNodes=64, MaxDepth=8, MaxLeaves=32, MaxDeclaredCombinations=1024` | `Promotions/PromotionGetLimitsTests.cs` · `D288_setting_rong__Limits_bang_mac_dinh_64_8_32_1024` | ✅ |
 | `Promotions:MaxNodes="10"`, `Promotions:MaxDepth="5"` ⇒ phản ánh đúng (10/5), trần còn lại mặc định | `Promotions/PromotionGetLimitsTests.cs` · `D288_setting_MaxNodes_10_MaxDepth_5__Limits_phan_anh_dung_con_lai_mac_dinh` | ✅ |
 
+### 1.3 Vá REV vòng 1 — `TC-72`…`TC-76` (`D-291`) + `D-292`
+
+| TC / quyết định | Nội dung | Test (tệp · tên method) | Tầng | Kết quả |
+|---|---|---|---|---|
+| **TC-72** (`D-291` ① P1 #1) | Voucher của promotion `Paused`/`Cancelled`/`Draft`/`Expired` **hoặc** voucher `Revoked` ⇒ `Applied=false` + 0 đồng, `VoucherOutcome.RejectionReason=NoCandidate`; guard chạy **trước** validate cây (cây lỗi cũng không ném `0004`) | `Promotions/PromotionVoucherGuardTests.cs` · `TC72_voucher_cua_promotion_khong_Active__khong_ap_va_0_dong` (Theory 4 trạng thái) · `TC72_voucher_Revoked_cua_promotion_Active__khong_ap_va_0_dong` · `TC72_guard_trang_thai_chay_TRUOC_validate_cay__cay_hong_cung_khong_nem_0004` | Unit (domain/engine) | ✅ |
+| **TC-73** (`D-291` ② P2 #2) | `CheckoutAppService` truyền `Subtotal` = `GioTinhTienDto.Subtotal` (pipeline giá, kênh có giá < `ListPrice`) + `Currency` = `CurrencyCode`; lượt dò `KhongGhiSoGiaiTrinh=true`, lượt chính thức `false` | `Promotions/PromotionCheckoutSubtotalTests.cs` · `TC73_Subtotal_va_Currency_lay_tu_pipeline_gia__khong_Sum_ListPrice` · `TC73_luot_do_dung_co_KhongGhiSoGiaiTrinh__luot_chinh_thuc_moi_ghi` | Unit (application `Sales`) | ✅ |
+| **TC-74** (`D-291` ② P2 #3/#4) | `ValidateVoucherAsync` chỉ đọc `VoucherOutcome`: mã không tồn tại + auto khớp ⇒ `IsValid=false`/`NoCandidate`; voucher được nhận ⇒ `IsValid=true` + `PromotionId`/`DiscountTotal` **của voucher**; voucher bị từ chối nhưng auto áp ⇒ **lý do vẫn hiện**; hết lượt mức promotion ⇒ ném `0119` | `Promotions/PromotionVoucherValidationTests.cs` · `TC74i_ma_khong_ton_tai_va_co_auto_khop__IsValid_false` · `TC74ii_voucher_duoc_nhan__IsValid_true_va_PromotionId_cua_voucher` · `TC74_voucher_bi_tu_choi_nhung_auto_ap__ly_do_van_hien` · `TC74iii_voucher_het_luot_muc_promotion__nem_0119` | Unit (application) | ✅ |
+| **TC-75** (`D-291` ③ P3 #6) | `?sort=Code` / `Priority desc` đổi thứ tự + tie-break `Id`; trường lạ / không truyền ⇒ `CreationTime desc` + tie-break `Id`, không ném | `Promotions/PromotionVoucherValidationTests.cs` · `TC75i_sort_Code__doi_thu_tu` · `TC75ii_sort_Priority_desc__doi_thu_tu` · `TC75iii_truong_la__mac_dinh_CreationTime_desc_tie_break_Id` · `TC75iv_khong_truyen_sort__mac_dinh_CreationTime_desc_tie_break_Id` · `TC75_tie_break_Id_khi_cung_Priority` | Unit (application) | ✅ |
+| **TC-76** (`D-291` ③ P3 #8) | `PromotionDiscountCalculator` nhánh `default` **NÉM** lỗi cấu hình (không `Money.Zero`); `Percentage`/`FixedAmount` vẫn đúng (đối chứng) | `Promotions/PromotionDiscountCalculatorTests.cs` · `TC76_kieu_giam_gia_la__nem_khong_tra_Money_Zero` · `TC76_FreeShipping_bi_chan_o_v1__nem_khong_im_lang_0_dong` · `TC76_hai_kieu_hop_le_van_tinh_dung` | Unit (domain) | ✅ |
+| **`D-292` (i)+(v)** | Auto + `CustomerId=NULL` + `MaxUsagePerCustomer=1` + cây `false` ⇒ `ConditionFalse`, **không** `CustomerRequired`; `promotion_usage_limit_hit_total` **không** tăng | `Promotions/PromotionVoucherGuardTests.cs` · `D292i_tu_dong_cay_FALSE_va_vang_lai_tran_khach__ConditionFalse_khong_CustomerRequired` · `D292v_auto_cay_TRUE_het_luot__counter_tang` (đối chứng counter **có** tăng khi cây `true`) | Unit (domain/engine) | ✅ |
+| **`D-292` (ii)** | Voucher cây `false` + hết lượt ⇒ `ConditionFalse`, **không ném** | `Promotions/PromotionVoucherGuardTests.cs` · `D292ii_voucher_cay_FALSE_cong_het_luot__ConditionFalse_khong_nem` | Unit (domain/engine) | ✅ |
+| **`D-292` (iii)** | Voucher cây `true` + hết lượt ⇒ **NÉM** `0007`/`0119`/`0104` | `Promotions/PromotionVoucherGuardTests.cs` · `D292iii_voucher_cay_TRUE_het_luot_MUC_MA__nem_0007` · `…_MUC_PROMOTION__nem_0119` · `…_MUC_KHACH__nem_0104` | Unit (domain/engine) | ✅ |
+| **`D-292` (iv)** | Giữ xanh ca cây `true`: `Tu_dong_tran_theo_khach_ma_vang_lai__CustomerRequired` | `Promotions/PromotionEngineTests.cs` · `Tu_dong_tran_theo_khach_ma_vang_lai__CustomerRequired` (không sửa) | Unit (domain/engine) | ✅ |
+| **`D-292` (vi)** | Comment integration `TC-43 (ix)` chỉ đúng nhánh cây `true`; ca cây `false` ⇒ `ConditionFalse` | `eCommerce.IntegrationTests/PostgreSqlPromotionSchemaTests.cs` (comment đầu tệp) | — (chú thích) | ✅ |
+
 ## 2. Số ca theo tầng (K-06)
 
-| Tầng | Trước (đầu vòng 2) | Sau | Ghi chú |
+| Tầng | Trước (đầu vòng 2) | Sau (N97) | Ghi chú |
 |---|---|---|---|
-| Toàn bộ `test/eCommerce.Tests` (unit) | **2432** | **2432** | Baseline phiên **2419** + 13 ca `W24-4` (vòng 1). Vòng 2 **không** thêm ca unit (chỉ testplan + negative control). 0 fail. |
-| `test/eCommerce.IntegrationTests` (PostgreSQL thật) | **156** | **156** | +17 ca `PostgreSqlPromotionSchemaTests` (vòng 1). 0 fail. |
-| Domain invariant / Unit (`Promotions`) | 43 | 43 | `HaTang`/`PromotionDomainTests`/`PromotionEngineTests`/`PromotionSurfaceTests`/`PromotionCheckoutGuardTests`. |
-| Application / API surface (`Promotions`) — unit mới | 0 | 13 | `PromotionV1SurfaceTests` (6) + `PromotionRuleCatalogTests` (5) + `PromotionGetLimitsTests` (2). |
-| API `/api/v1` (200 + 401/403) | — | **reflection** | Route/permission kiểm **tĩnh** bằng phản chiếu (`TC-70a`). **Không** chạy probe HTTP thật trong `W24-4` (WP test không yêu cầu Host sống; `409/400/401` khi chạy thật do `SAL-002`/`WEB-*` phủ ở hàng sau). |
-| UI Vitest / Playwright | **60** | **60** | `W24-3` đã có (list/new/tree builder) — hàng trước, **không** đổi `W24-4` (QA không có FE). |
-| OpenAPI drift | — | **N/A** | `W24-4` không đổi DTO/route (schema additive đã ở `W24-3`) ⇒ `pnpm gen:api` không đổi `schema.d.ts`. |
+| Toàn bộ `test/eCommerce.Tests` (unit) | **2432** | **2458** | +26 ca N97: `PromotionVoucherGuardTests` (12) + `PromotionVoucherValidationTests` (9) + `PromotionDiscountCalculatorTests` (3) + `PromotionCheckoutSubtotalTests` (2). 0 fail. Số ca **chỉ tăng**. |
+| `test/eCommerce.IntegrationTests` (PostgreSQL thật) | **156** | **156** | Chỉ sửa **comment** `PostgreSqlPromotionSchemaTests.cs` (`D-292`); 0 ca mới. 0 fail. |
+| Domain invariant / Unit (`Promotions`) | 43 | 43 | `HaTang`/`PromotionDomainTests`/`PromotionEngineTests`/`PromotionSurfaceTests`/`PromotionCheckoutGuardTests` (giữ nguyên). |
+| Application / API surface (`Promotions`) — unit mới | 13 | 13 | `PromotionV1SurfaceTests` (6) + `PromotionRuleCatalogTests` (5) + `PromotionGetLimitsTests` (2). |
+| API `/api/v1` (200 + 401/403) | — | **401 + 200 đo thật; 403 CHƯA ĐO** | `tools/probe-promotion-wp24.ps1` — ẩn danh ⇒ `401` (3 route), admin `GET rule-catalog`/`POST /` ⇒ `200`; **403 chưa đo** (Host không expose `/api/identity/**` ⇒ 404) — xem §3.1. 7 route còn lại kiểm **tĩnh** (`TC-70a`). |
+| UI Vitest / Playwright | **60** | **60** | `W24-3` đã có (list/new/tree builder) — hàng trước, **không** đổi. |
+| OpenAPI drift | — | **N/A** | N97 không đổi DTO/route (additive `VoucherOutcome`/`KhongGhiSoGiaiTrinh` đã ở vòng vá BE, không đổi `schema.d.ts`). |
 
 ## Negative control (bắt buộc) — bằng chứng thật (vòng 2, sau commit `33559e5`)
 
@@ -81,23 +98,56 @@
 | 2026-11-27 | NC-N96-2 | modules/Promotions/eCommerce.Promotions.Application/PromotionAppService.cs:71 | Limits: MaxNodes = limits.MaxNodes (doc setting) -> MaxNodes = 64 (hang so) | dotnet test test/eCommerce.Tests --filter "FullyQualifiedName~PromotionGetLimitsTests" | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
 | 2026-11-27 | NC-N96-3 | src/eCommerce.HttpApi/Controllers/PromotionsController.cs:98 | quyen: Approve route bi ha xuong Manage | dotnet test test/eCommerce.Tests --filter "FullyQualifiedName~PromotionV1SurfaceTests" | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
 | 2026-11-27 | NC-N96-4 | modules/Promotions/eCommerce.Promotions.Application/Engine/PromotionEngine.cs:186 | tien: tran DiscountTotal <= Subtotal bi vo hieu (nguong 1e9) | dotnet test test/eCommerce.Tests --filter "FullyQualifiedName~PromotionEngineTests" | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
+| 2026-11-27 | NC-N97-1 | modules/Promotions/eCommerce.Promotions.Application/Engine/PromotionEngine.cs:296 | go guard trang thai voucher (TC-72): bo dieu kien Status==Active/!Revoked | dotnet test test/eCommerce.Tests --filter FullyQualifiedName~PromotionVoucherGuardTests | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
+| 2026-11-27 | NC-N97-2 | modules/Promotions/eCommerce.Promotions.Application/Engine/PromotionEngine.cs:362 | D-292: auto cay false khong short-circuit => roi vao CustomerRequired (i) | dotnet test test/eCommerce.Tests --filter FullyQualifiedName~PromotionVoucherGuardTests | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
+| 2026-11-27 | NC-N97-3 | modules/Promotions/eCommerce.Promotions.Application/PromotionAppService.cs:374 | TC-74: IsValid lay Applied cua ca don thay vi VoucherOutcome (auto ap => ma rac thanh hop le) | dotnet test test/eCommerce.Tests --filter FullyQualifiedName~PromotionVoucherValidationTests | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
+| 2026-11-27 | NC-N97-4 | modules/Promotions/eCommerce.Promotions.Application/Engine/PromotionDiscountCalculator.cs:45 | TC-76: nhanh default tra Money.Zero im lang thay vi NEM (P3 #8) | dotnet test test/eCommerce.Tests --filter FullyQualifiedName~PromotionDiscountCalculatorTests | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
+| 2026-11-27 | NC-N97-5 | modules/Sales/eCommerce.Sales.Application/CheckoutAppService.cs:170 | TC-73: Subtotal = Sum(ListPrice x Qty) thay vi GioTinhTienDto.Subtotal (P2 #2) | dotnet test test/eCommerce.Tests --filter FullyQualifiedName~PromotionCheckoutSubtotalTests | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
+| 2026-11-27 | NC-N97-6 | modules/Promotions/eCommerce.Promotions.Application/PromotionAppService.cs:126 | TC-75: sort=Code dao thanh descending (whitelist sai chieu) | dotnet test test/eCommerce.Tests --filter FullyQualifiedName~PromotionVoucherValidationTests | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
 
-## 4. Cổng (đo trong phiên N96)
+## 3.1 Probe HTTP THẬT — `tools/probe-promotion-wp24.ps1` (N97, Host `54275`)
+
+> Chạy Host thật (`eCommerce.HttpApi.Host`, build `--no-incremental`) + PostgreSQL thật; script in `HTTP STATUS`
+> **trước** body (`README-probe.md` B1). Mã probe `PROBE-PROMO-<random>`; dọn `ProPromotions` sau lượt (đo lại = 0).
+
+| Ca | Kỳ vọng | Đo được | Ghi chú |
+|---|---|---|---|
+| T01 `GET /api/v1/promotion/rule-catalog` ẩn danh | `401` | **HTTP 401** | ✅ |
+| T02 `POST /api/v1/promotion` ẩn danh | `401` | **HTTP 401** | ✅ |
+| T03 `POST /api/v1/promotion/{id}/approve` ẩn danh | `401` | **HTTP 401** | ✅ |
+| T04–T08 user **thiếu quyền** (View/Manage/Approve, tách quyền) | `403` | **CHƯA ĐO** | ⛔ Host trả **`404`** cho `/api/identity/roles` — **không expose** Identity HTTP API ⇒ không tạo được user thường qua HTTP ⇒ **không dựng được ca 403**. **KHÔNG hạ kỳ vọng 403**; nợ chủ `qa`, hạn `W24-5`. |
+| T09 admin `GET /rule-catalog` | `200` | **HTTP 200** | ✅ (body `[]` — xem ghi chú dưới) |
+| T10 admin `POST /api/v1/promotion` | `200/201` | **HTTP 200** | ✅ tạo `Draft` |
+| T10b/ T11 `save-tree` 1 lá → `approve` | `200` | **HTTP 400** `0004` | ⛔ Bảng `ProPromotionRuleCosts` **rỗng** trên DB dev (seeder chưa chạy) ⇒ mọi rule ⇒ `0004` "Rule chua tung dang ky" ⇒ **không dựng được cây hợp lệ** ⇒ chưa đo được `approve` `200` / `0006`→`409`. |
+| T12 approve lần hai | `409` + `0006` | **CHƯA ĐO** | phụ thuộc T11. |
+| T13 `save-tree` 65 node | `400` + `0001` | **HTTP 400 + `eCommerce:Promotion:0001`** (data `NodeCount=65, MaxNodes=64`) | ✅ map lỗi `0001`→`400` đúng |
+| Dọn dẹp | `ProPromotions` mã probe = 0 | **còn lại = 0** | ✅ |
+
+- **Tổng đo được:** `401` (3 route) · `200` (admin `GET rule-catalog`, `POST /`) · `400` map `0001`/`0004`.
+  **Chưa đo được:** `403` (thiếu Identity HTTP API) · `approve` `200` / `0006`→`409` (`ProPromotionRuleCosts` rỗng).
+- ⚠️ **Quan sát cần REV/ORCH xác nhận (không sửa từ `qa`):** `GET /api/v1/promotion/rule-catalog` trả **`[]`** trên
+  Host thật trong khi `PromotionRuleCatalogAppService` duyệt `PromotionRuleRegistry.SystemNames` và unit test `TC-71(i)`
+  kỳ vọng **đủ 4 tên mặc định** khi bảng chi phí rỗng. Dấu hiệu: `IPromotionConditionRule` (4 rule `ISingletonDependency`)
+  **không được DI nạp** trong Host runtime ⇒ registry rỗng. Ghi nhận, **không** kết luận thay REV.
+
+## 4. Cổng (đo trong phiên N97)
 
 ```powershell
 dotnet build eCommerce.slnx --no-incremental      # 0 error / 9 warning (baseline phiên)
-dotnet test test/eCommerce.Tests --no-build       # 2432 pass · 0 fail
+dotnet test test/eCommerce.Tests --no-build       # 2458 pass · 0 fail
 dotnet test test/eCommerce.IntegrationTests       # 156 pass · 0 fail (Testcontainers postgres:17-alpine)
+pwsh -File tools/probe-promotion-wp24.ps1          # 401/200 đo thật; 403 + approve CHƯA ĐO (§3.1)
 pwsh -File tools/agents/check-agent-artifact.ps1 -Kind testplan -Path docs/tests/PRO-002-testplan.md -Srs docs/features/promotions/pro-002-cay-dieu-kien-engine-khuyen-mai.md   # exit 0
 pwsh -File tools/kiem-link-tai-lieu.ps1           # PASS
 ```
 
 - `dotnet build eCommerce.slnx --no-incremental` → **0 error**, **9 warning** (không phát sinh warning mới — đều ở Address/Sales).
-- `dotnet test test/eCommerce.Tests --no-build` → **2432/2432 pass**, exit **0**.
+- `dotnet test test/eCommerce.Tests --no-build` → **2458/2458 pass**, exit **0** (baseline đầu phiên **2432** ⇒ **+26**, không giảm).
 - `dotnet test test/eCommerce.IntegrationTests` → **156/156 pass**, exit **0**.
-- `check-agent-artifact -Kind testplan` → **exit 0** (`BR trong SRS=20 · chua co trong testplan=0`; negative control có ≥2 dòng `exit`).
-- `pwsh -File tools/kiem-link-tai-lieu.ps1` → **PASS** (290 tệp `.md`, 976 link markdown, 1743 đường dẫn backtick — 0 tham chiếu chết).
-- `git status --porcelain -- modules/ src/` rỗng sau toàn bộ negative control (code sản phẩm khôi phục nguyên trạng).
+- `pwsh -File tools/probe-promotion-wp24.ps1` → `400/401/200` đo thật; `403` + `approve 200`/`0006` **CHƯA ĐO** (§3.1).
+- `check-agent-artifact -Kind testplan` → **exit 0**.
+- `pwsh -File tools/kiem-link-tai-lieu.ps1` → **PASS**.
+- `git status --porcelain -- modules/ src/ shared/` rỗng sau toàn bộ negative control (code sản phẩm khôi phục nguyên trạng).
 
 ## 5. Chưa phủ / nợ
 
@@ -107,3 +157,6 @@ pwsh -File tools/kiem-link-tai-lieu.ps1           # PASS
 4. **`D-283`** — chỉ **5/9** metric promotion có điểm phát; 4 còn lại (`PromotionVoucherReserved/Released/ReservationExpired` + `PromotionApplied`) ở `ChuaCoNoiPhat`, chờ đường giữ/nhả lượt voucher (`PRO-001`) và mốc "sau commit" (`Sales`). **`D-284`** — guard chống trùng **payload** ở biên ghi **chưa** áp v1 (mới có khoá idempotency + unique); sẽ áp cùng đường ghi lượt.
 5. **`BR-12`** phủ ở **hành vi** (tính tiền qua `Money`/`decimal`); **chưa** có test quét tĩnh `double`/`float` riêng cho `Promotions` (không có `double`/`float` trong code — kiểm tay + `NFR-10` tổng thể).
 6. **`BR-16`** phủ ở **hành vi** (engine không có đường ghi; `TC-43` một lượt/đơn); **chưa** có test reflection "không setter công khai"/"không có `Delete`" trên `PromotionRedemption` (entity đã đóng setter `private set`). Nợ nhỏ, không chặn.
+7. **Probe `403` cho 7 route `/api/v1/promotion/**` — CHƯA ĐO ĐƯỢC (N97).** Host trả `404` cho `/api/identity/**` ⇒ không tạo được user thường qua HTTP để đo "thiếu quyền ⇒ 403". **Không hạ kỳ vọng 403**; nợ chủ `qa`, hạn `W24-5` (khuôn `D-249` ①). Admin `200` + ẩn danh `401` đã đo thật. Khi Identity HTTP API được bật (hoặc có user seed sẵn) ⇒ chạy lại `tools/probe-promotion-wp24.ps1` (T04–T08).
+8. **Probe `approve` `200` / `0006`→`409` — CHƯA ĐO ĐƯỢC.** Bảng `ProPromotionRuleCosts` **rỗng** trên DB dev (seeder `PromotionRuleCostSeedContributor` chưa chạy) ⇒ `save-tree` mọi rule ⇒ `0004` "Rule chua tung dang ky" ⇒ không có cây hợp lệ để duyệt. Đo được map `0001`→`400` (65 node) và `0004`→`400`. Chạy `DbMigrator`/seed rồi chạy lại probe (T10b–T12).
+9. **⚠️ Quan sát cho REV/ORCH:** `GET /api/v1/promotion/rule-catalog` trả **`[]`** trên Host thật trong khi unit test `TC-71(i)` kỳ vọng đủ 4 tên mặc định khi bảng chi phí rỗng ⇒ nghi `IPromotionConditionRule` **không được DI nạp** trong Host runtime (`PromotionRuleRegistry.SystemNames` rỗng). `qa` **không sửa** mã sản phẩm; cần REV xác nhận có phải lỗi đăng ký DI/module hay không — nếu đúng thì đây là lỗi **chặn dùng** màn dựng cây (FE lấy nhãn lá từ `rule-catalog`).

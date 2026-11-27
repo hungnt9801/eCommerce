@@ -200,13 +200,17 @@ public class PromotionAppService : ApplicationService, IPromotionAppService
     [Authorize(eCommerceConsts.Permissions.Promotions.Manage)]
     public async Task<PromotionTreeValidationResultDto> SaveTreeAsync(Guid id, PromotionTreeInput input)
     {
-        var tenantId = CurrentTenant.Id ?? Guid.Empty;
+        // 🚨 `TenantId` của entity PHẢI **khớp** promotion (cột `uuid NULL`): host ⇒ `null`, KHÔNG `Guid.Empty`.
+        //    `Guid.Empty` ở host làm ABP filter (`TenantId IS NULL`) **ẩn** node ⇒ `ApproveAsync`/`GetAsync`
+        //    đọc cây rỗng ⇒ `0004` dù `save-tree` trả 200 (đã đo bằng probe Host thật N97). Lock key vẫn dùng
+        //    giá trị không-null (`?? Guid.Empty`) chỉ để khoá phân tán.
+        var tenantId = CurrentTenant.Id;
 
-        await using var giuKhoa = await _lock.TryAcquireAsync(PromotionLockKeys.Tree(tenantId, id), TimeSpan.FromSeconds(30));
+        await using var giuKhoa = await _lock.TryAcquireAsync(PromotionLockKeys.Tree(tenantId ?? Guid.Empty, id), TimeSpan.FromSeconds(30));
         if (giuKhoa is null)
         {
             throw new BusinessException(eCommerceConsts.ErrorCodes.KhongGianhDuocKhoa)
-                .WithData("lockKey", PromotionLockKeys.Tree(tenantId, id));
+                .WithData("lockKey", PromotionLockKeys.Tree(tenantId ?? Guid.Empty, id));
         }
 
         var p = await _promotions.GetAsync(id);
@@ -482,7 +486,7 @@ public class PromotionAppService : ApplicationService, IPromotionAppService
         => value.Kind == DateTimeKind.Utc ? value : DateTime.SpecifyKind(value, DateTimeKind.Utc);
 
     private (List<PromotionConditionNode> Nodes, List<PromotionCondition> Finals) BuildNodes(
-        IReadOnlyList<PromotionTreeNodeInput> input, Guid tenantId, Guid promotionId)
+        IReadOnlyList<PromotionTreeNodeInput> input, Guid? tenantId, Guid promotionId)
     {
         var finals = new List<Guid>(input.Count);
         var providedToFinal = new Dictionary<Guid, Guid>();
