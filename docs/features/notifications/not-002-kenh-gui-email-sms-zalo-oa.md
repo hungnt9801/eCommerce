@@ -3,12 +3,12 @@
 | Thuộc tính | Nội dung |
 |---|---|
 | **Mã** | `NOT-002` |
-| **Module** | **Notification** — *module mới, chưa tồn tại trong code* (kế hoạch GĐ3) |
+| **Module** | **Notification** — module **đã có** (WP-22: 4 project · **28** tệp tracked); `NOT-002` là **lớp kênh gửi** (kế hoạch GĐ3) |
 | **Giai đoạn** | **GĐ3 — Điều hành** (theo `docs/implementation-plan.md` Phụ lục A.3, dòng 440) |
 | **Ưu tiên** | **Must have** (là điều kiện để `XC-005` Q3 và `XC-003` Q6 có nơi gửi cảnh báo email kỹ thuật) |
 | **Trạng thái** | 🟡 `Draft` — chờ review |
 | **Người viết / người review** | *(điền)* / **Kiến trúc trưởng + Vận hành + Security** |
-| **Phiên bản / ngày** | `v0.1 — 13/10/2026` |
+| **Phiên bản / ngày** | `v0.6 — 28/11/2026` |
 | **Tài liệu liên quan** | `NOT-001` (template & hàng đợi — *chưa có tài liệu*) · `XC-002` (outbox/inbox + DLQ) · `XC-003` (khoá phân tán) · `XC-005` (log/correlationId/metric — **Q3, Q4**) · `XC-001` (tiền tệ/làm tròn) · `XC-006` + `ACC-001` (thuế & xuất liệu kế toán) · `SHP-002`/`SHP-003`/`SHP-004` (`docs/implementation-plan.md:424–427`) · `REP-001` (read-model) · `docs/design-doc-guidelines.md` |
 
 ---
@@ -29,8 +29,8 @@ Trộn hai việc này vào nhau là cách chắc chắn nhất để sinh ra "g
 
 | Hạng mục | Hiện trạng | Bằng chứng (đường dẫn thật) |
 |---|---|---|
-| Module `Notification` | ❌ **CHƯA CÓ** — `modules/` hiện có 15 module (`Address`, `Catalog`, `ChannelHub`, `Customers`, `EInvoice`, `Inventory`, `Messaging`, `PaymentHub`, `Pos`, `Pricing`, `Reconciliation`, `Reporting`, `Sales`, `Signing`, `Tax`) nhưng **không** có `Notification` | liệt kê `modules/` (24/11/2026) |
-| Project Notification (Domain/EF/Application) | ❌ **CHƯA CÓ** — kế hoạch GĐ3 | `docs/implementation-plan.md:440` |
+| Module `Notification` | ✅ **ĐÃ CÓ** (WP-22) — `modules/` có **17** thư mục (thêm `Notification` + `Promotions`); module `Notification` có **4** project (`Domain` · `Application.Contracts` · `Application` · `EntityFrameworkCore`) | `git ls-files modules/Notification` = **28** tệp tracked · `ls modules/` = **17** (đo 28/11/2026, `D-312` ③) |
+| Project Notification (Domain/EF/Application) | ✅ **ĐÃ CÓ** — 4 project; hợp đồng bàn giao canonical `INotificationSender` (đúng **một** method) đã phát hành ở WP-22 (`D-264`) | `modules/Notification/eCommerce.Notification.Application.Contracts/Sending/INotificationSender.cs:8-27` |
 | Code gửi email / SMS / Zalo OA | ❌ **0 dòng** — `grep` cho `MailKit|SmtpClient|Zalo|Sms|SendGrid|Twilio|eSMS|Email` trong `*.cs` **không** có kết quả nào thuộc miền thông báo; các kết quả duy nhất là (a) cột `Email` của bảng ABP Identity trong `Migrations/`, (b) `AdminEmail` của seeder, (c) `"email"`/`"phone"` trong **danh sách nhãn BỊ CẤM** của metric | `shared/eCommerce.Kernel/Observability/eCommerceMetrics.cs:218–223` · `src/eCommerce.DbMigrator/IdentityDataSeedContributor.cs:35` |
 | Gói NuGet gửi thư/SMS | ❌ **0 gói** — không có `MailKit`, `SendGrid`, `Twilio`, `Volo.Abp.Emailing` trong danh sách package tập trung | `Directory.Packages.props` (toàn bộ file, 108 dòng) |
 | `eCommerce.Kernel` | ✅ **ĐÃ CÓ** (`shared/eCommerce.Kernel/`) — đã có `Money`/`RoundingPolicy`/`Currency`/`MoneyAllocator`, `LockErrorCodes`, `INotificationEvent`, `Observability/eCommerceMetrics.cs`. ❌ **Chưa có** helper minor-units `ToMinorUnits`/`ILockManager` | `shared/eCommerce.Kernel/Money/Money.cs` · `.../Money/RoundingPolicy.cs` · `.../Locking/LockErrorCodes.cs` · `.../Events/INotificationEvent.cs` |
@@ -38,11 +38,11 @@ Trộn hai việc này vào nhau là cách chắc chắn nhất để sinh ra "g
 | `XC-002` (outbox/inbox + DLQ) | ✅ **ĐÃ TRIỂN KHAI** — bảng `AbpEventOutbox`/`AbpEventInbox`, `DeadLetterAppService` (phát lại DLQ qua outbox), `IdempotencyGuard` dùng chung | `src/eCommerce.EntityFrameworkCore/Migrations/20261024045237_AbpEventBusOutboxInbox.cs:68–72` · `src/eCommerce.Application/Messaging/DeadLetterAppService.cs:40` · `modules/Messaging/eCommerce.Messaging.Domain/Idempotency/IdempotencyGuard.cs:50` |
 | Distributed lock (`IAbpDistributedLock`, Redis) | ✅ **CÓ thật**, đã dùng cho refresh token | `modules/ChannelHub/eCommerce.ChannelHub.Application/Sync/ChannelTokenManager.cs:29,67–91` |
 | `KeyPrefix` của lock | ✅ `"ecommerce:"` (đã vá lỗi dính tiền tố) | `src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs:222,237` |
-| Metric | ✅ **16 metric đã đăng ký** (`eCommerceMetricNames.All`) **và đã có điểm phát** ở luồng nghiệp vụ (ví dụ `DeadLetterAppService`, `ChannelTokenManager`, `OrderStatusMetricHandler`) | `shared/eCommerce.Kernel/Observability/eCommerceMetrics.cs:81–107` · `test/eCommerce.Tests/Observability/MetricsTests.cs:45–73` |
-| Metric cho thông báo | ❌ **CHƯA CÓ** metric nào cho notification; registry hiện **16 tên**, test **so tập tên phát ra với registry** và **không còn** chốt cứng số lượng | `test/eCommerce.Tests/Observability/MetricsTests.cs:64–73` |
+| Metric | ✅ **39 metric đã đăng ký** (`eCommerceMetricNames.All`) **và đã có điểm phát** ở luồng nghiệp vụ (ví dụ `DeadLetterAppService`, `ChannelTokenManager`, `OrderStatusMetricHandler`) | `shared/eCommerce.Kernel/Observability/eCommerceMetrics.cs:157–209` · `test/eCommerce.Tests/Observability/MetricsTests.cs:45–73` |
+| Metric cho thông báo | ✅ **ĐÃ CÓ 7 metric `NOT-001`** (**6** counter + **1** gauge `notification_queue_backlog`); `NOT-002` **dùng lại** `notification_queue_failed_total` (`D-315` AQ7), **0** metric mới; test **so tập tên phát ra với registry** và **không còn** chốt cứng số lượng | `shared/eCommerce.Kernel/Observability/eCommerceMetrics.cs:95–113,187–193` · `test/eCommerce.Tests/Observability/MetricsTests.cs:64–73` |
 | Nhãn metric `email`/`phone` | 🚨 **BỊ CẤM** (cardinality cao) — đây là ràng buộc **trực tiếp** lên `NOT-002` | `shared/eCommerce.Kernel/Observability/eCommerceMetrics.cs:218–223` (`eCommerceMetricTags.Forbidden`) |
 | `[Authorize]` cấp class | ✅ **ĐÃ CÓ tiền lệ đúng** (bài học `GetShopsAsync` từng là API công khai) | `src/eCommerce.Application/Channels/ChannelAppService.cs:21–28` |
-| `[Authorize]` cấp class cho miền thông báo | ❌ chưa có — module chưa tồn tại | — |
+| `[Authorize]` cấp class cho miền thông báo | 🔶 module đã có (WP-22) nhưng **chưa có** app service/endpoint của `NOT-002` (WP-23: **0** endpoint); `NotificationAppService` đầy đủ là increment sau (`D-202`/`D-314`) | — |
 | `DbSet` cho entity của module | ✅ **CÓ tiền lệ**: phải khai `DbSet` trên `eCommerceDbContext` hợp nhất, nếu không `IRepository<T>` **không** được đăng ký | `src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs:47–64` |
 | Unit of Work | ✅ `TransactionBehavior = Auto` cho toàn hệ thống | `src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs:91–95` |
 | Setting (`ISettingProvider`, `SettingDefinition`) | ❌ **0 định nghĩa setting trong code app** — chỉ có **bảng** `AbpSettings`/`AbpSettingDefinitions` do migration của ABP tạo | `grep "SettingDefinition"` chỉ khớp trong `Migrations/` |
@@ -51,9 +51,14 @@ Trộn hai việc này vào nhau là cách chắc chắn nhất để sinh ra "g
 | Health check | ✅ `/health-status` kiểm PostgreSQL thật | `src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs:155–158,506–509` |
 | Tài liệu `SHP-002/003/004`, `REP-*`, `ACC-001`, `NOT-001` | ❌ **CHƯA CÓ** — `docs/features/` chỉ có `XC-001`…`XC-006` | liệt kê `docs/features/` |
 
-> 🚨 **Kết luận bắt buộc đọc trước khi review:** *toàn bộ `NOT-002` là thiết kế MỚI.*
-> **Không có** dòng code nào của miền thông báo để đối chiếu. Mọi mục dưới đây ghi rõ **"chưa có trong code — kế hoạch GĐ3"**
-> khi nói tới việc phải viết mới, và chỉ ra **tiền lệ thật** để bám theo khi viết.
+> 🔎 **Kết luận bắt buộc đọc trước khi review:** module `Notification` **đã có** (WP-22: 4 project, **28** tệp tracked) và
+> hợp đồng bàn giao canonical `INotificationSender` đã phát hành (`D-264`); phần **còn thiếu** là **lớp kênh gửi `NOT-002`**
+> (adapter NCC · state machine · 6 bảng · endpoint) — đó là **thiết kế MỚI, kế hoạch GĐ3**. Mọi mục dưới đây ghi rõ
+> **"chưa có trong code — kế hoạch GĐ3"** khi nói tới việc phải viết mới, và chỉ ra **tiền lệ thật** để bám theo khi viết.
+>
+> 🚧 **Phạm vi WP-23 (`W23-2`) — tách khỏi increment đầy đủ:** WP-23 chỉ hiện thực **hợp đồng adapter trung lập NCC + `fake` sender
+> + fail-closed `0003`** — **0** bảng, **0** migration, **0** `DbSet`, **0** endpoint, **0** quyền, **0** metric mới (`D-313`/`D-314`).
+> **6 bảng** (§5, §11) và **11 endpoint** (§6.2) là **increment đầy đủ sau `R3-6`** — **giữ thiết kế**, **chưa** làm ở WP-23.
 
 **Phạm vi:**
 - ✅ **Ba kênh gửi**: email · SMS brandname · Zalo OA (gồm ZNS nếu kênh hỗ trợ — *chưa kiểm chứng*, xem §15 Q3).
@@ -84,7 +89,7 @@ Trộn hai việc này vào nhau là cách chắc chắn nhất để sinh ra "g
 | **ADR-04** | **State machine NÉM LỖI** khi chuyển trạng thái sai, **cấm** no-op im lặng | (a) bỏ qua im lặng · (b) log rồi bỏ qua · (c) `BusinessException` có mã | Bài học eShop (`SetPaidStatus()` no-op) đã được ghi thành nguyên tắc; tiền lệ code thật: `TaxClassification.Approve()` ném `TaxErrorCodes.InvalidStatusTransition` (`modules/Tax/eCommerce.Tax.Domain/Classifications/TaxClassification.cs:122–134`) | Mỗi nhánh state machine cần 1 test; callback đến **sai thứ tự** phải có đường xử lý tường minh (§3 bảng guard) |
 | **ADR-05** | **Nhật ký gửi là APPEND-ONLY** (bảng `NotificationDeliveryEvent`), tách khỏi aggregate có trạng thái | (a) một bảng vừa giữ trạng thái vừa làm lịch sử · (b) tách: `NotificationMessage` (trạng thái) + `NotificationDeliveryEvent` (append-only) | Tiền lệ thật: `StockLedgerEntry` "APPEND-ONLY. Không bao giờ UPDATE/DELETE" (`src/eCommerce.Domain/Entities/Inventory/StockLedger.cs:80–84`) và `XC-006` BR-005 | Truy vết "tin này đã đi qua những bước nào" luôn đọc được; **cấm** sửa/xoá event |
 | **ADR-06** | **Nhãn metric chỉ lấy từ `eCommerceMetricTags.Allowed`**; **cấm** `email`, `phone`, `messageId` | (a) gắn người nhận làm nhãn để dễ lọc · (b) nhãn hữu hạn + log | `email`/`phone` **đã nằm trong danh sách BỊ CẤM** của repo (`eCommerceMetrics.cs:218–223`, `eCommerceMetricTags.Forbidden`), và `XC-005` BR-009 cấm cardinality cao. Mỗi số điện thoại là **một chuỗi thời gian riêng** ⇒ nổ hệ thống metric | Truy vết theo người nhận **chỉ** bằng **log** (đã có `CorrelationId`), không bằng metric |
-| **ADR-07** | **Thêm metric mới ⇒ PHẢI sửa registry + `XC-005` §5.1 + test**, trong **cùng** PR | (a) phát metric mới ngay · (b) cập nhật registry trước | Registry hiện **16 tên** (`eCommerceMetricNames.All`); test **so tập tên phát ra với registry** và **không còn** chốt cứng số lượng (`MetricsTests.cs:45–73`, đã bỏ `Assert.Equal(12, …)`) ⇒ phát metric chưa đăng ký là **CI đỏ**, thêm metric hợp lệ thì không | `NOT-002` cần metric ⇒ đây là **việc phải làm tường minh** trong PR đầu của module, không phải việc phụ |
+| **ADR-07** | **Thêm metric mới ⇒ PHẢI sửa registry + `XC-005` §5.1 + test**, trong **cùng** PR | (a) phát metric mới ngay · (b) cập nhật registry trước | Registry hiện **39 tên** (`eCommerceMetricNames.All`); test **so tập tên phát ra với registry** và **không còn** chốt cứng số lượng (`MetricsTests.cs:45–73`, đã bỏ `Assert.Equal(12, …)`) ⇒ phát metric chưa đăng ký là **CI đỏ**, thêm metric hợp lệ thì không | `NOT-002` **dùng lại** `notification_queue_failed_total` (`D-315` AQ7) ⇒ **0** metric mới ở WP-23; nếu thêm metric sau này vẫn theo ADR-07 (cùng PR registry + `XC-005` + test) |
 | **ADR-08** | **Token Zalo OA (có rotate) chỉ ghi trong phạm vi `IAbpDistributedLock` + double-check** | (a) refresh không khoá · (b) khoá nhưng không double-check | Tiền lệ **đã chạy thật**: `ChannelTokenManager` khoá `channel:{channelCode}:{shopId}:token-refresh`, rồi **đọc lại** entity trong khoá (`ChannelTokenManager.cs:67–91`). Shopee rotate refresh token ⇒ refresh song song làm **mất token** | Khoá mới `notification:zalo-oa:{oaId}:token-refresh`; timeout bắt buộc (`XC-003` BR-004); không giành được khoá ⇒ **NÉM** `eCommerce:Lock:0001`, **không** gửi tiếp |
 | **ADR-09** | **`NOT-002` KHÔNG gọi app service của module khác** — chỉ **tiêu thụ ETO** | (a) gọi `IShippingAppService.GetWaybillAsync()` để lấy dữ liệu tin · (b) nhận ETO đã đủ dữ liệu | Quy ước bất biến: **module gọi app BỊ CẤM**. Tiền lệ: `ChannelOrderPulledEto` mang **đủ** dữ liệu để app tự tạo đơn, nhờ vậy ChannelHub không cần domain app (`modules/ChannelHub/eCommerce.ChannelHub.Application.Contracts/Events/ChannelEvents.cs:5–15`) | ETO cho `NOT-002` **phải** chứa đủ trường để dựng tin (tên, số tiền, mã đơn) — **không** để consumer phải gọi ngược lại |
 | **ADR-10** | **Retry/backoff chạy trên job BỀN VỮNG** (`AbpBackgroundJobs`), **không** dùng timer trong bộ nhớ | (a) timer trong bộ nhớ như supervisor kênh · (b) hàng đợi job bền vững trong DB | Bảng `AbpBackgroundJobs` **đã có** (`20261009102627_Added_Phase0_AuthModules.cs:64`) ⇒ không thêm hạ tầng. Và **bài học F6 thật**: `ChannelSyncSupervisorWorker` từng gọi `AddAsync` mỗi nhịp ⇒ ABP **THAY THẾ** worker ⇒ timer reset ⇒ worker **không bao giờ chạy** (`modules/ChannelHub/eCommerce.ChannelHub.Application/Sync/ChannelSyncSupervisorWorker.cs:68–85`) | Tin đang chờ gửi **sống qua restart**; **cấm** thiết kế "giữ hàng đợi trong `ConcurrentDictionary`" |
@@ -105,9 +110,9 @@ Trộn hai việc này vào nhau là cách chắc chắn nhất để sinh ra "g
 | **Trigger** | (a) `NOT-001` chuyển một tin đã dựng nội dung sang bước gửi; (b) đến nhịp job thử lại; (c) nhà cung cấp gọi callback trạng thái; (d) vận hành phát lại DLQ; (e) cảnh báo kỹ thuật từ `XC-005` (`XC-005` §15.1 **Q3**: *"alert gửi email kỹ thuật … Thuộc `NOT-002`"*) hoặc từ `XC-003` **Q6** |
 | **Pre-Condition(s)** | • **Tenant hiện tại** (`TenantId`) — mọi bản ghi và credential đều theo tenant (`IMultiTenant`).<br>• **Kênh đã được bật** cho tenant và **có credential hợp lệ** (email: SMTP/API key; SMS: brandname + API key; Zalo OA: `OA access token` còn hiệu lực **hoặc** có refresh token để làm mới).<br>• **Người nhận có định danh hợp lệ** cho kênh đó (email đã chuẩn hoá; số điện thoại **đã chuẩn hoá về E.164 hoặc đầu số VN**; Zalo `user_id`/`oa_id`).<br>• **`IdempotencyKey` ổn định** do tầng trên (`NOT-001`) cấp — **không** phải `Guid.NewGuid()` mỗi lần gọi.<br>• **`ChannelCode`** (*kênh bán*) **chỉ** đưa vào log/ngữ cảnh, **không** quyết định kênh gửi: cùng một đơn từ Shopee và từ website có thể gửi cùng một mẫu SMS.<br>• **`XC-002` (outbox/inbox) đã triển khai** — dùng trực tiếp; nếu hồi quy thì job quét DB vẫn giữ tin (§15.3 giả định 1). |
 | **Post-Condition(s)** | • Mỗi yêu cầu gửi có **đúng một** `NotificationMessage` (ràng buộc unique trên `IdempotencyKey`).<br>• Trạng thái cuối của tin thuộc tập **kết thúc**: `DaPhat` · `KhongPhatDuoc` · `HetHanXacNhan` · `ThatBai` · `Huy`.<br>• Mọi bước chuyển trạng thái có **một** `NotificationDeliveryEvent` **append-only** (kèm `CorrelationId`, `ProviderCode`, `Status`, `Reason`).<br>• Tin chưa gửi được **không** bị mất: nằm ở `ChoThuLai` (có `NextAttemptAtUtc`) hoặc `DLQ`.<br>• Chi phí phát sinh ghi vào `NotificationCostLedger` (append-only) với `decimal(18,4)`.<br>• **Không** tồn tại bản ghi chứa OTP; nội dung lưu đã **mask**. |
-| **Basic Flow** | 1. `NOT-001` gọi `INotificationSender.SendAsync(request)` với `IdempotencyKey`, `ChannelKind` (Email·Sms·ZaloOa), `Recipient`, `TemplateCode`, `Data`, `TenantId`.<br>2. `NotificationSender` **kiểm idempotency**: tra `NotificationMessage` theo `(TenantId, IdempotencyKey)`. **Đã có** ⇒ trả kết quả cũ, **không** gửi lại (BR-002).<br>3. Kiểm **opt-out** (số/email đã từ chối) và **quiet hours**; vi phạm ⇒ `Huy` (opt-out) hoặc dời `NextAttemptAtUtc` sang khung cho phép (quiet hours) (BR-012).<br>4. Trong **một Unit of Work**: tạo `NotificationMessage` (`ChoGui`) + `NotificationDeliveryEvent(Queued)` + ghi **outbox** (theo `XC-002`) (BR-006).<br>5. Job nền lấy tin `ChoGui` có `NextAttemptAtUtc <= now` ⇒ giành **khoá phân tán** `notification:provider:{providerCode}:quota:{tenantId}` (khoá ở §8.2; không giành được ⇒ **ném** `eCommerce:Lock:0001`).<br>6. Gọi adapter của kênh: `await sender.SendAsync(message, ct)` với **timeout** và **retry có giới hạn** (BR-011).<br>7. Thành công (nhà cung cấp **nhận**, có `ProviderMessageId`) ⇒ `DaGui` + `DeliveryEvent(Sent)`. Lỗi **tạm thời** ⇒ `ChoThuLai` + `NextAttemptAtUtc = now + backoff`. Lỗi **vĩnh viễn** ⇒ `ThatBai`.<br>8. Nhà cung cấp gọi **callback** trạng thái ⇒ **chống trùng** bằng unique index, ghi `DeliveryEvent` và cập nhật `DaPhat`/`KhongPhatDuoc` (BR-003).<br>9. Ghi **chi phí** vào `NotificationCostLedger` (append-only) với `decimal(18,4)` (BR-013). |
-| **Alternative Flow** | **A1: Email tới nhiều người nhận (to/cc/bcc)** — **mỗi người nhận một `NotificationMessage`** (một `Recipient`/tin; khoá `{gốc}:{channelKind}:{h}`, `h` = HMAC rút gọn người nhận theo `D-204`/`D-206`) cùng `RootMessageId`; trạng thái tổng = *kết quả xấu nhất*. **Không** có bảng con `NotificationRecipient` (cột người nhận nằm trên `NotificationMessages`, §5.1).<br>**A2: Kênh ưu tiên dự phòng** — Zalo OA thất bại **vĩnh viễn** ⇒ gửi SMS dự phòng **cùng** `IdempotencyKey` gốc với hậu tố `:fallback-sms` (**khoá khác** ⇒ không bị chặn nhầm, nhưng vẫn truy vết được về tin gốc qua `RootMessageId`).<br>**A3: Cảnh báo kỹ thuật** (`XC-005` Q3) — dùng **cùng** pipeline (`TemplateCode=ops-alert`); người nhận = **cấu hình** `NotificationChannelAccounts.Settings.opsAlertRecipients` (trần **20**/kênh; trống ⇒ **fail-closed NÉM** `0003`, **0** tin, log `Error` + metric; **cấm** hard-code/bịa địa chỉ) — **không** phải khách hàng ⇒ **cấm** opt-out áp lên nhóm này, **cấm** quiet hours chặn mức `Critical` (BR-012). `Priority=Critical` ⇒ **fan-out song song** theo `Settings.opsAlertCriticalChannels` (mặc định `["Email"]`): mỗi (người nhận × kênh) một `NotificationMessage` khoá `{gốc}:{channelKind}:{h}` (`h` = HMAC rút gọn người nhận, khuôn `D-204`); Email **không** triệt SMS; **≥1** kênh tới ⇒ coi là đã tới; **tất cả** fail ⇒ `DLQ` + `Error` + metric, chống đệ quy. Kênh 2 bật **chỉ khi** có NCC + credential + `unitCostPerMessage` (GĐ3 mặc định **Email-only**; rủi ro F6 **chặn release** tới khi bật kênh 2 hoặc chủ dự án chấp nhận **bằng văn bản**). Cảnh báo **host-level** (`TenantId = null`) **chưa có đường gửi** — nợ có chủ OPS + BA `XC-005`.<br>**A4: Vận hành phát lại DLQ** — giành khoá `notification:dlq-replay:{tenantId}` (chỉ **một** tiến trình), sau đó đưa tin về `ChoGui` với `AttemptCount = 0` và ghi `DeliveryEvent(ReplayedBy=userId)`.<br>**A5: Nhà cung cấp chậm** — quá `SentAckTtl` mà **không** có callback ⇒ `HetHanXacNhan` + metric; **không** tự gửi lại (tránh gửi trùng ra người thật) mà đưa vào báo cáo đối soát (§8.3). |
-| **Exception Flow** | **E1:** trùng `IdempotencyKey` ⇒ **không** gửi lại, trả kết quả cũ + `AlreadySent=true`.<br>**E2:** người nhận **sai định dạng** (email không hợp lệ / số điện thoại sai) ⇒ `ThatBai` vĩnh viễn, `eCommerce:Notification:0002`, **không** thử lại.<br>**E3:** thiếu credential / credential hết hạn ⇒ `eCommerce:Notification:0003`, tin ở `ChoThuLai` với backoff dài; **có** metric + **cảnh báo vận hành** (nếu im lặng thì thông báo chết hàng loạt mà không ai biết).<br>**E4:** hết hạn mức nhà cung cấp (SMS/Zalo) ⇒ `ChoThuLai` + `Reason=quota`, **không** tính là lỗi vĩnh viễn.<br>**E5:** quá số lần thử ⇒ `DLQ` + `eCommerce:Notification:0005`; **cấm** thử vô hạn.<br>**E6:** callback có **chữ ký sai / không xác thực được** ⇒ **từ chối**, ghi `NotificationInbox` với `ProcessStatus=Rejected`, tăng `payment_*`-kiểu counter tương ứng (metric mới, ADR-07), **không** đổi trạng thái tin.<br>**E7:** callback đến **sai thứ tự** (đã `DaPhat` rồi mới nhận `Sent`) ⇒ **không** lùi trạng thái; ghi event với `Status=IgnoredOutOfOrder` + log `Warning` (BR-004).<br>**E8:** không giành được khoá ⇒ `eCommerce:Lock:0001` (dùng **nguyên** mã lỗi của `XC-003`, không tự đặt mã mới). |
+| **Basic Flow** | 1. `NOT-001` gọi `INotificationSender.SendAsync(NotificationSendRequest)` với `IdempotencyKey`, `ChannelKind` (Email·Sms·ZaloOa), `RecipientEncrypted`, `Subject`/`Body` **đã render + mask**, `Priority`, `TenantId` — **bỏ** `TemplateCode`/`Data`/`Recipient` plaintext (`D-264`, §6.1).<br>2. `NotificationSender` **kiểm idempotency**: tra `NotificationMessage` theo `(TenantId, IdempotencyKey)`. **Đã có** ⇒ trả kết quả cũ, **không** gửi lại (BR-002).<br>3. Kiểm **opt-out** (số/email đã từ chối) và **quiet hours**; vi phạm ⇒ `Huy` (opt-out) hoặc dời `NextAttemptAtUtc` sang khung cho phép (quiet hours) (BR-012).<br>4. Trong **một Unit of Work**: tạo `NotificationMessage` (`ChoGui`) + `NotificationDeliveryEvent(Queued)` + ghi **outbox** (theo `XC-002`) (BR-006).<br>5. Job nền lấy tin `ChoGui` có `NextAttemptAtUtc <= now` ⇒ giành **khoá phân tán** `notification:provider:{providerCode}:quota:{tenantId}` (khoá ở §8.2; không giành được ⇒ **ném** `eCommerce:Lock:0001`).<br>6. Gọi adapter của kênh: `await sender.SendAsync(message, ct)` với **timeout** và **retry có giới hạn** (BR-011).<br>7. Thành công (nhà cung cấp **nhận**, có `ProviderMessageId`) ⇒ `DaGui` + `DeliveryEvent(Sent)`. Lỗi **tạm thời** ⇒ `ChoThuLai` + `NextAttemptAtUtc = now + backoff`. Lỗi **vĩnh viễn** ⇒ `ThatBai`.<br>8. Nhà cung cấp gọi **callback** trạng thái ⇒ **chống trùng** bằng unique index, ghi `DeliveryEvent` và cập nhật `DaPhat`/`KhongPhatDuoc` (BR-003).<br>9. Ghi **chi phí** vào `NotificationCostLedger` (append-only) với `decimal(18,4)` (BR-013). |
+| **Alternative Flow** | **A1: Email tới nhiều người nhận (to/cc/bcc)** — **mỗi người nhận một `NotificationMessage`** (một `Recipient`/tin; khoá `{gốc}:{channelKind}:{h}`, `h` = HMAC rút gọn người nhận theo `D-204`/`D-206`) cùng `RootMessageId`; trạng thái tổng = *kết quả xấu nhất*. **Không** có bảng con `NotificationRecipient` (cột người nhận nằm trên `NotificationMessages`, §5.1).<br>**A2: Kênh ưu tiên dự phòng** — Zalo OA thất bại **vĩnh viễn** ⇒ gửi SMS dự phòng **cùng** `IdempotencyKey` gốc với hậu tố `:fallback-sms` (**khoá khác** ⇒ không bị chặn nhầm, nhưng vẫn truy vết được về tin gốc qua `RootMessageId`).<br>**A3: Cảnh báo kỹ thuật** (`XC-005` Q3) — dùng **cùng** pipeline; **mẫu `ops-alert` do `NOT-001` chọn ở bước enqueue** (`NotificationSendRequest` **không** mang `TemplateCode`); người nhận = **cấu hình** `NotificationChannelAccounts.Settings.opsAlertRecipients` (trần **20**/kênh; trống ⇒ **fail-closed NÉM** `0003`, **0** tin, log `Error` + metric; **cấm** hard-code/bịa địa chỉ) — **không** phải khách hàng ⇒ **cấm** opt-out áp lên nhóm này, **cấm** quiet hours chặn mức `Critical` (BR-012). `Priority=Critical` ⇒ **fan-out song song** theo `Settings.opsAlertCriticalChannels` (mặc định `["Email"]`): mỗi (người nhận × kênh) một `NotificationMessage` khoá `{gốc}:{channelKind}:{h}` (`h` = HMAC rút gọn người nhận, khuôn `D-204`); Email **không** triệt SMS; **≥1** kênh tới ⇒ coi là đã tới; **tất cả** fail ⇒ `DLQ` + `Error` + metric, chống đệ quy. Kênh 2 bật **chỉ khi** có NCC + credential + `unitCostPerMessage` (GĐ3 mặc định **Email-only**; rủi ro F6 **chặn release** tới khi bật kênh 2 hoặc chủ dự án chấp nhận **bằng văn bản**). Cảnh báo **host-level** (`TenantId = null`) **chưa có đường gửi** — nợ có chủ OPS + BA `XC-005`.<br>**A4: Vận hành phát lại DLQ** — giành khoá `notification:dlq-replay:{tenantId}` (chỉ **một** tiến trình), sau đó đưa tin về `ChoGui` với `AttemptCount = 0` và ghi `DeliveryEvent(ReplayedBy=userId)`.<br>**A5: Nhà cung cấp chậm** — quá `SentAckTtl` mà **không** có callback ⇒ `HetHanXacNhan` + metric; **không** tự gửi lại (tránh gửi trùng ra người thật) mà đưa vào báo cáo đối soát (§8.3). |
+| **Exception Flow** | **E1:** trùng `IdempotencyKey` ⇒ **không** gửi lại, trả kết quả cũ + `AlreadySent=true`.<br>**E2:** người nhận **sai định dạng** (email không hợp lệ / số điện thoại sai) ⇒ `ThatBai` vĩnh viễn, `eCommerce:Notification:0002`, **không** thử lại.<br>**E3:** **mọi** lỗi credential — thiếu/hết hạn **trước** khi gọi **và** `Unauthenticated` do NCC trả **sau** khi gọi — ⇒ **NÉM** `eCommerce:Notification:0003`, **0** `IsTransient`, **không** `ChoThuLai`/backoff dài. Job as-built `catch` ⇒ lease đưa mục về `ChoGui` sau `LeaseSeconds`; **0** `DaBanGiao`/`DaGui`; **có** metric + `Warning` + `ErrorCode`.<br>**E4:** hết hạn mức nhà cung cấp (SMS/Zalo) ⇒ `ChoThuLai` + `Reason=quota`, **không** tính là lỗi vĩnh viễn.<br>**E5:** quá số lần thử ⇒ `DLQ` + `eCommerce:Notification:0005`; **cấm** thử vô hạn.<br>**E6:** callback có **chữ ký sai / không xác thực được** ⇒ **từ chối**, ghi `NotificationInbox` với `ProcessStatus=Rejected`, tăng `payment_*`-kiểu counter tương ứng (metric mới, ADR-07), **không** đổi trạng thái tin.<br>**E7:** callback đến **sai thứ tự** (đã `DaPhat` rồi mới nhận `Sent`) ⇒ **không** lùi trạng thái; ghi event với `Status=IgnoredOutOfOrder` + log `Warning` (BR-004).<br>**E8:** không giành được khoá ⇒ `eCommerce:Lock:0001` (dùng **nguyên** mã lỗi của `XC-003`, không tự đặt mã mới). |
 | **Business Rules** | • **BR-NOT-002-001**: Mọi lần gửi **phải** đi qua `INotificationChannelSender`; **cấm** gọi SDK/HTTP của nhà cung cấp trực tiếp từ app service hoặc job.<br>• **BR-NOT-002-002**: Mọi yêu cầu gửi **phải** có `IdempotencyKey` **ổn định**; gửi lại cùng khoá ⇒ **không** tạo tin thứ hai (ràng buộc unique ở DB, không chỉ kiểm ở code).<br>• **BR-NOT-002-003**: Mọi **callback/webhook** nhà cung cấp **phải** chống trùng bằng unique index trên `(TenantId, ProviderCode, ProviderMessageId, EventType)`; **cấm** dựa vào distributed lock để chống trùng.<br>• **BR-NOT-002-004**: **Mọi** chuyển trạng thái sai **phải NÉM** `BusinessException` có mã; **cấm** no-op im lặng. Chuyển trạng thái **lùi** (đã phát → chưa phát) **cấm** tuyệt đối.<br>• **BR-NOT-002-005**: `NotificationDeliveryEvent` là **APPEND-ONLY** — **cấm** `UPDATE`/`DELETE`; sửa sai phải ghi event mới.<br>• **BR-NOT-002-006**: Mọi thao tác ghi đi qua **Unit of Work**; `NotificationMessage` + `NotificationDeliveryEvent` + **outbox** ghi trong **cùng** transaction.<br>• **BR-NOT-002-007**: Nhãn metric **chỉ** lấy từ `eCommerceMetricTags.Allowed`; 🚨 **cấm** `email`, `phone`, `messageId`, `recipientId` (cardinality cao).<br>• **BR-NOT-002-008**: Thêm/đổi metric hoặc tag **phải** cập nhật `eCommerceMetricNames`/`eCommerceMetricTags` **và** `XC-005` §5.1 **và** test — trong **cùng** PR.<br>• **BR-NOT-002-009**: 🚨 **CẤM log & CẤM lưu OTP**; nội dung tin lưu vào DB **phải** đi qua hàm mask (kế thừa `PaymentTransaction.MaskSensitiveData`); **cấm** log token nhà cung cấp, số điện thoại đầy đủ, email đầy đủ ở mức `Information`.<br>• **BR-NOT-002-010**: Token Zalo OA **chỉ** được ghi trong phạm vi khoá `notification:zalo-oa:{oaId}:token-refresh` **và** phải **đọc lại (double-check)** trong khoá trước khi gọi API làm mới.<br>• **BR-NOT-002-011**: Mọi lần gọi nhà cung cấp **phải** có **timeout hữu hạn** và **retry có giới hạn** + backoff; quá giới hạn ⇒ `DLQ`. **Cấm** retry vô hạn và **cấm** gọi không timeout.<br>• **BR-NOT-002-012**: **Quiet hours** + **opt-out** **phải** được tôn trọng cho tin tới **khách hàng**; **ngoại lệ có kiểm soát**: cảnh báo kỹ thuật mức `Critical` **không** bị quiet hours chặn, và opt-out **không** áp cho người nhận nội bộ.<br>• **BR-NOT-002-013**: Mọi số tiền (chi phí gửi, số tiền in trong tin) **phải** là `decimal`; 🚨 **cấm** `double`/`float`; 🚨 **cấm** so sánh tiền bằng `==` (theo `XC-001` BR-003/BR-008).<br>• **BR-NOT-002-014**: 🚨 Trạng thái vận đơn đến từ webhook **KHÔNG xác thực được** (GHTK — `SHP-002`, `docs/implementation-plan.md:425` ghi rõ *"không có HMAC ở GHTK"*) **KHÔNG** được dùng làm **nguồn duy nhất** để gửi tin có **số tiền/COD**; trước khi gửi tin chứa số tiền **phải** có nguồn thứ hai đối chiếu, hoặc gửi tin **không** chứa số tiền.<br>• **BR-NOT-002-015**: 🚨 OTP đổi COD (`SHP-003`, `docs/implementation-plan.md:426` ghi rõ *"GHN cần OTP"*) **chỉ** gửi qua kênh **đã xác thực danh tính người nhận**; OTP **không** được lưu vào bất kỳ bảng nào, **không** được log; có **TTL** và **giới hạn số lần gửi lại** trong một cửa sổ thời gian.<br>• **BR-NOT-002-016**: **Cấm** `NOT-002` gọi app service của module khác; dữ liệu để dựng tin **phải** có sẵn trong ETO (ADR-09).<br>• **BR-NOT-002-017**: Credential nhà cung cấp **phải** mã hoá at-rest và **cấm** trả ra DTO (kể cả bản đã mã hoá) — kế thừa `ChannelShop.AccessTokenEncrypted` + `ChannelAppService.ToDto` (`src/eCommerce.Application/Channels/ChannelAppService.cs:189–209`).<br>• **BR-NOT-002-018**: Mọi lỗi **đã xử lý** (bị nuốt có chủ ý) **phải** log ở mức ≥ `Warning` + **có `ErrorCode`** — **cấm** nuốt im lặng (kế thừa `XC-005` BR-013).<br>• **BR-NOT-002-019**: 🚨 **Chống trùng callback** bằng **một** cột `DedupKey` + **một** UNIQUE `UX_NotificationInbox_Dedup` `(TenantId, ProviderCode, ProviderMessageId, EventType, DedupKey)` **NULLS NOT DISTINCT** (`D-203`). Khoá sinh ở **một cửa** `INotificationCallbackParser`: có id sự kiện ⇒ `"e:" + id`; không có ⇒ `"h:" + sha256(JSON chuẩn hoá nội dung **nghiệp vụ**, bỏ trường vận chuyển/không ổn định)`; id > 128 ⇒ `"h:" + sha256(giá trị nguyên)`. **Cấm** `Guid.NewGuid()`, **cấm** cắt chuỗi, **cấm** băm bản đã mask (băm payload thô **trước** mask).<br>• **BR-NOT-002-020**: 🚨 `NotificationOptOuts.RecipientHash` = **băm một chiều** HMAC-SHA256 hex thường **64** ký tự (`^[0-9a-f]{64}$`) của `"v1|" + ChuẩnHoáNgườiNhận`, chuẩn hoá ở **một cửa** `NotificationRecipientHash.Tinh` (`D-204`). **0** cột plaintext; kiểm opt-out **trước mọi lần gửi** bằng **cùng** hàm; ghi qua **một cửa** `CreateOptOutAsync` + UNIQUE `(TenantId, ChannelKind, RecipientHash)` **NULLS NOT DISTINCT**; thiếu khoá production ⇒ **fail-closed NÉM**.<br>• **BR-NOT-002-021**: `SentAckTtl` lưu ở `NotificationChannelAccounts.Settings.sentAckTtlMinutes` (mặc định Email **1440** / SMS **720** / ZaloOa **720** phút; biên `[60, 43200]`; trống/`≤0`/sai ⇒ **mặc định** + log `Warning` + `ErrorCode`, **cấm** hết hạn tức thì). Hết TTL **chỉ** chuyển `DaGui → HetHanXacNhan` + **đúng một** event `AckExpired` + metric; **0** gọi mạng/0 gửi lại/0 xoá/0 ghi chi phí (`D-205`).<br>• **BR-NOT-002-022**: Cảnh báo kỹ thuật: người nhận = **cấu hình** `Settings.opsAlertRecipients` (trần **20**/kênh; trống ⇒ **NÉM** `0003`, 0 tin, log `Error` + metric; **cấm** hard-code). `Priority=Critical` ⇒ **fan-out song song** theo `Settings.opsAlertCriticalChannels` (mặc định `["Email"]`), mỗi (người nhận × kênh) một `NotificationMessage`; ≥1 kênh tới ⇒ đã tới, tất cả fail ⇒ `DLQ` + metric, chống đệ quy; `Critical` không bị quiet hours chặn; opt-out không áp cho người nhận nội bộ; kênh 2 chỉ bật khi có NCC + credential + `unitCostPerMessage` (`D-206`).<br>• **BR-NOT-002-023**: 🚨 `NotificationOptOuts` là **nguồn sự thật duy nhất** + **cửa kiểm duy nhất** trước mỗi lần gửi; đồng bộ với NCC **chỉ** qua **hai adapter** — KÉO (`IOptOutSourceAdapter` + job, `Settings.optOutSync.mode` mặc định **off**) và ĐẨY (adapter trả `SendOutcome.RecipientRefused` ⇒ core ghi opt-out `Source=ProviderReport` cùng UoW + **không** retry) (`D-207`). **Cấm** đẩy danh sách của ta sang NCC; `required=true` mà danh sách chưa có/cũ ⇒ `0003` fail-closed; **không** kết luận tuân thủ pháp luật tin quảng cáo (`R3-5`).<br>• **BR-NOT-002-024**: 🚨 Phần **trung lập** NCC: mọi phụ thuộc hãng nằm ở `Settings` + ABP Setting (`ProviderCode`, base URL, `SenderIdentity`, credential mã hoá, QuietHours, DailyQuota, đơn giá/segment); **0** hằng số NCC/0 NuGet NCC; mọi test dùng `fake` sender (0 kết nối mạng). Kênh tắt/thiếu credential/thiếu đơn giá/thiếu `znsTemplateCode` ⇒ **fail-closed NÉM** `0003`, **không** gọi mạng, **không** đánh dấu `DaGui`, **không** suy đoán `UnitCost` (`D-200`/`D-202`). |
 | **Non-Functional Requirement** | • **NFR-NOT-002-001**: Độ trễ `SendAsync` (đã có credential, kênh rảnh) ⇒ **p95 < 2 s** cho SMS/Zalo OA, **< 5 s** cho email.<br>• **NFR-NOT-002-002**: Cùng `IdempotencyKey` gửi **1.000** lần ⇒ **đúng 1** tin gửi ra ngoài, **1** `NotificationMessage`.<br>• **NFR-NOT-002-003**: **100 %** callback có `CorrelationId` **và** được chống trùng (integration test gửi cùng callback 2 lần).<br>• **NFR-NOT-002-004**: **0** dòng log chứa OTP / token / số điện thoại đầy đủ (quét mã nguồn ở CI).<br>• **NFR-NOT-002-005**: **0** nhãn metric cardinality cao; **< 100** series mỗi metric.<br>• **NFR-NOT-002-006**: Retry tối đa **3** lần với backoff **1 s → 5 s → 25 s**; lần thứ 4 ⇒ `DLQ`. Không có tin nào thử quá **3** lần.<br>• **NFR-NOT-002-007**: Thông lượng tối thiểu **50 tin/giây/instance** với `ChannelKind=Sms` (đo bằng fake sender).<br>• **NFR-NOT-002-008**: **100 %** tin marketing có `NextAttemptAtUtc` nằm **trong** khung giờ cho phép (test với `TimeProvider` giả).<br>• **NFR-NOT-002-009**: Cách ly tenant: **0** trường hợp tenant B đọc/ghi được credential hay nội dung của tenant A.<br>• **NFR-NOT-002-010**: **0** tin gửi tới người nhận đã opt-out cho **mọi** `Source` (khách yêu cầu / thủ công / NCC báo / file NCC) (test 1.000 lần ngẫu nhiên).<br>• **NFR-NOT-002-011**: Chi phí gửi tính đúng tới **0,0001** đơn vị tiền và **khớp** file đối soát nhà cung cấp (lệch **0**); phép so dùng **minor units**.<br>• **NFR-NOT-002-012**: Log là **một dòng JSON**/sự kiện, có `CorrelationId` (kế thừa `XC-005` BR-010/BR-002).<br>• **NFR-NOT-002-013**: Không query nặng trên DB giao dịch khi mở báo cáo — **0** truy vấn không-index trên `NotificationDeliveryEvents` từ UI.<br>• **NFR-NOT-002-014**: Metric phát ra **nằm trong** bảng đăng ký — **100 %** (test `TC-06` hiện có, `MetricsTests.cs:38–47`). |
 
@@ -201,7 +206,7 @@ stateDiagram-v2
 |---|---|---|---|---|---|
 | 1 | `[*]` → `ChoGui` | `IdempotencyKey` **chưa** tồn tại cho `(TenantId, IdempotencyKey)` | `NotificationSender` | ghi `NotificationMessage` + `DeliveryEvent(Queued)` + outbox (cùng UoW) | **NÉM** `eCommerce:Notification:0001` (trùng khoá) — hoặc trả kết quả cũ nếu ở chế độ "đã gửi" (BR-002) |
 | 2 | `ChoGui` → `DangGui` | Giành được khoá `notification:provider:{providerCode}:quota:{tenantId}` **và** `NextAttemptAtUtc <= now` | Job nền | ghi `DeliveryEvent(Sending)` | **NÉM** `eCommerce:Lock:0001` (**mã của `XC-003`**, không tự đặt mã mới) |
-| 3 | `DangGui` → `DaGui` | Adapter trả `Accepted=true` **và** có `ProviderMessageId` | Adapter kênh | `DeliveryEvent(Sent)` + ghi `ProviderMessageId` | **NÉM** `eCommerce:Notification:0006` (nhà cung cấp nhận nhưng thiếu mã ⇒ không theo dõi được) |
+| 3 | `DangGui` → `DaGui` | Adapter trả `Accepted=true` **và** có `ProviderMessageId` | Adapter kênh | `DeliveryEvent(Sent)` + ghi `ProviderMessageId` | **Trả** kết quả `0006` — **không NÉM**; job as-built `NotificationDispatchWorker` gọi `DanhDauLoi` (trạng thái hàng đợi `Loi` của **`NOT-001`** — `NotificationQueueStatus`, **không** thuộc tập trạng thái thiết kế §3); **không** đánh dấu thành công (nhà cung cấp nhận nhưng thiếu mã ⇒ không theo dõi được) |
 | 4 | `DangGui` → `ChoThuLai` | `AttemptCount < 3` **và** lỗi phân loại là **tạm thời** | Adapter kênh | `AttemptCount++`, `NextAttemptAtUtc = now + backoff`, `DeliveryEvent(RetryScheduled)` | Nếu `AttemptCount >= 3` ⇒ sang `DLQ` + `eCommerce:Notification:0005` |
 | 5 | `ChoThuLai` → `DangGui` | `NextAttemptAtUtc <= now` **và** còn lượt | Job nền | `DeliveryEvent(Retrying)` | Ở lại `ChoThuLai` (không lỗi — đúng thiết kế) |
 | 6 | `ChoThuLai` → `DLQ` | `AttemptCount >= 3` **hoặc** lỗi vĩnh viễn sau khi đã thử | Job nền | `DeliveryEvent(MovedToDlq)` + **metric** | **NÉM** `eCommerce:Notification:0005` nếu bị gọi sai trạng thái |
@@ -214,6 +219,8 @@ stateDiagram-v2
 | 13 | `ChoGui` → `Huy` | Có `opt-out` **hoặc** người dùng huỷ yêu cầu | `NotificationSender` | `DeliveryEvent(Cancelled, reason)` | **NÉM** `eCommerce:Notification:0007` nếu cố huỷ tin **đã phát** (BR-004) |
 
 > 📌 **`SentAckTtl` (`D-205`)**: mặc định `Email=1440` · `Sms=720` · `ZaloOa=720` **phút**, lưu theo **dòng kênh** ở `NotificationChannelAccounts.Settings.sentAckTtlMinutes` (jsonb, **không** secret); thiếu khoá ⇒ mặc định theo `ChannelKind` (một bảng hằng trong module). Biên `[60, 43200]`; trống/`≤0`/sai ⇒ **mặc định** + log `Warning` + `ErrorCode`, **không bao giờ** hết hạn tức thì. Hết TTL **chỉ** `DaGui → HetHanXacNhan` + **đúng một** `AckExpired`; siết theo SLA NCC = **đổi cấu hình sau pilot** (0 code, 0 migration).
+
+> 📌 **`Loi`/`DanhDauLoi` KHÔNG thuộc tập trạng thái §3:** đây là trạng thái **hàng đợi as-built của `NOT-001`** (`NotificationQueueStatus`); job `NotificationDispatchWorker` ánh xạ kết quả `0006` sang `DanhDauLoi`. Tập trạng thái **thiết kế** của `NOT-002` (§3 sơ đồ) giữ nguyên — `Loi` là hệ quả job, **không** phải trạng thái `NOT-002` mới.
 
 > ⚠️ **Trạng thái nguy hiểm nhất là `HetHanXacNhan`.** Nhà cung cấp **có thể đã gửi** nhưng callback bị mất
 > (đúng bài học `XC-006` §7.1 về eShop: *"consumer luôn ACK kể cả khi handler lỗi ⇒ mất sự kiện vĩnh viễn"*).
@@ -238,7 +245,7 @@ sequenceDiagram
     participant DB as PostgreSQL
 
     MOD->>N1: «phát ETO kèm CorrelationId»
-    N1->>SVC: «SendAsync(IdempotencyKey, ChannelKind, Recipient, TemplateCode, Data)»
+    N1->>SVC: «SendAsync(NotificationSendRequest — khoá idempotency + RecipientEncrypted + Subject/Body đã render)»
     SVC->>DB: «tra (TenantId, IdempotencyKey)»
     alt «đã tồn tại»
         DB-->>SVC: «bản ghi cũ»
@@ -277,7 +284,7 @@ sequenceDiagram
 | Bước | Nguồn → Đích | Dữ liệu | Ghi chú |
 |---|---|---|---|
 | 1 | Module nghiệp vụ → `NOT-001` | ETO (đủ trường để dựng tin — ADR-09) | `NOT-002` **không** gọi ngược lại module nào |
-| 2 | `NOT-001` → `NOT-002` | `SendRequest` (khoá idempotency + template + data) | Đây là **biên vào thứ nhất** ⇒ kiểm idempotency |
+| 2 | `NOT-001` → `NOT-002` | `NotificationSendRequest` (khoá idempotency + `RecipientEncrypted` + `Subject`/`Body` đã render + mask) | Đây là **biên vào thứ nhất** ⇒ kiểm idempotency |
 | 3 | `NOT-002` ↔ PostgreSQL | `NotificationMessages`, `NotificationDeliveryEvents`, `NotificationInbox`, `NotificationCostLedger`, `NotificationChannelAccounts`, `NotificationOptOuts` | 6 bảng, xem §5 (opt-out là biên đọc **trước mỗi lần gửi** — BR-020/BR-023) |
 | 4 | `NOT-002` → Nhà cung cấp | HTTP/SMTP (timeout + retry) | Khoá quota bao ngoài |
 | 5 | Nhà cung cấp → `NOT-002` | Callback trạng thái | **Biên vào thứ hai** ⇒ chống trùng bằng unique index |
@@ -290,7 +297,7 @@ sequenceDiagram
 > 📌 **Không vẽ ERD** để giữ đúng giới hạn **3 sơ đồ Mermaid** của tài liệu này (2 sơ đồ đã dùng ở §2 và §3).
 > Quan hệ giữa các bảng được ghi rõ bằng cột **FK** trong Data Dictionary dưới đây.
 >
-> 🚨 **Trạng thái code:** module `Notification` **chưa có trong code** ⇒ toàn bộ §5 là **thiết kế mới, kế hoạch GĐ3**.
+> 🚨 **Trạng thái code:** **6 bảng dưới đây** chưa có trong code (module `Notification` **đã có** ở WP-22 — `D-312`); **phần bảng** của `NOT-002` là **thiết kế mới, kế hoạch GĐ3**.
 > Khi triển khai **bắt buộc**: (a) mọi entity **phải** có `DbSet` trên `eCommerceDbContext` hợp nhất, nếu không
 > `IRepository<T, Guid>` **không** được đăng ký (bài học `src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs:47–52`);
 > (b) **một** hàm `ConfigureNotification(...)` dùng chung cho **cả** `NOT-001`+`NOT-002` (một module `Notification` — `D-197`), gọi **một lần** trong `OnModelCreating` (mẫu `ConfigureChannelHub()` —
@@ -457,7 +464,13 @@ sequenceDiagram
 
 ## 6. Hợp đồng API
 
-### 6.1 Application Service (thiết kế mới — chưa có trong code, kế hoạch GĐ3)
+### 6.1 Hợp đồng canonical + adapter kênh (WP-23)
+
+> 📌 **Hai tầng, đừng lẫn:** (a) `INotificationSender` + `NotificationSendRequest`/`NotificationSendResult` là hợp đồng bàn giao
+> **canonical đã phát hành ở WP-22** (`D-264`) — as-built `INotificationSender.cs:8-30` (interface **1** method; `NotificationSendRequest:16-24`
+> **8** trường; `NotificationSendResult:26-30`). `W23-2` **thêm** `CorrelationId?` **cuối** `NotificationSendRequest` (additive, `D-315` AQ4) —
+> interface `INotificationSender` **không đổi**. (b) `INotificationChannelSender` + `SendCommand`/`SendOutcome` + registry kênh là **code mới
+> của WP-23** (`D-313`/`D-315`). State machine 6 bảng / app service / endpoint của `NOT-002` đầy đủ vẫn là **kế hoạch GĐ3** — **chưa** làm ở WP-23.
 
 ```csharp
 namespace eCommerce.Notification;
@@ -472,7 +485,7 @@ public enum NotificationFailureKind
     Transient = 1,        // timeout, 5xx, rate limit ⇒ THỬ LẠI
     Permanent = 2,        // định danh sai, template bị từ chối ⇒ KHÔNG thử lại
     QuotaExceeded = 3,    // hạn mức ⇒ thử lại ở cửa sổ sau
-    Unauthenticated = 4   // credential sai/hết hạn ⇒ thử lại + CẢNH BÁO VẬN HÀNH
+    Unauthenticated = 4   // credential bị NCC từ chối ⇒ NÉM 0003, KHÔNG thử lại, 0 IsTransient (docDeviation #8)
 }
 
 /// <summary>
@@ -486,64 +499,74 @@ public interface INotificationChannelSender
 
     ChannelKind ChannelKind { get; }
 
-    Task<SendOutcome> SendAsync(SendCommand command, CancellationToken cancellationToken = default);
+    /// <summary>Khoá Settings BẮT BUỘC của adapter (vd apiBaseUrl; SMS/Zalo: unitCostPerMessage + currency).
+    /// Thiếu bất kỳ khoá nào ⇒ 0003 TRƯỚC khi gọi mạng (BR-024).</summary>
+    IReadOnlyCollection<string> RequiredSettingsKeys { get; }
 
-    /// <summary>Làm mới credential (Zalo OA có rotate). BẮT BUỘC gọi trong phạm vi distributed lock (BR-010).</summary>
-    Task<RefreshOutcome> RefreshCredentialAsync(Guid channelAccountId, CancellationToken cancellationToken = default);
+    Task<SendOutcome> SendAsync(SendCommand command, CancellationToken cancellationToken = default);
+    // KHÔNG có RefreshCredentialAsync ở WP-23 (docDeviation #3): chưa có adapter Zalo/kho credential;
+    // thêm lại khi Zalo OA vào là ADDITIVE, không phá adapter đã có.
 }
 
 public sealed record SendCommand(
-    Guid MessageId,
     Guid? TenantId,
-    string Recipient,                 // email hoặc số điện thoại đã chuẩn hoá hoặc Zalo user_id
-    string TemplateCode,
-    IReadOnlyDictionary<string, string> Data,
-    string Priority,                  // Low · Normal · High · Critical
-    string CorrelationId);
+    Guid QueueItemId,                 // thay MessageId (bảng NOT-002 chưa có — §4.1 ARCH)
+    string IdempotencyKey,            // khoá đã phát hành; adapter CẤM sinh khoá mới (BR-002)
+    ChannelKind ChannelKind,
+    string ProviderCode,              // trung lập NCC (D-200)
+    Guid? ChannelAccountId,
+    string? CredentialEncrypted,      // CHỈ ciphertext (AQ8); adapter giải mã ở biên cuối, KHÔNG log/DTO/ETO
+    string RecipientEncrypted,        // PII — không plaintext (D-264)
+    string Subject,                   // bản đã render + mask
+    string Body,                      // bản đã render + mask
+    int Priority,                     // NotificationPriorities (0..3)
+    string? CorrelationId,            // tuỳ chọn (AQ4); có thể null nếu chưa truyền
+    IReadOnlyDictionary<string, string> Settings);
 
 public sealed record SendOutcome(
     bool Accepted,
     string? ProviderMessageId,
     NotificationFailureKind FailureKind,
     string? Reason,
-    bool RecipientRefused = false);   // D-207: NCC báo "người nhận từ chối/bị chặn" ⇒ core ghi opt-out Source=ProviderReport cùng UoW, KHÔNG retry
+    bool RecipientRefused = false);   // D-207: GIỮ CHỖ — WP-23 KHÔNG xử lý (opt-out ngoài phạm vi). Increment sau mới ghi opt-out Source=ProviderReport cùng UoW, KHÔNG retry.
 
+// CANONICAL đã phát hành ở WP-22 (D-264); as-built modules/.../Sending/INotificationSender.cs:8-30
+// (interface 1 method; NotificationSendRequest:16-24 = 8 trường; NotificationSendResult:26-30 = 4 trường).
 public interface INotificationSender
 {
     /// <summary>
     /// Gửi (hoặc trả kết quả cũ nếu đã gửi cùng <paramref name="request"/>).
     /// 🚨 IdempotencyKey PHẢI ổn định — CẤM sinh Guid mới mỗi lần gọi (BR-002).
     /// </summary>
-    Task<SendResult> SendAsync(SendRequest request, CancellationToken cancellationToken = default);
-
-    /// <summary>Xử lý callback/webhook của nhà cung cấp — chống trùng bằng unique index (BR-003).</summary>
-    Task<CallbackResult> HandleCallbackAsync(
-        string providerCode,
-        string rawBody,
-        IReadOnlyDictionary<string, string> headers,
-        CancellationToken cancellationToken = default);
+    Task<NotificationSendResult> SendAsync(NotificationSendRequest request, CancellationToken cancellationToken = default);
+    // KHÔNG có HandleCallbackAsync: callback tách sang INotificationCallbackParser (AQ5, D-315).
 }
 
-public sealed record SendRequest(
+public sealed record NotificationSendRequest(
     Guid? TenantId,
+    Guid QueueItemId,
     string IdempotencyKey,
     ChannelKind ChannelKind,
-    string Recipient,
-    string TemplateCode,
-    IReadOnlyDictionary<string, string> Data,
-    string Priority,
-    Guid? RootMessageId = null);
+    string RecipientEncrypted,
+    string Subject,                   // đã render + mask
+    string Body,                      // đã render + mask
+    int Priority,
+    string? CorrelationId = null);    // D-315 (AQ4): W23-2 THÊM ở cuối, additive, default null — as-built (D-264) KHÔNG có trường này
 
-public sealed record SendResult(
-    Guid MessageId,
+public sealed record NotificationSendResult(
+    bool Accepted,
     bool AlreadySent,
-    string Status,
-    string? ProviderMessageId);
+    bool IsTransient,
+    string? ErrorCode);
+// `AlreadySent` luôn false ở WP-23 (chưa có bảng chống trùng NOT-002); giữ trường để không đổi
+// NotificationSendResult đã phát hành.
 ```
 
-**Hợp đồng phụ trợ (kế hoạch GĐ3):** `INotificationCallbackParser` (Application.Contracts, đăng ký theo registry như ADR-01) trả `(ProviderMessageId, EventType, ProviderEventId?, DedupKey)` — **một cửa** sinh `DedupKey` (`D-203`). `IOptOutSourceAdapter` (Application.Contracts, `ProviderCode` + `FetchAsync`) cho đường KÉO danh sách từ chối (`D-207`; mặc định **0** adapter ⇒ tính năng **tắt**). Thứ tự viết adapter theo `D-200`: **email tổng quát (SMTP) trước** (giao thức, không phải hãng); adapter **HTTP API/SMS/Zalo OA** chỉ viết **sau khi `R3-6` đóng**.
+**Hợp đồng callback — CHỐT TÊN (`AQ5`, `D-315`; `D-202` = GĐ3 KHÔNG mở endpoint):** `INotificationCallbackParser.Parse(providerCode, rawBody, headers)` (Application.Contracts, đăng ký theo registry như ADR-01) trả record trung lập có `DedupKey` do adapter **tự định nghĩa** (**không** suy đoán trường NCC) — **một cửa** sinh `DedupKey` (`D-203`, BR-019). **Chỉ parse + DedupKey**; `INotificationCallbackReceiver` + endpoint `[AllowAnonymous]` **hoãn** sau `D-202` (P10). `IOptOutSourceAdapter` (`ProviderCode` + `FetchAsync`) cho đường KÉO danh sách từ chối (`D-207`; mặc định **0** adapter ⇒ tính năng **tắt**) — increment sau. Thứ tự viết adapter theo `D-200`: **email tổng quát (SMTP) trước** (giao thức, không phải hãng); adapter **HTTP API/SMS/Zalo OA** chỉ viết **sau khi `R3-6` đóng**.
 
 ### 6.2 REST endpoint
+
+> 🚧 **Phạm vi WP-23:** **0 endpoint**, **0 quyền mới** (`D-313`/`D-314`). **11** endpoint dưới đây (**8** lõi + **3** `opt-outs`; `NOT-002-arch.md` §1.3 ghi "8" là **chưa tính** 3 endpoint `opt-outs`, còn §16 #6 của ARCH cũng ghi **11**) là **increment đầy đủ sau `R3-6`** (cần bảng/DTO/permission chưa có) — **giữ thiết kế**, **chưa** hiện thực ở WP-23.
 
 | Method | Route | Quyền | Mô tả |
 |---|---|---|---|
@@ -566,16 +589,15 @@ public sealed record SendResult(
 > (`src/eCommerce.Application.Contracts/Permissions/eCommercePermissionDefinitionProvider.cs:8–11`).
 > Ngoại lệ **duy nhất** là endpoint callback, và nó **phải** tự xác thực chữ ký (§7.2).
 
-**Mã lỗi nghiệp vụ** — **một** `NotificationErrorCodes.cs` dùng chung `NOT-001`+`NOT-002` (`modules/Notification/.../NotificationErrorCodes.cs`
-— **chưa có**, kế hoạch GĐ3; theo đúng khuôn `ChannelHubErrorCodes` `modules/ChannelHub/eCommerce.ChannelHub.Domain/ChannelHubConsts.cs:36–42`
-và `TaxErrorCodes` `modules/Tax/eCommerce.Tax.Domain/TaxErrorCodes.cs:10–35`). **Dải mã (F9, `D-197` + `D-199`):** `NOT-002` dùng
-**`0001–0009`**; `NOT-001` dùng **`0010–0020`** (`0020` = `BodyFormatNotSupported`); **append-only**, `NOT-002` **không** chiếm `0010+`.
+**Mã lỗi nghiệp vụ** — **một** `NotificationErrorCodes.cs` dùng chung `NOT-001`+`NOT-002`; **tệp đã có** (`modules/Notification/eCommerce.Notification.Domain/NotificationErrorCodes.cs:8-42`, dải `0010–0020` của `NOT-001`; theo đúng khuôn `ChannelHubErrorCodes` `modules/ChannelHub/eCommerce.ChannelHub.Domain/ChannelHubConsts.cs:36–42`
+và `TaxErrorCodes` `modules/Tax/eCommerce.Tax.Domain/TaxErrorCodes.cs:10–35`). `NOT-002` **thêm `0001–0009` cùng tệp** (append-only, `D-199`). **Dải mã (F9, `D-197` + `D-199`):** `NOT-002` dùng
+**`0001–0009`**; `NOT-001` giữ **`0010–0020`** (`0020` = `BodyFormatNotSupported`); **append-only**, `NOT-002` **không** chiếm `0010+`.
 
 | Mã | HTTP | Khi nào | Thông điệp |
 |---|---|---|---|
 | `eCommerce:Notification:0001` | `409` | Trùng `IdempotencyKey` khi đang ở chế độ **cấm** trùng | `Yêu cầu gửi này đã tồn tại.` |
 | `eCommerce:Notification:0002` | `400` | Người nhận sai định dạng / lỗi vĩnh viễn | `Người nhận không hợp lệ: {lý do}.` |
-| `eCommerce:Notification:0003` | `503` | Thiếu credential hoặc credential hết hạn | `Kênh gửi {kênh} chưa sẵn sàng (credential).` |
+| `eCommerce:Notification:0003` | `503` | Kênh chưa sẵn sàng: thiếu/hết hạn credential, **hoặc** NCC từ chối xác thực (`Unauthenticated`), **hoặc** thiếu adapter/thiếu khoá `Settings` bắt buộc | `Kênh gửi {kênh} chưa sẵn sàng (credential/cấu hình).` |
 | `eCommerce:Notification:0004` | `429` | Vượt hạn mức gửi của kênh | `Đã vượt hạn mức gửi của kênh {kênh}.` |
 | `eCommerce:Notification:0005` | `409` | Tin đã vào DLQ / cố phát lại sai trạng thái | `Tin đang ở DLQ; cần phát lại có kiểm soát.` |
 | `eCommerce:Notification:0006` | `502` | Nhà cung cấp nhận nhưng **không** trả `ProviderMessageId` | `Nhà cung cấp không trả mã tin; không theo dõi được.` |
@@ -617,7 +639,7 @@ và `TaxErrorCodes` `modules/Tax/eCommerce.Tax.Domain/TaxErrorCodes.cs:10–35`)
 | **Nhà cung cấp SMS** (delivery report) | webhook / callback | ⚠️ **chưa kiểm chứng** — mỗi nhà cung cấp một kiểu (một số chỉ dùng IP allowlist) | như trên | như trên | ❌ có thể sai thứ tự |
 | **Zalo OA** (sự kiện tin nhắn/trạng thái) | webhook | ⚠️ **chưa kiểm chứng** 5 thông số (`D-202`) — cấu hình `webhookAuthMode ∈ {none, hmac_sha256, ip_allowlist, shared_secret_url}` (mặc định `none`); secret ở `WebhookSecretEncrypted` | như trên (`DedupKey`, `D-203`) | như trên; **`webhookAuthMode = none`** ⇒ `SignatureValid=false` + `ProcessStatus=Rejected` + metric BR-018, **không** đổi trạng thái tin | ❌ |
 
-> 🚪 **GĐ3 KHÔNG mở `POST /api/notification/callbacks/{providerCode}`** (`D-202`): endpoint `[AllowAnonymous]` phải **người duyệt từng endpoint + rate limit** (`P10`) ⇒ GĐ3 chỉ test bằng `fake` payload gọi **thẳng app service** (kiểm parser sinh `DedupKey`, chống trùng) — không lộ endpoint ẩn danh.
+> 🚪 **GĐ3 KHÔNG mở `POST /api/notification/callbacks/{providerCode}`** (`D-202`): endpoint `[AllowAnonymous]` phải **người duyệt từng endpoint + rate limit** (`P10`) ⇒ GĐ3 chỉ test bằng `fake` payload gọi **thẳng** `INotificationCallbackParser.Parse(providerCode, rawBody, headers)` (§6.1, `AQ5` — **chỉ parse + `DedupKey`**, **0** endpoint) để kiểm chống trùng — không lộ endpoint ẩn danh.
 
 > 🚨 **Nguyên tắc bắt buộc khi nhà cung cấp KHÔNG có chữ ký HMAC** (kế thừa cảnh báo của `SHP-002` —
 > `docs/implementation-plan.md:425` ghi rõ *"không có HMAC ở GHTK"*):
@@ -632,7 +654,7 @@ và `TaxErrorCodes` `modules/Tax/eCommerce.Tax.Domain/TaxErrorCodes.cs:10–35`)
 |---|---|---|---|---|---|
 | SMTP/API email (**chưa chọn NCC** — §15 Q1) | cấu hình trong `NotificationChannelAccounts.Settings` | mật khẩu SMTP / API key (mã hoá) | **10 s** | 3 lần, backoff 1/5/25 s | `ChoThuLai` → `DLQ` |
 | SMS brandname (**chưa chọn NCC** — §15 Q1) | cấu hình | API key + brandname | **10 s** | 3 lần, backoff 1/5/25 s | `ChoThuLai` → `DLQ`; `QuotaExceeded` ⇒ thử lại cửa sổ sau |
-| Zalo OA (**chưa kiểm chứng 5 thông số** — §15 Q3, `D-202`) | `Settings.apiBaseUrl` | OA access token (+ refresh token) | **10 s** | 3 lần, backoff 1/5/25 s | như trên; thiếu `znsTemplateCode` ⇒ **NÉM** `0003` **trước** gọi mạng, **không** hạ cấp sang CSKH; `Unauthenticated` ⇒ refresh **trong khoá** rồi thử lại **một** lần |
+| Zalo OA (**chưa kiểm chứng 5 thông số** — §15 Q3, `D-202`) | `Settings.apiBaseUrl` | OA access token (+ refresh token) | **10 s** | 3 lần, backoff 1/5/25 s | như trên; thiếu `znsTemplateCode` ⇒ **NÉM** `0003` **trước** gọi mạng, **không** hạ cấp sang CSKH; `Unauthenticated` ⇒ **NÉM** `0003` như mọi lỗi credential (`docDeviation #8`, **0** `IsTransient`); refresh-trong-khoá (`ADR-08`) chỉ áp khi có adapter Zalo OA (increment sau, `AQ3`) |
 
 > ⚠️ **Cấm hard-code endpoint** vào code — endpoint đặt trong `NotificationChannelAccounts.Settings`
 > (quy tắc 8 của `docs/design-doc-guidelines.md` §5; tiền lệ `ShopeeOptions.BaseUrl`
@@ -762,10 +784,12 @@ khi test (đã được ghi thành thói quen tốt trong `docs/design-doc-guide
 
 ## 11. Migration & seed
 
+> 🚧 **Phạm vi WP-23:** **0 migration, 0 bảng, 0 `DbSet`, 0 endpoint, 0 quyền mới** (`D-313`/`D-314`). Toàn bộ bảng dưới đây thuộc **increment đầy đủ của `NOT-002` sau `R3-6`** — **giữ thiết kế** làm hợp đồng, **chưa** làm ở WP-23.
+
 | Mục | Nội dung |
 |---|---|
-| Migration mới | **CÓ** — `Added_Notification_Module`: tạo **6** bảng `NotificationMessages`, `NotificationDeliveryEvents`, `NotificationInbox`, `NotificationCostLedger`, `NotificationChannelAccounts`, `NotificationOptOuts` + index + CHECK. Gồm: `UX_NotificationInbox_Dedup` **NULLS NOT DISTINCT** + `DedupKey`/`DedupKeyVersion` (`D-203`); `WebhookSecretEncrypted` (`D-202`); `OptOutLastSyncedAtUtc` (`D-207`); `NotificationMessages.RecipientEncrypted/Masked/Hash` (`D-206`); UNIQUE `(TenantId, IdempotencyKey)` + `(TenantId, ProviderCode, ProviderMessageId)` trên `NotificationMessages` **NULLS NOT DISTINCT** (`D-203`); `NotificationOptOuts.RecipientHash` HMAC hex64 + `HashVersion` + `Source`/`SourceRef` + UNIQUE **NULLS NOT DISTINCT** + `CHECK Source IN (0,1,2,3)` (`D-204`/`D-207`) |
-| `DbSet` | 🚨 **BẮT BUỘC** khai báo **cả 6** `DbSet` trên `src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs`, nếu không `IRepository<T, Guid>` **không** được đăng ký (bài học đã trả giá — `eCommerceDbContext.cs:47–52`) |
+| Migration mới (**increment đầy đủ** — **WP-23: KHÔNG**) | **CÓ** (sau `R3-6`) — `Added_Notification_Module`: tạo **6** bảng `NotificationMessages`, `NotificationDeliveryEvents`, `NotificationInbox`, `NotificationCostLedger`, `NotificationChannelAccounts`, `NotificationOptOuts` + index + CHECK. Gồm: `UX_NotificationInbox_Dedup` **NULLS NOT DISTINCT** + `DedupKey`/`DedupKeyVersion` (`D-203`); `WebhookSecretEncrypted` (`D-202`); `OptOutLastSyncedAtUtc` (`D-207`); `NotificationMessages.RecipientEncrypted/Masked/Hash` (`D-206`); UNIQUE `(TenantId, IdempotencyKey)` + `(TenantId, ProviderCode, ProviderMessageId)` trên `NotificationMessages` **NULLS NOT DISTINCT** (`D-203`); `NotificationOptOuts.RecipientHash` HMAC hex64 + `HashVersion` + `Source`/`SourceRef` + UNIQUE **NULLS NOT DISTINCT** + `CHECK Source IN (0,1,2,3)` (`D-204`/`D-207`) |
+| `DbSet` (**increment đầy đủ** — **WP-23: 0**) | 🚨 **BẮT BUỘC** khai báo **cả 6** `DbSet` trên `src/eCommerce.EntityFrameworkCore/eCommerceDbContext.cs`, nếu không `IRepository<T, Guid>` **không** được đăng ký (bài học đã trả giá — `eCommerceDbContext.cs:47–52`) |
 | Module mapping | thêm **một lần** `builder.ConfigureNotification();` vào `OnModelCreating` — **một cửa cấu hình** dùng chung `NOT-001`+`NOT-002` (`D-197`; `eCommerceDbContext.cs:347`) |
 | Seed | **CÓ, idempotent**: KHÔNG seed credential thật. Chỉ seed (a) `NotificationChannelAccounts` ở trạng thái `IsEnabled=false` cho 3 kênh với `SenderIdentity` rỗng — để UI có chỗ điền; (b) **không** seed opt-out; (c) **không** seed mẫu tin (`NOT-001` sở hữu) |
 | 🚨 **CẤM seed** | **CẤM** seed API key / mật khẩu SMTP / OA token vào migration hoặc `appsettings.json` (kế thừa cảnh báo `XC-004` F4 về mật khẩu seed trong tài liệu — `docs/features/cross-cutting/XC-005-observability-log-metric.md:463`) |
@@ -783,10 +807,10 @@ khi test (đã được ghi thành thói quen tốt trong `docs/design-doc-guide
 | **Không có tin nào cần gửi** | hàng đợi rỗng | job **không** log `Information` (tránh ngập log — `XC-005` BR-004/D9) | **không phải lỗi** |
 | Trùng `IdempotencyKey` | retry của tầng trên | **Không** gửi lại; trả kết quả cũ + `AlreadySent=true` | `200` (hoặc `409` `0001` ở chế độ cấm trùng) |
 | Người nhận sai định dạng | dữ liệu khách sai | `ThatBai` vĩnh viễn, **không** thử lại, `DeliveryEvent(FailedPermanent)` | `400` `0002` |
-| Thiếu / hết hạn credential | chưa cấu hình, token hết hạn | `ChoThuLai` + backoff dài + **metric + cảnh báo vận hành** | `503` `0003` |
+| Thiếu / hết hạn credential **hoặc** NCC từ chối xác thực (`Unauthenticated`) | chưa cấu hình, token hết hạn, credential bị NCC từ chối | **NÉM** `0003` (**0** `IsTransient`, **không** `ChoThuLai`/backoff dài); job `catch` ⇒ lease đưa về `ChoGui` sau `LeaseSeconds`, **0** `DaBanGiao`/`DaGui` + **metric + `Warning`** | `503` `0003` |
 | Vượt hạn mức nhà cung cấp | gửi nhiều / quota ngày | `ChoThuLai` với `Reason=quota`; **không** tính là lỗi vĩnh viễn | `429` `0004` |
 | Nhà cung cấp timeout | sự cố NCC | `ChoThuLai`, thử lại theo backoff; quá 3 lần ⇒ `DLQ` | log `Error` + metric |
-| Nhà cung cấp nhận nhưng **không** trả `ProviderMessageId` | NCC lỗi/hợp đồng khác | `ThatBai` (**không** đánh dấu thành công — nếu không sẽ không bao giờ theo dõi được phát) | `502` `0006` |
+| Nhà cung cấp nhận nhưng **không** trả `ProviderMessageId` | NCC lỗi/hợp đồng khác | **Trả** kết quả `0006` (**không NÉM**) ⇒ job `NotificationDispatchWorker` gọi `DanhDauLoi` (trạng thái hàng đợi `Loi` của `NOT-001`, **không** thuộc §3); **không** đánh dấu thành công (nếu không sẽ không bao giờ theo dõi được phát) | `502` `0006` |
 | **Callback trùng** | NCC gửi lại (at-least-once) | `IgnoredDuplicate`; **không** ghi event thứ hai; vẫn trả `200` (để NCC ngừng retry) | `200` |
 | **Callback sai thứ tự** | mạng/NCC | `IgnoredOutOfOrder` + log `Warning`; **không** lùi trạng thái (E7) | `200` |
 | **Callback không xác thực được** | giả mạo / cấu hình sai | `Rejected`; **không** đổi trạng thái tin; metric + log `Warning` | `403` `0008` |
@@ -934,13 +958,14 @@ public class NotificationChannelTests
     }
 
     /// <summary>TC-25 — OTP TUYỆT ĐỐI không được lưu (BR-015). `BodyMasked`/`GhiChuKhongLuuNoiDung`
-    /// là mã minh hoạ — KHÔNG thuộc `SendResult` (§6.1) mà đọc từ `NotificationMessage` đã lưu.</summary>
+    /// là mã minh hoạ — KHÔNG thuộc `NotificationSendResult` (§6.1) mà đọc từ `NotificationMessage` đã lưu.</summary>
     [Fact]
     public async Task TC25_tin_otp_khong_luu_noi_dung()
     {
         var (sut, _) = TaoSenderVoiKhoLuu();
-        var tin = await sut.SendAsync(TaoYeuCauOtpDoiCod());
-        var daLuu = LayNotificationMessage(tin.MessageId);   // SendResult → entity (§6.1)
+        var yeuCau = TaoYeuCauOtpDoiCod();
+        var tin = await sut.SendAsync(yeuCau);
+        var daLuu = LayNotificationMessage(yeuCau.QueueItemId);   // NotificationSendResult KHÔNG có MessageId — đọc mục theo QueueItemId (§6.1)
 
         Assert.Null(daLuu.BodyMasked);
         Assert.Contains("OTP", daLuu.GhiChuKhongLuuNoiDung);
@@ -971,6 +996,10 @@ public class NotificationConventionTests
 
 ### 14.3 Acceptance Criteria (Definition of Done)
 
+> 🚧 **Phạm vi WP-23 (tách khỏi DoD đầy đủ):** WP-23 chỉ cần các ca của **hợp đồng adapter + `fake` sender + fail-closed `0003`**
+> (`TC-FC-01…07`, `TC-DI-01/02` — xem `NOT-002-arch.md` §6.1/§13) trên **0** bảng/**0** migration/**0** endpoint/**0** quyền. Danh sách
+> đầy đủ dưới đây (47 TC · 6 bảng · 8 permission · migration) là **increment đầy đủ sau `R3-6`**.
+
 - [ ] **47 test case** pass, phủ **hết 24 BR** và **14 NFR** (`NFR-007` = `TC-46`, `NFR-012` = `TC-47`)
 - [ ] **Idempotency ở CẢ HAI biên vào** chứng minh bằng test: `TC-04` (khoá gửi, có chạy **song song**) và `TC-05` (callback trùng) — **unique index** là hàng rào, **không** chỉ code
 - [ ] **Mọi nhánh state machine (§3) có test** — **kể cả nhánh guard sai** (`TC-07`, `TC-08`)
@@ -978,11 +1007,11 @@ public class NotificationConventionTests
 - [ ] 🚨 **`TC-13` chứng minh 0 OTP trong log và trong DB** — bắt buộc, vì đây là rủi ro bảo mật thật (`SHP-003`)
 - [ ] 🚨 **`TC-24` chứng minh không dùng webhook không-HMAC (GHTK) làm nguồn duy nhất cho tin có số tiền** (`SHP-002`)
 - [ ] **Bảng đăng ký metric (`XC-005` §5.1) đã cập nhật** và `TC-06`/`TC-12` xanh (ADR-07/BR-008)
-- [ ] **6 bảng có `DbSet`** trên `eCommerceDbContext` + `ConfigureNotification()` trong `OnModelCreating`
-- [ ] `[Authorize]` **cấp CLASS** trên `NotificationAppService` + **8 permission** đã định nghĩa trong `PermissionDefinitionProvider`; test `401`/`403`
+- [ ] (**increment đầy đủ**) **6 bảng có `DbSet`** trên `eCommerceDbContext` + `ConfigureNotification()` trong `OnModelCreating`
+- [ ] (**increment đầy đủ**) `[Authorize]` **cấp CLASS** trên `NotificationAppService` + **8 permission** đã định nghĩa trong `PermissionDefinitionProvider`; test `401`/`403`
 - [ ] **Cách ly tenant** đúng: `TC-29` xanh
 - [ ] **`REP-*` không query DB giao dịch**: `TC-31` xanh; báo cáo đọc từ read-model
-- [ ] **Migration chạy được từ DB trống**, rollback được; **seed idempotent** và **không** chứa credential
+- [ ] (**increment đầy đủ**) **Migration chạy được từ DB trống**, rollback được; **seed idempotent** và **không** chứa credential
 - [ ] **0 gói ABP trùng phiên bản**: mọi gói `Volo.Abp.*` mới (nếu có) **phải** dùng `10.7.0` trong `Directory.Packages.props`
 - [ ] **Tài liệu này cập nhật khớp code** (quy tắc vàng `docs/design-doc-guidelines.md` §4)
 
@@ -991,8 +1020,8 @@ public class NotificationConventionTests
 - [ ] Tài liệu đã **review và Approved** (Kiến trúc trưởng + Vận hành + **Security** — vì có OTP/credential/PII)
 - [ ] **Q1 đã chốt**: chọn nhà cung cấp email + SMS (§15.1)
 - [x] ✅ **Ranh giới `NOT-001` / `NOT-002` đã rõ** (theo `implementation-plan.md:439–440`)
-- [x] ✅ **Đã xác nhận hiện trạng**: 0 dòng code miền thông báo, 0 gói NuGet, module chưa tồn tại
-- [x] ✅ **Đã xác nhận ràng buộc cứng**: `email`/`phone` **bị cấm** làm nhãn metric; registry hiện **16** tên
+- [x] ✅ **Đã xác nhận hiện trạng** (28/11/2026): module `Notification` **đã có** (WP-22 — 4 project, **28** tệp tracked, `D-312` ③); canonical `INotificationSender` đã phát hành (`D-264`); **0** gói NuGet NCC trong `Directory.Packages.props` (`D-200`)
+- [x] ✅ **Đã xác nhận ràng buộc cứng**: `email`/`phone` **bị cấm** làm nhãn metric; registry hiện **39** tên; **7** metric thông báo `NOT-001` đã có, `NOT-002` **0** metric mới (`D-315` AQ7)
 - [x] ✅ **Q2 đã chốt — D-201**: lưu `BodyMasked` **đã mask** (không lưu hash, không lưu thô); tin OTP ⇒ `BodyMasked = NULL` + ghi chú
 - [ ] **Q3 đã chốt**: cơ chế xác thực callback của từng nhà cung cấp (**chưa kiểm chứng**)
 - [ ] **Đơn giá/segment NCC đã có** để ghi `NotificationCostLedger` — **thiếu ⇒ KHÔNG suy đoán `UnitCost`** (việc `R3-6`, `D-200`; xem §5.4)
@@ -1022,9 +1051,9 @@ public class NotificationConventionTests
 
 | # | Vấn đề | Bằng chứng (đường dẫn thật) | Mức độ | Xử lý |
 |---|---|---|---|---|
-| **F1** | **Miền thông báo hoàn toàn CHƯA CÓ trong code**: không có project, không có entity, **0 gói NuGet** gửi thư/SMS/Zalo | `modules/` có 15 module nhưng **không** có `Notification` (24/11/2026); `Directory.Packages.props` (0 gói email/SMS) | 🟠 **Trung bình** (*không* phải lỗi — đúng kế hoạch GĐ3) | ⬜ **Chưa có** — tài liệu này là bước chuẩn bị; code là **kế hoạch GĐ3** |
+| **F1** | **Module `Notification` ĐÃ CÓ** (WP-22) nhưng **lớp kênh gửi `NOT-002` chưa có**: 4 project + `INotificationSender` canonical đã phát hành, **0** adapter NCC, **0 gói NuGet** gửi thư/SMS/Zalo | `modules/` có **17** thư mục (thêm `Notification` + `Promotions`); `git ls-files modules/Notification` = **28** tệp tracked (28/11/2026, `D-312` ③); `Directory.Packages.props` (0 gói NCC) | 🟠 **Trung bình** (*không* phải lỗi — đúng kế hoạch GĐ3) | 🔶 **Một phần** — module + cổng đã có (WP-22); adapter + state machine + bảng là **kế hoạch GĐ3** (WP-23 làm phần trung lập) |
 | **F2** | ✅ **ĐÃ SỬA trong code (`0f2f286`, 13/10/2026)** — `TaxLockKeys` từng trả `ecommerce:tax:…` trong khi `KeyPrefix` **đã là** `"ecommerce:"` ⇒ khoá thật thành **`ecommerce:ecommerce:tax:…`**; nay trả **không tiền tố**, đúng quy ước `XC-003` §5.4 điểm 2 và `ChannelHubConsts` | `modules/Tax/eCommerce.Tax.Domain/TaxErrorCodes.cs:45–50` (`tax:classification:…`/`tax:rate-schedule:…`) **vs** `modules/ChannelHub/eCommerce.ChannelHub.Domain/ChannelHubConsts.cs:23,27,31` + `src/eCommerce.HttpApi.Host/eCommerceHttpApiHostModule.cs:237` | 🟢 **Đã đóng** | `NOT-002` **giữ** quy ước: hàm sinh khoá **không** chứa `ecommerce:` (§8.2) |
-| **F3** | ✅ **ĐÃ SỬA trong code** — **16** metric có **điểm phát thật** ở luồng nghiệp vụ (vd `DeadLetterAppService`, `ChannelTokenManager`, `OrderStatusMetricHandler`); registry lên **16 tên**, test không còn chốt cứng số lượng | `shared/eCommerce.Kernel/Observability/eCommerceMetrics.cs:81–107` · `test/eCommerce.Tests/Observability/MetricsTests.cs:45–73` | 🟢 **Đã đóng** | `NOT-002` **vẫn phải** gọi metric **thật** ở luồng gửi và cập nhật registry theo ADR-07/BR-008 |
+| **F3** | ✅ **ĐÃ SỬA trong code** — **39** metric có **điểm phát thật** ở luồng nghiệp vụ (vd `DeadLetterAppService`, `ChannelTokenManager`, `OrderStatusMetricHandler`), trong đó **7** metric thông báo `NOT-001` (6 counter + 1 gauge); registry **39 tên**, test không còn chốt cứng số lượng | `shared/eCommerce.Kernel/Observability/eCommerceMetrics.cs:157–209` · `test/eCommerce.Tests/Observability/MetricsTests.cs:45–73` | 🟢 **Đã đóng** | `NOT-002` **dùng lại** `notification_queue_failed_total` (`D-315` AQ7, **0** metric mới); nếu thêm metric sau này vẫn theo ADR-07/BR-008 |
 | **F4** | **`ChannelOrderPulledEto` ĐÃ mang `CorrelationId`** (thêm ở `e7c56f6`, 16/10/2026); chỉ `ChannelShopTokenRefreshedEto` còn thiếu (`XC-005` BR-003) | `modules/ChannelHub/eCommerce.ChannelHub.Application.Contracts/Events/ChannelEvents.cs:72` (`ChannelOrderPulledEto`) · `:117–125` (`ChannelShopTokenRefreshedEto`); BR-003 ở `docs/features/cross-cutting/XC-005-observability-log-metric.md:79` | 🟠 **Trung bình** (một ETO còn thiếu ⇒ không nối được chuỗi log xuyên tiến trình) | 🔶 **Một phần** — `NOT-002` **phải** có `CorrelationId` trong ETO của mình (§7.1) |
 | **F5** | ✅ **`XC-002` ĐÃ triển khai**: có bảng `AbpEventOutbox`/`AbpEventInbox`, `DeadLetterAppService` (phát lại DLQ qua outbox), `IdempotencyGuard` dùng chung | `Migrations/20261024045237_AbpEventBusOutboxInbox.cs:68–72` · `src/eCommerce.Application/Messaging/DeadLetterAppService.cs:40` · `modules/Messaging/eCommerce.Messaging.Domain/Idempotency/IdempotencyGuard.cs:50` | 🟢 **Đã đóng** | `NOT-002` **dùng trực tiếp** outbox/inbox/DLQ của `XC-002` (không cần chế độ suy giảm) |
 | **F6** | **`XC-005` Q3 yêu cầu "alert gửi email kỹ thuật" nhưng chưa có nơi gửi** — tài liệu ghi rõ *"Thuộc `NOT-002`"* | `docs/features/cross-cutting/XC-005-observability-log-metric.md:449` · `docs/features/cross-cutting/XC-003-khoa-phan-tan-quy-uoc.md:528` | 🟡 **Thấp** ở GĐ3, **Cao** trước production | ✅ **Đã bao phủ** trong tài liệu này (A3 của §1, BR-012 ngoại lệ `Critical`, Q7) |
@@ -1051,6 +1080,8 @@ public class NotificationConventionTests
 | `v0.2` | 24/11/2026 | BA | Đối chiếu Nhanh (WP-14 `D-71`): đồng bộ `D-197` (một module `Notification`, enum `ChannelKind`, một `ConfigureNotification`/`NotificationErrorCodes`/`NotificationLockKeys`/nhóm permission `eCommerce.Notification`) · `D-199` (dải `0010–0020`, `BodyFormat`/`Subject` thuộc `NOT-001`) · đóng **Q9** theo `D-193` (chi phí kỳ) · sửa hiện trạng as-built (`eCommerce.Kernel`/`XC-002`/16 metric đã có) |
 | `v0.3` | 24/11/2026 | BA | Vòng áp quyết định N61: `D-200` (trung lập NCC + fail-closed + email SMTP trước) · `D-201` (đóng Q2 — `BodyMasked` mask một cửa) · `D-202` (trung lập Zalo, callback GĐ3 **không mở`) · `D-203` (đóng Q4 — `DedupKey` + `UX_NotificationInbox_Dedup` NND) · `D-204` (đóng Q5 — opt-out băm HMAC + `opt-outs/check`) · `D-205` (đóng Q6 — `SentAckTtl` 1440/720/720) · `D-206` (đóng Q7 — cảnh báo fan-out + cột người nhận §5.1) · `D-207` (đóng Q8 — opt-out sync 2 adapter + `Source`). Thêm **BR-019…024**, **TC-33…TC-45** (45 TC, 24 BR) |
 | `v0.4` | 24/11/2026 | BA | Vòng sửa DOCREV vòng 1: đóng **F2** (`0f2f286` — `TaxLockKeys` không còn tiền tố, §8.2/§15.2) · đóng một phần **F4** (`ChannelOrderPulledEto` đã có `CorrelationId`, chỉ `ChannelShopTokenRefreshedEto` thiếu, §7.1/§15.2) · §3 bỏ trạng thái không tồn tại `ChoTai` (hàng 1 = `[*]`, hàng 13 = `ChoGui`) · sửa dẫn as-built (`eCommerceMetrics.cs:218–223`, `PaymentTransaction.cs:313–337`/`otp` :323, `MetricsTests.cs:107+`) · gộp heading trùng thành `### 0.2` · §1 đủ **14 NFR** · §14.2 đặt đúng tên `TC-25` |
+| `v0.5` | 28/11/2026 | BA | Đối chiếu `NOT-002-arch.md` (N106, `D-313` tạm duyệt): áp **`docDeviation` #1–#9** — §6.1 canonical `INotificationSender.SendAsync(NotificationSendRequest)` (bỏ `TemplateCode`/`Data`/`Recipient` plaintext/`HandleCallbackAsync`; `SendCommand` đúng shape §4.1; bỏ `RefreshCredentialAsync`; `RecipientRefused` 0 hành vi) · §6.2/§11/§14.3 tách **phạm vi WP-23 = 0 migration/0 bảng/0 endpoint/0 quyền** khỏi increment đầy đủ sau `R3-6` · §0.1/§14.4/§15.2 as-built **17** module / `Notification` **28** tệp (`D-312` ③) · §1 E3/§12 mọi lỗi credential **NÉM** `0003` (**0** `IsTransient`) · §3 hàng 3/§12 `0006` **trả** kết quả cho job `Loi` (không NÉM) · §6.1 `INotificationCallbackParser` (`AQ5`). Bump `v0.5` (`D-313`/`D-314`/`D-315`) |
+| `v0.6` | 28/11/2026 | BA | Vòng sửa DOCREV vòng 5 (0 P1 · 5 P2 · 3 P3): §5 bỏ "module chưa có" (chỉ **6 bảng** chưa có) · §6.2 `NotificationErrorCodes.cs` **đã có** (dải `0010–0020`), `NOT-002` thêm `0001–0009` · §0.1/§15.2 F3/ADR-07/§14.4 metric **39 tên** + **7** metric thông báo `NOT-001` (`NOT-002` 0 mới, `D-315` AQ7) · §3 hàng 3/§12 ghi rõ `Loi`/`DanhDauLoi` là trạng thái hàng đợi as-built `NOT-001`, **không** thuộc tập trạng thái §3 · §6.1 ghi rõ `CorrelationId` **thêm ở W23-2** (`D-315` AQ4), as-built `:16-24` chỉ 8 trường · §14.2 fixture dùng `QueueItemId` (không `.MessageId` trên `NotificationSendResult`) · §1 A3 bỏ `TemplateCode=ops-alert` (mẫu do `NOT-001` chọn) · §6.2 chốt **11** endpoint (8 lõi + 3 `opt-outs`). Bump `v0.6` |
 
 ---
 
@@ -1072,3 +1103,7 @@ public class NotificationConventionTests
 | `D-205` | §3/Q6 "TTL đề xuất 24/12/12 h" chưa chốt | §3 nêu mặc định **1440/720/720 phút** ở `Settings.sentAckTtlMinutes`, biên `[60,43200]`, hết TTL chỉ `HetHanXacNhan`; Q6 **`Đã chốt — D-205`** | Chưa có code |
 | `D-206` | §1 A1 nhắc `NotificationRecipient` **không có** trong §5; A3/Q7 chưa có nguồn người nhận | §1 A1/A3 sửa (mỗi người nhận một `NotificationMessage`, người nhận từ `Settings.opsAlertRecipients`, fan-out `Critical`); §5.1 thêm `RecipientEncrypted/Masked/Hash`; Q7 **`Đã chốt — D-206`** | Chưa có code; host-level `TenantId=null` = nợ OPS + BA `XC-005` |
 | `D-207` | §5.6 không có `Source`; Q8 mở (lý do "vi phạm quy định") | §5.6 thêm `Source`/`SourceRef` + CHECK; §5.5 `OptOutLastSyncedAtUtc` + `optOutSync`; §6.1 `SendOutcome.RecipientRefused`; Q8 **`Đã chốt — D-207`** (phần thiết kế) | Chưa có code; pháp lý tin quảng cáo vẫn `R3-5` |
+| `D-264` | §6.1 `INotificationSender.SendAsync(SendRequest)` nhận `Recipient` plaintext + `TemplateCode` + `Data` + `HandleCallbackAsync` | §6.1 canonical `INotificationSender.SendAsync(NotificationSendRequest)`; bỏ 3 trường + tách callback sang `INotificationCallbackParser` (`AQ5`) | `modules/Notification/eCommerce.Notification.Application.Contracts/Sending/INotificationSender.cs:8-27` |
+| `D-312` | §0.1 `modules/` **15** module, **không** `Notification`, **0** dòng code miền thông báo | §0.1/§14.4/§15.2: **17** module, `Notification` **28** tệp tracked (4 project), bỏ câu "0 dòng code miền thông báo" | `git ls-files modules/Notification` = **28** · `ls modules/` = **17** (28/11/2026); `D-312` ③ |
+| `D-313`/`D-314` | §6.2 **11** endpoint; §11 migration **6** bảng + **6** `DbSet` như phạm vi chung | §6.2/§11/§14.3 tách **WP-23 = 0 migration/0 bảng/0 `DbSet`/0 endpoint/0 quyền**; 6 bảng + 11 endpoint là **increment đầy đủ sau `R3-6`** (giữ thiết kế) | Thiết kế — chưa code (`D-314` chọn cổng config stub + `null`) |
+| `D-315` | §6.1 `SendCommand` có `MessageId`/`Recipient`/`Priority string`; `RefreshCredentialAsync` trong interface; `RecipientRefused` như đã xử lý | §6.1 `SendCommand` shape §4.1 (`ProviderCode`/`ChannelAccountId`/`CredentialEncrypted`/`RecipientEncrypted`/`Priority int`/`CorrelationId?`/`Settings`); bỏ `RefreshCredentialAsync`; `RecipientRefused` **0** hành vi; `NotificationSendRequest` thêm `CorrelationId?` cuối (additive) | Thiết kế — WP-23 code |
