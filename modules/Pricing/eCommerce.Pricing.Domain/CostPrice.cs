@@ -59,6 +59,24 @@ public class CostPrice : FullAuditedAggregateRoot<Guid>, IMultiTenant
     /// <summary>Ngày kết thúc hiệu lực; `NULL` = vô thời hạn (`PRC-001` **D4**).</summary>
     public DateOnly? EffectiveTo { get; protected set; }
 
+    /// <summary>
+    /// 🆕 **`W17-2`** — nguồn sinh dòng (`PRC-001-arch` §4.1 **S4**). `NULL` = dòng **trước** `W17-2` ⇒ coi như
+    /// thủ công. ⚠️ Cột **nullable**, **không** `SET NOT NULL` (expand-only — `D-318` C4).
+    /// </summary>
+    public CostPriceSource? NguonTinh { get; protected set; }
+
+    /// <summary>🆕 **`W17-2`** — `Id` lần chạy động cơ sinh/cập nhật dòng (`PrcCostEngineRuns`). **Không** FK.</summary>
+    public Guid? RunId { get; protected set; }
+
+    /// <summary>🆕 **`W17-2`** — thời điểm động cơ tính (UTC). `NULL` = dòng thủ công/dữ liệu cũ.</summary>
+    public DateTime? ComputedAtUtc { get; protected set; }
+
+    /// <summary>
+    /// 🆕 **`W17-2`** — khoá idempotency của **đường ghi thủ công** (`PRC-001-arch` §4.1 **S7**/§5.6).
+    /// `NULL` = dòng do động cơ sinh hoặc dữ liệu cũ (unique index **có bộ lọc** `IS NOT NULL`).
+    /// </summary>
+    public string? IdempotencyKey { get; protected set; }
+
     /// <summary>Kế toán duyệt — `NULL` = **chưa duyệt** (giá vốn chưa duyệt **không** dùng để tính lãi gộp).</summary>
     public Guid? ApprovedBy { get; protected set; }
 
@@ -108,6 +126,81 @@ public class CostPrice : FullAuditedAggregateRoot<Guid>, IMultiTenant
         CurrencyCode = amount.Currency.Code;
         EffectiveFrom = effectiveFrom;
         EffectiveTo = effectiveTo;
+
+        // 📌 Dòng tạo qua constructor (đường ghi thủ công/seed) mặc định là `ThuCong`; động cơ gọi
+        // `DanhDauDongCo(...)` ngay sau đó để đổi thành `DongCo`. Dòng **cũ trong DB** vẫn `NULL` (additive).
+        NguonTinh = CostPriceSource.ThuCong;
+    }
+
+    /// <summary>
+    /// 🆕 **`W17-2`** — gắn **khoá idempotency** cho đường ghi thủ công (`PRC-001-arch` §5.6).
+    /// **NÉM** khi rỗng: gọi tạo mà **không** có khoá ⇒ mỗi lần retry sinh một dòng trùng (`XC-002`).
+    /// </summary>
+    public void GanKhoaIdempotency(string idempotencyKey)
+    {
+        if (string.IsNullOrWhiteSpace(idempotencyKey))
+        {
+            throw new BusinessException(PricingErrorCodes.ThieuKhoaIdempotency)
+                .WithData("sku", Sku)
+                .WithData("lyDo", "Đường ghi giá vốn BẮT BUỘC kèm `IdempotencyKey` (XC-002).");
+        }
+
+        IdempotencyKey = idempotencyKey.Trim();
+    }
+
+    /// <summary>
+    /// 🆕 **`W17-2`** — đánh dấu dòng do **động cơ** sinh/cập nhật (`NguonTinh = DongCo`, `RunId`, `ComputedAtUtc`).
+    /// </summary>
+    public void DanhDauDongCo(Guid runId, DateTime computedAtUtc)
+    {
+        if (runId == Guid.Empty)
+        {
+            throw new BusinessException(PricingErrorCodes.GiaVonKhongHopLe)
+                .WithData("lyDo", "Động cơ giá vốn phải có `RunId` (không nhận `Guid.Empty`).")
+                .WithData("sku", Sku);
+        }
+
+        NguonTinh = CostPriceSource.DongCo;
+        RunId = runId;
+        ComputedAtUtc = computedAtUtc;
+    }
+
+    /// <summary>
+    /// 🆕 **`W17-2`** — cập nhật dòng do động cơ tính lại **khi DÒNG CHƯA DUYỆT**.
+    ///
+    /// 🚨 **ĐÃ DUYỆT ⇒ NÉM `0015`** — **không** ghi đè im lặng số đã duyệt (`D-177` ③/§5.4). Đây là **lớp
+    /// trong**; động cơ còn kiểm trước để áp `Pricing:ChoNhapLuiNgay` (bỏ qua + đếm, hoặc NÉM).
+    /// </summary>
+    public void CapNhatGiaVonChuaDuyet(
+        Money amount, DateOnly? effectiveTo, Guid runId, DateTime computedAtUtc)
+    {
+        if (DaDuyet)
+        {
+            throw new BusinessException(PricingErrorCodes.GiaVonKhongTheTinhLai)
+                .WithData("sku", Sku)
+                .WithData("effectiveFrom", EffectiveFrom)
+                .WithData("lyDo", "Dòng ĐÃ DUYỆT ⇒ KHÔNG được tính lại/ghi đè (D-177 ③).");
+        }
+
+        if (amount.IsNegative)
+        {
+            throw new BusinessException(PricingErrorCodes.GiaVonKhongHopLe)
+                .WithData("lyDo", "Giá vốn KHÔNG được âm.")
+                .WithData("sku", Sku)
+                .WithData("amount", amount.Amount);
+        }
+
+        if (effectiveTo is not null && effectiveTo <= EffectiveFrom)
+        {
+            throw new BusinessException(PricingErrorCodes.GiaVonKhongHopLe)
+                .WithData("lyDo", "`EffectiveTo` phải SAU `EffectiveFrom`.")
+                .WithData("sku", Sku);
+        }
+
+        AmountValue = amount.Amount;
+        CurrencyCode = amount.Currency.Code;
+        EffectiveTo = effectiveTo;
+        DanhDauDongCo(runId, computedAtUtc);
     }
 
     /// <summary>Giá vốn có hiệu lực tại ngày <paramref name="at"/> không (`PRC-001` **BR-003**: bắt buộc kèm ngày).</summary>

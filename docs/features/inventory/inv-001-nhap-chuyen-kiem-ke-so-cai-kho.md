@@ -55,7 +55,9 @@ chuyển kho, phiếu kiểm kê) và **một sổ cái kho chỉ được ghi t
 - ❌ **Phân bổ tồn theo kênh** (`AvailableToPromise`, `StockAllotment`) — thuộc **`INV-003`** và `CHN-004`.
 - ❌ **Giá vốn / định giá tồn kho** — thuộc **`PRC-001`** (Pricing, `D-186` ⑥); **bút toán kế toán tiền** chỉ **tiêu thụ** ở
   **`ACC-001`** (chưa viết). `INV-001` ghi **số lượng** + **đơn giá nhập để tra cứu** (ánh xạ *"`UnitCost` (tài liệu) ↔ `UnitPrice` (as-built)"*);
-  **không** ghi bút toán kế toán, **không** tính giá vốn bình quân.
+  **không** ghi bút toán kế toán, **không** tính giá vốn bình quân. 🚨 `StockDocumentLine.UnitPrice` là **giá mua** chỉ ở phiếu
+  `GoodsReceipt` (`StockDocumentType.GoodsReceipt=0`); ở phiếu xuất/trả nó là **giá bán** ⇒ **KHÔNG** dùng làm giá vốn — giá vốn do
+  `PRC-001` tính (`D-321`).
 - ❌ **Đa kho theo pháp nhân / kho của đối tác 3PL** — ngoài GĐ1.
 - ❌ **Saga điều phối nhiều bước có bù trừ** — thuộc `SAL-004`.
 - ❌ **Màn hình UI** — thuộc `WEB-001`/`WEB-*`; tài liệu này chỉ chốt **hợp đồng dữ liệu cho UI** (§10).
@@ -1026,6 +1028,7 @@ public class StockLedgerInvariantTests
 |---|---|---|---|
 | v0.1 | 13/10/2026 | *(điền)* | Bản nháp đầu — số liệu lấy **từ code thật**: `InventoryItem`/`StockLedgerEntry` **đã có** + **đã có** bảng trong migration; **0** chỗ gọi `ApplyMovement` ngoài entity/test ⇒ feature **chưa có**; `eCommerce.Kernel` **chưa tồn tại**. Phát hiện **F1** (`StockLedgerEntry.Note` setter public ⇒ sổ cái **chưa** append-only), **F2** (permission `Inventory.Adjust` mồ côi), **F3** (khoá kho thiếu `tenantId` + tiền tố đôi), **F4** (mâu thuẫn `XC-003` `BR-XC-003-002` vs §5.4), **F5** (chưa có PostgreSQL để kiểm chứng), **F6** (`Money` chưa tồn tại). Chốt **12 ADR**, **24 BR**, **12 NFR**, **30 TC**; **3 sơ đồ** Mermaid |
 | v0.2 | 28/11/2026 | *(agent, phiên N113)* | §0: chủ động cơ giá vốn = **Pricing (`PRC-001`)** (`D-186` ⑥) — `INV-001` chỉ cấp đơn giá nhập để tra cứu, **`ACC-001`** chỉ tiêu thụ |
+| v0.3 | 28/11/2026 | *(agent, phiên N116 / `W17-2`)* | §0: làm rõ nghĩa `StockDocumentLine.UnitPrice` — **giá mua** chỉ ở `GoodsReceipt`; ở phiếu xuất/trả là **giá bán**, **không** dùng làm giá vốn; giá vốn do `PRC-001` tính (`D-321`) |
 
 ---
 

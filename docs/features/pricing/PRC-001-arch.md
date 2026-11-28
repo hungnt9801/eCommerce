@@ -243,7 +243,7 @@ public interface ICostFeedLookup
   (`StockLedger.cs:243-308`) cho **số lượng có dấu** (chỉ `StockLedgerEntry` **đã ghi sổ** — dòng chỉ sinh khi `GhiSo`)
   và **join** `StockDocumentLine.UnitPrice` (`StockDocument.cs:361-367`) qua `ReferenceLineId` (`StockLedger.cs:273`) để lấy
   đơn giá **nhập**. Ngày kinh doanh = `OccurredAtUtc` (`StockLedger.cs:278`) đổi sang **UTC+7** **ngay trong adapter** (biên I/O).
-- **Ánh xạ loại (đề xuất, AQ3 chốt phần biên):**
+- **Ánh xạ loại (đã chốt theo `D-321` — giữ nguyên bảng dưới):**
   - `NhapCoGia` = tăng `OnHand` **có** `UnitPrice` — chủ yếu `StockMovementType.Receipt=0` của phiếu `GoodsReceipt=0`.
   - `NhapKhongGia` = tăng `OnHand` **không** có đơn giá — `CustomerReturn=4`, `Adjustment=5` (tăng), `StocktakeGain=7`,
     `ShippingReturn=12`, `WarrantyRelease=16`.
@@ -266,6 +266,10 @@ public interface ICostFeedLookup
 | `CostPrice` cột hiện có (`Sku/AmountValue/CurrencyCode/EffectiveFrom/EffectiveTo/ApprovedBy/ApprovedAtUtc`) | **không đổi tên/kiểu** (`D-09`) | `CostPrice.cs:45-68`; mapping `PricingDbContextModelCreatingExtensions.cs:117-134` |
 | `StockLedger` / `InvStockLedger` (cấu trúc, cột, index) | **không đổi** — `INV-001` §5.2.2 :334 | `StockLedger.cs:243-308` |
 | `eCommerce.Pricing.Application.Contracts` DTO của báo giá bán | **không đổi** ⇒ `pnpm gen:api` không đổi `schema.d.ts` | `PriceCalculationDtos.cs`; `CostPriceDto` giữ |
+
+> 📌 **Đóng "nợ chữ `D-186` ②" (28/11/2026, N116/`W17-2`):** tên port trần `ICostPriceLookup` đã được **khớp chữ** vào SRS
+> `prc-001` §20.4 (`docs/features/pricing/prc-001-bang-gia-va-gia-theo-kenh.md:1236-1243`, cùng PR `W17-2`) — vẫn **giữ thực chất**
+> `D-186` ② (một hợp đồng đọc additive, chỉ dòng `DaDuyet`); **không** đổi dòng `D-186` (muốn đổi hẳn chữ = người quyết, `D-320` ⑤).
 
 ---
 
@@ -402,7 +406,7 @@ Ba nguồn "không biết":
 2. **Nhập kho không có `UnitPrice`** ⇒ từ mốc đó bình quân **không xác định** (`NhapKhongGia`). `PrcCostPrices.AmountValue` là
    `decimal` **NOT NULL** (`CostPrice.cs:48`) ⇒ động cơ **KHÔNG INSERT kỳ** nào cho tới khi có quy tắc phục hồi; **v1 KHÔNG phục hồi**
    (kể cả khi có lần nhập **có giá** sau đó — không đủ cơ sở định giá phần tồn đã mất giá trị). Khoảng không có dòng ⇒ lookup trả `null`
-   ⇒ fact `NULL` + `CostMissing` (không bịa `0`); phục hồi = `PRC-001-AQ4`.
+   ⇒ fact `NULL` + `CostMissing` (không bịa `0`); phục hồi = `D-xx` mới — v1 **không** phục hồi (`PRC-001-AQ4` ✅ `Closed (D-322)`).
 3. **Chưa tính tới kỳ** (bán trước lần nhập đầu) ⇒ không có kỳ ⇒ `null`.
 
 **Giá vốn `0` là HỢP LỆ** (hàng tặng/mẫu — `CostPrice.cs:85-87`) ⇒ `0` **không** bị coi là "thiếu"; chỉ `null` mới là thiếu.
@@ -431,7 +435,7 @@ Trạng thái chạy theo SKU: `(qtyOnHand, valueOnHand, avgCost | null, costMis
 | Chuyển động | Công thức | Bất biến |
 |---|---|---|
 | Nhập **có** giá `q, p` (khi `costMissing = false`) | `value += p·q`; `qty += q`; `avg = value / qty` | `avg` qua `Money` (`Money.cs:36,85`); `qty>0` ⇒ chia hợp lệ |
-| Nhập **có** giá **SAU khi** `costMissing = true` | `qty += q`; `value` **vẫn không xác định**; `avg` **giữ `null`** | **v1 KHÔNG phục hồi** — không bịa giá trị tồn cũ; phục hồi = `PRC-001-AQ4` |
+| Nhập **có** giá **SAU khi** `costMissing = true` | `qty += q`; `value` **vẫn không xác định**; `avg` **giữ `null`** | **v1 KHÔNG phục hồi** — không bịa giá trị tồn cũ; phục hồi = `D-xx` mới (`PRC-001-AQ4` ✅ `Closed (D-322)`) |
 | Nhập **không** giá `q` | `qty += q`; `value` **không xác định**; `avg = null`, `costMissing = true` | **CẤM** bịa `0` |
 | Xuất `q` (`Xuat`) | `value -= avg·q`; `qty -= q`; `avg` **giữ nguyên** | xuất **không** đổi đơn giá bình quân |
 | Xuất khi `avg = null` | `qty -= q`; `avg` vẫn `null` | không "hồi phục" số đã mất |
@@ -496,9 +500,9 @@ Trạng thái chạy theo SKU: `(qtyOnHand, valueOnHand, avgCost | null, costMis
 | # | Rủi ro | Mức | Xử lý / đường lùi |
 |---|---|---|---|
 | **R1** | **Ghi đè dòng đã duyệt** khi tính lại (nhập lùi / sửa `UnitPrice` cũ) làm **số kỳ cũ đổi** mà không ai biết — đúng lỗi `D-177` ③ chống | 🔴 Cao | `ChoNhapLuiNgay=false` mặc định + không UPDATE dòng `DaDuyet=true` (§5.4); K06-04/13; khi cần revision ⇒ `PRC-001-AQ2` (cần người duyệt phá huỷ nếu đổi unique) |
-| **R2** | **`StockDocumentLine.UnitPrice` không có cột tiền tệ** (as-built `numeric(18,2)`) ⇒ nhập ngoại tệ bị đọc như VND (sai ~25.000 lần) | 🟠 Trung bình | §3.3 `TienTeNhap` null ⇒ mặc định VND của tenant + cảnh báo; **không** tự quy đổi (`XC-001`); `PRC-001-AQ3` chốt |
+| **R2** | **`StockDocumentLine.UnitPrice` không có cột tiền tệ** (as-built `numeric(18,2)`) ⇒ nhập ngoại tệ bị đọc như VND (sai ~25.000 lần) | 🟠 Trung bình | §3.3 `TienTeNhap` null ⇒ mặc định VND của tenant + cảnh báo; **không** tự quy đổi (`XC-001`); `PRC-001-AQ3` ✅ `Closed (D-321)` |
 | **R3** | **Đơn giá nhập chỉ 2 chữ số** (`18,2`) trong khi tiền `18,4` ⇒ sai số tích luỹ trên số lượng lẻ | 🟡 Thấp | Đầu vào giữ nguyên precision; kết quả bình quân lưu `18,4`; làm tròn chỉ ở biên ra qua `IRoundingPolicy`; ghi rõ, không đổi cột (D-09) |
-| **R4** | **Loại chuyển động tính vào định giá** (CustomerReturn/StocktakeGain/WarrantyHold…) chưa chốt ⇒ bình quân lệch | 🟠 Trung bình | Bảng ánh xạ §3.3 là **đề xuất**; `PRC-001-AQ3` chốt; lớp ánh xạ ở **adapter** ⇒ đổi 1 tệp, 0 migration |
+| **R4** | **Loại chuyển động tính vào định giá** (CustomerReturn/StocktakeGain/WarrantyHold…) từng chưa chốt ⇒ bình quân lệch | 🟠 Trung bình | Bảng ánh xạ §3.3 **đã chốt theo `D-321`** (chỉ `Receipt`/`GoodsReceipt` có `UnitPrice` là `NhapCoGia`; bỏ cặp chuyển kho; tiền tệ = VND tenant; loại lạ/lệch dấu ⇒ NÉM `0014`); lớp ánh xạ ở **adapter** ⇒ đổi 1 tệp, 0 migration |
 | **R5** | **F3 `XC-002` chưa có** (`IIdempotencyGuard`/`InboxRecords`) ⇒ idempotency command dựa unique DB | 🟠 Trung bình | Unique filtered + run table v1; thay lớp khoá khi `XC-002` xong, 0 schema |
 | **R6** | **Provider Setting trong assembly module không được ABP quét** ⇒ `GiaVonDongCo`/`ChoNhapLuiNgay` bị bỏ qua im lặng | 🟠 Trung bình | `W17-2` **khởi động Host thật** đọc Setting (tiền lệ `PRC-002-arch.md` R8); đường lùi: chuyển provider sang `src/eCommerce.Domain/Settings/` (app → module hợp lệ) |
 | **R7** | **Động cơ O(N) replay toàn bộ** mỗi lần chạy ⇒ chậm khi dữ liệu lớn | 🟡 Thấp | v1 chấp nhận (dữ liệu nhỏ); giới hạn khoảng `[from,to]`; tối ưu incremental (bảng cursor) là additive sau (không đổi hợp đồng) |
@@ -510,11 +514,13 @@ Trạng thái chạy theo SKU: `(qtyOnHand, valueOnHand, avgCost | null, costMis
 |---|---|---|---|---|---|
 | **PRC-001-AQ1** | **`Q4`** — `CostPrice` có **bắt buộc luồng duyệt 2 bước** (nhập → kế toán trưởng duyệt) không? | (a) 2 bước (tạo `DaDuyet=false` → `ApproveAsync`); (b) auto-approve (1 bước) | **(a)** — `DaDuyet`/`Duyet()` đã có, `D-177` ④⑥ đòi dòng đã duyệt; nhưng (b) chỉ đổi **1 chỗ** trong `CreateAsync`, **0 schema** | **Kế toán trưởng (người)** | §3.2/§5.1 viết theo (a); (b) là cờ đổi được |
 | **PRC-001-AQ2** | Nhập lùi ngày đụng kỳ **đã duyệt**: có cần **revision** (thay vì từ chối) không? | (a) **từ chối** (NÉM `0015`) — thiết kế hiện tại; (b) revision — **đổi unique** `(TenantId, Sku, EffectiveFrom)` = **phá huỷ** | **(a)** cho GĐ3 (đã là hành vi §5.4, 0 migration); (b) chỉ mở bằng `D-xx` mới + người duyệt | **nguoi** (nếu chọn (b) — thay đổi phá huỷ schema, `D-318` C6) | §5.4/`ChoNhapLuiNgay=false` hiện thực được ngay; (b) **không** làm ở `W17-2` |
-| **PRC-001-AQ3** | Loại chuyển động nào tính vào định giá + tiền tệ của đơn giá nhập (as-built `UnitPrice` không có cột tiền tệ) | (a) chỉ `Receipt` (GoodsReceipt) là có giá; còn lại `NhapKhongGia`; tiền tệ = VND tenant; (b) thêm nguồn/tiền tệ riêng | **(a)** — sát `D-177`/`INV-001` (§0 :56-58); tránh suy đoán NCC/ngoại tệ | DEC + BA | Ánh xạ ở adapter (§3.3), đổi 1 tệp |
-| **PRC-001-AQ4** | Nhập kho **thiếu `UnitPrice`**: bình quân từ đó **không xác định** hay lấy bình quân hiện tại? | (a) `null` + `CostMissing` (fail-closed); (b) gán theo bình quân hiện tại | **(a)** — `D-177` ⑥ cấm `0`/bịa số | DEC | §5.2/§5.5 theo (a); (b) là đổi hàm thuần |
-| **PRC-001-AQ5** | Nhịp chạy động cơ: **event** khi ghi sổ nhập (đồng bộ) hay **job quét** + command on-demand? | (a) job quét + command; (b) ETO mỗi lần `GhiSo` | **(a)** — tránh phụ thuộc outbox/ETO (`XC-002` chưa xong), tất định + idempotent; event là tối ưu sau | DEC | Job/command theo (a); event additive sau |
+| **PRC-001-AQ3** ✅ `Closed (D-321)` | Loại chuyển động nào tính vào định giá + tiền tệ của đơn giá nhập (as-built `UnitPrice` không có cột tiền tệ) | (a) chỉ `Receipt` (GoodsReceipt) là có giá; còn lại `NhapKhongGia`; tiền tệ = VND tenant; (b) thêm nguồn/tiền tệ riêng | **(a)** — đã chốt: chỉ `Receipt`/`GoodsReceipt` có `UnitPrice` là `NhapCoGia`, còn lại `NhapKhongGia`; **bỏ** cặp `TransferOut/TransferIn`; tiền tệ = VND tenant (`TienTeNhap = null`); loại lạ/lệch dấu ⇒ NÉM `0014` | DEC + BA (đã chốt) | Ánh xạ ở adapter (§3.3), đổi 1 tệp |
+| **PRC-001-AQ4** ✅ `Closed (D-322)` | Nhập kho **thiếu `UnitPrice`**: bình quân từ đó **không xác định** hay lấy bình quân hiện tại? | (a) `null` + `CostMissing` (fail-closed); (b) gán theo bình quân hiện tại | **(a)** — đã chốt: `avg = null` + `CostMissing`, động cơ **KHÔNG INSERT** kỳ, **CẤM `0`**; v1 **không phục hồi** (kể cả sau đó có lần nhập có giá) | DEC (đã chốt) | §5.2/§5.5 theo (a); (b) là đổi hàm thuần |
+| **PRC-001-AQ5** ✅ `Closed (D-323)` | Nhịp chạy động cơ: **event** khi ghi sổ nhập (đồng bộ) hay **job quét** + command on-demand? | (a) job quét + command; (b) ETO mỗi lần `GhiSo` | **(a)** — đã chốt: **job quét** + **command on-demand** qua `BackgroundWorker`, **không** ETO mỗi `GhiSo`; event = tối ưu **additive sau** `XC-002` | DEC (đã chốt) | Job/command theo (a); event additive sau |
 
 > ⚠️ **Q4 (`PRC-001-AQ1`) vẫn `Open`** — `D-319` ⑤ nói rõ decider **không** đóng; đây là câu **kế toán**. Không tự chốt.
+> **`PRC-001-AQ2` vẫn của người** (revision = phá huỷ unique `(TenantId, Sku, EffectiveFrom)`). **`PRC-001-AQ3`/`AQ4`/`AQ5` đã `✅ Closed`**
+> theo `D-321`/`D-322`/`D-323` (28/11/2026, N116/`W17-2`) — chỉ đổi **nhãn trạng thái** + ghi chú, không đổi thực chất §3.3/§5.2/§5.5/§6.
 
 ---
 
@@ -555,3 +561,6 @@ Trạng thái chạy theo SKU: `(qtyOnHand, valueOnHand, avgCost | null, costMis
 - **Grain = SKU toàn hệ thống**, `PrcCostPrices` **không** `WarehouseId` (§3.3, K06-06) — `D-318` C9.
 - **Q4 giữ `Open`**, đưa `PRC-001-AQ1`, không tự chốt — `D-319` ⑤.
 - **Không** sửa code/migration/SRS/`decisions.md`/`.claude/**`; chỉ ghi `docs/features/pricing/PRC-001-arch.md`.
+- **28/11/2026, N116/`W17-2`:** cập nhật trạng thái `openQuestions` — `PRC-001-AQ3`/`AQ4`/`AQ5` → `✅ Closed (D-321)`/`(D-322)`/`(D-323)`;
+  `PRC-001-AQ1` (Q4) **vẫn `Open`**, `PRC-001-AQ2` **của người**; chỉ đổi **nhãn trạng thái + ghi chú** (không đổi công thức §6/schema §4/
+  hợp đồng §3.1/§3.3 về thực chất); đóng "nợ chữ `D-186` ②" — `ICostPriceLookup` đã khớp chữ SRS `prc-001` §20.4 (cùng PR `W17-2`).

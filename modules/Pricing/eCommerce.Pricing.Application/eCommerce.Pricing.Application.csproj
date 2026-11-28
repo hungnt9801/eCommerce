@@ -8,10 +8,17 @@
   <ItemGroup>
     <ProjectReference Include="..\eCommerce.Pricing.Application.Contracts\eCommerce.Pricing.Application.Contracts.csproj" />
     <ProjectReference Include="..\eCommerce.Pricing.EntityFrameworkCore\eCommerce.Pricing.EntityFrameworkCore.csproj" />
+    <!-- 🆕 `W17-2` (`PRC-001-arch` §2.1) — CHIỀU MỚI DUY NHẤT: Pricing.Application → Inventory.Application.Contracts
+         (port `ICostFeedLookup` + DTO; KHÔNG Inventory.Domain). `Inventory.Application.Contracts` KHÔNG tham chiếu
+         Pricing ⇒ không vòng. -->
+    <ProjectReference Include="..\..\Inventory\eCommerce.Inventory.Application.Contracts\eCommerce.Inventory.Application.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Volo.Abp.Ddd.Application" />
+    <!-- 🆕 `W17-2` — động cơ chạy qua `BackgroundWorker` (`D-323`) + khoá phân tán theo SKU (§5.2/R8). -->
+    <PackageReference Include="Volo.Abp.BackgroundWorkers" />
+    <PackageReference Include="Volo.Abp.DistributedLocking" />
   </ItemGroup>
 
 </Project>

@@ -64,6 +64,11 @@ public class eCommercePermissionDefinitionProvider : PermissionDefinitionProvide
         // triệu chứng là `403` trần, không trỏ tới chỗ sai (`XC-004` D2/E3).
         pricing.AddChild(eCommerce.Pricing.PricingPermissions.CostPriceView);
 
+        // 🆕 `W17-2` (`PRC-001-arch` §3.2) — **ĐƯỜNG GHI + DUYỆT GIÁ VỐN**. Chỉ khai khi có method dùng
+        // (`§20.3 #4`); `Manage` = tạo/sửa + chạy động cơ, `Approve` = duyệt (giữ 2 bước — Q4 còn `Open`).
+        pricing.AddChild(eCommerce.Pricing.PricingPermissions.CostPriceManage);
+        pricing.AddChild(eCommerce.Pricing.PricingPermissions.CostPriceApprove);
+
         // ---- Kho ----
         var inventory = group.AddPermission(eCommerceConsts.Permissions.Inventory.Default);
         inventory.AddChild(eCommerceConsts.Permissions.Inventory.Adjust);

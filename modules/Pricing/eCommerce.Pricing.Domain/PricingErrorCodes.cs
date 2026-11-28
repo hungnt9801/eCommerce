@@ -56,6 +56,34 @@ public static class PricingErrorCodes
     /// `tierPriceSetId`/`soBacHienTai`/`toiDa`. 📌 Guard vận hành, **không** phải bất biến dữ liệu.
     /// </summary>
     public const string VuotSoBacToiDa = "eCommerce:Pricing:0011";
+
+    /// <summary>
+    /// **Σ dòng đã làm tròn ≠ tổng** (`PRC-002` SRS §12 E8): lỗi thuật toán / `MoneyAllocator` ⇒ **NÉM** kèm
+    /// log `Error` (map `500`). 📌 Số `0012` **đã được `PRC-002` SRS cấp**; hằng số được khai ở đây vì test
+    /// bất biến `PricingErrorCodesTests` đòi dải mã **liên tục từ `0001`** — chưa có nơi tiêu thụ ở `W17-2`.
+    /// </summary>
+    public const string TongDongKhongKhop = "eCommerce:Pricing:0012";
+
+    /// <summary>
+    /// **Chồng khung hiệu lực** cùng `(Scope, ChannelCode, ChannelShopId)` (`PRC-002` SRS §12 E6) ⇒ **NÉM**.
+    /// 📌 Số `0013` **đã được `PRC-002` SRS cấp**; khai ở đây vì lý do liên tục dải như `0012` — chưa tiêu thụ.
+    /// </summary>
+    public const string ChongKhungHieuLuc = "eCommerce:Pricing:0013";
+
+    /// <summary>
+    /// 🆕 **`W17-2` — cấu hình/đầu vào động cơ giá vốn KHÔNG hợp lệ** (`PRC-001-arch` §5.2/§5.6): setting
+    /// `Pricing:PhuongPhapGiaVon` ≠ `BinhQuanGiaQuyenDiDong` · `Pricing:GiaVonTheoKho = true` · loại chuyển
+    /// động kho **lạ**/**lệch dấu** ở adapter (`D-321`). **Fail-closed**: NÉM, **không** rơi về mặc định.
+    /// ⚠️ Append **sau `0011`** (không dùng lại `0012`/`0013` của `PRC-002`).
+    /// </summary>
+    public const string CauHinhGiaVonKhongHopLe = "eCommerce:Pricing:0014";
+
+    /// <summary>
+    /// 🆕 **`W17-2` — không thể tính lại giá vốn** (`PRC-001-arch` §5.4/`D-318` C6): tính lại **đụng dòng
+    /// `DaDuyet = true`** mà giá trị/khoảng hiệu lực sẽ **đổi** (khi `Pricing:ChoNhapLuiNgay = true`) ⇒ **NÉM**,
+    /// **KHÔNG** ghi đè số đã duyệt. Người dùng phải xử lý tường minh (điều chỉnh tay có duyệt).
+    /// </summary>
+    public const string GiaVonKhongTheTinhLai = "eCommerce:Pricing:0015";
 }
 
 /// <summary>
@@ -73,4 +101,14 @@ public static class PricingLockKeys
     /// <summary>Khoá khi **phát hành/kích hoạt** bảng giá theo `(tenant, scope, kênh)` — chống hai bảng giá cùng `Active`.</summary>
     public static string BangGiaTheoPhamVi(Guid? tenantId, string scope, string? channelCode)
         => $"pricing:pricelist:{tenantId?.ToString() ?? "null"}:{scope}:{channelCode ?? "all"}";
+
+    /// <summary>
+    /// 🆕 **`W17-2` — khoá khi động cơ tính lại giá vốn cho MỘT SKU** (`PRC-001-arch` §5.2/R8).
+    ///
+    /// 🚨 **KHÔNG lặp tiền tố `ecommerce:`** — `AbpDistributedLockOptions.KeyPrefix` **đã là** `"ecommerce:"`
+    /// (`XC-003` §5.4; `PRC-002` ADR-12). Tự thêm ⇒ khoá thật `ecommerce:ecommerce:pricing:…` ⇒ **khoá không
+    /// bảo vệ gì**. 📌 Grain = **SKU toàn hệ thống** (không `WarehouseId` — `D-318` C9/K06-06).
+    /// </summary>
+    public static string GiaVonTheoSku(Guid? tenantId, string sku)
+        => $"pricing:cost-sku:{tenantId?.ToString() ?? "null"}:{sku}";
 }

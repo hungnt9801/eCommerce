@@ -1,4 +1,6 @@
+using Volo.Abp;
 using Volo.Abp.Application;
+using Volo.Abp.BackgroundWorkers;
 using Volo.Abp.Modularity;
 
 namespace eCommerce.Pricing;
@@ -7,12 +9,23 @@ namespace eCommerce.Pricing;
 /// Module tầng Application của **Pricing** (`PRC-001` §6.1).
 /// 📌 App service ở đây được Host **tự động** mở endpoint qua `ConventionalControllers` (quét mọi assembly
 /// `eCommerce*.Application` — bài học **C16**: chỉ đăng ký thủ công ⇒ endpoint **404 im lặng**).
+/// 🆕 `W17-2`: thêm `AbpBackgroundWorkersModule` để đăng ký `CostEngineWorker` (`D-323`).
 /// </summary>
 [DependsOn(
     typeof(PricingDomainModule),
     typeof(PricingApplicationContractsModule),
-    typeof(AbpDddApplicationModule)
+    typeof(AbpDddApplicationModule),
+    typeof(AbpBackgroundWorkersModule)
 )]
 public class PricingApplicationModule : AbpModule
 {
+    /// <summary>
+    /// 🚨 **ĐĂNG KÝ WORKER — THIẾU DÒNG NÀY THÌ JOB KHÔNG BAO GIỜ CHẠY** và không có lỗi biên dịch nào
+    /// (bài học `inv-001` §27.3; lưới an toàn `BackgroundWorkerCoCheTests`). Mặc định `GiaVonDongCo = false`
+    /// ⇒ lượt chạy no-op cho tới khi bật.
+    /// </summary>
+    public override async Task OnPostApplicationInitializationAsync(ApplicationInitializationContext context)
+    {
+        await context.AddBackgroundWorkerAsync<CostEngineWorker>();
+    }
 }

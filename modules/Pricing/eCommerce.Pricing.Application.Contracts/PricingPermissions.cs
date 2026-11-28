@@ -34,4 +34,20 @@ public static class PricingPermissions
     /// kiểu viết tắt của lớp này.
     /// </summary>
     public const string CostPriceView = Default + ".CostPrice.View";
+
+    /// <summary>
+    /// 🆕 **`W17-2`** — **TẠO/SỬA giá vốn** (`eCommerce.Pricing.CostPrice.Manage`) cho đường ghi thủ công
+    /// (`ICostPriceAdminAppService.CreateAsync`) + chạy động cơ on-demand.
+    ///
+    /// 🚨 **Chỉ khai KHI có method dùng** (`PRC-001` §20.3 #4 — cấm "quyền rỗng"). Khai **hai nơi**:
+    /// lớp này **và** `eCommercePermissionDefinitionProvider` (thiếu một nơi ⇒ `403` cho MỌI người).
+    /// </summary>
+    public const string CostPriceManage = Default + ".CostPrice.Manage";
+
+    /// <summary>
+    /// 🆕 **`W17-2`** — **DUYỆT giá vốn** (`eCommerce.Pricing.CostPrice.Approve`) cho `ApproveAsync`.
+    /// 📌 Tách khỏi `.Manage` **có chủ ý**: người nhập giá vốn **không** đương nhiên được duyệt con số mình nhập
+    /// (tách nhiệm vụ kế toán — `PRC-001` §3.2/Q4; vẫn giữ **2 bước**).
+    /// </summary>
+    public const string CostPriceApprove = Default + ".CostPrice.Approve";
 }

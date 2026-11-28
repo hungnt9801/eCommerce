@@ -19,6 +19,29 @@ public static class PRC002SettingTenKhoa
 }
 
 /// <summary>
+/// 🆕 **`W17-2` — TÊN 4 KHOÁ SETTING CỦA ĐỘNG CƠ GIÁ VỐN** (`PRC-001-arch` §5.2/`D-323`).
+///
+/// 📌 Đặt ở module (không nhét Kernel) — cùng lý do `PRC002SettingTenKhoa`: hàm đọc giá trị phải trả kiểu của
+/// Pricing. **Thiếu định nghĩa** ⇒ `ISettingProvider` trả `null` ⇒ động cơ fail-closed không chạy như mô tả
+/// (`PRC-001-arch` R6). Bốn khoá dưới đây khai trong `PricingSettingDefinitionProvider` (default kèm theo).
+/// </summary>
+public static class PRC001SettingTenKhoa
+{
+    /// <summary>Phương pháp giá vốn — v1 **chỉ** `BinhQuanGiaQuyenDiDong` (khác ⇒ NÉM `0014`).</summary>
+    public const string PhuongPhapGiaVon = "Pricing:PhuongPhapGiaVon";
+
+    /// <summary>Tính giá vốn **theo kho** — v1 **chỉ** `false` (`D-318` C9; `true` ⇒ NÉM `0014`).</summary>
+    public const string GiaVonTheoKho = "Pricing:GiaVonTheoKho";
+
+    /// <summary>Cho phép **nhập lùi ngày** tính lại kỳ (đụng approved ⇒ `0014`? **KHÔNG** — NÉM `0015`).</summary>
+    public const string ChoNhapLuiNgay = "Pricing:ChoNhapLuiNgay";
+
+    /// <summary>Bật/tắt động cơ (mặc định `false` = **tắt** — đường lùi `§4.3`).</summary>
+    public const string GiaVonDongCo = "Pricing:GiaVonDongCo";
+}
+
+
+/// <summary>
 /// **Chính sách khi tổng đơn âm** (`PRC-002` `D-219`). 🚨 Enum lưu DB (nếu có) chỉ được **thêm ở CUỐI dải**.
 /// </summary>
 public enum ChinhSachTongDonAm
@@ -53,6 +76,57 @@ public static class PricingChinhSach
     /// <summary>Allowlist chính sách tổng đơn âm.</summary>
     public static readonly string[] TongDonAmHopLe =
         { nameof(ChinhSachTongDonAm.Reject), nameof(ChinhSachTongDonAm.Clamp) };
+
+    /// <summary>
+    /// 🆕 **`W17-2`** — giá trị **duy nhất** hợp lệ của `Pricing:PhuongPhapGiaVon` ở v1 (`D-318` C9). Giá trị khác
+    /// (vd `FIFO`) ⇒ động cơ **NÉM `0014`** (fail-closed), **không** rơi về mặc định (`D-177` ②).
+    /// </summary>
+    public const string PhuongPhapBinhQuanGiaQuyenDiDong = "BinhQuanGiaQuyenDiDong";
+
+    /// <summary>
+    /// 🆕 **`W17-2`** — đọc `Pricing:PhuongPhapGiaVon`. Rỗng/`null` ⇒ mặc định
+    /// <see cref="PhuongPhapBinhQuanGiaQuyenDiDong"/> + `hopLe = true` (khớp `DefaultValue` của SettingDefinition);
+    /// giá trị khác ⇒ trả **nguyên giá trị** + `hopLe = false` để động cơ **NÉM `0014`** — **không** tự đổi về mặc định.
+    /// </summary>
+    public static string DocPhuongPhapGiaVon(string? tho, out bool hopLe)
+    {
+        var giaTri = (tho ?? string.Empty).Trim();
+
+        if (giaTri.Length == 0)
+        {
+            hopLe = true;
+            return PhuongPhapBinhQuanGiaQuyenDiDong;
+        }
+
+        hopLe = string.Equals(giaTri, PhuongPhapBinhQuanGiaQuyenDiDong, StringComparison.OrdinalIgnoreCase);
+
+        return giaTri;
+    }
+
+    /// <summary>
+    /// 🆕 **`W17-2`** — đọc một setting `bool` (`Pricing:GiaVonTheoKho`/`ChoNhapLuiNgay`/`GiaVonDongCo`).
+    /// Rỗng/`null` ⇒ <paramref name="macDinh"/> + `hopLe = true`; **không phải** `true`/`false` hợp lệ ⇒
+    /// <paramref name="macDinh"/> + `hopLe = false` (động cơ **NÉM `0014`** — cấu hình sai, không đoán).
+    /// </summary>
+    public static bool DocBool(string? tho, bool macDinh, out bool hopLe)
+    {
+        var giaTri = (tho ?? string.Empty).Trim();
+
+        if (giaTri.Length == 0)
+        {
+            hopLe = true;
+            return macDinh;
+        }
+
+        if (bool.TryParse(giaTri, out var giaTriBool))
+        {
+            hopLe = true;
+            return giaTriBool;
+        }
+
+        hopLe = false;
+        return macDinh;
+    }
 
     /// <summary>
     /// Đọc `Pricing:RoundingPolicyCode`. `"half-away-from-zero"` ⇒ `RoundHalfAwayFromZeroPolicy` + `hopLe = true`;

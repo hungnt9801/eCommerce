@@ -33,6 +33,17 @@ public class PricingSettingDefinitionProvider : SettingDefinitionProvider
             // Số bậc tối đa mỗi bộ bậc thang (D-224)
             new SettingDefinition(PRC002SettingTenKhoa.SoBacToiDa, "20").WithProviders(phamVi),
             // Chính sách khi tổng đơn âm (Reject | Clamp) — D-219
-            new SettingDefinition(PRC002SettingTenKhoa.TongDonAm, "Reject").WithProviders(phamVi));
+            new SettingDefinition(PRC002SettingTenKhoa.TongDonAm, "Reject").WithProviders(phamVi),
+
+            // ── 🆕 `W17-2` — 4 khoá SETTING ĐỘNG CƠ GIÁ VỐN (`PRC-001-arch` §5.2 · `D-323`) ─────────────
+            // 🚨 THIẾU định nghĩa ⇒ `ISettingProvider` trả `null` ⇒ động cơ fail-closed KHÔNG chạy như mô tả
+            // (R6). Mặc định an toàn: chỉ BQGG di động · không theo kho · không nhập lùi · động cơ TẮT.
+            new SettingDefinition(
+                PRC001SettingTenKhoa.PhuongPhapGiaVon,
+                PricingChinhSach.PhuongPhapBinhQuanGiaQuyenDiDong).WithProviders(phamVi),
+            new SettingDefinition(PRC001SettingTenKhoa.GiaVonTheoKho, "false").WithProviders(phamVi),
+            new SettingDefinition(PRC001SettingTenKhoa.ChoNhapLuiNgay, "false").WithProviders(phamVi),
+            // 📌 Mặc định `false` = **TẮT** — đường lùi rẻ nhất khi động cơ gây sự cố (`PRC-001-arch` §4.3).
+            new SettingDefinition(PRC001SettingTenKhoa.GiaVonDongCo, "false").WithProviders(phamVi));
     }
 }

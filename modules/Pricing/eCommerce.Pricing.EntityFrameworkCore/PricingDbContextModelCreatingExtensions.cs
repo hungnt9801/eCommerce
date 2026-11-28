@@ -132,6 +132,42 @@ public static class PricingDbContextModelCreatingExtensions
             // Truy vấn nóng: "giá vốn của SKU đang hiệu lực tại ngày X".
             b.HasIndex(x => new { x.TenantId, x.Sku, x.EffectiveTo })
                 .HasDatabaseName("IX_PrcCostPrices_TenantId_Sku_EffectiveTo");
+
+            // ── 🆕 `W17-2` (`PRC-001-arch` §4.1 S4–S8) — 4 cột nullable + index idempotency ──────────
+            // 📌 `NguonTinh` là enum nullable ⇒ map `int?`; `NULL` = dòng cũ (coi như thủ công).
+            b.Property(x => x.NguonTinh).HasConversion<int?>();
+            b.Property(x => x.IdempotencyKey).HasMaxLength(128);
+
+            // `RunId`/`ComputedAtUtc` map theo quy ước (`uuid`/`timestamptz`, nullable).
+
+            // 🚨 Unique **CÓ BỘ LỌC** `(TenantId, IdempotencyKey) WHERE IdempotencyKey IS NOT NULL` — idempotency
+            // đường ghi (`XC-002`). ⚠️ PHẢI sửa tay `NULLS NOT DISTINCT` trong migration (EF không sinh được), nếu
+            // không `TenantId = NULL` làm index MẤT TÁC DỤNG IM LẶNG ⇒ hai dòng cùng khoá LỌT.
+            b.HasIndex(x => new { x.TenantId, x.IdempotencyKey })
+                .IsUnique()
+                .HasFilter("\"IdempotencyKey\" IS NOT NULL")
+                .HasDatabaseName("IX_PrcCostPrices_TenantId_IdempotencyKey");
+        });
+
+        // ── 🆕 `W17-2` — NHẬT KÝ MỘT LẦN CHẠY ĐỘNG CƠ GIÁ VỐN (`PRC-001-arch` §4.1 S1–S3) ───────────
+        builder.Entity<CostEngineRun>(b =>
+        {
+            b.ToTable("PrcCostEngineRuns");
+            b.ConfigureByConvention();
+
+            b.Property(x => x.RunKey).IsRequired().HasMaxLength(128);
+            b.Property(x => x.Trigger).IsRequired().HasMaxLength(64);
+            b.Property(x => x.TrangThai).HasConversion<int>();
+            b.Property(x => x.ErrorMessage).HasMaxLength(2048);
+
+            // 🚨 Unique `(TenantId, RunKey)` — hàng rào idempotency run (§5.6). ⚠️ Sửa tay `NULLS NOT DISTINCT`.
+            b.HasIndex(x => new { x.TenantId, x.RunKey })
+                .IsUnique()
+                .HasDatabaseName("IX_PrcCostEngineRuns_TenantId_RunKey");
+
+            // Truy vấn nóng: "các lượt gần đây của tenant".
+            b.HasIndex(x => new { x.TenantId, x.StartedAtUtc })
+                .HasDatabaseName("IX_PrcCostEngineRuns_TenantId_StartedAtUtc");
         });
 
         // ── PRC-002: BẬC THANG GIÁ ────────────────────────────────────────────────────────────────

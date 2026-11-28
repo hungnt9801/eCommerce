@@ -145,6 +145,13 @@ public class eCommerceDbContext : AbpDbContext<eCommerceDbContext>, IHasEventOut
     /// </summary>
     public DbSet<Pricing.CostPrice> CostPrices { get; set; } = default!;
 
+    /// <summary>
+    /// 🆕 `W17-2` — **NHẬT KÝ LƯỢT CHẠY ĐỘNG CƠ GIÁ VỐN** (`PRC-001-arch` §4.1 S1, bảng `PrcCostEngineRuns`).
+    /// 📌 Thiếu `DbSet` ⇒ ABP không đăng ký `IRepository&lt;CostEngineRun, Guid&gt;` ⇒ `CostEngineService` không
+    /// resolve được (lỗi Phase 0). Lưới an toàn: `DbSetRegistrationTests`.
+    /// </summary>
+    public DbSet<Pricing.CostEngineRun> CostEngineRuns { get; set; } = default!;
+
     // PRC-002 — **bậc thang giá**: bảng RIÊNG vì `PriceListItem` duy nhất theo `(TenantId, PriceListId, Sku)`
     // (`PRC-001` BR-008) ⇒ **không chứa được nhiều bậc** cho cùng một SKU (`PRC-002` ADR-01).
     public DbSet<Pricing.TierPriceSet> TierPriceSets { get; set; } = default!;

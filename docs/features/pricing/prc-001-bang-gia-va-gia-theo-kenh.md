@@ -420,7 +420,7 @@ Module **chưa có** trong code; khi tạo, **phải** làm đúng 3 việc đã
 
 | Mục | Giá trị |
 |---|---|
-| Interface | `IPriceListAppService`, `IPriceResolverAppService`, `ICostPriceAppService`, `IPriceImportAppService` (đặt tại `eCommerce.Pricing.Application.Contracts`) |
+| Interface | `IPriceListAppService`, `IPriceResolverAppService`, `ICostPriceAppService`, `IPriceImportAppService`, `ICostPriceAdminAppService`, `ICostEngineAppService` (đặt tại `eCommerce.Pricing.Application.Contracts`) |
 | Implementation | `…AppService` (đặt tại `eCommerce.Pricing.Application`) |
 | `[Authorize]` | **cấp CLASS** + permission cụ thể ở từng method (`XC-004` BR-001/D3) |
 
@@ -642,6 +642,7 @@ public interface IPriceResolver
 | `eCommerce.Pricing.Price.Resolve` | `Pricing.Price` | `ResolveAsync`, `ResolveManyAsync` | admin · nhân viên · **client `SAL-002`** | ⚠️ `SAL-002` chạy cùng tiến trình ⇒ dùng quyền nội bộ, **không** cấp cho storefront |
 | `eCommerce.Pricing.CostPrice` | `Pricing.CostPrice` | — (nhóm cha) | admin | |
 | `eCommerce.Pricing.CostPrice.View` | `Pricing.CostPrice` | `GetCostAsync` | **kế toán** | BR-013: **cấm** lộ ra công khai |
+| `eCommerce.Pricing.CostPrice.Manage` | `Pricing.CostPrice` | `ICostPriceAdminAppService.CreateAsync` | **kế toán** | đường ghi giá vốn (`W17-2`) |
 | `eCommerce.Pricing.CostPrice.Approve` | `Pricing.CostPrice` | `ApproveCostAsync` | **kế toán trưởng** | |
 
 > ⚠️ **Bắt buộc khi code (đã có tiền lệ lỗi thật):**
@@ -719,6 +720,13 @@ public interface IPriceResolver
 | **Giá vốn không hợp lệ** (SKU rỗng · số tiền âm · kỳ hiệu lực ngược · duyệt lại lần hai) | dữ liệu nhập sai / bấm hai lần | **NÉM** `eCommerce:Pricing:0009` kèm `truong`/`lyDo` — **cấm** no-op im lặng (`D12`); DB có thêm 3 `CHECK` + unique index làm hàng rào cuối (§5.2) | `400` |
 | **Timing: job kích hoạt và resolve đồng thời** | hiếm | Resolve chỉ thấy trạng thái **đã commit**; nếu job chưa commit ⇒ resolve dùng bảng giá **cũ** — **chấp nhận** và ghi log `Warning` khi `EffectiveFrom` đã qua mà chưa `Active` | `200` |
 | **Lỗi runtime (DB timeout, deadlock)** | hạ tầng | **Rollback** + log có `CorrelationId` | lỗi chung (`500`) |
+| **`PRC-002` — Σ dòng đã làm tròn ≠ tổng** (`PRC-002` SRS §12 E8) | lỗi thuật toán / `MoneyAllocator`; số **giữ chỗ** để dải mã **liên tục từ `0001`** (`PricingErrorCodesTests`) | Hằng `TongDongKhongKhop = eCommerce:Pricing:0012` **đã khai** (`PricingErrorCodes.cs:65`) nhưng **CHƯA có nơi tiêu thụ** ở `W17-2`; `PRC-002` **NÉM** khi tiêu thụ | *(chưa tiêu thụ ở `W17-2`)* |
+| **`PRC-002` — chồng khung hiệu lực** cùng `(Scope, ChannelCode, ChannelShopId)` (`PRC-002` SRS §12 E6) | cấu hình khung hiệu lực chồng lấn; hằng giữ chỗ cùng lý do `0012` | Hằng `ChongKhungHieuLuc = eCommerce:Pricing:0013` **đã khai** (`PricingErrorCodes.cs:71`) nhưng **CHƯA có nơi tiêu thụ** ở `W17-2`; `PRC-002` **NÉM** khi tiêu thụ | *(chưa tiêu thụ ở `W17-2`)* |
+| **Giá vốn — cấu hình/đầu vào động cơ KHÔNG hợp lệ** (`W17-2`) | `Pricing:PhuongPhapGiaVon` ≠ `BinhQuanGiaQuyenDiDong` · `Pricing:GiaVonTheoKho = true` · loại chuyển động kho lạ/lệch dấu ở adapter (`D-321`) | **NÉM** `eCommerce:Pricing:0014` (`CauHinhGiaVonKhongHopLe`) — **fail-closed**, **không** rơi về mặc định; `W17-2` **tiêu thụ** | Lỗi `0014` (fail-closed) |
+| **Giá vốn — không thể tính lại** (`W17-2`) | nhập lùi đụng kỳ `DaDuyet = true` khi `Pricing:ChoNhapLuiNgay = true` (`D-318` C6) | **NÉM** `eCommerce:Pricing:0015` (`GiaVonKhongTheTinhLai`) — **KHÔNG** ghi đè số đã duyệt; `W17-2` **tiêu thụ** | Lỗi `0015` (không ghi đè số đã duyệt) |
+| **Giá vốn — `TienTeNhap` khác `VND`** (`W17-2`) | đơn giá nhập ngoại tệ; v1 chưa có tỷ giá/FX | **NÉM** `eCommerce:Pricing:0014` — **KHÔNG** tự quy đổi; v1 chỉ **VND literal** (`D-324` ③) | Lỗi `0014` (fail-closed) |
+
+> 📌 **`0012`/`0013`** là hằng **giữ chỗ** đúng nghĩa `PRC-002` (dải mã liên tục từ `0001`, `D-324` ①) — **`W17-2` chỉ tiêu thụ `0014`/`0015`**, **không** dùng lại số cũ với nghĩa khác. **`Q4`/`PRC-001-AQ1`** (luồng duyệt 2 bước) và **`PRC-001-AQ2`** (nhập lùi/revision) **vẫn `Open`** — **không** đóng ở `W17-2`.
 
 **Chiến lược transaction:** mọi thao tác **ghi** chạy trong **Unit of Work** của ABP; **outbox ghi cùng
 transaction** với dữ liệu (nguyên tắc #13 của `implementation-plan.md:56` + `XC-002` BR-001).
@@ -895,6 +903,11 @@ public class PriceListStateMachineTests
 | **Q6** | Bậc số lượng (`MinQuantity`) nên ở **`PRC-001`** (giá kênh) hay **`PRC-002`** (tier giá tổng quát)? | Kiến trúc trưởng + BA | ⬜ `Open` | Hiện `PRC-001` **có** `ChannelPrice.MinQuantity` (bậc **trong một kênh**); nếu `PRC-002` cũng làm tier tổng quát ⇒ **nguy cơ hai cơ chế bậc** chồng nhau ⇒ phải chốt ranh giới trước khi code |
 | **Q7** | `LowestPrice` (`SelectionStrategy`) có cần ở GĐ1 không? | BA | ⬜ `Open` | Nếu không cần ⇒ bỏ strategy khỏi GĐ1 (giảm bề mặt test); enum để dành |
 | **Q8** | Đường ghi + động cơ giá vốn (bình quân gia quyền di động) + luồng duyệt `CostPrice` thuộc module nào? | Kiến trúc trưởng + Kế toán trưởng | ✅ `Closed (D-186)` | Chủ = **Pricing (`PRC-001`)** — sở hữu `PrcCostPrices` + đường ghi + động cơ + duyệt; `INV-001` chỉ cấp đơn giá nhập để tra cứu; `ACC-001` chỉ tiêu thụ; động cơ đọc Inventory qua hợp đồng chỉ đọc ở `Inventory.Application.Contracts`; đường ghi/động cơ = WP code GĐ3 **trước** lãi gộp `REP-002` |
+| **Q9** (`PRC-001-AQ3`) | Loại chuyển động nào tính vào định giá + tiền tệ của đơn giá nhập (`UnitPrice` không có cột tiền tệ)? | BA + Kiến trúc trưởng | ✅ `Closed (D-321)` | `NhapCoGia` = chỉ `Receipt` (`GoodsReceipt`) **có** `UnitPrice`; `NhapKhongGia` = `CustomerReturn=4`/`Adjustment=5`/`StocktakeGain=7`/`ShippingReturn=12`/`WarrantyRelease=16` + `Receipt` **không** giá; `Xuat` = `Sale=3`/`StocktakeLoss=8`/`ShippingOut=11`/`DamagedOut=14`/`WarrantyHold=15`/`RetailSaleOut=19`/`SupplierReturnOut=20`/`OtherOut=21`; **BỎ** = `Reservation=1`/`ReservationRelease=2`/`Hold=17`/`HoldRelease=18`/`DamagedIn=13` + cụm chuyển kho `Transfer=6`/`TransferOut=9`/`TransferIn=10`; loại lạ/lệch dấu ⇒ NÉM `0014`; `TienTeNhap = null` = VND tenant (bảng đầy đủ ở §20.4) |
+| **Q10** (`PRC-001-AQ4`) | Nhập kho **thiếu `UnitPrice`**: bình quân từ đó **không xác định** hay lấy bình quân hiện tại? | BA + Kế toán trưởng | ✅ `Closed (D-322)` | `avg = null` + `CostMissing`, **KHÔNG INSERT kỳ**, **CẤM `0`**; giá vốn `0` vẫn hợp lệ; v1 **không phục hồi** |
+| **Q11** (`PRC-001-AQ5`) | Nhịp chạy động cơ: **event** mỗi lần `GhiSo` hay **job quét** + command on-demand? | BA + Kiến trúc trưởng | ✅ `Closed (D-323)` | Job quét + command on-demand qua `BackgroundWorker`; **không** ETO/`StockChangedEto` mỗi lần `GhiSo`; event additive sau `XC-002` |
+
+> 📌 `PRC-001-AQ1` ≡ **Q4** (luồng duyệt 2 bước) **vẫn `Open`** — câu **kế toán trưởng**; `PRC-001-AQ2` (nhập lùi/revision) **vẫn `Open`** — câu của **người** (đổi unique = phá huỷ schema). Hai câu này **không** đóng ở `W17-2` (`D-320`).
 
 ### 15.2 🚨 Sai lệch / nợ kỹ thuật phát hiện được
 
@@ -923,6 +936,7 @@ public class PriceListStateMachineTests
 |---|---|---|---|
 | v0.1 | 13/10/2026 | *(điền)* | Bản nháp đầu — 14 ADR · 14 BR · 10 NFR · 22 test case · 3 sơ đồ Mermaid · **mọi khẳng định về code đều có đường dẫn file đã kiểm**; ghi rõ **module `Pricing` chưa có trong code** và **`Money`/`IIdempotencyGuard`/outbox-inbox chưa có** (phụ thuộc chặn `XC-001`/`XC-002`); ghi nhận **F1–F5** |
 | v0.7 | 28/11/2026 | *(agent, phiên N113)* | Đồng bộ `D-186` ⑥: thêm **Q8** — đường ghi + động cơ giá vốn + luồng duyệt thuộc **Pricing (`PRC-001`)**, `INV-001` chỉ cấp đơn giá nhập, `ACC-001` chỉ tiêu thụ; §20.4 mục 1 cập nhật theo đó, **Q4** vẫn `Open` |
+| v0.8 | 28/11/2026 | *(agent, phiên N116 / `W17-2`)* | Chốt **`PRC-001-AQ3`/`AQ4`/`AQ5`** theo **`D-321`/`D-322`/`D-323`** (§15.1 Q9–Q11 `✅ Closed`): bảng ánh xạ loại chuyển động + tiền tệ VND tenant, nhập thiếu `UnitPrice` ⇒ `null` + `CostMissing` (cấm `0`), nhịp chạy job + command. Khớp **chữ `D-186` ②**: hợp đồng đọc nội bộ là **port trần `ICostPriceLookup`** (2 method, DTO, không `[Authorize]`/endpoint) — thay *"method của `ICostPriceAppService`"* (`D-320` ⑤); nội dung ở **§20.4**. **`Q4`/`PRC-001-AQ1`** và **`PRC-001-AQ2`** vẫn `Open` |
 
 ---
 
@@ -1175,6 +1189,11 @@ giỏ hàng**. Trên môi trường dev (1–2 dòng) nó **không nhìn thấy 
 > 📌 Đây là lát cắt **đầu tiên** của phần *"còn lại"* trong bản bàn giao
 > [`docs/ban-giao-gd1-con-lai.md`](../../ban-giao-gd1-con-lai.md) **§2** (`S12`). Mục tiêu **hẹp có chủ ý**:
 > **dựng đúng cái bảng + đúng quyền + đúng đường đọc**, KHÔNG mở đường ghi (nguồn giá vốn là **`Q2`** chưa chốt).
+>
+> ⚠️ **W17-2 (28/11/2026):** đã thêm đường ghi/duyệt `CostPrice` (`ICostPriceAdminAppService.CreateAsync` quyền
+> `.CostPrice.Manage` + `ApproveAsync` quyền `.CostPrice.Approve`) + động cơ giá vốn; quyền `.Manage`/`.Approve` khai ở
+> `PricingPermissions.cs` + `eCommercePermissionDefinitionProvider`. `Q2` (nguồn giá vốn) đã chốt bởi `D-186`/`D-321`
+> (Pricing sở hữu) — xem mục **"Trạng thái triển khai"** cuối tài liệu.
 
 ### 20.1 Đã làm
 
@@ -1208,8 +1227,8 @@ giỏ hàng**. Trên môi trường dev (1–2 dòng) nó **không nhìn thấy 
 |---|---|---|---|
 | 1 | `CostPrices` chỉ có `Sku, Amount, Currency, EffectiveFrom/To, ApprovedBy/At` | thêm **3 `CHECK`** (`Amount >= 0` · `EffectiveRange` · `Currency ~ '^[A-Z]{3}$'`) theo đúng bảng §5.2 (dòng `Amount`/`Currency` đã có `CostPrices`; dòng `EffectiveRange` **bổ sung** `CostPrices`) | §5.2 là **nguồn sự thật** về ràng buộc; `EffectiveRange` trước đây chỉ ghi `PriceLists` — nay sửa tài liệu cho khớp code (quy tắc *"sửa tài liệu TRƯỚC, cùng PR"*) |
 | 2 | Tên cột `"Amount"` / `"Currency"` | cột thật là `"AmountValue"` / `"CurrencyCode"` (trừ `PrcPriceLists.Currency`) | khuôn có sẵn của module: một cột số tiền **+ một cột tiền tệ đi kèm** (BR-001). 📌 Tên trong đặc tả là **khái niệm**, không phải DDL — đã ghi rõ ở §5.2 để lần sau không ai viết migration theo tên cũ |
-| 3 | `GetCostAsync` / `ApproveCostAsync` (§6.1) | `GetListAsync` + `GetAsync`; **KHÔNG** có `ApproveCostAsync` | `S12` chỉ mở **đường đọc**. Nguồn giá vốn là **`Q2`** chưa chốt ⇒ mở đường ghi là quyết định của chủ dự án. 🔒 Đường đọc vẫn giữ **quyền riêng** + **không** lộ ra công khai (BR-013) |
-| 4 | Nhóm quyền `eCommerce.Pricing.CostPrice` (cha) + `.View` + `.Approve` (§9) | chỉ thêm **một** quyền `eCommerce.Pricing.CostPrice.View` làm **con của `eCommerce.Pricing`** | 🚨 Thêm quyền **cha** `eCommerce.Pricing.CostPrice` mà **không** có method nào dùng ⇒ `BatBienPhanQuyenTests` vẫn xanh nhưng tạo **quyền rỗng** trong UI phân quyền. `.Approve` đi cùng `ApproveCostAsync` — chưa có đường ghi thì chưa cấp |
+| 3 | `GetCostAsync` / `ApproveCostAsync` (§6.1) | `GetListAsync` + `GetAsync`; **KHÔNG** có `ApproveCostAsync` | `S12` chỉ mở **đường đọc**. Nguồn giá vốn là **`Q2`** chưa chốt ⇒ mở đường ghi là quyết định của chủ dự án. 🔒 Đường đọc vẫn giữ **quyền riêng** + **không** lộ ra công khai (BR-013). ⚠️ **W17-2:** đã thêm `ICostPriceAdminAppService.CreateAsync` (`.CostPrice.Manage`) + `ApproveAsync` (`.CostPrice.Approve`) — đường ghi/duyệt + động cơ giá vốn; `Q2` đã chốt `D-186`/`D-321` |
+| 4 | Nhóm quyền `eCommerce.Pricing.CostPrice` (cha) + `.View` + `.Approve` (§9) | chỉ thêm **một** quyền `eCommerce.Pricing.CostPrice.View` làm **con của `eCommerce.Pricing`** | 🚨 Thêm quyền **cha** `eCommerce.Pricing.CostPrice` mà **không** có method nào dùng ⇒ `BatBienPhanQuyenTests` vẫn xanh nhưng tạo **quyền rỗng** trong UI phân quyền. `.Approve` đi cùng `ApproveCostAsync` — chưa có đường ghi thì chưa cấp. ⚠️ **W17-2:** `.CostPrice.Manage`/`.CostPrice.Approve` **đã cấp** (`PricingPermissions.cs` + `eCommercePermissionDefinitionProvider`) cùng đường ghi/duyệt |
 | 5 | `CostPrices` dùng `Money` cho `Amount` | `decimal AmountValue` + `string CurrencyCode` + computed `Money Amount` | EF **không** value-convert `Money` sạch (ctor riêng) — cùng lựa chọn đã dùng cho `PriceListItem`/`ChannelPrice`/`TierPrice` |
 
 ### 20.4 ⚠️ Giới hạn đã biết (KHÔNG được nói quá)
@@ -1217,6 +1236,8 @@ giỏ hàng**. Trên môi trường dev (1–2 dòng) nó **không nhìn thấy 
 1. **Đường ghi + động cơ giá vốn thuộc `PRC-001`** (`D-186` ⑥) — sẽ có ở WP code GĐ3 (**trước** lãi gộp `REP-002`);
    **luồng duyệt 2 bước** `CostPrice` **vẫn `Open`** ở **`Q4`** chờ kế toán trưởng. Hiện bảng `PrcCostPrices` **chỉ đọc** /
    chỉ có dữ liệu do **seed/ngoài luồng** ghi; màn hình `/GiaVon` vì thế **rỗng** trên môi trường chưa có dữ liệu.
+   ⚠️ **W17-2:** đường ghi/duyệt (`ICostPriceAdminAppService.CreateAsync`/`ApproveAsync`, quyền `.Manage`/`.Approve`) +
+   động cơ giá vốn **đã có**; `Q4` (duyệt 2 bước) **vẫn `Open`**; `Q2` (nguồn giá vốn) đã chốt `D-186`/`D-321`.
 2. **Chưa có job** tính lãi gộp / báo cáo dùng giá vốn. `CostPrice` mới là **nguồn dữ liệu**, chưa có nơi tiêu thụ.
 3. **`CostPrice` chưa nối vào `MissingPricePolicy`/`IPriceResolver`** — cố ý: giá vốn **không** tham gia chọn giá bán.
 4. **Bốn index `NULLS NOT DISTINCT` cũ của Pricing** (`PrcPriceLists` · `PrcPriceListItems` · `PrcChannelPrices` ·
@@ -1227,8 +1248,72 @@ giỏ hàng**. Trên môi trường dev (1–2 dòng) nó **không nhìn thấy 
    **`WEB-001`** (không phải của `S12`); E2E `S12-G3` vì vậy đo menu trên **khối menu của trang chủ**.
 6. **Chưa kiểm chứng trên CI Linux** cho lát cắt này (chỉ đo trên máy dev).
 
+**Khớp chữ `D-186` ② + chốt 3 câu mở — `W17-2` (28/11/2026, `D-320` ⑤, `D-321`/`D-322`/`D-323`):**
+
+> Hợp đồng đọc nội bộ cho module tiêu thụ (`REP-002`/`REP-003`) là **port trần `ICostPriceLookup`** đặt ở
+> `Pricing.Application.Contracts` — **2 method** `GetApprovedCostAsync`/`GetApprovedCostManyAsync`, trả **DTO**
+> `CostPriceLookupDto`, **KHÔNG** kế thừa `IApplicationService`, **KHÔNG** `[Authorize]`, **không** thành endpoint
+> (thiết kế: `PRC-001-arch.md` §3.1). Đây là cách khớp **thực chất** `D-186` ② ("một hợp đồng đọc additive, chỉ dòng
+> `DaDuyet`") thay cho cách hiểu *"method của `ICostPriceAppService`"* — app service có `[Authorize]` **cấp class**
+> (`CostPriceAppService.cs:24`) nên job nền không có user sẽ **NÉM** (`D-320` ⑤).
+
+| Nhóm định giá (`LoaiChuyenDongGiaVon`) | `StockMovementType` | Điều kiện |
+|---|---|---|
+| `NhapCoGia` | `Receipt=0` (phiếu `StockDocumentType.GoodsReceipt=0`) | **VÀ** `StockDocumentLine.UnitPrice != null` ⇒ `DonGiaNhap = UnitPrice` |
+| `NhapKhongGia` | `CustomerReturn=4` · `Adjustment=5` · `StocktakeGain=7` · `ShippingReturn=12` · `WarrantyRelease=16` · `Receipt=0` có `UnitPrice == null` | tăng `OnHand` nhưng **không** có giá dùng được |
+| `Xuat` | `Sale=3` · `StocktakeLoss=8` · `ShippingOut=11` · `DamagedOut=14` · `WarrantyHold=15` · `RetailSaleOut=19` · `SupplierReturnOut=20` · `OtherOut=21` | giảm `OnHand`, **không** đổi đơn giá bình quân |
+| **Bỏ** | `Reservation=1` · `ReservationRelease=2` · `Hold=17` · `HoldRelease=18` · `DamagedIn=13`; **cả cặp** `Transfer=6`/`TransferOut=9`/`TransferIn=10` | không đổi `OnHand` cấp SKU; chuyển kho net 0 (`D-318` C9) — **không** xử lý `TransferIn` như `NhapKhongGia` |
+
+- **Fail-closed:** bảng dấu của adapter **phải khớp** `DoiSoatTonKho.Dau()`
+  (`modules/Reconciliation/eCommerce.Reconciliation.Domain/DoiSoatTonKho.cs:31-64`); loại lạ hoặc lệch dấu ⇒ **NÉM
+  `eCommerce:Pricing:0014`**, không bỏ qua im lặng (`D-321`). **Ngoại lệ rõ — cụm chuyển kho:** `DoiSoatTonKho.Dau()`
+  trả `Transfer=+1`/`TransferIn=+1`/`TransferOut=-1` (`…DoiSoatTonKho.cs:36,38,42`) **nhưng** bảng ánh xạ **BỎ cả cụm
+  chuyển kho** (`D-321` ②(4)(5); net 0 cấp SKU) ⇒ adapter **KHÔNG** xét dấu nhóm `Transfer` (bỏ trước khi kiểm dấu —
+  `CostFeedLookupAdapter.cs:190-199`); chỉ đối chiếu dấu cho các loại **được map** (`NhapCoGia`/`NhapKhongGia`/`Xuat`).
+  Loại lạ hoặc lệch dấu **trong các loại được map** ⇒ **NÉM `0014`**. Nguồn enum: `Enums.cs:26-118`, `Enums.Inventory.cs:4-7`;
+  `StockDocumentLine.UnitPrice` là `decimal?` (`StockDocument.cs:361-367`).
+- **Tiền tệ:** `CostMovementDto.TienTeNhap = null` = **VND của tenant**; **v1 = VND literal** (`D-324` ③) — kết quả ghi
+  `PrcCostPrices.CurrencyCode = VND`, `TienTeNhap` khác `VND` ⇒ **NÉM `0014`** (không tự quy đổi); **đa tiền tệ / tiền tệ
+  cơ sở tenant = `D-xx` mới**, **không** có nguồn ngoại tệ/FX (`D-321`). `UnitPrice` chỉ là **giá mua** ở `GoodsReceipt`;
+  ở phiếu xuất/trả nó là **giá bán** ⇒ **KHÔNG** dùng làm giá vốn.
+- **Nhập thiếu `UnitPrice`:** `avg = null` + `CostMissing = true`, động cơ **KHÔNG INSERT kỳ** (`AmountValue` là
+  `decimal` NOT NULL — `CostPrice.cs:48`), **CẤM ghi `0`**; giá vốn `0` vẫn **hợp lệ** (`CostPrice.cs:103-105`, guard chỉ
+  chặn **âm**, không đòi `> 0`); v1 **không phục hồi** dù sau đó có lần nhập có giá (`D-322`).
+- **Nhịp chạy:** **job quét định kỳ + command on-demand** (`CostEngineAppService.ChayAsync`) chạy qua
+  `BackgroundWorker`, **không** đăng ký ETO/`StockChangedEto` mỗi lần `GhiSo`; event chỉ là tối ưu **additive sau khi
+  `XC-002` xong** (`D-323`, `PRC-001-arch.md` §5.2/§5.6).
+
 ### 20.5 Lịch sử thay đổi (bổ sung)
 
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.6 | 28/10/2026 | *(agent, session GĐ1 — `S12`)* | **Lát cắt 5 — GIÁ VỐN**: entity `CostPrice` + mapping + **migration 47** (NND **58**) + `schema.sql`; app service **chỉ đọc** với quyền **riêng** `eCommerce.Pricing.CostPrice.View` (seed **69** quyền); màn hình `/GiaVon` + menu; **15 unit** + **6 integration** + **5 ca E2E** (trong đó **`S12-G5`** đo BR-013 trên HTML công khai bằng **con số giá vốn CÓ THẬT**). Ghi rõ 5 sai lệch doc/code (§20.3) và 6 giới hạn (§20.4) |
+
+---
+
+## Trạng thái triển khai
+
+> Cập nhật **28/11/2026 — phiên N116 / `W17-2` (F3 BE), chuỗi `gd3-1`, nhánh `feat/gd3-wp17-gia-von`**. Chỉ ghi **trạng thái**;
+> hợp đồng giữ nguyên SRS/`PRC-001-arch.md` (đã tạm duyệt G2 `D-320`).
+
+**Đã làm (BE):**
+- Mã lỗi `PricingErrorCodes`: thêm `0014` `CauHinhGiaVonKhongHopLe`, `0015` `GiaVonKhongTheTinhLai` (sau `0011`) — cùng `0012`/`0013`
+  vốn đã được `PRC-002` SRS cấp (khai hằng số để giữ bất biến dải mã liên tục của `PricingErrorCodesTests`; chưa có nơi tiêu thụ).
+- Domain Pricing: `CostPriceSource`, 4 cột nullable trên `CostPrice` (`NguonTinh`/`RunId`/`ComputedAtUtc`/`IdempotencyKey`) +
+  `GanKhoaIdempotency`/`DanhDauDongCo`/`CapNhatGiaVonChuaDuyet`; entity `CostEngineRun` (`TrangThaiChayDongCo`); hàm **thuần**
+  `TinhBinhQuanGiaQuyenDiDong`; `PricingLockKeys.GiaVonTheoSku`; 4 `SettingDefinition` giá vốn + reader ở `PricingChinhSach`.
+- Contracts: port trần `ICostPriceLookup` + `ICostPriceAdminAppService` + `ICostEngineAppService` + DTO; quyền `.CostPrice.Manage`/
+  `.CostPrice.Approve` (khai ở cả `PricingPermissions` và `eCommercePermissionDefinitionProvider`); port `ICostFeedLookup`
+  (`Inventory.Application.Contracts`).
+- Application: `CostPriceAdminAppService` (giữ **2 bước**), `CostPriceLookupAdapter`, `CostEngineService`, `CostEngineAppService`,
+  `CostEngineWorker` (đăng ký ở `PricingApplicationModule`); `CostFeedLookupAdapter` ở Inventory (ánh xạ `D-321`, fail-closed `0014`).
+- Schema: migration **`20261128052137_Added_Pricing_CostEngine`** — chỉ `CREATE TABLE` + `ADD COLUMN` nullable + `CREATE INDEX`;
+  hai index unique sửa tay `NULLS NOT DISTINCT` (`IX_PrcCostEngineRuns_TenantId_RunKey`,
+  `IX_PrcCostPrices_TenantId_IdempotencyKey` filtered). Đã áp bằng `DbMigrator`; đã kiểm `__EFMigrationsHistory`/`\d`/`pg_indexes`.
+
+**Chưa làm / bàn giao:**
+- **Test F3 (K-06)** chưa thêm được trong phiên này: vai `be` **không có quyền ghi** `test/eCommerce.Tests` (hook `guard-write-scope`).
+  Danh sách ca cần dựng (đã thiết kế): K06-01…07, K06-08/08b/09/10/11/12/13 + adapter ánh xạ `D-321` + negative control — giao **`qa` (`W17-4`)**.
+- Chưa sinh lại **`schema.sql`** tích hợp (cố ý: `PostgreSqlSchemaTests` ghim tổng `NULLS NOT DISTINCT` = 114) ⇒ nợ cho `W17-4`/QA khi
+  cập nhật test tích hợp (đổi tổng + thêm 2 tên index đích danh).
+- Chưa sinh lại OpenAPI snapshot/`schema.d.ts` cho 2 endpoint mới (`cost-price-admin`, `cost-engine`) ⇒ nợ `W17-3`/`W17-5`.
