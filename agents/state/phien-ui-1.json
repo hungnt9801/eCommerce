@@ -7,7 +7,7 @@
   "nhanhGoc": "tich-hop/gd3",
   "refs": "D-327",
   "ghiChu": "Chuỗi nền tảng UI (D-327): mỗi WP một nhánh cắt từ đỉnh tich-hop/ui; hàng loai=ui chạy theo .claude/skills/ui-pipeline; dong-wp đẩy fast-forward vào tich-hop/ui (M3); PR xếp chồng mở một lần cuối chuỗi (WP đầu → tich-hop/gd3).",
-  "capNhat": "2026-11-28T23:59:33+07:00",
+  "capNhat": "2026-11-29T00:08:43+07:00",
   "rows": [
     {
       "id": "U41-1",
@@ -61,14 +61,16 @@
       "dependsOn": [
         "U41-2"
       ],
-      "status": "chua",
-      "phien": [],
+      "status": "dang-lam",
+      "phien": [
+        "N122"
+      ],
       "nhanh": "feat/ui-wp41-nen",
       "buoc": "U3 kiểm",
       "evidence": null,
       "ghiChu": null,
       "handover": null,
-      "batDau": null,
+      "batDau": "2026-11-29T00:08:43+07:00",
       "xongLuc": null
     },
     {
