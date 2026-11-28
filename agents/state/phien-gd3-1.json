@@ -7,7 +7,7 @@
   "nhanhGoc": "main",
   "refs": "D-216",
   "ghiChu": "Phương án B (D-216): mỗi WP một nhánh cắt từ đỉnh tich-hop/gd3; dong-wp đẩy fast-forward vào tich-hop/gd3 (M3, D-114); PR xếp chồng mở một lần cuối chuỗi.",
-  "capNhat": "2026-11-28T11:47:49+07:00",
+  "capNhat": "2026-11-28T13:25:00+07:00",
   "rows": [
     {
       "id": "W16-1",
@@ -1102,16 +1102,17 @@
       "dependsOn": [
         "W17-1n"
       ],
-      "status": "dang-lam",
+      "status": "xong",
       "phien": [
         "N116"
       ],
       "nhanh": "feat/gd3-wp17-gia-von",
       "buoc": "F3 BE",
-      "evidence": null,
+      "evidence": "kiem-tat-ca exit 0 10/10 352.9s (build 0E/9W, unit 2650/2650, integ 162/162, DB 25/25, gate 60/60, drift 0); probe Code WP-17 XANH; docreview DOC-OK P1=0/P2=0; migration 20261128052137_Added_Pricing_CostEngine applied after pg_dump 634674B; D-321/322/323/324; SHA 54ab64b",
       "ghiChu": null,
-      "handover": null,
-      "batDau": "2026-11-28T11:47:49+07:00"
+      "handover": "docs/nhanh/handover-n116.md",
+      "batDau": "2026-11-28T11:47:49+07:00",
+      "xongLuc": "2026-11-28T13:25:00+07:00"
     },
     {
       "id": "W17-3",
