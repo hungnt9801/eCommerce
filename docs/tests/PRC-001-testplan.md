@@ -100,3 +100,11 @@ dotnet test test/eCommerce.IntegrationTests --no-build  # exit 0 · 171/171 pass
 2. **`K06-08b` tách hai tầng**: nhánh trạng thái (`DangChay` ⇒ bận; `Loi` ⇒ `Attempt++`) đo ở tầng Application bằng `new` + hạ tầng giả (`D-229`); **bền vững sổ run qua rollback UoW ngoài** đo trên **PostgreSQL thật** (`PostgreSqlPricingCostEngineTests`) — vì chỉ DB mới chứng minh được transaction riêng commit trước khi tính.
 3. **`K06-10`**: adapter Inventory là nơi duy nhất biết loại chuyển động ⇒ test ở `CostFeedLookupAdapter` với `TransferOut`/`TransferIn` (không đẩy `TransferIn` thành `NhapKhongGia`).
 4. **Chưa phủ**: `W17-4` không thêm ca HTTP/probe (feature nội bộ, 0 route mới). Nếu F5/REV yêu cầu probe `CostEngineAppService` qua Host thật thì bổ sung ở phiên sau — ghi `openQuestions`.
+
+## Negative control
+| Ngay | Ma | Tep:dong | Dot bien | Lenh test | Bang chung |
+|---|---|---|---|---|---|
+| 2026-11-28 | NC-1 | modules/Pricing/eCommerce.Pricing.Application/CostEngineService.cs:299 | bo guard DaDuyet | dotnet test test/eCommerce.Tests --filter "FullyQualifiedName~K06_04" -v q | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
+| 2026-11-28 | NC-2 | modules/Pricing/eCommerce.Pricing.Domain/TinhBinhQuanGiaQuyenDiDong.cs:150 | bo danh dau thieu gia von | dotnet test test/eCommerce.Tests --filter "FullyQualifiedName~K06_09" -v q | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
+| 2026-11-28 | NC-3 | modules/Pricing/eCommerce.Pricing.Application/CostEngineService.cs:146 | dao nhanh trang thai run | dotnet test test/eCommerce.Tests --filter "FullyQualifiedName~K06_08" -v q | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
+| 2026-11-28 | NC-6 | modules/Pricing/eCommerce.Pricing.Domain/TinhBinhQuanGiaQuyenDiDong.cs:143 | doi cong thuc binh quan | dotnet test test/eCommerce.Tests --filter "FullyQualifiedName~K06_06" -v q | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
