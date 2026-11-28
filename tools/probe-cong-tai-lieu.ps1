@@ -19,7 +19,8 @@
 
     ══════════════════════════════════════════════════════════════════════════════════════════════════
     🔑 **SUY WP (`D-212` (i)):** `-WP` explicit > `GITHUB_HEAD_REF` > `GITHUB_REF_NAME` >
-    `git branch --show-current`; regex `(?i)(?:^|[-_/])wp[-_]?(\d{1,2})(?:[-_/]|$)`. So ngoai `15…34` ⇒ `2`.
+    `git branch --show-current`; regex `(?i)(?:^|[-_/])wp[-_]?(\d{1,2})(?:[-_/]|$)`. `D-328`: KHONG con tran
+    tren; so `< 15` ⇒ `2` (san), so `>= 15` do hang `07` §WP-15+ quyet (co hang ⇒ xac dinh duoc, khong co ⇒ `2`).
     **Khong suy duoc WP ⇒ fail-closed CO GIOI HAN:** diff so `merge-base(origin/main,HEAD)` (CI co the truyen
     `GITHUB_BASE_SHA`) **khong** cham `modules/**`,`src/**`,`shared/**`,`packages/**`,`apps/**`,`test/**`
     ⇒ `0` + in `KHONG_AP_DUNG (chi tai lieu/van hanh)`; **co** cham ⇒ `1` (doi ma nguon ma khong khai WP).
@@ -50,7 +51,9 @@
     khong ma ⇒ `0` o CA HAI · khong suy duoc WP + co tep ma nguon ⇒ `1` · khong suy duoc WP + chi tai lieu
     ⇒ `0` · co bien ban nguoi ky (`Đã duyệt` + `Nguoi ky`) ⇒ MergeMain `0` · ma 4 chu cai (`ADDR-002`)
     tam duyet ⇒ Code `0` · bien ban KHONG co ma do ⇒ Code `1` · **GD1 co ma ⇒ `0` o Code VA MergeMain ·
-    GD1 thieu ma ⇒ `1` o CA HAI · GD1 KHONG co `Hình thức: DUYỆT` ⇒ khong tinh la nguon ⇒ `1`**). Moi ca
+    GD1 thieu ma ⇒ `1` o CA HAI · GD1 KHONG co `Hình thức: DUYỆT` ⇒ khong tinh la nguon ⇒ `1` ·
+    **`D-328`: WP-41 co hang `07` ⇒ `0` o CA HAI (khong con tran cung `>34`) · WP-49 khong co hang ⇒ `2` ·
+    WP-14 < san 15 ⇒ `2`**). Moi ca
     in `DAT/DO` + ma thoat ky vong. Cuoi `-TuKiem`: moi ca DAT ⇒ `exit 0`, nguoc lai `exit 1`.
 
     📌 **WP-15 XANH o CA HAI che do** vi hang WP-15 co tap ma rong + cau `Không có tài liệu feature`
@@ -441,6 +444,12 @@ function Kiem-KhongSuyDuocWp {
 function Kiem-Cong {
     param([string]$GocRepo, [string]$CheDoCong, [int]$WpSo)
 
+    # 🔒 `D-328` (1): SAN `< 15` — `07` §WP-15+ khong co hang nao < 15 ⇒ fail-closed, "khong xac dinh duoc".
+    # KHONG con TRAN tren: WP >= 15 do `Lay-HangWp` quyet (co hang ⇒ xac dinh duoc; khong co hang ⇒ 2).
+    if ($WpSo -lt 15) {
+        return [pscustomobject]@{ Ma = 2; ChiTiet = @("WP-$WpSo < 15: 07 muc WP-15+ khong co hang nao duoi WP-15 ⇒ KHONG XAC DINH DUOC") }
+    }
+
     $hang = Lay-HangWp -GocRepo $GocRepo -WpSo $WpSo
 
     if (-not $hang.TimThay) {
@@ -576,6 +585,7 @@ function Ghi-Fixture07 {
 | **WP-18** | `ADDR-002` (ma 4 chu cai) | fixture dieu kien | WP-16 |
 | **WP-17** | `PRC-001` | fixture GD1 | WP-16 |
 | **WP-19** | `PRC-099` | fixture am | WP-16 |
+| **WP-41** | fixture | Không có tài liệu feature. fixture | — |
 
 ---
 '@
@@ -737,6 +747,15 @@ function Invoke-TuKiem {
         Ca 'CA12 GD1 khong co Hinh thuc DUYET ⇒ Code DO' 1 ((Kiem-Cong -GocRepo $gocTam -CheDoCong 'Code' -WpSo 17).Ma)
 
         Xoa-FixtureGd1 -GocTam $gocTam
+
+        # Ca 13 (xuoi, `D-328`) — WP-41 co hang trong `07` §WP-15+ (tap ma rong + `Không có tài liệu feature`)
+        # ⇒ XANH o CA HAI che do. Chong hoi quy TRAN CUNG `>34` (truoc day WP-41 ⇒ exit 2).
+        Ca 'CA13 WP-41 co hang 07 ⇒ Code XANH (khong tran cung)' 0 ((Kiem-Cong -GocRepo $gocTam -CheDoCong 'Code' -WpSo 41).Ma)
+        Ca 'CA13 WP-41 co hang 07 ⇒ MergeMain XANH' 0 ((Kiem-Cong -GocRepo $gocTam -CheDoCong 'MergeMain' -WpSo 41).Ma)
+
+        # Ca 14 (nguoc / fail-closed, `D-328`) — KHONG co hang trong fixture ⇒ 2 (WP-49); so < 15 ⇒ 2 (WP-14).
+        Ca 'CA14 WP-49 KHONG co hang 07 ⇒ KHONG XAC DINH DUOC' 2 ((Kiem-Cong -GocRepo $gocTam -CheDoCong 'Code' -WpSo 49).Ma)
+        Ca 'CA14 WP-14 < san 15 ⇒ KHONG XAC DINH DUOC' 2 ((Kiem-Cong -GocRepo $gocTam -CheDoCong 'Code' -WpSo 14).Ma)
     }
     finally {
         if (Test-Path $gocTam) { Remove-Item -Recurse -Force $gocTam -ErrorAction SilentlyContinue }
@@ -775,12 +794,8 @@ if ($null -eq $wpSo) {
     exit $kq.Ma
 }
 
-if ($wpSo -lt 15 -or $wpSo -gt 34) {
-    Write-Host ("   WP = {0} NGOAI khoang 15…34 ⇒ KHONG XAC DINH DUOC" -f $wpSo)
-    Write-Host 'KET QUA: KHONG XAC DINH DUOC'
-    exit 2
-}
-
+# 🔑 `D-328`: KHONG con tran cung `>34` o day — "xac dinh duoc WP" do `Kiem-Cong`/`Lay-HangWp` quyet
+# (co hang `WP-xx` trong `07` §WP-15+ ⇒ xac dinh duoc; khong co hang ⇒ 2; san `< 15` giu trong `Kiem-Cong`).
 $kq = Kiem-Cong -GocRepo $Goc -CheDoCong $CheDo -WpSo $wpSo
 
 Write-Host ("   WP      = WP-{0}" -f $wpSo)

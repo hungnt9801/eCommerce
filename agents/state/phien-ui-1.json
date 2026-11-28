@@ -7,7 +7,7 @@
   "nhanhGoc": "tich-hop/gd3",
   "refs": "D-327",
   "ghiChu": "Chuỗi nền tảng UI (D-327): mỗi WP một nhánh cắt từ đỉnh tich-hop/ui; hàng loai=ui chạy theo .claude/skills/ui-pipeline; dong-wp đẩy fast-forward vào tich-hop/ui (M3); PR xếp chồng mở một lần cuối chuỗi (WP đầu → tich-hop/gd3).",
-  "capNhat": "2026-11-28T21:00:00+07:00",
+  "capNhat": "2026-11-28T21:23:43+07:00",
   "rows": [
     {
       "id": "U41-1",
@@ -17,14 +17,16 @@
       "noiDung": "Kiểm kê + kiến trúc: ux docs/ui/00-kiem-ke.md (37 route, 47 component, pattern lặp, lệch số đo Nhanh, nợ a11y thấy được); arch docs/ui/01-kien-truc-ui.md (4 tầng token → primitive → pattern → domain, gói `packages/ui`, quy tắc import, theme/mật độ/i18n, Storybook + so ảnh chạy ở đâu, ngân sách bundle, chuyển dần giữ `data-testid`); decider TẠM CHỐT danh sách gói + bản ghim (ngoại lệ `next-auth` beta, biểu đồ SVG thay Recharts)",
       "vai": "ux · arch · docrev · decider",
       "dependsOn": [],
-      "status": "chua",
-      "phien": [],
+      "status": "dang-lam",
+      "phien": [
+        "N120"
+      ],
       "nhanh": "feat/ui-wp41-nen",
       "buoc": "U1 thiết kế",
       "evidence": null,
       "ghiChu": null,
       "handover": null,
-      "batDau": null,
+      "batDau": "2026-11-28T21:23:43+07:00",
       "xongLuc": null
     },
     {
