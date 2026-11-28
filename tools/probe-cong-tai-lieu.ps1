@@ -31,21 +31,27 @@
     rong ma khong co cau do, hoac khong thay hang WP ⇒ `2`.
 
     ══════════════════════════════════════════════════════════════════════════════════════════════════
-    🔑 **TRANG THAI DUYET (`D-212` (iv)):**
+    🔑 **TRANG THAI DUYET (`D-212` (iv), `D-217` ④):**
       · `Code`      = glob `docs/bien-ban-tam-duyet-gd3-*.md`, cot **Ket luan DEC**: o bat dau `Tạm duyệt`
                       ⇒ dat-code; `Chưa` ⇒ khong; khong thay dong/cot, hoac nhieu dong cung ma lech nhau
                       ⇒ khong (fail-closed, in ca hai).
       · `MergeMain` = glob `docs/bien-ban-duyet-gd3-*.md` (hom nay **0** tep) voi dong co ma + cot ket luan
                       `Đã duyệt` + cot **Nguoi ky** khac rong; khong co tep/dong ⇒ DO.
+      · **Nguon NGUOI GD1 (`D-217` ④)** — CA HAI che do doc them glob `docs/bien-ban-duyet-gd1-*.md`
+                      (bien ban duyet cua CHU DU AN o GD1): tep phai co **dong** chua CA `Hình thức` VA
+                      `DUYỆT` (nguoi duyet that) + **bang co cot `Mã`**; moi ma `^[A-Z]{3,4}-\d{3}$` trong
+                      bang ⇒ DAT cho ca `Code` va `MergeMain` (bo qua kiem tam-duyet/nguoi-ky cho ma do).
+                      Tep `bien-ban-duyet-gd1-*` KHONG co dong `Hình thức…DUYỆT` ⇒ **bo qua** (fail-closed).
       · `docs/features/README.md` §2 chi in **CANH BAO** khi lech — **KHONG** doi mau.
 
     ══════════════════════════════════════════════════════════════════════════════════════════════════
-    🔑 **`-TuKiem` (`D-211` ①):** dung fixture trong thu muc tam (`Lay-DuongDanTam`, khuon `XC-007`),
-    >= 8 ca (ma `Chưa` + WP dang code ⇒ `1` · tam duyet ⇒ `0` o Code / `1` o MergeMain · WP-15 khong ma
-    ⇒ `0` o CA HAI · khong suy duoc WP + co tep ma nguon ⇒ `1` · khong suy duoc WP + chi tai lieu ⇒ `0` ·
-    co bien ban nguoi ky (`Đã duyệt` + `Nguoi ky`) ⇒ MergeMain `0` · ma 4 chu cai (`ADDR-002`) tam duyet
-    ⇒ Code `0` · bien ban KHONG co ma do ⇒ Code `1`). Moi ca in `DAT/DO` + ma thoat ky vong.
-    Cuoi `-TuKiem`: moi ca DAT ⇒ `exit 0`, nguoc lai `exit 1`.
+    🔑 **`-TuKiem` (`D-211` ①, `D-217` ④):** dung fixture trong thu muc tam (`Lay-DuongDanTam`, khuon
+    `XC-007`), >= 12 ca (ma `Chưa` + WP dang code ⇒ `1` · tam duyet ⇒ `0` o Code / `1` o MergeMain · WP-15
+    khong ma ⇒ `0` o CA HAI · khong suy duoc WP + co tep ma nguon ⇒ `1` · khong suy duoc WP + chi tai lieu
+    ⇒ `0` · co bien ban nguoi ky (`Đã duyệt` + `Nguoi ky`) ⇒ MergeMain `0` · ma 4 chu cai (`ADDR-002`)
+    tam duyet ⇒ Code `0` · bien ban KHONG co ma do ⇒ Code `1` · **GD1 co ma ⇒ `0` o Code VA MergeMain ·
+    GD1 thieu ma ⇒ `1` o CA HAI · GD1 KHONG co `Hình thức: DUYỆT` ⇒ khong tinh la nguon ⇒ `1`**). Moi ca
+    in `DAT/DO` + ma thoat ky vong. Cuoi `-TuKiem`: moi ca DAT ⇒ `exit 0`, nguoc lai `exit 1`.
 
     📌 **WP-15 XANH o CA HAI che do** vi hang WP-15 co tap ma rong + cau `Không có tài liệu feature`
     (`D-212` (iii)). Probe nay **khong** cham DB, **khong** chay Host — chi doc tep.
@@ -170,6 +176,69 @@ function Doc-BienBan {
             if (-not $ketQua.ContainsKey($ma)) { $ketQua[$ma] = @() }
 
             $ketQua[$ma] += [pscustomobject]@{ KetLuan = $kqO; NguoiKy = $kyO; Tep = $f.Name }
+        }
+    }
+
+    return $ketQua
+}
+
+<#
+    Doc bien ban duyet cua CHU DU AN o GD1 (`docs/bien-ban-duyet-gd1-*.md`, `D-217` ④) va tra hashtable:
+    ma ⇒ mang PSCustomObject { KetLuan; NguoiKy; Tep } (cung khuon `Doc-BienBan` de dung chung logic).
+    🔒 Fail-closed: tep phai co MOT dong chua CA `Hình thức` VA `DUYỆT` (nguoi duyet that); khong co
+    ⇒ bo qua ca tep (khong doan). Trong tep: quet tung bang co cot `Mã`, moi o `Mã` khop
+    `^[A-Z]{3,4}-\d{3}$` ⇒ them. Day la NGUON DAT cho CA `Code` va `MergeMain`.
+#>
+function Doc-BienBanGd1 {
+    param([string]$GocRepo)
+
+    $ketQua = @{}
+    $thuMuc = Join-Path $GocRepo 'docs'
+
+    if (-not (Test-Path $thuMuc)) { return $ketQua }
+
+    $cacTep = @(Get-ChildItem -Path $thuMuc -Filter 'bien-ban-duyet-gd1-*.md' -File -ErrorAction SilentlyContinue | Sort-Object Name)
+
+    foreach ($f in $cacTep) {
+        $dong = [IO.File]::ReadAllLines($f.FullName, [Text.Encoding]::UTF8)
+
+        # 🔒 Chi nhan tep co dong chua CA `Hình thức` VA `DUYỆT` — neu khong, bo qua (fail-closed).
+        $coHinhThucDuyet = $false
+
+        for ($k = 0; $k -lt $dong.Count; $k++) {
+            if (($dong[$k] -match '(?i)hình thức') -and ($dong[$k] -match '(?i)duyệt')) { $coHinhThucDuyet = $true; break }
+        }
+
+        if (-not $coHinhThucDuyet) { continue }
+
+        # Quet TUNG bang markdown: header co cot `Mã`, roi cac dong du lieu lien tiep.
+        $i = 0
+
+        while ($i -lt $dong.Count) {
+            if (-not $dong[$i].TrimStart().StartsWith('|')) { $i++; continue }
+
+            $o = Lay-O $dong[$i]
+            $idxMa = Tim-Cot -O $o -Mau '(?i)^\s*m[ãa]\s*$'
+
+            if ($idxMa -lt 0) { $i++; continue }
+
+            # Day la header cua mot bang co cot `Mã` ⇒ cac dong pipe lien tiep la du lieu cua bang.
+            $j = $i + 1
+
+            while ($j -lt $dong.Count -and $dong[$j].TrimStart().StartsWith('|')) {
+                $oj = Lay-O $dong[$j]
+                $ma = if ($idxMa -lt $oj.Count) { Chuan-O $oj[$idxMa] } else { '' }
+
+                if ($ma -match '^[A-Z]{3,4}-\d{3}$') {
+                    if (-not $ketQua.ContainsKey($ma)) { $ketQua[$ma] = @() }
+
+                    $ketQua[$ma] += [pscustomobject]@{ KetLuan = 'Đã duyệt (GD1)'; NguoiKy = 'Chủ dự án (biên bản GĐ1)'; Tep = $f.Name }
+                }
+
+                $j++
+            }
+
+            $i = $j
         }
     }
 
@@ -388,11 +457,20 @@ function Kiem-Cong {
 
     if ($CheDoCong -eq 'Code') {
         $bb = Doc-BienBan -GocRepo $GocRepo -MauGlob 'bien-ban-tam-duyet-gd3-*.md' -CotKetLuanMau '(?i)kết luận dec'
+        $gd1 = Doc-BienBanGd1 -GocRepo $GocRepo
 
         $chiTiet = @()
+        $thongTin = @()
         $trangThai = @{}
 
         foreach ($ma in $hang.Ma) {
+            # 🔑 Nguon NGUOI o GD1 (`D-217` ④): da duyet that ⇒ dat, bo qua kiem tam-duyet cho ma nay.
+            if ($gd1.ContainsKey($ma)) {
+                $trangThai[$ma] = 'gd1'
+                $thongTin += ("{0}: duyệt GĐ1 (nguồn NGƯỜI) ⇒ đạt" -f $ma)
+                continue
+            }
+
             $dong = if ($bb.ContainsKey($ma)) { @($bb[$ma]) } else { @() }
 
             if ($dong.Count -eq 0) {
@@ -428,22 +506,38 @@ function Kiem-Cong {
             return [pscustomobject]@{ Ma = 1; ChiTiet = (@($chiTiet) + @($canhBao | ForEach-Object { "CANH BAO: $_" })) }
         }
 
-        return [pscustomobject]@{ Ma = 0; ChiTiet = (@("moi ma cua WP-$WpSo deu 'Tạm duyệt' trong bien ban tam duyet") + @($canhBao | ForEach-Object { "CANH BAO: $_" })) }
+        $moTa = if ($thongTin.Count -eq 0) {
+            "moi ma cua WP-$WpSo deu 'Tạm duyệt' trong bien ban tam duyet"
+        }
+        else {
+            "moi ma cua WP-$WpSo deu dat (nguon GD1/tam duyet)"
+        }
+
+        return [pscustomobject]@{ Ma = 0; ChiTiet = (@($thongTin) + @($moTa) + @($canhBao | ForEach-Object { "CANH BAO: $_" })) }
     }
 
     # ── MergeMain ──────────────────────────────────────────────────────────────────────────────────
     $bb = Doc-BienBan -GocRepo $GocRepo -MauGlob 'bien-ban-duyet-gd3-*.md' -CotKetLuanMau '(?i)kết luận' -CotNguoiKyMau '(?i)người ký'
+    $gd1 = Doc-BienBanGd1 -GocRepo $GocRepo
 
     $chiTiet = @()
+    $thongTin = @()
 
     $thuMuc = Join-Path $GocRepo 'docs'
     $coBienBan = @(Get-ChildItem -Path $thuMuc -Filter 'bien-ban-duyet-gd3-*.md' -File -ErrorAction SilentlyContinue)
 
-    if ($coBienBan.Count -eq 0) {
-        $chiTiet += 'KHONG co bien ban nguoi ky (docs/bien-ban-duyet-gd3-*.md) ⇒ DO (D-115 ⑤)'
+    # 🔒 Chi bao loi cung khi KHONG co nguon ky nao (khong co gd3 VA GD1 rong).
+    if ($coBienBan.Count -eq 0 -and $gd1.Count -eq 0) {
+        $chiTiet += 'KHONG co bien ban nguoi ky (docs/bien-ban-duyet-gd3-*.md) VA khong co bien ban GD1 ⇒ DO (D-115 ⑤)'
     }
 
     foreach ($ma in $hang.Ma) {
+        # 🔑 Nguon NGUOI o GD1 (`D-217` ④): da duyet that ⇒ dat.
+        if ($gd1.ContainsKey($ma)) {
+            $thongTin += ("{0}: duyệt GĐ1 (nguồn NGƯỜI) ⇒ đạt" -f $ma)
+            continue
+        }
+
         $dong = if ($bb.ContainsKey($ma)) { @($bb[$ma]) } else { @() }
 
         $dat = @($dong | Where-Object {
@@ -456,10 +550,10 @@ function Kiem-Cong {
     }
 
     if ($chiTiet.Count -gt 0) {
-        return [pscustomobject]@{ Ma = 1; ChiTiet = $chiTiet }
+        return [pscustomobject]@{ Ma = 1; ChiTiet = (@($chiTiet) + @($thongTin)) }
     }
 
-    return [pscustomobject]@{ Ma = 0; ChiTiet = @("moi ma cua WP-$WpSo co bien ban nguoi ky 'Đã duyệt' + 'Người ký'") }
+    return [pscustomobject]@{ Ma = 0; ChiTiet = (@($thongTin) + @("moi ma cua WP-$WpSo co bien ban nguoi ky 'Đã duyệt' + 'Người ký' hoac bien ban GD1")) }
 }
 
 # ══════════════════════════════════════════════════════════════════════════════════════════════════
@@ -480,6 +574,8 @@ function Ghi-Fixture07 {
 | **WP-15** | **Nền GĐ3** | Không có tài liệu feature. Vào được khi build/test chạy | — |
 | **WP-16** | `PRC-002` phần còn thiếu | `PRC-002` đã duyệt `Q5` | WP-15 |
 | **WP-18** | `ADDR-002` (ma 4 chu cai) | fixture dieu kien | WP-16 |
+| **WP-17** | `PRC-001` | fixture GD1 | WP-16 |
+| **WP-19** | `PRC-099` | fixture am | WP-16 |
 
 ---
 '@
@@ -527,6 +623,37 @@ function Xoa-FixtureNguoiKy {
     param([string]$GocTam)
 
     $tep = Join-Path $GocTam 'docs/bien-ban-duyet-gd3-tukiem-2026-11-24.md'
+
+    if (Test-Path $tep) { Remove-Item -Force $tep }
+}
+
+<# Fixture bien ban duyet cua CHU DU AN o GD1 (`D-217` ④). `-KhongHinhThuc` = bien the thieu dong
+   `Hình thức: DUYỆT` ⇒ phai bi bo qua (ca am fail-closed). #>
+function Ghi-FixtureGd1 {
+    param([string]$GocTam, [switch]$KhongHinhThuc)
+
+    $thuMuc = Join-Path $GocTam 'docs'
+    New-Item -ItemType Directory -Force -Path $thuMuc | Out-Null
+
+    $hinhThuc = if ($KhongHinhThuc) { '' } else { '| **Hình thức** | **DUYỆT** — fixture |' }
+
+    $s = @"
+# Fixture bien ban duyet GD1 (chi de tu kiem probe)
+
+$hinhThuc
+
+| # | Mã | Tài liệu |
+|---|---|---|
+| 1 | PRC-001 | fixture GD1 |
+"@
+
+    [IO.File]::WriteAllText((Join-Path $thuMuc 'bien-ban-duyet-gd1-tukiem-2026-10-29.md'), $s, [Text.UTF8Encoding]::new($false))
+}
+
+function Xoa-FixtureGd1 {
+    param([string]$GocTam)
+
+    $tep = Join-Path $GocTam 'docs/bien-ban-duyet-gd1-tukiem-2026-10-29.md'
 
     if (Test-Path $tep) { Remove-Item -Force $tep }
 }
@@ -591,6 +718,25 @@ function Invoke-TuKiem {
         Ghi-FixtureTamDuyet -GocTam $gocTam -KetLuan 'Tạm duyệt có điều kiện' -Ma 'ADDR-099'
         Xoa-FixtureNguoiKy -GocTam $gocTam
         Ca 'CA8 bien ban KHONG co ADDR-002 ⇒ Code DO' 1 ((Kiem-Cong -GocRepo $gocTam -CheDoCong 'Code' -WpSo 18).Ma)
+
+        # ── Cac ca NGUON NGUOI GD1 (`D-217` ④) — tao fixture GD1 truoc CA9, xoa sau CA12. ──
+        Ghi-FixtureGd1 -GocTam $gocTam
+
+        # Ca 9 — GD1 (nguon NGUOI) co PRC-001, KHONG co bien ban tam duyet ⇒ Code XANH (0).
+        Ca 'CA9 GD1 co PRC-001 ⇒ Code XANH (nguon NGUOI)' 0 ((Kiem-Cong -GocRepo $gocTam -CheDoCong 'Code' -WpSo 17).Ma)
+
+        # Ca 10 — cung fixture GD1 ⇒ MergeMain XANH (0) (GD1 la nguon ky nguoi).
+        Ca 'CA10 GD1 co PRC-001 ⇒ MergeMain XANH' 0 ((Kiem-Cong -GocRepo $gocTam -CheDoCong 'MergeMain' -WpSo 17).Ma)
+
+        # Ca 11 — GD1 co PRC-001 nhung KHONG co PRC-099 (WP-19) ⇒ Code VA MergeMain DO (1).
+        Ca 'CA11 GD1 thieu PRC-099 ⇒ Code DO' 1 ((Kiem-Cong -GocRepo $gocTam -CheDoCong 'Code' -WpSo 19).Ma)
+        Ca 'CA11 GD1 thieu PRC-099 ⇒ MergeMain DO' 1 ((Kiem-Cong -GocRepo $gocTam -CheDoCong 'MergeMain' -WpSo 19).Ma)
+
+        # Ca 12 — tep GD1 KHONG co dong `Hình thức: DUYỆT` ⇒ KHONG tinh la nguon ⇒ Code DO (1) (fail-closed).
+        Ghi-FixtureGd1 -GocTam $gocTam -KhongHinhThuc
+        Ca 'CA12 GD1 khong co Hinh thuc DUYET ⇒ Code DO' 1 ((Kiem-Cong -GocRepo $gocTam -CheDoCong 'Code' -WpSo 17).Ma)
+
+        Xoa-FixtureGd1 -GocTam $gocTam
     }
     finally {
         if (Test-Path $gocTam) { Remove-Item -Recurse -Force $gocTam -ErrorAction SilentlyContinue }
@@ -598,7 +744,7 @@ function Invoke-TuKiem {
 
     Write-Host ("════ TU KIEM: {0}/{1} ca DAT ════" -f $script:soCaTuKiemDat, $script:soCaTuKiem)
 
-    if ($script:soCaTuKiem -ge 8 -and $script:soCaTuKiemDat -eq $script:soCaTuKiem) { return 0 }
+    if ($script:soCaTuKiem -ge 12 -and $script:soCaTuKiemDat -eq $script:soCaTuKiem) { return 0 }
 
     return 1
 }

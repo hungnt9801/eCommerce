@@ -1042,10 +1042,16 @@ if (-not $ChiKiemDb) {
             KhangDinh (@(Tim-ViPhamChanDoanC10 -Ma $boChoDlq).Count -gt 0) 'Bo dieu kien cho DLQ ma phep quet KHONG bao ⇒ phep quet vo nghia.'
         }
 
-        It 'Y9) Cong tai lieu: -TuKiem DAT va repo THAT xanh o CA HAI che do (D-211, D-212)' {
+        It 'Y9) Cong tai lieu: -TuKiem DAT va repo THAT xanh o CA HAI che do (D-211, D-212, D-217)' {
             # 🚨 `D-211` ① (`N69`/WP-15): QA so huu LOGIC (`tools/probe-cong-tai-lieu.ps1`), OPS so huu
             #    **DAU DAY** — ca nay chong "cong rong": `-TuKiem` phai tu DAT (fixture cua chinh probe),
             #    va probe phai XANH tren **repo that** (khong chi tren fixture).
+            # 🚨 `D-217` ④ + `D-318` ①(8) (`N112`/WP-17): probe nay doc bien ban NGUOI GĐ1
+            #    (`docs/bien-ban-duyet-gd1-*.md`, dong `Hinh thuc: DUYET` + bang cot `Ma`) lam nguon DAT
+            #    cho **CA HAI** che do `Code` va `MergeMain`; tep guong tam thoi
+            #    `docs/bien-ban-tam-duyet-gd3-guong-q5-*.md` **da bi xoa**. Vi vay ca nay chay tren repo
+            #    that de chung minh "do oan da het" nho bien ban GD1, VA van con mot ca am (`SHP-001`)
+            #    chung minh cong KHONG bi noi.
             # 📌 `exit 2` = KHONG XAC DINH DUOC (fail-closed) ⇒ ca nay DO. 📌 `Y9` la lop thu ba cua
             #    `D-211` ①: (1) `-TuKiem` moi lan cong chay · (2) `Y9` (ca nay) · (3) negative-control cua QA.
             $tepProbe = Join-Path $PSScriptRoot 'probe-cong-tai-lieu.ps1'
@@ -1055,16 +1061,38 @@ if (-not $ChiKiemDb) {
             KhangDinh ($tuKiem.Ma -eq 0) ("-TuKiem phai exit 0 nhung do duoc {0}. Log:`n{1}" -f $tuKiem.Ma, (Get-Content $tuKiem.Log -Raw))
 
             # 📌 Chay `Code` tren repo that, de `-WP auto` tu suy (GITHUB_HEAD_REF → GITHUB_REF_NAME → ten nhanh).
+            #    Truoc `D-217` ④ ca nay DO OAN (Code = 1 vi `PRC-001` chua duoc thay); nay bien ban GD1 la
+            #    nguon ky NGUOI nen phai XANH.
             $cheDoCode = ChayScript $tepProbe @('-CheDo', 'Code')
-            KhangDinh ($cheDoCode.Ma -eq 0) ("-CheDo Code tren repo that phai exit 0 nhung do duoc {0} (2 = KHONG XAC DINH DUOC = DO). Log:`n{1}" -f $cheDoCode.Ma, (Get-Content $cheDoCode.Log -Raw))
+            KhangDinh ($cheDoCode.Ma -eq 0) ("-CheDo Code tren repo that phai exit 0 nhung do duoc {0} (2 = KHONG XAC DINH DUOC = DO; 1 = do oan chua duoc bien ban GD1 phu — xem D-217 ④). Log:`n{1}" -f $cheDoCode.Ma, (Get-Content $cheDoCode.Log -Raw))
+
+            # 📌 `D-217` ④: `MergeMain` ghim `-WP WP-17` PHAI XANH vi bien ban GD1 la nguon ky NGUOI
+            #    (truoc sua = 1). Che do nay chi chay tren workflow `pull_request` base `main` (`D-212` (ii)).
+            $cheDoMerge = ChayScript $tepProbe @('-CheDo', 'MergeMain', '-WP', 'WP-17')
+            KhangDinh ($cheDoMerge.Ma -eq 0) ("-CheDo MergeMain (WP-17, co trong bien ban GD1) tren repo that phai exit 0 nhung do duoc {0}. Log:`n{1}" -f $cheDoMerge.Ma, (Get-Content $cheDoMerge.Log -Raw))
+
+            # 📌 `D-217` ④: `PRC-002` (WP-16) chung minh viec XOA tep guong KHONG lam do — GD1 phu ca
+            #    `Code` va `MergeMain` (truoc sua ca hai deu = 0 vi tep guong; nay = 0 nho GD1).
+            $codeWp16 = ChayScript $tepProbe @('-CheDo', 'Code', '-WP', 'WP-16')
+            KhangDinh ($codeWp16.Ma -eq 0) ("-CheDo Code -WP WP-16 (PRC-002, GD1 phu) phai exit 0 nhung do duoc {0}. Log:`n{1}" -f $codeWp16.Ma, (Get-Content $codeWp16.Log -Raw))
+
+            $mergeWp16 = ChayScript $tepProbe @('-CheDo', 'MergeMain', '-WP', 'WP-16')
+            KhangDinh ($mergeWp16.Ma -eq 0) ("-CheDo MergeMain -WP WP-16 (PRC-002, GD1 ky NGUOI) phai exit 0 nhung do duoc {0}. Log:`n{1}" -f $mergeWp16.Ma, (Get-Content $mergeWp16.Log -Raw))
 
             # 📌 `MergeMain` ghim `-WP WP-15`: che do nay chi chay tren workflow `pull_request` base `main`
             #    (`D-212` (ii)); o cong cuc bo, WP khac co ma thi MergeMain DO **dung y** cho toi khi co chu
-            #    ky NGUOI — ghim WP-15 de `Y9` khong bien `kiem-tat-ca.ps1` thanh cong luon DO cho moi WP.
-            $cheDoMerge = ChayScript $tepProbe @('-CheDo', 'MergeMain', '-WP', 'WP-15')
-            KhangDinh ($cheDoMerge.Ma -eq 0) ("-CheDo MergeMain (WP-15, khong ma) tren repo that phai exit 0 nhung do duoc {0}. Log:`n{1}" -f $cheDoMerge.Ma, (Get-Content $cheDoMerge.Log -Raw))
+            #    ky NGUOI — ghim WP-15 (khong ma trong bien ban GD1) de `Y9` khong bien `kiem-tat-ca.ps1`
+            #    thanh cong luon DO cho moi WP.
+            $cheDoMergeWp15 = ChayScript $tepProbe @('-CheDo', 'MergeMain', '-WP', 'WP-15')
+            KhangDinh ($cheDoMergeWp15.Ma -eq 0) ("-CheDo MergeMain (WP-15, khong ma) tren repo that phai exit 0 nhung do duoc {0}. Log:`n{1}" -f $cheDoMergeWp15.Ma, (Get-Content $cheDoMergeWp15.Log -Raw))
 
-            Write-Output ("   -TuKiem exit {0} · Code exit {1} · MergeMain (WP-15) exit {2}" -f $tuKiem.Ma, $cheDoCode.Ma, $cheDoMerge.Ma)
+            # 🛡️ CA AM ("cong van chat", chong noi kiem): `SHP-001` (WP-20) KHONG co trong bien ban nao
+            #    ⇒ `MergeMain` PHAI exit 1. Neu do duoc 0 thi cong da bi NOI ⇒ ca nay DO (`D-217` ④).
+            $mergeWp20 = ChayScript $tepProbe @('-CheDo', 'MergeMain', '-WP', 'WP-20')
+            KhangDinh ($mergeWp20.Ma -ne 0) ("-CheDo MergeMain -WP WP-20 (SHP-001, KHONG co trong bien ban nao) phai exit 1 (cong van chat) nhung do duoc {0} ⇒ CONG DA BI NOI (D-217 ④). Log:`n{1}" -f $mergeWp20.Ma, (Get-Content $mergeWp20.Log -Raw))
+            KhangDinh ($mergeWp20.Ma -eq 1) ("-CheDo MergeMain -WP WP-20 phai exit 1 (khong co chu ky NGUOI) nhung do duoc {0} (2 = KHONG XAC DINH DUOC). Log:`n{1}" -f $mergeWp20.Ma, (Get-Content $mergeWp20.Log -Raw))
+
+            Write-Output ("   -TuKiem exit {0} · Code auto exit {1} · MergeMain WP-17 exit {2} · Code WP-16 exit {3} · MergeMain WP-16 exit {4} · MergeMain WP-15 exit {5} · MergeMain WP-20 exit {6} (mong doi 1)" -f $tuKiem.Ma, $cheDoCode.Ma, $cheDoMerge.Ma, $codeWp16.Ma, $mergeWp16.Ma, $cheDoMergeWp15.Ma, $mergeWp20.Ma)
         }
     }
 }
