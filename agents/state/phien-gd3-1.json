@@ -7,7 +7,7 @@
   "nhanhGoc": "main",
   "refs": "D-216",
   "ghiChu": "Phương án B (D-216): mỗi WP một nhánh cắt từ đỉnh tich-hop/gd3; dong-wp đẩy fast-forward vào tich-hop/gd3 (M3, D-114); PR xếp chồng mở một lần cuối chuỗi.",
-  "capNhat": "2026-11-28T05:37:15+07:00",
+  "capNhat": "2026-11-28T07:37:16+07:00",
   "rows": [
     {
       "id": "W16-1",
@@ -963,13 +963,17 @@
       "dependsOn": [
         "W23-5"
       ],
-      "status": "chua",
-      "phien": [],
+      "status": "xong",
+      "phien": [
+        "N111"
+      ],
       "nhanh": "feat/gd3-wp17-gia-von",
       "buoc": "phiên uỷ quyền WP-17",
-      "evidence": null,
+      "evidence": "D-318: 9 cau C1-C9 DA CHOT (nguoi, U-17); D-177/181/186/195 -> DA CHOT (noi dung khong doi); ho so 2.1 +1 dong ngoai le; W17-1n (G2) -> decider; W17-0n nguoi ky REP-003 tai W17-0; check-decision DAT, kiem-link PASS, PH check OK",
       "ghiChu": null,
-      "handover": null
+      "handover": null,
+      "batDau": "2026-11-28T07:20:11+07:00",
+      "xongLuc": "2026-11-28T07:37:15+07:00"
     },
     {
       "id": "W17-q",
@@ -1054,10 +1058,10 @@
     {
       "id": "W17-1n",
       "dot": "WP-17",
-      "loai": "nguoi",
+      "loai": "duyet-dec",
       "ma": [],
       "noiDung": "**Người duyệt G2** thiết kế ARCH giá vốn (danh sách đỏ §4.3 — decider không tạm duyệt)",
-      "vai": "người",
+      "vai": "ORCH · decider (uỷ quyền D-318)",
       "dependsOn": [
         "W17-1"
       ],
@@ -1066,7 +1070,7 @@
       "nhanh": "feat/gd3-wp17-gia-von",
       "buoc": "G2 người",
       "evidence": null,
-      "ghiChu": null,
+      "ghiChu": "uỷ quyền theo D-318 — chủ dự án xem lại theo lô",
       "handover": null
     },
     {

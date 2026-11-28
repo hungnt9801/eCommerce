@@ -36,6 +36,7 @@
   · `ADDR-003` (tạm duyệt được, **trừ** PII `freeText`: `D-101`/`D-105`/`Q21` chặn release) · `NOT-002` (tạm duyệt thiết kế; khoá HMAC production + chọn kênh Zalo là việc người).
 - **Họ mã luôn đỏ (ngoài WP-14):** `EINV-*` · `SIGN-*` · `PAY-*` · mọi tài liệu sửa `XC-001` · mọi thay đổi phá huỷ contract liên module hoặc schema.
 - **Tạm duyệt được:** `ADDR-001` · `ADDR-002` · `SHP-001` · `SHP-002` (phần ghi nhận doanh thu vẫn chặn release) · `PRO-001` · `PRO-002` (sau P3) · `NOT-001`.
+- **Ngoại lệ WP-17 (`D-318`, người, phiên uỷ quyền `U-17` 28/11/2026):** `decider` được duyệt thay **G1** (`prc-001` §15.1/§20.4 + `inv-001` §0 — **không** `REP-003`) và **G2** (ARCH giá vốn `W17-1`) tại cổng `W17-0`/`W17-1` **có điều kiện** (8 tiêu chí C5 + 7 điều kiện C4 của `D-318`); `REP-003` §0/Q11 (**đỏ cứng**) **chủ dự án ký** kiểu (c): ký ngay, ORCH đối chiếu diff ở `W17-0`, lệch từng dòng phạm vi ⇒ chữ ký **vô hiệu**; grain giá vốn theo **SKU toàn hệ thống**; giữ mức **L1**. Mọi thứ khác vẫn của người.
 
 ## 3. Chính sách theo nhóm câu (R1)
 
