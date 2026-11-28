@@ -7306,6 +7306,30 @@ export interface components {
             lineTotal?: number;
             allCandidates?: components["schemas"]["eCommerce.Pricing.Dtos.ResolvedPriceCandidateDto"][] | null;
         };
+        "eCommerce.Pricing.Dtos.CostEngineRunDto": {
+            /** Format: uuid */
+            id?: string;
+            runKey?: string | null;
+            /** Format: date */
+            fromDate?: string;
+            /** Format: date */
+            toDate?: string;
+            trigger?: string | null;
+            trangThai?: string | null;
+            /** Format: int32 */
+            attempt?: number;
+            /** Format: date-time */
+            startedAtUtc?: string;
+            /** Format: date-time */
+            finishedAtUtc?: string | null;
+            /** Format: int32 */
+            rowsUpserted?: number;
+            /** Format: int32 */
+            rowsSkippedApproved?: number;
+            /** Format: int32 */
+            rowsFlaggedMissing?: number;
+            errorMessage?: string | null;
+        };
         "eCommerce.Pricing.Dtos.CostPriceDto": {
             /** Format: uuid */
             id?: string;
@@ -7322,6 +7346,17 @@ export interface components {
             /** Format: date-time */
             approvedAtUtc?: string | null;
             daDuyet?: boolean;
+        };
+        "eCommerce.Pricing.Dtos.CreateCostPriceDto": {
+            sku: string;
+            /** Format: double */
+            amountValue?: number;
+            currencyCode: string;
+            /** Format: date */
+            effectiveFrom?: string;
+            /** Format: date */
+            effectiveTo?: string | null;
+            idempotencyKey: string;
         };
         "eCommerce.Pricing.Dtos.CreatePriceListDto": {
             code: string;

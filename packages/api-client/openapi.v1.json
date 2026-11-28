@@ -15645,6 +15645,65 @@
         },
         "additionalProperties": false
       },
+      "eCommerce.Pricing.Dtos.CostEngineRunDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "runKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "fromDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "toDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "trigger": {
+            "type": "string",
+            "nullable": true
+          },
+          "trangThai": {
+            "type": "string",
+            "nullable": true
+          },
+          "attempt": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "startedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finishedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "rowsUpserted": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "rowsSkippedApproved": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "rowsFlaggedMissing": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "eCommerce.Pricing.Dtos.CostPriceDto": {
         "type": "object",
         "properties": {
@@ -15685,6 +15744,47 @@
           },
           "daDuyet": {
             "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "eCommerce.Pricing.Dtos.CreateCostPriceDto": {
+        "required": [
+          "currencyCode",
+          "idempotencyKey",
+          "sku"
+        ],
+        "type": "object",
+        "properties": {
+          "sku": {
+            "maxLength": 64,
+            "minLength": 0,
+            "type": "string"
+          },
+          "amountValue": {
+            "maximum": 100000000000000,
+            "minimum": 0,
+            "type": "number",
+            "format": "double"
+          },
+          "currencyCode": {
+            "maxLength": 8,
+            "minLength": 0,
+            "type": "string"
+          },
+          "effectiveFrom": {
+            "type": "string",
+            "format": "date"
+          },
+          "effectiveTo": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "idempotencyKey": {
+            "maxLength": 128,
+            "minLength": 0,
+            "type": "string"
           }
         },
         "additionalProperties": false
@@ -18860,7 +18960,13 @@
       "name": "ChinhSachHanMuc"
     },
     {
+      "name": "CostEngine"
+    },
+    {
       "name": "CostPrice"
+    },
+    {
+      "name": "CostPriceAdmin"
     },
     {
       "name": "Customer"

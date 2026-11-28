@@ -1316,4 +1316,12 @@ giỏ hàng**. Trên môi trường dev (1–2 dòng) nó **không nhìn thấy 
   Danh sách ca cần dựng (đã thiết kế): K06-01…07, K06-08/08b/09/10/11/12/13 + adapter ánh xạ `D-321` + negative control — giao **`qa` (`W17-4`)**.
 - Chưa sinh lại **`schema.sql`** tích hợp (cố ý: `PostgreSqlSchemaTests` ghim tổng `NULLS NOT DISTINCT` = 114) ⇒ nợ cho `W17-4`/QA khi
   cập nhật test tích hợp (đổi tổng + thêm 2 tên index đích danh).
-- Chưa sinh lại OpenAPI snapshot/`schema.d.ts` cho 2 endpoint mới (`cost-price-admin`, `cost-engine`) ⇒ nợ `W17-3`/`W17-5`.
+- **✅ ĐÃ ĐÓNG NỢ ở `W17-3`** — `openapi.v1.json` + `schema.d.ts` sinh lại, **additive** đúng 2 schema component
+  (`eCommerce.Pricing.Dtos.CostEngineRunDto`, `eCommerce.Pricing.Dtos.CreateCostPriceDto`) + 2 tag (`CostEngine`, `CostPriceAdmin`);
+  `pwsh -File tools/kiem-openapi-drift.ps1` **PASS exit 0** (drift **0**), `pnpm gen:api` không đổi `schema.d.ts`. Hai app service
+  lộ ở `/api/app/cost-price-admin` và `/api/app/cost-engine/chay` (`CostPriceAdminAppService.cs:24`, `CostEngineAppService.cs:14`) —
+  **đúng §6.2** nên **không** thuộc hợp đồng `/api/v1` (`snapshot.mjs` chỉ giữ path `/api/v1`; snapshot **82 path** trước = sau).
+  `WEB-001` sau cần 2 endpoint này qua `/api/v1` ⇒ **BE** phải thêm controller v1 viết tay (ngoài vùng `fe`).
+
+**N117 / `W17-3` (F3 FE, 28/11/2026):** **KHÔNG** có màn hình FE mới (`PRC-001-arch.md` §1.1; SRS §10 UI thuộc `WEB-001`) — F3 FE chỉ
+**tái sinh hợp đồng** OpenAPI; không đổi hợp đồng SRS/`PRC-001-arch.md`.
