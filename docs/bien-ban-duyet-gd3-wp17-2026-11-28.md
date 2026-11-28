@@ -9,6 +9,6 @@
 
 | # | MÃ | Tài liệu | Kết luận | Người ký | Ngày |
 |---|---|---|---|---|---|
-| 1 | REP-003 | [rep-003](features/reporting/rep-003-bao-cao-ton-kho-hieu-suat-kenh.md) §0 :47 · §15.1 Q11 :938 | Đã duyệt |  | 28/11/2026 |
+| 1 | REP-003 | [rep-003](features/reporting/rep-003-bao-cao-ton-kho-hieu-suat-kenh.md) §0 :47 · §15.1 Q11 :938 | Đã duyệt | NTH  | 28/11/2026 |
 
 > ✍️ **Chủ dự án điền tên vào cột "Người ký"** rồi mới commit. Để trống ⇒ cổng `MergeMain` vẫn ĐỎ (đúng thiết kế, `D-115` ⑤).
