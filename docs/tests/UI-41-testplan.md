@@ -84,6 +84,7 @@ khác ⇒ lần đầu trên Linux dự kiến đỏ đều; đó là chuyển n
 | # | Tệp (đã commit) | Find → Replace (đột biến **thật**) | Ca chạy (`--grep`) | Khi đột biến | Sau khôi phục |
 |---|---|---|---|---|---|
 | NC-1 | `apps/admin-web/e2e/visual/specs/01-tinh.spec.ts` | `page.locator("main .grid.grid-cols-4"),` → `page.locator("main .grid.grid-cols-4"), page.locator("main"),` | `#3 dashboard` | chờ ORCH | chờ ORCH |
+| 2026-11-29 | NC-1 | apps/admin-web/e2e/visual/specs/01-tinh.spec.ts:44 | page.locator("main .grid.grid-cols-4"), -> page.locator("main .grid.grid-cols-4"), page.locator("main"), | pnpm --filter @ecommerce/admin-web exec playwright test -c e2e/visual/playwright.visual.config.ts --project=visual --grep "#3 dashboard" | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
 
 - **Mô tả NC-1:** thêm `main` vào mặt nạ của ca dashboard ⇒ toàn bộ vùng nội dung bị tô khối ⇒ ảnh chụp
   lệch so với `03-dashboard.png` quá `maxDiffPixelRatio 0.001` ⇒ ca **PHẢI ĐỎ**; khôi phục ⇒ **PHẢI XANH**.
