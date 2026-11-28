@@ -53,8 +53,9 @@ chuyển kho, phiếu kiểm kê) và **một sổ cái kho chỉ được ghi t
 **Không nằm trong phạm vi:**
 - ❌ **Giữ chỗ (reservation) + TTL + job nhả kho** — thuộc **`INV-002`**; `INV-001` **không** chạm `Reserved` của luồng giữ chỗ.
 - ❌ **Phân bổ tồn theo kênh** (`AvailableToPromise`, `StockAllotment`) — thuộc **`INV-003`** và `CHN-004`.
-- ❌ **Giá vốn / giá trị tồn kho / bút toán kế toán tiền** — thuộc **`ACC-001`** (chưa viết). `INV-001` ghi **số lượng** và
-  **đơn giá để tra cứu**; **không** ghi bút toán kế toán, **không** tính giá vốn bình quân.
+- ❌ **Giá vốn / định giá tồn kho** — thuộc **`PRC-001`** (Pricing, `D-186` ⑥); **bút toán kế toán tiền** chỉ **tiêu thụ** ở
+  **`ACC-001`** (chưa viết). `INV-001` ghi **số lượng** + **đơn giá nhập để tra cứu** (ánh xạ *"`UnitCost` (tài liệu) ↔ `UnitPrice` (as-built)"*);
+  **không** ghi bút toán kế toán, **không** tính giá vốn bình quân.
 - ❌ **Đa kho theo pháp nhân / kho của đối tác 3PL** — ngoài GĐ1.
 - ❌ **Saga điều phối nhiều bước có bù trừ** — thuộc `SAL-004`.
 - ❌ **Màn hình UI** — thuộc `WEB-001`/`WEB-*`; tài liệu này chỉ chốt **hợp đồng dữ liệu cho UI** (§10).
@@ -330,7 +331,7 @@ Hiện trạng đã kiểm: **14** cột do migration khai + **2** cột ABP (`E
 | ➕ CHECK `BalanceAfter >= 0` | **KHÔNG CÓ** | ➕ `CHECK ("BalanceAfter" >= 0)` | `BR-021` — số dư sau biến động không bao giờ âm; là **lưới an toàn thứ hai** cho bảng nhật ký |
 | Cột `Note` | `varchar(2048)`, setter **public** (`StockLedger.cs:110`) | ➕ đổi thành `private set` + chỉ gán trong constructor | **`BR-001`** — append-only: property `public set` là đường sửa bút toán cũ **qua API**; hiện tại nó tồn tại ⇒ đây là **lỗ hổng thiết kế thật**, xem **F1** §15.2 |
 | `MovementType` | `int` (enum `StockMovementType`) | ➕ **thêm 4 giá trị ở CUỐI** enum | ADR-04 — `Receipt=0`…`Transfer=6` (`Enums.cs:28-48`) **không được** đổi số |
-| Đơn giá / thành tiền | **KHÔNG CÓ** | **giữ là KHÔNG CÓ** | Giá trị tồn kho thuộc `ACC-001` (ngoài phạm vi). Đơn giá nằm trên **dòng phiếu nhập** (§5.2.3), **không** trên sổ cái ⇒ sổ cái thuần **số lượng**, đổi đơn giá **không** phải sửa nhật ký |
+| Đơn giá / thành tiền | **KHÔNG CÓ** | **giữ là KHÔNG CÓ** | Định giá / giá trị tồn kho thuộc **`PRC-001`** (Pricing, `D-186` ⑥); bút toán kế toán tiền chỉ **tiêu thụ** ở **`ACC-001`** (ngoài phạm vi). Đơn giá nằm trên **dòng phiếu nhập** (§5.2.3), **không** trên sổ cái ⇒ sổ cái thuần **số lượng**, đổi đơn giá **không** phải sửa nhật ký |
 
 #### 5.2.3 Bốn entity **MỚI** — toàn bộ là thiết kế đề xuất (🆕 **chưa có trong code — kế hoạch GĐ1**)
 
@@ -989,7 +990,7 @@ public class StockLedgerInvariantTests
 | **Q5** | `BR-002` phát biểu theo **dòng chứng từ** hay theo **(dòng chứng từ, loại biến động)**? | Kiến trúc trưởng | `Open` | Một dòng kiểm kê lệch cần **2** bút toán ⇒ nếu phát biểu theo **dòng** thì `BR-002` **mâu thuẫn** với A3. Đề xuất: theo **(dòng, loại biến động)** — xem lưu ý ở §5.2.3 |
 | **Q6** | Có cần **endpoint tra cứu đối soát** (`GET /ledger/reconcile`) cho kế toán không, hay chỉ job + metric? | BA + Kiến trúc trưởng | `Open` | Cần ⇒ thêm 1 endpoint **chỉ đọc**; không cần ⇒ giảm bề mặt API. ⚠️ Endpoint tra cứu **không** được phép sửa lệch (`ADR-10`) |
 | **Q7** | Phiếu nhập có cần **nhiều lô (lot)/hạn dùng (expiry)** không? | BA | `Open` | Nếu **có** ⇒ phải thêm `LotNo`/`ExpiryDate` vào dòng + đổi khoá chống trùng dòng (`Sku` → `Sku + LotNo`) ⇒ ảnh hưởng **`BR-007`** và **`BR-002`** |
-| **Q8** | Đơn giá nhập (`UnitCost`) có thuộc `INV-001` hay chuyển hẳn sang `ACC-001`? | Kế toán + Kiến trúc trưởng | `Open` | Hiện **giữ** trên dòng phiếu nhập (chỉ để tra cứu). Nếu `ACC-001` nhận ⇒ chuyển, **không** đổi `INV-001` (sổ cái vẫn thuần số lượng — §5.2.2) |
+| **Q8** | Đơn giá nhập (`UnitCost`) có thuộc `INV-001` hay chuyển hẳn sang `ACC-001`? | Kế toán + Kiến trúc trưởng | `✅ Closed (D-186)` | **Giữ** đơn giá nhập ở `INV-001` để **tra cứu**, **KHÔNG** chuyển sang `ACC-001`; định giá/giá vốn thuộc `PRC-001` (sổ cái vẫn thuần số lượng — §5.2.2) |
 
 ### 15.2 🚨 Sai lệch & lỗ hổng phát hiện được
 
@@ -1024,6 +1025,7 @@ public class StockLedgerInvariantTests
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.1 | 13/10/2026 | *(điền)* | Bản nháp đầu — số liệu lấy **từ code thật**: `InventoryItem`/`StockLedgerEntry` **đã có** + **đã có** bảng trong migration; **0** chỗ gọi `ApplyMovement` ngoài entity/test ⇒ feature **chưa có**; `eCommerce.Kernel` **chưa tồn tại**. Phát hiện **F1** (`StockLedgerEntry.Note` setter public ⇒ sổ cái **chưa** append-only), **F2** (permission `Inventory.Adjust` mồ côi), **F3** (khoá kho thiếu `tenantId` + tiền tố đôi), **F4** (mâu thuẫn `XC-003` `BR-XC-003-002` vs §5.4), **F5** (chưa có PostgreSQL để kiểm chứng), **F6** (`Money` chưa tồn tại). Chốt **12 ADR**, **24 BR**, **12 NFR**, **30 TC**; **3 sơ đồ** Mermaid |
+| v0.2 | 28/11/2026 | *(agent, phiên N113)* | §0: chủ động cơ giá vốn = **Pricing (`PRC-001`)** (`D-186` ⑥) — `INV-001` chỉ cấp đơn giá nhập để tra cứu, **`ACC-001`** chỉ tiêu thụ |
 
 ---
 

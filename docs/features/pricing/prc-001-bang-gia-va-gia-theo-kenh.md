@@ -894,6 +894,7 @@ public class PriceListStateMachineTests
 | **Q5** | **Giá bán buôn / theo nhóm khách** (đại lý, VIP) nằm trong `PRC-001` hay `PRC-002`? | BA | ⬜ `Open` | Nếu ở `PRC-001` ⇒ bảng `ChannelPrices` phải thêm trục `CustomerGroupId` ⇒ phình; nếu ở `PRC-002` ⇒ `PRC-002` phải cam kết làm |
 | **Q6** | Bậc số lượng (`MinQuantity`) nên ở **`PRC-001`** (giá kênh) hay **`PRC-002`** (tier giá tổng quát)? | Kiến trúc trưởng + BA | ⬜ `Open` | Hiện `PRC-001` **có** `ChannelPrice.MinQuantity` (bậc **trong một kênh**); nếu `PRC-002` cũng làm tier tổng quát ⇒ **nguy cơ hai cơ chế bậc** chồng nhau ⇒ phải chốt ranh giới trước khi code |
 | **Q7** | `LowestPrice` (`SelectionStrategy`) có cần ở GĐ1 không? | BA | ⬜ `Open` | Nếu không cần ⇒ bỏ strategy khỏi GĐ1 (giảm bề mặt test); enum để dành |
+| **Q8** | Đường ghi + động cơ giá vốn (bình quân gia quyền di động) + luồng duyệt `CostPrice` thuộc module nào? | Kiến trúc trưởng + Kế toán trưởng | ✅ `Closed (D-186)` | Chủ = **Pricing (`PRC-001`)** — sở hữu `PrcCostPrices` + đường ghi + động cơ + duyệt; `INV-001` chỉ cấp đơn giá nhập để tra cứu; `ACC-001` chỉ tiêu thụ; động cơ đọc Inventory qua hợp đồng chỉ đọc ở `Inventory.Application.Contracts`; đường ghi/động cơ = WP code GĐ3 **trước** lãi gộp `REP-002` |
 
 ### 15.2 🚨 Sai lệch / nợ kỹ thuật phát hiện được
 
@@ -921,6 +922,7 @@ public class PriceListStateMachineTests
 | Phiên bản | Ngày | Người | Thay đổi |
 |---|---|---|---|
 | v0.1 | 13/10/2026 | *(điền)* | Bản nháp đầu — 14 ADR · 14 BR · 10 NFR · 22 test case · 3 sơ đồ Mermaid · **mọi khẳng định về code đều có đường dẫn file đã kiểm**; ghi rõ **module `Pricing` chưa có trong code** và **`Money`/`IIdempotencyGuard`/outbox-inbox chưa có** (phụ thuộc chặn `XC-001`/`XC-002`); ghi nhận **F1–F5** |
+| v0.7 | 28/11/2026 | *(agent, phiên N113)* | Đồng bộ `D-186` ⑥: thêm **Q8** — đường ghi + động cơ giá vốn + luồng duyệt thuộc **Pricing (`PRC-001`)**, `INV-001` chỉ cấp đơn giá nhập, `ACC-001` chỉ tiêu thụ; §20.4 mục 1 cập nhật theo đó, **Q4** vẫn `Open` |
 
 ---
 
@@ -1212,8 +1214,9 @@ giỏ hàng**. Trên môi trường dev (1–2 dòng) nó **không nhìn thấy 
 
 ### 20.4 ⚠️ Giới hạn đã biết (KHÔNG được nói quá)
 
-1. **Không có đường ghi** (import / nhập tay / bình quân gia quyền) — chờ **`Q2`**. Hệ quả: bảng `PrcCostPrices`
-   hiện chỉ có dữ liệu do **seed/ngoài luồng** ghi; màn hình `/GiaVon` vì thế **rỗng** trên môi trường chưa có dữ liệu.
+1. **Đường ghi + động cơ giá vốn thuộc `PRC-001`** (`D-186` ⑥) — sẽ có ở WP code GĐ3 (**trước** lãi gộp `REP-002`);
+   **luồng duyệt 2 bước** `CostPrice` **vẫn `Open`** ở **`Q4`** chờ kế toán trưởng. Hiện bảng `PrcCostPrices` **chỉ đọc** /
+   chỉ có dữ liệu do **seed/ngoài luồng** ghi; màn hình `/GiaVon` vì thế **rỗng** trên môi trường chưa có dữ liệu.
 2. **Chưa có job** tính lãi gộp / báo cáo dùng giá vốn. `CostPrice` mới là **nguồn dữ liệu**, chưa có nơi tiêu thụ.
 3. **`CostPrice` chưa nối vào `MissingPricePolicy`/`IPriceResolver`** — cố ý: giá vốn **không** tham gia chọn giá bán.
 4. **Bốn index `NULLS NOT DISTINCT` cũ của Pricing** (`PrcPriceLists` · `PrcPriceListItems` · `PrcChannelPrices` ·
