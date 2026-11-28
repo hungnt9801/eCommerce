@@ -7,7 +7,7 @@
   "nhanhGoc": "main",
   "refs": "D-216",
   "ghiChu": "Phương án B (D-216): mỗi WP một nhánh cắt từ đỉnh tich-hop/gd3; dong-wp đẩy fast-forward vào tich-hop/gd3 (M3, D-114); PR xếp chồng mở một lần cuối chuỗi.",
-  "capNhat": "2026-11-28T08:50:00+07:00",
+  "capNhat": "2026-11-28T10:51:25+07:00",
   "rows": [
     {
       "id": "W16-1",
@@ -1035,13 +1035,14 @@
       "dependsOn": [
         "W17-0"
       ],
-      "status": "chua",
+      "status": "xong",
       "phien": [],
       "nhanh": "feat/gd3-wp17-gia-von",
       "buoc": "G1 người",
-      "evidence": null,
+      "evidence": "docs/bien-ban-duyet-gd3-wp17-2026-11-28.md: REP-003 Da duyet (D-318 C3, doi chieu W17-0 N113 khop)",
       "ghiChu": null,
-      "handover": null
+      "handover": null,
+      "xongLuc": "2026-11-28T10:51:25+07:00"
     },
     {
       "id": "W17-1",
