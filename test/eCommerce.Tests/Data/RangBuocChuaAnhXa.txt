@@ -265,3 +265,8 @@ CK_ProPromotionRedemptions_ReversedAt|PRO-002: Reversed ⇒ ReversedAtUtc — m�
 CK_ProPromotionRedemptions_ReasonCode|PRO-002: Released/Reversed ⇒ ReasonCode — máy trạng thái đặt; CHECK chặn ghi tắt
 CK_ProFlashSaleSlots_Slot|PRO-002 (CR-P2 chưa mở): bảng FlashSale dựng trước nhưng chưa có đường ghi (Kind=FlashSale bị chặn); CHECK là hàng rào cuối cho ghi tắt
 CK_ProPromotionRuleCosts_DeclaredCostFactor|PRO-002 (`D-154`): DeclaredCostFactor >= 1 — seeder chỉ ghi từ code catalog; CHECK bảo vệ bảng toàn cục khỏi ghi tắt
+CK_ProVoucherCodes_Status|PRO-002 (`W25`): Status ∈ {Generated,Issued,Revoked} — máy trạng thái voucher đặt; CHECK chặn SQL tay ghi trạng thái lạ (không có mã nghiệp vụ riêng)
+CK_ProPromotionRedemptions_Status|PRO-002 (`W25`): Status ∈ [0,3] — máy trạng thái lượt đặt; CHECK chặn giá trị lạ do ghi tắt
+IX_PrcCostEngineRuns_TenantId_RunKey|PRC-001 (`W17-2`, `K06-08`): *một lượt chạy cho một (tenant, RunKey)* — app tiền kiểm bảng run và NÉM `eCommerce:Lock:0001` khi `DangChay`; unique `NULLS NOT DISTINCT` là hàng rào cuối cho hai request đồng thời (race ⇒ 23505), không có mã riêng
+IX_PrcCostPrices_TenantId_IdempotencyKey|PRC-001 (`W17-2`, `BR-012`): *một khoá ghi thủ công ⇒ một dòng* — app pre-check trả dòng cũ; unique filtered `NULLS NOT DISTINCT` là hàng rào cuối cho retry đồng thời (không có mã riêng; 23505 = trùng khoá)
+

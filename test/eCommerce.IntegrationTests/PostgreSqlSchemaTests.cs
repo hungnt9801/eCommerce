@@ -224,7 +224,13 @@ public class PostgreSqlSchemaTests
         //      `ProPromotionConditions` (thứ tự node + **một gốc** theo `PromotionId`), `ProPromotionRedemptions`
         //      (khoá idempotency + **4** index chống trùng theo đơn/khách — `D-151`/`D-157`). 📌 Tất cả viết tay
         //      **SQL thô** trong migration vì EF **không** sinh được `NULLS NOT DISTINCT` kèm bộ lọc).
-        Assert.Equal(114L, await DemAsync(
+        //    → **116** (28/11/2026, `W17-2` migration `Added_Pricing_CostEngine` — **+2** index của động cơ
+        //      giá vốn, viết tay `NULLS NOT DISTINCT` vì EF không sinh được:
+        //      `IX_PrcCostEngineRuns_TenantId_RunKey` (*một lượt chạy cho một `RunKey`* — mất NND thì khi
+        //      `TenantId = NULL` hai lượt cùng khoảng chạy CHỒNG ⇒ giá vốn bị tính hai lần, không lỗi nào) và
+        //      `IX_PrcCostPrices_TenantId_IdempotencyKey` (partial — *một khoá ghi thủ công ⇒ một dòng*; mất
+        //      NND thì retry tạo dòng giá vốn thứ hai ⇒ lãi gộp có hai nguồn cho cùng một kỳ).
+        Assert.Equal(116L, await DemAsync(
             "select count(*) from pg_indexes where schemaname = 'public' and indexdef like '%NULLS NOT DISTINCT%'"));
 
         // Kiểm tra ĐÍCH DANH để thông báo lỗi có ý nghĩa (tên index dài có thể bị PostgreSQL cắt ⇒ so theo tiền tố).
@@ -459,6 +465,15 @@ public class PostgreSqlSchemaTests
             "IX_ProPromRedemptions_Tenant_Prom_Cust_Seq",
             "IX_ProPromotionRedemptions_TenantId_OrderId_Voucher",
             "IX_ProPromotionRedemptions_TenantId_PromotionId_OrderId_TuDong",
+            // 🆕 `W17-2` (28/11/2026, migration `Added_Pricing_CostEngine`) — **2 index của động cơ giá vốn**
+            // (`PRC-001` §5.6, `D-324` ②), viết tay SQL thô:
+            //   • `PrcCostEngineRuns (RunKey)`: *một lượt chạy cho một `(tenant, RunKey)`* — mất NND ⇒ khi
+            //     `TenantId = NULL` (đang chạy 1 tenant) hai lượt cùng khoảng/trigger LỌT ⇒ động cơ tính CHỒNG,
+            //     `PrcCostPrices` bị ghi đua và run log không còn là hàng rào idempotency (`K06-08`);
+            //   • `PrcCostPrices (IdempotencyKey)` (partial `IS NOT NULL`): *một khoá đường ghi thủ công ⇒ một
+            //     dòng* — mất NND ⇒ retry tạo HAI dòng giá vốn cho cùng kỳ ⇒ lãi gộp có hai nguồn, không lỗi nào.
+            "IX_PrcCostEngineRuns_TenantId_RunKey",
+            "IX_PrcCostPrices_TenantId_IdempotencyKey",
         ];
 
         foreach (var ten in phaiCo)

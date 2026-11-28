@@ -4715,3 +4715,70 @@ VALUES ('20261126224627_Add_Promotion_Module', '10.0.11');
 
 COMMIT;
 
+START TRANSACTION;
+ALTER TABLE "ProVoucherCodes" ADD CONSTRAINT "CK_ProVoucherCodes_Status" CHECK ("Status" IN ('Generated','Issued','Revoked'));
+
+ALTER TABLE "ProPromotionRedemptions" ADD CONSTRAINT "CK_ProPromotionRedemptions_Status" CHECK ("Status" BETWEEN 0 AND 3);
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261127153549_Add_Voucher_Status_Check', '10.0.11');
+
+COMMIT;
+
+START TRANSACTION;
+ALTER TABLE "PrcCostPrices" ADD "ComputedAtUtc" timestamp with time zone;
+
+ALTER TABLE "PrcCostPrices" ADD "IdempotencyKey" character varying(128);
+
+ALTER TABLE "PrcCostPrices" ADD "NguonTinh" integer;
+
+ALTER TABLE "PrcCostPrices" ADD "RunId" uuid;
+
+CREATE TABLE "PrcCostEngineRuns" (
+    "Id" uuid NOT NULL,
+    "TenantId" uuid,
+    "RunKey" character varying(128) NOT NULL,
+    "FromDate" date NOT NULL,
+    "ToDate" date NOT NULL,
+    "Trigger" character varying(64) NOT NULL,
+    "TrangThai" integer NOT NULL,
+    "Attempt" integer NOT NULL,
+    "StartedAtUtc" timestamp with time zone NOT NULL,
+    "FinishedAtUtc" timestamp with time zone,
+    "RowsUpserted" integer NOT NULL,
+    "RowsSkippedApproved" integer NOT NULL,
+    "RowsFlaggedMissing" integer NOT NULL,
+    "ErrorMessage" character varying(2048),
+    "ExtraProperties" text NOT NULL,
+    "ConcurrencyStamp" character varying(40) NOT NULL,
+    "CreationTime" timestamp with time zone NOT NULL,
+    "CreatorId" uuid,
+    "LastModificationTime" timestamp with time zone,
+    "LastModifierId" uuid,
+    "IsDeleted" boolean NOT NULL DEFAULT FALSE,
+    "DeleterId" uuid,
+    "DeletionTime" timestamp with time zone,
+    CONSTRAINT "PK_PrcCostEngineRuns" PRIMARY KEY ("Id")
+);
+
+CREATE UNIQUE INDEX "IX_PrcCostPrices_TenantId_IdempotencyKey" ON "PrcCostPrices" ("TenantId", "IdempotencyKey") WHERE "IdempotencyKey" IS NOT NULL;
+
+CREATE UNIQUE INDEX "IX_PrcCostEngineRuns_TenantId_RunKey" ON "PrcCostEngineRuns" ("TenantId", "RunKey");
+
+CREATE INDEX "IX_PrcCostEngineRuns_TenantId_StartedAtUtc" ON "PrcCostEngineRuns" ("TenantId", "StartedAtUtc");
+
+DROP INDEX IF EXISTS "IX_PrcCostEngineRuns_TenantId_RunKey";
+CREATE UNIQUE INDEX "IX_PrcCostEngineRuns_TenantId_RunKey"
+    ON "PrcCostEngineRuns" ("TenantId", "RunKey") NULLS NOT DISTINCT;
+
+DROP INDEX IF EXISTS "IX_PrcCostPrices_TenantId_IdempotencyKey";
+CREATE UNIQUE INDEX "IX_PrcCostPrices_TenantId_IdempotencyKey"
+    ON "PrcCostPrices" ("TenantId", "IdempotencyKey")
+    NULLS NOT DISTINCT
+    WHERE "IdempotencyKey" IS NOT NULL;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261128052137_Added_Pricing_CostEngine', '10.0.11');
+
+COMMIT;
+
