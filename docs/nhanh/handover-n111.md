@@ -60,7 +60,7 @@
 
 **Trạng thái phiên: XONG WP-17 (hàng `U-17`) → mở `W17-q` (nợ `D-217` ④).**
 
-- Hàng kế = **`W17-q`** (loại `code`, vai `qa`, nhánh `feat/gd3-wp17-gia-von`, phụ thuộc `U-17` nay đã xong): `tools/probe-cong-tai-lieu.ps1` đọc biên bản người GĐ1 (`docs/bien-ban-duyet-gd1-*.md`, `Hình thức: DUYỆT` + cột `Mã`) làm nguồn ĐẠT cho `Code` và `MergeMain` + ca `-TuKiem` mới + ca ngược (mã không có trong biên bản nào ⇒ ĐỎ) + `Y9`; **cùng commit xoá** `docs/bien-ban-tam-duyet-gd3-guong-q5-2026-11-25.md`. **KHÔNG** mở rộng cho `REP-003` (`D-318` ①(8)).
+- Hàng kế = **`W17-q`** (loại `code`, vai `qa`, nhánh `feat/gd3-wp17-gia-von`, phụ thuộc `U-17` nay đã xong): `tools/probe-cong-tai-lieu.ps1` đọc biên bản người GĐ1 (`docs/bien-ban-duyet-gd1-*.md`, `Hình thức: DUYỆT` + cột `Mã`) làm nguồn ĐẠT cho `Code` và `MergeMain` + ca `-TuKiem` mới + ca ngược (mã không có trong biên bản nào ⇒ ĐỎ) + `Y9`; **cùng commit xoá** `docs/bien-ban-tam-duyet-gd3-guong-q5-2026-11-25`. **KHÔNG** mở rộng cho `REP-003` (`D-318` ①(8)).
 - Sau `W17-q` ⇒ `W17-0` (doc-gate: BA sửa `prc-001` §15.1/§20.4 + `inv-001` §0 + `rep-003` §0/Q11 cùng nhánh → DOCREV; G1 của `prc-001`/`inv-001` do `decider` duyệt thay theo `D-318`).
 
 ```text

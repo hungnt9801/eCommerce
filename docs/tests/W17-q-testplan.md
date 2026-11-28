@@ -24,10 +24,10 @@
 | **R-02** | `D-217` ④: `MergeMain` cũng nhận GD1 là nguồn ký NGƯỜI — mã có trong GD1 ⇒ `0`; lỗi cứng "không có biên bản người ký" chỉ thêm khi **không có nguồn ký nào** | Nhánh `MergeMain` `:536`; `-TuKiem` **CA10**; thật: `-CheDo MergeMain -WP WP-17` = **0** (trước = **1**); `-WP WP-16` = **0** | Probe logic + runtime | ✅ |
 | **R-03** | Fail-closed, **không nới kiểm**: mã KHÔNG có trong bất kỳ biên bản nào vẫn ĐỎ ở **CẢ HAI** chế độ; tệp `bien-ban-duyet-gd1-*` **không** có dòng `Hình thức: DUYỆT` không tính là nguồn | `-TuKiem` **CA11** (Code + MergeMain = 1), **CA12** (GD1 thiếu Hình thức ⇒ Code = 1); thật: `MergeMain WP-20`/`WP-21` = **1** (`SHP-001`/`SHP-002` không có trong GD1) | Probe logic + runtime | ✅ |
 | **R-04** | `D-318` ①(8): **KHÔNG** mở rộng cho `REP-003`; chỉ đọc biên bản NGƯỜI GĐ1 `docs/bien-ban-duyet-gd1-*.md`, không đụng `rep-003` | Glob cố định `bien-ban-duyet-gd1-*.md` trong `Doc-BienBanGd1` (`:200`); `git diff --stat` chỉ chạm `tools/probe-cong-tai-lieu.ps1` + `docs/tests/W17-q-testplan.md` | Kiểm phạm vi | ✅ |
-| **R-05** | Tệp gương `docs/bien-ban-tam-duyet-gd3-guong-q5-2026-11-25.md` **không còn cần** sau khi xoá (WP-16 phải xanh nhờ GD1, không nhờ gương) | Thật: `Code WP-16` = **0** với thông điệp `PRC-002: duyệt GĐ1 (nguồn NGƯỜI) ⇒ đạt` ⇒ xoá gương **không** làm đỏ. **ORCH:** `git rm <tệp gương>` cùng commit rồi đo lại `Code WP-16` (điền: ____) | Runtime | ✅ (logic) · ORCH xác nhận sau xoá |
+| **R-05** | Tệp gương `docs/bien-ban-tam-duyet-gd3-guong-q5-2026-11-25` (đuôi md, đã xoá) **không còn cần** sau khi xoá (WP-16 phải xanh nhờ GD1, không nhờ gương) | **ĐÃ XOÁ** (`git rm` cùng commit `ba36bee`). Sau xoá: `Code WP-16` = **0** (`PRC-002: duyệt GĐ1 (nguồn NGƯỜI) ⇒ đạt`), `MergeMain WP-16` = **0** ⇒ xoá gương **không** làm đỏ; WP-16 xanh nhờ GD1 | Runtime | ✅ |
 | **R-06** | `-TuKiem` phủ mọi nhánh mới, mọi ca DAT, ngưỡng không giảm | `-TuKiem` = **15/15 DAT**, exit **0** (trước = 10/10, ngưỡng ≥8 → nay ≥12) | Probe logic | ✅ |
 | **R-07** | Không hồi quy: `Code WP-18/20/21` = 0, `MergeMain WP-15` = 0 (như trước sửa) | §4 | Runtime | ✅ |
-| **R-08** | `Y9` / `tools/test-cong-kiem.ps1` do `ops` cập nhật — **QA KHÔNG sửa** | `git diff` không chạm `tools/test-cong-kiem.ps1`; ORCH giao `ops` ngay sau phiên (điền log `-ChiKiemMoc`: ____) | Phạm vi | ✅ (QA không sửa) · `ops` chờ |
+| **R-08** | `Y9` / `tools/test-cong-kiem.ps1` do `ops` cập nhật — **QA KHÔNG sửa** | `git diff` không chạm `tools/test-cong-kiem.ps1`; **`ops` ĐÃ cập nhật `Y9`**: `-ChiKiemMoc` = **54/54 DAT · 0 HỎNG**, `Y9` DAT (7 exit: TuKiem 0 · Code auto 0 · MergeMain WP-17 0 · Code WP-16 0 · MergeMain WP-16 0 · MergeMain WP-15 0 · MergeMain WP-20 1 mong đợi 1); `test-cong-kiem` đầy đủ = **60/60 DAT · 0 HỎNG** | Phạm vi | ✅ |
 
 - Tổng yêu cầu: **8** · đã có bằng chứng (phần QA): **8** · chưa: **0**.
 
@@ -84,6 +84,13 @@ pwsh -File tools/agents/negative-control.ps1 -File tools/probe-cong-tai-lieu.ps1
 >   `negative-control.ps1` (nếu dùng `if ($gd1.ContainsKey($ma)) {` sẽ **fail** vì xuất hiện 2 lần `:468`/`:536`).
 > - Hôm nay (tệp chưa commit) script trả **exit 3**; đây là **bằng chứng tay tương đương** ở §3.1–§3.3.
 
+### 3.5 Sau commit — chính thức (script `negative-control.ps1`)
+
+> ✅ **`NC-N112-1` = KET QUA: DAT** (tệp đã commit `ba36bee`). Đột biến ⇒ **exit 1** (log
+> `artifacts/negative-control/20261128-080852-do.log`) → khôi phục ⇒ **exit 0** (log
+> `artifacts/negative-control/20261128-080852-xanh.log`). Script đã tự thêm dòng `NC-N112-1` (ngày 2026-11-28) vào
+> bảng "Negative control" cuối tệp — **giữ nguyên**.
+
 ## 4. Số đo thật (28/11/2026, nhánh `feat/gd3-wp17-gia-von`)
 
 | Lệnh | Trước sửa | Sau sửa |
@@ -106,13 +113,26 @@ pwsh -File tools/agents/negative-control.ps1 -File tools/probe-cong-tai-lieu.ps1
 - `git diff --stat` sau khôi phục: chỉ chạm `tools/probe-cong-tai-lieu.ps1` (+`docs/tests/W17-q-testplan.md` mới);
   `grep 'if ($false) {'` rỗng ⇒ **không còn dấu vết đột biến**.
 
+### 4.1 Sau commit — ORCH đo lại (commit `ba36bee`)
+
+| # | Lệnh | Kết quả |
+|---|---|---|
+| (1) | `probe -CheDo Code -WP WP-16` (sau `git rm` gương) | **exit 0** — `PRC-002: duyệt GĐ1 (nguồn NGƯỜI) ⇒ đạt`; `-CheDo MergeMain -WP WP-16` = **exit 0** ⇒ xoá gương **không** làm đỏ |
+| (2) | `tools/agents/negative-control.ps1 -Id NC-N112-1` | **KET QUA: DAT** — đột biến **exit 1** (log `artifacts/negative-control/20261128-080852-do.log`) → khôi phục **exit 0** (log `...-xanh.log`); đã append dòng vào bảng "Negative control" cuối tệp |
+| (3) | `pwsh -File tools/test-cong-kiem.ps1 -ChiKiemMoc` | **exit 0 · 54/54 DAT · 0 HỎNG** · `Y9` DAT (7 exit: TuKiem 0 · Code auto 0 · MergeMain WP-17 0 · Code WP-16 0 · MergeMain WP-16 0 · MergeMain WP-15 0 · MergeMain WP-20 1 mong đợi 1) |
+| (4) | `pwsh -File tools/test-cong-kiem.ps1` (đầy đủ, qua `kiem-tat-ca.ps1`) | **60/60 DAT · 0 HỎNG** |
+| (5) | `pwsh -File tools/kiem-tat-ca.ps1` (nhẹ) | **exit 0 · 10/10 bước · 368,3 s** (build 76,1 s · unit 23,1 s · integration 41,3 s · cổng tài liệu 0,8 s · test cổng 60/60) |
+
 ## 5. Chưa phủ / nợ (ghi rõ chủ)
 
-1. **ORCH (đóng phiên):** `git rm docs/bien-ban-tam-duyet-gd3-guong-q5-2026-11-25.md` **cùng commit** với tệp
-   này; đo lại `Code WP-16` + `MergeMain WP-16` (điền §1 R-05).
-2. **ORCH (sau commit):** chạy `negative-control.ps1 -Id NC-N112-1` (§3.4) trên tệp đã commit; ghi exit đỏ→xanh.
-3. **`ops` (ngay sau phiên):** cập nhật `Y9` (`tools/test-cong-kiem.ps1`) gọi `probe-cong-tai-lieu.ps1 -TuKiem`
-   (nay **15/15**). QA **không** sửa tệp `ops` (điền log `-ChiKiemMoc`: ____).
+1. **ORCH (đóng phiên) — ĐÃ XONG:** `git rm` tệp gương `docs/bien-ban-tam-duyet-gd3-guong-q5-2026-11-25` (đuôi md) cùng commit
+   `ba36bee`; sau xoá `Code WP-16` = **0** (`PRC-002: duyệt GĐ1`) và `MergeMain WP-16` = **0** (§1 R-05, §4.1).
+2. **ORCH (sau commit) — ĐÃ XONG:** `negative-control.ps1 -Id NC-N112-1` = **DAT** — đột biến exit **1** → khôi
+   phục exit **0** (log `artifacts/negative-control/20261128-080852-do.log`/`-xanh.log`); dòng bằng chứng đã append
+   cuối tệp (§3.5, §4.1).
+3. **`ops` (ngay sau phiên) — ĐÃ XONG:** `ops` đã cập nhật `Y9` (`tools/test-cong-kiem.ps1`) gọi
+   `probe-cong-tai-lieu.ps1 -TuKiem`; `-ChiKiemMoc` = **54/54 DAT · 0 HỎNG**, `test-cong-kiem` đầy đủ **60/60 DAT**.
+   QA **không** sửa tệp `ops`.
 4. **`check-agent-artifact.ps1 -Kind testplan`:** **không áp dụng** — hàng `W17-q` không có SRS/`BR` (đòi `-Srs`
    có `BR` ở §1); thay bằng Negative control + số đo thật §3–§4 (tiền lệ `WP-15-testplan.md`).
 
@@ -123,4 +143,5 @@ pwsh -File tools/agents/negative-control.ps1 -File tools/probe-cong-tai-lieu.ps1
 
 | Ngay | Ma | Tep:dong | Dot bien | Lenh test | Bang chung |
 |---|---|---|---|---|---|
+| 2026-11-28 | NC-N112-1 | tools/probe-cong-tai-lieu.ps1:200 | -Filter 'bien-ban-duyet-gd1-*.md' -> -Filter 'bien-ban-duyet-gd1-KHONGCO-*.md' | pwsh -NoProfile -File tools/probe-cong-tai-lieu.ps1 -TuKiem | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
 

@@ -11,7 +11,7 @@
 - **Cổng tài liệu đỏ oan → xanh (`D-217`):** `probe-cong-tai-lieu.ps1 -CheDo Code -WP WP-16` ban đầu **exit 1**
   ("PRC-002: KHONG thay dong trong bien ban tam duyet") vì probe `Code` chỉ đọc `docs/bien-ban-tam-duyet-gd3-*.md`,
   trong khi `PRC-002` đã được **người duyệt** ở `Q5` (`docs/bien-ban-duyet-gd1-2026-10-29.md:50`). DEC `D-217` chọn
-  **tệp gương** `docs/bien-ban-tam-duyet-gd3-guong-q5-2026-11-25.md` (1 dòng `PRC-002`, cột `Kết luận DEC` bắt đầu
+  **tệp gương** `docs/bien-ban-tam-duyet-gd3-guong-q5-2026-11-25` (1 dòng `PRC-002`, cột `Kết luận DEC` bắt đầu
   `Tạm duyệt`, **không** cột `Người ký`, **không** `Đã duyệt`). Sau khi thêm: **exit 0**. Cổng `MergeMain` **vẫn ĐỎ**
   có chủ ý; nợ QA `D-217` ④ sửa probe đọc biên bản GĐ1 rồi xoá tệp gương.
 - **F2 ARCH:** `docs/features/pricing/PRC-002-arch.md` (**466 dòng**) — vị trí `PricingSettingDefinitionProvider`
@@ -80,7 +80,7 @@ kế toán duyệt lô M4 (`D-219`/`D-221`/`D-222`/`D-223`/`D-224`) · biên b�
 - **QA — `D-217` ④ (chặn trước `W17-*` đầu tiên và trước PR `tich-hop/gd3` → `main`):** sửa `tools/probe-cong-tai-lieu.ps1`
   đọc biên bản người GĐ1 (`docs/bien-ban-duyet-gd1-*.md`, có dòng `Hình thức: DUYỆT` + bảng cột `Mã`) làm nguồn ĐẠT cho
   **cả `Code` và `MergeMain`** + ca `-TuKiem` mới + **ca ngược** (mã không có trong biên bản nào ⇒ vẫn ĐỎ) + cập nhật `Y9`;
-  **cùng commit xoá** `docs/bien-ban-tam-duyet-gd3-guong-q5-2026-11-25.md`. Nếu để quên: tệp gương tồn tại vĩnh viễn và
+  **cùng commit xoá** `docs/bien-ban-tam-duyet-gd3-guong-q5-2026-11-25`. Nếu để quên: tệp gương tồn tại vĩnh viễn và
   cổng `MergeMain` của WP-16/17 không bao giờ xanh đúng nghĩa.
 - **BA — cùng PR `W16-2`:** sửa `prc-002` §12/§9/§6.1/§20.3 theo `D-220` (nếu không, code theo SRS §9 sẽ dùng **sai khoá Setting**).
 - **Release bị chặn tới khi kế toán duyệt lô M4** cho các `D-219`/`D-221`…`D-224` (đúng chính sách M4).

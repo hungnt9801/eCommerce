@@ -7,7 +7,7 @@
   "nhanhGoc": "main",
   "refs": "D-216",
   "ghiChu": "Phương án B (D-216): mỗi WP một nhánh cắt từ đỉnh tich-hop/gd3; dong-wp đẩy fast-forward vào tich-hop/gd3 (M3, D-114); PR xếp chồng mở một lần cuối chuỗi.",
-  "capNhat": "2026-11-28T07:42:13+07:00",
+  "capNhat": "2026-11-28T08:14:48+07:00",
   "rows": [
     {
       "id": "W16-1",
@@ -982,21 +982,22 @@
       "ma": [
         "PRC-001"
       ],
-      "noiDung": "Nợ `D-217` ④ (QA): `tools/probe-cong-tai-lieu.ps1` đọc biên bản người GĐ1 (`docs/bien-ban-duyet-gd1-*.md`, `Hình thức: DUYỆT` + cột `Mã`) làm nguồn ĐẠT cho `Code` và `MergeMain` + ca `-TuKiem` mới + ca ngược (mã không có trong biên bản nào ⇒ ĐỎ) + `Y9`; **cùng commit xoá** `docs/bien-ban-tam-duyet-gd3-guong-q5-2026-11-25.md`",
+      "noiDung": "Nợ `D-217` ④ (QA): `tools/probe-cong-tai-lieu.ps1` đọc biên bản người GĐ1 (`docs/bien-ban-duyet-gd1-*.md`, `Hình thức: DUYỆT` + cột `Mã`) làm nguồn ĐẠT cho `Code` và `MergeMain` + ca `-TuKiem` mới + ca ngược (mã không có trong biên bản nào ⇒ ĐỎ) + `Y9`; **cùng commit xoá** `docs/bien-ban-tam-duyet-gd3-guong-q5-2026-11-25` (đã xoá ở `ba36bee`)",
       "vai": "qa",
       "dependsOn": [
         "U-17"
       ],
-      "status": "dang-lam",
+      "status": "xong",
       "phien": [
         "N112"
       ],
       "nhanh": "feat/gd3-wp17-gia-von",
       "buoc": "F4 QA — nợ D-217 ④",
-      "evidence": null,
+      "evidence": "probe -TuKiem 15/15 exit 0; Code WP-17 1->0; MergeMain WP-17 1->0; WP-16 0/0; Code WP-18/20/21 0; MergeMain WP-20/21 1 (cong chat); test-cong-kiem 54/54 (full 60/60); kiem-tat-ca 10/10 368.3s; NC-N112-1 exit 1->0; kiem-link PASS 318 tep/1029 link/1936 backtick; D-217 (4) trong D-318 (8); ba36bee",
       "ghiChu": null,
-      "handover": null,
-      "batDau": "2026-11-28T07:42:13+07:00"
+      "handover": "docs/nhanh/handover-n112.md",
+      "batDau": "2026-11-28T07:42:13+07:00",
+      "xongLuc": "2026-11-28T08:14:48+07:00"
     },
     {
       "id": "W17-0",

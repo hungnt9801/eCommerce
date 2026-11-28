@@ -51,7 +51,7 @@
 Kế thừa `N72`, còn nguyên:
 
 - **Nợ NGƯỜI (danh sách đỏ §2.1) — `D-228`:** `XC-001` §6.2 gán `0002` = mã tiền tệ lạ, `0003` = tổng trọng số 0… **lệch** `MoneyErrorCodes.cs` (`0001` CurrencyMismatch · `0002` InvalidDivisor · `0003` UnsupportedCurrency · `0005` InvalidAmount). Chủ dự án sửa tài liệu theo code + thêm mục DOCREV; **hạn trước PR `tich-hop/gd3 → main` của WP-16**.
-- **QA `D-217` ④ (chặn trước `W17-*` đầu tiên và trước PR `tich-hop/gd3 → main`):** sửa `probe-cong-tai-lieu.ps1` đọc biên bản GĐ1 + ca ngược; **cùng commit xoá** `docs/bien-ban-tam-duyet-gd3-guong-q5-2026-11-25.md`.
+- **QA `D-217` ④ (chặn trước `W17-*` đầu tiên và trước PR `tich-hop/gd3 → main`):** sửa `probe-cong-tai-lieu.ps1` đọc biên bản GĐ1 + ca ngược; **cùng commit xoá** `docs/bien-ban-tam-duyet-gd3-guong-q5-2026-11-25`.
 - **BA `D-227`:** thêm 4 dòng TC §14 cho `BR-PRC-002-010/011/013/014` + mục "Đối chiếu mô hình Nhanh" trước `doc-gate`/`duyet-dec` kế tiếp của `PRC-002`.
 - **`W16-4` — 3 ca tầng app service (`1c`/`2a`/`2b`):** repo test thiếu ABP test base/fake repo; phải dựng hạ tầng test (hoặc decider chọn cách khác) trước khi `W16-4` đóng.
 - **DOCREV vòng 4 — P2 không chặn BE:** `prc-002` §5.2/§8.1 còn khẳng định CÓ CHECK `^[A-Z]{3}$` trên `TierPriceSets`/`TierPrices`/`PriceCalculationRecords`, mâu thuẫn code (chỉ `PrcCostPrices` có CHECK). **P3:** §8.1 còn `Money.Of` (thật là `Money.Cua`); `-arch` §7 R7 còn nhắc `SettingScopes.Tenant`.

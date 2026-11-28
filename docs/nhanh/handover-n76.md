@@ -68,7 +68,7 @@ mã GHTK chưa có ⇒ không code nhánh đó; `ADDR-003` + PII ngoài WP).
 ## 5. Nợ / rủi ro
 
 - **`D-217`④ vẫn nguyên** (chưa quá hạn): QA sửa probe đọc biên bản **người** GĐ1 (`docs/bien-ban-duyet-gd1-*.md`) làm
-  nguồn ĐẠT cho `Code` + `MergeMain`, + ca ngược, + **cùng commit xoá tệp gương** `docs/bien-ban-tam-duyet-gd3-guong-q5-2026-11-25.md`.
+  nguồn ĐẠT cho `Code` + `MergeMain`, + ca ngược, + **cùng commit xoá tệp gương** `docs/bien-ban-tam-duyet-gd3-guong-q5-2026-11-25`.
   Hạn: trước hàng `W17-*` đầu tiên và trước PR `tich-hop/gd3 → main`. `D-231` **không** giải quyết nợ này (hai sửa đổi độc lập trên cùng tệp).
 - **Điều kiện còn lại của tạm duyệt `D-141`**: (a) DOCREV kiểm nhanh v0.5 — **ĐẠT** cả hai tài liệu; (b) `ADDR-001`:
   nguồn ĐVHC production (`D-93`, R3-7) trước WP code đường nạp production (W18-1/W18-2 **không** làm nhánh đó);
