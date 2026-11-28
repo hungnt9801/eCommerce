@@ -329,6 +329,32 @@ Buoc 'FE: typecheck + unit test (Vitest)' {
     }
 }
 
+# ── BUOC 4b-2: FE — LINT (`D-327`, `U41-2`) ─────────────────────────────────────────────────
+Buoc 'FE: lint (pnpm lint)' {
+    # 🔑 **VI SAO CO BUOC NAY (`D-327`, `U41-2` — chuoi `ui-1`):** tu `U41-2`, repo co **mot** cong lint
+    # goc: `pnpm lint` = `pnpm -r --if-present lint`, phu **ca** `apps/admin-web` (`eslint .`) lan
+    # `packages/ui` (`eslint src --max-warnings=0`). 📌 Truoc do typecheck **khong** bat duoc rule
+    # `jsx-a11y` / `react-hooks` / thu tu import ⇒ mot rule moi co the **bi tat** ma cong van xanh.
+    # 🔒 Chay o **GOC repo** (khong phai trong `apps/admin-web`) de `-r` quet **moi** goi workspace.
+    Push-Location $goc
+    try {
+        $l = ChayLenh 'pnpm' @('run', 'lint') 'fe-lint.log'
+    }
+    finally {
+        Pop-Location
+    }
+
+    # 📌 In **dong tong ket** (error/warning) neu bat duoc — de nguoi doc thay con so THAT, khong "OK" suong.
+    $tong = Select-String -Path $l.Log -Pattern '\d+ problems? \(' | Select-Object -First 1
+    if ($tong) { Write-Output ("   {0}" -f $tong.Line.Trim()) }
+
+    if ($l.Ma -ne 0) {
+        Select-String -Path $l.Log -Pattern 'error|warning|problem' | Select-Object -First 12 |
+            ForEach-Object { "   $($_.Line.Trim())" }
+        throw "LINT FE DO (exit $($l.Ma)) — xem $($l.Log)"
+    }
+}
+
 # ── BUOC 4c: FE — HOP DONG OPENAPI KHONG LECH (`WP-09`) ────────────────────────────────────
 Buoc 'FE: gen:api khong lam doi schema.d.ts (hop dong OpenAPI)' {
     # 🚨 **VI SAO LA "SINH LAI ROI SO", KHONG PHAI `git diff`:** working tree co the dang co thay doi hop le
@@ -677,6 +703,38 @@ if ($DayDu -and -not $BoQuaE2E) {
         }
 
         Write-Output '   ✅ 8/8 luong E2E: dang nhap · tao SP · nhap kho · ban le · in · doi trang thai · ket ca · CSV.'
+    }
+
+    # ── BUOC 18: WEB ADMIN — SO ANH 27 ROUTE (`UI-41`, `D-331`, `D-332`) ──────────────────────
+    Buoc 'Web Admin: so anh 27 route (UI-41 visual harness)' {
+        # 🔑 **VI SAO PHAI LA BUOC CUA CONG (khong phai "luc nao ranh thi chay"):** `D-331`/`D-332` chot
+        # *"so anh la hop dong"* — tu `WP-42` tro di moi WP so voi **27 anh chuan** route; mot thay doi
+        # bo cuc/mau loi **khong** nam trong "danh sach anh du kien doi" cua dac ta la DO.
+        # 📌 Harness **KE THUA** `playwright.config.ts` goc (bat Host DLL + `next start` cong 3000,
+        # `reuseExistingServer`), giu **27 anh chuan + 27 ca axe** (`D-331`, `D-332`); can Host DLL +
+        # `.next/BUILD_ID` — dieu kien da bat o `tools/e2e.ps1`.
+        # ⚠️ Chay **CUOI CUNG** (sau buoc E2E Playwright): buoc tren da giet + tat server cong 3000 ⇒
+        # harness tu bat server cua no (`reuseExistingServer` thay cong trong, khong tranh ai).
+        Push-Location $goc
+        try {
+            $v = ChayLenh 'pnpm' @('--filter', '@ecommerce/admin-web', 'exec', 'playwright', 'test',
+                '-c', 'e2e/visual/playwright.visual.config.ts') 'visual.log'
+        }
+        finally {
+            Pop-Location
+        }
+
+        # 📌 In **dong ket qua** tung ca (passed/failed) — de nguoi doc thay con so THAT, khong "OK" suong.
+        Get-Content $v.Log | Where-Object { $_ -match 'passed|failed|✘|×|Error:' } |
+            Select-Object -First 40 | ForEach-Object { "   $($_.Trim())" }
+
+        if ($v.Ma -ne 0) {
+            Get-Content $v.Log | Select-String 'Error:|failed|✘|×' | Select-Object -First 16 |
+                ForEach-Object { "   $($_.Line.Trim())" }
+            throw "SO ANH UI-41 DO (exit $($v.Ma)) — xem log: $($v.Log). Doi chieu 'danh sach anh du kien doi' cua dac ta TRUOC khi cap nhat anh chuan."
+        }
+
+        Write-Output '   ✅ 27/27 anh chuan khop (0 khac ngoai danh sach du kien doi) + 27 ca axe.'
     }
 }
 elseif (-not $BoQuaE2E -and -not $DayDu) {

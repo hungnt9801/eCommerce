@@ -7,7 +7,7 @@
   "nhanhGoc": "tich-hop/gd3",
   "refs": "D-327",
   "ghiChu": "Chuỗi nền tảng UI (D-327): mỗi WP một nhánh cắt từ đỉnh tich-hop/ui; hàng loai=ui chạy theo .claude/skills/ui-pipeline; dong-wp đẩy fast-forward vào tich-hop/ui (M3); PR xếp chồng mở một lần cuối chuỗi (WP đầu → tich-hop/gd3).",
-  "capNhat": "2026-11-29T02:03:53+07:00",
+  "capNhat": "2026-11-29T03:32:37+07:00",
   "rows": [
     {
       "id": "U41-1",
@@ -83,14 +83,16 @@
       "dependsOn": [
         "U41-3"
       ],
-      "status": "chua",
-      "phien": [],
+      "status": "do-dang",
+      "phien": [
+        "N123"
+      ],
       "nhanh": "feat/ui-wp41-nen",
       "buoc": "F6–G6",
       "evidence": null,
-      "ghiChu": null,
-      "handover": null,
-      "batDau": null,
+      "ghiChu": "G6 -DayDu CHUA chay duoc: PID 22404 giu DLL + PID 18936 giu cong 3000 (D-335, chu nguoi/CI). F6 xong: 2 buoc cong (lint + so anh), test-cong-kiem 2 khoa, docs/ops/UI-41-deploy.md, 8 anh chuan (D-337/D-338). Cho host nha roi chay -DayDu va push FF tich-hop/ui.",
+      "handover": "docs/nhanh/handover-n123.md",
+      "batDau": "2026-11-29T02:06:52+07:00",
       "xongLuc": null
     },
     {

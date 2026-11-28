@@ -406,6 +406,8 @@ if (-not $ChiKiemDb) {
         'probe-outbox.ps1'     = 'buoc ⑭ outbox (process chet sau commit)'
         'probe-outbox-2instance.ps1'      = 'buoc ⑮ outbox 2 instance'
         'probe-giu-cho-2instance.ps1'     = 'buoc ⑯ giu cho 2 instance (cong #2: 2 instance kho)'
+        'fe-lint.log'          = 'buoc FE lint (pnpm lint — chuoi ui-1)'
+        'e2e/visual/playwright.visual.config.ts' = 'buoc so anh 27 route (UI-41 visual harness)'
     }
 
     <#

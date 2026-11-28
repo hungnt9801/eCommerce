@@ -61,6 +61,9 @@ const CAS: Ca[] = [
       page.locator("main .flex.flex-wrap.items-center.gap-2"),
       page.locator("main .flex.flex-wrap.gap-1"),
       page.locator("main a span.rounded-full"),
+      // D-338 (đo 2 lượt): bảng `nh-table` auto-layout — bề rộng cột co theo nội dung `tbody` (DB dev trôi)
+      // ⇒ nhãn header dịch (diff 1680 px). `maskChung` chỉ che `tbody`; mask `thead`. Gỡ khi DB tất định.
+      page.locator("main table thead"),
     ],
   },
   {
@@ -79,6 +82,11 @@ const CAS: Ca[] = [
       await expect(page.getByRole("heading", { name: "Đơn hàng" })).toBeVisible();
       await expect(page.getByText("hàng đợi việc thật của nhân viên")).toBeVisible();
     },
+    // D-338: bảng `<table class="w-full">` auto-layout, `thead th` KHÔNG cố định bề rộng ⇒ bề rộng cột co theo
+    // nội dung `tbody` (DB dev trôi mỗi lượt E2E) ⇒ nhãn cột dịch ngang ⇒ ảnh đỏ giả nếu không che header.
+    // `maskChung` chỉ che `tbody`, không chặn dịch layout của `thead`; mask `thead` (chỉ TÔ, không đổi layout).
+    // Gỡ khi có DB tất định (`U42-4`/`U51-4`).
+    mask: (page) => [page.locator("main table thead")],
   },
   {
     slug: "08-inventory-bill",
@@ -106,6 +114,9 @@ const CAS: Ca[] = [
     kiem: async (page) => {
       await expect(page.getByRole("heading", { name: "Hoá đơn bán lẻ" })).toBeVisible();
     },
+    // D-338 (đo 2 lượt: --update → E2E → clean): bảng hoá đơn auto-layout, bề rộng cột co theo nội dung
+    // `tbody` (DB dev trôi) ⇒ nhãn header dịch (diff 2267 px). `maskChung` chỉ che `tbody`; mask `thead`.
+    mask: (page) => [page.locator("main table thead")],
   },
   {
     slug: "14-pos-return",
@@ -146,6 +157,9 @@ const CAS: Ca[] = [
       page.locator("main form b"),
       page.locator('main svg[role="img"]'),
       page.getByText(/đơn · .*huỷ · giá trị/),
+      // D-338 (đo 2 lượt): bảng tổng hợp auto-layout — bề rộng cột co theo nội dung `tbody` (DB dev trôi)
+      // ⇒ nhãn header dịch (diff 1710 px). `maskChung` chỉ che `tbody`; mask `thead`.
+      page.locator("main table thead"),
     ],
   },
   {
@@ -165,6 +179,9 @@ const CAS: Ca[] = [
     kiem: async (page) => {
       await expect(page.getByRole("heading", { name: "Khuyến mãi" })).toBeVisible();
     },
+    // D-338 (đo 2 lượt): bảng `nh-table` auto-layout — bề rộng cột co theo nội dung `tbody` (DB dev trôi)
+    // ⇒ nhãn header dịch. `maskChung` chỉ che `tbody`; mask `thead`. Gỡ khi DB tất định (`U42-4`/`U51-4`).
+    mask: (page) => [page.locator("main table thead")],
   },
   {
     slug: "22-promotion-new",
@@ -182,6 +199,9 @@ const CAS: Ca[] = [
     kiem: async (page) => {
       await expect(page.getByRole("heading", { name: "Mẫu thông báo" })).toBeVisible();
     },
+    // D-338 (đo 2 lượt): bảng mẫu auto-layout — bề rộng cột co theo nội dung `tbody` (DB dev trôi)
+    // ⇒ nhãn header dịch. `maskChung` chỉ che `tbody`; mask `thead`. Gỡ khi DB tất định (`U42-4`/`U51-4`).
+    mask: (page) => [page.locator("main table thead")],
   },
   {
     slug: "25-templates-new",

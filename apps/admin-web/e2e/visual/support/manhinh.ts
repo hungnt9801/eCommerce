@@ -121,7 +121,23 @@ export async function chup(page: Page, ten: string, mask: Locator[]): Promise<vo
   await page.addStyleTag({
     content:
       "html,body,*{scrollbar-width:none!important}" +
-      "::-webkit-scrollbar{width:0!important;height:0!important;display:none!important}",
+      "::-webkit-scrollbar{width:0!important;height:0!important;display:none!important}" +
+      // 🧩 D-337 (`U41-4`): chuẩn hoá bề rộng Ô ĐẾM của 5 tab `customer/list` (`#16`).
+      // Mask Playwright tô theo **bounding box** của locator; `maskChung` che chữ số `(n)` (`getByText(/^\(\d+\)$/)`),
+      // nhưng khung ô đếm co giãn theo **số chữ số** của `n` (1 → 2/3/… chữ số khi hồ sơ tích lũy) ⇒ nhãn 5 tab
+      // dịch 3–6 px ⇒ lệch ảnh 2266 px (ratio 0.01 > 0.001). Ép **min-width** cố định cho `<span.opacity-80>` trong
+      // `a.nh-btn` (ô đếm) ⇒ bounding box tất định; vẫn giữ phủ so ảnh cho nhãn/active-tab (không mask hàng tab).
+      // ⚠️ GỠ rule khi có `PageTabs` badge bề rộng cố định (`U45-2` + chuyển `#16` ở `U48-3`); latent `#4`/`#6`/`#8`
+      // ghi nợ có chủ ở testplan (§2.1 `D-337`).
+      "main a.nh-btn span.opacity-80{display:inline-block;min-width:3.25rem;text-align:right;overflow:hidden}" +
+      // 🧩 D-338 (`U41-4`): chuẩn hoá bề rộng BADGE ĐẾM của tab danh sách (`#4`/`#6`/`#8`) — cùng cơ chế `D-337`.
+      // Badge `<span class="rounded-full tabular">{count}</span>` rộng theo **số chữ số** của `count`; DB dev không reset
+      // (E2E trong `-DayDu` chạy trước, tạo thêm dòng mỗi lượt) ⇒ `9 → 10 → …` ⇒ badge rộng ra ⇒ nhãn các tab dịch
+      // ngang ⇒ ảnh đỏ giả (đo được: `#6` 6597 px, ratio 0.01 > 0.001). `maskChung` chỉ TÔ chữ số `(n)`/`.tabular`,
+      // KHÔNG chặn dịch layout. Ép `min-width` + `text-align:center` ⇒ bounding box badge tất định; vẫn giữ phủ so ảnh
+      // cho nhãn/active-tab/màu (KHÔNG mask cả hàng tab). Điều kiện gỡ: có DB tất định (`U42-4`/`U51-4`) hoặc `PageTabs`
+      // badge bề rộng cố định (`U45-2`, chuyển màn `U48-3`). Header bảng vẫn drift ⇒ mask `thead` **theo route** trong spec.
+      "main a span.rounded-full{display:inline-block;min-width:2.5rem;text-align:center}",
   });
 
   await expect(page).toHaveScreenshot(ten, {
