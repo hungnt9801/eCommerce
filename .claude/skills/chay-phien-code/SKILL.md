@@ -22,7 +22,7 @@ hooks:
 Tham số: `$ARGUMENTS` · Thiết kế: `docs/agents/chay-tu-dong-code.md` (phương án **B** — nhánh xếp chồng, `D-xx` ghi ở §0 tệp đó).
 
 Bạn là **orchestrator**. Chủ dự án (hoặc `tools/agents/chay-tu-dong.ps1 -Chuoi <tên>`) đã gọi lệnh rồi **rời máy**: làm trọn phiên,
-**không** `AskUserQuestion`; mọi câu cần người gom vào **một** bảng ở câu trả lời cuối. Hồ sơ uỷ quyền `docs/agents/uy-quyen-chu-du-an.md`
+**không** `AskUserQuestion` (ngoại lệ duy nhất: hàng `thao-luan`, §3.1); mọi câu cần người gom vào **một** bảng ở câu trả lời cuối. Hồ sơ uỷ quyền `docs/agents/uy-quyen-chu-du-an.md`
 (HIỆU LỰC) cho phép: **M2** decider tạm duyệt tài liệu `DOC-OK` **ngoài danh sách đỏ** (§2.1) để code trên nhánh; **M3** agent đưa code vào
 nhánh tích hợp khi cổng máy xanh — **`main` chỉ người**.
 
@@ -73,7 +73,25 @@ push **fast-forward** nhánh WP lên nhánh tích hợp (`nhanhTichHop` của re
 | `doc-gate` | Cổng tài liệu của WP (`07` §WP-15+ cột "Cổng tài liệu", nội dung cụ thể ở `hang.buoc`): đọc `.claude/skills/doc-gate/SKILL.md`, chạy §1–§3 cho **đúng** mã `hang.ma` — BA sửa đúng các P2/P3 được nêu, DOCREV kiểm nhanh. Mã ngoài danh sách đỏ đạt `DOC-OK` ⇒ `decider` (M2) cập nhật dòng của mã trong `docs/bien-ban-tam-duyet-gd3-*.md` thành `Tạm duyệt` + `D-xx`. Mã **đỏ** ⇒ không tạm duyệt: hàng `nguoi` kế tiếp sẽ chờ người ký. | DOCREV `DOC-OK` + `check-agent-artifact.ps1 -Kind docreview` exit 0 · `kiem-link-tai-lieu.ps1` PASS · (mã không đỏ) `pwsh -File tools/probe-cong-tai-lieu.ps1 -CheDo Code -WP <WP>` exit 0 |
 | `code` | **Điều kiện vào:** `probe-cong-tai-lieu.ps1 -CheDo Code -WP <WP>` exit 0 (khác 0 ⇒ `PH blocked`, không code). Đọc `.claude/skills/feature-pipeline/SKILL.md` và chạy **chỉ** các bước trong `hang.buoc` (vd `F0–F2b`, `F3 BE`, `F3 FE`, `F4–F5`) với `hang.ma` (WP hạ tầng không mã ⇒ lý do ở `hang.noiDung`). G1/G2 "người duyệt" ⇒ theo M2: `decider` tạm duyệt khi mã không đỏ và DOCREV `DOC-OK`; mã đỏ ⇒ `PH blocked -Reason "G1/G2 cần người (danh sách đỏ)"`. Không có phần FE ⇒ hàng `F3 FE` `done` với bằng chứng "WP không có phần FE: <lý do từ SRS>". | Cổng G3 của `feature-pipeline` §3 (build 0 error + 0 warning mới · số ca test không giảm · FE nếu có · `kiem-tat-ca.ps1` exit 0) · bước `F4` ⇒ G4 · `F5` ⇒ G5 · test mới có `negative-control.ps1` đỏ→xanh (sau commit) |
 | `dong-wp` | F6 `ops` + G6: `pwsh -File tools/kiem-tat-ca.ps1 -DayDu` (**không** chạy song song build/test khác — máy dev từng hết bộ nhớ, N69) · `docs/ops/<MÃ>-deploy.md` có đường lùi · `07` §13 một dòng. Xanh ⇒ commit + push nhánh WP rồi **đưa vào nhánh tích hợp**: `git push origin <nhanh>:<nhanhTichHop>` (chỉ fast-forward; bị từ chối ⇒ **không** force, không merge, `PH dodang -Reason "nhánh tích hợp đã đi tiếp — cần người xem"`). | G6 exit 0 (số bước + thời gian) · G4/G5 của WP còn xanh · push lên `nhanhTichHop` thành công (SHA) |
+| `thao-luan` | **Phiên uỷ quyền có người ngồi cùng** (ngoại lệ duy nhất được hỏi — §3.1). Bộ chạy tự động **dừng** trước hàng này. | `D-xx` **ĐÃ CHỐT (người, phiên uỷ quyền <ngày>)** · hồ sơ uỷ quyền §2.1 có dòng ngoại lệ · `PH uyquyen` xong các hàng 👤 người đồng ý giao · người xác nhận tóm tắt |
+| `duyet-dec` | Hàng 👤 đã giao cho decider (`PH uyquyen`, theo `D-xx` của `thao-luan`): gọi `decider` **một lần** với đúng tiêu chí của `D-xx` + bằng chứng của cổng (G1: docreview `DOC-OK` của các mã vừa sửa; G2: `docs/features/**/<MÃ>-arch.md` + docreview của nó). Đạt mọi tiêu chí ⇒ thêm dòng vào `docs/bien-ban-tam-duyet-gd3-wp17-<ngày>.md` (khuôn bảng **y hệt** `docs/bien-ban-tam-duyet-gd3-a-*.md`: cột `Mã`, `Kết luận DEC` bắt đầu bằng `Tạm duyệt`; tiêu đề **"TẠM DUYỆT (DEC, uỷ quyền D-xx) — chưa phải biên bản người; chặn release tới khi kế toán duyệt lô M4; không merge `main`"**) + dòng hàng đợi `docs/agents/hang-doi-xem-lai.md`. Thiếu tiêu chí nào / decider `CHUYEN_NGUOI` ⇒ **không** tạm duyệt: `PH blocked -Reason "<tiêu chí thiếu>"`, ghi bảng chờ người. | biên bản tạm duyệt có dòng · `probe-cong-tai-lieu.ps1 -CheDo Code -WP <WP>` exit 0 · `kiem-link-tai-lieu.ps1` PASS |
 | `nguoi` | Không bao giờ do bạn làm hay đánh dấu xong (trừ §1 khi người trả lời kèm tệp). | — |
+
+### 3.1. Phiên uỷ quyền (`thao-luan`) — chủ dự án ngồi cùng
+
+Khuôn `U-02` của `.claude/skills/chay-phien/SKILL.md` §3.1, thu hẹp cho **một** WP:
+1. Mở đầu một câu: phiên hỏi gì, bao lâu (~30–60 phút), sau phiên decider được duyệt thay **những hàng 👤 nào**, và cái gì **vẫn** của người
+   (release: kế toán duyệt lô M4; merge `main`: biên bản người ký — `D-115` ⑤; vùng cấm `CLAUDE.md` §5 không đổi).
+2. `decider` (chế độ chuẩn bị, **không** ghi `decisions.md`): đọc hồ sơ uỷ quyền §2.1, các tài liệu trong `hang.ma`, các `D-xx` liên quan
+   (`07` cột "Cổng tài liệu" của WP) ⇒ trả **≤ 8 câu**, mỗi câu: tiêu chí duyệt thay đề xuất + khuyến nghị + rủi ro + chi phí lùi. Bộ câu tối thiểu:
+   giao G1 không · giao G2 không · tiêu chí bắt buộc (DOCREV `DOC-OK` 0 P1/P2 · không đổi `XC-001`/làm tròn · công thức theo đúng SRS ·
+   mọi tiền qua `Money` · ca test domain invariant K-06) · điều gì luôn chuyển người (lệch SRS về tiền, phá huỷ schema, đổi contract liên module).
+3. Hỏi bằng `AskUserQuestion` (≤ 4 câu/lượt, khuyến nghị **đứng đầu** ghi "(khuyến nghị)", mỗi câu tự đứng được).
+4. Ghi ngay (bạn ghi, người đang ngồi cùng): `docs/nhanh/decisions.md` một dòng `D-xx` (đọc lại để lấy số kế tiếp) — tiêu chí + phạm vi +
+   `reviewBefore = release`, trạng thái `ĐÃ CHỐT (người, phiên uỷ quyền <ngày>)`; `docs/agents/uy-quyen-chu-du-an.md` §2.1 thêm **một dòng
+   ngoại lệ** trỏ `D-xx` (không sửa dòng cũ). Người đồng ý giao hàng nào ⇒ `PH uyquyen -Id <hàng> -Evidence D-xx` cho đúng hàng đó.
+5. In tóm tắt ≤ ½ trang, hỏi xác nhận một lần ⇒ `PH done -Id <hàng thao-luan> -Evidence "D-xx; uyquyen <hàng…>"`. Người không giao ⇒ hàng 👤
+   giữ nguyên; người dừng giữa chừng ⇒ ghi phần đã chốt, `PH dodang`.
 
 **Migration:** áp bằng `dotnet run --project src/eCommerce.DbMigrator` (`dotnet ef database update` bị **cấm** trong `.claude/settings.json`). Trước **mọi** lần áp trên DB dev có dữ liệu ⇒
 `mkdir -p artifacts/pg-dump && docker exec ecommerce-postgres pg_dump -U ecommerce -Fc ecommerce > artifacts/pg-dump/N<x>-<hàng>.dump`

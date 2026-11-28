@@ -951,6 +951,47 @@
       "xongLuc": "2026-11-28T05:37:15+07:00"
     },
     {
+      "id": "U-17",
+      "dot": "WP-17",
+      "loai": "thao-luan",
+      "ma": [
+        "PRC-001",
+        "REP-003"
+      ],
+      "noiDung": "**Phiên uỷ quyền WP-17** (chủ dự án ngồi cùng ~30–60 phút): decider soạn câu hỏi + tiêu chí duyệt thay **G1** (sửa `rep-003` §0/Q11, `prc-001`, `inv-001`) và **G2** (ARCH giá vốn); người trả lời ⇒ `D-xx` ĐÃ CHỐT (người) mở rộng M2 cho WP-17 có điều kiện ⇒ `phien.ps1 uyquyen` `W17-0n`, `W17-1n`",
+      "vai": "ORCH · decider · chủ dự án ngồi cùng",
+      "dependsOn": [
+        "W23-5"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp17-gia-von",
+      "buoc": "phiên uỷ quyền WP-17",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
+      "id": "W17-q",
+      "dot": "WP-17",
+      "loai": "code",
+      "ma": [
+        "PRC-001"
+      ],
+      "noiDung": "Nợ `D-217` ④ (QA): `tools/probe-cong-tai-lieu.ps1` đọc biên bản người GĐ1 (`docs/bien-ban-duyet-gd1-*.md`, `Hình thức: DUYỆT` + cột `Mã`) làm nguồn ĐẠT cho `Code` và `MergeMain` + ca `-TuKiem` mới + ca ngược (mã không có trong biên bản nào ⇒ ĐỎ) + `Y9`; **cùng commit xoá** `docs/bien-ban-tam-duyet-gd3-guong-q5-2026-11-25.md`",
+      "vai": "qa",
+      "dependsOn": [
+        "U-17"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/gd3-wp17-gia-von",
+      "buoc": "F4 QA — nợ D-217 ④",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null
+    },
+    {
       "id": "W17-0",
       "dot": "WP-17",
       "loai": "doc-gate",
@@ -962,7 +1003,7 @@
       "noiDung": "Cổng tài liệu `D-186` ⑥: BA sửa `prc-001` §15.1/§20.4 + `inv-001` §0 + `rep-003` §0/Q11 **cùng nhánh** → DOCREV kiểm nhanh (REP-003 đỏ cứng ⇒ không tạm duyệt)",
       "vai": "ba · docrev",
       "dependsOn": [
-        "W23-5"
+        "W17-q"
       ],
       "status": "chua",
       "phien": [],

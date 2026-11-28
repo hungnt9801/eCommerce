@@ -293,7 +293,7 @@ try {
         if ($n.ma -ne 0) { Ghi "DUNG: chi con viec cua nguoi / bi chan — $($n.out)"; $maThoat = 3; break }
         $id = ($n.out -split "`r?`n")[-1].Trim()
         $hang = @((Get-Content -LiteralPath $reg -Raw -Encoding utf8 | ConvertFrom-Json).rows | Where-Object { $_.id -eq $id })[0]
-        if ($hang.loai -eq 'thao-luan') { Ghi "DUNG: hang $id can nguoi ngoi cung — mo cua so va dan /chay-phien $id"; $maThoat = 3; break }
+        if ($hang.loai -eq 'thao-luan') { Ghi "DUNG: hang $id can nguoi ngoi cung — mo cua so Claude Code va dan: $lenhPhien $id"; $maThoat = 3; break }
 
         $ban = TepBanNgoaiVung
         if ($ban.Count) {
