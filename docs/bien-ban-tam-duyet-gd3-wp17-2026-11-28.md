@@ -23,7 +23,15 @@
 
 Nếu `W17-0n` đối chiếu thấy hai vị trí trên lệch so với `D-318` C3 ⇒ **chữ ký vô hiệu**, quay lại người. DOCREV `REP-003` hiện có = `DOC-OK` (P1=0/P2=0) — **không** phải nguồn tạm duyệt của DEC.
 
+## G2 — Tạm duyệt tài liệu ARCH giá vốn `PRC-001` — hàng `W17-1n` (phiên `N115`, 28/11/2026) · [D-320](nhanh/decisions.md)
+
+| # | MÃ | Tài liệu | DOCREV | Kết luận DEC | Lý do | Điều kiện (trước WP code / trước release) | Người review bắt buộc còn thiếu |
+|---|---|---|---|---|---|---|---|
+| 1 | PRC-001 (ARCH) | [PRC-001-arch](features/pricing/PRC-001-arch.md) 557 dòng | [DOC-OK vòng 3](reviews/PRC-001-arch-docreview.md) · P1=0 · P2=0 · P3=10 | **Tạm duyệt (M2)** — chỉ để code **F3 `W17-2` trên nhánh WP** | Ngoài danh sách đỏ §2.1; ngoại lệ WP-17 cho G2 (hồ sơ §2.1 :39, `D-318` C4). `D-320`: C4 **7/7 ĐẠT** (additive · cột nullable · enum dải mới `D-17` · 0 chạm `XC-001`/`RoundingPolicy` · `Money` · 14 ca K-06 · bảng schema + revert); C5 **7/8 ĐẠT**; (vi) nửa thiết kế đạt, nửa máy (testplan) là **điều kiện cứng của `W17-4`** chứ không chặn G2 | `W17-2`: thêm `0014`/`0015` **sau `0011`** (`PricingErrorCodes.cs:58`); khoá `pricing:cost-sku:` đúng `XC-003`; khớp chữ `D-186` ② ở `prc-001` §20.4 cùng PR. `W17-4`: `check-agent-artifact -Kind testplan` exit 0 (14 ca K-06 + negative control) — **cấm** bỏ/nới ca. `Q4`/`PRC-001-AQ1` **giữ `Open`** (kế toán, M4/R3-3); `PRC-001-AQ2` (revision = phá huỷ unique) = người. Trước release: kế toán duyệt lô M4/R3-3 | Kiến trúc trưởng · **kế toán** (trước release) |
+
+> Dòng `PRC-001 (ARCH)` **không** thay dòng G1 `PRC-001` ở bảng trên (G1 = tài liệu `prc-001` §15.1/§20.4, `D-319`; G2 = thiết kế `PRC-001-arch.md`, `D-320`). `REP-003` **không** mở lại. Tạm duyệt mất hiệu lực nếu DOCREV ra `DOC-CHANGES` hoặc ARCH đổi mà không qua DOCREV.
+
 ## Tóm tắt
 
-- Tạm duyệt có điều kiện: **2/2** tài liệu trong phạm vi (`PRC-001`, `INV-001`). `REP-003` **chưa** (đỏ cứng — chữ ký người ở `W17-0n`).
-- **0/2** có chữ ký người. Lùi: xoá tệp này + dòng `D-319` ở `docs/nhanh/decisions.md` và `docs/agents/hang-doi-xem-lai.md` (`D-320 (thay thế D-319)` nếu chỉ rút tạm duyệt) ⇒ `probe-cong-tai-lieu -CheDo Code -WP WP-17` ĐỎ lại.
+- Tạm duyệt có điều kiện: **2/2** tài liệu G1 trong phạm vi (`PRC-001`, `INV-001`) + **G2** `PRC-001 (ARCH)` (`D-320`). `REP-003` **chưa** (đỏ cứng — chữ ký người ở `W17-0n`).
+- **0** dòng có chữ ký người. Lùi: xoá tệp này + dòng `D-319`/`D-320` ở `docs/nhanh/decisions.md` và `docs/agents/hang-doi-xem-lai.md` (`D-321 (thay thế D-319)` nếu chỉ rút tạm duyệt G1) ⇒ `probe-cong-tai-lieu -CheDo Code -WP WP-17` ĐỎ lại.
