@@ -1,0 +1,7 @@
+/*
+ * T0 — điền ở WP-42 (UI-42).
+ *
+ * Rỗng ở U41-2 để 0 đổi giao diện: `@import "@ecommerce/ui/tokens.css"` trong
+ * `apps/admin-web/app/globals.css` là no-op. Không chép token hiện có (đang ở
+ * `app/globals.css`) — WP-42 mới chuyển sang gói.
+ */

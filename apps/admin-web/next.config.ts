@@ -2,6 +2,8 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // Gói UI xuất source TS ⇒ Next phải transpile (`docs/ui/01-kien-truc-ui.md` §4.2).
+  transpilePackages: ["@ecommerce/ui"],
   // Cho phép build trong monorepo pnpm
   outputFileTracingRoot: undefined,
 

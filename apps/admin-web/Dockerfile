@@ -26,6 +26,7 @@ RUN corepack enable && corepack prepare pnpm@10.22.0 --activate
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 COPY apps/admin-web/package.json apps/admin-web/package.json
 COPY packages/api-client/package.json packages/api-client/package.json
+COPY packages/ui/package.json packages/ui/package.json
 
 # 📌 `--frozen-lockfile`: image phải dựng từ **đúng** lockfile đã commit — cài "trôi" trong image là
 #    nguồn gốc của *"máy dev chạy được, container không"*.
@@ -33,6 +34,7 @@ RUN pnpm install --frozen-lockfile
 
 # ② Mã nguồn thật.
 COPY packages/api-client packages/api-client
+COPY packages/ui packages/ui
 COPY apps/admin-web apps/admin-web
 
 # 🚨 `NEXT_PUBLIC_*` được **NHÚNG LÚC BUILD** — truyền bằng `build.args` (compose) hoặc `--build-arg`.
