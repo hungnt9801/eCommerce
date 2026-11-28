@@ -119,3 +119,54 @@ ghi ở handover §2 — **không** làm lại phần đã xong, **không** mở
 ---
 
 **Hàng rào agent** (phiên `N123`): `decider` ×1 (trả 2 quyết định `D-337`, `D-338` trong cùng phiên) · `ops` ×2 · `qa` ×3 (một lượt bị cắt ở **giới hạn 60 lượt**, tiếp ở lượt sau theo hướng dẫn của harness). Cảnh báo hook "thiếu khối JSON" cho `ops`/`qa`/`decider` = **dương tính giả đã biết** (khối JSON vẫn có trong báo cáo; `chanDungKhiThieuJson=false`). Hook `guard-shell` chặn `git checkout` ⇒ `qa` phục hồi 1 PNG bằng `git show HEAD:<path> > <path>` (byte-identical, `git diff --quiet` = 0). `git status` cuối: `tools/kiem-tat-ca.ps1`, `tools/test-cong-kiem.ps1`, `docs/ops/UI-41-deploy.md`, `apps/admin-web/e2e/visual/**` (2 tệp TS + 8 PNG), `docs/tests/UI-41-testplan.md`, `docs/nhanh/decisions.md` + `07` + handover, `docs/agents/**`, `agents/state/**` — đúng vùng.
+
+---
+
+## 8. Mở lại `U41-4` để chạy G6 (29/11/2026 — cùng N123, `/chay-phien-code chuoi=ui-1`)
+
+**Trạng thái: vẫn 🟨 — G6 CHƯA đạt (bước 10 chặn bởi DB dev bẩn, cần NGƯỜI). Không báo xanh một phần.**
+
+### 8.1 Đã gỡ 2 nút thắt môi trường (theo `D-339`)
+`decider` duyệt **`D-339` TẠM CHỐT** (phương án B): dừng đúng 2 PID dev + chạy cổng trong **worktree sạch** (không đụng 3 tệp launcher của người).
+- `Stop-Process` PID **22404** (dotnet, giữ DLL + cổng 54275) và **18936** (node, cổng 3000) ⇒ đã dừng; DLL mở-ghi = **UNLOCKED**, cổng 3000/54275 **FREE** (đo lại sau).
+- Worktree `--detach` tại `010335e` (`D:/Projects/Tools/eCommerce-g6-n123`) ⇒ `Y1` không còn thấy 2–3 tệp launcher gitignored của người.
+- `pnpm install --frozen-lockfile` (3m29s) · `npm ci` trong `tools/` (55s) · `pnpm --filter @ecommerce/admin-web build` sinh `.next/BUILD_ID` (chỉ bước `standalone` báo EPERM symlink — Windows không có quyền tạo symlink; `.next/` đã hoàn chỉnh, `standalone` là đầu ra THÊM, không ảnh hưởng `next start`/cổng).
+- `dotnet build eCommerce.slnx` làm nóng (0 error, 9 warning CS8604 có sẵn) để `kiem-moc-build -GhiNho` có DLL.
+- `pnpm gen:api` một lần để `schema.d.ts` về LF (bản checkout tươi là CRLF; cổng so SHA256 trước/sau ⇒ lần đầu báo DRIFT giả, sau đó idempotent).
+
+### 8.2 Cổng `-DayDu` trên worktree sạch — 9 bước XANH, DỪNG ở bước 10
+
+| Bước | Kết quả |
+|---|---|
+| ① dọn tiến trình/cổng | XANH (0 tiến trình, cổng 5000/5100 trống) |
+| ② build + kiểm mốc | XANH — `dotnet build` exit 0 · 0 lỗi · "Build DA VAO (mọi mốc đều đổi)" |
+| ③ unit test | XANH — **2691/2691** |
+| ④ integration test | XANH — **171/171** |
+| ⑤ mermaid | XANH — 214 khối, 0 lỗi |
+| ⑥ cổng tài liệu WP | XANH — WP-41 "không có mã tài liệu" (dùng `GITHUB_HEAD_REF=feat/ui-wp41-nen` cho worktree detached; tương đương `-WP WP-41`, không nới kiểm) |
+| ⑦ FE typecheck + Vitest | XANH — `tsc` 0 lỗi · **6 file/60 ca** |
+| ⑧ FE lint | XANH — 12 warning, **0 error** |
+| ⑨ gen:api không đổi `schema.d.ts` | XANH — 82/82 path, SHA256 trước=sau |
+| ⑩ bất biến DB | **ĐỎ** — `CusCustomers: conSong=46 · moCoi=45 · xoaMem=0` |
+
+### 8.3 Vì sao bước 10 đỏ — DB dev tích rác probe (không phải mã)
+- **45/46** khách còn sống là **mồ côi** (không chứng từ trỏ vào) — tên `Khách QA 2026…`, `Khách WP06…` — do probe/POS cũ để lại; đúng `D-53` ①c. 1 khách hợp lệ: `Khách WP06 583950`.
+- **0 FK** trỏ `CusCustomers` ⇒ xoá không vướng khoá ngoại; **0 dòng xoá mềm**.
+- `tools/kiem-db.ps1` in: "Xoá đúng những dòng đó — KHÔNG xoá khách có hoá đơn". Không có tool dọn sàn tổng quát.
+- **`decider` trả `CHUYEN_NGUOI`** (không ghi `D-340`): xoá dữ liệu khách là **vùng cấm** (decision-policy §3.2, ke-hoach-he-thong-agent §4.3 mục 4, uỷ quyền §6) — *có dump không* biến hành động thành được phép ⇒ **chỉ người** quyết.
+
+### 8.4 Đã chuẩn bị cho người (read-only/backup)
+- **Dump**: `artifacts/pg-dump/n124-U41-4.dump` — **1 579 639 byte** (`PGDMP`), `pg_dump -Fc`.
+- **45 dòng mồ côi + đếm tham chiếu**: `tools/_tam-kiem/g6-n123/orphans-CusCustomers.txt` (`Id | Name | CreationTime`).
+- **Log cổng**: `tools/_tam-kiem/g6-n123/wt-logs/*.log` (build, unit, integration, mermaid, fe-*, cong-tai-lieu, db…). Đều gitignored.
+
+### 8.5 Việc của NGƯỜI để đóng `U41-4` (một trong hai)
+1. **Duyệt xoá đúng 45 dòng mồ côi** (ID ở tệp 8.4): sau dump, chạy MỘT transaction — predicate ①c của `kiem-db.ps1:273-279`, `DELETE` **không CASCADE**, kiểm `count(*)` trước/sau = 45, lỗi FK ⇒ `ROLLBACK`; rồi `pwsh -File tools/kiem-db.ps1` phải `moCoi=0 · xoaMem=0`; rồi chạy lại `-DayDu` (worktree sạch, 20–40 phút). Hoặc uỷ quyền agent chạy đúng SQL đã duyệt.
+2. **Chạy cổng trên DB dùng-một-lần/CI** (hướng bền, `U42-4`/`U51-4`): người tạo + migrate DB (`V3` cấm agent `dotnet ef database update`).
+
+Cách chạy lại cổng (sau khi DB sạch): `git worktree add --detach D:/Projects/Tools/eCommerce-g6-n123 010335e`; trong worktree `pnpm install --frozen-lockfile` · `(cd tools && npm ci)` · `pnpm --filter @ecommerce/admin-web build` · `dotnet build eCommerce.slnx` · `pnpm gen:api` · đặt `GITHUB_HEAD_REF=feat/ui-wp41-nen` · `pwsh -File tools/kiem-tat-ca.ps1 -DayDu`. Xanh ⇒ `PH done` + `git push origin feat/ui-wp41-nen:tich-hop/ui` (FF).
+
+### 8.6 Dấu vết
+- `D-339` (TẠM CHỐT, DEC) + dòng `hang-doi-xem-lai.md`. Câu DB ⇒ `CHUYEN_NGUOI` (không `D-xx`).
+- Worktree gỡ sau khi chép log. 2 dev server của người đã dừng — khởi động lại bằng launcher sẵn có (không đổi byte nào).
+- **Không** sửa mã nguồn/ngưỡng/ca/cổng; **không** đụng 3 tệp launcher của người; **không** xoá dữ liệu.

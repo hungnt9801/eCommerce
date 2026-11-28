@@ -7,7 +7,7 @@
   "nhanhGoc": "tich-hop/gd3",
   "refs": "D-327",
   "ghiChu": "Chuỗi nền tảng UI (D-327): mỗi WP một nhánh cắt từ đỉnh tich-hop/ui; hàng loai=ui chạy theo .claude/skills/ui-pipeline; dong-wp đẩy fast-forward vào tich-hop/ui (M3); PR xếp chồng mở một lần cuối chuỗi (WP đầu → tich-hop/gd3).",
-  "capNhat": "2026-11-29T03:32:37+07:00",
+  "capNhat": "2026-11-29T04:13:18+07:00",
   "rows": [
     {
       "id": "U41-1",
@@ -83,14 +83,14 @@
       "dependsOn": [
         "U41-3"
       ],
-      "status": "do-dang",
+      "status": "bi-chan",
       "phien": [
         "N123"
       ],
       "nhanh": "feat/ui-wp41-nen",
       "buoc": "F6–G6",
       "evidence": null,
-      "ghiChu": "G6 -DayDu CHUA chay duoc: PID 22404 giu DLL + PID 18936 giu cong 3000 (D-335, chu nguoi/CI). F6 xong: 2 buoc cong (lint + so anh), test-cong-kiem 2 khoa, docs/ops/UI-41-deploy.md, 8 anh chuan (D-337/D-338). Cho host nha roi chay -DayDu va push FF tich-hop/ui.",
+      "ghiChu": "G6 CHUA DAT: -DayDu dung o buoc 10 (bat bien DB): DB dev co 45/46 CusCustomers mo coi (D-53) do probe cu — DEC CHUYEN_NGUOI (xoa du lieu khach = vung cam). Buoc 1-9 XANH tren worktree sach 010335e (build+kiem moc · unit 2691/2691 · integration 171/171 · mermaid 214/0 · cong tai lieu WP-41 XANH · FE typecheck 0 loi + vitest 60/60 · lint 0 error · gen:api khong doi schema.d.ts). Backup artifacts/pg-dump/n124-U41-4.dump (1579639B) + danh sach tools/_tam-kiem/g6-n123/orphans-CusCustomers.txt. Can NGUOI: duyet xoa 45 dong mo coi (SQL o handover-n123 §8.5) hoac chay CI/DB dung-mot-lan.",
       "handover": "docs/nhanh/handover-n123.md",
       "batDau": "2026-11-29T02:06:52+07:00",
       "xongLuc": null
