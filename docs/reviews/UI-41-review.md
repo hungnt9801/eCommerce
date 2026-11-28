@@ -1,0 +1,53 @@
+# Review code `UI-41` — 29/11/2026 (WP-41 bước `U41-3`, phiên N122) — **VÒNG 2**
+
+- Nhánh: `feat/ui-wp41-nen` · base `9d8e254` (đỉnh N121) · head **`6fd7aad`** (vá vòng 2)
+- Vòng 1 (head `8c7ec22`) đã bắt **P1**: 27 ảnh chuẩn chụp giao diện **KHÔNG CSS** ⇒ cổng visual xanh giả. QA vá ở `6fd7aad`.
+- Diff committed `9d8e254..HEAD`: **40 tệp, 1301 dòng text** (27 PNG binary tính riêng; 0 migration). Thêm tệp **untracked** `docs/reviews/UI-41-a11y.md` + `docs/reviews/UI-41-review.md` và **1 dòng NC-1v2** chưa commit trong `docs/tests/UI-41-testplan.md`. Vượt mốc ~600 dòng của K-04 **nhưng là hàng harness** (spec Playwright + testplan + 27 ảnh + dòng `D-331…D-336`), **không** phải mã sản phẩm — ghi nhận, không tính P2 phạm vi.
+- Nguồn: `docs/ui/00-kiem-ke.md` §1.4 (BR-01…BR-09) · `docs/ui/01-kien-truc-ui.md` §7 · `docs/tests/UI-41-testplan.md` · `docs/reviews/UI-41-a11y.md` · `D-49`, `D-327`, `D-329`…`D-336` · `ui-pipeline` §2–§3.
+
+## 1. Trạng thái P1 vòng 1 — ĐÃ ĐÓNG (kiểm bằng ảnh thật + mã, không tin lời)
+
+| Kiểm | Bằng chứng vòng 2 |
+|---|---|
+| Ảnh chuẩn CÓ CSS | **Read trực tiếp** `apps/admin-web/e2e/visual/__screenshots__/02-login.png` ⇒ card trắng bo góc trên nền xám nhạt, tiêu đề `eCommerce Admin`, 2 ô input viền, **nút "Đăng nhập" XANH `--brand`**, dòng chú thích dev — **KHÔNG** phải form trần như vòng 1. `03-dashboard.png` ⇒ **topbar tối**, **sidebar nhóm điều hướng** (Tổng quan/Hàng hoá/Kho/Bán hàng/Khuyến mãi/Khách hàng/Báo cáo), **card trắng** "Doanh thu 7 ngày" + "Đường đọc đã chạy được", chữ/bố cục thật; vùng dữ liệu động bị Playwright **tô khối magenta** (mask F-02). Tailwind đã áp. |
+| Sinh lại toàn bộ 27 ảnh | `git show --stat 6fd7aad` ⇒ **cả 27 PNG đổi kích thước** (vd `02-login` 13810→22547 B, `03-dashboard` 31337→88607 B, `18-settings-staff` 31958→94432 B) — nhất quán với "thêm CSS ⇒ nhiều pixel/màu". Không phải ảnh cũ giữ nguyên. |
+| Guard chống "ảnh trần" | `support/manhinh.ts` thêm `kiemCss(page)` (dòng 70–100): chèn `<div class="flex">` vào `body`, đọc `getComputedStyle(div).display` **và** `document.styleSheets.length`; `expect(soStyleSheet).toBeGreaterThan(0)` + `expect(kieuHienThi).toBe("flex")`, thông điệp "Trang KHÔNG nạp stylesheet nào…"/"Tailwind KHÔNG áp…". |
+| Guard chạy MỌI ca | `chup()` gọi `await kiemCss(page)` **trước** `toHaveScreenshot` (`manhinh.ts:115`). 27 ca đều đi qua `chup()`: `01-tinh.spec.ts:226` (vòng lặp `for (const ca of CAS)`, đếm được **19** slug) + `02-dong.spec.ts` **8** lời gọi `chup` (dòng 39/63/91/122/150/173/199/223) ⇒ **19 + 8 = 27**. Không có đường chụp nào bỏ qua guard. |
+| Guard ĐỎ được (chứng minh) | `docs/tests/UI-41-testplan.md` dòng NC-1v2: `$env:E2E_WEB='http://localhost:3100'; … --grep "#3 dashboard"` ⇒ `exit 1 (do) -> khoi phuc -> exit 0 (xanh)`. ORCH đã chạy trên server CSS-less (3000) ⇒ ĐỎ "Trang KHÔNG nạp stylesheet nào"; server **có CSS** (3100, `486d…css` 200/29002 B) ⇒ XANH. Guard không phải trang trí. |
+
+**Kết luận P1:** P1 vòng 1 **đã hết thật** — baseline giờ là giao diện CÓ CSS và guard chặn tái diễn "xanh giả". Không còn P1.
+
+## 2. Đã kiểm (vòng 2)
+
+| Nhóm | Kết quả |
+|---|---|
+| Phạm vi (ràng buộc hàng) | `git diff --name-only 9d8e254..HEAD` chỉ chạm `agents/state/**`, `apps/admin-web/e2e/visual/**`, `docs/agents/**`, `docs/nhanh/decisions.md`, `docs/tests/**` (+ untracked `docs/reviews/UI-41-a11y.md`). **Lọc phần còn lại = RỖNG** ⇒ **0 vi phạm phạm vi**. `playwright.config.ts` root, `e2e/tests/**`, `schema.d.ts`, `pnpm-lock.yaml`, `.claude/**`, mã sản phẩm `(app|components)`/`packages/ui/src` **không** đổi. |
+| Guard CSS (mã) | `manhinh.ts:70-100` + wiring `:115` như §1. Dùng `flex` (tiện ích **cấu trúc** Tailwind v4 chắc chắn có trong CSS đã build) thay `h-4` — chọn đúng, tránh đỏ giả; `position:fixed`+`visibility:hidden`+`div.remove()` nên **không** xê dịch trang trước khi chụp. |
+| F-02 = **P2** (không P1) | `maskChung` che cả `main table tbody` (`manhinh.ts:28`). Xác nhận **P2**, không P1: (a) đây là **giới hạn độ phủ của cổng test**, không phải đường gây lỗi production (không mất tiền/sai tồn/lộ dữ liệu); (b) phần **tiêu đề/card/nút/sidebar/topbar** vẫn KHÔNG mask ⇒ token `WP-42` đổi ở các bề mặt đó **vẫn đỏ**; (c) QA **đo được** lý do: DB không reset, fixture thêm dòng mỗi lượt ⇒ chiều cao `tbody` đổi ⇒ che từng ô vẫn lệch + lộ `runId`. **Đường lùi:** khi DB test được reset/cố định (U42-4/U51-4) ⇒ thu mask về ô biến động (số/ngày) + thêm khẳng định `getComputedStyle` cho vài ô đại diện (nền dòng/màu chữ). |
+| F-03 = **P2** (không P1) | `fullPage:false` (`manhinh.ts:136`). Xác nhận **P2**: chỉ so viewport 1440×900 ⇒ nội dung **dưới fold** (bảng/form dài) không được so. Không phải P1 (cùng lý do F-02 — giới hạn phủ, không gây lỗi production; nhiều route đã thấy thân trang trong viewport như `02-login`/`03-dashboard`). QA **đo được**: `fullPage:true` ⇒ **8/27 rồi 7/27 đỏ** vì chiều cao `tbody` biến đổi. **Đường lùi:** bật `fullPage:true` khi có DB tất định; hoặc khẳng định heading `main` nằm trong khung nhìn. |
+| a11y report trung thực | Đối chiếu **tay** `docs/reviews/UI-41-a11y.md` với `apps/admin-web/e2e/visual/.run/axe-summary.json` (tôi Read toàn tệp): `tong.dem` = **critical 2 / serious 27 / moderate 8 / minor 6**, `soViPham 43`, `soRouteQuet 27`, `soRouteBoQua 0`, `boQua []` — **khớp từng con số**. critical 2 = `18-settings-staff` label 107 + `12-pos-bill` label 3 (=110 node ✓); serious 27 = `color-contrast` 25 route (cộng node = **571** ✓) + `scrollable-region-focusable` 2 route (`05`,`10`); moderate 8 = `02`(3)+`04`+`09`+`10`+`11`+`15` ✓; minor 6 = `08`+`09`+`21`+`24`+`27`+`12` ✓. Tất cả critical/serious quy **`P1 (nền)`**, nêu rõ **"P1 do WP-41 gây ra = 0"** (WP-41 đổi 0 giao diện — xác nhận bằng diff). **Không che dấu nợ.** |
+| `D-331…D-336` | `D-331`: viewport 1440×900, dsf 1, `vi-VN`, `Asia/Ho_Chi_Minh`, `animations:disabled`, `maxDiffPixelRatio 0.001` — khớp `playwright.visual.config.ts`. `D-332`: kế thừa root (`import … from "../../playwright.config"` + spread), **không** sửa root, `globalSetup/Teardown: "../…"`, `snapshotPathTemplate` đúng; nhưng cờ `NH_VISUAL=1` **chưa** có trong mã ⇒ F-05 P3 (xem dưới). `D-333`: fixture qua API thật, đơn chỉ qua `gieoDonHang` (`D-49`), 0 route bỏ ⇒ 27/27 chụp được. `D-334`: nợ regex checker = người (không phải QA). `D-335`: `dotnet` env-blocked. `D-336`: giữ `@vitejs/plugin-react 6.3.0`, 0 đổi lockfile ⇒ ghi **P2/nit** (F-07). |
+| Negative control | `docs/tests/UI-41-testplan.md:119-120` có **2** mốc `exit` (NC-1 + NC-1v2: `exit 1 (do) -> khoi phuc -> exit 0 (xanh)`), thỏa `check-agent-artifact.ps1:96` (≥2). NC-1 (thêm `page.locator("main")` vào mask ⇒ ảnh đỏ) chứng minh phép so **thực sự so pixel**. |
+| Bảo mật | Harness test-only: fixture gọi API `Authorization: Bearer` server-side; tài khoản seed dev (`admin@abp.io`/`1q2w3E*`) mặc định `e2e/support/env.ts` — chấp nhận E2E dev, không commit secret mới; 0 rò token ra client. |
+
+**graph (Dò code bằng đồ thị):** `codegraph_explore "kiemCss chup maskChung maskChuoi"` ⇒ `maskChuoi` (`support/manhinh.ts:49`, 1 caller), `maskChung` (`support/manhinh.ts:26`, 3 caller: `01-tinh`+`02-dong`), xác nhận `kiemCss`/`chup` trong `manhinh.ts` và blast-radius chỉ chạm 2 spec visual (khớp wiring §1). Không chạm mã sản phẩm.
+
+## 3. Phát hiện (vòng 2)
+
+| # | Mức | Vị trí | Phát hiện | Bằng chứng | Khuyến nghị |
+|---|---|---|---|---|---|
+| F-01 | **Đã vá** (P1→0) | `__screenshots__/*.png` · `support/manhinh.ts:70-115` | **P1 vòng 1 đã đóng**: 27 ảnh giờ là giao diện CÓ CSS; guard `kiemCss` chạy mọi ca, đỏ khi CSS-less. | §1 (Read 2 PNG + `git show --stat 6fd7aad` + wiring 19+8=27 + NC-1v2 đỏ→xanh). | Không cần làm thêm; giữ guard khi mở rộng route. |
+| F-02 | P2 | `support/manhinh.ts:28` (`maskChung`) | Che **cả** `main table tbody` ⇒ bỏ sót thay đổi màu nền/chữ/viền dòng bảng khi `WP-42` đổi token. | Lý do đo (DB không reset) + phần đầu trang vẫn không mask ⇒ `WP-42` đổi token ở header/card/nút **vẫn đỏ**. | **Chấp nhận** trong `U41-3`; **đường lùi** khi DB tất định: thu mask về ô biến động + thêm `getComputedStyle` cho ô đại diện. |
+| F-03 | P2 | `support/manhinh.ts:136` (`fullPage:false`) | Chỉ so viewport 900px ⇒ nội dung dưới fold không được so. | `fullPage:true` ⇒ 8/27 rồi 7/27 đỏ (chiều cao `tbody` biến đổi). | **Chấp nhận**; **đường lùi** bật `fullPage:true`/khẳng định `main`-heading trong khung nhìn khi có DB tất định (U42-4/U51-4). |
+| F-07 | P2 (nit) | `packages/ui/package.json` · `pnpm-lock.yaml` | `@vitejs/plugin-react 6.3.0` có peer `vite ^8` trong khi stack dùng `vite 7.3.7`; Vitest hiện transform bằng **esbuild fallback** nên test vẫn xanh. Ghi theo nghĩa vụ `D-336` ("rev ghi P2/nit"). | `D-336` ① (giữ 6.3.0, 0 đổi lockfile phiên này). | **Không đổi** trong `U41-3`; rà/hạ `5.x` ở `WP-42` (Storybook) qua `D-xx` của `ds`. |
+| F-04 | P3 | `specs/01-tinh.spec.ts:18-19,216` | Kiểu `url: string \| null` + nhánh `if (ca.url === null)` **không bao giờ** chạy (mọi ca dùng `url` chuỗi) — nhánh/chú thích chết gây hiểu nhầm. | Ca login khai `url: "/login"`, không có `null` nào. | Bỏ nhánh `null` thừa (hoặc dùng đúng như chú thích). |
+| F-05 | P3 | `playwright.visual.config.ts` (toàn tệp) · `docs/nhanh/decisions.md:346` (`D-332`) | `D-332` ① nói "bật bằng env `NH_VISUAL=1`", nhưng **không** mã nào tham chiếu `NH_VISUAL` (grep = 0 ngoài `D-332`/`01-kien-truc-ui.md:295`); harness bật bằng `-c <config>`. Lệch quyết-định ↔ mã. | `grep -rn NH_VISUAL apps/admin-web docs tools` = chỉ tài liệu. | Cập nhật `D-332` (bật bằng `-c`) **hoặc** thêm `if (!process.env.NH_VISUAL) test.skip()` — chọn một nguồn sự thật. |
+| F-06 | P3 | `playwright.visual.config.ts:52` | `maxDiffPixelRatio 0.001` ≈1296 px chống khử răng cưa font, nhưng lệch **màu nhỏ trên chữ nhỏ** có thể lọt ngưỡng. | 1440×900 · 0.001. | Ghi chú là bề mặt đã biết; khi `WP-42` có mật độ token cân nhắc `maxDiffPixels` tuyệt đối + `stylePath` cho vùng trọng yếu. |
+
+## 4. Kết luận
+
+P1 vòng 1 **đã hết thật** (ảnh CÓ CSS + guard đỏ→xanh đã chứng minh) ⇒ **P1 = 0**, DoD `rev PASS P1=0` đạt. Phạm vi sạch (0 tệp ngoài hàng). F-02/F-03 xác nhận **P2 chấp nhận** kèm đường lùi (DB tất định ở U42-4/U51-4). Báo cáo a11y **trung thực** với `axe-summary.json` (43 vi phạm, mọi critical/serious là `P1 (nền)`, P1 do WP-41 = 0). `D-331…D-336` tuân thủ (D-332 cờ env = F-05 P3; D-336 = F-07 P2/nit). P2/P3 còn lại không chạm tiền/tồn/quyền/idempotency ⇒ **không chặn merge**.
+
+**Bài học `code-review` §9 được xác nhận (lần 2):** `54/54 passed` ở vòng 1 là xanh **giả** (baseline == lượt chạy, cả hai đều trần) — chỉ lộ khi review mở ảnh thật; vòng 2 có guard + ảnh CSS mới thực sự chứng minh được BR-06/D-331.
+
+VERDICT: PASS

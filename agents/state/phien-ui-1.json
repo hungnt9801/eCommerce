@@ -7,7 +7,7 @@
   "nhanhGoc": "tich-hop/gd3",
   "refs": "D-327",
   "ghiChu": "Chuỗi nền tảng UI (D-327): mỗi WP một nhánh cắt từ đỉnh tich-hop/ui; hàng loai=ui chạy theo .claude/skills/ui-pipeline; dong-wp đẩy fast-forward vào tich-hop/ui (M3); PR xếp chồng mở một lần cuối chuỗi (WP đầu → tich-hop/gd3).",
-  "capNhat": "2026-11-29T00:08:43+07:00",
+  "capNhat": "2026-11-29T02:03:53+07:00",
   "rows": [
     {
       "id": "U41-1",
@@ -61,17 +61,17 @@
       "dependsOn": [
         "U41-2"
       ],
-      "status": "dang-lam",
+      "status": "xong",
       "phien": [
         "N122"
       ],
       "nhanh": "feat/ui-wp41-nen",
       "buoc": "U3 kiểm",
-      "evidence": null,
+      "evidence": "qa: e2e/visual 27 route + 27 PNG (styled) + testplan BR9/9 + NC exit1->0; a11y UI-41-a11y PASS P1-do-WP41=0 (axe27=43 viol critical2/serious27 nen); rev UI-41-review PASS P1=0 (v1 P1 no-CSS -> v2 CSS guard fix); ORCH visual 54/54 2.2m; typecheck0 test60/60 lint0e12w; check-agent-artifact review x2 DAT decision DAT testplan KHONG-DAT chi SRS heading D-334; dotnet env-blocked D-335; D-331..D-336; SHA 67c26d6 8c7ec22 6fd7aad",
       "ghiChu": null,
-      "handover": null,
+      "handover": "docs/nhanh/handover-n122.md",
       "batDau": "2026-11-29T00:08:43+07:00",
-      "xongLuc": null
+      "xongLuc": "2026-11-29T02:03:53+07:00"
     },
     {
       "id": "U41-4",

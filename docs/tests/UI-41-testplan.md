@@ -117,6 +117,7 @@ card, nút xanh `--brand`, font, sidebar màu — **KHÔNG** phải form trần.
 |---|---|---|---|---|---|
 | NC-1 | `apps/admin-web/e2e/visual/specs/01-tinh.spec.ts` | `page.locator("main .grid.grid-cols-4"),` → `page.locator("main .grid.grid-cols-4"), page.locator("main"),` | `#3 dashboard` | chờ ORCH | chờ ORCH |
 | 2026-11-29 | NC-1 | apps/admin-web/e2e/visual/specs/01-tinh.spec.ts:44 | page.locator("main .grid.grid-cols-4"), -> page.locator("main .grid.grid-cols-4"), page.locator("main"), | pnpm --filter @ecommerce/admin-web exec playwright test -c e2e/visual/playwright.visual.config.ts --project=visual --grep "#3 dashboard" | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
+| 2026-11-29 | NC-1v2 | apps/admin-web/e2e/visual/specs/01-tinh.spec.ts:44 | page.locator("main .grid.grid-cols-4"), -> page.locator("main .grid.grid-cols-4"), page.locator("main"), | $env:E2E_WEB='http://localhost:3100'; pnpm --filter @ecommerce/admin-web exec playwright test -c e2e/visual/playwright.visual.config.ts --project=visual --grep "#3 dashboard" | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
 
 > **Vòng 2 (29/11/2026):** dòng đột biến NC-1 **vẫn còn nguyên** `page.locator("main .grid.grid-cols-4"),`
 > tại `01-tinh.spec.ts:44` ⇒ **giữ nguyên recipe**. Lưu ý khi ORCH chạy lại NC: **phải** đặt
