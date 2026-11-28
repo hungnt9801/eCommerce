@@ -25,7 +25,7 @@ export type Fixture = {
   order?: { id: string; number: string };
   stockBill?: { id: string; number: string };
   retailBill?: { id: string; number: string };
-  customer?: { id: string; name: string };
+  customer?: { id: string; name: string; phone: string };
   promotion?: { id: string; code: string; name: string };
   template?: { id: string; code: string; name: string };
   /** Khoá = slug route cần dữ liệu (`07-order-detail`, `15-print-bill`…). */
@@ -131,7 +131,7 @@ export async function taoFixture(): Promise<Fixture> {
       phone: dienThoai,
       idempotencyKey: `kh-${runId}`,
     });
-    fixture.customer = { id: khach.id, name: khach.name };
+    fixture.customer = { id: khach.id, name: khach.name, phone: dienThoai };
   } catch (e) {
     ghiLoi(fixture.loi, "17-customer-detail", e);
   }

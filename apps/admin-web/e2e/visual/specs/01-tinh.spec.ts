@@ -55,8 +55,13 @@ const CAS: Ca[] = [
       await expect(page.getByPlaceholder("Tên, mã sản phẩm, SKU…")).toBeVisible();
       await expect(page.getByRole("button", { name: "Lọc" })).toBeVisible();
     },
-    // Badge đếm của tab "Tất cả" không mang `.tabular`.
-    mask: (page) => [page.locator("main a span.rounded-full")],
+    // Badge đếm của tab "Tất cả" + dòng tab: số hồ sơ tăng mỗi lượt ⇒ nhãn tab dịch ⇒ đỏ giả nếu chỉ che badge.
+    // Che cả dòng tiêu đề (h1 + tổng) và dòng tab để bề rộng không đổi giữa các lượt (F-02 P2 chấp nhận).
+    mask: (page) => [
+      page.locator("main .flex.flex-wrap.items-center.gap-2"),
+      page.locator("main .flex.flex-wrap.gap-1"),
+      page.locator("main a span.rounded-full"),
+    ],
   },
   {
     slug: "05-product-inventory",

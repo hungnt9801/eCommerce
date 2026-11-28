@@ -30,8 +30,11 @@ test("#12 pos/bill — quầy bán lẻ (kho fixture)", async ({ page }) => {
   await page.goto(duongPos(fixture));
 
   await expect(page.getByRole("heading", { name: "Bán lẻ tại quầy" })).toBeVisible();
-  // POS mở ở trạng thái CHƯA có tab hoá đơn (ô quét SP chỉ hiện sau khi bấm F1) — khẳng định đúng màn hiện tại.
-  await expect(page.getByText("Chưa có tab hoá đơn")).toBeVisible();
+  // 📌 Terminal tự mở **một tab hoá đơn nháp** sau khi có ca (fixture mở ca bằng ca thật của tenant) ⇒
+  // màn hiện tab trống "Chưa có món nào…", KHÔNG phải trạng thái "Chưa có tab". Khẳng định nút mở tab +
+  // dòng bảng trống — có mặt bất kể dữ liệu lượt chạy, chứng minh terminal đã render (ca không rỗng).
+  await expect(page.getByRole("button", { name: /\+ HĐ mới/ })).toBeVisible();
+  await expect(page.getByText("Chưa có món nào")).toBeVisible();
 
   await chup(
     page,
@@ -90,6 +93,14 @@ test("#10 inventory/bill/[id] — chi tiết phiếu kho (đã ghi sổ)", async
     "10-inventory-bill-detail.png",
     mask(page, [
       page.locator("main h1"),
+      // 🔴 Fixture là **entity MỚI mỗi lượt** (số phiếu, ngày tạo, SKU, kho, tồn) ⇒ nội dung thẻ + bảng
+      // biến động. Che breadcrumb + dòng tiêu đề/trạng thái + thẻ thông tin + bảng + mục tồn hiện tại
+      // (giữ chrome/nút ngoài các vùng này) — F-02 P2 chấp nhận.
+      page.locator("main .flex.items-center.gap-2").first(),
+      page.locator("main .flex.items-center.gap-3").first(),
+      page.locator("main .nh-card"),
+      page.locator("main table"),
+      page.locator("main section", { hasText: "Tồn kho hiện tại" }),
       ...maskChuoi(page, [phieu.number, `PN-${fixture.runId}`, `${fixture.warehouse.code} — ${fixture.warehouse.name}`]),
     ]),
   );
@@ -112,11 +123,12 @@ test("#11 inventory/bill/print?ids= — mẫu in phiếu kho", async ({ page }) 
     page,
     "11-inventory-bill-print.png",
     mask(page, [
-      // "Số: <số phiếu> · Ngày <thời điểm> · <trạng thái>" — một dòng ghép, không tách phần tử.
-      page.getByText(/^Số: .* · Ngày .* · /),
+      // Dòng "Số: <số> · Ngày <thời điểm> · <trạng thái>" — phần tử ghép, che cả khối tiêu đề giữa.
+      page.locator("section .text-center > div").nth(1),
+      // Ô "Kho: <mã> — <tên>" (kho fixture mỗi lượt) — con đầu của lưới thông tin.
+      page.locator("section > div.grid > div").first(),
       // "<số> phiếu · mẫu in cố định …" trên thanh công cụ.
       page.getByText(/phiếu · mẫu in cố định/),
-      page.getByText(/^Kho: /),
       ...maskChuoi(page, [phieu.number, `${fixture.warehouse.code} — ${fixture.warehouse.name}`]),
     ]),
   );
@@ -161,7 +173,13 @@ test("#17 customer/[id] — chi tiết khách (5 tab)", async ({ page }) => {
   await chup(
     page,
     "17-customer-detail.png",
-    mask(page, [page.locator("main h1"), ...maskChuoi(page, [khach.name])]),
+    mask(page, [
+      // Khách là fixture mới mỗi lượt: tên/SĐT/ngày tạo/điểm… biến động. Che dòng tiêu đề + thẻ thông tin.
+      page.locator("main .flex.flex-wrap.items-center.gap-2").first(),
+      page.locator("main .nh-card"),
+      page.locator("main h1"),
+      ...maskChuoi(page, [khach.name, khach.phone]),
+    ]),
   );
 });
 
@@ -181,7 +199,11 @@ test("#23 promotion/[id] — chi tiết khuyến mãi", async ({ page }) => {
   await chup(
     page,
     "23-promotion-detail.png",
-    mask(page, maskChuoi(page, [km.code, km.name])),
+    mask(page, [
+      // Thẻ thông tin (mã/ngày bắt đầu–kết thúc/trần lượt) là dữ liệu fixture mỗi lượt.
+      page.locator("main .nh-card").first(),
+      ...maskChuoi(page, [km.code, km.name]),
+    ]),
   );
 });
 

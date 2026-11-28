@@ -31,7 +31,7 @@
 |---|---|
 | Route trang có giao diện | **27** (19 tĩnh + 8 động; bỏ #1 `/` redirect) |
 | Ảnh chuẩn đã sinh | **27** tệp `apps/admin-web/e2e/visual/__screenshots__/*.png` |
-| Ca Playwright (lần chạy sạch, không `--update`) | **54 passed / 0 failed / 0 skipped** (27 ảnh + 27 axe) |
+| Ca Playwright (lần chạy sạch, không `--update`) — **vòng 2 trên server 3100** | **54 passed / 0 failed / 0 skipped** × **2 lần liên tiếp** (mỗi lần 27 ảnh + 27 axe) |
 | Ca tĩnh | `specs/01-tinh.spec.ts` — 19 ca (`02-login` … `28-notifications-batches`) |
 | Ca động | `specs/02-dong.spec.ts` — 8 ca (`12-pos-bill` … `26-template-detail`) |
 | Phép đo cố định (`D-331`) | viewport 1440×900 · dsf 1 · `locale vi-VN` · `timezoneId Asia/Ho_Chi_Minh` · `animations: disabled` · `maxDiffPixelRatio 0.001` |
@@ -45,9 +45,41 @@
 bố cục/màu/nhãn, không đỏ giả theo dữ liệu lượt chạy. Tiêu đề/tab/nhãn/khung/màu token **không** mask (WP-42
 đổi token ⇒ ảnh **phải** đỏ).
 
+**Vòng 2 — F-02 (mask quá rộng) — P2 chấp nhận:** `main table tbody` **giữ nguyên** (không thu hẹp về ô).
+Lý do đo được: DB không reset, mỗi lượt `global-setup`/`taoFixture` **thêm dòng** ⇒ **số dòng** bảng danh
+sách tăng giữa các lượt ⇒ chiều cao `tbody` đổi ⇒ mask từng ô vẫn lệch (và lộ giá trị `runId`). Vì vậy che cả
+`tbody` là điều kiện tất định. Bù lại, các trang chi tiết dựng fixture mới mỗi lượt (`10`, `11`, `17`, `23`) che
+thêm dòng tiêu đề/trạng thái + thẻ thông tin + bảng + mục tồn hiện tại; trang danh sách `16` che cả dòng tiêu đề
+và dòng tab (bề rộng tab đổi theo badge đếm) — **đã ghi rõ** để cổng CI biết đây là mask hạ tầng, không phải
+mask bố cục.
+
 ⚠️ **Rủi ro font (đã ghi `D-331`, `playwright.visual.config.ts`):** ảnh sinh trên **Windows**. Khi cổng
 visual vào CI Linux (`U42-4`/`U51-4`) phải **tái sinh** ảnh chuẩn trên Linux — font Segoe UI/Inter fallback
 khác ⇒ lần đầu trên Linux dự kiến đỏ đều; đó là chuyển nền tảng, không phải hồi quy giao diện.
+
+## 2.1. Vòng 2 — vá P1 "ảnh trang KHÔNG có CSS" (rev bắt) + F-03
+
+**Nguyên nhân P1 (đã xác minh bằng PNG + HTTP):** 27 ảnh vòng 1 chụp từ server cũ (PID 18936, build cũ) phục vụ
+HTML trỏ `/_next/static/css/d659…css`, nhưng `.next` đã thay bằng `486d…css` ⇒ CSS **404** ⇒ ảnh là **form trần /
+sidebar `<ul>`**. Cổng so ảnh vẫn "xanh" vì ảnh chuẩn cũng trần ⇒ **BR-06/D-331 "đổi token ⇒ ảnh đỏ" bất khả
+thi** (cổng xanh giả). PID 18936 không kill được (access denied); ORCH dựng server **MỚI** `next start -p 3100`
+(PID 26472): `http://localhost:3100/login` HTTP 200, CSS `486d…css` HTTP 200 **29002 bytes**.
+
+**Cách vá trong harness (phạm vi QA):**
+- **GUARD CSS** (`support/manhinh.ts` → `kiemCss`, gọi trong `chup()` **mọi ca**): chèn `<div class="flex">` dò
+  vào `body`, đọc `getComputedStyle(display)`. Tailwind áp ⇒ `.flex{display:flex}` ⇒ **`display === "flex"`**;
+  đồng thời `document.styleSheets.length > 0`. Không áp ⇒ **ca ĐỎ ngay** với thông điệp "trang chưa có CSS:
+  build/server sai". (Dùng `flex` **cấu trúc** thay `h-4`/`w-4` vì Tailwind v4 không sinh `h-4` trong CSS đã
+  build ⇒ guard `h-4` sẽ đỏ giả.)
+- Chạy Playwright với `E2E_WEB=http://localhost:3100` (`reuseExistingServer:true` tái dùng server mới).
+
+**F-03 (chụp toàn trang) — P2 chấp nhận, `fullPage:false`:** đã thử `fullPage:true`; ghi nhận **8/27 rồi 7/27
+ca đỏ** vì trang danh sách có `tbody` dài biến đổi dưới màn hình (cùng lý do F-02) ⇒ **không tất định**. Giữ
+viewport 1440×900 tất định; hồi quy nội dung cuộn xử lý ở cổng visual CI (`U42-4`/`U51-4`) khi có DB tất định.
+
+**Số đo vòng 2 (server 3100):** sinh lại **27/27** ảnh (`--update-snapshots` → 54 passed) · chạy sạch **54/54**
+× **2 lần** liên tiếp (không `--update`) ⇒ tất định. Ảnh `02-login.png`/`03-dashboard.png` đã mở kiểm: có nền,
+card, nút xanh `--brand`, font, sidebar màu — **KHÔNG** phải form trần.
 
 ## 3. Chiến lược fixture (`D-333`) + route chưa chụp
 
@@ -86,6 +118,12 @@ khác ⇒ lần đầu trên Linux dự kiến đỏ đều; đó là chuyển n
 | NC-1 | `apps/admin-web/e2e/visual/specs/01-tinh.spec.ts` | `page.locator("main .grid.grid-cols-4"),` → `page.locator("main .grid.grid-cols-4"), page.locator("main"),` | `#3 dashboard` | chờ ORCH | chờ ORCH |
 | 2026-11-29 | NC-1 | apps/admin-web/e2e/visual/specs/01-tinh.spec.ts:44 | page.locator("main .grid.grid-cols-4"), -> page.locator("main .grid.grid-cols-4"), page.locator("main"), | pnpm --filter @ecommerce/admin-web exec playwright test -c e2e/visual/playwright.visual.config.ts --project=visual --grep "#3 dashboard" | exit 1 (do) -> khoi phuc -> exit 0 (xanh) |
 
+> **Vòng 2 (29/11/2026):** dòng đột biến NC-1 **vẫn còn nguyên** `page.locator("main .grid.grid-cols-4"),`
+> tại `01-tinh.spec.ts:44` ⇒ **giữ nguyên recipe**. Lưu ý khi ORCH chạy lại NC: **phải** đặt
+> `E2E_WEB=http://localhost:3100` trong `-TestCommand` để trỏ server có CSS (nếu trỏ server cũ 3000 ⇒ guard
+> CSS ném lỗi trước cả phép so ảnh, không chứng minh được pixel-diff). Guard CSS vòng 2 là lớp bảo vệ **bổ
+> sung**, không thay NC-1.
+
 - **Mô tả NC-1:** thêm `main` vào mặt nạ của ca dashboard ⇒ toàn bộ vùng nội dung bị tô khối ⇒ ảnh chụp
   lệch so với `03-dashboard.png` quá `maxDiffPixelRatio 0.001` ⇒ ca **PHẢI ĐỎ**; khôi phục ⇒ **PHẢI XANH**.
   Đây chứng minh phép so ảnh (BR-06) **thực sự so pixel**, không phải ca rỗng.
@@ -101,19 +139,27 @@ khác ⇒ lần đầu trên Linux dự kiến đỏ đều; đó là chuyển n
     -Testplan docs/tests/UI-41-testplan.md -Id NC-1
   ```
 
-## 5. Cổng (số đo thực thi 28/11/2026)
+## 5. Cổng (số đo thực thi — vòng 2, 29/11/2026, server 3100)
 
 | Cổng | Lệnh | Kết quả |
 |---|---|---|
 | Typecheck | `pnpm --filter @ecommerce/admin-web typecheck` | **exit 0** (0 lỗi) |
 | Lint | `pnpm --filter @ecommerce/admin-web lint` | **0 error** · 12 warning (bằng nền `U41-2`, không tăng) |
 | Vitest | `pnpm --filter @ecommerce/admin-web test` | **60/60 passed** (6 tệp) — không đổi so `U41-2` |
-| Visual (sạch) | `playwright test -c e2e/visual/playwright.visual.config.ts` | **54/54 passed** (27 ảnh + 27 axe) |
-| Ảnh chuẩn | `__screenshots__/` | **27** tệp PNG |
+| Visual (sạch ×2) | `E2E_WEB=http://localhost:3100 playwright test -c e2e/visual/playwright.visual.config.ts` | **54/54 passed** × **2 lần liên tiếp** (27 ảnh + 27 axe) |
+| Ảnh chuẩn | `__screenshots__/` | **27** tệp PNG (đã sinh lại có CSS trên server 3100) |
 
 ## 6. Chưa phủ / nợ
 
 - Tầng Domain/Application/API (K-06): **không áp dụng** — `U41-3` không thêm luật nghiệp vụ.
+- **F-02 (mask rộng) — P2 chấp nhận:** `main table tbody` giữ nguyên do số dòng bảng tăng giữa các lượt (DB không
+  reset). Các trang chi tiết dựng fixture mới mỗi lượt che thêm header/thẻ/bảng. Chi tiết + lý do ở §2.
+- **F-03 (fullPage) — P2 chấp nhận:** `fullPage:true` gây 8/7 ca đỏ (chiều cao `tbody` biến đổi) ⇒ giữ viewport
+  1440×900. Chi tiết ở §2.1.
+- **`check-agent-artifact.ps1 -Kind testplan`:** script tách mục `## 1.` của SRS bằng regex `^##\s+1\.`, nhưng
+  tài liệu `docs/ui/00-kiem-ke.md` đánh số mục kiểu `## §1.` (có ký tự `§`) ⇒ script đọc §1 rỗng, báo
+  "SRS không có BR ở §1". Đây là **lệch định dạng công cụ ↔ tài liệu** (không phải testplan thiếu BR: §1 ở
+  trên phủ đủ BR-01…BR-09). Vá thuộc `tools/`/`docs/ui/**` — **ngoài vùng ghi QA**, ghi lại để ORCH xử lý.
 - Ảnh chuẩn sinh trên **Windows** ⇒ phải tái sinh trên Linux khi dựng cổng visual CI (`U42-4`/`U51-4`).
 - Báo cáo a11y chi tiết (theo mức + `file:dòng`) là việc của vai `a11y` (`docs/…UI-41-a11y.md`); testplan này
   chỉ cung cấp `axe-summary.json` làm nguyên liệu.
