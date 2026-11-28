@@ -35,6 +35,20 @@ namespace eCommerce.Pricing;
 /// </summary>
 public class CostEngineService : ITransientDependency
 {
+    /// <summary>
+    /// 🆕 **`D-325` — MỐC ĐẦU LỊCH SỬ CỦA ĐẦU VÀO TÍNH GIÁ VỐN (MỘT CHỖ):** mọi lượt tính nạp chuyển động
+    /// `[DauLichSu, to]` (**replay toàn lịch sử**), KHÔNG nạp `[from, to]`; `from` chỉ là mốc dưới của **kỳ được
+    /// ghi/đối soát** (xem <see cref="DoiSoatAsync"/>). Cắt cửa sổ tính ⇒ SKU có tồn/nhập TRƯỚC `from` bị tính
+    /// bình quân trên cửa sổ ⇒ **đơn giá sai** (`docs/reviews/PRC-001-review.md` #1).
+    ///
+    /// 📌 Vì sao `2000-01-01` và **KHÔNG** `DateOnly.MinValue`/`0001-01-01`: mốc này an toàn trước toàn bộ dữ liệu
+    /// của app (dữ liệu bắt đầu 2026), nhưng `CostFeedLookupAdapter.LayChuyenDongAsync` trừ 7 giờ trên
+    /// `new DateTime(y, m, d, 0, 0, 0, Utc)` để đổi sang **ngày kinh doanh UTC+7** ⇒ `0001-01-01` **underflow**
+    /// (`ArgumentOutOfRangeException`). `2000-01-01 00:00Z − 7h = 1999-12-31T17:00Z` hợp lệ; adapter vẫn lọc lại
+    /// theo ngày kinh doanh UTC+7 nên không kéo dữ liệu ngoài phạm vi.
+    /// </summary>
+    public static readonly DateOnly DauLichSu = new(2000, 1, 1);
+
     private static readonly TimeSpan ChoKhoaToiDa = TimeSpan.FromSeconds(30);
 
     private readonly IRepository<CostEngineRun, Guid> _runs;
@@ -71,6 +85,8 @@ public class CostEngineService : ITransientDependency
 
     /// <summary>
     /// Chạy động cơ cho khoảng ngày kinh doanh `[from, to]` (UTC+7).
+    /// 📌 **`D-325`:** `from`/`to` là mốc của **kỳ ĐƯỢC GHI/đối soát** — **KHÔNG** cắt đầu vào tính: chuyển động
+    /// luôn nạp `[<see cref="DauLichSu"/>, to]` (<c>TinhBinhQuanGiaQuyenDiDong</c> phụ thuộc toàn bộ lịch sử).
     /// Trả `null` khi động cơ **đang tắt** (`Pricing:GiaVonDongCo = false`); cấu hình sai ⇒ **NÉM `0014`**.
     /// </summary>
     public async Task<CostEngineRun?> ChayAsync(DateOnly from, DateOnly to, string trigger)
@@ -227,10 +243,14 @@ public class CostEngineService : ITransientDependency
         return runChot;
     }
 
+    /// <param name="from">Mốc dưới của **kỳ ĐƯỢC GHI/đối soát** — **KHÔNG** cắt đầu vào tính (`D-325`).</param>
+    /// <param name="to">Mốc trên (ngày kinh doanh UTC+7) của chuyển động cần nạp và của kỳ được ghi.</param>
     private async Task<ThongKe> XuLyAsync(
         Guid runId, DateOnly from, DateOnly to, bool choNhapLuiNgay, IRoundingPolicy chinhSachLamTron)
     {
-        var chuyenDongInventory = await _feed.LayChuyenDongAsync(from, to);
+        // 📌 `D-325`: đầu vào tính LUÔN là `[DauLichSu, to]` (replay toàn lịch sử) — bình quân di động phụ thuộc
+        //    TOÀN BỘ lịch sử; nạp `[from, to]` làm SKU có tồn/nhập trước `from` bị tính trên cửa sổ ⇒ đơn giá sai.
+        var chuyenDongInventory = await _feed.LayChuyenDongAsync(DauLichSu, to);
 
         // Ánh xạ DTO (Contracts) → kiểu GIÁ TRỊ nội bộ Domain Pricing (KHÔNG kéo entity Inventory).
         var chuyenDong = chuyenDongInventory.Select(AnhXa).ToList();
@@ -260,7 +280,7 @@ public class CostEngineService : ITransientDependency
                 thongKe.FlaggedMissing++;
             }
 
-            await DoiSoatAsync(runId, sku, ketQua, choNhapLuiNgay, chinhSachLamTron, thongKe);
+            await DoiSoatAsync(runId, sku, from, ketQua, choNhapLuiNgay, chinhSachLamTron, thongKe);
         }
 
         return thongKe;
@@ -269,6 +289,7 @@ public class CostEngineService : ITransientDependency
     private async Task DoiSoatAsync(
         Guid runId,
         string sku,
+        DateOnly from,
         KetQuaTinhGiaVon ketQua,
         bool choNhapLuiNgay,
         IRoundingPolicy chinhSachLamTron,
@@ -278,6 +299,13 @@ public class CostEngineService : ITransientDependency
 
         foreach (var ky in ketQua.CacKy)
         {
+            // 📌 `D-325`: `from` = mốc dưới của kỳ ĐƯỢC GHI ⇒ kỳ trước `from` KHÔNG thuộc lượt này (đầu vào tính
+            //    vẫn là `[DauLichSu, to]`). Kỳ chưa có dòng ⇒ lookup trả `null` + `costMissing` (fail-closed,
+            //    KHÔNG phải số sai) cho tới lượt job đầy đủ — v1 KHÔNG tự phục hồi (`D-322`).
+            if (ky.EffectiveFrom < from)
+            {
+                continue;
+            }
             // 🔒 Làm tròn CHỈ ở biên ra (`XC-001`/`IRoundingPolicy`) — hàm thuần giữ số chính xác.
             var giaTri = chinhSachLamTron.Round(ky.GiaBinhQuan);
 

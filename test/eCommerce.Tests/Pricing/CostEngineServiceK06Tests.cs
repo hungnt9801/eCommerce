@@ -20,12 +20,18 @@ namespace eCommerce.Tests.Pricing;
 /// `K06-08` (cùng `RunKey` xong ⇒ trả run cũ), `K06-08b` (`DangChay` ⇒ bận; `Loi` ⇒ `Attempt++`),
 /// `K06-11` (setting sai ⇒ NÉM `0014`), `K06-13` (kỳ đã duyệt bất biến) và ca `0014` tiền tệ nhập khác VND.
 ///
+/// 🆕 **`K06-14` (`D-325`, sửa P1 review #1):** cửa sổ chạy bắt đầu **GIỮA lịch sử** ⇒ bình quân của kỳ trong
+/// cửa sổ **PHẢI gộp cả chuyển động TRƯỚC `from`** (engine nạp `[DauLichSu, to]`); và `from` **CHỈ** là mốc dưới
+/// của **kỳ được ghi** — lượt `from = Ngay1` **KHÔNG** ghi/đổi kỳ `EffectiveFrom = Ngay0`.
+///
 /// 📌 Ca **bền vững của sổ run qua rollback UoW ngoài** (`K06-08b`) đo ở tầng PostgreSQL thật, xem
 /// `PostgreSqlPricingCostEngineTests` — ở đây đo **nhánh trạng thái** trên hợp đồng đọc/ghi.
 /// </summary>
 public class CostEngineServiceK06Tests
 {
+    private static readonly DateOnly Ngay0 = new(2025, 12, 31);
     private static readonly DateOnly Ngay1 = new(2026, 1, 1);
+    private static readonly DateOnly Ngay2 = new(2026, 1, 2);
     private const string RunKey = "cost:null:2026-01-01:2026-01-01:Manual";
 
     private static DateTime Luc(DateOnly ngay, int gio = 1)
@@ -302,5 +308,138 @@ public class CostEngineServiceK06Tests
         Assert.Equal(0, run.RowsSkippedApproved);
         Assert.Equal(100_000m, daDuyet.AmountValue);
         Assert.Equal(0, bo.GiaVon.SoLanSua);
+    }
+
+    // ── K06-14: cửa sổ chạy bắt đầu GIỮA lịch sử ⇒ replay toàn bộ (`D-325`) ──────────────────────
+
+    /// <summary>
+    /// 🆕 **K06-14 (`D-325`)** — SKU có nhập `Ngay0` **100 @ 10** (TRƯỚC `from`) và `Ngay1` **10 @ 20**; chạy
+    /// `[Ngay1, Ngay1]` ⇒ kỳ `Ngay1` phải mang bình quân gộp cả lịch sử `(100·10 + 10·20)/110 ≈ 10,909…`
+    /// (làm tròn `IRoundingPolicy` của VND = **11**), **KHÔNG** phải `20`.
+    ///
+    /// 📌 Đỏ khi engine nạp `(from, to)` thay vì `(DauLichSu, to)` (NC-7): fake `FeedGia` lọc theo `from/to`
+    /// nên chỉ còn `10 @ 20` ⇒ ghi `20`. So sánh tiền qua `Money.CompareTo` (BR-002), không `==` trên `decimal`.
+    /// </summary>
+    [Fact]
+    public async Task K06_14_cua_so_bat_dau_giua_lich_su__replay_toan_bo()
+    {
+        var bo = new Bo();
+        bo.Feed.CacChuyenDong.Add(Nhap("SKU-1", Ngay0, 100m, 10m)); // NGOÀI cửa sổ ghi [Ngay1, Ngay1]
+        bo.Feed.CacChuyenDong.Add(Nhap("SKU-1", Ngay1, 10m, 20m));
+
+        var run = await bo.Sut.ChayAsync(Ngay1, Ngay1, "Manual");
+
+        Assert.NotNull(run);
+        Assert.Equal(TrangThaiChayDongCo.ThanhCong, run!.TrangThai);
+
+        // `DoiSoatAsync` chỉ ghi kỳ `EffectiveFrom >= from` ⇒ đúng MỘT dòng, tại `Ngay1`.
+        var ky = Assert.Single(bo.GiaVon.TatCa);
+        Assert.Equal(Ngay1, ky.EffectiveFrom);
+        Assert.Null(ky.EffectiveTo);
+
+        // (100·10 + 10·20) / 110 = 1200/110 ≈ 10,909…; VND 0 chữ số thập phân + half-away-from-zero ⇒ 11.
+        var binhQuanGopCaHaiNgay = Money.Vnd(100m * 10m + 10m * 20m) / 110m;
+        var mongDoi = new RoundHalfAwayFromZeroPolicy().Round(binhQuanGopCaHaiNgay);
+
+        Assert.Equal(0, ky.Amount.CompareTo(mongDoi)); // qua Money, KHÔNG `==` decimal
+        Assert.Equal(0, ky.Amount.CompareTo(Money.Vnd(11m))); // = làm tròn của 1200/110
+
+        // Chốt lỗi P1: giá trị `20` = cửa sổ cắt mất lịch sử ⇒ PHẢI KHÁC.
+        Assert.NotEqual(0, ky.Amount.CompareTo(Money.Vnd(20m)));
+
+        Assert.Equal(1, run.RowsUpserted);
+        Assert.Equal(0, run.RowsSkippedApproved);
+    }
+
+    /// <summary>
+    /// 🆕 **K06-14 ca phụ (`D-325`)** — cùng dữ liệu cửa sổ giữa lịch sử, nhưng kỳ `EffectiveFrom = Ngay0`
+    /// **ĐÃ DUYỆT** với số khác (999). Lượt `from = Ngay1` **KHÔNG** ghi đè/đổi kỳ trước `from` **và không**
+    /// tính nó vào `RowsSkippedApproved` (guard `ky.EffectiveFrom < from` ⇒ `continue`).
+    ///
+    /// 📌 Đỏ nếu guard bị bỏ: kỳ `Ngay0` sẽ được đối soát, thấy `10 ≠ 999`, `ChoNhapLuiNgay=false` ⇒
+    /// `RowsSkippedApproved` thành `1`; và nếu dòng chưa duyệt thì bị UPDATE (`SoLanSua > 0`).
+    /// </summary>
+    [Fact]
+    public async Task K06_14b_cua_so_bat_dau_giua_lich_su__khong_ghi_khong_doi_ky_truoc_from()
+    {
+        var bo = new Bo(choNhapLui: false);
+        // Kỳ `Ngay0` ĐÃ DUYỆT, đang MỞ (`EffectiveTo = null` — đúng trạng thái sau lượt chỉ có dữ liệu `Ngay0`),
+        // số khác hẳn bình quân tính lại (10) để lượt sau nếu đối soát nhầm sẽ lộ ra.
+        var kyNgay0 = new CostPrice(Guid.NewGuid(), "SKU-1", Money.Vnd(999m), Ngay0);
+        kyNgay0.Duyet(Guid.NewGuid(), Luc(Ngay0, 8));
+        bo.GiaVon.Them(kyNgay0);
+        bo.Feed.CacChuyenDong.Add(Nhap("SKU-1", Ngay0, 100m, 10m));
+        bo.Feed.CacChuyenDong.Add(Nhap("SKU-1", Ngay1, 10m, 20m));
+
+        var run = await bo.Sut.ChayAsync(Ngay1, Ngay1, "Manual");
+
+        Assert.NotNull(run);
+        Assert.Equal(TrangThaiChayDongCo.ThanhCong, run!.TrangThai);
+        Assert.Equal(1, run.RowsUpserted); // chỉ kỳ `Ngay1`
+        Assert.Equal(0, run.RowsSkippedApproved); // kỳ `Ngay0` KHÔNG thuộc lượt này (guard `continue`)
+
+        // Kỳ `Ngay0` đã duyệt: KHÔNG ghi, KHÔNG đổi số, KHÔNG đổi `EffectiveTo`.
+        Assert.Equal(0, kyNgay0.Amount.CompareTo(Money.Vnd(999m)));
+        Assert.Null(kyNgay0.EffectiveTo);
+        Assert.Equal(0, bo.GiaVon.SoLanSua);
+        Assert.Equal(1, bo.GiaVon.SoLanChen); // chỉ chèn kỳ `Ngay1`
+
+        Assert.Single(bo.GiaVon.TatCa, x => x.EffectiveFrom == Ngay0);
+        var kyNgay1 = Assert.Single(bo.GiaVon.TatCa, x => x.EffectiveFrom == Ngay1);
+        Assert.Equal(0, kyNgay1.Amount.CompareTo(Money.Vnd(11m)));
+    }
+
+    // ── K06-15: hai ngày nhập LIỀN KỀ ⇒ kỳ MỘT NGÀY (`D-326`) ──────────────────────────────────
+
+    /// <summary>
+    /// 🆕 **K06-15 (`D-326`)** — SKU nhập `Ngay1` **10 @ 10** và `Ngay2` **10 @ 20** (hai ngày **LIỀN KỀ**). Hàm
+    /// thuần sinh kỳ `Ngay1` với `EffectiveTo = Ngay2.AddDays(-1) = Ngay1` ⇒ `EffectiveFrom == EffectiveTo`
+    /// (**kỳ MỘT NGÀY**). Với guard đúng (`EffectiveTo < EffectiveFrom` mới ném — `PRC-001` §5.2 CK `>=`),
+    /// `ChayAsync` **GHI ĐƯỢC, KHÔNG NÉM**, run `ThanhCong`; sau khi duyệt, cổng đọc trả `Ngay1 = 10` và
+    /// `Ngay2 = (10·10 + 10·20)/20 = 15`.
+    ///
+    /// 📌 **Đỏ khi guard trả về `<=` (NC-8)**: dòng kỳ một ngày làm `DoiSoatAsync` NÉM `0009` ⇒ run `Loi`,
+    /// không ghi kỳ nào. So sánh tiền qua `Money.CompareTo` (BR-002), không `==` trên `decimal`.
+    /// </summary>
+    [Fact]
+    public async Task K06_15_hai_ngay_nhap_lien_ke__ky_mot_ngay_ghi_duoc()
+    {
+        var bo = new Bo();
+        bo.Feed.CacChuyenDong.Add(Nhap("SKU-1", Ngay1, 10m, 10m));
+        bo.Feed.CacChuyenDong.Add(Nhap("SKU-1", Ngay2, 10m, 20m));
+
+        // Không được ném: kỳ `Ngay1` có `EffectiveTo == EffectiveFrom` (một ngày) là HỢP LỆ (`D-326`).
+        var run = await bo.Sut.ChayAsync(Ngay1, Ngay2, "Manual");
+
+        Assert.NotNull(run);
+        Assert.Equal(TrangThaiChayDongCo.ThanhCong, run!.TrangThai);
+        Assert.Equal(2, run.RowsUpserted);
+
+        var kyNgay1 = Assert.Single(bo.GiaVon.TatCa, x => x.EffectiveFrom == Ngay1);
+        Assert.Equal(Ngay1, kyNgay1.EffectiveFrom);
+        Assert.Equal(Ngay1, kyNgay1.EffectiveTo); // `From == To` — kỳ MỘT NGÀY đã ghi được
+
+        var kyNgay2 = Assert.Single(bo.GiaVon.TatCa, x => x.EffectiveFrom == Ngay2);
+        Assert.Null(kyNgay2.EffectiveTo);
+
+        // Bình quân: `Ngay1 = 10`; `Ngay2 = (10·10 + 10·20)/20 = 15` — so qua `Money.CompareTo`.
+        Assert.Equal(0, kyNgay1.Amount.CompareTo(Money.Vnd(10m)));
+        Assert.Equal(0, kyNgay2.Amount.CompareTo(Money.Vnd(15m)));
+
+        // Luồng duyệt (kế toán) rồi đọc lại qua cổng `ICostPriceLookup`: mỗi ngày trả đúng số của mình.
+        var lucDuyet = Luc(Ngay2, 9);
+        kyNgay1.Duyet(Guid.NewGuid(), lucDuyet);
+        kyNgay2.Duyet(Guid.NewGuid(), lucDuyet);
+
+        var doc = new CostPriceLookupAdapter(bo.GiaVon);
+
+        var taiNgay1 = await doc.GetApprovedCostAsync("SKU-1", Ngay1);
+        var taiNgay2 = await doc.GetApprovedCostAsync("SKU-1", Ngay2);
+
+        Assert.NotNull(taiNgay1);
+        Assert.NotNull(taiNgay2);
+        Assert.True(taiNgay1!.CoGiaVon);
+        Assert.Equal(0, Money.Vnd(taiNgay1.AmountValue!.Value).CompareTo(Money.Vnd(10m)));
+        Assert.Equal(0, Money.Vnd(taiNgay2!.AmountValue!.Value).CompareTo(Money.Vnd(15m)));
     }
 }

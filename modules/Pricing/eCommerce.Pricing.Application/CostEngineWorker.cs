@@ -19,7 +19,9 @@ namespace eCommerce.Pricing;
 ///
 /// 🔒 **An toàn cho test/cổng:** mặc định `Pricing:GiaVonDongCo = false` ⇒ `ChayAsync` trả `null` (no-op);
 /// lỗi bất kỳ **KHÔNG** làm chết worker/app (chỉ `LogWarning`).
-/// 📌 Cửa sổ quét: **hôm qua → hôm nay** (ngày kinh doanh UTC+7). Nhập lùi xa hơn dùng command on-demand.
+/// 📌 **Khoảng quét: `[DauLichSu, hôm nay]`** (ngày kinh doanh UTC+7) — nạp **toàn bộ lịch sử** để bình quân
+/// di động đúng; `from` của lượt chỉ là mốc dưới của **kỳ được ghi/đối soát** (`D-325`, `CostEngineService.DauLichSu`).
+/// Mỗi ngày MỘT `RunKey` (`cost:{tenant}:2000-01-01:{hôm nay}:Schedule`) ⇒ idempotent trong ngày.
 /// </summary>
 public class CostEngineWorker : AsyncPeriodicBackgroundWorkerBase
 {
@@ -52,7 +54,10 @@ public class CostEngineWorker : AsyncPeriodicBackgroundWorkerBase
 
         // Ngày kinh doanh UTC+7.
         var homNay = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(LechGioVnSoVoiUtc));
-        var tu = homNay.AddDays(-1);
+
+        // 📌 `D-325`: tính trên TOÀN BỘ lịch sử (`from` = mốc đầu lịch sử, KHÔNG phải "hôm qua") — bình quân
+        //    di động phụ thuộc toàn bộ lịch sử; `from` chỉ là mốc dưới của kỳ được ghi/đối soát.
+        var tu = CostEngineService.DauLichSu;
 
         try
         {

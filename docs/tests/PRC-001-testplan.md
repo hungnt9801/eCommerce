@@ -1,8 +1,8 @@
 # Testplan `PRC-001` — 28/11/2026
 
 - SRS: `docs/features/pricing/prc-001-bang-gia-va-gia-theo-kenh.md` (§1 `BR-PRC-001-001…014` · §12 bảng lỗi/trường hợp biên · §15.2 nợ F3 · §20)
-- Kiến trúc bổ trợ: `docs/features/pricing/PRC-001-arch.md` (§5.2 động cơ + UoW 3 pha · §5.4 nhập lùi · §5.5 thiếu giá vốn ⇒ `NULL` · §5.6 idempotency · §7 bảng **14 ca `K-06`** · §8 rủi ro/đường lùi)
-- Quyết định: `D-320` (14 ca K-06 cứng) · `D-321` (ánh xạ DTO) · `D-323` (BackgroundWorker + command on-demand) · `D-324` (0012/0013 giữ chỗ, `using eCommerce.Inventory;` cho phép — bất biến **0 tên entity**; v1 VND; sổ run UoW `requiresNew`)
+- Kiến trúc bổ trợ: `docs/features/pricing/PRC-001-arch.md` (§5.2 động cơ + UoW 3 pha · §5.4 nhập lùi · §5.5 thiếu giá vốn ⇒ `NULL` · §5.6 idempotency · §7 bảng **15 ca `K-06`** · §8 rủi ro/đường lùi)
+- Quyết định: `D-320` (14 ca K-06 cứng) · `D-321` (ánh xạ DTO) · `D-323` (BackgroundWorker + command on-demand) · `D-324` (0012/0013 giữ chỗ, `using eCommerce.Inventory;` cho phép — bất biến **0 tên entity**; v1 VND; sổ run UoW `requiresNew`) · **`D-325`** (replay `[DauLichSu, to]`; `from` chỉ là mốc dưới kỳ được ghi — ca `K06-14` + NC-7) · **`D-326`** (nới guard `CostPrice` về `EffectiveTo < EffectiveFrom` — kỳ MỘT NGÀY `From == To` hợp lệ, khớp SRS §5.2 CK `>=`/`CoHieuLucTai`; ca `K06-15` + NC-8; sửa ghi chú `0014` ⇒ `0009`)
 - Nhánh: `feat/gd3-wp17-gia-von` · Phiên `N118` · Hàng `W17-4` · Bước **F4 QA** (F5 REV làm sau)
 - Trạng thái nền: `W17-2` (BE: `CostEngineService`/`TinhBinhQuanGiaQuyenDiDong`/`CostPriceLookupAdapter`/`CostFeedLookupAdapter` + migration `20261128052137_Added_Pricing_CostEngine`) và `W17-3` (no-FE) XONG.
 
@@ -12,9 +12,9 @@
 
 | BR | Test (tệp · tên) | Tầng | Trạng thái |
 |---|---|---|---|
-| **BR-PRC-001-001** (mọi khoản tiền là `Money` + cột tiền tệ đi kèm) | `test/eCommerce.Tests/Pricing/CostPriceTests.cs` · `CurrencyCode_lay_TU_Money__khong_tu_gan_VND`; `test/eCommerce.Tests/Pricing/CostEngineK06Tests.cs` · `K06_01_gia_von_0_hop_le__sinh_ky_0_va_khong_phai_thieu` | Domain | ✅ |
-| **BR-PRC-001-002** (cấm so sánh tiền bằng `==` trên `decimal`) | `test/eCommerce.Tests/Pricing/CostEngineKienTrucTests.cs` · `K06_12_khong_so_sanh_tien_bang_dau_bang`; `PricingBatBienTienTests.cs` · `TC11_KHONG_so_tien_bang_toan_tu_bang_trong_Pricing_BR003` | Kiến trúc (quét mã) | ✅ |
-| **BR-PRC-001-003** (giá có hiệu lực theo ngày; cấm truy vấn "mới nhất" không ngày) | `CostPriceTests.cs` · `CoHieuLucTai__dung_ca_HAI_bien_va_ben_ngoai`; `CostPriceLookupK06Tests.cs` · `K06_02_dong_ngoai_hieu_luc__tra_null` | Domain + Application | ✅ |
+| **BR-PRC-001-001** (mọi khoản tiền là `Money` + cột tiền tệ đi kèm) | `test/eCommerce.Tests/Pricing/CostPriceTests.cs` · `CurrencyCode_lay_TU_Money__khong_tu_gan_VND`; `test/eCommerce.Tests/Pricing/CostEngineK06Tests.cs` · `K06_01_gia_von_0_hop_le__sinh_ky_0_va_khong_phai_thieu`; `CostEngineServiceK06Tests.cs` · `K06_14_cua_so_bat_dau_giua_lich_su__replay_toan_bo` (bình quân gộp lịch sử, so qua `Money`); `CostEngineServiceK06Tests.cs` · `K06_15_hai_ngay_nhap_lien_ke__ky_mot_ngay_ghi_duoc` (so kỳ vọng qua `Money.CompareTo`, không `==` decimal) | Domain + Application | ✅ |
+| **BR-PRC-001-002** (cấm so sánh tiền bằng `==` trên `decimal`) | `test/eCommerce.Tests/Pricing/CostEngineKienTrucTests.cs` · `K06_12_khong_so_sanh_tien_bang_dau_bang`; `PricingBatBienTienTests.cs` · `TC11_KHONG_so_tien_bang_toan_tu_bang_trong_Pricing_BR003`; `CostEngineServiceK06Tests.cs` · `K06_14...` (so kỳ vọng bằng `Money.CompareTo`, không `==` decimal) · `K06_15...` | Kiến trúc (quét mã) + Application | ✅ |
+| **BR-PRC-001-003** (giá có hiệu lực theo ngày; cấm truy vấn "mới nhất" không ngày) | `CostPriceTests.cs` · `CoHieuLucTai__dung_ca_HAI_bien_va_ben_ngoai` · `EffectiveTo_BANG_EffectiveFrom__HOP_LE` (kỳ MỘT NGÀY hợp lệ, `D-326`); `CostPriceLookupK06Tests.cs` · `K06_02_dong_ngoai_hieu_luc__tra_null`; `CostEngineServiceK06Tests.cs` · `K06_15_hai_ngay_nhap_lien_ke__ky_mot_ngay_ghi_duoc` (đọc lại `Ngay1`/`Ngay2` qua `ICostPriceLookup`) | Domain + Application | ✅ |
 | **BR-PRC-001-004** (bảng giá `Active` append-only) | `GiaCoSoResolverTests.cs` · `YeuCauChoPhepSuaNoiDung__bang_gia_ACTIVE_thi_NEM_0003__BR004`; `ChonBacThangTests.cs` · `Append_only__bo_dang_Active_thi_KHONG_sua_duoc_noi_dung` | Domain | ✅ |
 | **BR-PRC-001-005** (chuyển trạng thái sai guard **NÉM**; cấm no-op) | `GiaCoSoResolverTests.cs` · `KichHoat_khi_dang_Draft_thi_NEM_LOI`; `ChonBacThangTests.cs` · `PhatHanh_khi_CHUA_co_bac_nao_thi_NEM_LOI` | Domain | ✅ |
 | **BR-PRC-001-006** (thứ tự ưu tiên chọn giá cố định) | `ChonDonGiaCuoiTests.cs` · `CO_bac_thang_thi_bac_thang_THANG__va_cap_doi_thanh_BacThang`; `KHONG_co_bac_thang_thi_dung_gia_co_so__giu_nguyen_nguon_va_cap` | Domain | ✅ |
@@ -29,7 +29,7 @@
 
 - Tổng BR: **14** · đã phủ: **14** · chưa phủ: **0**.
 
-## 2. Bảng 14 ca `K-06` (điều kiện cứng `D-320` vi; ARCH §7)
+## 2. Bảng 16 ca `K-06` (điều kiện cứng `D-320` vi; ARCH §7; `K06-14` thêm bởi `D-325`; `K06-15` thêm bởi `D-326`)
 
 | Mã | Kịch bản | Tầng test | Tệp · tên test thật | Kết quả |
 |---|---|---|---|---|
@@ -47,6 +47,8 @@
 | **K06-11** | `PhuongPhapGiaVon != BinhQuanGiaQuyenDiDong` / `GiaVonTheoKho=true` ⇒ **NÉM `0014`** (không rơi mặc định) | Application | `CostEngineServiceK06Tests` · `K06_11_phuong_phap_FIFO__nem_0014` · `K06_11_gia_von_theo_kho_true__nem_0014` · `K06_11_dong_co_tat__tra_null_khong_ghi` | ✅ Pass |
 | **K06-12** | Toàn `Money`: **0** `double`/`float`, **0** `==` trên tiền, **0** `Math.Round` | Kiến trúc (quét mã) | `CostEngineKienTrucTests` · `K06_12_khong_dung_double_float` · `K06_12_khong_tu_lam_tron_trong_domain_application` · `K06_12_khong_so_sanh_tien_bang_dau_bang`; đối chứng cũ `PricingBatBienTienTests.TC10/TC11/TC12` | ✅ Pass |
 | **K06-13** | Dòng đã duyệt **bất biến** khi tính lại; replay tất định | Application + Domain | `CostEngineServiceK06Tests` · `K06_13_ky_da_duyet_bat_bien__chay_lai_khong_doi_so`; `CostEngineK06Tests` · `K06_13_replay_tat_dinh__cung_dau_vao_cung_ket_qua` | ✅ Pass |
+| **K06-14** | Cửa sổ chạy **bắt đầu GIỮA lịch sử**: SKU nhập `Ngay0` 100@10 (ngoài `from`) + `Ngay1` 10@20 ⇒ kỳ `Ngay1` = `(100·10 + 10·20)/110 ≈ 10,909…` (VND làm tròn **11**), **KHÔNG** phải `20`; lượt `from = Ngay1` **KHÔNG** ghi/đổi kỳ `EffectiveFrom = Ngay0` (`D-325`) | Application | `CostEngineServiceK06Tests` · `K06_14_cua_so_bat_dau_giua_lich_su__replay_toan_bo` · `K06_14b_cua_so_bat_dau_giua_lich_su__khong_ghi_khong_doi_ky_truoc_from` | ✅ Pass |
+| **K06-15** | **`D-326`** — Hai ngày nhập **LIỀN KỀ** (`Ngay1` 10@10 + `Ngay2` 10@20) sinh kỳ `Ngay1` có `EffectiveFrom == EffectiveTo` (kỳ **MỘT NGÀY**). `ChayAsync` **GHI ĐƯỢC, KHÔNG NÉM**, run `ThanhCong` (`RowsUpserted = 2`); sau khi duyệt, `ICostPriceLookup` trả `Ngay1 = 10`, `Ngay2 = 15` (`(10·10+10·20)/20`) | Domain + Application | `CostPriceTests` · `EffectiveTo_BANG_EffectiveFrom__HOP_LE` (ctor không ném); `CostEngineServiceK06Tests` · `K06_15_hai_ngay_nhap_lien_ke__ky_mot_ngay_ghi_duoc` | ✅ Pass |
 
 ## 3. Test bổ sung bắt buộc (ngoài bảng `K-06`)
 
@@ -57,6 +59,7 @@
 | 3 | **`BR-PRC-001-008`** (nợ cũ `check-feature-doc`): unique/grain của `CostPrice` trên DB thật | `PostgreSqlPricingCostEngineTests.cs` · `BR_008_mot_SKU_mot_ky...` · `BR_008_cung_SKU_khac_ky__cho_phep` | ✅ Pass |
 | 4 | **`K06-08b` trên PostgreSQL thật**: `DangChay` bận; `Loi` retry `Attempt++`; sổ run bền vững qua rollback UoW ngoài | `PostgreSqlPricingCostEngineTests.cs` · `K06_08b_run_ben_vung_qua_rollback_UoW_ngoai` · `K06_08b_loi_retry_attempt_moi_tren_cung_dong` · `K06_08b_RunKey_trung_bi_chan_khi_TenantId_NULL` | ✅ Pass |
 | 5 | **Quyền (K-06 tầng app service ≥ 3)**: `[Authorize]` cấp class + permission được định nghĩa cho `CostEngineAppService`/`CostPriceAdminAppService` | `test/eCommerce.Tests/Authorization/BatBienPhanQuyenTests.cs` (quét **mọi** app service + permission reference — cơ chế sẵn có, không thêm ca) | ✅ Pass |
+| 6 | **P2 #4 review `PRC-001`**: đẳng thức **số** giữa `LoaiDongGiaVon` (Domain Pricing) và `LoaiChuyenDongGiaVon` (Inventory Contracts) — cast `(LoaiDongGiaVon)(int)dto.Loai` ở `CostEngineService.AnhXa` chỉ đúng khi trùng số | `test/eCommerce.Tests/Pricing/LoaiDongGiaVonKhopInventoryTests.cs` · `LoaiDongGiaVon_khop_1_1_so_voi_LoaiChuyenDongGiaVon_cua_Inventory` | ✅ Pass |
 
 ## 4. Negative control (bắt buộc — đỏ → xanh)
 
@@ -70,17 +73,21 @@
 | NC-4 | Bỏ lọc `DaDuyet` ở cổng đọc: xoá `&& x.ApprovedBy != null && x.ApprovedAtUtc != null` | `modules/Pricing/eCommerce.Pricing.Application/CostPriceLookupAdapter.cs:38` | `K06_03...` | exit 1 (đỏ) → khôi phục → exit 0 (xanh) |
 | NC-5 | Đảo fail-closed setting: `if (theoKho)` ⇒ `if (!theoKho)` | `CostEngineService.cs:116` | `K06_11_gia_von_theo_kho_true...` | exit 1 (đỏ) → khôi phục → exit 0 (xanh) |
 | NC-6 | Đổi công thức bình quân: `binhQuan = soLuong > 0m ? giaTri / soLuong : null;` ⇒ `binhQuan = giaTri;` (sai đơn giá) | `TinhBinhQuanGiaQuyenDiDong.cs:143` | `K06_06...` | exit 1 (đỏ) → khôi phục → exit 0 (xanh) |
-| NC-7 | Bỏ `[Authorize(...)]` cấp class của `CostEngineAppService` (lộ endpoint command) | `modules/Pricing/eCommerce.Pricing.Application/CostEngineAppService.cs:14` | `BatBienPhanQuyenTests` | exit 1 (đỏ) → khôi phục → exit 0 (xanh) |
+| **NC-7** | **`D-325`** — cắt lịch sử giữa cửa sổ: `_feed.LayChuyenDongAsync(DauLichSu, to)` ⇒ `_feed.LayChuyenDongAsync(from, to)` (tái hiện đúng P1 review #1) | `modules/Pricing/eCommerce.Pricing.Application/CostEngineService.cs:253` | `K06_14_cua_so_bat_dau_giua_lich_su__replay_toan_bo` | exit 1 (đỏ) → khôi phục → exit 0 (xanh) |
+| **NC-8** | **`D-326`** — trả guard kỳ về `<=`: `effectiveTo < effectiveFrom` ⇒ `effectiveTo <= effectiveFrom` (kỳ MỘT NGÀY bị coi là sai ⇒ engine NÉM `0009`, run `Loi`) | `modules/Pricing/eCommerce.Pricing.Domain/CostPrice.cs:118` (hoặc `:197` ở `CapNhatGiaVonChuaDuyet`) | `K06_15_hai_ngay_nhap_lien_ke__ky_mot_ngay_ghi_duoc` | exit 1 (đỏ) → khôi phục → exit 0 (xanh) |
+| NC-9 | Bỏ `[Authorize(...)]` cấp class của `CostEngineAppService` (lộ endpoint command). *(Trước đây đánh số NC-8; đổi thành NC-9 khi `D-326` thêm NC-8 — chưa chạy.)* | `modules/Pricing/eCommerce.Pricing.Application/CostEngineAppService.cs:14` | `BatBienPhanQuyenTests` | exit 1 (đỏ) → khôi phục → exit 0 (xanh) |
 
-- Nhóm luật quan trọng được phủ: **tiền** (NC-2/NC-6) · **trạng thái run** (NC-3) · **duyệt/bất biến số đã duyệt** (NC-1/NC-4) · **cấu hình fail-closed** (NC-5) · **quyền** (NC-7) · **idempotency** (NC-3 + các ca `RunKey`/`IdempotencyKey` ở integration).
+- Nhóm luật quan trọng được phủ: **tiền/kỳ một ngày** (NC-2/NC-6/**NC-7**/**NC-8**) · **trạng thái run** (NC-3) · **duyệt/bất biến số đã duyệt** (NC-1/NC-4) · **cấu hình fail-closed** (NC-5) · **quyền** (NC-9) · **idempotency** (NC-3 + các ca `RunKey`/`IdempotencyKey` ở integration).
+- **NC-8** (`D-326`) bắt buộc cho kỳ **MỘT NGÀY**: đột biến `effectiveTo < effectiveFrom` ⇒ `effectiveTo <= effectiveFrom` tại ctor `CostPrice` làm `DoiSoatAsync` NÉM `0009` khi ghi kỳ `Ngay1` (`EffectiveFrom == EffectiveTo`) ⇒ `K06_15` **đỏ** (run `Loi`). Khôi phục `git` ⇒ `K06_15` **xanh**.
+- **NC-7** là ca bắt buộc cho P1 review #1 (`D-325`): đột biến cắt lịch sử tại biên nạp làm `K06_14` **đỏ** vì fake `FeedGia` lọc theo `from/to` ⇒ chỉ còn `10 @ 20` ⇒ ghi `20` thay vì ≈ `10,909…` (làm tròn `11`).
 - Xác nhận sau mỗi ca (ORCH): `git status --porcelain -- modules/ src/ shared/` rỗng ⇒ đã khôi phục byte gốc.
 
 ## 5. Số ca theo tầng + cổng (đo thật phiên `N118`)
 
 | Tầng | Trước (`W17-3` / baseline ORCH) | Sau (`W17-4`) | Ghi chú |
 |---|---|---|---|
-| `dotnet test test/eCommerce.Tests` | **2650** | **2687** | **+37** ca mới (0 fail) |
-| Trong đó — `Pricing` (`CostEngineK06Tests` 14 · `CostPriceLookupK06Tests` 6 · `CostEngineServiceK06Tests` 10 · `CostPriceAdminAppServiceTests` 3 · `CostEngineKienTrucTests` 4) | — | **37** | toàn bộ tầng Domain/Application/Kiến trúc của động cơ |
+| `dotnet test test/eCommerce.Tests` | **2650** | **2691** | **+41** ca mới so với `W17-3`: 37 ca nền `W17-4` + **3 ca bổ sung theo `D-325`** (`K06-14`, `K06-14b`, đẳng thức enum) + **1 ca `D-326`** (`K06-15`). Đổi tên ca `EffectiveTo_BANG_EffectiveFrom__NEM_0009` ⇒ `..._HOP_LE` **không đổi số ca** (0 fail) |
+| Trong đó — `Pricing` (`CostEngineK06Tests` 14 · `CostPriceLookupK06Tests` 6 · `CostEngineServiceK06Tests` **13** · `CostPriceAdminAppServiceTests` 3 · `CostEngineKienTrucTests` 4 · `LoaiDongGiaVonKhopInventoryTests` **1**) | — | **41** | toàn bộ tầng Domain/Application/Kiến trúc của động cơ |
 | `dotnet test test/eCommerce.IntegrationTests` | **162** | **171** | **+9** (`PostgreSqlPricingCostEngineTests`), 0 fail |
 | API `/api/v1` 200/401/403 | — | **N/A** | `D-323`: `CostEngineAppService` là command **nội bộ** qua app service; không thêm route HTTP mới ở `W17-4` (quyền phủ bằng `BatBienPhanQuyenTests`) |
 | UI Vitest / Playwright | — | **0** | `W17-3` no-FE (0 tệp FE) |
@@ -90,7 +97,7 @@ Cổng đã chạy:
 
 ```powershell
 dotnet build eCommerce.slnx --no-incremental     # exit 0 · 0 Error · 9 Warning (KHÔNG warning mới)
-dotnet test test/eCommerce.Tests --no-build      # exit 0 · 2687/2687 pass
+dotnet test test/eCommerce.Tests --no-build      # exit 0 · 2691/2691 pass
 dotnet test test/eCommerce.IntegrationTests --no-build  # exit 0 · 171/171 pass
 ```
 
@@ -100,6 +107,7 @@ dotnet test test/eCommerce.IntegrationTests --no-build  # exit 0 · 171/171 pass
 2. **`K06-08b` tách hai tầng**: nhánh trạng thái (`DangChay` ⇒ bận; `Loi` ⇒ `Attempt++`) đo ở tầng Application bằng `new` + hạ tầng giả (`D-229`); **bền vững sổ run qua rollback UoW ngoài** đo trên **PostgreSQL thật** (`PostgreSqlPricingCostEngineTests`) — vì chỉ DB mới chứng minh được transaction riêng commit trước khi tính.
 3. **`K06-10`**: adapter Inventory là nơi duy nhất biết loại chuyển động ⇒ test ở `CostFeedLookupAdapter` với `TransferOut`/`TransferIn` (không đẩy `TransferIn` thành `NhapKhongGia`).
 4. **Chưa phủ**: `W17-4` không thêm ca HTTP/probe (feature nội bộ, 0 route mới). Nếu F5/REV yêu cầu probe `CostEngineAppService` qua Host thật thì bổ sung ở phiên sau — ghi `openQuestions`.
+5. **`D-326` — kỳ MỘT NGÀY (`EffectiveFrom == EffectiveTo`) là HỢP LỆ:** `TinhBinhQuanGiaQuyenDiDong` sinh `EffectiveTo = kySau.Ngay.AddDays(-1)`; khi hai ngày nhập **liền kề**, kỳ trước có `EffectiveTo == EffectiveFrom`, và `CoHieuLucTai` dùng biên **bao gồm** (`at <= EffectiveTo`) nên ngữ nghĩa hợp lệ. Guard cũ `effectiveTo <= effectiveFrom` (ctor `CostPrice` + `CapNhatGiaVonChuaDuyet`) **chặt hơn** SRS §5.2 CK `>=` và chú thích cùng chỗ ⇒ `be` đã nới về `<` (`W17-4`/`D-326`, **0 migration**). Kỳ **NGƯỢC** vẫn NÉM `0009` (`EffectiveTo_TRUOC_EffectiveFrom__NEM_0009` **xanh**), CK DB `CK_PrcCostPrices_EffectiveRange` vẫn là hàng rào. Ca `K06-15` + `NC-8` chứng minh đỏ→xanh. (Ghi chú cũ ghi sai mã lỗi `0014` ⇒ nay **`0009`** `GiaVonKhongHopLe`.)
 
 ## Negative control
 | Ngay | Ma | Tep:dong | Dot bien | Lenh test | Bang chung |

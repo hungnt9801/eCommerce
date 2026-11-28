@@ -111,12 +111,14 @@ public class CostPrice : FullAuditedAggregateRoot<Guid>, IMultiTenant
                 .WithData("amount", amount.Amount);
         }
 
-        // 📌 Khoảng hiệu lực phải **tiến**: `EffectiveTo < EffectiveFrom` nghĩa là kỳ không tồn tại ⇒ mọi
+        // 📌 Khoảng hiệu lực phải **tiến**: kỳ NGƯỢC (`EffectiveTo < EffectiveFrom`) không tồn tại ⇒ mọi
         // truy vấn theo ngày **không bao giờ** thấy dòng này, và giá vốn của SKU đó **biến mất im lặng**.
-        if (effectiveTo is not null && effectiveTo <= effectiveFrom)
+        // 📌 `EffectiveTo == EffectiveFrom` là kỳ **MỘT NGÀY** — **HỢP LỆ**: hai ngày nhập liền kề sinh kỳ
+        // `From == To` theo đúng thiết kế (`D-326`, `PRC-001` §5.2 CK `>=`, `CoHieuLucTai` bao gồm).
+        if (effectiveTo is not null && effectiveTo < effectiveFrom)
         {
             throw new BusinessException(PricingErrorCodes.GiaVonKhongHopLe)
-                .WithData("lyDo", "`EffectiveTo` phải SAU `EffectiveFrom`.")
+                .WithData("lyDo", "`EffectiveTo` phải ≥ `EffectiveFrom` (kỳ MỘT NGÀY hợp lệ).")
                 .WithData("tu", effectiveFrom)
                 .WithData("den", effectiveTo);
         }
@@ -190,10 +192,12 @@ public class CostPrice : FullAuditedAggregateRoot<Guid>, IMultiTenant
                 .WithData("amount", amount.Amount);
         }
 
-        if (effectiveTo is not null && effectiveTo <= EffectiveFrom)
+        // 📌 `EffectiveTo == EffectiveFrom` là kỳ **MỘT NGÀY** — **HỢP LỆ** (`D-326`); chỉ kỳ **NGƯỢC**
+        // (`EffectiveTo < EffectiveFrom`) mới NÉM, khớp CK `CK_PrcCostPrices_EffectiveRange` (`>=`).
+        if (effectiveTo is not null && effectiveTo < EffectiveFrom)
         {
             throw new BusinessException(PricingErrorCodes.GiaVonKhongHopLe)
-                .WithData("lyDo", "`EffectiveTo` phải SAU `EffectiveFrom`.")
+                .WithData("lyDo", "`EffectiveTo` phải ≥ `EffectiveFrom` (kỳ MỘT NGÀY hợp lệ).")
                 .WithData("sku", Sku);
         }
 

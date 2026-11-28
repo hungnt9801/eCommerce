@@ -113,13 +113,20 @@ public class CostPriceTests
     }
 
     [Fact]
-    public void EffectiveTo_BANG_EffectiveFrom__NEM_0009()
+    public void EffectiveTo_BANG_EffectiveFrom__HOP_LE()
     {
-        // Kỳ "từ 1/1 đến 1/1" là **không có kỳ nào** — nhận nó nghĩa là dòng giá vốn **không bao giờ** hiệu lực.
-        var loi = Assert.Throws<BusinessException>(
-            () => Tao(tu: new DateOnly(2026, 1, 1), den: new DateOnly(2026, 1, 1)));
+        // 📌 `D-326`: `PRC-001` §5.2 CK `"EffectiveTo" >= "EffectiveFrom"` + `CoHieuLucTai` biên BAO GỒM
+        // (`at <= EffectiveTo`) ⇒ kỳ MỘT NGÀY (`From == To`) **HỢP LỆ**. Hai ngày nhập **liền kề** sinh đúng kỳ
+        // này theo thiết kế (hàm thuần `den = kySau.Ngay.AddDays(-1)`) ⇒ domain phải nhận, không được chặt hơn DB.
+        // ⚠️ Đây là **sửa kỳ vọng SAI** theo SRS/DB/CK, **KHÔNG** phải nới test để xanh: kỳ NGƯỢC vẫn NÉM
+        // (`EffectiveTo_TRUOC_EffectiveFrom__NEM_0009`).
+        var ngay = new DateOnly(2026, 1, 1);
+        var g = Tao(tu: ngay, den: ngay);
 
-        Assert.Equal(PricingErrorCodes.GiaVonKhongHopLe, loi.Code);
+        Assert.Equal(ngay, g.EffectiveFrom);
+        Assert.Equal(ngay, g.EffectiveTo);
+        Assert.True(g.CoHieuLucTai(ngay));                     // đúng ngày duy nhất — hiệu lực
+        Assert.False(g.CoHieuLucTai(ngay.AddDays(1)));         // ngày kế — hết hiệu lực
     }
 
     [Fact]

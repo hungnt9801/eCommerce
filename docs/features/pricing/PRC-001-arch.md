@@ -5,7 +5,7 @@
 | **Mã** | `PRC-001` (phần `arch`) |
 | **Module chủ** | **Pricing** — `modules/Pricing/**` |
 | **Phạm vi** | `WP-17`, hàng `W17-1` (F0–F2b) của chuỗi `gd3-1` — **đường ghi + luồng duyệt `CostPrice` + động cơ bình quân gia quyền di động** |
-| **Quyết định nguồn** | `D-177` (bình quân di động, ngày bán, chỉ dòng `DaDuyet`, thiếu ⇒ `NULL` + `CostMissing`) · `D-186` (chủ = Pricing, `INV-001` chỉ cấp đơn giá nhập) · `D-181`/`D-176` (Reporting tiêu thụ, `LG1/LG2`, vòng quay) · `D-195` (ACC-001 không xuất dòng giá vốn) · `D-318` C4/C5/C6/C9 · `D-09` (không rename) · `D-17` (enum thêm cuối) |
+| **Quyết định nguồn** | `D-177` (bình quân di động, ngày bán, chỉ dòng `DaDuyet`, thiếu ⇒ `NULL` + `CostMissing`) · `D-186` (chủ = Pricing, `INV-001` chỉ cấp đơn giá nhập) · `D-181`/`D-176` (Reporting tiêu thụ, `LG1/LG2`, vòng quay) · `D-195` (ACC-001 không xuất dòng giá vốn) · `D-318` C4/C5/C6/C9 · `D-09` (không rename) · `D-17` (enum thêm cuối) · `D-325` (động cơ **replay toàn lịch sử** từ `DauLichSu = 2000-01-01`; `from` = mốc dưới của **kỳ được ghi/đối soát**, **KHÔNG** chặn đầu vào tính — N118/`W17-4`) |
 | **SRS** | `docs/features/pricing/prc-001-bang-gia-va-gia-theo-kenh.md` §0/§5.2/§20/§15.1 · `docs/features/inventory/inv-001-nhap-chuyen-kiem-ke-so-cai-kho.md` §0/§5.2/§8 · `docs/features/reporting/rep-003-bao-cao-ton-kho-hieu-suat-kenh.md` §0/§5 |
 | **Schema** | **1 bảng mới + 4 cột nullable trên `PrcCostPrices` + index** — **expand-only**, **không** chạm `StockLedger`/`InvStockLedger` |
 | **Hợp đồng công khai** | **Chỉ thêm** method/DTO; **không** đổi chữ ký đang có (`ICostPriceAppService`, `StockDocumentLine`, `StockDocumentLineDto` giữ nguyên) |
@@ -348,7 +348,7 @@ CostEngineAppService.ChayAsync(from, to, trigger)      [đăng ký BackgroundWor
   │     • có & DangChay  ⇒ NÉM 409/bận (KHÔNG trả run chưa xong, KHÔNG chạy chồng — P2 #7)
   │     • có & Loi       ⇒ chạy lại attempt MỚI trên CÙNG dòng (UPDATE: Attempt++, StartedAtUtc mới, TrangThai=DangChay, xoá ErrorMessage)
   │     • chưa có ⇒ INSERT run (Attempt = 1, TrangThai = DangChay)
-  ├─ nạp ICostFeedLookup.LayChuyenDongAsync(from, to)   (qua Inventory.Application.Contracts)
+  ├─ nạp ICostFeedLookup.LayChuyenDongAsync(DauLichSu, to)   (qua Inventory.Application.Contracts; D-325)
   ├─ với mỗi SKU: replay tất định (Ngày, OccurredAtUtc, ReferenceLineId) → danh sách kỳ giá vốn (Sku, EffectiveFrom, EffectiveTo, AvgCost)
   ├─ đối soát với PrcCostPrices hiện có (theo (TenantId, Sku, EffectiveFrom)):
   │     • AvgCost != null & chưa có ⇒ INSERT (NguonTinh=DongCo, DaDuyet=false)   → chờ kế toán duyệt (§5.1)
@@ -357,6 +357,16 @@ CostEngineAppService.ChayAsync(from, to, trigger)      [đăng ký BackgroundWor
   │     • AvgCost == null ⇒ KHÔNG INSERT/UPDATE kỳ (AmountValue NOT NULL — P2 #3); khoảng không có dòng ⇒ lookup trả null
   └─ cập nhật PrcCostEngineRuns (ThanhCong/Loi, RowsUpserted/SkippedApproved/FlaggedMissing)
 ```
+
+> 📌 **`D-325` (N118/`W17-4`) — nghĩa của `from`:** đầu vào **tính** **LUÔN** là `[DauLichSu = 2000-01-01, to]` (replay toàn
+> lịch sử — bình quân di động phụ thuộc toàn bộ lịch sử: `CostEngineService.XuLyAsync` gọi `_feed.LayChuyenDongAsync(DauLichSu, to)`
+> — `modules/Pricing/eCommerce.Pricing.Application/CostEngineService.cs:253`, hằng `CostEngineService.DauLichSu` `:50`); `from` **chỉ**
+> là **mốc dưới của kỳ ĐƯỢC GHI/đối soát** — `DoiSoatAsync` **bỏ qua** kỳ có `EffectiveFrom < from` (`CostEngineService.cs:305-308`),
+> **KHÔNG** cắt đầu vào tính. Hệ quả chấp nhận: kỳ trước `from` chưa có dòng ⇒ lookup trả `null` + `CostMissing` (**fail-closed,
+> không phải số sai**) cho tới lượt job đầy đủ. Job `CostEngineWorker` dùng `tu = CostEngineService.DauLichSu`
+> (`modules/Pricing/eCommerce.Pricing.Application/CostEngineWorker.cs:60`) ⇒ mỗi ngày **một** lượt đối soát toàn lịch sử, `RunKey` giữ
+> dạng `cost:{tenant}:{from}:{to}:{trigger}` (`CostEngineService.cs:394-395`). `ICostFeedLookup`/`CostMovementDto` **không đổi**
+> (`D-325` ⑤: 0 đổi hợp đồng, 0 migration); tối ưu incremental (cursor) vẫn là additive sau (`R7`).
 
 > 📌 **Khai Setting (0 migration — P3 #20):** thêm 4 `SettingDefinition` (+ default) vào `PricingSettingDefinitionProvider`
 > (`modules/Pricing/eCommerce.Pricing.Domain/PricingSettingDefinitionProvider.cs:28-36` hiện chỉ có 4 khoá PRC-002) và reader ở
@@ -442,7 +452,7 @@ Trạng thái chạy theo SKU: `(qtyOnHand, valueOnHand, avgCost | null, costMis
 
 - **Làm tròn:** chỉ khi **xuất kết quả** ra `PrcCostPrices.AmountValue`: `IRoundingPolicy.Round(Money)` của `XC-001`
   (`shared/eCommerce.Kernel/Money/RoundingPolicy.cs`) — **không** đổi policy (`D-318` C4 (4)). **CẤM** `Math.Round`/`decimal.Round` trong module.
-- **Kỳ hiệu lực:** mỗi mốc **có nhập** sinh một kỳ; `EffectiveFrom` = ngày kinh doanh của lần nhập; `EffectiveTo` = **ngày trước** kỳ kế tiếp (kỳ cuối `null`). Nhiều phiếu nhập **cùng ngày** ⇒ gộp thành **một** kỳ (bình quân cuối ngày) ⇒ khớp unique `(TenantId, Sku, EffectiveFrom)`. 🚨 **Khi `avg = null` ⇒ KHÔNG sinh kỳ** (`AmountValue` NOT NULL) — khoảng đó không có dòng ⇒ lookup trả `null`; **không** ghi `0` thay chỗ trống.
+- **Kỳ hiệu lực:** mỗi mốc **có nhập** sinh một kỳ; `EffectiveFrom` = ngày kinh doanh của lần nhập; `EffectiveTo` = **ngày trước** kỳ kế tiếp (kỳ cuối `null`). Nhiều phiếu nhập **cùng ngày** ⇒ gộp thành **một** kỳ (bình quân cuối ngày) ⇒ khớp unique `(TenantId, Sku, EffectiveFrom)`. **Hai ngày nhập LIỀN KỀ ⇒ kỳ MỘT NGÀY (`EffectiveFrom == EffectiveTo`) là HỢP LỆ** — khớp CHECK DB `CK_PrcCostPrices_EffectiveRange` (`EffectiveTo IS NULL OR EffectiveTo >= EffectiveFrom`, `PricingDbContextModelCreatingExtensions.cs:109-111`) và `CostPrice.CoHieuLucTai` biên **bao gồm** (`CostPrice.cs:211-212`); domain `CostPrice` đã sửa guard `<=` → `<` (`CostPrice.cs:118`, `:197`) (`D-326`, N118/W17-4). 🚨 **Khi `avg = null` ⇒ KHÔNG sinh kỳ** (`AmountValue` NOT NULL) — khoảng đó không có dòng ⇒ lookup trả `null`; **không** ghi `0` thay chỗ trống.
 - **Tất định:** sắp `(NgàyKinhDoanh, OccurredAtUtc, ReferenceLineId)` ⇒ chạy lại bao nhiêu lần cũng cùng số (`D-177` ③).
 
 ### 6.1 Ví dụ số (VND, `Money`)
@@ -505,7 +515,7 @@ Trạng thái chạy theo SKU: `(qtyOnHand, valueOnHand, avgCost | null, costMis
 | **R4** | **Loại chuyển động tính vào định giá** (CustomerReturn/StocktakeGain/WarrantyHold…) từng chưa chốt ⇒ bình quân lệch | 🟠 Trung bình | Bảng ánh xạ §3.3 **đã chốt theo `D-321`** (chỉ `Receipt`/`GoodsReceipt` có `UnitPrice` là `NhapCoGia`; bỏ cặp chuyển kho; tiền tệ = VND tenant; loại lạ/lệch dấu ⇒ NÉM `0014`); lớp ánh xạ ở **adapter** ⇒ đổi 1 tệp, 0 migration |
 | **R5** | **F3 `XC-002` chưa có** (`IIdempotencyGuard`/`InboxRecords`) ⇒ idempotency command dựa unique DB | 🟠 Trung bình | Unique filtered + run table v1; thay lớp khoá khi `XC-002` xong, 0 schema |
 | **R6** | **Provider Setting trong assembly module không được ABP quét** ⇒ `GiaVonDongCo`/`ChoNhapLuiNgay` bị bỏ qua im lặng | 🟠 Trung bình | `W17-2` **khởi động Host thật** đọc Setting (tiền lệ `PRC-002-arch.md` R8); đường lùi: chuyển provider sang `src/eCommerce.Domain/Settings/` (app → module hợp lệ) |
-| **R7** | **Động cơ O(N) replay toàn bộ** mỗi lần chạy ⇒ chậm khi dữ liệu lớn | 🟡 Thấp | v1 chấp nhận (dữ liệu nhỏ); giới hạn khoảng `[from,to]`; tối ưu incremental (bảng cursor) là additive sau (không đổi hợp đồng) |
+| **R7** | **Động cơ O(N) replay toàn bộ** mỗi lần chạy ⇒ chậm khi dữ liệu lớn | 🟡 Thấp | **v1 replay TOÀN BỘ từ `DauLichSu = 2000-01-01` tới `to` mỗi lượt** (`D-325`); `from` **CHỈ** là mốc dưới của kỳ **được GHI/đối soát**, **KHÔNG** chặn đầu vào tính — nạp `[from,to]` làm SKU có tồn/nhập trước `from` bị tính trên cửa sổ ⇒ **sai đơn giá** (gốc lỗi P1 review `PRC-001`). Tối ưu incremental (bảng cursor) là additive sau (không đổi hợp đồng) |
 | **R8** | **Khoá phân tán tên chứa tiền tố** sai quy ước `XC-003` (`PRC-001` **§15.2 F5** tái phạm; §8.2 đang mâu thuẫn) | 🟡 Thấp | Hàm **MỚI** `PricingLockKeys.GiaVonTheoSku(tenantId, sku)` → chuỗi `pricing:cost-sku:{tenant|null}:{sku}` (**KHÔNG** lặp `ecommerce:` — KeyPrefix đã có; `PricingLockKeys` hiện chỉ có `BangGiaTheoPhamVi`); test tên khoá (khuôn `TC-17`) |
 
 ### 8.2 Câu hỏi mở (`openQuestions`)
@@ -564,3 +574,7 @@ Trạng thái chạy theo SKU: `(qtyOnHand, valueOnHand, avgCost | null, costMis
 - **28/11/2026, N116/`W17-2`:** cập nhật trạng thái `openQuestions` — `PRC-001-AQ3`/`AQ4`/`AQ5` → `✅ Closed (D-321)`/`(D-322)`/`(D-323)`;
   `PRC-001-AQ1` (Q4) **vẫn `Open`**, `PRC-001-AQ2` **của người**; chỉ đổi **nhãn trạng thái + ghi chú** (không đổi công thức §6/schema §4/
   hợp đồng §3.1/§3.3 về thực chất); đóng "nợ chữ `D-186` ②" — `ICostPriceLookup` đã khớp chữ SRS `prc-001` §20.4 (cùng PR `W17-2`).
+- **28/11/2026, N118/`W17-4`:** sửa theo **`D-325`** (P1 review `PRC-001`) — §8.1 **R7** bỏ mệnh đề giới hạn cửa sổ nạp
+  (mâu thuẫn nội tại với *"replay toàn bộ"*, chính là gốc lỗi) thành *"v1 replay `[DauLichSu, to]` mỗi lượt; `from` = mốc dưới của kỳ
+  được ghi; cursor incremental additive sau"*; §5.2 đổi `LayChuyenDongAsync(from, to)` → `(DauLichSu, to)` + thêm ghi chú nghĩa `from`;
+  **không** đổi công thức §6 / ngày bán §5.3 / dòng đã duyệt §5.4 / schema §4 / hợp đồng §3; **0 migration**.
