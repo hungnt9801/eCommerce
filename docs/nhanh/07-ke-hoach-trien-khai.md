@@ -762,7 +762,19 @@ storefront còn lại **đóng băng** (`D-70`).
 | **WP-32** | `REP-002` doanh thu + lãi gộp | **"chưa" — đỏ cứng**; 5 P3; **bắt buộc** sau `WP-17` (`D-177` ⑦/`D-186` ⑦) + `WP-26` | WP-17, WP-26 |
 | **WP-33** | `REP-003` tồn kho + hiệu suất kênh | **"chưa" — đỏ cứng**; 4 P3; thiếu giá vốn ⇒ `NULL` + `CostMissing`, **cấm `0`** | WP-17, WP-32 |
 | **WP-34** | `ACC-001` xuất liệu kế toán | **"chưa" — đỏ cứng** (R3-3/R3-8); 5 P3; `Q12` (kế toán trưởng) không chặn xuất file; chỉ **tiêu thụ** `IReportFactReader` (`D-183`) | WP-32, WP-33 |
+| **WP-41** | **UI nền**: kiểm kê UI, kiến trúc UI 4 tầng, khung `packages/ui`, ESLint + `pnpm lint`, Testing Library + axe, `next/font`, ghim `next-auth`, ảnh chuẩn 37 route | Không có tài liệu feature. Đặc tả `docs/ui/**` + DOCREV ở bước `U1` của chuỗi `ui-1` (`D-327`) | — |
+| **WP-42** | **UI token v2 + theme sáng/tối + mật độ + Storybook** | Không có tài liệu feature. Đặc tả `docs/ui/**` + DOCREV ở bước `U1` của chuỗi `ui-1` (`D-327`) | WP-41 |
+| **WP-43** | **UI i18n** (`next-intl`, `vi` gốc + `en`) + định dạng theo locale; chuyển shell/menu/đăng nhập | Không có tài liệu feature. Đặc tả `docs/ui/**` + DOCREV ở bước `U1` của chuỗi `ui-1` (`D-327`) | WP-42 |
+| **WP-44** | **UI primitive** (shadcn/Radix): nhập liệu, hiển thị, lớp phủ + người xem trước trong Storybook | Không có tài liệu feature. Đặc tả `docs/ui/**` + DOCREV ở bước `U1` của chuỗi `ui-1` (`D-327`) | WP-43 |
+| **WP-45** | **UI pattern dữ liệu**: DataTable (TanStack Table + virtual), FilterBar + `nuqs`, PageTabs, Pagination, BulkActionBar | Không có tài liệu feature. Đặc tả `docs/ui/**` + DOCREV ở bước `U1` của chuỗi `ui-1` (`D-327`) | WP-44 |
+| **WP-46** | **UI pattern form + trạng thái**: RHF + Zod, MoneyInput/QuantityInput/BarcodeInput, Empty/Error/Loading, Confirm, Toast | Không có tài liệu feature. Đặc tả `docs/ui/**` + DOCREV ở bước `U1` của chuỗi `ui-1` (`D-327`) | WP-45 |
+| **WP-47** | **UI shell + màn thí điểm kho** (Topbar, Sidebar, CommandPalette; phiếu kho, tồn kho) + người xem thẩm mỹ | Không có tài liệu feature. Đặc tả `docs/ui/**` + DOCREV ở bước `U1` của chuỗi `ui-1` (`D-327`) | WP-46 |
+| **WP-48** | **UI chuyển đợt 1**: Thông báo, Khuyến mại, Khách hàng, Nhân viên | Không có tài liệu feature. Đặc tả `docs/ui/**` + DOCREV ở bước `U1` của chuỗi `ui-1` (`D-327`) | WP-47 |
+| **WP-49** | **UI chuyển đợt 2**: Đơn hàng, Sản phẩm, Báo cáo, In, Đăng nhập, Trang chủ | Không có tài liệu feature. Đặc tả `docs/ui/**` + DOCREV ở bước `U1` của chuỗi `ui-1` (`D-327`) | WP-48 |
+| **WP-50** | **UI POS**: tách `PosTerminal` rồi chuyển sang design system (bán lẻ, trả hàng, danh sách hoá đơn) | Không có tài liệu feature. Đặc tả `docs/ui/**` + DOCREV ở bước `U1` của chuỗi `ui-1` (`D-327`) | WP-49 |
+| **WP-51** | **UI quản trị**: luật ESLint mức lỗi, gỡ lớp `.nh-*` cũ, audit toàn bộ, tài liệu đóng góp, bản vá CI cho người áp | Không có tài liệu feature. Đặc tả `docs/ui/**` + DOCREV ở bước `U1` của chuỗi `ui-1` (`D-327`) | WP-50 |
 
+**Chuỗi `ui-1` (`D-327`):** WP-41…51 là nền tảng UI Web Admin, **ngoài** phủ `D-70`; chạy theo [`bang-phien-ui-1.md`](../agents/bang-phien-ui-1.md), nhánh tích hợp `tich-hop/ui`.
 **Phủ `D-70`:** `PRO-001/002` = 24/25 · `SHP-001…004` = 20/21/27/28 · `REC-003` = 29 · `SAL-006` = 30 · `NOT-001/002` = 22/23 · `ACC-001` = 34 · `REP-*` = 26/32/33 · `LOY-001` = 31 · `PRC-002` = 16 · `ADDR-001…003` = 18/19 — **không** thêm/bỏ mục nào.
 **Cổng máy còn thiếu** (`D-209` ⑥): "cổng tài liệu chưa đạt ⇒ cấm code WP" + "merge `main` khi biên bản chưa ký" (`D-115` ⑤) — **OPS** dựng trước `WP-15`; **QA** thêm ca quét mục này với 3 biên bản (mã nào "chưa" mà có WP đang code ⇒ ĐỎ).
 

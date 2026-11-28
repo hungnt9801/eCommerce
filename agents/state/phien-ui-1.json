@@ -1,0 +1,1051 @@
+{
+  "version": 1,
+  "wp": "Nền tảng UI Web Admin — chuỗi 1",
+  "chuoi": "ui-1",
+  "skill": "chay-phien-code",
+  "nhanhTichHop": "tich-hop/ui",
+  "nhanhGoc": "tich-hop/gd3",
+  "refs": "D-327",
+  "ghiChu": "Chuỗi nền tảng UI (D-327): mỗi WP một nhánh cắt từ đỉnh tich-hop/ui; hàng loai=ui chạy theo .claude/skills/ui-pipeline; dong-wp đẩy fast-forward vào tich-hop/ui (M3); PR xếp chồng mở một lần cuối chuỗi (WP đầu → tich-hop/gd3).",
+  "capNhat": "2026-11-28T21:00:00+07:00",
+  "rows": [
+    {
+      "id": "U41-1",
+      "dot": "WP-41",
+      "loai": "ui",
+      "ma": [],
+      "noiDung": "Kiểm kê + kiến trúc: ux docs/ui/00-kiem-ke.md (37 route, 47 component, pattern lặp, lệch số đo Nhanh, nợ a11y thấy được); arch docs/ui/01-kien-truc-ui.md (4 tầng token → primitive → pattern → domain, gói `packages/ui`, quy tắc import, theme/mật độ/i18n, Storybook + so ảnh chạy ở đâu, ngân sách bundle, chuyển dần giữ `data-testid`); decider TẠM CHỐT danh sách gói + bản ghim (ngoại lệ `next-auth` beta, biểu đồ SVG thay Recharts)",
+      "vai": "ux · arch · docrev · decider",
+      "dependsOn": [],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp41-nen",
+      "buoc": "U1 thiết kế",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U41-2",
+      "dot": "WP-41",
+      "loai": "ui",
+      "ma": [],
+      "noiDung": "Khung `packages/ui` (`@ecommerce/ui`: build/typecheck/test) + Tailwind `@source`; ESLint flat config (next, react-hooks, jsx-a11y) cho admin-web + `packages/ui`, `pnpm lint` chạy được; Vitest + Testing Library + axe; `next/font` thay `@import` Google Fonts; ghim `next-auth` chính xác. **0 thay đổi giao diện**",
+      "vai": "ds",
+      "dependsOn": [
+        "U41-1"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp41-nen",
+      "buoc": "U2 dựng",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U41-3",
+      "dot": "WP-41",
+      "loai": "ui",
+      "ma": [],
+      "noiDung": "qa: harness so ảnh Playwright + **ảnh chuẩn 37 route** (giao diện hiện tại) — mọi WP sau so với bộ này; a11y: báo cáo nền `UI-41-a11y.md` (axe 37 route, đếm theo mức — chỉ chặn P1 do WP-41 gây ra); rev PASS P1=0",
+      "vai": "qa · a11y · rev",
+      "dependsOn": [
+        "U41-2"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp41-nen",
+      "buoc": "U3 kiểm",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U41-4",
+      "dot": "WP-41",
+      "loai": "dong-wp",
+      "ma": [],
+      "noiDung": "F6 OPS + G6 `kiem-tat-ca.ps1 -DayDu` (ops thêm bước `pnpm lint` + so ảnh vào `tools/kiem-tat-ca.ps1`); docs/ops/UI-41-deploy.md có đường lùi; `07` §13 một dòng ⇒ đẩy fast-forward vào `tich-hop/ui`",
+      "vai": "ops · ORCH",
+      "dependsOn": [
+        "U41-3"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp41-nen",
+      "buoc": "F6–G6",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U42-1",
+      "dot": "WP-42",
+      "loai": "ui",
+      "ma": [],
+      "noiDung": "Đặc tả token v2 docs/ui/02-token.md: tầng gốc (số đo Nhanh `01` §2.1) → tầng ngữ nghĩa (hành động, link, bề mặt, chữ, viền, trạng thái); thang chữ, khoảng cách 4px, bo góc, bóng, z-index, chuyển động; **theme tối** (bảng ánh xạ, tương phản AA); **mật độ** comfortable/compact (dòng bảng 52/40px, input 36/32px); decider ghim Storybook + addon",
+      "vai": "ux · docrev · decider",
+      "dependsOn": [
+        "U41-4"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp42-token",
+      "buoc": "U1 thiết kế",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U42-2",
+      "dot": "WP-42",
+      "loai": "ui",
+      "ma": [],
+      "noiDung": "`packages/ui` token (`@theme` + `[data-theme=dark]` + `[data-density=compact]`), ThemeProvider (cookie, render phía server, không nháy), công tắc theme/mật độ ở Topbar; ánh xạ lớp `.nh-*` cũ sang token (theme sáng **không đổi**); Storybook (addon a11y, công tắc theme/mật độ/ngôn ngữ) + story trang token; script kiểm tương phản",
+      "vai": "ds",
+      "dependsOn": [
+        "U42-1"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp42-token",
+      "buoc": "U2 dựng",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U42-3",
+      "dot": "WP-42",
+      "loai": "ui",
+      "ma": [],
+      "noiDung": "qa: so ảnh 37 route theme sáng **0 khác** so với ảnh chuẩn WP-41 + bộ ảnh tối/compact mới + ảnh story; a11y: tương phản cả 2 theme; rev",
+      "vai": "qa · a11y · rev",
+      "dependsOn": [
+        "U42-2"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp42-token",
+      "buoc": "U3 kiểm",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U42-4",
+      "dot": "WP-42",
+      "loai": "dong-wp",
+      "ma": [],
+      "noiDung": "F6 OPS + G6 `kiem-tat-ca.ps1 -DayDu` (ops thêm `build-storybook` + kiểm tương phản vào `kiem-tat-ca.ps1`); docs/ops/UI-42-deploy.md có đường lùi; `07` §13 một dòng ⇒ đẩy fast-forward vào `tich-hop/ui`",
+      "vai": "ops · ORCH",
+      "dependsOn": [
+        "U42-3"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp42-token",
+      "buoc": "F6–G6",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U43-1",
+      "dot": "WP-43",
+      "loai": "ui",
+      "ma": [],
+      "noiDung": "ux bảng thuật ngữ vi/en docs/ui/03-i18n.md (kho, bán, tiền, trạng thái) + quy ước định dạng theo locale (tiền luôn VND); arch: `next-intl` **không** tiền tố locale trên URL (cookie) để giữ route `/[business]/…` và E2E; decider ghim `next-intl`, `dayjs`",
+      "vai": "ux · arch · docrev · decider",
+      "dependsOn": [
+        "U42-4"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp43-i18n",
+      "buoc": "U1 thiết kế",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U43-2",
+      "dot": "WP-43",
+      "loai": "ui",
+      "ma": [],
+      "noiDung": "ds: `next-intl` + `messages/{vi,en}.json` + công tắc ngôn ngữ + script kiểm thiếu khoá; `lib/format.ts` theo locale; fe: chuyển chuỗi shell, menu (`lib/menu.ts`), đăng nhập, trang chủ",
+      "vai": "ds · fe",
+      "dependsOn": [
+        "U43-1"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp43-i18n",
+      "buoc": "U2 dựng",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U43-3",
+      "dot": "WP-43",
+      "loai": "ui",
+      "ma": [],
+      "noiDung": "`lang` đúng theo ngôn ngữ, thiếu khoá = 0, E2E (vi) xanh, so ảnh vi 0 khác ngoài danh sách; bộ ảnh en mới",
+      "vai": "qa · a11y · rev",
+      "dependsOn": [
+        "U43-2"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp43-i18n",
+      "buoc": "U3 kiểm",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U43-4",
+      "dot": "WP-43",
+      "loai": "dong-wp",
+      "ma": [],
+      "noiDung": "F6 OPS + G6 `kiem-tat-ca.ps1 -DayDu` (ops thêm kiểm thiếu khoá i18n vào `kiem-tat-ca.ps1`); docs/ops/UI-43-deploy.md có đường lùi; `07` §13 một dòng ⇒ đẩy fast-forward vào `tich-hop/ui`",
+      "vai": "ops · ORCH",
+      "dependsOn": [
+        "U43-3"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp43-i18n",
+      "buoc": "F6–G6",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U44-1",
+      "dot": "WP-44",
+      "loai": "ui",
+      "ma": [],
+      "noiDung": "Đặc tả docs/ui/04-primitive.md ~24 primitive: Button (chính xanh lá, phụ, viền, ghost, nguy hiểm, link; 3 cỡ; loading), IconButton, Input, Textarea, Select, Combobox, Checkbox, Radio, Switch, Label/FormField, Badge, Avatar, Separator, Skeleton, Spinner, Tabs (badge số), Tooltip, Popover, DropdownMenu, Dialog, AlertDialog, Drawer, Toast, DatePicker; decider ghim Radix/shadcn, `cmdk`, `sonner`, `react-day-picker`",
+      "vai": "ux · docrev · decider",
+      "dependsOn": [
+        "U43-4"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp44-primitive",
+      "buoc": "U1 thiết kế",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U44-2",
+      "dot": "WP-44",
+      "loai": "ui",
+      "ma": [],
+      "noiDung": "Nhóm nhập liệu + hiển thị (Button … Spinner, Tabs) — mỗi cái: story sáng/tối/compact + test + axe",
+      "vai": "ds",
+      "dependsOn": [
+        "U44-1"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp44-primitive",
+      "buoc": "U2 dựng",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U44-3",
+      "dot": "WP-44",
+      "loai": "ui",
+      "ma": [],
+      "noiDung": "Nhóm lớp phủ (Tooltip, Popover, DropdownMenu, Dialog, AlertDialog, Drawer, Toast, Combobox, DatePicker) — focus trap, Esc, trả focus; story + test + axe",
+      "vai": "ds",
+      "dependsOn": [
+        "U44-2"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp44-primitive",
+      "buoc": "U2 dựng",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U44-4",
+      "dot": "WP-44",
+      "loai": "ui",
+      "ma": [],
+      "noiDung": "Testplan phủ mọi BR của `04-primitive`; bàn phím từng primitive; so ảnh story; rev",
+      "vai": "qa · a11y · rev",
+      "dependsOn": [
+        "U44-3"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp44-primitive",
+      "buoc": "U3 kiểm",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U44-5",
+      "dot": "WP-44",
+      "loai": "dong-wp",
+      "ma": [],
+      "noiDung": "F6 OPS + G6 `kiem-tat-ca.ps1 -DayDu`; docs/ops/UI-44-deploy.md có đường lùi; `07` §13 một dòng ⇒ đẩy fast-forward vào `tich-hop/ui`",
+      "vai": "ops · ORCH",
+      "dependsOn": [
+        "U44-4"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp44-primitive",
+      "buoc": "F6–G6",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U44-n",
+      "dot": "WP-44",
+      "loai": "nguoi",
+      "ma": [],
+      "noiDung": "**Người xem trước primitive** (~10 phút): `git switch tich-hop/ui; git pull; pnpm install; pnpm --filter @ecommerce/ui storybook` — xem ~24 primitive ở sáng/tối/compact, đối chiếu cảm giác Nhanh; ghi `docs/bien-ban-duyet-ui-1-primitive-<ngày>.md` (`Hình thức: DUYỆT` hoặc danh sách cần sửa — có sửa ⇒ ORCH thêm hàng vá trước WP-45)",
+      "vai": "người",
+      "dependsOn": [
+        "U44-5"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp44-primitive",
+      "buoc": "Người xem trước",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U45-1",
+      "dot": "WP-45",
+      "loai": "ui",
+      "ma": [],
+      "noiDung": "Đặc tả docs/ui/05-bang-loc.md: DataTable (sort, chọn dòng, ẩn/hiện + nhớ cột, cột cố định, dòng tổng, mật độ, virtual ≥ 200 dòng, 3 trạng thái), Pagination kiểu Nhanh (20/50/100), FilterBar (ô pill, select, khoảng ngày, Lọc, Lưu bộ lọc), PageHeader + PageTabs có badge, BulkActionBar, ColumnChooser; arch: state trên URL (`nuqs`) + Server Component; decider ghim TanStack Table, `@tanstack/react-virtual`, `nuqs`",
+      "vai": "ux · arch · docrev · decider",
+      "dependsOn": [
+        "U44-n"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp45-bang-loc",
+      "buoc": "U1 thiết kế",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U45-2",
+      "dot": "WP-45",
+      "loai": "ui",
+      "ma": [],
+      "noiDung": "Dựng các pattern dữ liệu trong `packages/ui` + story với dữ liệu giả 20 / 1000 dòng + test + axe",
+      "vai": "ds",
+      "dependsOn": [
+        "U45-1"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp45-bang-loc",
+      "buoc": "U2 dựng",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U45-3",
+      "dot": "WP-45",
+      "loai": "ui",
+      "ma": [],
+      "noiDung": "Đo 1000 dòng cuộn 60 fps + ngân sách bundle trang danh sách < 200 KB gzip; a11y vai trò bảng/sort; rev",
+      "vai": "qa · a11y · rev",
+      "dependsOn": [
+        "U45-2"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp45-bang-loc",
+      "buoc": "U3 kiểm",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U45-4",
+      "dot": "WP-45",
+      "loai": "dong-wp",
+      "ma": [],
+      "noiDung": "F6 OPS + G6 `kiem-tat-ca.ps1 -DayDu` (ops thêm kiểm ngân sách bundle vào `kiem-tat-ca.ps1`); docs/ops/UI-45-deploy.md có đường lùi; `07` §13 một dòng ⇒ đẩy fast-forward vào `tich-hop/ui`",
+      "vai": "ops · ORCH",
+      "dependsOn": [
+        "U45-3"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp45-bang-loc",
+      "buoc": "F6–G6",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U46-1",
+      "dot": "WP-46",
+      "loai": "ui",
+      "ma": [],
+      "noiDung": "Đặc tả docs/ui/06-form-trang-thai.md: RHF + Zod (schema dùng chung client/server action), FormField + lỗi field từ `problem+json details[].field`, MoneyInput (số nguyên, hiển thị `150,000`), QuantityInput (3 lẻ), BarcodeInput (quét + Enter), PhoneInput, DateRange, SelectAsync (gọi BFF); EmptyState, ErrorState (thử lại), Skeleton theo trang, ConfirmDialog, `ApiError` → Toast; decider ghim `react-hook-form`, `zod`, `@hookform/resolvers`",
+      "vai": "ux · docrev · decider",
+      "dependsOn": [
+        "U45-4"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp46-form",
+      "buoc": "U1 thiết kế",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U46-2",
+      "dot": "WP-46",
+      "loai": "ui",
+      "ma": [],
+      "noiDung": "Dựng form kit + trạng thái trong `packages/ui` + story + test (MoneyInput, QuantityInput bắt buộc ca biên) + axe",
+      "vai": "ds",
+      "dependsOn": [
+        "U46-1"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp46-form",
+      "buoc": "U2 dựng",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U46-3",
+      "dot": "WP-46",
+      "loai": "ui",
+      "ma": [],
+      "noiDung": "Testplan form (validate 2 lớp, chống bấm lặp, lỗi field), a11y nhãn/aria-describedby, rev",
+      "vai": "qa · a11y · rev",
+      "dependsOn": [
+        "U46-2"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp46-form",
+      "buoc": "U3 kiểm",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U46-4",
+      "dot": "WP-46",
+      "loai": "dong-wp",
+      "ma": [],
+      "noiDung": "F6 OPS + G6 `kiem-tat-ca.ps1 -DayDu`; docs/ops/UI-46-deploy.md có đường lùi; `07` §13 một dòng ⇒ đẩy fast-forward vào `tich-hop/ui`",
+      "vai": "ops · ORCH",
+      "dependsOn": [
+        "U46-3"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp46-form",
+      "buoc": "F6–G6",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U47-1",
+      "dot": "WP-47",
+      "loai": "ui",
+      "ma": [],
+      "noiDung": "Đặc tả docs/ui/07-shell-thi-diem.md: shell (Topbar 52px, BusinessSwitcher, tìm kiếm + CommandPalette Ctrl+K, menu người dùng có theme/ngôn ngữ/mật độ; Sidebar 2 cấp ~256px thu gọn) + bản đồ chuyển màn kho (`inventory/bill`, `bill/new`, `bill/[id]`, `bill/print`, `product/inventory`, `report/inventory`) sang pattern",
+      "vai": "ux · docrev · decider",
+      "dependsOn": [
+        "U46-4"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp47-thi-diem",
+      "buoc": "U1 thiết kế",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U47-2",
+      "dot": "WP-47",
+      "loai": "ui",
+      "ma": [],
+      "noiDung": "Chuyển shell (Topbar, Sidebar, CommandPalette) sang `@ecommerce/ui`; giữ `data-testid`/URL",
+      "vai": "fe",
+      "dependsOn": [
+        "U47-1"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp47-thi-diem",
+      "buoc": "U2 dựng",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U47-3",
+      "dot": "WP-47",
+      "loai": "ui",
+      "ma": [],
+      "noiDung": "Chuyển màn kho: thay `BillTable`, `BillForm`, `BalancesTable`, `SavedFilters`, `ProductPicker` bằng pattern; chuỗi qua `next-intl`; 0 đổi API/hành vi",
+      "vai": "fe",
+      "dependsOn": [
+        "U47-2"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp47-thi-diem",
+      "buoc": "U2 dựng",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U47-4",
+      "dot": "WP-47",
+      "loai": "ui",
+      "ma": [],
+      "noiDung": "QA/A11Y/REV như mọi WP + ux ghi **đánh giá thí điểm** (độ giống Nhanh theo số đo, API component cần sửa) vào docs/ui/07-shell-thi-diem.md §8",
+      "vai": "qa · a11y · rev · ux",
+      "dependsOn": [
+        "U47-3"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp47-thi-diem",
+      "buoc": "U3 kiểm",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U47-5",
+      "dot": "WP-47",
+      "loai": "dong-wp",
+      "ma": [],
+      "noiDung": "F6 OPS + G6 `kiem-tat-ca.ps1 -DayDu`; docs/ops/UI-47-deploy.md có đường lùi; `07` §13 một dòng ⇒ đẩy fast-forward vào `tich-hop/ui`",
+      "vai": "ops · ORCH",
+      "dependsOn": [
+        "U47-4"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp47-thi-diem",
+      "buoc": "F6–G6",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U47-n",
+      "dot": "WP-47",
+      "loai": "nguoi",
+      "ma": [],
+      "noiDung": "**Người xem thẩm mỹ** (~20 phút): mở Storybook + màn kho (sáng/tối/compact, vi/en), đối chiếu Nhanh; ghi `docs/bien-ban-duyet-ui-1-thi-diem-<ngày>.md` (`Hình thức: DUYỆT` hoặc danh sách cần sửa — có sửa ⇒ ORCH thêm hàng vá trước WP-48)",
+      "vai": "người",
+      "dependsOn": [
+        "U47-5"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp47-thi-diem",
+      "buoc": "Người xem thẩm mỹ",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U48-1",
+      "dot": "WP-48",
+      "loai": "ui",
+      "ma": [],
+      "noiDung": "Bản đồ chuyển màn đợt 1 docs/ui/08-chuyen-dot-1.md (màn → pattern, chuỗi cần dịch, ảnh dự kiến đổi): Thông báo (5 màn), Khuyến mại (3 màn), Khách hàng (2 màn), Nhân viên",
+      "vai": "ux · docrev · decider",
+      "dependsOn": [
+        "U47-n"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp48-chuyen-dot-1",
+      "buoc": "U1 thiết kế",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U48-2",
+      "dot": "WP-48",
+      "loai": "ui",
+      "ma": [],
+      "noiDung": "Chuyển Thông báo (templates, templates/new, templates/[id], queue, batches — 2 hộp thoại tự viết → Dialog) + Khuyến mại (list, new, [id], `TreeBuilder`)",
+      "vai": "fe",
+      "dependsOn": [
+        "U48-1"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp48-chuyen-dot-1",
+      "buoc": "U2 dựng",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U48-3",
+      "dot": "WP-48",
+      "loai": "ui",
+      "ma": [],
+      "noiDung": "Chuyển Khách hàng (list, [id], `CareForm`, `SegmentForm`) + Nhân viên (`settings/staff`, `PermissionMatrix`, `ScopeSelect`)",
+      "vai": "fe",
+      "dependsOn": [
+        "U48-2"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp48-chuyen-dot-1",
+      "buoc": "U2 dựng",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U48-4",
+      "dot": "WP-48",
+      "loai": "ui",
+      "ma": [],
+      "noiDung": "Testplan đợt 1, so ảnh, E2E đầy đủ, a11y, rev",
+      "vai": "qa · a11y · rev",
+      "dependsOn": [
+        "U48-3"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp48-chuyen-dot-1",
+      "buoc": "U3 kiểm",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U48-5",
+      "dot": "WP-48",
+      "loai": "dong-wp",
+      "ma": [],
+      "noiDung": "F6 OPS + G6 `kiem-tat-ca.ps1 -DayDu`; docs/ops/UI-48-deploy.md có đường lùi; `07` §13 một dòng ⇒ đẩy fast-forward vào `tich-hop/ui`",
+      "vai": "ops · ORCH",
+      "dependsOn": [
+        "U48-4"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp48-chuyen-dot-1",
+      "buoc": "F6–G6",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U49-1",
+      "dot": "WP-49",
+      "loai": "ui",
+      "ma": [],
+      "noiDung": "Bản đồ chuyển màn đợt 2 docs/ui/09-chuyen-dot-2.md: Đơn hàng, Sản phẩm, Báo cáo, In, Đăng nhập, Trang chủ; arch: biểu đồ SVG (`StackedBarChart`) thành primitive Chart dùng token trong `packages/ui`; CSS in không phụ thuộc JS",
+      "vai": "ux · arch · docrev · decider",
+      "dependsOn": [
+        "U48-5"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp49-chuyen-dot-2",
+      "buoc": "U1 thiết kế",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U49-2",
+      "dot": "WP-49",
+      "loai": "ui",
+      "ma": [],
+      "noiDung": "Chuyển Đơn hàng (manage, [id], `OrderActions`, `OrderStatusBadge`) + Sản phẩm (item, inventory)",
+      "vai": "fe",
+      "dependsOn": [
+        "U49-1"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp49-chuyen-dot-2",
+      "buoc": "U2 dựng",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U49-3",
+      "dot": "WP-49",
+      "loai": "ui",
+      "ma": [],
+      "noiDung": "ds: Chart primitive; fe: Báo cáo (revenue, inventory, `ExportCsvButton`) + In (`print/bill/[id]`, `inventory/bill/print`) + Đăng nhập + Trang chủ `[business]`",
+      "vai": "ds · fe",
+      "dependsOn": [
+        "U49-2"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp49-chuyen-dot-2",
+      "buoc": "U2 dựng",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U49-4",
+      "dot": "WP-49",
+      "loai": "ui",
+      "ma": [],
+      "noiDung": "Testplan đợt 2, so ảnh (cả bản in), E2E đầy đủ, a11y, rev",
+      "vai": "qa · a11y · rev",
+      "dependsOn": [
+        "U49-3"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp49-chuyen-dot-2",
+      "buoc": "U3 kiểm",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U49-5",
+      "dot": "WP-49",
+      "loai": "dong-wp",
+      "ma": [],
+      "noiDung": "F6 OPS + G6 `kiem-tat-ca.ps1 -DayDu`; docs/ops/UI-49-deploy.md có đường lùi; `07` §13 một dòng ⇒ đẩy fast-forward vào `tich-hop/ui`",
+      "vai": "ops · ORCH",
+      "dependsOn": [
+        "U49-4"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp49-chuyen-dot-2",
+      "buoc": "F6–G6",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U50-1",
+      "dot": "WP-50",
+      "loai": "ui",
+      "ma": [],
+      "noiDung": "Đặc tả POS docs/ui/10-pos.md (phím tắt, quét mã, nhiều tab hoá đơn, mở tab < 100 ms, toàn màn hình) + arch tách `PosTerminal` (1134 dòng) thành khối giỏ / tìm SP / khách / thanh toán / phím tắt",
+      "vai": "ux · arch · docrev · decider",
+      "dependsOn": [
+        "U49-5"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp50-pos",
+      "buoc": "U1 thiết kế",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U50-2",
+      "dot": "WP-50",
+      "loai": "ui",
+      "ma": [],
+      "noiDung": "Tách `PosTerminal` theo arch **không đổi giao diện/hành vi** (0 khác ảnh, E2E bán lẻ xanh)",
+      "vai": "fe",
+      "dependsOn": [
+        "U50-1"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp50-pos",
+      "buoc": "U2 dựng",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U50-3",
+      "dot": "WP-50",
+      "loai": "ui",
+      "ma": [],
+      "noiDung": "Chuyển POS bán lẻ + trả hàng (`ReturnForm`) + danh sách hoá đơn (`VoidBillButton`) sang design system",
+      "vai": "fe",
+      "dependsOn": [
+        "U50-2"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp50-pos",
+      "buoc": "U2 dựng",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U50-4",
+      "dot": "WP-50",
+      "loai": "ui",
+      "ma": [],
+      "noiDung": "E2E bán lẻ/trả hàng, đo mở tab < 100 ms, bàn phím toàn luồng POS, so ảnh, rev",
+      "vai": "qa · a11y · rev",
+      "dependsOn": [
+        "U50-3"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp50-pos",
+      "buoc": "U3 kiểm",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U50-5",
+      "dot": "WP-50",
+      "loai": "dong-wp",
+      "ma": [],
+      "noiDung": "F6 OPS + G6 `kiem-tat-ca.ps1 -DayDu`; docs/ops/UI-50-deploy.md có đường lùi; `07` §13 một dòng ⇒ đẩy fast-forward vào `tich-hop/ui`",
+      "vai": "ops · ORCH",
+      "dependsOn": [
+        "U50-4"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp50-pos",
+      "buoc": "F6–G6",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U51-1",
+      "dot": "WP-51",
+      "loai": "ui",
+      "ma": [],
+      "noiDung": "docs/ui/README.md (cách dùng, thêm component mới, checklist review UI) + arch cập nhật `01-kien-truc-ui.md` theo thực tế; đề xuất sửa `docs/nhanh/04-web-admin-nextjs.md` §1 vào docs/inbox/UI-51-de-xuat-04.md cho người",
+      "vai": "ux · arch · docrev",
+      "dependsOn": [
+        "U50-5"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp51-quan-tri",
+      "buoc": "U1 thiết kế",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U51-2",
+      "dot": "WP-51",
+      "loai": "ui",
+      "ma": [],
+      "noiDung": "ESLint mức lỗi: cấm `<button>/<input>/<select>` thô và mã màu hex/`style` có màu trong `apps/admin-web`; gỡ lớp `.nh-*` + CSS cũ; gỡ gói thừa; báo cáo bundle",
+      "vai": "ds",
+      "dependsOn": [
+        "U51-1"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp51-quan-tri",
+      "buoc": "U2 dựng",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U51-3",
+      "dot": "WP-51",
+      "loai": "ui",
+      "ma": [],
+      "noiDung": "Audit toàn bộ: 37 route × (sáng/tối) × (vi/en) axe 0 P1; so ảnh; E2E + Playwright đầy đủ; rev",
+      "vai": "qa · a11y · rev",
+      "dependsOn": [
+        "U51-2"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp51-quan-tri",
+      "buoc": "U3 kiểm",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U51-4",
+      "dot": "WP-51",
+      "loai": "dong-wp",
+      "ma": [],
+      "noiDung": "F6 OPS + G6 `kiem-tat-ca.ps1 -DayDu` (ops soạn bản vá CI docs/ops/UI-51-ci-patch.md: lint, storybook, so ảnh, axe, bundle — **không** sửa `ci.yml`); docs/ops/UI-51-deploy.md có đường lùi; `07` §13 một dòng ⇒ đẩy fast-forward vào `tich-hop/ui`",
+      "vai": "ops · ORCH",
+      "dependsOn": [
+        "U51-3"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp51-quan-tri",
+      "buoc": "F6–G6",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    },
+    {
+      "id": "U51-n",
+      "dot": "WP-51",
+      "loai": "nguoi",
+      "ma": [],
+      "noiDung": "**Người** áp bản vá CI vào `.github/workflows/ci.yml`, sửa `04` §1 theo đề xuất, ký biên bản đóng chuỗi; merge `tich-hop/ui` → `main` theo `D-115` ⑤",
+      "vai": "người",
+      "dependsOn": [
+        "U51-4"
+      ],
+      "status": "chua",
+      "phien": [],
+      "nhanh": "feat/ui-wp51-quan-tri",
+      "buoc": "Người đóng chuỗi",
+      "evidence": null,
+      "ghiChu": null,
+      "handover": null,
+      "batDau": null,
+      "xongLuc": null
+    }
+  ]
+}

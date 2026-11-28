@@ -73,7 +73,8 @@
     "arch": {
       "write": [
         "docs/features/**/*-arch.md",
-        "docs/inbox/**"
+        "docs/inbox/**",
+        "docs/ui/01-kien-truc-ui.md"
       ],
       "shell": "read+psql-rollback",
       "stop": {
@@ -112,7 +113,8 @@
     "fe": {
       "write": [
         "apps/admin-web/**",
-        "packages/api-client/**"
+        "packages/api-client/**",
+        "packages/ui/**"
       ],
       "deny": [
         "apps/admin-web/e2e/**",
@@ -135,7 +137,8 @@
         "apps/admin-web/e2e/**",
         "apps/admin-web/test/**",
         "tools/probe-*.ps1",
-        "docs/tests/**"
+        "docs/tests/**",
+        "packages/ui/test/**"
       ],
       "shell": "dev",
       "stop": {
@@ -187,6 +190,65 @@
           "gateExit"
         ]
       }
+    },
+    "ux": {
+      "write": [
+        "docs/ui/**",
+        "docs/inbox/**"
+      ],
+      "deny": [
+        "docs/ui/01-kien-truc-ui.md"
+      ],
+      "shell": "read",
+      "stop": {
+        "jsonKeys": [
+          "agent",
+          "artifact",
+          "brCount",
+          "openQuestions"
+        ],
+        "artifactKey": "artifact"
+      }
+    },
+    "ds": {
+      "write": [
+        "packages/ui/**",
+        "apps/admin-web/**",
+        "package.json",
+        "pnpm-workspace.yaml",
+        "pnpm-lock.yaml"
+      ],
+      "deny": [
+        "apps/admin-web/e2e/**",
+        "apps/admin-web/test/**",
+        "packages/api-client/schema.d.ts"
+      ],
+      "shell": "dev",
+      "stop": {
+        "jsonKeys": [
+          "agent",
+          "lintExit",
+          "typecheckExit",
+          "testExit",
+          "buildExit",
+          "storybookExit"
+        ]
+      }
+    },
+    "a11y": {
+      "write": [
+        "docs/reviews/UI-*-a11y.md"
+      ],
+      "shell": "read+test",
+      "stop": {
+        "jsonKeys": [
+          "agent",
+          "verdict",
+          "p1"
+        ],
+        "artifactKey": "artifact",
+        "artifactMustContain": "VERDICT:"
+      }
     }
   },
   "neverWrite": [
@@ -209,7 +271,8 @@
     ],
     "pnpm-lock.yaml": [
       "fe",
-      "ops"
+      "ops",
+      "ds"
     ]
   },
   "alwaysAllowOutsideRepo": [

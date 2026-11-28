@@ -7,6 +7,7 @@ effort: medium
 maxTurns: 60
 skills:
   - nextjs-admin-rules
+  - ui-pipeline
 ---
 
 # FE — Frontend

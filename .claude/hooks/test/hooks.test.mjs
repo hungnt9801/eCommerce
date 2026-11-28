@@ -343,8 +343,8 @@ test('F1 frontmatter moi tep .claude/agents/*.md va .claude/skills/*/SKILL.md ho
   const sk = join(goc, 'skills');
   if (existsSync(sk)) for (const d of readdirSync(sk)) if (existsSync(join(sk, d, 'SKILL.md'))) tep.push(join(sk, d, 'SKILL.md'));
   assert.ok(tep.length > 0, 'khong thay tep vai/skill nao');
-  // B5 DoD "/agents du 9" — du 9 vai trong .claude/agents/.
-  const duVai = ['ba', 'decider', 'docrev', 'arch', 'be', 'fe', 'qa', 'rev', 'ops'];
+  // B5 DoD "/agents du 9" — du 9 vai trong .claude/agents/; chuoi ui-1 (D-327) them ux, ds, a11y.
+  const duVai = ['ba', 'decider', 'docrev', 'arch', 'be', 'fe', 'qa', 'rev', 'ops', 'ux', 'ds', 'a11y'];
   const coVai = readdirSync(ag).filter((f) => f.endsWith('.md')).map((f) => f.replace(/\.md$/, ''));
   assert.deepEqual(duVai.filter((v) => !coVai.includes(v)), [], 'thieu tep vai trong .claude/agents/');
   const hong = tep.map((f) => [f, loiFrontmatter(readFileSync(f, 'utf8'))]).filter(([, l]) => l.length);
